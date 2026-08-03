@@ -34,6 +34,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
 #include "GameLogic/TerrainLogic.h"
+#include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/MultiLocationSpecialPowerUpdate.h"
 
@@ -81,6 +82,8 @@ MultiLocationSpecialPowerUpdateModuleData::MultiLocationSpecialPowerUpdateModule
 	m_createLoc = CREATE_AT_EDGE_NEAR_SOURCE;
 	m_initialDelay = 0;
 	m_delay = 0;
+	m_waitForAttackComplete = FALSE;
+	m_maxWaitPerTarget = 0;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -96,6 +99,8 @@ MultiLocationSpecialPowerUpdateModuleData::MultiLocationSpecialPowerUpdateModule
 		{ "UpgradeOCL",						parseMultiLocUpgradeOCL,				nullptr, offsetof( MultiLocationSpecialPowerUpdateModuleData, m_upgradeOCL ) },
 		{ "InitialDelay",					INI::parseDurationUnsignedInt,	nullptr, offsetof( MultiLocationSpecialPowerUpdateModuleData, m_initialDelay ) },
 		{ "Delay",								INI::parseDurationUnsignedInt,	nullptr, offsetof( MultiLocationSpecialPowerUpdateModuleData, m_delay ) },
+		{ "WaitForAttackComplete",	INI::parseBool,								nullptr, offsetof( MultiLocationSpecialPowerUpdateModuleData, m_waitForAttackComplete ) },
+		{ "MaxWaitPerTarget",			INI::parseDurationUnsignedInt,	nullptr, offsetof( MultiLocationSpecialPowerUpdateModuleData, m_maxWaitPerTarget ) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
@@ -109,6 +114,8 @@ MultiLocationSpecialPowerUpdate::MultiLocationSpecialPowerUpdate( Thing *thing, 
 	m_locations.clear();
 	m_active = FALSE;
 	m_spawnIndex = 0;
+	m_attackSeen = FALSE;
+	m_waitDeadline = 0;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -203,6 +210,19 @@ void MultiLocationSpecialPowerUpdate::fireOclAtLocation( const Coord3D *loc )
 }
 
 //-------------------------------------------------------------------------------------------------
+// Frames between update() wake-ups. In WaitForAttackComplete mode Delay is the poll granularity and
+// the minimum gap between points, rather than the whole spacing.
+//-------------------------------------------------------------------------------------------------
+UnsignedInt MultiLocationSpecialPowerUpdate::getPollInterval() const
+{
+	const MultiLocationSpecialPowerUpdateModuleData *d = getMultiLocationSpecialPowerUpdateModuleData();
+	if( d->m_delay > 0 )
+		return d->m_delay;
+
+	return d->m_waitForAttackComplete ? (LOGICFRAMES_PER_SECOND / 4) : 1;
+}
+
+//-------------------------------------------------------------------------------------------------
 // First click: the first target point arrives here as targetPos. The rest of the points arrive
 // together via setSpecialPowerMultiLocations() once the final click commits.
 //-------------------------------------------------------------------------------------------------
@@ -242,6 +262,8 @@ void MultiLocationSpecialPowerUpdate::setSpecialPowerMultiLocations( const std::
 	const MultiLocationSpecialPowerUpdateModuleData *d = getMultiLocationSpecialPowerUpdateModuleData();
 	m_spawnIndex = 0;
 	m_active = TRUE;
+	m_attackSeen = FALSE;
+	m_waitDeadline = 0;
 	setWakeFrame( getObject(), UPDATE_SLEEP( d->m_initialDelay > 0 ? d->m_initialDelay : 1 ) );
 }
 
@@ -254,11 +276,34 @@ UpdateSleepTime MultiLocationSpecialPowerUpdate::update()
 		return UPDATE_SLEEP_FOREVER;
 
 	const MultiLocationSpecialPowerUpdateModuleData *d = getMultiLocationSpecialPowerUpdateModuleData();
+	const UnsignedInt pollInterval = getPollInterval();
+
+	// If the OCL makes us attack (an Attack nugget orders our own AI), the next point's order would
+	// cancel the barrage still in progress. In that mode hold here until the caster is done shooting.
+	if( d->m_waitForAttackComplete && m_spawnIndex > 0 && m_spawnIndex < (Int)m_locations.size() )
+	{
+		const AIUpdateInterface *ai = getObject()->getAIUpdateInterface();
+		const Bool attacking = ai != nullptr && ai->isAttacking();
+
+		// The AI needs a frame or two to enter the attack state after aiAttackPosition, so "not
+		// attacking" only means "finished" once we have actually seen it attack.
+		if( attacking )
+			m_attackSeen = TRUE;
+
+		const Bool finished = m_attackSeen && !attacking;
+		const Bool timedOut = TheGameLogic->getFrame() >= m_waitDeadline;
+		if( !finished && !timedOut )
+			return UPDATE_SLEEP( pollInterval );
+	}
 
 	if( m_spawnIndex < (Int)m_locations.size() )
 	{
 		fireOclAtLocation( &m_locations[m_spawnIndex] );
 		++m_spawnIndex;
+
+		m_attackSeen = FALSE;
+		const UnsignedInt maxWait = d->m_maxWaitPerTarget > 0 ? d->m_maxWaitPerTarget : (30 * LOGICFRAMES_PER_SECOND);
+		m_waitDeadline = TheGameLogic->getFrame() + maxWait;
 	}
 
 	if( m_spawnIndex >= (Int)m_locations.size() )
@@ -268,7 +313,7 @@ UpdateSleepTime MultiLocationSpecialPowerUpdate::update()
 		return UPDATE_SLEEP_FOREVER;
 	}
 
-	return UPDATE_SLEEP( d->m_delay > 0 ? d->m_delay : 1 );
+	return UPDATE_SLEEP( pollInterval );
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -284,12 +329,13 @@ void MultiLocationSpecialPowerUpdate::crc( Xfer *xfer )
 /** Xfer method
 	* Version Info:
 	* 1: Initial version
-	* 2: Added m_spawnIndex (timed OCL spawn sequence) */
+	* 2: Added m_spawnIndex (timed OCL spawn sequence)
+	* 3: Added m_attackSeen / m_waitDeadline (WaitForAttackComplete sequencing) */
 // ------------------------------------------------------------------------------------------------
 void MultiLocationSpecialPowerUpdate::xfer( Xfer *xfer )
 {
 	// version
-	const XferVersion currentVersion = 2;
+	const XferVersion currentVersion = 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -311,6 +357,12 @@ void MultiLocationSpecialPowerUpdate::xfer( Xfer *xfer )
 
 	if( version >= 2 )
 		xfer->xferInt( &m_spawnIndex );
+
+	if( version >= 3 )
+	{
+		xfer->xferBool( &m_attackSeen );
+		xfer->xferUnsignedInt( &m_waitDeadline );
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -321,10 +373,9 @@ void MultiLocationSpecialPowerUpdate::loadPostProcess( void )
 	// extend base class
 	SpecialPowerUpdateModule::loadPostProcess();
 
-	// resume an in-flight spawn sequence
-	if( m_active && m_spawnIndex < (Int)m_locations.size() )
-	{
-		const MultiLocationSpecialPowerUpdateModuleData *d = getMultiLocationSpecialPowerUpdateModuleData();
-		setWakeFrame( getObject(), UPDATE_SLEEP( d->m_delay > 0 ? d->m_delay : 1 ) );
-	}
+	// Do not call setWakeFrame() here to resume an in-flight spawn sequence. It is not safe from the
+	// xfer system: the sleepy update heap has not been rebuilt yet, so our index in the logic is
+	// still -1 and friend_awakenUpdateModule would RELEASE_CRASH. The sequence resumes on its own -
+	// UpdateModule::xfer already restored our wake frame, and GameLogic::loadPostProcess rebuilds the
+	// heap from it, which also preserves the sleep we had banked instead of restarting a full one.
 }

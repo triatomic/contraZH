@@ -322,11 +322,8 @@ void ChronoSphereUpdateModule::loadPostProcess( void )
 	// extend base class
 	SpecialPowerUpdateModule::loadPostProcess();
 
-	// If a teleport was pending when the game was saved, re-arm the wake so it still fires.
-	if( m_active )
-	{
-		UnsignedInt now = TheGameLogic->getFrame();
-		UnsignedInt delay = (m_teleportFrame > now) ? (m_teleportFrame - now) : 0;
-		setWakeFrame( getObject(), delay > 0 ? UPDATE_SLEEP( delay ) : UPDATE_SLEEP_NONE );
-	}
+	// Do not call setWakeFrame() here. It is not safe from the xfer system: the sleepy update heap
+	// has not been rebuilt yet, so our index in the logic is still -1 and friend_awakenUpdateModule
+	// would RELEASE_CRASH. Nothing needs re-arming anyway - UpdateModule::xfer already restored our
+	// wake frame, and GameLogic::loadPostProcess rebuilds the heap from it.
 }

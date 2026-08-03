@@ -58,6 +58,13 @@ public:
 	UnsignedInt								m_initialDelay;		///< delay before the first OCL fires (INI in ms, stored as frames)
 	UnsignedInt								m_delay;				///< delay between successive OCLs (INI in ms, stored as frames)
 
+	// An OCL containing an Attack nugget makes the caster attack the point with one of its own weapon
+	// slots, and aiAttackPosition replaces the previous order rather than queueing behind it. With a
+	// fixed m_delay the next point cuts the previous barrage short, so offer a mode that advances only
+	// once the caster has actually stopped attacking.
+	Bool											m_waitForAttackComplete;	///< advance only when the caster stops attacking
+	UnsignedInt								m_maxWaitPerTarget;				///< safety cap per point, so an unattackable point cannot stall the sequence
+
 	MultiLocationSpecialPowerUpdateModuleData();
 	static void buildFieldParse(MultiIniFieldParse& p);
 
@@ -110,10 +117,13 @@ protected:
 
 	const ObjectCreationList* findOCL() const;					///< science-upgraded OCL, else the default
 	void fireOclAtLocation( const Coord3D *loc );				///< spawn the OCL at one captured point, honoring CreateLocation
+	UnsignedInt getPollInterval() const;								///< frames between update() wake-ups during the sequence
 
 	SpecialPowerModuleInterface*	m_specialPowerModule;	///< cached paired power module (recharge/cost/timer)
 
 	std::vector<Coord3D>	m_locations;	///< all captured target points (in click order)
 	Bool									m_active;			///< TRUE while the OCL spawn sequence is running
 	Int										m_spawnIndex;	///< index of the next point to spawn an OCL at
+	Bool									m_attackSeen;		///< the caster actually entered its attack state for the point just fired
+	UnsignedInt						m_waitDeadline;	///< logic frame at which we give up waiting on the point just fired
 };
