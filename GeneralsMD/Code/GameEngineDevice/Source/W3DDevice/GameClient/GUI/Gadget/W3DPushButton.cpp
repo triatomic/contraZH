@@ -139,7 +139,22 @@ static void drawButtonHotKeyOverlay( GameWindow *window )
 
 	// tuck it into the top left of the cameo, where no existing decoration lives
 	const Int inset = 2;
-	hotKeyString->draw( origin.x + inset, origin.y + inset,
+	const Int textX = origin.x + inset;
+	const Int textY = origin.y + inset;
+
+	// Optional plate behind the letter, so it stays readable over busy cameo art.
+	if( TheGlobalData->m_keyboardOverlayBackdrop )
+	{
+		Int width, height;
+		hotKeyString->getSize( &width, &height );
+
+		const Int pad = 1;
+		TheDisplay->drawFillRect( textX - pad, textY - pad,
+			width + pad * 2, height + pad * 2,
+			TheGlobalData->m_keyboardOverlayBackdropColor );
+	}
+
+	hotKeyString->draw( textX, textY,
 		TheGlobalData->m_keyboardOverlayColor, GameMakeColor( 0, 0, 0, 255 ) );
 }
 

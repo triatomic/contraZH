@@ -71,6 +71,8 @@ public:
 	HealthBarDisplayMode getHealthBarDisplayMode() const;
 	Bool getKeyboardOverlayEnabled() const;
 	Color getKeyboardOverlayColor() const;
+	Bool getKeyboardOverlayBackdropEnabled() const;
+	Color getKeyboardOverlayBackdropColor() const;
 	Bool getDoubleClickAttackMoveEnabled(void);
 	Real getScrollFactor(void);
 	Bool getDrawScrollAnchor(void);
@@ -129,4 +131,8 @@ public:
 	Real getResolutionFontAdjustment(void);
 
 	Bool getShowMoneyPerMinute(void) const;
+
+private:
+	// TheSuperHackers @feature Read one 0-255 colour channel, clamped, with a fallback.
+	UnsignedByte getColorChannel(const char *keyName, UnsignedByte defaultValue) const;
 };

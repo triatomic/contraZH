@@ -1136,6 +1136,8 @@ GlobalData::GlobalData()
 	m_healthBarDisplayMode = HealthBarDisplayMode_Default;
 	m_keyboardOverlayEnabled = FALSE;
 	m_keyboardOverlayColor = GameMakeColor( 255, 255, 255, 255 );
+	m_keyboardOverlayBackdrop = TRUE;
+	m_keyboardOverlayBackdropColor = GameMakeColor( 0, 0, 0, 128 );
 
 	m_useOldMoveSpeed = FALSE;  //Fix is enabled by default
 
@@ -1326,6 +1328,8 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_healthBarDisplayMode = optionPref.getHealthBarDisplayMode();
 	TheWritableGlobalData->m_keyboardOverlayEnabled = optionPref.getKeyboardOverlayEnabled();
 	TheWritableGlobalData->m_keyboardOverlayColor = optionPref.getKeyboardOverlayColor();
+	TheWritableGlobalData->m_keyboardOverlayBackdrop = optionPref.getKeyboardOverlayBackdropEnabled();
+	TheWritableGlobalData->m_keyboardOverlayBackdropColor = optionPref.getKeyboardOverlayBackdropColor();
 	TheWritableGlobalData->m_doubleClickAttackMove = optionPref.getDoubleClickAttackMoveEnabled();
 	TheWritableGlobalData->m_keyboardScrollFactor = optionPref.getScrollFactor();
 	TheWritableGlobalData->m_drawScrollAnchor = optionPref.getDrawScrollAnchor();

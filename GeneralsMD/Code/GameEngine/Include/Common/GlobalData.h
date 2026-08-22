@@ -151,6 +151,8 @@ public:
 	// TheSuperHackers @feature Show each command bar cameo's hotkey letter on the cameo.
 	Bool m_keyboardOverlayEnabled;
 	Color m_keyboardOverlayColor;
+	Bool m_keyboardOverlayBackdrop;
+	Color m_keyboardOverlayBackdropColor;
 	Bool m_doubleClickAttackMove;
 	Bool m_rightMouseAlwaysScrolls;
 	Bool m_useWaterPlane;

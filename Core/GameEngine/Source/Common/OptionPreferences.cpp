@@ -209,32 +209,51 @@ Bool OptionPreferences::getKeyboardOverlayEnabled(void) const
 // Options.ini: KeyboardOverlayRed / KeyboardOverlayGreen / KeyboardOverlayBlue,
 // each 0-255. Defaults to white. An out of range or non numeric channel falls
 // back to full brightness rather than silently drawing an invisible letter.
+UnsignedByte OptionPreferences::getColorChannel(const char *keyName, UnsignedByte defaultValue) const
+{
+	OptionPreferences::const_iterator it = find(AsciiString(keyName));
+	if (it == end())
+		return defaultValue;
+
+	Int value = atoi(it->second.str());
+	if (value < 0)
+		value = 0;
+	else if (value > 255)
+		value = 255;
+
+	return (UnsignedByte)value;
+}
+
 Color OptionPreferences::getKeyboardOverlayColor(void) const
 {
-	UnsignedByte channel[3];
-	static const char *keyNames[3] =
-	{
-		"KeyboardOverlayRed", "KeyboardOverlayGreen", "KeyboardOverlayBlue"
-	};
+	return GameMakeColor(
+		getColorChannel("KeyboardOverlayRed", 255),
+		getColorChannel("KeyboardOverlayGreen", 255),
+		getColorChannel("KeyboardOverlayBlue", 255),
+		255);
+}
 
-	for (Int i = 0; i < 3; ++i)
-	{
-		channel[i] = 255;
+// TheSuperHackers @feature Translucent plate drawn behind the hotkey letter.
+Bool OptionPreferences::getKeyboardOverlayBackdropEnabled(void) const
+{
+	OptionPreferences::const_iterator it = find("KeyboardOverlayBackdrop");
+	if (it == end())
+		return TRUE;	// on by default -- it is what makes the letter readable
 
-		OptionPreferences::const_iterator it = find(AsciiString(keyNames[i]));
-		if (it == end())
-			continue;
-
-		Int value = atoi(it->second.str());
-		if (value < 0)
-			value = 0;
-		else if (value > 255)
-			value = 255;
-
-		channel[i] = (UnsignedByte)value;
+	if (stricmp(it->second.str(), "yes") == 0) {
+		return TRUE;
 	}
+	return FALSE;
+}
 
-	return GameMakeColor(channel[0], channel[1], channel[2], 255);
+Color OptionPreferences::getKeyboardOverlayBackdropColor(void) const
+{
+	// black at 50% opacity, matching the darkened plate look
+	return GameMakeColor(
+		getColorChannel("KeyboardOverlayBackdropRed", 0),
+		getColorChannel("KeyboardOverlayBackdropGreen", 0),
+		getColorChannel("KeyboardOverlayBackdropBlue", 0),
+		getColorChannel("KeyboardOverlayBackdropOpacity", 128));
 }
 
 Bool OptionPreferences::getRetaliationModeEnabled(void)
