@@ -670,29 +670,20 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 	{
 		// TheSuperHackers @feature Show the build time alongside the cost. Also shown for
 		// free items, which have no cost line of their own but still take time to build.
+		// Kept on the cost line, separated by a watch glyph. The description window sits
+		// directly beneath this one in the .wnd layout, so a second line here overlaps it.
 		UnicodeString costLine = cost;
 		if( !buildTimeText.isEmpty() )
 		{
-			// on its own line under the cost
 			if( !costLine.isEmpty() )
-				costLine.concat( L"\n" );
+				costLine.concat( L"   " );
+			costLine.concat( (WideChar)0x231A );	// WATCH
+			costLine.concat( L" " );
 			costLine.concat( buildTimeText );
 		}
 
 		if( !costLine.isEmpty() )
 		{
-			// The .wnd gives this window a single line of height, so grow it when we add the
-			// time line or the second line is clipped. Remember the original height so this
-			// does not accumulate across tooltips.
-			static Int s_originalHeight = -1;
-			ICoord2D costSize;
-			win->winGetSize( &costSize.x, &costSize.y );
-			if( s_originalHeight < 0 )
-				s_originalHeight = costSize.y;
-
-			const Int lines = buildTimeText.isEmpty() ? 1 : 2;
-			win->winSetSize( costSize.x, s_originalHeight * lines );
-
 			win->winHide( FALSE );
 			GadgetStaticTextSetText(win, costLine);
 		}
