@@ -778,6 +778,17 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 		}
 
+		// TheSuperHackers @feature Hold Fire stance. Only send the message here -- the stance itself
+		// is flipped on the logic side, or clients would desync.
+		// --------------------------------------------------------------------------------------------
+		case GUI_COMMAND_HOLD_FIRE:
+		{
+
+			TheMessageStream->appendMessage( GameMessage::MSG_TOGGLE_HOLD_FIRE );
+			break;
+
+		}
+
 #ifdef ALLOW_SURRENDER
 		// ------------------------------------------------------------------------------------------------
 		case GUI_COMMAND_POW_RETURN_TO_PRISON:

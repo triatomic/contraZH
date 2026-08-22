@@ -243,6 +243,8 @@ enum GUICommandType CPP_11(: Int)
 
 	GUI_COMMAND_REVERSE_MOVE,							///< move to the target position driving in reverse
 
+	GUI_COMMAND_HOLD_FIRE,								///< TheSuperHackers @feature toggle the Hold Fire stance
+
 	// add more commands here, don't forget to update the string command list below too ...
 
 	GUI_COMMAND_NUM_COMMANDS
@@ -293,6 +295,7 @@ static const char *const TheGuiCommandNames[] =
 	"SPECIAL_POWER_CONSTRUCT_FROM_SHORTCUT",
 	"SELECT_ALL_UNITS_OF_TYPE",
 	"REVERSE_MOVE",
+	"HOLD_FIRE",
 
 	nullptr
 };

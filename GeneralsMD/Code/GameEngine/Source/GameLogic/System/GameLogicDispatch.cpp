@@ -1636,6 +1636,19 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 
 		}
 
+		// TheSuperHackers @feature Hold Fire stance.
+		// --------------------------------------------------------------------------------------------
+		case GameMessage::MSG_TOGGLE_HOLD_FIRE:
+		{
+
+			// use the selected group
+			if( currentlySelectedGroup )
+				currentlySelectedGroup->groupToggleHoldFire( CMD_FROM_PLAYER );
+
+			break;
+
+		}
+
 #ifdef ALLOW_SURRENDER
 		// --------------------------------------------------------------------------------------------
 		case GameMessage::MSG_PICK_UP_PRISONER:

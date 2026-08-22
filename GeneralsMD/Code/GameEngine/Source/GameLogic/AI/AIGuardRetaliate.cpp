@@ -68,6 +68,14 @@ static Bool hasAttackedMeAndICanReturnFire( State *thisState, void* /*userData*/
 		return FALSE;
 	}
 
+	// TheSuperHackers @feature Units holding fire only return fire if their template allows it
+	// (AIUpdate: HoldFireAllowsRetaliation). Checked before clearing the attacker below, so that
+	// disallowing retaliation does not disturb the existing attacker bookkeeping.
+	AIUpdateInterface *ai = obj->getAI();
+	if (ai && !ai->isRetaliationAllowedWhileHoldingFire()) {
+		return FALSE;
+	}
+
 	// K. It appears we have a valid aggressor. Find it, and determine if we can attack it, etc.
 	Object *target = TheGameLogic->findObjectByID(bmi->getClearableLastAttacker());
 	bmi->clearLastAttacker();
