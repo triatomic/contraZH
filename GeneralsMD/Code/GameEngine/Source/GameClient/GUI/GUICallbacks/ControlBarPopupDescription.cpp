@@ -251,10 +251,12 @@ static UnicodeString formatBuildTimeForTooltip( Int buildFrames )
 			TheGlobalData->m_buildTimerDisplayMode == BuildTimerDisplayMode_None )
 		return result;
 
-	// Integer ceiling. Multiplying by SECONDS_PER_LOGICFRAME_REAL would be wrong here:
-	// 1/30 is not exact in float, so an exact 8 second build comes out as 8.0000004 and
-	// then ceils to 9.
-	const Int seconds = ( buildFrames + LOGICFRAMES_PER_SECOND - 1 ) / LOGICFRAMES_PER_SECOND;
+	// Round to nearest, so a template built from a fractional BuildTime reads as the number
+	// the modder typed rather than always the one above it. Integer math throughout, because
+	// 1/30 is not exact in float and an exact 8 second build would otherwise come out as
+	// 8.0000004. The live countdowns deliberately still ceil -- a running timer must not
+	// show 0 while there is work left.
+	const Int seconds = ( buildFrames + LOGICFRAMES_PER_SECOND / 2 ) / LOGICFRAMES_PER_SECOND;
 
 	if( TheGlobalData->m_buildTimerDisplayMode == BuildTimerDisplayMode_Auto && seconds >= 60 )
 		result.format( L"%d:%2.2d", seconds / 60, seconds % 60 );	// already reads as time
