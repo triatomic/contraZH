@@ -148,6 +148,9 @@ public:
 	// Holds a HealthBarDisplayMode; stored as Int so this widely included header does not
 	// have to pull in OptionPreferences.h.
 	Int m_healthBarDisplayMode;
+	// TheSuperHackers @feature Countdown numbers on build queue and cooldown cameos.
+	// Holds a BuildTimerDisplayMode; stored as Int to avoid pulling OptionPreferences.h in here.
+	Int m_buildTimerDisplayMode;
 	// TheSuperHackers @feature Show each command bar cameo's hotkey letter on the cameo.
 	Bool m_keyboardOverlayEnabled;
 	Color m_keyboardOverlayColor;

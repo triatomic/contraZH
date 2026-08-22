@@ -38,6 +38,18 @@ typedef UnsignedInt ScreenEdgeScrollMode;
 
 // TheSuperHackers @feature When health bars are shown above objects. Purely a client side
 // display preference -- it never affects game logic, so it is safe in multiplayer and replays.
+// TheSuperHackers @feature How remaining time is shown on build queue and cooldown cameos.
+// Purely a client side display preference.
+enum BuildTimerDisplayMode CPP_11(: Int)
+{
+	BuildTimerDisplayMode_None = 0,		///< no numbers, just the existing clock sweep (retail behavior)
+	BuildTimerDisplayMode_Seconds,		///< always plain seconds, however large
+	BuildTimerDisplayMode_Auto,				///< seconds under a minute, M:SS above it
+
+	BuildTimerDisplayMode_Count,
+	BuildTimerDisplayMode_Default = BuildTimerDisplayMode_None
+};
+
 enum HealthBarDisplayMode CPP_11(: Int)
 {
 	HealthBarDisplayMode_Classic = 0,	///< selected and moused over objects only (retail behavior)
@@ -69,6 +81,7 @@ public:
 	Bool getAlternateMouseModeEnabled(void);
 	Bool getRetaliationModeEnabled();
 	HealthBarDisplayMode getHealthBarDisplayMode() const;
+	BuildTimerDisplayMode getBuildTimerDisplayMode() const;
 	Bool getKeyboardOverlayEnabled() const;
 	Color getKeyboardOverlayColor() const;
 	Bool getKeyboardOverlayBackdropEnabled() const;

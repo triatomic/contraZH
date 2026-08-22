@@ -209,6 +209,28 @@ Bool OptionPreferences::getKeyboardOverlayEnabled(void) const
 // Options.ini: KeyboardOverlayRed / KeyboardOverlayGreen / KeyboardOverlayBlue,
 // each 0-255. Defaults to white. An out of range or non numeric channel falls
 // back to full brightness rather than silently drawing an invisible letter.
+// TheSuperHackers @feature Countdown numbers on build queue and cooldown cameos, read from
+// Options.ini as BuildTimerDisplayMode = None | Seconds | Auto (a plain index also works).
+BuildTimerDisplayMode OptionPreferences::getBuildTimerDisplayMode(void) const
+{
+	OptionPreferences::const_iterator it = find("BuildTimerDisplayMode");
+	if (it == end())
+		return BuildTimerDisplayMode_Default;
+
+	if (stricmp(it->second.str(), "Auto") == 0)
+		return BuildTimerDisplayMode_Auto;
+	if (stricmp(it->second.str(), "Seconds") == 0)
+		return BuildTimerDisplayMode_Seconds;
+	if (stricmp(it->second.str(), "None") == 0)
+		return BuildTimerDisplayMode_None;
+
+	Int mode = atoi(it->second.str());
+	if (mode >= 0 && mode < BuildTimerDisplayMode_Count)
+		return (BuildTimerDisplayMode)mode;
+
+	return BuildTimerDisplayMode_Default;
+}
+
 UnsignedByte OptionPreferences::getColorChannel(const char *keyName, UnsignedByte defaultValue) const
 {
 	OptionPreferences::const_iterator it = find(AsciiString(keyName));

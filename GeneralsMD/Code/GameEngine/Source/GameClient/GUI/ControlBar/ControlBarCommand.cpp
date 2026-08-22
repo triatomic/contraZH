@@ -37,6 +37,7 @@
 #include "Common/PlayerList.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/SpecialPower.h"
+#include "Common/OptionPreferences.h"
 #include "Common/Upgrade.h"
 #include "Common/BuildAssistant.h"
 #include "GameLogic/GameLogic.h"
@@ -796,6 +797,30 @@ void ControlBar::updateContextCommand( void )
 
 				GadgetButtonDrawInverseClock(win,produce->getPercentComplete(), m_buildUpClockColor);
 
+				// TheSuperHackers @feature Remaining build time on the head queue slot.
+				if( TheGlobalData->m_buildTimerDisplayMode != BuildTimerDisplayMode_None )
+				{
+					Int totalFrames = 0;
+					if( produce->getProductionType() == PRODUCTION_UNIT )
+					{
+						if( produce->getProductionObject() )
+							totalFrames = produce->getProductionObject()->calcTimeToBuild( obj->getControllingPlayer() );
+					}
+					else if( produce->getProductionUpgrade() )
+					{
+						totalFrames = produce->getProductionUpgrade()->calcTimeToBuild( obj->getControllingPlayer() );
+					}
+
+					if( totalFrames > 0 )
+					{
+						Real remainingFrames = totalFrames * (100.0f - produce->getPercentComplete()) / 100.0f;
+						if( remainingFrames < 0.0f )
+							remainingFrames = 0.0f;
+						GadgetButtonDrawCountdown( win,
+							REAL_TO_INT_CEIL( remainingFrames * SECONDS_PER_LOGICFRAME_REAL ) );
+					}
+				}
+
 			}
 
 		}
@@ -1442,6 +1467,18 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 				Int percent =  mod->getPercentReady() * 100;
 
 				GadgetButtonDrawInverseClock( applyToWin, percent, m_buildUpClockColor );
+
+				// TheSuperHackers @feature Remaining recharge time. getReadyFrame is an absolute
+				// frame, and already accounts for paused and shared/synced powers.
+				if( TheGlobalData->m_buildTimerDisplayMode != BuildTimerDisplayMode_None )
+				{
+					UnsignedInt now = TheGameLogic->getFrame();
+					UnsignedInt readyFrame = mod->getReadyFrame();
+					UnsignedInt remainingFrames = ( readyFrame > now ) ? ( readyFrame - now ) : 0;
+					GadgetButtonDrawCountdown( applyToWin,
+						REAL_TO_INT_CEIL( remainingFrames * SECONDS_PER_LOGICFRAME_REAL ) );
+				}
+
 				return COMMAND_NOT_READY;
 			}
 			else if (command->getSpecialPowerTemplate()->getCost() > 0 && player->getMoney()->countMoney() < command->getSpecialPowerTemplate()->getCost()) {

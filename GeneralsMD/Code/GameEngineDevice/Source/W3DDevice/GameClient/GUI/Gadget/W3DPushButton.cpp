@@ -55,6 +55,7 @@
 #include "GameClient/Display.h"
 // TheSuperHackers @feature for the command bar hotkey overlay
 #include "Common/GlobalData.h"
+#include "Common/OptionPreferences.h"
 #include "GameClient/DisplayStringManager.h"
 #include "GameClient/GameFont.h"
 #include "GameClient/GlobalLanguage.h"
@@ -80,6 +81,73 @@ void W3DGadgetPushButtonImageDrawThree(GameWindow *window, WinInstanceData *inst
 void W3DGadgetPushButtonImageDrawOne(GameWindow *window, WinInstanceData *instData );
 
 // PRIVATE FUNCTIONS //////////////////////////////////////////////////////////
+
+// TheSuperHackers @feature Countdown text over a cameo (Options.ini: BuildTimerDisplayMode).
+// drawButtonCountdown ========================================================
+/** Draw the remaining time for whatever this button is counting down -- a queued unit or
+	* upgrade, or a special power recharging. Drawn after the clock sweep so the darkening
+	* does not swallow the digits. */
+//=============================================================================
+static void drawButtonCountdown( GameWindow *window, Int seconds )
+{
+	if( seconds < 0 )
+		return;
+
+	if( !TheGlobalData || TheGlobalData->m_buildTimerDisplayMode == BuildTimerDisplayMode_None )
+		return;
+
+	if( TheDisplayStringManager == nullptr )
+		return;
+
+	static DisplayString *s_countdownString = nullptr;
+	static Int s_lastSeconds = -1;
+	static Int s_lastMode = -1;
+
+	if( s_countdownString == nullptr )
+	{
+		s_countdownString = TheDisplayStringManager->newDisplayString();
+		if( s_countdownString == nullptr )
+			return;
+
+		Int pointSize = 10;
+		if( TheGlobalLanguageData )
+			pointSize = TheGlobalLanguageData->adjustFontSize( pointSize );
+		s_countdownString->setFont( TheFontLibrary->getFont( AsciiString( "Arial" ), pointSize, TRUE ) );
+	}
+
+	// only rebuild the sentence when the displayed value actually changes, which at one
+	// tick per second is far less often than we are drawn
+	if( s_lastSeconds != seconds || s_lastMode != TheGlobalData->m_buildTimerDisplayMode )
+	{
+		UnicodeString text;
+		if( TheGlobalData->m_buildTimerDisplayMode == BuildTimerDisplayMode_Auto && seconds >= 60 )
+			text.format( L"%d:%2.2d", seconds / 60, seconds % 60 );
+		else
+			text.format( L"%d", seconds );
+
+		s_countdownString->setText( text );
+		s_lastSeconds = seconds;
+		s_lastMode = TheGlobalData->m_buildTimerDisplayMode;
+	}
+
+	ICoord2D origin, size;
+	window->winGetScreenPosition( &origin.x, &origin.y );
+	window->winGetSize( &size.x, &size.y );
+
+	Int width, height;
+	s_countdownString->getSize( &width, &height );
+
+	// centered along the bottom, clear of the hotkey badge in the top left
+	const Int pad = 1;
+	const Int textX = origin.x + (size.x / 2) - (width / 2);
+	const Int textY = origin.y + size.y - height - 2;
+
+	TheDisplay->drawFillRect( textX - pad, textY - pad,
+		width + pad * 2, height + pad * 2, GameMakeColor( 0, 0, 0, 128 ) );
+
+	s_countdownString->draw( textX, textY,
+		GameMakeColor( 255, 255, 255, 255 ), GameMakeColor( 0, 0, 0, 255 ) );
+}
 
 // TheSuperHackers @feature Command bar hotkey overlay (Options.ini: KeyboardOverlay).
 // drawButtonHotKeyOverlay ====================================================
@@ -348,6 +416,15 @@ void W3DGadgetPushButtonDraw( GameWindow *window, WinInstanceData *instData )
 			window->winSetUserData(pData);
 		}
 
+		// TheSuperHackers @feature Countdown text, after the clock so the darkening does not
+		// swallow the digits. One shot, like the clock above.
+		if( pData->countdownSeconds >= 0 )
+		{
+			drawButtonCountdown( window, pData->countdownSeconds );
+			pData->countdownSeconds = -1;
+			window->winSetUserData(pData);
+		}
+
 		if( pData->drawBorder && pData->colorBorder != GAME_COLOR_UNDEFINED )
 		{
 			TheDisplay->drawOpenRect(origin.x -1, origin.y - 1, size.x + 2, size.y + 2,1 , pData->colorBorder);
@@ -514,6 +591,15 @@ void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 				TheDisplay->drawRemainingRectClock( start.x, start.y, size.x, size.y, pData->percentClock,pData->colorClock );
 			}
 			pData->drawClock = NO_CLOCK;
+			window->winSetUserData(pData);
+		}
+
+		// TheSuperHackers @feature Countdown text, after the clock so the darkening does not
+		// swallow the digits. One shot, like the clock above.
+		if( pData->countdownSeconds >= 0 )
+		{
+			drawButtonCountdown( window, pData->countdownSeconds );
+			pData->countdownSeconds = -1;
 			window->winSetUserData(pData);
 		}
 
@@ -777,6 +863,15 @@ void W3DGadgetPushButtonImageDrawThree(GameWindow *window, WinInstanceData *inst
 				TheDisplay->drawRemainingRectClock( start.x, start.y, size.x, size.y, pData->percentClock,pData->colorClock );
 			}
 			pData->drawClock = NO_CLOCK;
+			window->winSetUserData(pData);
+		}
+
+		// TheSuperHackers @feature Countdown text, after the clock so the darkening does not
+		// swallow the digits. One shot, like the clock above.
+		if( pData->countdownSeconds >= 0 )
+		{
+			drawButtonCountdown( window, pData->countdownSeconds );
+			pData->countdownSeconds = -1;
 			window->winSetUserData(pData);
 		}
 
