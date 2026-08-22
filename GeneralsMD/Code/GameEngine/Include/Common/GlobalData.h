@@ -144,6 +144,10 @@ public:
 	Int m_terrainLODTargetTimeMS;
 	Bool m_useAlternateMouse;
 	Bool m_clientRetaliationModeEnabled;
+	// TheSuperHackers @feature Client side health bar display preference, from Options.ini.
+	// Holds a HealthBarDisplayMode; stored as Int so this widely included header does not
+	// have to pull in OptionPreferences.h.
+	Int m_healthBarDisplayMode;
 	Bool m_doubleClickAttackMove;
 	Bool m_rightMouseAlwaysScrolls;
 	Bool m_useWaterPlane;

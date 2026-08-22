@@ -35,6 +35,18 @@
 typedef UnsignedInt CursorCaptureMode;
 typedef UnsignedInt ScreenEdgeScrollMode;
 
+// TheSuperHackers @feature When health bars are shown above objects. Purely a client side
+// display preference -- it never affects game logic, so it is safe in multiplayer and replays.
+enum HealthBarDisplayMode CPP_11(: Int)
+{
+	HealthBarDisplayMode_Classic = 0,	///< selected and moused over objects only (retail behavior)
+	HealthBarDisplayMode_Damaged,			///< the above, plus anything that is not at full health
+	HealthBarDisplayMode_Always,			///< the above, plus every undamaged unit and structure
+
+	HealthBarDisplayMode_Count,
+	HealthBarDisplayMode_Default = HealthBarDisplayMode_Classic
+};
+
 //-----------------------------------------------------------------------------
 // OptionsPreferences options menu class
 //-----------------------------------------------------------------------------
@@ -55,6 +67,7 @@ public:
 	Bool getArchiveReplaysEnabled() const;
 	Bool getAlternateMouseModeEnabled(void);
 	Bool getRetaliationModeEnabled();
+	HealthBarDisplayMode getHealthBarDisplayMode() const;
 	Bool getDoubleClickAttackMoveEnabled(void);
 	Real getScrollFactor(void);
 	Bool getDrawScrollAnchor(void);

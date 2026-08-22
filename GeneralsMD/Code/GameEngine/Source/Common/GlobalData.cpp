@@ -1132,6 +1132,8 @@ GlobalData::GlobalData()
 	//m_allAdvice = FALSE;
 
 	m_clientRetaliationModeEnabled = TRUE; //On by default.
+	// TheSuperHackers @feature Health bars behave exactly as they always have unless Options.ini says otherwise.
+	m_healthBarDisplayMode = HealthBarDisplayMode_Default;
 
 	m_useOldMoveSpeed = FALSE;  //Fix is enabled by default
 
@@ -1319,6 +1321,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	OptionPreferences optionPref;
 	TheWritableGlobalData->m_useAlternateMouse = optionPref.getAlternateMouseModeEnabled();
 	TheWritableGlobalData->m_clientRetaliationModeEnabled = optionPref.getRetaliationModeEnabled();
+	TheWritableGlobalData->m_healthBarDisplayMode = optionPref.getHealthBarDisplayMode();
 	TheWritableGlobalData->m_doubleClickAttackMove = optionPref.getDoubleClickAttackMoveEnabled();
 	TheWritableGlobalData->m_keyboardScrollFactor = optionPref.getScrollFactor();
 	TheWritableGlobalData->m_drawScrollAnchor = optionPref.getDrawScrollAnchor();
