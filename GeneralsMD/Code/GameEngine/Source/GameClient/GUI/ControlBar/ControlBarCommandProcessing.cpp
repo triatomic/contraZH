@@ -84,6 +84,11 @@ static Bool tryQuickCast( const CommandButton *commandButton )
 	if( !HotKeyManager::isExecutingHotKey() )
 		return FALSE;
 
+	// Hold to aim: on the key down pass we want the normal arming path, which already shows the
+	// targeting decal and lets the player move the cursor. The key up pass then fires.
+	if( HotKeyManager::isQuickCastAiming() )
+		return FALSE;
+
 	if( TheInGameUI == nullptr || TheMouse == nullptr || TheTacticalView == nullptr )
 		return FALSE;
 
@@ -132,6 +137,9 @@ static Bool tryQuickCast( const CommandButton *commandButton )
 	// Hand the click to the normal path. Synthesizing the message rather than calling the
 	// do*Command helpers directly means quick cast reuses the engine's own validation,
 	// voice responses and cleanup, and cannot drift away from normal behaviour.
+	//
+	// In hold to aim mode the command was already armed on key down; re-arming here is
+	// harmless and covers the case where something cleared it while the key was held.
 	TheInGameUI->setGUICommand( commandButton );
 
 	// GUICommandTranslator reads the click position from pixelRegion.hi
@@ -142,7 +150,8 @@ static Bool tryQuickCast( const CommandButton *commandButton )
 	GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_MOUSE_LEFT_CLICK );
 	msg->appendPixelRegionArgument( clickRegion );
 
-	// Flash the targeting decal where it landed, so the player can see what happened.
+	// In indicator mode the decal has been visible the whole time the key was held, so let it
+	// linger briefly at the point it fired rather than vanishing the instant the key comes up.
 	if( TheGlobalData->m_castMode == CastMode_QuickCastWithIndicator )
 		TheInGameUI->triggerQuickCastHint( commandButton, mouseIO->pos );
 

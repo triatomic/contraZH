@@ -58,6 +58,9 @@
 #include "GameClient/Keyboard.h"
 #include "GameClient/GameText.h"
 #include "Common/AudioEventRTS.h"
+// TheSuperHackers @feature for hold to aim quick cast
+#include "Common/GlobalData.h"
+#include "Common/OptionPreferences.h"
 //-----------------------------------------------------------------------------
 // DEFINES ////////////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
@@ -72,7 +75,13 @@ GameMessageDisposition HotKeyTranslator::translateGameMessage(const GameMessage 
 	GameMessageDisposition disp = KEEP_MESSAGE;
 	GameMessage::Type t = msg->getType();
 
-	if ( t == GameMessage::MSG_RAW_KEY_UP)
+	// TheSuperHackers @feature In QuickCastWithIndicator mode a hotkey arms on key down so the
+	// player can see the targeting decal and still adjust aim, then fires on key up. Every other
+	// mode keeps the original behaviour of acting only on key up.
+	const Bool holdToAim = TheGlobalData &&
+		TheGlobalData->m_castMode == CastMode_QuickCastWithIndicator;
+
+	if ( t == GameMessage::MSG_RAW_KEY_UP || (holdToAim && t == GameMessage::MSG_RAW_KEY_DOWN) )
 	{
 
 		//char key = msg->getArgument(0)->integer;
@@ -103,8 +112,16 @@ GameMessageDisposition HotKeyTranslator::translateGameMessage(const GameMessage 
 		uKey.concat(key);
 		AsciiString aKey;
 		aKey.translate(uKey);
-		if(TheHotKeyManager && TheHotKeyManager->executeHotKey(aKey))
-			disp = DESTROY_MESSAGE;
+		if( TheHotKeyManager )
+		{
+			// key down arms and previews, key up commits at wherever the cursor ended up
+			HotKeyManager::setQuickCastAiming( holdToAim && t == GameMessage::MSG_RAW_KEY_DOWN );
+
+			if( TheHotKeyManager->executeHotKey(aKey) )
+				disp = DESTROY_MESSAGE;
+
+			HotKeyManager::setQuickCastAiming( FALSE );
+		}
 	}
 	return disp;
 }
@@ -160,6 +177,7 @@ void HotKeyManager::addHotKey( GameWindow *win, const AsciiString& keyIn)
 //-----------------------------------------------------------------------------
 // TheSuperHackers @feature See HotKey.h -- set only while synthesizing a button press.
 Bool HotKeyManager::s_executingHotKey = FALSE;
+Bool HotKeyManager::s_quickCastAiming = FALSE;
 
 Bool HotKeyManager::executeHotKey( const AsciiString& keyIn )
 {
