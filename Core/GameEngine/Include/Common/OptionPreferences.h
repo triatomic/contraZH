@@ -68,6 +68,7 @@ public:
 	Bool getAlternateMouseModeEnabled(void);
 	Bool getRetaliationModeEnabled();
 	HealthBarDisplayMode getHealthBarDisplayMode() const;
+	Bool getKeyboardOverlayEnabled() const;
 	Bool getDoubleClickAttackMoveEnabled(void);
 	Real getScrollFactor(void);
 	Bool getDrawScrollAnchor(void);

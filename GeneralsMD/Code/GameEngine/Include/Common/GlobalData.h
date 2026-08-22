@@ -148,6 +148,8 @@ public:
 	// Holds a HealthBarDisplayMode; stored as Int so this widely included header does not
 	// have to pull in OptionPreferences.h.
 	Int m_healthBarDisplayMode;
+	// TheSuperHackers @feature Show each command bar cameo's hotkey letter on the cameo.
+	Bool m_keyboardOverlayEnabled;
 	Bool m_doubleClickAttackMove;
 	Bool m_rightMouseAlwaysScrolls;
 	Bool m_useWaterPlane;

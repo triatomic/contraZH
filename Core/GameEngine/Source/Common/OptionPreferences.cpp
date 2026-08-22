@@ -191,6 +191,20 @@ HealthBarDisplayMode OptionPreferences::getHealthBarDisplayMode(void) const
 	return HealthBarDisplayMode_Default;
 }
 
+// TheSuperHackers @feature Draw each command bar cameo's keyboard hotkey over the cameo.
+// Options.ini: KeyboardOverlay = Yes
+Bool OptionPreferences::getKeyboardOverlayEnabled(void) const
+{
+	OptionPreferences::const_iterator it = find("KeyboardOverlay");
+	if (it == end())
+		return FALSE;
+
+	if (stricmp(it->second.str(), "yes") == 0) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
 Bool OptionPreferences::getRetaliationModeEnabled(void)
 {
 	OptionPreferences::const_iterator it = find("Retaliation");
