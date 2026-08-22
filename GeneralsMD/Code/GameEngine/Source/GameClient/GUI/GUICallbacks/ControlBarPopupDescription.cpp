@@ -251,7 +251,10 @@ static UnicodeString formatBuildTimeForTooltip( Int buildFrames )
 			TheGlobalData->m_buildTimerDisplayMode == BuildTimerDisplayMode_None )
 		return result;
 
-	const Int seconds = REAL_TO_INT_CEIL( buildFrames * SECONDS_PER_LOGICFRAME_REAL );
+	// Integer ceiling. Multiplying by SECONDS_PER_LOGICFRAME_REAL would be wrong here:
+	// 1/30 is not exact in float, so an exact 8 second build comes out as 8.0000004 and
+	// then ceils to 9.
+	const Int seconds = ( buildFrames + LOGICFRAMES_PER_SECOND - 1 ) / LOGICFRAMES_PER_SECOND;
 
 	if( TheGlobalData->m_buildTimerDisplayMode == BuildTimerDisplayMode_Auto && seconds >= 60 )
 		result.format( L"%d:%2.2d", seconds / 60, seconds % 60 );	// already reads as time
@@ -670,13 +673,26 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 		UnicodeString costLine = cost;
 		if( !buildTimeText.isEmpty() )
 		{
+			// on its own line under the cost
 			if( !costLine.isEmpty() )
-				costLine.concat( L"  " );
+				costLine.concat( L"\n" );
 			costLine.concat( buildTimeText );
 		}
 
 		if( !costLine.isEmpty() )
 		{
+			// The .wnd gives this window a single line of height, so grow it when we add the
+			// time line or the second line is clipped. Remember the original height so this
+			// does not accumulate across tooltips.
+			static Int s_originalHeight = -1;
+			ICoord2D costSize;
+			win->winGetSize( &costSize.x, &costSize.y );
+			if( s_originalHeight < 0 )
+				s_originalHeight = costSize.y;
+
+			const Int lines = buildTimeText.isEmpty() ? 1 : 2;
+			win->winSetSize( costSize.x, s_originalHeight * lines );
+
 			win->winHide( FALSE );
 			GadgetStaticTextSetText(win, costLine);
 		}

@@ -813,11 +813,11 @@ void ControlBar::updateContextCommand( void )
 
 					if( totalFrames > 0 )
 					{
-						Real remainingFrames = totalFrames * (100.0f - produce->getPercentComplete()) / 100.0f;
-						if( remainingFrames < 0.0f )
-							remainingFrames = 0.0f;
+						Real remainingReal = totalFrames * (100.0f - produce->getPercentComplete()) / 100.0f;
+						Int remainingFrames = ( remainingReal > 0.0f ) ? REAL_TO_INT_CEIL( remainingReal ) : 0;
+						// integer ceiling -- see formatBuildTimeForTooltip for why not the float form
 						GadgetButtonDrawCountdown( win,
-							REAL_TO_INT_CEIL( remainingFrames * SECONDS_PER_LOGICFRAME_REAL ) );
+							( remainingFrames + LOGICFRAMES_PER_SECOND - 1 ) / LOGICFRAMES_PER_SECOND );
 					}
 				}
 
@@ -1475,8 +1475,9 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 					UnsignedInt now = TheGameLogic->getFrame();
 					UnsignedInt readyFrame = mod->getReadyFrame();
 					UnsignedInt remainingFrames = ( readyFrame > now ) ? ( readyFrame - now ) : 0;
+					// integer ceiling -- see formatBuildTimeForTooltip for why not the float form
 					GadgetButtonDrawCountdown( applyToWin,
-						REAL_TO_INT_CEIL( remainingFrames * SECONDS_PER_LOGICFRAME_REAL ) );
+						( remainingFrames + LOGICFRAMES_PER_SECOND - 1 ) / LOGICFRAMES_PER_SECOND );
 				}
 
 				return COMMAND_NOT_READY;
