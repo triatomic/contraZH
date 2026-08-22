@@ -57,6 +57,7 @@
 #include "GameClient/HotKey.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/View.h"
+#include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameClient/AnimateWindowManager.h"
 
 // TheSuperHackers @feature How many units a shift click queues or cancels at once.
@@ -133,6 +134,26 @@ static Bool tryQuickCast( const CommandButton *commandButton )
 	if( TheWindowManager &&
 			TheWindowManager->getWindowUnderCursor( mouseIO->pos.x, mouseIO->pos.y ) != nullptr )
 		return FALSE;
+
+	// TheSuperHackers @feature If the ability is still recharging, remember the cast and let
+	// InGameUI fire it the moment the logic side says it is ready, rather than throwing the
+	// input away. The cooldown itself is untouched -- this only stops the press being wasted.
+	if( commandButton->getSpecialPowerTemplate() )
+	{
+		Drawable *draw = TheInGameUI->getFirstSelectedDrawable();
+		Object *source = draw ? draw->getObject() : nullptr;
+		if( source )
+		{
+			SpecialPowerModuleInterface *mod =
+				source->getSpecialPowerModule( commandButton->getSpecialPowerTemplate() );
+			if( mod && !mod->isReady() )
+			{
+				TheInGameUI->queueQuickCast( commandButton, mouseIO->pos );
+				TheInGameUI->triggerQuickCastHint( commandButton, mouseIO->pos );
+				return TRUE;
+			}
+		}
+	}
 
 	// Hand the click to the normal path. Synthesizing the message rather than calling the
 	// do*Command helpers directly means quick cast reuses the engine's own validation,
