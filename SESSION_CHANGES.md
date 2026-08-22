@@ -136,7 +136,7 @@ ways, mixed selection) and the replay-compatibility gate are outstanding.
 Client-side display settings, each read from `Options.ini` into `GlobalData` alongside the existing
 preference overrides, so they refresh whenever game data is parsed rather than only at process start.
 
-All four commits are **purely client-side**: they read state and draw. No logic, multiplayer sync, or
+All nine commits are **purely client-side**: they read state and draw. No logic, multiplayer sync, or
 replay impact.
 
 ```
@@ -144,7 +144,30 @@ replay impact.
 bc17260f0  feat: Add KeyboardOverlay option to show hotkeys on command bar cameos (7 files, +119)
 03ad4856c  feat: Make the hotkey overlay white and colourable per channel         (5 files, +55/-23)
 687ddd2c8  feat: Add a translucent backdrop behind the hotkey overlay letter      (5 files, +66/-20)
+bce64678f  feat: Add BuildTimerDisplayMode option for countdown numbers on cameos (10 files, +455)
+cecbf81c1  feat: Show build time next to cost in the build tooltip                (1 file, +51/-2)
+ab2c6dd63  fix: Correct off by one in displayed build and cooldown times          (2 files, +24/-7)
+865848b91  fix: Keep the tooltip build time on the cost line with a watch glyph   (1 file, +5/-14)
+24cc0aa4b  fix: Round tooltip build times to nearest second instead of up         (1 file, +6/-4)
 ```
+
+### Full set of Options.ini keys added
+
+```ini
+HealthBarDisplayMode           = Classic   ; Classic | Damaged | Always
+KeyboardOverlay                = No        ; Yes shows hotkey letters on cameos
+KeyboardOverlayRed             = 255       ; letter colour, 0-255 per channel
+KeyboardOverlayGreen           = 255
+KeyboardOverlayBlue            = 255
+KeyboardOverlayBackdrop        = Yes       ; plate behind the letter
+KeyboardOverlayBackdropRed     = 0
+KeyboardOverlayBackdropGreen   = 0
+KeyboardOverlayBackdropBlue    = 0
+KeyboardOverlayBackdropOpacity = 128       ; 0-255, 128 is 50%
+BuildTimerDisplayMode          = None      ; None | Seconds | Auto
+```
+
+Every key defaults to retail behaviour, so an untouched `Options.ini` changes nothing.
 
 ### 3.1 Health bar display modes
 
@@ -231,6 +254,76 @@ colours is factored into `OptionPreferences::getColorChannel`.
 **Status: built and deployed, not yet visually reviewed.** The reference image this was based on has
 a squarer, slightly more padded plate than the current text-width version.
 
+### 3.5 Countdown timers on cameos
+
+```ini
+BuildTimerDisplayMode = None      ; clock sweep only (default)
+BuildTimerDisplayMode = Seconds   ; plain seconds, however large
+BuildTimerDisplayMode = Auto      ; seconds under a minute, M:SS above it
+```
+
+Shows remaining time on the head of the production queue (units *and* upgrades) and on special
+powers recharging. White text on a translucent plate along the bottom of the cameo, clear of the
+hotkey badge in the top-left.
+
+The two time sources are stored differently, so they are derived differently. Special powers expose
+`getReadyFrame()` — an absolute frame that already accounts for paused and shared/synced powers — so
+that is used directly. Production has no public accessor for elapsed frames (`m_framesUnderConstruction`
+is protected), so the remainder is computed from percent-complete against `calcTimeToBuild()`.
+
+Drawing goes through a new `countdownSeconds` field on `PushButtonData`, mirroring the existing
+one-shot clock lifetime so a stale timer cannot linger once production ends. Deliberately **not**
+routed through `GadgetButtonSetText`, whose text slot is already contested by `setControlCommand`
+(which clears it on repopulate) and by `drawSpecialPowerShortcutMultiplierText`.
+
+**Status: confirmed working in-game.**
+
+### 3.6 Build time in the tooltip
+
+The cameo tooltip now shows build time next to the cost, separated by a U+231A watch glyph:
+
+```
+Cost: 200   ⌚ 8s
+```
+
+It follows `BuildTimerDisplayMode`, so `None` hides it entirely.
+
+**Power state is handled by the engine, not by this code.** `ThingTemplate::calcTimeToBuild()`
+already folds in the player's energy penalty — reading `getEnergySupplyRatio()`, applying
+`m_LowEnergyPenaltyModifier`, and clamping between `MinLowEnergyProductionSpeed` and
+`MaxLowEnergyProductionSpeed`. So a tooltip read while on low power shows the slower time and speeds
+back up once power is restored. Calling that function also picks up handicap, faction and per-KindOf
+production modifiers, and the multiple-factory bonus, all of which a hand-rolled calculation would
+have missed.
+
+> **Engine asymmetry worth knowing:** `UpgradeTemplate::calcTimeToBuild()` applies **no** energy
+> penalty (the source even carries a `///@todo modify this by power state of player`). Upgrade times
+> are therefore genuinely power-independent. That is the engine's behaviour, not this change's.
+
+Two iterations were needed on presentation. Putting the time on its own line under the cost failed:
+the description window is absolutely positioned directly beneath the cost window in the `.wnd`
+layout, so the second line rendered straight through the description text, and growing the cost
+window did not push it down. Back on one line, which the layout accommodates.
+
+**Status: confirmed working in-game.**
+
+### 3.7 Two rounding bugs, and why the fixes differ
+
+**Off-by-one on every whole-second duration.** `SECONDS_PER_LOGICFRAME_REAL` is `1.0f/30.0f`, which
+has no exact float representation, so an 8-second build (240 frames) computed to `8.0000004` and
+ceiled to **9**. Verified directly: 240 → 8.000000417, 300 → 10.00000052. Affected the tooltip and
+both cameo countdowns. Fixed with integer division, which is exact.
+
+**Upgrades reading one second high.** Separate cause: Contra's upgrade `BuildTime` values carry
+fractional parts, and ceiling turned a 10.1s upgrade into `11s`.
+
+The two displays now round differently, on purpose:
+
+| Site | Rounding | Why |
+|---|---|---|
+| Tooltip | nearest | States the time as authored — 303 frames reads `10s`, not `11s` |
+| Live countdown | ceiling | A running timer must never show `0` while work remains |
+
 ---
 
 ## 4. Branch state
@@ -239,17 +332,33 @@ Both branches stand independently on `main` and are pushed.
 
 | Branch | Commits | Contents |
 |---|---|---|
-| [`option-qol`](https://github.com/triatomic/contraZH/tree/option-qol) | 4 | Options.ini QoL settings |
+| [`option-qol`](https://github.com/triatomic/contraZH/tree/option-qol) | 9 | Options.ini QoL settings |
 | [`HoldFireCommand`](https://github.com/triatomic/contraZH/tree/HoldFireCommand) | 2 | Hold Fire command |
 
 They share no files, so they can be reviewed and merged separately. Neither has an open PR yet.
 
+### Test install
+
+Builds do not auto-deploy. The test install is `C:\Games\contra\contraprerelease\`, and
+`Options.ini` lives in `C:\Users\<user>\Documents\Command and Conquer Generals Zero Hour Data\`
+(shared with the retail install).
+
+> Copying over a **running** game silently fails on Windows — the exe is locked. This bit once
+> already: an overlay was reported "not showing" purely because the deployed exe predated the build.
+> Compare timestamps before concluding a feature is broken.
+
 ## 5. Outstanding
 
-- **Hold Fire**: never run in-game. Functional matrix and replay-compatibility gate outstanding; the
-  latter needs `git submodule update --init --recursive` for the `GeneralsReplays` corpus.
-- **Overlay backdrop**: not visually reviewed; padding and plate shape may want adjusting.
+- **Hold Fire**: never run in-game, and the only work here that touches game logic rather than
+  display. Functional matrix and replay-compatibility gate outstanding; the latter needs
+  `git submodule update --init --recursive` for the `GeneralsReplays` corpus.
+- **Overlay backdrop**: deployed but not visually reviewed; padding and plate shape may want
+  adjusting.
+- **Queue countdown covers the head slot only.** The engine arms the clock solely on `ButtonQueue01`,
+  so only the first queued item shows a number. Extending it to all slots is a different call site.
 - **VC6 build**: only the `win32` (VS2022) preset has been exercised. The `vc6` preset is the
   project's C++98 compatibility gate and has not been run against any of this work.
 - **Generals mirror**: all engine changes are Zero Hour only. `Core/` preference plumbing is shared,
   so it is available to Generals, but nothing there consumes it.
+- **History not squashed.** Three commits on `option-qol` are fixes to their own predecessors. Fine
+  for this fork; worth squashing before any upstream PR.
