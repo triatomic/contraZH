@@ -5910,12 +5910,12 @@ void Object::doCommandButton( const CommandButton *commandButton, CommandSourceT
 
 			// TheSuperHackers @feature Hold Fire stance, so scripts can toggle it too.
 			case GUI_COMMAND_HOLD_FIRE:
-			{
-				AIUpdateInterface *ai = getAI();
 				if( ai )
+				{
 					ai->setHoldingFire( !ai->isHoldingFire() );
-				return;
-			}
+					return;
+				}
+				break;
 
 			//Feel free to implement object based command buttons.
 			case GUI_COMMAND_COMBATDROP:

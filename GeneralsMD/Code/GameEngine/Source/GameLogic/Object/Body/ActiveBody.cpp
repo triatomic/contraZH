@@ -760,9 +760,10 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 				if (ai==nullptr) {
 					continue;
 				}
-				// TheSuperHackers @feature Do not drag units that are holding fire into a
-				// neighbor's retaliation, unless their template allows return fire.
-				if (!ai->isRetaliationAllowedWhileHoldingFire()) {
+				// TheSuperHackers @feature Skip units that are holding fire and are not allowed to
+				// return fire. The guard machines enforce this too, so this is an early out that
+				// avoids the far more expensive getAbleToAttackSpecificObject call below.
+				if (!ai->isRetaliationAllowed()) {
 					continue;
 				}
 				//If we have AI and we're mobile, then assist!

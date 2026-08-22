@@ -72,7 +72,7 @@ static Bool hasAttackedMeAndICanReturnFire( State *thisState, void* /*userData*/
 	// (AIUpdate: HoldFireAllowsRetaliation). Checked before clearing the attacker below, so that
 	// disallowing retaliation does not disturb the existing attacker bookkeeping.
 	AIUpdateInterface *ai = obj->getAI();
-	if (ai && !ai->isRetaliationAllowedWhileHoldingFire()) {
+	if (ai && !ai->isRetaliationAllowed()) {
 		return FALSE;
 	}
 

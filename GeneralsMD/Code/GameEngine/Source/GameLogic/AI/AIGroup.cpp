@@ -3150,7 +3150,6 @@ void AIGroup::groupToggleHoldFire( CommandSourceType cmdSource )
 	std::list<Object *>::iterator i;
 	Object *obj;
 	Bool allHolding = TRUE;
-	Int aiMemberCount = 0;
 
 	// first pass -- are they all holding fire already?
 	for( i = m_memberList.begin(); i != m_memberList.end(); ++i )
@@ -3161,14 +3160,9 @@ void AIGroup::groupToggleHoldFire( CommandSourceType cmdSource )
 		if( ai == nullptr )
 			continue;
 
-		++aiMemberCount;
 		if( !ai->isHoldingFire() )
 			allHolding = FALSE;
 	}
-
-	// nothing in the group can hold fire, so there is nothing to do
-	if( aiMemberCount == 0 )
-		return;
 
 	// second pass -- move the whole group to the same stance
 	for( i = m_memberList.begin(); i != m_memberList.end(); ++i )

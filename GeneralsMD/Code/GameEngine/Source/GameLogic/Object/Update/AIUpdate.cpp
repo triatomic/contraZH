@@ -4504,10 +4504,11 @@ void AIUpdateInterface::setHoldingFire( Bool holding )
 
 	m_isHoldingFire = holding;
 
-	// When we stop holding fire, re-check for targets immediately rather than waiting
-	// out a stale mood timer, so the unit responds promptly.
+	// When we stop holding fire, look for targets right away rather than waiting out a stale
+	// mood timer. This also staggers the re-check, so releasing a large group does not make
+	// every unit in it scan on the very same frame.
 	if( !holding )
-		setNextMoodCheckTime( TheGameLogic->getFrame() );
+		wakeUpAndAttemptToTarget();
 }
 
 /**
@@ -4522,37 +4523,29 @@ Bool AIUpdateInterface::isFireSuppressedByHoldFire( void ) const
 
 	// Walk up the containment chain. Containers with no AI (eg. garrisonable buildings)
 	// simply cannot hold fire, so keep walking past them.
-	const Int MAX_CONTAINER_DEPTH = 8;
-	const Object *container = getObject()->getContainedBy();
-	for( Int depth = 0; container != nullptr; ++depth )
+	for( const Object *container = getObject()->getContainedBy();
+			 container != nullptr;
+			 container = container->getContainedBy() )
 	{
-		if( depth >= MAX_CONTAINER_DEPTH )
-		{
-			DEBUG_CRASH(( "AIUpdateInterface::isFireSuppressedByHoldFire: containment chain too deep for %s",
-				getObject()->getTemplate()->getName().str() ));
-			break;
-		}
-
 		const AIUpdateInterface *containerAI = container->getAI();
 		if( containerAI && containerAI->isHoldingFire() )
 			return TRUE;
-
-		container = container->getContainedBy();
 	}
 
 	return FALSE;
 }
 
 /**
- * Returns true if this object may return fire when attacked while holding fire.
- * Controlled per-unit by the AIUpdate parameter HoldFireAllowsRetaliation.
+ * Returns true if this object may return fire when attacked. Only ever false while holding
+ * fire, and only for templates that opt out via the AIUpdate parameter HoldFireAllowsRetaliation.
  */
-Bool AIUpdateInterface::isRetaliationAllowedWhileHoldingFire( void ) const
+Bool AIUpdateInterface::isRetaliationAllowed( void ) const
 {
-	if( !isFireSuppressedByHoldFire() )
+	// nearly every template allows retaliation, so answer without walking containment
+	if( getAIUpdateModuleData()->m_holdFireAllowsRetaliation )
 		return TRUE;
 
-	return getAIUpdateModuleData()->m_holdFireAllowsRetaliation;
+	return !isFireSuppressedByHoldFire();
 }
 
 /**
@@ -4801,9 +4794,9 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 	if (obj->isEffectivelyDead())
 		return nullptr;
 
-	// TheSuperHackers @feature Hold Fire suppresses all automatic target acquisition, for us,
-	// our turrets (which ask us), and anyone we are carrying. Explicitly commanded attacks are
-	// unaffected, since they do not come through here.
+	// TheSuperHackers @feature Hold Fire skips the mood scan entirely. The authoritative veto lives
+	// in WeaponSet::getAbleToAttackSpecificObject (so the guard machines' own scans obey it too);
+	// this is purely an early out so we do not run a partition query we will discard.
 	if (isFireSuppressedByHoldFire())
 		return nullptr;
 

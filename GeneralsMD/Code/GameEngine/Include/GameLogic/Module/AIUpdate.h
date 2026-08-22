@@ -595,7 +595,7 @@ public:
 	Bool isHoldingFire() const { return m_isHoldingFire; }	///< is this object itself holding fire?
 	void setHoldingFire( Bool holding );										///< set the hold fire stance (logic side only!)
 	Bool isFireSuppressedByHoldFire() const;								///< are we, or any container we are inside of, holding fire?
-	Bool isRetaliationAllowedWhileHoldingFire() const;			///< may we return fire when attacked while holding fire?
+	Bool isRetaliationAllowed() const;											///< may we return fire when attacked? (only Hold Fire can forbid it)
 
 	// Common AI "status" effects -------------------------------------------------------------------
 	Bool hasNationalism() const;

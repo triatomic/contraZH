@@ -622,6 +622,17 @@ CanAttackResult WeaponSet::getAbleToAttackSpecificObject( AbleToAttackType attac
 	if (victim->testStatus(OBJECT_STATUS_NO_ATTACK_FROM_AI) && commandSource == CMD_FROM_AI)
 		return ATTACKRESULT_NOT_POSSIBLE;
 
+	// TheSuperHackers @feature Hold Fire suppresses attacks we pick ourselves, for us, our turrets,
+	// and anyone we are carrying. Player issued orders arrive with a different command source and
+	// are deliberately unaffected. This is the mirror of NO_ATTACK_FROM_AI above, seen from the
+	// attacker rather than the victim, and covers every automatic acquisition path at once.
+	if (commandSource == CMD_FROM_AI)
+	{
+		const AIUpdateInterface* sourceAI = source->getAI();
+		if (sourceAI && sourceAI->isFireSuppressedByHoldFire())
+			return ATTACKRESULT_NOT_POSSIBLE;
+	}
+
   Bool allowStealthToPreventAttacks = TRUE;
 	if (source->testStatus(OBJECT_STATUS_IGNORING_STEALTH) || sameOwnerForceAttack)
 		allowStealthToPreventAttacks = FALSE;
