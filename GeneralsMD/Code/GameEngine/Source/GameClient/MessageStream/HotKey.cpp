@@ -191,7 +191,21 @@ Bool HotKeyManager::executeHotKey( const AsciiString& keyIn )
 		return FALSE;
 	if( !BitIsSet( win->winGetStatus(), WIN_STATUS_HIDDEN ) )
 	{
-		if( BitIsSet( win->winGetStatus(), WIN_STATUS_ENABLED ) )
+		// TheSuperHackers @feature A recharging ability disables its button, which normally
+		// swallows the hotkey. In hold to aim mode let it through anyway so the player can
+		// pre-aim while the cooldown runs out. This only opens up buttons disabled by
+		// WIN_STATUS_NOT_READY -- ones that are restricted or unaffordable stay rejected, and
+		// the ability still only actually fires if the logic side says it is ready.
+		Bool allowWhileRecharging = FALSE;
+		if( !BitIsSet( win->winGetStatus(), WIN_STATUS_ENABLED ) &&
+				BitIsSet( win->winGetStatus(), WIN_STATUS_NOT_READY ) &&
+				TheGlobalData &&
+				TheGlobalData->m_castMode == CastMode_QuickCastWithIndicator )
+		{
+			allowWhileRecharging = TRUE;
+		}
+
+		if( BitIsSet( win->winGetStatus(), WIN_STATUS_ENABLED ) || allowWhileRecharging )
  		{
 			// TheSuperHackers @feature Tell the command bar this press came from the keyboard, so
 			// quick cast can fire at the cursor. A mouse click on the cameo leaves the cursor over
