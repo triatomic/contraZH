@@ -68,6 +68,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/GlobalData.h"
+#include "Common/OptionPreferences.h"
 #include "Common/BuildAssistant.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -232,6 +233,34 @@ void ControlBar::showBuildTooltipLayout( GameWindow *cmdButton )
 }
 
 
+// TheSuperHackers @feature Format a build time for the tooltip, using the same Auto/Seconds
+// rules as the cameo countdowns (Options.ini: BuildTimerDisplayMode).
+//
+// Note the value passed in should come from calcTimeToBuild(), which for units already folds
+// in the player's current energy penalty -- so a tooltip read while on low power correctly
+// shows the slower time, and speeds back up once power is restored. Upgrades have no energy
+// penalty in the engine, so their time is the same regardless of power state.
+static UnicodeString formatBuildTimeForTooltip( Int buildFrames )
+{
+	UnicodeString result = UnicodeString::TheEmptyString;
+
+	if( buildFrames <= 0 )
+		return result;
+
+	if( TheGlobalData == nullptr ||
+			TheGlobalData->m_buildTimerDisplayMode == BuildTimerDisplayMode_None )
+		return result;
+
+	const Int seconds = REAL_TO_INT_CEIL( buildFrames * SECONDS_PER_LOGICFRAME_REAL );
+
+	if( TheGlobalData->m_buildTimerDisplayMode == BuildTimerDisplayMode_Auto && seconds >= 60 )
+		result.format( L"%d:%2.2d", seconds / 60, seconds % 60 );	// already reads as time
+	else
+		result.format( L"%ds", seconds );
+
+	return result;
+}
+
 void ControlBar::repopulateBuildTooltipLayout( void )
 {
 	if(!prevWindow || !m_buildToolTipLayout)
@@ -249,6 +278,8 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 
 	Player *player = ThePlayerList->getLocalPlayer();
 	UnicodeString name, cost, descrip;
+	// TheSuperHackers @feature Build time shown under the cost, formatted like the cameo timers.
+	UnicodeString buildTimeText;
 	UnicodeString requiresFormat = UnicodeString::TheEmptyString, requiresList;
 	Bool firstRequirement = true;
 	const ProductionPrerequisite *prereq;
@@ -431,6 +462,10 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 				cost.format( TheGameText->fetch("TOOLTIP:Cost"), costToBuild );
 			}
 
+			// TheSuperHackers @feature calcTimeToBuild folds in the current energy penalty,
+			// so this tracks the player's power state as it changes.
+			buildTimeText = formatBuildTimeForTooltip( thingTemplate->calcTimeToBuild( player ) );
+
 			// ask each prerequisite to give us a list of the non satisfied prerequisites
 			for( Int i=0; i<thingTemplate->getPrereqCount(); i++ )
 			{
@@ -527,6 +562,10 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 				{
 					cost.format( TheGameText->fetch("TOOLTIP:Cost"), costToBuild );
 				}
+
+				// TheSuperHackers @feature Upgrades carry no energy penalty in the engine, so
+				// unlike units this time does not change with the player's power state.
+				buildTimeText = formatBuildTimeForTooltip( upgradeTemplate->calcTimeToBuild( player ) );
 
 				if( missingScience )
 				{
@@ -626,10 +665,20 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 	win = TheWindowManager->winGetWindowFromId(m_buildToolTipLayout->getFirstWindow(), TheNameKeyGenerator->nameToKey("ControlBarPopupDescription.wnd:StaticTextCost"));
 	if(win)
 	{
-		if( costToBuild > 0 )
+		// TheSuperHackers @feature Show the build time alongside the cost. Also shown for
+		// free items, which have no cost line of their own but still take time to build.
+		UnicodeString costLine = cost;
+		if( !buildTimeText.isEmpty() )
+		{
+			if( !costLine.isEmpty() )
+				costLine.concat( L"  " );
+			costLine.concat( buildTimeText );
+		}
+
+		if( !costLine.isEmpty() )
 		{
 			win->winHide( FALSE );
-			GadgetStaticTextSetText(win, cost);
+			GadgetStaticTextSetText(win, costLine);
 		}
 		else
 		{
