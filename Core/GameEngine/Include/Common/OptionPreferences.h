@@ -31,6 +31,7 @@
 #pragma once
 
 #include "Common/UserPreferences.h"
+#include "GameClient/Color.h"
 
 typedef UnsignedInt CursorCaptureMode;
 typedef UnsignedInt ScreenEdgeScrollMode;
@@ -69,6 +70,7 @@ public:
 	Bool getRetaliationModeEnabled();
 	HealthBarDisplayMode getHealthBarDisplayMode() const;
 	Bool getKeyboardOverlayEnabled() const;
+	Color getKeyboardOverlayColor() const;
 	Bool getDoubleClickAttackMoveEnabled(void);
 	Real getScrollFactor(void);
 	Bool getDrawScrollAnchor(void);

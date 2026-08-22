@@ -205,6 +205,38 @@ Bool OptionPreferences::getKeyboardOverlayEnabled(void) const
 	return FALSE;
 }
 
+// TheSuperHackers @feature Colour of the command bar hotkey overlay letters.
+// Options.ini: KeyboardOverlayRed / KeyboardOverlayGreen / KeyboardOverlayBlue,
+// each 0-255. Defaults to white. An out of range or non numeric channel falls
+// back to full brightness rather than silently drawing an invisible letter.
+Color OptionPreferences::getKeyboardOverlayColor(void) const
+{
+	UnsignedByte channel[3];
+	static const char *keyNames[3] =
+	{
+		"KeyboardOverlayRed", "KeyboardOverlayGreen", "KeyboardOverlayBlue"
+	};
+
+	for (Int i = 0; i < 3; ++i)
+	{
+		channel[i] = 255;
+
+		OptionPreferences::const_iterator it = find(AsciiString(keyNames[i]));
+		if (it == end())
+			continue;
+
+		Int value = atoi(it->second.str());
+		if (value < 0)
+			value = 0;
+		else if (value > 255)
+			value = 255;
+
+		channel[i] = (UnsignedByte)value;
+	}
+
+	return GameMakeColor(channel[0], channel[1], channel[2], 255);
+}
+
 Bool OptionPreferences::getRetaliationModeEnabled(void)
 {
 	OptionPreferences::const_iterator it = find("Retaliation");

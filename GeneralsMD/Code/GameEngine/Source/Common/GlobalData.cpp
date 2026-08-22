@@ -1135,6 +1135,7 @@ GlobalData::GlobalData()
 	// TheSuperHackers @feature Health bars behave exactly as they always have unless Options.ini says otherwise.
 	m_healthBarDisplayMode = HealthBarDisplayMode_Default;
 	m_keyboardOverlayEnabled = FALSE;
+	m_keyboardOverlayColor = GameMakeColor( 255, 255, 255, 255 );
 
 	m_useOldMoveSpeed = FALSE;  //Fix is enabled by default
 
@@ -1324,6 +1325,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_clientRetaliationModeEnabled = optionPref.getRetaliationModeEnabled();
 	TheWritableGlobalData->m_healthBarDisplayMode = optionPref.getHealthBarDisplayMode();
 	TheWritableGlobalData->m_keyboardOverlayEnabled = optionPref.getKeyboardOverlayEnabled();
+	TheWritableGlobalData->m_keyboardOverlayColor = optionPref.getKeyboardOverlayColor();
 	TheWritableGlobalData->m_doubleClickAttackMove = optionPref.getDoubleClickAttackMoveEnabled();
 	TheWritableGlobalData->m_keyboardScrollFactor = optionPref.getScrollFactor();
 	TheWritableGlobalData->m_drawScrollAnchor = optionPref.getDrawScrollAnchor();

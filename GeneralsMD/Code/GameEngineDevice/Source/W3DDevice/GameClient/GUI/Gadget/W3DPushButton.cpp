@@ -106,37 +106,32 @@ static void drawButtonHotKeyOverlay( GameWindow *window )
 	if( hotKey.isEmpty() )
 		return;
 
-	// one shared display string for every cameo -- they are drawn one at a time, and
-	// rebuilding the sentence is only paid for when the letter actually changes.
-	static DisplayString *s_hotKeyString = nullptr;
-	static AsciiString s_lastHotKey;
+	// One display string per letter, so that drawing many cameos in a row does not
+	// rebuild sentence geometry over and over. There are only ever a handful of
+	// distinct hotkeys on screen, so this stays small.
+	static DisplayString *s_hotKeyStrings[ 256 ] = { nullptr };
 
-	if( s_hotKeyString == nullptr )
+	const UnsignedByte index = (UnsignedByte)hotKey.getCharAt( 0 );
+	DisplayString *hotKeyString = s_hotKeyStrings[ index ];
+
+	if( hotKeyString == nullptr )
 	{
-		s_hotKeyString = TheDisplayStringManager->newDisplayString();
-		if( s_hotKeyString == nullptr )
+		hotKeyString = TheDisplayStringManager->newDisplayString();
+		if( hotKeyString == nullptr )
 			return;
 
 		Int pointSize = 10;
 		if( TheGlobalLanguageData )
 			pointSize = TheGlobalLanguageData->adjustFontSize( pointSize );
-		s_hotKeyString->setFont( TheFontLibrary->getFont( AsciiString( "Arial" ), pointSize, TRUE ) );
-		s_lastHotKey.clear();
-	}
+		hotKeyString->setFont( TheFontLibrary->getFont( AsciiString( "Arial" ), pointSize, TRUE ) );
 
-	if( s_lastHotKey != hotKey )
-	{
 		// the manager stores keys lowercased, but shortcuts read better as capitals
 		UnicodeString text;
-		text.translate( hotKey );
-		if( text.getLength() > 0 )
-		{
-			WideChar upper = (WideChar)toupper( (Int)text.getCharAt( 0 ) );
-			text.set( UnicodeString::TheEmptyString );
-			text.concat( upper );
-		}
-		s_hotKeyString->setText( text );
-		s_lastHotKey = hotKey;
+		WideChar upper = (WideChar)toupper( (Int)index );
+		text.concat( upper );
+		hotKeyString->setText( text );
+
+		s_hotKeyStrings[ index ] = hotKeyString;
 	}
 
 	ICoord2D origin;
@@ -144,8 +139,8 @@ static void drawButtonHotKeyOverlay( GameWindow *window )
 
 	// tuck it into the top left of the cameo, where no existing decoration lives
 	const Int inset = 2;
-	s_hotKeyString->draw( origin.x + inset, origin.y + inset,
-		TheGlobalData->m_hotKeyTextColor, GameMakeColor( 0, 0, 0, 255 ) );
+	hotKeyString->draw( origin.x + inset, origin.y + inset,
+		TheGlobalData->m_keyboardOverlayColor, GameMakeColor( 0, 0, 0, 255 ) );
 }
 
 // drawButtonText =============================================================
