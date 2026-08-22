@@ -205,10 +205,27 @@ Bool OptionPreferences::getKeyboardOverlayEnabled(void) const
 	return FALSE;
 }
 
-// TheSuperHackers @feature Colour of the command bar hotkey overlay letters.
-// Options.ini: KeyboardOverlayRed / KeyboardOverlayGreen / KeyboardOverlayBlue,
-// each 0-255. Defaults to white. An out of range or non numeric channel falls
-// back to full brightness rather than silently drawing an invisible letter.
+// TheSuperHackers @feature Options.ini: CastMode = Normal | QuickCast | QuickCastWithIndicator
+CastMode OptionPreferences::getCastMode(void) const
+{
+	OptionPreferences::const_iterator it = find("CastMode");
+	if (it == end())
+		return CastMode_Default;
+
+	if (stricmp(it->second.str(), "QuickCastWithIndicator") == 0)
+		return CastMode_QuickCastWithIndicator;
+	if (stricmp(it->second.str(), "QuickCast") == 0)
+		return CastMode_QuickCast;
+	if (stricmp(it->second.str(), "Normal") == 0)
+		return CastMode_Normal;
+
+	Int mode = atoi(it->second.str());
+	if (mode >= 0 && mode < CastMode_Count)
+		return (CastMode)mode;
+
+	return CastMode_Default;
+}
+
 // TheSuperHackers @feature Countdown numbers on build queue and cooldown cameos, read from
 // Options.ini as BuildTimerDisplayMode = None | Seconds | Auto (a plain index also works).
 BuildTimerDisplayMode OptionPreferences::getBuildTimerDisplayMode(void) const
@@ -246,6 +263,10 @@ UnsignedByte OptionPreferences::getColorChannel(const char *keyName, UnsignedByt
 	return (UnsignedByte)value;
 }
 
+// TheSuperHackers @feature Colour of the command bar hotkey overlay letters.
+// Options.ini: KeyboardOverlayRed / KeyboardOverlayGreen / KeyboardOverlayBlue,
+// each 0-255. Defaults to white. An out of range or non numeric channel falls
+// back to full brightness rather than silently drawing an invisible letter.
 Color OptionPreferences::getKeyboardOverlayColor(void) const
 {
 	return GameMakeColor(

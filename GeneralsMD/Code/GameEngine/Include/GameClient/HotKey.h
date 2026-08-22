@@ -103,9 +103,15 @@ public:
 	// with an earlier button, so only this reports the key that will really work.
 	AsciiString getHotKeyForWindow( const GameWindow *win ) const;
 
+	// TheSuperHackers @feature True while a button press is being synthesized from a keyboard
+	// hotkey rather than an actual mouse click. Quick cast needs to tell the two apart.
+	static void setExecutingHotKey( Bool executing ) { s_executingHotKey = executing; }
+	static Bool isExecutingHotKey( void ) { return s_executingHotKey; }
+
 private:
 	typedef std::map<AsciiString, HotKey> HotKeyMap;
 	HotKeyMap m_hotKeyMap;
+	static Bool s_executingHotKey;
 };
 extern HotKeyManager *TheHotKeyManager;
 //-----------------------------------------------------------------------------

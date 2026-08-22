@@ -1092,6 +1092,11 @@ InGameUI::InGameUI()
 	m_selectCount = 0;
 	m_frameSelectionChanged = 0;
   m_duringDoubleClickAttackMoveGuardHintTimer = 0;
+	// TheSuperHackers @feature quick cast indicator starts idle
+	m_quickCastHintTimer = 0;
+	m_quickCastHintPosition.zero();
+	m_quickCastHintCursorType = RADIUSCURSOR_NONE;
+	m_quickCastHintRadius = 0.0f;
   m_duringDoubleClickAttackMoveGuardHintStashedPosition.zero();
 	m_maxSelectCount = -1;
 	m_isScrolling = FALSE;
@@ -1607,7 +1612,13 @@ void InGameUI::handleRadiusCursor()
 			TheTacticalView->screenToTerrain( &mouseIO->pos, &pos );
 
 
-    if ( TheGlobalData->m_doubleClickAttackMove && m_duringDoubleClickAttackMoveGuardHintTimer > 0 )
+    // TheSuperHackers @feature Quick cast indicator fades out where the command landed.
+    if ( m_quickCastHintTimer > 0 )
+    {
+      m_curRadiusCursor.setOpacity( m_quickCastHintTimer * 0.1f );
+      m_curRadiusCursor.setPosition( m_quickCastHintPosition );
+    }
+    else if ( TheGlobalData->m_doubleClickAttackMove && m_duringDoubleClickAttackMoveGuardHintTimer > 0 )
     {
       m_curRadiusCursor.setOpacity( m_duringDoubleClickAttackMoveGuardHintTimer * 0.1f );
   		m_curRadiusCursor.setPosition( m_duringDoubleClickAttackMoveGuardHintStashedPosition );	//world space position of center of decal
@@ -1629,6 +1640,24 @@ void InGameUI::handleRadiusCursor()
 		(*it)->update();
 }
 
+
+// TheSuperHackers @feature Quick cast indicator.
+/** Flash the command's own targeting decal where the quick cast landed, so the player gets
+	* the same visual confirmation they would have had from aiming manually. */
+void InGameUI::triggerQuickCastHint( const CommandButton *command, const ICoord2D &screenPos )
+{
+	if( command == nullptr )
+		return;
+
+	m_quickCastHintTimer = 11;
+	resolveSpecialPowerRadiusCursor( command, m_quickCastHintCursorType, m_quickCastHintRadius );
+
+	if( !rts::localPlayerHasRadar() || (TheRadar->screenPixelToWorld( &screenPos, &m_quickCastHintPosition ) == FALSE) )
+		TheTacticalView->screenToTerrain( &screenPos, &m_quickCastHintPosition );
+
+	setRadiusCursor( m_quickCastHintCursorType, command->getSpecialPowerTemplate(),
+		command->getWeaponSlot(), m_quickCastHintRadius );
+}
 
 void InGameUI::triggerDoubleClickAttackMoveGuardHint( void )
 {
@@ -2971,6 +3000,18 @@ void InGameUI::createCommandHint( const GameMessage *msg )
 
 
 	setRadiusCursorNone();
+
+  // TheSuperHackers @feature Hold the quick cast decal for a few frames after firing, then
+  // let the normal cursor logic take back over.
+  if ( m_quickCastHintTimer > 0 )
+  {
+    if ( --m_quickCastHintTimer > 0 )
+    {
+      setRadiusCursor( m_quickCastHintCursorType, nullptr, PRIMARY_WEAPON, m_quickCastHintRadius );
+      return;
+    }
+  }
+
   if ( TheGlobalData->m_doubleClickAttackMove )
   {
     if ( --m_duringDoubleClickAttackMoveGuardHintTimer > 0 )

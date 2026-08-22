@@ -36,8 +36,19 @@
 typedef UnsignedInt CursorCaptureMode;
 typedef UnsignedInt ScreenEdgeScrollMode;
 
-// TheSuperHackers @feature When health bars are shown above objects. Purely a client side
-// display preference -- it never affects game logic, so it is safe in multiplayer and replays.
+// TheSuperHackers @feature How targeted commands (guard, attack move, abilities) are triggered.
+// Only affects hotkey activation -- a mouse click on a cameo leaves the cursor over the control
+// bar, where there is no world position to cast at, so it always uses the normal two step flow.
+enum CastMode CPP_11(: Int)
+{
+	CastMode_Normal = 0,				///< click the button, then click the world (retail behavior)
+	CastMode_QuickCast,					///< hotkey fires immediately at the cursor
+	CastMode_QuickCastWithIndicator,	///< as above, but flash the targeting decal where it fired
+
+	CastMode_Count,
+	CastMode_Default = CastMode_Normal
+};
+
 // TheSuperHackers @feature How remaining time is shown on build queue and cooldown cameos.
 // Purely a client side display preference.
 enum BuildTimerDisplayMode CPP_11(: Int)
@@ -50,6 +61,8 @@ enum BuildTimerDisplayMode CPP_11(: Int)
 	BuildTimerDisplayMode_Default = BuildTimerDisplayMode_None
 };
 
+// TheSuperHackers @feature When health bars are shown above objects. Purely a client side
+// display preference -- it never affects game logic, so it is safe in multiplayer and replays.
 enum HealthBarDisplayMode CPP_11(: Int)
 {
 	HealthBarDisplayMode_Classic = 0,	///< selected and moused over objects only (retail behavior)
@@ -82,6 +95,7 @@ public:
 	Bool getRetaliationModeEnabled();
 	HealthBarDisplayMode getHealthBarDisplayMode() const;
 	BuildTimerDisplayMode getBuildTimerDisplayMode() const;
+	CastMode getCastMode() const;
 	Bool getKeyboardOverlayEnabled() const;
 	Color getKeyboardOverlayColor() const;
 	Bool getKeyboardOverlayBackdropEnabled() const;

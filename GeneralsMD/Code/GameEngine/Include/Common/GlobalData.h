@@ -151,6 +151,9 @@ public:
 	// TheSuperHackers @feature Countdown numbers on build queue and cooldown cameos.
 	// Holds a BuildTimerDisplayMode; stored as Int to avoid pulling OptionPreferences.h in here.
 	Int m_buildTimerDisplayMode;
+	// TheSuperHackers @feature Hotkey activation behaviour for targeted commands.
+	// Holds a CastMode; stored as Int to avoid pulling OptionPreferences.h in here.
+	Int m_castMode;
 	// TheSuperHackers @feature Show each command bar cameo's hotkey letter on the cameo.
 	Bool m_keyboardOverlayEnabled;
 	Color m_keyboardOverlayColor;

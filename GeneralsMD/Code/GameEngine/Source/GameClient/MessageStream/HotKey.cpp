@@ -158,6 +158,9 @@ void HotKeyManager::addHotKey( GameWindow *win, const AsciiString& keyIn)
 }
 
 //-----------------------------------------------------------------------------
+// TheSuperHackers @feature See HotKey.h -- set only while synthesizing a button press.
+Bool HotKeyManager::s_executingHotKey = FALSE;
+
 Bool HotKeyManager::executeHotKey( const AsciiString& keyIn )
 {
 	AsciiString key = keyIn;
@@ -172,7 +175,12 @@ Bool HotKeyManager::executeHotKey( const AsciiString& keyIn )
 	{
 		if( BitIsSet( win->winGetStatus(), WIN_STATUS_ENABLED ) )
  		{
+			// TheSuperHackers @feature Tell the command bar this press came from the keyboard, so
+			// quick cast can fire at the cursor. A mouse click on the cameo leaves the cursor over
+			// the control bar, where there is nothing sensible to target.
+			HotKeyManager::setExecutingHotKey( TRUE );
  			TheWindowManager->winSendSystemMsg( win->winGetParent(), GBM_SELECTED, (WindowMsgData)win, win->winGetWindowId() );
+			HotKeyManager::setExecutingHotKey( FALSE );
 
  			// here we make the same click sound that the GUI uses when you click a button
  			AudioEventRTS buttonClick("GUIClick");

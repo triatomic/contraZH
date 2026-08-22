@@ -753,6 +753,8 @@ public:
 	void unregisterWindowLayout(WindowLayout *layout); // stop updates for this layout
 
   void triggerDoubleClickAttackMoveGuardHint( void );
+  // TheSuperHackers @feature Flash the targeting decal where a quick cast landed.
+  void triggerQuickCastHint( const CommandButton *command, const ICoord2D &screenPos );
 
 
 public:
@@ -912,6 +914,11 @@ protected:
 
   Int                         m_duringDoubleClickAttackMoveGuardHintTimer; ///< Frames left to draw the doubleClickFeedbackTimer
   Coord3D                     m_duringDoubleClickAttackMoveGuardHintStashedPosition;
+  // TheSuperHackers @feature Quick cast indicator, same shape as the hint above.
+  Int                         m_quickCastHintTimer;
+  Coord3D                     m_quickCastHintPosition;
+  RadiusCursorType            m_quickCastHintCursorType;
+  Real                        m_quickCastHintRadius;
 
 	// Video playback data
 	VideoBuffer*								m_videoBuffer;			///< video playback buffer

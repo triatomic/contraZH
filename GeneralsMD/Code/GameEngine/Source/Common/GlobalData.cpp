@@ -1135,6 +1135,7 @@ GlobalData::GlobalData()
 	// TheSuperHackers @feature Health bars behave exactly as they always have unless Options.ini says otherwise.
 	m_healthBarDisplayMode = HealthBarDisplayMode_Default;
 	m_buildTimerDisplayMode = BuildTimerDisplayMode_Default;
+	m_castMode = CastMode_Default;
 	m_keyboardOverlayEnabled = FALSE;
 	m_keyboardOverlayColor = GameMakeColor( 255, 255, 255, 255 );
 	m_keyboardOverlayBackdrop = TRUE;
@@ -1328,6 +1329,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_clientRetaliationModeEnabled = optionPref.getRetaliationModeEnabled();
 	TheWritableGlobalData->m_healthBarDisplayMode = optionPref.getHealthBarDisplayMode();
 	TheWritableGlobalData->m_buildTimerDisplayMode = optionPref.getBuildTimerDisplayMode();
+	TheWritableGlobalData->m_castMode = optionPref.getCastMode();
 	TheWritableGlobalData->m_keyboardOverlayEnabled = optionPref.getKeyboardOverlayEnabled();
 	TheWritableGlobalData->m_keyboardOverlayColor = optionPref.getKeyboardOverlayColor();
 	TheWritableGlobalData->m_keyboardOverlayBackdrop = optionPref.getKeyboardOverlayBackdropEnabled();

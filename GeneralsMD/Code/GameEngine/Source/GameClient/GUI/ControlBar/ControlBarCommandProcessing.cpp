@@ -51,10 +51,103 @@
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/Keyboard.h"
+// TheSuperHackers @feature for quick cast
+#include "Common/OptionPreferences.h"
+#include "Common/Recorder.h"
+#include "GameClient/HotKey.h"
+#include "GameClient/Mouse.h"
+#include "GameClient/View.h"
 #include "GameClient/AnimateWindowManager.h"
 
 // TheSuperHackers @feature How many units a shift click queues or cancels at once.
 static const Int SHIFT_CLICK_BATCH_SIZE = 5;
+
+// TheSuperHackers @feature Quick cast (Options.ini: CastMode).
+/**
+ * Fire a targeted command at the cursor instead of waiting for a second click.
+ *
+ * Returns TRUE only if the command was actually dispatched. Every rejection path returns
+ * FALSE so the caller arms the command normally -- an input is never silently eaten.
+ *
+ * Deliberately limited to keyboard activation. Clicking a cameo with the mouse leaves the
+ * cursor over the control bar, where there is no world position worth targeting.
+ */
+static Bool tryQuickCast( const CommandButton *commandButton )
+{
+	if( commandButton == nullptr || TheGlobalData == nullptr )
+		return FALSE;
+
+	if( TheGlobalData->m_castMode == CastMode_Normal )
+		return FALSE;
+
+	// only from a hotkey -- see the note above
+	if( !HotKeyManager::isExecutingHotKey() )
+		return FALSE;
+
+	if( TheInGameUI == nullptr || TheMouse == nullptr || TheTacticalView == nullptr )
+		return FALSE;
+
+	// leave replay playback alone, matching InGameUI::setGUICommand
+	if( TheRecorder && TheRecorder->getMode() == RECORDERMODETYPE_PLAYBACK )
+		return FALSE;
+
+	const UnsignedInt options = commandButton->getOptions();
+
+	// Commands that must not be fired blind:
+	//   NEED_N_TARGET_POS  needs several deliberate clicks by definition
+	//   SINGLE_USE_COMMAND burns the button permanently, so a misfire is unrecoverable
+	if( BitIsSet( options, NEED_N_TARGET_POS ) || BitIsSet( options, SINGLE_USE_COMMAND ) )
+		return FALSE;
+
+	// Rally points and beacons place a marker wherever the cursor happens to be, which is
+	// silent and easy to miss. Structure placement needs a deliberate footprint.
+	switch( commandButton->getCommandType() )
+	{
+		case GUI_COMMAND_SET_RALLY_POINT:
+		case GUICOMMANDMODE_PLACE_BEACON:
+		case GUI_COMMAND_DOZER_CONSTRUCT:
+		case GUI_COMMAND_SPECIAL_POWER_CONSTRUCT:
+		case GUI_COMMAND_SPECIAL_POWER_CONSTRUCT_FROM_SHORTCUT:
+			return FALSE;
+
+		// Superweapons are excluded on purpose: firing one at an unintended spot cannot be
+		// undone, and the stray keypress that does it is easy to make.
+		case GUI_COMMAND_SPECIAL_POWER:
+		case GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT:
+			return FALSE;
+
+		default:
+			break;
+	}
+
+	// The cursor has to be over the battlefield, not the command bar or another panel.
+	const MouseIO *mouseIO = TheMouse->getMouseStatus();
+	if( mouseIO == nullptr )
+		return FALSE;
+
+	if( TheWindowManager &&
+			TheWindowManager->getWindowUnderCursor( mouseIO->pos.x, mouseIO->pos.y ) != nullptr )
+		return FALSE;
+
+	// Hand the click to the normal path. Synthesizing the message rather than calling the
+	// do*Command helpers directly means quick cast reuses the engine's own validation,
+	// voice responses and cleanup, and cannot drift away from normal behaviour.
+	TheInGameUI->setGUICommand( commandButton );
+
+	// GUICommandTranslator reads the click position from pixelRegion.hi
+	IRegion2D clickRegion;
+	clickRegion.lo = mouseIO->pos;
+	clickRegion.hi = mouseIO->pos;
+
+	GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_MOUSE_LEFT_CLICK );
+	msg->appendPixelRegionArgument( clickRegion );
+
+	// Flash the targeting decal where it landed, so the player can see what happened.
+	if( TheGlobalData->m_castMode == CastMode_QuickCastWithIndicator )
+		TheInGameUI->triggerQuickCastHint( commandButton, mouseIO->pos );
+
+	return TRUE;
+}
 
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
@@ -229,6 +322,13 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		//with. For example, the terrorist can jack a car and convert it into a carbomb, but he has to
 		//click on a valid car. In this case the doCommandOrHint code will determine if the mode is valid
 		//or not and the cursor modes will be set appropriately.
+
+		// TheSuperHackers @feature Quick cast fires the command at the cursor instead of waiting for
+		// a second click. If it declines -- wrong mode, unsafe command, cursor not over the
+		// battlefield -- fall through and arm normally, so nothing is ever silently swallowed.
+		if( tryQuickCast( commandButton ) )
+			return CBC_COMMAND_USED;
+
 		TheInGameUI->setGUICommand( commandButton );
 	}
 	else switch( commandButton->getCommandType() )
