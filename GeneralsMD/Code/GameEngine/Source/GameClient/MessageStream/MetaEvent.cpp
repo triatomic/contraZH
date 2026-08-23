@@ -521,7 +521,13 @@ GameMessageDisposition MetaEventTranslator::translateGameMessage(const GameMessa
 					// here rather than by reordering translators, because the order is fixed before
 					// Options.ini is ever read. The meta event still fires whenever no button wants
 					// the key, so select all and friends keep working the rest of the time.
-					if( TheGlobalData && TheGlobalData->m_gridHotkeysEnabled && TheHotKeyManager )
+					// Only ever yield for an unmodified key. A command bar hotkey is a bare letter, or
+					// Shift plus one for batching, so anything carrying Ctrl or Alt cannot be a cameo
+					// press and must keep its meta event. Without this a Ctrl combo whose base letter
+					// happens to sit on a visible button is swallowed: the meta event steps aside and
+					// HotKeyTranslator then rejects the modifiers, so the key does nothing at all.
+					if( (newModState & ~SHIFT) == 0 &&
+							TheGlobalData && TheGlobalData->m_gridHotkeysEnabled && TheHotKeyManager )
 					{
 						WideChar wKey = TheKeyboard->getPrintableKey( (KeyDefType)msg->getArgument(0)->integer, 0 );
 						UnicodeString uKey;
