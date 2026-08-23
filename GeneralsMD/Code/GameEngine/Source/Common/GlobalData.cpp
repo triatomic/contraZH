@@ -1137,6 +1137,8 @@ GlobalData::GlobalData()
 	m_buildTimerDisplayMode = BuildTimerDisplayMode_Default;
 	m_castMode = CastMode_Default;
 	m_selectionCircleEnabled = FALSE;
+	m_gridHotkeysEnabled = FALSE;
+	m_gridHotkeyLayout.clear();
 	m_keyboardOverlayEnabled = FALSE;
 	m_keyboardOverlayColor = GameMakeColor( 255, 255, 255, 255 );
 	m_keyboardOverlayBackdrop = TRUE;
@@ -1332,6 +1334,8 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_buildTimerDisplayMode = optionPref.getBuildTimerDisplayMode();
 	TheWritableGlobalData->m_castMode = optionPref.getCastMode();
 	TheWritableGlobalData->m_selectionCircleEnabled = optionPref.getSelectionCircleEnabled();
+	TheWritableGlobalData->m_gridHotkeysEnabled = optionPref.getGridHotkeysEnabled();
+	TheWritableGlobalData->m_gridHotkeyLayout = optionPref.getGridHotkeyLayout();
 	TheWritableGlobalData->m_keyboardOverlayEnabled = optionPref.getKeyboardOverlayEnabled();
 	TheWritableGlobalData->m_keyboardOverlayColor = optionPref.getKeyboardOverlayColor();
 	TheWritableGlobalData->m_keyboardOverlayBackdrop = optionPref.getKeyboardOverlayBackdropEnabled();

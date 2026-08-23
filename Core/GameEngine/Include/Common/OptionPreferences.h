@@ -97,6 +97,8 @@ public:
 	BuildTimerDisplayMode getBuildTimerDisplayMode() const;
 	CastMode getCastMode() const;
 	Bool getSelectionCircleEnabled() const;
+	Bool getGridHotkeysEnabled() const;
+	AsciiString getGridHotkeyLayout() const;
 	Bool getKeyboardOverlayEnabled() const;
 	Color getKeyboardOverlayColor() const;
 	Bool getKeyboardOverlayBackdropEnabled() const;

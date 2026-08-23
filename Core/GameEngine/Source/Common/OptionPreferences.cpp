@@ -205,6 +205,34 @@ Bool OptionPreferences::getKeyboardOverlayEnabled(void) const
 	return FALSE;
 }
 
+// TheSuperHackers @feature Grid hotkeys assign a command bar key by slot position rather than
+// by whatever letter the string file marked with an ampersand.
+// Options.ini: GridHotkeys = Yes
+Bool OptionPreferences::getGridHotkeysEnabled(void) const
+{
+	OptionPreferences::const_iterator it = find("GridHotkeys");
+	if (it == end())
+		return FALSE;
+
+	if (stricmp(it->second.str(), "yes") == 0) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+// TheSuperHackers @feature The key for each slot, in slot order. Defaults to two rows of nine,
+// matching a command bar that is two rows deep. Mods with a different bar can set their own,
+// and the count is whatever the string is long -- slots past the end simply get no grid key.
+// Options.ini: GridHotkeyLayout = QWERTYUIOASDFGHJKL
+AsciiString OptionPreferences::getGridHotkeyLayout(void) const
+{
+	OptionPreferences::const_iterator it = find("GridHotkeyLayout");
+	if (it == end() || it->second.isEmpty())
+		return AsciiString("QWERTYUIOASDFGHJKL");
+
+	return it->second;
+}
+
 // TheSuperHackers @feature Options.ini: SelectionCircle = Yes draws a green hexagon under
 // every selected object.
 Bool OptionPreferences::getSelectionCircleEnabled(void) const
