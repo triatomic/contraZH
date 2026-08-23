@@ -978,8 +978,9 @@ static void drawSelectionHexagon( Drawable *draw )
 	if( center == nullptr )
 		return;
 
-	// sized to the object, with a little margin so the ring sits clear of the model
-	Real radius = draw->getDrawableGeometryInfo().getBoundingCircleRadius() * 1.15f;
+	// Tucked inside the bounding circle, which encloses the whole model and reads as too big
+	// when drawn at full size, especially on infantry.
+	Real radius = draw->getDrawableGeometryInfo().getBoundingCircleRadius() * 0.7f;
 	if( radius < 1.0f )
 		radius = 1.0f;
 
