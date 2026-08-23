@@ -997,7 +997,15 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 			{
 				//Added support to cancel the GUI command without deselecting the unit(s) involved
 				//when you right click.
-				if( TheInGameUI->getGUICommand() )
+				// TheSuperHackers @feature Right click also cancels a queued quick cast, so a cast
+				// waiting on a cooldown can be called off the same way an armed command is.
+				if( TheInGameUI->hasQueuedQuickCast() )
+				{
+					TheInGameUI->cancelQueuedQuickCast();
+					disp = DESTROY_MESSAGE;
+					TheInGameUI->setScrolling( FALSE );
+				}
+				else if( TheInGameUI->getGUICommand() )
 				{
 					//Cancel GUI command mode... don't deselect units.
 					TheInGameUI->setGUICommand( nullptr );

@@ -753,6 +753,15 @@ public:
 	void unregisterWindowLayout(WindowLayout *layout); // stop updates for this layout
 
   void triggerDoubleClickAttackMoveGuardHint( void );
+  // TheSuperHackers @feature Flash the targeting decal where a quick cast landed.
+  void triggerQuickCastHint( const CommandButton *command, const ICoord2D &screenPos );
+
+  // TheSuperHackers @feature Queued quick cast -- remember a cast requested while the ability
+  // was still recharging, and fire it once the logic side says it is ready.
+  void queueQuickCast( const CommandButton *command, const ICoord2D &screenPos );
+  void cancelQueuedQuickCast( void );
+  Bool hasQueuedQuickCast( void ) const { return m_queuedCastCommand != nullptr; }
+  void updateQueuedQuickCast( void );
 
 
 public:
@@ -912,6 +921,17 @@ protected:
 
   Int                         m_duringDoubleClickAttackMoveGuardHintTimer; ///< Frames left to draw the doubleClickFeedbackTimer
   Coord3D                     m_duringDoubleClickAttackMoveGuardHintStashedPosition;
+  // TheSuperHackers @feature Quick cast indicator, same shape as the hint above.
+  Int                         m_quickCastHintTimer;
+  Coord3D                     m_quickCastHintPosition;
+  RadiusCursorType            m_quickCastHintCursorType;
+  Real                        m_quickCastHintRadius;
+  // TheSuperHackers @feature Queued quick cast state.
+  const CommandButton        *m_queuedCastCommand;
+  ICoord2D                    m_queuedCastScreenPos;
+  Coord3D                     m_queuedCastWorldPos;
+  ObjectID                    m_queuedCastSourceID;
+  UnsignedInt                 m_queuedCastExpiryFrame;
 
 	// Video playback data
 	VideoBuffer*								m_videoBuffer;			///< video playback buffer

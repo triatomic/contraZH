@@ -39,6 +39,8 @@
 #include "Common/GameType.h"
 #include "Common/MultiplayerSettings.h"
 #include "Common/NameKeyGenerator.h"
+// TheSuperHackers @feature for the grid hotkey exclusion list
+#include "Common/OptionPreferences.h"
 #include "Common/Override.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/Player.h"
@@ -2494,6 +2496,69 @@ void ControlBar::setCommandBarBorder( GameWindow *button, CommandButtonMappedBor
 //-------------------------------------------------------------------------------------------------
 /** Set the command data into the control */
 //-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature Grid hotkeys.
+//-------------------------------------------------------------------------------------------------
+/** Which grid key belongs to this command bar button, or empty if it is not one of them.
+	*
+	* The slot is found by looking the window up in m_commandWindows, so the mapping follows the
+	* bar's own ordering and needs no assumption about how many slots a mod uses. Slots past the
+	* end of the configured layout simply get no grid key. */
+//-------------------------------------------------------------------------------------------------
+AsciiString ControlBar::getGridHotKeyForButton( GameWindow *button, Bool *isGridSlot ) const
+{
+	if( button == nullptr || TheGlobalData == nullptr )
+		return AsciiString::TheEmptyString;
+
+	const AsciiString &layout = TheGlobalData->m_gridHotkeyLayout;
+	if( layout.isEmpty() )
+		return AsciiString::TheEmptyString;
+
+	for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
+	{
+		if( m_commandWindows[ i ] != button )
+			continue;
+
+		// The command bar numbers its slots down each column, but the layout string is written
+		// in reading order, so translate between the two. Without this, sequential letters land
+		// on alternating rows.
+		Int layoutIndex = i;
+		const Int columns = TheGlobalData->m_gridHotkeyColumns;
+		if( columns > 0 )
+		{
+			// Rows come from the layout's own length, not MAX_COMMANDS_PER_SET, which is the
+			// internal cap of 32 rather than however many slots the mod actually shows.
+			const Int rows = ( layout.getLength() + columns - 1 ) / columns;
+			if( rows > 0 )
+			{
+				const Int column = i / rows;	// slots run down a column before moving right
+				const Int row = i % rows;
+				layoutIndex = row * columns + column;
+			}
+		}
+
+		if( layoutIndex >= layout.getLength() )
+			break;	// this mod has more slots than the layout covers
+
+		// this slot belongs to the grid, whatever we decide its key is
+		if( isGridSlot != nullptr )
+			*isGridSlot = TRUE;
+
+		AsciiString key;
+		key.concat( layout.getCharAt( layoutIndex ) );
+
+		// A key on the exclusion list gives this slot no hotkey at all. Falling back to the string
+		// file letter would be worse than useless here: the letter varies with whatever is being
+		// built, which is the very thing the grid exists to stop, and it competes with the grid
+		// letters for the same keys -- addHotKey silently drops the loser, so slots ended up blank.
+		if( OptionPreferences::isNonGridHotkeyInList( TheGlobalData->m_nonGridHotkeys, key ) )
+			return AsciiString::TheEmptyString;
+
+		return key;
+	}
+
+	return AsciiString::TheEmptyString;
+}
+
 void ControlBar::setControlCommand( GameWindow *button, const CommandButton *commandButton )
 {
 
@@ -2565,7 +2630,22 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 
 	if (TheHotKeyManager)
 	{
-		AsciiString hotKey =	TheHotKeyManager->searchHotKey(commandButton->getTextLabel());
+		// TheSuperHackers @feature Grid hotkeys key a button by where it sits in the command
+		// bar rather than by the letter its string file marked with an ampersand, so the keys
+		// stay in the same place whatever is being built.
+		AsciiString hotKey;
+		Bool isGridSlot = FALSE;
+
+		if( TheGlobalData && TheGlobalData->m_gridHotkeysEnabled )
+			hotKey = getGridHotKeyForButton( button, &isGridSlot );
+
+		// Fall back to the string file letter only for a button the grid does not cover -- one past
+		// the end of the layout, or not in the command bar at all -- so those key the way they always
+		// did. A slot that is in the grid but whose key was excluded gets no hotkey, rather than a
+		// unit specific letter that would defeat the point of a fixed layout.
+		if( hotKey.isEmpty() && !isGridSlot )
+			hotKey = TheHotKeyManager->searchHotKey(commandButton->getTextLabel());
+
 		if(hotKey.isNotEmpty())
 			TheHotKeyManager->addHotKey(button, hotKey);
 	}

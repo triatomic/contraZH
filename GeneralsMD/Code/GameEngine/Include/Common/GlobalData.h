@@ -144,6 +144,34 @@ public:
 	Int m_terrainLODTargetTimeMS;
 	Bool m_useAlternateMouse;
 	Bool m_clientRetaliationModeEnabled;
+	// TheSuperHackers @feature Client side health bar display preference, from Options.ini.
+	// Holds a HealthBarDisplayMode; stored as Int so this widely included header does not
+	// have to pull in OptionPreferences.h.
+	Int m_healthBarDisplayMode;
+	// TheSuperHackers @feature Countdown numbers on build queue and cooldown cameos.
+	// Holds a BuildTimerDisplayMode; stored as Int to avoid pulling OptionPreferences.h in here.
+	Int m_buildTimerDisplayMode;
+	// TheSuperHackers @feature Hotkey activation behaviour for targeted commands.
+	// Holds a CastMode; stored as Int to avoid pulling OptionPreferences.h in here.
+	Int m_castMode;
+	// TheSuperHackers @feature Draw a green hexagon under selected objects.
+	Bool m_selectionCircleEnabled;
+	// TheSuperHackers @feature Keep ammo and passenger pips on screen when there is something
+	// to report, rather than only on selection or hover.
+	Bool m_smartPips;
+	// TheSuperHackers @feature Print hit points beside the health bar.
+	Bool m_numericalHealth;
+	// TheSuperHackers @feature Command bar keys by slot position instead of by string file.
+	Bool m_gridHotkeysEnabled;
+	AsciiString m_gridHotkeyLayout;
+	Int m_gridHotkeyColumns;
+	// Keys the player asked to leave out of the grid; those slots keep their string file letter.
+	AsciiString m_nonGridHotkeys;
+	// TheSuperHackers @feature Show each command bar cameo's hotkey letter on the cameo.
+	Bool m_keyboardOverlayEnabled;
+	Color m_keyboardOverlayColor;
+	Bool m_keyboardOverlayBackdrop;
+	Color m_keyboardOverlayBackdropColor;
 	Bool m_doubleClickAttackMove;
 	Bool m_rightMouseAlwaysScrolls;
 	Bool m_useWaterPlane;

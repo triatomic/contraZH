@@ -58,6 +58,9 @@
 #include "GameClient/Keyboard.h"
 #include "GameClient/GameText.h"
 #include "Common/AudioEventRTS.h"
+// TheSuperHackers @feature for hold to aim quick cast
+#include "Common/GlobalData.h"
+#include "Common/OptionPreferences.h"
 //-----------------------------------------------------------------------------
 // DEFINES ////////////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
@@ -72,7 +75,13 @@ GameMessageDisposition HotKeyTranslator::translateGameMessage(const GameMessage 
 	GameMessageDisposition disp = KEEP_MESSAGE;
 	GameMessage::Type t = msg->getType();
 
-	if ( t == GameMessage::MSG_RAW_KEY_UP)
+	// TheSuperHackers @feature In QuickCastWithIndicator mode a hotkey arms on key down so the
+	// player can see the targeting decal and still adjust aim, then fires on key up. Every other
+	// mode keeps the original behaviour of acting only on key up.
+	const Bool holdToAim = TheGlobalData &&
+		TheGlobalData->m_castMode == CastMode_QuickCastWithIndicator;
+
+	if ( t == GameMessage::MSG_RAW_KEY_UP || (holdToAim && t == GameMessage::MSG_RAW_KEY_DOWN) )
 	{
 
 		//char key = msg->getArgument(0)->integer;
@@ -96,15 +105,27 @@ GameMessageDisposition HotKeyTranslator::translateGameMessage(const GameMessage 
 		{
 			newModState |= ALT;
 		}
-		if(newModState != 0)
+
+		// TheSuperHackers @feature Let Shift through so shift+hotkey batches production the same
+		// way shift+clicking the cameo does. Ctrl and Alt still bail, since those carry their own
+		// bindings (control groups and so on) that must not be shadowed by command hotkeys.
+		if( (newModState & ~SHIFT) != 0 )
 			return disp;
 		WideChar key = TheKeyboard->getPrintableKey((KeyDefType)msg->getArgument(0)->integer, 0);
 		UnicodeString uKey;
 		uKey.concat(key);
 		AsciiString aKey;
 		aKey.translate(uKey);
-		if(TheHotKeyManager && TheHotKeyManager->executeHotKey(aKey))
-			disp = DESTROY_MESSAGE;
+		if( TheHotKeyManager )
+		{
+			// key down arms and previews, key up commits at wherever the cursor ended up
+			HotKeyManager::setQuickCastAiming( holdToAim && t == GameMessage::MSG_RAW_KEY_DOWN );
+
+			if( TheHotKeyManager->executeHotKey(aKey) )
+				disp = DESTROY_MESSAGE;
+
+			HotKeyManager::setQuickCastAiming( FALSE );
+		}
 	}
 	return disp;
 }
@@ -158,6 +179,32 @@ void HotKeyManager::addHotKey( GameWindow *win, const AsciiString& keyIn)
 }
 
 //-----------------------------------------------------------------------------
+// TheSuperHackers @feature See HotKey.h -- set only while synthesizing a button press.
+Bool HotKeyManager::s_executingHotKey = FALSE;
+Bool HotKeyManager::s_quickCastAiming = FALSE;
+
+// TheSuperHackers @feature See HotKey.h.
+//-----------------------------------------------------------------------------
+Bool HotKeyManager::isHotKeyClaimed( const AsciiString& keyIn ) const
+{
+	AsciiString key = keyIn;
+	key.toLower();
+
+	HotKeyMap::const_iterator it = m_hotKeyMap.find(key);
+	if( it == m_hotKeyMap.end() )
+		return FALSE;
+
+	GameWindow *win = it->second.m_win;
+	if( win == nullptr )
+		return FALSE;
+
+	// only a button the player can actually press counts as claiming the key
+	if( BitIsSet( win->winGetStatus(), WIN_STATUS_HIDDEN ) )
+		return FALSE;
+
+	return TRUE;
+}
+
 Bool HotKeyManager::executeHotKey( const AsciiString& keyIn )
 {
 	AsciiString key = keyIn;
@@ -170,9 +217,28 @@ Bool HotKeyManager::executeHotKey( const AsciiString& keyIn )
 		return FALSE;
 	if( !BitIsSet( win->winGetStatus(), WIN_STATUS_HIDDEN ) )
 	{
-		if( BitIsSet( win->winGetStatus(), WIN_STATUS_ENABLED ) )
+		// TheSuperHackers @feature A recharging ability disables its button, which normally
+		// swallows the hotkey. In hold to aim mode let it through anyway so the player can
+		// pre-aim while the cooldown runs out. This only opens up buttons disabled by
+		// WIN_STATUS_NOT_READY -- ones that are restricted or unaffordable stay rejected, and
+		// the ability still only actually fires if the logic side says it is ready.
+		Bool allowWhileRecharging = FALSE;
+		if( !BitIsSet( win->winGetStatus(), WIN_STATUS_ENABLED ) &&
+				BitIsSet( win->winGetStatus(), WIN_STATUS_NOT_READY ) &&
+				TheGlobalData &&
+				TheGlobalData->m_castMode == CastMode_QuickCastWithIndicator )
+		{
+			allowWhileRecharging = TRUE;
+		}
+
+		if( BitIsSet( win->winGetStatus(), WIN_STATUS_ENABLED ) || allowWhileRecharging )
  		{
+			// TheSuperHackers @feature Tell the command bar this press came from the keyboard, so
+			// quick cast can fire at the cursor. A mouse click on the cameo leaves the cursor over
+			// the control bar, where there is nothing sensible to target.
+			HotKeyManager::setExecutingHotKey( TRUE );
  			TheWindowManager->winSendSystemMsg( win->winGetParent(), GBM_SELECTED, (WindowMsgData)win, win->winGetWindowId() );
+			HotKeyManager::setExecutingHotKey( FALSE );
 
  			// here we make the same click sound that the GUI uses when you click a button
  			AudioEventRTS buttonClick("GUIClick");
@@ -191,6 +257,24 @@ Bool HotKeyManager::executeHotKey( const AsciiString& keyIn )
 		}
 	}
 	return FALSE;
+}
+
+//-----------------------------------------------------------------------------
+// TheSuperHackers @feature Reverse lookup for the hotkey overlay on command bar cameos.
+//-----------------------------------------------------------------------------
+AsciiString HotKeyManager::getHotKeyForWindow( const GameWindow *win ) const
+{
+	if( win == nullptr )
+		return AsciiString::TheEmptyString;
+
+	// the map only ever holds the currently displayed commands, so this stays tiny
+	for( HotKeyMap::const_iterator it = m_hotKeyMap.begin(); it != m_hotKeyMap.end(); ++it )
+	{
+		if( it->second.m_win == win )
+			return it->second.m_key;
+	}
+
+	return AsciiString::TheEmptyString;
 }
 
 //-----------------------------------------------------------------------------

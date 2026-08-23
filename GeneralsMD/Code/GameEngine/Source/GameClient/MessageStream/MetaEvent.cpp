@@ -61,6 +61,13 @@
 #include "GameClient/Keyboard.h"
 #endif
 
+// TheSuperHackers @feature for grid hotkeys yielding to command bar buttons
+#include "Common/GlobalData.h"
+// TheSuperHackers @feature for the grid hotkey exclusion list
+#include "Common/OptionPreferences.h"
+#include "GameClient/HotKey.h"
+#include "GameClient/Keyboard.h"
+
 MetaMap *TheMetaMap = nullptr;
 
 
@@ -159,6 +166,7 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "TOGGLE_LOWER_DETAILS",											GameMessage::MSG_META_TOGGLE_LOWER_DETAILS },
 	{ "TOGGLE_CONTROL_BAR",												GameMessage::MSG_META_TOGGLE_CONTROL_BAR },
 	{ "TOGGLE_PLAYER_OBSERVER",										GameMessage::MSG_META_TOGGLE_PLAYER_OBSERVER },
+	{ "CYCLE_HEALTH_BAR_MODE",										GameMessage::MSG_META_CYCLE_HEALTH_BAR_MODE },
 	{ "BEGIN_PATH_BUILD",													GameMessage::MSG_META_BEGIN_PATH_BUILD },
 	{ "END_PATH_BUILD",														GameMessage::MSG_META_END_PATH_BUILD },
 	{ "BEGIN_FORCEATTACK",												GameMessage::MSG_META_BEGIN_FORCEATTACK },
@@ -509,6 +517,38 @@ GameMessageDisposition MetaEventTranslator::translateGameMessage(const GameMessa
 				else
 				{
 
+					// TheSuperHackers @feature With grid hotkeys on, a command bar button that has
+					// claimed this key wins over the meta event bound to the same letter. Checked
+					// here rather than by reordering translators, because the order is fixed before
+					// Options.ini is ever read. The meta event still fires whenever no button wants
+					// the key, so select all and friends keep working the rest of the time.
+					// Only ever yield for an unmodified key. A command bar hotkey is a bare letter, or
+					// Shift plus one for batching, so anything carrying Ctrl or Alt cannot be a cameo
+					// press and must keep its meta event. Without this a Ctrl combo whose base letter
+					// happens to sit on a visible button is swallowed: the meta event steps aside and
+					// HotKeyTranslator then rejects the modifiers, so the key does nothing at all.
+					if( (newModState & ~SHIFT) == 0 &&
+							TheGlobalData && TheGlobalData->m_gridHotkeysEnabled && TheHotKeyManager )
+					{
+						WideChar wKey = TheKeyboard->getPrintableKey( (KeyDefType)msg->getArgument(0)->integer, 0 );
+						UnicodeString uKey;
+						uKey.concat( wKey );
+						AsciiString aKey;
+						aKey.translate( uKey );
+
+						// A key on the exclusion list keeps its meta event no matter what, which is the
+						// whole point of listing it -- otherwise a button that took the key through the
+						// string file fallback would still shadow it.
+						const Bool nonGrid = OptionPreferences::isNonGridHotkeyInList(
+								TheGlobalData->m_nonGridHotkeys, aKey );
+
+						if( !nonGrid && aKey.isNotEmpty() && TheHotKeyManager->isHotKeyClaimed( aKey ) )
+						{
+							disp = KEEP_MESSAGE;	// let HotKeyTranslator have it
+							break;
+						}
+					}
+
           // THIS IS A GREASY HACK... MESSAGE SHOULD BE HANDLED IN A TRANSLATOR, BUT DURING CINEMATICS THE TRANSLATOR IS DISABLED
           if( map->m_meta ==  GameMessage::MSG_META_TOGGLE_FAST_FORWARD_REPLAY)
 		      {
@@ -783,6 +823,21 @@ MetaMapRec *MetaMap::getMetaMapRec(GameMessage::Type t)
 			map->m_transition = DOWN;
 			map->m_modState = NONE;
 			map->m_usableIn = COMMANDUSABLE_OBSERVER;
+		}
+	}
+	{
+		// TheSuperHackers @feature Cycle the health bar display mode. Ctrl+Shift+` is unbound in
+		// retail and in the debug and demo command maps, so this takes a key nothing else wants.
+		// Note the tick key is layout dependent -- it is ` on a US keyboard but prints something
+		// else elsewhere -- however the binding is by scancode, so the same physical key works.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_META_CYCLE_HEALTH_BAR_MODE);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_TICK;
+			map->m_transition = DOWN;
+			map->m_modState = SHIFT_CTRL;
+			// in game and while observing, but not in the menus, where health bars mean nothing
+			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
 		}
 	}
 	{

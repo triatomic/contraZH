@@ -601,6 +601,8 @@ PushButtonData * getNewPushButtonData( void )
 	p->drawBorder = FALSE;
 	p->drawClock = NO_CLOCK;
 	p->overlayImage = nullptr;
+	// TheSuperHackers @feature no countdown until someone asks for one
+	p->countdownSeconds = -1;
 	return p;
 }
 
@@ -660,6 +662,26 @@ void GadgetButtonDrawInverseClock( GameWindow *g, Int percent, Color color )
 	pData->drawClock = INVERSE_CLOCK;
 	pData->percentClock = percent;
 	pData->colorClock = color;
+	g->winSetUserData(pData);
+
+}
+
+// GadgetButtonDrawCountdown ==================================================
+/** TheSuperHackers @feature Show remaining time in seconds over the button. Like the clock
+	* above this is one shot, so it must be re-set every frame while the timer is running. */
+//=============================================================================
+void GadgetButtonDrawCountdown( GameWindow *g, Int seconds )
+{
+
+	if( g == nullptr )
+		return;
+
+	PushButtonData *pData = (PushButtonData *)g->winGetUserData();
+	if(!pData)
+	{
+		pData = getNewPushButtonData();
+	}
+	pData->countdownSeconds = seconds;
 	g->winSetUserData(pData);
 
 }

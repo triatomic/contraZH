@@ -98,9 +98,31 @@ public:
 	AsciiString searchHotKey( const AsciiString& label);
 	AsciiString searchHotKey( const UnicodeString& uStr );
 
+	// TheSuperHackers @feature Which hotkey actually got registered to this window, if any.
+	// Deliberately not derived from the window's label -- addHotKey drops keys that collide
+	// with an earlier button, so only this reports the key that will really work.
+	AsciiString getHotKeyForWindow( const GameWindow *win ) const;
+
+	// TheSuperHackers @feature True while a button press is being synthesized from a keyboard
+	// hotkey rather than an actual mouse click. Quick cast needs to tell the two apart.
+	static void setExecutingHotKey( Bool executing ) { s_executingHotKey = executing; }
+	static Bool isExecutingHotKey( void ) { return s_executingHotKey; }
+
+	// TheSuperHackers @feature True on the key down half of a hold to aim quick cast, when the
+	// command should arm and show its decal rather than fire.
+	static void setQuickCastAiming( Bool aiming ) { s_quickCastAiming = aiming; }
+	static Bool isQuickCastAiming( void ) { return s_quickCastAiming; }
+
+	// TheSuperHackers @feature Is this key currently claimed by a visible, enabled command
+	// button? Used so grid hotkeys can take precedence over a meta event bound to the same
+	// letter, but only while a button actually wants it.
+	Bool isHotKeyClaimed( const AsciiString& key ) const;
+
 private:
 	typedef std::map<AsciiString, HotKey> HotKeyMap;
 	HotKeyMap m_hotKeyMap;
+	static Bool s_executingHotKey;
+	static Bool s_quickCastAiming;
 };
 extern HotKeyManager *TheHotKeyManager;
 //-----------------------------------------------------------------------------

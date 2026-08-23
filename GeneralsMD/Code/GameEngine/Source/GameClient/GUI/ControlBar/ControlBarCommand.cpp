@@ -37,6 +37,7 @@
 #include "Common/PlayerList.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/SpecialPower.h"
+#include "Common/OptionPreferences.h"
 #include "Common/Upgrade.h"
 #include "Common/BuildAssistant.h"
 #include "GameLogic/GameLogic.h"
@@ -796,6 +797,30 @@ void ControlBar::updateContextCommand( void )
 
 				GadgetButtonDrawInverseClock(win,produce->getPercentComplete(), m_buildUpClockColor);
 
+				// TheSuperHackers @feature Remaining build time on the head queue slot.
+				if( TheGlobalData->m_buildTimerDisplayMode != BuildTimerDisplayMode_None )
+				{
+					Int totalFrames = 0;
+					if( produce->getProductionType() == PRODUCTION_UNIT )
+					{
+						if( produce->getProductionObject() )
+							totalFrames = produce->getProductionObject()->calcTimeToBuild( obj->getControllingPlayer() );
+					}
+					else if( produce->getProductionUpgrade() )
+					{
+						totalFrames = produce->getProductionUpgrade()->calcTimeToBuild( obj->getControllingPlayer() );
+					}
+
+					if( totalFrames > 0 )
+					{
+						Real remainingReal = totalFrames * (100.0f - produce->getPercentComplete()) / 100.0f;
+						Int remainingFrames = ( remainingReal > 0.0f ) ? REAL_TO_INT_CEIL( remainingReal ) : 0;
+						// integer ceiling -- see formatBuildTimeForTooltip for why not the float form
+						GadgetButtonDrawCountdown( win,
+							( remainingFrames + LOGICFRAMES_PER_SECOND - 1 ) / LOGICFRAMES_PER_SECOND );
+					}
+				}
+
 			}
 
 		}
@@ -1442,6 +1467,19 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 				Int percent =  mod->getPercentReady() * 100;
 
 				GadgetButtonDrawInverseClock( applyToWin, percent, m_buildUpClockColor );
+
+				// TheSuperHackers @feature Remaining recharge time. getReadyFrame is an absolute
+				// frame, and already accounts for paused and shared/synced powers.
+				if( TheGlobalData->m_buildTimerDisplayMode != BuildTimerDisplayMode_None )
+				{
+					UnsignedInt now = TheGameLogic->getFrame();
+					UnsignedInt readyFrame = mod->getReadyFrame();
+					UnsignedInt remainingFrames = ( readyFrame > now ) ? ( readyFrame - now ) : 0;
+					// integer ceiling -- see formatBuildTimeForTooltip for why not the float form
+					GadgetButtonDrawCountdown( applyToWin,
+						( remainingFrames + LOGICFRAMES_PER_SECOND - 1 ) / LOGICFRAMES_PER_SECOND );
+				}
+
 				return COMMAND_NOT_READY;
 			}
 			else if (command->getSpecialPowerTemplate()->getCost() > 0 && player->getMoney()->countMoney() < command->getSpecialPowerTemplate()->getCost()) {
