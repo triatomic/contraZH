@@ -2011,6 +2011,8 @@ W3DModelDraw::W3DModelDraw(Thing *thing, const ModuleData* moduleData) : DrawMod
 	m_shadow = nullptr;
 	m_shadowEnabled = TRUE;
 	m_terrainDecal = nullptr;
+	// TheSuperHackers @feature no selection ring until one is asked for
+	m_selectionDecal = nullptr;
 	m_trackRenderObject = nullptr;
 	m_lastTrackWasBackwards = FALSE;
 	m_isFirstDrawModule = FALSE;
@@ -3231,12 +3233,61 @@ void W3DModelDraw::handleFXEvents()
 
 
 //-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature Selection ring decal.
+//-------------------------------------------------------------------------------------------------
+/** Put a green ring on the ground under this object, or take it away.
+	*
+	* Uses the projected shadow system rather than screen space lines, so the ring is genuinely
+	* projected onto the terrain and the model draws over it. It lives in its own slot rather than
+	* sharing m_terrainDecal, so selecting a horde unit does not evict its horde ring.
+	*
+	* The texture is one of the game's existing plain rings, tinted green, so no new art is needed. */
+//-------------------------------------------------------------------------------------------------
+void W3DModelDraw::setSelectionDecal(Bool enable, Real radius)
+{
+	if (m_selectionDecal)
+	{
+		m_selectionDecal->release();
+		m_selectionDecal = nullptr;
+	}
+
+	if (!enable || m_renderObject == nullptr || TheProjectedShadowManager == nullptr)
+		return;
+
+	Shadow::ShadowTypeInfo decalInfo;
+	decalInfo.allowUpdates = FALSE;		//the ring never needs regenerating
+	decalInfo.allowWorldAlign = TRUE;	//wrap it around terrain and world objects
+	decalInfo.m_type = SHADOW_ALPHA_DECAL;
+	strlcpy(decalInfo.m_ShadowName, "PlainRingBlue", ARRAY_SIZE(decalInfo.m_ShadowName));
+	decalInfo.m_sizeX = radius * 2.0f;
+	decalInfo.m_sizeY = radius * 2.0f;
+	decalInfo.m_offsetX = 0.0f;
+	decalInfo.m_offsetY = 0.0f;
+
+	m_selectionDecal = TheProjectedShadowManager->addDecal(m_renderObject, &decalInfo);
+	if (m_selectionDecal)
+	{
+		m_selectionDecal->enableShadowInvisible(m_fullyObscuredByShroud);
+		m_selectionDecal->enableShadowRender(TRUE);
+		//the art is a plain ring, so tint it to the selection green
+		m_selectionDecal->setColor(GameMakeColor(0, 255, 0, 255));
+	}
+}
+
 void W3DModelDraw::setTerrainDecal(TerrainDecalType type)
 {
 	// DEBUG_LOG(("W3DModelDraw::setTerrainDecal - type = %d. invalid = %d\n", type, type == TERRAIN_DECAL_NONE || type >= TERRAIN_DECAL_MAX));
 
 	if (m_terrainDecal)
 		m_terrainDecal->release();
+
+	// TheSuperHackers @feature drop the selection ring too
+	if (m_selectionDecal)
+	{
+		m_selectionDecal->release();
+		m_selectionDecal = nullptr;
+	}
+
 
 	m_terrainDecal = nullptr;
 

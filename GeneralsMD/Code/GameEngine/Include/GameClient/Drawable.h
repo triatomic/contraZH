@@ -400,6 +400,10 @@ public:
 
 	/// Return true if drawable has been marked as "selected"
 	Bool isSelected( void ) const {	return m_selected; }
+
+	// TheSuperHackers @feature Green selection ring decal (Options.ini: SelectionCircle).
+	// Client only -- never xfer'd, never read by game logic.
+	void updateSelectionDecal( void );
 	void onSelected();														///< Work unrelated to selection that must happen at time of selection
 	void onUnselected();													///< Work unrelated to selection that must happen at time of unselection
 
@@ -745,6 +749,7 @@ private:
 	Real m_secondMaterialPassOpacity;			///< drawable gets rendered again in hardware with an extra material layer
 	// --------- BYTE-SIZED THINGS GO HERE
 	Byte m_selected;						///< drawable is selected or not
+
 	Bool m_hidden;							///< drawable is "hidden" or not (overrides stealth effects)
 	Bool m_hiddenByStealth;			///< drawable is hidden due to stealth
 	Bool m_instanceIsIdentity;	///< If true, instance matrix can be skipped
