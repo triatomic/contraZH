@@ -307,6 +307,20 @@ Bool OptionPreferences::getSelectionCircleEnabled(void) const
 	return FALSE;
 }
 
+// TheSuperHackers @feature Options.ini: NumericalHealth = Yes prints the hit points beside the
+// health bar. Follows HealthBarDisplayMode, so the number appears exactly where a bar does.
+Bool OptionPreferences::getNumericalHealthEnabled(void) const
+{
+	OptionPreferences::const_iterator it = find("NumericalHealth");
+	if (it == end())
+		return FALSE;
+
+	if (stricmp(it->second.str(), "yes") == 0) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
 // TheSuperHackers @feature Options.ini: SmartPips = Yes keeps ammo and passenger pips on screen
 // instead of showing them only while the unit is selected or moused over. Own units only -- not
 // allies, not enemies. Nothing is drawn when there is nothing to report: no shots left, or no

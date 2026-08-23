@@ -159,6 +159,8 @@ public:
 	// TheSuperHackers @feature Keep ammo and passenger pips on screen when there is something
 	// to report, rather than only on selection or hover.
 	Bool m_smartPips;
+	// TheSuperHackers @feature Print hit points beside the health bar.
+	Bool m_numericalHealth;
 	// TheSuperHackers @feature Command bar keys by slot position instead of by string file.
 	Bool m_gridHotkeysEnabled;
 	AsciiString m_gridHotkeyLayout;
