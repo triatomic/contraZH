@@ -97,6 +97,7 @@ public:
 	BuildTimerDisplayMode getBuildTimerDisplayMode() const;
 	CastMode getCastMode() const;
 	Bool getSelectionCircleEnabled() const;
+	Bool getEasyMilitaryDragEnabled() const;
 	Bool getGridHotkeysEnabled() const;
 	AsciiString getGridHotkeyLayout() const;
 	Int getGridHotkeyColumns() const;
