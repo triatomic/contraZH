@@ -307,6 +307,22 @@ Bool OptionPreferences::getSelectionCircleEnabled(void) const
 	return FALSE;
 }
 
+// TheSuperHackers @feature Options.ini: SmartPips = Yes keeps ammo and passenger pips on screen
+// instead of showing them only while the unit is selected or moused over. Own units only -- not
+// allies, not enemies. Nothing is drawn when there is nothing to report: no shots left, or no
+// one aboard. So the pips read as "still loaded" and "carrying someone" at a glance.
+Bool OptionPreferences::getSmartPipsEnabled(void) const
+{
+	OptionPreferences::const_iterator it = find("SmartPips");
+	if (it == end())
+		return FALSE;
+
+	if (stricmp(it->second.str(), "yes") == 0) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
 // TheSuperHackers @feature Options.ini: EasyMilitaryDrag = Yes leaves builders out of a drag
 // selection, so boxing over a base picks up the army without dragging them along. Covers
 // KINDOF_DOZER and KINDOF_IGNORES_SELECT_ALL, the same kinds Select All already disqualifies.

@@ -1137,6 +1137,7 @@ GlobalData::GlobalData()
 	m_buildTimerDisplayMode = BuildTimerDisplayMode_Default;
 	m_castMode = CastMode_Default;
 	m_selectionCircleEnabled = FALSE;
+	m_smartPips = FALSE;
 	m_gridHotkeysEnabled = FALSE;
 	m_gridHotkeyLayout.clear();
 	m_gridHotkeyColumns = 0;
@@ -1336,6 +1337,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_buildTimerDisplayMode = optionPref.getBuildTimerDisplayMode();
 	TheWritableGlobalData->m_castMode = optionPref.getCastMode();
 	TheWritableGlobalData->m_selectionCircleEnabled = optionPref.getSelectionCircleEnabled();
+	TheWritableGlobalData->m_smartPips = optionPref.getSmartPipsEnabled();
 	TheWritableGlobalData->m_gridHotkeysEnabled = optionPref.getGridHotkeysEnabled();
 	TheWritableGlobalData->m_gridHotkeyLayout = optionPref.getGridHotkeyLayout();
 	TheWritableGlobalData->m_gridHotkeyColumns = optionPref.getGridHotkeyColumns();

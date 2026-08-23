@@ -98,6 +98,7 @@ public:
 	CastMode getCastMode() const;
 	Bool getSelectionCircleEnabled() const;
 	Bool getEasyMilitaryDragEnabled() const;
+	Bool getSmartPipsEnabled() const;
 	Bool getGridHotkeysEnabled() const;
 	AsciiString getGridHotkeyLayout() const;
 	Int getGridHotkeyColumns() const;
