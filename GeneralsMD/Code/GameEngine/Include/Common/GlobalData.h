@@ -159,6 +159,7 @@ public:
 	// TheSuperHackers @feature Command bar keys by slot position instead of by string file.
 	Bool m_gridHotkeysEnabled;
 	AsciiString m_gridHotkeyLayout;
+	Int m_gridHotkeyColumns;
 	// TheSuperHackers @feature Show each command bar cameo's hotkey letter on the cameo.
 	Bool m_keyboardOverlayEnabled;
 	Color m_keyboardOverlayColor;

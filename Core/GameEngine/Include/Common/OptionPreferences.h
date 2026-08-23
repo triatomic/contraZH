@@ -99,6 +99,7 @@ public:
 	Bool getSelectionCircleEnabled() const;
 	Bool getGridHotkeysEnabled() const;
 	AsciiString getGridHotkeyLayout() const;
+	Int getGridHotkeyColumns() const;
 	Bool getKeyboardOverlayEnabled() const;
 	Color getKeyboardOverlayColor() const;
 	Bool getKeyboardOverlayBackdropEnabled() const;

@@ -2516,11 +2516,29 @@ AsciiString ControlBar::getGridHotKeyForButton( GameWindow *button ) const
 		if( m_commandWindows[ i ] != button )
 			continue;
 
-		if( i >= layout.getLength() )
+		// The command bar numbers its slots down each column, but the layout string is written
+		// in reading order, so translate between the two. Without this, sequential letters land
+		// on alternating rows.
+		Int layoutIndex = i;
+		const Int columns = TheGlobalData->m_gridHotkeyColumns;
+		if( columns > 0 )
+		{
+			// Rows come from the layout's own length, not MAX_COMMANDS_PER_SET, which is the
+			// internal cap of 32 rather than however many slots the mod actually shows.
+			const Int rows = ( layout.getLength() + columns - 1 ) / columns;
+			if( rows > 0 )
+			{
+				const Int column = i / rows;	// slots run down a column before moving right
+				const Int row = i % rows;
+				layoutIndex = row * columns + column;
+			}
+		}
+
+		if( layoutIndex >= layout.getLength() )
 			break;	// this mod has more slots than the layout covers
 
 		AsciiString key;
-		key.concat( layout.getCharAt( i ) );
+		key.concat( layout.getCharAt( layoutIndex ) );
 		return key;
 	}
 

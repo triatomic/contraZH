@@ -233,6 +233,24 @@ AsciiString OptionPreferences::getGridHotkeyLayout(void) const
 	return it->second;
 }
 
+// TheSuperHackers @feature How many columns the command bar is wide. The engine numbers command
+// slots down each column rather than across each row, so the layout string -- which is written in
+// reading order -- has to be mapped through this to land the right key on the right button.
+// 0 means do not remap, i.e. the layout string is already in slot order.
+// Options.ini: GridHotkeyColumns = 9
+Int OptionPreferences::getGridHotkeyColumns(void) const
+{
+	OptionPreferences::const_iterator it = find("GridHotkeyColumns");
+	if (it == end())
+		return 9;	// two rows of nine, matching a bar two rows deep
+
+	Int columns = atoi(it->second.str());
+	if (columns < 0)
+		columns = 0;
+
+	return columns;
+}
+
 // TheSuperHackers @feature Options.ini: SelectionCircle = Yes draws a green hexagon under
 // every selected object.
 Bool OptionPreferences::getSelectionCircleEnabled(void) const
