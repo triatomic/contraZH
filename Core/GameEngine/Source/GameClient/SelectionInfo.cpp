@@ -96,6 +96,7 @@ PickDrawableStruct::PickDrawableStruct() : drawableListToFill(nullptr), isPointS
 	// dragging a box, and what it selects is your own builders.
 	easyMilitaryDrag = FALSE;
 	easyMilitaryDragInverted = FALSE;
+	easyMilitaryDragDisabled = FALSE;
 	{
 		OptionPreferences optionPref;
 		if (optionPref.getEasyMilitaryDragEnabled())
@@ -421,7 +422,8 @@ Bool addDrawableToList( Drawable *draw, void *userData )
 	// KINDOF_IGNORES_SELECT_ALL marker a mod can put on anything else it wants left alone. Note
 	// KINDOF_DOZER also catches GLA Workers, which carry it alongside KINDOF_INFANTRY and
 	// KINDOF_HARVESTER.
-	if (!pds->isPointSelection && (pds->easyMilitaryDrag || pds->easyMilitaryDragInverted))
+	if (!pds->easyMilitaryDragDisabled &&
+			!pds->isPointSelection && (pds->easyMilitaryDrag || pds->easyMilitaryDragInverted))
 	{
 		const Bool isBuilder =
 				draw->isKindOf(KINDOF_DOZER) || draw->isKindOf(KINDOF_IGNORES_SELECT_ALL);

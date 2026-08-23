@@ -609,6 +609,20 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 			pds.isPointSelection = isPoint;
 			TheTacticalView->iterateDrawablesInRegion(&selectionRegion, addDrawableToList, &pds);
 
+			// TheSuperHackers @feature EasyMilitaryDrag drops builders from a drag, but if that leaves
+			// nothing at all then the box held only builders, and refusing to select them is just an
+			// unresponsive click. Run the region again with the filter suspended so they are selected
+			// after all. Only ever a second pass over an already empty result, so a drag that found
+			// anything pays nothing for this.
+			//
+			// Deliberately not done for the Ctrl inverted drag: there the player has explicitly asked
+			// for the builders, so grabbing the army instead would be the opposite of the request.
+			if (drawablesThatWillSelect.empty() && pds.easyMilitaryDrag)
+			{
+				pds.easyMilitaryDragDisabled = TRUE;
+				TheTacticalView->iterateDrawablesInRegion(&selectionRegion, addDrawableToList, &pds);
+			}
+
 			if (drawablesThatWillSelect.empty())
 			{
 				break;
