@@ -96,6 +96,7 @@ public:
 	HealthBarDisplayMode getHealthBarDisplayMode() const;
 	BuildTimerDisplayMode getBuildTimerDisplayMode() const;
 	CastMode getCastMode() const;
+	Bool getSelectionCircleEnabled() const;
 	Bool getKeyboardOverlayEnabled() const;
 	Color getKeyboardOverlayColor() const;
 	Bool getKeyboardOverlayBackdropEnabled() const;

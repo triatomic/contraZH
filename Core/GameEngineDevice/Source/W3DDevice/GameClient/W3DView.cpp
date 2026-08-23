@@ -947,6 +947,71 @@ static void drawAudioRadii( const Drawable * drawable )
 #endif
 
 //-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature Selection hexagon (Options.ini: SelectionCircle).
+// ------------------------------------------------------------------------------------------------
+/** Draw a green hexagon on the ground under a selected object.
+	*
+	* Drawn procedurally from line segments rather than a decal texture, so it needs no art asset.
+	* The tradeoff is that, like drawDebugCircle, it has no depth test and so shows through world
+	* geometry standing in front of it.
+	*
+	* Each corner is dropped onto the terrain individually, so the ring follows slopes instead of
+	* cutting through a hillside. */
+// ------------------------------------------------------------------------------------------------
+static void drawSelectionHexagon( Drawable *draw )
+{
+	if( !TheGlobalData || !TheGlobalData->m_selectionCircleEnabled )
+		return;
+
+	if( !draw->isSelected() )
+		return;
+
+	const Object *obj = draw->getObject();
+	if( obj == nullptr || obj->isEffectivelyDead() )
+		return;
+
+	// mob members and the like are not meaningfully selectable on their own
+	if( obj->isKindOf( KINDOF_IGNORED_IN_GUI ) )
+		return;
+
+	const Coord3D *center = draw->getPosition();
+	if( center == nullptr )
+		return;
+
+	// sized to the object, with a little margin so the ring sits clear of the model
+	Real radius = draw->getDrawableGeometryInfo().getBoundingCircleRadius() * 1.15f;
+	if( radius < 1.0f )
+		radius = 1.0f;
+
+	const Color color = GameMakeColor( 0, 255, 0, 255 );
+	const Real lineWidth = 1.5f;
+	const Real inc = PI / 3.0f;		// six segments -- a hexagon
+
+	Coord3D pnt, lastPnt;
+	ICoord2D start, end;
+	Bool startValid, endValid;
+
+	lastPnt.x = center->x + radius;
+	lastPnt.y = center->y;
+	lastPnt.z = TheTerrainLogic->getGroundHeight( lastPnt.x, lastPnt.y ) + 0.5f;
+	endValid = ( TheTacticalView->worldToScreenTriReturn( &lastPnt, &end ) != View::WTS_INVALID );
+
+	for( Real angle = inc; angle <= 2.0f * PI + 0.001f; angle += inc )
+	{
+		pnt.x = center->x + radius * (Real)cos( angle );
+		pnt.y = center->y + radius * (Real)sin( angle );
+		pnt.z = TheTerrainLogic->getGroundHeight( pnt.x, pnt.y ) + 0.5f;
+		startValid = ( TheTacticalView->worldToScreenTriReturn( &pnt, &start ) != View::WTS_INVALID );
+
+		if( startValid && endValid )
+			TheDisplay->drawLine( start.x, start.y, end.x, end.y, lineWidth, color );
+
+		lastPnt = pnt;
+		end = start;
+		endValid = startValid;
+	}
+}
+
 /** An opportunity to draw something after all drawables have been drawn once */
 //-------------------------------------------------------------------------------------------------
 static void drawablePostDraw( Drawable *draw, void *userData )
@@ -964,6 +1029,9 @@ static void drawablePostDraw( Drawable *draw, void *userData )
 #endif
 	if (ss > OBJECTSHROUD_PARTIAL_CLEAR)
 		return;
+
+	// TheSuperHackers @feature Selection hexagon, under the icons so bars stay legible on top.
+	drawSelectionHexagon( draw );
 
 	// draw the any "icon" UI for a drawable (health bars, veterency, etc);
 

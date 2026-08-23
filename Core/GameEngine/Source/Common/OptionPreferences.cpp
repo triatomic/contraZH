@@ -205,6 +205,20 @@ Bool OptionPreferences::getKeyboardOverlayEnabled(void) const
 	return FALSE;
 }
 
+// TheSuperHackers @feature Options.ini: SelectionCircle = Yes draws a green hexagon under
+// every selected object.
+Bool OptionPreferences::getSelectionCircleEnabled(void) const
+{
+	OptionPreferences::const_iterator it = find("SelectionCircle");
+	if (it == end())
+		return FALSE;
+
+	if (stricmp(it->second.str(), "yes") == 0) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
 // TheSuperHackers @feature Options.ini: CastMode = Normal | QuickCast | QuickCastWithIndicator
 CastMode OptionPreferences::getCastMode(void) const
 {

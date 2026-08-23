@@ -154,6 +154,8 @@ public:
 	// TheSuperHackers @feature Hotkey activation behaviour for targeted commands.
 	// Holds a CastMode; stored as Int to avoid pulling OptionPreferences.h in here.
 	Int m_castMode;
+	// TheSuperHackers @feature Draw a green hexagon under selected objects.
+	Bool m_selectionCircleEnabled;
 	// TheSuperHackers @feature Show each command bar cameo's hotkey letter on the cameo.
 	Bool m_keyboardOverlayEnabled;
 	Color m_keyboardOverlayColor;
