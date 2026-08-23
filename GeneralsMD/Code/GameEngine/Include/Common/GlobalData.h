@@ -160,6 +160,8 @@ public:
 	Bool m_gridHotkeysEnabled;
 	AsciiString m_gridHotkeyLayout;
 	Int m_gridHotkeyColumns;
+	// Keys the player asked to leave out of the grid; those slots keep their string file letter.
+	AsciiString m_nonGridHotkeys;
 	// TheSuperHackers @feature Show each command bar cameo's hotkey letter on the cameo.
 	Bool m_keyboardOverlayEnabled;
 	Color m_keyboardOverlayColor;

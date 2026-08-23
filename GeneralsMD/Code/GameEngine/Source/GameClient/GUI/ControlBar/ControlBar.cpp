@@ -39,6 +39,8 @@
 #include "Common/GameType.h"
 #include "Common/MultiplayerSettings.h"
 #include "Common/NameKeyGenerator.h"
+// TheSuperHackers @feature for the grid hotkey exclusion list
+#include "Common/OptionPreferences.h"
 #include "Common/Override.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/Player.h"
@@ -2539,6 +2541,12 @@ AsciiString ControlBar::getGridHotKeyForButton( GameWindow *button ) const
 
 		AsciiString key;
 		key.concat( layout.getCharAt( layoutIndex ) );
+
+		// A key on the exclusion list never grids. Returning empty makes the caller fall back to
+		// the string file letter for this slot, which is exactly the old behaviour.
+		if( OptionPreferences::isNonGridHotkeyInList( TheGlobalData->m_nonGridHotkeys, key ) )
+			return AsciiString::TheEmptyString;
+
 		return key;
 	}
 

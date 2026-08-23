@@ -1140,6 +1140,7 @@ GlobalData::GlobalData()
 	m_gridHotkeysEnabled = FALSE;
 	m_gridHotkeyLayout.clear();
 	m_gridHotkeyColumns = 0;
+	m_nonGridHotkeys.clear();
 	m_keyboardOverlayEnabled = FALSE;
 	m_keyboardOverlayColor = GameMakeColor( 255, 255, 255, 255 );
 	m_keyboardOverlayBackdrop = TRUE;
@@ -1338,6 +1339,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_gridHotkeysEnabled = optionPref.getGridHotkeysEnabled();
 	TheWritableGlobalData->m_gridHotkeyLayout = optionPref.getGridHotkeyLayout();
 	TheWritableGlobalData->m_gridHotkeyColumns = optionPref.getGridHotkeyColumns();
+	TheWritableGlobalData->m_nonGridHotkeys = optionPref.getNonGridHotkeys();
 	TheWritableGlobalData->m_keyboardOverlayEnabled = optionPref.getKeyboardOverlayEnabled();
 	TheWritableGlobalData->m_keyboardOverlayColor = optionPref.getKeyboardOverlayColor();
 	TheWritableGlobalData->m_keyboardOverlayBackdrop = optionPref.getKeyboardOverlayBackdropEnabled();
