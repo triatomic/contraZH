@@ -3241,7 +3241,8 @@ void W3DModelDraw::handleFXEvents()
 	* projected onto the terrain and the model draws over it. It lives in its own slot rather than
 	* sharing m_terrainDecal, so selecting a horde unit does not evict its horde ring.
 	*
-	* The texture is one of the game's existing plain rings, tinted green, so no new art is needed. */
+	* Expects a PlainRingSelection.tga in the mod's assets. The engine appends the extension, and
+	* the art is tinted green at runtime, so a plain white or greyscale ring works. */
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::setSelectionDecal(Bool enable, Real radius)
 {
@@ -3258,7 +3259,7 @@ void W3DModelDraw::setSelectionDecal(Bool enable, Real radius)
 	decalInfo.allowUpdates = FALSE;		//the ring never needs regenerating
 	decalInfo.allowWorldAlign = TRUE;	//wrap it around terrain and world objects
 	decalInfo.m_type = SHADOW_ALPHA_DECAL;
-	strlcpy(decalInfo.m_ShadowName, "PlainRingBlue", ARRAY_SIZE(decalInfo.m_ShadowName));
+	strlcpy(decalInfo.m_ShadowName, "PlainRingSelection", ARRAY_SIZE(decalInfo.m_ShadowName));
 	decalInfo.m_sizeX = radius * 2.0f;
 	decalInfo.m_sizeY = radius * 2.0f;
 	decalInfo.m_offsetX = 0.0f;
