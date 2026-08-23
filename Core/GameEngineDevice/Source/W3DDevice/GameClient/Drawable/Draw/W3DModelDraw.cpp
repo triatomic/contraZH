@@ -3355,6 +3355,14 @@ void W3DModelDraw::nukeCurrentRender(Matrix3D* xform)
 		m_terrainDecal->release();
 	m_terrainDecal = nullptr;
 
+	// TheSuperHackers @fix The selection ring is bound to the render object about to be torn down
+	// here, exactly like the shadow and the terrain decal above, so it has to go with them. Left
+	// behind it stayed registered with the projected shadow manager while the render object it
+	// points at was freed, and the next renderShadows walked that dangling entry into the driver.
+	if (m_selectionDecal)
+		m_selectionDecal->release();
+	m_selectionDecal = nullptr;
+
 	// remove existing render object from the scene
 	if (m_renderObject)
 	{
