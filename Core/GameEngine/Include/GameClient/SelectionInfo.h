@@ -75,6 +75,9 @@ struct PickDrawableStruct
 	// Set instead of easyMilitaryDrag when Ctrl is held: select only the builders the option
 	// normally skips, so they can still be boxed deliberately.
 	Bool easyMilitaryDragInverted;
+	// Set for a second pass when the first found nothing, which suspends the filter entirely so a
+	// box holding only builders still selects them rather than coming back empty.
+	Bool easyMilitaryDragDisabled;
 
 	// Note, this is OR'd with the things we are attempting to select.
 	KindOfMaskType kindofsToMatch;
