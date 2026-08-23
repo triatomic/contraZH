@@ -2504,7 +2504,7 @@ void ControlBar::setCommandBarBorder( GameWindow *button, CommandButtonMappedBor
 	* bar's own ordering and needs no assumption about how many slots a mod uses. Slots past the
 	* end of the configured layout simply get no grid key. */
 //-------------------------------------------------------------------------------------------------
-AsciiString ControlBar::getGridHotKeyForButton( GameWindow *button ) const
+AsciiString ControlBar::getGridHotKeyForButton( GameWindow *button, Bool *isGridSlot ) const
 {
 	if( button == nullptr || TheGlobalData == nullptr )
 		return AsciiString::TheEmptyString;
@@ -2539,11 +2539,17 @@ AsciiString ControlBar::getGridHotKeyForButton( GameWindow *button ) const
 		if( layoutIndex >= layout.getLength() )
 			break;	// this mod has more slots than the layout covers
 
+		// this slot belongs to the grid, whatever we decide its key is
+		if( isGridSlot != nullptr )
+			*isGridSlot = TRUE;
+
 		AsciiString key;
 		key.concat( layout.getCharAt( layoutIndex ) );
 
-		// A key on the exclusion list never grids. Returning empty makes the caller fall back to
-		// the string file letter for this slot, which is exactly the old behaviour.
+		// A key on the exclusion list gives this slot no hotkey at all. Falling back to the string
+		// file letter would be worse than useless here: the letter varies with whatever is being
+		// built, which is the very thing the grid exists to stop, and it competes with the grid
+		// letters for the same keys -- addHotKey silently drops the loser, so slots ended up blank.
 		if( OptionPreferences::isNonGridHotkeyInList( TheGlobalData->m_nonGridHotkeys, key ) )
 			return AsciiString::TheEmptyString;
 
@@ -2628,13 +2634,16 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 		// bar rather than by the letter its string file marked with an ampersand, so the keys
 		// stay in the same place whatever is being built.
 		AsciiString hotKey;
+		Bool isGridSlot = FALSE;
 
 		if( TheGlobalData && TheGlobalData->m_gridHotkeysEnabled )
-			hotKey = getGridHotKeyForButton( button );
+			hotKey = getGridHotKeyForButton( button, &isGridSlot );
 
-		// fall back to the string file letter, so a slot past the end of the layout, or a
-		// button that is not in the command bar at all, still keys the way it always did
-		if( hotKey.isEmpty() )
+		// Fall back to the string file letter only for a button the grid does not cover -- one past
+		// the end of the layout, or not in the command bar at all -- so those key the way they always
+		// did. A slot that is in the grid but whose key was excluded gets no hotkey, rather than a
+		// unit specific letter that would defeat the point of a fixed layout.
+		if( hotKey.isEmpty() && !isGridSlot )
 			hotKey = TheHotKeyManager->searchHotKey(commandButton->getTextLabel());
 
 		if(hotKey.isNotEmpty())
