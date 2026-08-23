@@ -978,9 +978,18 @@ static void drawSelectionHexagon( Drawable *draw )
 	if( center == nullptr )
 		return;
 
-	// Tucked inside the bounding circle, which encloses the whole model and reads as too big
-	// when drawn at full size, especially on infantry.
-	Real radius = draw->getDrawableGeometryInfo().getBoundingCircleRadius() * 0.7f;
+	// The bounding circle encloses the whole model, so it reads as too big drawn at full size.
+	// How much too big depends on the shape: a building fills its circle, a soldier barely
+	// occupies the middle of one, so scale per kind rather than using a single factor.
+	Real scale;
+	if( obj->isKindOf( KINDOF_STRUCTURE ) )
+		scale = 1.0f;
+	else if( obj->isKindOf( KINDOF_INFANTRY ) )
+		scale = 0.7f;
+	else
+		scale = 0.85f;	// vehicles, aircraft and everything else
+
+	Real radius = draw->getDrawableGeometryInfo().getBoundingCircleRadius() * scale;
 	if( radius < 1.0f )
 		radius = 1.0f;
 
