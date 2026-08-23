@@ -183,6 +183,28 @@ void HotKeyManager::addHotKey( GameWindow *win, const AsciiString& keyIn)
 Bool HotKeyManager::s_executingHotKey = FALSE;
 Bool HotKeyManager::s_quickCastAiming = FALSE;
 
+// TheSuperHackers @feature See HotKey.h.
+//-----------------------------------------------------------------------------
+Bool HotKeyManager::isHotKeyClaimed( const AsciiString& keyIn ) const
+{
+	AsciiString key = keyIn;
+	key.toLower();
+
+	HotKeyMap::const_iterator it = m_hotKeyMap.find(key);
+	if( it == m_hotKeyMap.end() )
+		return FALSE;
+
+	GameWindow *win = it->second.m_win;
+	if( win == nullptr )
+		return FALSE;
+
+	// only a button the player can actually press counts as claiming the key
+	if( BitIsSet( win->winGetStatus(), WIN_STATUS_HIDDEN ) )
+		return FALSE;
+
+	return TRUE;
+}
+
 Bool HotKeyManager::executeHotKey( const AsciiString& keyIn )
 {
 	AsciiString key = keyIn;
