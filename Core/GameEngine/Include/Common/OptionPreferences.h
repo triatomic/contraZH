@@ -108,6 +108,10 @@ public:
 	// Returns a TextureFilterClass::TextureFilterMode as an Int, so this widely included header
 	// does not have to pull in the WW3D headers.
 	Int getTextureFilter() const;
+	// TheSuperHackers @feature Options.ini: AnisotropicLevel picks the anisotropic sample count.
+	// Only meaningful when TextureFilter is Anisotropic. Returns the raw level (2, 4, 8, 16);
+	// the renderer clamps it to what the hardware reports.
+	Int getAnisotropicLevel() const;
 	Bool getGridHotkeysEnabled() const;
 	AsciiString getGridHotkeyLayout() const;
 	Int getGridHotkeyColumns() const;

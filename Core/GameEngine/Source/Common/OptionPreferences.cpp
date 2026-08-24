@@ -344,6 +344,32 @@ Int OptionPreferences::getTextureFilter(void) const
 	return 0;
 }
 
+// TheSuperHackers @feature Options.ini: AnisotropicLevel = 2 | 4 | 8 | 16
+//
+// The sample count used when TextureFilter is Anisotropic, and ignored otherwise. Retail hardcoded
+// this to 2, which is the lowest setting anisotropic filtering has, so the mode never looked like
+// much even once it could be selected.
+//
+// Rounded down to a valid power of two rather than rejected, so a typo degrades instead of
+// surprising. The renderer clamps further to whatever the device actually reports supporting.
+Int OptionPreferences::getAnisotropicLevel(void) const
+{
+	OptionPreferences::const_iterator it = find("AnisotropicLevel");
+	if (it == end())
+		return 2;	// what retail hardcoded
+
+	const Int level = atoi(it->second.str());
+
+	if (level >= 16)
+		return 16;
+	if (level >= 8)
+		return 8;
+	if (level >= 4)
+		return 4;
+
+	return 2;
+}
+
 // TheSuperHackers @feature Options.ini: ParticleNameLingerMS = 3000 keeps a particle name in the
 // debug overlay for that many milliseconds after its system has gone. Many effects are one shot
 // bursts that die within a frame or two, so without this their names flash past unreadably.

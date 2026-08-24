@@ -727,6 +727,11 @@ void W3DDisplay::init( void )
 			static_assert( (Int)TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC == 2,
 				"OptionPreferences::getTextureFilter returns these values as plain Ints" );
 			WW3D::Set_Texture_Filter( TheGlobalData->m_textureFilter );
+
+			// Applied after the mode, since Set_Texture_Filter re-runs _Init_Filters and the sample
+			// count has to survive that. Harmless when a non anisotropic mode is selected -- the
+			// stage state is simply not consulted.
+			TextureFilterClass::_Set_Max_Anisotropy( TheGlobalData->m_anisotropicLevel );
 		}
 
 		setWindowed( TheGlobalData->m_windowed );

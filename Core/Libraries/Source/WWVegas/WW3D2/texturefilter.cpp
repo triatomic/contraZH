@@ -192,10 +192,36 @@ void TextureFilterClass::_Init_Filters(TextureFilterMode filter_type)
 		_MinTextureFilters[i][FILTER_TYPE_DEFAULT]=_MinTextureFilters[i][FILTER_TYPE_BEST];
 		_MagTextureFilters[i][FILTER_TYPE_DEFAULT]=_MagTextureFilters[i][FILTER_TYPE_BEST];
 		_MipMapFilters[i][FILTER_TYPE_DEFAULT]=_MipMapFilters[i][FILTER_TYPE_BEST];
-
-		DX8Wrapper::Set_DX8_Texture_Stage_State(i,D3DTSS_MAXANISOTROPY,2);
 	}
 
+}
+
+// TheSuperHackers @feature Mauller 08/03/2026 Set the anisotropic sample count on every texture
+// stage, adapted from TheSuperHackers 8bf736a90. Retail hardcoded this to 2 inside _Init_Filters,
+// which is the lowest anisotropic filtering goes, so selecting anisotropic barely differed from
+// trilinear.
+//
+// Clamped to the device's reported MaxAnisotropy. DirectX rejects a value above it, which would
+// silently leave the previous setting in place rather than report an error, so asking for 16x on
+// hardware that tops out at 8x degrades cleanly instead of doing nothing.
+void TextureFilterClass::_Set_Max_Anisotropy(int level)
+{
+	if (level < 1)
+	{
+		level = 1;
+	}
+
+	const D3DCAPS8& dx8caps = DX8Wrapper::Get_Current_Caps()->Get_DX8_Caps();
+	const int maxSupported = (int)dx8caps.MaxAnisotropy;
+	if (maxSupported > 0 && level > maxSupported)
+	{
+		level = maxSupported;
+	}
+
+	for (int stage = 0; stage < MAX_TEXTURE_STAGES; ++stage)
+	{
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_MAXANISOTROPY, level);
+	}
 }
 
 
