@@ -109,10 +109,6 @@ public:
 	/// given a list, prepend this node, return new list
 	PathNode *prependToList( PathNode *list );
 
-	/// given a list, append this node, return new list.  slow implementation.
-	/// @todo optimize this
-	PathNode *appendToList( PathNode *list );
-
 	/// given a node, append to this node
 	void append( PathNode *list );
 
