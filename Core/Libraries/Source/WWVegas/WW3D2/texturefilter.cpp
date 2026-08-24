@@ -211,6 +211,8 @@ void TextureFilterClass::_Set_Max_Anisotropy(int level)
 		level = 1;
 	}
 
+	// Reads the device caps, so this must not be called before the render device exists --
+	// same requirement as _Init_Filters, which is what CurrentCaps is created alongside.
 	const D3DCAPS8& dx8caps = DX8Wrapper::Get_Current_Caps()->Get_DX8_Caps();
 	const int maxSupported = (int)dx8caps.MaxAnisotropy;
 	if (maxSupported > 0 && level > maxSupported)
