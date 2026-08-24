@@ -215,6 +215,7 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "CHEAT_INSTANT_BUILD",							        GameMessage::MSG_CHEAT_INSTANT_BUILD },
 	{ "CHEAT_DESHROUD",									          GameMessage::MSG_CHEAT_DESHROUD },
 	{ "CHEAT_KITCHEN_SINK",									          GameMessage::MSG_CHEAT_KITCHEN_SINK },
+	{ "CHEAT_TOGGLE_ZOOM_LOCK",									          GameMessage::MSG_CHEAT_TOGGLE_ZOOM_LOCK },
 	{ "CHEAT_ADD_CASH",									          GameMessage::MSG_CHEAT_ADD_CASH },
 	{ "CHEAT_GIVE_ALL_SCIENCES",					        GameMessage::MSG_CHEAT_GIVE_ALL_SCIENCES },
   { "CHEAT_GIVE_SCIENCEPURCHASEPOINTS",        	GameMessage::MSG_CHEAT_GIVE_SCIENCEPURCHASEPOINTS },
@@ -827,6 +828,18 @@ MetaMapRec *MetaMap::getMetaMapRec(GameMessage::Type t)
 		}
 	}
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	{
+		// TheSuperHackers @feature Free the camera from its zoom limit. Ctrl+Shift+Z is unbound in
+		// the engine, in the demo command map and in Contra's own.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_TOGGLE_ZOOM_LOCK);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_Z;
+			map->m_transition = DOWN;
+			map->m_modState = SHIFT_CTRL;
+			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
+		}
+	}
 	{
 		// TheSuperHackers @feature Default binding for the combined cheat. Ctrl+` is free in the
 		// engine, in the demo command map and in Contra's own, and it does not collide with the

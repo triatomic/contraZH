@@ -440,6 +440,7 @@ public:
 		// TheSuperHackers @feature Appended at the end of the meta range so no existing ordinal
 		// moves -- inserting mid enum would renumber every message below it and break replays.
 		MSG_CHEAT_KITCHEN_SINK,							///< instant build + cash + own sciences + deshroud
+		MSG_CHEAT_TOGGLE_ZOOM_LOCK,					///< TheSuperHackers @feature free the camera from its zoom limit
 
 		MSG_END_META_MESSAGES,											///< Marker to delineate "meta" messages
 

@@ -3954,6 +3954,30 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			}
 			break;
 		}
+
+		// TheSuperHackers @feature Free the camera from its zoom limit, so the view can pull much
+		// further out than normal. The engine already has this as a debug command, but that one
+		// lives inside an #if defined(RTS_DEBUG) block and is compiled out of a cheats enabled
+		// release build, where only _ALLOW_DEBUG_CHEATS_IN_RELEASE is set -- so it was unreachable
+		// in practice. This sits with the other cheats instead, where it actually builds.
+		//
+		// Purely a client side view setting: it changes nothing in the simulation, so unlike the
+		// other cheats here it is safe in multiplayer and needs no isInMultiplayerGame guard.
+		case GameMessage::MSG_CHEAT_TOGGLE_ZOOM_LOCK:
+		{
+			if( TheTacticalView )
+			{
+				TheTacticalView->setZoomLimited( !TheTacticalView->isZoomLimited() );
+
+				TheInGameUI->messageNoFormat( TheTacticalView->isZoomLimited()
+					? TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugCameraZoomLimitOn", L"Camera Zoom Limit is ON")
+					: TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugCameraZoomLimitOff", L"Camera Zoom Limit is OFF") );
+			}
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
 #endif
 
 		//-----------------------------------------------------------------------------------------
