@@ -753,8 +753,8 @@ ParticleSystemInfo::ParticleSystemInfo()
 {
 	m_priority = PARTICLE_PRIORITY_LOWEST;
 	m_isGroundAligned = false;
-	// TheSuperHackers @feature on by default; modders opt out per effect with IsGroundMorph = No
-	m_isGroundMorph = true;
+	// TheSuperHackers @feature on by default; modders opt out per effect with ConformToTerrain = No
+	m_conformToTerrain = true;
 	m_isEmitAboveGroundOnly = false;
 	m_isParticleUpTowardsEmitter = false;
 
@@ -832,7 +832,7 @@ void ParticleSystemInfo::xfer( Xfer *xfer )
 	Int i;
 
 	// version
-	// TheSuperHackers @feature version 2 adds m_isGroundMorph
+	// TheSuperHackers @feature version 2 adds m_conformToTerrain
 	XferVersion currentVersion = 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
@@ -1022,9 +1022,9 @@ void ParticleSystemInfo::xfer( Xfer *xfer )
 	// is ground aligned
 	xfer->xferBool( &m_isGroundAligned );
 
-	// TheSuperHackers @feature ground morph, appended so version 1 saves still load
+	// TheSuperHackers @feature terrain conforming flag, appended so version 1 saves still load
 	if( version >= 2 )
-		xfer->xferBool( &m_isGroundMorph );
+		xfer->xferBool( &m_conformToTerrain );
 
 	// emit above ground only
 	xfer->xferBool( &m_isEmitAboveGroundOnly );
@@ -1191,7 +1191,7 @@ ParticleSystem::ParticleSystem( const ParticleSystemTemplate *sysTemplate,
 
 	m_isEmissionVolumeHollow = sysTemplate->m_isEmissionVolumeHollow;
 	m_isGroundAligned = sysTemplate->m_isGroundAligned;
-	m_isGroundMorph = sysTemplate->m_isGroundMorph;
+	m_conformToTerrain = sysTemplate->m_conformToTerrain;
 	m_isEmitAboveGroundOnly = sysTemplate->m_isEmitAboveGroundOnly;
 	m_isParticleUpTowardsEmitter = sysTemplate->m_isParticleUpTowardsEmitter;
 
@@ -2766,7 +2766,7 @@ const FieldParse ParticleSystemTemplate::m_fieldParseTable[] =
 
 	{ "IsHollow",								INI::parseBool,																nullptr,		offsetof( ParticleSystemTemplate, m_isEmissionVolumeHollow ) },
 	{ "IsGroundAligned",				INI::parseBool,																nullptr,		offsetof( ParticleSystemTemplate, m_isGroundAligned ) },
-	{ "IsGroundMorph",					INI::parseBool,																			nullptr,		offsetof( ParticleSystemTemplate, m_isGroundMorph ) },
+	{ "ConformToTerrain",					INI::parseBool,																			nullptr,		offsetof( ParticleSystemTemplate, m_conformToTerrain ) },
 	{ "IsEmitAboveGroundOnly",	INI::parseBool,																nullptr,		offsetof( ParticleSystemTemplate, m_isEmitAboveGroundOnly) },
 	{ "IsParticleUpTowardsEmitter",	INI::parseBool,																nullptr,		offsetof( ParticleSystemTemplate, m_isParticleUpTowardsEmitter) },
 

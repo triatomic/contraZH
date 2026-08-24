@@ -52,6 +52,8 @@ public:
 private:
 	enum { MAX_POINTS_PER_GROUP = 512 };
 
+	// TheSuperHackers @feature renders ground aligned particles as terrain conforming meshes
+	class W3DTerrainParticle *m_terrainParticles;
 	PointGroupClass *m_pointGroup;							///< the point group that contains all of the particles
 	StreakLineClass *m_streakLine;							///< the streak class that contains all of the streaks
 	ShareBufferClass<Vector3> *m_posBuffer;			///< array of particle positions
