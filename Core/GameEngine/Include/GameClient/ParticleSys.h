@@ -432,6 +432,10 @@ public:
 	Bool m_isEmissionVolumeHollow;							///< if true, only create particles at boundary of volume
 	Bool m_isGroundAligned;											///< if true, align with the ground. if false, then do the normal billboarding.
 	Bool m_isEmitAboveGroundOnly;								///< if true, only emit particles when the system is above ground.
+	// TheSuperHackers @feature If true, each corner of a ground aligned quad takes the terrain
+	// height beneath it, so the quad tilts to match the slope rather than lying flat across it.
+	// Only meaningful with IsGroundAligned; a billboarded particle is unaffected either way.
+	Bool m_isGroundMorph;
 	Bool m_isParticleUpTowardsEmitter;					///< if true, align the up direction to be towards the emitter.
 
 	enum WindMotion
@@ -610,6 +614,9 @@ public:
 	UnsignedInt getVolumeParticleDepth( void ) { return ( m_particleType == VOLUME_PARTICLE ) ? OPTIMUM_VOLUME_PARTICLE_DEPTH : 0; }
 
 	Bool shouldBillboard( void ) { return !m_isGroundAligned; }
+
+	// TheSuperHackers @feature see m_isGroundMorph
+	Bool shouldGroundMorph( void ) { return m_isGroundAligned && m_isGroundMorph; }
 
 	ParticleShaderType getShaderType( void ) { return m_shaderType; }
 

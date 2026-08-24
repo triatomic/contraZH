@@ -27,6 +27,8 @@
 // Author: Michael S. Booth, November 2001
 
 #include "Common/GlobalData.h"
+// TheSuperHackers @feature for ground morphing particle quads
+#include "GameLogic/TerrainLogic.h"
 #include "GameClient/Color.h"
 #include "W3DDevice/GameClient/W3DParticleSys.h"
 #include "W3DDevice/GameClient/W3DAssetManager.h"
@@ -44,8 +46,21 @@
 //-------------------------------------------------------------------------------------------------
 
 
+// TheSuperHackers @feature Terrain height source handed to the point group renderer, which sits
+// below the game and has no way to ask about terrain itself. Returns 0 before the map exists, which
+// only happens outside a game, where there are no ground aligned particles to morph anyway.
+static float getParticleGroundHeight(float x, float y)
+{
+	if (TheTerrainLogic == nullptr)
+		return 0.0f;
+
+	return TheTerrainLogic->getGroundHeight(x, y);
+}
+
 W3DParticleSystemManager::W3DParticleSystemManager()
 {
+	PointGroupClass::Set_Ground_Height_Func(getParticleGroundHeight);
+
 	m_pointGroup = nullptr;
 	m_streakLine = nullptr;
 	m_posBuffer = nullptr;
@@ -324,6 +339,8 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 				m_pointGroup->Set_Point_Mode( PointGroupClass::QUADS );
 				m_pointGroup->Set_Arrays( m_posBuffer, m_RGBABuffer, nullptr, m_sizeBuffer, m_angleBuffer, nullptr, count );
 				m_pointGroup->Set_Billboard(sys->shouldBillboard());
+				// TheSuperHackers @feature tilt ground aligned quads to the terrain beneath them
+				m_pointGroup->Set_Ground_Morph(sys->shouldGroundMorph());
 
 				/// @todo Support animated texture particles
 				/// @todo lorenzen sez: unimplemented code wastes cpu cycles

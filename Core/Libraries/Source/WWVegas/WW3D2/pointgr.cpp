@@ -171,6 +171,8 @@ PointGroupClass::PointGroupClass(void) :
 	VPXMax(0.0f),
 	VPYMax(0.0f)
 {
+	// TheSuperHackers @feature off unless the caller asks for it
+	GroundMorph = false;
 }
 
 /**************************************************************************
@@ -691,6 +693,26 @@ void PointGroupClass::Set_Billboard(bool shouldBillboard)
 bool PointGroupClass::Get_Billboard(void)
 {
 	return Billboard;
+}
+
+/**************************************************************************
+ * TheSuperHackers @feature Ground morphing -- see pointgr.h.              *
+ *========================================================================*/
+PointGroupClass::GroundHeightFunc PointGroupClass::GroundHeightCallback = nullptr;
+
+void PointGroupClass::Set_Ground_Height_Func(GroundHeightFunc func)
+{
+	GroundHeightCallback = func;
+}
+
+void PointGroupClass::Set_Ground_Morph(bool enable)
+{
+	GroundMorph = enable;
+}
+
+bool PointGroupClass::Get_Ground_Morph(void)
+{
+	return GroundMorph;
 }
 
 /**************************************************************************
@@ -1231,6 +1253,41 @@ void PointGroupClass::Update_Arrays(
 						vertex_loc[vert + 3].X = point_loc[i].X +	(-orientedVecX.X + orientedVecY.X) * point_size[i];
 						vertex_loc[vert + 3].Y = point_loc[i].Y +	(-orientedVecX.Y + orientedVecY.Y) * point_size[i];
 						vertex_loc[vert + 3].Z = point_loc[i].Z;
+
+						// TheSuperHackers @feature Ground morphing: give each corner the terrain height
+						// beneath it, so the quad tilts to match the slope instead of cutting through it
+						// as a flat sheet. Done here, while the corners are still in world space and
+						// before the view transform below turns them into camera space.
+						//
+						// The particle's own height above the ground is preserved as an offset, so an
+						// effect that floats keeps floating -- it just follows the contour while doing it.
+						if (GroundMorph && GroundHeightCallback != nullptr) {
+							// A quad has only four vertices, so its surface is a single plane fitted through
+							// four heights. Each corner therefore sits on the terrain directly beneath it,
+							// which is what makes the quad hug a slope instead of lying flat across it.
+							//
+							// Terrain that rises between corners cannot be represented by a plane, so a very
+							// wide quad crossing a sharp ridge still cuts through it. Fixing that properly
+							// needs subdivision, which means a variable vertex count through the whole
+							// buffer, index and UV path that every particle in the game shares. Sampling the
+							// highest nearby ground instead was tried and is worse: it lifts the whole quad
+							// clear of the slope it is supposed to be lying on.
+							const float centreGround = GroundHeightCallback(point_loc[i].X, point_loc[i].Y);
+
+							// Keep whatever height the particle has above the ground, so an effect that is
+							// meant to hover still hovers. A small negative offset means the particle was
+							// spawned just under the surface, which is common for ground effects; carrying
+							// that down would bury the quad, so anything at or below ground is pinned to it.
+							float heightAboveGround = point_loc[i].Z - centreGround;
+							if (heightAboveGround < 0.0f)
+								heightAboveGround = 0.0f;
+
+							for (int c = 0; c < 4; ++c) {
+								vertex_loc[vert + c].Z =
+									GroundHeightCallback(vertex_loc[vert + c].X, vertex_loc[vert + c].Y)
+									+ heightAboveGround;
+							}
+						}
 
 						// now apply the view transform so that this data is in the format expected
 						// upon the functions return.
