@@ -437,6 +437,9 @@ public:
 
 		MSG_META_PLACE_BEACON,
 		MSG_META_REMOVE_BEACON,
+		// TheSuperHackers @feature Appended at the end of the meta range so no existing ordinal
+		// moves -- inserting mid enum would renumber every message below it and break replays.
+		MSG_CHEAT_KITCHEN_SINK,							///< instant build + cash + own sciences + deshroud
 
 		MSG_END_META_MESSAGES,											///< Marker to delineate "meta" messages
 
