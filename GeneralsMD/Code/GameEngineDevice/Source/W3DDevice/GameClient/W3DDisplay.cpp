@@ -84,6 +84,7 @@ static void drawFramerateBar(void);
 #include "WWMath/wwmath.h"
 #include "WWLib/registry.h"
 #include "WW3D2/ww3d.h"
+#include "WW3D2/texturefilter.h"
 #include "WW3D2/predlod.h"
 #include "WW3D2/part_emt.h"
 #include "WW3D2/part_ldr.h"
@@ -707,6 +708,26 @@ void W3DDisplay::init( void )
 		WW3D::Set_Thumbnail_Enabled(false);
 		WW3D::Set_Screen_UV_Bias( TRUE );  ///< this makes text look good :)
 		WW3D::Set_Texture_Bitdepth(32);
+
+		// TheSuperHackers @feature Apply the Options.ini texture filtering mode. The engine has
+		// supported trilinear and anisotropic since retail, but nothing ever called this, so the
+		// mode sat at the hardcoded default and the better two were unreachable. Set here, right
+		// after WW3D::Init, because _Init_Filters reads the device caps and so needs the device.
+		//
+		// Purely a client side render setting -- it changes nothing in the simulation, so it is
+		// safe in multiplayer and has no replay impact.
+		if( TheGlobalData )
+		{
+			// The Options.ini parser returns the mode as a plain Int to keep the WW3D headers out of
+			// GlobalData, so tie the two together here, where both are visible.
+			static_assert( (Int)TextureFilterClass::TEXTURE_FILTER_BILINEAR == 0,
+				"OptionPreferences::getTextureFilter returns these values as plain Ints" );
+			static_assert( (Int)TextureFilterClass::TEXTURE_FILTER_TRILINEAR == 1,
+				"OptionPreferences::getTextureFilter returns these values as plain Ints" );
+			static_assert( (Int)TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC == 2,
+				"OptionPreferences::getTextureFilter returns these values as plain Ints" );
+			WW3D::Set_Texture_Filter( TheGlobalData->m_textureFilter );
+		}
 
 		setWindowed( TheGlobalData->m_windowed );
 

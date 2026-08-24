@@ -321,6 +321,29 @@ Bool OptionPreferences::getNumericalHealthEnabled(void) const
 	return FALSE;
 }
 
+// TheSuperHackers @feature Options.ini: TextureFilter = Bilinear | Trilinear | Anisotropic
+//
+// The engine has supported all three since retail, but nothing ever called WW3D::Set_Texture_Filter,
+// so the mode was stuck at the hardcoded default of 0 (Bilinear) and there was no way to reach the
+// other two. This exposes them; the values match TextureFilterClass::TextureFilterMode.
+//
+// Returned as an Int rather than the enum so this file does not have to include the WW3D headers.
+// Anything unrecognised, or the key being absent, keeps the retail default.
+Int OptionPreferences::getTextureFilter(void) const
+{
+	OptionPreferences::const_iterator it = find("TextureFilter");
+	if (it == end())
+		return 0;	// TEXTURE_FILTER_BILINEAR, the retail default
+
+	if (stricmp(it->second.str(), "anisotropic") == 0)
+		return 2;	// TEXTURE_FILTER_ANISOTROPIC
+
+	if (stricmp(it->second.str(), "trilinear") == 0)
+		return 1;	// TEXTURE_FILTER_TRILINEAR
+
+	return 0;
+}
+
 // TheSuperHackers @feature Options.ini: ParticleNameLingerMS = 3000 keeps a particle name in the
 // debug overlay for that many milliseconds after its system has gone. Many effects are one shot
 // bursts that die within a frame or two, so without this their names flash past unreadably.

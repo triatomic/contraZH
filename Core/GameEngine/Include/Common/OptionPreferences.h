@@ -104,6 +104,10 @@ public:
 	// system is gone, in milliseconds. 0 (and an absent key) keeps the original behaviour, where a
 	// name shows only while its system is alive.
 	Int getParticleNameLingerMS() const;
+	// TheSuperHackers @feature Options.ini: TextureFilter picks the texture filtering mode.
+	// Returns a TextureFilterClass::TextureFilterMode as an Int, so this widely included header
+	// does not have to pull in the WW3D headers.
+	Int getTextureFilter() const;
 	Bool getGridHotkeysEnabled() const;
 	AsciiString getGridHotkeyLayout() const;
 	Int getGridHotkeyColumns() const;

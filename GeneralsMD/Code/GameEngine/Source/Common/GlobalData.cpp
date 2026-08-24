@@ -1140,6 +1140,7 @@ GlobalData::GlobalData()
 	m_smartPips = FALSE;
 	m_numericalHealth = FALSE;
 	m_particleNameLingerMS = 0;
+	m_textureFilter = 0;	// TEXTURE_FILTER_BILINEAR, the retail default
 	m_gridHotkeysEnabled = FALSE;
 	m_gridHotkeyLayout.clear();
 	m_gridHotkeyColumns = 0;
@@ -1342,6 +1343,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_smartPips = optionPref.getSmartPipsEnabled();
 	TheWritableGlobalData->m_numericalHealth = optionPref.getNumericalHealthEnabled();
 	TheWritableGlobalData->m_particleNameLingerMS = optionPref.getParticleNameLingerMS();
+	TheWritableGlobalData->m_textureFilter = optionPref.getTextureFilter();
 	TheWritableGlobalData->m_gridHotkeysEnabled = optionPref.getGridHotkeysEnabled();
 	TheWritableGlobalData->m_gridHotkeyLayout = optionPref.getGridHotkeyLayout();
 	TheWritableGlobalData->m_gridHotkeyColumns = optionPref.getGridHotkeyColumns();
