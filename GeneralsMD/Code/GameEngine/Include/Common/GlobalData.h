@@ -161,6 +161,9 @@ public:
 	Bool m_smartPips;
 	// TheSuperHackers @feature Print hit points beside the health bar.
 	Bool m_numericalHealth;
+	// TheSuperHackers @feature How long a particle name lingers in the debug name overlay after
+	// its system is gone, in milliseconds. 0 shows names only while the system is alive.
+	Int m_particleNameLingerMS;
 	// TheSuperHackers @feature Command bar keys by slot position instead of by string file.
 	Bool m_gridHotkeysEnabled;
 	AsciiString m_gridHotkeyLayout;

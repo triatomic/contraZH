@@ -441,6 +441,8 @@ public:
 		// moves -- inserting mid enum would renumber every message below it and break replays.
 		MSG_CHEAT_KITCHEN_SINK,							///< instant build + cash + own sciences + deshroud
 		MSG_CHEAT_TOGGLE_ZOOM_LOCK,					///< TheSuperHackers @feature free the camera from its zoom limit
+		MSG_CHEAT_SHOW_OBJECT_NAME,			///< TheSuperHackers @feature print the selected object template names
+		MSG_CHEAT_SHOW_PARTICLE_NAMES,		///< TheSuperHackers @feature print particle systems on the selection
 
 		MSG_END_META_MESSAGES,											///< Marker to delineate "meta" messages
 

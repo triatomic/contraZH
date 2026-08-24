@@ -216,6 +216,8 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "CHEAT_DESHROUD",									          GameMessage::MSG_CHEAT_DESHROUD },
 	{ "CHEAT_KITCHEN_SINK",									          GameMessage::MSG_CHEAT_KITCHEN_SINK },
 	{ "CHEAT_TOGGLE_ZOOM_LOCK",									          GameMessage::MSG_CHEAT_TOGGLE_ZOOM_LOCK },
+	{ "CHEAT_SHOW_OBJECT_NAME",									          GameMessage::MSG_CHEAT_SHOW_OBJECT_NAME },
+	{ "CHEAT_SHOW_PARTICLE_NAMES",								  GameMessage::MSG_CHEAT_SHOW_PARTICLE_NAMES },
 	{ "CHEAT_ADD_CASH",									          GameMessage::MSG_CHEAT_ADD_CASH },
 	{ "CHEAT_GIVE_ALL_SCIENCES",					        GameMessage::MSG_CHEAT_GIVE_ALL_SCIENCES },
   { "CHEAT_GIVE_SCIENCEPURCHASEPOINTS",        	GameMessage::MSG_CHEAT_GIVE_SCIENCEPURCHASEPOINTS },
@@ -852,6 +854,31 @@ MetaMapRec *MetaMap::getMetaMapRec(GameMessage::Type t)
 			map->m_transition = DOWN;
 			map->m_modState = CTRL;
 			map->m_usableIn = COMMANDUSABLE_GAME;
+		}
+	}
+	{
+		// TheSuperHackers @feature Print the template name of the selected objects. Ctrl+[ is unbound
+		// in the engine defaults, in Contra's CommandMap.ini and in the demo map, so it takes a key
+		// nothing else wants. Observer usable too, since reading names is useful while spectating.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_SHOW_OBJECT_NAME);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_LBRACKET;
+			map->m_transition = DOWN;
+			map->m_modState = CTRL;
+			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
+		}
+	}
+	{
+		// TheSuperHackers @feature Print the particle systems running on the selected objects.
+		// Ctrl+] sits next to the object name key and is likewise unbound everywhere.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_SHOW_PARTICLE_NAMES);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_RBRACKET;
+			map->m_transition = DOWN;
+			map->m_modState = CTRL;
+			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
 		}
 	}
 #endif

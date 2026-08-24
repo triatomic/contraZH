@@ -121,6 +121,32 @@ public:
 
 };
 
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+//-----------------------------------------------------------------------------
+// TheSuperHackers @feature Remembered particle names for the debug name overlay, so a name can
+// outlive the system that produced it (Options.ini: ParticleNameLingerMS).
+//
+// Many effects are one shot bursts that die within a frame or two, which made their names flash
+// past unreadably. Each entry keeps the frame it was last seen on; the overlay drops it once the
+// configured linger has elapsed. Allocated only for drawables the overlay has actually looked at.
+//-----------------------------------------------------------------------------
+enum { MAX_REMEMBERED_PARTICLE_NAMES = 8 };
+
+class DrawableParticleNameInfo : public MemoryPoolObject
+{
+	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(DrawableParticleNameInfo, "DrawableParticleNameInfo" )
+public:
+	AsciiString						m_name[MAX_REMEMBERED_PARTICLE_NAMES];
+	AsciiString						m_fxName[MAX_REMEMBERED_PARTICLE_NAMES];
+	UnsignedInt						m_lastSeenFrame[MAX_REMEMBERED_PARTICLE_NAMES];
+	Int										m_count;
+
+	DrawableParticleNameInfo();
+
+	void clear();
+};
+#endif
+
 //-----------------------------------------------------------------------------
 struct TWheelInfo
 {
@@ -745,6 +771,9 @@ private:
 
 	UnsignedInt					m_expirationDate;		///< if nonzero, Drawable should destroy itself at this frame
 	DrawableIconInfo*		m_iconInfo;					///< lazily allocated!
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	DrawableParticleNameInfo* m_particleNameInfo;	///< lazily allocated, debug overlay only
+#endif
 
 	Real m_secondMaterialPassOpacity;			///< drawable gets rendered again in hardware with an extra material layer
 	// --------- BYTE-SIZED THINGS GO HERE
@@ -786,6 +815,16 @@ private:
 	// TheSuperHackers @feature hit points beside the bar (Options.ini: NumericalHealth)
 	void drawNumericalHealth( const IRegion2D *healthBarRegion, Real health, Real maxHealth,
 													Color color );
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// TheSuperHackers @feature Debug object and particle name overlays (Ctrl+[ and Ctrl+]).
+	void drawDebugNameOverlay( const IRegion2D *healthBarRegion );
+	// Fold this frame's findings into the remembered list, refreshing anything already there.
+	void rememberParticleNames( const AsciiString *names, const AsciiString *fxNames, Int count,
+																UnsignedInt nowFrame );
+	// Read back everything still inside the linger window, newest first. Returns how many.
+	Int collectRememberedParticleNames( AsciiString *names, AsciiString *fxNames,
+																				UnsignedInt nowFrame, UnsignedInt lingerFrames ) const;
+#endif
 	void drawContained( const IRegion2D *healthBarRegion );					///< draw icons
 	void drawVeterancy( const IRegion2D *healthBarRegion );					///< draw veterency information
 

@@ -100,6 +100,10 @@ public:
 	Bool getEasyMilitaryDragEnabled() const;
 	Bool getSmartPipsEnabled() const;
 	Bool getNumericalHealthEnabled() const;
+	// TheSuperHackers @feature How long a particle name lingers in the debug overlay after its
+	// system is gone, in milliseconds. 0 (and an absent key) keeps the original behaviour, where a
+	// name shows only while its system is alive.
+	Int getParticleNameLingerMS() const;
 	Bool getGridHotkeysEnabled() const;
 	AsciiString getGridHotkeyLayout() const;
 	Int getGridHotkeyColumns() const;

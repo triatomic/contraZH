@@ -160,6 +160,14 @@ public:
 		m_nuggets.push_back(fxn);
 	}
 
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// TheSuperHackers @feature The FXList's own name, kept only so nuggets can stamp it onto the
+	// particle systems they create for the debug name overlay. The name is otherwise held solely
+	// as the key in FXListStore's map, so a nugget has no way to know which list it belongs to.
+	void setName( const AsciiString &name ) { m_name = name; }
+	const AsciiString &getName( void ) const { return m_name; }
+#endif
+
 	/// inline convenience method to avoid having to check for null.
 	inline static void doFXPos(const FXList* fx, const Coord3D *primary, const Matrix3D* primaryMtx = nullptr, const Real primarySpeed = 0.0f, const Coord3D *secondary = nullptr, const Real overrideRadius = 0.0f)
 	{
@@ -201,6 +209,9 @@ private:
 	typedef std::list< FXNugget* > FXNuggetList;
 
 	FXNuggetList m_nuggets;
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	AsciiString m_name;						///< this list's own name, debug overlay only
+#endif
 
 };
 

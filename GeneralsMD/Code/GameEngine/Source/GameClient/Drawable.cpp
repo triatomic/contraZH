@@ -201,6 +201,36 @@ void DrawableIconInfo::clear()
 	}
 }
 
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+// ------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature Remembered particle names for the debug name overlay.
+// ------------------------------------------------------------------------------------------------
+DrawableParticleNameInfo::DrawableParticleNameInfo()
+{
+	clear();
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+DrawableParticleNameInfo::~DrawableParticleNameInfo()
+{
+	clear();
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+void DrawableParticleNameInfo::clear()
+{
+	for (int i = 0; i < MAX_REMEMBERED_PARTICLE_NAMES; ++i)
+	{
+		m_name[i].clear();
+		m_fxName[i].clear();
+		m_lastSeenFrame[i] = 0;
+	}
+	m_count = 0;
+}
+#endif
+
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
 void DrawableIconInfo::killIcon(DrawableIconType t)
@@ -557,6 +587,9 @@ Drawable::Drawable( const ThingTemplate *thingTemplate, DrawableStatusBits statu
 	m_drawableInfo.m_ghostObject = nullptr;
 
 	m_iconInfo = nullptr;								// lazily allocate!
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	m_particleNameInfo = nullptr;				// lazily allocate!
+#endif
 	m_selectionFlashEnvelope = nullptr;	// lazily allocate!
 	m_colorTintEnvelope = nullptr;				// lazily allocate!
 
@@ -627,6 +660,10 @@ Drawable::~Drawable()
 	// delete any icons present
 	deleteInstance(m_iconInfo);
 	m_iconInfo = nullptr;
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	deleteInstance(m_particleNameInfo);
+	m_particleNameInfo = nullptr;
+#endif
 
 	deleteInstance(m_selectionFlashEnvelope);
 	m_selectionFlashEnvelope = nullptr;
@@ -2882,6 +2919,359 @@ static Bool computeHealthRegion( const Drawable *draw, IRegion2D& region )
 }
 
 
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+// TheSuperHackers @feature Most particle names an object can stack above itself before the text
+// starts covering its neighbours. Also bounds the per object scan.
+static const Int MAX_OVERLAY_PARTICLE_LINES = 4;
+
+//-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature Draw one line of the debug name overlay, horizontally centred on the
+// object and stacking upward: lineY is moved up by the line height so the next call sits above
+// this one. A black drop shadow rather than a backdrop plate, matching the numerical health text --
+// these sit over the battlefield, where a filled box would be far more intrusive than the text.
+//-------------------------------------------------------------------------------------------------
+static void drawOverlayLine( DisplayString *str, const UnicodeString &text, Int centerX, Int &lineY,
+														Color color, Color dropColor )
+{
+	if( str == nullptr )
+		return;
+
+	str->setText( text );
+
+	Int width, height;
+	str->getSize( &width, &height );
+
+	lineY -= height;
+	str->draw( centerX - ( width / 2 ), lineY, color, dropColor );
+}
+//-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature Fold this frame's particle names into the drawable's remembered list.
+// An entry already present is refreshed rather than duplicated, so a system that keeps running
+// keeps its slot. When the list is full the oldest entry is replaced, since the point of the
+// linger is to catch what just happened.
+//-------------------------------------------------------------------------------------------------
+void Drawable::rememberParticleNames( const AsciiString *names, const AsciiString *fxNames,
+																	Int count, UnsignedInt nowFrame )
+{
+	if( count <= 0 && m_particleNameInfo == nullptr )
+		return;
+
+	if( m_particleNameInfo == nullptr )
+		m_particleNameInfo = newInstance(DrawableParticleNameInfo);
+
+	DrawableParticleNameInfo *info = m_particleNameInfo;
+
+	for( Int i = 0; i < count; ++i )
+	{
+		// Refresh if we already know this pair.
+		Bool found = FALSE;
+		for( Int n = 0; n < info->m_count; ++n )
+		{
+			if( info->m_name[n] == names[i] && info->m_fxName[n] == fxNames[i] )
+			{
+				info->m_lastSeenFrame[n] = nowFrame;
+				found = TRUE;
+				break;
+			}
+		}
+
+		if( found )
+			continue;
+
+		Int slot;
+		if( info->m_count < MAX_REMEMBERED_PARTICLE_NAMES )
+		{
+			slot = info->m_count++;
+		}
+		else
+		{
+			// Full, so evict the stalest entry.
+			slot = 0;
+			for( Int n = 1; n < info->m_count; ++n )
+			{
+				if( info->m_lastSeenFrame[n] < info->m_lastSeenFrame[slot] )
+					slot = n;
+			}
+		}
+
+		info->m_name[slot] = names[i];
+		info->m_fxName[slot] = fxNames[i];
+		info->m_lastSeenFrame[slot] = nowFrame;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature Read back the remembered particle names that are still inside the
+// linger window, newest first so the most recent effect is the one that survives the line cap.
+// Returns how many were written into the caller's arrays.
+//-------------------------------------------------------------------------------------------------
+Int Drawable::collectRememberedParticleNames( AsciiString *names, AsciiString *fxNames,
+																							UnsignedInt nowFrame, UnsignedInt lingerFrames ) const
+{
+	if( m_particleNameInfo == nullptr )
+		return 0;
+
+	const DrawableParticleNameInfo *info = m_particleNameInfo;
+
+	// Selection sort by recency. The list is at most MAX_REMEMBERED_PARTICLE_NAMES long, so this
+	// stays cheaper than carrying an ordered structure around.
+	Bool used[ MAX_REMEMBERED_PARTICLE_NAMES ];
+	for( Int i = 0; i < MAX_REMEMBERED_PARTICLE_NAMES; ++i )
+		used[i] = FALSE;
+
+	Int written = 0;
+	while( written < MAX_OVERLAY_PARTICLE_LINES )
+	{
+		Int best = -1;
+		for( Int n = 0; n < info->m_count; ++n )
+		{
+			if( used[n] )
+				continue;
+
+			// getFrame can go backwards across a load, so guard the subtraction rather than
+			// letting it wrap into a huge age and hide the entry forever.
+			const UnsignedInt age =
+					( nowFrame >= info->m_lastSeenFrame[n] ) ? ( nowFrame - info->m_lastSeenFrame[n] ) : 0;
+			if( age > lingerFrames )
+				continue;
+
+			if( best < 0 || info->m_lastSeenFrame[n] > info->m_lastSeenFrame[best] )
+				best = n;
+		}
+
+		if( best < 0 )
+			break;
+
+		used[best] = TRUE;
+		names[written] = info->m_name[best];
+		fxNames[written] = info->m_fxName[best];
+		++written;
+	}
+
+	return written;
+}
+
+
+
+//-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature Draw the object template name and/or the names of the particle systems
+// running on this drawable, stacked above the health bar. Toggled by the Ctrl+[ and Ctrl+] cheats.
+//
+// Called from drawIconUI before the dead and KINDOF_IGNORED_IN_GUI bails, so this covers every
+// drawable on screen -- selected or not, props and wreckage included -- which is the whole point
+// of the overlay over the one shot message list version of the same lookup.
+//
+// Purely a client side read: it inspects names and draws text, posting nothing to the logic, so it
+// is replay and multiplayer safe.
+//-------------------------------------------------------------------------------------------------
+void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
+{
+	if( TheInGameUI == nullptr || TheDisplayStringManager == nullptr )
+		return;
+
+	const Bool wantObjectName = TheInGameUI->isObjectNameOverlayOn();
+	const Bool wantParticleNames = TheInGameUI->isParticleNameOverlayOn();
+	if( !wantObjectName && !wantParticleNames )
+		return;
+
+	const Object *obj = getObject();
+	if( obj == nullptr )
+		return;
+
+	// The health bar region is only computed for objects that actually get a bar, and it is absent
+	// for anything KINDOF_IGNORED_IN_GUI. Since this overlay deliberately covers those too, fall
+	// back to projecting the health box position directly when there is no region. worldToScreen
+	// fails outside the view frustum, which doubles as the off screen cull.
+	ICoord2D anchor;
+	if( healthBarRegion != nullptr )
+	{
+		anchor.x = ( healthBarRegion->lo.x + healthBarRegion->hi.x ) / 2;
+		anchor.y = healthBarRegion->lo.y;
+	}
+	else
+	{
+		if( TheTacticalView == nullptr )
+			return;
+
+		Coord3D world;
+		obj->getHealthBoxPosition( world );
+		if( !TheTacticalView->worldToScreen( &world, &anchor ) )
+			return;
+	}
+
+	// One shared string for every drawable. The text differs per object so it is rebuilt on each
+	// use rather than cached; it stays static only to avoid allocating a display string per frame
+	// per object, which with the overlay on would be thousands of allocations a second.
+	static DisplayString *s_nameString = nullptr;
+	if( s_nameString == nullptr )
+	{
+		s_nameString = TheDisplayStringManager->newDisplayString();
+		if( s_nameString == nullptr )
+			return;
+
+		// Same size as the numerical health text: this can be on over every object on screen at
+		// once, so it has to stay small enough to read as an annotation.
+		Int pointSize = 6;
+		if( TheGlobalLanguageData )
+			pointSize = TheGlobalLanguageData->adjustFontSize( pointSize );
+		s_nameString->setFont( TheFontLibrary->getFont( AsciiString( "Arial" ), pointSize, FALSE ) );
+	}
+
+	const Color textColor = GameMakeColor( 255, 255, 255, 255 );
+	const Color dropColor = GameMakeColor( 0, 0, 0, 255 );
+	const Color particleColor = GameMakeColor( 120, 220, 255, 255 );
+	// An FXList is a group of particle systems, so its name gets its own colour to separate the
+	// group from the systems inside it.
+	const Color fxListColor = GameMakeColor( 255, 190, 90, 255 );
+
+	// Lines stack upward from just above the bar, so adding particle names never pushes the object
+	// name off its anchor.
+	Int lineY = anchor.y - 2;
+
+	// Particle names sit above the object name, so they are gathered and drawn first from the
+	// bottom up. Reverse order here means the list still reads top to bottom on screen.
+	if( wantParticleNames && TheParticleSystemManager != nullptr )
+	{
+		const DrawableID myDrawableID = getID();
+		const ObjectID myObjectID = obj->getID();
+
+		// An object keeps no list of its particle systems, so this walks the live systems and
+		// keeps the ones parented to this drawable or its object. That is O(systems) per drawable
+		// and this runs per frame, which is why the overlay is a cheat build only debug aid and
+		// not something to leave on during normal play.
+		//
+		// A fixed array rather than a vector: the list is capped anyway, this runs per object per
+		// frame, and Drawable.cpp does not otherwise pull in <vector>.
+		AsciiString names[ MAX_OVERLAY_PARTICLE_LINES ];
+		// The FXList each system came from, empty when it was created directly rather than through
+		// one. Kept parallel to names so the pair can be drawn together.
+		AsciiString fxNames[ MAX_OVERLAY_PARTICLE_LINES ];
+		Int nameCount = 0;
+
+		// Options.ini: ParticleNameLingerMS. Zero, or the key absent, keeps the original behaviour --
+		// a name is shown only while its system is alive. Anything higher remembers names on the
+		// drawable so one shot bursts, which die within a frame or two, stay readable.
+		const Int lingerMS = TheGlobalData ? TheGlobalData->m_particleNameLingerMS : 0;
+		const Bool remembering = ( lingerMS > 0 );
+		const UnsignedInt nowFrame = TheGameLogic ? TheGameLogic->getFrame() : 0;
+
+		ParticleSystemManager::ParticleSystemList &allSystems =
+				TheParticleSystemManager->getAllParticleSystems();
+
+		for( ParticleSystemManager::ParticleSystemListIt it = allSystems.begin();
+					it != allSystems.end(); ++it )
+		{
+			ParticleSystem *sys = *it;
+			if( sys == nullptr )
+				continue;
+
+			// A system may be parented to either the drawable or the object behind it, depending
+			// on how it was created, so both have to be checked.
+			const DrawableID sysDrawableID = sys->getAttachedDrawable();
+			const ObjectID sysObjectID = sys->getAttachedObject();
+
+			Bool mine =
+					( sysDrawableID != INVALID_DRAWABLE_ID && sysDrawableID == myDrawableID ) ||
+					( sysObjectID != INVALID_ID && sysObjectID == myObjectID );
+
+			// An FXList nugget only parents its system when it says AttachToObject; otherwise the
+			// system is created at a bare world position with no parent at all. Those are exactly
+			// the ones worth labelling -- a PulseFX firing at an offset from a building is invisible
+			// to the parent check -- so an unparented system is claimed by the object it is sitting
+			// on top of. Nearest object wins is not tracked here; a system inside two overlapping
+			// footprints is listed under both, which is better than being listed under neither.
+			if( !mine && sysDrawableID == INVALID_DRAWABLE_ID && sysObjectID == INVALID_ID )
+			{
+				Coord3D sysPos;
+				sys->getPosition( &sysPos );
+				const Coord3D *objPos = obj->getPosition();
+				if( objPos != nullptr )
+				{
+					// Compared in the ground plane only: an effect bone often sits well above or below
+					// the object origin, as the propaganda tower pulse does at Z+45.
+					const Real reach = obj->getGeometryInfo().getBoundingCircleRadius() + 25.0f;
+					const Real dx = sysPos.x - objPos->x;
+					const Real dy = sysPos.y - objPos->y;
+					if( ( dx * dx + dy * dy ) <= ( reach * reach ) )
+						mine = TRUE;
+				}
+			}
+
+			if( !mine )
+				continue;
+
+			const ParticleSystemTemplate *sysTemplate = sys->getTemplate();
+			if( sysTemplate == nullptr )
+				continue;
+
+			const AsciiString sysName = sysTemplate->getName();
+			const AsciiString fxName = sys->getFXListName();
+
+			// The same template often runs many times over on one object; collapse duplicates so
+			// the stack does not become the same name repeated a dozen times. Keyed on the pair, so
+			// one particle system used by two different FXLists still shows up under both.
+			Bool alreadyListed = FALSE;
+			for( Int n = 0; n < nameCount; ++n )
+			{
+				if( names[n] == sysName && fxNames[n] == fxName )
+				{
+					alreadyListed = TRUE;
+					break;
+				}
+			}
+
+			if( alreadyListed )
+				continue;
+
+			fxNames[ nameCount ] = fxName;
+			names[ nameCount++ ] = sysName;
+
+			// Cap the stack so a heavily attached object cannot grow a tower of text that covers
+			// everything around it.
+			if( nameCount >= MAX_OVERLAY_PARTICLE_LINES )
+				break;
+		}
+
+		// With a linger set, this frame's findings are folded into the drawable's remembered list
+		// and the overlay draws from that instead, so a name outlives the system that produced it.
+		if( remembering )
+		{
+			rememberParticleNames( names, fxNames, nameCount, nowFrame );
+
+			const UnsignedInt lingerFrames =
+					(UnsignedInt)( (Real)lingerMS * LOGICFRAMES_PER_MSEC_REAL );
+
+			nameCount = collectRememberedParticleNames( names, fxNames, nowFrame, lingerFrames );
+		}
+
+		// Drawn bottom up, so within a pair the particle name is emitted before the FXList that
+		// owns it -- leaving the FX name sitting above its particles on screen, the way the INI
+		// nests them.
+		for( Int i = nameCount - 1; i >= 0; --i )
+		{
+			UnicodeString line;
+			line.format( L"%hs", names[i].str() );
+			drawOverlayLine( s_nameString, line, anchor.x, lineY, particleColor, dropColor );
+
+			// Only systems created through an FXList carry one.
+			if( !fxNames[i].isEmpty() )
+			{
+				line.format( L"%hs", fxNames[i].str() );
+				drawOverlayLine( s_nameString, line, anchor.x, lineY, fxListColor, dropColor );
+			}
+		}
+	}
+
+	if( wantObjectName )
+	{
+		const ThingTemplate *tmpl = getTemplate();
+		UnicodeString line;
+		line.format( L"%hs", tmpl ? tmpl->getName().str() : "<no template>" );
+		drawOverlayLine( s_nameString, line, anchor.x, lineY, textColor, dropColor );
+	}
+}
+#endif
+
 // ------------------------------------------------------------------------------------------------
 
 Bool Drawable::drawsAnyUIText( void )
@@ -2927,6 +3317,13 @@ void Drawable::drawIconUI( void )
 		// we only draw icons drawables with objects, so one bail here -------------------------
 		if ( ! obj )
 			return;
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+		// TheSuperHackers @feature Debug name overlays. Drawn here, before the dead and
+		// KINDOF_IGNORED_IN_GUI bails below, so the names cover every drawable on screen -- props,
+		// rocks and wreckage included -- rather than only the things that get a health bar.
+		drawDebugNameOverlay( healthBarRegion );
+#endif
 
 		//Icons that can be drawn on dead things
 		drawHealthBar( healthBarRegion );

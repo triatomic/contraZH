@@ -515,6 +515,14 @@ public:  // ********************************************************************
 	virtual void message( AsciiString stringManagerLabel, ... );///< display a message to the user
 	virtual void toggleMessages( void ) { m_messagesOn = 1 - m_messagesOn; }	///< toggle messages on/off
 	virtual Bool isMessagesOn( void ) { return m_messagesOn; }	///< are the display messages on
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// TheSuperHackers @feature Debug name overlays, toggled by the Ctrl+[ and Ctrl+] cheats. Runtime
+	// only and never saved, so they live here rather than in GlobalData with the Options.ini flags.
+	virtual void toggleObjectNameOverlay( void ) { m_objectNameOverlayOn = !m_objectNameOverlayOn; }
+	virtual Bool isObjectNameOverlayOn( void ) const { return m_objectNameOverlayOn; }
+	virtual void toggleParticleNameOverlay( void ) { m_particleNameOverlayOn = !m_particleNameOverlayOn; }
+	virtual Bool isParticleNameOverlayOn( void ) const { return m_particleNameOverlayOn; }
+#endif
 	void freeMessageResources( void );				///< free resources for the ui messages
 	void freeCustomUiResources( void );				///< free resources for custom ui elements
 	Color getMessageColor(Bool altColor) { return (altColor)?m_messageColor2:m_messageColor1; }
@@ -1090,6 +1098,10 @@ protected:
 	Coord2D											m_scrollAmt;
 	Bool												m_isQuitMenuVisible;
 	Bool												m_messagesOn;
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	Bool												m_objectNameOverlayOn;
+	Bool												m_particleNameOverlayOn;
+#endif
 
 	Color												m_messageColor1;
 	Color												m_messageColor2;

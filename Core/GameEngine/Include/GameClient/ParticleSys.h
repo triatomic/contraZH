@@ -655,6 +655,16 @@ public:
 	UnsignedInt getParticleCount( void ) const { return m_particleCount; }
 
 	ObjectID getAttachedObject( void ) { return m_attachedToObjectID; }
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// TheSuperHackers @feature Name of the FXList that spawned this system, for the debug name
+	// overlay. An FXList is a group of particle systems, and nothing in a created system otherwise
+	// records which list it came from -- the name exists only as the key in FXListStore's map --
+	// so the nugget stamps it here as it creates the system. Empty for systems created directly
+	// rather than through an FXList.
+	void setFXListName( const AsciiString &name ) { m_fxListName = name; }
+	const AsciiString &getFXListName( void ) const { return m_fxListName; }
+#endif
 	DrawableID getAttachedDrawable( void ) { return m_attachedToDrawableID; }
 
 	// Access to dynamically changing part of a particle system.
@@ -700,6 +710,9 @@ protected:
 
 	DrawableID				m_attachedToDrawableID;					///< if non-zero, system is parented to this Drawable
 	ObjectID					m_attachedToObjectID;						///< if non-zero, system is parented to this Object
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	AsciiString				m_fxListName;										///< FXList that spawned this system, debug overlay only
+#endif
 
 	Matrix3D					m_localTransform;								///< local orientation & position of system
 	Matrix3D					m_transform;										///< composite transform of parent Drawable and local

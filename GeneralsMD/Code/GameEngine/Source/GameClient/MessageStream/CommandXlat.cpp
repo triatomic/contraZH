@@ -3978,6 +3978,42 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			break;
 		}
 
+		// TheSuperHackers @feature Toggle the object name overlay: the template (INI) name drawn
+		// above every object on screen, selected or not. A modding aid -- it answers "what is this
+		// thing actually called" without leaving the game.
+		//
+		// The drawing lives in Drawable::drawDebugNameOverlay; this only flips the flag. Client side
+		// only, posting nothing to the logic, so it is replay and multiplayer safe.
+		case GameMessage::MSG_CHEAT_SHOW_OBJECT_NAME:
+		{
+			TheInGameUI->toggleObjectNameOverlay();
+
+			TheInGameUI->messageNoFormat( TheInGameUI->isObjectNameOverlayOn()
+				? TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugObjectNameOverlayOn", L"Object Names are ON")
+				: TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugObjectNameOverlayOff", L"Object Names are OFF") );
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
+		// TheSuperHackers @feature Toggle the particle name overlay: the names of the particle systems
+		// running on each object, stacked above it. Useful for tracking down which FX an effect
+		// actually is before editing it.
+		//
+		// Note this scans every live particle system once per drawn object, so it is heavier than the
+		// object name overlay and is best switched on only while looking for something.
+		case GameMessage::MSG_CHEAT_SHOW_PARTICLE_NAMES:
+		{
+			TheInGameUI->toggleParticleNameOverlay();
+
+			TheInGameUI->messageNoFormat( TheInGameUI->isParticleNameOverlayOn()
+				? TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugParticleNameOverlayOn", L"Particle Names are ON")
+				: TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugParticleNameOverlayOff", L"Particle Names are OFF") );
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
 #endif
 
 		//-----------------------------------------------------------------------------------------
