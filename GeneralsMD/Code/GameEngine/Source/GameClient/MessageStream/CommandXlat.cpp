@@ -43,6 +43,8 @@
 #include "Common/MultiplayerSettings.h"
 #include "Common/PerfTimer.h"
 #include "Common/Player.h"
+// TheSuperHackers @feature for the max rank part of the combined cheat
+#include "GameLogic/RankInfo.h"
 #include "Common/PlayerList.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/Radar.h"
@@ -3915,8 +3917,9 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			{
 				Player *localPlayer = ThePlayerList->getLocalPlayer();
 
-				// instant build, toggled like the standalone cheat
+				// One state drives the whole cheat, so everything flips together.
 				Bool enable = !localPlayer->buildsInstantly();
+
 				for( Int n = 0; n < ThePlayerList->getPlayerCount(); ++n )
 				{
 					Player* player = ThePlayerList->getNthPlayer(n);
@@ -3924,19 +3927,28 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 						player->enableInstantBuild(enable);
 				}
 
-				if( Money *money = localPlayer->getMoney() )
-					money->deposit( 999999 );
+				// Rank goes first, and this ordering matters. Lowering a rank calls resetRank, which
+				// wipes purchased sciences -- granting them before setting the rank would hand them
+				// over and then immediately take them away again.
+				const Int maxRank = TheRankInfoStore ? TheRankInfoStore->getRankLevelCount() : 1;
+				localPlayer->setRankLevel( enable ? maxRank : 1 );
 
-				// only this general's own tree, not every science in the game
-				giveOwnFactionSciences( localPlayer );
+				if( enable )
+				{
+					if( Money *money = localPlayer->getMoney() )
+						money->deposit( 999999 );
 
-				ThePartitionManager->revealMapForPlayerPermanently( localPlayer->getPlayerIndex() );
+					// only this general's own tree, not every science in the game
+					giveOwnFactionSciences( localPlayer );
+
+					ThePartitionManager->revealMapForPlayerPermanently( localPlayer->getPlayerIndex() );
+				}
 
 				TheInGameUI->messageNoFormat( enable
 					? TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugKitchenSinkOn",
-							L"Cash, sciences, map revealed. Instant Build is ON")
+							L"Cash, sciences, max rank, map revealed. Instant Build is ON")
 					: TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugKitchenSinkOff",
-							L"Cash, sciences, map revealed. Instant Build is OFF") );
+							L"Rank reset. Instant Build is OFF") );
 
 				disp = DESTROY_MESSAGE;
 			}
