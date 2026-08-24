@@ -321,6 +321,24 @@ Bool OptionPreferences::getNumericalHealthEnabled(void) const
 	return FALSE;
 }
 
+// TheSuperHackers @feature Options.ini: ParticleNameLingerMS = 3000 keeps a particle name in the
+// debug overlay for that many milliseconds after its system has gone. Many effects are one shot
+// bursts that die within a frame or two, so without this their names flash past unreadably.
+//
+// Absent or 0 keeps the original behaviour: a name shows only while its system is alive.
+Int OptionPreferences::getParticleNameLingerMS(void) const
+{
+	OptionPreferences::const_iterator it = find("ParticleNameLingerMS");
+	if (it == end())
+		return 0;	// key absent, so keep the lifetime driven behaviour
+
+	Int ms = atoi(it->second.str());
+	if (ms < 0)
+		ms = 0;
+
+	return ms;
+}
+
 // TheSuperHackers @feature Options.ini: SmartPips = Yes keeps ammo and passenger pips on screen
 // instead of showing them only while the unit is selected or moused over. Own units only -- not
 // allies, not enemies. Nothing is drawn when there is nothing to report: no shots left, or no

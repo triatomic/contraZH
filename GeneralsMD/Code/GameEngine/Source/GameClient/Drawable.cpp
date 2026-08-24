@@ -201,6 +201,36 @@ void DrawableIconInfo::clear()
 	}
 }
 
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+// ------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature Remembered particle names for the debug name overlay.
+// ------------------------------------------------------------------------------------------------
+DrawableParticleNameInfo::DrawableParticleNameInfo()
+{
+	clear();
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+DrawableParticleNameInfo::~DrawableParticleNameInfo()
+{
+	clear();
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+void DrawableParticleNameInfo::clear()
+{
+	for (int i = 0; i < MAX_REMEMBERED_PARTICLE_NAMES; ++i)
+	{
+		m_name[i].clear();
+		m_fxName[i].clear();
+		m_lastSeenFrame[i] = 0;
+	}
+	m_count = 0;
+}
+#endif
+
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
 void DrawableIconInfo::killIcon(DrawableIconType t)
@@ -557,6 +587,9 @@ Drawable::Drawable( const ThingTemplate *thingTemplate, DrawableStatusBits statu
 	m_drawableInfo.m_ghostObject = nullptr;
 
 	m_iconInfo = nullptr;								// lazily allocate!
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	m_particleNameInfo = nullptr;				// lazily allocate!
+#endif
 	m_selectionFlashEnvelope = nullptr;	// lazily allocate!
 	m_colorTintEnvelope = nullptr;				// lazily allocate!
 
@@ -627,6 +660,10 @@ Drawable::~Drawable()
 	// delete any icons present
 	deleteInstance(m_iconInfo);
 	m_iconInfo = nullptr;
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	deleteInstance(m_particleNameInfo);
+	m_particleNameInfo = nullptr;
+#endif
 
 	deleteInstance(m_selectionFlashEnvelope);
 	m_selectionFlashEnvelope = nullptr;
@@ -2907,6 +2944,113 @@ static void drawOverlayLine( DisplayString *str, const UnicodeString &text, Int 
 	lineY -= height;
 	str->draw( centerX - ( width / 2 ), lineY, color, dropColor );
 }
+//-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature Fold this frame's particle names into the drawable's remembered list.
+// An entry already present is refreshed rather than duplicated, so a system that keeps running
+// keeps its slot. When the list is full the oldest entry is replaced, since the point of the
+// linger is to catch what just happened.
+//-------------------------------------------------------------------------------------------------
+void Drawable::rememberParticleNames( const AsciiString *names, const AsciiString *fxNames,
+																	Int count, UnsignedInt nowFrame )
+{
+	if( count <= 0 && m_particleNameInfo == nullptr )
+		return;
+
+	if( m_particleNameInfo == nullptr )
+		m_particleNameInfo = newInstance(DrawableParticleNameInfo);
+
+	DrawableParticleNameInfo *info = m_particleNameInfo;
+
+	for( Int i = 0; i < count; ++i )
+	{
+		// Refresh if we already know this pair.
+		Bool found = FALSE;
+		for( Int n = 0; n < info->m_count; ++n )
+		{
+			if( info->m_name[n] == names[i] && info->m_fxName[n] == fxNames[i] )
+			{
+				info->m_lastSeenFrame[n] = nowFrame;
+				found = TRUE;
+				break;
+			}
+		}
+
+		if( found )
+			continue;
+
+		Int slot;
+		if( info->m_count < MAX_REMEMBERED_PARTICLE_NAMES )
+		{
+			slot = info->m_count++;
+		}
+		else
+		{
+			// Full, so evict the stalest entry.
+			slot = 0;
+			for( Int n = 1; n < info->m_count; ++n )
+			{
+				if( info->m_lastSeenFrame[n] < info->m_lastSeenFrame[slot] )
+					slot = n;
+			}
+		}
+
+		info->m_name[slot] = names[i];
+		info->m_fxName[slot] = fxNames[i];
+		info->m_lastSeenFrame[slot] = nowFrame;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature Read back the remembered particle names that are still inside the
+// linger window, newest first so the most recent effect is the one that survives the line cap.
+// Returns how many were written into the caller's arrays.
+//-------------------------------------------------------------------------------------------------
+Int Drawable::collectRememberedParticleNames( AsciiString *names, AsciiString *fxNames,
+																							UnsignedInt nowFrame, UnsignedInt lingerFrames ) const
+{
+	if( m_particleNameInfo == nullptr )
+		return 0;
+
+	const DrawableParticleNameInfo *info = m_particleNameInfo;
+
+	// Selection sort by recency. The list is at most MAX_REMEMBERED_PARTICLE_NAMES long, so this
+	// stays cheaper than carrying an ordered structure around.
+	Bool used[ MAX_REMEMBERED_PARTICLE_NAMES ];
+	for( Int i = 0; i < MAX_REMEMBERED_PARTICLE_NAMES; ++i )
+		used[i] = FALSE;
+
+	Int written = 0;
+	while( written < MAX_OVERLAY_PARTICLE_LINES )
+	{
+		Int best = -1;
+		for( Int n = 0; n < info->m_count; ++n )
+		{
+			if( used[n] )
+				continue;
+
+			// getFrame can go backwards across a load, so guard the subtraction rather than
+			// letting it wrap into a huge age and hide the entry forever.
+			const UnsignedInt age =
+					( nowFrame >= info->m_lastSeenFrame[n] ) ? ( nowFrame - info->m_lastSeenFrame[n] ) : 0;
+			if( age > lingerFrames )
+				continue;
+
+			if( best < 0 || info->m_lastSeenFrame[n] > info->m_lastSeenFrame[best] )
+				best = n;
+		}
+
+		if( best < 0 )
+			break;
+
+		used[best] = TRUE;
+		names[written] = info->m_name[best];
+		fxNames[written] = info->m_fxName[best];
+		++written;
+	}
+
+	return written;
+}
+
 
 
 //-------------------------------------------------------------------------------------------------
@@ -3004,6 +3148,13 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 		AsciiString fxNames[ MAX_OVERLAY_PARTICLE_LINES ];
 		Int nameCount = 0;
 
+		// Options.ini: ParticleNameLingerMS. Zero, or the key absent, keeps the original behaviour --
+		// a name is shown only while its system is alive. Anything higher remembers names on the
+		// drawable so one shot bursts, which die within a frame or two, stay readable.
+		const Int lingerMS = TheGlobalData ? TheGlobalData->m_particleNameLingerMS : 0;
+		const Bool remembering = ( lingerMS > 0 );
+		const UnsignedInt nowFrame = TheGameLogic ? TheGameLogic->getFrame() : 0;
+
 		ParticleSystemManager::ParticleSystemList &allSystems =
 				TheParticleSystemManager->getAllParticleSystems();
 
@@ -3079,6 +3230,18 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 			// everything around it.
 			if( nameCount >= MAX_OVERLAY_PARTICLE_LINES )
 				break;
+		}
+
+		// With a linger set, this frame's findings are folded into the drawable's remembered list
+		// and the overlay draws from that instead, so a name outlives the system that produced it.
+		if( remembering )
+		{
+			rememberParticleNames( names, fxNames, nameCount, nowFrame );
+
+			const UnsignedInt lingerFrames =
+					(UnsignedInt)( (Real)lingerMS * LOGICFRAMES_PER_MSEC_REAL );
+
+			nameCount = collectRememberedParticleNames( names, fxNames, nowFrame, lingerFrames );
 		}
 
 		// Drawn bottom up, so within a pair the particle name is emitted before the FXList that
