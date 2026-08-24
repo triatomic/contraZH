@@ -2882,6 +2882,190 @@ static Bool computeHealthRegion( const Drawable *draw, IRegion2D& region )
 }
 
 
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+// TheSuperHackers @feature Most particle names an object can stack above itself before the text
+// starts covering its neighbours. Also bounds the per object scan.
+static const Int MAX_OVERLAY_PARTICLE_LINES = 4;
+
+//-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature Draw one line of the debug name overlay, horizontally centred on the
+// object and stacking upward: lineY is moved up by the line height so the next call sits above
+// this one. A black drop shadow rather than a backdrop plate, matching the numerical health text --
+// these sit over the battlefield, where a filled box would be far more intrusive than the text.
+//-------------------------------------------------------------------------------------------------
+static void drawOverlayLine( DisplayString *str, const UnicodeString &text, Int centerX, Int &lineY,
+														Color color, Color dropColor )
+{
+	if( str == nullptr )
+		return;
+
+	str->setText( text );
+
+	Int width, height;
+	str->getSize( &width, &height );
+
+	lineY -= height;
+	str->draw( centerX - ( width / 2 ), lineY, color, dropColor );
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature Draw the object template name and/or the names of the particle systems
+// running on this drawable, stacked above the health bar. Toggled by the Ctrl+[ and Ctrl+] cheats.
+//
+// Called from drawIconUI before the dead and KINDOF_IGNORED_IN_GUI bails, so this covers every
+// drawable on screen -- selected or not, props and wreckage included -- which is the whole point
+// of the overlay over the one shot message list version of the same lookup.
+//
+// Purely a client side read: it inspects names and draws text, posting nothing to the logic, so it
+// is replay and multiplayer safe.
+//-------------------------------------------------------------------------------------------------
+void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
+{
+	if( TheInGameUI == nullptr || TheDisplayStringManager == nullptr )
+		return;
+
+	const Bool wantObjectName = TheInGameUI->isObjectNameOverlayOn();
+	const Bool wantParticleNames = TheInGameUI->isParticleNameOverlayOn();
+	if( !wantObjectName && !wantParticleNames )
+		return;
+
+	const Object *obj = getObject();
+	if( obj == nullptr )
+		return;
+
+	// The health bar region is only computed for objects that actually get a bar, and it is absent
+	// for anything KINDOF_IGNORED_IN_GUI. Since this overlay deliberately covers those too, fall
+	// back to projecting the health box position directly when there is no region. worldToScreen
+	// fails outside the view frustum, which doubles as the off screen cull.
+	ICoord2D anchor;
+	if( healthBarRegion != nullptr )
+	{
+		anchor.x = ( healthBarRegion->lo.x + healthBarRegion->hi.x ) / 2;
+		anchor.y = healthBarRegion->lo.y;
+	}
+	else
+	{
+		if( TheTacticalView == nullptr )
+			return;
+
+		Coord3D world;
+		obj->getHealthBoxPosition( world );
+		if( !TheTacticalView->worldToScreen( &world, &anchor ) )
+			return;
+	}
+
+	// One shared string for every drawable. The text differs per object so it is rebuilt on each
+	// use rather than cached; it stays static only to avoid allocating a display string per frame
+	// per object, which with the overlay on would be thousands of allocations a second.
+	static DisplayString *s_nameString = nullptr;
+	if( s_nameString == nullptr )
+	{
+		s_nameString = TheDisplayStringManager->newDisplayString();
+		if( s_nameString == nullptr )
+			return;
+
+		// Same size as the numerical health text: this can be on over every object on screen at
+		// once, so it has to stay small enough to read as an annotation.
+		Int pointSize = 6;
+		if( TheGlobalLanguageData )
+			pointSize = TheGlobalLanguageData->adjustFontSize( pointSize );
+		s_nameString->setFont( TheFontLibrary->getFont( AsciiString( "Arial" ), pointSize, FALSE ) );
+	}
+
+	const Color textColor = GameMakeColor( 255, 255, 255, 255 );
+	const Color dropColor = GameMakeColor( 0, 0, 0, 255 );
+	const Color particleColor = GameMakeColor( 120, 220, 255, 255 );
+
+	// Lines stack upward from just above the bar, so adding particle names never pushes the object
+	// name off its anchor.
+	Int lineY = anchor.y - 2;
+
+	// Particle names sit above the object name, so they are gathered and drawn first from the
+	// bottom up. Reverse order here means the list still reads top to bottom on screen.
+	if( wantParticleNames && TheParticleSystemManager != nullptr )
+	{
+		const DrawableID myDrawableID = getID();
+		const ObjectID myObjectID = obj->getID();
+
+		// An object keeps no list of its particle systems, so this walks the live systems and
+		// keeps the ones parented to this drawable or its object. That is O(systems) per drawable
+		// and this runs per frame, which is why the overlay is a cheat build only debug aid and
+		// not something to leave on during normal play.
+		//
+		// A fixed array rather than a vector: the list is capped anyway, this runs per object per
+		// frame, and Drawable.cpp does not otherwise pull in <vector>.
+		AsciiString names[ MAX_OVERLAY_PARTICLE_LINES ];
+		Int nameCount = 0;
+
+		ParticleSystemManager::ParticleSystemList &allSystems =
+				TheParticleSystemManager->getAllParticleSystems();
+
+		for( ParticleSystemManager::ParticleSystemListIt it = allSystems.begin();
+					it != allSystems.end(); ++it )
+		{
+			ParticleSystem *sys = *it;
+			if( sys == nullptr )
+				continue;
+
+			// A system may be parented to either the drawable or the object behind it, depending
+			// on how it was created, so both have to be checked.
+			const DrawableID sysDrawableID = sys->getAttachedDrawable();
+			const ObjectID sysObjectID = sys->getAttachedObject();
+
+			const Bool mine =
+					( sysDrawableID != INVALID_DRAWABLE_ID && sysDrawableID == myDrawableID ) ||
+					( sysObjectID != INVALID_ID && sysObjectID == myObjectID );
+			if( !mine )
+				continue;
+
+			const ParticleSystemTemplate *sysTemplate = sys->getTemplate();
+			if( sysTemplate == nullptr )
+				continue;
+
+			const AsciiString sysName = sysTemplate->getName();
+
+			// The same template often runs many times over on one object; collapse duplicates so
+			// the stack does not become the same name repeated a dozen times.
+			Bool alreadyListed = FALSE;
+			for( Int n = 0; n < nameCount; ++n )
+			{
+				if( names[n] == sysName )
+				{
+					alreadyListed = TRUE;
+					break;
+				}
+			}
+
+			if( alreadyListed )
+				continue;
+
+			names[ nameCount++ ] = sysName;
+
+			// Cap the stack so a heavily attached object cannot grow a tower of text that covers
+			// everything around it.
+			if( nameCount >= MAX_OVERLAY_PARTICLE_LINES )
+				break;
+		}
+
+		for( Int i = nameCount - 1; i >= 0; --i )
+		{
+			UnicodeString line;
+			line.format( L"%hs", names[i].str() );
+			drawOverlayLine( s_nameString, line, anchor.x, lineY, particleColor, dropColor );
+		}
+	}
+
+	if( wantObjectName )
+	{
+		const ThingTemplate *tmpl = getTemplate();
+		UnicodeString line;
+		line.format( L"%hs", tmpl ? tmpl->getName().str() : "<no template>" );
+		drawOverlayLine( s_nameString, line, anchor.x, lineY, textColor, dropColor );
+	}
+}
+#endif
+
 // ------------------------------------------------------------------------------------------------
 
 Bool Drawable::drawsAnyUIText( void )
@@ -2927,6 +3111,13 @@ void Drawable::drawIconUI( void )
 		// we only draw icons drawables with objects, so one bail here -------------------------
 		if ( ! obj )
 			return;
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+		// TheSuperHackers @feature Debug name overlays. Drawn here, before the dead and
+		// KINDOF_IGNORED_IN_GUI bails below, so the names cover every drawable on screen -- props,
+		// rocks and wreckage included -- rather than only the things that get a health bar.
+		drawDebugNameOverlay( healthBarRegion );
+#endif
 
 		//Icons that can be drawn on dead things
 		drawHealthBar( healthBarRegion );

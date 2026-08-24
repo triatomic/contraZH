@@ -786,6 +786,10 @@ private:
 	// TheSuperHackers @feature hit points beside the bar (Options.ini: NumericalHealth)
 	void drawNumericalHealth( const IRegion2D *healthBarRegion, Real health, Real maxHealth,
 													Color color );
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// TheSuperHackers @feature Debug object and particle name overlays (Ctrl+[ and Ctrl+]).
+	void drawDebugNameOverlay( const IRegion2D *healthBarRegion );
+#endif
 	void drawContained( const IRegion2D *healthBarRegion );					///< draw icons
 	void drawVeterancy( const IRegion2D *healthBarRegion );					///< draw veterency information
 
