@@ -40,7 +40,20 @@ enum CPP_11( : Int)
 {
 	MAX_BATCH_VERTICES = 65535,
 	MAX_BATCH_INDICES = 65535,
-	MAX_TILE_CELL_DIMENSION = 80
+	MAX_TILE_CELL_DIMENSION = 80,
+	// TheSuperHackers @tweak Largest footprint, in terrain cells per side, that is meshed at full
+	// terrain resolution. Past this the mesh samples every Nth cell instead.
+	//
+	// Cost is quadratic in particle size: calcBounds divides the radius by MAP_XY_FACTOR and the
+	// mesh is that squared. A growth effect such as NukeMushroomCloudRing, which starts at
+	// Size 0.6 and climbs via SizeRate for 500 frames, was measured reaching 373 cells per side
+	// -- 126,000 vertices for one particle, roughly twice MAX_BATCH_VERTICES, so it could not be
+	// drawn without flushing the batch mid mesh. 129 flushes in a single frame, where the plain
+	// quad path needs one, is what the frame rate drop actually was.
+	//
+	// 160 is two tiles, about 25,600 vertices, comfortably inside one batch. Ordinary effects
+	// were measured topping out near 145 cells, so nothing that behaves today is affected.
+	MAX_FULL_RESOLUTION_CELL_DIMENSION = 160
 };
 
 enum UVClipOutcode CPP_11( : Int)
@@ -284,14 +297,38 @@ void W3DTerrainParticle::CreateTerrainMesh(WorldHeightMap* map, const Vector3& l
 
 	const Real particleHeightOffset = MAP_XY_FACTOR / 10;
 
-	for (Int tileMinY = bounds.lo.y; tileMinY < bounds.hi.y - 1; tileMinY += MAX_TILE_CELL_DIMENSION)
+	// TheSuperHackers @tweak Sample every Nth terrain cell once the footprint grows past
+	// MAX_FULL_RESOLUTION_CELL_DIMENSION, so cost stops growing with the square of the particle
+	// size. The mesh follows the terrain more coarsely as a result, which is the trade: the
+	// effects that reach this size are growth effects like mushroom clouds, which drift upward
+	// and away from the ground, so the precision being given up is not visible on them anyway.
+	const Int footprintCells = max(bounds.width(), bounds.height());
+	Int stride = 1;
+	while (footprintCells / stride > MAX_FULL_RESOLUTION_CELL_DIMENSION)
+		++stride;
+
+	// Everything below counts in samples rather than cells; a sample is `stride` cells wide, and
+	// the stride is reapplied only when reading the heightmap or placing a vertex in the world.
+	const Int tileSampleSpan = MAX_TILE_CELL_DIMENSION * stride;
+
+	for (Int tileMinY = bounds.lo.y; tileMinY < bounds.hi.y - 1; tileMinY += tileSampleSpan)
 	{
-		const Int tileMaxY = std::min(tileMinY + MAX_TILE_CELL_DIMENSION + 1, bounds.hi.y);
-		for (Int tileMinX = bounds.lo.x; tileMinX < bounds.hi.x - 1; tileMinX += MAX_TILE_CELL_DIMENSION)
+		const Int tileMaxY = std::min(tileMinY + tileSampleSpan + stride, bounds.hi.y);
+		for (Int tileMinX = bounds.lo.x; tileMinX < bounds.hi.x - 1; tileMinX += tileSampleSpan)
 		{
-			const Int tileMaxX = std::min(tileMinX + MAX_TILE_CELL_DIMENSION + 1, bounds.hi.x);
-			const Int tileWidth = tileMaxX - tileMinX;
-			const Int tileHeight = tileMaxY - tileMinY;
+			const Int tileMaxX = std::min(tileMinX + tileSampleSpan + stride, bounds.hi.x);
+			// Number of samples, not cells: with a stride of 3 a 30 cell span is 10 samples across.
+			// Rounded up so a span that does not divide evenly still gets its final edge sample.
+			const Int tileWidth = (tileMaxX - tileMinX + stride - 1) / stride;
+			const Int tileHeight = (tileMaxY - tileMinY + stride - 1) / stride;
+			if (tileWidth < 2 || tileHeight < 2)
+			{
+				continue;
+			}
+			// The span is at most MAX_TILE_CELL_DIMENSION * stride + stride cells, which works out to
+			// exactly MAX_TILE_CELL_DIMENSION + 1 samples -- the size TileOutcodes is allocated for.
+			// Tight enough to be worth asserting rather than trusting.
+			WWASSERT(tileWidth <= MAX_TILE_CELL_DIMENSION + 1 && tileHeight <= MAX_TILE_CELL_DIMENSION + 1);
 			const Int tileVertexCount = tileWidth * tileHeight;
 			const Int tileCellWidth = tileWidth - 1;
 			const Int tileCellHeight = tileHeight - 1;
@@ -310,10 +347,14 @@ void W3DTerrainParticle::CreateTerrainMesh(WorldHeightMap* map, const Vector3& l
 
 			Int i, j;
 			const UnsignedShort baseVertex = NumberOfVertices;
-			for (j = tileMinY; j < tileMaxY; j++)
+			// Stepped by stride, and clamped to the last row and column so the mesh still ends on
+			// the footprint edge when the span does not divide evenly by the stride.
+			for (Int sj = 0; sj < tileHeight; sj++)
 			{
-				for (i = tileMinX; i < tileMaxX; i++)
+				j = std::min(tileMinY + sj * stride, tileMaxY - 1);
+				for (Int si = 0; si < tileWidth; si++)
 				{
+					i = std::min(tileMinX + si * stride, tileMaxX - 1);
 					VertexFormatXYZNDUV2 vertex;
 					vertex.diffuse = diffuse;
 					vertex.x = i * MAP_XY_FACTOR;
@@ -331,7 +372,7 @@ void W3DTerrainParticle::CreateTerrainMesh(WorldHeightMap* map, const Vector3& l
 					vertex.v1 = 0.5f - localY / (2.0f * size);
 					vertex.u2 = 0.0f;
 					vertex.v2 = 0.0f;
-					TileOutcodes[(j - tileMinY) * tileWidth + i - tileMinX] = getUVClipOutcode(vertex);
+					TileOutcodes[sj * tileWidth + si] = getUVClipOutcode(vertex);
 					VertexData[NumberOfVertices++] = vertex;
 				}
 			}
@@ -348,8 +389,10 @@ void W3DTerrainParticle::CreateTerrainMesh(WorldHeightMap* map, const Vector3& l
 					const UnsignedShort topRight = baseVertex + topRightOffset;
 					const UnsignedShort bottomLeft = baseVertex + bottomLeftOffset;
 					const UnsignedShort bottomRight = baseVertex + bottomRightOffset;
-					const Int mapCellX = tileMinX + i + map->getBorderSizeInline();
-					const Int mapCellY = tileMinY + j + map->getBorderSizeInline();
+					// i and j are sample indices here, so the stride has to come back in to reach the
+					// real cell. The flip state of the first cell in a span stands in for the span.
+					const Int mapCellX = tileMinX + i * stride + map->getBorderSizeInline();
+					const Int mapCellY = tileMinY + j * stride + map->getBorderSizeInline();
 					if (map->getFlipState(mapCellX, mapCellY))
 					{
 						AddTerrainTriangle(topRight, bottomLeft, topLeft,
