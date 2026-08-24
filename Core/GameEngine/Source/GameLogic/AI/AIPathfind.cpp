@@ -7481,6 +7481,7 @@ struct ExamineCellsStruct
 	const LocomotorSet	*theLoco;
 	Bool								centerInCell;
 	Bool								isHuman;
+	Bool								isCrusher;
 	Int									radius;
 	const Object				*obj;
 	PathfindCell				*goalCell;
@@ -7489,10 +7490,9 @@ struct ExamineCellsStruct
 /*static*/ Int Pathfinder::examineCellsCallback(Pathfinder* pathfinder, PathfindCell* from, PathfindCell* to, Int to_x, Int to_y, void* userData)
 {
 	ExamineCellsStruct* d = (ExamineCellsStruct*)userData;
-	Bool isCrusher = d->obj ? d->obj->getCrusherLevel() > 0 : false;
 	if (d->thePathfinder->m_isTunneling) return 1; // abort.
 	if (from && to) {
-			if (!d->thePathfinder->validMovementPosition( isCrusher, d->theLoco->getValidSurfaces(), d->theLoco->getRequiredWaterLevel(), d->obj->getRequiredBridgeHeight(), to, from )) {
+			if (!d->thePathfinder->validMovementPosition( d->isCrusher, d->theLoco->getValidSurfaces(), d->theLoco->getRequiredWaterLevel(), d->obj->getRequiredBridgeHeight(), to, from )) {
 				return 1;
 			}
 			if ( (to->getLayer() == LAYER_GROUND) && !d->thePathfinder->m_zoneManager.isPassable(to_x, to_y) ) {
@@ -7627,6 +7627,7 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 			info.radius = radius;
 			info.obj = obj;
 			info.isHuman = isHuman;
+			info.isCrusher = isCrusher;
 			info.goalCell = goalCell;
 			ICoord2D start, end;
 			start.x = parentCell->getXIndex();
