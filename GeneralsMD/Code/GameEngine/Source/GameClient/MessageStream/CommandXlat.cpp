@@ -43,6 +43,8 @@
 #include "Common/MultiplayerSettings.h"
 #include "Common/PerfTimer.h"
 #include "Common/Player.h"
+// TheSuperHackers @feature for the max rank part of the combined cheat
+#include "GameLogic/RankInfo.h"
 #include "Common/PlayerList.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/Radar.h"
@@ -151,6 +153,55 @@ void giveAllSciences(Player* player)
 		}
 	}
 }
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+// TheSuperHackers @feature Grant only the sciences that belong to this player's own general.
+//
+// giveAllSciences above hands out every grantable science in the game, which on a general with a
+// narrow tree means most of what it grants is not even his. The player template names the three
+// command sets the promotion UI builds its ranks from, so walking those gives exactly the tree the
+// player could actually have purchased, and nothing else.
+static void giveOwnFactionSciences(Player* player)
+{
+	if (player == NULL)
+		return;
+
+	const PlayerTemplate* tmpl = player->getPlayerTemplate();
+	if (tmpl == NULL)
+		return;
+
+	AsciiString setNames[3];
+	setNames[0] = tmpl->getPurchaseScienceCommandSetRank1();
+	setNames[1] = tmpl->getPurchaseScienceCommandSetRank3();
+	setNames[2] = tmpl->getPurchaseScienceCommandSetRank8();
+
+	for (Int setIndex = 0; setIndex < 3; ++setIndex)
+	{
+		if (setNames[setIndex].isEmpty())
+			continue;
+
+		const CommandSet* set = TheControlBar ? TheControlBar->findCommandSet(setNames[setIndex]) : NULL;
+		if (set == NULL)
+			continue;
+
+		for (Int i = 0; i < MAX_COMMANDS_PER_SET; ++i)
+		{
+			const CommandButton* button = set->getCommandButton(i);
+			if (button == NULL)
+				continue;
+
+			// A purchase button can name more than one science, for the ranks that unlock a pair.
+			const ScienceVec& sciences = button->getScienceVec();
+			for (size_t sv = 0; sv < sciences.size(); ++sv)
+			{
+				ScienceType st = sciences[sv];
+				if (st != SCIENCE_INVALID && TheScienceStore->isScienceGrantable(st))
+					player->grantScience(st);
+			}
+		}
+	}
+}
+#endif
 
 void objectUnderConstruction(Object* obj, void *underConstruction)
 {
@@ -3856,6 +3907,53 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		}
 
 
+		// TheSuperHackers @feature One cheat that does the four things usually wanted together at the
+		// start of a test: instant build, a pile of cash, this general's own sciences, and the map
+		// revealed. Single player only, like the individual cheats it stands in for -- none of them
+		// are network messages, so firing them on one client only would desync the game.
+		case GameMessage::MSG_CHEAT_KITCHEN_SINK:
+		{
+			if( !TheGameLogic->isInMultiplayerGame() )
+			{
+				Player *localPlayer = ThePlayerList->getLocalPlayer();
+
+				// One state drives the whole cheat, so everything flips together.
+				Bool enable = !localPlayer->buildsInstantly();
+
+				for( Int n = 0; n < ThePlayerList->getPlayerCount(); ++n )
+				{
+					Player* player = ThePlayerList->getNthPlayer(n);
+					if( player->getPlayerType() == PLAYER_HUMAN )
+						player->enableInstantBuild(enable);
+				}
+
+				// Rank goes first, and this ordering matters. Lowering a rank calls resetRank, which
+				// wipes purchased sciences -- granting them before setting the rank would hand them
+				// over and then immediately take them away again.
+				const Int maxRank = TheRankInfoStore ? TheRankInfoStore->getRankLevelCount() : 1;
+				localPlayer->setRankLevel( enable ? maxRank : 1 );
+
+				if( enable )
+				{
+					if( Money *money = localPlayer->getMoney() )
+						money->deposit( 999999 );
+
+					// only this general's own tree, not every science in the game
+					giveOwnFactionSciences( localPlayer );
+
+					ThePartitionManager->revealMapForPlayerPermanently( localPlayer->getPlayerIndex() );
+				}
+
+				TheInGameUI->messageNoFormat( enable
+					? TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugKitchenSinkOn",
+							L"Cash, sciences, max rank, map revealed. Instant Build is ON")
+					: TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugKitchenSinkOff",
+							L"Rank reset. Instant Build is OFF") );
+
+				disp = DESTROY_MESSAGE;
+			}
+			break;
+		}
 #endif
 
 		//-----------------------------------------------------------------------------------------
@@ -5003,6 +5101,7 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			TheWritableGlobalData->m_disableRender = !TheGlobalData->m_disableRender;
 			break;
 		}
+
 
 		//------------------------------------------------------------------------------- DEMO MESSAGES
 		//-----------------------------------------------------------------------------------------

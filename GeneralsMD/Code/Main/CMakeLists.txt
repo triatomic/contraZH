@@ -1,11 +1,15 @@
 add_executable(z_generals WIN32)
 
 # Use a binary name that doesn't conflict with original game.
-if("${CMAKE_SYSTEM}" MATCHES "Windows")
-    set_target_properties(z_generals PROPERTIES OUTPUT_NAME generalszh)
+# TheSuperHackers @feature A cheats enabled build gets a _c suffix, so a build that can grant
+# money and reveal the map is never mistaken for a normal one sitting in the same folder.
+if(RTS_DEBUG_CHEATS)
+    set(RTS_GENERALS_BINARY_NAME generalszh_c)
 else()
-    set_target_properties(z_generals PROPERTIES OUTPUT_NAME generalszh)
+    set(RTS_GENERALS_BINARY_NAME generalszh)
 endif()
+
+set_target_properties(z_generals PROPERTIES OUTPUT_NAME ${RTS_GENERALS_BINARY_NAME})
 
 target_link_libraries(z_generals PRIVATE
     binkstub

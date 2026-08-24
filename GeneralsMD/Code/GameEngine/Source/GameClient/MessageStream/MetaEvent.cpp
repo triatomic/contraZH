@@ -214,6 +214,7 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "CHEAT_TOGGLE_HAND_OF_GOD_MODE",		        GameMessage::MSG_CHEAT_TOGGLE_HAND_OF_GOD_MODE },
 	{ "CHEAT_INSTANT_BUILD",							        GameMessage::MSG_CHEAT_INSTANT_BUILD },
 	{ "CHEAT_DESHROUD",									          GameMessage::MSG_CHEAT_DESHROUD },
+	{ "CHEAT_KITCHEN_SINK",									          GameMessage::MSG_CHEAT_KITCHEN_SINK },
 	{ "CHEAT_ADD_CASH",									          GameMessage::MSG_CHEAT_ADD_CASH },
 	{ "CHEAT_GIVE_ALL_SCIENCES",					        GameMessage::MSG_CHEAT_GIVE_ALL_SCIENCES },
   { "CHEAT_GIVE_SCIENCEPURCHASEPOINTS",        	GameMessage::MSG_CHEAT_GIVE_SCIENCEPURCHASEPOINTS },
@@ -825,6 +826,22 @@ MetaMapRec *MetaMap::getMetaMapRec(GameMessage::Type t)
 			map->m_usableIn = COMMANDUSABLE_OBSERVER;
 		}
 	}
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	{
+		// TheSuperHackers @feature Default binding for the combined cheat. Ctrl+` is free in the
+		// engine, in the demo command map and in Contra's own, and it does not collide with the
+		// Shift+Ctrl+` health bar cycle because the modifier sets differ. Only exists in builds
+		// where cheats are compiled in.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_KITCHEN_SINK);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_TICK;
+			map->m_transition = DOWN;
+			map->m_modState = CTRL;
+			map->m_usableIn = COMMANDUSABLE_GAME;
+		}
+	}
+#endif
 	{
 		// TheSuperHackers @feature Cycle the health bar display mode. Ctrl+Shift+` is unbound in
 		// retail and in the debug and demo command maps, so this takes a key nothing else wants.
