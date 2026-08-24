@@ -2976,6 +2976,9 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 	const Color textColor = GameMakeColor( 255, 255, 255, 255 );
 	const Color dropColor = GameMakeColor( 0, 0, 0, 255 );
 	const Color particleColor = GameMakeColor( 120, 220, 255, 255 );
+	// An FXList is a group of particle systems, so its name gets its own colour to separate the
+	// group from the systems inside it.
+	const Color fxListColor = GameMakeColor( 255, 190, 90, 255 );
 
 	// Lines stack upward from just above the bar, so adding particle names never pushes the object
 	// name off its anchor.
@@ -2996,6 +2999,9 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 		// A fixed array rather than a vector: the list is capped anyway, this runs per object per
 		// frame, and Drawable.cpp does not otherwise pull in <vector>.
 		AsciiString names[ MAX_OVERLAY_PARTICLE_LINES ];
+		// The FXList each system came from, empty when it was created directly rather than through
+		// one. Kept parallel to names so the pair can be drawn together.
+		AsciiString fxNames[ MAX_OVERLAY_PARTICLE_LINES ];
 		Int nameCount = 0;
 
 		ParticleSystemManager::ParticleSystemList &allSystems =
@@ -3013,9 +3019,33 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 			const DrawableID sysDrawableID = sys->getAttachedDrawable();
 			const ObjectID sysObjectID = sys->getAttachedObject();
 
-			const Bool mine =
+			Bool mine =
 					( sysDrawableID != INVALID_DRAWABLE_ID && sysDrawableID == myDrawableID ) ||
 					( sysObjectID != INVALID_ID && sysObjectID == myObjectID );
+
+			// An FXList nugget only parents its system when it says AttachToObject; otherwise the
+			// system is created at a bare world position with no parent at all. Those are exactly
+			// the ones worth labelling -- a PulseFX firing at an offset from a building is invisible
+			// to the parent check -- so an unparented system is claimed by the object it is sitting
+			// on top of. Nearest object wins is not tracked here; a system inside two overlapping
+			// footprints is listed under both, which is better than being listed under neither.
+			if( !mine && sysDrawableID == INVALID_DRAWABLE_ID && sysObjectID == INVALID_ID )
+			{
+				Coord3D sysPos;
+				sys->getPosition( &sysPos );
+				const Coord3D *objPos = obj->getPosition();
+				if( objPos != nullptr )
+				{
+					// Compared in the ground plane only: an effect bone often sits well above or below
+					// the object origin, as the propaganda tower pulse does at Z+45.
+					const Real reach = obj->getGeometryInfo().getBoundingCircleRadius() + 25.0f;
+					const Real dx = sysPos.x - objPos->x;
+					const Real dy = sysPos.y - objPos->y;
+					if( ( dx * dx + dy * dy ) <= ( reach * reach ) )
+						mine = TRUE;
+				}
+			}
+
 			if( !mine )
 				continue;
 
@@ -3024,13 +3054,15 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 				continue;
 
 			const AsciiString sysName = sysTemplate->getName();
+			const AsciiString fxName = sys->getFXListName();
 
 			// The same template often runs many times over on one object; collapse duplicates so
-			// the stack does not become the same name repeated a dozen times.
+			// the stack does not become the same name repeated a dozen times. Keyed on the pair, so
+			// one particle system used by two different FXLists still shows up under both.
 			Bool alreadyListed = FALSE;
 			for( Int n = 0; n < nameCount; ++n )
 			{
-				if( names[n] == sysName )
+				if( names[n] == sysName && fxNames[n] == fxName )
 				{
 					alreadyListed = TRUE;
 					break;
@@ -3040,6 +3072,7 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 			if( alreadyListed )
 				continue;
 
+			fxNames[ nameCount ] = fxName;
 			names[ nameCount++ ] = sysName;
 
 			// Cap the stack so a heavily attached object cannot grow a tower of text that covers
@@ -3048,11 +3081,21 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 				break;
 		}
 
+		// Drawn bottom up, so within a pair the particle name is emitted before the FXList that
+		// owns it -- leaving the FX name sitting above its particles on screen, the way the INI
+		// nests them.
 		for( Int i = nameCount - 1; i >= 0; --i )
 		{
 			UnicodeString line;
 			line.format( L"%hs", names[i].str() );
 			drawOverlayLine( s_nameString, line, anchor.x, lineY, particleColor, dropColor );
+
+			// Only systems created through an FXList carry one.
+			if( !fxNames[i].isEmpty() )
+			{
+				line.format( L"%hs", fxNames[i].str() );
+				drawOverlayLine( s_nameString, line, anchor.x, lineY, fxListColor, dropColor );
+			}
 		}
 	}
 

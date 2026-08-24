@@ -825,7 +825,16 @@ public:
 		// m_createAtWaterHeight = FALSE;
 		m_allowedSurfaceType = SURFACE_ALL;
 		m_useSurfaceInfo = FALSE;
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+		m_fxListName.clear();
+#endif
 	}
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// TheSuperHackers @feature The FXList this nugget belongs to, stamped onto every particle
+	// system it creates so the debug name overlay can show which FX an effect came from.
+	AsciiString m_fxListName;
+#endif
 
 	virtual void doFXPos(const Coord3D *primary, const Matrix3D* primaryMtx, const Real /*primarySpeed*/, const Coord3D * /*secondary*/, const Real overrideRadius, FXSurfaceInfo* surfaceInfo) const
 	{
@@ -898,6 +907,11 @@ public:
 
 		ParticleSystemFXNugget* nugget = newInstance( ParticleSystemFXNugget );
 		ini->initFromINI(nugget, myFieldParse);
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+		// TheSuperHackers @feature Remember which FXList this nugget belongs to, so the systems it
+		// creates can be labelled with it in the debug name overlay.
+		nugget->m_fxListName = ((FXList*)instance)->getName();
+#endif
 		((FXList*)instance)->addFXNugget(nugget);
 	}
 
@@ -937,6 +951,11 @@ protected:
 				ParticleSystem *sys = TheParticleSystemManager->createParticleSystem(tmp);
 				if (sys)
 				{
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+					// TheSuperHackers @feature Label the system with the FXList that spawned it, for the
+					// debug name overlay. Nothing else records this link.
+					sys->setFXListName( m_fxListName );
+#endif
 					Coord3D newPos;
 					Real radius = m_radius.getValue();
 					Real angle = GameClientRandomValueReal(0.0f, 2.0f * PI);
@@ -1249,6 +1268,12 @@ const FXList *FXListStore::findFXList(const char* name) const
 	NameKeyType key = TheNameKeyGenerator->nameToKey(c);
 	FXList& fxl = TheFXListStore->m_fxmap[key];
 	fxl.clear();
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// TheSuperHackers @feature Keep the list's name so its nuggets can stamp it onto the particle
+	// systems they create, for the debug name overlay. Parsed here because this is the only place
+	// the name is known -- the map stores it as a key, not on the FXList itself.
+	fxl.setName( AsciiString( c ) );
+#endif
 	ini->initFromINI(&fxl, TheFXListFieldParse);
 }
 
