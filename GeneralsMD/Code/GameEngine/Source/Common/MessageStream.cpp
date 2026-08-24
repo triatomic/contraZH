@@ -659,6 +659,7 @@ const char *GameMessage::getCommandTypeAsString(GameMessage::Type t)
 #endif
 
 	CASE_LABEL(MSG_TOGGLE_OVERCHARGE)
+	CASE_LABEL(MSG_TOGGLE_HOLD_FIRE)
 
 #ifdef ALLOW_SURRENDER
 	CASE_LABEL(MSG_RETURN_TO_PRISON)

@@ -88,6 +88,8 @@ AIUpdateModuleData::AIUpdateModuleData()
 
     m_forbidPlayerCommands = FALSE;
 	m_turretsLinked = FALSE;
+	// TheSuperHackers @feature Default to allowing return fire while holding fire, so a held unit is not defenseless.
+	m_holdFireAllowsRetaliation = TRUE;
 	//m_attackAngle = 0.0f;
 	m_useAttackAngle = FALSE;
 	m_attackAngles.clear();
@@ -155,6 +157,8 @@ struct AttackAngleData
 #endif
     { "ForbidPlayerCommands",				INI::parseBool,										nullptr, offsetof(AIUpdateModuleData, m_forbidPlayerCommands) },
     { "TurretsLinked",							INI::parseBool,										nullptr, offsetof( AIUpdateModuleData, m_turretsLinked ) },
+    // TheSuperHackers @feature If No, this object stays silent even when attacked while holding fire.
+    { "HoldFireAllowsRetaliation",	INI::parseBool,										nullptr, offsetof( AIUpdateModuleData, m_holdFireAllowsRetaliation ) },
 		{ "PreferredAttackAngle",				AIUpdateModuleData::parseAttackAngle,					NULL, NULL },
 
 		{ nullptr, nullptr, nullptr, 0 }
@@ -341,6 +345,8 @@ AIUpdateInterface::AIUpdateInterface( Thing *thing, const ModuleData* moduleData
 	m_turretSyncFlag = TURRET_INVALID;
 	m_attitude = ATTITUDE_NORMAL;
 	m_nextMoodCheckTime = 0;
+	// TheSuperHackers @feature Hold Fire always starts off.
+	m_isHoldingFire = FALSE;
 #ifdef ALLOW_DEMORALIZE
 	m_demoralizedFramesLeft = 0;
 #endif
@@ -4485,6 +4491,63 @@ AttitudeType AIUpdateInterface::getAttitude( void ) const
 	return m_attitude;
 }
 
+// TheSuperHackers @feature Hold Fire stance.
+/**
+ * Set the hold fire stance. This must only ever be called from the logic side
+ * (via AIGroup::groupToggleHoldFire or Object::doCommandButton), never from client
+ * code, or clients will desync.
+ */
+void AIUpdateInterface::setHoldingFire( Bool holding )
+{
+	if( m_isHoldingFire == holding )
+		return;
+
+	m_isHoldingFire = holding;
+
+	// When we stop holding fire, look for targets right away rather than waiting out a stale
+	// mood timer. This also staggers the re-check, so releasing a large group does not make
+	// every unit in it scan on the very same frame.
+	if( !holding )
+		wakeUpAndAttemptToTarget();
+}
+
+/**
+ * Returns true if this object must not auto-acquire targets, either because it is
+ * holding fire itself, or because something it is contained within is holding fire
+ * (so passengers of a held transport stay silent too).
+ */
+Bool AIUpdateInterface::isFireSuppressedByHoldFire( void ) const
+{
+	if( m_isHoldingFire )
+		return TRUE;
+
+	// Walk up the containment chain. Containers with no AI (eg. garrisonable buildings)
+	// simply cannot hold fire, so keep walking past them.
+	for( const Object *container = getObject()->getContainedBy();
+			 container != nullptr;
+			 container = container->getContainedBy() )
+	{
+		const AIUpdateInterface *containerAI = container->getAI();
+		if( containerAI && containerAI->isHoldingFire() )
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
+/**
+ * Returns true if this object may return fire when attacked. Only ever false while holding
+ * fire, and only for templates that opt out via the AIUpdate parameter HoldFireAllowsRetaliation.
+ */
+Bool AIUpdateInterface::isRetaliationAllowed( void ) const
+{
+	// nearly every template allows retaliation, so answer without walking containment
+	if( getAIUpdateModuleData()->m_holdFireAllowsRetaliation )
+		return TRUE;
+
+	return !isFireSuppressedByHoldFire();
+}
+
 /**
  * Return the current state the AI is in.
  */
@@ -4729,6 +4792,12 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 
 	// if we're dead, we can't attack
 	if (obj->isEffectivelyDead())
+		return nullptr;
+
+	// TheSuperHackers @feature Hold Fire skips the mood scan entirely. The authoritative veto lives
+	// in WeaponSet::getAbleToAttackSpecificObject (so the guard machines' own scans obey it too);
+	// this is purely an early out so we do not run a partition query we will discard.
+	if (isFireSuppressedByHoldFire())
 		return nullptr;
 
 	if (obj->testStatus(OBJECT_STATUS_IS_USING_ABILITY)) {
@@ -5348,12 +5417,13 @@ void AIUpdateInterface::crc( Xfer *x )
 /** Xfer method
 	* Version Info:
 	* 1: Initial version
-	* 5: Added m_forceMoveBackwards (REVERSE_MOVE order) */
+	* 5: Added m_forceMoveBackwards (REVERSE_MOVE order)
+	* 6: Added m_isHoldingFire (HOLD_FIRE stance) */
 // ------------------------------------------------------------------------------------------------
 void AIUpdateInterface::xfer( Xfer *xfer )
 {
   // version
-  const XferVersion currentVersion = 5;
+  const XferVersion currentVersion = 6;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
@@ -5570,6 +5640,10 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 
 	if (version >= 5)
 		xfer->xferBool(&m_forceMoveBackwards);
+
+	// TheSuperHackers @feature Hold Fire stance. Must stay at the end so older saves still load.
+	if (version >= 6)
+		xfer->xferBool(&m_isHoldingFire);
 
 }
 

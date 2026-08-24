@@ -1555,6 +1555,24 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 			break;
 		}
 
+		// TheSuperHackers @feature Hold Fire stance.
+		case GUI_COMMAND_HOLD_FIRE:
+		{
+			const AIUpdateInterface *ai = obj->getAI();
+
+			// nothing without an AI can hold fire, so do not offer the command at all
+			if( ai == nullptr )
+				return COMMAND_RESTRICTED;
+
+			// show the button as toggled on for this object's own stance. Deliberately not
+			// isFireSuppressedByHoldFire(), or every passenger of a held transport would light
+			// up and clicking their button would appear to do nothing.
+			if( ai->isHoldingFire() )
+				return COMMAND_ACTIVE;
+
+			break;
+		}
+
 		// switch weapon command
 		case GUI_COMMAND_SWITCH_WEAPON:
 		{

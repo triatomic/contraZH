@@ -202,6 +202,8 @@ public:
 	UnsignedInt						m_moodAttackCheckRate;				///< how frequently we should recheck for enemies due to moods, when idle
   Bool        m_forbidPlayerCommands;     ///< Should isAllowedToRespondToAiCommands() filter out commands from the player, thus making it ai-controllable only?
   Bool        m_turretsLinked;						///< Turrets are linked together and attack together.
+  // TheSuperHackers @feature May this object return fire when attacked while the Hold Fire stance is active?
+  Bool        m_holdFireAllowsRetaliation;
 	UnsignedInt						m_autoAcquireEnemiesWhenIdle;
 #ifdef ALLOW_SURRENDER
  	UnsignedInt						m_surrenderDuration;					///< when we surrender, how long we stay surrendered.
@@ -588,6 +590,13 @@ public:
 	UnsignedInt getMoodMatrixActionAdjustment(MoodMatrixAction action) const;
 	void setAttitude(AttitudeType tude);	///< set the behavior modifier for this agent
 
+	// TheSuperHackers @feature Hold Fire stance -- suppresses automatic target acquisition,
+	// while still allowing explicitly commanded attacks.
+	Bool isHoldingFire() const { return m_isHoldingFire; }	///< is this object itself holding fire?
+	void setHoldingFire( Bool holding );										///< set the hold fire stance (logic side only!)
+	Bool isFireSuppressedByHoldFire() const;								///< are we, or any container we are inside of, holding fire?
+	Bool isRetaliationAllowed() const;											///< may we return fire when attacked? (only Hold Fire can forbid it)
+
 	// Common AI "status" effects -------------------------------------------------------------------
 	Bool hasNationalism() const;
 	Bool hasFanaticism() const;
@@ -806,6 +815,8 @@ private:
 	// AI -------------------------------------------------------------------------------------------
 	AttitudeType	m_attitude;
 	UnsignedInt		m_nextMoodCheckTime;
+	// TheSuperHackers @feature Hold Fire stance. True when this object will not auto-acquire targets.
+	Bool					m_isHoldingFire;
 
 	// Common AI "status" effects -------------------------------------------------------------------
 #ifdef ALLOW_DEMORALIZE

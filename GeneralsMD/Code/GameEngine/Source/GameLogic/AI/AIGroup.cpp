@@ -3242,6 +3242,50 @@ void AIGroup::groupToggleOvercharge( CommandSourceType cmdSource )
 
 }
 
+// TheSuperHackers @feature Hold Fire stance.
+/**
+ * Toggle the Hold Fire stance for every member of the group.
+ *
+ * All-or-nothing: if any member is not holding fire, everyone starts holding fire.
+ * Only when the whole group is already holding does this release them. Flipping each
+ * unit individually would leave a mixed selection permanently mixed.
+ *
+ * This runs on the logic side on every peer, so the decision must be derived here from
+ * group state rather than being computed by the client and sent over the wire.
+ */
+void AIGroup::groupToggleHoldFire( CommandSourceType cmdSource )
+{
+	std::list<Object *>::iterator i;
+	Object *obj;
+	Bool allHolding = TRUE;
+
+	// first pass -- are they all holding fire already?
+	for( i = m_memberList.begin(); i != m_memberList.end(); ++i )
+	{
+		obj = *i;
+
+		AIUpdateInterface *ai = obj->getAI();
+		if( ai == nullptr )
+			continue;
+
+		if( !ai->isHoldingFire() )
+			allHolding = FALSE;
+	}
+
+	// second pass -- move the whole group to the same stance
+	for( i = m_memberList.begin(); i != m_memberList.end(); ++i )
+	{
+		obj = *i;
+
+		AIUpdateInterface *ai = obj->getAI();
+		if( ai == nullptr )
+			continue;
+
+		ai->setHoldingFire( !allHolding );
+	}
+
+}
+
 #ifdef ALLOW_SURRENDER
 /**
 	* Pick up prisoners of war

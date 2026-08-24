@@ -760,6 +760,12 @@ void ActiveBody::attemptDamage( DamageInfo *damageInfo )
 				if (ai==nullptr) {
 					continue;
 				}
+				// TheSuperHackers @feature Skip units that are holding fire and are not allowed to
+				// return fire. The guard machines enforce this too, so this is an early out that
+				// avoids the far more expensive getAbleToAttackSpecificObject call below.
+				if (!ai->isRetaliationAllowed()) {
+					continue;
+				}
 				//If we have AI and we're mobile, then assist!
 				if( !them->isKindOf( KINDOF_IMMOBILE ))
 				{
