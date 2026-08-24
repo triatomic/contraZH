@@ -607,6 +607,10 @@ static PoolSizeRec PoolSizes[] =
 	{ "User", 32, 32 },
 	{ "FrameDataManager", 32, 32 },
 	{ "DrawableIconInfo", 32, 32 },
+	// TheSuperHackers @feature Remembered particle names for the debug name overlay. Allocated only
+	// for drawables the overlay has looked at, and only in cheat builds, so the initial count is
+	// small; the overflow covers a screen full of labelled objects.
+	{ "DrawableParticleNameInfo", 32, 128 },
 	{ "TintEnvelope", 128, 32 },
 	{ "DynamicAudioEventRTS", 4000, 256 },
 	{ "DrawableLocoInfo", 128, 32 },
