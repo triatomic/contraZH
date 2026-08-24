@@ -31,6 +31,7 @@
 #include "GameLogic/TerrainLogic.h"
 #include "GameClient/Color.h"
 #include "W3DDevice/GameClient/W3DParticleSys.h"
+#include "W3DDevice/GameClient/W3DTerrainParticle.h"
 #include "W3DDevice/GameClient/W3DAssetManager.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
 #include "W3DDevice/GameClient/HeightMap.h"
@@ -62,6 +63,7 @@ W3DParticleSystemManager::W3DParticleSystemManager()
 	PointGroupClass::Set_Ground_Height_Func(getParticleGroundHeight);
 
 	m_pointGroup = nullptr;
+	m_terrainParticles = nullptr;
 	m_streakLine = nullptr;
 	m_posBuffer = nullptr;
 	m_RGBABuffer = nullptr;
@@ -72,6 +74,7 @@ W3DParticleSystemManager::W3DParticleSystemManager()
 	m_onScreenParticleCount = 0;
 
 	m_pointGroup = NEW PointGroupClass();
+	m_terrainParticles = NEW W3DTerrainParticle();
 	//m_streakLine = nullptr;
 	m_streakLine = NEW StreakLineClass();
 
@@ -83,6 +86,9 @@ W3DParticleSystemManager::W3DParticleSystemManager()
 
 W3DParticleSystemManager::~W3DParticleSystemManager()
 {
+	delete m_terrainParticles;
+	m_terrainParticles = nullptr;
+
 	delete m_pointGroup;
 
 //	W3DDisplay::m_3DScene->Remove_Render_Object( m_streakLine );
@@ -312,35 +318,55 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 
 			WWASSERT( m_pointGroup );
 
-			if ( m_pointGroup ) // this catches the particle and volumeparticle cases
+			// shader is picked once and used by whichever renderer takes this system
+			ShaderClass shader = ShaderClass::_PresetAdditiveSpriteShader;
+			switch( sys->getShaderType() )
+			{
+				case ParticleSystemInfo::ADDITIVE:
+					shader = ShaderClass::_PresetAdditiveSpriteShader;
+					break;
+				case ParticleSystemInfo::ALPHA:
+					shader = ShaderClass::_PresetAlphaSpriteShader;
+					break;
+				case ParticleSystemInfo::ALPHA_TEST:
+					shader = ShaderClass::_PresetATestSpriteShader;
+					break;
+				case ParticleSystemInfo::MULTIPLY:
+					shader = ShaderClass::_PresetMultiplicativeSpriteShader;
+					break;
+			}
+
+			// TheSuperHackers @feature A ground aligned particle drawn as a quad can only ever be a
+			// flat plane, so a wide one cuts through a hillside no matter how its corners are placed.
+			// This renderer instead builds a mesh from the terrain's own heightmap cells, the same way
+			// projected decals do, so the particle inherits the ground geometry exactly.
+			const Bool useTerrainConformingParticles = !sys->shouldBillboard() &&
+					sys->getVolumeParticleDepth() == 0 &&
+					sys->shouldConformToTerrain();
+
+			if (useTerrainConformingParticles)
+			{
+				m_terrainParticles->Set_Texture( texture );
+				texture->Release_Ref();//release reference since it's held by terrainParticles
+
+				m_terrainParticles->Set_Shader( shader );
+				m_terrainParticles->Set_Arrays( m_posBuffer, m_RGBABuffer, m_sizeBuffer, m_angleBuffer, count );
+
+				m_terrainParticles->Render();
+			}
+			else if ( m_pointGroup )
 			{
 				// render all the systems' particles
 				m_pointGroup->Set_Texture( texture );
 				texture->Release_Ref();//release reference since it's held by pointGroup
 				m_pointGroup->Set_Flag( PointGroupClass::TRANSFORM, true );	// transform to screen space
 
-				switch( sys->getShaderType() )
-				{
-					case ParticleSystemInfo::ADDITIVE:
-						m_pointGroup->Set_Shader( ShaderClass::_PresetAdditiveSpriteShader );
-						break;
-					case ParticleSystemInfo::ALPHA:
-						m_pointGroup->Set_Shader( ShaderClass::_PresetAlphaSpriteShader );
-						break;
-					case ParticleSystemInfo::ALPHA_TEST:
-						m_pointGroup->Set_Shader( ShaderClass::_PresetATestSpriteShader );
-						break;
-					case ParticleSystemInfo::MULTIPLY:
-						m_pointGroup->Set_Shader( ShaderClass::_PresetMultiplicativeSpriteShader );
-						break;
-				}
+				m_pointGroup->Set_Shader( shader );
 
 				/// @todo Use both QUADS and TRIS for particles
 				m_pointGroup->Set_Point_Mode( PointGroupClass::QUADS );
 				m_pointGroup->Set_Arrays( m_posBuffer, m_RGBABuffer, nullptr, m_sizeBuffer, m_angleBuffer, nullptr, count );
 				m_pointGroup->Set_Billboard(sys->shouldBillboard());
-				// TheSuperHackers @feature tilt ground aligned quads to the terrain beneath them
-				m_pointGroup->Set_Ground_Morph(sys->shouldGroundMorph());
 
 				/// @todo Support animated texture particles
 				/// @todo lorenzen sez: unimplemented code wastes cpu cycles

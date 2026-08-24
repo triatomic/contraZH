@@ -435,7 +435,7 @@ public:
 	// TheSuperHackers @feature If true, each corner of a ground aligned quad takes the terrain
 	// height beneath it, so the quad tilts to match the slope rather than lying flat across it.
 	// Only meaningful with IsGroundAligned; a billboarded particle is unaffected either way.
-	Bool m_isGroundMorph;
+	Bool m_conformToTerrain;
 	Bool m_isParticleUpTowardsEmitter;					///< if true, align the up direction to be towards the emitter.
 
 	enum WindMotion
@@ -615,8 +615,9 @@ public:
 
 	Bool shouldBillboard( void ) { return !m_isGroundAligned; }
 
-	// TheSuperHackers @feature see m_isGroundMorph
-	Bool shouldGroundMorph( void ) { return m_isGroundAligned && m_isGroundMorph; }
+	// TheSuperHackers @feature see m_conformToTerrain. Named to match the upstream
+	// TheSuperHackers option of the same name, so a future port lines up.
+	Bool shouldConformToTerrain( void ) { return m_isGroundAligned && m_conformToTerrain; }
 
 	ParticleShaderType getShaderType( void ) { return m_shaderType; }
 
