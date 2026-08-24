@@ -155,6 +155,12 @@ void giveAllSciences(Player* player)
 }
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+// TheSuperHackers @feature How many names the debug name cheats will print at once. The in game
+// message list holds only MAX_UI_MESSAGES (6) lines and each new message pushes the oldest off the
+// end, so printing more than a few would scroll the earlier ones out of view before they are read.
+// One slot is left free so a trailing "and N more" line still fits.
+static const Int MAX_DEBUG_NAME_LINES = 5;
+
 // TheSuperHackers @feature Grant only the sciences that belong to this player's own general.
 //
 // giveAllSciences above hands out every grantable science in the game, which on a general with a
@@ -3972,6 +3978,172 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 				TheInGameUI->messageNoFormat( TheTacticalView->isZoomLimited()
 					? TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugCameraZoomLimitOn", L"Camera Zoom Limit is ON")
 					: TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugCameraZoomLimitOff", L"Camera Zoom Limit is OFF") );
+			}
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
+		// TheSuperHackers @feature Print the template (INI) name of each selected object. A debug
+		// aid for modding: it answers "what is this thing actually called" without leaving the game.
+		// Client side only -- it reads names and prints them, and posts no message to the logic, so
+		// it is replay and multiplayer safe and needs no isInMultiplayerGame guard.
+		case GameMessage::MSG_CHEAT_SHOW_OBJECT_NAME:
+		{
+			const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
+			if( selected == NULL || selected->empty() )
+			{
+				TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE(
+						"GUI:DebugShowObjectNameNone", L"No selection") );
+			}
+			else
+			{
+				// The UI message list scrolls upward -- each new message is inserted at the top,
+				// pushing older ones down. Walking the selection backwards therefore leaves the
+				// lines reading in selection order on screen rather than inverted.
+				Int printed = 0;
+				const Int total = (Int)selected->size();
+				for( DrawableList::const_reverse_iterator it = selected->rbegin();
+							it != selected->rend(); ++it )
+				{
+					const Drawable *draw = *it;
+					if( draw == NULL )
+						continue;
+
+					// Only so many messages fit before the oldest scroll off, so stop rather than
+					// flushing the earlier lines out of view with ones nobody will read.
+					if( printed >= MAX_DEBUG_NAME_LINES )
+					{
+						UnicodeString more;
+						more.format( L"... and %d more", total - printed );
+						TheInGameUI->messageNoFormat( more );
+						break;
+					}
+
+					const ThingTemplate *tmpl = draw->getTemplate();
+					UnicodeString line;
+					line.format( L"%hs", tmpl ? tmpl->getName().str() : "<no template>" );
+					TheInGameUI->messageNoFormat( line );
+					++printed;
+				}
+			}
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
+		// TheSuperHackers @feature Print the name of every particle system currently attached to the
+		// selected objects, one per line. Useful for tracking down which FX an effect actually is
+		// before editing it. Like the object name cheat this only reads and prints, so it is safe
+		// in multiplayer and in replays.
+		case GameMessage::MSG_CHEAT_SHOW_PARTICLE_NAMES:
+		{
+			const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
+			if( selected == NULL || selected->empty() )
+			{
+				TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE(
+						"GUI:DebugShowParticleNamesNone", L"No selection") );
+			}
+			else if( TheParticleSystemManager != NULL )
+			{
+				// Particle systems know what they are attached to, but an object does not keep a
+				// list of its systems, so the lookup has to go the other way: walk the live systems
+				// once and keep those whose parent is in the selection. Gather first, print after,
+				// so the lines can be emitted in reverse for the upward scrolling message list.
+				std::vector<AsciiString> names;
+
+				ParticleSystemManager::ParticleSystemList &allSystems =
+						TheParticleSystemManager->getAllParticleSystems();
+
+				for( ParticleSystemManager::ParticleSystemListIt sysIt = allSystems.begin();
+							sysIt != allSystems.end(); ++sysIt )
+				{
+					ParticleSystem *sys = *sysIt;
+					if( sys == NULL )
+						continue;
+
+					const DrawableID sysDrawableID = sys->getAttachedDrawable();
+					const ObjectID sysObjectID = sys->getAttachedObject();
+
+					// An unattached system belongs to the world, not to anything selected.
+					if( sysDrawableID == INVALID_DRAWABLE_ID && sysObjectID == INVALID_ID )
+						continue;
+
+					Bool matches = FALSE;
+					for( DrawableList::const_iterator selIt = selected->begin();
+								selIt != selected->end() && !matches; ++selIt )
+					{
+						const Drawable *draw = *selIt;
+						if( draw == NULL )
+							continue;
+
+						// A system may be parented to either the drawable or the object behind it,
+						// depending on how it was created, so both have to be checked.
+						if( sysDrawableID != INVALID_DRAWABLE_ID && draw->getID() == sysDrawableID )
+							matches = TRUE;
+
+						if( sysObjectID != INVALID_ID )
+						{
+							const Object *obj = draw->getObject();
+							if( obj != NULL && obj->getID() == sysObjectID )
+								matches = TRUE;
+						}
+					}
+
+					if( !matches )
+						continue;
+
+					const ParticleSystemTemplate *sysTemplate = sys->getTemplate();
+					if( sysTemplate == NULL )
+						continue;
+
+					const AsciiString sysName = sysTemplate->getName();
+
+					// The same template often runs several times over on one object. Listing it once
+					// per instance would fill the short message list with duplicates, so collapse
+					// them to a single line each.
+					Bool alreadyListed = FALSE;
+					for( std::vector<AsciiString>::const_iterator n = names.begin();
+								n != names.end(); ++n )
+					{
+						if( *n == sysName )
+						{
+							alreadyListed = TRUE;
+							break;
+						}
+					}
+
+					if( !alreadyListed )
+						names.push_back( sysName );
+				}
+
+				if( names.empty() )
+				{
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE(
+							"GUI:DebugShowParticleNamesEmpty", L"No particle systems on selection") );
+				}
+				else
+				{
+					// Reverse order, so the list reads top to bottom once the message list has
+					// scrolled each line up.
+					Int printed = 0;
+					const Int total = (Int)names.size();
+					for( Int i = total - 1; i >= 0; --i )
+					{
+						if( printed >= MAX_DEBUG_NAME_LINES )
+						{
+							UnicodeString more;
+							more.format( L"... and %d more", total - printed );
+							TheInGameUI->messageNoFormat( more );
+							break;
+						}
+
+						UnicodeString line;
+						line.format( L"%hs", names[i].str() );
+						TheInGameUI->messageNoFormat( line );
+						++printed;
+					}
+				}
 			}
 
 			disp = DESTROY_MESSAGE;
