@@ -947,6 +947,8 @@ public:
 	void groupGetRepaired( Object *repairDepot, CommandSourceType cmdSource );///< go get repaired at the repair depot
 	void groupEnter( Object *obj, CommandSourceType cmdSource );							///< enter the given object
 	void groupSmartGarrison( Object *target, CommandSourceType cmdSource );	///< distribute the group across the target and nearby transports (round-robin by priority)
+	// TheSuperHackers @feature Fill the selected containers from nearby idle infantry.
+	void groupAutoFill( CommandSourceType cmdSource );
 	void groupDock( Object *obj, CommandSourceType cmdSource );							///< get near given object and wait for enter clearance
 	void groupExit( Object *objectToExit, CommandSourceType cmdSource );			///< get out of this Object
 	void groupEvacuate( CommandSourceType cmdSource );												///< empty its contents

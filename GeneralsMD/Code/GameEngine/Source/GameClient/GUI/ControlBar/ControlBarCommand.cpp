@@ -1125,6 +1125,7 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 		GUICommandType commandType = command->getCommandType();
 		if( commandType != GUI_COMMAND_SELL &&
 				commandType != GUI_COMMAND_EVACUATE &&
+				commandType != GUI_COMMAND_AUTO_FILL &&
 				commandType != GUI_COMMAND_EXIT_CONTAINER &&
 				commandType != GUI_COMMAND_BEACON_DELETE &&
 				commandType != GUI_COMMAND_SET_RALLY_POINT &&
@@ -1430,6 +1431,28 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
       if ( obj->isDisabledByType( DISABLED_SUBDUED ) )
         return COMMAND_RESTRICTED;
 
+
+			break;
+		}
+
+		// TheSuperHackers @feature The mirror of EVACUATE: restricted when there is no room rather
+		// than when there is nothing aboard.
+		case GUI_COMMAND_AUTO_FILL:
+		{
+			ContainModuleInterface *contain = obj->getContain();
+			if( contain == nullptr )
+				return COMMAND_RESTRICTED;
+
+			const Int maxSlots = contain->getContainMax();
+			if( maxSlots >= 0 )
+			{
+				const Int used = (Int)contain->getContainCount() + contain->getExtraSlotsInUse();
+				if( used >= maxSlots )
+					return COMMAND_RESTRICTED;	// full
+			}
+
+			if( obj->isDisabledByType( DISABLED_SUBDUED ) )
+				return COMMAND_RESTRICTED;
 
 			break;
 		}
