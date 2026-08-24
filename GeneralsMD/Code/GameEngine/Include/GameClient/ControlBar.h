@@ -242,6 +242,7 @@ enum GUICommandType CPP_11(: Int)
 	GUI_COMMAND_SELECT_ALL_UNITS_OF_TYPE,
 
 	GUI_COMMAND_REVERSE_MOVE,							///< move to the target position driving in reverse
+	GUI_COMMAND_AUTO_FILL,								///< TheSuperHackers @feature fill from nearby idle infantry
 
 	// add more commands here, don't forget to update the string command list below too ...
 
@@ -293,6 +294,7 @@ static const char *const TheGuiCommandNames[] =
 	"SPECIAL_POWER_CONSTRUCT_FROM_SHORTCUT",
 	"SELECT_ALL_UNITS_OF_TYPE",
 	"REVERSE_MOVE",
+	"AUTO_FILL",
 
 	nullptr
 };

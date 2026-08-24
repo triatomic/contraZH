@@ -906,6 +906,16 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		}
 
 		// --------------------------------------------------------------------------------------------
+		// TheSuperHackers @feature Fill the selected containers from nearby idle infantry. The UI only
+		// appends the message; the logic side decides who actually boards, so peers stay in sync.
+		case GUI_COMMAND_AUTO_FILL:
+		{
+			TheInGameUI->setGUICommand( nullptr );
+			TheMessageStream->appendMessage( GameMessage::MSG_DO_AUTO_FILL );
+			break;
+		}
+
+		// --------------------------------------------------------------------------------------------
 		case GUI_COMMAND_EXECUTE_RAILED_TRANSPORT:
 		{
 			TheMessageStream->appendMessage( GameMessage::MSG_EXECUTE_RAILED_TRANSPORT );

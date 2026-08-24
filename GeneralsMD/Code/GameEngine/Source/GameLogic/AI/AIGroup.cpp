@@ -2630,6 +2630,114 @@ void AIGroup::groupSmartGarrison( Object *target, CommandSourceType cmdSource )
 }
 
 /**
+ * TheSuperHackers @feature Fill the selected containers from nearby loose infantry.
+ *
+ * This is the mirror of groupSmartGarrison: there the selection is the infantry and the click picks
+ * the container, here the selection *is* the containers and the infantry are found for them. It
+ * saves the usual dance of selecting the troops, finding them on screen, and clicking the building.
+ *
+ * Only idle, uncontained, locally controlled infantry within SmartGarrisonRange are recruited, so
+ * this never pulls a unit out of a fight or countermands an order the player just gave.
+ */
+void AIGroup::groupAutoFill( CommandSourceType cmdSource )
+{
+	if( m_memberList.empty() )
+		return;
+
+	// Gather the selected containers that still have room. A selection can hold anything, so
+	// everything without a contain module is simply skipped rather than treated as an error.
+	std::vector<SmartGarrisonCandidate> candidates;
+	std::list<Object *>::iterator it;
+	for( it = m_memberList.begin(); it != m_memberList.end(); ++it )
+	{
+		Object *obj = *it;
+		if( obj == NULL )
+			continue;
+
+		ContainModuleInterface *contain = obj->getContain();
+		if( contain == NULL )
+			continue;
+
+		Int freeSlots = getSmartGarrisonFreeSlots( contain );
+		if( freeSlots <= 0 )
+			continue;
+
+		SmartGarrisonCandidate c;
+		c.transport = obj;
+		c.remaining = freeSlots;
+		c.sameType = true;
+		candidates.push_back( c );
+	}
+
+	if( candidates.empty() )
+		return;
+
+	// One range query per container, centred on it, so each fills from the troops nearest to
+	// itself rather than from wherever the first container happened to be standing.
+	const Player *owner = candidates[0].transport->getControllingPlayer();
+
+	for( Int ci = 0; ci < (Int)candidates.size(); ++ci )
+	{
+		SmartGarrisonCandidate &cand = candidates[ci];
+		if( cand.remaining <= 0 )
+			continue;
+
+		ContainModuleInterface *contain = cand.transport->getContain();
+		if( contain == NULL )
+			continue;
+
+		PartitionFilterSamePlayer fPlayer( owner );
+		PartitionFilter *filters[] = { &fPlayer, NULL };
+
+		MemoryPoolObjectHolder holder;
+		SimpleObjectIterator *iter = ThePartitionManager->iterateObjectsInRange(
+			cand.transport, TheGlobalData->m_smartGarrisonRange, FROM_CENTER_2D, filters, ITER_SORTED_NEAR_TO_FAR );
+		holder.hold( iter );
+
+		for( Object *o = iter ? iter->first() : NULL; o != NULL; o = iter->next() )
+		{
+			if( cand.remaining <= 0 )
+				break;
+
+			if( o == cand.transport )
+				continue;
+
+			// infantry only -- this is a garrison order, not a general load everything order
+			if( !o->isKindOf( KINDOF_INFANTRY ) )
+				continue;
+
+			// already inside something, including this very container
+			if( o->getContainedBy() != NULL )
+				continue;
+
+			// Never recruit a unit that is busy. Pulling a soldier out of a fight, or off a move
+			// the player just ordered, would make this command feel like it disobeys.
+			AIUpdateInterface *ai = o->getAIUpdateInterface();
+			if( ai == NULL || !ai->isIdle() )
+				continue;
+
+			// Do not empty out a selected container to fill another one: a member of this very
+			// group is something the player is commanding, not loose infantry lying around.
+			if( isMember( o ) )
+				continue;
+
+			Int cost = o->getTransportSlotCount();
+			if( cost <= 0 )
+				continue;	// not transportable
+
+			if( cand.remaining < cost )
+				continue;	// too big for what is left, but a smaller one may still fit
+
+			if( !contain->isValidContainerFor( o, TRUE ) )
+				continue;
+
+			cand.remaining -= cost;
+			ai->aiEnter( cand.transport, cmdSource );
+		}
+	}
+}
+
+/**
  * Get near given object and wait for enter clearance
  */
 void AIGroup::groupDock( Object *obj, CommandSourceType cmdSource )
