@@ -245,6 +245,7 @@ public:
 		MSG_META_TOGGLE_LOWER_DETAILS,							///< toggles graphics options to crappy mode instantly
 		MSG_META_TOGGLE_CONTROL_BAR,								///< show/hide controlbar
 		MSG_META_TOGGLE_PLAYER_OBSERVER,						///< TheSuperHackers @feature Toggle the player observer view in game
+		MSG_META_CYCLE_HEALTH_BAR_MODE,							///< TheSuperHackers @feature Cycle HealthBarDisplayMode in game
 
 		MSG_META_BEGIN_PATH_BUILD,									///< enter path-building mode
 		MSG_META_END_PATH_BUILD,										///< exit path-building mode
@@ -436,6 +437,9 @@ public:
 
 		MSG_META_PLACE_BEACON,
 		MSG_META_REMOVE_BEACON,
+		// TheSuperHackers @feature Appended at the end of the meta range so no existing ordinal
+		// moves -- inserting mid enum would renumber every message below it and break replays.
+		MSG_CHEAT_KITCHEN_SINK,							///< instant build + cash + own sciences + deshroud
 
 		MSG_END_META_MESSAGES,											///< Marker to delineate "meta" messages
 
@@ -605,6 +609,7 @@ public:
 		MSG_DO_SPECIAL_POWER_AT_MULTIPLE_LOCATIONS,	///< N-point: (spID, count, coord*count, options, sourceID) - all target points committed in one message (chronosphere = 2)
 		MSG_DO_REVERSE_MOVETO,											///< (location) move to the location driving in reverse
 		MSG_DO_SMART_GARRISON,											///< (target objectID) distribute the selected group across the target and nearby transports
+		MSG_DO_AUTO_FILL,												///< TheSuperHackers @feature fill the selected containers from nearby idle infantry
 		MSG_TOGGLE_HOLD_FIRE,												///< Toggle the Hold Fire stance of the selected group
 
 		MSG_BEGIN_DEBUG_NETWORK_MESSAGES = 1900,		///< network messages that exist only in debug/internal builds. all grouped separately.

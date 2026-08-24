@@ -242,6 +242,7 @@ enum GUICommandType CPP_11(: Int)
 	GUI_COMMAND_SELECT_ALL_UNITS_OF_TYPE,
 
 	GUI_COMMAND_REVERSE_MOVE,							///< move to the target position driving in reverse
+	GUI_COMMAND_AUTO_FILL,								///< TheSuperHackers @feature fill from nearby idle infantry
 
 	GUI_COMMAND_HOLD_FIRE,								///< TheSuperHackers @feature toggle the Hold Fire stance
 
@@ -295,6 +296,7 @@ static const char *const TheGuiCommandNames[] =
 	"SPECIAL_POWER_CONSTRUCT_FROM_SHORTCUT",
 	"SELECT_ALL_UNITS_OF_TYPE",
 	"REVERSE_MOVE",
+	"AUTO_FILL",
 	"HOLD_FIRE",
 
 	nullptr
@@ -819,6 +821,10 @@ public:
 
 	/// set the command data into the button
 	void setControlCommand( GameWindow *button, const CommandButton *commandButton );
+	// TheSuperHackers @feature Grid hotkey for a command bar slot, empty if not applicable.
+	// isGridSlot, if given, reports whether the button is a command bar slot the grid covers,
+	// which is how the caller tells "excluded, so no key" apart from "not in the grid at all".
+	AsciiString getGridHotKeyForButton( GameWindow *button, Bool *isGridSlot = nullptr ) const;
 
 	void getForegroundMarkerPos(Int *x, Int *y);
 	void getBackgroundMarkerPos(Int *x, Int *y);

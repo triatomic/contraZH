@@ -50,7 +50,134 @@
 #include "GameClient/GameWindow.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/Keyboard.h"
+// TheSuperHackers @feature for quick cast
+#include "Common/OptionPreferences.h"
+#include "Common/Recorder.h"
+#include "GameClient/HotKey.h"
+#include "GameClient/Mouse.h"
+#include "GameClient/View.h"
+#include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameClient/AnimateWindowManager.h"
+
+// TheSuperHackers @feature How many units a shift click queues or cancels at once.
+static const Int SHIFT_CLICK_BATCH_SIZE = 5;
+
+// TheSuperHackers @feature Quick cast (Options.ini: CastMode).
+/**
+ * Fire a targeted command at the cursor instead of waiting for a second click.
+ *
+ * Returns TRUE only if the command was actually dispatched. Every rejection path returns
+ * FALSE so the caller arms the command normally -- an input is never silently eaten.
+ *
+ * Deliberately limited to keyboard activation. Clicking a cameo with the mouse leaves the
+ * cursor over the control bar, where there is no world position worth targeting.
+ */
+static Bool tryQuickCast( const CommandButton *commandButton )
+{
+	if( commandButton == nullptr || TheGlobalData == nullptr )
+		return FALSE;
+
+	if( TheGlobalData->m_castMode == CastMode_Normal )
+		return FALSE;
+
+	// only from a hotkey -- see the note above
+	if( !HotKeyManager::isExecutingHotKey() )
+		return FALSE;
+
+	// Hold to aim: on the key down pass we want the normal arming path, which already shows the
+	// targeting decal and lets the player move the cursor. The key up pass then fires.
+	if( HotKeyManager::isQuickCastAiming() )
+		return FALSE;
+
+	if( TheInGameUI == nullptr || TheMouse == nullptr || TheTacticalView == nullptr )
+		return FALSE;
+
+	// leave replay playback alone, matching InGameUI::setGUICommand
+	if( TheRecorder && TheRecorder->getMode() == RECORDERMODETYPE_PLAYBACK )
+		return FALSE;
+
+	const UnsignedInt options = commandButton->getOptions();
+
+	// Commands that must not be fired blind:
+	//   NEED_N_TARGET_POS  needs several deliberate clicks by definition
+	//   SINGLE_USE_COMMAND burns the button permanently, so a misfire is unrecoverable
+	if( BitIsSet( options, NEED_N_TARGET_POS ) || BitIsSet( options, SINGLE_USE_COMMAND ) )
+		return FALSE;
+
+	// Rally points and beacons place a marker wherever the cursor happens to be, which is
+	// silent and easy to miss. Structure placement needs a deliberate footprint.
+	switch( commandButton->getCommandType() )
+	{
+		case GUI_COMMAND_SET_RALLY_POINT:
+		case GUICOMMANDMODE_PLACE_BEACON:
+		case GUI_COMMAND_DOZER_CONSTRUCT:
+		case GUI_COMMAND_SPECIAL_POWER_CONSTRUCT:
+		case GUI_COMMAND_SPECIAL_POWER_CONSTRUCT_FROM_SHORTCUT:
+			return FALSE;
+
+		// Superweapons are excluded on purpose: firing one at an unintended spot cannot be
+		// undone, and the stray keypress that does it is easy to make.
+		case GUI_COMMAND_SPECIAL_POWER:
+		case GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT:
+			return FALSE;
+
+		default:
+			break;
+	}
+
+	// The cursor has to be over the battlefield, not the command bar or another panel.
+	const MouseIO *mouseIO = TheMouse->getMouseStatus();
+	if( mouseIO == nullptr )
+		return FALSE;
+
+	if( TheWindowManager &&
+			TheWindowManager->getWindowUnderCursor( mouseIO->pos.x, mouseIO->pos.y ) != nullptr )
+		return FALSE;
+
+	// TheSuperHackers @feature If the ability is still recharging, remember the cast and let
+	// InGameUI fire it the moment the logic side says it is ready, rather than throwing the
+	// input away. The cooldown itself is untouched -- this only stops the press being wasted.
+	if( commandButton->getSpecialPowerTemplate() )
+	{
+		Drawable *draw = TheInGameUI->getFirstSelectedDrawable();
+		Object *source = draw ? draw->getObject() : nullptr;
+		if( source )
+		{
+			SpecialPowerModuleInterface *mod =
+				source->getSpecialPowerModule( commandButton->getSpecialPowerTemplate() );
+			if( mod && !mod->isReady() )
+			{
+				TheInGameUI->queueQuickCast( commandButton, mouseIO->pos );
+				TheInGameUI->triggerQuickCastHint( commandButton, mouseIO->pos );
+				return TRUE;
+			}
+		}
+	}
+
+	// Hand the click to the normal path. Synthesizing the message rather than calling the
+	// do*Command helpers directly means quick cast reuses the engine's own validation,
+	// voice responses and cleanup, and cannot drift away from normal behaviour.
+	//
+	// In hold to aim mode the command was already armed on key down; re-arming here is
+	// harmless and covers the case where something cleared it while the key was held.
+	TheInGameUI->setGUICommand( commandButton );
+
+	// GUICommandTranslator reads the click position from pixelRegion.hi
+	IRegion2D clickRegion;
+	clickRegion.lo = mouseIO->pos;
+	clickRegion.hi = mouseIO->pos;
+
+	GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_MOUSE_LEFT_CLICK );
+	msg->appendPixelRegionArgument( clickRegion );
+
+	// In indicator mode the decal has been visible the whole time the key was held, so let it
+	// linger briefly at the point it fired rather than vanishing the instant the key comes up.
+	if( TheGlobalData->m_castMode == CastMode_QuickCastWithIndicator )
+		TheInGameUI->triggerQuickCastHint( commandButton, mouseIO->pos );
+
+	return TRUE;
+}
 
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
@@ -225,6 +352,13 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		//with. For example, the terrorist can jack a car and convert it into a carbomb, but he has to
 		//click on a valid car. In this case the doCommandOrHint code will determine if the mode is valid
 		//or not and the cursor modes will be set appropriately.
+
+		// TheSuperHackers @feature Quick cast fires the command at the cursor instead of waiting for
+		// a second click. If it declines -- wrong mode, unsafe command, cursor not over the
+		// battlefield -- fall through and arm normally, so nothing is ever silently swallowed.
+		if( tryQuickCast( commandButton ) )
+			return CBC_COMMAND_USED;
+
 		TheInGameUI->setGUICommand( commandButton );
 	}
 	else switch( commandButton->getCommandType() )
@@ -445,14 +579,28 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 			}
 
-			// get a new production id to assign to this
-			ProductionID productionID = pu->requestUniqueUnitID();
+			// TheSuperHackers @feature Shift queues a batch instead of a single unit.
+			Int unitsToQueue = 1;
+			if( TheKeyboard && TheKeyboard->isShift() )
+				unitsToQueue = SHIFT_CLICK_BATCH_SIZE;
 
-			// create a message to build this thing
+			for( Int queued = 0; queued < unitsToQueue; ++queued )
+			{
+				// Re-check every time round. canMakeUnit covers money, queue space, parking and
+				// per player unit caps, and each unit we just queued moves those. Stop quietly
+				// once we can no longer build -- the first unit already reported any problem.
+				if( queued > 0 && TheBuildAssistant->canMakeUnit( factory, whatToBuild ) != CANMAKE_OK )
+					break;
 
-			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_QUEUE_UNIT_CREATE );
-			msg->appendIntegerArgument( whatToBuild->getTemplateID() );
-			msg->appendIntegerArgument( productionID );
+				// get a new production id to assign to this
+				ProductionID productionID = pu->requestUniqueUnitID();
+
+				// create a message to build this thing
+
+				GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_QUEUE_UNIT_CREATE );
+				msg->appendIntegerArgument( whatToBuild->getTemplateID() );
+				msg->appendIntegerArgument( productionID );
+			}
 
 			break;
 
@@ -496,6 +644,26 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			// send a message to cancel that particular production entry
 			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_CANCEL_UNIT_CREATE );
 			msg->appendIntegerArgument( productionIDToCancel );
+
+			// TheSuperHackers @feature Shift cancels a batch. Walk backwards from the clicked
+			// slot so we take the most recently queued copies first, leaving the item that is
+			// actually being built alone for as long as possible. Only cancels entries of the
+			// same type, so a shift click does not silently eat unrelated queued units.
+			if( TheKeyboard && TheKeyboard->isShift() )
+			{
+				Int cancelled = 1;
+				for( Int j = i + 1; j < MAX_BUILD_QUEUE_BUTTONS && cancelled < SHIFT_CLICK_BATCH_SIZE; ++j )
+				{
+					if( m_queueData[ j ].control == nullptr )
+						continue;
+					if( m_queueData[ j ].type != PRODUCTION_UNIT )
+						continue;
+
+					msg = TheMessageStream->appendMessage( GameMessage::MSG_CANCEL_UNIT_CREATE );
+					msg->appendIntegerArgument( m_queueData[ j ].productionID );
+					++cancelled;
+				}
+			}
 
 			break;
 
@@ -734,6 +902,16 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				TheMessageStream->appendMessage( GameMessage::MSG_EVACUATE );
 			}
 
+			break;
+		}
+
+		// --------------------------------------------------------------------------------------------
+		// TheSuperHackers @feature Fill the selected containers from nearby idle infantry. The UI only
+		// appends the message; the logic side decides who actually boards, so peers stay in sync.
+		case GUI_COMMAND_AUTO_FILL:
+		{
+			TheInGameUI->setGUICommand( nullptr );
+			TheMessageStream->appendMessage( GameMessage::MSG_DO_AUTO_FILL );
 			break;
 		}
 

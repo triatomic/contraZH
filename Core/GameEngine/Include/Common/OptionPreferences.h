@@ -31,9 +31,47 @@
 #pragma once
 
 #include "Common/UserPreferences.h"
+#include "GameClient/Color.h"
 
 typedef UnsignedInt CursorCaptureMode;
 typedef UnsignedInt ScreenEdgeScrollMode;
+
+// TheSuperHackers @feature How targeted commands (guard, attack move, abilities) are triggered.
+// Only affects hotkey activation -- a mouse click on a cameo leaves the cursor over the control
+// bar, where there is no world position to cast at, so it always uses the normal two step flow.
+enum CastMode CPP_11(: Int)
+{
+	CastMode_Normal = 0,				///< click the button, then click the world (retail behavior)
+	CastMode_QuickCast,					///< hotkey fires immediately at the cursor
+	CastMode_QuickCastWithIndicator,	///< as above, but flash the targeting decal where it fired
+
+	CastMode_Count,
+	CastMode_Default = CastMode_Normal
+};
+
+// TheSuperHackers @feature How remaining time is shown on build queue and cooldown cameos.
+// Purely a client side display preference.
+enum BuildTimerDisplayMode CPP_11(: Int)
+{
+	BuildTimerDisplayMode_None = 0,		///< no numbers, just the existing clock sweep (retail behavior)
+	BuildTimerDisplayMode_Seconds,		///< always plain seconds, however large
+	BuildTimerDisplayMode_Auto,				///< seconds under a minute, M:SS above it
+
+	BuildTimerDisplayMode_Count,
+	BuildTimerDisplayMode_Default = BuildTimerDisplayMode_None
+};
+
+// TheSuperHackers @feature When health bars are shown above objects. Purely a client side
+// display preference -- it never affects game logic, so it is safe in multiplayer and replays.
+enum HealthBarDisplayMode CPP_11(: Int)
+{
+	HealthBarDisplayMode_Classic = 0,	///< selected and moused over objects only (retail behavior)
+	HealthBarDisplayMode_Damaged,			///< the above, plus anything that is not at full health
+	HealthBarDisplayMode_Always,			///< the above, plus every undamaged unit and structure
+
+	HealthBarDisplayMode_Count,
+	HealthBarDisplayMode_Default = HealthBarDisplayMode_Classic
+};
 
 //-----------------------------------------------------------------------------
 // OptionsPreferences options menu class
@@ -55,6 +93,25 @@ public:
 	Bool getArchiveReplaysEnabled() const;
 	Bool getAlternateMouseModeEnabled(void);
 	Bool getRetaliationModeEnabled();
+	HealthBarDisplayMode getHealthBarDisplayMode() const;
+	BuildTimerDisplayMode getBuildTimerDisplayMode() const;
+	CastMode getCastMode() const;
+	Bool getSelectionCircleEnabled() const;
+	Bool getEasyMilitaryDragEnabled() const;
+	Bool getSmartPipsEnabled() const;
+	Bool getNumericalHealthEnabled() const;
+	Bool getGridHotkeysEnabled() const;
+	AsciiString getGridHotkeyLayout() const;
+	Int getGridHotkeyColumns() const;
+	AsciiString getNonGridHotkeys() const;
+	Bool isNonGridHotkey(const AsciiString& key) const;
+	// TheSuperHackers @feature Exposed statically so GlobalData can test its cached copy of the
+	// list without re-reading Options.ini on every command bar rebuild.
+	static Bool isNonGridHotkeyInList(const AsciiString& list, const AsciiString& key);
+	Bool getKeyboardOverlayEnabled() const;
+	Color getKeyboardOverlayColor() const;
+	Bool getKeyboardOverlayBackdropEnabled() const;
+	Color getKeyboardOverlayBackdropColor() const;
 	Bool getDoubleClickAttackMoveEnabled(void);
 	Real getScrollFactor(void);
 	Bool getDrawScrollAnchor(void);
@@ -113,4 +170,8 @@ public:
 	Real getResolutionFontAdjustment(void);
 
 	Bool getShowMoneyPerMinute(void) const;
+
+private:
+	// TheSuperHackers @feature Read one 0-255 colour channel, clamped, with a fallback.
+	UnsignedByte getColorChannel(const char *keyName, UnsignedByte defaultValue) const;
 };

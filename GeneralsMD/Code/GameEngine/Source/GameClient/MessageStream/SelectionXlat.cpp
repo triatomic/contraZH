@@ -609,6 +609,42 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 			pds.isPointSelection = isPoint;
 			TheTacticalView->iterateDrawablesInRegion(&selectionRegion, addDrawableToList, &pds);
 
+			// TheSuperHackers @feature EasyMilitaryDrag drops builders from a drag, but if that leaves
+			// no actual units then the box held only builders, and refusing to select them is just an
+			// unresponsive click. Run the region again with the filter suspended so they are selected
+			// after all.
+			//
+			// The test is "no units survived", not "the list is empty", because structures are never
+			// filtered and so stay in the list. Dragging over workers standing next to a building left
+			// the building as the only survivor, and the selection logic below has a branch that hands
+			// you a building when it is the only selectable thing in the box -- so the drag silently
+			// grabbed the building instead of the workers.
+			//
+			// Deliberately not done for the Ctrl inverted drag: there the player has explicitly asked
+			// for the builders, so grabbing the army instead would be the opposite of the request.
+			if (pds.easyMilitaryDrag)
+			{
+				Bool anyNonStructure = FALSE;
+				for (DrawableListIt it = drawablesThatWillSelect.begin();
+							it != drawablesThatWillSelect.end(); ++it)
+				{
+					const Drawable *d = *it;
+					if (d && !d->isKindOf(KINDOF_STRUCTURE))
+					{
+						anyNonStructure = TRUE;
+						break;
+					}
+				}
+
+				if (!anyNonStructure)
+				{
+					// start clean, or the structures already gathered would be listed twice
+					drawablesThatWillSelect.clear();
+					pds.easyMilitaryDragDisabled = TRUE;
+					TheTacticalView->iterateDrawablesInRegion(&selectionRegion, addDrawableToList, &pds);
+				}
+			}
+
 			if (drawablesThatWillSelect.empty())
 			{
 				break;
@@ -997,7 +1033,15 @@ GameMessageDisposition SelectionTranslator::translateGameMessage(const GameMessa
 			{
 				//Added support to cancel the GUI command without deselecting the unit(s) involved
 				//when you right click.
-				if( TheInGameUI->getGUICommand() )
+				// TheSuperHackers @feature Right click also cancels a queued quick cast, so a cast
+				// waiting on a cooldown can be called off the same way an armed command is.
+				if( TheInGameUI->hasQueuedQuickCast() )
+				{
+					TheInGameUI->cancelQueuedQuickCast();
+					disp = DESTROY_MESSAGE;
+					TheInGameUI->setScrolling( FALSE );
+				}
+				else if( TheInGameUI->getGUICommand() )
 				{
 					//Cancel GUI command mode... don't deselect units.
 					TheInGameUI->setGUICommand( nullptr );

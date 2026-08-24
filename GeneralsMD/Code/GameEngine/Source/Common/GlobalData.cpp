@@ -1132,6 +1132,21 @@ GlobalData::GlobalData()
 	//m_allAdvice = FALSE;
 
 	m_clientRetaliationModeEnabled = TRUE; //On by default.
+	// TheSuperHackers @feature Health bars behave exactly as they always have unless Options.ini says otherwise.
+	m_healthBarDisplayMode = HealthBarDisplayMode_Default;
+	m_buildTimerDisplayMode = BuildTimerDisplayMode_Default;
+	m_castMode = CastMode_Default;
+	m_selectionCircleEnabled = FALSE;
+	m_smartPips = FALSE;
+	m_numericalHealth = FALSE;
+	m_gridHotkeysEnabled = FALSE;
+	m_gridHotkeyLayout.clear();
+	m_gridHotkeyColumns = 0;
+	m_nonGridHotkeys.clear();
+	m_keyboardOverlayEnabled = FALSE;
+	m_keyboardOverlayColor = GameMakeColor( 255, 255, 255, 255 );
+	m_keyboardOverlayBackdrop = TRUE;
+	m_keyboardOverlayBackdropColor = GameMakeColor( 0, 0, 0, 128 );
 
 	m_useOldMoveSpeed = FALSE;  //Fix is enabled by default
 
@@ -1319,6 +1334,20 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	OptionPreferences optionPref;
 	TheWritableGlobalData->m_useAlternateMouse = optionPref.getAlternateMouseModeEnabled();
 	TheWritableGlobalData->m_clientRetaliationModeEnabled = optionPref.getRetaliationModeEnabled();
+	TheWritableGlobalData->m_healthBarDisplayMode = optionPref.getHealthBarDisplayMode();
+	TheWritableGlobalData->m_buildTimerDisplayMode = optionPref.getBuildTimerDisplayMode();
+	TheWritableGlobalData->m_castMode = optionPref.getCastMode();
+	TheWritableGlobalData->m_selectionCircleEnabled = optionPref.getSelectionCircleEnabled();
+	TheWritableGlobalData->m_smartPips = optionPref.getSmartPipsEnabled();
+	TheWritableGlobalData->m_numericalHealth = optionPref.getNumericalHealthEnabled();
+	TheWritableGlobalData->m_gridHotkeysEnabled = optionPref.getGridHotkeysEnabled();
+	TheWritableGlobalData->m_gridHotkeyLayout = optionPref.getGridHotkeyLayout();
+	TheWritableGlobalData->m_gridHotkeyColumns = optionPref.getGridHotkeyColumns();
+	TheWritableGlobalData->m_nonGridHotkeys = optionPref.getNonGridHotkeys();
+	TheWritableGlobalData->m_keyboardOverlayEnabled = optionPref.getKeyboardOverlayEnabled();
+	TheWritableGlobalData->m_keyboardOverlayColor = optionPref.getKeyboardOverlayColor();
+	TheWritableGlobalData->m_keyboardOverlayBackdrop = optionPref.getKeyboardOverlayBackdropEnabled();
+	TheWritableGlobalData->m_keyboardOverlayBackdropColor = optionPref.getKeyboardOverlayBackdropColor();
 	TheWritableGlobalData->m_doubleClickAttackMove = optionPref.getDoubleClickAttackMoveEnabled();
 	TheWritableGlobalData->m_keyboardScrollFactor = optionPref.getScrollFactor();
 	TheWritableGlobalData->m_drawScrollAnchor = optionPref.getDrawScrollAnchor();

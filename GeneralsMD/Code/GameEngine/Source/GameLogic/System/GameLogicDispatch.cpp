@@ -1091,6 +1091,16 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 		}
 
 		//---------------------------------------------------------------------------------------------
+		//---------------------------------------------------------------------------------------------
+		// TheSuperHackers @feature Fill the selected containers from nearby idle infantry. Takes no
+		// arguments -- peers can hold different selections, so each derives the result from its own.
+		case GameMessage::MSG_DO_AUTO_FILL:
+		{
+			if( currentlySelectedGroup )
+				currentlySelectedGroup->groupAutoFill( CMD_FROM_PLAYER );
+			break;
+		}
+
 		case GameMessage::MSG_DO_SMART_GARRISON:
 		{
 			Object *target = findObjectByID( msg->getArgument( 0 )->objectID );

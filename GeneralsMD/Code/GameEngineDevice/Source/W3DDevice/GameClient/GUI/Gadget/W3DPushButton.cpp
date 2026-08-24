@@ -53,6 +53,13 @@
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/GadgetPushButton.h"
 #include "GameClient/Display.h"
+// TheSuperHackers @feature for the command bar hotkey overlay
+#include "Common/GlobalData.h"
+#include "Common/OptionPreferences.h"
+#include "GameClient/DisplayStringManager.h"
+#include "GameClient/GameFont.h"
+#include "GameClient/GlobalLanguage.h"
+#include "GameClient/HotKey.h"
 #include "W3DDevice/GameClient/W3DGameWindow.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
 #include "W3DDevice/GameClient/W3DGadget.h"
@@ -74,6 +81,150 @@ void W3DGadgetPushButtonImageDrawThree(GameWindow *window, WinInstanceData *inst
 void W3DGadgetPushButtonImageDrawOne(GameWindow *window, WinInstanceData *instData );
 
 // PRIVATE FUNCTIONS //////////////////////////////////////////////////////////
+
+// TheSuperHackers @feature Countdown text over a cameo (Options.ini: BuildTimerDisplayMode).
+// drawButtonCountdown ========================================================
+/** Draw the remaining time for whatever this button is counting down -- a queued unit or
+	* upgrade, or a special power recharging. Drawn after the clock sweep so the darkening
+	* does not swallow the digits. */
+//=============================================================================
+static void drawButtonCountdown( GameWindow *window, Int seconds )
+{
+	if( seconds < 0 )
+		return;
+
+	if( !TheGlobalData || TheGlobalData->m_buildTimerDisplayMode == BuildTimerDisplayMode_None )
+		return;
+
+	if( TheDisplayStringManager == nullptr )
+		return;
+
+	static DisplayString *s_countdownString = nullptr;
+	static Int s_lastSeconds = -1;
+	static Int s_lastMode = -1;
+
+	if( s_countdownString == nullptr )
+	{
+		s_countdownString = TheDisplayStringManager->newDisplayString();
+		if( s_countdownString == nullptr )
+			return;
+
+		Int pointSize = 10;
+		if( TheGlobalLanguageData )
+			pointSize = TheGlobalLanguageData->adjustFontSize( pointSize );
+		s_countdownString->setFont( TheFontLibrary->getFont( AsciiString( "Arial" ), pointSize, TRUE ) );
+	}
+
+	// only rebuild the sentence when the displayed value actually changes, which at one
+	// tick per second is far less often than we are drawn
+	if( s_lastSeconds != seconds || s_lastMode != TheGlobalData->m_buildTimerDisplayMode )
+	{
+		UnicodeString text;
+		if( TheGlobalData->m_buildTimerDisplayMode == BuildTimerDisplayMode_Auto && seconds >= 60 )
+			text.format( L"%d:%2.2d", seconds / 60, seconds % 60 );
+		else
+			text.format( L"%d", seconds );
+
+		s_countdownString->setText( text );
+		s_lastSeconds = seconds;
+		s_lastMode = TheGlobalData->m_buildTimerDisplayMode;
+	}
+
+	ICoord2D origin, size;
+	window->winGetScreenPosition( &origin.x, &origin.y );
+	window->winGetSize( &size.x, &size.y );
+
+	Int width, height;
+	s_countdownString->getSize( &width, &height );
+
+	// centered along the bottom, clear of the hotkey badge in the top left
+	const Int pad = 1;
+	const Int textX = origin.x + (size.x / 2) - (width / 2);
+	const Int textY = origin.y + size.y - height - 2;
+
+	TheDisplay->drawFillRect( textX - pad, textY - pad,
+		width + pad * 2, height + pad * 2, GameMakeColor( 0, 0, 0, 128 ) );
+
+	s_countdownString->draw( textX, textY,
+		GameMakeColor( 255, 255, 255, 255 ), GameMakeColor( 0, 0, 0, 255 ) );
+}
+
+// TheSuperHackers @feature Command bar hotkey overlay (Options.ini: KeyboardOverlay).
+// drawButtonHotKeyOverlay ====================================================
+/** Draw the keyboard hotkey letter over a command bar cameo, so the player can
+	* learn the shortcuts without hunting through tooltips.
+	*
+	* The letter comes from what actually got registered in the hotkey manager, not
+	* from the button's label -- colliding hotkeys are dropped at registration, and
+	* drawing those would advertise a key that does nothing. */
+//=============================================================================
+static void drawButtonHotKeyOverlay( GameWindow *window )
+{
+	if( !TheGlobalData || !TheGlobalData->m_keyboardOverlayEnabled )
+		return;
+
+	if( TheHotKeyManager == nullptr || TheDisplayStringManager == nullptr )
+		return;
+
+	// only cameo style buttons opt into overlay states, so this leaves menu buttons alone
+	if( !BitIsSet( window->winGetStatus(), WIN_STATUS_USE_OVERLAY_STATES ) )
+		return;
+
+	AsciiString hotKey = TheHotKeyManager->getHotKeyForWindow( window );
+	if( hotKey.isEmpty() )
+		return;
+
+	// One display string per letter, so that drawing many cameos in a row does not
+	// rebuild sentence geometry over and over. There are only ever a handful of
+	// distinct hotkeys on screen, so this stays small.
+	static DisplayString *s_hotKeyStrings[ 256 ] = { nullptr };
+
+	const UnsignedByte index = (UnsignedByte)hotKey.getCharAt( 0 );
+	DisplayString *hotKeyString = s_hotKeyStrings[ index ];
+
+	if( hotKeyString == nullptr )
+	{
+		hotKeyString = TheDisplayStringManager->newDisplayString();
+		if( hotKeyString == nullptr )
+			return;
+
+		Int pointSize = 10;
+		if( TheGlobalLanguageData )
+			pointSize = TheGlobalLanguageData->adjustFontSize( pointSize );
+		hotKeyString->setFont( TheFontLibrary->getFont( AsciiString( "Arial" ), pointSize, TRUE ) );
+
+		// the manager stores keys lowercased, but shortcuts read better as capitals
+		UnicodeString text;
+		WideChar upper = (WideChar)toupper( (Int)index );
+		text.concat( upper );
+		hotKeyString->setText( text );
+
+		s_hotKeyStrings[ index ] = hotKeyString;
+	}
+
+	ICoord2D origin;
+	window->winGetScreenPosition( &origin.x, &origin.y );
+
+	// tuck it into the top left of the cameo, where no existing decoration lives
+	const Int inset = 2;
+	const Int textX = origin.x + inset;
+	const Int textY = origin.y + inset;
+
+	// Optional plate behind the letter, so it stays readable over busy cameo art.
+	if( TheGlobalData->m_keyboardOverlayBackdrop )
+	{
+		Int width, height;
+		hotKeyString->getSize( &width, &height );
+
+		const Int pad = 1;
+		TheDisplay->drawFillRect( textX - pad, textY - pad,
+			width + pad * 2, height + pad * 2,
+			TheGlobalData->m_keyboardOverlayBackdropColor );
+	}
+
+	hotKeyString->draw( textX, textY,
+		TheGlobalData->m_keyboardOverlayColor, GameMakeColor( 0, 0, 0, 255 ) );
+}
 
 // drawButtonText =============================================================
 /** Draw button text to the screen */
@@ -265,6 +416,15 @@ void W3DGadgetPushButtonDraw( GameWindow *window, WinInstanceData *instData )
 			window->winSetUserData(pData);
 		}
 
+		// TheSuperHackers @feature Countdown text, after the clock so the darkening does not
+		// swallow the digits. One shot, like the clock above.
+		if( pData->countdownSeconds >= 0 )
+		{
+			drawButtonCountdown( window, pData->countdownSeconds );
+			pData->countdownSeconds = -1;
+			window->winSetUserData(pData);
+		}
+
 		if( pData->drawBorder && pData->colorBorder != GAME_COLOR_UNDEFINED )
 		{
 			TheDisplay->drawOpenRect(origin.x -1, origin.y - 1, size.x + 2, size.y + 2,1 , pData->colorBorder);
@@ -434,6 +594,15 @@ void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 			window->winSetUserData(pData);
 		}
 
+		// TheSuperHackers @feature Countdown text, after the clock so the darkening does not
+		// swallow the digits. One shot, like the clock above.
+		if( pData->countdownSeconds >= 0 )
+		{
+			drawButtonCountdown( window, pData->countdownSeconds );
+			pData->countdownSeconds = -1;
+			window->winSetUserData(pData);
+		}
+
 		if( pData->drawBorder && pData->colorBorder != GAME_COLOR_UNDEFINED )
 		{
 
@@ -481,6 +650,10 @@ void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 			}
 		}
 	}
+
+	// TheSuperHackers @feature Draw the hotkey letter last, so it stays readable on top
+	// of the hilite and pushed overlays.
+	drawButtonHotKeyOverlay( window );
 }
 
 
@@ -690,6 +863,15 @@ void W3DGadgetPushButtonImageDrawThree(GameWindow *window, WinInstanceData *inst
 				TheDisplay->drawRemainingRectClock( start.x, start.y, size.x, size.y, pData->percentClock,pData->colorClock );
 			}
 			pData->drawClock = NO_CLOCK;
+			window->winSetUserData(pData);
+		}
+
+		// TheSuperHackers @feature Countdown text, after the clock so the darkening does not
+		// swallow the digits. One shot, like the clock above.
+		if( pData->countdownSeconds >= 0 )
+		{
+			drawButtonCountdown( window, pData->countdownSeconds );
+			pData->countdownSeconds = -1;
 			window->winSetUserData(pData);
 		}
 

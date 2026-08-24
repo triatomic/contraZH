@@ -168,6 +168,284 @@ Bool OptionPreferences::getAlternateMouseModeEnabled(void)
 	return FALSE;
 }
 
+// TheSuperHackers @feature Health bar display mode, read from Options.ini as
+// HealthBarDisplayMode = Classic | Damaged | Always (a plain index also works).
+HealthBarDisplayMode OptionPreferences::getHealthBarDisplayMode(void) const
+{
+	OptionPreferences::const_iterator it = find("HealthBarDisplayMode");
+	if (it == end())
+		return HealthBarDisplayMode_Default;
+
+	if (stricmp(it->second.str(), "Always") == 0)
+		return HealthBarDisplayMode_Always;
+	if (stricmp(it->second.str(), "Damaged") == 0)
+		return HealthBarDisplayMode_Damaged;
+	if (stricmp(it->second.str(), "Classic") == 0)
+		return HealthBarDisplayMode_Classic;
+
+	// also accept the raw index, so the value round trips if it is ever written numerically
+	Int mode = atoi(it->second.str());
+	if (mode >= 0 && mode < HealthBarDisplayMode_Count)
+		return (HealthBarDisplayMode)mode;
+
+	return HealthBarDisplayMode_Default;
+}
+
+// TheSuperHackers @feature Draw each command bar cameo's keyboard hotkey over the cameo.
+// Options.ini: KeyboardOverlay = Yes
+Bool OptionPreferences::getKeyboardOverlayEnabled(void) const
+{
+	OptionPreferences::const_iterator it = find("KeyboardOverlay");
+	if (it == end())
+		return FALSE;
+
+	if (stricmp(it->second.str(), "yes") == 0) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+// TheSuperHackers @feature Grid hotkeys assign a command bar key by slot position rather than
+// by whatever letter the string file marked with an ampersand.
+// Options.ini: GridHotkeys = Yes
+Bool OptionPreferences::getGridHotkeysEnabled(void) const
+{
+	OptionPreferences::const_iterator it = find("GridHotkeys");
+	if (it == end())
+		return FALSE;
+
+	if (stricmp(it->second.str(), "yes") == 0) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+// TheSuperHackers @feature The key for each slot, in slot order. Defaults to two rows of nine,
+// matching a command bar that is two rows deep. Mods with a different bar can set their own,
+// and the count is whatever the string is long -- slots past the end simply get no grid key.
+// Options.ini: GridHotkeyLayout = QWERTYUIOASDFGHJKL
+AsciiString OptionPreferences::getGridHotkeyLayout(void) const
+{
+	OptionPreferences::const_iterator it = find("GridHotkeyLayout");
+	if (it == end() || it->second.isEmpty())
+		return AsciiString("QWERTYUIOASDFGHJKL");
+
+	return it->second;
+}
+
+// TheSuperHackers @feature Keys listed here opt out of the grid entirely. The slot that would
+// have taken such a key falls back to its string file letter, and the key keeps whatever it
+// normally does -- so a mod can leave S, G and friends on their usual bindings while everything
+// else grids. Letters only, case insensitive, separators optional: "SG" and "S,G" both work.
+// Options.ini: NonGridHotkeys = SG
+AsciiString OptionPreferences::getNonGridHotkeys(void) const
+{
+	OptionPreferences::const_iterator it = find("NonGridHotkeys");
+	if (it == end())
+		return AsciiString::TheEmptyString;
+
+	return it->second;
+}
+
+// TheSuperHackers @feature Is this key one the player asked to keep out of the grid?
+Bool OptionPreferences::isNonGridHotkey(const AsciiString& key) const
+{
+	if (key.isEmpty())
+		return FALSE;
+
+	return isNonGridHotkeyInList(getNonGridHotkeys(), key);
+}
+
+// TheSuperHackers @feature Shared by the option lookup above and by GlobalData's cached copy,
+// so both read the exclusion list exactly the same way.
+Bool OptionPreferences::isNonGridHotkeyInList(const AsciiString& list, const AsciiString& key)
+{
+	if (list.isEmpty() || key.isEmpty())
+		return FALSE;
+
+	const char wanted = tolower(key.getCharAt(0));
+	const char *c = list.str();
+	for (; *c; ++c)
+	{
+		// a plain scan, so commas, spaces or nothing at all all work as separators
+		if (tolower(*c) == wanted)
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
+// TheSuperHackers @feature How many columns the command bar is wide. The engine numbers command
+// slots down each column rather than across each row, so the layout string -- which is written in
+// reading order -- has to be mapped through this to land the right key on the right button.
+// 0 means do not remap, i.e. the layout string is already in slot order.
+// Options.ini: GridHotkeyColumns = 9
+Int OptionPreferences::getGridHotkeyColumns(void) const
+{
+	OptionPreferences::const_iterator it = find("GridHotkeyColumns");
+	if (it == end())
+		return 9;	// two rows of nine, matching a bar two rows deep
+
+	Int columns = atoi(it->second.str());
+	if (columns < 0)
+		columns = 0;
+
+	return columns;
+}
+
+// TheSuperHackers @feature Options.ini: SelectionCircle = Yes draws a green hexagon under
+// every selected object.
+Bool OptionPreferences::getSelectionCircleEnabled(void) const
+{
+	OptionPreferences::const_iterator it = find("SelectionCircle");
+	if (it == end())
+		return FALSE;
+
+	if (stricmp(it->second.str(), "yes") == 0) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+// TheSuperHackers @feature Options.ini: NumericalHealth = Yes prints the hit points beside the
+// health bar. Follows HealthBarDisplayMode, so the number appears exactly where a bar does.
+Bool OptionPreferences::getNumericalHealthEnabled(void) const
+{
+	OptionPreferences::const_iterator it = find("NumericalHealth");
+	if (it == end())
+		return FALSE;
+
+	if (stricmp(it->second.str(), "yes") == 0) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+// TheSuperHackers @feature Options.ini: SmartPips = Yes keeps ammo and passenger pips on screen
+// instead of showing them only while the unit is selected or moused over. Own units only -- not
+// allies, not enemies. Nothing is drawn when there is nothing to report: no shots left, or no
+// one aboard. So the pips read as "still loaded" and "carrying someone" at a glance.
+Bool OptionPreferences::getSmartPipsEnabled(void) const
+{
+	OptionPreferences::const_iterator it = find("SmartPips");
+	if (it == end())
+		return FALSE;
+
+	if (stricmp(it->second.str(), "yes") == 0) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+// TheSuperHackers @feature Options.ini: EasyMilitaryDrag = Yes leaves builders out of a drag
+// selection, so boxing over a base picks up the army without dragging them along. Covers
+// KINDOF_DOZER and KINDOF_IGNORES_SELECT_ALL, the same kinds Select All already disqualifies.
+Bool OptionPreferences::getEasyMilitaryDragEnabled(void) const
+{
+	OptionPreferences::const_iterator it = find("EasyMilitaryDrag");
+	if (it == end())
+		return FALSE;
+
+	if (stricmp(it->second.str(), "yes") == 0) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+// TheSuperHackers @feature Options.ini: CastMode = Normal | QuickCast | QuickCastWithIndicator
+CastMode OptionPreferences::getCastMode(void) const
+{
+	OptionPreferences::const_iterator it = find("CastMode");
+	if (it == end())
+		return CastMode_Default;
+
+	if (stricmp(it->second.str(), "QuickCastWithIndicator") == 0)
+		return CastMode_QuickCastWithIndicator;
+	if (stricmp(it->second.str(), "QuickCast") == 0)
+		return CastMode_QuickCast;
+	if (stricmp(it->second.str(), "Normal") == 0)
+		return CastMode_Normal;
+
+	Int mode = atoi(it->second.str());
+	if (mode >= 0 && mode < CastMode_Count)
+		return (CastMode)mode;
+
+	return CastMode_Default;
+}
+
+// TheSuperHackers @feature Countdown numbers on build queue and cooldown cameos, read from
+// Options.ini as BuildTimerDisplayMode = None | Seconds | Auto (a plain index also works).
+BuildTimerDisplayMode OptionPreferences::getBuildTimerDisplayMode(void) const
+{
+	OptionPreferences::const_iterator it = find("BuildTimerDisplayMode");
+	if (it == end())
+		return BuildTimerDisplayMode_Default;
+
+	if (stricmp(it->second.str(), "Auto") == 0)
+		return BuildTimerDisplayMode_Auto;
+	if (stricmp(it->second.str(), "Seconds") == 0)
+		return BuildTimerDisplayMode_Seconds;
+	if (stricmp(it->second.str(), "None") == 0)
+		return BuildTimerDisplayMode_None;
+
+	Int mode = atoi(it->second.str());
+	if (mode >= 0 && mode < BuildTimerDisplayMode_Count)
+		return (BuildTimerDisplayMode)mode;
+
+	return BuildTimerDisplayMode_Default;
+}
+
+UnsignedByte OptionPreferences::getColorChannel(const char *keyName, UnsignedByte defaultValue) const
+{
+	OptionPreferences::const_iterator it = find(AsciiString(keyName));
+	if (it == end())
+		return defaultValue;
+
+	Int value = atoi(it->second.str());
+	if (value < 0)
+		value = 0;
+	else if (value > 255)
+		value = 255;
+
+	return (UnsignedByte)value;
+}
+
+// TheSuperHackers @feature Colour of the command bar hotkey overlay letters.
+// Options.ini: KeyboardOverlayRed / KeyboardOverlayGreen / KeyboardOverlayBlue,
+// each 0-255. Defaults to white. An out of range or non numeric channel falls
+// back to full brightness rather than silently drawing an invisible letter.
+Color OptionPreferences::getKeyboardOverlayColor(void) const
+{
+	return GameMakeColor(
+		getColorChannel("KeyboardOverlayRed", 255),
+		getColorChannel("KeyboardOverlayGreen", 255),
+		getColorChannel("KeyboardOverlayBlue", 255),
+		255);
+}
+
+// TheSuperHackers @feature Translucent plate drawn behind the hotkey letter.
+Bool OptionPreferences::getKeyboardOverlayBackdropEnabled(void) const
+{
+	OptionPreferences::const_iterator it = find("KeyboardOverlayBackdrop");
+	if (it == end())
+		return TRUE;	// on by default -- it is what makes the letter readable
+
+	if (stricmp(it->second.str(), "yes") == 0) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+Color OptionPreferences::getKeyboardOverlayBackdropColor(void) const
+{
+	// black at 50% opacity, matching the darkened plate look
+	return GameMakeColor(
+		getColorChannel("KeyboardOverlayBackdropRed", 0),
+		getColorChannel("KeyboardOverlayBackdropGreen", 0),
+		getColorChannel("KeyboardOverlayBackdropBlue", 0),
+		getColorChannel("KeyboardOverlayBackdropOpacity", 128));
+}
+
 Bool OptionPreferences::getRetaliationModeEnabled(void)
 {
 	OptionPreferences::const_iterator it = find("Retaliation");
