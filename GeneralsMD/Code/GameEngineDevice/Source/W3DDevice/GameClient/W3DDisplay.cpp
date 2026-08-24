@@ -84,6 +84,7 @@ static void drawFramerateBar(void);
 #include "WWMath/wwmath.h"
 #include "WWLib/registry.h"
 #include "WW3D2/ww3d.h"
+#include "WW3D2/texturefilter.h"
 #include "WW3D2/predlod.h"
 #include "WW3D2/part_emt.h"
 #include "WW3D2/part_ldr.h"
@@ -780,6 +781,34 @@ void W3DDisplay::init( void )
 			throw ERROR_INVALID_D3D;	//failed to initialize.  User probably doesn't have DX 8.1
 			DEBUG_CRASH( ("Unable to set render device") );
 			return;
+		}
+
+		// TheSuperHackers @feature Apply the Options.ini texture filtering settings. The engine has
+		// supported trilinear and anisotropic since retail, but nothing ever called this, so the
+		// mode sat at the hardcoded default and the better two were unreachable.
+		//
+		// This has to come after Set_Render_Device, not merely after WW3D::Init: _Init_Filters reads
+		// DX8Wrapper::Get_Current_Caps(), and CurrentCaps is only created by Compute_Caps during
+		// device creation. Calling it any earlier dereferences a null and crashes on startup.
+		//
+		// Purely a client side render setting -- it changes nothing in the simulation, so it is
+		// safe in multiplayer and has no replay impact.
+		if( TheGlobalData )
+		{
+			// The Options.ini parser returns the mode as a plain Int to keep the WW3D headers out of
+			// GlobalData, so tie the two together here, where both are visible.
+			static_assert( (Int)TextureFilterClass::TEXTURE_FILTER_BILINEAR == 0,
+				"OptionPreferences::getTextureFilter returns these values as plain Ints" );
+			static_assert( (Int)TextureFilterClass::TEXTURE_FILTER_TRILINEAR == 1,
+				"OptionPreferences::getTextureFilter returns these values as plain Ints" );
+			static_assert( (Int)TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC == 2,
+				"OptionPreferences::getTextureFilter returns these values as plain Ints" );
+			WW3D::Set_Texture_Filter( TheGlobalData->m_textureFilter );
+
+			// Applied after the mode, since Set_Texture_Filter re-runs _Init_Filters and the sample
+			// count has to survive that. Harmless when a non anisotropic mode is selected -- the
+			// stage state is simply not consulted.
+			TextureFilterClass::_Set_Max_Anisotropy( TheGlobalData->m_anisotropicLevel );
 		}
 
 		//Check if level was never set and default to setting most suitable for system.

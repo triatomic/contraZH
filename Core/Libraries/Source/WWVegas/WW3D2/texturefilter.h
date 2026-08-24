@@ -116,6 +116,12 @@ public:
 	// This needs to be called after device has been created
 	static void _Init_Filters(TextureFilterMode texture_filter);
 
+	// TheSuperHackers @feature Set the anisotropic sample count on every texture stage. Retail
+	// hardcoded this to 2, the lowest anisotropic filtering goes, so the mode never looked like
+	// much. Clamped to what the device reports supporting, so asking for more than the hardware
+	// has degrades rather than failing. Only meaningful while anisotropic filtering is selected.
+	static void _Set_Max_Anisotropy(int level);
+
 	static void _Set_Default_Min_Filter(FilterType filter);
 	static void _Set_Default_Mag_Filter(FilterType filter);
 	static void _Set_Default_Mip_Filter(FilterType filter);
