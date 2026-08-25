@@ -805,9 +805,10 @@ void W3DDisplay::init( void )
 				"OptionPreferences::getTextureFilter returns these values as plain Ints" );
 			WW3D::Set_Texture_Filter( TheGlobalData->m_textureFilter );
 
-			// Applied after the mode, since Set_Texture_Filter re-runs _Init_Filters and the sample
-			// count has to survive that. Harmless when a non anisotropic mode is selected -- the
-			// stage state is simply not consulted.
+			// Applied after the mode, since Set_Texture_Filter re-runs _Init_Filters. This is the
+			// only place the player's level is supplied; _Init_Filters remembers it and re-applies
+			// it on its own after a device reset, so it does not have to be set again from here.
+			// Harmless when a non anisotropic mode is selected -- the stage state is not consulted.
 			TextureFilterClass::_Set_Max_Anisotropy( TheGlobalData->m_anisotropicLevel );
 		}
 
