@@ -345,7 +345,7 @@ UpdateSleepTime FireWeaponAdvancedUpdate::update( void )
 	{
 		Coord3D targetPos = getNextTargetPos();
 		Coord3D firingOffset = getScatterRadiusOffset(data->m_scatterRadius);
-		targetPos.add(&firingOffset);
+		targetPos.add(firingOffset);
 
 		//DEBUG_LOG(("NextPos: %f, %f, %f", targetPos.x, targetPos.y, targetPos.z));
 

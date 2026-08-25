@@ -44,6 +44,7 @@
 #include "GameClient/GameClient.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/ParticleSys.h"
+#include "GameClient/Smudge.h"
 
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
@@ -66,7 +67,7 @@ ParticleSystemManager *TheParticleSystemManager = nullptr;
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
-ParticleInfo::ParticleInfo( void )
+ParticleInfo::ParticleInfo()
 {
 #if PARTICLE_USE_XY_ROTATION
 	m_angleX = 0.0f;
@@ -194,7 +195,7 @@ void ParticleInfo::xfer( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 /** Load post process */
 // ------------------------------------------------------------------------------------------------
-void ParticleInfo::loadPostProcess( void )
+void ParticleInfo::loadPostProcess()
 {
 
 }
@@ -222,7 +223,7 @@ static Real angleBetween(const Coord2D *vecA, const Coord2D *vecB);
 // ------------------------------------------------------------------------------------------------
 /** Compute alpha rate to get to next key on given frame */
 // ------------------------------------------------------------------------------------------------
-void Particle::computeAlphaRate( void )
+void Particle::computeAlphaRate()
 {
 	if (m_alphaKey[ m_alphaTargetKey ].frame == 0)
 	{
@@ -239,7 +240,7 @@ void Particle::computeAlphaRate( void )
 // ------------------------------------------------------------------------------------------------
 /** Compute color rate to get to next key on given frame */
 // ------------------------------------------------------------------------------------------------
-void Particle::computeColorRate( void )
+void Particle::computeColorRate()
 {
 	if (m_colorKey[ m_colorTargetKey ].frame == 0)
 	{
@@ -371,7 +372,7 @@ void Particle::applyForce( const Coord3D *force )
 // ------------------------------------------------------------------------------------------------
 /** Update the behavior of an individual particle */
 // ------------------------------------------------------------------------------------------------
-Bool Particle::update( void )
+Bool Particle::update()
 {
 	// integrate acceleration into velocity
 	m_vel.x += m_accel.x;
@@ -512,7 +513,7 @@ Bool Particle::update( void )
 // ------------------------------------------------------------------------------------------------
 /** Do wind motion as specified by the particle system template, if present */
 // ------------------------------------------------------------------------------------------------
-void Particle::doWindMotion( void )
+void Particle::doWindMotion()
 {
 
 	// get the angle of the wind
@@ -594,7 +595,7 @@ void Particle::doWindMotion( void )
 // ------------------------------------------------------------------------------------------------
 /** Get priority of a particle ... which is the priority of it's attached system */
 // ------------------------------------------------------------------------------------------------
-ParticlePriorityType Particle::getPriority( void )
+ParticlePriorityType Particle::getPriority()
 {
 	return m_system->getPriority();
 }
@@ -602,7 +603,7 @@ ParticlePriorityType Particle::getPriority( void )
 // ------------------------------------------------------------------------------------------------
 /** Return true if this particle is invisible */
 // ------------------------------------------------------------------------------------------------
-Bool Particle::isInvisible( void )
+Bool Particle::isInvisible()
 {
 	switch (m_system->getShaderType())
 	{
@@ -713,7 +714,7 @@ void Particle::xfer( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 /** Load post process */
 // ------------------------------------------------------------------------------------------------
-void Particle::loadPostProcess( void )
+void Particle::loadPostProcess()
 {
 
 	// call base class post process
@@ -1073,7 +1074,7 @@ void ParticleSystemInfo::xfer( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 /** Load post process */
 // ------------------------------------------------------------------------------------------------
-void ParticleSystemInfo::loadPostProcess( void )
+void ParticleSystemInfo::loadPostProcess()
 {
 
 }
@@ -1213,6 +1214,15 @@ ParticleSystem::ParticleSystem( const ParticleSystemTemplate *sysTemplate,
 	m_particleType = sysTemplate->m_particleType;
 	m_particleTypeName = sysTemplate->m_particleTypeName;
 
+#if PRESERVE_RETAIL_PARTICLES
+	// TheSuperHackers @info Hack to allow isUsingSmudge() functionality with retail smudge particles
+	// The retail data template for smudge particles is not correctly configured with the smudge particle type
+	if (m_particleType != ParticleType::SMUDGE && m_particleTypeName.startsWithNoCase("SMUDGE."))
+	{
+		m_particleType = ParticleType::SMUDGE;
+	}
+#endif
+
 	m_isStopped = false;
 
 	// set up slave particle system, if any
@@ -1326,7 +1336,7 @@ void ParticleSystem::setSaveable(Bool b)
 // ------------------------------------------------------------------------------------------------
 /** (Re)start a stopped particle system */
 // ------------------------------------------------------------------------------------------------
-void ParticleSystem::start( void )
+void ParticleSystem::start()
 {
 	m_isStopped = false;
 }
@@ -1334,7 +1344,7 @@ void ParticleSystem::start( void )
 // ------------------------------------------------------------------------------------------------
 /** Stop a particle system from emitting */
 // ------------------------------------------------------------------------------------------------
-void ParticleSystem::stop( void )
+void ParticleSystem::stop()
 {
 	m_isStopped = true;
 }
@@ -1342,7 +1352,7 @@ void ParticleSystem::stop( void )
 // ------------------------------------------------------------------------------------------------
 /** Stop emitting, wait for all of our particles to die, then destroy self. */
 // ------------------------------------------------------------------------------------------------
-void ParticleSystem::destroy( void )
+void ParticleSystem::destroy()
 {
 	m_isDestroyed = true;
 	if( m_slaveSystem )
@@ -1438,7 +1448,7 @@ void ParticleSystem::attachToObject( const Object *obj )
 /** Compute a random point on a unit sphere
  * @todo The density of random points generated is not uniform within the sphere */
 // ------------------------------------------------------------------------------------------------
-const Coord3D *ParticleSystem::computePointOnUnitSphere( void )
+const Coord3D *ParticleSystem::computePointOnUnitSphere()
 {
 	static Coord3D point;
 
@@ -1541,8 +1551,8 @@ const Coord3D *ParticleSystem::computeParticleVelocity( const Coord3D *pos )
 					up.x = 0.0;
 					up.y = 0.0;
 					up.z = 1.0;
-					perp.crossProduct( &up, &along, &perp );
-					up.crossProduct( &along, &perp, &up );
+					perp.crossProduct( up, along, perp );
+					up.crossProduct( along, perp, up );
 
 					// "speed" is in 'horizontal' plane, and "otherSpeed" is 'vertical'
 					newVel.x = speed * perp.x + otherSpeed * up.x;
@@ -1615,7 +1625,7 @@ const Coord3D *ParticleSystem::computeParticleVelocity( const Coord3D *pos )
 // ------------------------------------------------------------------------------------------------
 /** Compute a position based on emission properties */
 // ------------------------------------------------------------------------------------------------
-const Coord3D *ParticleSystem::computeParticlePosition( void )
+const Coord3D *ParticleSystem::computeParticlePosition()
 {
 	static Coord3D newPos;
 
@@ -2084,9 +2094,9 @@ Bool ParticleSystem::update( Int localPlayerIndex  )
 							if (m_attachedSystemName.isEmpty() == false)
 							{
 								const ParticleSystemTemplate *tmp = TheParticleSystemManager->findTemplate( m_attachedSystemName );
-								if (tmp)
+								ParticleSystem *sys = TheParticleSystemManager->createParticleSystem( tmp, TRUE );
+								if (sys)
 								{
-									ParticleSystem *sys = TheParticleSystemManager->createParticleSystem( tmp, TRUE );
 									sys->setControlParticle( p );
 									p->controlParticleSystem( sys );
 								}
@@ -2174,7 +2184,7 @@ Bool ParticleSystem::update( Int localPlayerIndex  )
 // ------------------------------------------------------------------------------------------------
 /** Update the wind motion */
 // ------------------------------------------------------------------------------------------------
-void ParticleSystem::updateWindMotion( void )
+void ParticleSystem::updateWindMotion()
 {
 
 	switch( m_windMotion )
@@ -2610,7 +2620,7 @@ void ParticleSystem::xfer( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 /** Load post process */
 // ------------------------------------------------------------------------------------------------
-void ParticleSystem::loadPostProcess( void )
+void ParticleSystem::loadPostProcess()
 {
 
 	// call base class post process
@@ -2891,9 +2901,7 @@ ParticleSystem *ParticleSystemTemplate::createSlaveSystem( Bool createSlaves ) c
 	if (m_slaveTemplate == nullptr && m_slaveSystemName.isEmpty() == false)
 		m_slaveTemplate = TheParticleSystemManager->findTemplate( m_slaveSystemName );
 
-	ParticleSystem *slave = nullptr;
-	if (m_slaveTemplate)
-		slave = TheParticleSystemManager->createParticleSystem( m_slaveTemplate, createSlaves );
+	ParticleSystem *slave = TheParticleSystemManager->createParticleSystem( m_slaveTemplate, createSlaves );
 
 	return slave;
 }
@@ -2904,7 +2912,7 @@ ParticleSystem *ParticleSystemTemplate::createSlaveSystem( Bool createSlaves ) c
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
-ParticleSystemManager::ParticleSystemManager( void )
+ParticleSystemManager::ParticleSystemManager()
 {
 
 	m_uniqueSystemID = INVALID_PARTICLE_SYSTEM_ID;
@@ -2943,7 +2951,7 @@ ParticleSystemManager::~ParticleSystemManager()
 // ------------------------------------------------------------------------------------------------
 /** Initialize the manager */
 // ------------------------------------------------------------------------------------------------
-void ParticleSystemManager::init( void )
+void ParticleSystemManager::init()
 {
 	/// Read INI data and build templates
 	INI ini;
@@ -2968,7 +2976,7 @@ void ParticleSystemManager::init( void )
 // ------------------------------------------------------------------------------------------------
 /** Reset the manager and all particle systems */
 // ------------------------------------------------------------------------------------------------
-void ParticleSystemManager::reset( void )
+void ParticleSystemManager::reset()
 {
 	while (!m_allParticleSystemList.empty())
 	{
@@ -3006,7 +3014,7 @@ void ParticleSystemManager::reset( void )
 /** Update all particle systems */
 // ------------------------------------------------------------------------------------------------
 //DECLARE_PERF_TIMER(ParticleSystemManager)
-void ParticleSystemManager::update( void )
+void ParticleSystemManager::update()
 {
 	if (m_lastLogicFrameUpdate == TheGameLogic->getFrame()) {
 		return;
@@ -3026,6 +3034,43 @@ void ParticleSystemManager::update( void )
 		if (sys->update(m_localPlayerIndex) == false)
 		{
 			deleteInstance(sys);
+		}
+	}
+
+	const Bool drawSmudge = TheSmudgeManager && TheSmudgeManager->getHardwareSupport() && TheGlobalData->m_useHeatEffects;
+
+	if (drawSmudge)
+	{
+		// TheSuperHackers @bugfix The smudge time step is now decoupled from the render update.
+		// This clears all prior smudges and recreates them for all current smudge particles.
+
+		TheSmudgeManager->reset();
+		SmudgeSet *set = TheSmudgeManager->addSmudgeSet(); //global smudge set through which all smudges are rendered.
+
+		for (ParticleSystemManager::ParticleSystemListIt it = m_allParticleSystemList.begin(); it != m_allParticleSystemList.end(); ++it)
+		{
+			ParticleSystem *sys = (*it);
+			if (!sys)
+				continue;
+
+			// only look at particle/point style systems
+			if (sys->isUsingDrawables())
+				continue;
+
+			// Handle smudge type particles
+			if (sys->isUsingSmudge())
+			{
+				for (Particle *p = sys->getFirstParticle(); p; p = p->m_systemNext)
+				{
+					const Coord3D *pos = p->getPosition();
+					Smudge *smudge = set->addSmudgeToSet(p);
+					smudge->m_pos.Set(pos->x, pos->y, pos->z);
+					smudge->m_offset.Set(GameClientRandomValueReal(-0.06f,0.06f), GameClientRandomValueReal(-0.06f,0.06f));
+					smudge->m_size = p->getSize();
+					smudge->m_opacity = p->getAlpha();
+					smudge->m_draw = false;
+				}
+			}
 		}
 	}
 }
@@ -3371,6 +3416,8 @@ void ParticleSystemManager::xfer( Xfer *xfer )
 	}
 	else
 	{
+		DEBUG_ASSERTCRASH(m_allParticleSystemList.empty(), ("ParticleSystemManager: particle systems list is expected empty at start of xfer-load."));
+
 		const ParticleSystemTemplate *systemTemplate;
 
 		// read each particle system
@@ -3422,7 +3469,7 @@ void ParticleSystemManager::xfer( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 /** Load post process */
 // ------------------------------------------------------------------------------------------------
-void ParticleSystemManager::loadPostProcess( void )
+void ParticleSystemManager::loadPostProcess()
 {
 
 }

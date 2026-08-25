@@ -63,6 +63,7 @@ public:
 	virtual CanAttackResult getCanAnySlavesAttackSpecificTarget(AbleToAttackType attackType, const Object* target, CommandSourceType cmdSource);
 	virtual CanAttackResult getCanAnySlavesUseWeaponAgainstTarget(AbleToAttackType attackType, const Object* victim, const Coord3D* pos, CommandSourceType cmdSource);
 	virtual Bool canAnySlavesAttack();
+	virtual Int getSlaveCount() const override { return (Int)m_spawnIDs.size(); }
 	virtual void orderSlavesToGoIdle(CommandSourceType cmdSource);
 	virtual void orderSlavesDisabledUntil(DisabledType type, UnsignedInt frame);
 	virtual void orderSlavesToClearDisabled(DisabledType type);

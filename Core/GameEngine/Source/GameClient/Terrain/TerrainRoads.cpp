@@ -205,7 +205,7 @@ const FieldParse TerrainRoadType::m_terrainBridgeFieldParseTable[] =
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-TerrainRoadType::TerrainRoadType( void )
+TerrainRoadType::TerrainRoadType()
 {
 
 	m_isBridge = FALSE;
@@ -224,7 +224,7 @@ TerrainRoadType::TerrainRoadType( void )
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-TerrainRoadType::~TerrainRoadType( void )
+TerrainRoadType::~TerrainRoadType()
 {
 
 }
@@ -235,7 +235,7 @@ TerrainRoadType::~TerrainRoadType( void )
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-TerrainRoadCollection::TerrainRoadCollection( void )
+TerrainRoadCollection::TerrainRoadCollection()
 {
 
 	m_roadList = nullptr;
@@ -247,7 +247,7 @@ TerrainRoadCollection::TerrainRoadCollection( void )
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-TerrainRoadCollection::~TerrainRoadCollection( void )
+TerrainRoadCollection::~TerrainRoadCollection()
 {
 	TerrainRoadType *temp;
 

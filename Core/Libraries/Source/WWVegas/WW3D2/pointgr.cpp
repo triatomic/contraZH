@@ -73,13 +73,13 @@
 #include "pointgr.h"
 #include "vertmaterial.h"
 #include "ww3d.h"
-#include "aabox.h"
+#include "WWMath/aabox.h"
 #include "statistics.h"
-#include "simplevec.h"
+#include "WWLib/simplevec.h"
 #include "texture.h"
-#include "Vector.h"
-#include "vp.h"
-#include "matrix4.h"
+#include "WWLib/Vector.h"
+#include "WWMath/vp.h"
+#include "WWMath/matrix4.h"
 #include "dx8wrapper.h"
 #include "dx8vertexbuffer.h"
 #include "dx8indexbuffer.h"
@@ -148,7 +148,7 @@ SortingIndexBufferClass		*SortingTris, *SortingQuads;	// Sorting index buffers.
  * HISTORY:                                                               *
  *   11/17/1998 NH  : Created.                                            *
  *========================================================================*/
-PointGroupClass::PointGroupClass(void) :
+PointGroupClass::PointGroupClass() :
 	PointLoc(nullptr),
 	PointDiffuse(nullptr),
 	APT(nullptr),
@@ -187,7 +187,7 @@ PointGroupClass::PointGroupClass(void) :
  * HISTORY:                                                               *
  *   11/17/1998 NH  : Created.                                            *
  *========================================================================*/
-PointGroupClass::~PointGroupClass(void)
+PointGroupClass::~PointGroupClass()
 {
 	if (PointLoc) {
 		PointLoc->Release_Ref();
@@ -336,7 +336,7 @@ void PointGroupClass::Set_Point_Size(float size)
  * HISTORY:                                                               *
  *   11/17/1998 NH  : Created.                                            *
  *========================================================================*/
-float PointGroupClass::Get_Point_Size(void)
+float PointGroupClass::Get_Point_Size()
 {
 	return DefaultPointSize;
 }
@@ -371,7 +371,7 @@ void PointGroupClass::Set_Point_Color(Vector3 color)
  * HISTORY:                                                               *
  *   04/20/1999 NH  : Created.                                            *
  *========================================================================*/
-Vector3 PointGroupClass::Get_Point_Color(void)
+Vector3 PointGroupClass::Get_Point_Color()
 {
 	return DefaultPointColor;
 }
@@ -406,7 +406,7 @@ void PointGroupClass::Set_Point_Alpha(float alpha)
  * HISTORY:                                                               *
  *   08/25/1999 NH  : Created.                                            *
  *========================================================================*/
-float PointGroupClass::Get_Point_Alpha(void)
+float PointGroupClass::Get_Point_Alpha()
 {
 	return DefaultPointAlpha;
 }
@@ -444,7 +444,7 @@ void PointGroupClass::Set_Point_Orientation(unsigned char orientation)
  * HISTORY:                                                               *
  *   06/28/2000 NH  : Created.                                            *
  *========================================================================*/
-unsigned char PointGroupClass::Get_Point_Orientation(void)
+unsigned char PointGroupClass::Get_Point_Orientation()
 {
 	return DefaultPointOrientation;
 }
@@ -482,7 +482,7 @@ void PointGroupClass::Set_Point_Frame(unsigned char frame)
  * HISTORY:                                                               *
  *   06/28/2000 NH  : Created.                                            *
  *========================================================================*/
-unsigned char PointGroupClass::Get_Point_Frame(void)
+unsigned char PointGroupClass::Get_Point_Frame()
 {
 	return DefaultPointFrame;
 }
@@ -518,7 +518,7 @@ void PointGroupClass::Set_Point_Mode(PointModeEnum mode)
  * HISTORY:                                                               *
  *   11/17/1998 NH  : Created.                                            *
  *========================================================================*/
-PointGroupClass::PointModeEnum PointGroupClass::Get_Point_Mode(void)
+PointGroupClass::PointModeEnum PointGroupClass::Get_Point_Mode()
 {
 	return PointMode;
 }
@@ -591,7 +591,7 @@ void PointGroupClass::Set_Texture(TextureClass* texture)
  *   11/17/1998 NH  : Created.                                            *
  *   02/08/2001 HY  : Upgraded to DX8                                     *
  *========================================================================*/
-TextureClass * PointGroupClass::Get_Texture(void)
+TextureClass * PointGroupClass::Get_Texture()
 {
 	if (Texture) Texture->Add_Ref();
 	return Texture;
@@ -613,7 +613,7 @@ TextureClass * PointGroupClass::Get_Texture(void)
  * HISTORY:                                                                                    *
  *   4/12/2001  hy : Created.                                                                  *
  *=============================================================================================*/
-TextureClass * PointGroupClass::Peek_Texture(void)
+TextureClass * PointGroupClass::Peek_Texture()
 {
 	return Texture;
 }
@@ -656,7 +656,7 @@ void PointGroupClass::Set_Shader(ShaderClass shader)
  *   11/17/1998 NH  : Created.                                            *
  *   02/08/2001 HY  : Upgraded to DX8                                     *
  *========================================================================*/
-ShaderClass PointGroupClass::Get_Shader(void)
+ShaderClass PointGroupClass::Get_Shader()
 {
 	return Shader;
 }
@@ -690,7 +690,7 @@ void PointGroupClass::Set_Billboard(bool shouldBillboard)
  * HISTORY:                                                               *
  *   04/25/2002 JM  : Created.                                            *
  *========================================================================*/
-bool PointGroupClass::Get_Billboard(void)
+bool PointGroupClass::Get_Billboard()
 {
 	return Billboard;
 }
@@ -728,7 +728,7 @@ bool PointGroupClass::Get_Ground_Morph(void)
  *   06/28/2000 NH  : Created.                                            *
  *   02/08/2001 HY  : Upgraded to DX8                                     *
  *========================================================================*/
-unsigned char PointGroupClass::Get_Frame_Row_Column_Count_Log2(void)
+unsigned char PointGroupClass::Get_Frame_Row_Column_Count_Log2()
 {
 	return FrameRowColumnCountLog2;
 }
@@ -765,7 +765,7 @@ void PointGroupClass::Set_Frame_Row_Column_Count_Log2(unsigned char frccl2)
  *   11/18/1998 NH  : Created.                                            *
  *   02/08/2001 HY  : Upgraded to DX8                                     *
  *========================================================================*/
-int PointGroupClass::Get_Polygon_Count(void)
+int PointGroupClass::Get_Polygon_Count()
 {
 	switch (PointMode) {
 		case TRIS:
@@ -949,7 +949,12 @@ void PointGroupClass::Render(RenderInfoClass &rinfo)
 	DX8Wrapper::Set_Texture(0,Texture);
 
 	// Enable sorting if the primitives are translucent and alpha testing is not enabled.
-	const bool sort = (Shader.Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO) && (Shader.Get_Alpha_Test() == ShaderClass::ALPHATEST_DISABLE) && (WW3D::Is_Sorting_Enabled());
+	// TheSuperHackers @bugfix stephanmeesters 30/06/2026 However, do not apply sorting to ground-aligned particles.
+	// This improves performance and resolves rendering artifacts caused by clipping between ground-aligned particles and billboard particles.
+	const bool sort = Billboard &&
+	                  Shader.Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO &&
+	                  Shader.Get_Alpha_Test() == ShaderClass::ALPHATEST_DISABLE &&
+	                  WW3D::Is_Sorting_Enabled();
 
 	IndexBufferClass *indexbuffer;
 	int	verticesperprimitive;/// lorenzen fixed
@@ -1492,7 +1497,7 @@ void PointGroupClass::Update_Arrays(
  * HISTORY:                                                               *
  *   06/28/2000 NH  : Created.                                            *
  *========================================================================*/
-void PointGroupClass::_Init(void)
+void PointGroupClass::_Init()
 {
 	int i, j;
 
@@ -1656,7 +1661,7 @@ void PointGroupClass::_Init(void)
  * HISTORY:                                                               *
  *   06/28/2000 NH  : Created.                                            *
  *========================================================================*/
-void PointGroupClass::_Shutdown(void)
+void PointGroupClass::_Shutdown()
 {
 	for (int i = 0; i < 5; i++) {
 		delete [] _TriVertexUVFrameTable[i];
@@ -1893,6 +1898,8 @@ void PointGroupClass::RenderVolumeParticle(RenderInfoClass &rinfo, unsigned int 
 		DX8Wrapper::Set_Texture(0,Texture);
 
 		// Enable sorting if the primitives are translucent and alpha testing is not enabled.
+		// TheSuperHackers @info Volumetric particles, both billboarded and ground-aligned, must have sorting enabled to
+		// ensure accurate alpha-blending because these particles have stacked layers that don't face the camera straight on.
 		const bool sort = (Shader.Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO) && (Shader.Get_Alpha_Test() == ShaderClass::ALPHATEST_DISABLE) && (WW3D::Is_Sorting_Enabled());
 
 		IndexBufferClass *indexbuffer;

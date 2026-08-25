@@ -80,12 +80,12 @@ public:
 	static Int getInterfaceMask() { return UpdateModule::getInterfaceMask() | (MODULEINTERFACE_DIE); }
 
 	// BehaviorModule
-	virtual DieModuleInterface* getDie() { return this; }
+	virtual DieModuleInterface* getDie() override { return this; }
 
 	// DieModuleInterface
-	virtual void onDie( const DamageInfo *damageInfo );
+	virtual void onDie( const DamageInfo *damageInfo ) override;
 
-	virtual ProjectileUpdateInterface* getProjectileUpdateInterface() { return this; }
+	virtual ProjectileUpdateInterface* getProjectileUpdateInterface() override { return this; }
 
 	enum MissileStateType
 	{
@@ -95,22 +95,22 @@ public:
 		DEAD
 	};
 
-	virtual void projectileLaunchAtObjectOrPosition(const Object *victim, const Coord3D* victimPos, const Object *launcher, WeaponSlotType wslot, Int specificBarrelToUse, const WeaponTemplate* detWeap, const ParticleSystemTemplate* exhaustSysOverride);
-	virtual void projectileFireAtObjectOrPosition( const Object *victim, const Coord3D *victimPos, const WeaponTemplate *detWeap, const ParticleSystemTemplate* exhaustSysOverride );
-	virtual Bool projectileIsArmed() const { return m_isArmed; }											///< return true if the missile is armed and ready to explode
-	virtual ObjectID projectileGetLauncherID() const { return m_launcherID; }				///< Return firer of missile. Returns 0 if not yet fired.
+	virtual void projectileLaunchAtObjectOrPosition(const Object *victim, const Coord3D* victimPos, const Object *launcher, WeaponSlotType wslot, Int specificBarrelToUse, const WeaponTemplate* detWeap, const ParticleSystemTemplate* exhaustSysOverride) override;
+	virtual void projectileFireAtObjectOrPosition( const Object *victim, const Coord3D *victimPos, const WeaponTemplate *detWeap, const ParticleSystemTemplate* exhaustSysOverride ) override;
+	virtual Bool projectileIsArmed() const override { return m_isArmed; }											///< return true if the missile is armed and ready to explode
+	virtual ObjectID projectileGetLauncherID() const override { return m_launcherID; }				///< Return firer of missile. Returns 0 if not yet fired.
 	virtual Bool projectileGetLaunchPos(Coord3D& pos) const { if (m_launcherID == INVALID_ID) return false; pos = m_launchPos; return true; }	///< launcher's position at launch time (for DamageFactorAtMaxRange)
 	virtual void projectileSetLaunchVeterancy(VeterancyLevel v) { m_launchVeterancy = v; }	///< snapshot the launcher's veterancy at launch (for veterancy FX/OCL selection)
 	virtual Bool projectileGetLaunchVeterancy(VeterancyLevel& v) const { if (m_launcherID == INVALID_ID) return false; v = m_launchVeterancy; return true; }	///< launcher's veterancy at launch time
-	virtual Bool projectileHandleCollision( Object *other );
+	virtual Bool projectileHandleCollision( Object *other ) override;
 	virtual const Coord3D *getVelocity() const { return &m_vel; }		///< get current velocity
-	virtual void setFramesTillCountermeasureDiversionOccurs( UnsignedInt frames ) {}
-	virtual void projectileNowJammed() {}
+	virtual void setFramesTillCountermeasureDiversionOccurs( UnsignedInt frames ) override {}
+	virtual void projectileNowJammed() override {}
 	virtual Object* getTargetObject() { return NULL; }
 	virtual const Coord3D* getTargetPosition();
 
-	virtual UpdateSleepTime update();
-	virtual void onDelete( void );
+	virtual UpdateSleepTime update() override;
+	virtual void onDelete() override;
 
 private:
 
@@ -138,8 +138,8 @@ private:
 
 	const ParticleSystemTemplate* m_exhaustSysTmpl;
 
-	void doLaunch( void );							///< implement LAUNCH state
-	void doAttack( void );							///< implement ATTACK state
+	void doLaunch();							///< implement LAUNCH state
+	void doAttack();							///< implement ATTACK state
 	void detonate();												///< blow it up. (usually only called by MissileCollide)
 
 

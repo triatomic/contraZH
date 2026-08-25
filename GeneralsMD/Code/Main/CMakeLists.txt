@@ -4,18 +4,14 @@ add_executable(z_generals WIN32)
 # TheSuperHackers @feature A cheats enabled build gets a _c suffix, so a build that can grant
 # money and reveal the map is never mistaken for a normal one sitting in the same folder.
 if(RTS_DEBUG_CHEATS)
-    set(RTS_GENERALS_BINARY_NAME generalszh_c)
+    set_target_properties(z_generals PROPERTIES OUTPUT_NAME "generalszh_c${RTS_BUILD_OUTPUT_SUFFIX}")
 else()
-    set(RTS_GENERALS_BINARY_NAME generalszh)
+    set_target_properties(z_generals PROPERTIES OUTPUT_NAME "generalszh${RTS_BUILD_OUTPUT_SUFFIX}")
 endif()
-
-set_target_properties(z_generals PROPERTIES OUTPUT_NAME ${RTS_GENERALS_BINARY_NAME})
 
 target_link_libraries(z_generals PRIVATE
     binkstub
     comctl32
-    core_debug
-    core_profile
     d3d8
     d3dx8
     dinput8
@@ -80,7 +76,7 @@ if(MSVC)
 endif()
 
 # Strip debug symbols to separate file for MinGW Release builds
-# This creates generalszh.exe.debug (similar to MSVC .pdb files)
+# This creates generalszh${RTS_BUILD_OUTPUT_SUFFIX}.exe.debug (similar to MSVC .pdb files)
 if(MINGW AND COMMAND add_debug_strip_target)
     add_debug_strip_target(z_generals)
 endif()

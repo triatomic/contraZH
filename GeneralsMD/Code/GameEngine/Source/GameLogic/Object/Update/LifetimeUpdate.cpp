@@ -60,7 +60,7 @@ LifetimeUpdate::LifetimeUpdate( Thing *thing, const ModuleData* moduleData ) : U
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-LifetimeUpdate::~LifetimeUpdate( void )
+LifetimeUpdate::~LifetimeUpdate()
 {
 }
 
@@ -102,7 +102,7 @@ Real LifetimeUpdate::getProgress(void) {
 }
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-UpdateSleepTime LifetimeUpdate::update( void )
+UpdateSleepTime LifetimeUpdate::update()
 {
 	// Kill (NOT destroy) if time is up
 	getObject()->kill();
@@ -147,7 +147,7 @@ void LifetimeUpdate::xfer( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 /** Load post process */
 // ------------------------------------------------------------------------------------------------
-void LifetimeUpdate::loadPostProcess( void )
+void LifetimeUpdate::loadPostProcess()
 {
 
 	// extend base class

@@ -931,7 +931,7 @@ protected:
 		}
 
 		const ParticleSystemTemplate *tmp = TheParticleSystemManager->findTemplate(m_name);
-		DEBUG_ASSERTCRASH(tmp, ("ParticleSystem %s not found",m_name.str()));
+		DEBUG_ASSERTCRASH(TheParticleSystemManager->isDummy() || tmp, ("ParticleSystem %s not found",m_name.str()));
 		if (tmp)
 		{
 			Bool needHeightCheck = m_createAtGroundHeight || m_minAllowedHeight > -INFINITY || m_maxAllowedHeight < INFINITY || m_allowedSurfaceType != SURFACE_ALL;
