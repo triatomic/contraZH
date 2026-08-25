@@ -754,8 +754,8 @@ ParticleSystemInfo::ParticleSystemInfo()
 {
 	m_priority = PARTICLE_PRIORITY_LOWEST;
 	m_isGroundAligned = false;
-	// TheSuperHackers @feature on by default; modders opt out per effect with ConformToTerrain = No
-	m_conformToTerrain = true;
+	// TheSuperHackers @feature off by default; modders opt in per effect with ConformToTerrain = Yes
+	m_conformToTerrain = false;
 	m_isEmitAboveGroundOnly = false;
 	m_isParticleUpTowardsEmitter = false;
 

@@ -115,19 +115,21 @@ to point sampling as the merged code did.
 
 ## ConformToTerrain
 
-* `ConformToTerrain = Yes` - (Default. `No` opts a single effect out of terrain conforming.)
+* `ConformToTerrain = No` - (Default. `Yes` opts a single effect into terrain conforming.)
 
 A ground aligned particle drawn as a quad can only ever be a flat plane, so a wide one cuts through
-a hillside no matter how its corners are placed. Ground aligned, non-billboarded particles with no
-volume depth are instead built as a mesh from the terrain's own heightmap cells, the same way
-projected decals are, so the particle inherits the ground geometry exactly.
+a hillside no matter how its corners are placed. With `ConformToTerrain = Yes`, ground aligned,
+non-billboarded particles with no volume depth are instead built as a mesh from the terrain's own
+heightmap cells, the same way projected decals are, so the particle inherits the ground geometry
+exactly.
 
 Notes:
+* Conforming is **opt-in per effect**: retail effects render exactly as before unless an INI sets
+`ConformToTerrain = Yes`. (It was briefly opt-out; the default flipped to `No` so only effects
+checked against the new renderer pay its cost or change appearance.)
 * Cost is quadratic in particle size. Past 160 terrain cells per side the mesh samples every Nth cell
 instead, so a very large particle stops getting more expensive without bound. The trade is a coarser
 terrain fit, which is not visible on the effects that actually reach that size.
-* Effects that drift upward — mushroom clouds and similar — gain nothing from conforming and are
-worth opting out explicitly.
 
 # New CommandButton Commands
 
