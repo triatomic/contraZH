@@ -369,55 +369,6 @@ Bool OptionPreferences::getNumericalHealthEnabled(void) const
 	return FALSE;
 }
 
-// TheSuperHackers @feature Options.ini: TextureFilter = Bilinear | Trilinear | Anisotropic
-//
-// The engine has supported all three since retail, but nothing ever called WW3D::Set_Texture_Filter,
-// so the mode was stuck at the hardcoded default of 0 (Bilinear) and there was no way to reach the
-// other two. This exposes them; the values match TextureFilterClass::TextureFilterMode.
-//
-// Returned as an Int rather than the enum so this file does not have to include the WW3D headers.
-// Anything unrecognised, or the key being absent, keeps the retail default.
-Int OptionPreferences::getTextureFilter(void) const
-{
-	OptionPreferences::const_iterator it = find("TextureFilter");
-	if (it == end())
-		return 2;	// TEXTURE_FILTER_BILINEAR, the retail default
-
-	if (stricmp(it->second.str(), "anisotropic") == 0)
-		return 4;	// TEXTURE_FILTER_ANISOTROPIC
-
-	if (stricmp(it->second.str(), "trilinear") == 0)
-		return 3;	// TEXTURE_FILTER_TRILINEAR
-
-	return 2;
-}
-
-// TheSuperHackers @feature Options.ini: AnisotropicLevel = 2 | 4 | 8 | 16
-//
-// The sample count used when TextureFilter is Anisotropic, and ignored otherwise. Retail hardcoded
-// this to 2, which is the lowest setting anisotropic filtering has, so the mode never looked like
-// much even once it could be selected.
-//
-// Rounded down to a valid power of two rather than rejected, so a typo degrades instead of
-// surprising. The renderer clamps further to whatever the device actually reports supporting.
-Int OptionPreferences::getAnisotropicLevel(void) const
-{
-	OptionPreferences::const_iterator it = find("AnisotropicLevel");
-	if (it == end())
-		return 2;	// what retail hardcoded
-
-	const Int level = atoi(it->second.str());
-
-	if (level >= 16)
-		return 16;
-	if (level >= 8)
-		return 8;
-	if (level >= 4)
-		return 4;
-
-	return 2;
-}
-
 // TheSuperHackers @feature Options.ini: ParticleNameLingerMS = 3000 keeps a particle name in the
 // debug overlay for that many milliseconds after its system has gone. Many effects are one shot
 // bursts that die within a frame or two, so without this their names flash past unreadably.

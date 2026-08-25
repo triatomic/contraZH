@@ -165,13 +165,6 @@ public:
 	// TheSuperHackers @feature How long a particle name lingers in the debug name overlay after
 	// its system is gone, in milliseconds. 0 shows names only while the system is alive.
 	Int m_particleNameLingerMS;
-	// TheSuperHackers @feature Texture filtering mode, from Options.ini. Holds a
-	// TextureFilterClass::TextureFilterMode; stored as Int so this widely included header does
-	// not have to pull in the WW3D headers.
-	Int m_textureFilter;
-	// TheSuperHackers @feature Anisotropic sample count, from Options.ini. Only used when
-	// m_textureFilter selects anisotropic filtering.
-	Int m_anisotropicLevel;
 	// TheSuperHackers @feature Command bar keys by slot position instead of by string file.
 	Bool m_gridHotkeysEnabled;
 	AsciiString m_gridHotkeyLayout;
