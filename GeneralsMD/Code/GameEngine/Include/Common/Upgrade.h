@@ -53,6 +53,8 @@ enum UpgradeStatusType CPP_11(: Int)
 
 //The maximum number of upgrades.
 // TheSuperHackers @tweak Stubbjax 22/01/2026 Increases max upgrade count from Generals:64, Zero Hour:128 to allow for more upgrades.
+// Fork raises this further to 1024 to accommodate the fork's additional upgrades (crate upgrades,
+// PropagateUpgradeToContained, etc.). Costs 128 bytes per UpgradeMaskType vs 64 at 512.
 #define UPGRADE_MAX_COUNT 1024
 
 typedef BitFlags<UPGRADE_MAX_COUNT, struct UpgradeMaskTypeTag>	UpgradeMaskType;

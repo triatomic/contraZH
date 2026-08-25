@@ -266,7 +266,7 @@ private:
 		IMMUNE_TO_FALLING_DAMAGE				= 0x0100,
 		IS_IN_FREEFALL									= 0x0200,
 		IS_IN_UPDATE										= 0x0400,
-		IS_STUNNED											= 0x0800, // Added in Zero Hour
+		IS_STUNNED											= 0x0800,
 		WAS_ABOVE_WATER_LAST_FRAME      = 0x1000,
 	};
 
@@ -278,8 +278,8 @@ private:
 	Real												m_yawRate;								///< rate of rotation around up vector
 	Real												m_rollRate;								///< rate of rotation around forward vector
 	Real												m_pitchRate;							///< rate or rotation around side vector
-	RefCountPtr<DynamicAudioEventRTS> m_bounceSound;			///< The sound for when this thing bounces, or nullptr
-	RefCountPtr<DynamicAudioEventRTS> m_waterImpactSound;		///< The sound for when this thing hits the water surface, or nullptr
+	RefCountPtr<DynamicAudioEventRTS>				m_bounceSound;						///< The sound for when this thing bounces, or nullptr
+	RefCountPtr<DynamicAudioEventRTS>				m_waterImpactSound;						///< The sound for when this thing hits the water surface, or NULL
 	Coord3D											m_accel;									///< current acceleration
 	Coord3D											m_prevAccel;							///< last frame's acceleration
 	Coord3D											m_vel;										///< current velocity

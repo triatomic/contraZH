@@ -5439,9 +5439,9 @@ void AIUpdateInterface::crc( Xfer *x )
 	* 2: Added m_demoralizedFramesLeft (behind ALLOW_DEMORALIZE)
 	* 3: Removed lastFrameMoved and repulsorCountdown; removed surrender and demoralize variables
 	* 4: Read m_curLocomotorSet from ini
-	* 5: Added m_forceMoveBackwards (REVERSE_MOVE order)
-	* 6: Added m_isHoldingFire (HOLD_FIRE stance)
-	* 7: TheSuperHackers @fix Fixed out-of-bounds xfer of m_guardTargetType
+	* 5: TheSuperHackers @fix Fixed out-of-bounds xfer of m_guardTargetType
+	* 6: Added m_forceMoveBackwards (REVERSE_MOVE order)
+	* 7: Added m_isHoldingFire (HOLD_FIRE stance)
 	*/
 // ------------------------------------------------------------------------------------------------
 void AIUpdateInterface::xfer( Xfer *xfer )
@@ -5469,7 +5469,7 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 	xfer->xferReal(&m_desiredSpeed);
 	xfer->xferUser(&m_lastCommandSource, sizeof(m_lastCommandSource));
 
-	if (version < 7)
+	if (version < 5)
 	{
 		// TheSuperHackers @fix The original code effectively accessed m_guardTargetType[0], [1], [1], [2].
 		// The last one is out-of-bounds and points to m_locationToGuard.
@@ -5680,11 +5680,11 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 
 	xfer->xferReal(&m_speedMultiplier);
 
-	if (version >= 5)
+	if (version >= 6)
 		xfer->xferBool(&m_forceMoveBackwards);
 
 	// TheSuperHackers @feature Hold Fire stance. Must stay at the end so older saves still load.
-	if (version >= 6)
+	if (version >= 7)
 		xfer->xferBool(&m_isHoldingFire);
 
 }

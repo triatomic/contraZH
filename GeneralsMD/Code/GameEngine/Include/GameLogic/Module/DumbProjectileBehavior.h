@@ -91,16 +91,16 @@ public:
 	virtual ProjectileUpdateInterface* getProjectileUpdateInterface() override { return this; }
 
 	// ProjectileUpdateInterface
-	virtual void projectileLaunchAtObjectOrPosition(const Object *victim, const Coord3D* victimPos, const Object *launcher, WeaponSlotType wslot, Int specificBarrelToUse, const WeaponTemplate* detWeap, const ParticleSystemTemplate* exhaustSysOverride) override;
-	virtual void projectileFireAtObjectOrPosition( const Object *victim, const Coord3D *victimPos, const WeaponTemplate *detWeap, const ParticleSystemTemplate* exhaustSysOverride ) override;
-	virtual Bool projectileHandleCollision( Object *other ) override;
-	virtual Bool projectileIsArmed() const override { return true; }
-	virtual ObjectID projectileGetLauncherID() const override { return m_launcherID; }
+	virtual void projectileLaunchAtObjectOrPosition(const Object *victim, const Coord3D* victimPos, const Object *launcher, WeaponSlotType wslot, Int specificBarrelToUse, const WeaponTemplate* detWeap, const ParticleSystemTemplate* exhaustSysOverride);
+	virtual void projectileFireAtObjectOrPosition( const Object *victim, const Coord3D *victimPos, const WeaponTemplate *detWeap, const ParticleSystemTemplate* exhaustSysOverride );
+	virtual Bool projectileHandleCollision( Object *other );
+	virtual Bool projectileIsArmed() const { return true; }
+	virtual ObjectID projectileGetLauncherID() const { return m_launcherID; }
 	virtual Bool projectileGetLaunchPos(Coord3D& pos) const { if (m_launcherID == INVALID_ID) return false; pos = m_flightPathStart; return true; }
 	virtual void projectileSetLaunchVeterancy(VeterancyLevel v) { m_launchVeterancy = v; }
 	virtual Bool projectileGetLaunchVeterancy(VeterancyLevel& v) const { if (m_launcherID == INVALID_ID) return false; v = m_launchVeterancy; return true; }
-	virtual void setFramesTillCountermeasureDiversionOccurs( UnsignedInt frames ) override {}
-	virtual void projectileNowJammed() override {}
+	virtual void setFramesTillCountermeasureDiversionOccurs( UnsignedInt frames ) {}
+	virtual void projectileNowJammed() {}
 	virtual Object* getTargetObject();
 	virtual const Coord3D* getTargetPosition();
 	virtual Bool projectileShouldCollideWithWater() const override;

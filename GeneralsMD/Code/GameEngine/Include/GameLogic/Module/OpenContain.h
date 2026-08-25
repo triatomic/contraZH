@@ -73,7 +73,7 @@ public:
 
 	WeaponBonusConditionTypeVec m_passengerWeaponBonusVec;  ///< weaponBonus types granted to passengers
 
-	OpenContainModuleData();
+	OpenContainModuleData( void );
 	static void buildFieldParse(MultiIniFieldParse& p);
 };
 

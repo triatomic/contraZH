@@ -868,21 +868,27 @@ void MilesAudioManager::handleLoopStopEarly(PlayingAudio* audio) {
 
 	
 	if (audio->m_audioEventRTS->getNextPlayPortion() != PP_Done) {
-		if (audio->m_type == PAT_3DSample) {
-			// don't want to get an additional callback for this sample
-			AIL_register_3D_EOS_callback(audio->m_3DSample, NULL);
-			releaseMilesHandles(audio);
+		if (audio->m_type == PAT_3DSample && audio->m_3DSample) {
+			// TheSuperHackers @merge Stop the current playback but KEEP the Miles sample handle so we can
+			// immediately replay the decay/tail portion on it. releaseMilesHandles() must NOT be used here:
+			// as of base #2774 it returns the handle to the pool AND nulls m_3DSample, which would make the
+			// playSample3D() call below run on a null handle (access violation).
+			AIL_register_3D_EOS_callback(audio->m_3DSample, NULL);	// don't want an additional callback for this sample
+			AIL_stop_3D_sample(audio->m_3DSample);
 			closeFile(audio->m_file);	// close it so as not to leak it.
 
 			audio->m_file = playSample3D(audio->m_audioEventRTS.Peek(), audio->m_3DSample);
 
-			// If we don't have a file now, then we should drop to the stopped status so that 
-			// We correctly close this handle.
+			// If we have a file, the decay portion is now playing on the same handle; leave the audio
+			// PAT_3DSample/PS_Playing and let its normal EOS completion clean it up.
 			if (audio->m_file) {
 				return;
 			}
 		}
 	}
+
+	// Not replaying (done, non-3D, or replay failed): release the handle properly and mark stopped.
+	releaseMilesHandles(audio);
 	audio->m_status = PS_Stopped;
 
 
@@ -920,6 +926,7 @@ void MilesAudioManager::stopAudioEvent( AudioHandle handle )
 		PlayingAudio *audio = (*it);
 
 		if (audio->m_audioEventRTS->getPlayingHandle() == handle) {
+			// found it
 			stopPlayingAudio(audio);
 			break;
 		}
@@ -941,9 +948,10 @@ void MilesAudioManager::stopAudioEvent( AudioHandle handle )
 		#ifdef INTENSIVE_AUDIO_DEBUG
 			DEBUG_LOG((" (%s)", audio->m_audioEventRTS->getEventName()));
 		#endif
+			// Fork: AC_STOPEARLY looping 3D sounds advance to their decay/tail instead of hard-cutting.
+			// Otherwise use Base's atomic, crash-safe stop (#2774).
 			if (audio->m_audioEventRTS->getAudioEventInfo()->m_control & AC_STOPEARLY) {
 				DEBUG_LOG((">>> stopAudioEvent (3DSounds): %s\n", audio->m_audioEventRTS->getEventName().str()));
-
 				handleLoopStopEarly(audio);
 			}
 			else {

@@ -69,7 +69,7 @@ public:	// AIPlayer interface methods.
 
 	virtual void buildAIShipyard(const AsciiString& thingName) override; ///< Build structure at shipyard location
 
-	virtual Bool isSkirmishAI() override {return true;}
+	virtual Bool isSkirmishAI(void) {return true;}
 
 	virtual Bool checkBridges(Object *unit, Waypoint *way) override;
 

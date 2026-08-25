@@ -202,12 +202,12 @@ Vector2 SegmentedLineClass::Get_UV_Offset_Rate()
 	return LineRenderer.Get_UV_Offset_Rate();
 }
 
-Vector2 SegmentedLineClass::Get_Current_UV_Offset()
+Vector2 SegmentedLineClass::Get_Current_UV_Offset(void)
 {
 	return LineRenderer.Get_Current_UV_Offset();
 }
 
-int SegmentedLineClass::Is_Merge_Intersections()
+int SegmentedLineClass::Is_Merge_Intersections(void)
 {
 	return LineRenderer.Is_Merge_Intersections();
 }

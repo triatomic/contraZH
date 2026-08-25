@@ -456,10 +456,10 @@ void LaserUpdate::initLaser( const Object *parent, const Object *target, const C
 				system = TheParticleSystemManager->createParticleSystem( tmp );
 				if( system )
 				{
-						m_particleSystemID = system->getSystemID();
-						if (data->m_useHouseColor) {
-							system->tintColorsAllFrames(m_hexColor);
-						}
+					m_particleSystemID = system->getSystemID();
+					if (data->m_useHouseColor) {
+						system->tintColorsAllFrames(m_hexColor);
+					}
 				}
 			}
 
@@ -470,10 +470,10 @@ void LaserUpdate::initLaser( const Object *parent, const Object *target, const C
 				system = TheParticleSystemManager->createParticleSystem( tmp );
 				if( system )
 				{
-						m_targetParticleSystemID = system->getSystemID();
-						if (data->m_useHouseColor) {
-							system->tintColorsAllFrames(m_hexColor);
-						}
+					m_targetParticleSystemID = system->getSystemID();
+					if (data->m_useHouseColor) {
+						system->tintColorsAllFrames(m_hexColor);
+					}
 				}
 			}
 		}

@@ -101,17 +101,17 @@ public:
 		ATTACK_RANDOM_PATH = 8, ///< fly toward victim
 	};
 
-	virtual ProjectileUpdateInterface* getProjectileUpdateInterface() override { return this; }
-	virtual void projectileFireAtObjectOrPosition( const Object *victim, const Coord3D *victimPos, const WeaponTemplate *detWeap, const ParticleSystemTemplate* exhaustSysOverride ) override;
-	virtual void projectileLaunchAtObjectOrPosition(const Object *victim, const Coord3D* victimPos, const Object *launcher, WeaponSlotType wslot, Int specificBarrelToUse, const WeaponTemplate* detWeap, const ParticleSystemTemplate* exhaustSysOverride) override;
-	virtual Bool projectileHandleCollision( Object *other ) override;
-	virtual Bool projectileIsArmed() const override { return m_isArmed; }
-	virtual ObjectID projectileGetLauncherID() const override { return m_launcherID; }
+	virtual ProjectileUpdateInterface* getProjectileUpdateInterface() { return this; }
+	virtual void projectileFireAtObjectOrPosition( const Object *victim, const Coord3D *victimPos, const WeaponTemplate *detWeap, const ParticleSystemTemplate* exhaustSysOverride );
+	virtual void projectileLaunchAtObjectOrPosition(const Object *victim, const Coord3D* victimPos, const Object *launcher, WeaponSlotType wslot, Int specificBarrelToUse, const WeaponTemplate* detWeap, const ParticleSystemTemplate* exhaustSysOverride);
+	virtual Bool projectileHandleCollision( Object *other );
+	virtual Bool projectileIsArmed() const { return m_isArmed; }
+	virtual ObjectID projectileGetLauncherID() const { return m_launcherID; }
 	virtual Bool projectileGetLaunchPos(Coord3D& pos) const { if (m_launcherID == INVALID_ID) return false; pos = m_launchPos; return true; }
 	virtual void projectileSetLaunchVeterancy(VeterancyLevel v) { m_launchVeterancy = v; }
 	virtual Bool projectileGetLaunchVeterancy(VeterancyLevel& v) const { if (m_launcherID == INVALID_ID) return false; v = m_launchVeterancy; return true; }
-	virtual void setFramesTillCountermeasureDiversionOccurs( UnsignedInt frames ) override; ///< Number of frames till missile diverts to countermeasures.
-	virtual void projectileNowJammed() override;///< We lose our Object target and scatter to the ground
+	virtual void setFramesTillCountermeasureDiversionOccurs( UnsignedInt frames ); ///< Number of frames till missile diverts to countermeasures.
+	virtual void projectileNowJammed();///< We lose our Object target and scatter to the ground
 	virtual Object* getTargetObject();
 	virtual const Coord3D* getTargetPosition();
 	virtual bool projectileShouldCollideWithWater() const override;

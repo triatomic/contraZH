@@ -109,7 +109,7 @@ void DoDecals(RenderInfoClass & rinfo)
 		TheW3DProjectedShadowManager->renderDecals(rinfo, true);	//above-water subset
 }
 
-W3DShadowManager::W3DShadowManager()
+W3DShadowManager::W3DShadowManager( void )
 {
 	DEBUG_ASSERTCRASH(TheW3DVolumetricShadowManager == nullptr && TheW3DProjectedShadowManager == nullptr,
 		("Creating new shadow managers without deleting old ones"));

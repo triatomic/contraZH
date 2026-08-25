@@ -2572,6 +2572,9 @@ Bool W3DView::screenToTerrain( const ICoord2D *screen, Coord3D *world )
 		hasIntersection = true;
 	}
 
+	if (!hasIntersection)
+		return false;
+
 	//Check for water height in this area, create a dummy plane around the point
 	if (TheGlobalData->m_heightAboveTerrainIncludesWater) {
 		Vector3 outPos{ 0,0,0 };
@@ -2581,9 +2584,6 @@ Bool W3DView::screenToTerrain( const ICoord2D *screen, Coord3D *world )
 			}
 		}
 	}
-
-	if (!hasIntersection)
-		return false;
 
 	world->x = intersection.X;
 	world->y = intersection.Y;

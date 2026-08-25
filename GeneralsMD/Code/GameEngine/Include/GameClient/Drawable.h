@@ -331,12 +331,10 @@ public:
 	void friend_bindToObject( Object *obj ); ///< bind this drawable to an object ID. for use ONLY by GameLogic!
 	void setIndicatorColor(Color color);
 
-	//Bool testTintStatus( TintStatus statusBits ) const { return BitIsSet( m_tintStatus, statusBits ); };
-
 	void setTintStatus(TintStatus statusType) { m_tintStatus.set(statusType); };
 	void clearTintStatus(TintStatus statusType) { m_tintStatus.set(statusType, 0); };
 	Bool testTintStatus(TintStatus statusType) const { return m_tintStatus.test(statusType); };
-	
+
 	TintEnvelope *getColorTintEnvelope() { return m_colorTintEnvelope; }
 	void setColorTintEnvelope( TintEnvelope &source ) { if (m_colorTintEnvelope) *m_colorTintEnvelope = source; }
 

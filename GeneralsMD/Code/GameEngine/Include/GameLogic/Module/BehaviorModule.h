@@ -160,17 +160,17 @@ public:
 	static Int getInterfaceMask() { return 0; }
 	static ModuleType getModuleType() { return MODULETYPE_BEHAVIOR; }
 
-	virtual BodyModuleInterface* getBody() override { return nullptr; }
-	virtual CollideModuleInterface* getCollide() override { return nullptr; }
-	virtual ContainModuleInterface* getContain() override { return nullptr; }
-	virtual CreateModuleInterface* getCreate() override { return nullptr; }
-	virtual DamageModuleInterface* getDamage() override { return nullptr; }
-	virtual DestroyModuleInterface* getDestroy() override { return nullptr; }
-	virtual DieModuleInterface* getDie() override { return nullptr; }
-	virtual OnKillModuleInterface* getOnKill() override { return nullptr; }
-	virtual SpecialPowerModuleInterface* getSpecialPower() override { return nullptr; }
-	virtual UpdateModuleInterface* getUpdate() override { return nullptr; }
-	virtual UpgradeModuleInterface* getUpgrade() override { return nullptr; }
+	virtual BodyModuleInterface* getBody() { return nullptr; }
+	virtual CollideModuleInterface* getCollide() { return nullptr; }
+	virtual ContainModuleInterface* getContain() { return nullptr; }
+	virtual CreateModuleInterface* getCreate() { return nullptr; }
+	virtual DamageModuleInterface* getDamage() { return nullptr; }
+	virtual DestroyModuleInterface* getDestroy() { return nullptr; }
+	virtual DieModuleInterface* getDie() { return nullptr; }
+	virtual OnKillModuleInterface* getOnKill() { return nullptr; }
+	virtual SpecialPowerModuleInterface* getSpecialPower() { return nullptr; }
+	virtual UpdateModuleInterface* getUpdate() { return nullptr; }
+	virtual UpgradeModuleInterface* getUpgrade() { return nullptr; }
   virtual StealthUpdate* getStealth() { return nullptr; }
 	virtual SpyVisionUpdate* getSpyVisionUpdate() { return nullptr; }
 
@@ -185,20 +185,20 @@ public:
 	virtual LandMineInterface* getLandMineInterface() override { return nullptr; }
 	virtual DieModuleInterface* getEjectPilotDieInterface() override { return nullptr; }
 	// interface acquisition (moved from UpdateModule)
-	virtual ProjectileUpdateInterface* getProjectileUpdateInterface() override { return nullptr; }
-	virtual AIUpdateInterface* getAIUpdateInterface() override { return nullptr; }
-	virtual ExitInterface* getUpdateExitInterface() override { return nullptr; }
-	virtual DockUpdateInterface* getDockUpdateInterface() override { return nullptr; }
-	virtual RailedTransportDockUpdateInterface *getRailedTransportDockUpdateInterface() override { return nullptr; }
-	virtual SlowDeathBehaviorInterface* getSlowDeathBehaviorInterface() override { return nullptr; }
-	virtual SpecialPowerUpdateInterface* getSpecialPowerUpdateInterface() override { return nullptr; }
-	virtual SlavedUpdateInterface* getSlavedUpdateInterface() override { return nullptr; }
-	virtual ProductionUpdateInterface* getProductionUpdateInterface() override { return nullptr; }
-	virtual HordeUpdateInterface* getHordeUpdateInterface() override { return nullptr; }
-	virtual PowerPlantUpdateInterface* getPowerPlantUpdateInterface() override { return nullptr; }
-	virtual SpawnBehaviorInterface* getSpawnBehaviorInterface() override { return nullptr; }
-	virtual CountermeasuresBehaviorInterface* getCountermeasuresBehaviorInterface() override { return nullptr; }
-	virtual const CountermeasuresBehaviorInterface* getCountermeasuresBehaviorInterface() const override { return nullptr; }
+	virtual ProjectileUpdateInterface* getProjectileUpdateInterface() { return nullptr; }
+	virtual AIUpdateInterface* getAIUpdateInterface() { return nullptr; }
+	virtual ExitInterface* getUpdateExitInterface() { return nullptr; }
+	virtual DockUpdateInterface* getDockUpdateInterface() { return nullptr; }
+	virtual RailedTransportDockUpdateInterface *getRailedTransportDockUpdateInterface( void ) { return nullptr; }
+	virtual SlowDeathBehaviorInterface* getSlowDeathBehaviorInterface() { return nullptr; }
+	virtual SpecialPowerUpdateInterface* getSpecialPowerUpdateInterface() { return nullptr; }
+	virtual SlavedUpdateInterface* getSlavedUpdateInterface() { return nullptr; }
+	virtual ProductionUpdateInterface* getProductionUpdateInterface() { return nullptr; }
+	virtual HordeUpdateInterface* getHordeUpdateInterface() { return nullptr; }
+	virtual PowerPlantUpdateInterface* getPowerPlantUpdateInterface() { return nullptr; }
+	virtual SpawnBehaviorInterface* getSpawnBehaviorInterface() { return nullptr; }
+	virtual CountermeasuresBehaviorInterface* getCountermeasuresBehaviorInterface() { return nullptr; }
+	virtual const CountermeasuresBehaviorInterface* getCountermeasuresBehaviorInterface() const { return nullptr; }
 	virtual BattlePlanBonusBehaviorInterface* getBattlePlanBonusBehaviorInterface() { return NULL; }
 	virtual EnergyShieldBehaviorInterface* getEnergyShieldBehaviorInterface() { return NULL; }
 

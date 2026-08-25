@@ -189,8 +189,8 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 				// If shipyard move up building to at least waterheight if lower
 				if (build->isKindOf(KINDOF_SHIPYARD)) {
 					Real waterZ{ 0 };
-					if (TheTerrainLogic->isUnderwater(world.x, world.y, &waterZ)) {
-						world.z = std::max(world.z, waterZ);
+					if (TheTerrainLogic->isUnderwater(worldStart.x, worldStart.y, &waterZ)) {
+						worldStart.z = std::max(worldStart.z, waterZ);
 					}
 				}
 

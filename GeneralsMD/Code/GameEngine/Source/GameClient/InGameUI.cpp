@@ -1852,7 +1852,6 @@ void InGameUI::evaluateSoloNexus( Drawable *newlyAddedDrawable )
 
 }
 
-
 void InGameUI::handleBuildPlacements()
 {
 
@@ -1884,23 +1883,23 @@ void InGameUI::handleBuildPlacements()
 				{
 					Coord3D worldStart, worldEnd;
 
-				// project the start and the end points of the line anchor into the 3D world
-				if( TheTacticalView->screenToTerrain( &start, &worldStart ) &&
-					TheTacticalView->screenToTerrain( &end, &worldEnd ) )
-				{
-					Coord2D v;
-					v.x = worldEnd.x - worldStart.x;
-					v.y = worldEnd.y - worldStart.y;
-					angle = v.toAngle();
-
-					// TheSuperHackers @tweak Stubbjax 04/08/2025 Snap angle to nearest 45 degrees
-					// while using force attack mode for convenience.
-					if (isInForceAttackMode())
+					// project the start and the end points of the line anchor into the 3D world
+					if( TheTacticalView->screenToTerrain( &start, &worldStart ) &&
+						TheTacticalView->screenToTerrain( &end, &worldEnd ) )
 					{
-						const Real snapRadians = DEG_TO_RADF(45);
-						angle = WWMath::Round(angle / snapRadians) * snapRadians;
+						Coord2D v;
+						v.x = worldEnd.x - worldStart.x;
+						v.y = worldEnd.y - worldStart.y;
+						angle = v.toAngle();
+
+						// TheSuperHackers @tweak Stubbjax 04/08/2025 Snap angle to nearest 45 degrees
+						// while using force attack mode for convenience.
+						if (isInForceAttackMode())
+						{
+							const Real snapRadians = DEG_TO_RADF(45);
+							angle = WWMath::Round(angle / snapRadians) * snapRadians;
+						}
 					}
-				}
 				}
 			}
 			else {

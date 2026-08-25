@@ -148,7 +148,6 @@ static void doSetRallyPoint( Object *obj, const Coord3D& pos )
 	//
 	NameKeyType key;
 	Coord3D rallyPointPos = pos;
-#if RTS_ZEROHOUR
 	if (obj->isKindOf(KINDOF_SHIPYARD)) {
 		key = NAMEKEY("BasicBoatLocomotor");
 
@@ -157,18 +156,14 @@ static void doSetRallyPoint( Object *obj, const Coord3D& pos )
 		if (TheTerrainLogic->isUnderwater(rallyPointPos.x, rallyPointPos.y, &waterZ)) {
 			rallyPointPos.z = waterZ;
 		}
-
 	}
 	else {
 		key = NAMEKEY("BasicHumanLocomotor");
 	}
-#else
-	key = NAMEKEY( "BasicHumanLocomotor" );
-#endif
 
 	LocomotorSet locomotorSet;
 	locomotorSet.addLocomotor( TheLocomotorStore->findLocomotorTemplate( key ) );
-	if( TheAI->pathfinder()->clientSafeQuickDoesPathExist( locomotorSet, obj->getRequiredBridgeHeight(), obj->getPosition(), &rallyPointPos) == FALSE )
+	if( TheAI->pathfinder()->clientSafeQuickDoesPathExist( locomotorSet, obj->getRequiredBridgeHeight(), obj->getPosition(), &rallyPointPos ) == FALSE )
 	{
 
 		// user feedback
@@ -218,7 +213,7 @@ static void doSetRallyPoint( Object *obj, const Coord3D& pos )
 	if( exitInterface )
 	{
 		// set the rally point
-		exitInterface->setRallyPoint( &rallyPointPos);
+		exitInterface->setRallyPoint( &rallyPointPos );
 
 	}
 
@@ -524,6 +519,52 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			onDoSpecialPowerAtLocation(msg, currentlySelectedGroup);
 			break;
 		}
+		//---------------------------------------------------------------------------------------------
+		// N-point (chronosphere) special power: all target points committed together in one message.
+		case GameMessage::MSG_DO_SPECIAL_POWER_AT_MULTIPLE_LOCATIONS:
+		{
+			// first argument is the special power ID
+			UnsignedInt specialPowerID = msg->getArgument( 0 )->integer;
+
+			// argument 1 is the number of target points that follow
+			Int count = msg->getArgument( 1 )->integer;
+
+			// arguments 2 .. 2+count-1 are the target locations (in click order)
+			std::vector<Coord3D> locs;
+			locs.reserve( count );
+			for( Int p = 0; p < count; ++p )
+				locs.push_back( msg->getArgument( 2 + p )->location );
+
+			// Command button options -- special power may care about variance options
+			UnsignedInt options = msg->getArgument( 2 + count )->integer;
+
+			// check for possible specific source, ignoring selection.
+			ObjectID sourceID = msg->getArgument( 3 + count )->objectID;
+			Object* source = findObjectByID(sourceID);
+			if (source != nullptr)
+			{
+				AIGroupPtr theGroup = TheAI->createGroup();
+				theGroup->add(source);
+				theGroup->groupDoSpecialPowerAtMultipleLocations( specialPowerID, locs, options );
+#if RETAIL_COMPATIBLE_AIGROUP
+				TheAI->destroyGroup(theGroup);
+#else
+				theGroup->removeAll();
+#endif
+			}
+			else
+			{
+				//Use the selected group!
+				if( currentlySelectedGroup )
+				{
+					currentlySelectedGroup->groupDoSpecialPowerAtMultipleLocations( specialPowerID, locs, options );
+				}
+			}
+			break;
+
+		}
+
+		//---------------------------------------------------------------------------------------------
 		case GameMessage::MSG_DO_SPECIAL_POWER_AT_OBJECT:
 		{
 			onDoSpecialPowerAtObject(msg, currentlySelectedGroup);
@@ -542,13 +583,20 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			onDoAttackmoveto(msg, currentlySelectedGroup);
 			break;
 		}
-#if RTS_ZEROHOUR
 		case GameMessage::MSG_DO_REVERSE_MOVETO:
 		{
-			onDoReverseMoveto(msg, currentlySelectedGroup);
+			Coord3D dest = msg->getArgument( 0 )->location;
+
+			if (currentlySelectedGroup)
+			{
+				currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
+				currentlySelectedGroup->groupMoveToPosition( &dest, false, CMD_FROM_PLAYER, /*reverse=*/true );
+			}
+
 			break;
 		}
-#endif
+
+		//---------------------------------------------------------------------------------------------
 		case GameMessage::MSG_DO_FORCEMOVETO:
 		{
 			onDoForcemoveto(msg, currentlySelectedGroup);
@@ -626,20 +674,36 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			onEnter(msg, currentlySelectedGroup);
 			break;
 		}
-#if RTS_ZEROHOUR
 		// TheSuperHackers @feature Fill the selected containers from nearby idle infantry. Takes no
 		// arguments -- peers can hold different selections, so each derives the result from its own.
 		case GameMessage::MSG_DO_AUTO_FILL:
 		{
-			onDoAutoFill(msg, currentlySelectedGroup);
+			if( currentlySelectedGroup )
+				currentlySelectedGroup->groupAutoFill( CMD_FROM_PLAYER );
+
 			break;
 		}
+
+		//---------------------------------------------------------------------------------------------
 		case GameMessage::MSG_DO_SMART_GARRISON:
 		{
-			onDoSmartGarrison(msg, currentlySelectedGroup);
+			Object *target = findObjectByID( msg->getArgument( 0 )->objectID );
+
+			// sanity
+			if( target == nullptr )
+				break;
+
+			if( currentlySelectedGroup )
+			{
+				currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
+				currentlySelectedGroup->groupSmartGarrison( target, CMD_FROM_PLAYER );
+			}
+
 			break;
+
 		}
-#endif
+
+		//---------------------------------------------------------------------------------------------
 		case GameMessage::MSG_EXIT:
 		{
 			onExit(msg, currentlySelectedGroup);
@@ -746,14 +810,15 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			onToggleOvercharge(msg, currentlySelectedGroup);
 			break;
 		}
-#if RTS_ZEROHOUR
 		// TheSuperHackers @feature Hold Fire stance.
 		case GameMessage::MSG_TOGGLE_HOLD_FIRE:
 		{
-			onToggleHoldFire(msg, currentlySelectedGroup);
+			// use the selected group
+			if( currentlySelectedGroup )
+				currentlySelectedGroup->groupToggleHoldFire( CMD_FROM_PLAYER );
+
 			break;
 		}
-#endif
 
 #ifdef ALLOW_SURRENDER
 		case GameMessage::MSG_DO_SURRENDER:
@@ -1342,51 +1407,6 @@ bool GameLogic::onDoSpecialPowerAtObject(MAYBE_UNUSED GameMessage *msg, AIGroupP
 	return true;
 }
 
-#if RTS_ZEROHOUR
-// N-point (chronosphere) special power: all target points committed together in one message.
-bool GameLogic::onDoSpecialPowerAtMultipleLocations(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
-{
-	// first argument is the special power ID
-	UnsignedInt specialPowerID = msg->getArgument( 0 )->integer;
-
-	// argument 1 is the number of target points that follow
-	Int count = msg->getArgument( 1 )->integer;
-
-	// arguments 2 .. 2+count-1 are the target locations (in click order)
-	std::vector<Coord3D> locs;
-	locs.reserve( count );
-	for( Int p = 0; p < count; ++p )
-		locs.push_back( msg->getArgument( 2 + p )->location );
-
-	// Command button options -- special power may care about variance options
-	UnsignedInt options = msg->getArgument( 2 + count )->integer;
-
-	// check for possible specific source, ignoring selection.
-	ObjectID sourceID = msg->getArgument( 3 + count )->objectID;
-	Object* source = findObjectByID(sourceID);
-	if (source != nullptr)
-	{
-		AIGroupPtr theGroup = TheAI->createGroup();
-		theGroup->add(source);
-		theGroup->groupDoSpecialPowerAtMultipleLocations( specialPowerID, locs, options );
-#if RETAIL_COMPATIBLE_AIGROUP
-		TheAI->destroyGroup(theGroup);
-#else
-		theGroup->removeAll();
-#endif
-	}
-	else
-	{
-		//Use the selected group!
-		if( currentlySelectedGroup )
-		{
-			currentlySelectedGroup->groupDoSpecialPowerAtMultipleLocations( specialPowerID, locs, options );
-		}
-	}
-
-	return true;
-}
-#endif
 
 bool GameLogic::onDoAttackmoveto(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
@@ -1414,20 +1434,6 @@ bool GameLogic::onDoForcemoveto(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curre
 	return true;
 }
 
-#if RTS_ZEROHOUR
-bool GameLogic::onDoReverseMoveto(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
-{
-	Coord3D dest = msg->getArgument( 0 )->location;
-
-	if (currentlySelectedGroup)
-	{
-		currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
-		currentlySelectedGroup->groupMoveToPosition( &dest, false, CMD_FROM_PLAYER, /*reverse=*/true );
-	}
-
-	return true;
-}
-#endif
 
 bool GameLogic::onDoMoveto(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
@@ -1602,34 +1608,6 @@ bool GameLogic::onEnter(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySele
 	return true;
 }
 
-#if RTS_ZEROHOUR
-// TheSuperHackers @feature Fill the selected containers from nearby idle infantry. Takes no
-// arguments -- peers can hold different selections, so each derives the result from its own.
-bool GameLogic::onDoAutoFill(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
-{
-	if( currentlySelectedGroup )
-		currentlySelectedGroup->groupAutoFill( CMD_FROM_PLAYER );
-
-	return true;
-}
-
-bool GameLogic::onDoSmartGarrison(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
-{
-	Object *target = findObjectByID( msg->getArgument( 0 )->objectID );
-
-	// sanity
-	if( target == nullptr )
-		return false;
-
-	if( currentlySelectedGroup )
-	{
-		currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
-		currentlySelectedGroup->groupSmartGarrison( target, CMD_FROM_PLAYER );
-	}
-
-	return true;
-}
-#endif
 
 bool GameLogic::onExit(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
@@ -2121,17 +2099,6 @@ bool GameLogic::onToggleOvercharge(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &cu
 	return true;
 }
 
-#if RTS_ZEROHOUR
-// TheSuperHackers @feature Hold Fire stance.
-bool GameLogic::onToggleHoldFire(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
-{
-	// use the selected group
-	if( currentlySelectedGroup )
-		currentlySelectedGroup->groupToggleHoldFire( CMD_FROM_PLAYER );
-
-	return true;
-}
-#endif
 
 #ifdef ALLOW_SURRENDER
 
@@ -2591,11 +2558,7 @@ bool GameLogic::onPurchaseScience(MAYBE_UNUSED GameMessage *msg)
 	if( science == SCIENCE_INVALID )
 		return false;
 
-#if RTS_ZEROHOUR
 	msgPlayer->attemptToPurchaseScience(science, TRUE);
-#else
-	msgPlayer->attemptToPurchaseScience(science);
-#endif
 
 	return true;
 }

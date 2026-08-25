@@ -81,12 +81,12 @@ public:
 	/////////////////////////////////////////////////////////////////////////////
 	virtual void					Set_Animation() override;
 	virtual void					Set_Animation( HAnimClass * motion,
-															float frame, int anim_mode = ANIM_MODE_MANUAL) override;
-	virtual void					Set_Animation( HAnimClass * motion0,
+															float frame, int anim_mode = ANIM_MODE_MANUAL);
+	virtual void					Set_Animation(HAnimClass* motion0,
 															float frame0,
 															HAnimClass* motion1,
 															float frame1,
-															float percentage) override;
+															float percentage);
 	virtual void					Set_Animation(HAnimClass* motion0,
 															float frame0,
 															HAnimClass* motion1,
@@ -96,7 +96,7 @@ public:
 															int mode1,
 															int fadeOutTime,
 															int startFadeTime = 0);
-	virtual void					Set_Animation( HAnimComboClass * anim_combo) override;
+	virtual void					Set_Animation(HAnimComboClass* anim_combo);
 
 	virtual void					Set_Animation_Frame_Rate_Multiplier(float multiplier);	// 020607 srj -- added
 	virtual void					Set_Animation_Frame_Rate_Multiplier(float multiplier0, float multiplier1);

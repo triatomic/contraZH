@@ -625,7 +625,7 @@ public:
 		MSG_CREATE_FORMATION,												///< Creates a formation.
 		MSG_LOGIC_CRC,															///< CRC from the logic passed around in a network game :)
 		MSG_SET_MINE_CLEARING_DETAIL,								///< CRC from the logic passed around in a network game :)
-		MSG_ENABLE_RETALIATION_MODE,								///< Turn retaliation mode on or off.
+		MSG_ENABLE_RETALIATION_MODE,								///< Turn retaliation mode on or off for the specified player.
 		MSG_DO_SPECIAL_POWER_AT_MULTIPLE_LOCATIONS,	///< N-point: (spID, count, coord*count, options, sourceID) - all target points committed in one message (chronosphere = 2)
 		MSG_DO_REVERSE_MOVETO,											///< (location) move to the location driving in reverse
 		MSG_DO_SMART_GARRISON,											///< (target objectID) distribute the selected group across the target and nearby transports

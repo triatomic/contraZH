@@ -80,23 +80,23 @@ public:
 	void					Init(const W3dEmitterLinePropertiesStruct & props);
 
 	// Get properties used to render this line segment
-	TextureClass *		Get_Texture() const;
-	TextureClass *		Peek_Texture() const								{ return Texture; }
-	ShaderClass			Get_Shader() const									{ return Shader; }
-	float					Get_Width() const									{ return Width; }
-	const Vector3 &	Get_Color() const 									{ return Color; }
-	float					Get_Opacity() const									{ return Opacity; }
-	float					Get_Noise_Amplitude() const						{ return NoiseAmplitude; }
-	float					Get_Merge_Abort_Factor() const					{ return MergeAbortFactor; }
-	unsigned int		Get_Current_Subdivision_Level()	const			{ return SubdivisionLevel; }
-	TextureMapMode		Get_Texture_Mapping_Mode() const;
-	float					Get_Texture_Tile_Factor() const					{ return TextureTileFactor; }
-	Vector2				Get_UV_Offset_Rate() const;
-	Vector2				Get_Current_UV_Offset() const { return CurrentUVOffset; }
-	int					Is_Merge_Intersections() const					{ return Bits & MERGE_INTERSECTIONS; }
-	int					Is_Freeze_Random() const							{ return Bits & FREEZE_RANDOM; }
-	int					Is_Sorting_Disabled() const						{ return Bits & DISABLE_SORTING; }
-	int					Are_End_Caps_Enabled()	const						{ return Bits & END_CAPS; }
+	TextureClass *		Get_Texture(void) const;
+	TextureClass *		Peek_Texture(void) const								{ return Texture; }
+	ShaderClass			Get_Shader(void) const									{ return Shader; }
+	float					Get_Width(void) const									{ return Width; }
+	const Vector3 &	Get_Color(void) const 									{ return Color; }
+	float					Get_Opacity(void) const									{ return Opacity; }
+	float					Get_Noise_Amplitude(void) const						{ return NoiseAmplitude; }
+	float					Get_Merge_Abort_Factor(void) const					{ return MergeAbortFactor; }
+	unsigned int		Get_Current_Subdivision_Level(void)	const			{ return SubdivisionLevel; }
+	TextureMapMode		Get_Texture_Mapping_Mode(void) const;
+	float					Get_Texture_Tile_Factor(void) const					{ return TextureTileFactor; }
+	Vector2				Get_UV_Offset_Rate(void) const;
+	Vector2				Get_Current_UV_Offset(void) const { return CurrentUVOffset; }
+	int					Is_Merge_Intersections(void) const					{ return Bits & MERGE_INTERSECTIONS; }
+	int					Is_Freeze_Random(void) const							{ return Bits & FREEZE_RANDOM; }
+	int					Is_Sorting_Disabled(void) const						{ return Bits & DISABLE_SORTING; }
+	int					Are_End_Caps_Enabled(void)	const						{ return Bits & END_CAPS; }
 
 	// Set properties used to render this line segment
 	void					Set_Texture(TextureClass *texture);

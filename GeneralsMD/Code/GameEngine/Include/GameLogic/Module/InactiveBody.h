@@ -61,7 +61,7 @@ public:
 	virtual void clearArmorSetFlag(ArmorSetType ast) override { /* nothing */ }
 	virtual Bool testArmorSetFlag(ArmorSetType ast) override { return FALSE; }
 
-	virtual void internalChangeHealth( Real delta, Bool changeModelCondition = TRUE) override;
+	virtual void internalChangeHealth( Real delta, Bool changeModelCondition = TRUE);
 
 private:
 	Bool m_dieCalled;

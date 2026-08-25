@@ -391,8 +391,8 @@ class AudioManagerDummy : public AudioManager
 	virtual void resumeAudio(AudioAffect which) {}
 	virtual void pauseAmbient(Bool shouldPause) {}
 	virtual void killAudioEventImmediately(AudioHandle audioEvent) {}
-	virtual AsciiString nextMusicTrack() { return ""; }
-	virtual AsciiString prevMusicTrack() { return ""; }
+	virtual AsciiString nextMusicTrack() { return AsciiString::TheEmptyString; }
+	virtual AsciiString prevMusicTrack() { return AsciiString::TheEmptyString; }
 	virtual Bool isMusicPlaying() const { return false; }
 	virtual Bool hasMusicTrackCompleted(const AsciiString& trackName, Int numberOfTimes) const { return false; }
 	virtual AsciiString getMusicTrackName() const { return ""; }
@@ -428,6 +428,5 @@ class AudioManagerDummy : public AudioManager
 	virtual void closeAnySamplesUsingFile(const void* fileToClose) {}
 	virtual void setDeviceListenerPosition(void) {}
 };
-
 
 extern AudioManager *TheAudio;

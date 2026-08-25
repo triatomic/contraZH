@@ -84,18 +84,18 @@ class SegmentedLineClass : public RenderObjClass
 
 		float					Get_Width();
 		void					Get_Color(Vector3 &color);
-		float					Get_Opacity();
-		float					Get_Noise_Amplitude();
-		float					Get_Merge_Abort_Factor();
-		unsigned int		Get_Subdivision_Levels();
-		SegLineRendererClass::TextureMapMode		Get_Texture_Mapping_Mode();
-		float					Get_Texture_Tile_Factor();
-		Vector2				Get_UV_Offset_Rate();
-		Vector2				Get_Current_UV_Offset();
-		int					Is_Merge_Intersections();
-		int					Is_Freeze_Random();
-		int					Is_Sorting_Disabled();
-		int					Are_End_Caps_Enabled();
+		float					Get_Opacity(void);
+		float					Get_Noise_Amplitude(void);
+		float					Get_Merge_Abort_Factor(void);
+		unsigned int		Get_Subdivision_Levels(void);
+		SegLineRendererClass::TextureMapMode		Get_Texture_Mapping_Mode(void);
+		float					Get_Texture_Tile_Factor(void);
+		Vector2				Get_UV_Offset_Rate(void);
+		Vector2				Get_Current_UV_Offset(void);
+		int					Is_Merge_Intersections(void);
+		int					Is_Freeze_Random(void);
+		int					Is_Sorting_Disabled(void);
+		int					Are_End_Caps_Enabled(void);
 
 		void					Set_Texture(TextureClass *texture);
 		void					Set_Shader(ShaderClass shader);

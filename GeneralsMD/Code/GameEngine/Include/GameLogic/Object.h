@@ -30,6 +30,7 @@
 
 #include "Lib/BaseType.h"
 #include "Common/STLTypedefs.h"
+#include "WWLib/ref_ptr.h"
 
 #include "Common/Geometry.h"
 #include "Common/Snapshot.h"

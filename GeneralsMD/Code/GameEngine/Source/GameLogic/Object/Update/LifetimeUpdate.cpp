@@ -102,7 +102,7 @@ Real LifetimeUpdate::getProgress(void) {
 }
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-UpdateSleepTime LifetimeUpdate::update()
+UpdateSleepTime LifetimeUpdate::update( void )
 {
 	// Kill (NOT destroy) if time is up
 	getObject()->kill();

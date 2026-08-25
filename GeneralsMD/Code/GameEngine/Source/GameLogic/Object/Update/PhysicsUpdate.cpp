@@ -975,7 +975,7 @@ UpdateSleepTime PhysicsBehavior::update()
 		//DEBUG_LOG((">>> WATER IMPACT NOW!"));
 		// do water splash sound
 		if (m_waterImpactSound) {
-			AudioEventRTS collisionSound = *m_waterImpactSound;
+			AudioEventRTS collisionSound = *m_waterImpactSound.Peek();
 			collisionSound.setObjectID(getObject()->getID());
 			TheAudio->addAudioEvent(&collisionSound);
 		}

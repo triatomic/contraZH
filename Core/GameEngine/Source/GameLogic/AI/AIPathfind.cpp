@@ -1715,7 +1715,7 @@ Bool PathfindCell::removeObstacle( Object *obstacle )
 void PathfindCell::forwardInsertionSortRetailCompatible(PathfindCellList& list)
 {
 	DEBUG_ASSERTCRASH(m_info, ("Has to have info."));
-	DEBUG_ASSERTCRASH(m_info->m_closed == FALSE && m_info->m_open == FALSE, ("Serious error - Invalid flags. jba"));
+	DEBUG_ASSERTCRASH(m_info->m_closed==FALSE && m_info->m_open==FALSE, ("Serious error - Invalid flags. jba"));
 
 	// mark the newCell as being on the open list
 	m_info->m_open = true;
@@ -1729,7 +1729,7 @@ void PathfindCell::forwardInsertionSortRetailCompatible(PathfindCellList& list)
 		return;
 	}
 
-	// insertion sort
+		// insertion sort
 	PathfindCell* currentCell = list.m_head;
 	PathfindCell* previousCell = nullptr;
 	UnsignedInt cellCount = 0;
@@ -1745,14 +1745,14 @@ void PathfindCell::forwardInsertionSortRetailCompatible(PathfindCellList& list)
 		cellCount++;
 		previousCell = currentCell;
 		currentCell = currentCell->getNextOpen();
-	}
+		}
 
 	if (currentCell)
-	{
+		{
 		// insert just before "currentCell"
 		if (currentCell->m_info->m_prevOpen)
 			currentCell->m_info->m_prevOpen->m_nextOpen = this->m_info;
-		else
+			else
 			list.m_head = this;
 
 		m_info->m_prevOpen = currentCell->m_info->m_prevOpen;
@@ -1760,14 +1760,14 @@ void PathfindCell::forwardInsertionSortRetailCompatible(PathfindCellList& list)
 
 		m_info->m_nextOpen = currentCell->m_info;
 
-	}
-	else
-	{
+		}
+		else
+		{
 		// append after "previousCell" - we are at the end of the list
 		previousCell->m_info->m_nextOpen = this->m_info;
 		m_info->m_prevOpen = previousCell->m_info;
-		m_info->m_nextOpen = nullptr;
-	}
+			m_info->m_nextOpen = nullptr;
+		}
 }
 #endif
 
@@ -1883,7 +1883,6 @@ void PathfindCell::putOnSortedOpenList( PathfindCellList &list )
 		forwardInsertionSort(list);
 	}
 }
-
 
 /// remove self from "open" list
 void PathfindCell::removeFromOpenList( PathfindCellList &list )

@@ -3400,10 +3400,6 @@ void Drawable::drawIconUI()
 		drawVeterancy( healthBarRegion );
 
 		drawProgress( healthBarRegion );
-
-#ifdef KRIS_BRUTAL_HACK_FOR_AIRCRAFT_CARRIER_DEBUGGING
-		drawUIText();
-#endif
 	}
 }
 

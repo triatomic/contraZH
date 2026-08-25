@@ -87,16 +87,16 @@ public:
 	virtual Bool hasAnySubdualDamage() const override;
 	virtual Real getCurrentSubdualDamageAmount() const override { return m_currentSubdualDamage; }
 
-	virtual UnsignedInt getChronoDamageHealRate() const override;
-	virtual Real getChronoDamageHealAmount() const override;
-	virtual Bool hasAnyChronoDamage() const override;
-	virtual Real getCurrentChronoDamageAmount() const override { return m_currentChronoDamage; }
+	virtual UnsignedInt getChronoDamageHealRate() const;
+	virtual Real getChronoDamageHealAmount() const;
+	virtual Bool hasAnyChronoDamage() const;
+	virtual Real getCurrentChronoDamageAmount() const { return m_currentChronoDamage; }
 
-	virtual const DamageInfo *getLastDamageInfo() const override { return &m_lastDamageInfo; }	///< return info on last damage dealt to this object
-	virtual UnsignedInt getLastDamageTimestamp() const override { return m_lastDamageTimestamp; }	///< return frame of last damage dealt
-	virtual UnsignedInt getLastHealingTimestamp() const override { return m_lastHealingTimestamp; }	///< return frame of last damage dealt
-	virtual ObjectID getClearableLastAttacker() const override { return (m_lastDamageCleared ? INVALID_ID : m_lastDamageInfo.in.m_sourceID); }
-	virtual void clearLastAttacker() override { m_lastDamageCleared = true; }
+	virtual const DamageInfo *getLastDamageInfo() const { return &m_lastDamageInfo; }	///< return info on last damage dealt to this object
+	virtual UnsignedInt getLastDamageTimestamp() const { return m_lastDamageTimestamp; }	///< return frame of last damage dealt
+	virtual UnsignedInt getLastHealingTimestamp() const { return m_lastHealingTimestamp; }	///< return frame of last damage dealt
+	virtual ObjectID getClearableLastAttacker() const { return (m_lastDamageCleared ? INVALID_ID : m_lastDamageInfo.in.m_sourceID); }
+	virtual void clearLastAttacker() { m_lastDamageCleared = true; }
 
 	virtual void onVeterancyLevelChanged( VeterancyLevel oldLevel, VeterancyLevel newLevel, Bool provideFeedback = TRUE ) override;
 
@@ -121,7 +121,7 @@ public:
 	virtual void setIndestructible( Bool indestructible ) override;
 	virtual Bool isIndestructible() const override { return m_indestructible; }
 
-	virtual void internalChangeHealth( Real delta, Bool changeModelCondition = TRUE) override;								///< change health
+	virtual void internalChangeHealth( Real delta, Bool changeModelCondition = TRUE);								///< change health
 
 	virtual void evaluateVisualCondition() override;
 	virtual void updateBodyParticleSystems() override;// made public for topple anf building collapse updates -ML

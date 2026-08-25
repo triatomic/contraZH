@@ -311,13 +311,8 @@ private:
 	bool onDoSpecialPower(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onDoSpecialPowerAtLocation(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onDoSpecialPowerAtObject(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
-	bool onDoSpecialPowerAtMultipleLocations(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onDoAttackmoveto(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onDoForcemoveto(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
-	bool onDoReverseMoveto(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
-	bool onDoAutoFill(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
-	bool onDoSmartGarrison(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
-	bool onToggleHoldFire(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onDoMoveto(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onAddWaypoint(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onDoGuardPosition(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);

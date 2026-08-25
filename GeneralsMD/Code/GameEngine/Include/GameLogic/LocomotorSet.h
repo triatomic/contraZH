@@ -105,7 +105,7 @@ public:
 	void xferSelfAndCurLocoPtr(Xfer *xfer, Locomotor** loco);
 
 	LocomotorSurfaceTypeMask getValidSurfaces() const { return m_validLocomotorSurfaces; }
-	Bool isDownhillOnly() const { return m_downhillOnly; };
+	Bool isDownhillOnly( void ) const { return m_downhillOnly; };
 	Int getRequiredWaterLevel() const { return m_requiredWaterLevel; };
 
 };

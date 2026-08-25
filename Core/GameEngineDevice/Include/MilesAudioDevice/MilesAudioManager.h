@@ -363,7 +363,7 @@ class MilesAudioManagerDummy : public MilesAudioManager
 	//virtual void openDevice() override {}
 	//virtual void closeDevice() override {}
 	//virtual void* getDevice() override { return nullptr; }
-	virtual void notifyOfAudioCompletion(UnsignedInt audioCompleted, UnsignedInt flags, bool isEarlyStop=false) override {}
+	virtual void notifyOfAudioCompletion(UnsignedInt audioCompleted, UnsignedInt flags, bool isEarlyStop = false) override {}
 	virtual UnsignedInt getProviderCount() const override { return 0; };
 	virtual AsciiString getProviderName(UnsignedInt providerNum) const override { return AsciiString::TheEmptyString; }
 	virtual UnsignedInt getProviderIndex(AsciiString providerName) const override { return 0; }

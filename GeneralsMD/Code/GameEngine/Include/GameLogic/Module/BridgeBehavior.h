@@ -81,14 +81,13 @@ public:
 
 	virtual void setTower( BridgeTowerType towerType, Object *tower ) = 0;
 	virtual ObjectID getTowerID( BridgeTowerType towerType ) = 0;
-	virtual void createScaffolding() = 0;
-	virtual void removeScaffolding() = 0;
-	virtual Bool isScaffoldInMotion() = 0;
-	virtual Bool isScaffoldPresent() = 0;
+	virtual void createScaffolding( void ) = 0;
+	virtual void removeScaffolding( void ) = 0;
+	virtual Bool isScaffoldInMotion( void ) = 0;
+	virtual Bool isScaffoldPresent( void ) = 0;
 	virtual void towerCaptured(Player* oldOwner, Player* newOwner, const Object* fromTower) {};
 	virtual void towerDrawBridgeUpdate(const Object* fromTower, DrawBridgeTowerInfo towerInfo) {};
-	virtual void onRepaired() = 0;
-
+	virtual void onRepaired( void ) = 0;
 };
 
 // ------------------------------------------------------------------------------------------------
@@ -159,13 +158,13 @@ public:
 
 	// our own methods
 	static BridgeBehaviorInterface *getBridgeBehaviorInterfaceFromObject( Object *obj );
-	virtual void setTower( BridgeTowerType towerType, Object *tower ) override;	///< connect tower to us
-	virtual ObjectID getTowerID( BridgeTowerType towerType ) override;						///< retrieve one of our towers
-	virtual void createScaffolding() override;		///< create scaffolding around bridge
-	virtual void removeScaffolding() override;		///< remove scaffolding around bridge
-	virtual Bool isScaffoldInMotion() override;	///< is scaffold in motion
-	virtual Bool isScaffoldPresent() override { return m_scaffoldPresent; }
-	virtual void onRepaired() override;
+	virtual void setTower( BridgeTowerType towerType, Object *tower );	///< connect tower to us
+	virtual ObjectID getTowerID( BridgeTowerType towerType );						///< retrieve one of our towers
+	virtual void createScaffolding( void );		///< create scaffolding around bridge
+	virtual void removeScaffolding( void );		///< remove scaffolding around bridge
+	virtual Bool isScaffoldInMotion( void );	///< is scaffold in motion
+	virtual Bool isScaffoldPresent( void ) { return m_scaffoldPresent; }
+	virtual void onRepaired(void) override;
 
 protected:
 

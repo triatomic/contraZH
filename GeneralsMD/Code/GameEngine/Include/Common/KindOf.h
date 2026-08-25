@@ -220,7 +220,6 @@ enum KindOfType CPP_11(: Int)
 	KINDOF_TARGET_DESIGNATOR,
 
 	// TheSuperHackers @info New kinds for Mods
-
 	KINDOF_NO_ATTACK_WARNING,				///< does not trigger the under attack radar/EVA warning when taking damage
 
 	KINDOF_COUNT,										// total number of kindofs

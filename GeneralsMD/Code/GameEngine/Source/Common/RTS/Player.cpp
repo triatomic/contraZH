@@ -3877,22 +3877,15 @@ void Player::applyBattlePlanBonusesForObject( Object *obj ) const
 //-------------------------------------------------------------------------------------------------
 void Player::removeBattlePlanBonusesForObject( Object *obj ) const
 {
-	//Copy bonuses, and invert them.
-	BattlePlanBonusesData bonus = *m_battlePlanBonuses;
-	bonus.m_armorScalar = 1.0f / __max( bonus.m_armorScalar, 0.01f );
-	bonus.m_sightRangeScalar = 1.0f / __max( bonus.m_sightRangeScalar, 0.01f );
-
-	//bonus.m_bombardment = -ALL_PLANS; //Safe to remove as it clears the weapon bonus flag
-	//bonus.m_searchAndDestroy = -ALL_PLANS; //Safe to remove as it clears the weapon bonus flag
-	//bonus.m_holdTheLine = -ALL_PLANS; //Safe to remove as it clears the weapon bonus flag
-
-  // Update AW: We need use these variables now to track which plan should be added/removed
-	if (bonus.m_bombardment > 0)
-		bonus.m_bombardment = -1;
-	if (bonus.m_searchAndDestroy > 0)
-		bonus.m_searchAndDestroy = -1;
-	if (bonus.m_holdTheLine > 0)
-		bonus.m_holdTheLine = -1;
+	//Create inverted bonuses.
+	BattlePlanBonusesData bonus;
+	bonus.m_armorScalar = 1.0f / __max( m_battlePlanBonuses->m_armorScalar, 0.01f );
+	bonus.m_sightRangeScalar = 1.0f / __max( m_battlePlanBonuses->m_sightRangeScalar, 0.01f );
+	bonus.m_bombardment = -ALL_PLANS; //Safe to remove as it clears the weapon bonus flag
+	bonus.m_searchAndDestroy = -ALL_PLANS; //Safe to remove as it clears the weapon bonus flag
+	bonus.m_holdTheLine = -ALL_PLANS; //Safe to remove as it clears the weapon bonus flag
+	bonus.m_validKindOf = m_battlePlanBonuses->m_validKindOf;
+	bonus.m_invalidKindOf = m_battlePlanBonuses->m_invalidKindOf;
 
 	DUMPBATTLEPLANBONUSES(&bonus, this, obj);
 	localApplyBattlePlanBonusesToObject( obj, &bonus );

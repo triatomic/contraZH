@@ -389,22 +389,16 @@ public:
 
 	virtual void setFullyObscuredByShroud(Bool fullyObscured) override;
 	virtual void setTerrainDecal(TerrainDecalType type) override;
-	// TheSuperHackers @feature Selection ring, kept in its own slot so it does not evict the
-	// horde or chem suit decal while a unit is selected.
-	virtual void setSelectionDecal(Bool enable, Real radius) override;
 
 	virtual Bool isVisible() const override;
 	virtual void reactToTransformChange(const Matrix3D* oldMtx, const Coord3D* oldPos, Real oldAngle) override;
-	virtual void reactToTeleport() override;
+	virtual void reactToTeleport();
 	virtual void reactToGeometryChange() override { }
 
 	// this method must ONLY be called from the client, NEVER From the logic, not even indirectly.
 	virtual Bool clientOnly_getRenderObjInfo(Coord3D* pos, Real* boundingSphereRadius, Matrix3D* transform) const override;
 	virtual Bool clientOnly_getRenderObjBoundBox(OBBoxClass * boundbox) const override;
 	virtual Bool clientOnly_getRenderObjBoneTransform(const AsciiString & boneName,Matrix3D * set_tm) const override;
-#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
-	virtual Int clientOnly_getSubObjectNames(AsciiString* names, Int maxNames) const override;
-#endif
 	virtual Int getPristineBonePositionsForConditionState(const ModelConditionFlags& condition, const char* boneNamePrefix, Int startIndex, Coord3D* positions, Matrix3D* transforms, Int maxBones) const override;
 	virtual Int getCurrentBonePositions(const char* boneNamePrefix, Int startIndex, Coord3D* positions, Matrix3D* transforms, Int maxBones) const override;
 	virtual Bool getCurrentWorldspaceClientBonePositions(const char* boneName, Matrix3D& transform) const override;
@@ -417,7 +411,7 @@ public:
 	virtual void replaceModelConditionState(const ModelConditionFlags& c) override;
 	virtual void replaceIndicatorColor(Color color) override;
 	virtual Bool handleWeaponFireFX(WeaponSlotType wslot, Int specificBarrelToUse, const FXList* fxl, Real weaponSpeed, const Coord3D* victimPos, Real damageRadius) override;
-	virtual Bool handleWeaponPreAttackFX(WeaponSlotType wslot, Int specificBarrelToUse, const FXList* fxl, Real weaponSpeed, const Coord3D* victimPos, Real damageRadius) override;
+	virtual Bool handleWeaponPreAttackFX(WeaponSlotType wslot, Int specificBarrelToUse, const FXList* fxl, Real weaponSpeed, const Coord3D* victimPos, Real damageRadius);
 	virtual Int getBarrelCount(WeaponSlotType wslot) const override;
 	virtual void setSelectable(Bool selectable) override; // Change the selectability of the model.
 
@@ -548,8 +542,6 @@ private:
 	RenderObjClass*								m_renderObject;										///< W3D Render object for this drawable
 	Shadow*												m_shadow;													///< Updates/Renders shadows of this object
 	Shadow*												m_terrainDecal;
-	// TheSuperHackers @feature Selection ring decal, independent of m_terrainDecal.
-	Shadow*												m_selectionDecal;
 	TerrainTracksRenderObjClass*	m_trackRenderObject;							///< This is rendered under object
 	Bool													m_lastTrackWasBackwards;					///< travel direction of the last laid tread edge, to detect fwd<->rev flips
 	ParticleSystemIDVec						m_particleSystemIDs;							///< The ID numbers of the particle systems currently running.

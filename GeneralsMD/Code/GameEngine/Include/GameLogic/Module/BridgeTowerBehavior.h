@@ -69,9 +69,9 @@ public:
 	static Int getInterfaceMask() { return (MODULEINTERFACE_DAMAGE) | (MODULEINTERFACE_DIE); }
 	virtual BridgeTowerBehaviorInterface* getBridgeTowerBehaviorInterface() override { return this; }
 
-	virtual void setBridge( Object *bridge ) override;
-	virtual ObjectID getBridgeID() override;
-	virtual void setTowerType( BridgeTowerType type ) override;
+	virtual void setBridge( Object *bridge );
+	virtual ObjectID getBridgeID( void );
+	virtual void setTowerType( BridgeTowerType type );
 	virtual void onCapture(Player* oldOwner, Player* newOwner) override;
 
 	static BridgeTowerBehaviorInterface *getBridgeTowerBehaviorInterfaceFromObject( Object *obj );

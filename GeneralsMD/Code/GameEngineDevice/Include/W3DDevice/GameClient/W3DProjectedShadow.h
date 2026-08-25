@@ -58,9 +58,9 @@ class W3DProjectedShadowManager	: public ProjectedShadowManager
 		void prepareShadows();
 		Int	 renderShadows(RenderInfoClass & rinfo);	///<iterate over each object and render its shadow onto affected objects.
 		Int	 renderDecals(RenderInfoClass & rinfo, Bool aboveWaterPass);	///<draw the decal list subset for the given water pass (below before water, above after).
-		void ReleaseResources();	///<release device dependent D3D resources.
-		Bool ReAcquireResources();	///<allocate device dependent D3D resources.
-		void invalidateCachedLightPositions();	///<forces shadows to update regardless of last lightposition
+		void ReleaseResources(void);	///<release device dependent D3D resources.
+		Bool ReAcquireResources(void);	///<allocate device dependent D3D resources.
+		void invalidateCachedLightPositions(void);	///<forces shadows to update regardless of last lightposition
 
 		virtual Shadow	*addDecal(RenderObjClass *robj, Shadow::ShadowTypeInfo *shadowInfo) override;	///<add a non-shadow decal
 		virtual Shadow	*addDecal(Shadow::ShadowTypeInfo *shadowInfo) override;	///<add a non-shadow decal which does not follow an object.

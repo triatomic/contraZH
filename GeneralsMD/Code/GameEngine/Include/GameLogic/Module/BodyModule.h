@@ -249,6 +249,16 @@ public:
 	virtual Bool hasAnyChronoDamage() const override { return FALSE; }
 	virtual Real getCurrentChronoDamageAmount() const override { return 0.0f; }
 
+	virtual BodyDamageType getDamageState() const = 0;
+	virtual void setDamageState( BodyDamageType newState ) = 0;	///< control damage state directly.  Will adjust hitpoints.
+	virtual void setAflame( Bool setting ) = 0;///< This is a major change like a damage state.
+
+	virtual void onVeterancyLevelChanged( VeterancyLevel oldLevel, VeterancyLevel newLevel, Bool provideFeedback = FALSE ) = 0;	///< I just achieved this level right this moment
+
+	virtual void setArmorSetFlag(ArmorSetType ast) = 0;
+	virtual void clearArmorSetFlag(ArmorSetType ast) = 0;
+	virtual Bool testArmorSetFlag(ArmorSetType ast) = 0;
+
 	virtual void setFrontCrushed(Bool v) override { DEBUG_CRASH(("you should never call this for generic Bodys")); }
 	virtual void setBackCrushed(Bool v) override { DEBUG_CRASH(("you should never call this for generic Bodys")); }
 
@@ -257,12 +267,21 @@ public:
 	virtual Bool isIndestructible() const override { return TRUE; }
 
 	//Allows outside systems to apply defensive bonuses or penalties (they all stack as a multiplier!)
-	virtual void applyDamageScalar( Real scalar ) override { m_damageScalar *= scalar; }
-	virtual Real getDamageScalar() const override { return m_damageScalar; }
-	virtual void overrideDamageFX(DamageFX* damageFX) override { }
+	virtual void applyDamageScalar( Real scalar ) { m_damageScalar *= scalar; }
+	virtual Real getDamageScalar() const { return m_damageScalar; }
+	virtual void overrideDamageFX(DamageFX* damageFX) { }
 
-	virtual void evaluateVisualCondition() override { }
-	virtual void updateBodyParticleSystems() override { };// made public for topple anf building collapse updates -ML
+	/**
+		Change the module's health by the given delta. Note that
+		the module's DamageFX and Armor are NOT taken into
+		account, so you should think about what you're bypassing when you
+		call this directly (especially when when decreasing health, since
+		you probably want "attemptDamage" or "attemptHealing")
+	*/
+	virtual void internalChangeHealth( Real delta, Bool changeModelCondition = TRUE) = 0;
+
+	virtual void evaluateVisualCondition() { }
+	virtual void updateBodyParticleSystems() { };// made public for topple anf building collapse updates -ML
 
 protected:
 

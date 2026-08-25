@@ -2642,6 +2642,7 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 			}
 		}
 	}
+	}
 	else
 	{
 		m_whichAnimInCurState = -1;

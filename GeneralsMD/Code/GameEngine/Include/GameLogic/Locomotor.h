@@ -58,9 +58,8 @@ enum LocomotorAppearance CPP_11(: Int)
 	LOCO_WINGS,
 	LOCO_CLIMBER,			// human climber - backs down cliffs.
 	LOCO_OTHER,
-	LOCO_MOTORCYCLE, // Added in Zero Hour
+	LOCO_MOTORCYCLE,
 	LOCO_SHIP,
-
 	LOCOMOTOR_APPEARANCE_COUNT
 };
 

@@ -198,7 +198,6 @@ INI::INI()
 }
 
 //-------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------
 UnsignedInt INI::loadFileDirectory( AsciiString fileDirName, INILoadType loadType, Xfer *pXfer, Bool subdirs, Bool optional/* = FALSE*/)
 {
 	UnsignedInt filesRead = 0;
@@ -407,7 +406,7 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer, 
 			const char *token = strtok( m_buffer, getSeps() );
 
 			// skip non MapData blocks if loading
-			bool skip = (loadType == INI_LOAD_MAPDATA_ONLY) && (strcmp(token, "MapData") != 0);
+			bool skip = (loadType == INI_LOAD_MAPDATA_ONLY) && token && (strcmp(token, "MapData") != 0);
 
 			if( token && !skip)
 			{

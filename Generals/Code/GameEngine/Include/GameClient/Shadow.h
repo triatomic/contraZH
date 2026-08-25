@@ -105,7 +105,7 @@ public:
 				Int		m_waterRenderMode;	//ShadowWaterMode: above/below/default water ordering
 		};
 
-		Shadow() : m_diffuse(0xffffffff), m_color(0xffffffff), m_opacity (0x000000ff), m_localAngle(0.0f), m_waterRenderMode(SHADOW_WATER_DEFAULT) {}
+		Shadow(void) : m_diffuse(0xffffffff), m_color(0xffffffff), m_opacity (0x000000ff), m_localAngle(0.0f), m_waterRenderMode(SHADOW_WATER_DEFAULT) {}
 
 		void setWaterRenderMode(Int mode) { m_waterRenderMode = mode; }
 		Int  getWaterRenderMode(void) const { return m_waterRenderMode; }
