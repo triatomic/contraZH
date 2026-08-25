@@ -175,6 +175,13 @@ public:
 	// (gth) C&C3 adding these accessors to render object properties
 	virtual Bool clientOnly_getRenderObjBoundBox(OBBoxClass * boundbox) const = 0;
 	virtual Bool clientOnly_getRenderObjBoneTransform(const AsciiString & boneName,Matrix3D * set_tm) const = 0;
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// TheSuperHackers @feature Names of the model's sub objects, for the debug name overlay.
+	// Copies up to maxNames into the array and returns how many the model actually has, so the
+	// caller can tell that it saw only part of the list. Declared here rather than reaching for
+	// the render object directly, since Drawable lives in GameEngine and cannot see WW3D types.
+	virtual Int clientOnly_getSubObjectNames(AsciiString* names, Int maxNames) const = 0;
+#endif
 	/**
 		Find the bone(s) with the given name and return their positions and/or transforms in the given arrays.
 		We look for a bone named "boneNamePrefixQQ", where QQ is 01, 02, 03, etc, starting at the

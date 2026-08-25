@@ -518,8 +518,22 @@ public:  // ********************************************************************
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	// TheSuperHackers @feature Debug name overlays, toggled by the Ctrl+[ and Ctrl+] cheats. Runtime
 	// only and never saved, so they live here rather than in GlobalData with the Options.ini flags.
-	virtual void toggleObjectNameOverlay( void ) { m_objectNameOverlayOn = !m_objectNameOverlayOn; }
-	virtual Bool isObjectNameOverlayOn( void ) const { return m_objectNameOverlayOn; }
+	// TheSuperHackers @feature Three states rather than two: off, the object's template name, then
+	// the sub objects of its model as well.
+	enum ObjectNameOverlayMode CPP_11(: Int)
+	{
+		OBJECT_NAME_OVERLAY_OFF = 0,
+		OBJECT_NAME_OVERLAY_NAME,
+		OBJECT_NAME_OVERLAY_SUBOBJECTS,
+		OBJECT_NAME_OVERLAY_MODE_COUNT
+	};
+	virtual void toggleObjectNameOverlay( void )
+	{
+		m_objectNameOverlayMode = (ObjectNameOverlayMode)
+				( ( m_objectNameOverlayMode + 1 ) % OBJECT_NAME_OVERLAY_MODE_COUNT );
+	}
+	virtual ObjectNameOverlayMode getObjectNameOverlayMode( void ) const { return m_objectNameOverlayMode; }
+	virtual Bool isObjectNameOverlayOn( void ) const { return m_objectNameOverlayMode != OBJECT_NAME_OVERLAY_OFF; }
 	virtual void toggleParticleNameOverlay( void ) { m_particleNameOverlayOn = !m_particleNameOverlayOn; }
 	virtual Bool isParticleNameOverlayOn( void ) const { return m_particleNameOverlayOn; }
 #endif
@@ -1099,7 +1113,7 @@ protected:
 	Bool												m_isQuitMenuVisible;
 	Bool												m_messagesOn;
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
-	Bool												m_objectNameOverlayOn;
+	ObjectNameOverlayMode					m_objectNameOverlayMode;
 	Bool												m_particleNameOverlayOn;
 #endif
 

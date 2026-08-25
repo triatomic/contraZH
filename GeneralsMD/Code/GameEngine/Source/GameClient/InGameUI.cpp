@@ -1204,7 +1204,7 @@ InGameUI::InGameUI()
 	m_replayWindow = nullptr;
 	m_messagesOn = TRUE;
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
-	m_objectNameOverlayOn = FALSE;
+	m_objectNameOverlayMode = OBJECT_NAME_OVERLAY_OFF;
 	m_particleNameOverlayOn = FALSE;
 #endif
 

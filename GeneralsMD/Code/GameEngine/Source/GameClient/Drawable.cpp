@@ -2924,6 +2924,12 @@ static Bool computeHealthRegion( const Drawable *draw, IRegion2D& region )
 // starts covering its neighbours. Also bounds the per object scan.
 static const Int MAX_OVERLAY_PARTICLE_LINES = 4;
 
+// TheSuperHackers @feature Most sub object names to list before the stack starts covering the
+// object's neighbours. A typical vehicle has a dozen or so -- wheels, turret, housecolor,
+// headlights -- so this fits most models whole, and the overlay says how many were left out
+// rather than pretending the list is complete when it does not.
+static const Int MAX_OVERLAY_SUBOBJECT_LINES = 16;
+
 //-------------------------------------------------------------------------------------------------
 // TheSuperHackers @feature Draw one line of the debug name overlay, horizontally centred on the
 // object and stacking upward: lineY is moved up by the line height so the next call sits above
@@ -3083,7 +3089,9 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 	if( TheInGameUI == nullptr || TheDisplayStringManager == nullptr )
 		return;
 
-	const Bool wantObjectName = TheInGameUI->isObjectNameOverlayOn();
+	const InGameUI::ObjectNameOverlayMode nameMode = TheInGameUI->getObjectNameOverlayMode();
+	const Bool wantObjectName = ( nameMode != InGameUI::OBJECT_NAME_OVERLAY_OFF );
+	const Bool wantSubObjects = ( nameMode == InGameUI::OBJECT_NAME_OVERLAY_SUBOBJECTS );
 	const Bool wantParticleNames = TheInGameUI->isParticleNameOverlayOn();
 	if( !wantObjectName && !wantParticleNames )
 		return;
@@ -3134,6 +3142,8 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 	const Color textColor = GameMakeColor( 255, 255, 255, 255 );
 	const Color dropColor = GameMakeColor( 0, 0, 0, 255 );
 	const Color particleColor = GameMakeColor( 120, 220, 255, 255 );
+	// A third colour, so sub objects are not mistaken for the particle systems above them.
+	const Color subObjectColor = GameMakeColor( 170, 255, 170, 255 );
 	// An FXList is a group of particle systems, so its name gets its own colour to separate the
 	// group from the systems inside it.
 	const Color fxListColor = GameMakeColor( 255, 190, 90, 255 );
@@ -3273,6 +3283,46 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 				line.format( L"%hs", fxNames[i].str() );
 				drawOverlayLine( s_nameString, line, anchor.x, lineY, fxListColor, dropColor );
 			}
+		}
+	}
+
+	// Sub objects sit above the object name, so they are drawn first -- lines stack upward.
+	if( wantSubObjects )
+	{
+		AsciiString subNames[ MAX_OVERLAY_SUBOBJECT_LINES ];
+		Int total = 0;
+
+		// Drawable cannot see the render object itself, so the draw module is asked for the
+		// names through the device agnostic ObjectDrawInterface.
+		for( DrawModule **dm = getDrawModulesNonDirty(); dm && *dm; ++dm )
+		{
+			const ObjectDrawInterface *di = (*dm)->getObjectDrawInterface();
+			if( di == nullptr )
+				continue;
+
+			total = di->clientOnly_getSubObjectNames( subNames, MAX_OVERLAY_SUBOBJECT_LINES );
+			if( total > 0 )
+				break;
+		}
+
+		const Int shown = ( total < MAX_OVERLAY_SUBOBJECT_LINES ) ? total : MAX_OVERLAY_SUBOBJECT_LINES;
+
+		// Drawn bottom up, so the names are emitted first and the "and N more" line last, leaving
+		// it at the top of the stack where it reads as a continuation of the list above.
+		for( Int i = shown - 1; i >= 0; --i )
+		{
+			UnicodeString line;
+			line.format( L"%hs", subNames[i].str() );
+			drawOverlayLine( s_nameString, line, anchor.x, lineY, subObjectColor, dropColor );
+		}
+
+		// The count is the model's total, not what was copied, so say when the list was cut short
+		// rather than silently showing part of it.
+		if( total > shown )
+		{
+			UnicodeString more;
+			more.format( L"... and %d more", total - shown );
+			drawOverlayLine( s_nameString, more, anchor.x, lineY, subObjectColor, dropColor );
 		}
 	}
 
