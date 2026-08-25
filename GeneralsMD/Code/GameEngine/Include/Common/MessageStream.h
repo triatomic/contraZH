@@ -309,11 +309,19 @@ public:
 		// META items that are really for debug/demo/development use only...
 		// They do not get built into plain RELEASE builds.
 		//
-		// TheSuperHackers @tweak Also built into cheats enabled release builds. The ordinals are
-		// unchanged either way -- the block is widened in place rather than moved -- so this cannot
-		// shift anything below it and break replays or saves, which is what inserting mid enum did
-		// once already. Only the handlers that are separately enabled for cheat builds can actually
-		// be reached; the rest simply have a message type that nothing dispatches.
+		// TheSuperHackers @tweak Also built into cheats enabled release builds, so that a debug
+		// command can be enabled for them without moving its enumerator. Only the handlers that
+		// are separately enabled for cheat builds can actually be reached; the rest simply have a
+		// message type that nothing dispatches.
+		//
+		// Note this block is conditional, so every enumerator BELOW it -- MSG_META_PLACE_BEACON
+		// onwards, including MSG_END_META_MESSAGES -- has a different value in a cheats build than
+		// in a plain release one. That is survivable only because nothing persists or transmits a
+		// meta ordinal: the network range is pinned at an explicit 1000 below, saves and replays
+		// carry only those, and CommandMap.ini binds by name rather than by number.
+		//
+		// So do not add anything here that gets written to a file or sent over the wire, and do
+		// not assume two differently configured builds agree on any value after this point.
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 		MSG_META_DEMO_TOGGLE_BEHIND_BUILDINGS,			///< Toggles showing units behind buildings or not
 		MSG_META_DEMO_TOGGLE_LETTERBOX,							///< enable/disable letterbox mode
