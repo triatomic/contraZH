@@ -40,6 +40,11 @@
 #include "texturefilter.h"
 #include "dx8wrapper.h"
 
+// TheSuperHackers @fix The anisotropic sample count most recently asked for. Kept so that
+// _Init_Filters can restore it after a device reset, which resets the real device to its
+// default of 1 and invalidates the wrapper's cached stage states.
+static int _RequestedMaxAnisotropy = 2;	// what retail hardcoded
+
 unsigned _MinTextureFilters[MAX_TEXTURE_STAGES][TextureFilterClass::FILTER_TYPE_COUNT];
 unsigned _MagTextureFilters[MAX_TEXTURE_STAGES][TextureFilterClass::FILTER_TYPE_COUNT];
 unsigned _MipMapFilters[MAX_TEXTURE_STAGES][TextureFilterClass::FILTER_TYPE_COUNT];
@@ -194,6 +199,12 @@ void TextureFilterClass::_Init_Filters(TextureFilterMode filter_type)
 		_MipMapFilters[i][FILTER_TYPE_DEFAULT]=_MipMapFilters[i][FILTER_TYPE_BEST];
 	}
 
+	// TheSuperHackers @fix Re-apply the anisotropic sample count here rather than only once at
+	// startup. A device reset -- alt tabbing, or changing between windowed and fullscreen --
+	// returns the device to its default MaxAnisotropy of 1 and invalidates the wrapper's cached
+	// stage states. This function is re-run on that path, so the level is restored with the mode
+	// instead of being silently lost for the rest of the session.
+	_Set_Max_Anisotropy(_RequestedMaxAnisotropy);
 }
 
 // TheSuperHackers @feature Mauller 08/03/2026 Set the anisotropic sample count on every texture
@@ -210,6 +221,10 @@ void TextureFilterClass::_Set_Max_Anisotropy(int level)
 	{
 		level = 1;
 	}
+
+	// Remembered unclamped, so a later reset on different hardware still gets what was asked
+	// for rather than a value already narrowed to the old device's limit.
+	_RequestedMaxAnisotropy = level;
 
 	// Reads the device caps, so this must not be called before the render device exists --
 	// same requirement as _Init_Filters, which is what CurrentCaps is created alongside.

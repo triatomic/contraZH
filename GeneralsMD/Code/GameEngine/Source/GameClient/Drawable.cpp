@@ -3002,7 +3002,9 @@ void Drawable::rememberParticleNames( const AsciiString *names, const AsciiStrin
 
 //-------------------------------------------------------------------------------------------------
 // TheSuperHackers @feature Read back the remembered particle names that are still inside the
-// linger window, newest first so the most recent effect is the one that survives the line cap.
+// linger window. Selected newest first, so the most recent effect is the one that survives the
+// line cap, then returned oldest first to match the order the live scan produces -- the caller
+// draws bottom up, so the newest name lands at the top of the stack either way.
 // Returns how many were written into the caller's arrays.
 //-------------------------------------------------------------------------------------------------
 Int Drawable::collectRememberedParticleNames( AsciiString *names, AsciiString *fxNames,
@@ -3016,6 +3018,9 @@ Int Drawable::collectRememberedParticleNames( AsciiString *names, AsciiString *f
 	// Selection sort by recency. The list is at most MAX_REMEMBERED_PARTICLE_NAMES long, so this
 	// stays cheaper than carrying an ordered structure around.
 	Bool used[ MAX_REMEMBERED_PARTICLE_NAMES ];
+	// Which entries were picked, in pick order, so the final write can reverse them without
+	// disturbing the selection above.
+	Int selected[ MAX_OVERLAY_PARTICLE_LINES ];
 	for( Int i = 0; i < MAX_REMEMBERED_PARTICLE_NAMES; ++i )
 		used[i] = FALSE;
 
@@ -3043,9 +3048,18 @@ Int Drawable::collectRememberedParticleNames( AsciiString *names, AsciiString *f
 			break;
 
 		used[best] = TRUE;
-		names[written] = info->m_name[best];
-		fxNames[written] = info->m_fxName[best];
+		selected[written] = best;
 		++written;
+	}
+
+	// Picked newest first, so the line cap keeps the most recent effects, but handed back
+	// oldest first to match the order the live scan produces. The caller draws bottom up from
+	// the end of the array, so both paths put the newest name at the top of the stack.
+	for( Int w = 0; w < written; ++w )
+	{
+		const Int src = selected[ written - 1 - w ];
+		names[w] = info->m_name[src];
+		fxNames[w] = info->m_fxName[src];
 	}
 
 	return written;
