@@ -2925,9 +2925,10 @@ static Bool computeHealthRegion( const Drawable *draw, IRegion2D& region )
 static const Int MAX_OVERLAY_PARTICLE_LINES = 4;
 
 // TheSuperHackers @feature Most sub object names to list before the stack starts covering the
-// object's neighbours. Models routinely have more than this, so the overlay says how many were
-// left out rather than pretending the list is complete.
-static const Int MAX_OVERLAY_SUBOBJECT_LINES = 8;
+// object's neighbours. A typical vehicle has a dozen or so -- wheels, turret, housecolor,
+// headlights -- so this fits most models whole, and the overlay says how many were left out
+// rather than pretending the list is complete when it does not.
+static const Int MAX_OVERLAY_SUBOBJECT_LINES = 16;
 
 //-------------------------------------------------------------------------------------------------
 // TheSuperHackers @feature Draw one line of the debug name overlay, horizontally centred on the
@@ -3306,6 +3307,15 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 
 		const Int shown = ( total < MAX_OVERLAY_SUBOBJECT_LINES ) ? total : MAX_OVERLAY_SUBOBJECT_LINES;
 
+		// Drawn bottom up, so the names are emitted first and the "and N more" line last, leaving
+		// it at the top of the stack where it reads as a continuation of the list above.
+		for( Int i = shown - 1; i >= 0; --i )
+		{
+			UnicodeString line;
+			line.format( L"%hs", subNames[i].str() );
+			drawOverlayLine( s_nameString, line, anchor.x, lineY, subObjectColor, dropColor );
+		}
+
 		// The count is the model's total, not what was copied, so say when the list was cut short
 		// rather than silently showing part of it.
 		if( total > shown )
@@ -3313,13 +3323,6 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 			UnicodeString more;
 			more.format( L"... and %d more", total - shown );
 			drawOverlayLine( s_nameString, more, anchor.x, lineY, subObjectColor, dropColor );
-		}
-
-		for( Int i = shown - 1; i >= 0; --i )
-		{
-			UnicodeString line;
-			line.format( L"%hs", subNames[i].str() );
-			drawOverlayLine( s_nameString, line, anchor.x, lineY, subObjectColor, dropColor );
 		}
 	}
 
