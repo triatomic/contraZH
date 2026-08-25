@@ -174,13 +174,17 @@ build entirely.
 
 ## Debug name overlays
 
-Two toggles that draw names above every object on screen, selected or not, including props and
+Two overlays that draw names above every object on screen, selected or not, including props and
 wreckage that never get a health bar.
 
-| Keys | Shows |
-| ---- | ----- |
-| <kbd>Ctrl</kbd>+<kbd>[</kbd> | Object template (INI) name, in white |
-| <kbd>Ctrl</kbd>+<kbd>]</kbd> | Particle systems running on that object, in blue, with the FXList that spawned them in amber |
+* `Ctrl + [` - (Cycles three ways: off, the object's template (INI) name in white, then the
+model's sub object names in green as well.)
+* `Ctrl + ]` - (Particle systems running on that object, in blue, with the FXList that
+spawned them in amber)
+
+The sub object list is what the W3D model is actually built from - hull, turret, wheels,
+housecolor and so on - so it is useful for finding the name to use in `ShowSubObject` or
+`HideSubObject`. Up to 16 are listed, with a trailing "and N more" when the model has more.
 
 Also bindable in `CommandMap.ini` as `CHEAT_SHOW_OBJECT_NAME` and `CHEAT_SHOW_PARTICLE_NAMES`.
 
@@ -195,12 +199,11 @@ best switched on only while looking for something.
 
 ## Other cheat hotkeys
 
-| Keys | Does |
-| ---- | ---- |
-| <kbd>Ctrl</kbd>+<kbd>`</kbd> | Instant build, +999999 credits, this general's own sciences, max rank, reveals the map |
-| <kbd>Ctrl</kbd>+<kbd>\\</kbd> | Toggles rendering off and on; the simulation keeps running |
-| <kbd>Shift</kbd>+<kbd>Ctrl</kbd>+<kbd>Z</kbd> | Toggles the camera zoom limit |
-| <kbd>Shift</kbd>+<kbd>Ctrl</kbd>+<kbd>`</kbd> | Cycles `HealthBarDisplayMode` live |
+* ``Ctrl + ` `` - (Instant build, +999999 credits, this general's own sciences, max rank,
+reveals the map)
+* `Ctrl + \` - (Toggles rendering off and on; the simulation keeps running)
+* `Shift + Ctrl + Z` - (Toggles the camera zoom limit)
+* ``Shift + Ctrl + ` `` - (Cycles `HealthBarDisplayMode` live)
 
 Notes:
 * The health bar cycle is **not** a cheat and works in a normal release build too.
