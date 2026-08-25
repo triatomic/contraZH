@@ -1245,6 +1245,58 @@ else()
     )
 endif()
 
+if(RTS_BUILD_GENERALS_ONLINE)
+    # The Generals Online services stack, ported from
+    # GeneralsOnlineDevelopmentTeam/GameClient. See
+    # Source/GameNetwork/GeneralsOnline/PORT_NOTES.md
+    list(APPEND GAMEENGINE_SRC
+        Include/GameNetwork/UDPTransport.h
+        Source/GameNetwork/UDPTransport.cpp
+        Include/GameNetwork/GeneralsOnline/json.hpp
+        Include/GameNetwork/GeneralsOnline/DiscordRichPresence.h
+        Include/GameNetwork/GeneralsOnline/Vendor/DiscordRPC/discord_rpc.h
+        Include/GameNetwork/GeneralsOnline/NetworkBitstream.h
+        Include/GameNetwork/GeneralsOnline/NetworkMesh.h
+        Include/GameNetwork/GeneralsOnline/NetworkPacket.h
+        Include/GameNetwork/GeneralsOnline/NextGenMP_defines.h
+        Include/GameNetwork/GeneralsOnline/NGMPGame.h
+        Include/GameNetwork/GeneralsOnline/NGMP_include.h
+        Include/GameNetwork/GeneralsOnline/NGMP_interfaces.h
+        Include/GameNetwork/GeneralsOnline/NGMP_types.h
+        Include/GameNetwork/GeneralsOnline/OnlineServices_Auth.h
+        Include/GameNetwork/GeneralsOnline/OnlineServices_Init.h
+        Include/GameNetwork/GeneralsOnline/OnlineServices_LobbyInterface.h
+        Include/GameNetwork/GeneralsOnline/OnlineServices_RoomsInterface.h
+        Include/GameNetwork/GeneralsOnline/OnlineServices_StatsInterface.h
+        Include/GameNetwork/GeneralsOnline/OnlineServices_SocialInterface.h
+        Include/GameNetwork/GeneralsOnline/OnlineServices_MatchmakingInterface.h
+        Include/GameNetwork/GeneralsOnline/GeneralsOnline_Settings.h
+        Include/GameNetwork/GeneralsOnline/HTTP/HTTPManager.h
+        Include/GameNetwork/GeneralsOnline/HTTP/HTTPRequest.h
+        Include/GameNetwork/GeneralsOnline/NextGenTransport.h
+        Include/GameNetwork/GeneralsOnline/PluginInterfaces.h
+        Source/GameNetwork/GeneralsOnline/DiscordRichPresence.cpp
+        Source/GameNetwork/GeneralsOnline/NGMP_Helpers.cpp
+        Source/GameNetwork/GeneralsOnline/NGMPGame.cpp
+        Source/GameNetwork/GeneralsOnline/GeneralsOnline_Settings.cpp
+        Source/GameNetwork/GeneralsOnline/HTTP/HTTPManager.cpp
+        Source/GameNetwork/GeneralsOnline/HTTP/HTTPRequest.cpp
+        Source/GameNetwork/GeneralsOnline/NetworkMesh.cpp
+        Source/GameNetwork/GeneralsOnline/OnlineServices_Init.cpp
+        Source/GameNetwork/GeneralsOnline/OnlineServices_Auth.cpp
+        Source/GameNetwork/GeneralsOnline/OnlineServices_LobbyInterface.cpp
+        Source/GameNetwork/GeneralsOnline/OnlineServices_RoomsInterface.cpp
+        Source/GameNetwork/GeneralsOnline/OnlineServices_StatsInterface.cpp
+        Source/GameNetwork/GeneralsOnline/OnlineServices_SocialInterface.cpp
+        Source/GameNetwork/GeneralsOnline/OnlineServices_MatchmakingInterface.cpp
+        Source/GameNetwork/GeneralsOnline/NextGenTransport.cpp
+        Source/GameNetwork/GeneralsOnline/NetworkBitstream.cpp
+        Source/GameNetwork/GeneralsOnline/PluginInterfaces.cpp
+        # TEMPORARY - remove when the GO menu dual copies land (see the file header)
+        Source/GameNetwork/GeneralsOnline/GeneralsOnline_UIStubs.cpp
+    )
+endif()
+
 
 add_library(z_gameengine STATIC)
 
@@ -1257,6 +1309,17 @@ target_include_directories(z_gameengine PUBLIC
 target_include_directories(z_gameengine PRIVATE
     Include/Precompiled
 )
+
+if(RTS_BUILD_GENERALS_ONLINE)
+    # Vendored Generals Online dependencies: headers, and the prebuilt Win32 libs the
+    # online sources pull in via #pragma comment(lib, ...) (MSVC x86 only).
+    target_include_directories(z_gameengine PUBLIC
+        Include/GameNetwork/GeneralsOnline/Vendor/
+    )
+    target_link_directories(z_gameengine PUBLIC
+        Source/GameNetwork/GeneralsOnline/Vendor
+    )
+endif()
 
 target_link_libraries(z_gameengine PRIVATE
     corei_gameengine_private

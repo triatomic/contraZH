@@ -9,6 +9,27 @@ else()
     set_target_properties(z_generals PROPERTIES OUTPUT_NAME "generalszh${RTS_BUILD_OUTPUT_SUFFIX}")
 endif()
 
+if(RTS_BUILD_GENERALS_ONLINE AND WIN32)
+    # The Generals Online vendor libraries are import libs; their DLLs must sit
+    # beside the exe. discord-rpc's license ships alongside per its terms.
+    set(GO_VENDOR_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../GameEngine/Source/GameNetwork/GeneralsOnline/Vendor")
+    add_custom_command(TARGET z_generals POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${GO_VENDOR_DIR}/DiscordRPC/LICENSE.txt"
+            "$<TARGET_FILE_DIR:z_generals>/discord-rpc-LICENSE.txt"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${GO_VENDOR_DIR}/DiscordRPC/discord-rpc.dll"
+            "${GO_VENDOR_DIR}/libcurl/libcurl.dll"
+            "${GO_VENDOR_DIR}/libcurl/libcrypto-3.dll"
+            "${GO_VENDOR_DIR}/libcurl/libssl-3.dll"
+            "${GO_VENDOR_DIR}/libcurl/zlib1.dll"
+            "${GO_VENDOR_DIR}/ValveNetworkingSockets/GameNetworkingSockets.dll"
+            "${GO_VENDOR_DIR}/ValveNetworkingSockets/abseil_dll.dll"
+            "${GO_VENDOR_DIR}/ValveNetworkingSockets/libprotobuf.dll"
+            "$<TARGET_FILE_DIR:z_generals>"
+    )
+endif()
+
 target_link_libraries(z_generals PRIVATE
     binkstub
     comctl32

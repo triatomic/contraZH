@@ -15,6 +15,19 @@ target_compile_definitions(zi_always INTERFACE
 target_compile_definitions(zi_always_no_pch INTERFACE
     RTS_ZEROHOUR=1
 )
+
+if(RTS_BUILD_GENERALS_ONLINE)
+    # _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR keeps MSVC's STL mutex ABI compatible
+    # with the prebuilt Generals Online vendor libraries.
+    target_compile_definitions(zi_always INTERFACE
+        GENERALS_ONLINE
+        _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR
+    )
+    target_compile_definitions(zi_always_no_pch INTERFACE
+        GENERALS_ONLINE
+        _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR
+    )
+endif()
 target_link_libraries(zi_gameengine_include INTERFACE
     corei_gameengine_include
 )
