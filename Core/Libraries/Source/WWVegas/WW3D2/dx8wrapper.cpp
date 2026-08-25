@@ -646,6 +646,15 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 		}
 		Invalidate_Cached_Render_States();
 		Set_Default_Global_Render_States();
+		// TheSuperHackers @fix Re-apply the texture filtering mode and anisotropy level after a
+		// device reset. The reset returns the device to its default MaxAnisotropy of 1 and
+		// invalidates the wrapper's cached stage states, so without this the player's filtering
+		// setting was silently lost for the rest of the session after alt tabbing or toggling
+		// between windowed and fullscreen.
+		TextureFilterClass::_Init_Filters(
+			(TextureFilterClass::TextureFilterMode)WW3D::Get_Texture_Filter(),
+			(TextureFilterClass::AnisotropicFilterMode)WW3D::Get_Anisotropy_Level()
+		);
 		SHD_INIT_SHADERS;
 		WWDEBUG_SAY(("Device reset completed"));
 		return true;
