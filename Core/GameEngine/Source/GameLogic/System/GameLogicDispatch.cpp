@@ -570,14 +570,6 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			onDoSpecialPowerAtObject(msg, currentlySelectedGroup);
 			break;
 		}
-#if RTS_ZEROHOUR
-		// N-point (chronosphere) special power: all target points committed together in one message.
-		case GameMessage::MSG_DO_SPECIAL_POWER_AT_MULTIPLE_LOCATIONS:
-		{
-			onDoSpecialPowerAtMultipleLocations(msg, currentlySelectedGroup);
-			break;
-		}
-#endif
 		case GameMessage::MSG_DO_ATTACKMOVETO:
 		{
 			onDoAttackmoveto(msg, currentlySelectedGroup);

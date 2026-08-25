@@ -2639,7 +2639,6 @@ void W3DModelDraw::adjustAnimation(const ModelConditionInfo* prevState, Real pre
 					hlod->Set_Animation_Frame_Rate_Multiplier(factor);
 				}
 			}
-			}
 		}
 	}
 	}
