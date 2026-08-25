@@ -1,0 +1,210 @@
+# contraZH Changes
+
+This page describes changes made in [contraZH](https://github.com/triatomic/contraZH), a fork of
+GeneralsGameCode_Modding. Everything here is additional to upstream; the rest of this wiki still
+applies unchanged.
+
+Almost all of it is client-side presentation and input handling, read from `Options.ini` and
+defaulting to retail behaviour, so an untouched `Options.ini` plays exactly as before.
+
+# Options.ini
+
+These are read once at startup. Changing them needs a restart.
+
+## Display
+
+* `HealthBarDisplayMode = Classic` - (`Classic` | `Damaged` | `Always`. `Damaged` shows a bar only on
+hurt objects, `Always` shows one on everything.)
+* `NumericalHealth = No` - (Yes prints the hit points beside the health bar. Follows
+`HealthBarDisplayMode`, so the number appears exactly where a bar does.)
+* `SelectionCircle = No` - (Yes draws a green ring on the ground under selected objects. Retail draws
+nothing there; selection is only a brief tint flash on the model.)
+* `SmartPips = No` - (Yes keeps ammo and passenger pips on screen instead of showing them only while
+the unit is selected or moused over. Own units only. Nothing is drawn when there is nothing to
+report, so the pips read as "still loaded" and "carrying someone" at a glance.)
+* `BuildTimerDisplayMode = None` - (`None` | `Seconds` | `Auto`. Countdown numbers on build queue and
+special power cameos. `Auto` switches to MM:SS past a minute.)
+
+Note: `SelectionCircle` needs a mod-side `PlainRingSelection.tga` — a white or greyscale ring with
+alpha, tinted green at runtime. Until it exists the ring simply does not draw.
+
+## Hotkey overlay
+
+Draws each command bar cameo's hotkey letter on the cameo.
+
+* `KeyboardOverlay = No` - (Yes shows the letters.)
+* `KeyboardOverlayRed = 255` - (Letter colour, 0-255 per channel.)
+* `KeyboardOverlayGreen = 255`
+* `KeyboardOverlayBlue = 255`
+* `KeyboardOverlayBackdrop = Yes` - (Draw a translucent plate behind the letter.)
+* `KeyboardOverlayBackdropRed = 0` - (Backdrop colour, 0-255 per channel.)
+* `KeyboardOverlayBackdropGreen = 0`
+* `KeyboardOverlayBackdropBlue = 0`
+* `KeyboardOverlayBackdropOpacity = 128` - (0-255; 128 is 50%.)
+
+The letter shown is whatever actually got registered in the hotkey manager, not the button's label,
+so a colliding hotkey that was dropped at registration is not advertised as working.
+
+## Grid hotkeys
+
+Keys each cameo by **where it sits in the command bar** rather than by the letter its string file
+marked with an ampersand, so a key stays in the same place whatever is being built.
+
+* `GridHotkeys = No` - (Yes keys cameos by slot position.)
+* `GridHotkeyLayout = QWERTYUIOASDFGHJKL` - (One key per slot, in reading order.)
+* `GridHotkeyColumns = 9` - (Command bar width. The command bar numbers its slots down each column
+while the layout string is written across each row, so this is needed to map between them. 0
+disables remapping.)
+* `NonGridHotkeys =` - (Keys to leave out of the grid, e.g. `SGX`. Separators are ignored, so `SGX`,
+`S,G,X` and `S G X` are all the same.)
+
+An excluded slot falls back to its string file letter, so the key is freed for the game's own use
+while the button still works the way it did before grid hotkeys existed. If that letter is also a
+live grid letter the slot gets no hotkey instead, since `addHotKey` keeps whichever slot registered
+first and silently drops the other.
+
+## Input
+
+* `CastMode = Normal` - (`Normal` | `QuickCast` | `QuickCastWithIndicator`. `QuickCast` fires a
+targeted ability at the cursor on the hotkey press instead of arming it for a second click.
+`QuickCastWithIndicator` holds to aim with a decal and fires on release.)
+
+Notes:
+* Superweapons, structure placement, rally points and beacons are deliberately excluded — firing one
+at an unintended spot cannot be undone.
+* A cast requested while the ability is recharging is remembered and fired the moment the logic side
+says it is ready, rather than being thrown away. The cooldown itself is untouched: readiness is
+asked of `SpecialPowerModule::isReady` every frame rather than predicted, so a queued cast can never
+fire earlier than a manual one could.
+* Shift+click queues or cancels five units at once, from either the mouse or the hotkey.
+
+## Rendering
+
+* `TextureFilter = Bilinear` - (`Bilinear` | `Trilinear` | `Anisotropic`. The engine has supported
+all three since retail, but nothing ever called `WW3D::Set_Texture_Filter`, so the better two were
+unreachable.)
+* `AnisotropicLevel = 2` - (`2` | `4` | `8` | `16`. Only used when `TextureFilter = Anisotropic`.
+Retail hardcoded this to 2, the lowest anisotropic filtering goes.)
+
+Notes:
+* An unrecognised value falls back to the default rather than failing, and `AnisotropicLevel` rounds
+down to a valid step, so a typo degrades instead of surprising.
+* The level is clamped to whatever the device reports supporting. DirectX rejects a value above the
+cap and silently keeps the previous setting rather than reporting an error, so asking for 16x on
+hardware that tops out at 8x degrades cleanly instead of doing nothing.
+
+# ParticleSystem.ini
+
+## ConformToTerrain
+
+* `ConformToTerrain = Yes` - (Default. `No` opts a single effect out of terrain conforming.)
+
+A ground aligned particle drawn as a quad can only ever be a flat plane, so a wide one cuts through
+a hillside no matter how its corners are placed. Ground aligned, non-billboarded particles with no
+volume depth are instead built as a mesh from the terrain's own heightmap cells, the same way
+projected decals are, so the particle inherits the ground geometry exactly.
+
+Notes:
+* Cost is quadratic in particle size. Past 160 terrain cells per side the mesh samples every Nth cell
+instead, so a very large particle stops getting more expensive without bound. The trade is a coarser
+terrain fit, which is not visible on the effects that actually reach that size.
+* Effects that drift upward — mushroom clouds and similar — gain nothing from conforming and are
+worth opting out explicitly.
+
+# New CommandButton Commands
+
+## HOLD_FIRE
+
+Suppresses **automatic target acquisition only**. A holding unit still fires when the player
+explicitly orders an attack. Covers the unit, its addon and sub-turrets, and any infantry contained
+inside it.
+
+```
+CommandButton Command_HoldFire
+  Command       = HOLD_FIRE
+  Options       = CHECK_LIKE     ; required, or the button never renders as toggled on
+  TextLabel     = CONTROLBAR:HoldFire
+  ButtonImage   = SNHoldFire
+  DescriptLabel = CONTROLBAR:TooltipHoldFire
+End
+```
+
+Per-object parameter:
+* `HoldFireAllowsRetaliation = Yes` - (Default. `No` stops the unit returning fire even when attacked.)
+
+Note: the flag lives on `AIUpdateInterface`, so garrisoned buildings cannot hold fire — most have no
+AI module. Infantry inside a *unit* are covered.
+
+## AUTO_FILL
+
+Selects nearby idle infantry and orders them to board the selected container.
+
+```
+CommandButton Command_AutoFill
+  Command       = AUTO_FILL
+  Options       = OK_FOR_MULTI_SELECT
+  TextLabel     = CONTROLBAR:AutoFill
+  ButtonImage   = SNAutoFill
+  DescriptLabel = CONTROLBAR:TooltipAutoFill
+End
+```
+
+Only infantry that are idle, not already contained, and not already members of the group are
+considered, searched nearest-first per container.
+
+# Drag Selection
+
+## EasyMilitaryDrag
+
+* `EasyMilitaryDrag = No` - (Yes leaves builders out of a drag selection, so boxing over a base picks
+up the army without dragging workers along.)
+
+Covers `KINDOF_DOZER` and `KINDOF_IGNORES_SELECT_ALL`, the same kinds Select All already
+disqualifies.
+
+Notes:
+* Holding Ctrl while dragging inverts it, selecting **only** the builders.
+* If a drag would otherwise select nothing but structures, the filter is dropped for that drag and
+everything under the box is selected, so dragging over a group of workers still works.
+
+# Debug and Cheat Features
+
+These require a build made with `RTS_DEBUG_CHEATS=ON`. They are compiled out of a normal release
+build entirely.
+
+## Debug name overlays
+
+Two toggles that draw names above every object on screen, selected or not, including props and
+wreckage that never get a health bar.
+
+| Keys | Shows |
+| ---- | ----- |
+| <kbd>Ctrl</kbd>+<kbd>[</kbd> | Object template (INI) name, in white |
+| <kbd>Ctrl</kbd>+<kbd>]</kbd> | Particle systems running on that object, in blue, with the FXList that spawned them in amber |
+
+Also bindable in `CommandMap.ini` as `CHEAT_SHOW_OBJECT_NAME` and `CHEAT_SHOW_PARTICLE_NAMES`.
+
+* `ParticleNameLingerMS = 0` - (Options.ini. Milliseconds a particle name stays on screen after its
+system has gone. 0 or absent shows names only while the system is alive.)
+
+Notes:
+* Many effects are one-shot bursts that die within a frame or two, so without a linger their names
+flash past unreadably.
+* The particle overlay scans every live particle system once per drawn object, every frame, so it is
+best switched on only while looking for something.
+
+## Other cheat hotkeys
+
+| Keys | Does |
+| ---- | ---- |
+| <kbd>Ctrl</kbd>+<kbd>`</kbd> | Instant build, +999999 credits, this general's own sciences, max rank, reveals the map |
+| <kbd>Ctrl</kbd>+<kbd>\\</kbd> | Toggles rendering off and on; the simulation keeps running |
+| <kbd>Shift</kbd>+<kbd>Ctrl</kbd>+<kbd>Z</kbd> | Toggles the camera zoom limit |
+| <kbd>Shift</kbd>+<kbd>Ctrl</kbd>+<kbd>`</kbd> | Cycles `HealthBarDisplayMode` live |
+
+Notes:
+* The health bar cycle is **not** a cheat and works in a normal release build too.
+* The combined cheat's second press resets rank, which calls `resetRank()` and wipes purchased
+sciences — it returns you to a fresh general, not to what you had before.
+* Sciences granted are only this general's own tree, walked from the three purchase command sets the
+player template names, not every science in the game.
