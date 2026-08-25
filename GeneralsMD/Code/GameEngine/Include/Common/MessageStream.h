@@ -307,8 +307,14 @@ public:
 #endif
 
 		// META items that are really for debug/demo/development use only...
-		// They do not get built into RELEASE builds.
-#if defined(RTS_DEBUG)
+		// They do not get built into plain RELEASE builds.
+		//
+		// TheSuperHackers @tweak Also built into cheats enabled release builds. The ordinals are
+		// unchanged either way -- the block is widened in place rather than moved -- so this cannot
+		// shift anything below it and break replays or saves, which is what inserting mid enum did
+		// once already. Only the handlers that are separately enabled for cheat builds can actually
+		// be reached; the rest simply have a message type that nothing dispatches.
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 		MSG_META_DEMO_TOGGLE_BEHIND_BUILDINGS,			///< Toggles showing units behind buildings or not
 		MSG_META_DEMO_TOGGLE_LETTERBOX,							///< enable/disable letterbox mode
 		MSG_META_DEMO_TOGGLE_MESSAGE_TEXT,					///< toggle the text from the UI messages
@@ -426,7 +432,7 @@ public:
 		MSG_META_DEBUG_WIN,													///< Instant Win
 		MSG_META_DEMO_TOGGLE_DEBUG_STATS,						///< show/hide the debug stats
 		/// @todo END section to REMOVE (not disable) for release
-#endif // defined(RTS_DEBUG)
+#endif // defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 
 #if defined(RTS_DEBUG)
 		MSG_META_DEMO_TOGGLE_AUDIODEBUG,						///< show/hide the audio debug info

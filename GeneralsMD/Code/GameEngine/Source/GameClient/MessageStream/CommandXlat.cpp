@@ -3978,6 +3978,23 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			break;
 		}
 
+		// TheSuperHackers @feature Toggle rendering off and on. Retail has this as a debug command,
+		// but the handler lives inside an #if defined(RTS_DEBUG) block and so is compiled out of a
+		// cheats enabled release build, where only _ALLOW_DEBUG_CHEATS_IN_RELEASE is set -- the same
+		// trap that made the combined cheat unreachable. Moved here, where it actually builds.
+		//
+		// Everything it touches is already unguarded: m_disableRender, its initialiser, and the
+		// W3DDisplay check that reads it. Only the handler was missing.
+		//
+		// Client side only -- it stops the frame being drawn and posts nothing to the logic, so the
+		// simulation keeps running and this is multiplayer and replay safe.
+		case GameMessage::MSG_META_DEMO_TOGGLE_RENDER:
+		{
+			TheWritableGlobalData->m_disableRender = !TheGlobalData->m_disableRender;
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
 		// TheSuperHackers @feature Toggle the object name overlay: the template (INI) name drawn
 		// above every object on screen, selected or not. A modding aid -- it answers "what is this
 		// thing actually called" without leaving the game.
@@ -5153,15 +5170,6 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			disp = DESTROY_MESSAGE;
 			break;
 		}
-
-		//------------------------------------------------------------------------------- DEMO MESSAGES
-		//-----------------------------------------------------------------------------------------
-		case GameMessage::MSG_META_DEMO_TOGGLE_RENDER:
-		{
-			TheWritableGlobalData->m_disableRender = !TheGlobalData->m_disableRender;
-			break;
-		}
-
 
 		//------------------------------------------------------------------------------- DEMO MESSAGES
 		//-----------------------------------------------------------------------------------------
