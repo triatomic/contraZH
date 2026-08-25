@@ -7,6 +7,12 @@ applies unchanged.
 Almost all of it is client-side presentation and input handling, read from `Options.ini` and
 defaulting to retail behaviour, so an untouched `Options.ini` plays exactly as before.
 
+As of August 2026 the fork is synced with TheSuperHackers/GeneralsGameCode and
+GeneralsGameCode_Modding again (their `Core/` restructure included). Everything on this page
+survived the merge unchanged, with one exception: the texture filter option was superseded by the
+version TheSuperHackers landed — see [Rendering](#rendering) for the renamed `AnisotropyLevel` key
+and the extended value list.
+
 # Options.ini
 
 These are read once at startup. Changing them needs a restart.
@@ -80,18 +86,30 @@ fire earlier than a manual one could.
 
 ## Rendering
 
-* `TextureFilter = Bilinear` - (`Bilinear` | `Trilinear` | `Anisotropic`. The engine has supported
-all three since retail, but nothing ever called `WW3D::Set_Texture_Filter`, so the better two were
-unreachable.)
-* `AnisotropicLevel = 2` - (`2` | `4` | `8` | `16`. Only used when `TextureFilter = Anisotropic`.
-Retail hardcoded this to 2, the lowest anisotropic filtering goes.)
+The texture filter option shipped here pre-merge was this fork's adaptation of an unreleased
+TheSuperHackers branch. The August 2026 upstream merge replaced it with the version TheSuperHackers
+landed, which renames one key and extends the values:
+
+* `TextureFilter = Bilinear` - (`None` | `Point` | `Bilinear` | `Trilinear` | `Anisotropic`. The
+engine has supported the better modes since retail, but nothing ever called
+`WW3D::Set_Texture_Filter`, so they were unreachable. Now also selectable from the in-game options
+menu.)
+* `AnisotropyLevel = 2` - (`2` | `4` | `8` | `16`. Only used when `TextureFilter = Anisotropic`.
+Retail hardcoded this to 2, the lowest anisotropic filtering goes. **Renamed from the pre-merge
+`AnisotropicLevel`** — update Options.ini by hand; the old key is silently ignored.)
 
 Notes:
-* An unrecognised value falls back to the default rather than failing, and `AnisotropicLevel` rounds
-down to a valid step, so a typo degrades instead of surprising.
+* An unrecognised `TextureFilter` value now falls back to `None` (point sampling) rather than the
+default, so a typo shows up as a visibly unfiltered picture instead of being silently absorbed.
+`AnisotropyLevel` still rounds down to a valid step.
 * The level is clamped to whatever the device reports supporting. DirectX rejects a value above the
 cap and silently keeps the previous setting rather than reporting an error, so asking for 16x on
 hardware that tops out at 8x degrades cleanly instead of doing nothing.
+* Two fork fixes are layered on top of the merged version: the filter mode and anisotropy level are
+re-applied after a device reset (alt-tab, fullscreen/windowed toggle) instead of silently reverting
+to defaults, and when the driver supports anisotropic filtering for only one of
+minification/magnification the other falls back to linear per capability, instead of both dropping
+to point sampling as the merged code did.
 
 # ParticleSystem.ini
 
