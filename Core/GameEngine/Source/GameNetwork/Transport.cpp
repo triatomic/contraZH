@@ -67,6 +67,20 @@ static inline void decryptBuf( unsigned char *buf, Int len )
 
 //--------------------------------------------------------------------------
 
+#if defined(GENERALS_ONLINE)
+
+// GeneralsOnline port: Transport is an abstract base; the UDP socket lives in
+// UDPTransport (GeneralsMD), which carries the original implementation.
+Transport::Transport()
+{
+}
+
+Transport::~Transport()
+{
+}
+
+#else // !defined(GENERALS_ONLINE)
+
 Transport::Transport()
 {
 	m_winsockInit = false;
@@ -423,6 +437,8 @@ Bool Transport::queueSend(UnsignedInt addr, UnsignedShort port, const UnsignedBy
 	DEBUG_LOG(("Send Queue is getting full, dropping packets"));
 	return false;
 }
+
+#endif // !defined(GENERALS_ONLINE)
 
 Bool Transport::isGeneralsPacket( TransportMessage *msg )
 {

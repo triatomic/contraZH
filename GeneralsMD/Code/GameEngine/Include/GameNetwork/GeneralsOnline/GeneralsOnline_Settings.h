@@ -1,4 +1,5 @@
 #pragma once
+#include "NextGenMP_defines.h"
 #include "libcurl/curl.h"
 
 enum EHTTPVersion

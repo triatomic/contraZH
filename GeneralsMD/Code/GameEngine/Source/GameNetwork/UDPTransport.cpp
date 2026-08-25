@@ -27,6 +27,7 @@
 
 #include "Common/crc.h"
 #include "GameNetwork/Transport.h"
+#include "GameNetwork/UDPTransport.h"
 #include "GameNetwork/NetworkInterface.h"
 
 

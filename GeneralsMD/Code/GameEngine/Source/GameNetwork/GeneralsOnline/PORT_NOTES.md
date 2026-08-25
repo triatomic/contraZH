@@ -44,6 +44,40 @@ GameNetworkingSockets ICE P2P transport, lobbies/matchmaking/stats).
 - Blind file copies of any GO-touched gameplay file are forbidden — GO's balance changes
   are mostly unguarded.
 
+## Decisions made during the port (deviations from upstream GO)
+
+- **30 Hz client**: `GENERALS_ONLINE_HIGH_FPS_SERVER` is commented out (the 60 Hz
+  simulation is part of GO's engine-feel fork, not ported). Client id is
+  `gen_online_30hz`; `GENERALS_ONLINE_HIGH_FPS_LIMIT` resolves to 30. All
+  `GENERALS_ONLINE_HIGH_FPS_*` / `_RUN_FAST` hunks in shared files were dropped.
+- **Texture filtering kept**: `GENERALS_ONLINE_DISABLE_TEXTURE_FILTERING_AND_AA` is
+  commented out and the W3DDisplay hunk that forces MSAA off was not taken - this fork
+  has its own TextureFilter/AnisotropyLevel feature.
+- **Sentry**: gate reuses GO's own `GENERALS_ONLINE_USE_SENTRY`, now default-off and
+  extended to cover `InitSentry`'s body, `ShutdownSentry`, and the lib pragma (upstream
+  ran sentry_init unconditionally in release builds).
+- **Fingerprinting**: new `GENERALS_ONLINE_HW_FINGERPRINT` (default-off) gates machine
+  GUID / MAC / volume serial in the auth payloads and the loaded-module report on the
+  WS keepalive; fields are sent empty so the wire shape is unchanged.
+- **Version/branding**: `version.cpp` product title/version hunks NOT taken (cosmetic;
+  the backend gets `GENERALS_ONLINE_VERSION_STRING` directly from OnlineServices_Init).
+  WinMain's `TheVersion->setVersion` GO variant IS taken (guarded) since the network
+  version fields matter for matchmaking.
+- **W3DView::setDefaultView**: takes GO's 4-arg signature under the macro for compile
+  compatibility, but the body keeps this fork's camera behavior - GO's settings-driven
+  camera min/max heights (their settings.json camera section) are not applied.
+- **GO headers made self-sufficient**: upstream GO force-includes `PreRTS.h` into every
+  TU via CMake PCH, which transitively provides `NextGenMP_defines.h`. This port keeps
+  contraZH's PCH setup, so `NextGenMP_defines.h` is included explicitly where needed
+  (GeneralsOnline_Settings.h, NGMPGame.h, ConnectionManager.h).
+- **Deferred to the UI phases**: `SetLookAtPlayer` signature change
+  (PersistentStorageDefs.h - would break the unported WOL menus when ON),
+  `GameSpyOpenOverlay` buddy bypass, StatsExporter/StatsUploader plus their
+  CommandLine (-exportStats/-statsUrl/-disableCommunityDataPatch), GameMain validation
+  and GlobalData fields.
+- Log-only hunks (NetworkLog conversions of commented DEBUG_LOGs), `isspace/isdigit`
+  cast fixes, `nullptr`->`NULL` reverts, and GO's dead `#else` branches were not taken.
+
 ## Triage of GO's non-online-tree changes (`git diff -w e760b3695..d7f75517d`,
 ## excluding `*GameNetwork/GeneralsOnline/*`; 361 files, +21522/-3744)
 

@@ -32,6 +32,12 @@
 #include "GameClient/Display.h"
 #include "GameNetwork/networkutil.h"
 
+#if defined(GENERALS_ONLINE)
+#include "GameNetwork/GeneralsOnline/NGMP_include.h"
+#include "GameNetwork/GeneralsOnline/NetworkMesh.h"
+#include "GameNetwork/GeneralsOnline/NGMP_interfaces.h"
+#endif
+
 FrameMetrics::FrameMetrics()
 {
 	m_averageFps = 0.0f;
@@ -41,27 +47,65 @@ FrameMetrics::FrameMetrics()
 	m_lastFpsTimeThing = 0;
 	m_minimumCushion = 0;
 
+#if defined(USE_NEW_FRAMEMETRIC_LOGIC)
+	oldestLatencyInMap = -1;
+	oldestPendingLatencyInMap = -1;
+	m_mapLatenciesLookup.clear();
+	m_mapLatenciesSorted.clear();
+	m_mapPendingLatenciesLookup.clear();
+	m_mapPendingLatenciesSorted.clear();
+#else
 	m_pendingLatencies = NEW time_t[MAX_FRAMES_AHEAD];
 	for(Int i = 0; i < MAX_FRAMES_AHEAD; i++)
 		m_pendingLatencies[i] = 0;
-	m_fpsList = NEW Real[TheGlobalData->m_networkFPSHistoryLength];
 	m_latencyList = NEW Real[TheGlobalData->m_networkLatencyHistoryLength];
+#endif
+	m_fpsList = NEW Real[TheGlobalData->m_networkFPSHistoryLength];
 }
 
 FrameMetrics::~FrameMetrics() {
 	delete m_fpsList;
 	m_fpsList = nullptr;
 
+#if defined(USE_NEW_FRAMEMETRIC_LOGIC)
+	m_mapLatenciesLookup.clear();
+	m_mapLatenciesSorted.clear();
+	m_mapPendingLatenciesLookup.clear();
+	m_mapPendingLatenciesSorted.clear();
+#else
 	delete m_latencyList;
 	m_latencyList = nullptr;
 
 	delete[] m_pendingLatencies;
 	m_pendingLatencies = nullptr;
+#endif
 }
 
 void FrameMetrics::init() {
 	m_averageFps = 30;
+#if defined(GENERALS_ONLINE)
+	// NGMP_NOTE: Don't start with the assumption that we have latency. Connections are now formed earlier, so we have latency data earlier too.
+
+	NetworkMesh* pMesh = NGMP_OnlineServicesManager::GetNetworkMesh();
+	if (TheNGMPGame != nullptr && pMesh != nullptr)
+	{
+		int totalLatency = 0;
+		std::map<int64_t, PlayerConnection>& connections = pMesh->GetAllConnections();
+		for (auto& kvPair : connections)
+		{
+			PlayerConnection& conn = kvPair.second;
+			totalLatency += conn.GetLatency();
+		}
+
+		m_averageLatency = (Real)((Real)totalLatency / 1000.f) / (Real)connections.size();
+	}
+	else
+	{
+		m_averageLatency = (Real)0.2;
+	}
+#else
 	m_averageLatency = (Real)0.2;
+#endif
 	m_minimumCushion = -1;
 
 	UnsignedInt i = 0;
@@ -70,7 +114,12 @@ void FrameMetrics::init() {
 	}
 	m_fpsListIndex = 0;
 	for (i = 0; i < TheGlobalData->m_networkLatencyHistoryLength; ++i) {
+#if defined(USE_NEW_FRAMEMETRIC_LOGIC)
+		m_mapLatenciesLookup[i] = 0.2;
+		m_mapLatenciesSorted[i] = 0.2;
+#else
 		m_latencyList[i] = (Real)0.2;
+#endif
 	}
 	m_cushionIndex = 0;
 }
@@ -96,13 +145,75 @@ void FrameMetrics::doPerFrameMetrics(UnsignedInt frame) {
 		m_lastFpsTimeThing = curTime;
 	}
 
+#if defined(USE_NEW_FRAMEMETRIC_LOGIC)
+	m_mapPendingLatenciesSorted[frame] = curTime;
+	m_mapPendingLatenciesLookup[frame] = curTime;
+
+	// initialize
+	if (oldestPendingLatencyInMap == -1)
+	{
+		oldestPendingLatencyInMap = frame;
+	}
+
+	// beyond size limit? remove the oldest
+	if (m_mapPendingLatenciesSorted.size() > TheGlobalData->m_networkLatencyHistoryLength)
+	{
+		// remove oldest frame
+		UnsignedInt oldestFrame = m_mapPendingLatenciesSorted.begin()->first;
+		m_mapPendingLatenciesSorted.erase(m_mapPendingLatenciesSorted.begin());
+		m_mapPendingLatenciesLookup.erase(oldestFrame);
+	}
+#else
 	Int pendingLatenciesIndex = frame % MAX_FRAMES_AHEAD;
 	m_pendingLatencies[pendingLatenciesIndex] = curTime;
+#endif
 
 }
 
 void FrameMetrics::processLatencyResponse(UnsignedInt frame) {
+#if defined(USE_NEW_FRAMEMETRIC_LOGIC)
+	if (!m_mapPendingLatenciesLookup.contains(frame))
+	{
+		NetworkLog(ELogVerbosity::LOG_DEBUG, "WARNING: Frame hasn't been requested yet, frame %ld", frame);
+		return;
+	}
+#endif
+
 	time_t curTime = timeGetTime();
+#if defined(USE_NEW_FRAMEMETRIC_LOGIC)
+	time_t timeDiff = curTime - m_mapPendingLatenciesLookup[frame];
+
+	// initialize
+	if (oldestLatencyInMap == -1)
+	{
+		oldestLatencyInMap = frame;
+	}
+
+	// beyond size limit? remove the oldest
+	if (m_mapLatenciesLookup.size() > TheGlobalData->m_networkLatencyHistoryLength)
+	{
+		// remove oldest frame
+		UnsignedInt oldestFrame = m_mapLatenciesSorted.begin()->first;
+		m_mapLatenciesSorted.erase(m_mapLatenciesSorted.begin());
+		m_mapLatenciesLookup.erase(oldestFrame);
+	}
+
+	m_mapLatenciesLookup[frame] = (Real)timeDiff / (Real)1000; // convert to seconds from milliseconds.
+	m_mapLatenciesSorted[frame] = (Real)timeDiff / (Real)1000; // convert to seconds from milliseconds.
+
+	// calculate average
+	m_averageLatency = 0.0f;
+	for (auto kvPair : m_mapLatenciesLookup)
+	{
+		m_averageLatency += kvPair.second;
+	}
+	m_averageLatency /= m_mapLatenciesLookup.size();
+
+	if (timeDiff > 1000)
+	{
+		NetworkLog(ELogVerbosity::LOG_DEBUG, "WARNING: HIGH processLatencyResponse");
+	}
+#else
 	Int pendingIndex = frame % MAX_FRAMES_AHEAD;
 	time_t timeDiff = curTime - m_pendingLatencies[pendingIndex];
 
@@ -110,6 +221,7 @@ void FrameMetrics::processLatencyResponse(UnsignedInt frame) {
 	m_latencyList[latencyListIndex] = (Real)timeDiff / (Real)1000; // convert to seconds from milliseconds.
 	const Real latencySum = std::accumulate(m_latencyList, m_latencyList + TheGlobalData->m_networkLatencyHistoryLength, 0.0f);
 	m_averageLatency = latencySum / (Real)TheGlobalData->m_networkLatencyHistoryLength;
+#endif
 
 	if (frame % 16 == 0) {
 //		DEBUG_LOG(("ConnectionManager::processFrameInfoAck - average latency = %f", m_averageLatency));
@@ -138,3 +250,11 @@ Real FrameMetrics::getAverageLatency() {
 Int FrameMetrics::getMinimumCushion() {
 	return m_minimumCushion;
 }
+
+#if defined(GENERALS_ONLINE)
+void FrameMetrics::SeedLatencyData(int latency)
+{
+	m_averageFps = GENERALS_ONLINE_HIGH_FPS_LIMIT;
+	m_averageLatency = latency / 1000.f;
+}
+#endif

@@ -52,6 +52,10 @@
 #include "Common/Recorder.h"
 #include "GameClient/MessageBox.h"
 
+#if defined(GENERALS_ONLINE)
+#include "GameNetwork/GeneralsOnline/NGMP_include.h"
+#endif
+
 
 #if defined(DEBUG_CRC) && !RETAIL_COMPATIBLE_NETWORKING
 Int NET_CRC_INTERVAL = 1;
@@ -117,6 +121,9 @@ public:
 	virtual UnsignedInt getPacketArrivalCushion() override;								///< Returns the smallest packet arrival cushion since this was last called.
 	virtual Bool isFrameDataReady() override;
 	virtual Bool isStalling() override;
+#if defined(GENERALS_ONLINE)
+	virtual void SeedLatencyData(int latency) override;
+#endif
 	virtual void parseUserList( const GameInfo *game ) override;
 	virtual void startGame() override;																			///< Sets the network game frame counter to -1
 
@@ -164,7 +171,11 @@ public:
 	virtual void attachTransport(Transport *transport) override;
 	virtual void initTransport() override;
 
+#if defined(GENERALS_ONLINE)
+	virtual void setSawCRCMismatch(UnicodeString& strMismatchDetails) override;
+#else
 	virtual void setSawCRCMismatch() override;
+#endif
 	virtual Bool sawCRCMismatch() override { return m_sawCRCMismatch; }
 	virtual Bool isPlayerConnected( Int playerID ) override;
 
@@ -177,6 +188,12 @@ public:
 	virtual UnsignedInt getPingFrame() override;
 	virtual Int getPingsSent() override;
 	virtual Int getPingsReceived() override;
+
+#if defined(GENERALS_ONLINE)
+	virtual ConnectionManager* GetConnectionManager() override { return m_conMgr; }
+
+	virtual bool IsSlugging() override { return m_didSelfSlug; }
+#endif
 
 protected:
 	void GetCommandsFromCommandList();														///< Remove commands from TheCommandList and put them on the Network command list.
@@ -362,13 +379,31 @@ void Network::init()
 #endif
 }
 
+#if defined(GENERALS_ONLINE)
+void Network::SeedLatencyData(int highestLatency)
+{
+	NetworkLog(ELogVerbosity::LOG_RELEASE, "[PRESEED] Seeding with highest latency %d", highestLatency);
+
+	m_conMgr->SeedLatencyData(highestLatency);
+}
+#endif
+
+#if defined(GENERALS_ONLINE)
+void Network::setSawCRCMismatch(UnicodeString& strMismatchDetails)
+#else
 void Network::setSawCRCMismatch()
+#endif
 {
 	m_sawCRCMismatch = TRUE;
 
 	TheScriptActions->closeWindows( TRUE );
+#if defined(GENERALS_ONLINE)
+	m_messageWindow = MessageBoxOk(UnicodeString(L"Mismatch Occurred"), strMismatchDetails, nullptr);
+	TheScriptEngine->startEndGameTimer(true);
+#else
 	m_messageWindow = TheWindowManager->winCreateFromScript("Menus/CRCMismatch.wnd");
 	TheScriptEngine->startEndGameTimer();
+#endif
 
 	TheRecorder->logCRCMismatch();
 
@@ -649,9 +684,15 @@ void Network::processRunAheadCommand(NetRunAheadCommandMsg *msg) {
 	if (frameGrouping < 1) {
 		frameGrouping = 1; // Having a value less than 1 doesn't make sense.
 	}
+#if defined(GENERALS_ONLINE)
+	if (frameGrouping > FRAME_GROUPING_CAP) {
+		frameGrouping = FRAME_GROUPING_CAP; // Max of a half a second.
+	}
+#else
 	if (frameGrouping > 500) {
 		frameGrouping = 500; // Max of a half a second.
 	}
+#endif
 	m_conMgr->setFrameGrouping(frameGrouping);
 }
 
@@ -703,6 +744,15 @@ void Network::update()
 	GetCommandsFromCommandList(); // Remove commands from TheCommandList and send them to the connection manager.
 	if (m_conMgr != nullptr) {
 		if (m_localStatus == NETLOCALSTATUS_INGAME) {
+#if defined(GENERALS_ONLINE)
+#if defined(GENERALS_ONLINE_RUN_FAST)
+			m_frameRate = 60;
+#elif defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
+			m_frameRate = GENERALS_ONLINE_HIGH_FPS_LIMIT;
+#else
+			m_frameRate = 30;
+#endif
+#endif
 			m_conMgr->updateRunAhead(m_runAhead, m_frameRate, m_didSelfSlug, getExecutionFrame());
 			m_didSelfSlug = FALSE;
 		}
@@ -792,8 +842,12 @@ Bool Network::timeForNewFrame() {
 	if (curTime >= m_nextFrameTime) {
 //		DEBUG_LOG(("Allowing a new frame, frameDelay = %I64d, curTime - m_nextFrameTime = %I64d", frameDelay, curTime - m_nextFrameTime));
 
+#if defined(GENERALS_ONLINE)
+		if (m_nextFrameTime + frameDelay < curTime) {
+#else
 //		if (m_nextFrameTime + frameDelay < curTime) {
 		if ((m_nextFrameTime + (2 * frameDelay)) < curTime) {
+#endif
 			// If we get too far behind on our framerate we need to reset the nextFrameTime thing.
 			m_nextFrameTime = curTime;
 //			DEBUG_LOG(("Initializing m_nextFrameTime to %I64d", m_nextFrameTime));

@@ -16,7 +16,9 @@
 
 #define GENERALS_ONLINE_VERSION_STRING "081326_QFE3" // NOTE: Format is critical here for Sentry to work
 
-#define GENERALS_ONLINE_DISABLE_TEXTURE_FILTERING_AND_AA 1
+// contraZH port: not taken - this fork keeps its own texture filtering and MSAA
+// support (TextureFilter / AnisotropyLevel in Options.ini and the options menu).
+//#define GENERALS_ONLINE_DISABLE_TEXTURE_FILTERING_AND_AA 1
 
 #define GENERALS_ONLINE_LOBBY_MAX_PASSWORD_LENGTH 16
 
@@ -71,7 +73,9 @@ void showNotificationBox(AsciiString nick, UnicodeString message, bool bPlaySoun
 #define GENERALS_ONLINE_MIN_LOBBY_CAMERA_ZOOM 210
 #define GENERALS_ONLINE_MAX_LOBBY_CAMERA_ZOOM 1000
 
-#define GENERALS_ONLINE_HIGH_FPS_SERVER 1
+// contraZH port: the 60 Hz simulation belongs to GO's engine-feel fork, which is not
+// ported. This build is a 30 Hz client (client id "gen_online_30hz").
+//#define GENERALS_ONLINE_HIGH_FPS_SERVER 1
 
 #if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
 #define GENERALS_ONLINE_CLIENT_ID "gen_online_60hz"

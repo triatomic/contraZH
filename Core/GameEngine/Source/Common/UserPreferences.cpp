@@ -436,6 +436,26 @@ CustomMatchPreferences::~CustomMatchPreferences()
 {
 }
 
+#if defined(GENERALS_ONLINE)
+AsciiString CustomMatchPreferences::getLastLobbyName() const
+{
+	CustomMatchPreferences::const_iterator it = find("LastLobbyName");
+	if (it == end())
+	{
+		return AsciiString::TheEmptyString;
+	}
+
+	AsciiString ret = it->second;
+	ret.trim();
+	return ret;
+}
+
+void CustomMatchPreferences::setLastLobbyName(const AsciiString& name)
+{
+	(*this)["LastLobbyName"] = name;
+}
+#endif
+
 void CustomMatchPreferences::setLastLadder(const AsciiString& addr, UnsignedShort port)
 {
 	AsciiString strVal;

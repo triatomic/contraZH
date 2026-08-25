@@ -236,6 +236,10 @@ public:
 	void initTimeOutValues();
 	UnsignedInt getObjectCount();
 
+#if defined(GENERALS_ONLINE)
+	bool IsLoadScreenActive() const { return m_loadScreen != nullptr; }
+#endif
+
 	Int getRankLevelLimit() const { return m_rankLevelLimit; }
 	void setRankLevelLimit(Int limit)
 	{

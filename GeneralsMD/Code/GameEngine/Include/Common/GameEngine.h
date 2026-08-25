@@ -50,6 +50,12 @@ class Radar;
 class WebBrowser;
 class ParticleSystemManager;
 
+#if defined(GENERALS_ONLINE)
+class GeneralsOnlineDiscordRPC;
+
+void TearDownGeneralsOnline();
+#endif
+
 class GameEngine : public SubsystemInterface
 {
 public:
@@ -101,6 +107,9 @@ protected:
 
 	Bool m_quitting; ///< true when we need to quit the game
 	Bool m_isActive; ///< app has OS focus.
+#if defined(GENERALS_ONLINE)
+	GeneralsOnlineDiscordRPC* m_discordRichPresence;
+#endif
 };
 
 inline void GameEngine::setQuitting( Bool quitting ) { m_quitting = quitting; }
