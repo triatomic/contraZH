@@ -4135,6 +4135,42 @@ Bool W3DModelDraw::clientOnly_getRenderObjBoneTransform(const AsciiString & bone
 	}
 }
 
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+//-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature Names of the model's sub objects, for the debug name overlay.
+//
+// Returns the model's total count rather than how many were copied, so the caller can tell that it
+// is looking at a truncated list.
+//-------------------------------------------------------------------------------------------------
+Int W3DModelDraw::clientOnly_getSubObjectNames(AsciiString* names, Int maxNames) const
+{
+	if (m_renderObject == nullptr || names == nullptr || maxNames <= 0)
+	{
+		return 0;
+	}
+
+	const Int total = m_renderObject->Get_Num_Sub_Objects();
+	const Int wanted = (total < maxNames) ? total : maxNames;
+
+	for (Int i = 0; i < wanted; ++i)
+	{
+		// Get_Sub_Object adds a reference, so every one of these has to be released or the model
+		// leaks a little every frame the overlay is up.
+		RenderObjClass* sub = m_renderObject->Get_Sub_Object(i);
+		if (sub == nullptr)
+		{
+			continue;
+		}
+
+		const char* subName = sub->Get_Name();
+		names[i] = (subName != nullptr) ? subName : "<unnamed>";
+		sub->Release_Ref();
+	}
+
+	return total;
+}
+#endif
+
 
 //-------------------------------------------------------------------------------------------------
 Bool W3DModelDraw::getCurrentWorldspaceClientBonePositions(const char* boneName, Matrix3D& transform) const

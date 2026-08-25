@@ -4005,9 +4005,21 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		{
 			TheInGameUI->toggleObjectNameOverlay();
 
-			TheInGameUI->messageNoFormat( TheInGameUI->isObjectNameOverlayOn()
-				? TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugObjectNameOverlayOn", L"Object Names are ON")
-				: TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugObjectNameOverlayOff", L"Object Names are OFF") );
+			switch( TheInGameUI->getObjectNameOverlayMode() )
+			{
+				case InGameUI::OBJECT_NAME_OVERLAY_NAME:
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE(
+							"GUI:DebugObjectNameOverlayOn", L"Object Names are ON") );
+					break;
+				case InGameUI::OBJECT_NAME_OVERLAY_SUBOBJECTS:
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE(
+							"GUI:DebugObjectNameOverlaySubObjects", L"Object Names and Sub Objects are ON") );
+					break;
+				default:
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE(
+							"GUI:DebugObjectNameOverlayOff", L"Object Names are OFF") );
+					break;
+			}
 
 			disp = DESTROY_MESSAGE;
 			break;
