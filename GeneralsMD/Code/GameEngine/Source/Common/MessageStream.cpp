@@ -412,7 +412,8 @@ const char *GameMessage::getCommandTypeAsString(GameMessage::Type t)
 	CASE_LABEL(MSG_META_STEP_FRAME)
 	CASE_LABEL(MSG_META_STEP_FRAME_ALT)
 
-#if defined(RTS_DEBUG)
+// TheSuperHackers @tweak Matches the widened guard on these message types in MessageStream.h.
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	CASE_LABEL(MSG_META_DEMO_TOGGLE_BEHIND_BUILDINGS)
 	CASE_LABEL(MSG_META_DEMO_TOGGLE_LETTERBOX)
 	CASE_LABEL(MSG_META_DEMO_TOGGLE_MESSAGE_TEXT)
@@ -527,7 +528,7 @@ const char *GameMessage::getCommandTypeAsString(GameMessage::Type t)
 	CASE_LABEL(MSG_META_DEBUG_SLEEPY_UPDATE_PERFORMANCE)
 	CASE_LABEL(MSG_META_DEBUG_WIN)
 	CASE_LABEL(MSG_META_DEMO_TOGGLE_DEBUG_STATS)
-#endif // defined(RTS_DEBUG)
+#endif // defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 
 #if defined(RTS_DEBUG)
 	CASE_LABEL(MSG_META_DEMO_TOGGLE_AUDIODEBUG)

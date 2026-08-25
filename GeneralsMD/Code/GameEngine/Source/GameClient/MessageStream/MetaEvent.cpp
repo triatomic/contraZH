@@ -214,6 +214,10 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "CHEAT_TOGGLE_HAND_OF_GOD_MODE",		        GameMessage::MSG_CHEAT_TOGGLE_HAND_OF_GOD_MODE },
 	{ "CHEAT_INSTANT_BUILD",							        GameMessage::MSG_CHEAT_INSTANT_BUILD },
 	{ "CHEAT_DESHROUD",									          GameMessage::MSG_CHEAT_DESHROUD },
+		// TheSuperHackers @feature Default binding for the combined cheat. Ctrl+` is free in the
+		// engine, in the demo command map and in Contra's own, and it does not collide with the
+		// Shift+Ctrl+` health bar cycle because the modifier sets differ. Only exists in builds
+		// where cheats are compiled in.
 	{ "CHEAT_KITCHEN_SINK",									          GameMessage::MSG_CHEAT_KITCHEN_SINK },
 	{ "CHEAT_TOGGLE_ZOOM_LOCK",									          GameMessage::MSG_CHEAT_TOGGLE_ZOOM_LOCK },
 	{ "CHEAT_SHOW_OBJECT_NAME",									          GameMessage::MSG_CHEAT_SHOW_OBJECT_NAME },
@@ -223,6 +227,8 @@ static const LookupListRec GameMessageMetaTypeNames[] =
   { "CHEAT_GIVE_SCIENCEPURCHASEPOINTS",        	GameMessage::MSG_CHEAT_GIVE_SCIENCEPURCHASEPOINTS },
   { "CHEAT_SHOW_HEALTH",                        GameMessage::MSG_CHEAT_SHOW_HEALTH },
   { "CHEAT_TOGGLE_MESSAGE_TEXT",                GameMessage::MSG_CHEAT_TOGGLE_MESSAGE_TEXT },
+	// TheSuperHackers @feature Bindable in cheat builds too, not just debug ones.
+	{ "DEMO_TOGGLE_RENDER",												GameMessage::MSG_META_DEMO_TOGGLE_RENDER },
 
 #endif
 
@@ -288,7 +294,6 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "DEMO_RUNSCRIPT8",													GameMessage::MSG_META_DEMO_RUNSCRIPT8 },
 	{ "DEMO_RUNSCRIPT9",													GameMessage::MSG_META_DEMO_RUNSCRIPT9 },
 	{ "DEMO_ADDCASH",															GameMessage::MSG_META_DEMO_ADD_CASH },
-	{ "DEMO_TOGGLE_RENDER",												GameMessage::MSG_META_DEMO_TOGGLE_RENDER },
 	{ "DEMO_TOGGLE_BW_VIEW",											GameMessage::MSG_META_DEMO_TOGGLE_BW_VIEW },
 	{ "DEMO_TOGGLE_RED_VIEW",											GameMessage::MSG_META_DEMO_TOGGLE_RED_VIEW },
 	{ "DEMO_TOGGLE_GREEN_VIEW",										GameMessage::MSG_META_DEMO_TOGGLE_GREEN_VIEW },
@@ -840,6 +845,20 @@ MetaMapRec *MetaMap::getMetaMapRec(GameMessage::Type t)
 			map->m_transition = DOWN;
 			map->m_modState = SHIFT_CTRL;
 			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
+		}
+	}
+	{
+		// TheSuperHackers @feature Toggle rendering off and on. Retail binds this to Ctrl+\ in the
+		// debug command map, but Contra ships an empty CommandMapDebug.ini, so nothing was bound to
+		// it in practice. Defaulted here instead, which is how the other cheats in this fork reach
+		// a key without needing a mod side INI entry.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_META_DEMO_TOGGLE_RENDER);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_BACKSLASH;
+			map->m_transition = DOWN;
+			map->m_modState = CTRL;
+			map->m_usableIn = COMMANDUSABLE_GAME;
 		}
 	}
 	{
