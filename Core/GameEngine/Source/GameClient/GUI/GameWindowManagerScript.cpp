@@ -2759,6 +2759,9 @@ GameWindow *GameWindowManager::winCreateFromScript( AsciiString filenameString,
   // read into memory
   inFile=inFile->convertToRAMFile();
 
+  // read into memory
+  inFile=inFile->convertToRAMFile();
+
 	// read the file version
 	Int version;
 	inFile->read(nullptr, strlen("FILE_VERSION = "));
