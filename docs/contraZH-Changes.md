@@ -231,3 +231,27 @@ Notes:
 sciences — it returns you to a fresh general, not to what you had before.
 * Sciences granted are only this general's own tree, walked from the three purchase command sets the
 player template names, not every science in the game.
+
+# Generals Online (experimental)
+
+The engine can be built with the online system from
+[Generals Online](https://github.com/GeneralsOnlineDevelopmentTeam/GameClient), the
+community replacement for GameSpy: modern login, lobbies, matchmaking and stats over a
+REST + WebSocket backend, with peer to peer play over Valve's GameNetworkingSockets
+(ICE with STUN/TURN fallback) instead of the retail NAT negotiation.
+
+This is a build-time option, off by default. A normal build is completely unchanged -
+every ported line is compiled out. Building with `-DRTS_BUILD_GENERALS_ONLINE=ON`
+replaces the GameSpy online path: the Online button runs the Generals Online version
+check and login, and the WOL screens become their Generals Online counterparts. LAN and
+skirmish are untouched either way.
+
+Notes:
+* The client needs a Generals Online backend to actually play online; without one it
+fails gracefully at login and returns to the main menu. Connecting to the official
+`playgenerals.online` service with a Contra client is subject to coordination with the
+Generals Online team.
+* Crash reporting, anti-cheat and hardware fingerprinting from upstream are compiled
+out by default in this fork.
+* The port is documented in detail in `PORT_NOTES.md` next to the GeneralsOnline
+sources, including every deliberate deviation from upstream.
