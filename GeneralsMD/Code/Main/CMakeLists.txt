@@ -47,6 +47,12 @@ file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/BuildVersion.h
 
 if(MSVC)
     target_link_options(z_generals PRIVATE "/NODEFAULTLIB:libci.lib")
+
+    # Raise the 2 GB address space limit to 4 GB on 64 bit Windows. Contra's asset load
+    # gets close enough to the default ceiling that a large texture allocation can fail;
+    # the engine's texture loader does not check for that and crashes on the null
+    # surface. Costs nothing on a 32 bit OS, where the limit stays 2 GB.
+    target_link_options(z_generals PRIVATE "/LARGEADDRESSAWARE")
 endif()
 
 target_include_directories(z_generals PRIVATE
