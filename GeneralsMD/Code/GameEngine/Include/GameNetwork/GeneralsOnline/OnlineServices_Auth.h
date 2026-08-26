@@ -23,7 +23,7 @@ public:
 
 	void RefreshToken();
 	void BeginLogin();
-	void DoFullLoginFlow();
+	void DoReAuth();
 
 	void Tick();
 

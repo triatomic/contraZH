@@ -31,14 +31,6 @@ enum class EAuthResponseResult : int
 	FAILED = 2
 };
 
-struct GetLoginCodeResponse
-{
-	bool success = false;
-    std::string login_code = "";
-    
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GetLoginCodeResponse, success, login_code)
-};
-
 struct AuthResponse
 {
 	EAuthResponseResult result = EAuthResponseResult::FAILED;
@@ -58,6 +50,48 @@ struct MOTDResponse
 
 	NLOHMANN_DEFINE_TYPE_INTRUSIVE(MOTDResponse, MOTD)
 };
+
+std::string GenerateGamecode()
+{
+#if defined(_DEBUG) && !defined(USE_TEST_ENV) && !defined(USE_DEBUG_ON_LIVE_SERVER)
+	return "ILOVECODE";
+#else
+	std::string result;
+	const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	const size_t max_index = sizeof(charset) - 1;
+
+	auto seed = std::chrono::system_clock::now().time_since_epoch().count();
+	std::mt19937 generator(seed);
+	std::uniform_int_distribution<> distribution(0, max_index - 1);
+
+	for (int i = 0; i < 32; ++i) {
+		result += charset[distribution(generator)];
+	}
+
+	return result;
+#endif
+}
+
+
+// contraZH: in exclusive fullscreen the browser opens BEHIND the game (upstream GO runs
+// windowed-fullscreen, which this fork does not take), so the player never sees the login
+// page. Put the login link on the clipboard as well so it can be pasted anywhere.
+static void contraZH_CopyLoginLinkToClipboard(const std::string& strURI)
+{
+	if (OpenClipboard(NULL))
+	{
+		EmptyClipboard();
+		size_t uriLen = strURI.size() + 1;
+		HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, uriLen);
+		if (hMem != NULL)
+		{
+			memcpy(GlobalLock(hMem), strURI.c_str(), uriLen);
+			GlobalUnlock(hMem);
+			SetClipboardData(CF_TEXT, hMem);
+		}
+		CloseClipboard();
+	}
+}
 
 void NGMP_OnlineServices_AuthInterface::GoToDetermineNetworkCaps()
 {
@@ -269,8 +303,42 @@ void NGMP_OnlineServices_AuthInterface::RefreshToken()
     }
     else
     {
-		// nothing to refresh with, we're going through the full login flow instead
-		DoFullLoginFlow();
+        // nothing to refresh with, we're going through the full login flow instead
+        m_currentRefreshAttempt = 0;
+
+        m_bWaitingLogin = true;
+        m_lastCheckCode = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::utc_clock::now().time_since_epoch()).count();
+
+        m_strCode = GenerateGamecode();
+
+#if defined(USE_TEST_ENV)
+        std::string strURI = std::format("http://www.playgenerals.online/login/?gamecode={}&env=test", m_strCode.c_str());
+#else
+        std::string strURI = std::format("http://www.playgenerals.online/login/?gamecode={}", m_strCode.c_str());
+#endif
+
+        ClearGSMessageBoxes();
+        GSMessageBoxCancel(UnicodeString(L"Logging In"), UnicodeString(L"Please continue in your web browser.\n\nThe browser may have opened behind the game - press Alt+Tab to find it.\nThe login link is also on your clipboard, so you can paste it into any browser."), []()
+            {
+                if (NGMP_OnlineServicesManager::GetInstance() != nullptr)
+                {
+                    NGMP_OnlineServicesManager::GetInstance()->SetPendingFullTeardown(EGOTearDownReason::USER_REQUESTED_SILENT);
+                }
+
+                NGMP_OnlineServices_AuthInterface* pAuthInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_AuthInterface>();
+                if (pAuthInterface != nullptr)
+                {
+                    pAuthInterface->OnLoginComplete(ELoginResult::UserCancelled, "");
+                }
+            });
+
+#if !defined(_DEBUG) || defined(USE_TEST_ENV) || defined(USE_DEBUG_ON_LIVE_SERVER)
+        contraZH_CopyLoginLinkToClipboard(strURI);
+		ShellExecuteA(NULL, "open", strURI.c_str(), NULL, NULL, SW_SHOWNORMAL);
+#endif
+
+
+
     }
 }
 
@@ -288,15 +356,9 @@ void NGMP_OnlineServices_AuthInterface::BeginLogin()
 		std::map<std::string, std::string> mapHeaders;
 
 		nlohmann::json j;
-#if defined(GENERALS_ONLINE_HW_FINGERPRINT)
 		j["machine_guid"] = GetMachineGuid();
 		j["mac_addr"] = GetPrimaryMacAddress();
 		j["vol_serial"] = GetVolumeSerial();
-#else
-		j["machine_guid"] = "";
-		j["mac_addr"] = "";
-		j["vol_serial"] = "";
-#endif
 		j["exe_crc"] = getGameExeCRC();
 		j["ini_crc"] = TheGlobalData->m_iniCRC;
 		std::string strPostData = j.dump();
@@ -322,7 +384,7 @@ void NGMP_OnlineServices_AuthInterface::BeginLogin()
 					else
 					{
 						NetworkLog(ELogVerbosity::LOG_RELEASE, "LOGIN: Login failed due to 4XX code, trying to re-auth");
-						DoFullLoginFlow();
+						DoReAuth();
 					}
 				}
 				else
@@ -353,13 +415,13 @@ void NGMP_OnlineServices_AuthInterface::BeginLogin()
 						else if (authResp.result == EAuthResponseResult::FAILED)
 						{
 							NetworkLog(ELogVerbosity::LOG_RELEASE, "LOGIN: Login failed, trying to re-auth");
-							DoFullLoginFlow();
+							DoReAuth();
 						}
 					}
 					catch (...)
 					{
 						NetworkLog(ELogVerbosity::LOG_RELEASE, "LOGIN: Resp parse failed, trying to re-auth");
-						DoFullLoginFlow();
+						DoReAuth();
 					}
 				}
 
@@ -367,113 +429,75 @@ void NGMP_OnlineServices_AuthInterface::BeginLogin()
 	}
 	else
 	{
-		DoFullLoginFlow();
+		m_bWaitingLogin = true;
+		m_lastCheckCode = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::utc_clock::now().time_since_epoch()).count();
+
+		m_strCode = GenerateGamecode();
+
+#if defined(USE_TEST_ENV)
+		std::string strURI = std::format("http://www.playgenerals.online/login/?gamecode={}&env=test", m_strCode.c_str());
+#else
+		std::string strURI = std::format("http://www.playgenerals.online/login/?gamecode={}", m_strCode.c_str());
+#endif
+
+		ClearGSMessageBoxes();
+		GSMessageBoxCancel(UnicodeString(L"Logging In"), UnicodeString(L"Please continue in your web browser.\n\nThe browser may have opened behind the game - press Alt+Tab to find it.\nThe login link is also on your clipboard, so you can paste it into any browser."), []()
+			{
+                if (NGMP_OnlineServicesManager::GetInstance() != nullptr)
+                {
+                    NGMP_OnlineServicesManager::GetInstance()->SetPendingFullTeardown(EGOTearDownReason::USER_REQUESTED_SILENT);
+                }
+
+				NGMP_OnlineServices_AuthInterface* pAuthInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_AuthInterface>();
+				if (pAuthInterface != nullptr)
+				{
+					pAuthInterface->OnLoginComplete(ELoginResult::UserCancelled, "");
+				}
+			});
+
+#if !defined(_DEBUG) || defined(USE_TEST_ENV) || defined(USE_DEBUG_ON_LIVE_SERVER)
+		contraZH_CopyLoginLinkToClipboard(strURI);
+		ShellExecuteA(NULL, "open", strURI.c_str(), NULL, NULL, SW_SHOWNORMAL);
+#endif
+			
+
+			
 	}
 }
 
-void NGMP_OnlineServices_AuthInterface::DoFullLoginFlow()
+void NGMP_OnlineServices_AuthInterface::DoReAuth()
 {
-	NetworkLog(ELogVerbosity::LOG_RELEASE, "LOGIN: DoFullLoginFlow");
+	NetworkLog(ELogVerbosity::LOG_RELEASE, "LOGIN: DoReAuth");
+	ClearGSMessageBoxes();
+    GSMessageBoxCancel(UnicodeString(L"Logging In"), UnicodeString(L"Please continue in your web browser.\n\nThe browser may have opened behind the game - press Alt+Tab to find it.\nThe login link is also on your clipboard, so you can paste it into any browser."), []()
+        {
+            if (NGMP_OnlineServicesManager::GetInstance() != nullptr)
+            {
+                NGMP_OnlineServicesManager::GetInstance()->SetPendingFullTeardown(EGOTearDownReason::USER_REQUESTED_SILENT);
+            }
 
-    // get a game login code from server
-    std::string strGetLoginCodeURI = NGMP_OnlineServicesManager::GetAPIEndpoint("LoginCode");
-    std::map<std::string, std::string> mapHeaders;
-	NGMP_OnlineServicesManager::GetInstance()->GetHTTPManager()->SendGETRequest(strGetLoginCodeURI.c_str(), EIPProtocolVersion::DONT_CARE, mapHeaders, [=](bool bSuccess, int statusCode, std::string strBody, HTTPRequest* pReq)
-		{
-			std::function<void(void)> fnGetLoginCodeFailed = [this]()
-				{
-					// stop checking
-					m_bWaitingLogin = false;
-					m_strCode = std::string();
-					m_lastCheckCode = -1;
-
-
-					ClearGSMessageBoxes();
-					GSMessageBoxOk(UnicodeString(L"Login Failed"), UnicodeString(L"Failed to retrieve login code"), []()
-						{
-							TheShell->pop();
-						});
-				};
-
-			if (!bSuccess || (statusCode >= 400 && statusCode < 500))
-			{
-				fnGetLoginCodeFailed();
-			}
-			else
-			{
-				try
-				{
-					nlohmann::json jsonObject = nlohmann::json::parse(strBody, nullptr, false, true);
-					GetLoginCodeResponse authResp = jsonObject.get<GetLoginCodeResponse>();
-
-					if (authResp.success)
-					{
-						m_currentRefreshAttempt = 0;
-
-						m_bWaitingLogin = true;
-						m_lastCheckCode = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::utc_clock::now().time_since_epoch()).count();
-
-						m_strCode = authResp.login_code;
-						NetworkLog(ELogVerbosity::LOG_DEBUG, "Login Code is %s", m_strCode.c_str());
-
-#if defined(USE_TEST_ENV)
-                        std::string strURI = std::format("http://www.playgenerals.online/login/?gamecode={}&env=test", m_strCode.c_str());
-#else
-                        std::string strURI = std::format("http://www.playgenerals.online/login/?gamecode={}", m_strCode.c_str());
-#endif
-
-                        // contraZH: in exclusive fullscreen the browser opens BEHIND the
-                        // game (upstream GO runs windowed-fullscreen, which this fork does
-                        // not take). Put the login link on the clipboard as well, and tell
-                        // the player to Alt+Tab.
-                        if (OpenClipboard(NULL))
-                        {
-                            EmptyClipboard();
-                            size_t uriLen = strURI.size() + 1;
-                            HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, uriLen);
-                            if (hMem != NULL)
-                            {
-                                memcpy(GlobalLock(hMem), strURI.c_str(), uriLen);
-                                GlobalUnlock(hMem);
-                                SetClipboardData(CF_TEXT, hMem);
-                            }
-                            CloseClipboard();
-                        }
-
-                        ClearGSMessageBoxes();
-                        GSMessageBoxCancel(UnicodeString(L"Logging In"), UnicodeString(L"Please continue in your web browser.\n\nThe browser may have opened behind the game - press Alt+Tab to find it.\nThe login link is also on your clipboard, so you can paste it into any browser."), []()
-                            {
-                                if (NGMP_OnlineServicesManager::GetInstance() != nullptr)
-                                {
-                                    NGMP_OnlineServicesManager::GetInstance()->SetPendingFullTeardown(EGOTearDownReason::USER_REQUESTED_SILENT);
-                                }
-
-                                NGMP_OnlineServices_AuthInterface* pAuthInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_AuthInterface>();
-                                if (pAuthInterface != nullptr)
-                                {
-                                    pAuthInterface->OnLoginComplete(ELoginResult::UserCancelled, "");
-                                }
-                            });
-
-#if !defined(_DEBUG) || defined(USE_TEST_ENV) || defined(USE_DEBUG_ON_LIVE_SERVER)
-                        ShellExecuteA(NULL, "open", strURI.c_str(), NULL, NULL, SW_SHOWNORMAL);
-#endif
-                    }
-                    else
-                    {
-						fnGetLoginCodeFailed();
-                    }
-                }
-                catch (const std::exception& /*e*/)
-                {
-					fnGetLoginCodeFailed();
-                }
-                catch (...)
-                {
-					fnGetLoginCodeFailed();
-                }
+            NGMP_OnlineServices_AuthInterface* pAuthInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_AuthInterface>();
+            if (pAuthInterface != nullptr)
+            {
+				pAuthInterface->OnLoginComplete(ELoginResult::UserCancelled , "");
             }
         });
+
+	// do normal login flow, token is bad or expired etc
+	m_bWaitingLogin = true;
+	m_lastCheckCode = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::utc_clock::now().time_since_epoch()).count();
+	m_strCode = GenerateGamecode();
+
+#if defined(USE_TEST_ENV)
+	std::string strURI = std::format("http://www.playgenerals.online/login/?gamecode={}&env=test", m_strCode.c_str());
+#else
+	std::string strURI = std::format("http://www.playgenerals.online/login/?gamecode={}", m_strCode.c_str());
+#endif
+
+#if !defined(_DEBUG) || defined(USE_TEST_ENV) || defined(USE_DEBUG_ON_LIVE_SERVER)
+	contraZH_CopyLoginLinkToClipboard(strURI);
+		ShellExecuteA(NULL, "open", strURI.c_str(), NULL, NULL, SW_SHOWNORMAL);
+#endif
 }
 
 void NGMP_OnlineServices_AuthInterface::Tick()
@@ -516,15 +540,9 @@ void NGMP_OnlineServices_AuthInterface::Tick()
 			nlohmann::json j;
 			j["code"] = m_strCode.c_str();
 			j["client_id"] = GENERALS_ONLINE_CLIENT_ID;
-#if defined(GENERALS_ONLINE_HW_FINGERPRINT)
             j["machine_guid"] = GetMachineGuid();
             j["mac_addr"] = GetPrimaryMacAddress();
             j["vol_serial"] = GetVolumeSerial();
-#else
-            j["machine_guid"] = "";
-            j["mac_addr"] = "";
-            j["vol_serial"] = "";
-#endif
             j["exe_crc"] = getGameExeCRC();
             j["ini_crc"] = TheGlobalData->m_iniCRC;
 			std::string strPostData = j.dump();
