@@ -78,6 +78,27 @@ GameNetworkingSockets ICE P2P transport, lobbies/matchmaking/stats).
 - Log-only hunks (NetworkLog conversions of commented DEBUG_LOGs), `isspace/isdigit`
   cast fixes, `nullptr`->`NULL` reverts, and GO's dead `#else` branches were not taken.
 
+### UI phase decisions
+
+- **Dual copies** live in `GUICallbacks/Menus/GeneralsOnline/`; CMake swaps them for the
+  originals when the option is ON. Ported so far: WOLLoginMenu, WOLWelcomeMenu,
+  WOLLobbyMenu, WOLGameSetupMenu, WOLMapSelectMenu, PopupHostGame, PopupJoinGame.
+- **LobbyUtils.cpp** uses a whole-file dual instead of ~20 guarded hunks: the Core
+  implementation is wrapped in `#if !defined(GENERALS_ONLINE)` and GO's rewritten copy
+  compiles from the GO tree when ON. The shared LobbyUtils.h carries guarded enums.
+- **W3DListBox** row-entry animation: when OFF, `rowDrawY` is a const alias of `drawY`
+  (the one deliberate shared-text change that is not inside an `#if`; it is
+  behavior-identical). GO's hardcoded green listbox background fill was NOT taken
+  (visual restyle), nor were its unguarded null-check hunks in GadgetListBox.
+- **GeneralsOnline_UIStubs.cpp** temporarily defines showNotificationBox,
+  updateBuddyInfo and the GO-signature SetLookAtPlayer until WOLBuddyOverlay and
+  PopupPlayerInfo are ported; delete the stubs with that phase.
+- The GO menus' `#include "../X.h"` lines resolve through the Vendor `-I` entry
+  (`Vendor/../` = the GeneralsOnline dir) - kept verbatim for diffability with GO.
+- GO's menus reference only retail `.wnd` layout names; GO ships updated layouts as
+  loose files under `GeneralsOnlineGameData\` which winCreateFromScript prefers when
+  ON. Obtain that directory from a GO install/patcher for the full experience.
+
 ## Triage of GO's non-online-tree changes (`git diff -w e760b3695..d7f75517d`,
 ## excluding `*GameNetwork/GeneralsOnline/*`; 361 files, +21522/-3744)
 

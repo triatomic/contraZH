@@ -1294,6 +1294,31 @@ if(RTS_BUILD_GENERALS_ONLINE)
         Source/GameNetwork/GeneralsOnline/PluginInterfaces.cpp
         # TEMPORARY - remove when the GO menu dual copies land (see the file header)
         Source/GameNetwork/GeneralsOnline/GeneralsOnline_UIStubs.cpp
+        # Replaces Core's LobbyUtils.cpp, whose implementation is compiled out when ON
+        Source/GameNetwork/GeneralsOnline/LobbyUtils.cpp
+    )
+
+    # The Generals Online UI rewrote these screens with direct calls into the NGMP
+    # services; the GameSpy originals cannot coexist in the same build, so each is
+    # swapped for the GeneralsOnline copy. The originals stay untouched for the
+    # default build and for upstream merges.
+    list(REMOVE_ITEM GAMEENGINE_SRC
+        Source/GameClient/GUI/GUICallbacks/Menus/WOLLoginMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/WOLWelcomeMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/WOLLobbyMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/WOLGameSetupMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/WOLMapSelectMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/PopupHostGame.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/PopupJoinGame.cpp
+    )
+    list(APPEND GAMEENGINE_SRC
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/WOLLoginMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/WOLWelcomeMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/WOLLobbyMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/WOLGameSetupMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/WOLMapSelectMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/PopupHostGame.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/PopupJoinGame.cpp
     )
 endif()
 

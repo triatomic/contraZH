@@ -1370,7 +1370,15 @@ WindowMsgHandledType WOLBuddyOverlayRCMenuSystem( GameWindow *window, UnsignedIn
 				{
 					DEBUG_LOG(("buttonStatsID was pushed"));
 					GameSpyCloseOverlay(GSOVERLAY_PLAYERINFO);
+#if defined(GENERALS_ONLINE)
+					// SetLookAtPlayer takes the GO user id and display name; this GameSpy
+					// flow is unreachable with GO active, adapt the call so it compiles.
+					UnicodeString uniNick;
+					uniNick.translate(nick);
+					SetLookAtPlayer((int64_t)profileID, uniNick);
+#else
 					SetLookAtPlayer(profileID,nick );
+#endif
 					GameSpyOpenOverlay(GSOVERLAY_PLAYERINFO);
 					PSRequest req;
 					req.requestType = PSRequest::PSREQUEST_READPLAYERSTATS;

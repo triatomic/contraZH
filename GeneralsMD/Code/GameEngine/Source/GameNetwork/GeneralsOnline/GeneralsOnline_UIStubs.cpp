@@ -28,10 +28,6 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "GameNetwork/GeneralsOnline/NextGenMP_defines.h"
-#include "GameNetwork/GeneralsOnline/NGMPGame.h"
-
-// Upstream GO defines this in WOLGameSetupMenu.cpp; it moves there with the dual copy.
-NGMPGame* TheNGMPGame = nullptr;
 
 void showNotificationBox(AsciiString nick, UnicodeString message, bool bPlaySound)
 {
@@ -43,7 +39,7 @@ void updateBuddyInfo(bool bIsAutoRefresh, bool bUseCache)
 	// Stub: the buddy list UI is not ported yet.
 }
 
-void OnKickedFromLobby()
+void SetLookAtPlayer( int64_t id, UnicodeString nick )
 {
-	// Stub: the lobby UI is not ported yet.
+	// Stub: the player info popup is not ported yet.
 }
