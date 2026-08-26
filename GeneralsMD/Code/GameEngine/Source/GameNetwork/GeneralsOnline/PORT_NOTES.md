@@ -187,11 +187,28 @@ online flow with each fix.
 | `LoadScreen::didPlayerPreorder` | latent, would crash during an online match load | forced to `false` when GO is active |
 | `GameLogic` game-info selection | `GameSpyLoadScreen::init+0xce` via `tryStartNewGame` - launching a hosted match | `TheGameInfo = TheGameSpyGame` -> `TheNGMPGame` for `GAME_INTERNET` |
 | `Recorder` stats path | latent (`RTS_DEBUG` + `m_saveStats`) | same redirect, guarded on the services manager existing |
+| `GameSpyLoadScreen::init` per-slot stats | `GameSpyLoadScreen::init+0x850`, same launch - the *next* null in the same function | `TheGameSpyPSMessageQueue->findPlayerStatsByID()` -> `NGMP_OnlineServices_StatsInterface::getPlayerStatsFromCache()` |
+
+With that last one the full online path works end to end against the live service:
+login -> lobby -> host -> launch -> in match.
+
+Two details from the load screen fix worth keeping, because a straight line-for-line
+port of the crashing statement would have been wrong:
+
+- Upstream moves the stats fetch **above** the player-name block, because the name gets
+  an Elo suffix in QuickMatch games (`name.format(L"%s (Elo: %d)", ...)`). The port had
+  to reorder, not just guard.
+- `GetAdditionalDisconnectsFromUserFile` is neither declared nor called when GO is on -
+  its definition now lives only in the GO copy of `PopupPlayerInfo.cpp`.
 
 **How to diagnose the next one.** The game writes its own dumps to
 `Documents\Command and Conquer Generals Zero Hour Data\CrashDumps\` as
 `CrashMZ-<date>-<commit>-pid<n>.dmp` (mini) and `CrashFZ-...` (full, ~1 GB) - *not* to
-the Windows WER folder. The mini dump plus the deployed `generalszh.pdb` is enough:
+the Windows WER folder. **Do not trust the commit in that filename**: it is
+`GitShortSHA1`, baked in when CMake last *configured*, so it goes stale across rebuilds
+and does not identify the binary that crashed. Compare the faulting offset instead - a
+crash that moved from `+0xce` to `+0x850` in the same function is a fix working, not a
+fix failing. The mini dump plus the deployed `generalszh.pdb` is enough:
 
 ```
 cdb.cmd -z "<CrashMZ dump>" -y "C:\Games\contra\contraprerelease;srv*<symcache>*https://msdl.microsoft.com/download/symbols"
