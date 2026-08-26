@@ -83,6 +83,31 @@ void W3DGadgetPushButtonImageDrawOne(GameWindow *window, WinInstanceData *instDa
 // PRIVATE FUNCTIONS //////////////////////////////////////////////////////////
 
 // TheSuperHackers @feature Countdown text over a cameo (Options.ini: BuildTimerDisplayMode).
+// TheSuperHackers @feature The countdown's shared string and the per letter hotkey overlay
+// cache stay registered with TheDisplayStringManager between frames, so they must be handed
+// back before the manager is torn down - its destructor asserts on any string left behind.
+// The W3DDisplayStringManager destructor calls this.
+static DisplayString *s_countdownString = nullptr;
+static Int s_countdownLastSeconds = -1;
+static Int s_countdownLastMode = -1;
+static DisplayString *s_hotKeyStrings[ 256 ] = { nullptr };
+
+void W3DGadgetPushButtonFreeDisplayStrings( void )
+{
+	if( s_countdownString != nullptr && TheDisplayStringManager != nullptr )
+		TheDisplayStringManager->freeDisplayString( s_countdownString );
+	s_countdownString = nullptr;
+	s_countdownLastSeconds = -1;
+	s_countdownLastMode = -1;
+
+	for( Int i = 0; i < 256; ++i )
+	{
+		if( s_hotKeyStrings[ i ] != nullptr && TheDisplayStringManager != nullptr )
+			TheDisplayStringManager->freeDisplayString( s_hotKeyStrings[ i ] );
+		s_hotKeyStrings[ i ] = nullptr;
+	}
+}
+
 // drawButtonCountdown ========================================================
 /** Draw the remaining time for whatever this button is counting down -- a queued unit or
 	* upgrade, or a special power recharging. Drawn after the clock sweep so the darkening
@@ -99,10 +124,6 @@ static void drawButtonCountdown( GameWindow *window, Int seconds )
 	if( TheDisplayStringManager == nullptr )
 		return;
 
-	static DisplayString *s_countdownString = nullptr;
-	static Int s_lastSeconds = -1;
-	static Int s_lastMode = -1;
-
 	if( s_countdownString == nullptr )
 	{
 		s_countdownString = TheDisplayStringManager->newDisplayString();
@@ -117,7 +138,7 @@ static void drawButtonCountdown( GameWindow *window, Int seconds )
 
 	// only rebuild the sentence when the displayed value actually changes, which at one
 	// tick per second is far less often than we are drawn
-	if( s_lastSeconds != seconds || s_lastMode != TheGlobalData->m_buildTimerDisplayMode )
+	if( s_countdownLastSeconds != seconds || s_countdownLastMode != TheGlobalData->m_buildTimerDisplayMode )
 	{
 		UnicodeString text;
 		if( TheGlobalData->m_buildTimerDisplayMode == BuildTimerDisplayMode_Auto && seconds >= 60 )
@@ -126,8 +147,8 @@ static void drawButtonCountdown( GameWindow *window, Int seconds )
 			text.format( L"%d", seconds );
 
 		s_countdownString->setText( text );
-		s_lastSeconds = seconds;
-		s_lastMode = TheGlobalData->m_buildTimerDisplayMode;
+		s_countdownLastSeconds = seconds;
+		s_countdownLastMode = TheGlobalData->m_buildTimerDisplayMode;
 	}
 
 	ICoord2D origin, size;
@@ -174,11 +195,15 @@ static void drawButtonHotKeyOverlay( GameWindow *window )
 	if( hotKey.isEmpty() )
 		return;
 
+	// Only a single byte printable key can be shown faithfully. A localized mnemonic outside
+	// ASCII arrives as a multi byte sequence here, and drawing its first byte would show a
+	// wrong or garbled shortcut - better to draw nothing for those.
+	if( hotKey.getLength() != 1 || !isprint( (unsigned char)hotKey.getCharAt( 0 ) ) )
+		return;
+
 	// One display string per letter, so that drawing many cameos in a row does not
 	// rebuild sentence geometry over and over. There are only ever a handful of
 	// distinct hotkeys on screen, so this stays small.
-	static DisplayString *s_hotKeyStrings[ 256 ] = { nullptr };
-
 	const UnsignedByte index = (UnsignedByte)hotKey.getCharAt( 0 );
 	DisplayString *hotKeyString = s_hotKeyStrings[ index ];
 
