@@ -160,6 +160,57 @@ x86 `zlib1.dll` is correct for the game.
   StatsUploader replay-analytics pipeline** (its hooks live in Player.cpp/Object.cpp
   gameplay code; server-side stats are already covered by OnlineServices_StatsInterface).
 
+## Fixes
+
+Everything below was found after the port compiled, by running the client against the
+live service. They fall into three groups, and the second one is a pattern worth
+knowing before hunting the next crash.
+
+### 1. Environment / vendored binaries
+
+| Fix | Symptom | Cause |
+|---|---|---|
+| Replace vendored `abseil_dll.dll` | Process died before `WinMain` (`0xC0000374`) | The repo's abseil does not match the abseil its `libprotobuf.dll` was built against. See the vendor DLL section above. |
+
+### 2. GameSpy singletons that GO redirects to NGMP (the recurring pattern)
+
+**With the GO stack active, `SetUpGameSpy()` is compiled out, so `TheGameSpyInfo` and
+`TheGameSpyGame` are never created.** Upstream GO rewrote every site that reads them to
+use the NGMP equivalents instead. Where the port took a header change but missed the
+matching body, the result is a null dereference that only appears once the UI flow
+actually reaches that screen - so these surfaced one at a time, going deeper into the
+online flow with each fix.
+
+| Fix | Crash site | Redirect applied |
+|---|---|---|
+| Preference constructors (`Custom`, `QuickMatch`, `GameSpyMisc`, `Ignore`) | `CustomMatchPreferences::CustomMatchPreferences+0x7e` via `PopupHostGameInit` - clicking Host or Quick Match | `TheGameSpyInfo->getLocalProfileID()` -> NGMP auth user id, stored under `GeneralsOnlineData\` |
+| `LoadScreen::didPlayerPreorder` | latent, would crash during an online match load | forced to `false` when GO is active |
+| `GameLogic` game-info selection | `GameSpyLoadScreen::init+0xce` via `tryStartNewGame` - launching a hosted match | `TheGameInfo = TheGameSpyGame` -> `TheNGMPGame` for `GAME_INTERNET` |
+| `Recorder` stats path | latent (`RTS_DEBUG` + `m_saveStats`) | same redirect, guarded on the services manager existing |
+
+**How to diagnose the next one.** The game writes its own dumps to
+`Documents\Command and Conquer Generals Zero Hour Data\CrashDumps\` as
+`CrashMZ-<date>-<commit>-pid<n>.dmp` (mini) and `CrashFZ-...` (full, ~1 GB) - *not* to
+the Windows WER folder. The mini dump plus the deployed `generalszh.pdb` is enough:
+
+```
+cdb.cmd -z "<CrashMZ dump>" -y "C:\Games\contra\contraprerelease;srv*<symcache>*https://msdl.microsoft.com/download/symbols"
+.ecxr
+kb 40
+```
+
+A null read of the form `mov eax,dword ptr [ecx] ds:002b:00000000` inside a function
+whose name starts with `GameSpy` is almost certainly another instance of this pattern:
+find the same function in the GO clone, take its `#if defined(GENERALS_ONLINE)` branch.
+
+### 3. Behavior differences from running a fork against the official service
+
+| Fix | Reason |
+|---|---|
+| Report `anticheat_id = -1` (`NONE`) | Upstream's stub returns `0`, which is `GO_INTEGRATED_AC` - the client claimed to run GeneralsOnline's anticheat while running none. `IsPluginLoaded()`/`IsExternalProcessRunning()` were likewise hardcoded `true`. |
+| `GENERALS_ONLINE_DISABLE_SELF_UPDATE` | The service reports "update needed" for this client, and the stock flow would download and run the official patcher over a Contra install. |
+| Login link copied to clipboard, dialog reworded | `ShellExecute` opens the browser *behind* the game in exclusive fullscreen (upstream runs windowed-fullscreen, which this fork does not take), so the login appeared to fail silently. Applied at all three browser-open sites of the pre-newserver flow. |
+
 ## Triage of GO's non-online-tree changes (`git diff -w e760b3695..d7f75517d`,
 ## excluding `*GameNetwork/GeneralsOnline/*`; 361 files, +21522/-3744)
 
