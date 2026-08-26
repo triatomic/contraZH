@@ -1612,8 +1612,13 @@ AsciiString RecorderClass::getLastReplayFileName()
 		GameInfo *game = nullptr;
 		if (TheLAN)
 			game = TheLAN->GetMyGame();
+#if defined(GENERALS_ONLINE)
+		else if (NGMP_OnlineServicesManager::GetInstance() != nullptr)
+			game = TheNGMPGame;
+#else
 		else if (TheGameSpyInfo)
 			game = TheGameSpyGame;
+#endif
 		if (game)
 		{
 			AsciiString players;

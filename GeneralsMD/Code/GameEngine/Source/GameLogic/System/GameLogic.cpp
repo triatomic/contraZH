@@ -107,6 +107,12 @@
 
 #include "GameNetwork/GameSpy/BuddyThread.h"
 #include "GameNetwork/GameSpy/PeerDefs.h"
+
+#if defined(GENERALS_ONLINE)
+#include "GameNetwork/GeneralsOnline/NGMPGame.h"
+#include "GameNetwork/GeneralsOnline/NGMP_interfaces.h"
+extern NGMPGame* TheNGMPGame;
+#endif
 #include "GameNetwork/GameSpy/ThreadUtils.h"
 #include "GameNetwork/LANAPICallbacks.h"
 #include "GameNetwork/NetworkInterface.h"
@@ -1243,8 +1249,13 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 		}
 		else
 		{
+#if defined(GENERALS_ONLINE)
+			DEBUG_LOG(("Starting generals online game"));
+			TheGameInfo = TheNGMPGame;	/// @todo: MDC add back in after demo
+#else
 			DEBUG_LOG(("Starting gamespy game"));
 			TheGameInfo = TheGameSpyGame;	/// @todo: MDC add back in after demo
+#endif
 		}
 	}
 	else
