@@ -206,19 +206,24 @@ public:
 
     static bool DidPluginFailToLoad() { return false; }
 
+    // contraZH: with the plugin interface compiled out there is genuinely no anticheat
+    // plugin present, so report that honestly rather than impersonating one.
     static bool IsPluginLoaded()
     {
-        return true;
+        return false;
     }
 
     static bool IsExternalProcessRunning()
     {
-        return true;
+        return false;
     }
 
     static int GetAnticheatIdentifier()
     {
-        return 0;
+        // EKnownAnticheatID::NONE - upstream's stub returned 0, which is
+        // GO_INTEGRATED_AC, i.e. it claimed to be running GeneralsOnline's
+        // anticheat while no plugin was loaded at all.
+        return -1;
     }
 
     static int GetConnectionLatencyForUser(std::string mwUserID, uint32_t goUserID)
