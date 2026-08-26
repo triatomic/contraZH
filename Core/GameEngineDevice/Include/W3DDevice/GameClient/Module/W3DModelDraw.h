@@ -550,6 +550,11 @@ private:
 	Shadow*												m_terrainDecal;
 	// TheSuperHackers @feature Selection ring decal, independent of m_terrainDecal.
 	Shadow*												m_selectionDecal;
+	// TheSuperHackers @fix The wanted state is remembered separately so the ring survives
+	// render object rebuilds - a damage state or upgrade swaps the model while the object
+	// stays selected.
+	Bool													m_selectionDecalWanted;
+	Real													m_selectionDecalRadius;
 	TerrainTracksRenderObjClass*	m_trackRenderObject;							///< This is rendered under object
 	Bool													m_lastTrackWasBackwards;					///< travel direction of the last laid tread edge, to detect fwd<->rev flips
 	ParticleSystemIDVec						m_particleSystemIDs;							///< The ID numbers of the particle systems currently running.
