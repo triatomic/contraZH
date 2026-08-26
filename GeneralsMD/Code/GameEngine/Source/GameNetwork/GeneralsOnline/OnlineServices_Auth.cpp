@@ -422,8 +422,26 @@ void NGMP_OnlineServices_AuthInterface::DoFullLoginFlow()
                         std::string strURI = std::format("http://www.playgenerals.online/login/?gamecode={}", m_strCode.c_str());
 #endif
 
+                        // contraZH: in exclusive fullscreen the browser opens BEHIND the
+                        // game (upstream GO runs windowed-fullscreen, which this fork does
+                        // not take). Put the login link on the clipboard as well, and tell
+                        // the player to Alt+Tab.
+                        if (OpenClipboard(NULL))
+                        {
+                            EmptyClipboard();
+                            size_t uriLen = strURI.size() + 1;
+                            HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, uriLen);
+                            if (hMem != NULL)
+                            {
+                                memcpy(GlobalLock(hMem), strURI.c_str(), uriLen);
+                                GlobalUnlock(hMem);
+                                SetClipboardData(CF_TEXT, hMem);
+                            }
+                            CloseClipboard();
+                        }
+
                         ClearGSMessageBoxes();
-                        GSMessageBoxCancel(UnicodeString(L"Logging In"), UnicodeString(L"Please continue in your web browser"), []()
+                        GSMessageBoxCancel(UnicodeString(L"Logging In"), UnicodeString(L"Please continue in your web browser.\n\nThe browser may have opened behind the game - press Alt+Tab to find it.\nThe login link is also on your clipboard, so you can paste it into any browser."), []()
                             {
                                 if (NGMP_OnlineServicesManager::GetInstance() != nullptr)
                                 {
