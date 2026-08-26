@@ -51,6 +51,13 @@
 #include "GameClient/ChallengeGenerals.h"
 #include "GameNetwork/GameSpy/PeerDefs.h"
 
+#if defined(GENERALS_ONLINE)
+#include "GameNetwork/GeneralsOnline/NGMP_interfaces.h"
+#include "GameNetwork/GeneralsOnline/OnlineServices_Auth.h"
+#include "Common/GlobalData.h"
+#include <filesystem>
+#endif
+
 
 //-----------------------------------------------------------------------------
 // DEFINES ////////////////////////////////////////////////////////////////////
@@ -242,8 +249,16 @@ void UserPreferences::setAsciiString(AsciiString key, AsciiString val)
 QuickMatchPreferences::QuickMatchPreferences()
 {
 	AsciiString userPrefFilename;
+
+#if defined(GENERALS_ONLINE)
+	NGMP_OnlineServices_AuthInterface* pAuthInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_AuthInterface>();
+
+	int64_t localProfile = pAuthInterface != nullptr ? pAuthInterface->GetUserID() : -1;
+	userPrefFilename.format("GeneralsOnlineData\\QMPref%lld.ini", localProfile);
+#else
 	Int localProfile = TheGameSpyInfo->getLocalProfileID();
 	userPrefFilename.format("GeneralsOnline\\QMPref%d.ini", localProfile);
+#endif
 	load(userPrefFilename);
 }
 
@@ -427,8 +442,27 @@ Int QuickMatchPreferences::getSide()
 CustomMatchPreferences::CustomMatchPreferences()
 {
 	AsciiString userPrefFilename;
+
+#if defined(GENERALS_ONLINE)
+	// GeneralsOnline port: TheGameSpyInfo is never created when the GO stack is active,
+	// so the profile id comes from the NGMP session instead.
+	// NOTE: We need to use a different folder to avoid conflict with GS/Revora
+	NGMP_OnlineServices_AuthInterface* pAuthInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_AuthInterface>();
+
+	int64_t user_id = pAuthInterface != nullptr ? pAuthInterface->GetUserID() : -1;
+	userPrefFilename.format("GeneralsOnlineData\\CustomPref%lld.ini", user_id);
+
+	AsciiString prefsDirectory = TheGlobalData->getPath_UserData();
+	prefsDirectory.concat("GeneralsOnlineData");
+
+	if (!std::filesystem::exists(prefsDirectory.str()))
+	{
+		std::filesystem::create_directory(prefsDirectory.str());
+	}
+#else
 	Int localProfile = TheGameSpyInfo->getLocalProfileID();
 	userPrefFilename.format("GeneralsOnline\\CustomPref%d.ini", localProfile);
+#endif
 	load(userPrefFilename);
 }
 
@@ -796,8 +830,15 @@ void CustomMatchPreferences::setUseStats( Bool useStats )
 GameSpyMiscPreferences::GameSpyMiscPreferences()
 {
 	AsciiString userPrefFilename;
+
+#if defined(GENERALS_ONLINE)
+	NGMP_OnlineServices_AuthInterface* pAuthInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_AuthInterface>();
+	int64_t localProfile = pAuthInterface == nullptr ? -1 : pAuthInterface->GetUserID();
+	userPrefFilename.format("GeneralsOnlineData\\GSMiscPref%lld.ini", localProfile);
+#else
 	Int localProfile = TheGameSpyInfo->getLocalProfileID();
 	userPrefFilename.format("GeneralsOnline\\GSMiscPref%d.ini", localProfile);
+#endif
 	load(userPrefFilename);
 }
 
@@ -843,8 +884,15 @@ IgnorePreferences::IgnorePreferences()
 {
 	AsciiString userPrefFilename;
 //	if(!TheGameSpyInfo)
+
+#if defined(GENERALS_ONLINE)
+	NGMP_OnlineServices_AuthInterface* pAuthInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_AuthInterface>();
+	int64_t localProfile = pAuthInterface == nullptr ? -1 : pAuthInterface->GetUserID();
+	userPrefFilename.format("GeneralsOnlineData\\IgnorePref%lld.ini", localProfile);
+#else
 	Int localProfile = TheGameSpyInfo->getLocalProfileID();
 	userPrefFilename.format("GeneralsOnline\\IgnorePref%d.ini", localProfile);
+#endif
 	load(userPrefFilename);
 }
 

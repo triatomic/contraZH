@@ -1668,7 +1668,12 @@ GameSlot *lSlot = game->getSlot(game->getLocalSlotNum());
 		DEBUG_LOG(("LoadScreen - populating info for %ls(%d) - stats returned id %d",
 			slot->getName().str(), slot->getProfileID(), stats.id));
 
+#if defined(GENERALS_ONLINE)
+		// GeneralsOnline port: TheGameSpyInfo does not exist when the GO stack is active
+		Bool isPreorder = false;
+#else
 		Bool isPreorder = TheGameSpyInfo->didPlayerPreorder(stats.id);
+#endif
 		Int rankPoints = CalculateRank(stats);
 		Int favSide = GetFavoriteSide(stats);
 		const Image *preorderImg = TheMappedImageCollection->findImageByName("OfficersClubsmall");
