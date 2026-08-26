@@ -905,6 +905,10 @@ void StartPatchCheck()
 #if defined(USE_TEST_ENV) || defined(USE_DEBUG_ON_LIVE_SERVER)
 			bNeedsUpdate = false;
 #endif
+#if defined(GENERALS_ONLINE_DISABLE_SELF_UPDATE)
+			// contraZH: the official patcher must never run over a Contra install.
+			bNeedsUpdate = false;
+#endif
 			cantConnectBeforeOnline = !bSuccess;
 			mustDownloadPatch = bNeedsUpdate;
 

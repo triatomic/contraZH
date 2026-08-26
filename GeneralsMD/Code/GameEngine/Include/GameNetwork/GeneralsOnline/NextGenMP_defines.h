@@ -116,6 +116,12 @@ static int FRAME_GROUPING_CAP = 64;
 // require these — re-enable when coordinating with the Generals Online team.
 //#define GENERALS_ONLINE_HW_FINGERPRINT 1
 
+// contraZH port: never offer or run the official Generals Online patcher — it would
+// install the official client over this (Contra) install. A version mismatch from the
+// service proceeds straight to login instead. Remove when coordinating with the
+// Generals Online team on a proper update channel for this fork.
+#define GENERALS_ONLINE_DISABLE_SELF_UPDATE 1
+
 #define GENERALS_ONLINE_WIDESCREEN 1
 
 #if defined(GENERALS_ONLINE_WIDESCREEN)
