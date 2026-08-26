@@ -208,6 +208,7 @@ void GameSpyOpenOverlay( GSOverlayType overlay )
 {
 	if (overlay == GSOVERLAY_BUDDY)
 	{
+#if !defined(GENERALS_ONLINE)
 		if (!TheGameSpyBuddyMessageQueue->isConnected())
 		{
 			// not connected - is it because we were disconnected?
@@ -223,6 +224,7 @@ void GameSpyOpenOverlay( GSOverlayType overlay )
 			}
 			return;
 		}
+#endif
 		AudioEventRTS buttonClick("GUICommunicatorOpen");
 
 		if( TheAudio )

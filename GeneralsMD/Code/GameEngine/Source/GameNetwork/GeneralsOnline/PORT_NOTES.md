@@ -98,6 +98,15 @@ GameNetworkingSockets ICE P2P transport, lobbies/matchmaking/stats).
 - GO's menus reference only retail `.wnd` layout names; GO ships updated layouts as
   loose files under `GeneralsOnlineGameData\` which winCreateFromScript prefers when
   ON. Obtain that directory from a GO install/patcher for the full experience.
+- **InGameChat gate adapted, not adopted**: an active NGMP game additionally allows
+  the chat window; upstream GO allowed it ONLY then, which would have broken LAN chat
+  and this fork's singleplayer chat-command window.
+- **Skipped in the UI phases**: OptionsMenu hunks (observer-overlay font needs GO's
+  InGameUI, texture-filter guard is inert here), SkirmishGameOptionsMenu's team-colored
+  start positions (unguarded, and drops a bounds check), PopupReplay's null-check,
+  Diplomacy's GO_REVEAL_TEAMS block (macro never defined), and the **StatsExporter /
+  StatsUploader replay-analytics pipeline** (its hooks live in Player.cpp/Object.cpp
+  gameplay code; server-side stats are already covered by OnlineServices_StatsInterface).
 
 ## Triage of GO's non-online-tree changes (`git diff -w e760b3695..d7f75517d`,
 ## excluding `*GameNetwork/GeneralsOnline/*`; 361 files, +21522/-3744)

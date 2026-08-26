@@ -1292,8 +1292,6 @@ if(RTS_BUILD_GENERALS_ONLINE)
         Source/GameNetwork/GeneralsOnline/NextGenTransport.cpp
         Source/GameNetwork/GeneralsOnline/NetworkBitstream.cpp
         Source/GameNetwork/GeneralsOnline/PluginInterfaces.cpp
-        # TEMPORARY - remove when the GO menu dual copies land (see the file header)
-        Source/GameNetwork/GeneralsOnline/GeneralsOnline_UIStubs.cpp
         # Replaces Core's LobbyUtils.cpp, whose implementation is compiled out when ON
         Source/GameNetwork/GeneralsOnline/LobbyUtils.cpp
     )
@@ -1310,6 +1308,10 @@ if(RTS_BUILD_GENERALS_ONLINE)
         Source/GameClient/GUI/GUICallbacks/Menus/WOLMapSelectMenu.cpp
         Source/GameClient/GUI/GUICallbacks/Menus/PopupHostGame.cpp
         Source/GameClient/GUI/GUICallbacks/Menus/PopupJoinGame.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/WOLQuickMatchMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/WOLBuddyOverlay.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/PopupPlayerInfo.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/ScoreScreen.cpp
     )
     list(APPEND GAMEENGINE_SRC
         Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/WOLLoginMenu.cpp
@@ -1319,6 +1321,10 @@ if(RTS_BUILD_GENERALS_ONLINE)
         Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/WOLMapSelectMenu.cpp
         Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/PopupHostGame.cpp
         Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/PopupJoinGame.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/WOLQuickMatchMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/WOLBuddyOverlay.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/PopupPlayerInfo.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/ScoreScreen.cpp
     )
 endif()
 
