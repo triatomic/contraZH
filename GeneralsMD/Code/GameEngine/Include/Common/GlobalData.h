@@ -176,6 +176,8 @@ public:
 	Color m_keyboardOverlayColor;
 	Bool m_keyboardOverlayBackdrop;
 	Color m_keyboardOverlayBackdropColor;
+	// TheSuperHackers @feature Leave builders out of drag selections.
+	Bool m_easyMilitaryDrag;
 	Bool m_doubleClickAttackMove;
 	Bool m_rightMouseAlwaysScrolls;
 	Int m_jpegQuality; // TheSuperHackers @feature Quality for JPEG screenshots.
