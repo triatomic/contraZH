@@ -78,6 +78,19 @@ GameNetworkingSockets ICE P2P transport, lobbies/matchmaking/stats).
 - Log-only hunks (NetworkLog conversions of commented DEBUG_LOGs), `isspace/isdigit`
   cast fixes, `nullptr`->`NULL` reverts, and GO's dead `#else` branches were not taken.
 
+### Vendor DLL fix (found by crash triage)
+
+Upstream GO's vendored `Vendor/ValveNetworkingSockets/abseil_dll.dll` (4.3 MB) does
+not match the abseil the vendored `libprotobuf.dll` was built against - loading it
+corrupts the heap inside protobuf's static initializer (0xc0000374 in `DllMain`,
+before WinMain). GO never noticed because their POST_BUILD copies only
+discord-rpc.dll; the working DLL set comes from their patcher. The vendored copy is
+replaced here with the 1.8 MB `abseil_dll.dll` an official GeneralsOnline install
+ships (byte-verified against `libprotobuf.dll`/`GameNetworkingSockets.dll`, which are
+identical between the repo and the official install). Note the official install also
+carries a 64-bit `zlib1.dll` for other tooling - do NOT take that one; the repo's
+x86 `zlib1.dll` is correct for the game.
+
 ### UI phase decisions
 
 - **Dual copies** live in `GUICallbacks/Menus/GeneralsOnline/`; CMake swaps them for the
