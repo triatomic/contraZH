@@ -782,7 +782,7 @@ public:
   // was still recharging, and fire it once the logic side says it is ready.
   void queueQuickCast( const CommandButton *command, const ICoord2D &screenPos );
   void cancelQueuedQuickCast( void );
-  Bool hasQueuedQuickCast( void ) const { return m_queuedCastCommand != nullptr; }
+  Bool hasQueuedQuickCast( void ) const { return m_queuedCastCommandName.isNotEmpty(); }
   void updateQueuedQuickCast( void );
 
 
@@ -948,9 +948,14 @@ protected:
   Coord3D                     m_quickCastHintPosition;
   RadiusCursorType            m_quickCastHintCursorType;
   Real                        m_quickCastHintRadius;
+  // Remembered so the fading redraw recreates the cursor with the same radius inputs.
+  const SpecialPowerTemplate *m_quickCastHintTemplate;
+  WeaponSlotType              m_quickCastHintWeaponSlot;
   // TheSuperHackers @feature Queued quick cast state.
-  const CommandButton        *m_queuedCastCommand;
-  ICoord2D                    m_queuedCastScreenPos;
+  // The command is remembered by name and re-resolved at fire time: the control bar owns
+  // the button objects and recreates them on a resolution change, so a retained pointer
+  // could dangle while the queue waits.
+  AsciiString                 m_queuedCastCommandName;
   Coord3D                     m_queuedCastWorldPos;
   ObjectID                    m_queuedCastSourceID;
   UnsignedInt                 m_queuedCastExpiryFrame;

@@ -390,6 +390,26 @@ const Int MAX_ENABLED_MODULES								= 16;
 	s_animationTemplates = nullptr;
 }
 
+// TheSuperHackers @feature One shared string for the numerical health text, rebuilt whenever the
+// text changes. Unlike the command bar overlays there is no small fixed set of values to cache
+// per object, and many bars draw per frame, so it is rebuilt as often as it is reused. It stays
+// static purely to avoid allocating every call, and is returned to the manager before the manager
+// itself is torn down -- see Drawable::killStaticDisplayStrings.
+static DisplayString *s_healthString = nullptr;
+
+//-------------------------------------------------------------------------------------------------
+/** Return the shared display strings to the manager. Must run before TheDisplayStringManager is
+	* destroyed, which asserts on any string still registered -- GameClient's destructor calls this
+	* right before deleting the manager, unlike killStaticImages, which runs after. */
+//-------------------------------------------------------------------------------------------------
+/*static*/ void Drawable::killStaticDisplayStrings()
+{
+	if( s_healthString != nullptr && TheDisplayStringManager != nullptr )
+		TheDisplayStringManager->freeDisplayString( s_healthString );
+
+	s_healthString = nullptr;
+}
+
 //-------------------------------------------------------------------------------------------------
 void Drawable::saturateRGB(RGBColor& color, Real factor)
 {
@@ -4697,11 +4717,6 @@ void Drawable::drawNumericalHealth( const IRegion2D *healthBarRegion, Real healt
 	if( healthBarRegion == nullptr || TheDisplayStringManager == nullptr )
 		return;
 
-	// One shared string, rebuilt whenever the text changes. Unlike the command bar overlays there
-	// is no small fixed set of values to cache per object, and many bars draw per frame, so this
-	// is rebuilt as often as it is reused. It stays static purely to avoid allocating every call.
-	static DisplayString *s_healthString = nullptr;
-
 	if( s_healthString == nullptr )
 	{
 		s_healthString = TheDisplayStringManager->newDisplayString();
@@ -5152,6 +5167,9 @@ void Drawable::reactToTransformChange(const Matrix3D* oldMtx, const Coord3D* old
 //-------------------------------------------------------------------------------------------------
 void Drawable::reactToGeometryChange()
 {
+	// TheSuperHackers @fix resize the selection ring along with the geometry it is derived from
+	updateSelectionDecal();
+
 	for (DrawModule** dm = getDrawModules(); *dm; ++dm)
 	{
 		(*dm)->reactToGeometryChange();
