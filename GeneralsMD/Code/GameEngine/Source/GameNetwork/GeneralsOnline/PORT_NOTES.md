@@ -171,6 +171,27 @@ knowing before hunting the next crash.
 | Fix | Symptom | Cause |
 |---|---|---|
 | Replace vendored `abseil_dll.dll` | Process died before `WinMain` (`0xC0000374`) | The repo's abseil does not match the abseil its `libprotobuf.dll` was built against. See the vendor DLL section above. |
+| Build with `/LARGEADDRESSAWARE` | Null deref in `TextureLoadTaskClass::Lock_Surfaces` during a single player load screen | 32 bit address space exhaustion, not the online code - see below. |
+
+**The address space fix is not caused by this port, but the port provokes it.** The
+crash was a null dereference in the stock WW3D texture loader: creating a 2048x2048
+X8R8G8B8 surface for `ctrloadpageuserinterface.tga` (~16 MB contiguous) failed and
+`Lock_Surfaces` used the result without checking it. A *full* dump (`CrashFZ`) was what
+identified the cause - the process sat at **1.81 GB committed against the default 2 GB
+limit**, with the remaining ~200 MB fragmented across 500+ regions, so the allocation
+had nowhere to go. A mini dump would only have shown the null.
+
+The online build links GameNetworkingSockets, protobuf, OpenSSL, libcurl and abseil,
+which add real image and heap pressure to a process that was already close to the
+ceiling with Contra's assets - so the online build reaches the limit sooner even though
+no online code is on the stack. `/LARGEADDRESSAWARE` (in `GeneralsMD/Code/Main/
+CMakeLists.txt`) raises the limit to 4 GB on 64 bit Windows and is a no-op on a 32 bit
+OS. It is applied to **all** Zero Hour builds, not gated on the online option, because
+the underlying pressure is the mod's asset load.
+
+Note this raises the ceiling rather than making the loader tolerate a failed
+allocation; the same line would crash the same way if 4 GB were ever exhausted. Adding
+the null check as well is still open.
 
 ### 2. GameSpy singletons that GO redirects to NGMP (the recurring pattern)
 
@@ -219,6 +240,11 @@ kb 40
 A null read of the form `mov eax,dword ptr [ecx] ds:002b:00000000` inside a function
 whose name starts with `GameSpy` is almost certainly another instance of this pattern:
 find the same function in the GO clone, take its `#if defined(GENERALS_ONLINE)` branch.
+
+If the faulting function is *not* GameSpy related, reach for the **full** (`CrashFZ`)
+dump instead. It carries the heap, so `!address -summary` shows memory pressure and
+`dt` on the faulting object shows what was actually being loaded - that is how the
+texture crash above was traced to address space exhaustion rather than a bad pointer.
 
 ### 3. Behavior differences from running a fork against the official service
 
