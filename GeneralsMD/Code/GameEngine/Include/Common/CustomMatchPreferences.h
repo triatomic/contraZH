@@ -44,6 +44,11 @@ public:
 	CustomMatchPreferences();
 	virtual ~CustomMatchPreferences() override;
 
+#if defined(GENERALS_ONLINE)
+	AsciiString getLastLobbyName() const;
+	void setLastLobbyName(const AsciiString& name);
+#endif
+
 	void setLastLadder(const AsciiString& addr, UnsignedShort port);
 	AsciiString getLastLadderAddr();
 	UnsignedShort getLastLadderPort();

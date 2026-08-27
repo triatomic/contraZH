@@ -1545,6 +1545,10 @@ void SkirmishGameInfo::xfer( Xfer *xfer )
 
 	xfer->xferInt(&m_preorderMask);
 	xfer->xferInt(&m_crcInterval);
+#if defined(GENERALS_ONLINE)
+	if (m_crcInterval <= 0)
+		m_crcInterval = NET_CRC_INTERVAL;
+#endif
 	xfer->xferBool(&m_inGame);
 	xfer->xferBool(&m_inProgress);
 	xfer->xferBool(&m_surrendered);

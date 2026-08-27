@@ -230,6 +230,15 @@ static void drawListBoxText( GameWindow *window, WinInstanceData *instData,
 		}
 
 		listLineHeight = list->listData[i].height + 1;
+
+#if defined(GENERALS_ONLINE)
+		Int rowDrawY = drawY;
+		ApplyListBoxRowAnimation(window, i, listLineHeight, rowDrawY);
+#else
+		// rowDrawY is a plain alias here so the drawing code below is shared
+		// with the GeneralsOnline row-entry animation
+		const Int rowDrawY = drawY;
+#endif
 		//textColor =  list->listData[i].textColor;
 		selected = FALSE;
 
@@ -297,7 +306,7 @@ static void drawListBoxText( GameWindow *window, WinInstanceData *instData,
 				// region of the edge of the listbox
 				//
 				start.x = x;
-				start.y = drawY;
+				start.y = rowDrawY;
 				end.x = start.x + width;
 				end.y = start.y + listLineHeight;
 
@@ -338,7 +347,7 @@ static void drawListBoxText( GameWindow *window, WinInstanceData *instData,
 				// region of the edge of the listbox
 				//
 				start.x = x;
-				start.y = drawY;
+				start.y = rowDrawY;
 				end.x = start.x + width;
 				end.y = start.y + listLineHeight;
 
@@ -360,7 +369,7 @@ static void drawListBoxText( GameWindow *window, WinInstanceData *instData,
 				// region of the edge of the listbox
 				//
 				start.x = x + 1;
-				start.y = drawY + 1;
+				start.y = rowDrawY + 1;
 				end.x = start.x + width - 2;
 				end.y = start.y + listLineHeight - 2;
 
@@ -396,12 +405,12 @@ static void drawListBoxText( GameWindow *window, WinInstanceData *instData,
 				// setup the Clip Region size
 
 				columnRegion.lo.x = columnX;
-				columnRegion.lo.y = drawY;
+				columnRegion.lo.y = rowDrawY;
 				if(list->columns == 1 && list->slider && list->slider->winIsHidden())
 					columnRegion.hi.x = columnX + width-3;
 				else
 					columnRegion.hi.x = columnX + list->columnWidth[j];
-				columnRegion.hi.y = drawY + list->listData[i].height;
+				columnRegion.hi.y = rowDrawY + list->listData[i].height;
 				if(columnRegion.lo.y < clipRegion.lo.y )
 					columnRegion.lo.y = clipRegion.lo.y;
 				if( columnRegion.hi.y > clipRegion.hi.y )
@@ -422,7 +431,7 @@ static void drawListBoxText( GameWindow *window, WinInstanceData *instData,
 						// draw this text after setting the clip region for it
 						string->setClipRegion( &columnRegion );
 						string->draw( columnX + TEXT_X_OFFSET,
-													drawY,
+													rowDrawY,
 													textColor,
 													dropColor );
 
@@ -437,7 +446,7 @@ static void drawListBoxText( GameWindow *window, WinInstanceData *instData,
 						// set clip region and draw
 						string->setClipRegion( &columnRegion );
 						string->draw( columnX + TEXT_X_OFFSET,
-													drawY,
+													rowDrawY,
 													textColor,
 													dropColor );
 					}
@@ -461,9 +470,9 @@ static void drawListBoxText( GameWindow *window, WinInstanceData *instData,
 					else
 						offsetX = columnX;
 					if(height < list->listData[i].height)
-						offsetY = drawY + ((list->listData[i].height - height) / 2);
+						offsetY = rowDrawY + ((list->listData[i].height - height) / 2);
 					else
-						offsetY = drawY;
+						offsetY = rowDrawY;
 
 					offsetY++;
 					if(offsetX <x+1)

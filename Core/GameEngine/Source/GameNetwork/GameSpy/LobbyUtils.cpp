@@ -31,6 +31,10 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+// GeneralsOnline port: when the GO stack is enabled, this whole implementation is
+// replaced by the rewritten copy in GeneralsMD GameNetwork/GeneralsOnline/LobbyUtils.cpp.
+#if !defined(GENERALS_ONLINE)
+
 #include "Common/GameEngine.h"
 #include "Common/MultiplayerSettings.h"
 #include "Common/PlayerTemplate.h"
@@ -937,3 +941,5 @@ void playerTemplateListBoxTooltip(GameWindow *wndListBox, WinInstanceData *instD
 	// use no tooltip delay here
 	TheMouse->setCursorTooltip(ustringTooltip, 0);
 }
+
+#endif // !defined(GENERALS_ONLINE)

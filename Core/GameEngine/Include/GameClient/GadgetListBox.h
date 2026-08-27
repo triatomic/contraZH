@@ -61,6 +61,17 @@ typedef struct _RightClickStruct
 	Int pos;
 } RightClickStruct;
 
+#if defined(GENERALS_ONLINE)
+enum ListRowAnimMode
+{
+	LIST_ROW_ANIM_ID = 1,      // key by item ID, for lists that change order or have insertions/deletions
+	LIST_ROW_ANIM_SLOT = 2     // key by slot index, for append-only lists that don't change order
+};
+
+extern void SetListBoxRowAnimMode(GameWindow *window, ListRowAnimMode mode);
+extern void ApplyListBoxRowAnimation(GameWindow *window, Int rowIndex, Int rowHeight, Int &drawY);
+#endif
+
 ///////////////////////////////////////////////////////////////////////////////
 // INLINING ///////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////

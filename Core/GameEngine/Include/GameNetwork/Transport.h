@@ -31,6 +31,72 @@
 #include "GameNetwork/udp.h"
 #include "GameNetwork/NetworkDefs.h"
 
+#if defined(GENERALS_ONLINE)
+
+// GeneralsOnline port: there are multiple transports now, so Transport is an abstract
+// base class. UDPTransport (GeneralsMD) is what Transport was - the legacy, direct
+// connection transport the original game used - and NextGenTransport is the
+// GeneralsOnline implementation.
+class Transport //: public MemoryPoolObject
+{
+	//MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(Transport, "Transport")
+public:
+
+	Transport();
+	virtual ~Transport();
+
+	virtual Bool init( AsciiString ip, UnsignedShort port ) = 0;
+	virtual Bool init( UnsignedInt ip, UnsignedShort port ) = 0;
+	virtual void reset( void ) = 0;
+	virtual Bool update( void ) = 0;								///< Call this once a GameEngine tick, regardless of whether the frame advances.
+
+	virtual Bool doRecv( void ) = 0;		///< call this to service the receive packets
+	virtual Bool doSend( void ) = 0;		///< call this to service the send queue.
+
+	virtual Bool queueSend(UnsignedInt addr, UnsignedShort port, const UnsignedByte *buf, Int len /*,
+		NetMessageFlags flags, Int id */) = 0;				///< Queue a packet for sending to the specified address and port.  This will be sent on the next update() call.
+
+	virtual Bool allowBroadcasts(Bool val) = 0;
+
+	// Latency insertion and packet loss
+	void setLatency( Bool val ) { m_useLatency = val; }
+	void setPacketLoss( Bool val ) { m_usePacketLoss = val; }
+
+	// Bandwidth metrics
+	Real getIncomingBytesPerSecond();
+	Real getIncomingPacketsPerSecond();
+	Real getOutgoingBytesPerSecond();
+	Real getOutgoingPacketsPerSecond();
+	Real getUnknownBytesPerSecond();
+	Real getUnknownPacketsPerSecond();
+
+	TransportMessage m_outBuffer[MAX_MESSAGES];
+	TransportMessage m_inBuffer[MAX_MESSAGES];
+
+#if defined(RTS_DEBUG)
+	DelayedTransportMessage m_delayedInBuffer[MAX_MESSAGES];
+#endif
+
+protected:
+	// Latency insertion and packet loss
+	Bool m_useLatency;
+	Bool m_usePacketLoss;
+
+	// Bandwidth metrics
+	UnsignedInt m_incomingBytes[MAX_TRANSPORT_STATISTICS_SECONDS];
+	UnsignedInt m_unknownBytes[MAX_TRANSPORT_STATISTICS_SECONDS];
+	UnsignedInt m_outgoingBytes[MAX_TRANSPORT_STATISTICS_SECONDS];
+	UnsignedInt m_incomingPackets[MAX_TRANSPORT_STATISTICS_SECONDS];
+	UnsignedInt m_unknownPackets[MAX_TRANSPORT_STATISTICS_SECONDS];
+	UnsignedInt m_outgoingPackets[MAX_TRANSPORT_STATISTICS_SECONDS];
+	Int m_statisticsSlot;
+	UnsignedInt m_lastSecond;
+
+	Bool isGeneralsPacket( TransportMessage *msg );
+};
+
+#else // !defined(GENERALS_ONLINE)
+
 /**
  * The transport layer handles the UDP socket for the game, and will packetize and
  * de-packetize multiple ACK/CommandPacket/etc packets into larger aggregates.
@@ -98,3 +164,5 @@ private:
 
 	Bool isGeneralsPacket( TransportMessage *msg );
 };
+
+#endif // !defined(GENERALS_ONLINE)

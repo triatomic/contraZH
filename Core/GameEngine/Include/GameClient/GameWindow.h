@@ -191,6 +191,9 @@ enum
 //-----------------------------------------------------------------------------
 enum
 {
+#if defined(GENERALS_ONLINE)
+	MSG_BOX_NONE						= 0x00, //Display no buttons
+#endif
 	MSG_BOX_YES							= 0x01, //Display the yes button
 	MSG_BOX_NO							= 0x02, //Display the No button
 	MSG_BOX_OK							= 0x08, //Display the Ok button

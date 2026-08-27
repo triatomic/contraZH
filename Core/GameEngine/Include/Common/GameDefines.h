@@ -115,7 +115,13 @@
 
 // Disable non retail fixes in the networking, such as putting more data per UDP packet
 #ifndef RETAIL_COMPATIBLE_NETWORKING
+#if defined(GENERALS_ONLINE)
+// GeneralsOnline port: the GeneralsOnline netcode uses the larger non-retail packet
+// sizes, further adjusted for TURN relay overhead in NetworkDefs.h.
+#define RETAIL_COMPATIBLE_NETWORKING (0)
+#else
 #define RETAIL_COMPATIBLE_NETWORKING (1)
+#endif
 #endif
 
 // This is essentially synonymous for RETAIL_COMPATIBLE_CRC. There is a lot wrong with AIGroup, such as use-after-free, double-free, leaks,

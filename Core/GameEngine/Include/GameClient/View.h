@@ -178,7 +178,11 @@ public:
 	virtual Bool isTimeFrozen(){ return false;}					///< Freezes time during the next camera movement.
 	virtual Int	 getTimeMultiplier() {return 1;};				///< Get the time multiplier.
 	virtual void setTimeMultiplier(Int multiple) {}; ///< Set the time multiplier.
+#if defined(GENERALS_ONLINE)
+	virtual void setDefaultView(Real pitch, Real angle, Real maxHeight, bool bForceDefaultCam = true) {};
+#else
 	virtual void setDefaultView(Real pitch, Real angle, Real maxHeight) {}; // TheSuperHackers @todo Replace with setDefaultPitch(), setMaxHeightScale()
+#endif
 	virtual void zoomCamera( Real finalZoom, Int milliseconds, Real easeIn=0.0f, Real easeOut=0.0f ) {};
 	virtual void pitchCamera( Real finalPitch, Int milliseconds, Real easeIn=0.0f, Real easeOut=0.0f ) {};
 

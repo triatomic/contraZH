@@ -36,7 +36,15 @@ static constexpr const Int MAX_COMMANDS = 256;
 // This lets network games run at latencies down to 133ms when the network conditions allow
 static constexpr const Int MIN_LOGIC_FRAMES = 5;
 static constexpr const Int MAX_FRAMES_AHEAD = 128;
+#if defined(GENERALS_ONLINE)
+// GeneralsOnline port: the service config can override this at runtime (NGMPGame.cpp),
+// so it is a mutable static. Upstream GO makes it a plain per-translation-unit static,
+// so a runtime write is only visible in the writing file - replicated as-is to stay
+// behaviorally identical to official GeneralsOnline clients.
+static Int MIN_RUNAHEAD = 6;
+#else
 static constexpr const Int MIN_RUNAHEAD = 4;
+#endif
 
 // FRAME_DATA_LENGTH needs to be MAX_FRAMES_AHEAD+1 because a player on a different
 // computer can send commands for a frame that is one beyond twice the max runahead.
@@ -75,9 +83,19 @@ static constexpr const Int MAX_LANAPI_PACKET_SIZE = RETAIL_GAME_PACKET_SIZE;
 #if RETAIL_COMPATIBLE_NETWORKING
 static constexpr const Int MAX_PACKET_SIZE = RETAIL_GAME_PACKET_SIZE;
 static constexpr const Int MAX_NETWORK_MESSAGE_LEN = 1024;
+#elif defined(GENERALS_ONLINE)
+// GeneralsOnline port: upstream GO's packet sizing - 96 bytes are reserved for TURN
+// relay and Valve GameNetworkingSockets overhead.
+static constexpr const Int MAX_PACKET_SIZE = 1194 - 96;
+static constexpr const Int MAX_NETWORK_MESSAGE_LEN = 1104;
 #else
 static constexpr const Int MAX_PACKET_SIZE = MAX_UDP_PAYLOAD_SIZE - sizeof(TransportMessageHeader);
 static constexpr const Int MAX_NETWORK_MESSAGE_LEN = MAX_UDP_PAYLOAD_SIZE;
+#endif
+
+#if defined(GENERALS_ONLINE)
+// Alias used by the GeneralsOnline sources; upstream GO renamed the constant.
+static constexpr const Int MAX_MESSAGE_LEN = MAX_NETWORK_MESSAGE_LEN;
 #endif
 
 // TheSuperHackers @bugfix Mauller 08/02/2026 Double send and receive buffer sizes to alleviate the occurance of disconnection issues in retail and non retail code.

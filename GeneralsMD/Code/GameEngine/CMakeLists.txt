@@ -1245,6 +1245,89 @@ else()
     )
 endif()
 
+if(RTS_BUILD_GENERALS_ONLINE)
+    # The Generals Online services stack, ported from
+    # GeneralsOnlineDevelopmentTeam/GameClient. See
+    # Source/GameNetwork/GeneralsOnline/PORT_NOTES.md
+    list(APPEND GAMEENGINE_SRC
+        Include/GameNetwork/UDPTransport.h
+        Source/GameNetwork/UDPTransport.cpp
+        Include/GameNetwork/GeneralsOnline/json.hpp
+        Include/GameNetwork/GeneralsOnline/DiscordRichPresence.h
+        Include/GameNetwork/GeneralsOnline/Vendor/DiscordRPC/discord_rpc.h
+        Include/GameNetwork/GeneralsOnline/NetworkBitstream.h
+        Include/GameNetwork/GeneralsOnline/NetworkMesh.h
+        Include/GameNetwork/GeneralsOnline/NetworkPacket.h
+        Include/GameNetwork/GeneralsOnline/NextGenMP_defines.h
+        Include/GameNetwork/GeneralsOnline/NGMPGame.h
+        Include/GameNetwork/GeneralsOnline/NGMP_include.h
+        Include/GameNetwork/GeneralsOnline/NGMP_interfaces.h
+        Include/GameNetwork/GeneralsOnline/NGMP_types.h
+        Include/GameNetwork/GeneralsOnline/OnlineServices_Auth.h
+        Include/GameNetwork/GeneralsOnline/OnlineServices_Init.h
+        Include/GameNetwork/GeneralsOnline/OnlineServices_LobbyInterface.h
+        Include/GameNetwork/GeneralsOnline/OnlineServices_RoomsInterface.h
+        Include/GameNetwork/GeneralsOnline/OnlineServices_StatsInterface.h
+        Include/GameNetwork/GeneralsOnline/OnlineServices_SocialInterface.h
+        Include/GameNetwork/GeneralsOnline/OnlineServices_MatchmakingInterface.h
+        Include/GameNetwork/GeneralsOnline/GeneralsOnline_Settings.h
+        Include/GameNetwork/GeneralsOnline/HTTP/HTTPManager.h
+        Include/GameNetwork/GeneralsOnline/HTTP/HTTPRequest.h
+        Include/GameNetwork/GeneralsOnline/NextGenTransport.h
+        Include/GameNetwork/GeneralsOnline/PluginInterfaces.h
+        Source/GameNetwork/GeneralsOnline/DiscordRichPresence.cpp
+        Source/GameNetwork/GeneralsOnline/NGMP_Helpers.cpp
+        Source/GameNetwork/GeneralsOnline/NGMPGame.cpp
+        Source/GameNetwork/GeneralsOnline/GeneralsOnline_Settings.cpp
+        Source/GameNetwork/GeneralsOnline/HTTP/HTTPManager.cpp
+        Source/GameNetwork/GeneralsOnline/HTTP/HTTPRequest.cpp
+        Source/GameNetwork/GeneralsOnline/NetworkMesh.cpp
+        Source/GameNetwork/GeneralsOnline/OnlineServices_Init.cpp
+        Source/GameNetwork/GeneralsOnline/OnlineServices_Auth.cpp
+        Source/GameNetwork/GeneralsOnline/OnlineServices_LobbyInterface.cpp
+        Source/GameNetwork/GeneralsOnline/OnlineServices_RoomsInterface.cpp
+        Source/GameNetwork/GeneralsOnline/OnlineServices_StatsInterface.cpp
+        Source/GameNetwork/GeneralsOnline/OnlineServices_SocialInterface.cpp
+        Source/GameNetwork/GeneralsOnline/OnlineServices_MatchmakingInterface.cpp
+        Source/GameNetwork/GeneralsOnline/NextGenTransport.cpp
+        Source/GameNetwork/GeneralsOnline/NetworkBitstream.cpp
+        Source/GameNetwork/GeneralsOnline/PluginInterfaces.cpp
+        # Replaces Core's LobbyUtils.cpp, whose implementation is compiled out when ON
+        Source/GameNetwork/GeneralsOnline/LobbyUtils.cpp
+    )
+
+    # The Generals Online UI rewrote these screens with direct calls into the NGMP
+    # services; the GameSpy originals cannot coexist in the same build, so each is
+    # swapped for the GeneralsOnline copy. The originals stay untouched for the
+    # default build and for upstream merges.
+    list(REMOVE_ITEM GAMEENGINE_SRC
+        Source/GameClient/GUI/GUICallbacks/Menus/WOLLoginMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/WOLWelcomeMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/WOLLobbyMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/WOLGameSetupMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/WOLMapSelectMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/PopupHostGame.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/PopupJoinGame.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/WOLQuickMatchMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/WOLBuddyOverlay.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/PopupPlayerInfo.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/ScoreScreen.cpp
+    )
+    list(APPEND GAMEENGINE_SRC
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/WOLLoginMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/WOLWelcomeMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/WOLLobbyMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/WOLGameSetupMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/WOLMapSelectMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/PopupHostGame.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/PopupJoinGame.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/WOLQuickMatchMenu.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/WOLBuddyOverlay.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/PopupPlayerInfo.cpp
+        Source/GameClient/GUI/GUICallbacks/Menus/GeneralsOnline/ScoreScreen.cpp
+    )
+endif()
+
 
 add_library(z_gameengine STATIC)
 
@@ -1257,6 +1340,17 @@ target_include_directories(z_gameengine PUBLIC
 target_include_directories(z_gameengine PRIVATE
     Include/Precompiled
 )
+
+if(RTS_BUILD_GENERALS_ONLINE)
+    # Vendored Generals Online dependencies: headers, and the prebuilt Win32 libs the
+    # online sources pull in via #pragma comment(lib, ...) (MSVC x86 only).
+    target_include_directories(z_gameengine PUBLIC
+        Include/GameNetwork/GeneralsOnline/Vendor/
+    )
+    target_link_directories(z_gameengine PUBLIC
+        Source/GameNetwork/GeneralsOnline/Vendor
+    )
+endif()
 
 target_link_libraries(z_gameengine PRIVATE
     corei_gameengine_private

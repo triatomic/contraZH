@@ -238,3 +238,61 @@ Notes:
 sciences — it returns you to a fresh general, not to what you had before.
 * Sciences granted are only this general's own tree, walked from the three purchase command sets the
 player template names, not every science in the game.
+
+# Generals Online (experimental)
+
+The engine can be built with the online system from
+[Generals Online](https://github.com/GeneralsOnlineDevelopmentTeam/GameClient), the
+community replacement for GameSpy: modern login, lobbies, matchmaking and stats over a
+REST + WebSocket backend, with peer to peer play over Valve's GameNetworkingSockets
+(ICE with STUN/TURN fallback) instead of the retail NAT negotiation.
+
+This is a build-time option, off by default. A normal build is completely unchanged -
+every ported line is compiled out. Building with `-DRTS_BUILD_GENERALS_ONLINE=ON`
+replaces the GameSpy online path: the Online button runs the Generals Online version
+check and login, and the WOL screens become their Generals Online counterparts. LAN and
+skirmish are untouched either way.
+
+Notes:
+* The client needs a Generals Online backend to actually play online; without one it
+fails gracefully at login and returns to the main menu. Connecting to the official
+`playgenerals.online` service with a Contra client is subject to coordination with the
+Generals Online team.
+* Crash reporting, anti-cheat and hardware fingerprinting from upstream are compiled
+out by default in this fork.
+* The port is documented in detail in `PORT_NOTES.md` next to the GeneralsOnline
+sources, including every deliberate deviation from upstream.
+
+## Runtime requirements
+
+A build made with `RTS_BUILD_GENERALS_ONLINE=ON` links against several libraries that
+are not part of the game. Their DLLs must sit **next to the executable**, or the game
+dies at startup before it draws anything - usually with a bare "the application was
+unable to start correctly", because the failure happens in the loader rather than in
+game code.
+
+The build copies them automatically as a post build step, so a build directory is
+always complete. The list matters when you copy an executable somewhere by hand:
+
+| File | Provides |
+|---|---|
+| `GameNetworkingSockets.dll` | Valve GameNetworkingSockets - the peer to peer transport |
+| `libprotobuf.dll` | Protocol Buffers, used by GameNetworkingSockets |
+| `abseil_dll.dll` | Abseil, used by Protocol Buffers |
+| `libcrypto-3.dll`, `libssl-3.dll` | OpenSSL 3 - TLS for the service and DTLS for peer traffic |
+| `libcurl.dll` | HTTP and the WebSocket client |
+| `zlib1.dll` | compression, used by libcurl |
+| `discord-rpc.dll` | Discord rich presence (optional at runtime, but the import is not) |
+
+All seven are 32 bit, and they are versions of each other: `libprotobuf.dll` and
+`abseil_dll.dll` in particular have to come from the same set. Mixing a protobuf with a
+mismatched abseil corrupts the heap inside a static initializer and the game dies
+before `WinMain`, which looks nothing like a version problem. If you replace one of
+these, replace all of them together.
+
+Note also that some Generals Online installs ship a **64 bit** `zlib1.dll` for their
+own tooling. Copying that one into the game folder breaks `libcurl` with an invalid
+image error - the game needs the 32 bit one.
+
+Nothing here is required by a normal Contra build, which has no online stack compiled
+in and no extra dependencies.

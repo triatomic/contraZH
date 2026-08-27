@@ -86,6 +86,12 @@
 #include "GameLogic/GameLogic.h"
 #include "GameNetwork/GameSpy/PeerDefs.h"
 #include "GameNetwork/GameSpy/PersistentStorageThread.h"
+
+#if defined(GENERALS_ONLINE)
+#include "GameNetwork/GeneralsOnline/NGMPGame.h"
+#include "GameNetwork/GeneralsOnline/NGMP_interfaces.h"
+#include "GameNetwork/GeneralsOnline/OnlineServices_StatsInterface.h"
+#endif
 #include "GameNetwork/NetworkInterface.h"
 #include "GameNetwork/RankPointValue.h"
 
@@ -1516,7 +1522,9 @@ GameSpyLoadScreen::~GameSpyLoadScreen()
 	}
 }
 
+#if !defined(GENERALS_ONLINE)
 extern Int GetAdditionalDisconnectsFromUserFile(Int playerID);
+#endif
 
 void GameSpyLoadScreen::init( GameInfo *game )
 {
@@ -1659,16 +1667,41 @@ GameSlot *lSlot = game->getSlot(game->getLocalSlotNum());
 		m_progressBars[netSlot]->winSetEnabledImage( 6, houseImage );
 #endif
 
+		// Get the stats for the player
+#if defined(GENERALS_ONLINE)
+		PSPlayerStats stats = PSPlayerStats();
+		NGMP_OnlineServices_StatsInterface* pStatsInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_StatsInterface>();
+		if (pStatsInterface != nullptr)
+		{
+			// Data should be in cache from lobby joins, so we can do this synchronously
+			pStatsInterface->getPlayerStatsFromCache(slot->getProfileID(), &stats);
+		}
+#else
+		PSPlayerStats stats = TheGameSpyPSMessageQueue->findPlayerStatsByID(slot->getProfileID());
+#endif
+
 		UnicodeString name = slot->getName();
+
+#if defined(GENERALS_ONLINE)
+		// if QM, show ELO
+		NGMPGame* pNGMPGame = (NGMPGame*)game;
+		if (pNGMPGame->isQMGame())
+		{
+			name.format(L"%s (Elo: %d)", slot->getName().str(), stats.elo_rating);
+		}
+#endif
 		GadgetStaticTextSetText(m_playerNames[netSlot], name );
 		m_playerNames[netSlot]->winSetEnabledTextColors(houseColor, m_playerNames[netSlot]->winGetEnabledTextBorderColor());
 
-		// Get the stats for the player
-		PSPlayerStats stats = TheGameSpyPSMessageQueue->findPlayerStatsByID(slot->getProfileID());
 		DEBUG_LOG(("LoadScreen - populating info for %ls(%d) - stats returned id %d",
 			slot->getName().str(), slot->getProfileID(), stats.id));
 
+#if defined(GENERALS_ONLINE)
+		// GeneralsOnline port: TheGameSpyInfo does not exist when the GO stack is active
+		Bool isPreorder = false;
+#else
 		Bool isPreorder = TheGameSpyInfo->didPlayerPreorder(stats.id);
+#endif
 		Int rankPoints = CalculateRank(stats);
 		Int favSide = GetFavoriteSide(stats);
 		const Image *preorderImg = TheMappedImageCollection->findImageByName("OfficersClubsmall");
@@ -1732,7 +1765,9 @@ GameSlot *lSlot = game->getSlot(game->getLocalSlotNum());
 		{
 			numGames += it->second;
 		}
+#if !defined(GENERALS_ONLINE)
 		numGames += GetAdditionalDisconnectsFromUserFile(stats.id);
+#endif
 
 		formatString.format(L"%d", numGames);
 		GadgetStaticTextSetText(m_playerTotalDisconnects[netSlot], formatString);

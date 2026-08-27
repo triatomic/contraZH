@@ -67,6 +67,9 @@
 #include "GameClient/ChallengeGenerals.h"
 
 #include "GameNetwork/GameSpy/PeerDefs.h"
+#if defined(GENERALS_ONLINE)
+#include "GameNetwork/GeneralsOnline/OnlineServices_Init.h"
+#endif
 #include "GameNetwork/GameSpy/PeerThread.h"
 #include "GameNetwork/GameSpy/BuddyThread.h"
 
@@ -215,6 +218,10 @@ extern Bool dispChanged;
 void diffReverseSide();
 void HandleCanceledDownload( Bool resetDropDown )
 {
+#if defined(GENERALS_ONLINE)
+	NGMP_OnlineServicesManager::GetInstance()->CancelUpdate();
+#endif
+
 	buttonPushed = FALSE;
 	if (resetDropDown)
 	{
@@ -259,7 +266,13 @@ static void quitCallback()
 
 	}
 	if (TheGameLogic->isInGame())
+	{
+#if defined(GENERALS_ONLINE)
+		TheMessageStream->appendMessage( GameMessage::MSG_CLEAR_GAME_DATA );
+#else
 		TheGameLogic->exitGame();
+#endif
+	}
 }
 
 

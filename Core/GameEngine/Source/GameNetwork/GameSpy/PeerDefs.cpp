@@ -596,6 +596,9 @@ const AsciiString& GameSpyInfo::getConfig()
 // --------------------------------------------------------------
 void SetUpGameSpy( const char *motdBuffer, const char *configBuffer )
 {
+	// GeneralsOnline port: the GameSpy stack is bypassed entirely; the NGMP services
+	// take over from the Online button instead.
+#if !defined(GENERALS_ONLINE)
 	if (!motdBuffer)
 		motdBuffer = "";
 	if (!configBuffer)
@@ -639,6 +642,7 @@ void SetUpGameSpy( const char *motdBuffer, const char *configBuffer )
 	ThePinger->startThreads();
 
 	TheRankPointValues = NEW RankPoints;
+#endif // !defined(GENERALS_ONLINE)
 }
 
 void TearDownGameSpy()

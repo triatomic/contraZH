@@ -101,10 +101,21 @@ public:
 	virtual Int getAverageFPS() = 0;
 	virtual Int getSlotAverageFPS(Int slot) = 0;
 
+#if defined(GENERALS_ONLINE)
+	virtual void SeedLatencyData(int highestLatency) = 0;
+	virtual bool IsSlugging() = 0;
+#endif
+
 	virtual void attachTransport(Transport *transport) = 0;
 	virtual void initTransport() = 0;
 	virtual Bool sawCRCMismatch() = 0;
+#if defined(GENERALS_ONLINE)
+	virtual void setSawCRCMismatch(UnicodeString& strMismatchDetails) = 0;
+
+	virtual ConnectionManager* GetConnectionManager() = 0;
+#else
 	virtual void setSawCRCMismatch() = 0;
+#endif
 
 	virtual Bool isPlayerConnected(Int playerID) = 0;
 

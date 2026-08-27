@@ -31,6 +31,9 @@
 #include "Common/Registry.h"
 #include "GameNetwork/LANAPI.h"
 #include "GameNetwork/networkutil.h"
+#if defined(GENERALS_ONLINE)
+#include "GameNetwork/UDPTransport.h"
+#endif
 #include "Common/GlobalData.h"
 #include "Common/RandomValue.h"
 #include "GameClient/GameText.h"
@@ -85,7 +88,11 @@ LANAPI::LANAPI() : m_transport(nullptr)
 	m_directConnectRemoteIP = 0;
 	m_actionTimeout = 5000; // ms
 	m_lastUpdate = 0;
+#if defined(GENERALS_ONLINE)
+	m_transport = new UDPTransport;
+#else
 	m_transport = new Transport;
+#endif
 	m_isActive = TRUE;
 }
 

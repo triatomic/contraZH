@@ -106,8 +106,13 @@ public:
 
 	void updateCache();
 
+#if defined(GENERALS_ONLINE)
+	AsciiString getMapDir(bool bCustomMapDebug = false) const;
+	AsciiString getUserMapDir(bool bCustomMapDebug = false) const;
+#else
 	AsciiString getMapDir() const;
 	AsciiString getUserMapDir() const;
+#endif
 	AsciiString getMapExtension() const;
 
 	const MapMetaData *findMap(AsciiString mapName);

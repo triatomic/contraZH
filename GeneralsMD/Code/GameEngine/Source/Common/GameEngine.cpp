@@ -111,6 +111,56 @@
 
 #include "Common/version.h"
 
+#if defined(GENERALS_ONLINE)
+#include "GameNetwork/GeneralsOnline/NextGenMP_defines.h"
+#include "GameNetwork/GeneralsOnline/OnlineServices_Init.h"
+#include "GameNetwork/GeneralsOnline/DiscordRichPresence.h"
+#include "GameNetwork/GeneralsOnline/OnlineServices_LobbyInterface.h"
+#include "GameNetwork/GameSpyOverlay.h"
+
+static bool g_bTearDownGeneralsOnlineRequested = false;
+void TearDownGeneralsOnline()
+{
+	g_bTearDownGeneralsOnlineRequested = true;
+
+	if (NGMP_OnlineServicesManager::GetInstance() == nullptr)
+		return;
+
+	EGOTearDownReason teardownReason = NGMP_OnlineServicesManager::GetInstance()->GetTeardownReason();
+
+	if (teardownReason != EGOTearDownReason::USER_REQUESTED_SILENT)
+	{
+		UnicodeString title, body;
+
+		if (teardownReason == EGOTearDownReason::USER_LOGOUT)
+		{
+			title = L"Logged Out";
+			body = L"You are now logged out of GeneralsOnline.";
+		}
+		else if (teardownReason == EGOTearDownReason::LOST_CONNECTION)
+		{
+			title = TheGameText->fetch("GUI:GSErrorTitle");
+			body = L"Your connection to the Generals Online servers was lost.";
+		}
+		else if (teardownReason == EGOTearDownReason::AUTH_FAILED)
+		{
+			title = TheGameText->fetch("GUI:GSErrorTitle");
+			body = L"Authentication with the Generals Online servers failed.";
+		}
+		else
+		{
+			title = TheGameText->fetch("GUI:GSErrorTitle");
+			body = L"An unknown error occurred.";
+		}
+
+		NGMP_OnlineServicesManager::GetInstance()->ResetPendingFullTeardownReason();
+
+		GameSpyCloseAllOverlays();
+		GSMessageBoxOk(title, body);
+	}
+}
+#endif
+
 
 //-------------------------------------------------------------------------------------------------
 
@@ -253,6 +303,9 @@ GameEngine::GameEngine()
 	// initialize to non garbage values
 	m_logicTimeAccumulator = 0.0f;
 	m_quitting = FALSE;
+#if defined(GENERALS_ONLINE)
+	m_discordRichPresence = nullptr;
+#endif
 	m_isActive = FALSE;
 
 	_Module.Init(nullptr, ApplicationHInstance, nullptr);
@@ -261,6 +314,11 @@ GameEngine::GameEngine()
 //-------------------------------------------------------------------------------------------------
 GameEngine::~GameEngine()
 {
+#if defined(GENERALS_ONLINE)
+	delete m_discordRichPresence;
+	m_discordRichPresence = nullptr;
+#endif
+
 	//extern std::vector<std::string>	preloadTextureNamesGlobalHack;
 	//preloadTextureNamesGlobalHack.clear();
 
@@ -301,12 +359,21 @@ GameEngine::~GameEngine()
 	delete TheGameLODManager;
 	TheGameLODManager = nullptr;
 
+#if defined(GENERALS_ONLINE)
+	NGMP_OnlineServicesManager::DestroyInstance();
+#endif
+
 	Drawable::killStaticImages();
 
 	_Module.Term();
 
 #ifdef PERF_TIMERS
 	PerfGather::termPerfDump();
+#endif
+
+#if defined(GENERALS_ONLINE)
+	// Kill sentry
+	NGMP_OnlineServicesManager::ShutdownSentry();
 #endif
 }
 
@@ -458,6 +525,11 @@ void GameEngine::init()
 		initSubsystem(TheWritableGlobalData, "TheWritableGlobalData", TheWritableGlobalData, &xferCRC, "Data\\INI\\Default\\GameData", "Data\\INI\\GameData");
 		TheWritableGlobalData->parseCustomDefinition();
 
+#if defined(GENERALS_ONLINE)
+		// Init sentry ASAP to catch early crashes
+		NGMP_OnlineServicesManager::InitSentry();
+#endif
+
 		initSubsystem(TheWriteableMapData, "TheWriteableMapData", MapData::createMapDataSystem(), &xferCRC);
 
 	#ifdef DUMP_PERF_STATS///////////////////////////////////////////////////////////////////////////
@@ -476,6 +548,11 @@ void GameEngine::init()
 
 		// special-case: parse command-line parameters after loading global data
 		CommandLine::parseCommandLineForEngineInit();
+
+#if defined(GENERALS_ONLINE)
+		// NGMP_CHANGE: Init our settings before loadMods, which reads DataPacks_UseCommunityPatch. Needs TheGlobalData for the user data path.
+		NGMP_OnlineServicesManager::Settings.Initialize();
+#endif
 
 		TheArchiveFileSystem->loadMods();
 
@@ -776,6 +853,11 @@ void GameEngine::init()
 	resetSubsystems();
 
 	HideControlBar();
+
+#if defined(GENERALS_ONLINE)
+	m_discordRichPresence = new GeneralsOnlineDiscordRPC();
+	m_discordRichPresence->Initialize();
+#endif
 }
 
 /** -----------------------------------------------------------------------------------------------
@@ -920,6 +1002,26 @@ void GameEngine::update()
 			{
 				TheNetwork->UPDATE();
 			}
+
+#if defined(GENERALS_ONLINE)
+			if (g_bTearDownGeneralsOnlineRequested) // delayed tear down
+			{
+				g_bTearDownGeneralsOnlineRequested = false;
+
+				NGMP_OnlineServicesManager::DestroyInstance();
+			}
+
+			if (NGMP_OnlineServicesManager::GetInstance() != nullptr)
+			{
+				NGMP_OnlineServicesManager::GetInstance()->Tick();
+			}
+
+			if (m_discordRichPresence != nullptr)
+			{
+				m_discordRichPresence->Tick(
+					NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>());
+			}
+#endif
 		}
 
 		// TheSuperHackers @info Ignores frozen time because the script engine needs updating in the logic update regardless.
