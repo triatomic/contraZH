@@ -157,7 +157,7 @@ AI module. Infantry inside a *unit* are covered.
 
 ## AUTO_FILL
 
-Selects nearby idle infantry and orders them to board the selected container.
+Selects nearby infantry and orders them to board the selected container.
 
 ```
 CommandButton Command_AutoFill
@@ -169,8 +169,9 @@ CommandButton Command_AutoFill
 End
 ```
 
-Only infantry that are idle, not already contained, and not already members of the group are
-considered, searched nearest-first per container.
+Only infantry that are not already contained and not already members of the group are considered,
+searched nearest-first per container. What they are currently doing does not matter - infantry on
+the move or in a fight break off and board, the same as if the order had been given by hand.
 
 # Drag Selection
 
