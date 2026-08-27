@@ -248,17 +248,19 @@ void HelixContain::addToContainList( Object *obj )
 {
   if ( obj->isKindOf( KINDOF_PORTABLE_STRUCTURE ) && m_portableStructureID == INVALID_ID)
   {
-    Object *portable = getPortableStructure();
-    if ( portable )
+    if ( Object *portable = getPortableStructure() )
       TheGameLogic->destroyObject( portable );
 
     m_portableStructureID = obj->getID();
     obj->friend_setContainedBy( getObject() );//fool portable into thinking my object is his container
 
-
+    DEBUG_ASSERTCRASH(getObject() == nullptr || !getObject()->isDestroyed(),
+      ("HelixContain::addToContainList - Adding to a destroyed container"));
   }
   else
-		TransportContain::addToContainList( obj );
+  {
+    TransportContain::addToContainList( obj );
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -266,22 +268,25 @@ void HelixContain::addToContain( Object *obj )
 {
   if ( obj->isKindOf( KINDOF_PORTABLE_STRUCTURE ) && m_portableStructureID == INVALID_ID)
   {
-    Object *portable = getPortableStructure();
-    if ( portable )
+    if ( Object *portable = getPortableStructure() )
       TheGameLogic->destroyObject( portable );
 
     m_portableStructureID = obj->getID();
     obj->friend_setContainedBy( getObject() );//fool portable into thinking my object is his container
-
 
 #if !(RETAIL_COMPATIBLE_CRC || PRESERVE_NO_XP_FROM_HELIX_ATTACHMENT_KILLS)
     // TheSuperHackers @bugfix arcticdolphin 13/09/2026 Portable structures bypass onContaining(), so route their kill experience to the Helix here.
     if ( obj->getExperienceTracker() )
       obj->getExperienceTracker()->setExperienceSink( getObject()->getID() );
 #endif
+
+    DEBUG_ASSERTCRASH(getObject() == nullptr || !getObject()->isDestroyed(),
+      ("HelixContain::addToContain - Adding to a destroyed container"));
   }
   else
-		TransportContain::addToContain( obj );
+  {
+    TransportContain::addToContain( obj );
+  }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -292,6 +297,10 @@ void HelixContain::removeFromContain( Object *obj, Bool exposeStealthUnits )
     Object *portable = getPortableStructure();
     if ( portable )
     {
+#if !RETAIL_COMPATIBLE_CRC
+      portable->friend_setContainedBy(nullptr);
+#endif
+
 #if !(RETAIL_COMPATIBLE_CRC || PRESERVE_NO_XP_FROM_HELIX_ATTACHMENT_KILLS)
       if ( portable->getExperienceTracker() )
         portable->getExperienceTracker()->setExperienceSink( INVALID_ID );
