@@ -4820,6 +4820,25 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			break;
 		}
 
+		// TheSuperHackers @feature Toggle the CommandSet overlay: the name of the CommandSet an object
+		// uses. A modding aid for the other half of the question the name overlay answers -- which
+		// button set this thing actually gets, which for ZH is not always the one its template
+		// names, since a module can override it at runtime.
+		//
+		// Independent of the object name overlay: on its own it takes the name's line, and with the
+		// name also on it is drawn to the right of it.
+		case GameMessage::MSG_CHEAT_SHOW_COMMAND_SET:
+		{
+			TheInGameUI->toggleCommandSetOverlay();
+
+			TheInGameUI->messageNoFormat( TheInGameUI->isCommandSetOverlayOn()
+				? TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugCommandSetOverlayOn", L"Command Sets are ON")
+				: TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugCommandSetOverlayOff", L"Command Sets are OFF") );
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
 #endif
 
 		//-----------------------------------------------------------------------------------------

@@ -536,6 +536,10 @@ public:  // ********************************************************************
 	virtual Bool isObjectNameOverlayOn( void ) const { return m_objectNameOverlayMode != OBJECT_NAME_OVERLAY_OFF; }
 	virtual void toggleParticleNameOverlay( void ) { m_particleNameOverlayOn = !m_particleNameOverlayOn; }
 	virtual Bool isParticleNameOverlayOn( void ) const { return m_particleNameOverlayOn; }
+	// TheSuperHackers @feature The CommandSet an object uses. Independent of the name overlay: alone
+	// it takes the object name's line, and with the name on it is drawn to the right of it.
+	virtual void toggleCommandSetOverlay( void ) { m_commandSetOverlayOn = !m_commandSetOverlayOn; }
+	virtual Bool isCommandSetOverlayOn( void ) const { return m_commandSetOverlayOn; }
 #endif
 	void freeMessageResources();				///< free resources for the ui messages
 	void freeCustomUiResources();				///< free resources for custom ui elements
@@ -1122,6 +1126,7 @@ protected:
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	ObjectNameOverlayMode					m_objectNameOverlayMode;
 	Bool												m_particleNameOverlayOn;
+	Bool												m_commandSetOverlayOn;
 #endif
 
 	Color												m_messageColor1;

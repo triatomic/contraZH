@@ -194,19 +194,26 @@ build entirely.
 
 ## Debug name overlays
 
-Two overlays that draw names above every object on screen, selected or not, including props and
+Overlays that draw names above every object on screen, selected or not, including props and
 wreckage that never get a health bar.
 
 * `Ctrl + [` - (Cycles three ways: off, the object's template (INI) name in white, then the
 model's sub object names in green as well.)
 * `Ctrl + ]` - (Particle systems running on that object, in blue, with the FXList that
 spawned them in amber)
+* `Ctrl + '` - (The `CommandSet` the object uses, in yellow)
 
 The sub object list is what the W3D model is actually built from - hull, turret, wheels,
 housecolor and so on - so it is useful for finding the name to use in `ShowSubObject` or
 `HideSubObject`. Up to 16 are listed, with a trailing "and N more" when the model has more.
 
-Also bindable in `CommandMap.ini` as `CHEAT_SHOW_OBJECT_NAME` and `CHEAT_SHOW_PARTICLE_NAMES`.
+The command set is read from the object rather than its template, so a unit whose buttons were
+swapped at runtime shows the set it is actually using, which is not always the one its template
+names. Objects with no command set at all show `<none>`. It works on its own, and with the object
+name overlay also on the two are drawn side by side.
+
+Also bindable in `CommandMap.ini` as `CHEAT_SHOW_OBJECT_NAME`, `CHEAT_SHOW_PARTICLE_NAMES` and
+`CHEAT_SHOW_COMMAND_SET`.
 
 * `ParticleNameLingerMS = 0` - (Options.ini. Milliseconds a particle name stays on screen after its
 system has gone. 0 or absent shows names only while the system is alive.)
