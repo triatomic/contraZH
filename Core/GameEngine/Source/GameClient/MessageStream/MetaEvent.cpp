@@ -215,9 +215,9 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "CHEAT_TOGGLE_HAND_OF_GOD_MODE",		        GameMessage::MSG_CHEAT_TOGGLE_HAND_OF_GOD_MODE },
 	{ "CHEAT_INSTANT_BUILD",							        GameMessage::MSG_CHEAT_INSTANT_BUILD },
 	{ "CHEAT_DESHROUD",									          GameMessage::MSG_CHEAT_DESHROUD },
-		// TheSuperHackers @feature Default binding for the combined cheat. Ctrl+` is free in the
-		// engine, in the demo command map and in Contra's own, and it does not collide with the
-		// Shift+Ctrl+` health bar cycle because the modifier sets differ. Only exists in builds
+		// TheSuperHackers @feature Default binding for the combined cheat. Shift+Ctrl+` is free in
+		// the engine, in the demo command map and in Contra's own, and it does not collide with
+		// the Ctrl+` health bar cycle because the modifier sets differ. Only exists in builds
 		// where cheats are compiled in.
 	{ "CHEAT_KITCHEN_SINK",									          GameMessage::MSG_CHEAT_KITCHEN_SINK },
 	{ "CHEAT_TOGGLE_ZOOM_LOCK",									          GameMessage::MSG_CHEAT_TOGGLE_ZOOM_LOCK },
@@ -937,16 +937,16 @@ void MetaMap::generateMetaMap()
 		}
 	}
 	{
-		// TheSuperHackers @feature Default binding for the combined cheat. Ctrl+` is free in the
-		// engine, in the demo command map and in Contra's own, and it does not collide with the
-		// Shift+Ctrl+` health bar cycle because the modifier sets differ. Only exists in builds
+		// TheSuperHackers @feature Default binding for the combined cheat. Shift+Ctrl+` is free in
+		// the engine, in the demo command map and in Contra's own, and it does not collide with
+		// the Ctrl+` health bar cycle because the modifier sets differ. Only exists in builds
 		// where cheats are compiled in.
 		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_KITCHEN_SINK);
 		if (map->m_key == MK_NONE)
 		{
 			map->m_key = MK_TICK;
 			map->m_transition = DOWN;
-			map->m_modState = CTRL;
+			map->m_modState = SHIFT_CTRL;
 			map->m_usableIn = COMMANDUSABLE_GAME;
 		}
 	}
@@ -977,7 +977,7 @@ void MetaMap::generateMetaMap()
 	}
 #endif
 	{
-		// TheSuperHackers @feature Cycle the health bar display mode. Ctrl+Shift+` is unbound in
+		// TheSuperHackers @feature Cycle the health bar display mode. Ctrl+` is unbound in
 		// retail and in the debug and demo command maps, so this takes a key nothing else wants.
 		// Note the tick key is layout dependent -- it is ` on a US keyboard but prints something
 		// else elsewhere -- however the binding is by scancode, so the same physical key works.
@@ -986,7 +986,7 @@ void MetaMap::generateMetaMap()
 		{
 			map->m_key = MK_TICK;
 			map->m_transition = DOWN;
-			map->m_modState = SHIFT_CTRL;
+			map->m_modState = CTRL;
 			// in game and while observing, but not in the menus, where health bars mean nothing
 			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
 		}
