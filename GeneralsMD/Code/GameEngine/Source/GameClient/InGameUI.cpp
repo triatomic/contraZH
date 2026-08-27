@@ -1208,6 +1208,7 @@ InGameUI::InGameUI()
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	m_objectNameOverlayMode = OBJECT_NAME_OVERLAY_OFF;
 	m_particleNameOverlayOn = FALSE;
+	m_commandSetOverlayOn = FALSE;
 #endif
 
 	// TheSuperHackers @info the default font, size and positions of the various counters were chosen based on GenTools implementation

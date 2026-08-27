@@ -223,6 +223,7 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "CHEAT_TOGGLE_ZOOM_LOCK",									          GameMessage::MSG_CHEAT_TOGGLE_ZOOM_LOCK },
 	{ "CHEAT_SHOW_OBJECT_NAME",									          GameMessage::MSG_CHEAT_SHOW_OBJECT_NAME },
 	{ "CHEAT_SHOW_PARTICLE_NAMES",								  GameMessage::MSG_CHEAT_SHOW_PARTICLE_NAMES },
+	{ "CHEAT_SHOW_COMMAND_SET",									  GameMessage::MSG_CHEAT_SHOW_COMMAND_SET },
 	{ "CHEAT_ADD_CASH",									          GameMessage::MSG_CHEAT_ADD_CASH },
 	{ "CHEAT_GIVE_ALL_SCIENCES",					        GameMessage::MSG_CHEAT_GIVE_ALL_SCIENCES },
   { "CHEAT_GIVE_SCIENCEPURCHASEPOINTS",        	GameMessage::MSG_CHEAT_GIVE_SCIENCEPURCHASEPOINTS },
@@ -970,6 +971,19 @@ void MetaMap::generateMetaMap()
 		if (map->m_key == MK_NONE)
 		{
 			map->m_key = MK_RBRACKET;
+			map->m_transition = DOWN;
+			map->m_modState = CTRL;
+			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
+		}
+	}
+	{
+		// TheSuperHackers @feature Show the CommandSet each object uses. Ctrl+' continues the run of
+		// bracket and quote keys the other overlays took, and is likewise unbound in the engine
+		// defaults, in Contra's CommandMap.ini and in the demo map.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_SHOW_COMMAND_SET);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_APOSTROPHE;
 			map->m_transition = DOWN;
 			map->m_modState = CTRL;
 			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);

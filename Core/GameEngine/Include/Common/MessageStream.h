@@ -459,6 +459,7 @@ public:
 		MSG_CHEAT_TOGGLE_ZOOM_LOCK,					///< TheSuperHackers @feature free the camera from its zoom limit
 		MSG_CHEAT_SHOW_OBJECT_NAME,			///< TheSuperHackers @feature print the selected object template names
 		MSG_CHEAT_SHOW_PARTICLE_NAMES,		///< TheSuperHackers @feature print particle systems on the selection
+		MSG_CHEAT_SHOW_COMMAND_SET,			///< TheSuperHackers @feature show the CommandSet each object uses
 
 		MSG_END_META_MESSAGES,											///< Marker to delineate "meta" messages
 

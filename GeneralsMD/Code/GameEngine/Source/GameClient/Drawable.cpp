@@ -2948,6 +2948,45 @@ static void drawOverlayLine( DisplayString *str, const UnicodeString &text, Int 
 	lineY -= height;
 	str->draw( centerX - ( width / 2 ), lineY, color, dropColor );
 }
+
+//-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature Draw two pieces of text side by side on one line of the overlay, in
+// their own colours, with the pair as a whole centred on the object -- used for the object name
+// with its CommandSet to the right of it. Measuring both first is what keeps the pair centred;
+// drawing the second with a plain x offset would push the line off the object.
+//-------------------------------------------------------------------------------------------------
+static void drawOverlayLinePair( DisplayString *str, const UnicodeString &leftText,
+														const UnicodeString &rightText, Int centerX, Int &lineY,
+														Color leftColor, Color rightColor, Color dropColor )
+{
+	if( str == nullptr )
+		return;
+
+	// A space either side of the separator, so the two names do not run together.
+	const Int gapWidth = 8;
+
+	str->setText( leftText );
+	Int leftWidth, leftHeight;
+	str->getSize( &leftWidth, &leftHeight );
+
+	str->setText( rightText );
+	Int rightWidth, rightHeight;
+	str->getSize( &rightWidth, &rightHeight );
+
+	const Int totalWidth = leftWidth + gapWidth + rightWidth;
+	const Int height = ( leftHeight > rightHeight ) ? leftHeight : rightHeight;
+	const Int startX = centerX - ( totalWidth / 2 );
+
+	lineY -= height;
+
+	// Right side first: the string is already holding that text from the measure above, so drawing
+	// it now saves setting the text a third time.
+	str->draw( startX + leftWidth + gapWidth, lineY, rightColor, dropColor );
+
+	str->setText( leftText );
+	str->draw( startX, lineY, leftColor, dropColor );
+}
+
 //-------------------------------------------------------------------------------------------------
 // TheSuperHackers @feature Fold this frame's particle names into the drawable's remembered list.
 // An entry already present is refreshed rather than duplicated, so a system that keeps running
@@ -3091,7 +3130,8 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 	const Bool wantObjectName = ( nameMode != InGameUI::OBJECT_NAME_OVERLAY_OFF );
 	const Bool wantSubObjects = ( nameMode == InGameUI::OBJECT_NAME_OVERLAY_SUBOBJECTS );
 	const Bool wantParticleNames = TheInGameUI->isParticleNameOverlayOn();
-	if( !wantObjectName && !wantParticleNames )
+	const Bool wantCommandSet = TheInGameUI->isCommandSetOverlayOn();
+	if( !wantObjectName && !wantParticleNames && !wantCommandSet )
 		return;
 
 	const Object *obj = getObject();
@@ -3145,6 +3185,9 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 	// An FXList is a group of particle systems, so its name gets its own colour to separate the
 	// group from the systems inside it.
 	const Color fxListColor = GameMakeColor( 255, 190, 90, 255 );
+	// Sits on the same line as the object name, so it needs a colour of its own to be told apart
+	// from it at a glance.
+	const Color commandSetColor = GameMakeColor( 255, 235, 130, 255 );
 
 	// Lines stack upward from just above the bar, so adding particle names never pushes the object
 	// name off its anchor.
@@ -3324,12 +3367,39 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 		}
 	}
 
-	if( wantObjectName )
+	if( wantObjectName || wantCommandSet )
 	{
-		const ThingTemplate *tmpl = getTemplate();
-		UnicodeString line;
-		line.format( L"%hs", tmpl ? tmpl->getName().str() : "<no template>" );
-		drawOverlayLine( s_nameString, line, anchor.x, lineY, textColor, dropColor );
+		UnicodeString commandSetLine;
+		if( wantCommandSet )
+		{
+			// Object::getCommandSetString, not the template's, so an object whose command set was
+			// swapped at runtime reports the set it is actually using.
+			const AsciiString commandSet = obj->getCommandSetString();
+			commandSetLine.format( L"%hs", commandSet.isEmpty() ? "<none>" : commandSet.str() );
+		}
+
+		if( wantObjectName )
+		{
+			const ThingTemplate *tmpl = getTemplate();
+			UnicodeString line;
+			line.format( L"%hs", tmpl ? tmpl->getName().str() : "<no template>" );
+
+			// With both on the command set sits to the right of the name, as one centred line.
+			if( wantCommandSet )
+			{
+				drawOverlayLinePair( s_nameString, line, commandSetLine, anchor.x, lineY,
+														textColor, commandSetColor, dropColor );
+			}
+			else
+			{
+				drawOverlayLine( s_nameString, line, anchor.x, lineY, textColor, dropColor );
+			}
+		}
+		else
+		{
+			// Command set on its own, so it takes the line the object name would have had.
+			drawOverlayLine( s_nameString, commandSetLine, anchor.x, lineY, commandSetColor, dropColor );
+		}
 	}
 }
 #endif
