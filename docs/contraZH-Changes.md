@@ -84,6 +84,21 @@ asked of `SpecialPowerModule::isReady` every frame rather than predicted, so a q
 fire earlier than a manual one could.
 * Shift+click queues or cancels five units at once, from either the mouse or the hotkey.
 
+## Clipboard paste
+
+`Ctrl + V` pastes the clipboard into any text field. Retail had no paste at all, so a link or a
+callout had to be retyped by hand - most keenly felt in the in game chat, opened with Enter, or
+Shift+Enter for allies only.
+
+It works in every text entry, not just chat: lobby chat, game and player names, and so on.
+
+Notes:
+* Pasted text obeys the same rules as typing. A field that only takes numbers, letters or ASCII
+filters the paste the same way, and hidden fields keep showing asterisks.
+* Text longer than the space left is truncated to fit, the same way typing stops at the limit.
+* A multi-line paste stops at the first line break, so half a pasted paragraph cannot become a
+chat message on its own.
+
 ## Rendering
 
 The texture filter option shipped here pre-merge was this fork's adaptation of an unreleased
