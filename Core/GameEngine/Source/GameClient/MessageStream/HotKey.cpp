@@ -198,9 +198,26 @@ Bool HotKeyManager::isHotKeyClaimed( const AsciiString& keyIn ) const
 	if( win == nullptr )
 		return FALSE;
 
-	// only a button the player can actually press counts as claiming the key
+	// Only a button the player can actually press counts as claiming the key. This has to agree
+	// with executeHotKey below: yielding the meta event to a button that then refuses to run it
+	// loses the keypress entirely, doing neither thing.
 	if( BitIsSet( win->winGetStatus(), WIN_STATUS_HIDDEN ) )
 		return FALSE;
+
+	// A disabled button normally cannot be pressed, so it does not claim the key. The one
+	// exception mirrors executeHotKey: in quick cast a button held disabled only by NOT_READY --
+	// a recharging ability, or a weapon still working through its burst -- is still pressable, so
+	// it does claim it.
+	if( !BitIsSet( win->winGetStatus(), WIN_STATUS_ENABLED ) )
+	{
+		const Bool pressableWhileNotReady =
+				BitIsSet( win->winGetStatus(), WIN_STATUS_NOT_READY ) &&
+				TheGlobalData &&
+				TheGlobalData->m_castMode != CastMode_Normal;
+
+		if( !pressableWhileNotReady )
+			return FALSE;
+	}
 
 	return TRUE;
 }
