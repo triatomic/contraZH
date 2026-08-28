@@ -4132,6 +4132,22 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			break;
 		}
 
+		// TheSuperHackers @feature Toggle the armor overlay: the Armor line of the ArmorSet the object
+		// currently matches, drawn under the weapons. Which ArmorSet is live depends on the conditions
+		// the object meets (veterancy, upgrades, second life), so reading the armor back is the direct
+		// way to see which block the engine picked.
+		case GameMessage::MSG_CHEAT_SHOW_ARMOR_SET:
+		{
+			TheInGameUI->toggleArmorSetOverlay();
+
+			TheInGameUI->messageNoFormat( TheInGameUI->isArmorSetOverlayOn()
+				? TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugArmorSetOverlayOn", L"Armor is ON")
+				: TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugArmorSetOverlayOff", L"Armor is OFF") );
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
 #endif
 
 		//-----------------------------------------------------------------------------------------

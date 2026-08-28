@@ -461,6 +461,7 @@ public:
 		MSG_CHEAT_SHOW_PARTICLE_NAMES,		///< TheSuperHackers @feature print particle systems on the selection
 		MSG_CHEAT_SHOW_COMMAND_SET,			///< TheSuperHackers @feature show the CommandSet each object uses
 		MSG_CHEAT_SHOW_WEAPON_SET,			///< TheSuperHackers @feature show the WeaponSet flags each object has
+		MSG_CHEAT_SHOW_ARMOR_SET,			///< TheSuperHackers @feature show the Armor each object uses
 
 		MSG_END_META_MESSAGES,											///< Marker to delineate "meta" messages
 

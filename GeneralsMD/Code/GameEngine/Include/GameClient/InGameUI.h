@@ -544,6 +544,10 @@ public:  // ********************************************************************
 	// set. Independent of the other overlays: it shows only when toggled on.
 	virtual void toggleWeaponSetOverlay( void ) { m_weaponSetOverlayOn = !m_weaponSetOverlayOn; }
 	virtual Bool isWeaponSetOverlayOn( void ) const { return m_weaponSetOverlayOn; }
+	// TheSuperHackers @feature The Armor an object currently uses, drawn under the weapons. Shows
+	// only when toggled on.
+	virtual void toggleArmorSetOverlay( void ) { m_armorSetOverlayOn = !m_armorSetOverlayOn; }
+	virtual Bool isArmorSetOverlayOn( void ) const { return m_armorSetOverlayOn; }
 #endif
 	void freeMessageResources();				///< free resources for the ui messages
 	void freeCustomUiResources();				///< free resources for custom ui elements
@@ -1132,6 +1136,7 @@ protected:
 	Bool												m_particleNameOverlayOn;
 	Bool												m_commandSetOverlayOn;
 	Bool												m_weaponSetOverlayOn;
+	Bool												m_armorSetOverlayOn;
 #endif
 
 	Color												m_messageColor1;

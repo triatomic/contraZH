@@ -219,6 +219,7 @@ model's sub object names in green as well.)
 spawned them in amber)
 * `Ctrl + '` - (The `CommandSet` the object uses, in yellow)
 * `Ctrl + ;` - (The weapons the object is armed with, in red, under the command set)
+* `Ctrl + /` - (The `Armor` the object currently uses, in light blue, under the weapons)
 
 The sub object list is what the W3D model is actually built from - hull, turret, wheels,
 housecolor and so on - so it is useful for finding the name to use in `ShowSubObject` or
@@ -235,8 +236,14 @@ NapalmMissileWeapon` line. Which `WeaponSet` block is live depends on the condit
 currently matches (veterancy, player upgrades, rider slot), so reading the weapons back is the
 direct way to see which block the engine actually picked. Unarmed objects show `<no weapons>`.
 
+The armor overlay shows the `Armor` line of whichever `ArmorSet` block the object currently
+matches, the same idea one level down: which block is live depends on the conditions it meets
+(veterancy, player upgrades, second life), so reading the armor back is the direct way to see
+which one the engine picked. Objects with no armor, normal for props and rubble, show
+`<no armor>`.
+
 Also bindable in `CommandMap.ini` as `CHEAT_SHOW_OBJECT_NAME`, `CHEAT_SHOW_PARTICLE_NAMES`,
-`CHEAT_SHOW_COMMAND_SET` and `CHEAT_SHOW_WEAPON_SET`.
+`CHEAT_SHOW_COMMAND_SET`, `CHEAT_SHOW_WEAPON_SET` and `CHEAT_SHOW_ARMOR_SET`.
 
 * `ParticleNameLingerMS = 0` - (Options.ini. Milliseconds a particle name stays on screen after its
 system has gone. 0 or absent shows names only while the system is alive.)

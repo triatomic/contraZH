@@ -66,6 +66,8 @@
 #include "GameLogic/Module/StickyBombUpdate.h"
 #include "GameLogic/Module/BattlePlanUpdate.h"
 #include "GameLogic/ScriptEngine.h"
+#include "GameLogic/Armor.h"
+#include "GameLogic/ArmorSet.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/WeaponSet.h"
 
@@ -3136,7 +3138,8 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 	const Bool wantParticleNames = TheInGameUI->isParticleNameOverlayOn();
 	const Bool wantCommandSet = TheInGameUI->isCommandSetOverlayOn();
 	const Bool wantWeaponSet = TheInGameUI->isWeaponSetOverlayOn();
-	if( !wantObjectName && !wantParticleNames && !wantCommandSet && !wantWeaponSet )
+	const Bool wantArmorSet = TheInGameUI->isArmorSetOverlayOn();
+	if( !wantObjectName && !wantParticleNames && !wantCommandSet && !wantWeaponSet && !wantArmorSet )
 		return;
 
 	const Object *obj = getObject();
@@ -3196,6 +3199,8 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 	// A neutral red for the weapon set line under it: distinct from the yellow above without
 	// reading as a warning.
 	const Color weaponSetColor = GameMakeColor( 225, 110, 110, 255 );
+	// Light blue for the armor line under the weapons, well clear of the red above it.
+	const Color armorSetColor = GameMakeColor( 130, 200, 255, 255 );
 
 	// Lines stack upward from just above the bar, so adding particle names never pushes the object
 	// name off its anchor.
@@ -3373,6 +3378,38 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 			more.format( L"... and %d more", total - shown );
 			drawOverlayLine( s_nameString, more, anchor.x, lineY, subObjectColor, dropColor );
 		}
+	}
+
+	// Emitted before the weapons, and so before the name and command set too: lines stack upward
+	// from the anchor, which puts the armor at the very bottom of the stack.
+	if( wantArmorSet )
+	{
+		// The Armor line of whichever ArmorSet the object currently matches. Resolved the same way
+		// ActiveBody does it -- the object's live armor set flags against its template -- so it
+		// follows veterancy, upgrades and second life as they happen.
+		const ThingTemplate *armorTmpl = getTemplate();
+		const ArmorTemplateSet *armorSet = nullptr;
+		if( armorTmpl != NULL )
+		{
+			ArmorSetFlags flags;
+			for( Int i = 0; i < ARMORSET_COUNT; ++i )
+			{
+				if( obj->testArmorSetFlag( (ArmorSetType)i ) )
+					flags.set( i, 1 );
+			}
+
+			armorSet = armorTmpl->findArmorTemplateSet( flags );
+		}
+
+		AsciiString armorName;
+		if( armorSet != NULL && TheArmorStore != NULL )
+			armorName = TheArmorStore->getArmorTemplateName( armorSet->getArmorTemplate() );
+
+		UnicodeString armorLine;
+		// An object with no armor at all is normal for props and rubble, so say so rather than
+		// drawing an empty line.
+		armorLine.format( L"%hs", armorName.isEmpty() ? "<no armor>" : armorName.str() );
+		drawOverlayLine( s_nameString, armorLine, anchor.x, lineY, armorSetColor, dropColor );
 	}
 
 	// Drawn before the name and command set: lines stack upward from the anchor, so emitting this
