@@ -170,6 +170,27 @@ const ArmorTemplate* ArmorStore::findArmorTemplate(const char* name) const
 	return findArmorTemplate(TheNameKeyGenerator->nameToKey(name));
 }
 
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+//-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature Reverse of findArmorTemplate: the map is keyed by the name the armor was
+// defined under, so a linear walk is the only way back from a template pointer to that name. Only
+// the armor overlay cheat asks, and only for the objects on screen, so the cost never matters.
+//-------------------------------------------------------------------------------------------------
+AsciiString ArmorStore::getArmorTemplateName(const ArmorTemplate* tmpl) const
+{
+	if (tmpl == nullptr)
+		return AsciiString::TheEmptyString;
+
+	for (ArmorTemplateMap::const_iterator it = m_armorTemplates.begin(); it != m_armorTemplates.end(); ++it)
+	{
+		if (&it->second == tmpl)
+			return TheNameKeyGenerator->keyToName(it->first);
+	}
+
+	return AsciiString::TheEmptyString;
+}
+#endif
+
 //-------------------------------------------------------------------------------------------------
 /*static */ void ArmorStore::parseArmorDefinition(INI *ini)
 {

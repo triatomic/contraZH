@@ -115,6 +115,14 @@ public:
 	const ArmorTemplate* findArmorTemplate(const AsciiString& name) const;
 	const ArmorTemplate* findArmorTemplate(const char* name) const;
 
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// TheSuperHackers @feature The name an armor template was defined under. The parsed ArmorSet
+	// keeps only the resolved pointer, so the only way back to the name is to walk the store, which
+	// is keyed by it. Only needed by the armor overlay cheat, so it is not compiled into a normal
+	// build.
+	AsciiString getArmorTemplateName(const ArmorTemplate* tmpl) const;
+#endif
+
 	inline Armor makeArmor(const ArmorTemplate *tmpl) const
 	{
 		return Armor(tmpl);	// my, that was easy

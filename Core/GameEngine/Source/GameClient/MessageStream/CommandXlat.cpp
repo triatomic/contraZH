@@ -4113,6 +4113,41 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			break;
 		}
 
+		// TheSuperHackers @feature Toggle the WeaponSet overlay: the weapon set flags an object
+		// currently has, drawn under the command set. A weapon set is a set of flags rather than one
+		// name -- veterancy, player upgrades, rider slots and so on -- so every flag that is set is
+		// listed, which is what makes it useful for working out which WeaponSet block an INI actually
+		// selected.
+		//
+		// Independent of the other overlays: it shows only while toggled on.
+		case GameMessage::MSG_CHEAT_SHOW_WEAPON_SET:
+		{
+			TheInGameUI->toggleWeaponSetOverlay();
+
+			TheInGameUI->messageNoFormat( TheInGameUI->isWeaponSetOverlayOn()
+				? TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugWeaponSetOverlayOn", L"Weapon Sets are ON")
+				: TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugWeaponSetOverlayOff", L"Weapon Sets are OFF") );
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
+		// TheSuperHackers @feature Toggle the armor overlay: the Armor line of the ArmorSet the object
+		// currently matches, drawn under the weapons. Which ArmorSet is live depends on the conditions
+		// the object meets (veterancy, upgrades, second life), so reading the armor back is the direct
+		// way to see which block the engine picked.
+		case GameMessage::MSG_CHEAT_SHOW_ARMOR_SET:
+		{
+			TheInGameUI->toggleArmorSetOverlay();
+
+			TheInGameUI->messageNoFormat( TheInGameUI->isArmorSetOverlayOn()
+				? TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugArmorSetOverlayOn", L"Armor is ON")
+				: TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugArmorSetOverlayOff", L"Armor is OFF") );
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
 #endif
 
 		//-----------------------------------------------------------------------------------------
