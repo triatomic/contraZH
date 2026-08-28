@@ -2633,7 +2633,11 @@ Int ConnectionManager::getFileTransferProgress(Int playerID, AsciiString path)
 	{
 		//DEBUG_LOG(("ConnectionManager::getFileTransferProgress(%s): looking at existing transfer of '%s'",
 		//	path.str(), commandIt->second.str()));
-		if (commandIt->second == path)
+		// Compare without case. The stored name came from portableMapPathToRealMapPath(), which
+		// lowercases the whole path, while the caller passes the map path as the game holds it.
+		// On a profile whose directory has capitals in it those two never compare equal, so the
+		// receiver's own transfer is never found and its progress reads as a flat 0 throughout.
+		if (commandIt->second.compareNoCase(path) == 0)
 		{
 			return s_fileProgressMap[playerID][commandIt->first];
 		}

@@ -1955,7 +1955,16 @@ void MapTransferLoadScreen::init( GameInfo *game )
 		GadgetStaticTextSetText(m_progressText[netSlot], UnicodeString::TheEmptyString );
 		m_progressText[netSlot]->winSetEnabledTextColors(houseColor, m_progressText[netSlot]->winGetEnabledTextBorderColor());
 
-		if ((i == 0 || (TheGameInfo->getConstSlot(i)->isHuman() && TheGameInfo->getConstSlot(i)->hasMap())) && m_progressBars[netSlot])
+		// Hide the bar for anyone who is not receiving this transfer: the host, who is sending it,
+		// and anyone who already has the map. The one exception is ourselves -- a joiner who needs
+		// the map is still reported as having it here (hasMap() only ever reflects what the other
+		// peers announced about us, never our own local state), so testing hasMap() without this
+		// carve out hides the very bar the receiver is waiting to watch.
+		const Int localSlot = game->getLocalSlotNum();
+		const Bool isLocalPlayer = (i == localSlot);
+		const Bool isSender = (i == 0);
+		const Bool alreadyHasMap = TheGameInfo->getConstSlot(i)->isHuman() && TheGameInfo->getConstSlot(i)->hasMap();
+		if (!isLocalPlayer && (isSender || alreadyHasMap) && m_progressBars[netSlot])
 			m_progressBars[netSlot]->winHide(TRUE);
 
 		m_playerLookup[i] = netSlot; // save our mapping so we can update progress correctly
@@ -2002,9 +2011,17 @@ void MapTransferLoadScreen::update( Int percent )
 void MapTransferLoadScreen::processProgress(Int playerId, Int percentage, AsciiString stateStr)
 {
 
-	if( percentage < 0 || percentage > 100 || playerId >= MAX_SLOTS || playerId < 0 || m_playerLookup[playerId] == -1)
+	if( percentage < 0 || percentage > 100 || playerId >= MAX_SLOTS || playerId < 0 )
 	{
 		DEBUG_CRASH(("Percentage %d was passed in for Player %d", percentage, playerId));
+		return;
+	}
+
+	// An empty or non human slot simply has no bar on the screen. That is routine, not an error,
+	// so drop the update quietly instead of asserting on it.
+	if( m_playerLookup[playerId] == -1 )
+	{
+		DEBUG_LOG(("MapTransferLoadScreen::processProgress: no bar for player %d, dropping %d%%", playerId, percentage));
 		return;
 	}
 
