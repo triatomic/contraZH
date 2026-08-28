@@ -2009,25 +2009,35 @@ bool GameLogic::onMoveUnitCreateEarlier(MAYBE_UNUSED GameMessage *msg, AIGroupPt
 
 	// sanity
 	if( producer == nullptr )
+	{
 		return false;
+	}
 
 	// sanity, the player must control the producer
 	if( producer->getControllingPlayer() != msgPlayer )
+	{
 		return false;
+	}
 
 	// get the unit production interface
 	ProductionUpdateInterface *pu = producer->getProductionUpdateInterface();
 	if( pu == nullptr )
+	{
 		return false;
+	}
 
 	// move the entry one position earlier in the queue
 	pu->moveUnitCreateEarlier( productionID );
 
-	// mark the UI as dirty so the build queue redraws in its new order this frame; the
-	// reorder does not change the queue count, which is all the periodic refresh watches
+	// mark the UI as dirty so the build queue redraws in its new order; the reorder does
+	// not change the queue count, which is all the periodic refresh watches. Owner only:
+	// other peers can have this producer selected, but they never display its queue, so
+	// a rebuild there would repaint nothing.
 	Drawable *draw = producer->getDrawable();
-	if( draw && draw->isSelected() )
+	if( producer->isLocallyControlled() && draw && draw->isSelected() )
+	{
 		TheControlBar->markUIDirty();
+	}
 
 	return true;
 }
@@ -2045,25 +2055,35 @@ bool GameLogic::onMoveUpgradeEarlier(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &
 
 	// sanity
 	if( producer == nullptr || upgradeT == nullptr )
+	{
 		return false;
+	}
 
 	// sanity, the player must control the producer
 	if( producer->getControllingPlayer() != msgPlayer )
+	{
 		return false;
+	}
 
 	// get the unit production interface
 	ProductionUpdateInterface *pu = producer->getProductionUpdateInterface();
 	if( pu == nullptr )
+	{
 		return false;
+	}
 
 	// move the entry one position earlier in the queue
 	pu->moveUpgradeEarlier( upgradeT );
 
-	// mark the UI as dirty so the build queue redraws in its new order this frame; the
-	// reorder does not change the queue count, which is all the periodic refresh watches
+	// mark the UI as dirty so the build queue redraws in its new order; the reorder does
+	// not change the queue count, which is all the periodic refresh watches. Owner only:
+	// other peers can have this producer selected, but they never display its queue, so
+	// a rebuild there would repaint nothing.
 	Drawable *draw = producer->getDrawable();
-	if( draw && draw->isSelected() )
+	if( producer->isLocallyControlled() && draw && draw->isSelected() )
+	{
 		TheControlBar->markUIDirty();
+	}
 
 	return true;
 }

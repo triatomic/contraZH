@@ -503,7 +503,19 @@ void ProductionUpdate::moveProductionEarlier( ProductionEntry *production )
 	// already first, nothing to move before
 	ProductionEntry *previous = production->m_prev;
 	if( previous == nullptr )
+	{
 		return;
+	}
+
+	// A displaced head that has already hit 100 percent is only waiting for its exit -
+	// with door animations it holds the completion time door reservation update() took,
+	// and carrying that into the queue would skip reserveDoorForExit and its gating when
+	// the entry completes a second time. Refuse the swap; the unit is effectively done.
+	// Only the head can be at 100 percent, so this cannot block a mid queue swap.
+	if( previous->m_percentComplete >= 100.0f )
+	{
+		return;
+	}
 
 	ProductionEntry *before = previous->m_prev;
 	ProductionEntry *after = production->m_next;
@@ -514,14 +526,22 @@ void ProductionUpdate::moveProductionEarlier( ProductionEntry *production )
 	previous->m_next = after;
 
 	if( before )
+	{
 		before->m_next = production;
+	}
 	else
+	{
 		m_productionQueue = production;
+	}
 
 	if( after )
+	{
 		after->m_prev = previous;
+	}
 	else
+	{
 		m_productionQueueTail = previous;
+	}
 
 	// the displaced entry starts its current work over. The percent is re-derived from
 	// the frame count every update, so the frames are the authoritative reset; percent
@@ -540,7 +560,9 @@ void ProductionUpdate::moveUnitCreateEarlier( ProductionID productionID )
 	// upgrades sit in the same queue carrying PRODUCTIONID_INVALID, so an invalid ID must
 	// never reach the scan below or it would match the first queued upgrade
 	if( productionID == PRODUCTIONID_INVALID )
+	{
 		return;
+	}
 
 	// search for the production entry in our queue
 	ProductionEntry *production;
@@ -568,7 +590,9 @@ void ProductionUpdate::moveUpgradeEarlier( const UpgradeTemplate *upgrade )
 
 	// sanity
 	if( upgrade == nullptr )
+	{
 		return;
+	}
 
 	// search for the production entry in our queue
 	ProductionEntry *production;

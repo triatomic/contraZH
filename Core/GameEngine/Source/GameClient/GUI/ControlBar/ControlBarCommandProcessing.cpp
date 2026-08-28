@@ -289,7 +289,14 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 	if( commandButton->getCommandType() != GUI_COMMAND_EXIT_CONTAINER )
 	{
-		GadgetButtonSetEnabledImage( control, commandButton->getButtonImage() );
+		// Only stamp a real image. A command with no ButtonImage - the generic cancel
+		// commands on the build queue, whose cameo populateBuildQueue stamps afterwards -
+		// must not have its image nulled by the click, or any click that ends without a
+		// repopulate leaves that cameo blank. Same guard setControlCommand uses.
+		if( commandButton->getButtonImage() )
+		{
+			GadgetButtonSetEnabledImage( control, commandButton->getButtonImage() );
+		}
 	}
 
 	//
@@ -656,12 +663,6 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 					GameMessage *moveMsg = TheMessageStream->appendMessage( GameMessage::MSG_MOVE_UNIT_CREATE_EARLIER );
 					moveMsg->appendIntegerArgument( productionIDToCancel );
 				}
-
-				// repaint the queue even when nothing was sent. Every other click on this panel
-				// ends in a repopulate - a cancel changes the queue count and a successful move
-				// marks the UI dirty when the message is processed - and without one the clicked
-				// button is left showing the click's leftover visual state as an empty cameo.
-				markUIDirty();
 				break;
 			}
 
@@ -812,17 +813,16 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 			// Ctrl moves the clicked entry one position earlier in the queue instead of
 			// cancelling it. Break unconditionally so a Ctrl click can never fall through
-			// to the cancel below.
+			// to the cancel below. Unlike the cancel above, the move checks local control
+			// here like the unit branch does - the logic side rejects the message anyway,
+			// so sending one for someone else's producer only wastes network traffic.
 			if( TheKeyboard && TheKeyboard->isCtrl() )
 			{
-				if( i > 0 )
+				if( i > 0 && producer->isLocallyControlled() )
 				{
 					GameMessage *moveMsg = TheMessageStream->appendMessage( GameMessage::MSG_MOVE_UPGRADE_EARLIER );
 					moveMsg->appendIntegerArgument( upgradeT->getUpgradeNameKey() );
 				}
-
-				// repaint the queue even when nothing was sent, see the unit branch above
-				markUIDirty();
 				break;
 			}
 
