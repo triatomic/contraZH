@@ -218,6 +218,7 @@ model's sub object names in green as well.)
 * `Ctrl + ]` - (Particle systems running on that object, in blue, with the FXList that
 spawned them in amber)
 * `Ctrl + '` - (The `CommandSet` the object uses, in yellow)
+* `Ctrl + ;` - (The weapons the object is armed with, in red, under the command set)
 
 The sub object list is what the W3D model is actually built from - hull, turret, wheels,
 housecolor and so on - so it is useful for finding the name to use in `ShowSubObject` or
@@ -228,8 +229,14 @@ swapped at runtime shows the set it is actually using, which is not always the o
 names. Objects with no command set at all show `<none>`. It works on its own, and with the object
 name overlay also on the two are drawn side by side.
 
-Also bindable in `CommandMap.ini` as `CHEAT_SHOW_OBJECT_NAME`, `CHEAT_SHOW_PARTICLE_NAMES` and
-`CHEAT_SHOW_COMMAND_SET`.
+The weapon overlay lists one line per occupied weapon slot, written the way the INI writes it
+inside a `WeaponSet` block - `PRIMARY NapalmMissileWeapon` for a `Weapon = PRIMARY
+NapalmMissileWeapon` line. Which `WeaponSet` block is live depends on the conditions the object
+currently matches (veterancy, player upgrades, rider slot), so reading the weapons back is the
+direct way to see which block the engine actually picked. Unarmed objects show `<no weapons>`.
+
+Also bindable in `CommandMap.ini` as `CHEAT_SHOW_OBJECT_NAME`, `CHEAT_SHOW_PARTICLE_NAMES`,
+`CHEAT_SHOW_COMMAND_SET` and `CHEAT_SHOW_WEAPON_SET`.
 
 * `ParticleNameLingerMS = 0` - (Options.ini. Milliseconds a particle name stays on screen after its
 system has gone. 0 or absent shows names only while the system is alive.)

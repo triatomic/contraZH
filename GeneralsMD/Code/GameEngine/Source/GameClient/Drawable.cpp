@@ -29,6 +29,9 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+// TheSuperHackers @feature For TheWeaponSlotTypeNames, used by the weapon set overlay.
+#define DEFINE_WEAPONSLOTTYPE_NAMES
+
 #include "Common/AudioEventInfo.h"
 #include "Common/DynamicAudioEventInfo.h"
 #include "Common/AudioSettings.h"
@@ -64,6 +67,7 @@
 #include "GameLogic/Module/BattlePlanUpdate.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Weapon.h"
+#include "GameLogic/WeaponSet.h"
 
 #include "GameClient/Anim2D.h"
 #include "GameClient/ControlBar.h"
@@ -3131,7 +3135,8 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 	const Bool wantSubObjects = ( nameMode == InGameUI::OBJECT_NAME_OVERLAY_SUBOBJECTS );
 	const Bool wantParticleNames = TheInGameUI->isParticleNameOverlayOn();
 	const Bool wantCommandSet = TheInGameUI->isCommandSetOverlayOn();
-	if( !wantObjectName && !wantParticleNames && !wantCommandSet )
+	const Bool wantWeaponSet = TheInGameUI->isWeaponSetOverlayOn();
+	if( !wantObjectName && !wantParticleNames && !wantCommandSet && !wantWeaponSet )
 		return;
 
 	const Object *obj = getObject();
@@ -3188,6 +3193,9 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 	// Sits on the same line as the object name, so it needs a colour of its own to be told apart
 	// from it at a glance.
 	const Color commandSetColor = GameMakeColor( 255, 235, 130, 255 );
+	// A neutral red for the weapon set line under it: distinct from the yellow above without
+	// reading as a warning.
+	const Color weaponSetColor = GameMakeColor( 225, 110, 110, 255 );
 
 	// Lines stack upward from just above the bar, so adding particle names never pushes the object
 	// name off its anchor.
@@ -3364,6 +3372,41 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 			UnicodeString more;
 			more.format( L"... and %d more", total - shown );
 			drawOverlayLine( s_nameString, more, anchor.x, lineY, subObjectColor, dropColor );
+		}
+	}
+
+	// Drawn before the name and command set: lines stack upward from the anchor, so emitting this
+	// first is what puts it underneath them.
+	if( wantWeaponSet )
+	{
+		// The weapons the object is actually armed with right now, one line per occupied slot, in the
+		// same shape the INI writes them -- "PRIMARY NapalmMissileWeapon" for a Weapon = line inside
+		// the WeaponSet block. Which block is live depends on the object's current weapon set flags
+		// (veterancy, upgrades, rider slot), so reading the weapons back is the direct way to see
+		// which WeaponSet the engine actually picked.
+		Int slotsDrawn = 0;
+
+		// Emitted in reverse so the list still reads PRIMARY first from the top down once the lines
+		// have stacked upward.
+		for( Int i = WEAPONSLOT_COUNT - 1; i >= 0; --i )
+		{
+			const Weapon *weapon = obj->getWeaponInWeaponSlot( (WeaponSlotType)i );
+			if( weapon == NULL )
+				continue;
+
+			UnicodeString weaponLine;
+			weaponLine.format( L"%hs %hs", TheWeaponSlotTypeNames[i], weapon->getName().str() );
+			drawOverlayLine( s_nameString, weaponLine, anchor.x, lineY, weaponSetColor, dropColor );
+			++slotsDrawn;
+		}
+
+		// Say so explicitly rather than drawing nothing, so an unarmed object is never mistaken for
+		// the overlay having failed to draw.
+		if( slotsDrawn == 0 )
+		{
+			UnicodeString noneLine;
+			noneLine.format( L"%hs", "<no weapons>" );
+			drawOverlayLine( s_nameString, noneLine, anchor.x, lineY, weaponSetColor, dropColor );
 		}
 	}
 

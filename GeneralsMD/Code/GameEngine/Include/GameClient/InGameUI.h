@@ -540,6 +540,10 @@ public:  // ********************************************************************
 	// it takes the object name's line, and with the name on it is drawn to the right of it.
 	virtual void toggleCommandSetOverlay( void ) { m_commandSetOverlayOn = !m_commandSetOverlayOn; }
 	virtual Bool isCommandSetOverlayOn( void ) const { return m_commandSetOverlayOn; }
+	// TheSuperHackers @feature The WeaponSet flags an object currently has, drawn under the command
+	// set. Independent of the other overlays: it shows only when toggled on.
+	virtual void toggleWeaponSetOverlay( void ) { m_weaponSetOverlayOn = !m_weaponSetOverlayOn; }
+	virtual Bool isWeaponSetOverlayOn( void ) const { return m_weaponSetOverlayOn; }
 #endif
 	void freeMessageResources();				///< free resources for the ui messages
 	void freeCustomUiResources();				///< free resources for custom ui elements
@@ -1127,6 +1131,7 @@ protected:
 	ObjectNameOverlayMode					m_objectNameOverlayMode;
 	Bool												m_particleNameOverlayOn;
 	Bool												m_commandSetOverlayOn;
+	Bool												m_weaponSetOverlayOn;
 #endif
 
 	Color												m_messageColor1;

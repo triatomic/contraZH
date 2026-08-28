@@ -1209,6 +1209,7 @@ InGameUI::InGameUI()
 	m_objectNameOverlayMode = OBJECT_NAME_OVERLAY_OFF;
 	m_particleNameOverlayOn = FALSE;
 	m_commandSetOverlayOn = FALSE;
+	m_weaponSetOverlayOn = FALSE;
 #endif
 
 	// TheSuperHackers @info the default font, size and positions of the various counters were chosen based on GenTools implementation

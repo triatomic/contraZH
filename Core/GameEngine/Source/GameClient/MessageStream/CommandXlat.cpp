@@ -4113,6 +4113,25 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			break;
 		}
 
+		// TheSuperHackers @feature Toggle the WeaponSet overlay: the weapon set flags an object
+		// currently has, drawn under the command set. A weapon set is a set of flags rather than one
+		// name -- veterancy, player upgrades, rider slots and so on -- so every flag that is set is
+		// listed, which is what makes it useful for working out which WeaponSet block an INI actually
+		// selected.
+		//
+		// Independent of the other overlays: it shows only while toggled on.
+		case GameMessage::MSG_CHEAT_SHOW_WEAPON_SET:
+		{
+			TheInGameUI->toggleWeaponSetOverlay();
+
+			TheInGameUI->messageNoFormat( TheInGameUI->isWeaponSetOverlayOn()
+				? TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugWeaponSetOverlayOn", L"Weapon Sets are ON")
+				: TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugWeaponSetOverlayOff", L"Weapon Sets are OFF") );
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
 #endif
 
 		//-----------------------------------------------------------------------------------------
