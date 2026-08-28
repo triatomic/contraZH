@@ -86,6 +86,17 @@ public:
 	virtual UpdateSleepTime update() override;							///< called once per frame
 
 	virtual Bool isRiderChangeContain() const override { return TRUE; }
+
+#if RETAIL_COMPATIBLE_CRC
+	// Retail treats a rider as an enclosed passenger. Kept as-is so replay and network CRCs match.
+	virtual Bool isEnclosingContainerFor( const Object *obj ) const override { return TRUE; }
+#else
+	// TheSuperHackers @bugfix A rider is visibly mounted on its host, not sealed inside it, so it
+	// must not report as enclosing. OpenContain answers TRUE for every container, which made
+	// Object::getEnclosingContainedBy treat a rider as enclosed and switch off any influence the
+	// rider carries -- such as the PropagandaTowerBehavior Contra mounts on its Propaganda Officer.
+	virtual Bool isEnclosingContainerFor( const Object *obj ) const override { return FALSE; }
+#endif
 	virtual const Object *friend_getRider() const override;
 
 	virtual Int getContainMax() const override;
