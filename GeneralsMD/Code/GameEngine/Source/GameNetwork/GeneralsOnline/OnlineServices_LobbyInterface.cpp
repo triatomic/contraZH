@@ -1178,6 +1178,12 @@ void NGMP_OnlineServices_LobbyInterface::JoinLobby(LobbyEntry lobbyInfo, std::st
 						if (TheNGMPGame != nullptr)
 						{
 							NetworkLog(ELogVerbosity::LOG_RELEASE, "NGMP_OnlineServices_LobbyInterface::JoinLobby - Safety check - Expected NGMPGame to be null by now, it wasn't so forcefully destroying");
+							// TheGameInfo aliases this object while a match is running, so clear it too or
+							// it is left dangling at freed memory.
+							if (TheGameInfo == TheNGMPGame)
+							{
+								TheGameInfo = nullptr;
+							}
 							delete TheNGMPGame;
 							TheNGMPGame = nullptr;
 						}
@@ -1278,6 +1284,14 @@ void NGMP_OnlineServices_LobbyInterface::LeaveCurrentLobby()
 
 	if (TheNGMPGame != nullptr)
 	{
+		// TheGameInfo aliases this object while a match is running. Deleting the game without
+		// clearing it leaves a dangling pointer that anything still ticking will read through:
+		// Discord rich presence updates every frame from GameEngine::update, and its null check
+		// on TheGameInfo cannot tell a freed object from a live one.
+		if (TheGameInfo == TheNGMPGame)
+		{
+			TheGameInfo = nullptr;
+		}
 		delete TheNGMPGame;
 		TheNGMPGame = nullptr;
 	}
@@ -1405,6 +1419,12 @@ void NGMP_OnlineServices_LobbyInterface::CreateLobby(UnicodeString strLobbyName,
 							if (TheNGMPGame != nullptr)
 							{
 								NetworkLog(ELogVerbosity::LOG_RELEASE, "NGMP_OnlineServices_LobbyInterface::JoinLobby - Safety check - Expected NGMPGame to be null by now, it wasn't so forcefully destroying");
+								// TheGameInfo aliases this object while a match is running, so clear it too or
+								// it is left dangling at freed memory.
+								if (TheGameInfo == TheNGMPGame)
+								{
+									TheGameInfo = nullptr;
+								}
 								delete TheNGMPGame;
 								TheNGMPGame = nullptr;
 							}
