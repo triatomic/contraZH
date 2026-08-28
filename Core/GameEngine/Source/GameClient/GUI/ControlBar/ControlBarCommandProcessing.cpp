@@ -656,6 +656,12 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 					GameMessage *moveMsg = TheMessageStream->appendMessage( GameMessage::MSG_MOVE_UNIT_CREATE_EARLIER );
 					moveMsg->appendIntegerArgument( productionIDToCancel );
 				}
+
+				// repaint the queue even when nothing was sent. Every other click on this panel
+				// ends in a repopulate - a cancel changes the queue count and a successful move
+				// marks the UI dirty when the message is processed - and without one the clicked
+				// button is left showing the click's leftover visual state as an empty cameo.
+				markUIDirty();
 				break;
 			}
 
@@ -814,6 +820,9 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 					GameMessage *moveMsg = TheMessageStream->appendMessage( GameMessage::MSG_MOVE_UPGRADE_EARLIER );
 					moveMsg->appendIntegerArgument( upgradeT->getUpgradeNameKey() );
 				}
+
+				// repaint the queue even when nothing was sent, see the unit branch above
+				markUIDirty();
 				break;
 			}
 
