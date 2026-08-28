@@ -76,9 +76,10 @@ static GameWindow *curWindow = nullptr;  /**< so we can keep track of the input
 // be retyped by hand.
 //
 // Pasted characters go through exactly the constraints typing already obeys -- numeric, alpha
-// numeric and ASCII only fields, the maxTextLen cap and the secret text asterisk mirror -- so a
-// pasted string ends up indistinguishable from a typed one. Text longer than the space left is
-// truncated to fit, the same way typing simply stops at the cap.
+// numeric and ASCII only fields, the maxTextLen cap and the secret text asterisk mirror, which is
+// kept in step character for character -- so a pasted string ends up indistinguishable from a
+// typed one. Text longer than the space left is truncated to fit, the same way typing simply
+// stops at the cap.
 //
 // Newlines end the paste: the entry is a single line control, and a multi line clipboard would
 // otherwise smuggle a line break into a chat message.
@@ -150,8 +151,9 @@ static void pasteClipboardIntoEntry( GameWindow *window, EntryData *e )
 			break;
 
 		e->text->appendChar( *c );
-		if( e->secretText && e->sText )
-			e->sText->appendChar( L'*' );
+		// Unconditional, like every other write path: sText must stay the same length as text,
+		// because backspace pops both without checking secretText.
+		e->sText->appendChar( L'*' );
 		e->charPos++;
 		changed = TRUE;
 	}
