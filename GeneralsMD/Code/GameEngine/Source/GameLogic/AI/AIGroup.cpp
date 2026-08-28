@@ -2636,8 +2636,8 @@ void AIGroup::groupSmartGarrison( Object *target, CommandSourceType cmdSource )
  * the container, here the selection *is* the containers and the infantry are found for them. It
  * saves the usual dance of selecting the troops, finding them on screen, and clicking the building.
  *
- * Only idle, uncontained, locally controlled infantry within SmartGarrisonRange are recruited, so
- * this never pulls a unit out of a fight or countermands an order the player just gave.
+ * Uncontained, locally controlled infantry within SmartGarrisonRange are recruited whatever they
+ * are currently doing, so a squad already moving or fighting still answers the call.
  */
 void AIGroup::groupAutoFill( CommandSourceType cmdSource )
 {
@@ -2710,10 +2710,10 @@ void AIGroup::groupAutoFill( CommandSourceType cmdSource )
 			if( o->getContainedBy() != NULL )
 				continue;
 
-			// Never recruit a unit that is busy. Pulling a soldier out of a fight, or off a move
-			// the player just ordered, would make this command feel like it disobeys.
+			// Busy infantry are recruited too: whatever they were doing, the fill order is the more
+			// recent one, so it wins the same way any new order given by hand would.
 			AIUpdateInterface *ai = o->getAIUpdateInterface();
-			if( ai == NULL || !ai->isIdle() )
+			if( ai == NULL )
 				continue;
 
 			// Do not empty out a selected container to fill another one: a member of this very
