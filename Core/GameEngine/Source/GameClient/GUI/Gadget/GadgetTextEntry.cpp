@@ -71,6 +71,102 @@ static GameWindow *curWindow = nullptr;  /**< so we can keep track of the input
 
 // PRIVATE FUNCTIONS //////////////////////////////////////////////////////////
 
+// TheSuperHackers @feature Paste the clipboard into a text entry (Ctrl+V). The engine had no
+// paste at all, which is most keenly felt in the in game chat, where a link or a callout has to
+// be retyped by hand.
+//
+// Pasted characters go through exactly the constraints typing already obeys -- numeric, alpha
+// numeric and ASCII only fields, the maxTextLen cap and the secret text asterisk mirror -- so a
+// pasted string ends up indistinguishable from a typed one. Text longer than the space left is
+// truncated to fit, the same way typing simply stops at the cap.
+//
+// Newlines end the paste: the entry is a single line control, and a multi line clipboard would
+// otherwise smuggle a line break into a chat message.
+static void pasteClipboardIntoEntry( GameWindow *window, EntryData *e )
+{
+#ifdef _WIN32
+	if( window == NULL || e == NULL || e->text == NULL )
+		return;
+
+	if( !IsClipboardFormatAvailable( CF_UNICODETEXT ) && !IsClipboardFormatAvailable( CF_TEXT ) )
+		return;
+
+	if( !OpenClipboard( NULL ) )
+		return;
+
+	// Unicode first, so non Latin text survives; CF_TEXT is the fallback for plain ANSI sources.
+	// Windows synthesizes one format from the other, so in practice one of the two is always there.
+	UnicodeString pasted;
+	HANDLE hData = GetClipboardData( CF_UNICODETEXT );
+	if( hData != NULL )
+	{
+		const WideChar *src = (const WideChar *)GlobalLock( hData );
+		if( src != NULL )
+		{
+			pasted.set( src );
+			GlobalUnlock( hData );
+		}
+	}
+	else
+	{
+		hData = GetClipboardData( CF_TEXT );
+		if( hData != NULL )
+		{
+			const char *src = (const char *)GlobalLock( hData );
+			if( src != NULL )
+			{
+				pasted.translate( AsciiString( src ) );
+				GlobalUnlock( hData );
+			}
+		}
+	}
+
+	CloseClipboard();
+
+	if( pasted.isEmpty() )
+		return;
+
+	Bool changed = FALSE;
+	for( const WideChar *c = pasted.str(); *c != 0; ++c )
+	{
+		// A single line control: stop at the first line break rather than flattening it, so half a
+		// pasted paragraph never becomes a chat message on its own.
+		if( *c == L'\r' || *c == L'\n' )
+			break;
+
+		// Tabs and other control characters would render as garbage in the entry.
+		if( *c < L' ' )
+			continue;
+
+		if( e->numericalOnly && TheWindowManager->winIsDigit( *c ) == 0 )
+			continue;
+		if( e->alphaNumericalOnly && TheWindowManager->winIsAlNum( *c ) == 0 )
+			continue;
+		if( e->aSCIIOnly && TheWindowManager->winIsAscii( *c ) == 0 )
+			continue;
+
+		// Truncate rather than reject: fill what fits and drop the rest, the way typing stops.
+		if( e->charPos >= e->maxTextLen - 1 )
+			break;
+
+		e->text->appendChar( *c );
+		if( e->secretText && e->sText )
+			e->sText->appendChar( L'*' );
+		e->charPos++;
+		changed = TRUE;
+	}
+
+	if( changed )
+	{
+		TheWindowManager->winSendSystemMsg( window->winGetOwner(),
+																				GEM_UPDATE_TEXT,
+																				(WindowMsgData)window,
+																				0 );
+	}
+#endif // _WIN32
+}
+
+
 ///////////////////////////////////////////////////////////////////////////////
 // PUBLIC FUNCTIONS ///////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -146,6 +242,15 @@ WindowMsgHandledType GadgetTextEntryInput( GameWindow *window, UnsignedInt msg,
 		case GWM_CHAR:
 			if ( BitIsSet( mData2, KEY_STATE_DOWN ) && BitIsSet( mData2, KEY_STATE_ALT | KEY_STATE_CONTROL ) )
 			{
+				// TheSuperHackers @feature Ctrl+V is the one combination a text entry does want. It has to be
+				// caught ahead of the blanket ignore below, which is why paste is not simply another case in
+				// the switch that follows.
+				if ( mData1 == KEY_V && BitIsSet( mData2, KEY_STATE_CONTROL ) && !BitIsSet( mData2, KEY_STATE_ALT ) )
+				{
+					pasteClipboardIntoEntry( window, e );
+					return MSG_HANDLED;
+				}
+
 				return MSG_IGNORED; // text extries shouldn't care about CTRL+* or ALT+*
 			}
 
