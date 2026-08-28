@@ -781,6 +781,11 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			onCancelUnitCreate(msg, currentlySelectedGroup);
 			break;
 		}
+		case GameMessage::MSG_MOVE_UNIT_CREATE_EARLIER:
+		{
+			onMoveUnitCreateEarlier(msg, currentlySelectedGroup);
+			break;
+		}
 		case GameMessage::MSG_DOZER_CONSTRUCT:
 		case GameMessage::MSG_DOZER_CONSTRUCT_LINE:
 		{
@@ -1982,6 +1987,42 @@ bool GameLogic::onCancelUnitCreate(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &cu
 
 	// cancel the production
 	pu->cancelUnitCreate( productionID );
+
+	return true;
+}
+
+bool GameLogic::onMoveUnitCreateEarlier(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
+{
+	Player *msgPlayer = getMessagePlayer(msg);
+
+#if RETAIL_COMPATIBLE_AIGROUP
+	Object *producer = getSingleObjectFromSelection(currentlySelectedGroup);
+#else
+	Object *producer = getSingleObjectFromSelection(currentlySelectedGroup.Peek());
+#endif
+	ProductionID productionID = (ProductionID)msg->getArgument( 0 )->integer;
+
+	// sanity
+	if( producer == nullptr )
+		return false;
+
+	// sanity, the player must control the producer
+	if( producer->getControllingPlayer() != msgPlayer )
+		return false;
+
+	// get the unit production interface
+	ProductionUpdateInterface *pu = producer->getProductionUpdateInterface();
+	if( pu == nullptr )
+		return false;
+
+	// move the entry one position earlier in the queue
+	pu->moveUnitCreateEarlier( productionID );
+
+	// mark the UI as dirty so the build queue redraws in its new order this frame; the
+	// reorder does not change the queue count, which is all the periodic refresh watches
+	Drawable *draw = producer->getDrawable();
+	if( draw && draw->isSelected() )
+		TheControlBar->markUIDirty();
 
 	return true;
 }

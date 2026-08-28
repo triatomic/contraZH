@@ -490,6 +490,68 @@ void ProductionUpdate::cancelUnitCreate( ProductionID productionID )
 }
 
 //-------------------------------------------------------------------------------------------------
+/** Move the unit with the matching production ID one position earlier in the queue, swapping
+	* it with the entry directly before it. The displaced entry loses its build progress: only
+	* the queue head ever accumulates frames, so after the swap the former head must start over.
+	* Already produced units of a quantity batch stay produced. */
+//-------------------------------------------------------------------------------------------------
+void ProductionUpdate::moveUnitCreateEarlier( ProductionID productionID )
+{
+
+	// upgrades sit in the same queue carrying PRODUCTIONID_INVALID, so an invalid ID must
+	// never reach the scan below or it would match the first queued upgrade
+	if( productionID == PRODUCTIONID_INVALID )
+		return;
+
+	// search for the production entry in our queue
+	ProductionEntry *production;
+	for( production = m_productionQueue; production; production = production->m_next )
+	{
+
+		if( production->m_productionID == productionID )
+		{
+
+			// already first, nothing to move before
+			ProductionEntry *previous = production->m_prev;
+			if( previous == nullptr )
+				return;
+
+			// swap the two adjacent nodes by relinking only. removeFromProductionQueue and
+			// addToProductionQueue are not usable here: removing unreserves the exit door and
+			// re-adding disturbs the count and the constructing model condition.
+			ProductionEntry *before = previous->m_prev;
+			ProductionEntry *after = production->m_next;
+
+			production->m_prev = before;
+			production->m_next = previous;
+			previous->m_prev = production;
+			previous->m_next = after;
+
+			if( before )
+				before->m_next = production;
+			else
+				m_productionQueue = production;
+
+			if( after )
+				after->m_prev = previous;
+			else
+				m_productionQueueTail = previous;
+
+			// the displaced entry starts its current unit over. The percent is re-derived from
+			// the frame count every update, so the frames are the authoritative reset; percent
+			// is cleared as well so the UI shows zero on this same frame.
+			previous->m_framesUnderConstruction = 0;
+			previous->m_percentComplete = 0.0f;
+
+			return;
+
+		}
+
+	}
+
+}
+
+//-------------------------------------------------------------------------------------------------
 /** Cancel all production of type unitType */
 //-------------------------------------------------------------------------------------------------
 void ProductionUpdate::cancelAllUnitsOfType( const ThingTemplate *unitType)

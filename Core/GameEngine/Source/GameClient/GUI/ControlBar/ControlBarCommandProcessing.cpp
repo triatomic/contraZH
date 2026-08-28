@@ -646,6 +646,19 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			if( !producer->isLocallyControlled() )
 				break;
 
+			// Ctrl moves the clicked entry one position earlier in the queue instead of
+			// cancelling it. Break unconditionally so a Ctrl click can never fall through
+			// to the cancel below, and never combines with the Shift batch either.
+			if( TheKeyboard && TheKeyboard->isCtrl() )
+			{
+				if( i > 0 )
+				{
+					GameMessage *moveMsg = TheMessageStream->appendMessage( GameMessage::MSG_MOVE_UNIT_CREATE_EARLIER );
+					moveMsg->appendIntegerArgument( productionIDToCancel );
+				}
+				break;
+			}
+
 			// send a message to cancel that particular production entry
 			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_CANCEL_UNIT_CREATE );
 			msg->appendIntegerArgument( productionIDToCancel );
