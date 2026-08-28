@@ -804,6 +804,19 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			if( upgradeT == nullptr || producer == nullptr )
 				break;
 
+			// Ctrl moves the clicked entry one position earlier in the queue instead of
+			// cancelling it. Break unconditionally so a Ctrl click can never fall through
+			// to the cancel below.
+			if( TheKeyboard && TheKeyboard->isCtrl() )
+			{
+				if( i > 0 )
+				{
+					GameMessage *moveMsg = TheMessageStream->appendMessage( GameMessage::MSG_MOVE_UPGRADE_EARLIER );
+					moveMsg->appendIntegerArgument( upgradeT->getUpgradeNameKey() );
+				}
+				break;
+			}
+
 			// send the message
 			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_CANCEL_UPGRADE );
 			msg->appendIntegerArgument( upgradeT->getUpgradeNameKey() );

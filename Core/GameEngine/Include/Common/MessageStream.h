@@ -635,6 +635,7 @@ public:
 		MSG_DO_AUTO_FILL,												///< TheSuperHackers @feature fill the selected containers from nearby idle infantry
 		MSG_TOGGLE_HOLD_FIRE,												///< Toggle the Hold Fire stance of the selected group
 		MSG_MOVE_UNIT_CREATE_EARLIER,								///< (productionID) move the queued unit one position earlier in its production queue
+		MSG_MOVE_UPGRADE_EARLIER,										///< (upgrade name key) move the queued upgrade one position earlier in its production queue
 
 		MSG_BEGIN_DEBUG_NETWORK_MESSAGES = 1900,		///< network messages that exist only in debug/internal builds. all grouped separately.
 

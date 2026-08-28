@@ -160,6 +160,7 @@ public:
 	virtual Bool queueCreateUnit( const ThingTemplate *unitType, ProductionID productionID ) = 0;
 	virtual void cancelUnitCreate( ProductionID productionID ) = 0;
 	virtual void moveUnitCreateEarlier( ProductionID productionID ) = 0;
+	virtual void moveUpgradeEarlier( const UpgradeTemplate *upgrade ) = 0;
 	virtual void cancelAllUnitsOfType( const ThingTemplate *unitType) = 0;
 
 	virtual void cancelAndRefundAllProduction() = 0;
@@ -217,6 +218,7 @@ public:
 	virtual Bool queueCreateUnit( const ThingTemplate *unitType, ProductionID productionID ) override;					///< queue unit to be produced
 	virtual void cancelUnitCreate( ProductionID productionID ) override;		      ///< cancel construction of unit with matching production ID
 	virtual void moveUnitCreateEarlier( ProductionID productionID ) override;		///< move unit with matching production ID one position earlier in the queue
+	virtual void moveUpgradeEarlier( const UpgradeTemplate *upgrade ) override;		///< move the queued upgrade one position earlier in the queue
 	virtual void cancelAllUnitsOfType( const ThingTemplate *unitType) override;	///< cancel all production of type unitType
 
 	virtual void cancelAndRefundAllProduction() override;									///< cancel and refund anything in the production queue
@@ -244,6 +246,7 @@ protected:
 
 	void addToProductionQueue( ProductionEntry *production );				///< add to *END* of production queue list
 	void removeFromProductionQueue( ProductionEntry *production );	///< remove production from the queue list
+	void moveProductionEarlier( ProductionEntry *production );			///< swap production with the entry directly before it
 
 	void updateDoors();														///< update the door behavior
 

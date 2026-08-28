@@ -190,11 +190,11 @@ the move or in a fight break off and board, the same as if the order had been gi
 
 ## Queue reorder
 
-Ctrl+clicking a unit's cameo in the build queue moves it one position earlier, swapping it
-with the entry directly before it - unit or upgrade. The displaced entry loses the build
-time spent on it and starts over when it reaches the front again; already produced units of
-a quantity batch stay produced. Ctrl+click on the first entry does nothing. A plain click
-still cancels the entry, and Shift+click still cancels a batch.
+Ctrl+clicking any cameo in the build queue - unit or upgrade - moves it one position
+earlier, swapping it with the entry directly before it. The displaced entry loses the
+build time spent on it and starts over when it reaches the front again; already produced
+units of a quantity batch stay produced. Ctrl+click on the first entry does nothing. A
+plain click still cancels the entry, and Shift+click still cancels a batch of units.
 
 # Drag Selection
 
