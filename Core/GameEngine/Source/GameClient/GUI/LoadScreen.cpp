@@ -2021,7 +2021,7 @@ void MapTransferLoadScreen::processProgress(Int playerId, Int percentage, AsciiS
 	// so drop the update quietly instead of asserting on it.
 	if( m_playerLookup[playerId] == -1 )
 	{
-		DEBUG_LOG_LEVEL(DEBUG_LEVEL_NET, ("MapTransferLoadScreen::processProgress: no bar for player %d, dropping %d%%", playerId, percentage));
+		DEBUG_LOG(("MapTransferLoadScreen::processProgress: no bar for player %d, dropping %d%%", playerId, percentage));
 		return;
 	}
 
