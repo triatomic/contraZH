@@ -19,8 +19,10 @@ nothing is selected.
 With nothing selected: Default → Free → Orthographic → Default.
 
 While any mode is active the whole UI hides: control bar, radar, health bars and
-icons, hover tooltips, superweapon and script timers, FPS/time readouts. Game
-hotkeys stay live. Everything restores on exit, on object death, and at match end.
+icons, hover tooltips, superweapon and script timers, FPS/time readouts. The
+terrain also draws fully **unshrouded** — no black fog-of-war walls at low angles
+(hidden enemy units stay hidden; only the terrain clears). Game hotkeys stay live.
+Everything restores on exit, on object death, and at match end.
 
 ## Movement — Free and Orthographic
 
