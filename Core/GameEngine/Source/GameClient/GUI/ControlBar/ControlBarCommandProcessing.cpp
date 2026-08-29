@@ -289,7 +289,14 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 	if( commandButton->getCommandType() != GUI_COMMAND_EXIT_CONTAINER )
 	{
-		GadgetButtonSetEnabledImage( control, commandButton->getButtonImage() );
+		// Only stamp a real image. A command with no ButtonImage - the generic cancel
+		// commands on the build queue, whose cameo populateBuildQueue stamps afterwards -
+		// must not have its image nulled by the click, or any click that ends without a
+		// repopulate leaves that cameo blank. Same guard setControlCommand uses.
+		if( commandButton->getButtonImage() )
+		{
+			GadgetButtonSetEnabledImage( control, commandButton->getButtonImage() );
+		}
 	}
 
 	//
@@ -646,6 +653,21 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			if( !producer->isLocallyControlled() )
 				break;
 
+			// Ctrl moves the clicked entry one position earlier in the queue instead of
+			// cancelling it. Break unconditionally so a Ctrl click can never fall through
+			// to the cancel below, and never combines with the Shift batch either. Gated
+			// behind the QueueReorder GameData option; with it off, Ctrl+click cancels
+			// like retail.
+			if( TheGlobalData->m_queueReorder && TheKeyboard && TheKeyboard->isCtrl() )
+			{
+				if( i > 0 )
+				{
+					GameMessage *moveMsg = TheMessageStream->appendMessage( GameMessage::MSG_MOVE_UNIT_CREATE_EARLIER );
+					moveMsg->appendIntegerArgument( productionIDToCancel );
+				}
+				break;
+			}
+
 			// send a message to cancel that particular production entry
 			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_CANCEL_UNIT_CREATE );
 			msg->appendIntegerArgument( productionIDToCancel );
@@ -790,6 +812,21 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			// sanity
 			if( upgradeT == nullptr || producer == nullptr )
 				break;
+
+			// Ctrl moves the clicked entry one position earlier in the queue instead of
+			// cancelling it. Break unconditionally so a Ctrl click can never fall through
+			// to the cancel below. Unlike the cancel above, the move checks local control
+			// here like the unit branch does - the logic side rejects the message anyway,
+			// so sending one for someone else's producer only wastes network traffic.
+			if( TheGlobalData->m_queueReorder && TheKeyboard && TheKeyboard->isCtrl() )
+			{
+				if( i > 0 && producer->isLocallyControlled() )
+				{
+					GameMessage *moveMsg = TheMessageStream->appendMessage( GameMessage::MSG_MOVE_UPGRADE_EARLIER );
+					moveMsg->appendIntegerArgument( upgradeT->getUpgradeNameKey() );
+				}
+				break;
+			}
 
 			// send the message
 			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_CANCEL_UPGRADE );

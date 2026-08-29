@@ -188,6 +188,19 @@ Only infantry that are not already contained and not already members of the grou
 searched nearest-first per container. What they are currently doing does not matter - infantry on
 the move or in a fight break off and board, the same as if the order had been given by hand.
 
+## Queue reorder
+
+Off by default; a mod enables it with `QueueReorder = Yes` in the `GameData` block of
+GameData.ini. With it off, clicking the queue behaves exactly like retail, Ctrl held or
+not.
+
+Ctrl+clicking any cameo in the build queue - unit or upgrade - moves it one position
+earlier, swapping it with the entry directly before it. The displaced entry loses the
+build time spent on it and starts over when it reaches the front again; already produced
+units of a quantity batch stay produced. Ctrl+click on the first entry does nothing, and
+a finished unit that is only waiting to exit the factory cannot be displaced. A plain
+click still cancels the entry, and Shift+click still cancels a batch of units.
+
 # Drag Selection
 
 ## EasyMilitaryDrag

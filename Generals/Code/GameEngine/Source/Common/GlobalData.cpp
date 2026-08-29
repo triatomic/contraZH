@@ -80,6 +80,7 @@ GlobalData* GlobalData::m_theOriginal = nullptr;
 	{ "MoveHintName",							INI::parseAsciiString,nullptr,			offsetof( GlobalData, m_moveHintName ) },
 	{ "UseTrees",									INI::parseBool,				nullptr,			offsetof( GlobalData, m_useTrees ) },
 	{ "UseFPSLimit",							INI::parseBool,				nullptr,			offsetof( GlobalData, m_useFpsLimit ) },
+	{ "QueueReorder",							INI::parseBool,				nullptr,			offsetof( GlobalData, m_queueReorder ) },
 	{ "DumpAssetUsage",						INI::parseBool,				nullptr,			offsetof( GlobalData, m_dumpAssetUsage ) },
 	{ "FramesPerSecondLimit",			INI::parseInt,				nullptr,			offsetof( GlobalData, m_framesPerSecondLimit ) },
 	{ "ChipsetType",							INI::parseInt,				nullptr,			offsetof( GlobalData, m_chipSetType ) },
@@ -564,6 +565,7 @@ GlobalData::GlobalData()
 	m_next = nullptr;
 
   m_TiVOFastMode = FALSE;
+  m_queueReorder = FALSE;
 
 #if defined(RTS_DEBUG) || ENABLE_CONFIGURABLE_SHROUD
 	m_shroudOn = TRUE;

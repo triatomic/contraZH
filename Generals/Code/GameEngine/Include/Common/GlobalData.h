@@ -496,6 +496,7 @@ public:
   Int					m_playStats;									///< Int whether we want to log play stats or not, if <= 0 then we don't log
 
   Bool m_TiVOFastMode;            ///< When true, the client speeds up the framerate... set by HOTKEY!
+  Bool m_queueReorder;            ///< Ctrl+click moves a build queue entry one position earlier; off unless GameData enables it
 
 #if defined(RTS_DEBUG) || ENABLE_CONFIGURABLE_SHROUD
 	Bool m_shroudOn;

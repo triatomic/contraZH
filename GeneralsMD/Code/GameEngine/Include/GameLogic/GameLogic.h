@@ -349,6 +349,8 @@ private:
 	bool onCancelUpgrade(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onQueueUnitCreate(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onCancelUnitCreate(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
+	bool onMoveUnitCreateEarlier(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
+	bool onMoveUpgradeEarlier(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onDozerConstruct(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onDozerCancelConstruct(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onSell(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
