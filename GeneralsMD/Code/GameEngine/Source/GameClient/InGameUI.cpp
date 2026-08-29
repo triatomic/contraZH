@@ -4315,6 +4315,13 @@ void InGameUI::disregardDrawable( Drawable *draw )
 //-------------------------------------------------------------------------------------------------
 void InGameUI::postWindowDraw()
 {
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// The camera cheat hides the whole UI, these floating readouts included: render fps,
+	// system and game time, network latency and the observer player list.
+	if (TheTacticalView && TheTacticalView->isCameraCheatModeActive())
+		return;
+#endif
+
 	Int hudOffsetX = 0;
 	Int hudOffsetY = 0;
 
@@ -4349,6 +4356,13 @@ void InGameUI::postWindowDraw()
 //-------------------------------------------------------------------------------------------------
 void InGameUI::postDraw()
 {
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// The camera cheat hides the superweapon and named script timers. Only the drawing: the
+	// superweapon block below must keep running for its Eva ready checks.
+	const Bool hideTimersForCameraCheat = TheTacticalView && TheTacticalView->isCameraCheatModeActive();
+#else
+	const Bool hideTimersForCameraCheat = FALSE;
+#endif
 
 	// render our display strings for the messages if on
 	if( m_messagesOn )
@@ -4445,7 +4459,8 @@ void InGameUI::postDraw()
 							ellipsis.format(L"...");
 							info->setText( ellipsis, ellipsis );
 							info->setFont( m_superweaponReadyFont, m_superweaponNormalPointSize, m_superweaponNormalBold );
-							info->drawTime( startX,	startY, m_superweaponFlashColor, bgColor );
+							if ( !hideTimersForCameraCheat )
+								info->drawTime( startX,	startY, m_superweaponFlashColor, bgColor );
 
 							marginExceeded = TRUE;
 						}
@@ -4570,7 +4585,7 @@ void InGameUI::postDraw()
                 }
 
                 // draw the text
-                if ( !m_superweaponHiddenByScript && !marginExceeded )
+                if ( !m_superweaponHiddenByScript && !marginExceeded && !hideTimersForCameraCheat )
                 {
                   // Similarly, only checking timers is not truly indicative of readiness.
  								  Bool changeBolding = (readySecs != info->m_timestamp) || (isReady != info->m_ready) || info->m_forceUpdateText;
@@ -4650,7 +4665,7 @@ void InGameUI::postDraw()
 	}
 
 	// draw named timers
-	if (TheGameLogic->getFrame() > 0 && m_showNamedTimers)
+	if (TheGameLogic->getFrame() > 0 && m_showNamedTimers && !hideTimersForCameraCheat)
 	{
 //		Int namedTimerCount = 0;
 		Bool reverseXDir = (m_namedTimerPosition.x >= 0.5f);
