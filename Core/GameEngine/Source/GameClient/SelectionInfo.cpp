@@ -404,12 +404,17 @@ Bool addDrawableToList( Drawable *draw, void *userData )
 #endif
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	// CapsLock in a camera mode: the drag box takes everything with an object, same as the
-	// debug allow-unselectable flag. The kindof match and the shroud, hidden and builder
-	// filters below are gameplay rules; this is a camera tool.
+	// debug allow-unselectable flag. The kindof match and builder filters below are gameplay
+	// rules; this is a camera tool. Fog and stealth stay honest though -- what the player
+	// cannot see must not enter the selection, or the box doubles as a maphack.
 	if (pds->drawableListToFill && draw->getObject()
 			&& TheTacticalView && TheTacticalView->isCameraCheatModeActive()
 			&& (GetKeyState(VK_CAPITAL) & 0x0001) != 0)
 	{
+		if (draw->getFullyObscuredByShroud() || draw->isDrawableEffectivelyHidden())
+		{
+			return FALSE;
+		}
 		pds->drawableListToFill->push_back(draw);
 		return TRUE;
 	}

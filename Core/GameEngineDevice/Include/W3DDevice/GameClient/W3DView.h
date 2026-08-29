@@ -366,6 +366,7 @@ private:
 	};
 
 	void exitCameraCheatMode();									///< restore the pre-cheat view and turn the cheat off
+	void unhideRiddenDrawable();								///< put the ride-hidden model back, unless logic hid it too
 	void updateCameraCheatMouseLook( Real *yaw, Real *pitch );	///< shared RMB mouse look for both modes
 	void updateCameraCheatSharedInput();									///< Insert sun reset + CapsLock pick, all modes
 	void grabCheatSunIfNeeded();												///< capture the map sun before the first move
@@ -379,6 +380,7 @@ private:
 	Bool					m_preCheatZoomLimited;
 	Bool					m_preCheatOkToAdjustHeight;
 	Real					m_preCheatFOV;
+	Bool					m_preCheatControlBarHidden;		///< scripts may have hidden the HUD before us
 	ObjectID			m_focusObjectID;							///< object the chase camera follows
 	Real					m_focusYaw;
 	Real					m_focusPitch;

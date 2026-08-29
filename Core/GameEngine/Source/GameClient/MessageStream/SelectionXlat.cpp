@@ -125,12 +125,13 @@ Bool CanSelectDrawable( const Drawable *draw, Bool dragSelecting )
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	// CapsLock in a camera mode: anything with an object can be selected, by click or drag
-	// box -- unselectable kinds, enemies, structures, the lot. Every rule below is a gameplay
-	// rule, and this is a camera tool.
+	// box -- unselectable kinds, enemies, structures, the lot. The rules below are gameplay
+	// rules and this is a camera tool -- except stealth: what the player cannot see stays
+	// unpickable, or the tool doubles as a maphack in multiplayer.
 	if (TheTacticalView && TheTacticalView->isCameraCheatModeActive()
 			&& (GetKeyState(VK_CAPITAL) & 0x0001) != 0)
 	{
-		return TRUE;
+		return !draw->isDrawableEffectivelyHidden();
 	}
 #endif
 

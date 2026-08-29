@@ -1034,11 +1034,13 @@ void MetaMap::generateMetaMap()
 		}
 	}
 	{
-		// Cycle the skybox through the preset texture sets shipped with the game.
+		// Cycle the skybox through the preset texture sets shipped with the game. Ctrl+Home,
+		// because the shipped CommandMap.ini already binds Ctrl+D (DEMO_DEBUG_SELECTION) and
+		// the meta translator fires every record matching a keystroke.
 		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_CYCLE_SKYBOX);
 		if (map->m_key == MK_NONE)
 		{
-			map->m_key = MK_D;
+			map->m_key = MK_HOME;
 			map->m_transition = DOWN;
 			map->m_modState = CTRL;
 			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
@@ -1046,10 +1048,12 @@ void MetaMap::generateMetaMap()
 	}
 	{
 		// Cycle the terrain: normal, hidden over black, hidden over green for chroma keying.
+		// Ctrl+End, because the shipped CommandMap.ini already binds Ctrl+X
+		// (DEMO_TOGGLE_HURT_ME_MODE) and the meta translator fires every matching record.
 		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_CYCLE_TERRAIN_MODE);
 		if (map->m_key == MK_NONE)
 		{
-			map->m_key = MK_X;
+			map->m_key = MK_END;
 			map->m_transition = DOWN;
 			map->m_modState = CTRL;
 			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);

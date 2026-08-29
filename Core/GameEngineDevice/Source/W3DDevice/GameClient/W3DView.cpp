@@ -177,6 +177,7 @@ W3DView::W3DView()
 	m_preCheatZoomLimited = TRUE;
 	m_preCheatOkToAdjustHeight = FALSE;
 	m_preCheatFOV = 0.0f;
+	m_preCheatControlBarHidden = FALSE;
 	m_focusObjectID = INVALID_ID;
 	m_focusYaw = 0.0f;
 	m_focusPitch = 0.0f;
@@ -2463,6 +2464,11 @@ void W3DView::cycleCameraMode( ObjectID focusCandidate )
 		m_zoom = 0.0f;
 		m_heightAboveGround = 0.0f;
 		m_scriptedState = 0;
+		// Cutting a scripted movement short skips the stepper that would have cleared
+		// these on completion. Left set, the freeze flag makes the next scripted pan
+		// freeze game time, and a mid-ease multiplier disables the FPS limit for good.
+		m_freezeTimeForCameraMovement = false;
+		m_timeMultiplier = 1;
 		m_camCheatMouseLooking = FALSE;
 		m_camCheatRoll = 0.0f;
 		m_orthoViewHeight = 300.0f;
@@ -2471,7 +2477,19 @@ void W3DView::cycleCameraMode( ObjectID focusCandidate )
 		m_recalcCamera = true;
 
 		// Hide the HUD, radar included, for a clean cinematic view. This is the same path the
-		// scripted letterbox uses, so it also gives the view the full backbuffer height.
+		// scripted letterbox uses, so it also gives the view the full backbuffer height. A
+		// script may have hidden it first (letterbox cinematic); remember that so leaving
+		// the mode does not force the HUD back into the script's sequence.
+		m_preCheatControlBarHidden = FALSE;
+		if (TheWindowManager)
+		{
+			GameWindow *controlBarWindow = TheWindowManager->winGetWindowFromId(
+					NULL, (Int)TheNameKeyGenerator->nameToKey("ControlBar.wnd:ControlBarParent"));
+			if (controlBarWindow && controlBarWindow->winIsHidden())
+			{
+				m_preCheatControlBarHidden = TRUE;
+			}
+		}
 		HideControlBar(TRUE);
 		return;
 	}
@@ -2494,16 +2512,7 @@ void W3DView::cycleCameraMode( ObjectID focusCandidate )
 	{
 		// Last stage: orthographic free flight, continuing from the ride position. The ridden
 		// model comes back the moment the camera detaches from it.
-		if (m_perspHidDrawable)
-		{
-			Object *riddenObj = TheGameLogic ? TheGameLogic->findObjectByID(m_focusObjectID) : NULL;
-			Drawable *riddenDraw = riddenObj ? riddenObj->getDrawable() : NULL;
-			if (riddenDraw)
-			{
-				riddenDraw->setDrawableHidden(FALSE);
-			}
-			m_perspHidDrawable = FALSE;
-		}
+		unhideRiddenDrawable();
 		m_cameraCheatMode = CAMERA_CHEAT_ORTHO;
 		return;
 	}
@@ -2552,16 +2561,7 @@ void W3DView::exitCameraCheatMode()
 		return;
 	}
 
-	if (m_perspHidDrawable)
-	{
-		Object *riddenObj = TheGameLogic ? TheGameLogic->findObjectByID(m_focusObjectID) : NULL;
-		Drawable *riddenDraw = riddenObj ? riddenObj->getDrawable() : NULL;
-		if (riddenDraw)
-		{
-			riddenDraw->setDrawableHidden(FALSE);
-		}
-		m_perspHidDrawable = FALSE;
-	}
+	unhideRiddenDrawable();
 
 	m_cameraCheatMode = CAMERA_CHEAT_OFF;
 	m_focusObjectID = INVALID_ID;
@@ -2580,7 +2580,32 @@ void W3DView::exitCameraCheatMode()
 	setWidth(getWidth());
 	m_recalcCamera = true;
 
-	ShowControlBar(TRUE);
+	if (!m_preCheatControlBarHidden)
+	{
+		ShowControlBar(TRUE);
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Put the drawable the perspective ride hid back on screen. The hidden flag is shared with
+	* the contain modules -- a unit that entered a transport or tunnel while ridden was hidden by
+	* logic as well, and revealing it would draw it floating at its container. Logic re-shows it
+	* on exit, so in that case only our claim on the flag is dropped. */
+//-------------------------------------------------------------------------------------------------
+void W3DView::unhideRiddenDrawable()
+{
+	if (!m_perspHidDrawable)
+	{
+		return;
+	}
+
+	Object *riddenObj = TheGameLogic ? TheGameLogic->findObjectByID(m_focusObjectID) : NULL;
+	Drawable *riddenDraw = riddenObj ? riddenObj->getDrawable() : NULL;
+	if (riddenDraw && riddenObj->getContainedBy() == NULL)
+	{
+		riddenDraw->setDrawableHidden(FALSE);
+	}
+	m_perspHidDrawable = FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2823,16 +2848,7 @@ void W3DView::updateCameraCheatSharedInput()
 				else if (m_cameraCheatMode == CAMERA_CHEAT_PERSPECTIVE)
 				{
 					// Hop rides: put the old model back, the new one hides next frame.
-					if (m_perspHidDrawable)
-					{
-						Object *oldObj = TheGameLogic ? TheGameLogic->findObjectByID(m_focusObjectID) : NULL;
-						Drawable *oldDraw = oldObj ? oldObj->getDrawable() : NULL;
-						if (oldDraw)
-						{
-							oldDraw->setDrawableHidden(FALSE);
-						}
-						m_perspHidDrawable = FALSE;
-					}
+					unhideRiddenDrawable();
 					m_focusObjectID = m_pickedFocusID;
 					m_perspYawOffset = 0.0f;
 					m_perspPitchOffset = 0.0f;

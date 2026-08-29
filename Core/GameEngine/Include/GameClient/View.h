@@ -67,10 +67,12 @@ enum PickType CPP_11(: Int)
 	PICK_TYPE_MINES							= COLL_TYPE_3,	// mines aren't normally selectable, but workers/dozers need to
 	PICK_TYPE_FORCEATTACKABLE		= COLL_TYPE_4,
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
-	// Stamped on every render object in cheat builds so the pick anything camera tool can
-	// ray test things with no gameplay pick type at all: rocks, deer, pure decoration. No
-	// gameplay query ever asks for this bit.
-	PICK_TYPE_CHEAT_ANYTHING		= COLL_TYPE_5,
+	// The pick anything camera tool ray tests things with no gameplay pick type at all:
+	// rocks, deer, rubble, pure decoration. Set_Collision_Type unconditionally ORs
+	// COLL_TYPE_ALL into every render object, so asking for that bit matches everything
+	// with no per-object stamping -- including the dead and rubble states, whose
+	// Set_Collision_Type(0) would wipe any stamped bit. No gameplay query asks for it.
+	PICK_TYPE_CHEAT_ANYTHING		= COLL_TYPE_ALL,
 #endif
 	PICK_TYPE_ALL_DRAWABLES			= (PICK_TYPE_SELECTABLE | PICK_TYPE_SHRUBBERY | PICK_TYPE_MINES | PICK_TYPE_FORCEATTACKABLE)
 };

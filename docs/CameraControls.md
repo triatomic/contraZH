@@ -87,11 +87,11 @@ chase there.
 
 | Key | Action |
 |---|---|
-| `Ctrl` + `D` | Cycle the skybox: map default → Morning → Moon. Forces the sky to draw. |
-| `Ctrl` + `X` | Cycle the terrain: normal → black → **green screen**. Hides terrain, roads, trees, shroud and water, leaving units over a flat backdrop for chroma keying. |
+| `Ctrl` + `Home` | Cycle the skybox: map default → Morning → Moon. Forces the sky to draw. |
+| `Ctrl` + `End` | Cycle the terrain: normal → black → **green screen**. Hides terrain, roads, trees, shroud and water, leaving units over a flat backdrop for chroma keying. |
 
 Terrain-hidden mode also suppresses the skybox (the water object draws it), so use
-`Ctrl+D` with terrain on Normal.
+`Ctrl+Home` with terrain on Normal.
 
 ## Notes
 

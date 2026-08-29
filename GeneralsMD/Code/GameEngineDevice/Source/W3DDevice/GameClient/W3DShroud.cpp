@@ -224,6 +224,14 @@ void W3DShroud::reset()
 	m_currentFogData=nullptr;
 
 	m_clearDstTexture = TRUE;	//always refill the destination texture after a reset
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// The camera cheat's suppression is only reconciled in render(), which cannot run
+	// between matches. Left set, the flag drops every setShroudLevel of the next map's
+	// load and the first render replays the PREVIOUS map's border level. This object
+	// outlives the match, so the flag must die with the map.
+	m_cheatShroudSuppressed = FALSE;
+#endif
 }
 
 //-----------------------------------------------------------------------------

@@ -167,6 +167,10 @@ W3DTerrainVisual::W3DTerrainVisual()
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	m_skyboxPresetIndex = 0;
+	for (Int skyboxTexIndex = 0; skyboxTexIndex < NumSkyboxTextures; ++skyboxTexIndex)
+	{
+		m_cheatDefaultSkyboxTexNames[skyboxTexIndex].clear();
+	}
 	m_terrainHideMode = 0;
 	m_skyboxMapDrawFlag = FALSE;
 #endif
@@ -312,6 +316,10 @@ void W3DTerrainVisual::reset()
 		TheWritableGlobalData->m_drawSkyBox = m_skyboxMapDrawFlag;
 	}
 	m_skyboxPresetIndex = 0;
+	for (Int skyboxTexIndex = 0; skyboxTexIndex < NumSkyboxTextures; ++skyboxTexIndex)
+	{
+		m_cheatDefaultSkyboxTexNames[skyboxTexIndex].clear();
+	}
 #endif
 
 	m_terrainRenderObject->reset();
@@ -1214,17 +1222,28 @@ UnsignedInt W3DTerrainVisual::cycleSkyboxPreset()
 		}
 	}
 
+	// First step away from preset 0 latches the sky the map is actually wearing. That
+	// is what "Map Default" must come back to -- m_initialSkyboxTexNames would rewind
+	// past a map.ini override to the vanilla Water.ini textures.
+	if (m_skyboxPresetIndex == 1 && m_cheatDefaultSkyboxTexNames[0].isEmpty())
+	{
+		for (Int i = 0; i < NumSkyboxTextures; ++i)
+		{
+			m_cheatDefaultSkyboxTexNames[i] = current[i];
+		}
+	}
+
 	AsciiString target[NumSkyboxTextures];
 	if (m_skyboxPresetIndex == 0)
 	{
-		if (m_initialSkyboxTexNames[0].isEmpty())
+		if (m_cheatDefaultSkyboxTexNames[0].isEmpty())
 		{
-			// Nothing was ever replaced, so the map skybox is still up.
+			// Nothing was ever cycled, so the map skybox is still up.
 			return m_skyboxPresetIndex;
 		}
 		for (Int i = 0; i < NumSkyboxTextures; ++i)
 		{
-			target[i] = m_initialSkyboxTexNames[i];
+			target[i] = m_cheatDefaultSkyboxTexNames[i];
 		}
 	}
 	else

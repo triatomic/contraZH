@@ -3704,11 +3704,6 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 				m_renderObject->Set_Collision_Type( 0 );
 			}
 
-#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
-			// Everything is ray testable for the pick anything camera tool, whatever its kind.
-			m_renderObject->Set_Collision_Type( m_renderObject->Get_Collision_Type() | PICK_TYPE_CHEAT_ANYTHING );
-#endif
-
 			Object *obj = draw->getObject();
  			if( obj )
    		{

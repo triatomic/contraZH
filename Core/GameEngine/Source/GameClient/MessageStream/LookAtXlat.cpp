@@ -231,6 +231,20 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 				break;
 			}
 
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+			// The camera cheat reads the arrow keys itself (sun stepping, chase panning), so
+			// the RTS keyboard scroll must not engage underneath it. A scroll latched from
+			// before mode entry is released here for the same reason.
+			if (TheTacticalView->isCameraCheatModeActive())
+			{
+				if (m_isScrolling && m_scrollType == SCROLL_KEY)
+				{
+					stopScrolling();
+				}
+				break;
+			}
+#endif
+
 			if (TheInGameUI->isSelecting() || (m_isScrolling && m_scrollType != SCROLL_KEY))
 				break;
 
@@ -284,6 +298,12 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 			if (TheTacticalView->isCameraCheatModeActive())
 			{
+				// The matching button down may predate the camera mode, so the scroll it
+				// started must still be released here or it stays latched forever.
+				if (m_scrollType == SCROLL_RMB)
+				{
+					stopScrolling();
+				}
 				return DESTROY_MESSAGE;
 			}
 #endif
@@ -325,6 +345,9 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 			if (TheTacticalView->isCameraCheatModeActive())
 			{
+				// The matching button down may predate the camera mode; drop the rotate
+				// latch or every later mouse move keeps steering the RTS camera.
+				m_isRotating = false;
 				return DESTROY_MESSAGE;
 			}
 #endif
@@ -483,6 +506,21 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 		case GameMessage::MSG_FRAME_TICK:
 		{
 			Coord2D offset = {0, 0};
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+			// While a camera mode is active the cheat blocks own the camera position, so no
+			// scroll source may pump it. Whatever scroll or rotate was engaged when the mode
+			// started is shut down here rather than left running against the mode's input.
+			if (TheTacticalView->isCameraCheatModeActive())
+			{
+				if (m_isScrolling)
+				{
+					stopScrolling();
+				}
+				m_isRotating = false;
+				break;
+			}
+#endif
 
 			if (m_isScrolling && !TheInGameUI->isScrolling())
 			{
