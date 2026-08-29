@@ -264,7 +264,7 @@ void NGMP_OnlineServices_LobbyInterface::UpdateCurrentLobbyMaxCameraHeight(uint1
 	if (IsHost())
 	{
 		UnicodeString strInform;
-		strInform.format(L"The host has set the maximum camera height to %lu.", maxCameraHeight);
+		strInform.format(L"Camera height: The host set the limit to %lu.", maxCameraHeight);
 
 		SendAnnouncementMessageToCurrentLobby(strInform, true);
 
@@ -296,7 +296,7 @@ void NGMP_OnlineServices_LobbyInterface::SetJoinability(ELobbyJoinability joinab
 {
     if (IsHost())
     {
-        UnicodeString strInform(joinabilityFlag == ELobbyJoinability::LobbyJoinability_FriendsOnly ? L"The host has set the lobby joinability to friends only" : L"The host has set the lobby joinability to public");
+        UnicodeString strInform(joinabilityFlag == ELobbyJoinability::LobbyJoinability_FriendsOnly ? L"Lobby access: Friends only." : L"Lobby access: Anyone can join.");
 
 		SendAnnouncementMessageToCurrentLobby(strInform, false);
 
@@ -471,7 +471,7 @@ void NGMP_OnlineServices_LobbyInterface::UpdateCurrentLobby_KickUser(int64_t use
 	NGMP_OnlineServicesManager::GetInstance()->GetHTTPManager()->SendPOSTRequest(strURI.c_str(), EIPProtocolVersion::DONT_CARE, mapHeaders, strPostData.c_str(), [=](bool bSuccess, int statusCode, std::string strBody, HTTPRequest* pReq)
 		{
 			UnicodeString msg;
-			msg.format(L"'%s' was kicked by the host.", name.str());;
+			msg.format(L"Lobby: '%s' was removed by the host.", name.str());;
 			SendAnnouncementMessageToCurrentLobby(msg, true);
 		});
 }
@@ -488,7 +488,7 @@ void NGMP_OnlineServices_LobbyInterface::UpdateCurrentLobby_ForceReady()
 	// convert
 	NGMP_OnlineServicesManager::GetInstance()->GetHTTPManager()->SendPOSTRequest(strURI.c_str(), EIPProtocolVersion::DONT_CARE, mapHeaders, strPostData.c_str(), [=](bool bSuccess, int statusCode, std::string strBody, HTTPRequest* pReq)
 		{
-			UnicodeString msg = UnicodeString(L"All players have been forced to ready up.");
+			UnicodeString msg = UnicodeString(L"Ready check: All players are now marked ready.");
 			SendAnnouncementMessageToCurrentLobby(msg, true);
 		});
 }
