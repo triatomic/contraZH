@@ -173,6 +173,7 @@ W3DView::W3DView()
 	m_preCheatHeightAboveGround = 0.0f;
 	m_preCheatZoomLimited = TRUE;
 	m_preCheatOkToAdjustHeight = FALSE;
+	m_preCheatFOV = 0.0f;
 	m_focusObjectID = INVALID_ID;
 	m_focusYaw = 0.0f;
 	m_focusPitch = 0.0f;
@@ -1477,6 +1478,7 @@ void W3DView::update()
 		updateCameraCheatMouseLook(&m_angle, &m_pitch);
 
 		updateCameraTransform();
+		m_3DCamera->Set_View_Plane( m_FOV, -1 );
 		m_recalcCamera = false;
 
 		// Update all drawables so transforms and bone attached particle systems stay current.
@@ -1518,6 +1520,7 @@ void W3DView::update()
 			}
 
 			updateCameraTransform();
+			m_3DCamera->Set_View_Plane( m_FOV, -1 );
 			m_recalcCamera = false;
 
 			{
@@ -1602,6 +1605,7 @@ void W3DView::update()
 			m_pitch = m_focusPitch;
 
 			updateCameraTransform();
+			m_3DCamera->Set_View_Plane( m_FOV, -1 );
 			m_recalcCamera = false;
 
 			{
@@ -2365,6 +2369,7 @@ void W3DView::cycleCameraMode( ObjectID focusCandidate )
 		m_preCheatHeightAboveGround = m_heightAboveGround;
 		m_preCheatZoomLimited = m_zoomLimited;
 		m_preCheatOkToAdjustHeight = m_okToAdjustHeight;
+		m_preCheatFOV = m_FOV;
 
 		// Seed the eye from the rendered transform. The RTS state stores a look-at pivot and can
 		// still hold the destination of a smooth rotation in flight; mixing the position from one
@@ -2468,6 +2473,8 @@ void W3DView::exitCameraCheatMode()
 	m_heightAboveGround = m_preCheatHeightAboveGround;
 	m_zoomLimited = m_preCheatZoomLimited;
 	m_okToAdjustHeight = m_preCheatOkToAdjustHeight;
+	m_FOV = m_preCheatFOV;
+	setWidth(getWidth());
 	m_recalcCamera = true;
 
 	ShowControlBar(TRUE);
@@ -2528,12 +2535,21 @@ void W3DView::updateCameraCheatMouseLook( Real *yaw, Real *pitch )
 
 			if (dx != 0 || dy != 0)
 			{
-				const Real rotateSpeed = 0.003f;
-				*yaw += dx * rotateSpeed;
-				*pitch += dy * rotateSpeed;
+				if (TheKeyboard->isAlt())
+				{
+					// 3ds Max style: Alt with the right button drags the field of view. Down
+					// widens, up narrows.
+					m_FOV = clamp(DEG_TO_RADF(10.0f), m_FOV + dy * 0.002f, DEG_TO_RADF(120.0f));
+				}
+				else
+				{
+					const Real rotateSpeed = 0.003f;
+					*yaw += dx * rotateSpeed;
+					*pitch += dy * rotateSpeed;
 
-				// Clamp pitch to avoid gimbal flip. Negative looks up, positive looks down.
-				*pitch = clamp(DEG_TO_RADF(-89.0f), *pitch, DEG_TO_RADF(89.0f));
+					// Clamp pitch to avoid gimbal flip. Negative looks up, positive looks down.
+					*pitch = clamp(DEG_TO_RADF(-89.0f), *pitch, DEG_TO_RADF(89.0f));
+				}
 
 				// Lock the cursor back to the centre so it never reaches the screen edges.
 				POINT pCenter = { centerX, centerY };

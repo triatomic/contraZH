@@ -371,6 +371,7 @@ private:
 	Real					m_preCheatHeightAboveGround;
 	Bool					m_preCheatZoomLimited;
 	Bool					m_preCheatOkToAdjustHeight;
+	Real					m_preCheatFOV;
 	ObjectID			m_focusObjectID;							///< object the chase camera follows
 	Real					m_focusYaw;
 	Real					m_focusPitch;
