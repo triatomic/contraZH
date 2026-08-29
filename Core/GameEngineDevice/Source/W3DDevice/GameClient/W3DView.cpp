@@ -1456,6 +1456,19 @@ void W3DView::update()
 	Bool didScriptedMovement = false;
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// Insert restores the map sun. Polled outside the mode gate as well, because the sun
+	// override deliberately outlives the camera modes. The Win32 fallback catches numpad
+	// Insert and any scan code the engine keyboard table misses.
+	{
+		const Bool insertDown = TheKeyboard->isKeyDown(KEY_INS)
+				|| ((GetAsyncKeyState(VK_INSERT) & 0x8000) != 0);
+		if (insertDown && !m_lastInsertDown)
+		{
+			resetCheatSun();
+		}
+		m_lastInsertDown = insertDown;
+	}
+
 	if (m_cameraCheatMode != CAMERA_CHEAT_OFF)
 	{
 		updateCameraCheatSharedInput();
@@ -2696,13 +2709,6 @@ void W3DView::updateCameraCheatMouseLook( Real *yaw, Real *pitch )
 //-------------------------------------------------------------------------------------------------
 void W3DView::updateCameraCheatSharedInput()
 {
-	const Bool insertDown = TheKeyboard->isKeyDown(KEY_INS);
-	if (insertDown && !m_lastInsertDown)
-	{
-		resetCheatSun();
-	}
-	m_lastInsertDown = insertDown;
-
 	if ((GetKeyState(VK_CAPITAL) & 0x0001) != 0)
 	{
 		const Bool leftDown = TheMouse->getMouseStatus()->leftState == MBS_Down;
