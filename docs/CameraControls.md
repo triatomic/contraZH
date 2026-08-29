@@ -72,10 +72,16 @@ FOV and roll reset when you exit the cheat.
 ## Pick anything — `CapsLock`
 
 With CapsLock on (in any mode) the cursor returns and the whole selection system
-can grab **anything** — single click or drag box, trees, rocks, civilian props,
-enemies, things the game never lets you select. The selection is the camera
-target on the next `Delete`, and a click also retargets Chase/Perspective on the
-spot.
+can grab **anything** — single click or drag box, trees, rocks, wild animals,
+civilian props, enemies, things the game never lets you select. Cheat builds tag
+every rendered object as pick-testable, so even pure decoration with no gameplay
+role at all (a deer, a pile of rocks) responds to both the click and the box.
+The selection is the camera target on the next `Delete`, and a click also
+retargets Chase/Perspective on the spot.
+
+The only things out of reach are map decorations that aren't objects at all
+(baked scenery with no game object behind it) — there is nothing to select or
+chase there.
 
 ## Scene cheats
 
