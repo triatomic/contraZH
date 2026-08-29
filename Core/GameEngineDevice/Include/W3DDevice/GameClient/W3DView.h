@@ -240,6 +240,7 @@ public:
 	virtual void cycleCameraMode( ObjectID focusCandidate ) override;
 	virtual Bool isCameraCheatModeActive() const override { return m_cameraCheatMode != CAMERA_CHEAT_OFF; }
 	virtual Bool isCameraChaseModeActive() const override { return m_cameraCheatMode == CAMERA_CHEAT_FOCUS; }
+	virtual void cameraCheatZoomBy( Real spin ) override;
 #endif
 
 	/// Add an impulse force to shake the camera
@@ -372,6 +373,7 @@ private:
 	Real					m_focusYaw;
 	Real					m_focusPitch;
 	Real					m_focusDistance;
+	Coord2D				m_focusOffset;								///< arrow key pan away from the followed object
 	Bool					m_camCheatMouseLooking;					///< RMB look engaged last frame (cursor is captured)
 #endif
 };

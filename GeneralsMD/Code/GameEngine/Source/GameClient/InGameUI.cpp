@@ -2853,6 +2853,17 @@ void InGameUI::createMouseoverHint( const GameMessage *msg )
 	if (m_isScrolling || m_isSelecting)
 		return; // no mouseover for you
 
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// The camera cheat hides the whole UI; that includes the tooltip of whatever the pointer
+	// happens to rest on.
+	if (TheTacticalView && TheTacticalView->isCameraCheatModeActive())
+	{
+		TheMouse->setCursorTooltip( UnicodeString::TheEmptyString );
+		m_mousedOverDrawableID = INVALID_DRAWABLE_ID;
+		return;
+	}
+#endif
+
 	GameWindow *window = nullptr;
 	const MouseIO *io = TheMouse->getMouseStatus();
 	Bool underWindow = false;

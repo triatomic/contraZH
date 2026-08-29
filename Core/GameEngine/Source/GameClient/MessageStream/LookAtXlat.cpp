@@ -439,6 +439,16 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 			m_lastMouseMoveTimeMsec = timeGetTime();
 
 			const Real spin = msg->getArgument( 1 )->real;
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+			// The chase camera zooms its own spring arm; the RTS zoom must not eat the wheel.
+			if (TheTacticalView->isCameraChaseModeActive())
+			{
+				TheTacticalView->cameraCheatZoomBy( spin );
+				return DESTROY_MESSAGE;
+			}
+#endif
+
 			const Real zoom = -spin * View::ZoomHeightPerSecond;
 			TheTacticalView->userZoom(zoom);
 

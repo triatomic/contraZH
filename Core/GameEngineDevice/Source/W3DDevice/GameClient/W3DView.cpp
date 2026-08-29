@@ -58,6 +58,7 @@
 #include "GameClient/GameClient.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/Image.h"
+#include "GameClient/GUICallbacks.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/Keyboard.h"
 #include "GameClient/Mouse.h"
@@ -176,6 +177,8 @@ W3DView::W3DView()
 	m_focusYaw = 0.0f;
 	m_focusPitch = 0.0f;
 	m_focusDistance = 0.0f;
+	m_focusOffset.x = 0.0f;
+	m_focusOffset.y = 0.0f;
 	m_camCheatMouseLooking = FALSE;
 #endif
 
@@ -1495,9 +1498,39 @@ void W3DView::update()
 		{
 			updateCameraCheatMouseLook(&m_focusYaw, &m_focusPitch);
 
-			// Spring arm: the eye sits behind and above the object along the orbit yaw/pitch,
+			// Arrow keys pan the view away from the object, relative to the orbit yaw, so the
+			// camera follows the object without being nailed to it.
+			{
+				Real panSpeed = 10.0f * (TheFramePacer ? TheFramePacer->getBaseOverUpdateFpsRatio() : 1.0f);
+				if (TheKeyboard->isShift())
+				{
+					panSpeed *= 5.0f;
+				}
+				const Real panSa = sin(m_focusYaw);
+				const Real panCa = cos(m_focusYaw);
+				if (TheKeyboard->isKeyDown(KEY_UP))
+				{
+					m_focusOffset.x += panSa * panSpeed; m_focusOffset.y += panCa * panSpeed;
+				}
+				if (TheKeyboard->isKeyDown(KEY_DOWN))
+				{
+					m_focusOffset.x -= panSa * panSpeed; m_focusOffset.y -= panCa * panSpeed;
+				}
+				if (TheKeyboard->isKeyDown(KEY_RIGHT))
+				{
+					m_focusOffset.x += panCa * panSpeed; m_focusOffset.y -= panSa * panSpeed;
+				}
+				if (TheKeyboard->isKeyDown(KEY_LEFT))
+				{
+					m_focusOffset.x -= panCa * panSpeed; m_focusOffset.y += panSa * panSpeed;
+				}
+			}
+
+			// Spring arm: the eye sits behind and above the pan point along the orbit yaw/pitch,
 			// and looking down that same yaw/pitch lands the view on the pivot exactly.
 			Coord3D pivot = *focusObj->getPosition();
+			pivot.x += m_focusOffset.x;
+			pivot.y += m_focusOffset.y;
 			pivot.z += focusObj->getGeometryInfo().getMaxHeightAbovePosition() * 0.65f;
 
 			const Real sa = sin(m_focusYaw);
@@ -2314,6 +2347,10 @@ void W3DView::cycleCameraMode( ObjectID focusCandidate )
 
 		m_cameraCheatMode = CAMERA_CHEAT_FREE;
 		m_recalcCamera = true;
+
+		// Hide the HUD, radar included, for a clean cinematic view. This is the same path the
+		// scripted letterbox uses, so it also gives the view the full backbuffer height.
+		HideControlBar(TRUE);
 		return;
 	}
 
@@ -2330,6 +2367,8 @@ void W3DView::cycleCameraMode( ObjectID focusCandidate )
 			m_focusYaw = DEG_TO_RADF(90.0f) - focusObj->getOrientation();
 			m_focusPitch = DEG_TO_RADF(20.0f);
 			m_focusDistance = clamp(35.0f, focusObj->getGeometryInfo().getBoundingSphereRadius() * 4.5f, 200.0f);
+			m_focusOffset.x = 0.0f;
+			m_focusOffset.y = 0.0f;
 			m_cameraCheatMode = CAMERA_CHEAT_FOCUS;
 			return;
 		}
@@ -2362,6 +2401,23 @@ void W3DView::exitCameraCheatMode()
 	m_zoomLimited = m_preCheatZoomLimited;
 	m_okToAdjustHeight = m_preCheatOkToAdjustHeight;
 	m_recalcCamera = true;
+
+	ShowControlBar(TRUE);
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Mouse wheel zoom for the chase camera: scrolling up moves the eye closer to the object. */
+//-------------------------------------------------------------------------------------------------
+void W3DView::cameraCheatZoomBy( Real spin )
+{
+	if (m_cameraCheatMode != CAMERA_CHEAT_FOCUS)
+	{
+		return;
+	}
+
+	// A proportional step feels even across the whole range: fine when close, fast when far.
+	const Real step = maxf(5.0f, m_focusDistance * 0.15f);
+	m_focusDistance = clamp(10.0f, m_focusDistance - spin * step, 400.0f);
 }
 
 //-------------------------------------------------------------------------------------------------
