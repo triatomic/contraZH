@@ -179,6 +179,9 @@ W3DView::W3DView()
 	m_focusDistance = 0.0f;
 	m_focusOffset.x = 0.0f;
 	m_focusOffset.y = 0.0f;
+	m_perspYawOffset = 0.0f;
+	m_perspPitchOffset = 0.0f;
+	m_perspHidDrawable = FALSE;
 	m_camCheatMouseLooking = FALSE;
 #endif
 
@@ -1486,6 +1489,46 @@ void W3DView::update()
 		return;
 	}
 
+	if (m_cameraCheatMode == CAMERA_CHEAT_PERSPECTIVE)
+	{
+		Object *rideObj = TheGameLogic ? TheGameLogic->findObjectByID(m_focusObjectID) : NULL;
+		if (rideObj == NULL)
+		{
+			exitCameraCheatMode();
+		}
+		else
+		{
+			// RMB looks away from the facing; the view otherwise turns with the object.
+			updateCameraCheatMouseLook(&m_perspYawOffset, &m_perspPitchOffset);
+
+			const Coord3D *ridePos = rideObj->getPosition();
+			m_pos.x = ridePos->x;
+			m_pos.y = ridePos->y;
+			m_pos.z = ridePos->z + rideObj->getGeometryInfo().getMaxHeightAbovePosition() + 2.0f;
+			m_angle = DEG_TO_RADF(90.0f) - rideObj->getOrientation() + m_perspYawOffset;
+			m_pitch = clamp(DEG_TO_RADF(-89.0f), m_perspPitchOffset, DEG_TO_RADF(89.0f));
+
+			// The ridden model would fill the view from inside; hide it, but never one the game
+			// itself is hiding, and put it back the moment the mode ends.
+			Drawable *rideDraw = rideObj->getDrawable();
+			if (rideDraw && !m_perspHidDrawable && !rideDraw->isDrawableEffectivelyHidden())
+			{
+				rideDraw->setDrawableHidden(TRUE);
+				m_perspHidDrawable = TRUE;
+			}
+
+			updateCameraTransform();
+			m_recalcCamera = false;
+
+			{
+				Region3D axisAlignedRegion;
+				getAxisAlignedViewRegion(axisAlignedRegion);
+				TheGameClient->iterateDrawablesInRegion(&axisAlignedRegion, drawDrawable, nullptr);
+			}
+			return;
+		}
+	}
+
 	if (m_cameraCheatMode == CAMERA_CHEAT_FOCUS)
 	{
 		Object *focusObj = TheGameLogic ? TheGameLogic->findObjectByID(m_focusObjectID) : NULL;
@@ -2354,6 +2397,20 @@ void W3DView::cycleCameraMode( ObjectID focusCandidate )
 		return;
 	}
 
+	if (m_cameraCheatMode == CAMERA_CHEAT_FOCUS)
+	{
+		// Fourth stage: ride the object it was chasing, first person from its viewpoint.
+		Object *focusObj = TheGameLogic ? TheGameLogic->findObjectByID(m_focusObjectID) : NULL;
+		if (focusObj != NULL)
+		{
+			m_perspYawOffset = 0.0f;
+			m_perspPitchOffset = 0.0f;
+			m_perspHidDrawable = FALSE;
+			m_cameraCheatMode = CAMERA_CHEAT_PERSPECTIVE;
+			return;
+		}
+	}
+
 	if (m_cameraCheatMode == CAMERA_CHEAT_FREE)
 	{
 		Object *focusObj = (focusCandidate != INVALID_ID && TheGameLogic)
@@ -2385,6 +2442,17 @@ void W3DView::exitCameraCheatMode()
 	if (m_cameraCheatMode == CAMERA_CHEAT_OFF)
 	{
 		return;
+	}
+
+	if (m_perspHidDrawable)
+	{
+		Object *riddenObj = TheGameLogic ? TheGameLogic->findObjectByID(m_focusObjectID) : NULL;
+		Drawable *riddenDraw = riddenObj ? riddenObj->getDrawable() : NULL;
+		if (riddenDraw)
+		{
+			riddenDraw->setDrawableHidden(FALSE);
+		}
+		m_perspHidDrawable = FALSE;
 	}
 
 	m_cameraCheatMode = CAMERA_CHEAT_OFF;

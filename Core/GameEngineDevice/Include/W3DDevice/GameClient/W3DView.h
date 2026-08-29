@@ -240,6 +240,7 @@ public:
 	virtual void cycleCameraMode( ObjectID focusCandidate ) override;
 	virtual Bool isCameraCheatModeActive() const override { return m_cameraCheatMode != CAMERA_CHEAT_OFF; }
 	virtual Bool isCameraChaseModeActive() const override { return m_cameraCheatMode == CAMERA_CHEAT_FOCUS; }
+	virtual Bool isCameraPerspectiveModeActive() const override { return m_cameraCheatMode == CAMERA_CHEAT_PERSPECTIVE; }
 	virtual void cameraCheatZoomBy( Real spin ) override;
 #endif
 
@@ -358,7 +359,8 @@ private:
 	{
 		CAMERA_CHEAT_OFF = 0,
 		CAMERA_CHEAT_FREE,			///< fly: WASD/Space/Ctrl move, hold RMB to look
-		CAMERA_CHEAT_FOCUS			///< chase the focus object, hold RMB to orbit
+		CAMERA_CHEAT_FOCUS,			///< chase the focus object, hold RMB to orbit
+		CAMERA_CHEAT_PERSPECTIVE	///< ride the focus object: first person from its viewpoint
 	};
 
 	void exitCameraCheatMode();									///< restore the pre-cheat view and turn the cheat off
@@ -374,6 +376,9 @@ private:
 	Real					m_focusPitch;
 	Real					m_focusDistance;
 	Coord2D				m_focusOffset;								///< arrow key pan away from the followed object
+	Real					m_perspYawOffset;							///< RMB look away from the object's own facing
+	Real					m_perspPitchOffset;
+	Bool					m_perspHidDrawable;						///< we hid the ridden drawable and must unhide it
 	Bool					m_camCheatMouseLooking;					///< RMB look engaged last frame (cursor is captured)
 #endif
 };

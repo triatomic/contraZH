@@ -4179,6 +4179,11 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 				stateKey = "GUI:DebugCameraChase";
 				stateText = L"Camera: Chase";
 			}
+			else if( TheTacticalView->isCameraPerspectiveModeActive() )
+			{
+				stateKey = "GUI:DebugCameraPerspective";
+				stateText = L"Camera: Perspective";
+			}
 			else
 			{
 				stateKey = "GUI:DebugCameraFree";

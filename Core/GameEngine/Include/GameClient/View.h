@@ -213,6 +213,7 @@ public:
 	virtual void cycleCameraMode( ObjectID focusCandidate ) {}
 	virtual Bool isCameraCheatModeActive() const { return FALSE; }
 	virtual Bool isCameraChaseModeActive() const { return FALSE; }
+	virtual Bool isCameraPerspectiveModeActive() const { return FALSE; }
 	virtual void cameraCheatZoomBy( Real spin ) {}
 #endif
 
