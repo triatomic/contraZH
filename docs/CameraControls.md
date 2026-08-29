@@ -70,10 +70,11 @@ FOV and roll reset when you exit the cheat.
 
 ## Pick anything — `CapsLock`
 
-With CapsLock on (in any mode) the cursor returns and left-click picks **any**
-object under it — trees, rocks, civilian props, things the game never lets you
-select. The pick becomes the camera target: it retargets Chase/Perspective on the
-spot, and from Free it wins over the RTS selection on the next `Delete`.
+With CapsLock on (in any mode) the cursor returns and the whole selection system
+can grab **anything** — single click or drag box, trees, rocks, civilian props,
+enemies, things the game never lets you select. The selection is the camera
+target on the next `Delete`, and a click also retargets Chase/Perspective on the
+spot.
 
 ## Scene cheats
 

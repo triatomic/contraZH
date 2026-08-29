@@ -292,6 +292,16 @@ extern Bool contextCommandForNewSelection(const DrawableList *currentlySelectedD
 //-------------------------------------------------------------------------------------------------
 UnsignedInt getPickTypesForContext( Bool forceAttackMode )
 {
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// CapsLock in a camera mode turns the cursor into a pick anything tool: clicks may hit
+	// every drawable class, shrubbery and mines and force-attackables included.
+	if (TheTacticalView && TheTacticalView->isCameraCheatModeActive()
+			&& (GetKeyState(VK_CAPITAL) & 0x0001) != 0)
+	{
+		return PICK_TYPE_ALL_DRAWABLES;
+	}
+#endif
+
 	UnsignedInt types = PICK_TYPE_SELECTABLE;
 
 	if (forceAttackMode)

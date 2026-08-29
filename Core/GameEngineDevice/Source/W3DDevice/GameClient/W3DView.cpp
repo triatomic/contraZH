@@ -2504,9 +2504,10 @@ void W3DView::cycleCameraMode( ObjectID focusCandidate )
 
 	if (m_cameraCheatMode == CAMERA_CHEAT_FREE)
 	{
-		// A CapsLock pick wins over the RTS selection.
+		// The selection is the primary source -- with CapsLock it can hold anything -- and
+		// the click pick fills in only when nothing is selected.
 		ObjectID candidate = focusCandidate;
-		if (m_pickedFocusID != INVALID_ID && TheGameLogic && TheGameLogic->findObjectByID(m_pickedFocusID))
+		if (candidate == INVALID_ID && m_pickedFocusID != INVALID_ID && TheGameLogic && TheGameLogic->findObjectByID(m_pickedFocusID))
 		{
 			candidate = m_pickedFocusID;
 		}
