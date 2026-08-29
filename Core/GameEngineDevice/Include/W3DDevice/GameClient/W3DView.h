@@ -241,6 +241,7 @@ public:
 	virtual Bool isCameraCheatModeActive() const override { return m_cameraCheatMode != CAMERA_CHEAT_OFF; }
 	virtual Bool isCameraChaseModeActive() const override { return m_cameraCheatMode == CAMERA_CHEAT_FOCUS; }
 	virtual Bool isCameraPerspectiveModeActive() const override { return m_cameraCheatMode == CAMERA_CHEAT_PERSPECTIVE; }
+	virtual Bool isCameraOrthoModeActive() const override { return m_cameraCheatMode == CAMERA_CHEAT_ORTHO; }
 	virtual void cameraCheatZoomBy( Real spin ) override;
 #endif
 
@@ -360,7 +361,8 @@ private:
 		CAMERA_CHEAT_OFF = 0,
 		CAMERA_CHEAT_FREE,			///< fly: WASD/Space/Ctrl move, hold RMB to look
 		CAMERA_CHEAT_FOCUS,			///< chase the focus object, hold RMB to orbit
-		CAMERA_CHEAT_PERSPECTIVE	///< ride the focus object: first person from its viewpoint
+		CAMERA_CHEAT_PERSPECTIVE,	///< ride the focus object: first person from its viewpoint
+		CAMERA_CHEAT_ORTHO			///< free flight with an orthographic projection
 	};
 
 	void exitCameraCheatMode();									///< restore the pre-cheat view and turn the cheat off
@@ -382,6 +384,7 @@ private:
 	Bool					m_perspHidDrawable;						///< we hid the ridden drawable and must unhide it
 	Bool					m_camCheatMouseLooking;					///< RMB look engaged last frame (cursor is captured)
 	Real					m_camCheatRoll;								///< dutch angle bank, Ctrl+RMB drag
+	Real					m_orthoViewHeight;							///< ortho view volume height in world units
 #endif
 };
 

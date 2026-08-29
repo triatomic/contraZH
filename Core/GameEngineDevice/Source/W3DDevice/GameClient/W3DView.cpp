@@ -185,6 +185,7 @@ W3DView::W3DView()
 	m_perspHidDrawable = FALSE;
 	m_camCheatMouseLooking = FALSE;
 	m_camCheatRoll = 0.0f;
+	m_orthoViewHeight = 300.0f;
 #endif
 
 #if PRESERVE_RETAIL_SCRIPTED_CAMERA
@@ -1426,7 +1427,7 @@ void W3DView::update()
 	Bool didScriptedMovement = false;
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
-	if (m_cameraCheatMode == CAMERA_CHEAT_FREE)
+	if (m_cameraCheatMode == CAMERA_CHEAT_FREE || m_cameraCheatMode == CAMERA_CHEAT_ORTHO)
 	{
 		// Scale by the render frame rate, so the camera travels at the same speed regardless
 		// of how fast the game renders.
@@ -1483,7 +1484,19 @@ void W3DView::update()
 		updateCameraCheatMouseLook(&m_angle, &m_pitch);
 
 		updateCameraTransform();
-		m_3DCamera->Set_View_Plane( m_FOV, -1 );
+		if (m_cameraCheatMode == CAMERA_CHEAT_ORTHO)
+		{
+			// Orthographic: the view plane extents are the visible world size, aspect matched
+			// to the screen. Alt+RMB scales it in place of the meaningless field of view.
+			m_3DCamera->Set_Projection_Type(CameraClass::ORTHO);
+			const Real orthoW = m_orthoViewHeight * (Real)TheDisplay->getWidth() / (Real)TheDisplay->getHeight();
+			m_3DCamera->Set_View_Plane(Vector2(-orthoW * 0.5f, -m_orthoViewHeight * 0.5f),
+																Vector2(orthoW * 0.5f, m_orthoViewHeight * 0.5f));
+		}
+		else
+		{
+			m_3DCamera->Set_View_Plane( m_FOV, -1 );
+		}
 		m_recalcCamera = false;
 
 		// Update all drawables so transforms and bone attached particle systems stay current.
@@ -2398,6 +2411,7 @@ void W3DView::cycleCameraMode( ObjectID focusCandidate )
 		m_scriptedState = 0;
 		m_camCheatMouseLooking = FALSE;
 		m_camCheatRoll = 0.0f;
+		m_orthoViewHeight = 300.0f;
 
 		m_cameraCheatMode = CAMERA_CHEAT_FREE;
 		m_recalcCamera = true;
@@ -2422,6 +2436,24 @@ void W3DView::cycleCameraMode( ObjectID focusCandidate )
 		}
 	}
 
+	if (m_cameraCheatMode == CAMERA_CHEAT_PERSPECTIVE)
+	{
+		// Last stage: orthographic free flight, continuing from the ride position. The ridden
+		// model comes back the moment the camera detaches from it.
+		if (m_perspHidDrawable)
+		{
+			Object *riddenObj = TheGameLogic ? TheGameLogic->findObjectByID(m_focusObjectID) : NULL;
+			Drawable *riddenDraw = riddenObj ? riddenObj->getDrawable() : NULL;
+			if (riddenDraw)
+			{
+				riddenDraw->setDrawableHidden(FALSE);
+			}
+			m_perspHidDrawable = FALSE;
+		}
+		m_cameraCheatMode = CAMERA_CHEAT_ORTHO;
+		return;
+	}
+
 	if (m_cameraCheatMode == CAMERA_CHEAT_FREE)
 	{
 		Object *focusObj = (focusCandidate != INVALID_ID && TheGameLogic)
@@ -2440,6 +2472,10 @@ void W3DView::cycleCameraMode( ObjectID focusCandidate )
 			m_cameraCheatMode = CAMERA_CHEAT_FOCUS;
 			return;
 		}
+
+		// Nothing selected: skip the object stages, straight to orthographic flight.
+		m_cameraCheatMode = CAMERA_CHEAT_ORTHO;
+		return;
 	}
 
 	exitCameraCheatMode();
@@ -2481,6 +2517,7 @@ void W3DView::exitCameraCheatMode()
 	m_okToAdjustHeight = m_preCheatOkToAdjustHeight;
 	m_FOV = m_preCheatFOV;
 	m_camCheatRoll = 0.0f;
+	m_3DCamera->Set_Projection_Type(CameraClass::PERSPECTIVE);
 	setWidth(getWidth());
 	m_recalcCamera = true;
 
@@ -2552,6 +2589,11 @@ void W3DView::updateCameraCheatMouseLook( Real *yaw, Real *pitch )
 					m_FOV = clamp(DEG_TO_RADF(10.0f), m_FOV + dy * 0.002f, DEG_TO_RADF(120.0f));
 					m_focusDistance = clamp(10.0f,
 							m_focusDistance * tan(oldFOV * 0.5f) / tan(m_FOV * 0.5f), 400.0f);
+				}
+				else if (altHeld && m_cameraCheatMode == CAMERA_CHEAT_ORTHO)
+				{
+					// Ortho has no field of view; Alt scales the view volume instead. Down widens.
+					m_orthoViewHeight = clamp(20.0f, m_orthoViewHeight * (1.0f + dy * 0.002f), 4000.0f);
 				}
 				else if (altHeld)
 				{

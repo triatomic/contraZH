@@ -4184,6 +4184,11 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 				stateKey = "GUI:DebugCameraPerspective";
 				stateText = L"Camera: Perspective";
 			}
+			else if( TheTacticalView->isCameraOrthoModeActive() )
+			{
+				stateKey = "GUI:DebugCameraOrtho";
+				stateText = L"Camera: Orthographic";
+			}
 			else
 			{
 				stateKey = "GUI:DebugCameraFree";
