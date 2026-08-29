@@ -168,6 +168,7 @@ W3DTerrainVisual::W3DTerrainVisual()
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	m_skyboxPresetIndex = 0;
 	m_terrainHideMode = 0;
+	m_skyboxMapDrawFlag = FALSE;
 #endif
 
   m_logicHeightMap   = nullptr;
@@ -301,6 +302,14 @@ void W3DTerrainVisual::reset()
 		{
 			m_terrainRenderObject->Set_Hidden(FALSE);
 		}
+		if (m_waterRenderObject)
+		{
+			m_waterRenderObject->Set_Hidden(FALSE);
+		}
+	}
+	if (m_skyboxPresetIndex != 0)
+	{
+		TheWritableGlobalData->m_drawSkyBox = m_skyboxMapDrawFlag;
 	}
 	m_skyboxPresetIndex = 0;
 #endif
@@ -1156,6 +1165,13 @@ UnsignedInt W3DTerrainVisual::cycleTerrainHideMode()
 		m_terrainRenderObject->Set_Hidden(m_terrainHideMode != 0);
 	}
 
+	// The water is its own render object and would otherwise float over the void. It also
+	// draws the skybox, which a flat capture backdrop wants gone as well.
+	if (m_waterRenderObject)
+	{
+		m_waterRenderObject->Set_Hidden(m_terrainHideMode != 0);
+	}
+
 	return m_terrainHideMode;
 }
 
@@ -1166,7 +1182,18 @@ UnsignedInt W3DTerrainVisual::cycleTerrainHideMode()
 UnsignedInt W3DTerrainVisual::cycleSkyboxPreset()
 {
 	const UnsignedInt presetCount = ARRAY_SIZE(TheSkyboxPresets);
+
+	// The skybox is only rendered when a map script asks for it (DrawSkyBox defaults FALSE),
+	// so swapping textures alone shows nothing on most maps. Remember the map's own flag on
+	// the way out of preset 0, force drawing on for the presets, restore it on the way back.
+	if (m_skyboxPresetIndex == 0)
+	{
+		m_skyboxMapDrawFlag = TheGlobalData->m_drawSkyBox != 0.0f;
+	}
+
 	m_skyboxPresetIndex = (m_skyboxPresetIndex + 1) % (presetCount + 1);
+
+	TheWritableGlobalData->m_drawSkyBox = (m_skyboxPresetIndex != 0) ? TRUE : m_skyboxMapDrawFlag;
 
 	// What the skybox wears right now: the tracked names once anything was replaced, else the
 	// live water settings, which map.ini overrides already reflect.

@@ -188,6 +188,7 @@ protected:
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	UnsignedInt m_skyboxPresetIndex;	///< 0 = the skybox the map started with, then the presets
 	UnsignedInt m_terrainHideMode;		///< 0 normal, 1 hidden over black, 2 hidden over green
+	Bool m_skyboxMapDrawFlag;				///< the map's own DrawSkyBox flag, restored on preset 0
 #endif
 
 };
