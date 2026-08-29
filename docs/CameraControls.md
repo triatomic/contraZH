@@ -59,8 +59,9 @@ The camera cannot go below the terrain.
 | `Alt` | Sun intensity: drag up brightens, down dims (0.05×–3×). |
 | `Insert` | Reset the sun to the map's own light. |
 
-Moving the sun relights terrain, objects and shadows live. The override persists
-after leaving camera modes; `Insert` (in a mode) or match end restores it.
+Hold `Shift` while dragging for 4× speed. Moving the sun relights terrain,
+objects and shadows live. The override persists after leaving camera modes;
+`Insert` (works anywhere) or match end restores it.
 
 The cursor is hidden for the whole camera session (it returns when the game loses
 focus or the cheat exits) and is captured at the screen centre while RMB is held.

@@ -2640,14 +2640,17 @@ void W3DView::updateCameraCheatMouseLook( Real *yaw, Real *pitch )
 					// Middle button drags the sun: orbit with horizontal, raise and lower with
 					// vertical, and Alt scales the intensity instead. Insert restores the map sun.
 					grabCheatSunIfNeeded();
+					// Shift speeds the drag up 4x, same convention as the movement keys, so a full
+					// orbit is a wrist flick rather than a whole arm sweep.
+					const Real sunRate = TheKeyboard->isShift() ? 4.0f : 1.0f;
 					if (altHeld)
 					{
-						m_sunIntensity = clamp(0.05f, m_sunIntensity * (1.0f - dy * 0.002f), 3.0f);
+						m_sunIntensity = clamp(0.05f, m_sunIntensity * (1.0f - dy * 0.002f * sunRate), 3.0f);
 					}
 					else
 					{
-						m_sunAzimuth += dx * 0.005f;
-						m_sunElevation = clamp(DEG_TO_RADF(5.0f), m_sunElevation - dy * 0.005f, DEG_TO_RADF(90.0f));
+						m_sunAzimuth += dx * 0.010f * sunRate;
+						m_sunElevation = clamp(DEG_TO_RADF(5.0f), m_sunElevation - dy * 0.006f * sunRate, DEG_TO_RADF(90.0f));
 					}
 					applyCheatSun();
 				}
