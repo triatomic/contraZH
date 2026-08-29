@@ -299,6 +299,14 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 		//-----------------------------------------------------------------------------
 		case GameMessage::MSG_RAW_MOUSE_MIDDLE_BUTTON_DOWN:
 		{
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+			// While the camera cheat is active the middle button drags the sun; the RTS rotate
+			// must not engage underneath it.
+			if (TheTacticalView->isCameraCheatModeActive())
+			{
+				return DESTROY_MESSAGE;
+			}
+#endif
 			const UnsignedInt now = timeGetTime();
 			m_lastMouseMoveTimeMsec = now;
 			m_middleButtonDownTimeMsec = now;
@@ -314,6 +322,12 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 		//-----------------------------------------------------------------------------
 		case GameMessage::MSG_RAW_MOUSE_MIDDLE_BUTTON_UP:
 		{
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+			if (TheTacticalView->isCameraCheatModeActive())
+			{
+				return DESTROY_MESSAGE;
+			}
+#endif
 			const UnsignedInt now = timeGetTime();
 			m_lastMouseMoveTimeMsec = now;
 

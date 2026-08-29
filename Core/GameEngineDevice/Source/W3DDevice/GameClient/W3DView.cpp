@@ -186,6 +186,17 @@ W3DView::W3DView()
 	m_camCheatMouseLooking = FALSE;
 	m_camCheatRoll = 0.0f;
 	m_orthoViewHeight = 300.0f;
+	m_sunMoved = FALSE;
+	m_sunAzimuth = 0.0f;
+	m_sunElevation = 0.0f;
+	m_sunIntensity = 1.0f;
+	m_sunSavedTerrainPos.x = m_sunSavedTerrainPos.y = m_sunSavedTerrainPos.z = 0.0f;
+	m_sunSavedObjectPos.x = m_sunSavedObjectPos.y = m_sunSavedObjectPos.z = 0.0f;
+	m_sunSavedTerrainDiffuse[0] = m_sunSavedTerrainDiffuse[1] = m_sunSavedTerrainDiffuse[2] = 0.0f;
+	m_sunSavedObjectDiffuse[0] = m_sunSavedObjectDiffuse[1] = m_sunSavedObjectDiffuse[2] = 0.0f;
+	m_lastInsertDown = FALSE;
+	m_lastLeftDown = FALSE;
+	m_pickedFocusID = INVALID_ID;
 #endif
 
 #if PRESERVE_RETAIL_SCRIPTED_CAMERA
@@ -987,8 +998,10 @@ void W3DView::reset()
 {
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	// Leave the camera cheat before anything else: it restores the saved view and, when the
-	// mouse look had captured the cursor, makes the cursor visible again.
+	// mouse look had captured the cursor, makes the cursor visible again. The sun override
+	// lives in the global lighting tables and must not leak into the next game either.
 	exitCameraCheatMode();
+	resetCheatSun();
 #endif
 
 	View::reset();
@@ -1440,6 +1453,11 @@ void W3DView::update()
 	Bool didScriptedMovement = false;
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	if (m_cameraCheatMode != CAMERA_CHEAT_OFF)
+	{
+		updateCameraCheatSharedInput();
+	}
+
 	if (m_cameraCheatMode == CAMERA_CHEAT_FREE || m_cameraCheatMode == CAMERA_CHEAT_ORTHO)
 	{
 		// Scale by the render frame rate, so the camera travels at the same speed regardless
@@ -2469,12 +2487,18 @@ void W3DView::cycleCameraMode( ObjectID focusCandidate )
 
 	if (m_cameraCheatMode == CAMERA_CHEAT_FREE)
 	{
-		Object *focusObj = (focusCandidate != INVALID_ID && TheGameLogic)
-				? TheGameLogic->findObjectByID(focusCandidate)
+		// A CapsLock pick wins over the RTS selection.
+		ObjectID candidate = focusCandidate;
+		if (m_pickedFocusID != INVALID_ID && TheGameLogic && TheGameLogic->findObjectByID(m_pickedFocusID))
+		{
+			candidate = m_pickedFocusID;
+		}
+		Object *focusObj = (candidate != INVALID_ID && TheGameLogic)
+				? TheGameLogic->findObjectByID(candidate)
 				: NULL;
 		if (focusObj != NULL)
 		{
-			m_focusObjectID = focusCandidate;
+			m_focusObjectID = candidate;
 			// View yaw uses (sin, cos) for forward while object orientation uses (cos, sin), so
 			// this starts the camera directly behind the object, facing the way it faces.
 			m_focusYaw = DEG_TO_RADF(90.0f) - focusObj->getOrientation();
@@ -2517,6 +2541,7 @@ void W3DView::exitCameraCheatMode()
 
 	m_cameraCheatMode = CAMERA_CHEAT_OFF;
 	m_focusObjectID = INVALID_ID;
+	m_pickedFocusID = INVALID_ID;
 
 	TheMouse->setVisibility(TRUE);
 	m_camCheatMouseLooking = FALSE;
@@ -2557,7 +2582,10 @@ void W3DView::updateCameraCheatMouseLook( Real *yaw, Real *pitch )
 {
 	// Only when the game window has focus, or the captured cursor would fight other apps.
 	const Bool hasFocus = (GetForegroundWindow() == ApplicationHWnd);
-	if (hasFocus && TheMouse->getMouseStatus()->rightState == MBS_Down)
+	const Bool capsPick = ((GetKeyState(VK_CAPITAL) & 0x0001) != 0);
+	const Bool rightHeld = TheMouse->getMouseStatus()->rightState == MBS_Down;
+	const Bool middleHeld = TheMouse->getMouseStatus()->middleState == MBS_Down;
+	if (hasFocus && (rightHeld || middleHeld))
 	{
 		// Clear scripted states so no engine inertia or smoothing fights the look.
 		removeScriptedState(Scripted_Rotate);
@@ -2591,7 +2619,23 @@ void W3DView::updateCameraCheatMouseLook( Real *yaw, Real *pitch )
 			{
 				const Bool altHeld = TheKeyboard->isAlt();
 				const Bool ctrlHeld = TheKeyboard->isCtrl();
-				if (altHeld && ctrlHeld && m_cameraCheatMode == CAMERA_CHEAT_FOCUS)
+				if (!rightHeld)
+				{
+					// Middle button drags the sun: orbit with horizontal, raise and lower with
+					// vertical, and Alt scales the intensity instead. Insert restores the map sun.
+					grabCheatSunIfNeeded();
+					if (altHeld)
+					{
+						m_sunIntensity = clamp(0.05f, m_sunIntensity * (1.0f - dy * 0.002f), 3.0f);
+					}
+					else
+					{
+						m_sunAzimuth += dx * 0.005f;
+						m_sunElevation = clamp(DEG_TO_RADF(5.0f), m_sunElevation - dy * 0.005f, DEG_TO_RADF(90.0f));
+					}
+					applyCheatSun();
+				}
+				else if (altHeld && ctrlHeld && m_cameraCheatMode == CAMERA_CHEAT_FOCUS)
 				{
 					// Dolly zoom, the vertigo shot: the field of view drags while the spring arm
 					// compensates, keeping the chased object the same size on screen.
@@ -2636,10 +2680,161 @@ void W3DView::updateCameraCheatMouseLook( Real *yaw, Real *pitch )
 	else
 	{
 		// The cursor stays hidden for the whole camera session, not only while looking. It
-		// returns when the game loses focus, and when the cheat exits.
-		TheMouse->setVisibility(!hasFocus);
+		// returns when the game loses focus, when the cheat exits, and while CapsLock has
+		// turned it into the pick-anything tool.
+		TheMouse->setVisibility(!hasFocus || capsPick);
 		m_camCheatMouseLooking = FALSE;
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Per frame input shared by every camera mode: Insert restores the map sun, and with
+	* CapsLock on the cursor picks any drawable, selectable or not, as the camera focus. */
+//-------------------------------------------------------------------------------------------------
+void W3DView::updateCameraCheatSharedInput()
+{
+	const Bool insertDown = TheKeyboard->isKeyDown(KEY_INS);
+	if (insertDown && !m_lastInsertDown)
+	{
+		resetCheatSun();
+	}
+	m_lastInsertDown = insertDown;
+
+	if ((GetKeyState(VK_CAPITAL) & 0x0001) != 0)
+	{
+		const Bool leftDown = TheMouse->getMouseStatus()->leftState == MBS_Down;
+		if (leftDown && !m_lastLeftDown)
+		{
+			ICoord2D clickPos = TheMouse->getMouseStatus()->pos;
+			Drawable *picked = pickDrawable(&clickPos, FALSE, PICK_TYPE_ALL_DRAWABLES);
+			Object *pickedObj = picked ? picked->getObject() : NULL;
+			if (pickedObj)
+			{
+				m_pickedFocusID = pickedObj->getID();
+
+				if (m_cameraCheatMode == CAMERA_CHEAT_FOCUS)
+				{
+					// Retarget the chase on the spot.
+					m_focusObjectID = m_pickedFocusID;
+					m_focusYaw = DEG_TO_RADF(90.0f) - pickedObj->getOrientation();
+					m_focusPitch = DEG_TO_RADF(20.0f);
+					m_focusDistance = clamp(35.0f, pickedObj->getGeometryInfo().getBoundingSphereRadius() * 4.5f, 200.0f);
+					m_focusOffset.x = 0.0f;
+					m_focusOffset.y = 0.0f;
+				}
+				else if (m_cameraCheatMode == CAMERA_CHEAT_PERSPECTIVE)
+				{
+					// Hop rides: put the old model back, the new one hides next frame.
+					if (m_perspHidDrawable)
+					{
+						Object *oldObj = TheGameLogic ? TheGameLogic->findObjectByID(m_focusObjectID) : NULL;
+						Drawable *oldDraw = oldObj ? oldObj->getDrawable() : NULL;
+						if (oldDraw)
+						{
+							oldDraw->setDrawableHidden(FALSE);
+						}
+						m_perspHidDrawable = FALSE;
+					}
+					m_focusObjectID = m_pickedFocusID;
+					m_perspYawOffset = 0.0f;
+					m_perspPitchOffset = 0.0f;
+				}
+
+				UnicodeString pickMsg;
+				pickMsg.format(L"Camera target: %hs", pickedObj->getTemplate()->getName().str());
+				TheInGameUI->messageNoFormat(pickMsg);
+			}
+		}
+		m_lastLeftDown = leftDown;
+	}
+	else
+	{
+		m_lastLeftDown = FALSE;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Capture the map sun the first time it is moved, and seed the drag parameters from it. */
+//-------------------------------------------------------------------------------------------------
+void W3DView::grabCheatSunIfNeeded()
+{
+	if (m_sunMoved)
+	{
+		return;
+	}
+
+	const TimeOfDay tod = TheGlobalData->m_timeOfDay;
+	const GlobalData::TerrainLighting &tl = TheGlobalData->m_terrainLighting[tod][0];
+	const GlobalData::TerrainLighting &ol = TheGlobalData->m_terrainObjectsLighting[tod][0];
+	m_sunSavedTerrainPos = tl.lightPos;
+	m_sunSavedObjectPos = ol.lightPos;
+	m_sunSavedTerrainDiffuse[0] = tl.diffuse.red;
+	m_sunSavedTerrainDiffuse[1] = tl.diffuse.green;
+	m_sunSavedTerrainDiffuse[2] = tl.diffuse.blue;
+	m_sunSavedObjectDiffuse[0] = ol.diffuse.red;
+	m_sunSavedObjectDiffuse[1] = ol.diffuse.green;
+	m_sunSavedObjectDiffuse[2] = ol.diffuse.blue;
+
+	const Coord3D &p = tl.lightPos;
+	const Real horiz = sqrt(p.x * p.x + p.y * p.y);
+	m_sunAzimuth = (horiz > 0.0001f) ? (Real)atan2(p.x, p.y) : 0.0f;
+	m_sunElevation = clamp(DEG_TO_RADF(5.0f), (Real)atan2(-p.z, horiz), DEG_TO_RADF(90.0f));
+	m_sunIntensity = 1.0f;
+	m_sunMoved = TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Push the dragged sun into the lighting tables and relight the world. setTimeOfDay is the
+	* one entry point that cascades everywhere: scene lights, terrain bake, shadows, redraw. */
+//-------------------------------------------------------------------------------------------------
+void W3DView::applyCheatSun()
+{
+	const TimeOfDay tod = TheGlobalData->m_timeOfDay;
+
+	Coord3D dir;
+	dir.x = cos(m_sunElevation) * sin(m_sunAzimuth);
+	dir.y = cos(m_sunElevation) * cos(m_sunAzimuth);
+	dir.z = -sin(m_sunElevation);
+
+	GlobalData::TerrainLighting &tl = TheWritableGlobalData->m_terrainLighting[tod][0];
+	GlobalData::TerrainLighting &ol = TheWritableGlobalData->m_terrainObjectsLighting[tod][0];
+	tl.lightPos = dir;
+	ol.lightPos = dir;
+	tl.diffuse.red = clamp(0.0f, m_sunSavedTerrainDiffuse[0] * m_sunIntensity, 1.0f);
+	tl.diffuse.green = clamp(0.0f, m_sunSavedTerrainDiffuse[1] * m_sunIntensity, 1.0f);
+	tl.diffuse.blue = clamp(0.0f, m_sunSavedTerrainDiffuse[2] * m_sunIntensity, 1.0f);
+	ol.diffuse.red = clamp(0.0f, m_sunSavedObjectDiffuse[0] * m_sunIntensity, 1.0f);
+	ol.diffuse.green = clamp(0.0f, m_sunSavedObjectDiffuse[1] * m_sunIntensity, 1.0f);
+	ol.diffuse.blue = clamp(0.0f, m_sunSavedObjectDiffuse[2] * m_sunIntensity, 1.0f);
+
+	TheDisplay->setTimeOfDay(tod);
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Restore the sun the map defined. Bound to Insert while a camera mode is active, and runs
+	* on match reset so the override cannot leak through the global tables into the next game. */
+//-------------------------------------------------------------------------------------------------
+void W3DView::resetCheatSun()
+{
+	if (!m_sunMoved)
+	{
+		return;
+	}
+
+	const TimeOfDay tod = TheGlobalData->m_timeOfDay;
+	GlobalData::TerrainLighting &tl = TheWritableGlobalData->m_terrainLighting[tod][0];
+	GlobalData::TerrainLighting &ol = TheWritableGlobalData->m_terrainObjectsLighting[tod][0];
+	tl.lightPos = m_sunSavedTerrainPos;
+	ol.lightPos = m_sunSavedObjectPos;
+	tl.diffuse.red = m_sunSavedTerrainDiffuse[0];
+	tl.diffuse.green = m_sunSavedTerrainDiffuse[1];
+	tl.diffuse.blue = m_sunSavedTerrainDiffuse[2];
+	ol.diffuse.red = m_sunSavedObjectDiffuse[0];
+	ol.diffuse.green = m_sunSavedObjectDiffuse[1];
+	ol.diffuse.blue = m_sunSavedObjectDiffuse[2];
+	m_sunMoved = FALSE;
+
+	TheDisplay->setTimeOfDay(tod);
 }
 #endif
 

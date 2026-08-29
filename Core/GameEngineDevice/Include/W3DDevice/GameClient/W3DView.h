@@ -367,6 +367,10 @@ private:
 
 	void exitCameraCheatMode();									///< restore the pre-cheat view and turn the cheat off
 	void updateCameraCheatMouseLook( Real *yaw, Real *pitch );	///< shared RMB mouse look for both modes
+	void updateCameraCheatSharedInput();									///< Insert sun reset + CapsLock pick, all modes
+	void grabCheatSunIfNeeded();												///< capture the map sun before the first move
+	void applyCheatSun();															///< push azimuth/elevation/intensity into the world
+	void resetCheatSun();															///< restore the map sun
 
 	CameraCheatMode	m_cameraCheatMode;
 	ViewLocation		m_preCheatLocation;						///< pos/angle/pitch/zoom before entering the cheat
@@ -385,6 +389,17 @@ private:
 	Bool					m_camCheatMouseLooking;					///< RMB look engaged last frame (cursor is captured)
 	Real					m_camCheatRoll;								///< dutch angle bank, Ctrl+RMB drag
 	Real					m_orthoViewHeight;							///< ortho view volume height in world units
+	Bool					m_sunMoved;										///< the sun cheat holds an override right now
+	Real					m_sunAzimuth;
+	Real					m_sunElevation;
+	Real					m_sunIntensity;
+	Coord3D				m_sunSavedTerrainPos;						///< the map's own light 0, for Insert to restore
+	Coord3D				m_sunSavedObjectPos;
+	Real					m_sunSavedTerrainDiffuse[3];
+	Real					m_sunSavedObjectDiffuse[3];
+	Bool					m_lastInsertDown;
+	Bool					m_lastLeftDown;
+	ObjectID			m_pickedFocusID;								///< CapsLock pick, wins over the RTS selection
 #endif
 };
 

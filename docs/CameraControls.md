@@ -51,9 +51,27 @@ The camera cannot go below the terrain.
 | `Ctrl` | Roll — bank the camera for a dutch angle (±180°). |
 | `Ctrl` + `Alt` | **Dolly zoom** (Chase only): FOV changes while the camera compensates, keeping the object the same size while the background stretches — the vertigo shot. |
 
+## Sun light (hold MMB and drag, any mode)
+
+| Modifier | Action |
+|---|---|
+| *(none)* | Move the sun: horizontal orbits it, vertical raises/lowers it. |
+| `Alt` | Sun intensity: drag up brightens, down dims (0.05×–3×). |
+| `Insert` | Reset the sun to the map's own light. |
+
+Moving the sun relights terrain, objects and shadows live. The override persists
+after leaving camera modes; `Insert` (in a mode) or match end restores it.
+
 The cursor is hidden for the whole camera session (it returns when the game loses
 focus or the cheat exits) and is captured at the screen centre while RMB is held.
 FOV and roll reset when you exit the cheat.
+
+## Pick anything — `CapsLock`
+
+With CapsLock on (in any mode) the cursor returns and left-click picks **any**
+object under it — trees, rocks, civilian props, things the game never lets you
+select. The pick becomes the camera target: it retargets Chase/Perspective on the
+spot, and from Free it wins over the RTS selection on the next `Delete`.
 
 ## Scene cheats
 
