@@ -1270,6 +1270,7 @@ if(RTS_BUILD_GENERALS_ONLINE)
         Include/GameNetwork/GeneralsOnline/OnlineServices_StatsInterface.h
         Include/GameNetwork/GeneralsOnline/OnlineServices_SocialInterface.h
         Include/GameNetwork/GeneralsOnline/OnlineServices_MatchmakingInterface.h
+        Include/GameNetwork/GeneralsOnline/OnlineServices_Moderation.h
         Include/GameNetwork/GeneralsOnline/GeneralsOnline_Settings.h
         Include/GameNetwork/GeneralsOnline/HTTP/HTTPManager.h
         Include/GameNetwork/GeneralsOnline/HTTP/HTTPRequest.h
@@ -1289,6 +1290,7 @@ if(RTS_BUILD_GENERALS_ONLINE)
         Source/GameNetwork/GeneralsOnline/OnlineServices_StatsInterface.cpp
         Source/GameNetwork/GeneralsOnline/OnlineServices_SocialInterface.cpp
         Source/GameNetwork/GeneralsOnline/OnlineServices_MatchmakingInterface.cpp
+        Source/GameNetwork/GeneralsOnline/OnlineServices_Moderation.cpp
         Source/GameNetwork/GeneralsOnline/NextGenTransport.cpp
         Source/GameNetwork/GeneralsOnline/NetworkBitstream.cpp
         Source/GameNetwork/GeneralsOnline/PluginInterfaces.cpp
