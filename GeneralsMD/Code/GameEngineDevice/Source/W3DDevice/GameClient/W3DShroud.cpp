@@ -38,6 +38,10 @@
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "WW3D2/assetmgr.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+#include "GameClient/View.h"
+#include "GameLogic/PartitionManager.h"
+#endif
 #include "WW3D2/textureloader.h"
 #include "Common/GlobalData.h"
 #include "GameLogic/PartitionManager.h"
@@ -80,6 +84,10 @@ W3DShroud::W3DShroud()
 	m_dstTextureHeight=m_numMaxVisibleCellsY=0;
 	m_boderShroudLevel = (W3DShroudLevel)TheGlobalData->m_shroudAlpha;	//assume border is black
 	m_clearDstTexture = TRUE;	//force clearing of destination texture;
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	m_cheatShroudSuppressed = FALSE;
+	m_cheatSavedBorderLevel = m_boderShroudLevel;
+#endif
 
 	m_cellWidth=DEFAULT_SHROUD_CELL_SIZE;
 	m_cellHeight=DEFAULT_SHROUD_CELL_SIZE;
@@ -283,6 +291,12 @@ W3DShroudLevel W3DShroud::getShroudLevel(Int x, Int y)
 //-----------------------------------------------------------------------------
 void W3DShroud::setShroudLevel(Int x, Int y, W3DShroudLevel level, Bool textureOnly)
 {
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// The camera cheat holds the terrain fully unshrouded; the restore path refreshes every
+	// cell from the partition manager, so dropping the updates meanwhile loses nothing.
+	if (m_cheatShroudSuppressed)
+		return;
+#endif
 	DEBUG_ASSERTCRASH( m_pSrcTexture != nullptr, ("Writing empty shroud.  Usually means that map failed to load."));
 
 	if (!m_pSrcTexture)
@@ -525,6 +539,34 @@ void W3DShroud::render(CameraClass *cam)
 {
 	if (!m_pSrcTexture)
 		return; //nothing to update from.  Must be in reset state.
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// While a camera cheat mode is active the terrain draws fully unshrouded -- at ground
+	// level the unexplored shroud reads as a black wall across the world. Purely this
+	// client's terrain texture: the logic side shroud, object visibility and the radar are
+	// untouched, and leaving the mode refreshes every cell back from the partition manager.
+	{
+		const Bool wantSuppressed = TheTacticalView && TheTacticalView->isCameraCheatModeActive();
+		if (wantSuppressed != m_cheatShroudSuppressed)
+		{
+			if (wantSuppressed)
+			{
+				m_cheatShroudSuppressed = TRUE;
+				m_cheatSavedBorderLevel = m_boderShroudLevel;
+				fillShroudData(255);				// NO_SHROUD_LEVEL: everything visible
+				setBorderShroudLevel(255);		// and the border band beyond the map
+			}
+			else
+			{
+				m_cheatShroudSuppressed = FALSE;
+				setBorderShroudLevel(m_cheatSavedBorderLevel);
+				if (ThePartitionManager)
+					ThePartitionManager->refreshShroudForLocalPlayer();
+			}
+			m_clearDstTexture = TRUE;
+		}
+	}
+#endif
 
 	if (DX8Wrapper::_Get_D3D_Device8() && (DX8Wrapper::_Get_D3D_Device8()->TestCooperativeLevel()) != D3D_OK)
 		return;	//device not ready to render anything
