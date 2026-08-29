@@ -400,6 +400,7 @@ private:
 	Bool					m_lastInsertDown;
 	Bool					m_lastLeftDown;
 	ObjectID			m_pickedFocusID;								///< CapsLock pick, wins over the RTS selection
+	UnsignedInt		m_lastSunMsgMs;								///< throttle for the sun readout message
 #endif
 };
 

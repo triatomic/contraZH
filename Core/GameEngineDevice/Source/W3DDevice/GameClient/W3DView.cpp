@@ -200,6 +200,7 @@ W3DView::W3DView()
 	m_lastInsertDown = FALSE;
 	m_lastLeftDown = FALSE;
 	m_pickedFocusID = INVALID_ID;
+	m_lastSunMsgMs = 0;
 #endif
 
 #if PRESERVE_RETAIL_SCRIPTED_CAMERA
@@ -2640,19 +2641,48 @@ void W3DView::updateCameraCheatMouseLook( Real *yaw, Real *pitch )
 					// Middle button drags the sun: orbit with horizontal, raise and lower with
 					// vertical, and Alt scales the intensity instead. Insert restores the map sun.
 					grabCheatSunIfNeeded();
-					// Shift speeds the drag up 4x, same convention as the movement keys, so a full
-					// orbit is a wrist flick rather than a whole arm sweep.
+					// Velocity adaptive response: pixel-slow drags land fine adjustments, flicks
+					// sweep, up to five times the base rate. Sign and feel mirror the RTS camera
+					// rotate gesture, which moves 0.01 radians per pixel; a moderate drag here
+					// lands about the same. Shift still forces a flat 4x on top.
 					const Real sunRate = TheKeyboard->isShift() ? 4.0f : 1.0f;
+					Real accelX = 1.0f + 0.05f * (Real)abs(dx);
+					Real accelY = 1.0f + 0.05f * (Real)abs(dy);
+					if (accelX > 5.0f)
+					{
+						accelX = 5.0f;
+					}
+					if (accelY > 5.0f)
+					{
+						accelY = 5.0f;
+					}
 					if (altHeld)
 					{
-						m_sunIntensity = clamp(0.05f, m_sunIntensity * (1.0f - dy * 0.002f * sunRate), 3.0f);
+						m_sunIntensity = clamp(0.05f, m_sunIntensity * (1.0f - dy * 0.0015f * accelY * sunRate), 3.0f);
 					}
 					else
 					{
-						m_sunAzimuth += dx * 0.010f * sunRate;
-						m_sunElevation = clamp(DEG_TO_RADF(5.0f), m_sunElevation - dy * 0.006f * sunRate, DEG_TO_RADF(90.0f));
+						m_sunAzimuth += dx * 0.004f * accelX * sunRate;
+						m_sunElevation = clamp(DEG_TO_RADF(5.0f), m_sunElevation - dy * 0.003f * accelY * sunRate, DEG_TO_RADF(90.0f));
 					}
 					applyCheatSun();
+
+					// Readout, throttled so it does not flood the message area: where the sun is,
+					// so a good angle can be noted and dialled back in later.
+					const UnsignedInt nowMs = GetTickCount();
+					if (nowMs - m_lastSunMsgMs > 350)
+					{
+						m_lastSunMsgMs = nowMs;
+						Real azDeg = fmod((Real)RAD_TO_DEGF(m_sunAzimuth), 360.0f);
+						if (azDeg < 0.0f)
+						{
+							azDeg += 360.0f;
+						}
+						UnicodeString sunMsg;
+						sunMsg.format(L"Sun: %d\u00B0 az  %d\u00B0 el  %.2fx",
+								(Int)azDeg, (Int)RAD_TO_DEGF(m_sunElevation), m_sunIntensity);
+						TheInGameUI->messageNoFormat(sunMsg);
+					}
 				}
 				else if (altHeld && ctrlHeld && m_cameraCheatMode == CAMERA_CHEAT_FOCUS)
 				{
