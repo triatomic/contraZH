@@ -55,7 +55,8 @@ The camera cannot go below the terrain.
 
 | Modifier | Action |
 |---|---|
-| *(none)* | Move the sun: horizontal orbits it, vertical raises/lowers it. |
+| *(none)* | Orbit the sun (horizontal drag). |
+| `Ctrl` | Raise / lower the sun (vertical drag). |
 | `Alt` | Sun intensity: drag up brightens, down dims (0.05×–3×). |
 | `Insert` | Reset the sun to the map's own light. |
 

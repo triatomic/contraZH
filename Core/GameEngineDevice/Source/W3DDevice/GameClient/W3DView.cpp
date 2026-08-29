@@ -2656,14 +2656,19 @@ void W3DView::updateCameraCheatMouseLook( Real *yaw, Real *pitch )
 					{
 						accelY = 5.0f;
 					}
+					// One axis per gesture, so orbiting cannot drift the height and vice versa:
+					// plain drag orbits, Ctrl raises and lowers, Alt scales the intensity.
 					if (altHeld)
 					{
 						m_sunIntensity = clamp(0.05f, m_sunIntensity * (1.0f - dy * 0.0015f * accelY * sunRate), 3.0f);
 					}
+					else if (ctrlHeld)
+					{
+						m_sunElevation = clamp(DEG_TO_RADF(5.0f), m_sunElevation - dy * 0.003f * accelY * sunRate, DEG_TO_RADF(90.0f));
+					}
 					else
 					{
 						m_sunAzimuth += dx * 0.004f * accelX * sunRate;
-						m_sunElevation = clamp(DEG_TO_RADF(5.0f), m_sunElevation - dy * 0.003f * accelY * sunRate, DEG_TO_RADF(90.0f));
 					}
 					applyCheatSun();
 
