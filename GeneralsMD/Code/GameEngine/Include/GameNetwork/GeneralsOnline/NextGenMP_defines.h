@@ -14,7 +14,7 @@
 //#define USE_MAULLER_ONEDRIVE_FIX 1
 //#define USE_STUBBJAX_TRANSPORT_CONTAIN_FIX 1
 
-#define GENERALS_ONLINE_VERSION_STRING "082826" // NOTE: Format is critical here for Sentry to work
+#define GENERALS_ONLINE_VERSION_STRING "082826_QFE1" // NOTE: Format is critical here for Sentry to work
 
 // contraZH port: not taken - this fork keeps its own texture filtering and MSAA
 // support (TextureFilter / AnisotropyLevel in Options.ini and the options menu).
