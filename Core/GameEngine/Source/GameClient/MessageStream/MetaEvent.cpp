@@ -227,6 +227,7 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "CHEAT_SHOW_WEAPON_SET",									  GameMessage::MSG_CHEAT_SHOW_WEAPON_SET },
 	{ "CHEAT_SHOW_ARMOR_SET",									  GameMessage::MSG_CHEAT_SHOW_ARMOR_SET },
 	{ "CHEAT_CYCLE_CAMERA_MODE",							  GameMessage::MSG_CHEAT_CYCLE_CAMERA_MODE },
+	{ "CHEAT_CYCLE_SKYBOX",									  GameMessage::MSG_CHEAT_CYCLE_SKYBOX },
 	{ "CHEAT_ADD_CASH",									          GameMessage::MSG_CHEAT_ADD_CASH },
 	{ "CHEAT_GIVE_ALL_SCIENCES",					        GameMessage::MSG_CHEAT_GIVE_ALL_SCIENCES },
   { "CHEAT_GIVE_SCIENCEPURCHASEPOINTS",        	GameMessage::MSG_CHEAT_GIVE_SCIENCEPURCHASEPOINTS },
@@ -1028,6 +1029,17 @@ void MetaMap::generateMetaMap()
 			map->m_key = MK_DEL;
 			map->m_transition = DOWN;
 			map->m_modState = NONE;
+			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
+		}
+	}
+	{
+		// Cycle the skybox through the preset texture sets shipped with the game.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_CYCLE_SKYBOX);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_D;
+			map->m_transition = DOWN;
+			map->m_modState = CTRL;
 			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
 		}
 	}

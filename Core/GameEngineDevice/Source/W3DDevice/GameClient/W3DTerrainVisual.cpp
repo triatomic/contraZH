@@ -50,6 +50,7 @@
 #include "W3DDevice/GameClient/W3DScene.h"
 #include "W3DDevice/GameClient/W3DTerrainVisual.h"
 #include "W3DDevice/GameClient/WorldHeightMap.h"
+#include "GameClient/Water.h"
 #include "W3DDevice/GameClient/W3DWater.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
 #include "W3DDevice/GameClient/W3DDebugIcons.h"
@@ -163,6 +164,10 @@ W3DTerrainVisual::W3DTerrainVisual()
 	m_terrainRenderObject = nullptr;
 	m_waterRenderObject = nullptr;
 	TheWaterRenderObj = nullptr;
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	m_skyboxPresetIndex = 0;
+#endif
 
   m_logicHeightMap   = nullptr;
 
@@ -1113,6 +1118,78 @@ void W3DTerrainVisual::setShoreLineDetail()
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+
+// The complete skybox texture sets the game ships. Face order matches the replace path in
+// INIWater.cpp: N, E, S, W, T.
+static const char *const TheSkyboxPresets[][TerrainVisual::NumSkyboxTextures] =
+{
+	{ "TSMorningN.tga", "TSMorningE.tga", "TSMorningS.tga", "TSMorningW.tga", "TSMorningT.tga" },
+	{ "TSMoonSky_N.tga", "TSMoonSky_E.tga", "TSMoonSky_S.tga", "TSMoonSky_W.tga", "TSMoonSky_T.tga" },
+};
+
+//-------------------------------------------------------------------------------------------------
+/** Cheat: swap the skybox to the next preset. Index 0 restores the skybox the map started
+	* with, which the replace machinery below records the first time anything is swapped. */
+//-------------------------------------------------------------------------------------------------
+UnsignedInt W3DTerrainVisual::cycleSkyboxPreset()
+{
+	const UnsignedInt presetCount = ARRAY_SIZE(TheSkyboxPresets);
+	m_skyboxPresetIndex = (m_skyboxPresetIndex + 1) % (presetCount + 1);
+
+	// What the skybox wears right now: the tracked names once anything was replaced, else the
+	// live water settings, which map.ini overrides already reflect.
+	AsciiString current[NumSkyboxTextures];
+	if (m_currentSkyboxTexNames[0].isEmpty())
+	{
+		current[0] = TheWaterTransparency->m_skyboxTextureN;
+		current[1] = TheWaterTransparency->m_skyboxTextureE;
+		current[2] = TheWaterTransparency->m_skyboxTextureS;
+		current[3] = TheWaterTransparency->m_skyboxTextureW;
+		current[4] = TheWaterTransparency->m_skyboxTextureT;
+	}
+	else
+	{
+		for (Int i = 0; i < NumSkyboxTextures; ++i)
+		{
+			current[i] = m_currentSkyboxTexNames[i];
+		}
+	}
+
+	AsciiString target[NumSkyboxTextures];
+	if (m_skyboxPresetIndex == 0)
+	{
+		if (m_initialSkyboxTexNames[0].isEmpty())
+		{
+			// Nothing was ever replaced, so the map skybox is still up.
+			return m_skyboxPresetIndex;
+		}
+		for (Int i = 0; i < NumSkyboxTextures; ++i)
+		{
+			target[i] = m_initialSkyboxTexNames[i];
+		}
+	}
+	else
+	{
+		for (Int i = 0; i < NumSkyboxTextures; ++i)
+		{
+			target[i] = TheSkyboxPresets[m_skyboxPresetIndex - 1][i];
+		}
+	}
+
+	const AsciiString *oldNames[NumSkyboxTextures];
+	const AsciiString *newNames[NumSkyboxTextures];
+	for (Int i = 0; i < NumSkyboxTextures; ++i)
+	{
+		oldNames[i] = &current[i];
+		newNames[i] = &target[i];
+	}
+	replaceSkyboxTextures(oldNames, newNames);
+
+	return m_skyboxPresetIndex;
+}
+#endif
+
 /// Replace the skybox texture
 void W3DTerrainVisual::replaceSkyboxTextures(const AsciiString *oldTexName[5], const AsciiString *newTexName[5])
 {

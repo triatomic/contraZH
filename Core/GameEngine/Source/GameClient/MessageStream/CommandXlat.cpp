@@ -70,6 +70,7 @@
 #include "GameClient/ControlBar.h"
 #include "GameClient/SelectionInfo.h"
 #include "GameClient/SelectionXlat.h"
+#include "GameClient/TerrainVisual.h"
 
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/ExperienceTracker.h"
@@ -4184,6 +4185,29 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 				stateText = L"Camera: Free";
 			}
 			TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE(stateKey, stateText) );
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
+		// Cycle the skybox through the preset texture sets: the one the map started with, then
+		// each shipped set. Purely a texture swap on this client.
+		case GameMessage::MSG_CHEAT_CYCLE_SKYBOX:
+		{
+			const UnsignedInt preset = TheTerrainVisual ? TheTerrainVisual->cycleSkyboxPreset() : 0;
+
+			switch (preset)
+			{
+				case 1:
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugSkyboxMorning", L"Skybox: Morning") );
+					break;
+				case 2:
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugSkyboxMoon", L"Skybox: Moon") );
+					break;
+				default:
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugSkyboxMapDefault", L"Skybox: Map Default") );
+					break;
+			}
 
 			disp = DESTROY_MESSAGE;
 			break;
