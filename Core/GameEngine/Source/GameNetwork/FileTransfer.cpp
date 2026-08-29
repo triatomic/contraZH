@@ -80,15 +80,9 @@ static Bool doFileTransfer( AsciiString filename, MapTransferLoadScreen *ls, Int
 			// get the progress for each player, and take the min for our overall progress
 			fileTransferDone = TRUE;
 			fileTransferPercent = 100;
-			const Int localSlot = TheGameInfo->getLocalSlotNum();
 			for (i=1; i<MAX_SLOTS; ++i)
 			{
-				// A receiver has to poll its own slot too. hasMap() is only ever set from what the
-				// other peers announce about us, so on the joiner its own slot still reads as having
-				// the map and the plain filter below skips it -- leaving the joiner polling nothing
-				// at all and its bar pinned at 0 for the whole transfer.
-				const Bool isLocalSlot = (i == localSlot);
-				if (isLocalSlot || (TheGameInfo->getConstSlot(i)->isHuman() && !TheGameInfo->getConstSlot(i)->hasMap()))
+				if (TheGameInfo->getConstSlot(i)->isHuman() && !TheGameInfo->getConstSlot(i)->hasMap())
 				{
 					Int slotTransferPercent = TheNetwork->getFileTransferProgress(i, filename);
 					fileTransferPercent = min(fileTransferPercent, slotTransferPercent);
