@@ -201,6 +201,7 @@ W3DView::W3DView()
 	m_lastLeftDown = FALSE;
 	m_pickedFocusID = INVALID_ID;
 	m_lastSunMsgMs = 0;
+	m_lastSunArrowMask = 0;
 #endif
 
 #if PRESERVE_RETAIL_SCRIPTED_CAMERA
@@ -1614,7 +1615,9 @@ void W3DView::update()
 			updateCameraCheatMouseLook(&m_focusYaw, &m_focusPitch);
 
 			// Arrow keys pan the view away from the object, relative to the orbit yaw, so the
-			// camera follows the object without being nailed to it.
+			// camera follows the object without being nailed to it. While the middle button is
+			// down the arrows belong to the sun stepping instead.
+			if (TheMouse->getMouseStatus()->middleState != MBS_Down)
 			{
 				Real panSpeed = 10.0f * (TheFramePacer ? TheFramePacer->getBaseOverUpdateFpsRatio() : 1.0f);
 				if (TheKeyboard->isShift())
@@ -2677,21 +2680,11 @@ void W3DView::updateCameraCheatMouseLook( Real *yaw, Real *pitch )
 					}
 					applyCheatSun();
 
-					// Readout, throttled so it does not flood the message area: where the sun is,
-					// so a good angle can be noted and dialled back in later.
+					// Readout, throttled so it does not flood the message area.
 					const UnsignedInt nowMs = GetTickCount();
 					if (nowMs - m_lastSunMsgMs > 350)
 					{
-						m_lastSunMsgMs = nowMs;
-						Real azDeg = fmod((Real)RAD_TO_DEGF(m_sunAzimuth), 360.0f);
-						if (azDeg < 0.0f)
-						{
-							azDeg += 360.0f;
-						}
-						UnicodeString sunMsg;
-						sunMsg.format(L"Sun: %d\u00B0 az  %d\u00B0 el  %.2fx",
-								(Int)azDeg, (Int)RAD_TO_DEGF(m_sunElevation), m_sunIntensity);
-						TheInGameUI->messageNoFormat(sunMsg);
+						showCheatSunReadout();
 					}
 				}
 				else if (altHeld && ctrlHeld && m_cameraCheatMode == CAMERA_CHEAT_FOCUS)
@@ -2752,6 +2745,59 @@ void W3DView::updateCameraCheatMouseLook( Real *yaw, Real *pitch )
 //-------------------------------------------------------------------------------------------------
 void W3DView::updateCameraCheatSharedInput()
 {
+	// Holding the middle button, the arrow keys step the sun in exact 5 degree notches:
+	// Left and Right orbit, Up and Down raise and lower. The predictable complement to the
+	// velocity scaled drag, whose speed depends on hand speed.
+	if (TheMouse->getMouseStatus()->middleState == MBS_Down)
+	{
+		UnsignedInt arrows = 0;
+		if (TheKeyboard->isKeyDown(KEY_LEFT))
+		{
+			arrows |= 1;
+		}
+		if (TheKeyboard->isKeyDown(KEY_RIGHT))
+		{
+			arrows |= 2;
+		}
+		if (TheKeyboard->isKeyDown(KEY_UP))
+		{
+			arrows |= 4;
+		}
+		if (TheKeyboard->isKeyDown(KEY_DOWN))
+		{
+			arrows |= 8;
+		}
+
+		const UnsignedInt pressed = arrows & ~m_lastSunArrowMask;
+		m_lastSunArrowMask = arrows;
+		if (pressed != 0)
+		{
+			grabCheatSunIfNeeded();
+			if (pressed & 1)
+			{
+				m_sunAzimuth -= DEG_TO_RADF(5.0f);
+			}
+			if (pressed & 2)
+			{
+				m_sunAzimuth += DEG_TO_RADF(5.0f);
+			}
+			if (pressed & 4)
+			{
+				m_sunElevation = clamp(DEG_TO_RADF(5.0f), m_sunElevation + DEG_TO_RADF(5.0f), DEG_TO_RADF(90.0f));
+			}
+			if (pressed & 8)
+			{
+				m_sunElevation = clamp(DEG_TO_RADF(5.0f), m_sunElevation - DEG_TO_RADF(5.0f), DEG_TO_RADF(90.0f));
+			}
+			applyCheatSun();
+			showCheatSunReadout();
+		}
+	}
+	else
+	{
+		m_lastSunArrowMask = 0;
+	}
+
 	if ((GetKeyState(VK_CAPITAL) & 0x0001) != 0)
 	{
 		const Bool leftDown = TheMouse->getMouseStatus()->leftState == MBS_Down;
@@ -2803,6 +2849,26 @@ void W3DView::updateCameraCheatSharedInput()
 	{
 		m_lastLeftDown = FALSE;
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Where the sun is: azimuth, elevation, intensity. So a good angle can be noted and
+	* dialled back in later. */
+//-------------------------------------------------------------------------------------------------
+void W3DView::showCheatSunReadout()
+{
+	m_lastSunMsgMs = GetTickCount();
+
+	Real azDeg = fmod((Real)RAD_TO_DEGF(m_sunAzimuth), 360.0f);
+	if (azDeg < 0.0f)
+	{
+		azDeg += 360.0f;
+	}
+
+	UnicodeString sunMsg;
+	sunMsg.format(L"Sun: %d\u00B0 az  %d\u00B0 el  %.2fx",
+			(Int)azDeg, (Int)RAD_TO_DEGF(m_sunElevation), m_sunIntensity);
+	TheInGameUI->messageNoFormat(sunMsg);
 }
 
 //-------------------------------------------------------------------------------------------------

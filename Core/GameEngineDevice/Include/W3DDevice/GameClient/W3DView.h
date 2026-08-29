@@ -371,6 +371,7 @@ private:
 	void grabCheatSunIfNeeded();												///< capture the map sun before the first move
 	void applyCheatSun();															///< push azimuth/elevation/intensity into the world
 	void resetCheatSun();															///< restore the map sun
+	void showCheatSunReadout();												///< the azimuth/elevation/intensity message
 
 	CameraCheatMode	m_cameraCheatMode;
 	ViewLocation		m_preCheatLocation;						///< pos/angle/pitch/zoom before entering the cheat
@@ -401,6 +402,7 @@ private:
 	Bool					m_lastLeftDown;
 	ObjectID			m_pickedFocusID;								///< CapsLock pick, wins over the RTS selection
 	UnsignedInt		m_lastSunMsgMs;								///< throttle for the sun readout message
+	UnsignedInt		m_lastSunArrowMask;						///< arrow edge detection for the 5 degree steps
 #endif
 };
 
