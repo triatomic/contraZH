@@ -2518,11 +2518,8 @@ void W3DView::exitCameraCheatMode()
 	m_cameraCheatMode = CAMERA_CHEAT_OFF;
 	m_focusObjectID = INVALID_ID;
 
-	if (m_camCheatMouseLooking)
-	{
-		TheMouse->setVisibility(TRUE);
-		m_camCheatMouseLooking = FALSE;
-	}
+	TheMouse->setVisibility(TRUE);
+	m_camCheatMouseLooking = FALSE;
 
 	setLocation(&m_preCheatLocation);
 	m_heightAboveGround = m_preCheatHeightAboveGround;
@@ -2638,7 +2635,9 @@ void W3DView::updateCameraCheatMouseLook( Real *yaw, Real *pitch )
 	}
 	else
 	{
-		TheMouse->setVisibility(TRUE);
+		// The cursor stays hidden for the whole camera session, not only while looking. It
+		// returns when the game loses focus, and when the cheat exits.
+		TheMouse->setVisibility(!hasFocus);
 		m_camCheatMouseLooking = FALSE;
 	}
 }

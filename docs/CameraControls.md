@@ -51,8 +51,9 @@ The camera cannot go below the terrain.
 | `Ctrl` | Roll — bank the camera for a dutch angle (±180°). |
 | `Ctrl` + `Alt` | **Dolly zoom** (Chase only): FOV changes while the camera compensates, keeping the object the same size while the background stretches — the vertigo shot. |
 
-The cursor is captured while looking and released when RMB is let go. FOV and roll
-reset when you exit the cheat.
+The cursor is hidden for the whole camera session (it returns when the game loses
+focus or the cheat exits) and is captured at the screen centre while RMB is held.
+FOV and roll reset when you exit the cheat.
 
 ## Scene cheats
 
