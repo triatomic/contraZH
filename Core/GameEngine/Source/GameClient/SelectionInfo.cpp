@@ -298,7 +298,7 @@ UnsignedInt getPickTypesForContext( Bool forceAttackMode )
 	if (TheTacticalView && TheTacticalView->isCameraCheatModeActive()
 			&& (GetKeyState(VK_CAPITAL) & 0x0001) != 0)
 	{
-		return PICK_TYPE_ALL_DRAWABLES;
+		return PICK_TYPE_ALL_DRAWABLES | PICK_TYPE_CHEAT_ANYTHING;
 	}
 #endif
 
@@ -398,6 +398,18 @@ Bool addDrawableToList( Drawable *draw, void *userData )
 	PickDrawableStruct *pds = (PickDrawableStruct *) userData;
 #if defined(RTS_DEBUG)
 	if (TheGlobalData->m_allowUnselectableSelection) {
+		pds->drawableListToFill->push_back(draw);
+		return TRUE;
+	}
+#endif
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// CapsLock in a camera mode: the drag box takes everything with an object, same as the
+	// debug allow-unselectable flag. The kindof match and the shroud, hidden and builder
+	// filters below are gameplay rules; this is a camera tool.
+	if (pds->drawableListToFill && draw->getObject()
+			&& TheTacticalView && TheTacticalView->isCameraCheatModeActive()
+			&& (GetKeyState(VK_CAPITAL) & 0x0001) != 0)
+	{
 		pds->drawableListToFill->push_back(draw);
 		return TRUE;
 	}

@@ -2804,7 +2804,7 @@ void W3DView::updateCameraCheatSharedInput()
 		if (leftDown && !m_lastLeftDown)
 		{
 			ICoord2D clickPos = TheMouse->getMouseStatus()->pos;
-			Drawable *picked = pickDrawable(&clickPos, FALSE, PICK_TYPE_ALL_DRAWABLES);
+			Drawable *picked = pickDrawable(&clickPos, FALSE, (PickType)(PICK_TYPE_ALL_DRAWABLES | PICK_TYPE_CHEAT_ANYTHING));
 			Object *pickedObj = picked ? picked->getObject() : NULL;
 			if (pickedObj)
 			{
