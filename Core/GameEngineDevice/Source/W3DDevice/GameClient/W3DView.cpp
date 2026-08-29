@@ -184,6 +184,7 @@ W3DView::W3DView()
 	m_perspPitchOffset = 0.0f;
 	m_perspHidDrawable = FALSE;
 	m_camCheatMouseLooking = FALSE;
+	m_camCheatRoll = 0.0f;
 #endif
 
 #if PRESERVE_RETAIL_SCRIPTED_CAMERA
@@ -426,7 +427,11 @@ void W3DView::buildCameraTransform( Matrix3D *transform, const Vector3 &sourcePo
 
 	// build new camera transform
 	transform->Make_Identity();
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	transform->Look_At( sourcePos, targetPos, (m_cameraCheatMode != CAMERA_CHEAT_OFF) ? m_camCheatRoll : 0 );
+#else
 	transform->Look_At( sourcePos, targetPos, 0 );
+#endif
 
 	//WST 11/12/2002 New camera shaker system
 	// TheSuperHackers @tweak The camera shaker is now decoupled from the render update.
@@ -1460,7 +1465,7 @@ void W3DView::update()
 		{
 			m_pos.z += speed;
 		}
-		if (TheKeyboard->isCtrl())
+		if (TheKeyboard->isCtrl() && TheMouse->getMouseStatus()->rightState != MBS_Down)
 		{
 			m_pos.z -= speed;
 		}
@@ -2392,6 +2397,7 @@ void W3DView::cycleCameraMode( ObjectID focusCandidate )
 		m_heightAboveGround = 0.0f;
 		m_scriptedState = 0;
 		m_camCheatMouseLooking = FALSE;
+		m_camCheatRoll = 0.0f;
 
 		m_cameraCheatMode = CAMERA_CHEAT_FREE;
 		m_recalcCamera = true;
@@ -2474,6 +2480,7 @@ void W3DView::exitCameraCheatMode()
 	m_zoomLimited = m_preCheatZoomLimited;
 	m_okToAdjustHeight = m_preCheatOkToAdjustHeight;
 	m_FOV = m_preCheatFOV;
+	m_camCheatRoll = 0.0f;
 	setWidth(getWidth());
 	m_recalcCamera = true;
 
@@ -2535,11 +2542,27 @@ void W3DView::updateCameraCheatMouseLook( Real *yaw, Real *pitch )
 
 			if (dx != 0 || dy != 0)
 			{
-				if (TheKeyboard->isAlt())
+				const Bool altHeld = TheKeyboard->isAlt();
+				const Bool ctrlHeld = TheKeyboard->isCtrl();
+				if (altHeld && ctrlHeld && m_cameraCheatMode == CAMERA_CHEAT_FOCUS)
+				{
+					// Dolly zoom, the vertigo shot: the field of view drags while the spring arm
+					// compensates, keeping the chased object the same size on screen.
+					const Real oldFOV = m_FOV;
+					m_FOV = clamp(DEG_TO_RADF(10.0f), m_FOV + dy * 0.002f, DEG_TO_RADF(120.0f));
+					m_focusDistance = clamp(10.0f,
+							m_focusDistance * tan(oldFOV * 0.5f) / tan(m_FOV * 0.5f), 400.0f);
+				}
+				else if (altHeld)
 				{
 					// 3ds Max style: Alt with the right button drags the field of view. Down
 					// widens, up narrows.
 					m_FOV = clamp(DEG_TO_RADF(10.0f), m_FOV + dy * 0.002f, DEG_TO_RADF(120.0f));
+				}
+				else if (ctrlHeld)
+				{
+					// Ctrl with the right button banks the camera, a dutch angle.
+					m_camCheatRoll = clamp(DEG_TO_RADF(-180.0f), m_camCheatRoll + dx * 0.003f, DEG_TO_RADF(180.0f));
 				}
 				else
 				{

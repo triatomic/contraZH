@@ -381,6 +381,7 @@ private:
 	Real					m_perspPitchOffset;
 	Bool					m_perspHidDrawable;						///< we hid the ridden drawable and must unhide it
 	Bool					m_camCheatMouseLooking;					///< RMB look engaged last frame (cursor is captured)
+	Real					m_camCheatRoll;								///< dutch angle bank, Ctrl+RMB drag
 #endif
 };
 
