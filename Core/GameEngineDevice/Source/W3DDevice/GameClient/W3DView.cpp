@@ -310,6 +310,19 @@ void W3DView::buildCameraPosition( Vector3& sourcePos, Vector3& targetPos )
 		const Real sp = sin(m_pitch);
 		const Real cp = cos(m_pitch);
 
+		if (m_cameraCheatMode == CAMERA_CHEAT_ORTHO)
+		{
+			// The ortho view volume is a box, not a pyramid: the near plane is an infinite slab
+			// that slices off everything on the eye side of it. Pull the eye far back along the
+			// view direction -- parallel rays leave the framing untouched, only depth shifts --
+			// so the whole world sits between the clip planes. The far plane adapts by itself,
+			// being computed from the camera position.
+			const Real ORTHO_EYE_PULLBACK = 8000.0f;
+			sourcePos.X -= sa * cp * ORTHO_EYE_PULLBACK;
+			sourcePos.Y -= ca * cp * ORTHO_EYE_PULLBACK;
+			sourcePos.Z += sp * ORTHO_EYE_PULLBACK;
+		}
+
 		// Target is just ahead of the camera
 		targetPos.X = sourcePos.X + sa * cp;
 		targetPos.Y = sourcePos.Y + ca * cp;
