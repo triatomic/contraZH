@@ -127,6 +127,8 @@ public:
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	virtual UnsignedInt cycleSkyboxPreset() override;
+	virtual UnsignedInt cycleTerrainHideMode() override;
+	virtual UnsignedInt getTerrainHideMode() const override { return m_terrainHideMode; }
 #endif
 
   ////////////////////////////////////////////////////
@@ -185,6 +187,7 @@ protected:
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	UnsignedInt m_skyboxPresetIndex;	///< 0 = the skybox the map started with, then the presets
+	UnsignedInt m_terrainHideMode;		///< 0 normal, 1 hidden over black, 2 hidden over green
 #endif
 
 };

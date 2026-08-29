@@ -464,6 +464,7 @@ public:
 		MSG_CHEAT_SHOW_ARMOR_SET,			///< TheSuperHackers @feature show the Armor each object uses
 		MSG_CHEAT_CYCLE_CAMERA_MODE,		///< cycle default camera -> free camera -> chase selected object
 		MSG_CHEAT_CYCLE_SKYBOX,				///< cycle the skybox through the preset texture sets
+		MSG_CHEAT_CYCLE_TERRAIN_MODE,		///< cycle the terrain: normal -> hidden on black -> hidden on green
 
 		MSG_END_META_MESSAGES,											///< Marker to delineate "meta" messages
 

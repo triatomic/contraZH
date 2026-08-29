@@ -167,6 +167,7 @@ W3DTerrainVisual::W3DTerrainVisual()
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	m_skyboxPresetIndex = 0;
+	m_terrainHideMode = 0;
 #endif
 
   m_logicHeightMap   = nullptr;
@@ -290,6 +291,19 @@ void W3DTerrainVisual::reset()
 
 	// extend
 	TerrainVisual::reset();
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// The terrain and skybox cheats must not leak into the next match.
+	if (m_terrainHideMode != 0)
+	{
+		m_terrainHideMode = 0;
+		if (m_terrainRenderObject)
+		{
+			m_terrainRenderObject->Set_Hidden(FALSE);
+		}
+	}
+	m_skyboxPresetIndex = 0;
+#endif
 
 	m_terrainRenderObject->reset();
 
@@ -1127,6 +1141,23 @@ static const char *const TheSkyboxPresets[][TerrainVisual::NumSkyboxTextures] =
 	{ "TSMorningN.tga", "TSMorningE.tga", "TSMorningS.tga", "TSMorningW.tga", "TSMorningT.tga" },
 	{ "TSMoonSky_N.tga", "TSMoonSky_E.tga", "TSMoonSky_S.tga", "TSMoonSky_W.tga", "TSMoonSky_T.tga" },
 };
+
+//-------------------------------------------------------------------------------------------------
+/** Cheat: cycle the terrain draw mode. Hiding the terrain render object also hides roads,
+	* trees, scorches and the shroud it carries, leaving objects over the bare clear color --
+	* black, or green for chroma keying (the clear color itself is applied in W3DDisplay). */
+//-------------------------------------------------------------------------------------------------
+UnsignedInt W3DTerrainVisual::cycleTerrainHideMode()
+{
+	m_terrainHideMode = (m_terrainHideMode + 1) % 3;
+
+	if (m_terrainRenderObject)
+	{
+		m_terrainRenderObject->Set_Hidden(m_terrainHideMode != 0);
+	}
+
+	return m_terrainHideMode;
+}
 
 //-------------------------------------------------------------------------------------------------
 /** Cheat: swap the skybox to the next preset. Index 0 restores the skybox the map started

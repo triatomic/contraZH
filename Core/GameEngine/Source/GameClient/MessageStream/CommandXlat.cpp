@@ -4213,6 +4213,29 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			break;
 		}
 
+		// Cycle the terrain draw mode: normal, hidden over black, hidden over green -- a green
+		// screen for capturing units. Purely a draw change on this client.
+		case GameMessage::MSG_CHEAT_CYCLE_TERRAIN_MODE:
+		{
+			const UnsignedInt mode = TheTerrainVisual ? TheTerrainVisual->cycleTerrainHideMode() : 0;
+
+			switch (mode)
+			{
+				case 1:
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugTerrainBlack", L"Terrain: Black") );
+					break;
+				case 2:
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugTerrainGreen", L"Terrain: Green Screen") );
+					break;
+				default:
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugTerrainNormal", L"Terrain: Normal") );
+					break;
+			}
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
 #endif
 
 		//-----------------------------------------------------------------------------------------

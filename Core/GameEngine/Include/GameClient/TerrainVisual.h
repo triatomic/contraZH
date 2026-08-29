@@ -293,6 +293,11 @@ public:
 	/// Cheat: swap the skybox to the next preset texture set. Returns the new preset index,
 	/// 0 meaning the skybox the map started with.
 	virtual UnsignedInt cycleSkyboxPreset() { return 0; }
+
+	/// Cheat: cycle the terrain draw mode: 0 normal, 1 hidden over black, 2 hidden over green.
+	/// Returns the new mode.
+	virtual UnsignedInt cycleTerrainHideMode() { return 0; }
+	virtual UnsignedInt getTerrainHideMode() const { return 0; }
 #endif
 
 protected:

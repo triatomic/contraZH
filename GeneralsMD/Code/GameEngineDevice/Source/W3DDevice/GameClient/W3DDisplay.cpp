@@ -1979,7 +1979,16 @@ AGAIN:
 		{
 			//USE_PERF_TIMER(BigAssRenderLoop)
 			static Bool couldRender = true;
-			if ((TheGlobalData->m_breakTheMovie == FALSE) && (TheGlobalData->m_disableRender == false) && WW3D::Begin_Render( true, true, Vector3( 0.0f, 0.0f, 0.0f ), TheWaterTransparency->m_minWaterOpacity ) == WW3D_ERROR_OK)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+			// The terrain cheat leaves the scene over the bare clear color: black, or green when
+			// chroma keying.
+			const Vector3 clearColor = (TheTerrainVisual && TheTerrainVisual->getTerrainHideMode() == 2)
+					? Vector3( 0.0f, 1.0f, 0.0f )
+					: Vector3( 0.0f, 0.0f, 0.0f );
+#else
+			const Vector3 clearColor( 0.0f, 0.0f, 0.0f );
+#endif
+			if ((TheGlobalData->m_breakTheMovie == FALSE) && (TheGlobalData->m_disableRender == false) && WW3D::Begin_Render( true, true, clearColor, TheWaterTransparency->m_minWaterOpacity ) == WW3D_ERROR_OK)
 			{
 
 				if(TheGlobalData->m_loadScreenRender == TRUE)
