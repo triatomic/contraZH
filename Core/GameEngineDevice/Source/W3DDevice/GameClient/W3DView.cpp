@@ -60,6 +60,9 @@
 #include "GameClient/Image.h"
 #include "GameClient/GUICallbacks.h"
 #include "GameClient/InGameUI.h"
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+#include "W3DDevice/GameClient/W3DShadow.h"
+#endif
 #include "GameClient/Keyboard.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/Line2D.h"
@@ -2808,6 +2811,14 @@ void W3DView::applyCheatSun()
 	ol.diffuse.blue = clamp(0.0f, m_sunSavedObjectDiffuse[2] * m_sunIntensity, 1.0f);
 
 	TheDisplay->setTimeOfDay(tod);
+
+	// The display path does not reach the shadow system: its sun position is separate, and
+	// each shadow caches its projection until the light moves. Recompute and invalidate.
+	if (TheW3DShadowManager)
+	{
+		TheW3DShadowManager->setTimeOfDay(tod);
+		TheW3DShadowManager->invalidateCachedLightPositions();
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2835,6 +2846,12 @@ void W3DView::resetCheatSun()
 	m_sunMoved = FALSE;
 
 	TheDisplay->setTimeOfDay(tod);
+
+	if (TheW3DShadowManager)
+	{
+		TheW3DShadowManager->setTimeOfDay(tod);
+		TheW3DShadowManager->invalidateCachedLightPositions();
+	}
 }
 #endif
 
