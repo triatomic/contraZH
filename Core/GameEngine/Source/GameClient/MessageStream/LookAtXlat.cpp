@@ -256,6 +256,14 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 		//-----------------------------------------------------------------------------
 		case GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_DOWN:
 		{
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+			// While the camera cheat is active the right button drives its mouse look, so it must
+			// neither start the anchor scroll nor issue commands.
+			if (TheTacticalView->isCameraCheatModeActive())
+			{
+				return DESTROY_MESSAGE;
+			}
+#endif
 			m_lastMouseMoveTimeMsec = timeGetTime();
 
 			m_anchor = msg->getArgument( 0 )->pixel;
@@ -273,6 +281,12 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 		//-----------------------------------------------------------------------------
 		case GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_UP:
 		{
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+			if (TheTacticalView->isCameraCheatModeActive())
+			{
+				return DESTROY_MESSAGE;
+			}
+#endif
 			m_lastMouseMoveTimeMsec = timeGetTime();
 
 			if (m_scrollType == SCROLL_RMB)
@@ -355,7 +369,14 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 				}
 				else
 				{
-					if ( m_currentPos.x < edgeScrollSize || m_currentPos.y < edgeScrollSize || m_currentPos.y >= height-edgeScrollSize || m_currentPos.x >= width-edgeScrollSize )
+					const Bool nearScreenEdge = ( m_currentPos.x < edgeScrollSize || m_currentPos.y < edgeScrollSize || m_currentPos.y >= height-edgeScrollSize || m_currentPos.x >= width-edgeScrollSize );
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+					// Edge scrolling would drift the camera cheat, whose position the pointer
+					// no longer relates to.
+					if ( nearScreenEdge && !TheTacticalView->isCameraCheatModeActive() )
+#else
+					if ( nearScreenEdge )
+#endif
 					{
 						setScrolling(SCROLL_SCREENEDGE);
 					}

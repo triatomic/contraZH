@@ -207,6 +207,14 @@ public:
 	virtual Coord3D get3DCameraDirection() const { Coord3D c={0,0,0}; return c; } ///< Returns the actual camera view direction
 	virtual void set3DCameraLookAt(const Coord3D &pos, const Coord3D &dir, Real roll) {} ///< Set the actual camera position and view direction
 
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// Camera cheat: default -> free camera -> chase the given object -> default. Client side
+	// view state only, so it cannot desync; implemented by W3DView, a no-op elsewhere.
+	virtual void cycleCameraMode( ObjectID focusCandidate ) {}
+	virtual Bool isCameraCheatModeActive() const { return FALSE; }
+	virtual Bool isCameraChaseModeActive() const { return FALSE; }
+#endif
+
 	virtual Real getZoom() { return m_zoom; }
 	virtual void setZoom(Real z) { m_zoom = z; }
 	virtual Real getHeightAboveGround() { return m_heightAboveGround; }

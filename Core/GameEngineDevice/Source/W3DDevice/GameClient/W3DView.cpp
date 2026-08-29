@@ -59,6 +59,8 @@
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/Image.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/Keyboard.h"
+#include "GameClient/Mouse.h"
 #include "GameClient/Line2D.h"
 #include "GameClient/SelectionInfo.h"
 #include "GameClient/Shell.h"
@@ -96,6 +98,10 @@
 #include "WW3D2/ww3d.h"
 
 #include "W3DDevice/GameClient/CameraShakeSystem.h"
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+extern HWND ApplicationHWnd; ///< the game window, for the camera cheat mouse capture
+#endif
 
 // 30 fps
 Real TheW3DFrameLengthInMsec = MSEC_PER_LOGICFRAME_REAL; // default is 33msec/frame == 30fps. but we may change it depending on sys config.
@@ -160,6 +166,18 @@ W3DView::W3DView()
 
 	m_3DCamera = nullptr;
 	m_2DCamera = nullptr;
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	m_cameraCheatMode = CAMERA_CHEAT_OFF;
+	m_preCheatHeightAboveGround = 0.0f;
+	m_preCheatZoomLimited = TRUE;
+	m_preCheatOkToAdjustHeight = FALSE;
+	m_focusObjectID = INVALID_ID;
+	m_focusYaw = 0.0f;
+	m_focusPitch = 0.0f;
+	m_focusDistance = 0.0f;
+	m_camCheatMouseLooking = FALSE;
+#endif
 
 #if PRESERVE_RETAIL_SCRIPTED_CAMERA
 	m_initialGroundLevel = 10.0f;
@@ -269,6 +287,28 @@ void W3DView::setOrigin( Int x, Int y)
 #define MIN_CAPPED_ZOOM (0.5f) //WST 10.19.2002. JSC integrated 5/20/03.
 void W3DView::buildCameraPosition( Vector3& sourcePos, Vector3& targetPos )
 {
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// Camera cheat: m_pos is the camera eye itself, aimed by m_angle/m_pitch. Positive pitch
+	// looks down. The whole pivot/zoom model below is bypassed while a mode is active.
+	if (m_cameraCheatMode != CAMERA_CHEAT_OFF)
+	{
+		sourcePos.X = m_pos.x + m_shakeOffset.x;
+		sourcePos.Y = m_pos.y + m_shakeOffset.y;
+		sourcePos.Z = m_pos.z;
+
+		const Real sa = sin(m_angle);
+		const Real ca = cos(m_angle);
+		const Real sp = sin(m_pitch);
+		const Real cp = cos(m_pitch);
+
+		// Target is just ahead of the camera
+		targetPos.X = sourcePos.X + sa * cp;
+		targetPos.Y = sourcePos.Y + ca * cp;
+		targetPos.Z = sourcePos.Z - sp;
+		return;
+	}
+#endif
+
 	const Real zoom = getZoom();
 	const Real angle = getAngle();
 	const Real pitch = getPitch();
@@ -919,6 +959,12 @@ void W3DView::set3DCameraLookAt(const Coord3D &pos, const Coord3D &dir, Real rol
 //-------------------------------------------------------------------------------------------------
 void W3DView::reset()
 {
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// Leave the camera cheat before anything else: it restores the saved view and, when the
+	// mouse look had captured the cursor, makes the cursor visible again.
+	exitCameraCheatMode();
+#endif
+
 	View::reset();
 
 	// Just in case...
@@ -1366,6 +1412,131 @@ void W3DView::update()
 {
 	//USE_PERF_TIMER(W3DView_updateView)
 	Bool didScriptedMovement = false;
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	if (m_cameraCheatMode == CAMERA_CHEAT_FREE)
+	{
+		// Scale by the render frame rate, so the camera travels at the same speed regardless
+		// of how fast the game renders.
+		Real speed = 10.0f * (TheFramePacer ? TheFramePacer->getBaseOverUpdateFpsRatio() : 1.0f);
+		if (TheKeyboard->isShift())
+		{
+			speed *= 5.0f;
+		}
+
+		const Real sa = sin(m_angle);
+		const Real ca = cos(m_angle);
+		const Real sp = sin(m_pitch);
+		const Real cp = cos(m_pitch);
+
+		// Movement vectors based on the camera orientation
+		const Vector3 forward(sa * cp, ca * cp, -sp);
+		const Vector3 right(ca, -sa, 0);
+
+		if (TheKeyboard->isKeyDown(KEY_W))
+		{
+			m_pos.x += forward.X * speed; m_pos.y += forward.Y * speed; m_pos.z += forward.Z * speed;
+		}
+		if (TheKeyboard->isKeyDown(KEY_S))
+		{
+			m_pos.x -= forward.X * speed; m_pos.y -= forward.Y * speed; m_pos.z -= forward.Z * speed;
+		}
+		if (TheKeyboard->isKeyDown(KEY_A))
+		{
+			m_pos.x -= right.X * speed; m_pos.y -= right.Y * speed;
+		}
+		if (TheKeyboard->isKeyDown(KEY_D))
+		{
+			m_pos.x += right.X * speed; m_pos.y += right.Y * speed;
+		}
+		if (TheKeyboard->isKeyDown(KEY_SPACE))
+		{
+			m_pos.z += speed;
+		}
+		if (TheKeyboard->isCtrl())
+		{
+			m_pos.z -= speed;
+		}
+
+		// Clamp to the terrain surface so the camera cannot clip underground.
+		if (TheTerrainLogic)
+		{
+			const Real terrainFloor = TheTerrainLogic->getGroundHeight(m_pos.x, m_pos.y) + 2.0f;
+			if (m_pos.z < terrainFloor)
+			{
+				m_pos.z = terrainFloor;
+			}
+		}
+
+		updateCameraCheatMouseLook(&m_angle, &m_pitch);
+
+		updateCameraTransform();
+		m_recalcCamera = false;
+
+		// Update all drawables so transforms and bone attached particle systems stay current.
+		// Without this, objects outside the previous RTS camera frustum have stale poses.
+		{
+			Region3D axisAlignedRegion;
+			getAxisAlignedViewRegion(axisAlignedRegion);
+			TheGameClient->iterateDrawablesInRegion(&axisAlignedRegion, drawDrawable, nullptr);
+		}
+		return;
+	}
+
+	if (m_cameraCheatMode == CAMERA_CHEAT_FOCUS)
+	{
+		Object *focusObj = TheGameLogic ? TheGameLogic->findObjectByID(m_focusObjectID) : NULL;
+		if (focusObj == NULL)
+		{
+			// The object died or left the world: give the camera back and run a normal update.
+			exitCameraCheatMode();
+		}
+		else
+		{
+			updateCameraCheatMouseLook(&m_focusYaw, &m_focusPitch);
+
+			// Spring arm: the eye sits behind and above the object along the orbit yaw/pitch,
+			// and looking down that same yaw/pitch lands the view on the pivot exactly.
+			Coord3D pivot = *focusObj->getPosition();
+			pivot.z += focusObj->getGeometryInfo().getMaxHeightAbovePosition() * 0.65f;
+
+			const Real sa = sin(m_focusYaw);
+			const Real ca = cos(m_focusYaw);
+			const Real sp = sin(m_focusPitch);
+			const Real cp = cos(m_focusPitch);
+
+			Coord3D eye;
+			eye.x = pivot.x - sa * cp * m_focusDistance;
+			eye.y = pivot.y - ca * cp * m_focusDistance;
+			eye.z = pivot.z + sp * m_focusDistance;
+
+			// Keep the eye out of the ground. When this clamps, the view aims slightly above
+			// the pivot for a frame, which reads better than a camera under the terrain.
+			if (TheTerrainLogic)
+			{
+				const Real terrainFloor = TheTerrainLogic->getGroundHeight(eye.x, eye.y) + 4.0f;
+				if (eye.z < terrainFloor)
+				{
+					eye.z = terrainFloor;
+				}
+			}
+
+			m_pos = eye;
+			m_angle = m_focusYaw;
+			m_pitch = m_focusPitch;
+
+			updateCameraTransform();
+			m_recalcCamera = false;
+
+			{
+				Region3D axisAlignedRegion;
+				getAxisAlignedViewRegion(axisAlignedRegion);
+				TheGameClient->iterateDrawablesInRegion(&axisAlignedRegion, drawDrawable, nullptr);
+			}
+			return;
+		}
+	}
+#endif
 #ifdef LOG_FRAME_TIMES
 	__int64 curTime64,freq64;
 	static __int64 prevTime64=0;
@@ -2105,6 +2276,155 @@ void W3DView::setSnapMode( CameraLockType lockType, Real lockDist )
 	View::setSnapMode(lockType, lockDist);
 	addScriptedState(Scripted_CameraLock);
 }
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+//-------------------------------------------------------------------------------------------------
+/** Camera cheat: default -> free camera -> chase the selected object -> default. */
+//-------------------------------------------------------------------------------------------------
+void W3DView::cycleCameraMode( ObjectID focusCandidate )
+{
+	if (m_cameraCheatMode == CAMERA_CHEAT_OFF)
+	{
+		getLocation(&m_preCheatLocation);
+		m_preCheatHeightAboveGround = m_heightAboveGround;
+		m_preCheatZoomLimited = m_zoomLimited;
+		m_preCheatOkToAdjustHeight = m_okToAdjustHeight;
+
+		// Seed the eye from the rendered transform. The RTS state stores a look-at pivot and can
+		// still hold the destination of a smooth rotation in flight; mixing the position from one
+		// representation with the angles of the other makes the view jump on entry.
+		const Coord3D cameraPos = get3DCameraPosition();
+		const Coord3D cameraDir = get3DCameraDirection();
+		const Real horizontalDir = sqrt(cameraDir.x * cameraDir.x + cameraDir.y * cameraDir.y);
+		m_pos = cameraPos;
+		if (horizontalDir > 0.0001f)
+		{
+			m_angle = atan2(cameraDir.x, cameraDir.y);
+		}
+		m_pitch = clamp(DEG_TO_RADF(-89.0f), atan2(-cameraDir.z, horizontalDir), DEG_TO_RADF(89.0f));
+
+		// The pivot machinery must not fight the free camera: no zoom driven height, no terrain
+		// height adjustment, no scripted camera motion left running.
+		m_zoomLimited = FALSE;
+		m_okToAdjustHeight = FALSE;
+		m_zoom = 0.0f;
+		m_heightAboveGround = 0.0f;
+		m_scriptedState = 0;
+		m_camCheatMouseLooking = FALSE;
+
+		m_cameraCheatMode = CAMERA_CHEAT_FREE;
+		m_recalcCamera = true;
+		return;
+	}
+
+	if (m_cameraCheatMode == CAMERA_CHEAT_FREE)
+	{
+		Object *focusObj = (focusCandidate != INVALID_ID && TheGameLogic)
+				? TheGameLogic->findObjectByID(focusCandidate)
+				: NULL;
+		if (focusObj != NULL)
+		{
+			m_focusObjectID = focusCandidate;
+			// View yaw uses (sin, cos) for forward while object orientation uses (cos, sin), so
+			// this starts the camera directly behind the object, facing the way it faces.
+			m_focusYaw = DEG_TO_RADF(90.0f) - focusObj->getOrientation();
+			m_focusPitch = DEG_TO_RADF(20.0f);
+			m_focusDistance = clamp(35.0f, focusObj->getGeometryInfo().getBoundingSphereRadius() * 4.5f, 200.0f);
+			m_cameraCheatMode = CAMERA_CHEAT_FOCUS;
+			return;
+		}
+	}
+
+	exitCameraCheatMode();
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Restore the pre cheat view and turn the camera cheat off. */
+//-------------------------------------------------------------------------------------------------
+void W3DView::exitCameraCheatMode()
+{
+	if (m_cameraCheatMode == CAMERA_CHEAT_OFF)
+	{
+		return;
+	}
+
+	m_cameraCheatMode = CAMERA_CHEAT_OFF;
+	m_focusObjectID = INVALID_ID;
+
+	if (m_camCheatMouseLooking)
+	{
+		TheMouse->setVisibility(TRUE);
+		m_camCheatMouseLooking = FALSE;
+	}
+
+	setLocation(&m_preCheatLocation);
+	m_heightAboveGround = m_preCheatHeightAboveGround;
+	m_zoomLimited = m_preCheatZoomLimited;
+	m_okToAdjustHeight = m_preCheatOkToAdjustHeight;
+	m_recalcCamera = true;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Shared RMB mouse look for the camera cheat: adjusts the given yaw/pitch while the right
+	* button is held, capturing the cursor at the viewport centre for raw render rate deltas. */
+//-------------------------------------------------------------------------------------------------
+void W3DView::updateCameraCheatMouseLook( Real *yaw, Real *pitch )
+{
+	// Only when the game window has focus, or the captured cursor would fight other apps.
+	const Bool hasFocus = (GetForegroundWindow() == ApplicationHWnd);
+	if (hasFocus && TheMouse->getMouseStatus()->rightState == MBS_Down)
+	{
+		// Clear scripted states so no engine inertia or smoothing fights the look.
+		removeScriptedState(Scripted_Rotate);
+		removeScriptedState(Scripted_Pitch);
+		removeScriptedState(Scripted_Zoom);
+
+		TheMouse->setVisibility(FALSE);
+
+		const Int centerX = m_originX + getWidth() / 2;
+		const Int centerY = m_originY + getHeight() / 2;
+
+		if (!m_camCheatMouseLooking)
+		{
+			// First frame: lock the cursor to the centre and skip rotation to prevent a jump.
+			POINT pCenter = { centerX, centerY };
+			ClientToScreen(ApplicationHWnd, &pCenter);
+			SetCursorPos(pCenter.x, pCenter.y);
+			m_camCheatMouseLooking = TRUE;
+		}
+		else
+		{
+			// Raw Win32 cursor deltas: the engine mouse path is resolution and rate limited.
+			POINT p;
+			GetCursorPos(&p);
+			ScreenToClient(ApplicationHWnd, &p);
+
+			const Int dx = p.x - centerX;
+			const Int dy = p.y - centerY;
+
+			if (dx != 0 || dy != 0)
+			{
+				const Real rotateSpeed = 0.003f;
+				*yaw += dx * rotateSpeed;
+				*pitch += dy * rotateSpeed;
+
+				// Clamp pitch to avoid gimbal flip. Negative looks up, positive looks down.
+				*pitch = clamp(DEG_TO_RADF(-89.0f), *pitch, DEG_TO_RADF(89.0f));
+
+				// Lock the cursor back to the centre so it never reaches the screen edges.
+				POINT pCenter = { centerX, centerY };
+				ClientToScreen(ApplicationHWnd, &pCenter);
+				SetCursorPos(pCenter.x, pCenter.y);
+			}
+		}
+	}
+	else
+	{
+		TheMouse->setVisibility(TRUE);
+		m_camCheatMouseLooking = FALSE;
+	}
+}
+#endif
 
 //-------------------------------------------------------------------------------------------------
 // Scroll the view by the given delta in SCREEN COORDINATES, this interface
@@ -3735,6 +4055,17 @@ bool W3DView::getDesiredTerrainDrawSize(ICoord2D &dimensions) const
 
 		return false;
 	}
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// A ground level camera looks across the map rather than down at it, so the regular draw
+	// window around the pivot ends mid view. Use a much wider ring while the cheat is active.
+	if (m_cameraCheatMode != CAMERA_CHEAT_OFF)
+	{
+		dimensions.x = WorldHeightMap::FREE_CAM_DRAW_WIDTH;
+		dimensions.y = WorldHeightMap::FREE_CAM_DRAW_HEIGHT;
+		return true;
+	}
+#endif
 
 	const Real cameraPitch = asin(fabs(m_3DCamera->Get_Forward_Dir().Z));
 

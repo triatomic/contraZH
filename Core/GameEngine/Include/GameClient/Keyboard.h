@@ -111,6 +111,7 @@ public:
 	// simplified versions where the caller doesn't care which key type was pressed.
 	Bool isShift();
 	Bool isCtrl();
+	Bool isKeyDown( KeyDefType key ) { return getKeyStateBit( key, KEY_STATE_DOWN ); }  ///< is this key currently held
 	Bool isAlt();
 	Int getModifierFlags() { return m_modifiers; }
 

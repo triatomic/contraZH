@@ -236,6 +236,12 @@ public:
 	virtual void setCameraLock(ObjectID id) override;
 	virtual void setSnapMode( CameraLockType lockType, Real lockDist ) override;
 
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	virtual void cycleCameraMode( ObjectID focusCandidate ) override;
+	virtual Bool isCameraCheatModeActive() const override { return m_cameraCheatMode != CAMERA_CHEAT_OFF; }
+	virtual Bool isCameraChaseModeActive() const override { return m_cameraCheatMode == CAMERA_CHEAT_FOCUS; }
+#endif
+
 	/// Add an impulse force to shake the camera
 	virtual void shake( const Coord3D *epicenter, CameraShakeType shakeType ) override;
 
@@ -342,6 +348,32 @@ private:
 	Bool				m_useRealZoomCam;
 	AsciiString		m_cameraSlaveObjectName;
 	AsciiString		m_cameraSlaveObjectBoneName;
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// Camera cheat. Transient client driven view state, deliberately not saved: in these modes
+	// m_pos/m_angle/m_pitch describe the camera eye itself rather than the RTS look-at pivot
+	// (see buildCameraPosition), and the pre-cheat view is restored on the way out.
+	enum CameraCheatMode
+	{
+		CAMERA_CHEAT_OFF = 0,
+		CAMERA_CHEAT_FREE,			///< fly: WASD/Space/Ctrl move, hold RMB to look
+		CAMERA_CHEAT_FOCUS			///< chase the focus object, hold RMB to orbit
+	};
+
+	void exitCameraCheatMode();									///< restore the pre-cheat view and turn the cheat off
+	void updateCameraCheatMouseLook( Real *yaw, Real *pitch );	///< shared RMB mouse look for both modes
+
+	CameraCheatMode	m_cameraCheatMode;
+	ViewLocation		m_preCheatLocation;						///< pos/angle/pitch/zoom before entering the cheat
+	Real					m_preCheatHeightAboveGround;
+	Bool					m_preCheatZoomLimited;
+	Bool					m_preCheatOkToAdjustHeight;
+	ObjectID			m_focusObjectID;							///< object the chase camera follows
+	Real					m_focusYaw;
+	Real					m_focusPitch;
+	Real					m_focusDistance;
+	Bool					m_camCheatMouseLooking;					///< RMB look engaged last frame (cursor is captured)
+#endif
 };
 
 // EXTERNALS //////////////////////////////////////////////////////////////////////////////////////

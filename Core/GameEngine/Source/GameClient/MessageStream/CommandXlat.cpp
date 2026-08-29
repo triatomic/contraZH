@@ -4148,6 +4148,47 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			break;
 		}
 
+		// Cycle the camera cheat: default -> free camera -> chase the selected object -> default.
+		// Purely a view change on this client, like the overlays above, so it carries no
+		// multiplayer guard. The selection is resolved here and handed to the view so the view
+		// stays independent of the UI.
+		case GameMessage::MSG_CHEAT_CYCLE_CAMERA_MODE:
+		{
+			ObjectID selectedID = INVALID_ID;
+			for( Drawable *draw = TheGameClient->firstDrawable(); draw; draw = draw->getNextDrawable() )
+			{
+				if( draw->isSelected() && draw->getObject() )
+				{
+					selectedID = draw->getObject()->getID();
+					break;
+				}
+			}
+
+			TheTacticalView->cycleCameraMode( selectedID );
+
+			const char *stateKey;
+			const WideChar *stateText;
+			if( !TheTacticalView->isCameraCheatModeActive() )
+			{
+				stateKey = "GUI:DebugCameraDefault";
+				stateText = L"Camera: Default";
+			}
+			else if( TheTacticalView->isCameraChaseModeActive() )
+			{
+				stateKey = "GUI:DebugCameraChase";
+				stateText = L"Camera: Chase";
+			}
+			else
+			{
+				stateKey = "GUI:DebugCameraFree";
+				stateText = L"Camera: Free";
+			}
+			TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE(stateKey, stateText) );
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
 #endif
 
 		//-----------------------------------------------------------------------------------------
