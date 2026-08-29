@@ -56,8 +56,8 @@ The camera cannot go below the terrain.
 | Modifier | Action |
 |---|---|
 | *(none)* | Orbit the sun (horizontal drag). |
-| `Ctrl` | Raise / lower the sun (vertical drag). |
-| `Alt` | Sun intensity: drag up brightens, down dims (0.05×–3×). |
+| `Alt` | Raise / lower the sun (vertical drag). |
+| `Ctrl` | Sun intensity: drag up brightens, down dims (0.05×–3×). |
 | `Insert` | Reset the sun to the map's own light. |
 
 Hold `Shift` while dragging for 4× speed. Moving the sun relights terrain,

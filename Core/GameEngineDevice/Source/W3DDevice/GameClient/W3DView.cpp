@@ -1514,8 +1514,11 @@ void W3DView::update()
 		{
 			m_pos.z += speed;
 		}
-		if (TheKeyboard->isCtrl() && TheMouse->getMouseStatus()->rightState != MBS_Down)
+		if (TheKeyboard->isCtrl() && TheMouse->getMouseStatus()->rightState != MBS_Down
+				&& TheMouse->getMouseStatus()->middleState != MBS_Down)
 		{
+			// Ctrl is a gesture modifier while either look button is held (roll on the right,
+			// sun intensity on the middle); it only descends on its own.
 			m_pos.z -= speed;
 		}
 
@@ -2657,13 +2660,14 @@ void W3DView::updateCameraCheatMouseLook( Real *yaw, Real *pitch )
 					{
 						accelY = 5.0f;
 					}
-					// One axis per gesture, so orbiting cannot drift the height and vice versa:
-					// plain drag orbits, Ctrl raises and lowers, Alt scales the intensity.
-					if (altHeld)
+					// One axis per gesture, so orbiting cannot drift the height and vice versa.
+					// Alt raises and lowers, because Ctrl is the free camera descend key and must
+					// stay out of the frequent gestures; intensity, the rare one, takes Ctrl.
+					if (ctrlHeld)
 					{
 						m_sunIntensity = clamp(0.05f, m_sunIntensity * (1.0f - dy * 0.0015f * accelY * sunRate), 3.0f);
 					}
-					else if (ctrlHeld)
+					else if (altHeld)
 					{
 						m_sunElevation = clamp(DEG_TO_RADF(5.0f), m_sunElevation - dy * 0.003f * accelY * sunRate, DEG_TO_RADF(90.0f));
 					}
