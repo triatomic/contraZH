@@ -100,6 +100,7 @@ GlobalData* GlobalData::m_theOriginal = nullptr;
 	{ "MoveHintName",							INI::parseAsciiString,nullptr,			offsetof( GlobalData, m_moveHintName ) },
 	{ "UseTrees",									INI::parseBool,				nullptr,			offsetof( GlobalData, m_useTrees ) },
 	{ "UseFPSLimit",							INI::parseBool,				nullptr,			offsetof( GlobalData, m_useFpsLimit ) },
+	{ "QueueReorder",							INI::parseBool,				nullptr,			offsetof( GlobalData, m_queueReorder ) },
 	{ "DumpAssetUsage",						INI::parseBool,				nullptr,			offsetof( GlobalData, m_dumpAssetUsage ) },
 	{ "EnableSingleplayerChatwindow",	INI::parseBool,				nullptr,			offsetof( GlobalData, m_enableSingleplayerChatWindow ) },
 	{ "WeaponScatterOnWaterSurfaceDefault",	INI::parseBool,			nullptr,			offsetof( GlobalData, m_weaponScatterOnWaterSurfaceDefault ) },
@@ -626,6 +627,7 @@ GlobalData::GlobalData()
 	m_specialPowerUsesDelay = TRUE;
 #endif
   m_TiVOFastMode = FALSE;
+  m_queueReorder = FALSE;
 
 #if defined(RTS_DEBUG) || ENABLE_CONFIGURABLE_SHROUD
 	m_shroudOn = TRUE;

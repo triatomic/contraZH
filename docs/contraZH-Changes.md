@@ -190,6 +190,10 @@ the move or in a fight break off and board, the same as if the order had been gi
 
 ## Queue reorder
 
+Off by default; a mod enables it with `QueueReorder = Yes` in the `GameData` block of
+GameData.ini. With it off, clicking the queue behaves exactly like retail, Ctrl held or
+not.
+
 Ctrl+clicking any cameo in the build queue - unit or upgrade - moves it one position
 earlier, swapping it with the entry directly before it. The displaced entry loses the
 build time spent on it and starts over when it reaches the front again; already produced

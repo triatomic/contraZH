@@ -655,8 +655,10 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 			// Ctrl moves the clicked entry one position earlier in the queue instead of
 			// cancelling it. Break unconditionally so a Ctrl click can never fall through
-			// to the cancel below, and never combines with the Shift batch either.
-			if( TheKeyboard && TheKeyboard->isCtrl() )
+			// to the cancel below, and never combines with the Shift batch either. Gated
+			// behind the QueueReorder GameData option; with it off, Ctrl+click cancels
+			// like retail.
+			if( TheGlobalData->m_queueReorder && TheKeyboard && TheKeyboard->isCtrl() )
 			{
 				if( i > 0 )
 				{
@@ -816,7 +818,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			// to the cancel below. Unlike the cancel above, the move checks local control
 			// here like the unit branch does - the logic side rejects the message anyway,
 			// so sending one for someone else's producer only wastes network traffic.
-			if( TheKeyboard && TheKeyboard->isCtrl() )
+			if( TheGlobalData->m_queueReorder && TheKeyboard && TheKeyboard->isCtrl() )
 			{
 				if( i > 0 && producer->isLocallyControlled() )
 				{

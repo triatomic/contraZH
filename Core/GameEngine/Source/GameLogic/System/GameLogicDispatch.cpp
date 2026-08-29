@@ -1998,6 +1998,14 @@ bool GameLogic::onCancelUnitCreate(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &cu
 
 bool GameLogic::onMoveUnitCreateEarlier(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
+	// Gated behind the QueueReorder GameData option. Refusing here as well as at the
+	// click keeps the rule authoritative: a client cannot reorder queues in a game
+	// whose data has the feature off.
+	if( !TheGlobalData->m_queueReorder )
+	{
+		return false;
+	}
+
 	Player *msgPlayer = getMessagePlayer(msg);
 
 #if RETAIL_COMPATIBLE_AIGROUP
@@ -2044,6 +2052,14 @@ bool GameLogic::onMoveUnitCreateEarlier(MAYBE_UNUSED GameMessage *msg, AIGroupPt
 
 bool GameLogic::onMoveUpgradeEarlier(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
+	// Gated behind the QueueReorder GameData option. Refusing here as well as at the
+	// click keeps the rule authoritative: a client cannot reorder queues in a game
+	// whose data has the feature off.
+	if( !TheGlobalData->m_queueReorder )
+	{
+		return false;
+	}
+
 	Player *msgPlayer = getMessagePlayer(msg);
 
 #if RETAIL_COMPATIBLE_AIGROUP
