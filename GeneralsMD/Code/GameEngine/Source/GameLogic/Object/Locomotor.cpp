@@ -2174,20 +2174,43 @@ void Locomotor::moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics,
 			dir.y = fwd.Y;
 		}
 
-		Real slope = 0.0f;
-		Real surfaceHt = getSurfaceHtAhead(pos, dir, lookAhead, &slope);
+		Real nearSlope = 0.0f;
+		Real steepSlope = 0.0f;
+		Real surfaceHt = getSurfaceSlopeAhead(pos, dir, lookAhead, &nearSlope, &steepSlope);
 
-		// Ground steeper than we are willing to climb is a cliff, not a bump: stop hugging and
-		// hold our height, so the terrain rises past us and the usual collision fires. The test is
-		// on the magnitude, so a sheer drop is left alone too -- following one down would pitch us
-		// straight off the lip instead of carrying over it.
-		Bool tooSteep = (getGroundHugMaxSlope() != 0.0f && fabs(slope) > getGroundHugMaxSlope());
+		// Ground rising ahead more steeply than we will climb is a cliff: stop hugging and hold our
+		// height, so the terrain rises past us and the usual collision fires. Only the uphill case
+		// does this. A steep drop is not something to refuse but something to glide over, and
+		// refusing it is what used to pitch us off a plateau: hugging switched off at the lip and
+		// back on once both samples were on the low ground, by which point matching the surface
+		// meant diving at the valley floor.
+		Bool tooSteep = (getGroundHugMaxSlope() != 0.0f && steepSlope > getGroundHugMaxSlope());
 		if (!tooSteep)
 		{
+			// Follow the gradient of the ground rather than snapping to its height. Extrapolating
+			// from the slope keeps the goal continuous in our own position, so crossing an edge
+			// bends the flight instead of teleporting the target tens of units down.
+			Real rise = Tan(nearSlope) * lookAhead;
+
+			// The one absolute term, pulling us back toward the hug height so we do not drift away
+			// from the ground over a long flight.
+			rise += (getGroundHugHeight() + surfaceHt) - pos.z;
+
+			// Never descend more steeply than we would climb. Off a lip that correction points at
+			// ground far below us; unclamped it puts the goal under the terrain and we dive at it.
+			if (getGroundHugMaxSlope() != 0.0f)
+			{
+				Real maxDescent = -Tan(getGroundHugMaxSlope()) * lookAhead;
+				if (rise < maxDescent)
+				{
+					rise = maxDescent;
+				}
+			}
+
 			// Damped like the PreferredHeight case, and the deflection is still clamped by
 			// MaxThrustAngle below, so this bends the flight rather than snapping Z the way
 			// StickToGround does.
-			localGoalPos.z = getGroundHugHeight() + surfaceHt;
+			localGoalPos.z = pos.z + rise;
 			Real delta = localGoalPos.z - pos.z;
 			delta *= getPreferredHeightDamping();
 			localGoalPos.z = pos.z + delta;
@@ -2300,34 +2323,74 @@ void Locomotor::moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics,
 
 //-------------------------------------------------------------------------------------------------
 /**
-	Sample the surface a little ahead of pos along dir, and report both the height there and the
-	slope of the climb from the surface under pos to the surface ahead. Sampling ahead is the whole
-	point: a rise checked only underfoot is a wall by the time it is noticed, while the same rise
-	seen a cell early is a ramp. Returns the height ahead and fills outSlope with the climb angle
-	in radians, positive uphill.
+	Probe the surface along dir out to lookAhead and report how the ground is sloping. Two slopes
+	come back because they answer different questions. outNearSlope is the slope of the first step,
+	the ground we are flying over right now, so it is what the flight path should be bent to match.
+	outSteepSlope is the steepest step anywhere in the window, the early warning: a cliff face four
+	steps out has to be seen before we are on top of it. It keeps its sign, which is what tells an
+	uphill face to be collided with from a drop to be glided over.
+
+	Stepping matters. A single sample at lookAhead is one secant across the whole window, so its
+	angle depends on how far ahead we happen to look -- the same drop reads steep with a short
+	lookahead and gentle with a long one -- and anything shorter than the window falls between the
+	two samples and is never seen. Stepping keeps the reported angle a property of the terrain
+	rather than of the INI.
+
+	Returns the surface height under pos. Slopes are in radians, positive uphill.
 */
 //-------------------------------------------------------------------------------------------------
-/*static*/ Real Locomotor::getSurfaceHtAhead(const Coord3D& pos, const Coord3D& dir, Real lookAhead, Real* outSlope)
+/*static*/ Real Locomotor::getSurfaceSlopeAhead(const Coord3D& pos, const Coord3D& dir, Real lookAhead, Real* outNearSlope, Real* outSteepSlope)
 {
-	Real dirLen = sqrtf(sqr(dir.x) + sqr(dir.y));
-	Coord3D ahead = pos;
-	// A near-vertical heading has a horizontal component close to zero; dividing by it would
-	// throw the sample point far off, so in that case just sample underfoot.
-	if (!isNearlyZero(dirLen))
-	{
-		ahead.x += (dir.x / dirLen) * lookAhead;
-		ahead.y += (dir.y / dirLen) * lookAhead;
-	}
+	// Four steps puts each sample well inside a heightmap cell at any sane lookahead, so more
+	// would only re-read the same interpolated cell. Fixed rather than scaled off lookAhead, so
+	// the per-frame cost cannot run away if someone sets a very large one.
+	const Int GROUND_HUG_SAMPLE_STEPS = 4;
 
 	Real htHere = getSurfaceHtAtPt(pos.x, pos.y);
-	Real htAhead = getSurfaceHtAtPt(ahead.x, ahead.y);
+	Real nearSlope = 0.0f;
+	Real steepSlope = 0.0f;
 
-	if (outSlope != nullptr)
+	Real dirLen = sqrtf(sqr(dir.x) + sqr(dir.y));
+	// A near-vertical heading has a horizontal component close to zero; dividing by it would throw
+	// the sample points far off, so in that case report flat ground and just hold height.
+	if (!isNearlyZero(dirLen) && lookAhead > 0.0f)
 	{
-		*outSlope = atan2(htAhead - htHere, lookAhead);
+		Real stepDist = lookAhead / GROUND_HUG_SAMPLE_STEPS;
+		Real stepX = (dir.x / dirLen) * stepDist;
+		Real stepY = (dir.y / dirLen) * stepDist;
+
+		Coord3D sample = pos;
+		Real htPrev = htHere;
+		for (Int i = 0; i < GROUND_HUG_SAMPLE_STEPS; ++i)
+		{
+			sample.x += stepX;
+			sample.y += stepY;
+			Real htSample = getSurfaceHtAtPt(sample.x, sample.y);
+
+			Real segSlope = atan2(htSample - htPrev, stepDist);
+			if (i == 0)
+			{
+				nearSlope = segSlope;
+			}
+			if (fabs(segSlope) > fabs(steepSlope))
+			{
+				steepSlope = segSlope;
+			}
+
+			htPrev = htSample;
+		}
 	}
 
-	return htAhead;
+	if (outNearSlope != nullptr)
+	{
+		*outNearSlope = nearSlope;
+	}
+	if (outSteepSlope != nullptr)
+	{
+		*outSteepSlope = steepSlope;
+	}
+
+	return htHere;
 }
 
 //-------------------------------------------------------------------------------------------------

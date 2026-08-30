@@ -386,7 +386,7 @@ public:
 	void startMove(); ///< Indicates that a move is starting, primarily to reset the donut timer. jba.
 
 	static Real getSurfaceHtAtPt(Real x, Real y);
-	static Real getSurfaceHtAhead(const Coord3D& pos, const Coord3D& dir, Real lookAhead, Real* outSlope);
+	static Real getSurfaceSlopeAhead(const Coord3D& pos, const Coord3D& dir, Real lookAhead, Real* outNearSlope, Real* outSteepSlope);
 
 	inline void applySpeedMultiplier(Real scalar) { m_speedMultiplier *= scalar; }
 	// inline void setSpeedMultiplier(Real value) { m_speedMultiplier = value; }

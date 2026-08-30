@@ -20,10 +20,14 @@ the ground without chasing a target.
 
 * `GroundHugHeight = 4.0` - (Height above the surface to hold, even when `PreferredHeight` is 0.
 Terrain following is off while this is 0. Default = 0)
-* `GroundHugMaxSlope = 35` - (If the terrain ahead rises more steeply than this many degrees, stop
-following it, so cliffs are collided with instead of climbed. No slope limit when 0. Default = 0)
+* `GroundHugMaxSlope = 35` - (The steepest ground the object will follow. Terrain ahead *rising*
+more steeply than this stops the following, so cliffs are collided with instead of climbed;
+ground *falling* more steeply is followed at this angle instead, so the object glides off a drop
+rather than diving down it. No limit when 0. Default = 0)
 * `GroundHugLookAhead = 15.0` - (How far ahead of the object the terrain is sampled. Larger values
-start the climb earlier. 0 means one pathfinder cell, i.e. 10. Default = 0)
+start the climb earlier. The distance is sampled in steps and the object reacts to the steepest
+step in it, so changing this changes when the object reacts, not how steep it judges the ground
+to be. 0 means one pathfinder cell, i.e. 10. Default = 0)
 * `PreferredHeightDamping = 0.3` - (Existing key, but set it: it damps the hug as well. The default
 of 1.0 means the height is matched in a single frame, which reintroduces the bump-grinding this
 feature exists to avoid. Lower is smoother. Default = 1.0)
@@ -39,8 +43,11 @@ value (say 1 degree) cannot bank onto a ramp at all, so terrain following will a
 however these keys are set.
 * A hugging locomotor should always set `GroundHugMaxSlope`. With no limit it will try to climb
 anything, including vertical faces.
-* `GroundHugMaxSlope` is tested on the steepness of the ground either way, so it also stops the
-object diving down a sheer drop; it carries over the edge instead.
+* The flight follows the *slope* of the ground, extrapolated from the sampled gradient, with a
+correction back toward `GroundHugHeight`. That is what lets it conform to ramps and rolling
+ground of any length, and what makes crossing an edge continuous: the object leaves a drop on a
+bounded glide and settles back down as the ground comes up to meet it, instead of nose-diving
+at the low ground the moment it clears the lip.
 
 ## Ships
 ### TODO
