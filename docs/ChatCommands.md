@@ -1,6 +1,6 @@
 # Chat Commands
 
-Added a system for user-defined "chat commands" - cheat/debug-style commands that the local player can trigger by typing them into the in-game chat window. They are defined in an optional `ChatCommands.ini` file.
+Added a system for user-defined "chat commands" - cheat/debug-style commands that the local player can trigger by typing them into the in-game chat window, prefixed with a slash (`/money`). They are defined in an optional `ChatCommands.ini` file.
 
 ## Enabling the chat window in Singleplayer
 
@@ -12,7 +12,9 @@ With this set, the in-game chat window can be opened (Enter key) in singleplayer
 
 ## Usage
 
-Open the chat window and type the command name (the first word of the message is matched against the defined command names). If it matches a `ChatCommand` block, the command is executed for the local player and the message is not sent as chat.
+Open the chat window and type the command name prefixed with a slash, for example `/money`. The first word of the message, with the slash removed, is matched against the defined command names. If it matches a `ChatCommand` block, the command is executed for the local player and the message is not sent as chat. A message that does not start with a slash is always sent as ordinary chat.
+
+The name is matched case-insensitively, so `/MONEY` works as well as `/money`. The slash is only how the message is recognised as a command - it is not part of the name in `ChatCommands.ini`.
 
 ## ChatCommands.ini
 
@@ -35,8 +37,8 @@ Each command is defined as a `ChatCommand <name> ... End` block. The `<name>` is
 spawn anything instead of needing one command per object:
 
 ```
-spawntank                       spawns the object named in the INI
-spawntank AmericaTankCrusader   spawns that object instead
+/spawntank                       spawns the object named in the INI
+/spawntank AmericaTankCrusader   spawns that object instead
 ```
 
 The typed name is matched case-insensitively, so `americatankcrusader` also works. If no object of
@@ -51,7 +53,7 @@ ChatCommand spawn
 End
 ```
 
-Typing that command with nothing after it reports what it expects instead of spawning.
+That command needs a name: `/spawn AmericaTankCrusader` spawns, while `/spawn` on its own reports what it expects instead.
 
 ## Example
 
@@ -75,7 +77,7 @@ ChatCommand spawntank
 End
 ```
 
-With these defined (and `EnableSingleplayerChatwindow = Yes`), typing `money` in the chat window grants 10000 credits, etc.
+With these defined (and `EnableSingleplayerChatwindow = Yes`), typing `/money` in the chat window grants 10000 credits, etc.
 
 Notes:
 * Commands run only for the local player, in singleplayer/skirmish. They are intended for testing/debugging and custom cheat setups.
