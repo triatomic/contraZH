@@ -844,6 +844,81 @@ CanAttackResult ActionManager::getCanAttackObject( const Object *obj, const Obje
     }
 	}
 
+	// The container itself cannot attack this target. If its contain module accepts targets on
+	// behalf of its passengers -- an addon turret being the case this exists for -- ask them:
+	// whoever answers best speaks for the container, so the cursor and the order gate agree with
+	// what the turret will actually do. This replaces the dummy-weapon workaround, and unlike the
+	// KINDOF_SPAWNS_ARE_THE_WEAPONS branch above it is an opt-in module flag with no side effects.
+	ContainModuleInterface *contain = obj->getContain();
+	if( contain && contain->acceptsTargetsForPassengers() && contain->isPassengerAllowedToFire() )
+	{
+		CanAttackResult best = ATTACKRESULT_NOT_POSSIBLE;
+
+		const ContainedItemsList *lists[] = { contain->getContainedItemsList(), contain->getAddOnList() };
+		for( Int listIndex = 0; listIndex < 2; ++listIndex )
+		{
+			if( lists[ listIndex ] == nullptr )
+			{
+				continue;
+			}
+
+			for( ContainedItemsList::const_iterator it = lists[ listIndex ]->begin(); it != lists[ listIndex ]->end(); ++it )
+			{
+				const Object *rider = *it;
+				if( rider == nullptr || rider->isEffectivelyDead() )
+				{
+					continue;
+				}
+
+				// A disabled turret answers for nobody. Same set of disables the attack order
+				// forwarding in TransportAIUpdate checks before telling a rider to fire.
+				if( rider->isDisabledByType( DISABLED_HACKED )
+						|| rider->isDisabledByType( DISABLED_EMP )
+						|| rider->isDisabledByType( DISABLED_SUBDUED )
+						|| rider->isDisabledByType( DISABLED_PARALYZED ) )
+				{
+					continue;
+				}
+
+				if( !rider->isAbleToAttack() )
+				{
+					continue;
+				}
+
+				// Mirror the player-command gate above: a weapon the player cannot fire must not
+				// light the cursor either.
+				if( commandSource == CMD_FROM_PLAYER )
+				{
+					Bool anyValidWeapon = FALSE;
+					for( Int i = 0; i < WEAPONSLOT_COUNT; i++ )
+					{
+						if( rider->getWeaponInWeaponSlotCommandSourceMask( (WeaponSlotType)i ) )
+						{
+							anyValidWeapon = TRUE;
+							break;
+						}
+					}
+					if( !anyValidWeapon )
+					{
+						continue;
+					}
+				}
+
+				// CanAttackResult is ordered worst to best, so keep the best answer.
+				CanAttackResult riderResult = rider->getAbleToAttackSpecificObject( attackType, objectToAttack, commandSource );
+				if( riderResult > best )
+				{
+					best = riderResult;
+				}
+			}
+		}
+
+		if( best != ATTACKRESULT_NOT_POSSIBLE )
+		{
+			return best;
+		}
+	}
+
 	return ATTACKRESULT_NOT_POSSIBLE;
 }
 

@@ -59,6 +59,7 @@ public:
 	AudioEventRTS m_enterSound;			///< sound to play on entering
 	AudioEventRTS m_exitSound;			///< sound to play on exiting
 	Bool m_passengersAllowedToFire;	///< Can the passengers shoot out of us?
+	Bool m_acceptTargetsForPassengers;	///< can we be ordered to attack what only our passengers' weapons can hit?
 	Bool m_passengersInTurret;			///< The Firepoint bones are in our turret, not our chassis
 	Int m_numberOfExitPaths;				///< Will alternate through ExitStart/End paths as we exit people.
 	Real m_damagePercentageToUnits;
@@ -162,6 +163,7 @@ public:
   virtual void harmAndForceExitAllContained( DamageInfo *info ) override; // apply canned damage against those contains
 	virtual Bool isEnclosingContainerFor( const Object *obj ) const override;	///< Does this type of Contain Visibly enclose its contents?
 	virtual Bool isPassengerAllowedToFire( ObjectID id = INVALID_ID ) const override;	///< Hey, can I shoot out of this container?
+	virtual Bool acceptsTargetsForPassengers() const override { return getOpenContainModuleData()->m_acceptTargetsForPassengers; }
 
   virtual void setPassengerAllowedToFire( Bool permission = TRUE ) override { m_passengerAllowedToFire = permission; }	///< Hey, can I shoot out of this container?
 

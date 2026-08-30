@@ -69,6 +69,7 @@ OpenContainModuleData::OpenContainModuleData()
 
 	m_containMax = CONTAIN_MAX_UNKNOWN;  // means we don't care, infinite, unassigned, whatever
 	m_passengersAllowedToFire = FALSE;
+	m_acceptTargetsForPassengers = FALSE;
 	m_passengersInTurret = FALSE;
 	m_numberOfExitPaths = 1;
 	m_damagePercentageToUnits = 0;
@@ -99,6 +100,7 @@ OpenContainModuleData::OpenContainModuleData()
 		{ "AllowInsideKindOf",				KindOfMaskType::parseFromINI, nullptr, offsetof( OpenContainModuleData, m_allowInsideKindOf ) },
 		{ "ForbidInsideKindOf",				KindOfMaskType::parseFromINI, nullptr, offsetof( OpenContainModuleData, m_forbidInsideKindOf ) },
 		{ "PassengersAllowedToFire",	INI::parseBool, nullptr, offsetof( OpenContainModuleData, m_passengersAllowedToFire ) },
+		{ "AcceptTargetsForPassengers", INI::parseBool, nullptr, offsetof( OpenContainModuleData, m_acceptTargetsForPassengers ) },
 		{ "PassengersInTurret",				INI::parseBool, nullptr, offsetof( OpenContainModuleData, m_passengersInTurret ) },
 		{ "NumberOfExitPaths",				INI::parseInt, nullptr, offsetof( OpenContainModuleData, m_numberOfExitPaths ) },
 		{ "DoorOpenTime",							INI::parseDurationUnsignedInt, nullptr, offsetof( OpenContainModuleData, m_doorOpenTime ) },
