@@ -33,6 +33,7 @@
 
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/ThingTemplate.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
@@ -99,6 +100,95 @@ UpdateSleepTime NeutronBlastBehavior::update()
 }
 
 //-------------------------------------------------------------------------------------------------
+/** Is this object on the RejectEffectOnUnit list? Those are skipped whatever their KindOf says,
+  * which is the only way to spare a unit the hardcoded infantry and vehicle rules below --
+  * riders such as the Cyborg Commando being the reason the list exists. */
+//-------------------------------------------------------------------------------------------------
+Bool NeutronBlastBehavior::isRejected( const Object *obj ) const
+{
+	const NeutronBlastBehaviorModuleData *data = getNeutronBlastBehaviorModuleData();
+	if( data->m_rejectEffectOnUnit.empty() )
+	{
+		return FALSE;
+	}
+
+	const ThingTemplate *tmpl = obj ? obj->getTemplate() : nullptr;
+	if( tmpl == nullptr )
+	{
+		return FALSE;
+	}
+
+	const AsciiString& name = tmpl->getName();
+	for( std::vector<AsciiString>::const_iterator it = data->m_rejectEffectOnUnit.begin();
+			 it != data->m_rejectEffectOnUnit.end(); ++it )
+	{
+		if( it->compareNoCase( name ) == 0 )
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Kill the occupants of a container. With nothing on the reject list this is killAllContained(),
+  * which carries its own reentrancy handling: an occupant can damage the container as it dies and
+  * modify the very list being walked (a GLA Tunnel full of Terrorists hit by a Neutron Shell is the
+  * known case). Only when a rejected occupant has to be spared do we kill them one at a time, over
+  * a snapshot of the list and re-checking each ID, so that reentrancy stays survivable here too. */
+//-------------------------------------------------------------------------------------------------
+void NeutronBlastBehavior::killContained( Object *container, ContainModuleInterface *contain )
+{
+	const ContainedItemsList *items = contain->getContainedItemsList();
+	if( items == nullptr || items->empty() )
+	{
+		return;
+	}
+
+	// Take the IDs first: the list itself is rewritten as its members die.
+	std::vector<ObjectID> doomed;
+	Bool anyRejected = FALSE;
+	for( ContainedItemsList::const_iterator it = items->begin(); it != items->end(); ++it )
+	{
+		Object *rider = *it;
+		if( rider == nullptr )
+		{
+			continue;
+		}
+
+		if( isRejected( rider ) )
+		{
+			anyRejected = TRUE;
+		}
+		else
+		{
+			doomed.push_back( rider->getID() );
+		}
+	}
+
+	if( !anyRejected )
+	{
+		// Nobody is spared, so use the container's own hardened path.
+		contain->killAllContained();
+		return;
+	}
+
+	for( std::vector<ObjectID>::const_iterator it = doomed.begin(); it != doomed.end(); ++it )
+	{
+		// A previous death may have taken this one with it, or emptied the container outright.
+		Object *rider = TheGameLogic->findObjectByID( *it );
+		if( rider == nullptr || rider->isEffectivelyDead() || rider->getContainedBy() != container )
+		{
+			continue;
+		}
+
+		contain->removeFromContain( rider, TRUE );
+		rider->kill();
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 void NeutronBlastBehavior::neutronBlastToObject( Object *obj )
 {
@@ -113,17 +203,25 @@ void NeutronBlastBehavior::neutronBlastToObject( Object *obj )
 		return;
 	}
 
+	// Named on the reject list: no effect at all, not even to its passengers.
+	if (isRejected( obj ))
+	{
+		return;
+	}
+
 	// Kill if object is infantry
 	if (obj->isKindOf(KINDOF_INFANTRY))
 	{
 		obj->kill();
 	}
 
-	// Kill all contained if it is a container
+	// Kill all contained if it is a container. A garrisoned structure is the one container
+	// AffectGarrison speaks for; transports, tunnels and bunkers are not garrisons and keep
+	// losing their passengers either way.
 	ContainModuleInterface *contain = obj->getContain();
-	if( contain )
+	if( contain && ( data->m_affectGarrison || !contain->isGarrisonable() ) )
 	{
-		contain->killAllContained();
+		killContained( obj, contain );
 	}
 
 	// Kill pilots of vehicles

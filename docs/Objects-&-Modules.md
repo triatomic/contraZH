@@ -453,6 +453,30 @@ Notes:
 * ParkedUnitsDamageScalar can be used to apply an upgrade that grants damage protection to parked aircraft
 * Required/Forbidden KindOf can be used to allow only specific kinds of aircraft to land (i.e. to use different sizes, or differ between VTOL/Regular jets)
 
+## NeutronBlastBehavior
+
+The neutron blast that kills infantry and leaves vehicles unmanned. Two parameters were added so
+the effect can be kept off things it should not touch.
+
+```
+Behavior = NeutronBlastBehavior ModuleTag_neutron
+  BlastRadius = 100.0
+  AffectAirborne = No
+  AffectAllies = No
+  AffectGarrison = Yes         ; New
+  RejectEffectOnUnit = CyborgCommando AnotherUnit   ; New
+  RejectEffectOnUnit = YetAnotherUnit               ; the key appends, so it may repeat
+End
+```
+
+Added parameters:
+* `AffectGarrison = Yes` - (No spares infantry garrisoned in a structure. Only garrisons are
+affected by this: passengers of transports, tunnels and bunkers are killed either way, as before.)
+* `RejectEffectOnUnit = <object list>` - (Object names that the blast skips entirely, whatever their
+KindOfs. This is the only way to spare a unit the hardcoded infantry and vehicle rules, which is what
+it exists for: riders such as the Cyborg Commando. A rejected object keeps its passengers too. The
+key appends, so it can be written on several lines. Matching ignores case.)
+
 ## UnitProductionBonusUpgrade (New)
 
 This upgrade module allows to set a cost and/or build time modifier for individual types of units. This affects the whole player and not just individual factories.

@@ -32,6 +32,9 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "GameLogic/Module/DieModule.h"
 #include "GameLogic/Module/UpdateModule.h"
+#include <vector>
+
+class ContainModuleInterface;
 
 //-------------------------------------------------------------------------------------------------
 class NeutronBlastBehaviorModuleData : public UpdateModuleData
@@ -40,12 +43,16 @@ public:
 	Real m_blastRadius;
 	Bool m_isAffectAirborne;
 	Bool m_affectAllies;
+	Bool m_affectGarrison;
+	std::vector<AsciiString> m_rejectEffectOnUnit;
 
 	NeutronBlastBehaviorModuleData()
 	{
 		m_blastRadius = 10.0f;
 		m_isAffectAirborne = TRUE;
 		m_affectAllies = TRUE;
+		// Retail wiped garrisons, so that stays the default.
+		m_affectGarrison = TRUE;
 	}
 
 	static void buildFieldParse( MultiIniFieldParse& p )
@@ -57,6 +64,8 @@ public:
 			{ "BlastRadius",		INI::parseReal, nullptr, offsetof( NeutronBlastBehaviorModuleData, m_blastRadius ) },
 			{ "AffectAirborne", INI::parseBool, nullptr, offsetof( NeutronBlastBehaviorModuleData, m_isAffectAirborne ) },
 			{ "AffectAllies",		INI::parseBool, nullptr, offsetof( NeutronBlastBehaviorModuleData, m_affectAllies ) },
+			{ "AffectGarrison",	INI::parseBool, nullptr, offsetof( NeutronBlastBehaviorModuleData, m_affectGarrison ) },
+			{ "RejectEffectOnUnit", INI::parseAsciiStringVectorAppend, nullptr, offsetof( NeutronBlastBehaviorModuleData, m_rejectEffectOnUnit ) },
 			{ 0, 0, 0, 0 }
 		};
 
@@ -90,4 +99,6 @@ public:
 private:
 
 	void neutronBlastToObject( Object *obj );
+	Bool isRejected( const Object *obj ) const;
+	void killContained( Object *container, ContainModuleInterface *contain );
 };
