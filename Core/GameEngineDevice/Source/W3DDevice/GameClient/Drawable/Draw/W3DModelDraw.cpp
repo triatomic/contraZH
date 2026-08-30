@@ -3659,7 +3659,7 @@ void W3DModelDraw::recalcBonesForClientParticleSystems()
 #endif
 							m_renderObject->Set_Transform(tmp);					// set to identity transform
 
-							const Matrix3D boneTransform = m_renderObject->Get_Bone_Transform(tracker.boneIndex);
+							const Matrix3D& boneTransform = m_renderObject->Get_Bone_Transform(tracker.boneIndex);
 							Vector3 vpos = boneTransform.Get_Translation();
 							rotation = boneTransform.Get_Z_Rotation();
 
@@ -3770,7 +3770,7 @@ Bool W3DModelDraw::updateBonesForClientParticleSystems()
 #if RTS_ZEROHOUR
 				it->followsAnimatedBone = true;
 #endif
-    		const Matrix3D boneTransform = m_renderObject->Get_Bone_Transform(boneIndex);// just a little worried about state changes
+    		const Matrix3D& boneTransform = m_renderObject->Get_Bone_Transform(boneIndex);// just a little worried about state changes
 
         Vector3 vpos = boneTransform.Get_Translation();
 
@@ -5082,7 +5082,7 @@ Bool W3DModelDraw::clientOnly_getRenderObjBoundBox(OBBoxClass * boundbox) const
 	AABoxClass aabox;
 	m_renderObject->Get_Obj_Space_Bounding_Box(aabox);
 
-	Matrix3D tm = m_renderObject->Get_Transform();
+	const Matrix3D& tm = m_renderObject->Get_Transform();
 
 	// build an OBB for this AAB,transform
 	OBBoxClass box0(aabox.Center,aabox.Extent);
@@ -5444,7 +5444,7 @@ Bool W3DModelDraw::handleWeaponFireFX(WeaponSlotType wslot, Int specificBarrelTo
 			if( ! m_renderObject->Is_Hidden() || (logicObject == nullptr) )
 			{
 				// I can ask the drawable's bone position if I am not hidden (if I have no object I have no choice)
-				Matrix3D mtx = m_renderObject->Get_Bone_Transform(info.m_fxBone);
+				const Matrix3D& mtx = m_renderObject->Get_Bone_Transform(info.m_fxBone);
 				Coord3D pos;
 				pos.x = mtx.Get_X_Translation();
 				pos.y = mtx.Get_Y_Translation();

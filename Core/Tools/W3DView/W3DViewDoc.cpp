@@ -1626,7 +1626,7 @@ CW3DViewDoc::SaveSettings
                                          stringValue,
                                          (LPCTSTR)stringCompleteFilename);
 
-				Matrix3D transform = m_pCSceneLight->Get_Transform ();
+				const Matrix3D& transform = m_pCSceneLight->Get_Transform ();
 				Quaternion orientation = ::Build_Quaternion (transform);
 
             // Write the x-position out to the file
@@ -2525,7 +2525,7 @@ CW3DViewDoc::Make_Movie ()
 				if (index != -1) {
 
 					// Convert the bone's transform into a camera transform
-					Matrix3D	transform = m_pCRenderObj->Get_Bone_Transform (index);
+					const Matrix3D& transform = m_pCRenderObj->Get_Bone_Transform (index);
 					Matrix3D cam_transform (Vector3 (0, -1, 0), Vector3 (0, 0, 1), Vector3 (-1, 0, 0), Vector3 (0, 0, 0));
 #ifdef ALLOW_TEMPORARIES
 					Matrix3D new_transform = transform * cam_transform;
@@ -2869,7 +2869,7 @@ CW3DViewDoc::Copy_Assets_To_Dir (LPCTSTR directory)
 			//
 			//	Determine the source and destination filenames
 			//
-			StringClass dep_name		= dependency_list[counter];
+			const StringClass &dep_name		= dependency_list[counter];
 			CString dest_filename	= dest_path + CString (dep_name);
 
 			// TheSuperHackers @bugfix Tria 18/04/2026 Resolve dependency files through the file
