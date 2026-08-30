@@ -65,7 +65,7 @@ public:
 			{ "AffectAirborne", INI::parseBool, nullptr, offsetof( NeutronBlastBehaviorModuleData, m_isAffectAirborne ) },
 			{ "AffectAllies",		INI::parseBool, nullptr, offsetof( NeutronBlastBehaviorModuleData, m_affectAllies ) },
 			{ "AffectGarrison",	INI::parseBool, nullptr, offsetof( NeutronBlastBehaviorModuleData, m_affectGarrison ) },
-			{ "RejectEffectOnUnit", INI::parseAsciiStringVectorAppend, nullptr, offsetof( NeutronBlastBehaviorModuleData, m_rejectEffectOnUnit ) },
+			{ "RejectEffectOnUnit", INI::parseAsciiStringVector, nullptr, offsetof( NeutronBlastBehaviorModuleData, m_rejectEffectOnUnit ) },
 			{ 0, 0, 0, 0 }
 		};
 

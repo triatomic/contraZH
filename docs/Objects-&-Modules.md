@@ -464,8 +464,7 @@ Behavior = NeutronBlastBehavior ModuleTag_neutron
   AffectAirborne = No
   AffectAllies = No
   AffectGarrison = Yes         ; New
-  RejectEffectOnUnit = CyborgCommando AnotherUnit   ; New
-  RejectEffectOnUnit = YetAnotherUnit               ; the key appends, so it may repeat
+  RejectEffectOnUnit = CyborgCommando AnotherUnit YetAnotherUnit   ; New
 End
 ```
 
@@ -474,8 +473,8 @@ Added parameters:
 affected by this: passengers of transports, tunnels and bunkers are killed either way, as before.)
 * `RejectEffectOnUnit = <object list>` - (Object names that the blast skips entirely, whatever their
 KindOfs. This is the only way to spare a unit the hardcoded infantry and vehicle rules, which is what
-it exists for: riders such as the Cyborg Commando. A rejected object keeps its passengers too. The
-key appends, so it can be written on several lines. Matching ignores case.)
+it exists for: riders such as the Cyborg Commando. A rejected object keeps its passengers too. All
+names go on one line; a second line replaces the first. Matching ignores case.)
 
 ## UnitProductionBonusUpgrade (New)
 
