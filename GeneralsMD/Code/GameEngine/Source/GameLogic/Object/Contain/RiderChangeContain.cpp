@@ -63,6 +63,8 @@ RiderChangeContainModuleData::RiderChangeContainModuleData()
 {
 	m_scuttleFrames = 0;
 	m_scuttleState = MODELCONDITION_TOPPLED;
+	m_surviveScuttle = FALSE;
+	m_silentScuttle = FALSE;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -124,6 +126,8 @@ void RiderChangeContainModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "Rider16",				parseRiderInfo,					nullptr, offsetof( RiderChangeContainModuleData, m_riders[15] ) },
     { "ScuttleDelay",   INI::parseDurationUnsignedInt,	nullptr, offsetof( RiderChangeContainModuleData, m_scuttleFrames ) },
     { "ScuttleStatus",  INI::parseIndexList,		ModelConditionFlags::getBitNames(), offsetof( RiderChangeContainModuleData, m_scuttleState ) },
+    { "SurviveScuttle", INI::parseBool,			nullptr, offsetof( RiderChangeContainModuleData, m_surviveScuttle ) },
+    { "SilentScuttle",  INI::parseBool,			nullptr, offsetof( RiderChangeContainModuleData, m_silentScuttle ) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
@@ -228,6 +232,14 @@ void RiderChangeContain::onContaining( Object *rider, Bool wasSelected )
 		const ThingTemplate *thing = TheThingFactory->findTemplate( data->m_riders[ i ].m_templateName );
 		if( thing && thing->isEquivalentTo( rider->getTemplate() ) )
 		{
+
+			//A surviving bike was left toppled on the ground when its last rider dismounted.
+			//Mounting a new rider revives it, so clear the abandoned presentation and statuses.
+			if( data->m_surviveScuttle )
+			{
+				obj->clearModelConditionState( data->m_scuttleState );
+				obj->clearStatus( MAKE_OBJECT_STATUS_MASK2( OBJECT_STATUS_UNSELECTABLE, OBJECT_STATUS_IMMOBILE ) );
+			}
 
 			//This is our rider, so set the correct model condition.
 			obj->setModelConditionState( data->m_riders[ i ].m_modelConditionFlagType );
@@ -362,7 +374,12 @@ void RiderChangeContain::onRemoving( Object *rider )
 			}
 
 			//Finally, scuttle the bike so nobody else can use it! <Design Spec>
-			m_scuttledOnFrame = TheGameLogic->getFrame();
+			//A bike with SurviveScuttle stays on the map leaning on its side, ready for a new
+			//rider, so only arm the kill timer when it is meant to be destroyed.
+			if( !data->m_surviveScuttle )
+			{
+				m_scuttledOnFrame = TheGameLogic->getFrame();
+			}
 			bike->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_UNSELECTABLE ) );
 			bike->setModelConditionState( data->m_scuttleState );
 			if( !bike->getAI()->isMoving() )
@@ -394,7 +411,28 @@ UpdateSleepTime RiderChangeContain::update()
 		{
 			//We have scuttled the bike (at least as far as tipping it over via scuttle animation. Now
 			//kill the bike in a way that will cause it to sink into the ground without any real destruction.
-			getObject()->kill( DAMAGE_UNRESISTABLE, DEATH_TOPPLED ); //Sneaky, eh? Toppled heheh.
+			if( data->m_silentScuttle )
+			{
+				//Naming the bike as its own damage source marks the death as self inflicted, which is
+				//what suppresses the EVA unit lost announcement and its radar event. A rider getting
+				//off is a deliberate act, not a loss.
+				Object *bike = getObject();
+				DamageInfo damageInfo;
+				damageInfo.in.m_damageType = DAMAGE_UNRESISTABLE;
+				damageInfo.in.m_deathType = DEATH_TOPPLED;
+				damageInfo.in.m_sourceID = bike->getID();
+				if( bike->getControllingPlayer() )
+				{
+					damageInfo.in.m_sourcePlayerMask = bike->getControllingPlayer()->getPlayerMask();
+				}
+				damageInfo.in.m_amount = bike->getBodyModule()->getMaxHealth();
+				damageInfo.in.m_kill = TRUE;
+				bike->attemptDamage( &damageInfo );
+			}
+			else
+			{
+				getObject()->kill( DAMAGE_UNRESISTABLE, DEATH_TOPPLED ); //Sneaky, eh? Toppled heheh.
+			}
 		}
 	}
 	// extend base class
