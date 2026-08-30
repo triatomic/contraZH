@@ -76,6 +76,8 @@ OpenContainModuleData::OpenContainModuleData()
 	m_doorOpenTime = 1;
 	m_allowInsideKindOf.clear(); m_allowInsideKindOf.flip();		// everything is allowed
 	m_forbidInsideKindOf.clear();	// nothing is forbidden
+	m_allowInsideObjects.clear();	// empty means the allow list is not in use, so everything passes
+	m_forbidInsideObjects.clear();	// nothing is forbidden by name
 	m_weaponBonusPassedToPassengers = FALSE;
  	m_allowAlliesInside = TRUE;
  	m_allowEnemiesInside = TRUE;
@@ -98,6 +100,8 @@ OpenContainModuleData::OpenContainModuleData()
 		{ "BurnedDeathToUnits",				INI::parseBool,							nullptr, offsetof( OpenContainModuleData, m_isBurnedDeathToUnits ) },
 		{ "AllowInsideKindOf",				KindOfMaskType::parseFromINI, nullptr, offsetof( OpenContainModuleData, m_allowInsideKindOf ) },
 		{ "ForbidInsideKindOf",				KindOfMaskType::parseFromINI, nullptr, offsetof( OpenContainModuleData, m_forbidInsideKindOf ) },
+		{ "AllowInsideObjects",				INI::parseAsciiStringVectorAppend, nullptr, offsetof( OpenContainModuleData, m_allowInsideObjects ) },
+		{ "ForbidInsideObjects",			INI::parseAsciiStringVectorAppend, nullptr, offsetof( OpenContainModuleData, m_forbidInsideObjects ) },
 		{ "PassengersAllowedToFire",	INI::parseBool, nullptr, offsetof( OpenContainModuleData, m_passengersAllowedToFire ) },
 		{ "PassengersInTurret",				INI::parseBool, nullptr, offsetof( OpenContainModuleData, m_passengersInTurret ) },
 		{ "NumberOfExitPaths",				INI::parseInt, nullptr, offsetof( OpenContainModuleData, m_numberOfExitPaths ) },
@@ -955,6 +959,52 @@ void OpenContain::onDie( const DamageInfo * damageInfo )
 }
 
 // ------------------------------------------------------------------------------------------------
+/** Test 'obj' against the by-name lists. AllowInsideObjects, when set, is exclusive: only the
+  * objects on it may enter, whatever their KindOfs say. ForbidInsideObjects always wins.
+  * Both are matched on the template name and ignore case. */
+// ------------------------------------------------------------------------------------------------
+Bool OpenContainModuleData::isObjectAllowedInside( const Object *obj ) const
+{
+	if( m_allowInsideObjects.empty() && m_forbidInsideObjects.empty() )
+	{
+		return TRUE;
+	}
+
+	const ThingTemplate *tmpl = obj ? obj->getTemplate() : nullptr;
+	if( tmpl == nullptr )
+	{
+		return TRUE;
+	}
+
+	const AsciiString& name = tmpl->getName();
+
+	for( std::vector<AsciiString>::const_iterator it = m_forbidInsideObjects.begin();
+			 it != m_forbidInsideObjects.end(); ++it )
+	{
+		if( it->compareNoCase( name ) == 0 )
+		{
+			return FALSE;
+		}
+	}
+
+	if( m_allowInsideObjects.empty() )
+	{
+		return TRUE;
+	}
+
+	for( std::vector<AsciiString>::const_iterator it = m_allowInsideObjects.begin();
+			 it != m_allowInsideObjects.end(); ++it )
+	{
+		if( it->compareNoCase( name ) == 0 )
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+// ------------------------------------------------------------------------------------------------
 /** Check to see if we are a valid container for 'obj' */
 // ------------------------------------------------------------------------------------------------
 Bool OpenContain::isValidContainerFor(const Object* obj, Bool checkCapacity) const
@@ -968,6 +1018,12 @@ Bool OpenContain::isValidContainerFor(const Object* obj, Bool checkCapacity) con
 	// if we have any kind of masks set then we must make that check
 	if (obj->isAnyKindOf( modData->m_allowInsideKindOf ) == FALSE ||
 			obj->isAnyKindOf( modData->m_forbidInsideKindOf ) == TRUE)
+	{
+		return false;
+	}
+
+	// then the by-name lists, which name individual objects rather than whole KindOfs
+	if (modData->isObjectAllowedInside( obj ) == FALSE)
 	{
 		return false;
 	}

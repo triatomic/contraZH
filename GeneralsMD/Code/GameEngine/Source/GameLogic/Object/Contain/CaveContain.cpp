@@ -205,6 +205,12 @@ void CaveContain::onRemoving( Object *obj )
 
 Bool CaveContain::isValidContainerFor(const Object* obj, Bool checkCapacity) const
 {
+	// Same as TunnelContain: the cave system is shared and has no module data of its own.
+	if( getCaveContainModuleData()->isObjectAllowedInside( obj ) == FALSE )
+	{
+		return false;
+	}
+
 	TunnelTracker *myTracker = TheCaveSystem->getTunnelTrackerForCaveIndex( m_caveIndex );
 	return myTracker->isValidContainerFor( obj, checkCapacity );
 }
