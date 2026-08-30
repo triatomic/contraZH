@@ -2151,36 +2151,43 @@ void Locomotor::moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics,
 		zDirDamping = 1.0f - (delta / MAX_VERTICAL_DAMP_RANGE);
 #endif
 	}
-	else if( m_template->m_groundHugHeight != 0.0f && !getFlag(PRECISE_Z_POS) )
+	else if( getGroundHugHeight() != 0.0f && !getFlag(PRECISE_Z_POS) )
 	{
 		// Ground hugging with no PreferredHeight. The block above is the only terrain awareness
 		// the thrust path has, and it is skipped entirely when PreferredHeight is zero, so a wave
 		// fired off a ridge keeps the Z it was launched at. Sample the terrain a little ahead of
 		// us so the climb starts before we reach a rise rather than into the face of it.
-		Real lookAhead = m_template->m_groundHugLookAhead;
+		Real lookAhead = getGroundHugLookAhead();
 		if (lookAhead <= 0.0f)
 		{
 			lookAhead = PATHFIND_CELL_SIZE_F;
 		}
 
-		Vector3 fwd = obj->getTransformMatrix()->Get_X_Vector();
-		Coord3D dir;
-		dir.x = fwd.X;
-		dir.y = fwd.Y;
+		// Sample along where we are actually travelling. The transform is only turned to face our
+		// velocity further down this function, so its X vector still holds last frame's heading.
+		Coord3D dir = *physics->getVelocity();
 		dir.z = 0.0f;
+		if (isNearlyZero(sqr(dir.x) + sqr(dir.y)))
+		{
+			Vector3 fwd = obj->getTransformMatrix()->Get_X_Vector();
+			dir.x = fwd.X;
+			dir.y = fwd.Y;
+		}
 
 		Real slope = 0.0f;
 		Real surfaceHt = getSurfaceHtAhead(pos, dir, lookAhead, &slope);
 
 		// Ground steeper than we are willing to climb is a cliff, not a bump: stop hugging and
-		// hold our height, so the terrain rises past us and the usual collision fires.
-		Bool tooSteep = (m_template->m_groundHugMaxSlope != 0.0f && slope > m_template->m_groundHugMaxSlope);
+		// hold our height, so the terrain rises past us and the usual collision fires. The test is
+		// on the magnitude, so a sheer drop is left alone too -- following one down would pitch us
+		// straight off the lip instead of carrying over it.
+		Bool tooSteep = (getGroundHugMaxSlope() != 0.0f && fabs(slope) > getGroundHugMaxSlope());
 		if (!tooSteep)
 		{
 			// Damped like the PreferredHeight case, and the deflection is still clamped by
 			// MaxThrustAngle below, so this bends the flight rather than snapping Z the way
 			// StickToGround does.
-			localGoalPos.z = m_template->m_groundHugHeight + surfaceHt;
+			localGoalPos.z = getGroundHugHeight() + surfaceHt;
 			Real delta = localGoalPos.z - pos.z;
 			delta *= getPreferredHeightDamping();
 			localGoalPos.z = pos.z + delta;
@@ -2304,7 +2311,9 @@ void Locomotor::moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics,
 {
 	Real dirLen = sqrtf(sqr(dir.x) + sqr(dir.y));
 	Coord3D ahead = pos;
-	if (dirLen > 0.0f)
+	// A near-vertical heading has a horizontal component close to zero; dividing by it would
+	// throw the sample point far off, so in that case just sample underfoot.
+	if (!isNearlyZero(dirLen))
 	{
 		ahead.x += (dir.x / dirLen) * lookAhead;
 		ahead.y += (dir.y / dirLen) * lookAhead;

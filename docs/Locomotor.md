@@ -24,6 +24,9 @@ Terrain following is off while this is 0. Default = 0)
 following it, so cliffs are collided with instead of climbed. No slope limit when 0. Default = 0)
 * `GroundHugLookAhead = 15.0` - (How far ahead of the object the terrain is sampled. Larger values
 start the climb earlier. 0 means one pathfinder cell, i.e. 10. Default = 0)
+* `PreferredHeightDamping = 0.3` - (Existing key, but set it: it damps the hug as well. The default
+of 1.0 means the height is matched in a single frame, which reintroduces the bump-grinding this
+feature exists to avoid. Lower is smoother. Default = 1.0)
 
 Notes:
 * Only has an effect on `Appearance = THRUST`, and only while `PreferredHeight` is 0. A locomotor
@@ -36,6 +39,8 @@ value (say 1 degree) cannot bank onto a ramp at all, so terrain following will a
 however these keys are set.
 * A hugging locomotor should always set `GroundHugMaxSlope`. With no limit it will try to climb
 anything, including vertical faces.
+* `GroundHugMaxSlope` is tested on the steepness of the ground either way, so it also stops the
+object diving down a sheer drop; it carries over the edge instead.
 
 ## Ships
 ### TODO
