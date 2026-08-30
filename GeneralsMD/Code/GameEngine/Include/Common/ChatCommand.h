@@ -52,6 +52,7 @@ public:
 	UnsignedInt getAddRank() const { return m_addRank; }
 	Bool getReadyTimers() const { return m_readyTimers; }
 	const AsciiString& getSpawnObjectAtCursor() const { return m_spawnObjectAtCursor; }
+	Bool isSpawnObjectCommand() const { return m_isSpawnObjectCommand; }
 	Bool getTogglePrerequisites() const { return m_togglePrerequisites; }
 	Bool getToggleInfiniteEnergy() const { return m_toggleInfiniteEnergy; }
 	Bool getGrantAllUpgrades() const { return m_grantAllUpgrades; }
@@ -59,15 +60,23 @@ public:
 	Int getAddSalvageTier() const { return m_addSalvageTier; }
 	Real getProductionSpeedMultiplier() const { return m_productionSpeedMultiplier; }
 
-	/** Run this command's effects. Inspects the parsed members and acts accordingly. */
-	void execute() const;
+	/** Run this command's effects. Inspects the parsed members and acts accordingly.
+			"args" is whatever the user typed after the command name, empty when nothing followed.
+			Effects that accept an argument use it in place of their INI value; the rest ignore it. */
+	void execute( const AsciiString& args ) const;
+
+	/** Parser for "SpawnObjectAtCursor". Stores the name and records that the key was present,
+			which is what marks the command as a spawn command -- the name itself may be left blank
+			when the object is meant to be typed after the command instead. */
+	static void parseSpawnObjectAtCursor( INI *ini, void *instance, void *store, const void *userData );
 
 private:
 	AsciiString m_name;
 	Int m_addMoney = 0;			///< "AddMoney" attribute; signed amount, defaults to 0.
 	UnsignedInt m_addRank = 0;	///< "AddRank" attribute; ranks to grant, capped at the max rank. Defaults to 0.
 	Bool m_readyTimers = FALSE;	///< "ReadyTimers" attribute; when TRUE, set all of the player's special power timers to ready.
-	AsciiString m_spawnObjectAtCursor;	///< "SpawnObjectAtCursor" attribute; ObjectTemplate name to spawn for the local player at the mouse cursor.
+	AsciiString m_spawnObjectAtCursor;	///< "SpawnObjectAtCursor" attribute; ObjectTemplate name to spawn for the local player at the mouse cursor. May be blank when the name is typed after the command instead.
+	Bool m_isSpawnObjectCommand = FALSE;	///< TRUE when "SpawnObjectAtCursor" was present at all, blank value included; separates "is a spawn command" from "has a default object".
 	Bool m_togglePrerequisites = FALSE;	///< "TogglePrerequisites" attribute; when TRUE, toggles ignoring unit/building build prereqs (science still applies).
 	Bool m_toggleInfiniteEnergy = FALSE;	///< "ToggleInfiniteEnergy" attribute; when TRUE, toggles infinite power for the local player.
 	Bool m_grantAllUpgrades = FALSE;		///< "GrantAllUpgrades" attribute; when TRUE, grants the local player all player-type upgrades.
