@@ -5482,6 +5482,24 @@ StateReturnType AIAttackFireWeaponState::update()
 		return STATE_FAILURE;
 	}
 
+	// NOTWHILEMOVING: hold the trigger until we have actually come to a stop. Returning
+	// STATE_CONTINUE rather than STATE_FAILURE is the point -- like the PRE_ATTACK case just
+	// below, this waits without abandoning the attack, so the unit keeps closing on its target
+	// and fires the moment it settles. The approach state stops us of its own accord once we
+	// are in range (see AIAttackApproachTargetState m_stopIfInRange).
+	{
+		const AIUpdateInterface *ai = obj->getAI();
+		if (ai && ai->mustHoldStillToFire())
+		{
+			const Real HOLD_STILL_EPSILON = 0.001f;
+			const PhysicsBehavior *physics = obj->getPhysics();
+			if (physics && fabs(physics->getVelocityMagnitude()) >= HOLD_STILL_EPSILON)
+			{
+				return STATE_CONTINUE;
+			}
+		}
+	}
+
 	WeaponStatus status = weapon->getStatus();
 	if (status == PRE_ATTACK)
 	{

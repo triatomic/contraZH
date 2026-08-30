@@ -48,13 +48,18 @@ When a unit turns to attack, it will attempt to turn to this angle. If mirrored 
 Note: this is NOT needed for limited turret angles (See below). Units will follow the actual turret angles when trying to attack.
 
 New `AutoAcquireEnemiesWhenIdle` value:
-* `NOTWHILEMOVING` - the object will not pick up targets of opportunity while it is moving.
+* `NOTWHILEMOVING` - the object may not fire while it is moving. Intended for artillery that has to be
+stationary to shoot, which previously had to be faked in other ways.
 Combine it with the other values as usual, e.g. `AutoAcquireEnemiesWhenIdle = Yes NOTWHILEMOVING`.
 
-Intended for artillery that has to be stationary to fire, which previously needed to be faked in other ways.
-Like `NOTWHILEATTACKING`, this applies to every mood scan and not only to the idle one, so a turret on a moving
-chassis is covered too - the turret runs its own idle scan while the vehicle drives.
-It only suppresses *automatic* target acquisition; an explicit player or script attack order is unaffected.
+Despite living among the acquisition flags, this one gates *firing*, not target acquisition. The object still
+spots enemies while it is driving - it has to, because that is what makes it stop for them. An attack-move
+therefore behaves as expected: the unit drives, spots a target, halts once the target is in range, and opens
+fire. It resumes the move when the target is gone.
+
+While the object is in motion the shot is held rather than cancelled, so it keeps its target and fires the
+moment it settles. Ordinary move orders are unaffected in the sense that a unit told simply to move will not
+stop to shoot; it just never gets a shot off while rolling.
 
 ### Turret
 New paramters for Turret or AltTurret entries

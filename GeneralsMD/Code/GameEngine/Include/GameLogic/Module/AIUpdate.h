@@ -632,6 +632,9 @@ public:
 
 	Bool canAutoAcquireWhileStealthed() const;
 
+	/// True when this object is forbidden from firing while it is moving.
+	Bool mustHoldStillToFire() const { return BitIsSet(getAIUpdateModuleData()->m_autoAcquireEnemiesWhenIdle, AAS_Idle_Not_While_Moving); }
+
 	void applySpeedMultiplier(Real scalar);
 	inline Real getSpeedMultiplier(void) const { return m_speedMultiplier; }
 
