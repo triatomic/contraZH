@@ -5104,6 +5104,22 @@ StateReturnType AIAttackAimAtTargetState::update()
 			return STATE_FAILURE;	// can't aim at dead things
 	}
 
+	// NOTWHILEMOVING: stay in the aim state until we have actually come to a stop, so we never
+	// enter the fire state while rolling. Holding here rather than in the fire state matters:
+	// AIAttackFireWeaponState::onEnter spends the pre-attack wind-up (FX, audio and the
+	// PreAttackDelay timer) the moment it is entered, and that timer is wall clock, so a unit
+	// that entered while still moving would burn its wind-up on the move and then fire with none.
+	// Waiting here keeps the turret tracking the target, which is what this state does anyway.
+	if (sourceAI->mustHoldStillToFire())
+	{
+		const Real HOLD_STILL_EPSILON = 0.001f;
+		const PhysicsBehavior *physics = source->getPhysics();
+		if (physics && fabs(physics->getVelocityMagnitude()) >= HOLD_STILL_EPSILON)
+		{
+			return STATE_CONTINUE;
+		}
+	}
+
 	WhichTurretType tur = sourceAI->getWhichTurretForCurWeapon();
 	if (tur != TURRET_INVALID)
 	{
@@ -5480,24 +5496,6 @@ StateReturnType AIAttackFireWeaponState::update()
 	if (!weapon)
 	{
 		return STATE_FAILURE;
-	}
-
-	// NOTWHILEMOVING: hold the trigger until we have actually come to a stop. Returning
-	// STATE_CONTINUE rather than STATE_FAILURE is the point -- like the PRE_ATTACK case just
-	// below, this waits without abandoning the attack, so the unit keeps closing on its target
-	// and fires the moment it settles. The approach state stops us of its own accord once we
-	// are in range (see AIAttackApproachTargetState m_stopIfInRange).
-	{
-		const AIUpdateInterface *ai = obj->getAI();
-		if (ai && ai->mustHoldStillToFire())
-		{
-			const Real HOLD_STILL_EPSILON = 0.001f;
-			const PhysicsBehavior *physics = obj->getPhysics();
-			if (physics && fabs(physics->getVelocityMagnitude()) >= HOLD_STILL_EPSILON)
-			{
-				return STATE_CONTINUE;
-			}
-		}
 	}
 
 	WeaponStatus status = weapon->getStatus();

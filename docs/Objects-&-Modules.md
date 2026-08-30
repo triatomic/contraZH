@@ -64,9 +64,10 @@ What it does, by order type:
 This takes two separate checks, because the two halves pull against each other. Targets of opportunity - the
 idle scans, including a turret scanning while the chassis under it drives - are suppressed while the object is
 in motion, which is what keeps it from shooting on an ordinary move. Attack-move deliberately still acquires
-on the move, because spotting a target while driving is exactly what makes the unit stop for it; the shot
-itself is then held until the object has actually come to rest. The held shot is not cancelled, so the unit
-keeps its target and fires the moment it settles.
+on the move, because spotting a target while driving is exactly what makes the unit stop for it; the object
+then keeps aiming, without firing, until it has actually come to rest. It holds its target throughout and
+fires the moment it settles, so any PreAttackDelay wind-up plays where the shot is taken rather than being
+spent on the approach.
 
 ### Turret
 New paramters for Turret or AltTurret entries
