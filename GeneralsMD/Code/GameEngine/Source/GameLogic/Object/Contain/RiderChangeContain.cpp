@@ -413,26 +413,13 @@ UpdateSleepTime RiderChangeContain::update()
 			//kill the bike in a way that will cause it to sink into the ground without any real destruction.
 			if( data->m_silentScuttle )
 			{
-				//Naming the bike as its own damage source marks the death as self inflicted, which is
-				//what suppresses the EVA unit lost announcement and its radar event. A rider getting
-				//off is a deliberate act, not a loss.
-				Object *bike = getObject();
-				DamageInfo damageInfo;
-				damageInfo.in.m_damageType = DAMAGE_UNRESISTABLE;
-				damageInfo.in.m_deathType = DEATH_TOPPLED;
-				damageInfo.in.m_sourceID = bike->getID();
-				if( bike->getControllingPlayer() )
-				{
-					damageInfo.in.m_sourcePlayerMask = bike->getControllingPlayer()->getPlayerMask();
-				}
-				damageInfo.in.m_amount = bike->getBodyModule()->getMaxHealth();
-				damageInfo.in.m_kill = TRUE;
-				bike->attemptDamage( &damageInfo );
+				//Mark the bike as scuttling so Object::onDie knows this death was staged by us and
+				//skips the unit lost announcement. Deliberately not done by naming the bike as its
+				//own damage source: a non null source also drives kill credit, the units lost tally
+				//and the attacked by record, none of which should fire for a rider getting off.
+				getObject()->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_SCUTTLING ) );
 			}
-			else
-			{
-				getObject()->kill( DAMAGE_UNRESISTABLE, DEATH_TOPPLED ); //Sneaky, eh? Toppled heheh.
-			}
+			getObject()->kill( DAMAGE_UNRESISTABLE, DEATH_TOPPLED ); //Sneaky, eh? Toppled heheh.
 		}
 	}
 	// extend base class

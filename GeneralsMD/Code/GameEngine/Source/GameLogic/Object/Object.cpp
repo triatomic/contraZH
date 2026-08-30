@@ -2131,6 +2131,7 @@ void Object::attemptDamage( DamageInfo *damageInfo )
 			!BitIsSet(damageInfo->in.m_sourcePlayerMask, getControllingPlayer()->getPlayerMask()) &&
 			m_radarData != nullptr &&
 			isLocallyControlled() &&
+			!testStatus( OBJECT_STATUS_SCUTTLING ) &&
 			!isKindOf( KINDOF_NO_ATTACK_WARNING ) )
 		TheRadar->tryUnderAttackEvent( this );
 
@@ -4940,7 +4941,9 @@ void Object::onDie( DamageInfo *damageInfo )
 	if(m_team)
 		m_team->notifyTeamOfObjectDeath();
 
-	if (isLocallyViewed() && !selfInflicted) // wasLocallyViewed? :-)
+	// A unit scuttling itself by its own logic, such as a combat bike whose rider dismounted, is not a
+	// loss to report. The status is only ever set by the module staging that death.
+	if (isLocallyViewed() && !selfInflicted && !testStatus( OBJECT_STATUS_SCUTTLING )) // wasLocallyViewed? :-)
 	{
 		if (isKindOf(KINDOF_STRUCTURE) && isKindOf(KINDOF_MP_COUNT_FOR_VICTORY))
 		{

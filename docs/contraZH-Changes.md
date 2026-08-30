@@ -172,9 +172,12 @@ ordering a rider onto it works. It is only unselectable, not uninteractable.
 
 A dismount is a deliberate act, but the scuttle still killed the bike as an anonymous death, so EVA
 called out "Unit Lost", dropped a radar ping and could raise an "under attack" warning every time a
-rider got off. With `SilentScuttle = Yes` the bike is credited as its own killer, which is the
-condition the engine already uses to recognise a self inflicted death, so all three are skipped. A
-bike destroyed by an enemy still announces normally.
+rider got off. With `SilentScuttle = Yes` the bike is flagged as scuttling for the moment it dies,
+and the three announcements skip an object carrying that flag. A bike destroyed by an enemy still
+announces normally.
+
+The flag only silences the announcements. The bike is still not credited to anyone as a kill and is
+not added to either player’s score, exactly as an ordinary scuttle behaves today.
 
 The two fields are independent. `SurviveScuttle = Yes` never reaches the kill at all, so it does not
 need `SilentScuttle`.
