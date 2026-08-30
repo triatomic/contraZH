@@ -2204,14 +2204,11 @@ void Locomotor::moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics,
 		Bool tooSteep = (maxSlope > 0.0f && steepSlope > maxSlope);
 		if (!tooSteep)
 		{
-			// Follow the gradient of the ground rather than snapping to its height. Extrapolating
-			// from the slope keeps the goal continuous in our own position, so crossing an edge
-			// bends the flight instead of teleporting the target tens of units down.
-			Real rise = Tan(nearSlope) * lookAhead;
-
-			// The one absolute term, pulling us back toward the hug height so we do not drift away
-			// from the ground over a long flight.
-			rise += (getGroundHugHeight() + surfaceHt) - pos.z;
+			// Aim to be the hug height above the ground we are about to be over. surfaceHt is
+			// sampled at the far end of the probe, so that point already lies along the slope --
+			// adding the gradient on top of it would count the descent twice and put the goal
+			// under the terrain, which reads as the object sinking into the hillside.
+			Real rise = (getGroundHugHeight() + surfaceHt) - pos.z;
 
 			// Never descend more steeply than we would climb. Off a lip that correction points at
 			// ground far below us; unclamped it puts the goal under the terrain and we dive at it.
@@ -2353,7 +2350,8 @@ void Locomotor::moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics,
 	two samples and is never seen. Stepping keeps the reported angle a property of the terrain
 	rather than of the INI.
 
-	Returns the surface height under pos. Slopes are in radians, positive uphill.
+	Returns the surface height at the far end of the probe -- the ground we are about to be over,
+	which is the point worth flying above. Slopes are in radians, positive uphill.
 */
 //-------------------------------------------------------------------------------------------------
 /*static*/ Real Locomotor::getSurfaceSlopeAhead(const Coord3D& pos, const Coord3D& dir, Real lookAhead, Real* outNearSlope, Real* outSteepSlope)
@@ -2364,6 +2362,7 @@ void Locomotor::moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics,
 	const Int GROUND_HUG_SAMPLE_STEPS = 4;
 
 	Real htHere = getSurfaceHtAtPt(pos.x, pos.y);
+	Real htPrevOut = htHere;
 	Real nearSlope = 0.0f;
 	Real steepSlope = 0.0f;
 
@@ -2395,6 +2394,7 @@ void Locomotor::moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics,
 			}
 
 			htPrev = htSample;
+			htPrevOut = htSample;
 		}
 	}
 
@@ -2407,7 +2407,7 @@ void Locomotor::moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics,
 		*outSteepSlope = steepSlope;
 	}
 
-	return htHere;
+	return htPrevOut;
 }
 
 //-------------------------------------------------------------------------------------------------
