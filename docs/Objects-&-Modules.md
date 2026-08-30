@@ -486,6 +486,12 @@ Parameters:
 * `CostModifierPercentage = 0` - Percentage amount that the unit's costs are modified
 * `BuildTimeModifierPercentage = 0` - Percentage amount that the unit's build time is modified
 * `UnitTemplateName = <Name of an Object>` - The unit to apply this bonus to. (multiple lines are allowed)
+* `IsOneShotUpgrade = No` - (Yes makes the bonus permanent: it is never removed when the granting
+object dies and does not transfer when it is captured.)
+* `BonusStacksWith = NO_STACKING` - (`NO_STACKING` | `OTHER_TYPE` | `SAME_TYPE`. How the bonus
+stacks when several objects grant it. `NO_STACKING` is the previous behaviour, where only differing
+percentages stack; `OTHER_TYPE` stacks across different source object types; `SAME_TYPE` stacks
+across objects of the same type.)
 
 **Example**
 ```
@@ -499,7 +505,9 @@ End
 ```
 
 **Notes**
-- This upgrade is currently not removable, i.e. it will not work like the CostModifierUpgrade module for Tech OilRefinery. It's only suitable as a global upgrade for now
+- The bonus is now removed when the granting object is destroyed and transfers with it on capture,
+so it works for per-building upgrades such as Tech OilRefinery and not only as a global upgrade.
+Set `IsOneShotUpgrade = Yes` to get the old permanent behaviour back.
 
 ## StealthUpgrade
 
