@@ -332,7 +332,9 @@ Note: HelixContain grants GARRISONED to its passengers in vanilla ZH. This is ch
 A unit whose weapons live on a contained addon turret (an OverlordContain or MultiAddOnContain
 rider) could not be ordered to attack anything only the turret can hit -- the cursor showed a red
 cross, and the workaround was a dummy weapon on the carrier with the turret's range. This key
-replaces the dummy weapon. It works on every contain module.
+replaces the dummy weapon. It works on every contain module except TunnelContain and CaveContain,
+where it parses but stays inert: their contained list is the player's whole shared network, so
+the answers would come from units sitting at other entrances.
 
 * `AcceptTargetsForPassengers = No` - (Yes lets the container accept attack orders on behalf of its
 passengers: when the container's own weapons cannot attack a target, the passengers' weapons are

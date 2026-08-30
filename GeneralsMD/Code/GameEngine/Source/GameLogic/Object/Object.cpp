@@ -3596,6 +3596,17 @@ Bool Object::isAbleToAttack() const
 	if( contain && contain->isPassengerAllowedToFire( getID() ) && contain->getContainCount() > 0 )
 		return true;
 
+	// A container that accepts targets on behalf of its passengers attacks through them the same
+	// way. The clause above cannot answer for it: isPassengerAllowedToFire( getID() ) hands the
+	// container's OWN id to overrides like OverlordContain's, which reject it by KindOf, so a
+	// genuinely weaponless carrier would never think itself able to attack and the delegation in
+	// ActionManager::getCanAttackObject would be unreachable. Like the clause above, this only
+	// says "maybe" -- CanAttack asks the passengers' weapons for the real answer.
+	if( contain && contain->acceptsTargetsForPassengers() && contain->isPassengerAllowedToFire() )
+	{
+		return true;
+	}
+
 	// if we have AI and a weapon, assume we know how to use it
 	if (getAIUpdateInterface() != nullptr && m_weaponSet.hasAnyWeapon())
 	{

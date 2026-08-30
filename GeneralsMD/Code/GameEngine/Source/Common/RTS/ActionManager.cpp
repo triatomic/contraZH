@@ -749,6 +749,23 @@ Bool ActionManager::canEnterObject( const Object *obj, const Object *objectToEnt
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+/** Does the object hold any weapon a player command may fire? Weapons whose command-source mask
+  * excludes the player (AutoChoosesSources) must not light the attack cursor -- Kris's
+  * Demo_GLAInfantryWorker passive-bomb case. One test for the container and its riders alike. */
+// ------------------------------------------------------------------------------------------------
+static Bool hasAnyPlayerUsableWeapon( const Object *obj )
+{
+	for( Int i = 0; i < WEAPONSLOT_COUNT; i++ )
+	{
+		if( obj->getWeaponInWeaponSlotCommandSourceMask( (WeaponSlotType)i ) )
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 CanAttackResult ActionManager::getCanAttackObject( const Object *obj, const Object *objectToAttack, CommandSourceType commandSource, AbleToAttackType attackType )
 {
 
@@ -779,17 +796,7 @@ CanAttackResult ActionManager::getCanAttackObject( const Object *obj, const Obje
 		if( commandSource == CMD_FROM_PLAYER )
 		{
 			//Check if it's got any weapons that can be used.
-			Bool anyValidWeapon = FALSE;
-			for( Int i = 0; i < WEAPONSLOT_COUNT;	i++ )
-			{
-				UnsignedInt cmdSourceMask = obj->getWeaponInWeaponSlotCommandSourceMask( (WeaponSlotType)i );
-				if( cmdSourceMask )
-				{
-					anyValidWeapon = TRUE;
-					break;
-				}
-			}
-			if( !anyValidWeapon )
+			if( !hasAnyPlayerUsableWeapon( obj ) )
 			{
 				return ATTACKRESULT_NOT_POSSIBLE;
 			}
@@ -849,12 +856,23 @@ CanAttackResult ActionManager::getCanAttackObject( const Object *obj, const Obje
 	// whoever answers best speaks for the container, so the cursor and the order gate agree with
 	// what the turret will actually do. This replaces the dummy-weapon workaround, and unlike the
 	// KINDOF_SPAWNS_ARE_THE_WEAPONS branch above it is an opt-in module flag with no side effects.
+	// Only the sources whose orders actually reach the riders may take the riders' answer:
+	// TransportAIUpdate forwards attack orders for player and script commands alone, and AIGroup's
+	// member forwarding is likewise only fed by those two. Answering for CMD_FROM_AI would approve
+	// orders nothing executes and turn AIEnterState's clean failure into a silent no-op.
 	ContainModuleInterface *contain = obj->getContain();
-	if( contain && contain->acceptsTargetsForPassengers() && contain->isPassengerAllowedToFire() )
+	if( contain && contain->acceptsTargetsForPassengers() && contain->isPassengerAllowedToFire()
+			&& ( commandSource == CMD_FROM_PLAYER || commandSource == CMD_FROM_SCRIPT ) )
 	{
 		CanAttackResult best = ATTACKRESULT_NOT_POSSIBLE;
 
 		const ContainedItemsList *lists[] = { contain->getContainedItemsList(), contain->getAddOnList() };
+		if( lists[ 1 ] == lists[ 0 ] )
+		{
+			// OverlordContain and DroneCarrierContain alias their add-on list to the contain list;
+			// without this the same riders would be evaluated twice per query.
+			lists[ 1 ] = nullptr;
+		}
 		for( Int listIndex = 0; listIndex < 2; ++listIndex )
 		{
 			if( lists[ listIndex ] == nullptr )
@@ -887,21 +905,9 @@ CanAttackResult ActionManager::getCanAttackObject( const Object *obj, const Obje
 
 				// Mirror the player-command gate above: a weapon the player cannot fire must not
 				// light the cursor either.
-				if( commandSource == CMD_FROM_PLAYER )
+				if( commandSource == CMD_FROM_PLAYER && !hasAnyPlayerUsableWeapon( rider ) )
 				{
-					Bool anyValidWeapon = FALSE;
-					for( Int i = 0; i < WEAPONSLOT_COUNT; i++ )
-					{
-						if( rider->getWeaponInWeaponSlotCommandSourceMask( (WeaponSlotType)i ) )
-						{
-							anyValidWeapon = TRUE;
-							break;
-						}
-					}
-					if( !anyValidWeapon )
-					{
-						continue;
-					}
+					continue;
 				}
 
 				// CanAttackResult is ordered worst to best, so keep the best answer.
@@ -909,14 +915,16 @@ CanAttackResult ActionManager::getCanAttackObject( const Object *obj, const Obje
 				if( riderResult > best )
 				{
 					best = riderResult;
+					if( best == ATTACKRESULT_POSSIBLE )
+					{
+						// The enum's maximum: no other rider can answer better.
+						return best;
+					}
 				}
 			}
 		}
 
-		if( best != ATTACKRESULT_NOT_POSSIBLE )
-		{
-			return best;
-		}
+		return best;
 	}
 
 	return ATTACKRESULT_NOT_POSSIBLE;
