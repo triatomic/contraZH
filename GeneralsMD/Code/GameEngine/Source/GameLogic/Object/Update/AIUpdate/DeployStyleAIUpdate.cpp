@@ -56,6 +56,7 @@ DeployStyleAIUpdate::DeployStyleAIUpdate( Thing *thing, const ModuleData* module
 {
 	m_state = READY_TO_MOVE;
 	m_frameToWaitForDeploy = 0;
+	m_manualDeploy = FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -74,6 +75,25 @@ void DeployStyleAIUpdate::aiDoCommand( const AICommandParms* parms )
 {
 	if (!isAllowedToRespondToAiCommands(parms))
 		return;
+
+	// Any fresh order other than attacking drops a manual deploy: the player has asked for something
+	// else and the latch would otherwise pin us deployed forever. Attacking is exempt because that is
+	// what a deployed artillery piece is for, and so is idle, which is what toggleManualDeploy itself
+	// issues to stop us before deploying.
+	if( m_manualDeploy )
+	{
+		switch( parms->m_cmd )
+		{
+			case AICMD_IDLE:
+			case AICMD_ATTACK_OBJECT:
+			case AICMD_FORCE_ATTACK_OBJECT:
+			case AICMD_ATTACK_POSITION:
+				break;
+			default:
+				m_manualDeploy = FALSE;
+				break;
+		}
+	}
 
 	/*
 	//Hack code to allow follow waypoint scripts to be converted to attack follow waypoint scripts
@@ -149,11 +169,15 @@ UpdateSleepTime DeployStyleAIUpdate::update()
 
 	// TheSuperHackers @bugfix Caball009 27/07/2026 The pathfinding code may use a stricter attack range check than used
 	// in this function, so the range check is insufficient. Objects are not allowed to deploy and attack if they're moving.
+	// A manual deploy holds the stance until the player says otherwise, so it counts as a reason to
+	// be deployed in its own right, and it suppresses the pack-up branch below. Without the second
+	// half a unit ordered to move would pack up again on the next update, which is the whole point
+	// of the latch.
 #if RETAIL_COMPATIBLE_CRC
-	if (isInRange || isInGuardIdleState)
+	if (isInRange || isInGuardIdleState || m_manualDeploy)
 #else
 	// @todo Simplify the code by moving the second branch up so 'isTryingToMove' is checked first.
-	if (!isTryingToMove && (isInRange || isInGuardIdleState))
+	if ((!isTryingToMove && (isInRange || isInGuardIdleState)) || m_manualDeploy)
 #endif
 	{
 		switch( m_state )
@@ -292,6 +316,54 @@ UpdateSleepTime DeployStyleAIUpdate::update()
 	//into busy state during the update.
 	return UPDATE_SLEEP_NONE;
 
+}
+
+//-------------------------------------------------------------------------------------------------
+/**
+ * Deploy or pack up because the player said so, rather than because a target wandered into range.
+ * The flag latches: update() consults it so we hold the stance instead of immediately undoing it.
+ */
+void DeployStyleAIUpdate::toggleManualDeploy()
+{
+	if( isDeployedOrDeploying() )
+	{
+		// Packing up. Drop the latch and let the normal path run: it centres turrets first when the
+		// unit needs that, and reverses a half finished deploy rather than snapping.
+		m_manualDeploy = FALSE;
+
+		if( m_state == DEPLOY && m_frameToWaitForDeploy != 0 )
+		{
+			setMyState( UNDEPLOY, TRUE );
+		}
+		else if( m_state == READY_TO_ATTACK )
+		{
+			WhichTurretType tur = getWhichTurretForCurWeapon();
+			if( tur != TURRET_INVALID && doTurretsHaveToCenterBeforePacking() )
+			{
+				setMyState( ALIGNING_TURRETS );
+			}
+			else
+			{
+				setMyState( UNDEPLOY );
+			}
+		}
+		return;
+	}
+
+	// Deploying. Stop first -- a unit part way through a move would otherwise be told to pack up
+	// again on the very next update, since that branch is driven by having a path.
+	m_manualDeploy = TRUE;
+	aiIdle( CMD_FROM_PLAYER );
+
+	if( m_state == UNDEPLOY && m_frameToWaitForDeploy != 0 )
+	{
+		// Reverse a half finished pack up at the frame it reached.
+		setMyState( DEPLOY, TRUE );
+	}
+	else if( m_state == READY_TO_MOVE )
+	{
+		setMyState( DEPLOY );
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -482,7 +554,7 @@ void DeployStyleAIUpdate::crc( Xfer *xfer )
 void DeployStyleAIUpdate::xfer( Xfer *xfer )
 {
   // version
-  XferVersion currentVersion = 4;
+  XferVersion currentVersion = 5;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
@@ -493,6 +565,11 @@ void DeployStyleAIUpdate::xfer( Xfer *xfer )
 	{
 		xfer->xferUser(&m_state, sizeof(m_state));
 		xfer->xferUnsignedInt(&m_frameToWaitForDeploy);
+	}
+
+	if( version >= 5 )
+	{
+		xfer->xferBool(&m_manualDeploy);
 	}
 	else if( xfer->getXferMode() == XFER_LOAD )
 	{

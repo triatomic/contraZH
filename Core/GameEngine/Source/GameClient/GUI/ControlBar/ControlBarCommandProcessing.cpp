@@ -1012,6 +1012,17 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 		}
 
+		// Deploy button. As with Hold Fire, only send the message -- the deploy itself happens on the
+		// logic side, or clients would desync.
+		// --------------------------------------------------------------------------------------------
+		case GUI_COMMAND_TOGGLE_DEPLOY:
+		{
+
+			TheMessageStream->appendMessage( GameMessage::MSG_TOGGLE_DEPLOY );
+			break;
+
+		}
+
 #ifdef ALLOW_SURRENDER
 		// ------------------------------------------------------------------------------------------------
 		case GUI_COMMAND_POW_RETURN_TO_PRISON:

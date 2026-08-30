@@ -55,6 +55,7 @@ class WorkerAIInterface;
 class HackInternetAIInterface;
 class AssaultTransportAIInterface;
 class JetAIUpdate;
+class DeployStyleAIUpdate;
 
 struct AttackAngleData;
 
@@ -340,6 +341,8 @@ public:
 	virtual const AssaultTransportAIInterface* getAssaultTransportAIInterface() const { return nullptr; }
 	virtual JetAIUpdate* getJetAIUpdate() { return nullptr; }
 	virtual const JetAIUpdate* getJetAIUpdate() const { return nullptr; }
+	virtual DeployStyleAIUpdate* getDeployStyleAIUpdate() { return nullptr; }
+	virtual const DeployStyleAIUpdate* getDeployStyleAIUpdate() const { return nullptr; }
 
 #ifdef ALLOW_SURRENDER
 	void setSurrendered(const Object* objWeSurrenderedTo, Bool surrendered);

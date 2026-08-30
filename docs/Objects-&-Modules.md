@@ -69,6 +69,33 @@ then keeps aiming, without firing, until it has actually come to rest. It holds 
 fires the moment it settles, so any PreAttackDelay wind-up plays where the shot is taken rather than being
 spent on the approach.
 
+### DeployStyleAIUpdate
+New command for deploying artillery, replacing the old trick of pointing a `FIRE_WEAPON` button at a dummy
+weapon slot. That worked, but it went through the weapon lock and brought its bugs with it.
+
+```
+CommandButton Command_Deploy
+  Command           = TOGGLE_DEPLOY
+  Options           = OK_FOR_MULTI_SELECT
+  ButtonImage       = SNNukeCannonDeploy
+  ButtonBorderType  = ACTION
+  TextLabel         = CONTROLBAR:ToolTipDeploy
+  UnitSpecificSound = NukeCannonVoiceDeploy
+End
+```
+
+`TOGGLE_DEPLOY` needs no `WeaponSlot`. It flips the object between deployed and packed, and the button shows
+as toggled on while deployed. It works on any object with a `DeployStyleAIUpdate`; on anything else the
+button is unavailable.
+
+A deploy asked for this way latches, so the unit holds the stance instead of packing up again the moment
+nothing is in range - which is the point, since it lets a unit deploy before the enemy arrives. The latch is
+dropped when the player gives any order other than an attack, so a move order packs the unit up as usual.
+Automatic deploying when a target comes into range is unchanged.
+
+Selecting a mixed group and pressing the button moves the whole group to one stance rather than flipping each
+unit separately, so a second press does not undo half of them.
+
 ### Turret
 New paramters for Turret or AltTurret entries
 * `MinTurretAngle = 0` - Minimum angle the turret is allowed to turn
