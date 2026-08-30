@@ -4839,6 +4839,23 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 		return nullptr;
 	}
 
+	// NOTWHILEMOVING: while we are actually rolling, do not go looking for targets of opportunity.
+	// Unlike NOTWHILEATTACKING above this DOES respect calledDuringIdle, and that is the whole trick.
+	// The idle scans (AIIdleState, and a turret scanning from its own idle state while the chassis
+	// underneath drives) are what make a unit shoot as it passes something on an ordinary move order,
+	// and those are the ones we want to stop. Attack-move and pursue come through here with
+	// calledDuringIdle false and must keep working: acquiring on the move is what makes an attack-move
+	// unit stop for its target in the first place, so vetoing it there would mean never engaging at all.
+	if (calledDuringIdle && BitIsSet(d->m_autoAcquireEnemiesWhenIdle, AAS_Idle_Not_While_Moving))
+	{
+		const Real NOT_WHILE_MOVING_EPSILON = 0.001f;
+		const PhysicsBehavior *physics = obj->getPhysics();
+		if (physics && fabs(physics->getVelocityMagnitude()) >= NOT_WHILE_MOVING_EPSILON)
+		{
+			return nullptr;
+		}
+	}
+
 	//Check if unit is stealthed... is so we won't acquire targets unless he has
 	//AutoAcquireWhenIdle = Yes Stealthed.
 	if ( calledDuringIdle )

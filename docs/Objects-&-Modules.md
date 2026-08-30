@@ -48,18 +48,25 @@ When a unit turns to attack, it will attempt to turn to this angle. If mirrored 
 Note: this is NOT needed for limited turret angles (See below). Units will follow the actual turret angles when trying to attack.
 
 New `AutoAcquireEnemiesWhenIdle` value:
-* `NOTWHILEMOVING` - the object may not fire while it is moving. Intended for artillery that has to be
-stationary to shoot, which previously had to be faked in other ways.
+* `NOTWHILEMOVING` - the object will not shoot on the move. Intended for artillery that has to be stationary
+to fire, which previously had to be faked in other ways.
 Combine it with the other values as usual, e.g. `AutoAcquireEnemiesWhenIdle = Yes NOTWHILEMOVING`.
 
-Despite living among the acquisition flags, this one gates *firing*, not target acquisition. The object still
-spots enemies while it is driving - it has to, because that is what makes it stop for them. An attack-move
-therefore behaves as expected: the unit drives, spots a target, halts once the target is in range, and opens
-fire. It resumes the move when the target is gone.
+What it does, by order type:
 
-While the object is in motion the shot is held rather than cancelled, so it keeps its target and fires the
-moment it settles. Ordinary move orders are unaffected in the sense that a unit told simply to move will not
-stop to shoot; it just never gets a shot off while rolling.
+| Order | Behaviour |
+|---|---|
+| Move | Drives past enemies without stopping or engaging. |
+| Attack-move | Drives, spots a target, halts once in range, fires, then carries on. |
+| Attack (direct order) | Closes on the target, halts, fires. |
+| Stationary | Fires normally. |
+
+This takes two separate checks, because the two halves pull against each other. Targets of opportunity - the
+idle scans, including a turret scanning while the chassis under it drives - are suppressed while the object is
+in motion, which is what keeps it from shooting on an ordinary move. Attack-move deliberately still acquires
+on the move, because spotting a target while driving is exactly what makes the unit stop for it; the shot
+itself is then held until the object has actually come to rest. The held shot is not cancelled, so the unit
+keeps its target and fires the moment it settles.
 
 ### Turret
 New paramters for Turret or AltTurret entries
