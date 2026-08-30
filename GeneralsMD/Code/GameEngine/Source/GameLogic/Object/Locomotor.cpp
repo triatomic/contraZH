@@ -333,6 +333,10 @@ LocomotorTemplate::LocomotorTemplate()
 	m_locomotorWorksWhenDisabled = false;
 	m_airborneTargetingHeight = INT_MAX;
 	m_stickToGround = false;
+	// zero disables ground hugging entirely, so existing locomotors are untouched
+	m_groundHugHeight = 0.0f;
+	m_groundHugMaxSlope = 0.0f;
+	m_groundHugLookAhead = 0.0f;
 	m_canMoveBackward = false;
 	// defaults match the values the backwards-movement logic used before these were configurable
 	m_backwardsMoveAngleThreshold = PI/2;
@@ -435,6 +439,12 @@ void LocomotorTemplate::validate()
 		}
 	}
 
+	if (m_appearance != LOCO_THRUST) {
+		if (m_groundHugHeight != 0.0f) {
+			DEBUG_CRASH(("'GroundHugHeight' only has an effect on THRUST locomotors!"));
+		}
+	}
+
 #if RTS_GENERALS
 	// TheSuperHackers @info DecelerationPitchLimit was just added in Zero Hour and is therefore defaulted to
 	// AccelerationPitchLimit when zero to preserve the original behavior of Generals.
@@ -503,6 +513,9 @@ const FieldParse* LocomotorTemplate::getFieldParse() const
 		{ "LocomotorWorksWhenDisabled", INI::parseBool, nullptr, offsetof(LocomotorTemplate, m_locomotorWorksWhenDisabled) },
 		{ "AirborneTargetingHeight", INI::parseInt, nullptr, offsetof( LocomotorTemplate, m_airborneTargetingHeight ) },
 		{ "StickToGround",				INI::parseBool,			nullptr,	offsetof(LocomotorTemplate, m_stickToGround) },
+		{ "GroundHugHeight",			INI::parseReal,			nullptr,	offsetof(LocomotorTemplate, m_groundHugHeight) },
+		{ "GroundHugMaxSlope",			INI::parseAngleReal,	nullptr,	offsetof(LocomotorTemplate, m_groundHugMaxSlope) },
+		{ "GroundHugLookAhead",			INI::parseReal,			nullptr,	offsetof(LocomotorTemplate, m_groundHugLookAhead) },
 		{ "CanMoveBackwards",				INI::parseBool,			nullptr,	offsetof(LocomotorTemplate, m_canMoveBackward) },
 		{ "BackwardsMoveAngleThreshold",				INI::parseAngleReal,	nullptr,	offsetof(LocomotorTemplate, m_backwardsMoveAngleThreshold) },
 		{ "BackwardsMoveDistanceFactorThreshold",	INI::parseReal,			nullptr,	offsetof(LocomotorTemplate, m_backwardsMoveDistanceFactorThreshold) },
@@ -2138,6 +2151,41 @@ void Locomotor::moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics,
 		zDirDamping = 1.0f - (delta / MAX_VERTICAL_DAMP_RANGE);
 #endif
 	}
+	else if( m_template->m_groundHugHeight != 0.0f && !getFlag(PRECISE_Z_POS) )
+	{
+		// Ground hugging with no PreferredHeight. The block above is the only terrain awareness
+		// the thrust path has, and it is skipped entirely when PreferredHeight is zero, so a wave
+		// fired off a ridge keeps the Z it was launched at. Sample the terrain a little ahead of
+		// us so the climb starts before we reach a rise rather than into the face of it.
+		Real lookAhead = m_template->m_groundHugLookAhead;
+		if (lookAhead <= 0.0f)
+		{
+			lookAhead = PATHFIND_CELL_SIZE_F;
+		}
+
+		Vector3 fwd = obj->getTransformMatrix()->Get_X_Vector();
+		Coord3D dir;
+		dir.x = fwd.X;
+		dir.y = fwd.Y;
+		dir.z = 0.0f;
+
+		Real slope = 0.0f;
+		Real surfaceHt = getSurfaceHtAhead(pos, dir, lookAhead, &slope);
+
+		// Ground steeper than we are willing to climb is a cliff, not a bump: stop hugging and
+		// hold our height, so the terrain rises past us and the usual collision fires.
+		Bool tooSteep = (m_template->m_groundHugMaxSlope != 0.0f && slope > m_template->m_groundHugMaxSlope);
+		if (!tooSteep)
+		{
+			// Damped like the PreferredHeight case, and the deflection is still clamped by
+			// MaxThrustAngle below, so this bends the flight rather than snapping Z the way
+			// StickToGround does.
+			localGoalPos.z = m_template->m_groundHugHeight + surfaceHt;
+			Real delta = localGoalPos.z - pos.z;
+			delta *= getPreferredHeightDamping();
+			localGoalPos.z = pos.z + delta;
+		}
+	}
 
 	Vector3 forwardDir = obj->getTransformMatrix()->Get_X_Vector();
 
@@ -2241,6 +2289,36 @@ void Locomotor::moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics,
 	}
 
 	return ht;
+}
+
+//-------------------------------------------------------------------------------------------------
+/**
+	Sample the surface a little ahead of pos along dir, and report both the height there and the
+	slope of the climb from the surface under pos to the surface ahead. Sampling ahead is the whole
+	point: a rise checked only underfoot is a wall by the time it is noticed, while the same rise
+	seen a cell early is a ramp. Returns the height ahead and fills outSlope with the climb angle
+	in radians, positive uphill.
+*/
+//-------------------------------------------------------------------------------------------------
+/*static*/ Real Locomotor::getSurfaceHtAhead(const Coord3D& pos, const Coord3D& dir, Real lookAhead, Real* outSlope)
+{
+	Real dirLen = sqrtf(sqr(dir.x) + sqr(dir.y));
+	Coord3D ahead = pos;
+	if (dirLen > 0.0f)
+	{
+		ahead.x += (dir.x / dirLen) * lookAhead;
+		ahead.y += (dir.y / dirLen) * lookAhead;
+	}
+
+	Real htHere = getSurfaceHtAtPt(pos.x, pos.y);
+	Real htAhead = getSurfaceHtAtPt(ahead.x, ahead.y);
+
+	if (outSlope != nullptr)
+	{
+		*outSlope = atan2(htAhead - htHere, lookAhead);
+	}
+
+	return htAhead;
 }
 
 //-------------------------------------------------------------------------------------------------

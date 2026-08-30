@@ -205,6 +205,9 @@ private:
 	Bool											m_apply2DFrictionWhenAirborne;	// apply "2d friction" even when airborne... useful for realistic-looking movement
 	Bool											m_downhillOnly;	// pinewood derby, moves only by gravity pulling downhill
 	Bool											m_stickToGround;				// if true, can't leave ground
+	Real											m_groundHugHeight;			///< if nonzero, THRUST locos hold this height above terrain even when PreferredHeight is 0
+	Real											m_groundHugMaxSlope;		///< if nonzero, stop hugging when terrain ahead rises steeper than this (radians); makes cliffs solid
+	Real											m_groundHugLookAhead;		///< how far ahead to sample terrain for hugging; 0 = one pathfind cell
 	Bool											m_canMoveBackward;				// if true, can move backwards.
 	Real											m_backwardsMoveAngleThreshold;			///< goal must be at least this far off our heading (radians) before we reverse
 	Real											m_backwardsMoveDistanceFactorThreshold;	///< max reverse distance, as a factor of the object's MajorRadius
@@ -294,6 +297,9 @@ public:
 	Bool getLocomotorWorksWhenDead() const { return m_template->m_locomotorWorksWhenDead; }
 	Bool getLocomotorWorksWhenDisabled() const { return m_template->m_locomotorWorksWhenDisabled; }
 	Bool getStickToGround() const { return m_template->m_stickToGround; }
+	Real getGroundHugHeight() const { return m_template->m_groundHugHeight; }
+	Real getGroundHugMaxSlope() const { return m_template->m_groundHugMaxSlope; }
+	Real getGroundHugLookAhead() const { return m_template->m_groundHugLookAhead; }
 	Real getCloseEnoughDist() const { return m_closeEnoughDist; }
 	Bool isCloseEnoughDist3D() const { return getFlag(IS_CLOSE_ENOUGH_DIST_3D); }
 	Bool hasSuspension() const {return m_template->m_hasSuspension;}
@@ -380,6 +386,7 @@ public:
 	void startMove(); ///< Indicates that a move is starting, primarily to reset the donut timer. jba.
 
 	static Real getSurfaceHtAtPt(Real x, Real y);
+	static Real getSurfaceHtAhead(const Coord3D& pos, const Coord3D& dir, Real lookAhead, Real* outSlope);
 
 	inline void applySpeedMultiplier(Real scalar) { m_speedMultiplier *= scalar; }
 	// inline void setSpeedMultiplier(Real value) { m_speedMultiplier = value; }
