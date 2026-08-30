@@ -554,7 +554,14 @@ void DeployStyleAIUpdate::crc( Xfer *xfer )
 void DeployStyleAIUpdate::xfer( Xfer *xfer )
 {
   // version
+  // The manual deploy latch is only persisted where we are free to change the save format.
+  // In a retail compatible build it is simply not written, and a loaded unit reverts to
+  // deploying automatically, which is harmless.
+#if RETAIL_COMPATIBLE_XFER_SAVE
+  XferVersion currentVersion = 4;
+#else
   XferVersion currentVersion = 5;
+#endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
@@ -565,11 +572,11 @@ void DeployStyleAIUpdate::xfer( Xfer *xfer )
 	{
 		xfer->xferUser(&m_state, sizeof(m_state));
 		xfer->xferUnsignedInt(&m_frameToWaitForDeploy);
-	}
 
-	if( version >= 5 )
-	{
-		xfer->xferBool(&m_manualDeploy);
+		if( version >= 5 )
+		{
+			xfer->xferBool(&m_manualDeploy);
+		}
 	}
 	else if( xfer->getXferMode() == XFER_LOAD )
 	{
