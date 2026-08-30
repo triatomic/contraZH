@@ -195,7 +195,11 @@ Bool handleInGameSlashCommands(UnicodeString uText)
 		const ChatCommand *command = TheChatCommandStore->findChatCommand(token);
 		if (command)
 		{
-			command->execute();
+			// nextToken() above left everything after the command name in "remainder"; hand it to
+			// the command as its argument, trimmed of the separating whitespace.
+			AsciiString args;
+			remainder.nextToken(&args);
+			command->execute(args);
 			return TRUE; // was a slash command
 		}
 	}
