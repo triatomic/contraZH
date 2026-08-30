@@ -4839,6 +4839,14 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 		return nullptr;
 	}
 
+	// Like NOTWHILEATTACKING above, this ignores calledDuringIdle: a turreted unit scans for
+	// idle mood targets from its own idle state even while the chassis is driving, so gating on
+	// calledDuringIdle would not stop it. Intended for artillery that must be stationary to fire.
+	if (isMoving() && BitIsSet(d->m_autoAcquireEnemiesWhenIdle, AAS_Idle_Not_While_Moving))
+	{
+		return nullptr;
+	}
+
 	//Check if unit is stealthed... is so we won't acquire targets unless he has
 	//AutoAcquireWhenIdle = Yes Stealthed.
 	if ( calledDuringIdle )

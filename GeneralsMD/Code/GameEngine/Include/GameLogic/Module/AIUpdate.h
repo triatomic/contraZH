@@ -122,6 +122,7 @@ enum AutoAcquireStates CPP_11(: Int)
 	AAS_Idle_No										= 0x04,
 	AAS_Idle_Not_While_Attacking	= 0x08,
 	AAS_Idle_Attack_Buildings			= 0x10,
+	AAS_Idle_Not_While_Moving			= 0x20,
 };
 
 #ifdef DEFINE_AUTOACQUIRE_NAMES
@@ -132,6 +133,7 @@ static const char *const TheAutoAcquireEnemiesNames[] =
 	"NO",
 	"NOTWHILEATTACKING",
 	"ATTACK_BUILDINGS",
+	"NOTWHILEMOVING",
 
 	nullptr
 };

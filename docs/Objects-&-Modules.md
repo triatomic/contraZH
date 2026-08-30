@@ -47,6 +47,15 @@ New experimental parameter:
 When a unit turns to attack, it will attempt to turn to this angle. If mirrored is enable it can also use the same angle +180°. Possibly useful for battleship setups with multiple turrets. Only works for locomotors that can turn in place (minTurnSpeed = 0)
 Note: this is NOT needed for limited turret angles (See below). Units will follow the actual turret angles when trying to attack.
 
+New `AutoAcquireEnemiesWhenIdle` value:
+* `NOTWHILEMOVING` - the object will not pick up targets of opportunity while it is moving.
+Combine it with the other values as usual, e.g. `AutoAcquireEnemiesWhenIdle = Yes NOTWHILEMOVING`.
+
+Intended for artillery that has to be stationary to fire, which previously needed to be faked in other ways.
+Like `NOTWHILEATTACKING`, this applies to every mood scan and not only to the idle one, so a turret on a moving
+chassis is covered too - the turret runs its own idle scan while the vehicle drives.
+It only suppresses *automatic* target acquisition; an explicit player or script attack order is unaffected.
+
 ### Turret
 New paramters for Turret or AltTurret entries
 * `MinTurretAngle = 0` - Minimum angle the turret is allowed to turn
