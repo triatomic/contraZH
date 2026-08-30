@@ -2157,10 +2157,19 @@ void Locomotor::moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics,
 		// the thrust path has, and it is skipped entirely when PreferredHeight is zero, so a wave
 		// fired off a ridge keeps the Z it was launched at. Sample the terrain a little ahead of
 		// us so the climb starts before we reach a rise rather than into the face of it.
+		// Unset, work out a useful distance rather than making the modder guess one. What matters
+		// is having a few frames to react, so scale it off how far we travel in that time, and
+		// never sample closer than a heightmap cell or the samples all land in the same cell and
+		// tell us nothing new.
 		Real lookAhead = getGroundHugLookAhead();
 		if (lookAhead <= 0.0f)
 		{
-			lookAhead = PATHFIND_CELL_SIZE_F;
+			const Real GROUND_HUG_REACTION_FRAMES = 6.0f;
+			lookAhead = (maxForwardSpeed * GROUND_HUG_REACTION_FRAMES);
+			if (lookAhead < PATHFIND_CELL_SIZE_F)
+			{
+				lookAhead = PATHFIND_CELL_SIZE_F;
+			}
 		}
 
 		// Sample along where we are actually travelling. The transform is only turned to face our
@@ -2184,7 +2193,15 @@ void Locomotor::moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics,
 		// refusing it is what used to pitch us off a plateau: hugging switched off at the lip and
 		// back on once both samples were on the low ground, by which point matching the surface
 		// meant diving at the valley floor.
-		Bool tooSteep = (getGroundHugMaxSlope() != 0.0f && steepSlope > getGroundHugMaxSlope());
+		// Unset, fall back to how far we can deflect our thrust in a frame. Ground steeper than
+		// that cannot be flown onto however willing we are, so it is the honest limit.
+		Real maxSlope = getGroundHugMaxSlope();
+		if (maxSlope <= 0.0f)
+		{
+			maxSlope = m_template->m_maxThrustAngle;
+		}
+
+		Bool tooSteep = (maxSlope > 0.0f && steepSlope > maxSlope);
 		if (!tooSteep)
 		{
 			// Follow the gradient of the ground rather than snapping to its height. Extrapolating
@@ -2198,9 +2215,9 @@ void Locomotor::moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics,
 
 			// Never descend more steeply than we would climb. Off a lip that correction points at
 			// ground far below us; unclamped it puts the goal under the terrain and we dive at it.
-			if (getGroundHugMaxSlope() != 0.0f)
+			if (maxSlope > 0.0f)
 			{
-				Real maxDescent = -Tan(getGroundHugMaxSlope()) * lookAhead;
+				Real maxDescent = -Tan(maxSlope) * lookAhead;
 				if (rise < maxDescent)
 				{
 					rise = maxDescent;

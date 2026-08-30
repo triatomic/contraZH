@@ -20,14 +20,16 @@ the ground without chasing a target.
 
 * `GroundHugHeight = 4.0` - (Height above the surface to hold, even when `PreferredHeight` is 0.
 Terrain following is off while this is 0. Default = 0)
-* `GroundHugMaxSlope = 35` - (The steepest ground the object will follow. Terrain ahead *rising*
-more steeply than this stops the following, so cliffs are collided with instead of climbed;
-ground *falling* more steeply is followed at this angle instead, so the object glides off a drop
-rather than diving down it. No limit when 0. Default = 0)
-* `GroundHugLookAhead = 15.0` - (How far ahead of the object the terrain is sampled. Larger values
-start the climb earlier. The distance is sampled in steps and the object reacts to the steepest
-step in it, so changing this changes when the object reacts, not how steep it judges the ground
-to be. 0 means one pathfinder cell, i.e. 10. Default = 0)
+* `GroundHugMaxSlope = 35` - (Optional. The steepest ground the object will follow. Terrain ahead
+*rising* more steeply than this stops the following, so cliffs are collided with instead of
+climbed; ground *falling* more steeply is followed at this angle instead, so the object glides
+off a drop rather than diving down it. Left at 0 it uses `MaxThrustAngle`, which is the steepest
+the object could fly onto anyway. Default = 0, meaning `MaxThrustAngle`)
+* `GroundHugLookAhead = 15.0` - (Optional. How far ahead of the object the terrain is sampled.
+Larger values start the climb earlier. The distance is sampled in steps and the object reacts to
+the steepest step in it, so changing this changes when the object reacts, not how steep it judges
+the ground to be. Left at 0 it is worked out from `Speed`, far enough to give a few frames of
+warning and never less than one pathfinder cell. Default = 0, meaning automatic)
 * `PreferredHeightDamping = 0.3` - (Existing key, but set it: it damps the hug as well. The default
 of 1.0 means the height is matched in a single frame, which reintroduces the bump-grinding this
 feature exists to avoid. Lower is smoother. Default = 1.0)
@@ -35,6 +37,8 @@ feature exists to avoid. Lower is smoother. Default = 1.0)
 Notes:
 * Only has an effect on `Appearance = THRUST`, and only while `PreferredHeight` is 0. A locomotor
 with a `PreferredHeight` keeps using that and ignores these keys.
+* `GroundHugHeight` is the only one that has to be set. The other two work themselves out from
+`MaxThrustAngle` and `Speed`; set them only to override what that gives you.
 * Unlike `StickToGround`, the height change is a thrust adjustment damped by
 `PreferredHeightDamping` and clamped by `MaxThrustAngle`, not a hard snap onto the ground. That is
 what lets it ride over bumps rather than grind into them.
