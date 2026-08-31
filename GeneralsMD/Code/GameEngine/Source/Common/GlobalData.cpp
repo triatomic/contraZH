@@ -1136,6 +1136,8 @@ GlobalData::GlobalData()
 	m_selectionCircleEnabled = FALSE;
 	m_smartPips = FALSE;
 	m_numericalHealth = FALSE;
+	m_newRadar = FALSE;
+	m_radarBlipSize = RadarBlipSize_Default;
 	m_particleNameLingerMS = 0;
 	m_gridHotkeysEnabled = FALSE;
 	m_gridHotkeyLayout.clear();
@@ -1341,6 +1343,8 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_selectionCircleEnabled = optionPref.getSelectionCircleEnabled();
 	TheWritableGlobalData->m_smartPips = optionPref.getSmartPipsEnabled();
 	TheWritableGlobalData->m_numericalHealth = optionPref.getNumericalHealthEnabled();
+	TheWritableGlobalData->m_newRadar = optionPref.getNewRadarEnabled();
+	TheWritableGlobalData->m_radarBlipSize = optionPref.getRadarBlipSize();
 	TheWritableGlobalData->m_particleNameLingerMS = optionPref.getParticleNameLingerMS();
 	TheWritableGlobalData->m_gridHotkeysEnabled = optionPref.getGridHotkeysEnabled();
 	TheWritableGlobalData->m_gridHotkeyLayout = optionPref.getGridHotkeyLayout();

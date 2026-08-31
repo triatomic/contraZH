@@ -32,6 +32,7 @@
 #include "Common/AudioEventRTS.h"
 #include "Common/Debug.h"
 #include "Common/GlobalData.h"
+#include "Common/OptionPreferences.h"
 #include "Common/GameUtility.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -56,6 +57,8 @@
 #include "WW3D2/dx8caps.h"
 #include "WWMath/vector2i.h"
 
+#include <vector>
+
 
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
@@ -64,10 +67,10 @@ enum { OVERLAY_REFRESH_RATE = 6 };  ///< over updates once this many frames
 //-------------------------------------------------------------------------------------------------
 /** Is the point legal, that is, inside the resolution of the radar cells */
 //-------------------------------------------------------------------------------------------------
-inline Bool legalRadarPoint( Int px, Int py )
+Bool W3DRadar::legalRadarPoint( Int px, Int py ) const
 {
 
-	if( px < 0 || py < 0 || px >= RADAR_CELL_WIDTH || py >= RADAR_CELL_HEIGHT )
+	if( px < 0 || py < 0 || px >= getCellWidth() || py >= getCellHeight() )
 		return FALSE;
 
 	return TRUE;
@@ -197,8 +200,8 @@ void W3DRadar::reconstructViewBox()
 	{
 
 		// first convert to radar cells
- 		radar[ i ].x = world[ i ].x / (m_mapExtent.width() / RADAR_CELL_WIDTH);
- 		radar[ i ].y = world[ i ].y / (m_mapExtent.height() / RADAR_CELL_HEIGHT);
+ 		radar[ i ].x = world[ i ].x / (m_mapExtent.width() / getCellWidth());
+ 		radar[ i ].y = world[ i ].y / (m_mapExtent.height() / getCellHeight());
 
 		//
 		// store these points in the view box array which contains a first position
@@ -235,9 +238,9 @@ void W3DRadar::radarToPixel( const ICoord2D *radar, ICoord2D *pixel,
 	if( radar == nullptr || pixel == nullptr )
 		return;
 
-	pixel->x = (radar->x * radarWidth / RADAR_CELL_WIDTH) + radarUpperLeftX;
+	pixel->x = (radar->x * radarWidth / getCellWidth()) + radarUpperLeftX;
 	// note the "inverted" y here to orient the way our world looks with +x=right and -y=down
-	pixel->y = ((RADAR_CELL_HEIGHT - 1 - radar->y) * radarHeight / RADAR_CELL_HEIGHT) + radarUpperLeftY;
+	pixel->y = ((getCellHeight() - 1 - radar->y) * radarHeight / getCellHeight()) + radarUpperLeftY;
 
 }
 
@@ -253,8 +256,8 @@ void W3DRadar::drawHeroIcon( Int pixelX, Int pixelY, Int width, Int height, cons
 	{
 		// convert world to radar coords
 		ICoord2D ulRadar;
-		ulRadar.x = pos->x / (m_mapExtent.width() / RADAR_CELL_WIDTH);
-		ulRadar.y = pos->y / (m_mapExtent.height() / RADAR_CELL_HEIGHT);
+		ulRadar.x = pos->x / (m_mapExtent.width() / getCellWidth());
+		ulRadar.y = pos->y / (m_mapExtent.height() / getCellHeight());
 
 		// convert radar to screen coords
 		ICoord2D offsetScreen;
@@ -306,8 +309,8 @@ void W3DRadar::drawViewBox( Int pixelX, Int pixelY, Int width, Int height )
 		return;
 
 	// convert world to radar coords
- 	ulRadar.x = ulWorld.x / (m_mapExtent.width() / RADAR_CELL_WIDTH);
- 	ulRadar.y = ulWorld.y / (m_mapExtent.height() / RADAR_CELL_HEIGHT);
+ 	ulRadar.x = ulWorld.x / (m_mapExtent.width() / getCellWidth());
+ 	ulRadar.y = ulWorld.y / (m_mapExtent.height() / getCellHeight());
 
 	//
 	// convert radar point to actual pixel coords on the screen, shifted
@@ -630,6 +633,23 @@ void W3DRadar::updateObjectTexture(TextureClass *texture)
 }
 
 //-------------------------------------------------------------------------------------------------
+/** The alpha a stealthed object blinks at this frame. Both the blip core and the outline around
+	* it take this, so that a stealthed unit fades as one thing rather than leaving a solid ring
+	* around a vanishing middle. */
+//-------------------------------------------------------------------------------------------------
+UnsignedByte W3DRadar::stealthBlinkAlpha()
+{
+	const UnsignedInt framesForTransition = LOGICFRAMES_PER_SECOND;
+	const UnsignedByte minAlpha = 32;
+
+	Real alphaScale = INT_TO_REAL(TheGameLogic->getFrame() % framesForTransition) / (framesForTransition / 2.0f);
+	if( alphaScale > 0.0f )
+		return REAL_TO_UNSIGNEDBYTE( ((alphaScale - 1.0f) * (255.0f - minAlpha)) + minAlpha );
+
+	return REAL_TO_UNSIGNEDBYTE( (alphaScale * (255.0f - minAlpha)) + minAlpha );
+
+}
+//-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 Bool W3DRadar::canRenderObject( const RadarObject *rObj, const Player *localPlayer )
 {
@@ -678,6 +698,111 @@ Bool W3DRadar::canRenderObject( const RadarObject *rObj, const Player *localPlay
 }
 
 //-------------------------------------------------------------------------------------------------
+/** Draw one list of radar blips straight onto the screen, rather than into the overlay texture.
+	*
+	* The overlay texture is built at the radar cell resolution and then scaled down into whatever
+	* the radar window happens to be, so a blip drawn into it is either smeared by the filtering on
+	* the way down or, with the filtering off, shimmers as the texel that wins under each screen
+	* pixel changes while the unit moves. Drawing at screen resolution sidesteps both: the blip is
+	* the size it is meant to be, its edges land on pixel boundaries, and it moves smoothly.
+	*
+	* Called once per pass; see RadarBlipPass. */
+//-------------------------------------------------------------------------------------------------
+void W3DRadar::drawObjectListBlips( const RadarObject *listHead, RadarBlipPass pass,
+																 Int pixelX, Int pixelY, Int width, Int height )
+{
+
+	// sanity
+	if( listHead == nullptr )
+		return;
+
+	Player *player = rts::getObservedOrLocalPlayer();
+
+	//
+	// how big a blip is on screen. The radar window is a good deal smaller than the cell grid, so
+	// these are in screen pixels and do not follow the grid at all.
+	//
+	const UnsignedByte outlineAlpha = 200;
+
+	// the world to radar cell divisors do not change between objects
+	const Real xSample = m_mapExtent.width() / getCellWidth();
+	const Real ySample = m_mapExtent.height() / getCellHeight();
+
+	// keep the blips inside the radar image, the same region the terrain is drawn into
+	const Int clipLoX = pixelX;
+	const Int clipLoY = pixelY;
+	const Int clipHiX = pixelX + width;
+	const Int clipHiY = pixelY + height;
+
+	for( const RadarObject *rObj = listHead; rObj; rObj = rObj->friend_getNext() )
+	{
+		if (!canRenderObject(rObj, player))
+			continue;
+
+		// get object position
+		const Object *obj = rObj->friend_getObject();
+		const Coord3D *pos = obj->getPosition();
+
+		// world to radar cell, then radar cell to a pixel inside the radar image
+		ICoord2D radarPoint;
+		radarPoint.x = pos->x / xSample;
+		radarPoint.y = pos->y / ySample;
+
+		if( legalRadarPoint( radarPoint.x, radarPoint.y ) == FALSE )
+			continue;
+
+		ICoord2D screenPoint;
+		radarToPixel( &radarPoint, &screenPoint, pixelX, pixelY, width, height );
+
+		// get the color we are going to draw in
+		UnsignedByte r, g, b, a;
+		GameGetColorComponents( rObj->getColor(), &r, &g, &b, &a );
+
+		// adjust the alpha for stealth units so they "fade/blink" on the radar for the controller
+		if( obj->testStatus( OBJECT_STATUS_STEALTHED ) )
+		{
+			a = stealthBlinkAlpha();
+		}
+
+		//
+		// structures draw bigger than units. They are large and they do not move, so reading a base
+		// apart from the army standing in it is worth the extra pixels.
+		//
+		const Bool isStructure = (obj->getRadarPriority() == RADAR_PRIORITY_STRUCTURE);
+		const Int coreSize = isStructure ? m_structureBlipSize : m_unitBlipSize;
+
+		// centre the blip on the object rather than hanging it off to one side
+		Int drawSize = (pass == RADAR_BLIP_PASS_OUTLINE) ? coreSize + 2 : coreSize;
+		Int drawX = screenPoint.x - drawSize / 2;
+		Int drawY = screenPoint.y - drawSize / 2;
+
+		// clip to the radar image
+		if( drawX < clipLoX || drawY < clipLoY ||
+				drawX + drawSize > clipHiX || drawY + drawSize > clipHiY )
+			continue;
+
+		if( pass == RADAR_BLIP_PASS_OUTLINE )
+		{
+
+			//
+			// fade the outline in step with the core, otherwise a stealthed unit sits inside a
+			// solid ring while the middle of it blinks away
+			//
+			const Color outlineColor = GameMakeColor( 0, 0, 0, (UnsignedByte)((outlineAlpha * a) / 255) );
+			TheDisplay->drawFillRect( drawX, drawY, drawSize, drawSize, outlineColor );
+
+		}
+		else
+		{
+
+			TheDisplay->drawFillRect( drawX, drawY, drawSize, drawSize, GameMakeColor( r, g, b, a ) );
+
+		}
+
+	}
+
+}
+//-------------------------------------------------------------------------------------------------
 /** Render an object list into the texture passed in */
 //-------------------------------------------------------------------------------------------------
 void W3DRadar::renderObjectList( const RadarObject *listHead, TextureClass *texture )
@@ -711,8 +836,8 @@ void W3DRadar::renderObjectList( const RadarObject *listHead, TextureClass *text
 		const Coord3D *pos = obj->getPosition();
 
 		// compute object position as a radar blip
-		radarPoint.x = pos->x / (m_mapExtent.width() / RADAR_CELL_WIDTH);
-		radarPoint.y = pos->y / (m_mapExtent.height() / RADAR_CELL_HEIGHT);
+		radarPoint.x = pos->x / (m_mapExtent.width() / getCellWidth());
+		radarPoint.y = pos->y / (m_mapExtent.height() / getCellHeight());
 
 		// get the color we're going to draw in
 		Color argbColor = rObj->getColor();
@@ -726,14 +851,7 @@ void W3DRadar::renderObjectList( const RadarObject *listHead, TextureClass *text
 			UnsignedByte r, g, b, a;
 			GameGetColorComponents( argbColor, &r, &g, &b, &a );
 
-			const UnsignedInt framesForTransition = LOGICFRAMES_PER_SECOND;
-			const UnsignedByte minAlpha = 32;
-
-			Real alphaScale = INT_TO_REAL(TheGameLogic->getFrame() % framesForTransition) / (framesForTransition / 2.0f);
-			if( alphaScale > 0.0f )
-				a = REAL_TO_UNSIGNEDBYTE( ((alphaScale - 1.0f) * (255.0f - minAlpha)) + minAlpha );
-			else
-				a = REAL_TO_UNSIGNEDBYTE( (alphaScale * (255.0f - minAlpha)) + minAlpha );
+			a = stealthBlinkAlpha();
 			argbColor = GameMakeColor( r, g, b, a );
 
 		}
@@ -763,6 +881,56 @@ void W3DRadar::renderObjectList( const RadarObject *listHead, TextureClass *text
 
 }
 
+//-------------------------------------------------------------------------------------------------
+/** Does this terrain sample read as a man made surface rather than natural ground?
+	*
+	* The terrain sampler only hands back the averaged color of the texture under the point, so there
+	* is nothing in it that says "this is concrete" -- the material has to be guessed from the color.
+	* Natural ground keeps a colour cast to it, greens and browns and sand, while rock, concrete and
+	* snow all come back close to neutral, so how far the sample sits from grey sorts the two apart.
+	*
+	* Brightness deliberately does not come into it. Calling anything bright enough man made looks
+	* like it would catch pale concrete, but it catches desert sand first: sand is bright and it is
+	* everywhere, and a desert then draws as though the whole map were paved. The cast on its own
+	* already tells the two apart, sand being warm where concrete is neutral. */
+//-------------------------------------------------------------------------------------------------
+Bool W3DRadar::isManMadeTerrainColor( const RGBColor *color ) const
+{
+	const Real greyThreshold = 0.10f;		// below this much colour cast the sample is called man made
+
+	//
+	// how far from neutral the colour sits. The spread between the strongest and weakest channel
+	// is the cheap stand in for saturation, and it does not need to be more clever than that.
+	//
+	const Real channelHi = max( color->red, max( color->green, color->blue ) );
+	const Real channelLo = min( color->red, min( color->green, color->blue ) );
+	const Real colorCast = channelHi - channelLo;
+
+	return (colorCast < greyThreshold);
+
+}
+
+//-------------------------------------------------------------------------------------------------
+/** The tone the new radar draws ground in: a pale grey for rock and the man made surfaces sitting
+	* on it, and an olive for everything natural.
+	*
+	* Mixed by how much of the cell read as man made rather than picked outright, because picking
+	* leaves every boundary a hard step between the two tones and the ground stops looking like
+	* ground. Ground that is all one thing still comes out as one flat tone, which is the look this
+	* is after; it is only the cells along an edge that land somewhere in between. */
+//-------------------------------------------------------------------------------------------------
+void W3DRadar::getTerrainTone( RGBColor *color, Real manMadeFraction ) const
+{
+	const RGBColor groundTone = { 0.45f, 0.42f, 0.26f };		///< olive for natural ground
+	const RGBColor structureTone = { 0.72f, 0.73f, 0.72f };	///< pale grey for rock and concrete
+
+	manMadeFraction = clamp( 0.0f, manMadeFraction, 1.0f );
+
+	color->red = groundTone.red + (structureTone.red - groundTone.red) * manMadeFraction;
+	color->green = groundTone.green + (structureTone.green - groundTone.green) * manMadeFraction;
+	color->blue = groundTone.blue + (structureTone.blue - groundTone.blue) * manMadeFraction;
+
+}
 //-------------------------------------------------------------------------------------------------
 /** Shade the color passed in using the height parameter to lighten and darken it.  Colors
 	* will be interpolated using the value "height" across the range from loZ to hiZ.  The
@@ -862,8 +1030,26 @@ W3DRadar::W3DRadar()
 	m_shroudSurfaceFormat = WW3D_FORMAT_UNKNOWN;
 	m_shroudSurfacePixelSize = 0;
 
-	m_textureWidth = RADAR_CELL_WIDTH;
-	m_textureHeight = RADAR_CELL_HEIGHT;
+	m_textureWidth = getCellWidth();
+	m_textureHeight = getCellHeight();
+
+	m_newRadar = (TheGlobalData && TheGlobalData->m_newRadar);
+
+	//
+	// resolve the blip size option into screen pixels here, so the draw loop just reads a number.
+	// Both sizes are odd, because a blip is centred on its object by halving its size and an even
+	// one would land half a pixel off.
+	//
+	if( TheGlobalData && TheGlobalData->m_radarBlipSize == RadarBlipSize_Small )
+	{
+		m_unitBlipSize = 3;
+		m_structureBlipSize = 5;
+	}
+	else
+	{
+		m_unitBlipSize = 5;
+		m_structureBlipSize = 7;
+	}
 
 	m_reconstructViewBox = TRUE;
 
@@ -1080,6 +1266,29 @@ void W3DRadar::buildTerrainTexture( TerrainLogic *terrain )
 	void *pBits = surface->Lock(&pitch);
 	const unsigned int bytesPerPixel = Get_Bytes_Per_Pixel(surfaceDesc.Format);
 
+	//
+	// TheSuperHackers @feature the new radar draws a contour where the water meets the land. Note
+	// down which cells are water, and what colour each one came out, so that a second pass can
+	// darken just the waterline. Nothing is allocated for the retail radar.
+	//
+	std::vector<UnsignedByte> waterFlags;
+	std::vector<RGBColor> cellColors;
+	if( m_newRadar )
+	{
+		waterFlags.resize( m_textureWidth * m_textureHeight, 0 );
+		cellColors.resize( m_textureWidth * m_textureHeight );
+	}
+
+	//
+	// water is a smooth depth gradient rather than tiled texture, so unlike the terrain it does
+	// want a wider sample window at the finer grid, and it has no hard edges to soften.
+	//
+	Int waterSampleRadius = getCellWidth() / RADAR_CELL_WIDTH;
+	if( waterSampleRadius > 2 )
+	{
+		waterSampleRadius = 2;
+	}
+
 	for( y = 0; y < m_textureHeight; y++ )
 	{
 
@@ -1111,10 +1320,15 @@ void W3DRadar::buildTerrainTexture( TerrainLogic *terrain )
 
 			// create a color based on the Z height of the map
 			Real waterZ;
-			if( workingBridge == FALSE && terrain->isUnderwater( worldPoint.x, worldPoint.y, &waterZ ) )
+			const Bool isWater = terrain->isUnderwater( worldPoint.x, worldPoint.y, &waterZ );
+			if( m_newRadar )
 			{
-				const Int waterSamplesAway = 1;		// how many "tiles" from the center tile we will sample away
-																					// to average a color for the tile color
+				waterFlags[ y * m_textureWidth + x ] = isWater ? 1 : 0;
+			}
+
+			if( workingBridge == FALSE && isWater )
+			{
+				const Int waterSamplesAway = waterSampleRadius;
 
 				sampleColor.red = sampleColor.green = sampleColor.blue = 0.0f;
 				samples = 0;
@@ -1176,11 +1390,22 @@ void W3DRadar::buildTerrainTexture( TerrainLogic *terrain )
 			}
 			else  // regular terrain ...
 			{
-				const Int samplesAway = 1;  // how many "tiles" from the center tile we will sample away
-																		// to average a color for the tile color
+				//
+				// how many "tiles" from the center tile we will sample away to average a color for the
+				// tile color. TheSuperHackers @feature a cell at the doubled grid covers half the world
+				// a retail cell did, so a fixed window would average a quarter of the ground it used to
+				// and every patch of texture would speckle through. The two tone mix already flattens
+				// the texture out far better than averaging did, so this is no longer about noise: it
+				// sets how finely the mix between the two tones can be graded. A wider window gives more
+				// steps between all ground and all pavement, which is what keeps an edge from reading as
+				// a seam, and it costs no sharpness now that the tones themselves are flat.
+				//
+				const Int samplesAway = 2;
 
 				sampleColor.red = sampleColor.green = sampleColor.blue = 0.0f;
 				samples = 0;
+				Int manMadeSamples = 0;
+				Real sampleHeight = 0.0f;
 
 				for( j = y - samplesAway; j <= y + samplesAway; j++ )
 				{
@@ -1234,9 +1459,35 @@ void W3DRadar::buildTerrainTexture( TerrainLogic *terrain )
 									// get the color at this point
 									TheTerrainVisual->getTerrainColorAt( worldPoint.x, worldPoint.y, &color );
 
-									// interpolate the color for height
-									interpolateColorForHeight( &color, worldPoint.z, getTerrainAverageZ(),
-																						 m_mapExtent.hi.z, m_mapExtent.lo.z );
+									//
+									// just take the vote here. Which tone the cell ends up in is settled once, after
+									// all its samples are in, because a cell over the edge of a car park or a road
+									// through a park genuinely has both kinds of ground under it, and snapping each
+									// sample on its own leaves those cells dithering between the two tones.
+									//
+									if( m_newRadar && isManMadeTerrainColor( &color ) )
+									{
+										manMadeSamples++;
+									}
+
+									//
+									// gather the height over the same samples the colour uses. Shading the cell
+									// from a single probe instead would let one bump or hollow darken exactly one
+									// cell, which shows up as dots on the sample grid rather than as terrain.
+									//
+									sampleHeight += worldPoint.z;
+
+									//
+									// shade the sample only if its colour is going to be used. The two tone path
+									// replaces the averaged colour outright further down and shades once from the
+									// averaged height, so doing it per sample here would be thrown away.
+									//
+									if( m_newRadar == FALSE )
+									{
+										// interpolate the color for height
+										interpolateColorForHeight( &color, worldPoint.z, getTerrainAverageZ(),
+																							 m_mapExtent.hi.z, m_mapExtent.lo.z );
+									}
 
 								}
 
@@ -1263,6 +1514,28 @@ void W3DRadar::buildTerrainTexture( TerrainLogic *terrain )
 				color.green = sampleColor.green / (Real)samples;
 				color.blue = sampleColor.blue / (Real)samples;
 
+				//
+				// take the tone from how much of the cell read as man made, rather than from which kind
+				// won it. Ground that is all one thing still comes out flat, a cell over a kerb no longer
+				// dithers, and an edge between the two gets a step of shading across it instead of a
+				// hard seam. The averaged colour above is dropped; only its height shading is re-applied.
+				//
+				if( m_newRadar && workingBridge == FALSE )
+				{
+					getTerrainTone( &color, (Real)manMadeSamples / (Real)samples );
+					interpolateColorForHeight( &color, sampleHeight / (Real)samples, getTerrainAverageZ(),
+																	 m_mapExtent.hi.z, m_mapExtent.lo.z );
+				}
+
+			}
+
+			//
+			// only the water cells are ever read back, by the shoreline pass below, so there is no
+			// reason to keep the colour of every cell on the map
+			//
+			if( m_newRadar && isWater )
+			{
+				cellColors[ y * m_textureWidth + x ] = color;
 			}
 
 			// draw the pixel for the terrain at this point, note that because of the orientation
@@ -1270,6 +1543,77 @@ void W3DRadar::buildTerrainTexture( TerrainLogic *terrain )
 			const Color argbColor = GameMakeColor( color.red * 255, color.green * 255, color.blue * 255, 255 );
 			const unsigned int pixelColor = ARGB_Color_To_WW3D_Color(surfaceDesc.Format, argbColor);
 			surface->Draw_Pixel( x, y, pixelColor, bytesPerPixel, pBits, pitch );
+
+		}
+
+	}
+
+	//
+	// TheSuperHackers @feature draw the shoreline. A water cell that touches land on any of its
+	// four sides gets darkened, which puts a one cell rim on the water side of the waterline and
+	// leaves the land reading as it did. Marking both sides would double the thickness, and going
+	// eight ways would fatten it again on every diagonal stretch of coast.
+	//
+	if( m_newRadar )
+	{
+		//
+		// the water is already dark, so darkening it again would just smudge the edge. Bias the
+		// waterline toward a fixed near black instead, which keeps the contour a definite line
+		// whatever colour the map gave its water.
+		//
+		const Real shoreDarken = 0.30f;		// what is left of the cell colour along the waterline
+		const Real shoreFloor = 0.04f;		// the near black the waterline is pulled toward
+
+		for( y = 0; y < m_textureHeight; y++ )
+		{
+
+			for( x = 0; x < m_textureWidth; x++ )
+			{
+
+				if( waterFlags[ y * m_textureWidth + x ] == 0 )
+				{
+					continue;
+				}
+
+				//
+				// a missing neighbour off the edge of the map counts as more of the same, so that a
+				// map that runs into water at its border does not get a dark frame drawn round it
+				//
+				Bool touchesLand = FALSE;
+				if( x > 0 && waterFlags[ y * m_textureWidth + (x - 1) ] == 0 )
+				{
+					touchesLand = TRUE;
+				}
+				if( x < m_textureWidth - 1 && waterFlags[ y * m_textureWidth + (x + 1) ] == 0 )
+				{
+					touchesLand = TRUE;
+				}
+				if( y > 0 && waterFlags[ (y - 1) * m_textureWidth + x ] == 0 )
+				{
+					touchesLand = TRUE;
+				}
+				if( y < m_textureHeight - 1 && waterFlags[ (y + 1) * m_textureWidth + x ] == 0 )
+				{
+					touchesLand = TRUE;
+				}
+
+				if( touchesLand == FALSE )
+				{
+					continue;
+				}
+
+				//
+				// darken what is already there instead of writing a flat colour, so the depth shading
+				// survives and a map that overrides its radar water colour still looks right
+				//
+				const RGBColor &cell = cellColors[ y * m_textureWidth + x ];
+				const Color shoreArgb = GameMakeColor( (shoreFloor + cell.red * shoreDarken) * 255,
+																							 (shoreFloor + cell.green * shoreDarken) * 255,
+																							 (shoreFloor + cell.blue * shoreDarken) * 255, 255 );
+				const unsigned int shoreColor = ARGB_Color_To_WW3D_Color(surfaceDesc.Format, shoreArgb);
+				surface->Draw_Pixel( x, y, shoreColor, bytesPerPixel, pBits, pitch );
+
+			}
 
 		}
 
@@ -1371,12 +1715,14 @@ void W3DRadar::setShroudLevel(Int shroudX, Int shroudY, CellShroudStatus setting
 		const Color argbColor = GameMakeColor( 0, 0, 0, alpha );
 		const unsigned int pixelColor = ARGB_Color_To_WW3D_Color(surfaceDesc.Format, argbColor);
 
+		//
+		// TheSuperHackers @performance fill by the row rather than the pixel. Draw_H_Line works out
+		// the start of the row once instead of once per pixel, and this runs for every shroud cell
+		// that changed, every frame, so it is worth not paying that per pixel.
+		//
 		for( Int y = radarMinY; y <= radarMaxY; ++y )
 		{
-			for( Int x = radarMinX; x <= radarMaxX; ++x )
-			{
-				surface->Draw_Pixel( x, y, pixelColor, bytesPerPixel, pBits, pitch );
-			}
+			surface->Draw_H_Line( y, radarMinX, radarMaxX, pixelColor, bytesPerPixel, pBits, pitch );
 		}
 
 		surface->Unlock();
@@ -1393,10 +1739,7 @@ void W3DRadar::setShroudLevel(Int shroudX, Int shroudY, CellShroudStatus setting
 
 		for( Int y = radarMinY; y <= radarMaxY; ++y )
 		{
-			for( Int x = radarMinX; x <= radarMaxX; ++x )
-			{
-				m_shroudSurface->Draw_Pixel( x, y, pixelColor, m_shroudSurfacePixelSize, m_shroudSurfaceBits, m_shroudSurfacePitch );
-			}
+			m_shroudSurface->Draw_H_Line( y, radarMinX, radarMaxX, pixelColor, m_shroudSurfacePixelSize, m_shroudSurfaceBits, m_shroudSurfacePitch );
 		}
 	}
 }
@@ -1482,14 +1825,23 @@ void W3DRadar::draw( Int pixelX, Int pixelY, Int width, Int height )
 	// draw the terrain texture
 	TheDisplay->drawImage( m_terrainImage, ul.x, ul.y, lr.x, lr.y );
 
-	// refresh the overlay texture once every so many frames
-	if( TheGameClient->getFrame() % OVERLAY_REFRESH_RATE == 0 )
+	//
+	// the new radar draws its blips onto the screen further down instead of into this texture,
+	// so there is nothing to rebuild or to lay over the terrain here
+	//
+	if( m_newRadar == FALSE )
 	{
-		updateObjectTexture(m_overlayTexture);
-	}
 
-	// draw the overlay image
- 	TheDisplay->drawImage( m_overlayImage, ul.x, ul.y, lr.x, lr.y );
+		// refresh the overlay texture once every so many frames
+		if( TheGameClient->getFrame() % OVERLAY_REFRESH_RATE == 0 )
+		{
+			updateObjectTexture(m_overlayTexture);
+		}
+
+		// draw the overlay image
+		TheDisplay->drawImage( m_overlayImage, ul.x, ul.y, lr.x, lr.y );
+
+	}
 
 	// draw the shroud image
 #if ENABLE_CONFIGURABLE_SHROUD
@@ -1499,6 +1851,28 @@ void W3DRadar::draw( Int pixelX, Int pixelY, Int width, Int height )
 #endif
 	{
 		TheDisplay->drawImage( m_shroudImage, ul.x, ul.y, lr.x, lr.y );
+	}
+
+	//
+	// draw the blips at screen resolution. Every outline goes down before any core does, across
+	// both lists, so that no blip can have its core eaten by the outline of the one beside it,
+	// and the local list goes last within each pass so friendly blips win an overlap.
+	//
+	if( m_newRadar )
+	{
+		//
+		// batch the rects. Every blip is its own drawFillRect, and without a batch open each one of
+		// those flushes the 2D renderer on its own, so a big army would cost a draw call per blip
+		// per pass. Inside a batch they all accumulate and go down together.
+		//
+		TheDisplay->beginBatch();
+
+		drawObjectListBlips( m_objectList, RADAR_BLIP_PASS_OUTLINE, ul.x, ul.y, scaledWidth, scaledHeight );
+		drawObjectListBlips( m_localObjectList, RADAR_BLIP_PASS_OUTLINE, ul.x, ul.y, scaledWidth, scaledHeight );
+		drawObjectListBlips( m_objectList, RADAR_BLIP_PASS_CORE, ul.x, ul.y, scaledWidth, scaledHeight );
+		drawObjectListBlips( m_localObjectList, RADAR_BLIP_PASS_CORE, ul.x, ul.y, scaledWidth, scaledHeight );
+
+		TheDisplay->endBatch();
 	}
 
 	// draw any icons

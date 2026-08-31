@@ -42,6 +42,17 @@ class TerrainLogic;
 
 // PROTOTYPES /////////////////////////////////////////////////////////////////////////////////////
 //-------------------------------------------------------------------------------------------------
+/** Which half of an outlined blip to draw. All the outlines are drawn before any of the cores so
+	* that a blip packed in tight against its neighbours cannot have its core chewed away by the
+	* outline of the blip next to it. */
+//-------------------------------------------------------------------------------------------------
+enum RadarBlipPass CPP_11(: Int)
+{
+	RADAR_BLIP_PASS_OUTLINE,
+	RADAR_BLIP_PASS_CORE
+};
+
+//-------------------------------------------------------------------------------------------------
 /** W3D radar class.  This has the device specific implementation of the radar such as
 	* the drawing routines */
 //-------------------------------------------------------------------------------------------------
@@ -78,6 +89,7 @@ protected:
 	void drawSingleBeaconEvent( Int pixelX, Int pixelY, Int width, Int height, Int index );
 	void drawSingleGenericEvent( Int pixelX, Int pixelY, Int width, Int height, Int index );
 
+	Bool legalRadarPoint( Int px, Int py ) const;	///< is the point inside the radar cell grid
 	void initializeTextureFormats();				///< find format to use for the radar texture
 	void deleteResources();									///< delete resources used
 	void drawEvents( Int pixelX, Int pixelY, Int width, Int height);		///< draw all of the radar events
@@ -87,7 +99,12 @@ protected:
 	void drawIcons( Int pixelX, Int pixelY, Int width, Int height );	///< draw all of the radar icons
 	void updateObjectTexture(TextureClass *texture);
 	static Bool canRenderObject( const RadarObject *rObj, const Player *localPlayer );
+	static UnsignedByte stealthBlinkAlpha();	///< the alpha a stealthed object blinks at this frame
 	void renderObjectList( const RadarObject *listHead, TextureClass *texture );
+	void drawObjectListBlips( const RadarObject *listHead, RadarBlipPass pass,
+												Int pixelX, Int pixelY, Int width, Int height );
+	Bool isManMadeTerrainColor( const RGBColor *color ) const;	///< does this sample read as man made
+	void getTerrainTone( RGBColor *color, Real manMadeFraction ) const;	///< mix of the two tones
 	void interpolateColorForHeight( RGBColor *color,
 																	Real height,
 																	Real hiZ,
@@ -117,6 +134,15 @@ protected:
 
 	Int m_textureWidth;														///< width for all radar textures
 	Int m_textureHeight;													///< height for all radar textures
+
+	// TheSuperHackers @feature cached Options.ini NewRadar, so the drawing code does not have
+	// to reach through TheGlobalData for every blip and every terrain cell.
+	Bool m_newRadar;															///< draw outlined blips and a shoreline contour
+
+	// TheSuperHackers @feature Options.ini BlipSize, resolved to screen pixels once at startup.
+	Int m_unitBlipSize;												///< screen size of a unit blip core
+	Int m_structureBlipSize;									///< screen size of a structure blip core
+
 
 	//
 	// We want to keep a flag that tells us when to reconstruct the view box.
