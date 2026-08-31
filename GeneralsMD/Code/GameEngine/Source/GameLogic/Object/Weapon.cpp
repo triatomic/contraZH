@@ -2565,6 +2565,52 @@ static void clipToTerrainExtent(Coord3D& approachTargetPos)
 }
 
 //-------------------------------------------------------------------------------------------------
+// When a weapon bonus changes mid-reload the reload duration changes underneath us. Rather than
+// restarting the timer (which lets a bonus toggle grant an instant shot, or unfairly costs time
+// already served when a bonus is lost), carry the progress across proportionally: 5 frames into a
+// 10 frame reload with a new duration of 8 leaves us 4 frames into 8.
+// All integer math -- this is logic code and must be bit-identical on every peer.
+//-------------------------------------------------------------------------------------------------
+static void rescaleReloadProgress( UnsignedInt now, Int newTotal, UnsignedInt& startFrame, UnsignedInt& endFrame )
+{
+	if (newTotal < 0)
+	{
+		newTotal = 0;
+	}
+
+	// A degenerate window (zero length, or inverted by a weapon-set transfer) has no progress to
+	// carry, so just begin a fresh full-length one.
+	if (endFrame <= startFrame || now < startFrame)
+	{
+		startFrame = now;
+		endFrame = now + newTotal;
+		return;
+	}
+
+	UnsignedInt oldTotal = endFrame - startFrame;
+	UnsignedInt elapsed = now - startFrame;
+	if (elapsed > oldTotal)
+	{
+		elapsed = oldTotal;
+	}
+
+	UnsignedInt newElapsed = (UnsignedInt)(((UnsignedInt64)elapsed * (UnsignedInt64)newTotal) / (UnsignedInt64)oldTotal);
+	if (newElapsed > (UnsignedInt)newTotal)
+	{
+		newElapsed = (UnsignedInt)newTotal;
+	}
+
+	// Do not let the anchor run off the front of the game clock in the opening frames of a match.
+	if (newElapsed > now)
+	{
+		newElapsed = now;
+	}
+
+	startFrame = now - newElapsed;
+	endFrame = startFrame + newTotal;
+}
+
+//-------------------------------------------------------------------------------------------------
 void Weapon::onWeaponBonusChange(const Object *source)
 {
 	// We are concerned with our reload times being off if our ROF just changed.
@@ -2574,13 +2620,14 @@ void Weapon::onWeaponBonusChange(const Object *source)
 
 	Int newDelay;
 	Bool needUpdate = FALSE;
+	WeaponStatus curStatus = getStatus();
 
-	if( getStatus() == RELOADING_CLIP )
+	if( curStatus == RELOADING_CLIP )
 	{
 		newDelay = m_template->getClipReloadTime(bonus);
 		needUpdate = TRUE;
 	}
-	else if( getStatus() == BETWEEN_FIRING_SHOTS )
+	else if( curStatus == BETWEEN_FIRING_SHOTS )
 	{
 		newDelay = m_template->getDelayBetweenShots(bonus);
 		needUpdate = TRUE;
@@ -2588,8 +2635,9 @@ void Weapon::onWeaponBonusChange(const Object *source)
 
 	if( needUpdate )
 	{
-		m_whenLastReloadStarted = TheGameLogic->getFrame();
-		m_whenWeCanFireAgain = m_whenLastReloadStarted + newDelay;
+		// Carry our reload progress across proportionally instead of restarting the timer, so a
+		// bonus toggle can neither grant an instant shot nor cost us time already served.
+		rescaleReloadProgress( TheGameLogic->getFrame(), newDelay, m_whenLastReloadStarted, m_whenWeCanFireAgain );
 
 		if (source->isReloadTimeShared())
 		{
@@ -2599,7 +2647,8 @@ void Weapon::onWeaponBonusChange(const Object *source)
 				if (weapon)
 				{
 					weapon->setPossibleNextShotFrame(m_whenWeCanFireAgain);
-					weapon->setStatus(RELOADING_CLIP);
+					weapon->setLastReloadStartedFrame(m_whenLastReloadStarted);
+					weapon->setStatus(curStatus);
 				}
 			}
 		}
