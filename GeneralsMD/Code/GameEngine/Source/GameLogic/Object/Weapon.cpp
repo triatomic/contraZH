@@ -2587,24 +2587,16 @@ static void rescaleReloadProgress( UnsignedInt now, Int newTotal, UnsignedInt& s
 		return;
 	}
 
+	// A stale OUT_OF_AMMO sentinel can leave endFrame at 0x7fffffff, so clamp before scaling.
 	UnsignedInt oldTotal = endFrame - startFrame;
-	UnsignedInt elapsed = now - startFrame;
-	if (elapsed > oldTotal)
-	{
-		elapsed = oldTotal;
-	}
+	UnsignedInt elapsed = min(now - startFrame, oldTotal);
 
-	UnsignedInt newElapsed = (UnsignedInt)(((UnsignedInt64)elapsed * (UnsignedInt64)newTotal) / (UnsignedInt64)oldTotal);
-	if (newElapsed > (UnsignedInt)newTotal)
-	{
-		newElapsed = (UnsignedInt)newTotal;
-	}
+	// elapsed <= oldTotal, so the floored quotient is already bounded by newTotal.
+	UnsignedInt newElapsed = (UnsignedInt)(((UnsignedInt64)elapsed * (UnsignedInt64)newTotal) / oldTotal);
 
-	// Do not let the anchor run off the front of the game clock in the opening frames of a match.
-	if (newElapsed > now)
-	{
-		newElapsed = now;
-	}
+	// A large rate-of-fire penalty can push newElapsed past now early in a match; clamp so the
+	// unsigned subtraction below cannot wrap.
+	newElapsed = min(newElapsed, now);
 
 	startFrame = now - newElapsed;
 	endFrame = startFrame + newTotal;
@@ -2635,8 +2627,7 @@ void Weapon::onWeaponBonusChange(const Object *source)
 
 	if( needUpdate )
 	{
-		// Carry our reload progress across proportionally instead of restarting the timer, so a
-		// bonus toggle can neither grant an instant shot nor cost us time already served.
+		// Carry our progress across rather than restarting the timer.
 		rescaleReloadProgress( TheGameLogic->getFrame(), newDelay, m_whenLastReloadStarted, m_whenWeCanFireAgain );
 
 		if (source->isReloadTimeShared())
