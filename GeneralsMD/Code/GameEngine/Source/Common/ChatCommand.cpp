@@ -42,6 +42,7 @@
 #include "GameClient/View.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/WeaponSetType.h"
@@ -237,6 +238,17 @@ void ChatCommand::execute( const AsciiString& args ) const
 			{
 				obj->setPosition( &pos );
 				obj->setOrientation( 0.0f );
+
+				// newObject only runs the onCreate half of creation, so finish the object off the
+				// way ProductionUpdate does after a factory builds one.
+				for (BehaviorModule **m = obj->getBehaviorModules(); m && *m; ++m)
+				{
+					CreateModuleInterface *create = (*m)->getCreate();
+					if (create != nullptr)
+					{
+						create->onBuildComplete();
+					}
+				}
 			}
 		}
 		else if (!tmpl)

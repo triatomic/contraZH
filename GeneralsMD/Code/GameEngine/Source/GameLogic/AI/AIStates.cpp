@@ -5104,6 +5104,22 @@ StateReturnType AIAttackAimAtTargetState::update()
 			return STATE_FAILURE;	// can't aim at dead things
 	}
 
+	// NOTWHILEMOVING: stay in the aim state until we have actually come to a stop, so we never
+	// enter the fire state while rolling. Holding here rather than in the fire state matters:
+	// AIAttackFireWeaponState::onEnter spends the pre-attack wind-up (FX, audio and the
+	// PreAttackDelay timer) the moment it is entered, and that timer is wall clock, so a unit
+	// that entered while still moving would burn its wind-up on the move and then fire with none.
+	// Waiting here keeps the turret tracking the target, which is what this state does anyway.
+	if (sourceAI->mustHoldStillToFire())
+	{
+		const Real HOLD_STILL_EPSILON = 0.001f;
+		const PhysicsBehavior *physics = source->getPhysics();
+		if (physics && fabs(physics->getVelocityMagnitude()) >= HOLD_STILL_EPSILON)
+		{
+			return STATE_CONTINUE;
+		}
+	}
+
 	WhichTurretType tur = sourceAI->getWhichTurretForCurWeapon();
 	if (tur != TURRET_INVALID)
 	{
