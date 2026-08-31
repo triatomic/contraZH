@@ -3069,6 +3069,7 @@ W3DRoadBuffer::W3DRoadBuffer()	:
 	m_roads(nullptr),
 	m_numRoads(0),
 	m_initialized(false),
+	m_relitBuffers(false),
 	m_map(nullptr),
 #ifdef LOAD_TEST_ASSETS
 	m_maxUID(0),
@@ -3251,6 +3252,10 @@ void W3DRoadBuffer::updateLighting()
 		m_roads[curRoad].updateSegLighting();
 	}
 	m_updateBuffers = true;
+	// The new lighting only lives in our own copy of the vertices so far. Nothing moved in or out of
+	// view, so the visibility test below would decide there was no work to do and the roads would
+	// keep drawing with the colors already in the vertex buffer.
+	m_relitBuffers = true;
 }
 
 //=============================================================================
@@ -3316,11 +3321,12 @@ void W3DRoadBuffer::drawRoads(CameraClass * camera, TextureClass *cloudTexture, 
 
 	Bool loadBuffers = false;
 	if (m_updateBuffers) {
-		if (visibilityChanged(bounds)) {
+		if (visibilityChanged(bounds) || m_relitBuffers) {
 			loadBuffers = true;
 		}
 	}
 	m_updateBuffers = false;
+	m_relitBuffers = false;
 
 	for (stacking=0; stacking <= maxStacking; stacking++) {
 		for (i=0; i<m_maxRoadTypes; i++) {

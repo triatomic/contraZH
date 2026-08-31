@@ -263,9 +263,11 @@ never cut each other's night short.
 about it feeds back into the simulation - lighting and models are presentation only.
 * A timed switch that is still running when the firing structure dies reverts rather than sticking.
 
-Switching at runtime also relights the trees, building bibs and bridges, which the engine previously
-left with their baked daytime lighting. The debug time of day hotkey picks up the same fix, and now
-refreshes player indicator colours as well.
+Switching at runtime also relights the trees, building bibs, bridges and roads, which the engine
+previously left with their baked daytime lighting. Roads needed one more step: they were relit, but
+the new colours only reached the screen when a road moved in or out of view, so they kept their
+daytime look until the camera happened to travel far enough. The debug time of day hotkey picks up
+the same fixes, and now refreshes player indicator colours as well.
 
 # Drag Selection
 

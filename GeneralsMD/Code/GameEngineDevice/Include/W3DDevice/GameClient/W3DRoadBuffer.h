@@ -232,6 +232,7 @@ protected:
 	Int			m_curNumRoadIndices;	///<Number of indices used in current road type;
 
 	Bool m_updateBuffers; ///< If true, update the vertex buffers.
+	Bool m_relitBuffers; ///< If true, the lighting changed and the buffers must be reloaded even if visibility did not change.
 
 	void addMapObjects();
 	void addMapObject(RoadSegment *pRoad, Bool updateTheCounts);
