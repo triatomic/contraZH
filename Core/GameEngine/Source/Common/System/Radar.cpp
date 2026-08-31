@@ -199,6 +199,22 @@ Radar::Radar()
 	m_mapExtent.hi.z = 0.0f;
 	m_queueTerrainRefreshFrame = 0;
 
+	//
+	// TheSuperHackers @feature the NewRadar option doubles the radar grid so that there is room
+	// to outline the blips and the shoreline. Read once here; the radar textures are sized from
+	// this and never resized afterwards.
+	//
+	if( TheGlobalData && TheGlobalData->m_newRadar )
+	{
+		m_cellWidth = RADAR_CELL_WIDTH_HIRES;
+		m_cellHeight = RADAR_CELL_HEIGHT_HIRES;
+	}
+	else
+	{
+		m_cellWidth = RADAR_CELL_WIDTH;
+		m_cellHeight = RADAR_CELL_HEIGHT;
+	}
+
 	// clear the radar events
 	clearAllEvents();
 
@@ -322,8 +338,8 @@ void Radar::newMap( TerrainLogic *terrain )
 	terrain->getExtent( &m_mapExtent );
 
 	// we will sample at these intervals across the map
-	m_xSample = m_mapExtent.width() / RADAR_CELL_WIDTH;
-	m_ySample = m_mapExtent.height() / RADAR_CELL_HEIGHT;
+	m_xSample = m_mapExtent.width() / m_cellWidth;
+	m_ySample = m_mapExtent.height() / m_cellHeight;
 
 	// find the "middle" height for the terrain (most used value) and water table
 	Int x, y;
@@ -335,10 +351,10 @@ void Radar::newMap( TerrainLogic *terrain )
 
 	// since we're averaging let's skip every second sample...
 	worldPoint.y=0;
-	for( y = 0; y < RADAR_CELL_HEIGHT; y+=2, worldPoint.y+=2.0*m_ySample )
+	for( y = 0; y < m_cellHeight; y+=2, worldPoint.y+=2.0*m_ySample )
 	{
 		worldPoint.x=0;
-		for( x = 0; x < RADAR_CELL_WIDTH; x+=2, worldPoint.x+=2.0*m_xSample )
+		for( x = 0; x < m_cellWidth; x+=2, worldPoint.x+=2.0*m_xSample )
 		{
 			// don't use this, we don't really need the
 			// Z position by this function... radarToWorld( &radarPoint, &worldPoint );
@@ -506,12 +522,12 @@ Bool Radar::radarToWorld2D( const ICoord2D *radar, Coord3D *world )
 	// more sanity
 	if( x < 0 )
 		x = 0;
-	if( x >= RADAR_CELL_WIDTH )
-		x = RADAR_CELL_WIDTH - 1;
+	if( x >= m_cellWidth )
+		x = m_cellWidth - 1;
 	if( y < 0 )
 		y = 0;
-	if( y >= RADAR_CELL_HEIGHT )
-		y = RADAR_CELL_HEIGHT - 1;
+	if( y >= m_cellHeight )
+		y = m_cellHeight - 1;
 
 	// translate to world
 	world->x = x * m_xSample;
@@ -566,12 +582,12 @@ Bool Radar::worldToRadar( const Coord3D *world, ICoord2D *radar )
 	// keep it in bounds
 	if( radar->x < 0 )
 		radar->x = 0;
-	if( radar->x >= RADAR_CELL_WIDTH )
-		radar->x = RADAR_CELL_WIDTH - 1;
+	if( radar->x >= m_cellWidth )
+		radar->x = m_cellWidth - 1;
 	if( radar->y < 0 )
 		radar->y = 0;
-	if( radar->y >= RADAR_CELL_HEIGHT )
-		radar->y = RADAR_CELL_HEIGHT - 1;
+	if( radar->y >= m_cellHeight )
+		radar->y = m_cellHeight - 1;
 
 	return TRUE;  // valid translation
 
@@ -615,7 +631,7 @@ Bool Radar::localPixelToRadar( const ICoord2D *pixel, ICoord2D *radar )
 	{
 
 		// just normal conversion from full stretched to radar cells
-		radar->x = (pixel->x - ul.x)* RADAR_CELL_WIDTH / scaledWidth;
+		radar->x = (pixel->x - ul.x)* m_cellWidth / scaledWidth;
 
 		// conversion for scaled Y direction in map
 		radar->y = REAL_TO_INT( ((pixel->y - ul.y) / INT_TO_REAL( scaledHeight )) * size.y );
@@ -624,7 +640,7 @@ Bool Radar::localPixelToRadar( const ICoord2D *pixel, ICoord2D *radar )
 		// radar->y now refers to a point that was "as if" the map was square, translate to radar
 		// note that y is inverted to have the radar align with the world (+x = right, -y = down)
 		//
-		radar->y = (size.y - radar->y) * RADAR_CELL_HEIGHT / size.y;
+		radar->y = (size.y - radar->y) * m_cellHeight / size.y;
 
 
 	}
@@ -635,13 +651,13 @@ Bool Radar::localPixelToRadar( const ICoord2D *pixel, ICoord2D *radar )
 		radar->x = REAL_TO_INT( ((pixel->x - ul.x) / INT_TO_REAL( scaledWidth )) * size.x );
 
 		// radar->x now refers to a point that was "as if" the map was square, translate to radar
-		radar->x = radar->x * RADAR_CELL_WIDTH / size.x;
+		radar->x = radar->x * m_cellWidth / size.x;
 
 		//
 		// just normal conversion from full stretched to radar cells, note that y is inverted
 		// to have the radar align with the world (+x = right, -y = down)
 		//
-		radar->y = (size.y - pixel->y) * RADAR_CELL_HEIGHT / size.y;
+		radar->y = (size.y - pixel->y) * m_cellHeight / size.y;
 
 	}
 
@@ -748,11 +764,15 @@ Object *Radar::searchListForRadarLocationMatch( RadarObject *listHead, ICoord2D 
 		// convert object position to logical radar
 		worldToRadar( obj->getPosition(), &radar );
 
-		// see if this matches our match radar location
-		if( radar.x >= radarMatch->x - 1 &&
-				radar.x <= radarMatch->x + 1 &&
-				radar.y >= radarMatch->y - 1 &&
-				radar.y <= radarMatch->y + 1 )
+		//
+		// see if this matches our match radar location. The tolerance scales with the grid so
+		// that a click covers the same amount of world at either radar resolution.
+		//
+		const Int tolerance = m_cellWidth / RADAR_CELL_WIDTH;
+		if( radar.x >= radarMatch->x - tolerance &&
+				radar.x <= radarMatch->x + tolerance &&
+				radar.y >= radarMatch->y - tolerance &&
+				radar.y <= radarMatch->y + tolerance )
 			return obj;
 
 	}
