@@ -221,8 +221,9 @@ End
 * `SpecialPowerTemplate` - (Only react to this power. Leave it out and the module reacts to every
 special power the object fires.)
 * `TimeOfDay = NIGHT` - (`MORNING` | `AFTERNOON` | `EVENING` | `NIGHT`. What the world switches to.)
-* `FallbackTimeOfDay = AFTERNOON` - (Used when the map is already at `TimeOfDay`, so the same power
-brings day back on a night map instead of doing nothing.)
+* `FallbackTimeOfDay = AFTERNOON` - (Where a timed switch returns to when the map's own time of day
+is already `TimeOfDay`, since going back to it would leave the world where the switch put it. Only
+a revert target, never something the power switches to.)
 * `Duration = 0` - (In milliseconds. `0` makes the switch permanent, and firing again toggles it
 back. Any other value reverts to the original time of day after that long.)
 
@@ -233,6 +234,8 @@ for all four times of day, so a daytime map already carries the night palette it
 
 Notes:
 * The switch lands when the power is **launched**, not when it hits.
+* A map that already sits at `TimeOfDay` is left alone. The power still fires, it just has no time
+of day change to make, so a night bringing superweapon never brings daylight instead.
 * Time of day is global, so it changes the view for every player and every observer, not just the
 firing player.
 * It happens in the simulation on all machines at once, so it is multiplayer and replay safe. Nothing

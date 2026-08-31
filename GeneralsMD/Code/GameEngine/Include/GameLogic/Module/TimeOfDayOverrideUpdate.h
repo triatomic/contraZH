@@ -38,7 +38,7 @@ class TimeOfDayOverrideUpdateModuleData : public UpdateModuleData
 public:
 	SpecialPowerTemplate *m_specialPowerTemplate;		///< only react to this power, or any power when nullptr
 	Int m_targetTimeOfDay;													///< time of day we switch the world to
-	Int m_fallbackTimeOfDay;												///< used when the world already sits at the target
+	Int m_fallbackTimeOfDay;												///< where we revert to when the map itself sits at the target
 	UnsignedInt m_durationFrames;										///< in frames, 0 means the switch is permanent
 
 	TimeOfDayOverrideUpdateModuleData()

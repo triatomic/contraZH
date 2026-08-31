@@ -69,37 +69,26 @@ void TimeOfDayOverrideUpdate::activateOverride()
 	TimeOfDay currentTOD = TheGlobalData->m_timeOfDay;
 	TimeOfDay targetTOD = (TimeOfDay)d->m_targetTimeOfDay;
 
-	if( currentTOD == targetTOD )
+	if( m_activeTimeOfDay != TIME_OF_DAY_INVALID )
 	{
-		// We are already at the target, so switch the other way instead. If we are the ones who put
-		// the world here then we go back where we came from, otherwise we use the fallback.
-		if( m_activeTimeOfDay != TIME_OF_DAY_INVALID )
-		{
-			targetTOD = (TimeOfDay)m_originalTimeOfDay;
-		}
-		else
-		{
-			targetTOD = (TimeOfDay)d->m_fallbackTimeOfDay;
-		}
-	}
-
-	if( m_activeTimeOfDay == TIME_OF_DAY_INVALID )
-	{
-		// Only record where we started when we begin a fresh override.
-		m_originalTimeOfDay = currentTOD;
-	}
-
-	if( TheGameClient->switchTimeOfDay( targetTOD ) == FALSE )
-	{
+		// We are already holding the world at the target, so firing again puts it back.
+		revertOverride();
+		setWakeFrame( getObject(), UPDATE_SLEEP_FOREVER );
 		return;
 	}
 
-	if( targetTOD == (TimeOfDay)m_originalTimeOfDay )
+	if( currentTOD == targetTOD )
 	{
-		// We toggled the world back to where it started, so we have no override running anymore.
-		m_activeTimeOfDay = TIME_OF_DAY_INVALID;
-		m_revertFrame = 0;
-		setWakeFrame( getObject(), UPDATE_SLEEP_FOREVER );
+		// The map is already where we would take it, so there is nothing for us to do. The power
+		// itself still fires, we just have no time of day change to make.
+		return;
+	}
+
+	// Where we go back to when the override ends, which is simply wherever the map was.
+	m_originalTimeOfDay = currentTOD;
+
+	if( TheGameClient->switchTimeOfDay( targetTOD ) == FALSE )
+	{
 		return;
 	}
 
@@ -121,7 +110,18 @@ void TimeOfDayOverrideUpdate::activateOverride()
 //-------------------------------------------------------------------------------------------------
 void TimeOfDayOverrideUpdate::revertOverride()
 {
-	TheGameClient->switchTimeOfDay( (TimeOfDay)m_originalTimeOfDay );
+	const TimeOfDayOverrideUpdateModuleData* d = getTimeOfDayOverrideUpdateModuleData();
+
+	TimeOfDay returnTOD = (TimeOfDay)m_originalTimeOfDay;
+
+	if( returnTOD == (TimeOfDay)d->m_targetTimeOfDay )
+	{
+		// The map itself sits at the time of day we force, so going back to it would leave the
+		// world where the override put it. The fallback gives us somewhere to return to.
+		returnTOD = (TimeOfDay)d->m_fallbackTimeOfDay;
+	}
+
+	TheGameClient->switchTimeOfDay( returnTOD );
 	m_activeTimeOfDay = TIME_OF_DAY_INVALID;
 	m_revertFrame = 0;
 }
