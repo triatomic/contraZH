@@ -51,7 +51,13 @@ class TerrainLogic;
 enum
 {
 	RADAR_CELL_WIDTH  = 128,	// radar created at this horz resolution
-	RADAR_CELL_HEIGHT = 128   // radar created at this vert resolution
+	RADAR_CELL_HEIGHT = 128,  // radar created at this vert resolution
+
+	// TheSuperHackers @feature Options.ini NewRadar = Yes doubles the radar grid so that blips
+	// have room for an outline and the shoreline gets a one cell contour. Must stay a square
+	// power of two.
+	RADAR_CELL_WIDTH_HIRES  = 256,
+	RADAR_CELL_HEIGHT_HIRES = 256
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -243,6 +249,9 @@ protected:
 	Real getTerrainAverageZ() const { return m_terrainAverageZ; }
 	Real getWaterAverageZ() const { return m_waterAverageZ; }
 
+	Int getCellWidth() const { return m_cellWidth; }
+	Int getCellHeight() const { return m_cellHeight; }
+
 	void clearAllEvents();					///< remove all radar events in progress
 
 	// search the object list for an object that maps to the given logical radar coordinates
@@ -269,6 +278,14 @@ protected:
 	//
 	Real m_xSample;
 	Real m_ySample;
+
+	//
+	// resolution of the radar cell grid. Retail is RADAR_CELL_WIDTH x RADAR_CELL_HEIGHT; the
+	// NewRadar option doubles it. Set once at construction and constant thereafter, so it is
+	// startup configuration rather than game state and is deliberately not xfered.
+	//
+	Int m_cellWidth;
+	Int m_cellHeight;
 
 	enum { MAX_RADAR_EVENTS = 64 };
 	struct RadarEvent

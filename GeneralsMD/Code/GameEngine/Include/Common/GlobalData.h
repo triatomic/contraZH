@@ -162,6 +162,12 @@ public:
 	Bool m_smartPips;
 	// TheSuperHackers @feature Print hit points beside the health bar.
 	Bool m_numericalHealth;
+	// TheSuperHackers @feature Outline the radar blips and the shoreline, at double radar
+	// resolution. Client side only; the radar never feeds game logic.
+	Bool m_newRadar;
+	// TheSuperHackers @feature How big the NewRadar object blips draw.
+	// Holds a RadarBlipSize; stored as Int to avoid pulling OptionPreferences.h in here.
+	Int m_radarBlipSize;
 	// TheSuperHackers @feature How long a particle name lingers in the debug name overlay after
 	// its system is gone, in milliseconds. 0 shows names only while the system is alive.
 	Int m_particleNameLingerMS;
