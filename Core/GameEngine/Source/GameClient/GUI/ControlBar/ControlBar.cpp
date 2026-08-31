@@ -3951,12 +3951,15 @@ void ControlBar::drawSpecialPowerShortcutMultiplierText()
 
 void ControlBar::animateSpecialPowerShortcut( Bool isOn )
 {
-	if(!m_specialPowerShortcutParent || !m_animateWindowManagerForGenShortcuts || !m_currentlyUsedSpecialPowersButtons)
+	if(!m_specialPowerShortcutParent || !m_animateWindowManagerForGenShortcuts || !m_currentlyUsedSpecialPowersButtons
+		|| !m_specialPowerShortcutButtons)
 		return;
 	Bool dontAnimate = TRUE;
 	for( Int i = 0; i < m_currentlyUsedSpecialPowersButtons; ++i )
 	{
-		if (m_specialPowerShortcutButtons[i]->winGetUserData())
+		// The count comes from the INI but the buttons come from the layout, so a layout with fewer
+		// buttons than the count claims leaves the tail of the array empty.
+		if (m_specialPowerShortcutButtons[i] != nullptr && m_specialPowerShortcutButtons[i]->winGetUserData())
 		{
 			dontAnimate = FALSE;
 			break;
