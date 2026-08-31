@@ -403,6 +403,42 @@ Bool OptionPreferences::getSmartPipsEnabled(void) const
 	return FALSE;
 }
 
+// TheSuperHackers @feature Options.ini: NewRadar = Yes outlines the radar blips and the shoreline,
+// and doubles the radar resolution so there is room to draw those outlines. Purely presentational.
+Bool OptionPreferences::getNewRadarEnabled(void) const
+{
+	OptionPreferences::const_iterator it = find("NewRadar");
+	if (it == end())
+		return FALSE;
+
+	if (stricmp(it->second.str(), "yes") == 0) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+// TheSuperHackers @feature Options.ini: BlipSize = Large sets how big the NewRadar object blips
+// draw. Small is the size the feature shipped with, Large is easier to read at a glance but runs
+// together sooner when units are packed in. Ignored unless NewRadar is on.
+RadarBlipSize OptionPreferences::getRadarBlipSize(void) const
+{
+	OptionPreferences::const_iterator it = find("BlipSize");
+	if (it == end())
+		return RadarBlipSize_Default;
+
+	if (stricmp(it->second.str(), "Large") == 0)
+		return RadarBlipSize_Large;
+	if (stricmp(it->second.str(), "Small") == 0)
+		return RadarBlipSize_Small;
+
+	// also accept the raw index, so the value round trips if it is ever written numerically
+	Int size = atoi(it->second.str());
+	if (size >= 0 && size < RadarBlipSize_Count)
+		return (RadarBlipSize)size;
+
+	return RadarBlipSize_Default;
+}
+
 // TheSuperHackers @feature Options.ini: EasyMilitaryDrag = Yes leaves builders out of a drag
 // selection, so boxing over a base picks up the army without dragging them along. Covers
 // KINDOF_DOZER and KINDOF_IGNORES_SELECT_ALL, the same kinds Select All already disqualifies.

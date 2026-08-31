@@ -566,6 +566,8 @@ GlobalData::GlobalData()
 
   m_TiVOFastMode = FALSE;
   m_queueReorder = FALSE;
+	m_newRadar = FALSE;
+	m_radarBlipSize = RadarBlipSize_Default;
 
 #if defined(RTS_DEBUG) || ENABLE_CONFIGURABLE_SHROUD
 	m_shroudOn = TRUE;
@@ -1198,6 +1200,8 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	// override INI values with user preferences
 	OptionPreferences optionPref;
 	TheWritableGlobalData->m_useAlternateMouse = optionPref.getAlternateMouseModeEnabled();
+	TheWritableGlobalData->m_newRadar = optionPref.getNewRadarEnabled();
+	TheWritableGlobalData->m_radarBlipSize = optionPref.getRadarBlipSize();
 	TheWritableGlobalData->m_useRightMouseScrollWithAlternateMouse = optionPref.getRightMouseScrollWithAlternateMouseEnabled();
 	TheWritableGlobalData->m_clientRetaliationModeEnabled = optionPref.getRetaliationModeEnabled();
 	TheWritableGlobalData->m_doubleClickAttackMove = optionPref.getDoubleClickAttackMoveEnabled();
