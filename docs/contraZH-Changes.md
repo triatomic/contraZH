@@ -205,9 +205,14 @@ click still cancels the entry, and Shift+click still cancels a batch of units.
 
 ## TimeOfDayOverrideUpdate
 
-Switches the map's time of day when a superweapon fires. It is not a superweapon of its own: it
-rides along on one that already exists, so any existing special power can be made to bring on the
-night.
+Switches the map's time of day. It is not a superweapon of its own: it rides along on something that
+already exists, so any existing special power can be made to bring on the night.
+
+It works two ways. Attached to the structure that fires a special power it switches when that power
+is launched, and `Duration` decides how long the change lasts. Attached instead to an object the
+power creates, with `ActivateOnCreate`, it switches as soon as that object exists and holds the
+change until it dies - which for something like a storm that lingers over its target means the night
+lasts exactly as long as the storm does, with no duration to keep in step with it.
 
 ```
 Behavior = TimeOfDayOverrideUpdate ModuleTag_TODOverride01
@@ -218,14 +223,27 @@ Behavior = TimeOfDayOverrideUpdate ModuleTag_TODOverride01
 End
 ```
 
+Or on an object the power creates, where the effect itself decides how long the night lasts:
+
+```
+Behavior = TimeOfDayOverrideUpdate ModuleTag_TODOverride01
+  TimeOfDay        = NIGHT
+  ActivateOnCreate = Yes
+End
+```
+
 * `SpecialPowerTemplate` - (Only react to this power. Leave it out and the module reacts to every
-special power the object fires.)
+special power the object fires. Not used when `ActivateOnCreate` is set.)
 * `TimeOfDay = NIGHT` - (`MORNING` | `AFTERNOON` | `EVENING` | `NIGHT`. What the world switches to.)
 * `FallbackTimeOfDay = AFTERNOON` - (Where a timed switch returns to when the map's own time of day
 is already `TimeOfDay`, since going back to it would leave the world where the switch put it. Only
 a revert target, never something the power switches to.)
 * `Duration = 0` - (In milliseconds. `0` makes the switch permanent, and firing again toggles it
-back. Any other value reverts to the original time of day after that long.)
+back. Any other value reverts to the original time of day after that long. Ignored when
+`ActivateOnCreate` is set, since the object's own lifetime is the duration.)
+* `ActivateOnCreate = No` - (Yes switches the moment the object carrying the module is created and
+puts it back when that object dies, instead of waiting for a special power to fire. For an object
+created by a superweapon this ties the change to the weapon's effect rather than to its launch.)
 
 The switch is a real time of day change, not a lighting tint, so it brings everything night owns
 with it: the map author's own night lighting, night model variants such as headlights, the night
@@ -233,11 +251,14 @@ ambient sounds, the night sky and water, and the night player indicator colours.
 for all four times of day, so a daytime map already carries the night palette its author chose.
 
 Notes:
-* The switch lands when the power is **launched**, not when it hits.
+* Without `ActivateOnCreate` the switch lands when the power is **launched**, not when it hits.
 * A map that already sits at `TimeOfDay` is left alone. The power still fires, it just has no time
 of day change to make, so a night bringing superweapon never brings daylight instead.
 * Time of day is global, so it changes the view for every player and every observer, not just the
 firing player.
+* Several objects can hold the change at once. A second one arriving joins the first rather than
+starting over, and the world only goes back when the last of them lets go, so overlapping strikes
+never cut each other's night short.
 * It happens in the simulation on all machines at once, so it is multiplayer and replay safe. Nothing
 about it feeds back into the simulation - lighting and models are presentation only.
 * A timed switch that is still running when the firing structure dies reverts rather than sticking.

@@ -17,10 +17,11 @@
 */
 
 // FILE: TimeOfDayOverrideUpdate.h ////////////////////////////////////////////////////////////////
-// Desc:   Attaches to an existing superweapon and switches the world time of day when it fires.
-//         The switch is global presentation for every player and observer, it happens when the
-//         power is launched rather than when it lands, and replays reproduce it because the
-//         logic re-executes.
+// Desc:   Switches the world time of day, either when the superweapon it is attached to fires or,
+//         with ActivateOnCreate, for as long as the object carrying it lives. The switch is global
+//         presentation for every player and observer, and replays reproduce it because the logic
+//         re-executes. Several objects can hold the world at night at once, and it stays there
+//         until the last of them lets go.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
@@ -40,6 +41,7 @@ public:
 	Int m_targetTimeOfDay;													///< time of day we switch the world to
 	Int m_fallbackTimeOfDay;												///< where we revert to when the map itself sits at the target
 	UnsignedInt m_durationFrames;										///< in frames, 0 means the switch is permanent
+	Bool m_activateOnCreate;												///< switch as soon as we exist and hold it until we die
 
 	TimeOfDayOverrideUpdateModuleData()
 	{
@@ -47,6 +49,7 @@ public:
 		m_targetTimeOfDay = TIME_OF_DAY_NIGHT;
 		m_fallbackTimeOfDay = TIME_OF_DAY_AFTERNOON;
 		m_durationFrames = 0;
+		m_activateOnCreate = FALSE;
 	}
 
 	static void buildFieldParse(MultiIniFieldParse& p)
@@ -59,6 +62,7 @@ public:
 			{ "TimeOfDay",						INI::parseIndexList,						TimeOfDayNames,	offsetof( TimeOfDayOverrideUpdateModuleData, m_targetTimeOfDay ) },
 			{ "FallbackTimeOfDay",		INI::parseIndexList,						TimeOfDayNames,	offsetof( TimeOfDayOverrideUpdateModuleData, m_fallbackTimeOfDay ) },
 			{ "Duration",							INI::parseDurationUnsignedInt,	nullptr,				offsetof( TimeOfDayOverrideUpdateModuleData, m_durationFrames ) },
+			{ "ActivateOnCreate",			INI::parseBool,									nullptr,				offsetof( TimeOfDayOverrideUpdateModuleData, m_activateOnCreate ) },
 			{ 0, 0, 0, 0 }
 		};
 		p.add(dataFieldParse);
@@ -98,6 +102,9 @@ private:
 
 	void activateOverride();
 	void revertOverride();
+
+	static Int countOtherHolders( const TimeOfDayOverrideUpdate *exclude );
+	static TimeOfDayOverrideUpdate *findAnyHolder( const TimeOfDayOverrideUpdate *exclude );
 
 	Int m_activeTimeOfDay;					///< time of day we forced on the world, TIME_OF_DAY_INVALID when we have no override running
 	Int m_originalTimeOfDay;				///< time of day we go back to

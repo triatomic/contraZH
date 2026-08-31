@@ -17,7 +17,8 @@
 */
 
 // FILE: TimeOfDayOverrideUpdate.cpp //////////////////////////////////////////////////////////////
-// Desc:   Attaches to an existing superweapon and switches the world time of day when it fires.
+// Desc:   Switches the world time of day, either when the superweapon it is attached to fires or,
+//         with ActivateOnCreate, for as long as the object carrying it lives.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
@@ -37,7 +38,15 @@ TimeOfDayOverrideUpdate::TimeOfDayOverrideUpdate( Thing *thing, const ModuleData
 	m_originalTimeOfDay = TIME_OF_DAY_INVALID;
 	m_revertFrame = 0;
 
-	setWakeFrame( getObject(), UPDATE_SLEEP_FOREVER );
+	// An object that brings the night with it has to wake once to do the switch.
+	if( getTimeOfDayOverrideUpdateModuleData()->m_activateOnCreate )
+	{
+		setWakeFrame( getObject(), UPDATE_SLEEP_NONE );
+	}
+	else
+	{
+		setWakeFrame( getObject(), UPDATE_SLEEP_FOREVER );
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -49,6 +58,12 @@ TimeOfDayOverrideUpdate::~TimeOfDayOverrideUpdate()
 Bool TimeOfDayOverrideUpdate::initiateIntentToDoSpecialPower( const SpecialPowerTemplate *specialPowerTemplate, const Object *targetObj, const Coord3D *targetPos, const Waypoint *way, UnsignedInt commandOptions )
 {
 	const TimeOfDayOverrideUpdateModuleData* d = getTimeOfDayOverrideUpdateModuleData();
+
+	if( d->m_activateOnCreate )
+	{
+		// We run off our own lifetime, so a power firing is none of our business.
+		return FALSE;
+	}
 
 	if( d->m_specialPowerTemplate != nullptr && d->m_specialPowerTemplate != specialPowerTemplate )
 	{
@@ -79,22 +94,42 @@ void TimeOfDayOverrideUpdate::activateOverride()
 
 	if( currentTOD == targetTOD )
 	{
-		// The map is already where we would take it, so there is nothing for us to do. The power
-		// itself still fires, we just have no time of day change to make.
-		return;
+		// Somebody else already took the world where we would have taken it, so we join them rather
+		// than doing nothing. Otherwise the world would snap back the moment they let go, even
+		// though we are still here wanting the night.
+		TimeOfDayOverrideUpdate *holder = findAnyHolder( this );
+
+		if( holder == nullptr )
+		{
+			// Nobody is holding it, so the map itself sits at our target and there is nothing for us
+			// to do. The power still fires, we just have no time of day change to make.
+			return;
+		}
+
+		// Go back to wherever the first of us found the world, not to the night we are all holding.
+		m_originalTimeOfDay = holder->m_originalTimeOfDay;
+		m_activeTimeOfDay = targetTOD;
 	}
-
-	// Where we go back to when the override ends, which is simply wherever the map was.
-	m_originalTimeOfDay = currentTOD;
-
-	if( TheGameClient->switchTimeOfDay( targetTOD ) == FALSE )
+	else
 	{
-		return;
+		// Where we go back to when the override ends, which is simply wherever the map was.
+		m_originalTimeOfDay = currentTOD;
+
+		if( TheGameClient->switchTimeOfDay( targetTOD ) == FALSE )
+		{
+			return;
+		}
+
+		m_activeTimeOfDay = targetTOD;
 	}
 
-	m_activeTimeOfDay = targetTOD;
-
-	if( d->m_durationFrames > 0 )
+	if( d->m_activateOnCreate )
+	{
+		// We hold the night for as long as we live, so there is no timer to run.
+		m_revertFrame = 0;
+		setWakeFrame( getObject(), UPDATE_SLEEP_FOREVER );
+	}
+	else if( d->m_durationFrames > 0 )
 	{
 		m_revertFrame = TheGameLogic->getFrame() + d->m_durationFrames;
 		setWakeFrame( getObject(), UPDATE_SLEEP( d->m_durationFrames ) );
@@ -108,9 +143,62 @@ void TimeOfDayOverrideUpdate::activateOverride()
 }
 
 //-------------------------------------------------------------------------------------------------
+/** Count the other modules that are holding the world at their target right now. We walk the
+	* objects rather than keeping a counter, so a save and load or a replay rebuilds the same answer
+	* without any extra state to get out of step. */
+//-------------------------------------------------------------------------------------------------
+Int TimeOfDayOverrideUpdate::countOtherHolders( const TimeOfDayOverrideUpdate *exclude )
+{
+	static const NameKeyType key = NAMEKEY( "TimeOfDayOverrideUpdate" );
+
+	Int count = 0;
+
+	for( Object *obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject() )
+	{
+		TimeOfDayOverrideUpdate *other = (TimeOfDayOverrideUpdate*)obj->findUpdateModule( key );
+
+		if( other != nullptr && other != exclude && other->m_activeTimeOfDay != TIME_OF_DAY_INVALID )
+		{
+			++count;
+		}
+	}
+
+	return count;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Find any other module that is holding the world at its target right now. */
+//-------------------------------------------------------------------------------------------------
+TimeOfDayOverrideUpdate *TimeOfDayOverrideUpdate::findAnyHolder( const TimeOfDayOverrideUpdate *exclude )
+{
+	static const NameKeyType key = NAMEKEY( "TimeOfDayOverrideUpdate" );
+
+	for( Object *obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject() )
+	{
+		TimeOfDayOverrideUpdate *other = (TimeOfDayOverrideUpdate*)obj->findUpdateModule( key );
+
+		if( other != nullptr && other != exclude && other->m_activeTimeOfDay != TIME_OF_DAY_INVALID )
+		{
+			return other;
+		}
+	}
+
+	return nullptr;
+}
+
+//-------------------------------------------------------------------------------------------------
 void TimeOfDayOverrideUpdate::revertOverride()
 {
 	const TimeOfDayOverrideUpdateModuleData* d = getTimeOfDayOverrideUpdateModuleData();
+
+	// Somebody else still wants the world the way it is, so just let go of our own claim and leave
+	// the last one out to put it back.
+	if( countOtherHolders( this ) > 0 )
+	{
+		m_activeTimeOfDay = TIME_OF_DAY_INVALID;
+		m_revertFrame = 0;
+		return;
+	}
 
 	TimeOfDay returnTOD = (TimeOfDay)m_originalTimeOfDay;
 
@@ -129,6 +217,20 @@ void TimeOfDayOverrideUpdate::revertOverride()
 //-------------------------------------------------------------------------------------------------
 UpdateSleepTime TimeOfDayOverrideUpdate::update()
 {
+	const TimeOfDayOverrideUpdateModuleData* d = getTimeOfDayOverrideUpdateModuleData();
+
+	if( d->m_activateOnCreate )
+	{
+		// First tick after we came into the world. We hold the night for as long as we live, so
+		// there is nothing to do afterwards and onDelete does the putting back.
+		if( m_activeTimeOfDay == TIME_OF_DAY_INVALID )
+		{
+			activateOverride();
+		}
+
+		return UPDATE_SLEEP_FOREVER;
+	}
+
 	if( m_revertFrame != 0 && TheGameLogic->getFrame() >= m_revertFrame )
 	{
 		revertOverride();
@@ -140,8 +242,9 @@ UpdateSleepTime TimeOfDayOverrideUpdate::update()
 //-------------------------------------------------------------------------------------------------
 void TimeOfDayOverrideUpdate::onDelete()
 {
-	// A timed override must not become permanent just because we died holding it.
-	if( m_revertFrame != 0 )
+	// Whether we were holding the night for our own lifetime or running a timed switch, dying with
+	// it still in place must not leave the world stuck there.
+	if( m_activeTimeOfDay != TIME_OF_DAY_INVALID )
 	{
 		revertOverride();
 	}
