@@ -30,6 +30,22 @@ the unit is selected or moused over. Own units only. Nothing is drawn when there
 report, so the pips read as "still loaded" and "carrying someone" at a glance.)
 * `BuildTimerDisplayMode = None` - (`None` | `Seconds` | `Auto`. Countdown numbers on build queue and
 special power cameos. `Auto` switches to MM:SS past a minute.)
+* `NewRadar = No` - (Yes redraws the radar in the style of the RA3 minimap. Unit and structure
+blips get a dark outline so they read against any terrain, structures draw a little larger than
+units, and the waterline gets a dark contour instead of fading into the land. Ground is flattened
+to two tones, an olive for natural terrain and a pale grey for rock and man made surfaces, mixed
+where the two meet so edges shade across rather than seam, so the map reads as regions rather than
+as a patchwork of texture. The radar grid doubles to 256x256 to
+make room for the detail, so the radar is sharper as well. No keeps the retail radar exactly as it
+was.)
+* `BlipSize = Large` - (`Small` | `Large`. How big the object blips draw. `Small` is 3 pixels for a
+unit and 5 for a structure, `Large` is 5 and 7. Larger blips are easier to pick out at a glance but
+run together sooner when units are packed in. Ignored unless `NewRadar` is on.)
+
+Note: `NewRadar` cannot hide roads the way the RA3 minimap does. Roads are painted into the terrain
+textures themselves rather than drawn as their own radar layer, so by the time the radar samples a
+road cell it is indistinguishable from the ground around it. Bridges do still draw in their own
+colour, since those come from the bridge list rather than the terrain.
 
 Note: `SelectionCircle` needs a mod-side `PlainRingSelection.tga` — a white or greyscale ring with
 alpha, tinted green at runtime. Until it exists the ring simply does not draw.
