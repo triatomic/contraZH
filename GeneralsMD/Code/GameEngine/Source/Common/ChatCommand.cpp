@@ -42,6 +42,7 @@
 #include "GameClient/View.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/WeaponSetType.h"
@@ -57,7 +58,7 @@ const FieldParse ChatCommand::s_fieldParseTable[] =
 	{ "AddMoney",		INI::parseInt,			nullptr,	offsetof( ChatCommand, m_addMoney ) },
 	{ "AddRank",		INI::parseUnsignedInt,	nullptr,	offsetof( ChatCommand, m_addRank ) },
 	{ "ReadyTimers",	INI::parseBool,			nullptr,	offsetof( ChatCommand, m_readyTimers ) },
-	{ "SpawnObjectAtCursor",	INI::parseAsciiString,	nullptr,	offsetof( ChatCommand, m_spawnObjectAtCursor ) },
+	{ "SpawnObjectAtCursor",	ChatCommand::parseSpawnObjectAtCursor,	nullptr,	0 },
 	{ "TogglePrerequisites",	INI::parseBool,			nullptr,	offsetof( ChatCommand, m_togglePrerequisites ) },
 	{ "ToggleInfiniteEnergy",	INI::parseBool,			nullptr,	offsetof( ChatCommand, m_toggleInfiniteEnergy ) },
 	{ "GrantAllUpgrades",		INI::parseBool,			nullptr,	offsetof( ChatCommand, m_grantAllUpgrades ) },
@@ -100,7 +101,47 @@ static void setArmorSalvageTier( Object *obj, Int newTier )
 }
 
 //-------------------------------------------------------------------------------------------------
-void ChatCommand::execute() const
+void ChatCommand::parseSpawnObjectAtCursor( INI *ini, void *instance, void * /*store*/, const void * /*userData*/ )
+{
+	ChatCommand *command = (ChatCommand *)instance;
+	command->m_spawnObjectAtCursor = ini->getNextAsciiString();
+	// Presence of the key is what makes this a spawn command; the value is only the default object,
+	// and is allowed to be blank so the object can be typed after the command instead.
+	command->m_isSpawnObjectCommand = TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Find an ObjectTemplate by name for a chat command. Unlike a plain findTemplate() call this is
+// forgiving, because the name can come from whatever the user typed: the assert on a miss is
+// suppressed, and an exact lookup that fails falls back to a case-insensitive search so
+// "americatankcrusader" still finds "AmericaTankCrusader".
+static const ThingTemplate *findTemplateForChatCommand( const AsciiString& name )
+{
+	if (TheThingFactory == nullptr || name.isEmpty())
+	{
+		return nullptr;
+	}
+
+	// Exact match first; this is the hash lookup, and the only one that can hit for INI-supplied names.
+	const ThingTemplate *tmpl = TheThingFactory->findTemplate( name, FALSE );
+	if (tmpl)
+	{
+		return tmpl;
+	}
+
+	for (const ThingTemplate *t = TheThingFactory->firstTemplate(); t; t = t->friend_getNextTemplate())
+	{
+		if (t->getName().compareNoCase( name ) == 0)
+		{
+			return t;
+		}
+	}
+
+	return nullptr;
+}
+
+//-------------------------------------------------------------------------------------------------
+void ChatCommand::execute( const AsciiString& args ) const
 {
 	// Money: positive grants cash, negative removes it. The local player's funds can never
 	// go below zero (withdraw caps at the current balance), so a large removal just empties it.
@@ -177,10 +218,13 @@ void ChatCommand::execute() const
 	}
 
 	// SpawnObjectAtCursor: create one instance of the named ObjectTemplate for the local player,
-	// placed on the terrain under the mouse cursor.
-	if (!m_spawnObjectAtCursor.isEmpty())
+	// placed on the terrain under the mouse cursor. A name typed after the command wins over the
+	// INI one, so a single command can spawn anything; with nothing typed the INI name is used.
+	// The command only counts as a spawn command if one of the two supplied a name.
+	AsciiString spawnName = args.isEmpty() ? m_spawnObjectAtCursor : args;
+	if (m_isSpawnObjectCommand && !spawnName.isEmpty())
 	{
-		const ThingTemplate *tmpl = TheThingFactory ? TheThingFactory->findTemplate( m_spawnObjectAtCursor ) : nullptr;
+		const ThingTemplate *tmpl = findTemplateForChatCommand( spawnName );
 		Player *player = ThePlayerList ? ThePlayerList->getLocalPlayer() : nullptr;
 		Team *team = player ? player->getDefaultTeam() : nullptr;
 		if (tmpl && team && TheMouse && TheTacticalView)
@@ -194,12 +238,38 @@ void ChatCommand::execute() const
 			{
 				obj->setPosition( &pos );
 				obj->setOrientation( 0.0f );
+
+				// newObject only runs the onCreate half of creation, so finish the object off the
+				// way ProductionUpdate does after a factory builds one.
+				for (BehaviorModule **m = obj->getBehaviorModules(); m && *m; ++m)
+				{
+					CreateModuleInterface *create = (*m)->getCreate();
+					if (create != nullptr)
+					{
+						create->onBuildComplete();
+					}
+				}
 			}
 		}
 		else if (!tmpl)
 		{
-			DEBUG_LOG((">>> CHAT COMMAND SpawnObjectAtCursor: ThingTemplate '%s' not found.", m_spawnObjectAtCursor.str()));
+			// A typo is the normal failure now that the name can be typed, so say so on screen;
+			// the log alone is invisible in a release cheats build.
+			DEBUG_LOG((">>> CHAT COMMAND SpawnObjectAtCursor: ThingTemplate '%s' not found.", spawnName.str()));
+			if (TheInGameUI)
+			{
+				UnicodeString msg;
+				UnicodeString wideName;
+				wideName.translate( spawnName );
+				msg.format( L"Unknown object: %s", wideName.str() );
+				TheInGameUI->message( msg );
+			}
 		}
+	}
+	else if (m_isSpawnObjectCommand && TheInGameUI)
+	{
+		// Declared as a spawn command but neither the INI nor the user named anything to spawn.
+		TheInGameUI->message( UnicodeString( L"Usage: type an object name after the command." ) );
 	}
 
 	// TogglePrerequisites: flip ignoring of unit/building build prereqs for the local player

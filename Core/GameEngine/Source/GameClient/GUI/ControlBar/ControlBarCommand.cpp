@@ -1571,6 +1571,22 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 			break;
 		}
 
+		// Deploy button.
+		case GUI_COMMAND_TOGGLE_DEPLOY:
+		{
+			// only something with an AI can deploy, so do not offer the command at all otherwise
+			if( obj->getAI() == nullptr )
+				return COMMAND_RESTRICTED;
+
+			// Show the button toggled on while deployed. Read the status bit rather than asking the
+			// module directly, so this stays in the shared Core file: the deploy module is not reachable
+			// the same way in both games.
+			if( obj->testStatus( OBJECT_STATUS_DEPLOYED ) )
+				return COMMAND_ACTIVE;
+
+			break;
+		}
+
 		// switch weapon command
 		case GUI_COMMAND_SWITCH_WEAPON:
 		{

@@ -49,6 +49,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/DeployStyleAIUpdate.h"
 #include "GameLogic/Module/OverchargeBehavior.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/SpawnBehavior.h"
@@ -3284,6 +3285,47 @@ void AIGroup::groupToggleHoldFire( CommandSourceType cmdSource )
 		ai->setHoldingFire( !allHolding );
 	}
 
+}
+
+/**
+	* Deploy or pack up the group on the player's order. A mixed selection is moved to a single
+	* stance rather than each unit flipping its own, so one press does not scatter them.
+	*/
+void AIGroup::groupToggleDeploy( CommandSourceType cmdSource )
+{
+	std::list<Object *>::iterator i;
+	Object *obj;
+	Bool allDeployed = TRUE;
+
+	// first pass -- are they all deployed already?
+	for( i = m_memberList.begin(); i != m_memberList.end(); ++i )
+	{
+		obj = *i;
+
+		AIUpdateInterface *ai = obj->getAI();
+		DeployStyleAIUpdate *deployAI = ai ? ai->getDeployStyleAIUpdate() : nullptr;
+		if( deployAI == nullptr )
+			continue;
+
+		if( !deployAI->isDeployedOrDeploying() )
+			allDeployed = FALSE;
+	}
+
+	// second pass -- move the whole group to the same stance
+	for( i = m_memberList.begin(); i != m_memberList.end(); ++i )
+	{
+		obj = *i;
+
+		AIUpdateInterface *ai = obj->getAI();
+		DeployStyleAIUpdate *deployAI = ai ? ai->getDeployStyleAIUpdate() : nullptr;
+		if( deployAI == nullptr )
+			continue;
+
+		if( deployAI->isDeployedOrDeploying() == allDeployed )
+		{
+			deployAI->toggleManualDeploy();
+		}
+	}
 }
 
 #ifdef ALLOW_SURRENDER

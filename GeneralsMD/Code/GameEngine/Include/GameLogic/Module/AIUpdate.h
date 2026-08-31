@@ -55,6 +55,7 @@ class WorkerAIInterface;
 class HackInternetAIInterface;
 class AssaultTransportAIInterface;
 class JetAIUpdate;
+class DeployStyleAIUpdate;
 
 struct AttackAngleData;
 
@@ -122,6 +123,7 @@ enum AutoAcquireStates CPP_11(: Int)
 	AAS_Idle_No										= 0x04,
 	AAS_Idle_Not_While_Attacking	= 0x08,
 	AAS_Idle_Attack_Buildings			= 0x10,
+	AAS_Idle_Not_While_Moving			= 0x20,
 };
 
 #ifdef DEFINE_AUTOACQUIRE_NAMES
@@ -132,6 +134,7 @@ static const char *const TheAutoAcquireEnemiesNames[] =
 	"NO",
 	"NOTWHILEATTACKING",
 	"ATTACK_BUILDINGS",
+	"NOTWHILEMOVING",
 
 	nullptr
 };
@@ -338,6 +341,8 @@ public:
 	virtual const AssaultTransportAIInterface* getAssaultTransportAIInterface() const { return nullptr; }
 	virtual JetAIUpdate* getJetAIUpdate() { return nullptr; }
 	virtual const JetAIUpdate* getJetAIUpdate() const { return nullptr; }
+	virtual DeployStyleAIUpdate* getDeployStyleAIUpdate() { return nullptr; }
+	virtual const DeployStyleAIUpdate* getDeployStyleAIUpdate() const { return nullptr; }
 
 #ifdef ALLOW_SURRENDER
 	void setSurrendered(const Object* objWeSurrenderedTo, Bool surrendered);
@@ -629,6 +634,9 @@ public:
 	Bool canAutoAcquire() const { return getAIUpdateModuleData()->m_autoAcquireEnemiesWhenIdle; }
 
 	Bool canAutoAcquireWhileStealthed() const;
+
+	/// True when this object is forbidden from firing while it is moving.
+	Bool mustHoldStillToFire() const { return BitIsSet(getAIUpdateModuleData()->m_autoAcquireEnemiesWhenIdle, AAS_Idle_Not_While_Moving); }
 
 	void applySpeedMultiplier(Real scalar);
 	inline Real getSpeedMultiplier(void) const { return m_speedMultiplier; }

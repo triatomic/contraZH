@@ -822,6 +822,16 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			break;
 		}
 
+		// Deploy button: flip the selected group between deployed and packed.
+		case GameMessage::MSG_TOGGLE_DEPLOY:
+		{
+			// use the selected group
+			if( currentlySelectedGroup )
+				currentlySelectedGroup->groupToggleDeploy( CMD_FROM_PLAYER );
+
+			break;
+		}
+
 #ifdef ALLOW_SURRENDER
 		case GameMessage::MSG_DO_SURRENDER:
 		{

@@ -47,6 +47,55 @@ New experimental parameter:
 When a unit turns to attack, it will attempt to turn to this angle. If mirrored is enable it can also use the same angle +180°. Possibly useful for battleship setups with multiple turrets. Only works for locomotors that can turn in place (minTurnSpeed = 0)
 Note: this is NOT needed for limited turret angles (See below). Units will follow the actual turret angles when trying to attack.
 
+New `AutoAcquireEnemiesWhenIdle` value:
+* `NOTWHILEMOVING` - the object will not shoot on the move. Intended for artillery that has to be stationary
+to fire, which previously had to be faked in other ways.
+Combine it with the other values as usual, e.g. `AutoAcquireEnemiesWhenIdle = Yes NOTWHILEMOVING`.
+
+What it does, by order type:
+
+| Order | Behaviour |
+|---|---|
+| Move | Drives past enemies without stopping or engaging. |
+| Attack-move | Drives, spots a target, halts once in range, fires, then carries on. |
+| Attack (direct order) | Closes on the target, halts, fires. |
+| Stationary | Fires normally. |
+
+This takes two separate checks, because the two halves pull against each other. Targets of opportunity - the
+idle scans, including a turret scanning while the chassis under it drives - are suppressed while the object is
+in motion, which is what keeps it from shooting on an ordinary move. Attack-move deliberately still acquires
+on the move, because spotting a target while driving is exactly what makes the unit stop for it; the object
+then keeps aiming, without firing, until it has actually come to rest. It holds its target throughout and
+fires the moment it settles, so any PreAttackDelay wind-up plays where the shot is taken rather than being
+spent on the approach.
+
+### DeployStyleAIUpdate
+New command for deploying artillery, replacing the old trick of pointing a `FIRE_WEAPON` button at a dummy
+weapon slot. That worked, but it went through the weapon lock and brought its bugs with it.
+
+```
+CommandButton Command_Deploy
+  Command           = TOGGLE_DEPLOY
+  Options           = OK_FOR_MULTI_SELECT
+  ButtonImage       = SNNukeCannonDeploy
+  ButtonBorderType  = ACTION
+  TextLabel         = CONTROLBAR:ToolTipDeploy
+  UnitSpecificSound = NukeCannonVoiceDeploy
+End
+```
+
+`TOGGLE_DEPLOY` needs no `WeaponSlot`. It flips the object between deployed and packed, and the button shows
+as toggled on while deployed. It works on any object with a `DeployStyleAIUpdate`; on anything else the
+button is unavailable.
+
+A deploy asked for this way latches, so the unit holds the stance instead of packing up again the moment
+nothing is in range - which is the point, since it lets a unit deploy before the enemy arrives. The latch is
+dropped when the player gives any order other than an attack, so a move order packs the unit up as usual.
+Automatic deploying when a target comes into range is unchanged.
+
+Selecting a mixed group and pressing the button moves the whole group to one stance rather than flipping each
+unit separately, so a second press does not undo half of them.
+
 ### Turret
 New paramters for Turret or AltTurret entries
 * `MinTurretAngle = 0` - Minimum angle the turret is allowed to turn
@@ -462,6 +511,12 @@ Parameters:
 * `CostModifierPercentage = 0` - Percentage amount that the unit's costs are modified
 * `BuildTimeModifierPercentage = 0` - Percentage amount that the unit's build time is modified
 * `UnitTemplateName = <Name of an Object>` - The unit to apply this bonus to. (multiple lines are allowed)
+* `IsOneShotUpgrade = No` - (Yes makes the bonus permanent: it is never removed when the granting
+object dies and does not transfer when it is captured.)
+* `BonusStacksWith = NO_STACKING` - (`NO_STACKING` | `OTHER_TYPE` | `SAME_TYPE`. How the bonus
+stacks when several objects grant it. `NO_STACKING` is the previous behaviour, where only differing
+percentages stack; `OTHER_TYPE` stacks across different source object types; `SAME_TYPE` stacks
+across objects of the same type.)
 
 **Example**
 ```
@@ -475,7 +530,9 @@ End
 ```
 
 **Notes**
-- This upgrade is currently not removable, i.e. it will not work like the CostModifierUpgrade module for Tech OilRefinery. It's only suitable as a global upgrade for now
+- The bonus is now removed when the granting object is destroyed and transfers with it on capture,
+so it works for per-building upgrades such as Tech OilRefinery and not only as a global upgrade.
+Set `IsOneShotUpgrade = Yes` to get the old permanent behaviour back.
 
 ## StealthUpgrade
 
