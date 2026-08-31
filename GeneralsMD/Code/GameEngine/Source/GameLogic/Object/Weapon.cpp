@@ -3994,6 +3994,9 @@ void Weapon::transferNextShotStatsFrom( const Weapon &weapon )
 {
 	m_whenWeCanFireAgain = weapon.getPossibleNextShotFrame();
 	m_whenLastReloadStarted = weapon.getLastReloadStartedFrame();
+	// Carry the pre-attack deadline too, or a snipe charged up on one weapon is silently
+	// dropped: getStatus() can hand us PRE_ATTACK while our own deadline is still zero.
+	m_whenPreAttackFinished = weapon.getPreAttackFinishedFrame();
 	m_status = weapon.getStatus();
 }
 
@@ -4022,6 +4025,9 @@ void Weapon::transferReloadStateFrom(const Weapon& weapon, Real clipPercentage/*
 
 	m_whenWeCanFireAgain = weapon.getPossibleNextShotFrame();
 	m_whenLastReloadStarted = weapon.getLastReloadStartedFrame();
+	// Carry the pre-attack deadline too, or a snipe charged up in the previous set is silently
+	// dropped: getStatus() can hand us PRE_ATTACK while our own deadline is still zero.
+	m_whenPreAttackFinished = weapon.getPreAttackFinishedFrame();
 	m_status = weapon.getStatus();
 
 
