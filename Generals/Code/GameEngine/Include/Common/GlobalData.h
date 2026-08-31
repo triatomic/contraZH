@@ -498,6 +498,13 @@ public:
   Bool m_TiVOFastMode;            ///< When true, the client speeds up the framerate... set by HOTKEY!
   Bool m_queueReorder;            ///< Ctrl+click moves a build queue entry one position earlier; off unless GameData enables it
 
+	// TheSuperHackers @feature Outline the radar blips and the shoreline, at double radar
+	// resolution. Client side only; the radar never feeds game logic.
+	Bool m_newRadar;
+	// TheSuperHackers @feature How big the NewRadar object blips draw.
+	// Holds a RadarBlipSize; stored as Int to avoid pulling OptionPreferences.h in here.
+	Int m_radarBlipSize;
+
 #if defined(RTS_DEBUG) || ENABLE_CONFIGURABLE_SHROUD
 	Bool m_shroudOn;
 #endif
