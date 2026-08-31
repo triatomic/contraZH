@@ -71,6 +71,7 @@
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/CollideModule.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/DeployStyleAIUpdate.h"
 #include "GameLogic/Module/CountermeasuresBehavior.h"
 #include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/DamageModule.h"
@@ -5972,6 +5973,19 @@ void Object::doCommandButton( const CommandButton *commandButton, CommandSourceT
 				}
 				break;
 
+			// Deploy button, so scripts can toggle it too.
+			case GUI_COMMAND_TOGGLE_DEPLOY:
+				if( ai )
+				{
+					DeployStyleAIUpdate *deployAI = ai->getDeployStyleAIUpdate();
+					if( deployAI )
+					{
+						deployAI->toggleManualDeploy();
+						return;
+					}
+				}
+				break;
+
 			//Feel free to implement object based command buttons.
 			case GUI_COMMAND_COMBATDROP:
 			case GUI_COMMAND_DOZER_CONSTRUCT_CANCEL:
@@ -6107,6 +6121,7 @@ void Object::doCommandButtonAtObject( const CommandButton *commandButton, Object
 			case GUI_COMMAND_ATTACK_MOVE:
 			case GUI_COMMAND_REVERSE_MOVE:
 			case GUI_COMMAND_HOLD_FIRE:
+			case GUI_COMMAND_TOGGLE_DEPLOY:
 			case GUI_COMMAND_AUTO_FILL:
 			case GUI_COMMAND_GUARD:
 			case GUI_COMMAND_GUARD_WITHOUT_PURSUIT:
@@ -6227,6 +6242,7 @@ void Object::doCommandButtonAtPosition( const CommandButton *commandButton, cons
 			case GUI_COMMAND_COMBATDROP:
 			case GUI_COMMAND_SWITCH_WEAPON:
 			case GUI_COMMAND_HOLD_FIRE:
+			case GUI_COMMAND_TOGGLE_DEPLOY:
 			case GUICOMMANDMODE_HIJACK_VEHICLE:
 			case GUICOMMANDMODE_CONVERT_TO_CARBOMB:
 #ifdef ALLOW_SURRENDER
@@ -6270,6 +6286,7 @@ void Object::doCommandButtonUsingWaypoints( const CommandButton *commandButton, 
 			case GUI_COMMAND_ATTACK_MOVE:
 			case GUI_COMMAND_REVERSE_MOVE:
 			case GUI_COMMAND_HOLD_FIRE:
+			case GUI_COMMAND_TOGGLE_DEPLOY:
 			case GUI_COMMAND_AUTO_FILL:
 			case GUI_COMMAND_STOP:
 			case GUI_COMMAND_DOZER_CONSTRUCT:

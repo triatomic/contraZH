@@ -2133,6 +2133,7 @@ void ScriptActions::doTeamHuntWithCommandButton(const AsciiString& teamName, con
 			case GUI_COMMAND_ATTACK_MOVE:
 			case GUI_COMMAND_REVERSE_MOVE:
 			case GUI_COMMAND_HOLD_FIRE:
+			case GUI_COMMAND_TOGGLE_DEPLOY:
 			case GUI_COMMAND_AUTO_FILL:
 			case GUI_COMMAND_GUARD:
 			case GUI_COMMAND_GUARD_WITHOUT_PURSUIT:
