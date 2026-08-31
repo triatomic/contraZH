@@ -97,7 +97,7 @@ void TimeOfDayOverrideUpdate::activateOverride()
 		// Somebody else already took the world where we would have taken it, so we join them rather
 		// than doing nothing. Otherwise the world would snap back the moment they let go, even
 		// though we are still here wanting the night.
-		TimeOfDayOverrideUpdate *holder = findAnyHolder( this );
+		TimeOfDayOverrideUpdate *holder = findOtherHolder( this, targetTOD, nullptr );
 
 		if( holder == nullptr )
 		{
@@ -143,47 +143,54 @@ void TimeOfDayOverrideUpdate::activateOverride()
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Count the other modules that are holding the world at their target right now. We walk the
+/** Find another module that is holding the world at the given time of day right now, and count how
+	* many there are. Only holders of that same time of day count: one holding the world somewhere
+	* else neither tells us where to go back to nor has any say in when we let go. We walk the
 	* objects rather than keeping a counter, so a save and load or a replay rebuilds the same answer
 	* without any extra state to get out of step. */
 //-------------------------------------------------------------------------------------------------
-Int TimeOfDayOverrideUpdate::countOtherHolders( const TimeOfDayOverrideUpdate *exclude )
+TimeOfDayOverrideUpdate *TimeOfDayOverrideUpdate::findOtherHolder( const TimeOfDayOverrideUpdate *exclude, TimeOfDay heldTimeOfDay, Int *count )
 {
 	static const NameKeyType key = NAMEKEY( "TimeOfDayOverrideUpdate" );
 
-	Int count = 0;
+	TimeOfDayOverrideUpdate *found = nullptr;
+
+	if( count != nullptr )
+	{
+		*count = 0;
+	}
 
 	for( Object *obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject() )
 	{
-		TimeOfDayOverrideUpdate *other = (TimeOfDayOverrideUpdate*)obj->findUpdateModule( key );
-
-		if( other != nullptr && other != exclude && other->m_activeTimeOfDay != TIME_OF_DAY_INVALID )
+		for( BehaviorModule **b = obj->getBehaviorModules(); *b; ++b )
 		{
-			++count;
+			if( (*b)->getModuleNameKey() != key )
+			{
+				continue;
+			}
+
+			TimeOfDayOverrideUpdate *other = (TimeOfDayOverrideUpdate*)(*b);
+
+			if( other == exclude || other->m_activeTimeOfDay != (Int)heldTimeOfDay )
+			{
+				continue;
+			}
+
+			if( found == nullptr )
+			{
+				found = other;
+			}
+
+			if( count == nullptr )
+			{
+				return found;
+			}
+
+			++(*count);
 		}
 	}
 
-	return count;
-}
-
-//-------------------------------------------------------------------------------------------------
-/** Find any other module that is holding the world at its target right now. */
-//-------------------------------------------------------------------------------------------------
-TimeOfDayOverrideUpdate *TimeOfDayOverrideUpdate::findAnyHolder( const TimeOfDayOverrideUpdate *exclude )
-{
-	static const NameKeyType key = NAMEKEY( "TimeOfDayOverrideUpdate" );
-
-	for( Object *obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject() )
-	{
-		TimeOfDayOverrideUpdate *other = (TimeOfDayOverrideUpdate*)obj->findUpdateModule( key );
-
-		if( other != nullptr && other != exclude && other->m_activeTimeOfDay != TIME_OF_DAY_INVALID )
-		{
-			return other;
-		}
-	}
-
-	return nullptr;
+	return found;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -191,9 +198,12 @@ void TimeOfDayOverrideUpdate::revertOverride()
 {
 	const TimeOfDayOverrideUpdateModuleData* d = getTimeOfDayOverrideUpdateModuleData();
 
-	// Somebody else still wants the world the way it is, so just let go of our own claim and leave
-	// the last one out to put it back.
-	if( countOtherHolders( this ) > 0 )
+	// Somebody else still wants the world where we are holding it, so just let go of our own claim
+	// and leave the last one out to put it back.
+	Int otherHolders = 0;
+	findOtherHolder( this, (TimeOfDay)m_activeTimeOfDay, &otherHolders );
+
+	if( otherHolders > 0 )
 	{
 		m_activeTimeOfDay = TIME_OF_DAY_INVALID;
 		m_revertFrame = 0;

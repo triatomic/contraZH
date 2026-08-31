@@ -103,8 +103,7 @@ private:
 	void activateOverride();
 	void revertOverride();
 
-	static Int countOtherHolders( const TimeOfDayOverrideUpdate *exclude );
-	static TimeOfDayOverrideUpdate *findAnyHolder( const TimeOfDayOverrideUpdate *exclude );
+	static TimeOfDayOverrideUpdate *findOtherHolder( const TimeOfDayOverrideUpdate *exclude, TimeOfDay heldTimeOfDay, Int *count );
 
 	Int m_activeTimeOfDay;					///< time of day we forced on the world, TIME_OF_DAY_INVALID when we have no override running
 	Int m_originalTimeOfDay;				///< time of day we go back to
