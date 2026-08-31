@@ -66,6 +66,17 @@ enum BuildTimerDisplayMode CPP_11(: Int)
 
 // TheSuperHackers @feature When health bars are shown above objects. Purely a client side
 // display preference -- it never affects game logic, so it is safe in multiplayer and replays.
+// TheSuperHackers @feature How big the NewRadar object blips draw. Small is the size the feature
+// shipped with; Large is easier on the eye but merges sooner when units are packed together.
+enum RadarBlipSize CPP_11(: Int)
+{
+	RadarBlipSize_Small = 0,	///< 3 pixel units, 5 pixel structures
+	RadarBlipSize_Large,			///< 5 pixel units, 7 pixel structures
+
+	RadarBlipSize_Count,
+	RadarBlipSize_Default = RadarBlipSize_Large
+};
+
 enum HealthBarDisplayMode CPP_11(: Int)
 {
 	HealthBarDisplayMode_Classic = 0,	///< selected and moused over objects only (retail behavior)
@@ -116,6 +127,8 @@ public:
 	Bool getEasyMilitaryDragEnabled() const;
 	Bool getSmartPipsEnabled() const;
 	Bool getNumericalHealthEnabled() const;
+	Bool getNewRadarEnabled() const;
+	RadarBlipSize getRadarBlipSize() const;
 	// TheSuperHackers @feature How long a particle name lingers in the debug overlay after its
 	// system is gone, in milliseconds. 0 (and an absent key) keeps the original behaviour, where a
 	// name shows only while its system is alive.
