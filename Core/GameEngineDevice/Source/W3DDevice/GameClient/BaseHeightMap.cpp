@@ -2292,6 +2292,16 @@ void BaseHeightMapRenderObjClass::staticLightingChanged()
 	if (m_roadBuffer)
 		m_roadBuffer->updateLighting();
 
+	// These bake the lighting into their vertices, so they have to be rebuilt too.
+	if (m_treeBuffer)
+		m_treeBuffer->staticLightingChanged();
+
+	if (m_bibBuffer)
+		m_bibBuffer->staticLightingChanged();
+
+	if (m_bridgeBuffer)
+		m_bridgeBuffer->doFullUpdate();
+
 }
 
 //=============================================================================

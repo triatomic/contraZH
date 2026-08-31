@@ -201,6 +201,48 @@ units of a quantity batch stay produced. Ctrl+click on the first entry does noth
 a finished unit that is only waiting to exit the factory cannot be displaced. A plain
 click still cancels the entry, and Shift+click still cancels a batch of units.
 
+# New Behavior Modules
+
+## TimeOfDayOverrideUpdate
+
+Switches the map's time of day when a superweapon fires. It is not a superweapon of its own: it
+rides along on one that already exists, so any existing special power can be made to bring on the
+night.
+
+```
+Behavior = TimeOfDayOverrideUpdate ModuleTag_TODOverride01
+  SpecialPowerTemplate = SuperweaponScudStorm  ; optional, see below
+  TimeOfDay            = NIGHT
+  FallbackTimeOfDay    = AFTERNOON
+  Duration             = 60000
+End
+```
+
+* `SpecialPowerTemplate` - (Only react to this power. Leave it out and the module reacts to every
+special power the object fires.)
+* `TimeOfDay = NIGHT` - (`MORNING` | `AFTERNOON` | `EVENING` | `NIGHT`. What the world switches to.)
+* `FallbackTimeOfDay = AFTERNOON` - (Used when the map is already at `TimeOfDay`, so the same power
+brings day back on a night map instead of doing nothing.)
+* `Duration = 0` - (In milliseconds. `0` makes the switch permanent, and firing again toggles it
+back. Any other value reverts to the original time of day after that long.)
+
+The switch is a real time of day change, not a lighting tint, so it brings everything night owns
+with it: the map author's own night lighting, night model variants such as headlights, the night
+ambient sounds, the night sky and water, and the night player indicator colours. Maps store lighting
+for all four times of day, so a daytime map already carries the night palette its author chose.
+
+Notes:
+* The switch lands when the power is **launched**, not when it hits.
+* Time of day is global, so it changes the view for every player and every observer, not just the
+firing player.
+* It happens in the simulation on all machines at once, so it is multiplayer and replay safe. Nothing
+about it feeds back into the simulation - lighting and models are presentation only.
+* A timed switch that is still running when the firing structure dies reverts rather than sticking.
+
+Switching at runtime also relights the trees, building bibs and bridges, which the engine previously
+left with their baked daytime lighting. The debug time of day hotkey picks up the same fix, and now
+refreshes player indicator colours as well.
+
 # Drag Selection
 
 ## EasyMilitaryDrag

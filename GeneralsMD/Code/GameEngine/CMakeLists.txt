@@ -452,6 +452,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/TechBuildingBehavior.h
     Include/GameLogic/Module/TempWeaponBonusHelper.h
     Include/GameLogic/Module/TensileFormationUpdate.h
+    Include/GameLogic/Module/TimeOfDayOverrideUpdate.h
     Include/GameLogic/Module/ToppleUpdate.h
     Include/GameLogic/Module/TransitionDamageFX.h
     Include/GameLogic/Module/TransportAIUpdate.h
@@ -1043,6 +1044,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Update/StructureCollapseUpdate.cpp
     Source/GameLogic/Object/Update/StructureToppleUpdate.cpp
     Source/GameLogic/Object/Update/TensileFormationUpdate.cpp
+    Source/GameLogic/Object/Update/TimeOfDayOverrideUpdate.cpp
     Source/GameLogic/Object/Update/ToppleUpdate.cpp
     Source/GameLogic/Object/Update/UpdateModule.cpp
     Source/GameLogic/Object/Update/WaveGuideUpdate.cpp

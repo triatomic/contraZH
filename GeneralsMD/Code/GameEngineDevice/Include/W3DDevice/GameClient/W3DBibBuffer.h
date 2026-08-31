@@ -100,6 +100,8 @@ public:
 	void removeHighlighting();
 	/// Draws the bibs.
 	void renderBibs();
+	/// Called when the lighting changes, so the baked vertex lighting gets rebuilt.
+	void staticLightingChanged() {m_anythingChanged = true;};
 	/// Called when the view changes, and sort key needs to be recalculated.
 	/// Normally sortKey gets calculated when a bib becomes visible.
 protected:

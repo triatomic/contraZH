@@ -201,6 +201,8 @@ public:
 	/// Called when the view changes, and sort key needs to be recalculated.
 	/// Normally sortKey gets calculated when a tree becomes visible.
 	void doFullUpdate() {m_updateAllKeys = true;};
+	/// Called when the lighting changes, so the baked vertex lighting gets rebuilt.
+	void staticLightingChanged() {m_anythingChanged = true;};
 	void setIsTerrain() {m_isTerrainPass = true;}; ///< Terrain calls this to tell trees to draw.
 	Bool needToDraw() {return m_isTerrainPass;};
 

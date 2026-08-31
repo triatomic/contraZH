@@ -910,6 +910,40 @@ void GameClient::setTimeOfDay( TimeOfDay tod )
 }
 
 //-------------------------------------------------------------------------------------------------
+/** Change the time of day of the running game. This refreshes the lighting, the models, the
+	* ambient sounds and the player indicator colors, all of which are presentation only. */
+//-------------------------------------------------------------------------------------------------
+Bool GameClient::switchTimeOfDay( TimeOfDay tod )
+{
+
+	if( TheWritableGlobalData->setTimeOfDay( tod ) == FALSE )
+	{
+		return FALSE;
+	}
+
+	// this relights the terrain and the water, moves the shadows and tells the drawables
+	setTimeOfDay( tod );
+
+	for( Drawable *draw = firstDrawable(); draw; draw = draw->getNextDrawable() )
+	{
+
+		if( TheGlobalData->m_forceModelsToFollowTimeOfDay )
+		{
+			// this just forces a refresh, so the day and night models get swapped
+			ModelConditionFlags empty;
+			draw->clearAndSetModelConditionFlags( empty, empty );
+		}
+
+		// picks up the day or night flavor of the player indicator color
+		draw->changedTeam();
+
+	}
+
+	return TRUE;
+
+}
+
+//-------------------------------------------------------------------------------------------------
 void GameClient::assignSelectedDrawablesToGroup( Int group )
 {
 /*

@@ -281,6 +281,7 @@ static PoolSizeRec PoolSizes[] =
 	{ "EnemyNearUpdate", 1024, 32 },
 	{ "ProximityCaptureUpdate", 32, 32 },
 	{ "TechBuildingBehavior", 32, 32 },
+	{ "TimeOfDayOverrideUpdate", 16, 16 },
 	{ "ToppleUpdate", 256, 128 },
 	{ "TransitionDamageFX", 384, 128 },
 	{ "TransportAIUpdate", 64, 32 },
