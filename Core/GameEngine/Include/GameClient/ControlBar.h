@@ -248,6 +248,7 @@ enum GUICommandType CPP_11(: Int)
 	GUI_COMMAND_AUTO_FILL,								///< TheSuperHackers @feature fill from nearby idle infantry
 
 	GUI_COMMAND_HOLD_FIRE,								///< TheSuperHackers @feature toggle the Hold Fire stance
+	GUI_COMMAND_TOGGLE_DEPLOY,						///< toggle a DeployStyleAIUpdate object between deployed and packed
 
 	// add more commands here, don't forget to update the string command list below too ...
 
@@ -305,6 +306,7 @@ static const char *const TheGuiCommandNames[] =
 	"REVERSE_MOVE",
 	"AUTO_FILL",
 	"HOLD_FIRE",
+	"TOGGLE_DEPLOY",
 
 	nullptr
 };
