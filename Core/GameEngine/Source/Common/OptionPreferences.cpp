@@ -405,16 +405,14 @@ Bool OptionPreferences::getSmartPipsEnabled(void) const
 
 // TheSuperHackers @feature Options.ini: NewRadar = Yes outlines the radar blips and the shoreline,
 // and doubles the radar resolution so there is room to draw those outlines. Purely presentational.
-//
-// The preference map is keyed by a case sensitive compare, so look the key up however it was
-// written down rather than making the reader guess at our capitalisation.
 Bool OptionPreferences::getNewRadarEnabled(void) const
 {
-	OptionPreferences::const_iterator it;
-	for (it = begin(); it != end(); ++it) {
-		if (stricmp(it->first.str(), "NewRadar") == 0) {
-			return stricmp(it->second.str(), "yes") == 0;
-		}
+	OptionPreferences::const_iterator it = find("NewRadar");
+	if (it == end())
+		return FALSE;
+
+	if (stricmp(it->second.str(), "yes") == 0) {
+		return TRUE;
 	}
 	return FALSE;
 }
