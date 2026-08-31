@@ -236,6 +236,13 @@ UpdateSleepTime TimeOfDayOverrideUpdate::update()
 		if( m_activeTimeOfDay == TIME_OF_DAY_INVALID )
 		{
 			activateOverride();
+
+			// Sitting the world already at our target is a legitimate do nothing. Failing to get
+			// there at all is not, and it would otherwise sleep forever in silence.
+			if( m_activeTimeOfDay == TIME_OF_DAY_INVALID && TheGlobalData->m_timeOfDay != (TimeOfDay)d->m_targetTimeOfDay )
+			{
+				DEBUG_CRASH( ("TimeOfDayOverrideUpdate: could not switch to time of day %d, check the module's TimeOfDay setting", d->m_targetTimeOfDay) );
+			}
 		}
 
 		return UPDATE_SLEEP_FOREVER;
@@ -287,14 +294,17 @@ void TimeOfDayOverrideUpdate::xfer( Xfer *xfer )
 	// extend base class
 	SpecialPowerUpdateModule::xfer( xfer );
 
-	// active time of day
-	xfer->xferInt( &m_activeTimeOfDay );
+	if( version >= 1 )
+	{
+		// active time of day
+		xfer->xferInt( &m_activeTimeOfDay );
 
-	// original time of day
-	xfer->xferInt( &m_originalTimeOfDay );
+		// original time of day
+		xfer->xferInt( &m_originalTimeOfDay );
 
-	// revert frame
-	xfer->xferUnsignedInt( &m_revertFrame );
+		// revert frame
+		xfer->xferUnsignedInt( &m_revertFrame );
+	}
 
 }
 
@@ -308,8 +318,10 @@ void TimeOfDayOverrideUpdate::loadPostProcess()
 	SpecialPowerUpdateModule::loadPostProcess();
 
 	// Loading a game reloads the map, which puts the world back on the map's own time of day.
-	// Nothing saves the global time of day, so we have to put our override back ourselves.
-	if( m_activeTimeOfDay != TIME_OF_DAY_INVALID )
+	// Nothing saves the global time of day, so we have to put our override back ourselves. Any
+	// other holders of the same time of day are restoring the same thing, so whoever gets here
+	// while the world is still elsewhere does it and the rest find it already done.
+	if( m_activeTimeOfDay != TIME_OF_DAY_INVALID && TheGlobalData->m_timeOfDay != (TimeOfDay)m_activeTimeOfDay )
 	{
 		TheGameClient->switchTimeOfDay( (TimeOfDay)m_activeTimeOfDay );
 	}

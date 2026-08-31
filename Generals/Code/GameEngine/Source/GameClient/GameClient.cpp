@@ -927,6 +927,13 @@ Bool GameClient::switchTimeOfDay( TimeOfDay tod )
 	for( Drawable *draw = firstDrawable(); draw; draw = draw->getNextDrawable() )
 	{
 
+		// Only drawables standing in for an object have night models or an indicator color, so the
+		// decorative ones have nothing to refresh.
+		if( draw->getObject() == NULL )
+		{
+			continue;
+		}
+
 		if( TheGlobalData->m_forceModelsToFollowTimeOfDay )
 		{
 			// this just forces a refresh, so the day and night models get swapped
