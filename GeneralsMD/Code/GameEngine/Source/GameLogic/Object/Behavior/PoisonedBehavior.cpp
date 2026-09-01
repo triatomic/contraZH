@@ -47,14 +47,15 @@
 //-------------------------------------------------------------------------------------------------
 PoisonedBehaviorModuleData::PoisonedBehaviorModuleData()
 {
-	m_poisonDamageIntervalData = 0; // How often I retake poison damage dealt me
-	m_poisonDurationData = 0;				// And how long after the last poison dose I am poisoned
-	m_poisonBetaDamageIntervalData = 0;
-	m_poisonBetaDurationData = 0;
-	m_poisonBetaDamageBonus = 1.0f;
-	m_poisonGammaDamageIntervalData = 0;
-	m_poisonGammaDurationData = 0;
-	m_poisonGammaDamageBonus = 1.0f;
+	for( Int i = 0; i < POISON_TIER_COUNT; ++i )
+	{
+		m_tier[i].m_damageIntervalData = 0;
+		m_tier[i].m_durationData = 0;
+		m_tier[i].m_damageBonus = 1.0f;
+		m_tier[i].m_upgrade = nullptr;
+	}
+	m_upgradesResolved = FALSE;
+	m_hasAnyTierUpgrade = FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -63,16 +64,16 @@ PoisonedBehaviorModuleData::PoisonedBehaviorModuleData()
 
 	static const FieldParse dataFieldParse[] =
 	{
-		{ "PoisonDamageInterval", INI::parseDurationUnsignedInt, nullptr, offsetof(PoisonedBehaviorModuleData, m_poisonDamageIntervalData) },
-		{ "PoisonDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(PoisonedBehaviorModuleData, m_poisonDurationData) },
-		{ "PoisonBetaDamageInterval", INI::parseDurationUnsignedInt, nullptr, offsetof(PoisonedBehaviorModuleData, m_poisonBetaDamageIntervalData) },
-		{ "PoisonBetaDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(PoisonedBehaviorModuleData, m_poisonBetaDurationData) },
-		{ "PoisonBetaDamageBonus", INI::parseReal, nullptr, offsetof(PoisonedBehaviorModuleData, m_poisonBetaDamageBonus) },
-		{ "PoisonBetaTriggeredBy", INI::parseAsciiString, nullptr, offsetof(PoisonedBehaviorModuleData, m_poisonBetaTriggeredBy) },
-		{ "PoisonGammaDamageInterval", INI::parseDurationUnsignedInt, nullptr, offsetof(PoisonedBehaviorModuleData, m_poisonGammaDamageIntervalData) },
-		{ "PoisonGammaDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(PoisonedBehaviorModuleData, m_poisonGammaDurationData) },
-		{ "PoisonGammaDamageBonus", INI::parseReal, nullptr, offsetof(PoisonedBehaviorModuleData, m_poisonGammaDamageBonus) },
-		{ "PoisonGammaTriggeredBy", INI::parseAsciiString, nullptr, offsetof(PoisonedBehaviorModuleData, m_poisonGammaTriggeredBy) },
+		{ "PoisonDamageInterval", INI::parseDurationUnsignedInt, nullptr, offsetof(PoisonedBehaviorModuleData, m_tier[POISON_TIER_PLAIN].m_damageIntervalData) },
+		{ "PoisonDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(PoisonedBehaviorModuleData, m_tier[POISON_TIER_PLAIN].m_durationData) },
+		{ "PoisonBetaDamageInterval", INI::parseDurationUnsignedInt, nullptr, offsetof(PoisonedBehaviorModuleData, m_tier[POISON_TIER_BETA].m_damageIntervalData) },
+		{ "PoisonBetaDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(PoisonedBehaviorModuleData, m_tier[POISON_TIER_BETA].m_durationData) },
+		{ "PoisonBetaDamageBonus", INI::parseReal, nullptr, offsetof(PoisonedBehaviorModuleData, m_tier[POISON_TIER_BETA].m_damageBonus) },
+		{ "PoisonBetaTriggeredBy", INI::parseAsciiString, nullptr, offsetof(PoisonedBehaviorModuleData, m_tier[POISON_TIER_BETA].m_triggeredBy) },
+		{ "PoisonGammaDamageInterval", INI::parseDurationUnsignedInt, nullptr, offsetof(PoisonedBehaviorModuleData, m_tier[POISON_TIER_GAMMA].m_damageIntervalData) },
+		{ "PoisonGammaDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(PoisonedBehaviorModuleData, m_tier[POISON_TIER_GAMMA].m_durationData) },
+		{ "PoisonGammaDamageBonus", INI::parseReal, nullptr, offsetof(PoisonedBehaviorModuleData, m_tier[POISON_TIER_GAMMA].m_damageBonus) },
+		{ "PoisonGammaTriggeredBy", INI::parseAsciiString, nullptr, offsetof(PoisonedBehaviorModuleData, m_tier[POISON_TIER_GAMMA].m_triggeredBy) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 
@@ -83,43 +84,50 @@ PoisonedBehaviorModuleData::PoisonedBehaviorModuleData()
 //-------------------------------------------------------------------------------------------------
 UnsignedInt PoisonedBehaviorModuleData::getDamageInterval( PoisonTier tier ) const
 {
-	if( tier == POISON_TIER_GAMMA && m_poisonGammaDamageIntervalData != 0 )
+	if( m_tier[tier].m_damageIntervalData != 0 )
 	{
-		return m_poisonGammaDamageIntervalData;
+		return m_tier[tier].m_damageIntervalData;
 	}
-	if( tier == POISON_TIER_BETA && m_poisonBetaDamageIntervalData != 0 )
-	{
-		return m_poisonBetaDamageIntervalData;
-	}
-	return m_poisonDamageIntervalData;
+	return m_tier[POISON_TIER_PLAIN].m_damageIntervalData;
 }
 
 //-------------------------------------------------------------------------------------------------
 UnsignedInt PoisonedBehaviorModuleData::getDuration( PoisonTier tier ) const
 {
-	if( tier == POISON_TIER_GAMMA && m_poisonGammaDurationData != 0 )
+	if( m_tier[tier].m_durationData != 0 )
 	{
-		return m_poisonGammaDurationData;
+		return m_tier[tier].m_durationData;
 	}
-	if( tier == POISON_TIER_BETA && m_poisonBetaDurationData != 0 )
-	{
-		return m_poisonBetaDurationData;
-	}
-	return m_poisonDurationData;
+	return m_tier[POISON_TIER_PLAIN].m_durationData;
 }
 
 //-------------------------------------------------------------------------------------------------
 Real PoisonedBehaviorModuleData::getDamageBonus( PoisonTier tier ) const
 {
-	if( tier == POISON_TIER_GAMMA )
+	return m_tier[tier].m_damageBonus;
+}
+
+//-------------------------------------------------------------------------------------------------
+void PoisonedBehaviorModuleData::resolveUpgrades() const
+{
+	if( m_upgradesResolved )
 	{
-		return m_poisonGammaDamageBonus;
+		return;
 	}
-	if( tier == POISON_TIER_BETA )
+
+	for( Int i = 0; i < POISON_TIER_COUNT; ++i )
 	{
-		return m_poisonBetaDamageBonus;
+		if( m_tier[i].m_triggeredBy.isNotEmpty() )
+		{
+			m_tier[i].m_upgrade = TheUpgradeCenter->findUpgrade( m_tier[i].m_triggeredBy );
+			DEBUG_ASSERTCRASH( m_tier[i].m_upgrade != nullptr, ("PoisonedBehavior references '%s', which is not an Upgrade", m_tier[i].m_triggeredBy.str()) );
+			if( m_tier[i].m_upgrade != nullptr )
+			{
+				m_hasAnyTierUpgrade = TRUE;
+			}
+		}
 	}
-	return 1.0f;
+	m_upgradesResolved = TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -147,15 +155,16 @@ PoisonedBehavior::~PoisonedBehavior()
 //-------------------------------------------------------------------------------------------------
 void PoisonedBehavior::onDamage( DamageInfo *damageInfo )
 {
+	// @bugfix hanfield 01/08/2025 Our own ticks must not re-poison us
 	if( m_applyingTickDamage )
 	{
 		return;
 	}
 
-	// @bugfix hanfield 01/08/2025 Check m_sourceID to see if we are causing damage. If we are - ignore.
-	if( damageInfo->in.m_damageType == DAMAGE_POISON && 
-		damageInfo->in.m_sourceID != INVALID_ID) 
-		startPoisonedEffects( damageInfo );      
+	if( damageInfo->in.m_damageType == DAMAGE_POISON )
+	{
+		startPoisonedEffects( damageInfo );
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -187,7 +196,7 @@ UpdateSleepTime PoisonedBehavior::update()
 		DamageInfo damage;
 		damage.in.m_amount = m_poisonDamageAmount;
 		damage.in.m_sourceID = m_poisonSource;
-		damage.in.m_damageType = DAMAGE_POISON; // @bugfix hanfield 01/08/2025 Since we now check for sourceID, this damage will not cause an infinite poison loop
+		damage.in.m_damageType = DAMAGE_POISON;
 		damage.in.m_damageFXOverride = DAMAGE_POISON; // Not necessary anymore, but can help to make sure proper FX are used, if template is wonky
 		damage.in.m_deathType = m_deathType;
 		m_applyingTickDamage = TRUE;
@@ -222,25 +231,19 @@ UpdateSleepTime PoisonedBehavior::calcSleepTime()
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
-/*static*/ Bool PoisonedBehavior::attackerHasUpgrade( const AsciiString& upgradeName, const Player *player, const Object *attacker )
+/*static*/ Bool PoisonedBehavior::attackerHasUpgrade( const UpgradeTemplate *upgrade, const Player *player, const Object *attacker )
 {
-	if( upgradeName.isEmpty() )
-	{
-		return FALSE;
-	}
-
-	const UpgradeTemplate *upgradeTemplate = TheUpgradeCenter->findUpgrade( upgradeName );
-	if( upgradeTemplate == nullptr )
+	if( upgrade == nullptr )
 	{
 		return FALSE;
 	}
 
 	// the upgrade may be owned by the player or by the attacking object alone
-	if( player != nullptr && player->hasUpgradeComplete( upgradeTemplate ) )
+	if( player != nullptr && player->hasUpgradeComplete( upgrade ) )
 	{
 		return TRUE;
 	}
-	if( attacker != nullptr && attacker->hasUpgrade( upgradeTemplate ) )
+	if( attacker != nullptr && attacker->hasUpgrade( upgrade ) )
 	{
 		return TRUE;
 	}
@@ -252,7 +255,8 @@ UpdateSleepTime PoisonedBehavior::calcSleepTime()
 PoisonTier PoisonedBehavior::resolveTier( const DamageInfo *damageInfo ) const
 {
 	const PoisonedBehaviorModuleData* d = getPoisonedBehaviorModuleData();
-	if( d->m_poisonBetaTriggeredBy.isEmpty() && d->m_poisonGammaTriggeredBy.isEmpty() )
+	d->resolveUpgrades();
+	if( !d->m_hasAnyTierUpgrade )
 	{
 		return POISON_TIER_PLAIN;
 	}
@@ -269,13 +273,12 @@ PoisonTier PoisonedBehavior::resolveTier( const DamageInfo *damageInfo ) const
 		player = attacker->getControllingPlayer();
 	}
 
-	if( attackerHasUpgrade( d->m_poisonGammaTriggeredBy, player, attacker ) )
+	for( Int i = POISON_TIER_COUNT - 1; i > POISON_TIER_PLAIN; --i )
 	{
-		return POISON_TIER_GAMMA;
-	}
-	if( attackerHasUpgrade( d->m_poisonBetaTriggeredBy, player, attacker ) )
-	{
-		return POISON_TIER_BETA;
+		if( attackerHasUpgrade( d->m_tier[i].m_upgrade, player, attacker ) )
+		{
+			return (PoisonTier)i;
+		}
 	}
 	return POISON_TIER_PLAIN;
 }
@@ -313,13 +316,16 @@ void PoisonedBehavior::startPoisonedEffects( const DamageInfo *damageInfo )
 
 	m_deathType = damageInfo->in.m_deathType;
 	// let a tier weapon that only asks for plain poison still die the way its tier looks
-	if( m_deathType == DEATH_POISONED && tier == POISON_TIER_BETA )
+	if( m_deathType == DEATH_POISONED )
 	{
-		m_deathType = DEATH_POISONED_BETA;
-	}
-	else if( m_deathType == DEATH_POISONED && tier == POISON_TIER_GAMMA )
-	{
-		m_deathType = DEATH_POISONED_GAMMA;
+		if( tier == POISON_TIER_BETA )
+		{
+			m_deathType = DEATH_POISONED_BETA;
+		}
+		else if( tier == POISON_TIER_GAMMA )
+		{
+			m_deathType = DEATH_POISONED_GAMMA;
+		}
 	}
 
 	Drawable *myDrawable = getObject()->getDrawable();
