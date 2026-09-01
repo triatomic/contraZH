@@ -92,6 +92,17 @@ This means the listed death types will be excluded from any Death module that us
 
 * `SmartGarrisonRange = 100.0` - (Radius searched around the clicked target for additional transports/structures to distribute units into. Default = 100.0)
 
+## Queue Reorder
+
+Lets the player move a build queue entry (unit or upgrade) one position earlier by
+Ctrl+clicking its cameo, swapping it with the entry before it. The displaced entry loses
+its build progress. A plain click still cancels; a finished unit waiting to exit the
+factory cannot be displaced. See [Queue reorder](contraZH-Changes#queue-reorder) for the
+full behavior.
+
+* `QueueReorder = No` - (Enables the Ctrl+click build queue reorder. With No, clicking the
+  queue behaves exactly like retail, Ctrl held or not. Default = No)
+
 ## Extra Veterancy Levels
 
 Added two extra veterancy levels above HEROIC (see [New Enum Definitions](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/New-Enum-Definitions#veterancy-levels)). Health bonuses for the new levels are defined here:
