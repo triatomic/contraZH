@@ -1935,11 +1935,12 @@ Bool ActionManager::canDoSpecialPowerAtObject( const Object *obj, const Object *
 				// TheSuperHackers @feature triatomic 01/09/2026 Which kinds may be targeted used to be
 				// hardcoded to vehicles, and vehicle in Zero Hour covers aircraft too. Ask the module
 				// instead, so the rule lives in INI and agrees with the abort check in
-				// SpecialAbilityUpdate. Which relationships may be targeted stays here: it is already
-				// a CommandButton option, but that only filters player clicks, and this is also
-				// reached from the AI with CMD_FROM_AI.
+				// SpecialAbilityUpdate. The enemy only test is gone from here as well, so a button
+				// marked NEED_TARGET_ALLY_OBJECT can lock allies: relationship is filtered by the
+				// CommandButton for player clicks, and by the ALLOW_ENEMIES partition filter in
+				// CommandButtonHuntUpdate for the AI, so it does not need saying a third time.
 				const SpecialAbilityUpdate *spUpdate = obj->findSpecialAbilityUpdate( spTemplate->getSpecialPowerType() );
-				if( spUpdate && spUpdate->isValidLaserLockTarget( target ) && r == ENEMIES )
+				if( spUpdate && spUpdate->isValidLaserLockTarget( target ) )
 				{
 					return true;
 				}

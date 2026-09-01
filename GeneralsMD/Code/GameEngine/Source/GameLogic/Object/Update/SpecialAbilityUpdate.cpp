@@ -1202,8 +1202,19 @@ Bool SpecialAbilityUpdate::continuePreparation()
         return false;
       }
 
-      Relationship r = getObject()->getRelationship(target);
-      if( r == ALLIES )
+      // TheSuperHackers @feature triatomic 01/09/2026 Retail cancelled as soon as the target was an
+      // ally, on the assumption that it had been captured by a colleague. That assumption no longer
+      // holds for laser guided missiles, where a CommandButton may deliberately allow locking
+      // allies, so that power asks the same kind filter the targeting check uses instead. The
+      // vehicle hack keeps the original rule.
+      if( spTemplate->getSpecialPowerType() == SPECIAL_MISSILE_DEFENDER_LASER_GUIDED_MISSILES )
+      {
+        if( !getSpecialAbilityUpdateModuleData()->isValidLaserLockTarget( target ) )
+        {
+          return false;
+        }
+      }
+      else if( getObject()->getRelationship( target ) == ALLIES )
       {
         //It's been captured by a colleague, so cancel!
         return false;
