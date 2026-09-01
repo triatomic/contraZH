@@ -20,9 +20,9 @@ and the extended value list.
 Unlike the rest of this page these are not optional and have no `Options.ini` key. They are all retail
 bugs that upstream still carries.
 
-The first two change the simulation, so they alter the timing of a reload or a snipe and any replay
-recorded before them will not play back identically. The rest only change what is drawn, and leave
-replay playback alone; each entry says which kind it is.
+Some of them change the simulation - the timing of a reload or a snipe, the path a drone flies - so
+any replay recorded before them will not play back identically. Others only change what is drawn, and
+leave replay playback alone. Each entry says which kind it is.
 
 ## Weapon bonus no longer restarts the reload
 
@@ -66,6 +66,32 @@ visible anyway.
 
 This one is presentation only. The bounty is awarded identically for every player whether or not the
 text is drawn, so replays recorded before it still play back identically.
+
+## Drones stay on their leash
+
+A drone flies out to whatever its master is shooting at, and is meant to be pulled back once it
+strays too far from the master. The check that does the pulling sits at the end of a list of
+priorities, and the "go attack the master's victim" step above it returns before ever reaching it, so
+for as long as the master had a victim the leash simply did not exist. A master keeps its last victim
+recorded after it stops shooting, so a Humvee that fired once and then drove away left its drone
+behind indefinitely, chasing across the map and often parked on top of the enemy still attacking it.
+
+The leash is now checked before the drone commits to the chase, using the same distance it always
+meant to use - twice the guard range, from the master. A drone that strays past it breaks off and
+comes home, including one already in the middle of an attack, which the old code could not do even
+when it tried: an internally issued move order is layered on top of an attack rather than replacing
+it, and the attack resumes a few seconds later. The drone is now taken out of the attack properly
+before being sent back.
+
+Nothing changes in the ordinary case, where the master shoots at something within its own weapon
+range and the drone never approaches the leash. Drones that have no guard range are untouched, as are
+Stinger Site stingers, which use the same module but never take the attack path at all.
+
+This one changes the simulation, so replays recorded before it will not play back identically.
+
+Note: a drone set to acquire targets on its own can still pick a fight after being pulled home, since
+that is a separate mechanism from following the master's victim. That is a data decision rather than
+an engine one.
 
 # Options.ini
 
