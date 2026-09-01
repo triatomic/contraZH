@@ -705,35 +705,44 @@ Added Parameters:
 ## SpecialAbilityUpdate
 
 The valid targets for the laser lock ability (`SPECIAL_MISSILE_DEFENDER_LASER_GUIDED_MISSILES`) used to be hardcoded to
-`VEHICLE`, which in Zero Hour covers aircraft as well as ground vehicles. These two keys make the target filter
-data-driven.
+`VEHICLE`, which in Zero Hour covers aircraft as well as ground vehicles, and to enemies only. These three keys make
+the target filter data-driven.
 
 * `ForbiddenTargetKindOf = <KindOf list>` - (The target may have none of these. Checked first, so it beats
 `RequiredTargetKindOf`. Default = `STRUCTURE`.)
 * `RequiredTargetKindOf = <KindOf list>` - (The target must have **all** of these. Default = `VEHICLE`.)
+* `TargetRelationship = [ALLIES/ENEMIES/NEUTRALS]` - (Which relationships to the owner may be targeted. Several may be
+listed together. Default = `ENEMIES`.)
 
-Example - an Avenger that can only lock onto ground vehicles:
+Example - an Avenger that can only lock onto enemy ground vehicles:
 ```
 Behavior = SpecialAbilityUpdate ModuleTag_09
   SpecialPowerTemplate  = SpecialAbilityLaserGuidedMissiles
   StartAbilityRange     = 200.0
   RequiredTargetKindOf  = VEHICLE
   ForbiddenTargetKindOf = STRUCTURE AIRCRAFT   ; New
+  TargetRelationship    = ENEMIES              ; New
 End
 ```
 
-The defaults reproduce the original hardcoded behaviour exactly, so leaving both keys out changes nothing.
+The defaults reproduce the original hardcoded behaviour exactly, so leaving all three keys out changes nothing.
 
 Behaviour notes:
 * `RequiredTargetKindOf` is an all of test, not an any of test. Listing two KindOfs means the target must have both.
-* Both keys are honoured in two places, and always agree: the check that decides whether the cursor and the order are
-valid, and the check that runs while a lock is already in progress and cancels it if the target stops qualifying.
-* These keys decide which *kinds* may be targeted, not which *relationships*. Relationships are already a CommandButton
-option - `NEED_TARGET_ENEMY_OBJECT`, `NEED_TARGET_ALLY_OBJECT`, `NEED_TARGET_NEUTRAL_OBJECT` - set on the button that
-triggers the ability. Note the ability additionally refuses anything that is not an enemy, so allowing an ally target on
-the button alone is not enough.
+* All three keys are honoured in two places, and always agree: the check that decides whether the cursor and the order
+are valid, and the check that runs while a lock is already in progress and cancels it if the target stops qualifying.
+Because the relationship is part of that test, a lock breaks off if the target changes sides mid lock - by being
+hijacked or captured - unless the new relationship is also allowed.
+* To let the ability target allies, **both** `TargetRelationship` here and `NEED_TARGET_ALLY_OBJECT` on the
+CommandButton are needed. The button filters the player's click; this key covers the paths that never see a button and
+keeps checking while the lock is held.
+* Allowing a relationship other than `ENEMIES` means the ability really will shoot that target - the missile is fired as
+a forced attack, so the usual "you may not attack allies" rule does not stop it. Do not allow allies unless that is what
+you want.
+* The AI never reads CommandButton target options, and its own scan only considers enemies, so it will not use ally or
+neutral locking even when both are configured.
 * These keys currently affect the laser lock ability only. Other abilities that use `SpecialAbilityUpdate` keep their
-own built in target rules and ignore both.
+own built in target rules and ignore all three.
 
 ## DelayedUpgradeBehavior (New)
 

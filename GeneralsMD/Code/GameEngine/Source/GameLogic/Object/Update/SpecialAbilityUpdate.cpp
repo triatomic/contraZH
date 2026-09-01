@@ -69,20 +69,42 @@
 
 
 // ------------------------------------------------------------------------------------------------
-/** Test 'target' against the two KindOf filters. ForbiddenTargetKindOf always wins.
-  * RequiredTargetKindOf is an ALL of test: every bit listed must be set on the target.
+/** Test 'target' against the KindOf filters and the allowed relationships. ForbiddenTargetKindOf
+  * always wins. RequiredTargetKindOf is an ALL of test: every bit listed must be set on the target.
   * The defaults reproduce the rule that used to be hardcoded for laser guided missiles.
-  * Which relationships may be targeted is not decided here: that is already a CommandButton
-  * option (NEED_TARGET_ENEMY_OBJECT and friends), which filters the click before it gets here. */
+  * The CommandButton's NEED_TARGET_*_OBJECT options also filter by relationship, but only for
+  * player clicks, and only at the moment of the click. This test additionally covers the paths that
+  * never see the button, and re-runs while the lock is held, so a target that changes sides part
+  * way through is dropped rather than kept. */
 // ------------------------------------------------------------------------------------------------
-Bool SpecialAbilityUpdateModuleData::isValidLaserLockTarget( const Object *target ) const
+Bool SpecialAbilityUpdateModuleData::isValidLaserLockTarget( const Object *owner, const Object *target ) const
 {
-	if( target == nullptr )
+	if( owner == nullptr || target == nullptr )
 	{
 		return FALSE;
 	}
 
-	return target->isKindOfMulti( m_requiredTargetKindOf, m_forbiddenTargetKindOf );
+	if( !target->isKindOfMulti( m_requiredTargetKindOf, m_forbiddenTargetKindOf ) )
+	{
+		return FALSE;
+	}
+
+	Relationship r = owner->getRelationship( target );
+	Int need;
+	if( r == ALLIES )
+	{
+		need = WEAPON_AFFECTS_ALLIES;
+	}
+	else if( r == ENEMIES )
+	{
+		need = WEAPON_AFFECTS_ENEMIES;
+	}
+	else
+	{
+		need = WEAPON_AFFECTS_NEUTRALS;
+	}
+
+	return (m_targetRelationship & need) != 0;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -321,7 +343,7 @@ UpdateSleepTime SpecialAbilityUpdate::update()
         {
           // TheSuperHackers @feature triatomic 01/09/2026 Ask the module which targets are valid
           // instead of hardcoding it, so this agrees with the targeting check in ActionManager.
-          if ( !data->isValidLaserLockTarget( target ) )
+          if ( !data->isValidLaserLockTarget( getObject(), target ) )
             shouldAbort = TRUE;
           FALLTHROUGH; //deliberately falling through
         }
@@ -1204,12 +1226,13 @@ Bool SpecialAbilityUpdate::continuePreparation()
 
       // TheSuperHackers @feature triatomic 01/09/2026 Retail cancelled as soon as the target was an
       // ally, on the assumption that it had been captured by a colleague. That assumption no longer
-      // holds for laser guided missiles, where a CommandButton may deliberately allow locking
-      // allies, so that power asks the same kind filter the targeting check uses instead. The
-      // vehicle hack keeps the original rule.
+      // holds for laser guided missiles, where TargetRelationship may deliberately allow allies, so
+      // that power asks the same filter the targeting check uses instead. A target captured into a
+      // relationship the module does not allow still cancels the lock, which is what the original
+      // rule was protecting. The vehicle hack keeps the original rule.
       if( spTemplate->getSpecialPowerType() == SPECIAL_MISSILE_DEFENDER_LASER_GUIDED_MISSILES )
       {
-        if( !getSpecialAbilityUpdateModuleData()->isValidLaserLockTarget( target ) )
+        if( !getSpecialAbilityUpdateModuleData()->isValidLaserLockTarget( getObject(), target ) )
         {
           return false;
         }
@@ -1349,7 +1372,10 @@ void SpecialAbilityUpdate::triggerAbilityEffect()
           AIUpdateInterface *ai = object->getAIUpdateInterface();
           if( ai )
           {
-            ai->aiAttackObject( target, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI );
+            // TheSuperHackers @feature triatomic 01/09/2026 Force attack, so that shooting a target
+            // the ability deliberately allowed is stated outright rather than resting on CMD_FROM_AI
+            // slipping past a check that only rejects non enemies for CMD_FROM_PLAYER.
+            ai->aiForceAttackObject( target, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI );
           }
         }
       }
