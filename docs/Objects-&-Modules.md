@@ -568,6 +568,27 @@ Notes:
 * ParkedUnitsDamageScalar can be used to apply an upgrade that grants damage protection to parked aircraft
 * Required/Forbidden KindOf can be used to allow only specific kinds of aircraft to land (i.e. to use different sizes, or differ between VTOL/Regular jets)
 
+## PoisonedBehavior
+
+Added Beta and Gamma poison tiers, so the poison-over-time effect can be strengthened once the attacker owns an upgrade. The retail parameters keep working unchanged.
+
+* `PoisonBetaDamageInterval = 0` - tick interval while Beta poison is active. 0 uses `PoisonDamageInterval`
+* `PoisonBetaDuration = 0` - how long Beta poison lasts after the last dose. 0 uses `PoisonDuration`
+* `PoisonBetaDamageBonus = 1.0` - multiplier on the per-tick damage (1.2 = 20% more)
+* `PoisonBetaTriggeredBy = <upgrade name>` - upgrade the attacker needs for Beta poison. Empty disables the tier
+* `PoisonGammaDamageInterval = 0` - as above, for Gamma
+* `PoisonGammaDuration = 0` - as above, for Gamma
+* `PoisonGammaDamageBonus = 1.0` - as above, for Gamma
+* `PoisonGammaTriggeredBy = <upgrade name>` - as above, for Gamma
+
+Notes:
+* The tier is picked per hit from the attacker, not the victim. The upgrade counts if the attacking player has researched it or the attacking object itself carries it, so both player and object upgrades work.
+* Gamma is checked before Beta. If neither upgrade is present the hit applies normal poison.
+* Only one tier is active at a time and poison never stacks. A stronger hit takes over damage, interval and duration; an equally strong hit refreshes them as retail does; a weaker hit is ignored while the stronger poison is still running.
+* A hit with `DeathType = POISONED` is promoted to `POISONED_BETA` or `POISONED_GAMMA` for the active tier, so die modules and death FX can tell the tiers apart. A weapon that already names a tier death type is left alone.
+* If the attacker no longer exists when the damage lands, the hit counts as normal poison.
+* Healing of any kind still cures poison completely and clears the tier.
+
 ## NeutronBlastBehavior
 
 The neutron blast that kills infantry and leaves vehicles unmanned. Two parameters were added so
