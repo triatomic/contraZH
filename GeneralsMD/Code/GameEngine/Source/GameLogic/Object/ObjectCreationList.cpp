@@ -197,13 +197,15 @@ public:
 		// Should I const cast?  Should I eat them?  No!  I'd rather hurt them stomp them crush them hurt them
 		// stomp them while I dance!  Down.  Those insects make me dance!  Down.  I'll hurt them while I dance.
 
+		Bool queuedShots = FALSE;
 		Object *primaryObject = const_cast<Object *>(primaryObj);
 		AIUpdateInterface *ai = primaryObject->getAIUpdateInterface();
 		if( ai )
 		{
-			if( m_fireRegardlessOfOrders )
+			if( m_fireRegardlessOfOrders && m_numberOfShots > 0 )
 			{
 				ai->friend_queueShots( m_weaponSlot, m_numberOfShots, secondary );
+				queuedShots = TRUE;
 			}
 			else
 			{
@@ -219,7 +221,7 @@ public:
 		{
 			rd->createRadiusDecal(m_deliveryDecalTemplate, m_deliveryDecalRadius, *secondary);
 			// queued shots kill the decal themselves once the last one is away
-			rd->killWhenNoLongerAttacking(!m_fireRegardlessOfOrders);
+			rd->killWhenNoLongerAttacking(!queuedShots);
 		}
 		return nullptr;
   }

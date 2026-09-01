@@ -831,6 +831,7 @@ private:
 	WeaponSlotType	m_queuedShotsSlot;
 	Int						m_queuedShotsLeft;
 	Coord3D				m_queuedShotsPos;
+	UnsignedInt		m_clearFiringStatusFrame;
 	void fireQueuedShots();
 
 	// Common AI "status" effects -------------------------------------------------------------------

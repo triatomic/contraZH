@@ -351,6 +351,7 @@ AIUpdateInterface::AIUpdateInterface( Thing *thing, const ModuleData* moduleData
 	m_queuedShotsSlot = PRIMARY_WEAPON;
 	m_queuedShotsLeft = 0;
 	m_queuedShotsPos.zero();
+	m_clearFiringStatusFrame = 0;
 #ifdef ALLOW_DEMORALIZE
 	m_demoralizedFramesLeft = 0;
 #endif
@@ -1158,35 +1159,41 @@ void AIUpdateInterface::friend_queueShots(WeaponSlotType slot, Int shots, const 
 //-------------------------------------------------------------------------------------------------
 void AIUpdateInterface::fireQueuedShots()
 {
+	Object* obj = getObject();
+
+	// the shot set this last frame, and nothing else will take it back off again
+	if (m_clearFiringStatusFrame != 0 && TheGameLogic->getFrame() >= m_clearFiringStatusFrame)
+	{
+		obj->clearStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_IS_FIRING_WEAPON ) );
+		m_clearFiringStatusFrame = 0;
+	}
+
 	if (m_queuedShotsLeft <= 0)
 	{
 		return;
 	}
 
-	Object* obj = getObject();
 	Weapon* weapon = obj->getWeaponInWeaponSlot(m_queuedShotsSlot);
+	const Object* containedBy = obj->getContainedBy();
 	if (weapon == nullptr || obj->isEffectivelyDead() || weapon->getStatus() == OUT_OF_AMMO)
 	{
 		m_queuedShotsLeft = 0;
 	}
+	else if (containedBy != nullptr && containedBy->getContain() != nullptr
+					&& !containedBy->getContain()->isPassengerAllowedToFire(obj->getID()))
+	{
+		// boarding something that does not let its passengers shoot swallows the rest of the barrage
+		m_queuedShotsLeft = 0;
+	}
 	else if (weapon->getStatus() == READY_TO_FIRE)
 	{
-		// one slot per frame: a weapon the state machine fired this frame has priority
-		UnsignedInt now = TheGameLogic->getFrame();
-		Bool otherSlotFired = FALSE;
-		for (Int i = 0; i < WEAPONSLOT_COUNT; ++i)
-		{
-			const Weapon* other = obj->getWeaponInWeaponSlot((WeaponSlotType)i);
-			if (other != nullptr && other != weapon && other->getLastShotFrame() == now)
-			{
-				otherSlotFired = TRUE;
-			}
-		}
-		if (!otherSlotFired)
-		{
-			weapon->fireWeapon(obj, &m_queuedShotsPos);
-			--m_queuedShotsLeft;
-		}
+		// ranges are ignored: the unit is free to drive off mid-barrage, and a refused shot is still spent
+		weapon->forceFireWeapon(obj, &m_queuedShotsPos);
+		obj->notifyFiringTrackerShotFired(weapon, INVALID_ID);
+		// the attack state normally owns this, and stealth keys its firing checks off it
+		obj->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_IS_FIRING_WEAPON ) );
+		m_clearFiringStatusFrame = TheGameLogic->getFrame() + 1;
+		--m_queuedShotsLeft;
 	}
 
 	if (m_queuedShotsLeft <= 0)
@@ -1356,8 +1363,8 @@ UpdateSleepTime AIUpdateInterface::update()
 
 	m_isInUpdate = FALSE;
 
-	// queued shots poll their weapon every frame
-	if (m_completedWaypoint != nullptr || m_queuedShotsLeft > 0)
+	// queued shots poll their weapon every frame, and the frame after the last one clears the firing status
+	if (m_completedWaypoint != nullptr || m_queuedShotsLeft > 0 || m_clearFiringStatusFrame != 0)
 	{
 		// sleep NONE here so that it will get reset next frame.
 		// this happen infrequently, so it shouldn't be an issue.
@@ -5772,6 +5779,7 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 		xfer->xferUser(&m_queuedShotsSlot, sizeof(m_queuedShotsSlot));
 		xfer->xferInt(&m_queuedShotsLeft);
 		xfer->xferCoord3D(&m_queuedShotsPos);
+		xfer->xferUnsignedInt(&m_clearFiringStatusFrame);
 	}
 
 }

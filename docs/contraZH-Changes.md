@@ -270,11 +270,12 @@ End
 ```
 
 Notes:
-* The weapon fires without turning or aiming, so it should not sit on a turret, and it should have
-an `AcceptableAimDelta` wide enough that firing at any angle looks right. `PreAttackDelay` is not
-observed.
-* Only one weapon slot fires per frame. If another slot fired this frame, the queued shot waits for
-the next one.
+* The weapon fires without turning or aiming, so it should not sit on a turret. `PreAttackDelay` is
+not observed.
+* Range is not checked, so the shots keep landing after the unit has driven beyond the weapon's
+`AttackRange`.
+* Boarding a transport, garrison or tunnel that does not let its passengers fire drops the rest of
+the barrage.
 * Timing comes from the weapon as usual: `DelayBetweenShots` between shots, and a clip reload in the
 middle when `NumberOfShots` is larger than `ClipSize`. A weapon that runs dry with
 `AutoReloadsClip = No` drops the remaining shots.
