@@ -1931,12 +1931,22 @@ Bool ActionManager::canDoSpecialPowerAtObject( const Object *obj, const Object *
 			}
 
 			case SPECIAL_MISSILE_DEFENDER_LASER_GUIDED_MISSILES:
-				//Can only use laser guided missiles on vehicles!
-				if( target->isKindOf( KINDOF_VEHICLE ) && r == ENEMIES )
+			{
+				// TheSuperHackers @feature triatomic 01/09/2026 Which kinds may be targeted used to be
+				// hardcoded to vehicles, and vehicle in Zero Hour covers aircraft too. Ask the module
+				// instead, so the rule lives in INI and agrees with the abort check in
+				// SpecialAbilityUpdate. The enemy only test moved into the module too, as
+				// TargetRelationship, so allowing allies takes both NEED_TARGET_ALLY_OBJECT on the
+				// button and the key on the module. Keeping it in the module rather than here means
+				// it also covers the paths that never see the button, and is re-checked while the
+				// lock is held.
+				const SpecialAbilityUpdate *spUpdate = obj->findSpecialAbilityUpdate( spTemplate->getSpecialPowerType() );
+				if( spUpdate && spUpdate->isValidLaserLockTarget( target ) )
 				{
 					return true;
 				}
 				break;
+			}
 
 			case SPECIAL_HACKER_DISABLE_BUILDING:
 				//Can only disable buildings...

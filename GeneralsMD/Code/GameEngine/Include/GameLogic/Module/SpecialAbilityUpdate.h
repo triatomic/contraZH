@@ -32,6 +32,8 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "Common/AudioEventRTS.h"
 #include "Common/INI.h"
+#include "Common/KindOf.h"
+#include "GameLogic/Weapon.h"		// for TheWeaponAffectsMaskNames and WEAPON_AFFECTS_* bits
 #include "GameLogic/Module/SpecialPowerUpdateModule.h"
 #include "GameClient/ParticleSys.h"
 
@@ -78,6 +80,9 @@ public:
   Bool                  m_persistenceRequiresRecharge;
   Bool                  m_requiresMoveToTurn;	///< if set, orient by moving toward target (for locomotors that can't turn in place) instead of facing in place
   Real                  m_facingAngleTolerance;	///< heading delta (radians) considered "facing target" when m_requiresMoveToTurn
+  KindOfMaskType        m_requiredTargetKindOf;		///< target must have ALL of these kind of bits set (laser guided missiles only)
+  KindOfMaskType        m_forbiddenTargetKindOf;	///< target must have NONE of these kind of bits set (laser guided missiles only)
+  Int                   m_targetRelationship;			///< bitmask (WEAPON_AFFECTS_ALLIES/ENEMIES/NEUTRALS) of owner->target relationships that may be targeted (laser guided missiles only)
 
 	const ParticleSystemTemplate *m_disableFXParticleSystem;
 	AudioEventRTS					m_packSound;
@@ -117,6 +122,12 @@ public:
     m_persistenceRequiresRecharge = FALSE;
     m_requiresMoveToTurn = FALSE;
     m_facingAngleTolerance = 0.1f;	// ~5.7 degrees
+    // TheSuperHackers @feature triatomic 01/09/2026 These defaults reproduce the target rule that
+    // used to be hardcoded for the laser guided missiles ability, so INI that does not set them
+    // behaves exactly as before.
+    m_requiredTargetKindOf = MAKE_KINDOF_MASK( KINDOF_VEHICLE );		// retail: vehicles only
+    m_forbiddenTargetKindOf = MAKE_KINDOF_MASK( KINDOF_STRUCTURE );	// retail: never structures
+    m_targetRelationship = WEAPON_AFFECTS_ENEMIES;									// retail: enemies only
 	}
 
 	static void buildFieldParse(MultiIniFieldParse& p)
@@ -165,10 +176,18 @@ public:
       { "PersistenceRequiresRecharge",INI::parseBool,										nullptr, offsetof( SpecialAbilityUpdateModuleData, m_persistenceRequiresRecharge ) },
       { "RequiresMoveToTurn",         INI::parseBool,										nullptr, offsetof( SpecialAbilityUpdateModuleData, m_requiresMoveToTurn ) },
       { "FacingAngleTolerance",       INI::parseAngleReal,							nullptr, offsetof( SpecialAbilityUpdateModuleData, m_facingAngleTolerance ) },
+      { "RequiredTargetKindOf",       KindOfMaskType::parseFromINI,			nullptr, offsetof( SpecialAbilityUpdateModuleData, m_requiredTargetKindOf ) },
+      { "ForbiddenTargetKindOf",      KindOfMaskType::parseFromINI,			nullptr, offsetof( SpecialAbilityUpdateModuleData, m_forbiddenTargetKindOf ) },
+      { "TargetRelationship",         INI::parseBitString32,						TheWeaponAffectsMaskNames, offsetof( SpecialAbilityUpdateModuleData, m_targetRelationship ) },
 			{ 0, 0, 0, 0 }
 		};
     p.add(dataFieldParse);
 	}
+
+	/// Does 'target' pass RequiredTargetKindOf/ForbiddenTargetKindOf and TargetRelationship? Both the
+	/// targeting check in ActionManager and the abort check in SpecialAbilityUpdate::update() route
+	/// through here, so the two always agree on what may be locked.
+	Bool isValidLaserLockTarget( const Object *owner, const Object *target ) const;
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -205,6 +224,8 @@ public:
 	UnsignedInt getSpecialObjectMax() const;
 	Object* findSpecialObjectWithProducerID( const Object *target );
 	SpecialPowerType getSpecialPowerType() const;
+	Bool isValidLaserLockTarget( const Object *target ) const
+		{ return getSpecialAbilityUpdateModuleData()->isValidLaserLockTarget( getObject(), target ); }
 
 protected:
 	void onExit( Bool cleanup );
