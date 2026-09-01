@@ -34,6 +34,15 @@
 #include "GameLogic/Module/DamageModule.h"
 #include "GameLogic/Module/UpdateModule.h"
 
+class Player;
+
+// Ordered by strength: a running tier is only replaced by an equal or higher one
+enum PoisonTier
+{
+	POISON_TIER_PLAIN = 0,
+	POISON_TIER_BETA = 1,
+	POISON_TIER_GAMMA = 2,
+};
 
 //-------------------------------------------------------------------------------------------------
 class PoisonedBehaviorModuleData : public UpdateModuleData
@@ -41,10 +50,23 @@ class PoisonedBehaviorModuleData : public UpdateModuleData
 public:
 	UnsignedInt m_poisonDamageIntervalData; // How often I retake poison damage dealt me
 	UnsignedInt m_poisonDurationData;				// And how long after the last poison dose I am poisoned
+	UnsignedInt m_poisonBetaDamageIntervalData;
+	UnsignedInt m_poisonBetaDurationData;
+	Real m_poisonBetaDamageBonus;
+	AsciiString m_poisonBetaTriggeredBy;
+	UnsignedInt m_poisonGammaDamageIntervalData;
+	UnsignedInt m_poisonGammaDurationData;
+	Real m_poisonGammaDamageBonus;
+	AsciiString m_poisonGammaTriggeredBy;
 
 	PoisonedBehaviorModuleData();
 
 	static void buildFieldParse(MultiIniFieldParse& p);
+
+	// A tier interval or duration of 0 falls back to the plain value
+	UnsignedInt getDamageInterval( PoisonTier tier ) const;
+	UnsignedInt getDuration( PoisonTier tier ) const;
+	Real getDamageBonus( PoisonTier tier ) const;
 
 private:
 
@@ -84,6 +106,8 @@ protected:
 	void startPoisonedEffects( const DamageInfo *damageInfo );
 	void stopPoisonedEffects();
 	UpdateSleepTime calcSleepTime();
+	PoisonTier resolveTier( const DamageInfo *damageInfo ) const;
+	static Bool attackerHasUpgrade( const AsciiString& upgradeName, const Player *player, const Object *attacker );
 
 private:
 	UnsignedInt		m_poisonDamageFrame;
@@ -91,5 +115,7 @@ private:
 	Real					m_poisonDamageAmount;
 	ObjectID			m_poisonSource;
 	DeathType			m_deathType;
+	PoisonTier		m_activeTier;
+	Bool					m_applyingTickDamage;	// guards against our own poison ticks retriggering us
 
 };
