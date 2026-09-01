@@ -223,7 +223,11 @@ public:
 	virtual Bool isTimeFrozen() override { return false;}					///< Freezes time during the next camera movement.
 	virtual Int	 getTimeMultiplier() override {return 1;};				///< Get the time multiplier.
 	virtual void setTimeMultiplier(Int multiple) override {}; ///< Set the time multiplier.
+#if defined(GENERALS_ONLINE)
+	virtual void setDefaultView(Real pitch, Real angle, Real maxHeight, bool bForceDefaultCam = true) override {};
+#else
 	virtual void setDefaultView(Real pitch, Real angle, Real maxHeight) override {};
+#endif
 	virtual void zoomCamera( Real finalZoom, Int milliseconds, Real easeIn, Real easeOut ) override {};
 	virtual void pitchCamera( Real finalPitch, Int milliseconds, Real easeIn, Real easeOut ) override {};
 
