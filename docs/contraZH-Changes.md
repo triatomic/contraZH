@@ -242,6 +242,45 @@ checked against the new renderer pay its cost or change appearance.)
 instead, so a very large particle stops getting more expensive without bound. The trade is a coarser
 terrain fit, which is not visible on the effects that actually reach that size.
 
+# ObjectCreationList.ini
+
+## Attack nugget: FireRegardlessOfOrders
+
+* `FireRegardlessOfOrders = No` - (Default. `Yes` fires every `NumberOfShots` no matter what the
+unit is ordered to do meanwhile.)
+
+An `Attack` nugget normally orders the unit that fired the special power to attack the target point
+with `WeaponSlot` for `NumberOfShots`. That is an ordinary attack order, so any move, attack or stop
+given while it runs replaces it, and the barrage ends after however many shots got out.
+
+With `FireRegardlessOfOrders = Yes` the shots are queued on the unit instead of being an order. Every
+frame the weapon in `WeaponSlot` is ready, one shot is fired at the target point straight from the
+launch bone, until the count is used up. The unit stays fully responsive: it moves, retargets and
+shoots its other weapons exactly as ordered while the barrage carries on. The delivery decal stays
+until the last queued shot is away.
+
+```
+ObjectCreationList SUPERWEAPON_TomahawkStrike
+  Attack
+    WeaponSlot             = TERTIARY
+    NumberOfShots          = 6
+    FireRegardlessOfOrders = Yes
+  End
+End
+```
+
+Notes:
+* The weapon fires without turning or aiming, so it should not sit on a turret, and it should have
+an `AcceptableAimDelta` wide enough that firing at any angle looks right. `PreAttackDelay` is not
+observed.
+* Only one weapon slot fires per frame. If another slot fired this frame, the queued shot waits for
+the next one.
+* Timing comes from the weapon as usual: `DelayBetweenShots` between shots, and a clip reload in the
+middle when `NumberOfShots` is larger than `ClipSize`. A weapon that runs dry with
+`AutoReloadsClip = No` drops the remaining shots.
+* Firing the power again replaces the queue: new target point, count reset.
+* A dying unit drops its remaining shots. The queue survives a save and load.
+
 # RiderChangeContain
 
 Two opt-in fields on the combat bike contain module. Both default to `No`, so data that does not

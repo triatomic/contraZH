@@ -631,6 +631,9 @@ public:
 	// while the move is the original command source.  John A.
 	void friend_setLastCommandSource(CommandSourceType source) { m_lastCommandSource = source; }
 
+	// OCL Attack FireRegardlessOfOrders: shots fired straight from the slot outside the state machine, so orders never touch them
+	void friend_queueShots(WeaponSlotType slot, Int shots, const Coord3D* pos);
+
 	Bool canAutoAcquire() const { return getAIUpdateModuleData()->m_autoAcquireEnemiesWhenIdle; }
 
 	Bool canAutoAcquireWhileStealthed() const;
@@ -825,6 +828,10 @@ private:
 	UnsignedInt		m_nextMoodCheckTime;
 	// TheSuperHackers @feature Hold Fire stance. True when this object will not auto-acquire targets.
 	Bool					m_isHoldingFire;
+	WeaponSlotType	m_queuedShotsSlot;
+	Int						m_queuedShotsLeft;
+	Coord3D				m_queuedShotsPos;
+	void fireQueuedShots();
 
 	// Common AI "status" effects -------------------------------------------------------------------
 #ifdef ALLOW_DEMORALIZE

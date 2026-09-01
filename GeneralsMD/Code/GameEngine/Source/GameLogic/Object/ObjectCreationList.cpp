@@ -175,7 +175,8 @@ public:
 	AttackNugget() :
     m_numberOfShots(1),
 		m_weaponSlot(PRIMARY_WEAPON),
-		m_deliveryDecalRadius(0)
+		m_deliveryDecalRadius(0),
+		m_fireRegardlessOfOrders(FALSE)
 	{
 	}
 
@@ -200,9 +201,16 @@ public:
 		AIUpdateInterface *ai = primaryObject->getAIUpdateInterface();
 		if( ai )
 		{
-			// lock merely fires till the weapon is empty or the attack is "done"
-			primaryObject->setWeaponLock( m_weaponSlot, LOCKED_TEMPORARILY );
-			ai->aiAttackPosition( secondary, m_numberOfShots, CMD_FROM_AI );
+			if( m_fireRegardlessOfOrders )
+			{
+				ai->friend_queueShots( m_weaponSlot, m_numberOfShots, secondary );
+			}
+			else
+			{
+				// lock merely fires till the weapon is empty or the attack is "done"
+				primaryObject->setWeaponLock( m_weaponSlot, LOCKED_TEMPORARILY );
+				ai->aiAttackPosition( secondary, m_numberOfShots, CMD_FROM_AI );
+			}
 		}
 
 		static NameKeyType key_RadiusDecalUpdate = NAMEKEY("RadiusDecalUpdate");
@@ -210,7 +218,8 @@ public:
 		if (rd)
 		{
 			rd->createRadiusDecal(m_deliveryDecalTemplate, m_deliveryDecalRadius, *secondary);
-			rd->killWhenNoLongerAttacking(true);
+			// queued shots kill the decal themselves once the last one is away
+			rd->killWhenNoLongerAttacking(!m_fireRegardlessOfOrders);
 		}
 		return nullptr;
   }
@@ -223,6 +232,7 @@ public:
 			{ "WeaponSlot",			INI::parseLookupList,	TheWeaponSlotTypeNamesLookupList, offsetof( AttackNugget, m_weaponSlot ) },
 			{ "DeliveryDecal",				RadiusDecalTemplate::parseRadiusDecalTemplate,	nullptr, offsetof( AttackNugget, m_deliveryDecalTemplate ) },
 			{ "DeliveryDecalRadius",	INI::parseReal, nullptr, offsetof(AttackNugget, m_deliveryDecalRadius) },
+			{ "FireRegardlessOfOrders",	INI::parseBool, nullptr, offsetof(AttackNugget, m_fireRegardlessOfOrders) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
 
@@ -236,6 +246,7 @@ private:
 	Real								m_deliveryDecalRadius;
 	Int									m_numberOfShots;
 	WeaponSlotType			m_weaponSlot;
+	Bool								m_fireRegardlessOfOrders;
 };
 EMPTY_DTOR(AttackNugget)
 
