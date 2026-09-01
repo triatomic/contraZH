@@ -466,7 +466,7 @@ void WeaponSet::updateWeaponSet(const Object* obj)
 				// A pre-attack (eg Jarmen Kell's snipe) charged up in the outgoing set would be lost
 				// when the weapon is destroyed, so carry its deadline over to the incoming one.
 				UnsignedInt preAttackFinished = 0;
-				if (m_weapons[i] != nullptr)
+				if (m_weapons[i] != nullptr && m_weapons[i]->getStatus() == PRE_ATTACK)
 				{
 					preAttackFinished = m_weapons[i]->getPreAttackFinishedFrame();
 				}
@@ -479,7 +479,7 @@ void WeaponSet::updateWeaponSet(const Object* obj)
 				{
 					m_weapons[i] = TheWeaponStore->allocateNewWeapon(set->getNth((WeaponSlotType)i), (WeaponSlotType)i);
 					m_weapons[i]->loadAmmoNow(obj);	// start 'em all with full clips.
-					if (preAttackFinished > TheGameLogic->getFrame())
+					if (preAttackFinished != 0)
 					{
 						// getStatus() derives PRE_ATTACK from this deadline alone, so the status
 						// follows without our having to set it.

@@ -2568,8 +2568,8 @@ static void clipToTerrainExtent(Coord3D& approachTargetPos)
 // When a weapon bonus changes mid-reload the reload duration changes underneath us. Rather than
 // restarting the timer (which lets a bonus toggle grant an instant shot, or unfairly costs time
 // already served when a bonus is lost), carry the progress across proportionally: 5 frames into a
-// 10 frame reload with a new duration of 8 leaves us 4 frames into 8.
-// All integer math -- this is logic code and must be bit-identical on every peer.
+// 10 frame reload with a new duration of 8 leaves us 4 frames into 8. Integer math only, so the
+// result is bit-identical on every peer.
 //-------------------------------------------------------------------------------------------------
 static void rescaleReloadProgress( UnsignedInt now, Int newTotal, UnsignedInt& startFrame, UnsignedInt& endFrame )
 {
@@ -2587,7 +2587,8 @@ static void rescaleReloadProgress( UnsignedInt now, Int newTotal, UnsignedInt& s
 		return;
 	}
 
-	// A stale OUT_OF_AMMO sentinel can leave endFrame at 0x7fffffff, so clamp before scaling.
+	// A transfer helper can copy a status in from another weapon, so we can be told we are still
+	// reloading with now already past endFrame. Clamp, or the scaled window lands in the past.
 	UnsignedInt oldTotal = endFrame - startFrame;
 	UnsignedInt elapsed = min(now - startFrame, oldTotal);
 
@@ -3994,8 +3995,6 @@ void Weapon::transferNextShotStatsFrom( const Weapon &weapon )
 {
 	m_whenWeCanFireAgain = weapon.getPossibleNextShotFrame();
 	m_whenLastReloadStarted = weapon.getLastReloadStartedFrame();
-	// Carry the pre-attack deadline too, or a snipe charged up on one weapon is silently
-	// dropped: getStatus() can hand us PRE_ATTACK while our own deadline is still zero.
 	m_whenPreAttackFinished = weapon.getPreAttackFinishedFrame();
 	m_status = weapon.getStatus();
 }
@@ -4025,8 +4024,6 @@ void Weapon::transferReloadStateFrom(const Weapon& weapon, Real clipPercentage/*
 
 	m_whenWeCanFireAgain = weapon.getPossibleNextShotFrame();
 	m_whenLastReloadStarted = weapon.getLastReloadStartedFrame();
-	// Carry the pre-attack deadline too, or a snipe charged up in the previous set is silently
-	// dropped: getStatus() can hand us PRE_ATTACK while our own deadline is still zero.
 	m_whenPreAttackFinished = weapon.getPreAttackFinishedFrame();
 	m_status = weapon.getStatus();
 
