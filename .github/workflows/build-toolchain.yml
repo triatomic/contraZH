@@ -36,6 +36,9 @@ jobs:
       VCPKG_FILE_CACHE: ${{ github.workspace }}\vcpkg-bincache
       VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}\vcpkg-bincache,readwrite
       VCPKG_FEATURE_FLAGS: manifests,versions,binarycaching
+      # Metrics make every vcpkg run open its own exe exclusively to copy itself into
+      # TEMP for the telemetry upload, which randomly blocks the next vcpkg launch.
+      VCPKG_DISABLE_METRICS: "1"
 
     steps:
       - name: Checkout Code
