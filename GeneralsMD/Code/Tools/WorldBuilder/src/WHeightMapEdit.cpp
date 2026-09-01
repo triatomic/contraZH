@@ -401,8 +401,10 @@ void WorldHeightMapEdit::loadBaseImages()
 	     terrain;
 			 terrain = TheTerrainTypes->nextTerrain( terrain ) )
 	{
+		 // TheSuperHackers @bugfix Was dropping the remaining terrain types silently.
 		 if (m_numGlobalTextureClasses == NUM_TEXTURE_CLASSES)
 		 {
+			 DEBUG_CRASH(("More than %d terrain types defined in INI. The rest will not appear in the texture palette.", NUM_TEXTURE_CLASSES));
 			 break;
 		 }
 		// load the terrain definition for the WorldBuilder to reference
@@ -891,6 +893,11 @@ Int WorldHeightMapEdit::allocateTiles(Int textureClass)
 			m_warnTooManyTex = true;
 			return(-1);
 		}
+		// TheSuperHackers @bugfix The fit test below only runs after the write.
+		if (m_numTextureClasses >= NUM_TEXTURE_CLASSES) {
+			m_warnTooManyTex = true;
+			return(-1);
+		}
 		Int i;
 		m_textureClasses[m_numTextureClasses].globalTextureClass = textureClass;
 		m_textureClasses[m_numTextureClasses].firstTile = m_numBitmapTiles;
@@ -935,6 +942,11 @@ Int WorldHeightMapEdit::allocateEdgeTiles(Int globalTextureClass)
 		DEBUG_ASSERTCRASH(m_globalTextureClasses[globalTextureClass].isBlendEdgeTile, ("Shouldn't use this for edge tiles."));
 		// hasn't been copied into m_sourceTiles yet.
 		if (m_numEdgeTiles + m_globalTextureClasses[globalTextureClass].numTiles>NUM_SOURCE_TILES) {
+			m_warnTooManyTex = true;
+			return(-1);
+		}
+		// TheSuperHackers @bugfix The fit test below only runs after the write.
+		if (m_numEdgeTextureClasses >= NUM_TEXTURE_CLASSES) {
 			m_warnTooManyTex = true;
 			return(-1);
 		}
@@ -1006,6 +1018,10 @@ Bool WorldHeightMapEdit::canFitTexture(Int textureClass)
 		if (firstTile >= 0) return true; // already present.
 		if (this->m_numBitmapTiles + m_globalTextureClasses[textureClass].numTiles>NUM_SOURCE_TILES) {
 			// No room at the inn.
+			return(false);
+		}
+		// TheSuperHackers @bugfix The speculative add below would write past the array.
+		if (m_numTextureClasses >= NUM_TEXTURE_CLASSES) {
 			return(false);
 		}
 		Int i;
