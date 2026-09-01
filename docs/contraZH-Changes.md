@@ -5,13 +5,49 @@ GeneralsGameCode_Modding. Everything here is additional to upstream; the rest of
 applies unchanged.
 
 Almost all of it is client-side presentation and input handling, read from `Options.ini` and
-defaulting to retail behaviour, so an untouched `Options.ini` plays exactly as before.
+defaulting to retail behaviour, so an untouched `Options.ini` plays exactly as before. The exception
+is [Gameplay Fixes](#gameplay-fixes), which correct retail bugs in the simulation itself and are
+always on.
 
 As of August 2026 the fork is synced with TheSuperHackers/GeneralsGameCode and
 GeneralsGameCode_Modding again (their `Core/` restructure included). Everything on this page
 survived the merge unchanged, with one exception: the texture filter option was superseded by the
 version TheSuperHackers landed — see [Rendering](#rendering) for the renamed `AnisotropyLevel` key
 and the extended value list.
+
+# Gameplay Fixes
+
+Unlike the rest of this page these are not optional and have no `Options.ini` key. They change the
+simulation, so they alter the timing of a reload or a snipe and any replay recorded before them will
+not play back identically. Both are retail bugs that upstream still carries.
+
+## Weapon bonus no longer restarts the reload
+
+A weapon bonus changing mid-reload used to throw away the progress already made and start the timer
+again from zero. Since a bonus can come and go freely - walking in and out of a Propaganda aura, a
+horde forming and breaking up, continuous fire ramping up, a promotion landing - a unit could be held
+at the start of its reload indefinitely, and with the right timing the reload could be skipped
+outright. The China Nuke Cannon was the clearest case: toggling Propaganda on it let it fire well
+ahead of schedule.
+
+The reload now keeps the fraction it had already served. A unit halfway through a reload stays
+halfway through it; gaining rate of fire shortens what is left and losing it lengthens what is left,
+but neither hands back nor takes away time already spent. Toggling a bonus on and off again leaves
+the reload exactly where it was, so there is nothing left to exploit.
+
+## Snipe survives a weapon set change
+
+Jarmen Kell's snipe is a wind-up rather than an instant shot, and anything that changed his weapon
+set part way through threw that wind-up away. Picking up scrap is the usual way to hit it, since
+salvage grants a weapon upgrade, but a veterancy promotion does the same thing, as does mounting or
+dismounting the combat bike. The snipe either fired with no wind-up at all or dropped out of the
+attack entirely.
+
+The charge now carries over to the replacement weapon and finishes on its original schedule.
+
+Note: a related half of this is data rather than code. A weapon set change also drops the weapon lock
+and reverts to the primary weapon unless the set is marked `WeaponLockSharedAcrossSets`, which is
+what makes Kell fall out of snipe mode rather than merely lose the charge.
 
 # Options.ini
 
