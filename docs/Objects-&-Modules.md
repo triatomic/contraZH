@@ -409,6 +409,39 @@ to firing passengers); the carrier's own guns do not try to aim at a target they
 green attack cursor -- the carrier does not automatically drive into range. Keep a dummy weapon if
 you want the carrier to approach on its own.
 
+### Filtering by object name
+
+`AllowInsideKindOf` and `ForbidInsideKindOf` can only speak in whole KindOfs. These two name
+individual objects instead, and work on every contain module -- TunnelContain, TransportContain,
+GarrisonContain, CaveContain, OverlordContain, HelixContain and the rest.
+
+* `ForbidInsideObjects = <object list>` - (These objects can never enter. Checked first, so it
+beats everything else, including `AllowInsideObjects`.)
+* `AllowInsideObjects = <object list>` - (If set, ONLY these objects may enter, whatever their
+KindOfs say. Leave it out to allow everything the other filters permit.)
+
+Example -- a tunnel network that refuses one specific unit:
+```
+Behavior = TunnelContain ModuleTag_05
+  TimeForFullHeal = 5000
+  ForbidInsideObjects = Aslt_GLAInfantryHijacker
+End
+```
+
+Example -- a transport that carries nothing but two named units:
+```
+Behavior = TransportContain ModuleTag_07
+  ContainMax = 4
+  AllowInsideObjects = Aslt_GLAInfantryJarmenKell Aslt_GLAInfantryHijacker
+End
+```
+
+Both keys take several names per line and append across repeated lines, so a long list can be
+split up. Matching is on the object name and ignores case.
+
+Note: these filters decide whether a unit may *enter*. They do not evict anyone already inside,
+so changing them does not affect units that are already loaded.
+
 ## StickyBombUpdate#
 
 Added new parameters to customize the 2D anim visuals:

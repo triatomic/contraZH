@@ -80,6 +80,13 @@ Bool DroneCarrierContain::isValidContainerFor(const Object* rider, Bool checkCap
 	if (!rider)
 		return false;
 
+	// This one answers the question itself instead of chaining to OpenContain, so the
+	// by-name lists have to be applied here too.
+	if( getDroneCarrierContainModuleData()->isObjectAllowedInside( rider ) == FALSE )
+	{
+		return false;
+	}
+
 	// no... actually, only OUR OWN units can be transported.
 	if (rider->getControllingPlayer() != getObject()->getControllingPlayer())
 		return false;
