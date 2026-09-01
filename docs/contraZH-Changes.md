@@ -17,9 +17,12 @@ and the extended value list.
 
 # Gameplay Fixes
 
-Unlike the rest of this page these are not optional and have no `Options.ini` key. They change the
-simulation, so they alter the timing of a reload or a snipe and any replay recorded before them will
-not play back identically. Both are retail bugs that upstream still carries.
+Unlike the rest of this page these are not optional and have no `Options.ini` key. They are all retail
+bugs that upstream still carries.
+
+The first two change the simulation, so they alter the timing of a reload or a snipe and any replay
+recorded before them will not play back identically. The rest only change what is drawn, and leave
+replay playback alone; each entry says which kind it is.
 
 ## Weapon bonus no longer restarts the reload
 
@@ -48,6 +51,21 @@ The charge now carries over to the replacement weapon and finishes on its origin
 Note: a related half of this is data rather than code. A weapon set change also drops the weapon lock
 and reverts to the primary weapon unless the set is marked `WeaponLockSharedAcrossSets`, which is
 what makes Kell fall out of snipe mode rather than merely lose the charge.
+
+## Stealth kills no longer reveal the killer
+
+With a cash bounty in effect, a kill floats the money earned above the unit that made it. That text
+was drawn for everyone, including players who could not see the unit at all, so a stealthed sniper
+announced its own position the moment it fired successfully. Infantry shooting from inside a stealthed
+transport gave away the transport the same way, since the text appears over whoever scored the kill.
+
+The text is now shown only to players who can legitimately see the killer - its owner, their allies,
+and observers watching a replay. Everyone else sees nothing, exactly as they see nothing of the unit
+itself. A unit that is stealthed but has been detected still shows it, because at that point it is
+visible anyway.
+
+This one is presentation only. The bounty is awarded identically for every player whether or not the
+text is drawn, so replays recorded before it still play back identically.
 
 # Options.ini
 
