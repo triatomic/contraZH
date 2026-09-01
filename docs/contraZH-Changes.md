@@ -216,6 +216,42 @@ checked against the new renderer pay its cost or change appearance.)
 instead, so a very large particle stops getting more expensive without bound. The trade is a coarser
 terrain fit, which is not visible on the effects that actually reach that size.
 
+# RiderChangeContain
+
+Two opt-in fields on the combat bike contain module. Both default to `No`, so data that does not
+mention them behaves exactly as before.
+
+## SurviveScuttle
+
+* `SurviveScuttle = No` - (Default. `Yes` keeps the transport alive after its rider dismounts.)
+
+Normally a bike whose rider gets off topples over, waits out `ScuttleDelay` and is destroyed. With
+`SurviveScuttle = Yes` it still topples into its `ScuttleStatus` pose, but is never killed - it just
+lies there. Walking a new valid rider onto it stands it back up: the toppled model condition and the
+unselectable and immobile statuses are cleared, and the bike behaves normally again.
+
+Notes:
+* The abandoned bike cannot be box-selected, but it can still be right-clicked as a destination, so
+ordering a rider onto it works. It is only unselectable, not uninteractable.
+* It stays a legitimate target - enemies can shoot and destroy it. Only its owner can mount it.
+* `ScuttleDelay` becomes dead config, since the timer it feeds is never started.
+
+## SilentScuttle
+
+* `SilentScuttle = No` - (Default. `Yes` scuttles the bike without announcing a loss.)
+
+A dismount is a deliberate act, but the scuttle still killed the bike as an anonymous death, so EVA
+called out "Unit Lost", dropped a radar ping and could raise an "under attack" warning every time a
+rider got off. With `SilentScuttle = Yes` the bike is flagged as scuttling for the moment it dies,
+and the three announcements skip an object carrying that flag. A bike destroyed by an enemy still
+announces normally.
+
+The flag only silences the announcements. The bike is still not credited to anyone as a kill and is
+not added to either player’s score, exactly as an ordinary scuttle behaves today.
+
+The two fields are independent. `SurviveScuttle = Yes` never reaches the kill at all, so it does not
+need `SilentScuttle`.
+
 # New CommandButton Commands
 
 ## HOLD_FIRE

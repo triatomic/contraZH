@@ -89,7 +89,7 @@ const char* const ObjectStatusMaskType::s_bitNameList[] =
 	"STATUS_RIDER14",
 	"STATUS_RIDER15",
 	"STATUS_RIDER16",
-	"RESERVED_UNIQUE_SIZE_PAD",
+	"SCUTTLING",
 	nullptr
 };
 static_assert(ARRAY_SIZE(ObjectStatusMaskType::s_bitNameList) == ObjectStatusMaskType::NumBits + 1, "Incorrect array size");

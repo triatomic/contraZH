@@ -58,6 +58,8 @@ public:
 	RiderInfo m_riders[ MAX_RIDERS ];
 	UnsignedInt m_scuttleFrames;
 	ModelConditionFlagType m_scuttleState;
+	Bool m_surviveScuttle;
+	Bool m_silentScuttle;
 
 	RiderChangeContainModuleData();
 
