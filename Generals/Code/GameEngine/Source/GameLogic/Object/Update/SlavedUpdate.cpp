@@ -217,13 +217,12 @@ UpdateSleepTime SlavedUpdate::update()
 			// master's victim. Retail returns here unconditionally, so the hard leash at the bottom of
 			// this function is unreachable for as long as the master has a victim - and the victim id
 			// persists after the master stops attacking or drives away, so the drone chases forever.
-			// Go idle first: an aiMoveToPosition with CMD_FROM_AI on a non idle unit only layers a
-			// twenty second temporary AI_MOVE_TO over the preserved attack state, which then resumes.
-			// aiIdle clears the machine, and leaves us idle so the move in doGuardLogic takes the
-			// clean path.
-			if( data->m_guardMaxRange
-					&& ThePartitionManager->getDistanceSquared( me, master, FROM_CENTER_3D )
-							> sqr( STRAY_MULTIPLIER * data->m_guardMaxRange ) )
+			// Go idle first: an aiMoveToPosition with CMD_FROM_AI on a non idle unit is layered on as a
+			// twenty second temporary AI_MOVE_TO, so repeating it just stacks temporary states and the
+			// drone keeps following the old goal. aiIdle clears the machine, and leaves us idle so the
+			// move in doGuardLogic takes the clean path. Guarded because aiIdle re-enters AI_IDLE and
+			// draws a logic random each time.
+			if( isBeyondLeash( master ) )
 			{
 				endRepair();
 				if( !myAI->isIdle() )
@@ -292,7 +291,7 @@ UpdateSleepTime SlavedUpdate::update()
 			endRepair();
 			doGuardLogic( &pinnedPosition );
 		}
-		else if( ThePartitionManager->getDistanceSquared( me, master, FROM_CENTER_3D ) > sqr(STRAY_MULTIPLIER * data->m_guardMaxRange ) )
+		else if( isBeyondLeash( master ) )
 		{
 			//I'm too far away, no matter what I'm doing.
 			endRepair();
@@ -420,6 +419,22 @@ void SlavedUpdate::doScoutLogic( const Coord3D *mastersDestination )
 	{
 		ai->aiMoveToPosition( &scoutPosition, CMD_FROM_AI );
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+// Have I strayed further from my master than I am ever allowed to, whatever I am doing?
+//-------------------------------------------------------------------------------------------------
+Bool SlavedUpdate::isBeyondLeash( const Object *master ) const
+{
+	const SlavedUpdateModuleData* data = getSlavedUpdateModuleData();
+
+	if( !data->m_guardMaxRange )
+	{
+		return FALSE;
+	}
+
+	return ThePartitionManager->getDistanceSquared( getObject(), master, FROM_CENTER_3D )
+			> sqr( STRAY_MULTIPLIER * data->m_guardMaxRange );
 }
 
 //-------------------------------------------------------------------------------------------------

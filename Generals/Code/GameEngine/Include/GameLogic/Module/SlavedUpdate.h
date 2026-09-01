@@ -81,12 +81,9 @@ public:
 		m_scoutWanderRange = 0;
 		m_distToTargetToGrantRangeBonus = 0;
 #if !PRESERVE_SLAVED_DRONE_CHASE
-		// TheSuperHackers @bugfix triatomic 01/09/2026 m_repairRange was the only field here left
-		// uninitialized, so moveToNewRepairSpot read indeterminate memory in a GameLogic path for any
-		// template that omits RepairRange - both the branch taken and the offset computed from it were
-		// undefined, which can desync a multiplayer game. Gated because retail's garbage value is
-		// almost never zero, so retail effectively always takes that branch and draws two logic
-		// randoms that a correct zero skips.
+		// TheSuperHackers @bugfix triatomic 01/09/2026 m_repairRange was left uninitialized, so
+		// moveToNewRepairSpot read indeterminate memory and could desync. Gated because retail's
+		// garbage value is almost never zero, so retail always takes that branch and draws two randoms.
 		m_repairRange = 0;
 #endif
 		m_repairRatePerSecond = 0.0f;
@@ -171,6 +168,7 @@ public:
 	void setRepairState( RepairStates repairState );
 	void setRepairModelConditionStates( ModelConditionFlagType flag );
 	void moveToNewRepairSpot();
+	Bool isBeyondLeash( const Object *master ) const;	///< Have I strayed further from my master than I am ever allowed to?
 
 	virtual UpdateSleepTime update() override;	///< Deciding whether or not to make new guys
 
