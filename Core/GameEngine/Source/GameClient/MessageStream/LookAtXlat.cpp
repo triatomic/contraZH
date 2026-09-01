@@ -231,6 +231,20 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 				break;
 			}
 
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+			// The camera cheat reads the arrow keys itself (sun stepping, chase panning), so
+			// the RTS keyboard scroll must not engage underneath it. A scroll latched from
+			// before mode entry is released here for the same reason.
+			if (TheTacticalView->isCameraCheatModeActive())
+			{
+				if (m_isScrolling && m_scrollType == SCROLL_KEY)
+				{
+					stopScrolling();
+				}
+				break;
+			}
+#endif
+
 			if (TheInGameUI->isSelecting() || (m_isScrolling && m_scrollType != SCROLL_KEY))
 				break;
 
@@ -256,6 +270,14 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 		//-----------------------------------------------------------------------------
 		case GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_DOWN:
 		{
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+			// While the camera cheat is active the right button drives its mouse look, so it must
+			// neither start the anchor scroll nor issue commands.
+			if (TheTacticalView->isCameraCheatModeActive())
+			{
+				return DESTROY_MESSAGE;
+			}
+#endif
 			m_lastMouseMoveTimeMsec = timeGetTime();
 
 			m_anchor = msg->getArgument( 0 )->pixel;
@@ -273,6 +295,18 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 		//-----------------------------------------------------------------------------
 		case GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_UP:
 		{
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+			if (TheTacticalView->isCameraCheatModeActive())
+			{
+				// The matching button down may predate the camera mode, so the scroll it
+				// started must still be released here or it stays latched forever.
+				if (m_scrollType == SCROLL_RMB)
+				{
+					stopScrolling();
+				}
+				return DESTROY_MESSAGE;
+			}
+#endif
 			m_lastMouseMoveTimeMsec = timeGetTime();
 
 			if (m_scrollType == SCROLL_RMB)
@@ -285,6 +319,14 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 		//-----------------------------------------------------------------------------
 		case GameMessage::MSG_RAW_MOUSE_MIDDLE_BUTTON_DOWN:
 		{
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+			// While the camera cheat is active the middle button drags the sun; the RTS rotate
+			// must not engage underneath it.
+			if (TheTacticalView->isCameraCheatModeActive())
+			{
+				return DESTROY_MESSAGE;
+			}
+#endif
 			const UnsignedInt now = timeGetTime();
 			m_lastMouseMoveTimeMsec = now;
 			m_middleButtonDownTimeMsec = now;
@@ -300,6 +342,15 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 		//-----------------------------------------------------------------------------
 		case GameMessage::MSG_RAW_MOUSE_MIDDLE_BUTTON_UP:
 		{
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+			if (TheTacticalView->isCameraCheatModeActive())
+			{
+				// The matching button down may predate the camera mode; drop the rotate
+				// latch or every later mouse move keeps steering the RTS camera.
+				m_isRotating = false;
+				return DESTROY_MESSAGE;
+			}
+#endif
 			const UnsignedInt now = timeGetTime();
 			m_lastMouseMoveTimeMsec = now;
 
@@ -355,7 +406,14 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 				}
 				else
 				{
-					if ( m_currentPos.x < edgeScrollSize || m_currentPos.y < edgeScrollSize || m_currentPos.y >= height-edgeScrollSize || m_currentPos.x >= width-edgeScrollSize )
+					const Bool nearScreenEdge = ( m_currentPos.x < edgeScrollSize || m_currentPos.y < edgeScrollSize || m_currentPos.y >= height-edgeScrollSize || m_currentPos.x >= width-edgeScrollSize );
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+					// Edge scrolling would drift the camera cheat, whose position the pointer
+					// no longer relates to.
+					if ( nearScreenEdge && !TheTacticalView->isCameraCheatModeActive() )
+#else
+					if ( nearScreenEdge )
+#endif
 					{
 						setScrolling(SCROLL_SCREENEDGE);
 					}
@@ -418,6 +476,16 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 			m_lastMouseMoveTimeMsec = timeGetTime();
 
 			const Real spin = msg->getArgument( 1 )->real;
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+			// The chase camera zooms its own spring arm; the RTS zoom must not eat the wheel.
+			if (TheTacticalView->isCameraChaseModeActive())
+			{
+				TheTacticalView->cameraCheatZoomBy( spin );
+				return DESTROY_MESSAGE;
+			}
+#endif
+
 			const Real zoom = -spin * View::ZoomHeightPerSecond;
 			TheTacticalView->userZoom(zoom);
 
@@ -438,6 +506,21 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 		case GameMessage::MSG_FRAME_TICK:
 		{
 			Coord2D offset = {0, 0};
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+			// While a camera mode is active the cheat blocks own the camera position, so no
+			// scroll source may pump it. Whatever scroll or rotate was engaged when the mode
+			// started is shut down here rather than left running against the mode's input.
+			if (TheTacticalView->isCameraCheatModeActive())
+			{
+				if (m_isScrolling)
+				{
+					stopScrolling();
+				}
+				m_isRotating = false;
+				break;
+			}
+#endif
 
 			if (m_isScrolling && !TheInGameUI->isScrolling())
 			{

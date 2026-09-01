@@ -1,0 +1,102 @@
+# Camera Controls
+
+Cheat-build camera kit (`generalszh_c-camera.exe`). Everything here is client-side
+only: no effect on the simulation, replays or multiplayer sync.
+
+## Mode cycle — `Delete`
+
+Each press moves one stage forward. Stages that need an object are skipped when
+nothing is selected.
+
+| Stage | Name | What it is |
+|---|---|---|
+| 0 | **Default** | The normal RTS camera, restored exactly as you left it. |
+| 1 | **Free** | Fly anywhere, perspective projection. |
+| 2 | **Chase** | Third-person camera following the selected object. |
+| 3 | **Perspective** | First-person ride on that object; view turns with its facing. |
+| 4 | **Orthographic** | Free flight with a parallel projection — the schematic look. |
+
+With nothing selected: Default → Free → Orthographic → Default.
+
+While any mode is active the whole UI hides: control bar, radar, health bars and
+icons, hover tooltips, superweapon and script timers, FPS/time readouts. The
+terrain also draws fully **unshrouded** — no black fog-of-war walls at low angles
+(hidden enemy units stay hidden; only the terrain clears). Game hotkeys stay live.
+Everything restores on exit, on object death, and at match end.
+
+## Movement — Free and Orthographic
+
+| Control | Action |
+|---|---|
+| `W` `A` `S` `D` | Fly forward / left / back / right along the view. |
+| `Space` | Ascend. |
+| `Ctrl` | Descend (paused while RMB is held — that's the roll gesture). |
+| `Shift` | Hold for 5× speed. |
+
+The camera cannot go below the terrain.
+
+## Chase controls
+
+| Control | Action |
+|---|---|
+| Arrow keys | Pan the view away from the object; it keeps following. `Shift` = 5×. |
+| Mouse wheel | Zoom the follow distance in and out. |
+
+## Right-mouse-button gestures (hold RMB and drag)
+
+| Modifier | Action |
+|---|---|
+| *(none)* | Look around (Free/Perspective) or orbit the object (Chase). |
+| `Alt` | Field of view: drag down widens, up narrows (10°–120°). In Ortho: scales the view size instead. |
+| `Ctrl` | Roll — bank the camera for a dutch angle (±180°). |
+| `Ctrl` + `Alt` | **Dolly zoom** (Chase only): FOV changes while the camera compensates, keeping the object the same size while the background stretches — the vertigo shot. |
+
+## Sun light (hold MMB and drag, any mode)
+
+| Modifier | Action |
+|---|---|
+| *(none)* | Orbit the sun (horizontal drag). |
+| `Alt` | Raise / lower the sun (vertical drag). |
+| `Ctrl` | Sun intensity: drag up brightens, down dims (0.05×–3×). |
+| Arrow keys | Step the sun in exact 5° notches: Left/Right orbit, Up/Down raise/lower. |
+| `Insert` | Reset the sun to the map's own light. |
+
+Hold `Shift` while dragging for 4× speed. Moving the sun relights terrain,
+objects and shadows live. The override persists after leaving camera modes;
+`Insert` (works anywhere) or match end restores it.
+
+The cursor is hidden for the whole camera session (it returns when the game loses
+focus or the cheat exits) and is captured at the screen centre while RMB is held.
+FOV and roll reset when you exit the cheat.
+
+## Pick anything — `CapsLock`
+
+With CapsLock on (in any mode) the cursor returns and the whole selection system
+can grab **anything** — single click or drag box, trees, rocks, wild animals,
+civilian props, enemies, things the game never lets you select. Cheat builds tag
+every rendered object as pick-testable, so even pure decoration with no gameplay
+role at all (a deer, a pile of rocks) responds to both the click and the box.
+The selection is the camera target on the next `Delete`, and a click also
+retargets Chase/Perspective on the spot.
+
+The only things out of reach are map decorations that aren't objects at all
+(baked scenery with no game object behind it) — there is nothing to select or
+chase there.
+
+## Scene cheats
+
+| Key | Action |
+|---|---|
+| `Ctrl` + `Home` | Cycle the skybox: map default → Morning → Moon. Forces the sky to draw. |
+| `Ctrl` + `End` | Cycle the terrain: normal → black → **green screen**. Hides terrain, roads, trees, shroud and water, leaving units over a flat backdrop for chroma keying. |
+
+Terrain-hidden mode also suppresses the skybox (the water object draws it), so use
+`Ctrl+Home` with terrain on Normal.
+
+## Notes
+
+- All keys are rebindable through `CommandMap.ini`: `CHEAT_CYCLE_CAMERA_MODE`,
+  `CHEAT_CYCLE_SKYBOX`, `CHEAT_CYCLE_TERRAIN_MODE`.
+- The mode-change message ("Camera: Free" …) stays on screen deliberately, so you
+  always know where you are in the cycle.
+- The unit you ride or chase is still yours to command.

@@ -3517,6 +3517,13 @@ Bool Drawable::drawsAnyUIText()
 // ------------------------------------------------------------------------------------------------
 void Drawable::drawIconUI()
 {
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// The camera cheat hides the whole UI: health bars, veterancy and status icons, and the
+	// debug overlays this function also hosts.
+	if( TheTacticalView && TheTacticalView->isCameraCheatModeActive() )
+		return;
+#endif
+
 	if( TheGameLogic->getDrawIconUI() && (TheScriptEngine->getFade()==ScriptEngine::FADE_NONE) )
 	{
 		IRegion2D healthBarRegionStorage;

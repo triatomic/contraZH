@@ -66,6 +66,14 @@ enum PickType CPP_11(: Int)
 	PICK_TYPE_SHRUBBERY					= COLL_TYPE_2,
 	PICK_TYPE_MINES							= COLL_TYPE_3,	// mines aren't normally selectable, but workers/dozers need to
 	PICK_TYPE_FORCEATTACKABLE		= COLL_TYPE_4,
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// The pick anything camera tool ray tests things with no gameplay pick type at all:
+	// rocks, deer, rubble, pure decoration. Set_Collision_Type unconditionally ORs
+	// COLL_TYPE_ALL into every render object, so asking for that bit matches everything
+	// with no per-object stamping -- including the dead and rubble states, whose
+	// Set_Collision_Type(0) would wipe any stamped bit. No gameplay query asks for it.
+	PICK_TYPE_CHEAT_ANYTHING		= COLL_TYPE_ALL,
+#endif
 	PICK_TYPE_ALL_DRAWABLES			= (PICK_TYPE_SELECTABLE | PICK_TYPE_SHRUBBERY | PICK_TYPE_MINES | PICK_TYPE_FORCEATTACKABLE)
 };
 
@@ -206,6 +214,17 @@ public:
 	virtual Coord3D get3DCameraPosition() const { Coord3D c={0,0,0}; return c; } ///< Returns the actual camera position
 	virtual Coord3D get3DCameraDirection() const { Coord3D c={0,0,0}; return c; } ///< Returns the actual camera view direction
 	virtual void set3DCameraLookAt(const Coord3D &pos, const Coord3D &dir, Real roll) {} ///< Set the actual camera position and view direction
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// Camera cheat: default -> free camera -> chase the given object -> default. Client side
+	// view state only, so it cannot desync; implemented by W3DView, a no-op elsewhere.
+	virtual void cycleCameraMode( ObjectID focusCandidate ) {}
+	virtual Bool isCameraCheatModeActive() const { return FALSE; }
+	virtual Bool isCameraChaseModeActive() const { return FALSE; }
+	virtual Bool isCameraPerspectiveModeActive() const { return FALSE; }
+	virtual Bool isCameraOrthoModeActive() const { return FALSE; }
+	virtual void cameraCheatZoomBy( Real spin ) {}
+#endif
 
 	virtual Real getZoom() { return m_zoom; }
 	virtual void setZoom(Real z) { m_zoom = z; }

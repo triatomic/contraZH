@@ -118,6 +118,10 @@ protected:
 	Bool m_drawFogOfWar;					///<switch to draw alternate fog style instead of solid black
 	Bool m_clearDstTexture;				///<flag indicating we must clear video memory destination texture
 	W3DShroudLevel m_boderShroudLevel;			///<color used to clear the shroud border
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	Bool m_cheatShroudSuppressed;					///<camera cheat holds the whole map unshrouded
+	W3DShroudLevel m_cheatSavedBorderLevel;	///<border level to restore afterwards
+#endif
 	W3DShroudLevel *m_finalFogData;			///<copy of logical shroud in an easier to access array.
 	W3DShroudLevel *m_currentFogData;		///<copy of intermediate logical shroud while it's interpolated.
 	void interpolateFogLevels(RECT *rect);		///<fade current fog levels to actual logic side levels.

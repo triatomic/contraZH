@@ -236,6 +236,15 @@ public:
 	virtual void setCameraLock(ObjectID id) override;
 	virtual void setSnapMode( CameraLockType lockType, Real lockDist ) override;
 
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	virtual void cycleCameraMode( ObjectID focusCandidate ) override;
+	virtual Bool isCameraCheatModeActive() const override { return m_cameraCheatMode != CAMERA_CHEAT_OFF; }
+	virtual Bool isCameraChaseModeActive() const override { return m_cameraCheatMode == CAMERA_CHEAT_FOCUS; }
+	virtual Bool isCameraPerspectiveModeActive() const override { return m_cameraCheatMode == CAMERA_CHEAT_PERSPECTIVE; }
+	virtual Bool isCameraOrthoModeActive() const override { return m_cameraCheatMode == CAMERA_CHEAT_ORTHO; }
+	virtual void cameraCheatZoomBy( Real spin ) override;
+#endif
+
 	/// Add an impulse force to shake the camera
 	virtual void shake( const Coord3D *epicenter, CameraShakeType shakeType ) override;
 
@@ -342,6 +351,61 @@ private:
 	Bool				m_useRealZoomCam;
 	AsciiString		m_cameraSlaveObjectName;
 	AsciiString		m_cameraSlaveObjectBoneName;
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// Camera cheat. Transient client driven view state, deliberately not saved: in these modes
+	// m_pos/m_angle/m_pitch describe the camera eye itself rather than the RTS look-at pivot
+	// (see buildCameraPosition), and the pre-cheat view is restored on the way out.
+	enum CameraCheatMode
+	{
+		CAMERA_CHEAT_OFF = 0,
+		CAMERA_CHEAT_FREE,			///< fly: WASD/Space/Ctrl move, hold RMB to look
+		CAMERA_CHEAT_FOCUS,			///< chase the focus object, hold RMB to orbit
+		CAMERA_CHEAT_PERSPECTIVE,	///< ride the focus object: first person from its viewpoint
+		CAMERA_CHEAT_ORTHO			///< free flight with an orthographic projection
+	};
+
+	void exitCameraCheatMode();									///< restore the pre-cheat view and turn the cheat off
+	void unhideRiddenDrawable();								///< put the ride-hidden model back, unless logic hid it too
+	void updateCameraCheatMouseLook( Real *yaw, Real *pitch );	///< shared RMB mouse look for both modes
+	void updateCameraCheatSharedInput();									///< Insert sun reset + CapsLock pick, all modes
+	void grabCheatSunIfNeeded();												///< capture the map sun before the first move
+	void applyCheatSun();															///< push azimuth/elevation/intensity into the world
+	void resetCheatSun();															///< restore the map sun
+	void showCheatSunReadout();												///< the azimuth/elevation/intensity message
+
+	CameraCheatMode	m_cameraCheatMode;
+	ViewLocation		m_preCheatLocation;						///< pos/angle/pitch/zoom before entering the cheat
+	Real					m_preCheatHeightAboveGround;
+	Bool					m_preCheatZoomLimited;
+	Bool					m_preCheatOkToAdjustHeight;
+	Real					m_preCheatFOV;
+	Bool					m_preCheatControlBarHidden;		///< scripts may have hidden the HUD before us
+	ObjectID			m_focusObjectID;							///< object the chase camera follows
+	Real					m_focusYaw;
+	Real					m_focusPitch;
+	Real					m_focusDistance;
+	Coord2D				m_focusOffset;								///< arrow key pan away from the followed object
+	Real					m_perspYawOffset;							///< RMB look away from the object's own facing
+	Real					m_perspPitchOffset;
+	Bool					m_perspHidDrawable;						///< we hid the ridden drawable and must unhide it
+	Bool					m_camCheatMouseLooking;					///< RMB look engaged last frame (cursor is captured)
+	Real					m_camCheatRoll;								///< dutch angle bank, Ctrl+RMB drag
+	Real					m_orthoViewHeight;							///< ortho view volume height in world units
+	Bool					m_sunMoved;										///< the sun cheat holds an override right now
+	Real					m_sunAzimuth;
+	Real					m_sunElevation;
+	Real					m_sunIntensity;
+	Coord3D				m_sunSavedTerrainPos;						///< the map's own light 0, for Insert to restore
+	Coord3D				m_sunSavedObjectPos;
+	Real					m_sunSavedTerrainDiffuse[3];
+	Real					m_sunSavedObjectDiffuse[3];
+	Bool					m_lastInsertDown;
+	Bool					m_lastLeftDown;
+	ObjectID			m_pickedFocusID;								///< CapsLock pick, wins over the RTS selection
+	UnsignedInt		m_lastSunMsgMs;								///< throttle for the sun readout message
+	UnsignedInt		m_lastSunArrowMask;						///< arrow edge detection for the 5 degree steps
+#endif
 };
 
 // EXTERNALS //////////////////////////////////////////////////////////////////////////////////////
