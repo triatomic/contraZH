@@ -702,6 +702,39 @@ Added Parameters:
 * `TintStatusType` = [TINT_STATUS type]  ; which color tint to apply
 * `BonusConditionType` = [WeaponBonus type]  ; The WeaponBonus condition flag that is granted to affected units (default = the module's own bonus). Lets you pick which WeaponBonus the module applies.
 
+## SpecialAbilityUpdate
+
+The valid targets for the laser lock ability (`SPECIAL_MISSILE_DEFENDER_LASER_GUIDED_MISSILES`) used to be hardcoded to
+`VEHICLE`, which in Zero Hour covers aircraft as well as ground vehicles. These two keys make the target filter
+data-driven.
+
+* `ForbiddenTargetKindOf = <KindOf list>` - (The target may have none of these. Checked first, so it beats
+`RequiredTargetKindOf`. Default = `STRUCTURE`.)
+* `RequiredTargetKindOf = <KindOf list>` - (The target must have **all** of these. Default = `VEHICLE`.)
+
+Example - an Avenger that can only lock onto ground vehicles:
+```
+Behavior = SpecialAbilityUpdate ModuleTag_09
+  SpecialPowerTemplate  = SpecialAbilityLaserGuidedMissiles
+  StartAbilityRange     = 200.0
+  RequiredTargetKindOf  = VEHICLE
+  ForbiddenTargetKindOf = STRUCTURE AIRCRAFT   ; New
+End
+```
+
+The defaults reproduce the original hardcoded behaviour exactly, so leaving both keys out changes nothing.
+
+Behaviour notes:
+* `RequiredTargetKindOf` is an all of test, not an any of test. Listing two KindOfs means the target must have both.
+* Both keys are honoured in two places, and always agree: the check that decides whether the cursor and the order are
+valid, and the check that runs while a lock is already in progress and cancels it if the target stops qualifying.
+* These keys decide which *kinds* may be targeted, not which *relationships*. Relationships are already a CommandButton
+option - `NEED_TARGET_ENEMY_OBJECT`, `NEED_TARGET_ALLY_OBJECT`, `NEED_TARGET_NEUTRAL_OBJECT` - set on the button that
+triggers the ability. Note the ability additionally refuses anything that is not an enemy, so allowing an ally target on
+the button alone is not enough.
+* These keys currently affect the laser lock ability only. Other abilities that use `SpecialAbilityUpdate` keep their
+own built in target rules and ignore both.
+
 ## DelayedUpgradeBehavior (New)
 
 Applies or Removes Upgrade(s) after a set time. Initially triggered by an upgrade. This can be used to make temporary upgrades.

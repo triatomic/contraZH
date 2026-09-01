@@ -1931,12 +1931,20 @@ Bool ActionManager::canDoSpecialPowerAtObject( const Object *obj, const Object *
 			}
 
 			case SPECIAL_MISSILE_DEFENDER_LASER_GUIDED_MISSILES:
-				//Can only use laser guided missiles on vehicles!
-				if( target->isKindOf( KINDOF_VEHICLE ) && r == ENEMIES )
+			{
+				// TheSuperHackers @feature triatomic 01/09/2026 Which kinds may be targeted used to be
+				// hardcoded to vehicles, and vehicle in Zero Hour covers aircraft too. Ask the module
+				// instead, so the rule lives in INI and agrees with the abort check in
+				// SpecialAbilityUpdate. Which relationships may be targeted stays here: it is already
+				// a CommandButton option, but that only filters player clicks, and this is also
+				// reached from the AI with CMD_FROM_AI.
+				const SpecialAbilityUpdate *spUpdate = obj->findSpecialAbilityUpdate( spTemplate->getSpecialPowerType() );
+				if( spUpdate && spUpdate->isValidLaserLockTarget( target ) && r == ENEMIES )
 				{
 					return true;
 				}
 				break;
+			}
 
 			case SPECIAL_HACKER_DISABLE_BUILDING:
 				//Can only disable buildings...

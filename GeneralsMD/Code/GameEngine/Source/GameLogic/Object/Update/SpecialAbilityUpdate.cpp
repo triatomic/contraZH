@@ -68,6 +68,23 @@
 
 
 
+// ------------------------------------------------------------------------------------------------
+/** Test 'target' against the two KindOf filters. ForbiddenTargetKindOf always wins.
+  * RequiredTargetKindOf is an ALL of test: every bit listed must be set on the target.
+  * The defaults reproduce the rule that used to be hardcoded for laser guided missiles.
+  * Which relationships may be targeted is not decided here: that is already a CommandButton
+  * option (NEED_TARGET_ENEMY_OBJECT and friends), which filters the click before it gets here. */
+// ------------------------------------------------------------------------------------------------
+Bool SpecialAbilityUpdateModuleData::isValidLaserLockTarget( const Object *target ) const
+{
+	if( target == nullptr )
+	{
+		return FALSE;
+	}
+
+	return target->isKindOfMulti( m_requiredTargetKindOf, m_forbiddenTargetKindOf );
+}
+
 //-------------------------------------------------------------------------------------------------
 SpecialAbilityUpdate::SpecialAbilityUpdate( Thing *thing, const ModuleData* moduleData ) : SpecialPowerUpdateModule( thing, moduleData )
 {
@@ -302,7 +319,9 @@ UpdateSleepTime SpecialAbilityUpdate::update()
         }
         case SPECIAL_MISSILE_DEFENDER_LASER_GUIDED_MISSILES:
         {
-          if ( target->isKindOf( KINDOF_STRUCTURE ) )
+          // TheSuperHackers @feature triatomic 01/09/2026 Ask the module which targets are valid
+          // instead of hardcoding it, so this agrees with the targeting check in ActionManager.
+          if ( !data->isValidLaserLockTarget( target ) )
             shouldAbort = TRUE;
           FALLTHROUGH; //deliberately falling through
         }
