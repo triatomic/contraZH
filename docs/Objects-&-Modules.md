@@ -376,6 +376,39 @@ Setting `PassengerWeaponBonusList = None` will override the default value.
 
 Note: HelixContain grants GARRISONED to its passengers in vanilla ZH. This is changed to CONTAINED. To restore vanilla behaviour you will need to manually set the bonus here.
 
+### Targeting through addon turrets
+
+A unit whose weapons live on a contained addon turret (an OverlordContain or MultiAddOnContain
+rider) could not be ordered to attack anything only the turret can hit -- the cursor showed a red
+cross, and the workaround was a dummy weapon on the carrier with the turret's range. This key
+replaces the dummy weapon. It works on every contain module except TunnelContain and CaveContain,
+where it parses but stays inert: their contained list is the player's whole shared network, so
+the answers would come from units sitting at other entrances.
+
+* `AcceptTargetsForPassengers = No` - (Yes lets the container accept attack orders on behalf of its
+passengers: when the container's own weapons cannot attack a target, the passengers' weapons are
+asked instead, and their best answer drives the cursor and the order. Requires
+`PassengersAllowedToFire = Yes`.)
+
+```
+Behavior = OverlordContain ModuleTag_Turret
+  Slots                     = 1
+  AllowInsideKindOf         = PORTABLE_STRUCTURE
+  PassengersAllowedToFire   = Yes
+  PassengersInTurret        = Yes
+  PayloadTemplateName       = AmericaThorTurretBolt
+  AcceptTargetsForPassengers = Yes   ; New
+End
+```
+
+Behaviour notes:
+* When the order is given, the turret is told to attack (the engine already forwards attack orders
+to firing passengers); the carrier's own guns do not try to aim at a target they cannot attack.
+* A turret that is EMP'd, hacked, subdued or paralyzed does not answer for the carrier.
+* The turret cannot move, so a target beyond its range shows the out-of-range cursor rather than a
+green attack cursor -- the carrier does not automatically drive into range. Keep a dummy weapon if
+you want the carrier to approach on its own.
+
 ## StickyBombUpdate#
 
 Added new parameters to customize the 2D anim visuals:
