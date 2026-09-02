@@ -84,6 +84,7 @@ const FieldParse ChatCommand::s_fieldParseTable[] =
 	{ "SetSelectedOwner",		INI::parseIndexList,	TheChatCommandOwnerNames,	offsetof( ChatCommand, m_setSelectedOwner ) },
 	{ "AddHealth",				ChatCommand::parseAddHealth,		nullptr,	0 },
 	{ "KillSelected",			INI::parseBool,			nullptr,	offsetof( ChatCommand, m_killSelected ) },
+	{ "KillSelectedPilots",		INI::parseBool,			nullptr,	offsetof( ChatCommand, m_killSelectedPilots ) },
 	{ NULL, NULL, 0, 0 }  // keep this last
 };
 
@@ -558,6 +559,28 @@ void ChatCommand::execute( const AsciiString& args ) const
 				damageInfo.in.m_amount = -m_addHealth;
 				obj->attemptDamage( &damageInfo );
 			}
+		}
+	}
+
+	// KillSelectedPilots: snipe the crew, the same damage Jarmen Kell's shot deals. ActiveBody does
+	// the work and ignores the amount, leaving anything that is not a vehicle untouched.
+	if (m_killSelectedPilots && TheInGameUI)
+	{
+		std::vector<Object *> objects;
+		gatherSelectedObjects( objects );
+
+		for (std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); ++it)
+		{
+			Object *obj = *it;
+			if (obj->isEffectivelyDead())
+				continue;
+
+			DamageInfo damageInfo;
+			damageInfo.in.m_damageType = DAMAGE_KILLPILOT;
+			damageInfo.in.m_deathType = DEATH_NORMAL;
+			damageInfo.in.m_sourceID = INVALID_ID;
+			damageInfo.in.m_amount = 0.0f;
+			obj->attemptDamage( &damageInfo );
 		}
 	}
 

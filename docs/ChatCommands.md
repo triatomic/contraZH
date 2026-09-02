@@ -33,6 +33,7 @@ Each command is defined as a `ChatCommand <name> ... End` block. The `<name>` is
 * `SetSelectedOwner = <who>` - (Acts on the selection. Give the selected objects to another player. One of `ENEMIES`, `NEUTRAL`, `ALLIES` or `SELF`. See [Changing who owns the selection](#changing-who-owns-the-selection).)
 * `AddHealth = 100000` - (Acts on the selection. Add this much health, raising the maximum as well as the current health; a negative amount damages instead. The value may be left blank to use the default. See [Adding health](#adding-health).)
 * `KillSelected = No` - (Acts on the selection. If Yes, kill the selected objects outright.)
+* `KillSelectedPilots = No` - (Acts on the selection. If Yes, kill the crew of the selected vehicles, leaving them unmanned. See [Sniping the crew](#sniping-the-crew).)
 
 ## Adding health
 
@@ -57,6 +58,22 @@ End
 ```
 
 Anything without a body, such as a piece of terrain scenery, is skipped.
+
+## Sniping the crew
+
+`KillSelectedPilots` deals the same damage as Jarmen Kell's shot, so the selected vehicles lose
+their crew and are left unmanned for anyone to take over.
+
+```
+ChatCommand decrew
+  KillSelectedPilots = Yes
+End
+```
+
+An unmanned vehicle turns grey, is disabled and passes to the neutral player, exactly as one sniped
+in play. A combat bike is scuttled instead, since it carries a rider rather than a crew - and if it
+is moving at the time it simply explodes. Anything that is not a vehicle is left alone, so mixed
+selections are safe.
 
 ## Changing who owns the selection
 
