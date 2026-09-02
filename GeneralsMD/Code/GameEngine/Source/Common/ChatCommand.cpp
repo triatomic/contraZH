@@ -56,6 +56,19 @@
 //-------------------------------------------------------------------------------------------------
 ChatCommandStore* TheChatCommandStore = nullptr;
 
+// Names accepted by "SetSelectedOwner", in OwnerTarget order starting at OWNER_ENEMIES.
+static const char *TheChatCommandOwnerNames[] =
+{
+	"ENEMIES",
+	"NEUTRAL",
+	"ALLIES",
+	"SELF",
+	nullptr
+};
+
+// What "AddHealth" grants when the INI leaves the amount out, past any unit's own max health.
+static const Real DEFAULT_ADD_HEALTH = 100000.0f;
+
 const FieldParse ChatCommand::s_fieldParseTable[] =
 {
 	{ "AddMoney",		INI::parseInt,			nullptr,	offsetof( ChatCommand, m_addMoney ) },
@@ -68,7 +81,7 @@ const FieldParse ChatCommand::s_fieldParseTable[] =
 	{ "AddVeterancyLevel",		INI::parseInt,			nullptr,	offsetof( ChatCommand, m_addVeterancyLevel ) },
 	{ "AddSalvageTier",			INI::parseInt,			nullptr,	offsetof( ChatCommand, m_addSalvageTier ) },
 	{ "ProductionSpeedMultiplier",	INI::parseReal,		nullptr,	offsetof( ChatCommand, m_productionSpeedMultiplier ) },
-	{ "SetSelectedOwner",		ChatCommand::parseSetSelectedOwner,	nullptr,	0 },
+	{ "SetSelectedOwner",		INI::parseIndexList,	TheChatCommandOwnerNames,	offsetof( ChatCommand, m_setSelectedOwner ) },
 	{ "AddHealth",				ChatCommand::parseAddHealth,		nullptr,	0 },
 	{ "KillSelected",			INI::parseBool,			nullptr,	offsetof( ChatCommand, m_killSelected ) },
 	{ NULL, NULL, 0, 0 }  // keep this last
@@ -107,49 +120,29 @@ static void setArmorSalvageTier( Object *obj, Int newTier )
 }
 
 //-------------------------------------------------------------------------------------------------
-const Real ChatCommand::DEFAULT_ADD_HEALTH = 100000.0f;
-
-//-------------------------------------------------------------------------------------------------
 void ChatCommand::parseAddHealth( INI * /*ini*/, void *instance, void * /*store*/, const void * /*userData*/ )
 {
 	ChatCommand *command = (ChatCommand *)instance;
 	const char *token = INI::getNextTokenOrNull();
 
-	// presence of the key is what makes this a heal command; a blank value keeps the default amount
-	if (token != nullptr)
-		command->m_addHealth = (Real)atof( token );
-	command->m_isAddHealthCommand = TRUE;
+	command->m_addHealth = (token != nullptr) ? INI::scanReal( token ) : DEFAULT_ADD_HEALTH;
 }
 
 //-------------------------------------------------------------------------------------------------
-// Names accepted by "SetSelectedOwner", in OwnerTarget order starting at OWNER_ENEMIES.
-static const char *TheChatCommandOwnerNames[] =
+// Snapshot the selection, since giving an object away or killing it changes what is selected.
+static void gatherSelectedObjects( std::vector<Object *>& objects )
 {
-	"ENEMIES",
-	"NEUTRAL",
-	"ALLIES",
-	"SELF",
-	nullptr
-};
+	const DrawableList *selected = TheInGameUI ? TheInGameUI->getAllSelectedDrawables() : nullptr;
+	if (selected == nullptr)
+		return;
 
-//-------------------------------------------------------------------------------------------------
-void ChatCommand::parseSetSelectedOwner( INI *ini, void *instance, void * /*store*/, const void * /*userData*/ )
-{
-	ChatCommand *command = (ChatCommand *)instance;
-	const char *token = ini->getNextToken();
-
-	for (Int i = 0; TheChatCommandOwnerNames[i] != nullptr; ++i)
+	for (DrawableList::const_iterator it = selected->begin(); it != selected->end(); ++it)
 	{
-		if (stricmp( token, TheChatCommandOwnerNames[i] ) == 0)
-		{
-			command->m_setSelectedOwner = OWNER_ENEMIES + i;
-			return;
-		}
+		Drawable *draw = *it;
+		Object *obj = draw ? draw->getObject() : nullptr;
+		if (obj)
+			objects.push_back( obj );
 	}
-
-	DEBUG_CRASH(("[LINE: %d - FILE: '%s'] SetSelectedOwner '%s' must be ENEMIES, NEUTRAL, ALLIES or SELF",
-		ini->getLineNum(), ini->getFilename().str(), token));
-	throw INI_INVALID_DATA;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -170,13 +163,14 @@ static Player *findOwnerForChatCommand( Int ownerTarget )
 	if (localPlayer == nullptr)
 		return nullptr;
 
+	const Player *neutralPlayer = ThePlayerList->getNeutralPlayer();
 	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
 	{
 		Player *player = ThePlayerList->getNthPlayer( i );
 		if (player == nullptr || player == localPlayer)
 			continue;
 		// the neutral player is everyone's neutral, and NEUTRAL was already answered above
-		if (player == ThePlayerList->getNeutralPlayer())
+		if (player == neutralPlayer)
 			continue;
 		// setTeam bounces objects given to a defeated player back to neutral, so skip them here
 		if (!player->isPlayerActive())
@@ -509,18 +503,10 @@ void ChatCommand::execute( const AsciiString& args ) const
 			// a skirmish with no teammate has nobody to be allied with, which is worth saying out loud
 			TheInGameUI->message( UnicodeString( L"No player to give the selection to." ) );
 		}
-		// every selected object, not just the ones owned locally, so an object already given away can be taken back
-		const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
-		if (newTeam && selected)
+		else
 		{
 			std::vector<Object *> objects;
-			for (DrawableList::const_iterator it = selected->begin(); it != selected->end(); ++it)
-			{
-				Drawable *draw = *it;
-				Object *obj = draw ? draw->getObject() : nullptr;
-				if (obj)
-					objects.push_back( obj );
-			}
+			gatherSelectedObjects( objects );
 
 			if (!objects.empty())
 				TheInGameUI->deselectAllDrawables();
@@ -530,7 +516,7 @@ void ChatCommand::execute( const AsciiString& args ) const
 				Object *obj = *it;
 				obj->setTeam( newTeam );
 
-				// setTeam leaves these two to the caller, the same way the script transfer action does
+				// setTeam leaves these to the caller, as updateTeamAndPlayerStuff in ScriptActions.cpp does
 				obj->updateUpgradeModules();
 				Drawable *draw = obj->getDrawable();
 				if (draw)
@@ -545,71 +531,57 @@ void ChatCommand::execute( const AsciiString& args ) const
 	}
 
 	// AddHealth: raise the selected objects' max health and current health by the same amount, so
-	// the units end up tougher rather than merely topped up. A negative amount damages them instead,
-	// through the ordinary damage path, so that a lethal amount kills properly rather than parking
-	// the object at zero health: setMaxHealth only clamps, it never runs the death sequence.
-	if (m_isAddHealthCommand && m_addHealth != 0.0f && TheInGameUI)
+	// the units end up tougher rather than merely topped up. Damage takes the ordinary damage path
+	// instead, because setMaxHealth only clamps health and never runs the death sequence.
+	if (m_addHealth != 0.0f && TheInGameUI)
 	{
-		const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
-		if (selected)
+		std::vector<Object *> objects;
+		gatherSelectedObjects( objects );
+
+		for (std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); ++it)
 		{
-			std::vector<Object *> objects;
-			for (DrawableList::const_iterator it = selected->begin(); it != selected->end(); ++it)
+			Object *obj = *it;
+			BodyModuleInterface *body = obj->getBodyModule();
+			if (body == nullptr)
+				continue;
+
+			if (m_addHealth > 0.0f)
 			{
-				Drawable *draw = *it;
-				Object *obj = draw ? draw->getObject() : nullptr;
-				if (obj && obj->getBodyModule())
-					objects.push_back( obj );
+				body->setMaxHealth( body->getMaxHealth() + m_addHealth, ADD_CURRENT_HEALTH_TOO );
 			}
-
-			for (std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); ++it)
+			else if (!obj->isEffectivelyDead())
 			{
-				Object *obj = *it;
-				BodyModuleInterface *body = obj->getBodyModule();
-
-				if (m_addHealth > 0.0f)
-				{
-					body->setMaxHealth( body->getMaxHealth() + m_addHealth, ADD_CURRENT_HEALTH_TOO );
-					continue;
-				}
-
-				if (obj->isEffectivelyDead())
-					continue;
-
 				DamageInfo damageInfo;
 				damageInfo.in.m_damageType = DAMAGE_UNRESISTABLE;
 				damageInfo.in.m_deathType = DEATH_NORMAL;
 				damageInfo.in.m_sourceID = INVALID_ID;
 				damageInfo.in.m_amount = -m_addHealth;
-				body->attemptDamage( &damageInfo );
+				obj->attemptDamage( &damageInfo );
 			}
 		}
 	}
 
-	// KillSelected: kill the selected objects outright, the way the hand-of-god debug cheat does.
-	// The selection is dropped first, since the drawables are about to go away.
+	// KillSelected: kill the selected objects outright.
 	if (m_killSelected && TheInGameUI)
 	{
-		const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
-		if (selected)
+		std::vector<Object *> objects;
+		gatherSelectedObjects( objects );
+
+		std::vector<Object *> killable;
+		for (std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); ++it)
 		{
-			std::vector<Object *> objects;
-			for (DrawableList::const_iterator it = selected->begin(); it != selected->end(); ++it)
-			{
-				Drawable *draw = *it;
-				Object *obj = draw ? draw->getObject() : nullptr;
-				// an InactiveBody cannot be killed, and asserts if asked
-				if (obj && !obj->isEffectivelyDead() && obj->getBodyModule()
-						&& obj->getBodyModule()->getMaxHealth() > 0.0f)
-					objects.push_back( obj );
-			}
-
-			if (!objects.empty())
-				TheInGameUI->deselectAllDrawables();
-
-			for (std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); ++it)
-				(*it)->kill();
+			Object *obj = *it;
+			const BodyModuleInterface *body = obj->getBodyModule();
+			// an InactiveBody cannot be killed, and asserts if asked
+			if (!obj->isEffectivelyDead() && body && body->getMaxHealth() > 0.0f)
+				killable.push_back( obj );
 		}
+
+		if (!killable.empty())
+			TheInGameUI->deselectAllDrawables();
+
+		for (std::vector<Object *>::iterator it = killable.begin(); it != killable.end(); ++it)
+			(*it)->kill();
 	}
 
 	// Notify the player that the command ran.
