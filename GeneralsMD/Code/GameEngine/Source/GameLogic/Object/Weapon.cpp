@@ -658,6 +658,14 @@ Int WeaponTemplate::getGradualRoundFrames(const WeaponBonus& bonus) const
 }
 
 //-------------------------------------------------------------------------------------------------
+Int WeaponTemplate::getShotCycleFrames(const WeaponBonus& bonus) const
+{
+	// The longest a shot can hold the weapon. Deliberately not getDelayBetweenShots, which rolls
+	// the logic random number generator and must only be drawn once per shot.
+	return REAL_TO_INT_FLOOR(m_maxDelayBetweenShots / bonus.getField(WeaponBonus::RATE_OF_FIRE));
+}
+
+//-------------------------------------------------------------------------------------------------
 Int WeaponTemplate::getPreAttackDelay( const WeaponBonus& bonus ) const
 {
 	return m_preAttackDelay * bonus.getField( WeaponBonus::PRE_ATTACK );
@@ -2667,7 +2675,9 @@ void Weapon::settleGradualAmmo(UnsignedInt now)
 //-------------------------------------------------------------------------------------------------
 void Weapon::restartGradualRound(UnsignedInt now, const WeaponBonus& bonus)
 {
-	m_gradualRoundStart = now;
+	// The round may not begin until this shot cycle is over, or a weapon still working through a
+	// target would earn a round in every gap between its shots and never empty its clip.
+	m_gradualRoundStart = now + m_template->getShotCycleFrames(bonus);
 	m_gradualRoundFrames = m_template->getGradualRoundFrames(bonus);
 }
 

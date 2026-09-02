@@ -437,6 +437,7 @@ public:
 	// An unlimited clip has no rounds to count, so GRADUAL falls back to reloading like AUTO_RELOAD.
 	Bool isGradualReload() const { return m_reloadType == GRADUAL_RELOAD && m_clipSize > 0; }
 	Int getGradualRoundFrames(const WeaponBonus& bonus) const;
+	Int getShotCycleFrames(const WeaponBonus& bonus) const;
 	Int getClipSize() const { return m_clipSize; }
 	Int getContinuousFireOneShotsNeeded() const { return m_continuousFireOneShotsNeeded; }
 	Int getContinuousFireTwoShotsNeeded() const { return m_continuousFireTwoShotsNeeded; }
