@@ -1176,6 +1176,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/ShipSlowDeathBehavior.h
     Include/GameLogic/Module/SpecialPowerDesignatorUpdate.h
     Include/GameLogic/Module/StickyBombCrateCollide.h
+    Include/GameLogic/Module/TeleportSelfSpecialPower.h
     Include/GameLogic/Module/TeleporterAIUpdate.h
     Include/GameLogic/Module/UnitProductionBonusUpgrade.h
     Include/GameLogic/Module/UpgradeSpecialPower.h
@@ -1223,6 +1224,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Update/ScatterShotUpdate.cpp
     Source/GameLogic/Object/Update/ShipSlowDeathBehavior.cpp
     Source/GameLogic/Object/Update/SpecialPowerDesignatorUpdate.cpp
+    Source/GameLogic/Object/Update/TeleportSelfSpecialPower.cpp
     Source/GameLogic/Object/Upgrade/CrateApplyUpgrade.cpp
     Source/GameLogic/Object/Upgrade/ProductionTimeModifierUpgrade.cpp
     Source/GameLogic/Object/Upgrade/PropagateUpgradeToContainedUpgrade.cpp

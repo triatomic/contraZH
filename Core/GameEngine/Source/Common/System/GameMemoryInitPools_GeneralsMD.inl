@@ -197,6 +197,7 @@ static PoolSizeRec PoolSizes[] =
 	{ "DemoTrapUpdate", 32, 32 },
 	{ "ParticleUplinkCannonUpdate", 16, 16 },
 	{ "ChronoSphereUpdateModule", 8, 8 },
+	{ "TeleportSelfSpecialPower", 32, 32 },
 	{ "MultiLocationSpecialPowerUpdate", 8, 8 },
 	{ "SpectreGunshipUpdate", 8, 8 },
 	{ "SpectreGunshipDeploymentUpdate", 8, 8 },

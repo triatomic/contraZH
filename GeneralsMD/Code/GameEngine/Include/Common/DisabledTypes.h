@@ -58,6 +58,7 @@ enum DisabledType CPP_11(: Int)
 
 	DISABLED_TELEPORT,    // Chrono Legionnaire after teleporting
 	DISABLED_CHRONO,    // Chrono Gun removal
+	DISABLED_TELEPORT_RECOVER,    // Recovering from an activated teleport ability, unlike DISABLED_TELEPORT this immobilizes
 
 	DISABLED_COUNT,
 

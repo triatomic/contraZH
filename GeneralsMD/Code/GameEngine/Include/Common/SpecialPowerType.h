@@ -224,6 +224,8 @@ enum SpecialPowerType CPP_11(: Int)
 
 	SPECIAL_JUMPJET,
 
+	SPECIAL_TELEPORT_SELF,
+
 	SPECIALPOWER_COUNT,
 	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // NEW CONSTANTS NEED A BEHAVIORTYPE DEFINED IN THE SPECIALPOWER OR return one in getFallbackBehaviorType in ActionManager.cpp

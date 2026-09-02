@@ -295,7 +295,7 @@ void OpenContain::addOrRemoveObjFromWorld(Object* obj, Bool add)
 //-------------------------------------------------------------------------------------------------
 void OpenContain::addToContain( Object *rider )
 {
-	if (rider->isDisabledByType(DISABLED_TELEPORT))
+	if (rider->isTeleporting())
 		return;
 
 	if( getObject()->checkAndDetonateBoobyTrap(rider) )
