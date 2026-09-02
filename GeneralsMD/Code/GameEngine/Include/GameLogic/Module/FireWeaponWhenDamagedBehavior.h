@@ -44,6 +44,7 @@ public:
 	Bool									m_initiallyActive;
 	DamageTypeFlags				m_damageTypes;
 	Real									m_damageAmount;
+	Bool									m_noHealthLoss;
 	const WeaponTemplate* m_reactionWeaponPristine;///< fire these weapons only when damage is received
 	const WeaponTemplate* m_reactionWeaponDamaged;
 	const WeaponTemplate* m_reactionWeaponReallyDamaged;
@@ -66,6 +67,7 @@ public:
 		m_continuousWeaponRubble = nullptr;
 		m_damageTypes = DAMAGE_TYPE_FLAGS_ALL;
 		m_damageAmount = 0;
+		m_noHealthLoss = FALSE;
 	}
 
 
@@ -84,6 +86,7 @@ public:
 			{ "ContinuousWeaponRubble", INI::parseWeaponTemplate, nullptr, offsetof(FireWeaponWhenDamagedBehaviorModuleData,				m_continuousWeaponRubble) },
 			{ "DamageTypes", INI::parseDamageTypeFlags, nullptr, offsetof( FireWeaponWhenDamagedBehaviorModuleData, m_damageTypes ) },
 			{ "DamageAmount", INI::parseReal, nullptr, offsetof( FireWeaponWhenDamagedBehaviorModuleData, m_damageAmount ) },
+			{ "NoHealthLoss", INI::parseBool, nullptr, offsetof( FireWeaponWhenDamagedBehaviorModuleData, m_noHealthLoss ) },
 			{ 0, 0, 0, 0 }
 		};
 

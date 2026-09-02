@@ -174,6 +174,12 @@ void FireWeaponWhenDamagedBehavior::onDamage( DamageInfo *damageInfo )
 	if (damageInfo->out.m_actualDamageDealt < d->m_damageAmount)
 		return;
 
+	if( d->m_noHealthLoss )
+	{
+		// The hit is only a trigger, so give back what it took before it can change our state or kill us.
+		getObject()->getBodyModule()->internalChangeHealth( damageInfo->out.m_actualDamageClipped );
+	}
+
 	const Object *obj = getObject();
 	BodyDamageType bdt = obj->getBodyModule()->getDamageState();
 

@@ -278,6 +278,30 @@ not added to either player’s score, exactly as an ordinary scuttle behaves tod
 The two fields are independent. `SurviveScuttle = Yes` never reaches the kill at all, so it does not
 need `SilentScuttle`.
 
+# FireWeaponWhenDamagedBehavior
+
+## NoHealthLoss
+
+* `NoHealthLoss = No` - (Default. `Yes` refunds the health taken by any hit that passes the
+`DamageTypes` and `DamageAmount` gate.)
+
+The module is often used as a trigger rather than as a reaction to real harm: `DamageTypes` and
+`DamageAmount` name a damage type and a minimum amount that mean "do this now", the way a `MELEE`
+hit of 1 point fires the pilot-killing weapon on an infiltrated vehicle. The trigger hit still cost
+the object that much health, so the signal always came with a bite. With `NoHealthLoss = Yes` the
+health lost to a qualifying hit is given straight back, before the module picks and fires its
+reaction weapon.
+
+Notes:
+* Every qualifying hit is refunded, not only the ones that fire something. A hit that arrives while
+the reaction weapon is reloading, or in a damage state that has no weapon assigned, is still free.
+* Qualifying damage can no longer kill the object or move it between pristine, damaged, really
+damaged and rubble, so the reaction weapon is always chosen for the state the object was already in.
+* The hit still registers as a hit: its damage effects play and it still raises the owner's "under
+attack" warning.
+* Damage types outside `DamageTypes`, and hits below `DamageAmount`, are unaffected and drain health
+normally.
+
 # New CommandButton Commands
 
 ## HOLD_FIRE
