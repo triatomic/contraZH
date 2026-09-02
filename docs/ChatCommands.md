@@ -34,6 +34,7 @@ Each command is defined as a `ChatCommand <name> ... End` block. The `<name>` is
 * `AddHealth = 100000` - (Acts on the selection. Add this much health, raising the maximum as well as the current health; a negative amount damages instead. The value may be left blank to use the default. See [Adding health](#adding-health).)
 * `KillSelected = No` - (Acts on the selection. If Yes, kill the selected objects outright.)
 * `KillSelectedPilots = No` - (Acts on the selection. If Yes, kill the crew of the selected vehicles, leaving them unmanned. See [Sniping the crew](#sniping-the-crew).)
+* `ControlPlayer = No` - (If Yes, take control of the player named after the command. See [Controlling another player](#controlling-another-player).)
 
 ## Adding health
 
@@ -58,6 +59,30 @@ End
 ```
 
 Anything without a body, such as a piece of terrain scenery, is skipped.
+
+## Controlling another player
+
+`ControlPlayer` hands your own controls to another player, so their base and units answer to you and
+the view, shroud, radar and command bar all follow. It is the quickest way to check what an opponent
+is building, or to play both sides of a test.
+
+```
+ChatCommand control
+  ControlPlayer = Yes
+End
+```
+
+The player is named after the command, either by number - counting the playable players from 1, as
+the score screen lists them - or by name:
+
+```
+/control 2
+/control PlyrChina
+```
+
+`/control` on its own reports that it needs a name, and an unknown name says so. The neutral player
+that owns the map's civilian objects cannot be controlled. Switch back the same way, with your own
+number.
 
 ## Sniping the crew
 

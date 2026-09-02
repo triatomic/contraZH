@@ -75,6 +75,7 @@ public:
 	Real getAddHealth() const { return m_addHealth; }
 	Bool getKillSelected() const { return m_killSelected; }
 	Bool getKillSelectedPilots() const { return m_killSelectedPilots; }
+	Bool getControlPlayer() const { return m_controlPlayer; }
 
 	/** Run this command's effects. Inspects the parsed members and acts accordingly.
 			"args" is whatever the user typed after the command name, empty when nothing followed.
@@ -106,6 +107,7 @@ private:
 	Real m_addHealth = 0.0f;				///< "AddHealth" attribute; health added to the selected objects' max and current health, or damage dealt when negative. 0 means the field was absent.
 	Bool m_killSelected = FALSE;			///< "KillSelected" attribute; when TRUE, kill the selected objects outright.
 	Bool m_killSelectedPilots = FALSE;		///< "KillSelectedPilots" attribute; when TRUE, snipe the crew out of the selected vehicles.
+	Bool m_controlPlayer = FALSE;			///< "ControlPlayer" attribute; when TRUE, take control of the player named after the command.
 
 	static const FieldParse s_fieldParseTable[];
 };

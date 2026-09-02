@@ -24,6 +24,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/ChatCommand.h"
+#include "Common/GameUtility.h"
 #include "Common/GlobalData.h"
 #include "Common/INI.h"
 #include "Common/Money.h"
@@ -85,6 +86,7 @@ const FieldParse ChatCommand::s_fieldParseTable[] =
 	{ "AddHealth",				ChatCommand::parseAddHealth,		nullptr,	0 },
 	{ "KillSelected",			INI::parseBool,			nullptr,	offsetof( ChatCommand, m_killSelected ) },
 	{ "KillSelectedPilots",		INI::parseBool,			nullptr,	offsetof( ChatCommand, m_killSelectedPilots ) },
+	{ "ControlPlayer",			INI::parseBool,			nullptr,	offsetof( ChatCommand, m_controlPlayer ) },
 	{ NULL, NULL, 0, 0 }  // keep this last
 };
 
@@ -144,6 +146,36 @@ static void gatherSelectedObjects( std::vector<Object *>& objects )
 		if (obj)
 			objects.push_back( obj );
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+// The player "ControlPlayer" hands control to, named by the slot number shown in the score screen
+// or by the player's name. Skips the neutral player, which owns the map's civilian objects.
+static Player *findPlayerForChatCommand( const AsciiString& name )
+{
+	if (ThePlayerList == nullptr || name.isEmpty())
+		return nullptr;
+
+	const Player *neutralPlayer = ThePlayerList->getNeutralPlayer();
+
+	// a number picks by slot, counting the playable players from 1 the way the score screen does
+	if (isdigit( (unsigned char)name.getCharAt( 0 ) ))
+	{
+		Int wanted = atoi( name.str() );
+		Int slot = 0;
+		for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+		{
+			Player *player = ThePlayerList->getNthPlayer( i );
+			if (player == nullptr || player == neutralPlayer)
+				continue;
+			if (++slot == wanted)
+				return player;
+		}
+		return nullptr;
+	}
+
+	Player *player = ThePlayerList->findPlayerWithNameKey( NAMEKEY( name ) );
+	return (player != neutralPlayer) ? player : nullptr;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -605,6 +637,32 @@ void ChatCommand::execute( const AsciiString& args ) const
 
 		for (std::vector<Object *>::iterator it = killable.begin(); it != killable.end(); ++it)
 			(*it)->kill();
+	}
+
+	// ControlPlayer: hand the player's own controls to another player, so their base and units can
+	// be driven directly. rts::changeLocalPlayer moves the shroud, radar and control bar with it.
+	if (m_controlPlayer && TheInGameUI)
+	{
+		Player *player = findPlayerForChatCommand( args );
+		if (player != nullptr)
+		{
+			rts::changeLocalPlayer( player );
+			UnicodeString msg;
+			msg.format( L"Now controlling %s.", player->getPlayerDisplayName().str() );
+			TheInGameUI->message( msg );
+		}
+		else if (args.isEmpty())
+		{
+			TheInGameUI->message( UnicodeString( L"Name the player to control, by number or name." ) );
+		}
+		else
+		{
+			UnicodeString wanted;
+			wanted.translate( args );
+			UnicodeString msg;
+			msg.format( L"No player '%s' to control.", wanted.str() );
+			TheInGameUI->message( msg );
+		}
 	}
 
 	// Notify the player that the command ran.
