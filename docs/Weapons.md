@@ -76,6 +76,37 @@ Scale a weapon's damage and radii based on how far the target is, interpolated f
 * `RadiusFactorAtMaxRange = 1.0` - (Same, applied to the damage radii. Also affects the radius used to align the detonation FX.)
 * `ScatterRadiusFactorAtMaxRange = 1.0` - (Same, applied to the weapon's `ScatterRadius`, so shots scatter more/less depending on distance.)
 
+## Gradual Clip Reload
+
+Refill a clip one round at a time instead of all at once, so a weapon that fired only part of its clip is back
+in action sooner. `AutoReloadsClip` accepts a new value for this; the retail values are unchanged.
+
+* `AutoReloadsClip = YES` - (Retail values: `YES` refills the whole clip in `ClipReloadTime` once it runs empty;
+`NO` never refills it; `RETURN_TO_BASE` refills only after landing at an airfield. New: `GRADUAL` loads a single
+round every `ClipReloadTime / ClipSize`, up to a full clip.)
+
+With `GRADUAL`, rounds only load while the weapon is not firing: every shot pushes the next round back by a full
+round time, so a weapon fired continuously never gains any. When the clip does run empty the weapon waits for one
+round and then fires again, rather than waiting out the whole clip, and it keeps waiting one round at a time for as
+long as it keeps shooting. There is no return-to-base prerequisite, so aircraft with a `GRADUAL` weapon do not fly
+home to rearm. Rate-of-fire bonuses scale the round the same way they scale `ClipReloadTime`, and a bonus that
+changes mid-round carries the progress across instead of restarting it.
+
+Notes:
+- `AutoReloadWhenIdle` is ignored on a `GRADUAL` weapon. The clip already refills on its own, so a forced idle
+reload would only cut the round timer short.
+- `ClipSize = 0` means an unlimited clip and has no rounds to count, so `GRADUAL` behaves exactly like `YES`.
+- Set the round time above `DelayBetweenShots` (that is, `ClipReloadTime / ClipSize` greater than the shot delay),
+or a round arrives between every shot and the clip never drains.
+- While the clip is empty and waiting for its first round the weapon reports no ammo, so the reload animation and
+the command button clock run for that one round. A partly filled clip shows its real count on the ammo pips.
+- `WeaponClipShared` is not supported with `GRADUAL`: a shared clip is decremented from another weapon slot, which
+has no firing object to scale the round with.
+- `WeaponReloadSharedAcrossSets` carries the round timer only when both weapon sets use `GRADUAL`; mixing it with a
+non-gradual weapon drops the timer, and it restarts on the next shot.
+- Modules that derive a shot index from the clip (`FireWeaponAdvancedUpdate`, `KodiakUpdate` scatter patterns)
+assume a clip that only drains, so their sequence restarts as rounds come back.
+
 # WeaponExtend
 
 Added support to create WeaponExtend definitions, which will inherit all parameters from the parent Weapon.

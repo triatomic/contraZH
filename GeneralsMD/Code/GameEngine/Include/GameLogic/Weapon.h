@@ -60,6 +60,7 @@ enum WeaponReloadType CPP_11(: Int)
 	AUTO_RELOAD,
 	NO_RELOAD,
 	RETURN_TO_BASE_TO_RELOAD,
+	GRADUAL_RELOAD,
 
 	WEAPON_RELOAD_COUNT
 };
@@ -70,6 +71,7 @@ static const char *const TheWeaponReloadNames[] =
 	"YES",
 	"NO",
 	"RETURN_TO_BASE",
+	"GRADUAL",
 	nullptr
 };
 static_assert(ARRAY_SIZE(TheWeaponReloadNames) == WEAPON_RELOAD_COUNT + 1, "Incorrect array size");
@@ -431,7 +433,10 @@ public:
 	Int getProjectileCollideMask() const { return m_collideMask; }
 	WeaponReloadType getReloadType() const { return m_reloadType; }
 	WeaponPrefireType getPrefireType() const { return m_prefireType; }
-	Bool getAutoReloadsClip() const { return m_reloadType == AUTO_RELOAD; }
+	Bool getAutoReloadsClip() const { return m_reloadType == AUTO_RELOAD || m_reloadType == GRADUAL_RELOAD; }
+	// An unlimited clip has no rounds to count, so GRADUAL falls back to reloading like AUTO_RELOAD.
+	Bool isGradualReload() const { return m_reloadType == GRADUAL_RELOAD && m_clipSize > 0; }
+	Int getGradualRoundFrames(const WeaponBonus& bonus) const;
 	Int getClipSize() const { return m_clipSize; }
 	Int getContinuousFireOneShotsNeeded() const { return m_continuousFireOneShotsNeeded; }
 	Int getContinuousFireTwoShotsNeeded() const { return m_continuousFireTwoShotsNeeded; }
@@ -763,9 +768,10 @@ public:
 	AsciiString getName() const { return m_template->getName(); }
 	UnsignedInt getLastShotFrame() const { return m_lastFireFrame; }						///< frame a shot was last fired on
 	// If we are "reloading", then m_ammoInClip is a lie.  It will say full.
-	UnsignedInt getRemainingAmmo() const { return (getStatus() == RELOADING_CLIP) ? 0 : m_ammoInClip; }
+	UnsignedInt getRemainingAmmo() const { return (getStatus() == RELOADING_CLIP) ? 0 : getAmmoInClipNow(); }
 	WeaponReloadType getReloadType() const { return m_template->getReloadType(); }
 	Bool getAutoReloadsClip() const { return m_template->getAutoReloadsClip(); }
+	Bool isGradualReload() const { return m_template->isGradualReload(); }
 	Real getAimDelta() const { return m_template->getAimDelta(); }
 	Real getScatterRadius() const { return m_template->getScatterRadius(); }
 	Real getScatterTargetScalar() const { return m_template->getScatterTargetScalar(); }
@@ -774,7 +780,8 @@ public:
 	Int getContinuousFireOneShotsNeeded() const { return m_template->getContinuousFireOneShotsNeeded(); }
 	Int getContinuousFireTwoShotsNeeded() const { return m_template->getContinuousFireTwoShotsNeeded(); }
 	UnsignedInt getContinuousFireCoastFrames() const { return m_template->getContinuousFireCoastFrames(); }
- 	UnsignedInt getAutoReloadWhenIdleFrames() const { return m_template->getAutoReloadWhenIdleFrames(); }
+ 	// A GRADUAL clip already refills on its own, so the idle reload has nothing to do.
+ 	UnsignedInt getAutoReloadWhenIdleFrames() const { return m_template->isGradualReload() ? 0 : m_template->getAutoReloadWhenIdleFrames(); }
 	const AudioEventRTS& getFireSound() const { return m_template->getFireSound(); }
 	UnsignedInt getFireSoundLoopTime() const { return m_template->getFireSoundLoopTime(); }
 	DamageType getDamageType() const { return m_template->getDamageType(); }
@@ -887,9 +894,21 @@ private:
 	UnsignedInt										m_nextPreAttackFXFrame;			///< the frame when we are next allowed to play a preAttackFX
 	ObjectID									m_continuousLaserID;				///< the object that is tracking our continuous laser if we have one.
 	ObjectID									m_bonusRefObjID;					///< for weapons fired from projectiles, we compute the bonus from the original source object instead.
+	UnsignedInt								m_gradualRoundStart;				///< frame the round now loading began (GRADUAL only)
+	UnsignedInt								m_gradualRoundFrames;				///< frames per round, rate-of-fire scaled; 0 when no round is loading
 
 	// setter function for status that should not be used outside this class
 	void setStatus( WeaponStatus status) { m_status = status; }
+
+	// A GRADUAL clip accrues rounds with the passing frames, so the stored count is only a
+	// baseline; the count callers see must stay a pure function of it, or peers whose client
+	// asks at different frames would disagree.
+	UnsignedInt getAmmoInClipNow() const;
+	void settleGradualAmmo(UnsignedInt now);
+	void restartGradualRound(UnsignedInt now, const WeaponBonus& bonus);
+	void stopGradualRound() { m_gradualRoundStart = 0; m_gradualRoundFrames = 0; }
+	void beginGradualRoundWait(const Object* sourceObj, const WeaponBonus& bonus, UnsignedInt now);
+	void rescaleGradualRound(UnsignedInt now, const WeaponBonus& bonus);
 };
 
 //-------------------------------------------------------------------------------------------------
