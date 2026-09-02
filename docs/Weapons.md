@@ -84,10 +84,13 @@ in action sooner. `AutoReloadsClip` accepts a new value for this; the retail val
 * `AutoReloadsClip = YES` - (Retail values: `YES` refills the whole clip in `ClipReloadTime` once it runs empty;
 `NO` never refills it; `RETURN_TO_BASE` refills only after landing at an airfield. New: `GRADUAL` loads a single
 round every `ClipReloadTime / ClipSize`, up to a full clip.)
+* `ClipReloadDelay = 0` - (`GRADUAL` only. Quiet time owed after the last shot before any round starts loading.
+Defaults to 0, which still waits out one shot cycle. Ignored by the other reload types.)
 
-With `GRADUAL`, rounds only load while the weapon is not attacking: a round cannot even begin until the shot cycle
-that fired it is over, so a weapon working through a target gains nothing between its shots however slow its rate
-of fire, and the clip only refills once the firing stops. When the clip does run empty the weapon waits for one
+With `GRADUAL`, rounds only load while the weapon is not attacking: a round cannot even begin until the weapon has
+been quiet for `ClipReloadDelay`, so a weapon working through a target gains nothing between its shots however slow
+its rate of fire, and the clip only refills once the firing stops. `ClipReloadDelay` never falls below one shot
+cycle, so leaving it out still keeps a burst from feeding itself. When the clip runs empty the weapon waits for one
 round and then fires again, rather than waiting out the whole clip, and it keeps waiting one round at a time for as
 long as it keeps shooting. There is no return-to-base prerequisite, so aircraft with a `GRADUAL` weapon do not fly
 home to rearm. Rate-of-fire bonuses scale the round the same way they scale `ClipReloadTime`, and a bonus that
@@ -97,8 +100,8 @@ Notes:
 - `AutoReloadWhenIdle` is ignored on a `GRADUAL` weapon. The clip already refills on its own, so a forced idle
 reload would only cut the round timer short.
 - `ClipSize = 0` means an unlimited clip and has no rounds to count, so `GRADUAL` behaves exactly like `YES`.
-- `ClipReloadTime / ClipSize` is the time from the end of one shot cycle to the next round, so a clip empties in
-`ClipSize` shots whatever the rate of fire, and tops back up in about `ClipReloadTime` of quiet.
+- `ClipReloadTime / ClipSize` is the time per round once loading starts, so a clip empties in `ClipSize` shots
+whatever the rate of fire, and tops back up in about `ClipReloadDelay` plus `ClipReloadTime` of quiet.
 - While the clip is empty and waiting for its first round the weapon reports no ammo, so the reload animation and
 the command button clock run for that one round. A partly filled clip shows its real count on the ammo pips.
 - `WeaponClipShared` is not supported with `GRADUAL`: a shared clip is decremented from another weapon slot, which

@@ -217,6 +217,7 @@ const FieldParse WeaponTemplate::TheWeaponTemplateFieldParseTable[] =
 	{ "ContinuousFireCoast",			INI::parseDurationUnsignedInt,					nullptr,							offsetof(WeaponTemplate, m_continuousFireCoastFrames) },
  	{ "AutoReloadWhenIdle",				INI::parseDurationUnsignedInt,					nullptr,							offsetof(WeaponTemplate, m_autoReloadWhenIdleFrames) },
 	{ "ClipReloadTime",						INI::parseDurationUnsignedInt,					nullptr,							offsetof(WeaponTemplate, m_clipReloadTime) },
+	{ "ClipReloadDelay",					INI::parseDurationUnsignedInt,					nullptr,							offsetof(WeaponTemplate, m_clipReloadDelay) },
 	{ "DelayBetweenShots",				WeaponTemplate::parseShotDelay,					nullptr,							0 },
 	{ "ShotsPerBarrel",						INI::parseInt,													nullptr,							offsetof(WeaponTemplate, m_shotsPerBarrel) },
 	{ "DamageDealtAtSelfPosition",INI::parseBool,													nullptr,							offsetof(WeaponTemplate, m_damageDealtAtSelfPosition) },
@@ -332,6 +333,7 @@ WeaponTemplate::WeaponTemplate() : m_nextTemplate(nullptr)
 	m_continuousFireCoastFrames			= 0;
  	m_autoReloadWhenIdleFrames			= 0;
 	m_clipReloadTime								= 0;
+	m_clipReloadDelay								= 0;
 	m_minDelayBetweenShots					= 0;
 	m_maxDelayBetweenShots					= 0;
 	m_fireSoundLoopTime							= 0;
@@ -658,11 +660,13 @@ Int WeaponTemplate::getGradualRoundFrames(const WeaponBonus& bonus) const
 }
 
 //-------------------------------------------------------------------------------------------------
-Int WeaponTemplate::getShotCycleFrames(const WeaponBonus& bonus) const
+Int WeaponTemplate::getClipReloadDelayFrames(const WeaponBonus& bonus) const
 {
-	// The longest a shot can hold the weapon. Deliberately not getDelayBetweenShots, which rolls
-	// the logic random number generator and must only be drawn once per shot.
-	return REAL_TO_INT_FLOOR(m_maxDelayBetweenShots / bonus.getField(WeaponBonus::RATE_OF_FIRE));
+	// The quiet spell owed after the last shot. The longest shot delay is the floor, so the wait
+	// between two shots of a burst can never finish a round. Deliberately not getDelayBetweenShots,
+	// which rolls the logic random number generator and must only be drawn once per shot.
+	Int delay = max(m_clipReloadDelay, m_maxDelayBetweenShots);
+	return REAL_TO_INT_FLOOR(delay / bonus.getField(WeaponBonus::RATE_OF_FIRE));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2675,9 +2679,9 @@ void Weapon::settleGradualAmmo(UnsignedInt now)
 //-------------------------------------------------------------------------------------------------
 void Weapon::restartGradualRound(UnsignedInt now, const WeaponBonus& bonus)
 {
-	// The round may not begin until this shot cycle is over, or a weapon still working through a
-	// target would earn a round in every gap between its shots and never empty its clip.
-	m_gradualRoundStart = now + m_template->getShotCycleFrames(bonus);
+	// Rounds only start after the weapon has been quiet for ClipReloadDelay, so a weapon still
+	// working through a target gains nothing between its shots.
+	m_gradualRoundStart = now + m_template->getClipReloadDelayFrames(bonus);
 	m_gradualRoundFrames = m_template->getGradualRoundFrames(bonus);
 }
 
@@ -2691,7 +2695,7 @@ void Weapon::beginGradualRoundWait(const Object* sourceObj, const WeaponBonus& b
 
 	m_status = RELOADING_CLIP;
 	m_whenLastReloadStarted = now;
-	m_whenWeCanFireAgain = now + m_gradualRoundFrames;
+	m_whenWeCanFireAgain = m_gradualRoundStart + m_gradualRoundFrames;
 
 	if (sourceObj->isReloadTimeShared())
 	{

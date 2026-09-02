@@ -437,7 +437,7 @@ public:
 	// An unlimited clip has no rounds to count, so GRADUAL falls back to reloading like AUTO_RELOAD.
 	Bool isGradualReload() const { return m_reloadType == GRADUAL_RELOAD && m_clipSize > 0; }
 	Int getGradualRoundFrames(const WeaponBonus& bonus) const;
-	Int getShotCycleFrames(const WeaponBonus& bonus) const;
+	Int getClipReloadDelayFrames(const WeaponBonus& bonus) const;
 	Int getClipSize() const { return m_clipSize; }
 	Int getContinuousFireOneShotsNeeded() const { return m_continuousFireOneShotsNeeded; }
 	Int getContinuousFireTwoShotsNeeded() const { return m_continuousFireTwoShotsNeeded; }
@@ -577,6 +577,7 @@ private:
 	WeaponBonusSet* m_extraBonus;						///< optional extra per-weapon bonus
 	Int m_clipSize;													///< number of 'shots' in a clip
 	Int m_clipReloadTime;										///< when 'clip' is empty, how long it takes to reload (frames)
+	Int m_clipReloadDelay;									///< GRADUAL only: quiet time after the last shot before rounds start loading (frames)
 	Int m_minDelayBetweenShots;							///< min time allowed between firing single shots (frames)
 	Int m_maxDelayBetweenShots;							///< max time allowed between firing single shots (frames)
 	Int m_continuousFireOneShotsNeeded;			///< How many consecutive shots will give my owner the ContinuousFire Property
