@@ -905,12 +905,19 @@ private:
 	// A GRADUAL clip accrues rounds with the passing frames, so the stored count is only a
 	// baseline; the count callers see must stay a pure function of it, or peers whose client
 	// asks at different frames would disagree.
-	UnsignedInt getAmmoInClipNow() const;
+	Bool isGradualRoundLoading() const { return m_template->isGradualReload() && m_gradualRoundFrames > 0; }
+	// Kept inline: getStatus and getRemainingAmmo run every frame for every armed object, so a
+	// weapon that is not reloading this way must not pay for a call to read its clip.
+	UnsignedInt getAmmoInClipNow() const { return isGradualRoundLoading() ? getAmmoInClipGradual() : m_ammoInClip; }
+	UnsignedInt getAmmoInClipGradual() const;
+	UnsignedInt gradualRoundsElapsed(UnsignedInt now) const;
 	void settleGradualAmmo(UnsignedInt now);
 	void restartGradualRound(UnsignedInt now, const WeaponBonus& bonus);
 	void stopGradualRound() { m_gradualRoundStart = 0; m_gradualRoundFrames = 0; }
 	void beginGradualRoundWait(const Object* sourceObj, const WeaponBonus& bonus, UnsignedInt now);
 	void rescaleGradualRound(UnsignedInt now, const WeaponBonus& bonus);
+	Bool onGradualShotFired(const Object* sourceObj, const WeaponBonus& bonus, UnsignedInt now);
+	void propagateSharedReloadWindow(const Object* sourceObj);
 };
 
 //-------------------------------------------------------------------------------------------------
