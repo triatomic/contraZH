@@ -1357,6 +1357,40 @@ Improvements to make existing generals-power superweapons work correctly over wa
 
 See also [OrbitalBeamUpdate `HitWaterSurface`](#orbitalbeamupdate-new) and the [DeliverPayload `StrafingWeaponTargetsWater`](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Object-Creation-List#deliverpayload) flag.
 
+# Scorch Mark Selection
+
+## ParticleUplinkCannonUpdate
+
+The particle beam used to burn a random scorch decal (`SCORCH_1` to `SCORCH_4`) every time it marked the ground, which
+a mod cannot change. Mods that replace the scorch art with crater-like decals end up with craters punched along the
+beam path. This key picks which decals the beam is allowed to use, or turns them off entirely.
+
+* `ScorchType = SCORCH_1 SCORCH_2 SCORCH_3 SCORCH_4` - (The scorch types the beam may burn. One name always burns that
+type, several pick randomly among just those, and `NONE` burns no scorches at all. Accepts `SCORCH_1`, `SCORCH_2`,
+`SCORCH_3`, `SCORCH_4`, `SHADOW_SCORCH` and `NONE`.)
+
+Example - a beam that only leaves the fourth scorch decal:
+
+```
+Behavior = ParticleUplinkCannonUpdate ModuleTag_12
+  TotalScorchMarks = 20
+  ScorchMarkScalar = 1.0
+  ScorchType       = SCORCH_4   ; New
+End
+```
+
+Omitting `ScorchType` reproduces the original random `SCORCH_1` to `SCORCH_4` behaviour exactly, so data that does not
+mention it is unaffected.
+
+Behaviour notes:
+* `NONE` only suppresses the decal. The beam still counts its scorch marks, still fires its `GroundHitFX` on the same
+rhythm and still reveals the shroud, so the timing of everything else is untouched.
+* `SHADOW_SCORCH` was never reachable before, because the old random pick stopped at `SCORCH_4`. It is only used if you
+name it.
+* The list also takes `+`/`-` prefixes to add or remove single types when INI is layered, e.g. `ScorchType = -SCORCH_1`.
+* The `TerrainScorch` FXList nugget keeps its own `Type` key unchanged; it still accepts `RANDOM` and still has no
+`NONE`.
+
 # Veterancy
 
 ## Veterancy Object Parameters

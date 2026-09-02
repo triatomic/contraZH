@@ -67,6 +67,29 @@ constexpr const Real ORBITAL_BEAM_AUDIO_Z_OFFSET = 500.0f;
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+// Returns a scorch type drawn from the mask, or -1 when the mask asks for no scorch at all.
+//-------------------------------------------------------------------------------------------------
+static Int pickScorchTypeFromMask( UnsignedInt mask )
+{
+	Int candidates[SCORCH_COUNT];
+	Int count = 0;
+	for( Int i = 0; i < SCORCH_COUNT; ++i )
+	{
+		if( mask & (1 << i) )
+		{
+			candidates[count++] = i;
+		}
+	}
+
+	if( count == 0 )
+	{
+		return -1;
+	}
+
+	return candidates[GameClientRandomValue( 0, count - 1 )];
+}
+
+//-------------------------------------------------------------------------------------------------
 ParticleUplinkCannonUpdateModuleData::ParticleUplinkCannonUpdateModuleData()
 {
 	m_specialPowerTemplate					= nullptr;
@@ -79,6 +102,7 @@ ParticleUplinkCannonUpdateModuleData::ParticleUplinkCannonUpdateModuleData()
 	m_totalFiringFrames							= 0;
 	m_totalScorchMarks							= 0;
 	m_scorchMarkScalar							= 1.0f;
+	m_scorchTypeMask								= (1 << SCORCH_1) | (1 << SCORCH_2) | (1 << SCORCH_3) | (1 << SCORCH_4);
 	m_damageRadiusScalar						= 1.0f;
 	m_groundHitFX										= nullptr;
 	m_beamLaunchFX									= nullptr;
@@ -135,6 +159,7 @@ ParticleUplinkCannonUpdateModuleData::ParticleUplinkCannonUpdateModuleData()
 		{ "SwathOfDeathAmplitude",								INI::parseReal,									nullptr, offsetof( ParticleUplinkCannonUpdateModuleData, m_swathOfDeathAmplitude ) },
 		{ "TotalScorchMarks",											INI::parseUnsignedInt,					nullptr, offsetof( ParticleUplinkCannonUpdateModuleData, m_totalScorchMarks ) },
 		{ "ScorchMarkScalar",											INI::parseReal,									nullptr, offsetof( ParticleUplinkCannonUpdateModuleData, m_scorchMarkScalar ) },
+		{ "ScorchType",														INI::parseBitString32,					ScorchNames, offsetof( ParticleUplinkCannonUpdateModuleData, m_scorchTypeMask ) },
 		{ "BeamLaunchFX",													INI::parseFXList,								nullptr, offsetof( ParticleUplinkCannonUpdateModuleData, m_beamLaunchFX ) },
 		{ "DelayBetweenLaunchFX",									INI::parseDurationUnsignedInt,  nullptr, offsetof( ParticleUplinkCannonUpdateModuleData, m_framesBetweenLaunchFXRefresh ) },
 		{ "GroundHitFX",													INI::parseFXList,								nullptr, offsetof( ParticleUplinkCannonUpdateModuleData, m_groundHitFX ) },
@@ -685,8 +710,11 @@ UpdateSleepTime ParticleUplinkCannonUpdate::update()
 				m_scorchMarksMade++;
 
 				//Create the scorch mark now!
-				Scorches scorchID = (Scorches)GameClientRandomValue( SCORCH_1, SCORCH_4 ); //Yes, this is just client fluff!
-				TheGameClient->addScorch( &m_currentTargetPosition, scorchRadius, scorchID );
+				Int scorchID = pickScorchTypeFromMask( data->m_scorchTypeMask ); //Yes, this is just client fluff!
+				if( scorchID >= 0 )
+				{
+					TheGameClient->addScorch( &m_currentTargetPosition, scorchRadius, (Scorches)scorchID );
+				}
 
 				//Calculate next scorch mark frame.
 				Real nextFactor = (Real)m_scorchMarksMade / (Real)data->m_totalScorchMarks;

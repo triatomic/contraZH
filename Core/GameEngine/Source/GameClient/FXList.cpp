@@ -780,11 +780,11 @@ protected:
 	{
 		static const LookupListRec scorchTypeNames[] =
 		{
-			{ "SCORCH_1",				SCORCH_1 },
-			{ "SCORCH_2",				SCORCH_2 },
-			{ "SCORCH_3",				SCORCH_3 },
-			{ "SCORCH_4",				SCORCH_4 },
-			{ "SHADOW_SCORCH",	SHADOW_SCORCH },
+			{ ScorchNames[SCORCH_1],		SCORCH_1 },
+			{ ScorchNames[SCORCH_2],		SCORCH_2 },
+			{ ScorchNames[SCORCH_3],		SCORCH_3 },
+			{ ScorchNames[SCORCH_4],		SCORCH_4 },
+			{ ScorchNames[SHADOW_SCORCH],	SHADOW_SCORCH },
 			{ "RANDOM",					-1 },
 			{ nullptr, 0 }
 		};
