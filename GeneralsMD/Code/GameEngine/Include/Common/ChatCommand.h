@@ -44,6 +44,10 @@ class ChatCommand
 public:
 	ChatCommand() {}
 
+	/** What "AddHealth" grants when the INI leaves the amount out. Far above any unit's own max
+			health, so the default reads as "make this thing unkillable". */
+	static const Real DEFAULT_ADD_HEALTH;
+
 	/** Who "SetSelectedOwner" hands the selection to. The relationship values name the first
 			player holding that relationship to the local player. */
 	enum OwnerTarget CPP_11(: Int)
@@ -72,11 +76,17 @@ public:
 	Int getAddSalvageTier() const { return m_addSalvageTier; }
 	Real getProductionSpeedMultiplier() const { return m_productionSpeedMultiplier; }
 	Int getSetSelectedOwner() const { return m_setSelectedOwner; }
+	Real getAddHealth() const { return m_addHealth; }
+	Bool isAddHealthCommand() const { return m_isAddHealthCommand; }
 
 	/** Run this command's effects. Inspects the parsed members and acts accordingly.
 			"args" is whatever the user typed after the command name, empty when nothing followed.
 			Effects that accept an argument use it in place of their INI value; the rest ignore it. */
 	void execute( const AsciiString& args ) const;
+
+	/** Parser for "AddHealth". Stores the amount and records that the key was present, so the
+			command still works with the default amount when the value is left blank. */
+	static void parseAddHealth( INI *ini, void *instance, void *store, const void *userData );
 
 	/** Parser for "SetSelectedOwner". Takes ENEMIES, NEUTRAL, ALLIES or SELF, and stores it as
 			the owner to hand the selection to. */
@@ -101,6 +111,8 @@ private:
 	Int m_addSalvageTier = 0;				///< "AddSalvageTier" attribute; change selected salvagers' crate-upgrade tier by this much (negative removes), capped 0..2.
 	Real m_productionSpeedMultiplier = 0.0f;	///< "ProductionSpeedMultiplier" attribute; build-speed multiplier for the local player (>1 builds faster). 0 means the field was absent (no change).
 	Int m_setSelectedOwner = OWNER_UNCHANGED;	///< "SetSelectedOwner" attribute; who to give the selected objects to, as an OwnerTarget.
+	Real m_addHealth = DEFAULT_ADD_HEALTH;	///< "AddHealth" attribute; health added to the selected objects' max and current health. Negative takes it away.
+	Bool m_isAddHealthCommand = FALSE;		///< TRUE when "AddHealth" was present at all, blank value included; separates "is a heal command" from "has a default amount".
 
 	static const FieldParse s_fieldParseTable[];
 };

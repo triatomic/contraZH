@@ -49,6 +49,7 @@
 #include "GameLogic/WeaponSetType.h"
 #include "GameLogic/ArmorSet.h"
 #include "GameLogic/Module/BehaviorModule.h"
+#include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 
 //-------------------------------------------------------------------------------------------------
@@ -67,6 +68,7 @@ const FieldParse ChatCommand::s_fieldParseTable[] =
 	{ "AddSalvageTier",			INI::parseInt,			nullptr,	offsetof( ChatCommand, m_addSalvageTier ) },
 	{ "ProductionSpeedMultiplier",	INI::parseReal,		nullptr,	offsetof( ChatCommand, m_productionSpeedMultiplier ) },
 	{ "SetSelectedOwner",		ChatCommand::parseSetSelectedOwner,	nullptr,	0 },
+	{ "AddHealth",				ChatCommand::parseAddHealth,		nullptr,	0 },
 	{ NULL, NULL, 0, 0 }  // keep this last
 };
 
@@ -100,6 +102,21 @@ static void setArmorSalvageTier( Object *obj, Int newTier )
 		obj->setArmorSetFlag( ARMORSET_CRATE_UPGRADE_ONE );
 		obj->setModelConditionState( MODELCONDITION_ARMORSET_CRATEUPGRADE_ONE );
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+const Real ChatCommand::DEFAULT_ADD_HEALTH = 100000.0f;
+
+//-------------------------------------------------------------------------------------------------
+void ChatCommand::parseAddHealth( INI * /*ini*/, void *instance, void * /*store*/, const void * /*userData*/ )
+{
+	ChatCommand *command = (ChatCommand *)instance;
+	const char *token = INI::getNextTokenOrNull();
+
+	// presence of the key is what makes this a heal command; a blank value keeps the default amount
+	if (token != nullptr)
+		command->m_addHealth = (Real)atof( token );
+	command->m_isAddHealthCommand = TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -521,6 +538,31 @@ void ChatCommand::execute( const AsciiString& args ) const
 					else
 						draw->setIndicatorColor( obj->getIndicatorColor() );
 				}
+			}
+		}
+	}
+
+	// AddHealth: raise the selected objects' max health and current health by the same amount, so
+	// the units end up tougher rather than merely topped up. A negative amount takes health away.
+	if (m_isAddHealthCommand && m_addHealth != 0.0f && TheInGameUI)
+	{
+		const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
+		if (selected)
+		{
+			for (DrawableList::const_iterator it = selected->begin(); it != selected->end(); ++it)
+			{
+				Drawable *draw = *it;
+				Object *obj = draw ? draw->getObject() : nullptr;
+				BodyModuleInterface *body = obj ? obj->getBodyModule() : nullptr;
+				if (!body)
+					continue;
+
+				// never take the max below 1, which would leave the object dead on the spot
+				Real newMax = body->getMaxHealth() + m_addHealth;
+				if (newMax < 1.0f)
+					newMax = 1.0f;
+
+				body->setMaxHealth( newMax, ADD_CURRENT_HEALTH_TOO );
 			}
 		}
 	}

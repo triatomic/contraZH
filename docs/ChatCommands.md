@@ -31,6 +31,31 @@ Each command is defined as a `ChatCommand <name> ... End` block. The `<name>` is
 * `AddSalvageTier = 0` - (Change the selected salvagers' crate-upgrade tier by this much; negative removes. Capped 0..2.)
 * `ProductionSpeedMultiplier = 0.0` - (Build-speed multiplier for the local player; > 1 builds faster. 0 means the field is absent / no change.)
 * `SetSelectedOwner = <who>` - (Give the selected objects to another player. One of `ENEMIES`, `NEUTRAL`, `ALLIES` or `SELF`. See [Changing who owns the selection](#changing-who-owns-the-selection).)
+* `AddHealth = 100000` - (Add this much health to the selected objects, raising their maximum as well as their current health; negative takes it away. The value may be left blank to use the default. See [Adding health](#adding-health).)
+
+## Adding health
+
+`AddHealth` raises the maximum health of everything selected and adds the same amount to their
+current health, so the units come out tougher rather than merely repaired.
+
+```
+ChatCommand hp
+  AddHealth =
+End
+```
+
+The amount may be left blank, which uses the default of 100000 - far above any unit's own maximum,
+so the selection becomes effectively unkillable. Give it a smaller number for a realistic buff:
+
+```
+ChatCommand hp1000
+  AddHealth = 1000
+End
+```
+
+A negative amount takes health away instead, though the maximum never drops below 1, since a
+maximum of zero would kill the object where it stands. Anything without a body, such as a piece of
+terrain scenery, is skipped.
 
 ## Changing who owns the selection
 
@@ -101,4 +126,4 @@ With these defined (and `EnableSingleplayerChatwindow = Yes`), typing `/money` i
 
 Notes:
 * Commands run only for the local player, in singleplayer/skirmish. They are intended for testing/debugging and custom cheat setups.
-* `AddVeterancyLevel`, `AddSalvageTier` and `SetSelectedOwner` act on the currently selected units.
+* `AddVeterancyLevel`, `AddSalvageTier`, `SetSelectedOwner` and `AddHealth` act on the currently selected units.
