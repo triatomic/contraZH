@@ -28,6 +28,7 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "Common/AsciiString.h"
+#include "Common/GameCommon.h"
 #include "Common/SubsystemInterface.h"
 #include <vector>
 
@@ -42,6 +43,17 @@ class ChatCommand
 {
 public:
 	ChatCommand() {}
+
+	/** Who "SetSelectedOwner" hands the selection to. The relationship values name the first
+			player holding that relationship to the local player. */
+	enum OwnerTarget CPP_11(: Int)
+	{
+		OWNER_UNCHANGED = -1,	///< the attribute was absent
+		OWNER_ENEMIES = ENEMIES,
+		OWNER_NEUTRAL = NEUTRAL,
+		OWNER_ALLIES = ALLIES,
+		OWNER_SELF				///< the local player, to take objects back
+	};
 
 	const AsciiString& getName() const { return m_name; }
 	void setName( const AsciiString& name ) { m_name = name; }
@@ -59,11 +71,20 @@ public:
 	Int getAddVeterancyLevel() const { return m_addVeterancyLevel; }
 	Int getAddSalvageTier() const { return m_addSalvageTier; }
 	Real getProductionSpeedMultiplier() const { return m_productionSpeedMultiplier; }
+	Int getSetSelectedOwner() const { return m_setSelectedOwner; }
+	Real getAddHealth() const { return m_addHealth; }
+	Bool getKillSelected() const { return m_killSelected; }
+	Bool getKillSelectedPilots() const { return m_killSelectedPilots; }
+	Bool getControlPlayer() const { return m_controlPlayer; }
+	Bool getSubdueSelected() const { return m_subdueSelected; }
 
 	/** Run this command's effects. Inspects the parsed members and acts accordingly.
 			"args" is whatever the user typed after the command name, empty when nothing followed.
 			Effects that accept an argument use it in place of their INI value; the rest ignore it. */
 	void execute( const AsciiString& args ) const;
+
+	/** Parser for "AddHealth". A blank value means the default amount rather than no amount. */
+	static void parseAddHealth( INI *ini, void *instance, void *store, const void *userData );
 
 	/** Parser for "SpawnObjectAtCursor". Stores the name and records that the key was present,
 			which is what marks the command as a spawn command -- the name itself may be left blank
@@ -83,6 +104,12 @@ private:
 	Int m_addVeterancyLevel = 0;			///< "AddVeterancyLevel" attribute; promote selected units by this many veterancy levels (negative demotes), capped to the valid range.
 	Int m_addSalvageTier = 0;				///< "AddSalvageTier" attribute; change selected salvagers' crate-upgrade tier by this much (negative removes), capped 0..2.
 	Real m_productionSpeedMultiplier = 0.0f;	///< "ProductionSpeedMultiplier" attribute; build-speed multiplier for the local player (>1 builds faster). 0 means the field was absent (no change).
+	Int m_setSelectedOwner = OWNER_UNCHANGED;	///< "SetSelectedOwner" attribute; who to give the selected objects to, as an OwnerTarget.
+	Real m_addHealth = 0.0f;				///< "AddHealth" attribute; health added to the selected objects' max and current health, or damage dealt when negative. 0 means the field was absent.
+	Bool m_killSelected = FALSE;			///< "KillSelected" attribute; when TRUE, kill the selected objects outright.
+	Bool m_killSelectedPilots = FALSE;		///< "KillSelectedPilots" attribute; when TRUE, snipe the crew out of the selected vehicles.
+	Bool m_controlPlayer = FALSE;			///< "ControlPlayer" attribute; when TRUE, take control of the player named after the command.
+	Bool m_subdueSelected = FALSE;			///< "SubdueSelected" attribute; when TRUE, fill the selected objects' subdual damage so they sit disabled.
 
 	static const FieldParse s_fieldParseTable[];
 };

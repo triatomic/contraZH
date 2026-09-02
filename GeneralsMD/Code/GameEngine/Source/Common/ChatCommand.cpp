@@ -24,6 +24,8 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/ChatCommand.h"
+#include "Common/GameUtility.h"
+#include "Common/GlobalData.h"
 #include "Common/INI.h"
 #include "Common/Money.h"
 #include "Common/Player.h"
@@ -48,10 +50,25 @@
 #include "GameLogic/WeaponSetType.h"
 #include "GameLogic/ArmorSet.h"
 #include "GameLogic/Module/BehaviorModule.h"
+#include "GameLogic/Damage.h"
+#include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 
 //-------------------------------------------------------------------------------------------------
 ChatCommandStore* TheChatCommandStore = nullptr;
+
+// Names accepted by "SetSelectedOwner", in OwnerTarget order starting at OWNER_ENEMIES.
+static const char *TheChatCommandOwnerNames[] =
+{
+	"ENEMIES",
+	"NEUTRAL",
+	"ALLIES",
+	"SELF",
+	nullptr
+};
+
+// What "AddHealth" grants when the INI leaves the amount out, past any unit's own max health.
+static const Real DEFAULT_ADD_HEALTH = 100000.0f;
 
 const FieldParse ChatCommand::s_fieldParseTable[] =
 {
@@ -65,6 +82,12 @@ const FieldParse ChatCommand::s_fieldParseTable[] =
 	{ "AddVeterancyLevel",		INI::parseInt,			nullptr,	offsetof( ChatCommand, m_addVeterancyLevel ) },
 	{ "AddSalvageTier",			INI::parseInt,			nullptr,	offsetof( ChatCommand, m_addSalvageTier ) },
 	{ "ProductionSpeedMultiplier",	INI::parseReal,		nullptr,	offsetof( ChatCommand, m_productionSpeedMultiplier ) },
+	{ "SetSelectedOwner",		INI::parseIndexList,	TheChatCommandOwnerNames,	offsetof( ChatCommand, m_setSelectedOwner ) },
+	{ "AddHealth",				ChatCommand::parseAddHealth,		nullptr,	0 },
+	{ "KillSelected",			INI::parseBool,			nullptr,	offsetof( ChatCommand, m_killSelected ) },
+	{ "KillSelectedPilots",		INI::parseBool,			nullptr,	offsetof( ChatCommand, m_killSelectedPilots ) },
+	{ "ControlPlayer",			INI::parseBool,			nullptr,	offsetof( ChatCommand, m_controlPlayer ) },
+	{ "SubdueSelected",			INI::parseBool,			nullptr,	offsetof( ChatCommand, m_subdueSelected ) },
 	{ NULL, NULL, 0, 0 }  // keep this last
 };
 
@@ -98,6 +121,111 @@ static void setArmorSalvageTier( Object *obj, Int newTier )
 		obj->setArmorSetFlag( ARMORSET_CRATE_UPGRADE_ONE );
 		obj->setModelConditionState( MODELCONDITION_ARMORSET_CRATEUPGRADE_ONE );
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+void ChatCommand::parseAddHealth( INI * /*ini*/, void *instance, void * /*store*/, const void * /*userData*/ )
+{
+	ChatCommand *command = (ChatCommand *)instance;
+	const char *token = INI::getNextTokenOrNull();
+
+	command->m_addHealth = (token != nullptr) ? INI::scanReal( token ) : DEFAULT_ADD_HEALTH;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Snapshot the selection, since giving an object away or killing it changes what is selected.
+static void gatherSelectedObjects( std::vector<Object *>& objects )
+{
+	const DrawableList *selected = TheInGameUI ? TheInGameUI->getAllSelectedDrawables() : nullptr;
+	if (selected == nullptr)
+		return;
+
+	for (DrawableList::const_iterator it = selected->begin(); it != selected->end(); ++it)
+	{
+		Drawable *draw = *it;
+		Object *obj = draw ? draw->getObject() : nullptr;
+		if (obj)
+			objects.push_back( obj );
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+// Deal damage to everything selected, skipping what is already dead.
+static void damageSelectedObjects( DamageType damageType, Real amount )
+{
+	std::vector<Object *> objects;
+	gatherSelectedObjects( objects );
+
+	for (std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); ++it)
+	{
+		Object *obj = *it;
+		if (obj->isEffectivelyDead())
+			continue;
+
+		DamageInfo damageInfo;
+		damageInfo.in.m_damageType = damageType;
+		damageInfo.in.m_deathType = DEATH_NORMAL;
+		damageInfo.in.m_sourceID = INVALID_ID;
+		damageInfo.in.m_amount = amount;
+		obj->attemptDamage( &damageInfo );
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+// The player "ControlPlayer" hands control to, named by slot number or by name.
+static Player *findPlayerForChatCommand( const AsciiString& name )
+{
+	if (ThePlayerList == nullptr || name.isEmpty())
+		return nullptr;
+
+	// a number picks by slot, counting the playable players from 1: slot 0 is always the neutral player
+	if (isdigit( (unsigned char)name.getCharAt( 0 ) ))
+	{
+		Int wanted = atoi( name.str() );
+		if (wanted < 1 || wanted >= ThePlayerList->getPlayerCount())
+			return nullptr;
+		return ThePlayerList->getNthPlayer( wanted );
+	}
+
+	Player *player = ThePlayerList->findPlayerWithNameKey( NAMEKEY( name ) );
+	return (player != ThePlayerList->getNeutralPlayer()) ? player : nullptr;
+}
+
+//-------------------------------------------------------------------------------------------------
+// The player "SetSelectedOwner" hands the selection to: the local player for SELF, the neutral
+// player for NEUTRAL, otherwise the first player holding that relationship to the local player.
+static Player *findOwnerForChatCommand( Int ownerTarget )
+{
+	if (ThePlayerList == nullptr)
+		return nullptr;
+
+	if (ownerTarget == ChatCommand::OWNER_SELF)
+		return ThePlayerList->getLocalPlayer();
+
+	if (ownerTarget == ChatCommand::OWNER_NEUTRAL)
+		return ThePlayerList->getNeutralPlayer();
+
+	const Player *localPlayer = ThePlayerList->getLocalPlayer();
+	if (localPlayer == nullptr)
+		return nullptr;
+
+	const Player *neutralPlayer = ThePlayerList->getNeutralPlayer();
+	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+	{
+		Player *player = ThePlayerList->getNthPlayer( i );
+		if (player == nullptr || player == localPlayer)
+			continue;
+		// the neutral player is everyone's neutral, and NEUTRAL was already answered above
+		if (player == neutralPlayer)
+			continue;
+		// setTeam bounces objects given to a defeated player back to neutral, so skip them here
+		if (!player->isPlayerActive())
+			continue;
+		if (localPlayer->getRelationship( player->getDefaultTeam() ) == (Relationship)ownerTarget)
+			return player;
+	}
+
+	return nullptr;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -407,6 +535,124 @@ void ChatCommand::execute( const AsciiString& args ) const
 			player->setProductionSpeedMultiplier( m_productionSpeedMultiplier );
 			if (TheControlBar)
 				TheControlBar->markUIDirty();
+		}
+	}
+
+	// SetSelectedOwner: hand the selected objects to another player. The selection is dropped
+	// first, because the local player may not own what it ends up with.
+	if (m_setSelectedOwner != OWNER_UNCHANGED && TheInGameUI)
+	{
+		Player *newOwner = findOwnerForChatCommand( m_setSelectedOwner );
+		Team *newTeam = newOwner ? newOwner->getDefaultTeam() : nullptr;
+		if (newTeam == nullptr)
+		{
+			// a skirmish with no teammate has nobody to be allied with, which is worth saying out loud
+			TheInGameUI->message( UnicodeString( L"No player to give the selection to." ) );
+		}
+		else
+		{
+			std::vector<Object *> objects;
+			gatherSelectedObjects( objects );
+
+			if (!objects.empty())
+				TheInGameUI->deselectAllDrawables();
+
+			for (std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); ++it)
+			{
+				Object *obj = *it;
+				obj->setTeam( newTeam );
+
+				// setTeam leaves these to the caller, as updateTeamAndPlayerStuff in ScriptActions.cpp does
+				obj->updateUpgradeModules();
+				Drawable *draw = obj->getDrawable();
+				if (draw)
+				{
+					if (TheGlobalData->m_timeOfDay == TIME_OF_DAY_NIGHT)
+						draw->setIndicatorColor( obj->getNightIndicatorColor() );
+					else
+						draw->setIndicatorColor( obj->getIndicatorColor() );
+				}
+			}
+		}
+	}
+
+	// AddHealth: raise the selected objects' max health and current health by the same amount, so
+	// the units end up tougher rather than merely topped up. Damage takes the ordinary damage path
+	// instead, because setMaxHealth only clamps health and never runs the death sequence.
+	if (m_addHealth < 0.0f && TheInGameUI)
+	{
+		damageSelectedObjects( DAMAGE_UNRESISTABLE, -m_addHealth );
+	}
+	else if (m_addHealth > 0.0f && TheInGameUI)
+	{
+		std::vector<Object *> objects;
+		gatherSelectedObjects( objects );
+
+		for (std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); ++it)
+		{
+			BodyModuleInterface *body = (*it)->getBodyModule();
+			if (body != nullptr)
+			{
+				body->setMaxHealth( body->getMaxHealth() + m_addHealth, ADD_CURRENT_HEALTH_TOO );
+			}
+		}
+	}
+
+	// SubdueSelected: the pool an EMP fills. Unresistable because armor scales the vehicle and
+	// building subdual types, and can shrug the pulse off entirely.
+	if (m_subdueSelected && TheInGameUI)
+	{
+		damageSelectedObjects( DAMAGE_SUBDUAL_UNRESISTABLE, HUGE_DAMAGE_AMOUNT );
+	}
+
+	// KillSelectedPilots: the same damage Jarmen Kell's shot deals, which ActiveBody acts on itself.
+	if (m_killSelectedPilots && TheInGameUI)
+	{
+		damageSelectedObjects( DAMAGE_KILLPILOT, 0.0f );
+	}
+
+	// KillSelected: kill the selected objects outright.
+	if (m_killSelected && TheInGameUI)
+	{
+		std::vector<Object *> objects;
+		gatherSelectedObjects( objects );
+
+		std::vector<Object *> killable;
+		for (std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); ++it)
+		{
+			Object *obj = *it;
+			const BodyModuleInterface *body = obj->getBodyModule();
+			// an InactiveBody cannot be killed, and asserts if asked
+			if (!obj->isEffectivelyDead() && body && body->getMaxHealth() > 0.0f)
+				killable.push_back( obj );
+		}
+
+		if (!killable.empty())
+			TheInGameUI->deselectAllDrawables();
+
+		for (std::vector<Object *>::iterator it = killable.begin(); it != killable.end(); ++it)
+			(*it)->kill();
+	}
+
+	// ControlPlayer: changeLocalPlayer moves the shroud, radar and control bar along with the controls.
+	if (m_controlPlayer && TheInGameUI)
+	{
+		Player *player = findPlayerForChatCommand( args );
+		if (player != nullptr)
+		{
+			rts::changeLocalPlayer( player );
+		}
+		else if (args.isEmpty())
+		{
+			TheInGameUI->message( UnicodeString( L"Name the player to control, by number or name." ) );
+		}
+		else
+		{
+			UnicodeString wanted;
+			wanted.translate( args );
+			UnicodeString msg;
+			msg.format( L"No player '%s' to control.", wanted.str() );
+			TheInGameUI->message( msg );
 		}
 	}
 
