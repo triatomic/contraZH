@@ -1387,9 +1387,6 @@ Behaviour notes:
 rhythm and still reveals the shroud, so the timing of everything else is untouched.
 * `SHADOW_SCORCH` was never reachable before, because the old random pick stopped at `SCORCH_4`. It is only used if you
 name it.
-* The list also takes `+`/`-` prefixes to add or remove single types when INI is layered, e.g. `ScorchType = -SCORCH_1`.
-* The `TerrainScorch` FXList nugget keeps its own `Type` key unchanged; it still accepts `RANDOM` and still has no
-`NONE`.
 
 # Veterancy
 

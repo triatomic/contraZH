@@ -66,7 +66,6 @@ constexpr const Real ORBITAL_BEAM_Z_OFFSET = 3500.0f;
 constexpr const Real ORBITAL_BEAM_AUDIO_Z_OFFSET = 500.0f;
 
 //-------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------
 // Returns a scorch type drawn from the mask, or -1 when the mask asks for no scorch at all.
 //-------------------------------------------------------------------------------------------------
 static Int pickScorchTypeFromMask( UnsignedInt mask )
@@ -86,7 +85,7 @@ static Int pickScorchTypeFromMask( UnsignedInt mask )
 		return -1;
 	}
 
-	return candidates[GameClientRandomValue( 0, count - 1 )];
+	return candidates[GameClientRandomValue( 0, count - 1 )]; //Yes, this is just client fluff!
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -102,6 +101,7 @@ ParticleUplinkCannonUpdateModuleData::ParticleUplinkCannonUpdateModuleData()
 	m_totalFiringFrames							= 0;
 	m_totalScorchMarks							= 0;
 	m_scorchMarkScalar							= 1.0f;
+	// The types the beam picked from before this was configurable; SHADOW_SCORCH was never one of them.
 	m_scorchTypeMask								= (1 << SCORCH_1) | (1 << SCORCH_2) | (1 << SCORCH_3) | (1 << SCORCH_4);
 	m_damageRadiusScalar						= 1.0f;
 	m_groundHitFX										= nullptr;
@@ -710,7 +710,7 @@ UpdateSleepTime ParticleUplinkCannonUpdate::update()
 				m_scorchMarksMade++;
 
 				//Create the scorch mark now!
-				Int scorchID = pickScorchTypeFromMask( data->m_scorchTypeMask ); //Yes, this is just client fluff!
+				Int scorchID = pickScorchTypeFromMask( data->m_scorchTypeMask );
 				if( scorchID >= 0 )
 				{
 					TheGameClient->addScorch( &m_currentTargetPosition, scorchRadius, (Scorches)scorchID );
