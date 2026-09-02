@@ -2553,6 +2553,11 @@ void MilesAudioManager::processPlayingList()
 
 	if (m_volumeHasChanged) {
 		m_volumeHasChanged = false;
+
+		// TheSuperHackers @bugfix Push speech volume changes because Bink movie audio bypasses the Miles mixer.
+		if (TheVideoPlayer) {
+			TheVideoPlayer->setVolume(getVolume(AudioAffect_Speech));
+		}
 	}
 }
 
