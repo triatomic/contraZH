@@ -156,8 +156,11 @@ static Player *findOwnerForChatCommand( Int ownerTarget )
 		Player *player = ThePlayerList->getNthPlayer( i );
 		if (player == nullptr || player == localPlayer)
 			continue;
-		// skip the neutral player, which is every player's neutral and never a real opponent
+		// the neutral player is everyone's neutral, and NEUTRAL was already answered above
 		if (player == ThePlayerList->getNeutralPlayer())
+			continue;
+		// setTeam bounces objects given to a defeated player back to neutral, so skip them here
+		if (!player->isPlayerActive())
 			continue;
 		if (localPlayer->getRelationship( player->getDefaultTeam() ) == (Relationship)ownerTarget)
 			return player;
@@ -477,12 +480,18 @@ void ChatCommand::execute( const AsciiString& args ) const
 	}
 
 	// SetSelectedOwner: hand the selected objects to another player. The selection is dropped
-	// first, because objects the local player no longer owns must not stay selected.
+	// first, because the local player may not own what it ends up with.
 	if (m_setSelectedOwner != OWNER_UNCHANGED && TheInGameUI)
 	{
 		Player *newOwner = findOwnerForChatCommand( m_setSelectedOwner );
 		Team *newTeam = newOwner ? newOwner->getDefaultTeam() : nullptr;
-		const DrawableList *selected = TheInGameUI->getAllSelectedLocalDrawables();
+		if (newTeam == nullptr)
+		{
+			// a skirmish with no teammate has nobody to be allied with, which is worth saying out loud
+			TheInGameUI->message( UnicodeString( L"No player to give the selection to." ) );
+		}
+		// every selected object, not just the ones owned locally, so an object already given away can be taken back
+		const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
 		if (newTeam && selected)
 		{
 			std::vector<Object *> objects;
