@@ -8,7 +8,6 @@ option(RTS_BUILD_OPTION_PROFILE_TRACY "Build code with Tracy profiling enabled."
 option(RTS_BUILD_OPTION_DEBUG "Build code with the \"Debug\" configuration." OFF)
 option(RTS_BUILD_OPTION_ASAN "Build code with Address Sanitizer." OFF)
 option(RTS_BUILD_OPTION_VC6_FULL_DEBUG "Build VC6 with full debug info." OFF)
-option(RTS_BUILD_OPTION_FFMPEG "Enable FFmpeg support" OFF)
 option(RTS_BUILD_GENERALS_ONLINE "Build the Generals Online services stack for Zero Hour (replaces GameSpy online when ON)" OFF)
 option(RTS_GENERALS_ONLINE_60HZ "Run the Generals Online simulation at 60 Hz like the official client; OFF runs the classic 30 Hz" ON)
 
