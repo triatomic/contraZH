@@ -1492,6 +1492,37 @@ Behavior = ChronoSphereUpdate ModuleTag_Chrono
 End
 ```
 
+## TeleportSelfSpecialPower (New)
+
+Special power update module that teleports its own object to a clicked ground position. This is the activated-ability counterpart to [TeleporterAIUpdate](#teleporteraiupdate-new---experimental), which instead replaces all normal movement with teleporting; a unit with this module walks normally the rest of the time.
+
+Pair it with a `SpecialPowerModule` (or `SpecialAbility`) that sets `UpdateModuleStartsAttack = Yes`, otherwise the power triggers itself and a rejected click still consumes the recharge. The `SpecialPower` entry needs `BehaviorEnum = SPECIAL_JUMPJET`, which supplies the position-only validation (no water, no cliffs).
+
+```
+Behavior = TeleportSelfSpecialPower ModuleTag_Teleport
+  SpecialPowerTemplate = <SpecialPower entry>
+  MaxTeleportRange = 0.0       ; furthest the object may teleport, 0 = unlimited
+  TeleportDelay = 0            ; ms between activation and the teleport happening
+  TeleportStartFX = <FXList>   ; FX at the position we left
+  TeleportTargetFX = <FXList>  ; FX at the position we arrived at
+
+  ; Recovery is off entirely unless RecoverDuration is set
+  RecoverDuration = 0          ; ms the unit is immobilized after landing
+  TeleportRecoverEndFX = <FXList>             ; FX when the recovery finishes
+  TeleportRecoverSoundAmbient = <AudioEvent>  ; looped while recovering
+  TeleportRecoverTint = <TintStatus>          ; color tint applied while recovering
+  TeleportRecoverCondition = <ModelCondition> ; e.g. TELEPORT_RECOVER
+  TeleportRecoverOpacityStart = 100%          ; opacity when the recovery starts
+  TeleportRecoverOpacityEnd = 100%            ; opacity when the recovery ends
+End
+```
+
+Notes:
+* The destination is validated when the order is given and again when it fires, so a spot that becomes blocked during `TeleportDelay` cancels the teleport rather than stranding the unit.
+* An unaffordable `Cost`, a dead/garrisoned/disabled caster, or an invalid destination all refuse the order without consuming the recharge.
+* `RecoverDuration` uses `DISABLED_TELEPORT_RECOVER`, which genuinely immobilizes the unit. Because any disable pauses special power countdowns, the effective cooldown becomes `ReloadTime` + `RecoverDuration`.
+* Do **not** set `KINDOF_TELEPORTER` on a unit using this module - that KindOf excludes units from group speed, leader selection and column formations, which would break normal squad movement.
+
 ## MultiLocationSpecialPowerUpdate (New)
 
 Special power update that can create objects/OCLs at multiple resolved map locations (e.g. edges relative to the source/target). Used together with the [multi-target CommandButton](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/SpecialPowers#multi-target-special-powers) fields.

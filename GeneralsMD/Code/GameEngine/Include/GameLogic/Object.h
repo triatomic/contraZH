@@ -630,6 +630,9 @@ public:
 	void setDisabledUntil( DisabledType type, UnsignedInt frame );
 	Bool isDisabledByType( DisabledType type ) const { return TEST_DISABLEDMASK( m_disabledMask, type ); }
 
+	/// mid-teleport, either moving by teleport or recovering from a teleport ability
+	Bool isTeleporting() const { return isDisabledByType( DISABLED_TELEPORT ) || isDisabledByType( DISABLED_TELEPORT_RECOVER ); }
+
 	UnsignedInt getDisabledUntil( DisabledType type = DISABLED_ANY ) const;
 
 	void pauseAllSpecialPowers( const Bool disabling ) const;
