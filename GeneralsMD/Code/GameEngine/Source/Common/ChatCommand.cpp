@@ -24,6 +24,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/ChatCommand.h"
+#include "Common/GlobalData.h"
 #include "Common/INI.h"
 #include "Common/Money.h"
 #include "Common/Player.h"
@@ -497,7 +498,21 @@ void ChatCommand::execute( const AsciiString& args ) const
 				TheInGameUI->deselectAllDrawables();
 
 			for (std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); ++it)
-				(*it)->setTeam( newTeam );
+			{
+				Object *obj = *it;
+				obj->setTeam( newTeam );
+
+				// setTeam leaves these two to the caller, the same way the script transfer action does
+				obj->updateUpgradeModules();
+				Drawable *draw = obj->getDrawable();
+				if (draw)
+				{
+					if (TheGlobalData->m_timeOfDay == TIME_OF_DAY_NIGHT)
+						draw->setIndicatorColor( obj->getNightIndicatorColor() );
+					else
+						draw->setIndicatorColor( obj->getIndicatorColor() );
+				}
+			}
 		}
 	}
 
