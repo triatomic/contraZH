@@ -49,6 +49,7 @@
 #include "GameLogic/WeaponSetType.h"
 #include "GameLogic/ArmorSet.h"
 #include "GameLogic/Module/BehaviorModule.h"
+#include "GameLogic/Damage.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 
@@ -69,6 +70,7 @@ const FieldParse ChatCommand::s_fieldParseTable[] =
 	{ "ProductionSpeedMultiplier",	INI::parseReal,		nullptr,	offsetof( ChatCommand, m_productionSpeedMultiplier ) },
 	{ "SetSelectedOwner",		ChatCommand::parseSetSelectedOwner,	nullptr,	0 },
 	{ "AddHealth",				ChatCommand::parseAddHealth,		nullptr,	0 },
+	{ "KillSelected",			INI::parseBool,			nullptr,	offsetof( ChatCommand, m_killSelected ) },
 	{ NULL, NULL, 0, 0 }  // keep this last
 };
 
@@ -543,27 +545,70 @@ void ChatCommand::execute( const AsciiString& args ) const
 	}
 
 	// AddHealth: raise the selected objects' max health and current health by the same amount, so
-	// the units end up tougher rather than merely topped up. A negative amount takes health away.
+	// the units end up tougher rather than merely topped up. A negative amount damages them instead,
+	// through the ordinary damage path, so that a lethal amount kills properly rather than parking
+	// the object at zero health: setMaxHealth only clamps, it never runs the death sequence.
 	if (m_isAddHealthCommand && m_addHealth != 0.0f && TheInGameUI)
 	{
 		const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
 		if (selected)
 		{
+			std::vector<Object *> objects;
 			for (DrawableList::const_iterator it = selected->begin(); it != selected->end(); ++it)
 			{
 				Drawable *draw = *it;
 				Object *obj = draw ? draw->getObject() : nullptr;
-				BodyModuleInterface *body = obj ? obj->getBodyModule() : nullptr;
-				if (!body)
+				if (obj && obj->getBodyModule())
+					objects.push_back( obj );
+			}
+
+			for (std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); ++it)
+			{
+				Object *obj = *it;
+				BodyModuleInterface *body = obj->getBodyModule();
+
+				if (m_addHealth > 0.0f)
+				{
+					body->setMaxHealth( body->getMaxHealth() + m_addHealth, ADD_CURRENT_HEALTH_TOO );
+					continue;
+				}
+
+				if (obj->isEffectivelyDead())
 					continue;
 
-				// never take the max below 1, which would leave the object dead on the spot
-				Real newMax = body->getMaxHealth() + m_addHealth;
-				if (newMax < 1.0f)
-					newMax = 1.0f;
-
-				body->setMaxHealth( newMax, ADD_CURRENT_HEALTH_TOO );
+				DamageInfo damageInfo;
+				damageInfo.in.m_damageType = DAMAGE_UNRESISTABLE;
+				damageInfo.in.m_deathType = DEATH_NORMAL;
+				damageInfo.in.m_sourceID = INVALID_ID;
+				damageInfo.in.m_amount = -m_addHealth;
+				body->attemptDamage( &damageInfo );
 			}
+		}
+	}
+
+	// KillSelected: kill the selected objects outright, the way the hand-of-god debug cheat does.
+	// The selection is dropped first, since the drawables are about to go away.
+	if (m_killSelected && TheInGameUI)
+	{
+		const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
+		if (selected)
+		{
+			std::vector<Object *> objects;
+			for (DrawableList::const_iterator it = selected->begin(); it != selected->end(); ++it)
+			{
+				Drawable *draw = *it;
+				Object *obj = draw ? draw->getObject() : nullptr;
+				// an InactiveBody cannot be killed, and asserts if asked
+				if (obj && !obj->isEffectivelyDead() && obj->getBodyModule()
+						&& obj->getBodyModule()->getMaxHealth() > 0.0f)
+					objects.push_back( obj );
+			}
+
+			if (!objects.empty())
+				TheInGameUI->deselectAllDrawables();
+
+			for (std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); ++it)
+				(*it)->kill();
 		}
 	}
 

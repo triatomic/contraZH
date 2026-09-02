@@ -31,7 +31,8 @@ Each command is defined as a `ChatCommand <name> ... End` block. The `<name>` is
 * `AddSalvageTier = 0` - (Change the selected salvagers' crate-upgrade tier by this much; negative removes. Capped 0..2.)
 * `ProductionSpeedMultiplier = 0.0` - (Build-speed multiplier for the local player; > 1 builds faster. 0 means the field is absent / no change.)
 * `SetSelectedOwner = <who>` - (Give the selected objects to another player. One of `ENEMIES`, `NEUTRAL`, `ALLIES` or `SELF`. See [Changing who owns the selection](#changing-who-owns-the-selection).)
-* `AddHealth = 100000` - (Add this much health to the selected objects, raising their maximum as well as their current health; negative takes it away. The value may be left blank to use the default. See [Adding health](#adding-health).)
+* `AddHealth = 100000` - (Add this much health to the selected objects, raising their maximum as well as their current health; a negative amount damages them instead. The value may be left blank to use the default. See [Adding health](#adding-health).)
+* `KillSelected = No` - (If Yes, kill the selected objects outright.)
 
 ## Adding health
 
@@ -53,9 +54,17 @@ ChatCommand hp1000
 End
 ```
 
-A negative amount takes health away instead, though the maximum never drops below 1, since a
-maximum of zero would kill the object where it stands. Anything without a body, such as a piece of
-terrain scenery, is skipped.
+A negative amount damages the selection instead, as ordinary unresistable damage, so an amount
+larger than what the object has left kills it properly - with its death animation, explosion and
+score - rather than parking it at zero health:
+
+```
+ChatCommand hurt
+  AddHealth = -1000
+End
+```
+
+Anything without a body, such as a piece of terrain scenery, is skipped.
 
 ## Changing who owns the selection
 
@@ -126,4 +135,5 @@ With these defined (and `EnableSingleplayerChatwindow = Yes`), typing `/money` i
 
 Notes:
 * Commands run only for the local player, in singleplayer/skirmish. They are intended for testing/debugging and custom cheat setups.
-* `AddVeterancyLevel`, `AddSalvageTier`, `SetSelectedOwner` and `AddHealth` act on the currently selected units.
+* `AddVeterancyLevel`, `AddSalvageTier`, `SetSelectedOwner`, `AddHealth` and `KillSelected` act on the currently selected units.
+* `KillSelected` is the same kill the `DEMO_TOGGLE_HAND_OF_GOD_MODE` debug key performs, but it needs no debug build and takes the whole selection at once.

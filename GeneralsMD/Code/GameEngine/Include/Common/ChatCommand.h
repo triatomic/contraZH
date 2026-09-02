@@ -77,6 +77,7 @@ public:
 	Real getProductionSpeedMultiplier() const { return m_productionSpeedMultiplier; }
 	Int getSetSelectedOwner() const { return m_setSelectedOwner; }
 	Real getAddHealth() const { return m_addHealth; }
+	Bool getKillSelected() const { return m_killSelected; }
 	Bool isAddHealthCommand() const { return m_isAddHealthCommand; }
 
 	/** Run this command's effects. Inspects the parsed members and acts accordingly.
@@ -113,6 +114,7 @@ private:
 	Int m_setSelectedOwner = OWNER_UNCHANGED;	///< "SetSelectedOwner" attribute; who to give the selected objects to, as an OwnerTarget.
 	Real m_addHealth = DEFAULT_ADD_HEALTH;	///< "AddHealth" attribute; health added to the selected objects' max and current health. Negative takes it away.
 	Bool m_isAddHealthCommand = FALSE;		///< TRUE when "AddHealth" was present at all, blank value included; separates "is a heal command" from "has a default amount".
+	Bool m_killSelected = FALSE;			///< "KillSelected" attribute; when TRUE, kill the selected objects outright.
 
 	static const FieldParse s_fieldParseTable[];
 };
