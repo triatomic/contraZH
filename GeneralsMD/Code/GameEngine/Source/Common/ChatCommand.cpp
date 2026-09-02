@@ -87,6 +87,7 @@ const FieldParse ChatCommand::s_fieldParseTable[] =
 	{ "KillSelected",			INI::parseBool,			nullptr,	offsetof( ChatCommand, m_killSelected ) },
 	{ "KillSelectedPilots",		INI::parseBool,			nullptr,	offsetof( ChatCommand, m_killSelectedPilots ) },
 	{ "ControlPlayer",			INI::parseBool,			nullptr,	offsetof( ChatCommand, m_controlPlayer ) },
+	{ "SubdueSelected",			INI::parseBool,			nullptr,	offsetof( ChatCommand, m_subdueSelected ) },
 	{ NULL, NULL, 0, 0 }  // keep this last
 };
 
@@ -591,6 +592,30 @@ void ChatCommand::execute( const AsciiString& args ) const
 				damageInfo.in.m_amount = -m_addHealth;
 				obj->attemptDamage( &damageInfo );
 			}
+		}
+	}
+
+	// SubdueSelected: fill the subdual damage pool, which is what an EMP does. ActiveBody clamps the
+	// amount to the object's own SubdualDamageCap, so this holds for as long as its data allows, and
+	// leaves alone anything that cannot be subdued at all.
+	if (m_subdueSelected && TheInGameUI)
+	{
+		std::vector<Object *> objects;
+		gatherSelectedObjects( objects );
+
+		for (std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); ++it)
+		{
+			Object *obj = *it;
+			if (obj->isEffectivelyDead())
+				continue;
+
+			DamageInfo damageInfo;
+			// the vehicle and building types are scaled by armor, which can shrug the pulse off entirely
+			damageInfo.in.m_damageType = DAMAGE_SUBDUAL_UNRESISTABLE;
+			damageInfo.in.m_deathType = DEATH_NORMAL;
+			damageInfo.in.m_sourceID = INVALID_ID;
+			damageInfo.in.m_amount = HUGE_DAMAGE_AMOUNT;
+			obj->attemptDamage( &damageInfo );
 		}
 	}
 

@@ -76,6 +76,7 @@ public:
 	Bool getKillSelected() const { return m_killSelected; }
 	Bool getKillSelectedPilots() const { return m_killSelectedPilots; }
 	Bool getControlPlayer() const { return m_controlPlayer; }
+	Bool getSubdueSelected() const { return m_subdueSelected; }
 
 	/** Run this command's effects. Inspects the parsed members and acts accordingly.
 			"args" is whatever the user typed after the command name, empty when nothing followed.
@@ -108,6 +109,7 @@ private:
 	Bool m_killSelected = FALSE;			///< "KillSelected" attribute; when TRUE, kill the selected objects outright.
 	Bool m_killSelectedPilots = FALSE;		///< "KillSelectedPilots" attribute; when TRUE, snipe the crew out of the selected vehicles.
 	Bool m_controlPlayer = FALSE;			///< "ControlPlayer" attribute; when TRUE, take control of the player named after the command.
+	Bool m_subdueSelected = FALSE;			///< "SubdueSelected" attribute; when TRUE, fill the selected objects' subdual damage so they sit disabled.
 
 	static const FieldParse s_fieldParseTable[];
 };
