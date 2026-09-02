@@ -35,7 +35,7 @@ Each command is defined as a `ChatCommand <name> ... End` block. The `<name>` is
 * `KillSelected = No` - (Acts on the selection. If Yes, kill the selected objects outright.)
 * `KillSelectedPilots = No` - (Acts on the selection. If Yes, kill the crew of the selected vehicles, leaving them unmanned. See [Sniping the crew](#sniping-the-crew).)
 * `ControlPlayer = No` - (If Yes, take control of the player named after the command. See [Controlling another player](#controlling-another-player).)
-* `SubdueSelected = No` - (Acts on the selection. If Yes, disable the selected objects the way an EMP does, for as long as their own data allows. See [Disabling with an EMP](#disabling-with-an-emp).)
+* `SubdueSelected = No` - (Acts on the selection. If Yes, disable the selected objects the way an EMP does. See [Disabling with an EMP](#disabling-with-an-emp).)
 
 ## Adding health
 
@@ -73,17 +73,16 @@ ChatCommand control
 End
 ```
 
-The player is named after the command, either by number - counting the playable players from 1, as
-the score screen lists them - or by name:
+The player is named after the command, either by number - counting the playable players from 1, in
+the order the map defines them - or by name:
 
 ```
 /control 2
 /control PlyrChina
 ```
 
-`/control` on its own reports that it needs a name, and an unknown name says so. The neutral player
-that owns the map's civilian objects cannot be controlled. Switch back the same way, with your own
-number.
+The neutral player that owns the map's civilian objects cannot be controlled. Switch back the same
+way, with your own number.
 
 ## Disabling with an EMP
 

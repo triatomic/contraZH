@@ -150,33 +150,45 @@ static void gatherSelectedObjects( std::vector<Object *>& objects )
 }
 
 //-------------------------------------------------------------------------------------------------
-// The player "ControlPlayer" hands control to, named by the slot number shown in the score screen
-// or by the player's name. Skips the neutral player, which owns the map's civilian objects.
+// Deal damage to everything selected, skipping what is already dead.
+static void damageSelectedObjects( DamageType damageType, Real amount )
+{
+	std::vector<Object *> objects;
+	gatherSelectedObjects( objects );
+
+	for (std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); ++it)
+	{
+		Object *obj = *it;
+		if (obj->isEffectivelyDead())
+			continue;
+
+		DamageInfo damageInfo;
+		damageInfo.in.m_damageType = damageType;
+		damageInfo.in.m_deathType = DEATH_NORMAL;
+		damageInfo.in.m_sourceID = INVALID_ID;
+		damageInfo.in.m_amount = amount;
+		obj->attemptDamage( &damageInfo );
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+// The player "ControlPlayer" hands control to, named by slot number or by name.
 static Player *findPlayerForChatCommand( const AsciiString& name )
 {
 	if (ThePlayerList == nullptr || name.isEmpty())
 		return nullptr;
 
-	const Player *neutralPlayer = ThePlayerList->getNeutralPlayer();
-
-	// a number picks by slot, counting the playable players from 1 the way the score screen does
+	// a number picks by slot, counting the playable players from 1: slot 0 is always the neutral player
 	if (isdigit( (unsigned char)name.getCharAt( 0 ) ))
 	{
 		Int wanted = atoi( name.str() );
-		Int slot = 0;
-		for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
-		{
-			Player *player = ThePlayerList->getNthPlayer( i );
-			if (player == nullptr || player == neutralPlayer)
-				continue;
-			if (++slot == wanted)
-				return player;
-		}
-		return nullptr;
+		if (wanted < 1 || wanted >= ThePlayerList->getPlayerCount())
+			return nullptr;
+		return ThePlayerList->getNthPlayer( wanted );
 	}
 
 	Player *player = ThePlayerList->findPlayerWithNameKey( NAMEKEY( name ) );
-	return (player != neutralPlayer) ? player : nullptr;
+	return (player != ThePlayerList->getNeutralPlayer()) ? player : nullptr;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -567,78 +579,36 @@ void ChatCommand::execute( const AsciiString& args ) const
 	// AddHealth: raise the selected objects' max health and current health by the same amount, so
 	// the units end up tougher rather than merely topped up. Damage takes the ordinary damage path
 	// instead, because setMaxHealth only clamps health and never runs the death sequence.
-	if (m_addHealth != 0.0f && TheInGameUI)
+	if (m_addHealth < 0.0f && TheInGameUI)
+	{
+		damageSelectedObjects( DAMAGE_UNRESISTABLE, -m_addHealth );
+	}
+	else if (m_addHealth > 0.0f && TheInGameUI)
 	{
 		std::vector<Object *> objects;
 		gatherSelectedObjects( objects );
 
 		for (std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); ++it)
 		{
-			Object *obj = *it;
-			BodyModuleInterface *body = obj->getBodyModule();
-			if (body == nullptr)
-				continue;
-
-			if (m_addHealth > 0.0f)
+			BodyModuleInterface *body = (*it)->getBodyModule();
+			if (body != nullptr)
 			{
 				body->setMaxHealth( body->getMaxHealth() + m_addHealth, ADD_CURRENT_HEALTH_TOO );
 			}
-			else if (!obj->isEffectivelyDead())
-			{
-				DamageInfo damageInfo;
-				damageInfo.in.m_damageType = DAMAGE_UNRESISTABLE;
-				damageInfo.in.m_deathType = DEATH_NORMAL;
-				damageInfo.in.m_sourceID = INVALID_ID;
-				damageInfo.in.m_amount = -m_addHealth;
-				obj->attemptDamage( &damageInfo );
-			}
 		}
 	}
 
-	// SubdueSelected: fill the subdual damage pool, which is what an EMP does. ActiveBody clamps the
-	// amount to the object's own SubdualDamageCap, so this holds for as long as its data allows, and
-	// leaves alone anything that cannot be subdued at all.
+	// SubdueSelected: the pool an EMP fills. Unresistable because armor scales the vehicle and
+	// building subdual types, and can shrug the pulse off entirely.
 	if (m_subdueSelected && TheInGameUI)
 	{
-		std::vector<Object *> objects;
-		gatherSelectedObjects( objects );
-
-		for (std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); ++it)
-		{
-			Object *obj = *it;
-			if (obj->isEffectivelyDead())
-				continue;
-
-			DamageInfo damageInfo;
-			// the vehicle and building types are scaled by armor, which can shrug the pulse off entirely
-			damageInfo.in.m_damageType = DAMAGE_SUBDUAL_UNRESISTABLE;
-			damageInfo.in.m_deathType = DEATH_NORMAL;
-			damageInfo.in.m_sourceID = INVALID_ID;
-			damageInfo.in.m_amount = HUGE_DAMAGE_AMOUNT;
-			obj->attemptDamage( &damageInfo );
-		}
+		damageSelectedObjects( DAMAGE_SUBDUAL_UNRESISTABLE, HUGE_DAMAGE_AMOUNT );
 	}
 
-	// KillSelectedPilots: snipe the crew, the same damage Jarmen Kell's shot deals. ActiveBody does
-	// the work and ignores the amount, leaving anything that is not a vehicle untouched.
+	// KillSelectedPilots: the same damage Jarmen Kell's shot deals, which ActiveBody acts on itself.
 	if (m_killSelectedPilots && TheInGameUI)
 	{
-		std::vector<Object *> objects;
-		gatherSelectedObjects( objects );
-
-		for (std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); ++it)
-		{
-			Object *obj = *it;
-			if (obj->isEffectivelyDead())
-				continue;
-
-			DamageInfo damageInfo;
-			damageInfo.in.m_damageType = DAMAGE_KILLPILOT;
-			damageInfo.in.m_deathType = DEATH_NORMAL;
-			damageInfo.in.m_sourceID = INVALID_ID;
-			damageInfo.in.m_amount = 0.0f;
-			obj->attemptDamage( &damageInfo );
-		}
+		damageSelectedObjects( DAMAGE_KILLPILOT, 0.0f );
 	}
 
 	// KillSelected: kill the selected objects outright.
@@ -664,17 +634,13 @@ void ChatCommand::execute( const AsciiString& args ) const
 			(*it)->kill();
 	}
 
-	// ControlPlayer: hand the player's own controls to another player, so their base and units can
-	// be driven directly. rts::changeLocalPlayer moves the shroud, radar and control bar with it.
+	// ControlPlayer: changeLocalPlayer moves the shroud, radar and control bar along with the controls.
 	if (m_controlPlayer && TheInGameUI)
 	{
 		Player *player = findPlayerForChatCommand( args );
 		if (player != nullptr)
 		{
 			rts::changeLocalPlayer( player );
-			UnicodeString msg;
-			msg.format( L"Now controlling %s.", player->getPlayerDisplayName().str() );
-			TheInGameUI->message( msg );
 		}
 		else if (args.isEmpty())
 		{
