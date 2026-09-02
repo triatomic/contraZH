@@ -27,30 +27,22 @@ Each command is defined as a `ChatCommand <name> ... End` block. The `<name>` is
 * `TogglePrerequisites = No` - (If Yes, toggles ignoring unit/building build prerequisites. Science requirements still apply.)
 * `ToggleInfiniteEnergy = No` - (If Yes, toggles infinite power for the local player.)
 * `GrantAllUpgrades = No` - (If Yes, grants the local player all player-type upgrades.)
-* `AddVeterancyLevel = 0` - (Promote the selected units by this many veterancy levels; negative demotes. Capped to the valid range.)
-* `AddSalvageTier = 0` - (Change the selected salvagers' crate-upgrade tier by this much; negative removes. Capped 0..2.)
+* `AddVeterancyLevel = 0` - (Acts on the selection. Promote the selected units by this many veterancy levels; negative demotes. Capped to the valid range.)
+* `AddSalvageTier = 0` - (Acts on the selection. Change the selected salvagers' crate-upgrade tier by this much; negative removes. Capped 0..2.)
 * `ProductionSpeedMultiplier = 0.0` - (Build-speed multiplier for the local player; > 1 builds faster. 0 means the field is absent / no change.)
-* `SetSelectedOwner = <who>` - (Give the selected objects to another player. One of `ENEMIES`, `NEUTRAL`, `ALLIES` or `SELF`. See [Changing who owns the selection](#changing-who-owns-the-selection).)
-* `AddHealth = 100000` - (Add this much health to the selected objects, raising their maximum as well as their current health; a negative amount damages them instead. The value may be left blank to use the default. See [Adding health](#adding-health).)
-* `KillSelected = No` - (If Yes, kill the selected objects outright.)
+* `SetSelectedOwner = <who>` - (Acts on the selection. Give the selected objects to another player. One of `ENEMIES`, `NEUTRAL`, `ALLIES` or `SELF`. See [Changing who owns the selection](#changing-who-owns-the-selection).)
+* `AddHealth = 100000` - (Acts on the selection. Add this much health, raising the maximum as well as the current health; a negative amount damages instead. The value may be left blank to use the default. See [Adding health](#adding-health).)
+* `KillSelected = No` - (Acts on the selection. If Yes, kill the selected objects outright.)
 
 ## Adding health
 
 `AddHealth` raises the maximum health of everything selected and adds the same amount to their
-current health, so the units come out tougher rather than merely repaired.
+current health, so the units come out tougher rather than merely repaired. Leaving the amount blank
+uses the default, which is past any unit's own maximum and so makes the selection unkillable:
 
 ```
 ChatCommand hp
   AddHealth =
-End
-```
-
-The amount may be left blank, which uses the default of 100000 - far above any unit's own maximum,
-so the selection becomes effectively unkillable. Give it a smaller number for a realistic buff:
-
-```
-ChatCommand hp1000
-  AddHealth = 1000
 End
 ```
 
@@ -135,5 +127,8 @@ With these defined (and `EnableSingleplayerChatwindow = Yes`), typing `/money` i
 
 Notes:
 * Commands run only for the local player, in singleplayer/skirmish. They are intended for testing/debugging and custom cheat setups.
-* `AddVeterancyLevel`, `AddSalvageTier`, `SetSelectedOwner`, `AddHealth` and `KillSelected` act on the currently selected units.
-* `KillSelected` is the same kill the `DEMO_TOGGLE_HAND_OF_GOD_MODE` debug key performs, but it needs no debug build and takes the whole selection at once.
+* The fields marked "acts on the selection" above read the whole selection, including objects the
+player does not own, so a unit given away with `SetSelectedOwner` can be selected and handed back.
+* `KillSelected` performs the same kill as the hand-of-god debug mode, which reaches it through a
+message that only exists in a debug build. The chat command calls it directly, so it works in a
+release build and takes the whole selection at once.
