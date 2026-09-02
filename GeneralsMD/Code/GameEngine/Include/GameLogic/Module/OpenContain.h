@@ -44,6 +44,7 @@
 #include "Common/KindOf.h"
 #include "Common/GameMemory.h"
 #include "Common/ModelState.h"
+#include <vector>
 
 // ------------------------------------------------------------------------------------------------
 enum { CONTAIN_MAX_UNKNOWN = -1 };  // means we don't care, infinite, unassigned, whatever
@@ -59,6 +60,7 @@ public:
 	AudioEventRTS m_enterSound;			///< sound to play on entering
 	AudioEventRTS m_exitSound;			///< sound to play on exiting
 	Bool m_passengersAllowedToFire;	///< Can the passengers shoot out of us?
+	Bool m_acceptTargetsForPassengers;	///< can we be ordered to attack what only our passengers' weapons can hit?
 	Bool m_passengersInTurret;			///< The Firepoint bones are in our turret, not our chassis
 	Int m_numberOfExitPaths;				///< Will alternate through ExitStart/End paths as we exit people.
 	Real m_damagePercentageToUnits;
@@ -66,6 +68,8 @@ public:
 	UnsignedInt m_doorOpenTime;
 	KindOfMaskType m_allowInsideKindOf;			///< objects must have at least one of these kind of bits set to be contained by us
 	KindOfMaskType m_forbidInsideKindOf;		///< objects must have NONE of these kind of bits set to be contained by us
+	std::vector<AsciiString> m_allowInsideObjects;	///< if not empty, only these objects may be contained by us, whatever their KindOfs
+	std::vector<AsciiString> m_forbidInsideObjects;	///< these objects may never be contained by us, whatever their KindOfs
 	Bool m_weaponBonusPassedToPassengers;		///< Do our passengers get to use our weapon bonuses?
  	Bool m_allowAlliesInside;				///< allow allies inside us
  	Bool m_allowEnemiesInside;			///< allow enemies inside us
@@ -75,6 +79,11 @@ public:
 
 	OpenContainModuleData( void );
 	static void buildFieldParse(MultiIniFieldParse& p);
+
+	/// Does the object name pass AllowInsideObjects/ForbidInsideObjects? Containers whose
+	/// isValidContainerFor() does not chain to OpenContain's (TunnelContain, CaveContain)
+	/// call this directly, so the two keys mean the same thing everywhere.
+	Bool isObjectAllowedInside( const Object *obj ) const;
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -162,6 +171,7 @@ public:
   virtual void harmAndForceExitAllContained( DamageInfo *info ) override; // apply canned damage against those contains
 	virtual Bool isEnclosingContainerFor( const Object *obj ) const override;	///< Does this type of Contain Visibly enclose its contents?
 	virtual Bool isPassengerAllowedToFire( ObjectID id = INVALID_ID ) const override;	///< Hey, can I shoot out of this container?
+	virtual Bool acceptsTargetsForPassengers() const override { return getOpenContainModuleData()->m_acceptTargetsForPassengers; }
 
   virtual void setPassengerAllowedToFire( Bool permission = TRUE ) override { m_passengerAllowedToFire = permission; }	///< Hey, can I shoot out of this container?
 

@@ -82,7 +82,9 @@ typedef struct {
 	Short tileIndex; // Tile texture.
 } TCliffInfo;
 
-#define NUM_TEXTURE_CLASSES 256
+// TheSuperHackers @feature Palette size, unrelated to NUM_SOURCE_TILES. Was 256,
+// too few for mods (Contra defines 309 terrain types).
+#define NUM_TEXTURE_CLASSES 1024
 
 
 class TextureClass;
@@ -124,6 +126,8 @@ public:
 		NORMAL_DRAW_HEIGHT = 1 + 4*VERTEX_BUFFER_TILE_LENGTH,
 		LOW_ANGLE_DRAW_WIDTH = 1 + (NORMAL_DRAW_WIDTH-1) * 2,
 		LOW_ANGLE_DRAW_HEIGHT = 1 + (NORMAL_DRAW_HEIGHT-1) * 2,
+		FREE_CAM_DRAW_WIDTH = 1 + (NORMAL_DRAW_WIDTH-1) * 4,
+		FREE_CAM_DRAW_HEIGHT = 1 + (NORMAL_DRAW_HEIGHT-1) * 4,
 	};
 
 protected:

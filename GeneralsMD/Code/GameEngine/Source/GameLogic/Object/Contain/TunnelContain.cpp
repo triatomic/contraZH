@@ -299,6 +299,14 @@ Bool TunnelContain::isContained( const Object *obj ) const
 //-------------------------------------------------------------------------------------------------
 Bool TunnelContain::isValidContainerFor(const Object* obj, Bool checkCapacity) const
 {
+	// The tunnel network answers for capacity and the rest, but it is shared by every tunnel
+	// the player owns and carries no module data, so the by-name lists have to be applied here,
+	// per building, before we hand the question over.
+	if( getTunnelContainModuleData()->isObjectAllowedInside( obj ) == FALSE )
+	{
+		return false;
+	}
+
 	Player *owningPlayer = getObject()->getControllingPlayer();
 	if( owningPlayer && owningPlayer->getTunnelSystem() )
 	{

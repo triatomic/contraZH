@@ -80,6 +80,12 @@ public:
 		m_scoutRange = 0;
 		m_scoutWanderRange = 0;
 		m_distToTargetToGrantRangeBonus = 0;
+#if !PRESERVE_SLAVED_DRONE_CHASE
+		// TheSuperHackers @bugfix triatomic 01/09/2026 m_repairRange was left uninitialized, so
+		// moveToNewRepairSpot read indeterminate memory and could desync. Gated because retail's
+		// garbage value is almost never zero, so retail always takes that branch and draws two randoms.
+		m_repairRange = 0;
+#endif
 		m_repairRatePerSecond = 0.0f;
 		m_repairWhenHealthBelowPercentage = 0;
 		m_repairMinAltitude = 0.0f;
@@ -162,6 +168,7 @@ public:
 	void setRepairState( RepairStates repairState );
 	void setRepairModelConditionStates( ModelConditionFlagType flag );
 	void moveToNewRepairSpot();
+	Bool isBeyondLeash( const Object *master ) const;	///< Have I strayed further from my master than I am ever allowed to?
 
 	virtual UpdateSleepTime update() override;	///< Deciding whether or not to make new guys
 

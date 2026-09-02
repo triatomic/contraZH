@@ -125,6 +125,12 @@ public:
 	/// Replace the skybox texture
 	virtual void replaceSkyboxTextures(const AsciiString *oldTexName[NumSkyboxTextures], const AsciiString *newTexName[NumSkyboxTextures]) override;
 
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	virtual UnsignedInt cycleSkyboxPreset() override;
+	virtual UnsignedInt cycleTerrainHideMode() override;
+	virtual UnsignedInt getTerrainHideMode() const override { return m_terrainHideMode; }
+#endif
+
   ////////////////////////////////////////////////////
   ////////////////////////////////////////////////////
   ////////////////////////////////////////////////////
@@ -178,5 +184,12 @@ protected:
 
   AsciiString	m_currentSkyboxTexNames[NumSkyboxTextures];	///<store current texture names applied to skybox.
 	AsciiString m_initialSkyboxTexNames[NumSkyboxTextures];	///<store starting texture/default skybox textures.
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	UnsignedInt m_skyboxPresetIndex;	///< 0 = the skybox the map started with, then the presets
+	AsciiString m_cheatDefaultSkyboxTexNames[NumSkyboxTextures];	///< the sky preset 0 goes back to: what the map showed before the first cycle (map.ini overrides included), NOT m_initialSkyboxTexNames, which predates those overrides
+	UnsignedInt m_terrainHideMode;		///< 0 normal, 1 hidden over black, 2 hidden over green
+	Bool m_skyboxMapDrawFlag;				///< the map's own DrawSkyBox flag, restored on preset 0
+#endif
 
 };

@@ -226,6 +226,9 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "CHEAT_SHOW_COMMAND_SET",									  GameMessage::MSG_CHEAT_SHOW_COMMAND_SET },
 	{ "CHEAT_SHOW_WEAPON_SET",									  GameMessage::MSG_CHEAT_SHOW_WEAPON_SET },
 	{ "CHEAT_SHOW_ARMOR_SET",									  GameMessage::MSG_CHEAT_SHOW_ARMOR_SET },
+	{ "CHEAT_CYCLE_CAMERA_MODE",							  GameMessage::MSG_CHEAT_CYCLE_CAMERA_MODE },
+	{ "CHEAT_CYCLE_SKYBOX",									  GameMessage::MSG_CHEAT_CYCLE_SKYBOX },
+	{ "CHEAT_CYCLE_TERRAIN_MODE",							  GameMessage::MSG_CHEAT_CYCLE_TERRAIN_MODE },
 	{ "CHEAT_ADD_CASH",									          GameMessage::MSG_CHEAT_ADD_CASH },
 	{ "CHEAT_GIVE_ALL_SCIENCES",					        GameMessage::MSG_CHEAT_GIVE_ALL_SCIENCES },
   { "CHEAT_GIVE_SCIENCEPURCHASEPOINTS",        	GameMessage::MSG_CHEAT_GIVE_SCIENCEPURCHASEPOINTS },
@@ -1012,6 +1015,45 @@ void MetaMap::generateMetaMap()
 		if (map->m_key == MK_NONE)
 		{
 			map->m_key = MK_SLASH;
+			map->m_transition = DOWN;
+			map->m_modState = CTRL;
+			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
+		}
+	}
+	{
+		// Cycle the camera cheat: default -> free camera -> chase the selected object -> default.
+		// Plain Delete is unbound in the engine defaults, in Contra's CommandMap.ini and in the
+		// demo map, and a focused text entry field consumes it in WindowXlat before it gets here.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_CYCLE_CAMERA_MODE);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_DEL;
+			map->m_transition = DOWN;
+			map->m_modState = NONE;
+			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
+		}
+	}
+	{
+		// Cycle the skybox through the preset texture sets shipped with the game. Ctrl+Home,
+		// because the shipped CommandMap.ini already binds Ctrl+D (DEMO_DEBUG_SELECTION) and
+		// the meta translator fires every record matching a keystroke.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_CYCLE_SKYBOX);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_HOME;
+			map->m_transition = DOWN;
+			map->m_modState = CTRL;
+			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
+		}
+	}
+	{
+		// Cycle the terrain: normal, hidden over black, hidden over green for chroma keying.
+		// Ctrl+End, because the shipped CommandMap.ini already binds Ctrl+X
+		// (DEMO_TOGGLE_HURT_ME_MODE) and the meta translator fires every matching record.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_CYCLE_TERRAIN_MODE);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_END;
 			map->m_transition = DOWN;
 			map->m_modState = CTRL;
 			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);

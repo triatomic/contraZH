@@ -749,6 +749,23 @@ Bool ActionManager::canEnterObject( const Object *obj, const Object *objectToEnt
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+/** Does the object hold any weapon a player command may fire? Weapons whose command-source mask
+  * excludes the player (AutoChoosesSources) must not light the attack cursor -- Kris's
+  * Demo_GLAInfantryWorker passive-bomb case. One test for the container and its riders alike. */
+// ------------------------------------------------------------------------------------------------
+static Bool hasAnyPlayerUsableWeapon( const Object *obj )
+{
+	for( Int i = 0; i < WEAPONSLOT_COUNT; i++ )
+	{
+		if( obj->getWeaponInWeaponSlotCommandSourceMask( (WeaponSlotType)i ) )
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 CanAttackResult ActionManager::getCanAttackObject( const Object *obj, const Object *objectToAttack, CommandSourceType commandSource, AbleToAttackType attackType )
 {
 
@@ -779,17 +796,7 @@ CanAttackResult ActionManager::getCanAttackObject( const Object *obj, const Obje
 		if( commandSource == CMD_FROM_PLAYER )
 		{
 			//Check if it's got any weapons that can be used.
-			Bool anyValidWeapon = FALSE;
-			for( Int i = 0; i < WEAPONSLOT_COUNT;	i++ )
-			{
-				UnsignedInt cmdSourceMask = obj->getWeaponInWeaponSlotCommandSourceMask( (WeaponSlotType)i );
-				if( cmdSourceMask )
-				{
-					anyValidWeapon = TRUE;
-					break;
-				}
-			}
-			if( !anyValidWeapon )
+			if( !hasAnyPlayerUsableWeapon( obj ) )
 			{
 				return ATTACKRESULT_NOT_POSSIBLE;
 			}
@@ -842,6 +849,82 @@ CanAttackResult ActionManager::getCanAttackObject( const Object *obj, const Obje
         }
       }
     }
+	}
+
+	// The container itself cannot attack this target. If its contain module accepts targets on
+	// behalf of its passengers -- an addon turret being the case this exists for -- ask them:
+	// whoever answers best speaks for the container, so the cursor and the order gate agree with
+	// what the turret will actually do. This replaces the dummy-weapon workaround, and unlike the
+	// KINDOF_SPAWNS_ARE_THE_WEAPONS branch above it is an opt-in module flag with no side effects.
+	// Only the sources whose orders actually reach the riders may take the riders' answer:
+	// TransportAIUpdate forwards attack orders for player and script commands alone, and AIGroup's
+	// member forwarding is likewise only fed by those two. Answering for CMD_FROM_AI would approve
+	// orders nothing executes and turn AIEnterState's clean failure into a silent no-op.
+	ContainModuleInterface *contain = obj->getContain();
+	if( contain && contain->acceptsTargetsForPassengers() && contain->isPassengerAllowedToFire()
+			&& ( commandSource == CMD_FROM_PLAYER || commandSource == CMD_FROM_SCRIPT ) )
+	{
+		CanAttackResult best = ATTACKRESULT_NOT_POSSIBLE;
+
+		const ContainedItemsList *lists[] = { contain->getContainedItemsList(), contain->getAddOnList() };
+		if( lists[ 1 ] == lists[ 0 ] )
+		{
+			// OverlordContain and DroneCarrierContain alias their add-on list to the contain list;
+			// without this the same riders would be evaluated twice per query.
+			lists[ 1 ] = nullptr;
+		}
+		for( Int listIndex = 0; listIndex < 2; ++listIndex )
+		{
+			if( lists[ listIndex ] == nullptr )
+			{
+				continue;
+			}
+
+			for( ContainedItemsList::const_iterator it = lists[ listIndex ]->begin(); it != lists[ listIndex ]->end(); ++it )
+			{
+				const Object *rider = *it;
+				if( rider == nullptr || rider->isEffectivelyDead() )
+				{
+					continue;
+				}
+
+				// A disabled turret answers for nobody. Same set of disables the attack order
+				// forwarding in TransportAIUpdate checks before telling a rider to fire.
+				if( rider->isDisabledByType( DISABLED_HACKED )
+						|| rider->isDisabledByType( DISABLED_EMP )
+						|| rider->isDisabledByType( DISABLED_SUBDUED )
+						|| rider->isDisabledByType( DISABLED_PARALYZED ) )
+				{
+					continue;
+				}
+
+				if( !rider->isAbleToAttack() )
+				{
+					continue;
+				}
+
+				// Mirror the player-command gate above: a weapon the player cannot fire must not
+				// light the cursor either.
+				if( commandSource == CMD_FROM_PLAYER && !hasAnyPlayerUsableWeapon( rider ) )
+				{
+					continue;
+				}
+
+				// CanAttackResult is ordered worst to best, so keep the best answer.
+				CanAttackResult riderResult = rider->getAbleToAttackSpecificObject( attackType, objectToAttack, commandSource );
+				if( riderResult > best )
+				{
+					best = riderResult;
+					if( best == ATTACKRESULT_POSSIBLE )
+					{
+						// The enum's maximum: no other rider can answer better.
+						return best;
+					}
+				}
+			}
+		}
+
+		return best;
 	}
 
 	return ATTACKRESULT_NOT_POSSIBLE;
@@ -1848,12 +1931,22 @@ Bool ActionManager::canDoSpecialPowerAtObject( const Object *obj, const Object *
 			}
 
 			case SPECIAL_MISSILE_DEFENDER_LASER_GUIDED_MISSILES:
-				//Can only use laser guided missiles on vehicles!
-				if( target->isKindOf( KINDOF_VEHICLE ) && r == ENEMIES )
+			{
+				// TheSuperHackers @feature triatomic 01/09/2026 Which kinds may be targeted used to be
+				// hardcoded to vehicles, and vehicle in Zero Hour covers aircraft too. Ask the module
+				// instead, so the rule lives in INI and agrees with the abort check in
+				// SpecialAbilityUpdate. The enemy only test moved into the module too, as
+				// TargetRelationship, so allowing allies takes both NEED_TARGET_ALLY_OBJECT on the
+				// button and the key on the module. Keeping it in the module rather than here means
+				// it also covers the paths that never see the button, and is re-checked while the
+				// lock is held.
+				const SpecialAbilityUpdate *spUpdate = obj->findSpecialAbilityUpdate( spTemplate->getSpecialPowerType() );
+				if( spUpdate && spUpdate->isValidLaserLockTarget( target ) )
 				{
 					return true;
 				}
 				break;
+			}
 
 			case SPECIAL_HACKER_DISABLE_BUILDING:
 				//Can only disable buildings...

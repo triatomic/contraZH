@@ -2778,13 +2778,17 @@ void Player::doBountyForKill(const Object* killer, const Object* victim)
 		m_scoreKeeper.addMoneyEarned( bounty );
 
 		//Display cash income floating over the recipient.
-		UnicodeString moneyString;
-		moneyString.format( TheGameText->fetch( "GUI:AddCash" ), bounty );
-		Coord3D pos;
-		pos.zero();
-		pos.add( *killer->getPosition() );
-		pos.z += 10.0f; //add a little z to make it show up above the unit.
-		TheInGameUI->addFloatingText( moneyString, &pos, GameMakeColor( 255, 255, 0, 255 ) );
+		if( killer->isLogicallyVisible() )
+		{
+			// OY LOOK!  I AM USING LOCAL PLAYER.  Do not put anything other than TheInGameUI->addFloatingText in the block this controls!!!
+			UnicodeString moneyString;
+			moneyString.format( TheGameText->fetch( "GUI:AddCash" ), bounty );
+			Coord3D pos;
+			pos.zero();
+			pos.add( *killer->getPosition() );
+			pos.z += 10.0f; //add a little z to make it show up above the unit.
+			TheInGameUI->addFloatingText( moneyString, &pos, GameMakeColor( 255, 255, 0, 255 ) );
+		}
 	}
 }
 

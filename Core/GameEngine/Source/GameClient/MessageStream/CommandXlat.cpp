@@ -70,6 +70,7 @@
 #include "GameClient/ControlBar.h"
 #include "GameClient/SelectionInfo.h"
 #include "GameClient/SelectionXlat.h"
+#include "GameClient/TerrainVisual.h"
 
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/ExperienceTracker.h"
@@ -4143,6 +4144,103 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			TheInGameUI->messageNoFormat( TheInGameUI->isArmorSetOverlayOn()
 				? TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugArmorSetOverlayOn", L"Armor is ON")
 				: TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugArmorSetOverlayOff", L"Armor is OFF") );
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
+		// Cycle the camera cheat: default -> free camera -> chase the selected object -> default.
+		// Purely a view change on this client, like the overlays above, so it carries no
+		// multiplayer guard. The selection is resolved here and handed to the view so the view
+		// stays independent of the UI.
+		case GameMessage::MSG_CHEAT_CYCLE_CAMERA_MODE:
+		{
+			ObjectID selectedID = INVALID_ID;
+			for( Drawable *draw = TheGameClient->firstDrawable(); draw; draw = draw->getNextDrawable() )
+			{
+				if( draw->isSelected() && draw->getObject() )
+				{
+					selectedID = draw->getObject()->getID();
+					break;
+				}
+			}
+
+			TheTacticalView->cycleCameraMode( selectedID );
+
+			const char *stateKey;
+			const WideChar *stateText;
+			if( !TheTacticalView->isCameraCheatModeActive() )
+			{
+				stateKey = "GUI:DebugCameraDefault";
+				stateText = L"Camera: Default";
+			}
+			else if( TheTacticalView->isCameraChaseModeActive() )
+			{
+				stateKey = "GUI:DebugCameraChase";
+				stateText = L"Camera: Chase";
+			}
+			else if( TheTacticalView->isCameraPerspectiveModeActive() )
+			{
+				stateKey = "GUI:DebugCameraPerspective";
+				stateText = L"Camera: Perspective";
+			}
+			else if( TheTacticalView->isCameraOrthoModeActive() )
+			{
+				stateKey = "GUI:DebugCameraOrtho";
+				stateText = L"Camera: Orthographic";
+			}
+			else
+			{
+				stateKey = "GUI:DebugCameraFree";
+				stateText = L"Camera: Free";
+			}
+			TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE(stateKey, stateText) );
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
+		// Cycle the skybox through the preset texture sets: the one the map started with, then
+		// each shipped set. Purely a texture swap on this client.
+		case GameMessage::MSG_CHEAT_CYCLE_SKYBOX:
+		{
+			const UnsignedInt preset = TheTerrainVisual ? TheTerrainVisual->cycleSkyboxPreset() : 0;
+
+			switch (preset)
+			{
+				case 1:
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugSkyboxMorning", L"Skybox: Morning") );
+					break;
+				case 2:
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugSkyboxMoon", L"Skybox: Moon") );
+					break;
+				default:
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugSkyboxMapDefault", L"Skybox: Map Default") );
+					break;
+			}
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
+		// Cycle the terrain draw mode: normal, hidden over black, hidden over green -- a green
+		// screen for capturing units. Purely a draw change on this client.
+		case GameMessage::MSG_CHEAT_CYCLE_TERRAIN_MODE:
+		{
+			const UnsignedInt mode = TheTerrainVisual ? TheTerrainVisual->cycleTerrainHideMode() : 0;
+
+			switch (mode)
+			{
+				case 1:
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugTerrainBlack", L"Terrain: Black") );
+					break;
+				case 2:
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugTerrainGreen", L"Terrain: Green Screen") );
+					break;
+				default:
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugTerrainNormal", L"Terrain: Normal") );
+					break;
+			}
 
 			disp = DESTROY_MESSAGE;
 			break;

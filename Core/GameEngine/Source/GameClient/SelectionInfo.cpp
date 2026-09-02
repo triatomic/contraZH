@@ -292,6 +292,16 @@ extern Bool contextCommandForNewSelection(const DrawableList *currentlySelectedD
 //-------------------------------------------------------------------------------------------------
 UnsignedInt getPickTypesForContext( Bool forceAttackMode )
 {
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// CapsLock in a camera mode turns the cursor into a pick anything tool: clicks may hit
+	// every drawable class, shrubbery and mines and force-attackables included.
+	if (TheTacticalView && TheTacticalView->isCameraCheatModeActive()
+			&& (GetKeyState(VK_CAPITAL) & 0x0001) != 0)
+	{
+		return PICK_TYPE_ALL_DRAWABLES | PICK_TYPE_CHEAT_ANYTHING;
+	}
+#endif
+
 	UnsignedInt types = PICK_TYPE_SELECTABLE;
 
 	if (forceAttackMode)
@@ -388,6 +398,23 @@ Bool addDrawableToList( Drawable *draw, void *userData )
 	PickDrawableStruct *pds = (PickDrawableStruct *) userData;
 #if defined(RTS_DEBUG)
 	if (TheGlobalData->m_allowUnselectableSelection) {
+		pds->drawableListToFill->push_back(draw);
+		return TRUE;
+	}
+#endif
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// CapsLock in a camera mode: the drag box takes everything with an object, same as the
+	// debug allow-unselectable flag. The kindof match and builder filters below are gameplay
+	// rules; this is a camera tool. Fog and stealth stay honest though -- what the player
+	// cannot see must not enter the selection, or the box doubles as a maphack.
+	if (pds->drawableListToFill && draw->getObject()
+			&& TheTacticalView && TheTacticalView->isCameraCheatModeActive()
+			&& (GetKeyState(VK_CAPITAL) & 0x0001) != 0)
+	{
+		if (draw->getFullyObscuredByShroud() || draw->isDrawableEffectivelyHidden())
+		{
+			return FALSE;
+		}
 		pds->drawableListToFill->push_back(draw);
 		return TRUE;
 	}

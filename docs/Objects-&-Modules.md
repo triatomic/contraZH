@@ -376,6 +376,72 @@ Setting `PassengerWeaponBonusList = None` will override the default value.
 
 Note: HelixContain grants GARRISONED to its passengers in vanilla ZH. This is changed to CONTAINED. To restore vanilla behaviour you will need to manually set the bonus here.
 
+### Targeting through addon turrets
+
+A unit whose weapons live on a contained addon turret (an OverlordContain or MultiAddOnContain
+rider) could not be ordered to attack anything only the turret can hit -- the cursor showed a red
+cross, and the workaround was a dummy weapon on the carrier with the turret's range. This key
+replaces the dummy weapon. It works on every contain module except TunnelContain and CaveContain,
+where it parses but stays inert: their contained list is the player's whole shared network, so
+the answers would come from units sitting at other entrances.
+
+* `AcceptTargetsForPassengers = No` - (Yes lets the container accept attack orders on behalf of its
+passengers: when the container's own weapons cannot attack a target, the passengers' weapons are
+asked instead, and their best answer drives the cursor and the order. Requires
+`PassengersAllowedToFire = Yes`.)
+
+```
+Behavior = OverlordContain ModuleTag_Turret
+  Slots                     = 1
+  AllowInsideKindOf         = PORTABLE_STRUCTURE
+  PassengersAllowedToFire   = Yes
+  PassengersInTurret        = Yes
+  PayloadTemplateName       = AmericaThorTurretBolt
+  AcceptTargetsForPassengers = Yes   ; New
+End
+```
+
+Behaviour notes:
+* When the order is given, the turret is told to attack (the engine already forwards attack orders
+to firing passengers); the carrier's own guns do not try to aim at a target they cannot attack.
+* A turret that is EMP'd, hacked, subdued or paralyzed does not answer for the carrier.
+* The turret cannot move, so a target beyond its range shows the out-of-range cursor rather than a
+green attack cursor -- the carrier does not automatically drive into range. Keep a dummy weapon if
+you want the carrier to approach on its own.
+
+### Filtering by object name
+
+`AllowInsideKindOf` and `ForbidInsideKindOf` can only speak in whole KindOfs. These two name
+individual objects instead, and work on every contain module -- TunnelContain, TransportContain,
+GarrisonContain, CaveContain, OverlordContain, HelixContain and the rest.
+
+* `ForbidInsideObjects = <object list>` - (These objects can never enter. Checked first, so it
+beats everything else, including `AllowInsideObjects`.)
+* `AllowInsideObjects = <object list>` - (If set, ONLY these objects may enter, whatever their
+KindOfs say. Leave it out to allow everything the other filters permit.)
+
+Example -- a tunnel network that refuses one specific unit:
+```
+Behavior = TunnelContain ModuleTag_05
+  TimeForFullHeal = 5000
+  ForbidInsideObjects = Aslt_GLAInfantryHijacker
+End
+```
+
+Example -- a transport that carries nothing but two named units:
+```
+Behavior = TransportContain ModuleTag_07
+  ContainMax = 4
+  AllowInsideObjects = Aslt_GLAInfantryJarmenKell Aslt_GLAInfantryHijacker
+End
+```
+
+Both keys take several names per line and append across repeated lines, so a long list can be
+split up. Matching is on the object name and ignores case.
+
+Note: these filters decide whether a unit may *enter*. They do not evict anyone already inside,
+so changing them does not affect units that are already loaded.
+
 ## StickyBombUpdate#
 
 Added new parameters to customize the 2D anim visuals:
@@ -502,6 +568,50 @@ Notes:
 * ParkedUnitsDamageScalar can be used to apply an upgrade that grants damage protection to parked aircraft
 * Required/Forbidden KindOf can be used to allow only specific kinds of aircraft to land (i.e. to use different sizes, or differ between VTOL/Regular jets)
 
+## PoisonedBehavior
+
+Added Beta and Gamma poison tiers, so the poison-over-time effect can be strengthened once the attacker owns an upgrade. The retail parameters keep working unchanged.
+
+* `PoisonBetaDamageInterval = 0` - tick interval while Beta poison is active. 0 uses `PoisonDamageInterval`
+* `PoisonBetaDuration = 0` - how long Beta poison lasts after the last dose. 0 uses `PoisonDuration`
+* `PoisonBetaDamageBonus = 1.0` - multiplier on the per-tick damage (1.2 = 20% more)
+* `PoisonBetaTriggeredBy = <upgrade name>` - upgrade the attacker needs for Beta poison. Empty disables the tier
+* `PoisonGammaDamageInterval = 0` - as above, for Gamma
+* `PoisonGammaDuration = 0` - as above, for Gamma
+* `PoisonGammaDamageBonus = 1.0` - as above, for Gamma
+* `PoisonGammaTriggeredBy = <upgrade name>` - as above, for Gamma
+
+Notes:
+* The tier is picked per hit from the attacker, not the victim. The upgrade counts if the attacking player has researched it or the attacking object itself carries it, so both player and object upgrades work.
+* Gamma is checked before Beta. If neither upgrade is present the hit applies normal poison.
+* Only one tier is active at a time and poison never stacks. A stronger hit takes over damage, interval and duration; an equally strong hit refreshes them as retail does; a weaker hit is ignored while the stronger poison is still running.
+* A hit with `DeathType = POISONED` is promoted to `POISONED_BETA` or `POISONED_GAMMA` for the active tier, so die modules and death FX can tell the tiers apart. A weapon that already names a tier death type is left alone.
+* If the attacker no longer exists when the damage lands, the hit counts as normal poison.
+* Healing of any kind still cures poison completely and clears the tier.
+
+## NeutronBlastBehavior
+
+The neutron blast that kills infantry and leaves vehicles unmanned. Two parameters were added so
+the effect can be kept off things it should not touch.
+
+```
+Behavior = NeutronBlastBehavior ModuleTag_neutron
+  BlastRadius = 100.0
+  AffectAirborne = No
+  AffectAllies = No
+  AffectGarrison = Yes         ; New
+  RejectEffectOnUnit = CyborgCommando AnotherUnit YetAnotherUnit   ; New
+End
+```
+
+Added parameters:
+* `AffectGarrison = Yes` - (No spares infantry garrisoned in a structure. Only garrisons are
+affected by this: passengers of transports, tunnels and bunkers are killed either way, as before.)
+* `RejectEffectOnUnit = <object list>` - (Object names that the blast skips entirely, whatever their
+KindOfs. This is the only way to spare a unit the hardcoded infantry and vehicle rules, which is what
+it exists for: riders such as the Cyborg Commando. A rejected object keeps its passengers too. All
+names go on one line; a second line replaces the first. Matching ignores case.)
+
 ## UnitProductionBonusUpgrade (New)
 
 This upgrade module allows to set a cost and/or build time modifier for individual types of units. This affects the whole player and not just individual factories.
@@ -612,6 +722,48 @@ Added Parameters:
 * `AffectsAirborne` = Yes  ; allow/disallow the bonus be applied to currently airborne units
 * `TintStatusType` = [TINT_STATUS type]  ; which color tint to apply
 * `BonusConditionType` = [WeaponBonus type]  ; The WeaponBonus condition flag that is granted to affected units (default = the module's own bonus). Lets you pick which WeaponBonus the module applies.
+
+## SpecialAbilityUpdate
+
+The valid targets for the laser lock ability (`SPECIAL_MISSILE_DEFENDER_LASER_GUIDED_MISSILES`) used to be hardcoded to
+`VEHICLE`, which in Zero Hour covers aircraft as well as ground vehicles, and to enemies only. These three keys make
+the target filter data-driven.
+
+* `ForbiddenTargetKindOf = <KindOf list>` - (The target may have none of these. Checked first, so it beats
+`RequiredTargetKindOf`. Default = `STRUCTURE`.)
+* `RequiredTargetKindOf = <KindOf list>` - (The target must have **all** of these. Default = `VEHICLE`.)
+* `TargetRelationship = [ALLIES/ENEMIES/NEUTRALS]` - (Which relationships to the owner may be targeted. Several may be
+listed together. Default = `ENEMIES`.)
+
+Example - an Avenger that can only lock onto enemy ground vehicles:
+```
+Behavior = SpecialAbilityUpdate ModuleTag_09
+  SpecialPowerTemplate  = SpecialAbilityLaserGuidedMissiles
+  StartAbilityRange     = 200.0
+  RequiredTargetKindOf  = VEHICLE
+  ForbiddenTargetKindOf = STRUCTURE AIRCRAFT   ; New
+  TargetRelationship    = ENEMIES              ; New
+End
+```
+
+The defaults reproduce the original hardcoded behaviour exactly, so leaving all three keys out changes nothing.
+
+Behaviour notes:
+* `RequiredTargetKindOf` is an all of test, not an any of test. Listing two KindOfs means the target must have both.
+* All three keys are honoured in two places, and always agree: the check that decides whether the cursor and the order
+are valid, and the check that runs while a lock is already in progress and cancels it if the target stops qualifying.
+Because the relationship is part of that test, a lock breaks off if the target changes sides mid lock - by being
+hijacked or captured - unless the new relationship is also allowed.
+* To let the ability target allies, **both** `TargetRelationship` here and `NEED_TARGET_ALLY_OBJECT` on the
+CommandButton are needed. The button filters the player's click; this key covers the paths that never see a button and
+keeps checking while the lock is held.
+* Allowing a relationship other than `ENEMIES` means the ability really will shoot that target - the missile is fired as
+a forced attack, so the usual "you may not attack allies" rule does not stop it. Do not allow allies unless that is what
+you want.
+* The AI never reads CommandButton target options, and its own scan only considers enemies, so it will not use ally or
+neutral locking even when both are configured.
+* These keys currently affect the laser lock ability only. Other abilities that use `SpecialAbilityUpdate` keep their
+own built in target rules and ignore all three.
 
 ## DelayedUpgradeBehavior (New)
 

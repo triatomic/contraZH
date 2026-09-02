@@ -5,13 +5,93 @@ GeneralsGameCode_Modding. Everything here is additional to upstream; the rest of
 applies unchanged.
 
 Almost all of it is client-side presentation and input handling, read from `Options.ini` and
-defaulting to retail behaviour, so an untouched `Options.ini` plays exactly as before.
+defaulting to retail behaviour, so an untouched `Options.ini` plays exactly as before. The exception
+is [Gameplay Fixes](#gameplay-fixes), which correct retail bugs in the simulation itself and are
+always on.
 
 As of August 2026 the fork is synced with TheSuperHackers/GeneralsGameCode and
 GeneralsGameCode_Modding again (their `Core/` restructure included). Everything on this page
 survived the merge unchanged, with one exception: the texture filter option was superseded by the
 version TheSuperHackers landed — see [Rendering](#rendering) for the renamed `AnisotropyLevel` key
 and the extended value list.
+
+# Gameplay Fixes
+
+Unlike the rest of this page these are not optional and have no `Options.ini` key. They are all retail
+bugs that upstream still carries.
+
+Some of them change the simulation - the timing of a reload or a snipe, the path a drone flies - so
+any replay recorded before them will not play back identically. Others only change what is drawn, and
+leave replay playback alone. Each entry says which kind it is.
+
+## Weapon bonus no longer restarts the reload
+
+A weapon bonus changing mid-reload used to throw away the progress already made and start the timer
+again from zero. Since a bonus can come and go freely - walking in and out of a Propaganda aura, a
+horde forming and breaking up, continuous fire ramping up, a promotion landing - a unit could be held
+at the start of its reload indefinitely, and with the right timing the reload could be skipped
+outright. The China Nuke Cannon was the clearest case: toggling Propaganda on it let it fire well
+ahead of schedule.
+
+The reload now keeps the fraction it had already served. A unit halfway through a reload stays
+halfway through it; gaining rate of fire shortens what is left and losing it lengthens what is left,
+but neither hands back nor takes away time already spent. Toggling a bonus on and off again leaves
+the reload exactly where it was, so there is nothing left to exploit.
+
+## Snipe survives a weapon set change
+
+Jarmen Kell's snipe is a wind-up rather than an instant shot, and anything that changed his weapon
+set part way through threw that wind-up away. Picking up scrap is the usual way to hit it, since
+salvage grants a weapon upgrade, but a veterancy promotion does the same thing, as does mounting or
+dismounting the combat bike. The snipe either fired with no wind-up at all or dropped out of the
+attack entirely.
+
+The charge now carries over to the replacement weapon and finishes on its original schedule.
+
+Note: a related half of this is data rather than code. A weapon set change also drops the weapon lock
+and reverts to the primary weapon unless the set is marked `WeaponLockSharedAcrossSets`, which is
+what makes Kell fall out of snipe mode rather than merely lose the charge.
+
+## Stealth kills no longer reveal the killer
+
+With a cash bounty in effect, a kill floats the money earned above the unit that made it. That text
+was drawn for everyone, including players who could not see the unit at all, so a stealthed sniper
+announced its own position the moment it fired successfully. Infantry shooting from inside a stealthed
+transport gave away the transport the same way, since the text appears over whoever scored the kill.
+
+The text is now shown only to players who can legitimately see the killer - its owner, their allies,
+and observers watching a replay. Everyone else sees nothing, exactly as they see nothing of the unit
+itself. A unit that is stealthed but has been detected still shows it, because at that point it is
+visible anyway.
+
+This one is presentation only. The bounty is awarded identically for every player whether or not the
+text is drawn, so replays recorded before it still play back identically.
+
+## Drones stay on their leash
+
+A drone flies out to whatever its master is shooting at, and is meant to be pulled back once it
+strays too far from the master. The check that does the pulling sits at the end of a list of
+priorities, and the "go attack the master's victim" step above it returns before ever reaching it, so
+for as long as the master had a victim the leash simply did not exist. A master keeps its last victim
+recorded after it stops shooting, so a Humvee that fired once and then drove away left its drone
+behind indefinitely, chasing across the map and often parked on top of the enemy still attacking it.
+
+The leash is now checked before the drone commits to the chase, using the same distance it always
+meant to use - twice the guard range, from the master. A drone that strays past it breaks off and
+comes home, including one already in the middle of an attack, which the old code could not do even
+when it tried: an internally issued move order is layered on top of an attack rather than replacing
+it, and the attack resumes a few seconds later. The drone is now taken out of the attack properly
+before being sent back.
+
+Nothing changes in the ordinary case, where the master shoots at something within its own weapon
+range and the drone never approaches the leash. Drones that have no guard range are untouched, as are
+Stinger Site stingers, which use the same module but never take the attack path at all.
+
+This one changes the simulation, so replays recorded before it will not play back identically.
+
+Note: a drone set to acquire targets on its own can still pick a fight after being pulled home, since
+that is a separate mechanism from following the master's victim. That is a data decision rather than
+an engine one.
 
 # Options.ini
 
@@ -161,6 +241,42 @@ checked against the new renderer pay its cost or change appearance.)
 * Cost is quadratic in particle size. Past 160 terrain cells per side the mesh samples every Nth cell
 instead, so a very large particle stops getting more expensive without bound. The trade is a coarser
 terrain fit, which is not visible on the effects that actually reach that size.
+
+# RiderChangeContain
+
+Two opt-in fields on the combat bike contain module. Both default to `No`, so data that does not
+mention them behaves exactly as before.
+
+## SurviveScuttle
+
+* `SurviveScuttle = No` - (Default. `Yes` keeps the transport alive after its rider dismounts.)
+
+Normally a bike whose rider gets off topples over, waits out `ScuttleDelay` and is destroyed. With
+`SurviveScuttle = Yes` it still topples into its `ScuttleStatus` pose, but is never killed - it just
+lies there. Walking a new valid rider onto it stands it back up: the toppled model condition and the
+unselectable and immobile statuses are cleared, and the bike behaves normally again.
+
+Notes:
+* The abandoned bike cannot be box-selected, but it can still be right-clicked as a destination, so
+ordering a rider onto it works. It is only unselectable, not uninteractable.
+* It stays a legitimate target - enemies can shoot and destroy it. Only its owner can mount it.
+* `ScuttleDelay` becomes dead config, since the timer it feeds is never started.
+
+## SilentScuttle
+
+* `SilentScuttle = No` - (Default. `Yes` scuttles the bike without announcing a loss.)
+
+A dismount is a deliberate act, but the scuttle still killed the bike as an anonymous death, so EVA
+called out "Unit Lost", dropped a radar ping and could raise an "under attack" warning every time a
+rider got off. With `SilentScuttle = Yes` the bike is flagged as scuttling for the moment it dies,
+and the three announcements skip an object carrying that flag. A bike destroyed by an enemy still
+announces normally.
+
+The flag only silences the announcements. The bike is still not credited to anyone as a kill and is
+not added to either player’s score, exactly as an ordinary scuttle behaves today.
+
+The two fields are independent. `SurviveScuttle = Yes` never reaches the kill at all, so it does not
+need `SilentScuttle`.
 
 # New CommandButton Commands
 
