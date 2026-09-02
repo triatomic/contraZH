@@ -30,6 +30,26 @@ Each command is defined as a `ChatCommand <name> ... End` block. The `<name>` is
 * `AddVeterancyLevel = 0` - (Promote the selected units by this many veterancy levels; negative demotes. Capped to the valid range.)
 * `AddSalvageTier = 0` - (Change the selected salvagers' crate-upgrade tier by this much; negative removes. Capped 0..2.)
 * `ProductionSpeedMultiplier = 0.0` - (Build-speed multiplier for the local player; > 1 builds faster. 0 means the field is absent / no change.)
+* `SetSelectedOwner = <who>` - (Give the selected objects to another player. One of `ENEMIES`, `NEUTRAL`, `ALLIES` or `SELF`. See [Changing who owns the selection](#changing-who-owns-the-selection).)
+
+## Changing who owns the selection
+
+`SetSelectedOwner` hands whatever is currently selected to another player, which is the quickest way
+to get a unit onto the other side and watch it fight, or to take a captured one back.
+
+```
+ChatCommand giveenemy
+  SetSelectedOwner = ENEMIES
+End
+```
+
+`ENEMIES` and `ALLIES` pick the first player holding that relationship to you, so on a map with
+several opponents the objects always go to the same one. `NEUTRAL` gives them to the neutral player,
+which is how civilian structures are owned. `SELF` gives them back to you.
+
+The selection is cleared as the owner changes, since objects you no longer own cannot stay selected.
+Nothing happens if the map has no player with the relationship asked for - a one-on-one skirmish has
+no ally to give anything to.
 
 ## Spawning a typed object
 
@@ -81,4 +101,4 @@ With these defined (and `EnableSingleplayerChatwindow = Yes`), typing `/money` i
 
 Notes:
 * Commands run only for the local player, in singleplayer/skirmish. They are intended for testing/debugging and custom cheat setups.
-* `AddVeterancyLevel` and `AddSalvageTier` act on the currently selected units.
+* `AddVeterancyLevel`, `AddSalvageTier` and `SetSelectedOwner` act on the currently selected units.

@@ -65,6 +65,7 @@ const FieldParse ChatCommand::s_fieldParseTable[] =
 	{ "AddVeterancyLevel",		INI::parseInt,			nullptr,	offsetof( ChatCommand, m_addVeterancyLevel ) },
 	{ "AddSalvageTier",			INI::parseInt,			nullptr,	offsetof( ChatCommand, m_addSalvageTier ) },
 	{ "ProductionSpeedMultiplier",	INI::parseReal,		nullptr,	offsetof( ChatCommand, m_productionSpeedMultiplier ) },
+	{ "SetSelectedOwner",		ChatCommand::parseSetSelectedOwner,	nullptr,	0 },
 	{ NULL, NULL, 0, 0 }  // keep this last
 };
 
@@ -98,6 +99,70 @@ static void setArmorSalvageTier( Object *obj, Int newTier )
 		obj->setArmorSetFlag( ARMORSET_CRATE_UPGRADE_ONE );
 		obj->setModelConditionState( MODELCONDITION_ARMORSET_CRATEUPGRADE_ONE );
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+// Names accepted by "SetSelectedOwner", in OwnerTarget order starting at OWNER_ENEMIES.
+static const char *TheChatCommandOwnerNames[] =
+{
+	"ENEMIES",
+	"NEUTRAL",
+	"ALLIES",
+	"SELF",
+	nullptr
+};
+
+//-------------------------------------------------------------------------------------------------
+void ChatCommand::parseSetSelectedOwner( INI *ini, void *instance, void * /*store*/, const void * /*userData*/ )
+{
+	ChatCommand *command = (ChatCommand *)instance;
+	const char *token = ini->getNextToken();
+
+	for (Int i = 0; TheChatCommandOwnerNames[i] != nullptr; ++i)
+	{
+		if (stricmp( token, TheChatCommandOwnerNames[i] ) == 0)
+		{
+			command->m_setSelectedOwner = OWNER_ENEMIES + i;
+			return;
+		}
+	}
+
+	DEBUG_CRASH(("[LINE: %d - FILE: '%s'] SetSelectedOwner '%s' must be ENEMIES, NEUTRAL, ALLIES or SELF",
+		ini->getLineNum(), ini->getFilename().str(), token));
+	throw INI_INVALID_DATA;
+}
+
+//-------------------------------------------------------------------------------------------------
+// The player "SetSelectedOwner" hands the selection to: the local player for SELF, the neutral
+// player for NEUTRAL, otherwise the first player holding that relationship to the local player.
+static Player *findOwnerForChatCommand( Int ownerTarget )
+{
+	if (ThePlayerList == nullptr)
+		return nullptr;
+
+	if (ownerTarget == ChatCommand::OWNER_SELF)
+		return ThePlayerList->getLocalPlayer();
+
+	if (ownerTarget == ChatCommand::OWNER_NEUTRAL)
+		return ThePlayerList->getNeutralPlayer();
+
+	const Player *localPlayer = ThePlayerList->getLocalPlayer();
+	if (localPlayer == nullptr)
+		return nullptr;
+
+	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+	{
+		Player *player = ThePlayerList->getNthPlayer( i );
+		if (player == nullptr || player == localPlayer)
+			continue;
+		// skip the neutral player, which is every player's neutral and never a real opponent
+		if (player == ThePlayerList->getNeutralPlayer())
+			continue;
+		if (localPlayer->getRelationship( player->getDefaultTeam() ) == (Relationship)ownerTarget)
+			return player;
+	}
+
+	return nullptr;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -407,6 +472,32 @@ void ChatCommand::execute( const AsciiString& args ) const
 			player->setProductionSpeedMultiplier( m_productionSpeedMultiplier );
 			if (TheControlBar)
 				TheControlBar->markUIDirty();
+		}
+	}
+
+	// SetSelectedOwner: hand the selected objects to another player. The selection is dropped
+	// first, because objects the local player no longer owns must not stay selected.
+	if (m_setSelectedOwner != OWNER_UNCHANGED && TheInGameUI)
+	{
+		Player *newOwner = findOwnerForChatCommand( m_setSelectedOwner );
+		Team *newTeam = newOwner ? newOwner->getDefaultTeam() : nullptr;
+		const DrawableList *selected = TheInGameUI->getAllSelectedLocalDrawables();
+		if (newTeam && selected)
+		{
+			std::vector<Object *> objects;
+			for (DrawableList::const_iterator it = selected->begin(); it != selected->end(); ++it)
+			{
+				Drawable *draw = *it;
+				Object *obj = draw ? draw->getObject() : nullptr;
+				if (obj)
+					objects.push_back( obj );
+			}
+
+			if (!objects.empty())
+				TheInGameUI->deselectAllDrawables();
+
+			for (std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); ++it)
+				(*it)->setTeam( newTeam );
 		}
 	}
 
