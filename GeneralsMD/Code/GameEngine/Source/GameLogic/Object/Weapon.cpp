@@ -1690,6 +1690,27 @@ VeterancyLevel WeaponTemplate::getEffectiveFXVeterancy(const Object* sourceObj) 
 }
 
 //-------------------------------------------------------------------------------------------------
+// A projectile is never contained, so it is the launcher's containment chain that matters here.
+static Bool isContainingSource(const Object* container, const Object* source)
+{
+	const Object* shooter = source;
+	if( source->isKindOf( KINDOF_PROJECTILE ) )
+	{
+		shooter = TheGameLogic->findObjectByID( source->getProducerID() );
+	}
+
+	for( const Object* obj = shooter ? shooter->getContainedBy() : nullptr; obj != nullptr; obj = obj->getContainedBy() )
+	{
+		if( obj == container )
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
 void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, const Coord3D *pos, const WeaponBonus& bonus, Bool isProjectileDetonation) const
 {
 	if (sourceID == 0)	// must have a source
@@ -1809,6 +1830,12 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 							if( source == curVictim || source->getProducerID() == curVictim->getID() )
 							{
 								//DEBUG_LOG(("skipping damage done to SELF..."));
+								continue;
+							}
+
+							// a passenger firing out of its ride should no more hurt it than a tank hurts itself
+							if( !TheGlobalData->m_occupantsDamageContainer && isContainingSource( curVictim, source ) )
+							{
 								continue;
 							}
 						}

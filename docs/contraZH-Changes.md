@@ -5,9 +5,10 @@ GeneralsGameCode_Modding. Everything here is additional to upstream; the rest of
 applies unchanged.
 
 Almost all of it is client-side presentation and input handling, read from `Options.ini` and
-defaulting to retail behaviour, so an untouched `Options.ini` plays exactly as before. The exception
-is [Gameplay Fixes](#gameplay-fixes), which correct retail bugs in the simulation itself and are
-always on.
+defaulting to retail behaviour, so an untouched `Options.ini` plays exactly as before. Two things sit
+outside that: [Gameplay Fixes](#gameplay-fixes), which correct retail bugs in the simulation itself
+and are always on, and a small number of simulation rules read from the mod's own `GameData.ini`,
+each of which states its default where it is described.
 
 As of August 2026 the fork is synced with TheSuperHackers/GeneralsGameCode and
 GeneralsGameCode_Modding again (their `Core/` restructure included). Everything on this page
@@ -241,6 +242,28 @@ checked against the new renderer pay its cost or change appearance.)
 * Cost is quadratic in particle size. Past 160 terrain cells per side the mesh samples every Nth cell
 instead, so a very large particle stops getting more expensive without bound. The trade is a coarser
 terrain fit, which is not visible on the effects that actually reach that size.
+
+# GameData.ini
+
+## OccupantsDamageContainer
+
+* `OccupantsDamageContainer = No` - (Default. `Yes` restores the vanilla friendly fire from
+passengers onto their own container.)
+
+An object has never been able to hurt itself with its own splash damage, but a passenger firing out
+of a transport or a garrisoned building was a separate object, so it hurt the thing it was riding in.
+Anti-tank infantry are the usual victims of this: a Tank Hunter in a bunker firing at something
+beside the wall knocked down the bunker holding it. The splash now skips the container the shooter
+is inside, the same way it already skips the shooter.
+
+Notes:
+* The whole containment chain is skipped, not just the immediate container, so infantry inside a
+bunker riding an Overlord spare both.
+* Weapons that already damage their own firer - `RadiusDamageAffects = SELF`, which is how suicide
+attacks are built - are untouched and still destroy the container.
+* Directly ordering the passenger to attack its own container still damages it. Splash on a nearby
+target is what changes, not a deliberate shot.
+* This changes the simulation, so replays recorded before it will not play back identically.
 
 # RiderChangeContain
 
