@@ -1575,6 +1575,32 @@ const Weapon* Object::getCurrentWeapon(WeaponSlotType* wslot) const
 }
 
 //=============================================================================
+Bool Object::isFiringWeaponSlot( WeaponSlotType wslot ) const
+{
+	if( !testStatus( OBJECT_STATUS_IS_ATTACKING ) )
+	{
+		return FALSE;
+	}
+
+	const Weapon* weapon = getCurrentWeapon();
+
+	return weapon != nullptr && weapon->getWeaponSlot() == wslot;
+}
+
+//=============================================================================
+void Object::stopFiringWeaponSlot( WeaponSlotType wslot )
+{
+	// Spending the shots ends the attack next frame by the same path a burst that runs out takes.
+	Weapon* weapon = getWeaponInWeaponSlot( wslot );
+	if( weapon )
+	{
+		weapon->setMaxShotCount( 0 );
+	}
+
+	releaseWeaponLock( LOCKED_TEMPORARILY );
+}
+
+//=============================================================================
 Weapon* Object::findWaypointFollowingCapableWeapon()
 {
 	return m_weaponSet.findWaypointFollowingCapableWeapon();
@@ -5917,9 +5943,18 @@ void Object::doCommandButton( const CommandButton *commandButton, CommandSourceT
 					return;
 				}
 
+			case GUI_COMMAND_TOGGLE_FIRE_WEAPON:
 			case GUI_COMMAND_FIRE_WEAPON:
 				if( ai )
 				{
+					// a toggle already firing this weapon stops instead, and starts like FIRE_WEAPON otherwise
+					if( commandButton->getCommandType() == GUI_COMMAND_TOGGLE_FIRE_WEAPON
+						&& isFiringWeaponSlot( commandButton->getWeaponSlot() ) )
+					{
+						stopFiringWeaponSlot( commandButton->getWeaponSlot() );
+						return;
+					}
+
 					if( !BitIsSet( commandButton->getOptions(), COMMAND_OPTION_NEED_OBJECT_TARGET ) && !BitIsSet( commandButton->getOptions(), NEED_TARGET_POS ) )
 					{
 						setWeaponLock( commandButton->getWeaponSlot(), LOCKED_TEMPORARILY );
@@ -5978,28 +6013,6 @@ void Object::doCommandButton( const CommandButton *commandButton, CommandSourceT
 			case GUI_COMMAND_SELL:
 				TheBuildAssistant->sellObject( this );
 				return;
-
-			// Fire weapon toggle, so scripts can stop the firing too.
-			case GUI_COMMAND_TOGGLE_FIRE_WEAPON:
-				if( ai )
-				{
-					Weapon *weapon = getWeaponInWeaponSlot( commandButton->getWeaponSlot() );
-					const Weapon *curWeapon = getCurrentWeapon();
-					if( testStatus( OBJECT_STATUS_IS_ATTACKING ) && curWeapon
-						&& curWeapon->getWeaponSlot() == commandButton->getWeaponSlot() )
-					{
-						if( weapon )
-							weapon->setMaxShotCount( 0 );
-						releaseWeaponLock( LOCKED_TEMPORARILY );
-					}
-					else
-					{
-						setWeaponLock( commandButton->getWeaponSlot(), LOCKED_TEMPORARILY );
-						ai->aiAttackPosition( getPosition(), commandButton->getMaxShotsToFire(), cmdSource );
-					}
-					return;
-				}
-				break;
 
 			// TheSuperHackers @feature Hold Fire stance, so scripts can toggle it too.
 			case GUI_COMMAND_HOLD_FIRE:

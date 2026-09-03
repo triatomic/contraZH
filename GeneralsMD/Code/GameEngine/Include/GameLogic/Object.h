@@ -512,6 +512,8 @@ public:
 
 	Weapon* getCurrentWeapon(WeaponSlotType* wslot = nullptr);
 	const Weapon* getCurrentWeapon(WeaponSlotType* wslot = nullptr) const;
+	Bool isFiringWeaponSlot( WeaponSlotType wslot ) const;	///< is this object attacking with the weapon in this slot?
+	void stopFiringWeaponSlot( WeaponSlotType wslot );		///< end an attack being made with the weapon in this slot
 	void setFiringConditionForCurrentWeapon() const;
 	void adjustModelConditionForWeaponStatus();	///< Check to see if I should change my model condition.
 	void fireCurrentWeapon(Object *target);

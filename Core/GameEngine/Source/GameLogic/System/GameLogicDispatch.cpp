@@ -830,7 +830,9 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 
 			// use the selected group
 			if( currentlySelectedGroup )
+			{
 				currentlySelectedGroup->groupToggleFireWeapon( weaponSlot, maxShotsToFire, CMD_FROM_PLAYER );
+			}
 
 			break;
 		}
