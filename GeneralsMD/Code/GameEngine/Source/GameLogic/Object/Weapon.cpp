@@ -1847,7 +1847,7 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 							}
 
 							// the SELF gate above is also what lets a suicide weapon still destroy the ride carrying it
-							if( !TheGlobalData->m_occupantsDamageContainer && isSourceContainedBy( shooter, curVictim ) )
+							if( TheGlobalData->m_noOccupantFriendlyFire && isSourceContainedBy( shooter, curVictim ) )
 							{
 								continue;
 							}

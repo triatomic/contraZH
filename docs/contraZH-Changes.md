@@ -245,16 +245,16 @@ terrain fit, which is not visible on the effects that actually reach that size.
 
 # GameData.ini
 
-## OccupantsDamageContainer
+## NoOccupantFriendlyFire
 
-* `OccupantsDamageContainer = No` - (Default. `Yes` restores the vanilla friendly fire from
-passengers onto their own container.)
+* `NoOccupantFriendlyFire = No` - (Default. `Yes` spares the container a passenger is riding in from
+that passenger's own splash damage.)
 
 An object has never been able to hurt itself with its own splash damage, but a passenger firing out
-of a transport or a garrisoned building was a separate object, so it hurt the thing it was riding in.
+of a transport or a garrisoned building is a separate object, so it hurts the thing it is riding in.
 Anti-tank infantry are the usual victims of this: a Tank Hunter in a bunker firing at something
-beside the wall knocked down the bunker holding it. The splash now skips the container the shooter
-is inside, the same way it already skips the shooter.
+beside the wall knocks down the bunker holding it. With `NoOccupantFriendlyFire = Yes` the splash
+skips the container the shooter is inside, the same way it already skips the shooter.
 
 Notes:
 * The whole containment chain is skipped, not just the immediate container, so infantry inside a
@@ -263,7 +263,8 @@ bunker riding an Overlord spare both.
 attacks are built - are untouched and still destroy the container.
 * Directly ordering the passenger to attack its own container still damages it. Splash on a nearby
 target is what changes, not a deliberate shot.
-* This changes the simulation, so replays recorded before it will not play back identically.
+* Turning this on changes the simulation, so a replay must be played back with the same setting it
+was recorded with.
 
 # RiderChangeContain
 
