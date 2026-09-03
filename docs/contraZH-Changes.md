@@ -366,6 +366,35 @@ Per-object parameter:
 Note: the flag lives on `AIUpdateInterface`, so garrisoned buildings cannot hold fire — most have no
 AI module. Infantry inside a *unit* are covered.
 
+## TOGGLE_FIRE_WEAPON
+
+Fires a weapon exactly as `FIRE_WEAPON` does, but a second click stops it again. Retail has no way
+to call off a `FIRE_WEAPON` order: it runs until `MaxShotsToFire` is spent, so a jammer set to sixty
+shots is committed to all sixty.
+
+```
+CommandButton Slth_Command_JammerStationActivate_HumanPlayer
+  Command          = TOGGLE_FIRE_WEAPON
+  Options          = CHECK_LIKE     ; required, or the button never renders as toggled on
+  WeaponSlot       = SECONDARY
+  MaxShotsToFire   = 60
+  TextLabel        = CONTROLBAR:GLAJamm
+  ButtonImage      = SUJPulse
+  ButtonBorderType = ACTION
+  DescriptLabel    = CONTROLBAR:ToolTipGLAFireJamm
+End
+```
+
+Notes:
+* The button reads the unit's actual state rather than remembering a click, so it also switches off
+by itself once `MaxShotsToFire` is spent.
+* Stopping ends only the firing. A move order given alongside it survives, unlike the stop command,
+which clears everything.
+* The button stays clickable while the weapon reloads between shots. A plain `FIRE_WEAPON` button
+greys out there, which would otherwise take the cancel away for most of a burst.
+* A selection where only some units are firing resolves one way for the whole group: if any of them
+is firing, the click stops all of them.
+
 ## AUTO_FILL
 
 Selects nearby infantry and orders them to board the selected container.

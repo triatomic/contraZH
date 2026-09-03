@@ -5979,6 +5979,28 @@ void Object::doCommandButton( const CommandButton *commandButton, CommandSourceT
 				TheBuildAssistant->sellObject( this );
 				return;
 
+			// Fire weapon toggle, so scripts can stop the firing too.
+			case GUI_COMMAND_TOGGLE_FIRE_WEAPON:
+				if( ai )
+				{
+					Weapon *weapon = getWeaponInWeaponSlot( commandButton->getWeaponSlot() );
+					const Weapon *curWeapon = getCurrentWeapon();
+					if( testStatus( OBJECT_STATUS_IS_ATTACKING ) && curWeapon
+						&& curWeapon->getWeaponSlot() == commandButton->getWeaponSlot() )
+					{
+						if( weapon )
+							weapon->setMaxShotCount( 0 );
+						releaseWeaponLock( LOCKED_TEMPORARILY );
+					}
+					else
+					{
+						setWeaponLock( commandButton->getWeaponSlot(), LOCKED_TEMPORARILY );
+						ai->aiAttackPosition( getPosition(), commandButton->getMaxShotsToFire(), cmdSource );
+					}
+					return;
+				}
+				break;
+
 			// TheSuperHackers @feature Hold Fire stance, so scripts can toggle it too.
 			case GUI_COMMAND_HOLD_FIRE:
 				if( ai )
@@ -6137,6 +6159,7 @@ void Object::doCommandButtonAtObject( const CommandButton *commandButton, Object
 			case GUI_COMMAND_REVERSE_MOVE:
 			case GUI_COMMAND_HOLD_FIRE:
 			case GUI_COMMAND_TOGGLE_DEPLOY:
+			case GUI_COMMAND_TOGGLE_FIRE_WEAPON:
 			case GUI_COMMAND_AUTO_FILL:
 			case GUI_COMMAND_GUARD:
 			case GUI_COMMAND_GUARD_WITHOUT_PURSUIT:
@@ -6258,6 +6281,7 @@ void Object::doCommandButtonAtPosition( const CommandButton *commandButton, cons
 			case GUI_COMMAND_SWITCH_WEAPON:
 			case GUI_COMMAND_HOLD_FIRE:
 			case GUI_COMMAND_TOGGLE_DEPLOY:
+			case GUI_COMMAND_TOGGLE_FIRE_WEAPON:
 			case GUICOMMANDMODE_HIJACK_VEHICLE:
 			case GUICOMMANDMODE_CONVERT_TO_CARBOMB:
 #ifdef ALLOW_SURRENDER
@@ -6302,6 +6326,7 @@ void Object::doCommandButtonUsingWaypoints( const CommandButton *commandButton, 
 			case GUI_COMMAND_REVERSE_MOVE:
 			case GUI_COMMAND_HOLD_FIRE:
 			case GUI_COMMAND_TOGGLE_DEPLOY:
+			case GUI_COMMAND_TOGGLE_FIRE_WEAPON:
 			case GUI_COMMAND_AUTO_FILL:
 			case GUI_COMMAND_STOP:
 			case GUI_COMMAND_DOZER_CONSTRUCT:

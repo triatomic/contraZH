@@ -58,6 +58,7 @@
 #include "GameLogic/Module/SpecialPowerUpdateModule.h"
 #include "GameLogic/ObjectIter.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/Weapon.h"
 
 
 /**
@@ -3283,6 +3284,51 @@ void AIGroup::groupToggleHoldFire( CommandSourceType cmdSource )
 			continue;
 
 		ai->setHoldingFire( !allHolding );
+	}
+
+}
+
+// ------------------------------------------------------------------------------------------------
+/** Start the group firing a weapon, or stop it if any member is already firing that weapon. */
+// ------------------------------------------------------------------------------------------------
+void AIGroup::groupToggleFireWeapon( WeaponSlotType weaponSlot, Int maxShotsToFire, CommandSourceType cmdSource )
+{
+	std::list<Object *>::iterator i;
+	Object *obj;
+	Bool anyFiring = FALSE;
+
+	// first pass -- is anyone already firing this weapon?
+	for( i = m_memberList.begin(); i != m_memberList.end(); ++i )
+	{
+		obj = *i;
+
+		if( !obj->testStatus( OBJECT_STATUS_IS_ATTACKING ) )
+			continue;
+
+		const Weapon *curWeapon = obj->getCurrentWeapon();
+		if( curWeapon && curWeapon->getWeaponSlot() == weaponSlot )
+			anyFiring = TRUE;
+	}
+
+	// second pass -- move the whole group the same way, so every peer derives the same result
+	if( anyFiring )
+	{
+		for( i = m_memberList.begin(); i != m_memberList.end(); ++i )
+		{
+			obj = *i;
+
+			// Spending the remaining shots ends the attack on the next frame through the same path a
+			// burst that runs out takes, so only the firing stops and any other order survives.
+			Weapon *weapon = obj->getWeaponInWeaponSlot( weaponSlot );
+			if( weapon )
+				weapon->setMaxShotCount( 0 );
+		}
+
+		releaseWeaponLockForGroup( LOCKED_TEMPORARILY );
+	}
+	else if( setWeaponLockForGroup( weaponSlot, LOCKED_TEMPORARILY ) )
+	{
+		groupAttackPosition( nullptr, maxShotsToFire, cmdSource );
 	}
 
 }
