@@ -1632,9 +1632,9 @@ module on the object like any other unit. A stationary one can be spawned by a w
 ```
 Behavior = TornadoUpdate ModuleTag_Tornado
   Radius = 120                    ; (required; how far out units are grabbed)
-  PullForce = 300                 ; (force toward the centre; divided by the victim Mass)
+  PullForce = 0.6                 ; (inward speed toward the centre, in distance per frame)
   LiftForce = 1.5                 ; (climb speed toward MaxLiftHeight, in height per frame)
-  SpinForce = 200                 ; (tangential force; a negative value orbits the other way)
+  SpinForce = 6                   ; (orbit speed around the centre; a negative value orbits the other way)
   YawRate = 360                   ; (how fast a victim spins about its own axis, in degrees per second)
   MaxLiftHeight = 40              ; (above this height over the tornado ground, lift stops, so victims hover)
   MaxVictimSpeed = 12             ; (speed cap on victims; 0 = uncapped, which lets them spiral away)

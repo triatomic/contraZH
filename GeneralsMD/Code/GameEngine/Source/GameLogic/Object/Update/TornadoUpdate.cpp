@@ -290,12 +290,10 @@ void TornadoUpdate::holdVictim( Object *obj, const Coord3D *center, Real groundZ
 		}
 	}
 
-	// Below the ceiling we push up; at it we hold station, else the victim would fall back out
-	// of the lift band and bob up and down for as long as the tornado holds it.
-	// Every lift term is multiplied by mass, because applyMotiveForce divides it straight back
-	// out again. That is what keeps a heavy tank riding at the same height as an infantryman.
-	// Lift is flown as a target climb rate, not a raw push: a push keeps accelerating for as
-	// long as the victim is under the ceiling, which is what launches it through the roof.
+	// Lift is flown as a target climb rate, not a raw push, else the victim accelerates for as
+	// long as it is under the ceiling and shoots through it. Every term is multiplied by mass
+	// because applyMotiveForce divides it straight back out, which is what lets a heavy tank
+	// ride at the same height as an infantryman.
 	Real mass = physics->getMass();
 	Real ceiling = groundZ + data->m_maxLiftHeight * strength;
 	Real wantedRise = 0.0f;
@@ -322,9 +320,17 @@ void TornadoUpdate::holdVictim( Object *obj, const Coord3D *center, Real groundZ
 	Real resistance = 1.0f - __min( 1.0f, __max( 0.0f, physics->getShockResistance() ) );
 	Real scale = strength * resistance;
 
+	// The orbit is flown as a target velocity too. Once a victim is off the ground the engine
+	// switches it to air drag, which grows with speed and would otherwise cancel a fixed push
+	// and leave the victim hanging still under the ceiling.
+	Coord3D wantedVel;
+	wantedVel.x = ( data->m_pullForce * pullScale * radial.x - data->m_spinForce * radial.y ) * scale;
+	wantedVel.y = ( data->m_pullForce * pullScale * radial.y + data->m_spinForce * radial.x ) * scale;
+
+	const Coord3D *vel = physics->getVelocity();
 	Coord3D force;
-	force.x = ( data->m_pullForce * pullScale * radial.x - data->m_spinForce * radial.y ) * scale;
-	force.y = ( data->m_pullForce * pullScale * radial.y + data->m_spinForce * radial.x ) * scale;
+	force.x = ( wantedVel.x - vel->x ) * mass * TORNADO_HOVER_DAMPING;
+	force.y = ( wantedVel.y - vel->y ) * mass * TORNADO_HOVER_DAMPING;
 	force.z = lift * scale;
 
 	// applyForce would keep only the sideways part of the pull on anything that is driving.

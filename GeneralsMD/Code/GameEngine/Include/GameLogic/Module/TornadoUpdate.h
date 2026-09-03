@@ -38,9 +38,9 @@ public:
 	TornadoUpdateModuleData();
 
 	Real				m_radius;					///< how far from this object victims are grabbed
-	Real				m_pullForce;				///< force toward the center, divided by the victim's mass
+	Real				m_pullForce;				///< inward speed toward the center, per frame
 	Real				m_liftForce;				///< how fast victims climb toward MaxLiftHeight, per frame
-	Real				m_spinForce;				///< tangential force; negative orbits the other way
+	Real				m_spinForce;				///< orbit speed around the center; negative orbits the other way
 	Real				m_yawRate;					///< how fast a victim spins about its own axis
 	Real				m_maxLiftHeight;			///< above this height over the tornado's ground, lift stops
 	Real				m_maxVictimSpeed;			///< speed cap on victims, 0 disables the cap
