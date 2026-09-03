@@ -47,6 +47,9 @@ static const Real TORNADO_HOVER_DAMPING = 0.35f;
 // Frames spent easing into the ceiling, so victims settle instead of slamming into it.
 static const Real TORNADO_APPROACH_FRAMES = 12.0f;
 
+// How far a victim is lifted clear of the ground when it is first grabbed.
+static const Real TORNADO_LIFTOFF_HEIGHT = 2.0f;
+
 //-------------------------------------------------------------------------------------------------
 TornadoUpdateModuleData::TornadoUpdateModuleData()
 {
@@ -244,6 +247,13 @@ void TornadoUpdate::captureVictim( Object *obj )
 	physics->clearAcceleration();
 	physics->setAllowBouncing( TRUE );
 
+	// Physics runs before this module and kills upward velocity while an object is on the
+	// ground, so lift alone never gets a victim airborne. Break it loose by hand, once.
+	physics->setStickToGround( FALSE );
+	Coord3D liftOff = *obj->getPosition();
+	liftOff.z += TORNADO_LIFTOFF_HEIGHT;
+	obj->setPosition( &liftOff );
+
 	// A braking object does not integrate its horizontal velocity, so it could never be dragged in.
 	obj->clearStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_BRAKING ) );
 
@@ -263,9 +273,11 @@ void TornadoUpdate::holdVictim( Object *obj, const Coord3D *center, Real groundZ
 		return;
 	}
 
-	// Keeps the locomotor from fighting us, and lets the victim leave the ground.
+	// Keeps the locomotor from fighting us, and lets the victim leave the ground. The locomotor
+	// re-arms stickToGround every time it runs, so clear it again every frame.
 	physics->setStunned( TRUE );
 	physics->setAllowToFall( TRUE );
+	physics->setStickToGround( FALSE );
 
 	const Coord3D *pos = obj->getPosition();
 	Coord3D toCenter;
