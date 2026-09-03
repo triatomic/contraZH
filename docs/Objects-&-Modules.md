@@ -1633,7 +1633,7 @@ module on the object like any other unit. A stationary one can be spawned by a w
 Behavior = TornadoUpdate ModuleTag_Tornado
   Radius = 120                    ; (required; how far out units are grabbed)
   PullForce = 300                 ; (force toward the centre; divided by the victim Mass)
-  LiftForce = 400                 ; (upward force below MaxLiftHeight; must beat gravity * Mass to lift)
+  LiftForce = 1.5                 ; (climb speed toward MaxLiftHeight, in height per frame)
   SpinForce = 200                 ; (tangential force; a negative value orbits the other way)
   YawRate = 360                   ; (how fast a victim spins about its own axis, in degrees per second)
   MaxLiftHeight = 40              ; (above this height over the tornado ground, lift stops, so victims hover)
@@ -1656,8 +1656,10 @@ Behavior = TornadoUpdate ModuleTag_Tornado
 End
 ```
 **Notes:**
-- A victim needs a `PhysicsBehavior`. Forces are divided by its `Mass`, so heavy units are harder to
-  move, and are scaled down by its `ShockResistance`, which doubles as a per unit immunity dial.
+- A victim needs a `PhysicsBehavior`. Lift and spin deliberately ignore `Mass`, so that every held
+  unit rides at the same height and turns at the same rate. The horizontal pull and spin forces are
+  still divided by `Mass`, so heavy units resist being dragged, and every force is scaled down by
+  the victim's `ShockResistance`, which doubles as a per unit immunity dial.
 - Structures, immobile objects and projectiles take damage but are never pulled. Units inside a
   transport are untouched; only the transport itself is grabbed.
 - Airborne targets are skipped unless `AffectAirborne = Yes`. Aircraft with a fixed flight height

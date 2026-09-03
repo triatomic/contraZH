@@ -39,7 +39,7 @@ public:
 
 	Real				m_radius;					///< how far from this object victims are grabbed
 	Real				m_pullForce;				///< force toward the center, divided by the victim's mass
-	Real				m_liftForce;				///< upward force, only applied below MaxLiftHeight
+	Real				m_liftForce;				///< how fast victims climb toward MaxLiftHeight, per frame
 	Real				m_spinForce;				///< tangential force; negative orbits the other way
 	Real				m_yawRate;					///< how fast a victim spins about its own axis
 	Real				m_maxLiftHeight;			///< above this height over the tornado's ground, lift stops

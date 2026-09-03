@@ -41,8 +41,11 @@
 // Inside this fraction of the radius the pull fades out, so a victim at the eye does not jitter.
 static const Real TORNADO_CORE_FRACTION = 0.1f;
 
-// How hard a hovering victim is pulled back to zero vertical speed once it reaches the ceiling.
-static const Real TORNADO_HOVER_DAMPING = 0.5f;
+// How hard a victim is steered toward the climb rate the tornado wants for it.
+static const Real TORNADO_HOVER_DAMPING = 0.35f;
+
+// Frames spent easing into the ceiling, so victims settle instead of slamming into it.
+static const Real TORNADO_APPROACH_FRAMES = 12.0f;
 
 //-------------------------------------------------------------------------------------------------
 TornadoUpdateModuleData::TornadoUpdateModuleData()
@@ -291,18 +294,25 @@ void TornadoUpdate::holdVictim( Object *obj, const Coord3D *center, Real groundZ
 	// of the lift band and bob up and down for as long as the tornado holds it.
 	// Every lift term is multiplied by mass, because applyMotiveForce divides it straight back
 	// out again. That is what keeps a heavy tank riding at the same height as an infantryman.
+	// Lift is flown as a target climb rate, not a raw push: a push keeps accelerating for as
+	// long as the victim is under the ceiling, which is what launches it through the roof.
 	Real mass = physics->getMass();
 	Real ceiling = groundZ + data->m_maxLiftHeight * strength;
-	Real lift = -TheGlobalData->m_gravity * mass;
+	Real wantedRise = 0.0f;
 	if( pos->z < ceiling )
 	{
-		lift += data->m_liftForce * mass;
+		wantedRise = data->m_liftForce * strength;
+
+		// Ease off over the last stretch so the victim arrives already slow.
+		Real remaining = ceiling - pos->z;
+		if( remaining < wantedRise * TORNADO_APPROACH_FRAMES )
+		{
+			wantedRise = remaining / TORNADO_APPROACH_FRAMES;
+		}
 	}
-	else
-	{
-		// At the ceiling gravity is already cancelled, so just bleed off any climb or sink left.
-		lift -= physics->getVelocity()->z * mass * TORNADO_HOVER_DAMPING;
-	}
+
+	Real lift = -TheGlobalData->m_gravity * mass;
+	lift += ( wantedRise - physics->getVelocity()->z ) * mass * TORNADO_HOVER_DAMPING;
 	if( lift < 0.0f )
 	{
 		lift = 0.0f;
