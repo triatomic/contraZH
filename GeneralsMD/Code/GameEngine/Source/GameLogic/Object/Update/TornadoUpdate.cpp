@@ -23,6 +23,7 @@
 #define DEFINE_DEATH_NAMES
 
 #include "Common/Xfer.h"
+#include "Lib/trig.h"
 #include "Common/GlobalData.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
@@ -41,6 +42,9 @@
 
 // Where victims orbit when RingRadius is left unset, as a fraction of the grab radius.
 static const Real TORNADO_DEFAULT_RING_FRACTION = 0.1f;
+
+// Fraction of the ring inside which the radial direction is too noisy to steer by.
+static const Real TORNADO_STEADY_FRACTION = 0.25f;
 
 // How hard a victim is steered toward the climb rate the tornado wants for it.
 static const Real TORNADO_HOVER_DAMPING = 0.35f;
@@ -354,10 +358,13 @@ void TornadoUpdate::holdVictim( Object *obj, const Coord3D *center, Real groundZ
 	{
 		// Dead on the axis there is no radial direction to derive a tangent from, and a zero
 		// tangent means the controller would brake the victim to a halt and pin it at the eye.
-		// Any direction will do, so pick one off the victim's own facing and keep it orbiting.
-		const Coord3D *dir = obj->getUnitDirectionVector2D();
-		radial.x = dir->x;
-		radial.y = dir->y;
+		// The direction is arbitrary, but it must not come from anything this module is itself
+		// changing: deriving it from the victim's facing feeds our own yaw back into the orbit
+		// and the victim is shoved a different way every frame. Derive it from the object id,
+		// which never changes, so each victim leaves the axis on its own fixed heading.
+		Real bearing = (Real)( (UnsignedInt)obj->getID() % 360 ) * ( PI / 180.0f );
+		radial.x = Cos( bearing );
+		radial.y = Sin( bearing );
 	}
 	radial.z = 0.0f;
 
@@ -368,6 +375,15 @@ void TornadoUpdate::holdVictim( Object *obj, const Coord3D *center, Real groundZ
 	if( ring > 0.0f && distance < ring )
 	{
 		pullScale = ( distance / ring ) * 2.0f - 1.0f;
+
+		// Close to the axis a small wobble swings the radial direction through a huge arc, and
+		// the orbit would jerk about with it. Ease the outward push in over that stretch so the
+		// victim drifts out to the ring instead of being kicked around by the direction noise.
+		Real steady = ring * TORNADO_STEADY_FRACTION;
+		if( distance < steady && steady > 0.0f )
+		{
+			pullScale *= distance / steady;
+		}
 	}
 
 	// Lift is flown as a target climb rate, not a raw push, else the victim accelerates for as
