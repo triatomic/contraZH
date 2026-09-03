@@ -495,6 +495,7 @@ void TunnelContain::onBuildComplete()
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+#if !(RTS_GENERALS && RETAIL_COMPATIBLE_CRC)
 void TunnelContain::onCapture( Player *oldOwner, Player *newOwner )
 {
 	if( m_isCurrentlyRegistered )
@@ -517,6 +518,7 @@ void TunnelContain::onCapture( Player *oldOwner, Player *newOwner )
 	// extend base class
 	OpenContain::onCapture( oldOwner, newOwner );
 }
+#endif
 
 //-------------------------------------------------------------------------------------------------
 Bool TunnelContain::canUseNetworkExit() const
