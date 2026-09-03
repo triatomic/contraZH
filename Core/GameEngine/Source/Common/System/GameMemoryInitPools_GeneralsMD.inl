@@ -196,6 +196,7 @@ static PoolSizeRec PoolSizes[] =
 	{ "PilotFindVehicleUpdate", 256, 32 },
 	{ "DemoTrapUpdate", 32, 32 },
 	{ "ParticleUplinkCannonUpdate", 16, 16 },
+	{ "TornadoUpdate", 16, 16 },
 	{ "ChronoSphereUpdateModule", 8, 8 },
 	{ "TeleportSelfSpecialPower", 32, 32 },
 	{ "MultiLocationSpecialPowerUpdate", 8, 8 },
