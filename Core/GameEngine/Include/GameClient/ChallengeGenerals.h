@@ -35,8 +35,7 @@
 #include "Common/Overridable.h"
 
 // DEFINES ////////////////////////////////////////////////////////////////////////////////////////
-// A persona with no matching GeneralPosition button in ChallengeMenu.wnd is skipped, so raising
-// this ahead of the layout is safe.
+// A persona with no GeneralPosition button in ChallengeMenu.wnd is skipped
 #define NUM_GENERALS (24)
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////

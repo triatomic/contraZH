@@ -142,6 +142,8 @@ Int findPositionButton( Int controlID )
 //-------------------------------------------------------------------------------------------------
 void setEnabledButtons()
 {
+	const GeneralPersona* generals = TheChallengeGenerals->getChallengeGenerals();
+
 	for (Int i = 0; i < NUM_GENERALS; i++)
 	{
 		if( buttonGeneralPosition[i] == nullptr )
@@ -149,7 +151,6 @@ void setEnabledButtons()
 			continue;
 		}
 
-		const GeneralPersona* generals = TheChallengeGenerals->getChallengeGenerals();
 		buttonGeneralPosition[i]->winEnable(generals[i].isStartingEnabled());
 		buttonGeneralPosition[i]->winHide(! generals[i].isStartingEnabled());
 
@@ -243,7 +244,7 @@ void updateButtonSequence(Int stepsPerUpdate)
 	{
 		// selected look
 		Int pos = buttonSequenceStep;
-		if (pos < NUM_GENERALS && buttonGeneralPosition[pos] != nullptr && !buttonGeneralPosition[pos]->winIsHidden())
+		if (pos < NUM_GENERALS && !buttonGeneralPosition[pos]->winIsHidden())
 		{
 			Int templateNum = ThePlayerTemplateStore->getTemplateNumByName(generals[pos].getPlayerTemplateName());
 			const PlayerTemplate *playerTemplate = ThePlayerTemplateStore->getNthPlayerTemplate(templateNum);
@@ -252,7 +253,7 @@ void updateButtonSequence(Int stepsPerUpdate)
 		}
 
 		// mouseover look
-		if (--pos > 0 && pos < NUM_GENERALS && buttonGeneralPosition[pos] != nullptr && !buttonGeneralPosition[pos]->winIsHidden())
+		if (--pos > 0 && pos < NUM_GENERALS && !buttonGeneralPosition[pos]->winIsHidden())
 		{
 			Int templateNum = ThePlayerTemplateStore->getTemplateNumByName(generals[pos].getPlayerTemplateName());
 			const PlayerTemplate *playerTemplate = ThePlayerTemplateStore->getNthPlayerTemplate(templateNum);
@@ -261,7 +262,7 @@ void updateButtonSequence(Int stepsPerUpdate)
 		}
 
 		// regular look
-		if (--pos > 0 && pos < NUM_GENERALS && buttonGeneralPosition[pos] != nullptr && !buttonGeneralPosition[pos]->winIsHidden())
+		if (--pos > 0 && pos < NUM_GENERALS && !buttonGeneralPosition[pos]->winIsHidden())
 		{
 			Int templateNum = ThePlayerTemplateStore->getTemplateNumByName(generals[pos].getPlayerTemplateName());
 			const PlayerTemplate *playerTemplate = ThePlayerTemplateStore->getNthPlayerTemplate(templateNum);
@@ -371,9 +372,12 @@ void ChallengeMenuInit( WindowLayout *layout, void *userData )
 		buttonGeneralPositionID[i] = TheNameKeyGenerator->nameToKey( strButtonName );
 		buttonGeneralPosition[i] = TheWindowManager->winGetWindowFromId( parentMenu, buttonGeneralPositionID[i] );
 
-		// the layout need not carry a button for every persona slot, so skip the ones it leaves out
 		if( buttonGeneralPosition[i] == nullptr )
 		{
+			// an empty slot needs no button, but a persona without one can never be picked
+			DEBUG_ASSERTCRASH( TheChallengeGenerals->getChallengeGenerals()[i].getBioName().isEmpty(),
+				("ChallengeMenu.wnd has no GeneralPosition%d for persona '%s'", i,
+				TheChallengeGenerals->getChallengeGenerals()[i].getBioName().str()) );
 			continue;
 		}
 
