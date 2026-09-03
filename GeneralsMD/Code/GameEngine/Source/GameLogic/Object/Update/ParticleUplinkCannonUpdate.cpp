@@ -1149,15 +1149,27 @@ void ParticleUplinkCannonUpdate::recoverTornado()
 		return;
 	}
 
+	// Several of our tornadoes can be alive at once, since the safety-net lifetime on the object
+	// outlasts a firing cycle. The one belonging to this shot is the newest, and object ids rise
+	// with creation order, so take the highest rather than the first we happen to walk past.
 	ObjectID myID = getObject()->getID();
+	ObjectID newest = INVALID_ID;
 	for( Object *obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject() )
 	{
-		if( obj->getProducerID() == myID && obj->getTemplate() == thing )
+		if( obj->getProducerID() != myID || obj->getTemplate() != thing )
 		{
-			m_tornadoObjectID = obj->getID();
-			return;
+			continue;
+		}
+		if( obj->isEffectivelyDead() )
+		{
+			continue;
+		}
+		if( newest == INVALID_ID || obj->getID() > newest )
+		{
+			newest = obj->getID();
 		}
 	}
+	m_tornadoObjectID = newest;
 }
 
 //-------------------------------------------------------------------------------------------------

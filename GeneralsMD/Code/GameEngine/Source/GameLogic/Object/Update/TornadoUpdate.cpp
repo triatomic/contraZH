@@ -25,6 +25,7 @@
 #include "Common/Xfer.h"
 #include "Common/GlobalData.h"
 #include "GameLogic/AI.h"
+#include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectIter.h"
@@ -49,6 +50,9 @@ static const Real TORNADO_APPROACH_FRAMES = 12.0f;
 
 // How far a victim is lifted clear of the ground when it is first grabbed.
 static const Real TORNADO_LIFTOFF_HEIGHT = 2.0f;
+
+// How long a tornado with no timer, no lifetime and no controller runs before ending itself.
+static const UnsignedInt TORNADO_ORPHAN_FRAMES = 30 * LOGICFRAMES_PER_SECOND;
 
 //-------------------------------------------------------------------------------------------------
 TornadoUpdateModuleData::TornadoUpdateModuleData()
@@ -129,7 +133,11 @@ TornadoUpdate::TornadoUpdate( Thing *thing, const ModuleData* moduleData ) : Upd
 //-------------------------------------------------------------------------------------------------
 TornadoUpdate::~TornadoUpdate( void )
 {
-	releaseAll();
+	// The engine may already be tearing down, in which case there is nothing left to release.
+	if( TheGameLogic != nullptr )
+	{
+		releaseAll();
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -141,7 +149,10 @@ void TornadoUpdate::beginRampDown( void )
 	}
 
 	UnsignedInt now = TheGameLogic->getFrame();
-	m_rampDownStartStrength = computeStrength( now );
+
+	// A controller can end us before our first update, when there is no start frame to measure
+	// from yet. Treat that as a tornado that never got going rather than one at full strength.
+	m_rampDownStartStrength = m_started ? computeStrength( now ) : 0.0f;
 	m_rampDownStartFrame = now;
 	m_rampingDown = TRUE;
 }
@@ -228,6 +239,41 @@ Bool TornadoUpdate::canAffect( const Object *obj ) const
 }
 
 //-------------------------------------------------------------------------------------------------
+/** Is something other than this module going to end the object? A controller ramps us down by
+	* hand, and a lifetime module kills the object outright; either way we need no fallback. */
+//-------------------------------------------------------------------------------------------------
+Bool TornadoUpdate::hasExternalLifetime( void ) const
+{
+	static NameKeyType key_LifetimeUpdate = NAMEKEY( "LifetimeUpdate" );
+	return getObject()->findUpdateModule( key_LifetimeUpdate ) != nullptr;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** The rest of the victim test: what the tornado can physically take hold of. Damage uses this
+	* too, so that nothing takes tornado damage without being a candidate for the pull. */
+//-------------------------------------------------------------------------------------------------
+Bool TornadoUpdate::canGrab( const Object *obj ) const
+{
+	if( obj->getPhysics() == nullptr )
+	{
+		return FALSE;
+	}
+	if( obj->isKindOf( KINDOF_IMMOBILE ) || obj->isKindOf( KINDOF_STRUCTURE ) || obj->isKindOf( KINDOF_PROJECTILE ) )
+	{
+		return FALSE;
+	}
+	if( obj->getContainedBy() != nullptr )
+	{
+		return FALSE;
+	}
+	if( obj->isDisabledByType( DISABLED_HELD ) )
+	{
+		return FALSE;
+	}
+	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
 /** Break a victim loose from whatever it was doing, once, as it is grabbed. */
 //-------------------------------------------------------------------------------------------------
 void TornadoUpdate::captureVictim( Object *obj )
@@ -248,11 +294,20 @@ void TornadoUpdate::captureVictim( Object *obj )
 	physics->setAllowBouncing( TRUE );
 
 	// Physics runs before this module and kills upward velocity while an object is on the
-	// ground, so lift alone never gets a victim airborne. Break it loose by hand, once.
+	// ground, so lift alone never gets a victim airborne. Break it loose by hand, once, but
+	// only into space the victim already occupies - setPosition does no collision test.
 	physics->setStickToGround( FALSE );
 	Coord3D liftOff = *obj->getPosition();
-	liftOff.z += TORNADO_LIFTOFF_HEIGHT;
-	obj->setPosition( &liftOff );
+	Real headroom = obj->getGeometryInfo().getMaxHeightAbovePosition();
+	Real step = __min( TORNADO_LIFTOFF_HEIGHT, headroom );
+	if( step > 0.0f )
+	{
+		liftOff.z += step;
+		obj->setPosition( &liftOff );
+
+		// A ground unit owns pathfind cells; leave them behind or others path around bare ground.
+		TheAI->pathfinder()->updatePos( obj, &liftOff );
+	}
 
 	// A braking object does not integrate its horizontal velocity, so it could never be dragged in.
 	obj->clearStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_BRAKING ) );
@@ -325,8 +380,11 @@ void TornadoUpdate::holdVictim( Object *obj, const Coord3D *center, Real groundZ
 		}
 	}
 
-	Real lift = -TheGlobalData->m_gravity * mass;
-	lift += ( wantedRise - physics->getVelocity()->z ) * mass * TORNADO_HOVER_DAMPING;
+	// A victim that overshoots the ceiling needs a downward correction, so the damping term is
+	// allowed to go negative. Zero is the floor only for a victim still climbing; above the
+	// ceiling we stop short of cancelling gravity so it can actually sink back.
+	Real hold = -TheGlobalData->m_gravity * mass;
+	Real lift = hold + ( wantedRise - physics->getVelocity()->z ) * mass * TORNADO_HOVER_DAMPING;
 	if( lift < 0.0f )
 	{
 		lift = 0.0f;
@@ -398,6 +456,9 @@ void TornadoUpdate::releaseVictim( Object *obj )
 
 	physics->setYawRate( 0.0f );
 	physics->scrubVelocity2D( getTornadoUpdateModuleData()->m_releaseSpeed );
+
+	// We cleared this to lift the victim; an idle unit never runs the locomotor that re-arms it.
+	physics->setStickToGround( TRUE );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -442,7 +503,7 @@ void TornadoUpdate::doDamagePulse( const Coord3D *center, Real strength )
 		MemoryPoolObjectHolder hold( iter );
 		for( Object *obj = iter->first(); obj; obj = iter->next() )
 		{
-			if( canAffect( obj ) )
+			if( canAffect( obj ) && canGrab( obj ) )
 			{
 				targets.push_back( obj->getID() );
 			}
@@ -494,6 +555,16 @@ UpdateSleepTime TornadoUpdate::update( void )
 	{
 		beginRampDown();
 	}
+	else if( data->m_fullStrengthFrames == 0 && !m_rampingDown && !hasExternalLifetime() )
+	{
+		// FullStrengthTime 0 means "until something else ends us". If nothing can - no lifetime
+		// module and no controller driving us - fall back to the ramp up time so we still stop.
+		UnsignedInt endless = m_startFrame + data->m_rampUpFrames + TORNADO_ORPHAN_FRAMES;
+		if( now >= endless )
+		{
+			beginRampDown();
+		}
+	}
 
 	Real strength = computeStrength( now );
 	if( m_rampingDown && strength <= 0.0f )
@@ -522,23 +593,7 @@ UpdateSleepTime TornadoUpdate::update( void )
 		MemoryPoolObjectHolder hold( iter );
 		for( Object *obj = iter->first(); obj; obj = iter->next() )
 		{
-			if( !canAffect( obj ) )
-			{
-				continue;
-			}
-			if( obj->getPhysics() == nullptr )
-			{
-				continue;
-			}
-			if( obj->isKindOf( KINDOF_IMMOBILE ) || obj->isKindOf( KINDOF_STRUCTURE ) || obj->isKindOf( KINDOF_PROJECTILE ) )
-			{
-				continue;
-			}
-			if( obj->getContainedBy() != nullptr )
-			{
-				continue;
-			}
-			if( obj->isDisabledByType( DISABLED_HELD ) )
+			if( !canAffect( obj ) || !canGrab( obj ) )
 			{
 				continue;
 			}

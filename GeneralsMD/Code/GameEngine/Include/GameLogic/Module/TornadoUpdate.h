@@ -85,6 +85,8 @@ protected:
 	Real computeStrength( UnsignedInt now ) const;
 	Int buildRelationshipFlags( void ) const;
 	Bool canAffect( const Object *obj ) const;
+	Bool canGrab( const Object *obj ) const;
+	Bool hasExternalLifetime( void ) const;
 	void captureVictim( Object *obj );
 	void holdVictim( Object *obj, const Coord3D *center, Real groundZ, Real strength );
 	void releaseVictim( Object *obj );
