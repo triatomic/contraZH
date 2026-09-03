@@ -301,6 +301,10 @@ void TornadoUpdate::captureVictim( Object *obj )
 	physics->clearAcceleration();
 	physics->setAllowBouncing( TRUE );
 
+	// Forget the locomotor's recent drive, else applyForce would throw away the part of our pull
+	// that is not sideways to the victim's facing for the next third of a second.
+	physics->clearMotiveForce();
+
 	// Victims are all steered onto one ring, so they overlap constantly and the collision system
 	// shoves them apart faster than the orbit can settle. Optionally mute that while we hold them.
 	if( getTornadoUpdateModuleData()->m_ignoreVictimGeometry )
@@ -397,7 +401,7 @@ void TornadoUpdate::holdVictim( Object *obj, const Coord3D *center, Real groundZ
 
 	// Lift is flown as a target climb rate, not a raw push, else the victim accelerates for as
 	// long as it is under the ceiling and shoots through it. Every term is multiplied by mass
-	// because applyMotiveForce divides it straight back out, which is what lets a heavy tank
+	// because applyForce divides it straight back out, which is what lets a heavy tank
 	// ride at the same height as an infantryman.
 	Real mass = physics->getMass();
 	Real ceiling = groundZ + data->m_maxLiftHeight * strength;
@@ -457,8 +461,12 @@ void TornadoUpdate::holdVictim( Object *obj, const Coord3D *center, Real groundZ
 	force.y = ( wantedVel.y - vel->y ) * mass * TORNADO_HOVER_DAMPING;
 	force.z = lift * scale;
 
-	// applyForce would keep only the sideways part of the pull on anything that is driving.
-	physics->applyMotiveForce( &force );
+	// Never applyMotiveForce here. It flags the victim as driven by its locomotor, and an AI that
+	// is holding position - a turreted unit shooting from the ring, say - scrubs the horizontal
+	// velocity of anything so flagged to zero every tick, without checking the stun. The victim
+	// then only ever moves by one frame of acceleration at a time and crawls around the ring
+	// in jerks. Stunned locomotors never re-flag it, so a plain force is never projected either.
+	physics->applyForce( &force );
 
 	// Held victims spin at the full rate whatever they weigh; MassReference only slows the
 	// spin-up of heavy things while the tornado is still building.
