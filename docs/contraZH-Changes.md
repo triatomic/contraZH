@@ -94,6 +94,22 @@ Note: a drone set to acquire targets on its own can still pick a fight after bei
 that is a separate mechanism from following the master's victim. That is a data decision rather than
 an engine one.
 
+## More Generals Challenge personas
+
+ChallengeMode.ini stopped at twelve personas, `GeneralPersona0` through `GeneralPersona11`. A
+thirteenth was quietly dropped by the parser, and because the block was abandoned at that point every
+persona after it was lost too. The ceiling is now twenty four.
+
+The menu draws a persona on the button named `GeneralPosition<N>` in ChallengeMenu.wnd, so a new
+persona needs a matching control added to that layout to be visible. A slot the layout has no button
+for is now skipped instead of crashing the game on entering the Challenge menu, so the code and the
+layout can be updated independently.
+
+Notes:
+* Raising the ceiling does not add any generals by itself. The personas and the buttons are both data.
+* The twelve retail personas are untouched, and a layout that still carries exactly twelve buttons
+behaves as it always did.
+
 # Options.ini
 
 These are read once at startup. Changing them needs a restart.

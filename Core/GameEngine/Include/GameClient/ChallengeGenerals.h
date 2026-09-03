@@ -35,8 +35,9 @@
 #include "Common/Overridable.h"
 
 // DEFINES ////////////////////////////////////////////////////////////////////////////////////////
-//static const Int NUM_GENERALS = 12;  // ChallengeMenu.wnd dependent
-#define NUM_GENERALS (12)
+// A persona with no matching GeneralPosition button in ChallengeMenu.wnd is skipped, so raising
+// this ahead of the layout is safe.
+#define NUM_GENERALS (24)
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class Image;

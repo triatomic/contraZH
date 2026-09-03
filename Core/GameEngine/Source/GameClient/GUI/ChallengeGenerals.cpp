@@ -110,6 +110,18 @@ const FieldParse ChallengeGenerals::s_fieldParseTable[] =
 	{ "GeneralPersona9", ChallengeGenerals::parseGeneralPersona, nullptr, offsetof( ChallengeGenerals, m_position[9] ) },
 	{ "GeneralPersona10", ChallengeGenerals::parseGeneralPersona, nullptr, offsetof( ChallengeGenerals, m_position[10] ) },
 	{ "GeneralPersona11", ChallengeGenerals::parseGeneralPersona, nullptr, offsetof( ChallengeGenerals, m_position[11] ) },
+	{ "GeneralPersona12", ChallengeGenerals::parseGeneralPersona, nullptr, offsetof( ChallengeGenerals, m_position[12] ) },
+	{ "GeneralPersona13", ChallengeGenerals::parseGeneralPersona, nullptr, offsetof( ChallengeGenerals, m_position[13] ) },
+	{ "GeneralPersona14", ChallengeGenerals::parseGeneralPersona, nullptr, offsetof( ChallengeGenerals, m_position[14] ) },
+	{ "GeneralPersona15", ChallengeGenerals::parseGeneralPersona, nullptr, offsetof( ChallengeGenerals, m_position[15] ) },
+	{ "GeneralPersona16", ChallengeGenerals::parseGeneralPersona, nullptr, offsetof( ChallengeGenerals, m_position[16] ) },
+	{ "GeneralPersona17", ChallengeGenerals::parseGeneralPersona, nullptr, offsetof( ChallengeGenerals, m_position[17] ) },
+	{ "GeneralPersona18", ChallengeGenerals::parseGeneralPersona, nullptr, offsetof( ChallengeGenerals, m_position[18] ) },
+	{ "GeneralPersona19", ChallengeGenerals::parseGeneralPersona, nullptr, offsetof( ChallengeGenerals, m_position[19] ) },
+	{ "GeneralPersona20", ChallengeGenerals::parseGeneralPersona, nullptr, offsetof( ChallengeGenerals, m_position[20] ) },
+	{ "GeneralPersona21", ChallengeGenerals::parseGeneralPersona, nullptr, offsetof( ChallengeGenerals, m_position[21] ) },
+	{ "GeneralPersona22", ChallengeGenerals::parseGeneralPersona, nullptr, offsetof( ChallengeGenerals, m_position[22] ) },
+	{ "GeneralPersona23", ChallengeGenerals::parseGeneralPersona, nullptr, offsetof( ChallengeGenerals, m_position[23] ) },
 	{ nullptr, nullptr, nullptr, 0 }
 };
 
