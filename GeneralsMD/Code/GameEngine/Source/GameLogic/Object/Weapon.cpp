@@ -1690,16 +1690,26 @@ VeterancyLevel WeaponTemplate::getEffectiveFXVeterancy(const Object* sourceObj) 
 }
 
 //-------------------------------------------------------------------------------------------------
-// A projectile is never contained, so it is the launcher's containment chain that matters here.
-static Bool isContainingSource(const Object* container, const Object* source)
+static const Object* getEffectiveShooter(const Object* source)
 {
-	const Object* shooter = source;
+	// a projectile is never contained, so it is the launcher's chain that matters
 	if( source->isKindOf( KINDOF_PROJECTILE ) )
 	{
-		shooter = TheGameLogic->findObjectByID( source->getProducerID() );
+		return TheGameLogic->findObjectByID( source->getProducerID() );
 	}
 
-	for( const Object* obj = shooter ? shooter->getContainedBy() : nullptr; obj != nullptr; obj = obj->getContainedBy() )
+	return source;
+}
+
+//-------------------------------------------------------------------------------------------------
+static Bool isSourceContainedBy(const Object* shooter, const Object* container)
+{
+	if( shooter == nullptr )
+	{
+		return FALSE;
+	}
+
+	for( const Object* obj = shooter->getContainedBy(); obj != nullptr; obj = obj->getContainedBy() )
 	{
 		if( obj == container )
 		{
@@ -1746,6 +1756,9 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 		Real primaryDamage = getPrimaryDamage(bonus);
 		Real secondaryDamage = getSecondaryDamage(bonus);
 		Int affects = getAffectsMask();
+
+		// resolved once: the shooter cannot change while we work through the victims
+		const Object* shooter = source ? getEffectiveShooter( source ) : nullptr;
 
 		// Apply random damage variance (from Min:/Max: definition). Roll once per shot so that every
 		// victim caught in the blast takes the same rolled damage. Must use the synchronized game-logic
@@ -1833,8 +1846,8 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 								continue;
 							}
 
-							// a passenger firing out of its ride should no more hurt it than a tank hurts itself
-							if( !TheGlobalData->m_occupantsDamageContainer && isContainingSource( curVictim, source ) )
+							// the SELF gate above is also what lets a suicide weapon still destroy the ride carrying it
+							if( !TheGlobalData->m_occupantsDamageContainer && isSourceContainedBy( shooter, curVictim ) )
 							{
 								continue;
 							}
