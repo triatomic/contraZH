@@ -289,22 +289,23 @@ void TornadoUpdate::holdVictim( Object *obj, const Coord3D *center, Real groundZ
 
 	// Below the ceiling we push up; at it we hold station, else the victim would fall back out
 	// of the lift band and bob up and down for as long as the tornado holds it.
+	// Every lift term is multiplied by mass, because applyMotiveForce divides it straight back
+	// out again. That is what keeps a heavy tank riding at the same height as an infantryman.
+	Real mass = physics->getMass();
 	Real ceiling = groundZ + data->m_maxLiftHeight * strength;
-	Real lift;
+	Real lift = -TheGlobalData->m_gravity * mass;
 	if( pos->z < ceiling )
 	{
-		lift = data->m_liftForce;
+		lift += data->m_liftForce * mass;
 	}
 	else
 	{
-		// Cancel gravity, then bleed off whatever climb or sink is left.
-		Real mass = physics->getMass();
-		lift = -TheGlobalData->m_gravity * mass;
+		// At the ceiling gravity is already cancelled, so just bleed off any climb or sink left.
 		lift -= physics->getVelocity()->z * mass * TORNADO_HOVER_DAMPING;
-		if( lift < 0.0f )
-		{
-			lift = 0.0f;
-		}
+	}
+	if( lift < 0.0f )
+	{
+		lift = 0.0f;
 	}
 
 	// A unit built to shrug off shockwaves shrugs off the tornado by the same amount.
@@ -319,12 +320,15 @@ void TornadoUpdate::holdVictim( Object *obj, const Coord3D *center, Real groundZ
 	// applyForce would keep only the sideways part of the pull on anything that is driving.
 	physics->applyMotiveForce( &force );
 
+	// Held victims spin at the full rate whatever they weigh; MassReference only slows the
+	// spin-up of heavy things while the tornado is still building.
 	Real massScale = 1.0f;
-	if( data->m_massReference > 0.0f )
+	if( data->m_massReference > 0.0f && strength < 1.0f )
 	{
-		massScale = __min( 1.0f, data->m_massReference / physics->getMass() );
+		massScale = __min( 1.0f, data->m_massReference / mass );
+		massScale += ( 1.0f - massScale ) * strength;
 	}
-	physics->setYawRate( data->m_yawRate * strength * massScale );
+	physics->setYawRate( data->m_yawRate * massScale );
 
 	if( data->m_maxVictimSpeed > 0.0f )
 	{
@@ -333,6 +337,10 @@ void TornadoUpdate::holdVictim( Object *obj, const Coord3D *center, Real groundZ
 		physics->scrubVelocityZ( data->m_maxVictimSpeed );
 		physics->scrubVelocityZ( -data->m_maxVictimSpeed );
 	}
+
+	// Physics drops the stun again the moment a victim is slow or low, and a cleared stun hands
+	// the unit back to its locomotor, which lands it. Re-assert it after the speed scrubbing.
+	physics->setStunned( TRUE );
 }
 
 //-------------------------------------------------------------------------------------------------
