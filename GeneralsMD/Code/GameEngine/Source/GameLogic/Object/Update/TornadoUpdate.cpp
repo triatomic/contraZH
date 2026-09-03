@@ -342,19 +342,30 @@ void TornadoUpdate::holdVictim( Object *obj, const Coord3D *center, Real groundZ
 
 	Real distance = toCenter.length();
 	Coord3D radial;
-	radial.zero();
 	Real pullScale = 1.0f;
 	if( distance > 0.01f )
 	{
 		radial.x = toCenter.x / distance;
 		radial.y = toCenter.y / distance;
+	}
+	else
+	{
+		// Dead on the axis there is no radial direction to derive a tangent from, and a zero
+		// tangent means the controller would brake the victim to a halt and pin it at the eye.
+		// Any direction will do, so pick one off the victim's own facing and keep it orbiting.
+		const Coord3D *dir = obj->getUnitDirectionVector2D();
+		radial.x = dir->x;
+		radial.y = dir->y;
+	}
+	radial.z = 0.0f;
 
-		// Fade the inward pull near the axis, else a victim at the eye jitters across it.
-		Real core = data->m_radius * TORNADO_CORE_FRACTION;
-		if( core > 0.0f && distance < core )
-		{
-			pullScale = distance / core;
-		}
+	// Inside the core the pull reverses and pushes back out, so victims settle into a ring and
+	// orbit there instead of all collapsing onto the axis and stacking up in one spot. The
+	// tangential term is left at full strength throughout so the orbit never stalls.
+	Real core = data->m_radius * TORNADO_CORE_FRACTION;
+	if( core > 0.0f && distance < core )
+	{
+		pullScale = ( distance / core ) * 2.0f - 1.0f;
 	}
 
 	// Lift is flown as a target climb rate, not a raw push, else the victim accelerates for as
