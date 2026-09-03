@@ -75,6 +75,7 @@ TornadoUpdateModuleData::TornadoUpdateModuleData()
 	m_forbiddenKindOf.clear();
 	m_targetsMask = WEAPON_AFFECTS_ALLIES | WEAPON_AFFECTS_ENEMIES | WEAPON_AFFECTS_NEUTRALS;
 	m_affectAirborne = FALSE;
+	m_ignoreVictimGeometry = FALSE;
 	m_rampUpFrames = 0;
 	m_fullStrengthFrames = 0;
 	m_rampDownFrames = 0;
@@ -107,6 +108,7 @@ TornadoUpdateModuleData::TornadoUpdateModuleData()
 		{ "ForbiddenKindOf",	KindOfMaskType::parseFromINI,			nullptr,					offsetof( TornadoUpdateModuleData, m_forbiddenKindOf ) },
 		{ "AffectsTargets",		INI::parseBitString32,					TheWeaponAffectsMaskNames,	offsetof( TornadoUpdateModuleData, m_targetsMask ) },
 		{ "AffectAirborne",		INI::parseBool,							nullptr,					offsetof( TornadoUpdateModuleData, m_affectAirborne ) },
+		{ "IgnoreVictimGeometry",INI::parseBool,						nullptr,					offsetof( TornadoUpdateModuleData, m_ignoreVictimGeometry ) },
 		{ "RampUpTime",			INI::parseDurationUnsignedInt,			nullptr,					offsetof( TornadoUpdateModuleData, m_rampUpFrames ) },
 		{ "FullStrengthTime",	INI::parseDurationUnsignedInt,			nullptr,					offsetof( TornadoUpdateModuleData, m_fullStrengthFrames ) },
 		{ "RampDownTime",		INI::parseDurationUnsignedInt,			nullptr,					offsetof( TornadoUpdateModuleData, m_rampDownFrames ) },
@@ -299,6 +301,13 @@ void TornadoUpdate::captureVictim( Object *obj )
 	physics->clearAcceleration();
 	physics->setAllowBouncing( TRUE );
 
+	// Victims are all steered onto one ring, so they overlap constantly and the collision system
+	// shoves them apart faster than the orbit can settle. Optionally mute that while we hold them.
+	if( getTornadoUpdateModuleData()->m_ignoreVictimGeometry )
+	{
+		physics->setAllowCollideForce( FALSE );
+	}
+
 	// Physics runs before this module and kills upward velocity while an object is on the
 	// ground, so lift alone never gets a victim airborne. Break it loose by hand, once, but
 	// only into space the victim already occupies - setPosition does no collision test.
@@ -485,6 +494,11 @@ void TornadoUpdate::releaseVictim( Object *obj )
 
 	physics->setYawRate( 0.0f );
 	physics->scrubVelocity2D( getTornadoUpdateModuleData()->m_releaseSpeed );
+
+	if( getTornadoUpdateModuleData()->m_ignoreVictimGeometry )
+	{
+		physics->setAllowCollideForce( physics->getDefaultAllowCollideForce() );
+	}
 
 	// We cleared this to lift the victim; an idle unit never runs the locomotor that re-arms it.
 	physics->setStickToGround( TRUE );

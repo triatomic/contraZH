@@ -51,6 +51,7 @@ public:
 	KindOfMaskType		m_forbiddenKindOf;			///< a victim must be none of these
 	Int					m_targetsMask;				///< ALLIES, ENEMIES or NEUTRALS
 	Bool				m_affectAirborne;			///< also grab airborne targets
+	Bool				m_ignoreVictimGeometry;		///< stop held victims shoving each other apart
 	UnsignedInt			m_rampUpFrames;				///< time to reach full strength
 	UnsignedInt			m_fullStrengthFrames;		///< time at full strength, 0 lasts until told to stop
 	UnsignedInt			m_rampDownFrames;			///< time to fade from full strength to nothing

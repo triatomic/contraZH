@@ -142,6 +142,7 @@ public:
 	void setAngles( Real yaw, Real pitch, Real roll );
 	Real getMass() const;
 	Real getShockResistance() const { return getPhysicsBehaviorModuleData()->m_shockResistance; }
+	Bool getDefaultAllowCollideForce() const { return getPhysicsBehaviorModuleData()->m_allowCollideForce; }
 	void setMass( Real mass ) { m_mass = mass; }
 	Real getCenterOfMassOffset() const { return getPhysicsBehaviorModuleData()->m_centerOfMassOffset; }
 

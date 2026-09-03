@@ -1645,6 +1645,7 @@ Behavior = TornadoUpdate ModuleTag_Tornado
   ForbiddenKindOf = AIRCRAFT      ; (optional; a victim must be none of these)
   AffectsTargets = ENEMIES NEUTRALS   ; (default = ALLIES ENEMIES NEUTRALS)
   AffectAirborne = No             ; (default = No)
+  IgnoreVictimGeometry = No       ; (default = No; Yes stops held victims shoving each other apart)
   RampUpTime = 2000               ; (ms to reach full strength)
   FullStrengthTime = 6000         ; (ms at full strength; 0 = until the object dies or a controller ends it)
   RampDownTime = 2000             ; (ms to fade to nothing; victims fall once it reaches zero)
@@ -1668,6 +1669,9 @@ End
 - Falling damage on release is the victim's own, from `MinFallHeightForDamage` and
   `FallHeightDamageFactor` on its `PhysicsBehavior`. It only counts a steep descent, which is why
   `ReleaseSpeed = 0` is the reliable way to splat units.
+- `IgnoreVictimGeometry` suppresses collision push-apart between held victims. Because they are
+  all steered onto the same ring they overlap constantly, and wide units can be shoved around
+  faster than the orbit settles, which reads as juddering. It is restored on release.
 - The module does not end the object. Pair it with a `LifetimeUpdate`, or the OCL `MinLifetime` and
   `MaxLifetime` fields, or set `KillObjectWhenDone`.
 
