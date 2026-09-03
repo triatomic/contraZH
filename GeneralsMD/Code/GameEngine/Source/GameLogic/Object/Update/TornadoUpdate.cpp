@@ -23,6 +23,7 @@
 #define DEFINE_DEATH_NAMES
 
 #include "Common/Xfer.h"
+#include "Common/GlobalData.h"
 #include "GameLogic/AI.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
@@ -39,6 +40,9 @@
 
 // Inside this fraction of the radius the pull fades out, so a victim at the eye does not jitter.
 static const Real TORNADO_CORE_FRACTION = 0.1f;
+
+// How hard a hovering victim is pulled back to zero vertical speed once it reaches the ceiling.
+static const Real TORNADO_HOVER_DAMPING = 0.5f;
 
 //-------------------------------------------------------------------------------------------------
 TornadoUpdateModuleData::TornadoUpdateModuleData()
@@ -283,10 +287,24 @@ void TornadoUpdate::holdVictim( Object *obj, const Coord3D *center, Real groundZ
 		}
 	}
 
-	Real lift = 0.0f;
-	if( pos->z < groundZ + data->m_maxLiftHeight * strength )
+	// Below the ceiling we push up; at it we hold station, else the victim would fall back out
+	// of the lift band and bob up and down for as long as the tornado holds it.
+	Real ceiling = groundZ + data->m_maxLiftHeight * strength;
+	Real lift;
+	if( pos->z < ceiling )
 	{
 		lift = data->m_liftForce;
+	}
+	else
+	{
+		// Cancel gravity, then bleed off whatever climb or sink is left.
+		Real mass = physics->getMass();
+		lift = -TheGlobalData->m_gravity * mass;
+		lift -= physics->getVelocity()->z * mass * TORNADO_HOVER_DAMPING;
+		if( lift < 0.0f )
+		{
+			lift = 0.0f;
+		}
 	}
 
 	// A unit built to shrug off shockwaves shrugs off the tornado by the same amount.
