@@ -312,6 +312,10 @@ void TornadoUpdate::holdVictim( Object *obj, const Coord3D *center, Real groundZ
 	if( pos->z < ceiling )
 	{
 		wantedRise = data->m_liftForce * strength;
+		if( data->m_maxVictimSpeed > 0.0f && wantedRise > data->m_maxVictimSpeed )
+		{
+			wantedRise = data->m_maxVictimSpeed;
+		}
 
 		// Ease off over the last stretch so the victim arrives already slow.
 		Real remaining = ceiling - pos->z;
@@ -339,6 +343,18 @@ void TornadoUpdate::holdVictim( Object *obj, const Coord3D *center, Real groundZ
 	wantedVel.x = ( data->m_pullForce * pullScale * radial.x - data->m_spinForce * radial.y ) * scale;
 	wantedVel.y = ( data->m_pullForce * pullScale * radial.y + data->m_spinForce * radial.x ) * scale;
 
+	// Limit what we ask for, rather than clamping the victim after the fact.
+	if( data->m_maxVictimSpeed > 0.0f )
+	{
+		Real wantedSpeed = sqrtf( sqr( wantedVel.x ) + sqr( wantedVel.y ) );
+		if( wantedSpeed > data->m_maxVictimSpeed )
+		{
+			Real trim = data->m_maxVictimSpeed / wantedSpeed;
+			wantedVel.x *= trim;
+			wantedVel.y *= trim;
+		}
+	}
+
 	const Coord3D *vel = physics->getVelocity();
 	Coord3D force;
 	force.x = ( wantedVel.x - vel->x ) * mass * TORNADO_HOVER_DAMPING;
@@ -358,16 +374,13 @@ void TornadoUpdate::holdVictim( Object *obj, const Coord3D *center, Real groundZ
 	}
 	physics->setYawRate( data->m_yawRate * massScale );
 
-	if( data->m_maxVictimSpeed > 0.0f )
-	{
-		// Both scrub calls only ever reduce speed, and scrubVelocityZ is signed, so cap each way.
-		physics->scrubVelocity2D( data->m_maxVictimSpeed );
-		physics->scrubVelocityZ( data->m_maxVictimSpeed );
-		physics->scrubVelocityZ( -data->m_maxVictimSpeed );
-	}
+	// No velocity scrubbing here on purpose. The orbit and climb are already flown as target
+	// speeds, so a scrub would chop the velocity back every frame right after the force built
+	// it up, and the victim would jerk around the tornado instead of gliding. MaxVictimSpeed is
+	// applied to the target above, which is where a limit belongs.
 
 	// Physics drops the stun again the moment a victim is slow or low, and a cleared stun hands
-	// the unit back to its locomotor, which lands it. Re-assert it after the speed scrubbing.
+	// the unit back to its locomotor, which lands it.
 	physics->setStunned( TRUE );
 }
 
