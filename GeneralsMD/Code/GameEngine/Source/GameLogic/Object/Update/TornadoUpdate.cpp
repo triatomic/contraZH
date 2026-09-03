@@ -39,8 +39,8 @@
 
 #include <algorithm>
 
-// Inside this fraction of the radius the pull fades out, so a victim at the eye does not jitter.
-static const Real TORNADO_CORE_FRACTION = 0.1f;
+// Where victims orbit when RingRadius is left unset, as a fraction of the grab radius.
+static const Real TORNADO_DEFAULT_RING_FRACTION = 0.1f;
 
 // How hard a victim is steered toward the climb rate the tornado wants for it.
 static const Real TORNADO_HOVER_DAMPING = 0.35f;
@@ -58,6 +58,7 @@ static const UnsignedInt TORNADO_ORPHAN_FRAMES = 30 * LOGICFRAMES_PER_SECOND;
 TornadoUpdateModuleData::TornadoUpdateModuleData()
 {
 	m_radius = 0.0f;
+	m_ringRadius = 0.0f;
 	m_pullForce = 0.0f;
 	m_liftForce = 0.0f;
 	m_spinForce = 0.0f;
@@ -89,6 +90,7 @@ TornadoUpdateModuleData::TornadoUpdateModuleData()
 	static const FieldParse dataFieldParse[] =
 	{
 		{ "Radius",				INI::parseReal,							nullptr,					offsetof( TornadoUpdateModuleData, m_radius ) },
+		{ "RingRadius",			INI::parseReal,							nullptr,					offsetof( TornadoUpdateModuleData, m_ringRadius ) },
 		{ "PullForce",			INI::parseReal,							nullptr,					offsetof( TornadoUpdateModuleData, m_pullForce ) },
 		{ "LiftForce",			INI::parseReal,							nullptr,					offsetof( TornadoUpdateModuleData, m_liftForce ) },
 		{ "SpinForce",			INI::parseReal,							nullptr,					offsetof( TornadoUpdateModuleData, m_spinForce ) },
@@ -359,13 +361,13 @@ void TornadoUpdate::holdVictim( Object *obj, const Coord3D *center, Real groundZ
 	}
 	radial.z = 0.0f;
 
-	// Inside the core the pull reverses and pushes back out, so victims settle into a ring and
-	// orbit there instead of all collapsing onto the axis and stacking up in one spot. The
+	// Inside the ring the pull reverses and pushes back out, so victims settle at that distance
+	// and orbit there instead of all collapsing onto the axis and stacking up in one spot. The
 	// tangential term is left at full strength throughout so the orbit never stalls.
-	Real core = data->m_radius * TORNADO_CORE_FRACTION;
-	if( core > 0.0f && distance < core )
+	Real ring = ( data->m_ringRadius > 0.0f ) ? data->m_ringRadius : ( data->m_radius * TORNADO_DEFAULT_RING_FRACTION );
+	if( ring > 0.0f && distance < ring )
 	{
-		pullScale = ( distance / core ) * 2.0f - 1.0f;
+		pullScale = ( distance / ring ) * 2.0f - 1.0f;
 	}
 
 	// Lift is flown as a target climb rate, not a raw push, else the victim accelerates for as

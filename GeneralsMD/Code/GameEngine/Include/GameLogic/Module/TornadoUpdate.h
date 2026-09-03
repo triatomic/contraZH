@@ -38,6 +38,7 @@ public:
 	TornadoUpdateModuleData();
 
 	Real				m_radius;					///< how far from this object victims are grabbed
+	Real				m_ringRadius;				///< distance from the axis victims settle into orbit at
 	Real				m_pullForce;				///< inward speed toward the center, per frame
 	Real				m_liftForce;				///< how fast victims climb toward MaxLiftHeight, per frame
 	Real				m_spinForce;				///< orbit speed around the center; negative orbits the other way

@@ -1632,6 +1632,7 @@ module on the object like any other unit. A stationary one can be spawned by a w
 ```
 Behavior = TornadoUpdate ModuleTag_Tornado
   Radius = 120                    ; (required; how far out units are grabbed)
+  RingRadius = 12                 ; (distance from the axis victims orbit at; 0 = a tenth of Radius)
   PullForce = 0.6                 ; (inward speed toward the centre, in distance per frame)
   LiftForce = 1.5                 ; (climb speed toward MaxLiftHeight, in height per frame)
   SpinForce = 6                   ; (orbit speed around the centre; a negative value orbits the other way)
