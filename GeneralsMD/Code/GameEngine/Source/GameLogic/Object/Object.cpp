@@ -1575,6 +1575,32 @@ const Weapon* Object::getCurrentWeapon(WeaponSlotType* wslot) const
 }
 
 //=============================================================================
+Bool Object::isFiringWeaponSlot( WeaponSlotType wslot ) const
+{
+	if( !testStatus( OBJECT_STATUS_IS_ATTACKING ) )
+	{
+		return FALSE;
+	}
+
+	const Weapon* weapon = getCurrentWeapon();
+
+	return weapon != nullptr && weapon->getWeaponSlot() == wslot;
+}
+
+//=============================================================================
+void Object::stopFiringWeaponSlot( WeaponSlotType wslot )
+{
+	// Spending the shots ends the attack next frame by the same path a burst that runs out takes.
+	Weapon* weapon = getWeaponInWeaponSlot( wslot );
+	if( weapon )
+	{
+		weapon->setMaxShotCount( 0 );
+	}
+
+	releaseWeaponLock( LOCKED_TEMPORARILY );
+}
+
+//=============================================================================
 Weapon* Object::findWaypointFollowingCapableWeapon()
 {
 	return m_weaponSet.findWaypointFollowingCapableWeapon();
@@ -2380,7 +2406,7 @@ void Object::setDisabledUntil( DisabledType type, UnsignedInt frame )
 				// Doh. Also shouldn't be tinting when disabled by scripting.
 				// Doh^2. Also shouldn't be CLEARING tinting if we're disabling by held or script disabledness
 				// Doh^3. Unmanned is no tint too
-				if( type != DISABLED_HELD && type != DISABLED_SCRIPT_DISABLED && type != DISABLED_UNMANNED && type != DISABLED_TELEPORT && type != DISABLED_CHRONO)
+				if( type != DISABLED_HELD && type != DISABLED_SCRIPT_DISABLED && type != DISABLED_UNMANNED && type != DISABLED_TELEPORT && type != DISABLED_CHRONO && type != DISABLED_TELEPORT_RECOVER)
 				{
 					m_drawable->setTintStatus( TINT_STATUS_DISABLED );
 				}
@@ -2573,6 +2599,7 @@ Bool Object::clearDisabled( DisabledType type )
 	exceptions.set(DISABLED_UNMANNED);
 	exceptions.set(DISABLED_TELEPORT);
 	exceptions.set(DISABLED_CHRONO);
+	exceptions.set(DISABLED_TELEPORT_RECOVER);
 
 	DisabledMaskType myFlagsMinusExceptions = getDisabledFlags();
 	myFlagsMinusExceptions.clearAndSet(exceptions, DISABLEDMASK_NONE);
@@ -5916,9 +5943,18 @@ void Object::doCommandButton( const CommandButton *commandButton, CommandSourceT
 					return;
 				}
 
+			case GUI_COMMAND_TOGGLE_FIRE_WEAPON:
 			case GUI_COMMAND_FIRE_WEAPON:
 				if( ai )
 				{
+					// a toggle already firing this weapon stops instead, and starts like FIRE_WEAPON otherwise
+					if( commandButton->getCommandType() == GUI_COMMAND_TOGGLE_FIRE_WEAPON
+						&& isFiringWeaponSlot( commandButton->getWeaponSlot() ) )
+					{
+						stopFiringWeaponSlot( commandButton->getWeaponSlot() );
+						return;
+					}
+
 					if( !BitIsSet( commandButton->getOptions(), COMMAND_OPTION_NEED_OBJECT_TARGET ) && !BitIsSet( commandButton->getOptions(), NEED_TARGET_POS ) )
 					{
 						setWeaponLock( commandButton->getWeaponSlot(), LOCKED_TEMPORARILY );
@@ -6136,6 +6172,7 @@ void Object::doCommandButtonAtObject( const CommandButton *commandButton, Object
 			case GUI_COMMAND_REVERSE_MOVE:
 			case GUI_COMMAND_HOLD_FIRE:
 			case GUI_COMMAND_TOGGLE_DEPLOY:
+			case GUI_COMMAND_TOGGLE_FIRE_WEAPON:
 			case GUI_COMMAND_AUTO_FILL:
 			case GUI_COMMAND_GUARD:
 			case GUI_COMMAND_GUARD_WITHOUT_PURSUIT:
@@ -6257,6 +6294,7 @@ void Object::doCommandButtonAtPosition( const CommandButton *commandButton, cons
 			case GUI_COMMAND_SWITCH_WEAPON:
 			case GUI_COMMAND_HOLD_FIRE:
 			case GUI_COMMAND_TOGGLE_DEPLOY:
+			case GUI_COMMAND_TOGGLE_FIRE_WEAPON:
 			case GUICOMMANDMODE_HIJACK_VEHICLE:
 			case GUICOMMANDMODE_CONVERT_TO_CARBOMB:
 #ifdef ALLOW_SURRENDER
@@ -6301,6 +6339,7 @@ void Object::doCommandButtonUsingWaypoints( const CommandButton *commandButton, 
 			case GUI_COMMAND_REVERSE_MOVE:
 			case GUI_COMMAND_HOLD_FIRE:
 			case GUI_COMMAND_TOGGLE_DEPLOY:
+			case GUI_COMMAND_TOGGLE_FIRE_WEAPON:
 			case GUI_COMMAND_AUTO_FILL:
 			case GUI_COMMAND_STOP:
 			case GUI_COMMAND_DOZER_CONSTRUCT:

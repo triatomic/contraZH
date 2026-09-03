@@ -972,6 +972,7 @@ public:
 	// TheSuperHackers @feature Toggle the Hold Fire stance for the whole group.
 	void groupToggleHoldFire( CommandSourceType cmdSource );
 	void groupToggleDeploy( CommandSourceType cmdSource );
+	void groupToggleFireWeapon( WeaponSlotType weaponSlot, Int maxShotsToFire, CommandSourceType cmdSource );
 #ifdef ALLOW_SURRENDER
 	void groupPickUpPrisoner( Object *prisoner, CommandSourceType cmdSource );	///< pick up prisoner
 	void groupReturnToPrison( Object *prison, CommandSourceType cmdSource );		///< return to prison

@@ -1357,6 +1357,37 @@ Improvements to make existing generals-power superweapons work correctly over wa
 
 See also [OrbitalBeamUpdate `HitWaterSurface`](#orbitalbeamupdate-new) and the [DeliverPayload `StrafingWeaponTargetsWater`](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Object-Creation-List#deliverpayload) flag.
 
+# Scorch Mark Selection
+
+## ParticleUplinkCannonUpdate
+
+The particle beam used to burn a random scorch decal (`SCORCH_1` to `SCORCH_4`) every time it marked the ground, which
+a mod cannot change. Mods that replace the scorch art with crater-like decals end up with craters punched along the
+beam path. This key picks which decals the beam is allowed to use, or turns them off entirely.
+
+* `ScorchType = SCORCH_1 SCORCH_2 SCORCH_3 SCORCH_4` - (The scorch types the beam may burn. One name always burns that
+type, several pick randomly among just those, and `NONE` burns no scorches at all. Accepts `SCORCH_1`, `SCORCH_2`,
+`SCORCH_3`, `SCORCH_4`, `SHADOW_SCORCH` and `NONE`.)
+
+Example - a beam that only leaves the fourth scorch decal:
+
+```
+Behavior = ParticleUplinkCannonUpdate ModuleTag_12
+  TotalScorchMarks = 20
+  ScorchMarkScalar = 1.0
+  ScorchType       = SCORCH_4   ; New
+End
+```
+
+Omitting `ScorchType` reproduces the original random `SCORCH_1` to `SCORCH_4` behaviour exactly, so data that does not
+mention it is unaffected.
+
+Behaviour notes:
+* `NONE` only suppresses the decal. The beam still counts its scorch marks, still fires its `GroundHitFX` on the same
+rhythm and still reveals the shroud, so the timing of everything else is untouched.
+* `SHADOW_SCORCH` was never reachable before, because the old random pick stopped at `SCORCH_4`. It is only used if you
+name it.
+
 # Veterancy
 
 ## Veterancy Object Parameters
@@ -1491,6 +1522,37 @@ Behavior = ChronoSphereUpdate ModuleTag_Chrono
   UnitTargetFX = <FXList>      ; FX on each teleported unit at the target
 End
 ```
+
+## TeleportSelfSpecialPower (New)
+
+Special power update module that teleports its own object to a clicked ground position. This is the activated-ability counterpart to [TeleporterAIUpdate](#teleporteraiupdate-new---experimental), which instead replaces all normal movement with teleporting; a unit with this module walks normally the rest of the time.
+
+Pair it with a `SpecialPowerModule` (or `SpecialAbility`) that sets `UpdateModuleStartsAttack = Yes`, otherwise the power triggers itself and a rejected click still consumes the recharge. The `SpecialPower` entry needs `BehaviorEnum = SPECIAL_JUMPJET`, which supplies the position-only validation (no water, no cliffs).
+
+```
+Behavior = TeleportSelfSpecialPower ModuleTag_Teleport
+  SpecialPowerTemplate = <SpecialPower entry>
+  MaxTeleportRange = 0.0       ; furthest the object may teleport, 0 = unlimited
+  TeleportDelay = 0            ; ms between activation and the teleport happening
+  TeleportStartFX = <FXList>   ; FX at the position we left
+  TeleportTargetFX = <FXList>  ; FX at the position we arrived at
+
+  ; Recovery is off entirely unless RecoverDuration is set
+  RecoverDuration = 0          ; ms the unit is immobilized after landing
+  TeleportRecoverEndFX = <FXList>             ; FX when the recovery finishes
+  TeleportRecoverSoundAmbient = <AudioEvent>  ; looped while recovering
+  TeleportRecoverTint = <TintStatus>          ; color tint applied while recovering
+  TeleportRecoverCondition = <ModelCondition> ; e.g. TELEPORT_RECOVER
+  TeleportRecoverOpacityStart = 100%          ; opacity when the recovery starts
+  TeleportRecoverOpacityEnd = 100%            ; opacity when the recovery ends
+End
+```
+
+Notes:
+* The destination is validated when the order is given and again when it fires, so a spot that becomes blocked during `TeleportDelay` cancels the teleport rather than stranding the unit.
+* An unaffordable `Cost`, a dead/garrisoned/disabled caster, or an invalid destination all refuse the order without consuming the recharge.
+* `RecoverDuration` uses `DISABLED_TELEPORT_RECOVER`, which genuinely immobilizes the unit. Because any disable pauses special power countdowns, the effective cooldown becomes `ReloadTime` + `RecoverDuration`.
+* Do **not** set `KINDOF_TELEPORTER` on a unit using this module - that KindOf excludes units from group speed, leader selection and column formations, which would break normal squad movement.
 
 ## MultiLocationSpecialPowerUpdate (New)
 

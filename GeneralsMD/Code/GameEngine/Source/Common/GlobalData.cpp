@@ -101,6 +101,7 @@ GlobalData* GlobalData::m_theOriginal = nullptr;
 	{ "UseTrees",									INI::parseBool,				nullptr,			offsetof( GlobalData, m_useTrees ) },
 	{ "UseFPSLimit",							INI::parseBool,				nullptr,			offsetof( GlobalData, m_useFpsLimit ) },
 	{ "QueueReorder",							INI::parseBool,				nullptr,			offsetof( GlobalData, m_queueReorder ) },
+	{ "NoOccupantFriendlyFire",			INI::parseBool,				nullptr,			offsetof( GlobalData, m_noOccupantFriendlyFire ) },
 	{ "DumpAssetUsage",						INI::parseBool,				nullptr,			offsetof( GlobalData, m_dumpAssetUsage ) },
 	{ "EnableSingleplayerChatwindow",	INI::parseBool,				nullptr,			offsetof( GlobalData, m_enableSingleplayerChatWindow ) },
 	{ "WeaponScatterOnWaterSurfaceDefault",	INI::parseBool,			nullptr,			offsetof( GlobalData, m_weaponScatterOnWaterSurfaceDefault ) },
@@ -628,6 +629,7 @@ GlobalData::GlobalData()
 #endif
   m_TiVOFastMode = FALSE;
   m_queueReorder = FALSE;
+  m_noOccupantFriendlyFire = FALSE;
 
 #if defined(RTS_DEBUG) || ENABLE_CONFIGURABLE_SHROUD
 	m_shroudOn = TRUE;

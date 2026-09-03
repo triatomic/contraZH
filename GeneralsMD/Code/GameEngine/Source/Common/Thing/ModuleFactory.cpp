@@ -152,6 +152,7 @@
 #include "GameLogic/Module/DemoTrapUpdate.h"
 #include "GameLogic/Module/ParticleUplinkCannonUpdate.h"
 #include "GameLogic/Module/ChronoSphereUpdateModule.h"
+#include "GameLogic/Module/TeleportSelfSpecialPower.h"
 #include "GameLogic/Module/MultiLocationSpecialPowerUpdate.h"
 #include "GameLogic/Module/SpectreGunshipUpdate.h"
 #include "GameLogic/Module/SpectreGunshipDeploymentUpdate.h"
@@ -487,6 +488,7 @@ void ModuleFactory::init()
 	addModule( DemoTrapUpdate );
 	addModule( ParticleUplinkCannonUpdate );
 	addModule( ChronoSphereUpdateModule );
+	addModule( TeleportSelfSpecialPower );
 	addModule( MultiLocationSpecialPowerUpdate );
 	addModule( SpectreGunshipUpdate );
 	addModule( SpectreGunshipDeploymentUpdate );

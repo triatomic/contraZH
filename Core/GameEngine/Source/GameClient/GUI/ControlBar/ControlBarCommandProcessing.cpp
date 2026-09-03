@@ -1081,6 +1081,18 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		}
 
 		//---------------------------------------------------------------------------------------------
+		case GUI_COMMAND_TOGGLE_FIRE_WEAPON:
+		{
+			// Only send the intent -- start or stop is decided on the logic side, or clients desync.
+			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_TOGGLE_FIRE_WEAPON );
+			msg->appendIntegerArgument( commandButton->getWeaponSlot() );
+			msg->appendIntegerArgument( commandButton->getMaxShotsToFire() );
+
+			break;
+
+		}
+
+		//---------------------------------------------------------------------------------------------
 		case GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT:
 		{
 			const SpecialPowerTemplate *spTemplate = commandButton->getSpecialPowerTemplate();

@@ -142,9 +142,15 @@ Int findPositionButton( Int controlID )
 //-------------------------------------------------------------------------------------------------
 void setEnabledButtons()
 {
+	const GeneralPersona* generals = TheChallengeGenerals->getChallengeGenerals();
+
 	for (Int i = 0; i < NUM_GENERALS; i++)
 	{
-		const GeneralPersona* generals = TheChallengeGenerals->getChallengeGenerals();
+		if( buttonGeneralPosition[i] == nullptr )
+		{
+			continue;
+		}
+
 		buttonGeneralPosition[i]->winEnable(generals[i].isStartingEnabled());
 		buttonGeneralPosition[i]->winHide(! generals[i].isStartingEnabled());
 
@@ -365,7 +371,15 @@ void ChallengeMenuInit( WindowLayout *layout, void *userData )
 		strButtonName.format("ChallengeMenu.wnd:GeneralPosition%d", i);
 		buttonGeneralPositionID[i] = TheNameKeyGenerator->nameToKey( strButtonName );
 		buttonGeneralPosition[i] = TheWindowManager->winGetWindowFromId( parentMenu, buttonGeneralPositionID[i] );
-		DEBUG_ASSERTCRASH(buttonGeneralPosition[i], ("Could not find the ButtonGeneralPosition[%d]",i ));
+
+		if( buttonGeneralPosition[i] == nullptr )
+		{
+			// an empty slot needs no button, but a persona without one can never be picked
+			DEBUG_ASSERTCRASH( TheChallengeGenerals->getChallengeGenerals()[i].getBioName().isEmpty(),
+				("ChallengeMenu.wnd has no GeneralPosition%d for persona '%s'", i,
+				TheChallengeGenerals->getChallengeGenerals()[i].getBioName().str()) );
+			continue;
+		}
 
 		// start all buttons hidden, then expose them later if there is a general for this spot
 		buttonGeneralPosition[i]->winHide( TRUE );

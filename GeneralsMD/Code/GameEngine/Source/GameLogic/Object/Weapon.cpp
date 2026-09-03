@@ -217,6 +217,7 @@ const FieldParse WeaponTemplate::TheWeaponTemplateFieldParseTable[] =
 	{ "ContinuousFireCoast",			INI::parseDurationUnsignedInt,					nullptr,							offsetof(WeaponTemplate, m_continuousFireCoastFrames) },
  	{ "AutoReloadWhenIdle",				INI::parseDurationUnsignedInt,					nullptr,							offsetof(WeaponTemplate, m_autoReloadWhenIdleFrames) },
 	{ "ClipReloadTime",						INI::parseDurationUnsignedInt,					nullptr,							offsetof(WeaponTemplate, m_clipReloadTime) },
+	{ "ClipReloadDelay",					INI::parseDurationUnsignedInt,					nullptr,							offsetof(WeaponTemplate, m_clipReloadDelay) },
 	{ "DelayBetweenShots",				WeaponTemplate::parseShotDelay,					nullptr,							0 },
 	{ "ShotsPerBarrel",						INI::parseInt,													nullptr,							offsetof(WeaponTemplate, m_shotsPerBarrel) },
 	{ "DamageDealtAtSelfPosition",INI::parseBool,													nullptr,							offsetof(WeaponTemplate, m_damageDealtAtSelfPosition) },
@@ -332,6 +333,7 @@ WeaponTemplate::WeaponTemplate() : m_nextTemplate(nullptr)
 	m_continuousFireCoastFrames			= 0;
  	m_autoReloadWhenIdleFrames			= 0;
 	m_clipReloadTime								= 0;
+	m_clipReloadDelay								= 0;
 	m_minDelayBetweenShots					= 0;
 	m_maxDelayBetweenShots					= 0;
 	m_fireSoundLoopTime							= 0;
@@ -647,6 +649,24 @@ Int WeaponTemplate::getClipReloadTime(const WeaponBonus& bonus) const
 	// yes, divide, not multiply; the larger the rate-of-fire bonus, the shorter
 	// we want the reload time to be.
 	return REAL_TO_INT_FLOOR(m_clipReloadTime / bonus.getField(WeaponBonus::RATE_OF_FIRE));
+}
+
+//-------------------------------------------------------------------------------------------------
+Int WeaponTemplate::getGradualRoundFrames(const WeaponBonus& bonus) const
+{
+	// Floor at a frame, or a big rate-of-fire bonus would divide the round away and refill the
+	// whole clip at once.
+	return max(1, getClipReloadTime(bonus) / m_clipSize);
+}
+
+//-------------------------------------------------------------------------------------------------
+Int WeaponTemplate::getClipReloadDelayFrames(const WeaponBonus& bonus) const
+{
+	// The quiet spell owed after the last shot. The longest shot delay is the floor, so the wait
+	// between two shots of a burst can never finish a round. Deliberately not getDelayBetweenShots,
+	// which rolls the logic random number generator and must only be drawn once per shot.
+	Int delay = max(m_clipReloadDelay, m_maxDelayBetweenShots);
+	return REAL_TO_INT_FLOOR(delay / bonus.getField(WeaponBonus::RATE_OF_FIRE));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1670,6 +1690,37 @@ VeterancyLevel WeaponTemplate::getEffectiveFXVeterancy(const Object* sourceObj) 
 }
 
 //-------------------------------------------------------------------------------------------------
+static const Object* getEffectiveShooter(const Object* source)
+{
+	// a projectile is never contained, so it is the launcher's chain that matters
+	if( source->isKindOf( KINDOF_PROJECTILE ) )
+	{
+		return TheGameLogic->findObjectByID( source->getProducerID() );
+	}
+
+	return source;
+}
+
+//-------------------------------------------------------------------------------------------------
+static Bool isSourceContainedBy(const Object* shooter, const Object* container)
+{
+	if( shooter == nullptr )
+	{
+		return FALSE;
+	}
+
+	for( const Object* obj = shooter->getContainedBy(); obj != nullptr; obj = obj->getContainedBy() )
+	{
+		if( obj == container )
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
 void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, const Coord3D *pos, const WeaponBonus& bonus, Bool isProjectileDetonation) const
 {
 	if (sourceID == 0)	// must have a source
@@ -1705,6 +1756,9 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 		Real primaryDamage = getPrimaryDamage(bonus);
 		Real secondaryDamage = getSecondaryDamage(bonus);
 		Int affects = getAffectsMask();
+
+		// resolved once: the shooter cannot change while we work through the victims
+		const Object* shooter = source ? getEffectiveShooter( source ) : nullptr;
 
 		// Apply random damage variance (from Min:/Max: definition). Roll once per shot so that every
 		// victim caught in the blast takes the same rolled damage. Must use the synchronized game-logic
@@ -1789,6 +1843,12 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 							if( source == curVictim || source->getProducerID() == curVictim->getID() )
 							{
 								//DEBUG_LOG(("skipping damage done to SELF..."));
+								continue;
+							}
+
+							// the SELF gate above is also what lets a suicide weapon still destroy the ride carrying it
+							if( TheGlobalData->m_noOccupantFriendlyFire && isSourceContainedBy( shooter, curVictim ) )
+							{
 								continue;
 							}
 						}
@@ -2317,6 +2377,8 @@ Weapon::Weapon(const WeaponTemplate* tmpl, WeaponSlotType wslot)
 	m_nextPreAttackFXFrame = 0;
 	m_continuousLaserID = INVALID_ID;
 	m_bonusRefObjID = INVALID_ID;
+	m_gradualRoundStart = 0;
+	m_gradualRoundFrames = 0;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2341,6 +2403,8 @@ Weapon::Weapon(const Weapon& that)
 	this->m_nextPreAttackFXFrame = 0;
 	this->m_continuousLaserID = INVALID_ID;
 	this->m_bonusRefObjID = INVALID_ID;
+	this->m_gradualRoundStart = 0;
+	this->m_gradualRoundFrames = 0;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2366,6 +2430,8 @@ Weapon& Weapon::operator=(const Weapon& that)
 		this->m_projectileStreamID = INVALID_ID;
 		this->m_nextPreAttackFXFrame = 0;
 		this->m_continuousLaserID = INVALID_ID;
+		this->m_gradualRoundStart = 0;
+		this->m_gradualRoundFrames = 0;
 	}
 	return *this;
 }
@@ -2455,10 +2521,14 @@ void Weapon::setClipPercentFull(Real percent, Bool allowReduction)
 	if (m_template->getClipSize() == 0)
 		return;
 
+	settleGradualAmmo(TheGameLogic->getFrame());
+
 	Int ammo = REAL_TO_INT_FLOOR(m_template->getClipSize() * percent);
 	if (ammo > m_ammoInClip || (allowReduction && ammo < m_ammoInClip))
 	{
 		m_ammoInClip = ammo;
+		// The caller drives this fill itself, so the round timer restarts with the next shot.
+		stopGradualRound();
 		m_status = m_ammoInClip ? OUT_OF_AMMO : READY_TO_FIRE;
 		//CRCDEBUG_LOG(("Weapon::setClipPercentFull() just set m_status to %d (ammo in clip is %d)", m_status, m_ammoInClip));
 		m_whenLastReloadStarted = TheGameLogic->getFrame();
@@ -2499,8 +2569,35 @@ void Weapon::rebuildScatterTargets(Bool recenter/* = false*/)
 }
 
 //-------------------------------------------------------------------------------------------------
+// Hand the window we just opened to the other slots when they share a reload clock.
+//-------------------------------------------------------------------------------------------------
+void Weapon::propagateSharedReloadWindow(const Object* sourceObj)
+{
+	if (!sourceObj->isReloadTimeShared())
+	{
+		return;
+	}
+
+	for (Int wt = 0; wt<WEAPONSLOT_COUNT; wt++)
+	{
+		Weapon *weapon = sourceObj->getWeaponInWeaponSlot((WeaponSlotType)wt);
+		if (weapon)
+		{
+			weapon->setPossibleNextShotFrame(m_whenWeCanFireAgain);
+			weapon->setLastReloadStartedFrame(m_whenLastReloadStarted);
+			weapon->setStatus(RELOADING_CLIP);
+
+			if (m_template->isResetFireBonesOnReload())
+				weapon->setCurBarrel(0);
+		}
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
 void Weapon::reloadWithBonus(const Object *sourceObj, const WeaponBonus& bonus, Bool loadInstantly)
 {
+	settleGradualAmmo(TheGameLogic->getFrame());
+
 	if (m_template->getClipSize() > 0
 			&& m_ammoInClip == m_template->getClipSize()
 			&& !sourceObj->isReloadTimeShared())
@@ -2509,6 +2606,9 @@ void Weapon::reloadWithBonus(const Object *sourceObj, const WeaponBonus& bonus, 
 	m_ammoInClip = m_template->getClipSize();
 	if (m_ammoInClip <= 0)
 		m_ammoInClip = 0x7fffffff;	// 0 == unlimited (or effectively so)
+
+	// A whole clip arrives at once here, so there is no round left to load.
+	stopGradualRound();
 
 	m_status = RELOADING_CLIP;
 	Real reloadTime = loadInstantly ? 0 : m_template->getClipReloadTime(bonus);
@@ -2524,23 +2624,7 @@ void Weapon::reloadWithBonus(const Object *sourceObj, const WeaponBonus& bonus, 
 			// go through other weapons in weapon set
 			// set their m_whenWeCanFireAgain to this guy's delay
 			// set their m_status to this guy's status
-	if (sourceObj->isReloadTimeShared())
-	{
-		for (Int wt = 0; wt<WEAPONSLOT_COUNT; wt++)
-		{
-			Weapon *weapon = sourceObj->getWeaponInWeaponSlot((WeaponSlotType)wt);
-			if (weapon)
-			{
-				weapon->setPossibleNextShotFrame(m_whenWeCanFireAgain);
-				weapon->setLastReloadStartedFrame(m_whenLastReloadStarted);  // This might actually be right to use here
-				//CRCDEBUG_LOG(("Just set m_whenWeCanFireAgain to %d in Weapon::reloadWithBonus 2", m_whenWeCanFireAgain));
-				weapon->setStatus(RELOADING_CLIP);
-
-				if (m_template->isResetFireBonesOnReload())
-					weapon->setCurBarrel(0);
-			}
-		}
-	}
+	propagateSharedReloadWindow(sourceObj);
 
 	rebuildScatterTargets();
 }
@@ -2604,6 +2688,103 @@ static void rescaleReloadProgress( UnsignedInt now, Int newTotal, UnsignedInt& s
 }
 
 //-------------------------------------------------------------------------------------------------
+// The round start sits a ClipReloadDelay in the future, so a start we have not reached yet is
+// the normal state right after a shot rather than an edge case.
+//-------------------------------------------------------------------------------------------------
+UnsignedInt Weapon::gradualRoundsElapsed(UnsignedInt now) const
+{
+	if (!isGradualRoundLoading() || now < m_gradualRoundStart)
+	{
+		return 0;
+	}
+	return (now - m_gradualRoundStart) / m_gradualRoundFrames;
+}
+
+//-------------------------------------------------------------------------------------------------
+UnsignedInt Weapon::getAmmoInClipGradual() const
+{
+	UnsignedInt loaded = m_ammoInClip + gradualRoundsElapsed(TheGameLogic->getFrame());
+	return min(loaded, (UnsignedInt)m_template->getClipSize());
+}
+
+//-------------------------------------------------------------------------------------------------
+// Fold the rounds that have finished loading into the stored count. Only whole rounds move, so
+// the part of the current one already served survives a rescale.
+//-------------------------------------------------------------------------------------------------
+void Weapon::settleGradualAmmo(UnsignedInt now)
+{
+	UnsignedInt rounds = gradualRoundsElapsed(now);
+	if (rounds == 0)
+	{
+		return;
+	}
+
+	m_ammoInClip = min(m_ammoInClip + rounds, (UnsignedInt)m_template->getClipSize());
+	m_gradualRoundStart += rounds * m_gradualRoundFrames;
+	if (m_ammoInClip >= (UnsignedInt)m_template->getClipSize())
+	{
+		stopGradualRound();
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+void Weapon::restartGradualRound(UnsignedInt now, const WeaponBonus& bonus)
+{
+	// Rounds only start after the weapon has been quiet for ClipReloadDelay, so a weapon still
+	// working through a target gains nothing between its shots.
+	m_gradualRoundStart = now + m_template->getClipReloadDelayFrames(bonus);
+	m_gradualRoundFrames = m_template->getGradualRoundFrames(bonus);
+}
+
+//-------------------------------------------------------------------------------------------------
+// An empty GRADUAL clip waits for one round rather than a whole clip. The wait window matches
+// the round timer, so the reload animation and the command button clock describe the real wait.
+//-------------------------------------------------------------------------------------------------
+void Weapon::beginGradualRoundWait(const Object* sourceObj, const WeaponBonus& bonus, UnsignedInt now)
+{
+	restartGradualRound(now, bonus);
+
+	m_status = RELOADING_CLIP;
+	m_whenLastReloadStarted = now;
+	m_whenWeCanFireAgain = m_gradualRoundStart + m_gradualRoundFrames;
+
+	propagateSharedReloadWindow(sourceObj);
+
+	rebuildScatterTargets();
+}
+
+//-------------------------------------------------------------------------------------------------
+// The clip a shot just drew from. TRUE when that shot emptied it and the wait has begun.
+//-------------------------------------------------------------------------------------------------
+Bool Weapon::onGradualShotFired(const Object* sourceObj, const WeaponBonus& bonus, UnsignedInt now)
+{
+	settleGradualAmmo(now);
+	--m_ammoInClip;
+	if (m_ammoInClip <= 0)
+	{
+		beginGradualRoundWait(sourceObj, bonus, now);
+		return TRUE;
+	}
+
+	restartGradualRound(now, bonus);
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
+void Weapon::rescaleGradualRound(UnsignedInt now, const WeaponBonus& bonus)
+{
+	settleGradualAmmo(now);
+	if (!isGradualRoundLoading())
+	{
+		return;
+	}
+
+	UnsignedInt roundEnd = m_gradualRoundStart + m_gradualRoundFrames;
+	rescaleReloadProgress( now, m_template->getGradualRoundFrames(bonus), m_gradualRoundStart, roundEnd );
+	m_gradualRoundFrames = roundEnd - m_gradualRoundStart;
+}
+
+//-------------------------------------------------------------------------------------------------
 void Weapon::onWeaponBonusChange(const Object *source)
 {
 	// We are concerned with our reload times being off if our ROF just changed.
@@ -2617,7 +2798,15 @@ void Weapon::onWeaponBonusChange(const Object *source)
 
 	if( curStatus == RELOADING_CLIP )
 	{
-		newDelay = m_template->getClipReloadTime(bonus);
+		// A GRADUAL weapon in this state is waiting out a single round, not a clip.
+		if (m_template->isGradualReload() && m_gradualRoundFrames > 0)
+		{
+			newDelay = m_template->getGradualRoundFrames(bonus);
+		}
+		else
+		{
+			newDelay = m_template->getClipReloadTime(bonus);
+		}
 		needUpdate = TRUE;
 	}
 	else if( curStatus == BETWEEN_FIRING_SHOTS )
@@ -2644,6 +2833,11 @@ void Weapon::onWeaponBonusChange(const Object *source)
 				}
 			}
 		}
+	}
+
+	if (isGradualRoundLoading())
+	{
+		rescaleGradualRound(TheGameLogic->getFrame(), bonus);
 	}
 }
 
@@ -3201,6 +3395,11 @@ Bool Weapon::privateFireWeapon(
 	if (!m_template)
 		return false;
 
+	// Hoisted above the damage type switch so the mine clearing path shares it. computeBonus only
+	// fills its out parameter, so computing it here costs nothing else.
+	WeaponBonus bonus;
+	computeBonus(sourceObj, extraBonusFlags, bonus);
+
 	// If we are a networked weapon, tell everyone nearby they might want to get in on this shot
 	if( m_template->getRequestAssistRange()  &&  victimObj )
 		processRequestAssistance( sourceObj, victimObj );
@@ -3268,6 +3467,10 @@ Bool Weapon::privateFireWeapon(
 			}
 
 			--m_maxShotCount;
+			if (m_template->isGradualReload())
+			{
+				return onGradualShotFired(sourceObj, bonus, TheGameLogic->getFrame());
+			}
 			--m_ammoInClip;	// so we can use the delay between shots on the mine clearing weapon
 			if (m_ammoInClip <= 0 && m_template->getAutoReloadsClip())
 			{
@@ -3288,20 +3491,18 @@ Bool Weapon::privateFireWeapon(
 		}
 	}
 
-	WeaponBonus bonus;
-	computeBonus(sourceObj, extraBonusFlags, bonus);
-
 	// debug_printWeaponBonus(&bonus, m_template->getName());
 
 	DEBUG_ASSERTCRASH(getStatus() != OUT_OF_AMMO, ("Hmm, firing weapon that is OUT_OF_AMMO"));
 	DEBUG_ASSERTCRASH(getStatus() == READY_TO_FIRE, ("Hmm, Weapon is firing more often than should be possible"));
-	DEBUG_ASSERTCRASH(m_ammoInClip > 0, ("Hmm, firing an empty weapon"));
+	DEBUG_ASSERTCRASH(getAmmoInClipNow() > 0, ("Hmm, firing an empty weapon"));
 
 	if (getStatus() != READY_TO_FIRE)
 		return false;
 
 	UnsignedInt now = TheGameLogic->getFrame();
 	Bool reloaded = false;
+	settleGradualAmmo(now);
 	if (m_ammoInClip > 0)
 	{
 		// TheSuperHackers @logic-client-separation helmutbuhler 11/04/2025
@@ -3429,7 +3630,12 @@ Bool Weapon::privateFireWeapon(
 
 		if (m_ammoInClip <= 0)
 		{
-			if (m_template->getAutoReloadsClip())
+			if (m_template->isGradualReload())
+			{
+				beginGradualRoundWait(sourceObj, bonus, now);
+				reloaded = true;
+			}
+			else if (m_template->getAutoReloadsClip())
 			{
 				reloadAmmo(sourceObj);
 				reloaded = true;
@@ -3478,6 +3684,11 @@ Bool Weapon::privateFireWeapon(
 				}
 			}
 
+			// Every shot pushes the next round back, so a clip only refills once the firing stops.
+			if (m_template->isGradualReload())
+			{
+				restartGradualRound(now, bonus);
+			}
 		}
 	}
 
@@ -3609,7 +3820,7 @@ WeaponStatus Weapon::getStatus() const
 	}
 	if( now >= m_whenWeCanFireAgain )
 	{
-		if (m_ammoInClip > 0)
+		if (getAmmoInClipNow() > 0)
 			m_status = READY_TO_FIRE;
 		else
 			m_status = OUT_OF_AMMO;
@@ -3690,7 +3901,7 @@ Int Weapon::getPreAttackDelay( const Object *source, const Object *victim ) cons
 	WeaponPrefireType type = m_template->getPrefireType();
 	if( type == PREFIRE_PER_CLIP )
 	{
-		if( m_template->getClipSize() > 0  &&  m_ammoInClip < m_template->getClipSize() )
+		if( m_template->getClipSize() > 0  &&  getAmmoInClipNow() < (UnsignedInt)m_template->getClipSize() )
 			return 0;// I only delay once a clip, and this is not the first shot
 	}
 	else if( type == PREFIRE_PER_ATTACK )
@@ -4027,6 +4238,20 @@ void Weapon::transferReloadStateFrom(const Weapon& weapon, Real clipPercentage/*
 	m_whenPreAttackFinished = weapon.getPreAttackFinishedFrame();
 	m_status = weapon.getStatus();
 
+	if (m_template->isGradualReload() && weapon.isGradualRoundLoading())
+	{
+		// A GRADUAL wait is one round, so the clip really is this empty rather than secretly full.
+		UnsignedInt now = TheGameLogic->getFrame();
+		m_ammoInClip = REAL_TO_INT_FLOOR(m_template->getClipSize() * clipPercentage);
+		m_gradualRoundFrames = weapon.m_gradualRoundFrames;
+		m_gradualRoundStart = weapon.m_gradualRoundStart;
+		settleGradualAmmo(now);
+	}
+	else
+	{
+		stopGradualRound();
+	}
+
 
 	DEBUG_LOG(("Weapon::transferReloadStateFrom (now = %d): m_whenWeCanFireAgain = %d, m_whenLastReloadStarted = %d, m_status = %d", TheGameLogic->getFrame(), m_whenWeCanFireAgain, m_whenLastReloadStarted, m_status));
 }
@@ -4035,6 +4260,8 @@ void Weapon::transferReloadStateFrom(const Weapon& weapon, Real clipPercentage/*
 //-------------------------------------------------------------------------------------------------
 void Weapon::sharedClipIncrementShot()
 {
+	UnsignedInt now = TheGameLogic->getFrame();
+	settleGradualAmmo(now);
 	--m_ammoInClip;
 	--m_maxShotCount;
 	--m_numShotsForCurBarrel;
@@ -4042,6 +4269,13 @@ void Weapon::sharedClipIncrementShot()
 	{
 		++m_curBarrel;
 		m_numShotsForCurBarrel = m_template->getShotsPerBarrel();
+	}
+
+	// There is no firing object here to scale the round, so a shared clip cannot pace one properly.
+	if (m_template->isGradualReload())
+	{
+		WeaponBonus noBonus;
+		restartGradualRound(now, noBonus);
 	}
 }
 
@@ -4144,6 +4378,22 @@ void Weapon::crc( Xfer *xfer )
 		logString.concat(tmp);
 	}
 #endif // DEBUG_CRC
+
+	// Only the weapons that reload this way carry a round timer, so every other weapon keeps the
+	// stream it had and old replays still match. Safe to gate on the template because reload type
+	// and clip size are immutable INI data, identical on every peer.
+	if (m_template->isGradualReload())
+	{
+		xfer->xferUnsignedInt( &m_gradualRoundStart );
+		xfer->xferUnsignedInt( &m_gradualRoundFrames );
+#ifdef DEBUG_CRC
+		if (doLogging)
+		{
+			tmp.format("m_gradualRoundStart %d m_gradualRoundFrames %d ", m_gradualRoundStart, m_gradualRoundFrames);
+			logString.concat(tmp);
+		}
+#endif // DEBUG_CRC
+	}
 
 	// projectile stream object
 	xfer->xferObjectID( &m_projectileStreamID );
@@ -4283,12 +4533,14 @@ void Weapon::crc( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 /** Xfer
 	* Version Info:
-	* 1: Initial version */
+	* 1: Initial version
+	* 2-3: Undocumented in the original source
+	* 4: Gradual reload round timer */
 // ------------------------------------------------------------------------------------------------
 void Weapon::xfer( Xfer *xfer )
 {
 	// version
-	const XferVersion currentVersion = 3;
+	const XferVersion currentVersion = 4;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -4395,6 +4647,12 @@ void Weapon::xfer( Xfer *xfer )
 	// continuous laser object
 	xfer->xferObjectID(&m_continuousLaserID);
 
+	// gradual reload round timer
+	if (version >= 4)
+	{
+		xfer->xferUnsignedInt( &m_gradualRoundStart );
+		xfer->xferUnsignedInt( &m_gradualRoundFrames );
+	}
 
 }  // end xfer
 

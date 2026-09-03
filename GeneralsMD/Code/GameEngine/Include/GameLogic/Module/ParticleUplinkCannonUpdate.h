@@ -83,6 +83,7 @@ public:
 	Real						m_swathOfDeathAmplitude;
 	UnsignedInt			m_totalScorchMarks;
 	Real						m_scorchMarkScalar;
+	UnsignedInt			m_scorchTypeMask;
 
 	UnsignedInt			m_totalDamagePulses;
 	Real						m_damagePerSecond;

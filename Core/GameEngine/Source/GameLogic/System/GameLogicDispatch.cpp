@@ -822,6 +822,21 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			break;
 		}
 
+		// Fire weapon toggle: start the selected group firing, or stop it if it already is.
+		case GameMessage::MSG_TOGGLE_FIRE_WEAPON:
+		{
+			WeaponSlotType weaponSlot = (WeaponSlotType)msg->getArgument( 0 )->integer;
+			Int maxShotsToFire = msg->getArgument( 1 )->integer;
+
+			// use the selected group
+			if( currentlySelectedGroup )
+			{
+				currentlySelectedGroup->groupToggleFireWeapon( weaponSlot, maxShotsToFire, CMD_FROM_PLAYER );
+			}
+
+			break;
+		}
+
 		// Deploy button: flip the selected group between deployed and packed.
 		case GameMessage::MSG_TOGGLE_DEPLOY:
 		{

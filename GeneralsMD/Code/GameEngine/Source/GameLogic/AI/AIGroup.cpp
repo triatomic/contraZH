@@ -3287,6 +3287,44 @@ void AIGroup::groupToggleHoldFire( CommandSourceType cmdSource )
 
 }
 
+// ------------------------------------------------------------------------------------------------
+/** Start the group firing a weapon, or stop it if any member is already firing that weapon. */
+// ------------------------------------------------------------------------------------------------
+void AIGroup::groupToggleFireWeapon( WeaponSlotType weaponSlot, Int maxShotsToFire, CommandSourceType cmdSource )
+{
+	std::list<Object *>::iterator i;
+	Object *obj;
+	Bool anyFiring = FALSE;
+
+	// first pass -- is anyone already firing this weapon?
+	for( i = m_memberList.begin(); i != m_memberList.end(); ++i )
+	{
+		obj = *i;
+
+		if( obj->isFiringWeaponSlot( weaponSlot ) )
+		{
+			anyFiring = TRUE;
+		}
+	}
+
+	// second pass -- move the whole group the same way
+	if( anyFiring )
+	{
+		for( i = m_memberList.begin(); i != m_memberList.end(); ++i )
+		{
+			obj = *i;
+
+			obj->stopFiringWeaponSlot( weaponSlot );
+		}
+	}
+	else if( setWeaponLockForGroup( weaponSlot, LOCKED_TEMPORARILY ) )
+	{
+		groupAttackPosition( nullptr, maxShotsToFire, cmdSource );
+	}
+
+}
+
+
 /**
 	* Deploy or pack up the group on the player's order. A mixed selection is moved to a single
 	* stance rather than each unit flipping its own, so one press does not scatter them.

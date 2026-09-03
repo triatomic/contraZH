@@ -5,9 +5,10 @@ GeneralsGameCode_Modding. Everything here is additional to upstream; the rest of
 applies unchanged.
 
 Almost all of it is client-side presentation and input handling, read from `Options.ini` and
-defaulting to retail behaviour, so an untouched `Options.ini` plays exactly as before. The exception
-is [Gameplay Fixes](#gameplay-fixes), which correct retail bugs in the simulation itself and are
-always on.
+defaulting to retail behaviour, so an untouched `Options.ini` plays exactly as before. Two things sit
+outside that: [Gameplay Fixes](#gameplay-fixes), which correct retail bugs in the simulation itself
+and are always on, and a small number of simulation rules read from the mod's own `GameData.ini`,
+each of which states its default where it is described.
 
 As of August 2026 the fork is synced with TheSuperHackers/GeneralsGameCode and
 GeneralsGameCode_Modding again (their `Core/` restructure included). Everything on this page
@@ -92,6 +93,22 @@ This one changes the simulation, so replays recorded before it will not play bac
 Note: a drone set to acquire targets on its own can still pick a fight after being pulled home, since
 that is a separate mechanism from following the master's victim. That is a data decision rather than
 an engine one.
+
+## More Generals Challenge personas
+
+ChallengeMode.ini stopped at twelve personas, `GeneralPersona0` through `GeneralPersona11`. A
+thirteenth was quietly dropped by the parser, and because the block was abandoned at that point every
+persona after it was lost too. The ceiling is now twenty four.
+
+The menu draws a persona on the button named `GeneralPosition<N>` in ChallengeMenu.wnd, so a new
+persona needs a matching control added to that layout to be visible. A slot the layout has no button
+for is now skipped instead of crashing the game on entering the Challenge menu, so the code and the
+layout can be updated independently.
+
+Notes:
+* Raising the ceiling does not add any generals by itself. The personas and the buttons are both data.
+* The twelve retail personas are untouched, and a layout that still carries exactly twelve buttons
+behaves as it always did.
 
 # Options.ini
 
@@ -242,6 +259,29 @@ checked against the new renderer pay its cost or change appearance.)
 instead, so a very large particle stops getting more expensive without bound. The trade is a coarser
 terrain fit, which is not visible on the effects that actually reach that size.
 
+# GameData.ini
+
+## NoOccupantFriendlyFire
+
+* `NoOccupantFriendlyFire = No` - (Default. `Yes` spares the container a passenger is riding in from
+that passenger's own splash damage.)
+
+An object has never been able to hurt itself with its own splash damage, but a passenger firing out
+of a transport or a garrisoned building is a separate object, so it hurts the thing it is riding in.
+Anti-tank infantry are the usual victims of this: a Tank Hunter in a bunker firing at something
+beside the wall knocks down the bunker holding it. With `NoOccupantFriendlyFire = Yes` the splash
+skips the container the shooter is inside, the same way it already skips the shooter.
+
+Notes:
+* The whole containment chain is skipped, not just the immediate container, so infantry inside a
+bunker riding an Overlord spare both.
+* Weapons that already damage their own firer - `RadiusDamageAffects = SELF`, which is how suicide
+attacks are built - are untouched and still destroy the container.
+* Directly ordering the passenger to attack its own container still damages it. Splash on a nearby
+target is what changes, not a deliberate shot.
+* Turning this on changes the simulation, so a replay must be played back with the same setting it
+was recorded with.
+
 # ObjectCreationList.ini
 
 ## Attack nugget: FireRegardlessOfOrders
@@ -318,6 +358,30 @@ not added to either player’s score, exactly as an ordinary scuttle behaves tod
 The two fields are independent. `SurviveScuttle = Yes` never reaches the kill at all, so it does not
 need `SilentScuttle`.
 
+# FireWeaponWhenDamagedBehavior
+
+## NoHealthLoss
+
+* `NoHealthLoss = No` - (Default. `Yes` refunds the health taken by any hit that passes the
+`DamageTypes` and `DamageAmount` gate.)
+
+The module is often used as a trigger rather than as a reaction to real harm: `DamageTypes` and
+`DamageAmount` name a damage type and a minimum amount that mean "do this now", the way a `MELEE`
+hit of 1 point fires the pilot-killing weapon on an infiltrated vehicle. The trigger hit still cost
+the object that much health, so the signal always came with a bite. With `NoHealthLoss = Yes` the
+health lost to a qualifying hit is given straight back, before the module picks and fires its
+reaction weapon.
+
+Notes:
+* Every qualifying hit is refunded, not only the ones that fire something. A hit that arrives while
+the reaction weapon is reloading, or in a damage state that has no weapon assigned, is still free.
+* Qualifying damage can no longer kill the object or move it between pristine, damaged, really
+damaged and rubble, so the reaction weapon is always chosen for the state the object was already in.
+* The hit still registers as a hit: its damage effects play and it still raises the owner's "under
+attack" warning.
+* Damage types outside `DamageTypes`, and hits below `DamageAmount`, are unaffected and drain health
+normally.
+
 # New CommandButton Commands
 
 ## HOLD_FIRE
@@ -341,6 +405,35 @@ Per-object parameter:
 
 Note: the flag lives on `AIUpdateInterface`, so garrisoned buildings cannot hold fire — most have no
 AI module. Infantry inside a *unit* are covered.
+
+## TOGGLE_FIRE_WEAPON
+
+Fires a weapon exactly as `FIRE_WEAPON` does, but a second click stops it again. Retail has no way
+to call off a `FIRE_WEAPON` order: it runs until `MaxShotsToFire` is spent, so a jammer set to sixty
+shots is committed to all sixty.
+
+```
+CommandButton Slth_Command_JammerStationActivate_HumanPlayer
+  Command          = TOGGLE_FIRE_WEAPON
+  Options          = CHECK_LIKE     ; required, or the button never renders as toggled on
+  WeaponSlot       = SECONDARY
+  MaxShotsToFire   = 60
+  TextLabel        = CONTROLBAR:GLAJamm
+  ButtonImage      = SUJPulse
+  ButtonBorderType = ACTION
+  DescriptLabel    = CONTROLBAR:ToolTipGLAFireJamm
+End
+```
+
+Notes:
+* The button reads the unit's actual state rather than remembering a click, so it also switches off
+by itself once `MaxShotsToFire` is spent.
+* Stopping ends only the firing. A move order given alongside it survives, unlike the stop command,
+which clears everything.
+* The button stays clickable while the weapon reloads between shots. A plain `FIRE_WEAPON` button
+greys out there, which would otherwise take the cancel away for most of a burst.
+* A selection where only some units are firing resolves one way for the whole group: if any of them
+is firing, the click stops all of them.
 
 ## AUTO_FILL
 

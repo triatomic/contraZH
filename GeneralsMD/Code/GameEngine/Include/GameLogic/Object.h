@@ -512,6 +512,8 @@ public:
 
 	Weapon* getCurrentWeapon(WeaponSlotType* wslot = nullptr);
 	const Weapon* getCurrentWeapon(WeaponSlotType* wslot = nullptr) const;
+	Bool isFiringWeaponSlot( WeaponSlotType wslot ) const;	///< is this object attacking with the weapon in this slot?
+	void stopFiringWeaponSlot( WeaponSlotType wslot );		///< end an attack being made with the weapon in this slot
 	void setFiringConditionForCurrentWeapon() const;
 	void adjustModelConditionForWeaponStatus();	///< Check to see if I should change my model condition.
 	void fireCurrentWeapon(Object *target);
@@ -629,6 +631,9 @@ public:
 	void setDisabled( DisabledType type );
 	void setDisabledUntil( DisabledType type, UnsignedInt frame );
 	Bool isDisabledByType( DisabledType type ) const { return TEST_DISABLEDMASK( m_disabledMask, type ); }
+
+	/// mid-teleport, either moving by teleport or recovering from a teleport ability
+	Bool isTeleporting() const { return isDisabledByType( DISABLED_TELEPORT ) || isDisabledByType( DISABLED_TELEPORT_RECOVER ); }
 
 	UnsignedInt getDisabledUntil( DisabledType type = DISABLED_ANY ) const;
 

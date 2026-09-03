@@ -551,6 +551,7 @@ public:
 #endif
   Bool m_TiVOFastMode;            ///< When true, the client speeds up the framerate... set by HOTKEY!
   Bool m_queueReorder;            ///< Ctrl+click moves a build queue entry one position earlier; off unless GameData enables it
+  Bool m_noOccupantFriendlyFire;  ///< spares the container a passenger is riding in from its own splash; off unless GameData enables it
 
 #if defined(RTS_DEBUG) || ENABLE_CONFIGURABLE_SHROUD
 	Bool m_shroudOn;

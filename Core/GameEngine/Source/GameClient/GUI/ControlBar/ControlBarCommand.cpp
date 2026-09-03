@@ -1325,6 +1325,7 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 			break;
 		}
 
+		case GUI_COMMAND_TOGGLE_FIRE_WEAPON:
 		case GUI_COMMAND_FIRE_WEAPON:
 		{
 			AIUpdateInterface *ai = obj->getAIUpdateInterface();
@@ -1332,6 +1333,13 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 			// no ai, can't possibly fire weapon
 			if( ai == nullptr )
 				return COMMAND_RESTRICTED;
+
+			// Must precede the readiness checks below, which grey the button out between shots.
+			if( command->getCommandType() == GUI_COMMAND_TOGGLE_FIRE_WEAPON
+				&& obj->isFiringWeaponSlot( command->getWeaponSlot() ) )
+			{
+				return COMMAND_ACTIVE;
+			}
 
 			// ask the ai if the weapon is ready to fire
 			const Weapon* w = obj->getWeaponInWeaponSlot( command->getWeaponSlot() );

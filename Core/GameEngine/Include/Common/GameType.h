@@ -167,6 +167,8 @@ enum Scorches CPP_11(: Int)
 	SCORCH_COUNT
 };
 
+extern const char *const ScorchNames[];
+
 //-------------------------------------------------------------------------------------------------
 enum WeaponSlotType CPP_11(: Int)
 {

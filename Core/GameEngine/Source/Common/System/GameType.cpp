@@ -46,3 +46,17 @@ const char *const WeatherNames[] =
 	nullptr
 };
 static_assert(ARRAY_SIZE(WeatherNames) == WEATHER_COUNT + 1, "Incorrect array size");
+
+const char *const ScorchNames[] =
+{
+	"SCORCH_1",
+	"SCORCH_2",
+	"SCORCH_3",
+	"SCORCH_4",
+	"SHADOW_SCORCH",
+
+	nullptr
+};
+static_assert(ARRAY_SIZE(ScorchNames) == SCORCH_COUNT + 1, "Incorrect array size");
+// Scorch types are selected as a 32 bit mask, so restoring the commented out decals needs a wider one.
+static_assert(SCORCH_COUNT <= 32, "Too many scorch types to select with a 32 bit mask");
