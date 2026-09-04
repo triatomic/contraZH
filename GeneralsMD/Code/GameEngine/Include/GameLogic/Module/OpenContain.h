@@ -173,7 +173,7 @@ public:
 	virtual Bool isEnclosingContainerFor( const Object *obj ) const override;	///< Does this type of Contain Visibly enclose its contents?
 	virtual Bool isPassengerAllowedToFire( ObjectID id = INVALID_ID ) const override;	///< Hey, can I shoot out of this container?
 	virtual Bool acceptsTargetsForPassengers() const override { return getOpenContainModuleData()->m_acceptTargetsForPassengers; }
-	virtual Bool measuresWeaponRangeFromContainerCenter( const Object *forWhom ) const override { return getOpenContainModuleData()->m_addOnWeaponRangeFromCenter; }
+	virtual Bool measuresWeaponRangeFromContainerCenter() const override { return getOpenContainModuleData()->m_addOnWeaponRangeFromCenter; }
 
   virtual void setPassengerAllowedToFire( Bool permission = TRUE ) override { m_passengerAllowedToFire = permission; }	///< Hey, can I shoot out of this container?
 

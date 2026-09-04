@@ -88,6 +88,16 @@
 	const DistanceCalculationType ATTACK_RANGE_CALC_TYPE = FROM_BOUNDINGSPHERE_3D;
 #endif
 
+// The radius attack range measures to, in whichever dimensionality the constant above selected.
+static inline Real getAttackRangeBoundingRadius(const Object* obj)
+{
+#ifdef ATTACK_RANGE_IS_2D
+	return obj->getGeometryInfo().getBoundingCircleRadius();
+#else
+	return obj->getGeometryInfo().getBoundingSphereRadius();
+#endif
+}
+
 
 // damage is ALWAYS 3d
 const DistanceCalculationType DAMAGE_RANGE_CALC_TYPE = FROM_BOUNDINGSPHERE_3D;
@@ -1654,14 +1664,12 @@ Real WeaponTemplate::computeRangeScaleFactor(const Object* source, const Coord3D
 	Real range = getAttackRange(bonus);
 	// A centered add-on is allowed to fire out to the carrier's hull plus its range, so the
 	// falloff has to span that same band or it saturates before the target is truly at max range.
+	// Only the denominator moves: the shot still flies from the barrel, so fromPos stays put.
+	// Adds nothing when no substitution happened, leaving every other weapon as it was.
 	const Object* rangeSrc = Weapon::getWeaponRangeSource( source );
 	if (rangeSrc != source)
 	{
-	#ifdef ATTACK_RANGE_IS_2D
-		range += rangeSrc->getGeometryInfo().getBoundingCircleRadius();
-	#else
-		range += rangeSrc->getGeometryInfo().getBoundingSphereRadius();
-	#endif
+		range += getAttackRangeBoundingRadius( rangeSrc );
 	}
 	if (!haveFromPos || range <= 0.0f)
 		return 1.0f;
@@ -2927,15 +2935,9 @@ Bool Weapon::computeApproachTarget(const Object *source, const Object *target, c
 
 		// select a spot along the line between us, halfway between the min & max range.
 		Real attackRange = (getAttackRange(source) + minAttackRange)/2.0f;
-#ifdef ATTACK_RANGE_IS_2D
 		if (target)
-			attackRange += target->getGeometryInfo().getBoundingCircleRadius();
-		attackRange += rangeSrc->getGeometryInfo().getBoundingCircleRadius();
-#else
-		if (target)
-			attackRange += target->getGeometryInfo().getBoundingSphereRadius();
-		attackRange += rangeSrc->getGeometryInfo().getBoundingSphereRadius();
-#endif
+			attackRange += getAttackRangeBoundingRadius( target );
+		attackRange += getAttackRangeBoundingRadius( rangeSrc );
 		approachTargetPos.x = attackRange * dir.x + targetPos->x;
 		approachTargetPos.y = attackRange * dir.y + targetPos->y;
 		approachTargetPos.z = attackRange * dir.z + targetPos->z;
@@ -2995,7 +2997,8 @@ Bool Weapon::computeApproachTarget(const Object *source, const Object *target, c
 //-------------------------------------------------------------------------------------------------
 Bool Weapon::isSourceObjectWithGoalPositionWithinAttackRange( const Object *source, const Coord3D *goalPos, const Object *target, const Coord3D *targetPos ) const
 {
-
+	// No range source substitution here, nor in isGoalPosWithinAttackRange: goalPos already says
+	// where to measure from, and both callers are garrison and pathfinding queries about a mover.
 	Real distSqr;
 	if( target )
 		distSqr = ThePartitionManager->getGoalDistanceSquared( source, goalPos, target, ATTACK_RANGE_CALC_TYPE );
@@ -3233,7 +3236,7 @@ const Object *Weapon::getWeaponRangeSource( const Object *source )
 	}
 
 	const ContainModuleInterface *contain = container->getContain();
-	if( contain == nullptr || !contain->measuresWeaponRangeFromContainerCenter( source ) )
+	if( contain == nullptr || !contain->measuresWeaponRangeFromContainerCenter() )
 	{
 		return source;
 	}
@@ -3264,14 +3267,8 @@ Real Weapon::getAttackDistance(const Object *source, const Object *victimObj, co
 
 	if (victimObj != nullptr)
 	{
-		const Object *rangeSrc = getWeaponRangeSource( source );
-	#ifdef ATTACK_RANGE_IS_2D
-		range += rangeSrc->getGeometryInfo().getBoundingCircleRadius();
-		range += victimObj->getGeometryInfo().getBoundingCircleRadius();
-	#else
-		range += rangeSrc->getGeometryInfo().getBoundingSphereRadius();
-		range += victimObj->getGeometryInfo().getBoundingSphereRadius();
-	#endif
+		range += getAttackRangeBoundingRadius( getWeaponRangeSource( source ) );
+		range += getAttackRangeBoundingRadius( victimObj );
 	}
 
 	return range;

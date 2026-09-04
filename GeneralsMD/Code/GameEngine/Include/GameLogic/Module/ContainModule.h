@@ -163,7 +163,7 @@ public:
 	virtual Bool isEnclosingContainerFor( const Object *obj ) const = 0;	///< Does this type of Contain Visibly enclose its contents?
 	virtual Bool isPassengerAllowedToFire( ObjectID id = INVALID_ID ) const = 0;	///< Hey, can I shoot out of this container?
 	virtual Bool acceptsTargetsForPassengers() const = 0;	///< may the container be ordered to attack what only its passengers' weapons can hit?
-	virtual Bool measuresWeaponRangeFromContainerCenter( const Object *forWhom ) const = 0;	///< does the given add-on measure weapon range from the container's center?
+	virtual Bool measuresWeaponRangeFromContainerCenter() const = 0;	///< do our add-ons measure weapon range from our center instead of their own bone?
 	virtual void setPassengerAllowedToFire( Bool permission = TRUE ) = 0;	///< Hey, can I shoot out of this container?
 	virtual void setOverrideDestination( const Coord3D * ) = 0; ///< Instead of falling peacefully towards a clear spot, I will now aim here
 	virtual Bool isDisplayedOnControlBar() const = 0;///< Does this container display its contents on the ControlBar?
