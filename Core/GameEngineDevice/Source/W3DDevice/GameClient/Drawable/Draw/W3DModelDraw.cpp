@@ -2137,8 +2137,9 @@ void W3DModelDraw::setHidden(Bool hidden)
 	if (m_selectionDecal)
 		m_selectionDecal->enableShadowRender(!hidden);
 
+	// goes through the helper so hiding does not override the disabled-state rule
 	if (m_objectDecal)
-		m_objectDecal->enableShadowRender(!hidden);
+		updateObjectDecalVisibility();
 
 	if (m_trackRenderObject && hidden)
 	{	const Coord3D* pos = getDrawable()->getPosition();
@@ -2373,6 +2374,10 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 
 	// update whether or not we should be animating.
 	setPauseAnimation( !getDrawable()->getShouldAnimate(getW3DModelDrawModuleData()->m_animationsRequirePower) );
+
+	// disabled state changes without touching the model, so the decal has to follow it here
+	if (m_objectDecal && getDrawable()->getTemplate()->hidesDecalWhenDisabled())
+		updateObjectDecalVisibility();
 
 	Matrix3D scaledTransform;
 	if (getDrawable()->getInstanceScale() != 1.0f)
@@ -3333,9 +3338,30 @@ void W3DModelDraw::createObjectDecal()
 		m_objectDecal->setColor(tmplate->getDecalColor());
 		m_objectDecal->setOpacity(REAL_TO_INT(tmplate->getDecalOpacity() * 255.0f));
 		m_objectDecal->enableShadowInvisible(m_fullyObscuredByShroud);
-		// a model swap builds an unhidden render object, so ask the drawable rather than the model
-		m_objectDecal->enableShadowRender(!getDrawable()->isDrawableEffectivelyHidden());
+		updateObjectDecalVisibility();
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Point the decal's render flag at the drawable's current state.
+	*
+	* Asks the drawable rather than the render object, which a model swap rebuilds unhidden. */
+//-------------------------------------------------------------------------------------------------
+void W3DModelDraw::updateObjectDecalVisibility()
+{
+	if (m_objectDecal == nullptr)
+		return;
+
+	Bool visible = !getDrawable()->isDrawableEffectivelyHidden();
+
+	if (visible && getDrawable()->getTemplate()->hidesDecalWhenDisabled())
+	{
+		const Object *obj = getDrawable()->getObject();
+		if (obj && obj->isDisabled())
+			visible = FALSE;
+	}
+
+	m_objectDecal->enableShadowRender(visible);
 }
 
 //-------------------------------------------------------------------------------------------------
