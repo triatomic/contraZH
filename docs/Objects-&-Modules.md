@@ -57,6 +57,7 @@ Added new parameters for object definitions:
   DecalStyle = SHADOW_ALPHA_DECAL   ; SHADOW_DECAL, SHADOW_ALPHA_DECAL or SHADOW_ADDITIVE_DECAL
   DecalColor = R:255 G:255 B:255    ; tint, default white
   DecalOpacity = 100%               ; default 100%
+  DecalHideWhenDisabled = No        ; default No
 ```
 
 * `DecalTexture` has no default, unlike `ShadowTexture`. An object that sets `DisplayDecal = Yes`
@@ -70,6 +71,9 @@ shadow-casting setup a display decal does not have, and fall back to `SHADOW_ALP
 * Whichever style, the decal always rasterizes the full `DecalSizeX` by `DecalSizeY` rectangle,
 snapped outward to whole terrain cells, and relies on clamped texture addressing. The art has to
 fade out at its own edges - an opaque edge texel gets stretched across the whole footprint.
+* `DecalHideWhenDisabled = Yes` stops drawing the decal while the object is disabled - EMP,
+hacked, subdued, unmanned, out of power, disabled by script and so on - and brings it back when
+the object recovers. Useful when the decal reads as something the unit is actively doing.
 * `DecalColor` tints the texture. Any alpha written here is ignored - `DecalOpacity` is what fades
 the decal. Both are ignored under `SHADOW_DECAL`, whose blend has no way to apply them.
 * `DecalOpacity` means different things per style. Under `SHADOW_ALPHA_DECAL` it is an ordinary

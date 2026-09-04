@@ -575,6 +575,7 @@ private:
 	void doHideShowProjectileObjects( UnsignedInt showCount, UnsignedInt maxCount, WeaponSlotType slot );///< Means effectively, show m of n.
 	void nukeCurrentRender(Matrix3D* xform);
 	void createObjectDecal();
+	void updateObjectDecalVisibility();
 	void doStartOrStopParticleSys();
 	void adjustAnimSpeedToMovementSpeed();
 	static void hideAllMuzzleFlashes(const ModelConditionInfo* state, RenderObjClass* renderObject);

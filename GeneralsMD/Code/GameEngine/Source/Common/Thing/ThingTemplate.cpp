@@ -259,6 +259,7 @@ const FieldParse ThingTemplate::s_objectFieldParseTable[] =
 	{ "ShadowTexture",				INI::parseAsciiString,		nullptr,	offsetof(ThingTemplate, m_shadowTextureName) },
 	{ "ShadowDynamicLengthWhenAirborne",	INI::parseBool,		nullptr,	offsetof( ThingTemplate, m_shadowHasDynamicLength) },
 	{ "DisplayDecal",					INI::parseBool,				nullptr,	offsetof(ThingTemplate, m_displayDecal) },
+	{ "DecalHideWhenDisabled",	INI::parseBool,				nullptr,	offsetof(ThingTemplate, m_decalHideWhenDisabled) },
 	{ "DecalStyle",						INI::parseBitString8,	TheShadowNames,	offsetof(ThingTemplate, m_decalStyle) },
 	{ "DecalSizeX",						INI::parseReal,				nullptr,	offsetof(ThingTemplate, m_decalSizeX) },
 	{ "DecalSizeY",						INI::parseReal,				nullptr,	offsetof(ThingTemplate, m_decalSizeY) },
@@ -1148,6 +1149,7 @@ ThingTemplate::ThingTemplate() :
 	m_shadowHasDynamicLength = false;
 
 	m_displayDecal = false;
+	m_decalHideWhenDisabled = false;
 	m_decalStyle = SHADOW_ALPHA_DECAL;
 	m_decalSizeX = 0.0f;
 	m_decalSizeY = 0.0f;

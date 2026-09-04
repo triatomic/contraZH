@@ -488,6 +488,7 @@ public:
 
 	// TheSuperHackers @feature Display decal, drawn under the object independently of its shadow.
 	Bool displaysDecal() const { return m_displayDecal; }
+	Bool hidesDecalWhenDisabled() const { return m_decalHideWhenDisabled; }
 	ShadowType getDecalStyle() const { return (ShadowType)m_decalStyle; }
 	Real getDecalSizeX() const { return m_decalSizeX; }
 	Real getDecalSizeY() const { return m_decalSizeY; }
@@ -808,6 +809,7 @@ private:
 	Real					m_decalOffsetY;				///< world-space offset of the display decal texture
 	Real					m_decalOpacity;				///< 0..1, fades the display decal
 	Bool					m_displayDecal;				///< draw a display decal under this object, independent of its shadow
+	Bool					m_decalHideWhenDisabled;	///< stop drawing the display decal while the object is disabled
 
 	// ---- Int-sized things
 	Color					m_decalColor;					///< ARGB tint for the display decal; alpha comes from DecalOpacity
