@@ -963,6 +963,9 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 
 	ObjectID sourceID = sourceObj->getID();
 	const Coord3D* sourcePos = sourceObj->getPosition();
+	// The range gates below must agree with the predicates the AI used to approve this shot,
+	// or a centered add-on aims at a target it then silently refuses to fire on.
+	const Object* rangeSrc = Weapon::getWeaponRangeSource( sourceObj );
 
 	Real distSqr;
 	ObjectID victimID;
@@ -987,7 +990,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 			// for a sneaky offset, we always target a position rather than an object
 			victimObj = nullptr;
 			victimID = INVALID_ID;
-			distSqr = ThePartitionManager->getDistanceSquared(sourceObj, victimPos, ATTACK_RANGE_CALC_TYPE);
+			distSqr = ThePartitionManager->getDistanceSquared(rangeSrc, victimPos, ATTACK_RANGE_CALC_TYPE);
 		}
 		else
 		{
@@ -995,9 +998,9 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 			{
 				// Bridges are kind of oddball - they have 2 target points at either end.
 				TheTerrainLogic->getBridgeAttackPoints(victimObj, &info);
-				distSqr = ThePartitionManager->getDistanceSquared( sourceObj, &info.attackPoint1, ATTACK_RANGE_CALC_TYPE );
+				distSqr = ThePartitionManager->getDistanceSquared( rangeSrc, &info.attackPoint1, ATTACK_RANGE_CALC_TYPE );
 				victimPos = &info.attackPoint1;
- 				Real distSqr2 = ThePartitionManager->getDistanceSquared( sourceObj, &info.attackPoint2, ATTACK_RANGE_CALC_TYPE );
+ 				Real distSqr2 = ThePartitionManager->getDistanceSquared( rangeSrc, &info.attackPoint2, ATTACK_RANGE_CALC_TYPE );
 				if (distSqr > distSqr2)
 				{
 					// Try the other one.
@@ -1007,14 +1010,14 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 			}
 			else
 			{
-				distSqr = ThePartitionManager->getDistanceSquared(sourceObj, victimObj, ATTACK_RANGE_CALC_TYPE);
+				distSqr = ThePartitionManager->getDistanceSquared(rangeSrc, victimObj, ATTACK_RANGE_CALC_TYPE);
 			}
 		}
 	}
 	else
 	{
 		victimID = INVALID_ID;
-		distSqr = ThePartitionManager->getDistanceSquared(sourceObj, victimPos, ATTACK_RANGE_CALC_TYPE);
+		distSqr = ThePartitionManager->getDistanceSquared(rangeSrc, victimPos, ATTACK_RANGE_CALC_TYPE);
 	}
 
 //	DEBUG_LOG(("WeaponTemplate::fireWeaponTemplate: firing weapon %s (source=%s, victim=%s)",
@@ -2844,18 +2847,22 @@ void Weapon::onWeaponBonusChange(const Object *source)
 //-------------------------------------------------------------------------------------------------
 Bool Weapon::computeApproachTarget(const Object *source, const Object *target, const Coord3D *pos, Real angleOffset, Coord3D& approachTargetPos) const
 {
+	// The stopping distance has to be measured the same way the range check will be, or the
+	// carrier parks where its add-on turns out not to reach and creeps forward again.
+	const Object *rangeSrc = getWeaponRangeSource( source );
+
 	// compute unit direction vector from us to our victim
 	const Coord3D *targetPos;
 	Coord3D dir;
 	if (target)
 	{
 		targetPos = target->getPosition();
-		ThePartitionManager->getVectorTo( target, source, ATTACK_RANGE_CALC_TYPE, dir );
+		ThePartitionManager->getVectorTo( target, rangeSrc, ATTACK_RANGE_CALC_TYPE, dir );
 	}
 	else if (pos)
 	{
 		targetPos = pos;
-		ThePartitionManager->getVectorTo( source, pos, ATTACK_RANGE_CALC_TYPE, dir );
+		ThePartitionManager->getVectorTo( rangeSrc, pos, ATTACK_RANGE_CALC_TYPE, dir );
 		// Flip the vector to get from source to pos.
 		dir.x = -dir.x;
 		dir.y = -dir.y;
@@ -2875,7 +2882,7 @@ Bool Weapon::computeApproachTarget(const Object *source, const Object *target, c
 		// We aret too close, so move away from the target.
 		DEBUG_ASSERTCRASH((minAttackRange<0.9f*getAttackRange(source)), ("Min attack range is too near attack range."));
 		// Recompute dir, cause if the bounding spheres touch, it will be 0.
-		Coord3D srcPos = *source->getPosition();
+		Coord3D srcPos = *rangeSrc->getPosition();
 		dir.x = srcPos.x-targetPos->x;
 		dir.y = srcPos.y-targetPos->y;
 #ifdef ATTACK_RANGE_IS_2D
@@ -2912,11 +2919,11 @@ Bool Weapon::computeApproachTarget(const Object *source, const Object *target, c
 #ifdef ATTACK_RANGE_IS_2D
 		if (target)
 			attackRange += target->getGeometryInfo().getBoundingCircleRadius();
-		attackRange += source->getGeometryInfo().getBoundingCircleRadius();
+		attackRange += rangeSrc->getGeometryInfo().getBoundingCircleRadius();
 #else
 		if (target)
 			attackRange += target->getGeometryInfo().getBoundingSphereRadius();
-		attackRange += source->getGeometryInfo().getBoundingSphereRadius();
+		attackRange += rangeSrc->getGeometryInfo().getBoundingSphereRadius();
 #endif
 		approachTargetPos.x = attackRange * dir.x + targetPos->x;
 		approachTargetPos.y = attackRange * dir.y + targetPos->y;
@@ -3002,7 +3009,7 @@ Bool Weapon::isSourceObjectWithGoalPositionWithinAttackRange( const Object *sour
 //-------------------------------------------------------------------------------------------------
 Bool Weapon::isWithinAttackRange(const Object *source, const Coord3D* pos) const
 {
-	Real distSqr = ThePartitionManager->getDistanceSquared( source, pos, ATTACK_RANGE_CALC_TYPE );
+	Real distSqr = ThePartitionManager->getDistanceSquared( getWeaponRangeSource( source ), pos, ATTACK_RANGE_CALC_TYPE );
 	Real attackRangeSqr = sqr(getAttackRange(source));
 	Real minAttackRangeSqr = sqr(m_template->getMinimumAttackRange());
 #ifdef RATIONALIZE_ATTACK_RANGE
@@ -3022,20 +3029,21 @@ Bool Weapon::isWithinAttackRange(const Object *source, const Object *target) con
 	Real distSqr;
 	Real attackRangeSqr = sqr(getAttackRange(source));
 
+	const Object *rangeSrc = getWeaponRangeSource( source );
 	if( !target->isKindOf(KINDOF_BRIDGE) )
 	{
-		distSqr = ThePartitionManager->getDistanceSquared( source, target, ATTACK_RANGE_CALC_TYPE );
+		distSqr = ThePartitionManager->getDistanceSquared( rangeSrc, target, ATTACK_RANGE_CALC_TYPE );
 	}
 	else
 	{
 		// Special case - bridges have two attackable points at either end.
 		TBridgeAttackInfo info;
 		TheTerrainLogic->getBridgeAttackPoints(target, &info);
-		distSqr = ThePartitionManager->getDistanceSquared( source, &info.attackPoint1, ATTACK_RANGE_CALC_TYPE );
+		distSqr = ThePartitionManager->getDistanceSquared( rangeSrc, &info.attackPoint1, ATTACK_RANGE_CALC_TYPE );
 		if (distSqr>attackRangeSqr)
 		{
 			// Try the other one.
-			distSqr = ThePartitionManager->getDistanceSquared( source, &info.attackPoint2, ATTACK_RANGE_CALC_TYPE );
+			distSqr = ThePartitionManager->getDistanceSquared( rangeSrc, &info.attackPoint2, ATTACK_RANGE_CALC_TYPE );
 		}
 	}
 
@@ -3082,7 +3090,7 @@ Bool Weapon::isTooClose(const Object *source, const Object *target) const
 	if (minAttackRange == 0.0f)
 		return false;
 
-	Real distSqr = ThePartitionManager->getDistanceSquared( source, target, ATTACK_RANGE_CALC_TYPE );
+	Real distSqr = ThePartitionManager->getDistanceSquared( getWeaponRangeSource( source ), target, ATTACK_RANGE_CALC_TYPE );
 	if (distSqr < sqr(minAttackRange))
 	{
 		return true;
@@ -3097,7 +3105,7 @@ Bool Weapon::isTooClose( const Object *source, const Coord3D *pos ) const
 	if (minAttackRange == 0.0f)
 		return false;
 
-	Real distSqr = ThePartitionManager->getDistanceSquared( source, pos, ATTACK_RANGE_CALC_TYPE );
+	Real distSqr = ThePartitionManager->getDistanceSquared( getWeaponRangeSource( source ), pos, ATTACK_RANGE_CALC_TYPE );
 	if (distSqr < sqr(minAttackRange))
 	{
 		return true;
@@ -3201,6 +3209,28 @@ Real Weapon::getPercentReadyToFire() const
 }
 
 //-------------------------------------------------------------------------------------------------
+// An add-on turret is placed at a bone on its carrier, and with PassengersInTurret that bone
+// sweeps with the carrier's turret, so measuring from the add-on makes its reach grow and shrink
+// as the turret turns. Substituting the carrier brings both the origin and the bounding circle
+// with it, so the add-on reaches exactly as far as a weapon mounted on the carrier would.
+const Object *Weapon::getWeaponRangeSource( const Object *source )
+{
+	const Object *container = source ? source->getContainedBy() : nullptr;
+	if( container == nullptr )
+	{
+		return source;
+	}
+
+	const ContainModuleInterface *contain = container->getContain();
+	if( contain == nullptr || !contain->measuresWeaponRangeFromContainerCenter( source ) )
+	{
+		return source;
+	}
+
+	return container;
+}
+
+//-------------------------------------------------------------------------------------------------
 Real Weapon::getAttackRange(const Object *source) const
 {
 	WeaponBonus bonus;
@@ -3223,11 +3253,12 @@ Real Weapon::getAttackDistance(const Object *source, const Object *victimObj, co
 
 	if (victimObj != nullptr)
 	{
+		const Object *rangeSrc = getWeaponRangeSource( source );
 	#ifdef ATTACK_RANGE_IS_2D
-		range += source->getGeometryInfo().getBoundingCircleRadius();
+		range += rangeSrc->getGeometryInfo().getBoundingCircleRadius();
 		range += victimObj->getGeometryInfo().getBoundingCircleRadius();
 	#else
-		range += source->getGeometryInfo().getBoundingSphereRadius();
+		range += rangeSrc->getGeometryInfo().getBoundingSphereRadius();
 		range += victimObj->getGeometryInfo().getBoundingSphereRadius();
 	#endif
 	}

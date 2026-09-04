@@ -409,6 +409,44 @@ to firing passengers); the carrier's own guns do not try to aim at a target they
 green attack cursor -- the carrier does not automatically drive into range. Keep a dummy weapon if
 you want the carrier to approach on its own.
 
+### Add-on turret range from the carrier's center
+
+An add-on turret is a separate object placed at a bone on its carrier -- `AddOnBoneName` for
+MultiAddOnContain, the FIREPOINT bones for OverlordContain -- and with `PassengersInTurret = Yes`
+that bone rides the carrier's turret. Weapon range is measured from the firing object's own
+position and bounding circle, so the turret's reach swings by the bone's offset as the carrier's
+turret sweeps: longer the way the barrel points, shorter the other way. The Overlord's gattling
+shows it, and a turret mounted at the front of a chassis shows it plainly -- it opens fire early
+forward and falls short backward, and no single `AttackRange` works in both directions.
+
+* `AddOnWeaponRangeFromCenter = No` - (Yes measures the add-on's weapon range from the carrier's
+center, using the carrier's bounding circle, instead of from its own attachment point.)
+
+```
+Behavior = OverlordContain ModuleTag_Turret
+  Slots                      = 1
+  AllowInsideKindOf          = PORTABLE_STRUCTURE
+  PassengersAllowedToFire    = Yes
+  PassengersInTurret         = Yes
+  PayloadTemplateName        = AmericaThorTurretBolt
+  AddOnWeaponRangeFromCenter = Yes   ; New
+End
+```
+
+Behaviour notes:
+* An add-on whose `AttackRange` equals the carrier's now reaches exactly as far as the carrier
+does, in every direction, at every turret angle -- the range no longer has to be tuned to
+compensate for where the bone sits.
+* `MinimumAttackRange` moves with it, so the too-close band is measured from the carrier's hull
+too, as it would be for a weapon mounted on the carrier.
+* The approach distance moves with it, so a carrier ordered to attack stops where its add-on can
+actually reach.
+* Only the range test moves. The add-on still aims and fires from its own barrel, and its line of
+sight, muzzle effects and projectiles are unchanged.
+* Parses on every contain module but stays inert on TunnelContain and CaveContain, whose passengers
+sit at whichever entrance they used rather than on a bone of the container.
+
+
 ### Filtering by object name
 
 `AllowInsideKindOf` and `ForbidInsideKindOf` can only speak in whole KindOfs. These two name

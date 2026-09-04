@@ -120,6 +120,9 @@ public:
 	// whichever entrance they used -- their answers would come from the wrong place, at the
 	// cost of a network-wide weapon scan per query. The key parses but stays inert.
 	virtual Bool acceptsTargetsForPassengers() const override { return false; }
+	// A passenger here sits at whichever entrance it used, not on a bone of ours, so there is no
+	// offset to correct for and no meaningful center to measure from.
+	virtual Bool measuresWeaponRangeFromContainerCenter( const Object *forWhom ) const override { return false; }
 	virtual Bool isContained( const Object *obj ) const override;
 	virtual UnsignedInt getFullTimeForHeal() const; ///< Returns the time in frames until a contained object becomes fully healed
 	virtual Bool isDisplayedOnControlBar() const override { return TRUE; } ///< Does this container display its contents on the ControlBar?
