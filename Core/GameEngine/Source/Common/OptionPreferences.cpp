@@ -359,14 +359,8 @@ Bool OptionPreferences::getSelectionCircleEnabled(void) const
 // with DisplayDecal. On by default, since the templates opted in.
 Bool OptionPreferences::getObjectDecalsEnabled(void) const
 {
-	OptionPreferences::const_iterator it = find("ObjectDecals");
-	if (it == end())
-		return TRUE;
-
-	if (stricmp(it->second.str(), "no") == 0) {
-		return FALSE;
-	}
-	return TRUE;
+	// the only option here that defaults on, which is exactly what getBool's default expresses
+	return getBool("ObjectDecals", TRUE);
 }
 
 // TheSuperHackers @feature Options.ini: NumericalHealth = Yes prints the hit points beside the

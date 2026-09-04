@@ -494,7 +494,7 @@ public:
 	Real getDecalOffsetX() const { return m_decalOffsetX; }
 	Real getDecalOffsetY() const { return m_decalOffsetY; }
 	Real getDecalOpacity() const { return m_decalOpacity; }
-	UnsignedInt getDecalColor() const { return m_decalColor; }
+	Color getDecalColor() const { return m_decalColor; }
 	const AsciiString& getDecalTextureName() const { return m_decalTextureName; }
 
 	UnsignedInt getOcclusionDelay() const { return m_occlusionDelay;}
@@ -810,7 +810,7 @@ private:
 	Bool					m_displayDecal;				///< draw a display decal under this object, independent of its shadow
 
 	// ---- Int-sized things
-	UnsignedInt			m_decalColor;					///< ARGB tint for the display decal; alpha comes from DecalOpacity
+	Color					m_decalColor;					///< ARGB tint for the display decal; alpha comes from DecalOpacity
 	Int						m_energyProduction;						///< how much Energy this takes (negative values produce Energy, rather than consuming it)
 	Int						m_energyBonus;								///< how much extra Energy this produces due to the upgrade
 	Color					m_displayColor;								///< for the editor display color

@@ -2374,11 +2374,6 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 	// update whether or not we should be animating.
 	setPauseAnimation( !getDrawable()->getShouldAnimate(getW3DModelDrawModuleData()->m_animationsRequirePower) );
 
-	// a state with no model leaves nothing to attach the decal to, and a later state that reuses
-	// the current model name never rebuilds, so pick it up here once a render object exists
-	if (m_objectDecal == nullptr && m_renderObject != nullptr)
-		createObjectDecal();
-
 	Matrix3D scaledTransform;
 	if (getDrawable()->getInstanceScale() != 1.0f)
 	{
@@ -3310,14 +3305,10 @@ void W3DModelDraw::setSelectionDecal(Bool enable, Real radius)
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::createObjectDecal()
 {
-	if (m_objectDecal || m_renderObject == nullptr || TheProjectedShadowManager == nullptr)
-		return;
-
-	if (!TheGlobalData->m_objectDecalsEnabled)
-		return;
-
-	// one decal per object, or every draw module of a multi-model unit stacks its own
-	if (!m_isFirstDrawModule)
+	// m_isFirstDrawModule keeps the decal to one per object, or every draw module of a
+	// multi-model unit would stack its own
+	if (m_objectDecal || m_renderObject == nullptr || !m_isFirstDrawModule
+			|| TheProjectedShadowManager == nullptr || !TheGlobalData->m_objectDecalsEnabled)
 		return;
 
 	const ThingTemplate *tmplate = getDrawable()->getTemplate();
@@ -3337,15 +3328,10 @@ void W3DModelDraw::createObjectDecal()
 	m_objectDecal = TheProjectedShadowManager->addDecal(m_renderObject, &decalInfo);
 	if (m_objectDecal)
 	{
-		// the diffuse starts out opaque white, which an additive decal adds over the whole quad
-		// rather than only where the art is, so it has to be built for the style before drawing.
-		// SHADOW_DECAL multiplies instead, and white is that blend's identity, so leave it alone -
-		// both setters ignore the type anyway.
-		if (tmplate->getDecalStyle() != SHADOW_DECAL)
-		{
-			m_objectDecal->setColor(tmplate->getDecalColor());
-			m_objectDecal->setOpacity(REAL_TO_INT(tmplate->getDecalOpacity() * 255.0f));
-		}
+		// the diffuse starts out opaque white, which an additive decal would add over the whole
+		// quad rather than only where the art is, so it has to be built before drawing
+		m_objectDecal->setColor(tmplate->getDecalColor());
+		m_objectDecal->setOpacity(REAL_TO_INT(tmplate->getDecalOpacity() * 255.0f));
 		m_objectDecal->enableShadowInvisible(m_fullyObscuredByShroud);
 		// a model swap builds an unhidden render object, so ask the drawable rather than the model
 		m_objectDecal->enableShadowRender(!getDrawable()->isDrawableEffectivelyHidden());
@@ -3747,8 +3733,6 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 		if (m_selectionDecalWanted)
 			setSelectionDecal(TRUE, m_selectionDecalRadius);
 
-		createObjectDecal();
-
 		if( m_renderObject )
 		{
 			// set collision type for render object.  Used by WW3D2 collision code.
@@ -3839,6 +3823,10 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 		doHideShowSubObjs(&newState->m_hideShowVec);
 	}
 	hideAllHeadlights(m_hideHeadlights);
+
+	// outside the rebuild branch: a state that reuses the current model keeps its render object
+	// and never rebuilds, but may be the first state to offer one to attach the decal to
+	createObjectDecal();
 
 	const ModelConditionInfo* prevState = m_curState;	// save, to pass to adjustAnimation (could be null)
 	m_curState = newState;

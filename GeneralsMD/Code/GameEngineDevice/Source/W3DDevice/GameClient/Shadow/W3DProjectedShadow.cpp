@@ -2075,23 +2075,20 @@ void W3DProjectedShadowManager::removeShadow (W3DProjectedShadow *shadow)
 	W3DProjectedShadow *prev_shadow=nullptr;
 	W3DProjectedShadow *next_shadow=nullptr;
 
-	// SHADOW_DECAL reaches either list: addShadow puts it on m_shadowList, addDecal on m_decalList.
-	// Searching by type alone would miss the latter and leave the entry linked after the delete.
-	if (shadow->m_type & (SHADOW_DECAL|SHADOW_ALPHA_DECAL|SHADOW_ADDITIVE_DECAL))
+	// which list an entry is on follows from the add function that created it, not from its type -
+	// addShadow and addDecal both accept SHADOW_DECAL - so look in both rather than guess
+	for( next_shadow = m_decalList; next_shadow; prev_shadow=next_shadow, next_shadow = next_shadow->m_next )
 	{
-		for( next_shadow = m_decalList; next_shadow; prev_shadow=next_shadow, next_shadow = next_shadow->m_next )
+		if (next_shadow == shadow)
 		{
-			if (next_shadow == shadow)
-			{
-				if (prev_shadow)
-					prev_shadow->m_next=shadow->m_next;
-				else
-					m_decalList=shadow->m_next;
+			if (prev_shadow)
+				prev_shadow->m_next=shadow->m_next;
+			else
+				m_decalList=shadow->m_next;
 
-				updateShadowNumbers(shadow->m_type, -1);
-				delete shadow;
-				return;
-			}
+			updateShadowNumbers(shadow->m_type, -1);
+			delete shadow;
+			return;
 		}
 	}
 

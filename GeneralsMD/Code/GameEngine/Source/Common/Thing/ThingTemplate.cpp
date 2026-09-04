@@ -1153,7 +1153,7 @@ ThingTemplate::ThingTemplate() :
 	m_decalSizeY = 0.0f;
 	m_decalOffsetX = 0.0f;
 	m_decalOffsetY = 0.0f;
-	m_decalColor = 0xffffffff;
+	m_decalColor = GameMakeColor(255, 255, 255, 255);
 	m_decalOpacity = 1.0f;
 
 	m_occlusionDelay = TheGlobalData->m_defaultOcclusionDelay;
