@@ -157,6 +157,8 @@ public:
 	Int m_castMode;
 	// TheSuperHackers @feature Draw a green hexagon under selected objects.
 	Bool m_selectionCircleEnabled;
+	// TheSuperHackers @feature Draw the decals objects ask for with DisplayDecal.
+	Bool m_objectDecalsEnabled;
 	// TheSuperHackers @feature Keep ammo and passenger pips on screen when there is something
 	// to report, rather than only on selection or hover.
 	Bool m_smartPips;

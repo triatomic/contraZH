@@ -1524,10 +1524,12 @@ Int W3DProjectedShadowManager::renderDecals(RenderInfoClass & rinfo, Bool aboveW
 
 		if (shadow->m_isEnabled && !shadow->m_isInvisibleEnabled)
 		{
+			// seed from this decal, not the list head - the head may have been skipped by the
+			// water pass or by being hidden, and its blend style can differ from this one's
 			if (lastShadowDecalTexture == nullptr)
-				lastShadowDecalTexture=m_decalList->m_shadowTexture[0];
+				lastShadowDecalTexture=shadow->m_shadowTexture[0];
 			if (lastShadowType == SHADOW_NONE)
-				lastShadowType = m_decalList->m_type;
+				lastShadowType = shadow->m_type;
 
 			if (shadow->m_shadowTexture[0] != lastShadowDecalTexture ||
 				shadow->m_type != lastShadowType)
@@ -2073,25 +2075,25 @@ void W3DProjectedShadowManager::removeShadow (W3DProjectedShadow *shadow)
 	W3DProjectedShadow *prev_shadow=nullptr;
 	W3DProjectedShadow *next_shadow=nullptr;
 
-	if (shadow->m_type & (SHADOW_ALPHA_DECAL|SHADOW_ADDITIVE_DECAL))
+	// which list an entry is on follows from the add function that created it, not from its type -
+	// addShadow and addDecal both accept SHADOW_DECAL - so look in both rather than guess
+	for( next_shadow = m_decalList; next_shadow; prev_shadow=next_shadow, next_shadow = next_shadow->m_next )
 	{
-		for( next_shadow = m_decalList; next_shadow; prev_shadow=next_shadow, next_shadow = next_shadow->m_next )
+		if (next_shadow == shadow)
 		{
-			if (next_shadow == shadow)
-			{
-				if (prev_shadow)
-					prev_shadow->m_next=shadow->m_next;
-				else
-					m_decalList=shadow->m_next;
+			if (prev_shadow)
+				prev_shadow->m_next=shadow->m_next;
+			else
+				m_decalList=shadow->m_next;
 
-				updateShadowNumbers(shadow->m_type, -1);
-				delete shadow;
-				return;
-			}
+			updateShadowNumbers(shadow->m_type, -1);
+			delete shadow;
+			return;
 		}
 	}
 
 	//search for this shadow
+	prev_shadow=nullptr;	//the decal list walk above leaves its own tail here
 	for( next_shadow = m_shadowList; next_shadow; prev_shadow=next_shadow, next_shadow = next_shadow->m_next )
 	{
 		if (next_shadow == shadow)

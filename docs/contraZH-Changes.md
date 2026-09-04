@@ -122,6 +122,9 @@ hurt objects, `Always` shows one on everything.)
 `HealthBarDisplayMode`, so the number appears exactly where a bar does.)
 * `SelectionCircle = No` - (Yes draws a green ring on the ground under selected objects. Retail draws
 nothing there; selection is only a brief tint flash on the model.)
+* `ObjectDecals = Yes` - (No suppresses the ground decals objects ask for with `DisplayDecal`.
+On by default, since a template only gets one when it asks. Independent of the 2D and 3D shadow
+settings, because the decal is an aura marker rather than a shadow.)
 * `SmartPips = No` - (Yes keeps ammo and passenger pips on screen instead of showing them only while
 the unit is selected or moused over. Own units only. Nothing is drawn when there is nothing to
 report, so the pips read as "still loaded" and "carrying someone" at a glance.)
@@ -146,6 +149,9 @@ colour, since those come from the bridge list rather than the terrain.
 
 Note: `SelectionCircle` needs a mod-side `PlainRingSelection.tga` — a white or greyscale ring with
 alpha, tinted green at runtime. Until it exists the ring simply does not draw.
+
+Note: `DisplayDecal` likewise needs a mod-side `.tga`, named by `DecalTexture`. There is no default
+texture for it, so an object that asks for a decal without naming one simply does not draw it.
 
 ## Hotkey overlay
 

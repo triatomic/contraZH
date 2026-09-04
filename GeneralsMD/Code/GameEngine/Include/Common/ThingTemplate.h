@@ -485,6 +485,18 @@ public:
 	Bool hasDynamicShadowLength() const { return m_shadowHasDynamicLength; }
 
 	const AsciiString& getShadowTextureName() const { return m_shadowTextureName; }
+
+	// TheSuperHackers @feature Display decal, drawn under the object independently of its shadow.
+	Bool displaysDecal() const { return m_displayDecal; }
+	ShadowType getDecalStyle() const { return (ShadowType)m_decalStyle; }
+	Real getDecalSizeX() const { return m_decalSizeX; }
+	Real getDecalSizeY() const { return m_decalSizeY; }
+	Real getDecalOffsetX() const { return m_decalOffsetX; }
+	Real getDecalOffsetY() const { return m_decalOffsetY; }
+	Real getDecalOpacity() const { return m_decalOpacity; }
+	Color getDecalColor() const { return m_decalColor; }
+	const AsciiString& getDecalTextureName() const { return m_decalTextureName; }
+
 	UnsignedInt getOcclusionDelay() const { return m_occlusionDelay;}
 
 	const ModuleInfo& getBehaviorModuleInfo() const { return m_behaviorModuleInfo; }
@@ -727,6 +739,7 @@ private:
 	AsciiString				m_buttonImageName;
 	AsciiString				m_upgradeCameoUpgradeNames[MAX_UPGRADE_CAMEO_UPGRADES];	///< Use these to find the upgrade images to display on the control bar
 	AsciiString				m_shadowTextureName;					///< name of texture to use for shadow decal
+	AsciiString				m_decalTextureName;						///< name of texture to use for the display decal
 	AsciiString				m_moduleBeingReplacedName;		///< used only during map.ini loading... name (not tag) of Module being replaced, or empty if not inside ReplaceModule block
 	AsciiString				m_moduleBeingReplacedTag;			///< used only during map.ini loading... tag (not name) of Module being replaced, or empty if not inside ReplaceModule block
 #ifdef LOAD_TEST_ASSETS
@@ -789,8 +802,15 @@ private:
 	Real					m_shadowOffsetX;			///< world-space offset of decal shadow texture
 	Real					m_shadowOffsetY;			///< world-space offset of decal shadow texture
 	Bool					m_shadowHasDynamicLength;  ///< dynamic shadow angle scaling based on object height
+	Real					m_decalSizeX;					///< world-space extent of the display decal texture
+	Real					m_decalSizeY;					///< world-space extent of the display decal texture
+	Real					m_decalOffsetX;				///< world-space offset of the display decal texture
+	Real					m_decalOffsetY;				///< world-space offset of the display decal texture
+	Real					m_decalOpacity;				///< 0..1, fades the display decal
+	Bool					m_displayDecal;				///< draw a display decal under this object, independent of its shadow
 
 	// ---- Int-sized things
+	Color					m_decalColor;					///< ARGB tint for the display decal; alpha comes from DecalOpacity
 	Int						m_energyProduction;						///< how much Energy this takes (negative values produce Energy, rather than consuming it)
 	Int						m_energyBonus;								///< how much extra Energy this produces due to the upgrade
 	Color					m_displayColor;								///< for the editor display color
@@ -824,6 +844,7 @@ private:
 	Byte					m_editorSorting;						///< editor sorting type, see EditorSortingType enum
 	Byte					m_structureRubbleHeight;
 	Byte					m_shadowType;								///< settings which determine the type of shadow rendered
+	Byte					m_decalStyle;								///< blend style of the display decal, kept apart so Shadow keeps all 8 bits
 	Byte					m_moduleParsingMode;
 	UnsignedByte	m_crusherLevel;							///< crusher > crushable level to actually crush
 	UnsignedByte	m_crushableLevel;						///< Specifies the level of crushability (must be hit by a crusher greater than this to crush me).

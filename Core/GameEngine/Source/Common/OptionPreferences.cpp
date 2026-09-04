@@ -355,6 +355,14 @@ Bool OptionPreferences::getSelectionCircleEnabled(void) const
 	return FALSE;
 }
 
+// TheSuperHackers @feature Options.ini: ObjectDecals = No suppresses the decals objects ask for
+// with DisplayDecal. On by default, since the templates opted in.
+Bool OptionPreferences::getObjectDecalsEnabled(void) const
+{
+	// the only option here that defaults on, which is exactly what getBool's default expresses
+	return getBool("ObjectDecals", TRUE);
+}
+
 // TheSuperHackers @feature Options.ini: NumericalHealth = Yes prints the hit points beside the
 // health bar. Follows HealthBarDisplayMode, so the number appears exactly where a bar does.
 Bool OptionPreferences::getNumericalHealthEnabled(void) const
