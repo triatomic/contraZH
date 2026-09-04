@@ -1357,6 +1357,8 @@ Improvements to make existing generals-power superweapons work correctly over wa
 
 See also [OrbitalBeamUpdate `HitWaterSurface`](#orbitalbeamupdate-new) and the [DeliverPayload `StrafingWeaponTargetsWater`](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Object-Creation-List#deliverpayload) flag.
 
+See also [ParticleUplinkCannonUpdate `TornadoObjectName`](#particleuplinkcannonupdate-tornado).
+
 # Scorch Mark Selection
 
 ## ParticleUplinkCannonUpdate
@@ -1616,6 +1618,72 @@ Behavior = GlobalLightingModifierUpdate ModuleTag_Lighting
   RequiredUpgrade = <Upgrade> ; optional; the modifier only applies once this upgrade is present
 End
 ```
+
+## TornadoUpdate (New)
+
+Applies a tornado effect around the object: nearby units are dragged toward it, lifted, spun, and
+damaged, and they fall when the effect fades. The strength follows a weak - strong - weak envelope,
+so the tornado builds up, holds, and dies away like the particle uplink cannon beam does.
+
+The module never moves its own object, so a tornado that wanders needs a `Locomotor` and an AI
+module on the object like any other unit. A stationary one can be spawned by a weapon through
+`ProjectileDetonationOCL` or `FireOCL` with a `CreateObject` nugget.
+
+```
+Behavior = TornadoUpdate ModuleTag_Tornado
+  Radius = 120                    ; (required; how far out units are grabbed)
+  RingRadius = 12                 ; (distance from the axis victims orbit at; 0 = a tenth of Radius)
+  PullForce = 0.6                 ; (inward speed toward the centre, in distance per frame)
+  LiftForce = 1.5                 ; (climb speed toward MaxLiftHeight, in height per frame)
+  SpinForce = 6                   ; (orbit speed around the centre; a negative value orbits the other way)
+  YawRate = 360                   ; (how fast a victim spins about its own axis, in degrees per second)
+  MaxLiftHeight = 40              ; (above this height over the tornado ground, lift stops, so victims hover)
+  MaxVictimSpeed = 12             ; (speed cap on victims; 0 = uncapped, which lets them spiral away)
+  MassReference = 100             ; (victims heavier than this spin proportionally slower; 0 = no scaling)
+  ReleaseSpeed = 0                ; (horizontal speed kept when released; 0 drops them straight down)
+  RequiredKindOf = VEHICLE INFANTRY   ; (optional; a victim must be at least one of these)
+  ForbiddenKindOf = AIRCRAFT      ; (optional; a victim must be none of these)
+  AffectsTargets = ENEMIES NEUTRALS   ; (default = ALLIES ENEMIES NEUTRALS)
+  AffectAirborne = No             ; (default = No)
+  IgnoreVictimGeometry = No       ; (default = No; Yes stops held victims shoving each other apart)
+  RampUpTime = 2000               ; (ms to reach full strength)
+  FullStrengthTime = 6000         ; (ms at full strength; 0 = until the object dies or a controller ends it)
+  RampDownTime = 2000             ; (ms to fade to nothing; victims fall once it reaches zero)
+  DamagePerSecond = 20            ; (damage rate at full strength)
+  DamageRadius = 0                ; (default = 0, which uses Radius)
+  DamagePulseDelay = 500          ; (ms between damage pulses; 0 disables damage)
+  DamageType = EXPLOSION          ; (default = EXPLOSION)
+  DeathType = EXPLODED            ; (default = EXPLODED)
+  KillObjectWhenDone = No         ; (default = No; Yes destroys the object once the ramp down finishes)
+End
+```
+**Notes:**
+- A victim needs a `PhysicsBehavior`. Lift, pull and spin all ignore `Mass`, so every held unit
+  rides at the same height and speed. The one per unit resistance is `ShockResistance`, which
+  scales the whole effect down and doubles as an immunity dial.
+- Structures, immobile objects and projectiles take damage but are never pulled. Units inside a
+  transport are untouched; only the transport itself is grabbed.
+- Airborne targets are skipped unless `AffectAirborne = Yes`. Aircraft with a fixed flight height
+  overwrite their own height every frame, so lifting them does not work well.
+- Falling damage on release is the victim's own, from `MinFallHeightForDamage` and
+  `FallHeightDamageFactor` on its `PhysicsBehavior`. It only counts a steep descent, which is why
+  `ReleaseSpeed = 0` is the reliable way to splat units.
+- `IgnoreVictimGeometry` suppresses collision push-apart between held victims. Because they are
+  all steered onto the same ring they overlap constantly, and wide units can be shoved around
+  faster than the orbit settles, which reads as juddering. It is restored on release.
+- The module does not end the object. Pair it with a `LifetimeUpdate`, or the OCL `MinLifetime` and
+  `MaxLifetime` fields, or set `KillObjectWhenDone`. A tornado with `FullStrengthTime = 0` and none
+  of these, and no controller such as the cannon, fades out by itself after 30 seconds.
+
+## ParticleUplinkCannonUpdate (Tornado)
+
+* `TornadoObjectName = <object>` - (Creates this object at the beam ground point when the orbital
+  beam appears, drags it along with the beam, ramps it down when the beam starts decaying, and
+  destroys it when the beam dies or the cannon is sold or destroyed.)
+
+The named object is expected to carry a [TornadoUpdate](#tornadoupdate-new). Give it
+`FullStrengthTime = 0` and a `RampDownTime` matching the cannon `WidthGrowTime`, so that the tornado
+follows the beam for as long as it fires and then fades out with it.
 
 # Misc Improvements
 
