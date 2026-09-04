@@ -653,6 +653,39 @@ Notes:
 * ParkedUnitsDamageScalar can be used to apply an upgrade that grants damage protection to parked aircraft
 * Required/Forbidden KindOf can be used to allow only specific kinds of aircraft to land (i.e. to use different sizes, or differ between VTOL/Regular jets)
 
+### Filtering by object name
+
+`RequiredKindOf` and `ForbiddenKindOf` can only speak in whole KindOfs. These two name individual
+objects instead, so a single aircraft can be kept off an airfield without inventing a KindOf for it.
+
+* `ForbiddenObjects = <object list>` - (These aircraft can never land here. Checked first, so it beats
+everything else, including `AllowedObjects`.)
+* `AllowedObjects = <object list>` - (If set, ONLY these aircraft may land here. Leave it out to allow
+everything the other filters permit.)
+
+Example - an airfield that takes only two of the player's jets:
+```
+Behavior = ParkingPlaceBehavior ModuleTag_park
+  NumRows = 2
+  NumCols = 2
+  HasRunways = Yes
+  ApproachHeight = 40
+  AllowedObjects = AirF_AmericaJetRaptor SupW_AmericaJetStealthFighter
+End
+```
+
+Both keys take several names on one line, and a second line of the same key replaces the first rather
+than adding to it. Matching is on the object name and ignores case.
+
+Notes:
+* These filters are checked in addition to `RequiredKindOf` and `ForbiddenKindOf`, not instead of them.
+An aircraft has to pass both to land, so naming it in `AllowedObjects` does not get it past a
+`ForbiddenKindOf` that rejects it.
+* Leaving both keys out is the previous behavior exactly, so existing INI is unaffected.
+* The filters decide whether an aircraft may land or be produced here. They do not evict anything
+already parked, so changing them does not affect aircraft that are on the airfield.
+* Aircraft with `KINDOF_PRODUCED_AT_HELIPAD` skip these filters, as they already skip the KindOf ones.
+
 ## PoisonedBehavior
 
 Added Beta and Gamma poison tiers, so the poison-over-time effect can be strengthened once the attacker owns an upgrade. The retail parameters keep working unchanged.

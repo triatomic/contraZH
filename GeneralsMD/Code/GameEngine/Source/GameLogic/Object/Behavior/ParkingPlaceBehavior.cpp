@@ -278,6 +278,56 @@ ParkingPlaceBehavior::ParkingPlaceInfo* ParkingPlaceBehavior::findEmptyPPI()
 }
 
 //-------------------------------------------------------------------------------------------------
+/** May this template land here? The KindOf masks speak in whole KindOfs, the name lists name
+  * individual objects, and a template has to pass both. ForbiddenObjects is checked before
+  * AllowedObjects and always wins; AllowedObjects, when set, is exclusive. */
+//-------------------------------------------------------------------------------------------------
+Bool ParkingPlaceBehaviorModuleData::isTemplateAllowedToLand( const ThingTemplate *tmpl ) const
+{
+	if (tmpl == nullptr)
+	{
+		return TRUE;
+	}
+
+	if (!tmpl->isKindOfMulti(m_kindof, m_kindofnot))
+	{
+		return FALSE;
+	}
+
+	if (m_allowedObjects.empty() && m_forbiddenObjects.empty())
+	{
+		return TRUE;
+	}
+
+	const AsciiString& name = tmpl->getName();
+
+	for (std::vector<AsciiString>::const_iterator it = m_forbiddenObjects.begin();
+			 it != m_forbiddenObjects.end(); ++it)
+	{
+		if (it->compareNoCase( name ) == 0)
+		{
+			return FALSE;
+		}
+	}
+
+	if (m_allowedObjects.empty())
+	{
+		return TRUE;
+	}
+
+	for (std::vector<AsciiString>::const_iterator it = m_allowedObjects.begin();
+			 it != m_allowedObjects.end(); ++it)
+	{
+		if (it->compareNoCase( name ) == 0)
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
 // note: called from client, so MUST NOT modify self in any way, or desyncs will occur
 Bool ParkingPlaceBehavior::shouldReserveDoorWhenQueued(const ThingTemplate* thing) const
 {
@@ -298,7 +348,7 @@ Bool ParkingPlaceBehavior::hasAvailableSpaceFor(const ThingTemplate* thing) cons
 		return true;
 
 	const ParkingPlaceBehaviorModuleData* d = getParkingPlaceBehaviorModuleData();
-	if (d && !thing->isKindOfMulti(d->m_kindof, d->m_kindofnot))
+	if (d && !d->isTemplateAllowedToLand(thing))
 		return FALSE;
 
 	for (std::vector<ParkingPlaceInfo>::const_iterator it = m_spaces.begin(); it != m_spaces.end(); ++it)
@@ -332,9 +382,9 @@ Bool ParkingPlaceBehavior::reserveSpace(ObjectID id, Real parkingOffset, Parking
 
 	const ParkingPlaceBehaviorModuleData* d = getParkingPlaceBehaviorModuleData();
 
-	// Check Valid Kindof
 	Object* obj = TheGameLogic->findObjectByID(id);
-	if (d && !obj->getTemplate()->isKindOfMulti(d->m_kindof, d->m_kindofnot))
+	const ThingTemplate* tmpl = obj ? obj->getTemplate() : nullptr;
+	if (d && !d->isTemplateAllowedToLand(tmpl))
 		return FALSE;
 
 	ParkingPlaceInfo* ppi = findPPI(id);
