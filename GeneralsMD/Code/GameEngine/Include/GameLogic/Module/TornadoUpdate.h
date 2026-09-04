@@ -82,27 +82,41 @@ public:
 	/// Start fading out now; safe to call repeatedly and on an already fading tornado.
 	void beginRampDown( void );
 
+	/// A controller promises to end us, so an endless tornado must not end itself.
+	void setExternallyControlled( void ) { m_externallyControlled = TRUE; }
+
 protected:
 
+	/// Everything holdVictim needs that is the same for every victim this frame.
+	struct HoldParams
+	{
+		Coord3D	center;
+		Real	strength;
+		Real	ring;			///< where victims settle; inside it the pull pushes back out
+		Real	steady;			///< inside this the radial direction is too noisy to steer by
+		Real	ceiling;		///< absolute height victims are lifted to
+		Real	riseSpeed;		///< climb rate toward the ceiling
+	};
+
 	Real computeStrength( UnsignedInt now ) const;
-	Int buildRelationshipFlags( void ) const;
+	Bool hasLifetimeUpdate( void ) const;
 	Bool canAffect( const Object *obj ) const;
 	Bool canGrab( const Object *obj ) const;
-	Bool hasExternalLifetime( void ) const;
+	void gatherTargets( const Coord3D *center, Real radius, ObjectIDVector &out );
 	void captureVictim( Object *obj );
-	void holdVictim( Object *obj, const Coord3D *center, Real groundZ, Real strength );
+	void holdVictim( Object *obj, const HoldParams &p );
 	void releaseVictim( Object *obj );
 	void releaseAll( void );
 	void doDamagePulse( const Coord3D *center, Real strength );
 
 	ObjectIDVector	m_victims;				///< who we are currently holding, sorted by id
-	UnsignedInt		m_startFrame;			///< frame the effect began, valid once m_started is set
-	UnsignedInt		m_rampDownStartFrame;	///< frame the fade out began, valid once m_rampingDown is set
+	ObjectIDVector	m_scratch;				///< this frame's gather, kept so it stops reallocating; not saved
+	UnsignedInt		m_startFrame;
+	UnsignedInt		m_rampDownStartFrame;	///< valid once m_rampingDown is set
 	Real			m_rampDownStartStrength;///< strength when the fade out began
 	UnsignedInt		m_nextDamagePulseFrame;
-	Bool			m_started;
 	Bool			m_rampingDown;
-	Bool			m_done;
+	Bool			m_externallyControlled;
 };
 
 #endif

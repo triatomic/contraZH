@@ -200,7 +200,7 @@ protected:
 	void moveTornado();
 	void rampDownTornado();
 	void destroyTornado();
-	void recoverTornado();
+	Object *getTornado() const;
 
 	SpecialPowerModuleInterface* m_specialPowerModule;
 

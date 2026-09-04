@@ -1063,6 +1063,13 @@ void ParticleUplinkCannonUpdate::createGroundToOrbitLaser( UnsignedInt growthFra
 }
 
 //-------------------------------------------------------------------------------------------------
+static TornadoUpdate *findTornadoUpdate( Object *tornado )
+{
+	static NameKeyType key_TornadoUpdate = NAMEKEY( "TornadoUpdate" );
+	return (TornadoUpdate*)tornado->findUpdateModule( key_TornadoUpdate );
+}
+
+//-------------------------------------------------------------------------------------------------
 /** Put a tornado object where the beam lands, so the beam can drag it around. */
 //-------------------------------------------------------------------------------------------------
 void ParticleUplinkCannonUpdate::createTornado()
@@ -1091,17 +1098,29 @@ void ParticleUplinkCannonUpdate::createTornado()
 	tornado->setProducer( me );
 	tornado->setPosition( &m_currentTargetPosition );
 	m_tornadoObjectID = tornado->getID();
+
+	// We end it with the beam, so it must not end itself first.
+	TornadoUpdate *update = findTornadoUpdate( tornado );
+	if( update )
+	{
+		update->setExternallyControlled();
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+Object *ParticleUplinkCannonUpdate::getTornado() const
+{
+	if( m_tornadoObjectID == INVALID_ID )
+	{
+		return nullptr;
+	}
+	return TheGameLogic->findObjectByID( m_tornadoObjectID );
 }
 
 //-------------------------------------------------------------------------------------------------
 void ParticleUplinkCannonUpdate::moveTornado()
 {
-	if( m_tornadoObjectID == INVALID_ID )
-	{
-		return;
-	}
-
-	Object *tornado = TheGameLogic->findObjectByID( m_tornadoObjectID );
+	Object *tornado = getTornado();
 	if( tornado )
 	{
 		tornado->setPosition( &m_currentTargetPosition );
@@ -1113,19 +1132,13 @@ void ParticleUplinkCannonUpdate::moveTornado()
 //-------------------------------------------------------------------------------------------------
 void ParticleUplinkCannonUpdate::rampDownTornado()
 {
-	if( m_tornadoObjectID == INVALID_ID )
-	{
-		return;
-	}
-
-	Object *tornado = TheGameLogic->findObjectByID( m_tornadoObjectID );
+	Object *tornado = getTornado();
 	if( tornado == nullptr )
 	{
 		return;
 	}
 
-	static NameKeyType key_TornadoUpdate = NAMEKEY( "TornadoUpdate" );
-	TornadoUpdate *update = (TornadoUpdate*)tornado->findUpdateModule( key_TornadoUpdate );
+	TornadoUpdate *update = findTornadoUpdate( tornado );
 	if( update )
 	{
 		update->beginRampDown();
@@ -1133,54 +1146,9 @@ void ParticleUplinkCannonUpdate::rampDownTornado()
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Re-attach to a tornado that was saved without its id, so that it still gets ramped down. */
-//-------------------------------------------------------------------------------------------------
-void ParticleUplinkCannonUpdate::recoverTornado()
-{
-	const ParticleUplinkCannonUpdateModuleData *data = getParticleUplinkCannonUpdateModuleData();
-	if( m_tornadoObjectID != INVALID_ID || data->m_tornadoObjectName.isEmpty() )
-	{
-		return;
-	}
-
-	const ThingTemplate *thing = TheThingFactory->findTemplate( data->m_tornadoObjectName );
-	if( thing == nullptr )
-	{
-		return;
-	}
-
-	// Several of our tornadoes can be alive at once, since the safety-net lifetime on the object
-	// outlasts a firing cycle. The one belonging to this shot is the newest, and object ids rise
-	// with creation order, so take the highest rather than the first we happen to walk past.
-	ObjectID myID = getObject()->getID();
-	ObjectID newest = INVALID_ID;
-	for( Object *obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject() )
-	{
-		if( obj->getProducerID() != myID || obj->getTemplate() != thing )
-		{
-			continue;
-		}
-		if( obj->isEffectivelyDead() )
-		{
-			continue;
-		}
-		if( newest == INVALID_ID || obj->getID() > newest )
-		{
-			newest = obj->getID();
-		}
-	}
-	m_tornadoObjectID = newest;
-}
-
-//-------------------------------------------------------------------------------------------------
 void ParticleUplinkCannonUpdate::destroyTornado()
 {
-	if( m_tornadoObjectID == INVALID_ID )
-	{
-		return;
-	}
-
-	Object *tornado = TheGameLogic->findObjectByID( m_tornadoObjectID );
+	Object *tornado = getTornado();
 	if( tornado )
 	{
 		TheGameLogic->destroyObject( tornado );
@@ -1773,11 +1741,5 @@ void ParticleUplinkCannonUpdate::loadPostProcess()
 				m_annihilationSound.setPlayingHandle( TheAudio->addAudioEvent( &m_annihilationSound ) );
 			}
 		}
-	}
-
-	if( m_xferVersion < 5 )
-	{
-		// Saves that predate the tornado id lost it, so find our tornado again by who made it.
-		recoverTornado();
 	}
 }

@@ -1658,10 +1658,9 @@ Behavior = TornadoUpdate ModuleTag_Tornado
 End
 ```
 **Notes:**
-- A victim needs a `PhysicsBehavior`. Lift and spin deliberately ignore `Mass`, so that every held
-  unit rides at the same height and turns at the same rate. The horizontal pull and spin forces are
-  still divided by `Mass`, so heavy units resist being dragged, and every force is scaled down by
-  the victim's `ShockResistance`, which doubles as a per unit immunity dial.
+- A victim needs a `PhysicsBehavior`. Lift, pull and spin all ignore `Mass`, so every held unit
+  rides at the same height and speed. The one per unit resistance is `ShockResistance`, which
+  scales the whole effect down and doubles as an immunity dial.
 - Structures, immobile objects and projectiles take damage but are never pulled. Units inside a
   transport are untouched; only the transport itself is grabbed.
 - Airborne targets are skipped unless `AffectAirborne = Yes`. Aircraft with a fixed flight height
@@ -1673,7 +1672,8 @@ End
   all steered onto the same ring they overlap constantly, and wide units can be shoved around
   faster than the orbit settles, which reads as juddering. It is restored on release.
 - The module does not end the object. Pair it with a `LifetimeUpdate`, or the OCL `MinLifetime` and
-  `MaxLifetime` fields, or set `KillObjectWhenDone`.
+  `MaxLifetime` fields, or set `KillObjectWhenDone`. A tornado with `FullStrengthTime = 0` and none
+  of these, and no controller such as the cannon, fades out by itself after 30 seconds.
 
 ## ParticleUplinkCannonUpdate (Tornado)
 

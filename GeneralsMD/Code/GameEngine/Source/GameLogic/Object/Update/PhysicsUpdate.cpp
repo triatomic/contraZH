@@ -383,10 +383,16 @@ void PhysicsBehavior::applyForce( const Coord3D *force )
 void PhysicsBehavior::applyShock( const Coord3D *force )
 {
 	Coord3D resistedForce = *force;
-	resistedForce.scale( 1.0f - min( 1.0f, max( 0.0f, getPhysicsBehaviorModuleData()->m_shockResistance ) ) );
+	resistedForce.scale( getShockResistanceScale() );
 
 	// Apply the processed shock force to the object
 	applyForce(&resistedForce);
+}
+
+//-------------------------------------------------------------------------------------------------
+Real PhysicsBehavior::getShockResistanceScale() const
+{
+	return 1.0f - clamp( 0.0f, getPhysicsBehaviorModuleData()->m_shockResistance, 1.0f );
 }
 
 //-------------------------------------------------------------------------------------------------

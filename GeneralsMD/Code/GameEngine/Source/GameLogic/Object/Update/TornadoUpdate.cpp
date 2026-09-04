@@ -46,7 +46,7 @@ static const Real TORNADO_DEFAULT_RING_FRACTION = 0.1f;
 // Fraction of the ring inside which the radial direction is too noisy to steer by.
 static const Real TORNADO_STEADY_FRACTION = 0.25f;
 
-// How hard a victim is steered toward the climb rate the tornado wants for it.
+// How hard a victim is steered toward the speed the tornado wants for it.
 static const Real TORNADO_HOVER_DAMPING = 0.35f;
 
 // Frames spent easing into the ceiling, so victims settle instead of slamming into it.
@@ -126,14 +126,12 @@ TornadoUpdateModuleData::TornadoUpdateModuleData()
 //-------------------------------------------------------------------------------------------------
 TornadoUpdate::TornadoUpdate( Thing *thing, const ModuleData* moduleData ) : UpdateModule( thing, moduleData )
 {
-	m_victims.clear();
-	m_startFrame = 0;
+	m_startFrame = TheGameLogic->getFrame();
 	m_rampDownStartFrame = 0;
 	m_rampDownStartStrength = 0.0f;
-	m_nextDamagePulseFrame = 0;
-	m_started = FALSE;
+	m_nextDamagePulseFrame = m_startFrame;
 	m_rampingDown = FALSE;
-	m_done = FALSE;
+	m_externallyControlled = FALSE;
 
 	setWakeFrame( getObject(), UPDATE_SLEEP_NONE );
 }
@@ -157,10 +155,7 @@ void TornadoUpdate::beginRampDown( void )
 	}
 
 	UnsignedInt now = TheGameLogic->getFrame();
-
-	// A controller can end us before our first update, when there is no start frame to measure
-	// from yet. Treat that as a tornado that never got going rather than one at full strength.
-	m_rampDownStartStrength = m_started ? computeStrength( now ) : 0.0f;
+	m_rampDownStartStrength = computeStrength( now );
 	m_rampDownStartFrame = now;
 	m_rampingDown = TRUE;
 }
@@ -200,28 +195,14 @@ Real TornadoUpdate::computeStrength( UnsignedInt now ) const
 }
 
 //-------------------------------------------------------------------------------------------------
-Int TornadoUpdate::buildRelationshipFlags( void ) const
+Bool TornadoUpdate::hasLifetimeUpdate( void ) const
 {
-	const TornadoUpdateModuleData *data = getTornadoUpdateModuleData();
-
-	Int targetFlags = 0;
-	if( data->m_targetsMask & WEAPON_AFFECTS_ALLIES )
-	{
-		targetFlags |= PartitionFilterRelationship::ALLOW_ALLIES;
-	}
-	if( data->m_targetsMask & WEAPON_AFFECTS_ENEMIES )
-	{
-		targetFlags |= PartitionFilterRelationship::ALLOW_ENEMIES;
-	}
-	if( data->m_targetsMask & WEAPON_AFFECTS_NEUTRALS )
-	{
-		targetFlags |= PartitionFilterRelationship::ALLOW_NEUTRAL;
-	}
-	return targetFlags;
+	static NameKeyType key_LifetimeUpdate = NAMEKEY( "LifetimeUpdate" );
+	return getObject()->findUpdateModule( key_LifetimeUpdate ) != nullptr;
 }
 
 //-------------------------------------------------------------------------------------------------
-/** The KindOf test that both the pull and the damage share. */
+/** The side and KindOf test. */
 //-------------------------------------------------------------------------------------------------
 Bool TornadoUpdate::canAffect( const Object *obj ) const
 {
@@ -247,18 +228,7 @@ Bool TornadoUpdate::canAffect( const Object *obj ) const
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Is something other than this module going to end the object? A controller ramps us down by
-	* hand, and a lifetime module kills the object outright; either way we need no fallback. */
-//-------------------------------------------------------------------------------------------------
-Bool TornadoUpdate::hasExternalLifetime( void ) const
-{
-	static NameKeyType key_LifetimeUpdate = NAMEKEY( "LifetimeUpdate" );
-	return getObject()->findUpdateModule( key_LifetimeUpdate ) != nullptr;
-}
-
-//-------------------------------------------------------------------------------------------------
-/** The rest of the victim test: what the tornado can physically take hold of. Damage uses this
-	* too, so that nothing takes tornado damage without being a candidate for the pull. */
+/** What the tornado can physically take hold of; damage is limited to the same set. */
 //-------------------------------------------------------------------------------------------------
 Bool TornadoUpdate::canGrab( const Object *obj ) const
 {
@@ -282,6 +252,46 @@ Bool TornadoUpdate::canGrab( const Object *obj ) const
 }
 
 //-------------------------------------------------------------------------------------------------
+/** Collect the ids of everything in range we may act on, so acting cannot disturb the query. */
+//-------------------------------------------------------------------------------------------------
+void TornadoUpdate::gatherTargets( const Coord3D *center, Real radius, ObjectIDVector &out )
+{
+	const TornadoUpdateModuleData *data = getTornadoUpdateModuleData();
+	Object *me = getObject();
+
+	Int targetFlags = 0;
+	if( data->m_targetsMask & WEAPON_AFFECTS_ALLIES )
+	{
+		targetFlags |= PartitionFilterRelationship::ALLOW_ALLIES;
+	}
+	if( data->m_targetsMask & WEAPON_AFFECTS_ENEMIES )
+	{
+		targetFlags |= PartitionFilterRelationship::ALLOW_ENEMIES;
+	}
+	if( data->m_targetsMask & WEAPON_AFFECTS_NEUTRALS )
+	{
+		targetFlags |= PartitionFilterRelationship::ALLOW_NEUTRAL;
+	}
+
+	// Flag tests first; the relationship filter looks up teams for every candidate.
+	PartitionFilterAlive filterAlive;
+	PartitionFilterSameMapStatus filterMapStatus( me );
+	PartitionFilterRelationship relationship( me, targetFlags );
+	PartitionFilter *filters[] = { &filterAlive, &filterMapStatus, &relationship, nullptr };
+
+	out.clear();
+	ObjectIterator *iter = ThePartitionManager->iterateObjectsInRange( center, radius, FROM_CENTER_2D, filters );
+	MemoryPoolObjectHolder hold( iter );
+	for( Object *obj = iter->first(); obj; obj = iter->next() )
+	{
+		if( canGrab( obj ) && canAffect( obj ) )
+		{
+			out.push_back( obj->getID() );
+		}
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
 /** Break a victim loose from whatever it was doing, once, as it is grabbed. */
 //-------------------------------------------------------------------------------------------------
 void TornadoUpdate::captureVictim( Object *obj )
@@ -293,199 +303,134 @@ void TornadoUpdate::captureVictim( Object *obj )
 	}
 
 	PhysicsBehavior *physics = obj->getPhysics();
-	if( physics == nullptr )
-	{
-		return;
-	}
-
 	physics->clearAcceleration();
 	physics->setAllowBouncing( TRUE );
 
-	// Forget the locomotor's recent drive, else applyForce would throw away the part of our pull
-	// that is not sideways to the victim's facing for the next third of a second.
+	// Else applyForce keeps only the sideways part of our pull for the next third of a second.
 	physics->clearMotiveForce();
 
-	// Victims are all steered onto one ring, so they overlap constantly and the collision system
-	// shoves them apart faster than the orbit can settle. Optionally mute that while we hold them.
+	// Victims crowd one ring, so the collision push-apart fights the orbit; optionally mute it.
 	if( getTornadoUpdateModuleData()->m_ignoreVictimGeometry )
 	{
 		physics->setAllowCollideForce( FALSE );
 	}
 
-	// Physics runs before this module and kills upward velocity while an object is on the
-	// ground, so lift alone never gets a victim airborne. Break it loose by hand, once, but
-	// only into space the victim already occupies - setPosition does no collision test.
+	// Physics zeroes upward velocity on the ground, so break contact by hand, within the victim's own height.
 	physics->setStickToGround( FALSE );
-	Coord3D liftOff = *obj->getPosition();
-	Real headroom = obj->getGeometryInfo().getMaxHeightAbovePosition();
-	Real step = __min( TORNADO_LIFTOFF_HEIGHT, headroom );
+	Real step = __min( TORNADO_LIFTOFF_HEIGHT, obj->getGeometryInfo().getMaxHeightAbovePosition() );
 	if( step > 0.0f )
 	{
+		Coord3D liftOff = *obj->getPosition();
 		liftOff.z += step;
 		obj->setPosition( &liftOff );
 
-		// A ground unit owns pathfind cells; leave them behind or others path around bare ground.
+		// Leave the ground cells behind, or others path around bare ground.
 		TheAI->pathfinder()->updatePos( obj, &liftOff );
 	}
 
-	// A braking object does not integrate its horizontal velocity, so it could never be dragged in.
+	// A braking object does not integrate its horizontal velocity.
 	obj->clearStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_BRAKING ) );
 
 	obj->setModelConditionState( MODELCONDITION_STUNNED_FLAILING );
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Spin and drag one victim for a frame. Physics undoes most of this every frame, so it is all
-	* re-applied rather than set once. */
+/** Drag one victim for a frame. Physics undoes most of this every frame, so it is re-applied. */
 //-------------------------------------------------------------------------------------------------
-void TornadoUpdate::holdVictim( Object *obj, const Coord3D *center, Real groundZ, Real strength )
+void TornadoUpdate::holdVictim( Object *obj, const HoldParams &p )
 {
 	const TornadoUpdateModuleData *data = getTornadoUpdateModuleData();
 	PhysicsBehavior *physics = obj->getPhysics();
-	if( physics == nullptr )
-	{
-		return;
-	}
 
-	// Keeps the locomotor from fighting us, and lets the victim leave the ground. The locomotor
-	// re-arms stickToGround every time it runs, so clear it again every frame.
+	// The stun halts the locomotor, which otherwise re-arms stickToGround every tick.
 	physics->setStunned( TRUE );
 	physics->setAllowToFall( TRUE );
 	physics->setStickToGround( FALSE );
 
 	const Coord3D *pos = obj->getPosition();
-	Coord3D toCenter;
-	toCenter.x = center->x - pos->x;
-	toCenter.y = center->y - pos->y;
-	toCenter.z = 0.0f;
-
-	Real distance = toCenter.length();
 	Coord3D radial;
-	Real pullScale = 1.0f;
+	radial.x = p.center.x - pos->x;
+	radial.y = p.center.y - pos->y;
+	radial.z = 0.0f;
+
+	Real distance = radial.length();
 	if( distance > 0.01f )
 	{
-		radial.x = toCenter.x / distance;
-		radial.y = toCenter.y / distance;
+		radial.normalize();
 	}
 	else
 	{
-		// Dead on the axis there is no radial direction to derive a tangent from, and a zero
-		// tangent means the controller would brake the victim to a halt and pin it at the eye.
-		// The direction is arbitrary, but it must not come from anything this module is itself
-		// changing: deriving it from the victim's facing feeds our own yaw back into the orbit
-		// and the victim is shoved a different way every frame. Derive it from the object id,
-		// which never changes, so each victim leaves the axis on its own fixed heading.
-		Real bearing = (Real)( (UnsignedInt)obj->getID() % 360 ) * ( PI / 180.0f );
+		// On the axis any heading will do, but not one our own yaw keeps changing, so use the id.
+		Real bearing = deg2rad( (Real)( (UnsignedInt)obj->getID() % 360 ) );
 		radial.x = Cos( bearing );
 		radial.y = Sin( bearing );
 	}
-	radial.z = 0.0f;
 
-	// Inside the ring the pull reverses and pushes back out, so victims settle at that distance
-	// and orbit there instead of all collapsing onto the axis and stacking up in one spot. The
-	// tangential term is left at full strength throughout so the orbit never stalls.
-	Real ring = ( data->m_ringRadius > 0.0f ) ? data->m_ringRadius : ( data->m_radius * TORNADO_DEFAULT_RING_FRACTION );
-	if( ring > 0.0f && distance < ring )
+	// Inside the ring the pull reverses; near the axis it eases in, since the direction is noise there.
+	Real pullScale = 1.0f;
+	if( distance < p.ring )
 	{
-		pullScale = ( distance / ring ) * 2.0f - 1.0f;
-
-		// Close to the axis a small wobble swings the radial direction through a huge arc, and
-		// the orbit would jerk about with it. Ease the outward push in over that stretch so the
-		// victim drifts out to the ring instead of being kicked around by the direction noise.
-		Real steady = ring * TORNADO_STEADY_FRACTION;
-		if( distance < steady && steady > 0.0f )
+		pullScale = ( distance / p.ring ) * 2.0f - 1.0f;
+		if( distance < p.steady )
 		{
-			pullScale *= distance / steady;
+			pullScale *= distance / p.steady;
 		}
 	}
 
-	// Lift is flown as a target climb rate, not a raw push, else the victim accelerates for as
-	// long as it is under the ceiling and shoots through it. Every term is multiplied by mass
-	// because applyForce divides it straight back out, which is what lets a heavy tank
-	// ride at the same height as an infantryman.
-	Real mass = physics->getMass();
-	Real ceiling = groundZ + data->m_maxLiftHeight * strength;
+	// A climb rate rather than a push, else the victim keeps accelerating and shoots through the ceiling.
 	Real wantedRise = 0.0f;
-	if( pos->z < ceiling )
+	if( pos->z < p.ceiling )
 	{
-		wantedRise = data->m_liftForce * strength;
-		if( data->m_maxVictimSpeed > 0.0f && wantedRise > data->m_maxVictimSpeed )
-		{
-			wantedRise = data->m_maxVictimSpeed;
-		}
+		wantedRise = p.riseSpeed;
 
 		// Ease off over the last stretch so the victim arrives already slow.
-		Real remaining = ceiling - pos->z;
+		Real remaining = p.ceiling - pos->z;
 		if( remaining < wantedRise * TORNADO_APPROACH_FRAMES )
 		{
 			wantedRise = remaining / TORNADO_APPROACH_FRAMES;
 		}
 	}
 
-	// A victim that overshoots the ceiling needs a downward correction, so the damping term is
-	// allowed to go negative. Zero is the floor only for a victim still climbing; above the
-	// ceiling we stop short of cancelling gravity so it can actually sink back.
-	Real hold = -TheGlobalData->m_gravity * mass;
-	Real lift = hold + ( wantedRise - physics->getVelocity()->z ) * mass * TORNADO_HOVER_DAMPING;
+	// Mass is multiplied back in because applyForce divides it out; every victim then rides alike.
+	Real mass = physics->getMass();
+	const Coord3D *vel = physics->getVelocity();
+	Real lift = -TheGlobalData->m_gravity * mass + ( wantedRise - vel->z ) * mass * TORNADO_HOVER_DAMPING;
 	if( lift < 0.0f )
 	{
 		lift = 0.0f;
 	}
 
-	// A unit built to shrug off shockwaves shrugs off the tornado by the same amount.
-	Real resistance = 1.0f - __min( 1.0f, __max( 0.0f, physics->getShockResistance() ) );
-	Real scale = strength * resistance;
-
-	// The orbit is flown as a target velocity too. Once a victim is off the ground the engine
-	// switches it to air drag, which grows with speed and would otherwise cancel a fixed push
-	// and leave the victim hanging still under the ceiling.
+	// Flown as a target speed, so that air drag, which grows with speed, cannot bleed the orbit away.
+	Real scale = p.strength * physics->getShockResistanceScale();
 	Coord3D wantedVel;
 	wantedVel.x = ( data->m_pullForce * pullScale * radial.x - data->m_spinForce * radial.y ) * scale;
 	wantedVel.y = ( data->m_pullForce * pullScale * radial.y + data->m_spinForce * radial.x ) * scale;
-
-	// Limit what we ask for, rather than clamping the victim after the fact.
+	wantedVel.z = 0.0f;
 	if( data->m_maxVictimSpeed > 0.0f )
 	{
-		Real wantedSpeed = sqrtf( sqr( wantedVel.x ) + sqr( wantedVel.y ) );
-		if( wantedSpeed > data->m_maxVictimSpeed )
+		Real wantedSpeedSqr = sqr( wantedVel.x ) + sqr( wantedVel.y );
+		if( wantedSpeedSqr > sqr( data->m_maxVictimSpeed ) )
 		{
-			Real trim = data->m_maxVictimSpeed / wantedSpeed;
-			wantedVel.x *= trim;
-			wantedVel.y *= trim;
+			wantedVel.scale( data->m_maxVictimSpeed / sqrtf( wantedSpeedSqr ) );
 		}
 	}
 
-	const Coord3D *vel = physics->getVelocity();
 	Coord3D force;
 	force.x = ( wantedVel.x - vel->x ) * mass * TORNADO_HOVER_DAMPING;
 	force.y = ( wantedVel.y - vel->y ) * mass * TORNADO_HOVER_DAMPING;
 	force.z = lift * scale;
 
-	// Never applyMotiveForce here. It flags the victim as driven by its locomotor, and an AI that
-	// is holding position - a turreted unit shooting from the ring, say - scrubs the horizontal
-	// velocity of anything so flagged to zero every tick, without checking the stun. The victim
-	// then only ever moves by one frame of acceleration at a time and crawls around the ring
-	// in jerks. Stunned locomotors never re-flag it, so a plain force is never projected either.
+	// Not applyMotiveForce: an AI holding position scrubs the velocity of motive units every tick.
 	physics->applyForce( &force );
 
-	// Held victims spin at the full rate whatever they weigh; MassReference only slows the
-	// spin-up of heavy things while the tornado is still building.
+	// MassReference only slows the spin-up of heavy victims while the tornado is still building.
 	Real massScale = 1.0f;
-	if( data->m_massReference > 0.0f && strength < 1.0f )
+	if( data->m_massReference > 0.0f && p.strength < 1.0f )
 	{
 		massScale = __min( 1.0f, data->m_massReference / mass );
-		massScale += ( 1.0f - massScale ) * strength;
+		massScale += ( 1.0f - massScale ) * p.strength;
 	}
 	physics->setYawRate( data->m_yawRate * massScale );
-
-	// No velocity scrubbing here on purpose. The orbit and climb are already flown as target
-	// speeds, so a scrub would chop the velocity back every frame right after the force built
-	// it up, and the victim would jerk around the tornado instead of gliding. MaxVictimSpeed is
-	// applied to the target above, which is where a limit belongs.
-
-	// Physics drops the stun again the moment a victim is slow or low, and a cleared stun hands
-	// the unit back to its locomotor, which lands it.
-	physics->setStunned( TRUE );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -530,38 +475,24 @@ void TornadoUpdate::releaseAll( void )
 void TornadoUpdate::doDamagePulse( const Coord3D *center, Real strength )
 {
 	const TornadoUpdateModuleData *data = getTornadoUpdateModuleData();
-	Object *me = getObject();
 
 	Real pulseSeconds = (Real)data->m_damagePulseFrames / LOGICFRAMES_PER_SECONDS_REAL;
 
 	DamageInfo damageInfo;
 	damageInfo.in.m_amount = data->m_damagePerSecond * strength * pulseSeconds;
-	damageInfo.in.m_sourceID = me->getID();
+	damageInfo.in.m_sourceID = getObject()->getID();
 	damageInfo.in.m_damageType = data->m_damageType;
 	damageInfo.in.m_deathType = data->m_deathType;
 
-	Real radius = ( data->m_damageRadius > 0.0f ) ? data->m_damageRadius : data->m_radius;
-
-	PartitionFilterRelationship relationship( me, buildRelationshipFlags() );
-	PartitionFilterSameMapStatus filterMapStatus( me );
-	PartitionFilterAlive filterAlive;
-	PartitionFilter *filters[] = { &relationship, &filterAlive, &filterMapStatus, nullptr };
-
-	// Gather first, since damage can kill, and killing while walking the partition is not safe.
-	ObjectIDVector targets;
+	// Without a damage radius of its own the targets are exactly this frame's victims.
+	const ObjectIDVector *targets = &m_victims;
+	if( data->m_damageRadius > 0.0f )
 	{
-		ObjectIterator *iter = ThePartitionManager->iterateObjectsInRange( center, radius, FROM_CENTER_2D, filters );
-		MemoryPoolObjectHolder hold( iter );
-		for( Object *obj = iter->first(); obj; obj = iter->next() )
-		{
-			if( canAffect( obj ) && canGrab( obj ) )
-			{
-				targets.push_back( obj->getID() );
-			}
-		}
+		gatherTargets( center, data->m_damageRadius, m_scratch );
+		targets = &m_scratch;
 	}
 
-	for( ObjectIDVectorIterator it = targets.begin(); it != targets.end(); ++it )
+	for( ObjectIDVector::const_iterator it = targets->begin(); it != targets->end(); ++it )
 	{
 		Object *obj = TheGameLogic->findObjectByID( *it );
 		if( obj == nullptr )
@@ -579,39 +510,28 @@ void TornadoUpdate::doDamagePulse( const Coord3D *center, Real strength )
 //-------------------------------------------------------------------------------------------------
 UpdateSleepTime TornadoUpdate::update( void )
 {
-	if( m_done )
-	{
-		return UPDATE_SLEEP_FOREVER;
-	}
-
 	const TornadoUpdateModuleData *data = getTornadoUpdateModuleData();
 	Object *me = getObject();
 	UnsignedInt now = TheGameLogic->getFrame();
 
-	if( !m_started )
-	{
-		m_started = TRUE;
-		m_startFrame = now;
-		m_nextDamagePulseFrame = now;
-	}
-
 	if( me->isEffectivelyDead() )
 	{
 		releaseAll();
-		m_done = TRUE;
 		return UPDATE_SLEEP_FOREVER;
 	}
 
-	if( data->m_fullStrengthFrames > 0 && now >= m_startFrame + data->m_rampUpFrames + data->m_fullStrengthFrames )
+	if( !m_rampingDown )
 	{
-		beginRampDown();
-	}
-	else if( data->m_fullStrengthFrames == 0 && !m_rampingDown && !hasExternalLifetime() )
-	{
-		// FullStrengthTime 0 means "until something else ends us". If nothing can - no lifetime
-		// module and no controller driving us - fall back to the ramp up time so we still stop.
-		UnsignedInt endless = m_startFrame + data->m_rampUpFrames + TORNADO_ORPHAN_FRAMES;
-		if( now >= endless )
+		UnsignedInt fullFrame = m_startFrame + data->m_rampUpFrames;
+		if( data->m_fullStrengthFrames > 0 )
+		{
+			if( now >= fullFrame + data->m_fullStrengthFrames )
+			{
+				beginRampDown();
+			}
+		}
+		// FullStrengthTime 0 lasts until something else ends us; if nothing can, stop anyway.
+		else if( !m_externallyControlled && now >= fullFrame + TORNADO_ORPHAN_FRAMES && !hasLifetimeUpdate() )
 		{
 			beginRampDown();
 		}
@@ -621,7 +541,6 @@ UpdateSleepTime TornadoUpdate::update( void )
 	if( m_rampingDown && strength <= 0.0f )
 	{
 		releaseAll();
-		m_done = TRUE;
 		if( data->m_killObjectWhenDone )
 		{
 			TheGameLogic->destroyObject( me );
@@ -629,35 +548,26 @@ UpdateSleepTime TornadoUpdate::update( void )
 		return UPDATE_SLEEP_FOREVER;
 	}
 
-	Coord3D center = *me->getPosition();
-	Real groundZ = TheTerrainLogic->getGroundHeight( center.x, center.y );
-
-	// Gather first, so that touching a victim cannot disturb the query we are walking.
-	ObjectIDVector inRange;
+	HoldParams p;
+	p.center = *me->getPosition();
+	p.strength = strength;
+	p.ring = ( data->m_ringRadius > 0.0f ) ? data->m_ringRadius : ( data->m_radius * TORNADO_DEFAULT_RING_FRACTION );
+	p.steady = p.ring * TORNADO_STEADY_FRACTION;
+	p.ceiling = TheTerrainLogic->getGroundHeight( p.center.x, p.center.y ) + data->m_maxLiftHeight * strength;
+	p.riseSpeed = data->m_liftForce * strength;
+	if( data->m_maxVictimSpeed > 0.0f && p.riseSpeed > data->m_maxVictimSpeed )
 	{
-		PartitionFilterRelationship relationship( me, buildRelationshipFlags() );
-		PartitionFilterSameMapStatus filterMapStatus( me );
-		PartitionFilterAlive filterAlive;
-		PartitionFilter *filters[] = { &relationship, &filterAlive, &filterMapStatus, nullptr };
-
-		ObjectIterator *iter = ThePartitionManager->iterateObjectsInRange( &center, data->m_radius, FROM_CENTER_2D, filters );
-		MemoryPoolObjectHolder hold( iter );
-		for( Object *obj = iter->first(); obj; obj = iter->next() )
-		{
-			if( !canAffect( obj ) || !canGrab( obj ) )
-			{
-				continue;
-			}
-			inRange.push_back( obj->getID() );
-		}
+		p.riseSpeed = data->m_maxVictimSpeed;
 	}
 
+	gatherTargets( &p.center, data->m_radius, m_scratch );
+
 	// Sorted, so that comparing against last frame does not depend on the partition order.
-	std::sort( inRange.begin(), inRange.end() );
+	std::sort( m_scratch.begin(), m_scratch.end() );
 
 	for( ObjectIDVectorIterator it = m_victims.begin(); it != m_victims.end(); ++it )
 	{
-		if( std::binary_search( inRange.begin(), inRange.end(), *it ) )
+		if( std::binary_search( m_scratch.begin(), m_scratch.end(), *it ) )
 		{
 			continue;
 		}
@@ -668,7 +578,7 @@ UpdateSleepTime TornadoUpdate::update( void )
 		}
 	}
 
-	for( ObjectIDVectorIterator it = inRange.begin(); it != inRange.end(); ++it )
+	for( ObjectIDVectorIterator it = m_scratch.begin(); it != m_scratch.end(); ++it )
 	{
 		Object *obj = TheGameLogic->findObjectByID( *it );
 		if( obj == nullptr )
@@ -679,14 +589,14 @@ UpdateSleepTime TornadoUpdate::update( void )
 		{
 			captureVictim( obj );
 		}
-		holdVictim( obj, &center, groundZ, strength );
+		holdVictim( obj, p );
 	}
 
-	m_victims.swap( inRange );
+	m_victims.swap( m_scratch );
 
 	if( data->m_damagePulseFrames > 0 && data->m_damagePerSecond > 0.0f && m_nextDamagePulseFrame <= now )
 	{
-		doDamagePulse( &center, strength );
+		doDamagePulse( &p.center, strength );
 		m_nextDamagePulseFrame = now + data->m_damagePulseFrames;
 	}
 
@@ -720,22 +630,13 @@ void TornadoUpdate::xfer( Xfer *xfer )
 	// extend base class
 	UpdateModule::xfer( xfer );
 
-	// victims
-	Int vectorSize = m_victims.size();
-	xfer->xferInt( &vectorSize );
-	m_victims.resize( vectorSize );
-	for( Int vectorIndex = 0; vectorIndex < vectorSize; ++vectorIndex )
-	{
-		xfer->xferObjectID( &m_victims[vectorIndex] );
-	}
-
+	xfer->xferSTLObjectIDVector( &m_victims );
 	xfer->xferUnsignedInt( &m_startFrame );
 	xfer->xferUnsignedInt( &m_rampDownStartFrame );
 	xfer->xferReal( &m_rampDownStartStrength );
 	xfer->xferUnsignedInt( &m_nextDamagePulseFrame );
-	xfer->xferBool( &m_started );
 	xfer->xferBool( &m_rampingDown );
-	xfer->xferBool( &m_done );
+	xfer->xferBool( &m_externallyControlled );
 
 }  // end xfer
 
