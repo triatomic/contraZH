@@ -1652,6 +1652,17 @@ Real WeaponTemplate::computeRangeScaleFactor(const Object* source, const Coord3D
 	}
 
 	Real range = getAttackRange(bonus);
+	// A centered add-on is allowed to fire out to the carrier's hull plus its range, so the
+	// falloff has to span that same band or it saturates before the target is truly at max range.
+	const Object* rangeSrc = Weapon::getWeaponRangeSource( source );
+	if (rangeSrc != source)
+	{
+	#ifdef ATTACK_RANGE_IS_2D
+		range += rangeSrc->getGeometryInfo().getBoundingCircleRadius();
+	#else
+		range += rangeSrc->getGeometryInfo().getBoundingSphereRadius();
+	#endif
+	}
 	if (!haveFromPos || range <= 0.0f)
 		return 1.0f;
 
@@ -3596,6 +3607,16 @@ Bool Weapon::privateFireWeapon(
 				Real maxRange = m_template->getUnmodifiedAttackRange();
 				Real range = sqrt(ThePartitionManager->getDistanceSquared(sourceObj, victimPos, FROM_CENTER_2D));
 				Real rangeRatio = (range - minRange) / (maxRange - minRange);
+				// This distance is raw center to center, so a centered add-on firing from the far side
+				// of its carrier can overshoot the table's band. Interpolate, never extrapolate.
+				if (rangeRatio < 0.0f)
+				{
+					rangeRatio = 0.0f;
+				}
+				if (rangeRatio > 1.0f)
+				{
+					rangeRatio = 1.0f;
+				}
 				scatterTargetScalar = (rangeRatio * (scatterTargetScalar - minScale)) + minScale;
 				// DEBUG_LOG((">>> Weapon: Range = %f, RangeRatio = %f, TargetScalar = %f\n", range, rangeRatio, scatterTargetScalar));
 			}
