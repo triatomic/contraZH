@@ -3332,6 +3332,10 @@ void W3DModelDraw::createObjectDecal()
 	m_objectDecal = TheProjectedShadowManager->addDecal(m_renderObject, &decalInfo);
 	if (m_objectDecal)
 	{
+		// the diffuse starts out opaque white, which an additive decal adds over the whole quad
+		// rather than only where the art is, so it has to be built for the style before drawing
+		m_objectDecal->setColor(tmplate->getDecalColor());
+		m_objectDecal->setOpacity(REAL_TO_INT(tmplate->getDecalOpacity() * 255.0f));
 		m_objectDecal->enableShadowInvisible(m_fullyObscuredByShroud);
 		m_objectDecal->enableShadowRender(!m_renderObject->Is_Hidden());
 	}
