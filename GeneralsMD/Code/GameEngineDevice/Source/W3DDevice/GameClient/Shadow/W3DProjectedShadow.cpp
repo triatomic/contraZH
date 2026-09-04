@@ -1524,10 +1524,12 @@ Int W3DProjectedShadowManager::renderDecals(RenderInfoClass & rinfo, Bool aboveW
 
 		if (shadow->m_isEnabled && !shadow->m_isInvisibleEnabled)
 		{
+			// seed from this decal, not the list head - the head may have been skipped by the
+			// water pass or by being hidden, and its blend style can differ from this one's
 			if (lastShadowDecalTexture == nullptr)
-				lastShadowDecalTexture=m_decalList->m_shadowTexture[0];
+				lastShadowDecalTexture=shadow->m_shadowTexture[0];
 			if (lastShadowType == SHADOW_NONE)
-				lastShadowType = m_decalList->m_type;
+				lastShadowType = shadow->m_type;
 
 			if (shadow->m_shadowTexture[0] != lastShadowDecalTexture ||
 				shadow->m_type != lastShadowType)
@@ -2073,7 +2075,9 @@ void W3DProjectedShadowManager::removeShadow (W3DProjectedShadow *shadow)
 	W3DProjectedShadow *prev_shadow=nullptr;
 	W3DProjectedShadow *next_shadow=nullptr;
 
-	if (shadow->m_type & (SHADOW_ALPHA_DECAL|SHADOW_ADDITIVE_DECAL))
+	// SHADOW_DECAL reaches either list: addShadow puts it on m_shadowList, addDecal on m_decalList.
+	// Searching by type alone would miss the latter and leave the entry linked after the delete.
+	if (shadow->m_type & (SHADOW_DECAL|SHADOW_ALPHA_DECAL|SHADOW_ADDITIVE_DECAL))
 	{
 		for( next_shadow = m_decalList; next_shadow; prev_shadow=next_shadow, next_shadow = next_shadow->m_next )
 		{
@@ -2092,6 +2096,7 @@ void W3DProjectedShadowManager::removeShadow (W3DProjectedShadow *shadow)
 	}
 
 	//search for this shadow
+	prev_shadow=nullptr;	//the decal list walk above leaves its own tail here
 	for( next_shadow = m_shadowList; next_shadow; prev_shadow=next_shadow, next_shadow = next_shadow->m_next )
 	{
 		if (next_shadow == shadow)
