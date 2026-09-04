@@ -555,6 +555,9 @@ private:
 	// stays selected.
 	Bool													m_selectionDecalWanted;
 	Real													m_selectionDecalRadius;
+	// TheSuperHackers @feature Display decal from the template, in its own slot so it coexists
+	// with the object's shadow.
+	Shadow*												m_objectDecal;
 	TerrainTracksRenderObjClass*	m_trackRenderObject;							///< This is rendered under object
 	Bool													m_lastTrackWasBackwards;					///< travel direction of the last laid tread edge, to detect fwd<->rev flips
 	ParticleSystemIDVec						m_particleSystemIDs;							///< The ID numbers of the particle systems currently running.
@@ -571,6 +574,7 @@ private:
 	void rebuildWeaponRecoilInfo(const ModelConditionInfo* state, bool clear = TRUE);
 	void doHideShowProjectileObjects( UnsignedInt showCount, UnsignedInt maxCount, WeaponSlotType slot );///< Means effectively, show m of n.
 	void nukeCurrentRender(Matrix3D* xform);
+	void createObjectDecal();
 	void doStartOrStopParticleSys();
 	void adjustAnimSpeedToMovementSpeed();
 	static void hideAllMuzzleFlashes(const ModelConditionInfo* state, RenderObjClass* renderObject);

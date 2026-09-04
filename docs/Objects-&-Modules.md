@@ -38,6 +38,35 @@ Added a new parameter for object definitions:
 
 Note: This parameter might be moved to individual weapons in the future, to allow displaying ammo pips for multiple weapon slots at once.
 
+## Display Decal (New)
+
+A ground decal drawn under the object, for auras, faction markers and similar. It is separate from
+the object's shadow: an object can carry a `Shadow` and a display decal at the same time, and the
+decal keeps drawing when the player turns 2D or 3D shadows off in the video options. It does hide
+under shroud and while the object is hidden.
+
+Added new parameters for object definitions:
+
+```
+  DisplayDecal = Yes                ; default No
+  DecalTexture = ShadowIH           ; required; the engine appends .tga
+  DecalSizeX = 14                   ; world-space size in X
+  DecalSizeY = 14                   ; world-space size in Y
+  DecalOffsetX = 0                  ; world-space offset in X
+  DecalOffsetY = 0                  ; world-space offset in Y
+  DecalStyle = SHADOW_ALPHA_DECAL   ; SHADOW_ALPHA_DECAL or SHADOW_ADDITIVE_DECAL
+```
+
+* `DecalTexture` has no default, unlike `ShadowTexture`. An object that sets `DisplayDecal = Yes`
+without naming a texture draws nothing.
+* `DecalStyle` takes only the two decal blend styles. `SHADOW_ADDITIVE_DECAL` suits a glow;
+`SHADOW_ALPHA_DECAL` suits a painted marker. Anything else falls back to `SHADOW_ALPHA_DECAL`.
+* A unit with several draw modules gets one decal, not one per module.
+* The whole feature can be switched off by the player with `ObjectDecals = No` in Options.ini.
+
+This is for a decal that belongs to a unit for its whole life. For a temporary decal spawned by an
+effect — a scorch mark or a footprint — use the [Decal FX nugget](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/FXList-&-ParticleSystems#decal-entries) with `W3DDecalDraw` instead.
+
 # Object Modules
 
 ## AIUpdateInterface (And all other AIUpdate types)

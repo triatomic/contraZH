@@ -258,6 +258,13 @@ const FieldParse ThingTemplate::s_objectFieldParseTable[] =
 	{ "ShadowOffsetY",				INI::parseReal,						nullptr,	offsetof(ThingTemplate, m_shadowOffsetY) },
 	{ "ShadowTexture",				INI::parseAsciiString,		nullptr,	offsetof(ThingTemplate, m_shadowTextureName) },
 	{ "ShadowDynamicLengthWhenAirborne",	INI::parseBool,		nullptr,	offsetof( ThingTemplate, m_shadowHasDynamicLength) },
+	{ "DisplayDecal",					INI::parseBool,				nullptr,	offsetof(ThingTemplate, m_displayDecal) },
+	{ "DecalStyle",						INI::parseBitString8,	TheShadowNames,	offsetof(ThingTemplate, m_decalStyle) },
+	{ "DecalSizeX",						INI::parseReal,				nullptr,	offsetof(ThingTemplate, m_decalSizeX) },
+	{ "DecalSizeY",						INI::parseReal,				nullptr,	offsetof(ThingTemplate, m_decalSizeY) },
+	{ "DecalOffsetX",					INI::parseReal,				nullptr,	offsetof(ThingTemplate, m_decalOffsetX) },
+	{ "DecalOffsetY",					INI::parseReal,				nullptr,	offsetof(ThingTemplate, m_decalOffsetY) },
+	{ "DecalTexture",					INI::parseAsciiString,	nullptr,	offsetof(ThingTemplate, m_decalTextureName) },
 	{ "OcclusionDelay",					INI::parseDurationUnsignedInt,		nullptr, offsetof( ThingTemplate, m_occlusionDelay ) },
 	{ "AddModule",						ThingTemplate::parseAddModule,			nullptr, 0 },
 	{ "RemoveModule",					ThingTemplate::parseRemoveModule,		nullptr, 0 },
@@ -1137,6 +1144,14 @@ ThingTemplate::ThingTemplate() :
 	m_shadowOffsetX = 0.0f;
 	m_shadowOffsetY = 0.0f;
 	m_shadowHasDynamicLength = false;
+
+	m_displayDecal = false;
+	m_decalStyle = SHADOW_ALPHA_DECAL;
+	m_decalSizeX = 0.0f;
+	m_decalSizeY = 0.0f;
+	m_decalOffsetX = 0.0f;
+	m_decalOffsetY = 0.0f;
+
 	m_occlusionDelay = TheGlobalData->m_defaultOcclusionDelay;
 
 	m_structureRubbleHeight = 0;
@@ -1258,6 +1273,22 @@ void ThingTemplate::validate()
 				m_shadowTextureName = "shadows";
 				break;
 		}
+	}
+
+	// there is no sensible stand-in for an aura texture, so drop the decal rather than let
+	// addDecal try to load ".tga"
+	if (m_displayDecal && m_decalTextureName.isEmpty())
+	{
+		DEBUG_CRASH(("%s sets DisplayDecal but no DecalTexture", getName().str()));
+		m_displayDecal = false;
+	}
+
+	// the other styles need a shadow-casting setup the display decal does not have, and plain
+	// SHADOW_DECAL blends multiplicatively so it could never be tinted
+	if (m_displayDecal && m_decalStyle != SHADOW_ALPHA_DECAL && m_decalStyle != SHADOW_ADDITIVE_DECAL)
+	{
+		DEBUG_CRASH(("%s has an invalid DecalStyle", getName().str()));
+		m_decalStyle = SHADOW_ALPHA_DECAL;
 	}
 
 	validateAudio();

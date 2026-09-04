@@ -2015,6 +2015,7 @@ W3DModelDraw::W3DModelDraw(Thing *thing, const ModuleData* moduleData) : DrawMod
 	m_selectionDecal = nullptr;
 	m_selectionDecalWanted = FALSE;
 	m_selectionDecalRadius = 0.0f;
+	m_objectDecal = nullptr;
 	m_trackRenderObject = nullptr;
 	m_lastTrackWasBackwards = FALSE;
 	m_isFirstDrawModule = FALSE;
@@ -2136,6 +2137,9 @@ void W3DModelDraw::setHidden(Bool hidden)
 	if (m_selectionDecal)
 		m_selectionDecal->enableShadowRender(!hidden);
 
+	if (m_objectDecal)
+		m_objectDecal->enableShadowRender(!hidden);
+
 	if (m_trackRenderObject && hidden)
 	{	const Coord3D* pos = getDrawable()->getPosition();
 		m_trackRenderObject->addCapEdgeToTrack(pos->x,pos->y);
@@ -2256,6 +2260,8 @@ void W3DModelDraw::setFullyObscuredByShroud(Bool fullyObscured)
 		// TheSuperHackers @fix the ring must not expose a fully shrouded unit
 		if (m_selectionDecal)
 			m_selectionDecal->enableShadowInvisible(m_fullyObscuredByShroud);
+		if (m_objectDecal)
+			m_objectDecal->enableShadowInvisible(m_fullyObscuredByShroud);
 
 		doStartOrStopParticleSys();
 	}
@@ -3290,6 +3296,48 @@ void W3DModelDraw::setSelectionDecal(Bool enable, Real radius)
 	}
 }
 
+//-------------------------------------------------------------------------------------------------
+/** Create the object's own ground decal from the DisplayDecal fields on its template.
+	*
+	* Routed through addDecal rather than addShadow so it lands on the decal list, which renders
+	* outside the m_useShadowDecals gate - this is an aura marker, not a shadow, so the shadow
+	* video options must not take it away. */
+//-------------------------------------------------------------------------------------------------
+void W3DModelDraw::createObjectDecal()
+{
+	if (m_objectDecal || m_renderObject == nullptr || TheProjectedShadowManager == nullptr)
+		return;
+
+	if (!TheGlobalData->m_objectDecalsEnabled)
+		return;
+
+	// one decal per object, or every draw module of a multi-model unit stacks its own
+	if (!m_isFirstDrawModule)
+		return;
+
+	const ThingTemplate *tmplate = getDrawable()->getTemplate();
+	if (!tmplate->displaysDecal())
+		return;
+
+	Shadow::ShadowTypeInfo decalInfo;
+	decalInfo.allowUpdates = FALSE;		//the decal art never needs regenerating
+	decalInfo.allowWorldAlign = TRUE;	//wrap it around terrain and world objects
+	decalInfo.m_type = tmplate->getDecalStyle();
+	strlcpy(decalInfo.m_ShadowName, tmplate->getDecalTextureName().str(), ARRAY_SIZE(decalInfo.m_ShadowName));
+	decalInfo.m_sizeX = tmplate->getDecalSizeX();
+	decalInfo.m_sizeY = tmplate->getDecalSizeY();
+	decalInfo.m_offsetX = tmplate->getDecalOffsetX();
+	decalInfo.m_offsetY = tmplate->getDecalOffsetY();
+
+	m_objectDecal = TheProjectedShadowManager->addDecal(m_renderObject, &decalInfo);
+	if (m_objectDecal)
+	{
+		m_objectDecal->enableShadowInvisible(m_fullyObscuredByShroud);
+		m_objectDecal->enableShadowRender(!m_renderObject->Is_Hidden());
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
 void W3DModelDraw::setTerrainDecal(TerrainDecalType type)
 {
 	// DEBUG_LOG(("W3DModelDraw::setTerrainDecal - type = %d. invalid = %d\n", type, type == TERRAIN_DECAL_NONE || type >= TERRAIN_DECAL_MAX));
@@ -3370,6 +3418,11 @@ void W3DModelDraw::nukeCurrentRender(Matrix3D* xform)
 	if (m_selectionDecal)
 		m_selectionDecal->release();
 	m_selectionDecal = nullptr;
+
+	// bound to the render object about to be torn down, like the shadow and decals above
+	if (m_objectDecal)
+		m_objectDecal->release();
+	m_objectDecal = nullptr;
 
 	// remove existing render object from the scene
 	if (m_renderObject)
@@ -3678,6 +3731,8 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 		// torn down; the object is still selected, so put the ring back on the new one.
 		if (m_selectionDecalWanted)
 			setSelectionDecal(TRUE, m_selectionDecalRadius);
+
+		createObjectDecal();
 
 		if( m_renderObject )
 		{
