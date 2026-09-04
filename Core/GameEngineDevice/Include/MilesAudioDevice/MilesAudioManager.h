@@ -23,7 +23,6 @@
 #include "Common/AsciiString.h"
 #include "Common/GameAudio.h"
 #include "mss/mss.h"
-#include "WWLib/mutex.h"
 
 class AudioEventRTS;
 class DynamicAudioEventRTS;
@@ -41,8 +40,7 @@ enum PlayingAudioType CPP_11(: Int)
 enum PlayingStatus CPP_11(: Int)
 {
 	PS_Playing,
-	PS_Stopping, ///< Is about to be stopped
-	PS_Stopped, ///< Is about to be released
+	PS_Stopped,
 };
 
 enum PlayingWhich CPP_11(: Int)
@@ -67,7 +65,7 @@ struct PlayingAudio
 	PlayingAudioType m_type;
 	volatile PlayingStatus m_status; // This member is adjusted by another running thread.
 	Short m_framesFaded;
-	Bool m_fade;
+	Bool m_requestStop;
 	volatile Bool m_rerequestOnNextUpdate;
 
 	PlayingAudio()
@@ -77,11 +75,9 @@ struct PlayingAudio
 		, m_type(PAT_INVALID)
 		, m_status(PS_Playing)
 		, m_framesFaded(0)
-		, m_fade(false)
+		, m_requestStop(false)
 		, m_rerequestOnNextUpdate(false)
 	{}
-
-	static_assert(sizeof(m_status) == sizeof(long), "Must be size of long, because it is used with Interlocked functions");
 };
 
 struct ProviderInfo
@@ -265,15 +261,12 @@ class MilesAudioManager : public AudioManager
 		PlayingAudio *allocatePlayingAudio();
 		void releaseMilesHandles( PlayingAudio *release );
 		void releasePlayingAudio( PlayingAudio *release );
-		void stopPlayingAudio( PlayingAudio *release );
 		void rerequestPlayingAudio( PlayingAudio *playing );
 		void rerequestPlayingAudioWhenSignalled( PlayingAudio *playing );
-		void fadePlayingAudio( PlayingAudio *playing );
 
 		PlayingAudio *findActiveMusic( const AsciiString *trackName = nullptr );
 		const PlayingAudio *findActiveMusic( const AsciiString* trackName = nullptr ) const;
 
-		void releasePlayingAudioInListIfStopped(std::list<PlayingAudio *> &list, CriticalSectionClass &cs);
 		void stopAllAudioImmediately();
 		void freeAllMilesHandles();
 
@@ -320,13 +313,6 @@ class MilesAudioManager : public AudioManager
 
 		// Currently fading music. We just let it finish fading, then release it.
 		std::list<PlayingAudio *> m_fadingAudio;
-
-		// TheSuperHackers @fix Erasing from PlayingAudio lists on main thread is not safe when the MSS Timer thread
-		// needs to iterate the same lists. The critical sections are used to guard writes that will invalidate iterators.
-		CriticalSectionClass m_playingSoundsCS;
-		CriticalSectionClass m_playing3DSoundsCS;
-		CriticalSectionClass m_playingStreamsCS;
-		CriticalSectionClass m_fadingAudioCS;
 
 		AudioFileCache *m_audioCache;
 		PlayingAudio *m_binkHandle;
