@@ -1287,9 +1287,11 @@ void ThingTemplate::validate()
 		m_displayDecal = false;
 	}
 
-	// the other styles need a shadow-casting setup the display decal does not have, and plain
-	// SHADOW_DECAL blends multiplicatively so it could never be tinted
-	if (m_displayDecal && m_decalStyle != SHADOW_ALPHA_DECAL && m_decalStyle != SHADOW_ADDITIVE_DECAL)
+	// the projection and volume styles need a shadow-casting setup the display decal does not have
+	if (m_displayDecal
+			&& m_decalStyle != SHADOW_DECAL
+			&& m_decalStyle != SHADOW_ALPHA_DECAL
+			&& m_decalStyle != SHADOW_ADDITIVE_DECAL)
 	{
 		DEBUG_CRASH(("%s has an invalid DecalStyle", getName().str()));
 		m_decalStyle = SHADOW_ALPHA_DECAL;

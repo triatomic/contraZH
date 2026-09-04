@@ -54,23 +54,27 @@ Added new parameters for object definitions:
   DecalSizeY = 14                   ; world-space size in Y
   DecalOffsetX = 0                  ; world-space offset in X
   DecalOffsetY = 0                  ; world-space offset in Y
-  DecalStyle = SHADOW_ALPHA_DECAL   ; SHADOW_ALPHA_DECAL or SHADOW_ADDITIVE_DECAL
+  DecalStyle = SHADOW_ALPHA_DECAL   ; SHADOW_DECAL, SHADOW_ALPHA_DECAL or SHADOW_ADDITIVE_DECAL
   DecalColor = R:255 G:255 B:255    ; tint, default white
   DecalOpacity = 100%               ; default 100%
 ```
 
 * `DecalTexture` has no default, unlike `ShadowTexture`. An object that sets `DisplayDecal = Yes`
 without naming a texture draws nothing.
-* `DecalStyle` takes only the two decal blend styles. `SHADOW_ADDITIVE_DECAL` suits a glow;
-`SHADOW_ALPHA_DECAL` suits a painted marker. Anything else falls back to `SHADOW_ALPHA_DECAL`.
+* `DecalStyle` takes only the three decal blend styles; the projection and volume types need a
+shadow-casting setup a display decal does not have, and fall back to `SHADOW_ALPHA_DECAL`.
+  - `SHADOW_DECAL` multiplies, exactly like a 2D shadow. White is invisible and darker pixels
+  darken the ground, so the art needs no alpha channel at all - a plain DXT1 works.
+  - `SHADOW_ALPHA_DECAL` alpha blends, for a painted marker. Needs a real alpha channel.
+  - `SHADOW_ADDITIVE_DECAL` adds, for a glow. Ignores alpha; black is what reads as nothing.
+* Whichever style, the decal always rasterizes the full `DecalSizeX` by `DecalSizeY` rectangle,
+snapped outward to whole terrain cells, and relies on clamped texture addressing. The art has to
+fade out at its own edges - an opaque edge texel gets stretched across the whole footprint.
 * `DecalColor` tints the texture. Any alpha written here is ignored - `DecalOpacity` is what fades
-the decal.
+the decal. Both are ignored under `SHADOW_DECAL`, whose blend has no way to apply them.
 * `DecalOpacity` means different things per style. Under `SHADOW_ALPHA_DECAL` it is an ordinary
 alpha fade. Under `SHADOW_ADDITIVE_DECAL` the blend ignores alpha entirely, so opacity instead
 scales the colour toward black, dimming the glow.
-* The texture needs a real alpha channel for `SHADOW_ALPHA_DECAL`, and black where it should show
-nothing for `SHADOW_ADDITIVE_DECAL`. Both styles draw the full `DecalSizeX` by `DecalSizeY`
-rectangle; it is the art that has to disappear at the edges, not the quad.
 * A unit with several draw modules gets one decal, not one per module.
 * The whole feature can be switched off by the player with `ObjectDecals = No` in Options.ini.
 

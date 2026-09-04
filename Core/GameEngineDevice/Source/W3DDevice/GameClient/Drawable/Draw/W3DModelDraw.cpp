@@ -2374,6 +2374,11 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 	// update whether or not we should be animating.
 	setPauseAnimation( !getDrawable()->getShouldAnimate(getW3DModelDrawModuleData()->m_animationsRequirePower) );
 
+	// a state with no model leaves nothing to attach the decal to, and a later state that reuses
+	// the current model name never rebuilds, so pick it up here once a render object exists
+	if (m_objectDecal == nullptr && m_renderObject != nullptr)
+		createObjectDecal();
+
 	Matrix3D scaledTransform;
 	if (getDrawable()->getInstanceScale() != 1.0f)
 	{
@@ -3333,11 +3338,17 @@ void W3DModelDraw::createObjectDecal()
 	if (m_objectDecal)
 	{
 		// the diffuse starts out opaque white, which an additive decal adds over the whole quad
-		// rather than only where the art is, so it has to be built for the style before drawing
-		m_objectDecal->setColor(tmplate->getDecalColor());
-		m_objectDecal->setOpacity(REAL_TO_INT(tmplate->getDecalOpacity() * 255.0f));
+		// rather than only where the art is, so it has to be built for the style before drawing.
+		// SHADOW_DECAL multiplies instead, and white is that blend's identity, so leave it alone -
+		// both setters ignore the type anyway.
+		if (tmplate->getDecalStyle() != SHADOW_DECAL)
+		{
+			m_objectDecal->setColor(tmplate->getDecalColor());
+			m_objectDecal->setOpacity(REAL_TO_INT(tmplate->getDecalOpacity() * 255.0f));
+		}
 		m_objectDecal->enableShadowInvisible(m_fullyObscuredByShroud);
-		m_objectDecal->enableShadowRender(!m_renderObject->Is_Hidden());
+		// a model swap builds an unhidden render object, so ask the drawable rather than the model
+		m_objectDecal->enableShadowRender(!getDrawable()->isDrawableEffectivelyHidden());
 	}
 }
 
