@@ -485,7 +485,6 @@ void SpecialPowerModule::clearPendingShots()
 	m_pendingTimeoutFrame = 0;
 	m_pendingStartFrame = 0;
 	m_pendingSettleFrame = 0;
-	m_pendingOrderTaken = FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -523,8 +522,7 @@ Bool SpecialPowerModule::shouldWaitForShots() const
 //-------------------------------------------------------------------------------------------------
 Bool SpecialPowerModule::wakeFiringTrackerForWait()
 {
-	Object *obj = getObject();
-	FiringTracker *tracker = obj ? obj->getFiringTracker() : nullptr;
+	FiringTracker *tracker = getObject()->getFiringTracker();
 	if( tracker == nullptr )
 	{
 		// Only an object that can hold a weapon gets a tracker, and the tracker is what advances
@@ -559,13 +557,23 @@ void SpecialPowerModule::updatePendingShots()
 	}
 
 	const Object *obj = getObject();
-	if( obj == nullptr )
-	{
-		beginCooldownNow();
-		return;
-	}
+	const UnsignedInt now = TheGameLogic->getFrame();
 
-	if( m_pendingShotsState == PENDING_WAITING_FOR_FIRST_SHOT )
+	// Counting the shots instead of watching the caster would hang whenever a burst ends early,
+	// which a move order, an empty clip or the caster dying all do.
+	const AIUpdateInterface *ai = obj->getAIUpdateInterface();
+	const Bool busy = obj->testStatus( OBJECT_STATUS_IS_ATTACKING )
+									|| ( ai != nullptr && ai->friend_getQueuedShotsLeft() > 0 );
+
+	if( m_pendingShotsState == PENDING_FIRING )
+	{
+		if( !busy )
+		{
+			beginCooldownNow();
+			return;
+		}
+	}
+	else
 	{
 		// The caster is gone, so no shot is coming.
 		if( obj->isEffectivelyDead() )
@@ -575,41 +583,20 @@ void SpecialPowerModule::updatePendingShots()
 		}
 
 		// The order was taken up and then dropped without a shot: cancelled, by a new order or
-		// by the target going away. Waiting on the timeout for that would read as the power
-		// being spent on nothing.
-		const AIUpdateInterface *ai = obj->getAIUpdateInterface();
-		const Bool queuedShotsLeft = ( ai != nullptr ) && ( ai->friend_getQueuedShotsLeft() > 0 );
-		const Bool attacking = obj->getStatusBits().test( OBJECT_STATUS_IS_ATTACKING );
-		if( attacking || queuedShotsLeft )
+		// by the target going away. The attack state also drops for a frame or two while it
+		// repaths or reacquires, so a cancel only counts once it has stayed dropped.
+		if( busy )
 		{
-			m_pendingOrderTaken = TRUE;
-			m_pendingSettleFrame = TheGameLogic->getFrame() + PENDING_CANCEL_SETTLE_FRAMES;
+			m_pendingSettleFrame = now + PENDING_CANCEL_SETTLE_FRAMES;
 		}
-		else if( m_pendingOrderTaken && TheGameLogic->getFrame() >= m_pendingSettleFrame )
+		else if( m_pendingSettleFrame != 0 && now >= m_pendingSettleFrame )
 		{
-			// The attack state drops for a frame or two while it repaths or reacquires, so a
-			// cancel only counts once it has stayed dropped.
 			refundUnfiredPower();
 			return;
 		}
 	}
 
-	if( m_pendingShotsState == PENDING_FIRING )
-	{
-		// The burst is over when the attack state has let go and no queued shots remain. Counting
-		// the shots instead would hang whenever a burst ends early, which a move order, an empty
-		// clip or the caster dying all do.
-		const AIUpdateInterface *ai = obj->getAIUpdateInterface();
-		const Bool queuedShotsDone = ( ai == nullptr ) || ( ai->friend_getQueuedShotsLeft() <= 0 );
-		const Bool attackDone = !obj->getStatusBits().test( OBJECT_STATUS_IS_ATTACKING );
-		if( queuedShotsDone && attackDone )
-		{
-			beginCooldownNow();
-			return;
-		}
-	}
-
-	if( TheGameLogic->getFrame() >= m_pendingTimeoutFrame )
+	if( now >= m_pendingTimeoutFrame )
 	{
 		if( m_pendingShotsState == PENDING_WAITING_FOR_FIRST_SHOT )
 		{
@@ -726,8 +713,8 @@ void SpecialPowerModule::triggerSpecialPower( const Coord3D *location )
 		const UnsignedInt now = TheGameLogic->getFrame();
 		m_pendingShotsState = PENDING_WAITING_FOR_FIRST_SHOT;
 		m_pendingTimeoutFrame = now + timeout;
-		m_pendingOrderTaken = FALSE;
 		m_pendingStartFrame = now;
+		m_pendingSettleFrame = 0;
 
 		if( wakeFiringTrackerForWait() )
 		{
@@ -1160,7 +1147,10 @@ void SpecialPowerModule::pauseCountdown( Bool pause )
 			{
 				m_pendingTimeoutFrame += pausedFrames;
 				m_pendingStartFrame += pausedFrames;
-				m_pendingSettleFrame += pausedFrames;
+				if( m_pendingSettleFrame != 0 )
+				{
+					m_pendingSettleFrame += pausedFrames;
+				}
 			}
 			else
 			{
@@ -1302,7 +1292,6 @@ void SpecialPowerModule::xfer( Xfer *xfer )
 		xfer->xferUnsignedInt( &m_pendingTimeoutFrame );
 		xfer->xferUnsignedInt( &m_pendingStartFrame );
 		xfer->xferUnsignedInt( &m_pendingSettleFrame );
-		xfer->xferBool( &m_pendingOrderTaken );
 	}
 
 }

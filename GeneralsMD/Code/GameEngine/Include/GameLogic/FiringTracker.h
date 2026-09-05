@@ -82,8 +82,10 @@ private:
 	void speedUp();		///< I've qualified for an increase in my Object flag status
 	void coolDown();	///< I need to slow down because it has been too long since I fired.
 	UpdateSleepTime calcTimeToSleep();
-	/// tell the special powers about a shot, or tick the ones waiting on one
-	void updateWaitingSpecialPowers( Bool shotFired );
+	/// tell the special powers waiting on a shot that one just went out
+	void notifySpecialPowersOfShot();
+	/// tick the special powers waiting on their shots, and recount those still waiting
+	void updateWaitingSpecialPowers();
 
 private:
 	Int							m_consecutiveShots;					///< How many times I have shot at the same thing
@@ -91,7 +93,7 @@ private:
 	UnsignedInt			m_frameToStartCooldown;			///< This is the frame I should cool down at, and is pushed back every time a shot is fired
  	UnsignedInt			m_frameToForceReload;				///< Even more than AutoReload, this means it will pre-emptively reload instead of event triggering a delay after the last shot
 
-	Int							m_specialPowersWaiting;			///< how many of our special powers hold their cooldown for their shots
+	Bool						m_specialPowerWaiting;			///< a special power of ours holds its cooldown for its shots
 	UnsignedInt			m_frameToStopLoopingSound;	///< if sound is looping, frame to stop looping it (or zero if not looping)
 	AudioHandle			m_audioHandle;
 	AsciiString			m_currentFireSoundName;			///< event name of the currently looping fire sound, so we can detect a weapon (sound) switch

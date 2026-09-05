@@ -199,7 +199,7 @@ protected:
 	Bool wakeFiringTrackerForWait();
 
 	/// how long a dropped attack must stay dropped before it counts as a cancel
-	enum { PENDING_CANCEL_SETTLE_FRAMES = 15 };
+	enum { PENDING_CANCEL_SETTLE_FRAMES = LOGICFRAMES_PER_SECOND / 2 };
 
 	enum
 	{
@@ -214,8 +214,8 @@ protected:
 	Real m_pausedPercent;
 	Int m_pendingShotsState;						///< one of the PENDING_ values above
 	UnsignedInt m_pendingTimeoutFrame;	///< start the cooldown anyway once this frame passes
-	UnsignedInt m_pendingStartFrame;		///< frame the wait began, for the settle time below
-	UnsignedInt m_pendingSettleFrame;		///< a dropped attack is only a cancel once this frame passes
-	Bool m_pendingOrderTaken;						///< the caster took up the attack, so dropping it is a cancel
+	UnsignedInt m_pendingStartFrame;		///< frame the wait began, so the cameo can count down from it
+	UnsignedInt m_pendingSettleFrame;		///< zero until the caster takes the attack up, then the frame
+																			///< a dropped attack becomes a cancel
 
 };
