@@ -19,7 +19,7 @@
 // TheSuperHackers @feature Smart selection (Options.ini: SmartSelection). A row of half size
 // cameos above the command bar, one per selected unit type, each with a count. Left click and
 // Tab focus a type: the whole group stays selected, but the bar shows that type's command set
-// instead of the group's common subset. Shift click drops the type from the selection.
+// instead of the group's common subset. Ctrl click drops the type from the selection.
 //
 // The row is built in code rather than from ControlBar.wnd, which ships in the game data.
 // The container is a top level window because a child sitting outside its parent's rect is
@@ -205,6 +205,7 @@ void ControlBar::resetSmartSelection()
 	m_smartSelectionGroups.clear();
 	m_smartSelectionLiveIDs.clear();
 	m_smartSelectionActive = -1;
+	m_smartSelectionNarrowed = FALSE;
 	if( m_smartSelectionParent )
 	{
 		m_smartSelectionParent->winHide( TRUE );
@@ -221,6 +222,120 @@ const ThingTemplate *ControlBar::getSmartSelectionFocusTemplate() const
 		return nullptr;
 	}
 	return m_smartSelectionGroups[ m_smartSelectionActive ].thingTemplate;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Whether a command set carries the button, by name because sets hold overridable copies. */
+//-------------------------------------------------------------------------------------------------
+static Bool commandSetHasButton( const CommandSet *commandSet, const CommandButton *command )
+{
+	if( commandSet == nullptr )
+	{
+		return FALSE;
+	}
+	for( Int i = 0; i < MAX_COMMANDS_PER_SET; i++ )
+	{
+		const CommandButton *button = commandSet->getCommandButton( i );
+		if( button && button->getName() == command->getName() )
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** The logic side sends a command to every unit in the player's group that can do it, so a
+	* command off the focused type's card would leak to any other type with a matching one. For
+	* a command that is not common to the whole group, hand the logic side just the focused type
+	* until the command is done. The client selection is untouched throughout. */
+//-------------------------------------------------------------------------------------------------
+void ControlBar::smartSelectionBeginCommand( const CommandButton *command )
+{
+	if( m_smartSelectionNarrowed || command == nullptr || m_currContext != CB_CONTEXT_MULTI_SELECT )
+	{
+		return;
+	}
+	const ThingTemplate *focus = getSmartSelectionFocusTemplate();
+	if( focus == nullptr || TheInGameUI == nullptr || TheMessageStream == nullptr )
+	{
+		return;
+	}
+
+	std::vector<Object *> focused;
+	const std::vector<ObjectID> &ids = m_smartSelectionGroups[ m_smartSelectionActive ].objectIDs;
+	for( size_t i = 0; i < ids.size(); i++ )
+	{
+		Object *obj = getLiveSmartSelectionObject( ids[ i ] );
+		if( obj && obj->getDrawable()->isSelected() )
+		{
+			focused.push_back( obj );
+		}
+	}
+	if( focused.empty() )
+	{
+		return;
+	}
+
+	// a command the focused card does not carry came from elsewhere, the shortcut bar say
+	if( !commandSetHasButton( findCommandSet( focused[ 0 ]->getCommandSetString() ), command ) )
+	{
+		return;
+	}
+
+	// a command every selected type carries is the group's own and still goes to everyone
+	Bool common = TRUE;
+	const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
+	for( DrawableListCIt it = selected->begin(); common && it != selected->end(); ++it )
+	{
+		Object *obj = getSmartSelectionObject( *it );
+		if( obj == nullptr )
+		{
+			continue;
+		}
+		common = commandSetHasButton( findCommandSet( obj->getCommandSetString() ), command );
+	}
+	if( common )
+	{
+		return;
+	}
+
+	GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_CREATE_SELECTED_GROUP_NO_SOUND );
+	msg->appendBooleanArgument( TRUE );
+	for( size_t i = 0; i < focused.size(); i++ )
+	{
+		msg->appendObjectIDArgument( focused[ i ]->getID() );
+	}
+	m_smartSelectionNarrowed = TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Give the logic side the whole selection back, once no command is still waiting for a
+	* target. That later clear of the pending command ends up here as well. */
+//-------------------------------------------------------------------------------------------------
+void ControlBar::smartSelectionEndCommand()
+{
+	if( !m_smartSelectionNarrowed || TheInGameUI == nullptr || TheMessageStream == nullptr )
+	{
+		return;
+	}
+	if( TheInGameUI->getGUICommand() != nullptr )
+	{
+		return;
+	}
+
+	GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_CREATE_SELECTED_GROUP_NO_SOUND );
+	msg->appendBooleanArgument( TRUE );
+	const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
+	for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
+	{
+		Object *obj = ( *it )->getObject();
+		if( obj )
+		{
+			msg->appendObjectIDArgument( obj->getID() );
+		}
+	}
+	m_smartSelectionNarrowed = FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -251,9 +366,10 @@ void ControlBar::populateSmartSelection()
 	}
 	std::sort( liveIDs.begin(), liveIDs.end() );
 
+	// the dirty flag fires for production, rank and much else, so an unchanged selection must
+	// not repaint the row -- the button labels alone would re-lay out a display string each time
 	if( liveIDs == m_smartSelectionLiveIDs )
 	{
-		refreshSmartSelectionButtons();
 		return;
 	}
 	m_smartSelectionLiveIDs = liveIDs;
@@ -264,8 +380,14 @@ void ControlBar::populateSmartSelection()
 		return;
 	}
 
-	// the focused type survives the rebuild if it is still in the selection
-	const ThingTemplate *focus = getSmartSelectionFocusTemplate();
+	// The focused type survives the rebuild if it is still in the selection. It cannot survive
+	// into a selection the bar drives from one drawable, whose own command set is shown and
+	// where the focus would silently filter the next multi selection.
+	const ThingTemplate *focus = nullptr;
+	if( TheInGameUI->getSelectCount() > 1 )
+	{
+		focus = getSmartSelectionFocusTemplate();
+	}
 	m_smartSelectionActive = -1;
 
 	m_smartSelectionGroups.clear();
@@ -295,7 +417,9 @@ void ControlBar::populateSmartSelection()
 			SmartSelectionGroup group;
 			group.thingTemplate = thingTemplate;
 			m_smartSelectionGroups.push_back( group );
-			if( focus && thingTemplate->isEquivalentTo( focus ) )
+			// the same template, not merely an equivalent one, or an upgraded variant in the
+			// same selection could take the focus away from the type the player picked
+			if( thingTemplate == focus )
 			{
 				m_smartSelectionActive = (Int)g;
 			}
@@ -335,13 +459,16 @@ void ControlBar::updateSmartSelection()
 	// lifts above it instead of running into it
 	if( m_smartSelectionMoneyWindow && !m_smartSelectionMoneyWindow->winIsHidden() )
 	{
-		ICoord2D moneyPos, rowSize;
+		ICoord2D moneyPos;
 		m_smartSelectionMoneyWindow->winGetScreenPosition( &moneyPos.x, &moneyPos.y );
-		m_smartSelectionParent->winGetSize( &rowSize.x, &rowSize.y );
+		// measured from the groups rather than read back from the container, whose size is
+		// only written when the buttons are repainted
+		const Int rowWidth = (Int)m_smartSelectionGroups.size() *
+			( m_smartSelectionButtonSize.x + SMART_SELECTION_GAP ) - SMART_SELECTION_GAP;
 		// the housing slopes out about a cameo's width left of the money text
 		const Int housingX = moneyPos.x - m_smartSelectionButtonSize.x;
 		const Int liftedY = moneyPos.y - m_smartSelectionButtonSize.y - SMART_SELECTION_GAP;
-		if( commandPos.x + rowSize.x > housingX && liftedY < rowY )
+		if( commandPos.x + rowWidth > housingX && liftedY < rowY )
 		{
 			rowY = liftedY;
 		}
@@ -410,8 +537,9 @@ void ControlBar::processSmartSelectionClick( GameWindow *button, GadgetGameMessa
 		return;
 	}
 
-	// right click is left alone so it keeps deselecting, as it does anywhere else on screen
-	if( TheKeyboard && TheKeyboard->isShift() )
+	// Ctrl, not Shift, because Shift+Tab cycles the row: a click landing while that Shift is
+	// still held must not delete the type. Right click is left alone so it keeps deselecting.
+	if( TheKeyboard && TheKeyboard->isCtrl() )
 	{
 		smartSelectionRemove( groupIndex );
 	}
@@ -478,16 +606,21 @@ void ControlBar::smartSelectionRemove( Int groupIndex )
 	for( size_t i = 0; i < ids.size(); i++ )
 	{
 		Object *obj = getLiveSmartSelectionObject( ids[ i ] );
-		if( obj == nullptr || !obj->getDrawable()->isSelected() )
+		if( obj == nullptr )
 		{
 			continue;
 		}
+		// the logic side keeps a member that has since left the client selection, boarding a
+		// transport for one, so it is named here too or it would go on taking orders
 		if( msg == nullptr )
 		{
 			msg = TheMessageStream->appendMessage( GameMessage::MSG_REMOVE_FROM_SELECTED_GROUP );
 		}
 		msg->appendObjectIDArgument( obj->getID() );
-		TheInGameUI->deselectDrawable( obj->getDrawable() );
+		if( obj->getDrawable()->isSelected() )
+		{
+			TheInGameUI->deselectDrawable( obj->getDrawable() );
+		}
 	}
 
 	if( groupIndex == m_smartSelectionActive )

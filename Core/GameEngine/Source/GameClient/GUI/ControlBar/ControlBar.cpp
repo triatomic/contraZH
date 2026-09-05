@@ -1001,6 +1001,7 @@ ControlBar::ControlBar()
 	m_smartSelectionButtonSize.x = 0;
 	m_smartSelectionButtonSize.y = 0;
 	m_smartSelectionActive = -1;
+	m_smartSelectionNarrowed = FALSE;
 	m_scienceLayout = nullptr;
 	m_rightHUDWindow = nullptr;
 	m_rightHUDCameoWindow = nullptr;
@@ -1532,6 +1533,10 @@ void ControlBar::update()
 	// if we're an observer, don't do the complete update
 	if( m_isObserverCommandBar)
 	{
+		// this branch returns before the smart selection hooks below, so the row would keep
+		// whatever it held when the player was still playing
+		resetSmartSelection();
+
 		if((TheGameLogic->getFrame() % (LOGICFRAMES_PER_SECOND/2)) == 0)
 			populateObserverInfoWindow();
 

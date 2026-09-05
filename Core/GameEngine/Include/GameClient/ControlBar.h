@@ -754,10 +754,13 @@ public:
 
 	// TheSuperHackers @feature Smart selection: one cameo per selected unit type above the
 	// command bar. Left click and Tab pick which type's command set the bar shows while the
-	// whole group stays selected, Shift click drops the type from the selection.
+	// whole group stays selected, Ctrl click drops the type from the selection.
 	void processSmartSelectionClick( GameWindow *button, GadgetGameMessage gadgetMessage );
 	void smartSelectionCycle( Int direction );
 	const ThingTemplate *getSmartSelectionFocusTemplate() const;
+	/// a command that only the focused type has goes to the focused type alone
+	void smartSelectionBeginCommand( const CommandButton *command );
+	void smartSelectionEndCommand();
 
 	//-----------------------------------------------------------------------------------------------
 	// the remaining methods are used to construct the command buttons and command sets for
@@ -1026,6 +1029,7 @@ protected:
 	GameWindow *m_smartSelectionButtons[ MAX_SMART_SELECTION_BUTTONS ];
 	ICoord2D m_smartSelectionButtonSize;
 	Int m_smartSelectionActive;																///< group whose command set the bar shows, or -1 for the common set
+	Bool m_smartSelectionNarrowed;														///< the logic side group is narrowed to the focused type for a command in flight
 
 	GameWindow *m_commandWindows[ MAX_COMMANDS_PER_SET ];			///< command window controls for easy access
 	const CommandButton *m_commonCommands[ MAX_COMMANDS_PER_SET ];	///< shared commands we will use for multi-selection

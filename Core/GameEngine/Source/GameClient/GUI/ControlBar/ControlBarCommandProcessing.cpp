@@ -255,6 +255,23 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		return CBC_COMMAND_NOT_USED;
 	}
 
+	// TheSuperHackers @feature Narrow the logic side group to the smart selection focus for the
+	// life of this call. A command that arms and waits for a target keeps the narrowing until
+	// the pending command clears, which lands in smartSelectionEndCommand again.
+	struct SmartSelectionCommandScope
+	{
+		ControlBar *m_bar;
+		SmartSelectionCommandScope( ControlBar *bar, const CommandButton *command ) : m_bar( bar )
+		{
+			m_bar->smartSelectionBeginCommand( command );
+		}
+		~SmartSelectionCommandScope()
+		{
+			m_bar->smartSelectionEndCommand();
+		}
+	};
+	SmartSelectionCommandScope smartSelectionScope( this, commandButton );
+
 	// sanity, we won't process messages if we have no source object,
 	// unless we're CB_CONTEXT_PURCHASE_SCIENCE or GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT
 	if( m_currContext != CB_CONTEXT_MULTI_SELECT &&

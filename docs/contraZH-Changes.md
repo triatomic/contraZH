@@ -196,9 +196,10 @@ a count of how many are selected.
 * `SmartSelection = Yes` - (No hides the row and unbinds its keys.)
 
 * Left click a cameo to show that type's command set in the bar. The whole group stays selected,
-so orders still go to everyone; commands only that type can do are issued to it alone. Click the
-pushed in cameo again to go back to the group's common commands.
-* Shift+click a cameo to drop that type from the selection. Right click is left alone, so it
+so orders still go to everyone. A command off that card which not every selected type carries is
+issued to the focused type alone; one they all carry, like Stop or Guard, still goes to everyone.
+Click the pushed in cameo again to go back to the group's common commands.
+* Ctrl+click a cameo to drop that type from the selection. Right click is left alone, so it
 still deselects like anywhere else on screen.
 * Tab and Shift+Tab (`SMART_SELECTION_NEXT_TYPE` / `SMART_SELECTION_PREV_TYPE` in
 CommandMap.ini) step the focused type through the row.
