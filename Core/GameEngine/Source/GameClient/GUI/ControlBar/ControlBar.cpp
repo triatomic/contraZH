@@ -992,6 +992,15 @@ ControlBar::ControlBar()
 
 	m_specialPowerShortcutParent = nullptr;
 	m_specialPowerLayout = nullptr;
+	m_smartSelectionParent = nullptr;
+	m_smartSelectionMoneyWindow = nullptr;
+	for( i = 0; i < MAX_SMART_SELECTION_BUTTONS; i++ )
+	{
+		m_smartSelectionButtons[i] = nullptr;
+	}
+	m_smartSelectionButtonSize.x = 0;
+	m_smartSelectionButtonSize.y = 0;
+	m_smartSelectionActive = -1;
 	m_scienceLayout = nullptr;
 	m_rightHUDWindow = nullptr;
 	m_rightHUDCameoWindow = nullptr;
@@ -1102,6 +1111,8 @@ ControlBar::~ControlBar()
 		m_specialPowerLayout = nullptr;
 	}
 
+	destroySmartSelectionBar();
+
 	m_radarAttackGlowWindow = nullptr;
 
 	if (m_rightHUDCameoWindow && m_rightHUDCameoWindow->winGetUserData())
@@ -1205,6 +1216,11 @@ void ControlBar::init()
 
 
 
+		}
+
+		if( m_commandWindows[ 0 ] )
+		{
+			initSmartSelectionBar( commandSize );
 		}
 
 
@@ -1373,6 +1389,7 @@ void ControlBar::init()
 void ControlBar::reset()
 {
 	hideSpecialPowerShortcut();
+	resetSmartSelection();
 	// do not destroy the rally drawable, it will get destroyed with everything else during a reset
 	m_rallyPointDrawableID = INVALID_DRAWABLE_ID;
 	if(m_radarAttackGlowWindow)
@@ -1589,11 +1606,16 @@ void ControlBar::update()
 	//
 	if( m_UIDirty )
 	{
+		// first, so the context below can show the type the row has focused
+		populateSmartSelection();
 		evaluateContextUI();
 		populateSpecialPowerShortcut(ThePlayerList->getLocalPlayer());
 		// if we have a build tooltip layout, update it with the new data.
 		repopulateBuildTooltipLayout();
 	}
+
+	// before the per context early outs below, the row lives outside every context
+	updateSmartSelection();
 
 	// enable/disable the beacon button depending on if the max has been reached
 	if (ThePlayerList && ThePlayerList->getLocalPlayer() && ThePlayerList->getLocalPlayer()->getPlayerTemplate())

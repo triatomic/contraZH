@@ -462,6 +462,21 @@ Bool OptionPreferences::getEasyMilitaryDragEnabled(void) const
 	return FALSE;
 }
 
+// TheSuperHackers @feature Options.ini: SmartSelection = Yes shows a row of cameos above the
+// command bar, one per selected unit type with a count, that narrows the selection on click
+// and cycles it with Tab. On by default.
+Bool OptionPreferences::getSmartSelectionEnabled(void) const
+{
+	OptionPreferences::const_iterator it = find("SmartSelection");
+	if (it == end())
+		return TRUE;
+
+	if (stricmp(it->second.str(), "yes") == 0) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
 // TheSuperHackers @feature Options.ini: CastMode = Normal | QuickCast | QuickCastWithIndicator
 CastMode OptionPreferences::getCastMode(void) const
 {

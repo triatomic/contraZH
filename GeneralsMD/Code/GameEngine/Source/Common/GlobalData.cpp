@@ -1151,6 +1151,7 @@ GlobalData::GlobalData()
 	m_keyboardOverlayBackdrop = TRUE;
 	m_keyboardOverlayBackdropColor = GameMakeColor( 0, 0, 0, 128 );
 	m_easyMilitaryDrag = FALSE;
+	m_smartSelection = TRUE;
 	m_doubleClickAttackMove = FALSE;
 
 	m_useOldMoveSpeed = FALSE;  //Fix is enabled by default
@@ -1360,6 +1361,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_keyboardOverlayBackdropColor = optionPref.getKeyboardOverlayBackdropColor();
 	TheWritableGlobalData->m_doubleClickAttackMove = optionPref.getDoubleClickAttackMoveEnabled();
 	TheWritableGlobalData->m_easyMilitaryDrag = optionPref.getEasyMilitaryDragEnabled();
+	TheWritableGlobalData->m_smartSelection = optionPref.getSmartSelectionEnabled();
 	TheWritableGlobalData->m_jpegQuality = optionPref.getJpegQuality();
 	TheWritableGlobalData->m_keyboardScrollFactor = optionPref.getScrollFactor();
 	TheWritableGlobalData->m_drawScrollAnchor = optionPref.getDrawScrollAnchor();

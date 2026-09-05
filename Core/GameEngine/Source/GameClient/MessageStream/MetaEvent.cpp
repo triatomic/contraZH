@@ -137,6 +137,8 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "VIEW_TEAM8",																GameMessage::MSG_META_VIEW_TEAM8 },
 	{ "VIEW_TEAM9",																GameMessage::MSG_META_VIEW_TEAM9 },
 	{ "SELECT_MATCHING_UNITS",										GameMessage::MSG_META_SELECT_MATCHING_UNITS },
+	{ "SMART_SELECTION_NEXT_TYPE",								GameMessage::MSG_META_SMART_SELECTION_NEXT_TYPE },
+	{ "SMART_SELECTION_PREV_TYPE",								GameMessage::MSG_META_SMART_SELECTION_PREV_TYPE },
 	{ "SELECT_NEXT_UNIT",													GameMessage::MSG_META_SELECT_NEXT_UNIT },
 	{ "SELECT_PREV_UNIT",													GameMessage::MSG_META_SELECT_PREV_UNIT },
 	{ "SELECT_NEXT_WORKER",												GameMessage::MSG_META_SELECT_NEXT_WORKER },
@@ -1073,6 +1075,26 @@ void MetaMap::generateMetaMap()
 			map->m_modState = CTRL;
 			// in game and while observing, but not in the menus, where health bars mean nothing
 			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
+		}
+	}
+	{
+		// TheSuperHackers @feature Tab and Shift+Tab walk the smart selection row. Tab is unbound
+		// in retail and in Contra's CommandMap.ini, so the default only fills an empty slot.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_META_SMART_SELECTION_NEXT_TYPE);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_TAB;
+			map->m_transition = DOWN;
+			map->m_modState = NONE;
+			map->m_usableIn = COMMANDUSABLE_GAME;
+		}
+		map = TheMetaMap->getMetaMapRec(GameMessage::MSG_META_SMART_SELECTION_PREV_TYPE);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_TAB;
+			map->m_transition = DOWN;
+			map->m_modState = SHIFT;
+			map->m_usableIn = COMMANDUSABLE_GAME;
 		}
 	}
 	{

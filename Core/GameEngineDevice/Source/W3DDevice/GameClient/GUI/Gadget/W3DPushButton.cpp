@@ -297,7 +297,16 @@ static void drawButtonText( GameWindow *window, WinInstanceData *instData )
 	text->getSize( &width, &height );
 
 	// where to draw
-	if( BitIsSet( window->winGetStatus(), WIN_STATUS_SHORTCUT_BUTTON ) )
+	if( BitIsSet( window->winGetStatus(), WIN_STATUS_COUNT_BADGE ) )
+	{
+		// TheSuperHackers @feature A count over a cameo sits bottom right on a translucent plate
+		textPos.x = origin.x + size.x - width - 2;
+		textPos.y = origin.y + size.y - height - 1;
+		const Int pad = 1;
+		TheDisplay->drawFillRect( textPos.x - pad, textPos.y - pad,
+			width + pad * 2, height + pad * 2, GameMakeColor( 0, 0, 0, 160 ) );
+	}
+	else if( BitIsSet( window->winGetStatus(), WIN_STATUS_SHORTCUT_BUTTON ) )
 	{
 		// Oh god... this is a total hack for shortcut buttons to handle rendering text top left corner...
 		textPos.x = origin.x + 2;

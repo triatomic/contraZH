@@ -2742,6 +2742,28 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		}
 
 		//-----------------------------------------------------------------------------------------
+		case GameMessage::MSG_META_SMART_SELECTION_NEXT_TYPE:
+		{
+			if( TheControlBar )
+			{
+				TheControlBar->smartSelectionCycle( 1 );
+			}
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
+		//-----------------------------------------------------------------------------------------
+		case GameMessage::MSG_META_SMART_SELECTION_PREV_TYPE:
+		{
+			if( TheControlBar )
+			{
+				TheControlBar->smartSelectionCycle( -1 );
+			}
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
+		//-----------------------------------------------------------------------------------------
 		case GameMessage::MSG_META_SELECT_NEXT_UNIT:
 		{
 			/* because list is prepended, iterate through backwards */
