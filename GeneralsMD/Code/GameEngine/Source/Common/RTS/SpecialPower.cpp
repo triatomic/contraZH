@@ -321,7 +321,6 @@ void SpecialPowerStore::parseSpecialPowerDefinition( INI *ini )
 	{ "NeedsTargetDesignator",						INI::parseBool,										nullptr, offsetof(SpecialPowerTemplate, m_needsTargetDesignator) },
 	{ "Cost",											INI::parseInt,									NULL, offsetof(SpecialPowerTemplate, m_cost) },
 	{ "StartCooldownOnFirstShot",	INI::parseBool,										nullptr, offsetof(SpecialPowerTemplate, m_startCooldownOnFirstShot) },
-	{ "StartCooldownTimeout",			INI::parseDurationUnsignedInt,		nullptr, offsetof(SpecialPowerTemplate, m_startCooldownTimeout) },
 	{ nullptr,	nullptr, nullptr,	0 }
 
 };
@@ -353,7 +352,6 @@ SpecialPowerTemplate::SpecialPowerTemplate()
 	m_eva_ready_enemy = EVA_Invalid;
 	m_cost = 0;
 	m_startCooldownOnFirstShot = FALSE;
-	m_startCooldownTimeout = 0;
 }
 
 //-------------------------------------------------------------------------------------------------

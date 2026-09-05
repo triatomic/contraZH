@@ -601,7 +601,7 @@ void SpecialPowerModule::updatePendingShots()
 		if( m_pendingShotsState == PENDING_WAITING_FOR_FIRST_SHOT )
 		{
 			// never fired a shot, so the use was cancelled one way or another
-			DEBUG_LOG(( "SpecialPower '%s' fired no shot within StartCooldownTimeout; handing the power back",
+			DEBUG_LOG(( "SpecialPower '%s' fired no shot before its reload time was up; handing the power back",
 				getPowerName().str() ));
 			refundUnfiredPower();
 			return;
@@ -704,15 +704,11 @@ void SpecialPowerModule::triggerSpecialPower( const Coord3D *location )
 		}
 #endif
 
-		const SpecialPowerTemplate *powerTemplate = getSpecialPowerTemplate();
-		UnsignedInt timeout = powerTemplate->getStartCooldownTimeout();
-		if( timeout == 0 )
-		{
-			timeout = powerTemplate->getReloadTime();
-		}
+		// The wait cannot run longer than the cooldown it is holding back, or the power would be
+		// unavailable for longer than its own reload time.
 		const UnsignedInt now = TheGameLogic->getFrame();
 		m_pendingShotsState = PENDING_WAITING_FOR_FIRST_SHOT;
-		m_pendingTimeoutFrame = now + timeout;
+		m_pendingTimeoutFrame = now + getSpecialPowerTemplate()->getReloadTime();
 		m_pendingStartFrame = now;
 		m_pendingSettleFrame = 0;
 

@@ -33,8 +33,7 @@ When Yes, this special power can only be fired while a valid target designator i
 `StartCooldownOnFirstShot = No`  
 When Yes, `ReloadTime` starts after the unit fires the shots this power's OCL ordered, instead of starting when the player uses the power. Until then the power is locked: the cameo shows it as unavailable and the player cannot use it again. Use this when the OCL has an `Attack` nugget, because the unit needs time to line up and shoot. Default = No.
 
-`StartCooldownTimeout = 0`  
-In milliseconds. If the unit never fires, the cooldown starts anyway once this long has passed, so a power can never get stuck. `0` means use this power's own `ReloadTime`. The engine only reads this field when `StartCooldownOnFirstShot = Yes`. If the unit fires nothing at all, the engine treats the use as cancelled and gives the power back ready, instead of charging a cooldown.
+If the unit fires nothing at all, the engine treats the use as cancelled and gives the power back ready, instead of charging a cooldown. Should the engine somehow miss the cancel, the power gives up waiting after `ReloadTime` and starts its cooldown, so it can never get stuck.
 
 ### Code Example: 
 ```
