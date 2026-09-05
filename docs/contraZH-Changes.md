@@ -308,18 +308,19 @@ was recorded with.
 
 ## StartCooldownOnFirstShot
 
-* `StartCooldownOnFirstShot = No` - (Default. `Yes` holds `ReloadTime` until the shots the power
-orders are away.)
-* `StartCooldownTimeout = 0` - (Milliseconds to wait for those shots before starting the cooldown
-regardless. `0` uses this power's own `ReloadTime`.)
+* `StartCooldownOnFirstShot = No` - (Default. `Yes` delays `ReloadTime` until the unit has fired the
+shots the power ordered.)
+* `StartCooldownTimeout = 0` - (Milliseconds to wait for those shots. Once this long has passed the
+cooldown starts even if the unit never fired. `0` uses this power's own `ReloadTime`.)
 
-A special power normally starts its cooldown the instant it is used. When the power's OCL carries an
-`Attack` nugget, the caster still has to line up and fire, so that part of the cooldown is spent
-before a shot leaves the barrel.
+A special power normally starts its cooldown the moment the player uses it. When the power's OCL has
+an `Attack` nugget, the unit still has to line up and shoot, so it spends part of that cooldown
+before firing anything.
 
-With `StartCooldownOnFirstShot = Yes` the cooldown starts once the burst is over instead. While
-waiting, the power is locked: it reads as not ready, so the cameo is greyed out and it cannot be
-used again. With `NumberOfShots` above one it stays locked for the whole burst.
+Set `StartCooldownOnFirstShot = Yes` and the cooldown starts after the unit finishes shooting
+instead. While the game waits for those shots, the power is locked: it reports itself as not ready,
+so the cameo greys out and the player cannot use it again. If `NumberOfShots` is more than one, the
+power stays locked until the unit fires the last one.
 
 ```
 SpecialPower SpecialPowerDig
@@ -330,16 +331,16 @@ End
 ```
 
 Notes:
-* A burst that ends early still starts the cooldown, since the power did fire. Interrupting the
-attack with a move order, running the weapon dry or losing the caster all count as the burst being
-over, so the power is never left waiting on a shot that is not coming.
-* A use that fires **nothing** is treated as cancelled and the power is handed straight back, ready
-to use again. That covers ordering the caster away before it shoots, the target going away, and the
-caster dying first. Any credits the power cost stay spent, since they are taken when it is used.
-* `StartCooldownTimeout` is the backstop for a cancel the engine cannot see. It also catches a power
-whose OCL has no `Attack` nugget at all, which is otherwise a data error; the log names the power.
-* `SharedSyncedTimer` powers ignore the field. Their timer belongs to the player rather than to the
-building that fired, so there is no one caster whose shots could start it.
+* If the unit fires at least one shot, the cooldown starts even when it does not fire the rest. A
+move order that interrupts the attack, an empty clip, and the unit dying all end the shooting, so the
+power never waits for a shot that will not come.
+* If the unit fires **nothing**, the game treats the use as cancelled and gives the power back ready.
+This covers ordering the unit away before it shoots, the target disappearing, and the unit dying
+first. The player does not get the credits back, because the power charges them when it is used.
+* `StartCooldownTimeout` catches a cancel the engine cannot detect. It also catches a power whose OCL
+has no `Attack` nugget, which is a mistake in the data; the log says which power it was.
+* A power with `SharedSyncedTimer` ignores this field. The player owns that timer, not the building
+that fired, so no single unit's shots can start it.
 
 # ObjectCreationList.ini
 

@@ -31,10 +31,10 @@ Optional credits cost to activate the special power. When set (> 0), the player 
 When Yes, this special power can only be fired while a valid target designator is active for the player (see the [SpecialPowerDesignatorUpdate](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Objects-&-Modules#specialpowerdesignatorupdate-new) module). Used to gate a superweapon behind a "designate target" unit/ability. Default = No.
 
 `StartCooldownOnFirstShot = No`  
-When Yes, `ReloadTime` starts once the shots this power's OCL orders are away, rather than the moment the power is used. The power is locked meanwhile: the cameo reads unavailable and it cannot be triggered again. Intended for an OCL with an `Attack` nugget, where the caster takes time to line up and fire. Default = No.
+When Yes, `ReloadTime` starts after the unit fires the shots this power's OCL ordered, instead of starting when the player uses the power. Until then the power is locked: the cameo shows it as unavailable and the player cannot use it again. Use this when the OCL has an `Attack` nugget, because the unit needs time to line up and shoot. Default = No.
 
 `StartCooldownTimeout = 0`  
-In milliseconds. How long to wait for those shots before starting the cooldown anyway, so a power can never be stranded. `0` means use this power's own `ReloadTime`. Only read when `StartCooldownOnFirstShot = Yes`. A use that fires nothing at all is treated as cancelled and the power is handed back ready, rather than charged a cooldown.
+In milliseconds. If the unit never fires, the cooldown starts anyway once this long has passed, so a power can never get stuck. `0` means use this power's own `ReloadTime`. The engine only reads this field when `StartCooldownOnFirstShot = Yes`. If the unit fires nothing at all, the engine treats the use as cancelled and gives the power back ready, instead of charging a cooldown.
 
 ### Code Example: 
 ```
