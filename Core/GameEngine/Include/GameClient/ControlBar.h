@@ -483,6 +483,7 @@ enum {
 enum { MAX_STRUCTURE_INVENTORY_BUTTONS = 10 }; // there are this many physical buttons in "inventory" windows for structures
 enum { MAX_BUILD_QUEUE_BUTTONS = 9 };// physical button count for the build queue
 enum { MAX_SPECIAL_POWER_SHORTCUTS = 32};
+enum { MAX_SMART_SELECTION_BUTTONS = 16 };	///< TheSuperHackers @feature per type cameos above the command bar
 class CommandSet : public Overridable
 {
 
@@ -751,6 +752,17 @@ public:
 	/// is the drawable the currently selected drawable for the context sensitive UI?
 	Bool isDrivingContextUI( Drawable *draw ) const { return draw == m_currentSelectedDrawable; }
 
+	// TheSuperHackers @feature Smart selection: one cameo per selected unit type above the
+	// command bar. Left click and Tab pick which type's command set the bar shows while the
+	// whole group stays selected, Ctrl click drops the type from the selection.
+	void processSmartSelectionClick( GameWindow *button );
+	void smartSelectionCycle( Int direction );
+	const ThingTemplate *getSmartSelectionFocusTemplate() const;
+	Bool isSmartSelectionFocused( const Object *obj ) const;
+	/// a command that only the focused type has goes to the focused type alone
+	void smartSelectionBeginCommand( const CommandButton *command );
+	void smartSelectionEndCommand();
+
 	//-----------------------------------------------------------------------------------------------
 	// the remaining methods are used to construct the command buttons and command sets for
 	// the command bar
@@ -934,6 +946,17 @@ protected:
 	void populateSpecialPowerShortcut( Player *player);
 	void updateSpecialPowerShortcut();
 
+	// the following methods are for the smart selection row
+	void initSmartSelectionBar( const ICoord2D &commandButtonSize );
+	void destroySmartSelectionBar();
+	void resetSmartSelection();
+	void populateSmartSelection();
+	void updateSmartSelection();
+	void refreshSmartSelectionButtons();
+	Int getSmartSelectionRowWidth() const;
+	void smartSelectionFocus( Int groupIndex );
+	void smartSelectionRemove( Int groupIndex );
+
 	static const Image* calculateVeterancyOverlayForThing( const ThingTemplate *thingTemplate );
 	static const Image* calculateVeterancyOverlayForObject( const Object *obj );
 
@@ -995,6 +1018,19 @@ protected:
 
 	WindowLayout *m_specialPowerLayout;
 	GameWindow *m_specialPowerShortcutParent;
+
+	struct SmartSelectionGroup
+	{
+		const ThingTemplate *thingTemplate;
+		Int count;
+	};
+	std::vector<SmartSelectionGroup> m_smartSelectionGroups;	///< one per unit type in the selection
+	GameWindow *m_smartSelectionParent;												///< top level container for the row, created in code
+	GameWindow *m_smartSelectionMoneyWindow;									///< the money display the row must not run into
+	GameWindow *m_smartSelectionButtons[ MAX_SMART_SELECTION_BUTTONS ];
+	ICoord2D m_smartSelectionButtonSize;
+	Int m_smartSelectionActive;																///< group whose command set the bar shows, or -1 for the common set
+	Bool m_smartSelectionNarrowed;														///< the logic side group is narrowed to the focused type for a command in flight
 
 	GameWindow *m_commandWindows[ MAX_COMMANDS_PER_SET ];			///< command window controls for easy access
 	const CommandButton *m_commonCommands[ MAX_COMMANDS_PER_SET ];	///< shared commands we will use for multi-selection

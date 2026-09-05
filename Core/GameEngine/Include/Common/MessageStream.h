@@ -213,6 +213,8 @@ public:
 		MSG_META_VIEW_TEAM9,												///< center view on given user-defined team (but do not affect selection)
 
 		MSG_META_SELECT_MATCHING_UNITS,              ///< selects matching units, used for both on screen and across map
+		MSG_META_SMART_SELECTION_NEXT_TYPE,					///< TheSuperHackers @feature narrow the selection to the next type in the smart selection row
+		MSG_META_SMART_SELECTION_PREV_TYPE,					///< TheSuperHackers @feature narrow the selection to the previous type in the smart selection row
 		MSG_META_SELECT_NEXT_UNIT,									///< select 'next' unit
 		MSG_META_SELECT_PREV_UNIT,									///< select 'prev' unit
 		MSG_META_SELECT_NEXT_WORKER,                ///< select 'next' worker

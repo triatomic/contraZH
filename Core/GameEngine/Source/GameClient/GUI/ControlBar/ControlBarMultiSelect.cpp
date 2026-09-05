@@ -246,6 +246,13 @@ void ControlBar::populateMultiSelect()
 		if (draw->getObject()->isKindOf(KINDOF_IGNORED_IN_GUI)) // ignore these guys
 			continue;
 
+		// TheSuperHackers @feature With a type focused in the smart selection row, only that type
+		// contributes, so the bar shows its command set rather than the group's common subset.
+		if( !isSmartSelectionFocused( draw->getObject() ) )
+		{
+			continue;
+		}
+
 
 		//
 		// add command for this drawable, note that we also sanity check to make sure the
@@ -325,6 +332,13 @@ void ControlBar::updateContextMultiSelect()
 
 		if (draw->getObject()->isKindOf(KINDOF_IGNORED_IN_GUI)) // ignore these guys
 			continue;
+
+		// TheSuperHackers @feature Only the focused type judges availability, or another type
+		// that cannot do a command would hide or grey it out.
+		if( !isSmartSelectionFocused( draw->getObject() ) )
+		{
+			continue;
+		}
 
 
 		// get the object

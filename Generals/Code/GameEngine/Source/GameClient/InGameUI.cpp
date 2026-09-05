@@ -3187,6 +3187,21 @@ void InGameUI::setGUICommand( const CommandButton *command )
 	// set the command
 	m_pendingGUICommand = command;
 
+	// TheSuperHackers @feature A queued cast arms here without passing through the control
+	// bar, and every cancel or completion clears here, so the smart selection focus narrows
+	// and restores the logic side group from this one spot.
+	if( TheControlBar )
+	{
+		if( command )
+		{
+			TheControlBar->smartSelectionBeginCommand( command );
+		}
+		else
+		{
+			TheControlBar->smartSelectionEndCommand();
+		}
+	}
+
 	// set the mouse cursor for commands that need a targeting or to normal with no command
 	if( command && BitIsSet( command->getOptions(), COMMAND_OPTION_NEED_TARGET ) && !command->isContextCommand() )
 	{
