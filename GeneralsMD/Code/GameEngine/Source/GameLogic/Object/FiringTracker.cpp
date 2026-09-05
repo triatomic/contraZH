@@ -39,6 +39,7 @@
 #include "GameLogic/FiringTracker.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/ObjectHelper.h"
+#include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Weapon.h"
 
@@ -51,6 +52,7 @@ FiringTracker::FiringTracker(Thing* thing, const ModuleData *modData) : UpdateMo
 	m_frameToStartCooldown = 0;
  	m_frameToForceReload = 0;
 	m_frameToStopLoopingSound = 0;
+	m_specialPowerWaiting = FALSE;
 	m_audioHandle = AHSV_NoSound;
 	setWakeFrame(getObject(), UPDATE_SLEEP_FOREVER);
 }
@@ -204,7 +206,69 @@ void FiringTracker::shotFired(const Weapon* weaponFired, ObjectID victimID)
 	}
 
 
+	notifySpecialPowersOfShot();
+
 	setWakeFrame(me, calcTimeToSleep());
+}
+
+//-------------------------------------------------------------------------------------------------
+/** TheSuperHackers @feature Report a shot to the special powers waiting on one. */
+//-------------------------------------------------------------------------------------------------
+void FiringTracker::notifySpecialPowersOfShot()
+{
+	// The flag is what every shot and every sleep decision reads, so the module list is only
+	// walked while one of ours is actually waiting -- which is almost never.
+	if( !m_specialPowerWaiting )
+	{
+		return;
+	}
+
+	for( BehaviorModule **b = getObject()->getBehaviorModules(); *b; ++b )
+	{
+		SpecialPowerModuleInterface *sp = (*b)->getSpecialPower();
+		if( sp != nullptr && sp->isWaitingForShots() )
+		{
+			// a shot only ever turns a wait into a burst, so nothing stops waiting here
+			sp->onShotFired();
+		}
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** TheSuperHackers @feature Tick the powers waiting on their shots. This is what lets one end
+	* its wait, so the flag is recomputed from what is still waiting afterwards. */
+//-------------------------------------------------------------------------------------------------
+void FiringTracker::updateWaitingSpecialPowers()
+{
+	if( !m_specialPowerWaiting )
+	{
+		return;
+	}
+
+	Bool stillWaiting = FALSE;
+	for( BehaviorModule **b = getObject()->getBehaviorModules(); *b; ++b )
+	{
+		SpecialPowerModuleInterface *sp = (*b)->getSpecialPower();
+		if( sp == nullptr || !sp->isWaitingForShots() )
+		{
+			continue;
+		}
+		sp->updatePendingShots();
+		if( sp->isWaitingForShots() )
+		{
+			stillWaiting = TRUE;
+		}
+	}
+	m_specialPowerWaiting = stillWaiting;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** A special power just started waiting on its shots, so we cannot stay asleep. */
+//-------------------------------------------------------------------------------------------------
+void FiringTracker::notifySpecialPowerWaiting()
+{
+	m_specialPowerWaiting = TRUE;
+	setWakeFrame( getObject(), UPDATE_SLEEP_NONE );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -235,11 +299,16 @@ UpdateSleepTime FiringTracker::update()
 		}
 	}
 
+	// before the cooldown branch below, which returns a one second sleep of its own
+	updateWaitingSpecialPowers();
+
 	if( m_frameToStartCooldown != 0 && now > m_frameToStartCooldown )
 	{
 		m_frameToStartCooldown = now + LOGICFRAMES_PER_SECOND;
 		coolDown();// if this is the coolest call to cooldown, it will set m_frameToStartCooldown to zero
-		return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND);
+		// a power waiting on its shots is ticked by us, so it decides the sleep instead
+		if( !m_specialPowerWaiting )
+			return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND);
 	}
 
 	UpdateSleepTime sleepTime = calcTimeToSleep();
@@ -251,6 +320,10 @@ UpdateSleepTime FiringTracker::update()
 UpdateSleepTime FiringTracker::calcTimeToSleep()
 {
  	// Figure out the longest amount of time we can sleep as unneeded
+
+ 	// A special power waiting on its shots is ticked by us, so staying asleep would strand it.
+ 	if( m_specialPowerWaiting )
+ 		return UPDATE_SLEEP_NONE;
 
  	// If all the timers are off, then we aren't needed at all
  	if (m_frameToStopLoopingSound == 0 && m_frameToStartCooldown == 0 && m_frameToForceReload == 0)

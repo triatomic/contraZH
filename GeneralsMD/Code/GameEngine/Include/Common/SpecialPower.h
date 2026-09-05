@@ -126,6 +126,8 @@ public:
 	Real getRadiusCursorRadius() const { return getFO()->m_radiusCursorRadius; }
 	Bool isShortcutPower() const { return getFO()->m_shortcutPower; }
 	Bool isNeedsTargetDesignator() const { return getFO()->m_needsTargetDesignator; }
+	// TheSuperHackers @feature Hold the cooldown until the shots this power orders are away.
+	Bool isStartCooldownOnFirstShot() const { return getFO()->m_startCooldownOnFirstShot; }
 	AcademyClassificationType getAcademyClassificationType() const { return m_academyClassificationType; }
 	EvaMessage getEvaDetectedOwn( void ) const { return getFO()->m_eva_detected_own; }
 	EvaMessage getEvaDetectedAlly( void ) const { return getFO()->m_eva_detected_ally; }
@@ -158,6 +160,7 @@ private:
 	Bool							m_sharedNSync;				///< If true, this is a special that is shared between all of a player's command centers
 	Bool							m_shortcutPower;		///< Is this shortcut power capable of being fired by the side panel?
 	Bool							m_needsTargetDesignator;		///< Is this special power only allowed to hit designated areas
+	Bool							m_startCooldownOnFirstShot;	///< hold the cooldown until the ordered shots are away
 	SpecialPowerType	m_type_behavior; //< behave like a default special power, used by new ones only
 	EvaMessage m_eva_detected_own; //< eva event when constructed by self
 	EvaMessage m_eva_detected_ally; //< eva event when constructed by ally

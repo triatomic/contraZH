@@ -304,6 +304,43 @@ target is what changes, not a deliberate shot.
 * Turning this on changes the simulation, so a replay must be played back with the same setting it
 was recorded with.
 
+# SpecialPower.ini
+
+## StartCooldownOnFirstShot
+
+* `StartCooldownOnFirstShot = No` - (Default. `Yes` delays `ReloadTime` until the unit has fired the
+shots the power ordered.)
+
+A special power normally starts its cooldown the moment the player uses it. When the power's OCL has
+an `Attack` nugget, the unit still has to line up and shoot, so it spends part of that cooldown
+before firing anything.
+
+Set `StartCooldownOnFirstShot = Yes` and the cooldown starts after the unit finishes shooting
+instead. While the game waits for those shots, the power is locked: it reports itself as not ready,
+so the cameo greys out and the player cannot use it again. If `NumberOfShots` is more than one, the
+power stays locked until the unit fires the last one.
+
+```
+SpecialPower SpecialPowerDig
+  Enum                     = SPECIAL_HELIX_NAPALM_BOMB
+  ReloadTime               = 60000
+  StartCooldownOnFirstShot = Yes
+End
+```
+
+Notes:
+* If the unit fires at least one shot, the cooldown starts even when it does not fire the rest. A
+move order that interrupts the attack, an empty clip, and the unit dying all end the shooting, so the
+power never waits for a shot that will not come.
+* If the unit fires **nothing**, the game treats the use as cancelled and gives the power back ready.
+This covers ordering the unit away before it shoots, the target disappearing, and the unit dying
+first. The player does not get the credits back, because the power charges them when it is used.
+* Should the engine miss a cancel, the power gives up waiting after `ReloadTime` and starts its
+cooldown, so it can never get stuck. This also catches a power whose OCL has no `Attack` nugget,
+which is a mistake in the data; the log says which power it was.
+* A power with `SharedSyncedTimer` ignores this field. The player owns that timer, not the building
+that fired, so no single unit's shots can start it.
+
 # ObjectCreationList.ini
 
 ## Attack nugget: FireRegardlessOfOrders

@@ -54,6 +54,9 @@ class FiringTracker : public UpdateModule
 public:
 	FiringTracker(Thing *thing, const ModuleData *modData);
 	void shotFired(const Weapon* weaponFired, ObjectID victimID );			///< Owner just fired this weapon at this Object
+	// TheSuperHackers @feature A special power holding its cooldown for its shots is ticked from
+	// here, this being the one place that sees every shot. Wakes us, since we sleep when idle.
+	void notifySpecialPowerWaiting();
 	ObjectID getLastShotVictim() const { return m_victimID; }						///< get the last victim ID that was shot at
 	Int getNumConsecutiveShotsAtVictim( const Object *victim ) const;
 
@@ -79,6 +82,10 @@ private:
 	void speedUp();		///< I've qualified for an increase in my Object flag status
 	void coolDown();	///< I need to slow down because it has been too long since I fired.
 	UpdateSleepTime calcTimeToSleep();
+	/// tell the special powers waiting on a shot that one just went out
+	void notifySpecialPowersOfShot();
+	/// tick the special powers waiting on their shots, and recount those still waiting
+	void updateWaitingSpecialPowers();
 
 private:
 	Int							m_consecutiveShots;					///< How many times I have shot at the same thing
@@ -86,6 +93,7 @@ private:
 	UnsignedInt			m_frameToStartCooldown;			///< This is the frame I should cool down at, and is pushed back every time a shot is fired
  	UnsignedInt			m_frameToForceReload;				///< Even more than AutoReload, this means it will pre-emptively reload instead of event triggering a delay after the last shot
 
+	Bool						m_specialPowerWaiting;			///< a special power of ours holds its cooldown for its shots
 	UnsignedInt			m_frameToStopLoopingSound;	///< if sound is looping, frame to stop looping it (or zero if not looping)
 	AudioHandle			m_audioHandle;
 	AsciiString			m_currentFireSoundName;			///< event name of the currently looping fire sound, so we can detect a weapon (sound) switch
