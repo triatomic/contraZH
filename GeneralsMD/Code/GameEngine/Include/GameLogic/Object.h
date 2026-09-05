@@ -529,6 +529,7 @@ public:
 	Bool getProgressBarShowingInfo(bool selected, Real& progress, Int& type, RGBAColorInt& color, RGBAColorInt& colorBG) const;
 
   void notifyFiringTrackerShotFired( const Weapon* weaponFired, ObjectID victimID ) ;
+	FiringTracker* getFiringTracker() const { return m_firingTracker; }	///< the helper that watches this object's shots
 
   /**
 		Determines if the unit has any weapon that could conceivably

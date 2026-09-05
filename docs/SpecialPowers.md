@@ -30,6 +30,12 @@ Optional credits cost to activate the special power. When set (> 0), the player 
 `NeedsTargetDesignator = No`  
 When Yes, this special power can only be fired while a valid target designator is active for the player (see the [SpecialPowerDesignatorUpdate](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Objects-&-Modules#specialpowerdesignatorupdate-new) module). Used to gate a superweapon behind a "designate target" unit/ability. Default = No.
 
+`StartCooldownOnFirstShot = No`  
+When Yes, `ReloadTime` starts once the shots this power's OCL orders are away, rather than the moment the power is used. The power is locked meanwhile: the cameo reads unavailable and it cannot be triggered again. Intended for an OCL with an `Attack` nugget, where the caster takes time to line up and fire. Default = No.
+
+`StartCooldownTimeout = 0`  
+In milliseconds. How long to wait for those shots before starting the cooldown anyway, so a power can never be stranded. `0` means use this power's own `ReloadTime`. Only read when `StartCooldownOnFirstShot = Yes`. A use that fires nothing at all is treated as cancelled and the power is handed back ready, rather than charged a cooldown.
+
 ### Code Example: 
 ```
 SpecialPower SupW_SpecialPowerChronoSphere

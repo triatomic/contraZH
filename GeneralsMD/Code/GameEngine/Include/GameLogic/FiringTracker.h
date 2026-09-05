@@ -54,6 +54,9 @@ class FiringTracker : public UpdateModule
 public:
 	FiringTracker(Thing *thing, const ModuleData *modData);
 	void shotFired(const Weapon* weaponFired, ObjectID victimID );			///< Owner just fired this weapon at this Object
+	// TheSuperHackers @feature A special power holding its cooldown for its shots is ticked from
+	// here, this being the one place that sees every shot. Wakes us, since we sleep when idle.
+	void notifySpecialPowerWaiting();
 	ObjectID getLastShotVictim() const { return m_victimID; }						///< get the last victim ID that was shot at
 	Int getNumConsecutiveShotsAtVictim( const Object *victim ) const;
 
@@ -79,6 +82,10 @@ private:
 	void speedUp();		///< I've qualified for an increase in my Object flag status
 	void coolDown();	///< I need to slow down because it has been too long since I fired.
 	UpdateSleepTime calcTimeToSleep();
+	/// tell the special powers about a shot, or tick the ones waiting on one
+	void updateWaitingSpecialPowers( Bool shotFired );
+	/// TRUE while any special power is holding its cooldown for its shots
+	Bool anySpecialPowerWaiting() const;
 
 private:
 	Int							m_consecutiveShots;					///< How many times I have shot at the same thing

@@ -633,6 +633,7 @@ public:
 
 	// OCL Attack FireRegardlessOfOrders: shots fired straight from the slot outside the state machine, so orders never touch them
 	void friend_queueShots(WeaponSlotType slot, Int shots, const Coord3D* pos);
+	Int friend_getQueuedShotsLeft() const { return m_queuedShotsLeft; }
 
 	Bool canAutoAcquire() const { return getAIUpdateModuleData()->m_autoAcquireEnemiesWhenIdle; }
 

@@ -304,6 +304,43 @@ target is what changes, not a deliberate shot.
 * Turning this on changes the simulation, so a replay must be played back with the same setting it
 was recorded with.
 
+# SpecialPower.ini
+
+## StartCooldownOnFirstShot
+
+* `StartCooldownOnFirstShot = No` - (Default. `Yes` holds `ReloadTime` until the shots the power
+orders are away.)
+* `StartCooldownTimeout = 0` - (Milliseconds to wait for those shots before starting the cooldown
+regardless. `0` uses this power's own `ReloadTime`.)
+
+A special power normally starts its cooldown the instant it is used. When the power's OCL carries an
+`Attack` nugget, the caster still has to line up and fire, so that part of the cooldown is spent
+before a shot leaves the barrel.
+
+With `StartCooldownOnFirstShot = Yes` the cooldown starts once the burst is over instead. While
+waiting, the power is locked: it reads as not ready, so the cameo is greyed out and it cannot be
+used again. With `NumberOfShots` above one it stays locked for the whole burst.
+
+```
+SpecialPower SpecialPowerDig
+  Enum                     = SPECIAL_HELIX_NAPALM_BOMB
+  ReloadTime               = 60000
+  StartCooldownOnFirstShot = Yes
+End
+```
+
+Notes:
+* A burst that ends early still starts the cooldown, since the power did fire. Interrupting the
+attack with a move order, running the weapon dry or losing the caster all count as the burst being
+over, so the power is never left waiting on a shot that is not coming.
+* A use that fires **nothing** is treated as cancelled and the power is handed straight back, ready
+to use again. That covers ordering the caster away before it shoots, the target going away, and the
+caster dying first. Any credits the power cost stay spent, since they are taken when it is used.
+* `StartCooldownTimeout` is the backstop for a cancel the engine cannot see. It also catches a power
+whose OCL has no `Attack` nugget at all, which is otherwise a data error; the log names the power.
+* `SharedSyncedTimer` powers ignore the field. Their timer belongs to the player rather than to the
+building that fired, so there is no one caster whose shots could start it.
+
 # ObjectCreationList.ini
 
 ## Attack nugget: FireRegardlessOfOrders

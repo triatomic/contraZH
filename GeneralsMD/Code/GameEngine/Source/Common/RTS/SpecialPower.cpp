@@ -279,7 +279,15 @@ void SpecialPowerStore::parseSpecialPowerDefinition( INI *ini )
 
 	// parse the ini definition
 	if (specialPower)
+	{
 		ini->initFromINI( specialPower, specialPower->getFieldParse() );
+
+		// TheSuperHackers @feature A shared timer lives on the player, not on the module that
+		// fires, so there is no one caster whose shots could start it.
+		DEBUG_ASSERTCRASH( !(specialPower->isStartCooldownOnFirstShot() && specialPower->isSharedNSync()),
+			("SpecialPower '%s' sets both StartCooldownOnFirstShot and SharedSyncedTimer; the shot delay is ignored",
+			 name.str()) );
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -312,6 +320,8 @@ void SpecialPowerStore::parseSpecialPowerDefinition( INI *ini )
 	{ "EvaReadyEnemy",						INI::parseEvaNameIndexList,			TheEvaMessageNames, offsetof(SpecialPowerTemplate, m_eva_ready_enemy) },
 	{ "NeedsTargetDesignator",						INI::parseBool,										nullptr, offsetof(SpecialPowerTemplate, m_needsTargetDesignator) },
 	{ "Cost",											INI::parseInt,									NULL, offsetof(SpecialPowerTemplate, m_cost) },
+	{ "StartCooldownOnFirstShot",	INI::parseBool,										nullptr, offsetof(SpecialPowerTemplate, m_startCooldownOnFirstShot) },
+	{ "StartCooldownTimeout",			INI::parseDurationUnsignedInt,		nullptr, offsetof(SpecialPowerTemplate, m_startCooldownTimeout) },
 	{ nullptr,	nullptr, nullptr,	0 }
 
 };
@@ -342,6 +352,8 @@ SpecialPowerTemplate::SpecialPowerTemplate()
 	m_eva_ready_ally = EVA_Invalid;
 	m_eva_ready_enemy = EVA_Invalid;
 	m_cost = 0;
+	m_startCooldownOnFirstShot = FALSE;
+	m_startCooldownTimeout = 0;
 }
 
 //-------------------------------------------------------------------------------------------------

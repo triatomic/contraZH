@@ -39,6 +39,7 @@
 #include "GameLogic/FiringTracker.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/ObjectHelper.h"
+#include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Weapon.h"
 
@@ -204,7 +205,57 @@ void FiringTracker::shotFired(const Weapon* weaponFired, ObjectID victimID)
 	}
 
 
+	updateWaitingSpecialPowers( TRUE );
+
 	setWakeFrame(me, calcTimeToSleep());
+}
+
+//-------------------------------------------------------------------------------------------------
+/** TheSuperHackers @feature Report a shot to the special powers waiting on one, or tick their
+	* wait. Called for every shot and every frame one of them is still waiting. */
+//-------------------------------------------------------------------------------------------------
+void FiringTracker::updateWaitingSpecialPowers( Bool shotFired )
+{
+	Object *me = getObject();
+	for( BehaviorModule **b = me->getBehaviorModules(); *b; ++b )
+	{
+		SpecialPowerModuleInterface *sp = (*b)->getSpecialPower();
+		if( sp == nullptr || !sp->isWaitingForShots() )
+		{
+			continue;
+		}
+		if( shotFired )
+		{
+			sp->onShotFired();
+		}
+		else
+		{
+			sp->updatePendingShots();
+		}
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool FiringTracker::anySpecialPowerWaiting() const
+{
+	const Object *me = getObject();
+	for( BehaviorModule **b = me->getBehaviorModules(); *b; ++b )
+	{
+		SpecialPowerModuleInterface *sp = (*b)->getSpecialPower();
+		if( sp && sp->isWaitingForShots() )
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** A special power just started waiting on its shots, so we cannot stay asleep. */
+//-------------------------------------------------------------------------------------------------
+void FiringTracker::notifySpecialPowerWaiting()
+{
+	setWakeFrame( getObject(), UPDATE_SLEEP_NONE );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -242,6 +293,8 @@ UpdateSleepTime FiringTracker::update()
 		return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND);
 	}
 
+	updateWaitingSpecialPowers( FALSE );
+
 	UpdateSleepTime sleepTime = calcTimeToSleep();
 
 	return sleepTime;
@@ -251,6 +304,10 @@ UpdateSleepTime FiringTracker::update()
 UpdateSleepTime FiringTracker::calcTimeToSleep()
 {
  	// Figure out the longest amount of time we can sleep as unneeded
+
+ 	// A special power waiting on its shots is ticked by us, so staying asleep would strand it.
+ 	if( anySpecialPowerWaiting() )
+ 		return UPDATE_SLEEP_NONE;
 
  	// If all the timers are off, then we aren't needed at all
  	if (m_frameToStopLoopingSound == 0 && m_frameToStartCooldown == 0 && m_frameToForceReload == 0)
