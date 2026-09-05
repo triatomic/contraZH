@@ -111,9 +111,7 @@ SpecialPowerModule::SpecialPowerModule( Thing *thing, const ModuleData *moduleDa
 	m_pausedCount = 0;
 	m_pausedOnFrame = 0;
 	m_pausedPercent = 0.0f;
-	m_pendingShotsState = PENDING_NONE;
-	m_pendingTimeoutFrame = 0;
-	m_pendingOrderTaken = FALSE;
+	clearPendingShots();
 
 	// we won't be able to use the power for X number of frames now
 
@@ -183,9 +181,7 @@ SpecialPowerModule::~SpecialPowerModule()
 void SpecialPowerModule::setReadyFrame( UnsignedInt frame )
 {
 	// the frame given here is the answer, so stop waiting on any shots
-	m_pendingShotsState = PENDING_NONE;
-	m_pendingTimeoutFrame = 0;
-	m_pendingOrderTaken = FALSE;
+	clearPendingShots();
 
 	m_availableOnFrame = frame;
 
@@ -441,9 +437,7 @@ void SpecialPowerModule::startPowerRecharge()
 //-------------------------------------------------------------------------------------------------
 void SpecialPowerModule::beginCooldownNow()
 {
-	m_pendingShotsState = PENDING_NONE;
-	m_pendingTimeoutFrame = 0;
-	m_pendingOrderTaken = FALSE;
+	clearPendingShots();
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	// this is a cheat ... remove this for release!
@@ -483,28 +477,28 @@ void SpecialPowerModule::beginCooldownNow()
 }
 
 //-------------------------------------------------------------------------------------------------
+/** Forget any wait in progress. */
+//-------------------------------------------------------------------------------------------------
+void SpecialPowerModule::clearPendingShots()
+{
+	m_pendingShotsState = PENDING_NONE;
+	m_pendingTimeoutFrame = 0;
+	m_pendingStartFrame = 0;
+	m_pendingSettleFrame = 0;
+	m_pendingOrderTaken = FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
 /** TheSuperHackers @feature Nothing was ever fired, so the use did not happen. Hand the power
 	* back rather than charging a cooldown for it. Any credits it cost stay spent, matching how
 	* the money is taken up front. */
 //-------------------------------------------------------------------------------------------------
 void SpecialPowerModule::refundUnfiredPower()
 {
-	m_pendingShotsState = PENDING_NONE;
-	m_pendingTimeoutFrame = 0;
-	m_pendingOrderTaken = FALSE;
+	clearPendingShots();
 
-	const SpecialPowerTemplate *powerTemplate = getSpecialPowerTemplate();
-	if( powerTemplate != nullptr && powerTemplate->isSharedNSync() )
-	{
-		Object *obj = getObject();
-		Player *player = obj ? obj->getControllingPlayer() : nullptr;
-		if( player )
-		{
-			player->expressSpecialPowerReadyFrame( powerTemplate, TheGameLogic->getFrame() );
-		}
-		return;
-	}
-
+	// Only a power with its own timer can be waiting: shouldWaitForShots turns a shared one
+	// down, since that timer belongs to the player rather than to this caster.
 	m_availableOnFrame = TheGameLogic->getFrame();
 }
 
@@ -527,14 +521,18 @@ Bool SpecialPowerModule::shouldWaitForShots() const
 /** The firing tracker ticks the wait and sleeps whenever nothing is shooting, so it has to be
 	* woken both when a wait starts and when a save is loaded in the middle of one. */
 //-------------------------------------------------------------------------------------------------
-void SpecialPowerModule::wakeFiringTrackerForWait()
+Bool SpecialPowerModule::wakeFiringTrackerForWait()
 {
 	Object *obj = getObject();
 	FiringTracker *tracker = obj ? obj->getFiringTracker() : nullptr;
-	if( tracker )
+	if( tracker == nullptr )
 	{
-		tracker->notifySpecialPowerWaiting();
+		// Only an object that can hold a weapon gets a tracker, and the tracker is what advances
+		// the wait. Without one the power would stay locked for good, so it does not wait at all.
+		return FALSE;
 	}
+	tracker->notifySpecialPowerWaiting();
+	return TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -585,9 +583,12 @@ void SpecialPowerModule::updatePendingShots()
 		if( attacking || queuedShotsLeft )
 		{
 			m_pendingOrderTaken = TRUE;
+			m_pendingSettleFrame = TheGameLogic->getFrame() + PENDING_CANCEL_SETTLE_FRAMES;
 		}
-		else if( m_pendingOrderTaken )
+		else if( m_pendingOrderTaken && TheGameLogic->getFrame() >= m_pendingSettleFrame )
 		{
+			// The attack state drops for a frame or two while it repaths or reacquires, so a
+			// cancel only counts once it has stayed dropped.
 			refundUnfiredPower();
 			return;
 		}
@@ -706,18 +707,36 @@ void SpecialPowerModule::triggerSpecialPower( const Coord3D *location )
 	// crate resets an enemy timer, and that must take effect at once.
 	if( shouldWaitForShots() )
 	{
+#if RETAIL_COMPATIBLE_CRC
+		// the MissileLauncherBuildingUpdate crash fix parks this frame as a sentinel, and the
+		// paths that read it must keep seeing it, so that use does not wait
+		if( m_availableOnFrame == 0xFFFFFFFF )
+		{
+			startPowerRecharge();
+			return;
+		}
+#endif
+
 		const SpecialPowerTemplate *powerTemplate = getSpecialPowerTemplate();
 		UnsignedInt timeout = powerTemplate->getStartCooldownTimeout();
 		if( timeout == 0 )
 		{
 			timeout = powerTemplate->getReloadTime();
 		}
+		const UnsignedInt now = TheGameLogic->getFrame();
 		m_pendingShotsState = PENDING_WAITING_FOR_FIRST_SHOT;
-		m_pendingTimeoutFrame = TheGameLogic->getFrame() + timeout;
+		m_pendingTimeoutFrame = now + timeout;
 		m_pendingOrderTaken = FALSE;
+		m_pendingStartFrame = now;
 
-		wakeFiringTrackerForWait();
-		return;
+		if( wakeFiringTrackerForWait() )
+		{
+			return;
+		}
+
+		// nothing here can watch for a shot, so charge the cooldown the ordinary way
+		DEBUG_LOG(( "SpecialPower '%s' uses StartCooldownOnFirstShot on an object that cannot fire; starting the cooldown at once",
+			getPowerName().str() ));
 	}
 
 	// we won't be able to use the power for X number of frames now
@@ -1134,14 +1153,18 @@ void SpecialPowerModule::pauseCountdown( Bool pause )
 		// And only update the ready time if we are fully unpaused now.
 		if( m_pausedCount == 0 )
 		{
-			// while waiting on shots there is no ready frame yet, so the wait is what gets extended
+			const UnsignedInt pausedFrames = (TheGameLogic->getFrame() - m_pausedOnFrame);
+			// A wait that is still running has no ready frame yet, so its own frames move instead.
+			// The state can also have ended mid pause, in which case the cooldown moves as usual.
 			if( m_pendingShotsState != PENDING_NONE )
 			{
-				m_pendingTimeoutFrame += (TheGameLogic->getFrame() - m_pausedOnFrame);
+				m_pendingTimeoutFrame += pausedFrames;
+				m_pendingStartFrame += pausedFrames;
+				m_pendingSettleFrame += pausedFrames;
 			}
 			else
 			{
-				m_availableOnFrame += (TheGameLogic->getFrame() - m_pausedOnFrame);
+				m_availableOnFrame += pausedFrames;
 			}
 		}
 	}
@@ -1151,11 +1174,11 @@ void SpecialPowerModule::pauseCountdown( Bool pause )
 //-------------------------------------------------------------------------------------------------
 UnsignedInt SpecialPowerModule::getReadyFrame() const
 {
-	// Nothing is charging yet. Reporting the timeout here would draw a full countdown that then
-	// jumps back to the top once the shot lands, so report the cooldown as not started instead.
+	// Nothing is charging yet, so hold the frame the cooldown would have ended on had it begun
+	// at the use. It counts down like any other, and the real one takes over once a shot lands.
 	if( m_pendingShotsState != PENDING_NONE )
 	{
-		return TheGameLogic->getFrame() + getSpecialPowerTemplate()->getReloadTime();
+		return m_pendingStartFrame + getSpecialPowerTemplate()->getReloadTime();
 	}
 
 	if ( getSpecialPowerTemplate()->isSharedNSync() )
@@ -1277,6 +1300,8 @@ void SpecialPowerModule::xfer( Xfer *xfer )
 	{
 		xfer->xferInt( &m_pendingShotsState );
 		xfer->xferUnsignedInt( &m_pendingTimeoutFrame );
+		xfer->xferUnsignedInt( &m_pendingStartFrame );
+		xfer->xferUnsignedInt( &m_pendingSettleFrame );
 		xfer->xferBool( &m_pendingOrderTaken );
 	}
 

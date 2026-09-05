@@ -190,10 +190,16 @@ protected:
 	void beginCooldownNow();
 	/// give the power back, for a use whose shots never happened
 	void refundUnfiredPower();
+	/// forget any wait in progress
+	void clearPendingShots();
 	/// TRUE when this use should hold its cooldown until the ordered shots are away
 	Bool shouldWaitForShots() const;
-	/// the firing tracker ticks the wait, and it sleeps whenever nothing is shooting
-	void wakeFiringTrackerForWait();
+	/// the firing tracker ticks the wait, and it sleeps whenever nothing is shooting.
+	/// FALSE when this object has no tracker at all, so no wait can be watched.
+	Bool wakeFiringTrackerForWait();
+
+	/// how long a dropped attack must stay dropped before it counts as a cancel
+	enum { PENDING_CANCEL_SETTLE_FRAMES = 15 };
 
 	enum
 	{
@@ -208,6 +214,8 @@ protected:
 	Real m_pausedPercent;
 	Int m_pendingShotsState;						///< one of the PENDING_ values above
 	UnsignedInt m_pendingTimeoutFrame;	///< start the cooldown anyway once this frame passes
+	UnsignedInt m_pendingStartFrame;		///< frame the wait began, for the settle time below
+	UnsignedInt m_pendingSettleFrame;		///< a dropped attack is only a cancel once this frame passes
 	Bool m_pendingOrderTaken;						///< the caster took up the attack, so dropping it is a cancel
 
 };

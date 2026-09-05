@@ -52,6 +52,7 @@ FiringTracker::FiringTracker(Thing* thing, const ModuleData *modData) : UpdateMo
 	m_frameToStartCooldown = 0;
  	m_frameToForceReload = 0;
 	m_frameToStopLoopingSound = 0;
+	m_specialPowersWaiting = 0;
 	m_audioHandle = AHSV_NoSound;
 	setWakeFrame(getObject(), UPDATE_SLEEP_FOREVER);
 }
@@ -216,7 +217,15 @@ void FiringTracker::shotFired(const Weapon* weaponFired, ObjectID victimID)
 //-------------------------------------------------------------------------------------------------
 void FiringTracker::updateWaitingSpecialPowers( Bool shotFired )
 {
+	// The count is what every shot and every sleep decision reads, so the module list is only
+	// walked while one of ours is actually waiting -- which is almost never.
+	if( m_specialPowersWaiting == 0 )
+	{
+		return;
+	}
+
 	Object *me = getObject();
+	Int stillWaiting = 0;
 	for( BehaviorModule **b = me->getBehaviorModules(); *b; ++b )
 	{
 		SpecialPowerModuleInterface *sp = (*b)->getSpecialPower();
@@ -232,22 +241,12 @@ void FiringTracker::updateWaitingSpecialPowers( Bool shotFired )
 		{
 			sp->updatePendingShots();
 		}
-	}
-}
-
-//-------------------------------------------------------------------------------------------------
-Bool FiringTracker::anySpecialPowerWaiting() const
-{
-	const Object *me = getObject();
-	for( BehaviorModule **b = me->getBehaviorModules(); *b; ++b )
-	{
-		SpecialPowerModuleInterface *sp = (*b)->getSpecialPower();
-		if( sp && sp->isWaitingForShots() )
+		if( sp->isWaitingForShots() )
 		{
-			return TRUE;
+			stillWaiting++;
 		}
 	}
-	return FALSE;
+	m_specialPowersWaiting = stillWaiting;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -255,6 +254,7 @@ Bool FiringTracker::anySpecialPowerWaiting() const
 //-------------------------------------------------------------------------------------------------
 void FiringTracker::notifySpecialPowerWaiting()
 {
+	m_specialPowersWaiting++;
 	setWakeFrame( getObject(), UPDATE_SLEEP_NONE );
 }
 
@@ -286,14 +286,17 @@ UpdateSleepTime FiringTracker::update()
 		}
 	}
 
+	// before the cooldown branch below, which returns a one second sleep of its own
+	updateWaitingSpecialPowers( FALSE );
+
 	if( m_frameToStartCooldown != 0 && now > m_frameToStartCooldown )
 	{
 		m_frameToStartCooldown = now + LOGICFRAMES_PER_SECOND;
 		coolDown();// if this is the coolest call to cooldown, it will set m_frameToStartCooldown to zero
-		return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND);
+		// a power waiting on its shots is ticked by us, so it decides the sleep instead
+		if( m_specialPowersWaiting == 0 )
+			return UPDATE_SLEEP(LOGICFRAMES_PER_SECOND);
 	}
-
-	updateWaitingSpecialPowers( FALSE );
 
 	UpdateSleepTime sleepTime = calcTimeToSleep();
 
@@ -306,7 +309,7 @@ UpdateSleepTime FiringTracker::calcTimeToSleep()
  	// Figure out the longest amount of time we can sleep as unneeded
 
  	// A special power waiting on its shots is ticked by us, so staying asleep would strand it.
- 	if( anySpecialPowerWaiting() )
+ 	if( m_specialPowersWaiting > 0 )
  		return UPDATE_SLEEP_NONE;
 
  	// If all the timers are off, then we aren't needed at all
