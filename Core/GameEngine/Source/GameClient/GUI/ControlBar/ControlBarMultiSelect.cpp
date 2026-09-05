@@ -234,10 +234,6 @@ void ControlBar::populateMultiSelect()
 	// sanity
 	DEBUG_ASSERTCRASH( selectedDrawables->empty() == FALSE, ("populateMultiSelect: Drawable list is empty") );
 
-	// TheSuperHackers @feature With a type focused in the smart selection row, only that type
-	// contributes, so the bar shows its command set rather than the group's common subset.
-	const ThingTemplate *focus = getSmartSelectionFocusTemplate();
-
 	// loop through all the selected drawables
 	for( DrawableListCIt it = selectedDrawables->begin();
 			 it != selectedDrawables->end(); ++it )
@@ -250,7 +246,9 @@ void ControlBar::populateMultiSelect()
 		if (draw->getObject()->isKindOf(KINDOF_IGNORED_IN_GUI)) // ignore these guys
 			continue;
 
-		if( focus && !draw->getObject()->getTemplate()->isEquivalentTo( focus ) )
+		// TheSuperHackers @feature With a type focused in the smart selection row, only that type
+		// contributes, so the bar shows its command set rather than the group's common subset.
+		if( !isSmartSelectionFocused( draw->getObject() ) )
 		{
 			continue;
 		}
@@ -324,10 +322,6 @@ void ControlBar::updateContextMultiSelect()
 	// sanity
 	DEBUG_ASSERTCRASH( selectedDrawables->empty() == FALSE, ("populateMultiSelect: Drawable list is empty") );
 
-	// TheSuperHackers @feature Only the focused type judges availability, or another type
-	// that cannot do a command would hide or grey it out.
-	const ThingTemplate *focus = getSmartSelectionFocusTemplate();
-
 	// loop through all the selected drawable IDs
 	for( DrawableListCIt it = selectedDrawables->begin();
 			 it != selectedDrawables->end(); ++it )
@@ -339,7 +333,9 @@ void ControlBar::updateContextMultiSelect()
 		if (draw->getObject()->isKindOf(KINDOF_IGNORED_IN_GUI)) // ignore these guys
 			continue;
 
-		if( focus && !draw->getObject()->getTemplate()->isEquivalentTo( focus ) )
+		// TheSuperHackers @feature Only the focused type judges availability, or another type
+		// that cannot do a command would hide or grey it out.
+		if( !isSmartSelectionFocused( draw->getObject() ) )
 		{
 			continue;
 		}

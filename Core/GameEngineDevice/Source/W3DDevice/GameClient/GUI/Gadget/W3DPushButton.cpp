@@ -108,6 +108,15 @@ void W3DGadgetPushButtonFreeDisplayStrings( void )
 	}
 }
 
+// drawTextPlate ==============================================================
+/** A translucent plate one pixel larger than the text it sits behind. */
+//=============================================================================
+static void drawTextPlate( Int textX, Int textY, Int width, Int height, Color color )
+{
+	const Int pad = 1;
+	TheDisplay->drawFillRect( textX - pad, textY - pad, width + pad * 2, height + pad * 2, color );
+}
+
 // drawButtonCountdown ========================================================
 /** Draw the remaining time for whatever this button is counting down -- a queued unit or
 	* upgrade, or a special power recharging. Drawn after the clock sweep so the darkening
@@ -159,12 +168,10 @@ static void drawButtonCountdown( GameWindow *window, Int seconds )
 	s_countdownString->getSize( &width, &height );
 
 	// centered along the bottom, clear of the hotkey badge in the top left
-	const Int pad = 1;
 	const Int textX = origin.x + (size.x / 2) - (width / 2);
 	const Int textY = origin.y + size.y - height - 2;
 
-	TheDisplay->drawFillRect( textX - pad, textY - pad,
-		width + pad * 2, height + pad * 2, GameMakeColor( 0, 0, 0, 128 ) );
+	drawTextPlate( textX, textY, width, height, GameMakeColor( 0, 0, 0, 128 ) );
 
 	s_countdownString->draw( textX, textY,
 		GameMakeColor( 255, 255, 255, 255 ), GameMakeColor( 0, 0, 0, 255 ) );
@@ -241,10 +248,7 @@ static void drawButtonHotKeyOverlay( GameWindow *window )
 		Int width, height;
 		hotKeyString->getSize( &width, &height );
 
-		const Int pad = 1;
-		TheDisplay->drawFillRect( textX - pad, textY - pad,
-			width + pad * 2, height + pad * 2,
-			TheGlobalData->m_keyboardOverlayBackdropColor );
+		drawTextPlate( textX, textY, width, height, TheGlobalData->m_keyboardOverlayBackdropColor );
 	}
 
 	hotKeyString->draw( textX, textY,
@@ -302,9 +306,7 @@ static void drawButtonText( GameWindow *window, WinInstanceData *instData )
 		// TheSuperHackers @feature A count over a cameo sits bottom right on a translucent plate
 		textPos.x = origin.x + size.x - width - 2;
 		textPos.y = origin.y + size.y - height - 1;
-		const Int pad = 1;
-		TheDisplay->drawFillRect( textPos.x - pad, textPos.y - pad,
-			width + pad * 2, height + pad * 2, GameMakeColor( 0, 0, 0, 160 ) );
+		drawTextPlate( textPos.x, textPos.y, width, height, GameMakeColor( 0, 0, 0, 160 ) );
 	}
 	else if( BitIsSet( window->winGetStatus(), WIN_STATUS_SHORTCUT_BUTTON ) )
 	{

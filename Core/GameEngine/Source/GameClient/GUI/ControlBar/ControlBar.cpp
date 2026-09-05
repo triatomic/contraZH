@@ -1328,6 +1328,7 @@ void ControlBar::init()
 		{
 			win->winSetTooltipFunc(commandButtonTooltip);
 		}
+		m_smartSelectionMoneyWindow = win;
 		win = TheWindowManager->winGetWindowFromId(nullptr, TheNameKeyGenerator->nameToKey("ControlBar.wnd:GeneralsExp"));
 		if(win)
 		{
@@ -1533,10 +1534,6 @@ void ControlBar::update()
 	// if we're an observer, don't do the complete update
 	if( m_isObserverCommandBar)
 	{
-		// this branch returns before the smart selection hooks below, so the row would keep
-		// whatever it held when the player was still playing
-		resetSmartSelection();
-
 		if((TheGameLogic->getFrame() % (LOGICFRAMES_PER_SECOND/2)) == 0)
 			populateObserverInfoWindow();
 
@@ -3006,6 +3003,8 @@ void ControlBar::setControlBarSchemeByPlayer(Player *p)
 	if( !p->isPlayerActive() )
 	{
 		m_isObserverCommandBar = TRUE;
+		// the observer update returns before the smart selection hooks, so clear the row here
+		resetSmartSelection();
 		switchToContext( CB_CONTEXT_OBSERVER_LIST, nullptr );
 		DEBUG_LOG(("We're loading the Observer Command Bar"));
 
@@ -3051,6 +3050,7 @@ void ControlBar::setControlBarSchemeByPlayerTemplate( const PlayerTemplate *pt)
 	if(pt == ThePlayerTemplateStore->findPlayerTemplate(TheNameKeyGenerator->nameToKey("FactionObserver")))
 	{
 		m_isObserverCommandBar = TRUE;
+		resetSmartSelection();
 		switchToContext( CB_CONTEXT_OBSERVER_LIST, nullptr );
 		DEBUG_LOG(("We're loading the Observer Command Bar"));
 

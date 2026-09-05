@@ -755,9 +755,10 @@ public:
 	// TheSuperHackers @feature Smart selection: one cameo per selected unit type above the
 	// command bar. Left click and Tab pick which type's command set the bar shows while the
 	// whole group stays selected, Ctrl click drops the type from the selection.
-	void processSmartSelectionClick( GameWindow *button, GadgetGameMessage gadgetMessage );
+	void processSmartSelectionClick( GameWindow *button );
 	void smartSelectionCycle( Int direction );
 	const ThingTemplate *getSmartSelectionFocusTemplate() const;
+	Bool isSmartSelectionFocused( const Object *obj ) const;
 	/// a command that only the focused type has goes to the focused type alone
 	void smartSelectionBeginCommand( const CommandButton *command );
 	void smartSelectionEndCommand();
@@ -952,6 +953,7 @@ protected:
 	void populateSmartSelection();
 	void updateSmartSelection();
 	void refreshSmartSelectionButtons();
+	Int getSmartSelectionRowWidth() const;
 	void smartSelectionFocus( Int groupIndex );
 	void smartSelectionRemove( Int groupIndex );
 
@@ -1020,10 +1022,9 @@ protected:
 	struct SmartSelectionGroup
 	{
 		const ThingTemplate *thingTemplate;
-		std::vector<ObjectID> objectIDs;
+		Int count;
 	};
 	std::vector<SmartSelectionGroup> m_smartSelectionGroups;	///< one per unit type in the selection
-	std::vector<ObjectID> m_smartSelectionLiveIDs;						///< sorted snapshot of the selection the row was last built from
 	GameWindow *m_smartSelectionParent;												///< top level container for the row, created in code
 	GameWindow *m_smartSelectionMoneyWindow;									///< the money display the row must not run into
 	GameWindow *m_smartSelectionButtons[ MAX_SMART_SELECTION_BUTTONS ];

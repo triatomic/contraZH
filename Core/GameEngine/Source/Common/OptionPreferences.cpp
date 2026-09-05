@@ -467,14 +467,7 @@ Bool OptionPreferences::getEasyMilitaryDragEnabled(void) const
 // and cycles it with Tab. On by default.
 Bool OptionPreferences::getSmartSelectionEnabled(void) const
 {
-	OptionPreferences::const_iterator it = find("SmartSelection");
-	if (it == end())
-		return TRUE;
-
-	if (stricmp(it->second.str(), "yes") == 0) {
-		return TRUE;
-	}
-	return FALSE;
+	return getBool("SmartSelection", TRUE);
 }
 
 // TheSuperHackers @feature Options.ini: CastMode = Normal | QuickCast | QuickCastWithIndicator

@@ -22,16 +22,15 @@
 // instead of the group's common subset. Ctrl click drops the type from the selection.
 //
 // The row is built in code rather than from ControlBar.wnd, which ships in the game data.
-// The container is a top level window because a child sitting outside its parent's rect is
-// drawn but never hit tested. It is SEE_THRU so the gaps between cameos still reach the world.
+// The container is a top level window because the hit test only descends into a top level
+// window that contains the point, so a child sitting above its parent's rect is never found.
+// It is SEE_THRU so the gaps between cameos still reach the world.
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/GlobalData.h"
 #include "Common/MessageStream.h"
-#include "Common/NameKeyGenerator.h"
 #include "Common/ThingTemplate.h"
-#include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
@@ -52,21 +51,11 @@ static const Int SMART_SELECTION_GAP = 2;
 static WindowMsgHandledType SmartSelectionBarSystem( GameWindow *window, UnsignedInt msg,
 																										 WindowMsgData mData1, WindowMsgData mData2 )
 {
-	switch( msg )
+	if( msg != GBM_SELECTED )
 	{
-		case GBM_SELECTED:
-		{
-			if( TheControlBar )
-			{
-				TheControlBar->processSmartSelectionClick( (GameWindow *)mData1, (GadgetGameMessage)msg );
-			}
-			break;
-		}
-
-		default:
-			return MSG_IGNORED;
+		return MSG_IGNORED;
 	}
-
+	TheControlBar->processSmartSelectionClick( (GameWindow *)mData1 );
 	return MSG_HANDLED;
 }
 
@@ -76,8 +65,8 @@ static WindowMsgHandledType SmartSelectionBarSystem( GameWindow *window, Unsigne
 //-------------------------------------------------------------------------------------------------
 static Object *getSmartSelectionObject( Drawable *draw )
 {
-	Object *obj = draw ? draw->getObject() : nullptr;
-	if( obj == nullptr )
+	Object *obj = draw->getObject();
+	if( obj == nullptr || !obj->isLocallyControlled() )
 	{
 		return nullptr;
 	}
@@ -89,16 +78,46 @@ static Object *getSmartSelectionObject( Drawable *draw )
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Resolve a row member, or null once it is gone. */
+/** Whether a command set carries the button, by name because sets hold overridable copies. */
 //-------------------------------------------------------------------------------------------------
-static Object *getLiveSmartSelectionObject( ObjectID id )
+static Bool commandSetHasButton( const CommandSet *commandSet, const CommandButton *command )
 {
-	Object *obj = TheGameLogic->findObjectByID( id );
-	if( obj == nullptr || obj->isEffectivelyDead() || obj->getDrawable() == nullptr )
+	if( commandSet == nullptr )
 	{
-		return nullptr;
+		return FALSE;
 	}
-	return obj;
+	for( Int i = 0; i < MAX_COMMANDS_PER_SET; i++ )
+	{
+		const CommandButton *button = commandSet->getCommandButton( i );
+		if( button && button->getName() == command->getName() )
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Hand the logic side a group made of the selection, or of one type in it for onlyType. */
+//-------------------------------------------------------------------------------------------------
+static void appendSelectionGroup( const ThingTemplate *onlyType )
+{
+	GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_CREATE_SELECTED_GROUP_NO_SOUND );
+	msg->appendBooleanArgument( TRUE );
+	const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
+	for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
+	{
+		Object *obj = ( *it )->getObject();
+		if( obj == nullptr )
+		{
+			continue;
+		}
+		if( onlyType && !obj->getTemplate()->isEquivalentTo( onlyType ) )
+		{
+			continue;
+		}
+		msg->appendObjectIDArgument( obj->getID() );
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -129,28 +148,16 @@ void ControlBar::initSmartSelectionBar( const ICoord2D &commandButtonSize )
 		return;
 	}
 
-	m_smartSelectionMoneyWindow = TheWindowManager->winGetWindowFromId( nullptr,
-		TheNameKeyGenerator->nameToKey( "ControlBar.wnd:MoneyDisplay" ) );
-
-	Int pointSize = m_smartSelectionButtonSize.y / 3;
-	if( pointSize < 8 )
-	{
-		pointSize = 8;
-	}
-	if( pointSize > 10 )
-	{
-		pointSize = 10;
-	}
+	Int pointSize = MIN( MAX( m_smartSelectionButtonSize.y / 3, 8 ), 10 );
 	if( TheGlobalLanguageData )
 	{
 		pointSize = TheGlobalLanguageData->adjustFontSize( pointSize );
 	}
-	GameFont *font = TheFontLibrary ? TheFontLibrary->getFont( AsciiString( "Arial" ), pointSize, TRUE ) : nullptr;
+	GameFont *font = TheFontLibrary->getFont( AsciiString( "Arial" ), pointSize, TRUE );
 
 	const Color textColor = GameMakeColor( 255, 255, 255, 255 );
 	const Color dropColor = GameMakeColor( 0, 0, 0, 255 );
 
-	AsciiString windowName;
 	for( Int i = 0; i < MAX_SMART_SELECTION_BUTTONS; i++ )
 	{
 		WinInstanceData instData;
@@ -167,12 +174,9 @@ void ControlBar::initSmartSelectionBar( const ICoord2D &commandButtonSize )
 			continue;
 		}
 
-		windowName.format( "SmartSelection:Button%02d", i + 1 );
-		button->winSetWindowId( TheNameKeyGenerator->nameToKey( windowName ) );
-		if( font )
-		{
-			button->winSetFont( font );
-		}
+		// the slot rides on the button, one based so an unset payload never reads as slot zero
+		GadgetButtonSetData( button, (void *)(size_t)( i + 1 ) );
+		button->winSetFont( font );
 		button->winSetEnabledTextColors( textColor, dropColor );
 		button->winSetHiliteTextColors( textColor, dropColor );
 		button->winSetDisabledTextColors( textColor, dropColor );
@@ -187,7 +191,7 @@ void ControlBar::initSmartSelectionBar( const ICoord2D &commandButtonSize )
 //-------------------------------------------------------------------------------------------------
 void ControlBar::destroySmartSelectionBar()
 {
-	if( m_smartSelectionParent && TheWindowManager )
+	if( m_smartSelectionParent )
 	{
 		TheWindowManager->winDestroy( m_smartSelectionParent );
 	}
@@ -203,10 +207,9 @@ void ControlBar::destroySmartSelectionBar()
 void ControlBar::resetSmartSelection()
 {
 	m_smartSelectionGroups.clear();
-	m_smartSelectionLiveIDs.clear();
 	m_smartSelectionActive = -1;
 	m_smartSelectionNarrowed = FALSE;
-	if( m_smartSelectionParent )
+	if( m_smartSelectionParent && !m_smartSelectionParent->winIsHidden() )
 	{
 		m_smartSelectionParent->winHide( TRUE );
 	}
@@ -217,130 +220,27 @@ void ControlBar::resetSmartSelection()
 //-------------------------------------------------------------------------------------------------
 const ThingTemplate *ControlBar::getSmartSelectionFocusTemplate() const
 {
-	if( m_smartSelectionActive < 0 || (size_t)m_smartSelectionActive >= m_smartSelectionGroups.size() )
-	{
-		return nullptr;
-	}
-	return m_smartSelectionGroups[ m_smartSelectionActive ].thingTemplate;
+	return m_smartSelectionActive < 0 ? nullptr : m_smartSelectionGroups[ m_smartSelectionActive ].thingTemplate;
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Whether a command set carries the button, by name because sets hold overridable copies. */
+/** Whether the object takes part in the command bar while a type is focused. */
 //-------------------------------------------------------------------------------------------------
-static Bool commandSetHasButton( const CommandSet *commandSet, const CommandButton *command )
+Bool ControlBar::isSmartSelectionFocused( const Object *obj ) const
 {
-	if( commandSet == nullptr )
-	{
-		return FALSE;
-	}
-	for( Int i = 0; i < MAX_COMMANDS_PER_SET; i++ )
-	{
-		const CommandButton *button = commandSet->getCommandButton( i );
-		if( button && button->getName() == command->getName() )
-		{
-			return TRUE;
-		}
-	}
-	return FALSE;
-}
-
-//-------------------------------------------------------------------------------------------------
-/** The logic side sends a command to every unit in the player's group that can do it, so a
-	* command off the focused type's card would leak to any other type with a matching one. For
-	* a command that is not common to the whole group, hand the logic side just the focused type
-	* until the command is done. The client selection is untouched throughout. */
-//-------------------------------------------------------------------------------------------------
-void ControlBar::smartSelectionBeginCommand( const CommandButton *command )
-{
-	if( m_smartSelectionNarrowed || command == nullptr || m_currContext != CB_CONTEXT_MULTI_SELECT )
-	{
-		return;
-	}
 	const ThingTemplate *focus = getSmartSelectionFocusTemplate();
-	if( focus == nullptr || TheInGameUI == nullptr || TheMessageStream == nullptr )
-	{
-		return;
-	}
-
-	std::vector<Object *> focused;
-	const std::vector<ObjectID> &ids = m_smartSelectionGroups[ m_smartSelectionActive ].objectIDs;
-	for( size_t i = 0; i < ids.size(); i++ )
-	{
-		Object *obj = getLiveSmartSelectionObject( ids[ i ] );
-		if( obj && obj->getDrawable()->isSelected() )
-		{
-			focused.push_back( obj );
-		}
-	}
-	if( focused.empty() )
-	{
-		return;
-	}
-
-	// a command the focused card does not carry came from elsewhere, the shortcut bar say
-	if( !commandSetHasButton( findCommandSet( focused[ 0 ]->getCommandSetString() ), command ) )
-	{
-		return;
-	}
-
-	// a command every selected type carries is the group's own and still goes to everyone
-	Bool common = TRUE;
-	const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
-	for( DrawableListCIt it = selected->begin(); common && it != selected->end(); ++it )
-	{
-		Object *obj = getSmartSelectionObject( *it );
-		if( obj == nullptr )
-		{
-			continue;
-		}
-		common = commandSetHasButton( findCommandSet( obj->getCommandSetString() ), command );
-	}
-	if( common )
-	{
-		return;
-	}
-
-	GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_CREATE_SELECTED_GROUP_NO_SOUND );
-	msg->appendBooleanArgument( TRUE );
-	for( size_t i = 0; i < focused.size(); i++ )
-	{
-		msg->appendObjectIDArgument( focused[ i ]->getID() );
-	}
-	m_smartSelectionNarrowed = TRUE;
+	return focus == nullptr || obj->getTemplate()->isEquivalentTo( focus );
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Give the logic side the whole selection back, once no command is still waiting for a
-	* target. That later clear of the pending command ends up here as well. */
-//-------------------------------------------------------------------------------------------------
-void ControlBar::smartSelectionEndCommand()
+Int ControlBar::getSmartSelectionRowWidth() const
 {
-	if( !m_smartSelectionNarrowed || TheInGameUI == nullptr || TheMessageStream == nullptr )
-	{
-		return;
-	}
-	if( TheInGameUI->getGUICommand() != nullptr )
-	{
-		return;
-	}
-
-	GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_CREATE_SELECTED_GROUP_NO_SOUND );
-	msg->appendBooleanArgument( TRUE );
-	const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
-	for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
-	{
-		Object *obj = ( *it )->getObject();
-		if( obj )
-		{
-			msg->appendObjectIDArgument( obj->getID() );
-		}
-	}
-	m_smartSelectionNarrowed = FALSE;
+	return (Int)m_smartSelectionGroups.size() * ( m_smartSelectionButtonSize.x + SMART_SELECTION_GAP ) - SMART_SELECTION_GAP;
 }
 
 //-------------------------------------------------------------------------------------------------
 /** Runs whenever the UI is marked dirty, which is far more often than the selection changes,
-	* so the selection is snapshotted and compared before anything is rebuilt. */
+	* so the groups are rebuilt into a local and the row only repainted when they differ. */
 //-------------------------------------------------------------------------------------------------
 void ControlBar::populateSmartSelection()
 {
@@ -348,49 +248,14 @@ void ControlBar::populateSmartSelection()
 	{
 		return;
 	}
-	if( TheGlobalData == nullptr || !TheGlobalData->m_smartSelection || TheInGameUI == nullptr )
+	if( !TheGlobalData->m_smartSelection )
 	{
 		resetSmartSelection();
 		return;
 	}
 
-	std::vector<ObjectID> liveIDs;
-	const DrawableList *selected = TheInGameUI->getAllSelectedLocalDrawables();
-	for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
-	{
-		Object *obj = getSmartSelectionObject( *it );
-		if( obj )
-		{
-			liveIDs.push_back( obj->getID() );
-		}
-	}
-	std::sort( liveIDs.begin(), liveIDs.end() );
-
-	// the dirty flag fires for production, rank and much else, so an unchanged selection must
-	// not repaint the row -- the button labels alone would re-lay out a display string each time
-	if( liveIDs == m_smartSelectionLiveIDs )
-	{
-		return;
-	}
-	m_smartSelectionLiveIDs = liveIDs;
-
-	if( liveIDs.empty() )
-	{
-		resetSmartSelection();
-		return;
-	}
-
-	// The focused type survives the rebuild if it is still in the selection. It cannot survive
-	// into a selection the bar drives from one drawable, whose own command set is shown and
-	// where the focus would silently filter the next multi selection.
-	const ThingTemplate *focus = nullptr;
-	if( TheInGameUI->getSelectCount() > 1 )
-	{
-		focus = getSmartSelectionFocusTemplate();
-	}
-	m_smartSelectionActive = -1;
-
-	m_smartSelectionGroups.clear();
+	std::vector<SmartSelectionGroup> groups;
+	const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
 	for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
 	{
 		Object *obj = getSmartSelectionObject( *it );
@@ -401,14 +266,14 @@ void ControlBar::populateSmartSelection()
 
 		const ThingTemplate *thingTemplate = obj->getTemplate();
 		size_t g = 0;
-		for( ; g < m_smartSelectionGroups.size(); g++ )
+		for( ; g < groups.size(); g++ )
 		{
-			if( m_smartSelectionGroups[ g ].thingTemplate->isEquivalentTo( thingTemplate ) )
+			if( groups[ g ].thingTemplate->isEquivalentTo( thingTemplate ) )
 			{
 				break;
 			}
 		}
-		if( g == m_smartSelectionGroups.size() )
+		if( g == groups.size() )
 		{
 			if( g >= MAX_SMART_SELECTION_BUTTONS )
 			{
@@ -416,23 +281,43 @@ void ControlBar::populateSmartSelection()
 			}
 			SmartSelectionGroup group;
 			group.thingTemplate = thingTemplate;
-			m_smartSelectionGroups.push_back( group );
-			// the same template, not merely an equivalent one, or an upgraded variant in the
-			// same selection could take the focus away from the type the player picked
-			if( thingTemplate == focus )
-			{
-				m_smartSelectionActive = (Int)g;
-			}
+			group.count = 0;
+			groups.push_back( group );
 		}
-		m_smartSelectionGroups[ g ].objectIDs.push_back( obj->getID() );
+		groups[ g ].count++;
+	}
+
+	Bool same = groups.size() == m_smartSelectionGroups.size();
+	for( size_t g = 0; same && g < groups.size(); g++ )
+	{
+		same = groups[ g ].thingTemplate == m_smartSelectionGroups[ g ].thingTemplate &&
+					 groups[ g ].count == m_smartSelectionGroups[ g ].count;
+	}
+	if( same )
+	{
+		return;
+	}
+
+	// The focused type survives the rebuild if it is still in the selection, matched as the
+	// same template so an upgraded variant in the selection cannot take it. It cannot survive
+	// into a selection the bar drives from one drawable, whose own command set is shown and
+	// where the focus would silently filter the next multi selection.
+	const ThingTemplate *focus = TheInGameUI->getSelectCount() > 1 ? getSmartSelectionFocusTemplate() : nullptr;
+	m_smartSelectionGroups.swap( groups );
+	m_smartSelectionActive = -1;
+	for( size_t g = 0; g < m_smartSelectionGroups.size(); g++ )
+	{
+		if( m_smartSelectionGroups[ g ].thingTemplate == focus )
+		{
+			m_smartSelectionActive = (Int)g;
+		}
 	}
 
 	refreshSmartSelectionButtons();
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Every frame: follow the command bar, which slides and hides on its own schedule. Members
-	* that die leave the selection, which rebuilds the row through the dirty flag. */
+/** Every frame: follow the command bar, which slides in on show and hides on its own schedule. */
 //-------------------------------------------------------------------------------------------------
 void ControlBar::updateSmartSelection()
 {
@@ -445,7 +330,10 @@ void ControlBar::updateSmartSelection()
 	GameWindow *commandWindow = m_contextParent[ CP_COMMAND ] ? m_contextParent[ CP_COMMAND ] : master;
 	if( master == nullptr || master->winIsHidden() || m_smartSelectionGroups.empty() )
 	{
-		m_smartSelectionParent->winHide( TRUE );
+		if( !m_smartSelectionParent->winIsHidden() )
+		{
+			m_smartSelectionParent->winHide( TRUE );
+		}
 		return;
 	}
 
@@ -461,14 +349,10 @@ void ControlBar::updateSmartSelection()
 	{
 		ICoord2D moneyPos;
 		m_smartSelectionMoneyWindow->winGetScreenPosition( &moneyPos.x, &moneyPos.y );
-		// measured from the groups rather than read back from the container, whose size is
-		// only written when the buttons are repainted
-		const Int rowWidth = (Int)m_smartSelectionGroups.size() *
-			( m_smartSelectionButtonSize.x + SMART_SELECTION_GAP ) - SMART_SELECTION_GAP;
 		// the housing slopes out about a cameo's width left of the money text
-		const Int housingX = moneyPos.x - m_smartSelectionButtonSize.x;
+		const Int housingMargin = m_smartSelectionButtonSize.x;
 		const Int liftedY = moneyPos.y - m_smartSelectionButtonSize.y - SMART_SELECTION_GAP;
-		if( commandPos.x + rowWidth > housingX && liftedY < rowY )
+		if( commandPos.x + getSmartSelectionRowWidth() > moneyPos.x - housingMargin && liftedY < rowY )
 		{
 			rowY = liftedY;
 		}
@@ -507,31 +391,21 @@ void ControlBar::refreshSmartSelectionButtons()
 		GadgetButtonSetEnabledImage( button, image );
 
 		UnicodeString count;
-		count.format( L"%d", (Int)group.objectIDs.size() );
+		count.format( L"%d", group.count );
 		GadgetButtonSetText( button, count );
 		button->winSetTooltip( group.thingTemplate->getDisplayName() );
 		GadgetCheckLikeButtonSetVisualCheck( button, i == m_smartSelectionActive );
 		button->winHide( FALSE );
 	}
 
-	const Int stride = m_smartSelectionButtonSize.x + SMART_SELECTION_GAP;
-	const Int width = (Int)groupCount * stride - SMART_SELECTION_GAP;
-	m_smartSelectionParent->winSetSize( width > 0 ? width : 1, m_smartSelectionButtonSize.y );
+	m_smartSelectionParent->winSetSize( MAX( getSmartSelectionRowWidth(), 1 ), m_smartSelectionButtonSize.y );
 }
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-void ControlBar::processSmartSelectionClick( GameWindow *button, GadgetGameMessage gadgetMessage )
+void ControlBar::processSmartSelectionClick( GameWindow *button )
 {
-	Int groupIndex = -1;
-	for( Int i = 0; i < MAX_SMART_SELECTION_BUTTONS; i++ )
-	{
-		if( m_smartSelectionButtons[ i ] == button )
-		{
-			groupIndex = i;
-			break;
-		}
-	}
+	const Int groupIndex = (Int)(size_t)GadgetButtonGetData( button ) - 1;
 	if( groupIndex < 0 || (size_t)groupIndex >= m_smartSelectionGroups.size() )
 	{
 		return;
@@ -543,13 +417,9 @@ void ControlBar::processSmartSelectionClick( GameWindow *button, GadgetGameMessa
 	{
 		smartSelectionRemove( groupIndex );
 	}
-	else if( groupIndex == m_smartSelectionActive )
-	{
-		smartSelectionFocus( -1 );
-	}
 	else
 	{
-		smartSelectionFocus( groupIndex );
+		smartSelectionFocus( groupIndex == m_smartSelectionActive ? -1 : groupIndex );
 	}
 }
 
@@ -581,11 +451,7 @@ void ControlBar::smartSelectionCycle( Int direction )
 //-------------------------------------------------------------------------------------------------
 void ControlBar::smartSelectionFocus( Int groupIndex )
 {
-	if( groupIndex >= (Int)m_smartSelectionGroups.size() )
-	{
-		return;
-	}
-	m_smartSelectionActive = groupIndex < 0 ? -1 : groupIndex;
+	m_smartSelectionActive = groupIndex;
 	refreshSmartSelectionButtons();
 	markUIDirty();
 }
@@ -596,35 +462,95 @@ void ControlBar::smartSelectionFocus( Int groupIndex )
 //-------------------------------------------------------------------------------------------------
 void ControlBar::smartSelectionRemove( Int groupIndex )
 {
-	if( groupIndex < 0 || (size_t)groupIndex >= m_smartSelectionGroups.size() )
+	const ThingTemplate *thingTemplate = m_smartSelectionGroups[ groupIndex ].thingTemplate;
+
+	// gathered first, since deselecting walks the very list being read
+	std::vector<Drawable *> members;
+	const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
+	for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
+	{
+		Object *obj = getSmartSelectionObject( *it );
+		if( obj && obj->getTemplate()->isEquivalentTo( thingTemplate ) )
+		{
+			members.push_back( *it );
+		}
+	}
+	if( members.empty() )
 	{
 		return;
 	}
 
-	GameMessage *msg = nullptr;
-	const std::vector<ObjectID> &ids = m_smartSelectionGroups[ groupIndex ].objectIDs;
-	for( size_t i = 0; i < ids.size(); i++ )
+	GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_REMOVE_FROM_SELECTED_GROUP );
+	for( size_t i = 0; i < members.size(); i++ )
 	{
-		Object *obj = getLiveSmartSelectionObject( ids[ i ] );
-		if( obj == nullptr )
-		{
-			continue;
-		}
-		// the logic side keeps a member that has since left the client selection, boarding a
-		// transport for one, so it is named here too or it would go on taking orders
-		if( msg == nullptr )
-		{
-			msg = TheMessageStream->appendMessage( GameMessage::MSG_REMOVE_FROM_SELECTED_GROUP );
-		}
-		msg->appendObjectIDArgument( obj->getID() );
-		if( obj->getDrawable()->isSelected() )
-		{
-			TheInGameUI->deselectDrawable( obj->getDrawable() );
-		}
+		msg->appendObjectIDArgument( members[ i ]->getObject()->getID() );
+		TheInGameUI->deselectDrawable( members[ i ] );
 	}
 
 	if( groupIndex == m_smartSelectionActive )
 	{
 		m_smartSelectionActive = -1;
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** The logic side sends a command to every unit in the player's group that can do it, so a
+	* command off the focused type's card would leak to any other type with a matching one. For
+	* a command that is not common to the whole group, hand the logic side just the focused type
+	* until the command is done. The client selection is untouched throughout. */
+//-------------------------------------------------------------------------------------------------
+void ControlBar::smartSelectionBeginCommand( const CommandButton *command )
+{
+	if( m_smartSelectionNarrowed || m_currContext != CB_CONTEXT_MULTI_SELECT )
+	{
+		return;
+	}
+	const ThingTemplate *focus = getSmartSelectionFocusTemplate();
+	if( focus == nullptr )
+	{
+		return;
+	}
+
+	// with a type focused the populated commands are its card, so anything else, a shortcut
+	// bar power say, came from elsewhere
+	Bool onCard = FALSE;
+	for( Int i = 0; !onCard && i < MAX_COMMANDS_PER_SET; i++ )
+	{
+		onCard = m_commonCommands[ i ] == command;
+	}
+	if( !onCard )
+	{
+		return;
+	}
+
+	// a command every other selected type carries too is the group's own and still goes to everyone
+	const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
+	for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
+	{
+		Object *obj = getSmartSelectionObject( *it );
+		if( obj == nullptr || obj->getTemplate()->isEquivalentTo( focus ) )
+		{
+			continue;
+		}
+		if( !commandSetHasButton( findCommandSet( obj->getCommandSetString() ), command ) )
+		{
+			appendSelectionGroup( focus );
+			m_smartSelectionNarrowed = TRUE;
+			return;
+		}
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Give the logic side the whole selection back, once no command is still waiting for a
+	* target. That later clear of the pending command ends up here as well. */
+//-------------------------------------------------------------------------------------------------
+void ControlBar::smartSelectionEndCommand()
+{
+	if( !m_smartSelectionNarrowed || TheInGameUI->getGUICommand() != nullptr )
+	{
+		return;
+	}
+	appendSelectionGroup( nullptr );
+	m_smartSelectionNarrowed = FALSE;
 }

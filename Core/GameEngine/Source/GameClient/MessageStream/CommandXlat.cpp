@@ -2744,10 +2744,7 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		//-----------------------------------------------------------------------------------------
 		case GameMessage::MSG_META_SMART_SELECTION_NEXT_TYPE:
 		{
-			if( TheControlBar )
-			{
-				TheControlBar->smartSelectionCycle( 1 );
-			}
+			TheControlBar->smartSelectionCycle( 1 );
 			disp = DESTROY_MESSAGE;
 			break;
 		}
@@ -2755,10 +2752,7 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		//-----------------------------------------------------------------------------------------
 		case GameMessage::MSG_META_SMART_SELECTION_PREV_TYPE:
 		{
-			if( TheControlBar )
-			{
-				TheControlBar->smartSelectionCycle( -1 );
-			}
+			TheControlBar->smartSelectionCycle( -1 );
 			disp = DESTROY_MESSAGE;
 			break;
 		}
