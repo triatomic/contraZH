@@ -170,7 +170,7 @@ static Bool kindOfUnitSelection( Drawable *test, void *userData )
 					&& !object->isContained()
 					&& !object->getDrawable()->isSelected()
 					&& !object->isEffectivelyDead()
-					&& object->isMassSelectable()
+					&& object->isSelectable() // MYEDIT kindOfUnitSelection Might be used but disabled it anyway
 					&& !object->isOffMap()
 				)
 		{
@@ -229,7 +229,8 @@ static Bool similarUnitSelection( Drawable *test, void *userData )
 			  && object->isLocallyControlled()
 				&& !object->isContained()
 				&& !( object->getDrawable()->isSelected() )
-				&& object->isMassSelectable() // And only if they can be multiply selected. (otherwise the drawable will be, but the object will not be)
+				&& object->isSelectable() // MYEDIT allows multiple structure to be selected
+			// And only if they can be multiply selected. (otherwise the drawable will be, but the object will not be)
 				&& !object->isOffMap()
 				)
 		{

@@ -849,7 +849,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			break;
 		}
 
-		case GUI_COMMAND_SELECT_ALL_UNITS_OF_TYPE:
+		case GUI_COMMAND_SELECT_ALL_UNITS_OF_TYPE: //MY NOTE this will finally call selectobject() and it can select multiple structures 
 		{
 			Player* localPlayer = ThePlayerList->getLocalPlayer();
 			if( !localPlayer )
