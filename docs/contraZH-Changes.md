@@ -424,6 +424,31 @@ which is a mistake in the data; the log says which power it was.
 * A power with `SharedSyncedTimer` ignores this field. The player owns that timer, not the building
 that fired, so no single unit's shots can start it.
 
+## Named enums for Contra superweapons
+
+* `Enum = SPECIAL_STRATEGIC_BOMBING` and eight more: `SPECIAL_TOMAHAWK_STORM`, `SPECIAL_EMP_STORM`,
+`SPECIAL_ICBM_MISSILE`, `SPECIAL_ATMO_LENS`, `SPECIAL_HATF_MISSILE`, `SPECIAL_HATF_V_MISSILE`,
+`SPECIAL_NUCLEAR_STORM`, `SPECIAL_MISSILE_SILO`.
+* `Enum = SPECIAL_CUSTOM_01` to `SPECIAL_CUSTOM_16` - Reserve values with no behavior of their own;
+`BehaviorEnum` is required.
+
+Contra's superweapons shared three retail values, so the engine could not tell a Tomahawk Storm from
+a Particle Cannon. Each now has its own value that borrows the retail targeting rules through the
+fallback map. They get no retail voice lines, so set the `Eva*` fields when moving a power over.
+The full list of values and what the engine hardcodes to each is on
+[SpecialPower Enums](SpecialPowerEnums.md).
+
+## Data-driven Eva events
+
+* `EvaEvent <AnyName>` - An `Eva.ini` block may use a name the engine does not know.
+* `EvaDetectedOwn = <AnyName>` and the other eight `Eva*` fields, plus `StealthUpdate`'s
+`EnemyDetectionEvaEvent` and `OwnDetectionEvaEvent`, accept any name. `None` disables the field.
+
+Eva message names used to be a fixed engine list, so every new superweapon needed nine new engine
+values before its lines could play. Names are now registered from data as they are read, in any INI
+order. An undefined name is silent rather than an error, and a repeated `EvaEvent` block replaces the
+earlier one. Details and examples on [SpecialPower Enums](SpecialPowerEnums.md#eva-events).
+
 # ObjectCreationList.ini
 
 ## Attack nugget: FireRegardlessOfOrders

@@ -15,6 +15,7 @@ Changes specific to this fork are on [contraZH Changes](contraZH-Changes.md).
 ## This fork
 
 * [contraZH Changes](contraZH-Changes.md) - Options.ini settings, new command buttons, debug overlays and cheat hotkeys
+* [SpecialPower Enums](SpecialPowerEnums.md) - every `Enum` value and its hardcoded logic, data-driven Eva events
 
 ## Upstream reference
 

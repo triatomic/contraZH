@@ -1,6 +1,8 @@
 # SpecialPower.ini
 
 ## New Special Power Enums:
+
+contraZH adds more values and makes the Eva names data-driven; see [SpecialPower Enums](SpecialPowerEnums.md).
 * SPECIAL_ION_CANNON
 * SPECIAL_CLUSTER_MISSILE
 * SPECIAL_SUNSTORM_MISSILE
