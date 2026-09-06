@@ -38,6 +38,53 @@ Added a new parameter for object definitions:
 
 Note: This parameter might be moved to individual weapons in the future, to allow displaying ammo pips for multiple weapon slots at once.
 
+## Display Decal (New)
+
+A ground decal drawn under the object, for auras, faction markers and similar. It is separate from
+the object's shadow: an object can carry a `Shadow` and a display decal at the same time, and the
+decal keeps drawing when the player turns 2D or 3D shadows off in the video options. It does hide
+under shroud and while the object is hidden.
+
+Added new parameters for object definitions:
+
+```
+  DisplayDecal = Yes                ; default No
+  DecalTexture = ShadowIH           ; required; the engine appends .tga
+  DecalSizeX = 14                   ; world-space size in X
+  DecalSizeY = 14                   ; world-space size in Y
+  DecalOffsetX = 0                  ; world-space offset in X
+  DecalOffsetY = 0                  ; world-space offset in Y
+  DecalStyle = SHADOW_ALPHA_DECAL   ; SHADOW_DECAL, SHADOW_ALPHA_DECAL or SHADOW_ADDITIVE_DECAL
+  DecalColor = R:255 G:255 B:255    ; tint, default white
+  DecalOpacity = 100%               ; default 100%
+  DecalHideWhenDisabled = No        ; default No
+```
+
+* `DecalTexture` has no default, unlike `ShadowTexture`. An object that sets `DisplayDecal = Yes`
+without naming a texture draws nothing.
+* `DecalStyle` takes only the three decal blend styles; the projection and volume types need a
+shadow-casting setup a display decal does not have, and fall back to `SHADOW_ALPHA_DECAL`.
+  - `SHADOW_DECAL` multiplies, exactly like a 2D shadow. White is invisible and darker pixels
+  darken the ground, so the art needs no alpha channel at all - a plain DXT1 works.
+  - `SHADOW_ALPHA_DECAL` alpha blends, for a painted marker. Needs a real alpha channel.
+  - `SHADOW_ADDITIVE_DECAL` adds, for a glow. Ignores alpha; black is what reads as nothing.
+* Whichever style, the decal always rasterizes the full `DecalSizeX` by `DecalSizeY` rectangle,
+snapped outward to whole terrain cells, and relies on clamped texture addressing. The art has to
+fade out at its own edges - an opaque edge texel gets stretched across the whole footprint.
+* `DecalHideWhenDisabled = Yes` stops drawing the decal while the object is disabled - EMP,
+hacked, subdued, unmanned, out of power, disabled by script and so on - and brings it back when
+the object recovers. Useful when the decal reads as something the unit is actively doing.
+* `DecalColor` tints the texture. Any alpha written here is ignored - `DecalOpacity` is what fades
+the decal. Both are ignored under `SHADOW_DECAL`, whose blend has no way to apply them.
+* `DecalOpacity` means different things per style. Under `SHADOW_ALPHA_DECAL` it is an ordinary
+alpha fade. Under `SHADOW_ADDITIVE_DECAL` the blend ignores alpha entirely, so opacity instead
+scales the colour toward black, dimming the glow.
+* A unit with several draw modules gets one decal, not one per module.
+* The whole feature can be switched off by the player with `ObjectDecals = No` in Options.ini.
+
+This is for a decal that belongs to a unit for its whole life. For a temporary decal spawned by an
+effect — a scorch mark or a footprint — use the [Decal FX nugget](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/FXList-&-ParticleSystems#decal-entries) with `W3DDecalDraw` instead.
+
 # Object Modules
 
 ## AIUpdateInterface (And all other AIUpdate types)
@@ -409,6 +456,87 @@ to firing passengers); the carrier's own guns do not try to aim at a target they
 green attack cursor -- the carrier does not automatically drive into range. Keep a dummy weapon if
 you want the carrier to approach on its own.
 
+### Add-on turret range from the carrier's center
+
+An add-on turret is a separate object placed at a bone on its carrier -- `AddOnBoneName` for
+MultiAddOnContain, the FIREPOINT bones for OverlordContain -- and with `PassengersInTurret = Yes`
+that bone rides the carrier's turret. Weapon range is measured from the firing object's own
+position and bounding circle, so the turret's reach swings by the bone's offset as the carrier's
+turret sweeps: longer the way the barrel points, shorter the other way. The Overlord's gattling
+shows it, and a turret mounted at the front of a chassis shows it plainly -- it opens fire early
+forward and falls short backward, and no single `AttackRange` works in both directions.
+
+* `AddOnWeaponRangeFromCenter = No` - (Yes measures the add-on's weapon range from the carrier's
+center, using the carrier's bounding circle, instead of from its own attachment point.)
+
+```
+Behavior = OverlordContain ModuleTag_Turret
+  Slots                      = 1
+  AllowInsideKindOf          = PORTABLE_STRUCTURE
+  PassengersAllowedToFire    = Yes
+  PassengersInTurret         = Yes
+  PayloadTemplateName        = AmericaThorTurretBolt
+  AddOnWeaponRangeFromCenter = Yes   ; New
+End
+```
+
+Behaviour notes:
+* An add-on whose `AttackRange` equals the carrier's now reaches exactly as far as the carrier
+does, in every direction, at every turret angle -- the range no longer has to be tuned to
+compensate for where the bone sits.
+* `MinimumAttackRange` moves with it, so the too-close band is measured from the carrier's hull
+too, as it would be for a weapon mounted on the carrier.
+* The approach distance moves with it, so a carrier ordered to attack stops where its add-on can
+actually reach.
+* Only the range test moves. The add-on still aims and fires from its own barrel, and its line of
+sight, muzzle effects and projectiles are unchanged.
+* Parses on every contain module but stays inert on TunnelContain and CaveContain, whose passengers
+sit at whichever entrance they used rather than on a bone of the container.
+
+
+### Load slowdown from occupants
+
+A container can be slowed by what it carries. The penalty scales with how full it is, so each
+passenger costs a share of it and leaving gives that share back; an emptied container returns to
+exactly its original speed. Fullness is measured in slots, not bodies, so a unit that takes three
+slots slows the transport three times as much as one that takes a single slot.
+
+The defaults come from GameData's `TransportLoadSpeedPenalty` and friends, and these four override
+them per container. Each is the fraction of that value lost at a full load.
+
+* `LoadSpeedPenalty = 0%` - (Fraction of `Speed` lost at a full load.)
+* `LoadTurnRatePenalty = 0%` - (Fraction of `TurnRate` lost at a full load.)
+* `LoadAccelerationPenalty = 0%` - (Fraction of `Acceleration` lost at a full load.)
+* `LoadLiftPenalty = 0%` - (Fraction of `Lift` lost at a full load.)
+* `LoadPenaltyEnabled = Yes` - (`No` exempts this container entirely, whatever GameData sets. Use it
+to keep one transport at full speed without restating every percentage.)
+* `LoadPenaltyKindOf = <KindOf list>` - (If set, only occupants with one of these KindOfs count
+toward the load. Everything counts by default.)
+* `LoadPenaltyForbidKindOf = <KindOf list>` - (Occupants with any of these KindOfs never count
+toward the load. Nothing is excluded by default.)
+
+Example - a transport that is dragged down by vehicles but not by the infantry it carries:
+```
+Behavior = TransportContain ModuleTag_07
+  Slots                   = 8
+  LoadSpeedPenalty        = 40%
+  LoadAccelerationPenalty = 25%
+  LoadPenaltyForbidKindOf = INFANTRY
+End
+```
+
+Behaviour notes:
+* Each penalty covers the damaged variant of its value, so `SpeedDamaged` scales by the same
+percentage as `Speed`.
+* The penalty follows the container across locomotor sets, so an upgrade that grants
+`SET_NORMAL_UPGRADED`, or a switch to `SET_PANIC`, keeps it in effect.
+* A container that cannot move ignores all of this. The keys parse on every contain module, but a
+garrisoned building has no locomotor to slow down.
+* Slot counts come from the occupant's `TransportSlotCount`, so a bunker riding an Overlord is
+weighed by what is inside it.
+* A loaded transport moving with a group slows the whole group, the same way any slow unit does.
+* Leaving every penalty at `0%` is the previous behavior exactly, so existing INI is unaffected.
+
 ### Filtering by object name
 
 `AllowInsideKindOf` and `ForbidInsideKindOf` can only speak in whole KindOfs. These two name
@@ -567,6 +695,39 @@ Added new features and parameters to ParkingPlaceBehavior (Airfield)
 Notes:
 * ParkedUnitsDamageScalar can be used to apply an upgrade that grants damage protection to parked aircraft
 * Required/Forbidden KindOf can be used to allow only specific kinds of aircraft to land (i.e. to use different sizes, or differ between VTOL/Regular jets)
+
+### Filtering by object name
+
+`RequiredKindOf` and `ForbiddenKindOf` can only speak in whole KindOfs. These two name individual
+objects instead, so a single aircraft can be kept off an airfield without inventing a KindOf for it.
+
+* `ForbiddenObjects = <object list>` - (These aircraft can never land here. Checked first, so it beats
+everything else, including `AllowedObjects`.)
+* `AllowedObjects = <object list>` - (If set, ONLY these aircraft may land here. Leave it out to allow
+everything the other filters permit.)
+
+Example - an airfield that takes only two of the player's jets:
+```
+Behavior = ParkingPlaceBehavior ModuleTag_park
+  NumRows = 2
+  NumCols = 2
+  HasRunways = Yes
+  ApproachHeight = 40
+  AllowedObjects = AirF_AmericaJetRaptor SupW_AmericaJetStealthFighter
+End
+```
+
+Both keys take several names on one line, and a second line of the same key replaces the first rather
+than adding to it. Matching is on the object name and ignores case.
+
+Notes:
+* These filters are checked in addition to `RequiredKindOf` and `ForbiddenKindOf`, not instead of them.
+An aircraft has to pass both to land, so naming it in `AllowedObjects` does not get it past a
+`ForbiddenKindOf` that rejects it.
+* Leaving both keys out is the previous behavior exactly, so existing INI is unaffected.
+* The filters decide whether an aircraft may land or be produced here. They do not evict anything
+already parked, so changing them does not affect aircraft that are on the airfield.
+* Aircraft with `KINDOF_PRODUCED_AT_HELIPAD` skip these filters, as they already skip the KindOf ones.
 
 ## PoisonedBehavior
 
@@ -1357,6 +1518,8 @@ Improvements to make existing generals-power superweapons work correctly over wa
 
 See also [OrbitalBeamUpdate `HitWaterSurface`](#orbitalbeamupdate-new) and the [DeliverPayload `StrafingWeaponTargetsWater`](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Object-Creation-List#deliverpayload) flag.
 
+See also [ParticleUplinkCannonUpdate `TornadoObjectName`](#particleuplinkcannonupdate-tornado).
+
 # Scorch Mark Selection
 
 ## ParticleUplinkCannonUpdate
@@ -1616,6 +1779,72 @@ Behavior = GlobalLightingModifierUpdate ModuleTag_Lighting
   RequiredUpgrade = <Upgrade> ; optional; the modifier only applies once this upgrade is present
 End
 ```
+
+## TornadoUpdate (New)
+
+Applies a tornado effect around the object: nearby units are dragged toward it, lifted, spun, and
+damaged, and they fall when the effect fades. The strength follows a weak - strong - weak envelope,
+so the tornado builds up, holds, and dies away like the particle uplink cannon beam does.
+
+The module never moves its own object, so a tornado that wanders needs a `Locomotor` and an AI
+module on the object like any other unit. A stationary one can be spawned by a weapon through
+`ProjectileDetonationOCL` or `FireOCL` with a `CreateObject` nugget.
+
+```
+Behavior = TornadoUpdate ModuleTag_Tornado
+  Radius = 120                    ; (required; how far out units are grabbed)
+  RingRadius = 12                 ; (distance from the axis victims orbit at; 0 = a tenth of Radius)
+  PullForce = 0.6                 ; (inward speed toward the centre, in distance per frame)
+  LiftForce = 1.5                 ; (climb speed toward MaxLiftHeight, in height per frame)
+  SpinForce = 6                   ; (orbit speed around the centre; a negative value orbits the other way)
+  YawRate = 360                   ; (how fast a victim spins about its own axis, in degrees per second)
+  MaxLiftHeight = 40              ; (above this height over the tornado ground, lift stops, so victims hover)
+  MaxVictimSpeed = 12             ; (speed cap on victims; 0 = uncapped, which lets them spiral away)
+  MassReference = 100             ; (victims heavier than this spin proportionally slower; 0 = no scaling)
+  ReleaseSpeed = 0                ; (horizontal speed kept when released; 0 drops them straight down)
+  RequiredKindOf = VEHICLE INFANTRY   ; (optional; a victim must be at least one of these)
+  ForbiddenKindOf = AIRCRAFT      ; (optional; a victim must be none of these)
+  AffectsTargets = ENEMIES NEUTRALS   ; (default = ALLIES ENEMIES NEUTRALS)
+  AffectAirborne = No             ; (default = No)
+  IgnoreVictimGeometry = No       ; (default = No; Yes stops held victims shoving each other apart)
+  RampUpTime = 2000               ; (ms to reach full strength)
+  FullStrengthTime = 6000         ; (ms at full strength; 0 = until the object dies or a controller ends it)
+  RampDownTime = 2000             ; (ms to fade to nothing; victims fall once it reaches zero)
+  DamagePerSecond = 20            ; (damage rate at full strength)
+  DamageRadius = 0                ; (default = 0, which uses Radius)
+  DamagePulseDelay = 500          ; (ms between damage pulses; 0 disables damage)
+  DamageType = EXPLOSION          ; (default = EXPLOSION)
+  DeathType = EXPLODED            ; (default = EXPLODED)
+  KillObjectWhenDone = No         ; (default = No; Yes destroys the object once the ramp down finishes)
+End
+```
+**Notes:**
+- A victim needs a `PhysicsBehavior`. Lift, pull and spin all ignore `Mass`, so every held unit
+  rides at the same height and speed. The one per unit resistance is `ShockResistance`, which
+  scales the whole effect down and doubles as an immunity dial.
+- Structures, immobile objects and projectiles take damage but are never pulled. Units inside a
+  transport are untouched; only the transport itself is grabbed.
+- Airborne targets are skipped unless `AffectAirborne = Yes`. Aircraft with a fixed flight height
+  overwrite their own height every frame, so lifting them does not work well.
+- Falling damage on release is the victim's own, from `MinFallHeightForDamage` and
+  `FallHeightDamageFactor` on its `PhysicsBehavior`. It only counts a steep descent, which is why
+  `ReleaseSpeed = 0` is the reliable way to splat units.
+- `IgnoreVictimGeometry` suppresses collision push-apart between held victims. Because they are
+  all steered onto the same ring they overlap constantly, and wide units can be shoved around
+  faster than the orbit settles, which reads as juddering. It is restored on release.
+- The module does not end the object. Pair it with a `LifetimeUpdate`, or the OCL `MinLifetime` and
+  `MaxLifetime` fields, or set `KillObjectWhenDone`. A tornado with `FullStrengthTime = 0` and none
+  of these, and no controller such as the cannon, fades out by itself after 30 seconds.
+
+## ParticleUplinkCannonUpdate (Tornado)
+
+* `TornadoObjectName = <object>` - (Creates this object at the beam ground point when the orbital
+  beam appears, drags it along with the beam, ramps it down when the beam starts decaying, and
+  destroys it when the beam dies or the cannon is sold or destroyed.)
+
+The named object is expected to carry a [TornadoUpdate](#tornadoupdate-new). Give it
+`FullStrengthTime = 0` and a `RampDownTime` matching the cannon `WidthGrowTime`, so that the tornado
+follows the beam for as long as it fires and then fades out with it.
 
 # Misc Improvements
 

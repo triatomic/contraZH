@@ -749,6 +749,11 @@ public:
 
 	void transferReloadStateFrom( const Weapon &weapon, Real clipPercentage = 0.0);
 
+	// The object whose position and bounding circle weapon range is measured from: an add-on whose
+	// container sets AddOnWeaponRangeFromCenter answers with that container, otherwise the source
+	// itself. Public because WeaponTemplate's own range gate needs it too.
+	static const Object *getWeaponRangeSource( const Object *source );
+
 	// we must pass the source object for these (and for ANY FUTURE ADDITIONS)
 	// so that we can take the source's weapon bonuses, if any, into account.
 	// Also note: you should RARELY need to call getAttackRange. If what you want is to

@@ -124,6 +124,7 @@ public:
 	BuildTimerDisplayMode getBuildTimerDisplayMode() const;
 	CastMode getCastMode() const;
 	Bool getSelectionCircleEnabled() const;
+	Bool getObjectDecalsEnabled() const;
 	Bool getEasyMilitaryDragEnabled() const;
 	Bool getSmartPipsEnabled() const;
 	Bool getNumericalHealthEnabled() const;
@@ -203,6 +204,8 @@ public:
 	Real getResolutionFontAdjustment();
 
 	Bool getShowMoneyPerMinute() const;
+
+	Bool getSmartSelectionEnabled() const;
 
 	Real getGameWindowTransitionSpeedMultiplier() const;
 

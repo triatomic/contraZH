@@ -501,6 +501,7 @@ public:
 	// TheSuperHackers @feature Outline the radar blips and the shoreline, at double radar
 	// resolution. Client side only; the radar never feeds game logic.
 	Bool m_newRadar;
+	Bool m_smartSelection;
 	// TheSuperHackers @feature How big the NewRadar object blips draw.
 	// Holds a RadarBlipSize; stored as Int to avoid pulling OptionPreferences.h in here.
 	Int m_radarBlipSize;

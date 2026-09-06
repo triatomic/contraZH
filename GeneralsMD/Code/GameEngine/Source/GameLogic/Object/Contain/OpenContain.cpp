@@ -36,6 +36,7 @@
 #include "Common/BitFlagsIO.h"
 #include "Common/GameAudio.h"
 #include "Common/GameState.h"
+#include "Common/GlobalData.h"
 #include "Common/Module.h"
 #include "Common/Player.h"
 #include "Common/RandomValue.h"
@@ -46,6 +47,7 @@
 #include "GameClient/InGameUI.h"
 #include "GameClient/ControlBar.h"
 
+#include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/OpenContain.h"
@@ -70,6 +72,7 @@ OpenContainModuleData::OpenContainModuleData()
 	m_containMax = CONTAIN_MAX_UNKNOWN;  // means we don't care, infinite, unassigned, whatever
 	m_passengersAllowedToFire = FALSE;
 	m_acceptTargetsForPassengers = FALSE;
+	m_addOnWeaponRangeFromCenter = FALSE;
 	m_passengersInTurret = FALSE;
 	m_numberOfExitPaths = 1;
 	m_damagePercentageToUnits = 0;
@@ -84,6 +87,14 @@ OpenContainModuleData::OpenContainModuleData()
  	m_allowEnemiesInside = TRUE;
  	m_allowNeutralInside = TRUE;
 	m_passengerWeaponBonusVec.clear();
+
+	m_loadPenaltyEnabled = TRUE;
+	m_loadSpeedPenalty = TheGlobalData ? TheGlobalData->m_transportLoadSpeedPenalty : 0.0f;
+	m_loadTurnRatePenalty = TheGlobalData ? TheGlobalData->m_transportLoadTurnRatePenalty : 0.0f;
+	m_loadAccelerationPenalty = TheGlobalData ? TheGlobalData->m_transportLoadAccelerationPenalty : 0.0f;
+	m_loadLiftPenalty = TheGlobalData ? TheGlobalData->m_transportLoadLiftPenalty : 0.0f;
+	m_loadPenaltyKindOf.clear(); m_loadPenaltyKindOf.flip();	// everything counts
+	m_loadPenaltyForbidKindOf.clear();	// nothing is excluded
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -105,6 +116,7 @@ OpenContainModuleData::OpenContainModuleData()
 		{ "ForbidInsideObjects",			INI::parseAsciiStringVectorAppend, nullptr, offsetof( OpenContainModuleData, m_forbidInsideObjects ) },
 		{ "PassengersAllowedToFire",	INI::parseBool, nullptr, offsetof( OpenContainModuleData, m_passengersAllowedToFire ) },
 		{ "AcceptTargetsForPassengers", INI::parseBool, nullptr, offsetof( OpenContainModuleData, m_acceptTargetsForPassengers ) },
+		{ "AddOnWeaponRangeFromCenter", INI::parseBool, nullptr, offsetof( OpenContainModuleData, m_addOnWeaponRangeFromCenter ) },
 		{ "PassengersInTurret",				INI::parseBool, nullptr, offsetof( OpenContainModuleData, m_passengersInTurret ) },
 		{ "NumberOfExitPaths",				INI::parseInt, nullptr, offsetof( OpenContainModuleData, m_numberOfExitPaths ) },
 		{ "DoorOpenTime",							INI::parseDurationUnsignedInt, nullptr, offsetof( OpenContainModuleData, m_doorOpenTime ) },
@@ -113,6 +125,13 @@ OpenContainModuleData::OpenContainModuleData()
  		{ "AllowEnemiesInside",				INI::parseBool,	nullptr, offsetof( OpenContainModuleData, m_allowEnemiesInside ) },
  		{ "AllowNeutralInside",				INI::parseBool,	nullptr, offsetof( OpenContainModuleData, m_allowNeutralInside ) },
 		{ "PassengerWeaponBonusList",       INI::parseWeaponBonusVectorKeepDefault, NULL, offsetof(OpenContainModuleData, m_passengerWeaponBonusVec) },
+		{ "LoadPenaltyEnabled",			INI::parseBool, nullptr, offsetof( OpenContainModuleData, m_loadPenaltyEnabled ) },
+		{ "LoadSpeedPenalty",			INI::parsePercentToReal, nullptr, offsetof( OpenContainModuleData, m_loadSpeedPenalty ) },
+		{ "LoadTurnRatePenalty",		INI::parsePercentToReal, nullptr, offsetof( OpenContainModuleData, m_loadTurnRatePenalty ) },
+		{ "LoadAccelerationPenalty",	INI::parsePercentToReal, nullptr, offsetof( OpenContainModuleData, m_loadAccelerationPenalty ) },
+		{ "LoadLiftPenalty",			INI::parsePercentToReal, nullptr, offsetof( OpenContainModuleData, m_loadLiftPenalty ) },
+		{ "LoadPenaltyKindOf",			KindOfMaskType::parseFromINI, nullptr, offsetof( OpenContainModuleData, m_loadPenaltyKindOf ) },
+		{ "LoadPenaltyForbidKindOf",	KindOfMaskType::parseFromINI, nullptr, offsetof( OpenContainModuleData, m_loadPenaltyForbidKindOf ) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
@@ -424,6 +443,8 @@ void OpenContain::addToContainList( Object *rider )
 	{
 		m_heroUnitsContained++;
 	}
+
+	recomputeLoadPenalty();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -748,6 +769,8 @@ void OpenContain::removeFromContainViaIterator( ContainedItemsList::iterator it,
 	DEBUG_ASSERTCRASH(getObject()->getContain() == this, ("hmm, wrong container 2"));
 	rider->onRemovedFrom( getObject() );
 
+	recomputeLoadPenalty();
+
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1004,6 +1027,94 @@ Bool OpenContainModuleData::isObjectAllowedInside( const Object *obj ) const
 	}
 
 	return FALSE;
+}
+
+// ------------------------------------------------------------------------------------------------
+Bool OpenContainModuleData::hasLoadPenalty() const
+{
+	return m_loadPenaltyEnabled
+		&& ( m_loadSpeedPenalty != 0.0f
+		|| m_loadTurnRatePenalty != 0.0f
+		|| m_loadAccelerationPenalty != 0.0f
+		|| m_loadLiftPenalty != 0.0f );
+}
+
+// ------------------------------------------------------------------------------------------------
+Bool OpenContainModuleData::doesObjectCountTowardLoad( const Object *obj ) const
+{
+	if( obj == nullptr )
+	{
+		return FALSE;
+	}
+
+	// not isKindOfMulti: that wants every bit of the allow mask, and this one means any of them
+	return obj->isAnyKindOf( m_loadPenaltyKindOf ) && !obj->isAnyKindOf( m_loadPenaltyForbidKindOf );
+}
+
+// ------------------------------------------------------------------------------------------------
+/** Capped so a negative penalty in the INI cannot turn a load into a speed bonus, and
+	floored so a 100% one leaves the container crawling rather than frozen. */
+// ------------------------------------------------------------------------------------------------
+static Real calcLoadFactor( Real penalty, Real load )
+{
+	const Real MIN_LOAD_FACTOR = 0.01f;
+
+	return clamp( MIN_LOAD_FACTOR, 1.0f - penalty * load, 1.0f );
+}
+
+// ------------------------------------------------------------------------------------------------
+/** Recomputed from the current occupants rather than adjusted per passenger, so an emptied
+	container returns to exactly full speed. */
+// ------------------------------------------------------------------------------------------------
+void OpenContain::recomputeLoadPenalty()
+{
+	AIUpdateInterface *ai = getObject()->getAIUpdateInterface();
+	if( ai == nullptr )
+	{
+		return;
+	}
+
+	const OpenContainModuleData *d = getOpenContainModuleData();
+
+	Real load = 0.0f;
+	if( d->hasLoadPenalty() )
+	{
+		// both halves of the ratio must come from the same container, and a redirecting one
+		// (OverlordContain) or a shared one (TunnelContain) answers these two for its own list
+		const Int capacity = getContainMax();
+		const ContainedItemsList *items = getContainedItemsList();
+		if( capacity > 0 && items )
+		{
+			Int occupied = 0;
+			for( ContainedItemsList::const_iterator it = items->begin(); it != items->end(); ++it )
+			{
+				if( d->doesObjectCountTowardLoad( *it ) )
+				{
+					occupied += (*it)->getTransportSlotCount();
+				}
+			}
+
+			load = clamp( 0.0f, (Real)occupied / (Real)capacity, 1.0f );
+		}
+	}
+
+	const Real speedFactor = calcLoadFactor( d->m_loadSpeedPenalty, load );
+	const Real turnRateFactor = calcLoadFactor( d->m_loadTurnRatePenalty, load );
+	const Real accelFactor = calcLoadFactor( d->m_loadAccelerationPenalty, load );
+	const Real liftFactor = calcLoadFactor( d->m_loadLiftPenalty, load );
+
+	const Bool changed = speedFactor != ai->getLoadSpeedFactor()
+		|| turnRateFactor != ai->getLoadTurnRateFactor()
+		|| accelFactor != ai->getLoadAccelFactor()
+		|| liftFactor != ai->getLoadLiftFactor();
+
+	ai->setLoadFactors( speedFactor, turnRateFactor, accelFactor, liftFactor );
+
+	// the group caches its slowest member's speed, so it must be asked to look again
+	if( changed && ai->getGroup() )
+	{
+		ai->getGroup()->recomputeGroupSpeed();
+	}
 }
 
 // ------------------------------------------------------------------------------------------------

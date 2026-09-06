@@ -735,6 +735,7 @@ set(GAMEENGINE_SRC
     Source/GameClient/GUI/ControlBar/ControlBarPrintPositions.cpp
     Source/GameClient/GUI/ControlBar/ControlBarResizer.cpp
     Source/GameClient/GUI/ControlBar/ControlBarScheme.cpp
+    Source/GameClient/GUI/ControlBar/ControlBarSmartSelection.cpp
     Source/GameClient/GUI/ControlBar/ControlBarStructureInventory.cpp
     Source/GameClient/GUI/ControlBar/ControlBarUnderConstruction.cpp
 #    Source/GameClient/GUI/DisconnectMenu/DisconnectMenu.cpp

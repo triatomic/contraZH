@@ -213,6 +213,8 @@ public:
 		MSG_META_VIEW_TEAM9,												///< center view on given user-defined team (but do not affect selection)
 
 		MSG_META_SELECT_MATCHING_UNITS,              ///< selects matching units, used for both on screen and across map
+		MSG_META_SMART_SELECTION_NEXT_TYPE,					///< TheSuperHackers @feature narrow the selection to the next type in the smart selection row
+		MSG_META_SMART_SELECTION_PREV_TYPE,					///< TheSuperHackers @feature narrow the selection to the previous type in the smart selection row
 		MSG_META_SELECT_NEXT_UNIT,									///< select 'next' unit
 		MSG_META_SELECT_PREV_UNIT,									///< select 'prev' unit
 		MSG_META_SELECT_NEXT_WORKER,                ///< select 'next' worker
@@ -640,6 +642,7 @@ public:
 		MSG_TOGGLE_DEPLOY,													///< Toggle the deployed state of the selected group
 		MSG_MOVE_UNIT_CREATE_EARLIER,								///< (productionID) move the queued unit one position earlier in its production queue
 		MSG_MOVE_UPGRADE_EARLIER,										///< (upgrade name key) move the queued upgrade one position earlier in its production queue
+		MSG_TOGGLE_FIRE_WEAPON,											///< (weapon slot, max shots) start the selected group firing a weapon, or stop it
 
 		MSG_BEGIN_DEBUG_NETWORK_MESSAGES = 1900,		///< network messages that exist only in debug/internal builds. all grouped separately.
 

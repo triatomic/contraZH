@@ -385,6 +385,15 @@ public:
 	// inline void setSpeedMultiplier(Real value) { m_speedMultiplier = value; }
 	inline Real getSpeedMultiplier(void) const { return m_speedMultiplier; }
 
+	/// Assigns rather than accumulates, so a container can restore full speed exactly.
+	inline void setLoadFactors(Real speed, Real turnRate, Real accel, Real lift)
+	{
+		m_loadSpeedFactor = speed;
+		m_loadTurnRateFactor = turnRate;
+		m_loadAccelFactor = accel;
+		m_loadLiftFactor = lift;
+	}
+
 protected:
 	void moveTowardsPositionLegs(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionLegsWander(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
@@ -480,6 +489,11 @@ private:
 	UnsignedInt m_donutTimer;				///< Frame time to keep units from doing the donut. jba.
 
 	Real			    m_speedMultiplier;  ///< scalar to max speed and acceleration
+
+	Real			    m_loadSpeedFactor;      ///< how much a container's occupants slow it down
+	Real			    m_loadTurnRateFactor;
+	Real			    m_loadAccelFactor;
+	Real			    m_loadLiftFactor;
 
 };
 

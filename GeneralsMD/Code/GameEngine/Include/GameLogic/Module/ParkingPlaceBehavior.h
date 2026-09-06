@@ -54,6 +54,11 @@ public:
 	KindOfMaskType	m_kindof;			///< the kind(s) of units that can land here
 	KindOfMaskType	m_kindofnot;		///< the kind(s) of units that must not land here
 
+	std::vector<AsciiString> m_allowedObjects;		///< if not empty, only these objects may land here, whatever their KindOfs
+	std::vector<AsciiString> m_forbiddenObjects;	///< these objects may never land here, whatever their KindOfs
+
+	Bool isTemplateAllowedToLand( const ThingTemplate *tmpl ) const;
+
 	ParkingPlaceBehaviorModuleData()
 	{
 		m_damageScalarUpgradeTrigger.clear();
@@ -90,6 +95,8 @@ public:
 
 			{ "RequiredKindOf", KindOfMaskType::parseFromINI, NULL, offsetof(ParkingPlaceBehaviorModuleData, m_kindof) },
 			{ "ForbiddenKindOf", KindOfMaskType::parseFromINI, NULL, offsetof(ParkingPlaceBehaviorModuleData, m_kindofnot) },
+			{ "AllowedObjects", INI::parseAsciiStringVector, NULL, offsetof(ParkingPlaceBehaviorModuleData, m_allowedObjects) },
+			{ "ForbiddenObjects", INI::parseAsciiStringVector, NULL, offsetof(ParkingPlaceBehaviorModuleData, m_forbiddenObjects) },
 
 			//{ "TimeForFullHeal",	INI::parseDurationUnsignedInt,	nullptr, offsetof( ParkingPlaceBehaviorModuleData, m_framesForFullHeal ) },
 			{ 0, 0, 0, 0 }

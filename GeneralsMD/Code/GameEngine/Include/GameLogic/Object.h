@@ -512,6 +512,8 @@ public:
 
 	Weapon* getCurrentWeapon(WeaponSlotType* wslot = nullptr);
 	const Weapon* getCurrentWeapon(WeaponSlotType* wslot = nullptr) const;
+	Bool isFiringWeaponSlot( WeaponSlotType wslot ) const;	///< is this object attacking with the weapon in this slot?
+	void stopFiringWeaponSlot( WeaponSlotType wslot );		///< end an attack being made with the weapon in this slot
 	void setFiringConditionForCurrentWeapon() const;
 	void adjustModelConditionForWeaponStatus();	///< Check to see if I should change my model condition.
 	void fireCurrentWeapon(Object *target);
@@ -527,6 +529,7 @@ public:
 	Bool getProgressBarShowingInfo(bool selected, Real& progress, Int& type, RGBAColorInt& color, RGBAColorInt& colorBG) const;
 
   void notifyFiringTrackerShotFired( const Weapon* weaponFired, ObjectID victimID ) ;
+	FiringTracker* getFiringTracker() const { return m_firingTracker; }	///< the helper that watches this object's shots
 
   /**
 		Determines if the unit has any weapon that could conceivably

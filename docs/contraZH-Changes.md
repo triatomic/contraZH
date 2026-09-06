@@ -5,9 +5,10 @@ GeneralsGameCode_Modding. Everything here is additional to upstream; the rest of
 applies unchanged.
 
 Almost all of it is client-side presentation and input handling, read from `Options.ini` and
-defaulting to retail behaviour, so an untouched `Options.ini` plays exactly as before. The exception
-is [Gameplay Fixes](#gameplay-fixes), which correct retail bugs in the simulation itself and are
-always on.
+defaulting to retail behaviour, so an untouched `Options.ini` plays exactly as before. Two things sit
+outside that: [Gameplay Fixes](#gameplay-fixes), which correct retail bugs in the simulation itself
+and are always on, and a small number of simulation rules read from the mod's own `GameData.ini`,
+each of which states its default where it is described.
 
 As of August 2026 the fork is synced with TheSuperHackers/GeneralsGameCode and
 GeneralsGameCode_Modding again (their `Core/` restructure included). Everything on this page
@@ -93,6 +94,22 @@ Note: a drone set to acquire targets on its own can still pick a fight after bei
 that is a separate mechanism from following the master's victim. That is a data decision rather than
 an engine one.
 
+## More Generals Challenge personas
+
+ChallengeMode.ini stopped at twelve personas, `GeneralPersona0` through `GeneralPersona11`. A
+thirteenth was quietly dropped by the parser, and because the block was abandoned at that point every
+persona after it was lost too. The ceiling is now twenty four.
+
+The menu draws a persona on the button named `GeneralPosition<N>` in ChallengeMenu.wnd, so a new
+persona needs a matching control added to that layout to be visible. A slot the layout has no button
+for is now skipped instead of crashing the game on entering the Challenge menu, so the code and the
+layout can be updated independently.
+
+Notes:
+* Raising the ceiling does not add any generals by itself. The personas and the buttons are both data.
+* The twelve retail personas are untouched, and a layout that still carries exactly twelve buttons
+behaves as it always did.
+
 # Options.ini
 
 These are read once at startup. Changing them needs a restart.
@@ -105,6 +122,9 @@ hurt objects, `Always` shows one on everything.)
 `HealthBarDisplayMode`, so the number appears exactly where a bar does.)
 * `SelectionCircle = No` - (Yes draws a green ring on the ground under selected objects. Retail draws
 nothing there; selection is only a brief tint flash on the model.)
+* `ObjectDecals = Yes` - (No suppresses the ground decals objects ask for with `DisplayDecal`.
+On by default, since a template only gets one when it asks. Independent of the 2D and 3D shadow
+settings, because the decal is an aura marker rather than a shadow.)
 * `SmartPips = No` - (Yes keeps ammo and passenger pips on screen instead of showing them only while
 the unit is selected or moused over. Own units only. Nothing is drawn when there is nothing to
 report, so the pips read as "still loaded" and "carrying someone" at a glance.)
@@ -129,6 +149,9 @@ colour, since those come from the bridge list rather than the terrain.
 
 Note: `SelectionCircle` needs a mod-side `PlainRingSelection.tga` — a white or greyscale ring with
 alpha, tinted green at runtime. Until it exists the ring simply does not draw.
+
+Note: `DisplayDecal` likewise needs a mod-side `.tga`, named by `DecalTexture`. There is no default
+texture for it, so an object that asks for a decal without naming one simply does not draw it.
 
 ## Hotkey overlay
 
@@ -164,6 +187,22 @@ An excluded slot falls back to its string file letter, so the key is freed for t
 while the button still works the way it did before grid hotkeys existed. If that letter is also a
 live grid letter the slot gets no hotkey instead, since `addHotKey` keeps whichever slot registered
 first and silently drops the other.
+
+## Smart selection
+
+Shows a row of half size cameos above the command bar, one per selected unit type, each with
+a count of how many are selected.
+
+* `SmartSelection = Yes` - (No hides the row and unbinds its keys.)
+
+* Left click a cameo to show that type's command set in the bar. The whole group stays selected,
+so orders still go to everyone. A command off that card which not every selected type carries is
+issued to the focused type alone; one they all carry, like Stop or Guard, still goes to everyone.
+Click the pushed in cameo again to go back to the group's common commands.
+* Ctrl+click a cameo to drop that type from the selection. Right click is left alone, so it
+still deselects like anywhere else on screen.
+* Tab and Shift+Tab (`SMART_SELECTION_NEXT_TYPE` / `SMART_SELECTION_PREV_TYPE` in
+CommandMap.ini) step the focused type through the row.
 
 ## Input
 
@@ -241,6 +280,161 @@ checked against the new renderer pay its cost or change appearance.)
 * Cost is quadratic in particle size. Past 160 terrain cells per side the mesh samples every Nth cell
 instead, so a very large particle stops getting more expensive without bound. The trade is a coarser
 terrain fit, which is not visible on the effects that actually reach that size.
+
+# GameData.ini
+
+## NoOccupantFriendlyFire
+
+* `NoOccupantFriendlyFire = No` - (Default. `Yes` spares the container a passenger is riding in from
+that passenger's own splash damage.)
+
+An object has never been able to hurt itself with its own splash damage, but a passenger firing out
+of a transport or a garrisoned building is a separate object, so it hurts the thing it is riding in.
+Anti-tank infantry are the usual victims of this: a Tank Hunter in a bunker firing at something
+beside the wall knocks down the bunker holding it. With `NoOccupantFriendlyFire = Yes` the splash
+skips the container the shooter is inside, the same way it already skips the shooter.
+
+Notes:
+* The whole containment chain is skipped, not just the immediate container, so infantry inside a
+bunker riding an Overlord spare both.
+* Weapons that already damage their own firer - `RadiusDamageAffects = SELF`, which is how suicide
+attacks are built - are untouched and still destroy the container.
+* Directly ordering the passenger to attack its own container still damages it. Splash on a nearby
+target is what changes, not a deliberate shot.
+* Turning this on changes the simulation, so a replay must be played back with the same setting it
+was recorded with.
+
+## Transport load slowdown
+
+* `TransportLoadSpeedPenalty = 0%` - (Default. The fraction of its `Speed` a container loses when it
+is completely full.)
+* `TransportLoadTurnRatePenalty = 0%` - (Default. The same for `TurnRate`.)
+* `TransportLoadAccelerationPenalty = 0%` - (Default. The same for `Acceleration`.)
+* `TransportLoadLiftPenalty = 0%` - (Default. The same for `Lift`.)
+
+A transport in retail moves at exactly the same speed whether it is empty or packed, so there is no
+cost to filling one up and no reason to send a half-loaded one anywhere. These make a container
+heavier the more it is carrying: at a full load it loses the whole percentage, at half a load it
+loses half of it, and as passengers leave it gets the speed back.
+
+The penalty is worked out from what is inside at that moment rather than tallied up as passengers
+come and go, so an emptied transport is back to exactly its original speed with nothing left over.
+
+Fullness is counted in slots rather than bodies, so a unit that takes three slots weighs three times
+as much as one that takes a single slot.
+
+```
+GameData
+  TransportLoadSpeedPenalty        = 40%
+  TransportLoadAccelerationPenalty = 25%
+End
+```
+
+Individual containers can override any of these, exclude particular passengers from counting, or opt
+out of the whole thing - see
+[Load slowdown from occupants](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Objects-&-Modules#load-slowdown-from-occupants).
+
+Notes:
+* Each percentage covers the damaged variant of its value, so `SpeedDamaged` is scaled by the same
+amount as `Speed`. A damaged transport is slowed once, not twice.
+* The slowdown survives a change of locomotor, so an upgrade that grants `SET_NORMAL_UPGRADED`, or a
+unit falling back to `SET_PANIC`, keeps it.
+* Containers that cannot move are unaffected. A garrisoned building has no locomotor, so the keys
+parse but do nothing there.
+* A loaded transport travelling with a group holds the group to its speed, exactly as any other slow
+unit does.
+* Turning this on changes the simulation, so a replay must be played back with the same setting it
+was recorded with. Left at the `0%` default nothing changes at all.
+
+# SpecialPower.ini
+
+## StartCooldownOnFirstShot
+
+* `StartCooldownOnFirstShot = No` - (Default. `Yes` delays `ReloadTime` until the unit has fired the
+shots the power ordered.)
+
+A special power normally starts its cooldown the moment the player uses it. When the power's OCL has
+an `Attack` nugget, the unit still has to line up and shoot, so it spends part of that cooldown
+before firing anything.
+
+Set `StartCooldownOnFirstShot = Yes` and the cooldown starts after the unit finishes shooting
+instead. While the game waits for those shots, the power is locked: it reports itself as not ready,
+so the cameo greys out and the player cannot use it again. If `NumberOfShots` is more than one, the
+power stays locked until the unit fires the last one.
+
+```
+SpecialPower SpecialPowerDig
+  Enum                     = SPECIAL_HELIX_NAPALM_BOMB
+  ReloadTime               = 60000
+  StartCooldownOnFirstShot = Yes
+End
+```
+
+Notes:
+* If the unit fires at least one shot, the cooldown starts even when it does not fire the rest. A
+move order that interrupts the attack, an empty clip, and the unit dying all end the shooting, so the
+power never waits for a shot that will not come.
+* If the unit fires **nothing**, the game treats the use as cancelled and gives the power back ready.
+This covers ordering the unit away before it shoots, the target disappearing, and the unit dying
+first. The player does not get the credits back, because the power charges them when it is used.
+* Should the engine miss a cancel, the power gives up waiting after `ReloadTime` and starts its
+cooldown, so it can never get stuck. This also catches a power whose OCL has no `Attack` nugget,
+which is a mistake in the data; the log says which power it was.
+* A power with `SharedSyncedTimer` ignores this field. The player owns that timer, not the building
+that fired, so no single unit's shots can start it.
+
+# ObjectCreationList.ini
+
+## Attack nugget: FireRegardlessOfOrders
+
+* `FireRegardlessOfOrders = No` - (Default. `Yes` fires every `NumberOfShots` no matter what the
+unit is ordered to do meanwhile.)
+
+An `Attack` nugget normally orders the unit that fired the special power to attack the target point
+with `WeaponSlot` for `NumberOfShots`. That is an ordinary attack order, so any move, attack or stop
+given while it runs replaces it, and the barrage ends after however many shots got out.
+
+With `FireRegardlessOfOrders = Yes` the shots are queued on the unit instead of being an order. Every
+frame the weapon in `WeaponSlot` is ready, one shot is fired at the target point straight from the
+launch bone, until the count is used up. The unit stays fully responsive: it moves, retargets and
+shoots its other weapons exactly as ordered while the barrage carries on. The delivery decal stays
+until the last queued shot is away.
+
+```
+ObjectCreationList SUPERWEAPON_TomahawkStrike
+  Attack
+    WeaponSlot             = TERTIARY
+    NumberOfShots          = 6
+    FireRegardlessOfOrders = Yes
+  End
+End
+```
+
+Notes:
+* The weapon fires without turning or aiming, so it should not sit on a turret. `PreAttackDelay` is
+not observed.
+* Range is not checked, so the shots keep landing after the unit has driven beyond the weapon's
+`AttackRange`.
+* Boarding a transport, garrison or tunnel that does not let its passengers fire drops the rest of
+the barrage.
+* Timing comes from the weapon as usual: `DelayBetweenShots` between shots, and a clip reload in the
+middle when `NumberOfShots` is larger than `ClipSize`. A weapon that runs dry with
+`AutoReloadsClip = No` drops the remaining shots.
+* Firing the power again replaces the queue: new target point, count reset.
+* A dying unit drops its remaining shots. The queue survives a save and load.
+
+# Turret modules
+
+## MaxPhysicalPitch
+
+* `MaxPhysicalPitch = 90` - (Default. The highest pitch a turret with `AllowsPitch = Yes` will aim at,
+in degrees.)
+
+The counterpart of `MinPhysicalPitch`. A turret's pitch is the angle to its target plus the arc from
+`GroundUnitPitch`, and retail only clamps the low end. On a Fire Base that is fine, since a building
+never aims at anything past its range, but a vehicle can be ordered to attack a target far outside
+its range, so nothing stopped its cannon from climbing skyward on the way. `MaxPhysicalPitch` caps the
+aim at the given angle; the default of straight up leaves data that does not mention it exactly as before.
 
 # RiderChangeContain
 
@@ -325,6 +519,35 @@ Per-object parameter:
 
 Note: the flag lives on `AIUpdateInterface`, so garrisoned buildings cannot hold fire — most have no
 AI module. Infantry inside a *unit* are covered.
+
+## TOGGLE_FIRE_WEAPON
+
+Fires a weapon exactly as `FIRE_WEAPON` does, but a second click stops it again. Retail has no way
+to call off a `FIRE_WEAPON` order: it runs until `MaxShotsToFire` is spent, so a jammer set to sixty
+shots is committed to all sixty.
+
+```
+CommandButton Slth_Command_JammerStationActivate_HumanPlayer
+  Command          = TOGGLE_FIRE_WEAPON
+  Options          = CHECK_LIKE     ; required, or the button never renders as toggled on
+  WeaponSlot       = SECONDARY
+  MaxShotsToFire   = 60
+  TextLabel        = CONTROLBAR:GLAJamm
+  ButtonImage      = SUJPulse
+  ButtonBorderType = ACTION
+  DescriptLabel    = CONTROLBAR:ToolTipGLAFireJamm
+End
+```
+
+Notes:
+* The button reads the unit's actual state rather than remembering a click, so it also switches off
+by itself once `MaxShotsToFire` is spent.
+* Stopping ends only the firing. A move order given alongside it survives, unlike the stop command,
+which clears everything.
+* The button stays clickable while the weapon reloads between shots. A plain `FIRE_WEAPON` button
+greys out there, which would otherwise take the cancel away for most of a burst.
+* A selection where only some units are firing resolves one way for the whole group: if any of them
+is firing, the click stops all of them.
 
 ## AUTO_FILL
 

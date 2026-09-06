@@ -222,6 +222,7 @@ public:
 	Real						m_turretSweepSpeedModifier[WEAPONSLOT_COUNT];	///< While sweeping, change your speed by this
 	Real						m_firePitch;						///< if nonzero, I am on target at this fixed pitch, not when pointing at target
 	Real						m_minPitch;							///< dependent on allowspitch. defaults to 0 (horizontal). The lowest pitch allowed (negative to allow pointing down of a high turret)
+	Real						m_maxPitch;							///< dependent on allowspitch. defaults to 90 (vertical). The highest pitch allowed
 	Real						m_groundUnitPitch;			///< dependent on allowspitch. defaults to 0 (horizontal). The lowest pitch allowed when firing at ground units to give the weapon an arc.  jba
 	UnsignedInt			m_turretWeaponSlots;		///< which WeaponSlots are controlled by this turret
 #ifdef INTER_TURRET_DELAY
@@ -274,6 +275,7 @@ public:
 	Real getTurretAngle() const { return m_angle; }
 	Real getTurretPitch() const { return m_pitch; }
 	Real getMinPitch() const { return m_data->m_minPitch; }
+	Real getMaxPitch() const { return m_data->m_maxPitch; }
 	Bool isAllowsPitch() const { return m_data->m_isAllowsPitch; }
 	Real getTurnRate() const { return m_data->m_turnRate; }
 	Real getNaturalTurretAngle() const { return m_data->m_naturalTurretAngle; }

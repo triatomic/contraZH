@@ -63,6 +63,7 @@
 #include "GameLogic/Module/DeliverPayloadAIUpdate.h"
 #include "GameLogic/Module/HackInternetAIUpdate.h"
 #include "GameLogic/Module/HordeUpdate.h"
+#include "GameLogic/Module/RadiusDecalUpdate.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
@@ -347,6 +348,10 @@ AIUpdateInterface::AIUpdateInterface( Thing *thing, const ModuleData* moduleData
 	m_nextMoodCheckTime = 0;
 	// TheSuperHackers @feature Hold Fire always starts off.
 	m_isHoldingFire = FALSE;
+	m_queuedShotsSlot = PRIMARY_WEAPON;
+	m_queuedShotsLeft = 0;
+	m_queuedShotsPos.zero();
+	m_clearFiringStatusFrame = 0;
 #ifdef ALLOW_DEMORALIZE
 	m_demoralizedFramesLeft = 0;
 #endif
@@ -377,6 +382,10 @@ AIUpdateInterface::AIUpdateInterface( Thing *thing, const ModuleData* moduleData
 	m_isInUpdate = FALSE;
 	m_fixLocoInPostProcess = FALSE;
 	m_speedMultiplier = 1.0;
+	m_loadSpeedFactor = 1.0f;
+	m_loadTurnRateFactor = 1.0f;
+	m_loadAccelFactor = 1.0f;
+	m_loadLiftFactor = 1.0f;
 
 	// ---------------------------------------------
 
@@ -1033,6 +1042,10 @@ void AIUpdateInterface::chooseGoodLocomotorFromCurrentSet()
 		if (m_speedMultiplier != 1.0)
 			m_curLocomotor->applySpeedMultiplier(m_speedMultiplier);
 
+		// Restore the occupant load slowdown, which the new loco knows nothing about
+		if (m_loadSpeedFactor != 1.0f || m_loadTurnRateFactor != 1.0f || m_loadAccelFactor != 1.0f || m_loadLiftFactor != 1.0f)
+			m_curLocomotor->setLoadFactors(m_loadSpeedFactor, m_loadTurnRateFactor, m_loadAccelFactor, m_loadLiftFactor);
+
 		// Reset drawable transforms
 		if (prevLoco != NULL && prevLoco->getAppearance() != m_curLocomotor->getAppearance()) {
 			Drawable* draw = getObject()->getDrawable();
@@ -1143,6 +1156,66 @@ void AIUpdateInterface::wakeUpNow()
 }
 
 //-------------------------------------------------------------------------------------------------
+void AIUpdateInterface::friend_queueShots(WeaponSlotType slot, Int shots, const Coord3D* pos)
+{
+	m_queuedShotsSlot = slot;
+	m_queuedShotsLeft = shots;
+	m_queuedShotsPos = *pos;
+	wakeUpNow();
+}
+
+//-------------------------------------------------------------------------------------------------
+void AIUpdateInterface::fireQueuedShots()
+{
+	Object* obj = getObject();
+
+	// the shot set this last frame, and nothing else will take it back off again
+	if (m_clearFiringStatusFrame != 0 && TheGameLogic->getFrame() >= m_clearFiringStatusFrame)
+	{
+		obj->clearStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_IS_FIRING_WEAPON ) );
+		m_clearFiringStatusFrame = 0;
+	}
+
+	if (m_queuedShotsLeft <= 0)
+	{
+		return;
+	}
+
+	Weapon* weapon = obj->getWeaponInWeaponSlot(m_queuedShotsSlot);
+	const Object* containedBy = obj->getContainedBy();
+	if (weapon == nullptr || obj->isEffectivelyDead() || weapon->getStatus() == OUT_OF_AMMO)
+	{
+		m_queuedShotsLeft = 0;
+	}
+	else if (containedBy != nullptr && containedBy->getContain() != nullptr
+					&& !containedBy->getContain()->isPassengerAllowedToFire(obj->getID()))
+	{
+		// boarding something that does not let its passengers shoot swallows the rest of the barrage
+		m_queuedShotsLeft = 0;
+	}
+	else if (weapon->getStatus() == READY_TO_FIRE)
+	{
+		// ranges are ignored: the unit is free to drive off mid-barrage, and a refused shot is still spent
+		weapon->forceFireWeapon(obj, &m_queuedShotsPos);
+		obj->notifyFiringTrackerShotFired(weapon, INVALID_ID);
+		// the attack state normally owns this, and stealth keys its firing checks off it
+		obj->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_IS_FIRING_WEAPON ) );
+		m_clearFiringStatusFrame = TheGameLogic->getFrame() + 1;
+		--m_queuedShotsLeft;
+	}
+
+	if (m_queuedShotsLeft <= 0)
+	{
+		static NameKeyType key_RadiusDecalUpdate = NAMEKEY("RadiusDecalUpdate");
+		RadiusDecalUpdate* rd = (RadiusDecalUpdate*)obj->findUpdateModule(key_RadiusDecalUpdate);
+		if (rd)
+		{
+			rd->killRadiusDecal();
+		}
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
 void AIUpdateInterface::friend_notifyStateMachineChanged()
 {
 	wakeUpNow();
@@ -1190,6 +1263,8 @@ UpdateSleepTime AIUpdateInterface::update()
 		// any of which will probably require next frame
 		subMachineSleep = UPDATE_SLEEP_NONE;
 	}
+
+	fireQueuedShots();
 
 	// note that this is all OK with sleepiness, since m_movementComplete can
 	// only be set via our statemachine (via friend_startingMove or friend_endMove),
@@ -1296,7 +1371,8 @@ UpdateSleepTime AIUpdateInterface::update()
 
 	m_isInUpdate = FALSE;
 
-	if (m_completedWaypoint != nullptr)
+	// queued shots poll their weapon every frame, and the frame after the last one clears the firing status
+	if (m_completedWaypoint != nullptr || m_queuedShotsLeft > 0 || m_clearFiringStatusFrame != 0)
 	{
 		// sleep NONE here so that it will get reset next frame.
 		// this happen infrequently, so it shouldn't be an issue.
@@ -4800,6 +4876,17 @@ void AIUpdateInterface::applySpeedMultiplier(Real scalar) {
 		m_curLocomotor->applySpeedMultiplier(scalar); // Use Set instead of Apply?
 }
 
+//----------------------------------------------------------------------------------------------
+void AIUpdateInterface::setLoadFactors(Real speed, Real turnRate, Real accel, Real lift)
+{
+	m_loadSpeedFactor = speed;
+	m_loadTurnRateFactor = turnRate;
+	m_loadAccelFactor = accel;
+	m_loadLiftFactor = lift;
+	if (m_curLocomotor)
+		m_curLocomotor->setLoadFactors(speed, turnRate, accel, lift);
+}
+
 
 //----------------------------------------------------------------------------------------------
 /**
@@ -5459,6 +5546,7 @@ void AIUpdateInterface::crc( Xfer *x )
 	* 5: TheSuperHackers @fix Fixed out-of-bounds xfer of m_guardTargetType
 	* 6: Added m_forceMoveBackwards (REVERSE_MOVE order)
 	* 7: Added m_isHoldingFire (HOLD_FIRE stance)
+	* 8: Added the queued shots (OCL Attack FireRegardlessOfOrders)
 	*/
 // ------------------------------------------------------------------------------------------------
 void AIUpdateInterface::xfer( Xfer *xfer )
@@ -5467,7 +5555,7 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 #if RETAIL_COMPATIBLE_CRC || RETAIL_COMPATIBLE_XFER_SAVE
 	const XferVersion currentVersion = 4;
 #else
-	const XferVersion currentVersion = 7;
+	const XferVersion currentVersion = 8;
 #endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
@@ -5703,6 +5791,15 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 	// TheSuperHackers @feature Hold Fire stance. Must stay at the end so older saves still load.
 	if (version >= 7)
 		xfer->xferBool(&m_isHoldingFire);
+
+	// OCL Attack FireRegardlessOfOrders. Must stay at the end so older saves still load.
+	if (version >= 8)
+	{
+		xfer->xferUser(&m_queuedShotsSlot, sizeof(m_queuedShotsSlot));
+		xfer->xferInt(&m_queuedShotsLeft);
+		xfer->xferCoord3D(&m_queuedShotsPos);
+		xfer->xferUnsignedInt(&m_clearFiringStatusFrame);
+	}
 
 }
 

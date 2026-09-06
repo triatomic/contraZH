@@ -196,6 +196,7 @@ TurretAIData::TurretAIData()
 	}
 	m_firePitch = 0.0f;
 	m_minPitch = 0.0f;
+	m_maxPitch = PI/2;
 	m_groundUnitPitch = 0;
 	m_turretWeaponSlots = 0;
 #ifdef INTER_TURRET_DELAY
@@ -251,6 +252,7 @@ void TurretAIData::buildFieldParse(MultiIniFieldParse& p)
 		{ "NaturalTurretPitch",			INI::parseAngleReal,									nullptr, offsetof( TurretAIData, m_naturalTurretPitch ) },
 		{ "FirePitch",							INI::parseAngleReal,									nullptr, offsetof( TurretAIData, m_firePitch ) },
 		{ "MinPhysicalPitch",				INI::parseAngleReal,									nullptr, offsetof( TurretAIData, m_minPitch ) },
+		{ "MaxPhysicalPitch",				INI::parseAngleReal,									nullptr, offsetof( TurretAIData, m_maxPitch ) },
 		{ "GroundUnitPitch",				INI::parseAngleReal,									nullptr, offsetof( TurretAIData, m_groundUnitPitch ) },
 		{ "TurretFireAngleSweep",		TurretAIData::parseTurretSweep,				nullptr, 0 },
 		{ "TurretSweepSpeedModifier",TurretAIData::parseTurretSweepSpeed,	nullptr, 0 },
@@ -1144,6 +1146,10 @@ StateReturnType TurretAIAimTurretState::update()
 						desiredPitch = turret->getMinPitch();
 					}
 				}
+			}
+			if( desiredPitch > turret->getMaxPitch() )
+			{
+				desiredPitch = turret->getMaxPitch();
 			}
 
 		}

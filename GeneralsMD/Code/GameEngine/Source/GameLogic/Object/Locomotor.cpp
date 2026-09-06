@@ -744,6 +744,11 @@ Locomotor::Locomotor(const LocomotorTemplate* tmpl)
 	m_donutTimer = TheGameLogic->getFrame()+DONUT_TIME_DELAY_SECONDS*LOGICFRAMES_PER_SECOND;
 
 	m_speedMultiplier = 1.0;
+
+	m_loadSpeedFactor = 1.0f;
+	m_loadTurnRateFactor = 1.0f;
+	m_loadAccelFactor = 1.0f;
+	m_loadLiftFactor = 1.0f;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -767,6 +772,10 @@ Locomotor::Locomotor(const Locomotor& that)
 	m_preferredHeightDamping = that.m_preferredHeightDamping;
 	m_angleOffset = that.m_angleOffset;
 	m_offsetIncrement = that.m_offsetIncrement;
+	m_loadSpeedFactor = that.m_loadSpeedFactor;
+	m_loadTurnRateFactor = that.m_loadTurnRateFactor;
+	m_loadAccelFactor = that.m_loadAccelFactor;
+	m_loadLiftFactor = that.m_loadLiftFactor;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -788,6 +797,10 @@ Locomotor& Locomotor::operator=(const Locomotor& that)
 #endif
 		m_preferredHeight = that.m_preferredHeight;
 		m_preferredHeightDamping = that.m_preferredHeightDamping;
+		m_loadSpeedFactor = that.m_loadSpeedFactor;
+		m_loadTurnRateFactor = that.m_loadTurnRateFactor;
+		m_loadAccelFactor = that.m_loadAccelFactor;
+		m_loadLiftFactor = that.m_loadLiftFactor;
 	}
 	return *this;
 }
@@ -868,6 +881,7 @@ Real Locomotor::getMaxSpeedForCondition(BodyDamageType condition) const
 		speed = m_template->m_maxSpeedDamaged;
 
 	speed *= m_speedMultiplier;
+	speed *= m_loadSpeedFactor;
 
 	if (speed > m_maxSpeed)
 		speed = m_maxSpeed;
@@ -886,6 +900,7 @@ Real Locomotor::getMaxTurnRate(BodyDamageType condition) const
 		turn = m_template->m_maxTurnRateDamaged;
 
 	turn *= m_speedMultiplier;
+	turn *= m_loadTurnRateFactor;
 
 	if (turn > m_maxTurnRate)
 		turn = m_maxTurnRate;
@@ -908,6 +923,7 @@ Real Locomotor::getMaxAcceleration(BodyDamageType condition) const
 		accel = m_template->m_accelerationDamaged;
 
 	accel *= m_speedMultiplier;
+	accel *= m_loadAccelFactor;
 
 	if (accel > m_maxAccel)
 		accel = m_maxAccel;
@@ -939,6 +955,7 @@ Real Locomotor::getMaxLift(BodyDamageType condition) const
 		lift = m_template->m_liftDamaged;
 
 	lift *= m_speedMultiplier;
+	lift *= m_loadLiftFactor;
 
 	if (lift > m_maxLift)
 		lift = m_maxLift;

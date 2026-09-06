@@ -157,6 +157,8 @@ public:
 	Int m_castMode;
 	// TheSuperHackers @feature Draw a green hexagon under selected objects.
 	Bool m_selectionCircleEnabled;
+	// TheSuperHackers @feature Draw the decals objects ask for with DisplayDecal.
+	Bool m_objectDecalsEnabled;
 	// TheSuperHackers @feature Keep ammo and passenger pips on screen when there is something
 	// to report, rather than only on selection or hover.
 	Bool m_smartPips;
@@ -184,6 +186,8 @@ public:
 	Color m_keyboardOverlayBackdropColor;
 	// TheSuperHackers @feature Leave builders out of drag selections.
 	Bool m_easyMilitaryDrag;
+	// TheSuperHackers @feature Per type cameos with counts above the command bar.
+	Bool m_smartSelection;
 	Bool m_doubleClickAttackMove;
 	Bool m_rightMouseAlwaysScrolls;
 	Int m_jpegQuality; // TheSuperHackers @feature Quality for JPEG screenshots.
@@ -551,6 +555,7 @@ public:
 #endif
   Bool m_TiVOFastMode;            ///< When true, the client speeds up the framerate... set by HOTKEY!
   Bool m_queueReorder;            ///< Ctrl+click moves a build queue entry one position earlier; off unless GameData enables it
+  Bool m_noOccupantFriendlyFire;  ///< spares the container a passenger is riding in from its own splash; off unless GameData enables it
 
 #if defined(RTS_DEBUG) || ENABLE_CONFIGURABLE_SHROUD
 	Bool m_shroudOn;
@@ -645,6 +650,10 @@ public:
 	Bool m_weaponScatterOnWaterSurfaceDefault;	///< default for WeaponTemplate ScatterOnWaterSurface when not set per-weapon
 	Bool m_reverseMoveIgnoreAngleThreshold;	///< if true, a manual REVERSE_MOVE order reverses regardless of heading; if false, only when the goal is behind us
 	Real m_smartGarrisonRange;	///< radius searched for additional transports by the Smart Garrison command
+	Real m_transportLoadSpeedPenalty;	///< default fraction of speed a container loses at a full load
+	Real m_transportLoadTurnRatePenalty;	///< likewise for turn rate
+	Real m_transportLoadAccelerationPenalty;	///< likewise for acceleration
+	Real m_transportLoadLiftPenalty;	///< likewise for lift
 
 	// the trailing '\' is included!
   const AsciiString &getPath_UserData() const { return m_userDataDir; }

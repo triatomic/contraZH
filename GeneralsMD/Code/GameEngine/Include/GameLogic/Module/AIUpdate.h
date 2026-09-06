@@ -631,6 +631,10 @@ public:
 	// while the move is the original command source.  John A.
 	void friend_setLastCommandSource(CommandSourceType source) { m_lastCommandSource = source; }
 
+	// OCL Attack FireRegardlessOfOrders: shots fired straight from the slot outside the state machine, so orders never touch them
+	void friend_queueShots(WeaponSlotType slot, Int shots, const Coord3D* pos);
+	Int friend_getQueuedShotsLeft() const { return m_queuedShotsLeft; }
+
 	Bool canAutoAcquire() const { return getAIUpdateModuleData()->m_autoAcquireEnemiesWhenIdle; }
 
 	Bool canAutoAcquireWhileStealthed() const;
@@ -640,6 +644,13 @@ public:
 
 	void applySpeedMultiplier(Real scalar);
 	inline Real getSpeedMultiplier(void) const { return m_speedMultiplier; }
+
+	/// Occupant load slowdown, kept here so it survives a locomotor set being rebuilt.
+	void setLoadFactors(Real speed, Real turnRate, Real accel, Real lift);
+	inline Real getLoadSpeedFactor(void) const { return m_loadSpeedFactor; }
+	inline Real getLoadTurnRateFactor(void) const { return m_loadTurnRateFactor; }
+	inline Real getLoadAccelFactor(void) const { return m_loadAccelFactor; }
+	inline Real getLoadLiftFactor(void) const { return m_loadLiftFactor; }
 
 protected:
 
@@ -825,6 +836,11 @@ private:
 	UnsignedInt		m_nextMoodCheckTime;
 	// TheSuperHackers @feature Hold Fire stance. True when this object will not auto-acquire targets.
 	Bool					m_isHoldingFire;
+	WeaponSlotType	m_queuedShotsSlot;
+	Int						m_queuedShotsLeft;
+	Coord3D				m_queuedShotsPos;
+	UnsignedInt		m_clearFiringStatusFrame;
+	void fireQueuedShots();
 
 	// Common AI "status" effects -------------------------------------------------------------------
 #ifdef ALLOW_DEMORALIZE
@@ -864,6 +880,10 @@ private:
 	Bool				m_fixLocoInPostProcess;
 
 	Real        m_speedMultiplier;          ///< global multiplier to move speed (kept in AIUpdate rather than Locomotor because it's persistent)
+	Real        m_loadSpeedFactor;          ///< how much our occupants slow us down, likewise persistent
+	Real        m_loadTurnRateFactor;
+	Real        m_loadAccelFactor;
+	Real        m_loadLiftFactor;
 };
 
 //------------------------------------------------------------------------------------------------------------

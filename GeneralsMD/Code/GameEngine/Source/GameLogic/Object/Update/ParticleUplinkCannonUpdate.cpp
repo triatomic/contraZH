@@ -55,6 +55,7 @@
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/ParticleUplinkCannonUpdate.h"
+#include "GameLogic/Module/TornadoUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/ActiveBody.h"
 
@@ -180,6 +181,7 @@ ParticleUplinkCannonUpdateModuleData::ParticleUplinkCannonUpdateModuleData()
     { "ManualFastDrivingSpeed",								INI::parseReal,									nullptr, offsetof( ParticleUplinkCannonUpdateModuleData, m_manualFastDrivingSpeed ) },
     { "DoubleClickToFastDriveDelay",					INI::parseDurationUnsignedInt,	nullptr, offsetof( ParticleUplinkCannonUpdateModuleData, m_doubleClickToFastDriveDelay ) },
     { "HitWaterSurface",											INI::parseBool,									nullptr, offsetof( ParticleUplinkCannonUpdateModuleData, m_hitWaterSurface ) },
+    { "TornadoObjectName",										INI::parseAsciiString,							nullptr, offsetof( ParticleUplinkCannonUpdateModuleData, m_tornadoObjectName ) },
 
 		{ nullptr, nullptr, nullptr, 0 }
 	};
@@ -206,6 +208,7 @@ ParticleUplinkCannonUpdate::ParticleUplinkCannonUpdate( Thing *thing, const Modu
 	m_manualTargetMode = FALSE;
 	m_scriptedWaypointMode = FALSE;
 	m_nextDestWaypointID = 0;
+	m_tornadoObjectID = INVALID_ID;
 	m_xferVersion = 1;
 	m_initialTargetPosition.zero();
 	m_currentTargetPosition.zero();
@@ -248,6 +251,8 @@ void ParticleUplinkCannonUpdate::killEverything()
 		m_orbitToTargetBeamID = INVALID_DRAWABLE_ID;
 	}
 	m_orbitToTargetLaserRadius = LaserRadiusUpdate();
+
+	destroyTornado();
 
 	TheAudio->removeAudioEvent( m_powerupSound.getPlayingHandle() );
 	TheAudio->removeAudioEvent( m_unpackToReadySound.getPlayingHandle() );
@@ -483,6 +488,7 @@ UpdateSleepTime ParticleUplinkCannonUpdate::update()
 				if( orbitalBirthFrame <= now )
 				{
 					createOrbitToTargetLaser( data->m_widthGrowFrames );
+					createTornado();
 					m_laserStatus = LASERSTATUS_BORN;
 					m_scorchMarksMade		= 0;
 					m_nextScorchMarkFrame = now;
@@ -506,6 +512,7 @@ UpdateSleepTime ParticleUplinkCannonUpdate::update()
 						}
 					}
 					m_orbitToTargetLaserRadius.setDecayFrames( data->m_widthGrowFrames );
+					rampDownTornado();
 					m_laserStatus = LASERSTATUS_DECAYING;
 				}
 				break;
@@ -526,6 +533,7 @@ UpdateSleepTime ParticleUplinkCannonUpdate::update()
 						m_orbitToTargetBeamID = INVALID_DRAWABLE_ID;
 					}
 					m_orbitToTargetLaserRadius = LaserRadiusUpdate();
+					destroyTornado();
 					m_laserStatus = LASERSTATUS_DEAD;
 					m_startAttackFrame = 0;
 					setLogicalStatus( STATUS_IDLE );
@@ -664,6 +672,8 @@ UpdateSleepTime ParticleUplinkCannonUpdate::update()
 			{
 				m_currentTargetPosition.z = TheTerrainLogic->getGroundHeight( m_currentTargetPosition.x, m_currentTargetPosition.y );
 			}
+
+			moveTornado();
 
 			Coord3D orbitPosition;
 			orbitPosition.set( m_currentTargetPosition );
@@ -1050,6 +1060,100 @@ void ParticleUplinkCannonUpdate::createGroundToOrbitLaser( UnsignedInt growthFra
 			}
 		}
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+static TornadoUpdate *findTornadoUpdate( Object *tornado )
+{
+	static NameKeyType key_TornadoUpdate = NAMEKEY( "TornadoUpdate" );
+	return (TornadoUpdate*)tornado->findUpdateModule( key_TornadoUpdate );
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Put a tornado object where the beam lands, so the beam can drag it around. */
+//-------------------------------------------------------------------------------------------------
+void ParticleUplinkCannonUpdate::createTornado()
+{
+	const ParticleUplinkCannonUpdateModuleData *data = getParticleUplinkCannonUpdateModuleData();
+	if( data->m_tornadoObjectName.isEmpty() )
+	{
+		return;
+	}
+
+	destroyTornado();
+
+	const ThingTemplate *thing = TheThingFactory->findTemplate( data->m_tornadoObjectName );
+	if( thing == nullptr )
+	{
+		return;
+	}
+
+	Object *me = getObject();
+	Object *tornado = TheThingFactory->newObject( thing, me->getTeam() );
+	if( tornado == nullptr )
+	{
+		return;
+	}
+
+	tornado->setProducer( me );
+	tornado->setPosition( &m_currentTargetPosition );
+	m_tornadoObjectID = tornado->getID();
+
+	// We end it with the beam, so it must not end itself first.
+	TornadoUpdate *update = findTornadoUpdate( tornado );
+	if( update )
+	{
+		update->setExternallyControlled();
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+Object *ParticleUplinkCannonUpdate::getTornado() const
+{
+	if( m_tornadoObjectID == INVALID_ID )
+	{
+		return nullptr;
+	}
+	return TheGameLogic->findObjectByID( m_tornadoObjectID );
+}
+
+//-------------------------------------------------------------------------------------------------
+void ParticleUplinkCannonUpdate::moveTornado()
+{
+	Object *tornado = getTornado();
+	if( tornado )
+	{
+		tornado->setPosition( &m_currentTargetPosition );
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Fade the tornado out with the beam, so it does not simply vanish with units in the air. */
+//-------------------------------------------------------------------------------------------------
+void ParticleUplinkCannonUpdate::rampDownTornado()
+{
+	Object *tornado = getTornado();
+	if( tornado == nullptr )
+	{
+		return;
+	}
+
+	TornadoUpdate *update = findTornadoUpdate( tornado );
+	if( update )
+	{
+		update->beginRampDown();
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+void ParticleUplinkCannonUpdate::destroyTornado()
+{
+	Object *tornado = getTornado();
+	if( tornado )
+	{
+		TheGameLogic->destroyObject( tornado );
+	}
+	m_tornadoObjectID = INVALID_ID;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1441,6 +1545,7 @@ void ParticleUplinkCannonUpdate::crc( Xfer *xfer )
 	* 2: Serialize decay frames
 	* 3: Serialize scripted waypoints (Added for Zero Hour)
 	* 4: TheSuperHackers @tweak Serialize orbit to target laser radius
+	* 5: Serialize the tornado object
 	*/
 // ------------------------------------------------------------------------------------------------
 void ParticleUplinkCannonUpdate::xfer( Xfer *xfer )
@@ -1451,7 +1556,7 @@ void ParticleUplinkCannonUpdate::xfer( Xfer *xfer )
 #if RETAIL_COMPATIBLE_XFER_SAVE
 	const XferVersion currentVersion = 3;
 #else
-	const XferVersion currentVersion = 4;
+	const XferVersion currentVersion = 5;
 #endif
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
@@ -1564,6 +1669,11 @@ void ParticleUplinkCannonUpdate::xfer( Xfer *xfer )
 	if( version >= 4 )
 	{
 		m_orbitToTargetLaserRadius.xfer( xfer );
+	}
+
+	if( version >= 5 )
+	{
+		xfer->xferObjectID( &m_tornadoObjectID );
 	}
 
 }

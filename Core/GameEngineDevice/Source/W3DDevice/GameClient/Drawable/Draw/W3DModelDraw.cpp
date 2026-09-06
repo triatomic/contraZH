@@ -2015,6 +2015,7 @@ W3DModelDraw::W3DModelDraw(Thing *thing, const ModuleData* moduleData) : DrawMod
 	m_selectionDecal = nullptr;
 	m_selectionDecalWanted = FALSE;
 	m_selectionDecalRadius = 0.0f;
+	m_objectDecal = nullptr;
 	m_trackRenderObject = nullptr;
 	m_lastTrackWasBackwards = FALSE;
 	m_isFirstDrawModule = FALSE;
@@ -2136,6 +2137,10 @@ void W3DModelDraw::setHidden(Bool hidden)
 	if (m_selectionDecal)
 		m_selectionDecal->enableShadowRender(!hidden);
 
+	// goes through the helper so hiding does not override the disabled-state rule
+	if (m_objectDecal)
+		updateObjectDecalVisibility();
+
 	if (m_trackRenderObject && hidden)
 	{	const Coord3D* pos = getDrawable()->getPosition();
 		m_trackRenderObject->addCapEdgeToTrack(pos->x,pos->y);
@@ -2256,6 +2261,8 @@ void W3DModelDraw::setFullyObscuredByShroud(Bool fullyObscured)
 		// TheSuperHackers @fix the ring must not expose a fully shrouded unit
 		if (m_selectionDecal)
 			m_selectionDecal->enableShadowInvisible(m_fullyObscuredByShroud);
+		if (m_objectDecal)
+			m_objectDecal->enableShadowInvisible(m_fullyObscuredByShroud);
 
 		doStartOrStopParticleSys();
 	}
@@ -2367,6 +2374,10 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 
 	// update whether or not we should be animating.
 	setPauseAnimation( !getDrawable()->getShouldAnimate(getW3DModelDrawModuleData()->m_animationsRequirePower) );
+
+	// disabled state changes without touching the model, so the decal has to follow it here
+	if (m_objectDecal && getDrawable()->getTemplate()->hidesDecalWhenDisabled())
+		updateObjectDecalVisibility();
 
 	Matrix3D scaledTransform;
 	if (getDrawable()->getInstanceScale() != 1.0f)
@@ -3290,6 +3301,70 @@ void W3DModelDraw::setSelectionDecal(Bool enable, Real radius)
 	}
 }
 
+//-------------------------------------------------------------------------------------------------
+/** Create the object's own ground decal from the DisplayDecal fields on its template.
+	*
+	* Routed through addDecal rather than addShadow so it lands on the decal list, which renders
+	* outside the m_useShadowDecals gate - this is an aura marker, not a shadow, so the shadow
+	* video options must not take it away. */
+//-------------------------------------------------------------------------------------------------
+void W3DModelDraw::createObjectDecal()
+{
+	// m_isFirstDrawModule keeps the decal to one per object, or every draw module of a
+	// multi-model unit would stack its own
+	if (m_objectDecal || m_renderObject == nullptr || !m_isFirstDrawModule
+			|| TheProjectedShadowManager == nullptr || !TheGlobalData->m_objectDecalsEnabled)
+		return;
+
+	const ThingTemplate *tmplate = getDrawable()->getTemplate();
+	if (!tmplate->displaysDecal())
+		return;
+
+	Shadow::ShadowTypeInfo decalInfo;
+	decalInfo.allowUpdates = FALSE;		//the decal art never needs regenerating
+	decalInfo.allowWorldAlign = TRUE;	//wrap it around terrain and world objects
+	decalInfo.m_type = tmplate->getDecalStyle();
+	strlcpy(decalInfo.m_ShadowName, tmplate->getDecalTextureName().str(), ARRAY_SIZE(decalInfo.m_ShadowName));
+	decalInfo.m_sizeX = tmplate->getDecalSizeX();
+	decalInfo.m_sizeY = tmplate->getDecalSizeY();
+	decalInfo.m_offsetX = tmplate->getDecalOffsetX();
+	decalInfo.m_offsetY = tmplate->getDecalOffsetY();
+
+	m_objectDecal = TheProjectedShadowManager->addDecal(m_renderObject, &decalInfo);
+	if (m_objectDecal)
+	{
+		// the diffuse starts out opaque white, which an additive decal would add over the whole
+		// quad rather than only where the art is, so it has to be built before drawing
+		m_objectDecal->setColor(tmplate->getDecalColor());
+		m_objectDecal->setOpacity(REAL_TO_INT(tmplate->getDecalOpacity() * 255.0f));
+		m_objectDecal->enableShadowInvisible(m_fullyObscuredByShroud);
+		updateObjectDecalVisibility();
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Point the decal's render flag at the drawable's current state.
+	*
+	* Asks the drawable rather than the render object, which a model swap rebuilds unhidden. */
+//-------------------------------------------------------------------------------------------------
+void W3DModelDraw::updateObjectDecalVisibility()
+{
+	if (m_objectDecal == nullptr)
+		return;
+
+	Bool visible = !getDrawable()->isDrawableEffectivelyHidden();
+
+	if (visible && getDrawable()->getTemplate()->hidesDecalWhenDisabled())
+	{
+		const Object *obj = getDrawable()->getObject();
+		if (obj && obj->isDisabled())
+			visible = FALSE;
+	}
+
+	m_objectDecal->enableShadowRender(visible);
+}
+
+//-------------------------------------------------------------------------------------------------
 void W3DModelDraw::setTerrainDecal(TerrainDecalType type)
 {
 	// DEBUG_LOG(("W3DModelDraw::setTerrainDecal - type = %d. invalid = %d\n", type, type == TERRAIN_DECAL_NONE || type >= TERRAIN_DECAL_MAX));
@@ -3370,6 +3445,11 @@ void W3DModelDraw::nukeCurrentRender(Matrix3D* xform)
 	if (m_selectionDecal)
 		m_selectionDecal->release();
 	m_selectionDecal = nullptr;
+
+	// bound to the render object about to be torn down, like the shadow and decals above
+	if (m_objectDecal)
+		m_objectDecal->release();
+	m_objectDecal = nullptr;
 
 	// remove existing render object from the scene
 	if (m_renderObject)
@@ -3769,6 +3849,10 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 		doHideShowSubObjs(&newState->m_hideShowVec);
 	}
 	hideAllHeadlights(m_hideHeadlights);
+
+	// outside the rebuild branch: a state that reuses the current model keeps its render object
+	// and never rebuilds, but may be the first state to offer one to attach the decal to
+	createObjectDecal();
 
 	const ModelConditionInfo* prevState = m_curState;	// save, to pass to adjustAnimation (could be null)
 	m_curState = newState;

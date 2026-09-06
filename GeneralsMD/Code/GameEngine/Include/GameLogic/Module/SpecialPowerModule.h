@@ -65,6 +65,10 @@ public:
 	virtual void doSpecialPowerUsingWaypoints( const Waypoint *way, UnsignedInt commandOptions ) = 0;
 	virtual void markSpecialPowerTriggered( const Coord3D *location ) = 0;
 	virtual void startPowerRecharge() = 0;
+	// TheSuperHackers @feature StartCooldownOnFirstShot: the firing tracker drives the wait
+	virtual Bool isWaitingForShots() const = 0;
+	virtual void onShotFired() = 0;
+	virtual void updatePendingShots() = 0;
 	virtual const AudioEventRTS& getInitiateSound() const = 0;
 	virtual Bool startsReady() const = 0;
 	virtual Bool isScriptOnly() const = 0;
@@ -157,6 +161,13 @@ public:
 	/** start the recharge process for this special power. public because some powers call it repeatedly.
 	*/
 	virtual void startPowerRecharge() override;
+
+	// TheSuperHackers @feature StartCooldownOnFirstShot. The module has no update of its own,
+	// so the object's firing tracker reports the shots and ticks the wait.
+	virtual Bool isWaitingForShots() const override { return m_pendingShotsState != PENDING_NONE; }
+	virtual void onShotFired() override;
+	virtual void updatePendingShots() override;
+
 	virtual const AudioEventRTS& getInitiateSound() const override;
 
 	virtual Bool startsReady() const override;
@@ -175,9 +186,36 @@ protected:
 
 	void handleTargetDesignator(const Coord3D* location);
 
+	/// start the cooldown right now, whatever the template asked for
+	void beginCooldownNow();
+	/// give the power back, for a use whose shots never happened
+	void refundUnfiredPower();
+	/// forget any wait in progress
+	void clearPendingShots();
+	/// TRUE when this use should hold its cooldown until the ordered shots are away
+	Bool shouldWaitForShots() const;
+	/// the firing tracker ticks the wait, and it sleeps whenever nothing is shooting.
+	/// FALSE when this object has no tracker at all, so no wait can be watched.
+	Bool wakeFiringTrackerForWait();
+
+	/// how long a dropped attack must stay dropped before it counts as a cancel
+	enum { PENDING_CANCEL_SETTLE_FRAMES = LOGICFRAMES_PER_SECOND / 2 };
+
+	enum
+	{
+		PENDING_NONE = 0,									///< no shots are being waited on
+		PENDING_WAITING_FOR_FIRST_SHOT,		///< used, but nothing has fired yet
+		PENDING_FIRING										///< firing; the cooldown starts when the burst ends
+	};
+
 	UnsignedInt m_availableOnFrame;			///< on this frame, this special power is available
 	Int m_pausedCount;									///< Reference count of sources pausing me
 	UnsignedInt m_pausedOnFrame;
 	Real m_pausedPercent;
+	Int m_pendingShotsState;						///< one of the PENDING_ values above
+	UnsignedInt m_pendingTimeoutFrame;	///< start the cooldown anyway once this frame passes
+	UnsignedInt m_pendingStartFrame;		///< frame the wait began, so the cameo can count down from it
+	UnsignedInt m_pendingSettleFrame;		///< zero until the caster takes the attack up, then the frame
+																			///< a dropped attack becomes a cancel
 
 };

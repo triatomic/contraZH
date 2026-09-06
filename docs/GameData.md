@@ -114,6 +114,17 @@ Notes:
 * These extend the existing `HealthBonus_Veteran` / `HealthBonus_Elite` / `HealthBonus_Heroic` parameters.
 * See [ThingTemplate veterancy parameters](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Objects-&-Modules#veterancy-object-parameters) for per-object level configuration.
 
+## Transport Load Slowdown
+
+A container can be slowed by what it carries: the fuller it is, the worse it moves, and it recovers as passengers leave. These four set the default penalty, as the fraction of each value lost at a full load. Each is `0%` by default, so transports behave exactly as before until a value is set.
+
+* `TransportLoadSpeedPenalty = 0%` - (Fraction of `Speed` lost at a full load. Default = 0%)
+* `TransportLoadTurnRatePenalty = 0%` - (Fraction of `TurnRate` lost at a full load. Default = 0%)
+* `TransportLoadAccelerationPenalty = 0%` - (Fraction of `Acceleration` lost at a full load. Default = 0%)
+* `TransportLoadLiftPenalty = 0%` - (Fraction of `Lift` lost at a full load. Default = 0%)
+
+Each penalty covers the damaged variant of its value too, so `SpeedDamaged` scales by the same percentage as `Speed`. Any container can override these or opt out entirely - see [Contain module load slowdown](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Objects-&-Modules#load-slowdown-from-occupants).
+
 ## Weapon Scatter on Water
 
 * `WeaponScatterOnWaterSurfaceDefault = No` - (Default value for the per-weapon `ScatterOnWaterSurface` flag when it is not set explicitly on a WeaponTemplate. Controls whether scattered shots that land on water detonate at the water surface. Individual weapons can still override this via `ScatterOnWaterSurface` in Weapon.ini. Default = No)

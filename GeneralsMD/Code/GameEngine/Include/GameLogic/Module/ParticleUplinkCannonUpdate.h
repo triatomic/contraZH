@@ -105,6 +105,7 @@ public:
   Real					m_manualFastDrivingSpeed;
   UnsignedInt		m_doubleClickToFastDriveDelay;
 	Bool          m_hitWaterSurface;
+	AsciiString   m_tornadoObjectName;
 
 	ParticleUplinkCannonUpdateModuleData();
 	static void buildFieldParse(MultiIniFieldParse& p);
@@ -195,6 +196,12 @@ protected:
 	void setClientStatus( PUCStatus status, Bool revealThisFrame );
 	void killEverything();
 
+	void createTornado();
+	void moveTornado();
+	void rampDownTornado();
+	void destroyTornado();
+	Object *getTornado() const;
+
 	SpecialPowerModuleInterface* m_specialPowerModule;
 
 	AudioEventRTS		m_powerupSound;
@@ -232,6 +239,7 @@ protected:
 	UnsignedInt			m_lastDrivingClickFrame;
 	UnsignedInt			m_2ndLastDrivingClickFrame;
 	UnsignedInt			m_nextDestWaypointID;
+	ObjectID				m_tornadoObjectID;
 
 	XferVersion			m_xferVersion;
 

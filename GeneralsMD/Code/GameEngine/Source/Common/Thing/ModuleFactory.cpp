@@ -205,6 +205,7 @@
 #include "GameLogic/Module/SupplyTruckAIUpdate.h"
 #include "GameLogic/Module/SupplyWarehouseDockUpdate.h"
 #include "GameLogic/Module/ToppleUpdate.h"
+#include "GameLogic/Module/TornadoUpdate.h"
 #include "GameLogic/Module/TransportAIUpdate.h"
 #include "GameLogic/Module/WanderAIUpdate.h"
 #include "GameLogic/Module/TeleporterAIUpdate.h"
@@ -487,6 +488,7 @@ void ModuleFactory::init()
 	addModule( PilotFindVehicleUpdate );
 	addModule( DemoTrapUpdate );
 	addModule( ParticleUplinkCannonUpdate );
+	addModule( TornadoUpdate );
 	addModule( ChronoSphereUpdateModule );
 	addModule( TeleportSelfSpecialPower );
 	addModule( MultiLocationSpecialPowerUpdate );

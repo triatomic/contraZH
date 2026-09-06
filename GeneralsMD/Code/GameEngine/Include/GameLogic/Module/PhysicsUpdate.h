@@ -141,6 +141,9 @@ public:
 
 	void setAngles( Real yaw, Real pitch, Real roll );
 	Real getMass() const;
+	Real getShockResistanceScale() const;		///< what ShockResistance leaves of an incoming force
+	Bool getDefaultAllowCollideForce() const { return getPhysicsBehaviorModuleData()->m_allowCollideForce; }
+	void clearMotiveForce() { m_motiveForceExpires = 0; }		///< forget the recent locomotor drive, so applyForce is not projected
 	void setMass( Real mass ) { m_mass = mass; }
 	Real getCenterOfMassOffset() const { return getPhysicsBehaviorModuleData()->m_centerOfMassOffset; }
 
