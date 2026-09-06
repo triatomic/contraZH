@@ -226,6 +226,35 @@ enum SpecialPowerType CPP_11(: Int)
 
 	SPECIAL_TELEPORT_SELF,
 
+	// Contra superweapons; the fallback in getFallbackBehaviorType gives each its retail behavior
+	SPECIAL_STRATEGIC_BOMBING,
+	SPECIAL_TOMAHAWK_STORM,
+	SPECIAL_EMP_STORM,
+	SPECIAL_ICBM_MISSILE,
+	SPECIAL_ATMO_LENS,
+	SPECIAL_HATF_MISSILE,
+	SPECIAL_HATF_V_MISSILE,
+	SPECIAL_NUCLEAR_STORM,
+	SPECIAL_MISSILE_SILO,
+
+	// reserve for data; BehaviorEnum is required
+	SPECIAL_CUSTOM_01,
+	SPECIAL_CUSTOM_02,
+	SPECIAL_CUSTOM_03,
+	SPECIAL_CUSTOM_04,
+	SPECIAL_CUSTOM_05,
+	SPECIAL_CUSTOM_06,
+	SPECIAL_CUSTOM_07,
+	SPECIAL_CUSTOM_08,
+	SPECIAL_CUSTOM_09,
+	SPECIAL_CUSTOM_10,
+	SPECIAL_CUSTOM_11,
+	SPECIAL_CUSTOM_12,
+	SPECIAL_CUSTOM_13,
+	SPECIAL_CUSTOM_14,
+	SPECIAL_CUSTOM_15,
+	SPECIAL_CUSTOM_16,
+
 	SPECIALPOWER_COUNT,
 	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // NEW CONSTANTS NEED A BEHAVIORTYPE DEFINED IN THE SPECIALPOWER OR return one in getFallbackBehaviorType in ActionManager.cpp

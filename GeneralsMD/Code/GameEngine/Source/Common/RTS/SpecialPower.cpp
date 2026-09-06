@@ -225,6 +225,32 @@ const char* const SpecialPowerMaskType::s_bitNameList[] =
 
 	 "SPECIAL_TELEPORT_SELF",
 
+	 "SPECIAL_STRATEGIC_BOMBING",
+	 "SPECIAL_TOMAHAWK_STORM",
+	 "SPECIAL_EMP_STORM",
+	 "SPECIAL_ICBM_MISSILE",
+	 "SPECIAL_ATMO_LENS",
+	 "SPECIAL_HATF_MISSILE",
+	 "SPECIAL_HATF_V_MISSILE",
+	 "SPECIAL_NUCLEAR_STORM",
+	 "SPECIAL_MISSILE_SILO",
+	 "SPECIAL_CUSTOM_01",
+	 "SPECIAL_CUSTOM_02",
+	 "SPECIAL_CUSTOM_03",
+	 "SPECIAL_CUSTOM_04",
+	 "SPECIAL_CUSTOM_05",
+	 "SPECIAL_CUSTOM_06",
+	 "SPECIAL_CUSTOM_07",
+	 "SPECIAL_CUSTOM_08",
+	 "SPECIAL_CUSTOM_09",
+	 "SPECIAL_CUSTOM_10",
+	 "SPECIAL_CUSTOM_11",
+	 "SPECIAL_CUSTOM_12",
+	 "SPECIAL_CUSTOM_13",
+	 "SPECIAL_CUSTOM_14",
+	 "SPECIAL_CUSTOM_15",
+	 "SPECIAL_CUSTOM_16",
+
 	nullptr
 };
 static_assert(ARRAY_SIZE(SpecialPowerMaskType::s_bitNameList) == SpecialPowerMaskType::NumBits + 1, "Incorrect array size");
@@ -287,6 +313,13 @@ void SpecialPowerStore::parseSpecialPowerDefinition( INI *ini )
 		DEBUG_ASSERTCRASH( !(specialPower->isStartCooldownOnFirstShot() && specialPower->isSharedNSync()),
 			("SpecialPower '%s' sets both StartCooldownOnFirstShot and SharedSyncedTimer; the shot delay is ignored",
 			 name.str()) );
+
+#if defined(RTS_DEBUG)
+		// the reserve enums carry no behavior of their own
+		const SpecialPowerType type = specialPower->getSpecialPowerType();
+		DEBUG_ASSERTCRASH( !(type >= SPECIAL_CUSTOM_01 && type <= SPECIAL_CUSTOM_16 && specialPower->getSpecialPowerBehaviorType() == SPECIAL_INVALID),
+			("SpecialPower '%s' uses a SPECIAL_CUSTOM enum without BehaviorEnum", name.str()) );
+#endif
 	}
 }
 

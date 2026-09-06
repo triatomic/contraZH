@@ -2251,6 +2251,23 @@ SpecialPowerType ActionManager::getFallbackBehaviorType(SpecialPowerType type) {
 		// this has special code
 		return SPECIAL_TOGGLE_DRAWBRIDGE;
 
+	case SPECIAL_STRATEGIC_BOMBING:
+	case SPECIAL_TOMAHAWK_STORM:
+	case SPECIAL_EMP_STORM:
+		return SPECIAL_PARTICLE_UPLINK_CANNON;
+
+	case SPECIAL_ICBM_MISSILE:
+	case SPECIAL_ATMO_LENS:
+	case SPECIAL_NUCLEAR_STORM:
+		return SPECIAL_NEUTRON_MISSILE;
+
+	case SPECIAL_HATF_MISSILE:
+	case SPECIAL_HATF_V_MISSILE:
+		return SPECIAL_SCUD_STORM;
+
+	case SPECIAL_MISSILE_SILO:
+		return SPECIAL_CHINA_CARPET_BOMB;
+
 	default:
 		return SPECIAL_NEUTRON_MISSILE;
 	}
