@@ -2408,7 +2408,7 @@ void GameLogic::selectObject(Object *obj, Bool createNewSelection, PlayerMaskTyp
 	if (!obj) {
 		return;
 	}
-	// MYEDIT Disable MassSelectable() check for multiselection of same type of structures
+	//  ShigureUi 07/09/2026 Don't do the check, we have check elsewhere.
 	//if (!obj->isMassSelectable() && !createNewSelection) {
 	//	DEBUG_LOG(("GameLogic::selectObject() - Object attempted to be added to selection, but isn't mass-selectable."));
 	//	return;

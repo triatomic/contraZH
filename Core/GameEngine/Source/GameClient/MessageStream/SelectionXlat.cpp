@@ -634,7 +634,7 @@ GameMessageDisposition SelectionTranslator::onMouseLeftDoubleClick(MAYBE_UNUSED 
 	if (picked == nullptr)
 		return KEEP_MESSAGE;
 
-	//MYEDIT delay the return KEEP_MESSAGE
+	//ShigureUi 07/09/2026 delay "return KEEP_MESSAGE".
 	//if (!picked->isMassSelectable())  
 	//	return KEEP_MESSAGE;
 
@@ -654,7 +654,7 @@ GameMessageDisposition SelectionTranslator::onMouseLeftDoubleClick(MAYBE_UNUSED 
 		listOfSelectedDrawables	= *TheInGameUI->getAllSelectedDrawables();
 	}
 
-	//MYEDIT move return KEEP_MESSAGE here
+	//ShigureUi 07/09/2026 "return KEEP_MESSAGE" was moved here with listOfSelectedDrawables as requirement.
   if (!listOfSelectedDrawables.empty() && !picked->isMassSelectable() &&
 		  picked->getTemplate() != listOfSelectedDrawables.front()->getTemplate())
    	return KEEP_MESSAGE;
@@ -831,8 +831,11 @@ GameMessageDisposition SelectionTranslator::onMouseLeftClick(MAYBE_UNUSED const 
 			si.currentCountCivilians > 0 ||
 			si.currentCountFriends > 0 ||
 			(si.currentCountMineBuildings > 0 && si.newCountMineBuildings == 0)
-		  ) // MYEdit this prevent shift select adding new structure into the team.
-		    // So do not cancel bool addToGroup too early
+		  //si.currentCountMineBuildings > 0
+		  //ShigureUi 07/09/2026 this prevent shift select adding new structure into the team.
+		  //Change condition in order to filter illegal selection only.
+		  //This is 1st of the cases.
+		  )
 	{
 		// force a new group creation
 		addToGroup = FALSE;
@@ -846,7 +849,10 @@ GameMessageDisposition SelectionTranslator::onMouseLeftClick(MAYBE_UNUSED const 
 		// EXACTLY ONE CLICKED OR DRAGGED BUILDING
 		if ( si.newCountMineBuildings == 1 && si.newCountMine == 1 )
 		{
-			// MYEDIT Add new check allowing same type of structure being selected
+			//ShigureUi 07/09/2026 this prevent shift select adding new structure into the team.
+      //Change condition in order to filter illegal selection only.
+      //This is 2nd of the cases.
+			//addToGroup = FALSE;
 			if (si.currentCountMineBuildings > 0 &&
 				(*currentList->begin())->getTemplate() != (*drawablesThatWillSelect.begin())->getTemplate())
 			  addToGroup = FALSE;
@@ -882,7 +888,10 @@ GameMessageDisposition SelectionTranslator::onMouseLeftClick(MAYBE_UNUSED const 
 			}
 			if ( onlyTheOneBuildingIsSelectableAnyway )
 			{
-			  // MYEDIT Add new check allowing same type of structure being selected
+				//ShigureUi 07/09/2026 this prevent shift select adding new structure into the team.
+				//Change condition in order to filter illegal selection only.
+				//This is 3rd of the cases.
+				//addToGroup = FALSE;
 			  if (si.currentCountMineBuildings > 0 &&
 				  (*currentList->begin())->getTemplate() != thebuilding->getTemplate())
 			    addToGroup = FALSE;
@@ -1337,10 +1346,11 @@ GameMessageDisposition SelectionTranslator::onMetaAddTeam(MAYBE_UNUSED const Gam
 		}
 		else
 		{
-			// MYEDIT Add Team PreventTeam From adding new structure
 			Drawable *draw = TheInGameUI->getFirstSelectedDrawable();
 
-			// Delay deselection of current selections, for allowing same type of structures to be selected 
+			//  ShigureUi 07/09/2026 Shift add team into selection group,
+			// these code prevent same type of structures being selected together.
+			// We're not going to deselect this early and without check.
 			//if( draw && draw->isKindOf( KINDOF_STRUCTURE ) )
 			//{
 			//	//Kris: Jan 12, 2005
@@ -1360,8 +1370,13 @@ GameMessageDisposition SelectionTranslator::onMetaAddTeam(MAYBE_UNUSED const Gam
 					VecObjectPtr objlist = selectedSquad->getLiveObjects();
 					Int numObjs = objlist.size();
 
-					// TheSuperHackers @bugfix skyaero 22/07/2025 Can't select other units if you have a structure selected. So deselect the structure to prevent group force attack exploit.
-					// 06/09/2026 ShigureUi Add new conditions to allow same type of structures being selected together
+					//  ShigureUi 07/09/2026 Add new conditions to allow same type of structures being selected together
+					// // TheSuperHackers @bugfix skyaero 22/07/2025 Can't select other units if you have a structure selected. So deselect the structure to prevent group force attack exploit.
+					// if (numObjs > 0 && objlist[0]->getDrawable()->isKindOf(KINDOF_STRUCTURE))
+					// {
+					//  	TheInGameUI->deselectAllDrawables();
+					// }
+
 					if (numObjs > 0 && draw &&
 						(objlist[0]->getDrawable()->isKindOf(KINDOF_STRUCTURE) || draw->isKindOf(KINDOF_STRUCTURE)) &&
 						 objlist[0]->getDrawable()->getTemplate() != draw->getTemplate()
