@@ -163,133 +163,8 @@ const char *const TheEvaMessageNames[] =
 	"SUPERWEAPONREADY_ALLY_CHRONOSPHERE",
 	"SUPERWEAPONREADY_ENEMY_CHRONOSPHERE",
 
-	//****************************************************************************
-	//Kris: Don't forget to add another handler below -- it's ghey-ly implemented.
-	//****************************************************************************
 };
 static_assert(ARRAY_SIZE(TheEvaMessageNames) == EVA_COUNT, "Incorrect array size");
-
-//-------------------------------------------------------------------------------------------------
-const ShouldPlayFunc Eva::s_shouldPlayFuncs[] =
-{
-	Eva::shouldPlayLowPower,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-	Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-  Eva::shouldPlayGenericHandler,
-};
-
 
 //------------------------------------------------------------------------------ INI::parseEvaEvent
 void INI::parseEvaEvent( INI* ini )
@@ -301,8 +176,8 @@ void INI::parseEvaEvent( INI* ini )
 	name.set( c );
 
 	EvaCheckInfo *check = TheEva->newEvaCheckInfo( name );
-	if (!check) {
-		// could be null because it already exists.
+	if (!check)
+	{
 		return;
 	}
 
@@ -332,13 +207,18 @@ const FieldParse EvaSideSounds::s_evaSideSounds[] =
 
 //------------------------------------------------------------------------------------ EvaCheckInfo
 EvaCheckInfo::EvaCheckInfo() :
-	m_message(EVA_COUNT),
-	m_priority(1), // lowest of all priorities
-	m_framesBetweenChecks(900),	// 30 seconds at 30 fps
-	m_framesToExpire(150) // 5 seconds at 30 fps
+	m_message(EVA_Invalid)
 {
+	resetToDefaults();
+}
 
-
+//-------------------------------------------------------------------------------------------------
+void EvaCheckInfo::resetToDefaults()
+{
+	m_priority = 1; // lowest of all priorities
+	m_framesBetweenChecks = 900;	// 30 seconds at 30 fps
+	m_framesToExpire = 150; // 5 seconds at 30 fps
+	m_evaSideSounds.clear();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -369,10 +249,7 @@ Eva::Eva() :
 	m_previousUnitCount(0),
 	m_enabled(TRUE)
 {
-
-	for (Int i = 0; i < EVA_COUNT; ++i) {
-		m_shouldPlay[i] = FALSE;
-	}
+	growShouldPlay();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -390,6 +267,17 @@ void Eva::init()
 	// parse the INI here, etc.
 	INI ini;
 	ini.loadFileDirectory( "Data\\INI\\Eva", INI_LOAD_OVERWRITE, nullptr);
+
+#if defined(RTS_DEBUG)
+	// a name used by SpecialPower or Object INI without an EvaEvent block never plays
+	for (Int i = EVA_FIRST; i < getMessageCount(); ++i)
+	{
+		if (getEvaCheckInfo(messageToName((EvaMessage)i)) == nullptr)
+		{
+			DEBUG_LOG(("Eva message %s has no EvaEvent definition", messageToName((EvaMessage)i).str()));
+		}
+	}
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -405,9 +293,8 @@ void Eva::reset()
 	}
 
 	// remove all things flagged as "need to play"
-	for (Int i = 0; i < EVA_COUNT; ++i) {
-		m_shouldPlay[i] = FALSE;
-	}
+	growShouldPlay();
+	std::fill(m_shouldPlay.begin(), m_shouldPlay.end(), FALSE);
 
 	// If we were previously disabled, re-enable ourselves.
 	m_enabled = TRUE;
@@ -429,7 +316,10 @@ void Eva::update()
 		return;
 	}
 
-	for (Int mesg = (Int)EVA_FIRST; mesg < (Int)EVA_COUNT; ++mesg) {
+	// map INI can register names after init
+	growShouldPlay();
+	const Int messageCount = getMessageCount();
+	for (Int mesg = (Int)EVA_FIRST; mesg < messageCount; ++mesg) {
 		if (isTimeForCheck((EvaMessage)mesg, frame)) {
 			if (messageShouldPlay((EvaMessage)mesg, frame)) {
 				playMessage((EvaMessage)mesg, frame);
@@ -442,29 +332,80 @@ void Eva::update()
 
 	// Reset all of the flags that have been set to true that haven't actually been probed, because
 	// they will need to trigger again to be valid messages.
-	for (Int i = EVA_FIRST; i < EVA_COUNT; ++i) {
-		m_shouldPlay[i] = FALSE;
+	std::fill(m_shouldPlay.begin(), m_shouldPlay.end(), FALSE);
+}
+
+//-------------------------------------------------------------------------------------------------
+// Seeded on first use so INI parsed before TheEva exists can already register names.
+std::vector<AsciiString>& Eva::getMessageNames()
+{
+	static std::vector<AsciiString> names;
+	if (names.empty())
+	{
+		names.reserve(EVA_COUNT);
+		for (Int i = EVA_FIRST; i < EVA_COUNT; ++i)
+		{
+			names.push_back(AsciiString(TheEvaMessageNames[i]));
+		}
 	}
+	return names;
+}
+
+//-------------------------------------------------------------------------------------------------
+Int Eva::getMessageCount()
+{
+	return (Int)getMessageNames().size();
+}
+
+//-------------------------------------------------------------------------------------------------
+void Eva::growShouldPlay()
+{
+	const size_t count = getMessageNames().size();
+	if (m_shouldPlay.size() < count)
+	{
+		m_shouldPlay.resize(count, FALSE);
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+EvaMessage Eva::findMessage(const AsciiString& name)
+{
+	const std::vector<AsciiString>& names = getMessageNames();
+	for (size_t i = 0; i < names.size(); ++i)
+	{
+		if (name.compareNoCase(names[i].str()) == 0)
+		{
+			return (EvaMessage)i;
+		}
+	}
+	return EVA_Invalid;
 }
 
 //-------------------------------------------------------------------------------------------------
 EvaMessage Eva::nameToMessage(const AsciiString& name)
 {
-	for (Int i = EVA_FIRST; i < EVA_COUNT; ++i) {
-		if (name.compareNoCase(TheEvaMessageNames[i]) == 0) {
-			return (EvaMessage) i;
-		}
+	if (name.isEmpty())
+	{
+		return EVA_Invalid;
 	}
 
-	DEBUG_CRASH(("Invalid requested Eva message translation :%s: jkmcd", name.str()));
-	return EVA_Invalid;
+	EvaMessage message = findMessage(name);
+	if (message == EVA_Invalid)
+	{
+		std::vector<AsciiString>& names = getMessageNames();
+		message = (EvaMessage)names.size();
+		names.push_back(name);
+	}
+	return message;
 }
 
 //-------------------------------------------------------------------------------------------------
 AsciiString Eva::messageToName(EvaMessage message)
 {
-  if (message >= EVA_FIRST && message < EVA_COUNT)
-		return TheEvaMessageNames[message];
+	if (message >= EVA_FIRST && message < getMessageCount())
+	{
+		return getMessageNames()[message];
+	}
 
 	DEBUG_CRASH(("Invalid requested Eva message translation. jkmcd"));
 	return AsciiString::TheEmptyString;
@@ -474,12 +415,19 @@ AsciiString Eva::messageToName(EvaMessage message)
 EvaCheckInfo *Eva::newEvaCheckInfo(AsciiString name)
 {
 	EvaMessage mesg = nameToMessage(name);
+	if (mesg == EVA_Invalid)
+	{
+		return nullptr;
+	}
 
-	// Only return a new one if there isn't an existing one.
+	// A later definition replaces the earlier one entirely.
 	EvaCheckInfoPtrVecIt it;
 	for (it = m_allCheckInfos.begin(); it != m_allCheckInfos.end(); ++it) {
 		if (*it && (*it)->m_message == mesg)
-			return nullptr;
+		{
+			(*it)->resetToDefaults();
+			return *it;
+		}
 	}
 
 	EvaCheckInfo *checkInfo = newInstance(EvaCheckInfo);
@@ -491,7 +439,7 @@ EvaCheckInfo *Eva::newEvaCheckInfo(AsciiString name)
 //-------------------------------------------------------------------------------------------------
 const EvaCheckInfo *Eva::getEvaCheckInfo(AsciiString name)
 {
-	EvaMessage mesg = nameToMessage(name);
+	EvaMessage mesg = findMessage(name);
 
 	// Only return a new one if there isn't an existing one.
 	EvaCheckInfoPtrVecIt it;
@@ -506,6 +454,11 @@ const EvaCheckInfo *Eva::getEvaCheckInfo(AsciiString name)
 //-------------------------------------------------------------------------------------------------
 void Eva::setShouldPlay(EvaMessage messageToPlay)
 {
+	if (messageToPlay < EVA_FIRST)
+	{
+		return;
+	}
+	growShouldPlay();
 	m_shouldPlay[messageToPlay] = TRUE;
 
   // DEBUG_LOG( ( "Eva message %s play requested", messageToName( messageToPlay).str() ) );
@@ -515,9 +468,7 @@ void Eva::setShouldPlay(EvaMessage messageToPlay)
 void Eva::setEvaEnabled(Bool enabled)
 {
 	// clear out any waiting messages.
-	for (Int i = EVA_FIRST; i < EVA_COUNT; ++i) {
-		m_shouldPlay[i] = FALSE;
-	}
+	std::fill(m_shouldPlay.begin(), m_shouldPlay.end(), FALSE);
 	m_enabled = enabled;
 }
 
@@ -541,10 +492,12 @@ Bool Eva::messageShouldPlay(EvaMessage messageToTest, UnsignedInt currentFrame) 
 		return FALSE;
 	}
 
-	static_assert(ARRAY_SIZE(s_shouldPlayFuncs) == EVA_COUNT, "Incorrect array size");
-
 	m_messageBeingTested = messageToTest;
-	return s_shouldPlayFuncs[messageToTest](m_localPlayer);
+	if (messageToTest == EVA_LowPower)
+	{
+		return shouldPlayLowPower(m_localPlayer);
+	}
+	return shouldPlayGenericHandler(m_localPlayer);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -668,16 +621,22 @@ void Eva::processPlayingMessages(UnsignedInt currentFrame)
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Parses the name of an Eva message from an INI file */
+/** Parses the name of an Eva message from an INI file. None disables the event; an unknown name
+	* is registered and stays silent until an EvaEvent block defines it. */
 //-------------------------------------------------------------------------------------------------
 /*static*/void Eva::parseEvaMessageFromIni( INI * ini, void *instance, void *store, const void* userData )
 {
   const char *token = ini->getNextToken();
 
+  if ( stricmp( token, "None" ) == 0 )
+  {
+    *((EvaMessage *)store) = EVA_None;
+    return;
+  }
+
   EvaMessage message = nameToMessage( token );
   if ( message == EVA_Invalid )
   {
-    // debug message already displayed
     throw ERROR_BAD_INI;
   }
 

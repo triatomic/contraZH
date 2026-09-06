@@ -35,7 +35,7 @@ class Player;
 class INI;
 
 //------------------------------------------------------------------------------------ Eva Messages
-// Keep in sync with TheEvaMessageNames AND Eva::s_shouldPlayFuncs
+// Keep in sync with TheEvaMessageNames. Names past EVA_COUNT are registered from INI at parse time.
 enum EvaMessage CPP_11(: Int)
 {
 	EVA_None = -2, //< Explicitely turn off eva event for vanilla ZH Special Powers
@@ -195,6 +195,7 @@ public:
 	std::vector<EvaSideSounds>	m_evaSideSounds;
 
 	EvaCheckInfo();
+	void resetToDefaults();
 
 	static const FieldParse s_evaEventInfo[];		///< the parse table for INI definition
 	const FieldParse *getFieldParse() const { return s_evaEventInfo; }
@@ -215,15 +216,10 @@ struct EvaCheck
 		EvaCheck();
 };
 
-//-------------------------------------------------------------------------------- ShouldPlayStruct
-typedef Bool (*ShouldPlayFunc)( Player *localPlayer );
-
 //--------------------------------------------------------------------------------------------- Eva
 class Eva : public SubsystemInterface
 {
 	private:
-		static const ShouldPlayFunc s_shouldPlayFuncs[];
-
 		typedef std::vector<EvaCheckInfo *> EvaCheckInfoPtrVec;
 		typedef EvaCheckInfoPtrVec::iterator EvaCheckInfoPtrVecIt;
 		EvaCheckInfoPtrVec m_allCheckInfos;
@@ -244,7 +240,7 @@ class Eva : public SubsystemInterface
 		Int m_previousBuildingCount;
 		Int m_previousUnitCount;
 		mutable EvaMessage m_messageBeingTested;	// Used by the generic hooks so they can figure out which flag to test.
-		Bool m_shouldPlay[EVA_COUNT];	// These aren't all used, but some of them are.
+		std::vector<Bool> m_shouldPlay;	// one flag per registered message, grown on demand
 
 		Bool m_enabled;
 
@@ -257,8 +253,10 @@ class Eva : public SubsystemInterface
 		virtual void reset() override;
 		virtual void update() override;
 
-		static EvaMessage nameToMessage(const AsciiString& name);
+		static EvaMessage nameToMessage(const AsciiString& name);	///< finds the message, registering the name if it is new
+		static EvaMessage findMessage(const AsciiString& name);		///< finds the message, EVA_Invalid if unknown
 		static AsciiString messageToName(EvaMessage message);
+		static Int getMessageCount();
 
 		EvaCheckInfo *newEvaCheckInfo(AsciiString name);
 		const EvaCheckInfo *getEvaCheckInfo(AsciiString name);
@@ -281,6 +279,8 @@ class Eva : public SubsystemInterface
 		void playMessage(EvaMessage messageToTest, UnsignedInt currentFrame);
 		void processPlayingMessages(UnsignedInt currentFrame);
 
+		static std::vector<AsciiString>& getMessageNames();
+		void growShouldPlay();
 
 };
 
