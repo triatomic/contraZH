@@ -1555,22 +1555,6 @@ void INI::parseLookupList( INI* ini, void * /*instance*/, void *store, const voi
 	*(Int *)store = scanLookupList(ini->getNextToken(), lookupList);
 }
 
-//-------------------------------------------------------------------------------------------------
-/** Special Handling for None = -2 (Eva_NONE), otherwise like parseIndexList **/
-//-------------------------------------------------------------------------------------------------
-void INI::parseEvaNameIndexList(INI* ini, void* /*instance*/, void* store, const void* userData)
-{
-	const char* token = ini->getNextToken();
-	if (stricmp(token, "None") == 0) {
-		*(Int*)store = -2;
-	}
-	else {
-		//like parseIndexList
-		ConstCharPtrArray nameList = (ConstCharPtrArray)userData;
-		*(Int*)store = scanIndexList(token, nameList);
-	}
-}
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // PRIVATE FUNCTIONS //////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
