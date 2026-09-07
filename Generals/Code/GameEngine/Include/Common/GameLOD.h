@@ -122,6 +122,7 @@ struct StaticGameLODInfo
 	Bool m_useFpsLimit;	///<don't lock fps to 30hz
 	Bool m_enableDynamicLOD;	///<don't do dynamic lod based on current fps.
 	Bool m_useTrees;			///<don't include trees on map.
+	Bool m_skipTranslucencySort;	///<skip the per-triangle translucency sorter.
 
 };
 

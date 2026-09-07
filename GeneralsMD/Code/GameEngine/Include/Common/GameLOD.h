@@ -119,6 +119,7 @@ struct StaticGameLODInfo
 	Bool m_useTreeSway;		///<sway trees to simulate wind.
 	Bool m_useEmissiveNightMaterials; ///<perform second lighting pass on night buildings.
 	Bool m_useHeatEffects;			///<draw heat distortion effects (i.e Microwave Tank).
+	Bool m_skipTranslucencySort;	///<skip the per-triangle translucency sorter.
 	Int m_textureReduction;	///<reduce texture resolution by dividing in half n times.
 	Bool m_useFpsLimit;	///<don't lock fps to 30hz
 	Bool m_enableDynamicLOD;	///<don't do dynamic lod based on current fps.

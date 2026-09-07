@@ -40,6 +40,7 @@
 
 #define DEFINE_PARTICLE_SYSTEM_NAMES
 #include "GameClient/ParticleSys.h"
+#include "WW3D2/ww3d.h"
 
 
 #define PROFILE_ERROR_LIMIT	0.94f	//fraction of profiled result needed to get a match.  Allows some room for error/fluctuation.
@@ -69,6 +70,7 @@ static const FieldParse TheStaticGameLODFieldParseTable[] =
 	{ "UseTreeSway",					INI::parseBool,					nullptr,	offsetof( StaticGameLODInfo, m_useTreeSway ) },
 	{ "UseEmissiveNightMaterials",		INI::parseBool,					nullptr,	offsetof( StaticGameLODInfo, m_useEmissiveNightMaterials ) },
 	{ "TextureReductionFactor",		INI::parseInt,					nullptr,	offsetof( StaticGameLODInfo, m_textureReduction ) },
+	{ "SkipTranslucencySort",		INI::parseBool,					nullptr,	offsetof( StaticGameLODInfo, m_skipTranslucencySort ) },
 };
 
 static const char *const StaticGameLODNames[]=
@@ -105,6 +107,7 @@ StaticGameLODInfo::StaticGameLODInfo()
 	m_useFpsLimit = TRUE;
 	m_enableDynamicLOD = TRUE;
 	m_useTrees = TRUE;
+	m_skipTranslucencySort = FALSE;
 }
 
 static const FieldParse TheDynamicGameLODFieldParseTable[] =
@@ -266,6 +269,7 @@ void GameLODManager::initStaticLODLevels()
 	veryhigh.m_useFpsLimit = TRUE;
 	veryhigh.m_enableDynamicLOD = TRUE;
 	veryhigh.m_useTrees = TRUE;
+	veryhigh.m_skipTranslucencySort = FALSE;
 }
 
 BenchProfile *GameLODManager::newBenchProfile()
@@ -411,6 +415,7 @@ void GameLODManager::refreshCustomStaticLODLevel()
 	lodInfo->m_useFpsLimit = TheGlobalData->m_useFpsLimit;
 	lodInfo->m_enableDynamicLOD=TheGlobalData->m_enableDynamicLOD;
 	lodInfo->m_useTrees = TheGlobalData->m_useTrees;
+	lodInfo->m_skipTranslucencySort = TheGlobalData->m_skipTranslucencySort;
 
 }
 
@@ -611,6 +616,12 @@ void GameLODManager::applyStaticLODLevel(StaticGameLODLevel level)
 		TheWritableGlobalData->m_enableDynamicLOD = lodInfo->m_enableDynamicLOD;
 		TheWritableGlobalData->m_useFpsLimit = lodInfo->m_useFpsLimit;
 		TheWritableGlobalData->m_useTrees = requestedTrees;
+		// GameData is the baseline a detail level can only add to, and re-enabling costs a mesh cache rebuild
+		const Bool skipSort = lodInfo->m_skipTranslucencySort || TheGlobalData->m_skipTranslucencySort;
+		if (WW3D::Is_Sorting_Enabled() == skipSort)
+		{
+			WW3D::Enable_Sorting(!skipSort);
+		}
 
 		if (!m_memPassed || isReallyLowMHz()) {
 			TheWritableGlobalData->m_shellMapOn = false;

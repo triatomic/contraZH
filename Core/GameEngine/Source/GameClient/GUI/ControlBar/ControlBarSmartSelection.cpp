@@ -185,6 +185,8 @@ void ControlBar::initSmartSelectionBar( const ICoord2D &commandButtonSize )
 		WinInstanceData instData;
 		instData.init();
 		instData.m_style = GWS_PUSH_BUTTON | GWS_MOUSE_TRACK;
+		// the button input reads the right click flag off the instance data, not the window
+		instData.m_status = WIN_STATUS_RIGHT_CLICK;
 
 		GameWindow *button = TheWindowManager->gogoGadgetPushButton( m_smartSelectionParent,
 			WIN_STATUS_ENABLED | WIN_STATUS_IMAGE | WIN_STATUS_USE_OVERLAY_STATES |

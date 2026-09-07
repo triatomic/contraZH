@@ -40,6 +40,7 @@
 
 #define DEFINE_PARTICLE_SYSTEM_NAMES
 #include "GameClient/ParticleSys.h"
+#include "WW3D2/ww3d.h"
 
 
 #define PROFILE_ERROR_LIMIT	0.94f	//fraction of profiled result needed to get a match.  Allows some room for error/fluctuation.
@@ -69,6 +70,7 @@ static const FieldParse TheStaticGameLODFieldParseTable[] =
 	{ "UseTreeSway",					INI::parseBool,					nullptr,	offsetof( StaticGameLODInfo, m_useTreeSway ) },
 	{ "UseEmissiveNightMaterials",		INI::parseBool,					nullptr,	offsetof( StaticGameLODInfo, m_useEmissiveNightMaterials ) },
 	{ "UseHeatEffects",					INI::parseBool,					nullptr,	offsetof( StaticGameLODInfo, m_useHeatEffects ) },
+	{ "SkipTranslucencySort",		INI::parseBool,					nullptr,	offsetof( StaticGameLODInfo, m_skipTranslucencySort ) },
 	{ "TextureReductionFactor",		INI::parseInt,					nullptr,	offsetof( StaticGameLODInfo, m_textureReduction ) },
 };
 
@@ -103,6 +105,7 @@ StaticGameLODInfo::StaticGameLODInfo()
 	m_useTreeSway=TRUE;
 	m_useEmissiveNightMaterials=TRUE;
 	m_useHeatEffects=TRUE;
+	m_skipTranslucencySort=FALSE;
 	m_textureReduction = 0;	//none
 	m_useFpsLimit = TRUE;
 	m_enableDynamicLOD = TRUE;
@@ -265,6 +268,7 @@ void GameLODManager::initStaticLODLevels()
 	veryhigh.m_useTreeSway = TRUE;
 	veryhigh.m_useEmissiveNightMaterials = TRUE;
 	veryhigh.m_useHeatEffects = TRUE;
+	veryhigh.m_skipTranslucencySort = FALSE;
 	veryhigh.m_textureReduction = 0;
 	veryhigh.m_useFpsLimit = TRUE;
 	veryhigh.m_enableDynamicLOD = TRUE;
@@ -411,6 +415,7 @@ void GameLODManager::refreshCustomStaticLODLevel()
 	lodInfo->m_maxTankTrackFadeDelay=TheGlobalData->m_maxTankTrackFadeDelay;
 	lodInfo->m_useBuildupScaffolds=!TheGlobalData->m_useDrawModuleLOD;
 	lodInfo->m_useHeatEffects = TheGlobalData->m_useHeatEffects;
+	lodInfo->m_skipTranslucencySort = TheGlobalData->m_skipTranslucencySort;
 	lodInfo->m_useTreeSway=lodInfo->m_useBuildupScaffolds;// Borrow same setting. //TheGlobalData->m_useTreeSway;
 	lodInfo->m_textureReduction=TheGlobalData->m_textureReductionFactor;
 	lodInfo->m_useFpsLimit = TheGlobalData->m_useFpsLimit;
@@ -617,6 +622,12 @@ void GameLODManager::applyStaticLODLevel(StaticGameLODLevel level)
 		TheWritableGlobalData->m_enableDynamicLOD = lodInfo->m_enableDynamicLOD;
 		TheWritableGlobalData->m_useFpsLimit = lodInfo->m_useFpsLimit;
 		TheWritableGlobalData->m_useTrees = requestedTrees;
+		// GameData is the baseline a detail level can only add to, and re-enabling costs a mesh cache rebuild
+		const Bool skipSort = lodInfo->m_skipTranslucencySort || TheGlobalData->m_skipTranslucencySort;
+		if (WW3D::Is_Sorting_Enabled() == skipSort)
+		{
+			WW3D::Enable_Sorting(!skipSort);
+		}
 
 		if (!m_memPassed || isReallyLowMHz()) {
 			TheWritableGlobalData->m_shellMapOn = false;

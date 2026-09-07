@@ -32,6 +32,7 @@
 #include "WW3D2/streak.h"
 #include "WW3D2/rinfo.h"
 #include "WWLib/bittype.h"
+#include <vector>
 
 //=============================================================================
 /** W3D implementation of the game display which is responsible for creating
@@ -56,8 +57,16 @@ private:
 
 	enum { MAX_POINTS_PER_GROUP = 512 };
 
+	struct DrawEntry
+	{
+		ParticleSystem *sys;
+		Real depth;												///< view space Z of the visible particles' mean, only filled when ordering back to front
+	};
+	static Bool isFarther(const DrawEntry &a, const DrawEntry &b);
+
 	// TheSuperHackers @feature renders ground aligned particles as terrain conforming meshes
 	class W3DTerrainParticle *m_terrainParticles;
+	std::vector<DrawEntry> m_drawOrder;			///< visible systems in the order they draw this frame
 	RefCountPtr<TextureClass> m_batchTexture;		///< the texture used as the drawing surface for batched particle draws
 	PointGroupClass *m_pointGroup;							///< the point group that contains all of the particles
 	StreakLineClass *m_streakLine;							///< the streak class that contains all of the streaks
