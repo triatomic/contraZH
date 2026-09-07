@@ -717,6 +717,12 @@ enum ControlBarStages CPP_11(: Int)
 class ControlBar : public SubsystemInterface
 {
 
+// ShigureUi 07/08/2026 borrowed from InGameUI.h
+protected:
+
+	typedef std::vector<Object*> ObjectVector;
+	typedef std::vector<Object*>::iterator ObjectVectorIt;
+
 public:
 
 	ControlBar();
@@ -926,6 +932,7 @@ protected:
 	void populateCommand( Object *obj );
 	void populateMultiSelect();
 	void populateBuildQueue( Object *producer );
+	void populateMultiSelectBuildQueue(ObjectVector *producerList);
 	void populateStructureInventory( Object *building );
 	void populateBeacon( Object *beacon );
 	void populateUnderConstruction( Object *objectUnderConstruction );
