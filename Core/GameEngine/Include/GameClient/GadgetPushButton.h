@@ -78,6 +78,7 @@ void GadgetButtonDrawClock( GameWindow *g, Int percent, Color color ); //Darkens
 void GadgetButtonDrawInverseClock( GameWindow *g, Int percent, Color color ); //Darkens the remaining portion.
 // TheSuperHackers @feature Remaining time in seconds, drawn over the cameo. One shot, like the clocks.
 void GadgetButtonDrawCountdown( GameWindow *g, Int seconds );
+void GadgetButtonDrawHealthBar( GameWindow *g, Real ratio );
 void GadgetButtonDrawOverlayImage( GameWindow *g, const Image *image );
 void GadgetButtonSetBorder( GameWindow *g, Color color, Bool drawBorder = TRUE );
 void GadgetButtonSetData(GameWindow *g, void *data);

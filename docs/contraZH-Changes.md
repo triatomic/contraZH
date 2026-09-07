@@ -110,6 +110,24 @@ Notes:
 * The twelve retail personas are untouched, and a layout that still carries exactly twelve buttons
 behaves as it always did.
 
+# Game Setup
+
+## Random army per faction
+
+The army list in Skirmish, LAN and online game setup gains one `Random <faction>` entry per base
+faction, listed right after `Random`: with the retail generals that is `Random USA`, `Random China`
+and `Random GLA`. Picking one starts the game as a random general of that faction only, for a human
+slot or an AI slot alike. Which generals belong to a faction comes from the `BaseSide` line of their
+`PlayerTemplate.ini` entry, so a mod that adds a faction gets its own entry without a code change.
+
+Notes:
+* The labels are string table lookups named `GUI:Random<BaseSide>` (`GUI:RandomUSA`,
+`GUI:RandomChina`, `GUI:RandomGLA`). A missing key falls back to `Random <BaseSide>`.
+* Limit Armies still applies: the random pick only considers generals the checkbox allows, and an
+entry disappears when none of its generals are allowed.
+* The choice travels in the game options like plain `Random` does. All players in a LAN or online
+game need this build, and a replay made with one of these entries needs it too.
+
 # Options.ini
 
 These are read once at startup. Changing them needs a restart.
@@ -190,19 +208,25 @@ first and silently drops the other.
 
 ## Smart selection
 
-Shows a row of half size cameos above the command bar, one per selected unit type, each with
-a count of how many are selected.
+Shows a row of half size cameos above the command bar. A selection of different unit types gets one
+cameo per type with a count of how many are selected; a selection of a single type gets one cameo
+per object. A cameo standing for one object shows a small health bar instead of a count. The row
+holds 16 cameos; anything beyond that gets none.
 
 * `SmartSelection = Yes` - (No hides the row and unbinds its keys.)
+* `SmartSelectionUseMouse = Yes` - (Yes keeps only a cameo's units on double click, No on
+Ctrl+Shift+click.)
 
-* Left click a cameo to show that type's command set in the bar. The whole group stays selected,
-so orders still go to everyone. A command off that card which not every selected type carries is
-issued to the focused type alone; one they all carry, like Stop or Guard, still goes to everyone.
-Click the pushed in cameo again to go back to the group's common commands.
-* Ctrl+click a cameo to drop that type from the selection. Right click is left alone, so it
-still deselects like anywhere else on screen.
+* Left click a cameo to show its type's command set in the bar; every cameo of that type pushes
+in. The whole group stays selected, so orders still go to everyone. A command off that card which
+not every selected type carries is issued to the focused type alone; one they all carry, like Stop
+or Guard, still goes to everyone. Click a pushed in cameo again to go back to the group's common
+commands.
+* Right click a cameo to drop its unit, or its whole type, from the selection.
+* Double click a cameo (or Ctrl+Shift+click it with `SmartSelectionUseMouse = No`) to keep only its
+unit, or its whole type, and drop everything else.
 * Tab and Shift+Tab (`SMART_SELECTION_NEXT_TYPE` / `SMART_SELECTION_PREV_TYPE` in
-CommandMap.ini) step the focused type through the row.
+CommandMap.ini) step the focused type through the row, skipping cameos of the type already focused.
 
 ## Input
 
@@ -283,6 +307,21 @@ terrain fit, which is not visible on the effects that actually reach that size.
 
 # GameData.ini
 
+## BatchParticles
+
+* `BatchParticles = No` - (Default. `Yes` draws consecutive particle systems that share a texture,
+blend mode and billboard mode in a single call.)
+
+Every particle system used to be its own draw call. With `BatchParticles = Yes`, plain particle
+systems that look alike are gathered into one 512-point buffer and drawn together, which
+TheSuperHackers measured at 15 to 30 percent cheaper particle rendering. Streak, volume and
+terrain-conforming systems are never batched and draw exactly as before.
+
+Notes:
+* Independent of the option, a particle system with nothing on screen is now skipped outright
+instead of being walked and drawn empty.
+* Ported from TheSuperHackers commit `de20ae0cb` (Ronin and Mauller).
+
 ## NoOccupantFriendlyFire
 
 * `NoOccupantFriendlyFire = No` - (Default. `Yes` spares the container a passenger is riding in from
@@ -311,6 +350,10 @@ is completely full.)
 * `TransportLoadTurnRatePenalty = 0%` - (Default. The same for `TurnRate`.)
 * `TransportLoadAccelerationPenalty = 0%` - (Default. The same for `Acceleration`.)
 * `TransportLoadLiftPenalty = 0%` - (Default. The same for `Lift`.)
+* `TransportLoadPenaltyKindOf` - (Default: every kind. Only occupants with at least one of these
+`KindOf` bits count toward the load.)
+* `TransportLoadPenaltyForbidKindOf` - (Default: none. Occupants with any of these `KindOf` bits
+never count toward the load.)
 
 A transport in retail moves at exactly the same speed whether it is empty or packed, so there is no
 cost to filling one up and no reason to send a half-loaded one anywhere. These make a container
@@ -329,6 +372,10 @@ GameData
   TransportLoadAccelerationPenalty = 25%
 End
 ```
+
+The two `KindOf` keys set the game-wide default for which passengers weigh anything, so a mod can
+exclude, say, `INFANTRY` everywhere without touching each transport. A container's own
+`LoadPenaltyKindOf` and `LoadPenaltyForbidKindOf` replace the global values for that container.
 
 Individual containers can override any of these, exclude particular passengers from counting, or opt
 out of the whole thing - see
@@ -495,6 +542,28 @@ damaged and rubble, so the reaction weapon is always chosen for the state the ob
 attack" warning.
 * Damage types outside `DamageTypes`, and hits below `DamageAmount`, are unaffected and drain health
 normally.
+
+# StealthUpdate
+
+## New StealthForbiddenConditions
+
+Four new values for `StealthForbiddenConditions` (and `OverrideStealthForbiddenConditions` on
+`StealthUpgrade`), alongside the retail set of `ATTACKING`, `MOVING`, `USING_ABILITY`,
+`FIRING_PRIMARY`, `FIRING_SECONDARY`, `FIRING_TERTIARY`, `NO_BLACK_MARKET`, `TAKING_DAMAGE`,
+`RIDERS_ATTACKING` and `FIRING_WEAPON_FOUR` to `FIRING_WEAPON_EIGHT`.
+
+* `RIDERS_FIRING_PRIMARY`, `RIDERS_FIRING_SECONDARY`, `RIDERS_FIRING_TERTIARY` - the transport
+cannot stealth while any passenger fired the named weapon slot this frame or the last. They work
+like the transport's own `FIRING_*` conditions but look at the riders, and, like `RIDERS_ATTACKING`,
+only apply to a container whose `PassengersAllowedToFire = Yes`. `RIDERS_ATTACKING` reveals for as
+long as a rider holds an attack order, even between shots; these reveal only on the shots
+themselves, so a container with a slow-firing rider can re-cloak in between.
+* `UNIT_CREATED` - the object cannot stealth in the frame it finishes producing a unit. This covers
+a `ProductionUpdate` queue completing, a spawner or drone carrier releasing a spawn, and a dozer
+finishing a structure.
+
+As with `TAKING_DAMAGE`, each of these breaks stealth for a single frame; the object's `StealthDelay`
+then decides how long it stays visible before it may cloak again.
 
 # New CommandButton Commands
 

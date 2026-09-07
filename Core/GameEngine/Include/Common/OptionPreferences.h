@@ -206,6 +206,7 @@ public:
 	Bool getShowMoneyPerMinute() const;
 
 	Bool getSmartSelectionEnabled() const;
+	Bool getSmartSelectionUseMouse() const;
 
 	Real getGameWindowTransitionSpeedMultiplier() const;
 

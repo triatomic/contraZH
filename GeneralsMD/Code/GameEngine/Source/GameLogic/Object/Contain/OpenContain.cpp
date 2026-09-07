@@ -93,8 +93,16 @@ OpenContainModuleData::OpenContainModuleData()
 	m_loadTurnRatePenalty = TheGlobalData ? TheGlobalData->m_transportLoadTurnRatePenalty : 0.0f;
 	m_loadAccelerationPenalty = TheGlobalData ? TheGlobalData->m_transportLoadAccelerationPenalty : 0.0f;
 	m_loadLiftPenalty = TheGlobalData ? TheGlobalData->m_transportLoadLiftPenalty : 0.0f;
-	m_loadPenaltyKindOf.clear(); m_loadPenaltyKindOf.flip();	// everything counts
-	m_loadPenaltyForbidKindOf.clear();	// nothing is excluded
+	if( TheGlobalData )
+	{
+		m_loadPenaltyKindOf = TheGlobalData->m_transportLoadPenaltyKindOf;
+		m_loadPenaltyForbidKindOf = TheGlobalData->m_transportLoadPenaltyForbidKindOf;
+	}
+	else
+	{
+		m_loadPenaltyKindOf.clear(); m_loadPenaltyKindOf.flip();	// everything counts
+		m_loadPenaltyForbidKindOf.clear();	// nothing is excluded
+	}
 }
 
 // ------------------------------------------------------------------------------------------------

@@ -102,6 +102,7 @@ GlobalData* GlobalData::m_theOriginal = nullptr;
 	{ "UseFPSLimit",							INI::parseBool,				nullptr,			offsetof( GlobalData, m_useFpsLimit ) },
 	{ "QueueReorder",							INI::parseBool,				nullptr,			offsetof( GlobalData, m_queueReorder ) },
 	{ "NoOccupantFriendlyFire",			INI::parseBool,				nullptr,			offsetof( GlobalData, m_noOccupantFriendlyFire ) },
+	{ "BatchParticles",						INI::parseBool,				nullptr,			offsetof( GlobalData, m_batchParticles ) },
 	{ "DumpAssetUsage",						INI::parseBool,				nullptr,			offsetof( GlobalData, m_dumpAssetUsage ) },
 	{ "EnableSingleplayerChatwindow",	INI::parseBool,				nullptr,			offsetof( GlobalData, m_enableSingleplayerChatWindow ) },
 	{ "WeaponScatterOnWaterSurfaceDefault",	INI::parseBool,			nullptr,			offsetof( GlobalData, m_weaponScatterOnWaterSurfaceDefault ) },
@@ -111,6 +112,8 @@ GlobalData* GlobalData::m_theOriginal = nullptr;
 	{ "TransportLoadTurnRatePenalty",	INI::parsePercentToReal,	nullptr,			offsetof( GlobalData, m_transportLoadTurnRatePenalty ) },
 	{ "TransportLoadAccelerationPenalty",	INI::parsePercentToReal,	nullptr,		offsetof( GlobalData, m_transportLoadAccelerationPenalty ) },
 	{ "TransportLoadLiftPenalty",		INI::parsePercentToReal,	nullptr,			offsetof( GlobalData, m_transportLoadLiftPenalty ) },
+	{ "TransportLoadPenaltyKindOf",		KindOfMaskType::parseFromINI,	nullptr,		offsetof( GlobalData, m_transportLoadPenaltyKindOf ) },
+	{ "TransportLoadPenaltyForbidKindOf",	KindOfMaskType::parseFromINI,	nullptr,		offsetof( GlobalData, m_transportLoadPenaltyForbidKindOf ) },
 	{ "FramesPerSecondLimit",			INI::parseInt,				nullptr,			offsetof( GlobalData, m_framesPerSecondLimit ) },
 	{ "ChipsetType",							INI::parseInt,				nullptr,			offsetof( GlobalData, m_chipSetType ) },
 	{ "MaxShellScreens",					INI::parseInt,				nullptr,			offsetof( GlobalData, m_maxShellScreens ) },
@@ -634,6 +637,7 @@ GlobalData::GlobalData()
   m_TiVOFastMode = FALSE;
   m_queueReorder = FALSE;
   m_noOccupantFriendlyFire = FALSE;
+  m_batchParticles = FALSE;
 
 #if defined(RTS_DEBUG) || ENABLE_CONFIGURABLE_SHROUD
 	m_shroudOn = TRUE;
@@ -707,6 +711,8 @@ GlobalData::GlobalData()
 	m_transportLoadTurnRatePenalty = 0.0f;
 	m_transportLoadAccelerationPenalty = 0.0f;
 	m_transportLoadLiftPenalty = 0.0f;
+	m_transportLoadPenaltyKindOf.clear(); m_transportLoadPenaltyKindOf.flip();	// everything counts
+	m_transportLoadPenaltyForbidKindOf.clear();	// nothing is excluded
 	m_dumpAssetUsage = FALSE;
 	m_framesPerSecondLimit = 0;
 	m_chipSetType = 0;
@@ -1160,6 +1166,7 @@ GlobalData::GlobalData()
 	m_keyboardOverlayBackdropColor = GameMakeColor( 0, 0, 0, 128 );
 	m_easyMilitaryDrag = FALSE;
 	m_smartSelection = TRUE;
+	m_smartSelectionUseMouse = TRUE;
 	m_doubleClickAttackMove = FALSE;
 
 	m_useOldMoveSpeed = FALSE;  //Fix is enabled by default
@@ -1370,6 +1377,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_doubleClickAttackMove = optionPref.getDoubleClickAttackMoveEnabled();
 	TheWritableGlobalData->m_easyMilitaryDrag = optionPref.getEasyMilitaryDragEnabled();
 	TheWritableGlobalData->m_smartSelection = optionPref.getSmartSelectionEnabled();
+	TheWritableGlobalData->m_smartSelectionUseMouse = optionPref.getSmartSelectionUseMouse();
 	TheWritableGlobalData->m_jpegQuality = optionPref.getJpegQuality();
 	TheWritableGlobalData->m_keyboardScrollFactor = optionPref.getScrollFactor();
 	TheWritableGlobalData->m_drawScrollAnchor = optionPref.getDrawScrollAnchor();

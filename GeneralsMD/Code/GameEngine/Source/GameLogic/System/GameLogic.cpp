@@ -722,6 +722,17 @@ static void checkForDuplicateColors( GameInfo *game )
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+static UnsignedInt mixRandomSeed( UnsignedInt seed, Int slot )
+{
+	UnsignedInt h = seed ^ (UnsignedInt)(slot * 0x9E3779B9);
+	h ^= h >> 16;
+	h *= 0x85EBCA6B;
+	h ^= h >> 13;
+	h *= 0xC2B2AE35;
+	h ^= h >> 16;
+	return h;
+}
+
 static void populateRandomSideAndColor( GameInfo *game )
 {
 	if(!game)
@@ -765,10 +776,26 @@ static void populateRandomSideAndColor( GameInfo *game )
 
 		// clean up random factions
 		Int playerTemplateIdx = slot->getPlayerTemplate();
+		const Int requestedTemplateIdx = playerTemplateIdx;
 		DEBUG_LOG(("Player %d has playerTemplate index %d", i, playerTemplateIdx));
+#ifdef MORE_RANDOM
+		std::vector<Int> sideSlots;
+		if (IsRandomBaseSidePlayerTemplate(requestedTemplateIdx))
+		{
+			AsciiString baseSide = GetRandomBaseSide(PLAYERTEMPLATE_RANDOM_SIDE_FIRST - requestedTemplateIdx);
+			for (size_t s = 0; s < startSlots.size(); ++s)
+			{
+				if (ThePlayerTemplateStore->getNthPlayerTemplate(startSlots[s])->getBaseSide() == baseSide)
+				{
+					sideSlots.push_back(startSlots[s]);
+				}
+			}
+		}
+		const std::vector<Int> &pool = sideSlots.empty() ? startSlots : sideSlots;
+#endif
 		while (playerTemplateIdx != PLAYERTEMPLATE_OBSERVER && (playerTemplateIdx < 0 || playerTemplateIdx >= ThePlayerTemplateStore->getPlayerTemplateCount()))
 		{
-			DEBUG_ASSERTCRASH(playerTemplateIdx == PLAYERTEMPLATE_RANDOM, ("Non-random bad playerTemplate %d in slot %d", playerTemplateIdx, i));
+			DEBUG_ASSERTCRASH(IsRandomPlayerTemplate(requestedTemplateIdx), ("Non-random bad playerTemplate %d in slot %d", requestedTemplateIdx, i));
 #ifdef MORE_RANDOM
 			// our RNG is basically shit -- horribly nonrandom at the start of the sequence.
 			// get a few values at random to get rid of the dreck.
@@ -778,8 +805,13 @@ static void populateRandomSideAndColor( GameInfo *game )
 			{
 				GameLogicRandomValue(0, 1);	// ignore result
 			}
-			Int idxIdx = GameLogicRandomValue(0, 1000) % startSlots.size();
-			playerTemplateIdx = startSlots[idxIdx];
+			Int idxIdx = GameLogicRandomValue(0, 1000);
+			if (!sideSlots.empty())
+			{
+				idxIdx += mixRandomSeed(GetGameLogicRandomSeed(), i) % 1000;
+			}
+			idxIdx %= pool.size();
+			playerTemplateIdx = pool[idxIdx];
 #else
 			playerTemplateIdx = GameLogicRandomValue(0, ThePlayerTemplateStore->getPlayerTemplateCount()-1);
 #endif

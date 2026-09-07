@@ -38,6 +38,7 @@
 #include "GameClient/TintStatus.h"
 #include "Common/STLTypedefs.h"
 #include "Common/Money.h"
+#include "Common/KindOf.h"
 
 // FORWARD DECLARATIONS ///////////////////////////////////////////////////////////////////////////
 struct FieldParse;
@@ -188,6 +189,7 @@ public:
 	Bool m_easyMilitaryDrag;
 	// TheSuperHackers @feature Per type cameos with counts above the command bar.
 	Bool m_smartSelection;
+	Bool m_smartSelectionUseMouse;
 	Bool m_doubleClickAttackMove;
 	Bool m_rightMouseAlwaysScrolls;
 	Int m_jpegQuality; // TheSuperHackers @feature Quality for JPEG screenshots.
@@ -556,6 +558,7 @@ public:
   Bool m_TiVOFastMode;            ///< When true, the client speeds up the framerate... set by HOTKEY!
   Bool m_queueReorder;            ///< Ctrl+click moves a build queue entry one position earlier; off unless GameData enables it
   Bool m_noOccupantFriendlyFire;  ///< spares the container a passenger is riding in from its own splash; off unless GameData enables it
+  Bool m_batchParticles;          ///< draws same-looking particle systems in one batch; off unless GameData enables it
 
 #if defined(RTS_DEBUG) || ENABLE_CONFIGURABLE_SHROUD
 	Bool m_shroudOn;
@@ -654,6 +657,8 @@ public:
 	Real m_transportLoadTurnRatePenalty;	///< likewise for turn rate
 	Real m_transportLoadAccelerationPenalty;	///< likewise for acceleration
 	Real m_transportLoadLiftPenalty;	///< likewise for lift
+	KindOfMaskType m_transportLoadPenaltyKindOf;	///< default: only occupants with one of these kind of bits count toward the load
+	KindOfMaskType m_transportLoadPenaltyForbidKindOf;	///< default: occupants with any of these kind of bits do not count toward the load
 
 	// the trailing '\' is included!
   const AsciiString &getPath_UserData() const { return m_userDataDir; }

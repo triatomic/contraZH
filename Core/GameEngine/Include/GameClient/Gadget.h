@@ -435,6 +435,7 @@ typedef struct _PushButtonData
 	// nothing to show. Like drawClock this is one shot -- it is cleared after being drawn, so
 	// whoever sets it must re-set it every frame.
 	Int countdownSeconds;
+	Real healthRatio;				///< TheSuperHackers @feature Health bar along the bottom, negative for none. One shot like the countdown.
 } PushButtonData;
 
 // TabControlData ------------------------------------------------------------

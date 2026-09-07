@@ -603,6 +603,7 @@ PushButtonData * getNewPushButtonData()
 	p->overlayImage = nullptr;
 	// TheSuperHackers @feature no countdown until someone asks for one
 	p->countdownSeconds = -1;
+	p->healthRatio = -1.0f;
 	return p;
 }
 
@@ -682,6 +683,26 @@ void GadgetButtonDrawCountdown( GameWindow *g, Int seconds )
 		pData = getNewPushButtonData();
 	}
 	pData->countdownSeconds = seconds;
+	g->winSetUserData(pData);
+
+}
+
+// GadgetButtonDrawHealthBar ==================================================
+/** TheSuperHackers @feature Show a health bar along the bottom of the button. One shot like
+	* the countdown, so it must be re-set every frame. */
+//=============================================================================
+void GadgetButtonDrawHealthBar( GameWindow *g, Real ratio )
+{
+
+	if( g == nullptr )
+		return;
+
+	PushButtonData *pData = (PushButtonData *)g->winGetUserData();
+	if(!pData)
+	{
+		pData = getNewPushButtonData();
+	}
+	pData->healthRatio = ratio;
 	g->winSetUserData(pData);
 
 }

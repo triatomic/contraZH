@@ -470,6 +470,13 @@ Bool OptionPreferences::getSmartSelectionEnabled(void) const
 	return getBool("SmartSelection", TRUE);
 }
 
+// TheSuperHackers @feature Options.ini: SmartSelectionUseMouse = Yes keeps only a cameo's units
+// on double click, No on Ctrl+Shift click. On by default.
+Bool OptionPreferences::getSmartSelectionUseMouse(void) const
+{
+	return getBool("SmartSelectionUseMouse", TRUE);
+}
+
 // TheSuperHackers @feature Options.ini: CastMode = Normal | QuickCast | QuickCastWithIndicator
 CastMode OptionPreferences::getCastMode(void) const
 {

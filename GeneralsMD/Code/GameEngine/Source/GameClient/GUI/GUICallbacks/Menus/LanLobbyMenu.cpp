@@ -149,7 +149,7 @@ Int LANPreferences::getPreferredFaction()
 	}
 
 	ret = atoi(it->second.str());
-	if (ret == PLAYERTEMPLATE_OBSERVER || ret < PLAYERTEMPLATE_MIN || ret >= ThePlayerTemplateStore->getPlayerTemplateCount())
+	if (ret == PLAYERTEMPLATE_OBSERVER || !IsValidSlotPlayerTemplate(ret))
 		ret = PLAYERTEMPLATE_RANDOM;
 
 	if (ret >= 0)

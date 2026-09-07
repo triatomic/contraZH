@@ -752,10 +752,12 @@ public:
 	/// is the drawable the currently selected drawable for the context sensitive UI?
 	Bool isDrivingContextUI( Drawable *draw ) const { return draw == m_currentSelectedDrawable; }
 
-	// TheSuperHackers @feature Smart selection: one cameo per selected unit type above the
-	// command bar. Left click and Tab pick which type's command set the bar shows while the
-	// whole group stays selected, Ctrl click drops the type from the selection.
-	void processSmartSelectionClick( GameWindow *button );
+	// TheSuperHackers @feature Smart selection: cameos above the command bar, one per type with
+	// a count in a mixed selection, one per object when all are the same type. Left click and Tab
+	// pick which type's command set the bar shows while the whole group stays selected, right
+	// click drops the cameo's units from the selection and double click, or Ctrl+Shift click,
+	// keeps only them.
+	void processSmartSelectionClick( GameWindow *button, Bool rightClick );
 	void smartSelectionCycle( Int direction );
 	const ThingTemplate *getSmartSelectionFocusTemplate() const;
 	Bool isSmartSelectionFocused( const Object *obj ) const;
@@ -955,7 +957,7 @@ protected:
 	void refreshSmartSelectionButtons();
 	Int getSmartSelectionRowWidth() const;
 	void smartSelectionFocus( Int groupIndex );
-	void smartSelectionRemove( Int groupIndex );
+	void smartSelectionRemove( Int groupIndex, Bool keepGroup );
 
 	static const Image* calculateVeterancyOverlayForThing( const ThingTemplate *thingTemplate );
 	static const Image* calculateVeterancyOverlayForObject( const Object *obj );
@@ -1023,14 +1025,17 @@ protected:
 	{
 		const ThingTemplate *thingTemplate;
 		Int count;
+		ObjectID objectID;	///< the one member when count is 1, else INVALID_ID
 	};
-	std::vector<SmartSelectionGroup> m_smartSelectionGroups;	///< one per unit type in the selection
+	std::vector<SmartSelectionGroup> m_smartSelectionGroups;	///< one per type in a mixed selection, one per object otherwise
 	GameWindow *m_smartSelectionParent;												///< top level container for the row, created in code
 	GameWindow *m_smartSelectionMoneyWindow;									///< the money display the row must not run into
 	GameWindow *m_smartSelectionButtons[ MAX_SMART_SELECTION_BUTTONS ];
 	ICoord2D m_smartSelectionButtonSize;
-	Int m_smartSelectionActive;																///< group whose command set the bar shows, or -1 for the common set
+	Int m_smartSelectionActive;																///< cameo whose type's command set the bar shows, or -1 for the common set
 	Bool m_smartSelectionNarrowed;														///< the logic side group is narrowed to the focused type for a command in flight
+	Int m_smartSelectionLastClickSlot;												///< cameo of the last left click, for double click detection
+	UnsignedInt m_smartSelectionLastClickTime;
 
 	GameWindow *m_commandWindows[ MAX_COMMANDS_PER_SET ];			///< command window controls for easy access
 	const CommandButton *m_commonCommands[ MAX_COMMANDS_PER_SET ];	///< shared commands we will use for multi-selection

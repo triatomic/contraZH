@@ -2154,7 +2154,7 @@ winName.format("ScoreScreen.wnd:StaticTextScore%d", pos);
 						if (disCons >= 0)
 							stats.discons[ptIdx] = disCons;
 
-						stats.gamesAsRandom += (localSlot->getOriginalPlayerTemplate() == PLAYERTEMPLATE_RANDOM);
+						stats.gamesAsRandom += IsRandomPlayerTemplate(localSlot->getOriginalPlayerTemplate());
 
 						if (stats.lastGeneral != ptIdx)
 							stats.gamesInRowWithLastGeneral = 0;

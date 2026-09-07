@@ -893,7 +893,7 @@ void playerTemplateComboBoxTooltip(GameWindow *wndComboBox, WinInstanceData *ins
 	GadgetComboBoxGetSelectedPos(wndComboBox, &index);
 	Int templateNum = (Int)GadgetComboBoxGetItemData(wndComboBox, index);
 	UnicodeString ustringTooltip;
-	if (templateNum == -1)
+	if (IsRandomPlayerTemplate(templateNum))
 	{
 			// the "Random" template is always first
 			ustringTooltip = TheGameText->fetch("TOOLTIP:BioStrategyLong_Random");
@@ -924,7 +924,7 @@ void playerTemplateListBoxTooltip(GameWindow *wndListBox, WinInstanceData *instD
 
 	Int templateNum = (Int)GadgetListBoxGetItemData(wndListBox, row, col);
 	UnicodeString ustringTooltip;
-	if (templateNum == -1)
+	if (IsRandomPlayerTemplate(templateNum))
 	{
 			// the "Random" template is always first
 			ustringTooltip = TheGameText->fetch("TOOLTIP:BioStrategyLong_Random");

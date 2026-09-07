@@ -177,6 +177,40 @@ static void drawButtonCountdown( GameWindow *window, Int seconds )
 		GameMakeColor( 255, 255, 255, 255 ), GameMakeColor( 0, 0, 0, 255 ) );
 }
 
+// drawButtonHealthBar ========================================================
+/** TheSuperHackers @feature A thin health bar along the bottom of a cameo, green through
+	* yellow to red like the in world bar. */
+//=============================================================================
+static void drawButtonHealthBar( GameWindow *window, Real ratio )
+{
+	ICoord2D origin, size;
+	window->winGetScreenPosition( &origin.x, &origin.y );
+	window->winGetSize( &size.x, &size.y );
+
+	const Int inset = 2;
+	const Int frameHeight = 5;
+	const Int barX = origin.x + inset;
+	const Int barY = origin.y + size.y - inset - frameHeight;
+	const Int barWidth = size.x - inset * 2;
+	if( barWidth <= 2 )
+		return;
+
+	Real red, green;
+	if( ratio >= 0.5f )
+	{
+		red = 1.0f - ( ratio - 0.5f ) / 0.5f;
+		green = 1.0f;
+	}
+	else
+	{
+		red = 1.0f;
+		green = ratio / 0.5f;
+	}
+
+	TheDisplay->drawOpenRect( barX, barY, barWidth, frameHeight, 1.0f, GameMakeColor( red * 128, green * 128, 0, 255 ) );
+	TheDisplay->drawFillRect( barX + 1, barY + 1, ( barWidth - 2 ) * ratio, frameHeight - 2, GameMakeColor( red * 255, green * 255, 0, 255 ) );
+}
+
 // TheSuperHackers @feature Command bar hotkey overlay (Options.ini: KeyboardOverlay).
 // drawButtonHotKeyOverlay ====================================================
 /** Draw the keyboard hotkey letter over a command bar cameo, so the player can
@@ -461,6 +495,13 @@ void W3DGadgetPushButtonDraw( GameWindow *window, WinInstanceData *instData )
 			window->winSetUserData(pData);
 		}
 
+		if( pData->healthRatio >= 0.0f )
+		{
+			drawButtonHealthBar( window, pData->healthRatio );
+			pData->healthRatio = -1.0f;
+			window->winSetUserData(pData);
+		}
+
 		if( pData->drawBorder && pData->colorBorder != GAME_COLOR_UNDEFINED )
 		{
 			TheDisplay->drawOpenRect(origin.x -1, origin.y - 1, size.x + 2, size.y + 2,1 , pData->colorBorder);
@@ -636,6 +677,13 @@ void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 		{
 			drawButtonCountdown( window, pData->countdownSeconds );
 			pData->countdownSeconds = -1;
+			window->winSetUserData(pData);
+		}
+
+		if( pData->healthRatio >= 0.0f )
+		{
+			drawButtonHealthBar( window, pData->healthRatio );
+			pData->healthRatio = -1.0f;
 			window->winSetUserData(pData);
 		}
 
@@ -908,6 +956,13 @@ void W3DGadgetPushButtonImageDrawThree(GameWindow *window, WinInstanceData *inst
 		{
 			drawButtonCountdown( window, pData->countdownSeconds );
 			pData->countdownSeconds = -1;
+			window->winSetUserData(pData);
+		}
+
+		if( pData->healthRatio >= 0.0f )
+		{
+			drawButtonHealthBar( window, pData->healthRatio );
+			pData->healthRatio = -1.0f;
 			window->winSetUserData(pData);
 		}
 

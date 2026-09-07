@@ -141,6 +141,7 @@ StealthUpdate::StealthUpdate( Thing *thing, const ModuleData* moduleData ) : Upd
 	m_disguiseTransitionFrames	= 0;
 	m_disguiseHalfpointReached  = false;
 	m_nextBlackMarketCheckFrame = 0;
+	m_lastUnitCreatedFrame = 0;
 	m_framesGranted = 0;
 
 	m_stealthLevelOverride = 0;
@@ -245,6 +246,39 @@ void StealthUpdate::receiveGrant( Bool active, UnsignedInt frames )
 
 }
 
+
+//-------------------------------------------------------------------------------------------------
+struct RiderFiringInfo
+{
+	UnsignedInt flags;
+	UnsignedInt lastFrame;
+	Bool firing;
+};
+
+//-------------------------------------------------------------------------------------------------
+static void testForRiderFiringProc( Object *obj, void *userData )
+{
+	RiderFiringInfo *info = (RiderFiringInfo*)userData;
+	if( info->firing )
+	{
+		return;
+	}
+
+	// the three rider flags are contiguous bits in slot order
+	for( Int slot = PRIMARY_WEAPON; slot <= TERTIARY_WEAPON; ++slot )
+	{
+		if( (info->flags & (STEALTH_NOT_WHILE_RIDERS_FIRING_PRIMARY << slot)) == 0 )
+		{
+			continue;
+		}
+		const Weapon *weapon = obj->getWeaponInWeaponSlot( (WeaponSlotType)slot );
+		if( weapon && weapon->getLastShotFrame() >= info->lastFrame )
+		{
+			info->firing = TRUE;
+			return;
+		}
+	}
+}
 
 //-------------------------------------------------------------------------------------------------
 Bool StealthUpdate::allowedToStealth( Object *stealthOwner ) const
@@ -403,6 +437,28 @@ Bool StealthUpdate::allowedToStealth( Object *stealthOwner ) const
 
     }
   }
+
+	if( flags & STEALTH_NOT_WHILE_RIDERS_FIRING_WEAPON )
+	{
+		ContainModuleInterface *myContain = self->getContain();
+		if( myContain && myContain->isPassengerAllowedToFire() )
+		{
+			RiderFiringInfo info;
+			info.flags = flags;
+			info.lastFrame = now - 1;
+			info.firing = FALSE;
+			myContain->iterateContained( testForRiderFiringProc, &info, FALSE );
+			if( info.firing )
+			{
+				return FALSE;
+			}
+		}
+	}
+
+	if( flags & STEALTH_NOT_WHILE_UNIT_CREATED && m_lastUnitCreatedFrame != 0 && m_lastUnitCreatedFrame >= now - 1 )
+	{
+		return FALSE;
+	}
 
 
 
@@ -867,6 +923,12 @@ void setWakeupIfInRange( Object *obj, void *userData)
 
 
 //-------------------------------------------------------------------------------------------------
+void StealthUpdate::notifyUnitCreated()
+{
+	m_lastUnitCreatedFrame = TheGameLogic->getFrame();
+}
+
+//-------------------------------------------------------------------------------------------------
 void StealthUpdate::markAsDetected(UnsignedInt numFrames)
 {
 	Object *self = getObject();
@@ -1136,13 +1198,15 @@ void StealthUpdate::crc( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 /** Xfer method
 	* Version Info:
-	* 1: Initial version */
+	* 1: Initial version
+	* 2: Added m_framesGranted
+	* 3: Added m_lastUnitCreatedFrame */
 // ------------------------------------------------------------------------------------------------
 void StealthUpdate::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 2;
+	XferVersion currentVersion = 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1208,6 +1272,11 @@ void StealthUpdate::xfer( Xfer *xfer )
 	}
 
 	xfer->xferUnsignedInt( &m_stealthLevelOverride );
+
+	if( version >= 3 )
+	{
+		xfer->xferUnsignedInt( &m_lastUnitCreatedFrame );
+	}
 
 }  // end xfer
 

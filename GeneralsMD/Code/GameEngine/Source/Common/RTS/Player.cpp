@@ -1589,6 +1589,15 @@ void Player::onUnitCreated( Object *factory, Object *unit )
 	// increment our scorekeeper
 	m_scoreKeeper.addObjectBuilt(unit);
 
+	if( factory )
+	{
+		StealthUpdate *stealth = factory->getStealth();
+		if( stealth )
+		{
+			stealth->notifyUnitCreated();
+		}
+	}
+
 	// ai notification callback
 	if( m_ai )
 		m_ai->onUnitProduced( factory, unit );

@@ -55,7 +55,12 @@ enum
 	STEALTH_NOT_WHILE_FIRING_SIX		= 0x00000800,
 	STEALTH_NOT_WHILE_FIRING_SEVEN 		= 0x00001000,
 	STEALTH_NOT_WHILE_FIRING_EIGHT		= 0x00002000,
+	STEALTH_NOT_WHILE_RIDERS_FIRING_PRIMARY		= 0x00004000,
+	STEALTH_NOT_WHILE_RIDERS_FIRING_SECONDARY	= 0x00008000,
+	STEALTH_NOT_WHILE_RIDERS_FIRING_TERTIARY	= 0x00010000,
+	STEALTH_NOT_WHILE_UNIT_CREATED						= 0x00020000,
 	STEALTH_NOT_WHILE_FIRING_WEAPON			= (STEALTH_NOT_WHILE_FIRING_PRIMARY | STEALTH_NOT_WHILE_FIRING_SECONDARY | STEALTH_NOT_WHILE_FIRING_TERTIARY | STEALTH_NOT_WHILE_FIRING_FOUR | STEALTH_NOT_WHILE_FIRING_FIVE | STEALTH_NOT_WHILE_FIRING_SIX | STEALTH_NOT_WHILE_FIRING_SEVEN | STEALTH_NOT_WHILE_FIRING_EIGHT),
+	STEALTH_NOT_WHILE_RIDERS_FIRING_WEAPON	= (STEALTH_NOT_WHILE_RIDERS_FIRING_PRIMARY | STEALTH_NOT_WHILE_RIDERS_FIRING_SECONDARY | STEALTH_NOT_WHILE_RIDERS_FIRING_TERTIARY),
 };
 
 #ifdef DEFINE_STEALTHLEVEL_NAMES
@@ -75,6 +80,10 @@ static const char *const TheStealthLevelNames[] =
 	"FIRING_WEAPON_SIX",
 	"FIRING_WEAPON_SEVEN",
 	"FIRING_WEAPON_EIGHT",
+	"RIDERS_FIRING_PRIMARY",
+	"RIDERS_FIRING_SECONDARY",
+	"RIDERS_FIRING_TERTIARY",
+	"UNIT_CREATED",
 	nullptr
 };
 #endif
@@ -139,6 +148,7 @@ public:
 	Int getDisguisedPlayerIndex() const { return m_disguiseAsPlayerIndex; }
 	const ThingTemplate *getDisguisedTemplate() { return m_disguiseAsTemplate; }
 	void markAsDetected( UnsignedInt numFrames = 0 );
+	void notifyUnitCreated();
 	void disguiseAsObject( const Object *target ); //wrapper function for ease.
 	Real getFriendlyOpacity() const;
 	UnsignedInt getStealthDelay() const { return getStealthUpdateModuleData()->m_stealthDelay; }
@@ -170,6 +180,7 @@ private:
 	UnsignedInt						m_stealthAllowedFrame;
 	UnsignedInt						m_detectionExpiresFrame;
 	mutable UnsignedInt		m_nextBlackMarketCheckFrame;
+	UnsignedInt						m_lastUnitCreatedFrame;
 	Bool									m_enabled;
 
 	Real                  m_pulsePhaseRate;
