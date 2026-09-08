@@ -1070,6 +1070,8 @@ protected:
 	{
 		GameWindow *control;											///< window that the GUI control is tied to
 		ProductionType type;											///< type of queue data
+		Object *producer;                         ///< the producer of the production
+
 		union
 		{
 			ProductionID productionID;										///< production id for unit productions

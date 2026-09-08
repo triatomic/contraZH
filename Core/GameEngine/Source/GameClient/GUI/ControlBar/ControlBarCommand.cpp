@@ -537,6 +537,7 @@ void ControlBar::resetBuildQueueData()
 
 		m_queueData[ i ].control = nullptr;
 		m_queueData[ i ].type = PRODUCTION_INVALID;
+		m_queueData[ i ].producer = nullptr;
 		m_queueData[ i ].productionID = PRODUCTIONID_INVALID;
 		m_queueData[ i ].upgradeToResearch = nullptr;
 
@@ -1118,6 +1119,10 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 	{
 		disabled = false;
 	}
+
+	//ShigureUi 08/09/2026 for structure multiselect
+	if (obj->isStructure() && obj->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION))
+		return COMMAND_RESTRICTED;
 
  	if (disabled && !forceDisabledEvaluation)
  	{

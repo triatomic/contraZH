@@ -325,9 +325,9 @@ void ControlBar::populateMultiSelect()
 	for (i = 0; i < MAX_COMMANDS_PER_SET; i++)
 	{
 		if (m_commonCommands[i] &&
-			m_commonCommands[i]->getCommandType() == GUI_COMMAND_UNIT_BUILD ||
+			(m_commonCommands[i]->getCommandType() == GUI_COMMAND_UNIT_BUILD ||
 			m_commonCommands[i]->getCommandType() == GUI_COMMAND_PLAYER_UPGRADE ||
-			m_commonCommands[i]->getCommandType() == GUI_COMMAND_OBJECT_UPGRADE)
+			m_commonCommands[i]->getCommandType() == GUI_COMMAND_OBJECT_UPGRADE))
 			break;
 	}
 
@@ -408,6 +408,7 @@ void ControlBar::populateMultiSelectBuildQueue(ObjectVector *producerList)
 
 	allPU.resize(producerCount);
 	productionPointer.resize(producerCount);
+	currentBuildTime.resize(producerCount);
 
 	for (i = 0; i < producerCount; i++)
 	{
@@ -529,6 +530,8 @@ void ControlBar::populateMultiSelectBuildQueue(ObjectVector *producerList)
 
 		}
 
+		m_queueData[windowIndex].producer = (*producerList)[minTimeOwner];
+
 		productionPointer[minTimeOwner] = allPU[minTimeOwner]->nextProduction(productionPointer[minTimeOwner]);
 
 		if (!productionPointer[minTimeOwner])
@@ -570,7 +573,7 @@ void ControlBar::updateContextMultiSelect()
 	const CommandButton *command;
 	GameWindow *win;
 	Int objectsThatCanDoCommand[ MAX_COMMANDS_PER_SET ];
-	Int i, j;
+	Int i;
 
 	// zero the array that counts how many objects can do each command
 	memset( objectsThatCanDoCommand, 0, sizeof( objectsThatCanDoCommand ) );
@@ -795,66 +798,70 @@ void ControlBar::updateContextMultiSelect()
 			const ProductionEntry* pe;
 			static char name[] = "ControlBar.wnd:ButtonQueue01";
 
-			
+
 			for (i = 0; i < MAX_BUILD_QUEUE_BUTTONS; i++)
 			{
 				if (!m_queueData[i].control->winGetEnabled())
 					break;
 
-				for (j = 0; j < producerCount; j++)
+				if (!m_queueData[i].producer)
+					break;
+
+				pu = m_queueData[i].producer->getProductionUpdateInterface();
+
+				if (!pu)
+					break;
+				pe = pu->firstProduction();
+
+				if (m_queueData[i].type == pe->getProductionType() &&
+					((m_queueData[i].type == PRODUCTION_UNIT && m_queueData[i].productionID == pe->getProductionID()) ||
+						(m_queueData[i].type == PRODUCTION_UPGRADE && m_queueData[i].upgradeToResearch == pe->getProductionUpgrade()))
+					)
 				{
-					pu = producerList[j]->getProductionUpdateInterface();
-					if (pu && pu->firstProduction() && pu->firstProduction()->getProductionID() == m_queueData[i].productionID)
+					name[strlen(name) - 1] += i;
+					NameKeyType winID = TheNameKeyGenerator->nameToKey(name);
+					GameWindow* win = TheWindowManager->winGetWindowFromId(m_contextParent[CP_BUILD_QUEUE], winID);
+					DEBUG_ASSERTCRASH(win, ("updateMultiSelect: Unable to find the build queue button"));
+					//				UnicodeString text;
+					//
+					//				text.format( L"%.0f%%", produce->getPercentComplete() );
+					//				GadgetButtonSetText( win, text );
+
+					GadgetButtonDrawInverseClock(win, pe->getPercentComplete(), m_buildUpClockColor);
+
+					// TheSuperHackers @feature Remaining build time on the head queue slot.
+					if (TheGlobalData->m_buildTimerDisplayMode != BuildTimerDisplayMode_None)
 					{
-						pe = pu->firstProduction();
-
-						name[strlen(name) - 1] += i;
-						NameKeyType winID = TheNameKeyGenerator->nameToKey(name);
-						GameWindow* win = TheWindowManager->winGetWindowFromId(m_contextParent[CP_BUILD_QUEUE], winID);
-						DEBUG_ASSERTCRASH(win, ("updateMultiSelect: Unable to find the build queue button"));
-						//				UnicodeString text;
-						//
-						//				text.format( L"%.0f%%", produce->getPercentComplete() );
-						//				GadgetButtonSetText( win, text );
-
-						GadgetButtonDrawInverseClock(win, pe->getPercentComplete(), m_buildUpClockColor);
-
-						// TheSuperHackers @feature Remaining build time on the head queue slot.
-						if (TheGlobalData->m_buildTimerDisplayMode != BuildTimerDisplayMode_None)
+						Int totalFrames = 0;
+						if (pe->getProductionType() == PRODUCTION_UNIT)
 						{
-							Int totalFrames = 0;
-							if (pe->getProductionType() == PRODUCTION_UNIT)
-							{
-								if (pe->getProductionObject())
-									totalFrames = pe->getProductionObject()->calcTimeToBuild(obj->getControllingPlayer());
-							}
-							else if (pe->getProductionUpgrade())
-							{
-								totalFrames = pe->getProductionUpgrade()->calcTimeToBuild(obj->getControllingPlayer());
-							}
-
-							if (totalFrames > 0)
-							{
-								Real remainingReal = totalFrames * (100.0f - pe->getPercentComplete()) / 100.0f;
-								Int remainingFrames = (remainingReal > 0.0f) ? REAL_TO_INT_CEIL(remainingReal) : 0;
-								// integer ceiling -- see formatBuildTimeForTooltip for why not the float form
-								GadgetButtonDrawCountdown(win,
-									(remainingFrames + LOGICFRAMES_PER_SECOND - 1) / LOGICFRAMES_PER_SECOND);
-							}
+							if (pe->getProductionObject())
+								totalFrames = pe->getProductionObject()->calcTimeToBuild(obj->getControllingPlayer());
+						}
+						else if (pe->getProductionUpgrade())
+						{
+							totalFrames = pe->getProductionUpgrade()->calcTimeToBuild(obj->getControllingPlayer());
 						}
 
-						name[strlen(name) - 1] -= i;
-						break;
+						if (totalFrames > 0)
+						{
+							Real remainingReal = totalFrames * (100.0f - pe->getPercentComplete()) / 100.0f;
+							Int remainingFrames = (remainingReal > 0.0f) ? REAL_TO_INT_CEIL(remainingReal) : 0;
+							// integer ceiling -- see formatBuildTimeForTooltip for why not the float form
+							GadgetButtonDrawCountdown(win,
+								(remainingFrames + LOGICFRAMES_PER_SECOND - 1) / LOGICFRAMES_PER_SECOND);
+						}
 					}
+
+					name[strlen(name) - 1] -= i;
 				}
+			}
+		}
 
-		  }
+  }
 
-	}
-
-	// After Every change to the m_commandWIndows, we need to show fill in the missing blanks with the images
-	// removed from multiplayer branch
-	//showCommandMarkers();
-
+		// After Every change to the m_commandWIndows, we need to show fill in the missing blanks with the images
+		// removed from multiplayer branch
+		//showCommandMarkers();
 
 }
