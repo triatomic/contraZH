@@ -31,7 +31,7 @@ if(RTS_BUILD_GENERALS_ONLINE AND WIN32)
 endif()
 
 target_link_libraries(z_generals PRIVATE
-    binkstub
+    binkloader
     comctl32
     d3d8
     d3dx8

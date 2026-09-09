@@ -51,7 +51,6 @@ endif()
 # Find/Add build dependencies and stubs shared by all projects
 if((WIN32 OR "${CMAKE_SYSTEM}" MATCHES "Windows") AND ${CMAKE_SIZEOF_VOID_P} EQUAL 4)
     include(cmake/miles.cmake)
-    include(cmake/bink.cmake)
     include(cmake/dx8.cmake)
 endif()
 
@@ -79,6 +78,8 @@ if (IS_VS6_BUILD)
     include_directories(Dependencies/Utility)
     add_compile_options(/FIUtility/CppMacros.h)
 endif()
+
+add_subdirectory(Dependencies/Bink)
 
 add_subdirectory(resources)
 
