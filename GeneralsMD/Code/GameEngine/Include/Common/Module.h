@@ -249,6 +249,8 @@ public:
 
 	virtual void onCapture( Player *oldOwner, Player *newOwner ) { }
 	virtual void onDisabledEdge( Bool nowDisabled ) { }
+	/// Owner power state changed. Return TRUE to take over from the KINDOF_POWERED disable.
+	virtual Bool onPowerChange( Bool hasPower ) { return FALSE; }
 
 protected:
 

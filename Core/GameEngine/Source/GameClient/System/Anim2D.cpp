@@ -248,7 +248,6 @@ void Anim2DTemplate::parseImage( INI *ini, void *instance, void *store, const vo
 
 	if( !TheMappedImageCollection )
 	{
-		animTemplate->storeImage( nullptr );
 		return;
 	}
 
@@ -259,8 +258,6 @@ void Anim2DTemplate::parseImage( INI *ini, void *instance, void *store, const vo
 		image = newInstance(Image);
 		image->setName( filename );
 		image->setFilename( filename );
-		image->setTextureWidth( size.x );
-		image->setTextureHeight( size.y );
 		image->setImageSize( &size );
 		TheMappedImageCollection->addImage( image );
 	}

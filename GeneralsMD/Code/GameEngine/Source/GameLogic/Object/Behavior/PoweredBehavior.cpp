@@ -56,9 +56,7 @@ PoweredBehaviorModuleData::PoweredBehaviorModuleData()
 //-------------------------------------------------------------------------------------------------
 PoweredBehavior::PoweredBehavior( Thing *thing, const ModuleData* moduleData ) :
 	UpdateModule( thing, moduleData ),
-	m_unpowered(FALSE),
-	m_appliedScalar(1.0f),
-	m_appliedLift(1.0f)
+	m_powered(TRUE)
 {
 	// the owner is not known yet, so the first tick reads the power state
 	setWakeFrame( getObject(), UPDATE_SLEEP_NONE );
@@ -70,78 +68,52 @@ PoweredBehavior::~PoweredBehavior()
 }
 
 //-------------------------------------------------------------------------------------------------
-void PoweredBehavior::setPowered( Bool hasPower )
+Bool PoweredBehavior::onPowerChange( Bool hasPower )
 {
-	if (m_unpowered == !hasPower)
+	if (m_powered == hasPower)
 	{
-		return;
+		return TRUE;
 	}
-	m_unpowered = !hasPower;
+	m_powered = hasPower;
 
 	const PoweredBehaviorModuleData *d = getPoweredBehaviorModuleData();
 	Object *obj = getObject();
 	AIUpdateInterface *ai = obj->getAI();
 	Drawable *draw = obj->getDrawable();
 	Bool immobile = !d->m_isMobile || d->m_movePenalty >= 1.0f;
+	Real speedScalar = (!immobile && d->m_movePenalty > 0.0f) ? 1.0f - d->m_movePenalty : 1.0f;
+	Real liftScalar = (d->m_liftPenalty > 0.0f && d->m_liftPenalty < 1.0f) ? 1.0f - d->m_liftPenalty : 1.0f;
 
-	if (m_unpowered)
+	if (ai)
 	{
-		if (draw && d->m_iconName.isNotEmpty())
-		{
-			draw->setStatusIcon( d->m_iconName );
-		}
-
-		if (d->m_disableWeapon)
-		{
-			obj->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_NO_ATTACK ) );
-		}
-
-		if (immobile)
-		{
-			obj->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_IMMOBILE ) );
-			if (ai)
-			{
-				ai->aiIdle( CMD_FROM_AI );
-			}
-		}
-		else if (d->m_movePenalty > 0.0f && ai)
-		{
-			m_appliedScalar = 1.0f - d->m_movePenalty;
-			ai->applySpeedMultiplier( m_appliedScalar );
-		}
-
-		if (d->m_liftPenalty > 0.0f && d->m_liftPenalty < 1.0f && ai)
-		{
-			m_appliedLift = 1.0f - d->m_liftPenalty;
-			ai->applyLiftMultiplier( m_appliedLift );
-		}
+		ai->applySpeedMultiplier( m_powered ? 1.0f / speedScalar : speedScalar );
+		ai->applyLiftMultiplier( m_powered ? 1.0f / liftScalar : liftScalar );
 	}
-	else
+
+	if (m_powered)
 	{
 		if (draw)
 		{
 			draw->clearStatusIcon();
 		}
-		obj->clearStatus( MAKE_OBJECT_STATUS_MASK2( OBJECT_STATUS_NO_ATTACK, OBJECT_STATUS_IMMOBILE ) );
-
-		if (m_appliedScalar != 1.0f)
+		obj->clearStatus( m_appliedStatus );
+		m_appliedStatus.clear();
+	}
+	else
+	{
+		if (draw && d->m_iconName.isNotEmpty())
 		{
-			if (ai)
-			{
-				ai->applySpeedMultiplier( 1.0f / m_appliedScalar );
-			}
-			m_appliedScalar = 1.0f;
+			draw->setStatusIcon( d->m_iconName );
 		}
-
-		if (m_appliedLift != 1.0f)
+		m_appliedStatus.set( OBJECT_STATUS_NO_ATTACK, d->m_disableWeapon );
+		m_appliedStatus.set( OBJECT_STATUS_IMMOBILE, immobile );
+		obj->setStatus( m_appliedStatus );
+		if (immobile && ai)
 		{
-			if (ai)
-			{
-				ai->applyLiftMultiplier( 1.0f / m_appliedLift );
-			}
-			m_appliedLift = 1.0f;
+			ai->aiIdle( CMD_FROM_AI );
 		}
 	}
+	return TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -152,7 +124,7 @@ void PoweredBehavior::syncToOwner()
 	{
 		return;
 	}
-	setPowered( player->getEnergy()->hasSufficientPower() );
+	onPowerChange( player->getEnergy()->hasSufficientPower() );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -186,9 +158,8 @@ void PoweredBehavior::xfer( Xfer *xfer )
 
 	UpdateModule::xfer( xfer );
 
-	xfer->xferBool( &m_unpowered );
-	xfer->xferReal( &m_appliedScalar );
-	xfer->xferReal( &m_appliedLift );
+	xfer->xferBool( &m_powered );
+	m_appliedStatus.xfer( xfer );
 }
 
 //-------------------------------------------------------------------------------------------------

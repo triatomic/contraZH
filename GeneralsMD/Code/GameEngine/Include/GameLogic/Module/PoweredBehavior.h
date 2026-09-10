@@ -57,8 +57,8 @@ public:
 	PoweredBehavior( Thing *thing, const ModuleData* moduleData );
 	// virtual destructor prototype provided by memory pool declaration
 
-	/// Player calls this on every brown-out edge; applies or removes the configured effects
-	void setPowered( Bool hasPower );
+	/// applies or removes the configured effects; always takes over from the KINDOF_POWERED disable
+	virtual Bool onPowerChange( Bool hasPower ) override;
 
 	virtual UpdateSleepTime update() override;
 	virtual void onCapture( Player *oldOwner, Player *newOwner ) override;
@@ -70,9 +70,8 @@ protected:
 
 	void syncToOwner();
 
-	Bool	m_unpowered;			///< effects are currently applied
-	Real	m_appliedScalar;	///< speed multiplier applied, 1.0 when none
-	Real	m_appliedLift;		///< lift multiplier applied, 1.0 when none
+	Bool									m_powered;
+	ObjectStatusMaskType	m_appliedStatus;	///< status bits this module set, so only those get cleared
 
 };
 

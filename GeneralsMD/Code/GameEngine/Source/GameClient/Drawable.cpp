@@ -3601,23 +3601,14 @@ void Drawable::clearEmoticon()
 }
 
 //------------------------------------------------------------------------------------------------
-void Drawable::clearStatusIcon()
+void Drawable::setNamedIcon( DrawableIconType slot, const AsciiString &name, UnsignedInt keepTillFrame )
 {
-	if (!hasIconInfo())
-		return;
-
-	killIcon(ICON_STATUS);
-}
-
-//------------------------------------------------------------------------------------------------
-void Drawable::setStatusIcon( const AsciiString &name )
-{
-	clearStatusIcon();
+	killIcon( slot );
 	Anim2DTemplate *animTemplate = TheAnim2DCollection->findTemplate( name );
 	if( animTemplate )
 	{
-		getIconInfo()->m_icon[ ICON_STATUS ] = newInstance(Anim2D)( animTemplate, TheAnim2DCollection );
-		getIconInfo()->m_keepTillFrame[ ICON_STATUS ] = FOREVER;
+		getIconInfo()->m_icon[ slot ] = newInstance(Anim2D)( animTemplate, TheAnim2DCollection );
+		getIconInfo()->m_keepTillFrame[ slot ] = keepTillFrame;
 	}
 }
 
@@ -3625,17 +3616,7 @@ void Drawable::setStatusIcon( const AsciiString &name )
 void Drawable::setEmoticon( const AsciiString &name, Int duration )
 {
 	//A duration of -1 means FOREVER
-	clearEmoticon();
-	Anim2DTemplate *animTemplate = TheAnim2DCollection->findTemplate( name );
-	if( animTemplate )
-	{
-		DEBUG_ASSERTCRASH( getIconInfo()->m_icon[ ICON_EMOTICON ] == nullptr, ("Drawable::setEmoticon - Emoticon isn't empty, need to refuse to set or destroy the old one in favor of the new one") );
-		if( getIconInfo()->m_icon[ ICON_EMOTICON ] == nullptr )
-		{
-			getIconInfo()->m_icon[ ICON_EMOTICON ] = newInstance(Anim2D)( animTemplate, TheAnim2DCollection );
-			getIconInfo()->m_keepTillFrame[ ICON_EMOTICON ] = duration >= 0 ? TheGameLogic->getFrame() + duration : FOREVER;
-		}
-	}
+	setNamedIcon( ICON_EMOTICON, name, duration >= 0 ? TheGameLogic->getFrame() + duration : FOREVER );
 }
 
 //------------------------------------------------------------------------------------------------
@@ -4663,28 +4644,7 @@ void Drawable::drawDisabled(const IRegion2D* healthBarRegion)
 			( s_animationTemplates[ ICON_DISABLED ], TheAnim2DCollection );
 		}
 
-		// draw the icon
-		if( healthBarRegion )
-		{
-			Int barHeight = healthBarRegion->hi.y - healthBarRegion->lo.y;
-
-			Int frameWidth = getIconInfo()->m_icon[ ICON_DISABLED ]->getCurrentFrameWidth();
-			Int frameHeight = getIconInfo()->m_icon[ ICON_DISABLED ]->getCurrentFrameHeight();
-
-#ifdef SCALE_ICONS_WITH_ZOOM_ML
-			// adjust the width to be a % of the health bar region size
-			Int barWidth = healthBarRegion->hi.x - healthBarRegion->lo.x;
-			Int size = REAL_TO_INT( barWidth * 0.3f );
-			frameHeight = REAL_TO_INT((INT_TO_REAL(size) / INT_TO_REAL(frameWidth)) * frameHeight);
-			frameWidth = size;
-#endif
-			// given our scaled width and height we need to find the top left point to draw the image at
-			ICoord2D screen;
-			screen.x = healthBarRegion->lo.x;
-			screen.y = healthBarRegion->hi.y - (frameHeight + barHeight);
-			getIconInfo()->m_icon[ ICON_DISABLED ]->draw( screen.x, screen.y, frameWidth, frameHeight );
-
-		}
+		drawIconAboveBar( ICON_DISABLED, healthBarRegion, 0 );
 	}
 	else
 	{
@@ -4696,27 +4656,49 @@ void Drawable::drawDisabled(const IRegion2D* healthBarRegion)
 }
 
 //-------------------------------------------------------------------------------------------------
-void Drawable::drawStatusIcon(const IRegion2D* healthBarRegion)
+/** Draw a live icon slot at the left of the health bar, sitting on top of it */
+//-------------------------------------------------------------------------------------------------
+void Drawable::drawIconAboveBar( DrawableIconType slot, const IRegion2D* healthBarRegion, Int xOffset )
 {
-	if( !healthBarRegion || !hasIconInfo() || getIconInfo()->m_icon[ ICON_STATUS ] == nullptr )
+	if( !healthBarRegion )
 	{
 		return;
 	}
 
-	Anim2D *icon = getIconInfo()->m_icon[ ICON_STATUS ];
+	Anim2D *icon = getIconInfo()->m_icon[ slot ];
 	Int barHeight = healthBarRegion->hi.y - healthBarRegion->lo.y;
 	Int frameWidth = icon->getCurrentFrameWidth();
 	Int frameHeight = icon->getCurrentFrameHeight();
 
-	// sit beside the disabled icon when both are showing
+#ifdef SCALE_ICONS_WITH_ZOOM_ML
+	// adjust the width to be a % of the health bar region size
+	Int barWidth = healthBarRegion->hi.x - healthBarRegion->lo.x;
+	Int size = REAL_TO_INT( barWidth * 0.3f );
+	frameHeight = REAL_TO_INT((INT_TO_REAL(size) / INT_TO_REAL(frameWidth)) * frameHeight);
+	frameWidth = size;
+#endif
+
 	ICoord2D screen;
-	screen.x = healthBarRegion->lo.x;
+	screen.x = healthBarRegion->lo.x + xOffset;
 	screen.y = healthBarRegion->hi.y - (frameHeight + barHeight);
+	icon->draw( screen.x, screen.y, frameWidth, frameHeight );
+}
+
+//-------------------------------------------------------------------------------------------------
+void Drawable::drawStatusIcon(const IRegion2D* healthBarRegion)
+{
+	if( !hasIconInfo() || getIconInfo()->m_icon[ ICON_STATUS ] == nullptr )
+	{
+		return;
+	}
+
+	// sit beside the disabled icon when both are showing
+	Int xOffset = 0;
 	if( getIconInfo()->m_icon[ ICON_DISABLED ] )
 	{
-		screen.x += getIconInfo()->m_icon[ ICON_DISABLED ]->getCurrentFrameWidth();
+		xOffset = getIconInfo()->m_icon[ ICON_DISABLED ]->getCurrentFrameWidth();
 	}
-	icon->draw( screen.x, screen.y, frameWidth, frameHeight );
+	drawIconAboveBar( ICON_STATUS, healthBarRegion, xOffset );
 }
 
 //-------------------------------------------------------------------------------------------------
