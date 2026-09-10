@@ -100,6 +100,7 @@
 #include "GameLogic/Module/BattlePlanUpdate.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/BattlePlanBonusBehavior.h"
+#include "GameLogic/Module/PoweredBehavior.h"
 #include "GameLogic/VictoryConditions.h"
 
 #include "GameNetwork/GameInfo.h"
@@ -3653,7 +3654,21 @@ Bool Player::hasRadar() const
 static void doPowerDisable( Object *obj, void *userData )
 {
 	Bool disabling = *((Bool*)userData);
-	if( obj && obj->isKindOf(KINDOF_POWERED) )
+	if( !obj )
+	{
+		return;
+	}
+
+	// a PoweredBehavior owns the reaction and skips the blanket disable
+	static const NameKeyType key_PoweredBehavior = NAMEKEY( "PoweredBehavior" );
+	PoweredBehavior *powered = (PoweredBehavior*)obj->findUpdateModule( key_PoweredBehavior );
+	if( powered )
+	{
+		powered->setPowered( !disabling );
+		return;
+	}
+
+	if( obj->isKindOf(KINDOF_POWERED) )
 	{
 		if( disabling )
 			obj->setDisabled( DISABLED_UNDERPOWERED ); //set disabled has a pauseAllSpecialPowers that prevents double pausing

@@ -92,6 +92,7 @@
 #include "GameLogic/Module/ParkingPlaceBehavior.h"
 #include "GameLogic/Module/FlightDeckBehavior.h"
 #include "GameLogic/Module/PoisonedBehavior.h"
+#include "GameLogic/Module/PoweredBehavior.h"
 #include "GameLogic/Module/RebuildHoleBehavior.h"
 #include "GameLogic/Module/SupplyWarehouseCripplingBehavior.h"
 #include "GameLogic/Module/TechBuildingBehavior.h"
@@ -414,6 +415,7 @@ void ModuleFactory::init()
 	addModule( ParkingPlaceBehavior );
 	addModule( FlightDeckBehavior );
 	addModule( PoisonedBehavior );
+	addModule( PoweredBehavior );
 	addModule( RebuildHoleBehavior );
 	addModule( SupplyWarehouseCripplingBehavior );
 	addModule( TechBuildingBehavior );

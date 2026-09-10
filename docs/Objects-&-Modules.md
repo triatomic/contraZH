@@ -1872,6 +1872,27 @@ End
 - The upgrade check looks at the firing player, the launcher object and the projectile, so both
   player upgrades and object upgrades on the launcher work as `TriggeredBy`.
 
+## PoweredBehavior (New)
+
+Controls what an object does while its owner is out of power. Without the module, a `KINDOF_POWERED`
+object gets the underpowered disable and shuts down completely. With the module the object stays
+active, and only the listed effects apply. The module replaces the `KINDOF_POWERED` disable on that
+object, so abilities and command buttons keep working.
+
+```
+Behavior = PoweredBehavior ModuleTag_Powered
+  IsMobile = No         ; (default = Yes; No = cannot move while out of power)
+  DisableWeapon = Yes   ; (default = No; Yes = cannot attack while out of power)
+  MovePenalty = 50%     ; (default = 0%; move speed lost while out of power)
+End
+```
+**Notes:**
+- `MovePenalty` of 100% or more acts like `IsMobile = No`.
+- Losing power with `IsMobile = No` stops the current move order. Attack orders still work, so a
+  turreted unit keeps firing from where it stands.
+- The effects follow the owner. A captured object takes the new owner's power state.
+- No disabled tint is shown.
+
 ## ParticleUplinkCannonUpdate (Tornado)
 
 * `TornadoObjectName = <object>` - (Creates this object at the beam ground point when the orbital
