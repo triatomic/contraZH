@@ -19,10 +19,10 @@
 // TheSuperHackers @feature Smart selection (Options.ini: SmartSelection). A row of half size
 // cameos above the command bar. A mixed selection gets one cameo per type with a count; a
 // selection of one type gets one cameo per object. A cameo for a single object shows its health
-// bar. Left click and Tab focus a type: the whole group stays selected, but the bar shows that
-// type's command set instead of the group's common subset. Right click drops the cameo's units
-// from the selection, double click (or Ctrl+Shift click with SmartSelectionUseMouse = No) keeps
-// only them.
+// bar. Left click and Tab focus a cameo: the whole group stays selected, but the bar shows the
+// command set of that cameo's type, or of its one object, instead of the group's common subset.
+// Right click drops the cameo's units from the selection, double click (or Ctrl+Shift click
+// with SmartSelectionUseMouse = No) keeps only them.
 //
 // The row is built in code rather than from ControlBar.wnd, which ships in the game data.
 // The container is a top level window because the hit test only descends into a top level
@@ -129,16 +129,22 @@ static void appendSelectionGroup( const ThingTemplate *onlyType )
 	for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
 	{
 		Object *obj = ( *it )->getObject();
-		if( obj == nullptr )
-		{
-			continue;
-		}
-		if( onlyType && obj->getTemplate() != onlyType )
+		if( obj == nullptr || ( onlyType && obj->getTemplate() != onlyType ) )
 		{
 			continue;
 		}
 		msg->appendObjectIDArgument( obj->getID() );
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Hand the logic side a group of that one object. */
+//-------------------------------------------------------------------------------------------------
+static void appendSelectionGroupOf( ObjectID objectID )
+{
+	GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_CREATE_SELECTED_GROUP_NO_SOUND );
+	msg->appendBooleanArgument( TRUE );
+	msg->appendObjectIDArgument( objectID );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -233,6 +239,7 @@ void ControlBar::resetSmartSelection()
 	m_smartSelectionGroups.clear();
 	m_smartSelectionActive = -1;
 	m_smartSelectionNarrowed = FALSE;
+	m_smartSelectionInCommand = FALSE;
 	if( m_smartSelectionParent && !m_smartSelectionParent->winIsHidden() )
 	{
 		m_smartSelectionParent->winHide( TRUE );
@@ -248,12 +255,48 @@ const ThingTemplate *ControlBar::getSmartSelectionFocusTemplate() const
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Whether the object takes part in the command bar while a type is focused. */
+/** The one object the bar should show, when the focused cameo stands for a single object. */
+//-------------------------------------------------------------------------------------------------
+ObjectID ControlBar::getSmartSelectionFocusObject() const
+{
+	return m_smartSelectionActive < 0 ? INVALID_ID : m_smartSelectionGroups[ m_smartSelectionActive ].objectID;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** The drawable of the one focused object, which drives the bar's context in place of the
+	* multi select context, or null. */
+//-------------------------------------------------------------------------------------------------
+Drawable *ControlBar::getSmartSelectionFocusDrawable() const
+{
+	const ObjectID focusObject = getSmartSelectionFocusObject();
+	if( focusObject == INVALID_ID )
+	{
+		return nullptr;
+	}
+	Object *obj = TheGameLogic->findObjectByID( focusObject );
+	return obj ? obj->getDrawable() : nullptr;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Whether the object takes part in the command bar while a cameo is focused. */
 //-------------------------------------------------------------------------------------------------
 Bool ControlBar::isSmartSelectionFocused( const Object *obj ) const
 {
 	const ThingTemplate *focus = getSmartSelectionFocusTemplate();
 	return focus == nullptr || obj->getTemplate() == focus;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Whether the cameo is pushed in: the focused one, or every one of the focused type. */
+//-------------------------------------------------------------------------------------------------
+Bool ControlBar::isSmartSelectionGroupFocused( Int groupIndex ) const
+{
+	if( m_smartSelectionActive < 0 )
+	{
+		return FALSE;
+	}
+	const SmartSelectionGroup &focus = m_smartSelectionGroups[ m_smartSelectionActive ];
+	return focus.objectID != INVALID_ID ? groupIndex == m_smartSelectionActive : m_smartSelectionGroups[ groupIndex ].thingTemplate == focus.thingTemplate;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -344,15 +387,22 @@ void ControlBar::populateSmartSelection()
 		return;
 	}
 
-	// The focused type survives the rebuild if it is still in the selection. It cannot survive
-	// into a selection the bar drives from one drawable, whose own command set is shown and
-	// where the focus would silently filter the next multi selection.
-	const ThingTemplate *focus = TheInGameUI->getSelectCount() > 1 ? getSmartSelectionFocusTemplate() : nullptr;
+	// The focus survives the rebuild if its object, or else its type, is still in the
+	// selection. It cannot survive into a selection the bar drives from one drawable, whose own
+	// command set is shown and where the focus would silently filter the next multi selection.
+	SmartSelectionGroup focus;
+	focus.thingTemplate = nullptr;
+	focus.objectID = INVALID_ID;
+	if( m_smartSelectionActive >= 0 && TheInGameUI->getSelectCount() > 1 )
+	{
+		focus = m_smartSelectionGroups[ m_smartSelectionActive ];
+	}
 	m_smartSelectionGroups.swap( groups );
 	m_smartSelectionActive = -1;
-	for( size_t g = 0; focus && g < m_smartSelectionGroups.size(); g++ )
+	for( size_t g = 0; focus.thingTemplate && g < m_smartSelectionGroups.size(); g++ )
 	{
-		if( m_smartSelectionGroups[ g ].thingTemplate == focus )
+		const SmartSelectionGroup &group = m_smartSelectionGroups[ g ];
+		if( focus.objectID != INVALID_ID ? group.objectID == focus.objectID : group.thingTemplate == focus.thingTemplate )
 		{
 			m_smartSelectionActive = (Int)g;
 			break;
@@ -428,12 +478,11 @@ void ControlBar::updateSmartSelection()
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Put the groups on the cameos, with every one of the focused type pushed in. */
+/** Put the groups on the cameos, with the focused one, or every one of its type, pushed in. */
 //-------------------------------------------------------------------------------------------------
 void ControlBar::refreshSmartSelectionButtons()
 {
 	const size_t groupCount = m_smartSelectionGroups.size();
-	const ThingTemplate *focus = getSmartSelectionFocusTemplate();
 
 	for( Int i = 0; i < MAX_SMART_SELECTION_BUTTONS; i++ )
 	{
@@ -463,7 +512,7 @@ void ControlBar::refreshSmartSelectionButtons()
 		}
 		GadgetButtonSetText( button, count );
 		button->winSetTooltip( group.thingTemplate->getDisplayName() );
-		GadgetCheckLikeButtonSetVisualCheck( button, group.thingTemplate == focus );
+		GadgetCheckLikeButtonSetVisualCheck( button, isSmartSelectionGroupFocused( i ) );
 		button->winHide( FALSE );
 	}
 
@@ -508,14 +557,13 @@ void ControlBar::processSmartSelectionClick( GameWindow *button, Bool rightClick
 	}
 	else
 	{
-		const Bool focused = m_smartSelectionGroups[ groupIndex ].thingTemplate == getSmartSelectionFocusTemplate();
-		smartSelectionFocus( focused ? -1 : groupIndex );
+		smartSelectionFocus( isSmartSelectionGroupFocused( groupIndex ) ? -1 : groupIndex );
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-/** Step the focus to the next cameo of a different type than the focused one. */
+/** Step the focus to the next cameo that is not pushed in. */
 //-------------------------------------------------------------------------------------------------
 void ControlBar::smartSelectionCycle( Int direction )
 {
@@ -525,7 +573,6 @@ void ControlBar::smartSelectionCycle( Int direction )
 		return;
 	}
 
-	const ThingTemplate *focus = getSmartSelectionFocusTemplate();
 	Int next = m_smartSelectionActive;
 	for( Int step = 0; step < groupCount; step++ )
 	{
@@ -537,7 +584,7 @@ void ControlBar::smartSelectionCycle( Int direction )
 		{
 			next = ( next + direction + groupCount ) % groupCount;
 		}
-		if( m_smartSelectionGroups[ next ].thingTemplate != focus )
+		if( !isSmartSelectionGroupFocused( next ) )
 		{
 			smartSelectionFocus( next );
 			return;
@@ -546,7 +593,7 @@ void ControlBar::smartSelectionCycle( Int direction )
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Show one type's command set, or the common set again for -1. Nothing about the selection
+/** Show one cameo's command set, or the common set again for -1. Nothing about the selection
 	* changes; the dirty flag makes the context repopulate around the new focus. */
 //-------------------------------------------------------------------------------------------------
 void ControlBar::smartSelectionFocus( Int groupIndex )
@@ -602,23 +649,33 @@ void ControlBar::smartSelectionRemove( Int groupIndex, Bool keepGroup )
 
 //-------------------------------------------------------------------------------------------------
 /** The logic side sends a command to every unit in the player's group that can do it, so a
-	* command off the focused type's card would leak to any other type with a matching one. For
-	* a command that is not common to the whole group, hand the logic side just the focused type
-	* until the command is done. The client selection is untouched throughout. */
+	* command off the focused card would leak to any other unit with a matching one. Hand the
+	* logic side just the focused object, or for a focused type only a command the group does
+	* not share, until the command is done. The client selection is untouched throughout. */
 //-------------------------------------------------------------------------------------------------
 void ControlBar::smartSelectionBeginCommand( const CommandButton *command )
 {
-	if( m_smartSelectionNarrowed || m_currContext != CB_CONTEXT_MULTI_SELECT )
-	{
-		return;
-	}
-	const ThingTemplate *focus = getSmartSelectionFocusTemplate();
-	if( focus == nullptr )
+	if( m_smartSelectionNarrowed )
 	{
 		return;
 	}
 
-	// with a type focused the populated commands are its card, so anything else, a shortcut
+	// the bar is that object's own, so anything out of it goes to that object alone
+	const ObjectID focusObject = getSmartSelectionFocusObject();
+	if( focusObject != INVALID_ID )
+	{
+		appendSelectionGroupOf( focusObject );
+		m_smartSelectionNarrowed = TRUE;
+		return;
+	}
+
+	const ThingTemplate *focus = getSmartSelectionFocusTemplate();
+	if( focus == nullptr || m_currContext != CB_CONTEXT_MULTI_SELECT )
+	{
+		return;
+	}
+
+	// with a cameo focused the populated commands are its card, so anything else, a shortcut
 	// bar power say, came from elsewhere
 	Bool onCard = FALSE;
 	for( Int i = 0; !onCard && i < MAX_COMMANDS_PER_SET; i++ )
@@ -630,12 +687,12 @@ void ControlBar::smartSelectionBeginCommand( const CommandButton *command )
 		return;
 	}
 
-	// a command every other selected type carries too is the group's own and still goes to everyone
+	// a command every other selected unit carries too is the group's own and still goes to everyone
 	const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
 	for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
 	{
 		Object *obj = getSmartSelectionObject( *it );
-		if( obj == nullptr || obj->getTemplate() == focus )
+		if( obj == nullptr || isSmartSelectionFocused( obj ) )
 		{
 			continue;
 		}
@@ -649,12 +706,12 @@ void ControlBar::smartSelectionBeginCommand( const CommandButton *command )
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Give the logic side the whole selection back, once no command is still waiting for a
-	* target. That later clear of the pending command ends up here as well. */
+/** Give the logic side the whole selection back, once the handler is done and no command is
+	* still waiting for a target. That later clear of the pending command ends up here as well. */
 //-------------------------------------------------------------------------------------------------
 void ControlBar::smartSelectionEndCommand()
 {
-	if( !m_smartSelectionNarrowed || TheInGameUI->getGUICommand() != nullptr )
+	if( !m_smartSelectionNarrowed || m_smartSelectionInCommand || TheInGameUI->getGUICommand() != nullptr )
 	{
 		return;
 	}

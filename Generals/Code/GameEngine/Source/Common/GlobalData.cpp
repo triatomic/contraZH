@@ -862,6 +862,7 @@ GlobalData::GlobalData()
 #endif
 	m_minCameraHeight = 100.0f;
 	m_maxCameraHeight = 300.0f;
+	m_defaultMaxCameraHeight = 0.0f;
 	m_terrainHeightAtEdgeOfMap = 0.0f;
 
 	m_unitDamagedThresh = 0.5f;
@@ -1200,6 +1201,8 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 
 	// parse the ini weapon definition
 	ini->initFromINI( TheWritableGlobalData, s_GlobalDataFieldParseTable );
+
+	TheWritableGlobalData->m_defaultMaxCameraHeight = TheWritableGlobalData->m_maxCameraHeight;
 
 	TheWritableGlobalData->m_userDataDir.clear();
 	TheWritableGlobalData->m_userDataDir = BuildUserDataPathFromIni();

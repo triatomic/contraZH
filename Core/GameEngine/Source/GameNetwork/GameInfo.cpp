@@ -35,6 +35,7 @@
 #include "GameClient/GameText.h"
 #include "GameClient/MapUtil.h"
 #include "Common/MultiplayerSettings.h"
+#include "Common/OptionPreferences.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/Xfer.h"
 #include "GameNetwork/FileTransfer.h"
@@ -385,6 +386,7 @@ void GameInfo::reset()
 	m_mapSize = 0;
   m_superweaponRestriction = 0;
   m_startingCash = TheGlobalData->m_defaultStartingCash;
+  m_maxCameraHeight = 0;
 
 	for (Int i=0; i<MAX_SLOTS; ++i)
 	{
@@ -994,9 +996,9 @@ AsciiString GameInfoToAsciiString( const GameInfo *game )
 	optionsString.format("M=%2.2x%s;MC=%X;MS=%d;SD=%d;C=%d;", game->getMapContentsMask(), newMapName.str(),
 		game->getMapCRC(), game->getMapSize(), game->getSeed(), game->getCRCInterval());
 #else
-	optionsString.format("US=%d;M=%2.2x%s;MC=%X;MS=%d;SD=%d;C=%d;SR=%u;SC=%u;O=%c;", game->getUseStats(), game->getMapContentsMask(), newMapName.str(),
+	optionsString.format("US=%d;M=%2.2x%s;MC=%X;MS=%d;SD=%d;C=%d;SR=%u;SC=%u;CH=%d;O=%c;", game->getUseStats(), game->getMapContentsMask(), newMapName.str(),
 		game->getMapCRC(), game->getMapSize(), game->getSeed(), game->getCRCInterval(), game->getSuperweaponRestriction(),
-		game->getStartingCash().countMoney(), game->oldFactionsOnly() ? 'Y' : 'N' );
+		game->getStartingCash().countMoney(), game->getMaxCameraHeight(), game->oldFactionsOnly() ? 'Y' : 'N' );
 #endif
 
 	//add player info for each slot
@@ -1090,6 +1092,7 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 	Int useStats = TRUE;
   Money startingCash = TheGlobalData->m_defaultStartingCash;
   UnsignedShort restriction = 0; // Always the default
+  Int maxCameraHeight = 0;
 
 	Bool sawMap = FALSE;
 	Bool sawMapCRC = FALSE;
@@ -1203,6 +1206,14 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
       startingCash.init();
       startingCash.deposit( startingCashAmount, FALSE, FALSE );
       sawStartingCash = TRUE;
+    }
+    else if (key.compare("CH") == 0 )
+    {
+      maxCameraHeight = atoi( val.str() );
+      if (maxCameraHeight != 0)
+      {
+        maxCameraHeight = clamp( (Int)OptionPreferences::MaxCameraHeightMin, maxCameraHeight, (Int)OptionPreferences::MaxCameraHeightMax );
+      }
     }
     else if (key.compare("O") == 0 )
     {
@@ -1576,6 +1587,7 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 		game->setUseStats(useStats);
 		game->setSuperweaponRestriction(restriction);
 		game->setStartingCash(startingCash);
+		game->setMaxCameraHeight(maxCameraHeight);
 		game->setOldFactionsOnly(oldFactionsOnly);
 
 		return true;

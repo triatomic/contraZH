@@ -218,7 +218,7 @@ Bool JumpjetMissileAIUpdate::projectileHandleCollision(Object* other)
 }
 
 //-------------------------------------------------------------------------------------------------
-void JumpjetMissileAIUpdate::detonate()
+void JumpjetMissileAIUpdate::detonate( Object *victim )
 {
 	// DEBUG_LOG((">>>JJMAU - detonate.\n"));
 

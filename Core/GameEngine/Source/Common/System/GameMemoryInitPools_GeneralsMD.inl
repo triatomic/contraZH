@@ -224,6 +224,7 @@ static PoolSizeRec PoolSizes[] =
 	{ "ParachuteContain", 128, 32 },
 	{ "PhysicsBehavior", 600, 32 },
 	{ "PoisonedBehavior", 512, 64 },
+	{ "ThermiteBehavior", 64, 32 },
 	{ "ProductionEntry", 32, 32 },
 	{ "ProductionUpdate", 256, 32 },
 	{ "ProjectileStreamUpdate", 32, 32 },

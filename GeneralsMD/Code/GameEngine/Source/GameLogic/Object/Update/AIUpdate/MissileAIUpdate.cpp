@@ -41,6 +41,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
+#include "GameLogic/Module/ThermiteBehavior.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/TerrainLogic.h"
@@ -445,7 +446,7 @@ Bool MissileAIUpdate::projectileHandleCollision( Object *other )
 	}
 
 	// collided with something... blow'd up!
-	detonate();
+	detonate( other );
 
 	// mark ourself as "no collisions" (since we might still exist in slow death mode)
 	obj->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_NO_COLLISIONS ) );
@@ -453,14 +454,26 @@ Bool MissileAIUpdate::projectileHandleCollision( Object *other )
 }
 
 //-------------------------------------------------------------------------------------------------
-void MissileAIUpdate::detonate()
+void MissileAIUpdate::detonate( Object *victim )
 {
 	Object* obj = getObject();
+
+	if (m_state == DEAD)
+	{
+		return;
+	}
 
 	if (m_detonationWeaponTmpl)
 	{
 
 		TheWeaponStore->handleProjectileDetonation(m_detonationWeaponTmpl, obj, obj->getPosition(), m_extraBonusFlags, !m_noDamage );
+
+		if( ThermiteBehavior::tryIgnite( obj, victim ) )
+		{
+			// the thermite owns the object now, so skip the kill-self state
+			switchToState(DEAD);
+			return;
+		}
 
 		if( m_detonationWeaponTmpl->getDieOnDetonate() )
 		{

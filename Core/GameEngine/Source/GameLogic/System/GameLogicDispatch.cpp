@@ -34,6 +34,7 @@
 #include "Common/FramePacer.h"
 #include "Common/GameAudio.h"
 #include "Common/GameEngine.h"
+#include "Common/OptionPreferences.h"
 #include "Common/GlobalData.h"
 #include "Common/NameKeyGenerator.h"
 #include "Common/ThingFactory.h"
@@ -296,6 +297,13 @@ void GameLogic::clearGameData( Bool showScoreScreen )
 		FixupScoreScreenMovieWindow();
 
 		destroyQuitMenu();
+	}
+
+	// The shared multiplayer camera limit ends with the game; the menus go back to the personal one
+	if (m_gameMode == GAME_LAN || m_gameMode == GAME_INTERNET)
+	{
+		OptionPreferences prefs;
+		TheWritableGlobalData->m_maxCameraHeight = prefs.getMaxCameraHeight();
 	}
 
 	TheGameEngine->reset();

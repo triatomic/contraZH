@@ -7,6 +7,7 @@
 #include "GameClient/GameText.h"
 #include "GameNetwork/GameSpyOverlay.h"
 #include "Common/RandomValue.h"
+#include "Common/OptionPreferences.h"
 #include "GameNetwork/GeneralsOnline/NGMP_interfaces.h"
 #include "GameNetwork/NetworkInterface.h"
 #include "Common/GlobalData.h"
@@ -129,6 +130,15 @@ void NGMPGame::SyncWithLobby(LobbyEntry& lobby)
 	startingCash.deposit(lobby.starting_cash, FALSE);
 	setStartingCash(startingCash);
 
+	// GO's stock value means the host never set one, so the mod's own GameData limit applies
+	if (lobby.max_cam_height == 0 || lobby.max_cam_height == GENERALS_ONLINE_DEFAULT_LOBBY_CAMERA_ZOOM)
+	{
+		setMaxCameraHeight(0);
+	}
+	else
+	{
+		setMaxCameraHeight(clamp((Int)OptionPreferences::MaxCameraHeightMin, (Int)lobby.max_cam_height, (Int)OptionPreferences::MaxCameraHeightMax));
+	}
 }
 
 void NGMPGame::UpdateSlotsFromCurrentLobby()
@@ -309,6 +319,13 @@ void NGMPGame::startGame(Int gameID)
 	DEBUG_LOG(("NGMPGame::startGame - game id = %d\n", gameID));
 	//DEBUG_ASSERTCRASH(m_transport == NULL, ("m_transport is not NULL when it should be"));
 	//DEBUG_ASSERTCRASH(TheNAT == NULL, ("TheNAT is not NULL when it should be"));
+
+	// The replay header and the game start read the last lobby state the service echoed back
+	NGMP_OnlineServices_LobbyInterface* pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
+	if (pLobbyInterface != nullptr && pLobbyInterface->IsInLobby())
+	{
+		SyncWithLobby(pLobbyInterface->GetCurrentLobby());
+	}
 
 	//UnsignedInt localIP = TheGameSpyInfo->getInternalIP();
 	UnsignedInt localIP = 1337; // dont care anymore

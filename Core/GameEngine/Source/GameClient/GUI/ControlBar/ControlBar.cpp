@@ -1002,6 +1002,7 @@ ControlBar::ControlBar()
 	m_smartSelectionButtonSize.y = 0;
 	m_smartSelectionActive = -1;
 	m_smartSelectionNarrowed = FALSE;
+	m_smartSelectionInCommand = FALSE;
 	m_smartSelectionLastClickSlot = -1;
 	m_smartSelectionLastClickTime = 0;
 	m_scienceLayout = nullptr;
@@ -1941,6 +1942,12 @@ void ControlBar::evaluateContextUI()
 		// but is represented in the UI as a single unit,
 		// so we must isolate and evaluate only the Nexus
 		drawToEvaluateFor = TheGameClient->findDrawableByID( TheInGameUI->getSoloNexusSelectedDrawableID() ) ;
+
+		// a cameo focused on one object drives the bar as if that object alone were selected
+		if( drawToEvaluateFor == nullptr )
+		{
+			drawToEvaluateFor = getSmartSelectionFocusDrawable();
+		}
 		multiSelect = ( drawToEvaluateFor == nullptr );
 
 	}

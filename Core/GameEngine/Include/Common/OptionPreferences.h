@@ -149,6 +149,11 @@ public:
 	Bool getDoubleClickAttackMoveEnabled();
 	Int getJpegQuality() const;
 	Real getScrollFactor();
+
+	// Options.ini: UseCustomMaxCameraHeight = Yes lets MaxCameraHeight (210..1000) replace GameData's limit
+	enum { MaxCameraHeightMin = 210, MaxCameraHeightMax = 1000 };
+	Bool getUseCustomMaxCameraHeight() const;
+	Real getMaxCameraHeight() const;
 	Bool getDrawScrollAnchor();
 	Bool getMoveScrollAnchor();
 	Bool getCursorCaptureEnabledInWindowedGame() const;

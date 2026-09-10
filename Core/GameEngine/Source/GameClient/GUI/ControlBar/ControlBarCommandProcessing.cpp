@@ -257,16 +257,19 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 	// TheSuperHackers @feature Narrow the logic side group to the smart selection focus for the
 	// life of this call. A command that arms and waits for a target keeps the narrowing until
-	// the pending command clears, which lands in smartSelectionEndCommand again.
+	// the pending command clears, which lands in smartSelectionEndCommand again. So does the
+	// handler's own clear of the previous pending command, hence the flag holding it off.
 	struct SmartSelectionCommandScope
 	{
 		ControlBar *m_bar;
 		SmartSelectionCommandScope( ControlBar *bar, const CommandButton *command ) : m_bar( bar )
 		{
+			m_bar->m_smartSelectionInCommand = TRUE;
 			m_bar->smartSelectionBeginCommand( command );
 		}
 		~SmartSelectionCommandScope()
 		{
+			m_bar->m_smartSelectionInCommand = FALSE;
 			m_bar->smartSelectionEndCommand();
 		}
 	};

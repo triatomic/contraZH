@@ -3112,8 +3112,7 @@ void W3DView::setPitchToDefault()
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 #if defined(GENERALS_ONLINE)
-// GeneralsOnline port: the extra parameter exists for the GO lobby's camera settings;
-// this fork does not take GO's camera-height changes, so it is accepted and ignored.
+// GeneralsOnline port: bForceDefaultCam is unused, the lobby camera limit arrives through GameInfo
 void W3DView::setDefaultView(Real pitch, Real angle, Real maxHeight, bool bForceDefaultCam)
 #else
 void W3DView::setDefaultView(Real pitch, Real angle, Real maxHeight)
