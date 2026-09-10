@@ -656,7 +656,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			if( !producer->isLocallyControlled() )
 				break;
 
-			ProductionUpdateInterface* pu = producer->getProductionUpdateInterface();
+			ProductionUpdateInterface *pu = producer->getProductionUpdateInterface();
 			if (!pu)
 				break;
 
@@ -669,13 +669,13 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			{
 				if (i > 0)
 				{
-					GameMessage* moveMsg = TheMessageStream->appendMessage(GameMessage::MSG_MOVE_UNIT_CREATE_EARLIER);
+					GameMessage *moveMsg = TheMessageStream->appendMessage(GameMessage::MSG_MOVE_UNIT_CREATE_EARLIER);
 					moveMsg->appendIntegerArgument(productionIDToCancel);
 				}
 				break;
 			}
 
-			const ProductionEntry* pe;
+			const ProductionEntry *pe;
 			UnsignedShort typeIDToCancel = UINT16_MAX;
 			for (pe = pu->firstProduction(); pe; pe = pu->nextProduction(pe))
 				if (pe->getProductionType() == PRODUCTION_UNIT && pe->getProductionID() == productionIDToCancel)
@@ -693,14 +693,14 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 					if (pe->getProductionType() == PRODUCTION_UNIT && pe->getProductionObject()->getTemplateID() == typeIDToCancel)
 					{
 						// send a message to cancel that particular production entry
-						GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_CANCEL_UNIT_CREATE);
+						GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_CANCEL_UNIT_CREATE);
 						msg->appendIntegerArgument(pe->getProductionID());
 					}
 			}
 			else
 			{
 				// send a message to cancel that particular production entry
-				GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_CANCEL_UNIT_CREATE);
+				GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_CANCEL_UNIT_CREATE);
 				msg->appendIntegerArgument(productionIDToCancel);
 			}
 
