@@ -37,6 +37,7 @@
 #include "Common/GameAudio.h"
 #include "Common/GameEngine.h"
 #include "Common/GameLOD.h"
+#include "Common/OptionPreferences.h"
 #include "Common/GameState.h"
 #include "Common/GameUtility.h"
 #include "Common/INI.h"
@@ -849,6 +850,32 @@ static void populateRandomSideAndColor( GameInfo *game )
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
 static const WaypointMap s_emptyWaypoints = WaypointMap();
+
+// Picks the camera limit this game plays with: the host's shared value, the INI default when
+// humans share a game without one, or the player's own Options.ini choice otherwise.
+static void applyMaxCameraHeightForGame()
+{
+	Real height = 0.0f;
+	if (TheGameInfo != nullptr && TheGameInfo->getMaxCameraHeight() > 0)
+	{
+		height = (Real)TheGameInfo->getMaxCameraHeight();
+	}
+	else if (TheGameInfo != nullptr && TheGameInfo->isMultiPlayer())
+	{
+		height = TheGlobalData->m_defaultMaxCameraHeight;
+	}
+	else
+	{
+		OptionPreferences prefs;
+		height = prefs.getMaxCameraHeight();
+	}
+
+	TheWritableGlobalData->m_maxCameraHeight = height;
+	if (TheTacticalView != nullptr)
+	{
+		TheTacticalView->setMaxHeightAboveGround(height);
+	}
+}
 
 static void populateRandomStartPosition( GameInfo *game )
 {
@@ -2125,6 +2152,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	// update the loadscreen
 	updateLoadProgress(LOAD_PROGRESS_POST_PRELOAD_ASSETS);
 
+	applyMaxCameraHeightForGame();
 	TheTacticalView->setAngleToDefault();
 	TheTacticalView->setPitchToDefault();
 	TheTacticalView->setZoomToDefault();

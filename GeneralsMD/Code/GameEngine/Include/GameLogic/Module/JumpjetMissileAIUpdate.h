@@ -81,7 +81,7 @@ public:
 
 protected:
 
-	void detonate();
+	virtual void detonate( Object *victim = nullptr ) override;
 
 private:
 

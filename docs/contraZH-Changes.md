@@ -128,9 +128,29 @@ entry disappears when none of its generals are allowed.
 * The choice travels in the game options like plain `Random` does. All players in a LAN or online
 game need this build, and a replay made with one of these entries needs it too.
 
+## Host camera height
+
+The LAN game setup gains a `Max Camera Height` checkbox and number field for the host. When checked,
+every player in that game zooms out to that height (210 to 1000) instead of `GameData.ini`'s
+`MaxCameraHeight`, and personal Options settings are ignored. The value travels in the game options
+like starting cash, so clients need this build. Generals Online keeps its `/maxcameraheight` lobby
+command; a lobby left at GO's default (310) plays the mod's own limit. Replays keep the limit they were
+played with. The `Shift + Ctrl + Z` zoom-limit cheat is unaffected.
+
 # Options.ini
 
-These are read once at startup. Changing them needs a restart.
+These are read at startup. Most of them can also be changed in game from Options, with the
+`Game Options` button in the title bar, and take effect when you press Accept. `NewRadar` and
+`BlipSize` still need a restart.
+
+## Camera
+
+* `UseCustomMaxCameraHeight = No` - (`Yes` lets `MaxCameraHeight` below replace `GameData.ini`'s
+`MaxCameraHeight`, 670 in Contra. Also editable in Options as `Max Camera Height`, where it applies
+without a restart.)
+* `MaxCameraHeight = 670` - (210 to 1000. Used in single player, skirmish and campaign. LAN and
+online games with two or more humans use the host's limit, or `GameData.ini`'s when the host set
+none.)
 
 ## Display
 
@@ -217,16 +237,19 @@ holds 16 cameos; anything beyond that gets none.
 * `SmartSelectionUseMouse = Yes` - (Yes keeps only a cameo's units on double click, No on
 Ctrl+Shift+click.)
 
-* Left click a cameo to show its type's command set in the bar; every cameo of that type pushes
-in. The whole group stays selected, so orders still go to everyone. A command off that card which
-not every selected type carries is issued to the focused type alone; one they all carry, like Stop
-or Guard, still goes to everyone. Click a pushed in cameo again to go back to the group's common
-commands.
+* Left click a cameo to show its command set in the bar. A cameo that stands for a whole type
+shows the type's set, and every cameo of that type pushes in. A cameo that stands for one object
+drives the bar as if that object alone were selected, so a transport shows its passengers and a
+factory its queue, and only its cameo pushes in. The whole group stays selected, so orders given on
+the map still go to everyone. A command off a focused object's bar goes to that object alone.
+A command off a focused type's card which not every selected unit carries goes to that type alone;
+one they all carry, like Stop or Guard, still goes to everyone. Click a pushed in cameo again to go
+back to the group's common commands.
 * Right click a cameo to drop its unit, or its whole type, from the selection.
 * Double click a cameo (or Ctrl+Shift+click it with `SmartSelectionUseMouse = No`) to keep only its
 unit, or its whole type, and drop everything else.
 * Tab and Shift+Tab (`SMART_SELECTION_NEXT_TYPE` / `SMART_SELECTION_PREV_TYPE` in
-CommandMap.ini) step the focused type through the row, skipping cameos of the type already focused.
+CommandMap.ini) step the focus through the row, skipping cameos that are already pushed in.
 
 ## Input
 

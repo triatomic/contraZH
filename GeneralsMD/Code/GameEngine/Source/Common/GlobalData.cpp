@@ -938,6 +938,7 @@ GlobalData::GlobalData()
 #endif
 	m_minCameraHeight = 100.0f;
 	m_maxCameraHeight = 300.0f;
+	m_defaultMaxCameraHeight = 0.0f;
 	m_terrainHeightAtEdgeOfMap = 0.0f;
 
 	m_unitDamagedThresh = 0.5f;
@@ -1339,7 +1340,15 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 		// be loading into a new override item
 		//
 		if( ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES )
+		{
 			TheWritableGlobalData->newOverride();
+
+			// A map override starts from the INI limit, not from the player's personal one
+			if (TheWritableGlobalData->m_defaultMaxCameraHeight > 0.0f)
+			{
+				TheWritableGlobalData->m_maxCameraHeight = TheWritableGlobalData->m_defaultMaxCameraHeight;
+			}
+		}
 
 	}
 	else if (!TheWritableGlobalData)
@@ -1354,6 +1363,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	// parse the ini weapon definition
 	ini->initFromINI( TheWritableGlobalData, s_GlobalDataFieldParseTable );
 
+	TheWritableGlobalData->m_defaultMaxCameraHeight = TheWritableGlobalData->m_maxCameraHeight;
 
 	// override INI values with user preferences
 	OptionPreferences optionPref;
@@ -1384,6 +1394,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_smartSelectionUseMouse = optionPref.getSmartSelectionUseMouse();
 	TheWritableGlobalData->m_jpegQuality = optionPref.getJpegQuality();
 	TheWritableGlobalData->m_keyboardScrollFactor = optionPref.getScrollFactor();
+	TheWritableGlobalData->m_maxCameraHeight = optionPref.getMaxCameraHeight();
 	TheWritableGlobalData->m_drawScrollAnchor = optionPref.getDrawScrollAnchor();
 	TheWritableGlobalData->m_moveScrollAnchor = optionPref.getMoveScrollAnchor();
 	TheWritableGlobalData->m_defaultIP = optionPref.getLANIPAddress();

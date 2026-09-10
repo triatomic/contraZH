@@ -110,7 +110,7 @@ public:
 protected:
 
 	void positionForLaunch(const Object *launcher, WeaponSlotType wslot, Int specificBarrelToUse);
-	void detonate();
+	void detonate( Object *victim = nullptr );
 
 private:
 

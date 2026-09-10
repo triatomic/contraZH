@@ -760,14 +760,17 @@ public:
 
 	// TheSuperHackers @feature Smart selection: cameos above the command bar, one per type with
 	// a count in a mixed selection, one per object when all are the same type. Left click and Tab
-	// pick which type's command set the bar shows while the whole group stays selected, right
-	// click drops the cameo's units from the selection and double click, or Ctrl+Shift click,
-	// keeps only them.
+	// pick which cameo's command set the bar shows, its type's or its one object's, while the
+	// whole group stays selected; right click drops the cameo's units from the selection and
+	// double click, or Ctrl+Shift click, keeps only them.
 	void processSmartSelectionClick( GameWindow *button, Bool rightClick );
 	void smartSelectionCycle( Int direction );
 	const ThingTemplate *getSmartSelectionFocusTemplate() const;
+	ObjectID getSmartSelectionFocusObject() const;
+	Drawable *getSmartSelectionFocusDrawable() const;
 	Bool isSmartSelectionFocused( const Object *obj ) const;
-	/// a command that only the focused type has goes to the focused type alone
+	Bool isSmartSelectionGroupFocused( Int groupIndex ) const;
+	/// a command that only the focused cameo has goes to its type, or its object, alone
 	void smartSelectionBeginCommand( const CommandButton *command );
 	void smartSelectionEndCommand();
 
@@ -1039,8 +1042,9 @@ protected:
 	GameWindow *m_smartSelectionMoneyWindow;									///< the money display the row must not run into
 	GameWindow *m_smartSelectionButtons[ MAX_SMART_SELECTION_BUTTONS ];
 	ICoord2D m_smartSelectionButtonSize;
-	Int m_smartSelectionActive;																///< cameo whose type's command set the bar shows, or -1 for the common set
-	Bool m_smartSelectionNarrowed;														///< the logic side group is narrowed to the focused type for a command in flight
+	Int m_smartSelectionActive;																///< cameo whose command set the bar shows, or -1 for the common set
+	Bool m_smartSelectionNarrowed;														///< the logic side group is narrowed to the focused cameo for a command in flight
+	Bool m_smartSelectionInCommand;														///< held by the processCommandUI scope, which owns the narrowing while it runs
 	Int m_smartSelectionLastClickSlot;												///< cameo of the last left click, for double click detection
 	UnsignedInt m_smartSelectionLastClickTime;
 

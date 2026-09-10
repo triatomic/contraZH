@@ -64,8 +64,13 @@ GameNetworkingSockets ICE P2P transport, lobbies/matchmaking/stats).
   WinMain's `TheVersion->setVersion` GO variant IS taken (guarded) since the network
   version fields matter for matchmaking.
 - **W3DView::setDefaultView**: takes GO's 4-arg signature under the macro for compile
-  compatibility, but the body keeps this fork's camera behavior - GO's settings-driven
-  camera min/max heights (their settings.json camera section) are not applied.
+  compatibility, but `bForceDefaultCam` is unused and GO's settings.json camera section
+  (`DetermineCameraMaxHeight`, `Camera_GetMinHeight`) is not applied. The lobby's
+  `max_cam_height` (host `/maxcameraheight`) IS honored, via `NGMPGame::SyncWithLobby` ->
+  `GameInfo::m_maxCameraHeight` (`CH=` in the options string) ->
+  `GameLogic::applyMaxCameraHeightForGame`. A lobby left at GO's default (310) plays the
+  mod's own GameData `MaxCameraHeight`. Options.ini `UseCustomMaxCameraHeight` /
+  `MaxCameraHeight` are personal and never affect GO games.
 - **GO headers made self-sufficient**: upstream GO force-includes `PreRTS.h` into every
   TU via CMake PCH, which transitively provides `NextGenMP_defines.h`. This port keeps
   contraZH's PCH setup, so `NextGenMP_defines.h` is included explicitly where needed

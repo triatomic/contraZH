@@ -1836,6 +1836,42 @@ End
   `MaxLifetime` fields, or set `KillObjectWhenDone`. A tornado with `FullStrengthTime = 0` and none
   of these, and no controller such as the cannon, fades out by itself after 30 seconds.
 
+## ThermiteBehavior (New)
+
+Goes on a projectile object. When the projectile detonates, the projectile itself stays alive as a
+hidden burn instead of being destroyed. If the projectile hit an object, the burn sticks to that
+object and follows it around. If the projectile detonated on the ground, the burn stays where it
+landed. Every time `Weapon` is ready it fires at the stuck object, or at the ground spot, until the
+lifetime runs out. Damage, radius, pulse rate and FX all come from that weapon.
+
+The module is meant for an upgrade such as thermite shells, so the upgrade fields gate it. Without
+the trigger the projectile detonates and dies as usual.
+
+```
+Behavior = ThermiteBehavior ModuleTag_Thermite
+  Weapon = FlameTankThermiteBurn  ; (required; fired on every pulse, its FireFX is the burn visual)
+  MinLifetime = 3000              ; (ms; shortest burn)
+  MaxLifetime = 5000              ; (ms; longest burn, picked once per projectile)
+  TriggeredBy = Upgrade_ChinaThermiteShells   ; (optional; none = always on)
+  ConflictsWith = Upgrade_Something           ; (optional)
+  RequiresAllTriggers = No        ; (default = No)
+End
+```
+**Notes:**
+- Works with `DumbProjectileBehavior`, `MissileAIUpdate` and `FreeFallProjectileBehavior`. The
+  normal `ProjectileDetonationFX` and damage still happen first, and only then does the burn start.
+- The projectile is the burn, so `DetonateCallsKill` and the projectile's own death FX are skipped
+  when the thermite ignites.
+- `Weapon` is fired from the projectile with the stuck object as the target, so it must have no
+  `MinimumAttackRange`. `DelayBetweenShots` sets the pulse rate. On the ground it is fired at the
+  burn position, so give it a `PrimaryDamageRadius`.
+- The stuck object is the one the projectile collided with, not the one it was aimed at. Mobile
+  victims are followed at their center. Structures and the ground keep the impact point.
+- A victim that dies or enters a transport or tunnel drops the burn to the ground under it, where
+  it keeps burning for the rest of its lifetime.
+- The upgrade check looks at the firing player, the launcher object and the projectile, so both
+  player upgrades and object upgrades on the launcher work as `TriggeredBy`.
+
 ## ParticleUplinkCannonUpdate (Tornado)
 
 * `TornadoObjectName = <object>` - (Creates this object at the beam ground point when the orbital

@@ -244,6 +244,8 @@ public:
 
   inline Bool oldFactionsOnly() const;
   inline void setOldFactionsOnly( Bool oldFactionsOnly );
+  inline Int getMaxCameraHeight() const;
+  inline void setMaxCameraHeight( Int maxCameraHeight );
 
 protected:
 	Int m_preorderMask;
@@ -266,6 +268,7 @@ protected:
   Money         m_startingCash;
   UnsignedShort m_superweaponRestriction;
   Bool m_oldFactionsOnly; // Only USA, China, GLA -- not USA Air Force General, GLA Toxic General, et al
+  Int m_maxCameraHeight; // Shared camera limit for every player, 0 when the host set none
 };
 
 extern GameInfo *TheGameInfo;
@@ -287,6 +290,8 @@ const Money&GameInfo::getStartingCash() const         { return m_startingCash; }
 UnsignedShort GameInfo::getSuperweaponRestriction() const { return m_superweaponRestriction; }
 Bool        GameInfo::oldFactionsOnly() const           { return m_oldFactionsOnly; }
 void        GameInfo::setOldFactionsOnly( Bool oldFactionsOnly ) { m_oldFactionsOnly = oldFactionsOnly; }
+Int         GameInfo::getMaxCameraHeight() const        { return m_maxCameraHeight; }
+void        GameInfo::setMaxCameraHeight( Int maxCameraHeight ) { m_maxCameraHeight = maxCameraHeight; }
 
 AsciiString GameInfoToAsciiString( const GameInfo *game );
 Bool ParseAsciiStringToGameInfo( GameInfo *game, AsciiString options );

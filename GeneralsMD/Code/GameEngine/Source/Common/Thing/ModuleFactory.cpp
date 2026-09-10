@@ -95,6 +95,7 @@
 #include "GameLogic/Module/RebuildHoleBehavior.h"
 #include "GameLogic/Module/SupplyWarehouseCripplingBehavior.h"
 #include "GameLogic/Module/TechBuildingBehavior.h"
+#include "GameLogic/Module/ThermiteBehavior.h"
 #include "GameLogic/Module/MinefieldBehavior.h"
 #include "GameLogic/Module/BattleBusSlowDeathBehavior.h"
 #include "GameLogic/Module/JetSlowDeathBehavior.h"
@@ -416,6 +417,7 @@ void ModuleFactory::init()
 	addModule( RebuildHoleBehavior );
 	addModule( SupplyWarehouseCripplingBehavior );
 	addModule( TechBuildingBehavior );
+	addModule( ThermiteBehavior );
 	addModule( MinefieldBehavior );
 	addModule( BattleBusSlowDeathBehavior );
 	addModule( JetSlowDeathBehavior );
