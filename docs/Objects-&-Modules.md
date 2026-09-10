@@ -1884,14 +1884,17 @@ Behavior = PoweredBehavior ModuleTag_Powered
   IsMobile = No         ; (default = Yes; No = cannot move while out of power)
   DisableWeapon = Yes   ; (default = No; Yes = cannot attack while out of power)
   MovePenalty = 50%     ; (default = 0%; move speed lost while out of power)
+  Icon = LowPower       ; (optional; name of an Animation block, shown while out of power)
 End
 ```
 **Notes:**
 - `MovePenalty` of 100% or more acts like `IsMobile = No`.
+- `Icon` names an `Animation` block from `animation2d.ini`, like the stock `Disabled` one. It sits
+  above the health bar, beside the disabled icon when both show.
 - Losing power with `IsMobile = No` stops the current move order. Attack orders still work, so a
   turreted unit keeps firing from where it stands.
 - The effects follow the owner. A captured object takes the new owner's power state.
-- No disabled tint is shown.
+- No disabled tint is shown; use `Icon` for feedback.
 
 ## ParticleUplinkCannonUpdate (Tornado)
 

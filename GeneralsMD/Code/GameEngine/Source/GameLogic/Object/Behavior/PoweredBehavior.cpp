@@ -22,6 +22,7 @@
 
 #include "Common/Player.h"
 #include "Common/Xfer.h"
+#include "GameClient/Drawable.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/PoweredBehavior.h"
@@ -44,6 +45,7 @@ PoweredBehaviorModuleData::PoweredBehaviorModuleData()
 		{ "IsMobile",				INI::parseBool,						nullptr, offsetof( PoweredBehaviorModuleData, m_isMobile ) },
 		{ "DisableWeapon",	INI::parseBool,						nullptr, offsetof( PoweredBehaviorModuleData, m_disableWeapon ) },
 		{ "MovePenalty",		INI::parsePercentToReal,	nullptr, offsetof( PoweredBehaviorModuleData, m_movePenalty ) },
+		{ "Icon",						INI::parseAsciiString,		nullptr, offsetof( PoweredBehaviorModuleData, m_iconName ) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
@@ -76,10 +78,16 @@ void PoweredBehavior::setPowered( Bool hasPower )
 	const PoweredBehaviorModuleData *d = getPoweredBehaviorModuleData();
 	Object *obj = getObject();
 	AIUpdateInterface *ai = obj->getAI();
+	Drawable *draw = obj->getDrawable();
 	Bool immobile = !d->m_isMobile || d->m_movePenalty >= 1.0f;
 
 	if (m_unpowered)
 	{
+		if (draw && d->m_iconName.isNotEmpty())
+		{
+			draw->setStatusIcon( d->m_iconName );
+		}
+
 		if (d->m_disableWeapon)
 		{
 			obj->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_NO_ATTACK ) );
@@ -101,6 +109,10 @@ void PoweredBehavior::setPowered( Bool hasPower )
 	}
 	else
 	{
+		if (draw)
+		{
+			draw->clearStatusIcon();
+		}
 		obj->clearStatus( MAKE_OBJECT_STATUS_MASK2( OBJECT_STATUS_NO_ATTACK, OBJECT_STATUS_IMMOBILE ) );
 
 		if (m_appliedScalar != 1.0f)

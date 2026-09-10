@@ -112,6 +112,7 @@ static const char *const TheDrawableIconNames[] =
 	"Enthusiastic",//a red cross? // soon to replace?
 	"Subliminal",  //with the gold border! replace?
 	"CarBomb",
+	"Status",
 	nullptr
 };
 static_assert(ARRAY_SIZE(TheDrawableIconNames) == MAX_ICONS + 1, "Incorrect array size");
@@ -384,6 +385,7 @@ const Int MAX_ENABLED_MODULES								= 16;
 	s_animationTemplates[ICON_ENTHUSIASTIC]			= TheAnim2DCollection->findTemplate(TheDrawableIconNames[ICON_ENTHUSIASTIC]);
 	s_animationTemplates[ICON_ENTHUSIASTIC_SUBLIMINAL]			= TheAnim2DCollection->findTemplate(TheDrawableIconNames[ICON_ENTHUSIASTIC_SUBLIMINAL]);
 	s_animationTemplates[ICON_CARBOMB]			= TheAnim2DCollection->findTemplate(TheDrawableIconNames[ICON_CARBOMB]);
+	s_animationTemplates[ICON_STATUS]				= nullptr; //Set per object by name, so there is no single template.
 
 	s_staticImagesInited = true;
 
@@ -3569,6 +3571,7 @@ void Drawable::drawIconUI()
 		drawDemoralized( healthBarRegion );
 #endif
 		drawDisabled( healthBarRegion );
+		drawStatusIcon( healthBarRegion );
 
 		drawAmmo( healthBarRegion );
 		drawContained( healthBarRegion );
@@ -3595,6 +3598,27 @@ void Drawable::clearEmoticon()
 		return;
 
 	killIcon(ICON_EMOTICON);
+}
+
+//------------------------------------------------------------------------------------------------
+void Drawable::clearStatusIcon()
+{
+	if (!hasIconInfo())
+		return;
+
+	killIcon(ICON_STATUS);
+}
+
+//------------------------------------------------------------------------------------------------
+void Drawable::setStatusIcon( const AsciiString &name )
+{
+	clearStatusIcon();
+	Anim2DTemplate *animTemplate = TheAnim2DCollection->findTemplate( name );
+	if( animTemplate )
+	{
+		getIconInfo()->m_icon[ ICON_STATUS ] = newInstance(Anim2D)( animTemplate, TheAnim2DCollection );
+		getIconInfo()->m_keepTillFrame[ ICON_STATUS ] = FOREVER;
+	}
 }
 
 //------------------------------------------------------------------------------------------------
@@ -4669,6 +4693,30 @@ void Drawable::drawDisabled(const IRegion2D* healthBarRegion)
 
 	}
 
+}
+
+//-------------------------------------------------------------------------------------------------
+void Drawable::drawStatusIcon(const IRegion2D* healthBarRegion)
+{
+	if( !healthBarRegion || !hasIconInfo() || getIconInfo()->m_icon[ ICON_STATUS ] == nullptr )
+	{
+		return;
+	}
+
+	Anim2D *icon = getIconInfo()->m_icon[ ICON_STATUS ];
+	Int barHeight = healthBarRegion->hi.y - healthBarRegion->lo.y;
+	Int frameWidth = icon->getCurrentFrameWidth();
+	Int frameHeight = icon->getCurrentFrameHeight();
+
+	// sit beside the disabled icon when both are showing
+	ICoord2D screen;
+	screen.x = healthBarRegion->lo.x;
+	screen.y = healthBarRegion->hi.y - (frameHeight + barHeight);
+	if( getIconInfo()->m_icon[ ICON_DISABLED ] )
+	{
+		screen.x += getIconInfo()->m_icon[ ICON_DISABLED ]->getCurrentFrameWidth();
+	}
+	icon->draw( screen.x, screen.y, frameWidth, frameHeight );
 }
 
 //-------------------------------------------------------------------------------------------------
