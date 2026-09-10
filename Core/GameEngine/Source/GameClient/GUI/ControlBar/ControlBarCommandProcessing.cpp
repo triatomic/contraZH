@@ -321,6 +321,51 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 	// select context
 	//
 	Object *obj = nullptr;
+	const DrawableList* selected = TheInGameUI->getAllSelectedDrawables();
+	DrawableList factorys;
+	Drawable* draw;
+
+	if (commandButton->getCommandType() == GUI_COMMAND_UNIT_BUILD ||
+		commandButton->getCommandType() == GUI_COMMAND_CANCEL_UNIT_BUILD ||
+		commandButton->getCommandType() == GUI_COMMAND_PLAYER_UPGRADE ||
+		commandButton->getCommandType() == GUI_COMMAND_OBJECT_UPGRADE ||
+		commandButton->getCommandType() == GUI_COMMAND_CANCEL_UPGRADE)
+	{
+		for (DrawableListCIt it = selected->begin();
+			it != selected->end(); ++it)
+		{
+
+			// get the drawable
+			draw = *it;
+
+
+			if (draw->getObject()->isKindOf(KINDOF_IGNORED_IN_GUI)) // ignore these guys
+				continue;
+
+			// TheSuperHackers @feature With a type focused in the smart selection row, only that type
+			// contributes, so the bar shows its command set rather than the group's common subset.
+			if (!isSmartSelectionFocused(draw->getObject()))
+			{
+				continue;
+			}
+
+			if (draw && draw->getObject() &&
+				!draw->getObject()->getStatusBits().test(OBJECT_STATUS_SOLD) &&
+				!draw->getObject()->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION))
+			{
+				factorys.push_back(draw);
+			}
+		}
+
+		for (DrawableListCIt it = factorys.begin();
+			it != factorys.end(); ++it)
+			if (!(*it)->getObject()->getProductionUpdateInterface())
+			{
+				factorys.clear();
+				break;
+			}
+	}
+
 	if( m_currContext != CB_CONTEXT_MULTI_SELECT &&
 			commandButton->getCommandType() != GUI_COMMAND_PURCHASE_SCIENCE &&
 			commandButton->getCommandType() != GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT &&
@@ -555,15 +600,82 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			const ThingTemplate *whatToBuild = commandButton->getThingTemplate();
 
 			// get the "factory" object that is going to make the thing
-			Object *factory = obj;
-			if( factory == nullptr )
+
+			if( factorys.size() == 0)
 				break;
 
 			// sanity, we must have something to build
 			DEBUG_ASSERTCRASH( whatToBuild, ("Undefined BUILD command for object '%s'",
 												 commandButton->getThingTemplate()->getName().str()) );
 
-			CanMakeType cmt = TheBuildAssistant->canMakeUnit(factory, whatToBuild);
+			Real minFinishTime = 1e9, curFinishTime;
+			Object *bestFactory = nullptr, *curFactory;
+			ProductionUpdateInterface *pu = nullptr;
+			const ProductionEntry* pe;
+			Int totalFrames = 0;
+			CanMakeType cmt = CANMAKE_FACTORY_IS_DISABLED, curCmt;
+
+			for (DrawableListCIt it = factorys.begin(); it != factorys.end(); it++)
+			{
+				curFinishTime = 0.0;
+				curFactory = (*it)->getObject();
+				if (!curFactory)
+					break;
+				pu = curFactory->getProductionUpdateInterface();
+				if (!pu)
+					break;
+				pe = pu->firstProduction();
+				if (pe)
+				{
+					totalFrames = 0;
+					if (pe->getProductionType() == PRODUCTION_UNIT)
+					{
+						if (pe->getProductionObject())
+							totalFrames = pe->getProductionObject()->calcTimeToBuild(player);
+					}
+					else if (pe->getProductionUpgrade())
+					{
+						totalFrames = pe->getProductionUpgrade()->calcTimeToBuild(player);
+					}
+					curFinishTime = (100.0f - pe->getPercentComplete()) / 100.f * totalFrames;
+
+					while (pe = pu->nextProduction(pe))
+						if (pe->getProductionType() == PRODUCTION_UNIT)
+						{
+							if (pe->getProductionObject())
+								curFinishTime += pe->getProductionObject()->calcTimeToBuild(player);
+						}
+						else if (pe->getProductionUpgrade())
+						{
+							curFinishTime += pe->getProductionUpgrade()->calcTimeToBuild(player);
+						}
+				}
+
+				curCmt = TheBuildAssistant->canMakeUnit(bestFactory, whatToBuild);
+
+				if (it == factorys.begin())
+				{
+					cmt = curCmt;
+					if (cmt == CANMAKE_NO_MONEY || cmt == CANMAKE_NO_PREREQ || cmt == CANMAKE_MAXED_OUT_FOR_PLAYER)
+						break;
+				}
+
+				if (curCmt == CANMAKE_OK)
+				{
+					if (curFinishTime < minFinishTime || cmt != CANMAKE_OK)
+					{
+						cmt = CANMAKE_OK;
+						minFinishTime = curFinishTime;
+						bestFactory = curFactory;
+					}
+				}
+				else if (curCmt == CANMAKE_QUEUE_FULL && cmt == CANMAKE_PARKING_PLACES_FULL)
+						cmt = CANMAKE_QUEUE_FULL;
+
+				if (minFinishTime == 0.0)
+					break;
+			}
+
 
 			if (cmt == CANMAKE_NO_MONEY)
 			{
@@ -595,7 +707,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			}
 
 			// get the production interface from the factory object
-			ProductionUpdateInterface *pu = factory->getProductionUpdateInterface();
+			pu = bestFactory->getProductionUpdateInterface();
 
 			// sanity, we can't build things if we can't produce units
 			if( pu == nullptr )
@@ -610,7 +722,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 			// TheSuperHackers @feature Shift queues a batch instead of a single unit.
 			Int unitsToQueue = 1;
-			if( TheKeyboard && TheKeyboard->isShift() )
+			if (TheKeyboard && TheKeyboard->isShift())
 				unitsToQueue = SHIFT_CLICK_BATCH_SIZE;
 
 			for( Int queued = 0; queued < unitsToQueue; ++queued )
@@ -618,7 +730,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				// Re-check every time round. canMakeUnit covers money, queue space, parking and
 				// per player unit caps, and each unit we just queued moves those. Stop quietly
 				// once we can no longer build -- the first unit already reported any problem.
-				if( queued > 0 && TheBuildAssistant->canMakeUnit( factory, whatToBuild ) != CANMAKE_OK )
+				if( queued > 0 && TheBuildAssistant->canMakeUnit( bestFactory, whatToBuild ) != CANMAKE_OK )
 					break;
 
 				// get a new production id to assign to this
@@ -628,6 +740,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 				GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_QUEUE_UNIT_CREATE );
 				msg->appendIntegerArgument( whatToBuild->getTemplateID() );
+				msg->appendObjectIDArgument(obj->getID());
 				msg->appendIntegerArgument( productionID );
 			}
 
@@ -719,33 +832,90 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		//---------------------------------------------------------------------------------------------
 		case GUI_COMMAND_PLAYER_UPGRADE:
 		{
-			const UpgradeTemplate *upgradeT = commandButton->getUpgradeTemplate();
-			DEBUG_ASSERTCRASH( upgradeT, ("Undefined upgrade '%s' in player upgrade command", "UNKNOWN") );
+			const UpgradeTemplate* upgradeT = commandButton->getUpgradeTemplate();
+			DEBUG_ASSERTCRASH(upgradeT, ("Undefined upgrade '%s' in player upgrade command", "UNKNOWN"));
 
 			// sanity
-			if( obj == nullptr || upgradeT == nullptr )
+			if (factorys.size() == 0 || upgradeT == nullptr)
 				break;
 
 			// make sure the player can really make this
-			if( TheUpgradeCenter->canAffordUpgrade( ThePlayerList->getLocalPlayer(), upgradeT, TRUE ) == FALSE )
+			if (TheUpgradeCenter->canAffordUpgrade(ThePlayerList->getLocalPlayer(), upgradeT, TRUE) == FALSE)
 			{
 				break;
 			}
 
-			ProductionUpdateInterface* pu = obj ? obj->getProductionUpdateInterface() : nullptr;
-			if (pu != nullptr)
+			Real minFinishTime = 1e9, curFinishTime;
+			Object* bestFactory = nullptr, * curFactory;
+			ProductionUpdateInterface* pu = nullptr;
+			const ProductionEntry* pe;
+			Int totalFrames = 0;
+			CanMakeType cmt = CANMAKE_FACTORY_IS_DISABLED, curCmt;
+
+			for (DrawableListCIt it = factorys.begin(); it != factorys.end(); it++)
 			{
-				CanMakeType cmt = pu->canQueueUpgrade(upgradeT);
-				if (cmt == CANMAKE_QUEUE_FULL)
-				{
-					TheInGameUI->message( "GUI:ProductionQueueFull" );
+				curFinishTime = 0.0;
+				curFactory = (*it)->getObject();
+				if (!curFactory)
 					break;
+				pu = curFactory->getProductionUpdateInterface();
+				if (!pu)
+					break;
+				pe = pu->firstProduction();
+				if (pe)
+				{
+					totalFrames = 0;
+					if (pe->getProductionType() == PRODUCTION_UNIT)
+					{
+						if (pe->getProductionObject())
+							totalFrames = pe->getProductionObject()->calcTimeToBuild(player);
+					}
+					else if (pe->getProductionUpgrade())
+					{
+						totalFrames = pe->getProductionUpgrade()->calcTimeToBuild(player);
+					}
+					curFinishTime = (100.0f - pe->getPercentComplete()) / 100.f * totalFrames;
+
+					while (pe = pu->nextProduction(pe))
+						if (pe->getProductionType() == PRODUCTION_UNIT)
+						{
+							if (pe->getProductionObject())
+								curFinishTime += pe->getProductionObject()->calcTimeToBuild(player);
+						}
+						else if (pe->getProductionUpgrade())
+						{
+							curFinishTime += pe->getProductionUpgrade()->calcTimeToBuild(player);
+						}
 				}
+
+				curCmt = pu->canQueueUpgrade(upgradeT);
+
+				if (it == factorys.begin())
+					cmt = curCmt;
+
+				if (curCmt == CANMAKE_OK)
+				{
+					if (curFinishTime < minFinishTime || cmt != CANMAKE_OK)
+					{
+						cmt = CANMAKE_OK;
+						minFinishTime = curFinishTime;
+						bestFactory = curFactory;
+					}
+				}
+
+				if (minFinishTime == 0.0)
+					break;
+			}
+
+			if (cmt == CANMAKE_QUEUE_FULL)
+			{
+				TheInGameUI->message("GUI:ProductionQueueFull");
+				break;
 			}
 
 			// send the message
 			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_QUEUE_UPGRADE );
-			msg->appendObjectIDArgument( obj->getID() );
+			msg->appendObjectIDArgument( bestFactory->getID() );
 			msg->appendIntegerArgument( upgradeT->getUpgradeNameKey() );
 
 			break;

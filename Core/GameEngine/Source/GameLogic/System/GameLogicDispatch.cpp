@@ -1960,17 +1960,22 @@ bool GameLogic::onCancelUpgrade(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curre
 
 bool GameLogic::onQueueUnitCreate(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
+	// ShigureUi 09/09/2026 we're not gonna use this producer
 #if RETAIL_COMPATIBLE_AIGROUP
-	Object *producer = getSingleObjectFromSelection(currentlySelectedGroup);
+	//Object *producer = getSingleObjectFromSelection(currentlySelectedGroup);
 #else
 	Object *producer = getSingleObjectFromSelection(currentlySelectedGroup.Peek());
 #endif
 	const ThingTemplate *whatToCreate;
+	ObjectID objID;
 	ProductionID productionID;
 
 	// get data from the message
 	whatToCreate = TheThingFactory->findByTemplateID( msg->getArgument( 0 )->integer );
-	productionID = (ProductionID)msg->getArgument( 1 )->integer;
+	objID = (ObjectID)msg->getArgument(1)->integer;
+	productionID = (ProductionID)msg->getArgument( 2 )->integer;
+
+	Object* producer = TheGameLogic->findObjectByID(objID);
 
 	// sanity
 	if ( producer == nullptr || whatToCreate == nullptr )
