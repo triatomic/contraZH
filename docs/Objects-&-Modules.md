@@ -1890,7 +1890,9 @@ End
 **Notes:**
 - `MovePenalty` of 100% or more acts like `IsMobile = No`.
 - `Icon` names an `Animation` block from `animation2d.ini`, like the stock `Disabled` one. It sits
-  above the health bar, beside the disabled icon when both show.
+  above the health bar, beside the disabled icon when both show. An `Animation` block can now take
+  `Texture = file.tga [width height]` per frame instead of a `MappedImage` name; size defaults to
+  32 x 32.
 - Losing power with `IsMobile = No` stops the current move order. Attack orders still work, so a
   turreted unit keeps firing from where it stands.
 - The effects follow the owner. A captured object takes the new owner's power state.
