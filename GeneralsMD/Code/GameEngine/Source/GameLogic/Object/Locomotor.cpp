@@ -744,6 +744,7 @@ Locomotor::Locomotor(const LocomotorTemplate* tmpl)
 	m_donutTimer = TheGameLogic->getFrame()+DONUT_TIME_DELAY_SECONDS*LOGICFRAMES_PER_SECOND;
 
 	m_speedMultiplier = 1.0;
+	m_liftMultiplier = 1.0;
 
 	m_loadSpeedFactor = 1.0f;
 	m_loadTurnRateFactor = 1.0f;
@@ -826,7 +827,7 @@ void Locomotor::crc( Xfer *xfer )
 void Locomotor::xfer( Xfer *xfer )
 {
 	// version
-	const XferVersion currentVersion = 2;
+	const XferVersion currentVersion = 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -852,6 +853,11 @@ void Locomotor::xfer( Xfer *xfer )
 	xfer->xferReal(&m_offsetIncrement);
 
 	xfer->xferReal(&m_speedMultiplier);
+
+	if (version >= 3)
+	{
+		xfer->xferReal(&m_liftMultiplier);
+	}
 
 }  // end xfer
 
@@ -954,7 +960,7 @@ Real Locomotor::getMaxLift(BodyDamageType condition) const
 	else
 		lift = m_template->m_liftDamaged;
 
-	lift *= m_speedMultiplier;
+	lift *= m_liftMultiplier;
 	lift *= m_loadLiftFactor;
 
 	if (lift > m_maxLift)

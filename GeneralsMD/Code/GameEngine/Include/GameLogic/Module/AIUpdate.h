@@ -644,6 +644,8 @@ public:
 
 	void applySpeedMultiplier(Real scalar);
 	inline Real getSpeedMultiplier(void) const { return m_speedMultiplier; }
+	void applyLiftMultiplier(Real scalar);
+	inline Real getLiftMultiplier(void) const { return m_liftMultiplier; }
 
 	/// Occupant load slowdown, kept here so it survives a locomotor set being rebuilt.
 	void setLoadFactors(Real speed, Real turnRate, Real accel, Real lift);
@@ -880,6 +882,7 @@ private:
 	Bool				m_fixLocoInPostProcess;
 
 	Real        m_speedMultiplier;          ///< global multiplier to move speed (kept in AIUpdate rather than Locomotor because it's persistent)
+	Real        m_liftMultiplier;           ///< global multiplier to lift, likewise persistent
 	Real        m_loadSpeedFactor;          ///< how much our occupants slow us down, likewise persistent
 	Real        m_loadTurnRateFactor;
 	Real        m_loadAccelFactor;

@@ -385,6 +385,10 @@ public:
 	// inline void setSpeedMultiplier(Real value) { m_speedMultiplier = value; }
 	inline Real getSpeedMultiplier(void) const { return m_speedMultiplier; }
 
+	/// Lift is kept apart from speed, since a hovering unit with less lift than gravity falls.
+	inline void applyLiftMultiplier(Real scalar) { m_liftMultiplier *= scalar; }
+	inline Real getLiftMultiplier(void) const { return m_liftMultiplier; }
+
 	/// Assigns rather than accumulates, so a container can restore full speed exactly.
 	inline void setLoadFactors(Real speed, Real turnRate, Real accel, Real lift)
 	{
@@ -489,6 +493,7 @@ private:
 	UnsignedInt m_donutTimer;				///< Frame time to keep units from doing the donut. jba.
 
 	Real			    m_speedMultiplier;  ///< scalar to max speed and acceleration
+	Real			    m_liftMultiplier;   ///< scalar to max lift
 
 	Real			    m_loadSpeedFactor;      ///< how much a container's occupants slow it down
 	Real			    m_loadTurnRateFactor;

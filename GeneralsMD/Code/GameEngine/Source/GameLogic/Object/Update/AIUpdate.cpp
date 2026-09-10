@@ -382,6 +382,7 @@ AIUpdateInterface::AIUpdateInterface( Thing *thing, const ModuleData* moduleData
 	m_isInUpdate = FALSE;
 	m_fixLocoInPostProcess = FALSE;
 	m_speedMultiplier = 1.0;
+	m_liftMultiplier = 1.0;
 	m_loadSpeedFactor = 1.0f;
 	m_loadTurnRateFactor = 1.0f;
 	m_loadAccelFactor = 1.0f;
@@ -1041,6 +1042,8 @@ void AIUpdateInterface::chooseGoodLocomotorFromCurrentSet()
 		// Add speed multiplier to loco
 		if (m_speedMultiplier != 1.0)
 			m_curLocomotor->applySpeedMultiplier(m_speedMultiplier);
+		if (m_liftMultiplier != 1.0)
+			m_curLocomotor->applyLiftMultiplier(m_liftMultiplier);
 
 		// Restore the occupant load slowdown, which the new loco knows nothing about
 		if (m_loadSpeedFactor != 1.0f || m_loadTurnRateFactor != 1.0f || m_loadAccelFactor != 1.0f || m_loadLiftFactor != 1.0f)
@@ -4883,6 +4886,13 @@ void AIUpdateInterface::applySpeedMultiplier(Real scalar) {
 }
 
 //----------------------------------------------------------------------------------------------
+void AIUpdateInterface::applyLiftMultiplier(Real scalar) {
+	m_liftMultiplier *= scalar;
+	if (m_curLocomotor)
+		m_curLocomotor->applyLiftMultiplier(scalar);
+}
+
+//----------------------------------------------------------------------------------------------
 void AIUpdateInterface::setLoadFactors(Real speed, Real turnRate, Real accel, Real lift)
 {
 	m_loadSpeedFactor = speed;
@@ -5561,7 +5571,7 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 #if RETAIL_COMPATIBLE_CRC || RETAIL_COMPATIBLE_XFER_SAVE
 	const XferVersion currentVersion = 4;
 #else
-	const XferVersion currentVersion = 8;
+	const XferVersion currentVersion = 9;
 #endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
@@ -5805,6 +5815,11 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 		xfer->xferInt(&m_queuedShotsLeft);
 		xfer->xferCoord3D(&m_queuedShotsPos);
 		xfer->xferUnsignedInt(&m_clearFiringStatusFrame);
+	}
+
+	if (version >= 9)
+	{
+		xfer->xferReal(&m_liftMultiplier);
 	}
 
 }

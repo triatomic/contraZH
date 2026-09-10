@@ -1884,11 +1884,14 @@ Behavior = PoweredBehavior ModuleTag_Powered
   IsMobile = No         ; (default = Yes; No = cannot move while out of power)
   DisableWeapon = Yes   ; (default = No; Yes = cannot attack while out of power)
   MovePenalty = 50%     ; (default = 0%; move speed lost while out of power)
+  LiftPenalty = 20%     ; (default = 0%; lift lost while out of power, hovering units only)
   Icon = LowPower       ; (optional; name of an Animation block, shown while out of power)
 End
 ```
 **Notes:**
 - `MovePenalty` of 100% or more acts like `IsMobile = No`.
+- `MovePenalty` never touches lift, so helicopters keep hovering. `LiftPenalty` lowers lift on
+  its own. Once lift no longer beats gravity the unit sinks, so keep it small. 100% is ignored.
 - `Icon` names an `Animation` block from `animation2d.ini`, like the stock `Disabled` one. It sits
   above the health bar, beside the disabled icon when both show. An `Animation` block can now take
   `Texture = file.tga [width height]` per frame instead of a `MappedImage` name; size defaults to

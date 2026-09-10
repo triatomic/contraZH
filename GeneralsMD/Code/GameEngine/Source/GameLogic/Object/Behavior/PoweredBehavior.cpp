@@ -33,6 +33,7 @@ PoweredBehaviorModuleData::PoweredBehaviorModuleData()
 	m_isMobile = TRUE;
 	m_disableWeapon = FALSE;
 	m_movePenalty = 0.0f;
+	m_liftPenalty = 0.0f;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -45,6 +46,7 @@ PoweredBehaviorModuleData::PoweredBehaviorModuleData()
 		{ "IsMobile",				INI::parseBool,						nullptr, offsetof( PoweredBehaviorModuleData, m_isMobile ) },
 		{ "DisableWeapon",	INI::parseBool,						nullptr, offsetof( PoweredBehaviorModuleData, m_disableWeapon ) },
 		{ "MovePenalty",		INI::parsePercentToReal,	nullptr, offsetof( PoweredBehaviorModuleData, m_movePenalty ) },
+		{ "LiftPenalty",		INI::parsePercentToReal,	nullptr, offsetof( PoweredBehaviorModuleData, m_liftPenalty ) },
 		{ "Icon",						INI::parseAsciiString,		nullptr, offsetof( PoweredBehaviorModuleData, m_iconName ) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
@@ -55,7 +57,8 @@ PoweredBehaviorModuleData::PoweredBehaviorModuleData()
 PoweredBehavior::PoweredBehavior( Thing *thing, const ModuleData* moduleData ) :
 	UpdateModule( thing, moduleData ),
 	m_unpowered(FALSE),
-	m_appliedScalar(1.0f)
+	m_appliedScalar(1.0f),
+	m_appliedLift(1.0f)
 {
 	// the owner is not known yet, so the first tick reads the power state
 	setWakeFrame( getObject(), UPDATE_SLEEP_NONE );
@@ -106,6 +109,12 @@ void PoweredBehavior::setPowered( Bool hasPower )
 			m_appliedScalar = 1.0f - d->m_movePenalty;
 			ai->applySpeedMultiplier( m_appliedScalar );
 		}
+
+		if (d->m_liftPenalty > 0.0f && d->m_liftPenalty < 1.0f && ai)
+		{
+			m_appliedLift = 1.0f - d->m_liftPenalty;
+			ai->applyLiftMultiplier( m_appliedLift );
+		}
 	}
 	else
 	{
@@ -122,6 +131,15 @@ void PoweredBehavior::setPowered( Bool hasPower )
 				ai->applySpeedMultiplier( 1.0f / m_appliedScalar );
 			}
 			m_appliedScalar = 1.0f;
+		}
+
+		if (m_appliedLift != 1.0f)
+		{
+			if (ai)
+			{
+				ai->applyLiftMultiplier( 1.0f / m_appliedLift );
+			}
+			m_appliedLift = 1.0f;
 		}
 	}
 }
@@ -170,6 +188,7 @@ void PoweredBehavior::xfer( Xfer *xfer )
 
 	xfer->xferBool( &m_unpowered );
 	xfer->xferReal( &m_appliedScalar );
+	xfer->xferReal( &m_appliedLift );
 }
 
 //-------------------------------------------------------------------------------------------------

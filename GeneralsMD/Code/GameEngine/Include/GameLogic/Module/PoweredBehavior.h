@@ -39,6 +39,7 @@ public:
 	Bool	m_isMobile;				///< No = cannot move while out of power
 	Bool	m_disableWeapon;	///< Yes = cannot attack while out of power
 	Real	m_movePenalty;		///< share of move speed lost while out of power, 1.0 or more immobilizes
+	Real	m_liftPenalty;		///< share of lift lost while out of power, for hovering units
 	AsciiString	m_iconName;	///< Animation block shown over the object while out of power
 
 	static void buildFieldParse(MultiIniFieldParse& p);
@@ -71,6 +72,7 @@ protected:
 
 	Bool	m_unpowered;			///< effects are currently applied
 	Real	m_appliedScalar;	///< speed multiplier applied, 1.0 when none
+	Real	m_appliedLift;		///< lift multiplier applied, 1.0 when none
 
 };
 
