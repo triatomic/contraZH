@@ -656,37 +656,38 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			if( !producer->isLocallyControlled() )
 				break;
 
-			ProductionUpdateInterface *pu = producer->getProductionUpdateInterface();
+			ProductionUpdateInterface* pu = producer->getProductionUpdateInterface();
 			if (!pu)
 				break;
 
-			const ProductionEntry *pe;
-			UnsignedShort typeIDToCancel;
+			// Ctrl moves the clicked entry one position earlier in the queue instead of
+			// cancelling it. Break unconditionally so a Ctrl click can never fall through
+			// to the cancel below, and never combines with the Shift cancel either. Gated
+			// behind the QueueReorder GameData option; with it off, Ctrl+click cancels
+			// like retail.
+			if (TheGlobalData->m_queueReorder && TheKeyboard && TheKeyboard->isCtrl())
+			{
+				if (i > 0)
+				{
+					GameMessage* moveMsg = TheMessageStream->appendMessage(GameMessage::MSG_MOVE_UNIT_CREATE_EARLIER);
+					moveMsg->appendIntegerArgument(productionIDToCancel);
+				}
+				break;
+			}
+
+			const ProductionEntry* pe;
+			UnsignedShort typeIDToCancel = UINT16_MAX;
 			for (pe = pu->firstProduction(); pe; pe = pu->nextProduction(pe))
 				if (pe->getProductionType() == PRODUCTION_UNIT && pe->getProductionID() == productionIDToCancel)
 				{
 					typeIDToCancel = pe->getProductionObject()->getTemplateID();
 					break;
 				}
-
-			// Ctrl moves the clicked entry one position earlier in the queue instead of
-			// cancelling it. Break unconditionally so a Ctrl click can never fall through
-			// to the cancel below, and never combines with the Shift batch either. Gated
-			// behind the QueueReorder GameData option; with it off, Ctrl+click cancels
-			// like retail.
-			if( TheGlobalData->m_queueReorder && TheKeyboard && TheKeyboard->isCtrl() )
-			{
-				if( i > 0 )
-				{
-					GameMessage *moveMsg = TheMessageStream->appendMessage( GameMessage::MSG_MOVE_UNIT_CREATE_EARLIER );
-					moveMsg->appendIntegerArgument( productionIDToCancel );
-				}
+			if (typeIDToCancel == UINT16_MAX)
 				break;
-			}
 
-			// TheSuperHackers @feature Shift cancels all units of one type
-
-			if( TheKeyboard && TheKeyboard->isShift() )
+			// TheSuperHackers @feature Shift cancels all units of this type
+			if (TheKeyboard && TheKeyboard->isShift())
 			{
 				for (pe = pu->firstProduction(); pe; pe = pu->nextProduction(pe))
 					if (pe->getProductionType() == PRODUCTION_UNIT && pe->getProductionObject()->getTemplateID() == typeIDToCancel)
@@ -704,7 +705,6 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			}
 
 			break;
-
 		}
 
 		//---------------------------------------------------------------------------------------------
