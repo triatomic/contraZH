@@ -100,6 +100,7 @@ protected:
 	static void parseImage( INI *ini, void *instance, void *store, const void *userData );
 	static void parseNumImages( INI *ini, void *instance, void *store, const void *userData );
 	static void parseImageSequence( INI *ini, void *instance, void *store, const void *userData );
+	static void parseTexture( INI *ini, void *instance, void *store, const void *userData );
 
 protected:
 	enum { NUM_FRAMES_INVALID = 0 };			///< initialization value for num frames

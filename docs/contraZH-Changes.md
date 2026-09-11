@@ -94,6 +94,18 @@ Note: a drone set to acquire targets on its own can still pick a fight after bei
 that is a separate mechanism from following the master's victim. That is a data decision rather than
 an engine one.
 
+## USE_OWNER_OBJECT fires from the owner
+
+An `OCLSpecialPower` with `CreateLocation = USE_OWNER_OBJECT` is meant to make the object that owns
+the power carry out the delivery itself, with no new transport spawned. That is how vanilla Generals
+behaves and what the retail INI comments describe. Zero Hour instead spawned a fresh transport next
+to the owner and left the owner idle, because a `Real angle` overload added to the OCL entry point
+swallowed the "do not create the owner" flag as a lifetime of zero frames.
+
+The owner now performs the delivery, as in Generals. Only powers that set `USE_OWNER_OBJECT`, which
+are scripted or mod-defined, are affected; every other `CreateLocation` is untouched. This changes the
+simulation for those powers, so replays that rely on them will not play back identically.
+
 ## More Generals Challenge personas
 
 ChallengeMode.ini stopped at twelve personas, `GeneralPersona0` through `GeneralPersona11`. A
@@ -241,10 +253,9 @@ Ctrl+Shift+click.)
 shows the type's set, and every cameo of that type pushes in. A cameo that stands for one object
 drives the bar as if that object alone were selected, so a transport shows its passengers and a
 factory its queue, and only its cameo pushes in. The whole group stays selected, so orders given on
-the map still go to everyone. A command off a focused object's bar goes to that object alone.
-A command off a focused type's card which not every selected unit carries goes to that type alone;
-one they all carry, like Stop or Guard, still goes to everyone. Click a pushed in cameo again to go
-back to the group's common commands.
+the map still go to everyone, but a command off the bar goes to the focused object, or the focused
+type, alone. A building placed from a focused dozer is built by it, and the other selected dozers
+go to help. Click a pushed in cameo again to go back to the group's common commands.
 * Right click a cameo to drop its unit, or its whole type, from the selection.
 * Double click a cameo (or Ctrl+Shift+click it with `SmartSelectionUseMouse = No`) to keep only its
 unit, or its whole type, and drop everything else.
@@ -264,7 +275,8 @@ at an unintended spot cannot be undone.
 says it is ready, rather than being thrown away. The cooldown itself is untouched: readiness is
 asked of `SpecialPowerModule::isReady` every frame rather than predicted, so a queued cast can never
 fire earlier than a manual one could.
-* Shift+click queues or cancels five units at once, from either the mouse or the hotkey.
+* Shift+click queues five units at once, from either the mouse or the hotkey. Shift+click on a
+queue entry cancels every queued unit of that type in the factory.
 
 ## Clipboard paste
 
@@ -704,7 +716,7 @@ earlier, swapping it with the entry directly before it. The displaced entry lose
 build time spent on it and starts over when it reaches the front again; already produced
 units of a quantity batch stay produced. Ctrl+click on the first entry does nothing, and
 a finished unit that is only waiting to exit the factory cannot be displaced. A plain
-click still cancels the entry, and Shift+click still cancels a batch of units.
+click still cancels the entry, and Shift+click still cancels every unit of its type.
 
 # Drag Selection
 

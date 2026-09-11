@@ -217,7 +217,7 @@ void OCLSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, 
 			break;
 		case USE_OWNER_OBJECT:
 			creationCoord.set( targetCoord );
-			createdObject = ObjectCreationList::create( ocl, getObject(), &creationCoord, &targetCoord, angle, false );
+			createdObject = ObjectCreationList::create( ocl, getObject(), &creationCoord, &targetCoord, false );
 			break;
 		case CREATE_ABOVE_LOCATION:
 			// this is the case where the special power stuff originates above the location of the mouse click

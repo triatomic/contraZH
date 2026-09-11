@@ -100,6 +100,7 @@ enum DrawableIconType CPP_11(: Int)
 	ICON_ENTHUSIASTIC,
 	ICON_ENTHUSIASTIC_SUBLIMINAL,
 	ICON_CARBOMB,
+	ICON_STATUS,
 
 	MAX_ICONS,
 	ICON_FIRST = 0,
@@ -800,6 +801,10 @@ public:
 	//For now, you can only have one emoticon at a time. Changing it will clear the previous one.
 	void clearEmoticon();
 	void setEmoticon( const AsciiString &name, Int duration );
+
+	//One logic-driven status icon, set by name of an Animation block. Setting a new name replaces the old one.
+	void clearStatusIcon() { killIcon( ICON_STATUS ); }
+	void setStatusIcon( const AsciiString &name ) { setNamedIcon( ICON_STATUS, name, FOREVER ); }
 	void drawUIText();				///< draw the group number of this unit // public so gameclient can call
 private:
 	// "icon" drawing methods **************
@@ -834,6 +839,9 @@ private:
 #endif
 	void drawBombed( const IRegion2D* healthBarRegion );						///< draw icons
 	void drawDisabled( const IRegion2D* healthBarRegion );					///< draw icons
+	void drawStatusIcon( const IRegion2D* healthBarRegion );				///< draw the module-set status icon
+	void drawIconAboveBar( DrawableIconType slot, const IRegion2D* healthBarRegion, Int xOffset );
+	void setNamedIcon( DrawableIconType slot, const AsciiString &name, UnsignedInt keepTillFrame );
 	void drawBattlePlans( const IRegion2D* healthBarRegion );				///< Icons rendering for active battle plan statii
 
 	Bool drawsAnyUIText();
