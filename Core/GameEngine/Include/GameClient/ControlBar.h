@@ -770,9 +770,10 @@ public:
 	Drawable *getSmartSelectionFocusDrawable() const;
 	Bool isSmartSelectionFocused( const Object *obj ) const;
 	Bool isSmartSelectionGroupFocused( Int groupIndex ) const;
-	/// a command that only the focused cameo has goes to its type, or its object, alone
-	void smartSelectionBeginCommand( const CommandButton *command );
-	void smartSelectionEndCommand();
+	/// sent ahead of a bar command, so it acts on the focused object or type alone
+	void appendCommandGroup( const CommandButton *command );
+	/// sent ahead of a placement, so the builder builds and the other selected dozers help
+	void appendBuildGroup( const Object *builder );
 
 	//-----------------------------------------------------------------------------------------------
 	// the remaining methods are used to construct the command buttons and command sets for
@@ -1043,8 +1044,6 @@ protected:
 	GameWindow *m_smartSelectionButtons[ MAX_SMART_SELECTION_BUTTONS ];
 	ICoord2D m_smartSelectionButtonSize;
 	Int m_smartSelectionActive;																///< cameo whose command set the bar shows, or -1 for the common set
-	Bool m_smartSelectionNarrowed;														///< the logic side group is narrowed to the focused cameo for a command in flight
-	Bool m_smartSelectionInCommand;														///< held by the processCommandUI scope, which owns the narrowing while it runs
 	Int m_smartSelectionLastClickSlot;												///< cameo of the last left click, for double click detection
 	UnsignedInt m_smartSelectionLastClickTime;
 

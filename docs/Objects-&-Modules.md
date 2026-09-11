@@ -1872,6 +1872,35 @@ End
 - The upgrade check looks at the firing player, the launcher object and the projectile, so both
   player upgrades and object upgrades on the launcher work as `TriggeredBy`.
 
+## PoweredBehavior (New)
+
+Controls what an object does while its owner is out of power. Without the module, a `KINDOF_POWERED`
+object gets the underpowered disable and shuts down completely. With the module the object stays
+active, and only the listed effects apply. The module replaces the `KINDOF_POWERED` disable on that
+object, so abilities and command buttons keep working.
+
+```
+Behavior = PoweredBehavior ModuleTag_Powered
+  IsMobile = No         ; (default = Yes; No = cannot move while out of power)
+  DisableWeapon = Yes   ; (default = No; Yes = cannot attack while out of power)
+  MovePenalty = 50%     ; (default = 0%; move speed lost while out of power)
+  LiftPenalty = 20%     ; (default = 0%; lift lost while out of power, hovering units only)
+  Icon = LowPower       ; (optional; name of an Animation block, shown while out of power)
+End
+```
+**Notes:**
+- `MovePenalty` of 100% or more acts like `IsMobile = No`.
+- `MovePenalty` never touches lift, so helicopters keep hovering. `LiftPenalty` lowers lift on
+  its own. Once lift no longer beats gravity the unit sinks, so keep it small. 100% is ignored.
+- `Icon` names an `Animation` block from `animation2d.ini`, like the stock `Disabled` one. It sits
+  above the health bar, beside the disabled icon when both show. An `Animation` block can now take
+  `Texture = file.tga [width height]` per frame instead of a `MappedImage` name; size defaults to
+  32 x 32.
+- Losing power with `IsMobile = No` stops the current move order. Attack orders still work, so a
+  turreted unit keeps firing from where it stands.
+- The effects follow the owner. A captured object takes the new owner's power state.
+- No disabled tint is shown; use `Icon` for feedback.
+
 ## ParticleUplinkCannonUpdate (Tornado)
 
 * `TornadoObjectName = <object>` - (Creates this object at the beam ground point when the orbital

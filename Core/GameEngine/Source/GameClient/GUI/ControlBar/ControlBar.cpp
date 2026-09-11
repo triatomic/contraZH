@@ -1001,8 +1001,6 @@ ControlBar::ControlBar()
 	m_smartSelectionButtonSize.x = 0;
 	m_smartSelectionButtonSize.y = 0;
 	m_smartSelectionActive = -1;
-	m_smartSelectionNarrowed = FALSE;
-	m_smartSelectionInCommand = FALSE;
 	m_smartSelectionLastClickSlot = -1;
 	m_smartSelectionLastClickTime = 0;
 	m_scienceLayout = nullptr;

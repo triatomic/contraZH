@@ -199,7 +199,7 @@ void MultiLocationSpecialPowerUpdate::fireOclAtLocation( const Coord3D *loc )
 			break;
 		case USE_OWNER_OBJECT:
 			creationCoord.set(targetCoord );
-			ObjectCreationList::create( ocl, obj, &creationCoord, &targetCoord, INVALID_ANGLE, false );
+			ObjectCreationList::create( ocl, obj, &creationCoord, &targetCoord, false );
 			break;
 		case CREATE_ABOVE_LOCATION:
 			creationCoord = targetCoord;

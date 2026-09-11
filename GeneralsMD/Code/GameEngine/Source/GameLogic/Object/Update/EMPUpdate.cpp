@@ -231,9 +231,9 @@ void EMPUpdate::doDisableAttack()
 
 
 
-//////////////	    // must match our kindof flags (if any)
-//////////////	    if (data && !curVictim->isKindOfMulti(data->m_victimKindOf, data->m_victimKindOfNot))
-//////////////		    continue;
+	    // must match our kindof flags (if any)
+	    if (data && !curVictim->isKindOfMulti(data->m_victimKindOf, data->m_victimKindOfNot))
+		    continue;
 
 
 

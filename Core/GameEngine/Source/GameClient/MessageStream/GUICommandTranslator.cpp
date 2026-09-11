@@ -421,6 +421,12 @@ GameMessageDisposition GUICommandTranslator::translateGameMessage(const GameMess
 			CommandStatus commandStatus = COMMAND_COMPLETE;
 			ICoord2D mouse = msg->getArgument(0)->pixelRegion.hi;
 
+			// a command armed off a focused cameo acts on that cameo's group
+			if( TheControlBar )
+			{
+				TheControlBar->appendCommandGroup( command );
+			}
+
 			// do the command action
 			if( command && !command->isContextCommand() )
 			{

@@ -79,6 +79,7 @@ const FieldParse Anim2DTemplate::s_anim2DFieldParseTable[] =
 	{ "NumberImages",					Anim2DTemplate::parseNumImages,			nullptr,							0 },
 	{ "Image",								Anim2DTemplate::parseImage,					nullptr,							0 },
 	{ "ImageSequence",				Anim2DTemplate::parseImageSequence, nullptr,							0 },
+	{ "Texture",							Anim2DTemplate::parseTexture,				nullptr,							0 },
 	{ "AnimationMode",				INI::parseIndexList,								Anim2DModeNames,	offsetof( Anim2DTemplate, m_animMode ) },
 	{ "AnimationDelay",				INI::parseDurationUnsignedShort,		nullptr,							offsetof( Anim2DTemplate, m_framesBetweenUpdates ) },
 	{ "RandomizeStartFrame",	INI::parseBool,											nullptr,							offsetof( Anim2DTemplate, m_randomizeStartFrame ) },
@@ -224,6 +225,44 @@ void Anim2DTemplate::parseImage( INI *ini, void *instance, void *store, const vo
 
 	}
 
+}
+
+// ------------------------------------------------------------------------------------------------
+/** Parse "Texture = file.tga [width height]" as one frame that covers the whole texture, so a
+	* plain texture file works without a MappedImage block. Size defaults to 32 x 32. */
+// ------------------------------------------------------------------------------------------------
+/*static*/ void Anim2DTemplate::parseTexture( INI *ini, void *instance, void *store, const void *userData )
+{
+	Anim2DTemplate *animTemplate = (Anim2DTemplate *)instance;
+
+	AsciiString filename = ini->getNextAsciiString();
+	ICoord2D size;
+	size.x = 32;
+	size.y = 32;
+	const char *token = ini->getNextTokenOrNull();
+	if( token )
+	{
+		size.x = INI::scanInt( token );
+		size.y = INI::scanInt( ini->getNextToken() );
+	}
+
+	if( !TheMappedImageCollection )
+	{
+		return;
+	}
+
+	// the file name doubles as the image name, so every animation using it shares one image
+	Image *image = const_cast<Image*>( TheMappedImageCollection->findImageByName( filename ) );
+	if( image == nullptr )
+	{
+		image = newInstance(Image);
+		image->setName( filename );
+		image->setFilename( filename );
+		image->setImageSize( &size );
+		TheMappedImageCollection->addImage( image );
+	}
+
+	animTemplate->storeImage( image );
 }
 
 // ------------------------------------------------------------------------------------------------

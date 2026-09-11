@@ -99,55 +99,6 @@ static Object *getSmartSelectionObject( Drawable *draw )
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Whether a command set carries the button, by name because sets hold overridable copies. */
-//-------------------------------------------------------------------------------------------------
-static Bool commandSetHasButton( const CommandSet *commandSet, const CommandButton *command )
-{
-	if( commandSet == nullptr )
-	{
-		return FALSE;
-	}
-	for( Int i = 0; i < MAX_COMMANDS_PER_SET; i++ )
-	{
-		const CommandButton *button = commandSet->getCommandButton( i );
-		if( button && button->getName() == command->getName() )
-		{
-			return TRUE;
-		}
-	}
-	return FALSE;
-}
-
-//-------------------------------------------------------------------------------------------------
-/** Hand the logic side a group made of the selection, or of one type in it for onlyType. */
-//-------------------------------------------------------------------------------------------------
-static void appendSelectionGroup( const ThingTemplate *onlyType )
-{
-	GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_CREATE_SELECTED_GROUP_NO_SOUND );
-	msg->appendBooleanArgument( TRUE );
-	const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
-	for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
-	{
-		Object *obj = ( *it )->getObject();
-		if( obj == nullptr || ( onlyType && obj->getTemplate() != onlyType ) )
-		{
-			continue;
-		}
-		msg->appendObjectIDArgument( obj->getID() );
-	}
-}
-
-//-------------------------------------------------------------------------------------------------
-/** Hand the logic side a group of that one object. */
-//-------------------------------------------------------------------------------------------------
-static void appendSelectionGroupOf( ObjectID objectID )
-{
-	GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_CREATE_SELECTED_GROUP_NO_SOUND );
-	msg->appendBooleanArgument( TRUE );
-	msg->appendObjectIDArgument( objectID );
-}
-
-//-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 void ControlBar::initSmartSelectionBar( const ICoord2D &commandButtonSize )
 {
@@ -238,8 +189,6 @@ void ControlBar::resetSmartSelection()
 {
 	m_smartSelectionGroups.clear();
 	m_smartSelectionActive = -1;
-	m_smartSelectionNarrowed = FALSE;
-	m_smartSelectionInCommand = FALSE;
 	if( m_smartSelectionParent && !m_smartSelectionParent->winIsHidden() )
 	{
 		m_smartSelectionParent->winHide( TRUE );
@@ -649,23 +598,17 @@ void ControlBar::smartSelectionRemove( Int groupIndex, Bool keepGroup )
 
 //-------------------------------------------------------------------------------------------------
 /** The logic side sends a command to every unit in the player's group that can do it, so a
-	* command off the focused card would leak to any other unit with a matching one. Hand the
-	* logic side just the focused object, or for a focused type only a command the group does
-	* not share, until the command is done. The client selection is untouched throughout. */
+	* command off the focused card would leak to any other unit with a matching one. The group
+	* the command acts on goes ahead of it instead. The client selection is untouched. */
 //-------------------------------------------------------------------------------------------------
-void ControlBar::smartSelectionBeginCommand( const CommandButton *command )
+void ControlBar::appendCommandGroup( const CommandButton *command )
 {
-	if( m_smartSelectionNarrowed )
-	{
-		return;
-	}
-
 	// the bar is that object's own, so anything out of it goes to that object alone
 	const ObjectID focusObject = getSmartSelectionFocusObject();
 	if( focusObject != INVALID_ID )
 	{
-		appendSelectionGroupOf( focusObject );
-		m_smartSelectionNarrowed = TRUE;
+		GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_COMMAND_GROUP );
+		msg->appendObjectIDArgument( focusObject );
 		return;
 	}
 
@@ -687,34 +630,37 @@ void ControlBar::smartSelectionBeginCommand( const CommandButton *command )
 		return;
 	}
 
-	// a command every other selected unit carries too is the group's own and still goes to everyone
+	GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_COMMAND_GROUP );
 	const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
 	for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
 	{
-		Object *obj = getSmartSelectionObject( *it );
-		if( obj == nullptr || isSmartSelectionFocused( obj ) )
+		Object *obj = ( *it )->getObject();
+		if( obj && obj->getTemplate() == focus )
 		{
-			continue;
-		}
-		if( !commandSetHasButton( findCommandSet( obj->getCommandSetString() ), command ) )
-		{
-			appendSelectionGroup( focus );
-			m_smartSelectionNarrowed = TRUE;
-			return;
+			msg->appendObjectIDArgument( obj->getID() );
 		}
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Give the logic side the whole selection back, once the handler is done and no command is
-	* still waiting for a target. That later clear of the pending command ends up here as well. */
+/** A multi selection only gets build buttons off a focused dozer's own bar. The builder leads
+	* the group and the logic side sends the dozers behind it to help. */
 //-------------------------------------------------------------------------------------------------
-void ControlBar::smartSelectionEndCommand()
+void ControlBar::appendBuildGroup( const Object *builder )
 {
-	if( !m_smartSelectionNarrowed || m_smartSelectionInCommand || TheInGameUI->getGUICommand() != nullptr )
+	if( builder == nullptr || TheInGameUI->getSelectCount() < 2 )
 	{
 		return;
 	}
-	appendSelectionGroup( nullptr );
-	m_smartSelectionNarrowed = FALSE;
+	GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_COMMAND_GROUP );
+	msg->appendObjectIDArgument( builder->getID() );
+	const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
+	for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
+	{
+		Object *obj = ( *it )->getObject();
+		if( obj && obj != builder && obj->isKindOf( KINDOF_DOZER ) )
+		{
+			msg->appendObjectIDArgument( obj->getID() );
+		}
+	}
 }

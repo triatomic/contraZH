@@ -255,25 +255,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		return CBC_COMMAND_NOT_USED;
 	}
 
-	// TheSuperHackers @feature Narrow the logic side group to the smart selection focus for the
-	// life of this call. A command that arms and waits for a target keeps the narrowing until
-	// the pending command clears, which lands in smartSelectionEndCommand again. So does the
-	// handler's own clear of the previous pending command, hence the flag holding it off.
-	struct SmartSelectionCommandScope
-	{
-		ControlBar *m_bar;
-		SmartSelectionCommandScope( ControlBar *bar, const CommandButton *command ) : m_bar( bar )
-		{
-			m_bar->m_smartSelectionInCommand = TRUE;
-			m_bar->smartSelectionBeginCommand( command );
-		}
-		~SmartSelectionCommandScope()
-		{
-			m_bar->m_smartSelectionInCommand = FALSE;
-			m_bar->smartSelectionEndCommand();
-		}
-	};
-	SmartSelectionCommandScope smartSelectionScope( this, commandButton );
+	// TheSuperHackers @feature A smart selection focus decides the group the command acts on
+	appendCommandGroup( commandButton );
 
 	// sanity, we won't process messages if we have no source object,
 	// unless we're CB_CONTEXT_PURCHASE_SCIENCE or GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT
@@ -618,11 +601,6 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 			for( Int queued = 0; queued < unitsToQueue; ++queued )
 			{
-				// Re-check every time round. canMakeUnit covers money, queue space, parking and
-				// per player unit caps, and each unit we just queued moves those. Stop quietly
-				// once we can no longer build -- the first unit already reported any problem.
-				if( queued > 0 && TheBuildAssistant->canMakeUnit( factory, whatToBuild ) != CANMAKE_OK )
-					break;
 
 				// get a new production id to assign to this
 				ProductionID productionID = pu->requestUniqueUnitID();
@@ -673,9 +651,13 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			if( !producer->isLocallyControlled() )
 				break;
 
+			ProductionUpdateInterface *pu = producer->getProductionUpdateInterface();
+			if( pu == nullptr )
+				break;
+
 			// Ctrl moves the clicked entry one position earlier in the queue instead of
 			// cancelling it. Break unconditionally so a Ctrl click can never fall through
-			// to the cancel below, and never combines with the Shift batch either. Gated
+			// to the cancel below, and never combines with the Shift cancel either. Gated
 			// behind the QueueReorder GameData option; with it off, Ctrl+click cancels
 			// like retail.
 			if( TheGlobalData->m_queueReorder && TheKeyboard && TheKeyboard->isCtrl() )
@@ -688,31 +670,35 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				break;
 			}
 
-			// send a message to cancel that particular production entry
-			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_CANCEL_UNIT_CREATE );
-			msg->appendIntegerArgument( productionIDToCancel );
+			// the clicked entry may already have left the queue since the buttons were filled
+			const ThingTemplate *typeToCancel = nullptr;
+			for( const ProductionEntry *pe = pu->firstProduction(); pe; pe = pu->nextProduction( pe ) )
+			{
+				if( pe->getProductionType() == PRODUCTION_UNIT && pe->getProductionID() == productionIDToCancel )
+				{
+					typeToCancel = pe->getProductionObject();
+					break;
+				}
+			}
+			if( typeToCancel == nullptr )
+				break;
 
-			// TheSuperHackers @feature Shift cancels a batch: the clicked entry plus the newest
-			// queued units. The queue is displayed oldest to newest, so the extra cancels walk
-			// from the tail towards the clicked slot - taking the most recently queued entries
-			// first and leaving whatever is closest to completion alone for as long as
-			// possible. Deliberately not filtered by template: the point of the batch is to
-			// clear what was just queued, whatever it was. Only unit entries are taken, so an
-			// upgrade sitting in the queue is never swept up.
+			// TheSuperHackers @feature Shift cancels every queued unit of the clicked entry's type
 			if( TheKeyboard && TheKeyboard->isShift() )
 			{
-				Int cancelled = 1;
-				for( Int j = MAX_BUILD_QUEUE_BUTTONS - 1; j > i && cancelled < SHIFT_CLICK_BATCH_SIZE; --j )
+				for( const ProductionEntry *pe = pu->firstProduction(); pe; pe = pu->nextProduction( pe ) )
 				{
-					if( m_queueData[ j ].control == nullptr )
-						continue;
-					if( m_queueData[ j ].type != PRODUCTION_UNIT )
-						continue;
-
-					msg = TheMessageStream->appendMessage( GameMessage::MSG_CANCEL_UNIT_CREATE );
-					msg->appendIntegerArgument( m_queueData[ j ].productionID );
-					++cancelled;
+					if( pe->getProductionType() == PRODUCTION_UNIT && pe->getProductionObject() == typeToCancel )
+					{
+						GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_CANCEL_UNIT_CREATE );
+						msg->appendIntegerArgument( pe->getProductionID() );
+					}
 				}
+			}
+			else
+			{
+				GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_CANCEL_UNIT_CREATE );
+				msg->appendIntegerArgument( productionIDToCancel );
 			}
 
 			break;
