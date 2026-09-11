@@ -853,7 +853,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			ProductionUpdateInterface* pu = nullptr;
 			const ProductionEntry* pe;
 			Int totalFrames = 0;
-			CanMakeType cmt = CANMAKE_FACTORY_IS_DISABLED, curCmt;
+			CanMakeType cmt = CANMAKE_QUEUE_FULL, curCmt;
 
 			for (DrawableListCIt it = factorys.begin(); it != factorys.end(); it++)
 			{
@@ -893,9 +893,6 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 				curCmt = pu->canQueueUpgrade(upgradeT);
 
-				if (it == factorys.begin())
-					cmt = curCmt;
-
 				if (curCmt == CANMAKE_OK)
 				{
 					if (curFinishTime < minFinishTime || cmt != CANMAKE_OK)
@@ -930,8 +927,9 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		{
 			const UpgradeTemplate *upgradeT = commandButton->getUpgradeTemplate();
 			DEBUG_ASSERTCRASH( upgradeT, ("Undefined upgrade '%s' in object upgrade command", "UNKNOWN") );
+
 			// sanity
-			if( upgradeT == nullptr )
+			if (factorys.size() == 0 || upgradeT == nullptr)
 				break;
 
 			//Make sure the player can really make this
@@ -942,29 +940,99 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				break;
 			}
 
-			ProductionUpdateInterface* pu = obj ? obj->getProductionUpdateInterface() : nullptr;
-			if (pu != nullptr)
+			Real minFinishTime[SHIFT_CLICK_BATCH_SIZE], curFinishTime;
+			Object* bestFactories[SHIFT_CLICK_BATCH_SIZE], *curFactory;
+			ProductionUpdateInterface* pu = nullptr;
+			const ProductionEntry* pe;
+			Int totalFrames = 0, i, j;
+			CanMakeType cmt = CANMAKE_QUEUE_FULL, curCmt;
+
+			for (i = 0; i < SHIFT_CLICK_BATCH_SIZE; i++)
 			{
-				CanMakeType cmt = pu->canQueueUpgrade(upgradeT);
-				if (cmt == CANMAKE_QUEUE_FULL)
-				{
-					TheInGameUI->message( "GUI:ProductionQueueFull" );
-					break;
-				}
+				minFinishTime[i] = 1e9;
+				bestFactories[i] = nullptr;
 			}
 
-			ObjectID objID = INVALID_ID;
-			if (obj)
-				objID = obj->getID();
+			// TheSuperHackers @feature Shift queues upgrade on a batch of units instead of single.
+			Int unitsToQueue = 1;
+			if (TheKeyboard && TheKeyboard->isShift())
+				unitsToQueue = SHIFT_CLICK_BATCH_SIZE;
 
-			// make sure that the this object can actually build the upgrade
-			if( obj && (obj->hasUpgrade( upgradeT ) == TRUE || obj->affectedByUpgrade( upgradeT ) == FALSE) )
+			for (DrawableListCIt it = factorys.begin(); it != factorys.end(); it++)
+			{
+				curFinishTime = 0.0;
+				curFactory = (*it)->getObject();
+				if (!curFactory)
+					break;
+				pu = curFactory->getProductionUpdateInterface();
+				if (!pu)
+					break;
+				pe = pu->firstProduction();
+				if (pe)
+				{
+					totalFrames = 0;
+					if (pe->getProductionType() == PRODUCTION_UNIT)
+					{
+						if (pe->getProductionObject())
+							totalFrames = pe->getProductionObject()->calcTimeToBuild(player);
+					}
+					else if (pe->getProductionUpgrade())
+					{
+						totalFrames = pe->getProductionUpgrade()->calcTimeToBuild(player);
+					}
+					curFinishTime = (100.0f - pe->getPercentComplete()) / 100.f * totalFrames;
+
+					while (pe = pu->nextProduction(pe))
+						if (pe->getProductionType() == PRODUCTION_UNIT)
+						{
+							if (pe->getProductionObject())
+								curFinishTime += pe->getProductionObject()->calcTimeToBuild(player);
+						}
+						else if (pe->getProductionUpgrade())
+						{
+							curFinishTime += pe->getProductionUpgrade()->calcTimeToBuild(player);
+						}
+				}
+
+				curCmt = pu->canQueueUpgrade(upgradeT);
+
+				if (curCmt == CANMAKE_OK && !curFactory->hasUpgrade(upgradeT) && curFactory->affectedByUpgrade(upgradeT))
+				{
+					for (i = 0; i < unitsToQueue; i++)
+						if (minFinishTime[i] > curFinishTime)
+						{
+							for (j = unitsToQueue - 1; j > i; j--)
+							{
+								minFinishTime[j] = minFinishTime[j - 1];
+								bestFactories[j] = bestFactories[j - 1];
+							}
+							minFinishTime[i] = curFinishTime;
+							bestFactories[i] = curFactory;
+						}
+				}
+
+				for (i = 0; i < unitsToQueue; i++)
+					if (minFinishTime[i] != 0.0)
+						break;
+				if (i == unitsToQueue)
+					break;
+			}
+
+			if (cmt == CANMAKE_QUEUE_FULL)
+			{
+				TheInGameUI->message("GUI:ProductionQueueFull");
 				break;
+			}
 
-			// send the message
-			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_QUEUE_UPGRADE );
-			msg->appendObjectIDArgument( objID );
-			msg->appendIntegerArgument( upgradeT->getUpgradeNameKey() );
+			GameMessage* msg;
+
+			for (i = 0; i < unitsToQueue; i++)
+			{
+				// send the message
+				msg = TheMessageStream->appendMessage(GameMessage::MSG_QUEUE_UPGRADE);
+				msg->appendObjectIDArgument(bestFactories[i]->getID());
+				msg->appendIntegerArgument(upgradeT->getUpgradeNameKey());
+			}
 
 			break;
 
