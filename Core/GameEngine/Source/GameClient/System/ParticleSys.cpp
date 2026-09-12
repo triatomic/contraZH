@@ -854,7 +854,7 @@ void Particle::loadPostProcess()
 ParticleSystemInfo::ParticleSystemInfo()
 {
 	m_priority = PARTICLE_PRIORITY_LOWEST;
-	m_isGroundAligned = false;
+	m_particleAlignment = PARTICLE_ALIGNMENT_BILLBOARD;
 	// TheSuperHackers @feature off by default; modders opt in per effect with ConformToTerrain = Yes
 	m_conformToTerrain = false;
 	m_isEmitAboveGroundOnly = false;
@@ -943,7 +943,8 @@ void ParticleSystemInfo::xfer( Xfer *xfer )
 	// version 4 adds m_electricShader
 	// version 5 adds m_laserShader
 	// version 6 adds m_cryoShader
-	XferVersion currentVersion = 6;
+	// version 7 serializes the particle alignment as an enum instead of a boolean
+	XferVersion currentVersion = 7;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1129,8 +1130,19 @@ void ParticleSystemInfo::xfer( Xfer *xfer )
 	// is emission volume hollow
 	xfer->xferBool( &m_isEmissionVolumeHollow );
 
-	// is ground aligned
-	xfer->xferBool( &m_isGroundAligned );
+	// particle alignment
+	if (version <= 6)
+	{
+		// TheSuperHackers @info Preserve save compatibility by mapping all non-billboard alignments to ground-aligned particles.
+		Bool groundAligned = m_particleAlignment > PARTICLE_ALIGNMENT_BILLBOARD;
+		xfer->xferBool( &groundAligned );
+		if (xfer->getXferMode() == XFER_LOAD)
+			m_particleAlignment = groundAligned ? PARTICLE_ALIGNMENT_XYPLANAR : PARTICLE_ALIGNMENT_BILLBOARD;
+	}
+	else
+	{
+		xfer->xferUser( &m_particleAlignment, sizeof( ParticleAlignmentType ) );
+	}
 
 	// TheSuperHackers @feature terrain conforming flag, appended so version 1 saves still load
 	if( version >= 2 )
@@ -1359,7 +1371,7 @@ ParticleSystem::ParticleSystem( const ParticleSystemTemplate *sysTemplate,
 	m_emissionVolume = sysTemplate->m_emissionVolume;
 
 	m_isEmissionVolumeHollow = sysTemplate->m_isEmissionVolumeHollow;
-	m_isGroundAligned = sysTemplate->m_isGroundAligned;
+	m_particleAlignment = sysTemplate->m_particleAlignment;
 	m_conformToTerrain = sysTemplate->m_conformToTerrain;
 	m_isEmitAboveGroundOnly = sysTemplate->m_isEmitAboveGroundOnly;
 	m_isParticleUpTowardsEmitter = sysTemplate->m_isParticleUpTowardsEmitter;
@@ -2097,7 +2109,7 @@ Particle *ParticleSystem::createParticle( const ParticleInfo *info,
 				 TheGameLODManager->isParticleSkipped()) )
 			return nullptr;
 
-		if ( getParticleCount() > 0 && priority == AREA_EFFECT && m_isGroundAligned && TheParticleSystemManager->getFieldParticleCount() > (UnsignedInt)TheGlobalData->m_maxFieldParticleCount )
+		if ( getParticleCount() > 0 && priority == AREA_EFFECT && !shouldBillboard() && TheParticleSystemManager->getFieldParticleCount() > (UnsignedInt)TheGlobalData->m_maxFieldParticleCount )
 			return nullptr;
 
 		// ALWAYS_RENDER particles are exempt from all count limits, and are always created, regardless of LOD issues.
@@ -3210,7 +3222,7 @@ const FieldParse ParticleSystemTemplate::m_fieldParseTable[] =
 	{ "VolCylinderLength",			INI::parseReal,																nullptr,		offsetof( ParticleSystemTemplate, m_emissionVolume.cylinder.length ) },
 
 	{ "IsHollow",								INI::parseBool,																nullptr,		offsetof( ParticleSystemTemplate, m_isEmissionVolumeHollow ) },
-	{ "IsGroundAligned",				INI::parseBool,																nullptr,		offsetof( ParticleSystemTemplate, m_isGroundAligned ) },
+	{ "IsGroundAligned",				INI::parseIndexList,		GroundAlignmentTypeNames,		offsetof( ParticleSystemTemplate, m_particleAlignment ) },
 	{ "ConformToTerrain",					INI::parseBool,																			nullptr,		offsetof( ParticleSystemTemplate, m_conformToTerrain ) },
 	{ "IsEmitAboveGroundOnly",	INI::parseBool,																nullptr,		offsetof( ParticleSystemTemplate, m_isEmitAboveGroundOnly) },
 	{ "IsParticleUpTowardsEmitter",	INI::parseBool,																nullptr,		offsetof( ParticleSystemTemplate, m_isParticleUpTowardsEmitter) },
