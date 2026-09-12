@@ -193,9 +193,9 @@ void RampTool::applyRampStroke(
 		pDoc->getCoordFromCellIndex(indices[i], &pt);
 
 		Real uVal;
-		Coord2D seg0 = { start.x, start.y };
-		Coord2D seg1 = { end.x,   end.y   };
-		Coord2D pt2D = { pt.x,    pt.y    };
+		Coord2D seg0 = start.asCoord2D();
+		Coord2D seg1 = end.asCoord2D();
+		Coord2D pt2D = pt.asCoord2D();
 
 		ShortestDistancePointToSegment2D(&seg0, &seg1, &pt2D, NULL, NULL, &uVal);
 		Real height = start.z + uVal * (end.z - start.z);
