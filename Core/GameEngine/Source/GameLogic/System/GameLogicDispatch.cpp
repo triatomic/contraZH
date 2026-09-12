@@ -1970,14 +1970,12 @@ bool GameLogic::onQueueUpgrade(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curren
 	if (!upgradeT)	// sanity
 		return false;
 
-	//
-	//if (currentlySelectedGroup)
-	//currentlySelectedGroup->queueUpgrade( upgradeT );
-
+	// ShigureUi 13/9/2026 check added, maybe invalid might be sent
 	if (!TheUpgradeCenter->canAffordUpgrade(producer->getControllingPlayer(), upgradeT, FALSE))
 	{
 		return false;
 	}
+
 	if (upgradeT->getUpgradeType() == UPGRADE_TYPE_OBJECT)
 	{
 		if (producer->hasUpgrade(upgradeT) || !producer->affectedByUpgrade(upgradeT))
@@ -2053,7 +2051,7 @@ bool GameLogic::onQueueUnitCreate(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &cur
 #if RETAIL_COMPATIBLE_AIGROUP
 	//Object *producer = getSingleObjectFromSelection(currentlySelectedGroup);
 #else
-	Object *producer = getSingleObjectFromSelection(currentlySelectedGroup.Peek());
+	//Object *producer = getSingleObjectFromSelection(currentlySelectedGroup.Peek());
 #endif
 	const ThingTemplate *whatToCreate;
 	ObjectID objID;

@@ -717,7 +717,7 @@ enum ControlBarStages CPP_11(: Int)
 class ControlBar : public SubsystemInterface
 {
 
-// ShigureUi 07/08/2026 borrowed from InGameUI.h
+// ShigureUi 07/09/2026 borrowed from InGameUI.h
 protected:
 
 	typedef std::vector<Object*> ObjectVector;
@@ -936,6 +936,7 @@ protected:
 	void populateCommand( Object *obj );
 	void populateMultiSelect();
 	void populateBuildQueue( Object *producer );
+	// ShigureUi 13/09/2026 We need a function for multiselect structure
 	void populateMultiSelectBuildQueue(ObjectVector *producerList);
 	void populateStructureInventory( Object *building );
 	void populateBeacon( Object *beacon );
@@ -1073,6 +1074,7 @@ protected:
 	{
 		GameWindow *control;											///< window that the GUI control is tied to
 		ProductionType type;											///< type of queue data
+		// ShigureUi 13/09/2026 need to storage it for tracing back when there is multiselect production
 		Object *producer;                         ///< the producer of the production
 
 		union

@@ -128,7 +128,8 @@ void ControlBar::addCommonCommands( Drawable *draw, Bool firstDrawable )
 			if (!command)
 				continue;
 
-			//Script only command -- don't show it in the UI.
+			// Script only command -- don't show it in the UI.
+			// ShigureUi 07/09/2026 Since no production command button was allowed when multiselect, we need a check here.
 			if (BitIsSet(command->getOptions(), SCRIPT_ONLY))
 			{
 				m_commandWindows[i]->winHide(TRUE);
@@ -255,9 +256,6 @@ void ControlBar::populateMultiSelect()
 	// sanity
 	DEBUG_ASSERTCRASH( selectedDrawables->empty() == FALSE, ("populateMultiSelect: Drawable list is empty") );
 
-	// ShigureUi 07/09/2026 Add "populateBuildQueue()" counter-part into populateMultiSelect()
-  // Now we can process multiple production facilities altogether
-
 	ObjectVector producerList;
 	Bool anyOngoingProduction = false, everyHasPU = true;
 
@@ -297,7 +295,7 @@ void ControlBar::populateMultiSelect()
 			// add the common commands of this drawable to the common command set
 			addCommonCommands( draw, firstDrawable );
 
-			// ShigureUi 07/09/2026 find common producer drawables, if all of them are.
+			// ShigureUi 07/09/2026 find producer drawables, we need all of them to be producer.
 			ProductionUpdateInterface *pu = draw->getObject()->getProductionUpdateInterface();
 			if (pu)
 			{
@@ -329,6 +327,7 @@ void ControlBar::populateMultiSelect()
 
 		}
 
+		// ShigureUi 13/9/2026 Shows Rally point when multiselect
 		ExitInterface* exit = draw->getObject()->getObjectExitInterface();
 		if (exit)
 		{
@@ -358,13 +357,14 @@ void ControlBar::populateMultiSelect()
 		setPortraitByObject( portraitObj );
 	else
 	{
+		// ShigureUi 13/9/2026 either portrait or build queue
 		populateMultiSelectBuildQueue(&producerList);
 	}
 
 }
 
 
-// ShigureUi 08/09/2026 copied from populateBuildQueue() then modified
+// ShigureUi 08/09/2026 copied from populateBuildQueue() and modified
 void ControlBar::populateMultiSelectBuildQueue(ObjectVector *producerList)
 {
 	/// @todo srj -- remove hard-coding here, please
@@ -418,8 +418,6 @@ void ControlBar::populateMultiSelectBuildQueue(ObjectVector *producerList)
 
 	}
 
-	// step through each object being built and set the image data for the buttons
-
 	ProductionUpdateInterface *pu;
 
 	std::vector<ProductionUpdateInterface*> allPU;
@@ -433,6 +431,8 @@ void ControlBar::populateMultiSelectBuildQueue(ObjectVector *producerList)
 	productionPointer.resize(producerCount);
 	currentBuildTime.resize(producerCount);
 
+
+	// ShigureUi 13/9/2026 calculate all first production's finish time
 	for (i = 0; i < producerCount; i++)
 	{
 		pu = (*producerList)[i]->getProductionUpdateInterface();
@@ -469,6 +469,7 @@ void ControlBar::populateMultiSelectBuildQueue(ObjectVector *producerList)
 	Real minFinishTime;
 	Int minTimeOwner;
 
+	// ShigureUi 13/9/2026 find nine least estimated finished time production
 	while (windowIndex < MAX_BUILD_QUEUE_BUTTONS)
 	{
 
@@ -486,8 +487,8 @@ void ControlBar::populateMultiSelectBuildQueue(ObjectVector *producerList)
 
 		if (minTimeOwner == -1)
 			break;
-		// ShigureUi 08/09/2026 draw the button which gonna be newest
 
+		// ShigureUi 08/09/2026 draw the button which gonna be newest
 		pe = productionPointer[minTimeOwner];
 
 		// set the command into the queue button
@@ -557,6 +558,7 @@ void ControlBar::populateMultiSelectBuildQueue(ObjectVector *producerList)
 
 		productionPointer[minTimeOwner] = allPU[minTimeOwner]->nextProduction(productionPointer[minTimeOwner]);
 
+		// ShigureUi 13/9/2026 if no production set it to 1e9, otherwise calculate next production time
 		if (!productionPointer[minTimeOwner])
 			currentBuildTime[minTimeOwner] = 1e9;
 		else
@@ -825,7 +827,7 @@ void ControlBar::updateContextMultiSelect()
 			// update the build percentage on the first thing (the thing that's being built)
 			// in the queue
 			//
-			// ShigureUi 08/09/2026 for multiselect, try every build queue windows to see if they're any production facility's first production.
+			// ShigureUi 08/09/2026 for multiselect, check every build queue windows to see if they're any production facility's first production.
 
 			const ProductionEntry* pe;
 			static char name[] = "ControlBar.wnd:ButtonQueue01";

@@ -1122,7 +1122,7 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 		disabled = false;
 	}
 
-	//ShigureUi 08/09/2026 for structure multiselect
+	//ShigureUi 08/09/2026 when not finished structure multiselected, must return COMMAND_RESTRICTED
 	if (obj->isStructure() && obj->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION))
 		return COMMAND_RESTRICTED;
 

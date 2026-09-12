@@ -311,6 +311,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 	DrawableList factorys;
 	Drawable* draw;
 
+	// ShigureUi 13/9/2026 prepare producer list for unit build and upgrade
 	if (commandButton->getCommandType() == GUI_COMMAND_UNIT_BUILD ||
 		commandButton->getCommandType() == GUI_COMMAND_CANCEL_UNIT_BUILD ||
 		commandButton->getCommandType() == GUI_COMMAND_PLAYER_UPGRADE ||
@@ -343,6 +344,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			}
 		}
 
+		//sanity
 		for (DrawableListCIt it = factorys.begin();
 			it != factorys.end(); ++it)
 			if (!(*it)->getObject()->getProductionUpdateInterface() || !(*it)->getObject()->isLocallyControlled())
@@ -352,6 +354,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			}
 	}
 
+	// ShigureUi 13/9/2026 otherwise give them the object
 	if( m_currContext != CB_CONTEXT_MULTI_SELECT &&
 			commandButton->getCommandType() != GUI_COMMAND_PURCHASE_SCIENCE &&
 			commandButton->getCommandType() != GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT &&
@@ -585,8 +588,6 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		{
 			const ThingTemplate *whatToBuild = commandButton->getThingTemplate();
 
-			// get the "factory" object that is going to make the thing
-
 			if( factorys.size() == 0)
 				break;
 
@@ -601,6 +602,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			Int totalFrames = 0;
 			CanMakeType cmt = CANMAKE_FACTORY_IS_DISABLED, curCmt;
 
+			// ShigureUi 13/9/2026 find best producer, compare them estimated finish time
 			for (DrawableListCIt it = factorys.begin(); it != factorys.end(); it++)
 			{
 				curFinishTime = 0.0;
@@ -642,10 +644,12 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				if (it == factorys.begin())
 				{
 					cmt = curCmt;
+					// ShigureUi 13/9/2026 if these CANMAKE type then no hope, no need to check others 
 					if (cmt == CANMAKE_NO_MONEY || cmt == CANMAKE_NO_PREREQ || cmt == CANMAKE_MAXED_OUT_FOR_PLAYER)
 						break;
 				}
 
+				// ShigureUi 13/9/2026 do update if better
 				if (curCmt == CANMAKE_OK)
 				{
 					if (curFinishTime < minFinishTime || cmt != CANMAKE_OK)
@@ -655,6 +659,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 						bestFactory = curFactory;
 					}
 				}
+				// ShigureUi 13/9/2026 queue full is better than parking places full, update if possible
 				else if (curCmt == CANMAKE_QUEUE_FULL && cmt == CANMAKE_PARKING_PLACES_FULL)
 						cmt = CANMAKE_QUEUE_FULL;
 
@@ -718,7 +723,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				ProductionID productionID = pu->requestUniqueUnitID();
 
 				// create a message to build this thing
-
+				// ShigureUi 13/9/2026 Add a new factory objectID argument, otherwise message processor needs to find best producer again
 				GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_QUEUE_UNIT_CREATE );
 				msg->appendIntegerArgument( whatToBuild->getTemplateID() );
 				msg->appendObjectIDArgument( bestFactory->getID() );
@@ -760,6 +765,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			// to the cancel below, and never combines with the Shift cancel either. Gated
 			// behind the QueueReorder GameData option; with it off, Ctrl+click cancels
 			// like retail.
+			// ShigureUi 13/9/2026 only work when there's no multiselect
 			if( TheGlobalData->m_queueReorder && TheKeyboard && TheKeyboard->isCtrl() && factorys.size() == 1)
 			{
 				if( i > 0 )
@@ -776,7 +782,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 			Object* curFactory;
 
-			//Find the production and get the type
+			// ShigureUi 13/9/2026 Find the production and save the type
 			for (DrawableListCIt it = factorys.begin(); it != factorys.end(); it++)
 			{
 				curFactory = (*it)->getObject();
@@ -796,6 +802,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			}
 
 			// TheSuperHackers @feature Shift cancels every queued unit of the clicked entry's type
+			// ShigureUi 13/9/2026 instead of decide here, cancel all needs to add new templateID argument and send them to the message processor
+			// When ultiselect cancel the production alone also needs producer ID
 			GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_CANCEL_UNIT_CREATE);
 			if (TheKeyboard && TheKeyboard->isShift())
 			{
@@ -840,6 +848,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			Int totalFrames = 0;
 			CanMakeType cmt = CANMAKE_QUEUE_FULL, curCmt;
 
+			// ShigureUi 13/9/2026 Find best producer for the upgrade
 			for (DrawableListCIt it = factorys.begin(); it != factorys.end(); it++)
 			{
 				curFinishTime = 0.0;
@@ -850,6 +859,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				if (!pu)
 					break;
 				pe = pu->firstProduction();
+
+				// ShigureUi 13/9/2026 calculate best estimated finish time
 				if (pe)
 				{
 					totalFrames = 0;
@@ -878,6 +889,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 				curCmt = pu->canQueueUpgrade(upgradeT);
 
+				// ShigureUi 13/9/2026 update if better
 				if (curCmt == CANMAKE_OK)
 				{
 					if (curFinishTime < minFinishTime || cmt != CANMAKE_OK)
@@ -939,12 +951,13 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			}
 
 			// TheSuperHackers @feature Shift queues upgrade on a batch of units instead of single.
-			Int unitsToQueue = 1;
+			Int upgradeToQueue = 1;
 			if (TheKeyboard && TheKeyboard->isShift())
-				unitsToQueue = SHIFT_CLICK_BATCH_SIZE;
+				upgradeToQueue = SHIFT_CLICK_BATCH_SIZE;
 
 			Bool upgrading;
 
+			// ShigureUi 13/9/2026 Find 5 best producer, or 1
 			for (DrawableListCIt it = factorys.begin(); it != factorys.end(); it++)
 			{
 				curFinishTime = 0.0;
@@ -956,6 +969,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 					break;
 				pe = pu->firstProduction();
 				upgrading = false;
+
+				// ShigureUi 13/9/2026 calulate best estimated finish time
 				if (pe)
 				{
 					totalFrames = 0;
@@ -986,13 +1001,14 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 				curCmt = pu->canQueueUpgrade(upgradeT);
 
+				// ShigureUi 13/9/2026 find best location to insert then update best 5
 				if (curCmt == CANMAKE_OK && !curFactory->hasUpgrade(upgradeT) && curFactory->affectedByUpgrade(upgradeT) && !upgrading)
 				{
 					cmt = CANMAKE_OK;
-					for (i = 0; i < unitsToQueue; i++)
+					for (i = 0; i < upgradeToQueue; i++)
 						if (minFinishTime[i] > curFinishTime)
 						{
-							for (j = unitsToQueue - 1; j > i; j--)
+							for (j = upgradeToQueue - 1; j > i; j--)
 							{
 								minFinishTime[j] = minFinishTime[j - 1];
 								bestFactories[j] = bestFactories[j - 1];
@@ -1003,10 +1019,10 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 						}
 				}
 
-				for (i = 0; i < unitsToQueue; i++)
+				for (i = 0; i < upgradeToQueue; i++)
 					if (minFinishTime[i] != 0.0)
 						break;
-				if (i == unitsToQueue)
+				if (i == upgradeToQueue)
 					break;
 			}
 
@@ -1018,7 +1034,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 			GameMessage* msg;
 
-			for (i = 0; i < unitsToQueue && bestFactories[i]; i++)
+			// ShigureUi 13/9/2026 Add new factory objectID argument for identify
+			for (i = 0; i < upgradeToQueue && bestFactories[i]; i++)
 			{
 				// send the message
 				msg = TheMessageStream->appendMessage(GameMessage::MSG_QUEUE_UPGRADE);
@@ -1065,7 +1082,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 			Object* curFactory;
 
-			//Find the production and get the type
+			// ShigureUi 13/9/2026 Find the production and get the type
 			for (DrawableListCIt it = factorys.begin(); it != factorys.end(); it++)
 			{
 				curFactory = (*it)->getObject();
@@ -1090,7 +1107,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			// to the cancel below. Unlike the cancel above, the move checks local control
 			// here like the unit branch does - the logic side rejects the message anyway,
 			// so sending one for someone else's producer only wastes network traffic.
-			if (TheGlobalData->m_queueReorder && TheKeyboard && TheKeyboard->isCtrl())
+			// ShigureUi 13/9/2026 only if there is only 1 producer
+			if (TheGlobalData->m_queueReorder && TheKeyboard && TheKeyboard->isCtrl() && factorys.size() == 1)
 			{
 				if (i > 0 && curFactory->isLocallyControlled())
 				{
@@ -1101,6 +1119,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			}
 
 			// TheSuperHackers @feature Shift cancel all of this upgrade on selected units instead of that production.
+			// ShigureUi 13/9/2026 need a argument to tell cancel all or the only one
 			if (TheKeyboard && TheKeyboard->isShift())
 			{
 				// send the message
@@ -1112,6 +1131,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			else
 			{
 				// send the message
+				// ShigureUi 13/9/2026 the only one need an extra producer objectID argument
 				GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_CANCEL_UPGRADE);
 				msg->appendBooleanArgument(false);
 				msg->appendIntegerArgument(upgradeT->getUpgradeNameKey());

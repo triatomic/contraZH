@@ -3617,7 +3617,6 @@ void AIGroup::cancelUpgradeOfType(const UpgradeTemplate* upgradeToCancel)
 	if (!upgradeToCancel)
 		return;
 
-	//This is currently only activated via test key
 	std::list<Object*>::iterator i;
 	ProductionUpdateInterface* pu;
 	for (i = m_memberList.begin(); i != m_memberList.end(); ++i)
