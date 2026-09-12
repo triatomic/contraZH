@@ -1010,6 +1010,8 @@ public:
 	Int getCount();										///< return the number of objects in the group
 	Bool isEmpty() const;										///< returns true if the group has no members
 	void queueUpgrade( const UpgradeTemplate *upgrade );	///< queue an upgrade
+	void cancelProductionOfType(const ThingTemplate *typeToCancel);  ///<cancel all productions of type
+	void cancelUpgradeOfType(const UpgradeTemplate * upgradeToCancel);  ///<cancel all upgrades of type if they're building it
 
 	void add( Object *obj );								///< add object to group
 

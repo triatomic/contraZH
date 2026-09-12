@@ -345,7 +345,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 		for (DrawableListCIt it = factorys.begin();
 			it != factorys.end(); ++it)
-			if (!(*it)->getObject()->getProductionUpdateInterface())
+			if (!(*it)->getObject()->getProductionUpdateInterface() || !(*it)->getObject()->isLocallyControlled())
 			{
 				factorys.clear();
 				break;
@@ -605,7 +605,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			{
 				curFinishTime = 0.0;
 				curFactory = (*it)->getObject();
-				if (!curFactory)
+				if (!curFactory || !curFactory->isLocallyControlled())
 					break;
 				pu = curFactory->getProductionUpdateInterface();
 				if (!pu)
@@ -625,7 +625,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 					}
 					curFinishTime = (100.0f - pe->getPercentComplete()) / 100.f * totalFrames;
 
-					while (pe = pu->nextProduction(pe))
+					while ((pe = pu->nextProduction(pe)) != nullptr)
 						if (pe->getProductionType() == PRODUCTION_UNIT)
 						{
 							if (pe->getProductionObject())
@@ -637,7 +637,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 						}
 				}
 
-				curCmt = TheBuildAssistant->canMakeUnit(bestFactory, whatToBuild);
+				curCmt = TheBuildAssistant->canMakeUnit(curFactory, whatToBuild);
 
 				if (it == factorys.begin())
 				{
@@ -721,7 +721,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 				GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_QUEUE_UNIT_CREATE );
 				msg->appendIntegerArgument( whatToBuild->getTemplateID() );
-				msg->appendObjectIDArgument(obj->getID());
+				msg->appendObjectIDArgument( bestFactory->getID() );
 				msg->appendIntegerArgument( productionID );
 			}
 
@@ -755,25 +755,12 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			// the the production ID to cancel
 			ProductionID productionIDToCancel = m_queueData[ i ].productionID;
 
-			// get the object that is the producer
-			Object *producer = obj;
-			if( producer == nullptr )
-				break;
-
-			// sanity, we must control the producer ... if this isn't true they might be hacking the game
-			if( !producer->isLocallyControlled() )
-				break;
-
-			ProductionUpdateInterface *pu = producer->getProductionUpdateInterface();
-			if( pu == nullptr )
-				break;
-
 			// Ctrl moves the clicked entry one position earlier in the queue instead of
 			// cancelling it. Break unconditionally so a Ctrl click can never fall through
 			// to the cancel below, and never combines with the Shift cancel either. Gated
 			// behind the QueueReorder GameData option; with it off, Ctrl+click cancels
 			// like retail.
-			if( TheGlobalData->m_queueReorder && TheKeyboard && TheKeyboard->isCtrl() )
+			if( TheGlobalData->m_queueReorder && TheKeyboard && TheKeyboard->isCtrl() && factorys.size() == 1)
 			{
 				if( i > 0 )
 				{
@@ -783,35 +770,47 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				break;
 			}
 
-			// the clicked entry may already have left the queue since the buttons were filled
-			const ThingTemplate *typeToCancel = nullptr;
-			for( const ProductionEntry *pe = pu->firstProduction(); pe; pe = pu->nextProduction( pe ) )
+			ProductionUpdateInterface* pu;
+			const ProductionEntry* pe;
+			const ThingTemplate* typeToCancel = nullptr;
+
+			Object* curFactory;
+
+			//Find the production and get the type
+			for (DrawableListCIt it = factorys.begin(); it != factorys.end(); it++)
 			{
-				if( pe->getProductionType() == PRODUCTION_UNIT && pe->getProductionID() == productionIDToCancel )
+				curFactory = (*it)->getObject();
+				if (!curFactory || !curFactory->isLocallyControlled())
+					break;
+				pu = curFactory->getProductionUpdateInterface();
+				if (m_queueData[i].producer == curFactory)
 				{
-					typeToCancel = pe->getProductionObject();
+					for (pe = pu->firstProduction(); pe; pe = pu->nextProduction(pe))
+						if (pe->getProductionType() == PRODUCTION_UNIT && pe->getProductionID() == productionIDToCancel)
+						{
+							typeToCancel = pe->getProductionObject();
+							break;
+						}
 					break;
 				}
 			}
-			if( typeToCancel == nullptr )
-				break;
 
 			// TheSuperHackers @feature Shift cancels every queued unit of the clicked entry's type
-			if( TheKeyboard && TheKeyboard->isShift() )
+			GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_CANCEL_UNIT_CREATE);
+			if (TheKeyboard && TheKeyboard->isShift())
 			{
-				for( const ProductionEntry *pe = pu->firstProduction(); pe; pe = pu->nextProduction( pe ) )
-				{
-					if( pe->getProductionType() == PRODUCTION_UNIT && pe->getProductionObject() == typeToCancel )
-					{
-						GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_CANCEL_UNIT_CREATE );
-						msg->appendIntegerArgument( pe->getProductionID() );
-					}
-				}
+				if (!typeToCancel)
+					break;
+				msg->appendBooleanArgument(true);
+				msg->appendIntegerArgument(typeToCancel->getTemplateID());
 			}
 			else
 			{
-				GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_CANCEL_UNIT_CREATE );
-				msg->appendIntegerArgument( productionIDToCancel );
+				if (!curFactory)
+					break;
+				msg->appendBooleanArgument(false);
+				msg->appendIntegerArgument(productionIDToCancel);
+				msg->appendObjectIDArgument(curFactory->getID());
 			}
 
 			break;
@@ -845,7 +844,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			{
 				curFinishTime = 0.0;
 				curFactory = (*it)->getObject();
-				if (!curFactory)
+				if (!curFactory || !curFactory->isLocallyControlled())
 					break;
 				pu = curFactory->getProductionUpdateInterface();
 				if (!pu)
@@ -865,7 +864,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 					}
 					curFinishTime = (100.0f - pe->getPercentComplete()) / 100.f * totalFrames;
 
-					while (pe = pu->nextProduction(pe))
+					while ((pe = pu->nextProduction(pe)) != nullptr)
 						if (pe->getProductionType() == PRODUCTION_UNIT)
 						{
 							if (pe->getProductionObject())
@@ -927,7 +926,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			}
 
 			Real minFinishTime[SHIFT_CLICK_BATCH_SIZE], curFinishTime;
-			Object* bestFactories[SHIFT_CLICK_BATCH_SIZE], *curFactory;
+			Object *bestFactories[SHIFT_CLICK_BATCH_SIZE], *curFactory;
 			ProductionUpdateInterface* pu = nullptr;
 			const ProductionEntry* pe;
 			Int totalFrames = 0, i, j;
@@ -944,6 +943,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			if (TheKeyboard && TheKeyboard->isShift())
 				unitsToQueue = SHIFT_CLICK_BATCH_SIZE;
 
+			Bool upgrading;
+
 			for (DrawableListCIt it = factorys.begin(); it != factorys.end(); it++)
 			{
 				curFinishTime = 0.0;
@@ -954,6 +955,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				if (!pu)
 					break;
 				pe = pu->firstProduction();
+				upgrading = false;
 				if (pe)
 				{
 					totalFrames = 0;
@@ -964,11 +966,13 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 					}
 					else if (pe->getProductionUpgrade())
 					{
+						if (pe->getProductionUpgrade() == upgradeT)
+							upgrading = true;
 						totalFrames = pe->getProductionUpgrade()->calcTimeToBuild(player);
 					}
 					curFinishTime = (100.0f - pe->getPercentComplete()) / 100.f * totalFrames;
 
-					while (pe = pu->nextProduction(pe))
+					while ((pe = pu->nextProduction(pe)) != nullptr)
 						if (pe->getProductionType() == PRODUCTION_UNIT)
 						{
 							if (pe->getProductionObject())
@@ -982,8 +986,9 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 				curCmt = pu->canQueueUpgrade(upgradeT);
 
-				if (curCmt == CANMAKE_OK && !curFactory->hasUpgrade(upgradeT) && curFactory->affectedByUpgrade(upgradeT))
+				if (curCmt == CANMAKE_OK && !curFactory->hasUpgrade(upgradeT) && curFactory->affectedByUpgrade(upgradeT) && !upgrading)
 				{
+					cmt = CANMAKE_OK;
 					for (i = 0; i < unitsToQueue; i++)
 						if (minFinishTime[i] > curFinishTime)
 						{
@@ -994,6 +999,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 							}
 							minFinishTime[i] = curFinishTime;
 							bestFactories[i] = curFactory;
+							break;
 						}
 				}
 
@@ -1012,7 +1018,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 			GameMessage* msg;
 
-			for (i = 0; i < unitsToQueue; i++)
+			for (i = 0; i < unitsToQueue && bestFactories[i]; i++)
 			{
 				// send the message
 				msg = TheMessageStream->appendMessage(GameMessage::MSG_QUEUE_UPGRADE);
@@ -1050,11 +1056,33 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			// get the upgrade to cancel
 			const UpgradeTemplate *upgradeT = m_queueData[ i ].upgradeToResearch;
 
-			// get producer object (the thing driving our UI)
-			Object *producer = obj;
+			// sanity
+			if (upgradeT == nullptr)
+				break;
+
+			ProductionUpdateInterface* pu;
+			const ProductionEntry* pe;
+
+			Object* curFactory;
+
+			//Find the production and get the type
+			for (DrawableListCIt it = factorys.begin(); it != factorys.end(); it++)
+			{
+				curFactory = (*it)->getObject();
+				if (!curFactory || !curFactory->isLocallyControlled())
+					break;
+				pu = curFactory->getProductionUpdateInterface();
+				if (m_queueData[i].producer == curFactory)
+				{
+					for (pe = pu->firstProduction(); pe; pe = pu->nextProduction(pe))
+						if (pe->getProductionType() == PRODUCTION_UPGRADE && pe->getProductionUpgrade() == upgradeT)
+							break;
+					break;
+				}
+			}
 
 			// sanity
-			if( upgradeT == nullptr || producer == nullptr )
+			if (curFactory == nullptr)
 				break;
 
 			// Ctrl moves the clicked entry one position earlier in the queue instead of
@@ -1062,19 +1090,33 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			// to the cancel below. Unlike the cancel above, the move checks local control
 			// here like the unit branch does - the logic side rejects the message anyway,
 			// so sending one for someone else's producer only wastes network traffic.
-			if( TheGlobalData->m_queueReorder && TheKeyboard && TheKeyboard->isCtrl() )
+			if (TheGlobalData->m_queueReorder && TheKeyboard && TheKeyboard->isCtrl())
 			{
-				if( i > 0 && producer->isLocallyControlled() )
+				if (i > 0 && curFactory->isLocallyControlled())
 				{
-					GameMessage *moveMsg = TheMessageStream->appendMessage( GameMessage::MSG_MOVE_UPGRADE_EARLIER );
-					moveMsg->appendIntegerArgument( upgradeT->getUpgradeNameKey() );
+					GameMessage* moveMsg = TheMessageStream->appendMessage(GameMessage::MSG_MOVE_UPGRADE_EARLIER);
+					moveMsg->appendIntegerArgument(upgradeT->getUpgradeNameKey());
 				}
 				break;
 			}
 
-			// send the message
-			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_CANCEL_UPGRADE );
-			msg->appendIntegerArgument( upgradeT->getUpgradeNameKey() );
+			// TheSuperHackers @feature Shift cancel all of this upgrade on selected units instead of that production.
+			if (TheKeyboard && TheKeyboard->isShift())
+			{
+				// send the message
+				GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_CANCEL_UPGRADE);
+				msg->appendBooleanArgument(true);
+				msg->appendIntegerArgument(upgradeT->getUpgradeNameKey());
+
+			}
+			else
+			{
+				// send the message
+				GameMessage* msg = TheMessageStream->appendMessage(GameMessage::MSG_CANCEL_UPGRADE);
+				msg->appendBooleanArgument(false);
+				msg->appendIntegerArgument(upgradeT->getUpgradeNameKey());
+				msg->appendObjectIDArgument(curFactory->getID());
+			}
 
 			break;
 

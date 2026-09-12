@@ -3593,6 +3593,43 @@ void AIGroup::setWeaponSetFlag( WeaponSetType wst )
 	}
 }
 
+//ShigureUi 11/9/2026 cancel all production of a unit type
+void AIGroup::cancelProductionOfType( const ThingTemplate *typeToCancel)
+{
+	if (!typeToCancel)
+		return;
+
+	std::list<Object*>::iterator i;
+	ProductionUpdateInterface *pu;
+	for (i = m_memberList.begin(); i != m_memberList.end(); ++i)
+	{
+		Object* object = (*i);
+		pu = object->getProductionUpdateInterface();
+		if (!pu)
+			continue;
+		pu->cancelAllUnitsOfType(typeToCancel);
+	}
+}
+
+//ShigureUi 11/9/2026 cancel upgrades of type for everyone who is building it
+void AIGroup::cancelUpgradeOfType(const UpgradeTemplate* upgradeToCancel)
+{
+	if (!upgradeToCancel)
+		return;
+
+	//This is currently only activated via test key
+	std::list<Object*>::iterator i;
+	ProductionUpdateInterface* pu;
+	for (i = m_memberList.begin(); i != m_memberList.end(); ++i)
+	{
+		Object* object = (*i);
+		pu = object->getProductionUpdateInterface();
+		if (!pu)
+			continue;
+		pu->cancelUpgrade(upgradeToCancel);
+	}
+}
+
 void AIGroup::queueUpgrade( const UpgradeTemplate *upgrade )
 {
 	if (!upgrade)

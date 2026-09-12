@@ -124,9 +124,19 @@ void ControlBar::addCommonCommands( Drawable *draw, Bool firstDrawable )
 			// get command
 			command = commandSet->getCommandButton(i);
 
+			//sanity
+			if (!command)
+				continue;
+
+			//Script only command -- don't show it in the UI.
+			if (BitIsSet(command->getOptions(), SCRIPT_ONLY))
+			{
+				m_commandWindows[i]->winHide(TRUE);
+				continue;
+			}
+
 			// add if present and can be used in a multi select
-			if (command &&
-				(BitIsSet(command->getOptions(), OK_FOR_MULTI_SELECT) == TRUE ||
+			if ((BitIsSet(command->getOptions(), OK_FOR_MULTI_SELECT) == TRUE ||
 					// ShigureUi 07/09/2026 Allows unit build and upgrade command button OK_FOR_MULTI_SELECT by default.
 					command->getCommandType() == GUI_COMMAND_UNIT_BUILD ||
 					command->getCommandType() == GUI_COMMAND_PLAYER_UPGRADE ||
@@ -319,6 +329,18 @@ void ControlBar::populateMultiSelect()
 
 		}
 
+		ExitInterface* exit = draw->getObject()->getObjectExitInterface();
+		if (exit)
+		{
+
+			//
+			// if a rally point is set, show the rally point, if we don't have it set hide any rally
+			// point we might have visible
+			//
+			showRallyPoint(exit->getRallyPoint());
+
+		}
+
 	}
 
 	// ShigureUi 07/09/2026 check for common buildable production
@@ -338,6 +360,7 @@ void ControlBar::populateMultiSelect()
 	{
 		populateMultiSelectBuildQueue(&producerList);
 	}
+
 }
 
 
@@ -604,19 +627,19 @@ void ControlBar::updateContextMultiSelect()
 		if (draw->getObject()->isKindOf(KINDOF_IGNORED_IN_GUI)) // ignore these guys
 			continue;
 
-		// TheSuperHackers @feature Only the focused type judges availability, or another type
-		// that cannot do a command would hide or grey it out.
-		if( !isSmartSelectionFocused( draw->getObject() ) )
-		{
-			continue;
-		}
-
 		// get the object
 		obj = draw->getObject();
 
 		// sanity
-		if( obj == nullptr )
+		if (obj == nullptr)
 			continue;
+
+		// TheSuperHackers @feature Only the focused type judges availability, or another type
+		// that cannot do a command would hide or grey it out.
+		if( !isSmartSelectionFocused( obj ) )
+		{
+			continue;
+		}
 
 		//ShigureUi 07/09/2026 check if there is any production exists in order to populate build queue
 		pu = obj->getProductionUpdateInterface();
@@ -678,6 +701,15 @@ void ControlBar::updateContextMultiSelect()
 					break;
 			}
 
+			//Determine by the production type of this button, whether or not the created object
+			//will have a veterancy rank
+			if (command->getCommandType() != GUI_COMMAND_EXIT_CONTAINER)
+			{
+				//Already handled for contained members -- see ControlBar::populateButtonProc()
+				const Image* image = calculateVeterancyOverlayForThing(command->getThingTemplate());
+				GadgetButtonDrawOverlayImage(win, image);
+			}
+
 			//If button is a CHECK_LIKE, then update it's status now.
 			if( BitIsSet( command->getOptions(), CHECK_LIKE ) )
 			{
@@ -719,7 +751,7 @@ void ControlBar::updateContextMultiSelect()
 
 
 		// ShigureUi 07/09/2026 check if there is any command button is build/upgrade and available to all.
-		if (objectsThatCanDoCommand[ i ] == producerCount && everyHasPU &&
+		if (everyHasPU &&
 			  (m_commonCommands[ i ]->getCommandType() == GUI_COMMAND_UNIT_BUILD ||
 				m_commonCommands[ i ]->getCommandType() == GUI_COMMAND_PLAYER_UPGRADE ||
 				m_commonCommands[ i ]->getCommandType() == GUI_COMMAND_OBJECT_UPGRADE

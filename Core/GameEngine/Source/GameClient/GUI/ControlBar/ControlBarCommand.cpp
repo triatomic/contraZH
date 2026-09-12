@@ -616,6 +616,8 @@ void ControlBar::populateBuildQueue( Object *producer )
 		if( windowIndex >= MAX_BUILD_QUEUE_BUTTONS )
 			break;  // exit for
 
+		m_queueData[ windowIndex ].producer = producer;
+
 		// set the command into the queue button
 		if( production->getProductionType() == PRODUCTION_UNIT )
 		{
