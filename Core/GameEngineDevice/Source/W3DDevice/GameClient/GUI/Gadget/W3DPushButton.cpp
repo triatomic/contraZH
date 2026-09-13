@@ -218,9 +218,9 @@ static void drawButtonHealthBar( GameWindow *window, Real ratio )
 /** TheSuperHackers @feature One letter in the top left of a cameo, drawn for the hotkey overlay
 	* and for a caller's own corner letter. */
 //=============================================================================
-static void drawButtonCornerLetter( GameWindow *window, UnsignedByte index, Bool plate, Color plateColor, Color textColor )
+static void drawButtonCornerLetter( GameWindow *window, UnsignedByte index, GameFont *font, Bool plate, Color plateColor, Color textColor )
 {
-	if( TheDisplayStringManager == nullptr )
+	if( TheDisplayStringManager == nullptr || font == nullptr )
 		return;
 
 	// One display string per letter, so that drawing many cameos in a row does not
@@ -234,11 +234,6 @@ static void drawButtonCornerLetter( GameWindow *window, UnsignedByte index, Bool
 		if( letterString == nullptr )
 			return;
 
-		Int pointSize = 10;
-		if( TheGlobalLanguageData )
-			pointSize = TheGlobalLanguageData->adjustFontSize( pointSize );
-		letterString->setFont( TheFontLibrary->getFont( AsciiString( "Arial" ), pointSize, TRUE ) );
-
 		// the manager stores keys lowercased, but shortcuts read better as capitals
 		UnicodeString text;
 		WideChar upper = (WideChar)toupper( (Int)index );
@@ -247,6 +242,8 @@ static void drawButtonCornerLetter( GameWindow *window, UnsignedByte index, Bool
 
 		s_letterStrings[ index ] = letterString;
 	}
+	if( letterString->getFont() != font )
+		letterString->setFont( font );
 
 	ICoord2D origin;
 	window->winGetScreenPosition( &origin.x, &origin.y );
@@ -299,7 +296,12 @@ static void drawButtonHotKeyOverlay( GameWindow *window )
 	if( hotKey.getLength() != 1 || !isprint( (unsigned char)hotKey.getCharAt( 0 ) ) )
 		return;
 
-	drawButtonCornerLetter( window, (UnsignedByte)hotKey.getCharAt( 0 ), TheGlobalData->m_keyboardOverlayBackdrop,
+	Int pointSize = 10;
+	if( TheGlobalLanguageData )
+		pointSize = TheGlobalLanguageData->adjustFontSize( pointSize );
+	GameFont *font = TheFontLibrary->getFont( AsciiString( "Arial" ), pointSize, TRUE );
+
+	drawButtonCornerLetter( window, (UnsignedByte)hotKey.getCharAt( 0 ), font, TheGlobalData->m_keyboardOverlayBackdrop,
 		TheGlobalData->m_keyboardOverlayBackdropColor, TheGlobalData->m_keyboardOverlayColor );
 }
 
@@ -750,10 +752,11 @@ void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 	}
 
 	// TheSuperHackers @feature Draw the corner letter last, so it stays readable on top of the
-	// hilite and pushed overlays. A caller's own letter takes the corner over the hotkey.
+	// hilite and pushed overlays. A caller's own letter takes the corner over the hotkey and
+	// draws in the button's font, so it scales with the badge text.
 	if( pData && pData->cornerLetter != 0 )
 	{
-		drawButtonCornerLetter( window, (UnsignedByte)pData->cornerLetter, TRUE, CAMEO_PLATE_COLOR, GameMakeColor( 255, 255, 255, 255 ) );
+		drawButtonCornerLetter( window, (UnsignedByte)pData->cornerLetter, window->winGetFont(), TRUE, CAMEO_PLATE_COLOR, GameMakeColor( 255, 255, 255, 255 ) );
 	}
 	else
 	{

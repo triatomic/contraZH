@@ -254,7 +254,7 @@ first and silently drops the other.
 Shows a row of half size cameos above the command bar. A selection of different unit types gets one
 cameo per type with a count of how many are selected; a selection of a single type gets one cameo
 per object. A cameo standing for one object shows a small health bar instead of a count. The row
-holds 16 cameos; anything beyond that gets none.
+holds 16 cameos; anything beyond that gets none. A count past 999 gets no badge.
 
 * `SmartSelection = Yes` - (No hides the row and unbinds its keys.)
 * `SmartSelectionUseMouse = Yes` - (Yes keeps only a cameo's units on double click, No on

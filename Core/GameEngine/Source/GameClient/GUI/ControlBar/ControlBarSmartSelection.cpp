@@ -124,6 +124,8 @@ GameWindow *ControlBar::createCameoRow( GameWinSystemFunc systemFunc, Int slotCo
 	{
 		pointSize = TheGlobalLanguageData->adjustFontSize( pointSize );
 	}
+	// the badges read fine at seven tenths of the command bar's text size
+	pointSize = MAX( pointSize * 7 / 10, 6 );
 	GameFont *font = TheFontLibrary->getFont( AsciiString( "Arial" ), pointSize, TRUE );
 
 	const Color textColor = GameMakeColor( 255, 255, 255, 255 );
@@ -483,7 +485,7 @@ void ControlBar::refreshSmartSelectionButtons()
 		GadgetButtonSetEnabledImage( button, getCameoImage( group.thingTemplate ) );
 
 		UnicodeString count;
-		if( group.objectID == INVALID_ID )
+		if( group.objectID == INVALID_ID && group.count <= MAX_CAMEO_COUNT_BADGE )
 		{
 			count.format( L"%d", group.count );
 		}

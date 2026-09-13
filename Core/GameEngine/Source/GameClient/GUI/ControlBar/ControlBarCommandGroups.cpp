@@ -197,7 +197,10 @@ void ControlBar::refreshCommandGroupButtons()
 		GadgetButtonSetEnabledImage( button, getCameoImage( entry.thingTemplate ) );
 
 		UnicodeString count;
-		count.format( L"%d", entry.count );
+		if( entry.count <= MAX_CAMEO_COUNT_BADGE )
+		{
+			count.format( L"%d", entry.count );
+		}
 		GadgetButtonSetText( button, count );
 		GadgetButtonSetCornerLetter( button, (Char)( '0' + entry.group ) );
 

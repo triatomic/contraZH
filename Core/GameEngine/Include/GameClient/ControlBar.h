@@ -487,6 +487,7 @@ enum { MAX_SPECIAL_POWER_SHORTCUTS = 32};
 enum { MAX_SMART_SELECTION_BUTTONS = 16 };	///< TheSuperHackers @feature per type cameos above the command bar
 enum { MAX_COMMAND_GROUP_BUTTONS = 10 };		///< TheSuperHackers @feature one cameo per hotkey squad, under the smart selection row
 enum { CAMEO_ROW_GAP = 2 };									///< pixels between cameos in a row, and between the rows
+enum { MAX_CAMEO_COUNT_BADGE = 999 };				///< a count past this gets no badge, it would not fit
 class CommandSet : public Overridable
 {
 
