@@ -151,7 +151,7 @@ public:
 
 	// ParkingPlaceBehaviorInterface
 	virtual Bool shouldReserveDoorWhenQueued(const ThingTemplate* thing) const override;
-	virtual Bool hasAvailableSpaceFor(const ThingTemplate* thing) const override;
+	virtual Bool hasAvailableSpaceFor(const ThingTemplate* thing, UnsignedInt count = 1) const override;
 	virtual Bool hasReservedSpace(ObjectID id) const override;
 	virtual Int  getSpaceIndex( ObjectID id ) const override;
 	virtual Bool reserveSpace(ObjectID id, Real parkingOffset, PPInfo* info) override;

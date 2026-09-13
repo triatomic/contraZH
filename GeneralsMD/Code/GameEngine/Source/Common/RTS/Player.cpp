@@ -3285,7 +3285,7 @@ static void countExisting( Object *obj, void *userData )
 
 //=============================================================================
 // Make sure that building another of this unit/structure/object won't exceed MaxSimultaneousOfType()
-Bool Player::canBuildMoreOfType( const ThingTemplate *whatToBuild ) const
+Bool Player::canBuildMoreOfType( const ThingTemplate *whatToBuild, UnsignedInt buildCount) const
 {
   // make sure we're not maxed out for this type of unit.
   UnsignedInt maxSimultaneousOfType = whatToBuild->getMaxSimultaneousOfType();
@@ -3304,7 +3304,7 @@ Bool Player::canBuildMoreOfType( const ThingTemplate *whatToBuild ) const
     typeCountData.checkProductionInterface = !whatToBuild->isKindOf( KINDOF_STRUCTURE );
 
     iterateObjects( countExisting, &typeCountData );
-    if( typeCountData.count >= maxSimultaneousOfType )
+    if( typeCountData.count + buildCount > maxSimultaneousOfType )
       return false;
   }
   return true;
