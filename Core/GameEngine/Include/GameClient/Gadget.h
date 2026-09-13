@@ -436,6 +436,7 @@ typedef struct _PushButtonData
 	// whoever sets it must re-set it every frame.
 	Int countdownSeconds;
 	Real healthRatio;				///< TheSuperHackers @feature Health bar along the bottom, negative for none. One shot like the countdown.
+	Char cornerLetter;			///< TheSuperHackers @feature One letter drawn top left like the hotkey overlay, 0 for none. Persistent.
 } PushButtonData;
 
 // TabControlData ------------------------------------------------------------

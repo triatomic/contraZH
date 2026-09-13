@@ -90,7 +90,10 @@ void W3DGadgetPushButtonImageDrawOne(GameWindow *window, WinInstanceData *instDa
 static DisplayString *s_countdownString = nullptr;
 static Int s_countdownLastSeconds = -1;
 static Int s_countdownLastMode = -1;
-static DisplayString *s_hotKeyStrings[ 256 ] = { nullptr };
+static DisplayString *s_letterStrings[ 256 ] = { nullptr };
+
+// the plate behind a count badge or corner letter over a cameo
+static const Color CAMEO_PLATE_COLOR = GameMakeColor( 0, 0, 0, 160 );
 
 void W3DGadgetPushButtonFreeDisplayStrings( void )
 {
@@ -102,9 +105,9 @@ void W3DGadgetPushButtonFreeDisplayStrings( void )
 
 	for( Int i = 0; i < 256; ++i )
 	{
-		if( s_hotKeyStrings[ i ] != nullptr && TheDisplayStringManager != nullptr )
-			TheDisplayStringManager->freeDisplayString( s_hotKeyStrings[ i ] );
-		s_hotKeyStrings[ i ] = nullptr;
+		if( s_letterStrings[ i ] != nullptr && TheDisplayStringManager != nullptr )
+			TheDisplayStringManager->freeDisplayString( s_letterStrings[ i ] );
+		s_letterStrings[ i ] = nullptr;
 	}
 }
 
@@ -211,6 +214,60 @@ static void drawButtonHealthBar( GameWindow *window, Real ratio )
 	TheDisplay->drawFillRect( barX + 1, barY + 1, ( barWidth - 2 ) * ratio, frameHeight - 2, GameMakeColor( red * 255, green * 255, 0, 255 ) );
 }
 
+// drawButtonCornerLetter =====================================================
+/** TheSuperHackers @feature One letter in the top left of a cameo, drawn for the hotkey overlay
+	* and for a caller's own corner letter. */
+//=============================================================================
+static void drawButtonCornerLetter( GameWindow *window, UnsignedByte index, Bool plate, Color plateColor, Color textColor )
+{
+	if( TheDisplayStringManager == nullptr )
+		return;
+
+	// One display string per letter, so that drawing many cameos in a row does not
+	// rebuild sentence geometry over and over. There are only ever a handful of
+	// distinct letters on screen, so this stays small.
+	DisplayString *letterString = s_letterStrings[ index ];
+
+	if( letterString == nullptr )
+	{
+		letterString = TheDisplayStringManager->newDisplayString();
+		if( letterString == nullptr )
+			return;
+
+		Int pointSize = 10;
+		if( TheGlobalLanguageData )
+			pointSize = TheGlobalLanguageData->adjustFontSize( pointSize );
+		letterString->setFont( TheFontLibrary->getFont( AsciiString( "Arial" ), pointSize, TRUE ) );
+
+		// the manager stores keys lowercased, but shortcuts read better as capitals
+		UnicodeString text;
+		WideChar upper = (WideChar)toupper( (Int)index );
+		text.concat( upper );
+		letterString->setText( text );
+
+		s_letterStrings[ index ] = letterString;
+	}
+
+	ICoord2D origin;
+	window->winGetScreenPosition( &origin.x, &origin.y );
+
+	// tuck it into the top left of the cameo, where no existing decoration lives
+	const Int inset = 2;
+	const Int textX = origin.x + inset;
+	const Int textY = origin.y + inset;
+
+	// Optional plate behind the letter, so it stays readable over busy cameo art.
+	if( plate )
+	{
+		Int width, height;
+		letterString->getSize( &width, &height );
+
+		drawTextPlate( textX, textY, width, height, plateColor );
+	}
+
+	letterString->draw( textX, textY, textColor, GameMakeColor( 0, 0, 0, 255 ) );
+}
+
 // TheSuperHackers @feature Command bar hotkey overlay (Options.ini: KeyboardOverlay).
 // drawButtonHotKeyOverlay ====================================================
 /** Draw the keyboard hotkey letter over a command bar cameo, so the player can
@@ -225,7 +282,7 @@ static void drawButtonHotKeyOverlay( GameWindow *window )
 	if( !TheGlobalData || !TheGlobalData->m_keyboardOverlayEnabled )
 		return;
 
-	if( TheHotKeyManager == nullptr || TheDisplayStringManager == nullptr )
+	if( TheHotKeyManager == nullptr )
 		return;
 
 	// only cameo style buttons opt into overlay states, so this leaves menu buttons alone
@@ -242,51 +299,8 @@ static void drawButtonHotKeyOverlay( GameWindow *window )
 	if( hotKey.getLength() != 1 || !isprint( (unsigned char)hotKey.getCharAt( 0 ) ) )
 		return;
 
-	// One display string per letter, so that drawing many cameos in a row does not
-	// rebuild sentence geometry over and over. There are only ever a handful of
-	// distinct hotkeys on screen, so this stays small.
-	const UnsignedByte index = (UnsignedByte)hotKey.getCharAt( 0 );
-	DisplayString *hotKeyString = s_hotKeyStrings[ index ];
-
-	if( hotKeyString == nullptr )
-	{
-		hotKeyString = TheDisplayStringManager->newDisplayString();
-		if( hotKeyString == nullptr )
-			return;
-
-		Int pointSize = 10;
-		if( TheGlobalLanguageData )
-			pointSize = TheGlobalLanguageData->adjustFontSize( pointSize );
-		hotKeyString->setFont( TheFontLibrary->getFont( AsciiString( "Arial" ), pointSize, TRUE ) );
-
-		// the manager stores keys lowercased, but shortcuts read better as capitals
-		UnicodeString text;
-		WideChar upper = (WideChar)toupper( (Int)index );
-		text.concat( upper );
-		hotKeyString->setText( text );
-
-		s_hotKeyStrings[ index ] = hotKeyString;
-	}
-
-	ICoord2D origin;
-	window->winGetScreenPosition( &origin.x, &origin.y );
-
-	// tuck it into the top left of the cameo, where no existing decoration lives
-	const Int inset = 2;
-	const Int textX = origin.x + inset;
-	const Int textY = origin.y + inset;
-
-	// Optional plate behind the letter, so it stays readable over busy cameo art.
-	if( TheGlobalData->m_keyboardOverlayBackdrop )
-	{
-		Int width, height;
-		hotKeyString->getSize( &width, &height );
-
-		drawTextPlate( textX, textY, width, height, TheGlobalData->m_keyboardOverlayBackdropColor );
-	}
-
-	hotKeyString->draw( textX, textY,
-		TheGlobalData->m_keyboardOverlayColor, GameMakeColor( 0, 0, 0, 255 ) );
+	drawButtonCornerLetter( window, (UnsignedByte)hotKey.getCharAt( 0 ), TheGlobalData->m_keyboardOverlayBackdrop,
+		TheGlobalData->m_keyboardOverlayBackdropColor, TheGlobalData->m_keyboardOverlayColor );
 }
 
 // drawButtonText =============================================================
@@ -340,7 +354,7 @@ static void drawButtonText( GameWindow *window, WinInstanceData *instData )
 		// TheSuperHackers @feature A count over a cameo sits bottom right on a translucent plate
 		textPos.x = origin.x + size.x - width - 2;
 		textPos.y = origin.y + size.y - height - 1;
-		drawTextPlate( textPos.x, textPos.y, width, height, GameMakeColor( 0, 0, 0, 160 ) );
+		drawTextPlate( textPos.x, textPos.y, width, height, CAMEO_PLATE_COLOR );
 	}
 	else if( BitIsSet( window->winGetStatus(), WIN_STATUS_SHORTCUT_BUTTON ) )
 	{
@@ -735,9 +749,16 @@ void W3DGadgetPushButtonImageDrawOne( GameWindow *window,
 		}
 	}
 
-	// TheSuperHackers @feature Draw the hotkey letter last, so it stays readable on top
-	// of the hilite and pushed overlays.
-	drawButtonHotKeyOverlay( window );
+	// TheSuperHackers @feature Draw the corner letter last, so it stays readable on top of the
+	// hilite and pushed overlays. A caller's own letter takes the corner over the hotkey.
+	if( pData && pData->cornerLetter != 0 )
+	{
+		drawButtonCornerLetter( window, (UnsignedByte)pData->cornerLetter, TRUE, CAMEO_PLATE_COLOR, GameMakeColor( 255, 255, 255, 255 ) );
+	}
+	else
+	{
+		drawButtonHotKeyOverlay( window );
+	}
 }
 
 

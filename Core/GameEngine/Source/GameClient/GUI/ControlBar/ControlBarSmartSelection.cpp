@@ -48,8 +48,6 @@
 #include "GameClient/Keyboard.h"
 #include "GameClient/WinInstanceData.h"
 
-static const Int SMART_SELECTION_GAP = 2;
-
 //-------------------------------------------------------------------------------------------------
 /** The container owns the cameos, so their clicks land here. */
 //-------------------------------------------------------------------------------------------------
@@ -69,8 +67,8 @@ static WindowMsgHandledType SmartSelectionBarSystem( GameWindow *window, Unsigne
 	* reach the world as a deselect. Swallow it over a cameo only: in a gap the right button must
 	* still pass, or a camera scroll started there never ends. */
 //-------------------------------------------------------------------------------------------------
-static WindowMsgHandledType SmartSelectionBarInput( GameWindow *window, UnsignedInt msg,
-																										WindowMsgData mData1, WindowMsgData mData2 )
+static WindowMsgHandledType CameoRowInput( GameWindow *window, UnsignedInt msg,
+																					 WindowMsgData mData1, WindowMsgData mData2 )
 {
 	if( msg != GWM_RIGHT_DOWN && msg != GWM_RIGHT_UP )
 	{
@@ -99,17 +97,12 @@ static Object *getSmartSelectionObject( Drawable *draw )
 }
 
 //-------------------------------------------------------------------------------------------------
+/** A top level row of half size cameos, hidden, with one based slots in the button data so an
+	* unset payload never reads as slot zero. */
 //-------------------------------------------------------------------------------------------------
-void ControlBar::initSmartSelectionBar( const ICoord2D &commandButtonSize )
+GameWindow *ControlBar::createCameoRow( GameWinSystemFunc systemFunc, Int slotCount, Bool rightClick, GameWindow **buttons )
 {
-	m_smartSelectionButtonSize.x = commandButtonSize.x / 2;
-	m_smartSelectionButtonSize.y = commandButtonSize.y / 2;
-	if( m_smartSelectionButtonSize.x <= 0 || m_smartSelectionButtonSize.y <= 0 )
-	{
-		return;
-	}
-
-	const Int stride = m_smartSelectionButtonSize.x + SMART_SELECTION_GAP;
+	const Int stride = m_smartSelectionButtonSize.x + CAMEO_ROW_GAP;
 
 	// the bar's own ABOVE bit decides which hit test pass finds it, so the row must match it
 	UnsignedInt parentStatus = WIN_STATUS_ENABLED | WIN_STATUS_SEE_THRU | WIN_STATUS_HIDDEN;
@@ -118,14 +111,13 @@ void ControlBar::initSmartSelectionBar( const ICoord2D &commandButtonSize )
 		parentStatus |= WIN_STATUS_ABOVE;
 	}
 
-	m_smartSelectionParent = TheWindowManager->winCreate( nullptr, parentStatus, 0, 0,
-		MAX_SMART_SELECTION_BUTTONS * stride - SMART_SELECTION_GAP, m_smartSelectionButtonSize.y,
-		SmartSelectionBarSystem );
-	if( m_smartSelectionParent == nullptr )
+	GameWindow *parent = TheWindowManager->winCreate( nullptr, parentStatus, 0, 0,
+		slotCount * stride - CAMEO_ROW_GAP, m_smartSelectionButtonSize.y, systemFunc );
+	if( parent == nullptr )
 	{
-		return;
+		return nullptr;
 	}
-	m_smartSelectionParent->winSetInputFunc( SmartSelectionBarInput );
+	parent->winSetInputFunc( CameoRowInput );
 
 	Int pointSize = MIN( MAX( m_smartSelectionButtonSize.y / 3, 8 ), 10 );
 	if( TheGlobalLanguageData )
@@ -136,18 +128,19 @@ void ControlBar::initSmartSelectionBar( const ICoord2D &commandButtonSize )
 
 	const Color textColor = GameMakeColor( 255, 255, 255, 255 );
 	const Color dropColor = GameMakeColor( 0, 0, 0, 255 );
+	const UnsignedInt rightClickStatus = rightClick ? WIN_STATUS_RIGHT_CLICK : 0;
 
-	for( Int i = 0; i < MAX_SMART_SELECTION_BUTTONS; i++ )
+	for( Int i = 0; i < slotCount; i++ )
 	{
 		WinInstanceData instData;
 		instData.init();
 		instData.m_style = GWS_PUSH_BUTTON | GWS_MOUSE_TRACK;
 		// the button input reads the right click flag off the instance data, not the window
-		instData.m_status = WIN_STATUS_RIGHT_CLICK;
+		instData.m_status = rightClickStatus;
 
-		GameWindow *button = TheWindowManager->gogoGadgetPushButton( m_smartSelectionParent,
+		GameWindow *button = TheWindowManager->gogoGadgetPushButton( parent,
 			WIN_STATUS_ENABLED | WIN_STATUS_IMAGE | WIN_STATUS_USE_OVERLAY_STATES |
-			WIN_STATUS_COUNT_BADGE | WIN_STATUS_RIGHT_CLICK | WIN_STATUS_HIDDEN,
+			WIN_STATUS_COUNT_BADGE | WIN_STATUS_HIDDEN | rightClickStatus,
 			i * stride, 0, m_smartSelectionButtonSize.x, m_smartSelectionButtonSize.y,
 			&instData, font, FALSE );
 		if( button == nullptr )
@@ -155,17 +148,54 @@ void ControlBar::initSmartSelectionBar( const ICoord2D &commandButtonSize )
 			continue;
 		}
 
-		// the slot rides on the button, one based so an unset payload never reads as slot zero
 		GadgetButtonSetData( button, (void *)(size_t)( i + 1 ) );
 		button->winSetFont( font );
 		button->winSetEnabledTextColors( textColor, dropColor );
 		button->winSetHiliteTextColors( textColor, dropColor );
 		button->winSetDisabledTextColors( textColor, dropColor );
-		GadgetButtonEnableCheckLike( button, TRUE, FALSE );
 		GadgetButtonSetAltSound( button, "GUICommandBarClick" );
 
-		m_smartSelectionButtons[ i ] = button;
+		buttons[ i ] = button;
 	}
+	return parent;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** The cameo image of a type, falling back to its portrait. */
+//-------------------------------------------------------------------------------------------------
+const Image *ControlBar::getCameoImage( const ThingTemplate *thingTemplate )
+{
+	const Image *image = thingTemplate->getButtonImage();
+	return image ? image : thingTemplate->getSelectedPortraitImage();
+}
+
+//-------------------------------------------------------------------------------------------------
+Int ControlBar::getCameoRowWidth( Int cameoCount ) const
+{
+	return cameoCount * ( m_smartSelectionButtonSize.x + CAMEO_ROW_GAP ) - CAMEO_ROW_GAP;
+}
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+void ControlBar::initSmartSelectionBar( const ICoord2D &commandButtonSize )
+{
+	m_smartSelectionButtonSize.x = commandButtonSize.x / 2;
+	m_smartSelectionButtonSize.y = commandButtonSize.y / 2;
+	if( m_smartSelectionButtonSize.x <= 0 || m_smartSelectionButtonSize.y <= 0 )
+	{
+		return;
+	}
+
+	m_smartSelectionParent = createCameoRow( SmartSelectionBarSystem, MAX_SMART_SELECTION_BUTTONS, TRUE, m_smartSelectionButtons );
+	for( Int i = 0; i < MAX_SMART_SELECTION_BUTTONS; i++ )
+	{
+		if( m_smartSelectionButtons[ i ] )
+		{
+			GadgetButtonEnableCheckLike( m_smartSelectionButtons[ i ], TRUE, FALSE );
+		}
+	}
+
+	initCommandGroupBar();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -181,6 +211,7 @@ void ControlBar::destroySmartSelectionBar()
 	{
 		m_smartSelectionButtons[ i ] = nullptr;
 	}
+	destroyCommandGroupBar();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -193,6 +224,7 @@ void ControlBar::resetSmartSelection()
 	{
 		m_smartSelectionParent->winHide( TRUE );
 	}
+	resetCommandGroupBar();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -246,12 +278,6 @@ Bool ControlBar::isSmartSelectionGroupFocused( Int groupIndex ) const
 	}
 	const SmartSelectionGroup &focus = m_smartSelectionGroups[ m_smartSelectionActive ];
 	return focus.objectID != INVALID_ID ? groupIndex == m_smartSelectionActive : m_smartSelectionGroups[ groupIndex ].thingTemplate == focus.thingTemplate;
-}
-
-//-------------------------------------------------------------------------------------------------
-Int ControlBar::getSmartSelectionRowWidth() const
-{
-	return (Int)m_smartSelectionGroups.size() * ( m_smartSelectionButtonSize.x + SMART_SELECTION_GAP ) - SMART_SELECTION_GAP;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -371,6 +397,9 @@ void ControlBar::updateSmartSelection()
 		return;
 	}
 
+	// first, so this row knows whether to sit above it
+	updateCommandGroupBar();
+
 	GameWindow *master = m_contextParent[ CP_MASTER ];
 	GameWindow *commandWindow = m_contextParent[ CP_COMMAND ] ? m_contextParent[ CP_COMMAND ] : master;
 	if( master == nullptr || master->winIsHidden() || m_smartSelectionGroups.empty() )
@@ -386,7 +415,11 @@ void ControlBar::updateSmartSelection()
 	// grid, whose top sits at the frame
 	ICoord2D commandPos;
 	commandWindow->winGetScreenPosition( &commandPos.x, &commandPos.y );
-	Int rowY = commandPos.y - m_smartSelectionButtonSize.y - SMART_SELECTION_GAP;
+	Int rowY = commandPos.y - m_smartSelectionButtonSize.y - CAMEO_ROW_GAP;
+	if( isCommandGroupRowShown() )
+	{
+		rowY -= m_smartSelectionButtonSize.y + CAMEO_ROW_GAP;
+	}
 
 	// the money display rises out of the frame, so a row long enough to reach its housing
 	// lifts above it instead of running into it
@@ -396,8 +429,8 @@ void ControlBar::updateSmartSelection()
 		m_smartSelectionMoneyWindow->winGetScreenPosition( &moneyPos.x, &moneyPos.y );
 		// the housing slopes out about a cameo's width left of the money text
 		const Int housingMargin = m_smartSelectionButtonSize.x;
-		const Int liftedY = moneyPos.y - m_smartSelectionButtonSize.y - SMART_SELECTION_GAP;
-		if( commandPos.x + getSmartSelectionRowWidth() > moneyPos.x - housingMargin && liftedY < rowY )
+		const Int liftedY = moneyPos.y - m_smartSelectionButtonSize.y - CAMEO_ROW_GAP;
+		if( commandPos.x + getCameoRowWidth( (Int)m_smartSelectionGroups.size() ) > moneyPos.x - housingMargin && liftedY < rowY )
 		{
 			rowY = liftedY;
 		}
@@ -447,12 +480,7 @@ void ControlBar::refreshSmartSelectionButtons()
 		}
 
 		const SmartSelectionGroup &group = m_smartSelectionGroups[ i ];
-		const Image *image = group.thingTemplate->getButtonImage();
-		if( image == nullptr )
-		{
-			image = group.thingTemplate->getSelectedPortraitImage();
-		}
-		GadgetButtonSetEnabledImage( button, image );
+		GadgetButtonSetEnabledImage( button, getCameoImage( group.thingTemplate ) );
 
 		UnicodeString count;
 		if( group.objectID == INVALID_ID )
@@ -465,7 +493,7 @@ void ControlBar::refreshSmartSelectionButtons()
 		button->winHide( FALSE );
 	}
 
-	m_smartSelectionParent->winSetSize( MAX( getSmartSelectionRowWidth(), 1 ), m_smartSelectionButtonSize.y );
+	m_smartSelectionParent->winSetSize( MAX( getCameoRowWidth( (Int)m_smartSelectionGroups.size() ), 1 ), m_smartSelectionButtonSize.y );
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -1003,6 +1003,12 @@ ControlBar::ControlBar()
 	m_smartSelectionActive = -1;
 	m_smartSelectionLastClickSlot = -1;
 	m_smartSelectionLastClickTime = 0;
+	m_commandGroupFrame = 0;
+	m_commandGroupParent = nullptr;
+	for( i = 0; i < MAX_COMMAND_GROUP_BUTTONS; i++ )
+	{
+		m_commandGroupButtons[i] = nullptr;
+	}
 	m_scienceLayout = nullptr;
 	m_rightHUDWindow = nullptr;
 	m_rightHUDCameoWindow = nullptr;

@@ -35,6 +35,7 @@
 #include "Common/Overridable.h"
 #include "Common/Science.h"
 #include "GameClient/Color.h"
+#include "GameClient/GameWindow.h"
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class Drawable;
@@ -484,6 +485,8 @@ enum { MAX_STRUCTURE_INVENTORY_BUTTONS = 10 }; // there are this many physical b
 enum { MAX_BUILD_QUEUE_BUTTONS = 9 };// physical button count for the build queue
 enum { MAX_SPECIAL_POWER_SHORTCUTS = 32};
 enum { MAX_SMART_SELECTION_BUTTONS = 16 };	///< TheSuperHackers @feature per type cameos above the command bar
+enum { MAX_COMMAND_GROUP_BUTTONS = 10 };		///< TheSuperHackers @feature one cameo per hotkey squad, under the smart selection row
+enum { CAMEO_ROW_GAP = 2 };									///< pixels between cameos in a row, and between the rows
 class CommandSet : public Overridable
 {
 
@@ -774,6 +777,8 @@ public:
 	void appendCommandGroup( const CommandButton *command );
 	/// sent ahead of a placement, so the builder builds and the other selected dozers help
 	void appendBuildGroup( const Object *builder );
+	/// a cameo in the command group row selects its hotkey squad
+	void processCommandGroupClick( GameWindow *button );
 
 	//-----------------------------------------------------------------------------------------------
 	// the remaining methods are used to construct the command buttons and command sets for
@@ -960,16 +965,25 @@ protected:
 	void populateSpecialPowerShortcut( Player *player);
 	void updateSpecialPowerShortcut();
 
-	// the following methods are for the smart selection row
+	// the following methods are for the smart selection row and the command group row under it
+	GameWindow *createCameoRow( GameWinSystemFunc systemFunc, Int slotCount, Bool rightClick, GameWindow **buttons );
+	static const Image *getCameoImage( const ThingTemplate *thingTemplate );
+	Int getCameoRowWidth( Int cameoCount ) const;
 	void initSmartSelectionBar( const ICoord2D &commandButtonSize );
 	void destroySmartSelectionBar();
 	void resetSmartSelection();
 	void populateSmartSelection();
 	void updateSmartSelection();
 	void refreshSmartSelectionButtons();
-	Int getSmartSelectionRowWidth() const;
 	void smartSelectionFocus( Int groupIndex );
 	void smartSelectionRemove( Int groupIndex, Bool keepGroup );
+
+	void initCommandGroupBar();
+	void destroyCommandGroupBar();
+	void resetCommandGroupBar();
+	void updateCommandGroupBar();
+	void refreshCommandGroupButtons();
+	Bool isCommandGroupRowShown() const;
 
 	static const Image* calculateVeterancyOverlayForThing( const ThingTemplate *thingTemplate );
 	static const Image* calculateVeterancyOverlayForObject( const Object *obj );
@@ -1047,6 +1061,18 @@ protected:
 	Int m_smartSelectionActive;																///< cameo whose command set the bar shows, or -1 for the common set
 	Int m_smartSelectionLastClickSlot;												///< cameo of the last left click, for double click detection
 	UnsignedInt m_smartSelectionLastClickTime;
+
+	struct CommandGroupEntry
+	{
+		Int group;														///< hotkey squad index
+		const ThingTemplate *thingTemplate;		///< the most common type among the members, for the cameo image
+		Int count;
+		Bool operator==( const CommandGroupEntry &other ) const { return group == other.group && thingTemplate == other.thingTemplate && count == other.count; }
+	};
+	std::vector<CommandGroupEntry> m_commandGroupEntries;			///< one per squad with live members
+	UnsignedInt m_commandGroupFrame;													///< logic frame the entries were built on; they cannot change within one
+	GameWindow *m_commandGroupParent;													///< top level container for the row, created in code
+	GameWindow *m_commandGroupButtons[ MAX_COMMAND_GROUP_BUTTONS ];
 
 	GameWindow *m_commandWindows[ MAX_COMMANDS_PER_SET ];			///< command window controls for easy access
 	const CommandButton *m_commonCommands[ MAX_COMMANDS_PER_SET ];	///< shared commands we will use for multi-selection

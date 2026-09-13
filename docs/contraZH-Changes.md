@@ -262,6 +262,19 @@ unit, or its whole type, and drop everything else.
 * Tab and Shift+Tab (`SMART_SELECTION_NEXT_TYPE` / `SMART_SELECTION_PREV_TYPE` in
 CommandMap.ini) step the focus through the row, skipping cameos that are already pushed in.
 
+### Command group row
+
+A second row of half size cameos sits on the command bar frame, one per command group (Ctrl+1
+to Ctrl+0) that still has live members, in key order 1 to 9 then 0. Each cameo shows the group's
+most common unit type, the group number top left and the live member count bottom right; the
+count drops as members die. The row shows whenever any group has members, even with nothing
+selected, and the smart selection row lifts one row above it while both are shown. It follows the
+`SmartSelection` option.
+
+* Left click a cameo to select its group, as the number key does.
+* Double click a cameo to also center the camera on the group, as double tapping the number key
+does.
+
 ## Input
 
 * `CastMode = Normal` - (`Normal` | `QuickCast` | `QuickCastWithIndicator`. `QuickCast` fires a

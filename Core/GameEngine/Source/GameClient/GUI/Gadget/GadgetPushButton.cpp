@@ -604,6 +604,7 @@ PushButtonData * getNewPushButtonData()
 	// TheSuperHackers @feature no countdown until someone asks for one
 	p->countdownSeconds = -1;
 	p->healthRatio = -1.0f;
+	p->cornerLetter = 0;
 	return p;
 }
 
@@ -703,6 +704,26 @@ void GadgetButtonDrawHealthBar( GameWindow *g, Real ratio )
 		pData = getNewPushButtonData();
 	}
 	pData->healthRatio = ratio;
+	g->winSetUserData(pData);
+
+}
+
+// GadgetButtonSetCornerLetter ================================================
+/** TheSuperHackers @feature A letter in the top left of the button, where the hotkey overlay
+	* draws. Stays until set to 0. */
+//=============================================================================
+void GadgetButtonSetCornerLetter( GameWindow *g, Char letter )
+{
+
+	if( g == nullptr )
+		return;
+
+	PushButtonData *pData = (PushButtonData *)g->winGetUserData();
+	if(!pData)
+	{
+		pData = getNewPushButtonData();
+	}
+	pData->cornerLetter = letter;
 	g->winSetUserData(pData);
 
 }
