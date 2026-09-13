@@ -268,7 +268,7 @@ Bool ParkingPlaceBehavior::shouldReserveDoorWhenQueued(const ThingTemplate* thin
 
 //-------------------------------------------------------------------------------------------------
 // note: called from client, so MUST NOT modify self in any way, or desyncs will occur
-Bool ParkingPlaceBehavior::hasAvailableSpaceFor(const ThingTemplate* thing) const
+Bool ParkingPlaceBehavior::hasAvailableSpaceFor(const ThingTemplate* thing, UnsignedInt count) const
 {
 	if (!m_gotInfo)	// degenerate case, shouldn't happen, but just in case...
 		return false;
@@ -276,6 +276,7 @@ Bool ParkingPlaceBehavior::hasAvailableSpaceFor(const ThingTemplate* thing) cons
 	if (thing->isKindOf(KINDOF_PRODUCED_AT_HELIPAD))
 		return true;
 
+	UnsignedInt roomLeft = 0;
 	for (std::vector<ParkingPlaceInfo>::const_iterator it = m_spaces.begin(); it != m_spaces.end(); ++it)
 	{
 		ObjectID id = it->m_objectInSpace;
@@ -292,11 +293,11 @@ Bool ParkingPlaceBehavior::hasAvailableSpaceFor(const ThingTemplate* thing) cons
 
 		if (id == INVALID_ID && it->m_reservedForExit == false)
 		{
-			return true;
+			roomLeft++;
 		}
 	}
 
-	return false;
+	return roomLeft >= count;
 }
 
 //-------------------------------------------------------------------------------------------------
