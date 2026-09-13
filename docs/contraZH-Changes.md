@@ -122,6 +122,17 @@ Notes:
 * The twelve retail personas are untouched, and a layout that still carries exactly twelve buttons
 behaves as it always did.
 
+## Dying infantry do not block or catch clicks
+
+A soldier in its death fall stayed on the pathfind grid until its `SlowDeathBehavior` sink began,
+so for a few seconds it was a solid obstacle to any vehicle that could not crush it, such as radar
+vans and drones. A dying soldier now leaves the grid the moment it dies and no longer blocks a
+mover. Crushers still shove corpses aside as before, and dying vehicles still block until they turn
+into hulks.
+
+A dying unit also kept catching the mouse, so a click on a corpse never reached the unit or ground
+behind it. Anything effectively dead now drops its pick bit, unless it is `ALWAYS_SELECTABLE`.
+
 # Game Setup
 
 ## Random army per faction

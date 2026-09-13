@@ -1437,6 +1437,11 @@ void AIUpdateInterface::clearWaypointQueue()
 void AIUpdateInterface::markAsDead()
 {
 	m_isAiDead = TRUE;
+	// the pathfinder drops a unit that stopped being a ground mover on its next move, which a corpse never makes
+	if (!isDoingGroundMovement())
+	{
+		TheAI->pathfinder()->removeUnitFromPathfindMap(getObject());
+	}
 	getObject()->setEffectivelyDead(TRUE);
 	wakeUpNow();	// wake us up immediately so that our anim plays promptly!
 }
@@ -1685,6 +1690,12 @@ Bool AIUpdateInterface::processCollision(PhysicsBehavior *physics, Object *other
 	if (aiOther == nullptr)
 		return FALSE;
 
+	if (isAiInDeadState())
+	{
+		// Dead infantry get pushed around by crushers.
+		return getObject()->isKindOf(KINDOF_INFANTRY) && other->canCrushOrSquish(getObject(), TEST_SQUISH_ONLY);
+	}
+
 	Bool selfMoving = isMoving();
 	Bool otherMoving = ( aiOther && aiOther->isMoving() );
 	if (!isDoingGroundMovement()) return FALSE;
@@ -1786,15 +1797,6 @@ Bool AIUpdateInterface::processCollision(PhysicsBehavior *physics, Object *other
 	}
 	else
 	{
-		if (isAiInDeadState())
-		{
-			// Dead infantry get pushed around by crushers.
-			if (getObject()->isKindOf(KINDOF_INFANTRY) && other->canCrushOrSquish(getObject(), TEST_SQUISH_ONLY))
-			{
-				return TRUE;
-			}
-		}
-
 		Coord3D otherPos = *other->getPosition();
 		Real dx = getObject()->getPosition()->x - otherPos.x;
 		Real dy = getObject()->getPosition()->y - otherPos.y;
@@ -2646,6 +2648,12 @@ Bool AIUpdateInterface::isDoingGroundMovement() const
   {
     return TRUE; // an unmanned helicopter gets grounded, eventually.
   }
+
+	// a dying soldier lies flat, so it neither holds pathfind cells nor blocks a mover
+	if (m_isAiDead && getObject()->isKindOf(KINDOF_INFANTRY))
+	{
+		return FALSE;
+	}
 
 	if (m_locomotorSet.getValidSurfaces() == LOCOMOTORSURFACE_AIR)
 	{

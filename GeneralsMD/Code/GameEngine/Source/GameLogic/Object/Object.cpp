@@ -2263,10 +2263,17 @@ void Object::healCompletely()
 //-------------------------------------------------------------------------------------------------
 void Object::setEffectivelyDead(Bool dead)
 {
+	const Bool wasDead = BitIsSet(m_privateStatus, EFFECTIVELY_DEAD);
 	if (dead)
 		BitSet(m_privateStatus, EFFECTIVELY_DEAD);
 	else
 		BitClear(m_privateStatus, EFFECTIVELY_DEAD);
+
+	// refresh the pick bit, or a corpse catches clicks meant for what lies behind it
+	if (wasDead != dead && m_drawable)
+	{
+		m_drawable->setSelectable(isSelectable());
+	}
 
 	if (dead)
 	{
