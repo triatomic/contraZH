@@ -510,6 +510,7 @@ public:
 	Bool m_newRadar;
 	Bool m_smartSelection;
 	Bool m_smartSelectionUseMouse;
+	Bool m_smartCommandGroup;
 	// TheSuperHackers @feature How big the NewRadar object blips draw.
 	// Holds a RadarBlipSize; stored as Int to avoid pulling OptionPreferences.h in here.
 	Int m_radarBlipSize;

@@ -212,6 +212,7 @@ public:
 
 	Bool getSmartSelectionEnabled() const;
 	Bool getSmartSelectionUseMouse() const;
+	Bool getSmartCommandGroupEnabled() const;
 
 	Real getGameWindowTransitionSpeedMultiplier() const;
 

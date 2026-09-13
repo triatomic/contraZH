@@ -477,6 +477,13 @@ Bool OptionPreferences::getSmartSelectionUseMouse(void) const
 	return getBool("SmartSelectionUseMouse", TRUE);
 }
 
+// TheSuperHackers @feature Options.ini: SmartCommandGroup = Yes shows a row of cameos for the
+// command groups under the smart selection row. On by default.
+Bool OptionPreferences::getSmartCommandGroupEnabled(void) const
+{
+	return getBool("SmartCommandGroup", TRUE);
+}
+
 // TheSuperHackers @feature Options.ini: CastMode = Normal | QuickCast | QuickCastWithIndicator
 CastMode OptionPreferences::getCastMode(void) const
 {

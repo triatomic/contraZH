@@ -102,7 +102,8 @@ void ControlBar::updateCommandGroupBar()
 	GameWindow *master = m_contextParent[ CP_MASTER ];
 	GameWindow *commandWindow = m_contextParent[ CP_COMMAND ] ? m_contextParent[ CP_COMMAND ] : master;
 	Player *player = ThePlayerList ? ThePlayerList->getLocalPlayer() : nullptr;
-	if( master == nullptr || master->winIsHidden() || player == nullptr || m_isObserverCommandBar || !TheGlobalData->m_smartSelection )
+	if( master == nullptr || master->winIsHidden() || player == nullptr || m_isObserverCommandBar ||
+			!TheGlobalData->m_smartSelection || !TheGlobalData->m_smartCommandGroup )
 	{
 		resetCommandGroupBar();
 		return;

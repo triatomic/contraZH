@@ -191,6 +191,7 @@ static GameWindow *   checkObjectDecals           = nullptr;
 static GameWindow *   checkEasyMilitaryDrag       = nullptr;
 static GameWindow *   checkSmartSelection         = nullptr;
 static GameWindow *   checkSmartSelectionUseMouse = nullptr;
+static GameWindow *   checkSmartCommandGroup      = nullptr;
 static GameWindow *   checkNewRadar               = nullptr;
 static GameWindow *   checkLargeBlips             = nullptr;
 static NameKeyType    checkGridHotkeysID          = NAMEKEY_INVALID;
@@ -446,6 +447,7 @@ static const BoolOption BoolOptions[] =
 	{ &checkEasyMilitaryDrag, "EasyMilitaryDrag", &OptionPreferences::getEasyMilitaryDragEnabled, &GlobalData::m_easyMilitaryDrag, FALSE },
 	{ &checkSmartSelection, "SmartSelection", &OptionPreferences::getSmartSelectionEnabled, &GlobalData::m_smartSelection, TRUE },
 	{ &checkSmartSelectionUseMouse, "SmartSelectionUseMouse", &OptionPreferences::getSmartSelectionUseMouse, &GlobalData::m_smartSelectionUseMouse, TRUE },
+	{ &checkSmartCommandGroup, "SmartCommandGroup", &OptionPreferences::getSmartCommandGroupEnabled, &GlobalData::m_smartCommandGroup, TRUE },
 	// the radar caches this when it is created, so it waits for the next launch
 	{ &checkNewRadar, "NewRadar", &OptionPreferences::getNewRadarEnabled, &GlobalData::m_newRadar, FALSE },
 	{ &checkGridHotkeys, "GridHotkeys", &OptionPreferences::getGridHotkeysEnabled, &GlobalData::m_gridHotkeysEnabled, FALSE },
@@ -1457,6 +1459,7 @@ static void initGameOptionsWindows()
 	checkEasyMilitaryDrag = findOptionsWindow( "OptionsMenu.wnd:CheckEasyMilitaryDrag" );
 	checkSmartSelection = findOptionsWindow( "OptionsMenu.wnd:CheckSmartSelection" );
 	checkSmartSelectionUseMouse = findOptionsWindow( "OptionsMenu.wnd:CheckSmartSelectionUseMouse" );
+	checkSmartCommandGroup = findOptionsWindow( "OptionsMenu.wnd:CheckSmartCommandGroup" );
 	checkNewRadar = findOptionsWindow( "OptionsMenu.wnd:CheckNewRadar" );
 	checkLargeBlips = findOptionsWindow( "OptionsMenu.wnd:CheckLargeBlips" );
 	checkGridHotkeys = findOptionsWindow( "OptionsMenu.wnd:CheckGridHotkeys", checkGridHotkeysID );
@@ -1504,6 +1507,7 @@ static void initGameOptionsWindows()
 	setCheckText( checkEasyMilitaryDrag, "GUI:EasyMilitaryDrag", L"Drag select skips builders", "TOOLTIP:EasyMilitaryDrag", L"A drag box that holds combat units leaves dozers and workers out" );
 	setCheckText( checkSmartSelection, "GUI:SmartSelection", L"Smart selection", "TOOLTIP:SmartSelection", L"Selecting a mixed group shows the command bar of the unit type you pick" );
 	setCheckText( checkSmartSelectionUseMouse, "GUI:SmartSelectionUseMouse", L"Smart selection follows mouse", "TOOLTIP:SmartSelectionUseMouse", L"Right clicking a unit cameo also switches the command bar" );
+	setCheckText( checkSmartCommandGroup, "GUI:SmartCommandGroup", L"Command group row", "TOOLTIP:SmartCommandGroup", L"Shows a cameo for each command group under the smart selection row" );
 	setCheckText( checkNewRadar, "GUI:NewRadar", L"New radar (needs restart)", "TOOLTIP:NewRadar", L"Outlined blips and shoreline on the radar. Takes effect after a restart." );
 	setCheckText( checkLargeBlips, "GUI:LargeBlips", L"Large radar blips (needs restart)", "TOOLTIP:LargeBlips", L"Bigger blips on the new radar. Takes effect after a restart." );
 	setCheckText( checkGridHotkeys, "GUI:GridHotkeys", L"Use grid hotkeys", "TOOLTIP:GridHotkeys", L"Command bar slots use the layout keys instead of the retail hotkeys" );

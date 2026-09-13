@@ -193,6 +193,7 @@ public:
 	// TheSuperHackers @feature Per type cameos with counts above the command bar.
 	Bool m_smartSelection;
 	Bool m_smartSelectionUseMouse;
+	Bool m_smartCommandGroup;
 	Bool m_doubleClickAttackMove;
 	Bool m_rightMouseAlwaysScrolls;
 	Int m_jpegQuality; // TheSuperHackers @feature Quality for JPEG screenshots.

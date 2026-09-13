@@ -268,8 +268,9 @@ A second row of half size cameos sits on the command bar frame, one per command 
 to Ctrl+0) that still has live members, in key order 1 to 9 then 0. Each cameo shows the group's
 most common unit type, the group number top left and the live member count bottom right; the
 count drops as members die. The row shows whenever any group has members, even with nothing
-selected, and the smart selection row lifts one row above it while both are shown. It follows the
-`SmartSelection` option.
+selected, and the smart selection row lifts one row above it while both are shown.
+
+* `SmartCommandGroup = Yes` - (No hides the row. `SmartSelection = No` hides it too.)
 
 * Left click a cameo to select its group, as the number key does.
 * Double click a cameo to also center the camera on the group, as double tapping the number key
