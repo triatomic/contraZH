@@ -245,7 +245,7 @@ public:
 		Real			hangarInternalOrient;
 	};
 	virtual Bool shouldReserveDoorWhenQueued(const ThingTemplate* thing) const = 0;
-	virtual Bool hasAvailableSpaceFor(const ThingTemplate* thing) const = 0;
+	virtual Bool hasAvailableSpaceFor(const ThingTemplate* thing, UnsignedInt count = 1) const = 0;
 	virtual Bool hasReservedSpace(ObjectID id) const = 0;
 	virtual Int  getSpaceIndex( ObjectID id ) const = 0;
 	virtual Bool reserveSpace(ObjectID id, Real parkingOffset, PPInfo* info) = 0;

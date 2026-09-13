@@ -430,11 +430,12 @@ Bool FlightDeckBehavior::shouldReserveDoorWhenQueued(const ThingTemplate* thing)
 
 //-------------------------------------------------------------------------------------------------
 // note: called from client, so MUST NOT modify self in any way, or desyncs will occur
-Bool FlightDeckBehavior::hasAvailableSpaceFor(const ThingTemplate* thing) const
+Bool FlightDeckBehavior::hasAvailableSpaceFor(const ThingTemplate* thing, UnsignedInt count) const
 {
 	if (!m_gotInfo)	// degenerate case, shouldn't happen, but just in case...
 		return false;
 
+	UINT roomLeft = 0;
 	for (std::vector<FlightDeckInfo>::const_iterator it = m_spaces.begin(); it != m_spaces.end(); ++it)
 	{
 		ObjectID id = it->m_objectInSpace;
@@ -451,11 +452,11 @@ Bool FlightDeckBehavior::hasAvailableSpaceFor(const ThingTemplate* thing) const
 
 		if( id == INVALID_ID )
 		{
-			return true;
+			roomLeft++;
 		}
 	}
 
-	return false;
+	return roomLeft >= count;
 }
 
 //-------------------------------------------------------------------------------------------------
