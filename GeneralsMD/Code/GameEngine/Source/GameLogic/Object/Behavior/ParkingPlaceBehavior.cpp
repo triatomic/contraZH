@@ -351,7 +351,7 @@ Bool ParkingPlaceBehavior::hasAvailableSpaceFor(const ThingTemplate* thing, Unsi
 	if (d && !d->isTemplateAllowedToLand(thing))
 		return FALSE;
 
-	UINT roomLeft = 0;
+	UnsignedInt roomLeft = 0;
 	for (std::vector<ParkingPlaceInfo>::const_iterator it = m_spaces.begin(); it != m_spaces.end(); ++it)
 	{
 		ObjectID id = it->m_objectInSpace;

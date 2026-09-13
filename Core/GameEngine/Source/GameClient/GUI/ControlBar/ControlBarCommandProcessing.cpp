@@ -599,7 +599,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			Object *curFactory;
 			ProductionUpdateInterface *pu = nullptr;
 			const ProductionEntry* pe;
-			Int totalFrames = 0, room;
+			Int totalFrames = 0;
 			CanMakeType cmt = CANMAKE_FACTORY_IS_DISABLED, curCmt;
 
 			// TheSuperHackers @feature Shift queues a batch instead of a single unit.
@@ -666,19 +666,23 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 					okFactories.push_back(curFactory);
 					finishTimes.push_back(curFinishTime);
 
-					room = MAX_BUILD_QUEUE_BUTTONS - pu->getProductionCount();
-					ParkingPlaceBehaviorInterface* pp = nullptr;
+					// how many more this producer takes before its queue, or its parking, fills
+					Int room = pu->getMaxQueueEntries() - pu->getProductionCount();
 					for (BehaviorModule** i = curFactory->getBehaviorModules(); *i; ++i)
 					{
-						if ((pp = (*i)->getParkingPlaceBehaviorInterface()) != nullptr)
+						ParkingPlaceBehaviorInterface* pp = (*i)->getParkingPlaceBehaviorInterface();
+						if (pp != nullptr)
 						{
 							if (pp->shouldReserveDoorWhenQueued(whatToBuild))
-								while (!pp->hasAvailableSpaceFor(whatToBuild, room))
+							{
+								while (room > 0 && !pp->hasAvailableSpaceFor(whatToBuild, room))
+								{
 									room--;
+								}
+							}
 							break;
 						}
 					}
-
 					roomToLeft.push_back(room);
 				}
 				// ShigureUi 13/9/2026 queue full is better than parking places full, update if possible
@@ -716,19 +720,25 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				break;
 			}
 
-			unitsToQueue = std::min((UnsignedInt)unitsToQueue, player->getMoney()->countMoney() / whatToBuild->calcCostToBuild(player));
-			if (unitsToQueue < 1)
-				break;
-			while (!player->canBuildMoreOfType(whatToBuild, unitsToQueue))
+			// the batch stops where the money or the per type limit runs out; canMakeUnit
+			// already vouched for the first unit
+			const Int unitCost = whatToBuild->calcCostToBuild(player);
+			if (unitCost > 0)
+			{
+				unitsToQueue = MIN(unitsToQueue, (Int)(player->getMoney()->countMoney() / unitCost));
+			}
+			while (unitsToQueue > 1 && !player->canBuildMoreOfType(whatToBuild, unitsToQueue))
+			{
 				unitsToQueue--;
-			if (unitsToQueue < 1)
-				break;
+			}
 
 			const Int unitFrames = whatToBuild->calcTimeToBuild(player);
 			for( Int queued = 0; queued < unitsToQueue; )
 			{
-				if (!finishTimes.size())
+				if (finishTimes.empty())
+				{
 					break;
+				}
 				// the producer that would finish first takes the unit and is charged for it
 				const size_t best = std::min_element(finishTimes.begin(), finishTimes.end()) - finishTimes.begin();
 				if (roomToLeft[best] < 1)

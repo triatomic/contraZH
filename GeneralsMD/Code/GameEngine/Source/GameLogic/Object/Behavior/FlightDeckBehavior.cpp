@@ -435,7 +435,7 @@ Bool FlightDeckBehavior::hasAvailableSpaceFor(const ThingTemplate* thing, Unsign
 	if (!m_gotInfo)	// degenerate case, shouldn't happen, but just in case...
 		return false;
 
-	UINT roomLeft = 0;
+	UnsignedInt roomLeft = 0;
 	for (std::vector<FlightDeckInfo>::const_iterator it = m_spaces.begin(); it != m_spaces.end(); ++it)
 	{
 		ObjectID id = it->m_objectInSpace;
