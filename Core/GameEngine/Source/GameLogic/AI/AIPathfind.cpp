@@ -13136,6 +13136,10 @@ Path *Pathfinder::findAttackPathImpl( const Object *obj, const LocomotorSet& loc
 				Path *path = buildActualPath( obj, locomotorSet.getValidSurfaces(), obj->getPosition(), parentCell, centerInCell, false, locomotorSet.getRequiredWaterLevel());
 #if RETAIL_COMPATIBLE_PATHFINDING
 				if (!s_useFixedPathfinding) {
+#if RTS_GENERALS
+					parentCell->releaseInfo();
+#endif
+
 					if (goalCell->hasInfo() && !goalCell->getClosed() && !goalCell->getOpen()) {
 						goalCell->releaseInfo();
 					}
