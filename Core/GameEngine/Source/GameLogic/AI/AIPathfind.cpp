@@ -800,10 +800,6 @@ void Path::prependNode( const Coord3D *pos, PathfindLayerEnum layer )
 		m_pathTail = node;
 
 	m_isOptimized = false;
-
-#ifdef CPOP_STARTS_FROM_PREV_SEG
-	m_cpopRecentStart = nullptr;
-#endif
 }
 
 /**
@@ -832,10 +828,6 @@ void Path::appendNode( const Coord3D *pos, PathfindLayerEnum layer )
 	}
 
 	m_pathTail = node;
-
-#ifdef CPOP_STARTS_FROM_PREV_SEG
-	m_cpopRecentStart = nullptr;
-#endif
 }
 /**
  * Create a new node at the tail of the path
@@ -1192,13 +1184,7 @@ void Path::computePointOnPath(
 	//
 	// Find the closest segment of the path
 	//
-#ifdef CPOP_STARTS_FROM_PREV_SEG
-	const PathNode* prevNode = m_cpopRecentStart;
-	if (prevNode == nullptr)
-		prevNode = m_path;
-#else
 	const PathNode* prevNode = m_path;
-#endif
 	Coord2D segmentDirNorm;
 	Real segmentLength;
 
@@ -1271,10 +1257,6 @@ void Path::computePointOnPath(
 		prevNode = node;
 		DUMPCOORD3D(&pointOnPath);
 	}
-
-#ifdef CPOP_STARTS_FROM_PREV_SEG
-	m_cpopRecentStart = closeNode;
-#endif
 
 	//
 	// Compute the goal movement position for this agent
