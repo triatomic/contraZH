@@ -9135,23 +9135,12 @@ void Pathfinder::processHierarchicalCell( const ICoord2D &scanCell, const ICoord
 		{
 			return;
 		}
-#if RETAIL_COMPATIBLE_PATHFINDING
-		if (!s_useFixedPathfinding)
+		if (!newCell->getOpen() && !newCell->getClosed())
 		{
-			if (!newCell->getClosed() && !newCell->getOpen()) {
-				newCell->putOnClosedList(m_closedList);
-			}
-		}
-		else
-#endif
-		{
-			if (newCell->hasInfo() && !newCell->getClosed() && !newCell->getOpen()) {
-				newCell->putOnClosedList(m_closedList);
-			}
+			newCell->putOnClosedList(m_closedList);
 		}
 
-		adjNewCell->allocateInfo(adjacentCell);
-		if( adjNewCell->hasInfo() )
+		if (adjNewCell->allocateInfo(adjacentCell))
 		{
 
 			cellCount++;
