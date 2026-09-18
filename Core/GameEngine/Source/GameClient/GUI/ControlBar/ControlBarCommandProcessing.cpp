@@ -1251,12 +1251,15 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			// get the actual object
 			Object* objWantingExit = TheGameLogic->findObjectByID(objID);
 
+			if (!objWantingExit)
+				break;
+
 			const ThingTemplate* typeEvac = objWantingExit->getTemplate();
 
 			//what if container is subdued... assert a logic failure, perhaps?
 
 
-			bool isShift = TheKeyboard && TheKeyboard->isShift();
+			Bool isShift = TheKeyboard && TheKeyboard->isShift();
 
 			for (i = 0; i < MAX_COMMANDS_PER_SET; i++)
 			{
