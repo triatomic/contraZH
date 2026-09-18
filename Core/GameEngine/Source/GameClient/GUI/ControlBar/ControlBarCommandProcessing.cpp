@@ -1251,8 +1251,19 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			// get the actual object
 			Object* objWantingExit = TheGameLogic->findObjectByID(objID);
 
-			if (!objWantingExit)
-				break;
+			if (objWantingExit == nullptr)
+			{
+
+				//
+				// remove from inventory data to avoid future matches ... the inventory update
+				// cycle of the UI will repopulate any buttons as the contents of objects
+				// change so this is only an edge case that will be visually corrected next frame
+				//
+				m_containData[i].control = nullptr;
+				m_containData[i].objectID = INVALID_ID;
+				break;  // exit case
+
+			}
 
 			const ThingTemplate* typeEvac = objWantingExit->getTemplate();
 
