@@ -2315,7 +2315,8 @@ void Team::transferUnitsTo(Team *newTeam)
 }
 
 // ------------------------------------------------------------------------
-static Bool isInBuildVariations(const ThingTemplate* ttWithVariations, const ThingTemplate* b)
+// ShigureUi 19/9/2026 Cancel static for extern use
+Bool isInBuildVariations(const ThingTemplate* ttWithVariations, const ThingTemplate* b)
 {
 	const std::vector<AsciiString>& bv = ttWithVariations->getBuildVariations();
 	if (bv.empty())
