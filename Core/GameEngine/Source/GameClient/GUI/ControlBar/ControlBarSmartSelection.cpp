@@ -537,7 +537,14 @@ void ControlBar::processSmartSelectionClick( GameWindow *button, Bool rightClick
 
 	if( rightClick )
 	{
-		smartSelectionRemove( groupIndex, FALSE );
+		if (isIndexSmartSelectionFocused(groupIndex))
+		{
+			smartSelectionFocus( -1 );
+		}
+		else
+		{
+			smartSelectionRemove( groupIndex, FALSE );
+		}
 		return;
 	}
 
@@ -563,7 +570,7 @@ void ControlBar::processSmartSelectionClick( GameWindow *button, Bool rightClick
 	}
 	else
 	{
-		smartSelectionFocus( isIndexSmartSelectionFocused( groupIndex ) ? -1 : groupIndex );
+		smartSelectionFocus( groupIndex );
 	}
 }
 
