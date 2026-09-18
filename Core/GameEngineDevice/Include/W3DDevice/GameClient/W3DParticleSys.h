@@ -105,7 +105,7 @@ private:
 
 	ParticleSystemInfo::ParticleShaderType m_batchShaderType;
 	Bool m_readyToRender;											///< if true, it is OK to render
-	Bool m_batchBillboard;
+	ParticleSystemInfo::ParticleAlignmentType m_batchParticleAlignment;
 	Bool m_batchPremultiplied;								///< the batch draws from an atlas page, so its shader type is only that of its first system
 	unsigned m_batchEffects;									///< SoftParticleHookClass effects beyond soft fading
 	const void *m_batchEffectData;						///< what the hook gets with the effects: a template with flame settings of its own, a DisruptionShaderInfo, or null

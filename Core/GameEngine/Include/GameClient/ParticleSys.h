@@ -783,7 +783,8 @@ public:
 	Bool isUsingVolumeParticles() const { return m_particleType == VOLUME_PARTICLE; }
 	UnsignedInt getVolumeParticleDepth() const { return m_volumeParticleDepth; }
 
-	Bool shouldBillboard() const { return m_particleAlignment == PARTICLE_ALIGNMENT_BILLBOARD; }
+	ParticleAlignmentType getParticleAlignment() const { return m_particleAlignment; }
+	Bool isFieldParticle() const { return m_particleAlignment != PARTICLE_ALIGNMENT_BILLBOARD; }
 
 	// TheSuperHackers @feature see m_conformToTerrain. Named to match the upstream
 	// TheSuperHackers option of the same name, so a future port lines up.
