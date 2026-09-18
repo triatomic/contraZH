@@ -1240,7 +1240,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			{
 				if (m_containData[i].control == control)
 				{
-					objID = m_containData[ i ].objectID;
+					objID = m_containData[i].objectID;
 					break;
 				}
 			}
@@ -1249,31 +1249,50 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				break;
 
 			// get the actual object
-			Object *objWantingExit = TheGameLogic->findObjectByID( objID );
+			Object* objWantingExit = TheGameLogic->findObjectByID(objID);
 
-			// if the control container returns an object ID but the object is not found, remove the control entry and exit
-			if( objWantingExit == nullptr )
+			const ThingTemplate* typeEvac = objWantingExit->getTemplate();
+
+			//what if container is subdued... assert a logic failure, perhaps?
+
+
+			bool isShift = TheKeyboard && TheKeyboard->isShift();
+
+			for (i = 0; i < MAX_COMMANDS_PER_SET; i++)
 			{
+				// ShigureUi 19/09/2026 if not shift evac all of 1 type, and it's not what player click, don't do it
+				if (m_containData[i].control != control && !isShift)
+					continue;
+				objID = m_containData[i].objectID;
+				if (!objID)
+					continue;
+				objWantingExit = TheGameLogic->findObjectByID(objID);
 
-				//
-				// remove from inventory data to avoid future matches ... the inventory update
-				// cycle of the UI will repopulate any buttons as the contents of objects
-				// change so this is only an edge case that will be visually corrected next frame
-				//
-				m_containData[ i ].control = nullptr;
-				m_containData[ i ].objectID = INVALID_ID;
-				break;  // exit case
+				// if the control container returns an object ID but the object is not found, remove the control entry and exit
+				if (objWantingExit == nullptr)
+				{
+
+					//
+					// remove from inventory data to avoid future matches ... the inventory update
+					// cycle of the UI will repopulate any buttons as the contents of objects
+					// change so this is only an edge case that will be visually corrected next frame
+					//
+					m_containData[i].control = nullptr;
+					m_containData[i].objectID = INVALID_ID;
+					continue;  // exit case
+
+				}
+
+				if (objWantingExit->getTemplate()->isEquivalentTo(typeEvac))
+				{
+					// send message to exit
+					GameMessage* exitMsg = TheMessageStream->appendMessage(GameMessage::MSG_EXIT);
+					exitMsg->appendObjectIDArgument(objWantingExit->getID()); // 0 is the thing inside coming out
+				}
 
 			}
 
-      //what if container is subdued... assert a logic failure, perhaps?
-
-			// send message to exit
-			GameMessage *exitMsg = TheMessageStream->appendMessage( GameMessage::MSG_EXIT );
-			exitMsg->appendObjectIDArgument( objWantingExit->getID() ); // 0 is the thing inside coming out
-
 			break;
-
 		}
 
 		//---------------------------------------------------------------------------------------------
