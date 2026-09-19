@@ -1284,7 +1284,23 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 					}
 
 					Object *other = TheGameLogic->findObjectByID( m_containData[i].objectID );
-					if (other == nullptr || !other->getTemplate()->isEquivalentTo(exitType))
+
+					// if the control container returns an object ID but the object is not found, remove the control entry and exit
+					if (other == nullptr)
+					{
+
+						//
+						// remove from inventory data to avoid future matches ... the inventory update
+						// cycle of the UI will repopulate any buttons as the contents of objects
+						// change so this is only an edge case that will be visually corrected next frame
+						//
+						m_containData[i].control = nullptr;
+						m_containData[i].objectID = INVALID_ID;
+						continue;  // exit case
+
+					}
+
+					if (!other->getTemplate()->isEquivalentTo(exitType))
 					{
 						continue;
 					}
