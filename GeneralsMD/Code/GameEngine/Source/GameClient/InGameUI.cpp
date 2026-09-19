@@ -3237,11 +3237,14 @@ void InGameUI::createCommandHint( const GameMessage *msg )
 	// Note: These are only non-null if there is exactly one thing selected.
 	const Drawable *srcDraw = nullptr;
 	const Object *srcObj = nullptr;
-	if (getSelectCount() == 1) {
+	if (getSelectCount() >= 1) {
 		srcDraw = getAllSelectedDrawables()->front();
 		srcObj = (srcDraw ? srcDraw->getObject() : nullptr);
 	}
 
+	if (getSelectCount() > 1 && (!srcObj || !srcObj->isKindOf(KINDOF_STRUCTURE) || !srcObj->isLocallyControlled() ||
+		m_mouseMode != MOUSEMODE_DEFAULT || t != GameMessage::MSG_DO_MOVETO_HINT))
+		srcObj = nullptr;
 	switch (m_mouseMode)
 	{
 		case MOUSEMODE_DEFAULT:
