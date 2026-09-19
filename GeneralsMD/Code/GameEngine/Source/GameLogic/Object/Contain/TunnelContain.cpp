@@ -31,6 +31,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/MessageStream.h"
 #include "Common/Player.h"
 #include "Common/RandomValue.h"
 #include "Common/ThingTemplate.h"
@@ -481,31 +482,21 @@ void TunnelContain::onObjectCreated()
 	if( tunnelTracker == nullptr )
 		return;
 
-	tunnelTracker->onTunnelCreated( getObject() );
-	m_isCurrentlyRegistered = TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------
 void TunnelContain::onBuildComplete()
 {
-	//Kris: July 29, 2003
-	//Obsolete -- onObjectCreated handles it before this function gets called.
-	/*
-	if( ! shouldDoOnBuildComplete() )
+	//ShigureUi 16/9/2026 reenabled for Registered and model conditions
+	Player* owningPlayer = getObject()->getControllingPlayer();
+	if (owningPlayer == nullptr)
+		return;
+	TunnelTracker* tunnelTracker = owningPlayer->getTunnelSystem();
+	if (tunnelTracker == nullptr)
 		return;
 
-	m_needToRunOnBuildComplete = false;
-
-	Player *owningPlayer = getObject()->getControllingPlayer();
-	if( owningPlayer == nullptr )
-		return;
-	TunnelTracker *tunnelTracker = owningPlayer->getTunnelSystem();
-	if( tunnelTracker == nullptr )
-		return;
-
-	tunnelTracker->onTunnelCreated( getObject() );
+	tunnelTracker->onTunnelCreated(getObject());
 	m_isCurrentlyRegistered = TRUE;
-	*/
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -574,6 +565,13 @@ UpdateSleepTime TunnelContain::update()
 		{
 			const TunnelContainModuleData* modData = getTunnelContainModuleData();
 			tunnelSystem->healObjects(modData->m_framesForFullHeal);
+
+			if (tunnelSystem->isNextTunnelToPop(obj) && tunnelSystem->getContainCount() > 0)
+			{
+				GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_EVACUATE);
+				msg->appendBooleanArgument(true);
+				msg->appendObjectIDArgument(getObject()->getID());
+			}
 		}
 #endif
 
@@ -599,6 +597,7 @@ UpdateSleepTime TunnelContain::update()
 	return UPDATE_SLEEP_NONE;
 
 }
+
 
 // ------------------------------------------------------------------------------------------------
 /** CRC */

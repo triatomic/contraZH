@@ -43,6 +43,7 @@
 #include "Common/SpecialPower.h"
 #include "Common/Team.h"
 #include "Common/ThingTemplate.h"
+#include "Common/TunnelTracker.h"
 
 #include "GameClient/Drawable.h"
 #include "GameClient/InGameUI.h"
@@ -578,6 +579,14 @@ Bool ActionManager::canEnterObject( const Object *obj, const Object *objectToEnt
 			objectToEnter->getStatusBits().test( OBJECT_STATUS_UNDER_CONSTRUCTION ) )
 	{
 		return FALSE;
+	}
+
+	//ShigureUi 16/09/2026 cant enter tunnel with auto pop on
+	if (objectToEnter->getContain() && objectToEnter->getContain()->isTunnelContain())
+	{
+		Player* player = objectToEnter->getControllingPlayer();
+		if (player->getTunnelSystem() && player->getTunnelSystem()->isAutoExitTunnel(objectToEnter))
+			return FALSE;
 	}
 
 	// Can't enter something being sold

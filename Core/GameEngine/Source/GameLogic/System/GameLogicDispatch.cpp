@@ -831,6 +831,14 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			onToggleOvercharge(msg, currentlySelectedGroup);
 			break;
 		}
+
+		// Auto-pop, switch between two states of tunnel.
+		case GameMessage::MSG_TOGGLE_TUNNEL_AUTO_POP:
+		{
+			onToggleTunnelAutoPop(msg, currentlySelectedGroup);
+			break;
+		}
+
 		// TheSuperHackers @feature Hold Fire stance.
 		case GameMessage::MSG_TOGGLE_HOLD_FIRE:
 		{
@@ -1698,6 +1706,18 @@ bool GameLogic::onEvacuate(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlyS
 {
 	// issue command for either single object or for selected group
 	//	AIGroup *group = TheAI->findGroup( *selectedGroupID );
+	Bool isAutoEvac = (Bool)msg->getArgument(0)->boolean;
+
+	//for tunnel auto pop
+	if (isAutoEvac)
+	{
+		Object* obj = TheGameLogic->findObjectByID((ObjectID)msg->getArgument(1)->objectID);
+		if (!obj || !obj->getContain())
+			return false;
+		obj->getContain()->orderAllPassengersToExit(CMD_FROM_AI, false);
+		return true;
+	}
+
 	if( currentlySelectedGroup )
 	{
 		//Coord3D pos;
@@ -2343,6 +2363,15 @@ bool GameLogic::onToggleOvercharge(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &cu
 	// use the selected group
 	if( currentlySelectedGroup )
 		currentlySelectedGroup->groupToggleOvercharge( CMD_FROM_PLAYER );
+
+	return true;
+}
+
+bool GameLogic::onToggleTunnelAutoPop(MAYBE_UNUSED GameMessage* msg, AIGroupPtr& currentlySelectedGroup)
+{
+	// use the selected group
+	if (currentlySelectedGroup)
+		currentlySelectedGroup->groupToggleTunnelAutoPop(CMD_FROM_PLAYER);
 
 	return true;
 }

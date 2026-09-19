@@ -355,6 +355,7 @@ private:
 	bool onDozerCancelConstruct(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onSell(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onToggleOvercharge(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
+	bool onToggleTunnelAutoPop(GameMessage* msg, AIGroupPtr& currentlySelectedGroup);
 #ifdef ALLOW_SURRENDER
 	bool onDoSurrender(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onPickUpPrisoner(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);

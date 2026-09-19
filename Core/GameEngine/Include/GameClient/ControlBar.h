@@ -251,7 +251,7 @@ enum GUICommandType CPP_11(: Int)
 	GUI_COMMAND_HOLD_FIRE,								///< TheSuperHackers @feature toggle the Hold Fire stance
 	GUI_COMMAND_TOGGLE_DEPLOY,						///< toggle a DeployStyleAIUpdate object between deployed and packed
 	GUI_COMMAND_TOGGLE_FIRE_WEAPON,				///< fire a weapon, or stop firing it if it is already firing
-
+	GUI_COMMAND_TOGGLE_TUNNEL_AUTO_POP,		///< tunnel with this toggle on will automatically evac units and becomes not enterable 
 	// add more commands here, don't forget to update the string command list below too ...
 
 	GUI_COMMAND_NUM_COMMANDS
@@ -310,6 +310,7 @@ static const char *const TheGuiCommandNames[] =
 	"HOLD_FIRE",
 	"TOGGLE_DEPLOY",
 	"TOGGLE_FIRE_WEAPON",
+	"TOGGLE_TUNNEL_AUTO_POP",
 
 	nullptr
 };

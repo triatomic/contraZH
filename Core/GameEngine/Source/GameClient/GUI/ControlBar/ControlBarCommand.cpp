@@ -37,6 +37,7 @@
 #include "Common/PlayerList.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/SpecialPower.h"
+#include "Common/TunnelTracker.h"
 #include "Common/OptionPreferences.h"
 #include "Common/Upgrade.h"
 #include "Common/BuildAssistant.h"
@@ -1600,6 +1601,28 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 				return COMMAND_ACTIVE;
 
 			break;
+		}
+
+		//ShigureUi 15/9/2026 Switch auto pop on/off
+		case GUI_COMMAND_TOGGLE_TUNNEL_AUTO_POP:
+		{
+			// only tunnel can have it
+			if (!obj->getContain() || !obj->getContain()->isTunnelContain())
+				return COMMAND_RESTRICTED;
+
+
+			if (obj->getControllingPlayer())
+			{
+				TunnelTracker *tunnelSystem = obj->getControllingPlayer()->getTunnelSystem();
+				if (tunnelSystem)
+				{
+					if (tunnelSystem->isAutoExitTunnel(obj))
+						return COMMAND_ACTIVE;
+					else
+						break;
+				}
+			}
+			return COMMAND_RESTRICTED;
 		}
 
 		// switch weapon command
