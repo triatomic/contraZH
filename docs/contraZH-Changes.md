@@ -784,6 +784,29 @@ Notes:
 * The hit still plays damage effects and raises "under attack".
 * Other damage types and smaller hits drain health normally.
 
+# FireWeaponUpdate
+
+## Upgrade parameters
+
+`FireWeaponUpdate` and `FireWeaponAdvancedUpdate` now take the standard upgrade keys, so a
+self-firing weapon can be switched on by an upgrade instead of needing a separate object variant.
+
+* `TriggeredBy` - upgrades that switch the module on. Any one of them is enough unless
+`RequiresAllTriggers = Yes`.
+* `ConflictsWith` - upgrades that switch it off. A conflict wins over a trigger.
+* `RequiresAllTriggers = No` - (Default. `Yes` demands every upgrade in `TriggeredBy`.)
+* `RemovesUpgrades` - upgrades stripped from the object when the trigger first completes.
+* `FXListUpgrade` - played once when the trigger first completes.
+
+With no `TriggeredBy` listed the module fires as it always has, so existing objects need no change.
+
+Notes:
+* The gate is re-read every frame rather than latched, so an upgrade named in `ConflictsWith` stops
+the firing again once it completes. Most upgrade modules only ever turn on; this one can turn back
+off.
+* `RemovesUpgrades` and `FXListUpgrade` still run only once, on the frame the trigger completes.
+* Both the object's own upgrades and its owning player's upgrades count toward the gate.
+
 # StealthUpdate
 
 ## New StealthForbiddenConditions
