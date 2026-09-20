@@ -247,8 +247,9 @@ void ControlBar::showBuildTooltipLayout( GameWindow *cmdButton )
 }
 
 
-// TheSuperHackers @feature Format a build time for the tooltip, using the same Auto/Seconds
-// rules as the cameo countdowns (Options.ini: BuildTimerDisplayMode).
+// TheSuperHackers @feature Format a build time for the tooltip as m:ss, always digital, so
+// the field keeps one shape whatever the length. BuildTimerDisplayMode still hides it
+// entirely when set to None, but does not pick the format here.
 //
 // Note the value passed in should come from calcTimeToBuild(), which for units already folds
 // in the player's current energy penalty -- so a tooltip read while on low power correctly
@@ -272,10 +273,23 @@ static UnicodeString formatBuildTimeForTooltip( Int buildFrames )
 	// show 0 while there is work left.
 	const Int seconds = ( buildFrames + LOGICFRAMES_PER_SECOND / 2 ) / LOGICFRAMES_PER_SECOND;
 
-	if( TheGlobalData->m_buildTimerDisplayMode == BuildTimerDisplayMode_Auto && seconds >= 60 )
-		result.format( L"%d:%2.2d", seconds / 60, seconds % 60 );	// already reads as time
-	else
-		result.format( L"%ds", seconds );
+	result.format( L"%d:%2.2d", seconds / 60, seconds % 60 );
+
+	return result;
+}
+
+// Format a template's energy figure for the tooltip. The engine stores this signed, with
+// negative meaning the building draws power, so the raw value already reads correctly and
+// only needs a plus added. Templates with no energy at all print nothing, which keeps the
+// line clear for the units and upgrades that make up most of the tooltips.
+static UnicodeString formatPowerForTooltip( Int energyProduction )
+{
+	UnicodeString result = UnicodeString::TheEmptyString;
+
+	if( energyProduction == 0 )
+		return result;
+
+	result.format( L"%+d", energyProduction );
 
 	return result;
 }
@@ -297,8 +311,9 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 
 	Player *player = ThePlayerList->getLocalPlayer();
 	UnicodeString name, cost, descrip;
-	// TheSuperHackers @feature Build time shown under the cost, formatted like the cameo timers.
+	// TheSuperHackers @feature Build time and power draw shown alongside the cost.
 	UnicodeString buildTimeText;
+	UnicodeString powerText;
 	UnicodeString requiresFormat = UnicodeString::TheEmptyString, requiresList;
 	Bool firstRequirement = true;
 	const ProductionPrerequisite *prereq;
@@ -485,12 +500,14 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 			costToBuild = thingTemplate->calcCostToBuild( player );
 			if( costToBuild > 0 )
 			{
-				cost.format( TheGameText->fetch("TOOLTIP:Cost"), costToBuild );
+				cost.format( L"$%d", costToBuild );
 			}
 
 			// TheSuperHackers @feature calcTimeToBuild folds in the current energy penalty,
 			// so this tracks the player's power state as it changes.
 			buildTimeText = formatBuildTimeForTooltip( thingTemplate->calcTimeToBuild( player ) );
+
+			powerText = formatPowerForTooltip( thingTemplate->getEnergyProduction() );
 
 			// ask each prerequisite to give us a list of the non satisfied prerequisites
 			for( Int i=0; i<thingTemplate->getPrereqCount(); i++ )
@@ -586,7 +603,7 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 				costToBuild = upgradeTemplate->calcCostToBuild( player );
 				if( costToBuild > 0 )
 				{
-					cost.format( TheGameText->fetch("TOOLTIP:Cost"), costToBuild );
+					cost.format( L"$%d", costToBuild );
 				}
 
 				// TheSuperHackers @feature Upgrades carry no energy penalty in the engine, so
@@ -691,18 +708,26 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 	win = TheWindowManager->winGetWindowFromId(m_buildToolTipLayout->getFirstWindow(), TheNameKeyGenerator->nameToKey("ControlBarPopupDescription.wnd:StaticTextCost"));
 	if(win)
 	{
-		// TheSuperHackers @feature Show the build time alongside the cost. Also shown for
-		// free items, which have no cost line of their own but still take time to build.
-		// Kept on the cost line, separated by a watch glyph. The description window sits
-		// directly beneath this one in the .wnd layout, so a second line here overlaps it.
+		// TheSuperHackers @feature Show the build time and power draw alongside the cost. Each
+		// field carries a glyph instead of a word, so the three fit on one line. Fields absent
+		// from a template are skipped entirely, since a free item or one with no energy would
+		// otherwise pad the line with meaningless zeroes. The description window sits directly
+		// beneath this one in the .wnd layout, so a second line here overlaps it.
 		UnicodeString costLine = cost;
 		if( !buildTimeText.isEmpty() )
 		{
 			if( !costLine.isEmpty() )
 				costLine.concat( L"   " );
 			costLine.concat( (WideChar)0x231A );	// WATCH
-			costLine.concat( L" " );
 			costLine.concat( buildTimeText );
+		}
+
+		if( !powerText.isEmpty() )
+		{
+			if( !costLine.isEmpty() )
+				costLine.concat( L"   " );
+			costLine.concat( (WideChar)0x26A1 );	// HIGH VOLTAGE SIGN
+			costLine.concat( powerText );
 		}
 
 		if( !costLine.isEmpty() )
