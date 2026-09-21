@@ -112,7 +112,6 @@ set(WWLIB_SRC
     SLNODE.h
     stimer.cpp
     stimer.h
-    STLUtils.h
     straw.cpp
     STRAW.h
     stringex.h
@@ -176,7 +175,7 @@ target_sources(core_wwlib PRIVATE ${WWLIB_SRC})
 target_precompile_headers(core_wwlib PRIVATE
     [["Precompiled/precompiled.h"]] # Must be first
     [["WWLib/always.h"]]
-    [["WWLib/STLUtils.h"]]
+    [["Utility/STLUtils.h"]]
     [["WWLib/win.h"]]
     [["WWLib/WWCommon.h"]]
     [["WWLib/wwstring.h"]]
