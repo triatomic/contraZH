@@ -1,4 +1,5 @@
 set(UTILITY_SRC
+    Allocator/SystemAllocator.h
     Utility/compat.h
     Utility/comsupp_compat.h
     Utility/endian_compat.h
