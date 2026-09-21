@@ -164,6 +164,7 @@ class GameInfo
 {
 public:
 	GameInfo();
+	virtual ~GameInfo();
 
 	void init();
 	virtual void reset();
