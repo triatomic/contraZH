@@ -153,8 +153,6 @@ if(WIN32)
         rcfile.h
         registry.cpp
         registry.h
-        Usp10Loader.cpp
-        Usp10Loader.h
         verchk.cpp
         verchk.h
         WWCOMUtil.cpp
