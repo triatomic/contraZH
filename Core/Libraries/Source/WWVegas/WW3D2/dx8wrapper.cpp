@@ -701,8 +701,8 @@ void DX8Wrapper::Release_Device()
 			DX8CALL(SetTexture(a,nullptr));
 		}
 
-		DX8CALL(SetStreamSource(0, nullptr, 0));	//release reference count on last rendered vertex buffer
-		DX8CALL(SetIndices(nullptr,0));	//release reference count on last rendered index buffer
+		Set_DX8_Stream_Source(0, nullptr, 0, 0);	//release reference count on last rendered vertex buffer
+		Set_DX8_Indices(nullptr, 0);	//release reference count on last rendered index buffer
 
 
 		/*
@@ -1991,10 +1991,11 @@ void DX8Wrapper::Draw_Sorting_IB_VB(
 		}
 	}
 
-	DX8CALL(SetStreamSource(
+	Set_DX8_Stream_Source(
 		0,
 		static_cast<DX8VertexBufferClass*>(dyn_vb_access.VertexBuffer)->Get_DX8_Vertex_Buffer(),
-		dyn_vb_access.FVF_Info().Get_FVF_Size()));
+		0,
+		dyn_vb_access.FVF_Info().Get_FVF_Size());
 	// If using FVF format VB, set the FVF as vertex shader (may not be needed here KM)
 	unsigned fvf=dyn_vb_access.FVF_Info().Get_FVF();
 	if (fvf!=0) {
@@ -2027,9 +2028,9 @@ void DX8Wrapper::Draw_Sorting_IB_VB(
 		}
 	}
 
-	DX8CALL(SetIndices(
+	Set_DX8_Indices(
 		static_cast<DX8IndexBufferClass*>(dyn_ib_access.IndexBuffer)->Get_DX8_Index_Buffer(),
-		dyn_vb_access.VertexBufferOffset));
+		dyn_vb_access.VertexBufferOffset);
 	DX8_RECORD_INDEX_BUFFER_CHANGE();
 
 	DX8_RECORD_DRAW_CALLS();
@@ -2332,10 +2333,11 @@ void DX8Wrapper::Apply_Render_State_Changes()
 				switch (render_state.vertex_buffer_types[i]) {//->Type()) {
 				case BUFFER_TYPE_DX8:
 				case BUFFER_TYPE_DYNAMIC_DX8:
-					DX8CALL(SetStreamSource(
+					Set_DX8_Stream_Source(
 						i,
 						static_cast<DX8VertexBufferClass*>(render_state.vertex_buffers[i])->Get_DX8_Vertex_Buffer(),
-						render_state.vertex_buffers[i]->FVF_Info().Get_FVF_Size()));
+						0,
+						render_state.vertex_buffers[i]->FVF_Info().Get_FVF_Size());
 					DX8_RECORD_VERTEX_BUFFER_CHANGE();
 					{
 						// If the VB format is FVF, set the FVF as a vertex shader
@@ -2352,7 +2354,7 @@ void DX8Wrapper::Apply_Render_State_Changes()
 					WWASSERT(0);
 				}
 			} else {
-				DX8CALL(SetStreamSource(i,nullptr,0));
+				Set_DX8_Stream_Source(i, nullptr, 0, 0);
 				DX8_RECORD_VERTEX_BUFFER_CHANGE();
 			}
 		}
@@ -2363,9 +2365,9 @@ void DX8Wrapper::Apply_Render_State_Changes()
 			switch (render_state.index_buffer_type) {//->Type()) {
 			case BUFFER_TYPE_DX8:
 			case BUFFER_TYPE_DYNAMIC_DX8:
-				DX8CALL(SetIndices(
+				Set_DX8_Indices(
 					static_cast<DX8IndexBufferClass*>(render_state.index_buffer)->Get_DX8_Index_Buffer(),
-					render_state.index_base_offset+render_state.vba_offset));
+					render_state.index_base_offset+render_state.vba_offset);
 				DX8_RECORD_INDEX_BUFFER_CHANGE();
 				break;
 			case BUFFER_TYPE_SORTING:
@@ -2376,9 +2378,9 @@ void DX8Wrapper::Apply_Render_State_Changes()
 			}
 		}
 		else {
-			DX8CALL(SetIndices(
+			Set_DX8_Indices(
 				nullptr,
-				0));
+				0);
 			DX8_RECORD_INDEX_BUFFER_CHANGE();
 		}
 	}
@@ -3407,7 +3409,7 @@ DX8Wrapper::Set_Render_Target(IDirect3DSurface8 *render_target, bool use_default
 		//
 		if (DefaultRenderTarget != nullptr)
 		{
-			DX8CALL(SetRenderTarget (DefaultRenderTarget, DefaultDepthBuffer));
+			Set_DX8_Render_Target_Surfaces(DefaultRenderTarget, DefaultDepthBuffer);
 			DefaultRenderTarget->Release ();
 			DefaultRenderTarget = nullptr;
 			if (DefaultDepthBuffer)
@@ -3483,11 +3485,11 @@ DX8Wrapper::Set_Render_Target(IDirect3DSurface8 *render_target, bool use_default
 			//
 			if (use_default_depth_buffer)
 			{
-				DX8CALL(SetRenderTarget (CurrentRenderTarget, DefaultDepthBuffer));
+				Set_DX8_Render_Target_Surfaces(CurrentRenderTarget, DefaultDepthBuffer);
 			}
 			else
 			{
-				DX8CALL(SetRenderTarget (CurrentRenderTarget, nullptr));
+				Set_DX8_Render_Target_Surfaces(CurrentRenderTarget, nullptr);
 			}
 		}
 	}
@@ -3533,7 +3535,7 @@ void DX8Wrapper::Set_Render_Target
 		//
 		if (DefaultRenderTarget != nullptr)
 		{
-			DX8CALL(SetRenderTarget (DefaultRenderTarget, DefaultDepthBuffer));
+			Set_DX8_Render_Target_Surfaces(DefaultRenderTarget, DefaultDepthBuffer);
 			DefaultRenderTarget->Release ();
 			DefaultRenderTarget = nullptr;
 			if (DefaultDepthBuffer)
@@ -3608,7 +3610,7 @@ void DX8Wrapper::Set_Render_Target
 			//
 			//	Switch render targets
 			//
-			DX8CALL(SetRenderTarget (CurrentRenderTarget, CurrentDepthBuffer));
+			Set_DX8_Render_Target_Surfaces(CurrentRenderTarget, CurrentDepthBuffer);
 		}
 	}
 

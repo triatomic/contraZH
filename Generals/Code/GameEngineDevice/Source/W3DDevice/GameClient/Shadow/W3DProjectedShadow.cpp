@@ -483,11 +483,11 @@ Int W3DProjectedShadowManager::renderProjectedTerrainShadow(W3DProjectedShadow *
 
 		shadowIndexBufferD3D->Unlock();
 
-		m_pDev->SetIndices(shadowIndexBufferD3D,nShadowStartBatchVertex);
+		DX8Wrapper::Set_DX8_Indices(shadowIndexBufferD3D, nShadowStartBatchVertex);
 
 		m_pDev->SetTransform(D3DTS_WORLD,(_D3DMATRIX *)&mWorld);
 
-		m_pDev->SetStreamSource(0,shadowVertexBufferD3D,sizeof(SHADOW_VOLUME_VERTEX));
+		DX8Wrapper::Set_DX8_Stream_Source(0, shadowVertexBufferD3D, 0, sizeof(SHADOW_VOLUME_VERTEX));
 		m_pDev->SetVertexShader(SHADOW_VOLUME_FVF);
 
 		Int numPolys = (endX - startX)*(endY - startY)*2;	//2 triangles per cell
@@ -725,10 +725,10 @@ void W3DProjectedShadowManager::flushDecals(W3DShadowTexture *texture, ShadowTyp
 */
 
 
-	m_pDev->SetIndices(shadowDecalIndexBufferD3D,nShadowDecalStartBatchVertex);
+	DX8Wrapper::Set_DX8_Indices(shadowDecalIndexBufferD3D, nShadowDecalStartBatchVertex);
 	m_pDev->SetTransform(D3DTS_WORLD,(_D3DMATRIX *)&mWorld);
 
-	m_pDev->SetStreamSource(0,shadowDecalVertexBufferD3D,sizeof(SHADOW_DECAL_VERTEX));
+	DX8Wrapper::Set_DX8_Stream_Source(0, shadowDecalVertexBufferD3D, 0, sizeof(SHADOW_DECAL_VERTEX));
 	m_pDev->SetVertexShader(SHADOW_DECAL_FVF);
 
 //Hard Shadows using stencil

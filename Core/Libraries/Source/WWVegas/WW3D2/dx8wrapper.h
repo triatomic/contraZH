@@ -336,6 +336,12 @@ public:
 	static void Set_DX8_Clip_Plane(DWORD Index, CONST float* pPlane);
 	static void Set_DX8_Texture_Stage_State(unsigned stage, D3DTEXTURESTAGESTATETYPE state, unsigned value);
 	static void Set_DX8_Texture(unsigned int stage, IDirect3DBaseTexture8* texture);
+
+	// Single funnels for the binding calls whose signatures differ between D3D8 and D3D9
+	static void Set_DX8_Stream_Source(UINT stream, IDirect3DVertexBuffer8* vertex_buffer, UINT offset, UINT stride);
+	static void Set_DX8_Indices(IDirect3DIndexBuffer8* index_buffer, UINT base_vertex_index);
+	static HRESULT Set_DX8_Render_Target_Surfaces(IDirect3DSurface8* render_target, IDirect3DSurface8* depth_stencil);
+
 	static void Set_Light_Environment(LightEnvironmentClass* light_env);
 	static LightEnvironmentClass* Get_Light_Environment() { return Light_Environment; }
 	static void Set_Fog(bool enable, const Vector3 &color, float start, float end);
@@ -916,6 +922,25 @@ WWINLINE void DX8Wrapper::Set_DX8_Texture(unsigned int stage, IDirect3DBaseTextu
 	if (Textures[stage]) Textures[stage]->AddRef();
 	DX8CALL(SetTexture(stage, texture));
 	DX8_RECORD_TEXTURE_CHANGE();
+}
+
+WWINLINE void DX8Wrapper::Set_DX8_Stream_Source(UINT stream, IDirect3DVertexBuffer8* vertex_buffer, UINT offset, UINT stride)
+{
+	// D3D8 has no stream offset; callers must rebase the buffer pointer instead
+	WWASSERT(offset == 0);
+	DX8CALL(SetStreamSource(stream, vertex_buffer, stride));
+}
+
+WWINLINE void DX8Wrapper::Set_DX8_Indices(IDirect3DIndexBuffer8* index_buffer, UINT base_vertex_index)
+{
+	DX8CALL(SetIndices(index_buffer, base_vertex_index));
+}
+
+WWINLINE HRESULT DX8Wrapper::Set_DX8_Render_Target_Surfaces(IDirect3DSurface8* render_target, IDirect3DSurface8* depth_stencil)
+{
+	HRESULT hr;
+	DX8CALL_HRES(SetRenderTarget(render_target, depth_stencil), hr);
+	return hr;
 }
 
 WWINLINE void DX8Wrapper::_Copy_DX8_Rects(

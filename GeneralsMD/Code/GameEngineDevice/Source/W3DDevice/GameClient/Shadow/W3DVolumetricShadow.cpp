@@ -1363,8 +1363,7 @@ void W3DVolumetricShadow::RenderMeshVolume(Int meshIndex, Int lightIndex, const 
 		return;
 	if (vbSlot->m_VB->m_DX8VertexBuffer->Get_DX8_Vertex_Buffer() != lastActiveVertexBuffer)
 	{	lastActiveVertexBuffer=vbSlot->m_VB->m_DX8VertexBuffer->Get_DX8_Vertex_Buffer();
-		m_pDev->SetStreamSource(0,lastActiveVertexBuffer,
-			vbSlot->m_VB->m_DX8VertexBuffer->FVF_Info().Get_FVF_Size());	//12 bytes per vertex.
+		DX8Wrapper::Set_DX8_Stream_Source(0, lastActiveVertexBuffer, 0, vbSlot->m_VB->m_DX8VertexBuffer->FVF_Info().Get_FVF_Size());	//12 bytes per vertex.
 	}
 
 	DEBUG_ASSERTCRASH(vbSlot->m_size >= numVerts,("Overflowing Shadow Vertex Buffer Slot"));
@@ -1375,7 +1374,7 @@ void W3DVolumetricShadow::RenderMeshVolume(Int meshIndex, Int lightIndex, const 
 
 	DEBUG_ASSERTCRASH(ibSlot->m_size >= numIndex,("Overflowing Shadow Index Buffer Slot"));
 
-	m_pDev->SetIndices(ibSlot->m_IB->m_DX8IndexBuffer->Get_DX8_Index_Buffer(),vbSlot->m_start);
+	DX8Wrapper::Set_DX8_Indices(ibSlot->m_IB->m_DX8IndexBuffer->Get_DX8_Index_Buffer(), vbSlot->m_start);
 
 	if (DX8Wrapper::_Is_Triangle_Draw_Enabled())
 	{
@@ -1467,13 +1466,13 @@ void W3DVolumetricShadow::RenderDynamicMeshVolume(Int meshIndex, Int lightIndex,
 
 	shadowIndexBufferD3D->Unlock();
 
-	m_pDev->SetIndices(shadowIndexBufferD3D,nShadowStartBatchVertex);
+	DX8Wrapper::Set_DX8_Indices(shadowIndexBufferD3D, nShadowStartBatchVertex);
 
 	D3DMATRIX dxmWorld = To_D3DMATRIX(*meshXform);
 	m_pDev->SetTransform(D3DTS_WORLD,&dxmWorld);
 
 	if (shadowVertexBufferD3D != lastActiveVertexBuffer)
-	{	m_pDev->SetStreamSource(0,shadowVertexBufferD3D,sizeof(SHADOW_DYNAMIC_VOLUME_VERTEX));
+	{	DX8Wrapper::Set_DX8_Stream_Source(0, shadowVertexBufferD3D, 0, sizeof(SHADOW_DYNAMIC_VOLUME_VERTEX));
 		lastActiveVertexBuffer = shadowVertexBufferD3D;
 	}
 
@@ -1619,7 +1618,7 @@ void W3DVolumetricShadow::RenderMeshVolumeBounds(Int meshIndex, Int lightIndex, 
 
 	shadowIndexBufferD3D->Unlock();
 
-	m_pDev->SetIndices(shadowIndexBufferD3D,nShadowStartBatchVertex);
+	DX8Wrapper::Set_DX8_Indices(shadowIndexBufferD3D, nShadowStartBatchVertex);
 
 
 	//todo: replace this with mesh transform
@@ -1627,7 +1626,7 @@ void W3DVolumetricShadow::RenderMeshVolumeBounds(Int meshIndex, Int lightIndex, 
 	D3DMATRIX dxmWorld = To_D3DMATRIX(mWorld);
 	m_pDev->SetTransform(D3DTS_WORLD,&dxmWorld);
 
-	m_pDev->SetStreamSource(0,shadowVertexBufferD3D,sizeof(SHADOW_DYNAMIC_VOLUME_VERTEX));
+	DX8Wrapper::Set_DX8_Stream_Source(0, shadowVertexBufferD3D, 0, sizeof(SHADOW_DYNAMIC_VOLUME_VERTEX));
 	m_pDev->SetVertexShader(SHADOW_DYNAMIC_VOLUME_FVF);
 
 	m_pDev->DrawIndexedPrimitive(D3DPT_TRIANGLELIST,0,numVerts,nShadowStartBatchIndex,numPolys);

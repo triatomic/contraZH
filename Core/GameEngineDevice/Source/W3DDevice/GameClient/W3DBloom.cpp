@@ -188,7 +188,7 @@ void W3DBloom::releaseDefaults()
 // every target borrows the screen's depth buffer, which DX8 allows because none is larger than it
 Bool W3DBloom::setTarget(Int target)
 {
-	return SUCCEEDED(DX8Wrapper::_Get_D3D_Device8()->SetRenderTarget(m_targetSurface[target], m_defaultDepth));
+	return SUCCEEDED(DX8Wrapper::Set_DX8_Render_Target_Surfaces(m_targetSurface[target], m_defaultDepth));
 }
 
 Bool W3DBloom::begin(RenderInfoClass &rinfo, Bool anythingToDraw)
@@ -286,7 +286,7 @@ void W3DBloom::end(RenderInfoClass &rinfo)
 			FALSE);
 	}
 
-	DX8Wrapper::_Get_D3D_Device8()->SetRenderTarget(m_defaultTarget, m_defaultDepth);
+	DX8Wrapper::Set_DX8_Render_Target_Surfaces(m_defaultTarget, m_defaultDepth);
 
 	if (drawn)
 	{
