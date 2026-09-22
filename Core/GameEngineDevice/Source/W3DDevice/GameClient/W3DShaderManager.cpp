@@ -1600,6 +1600,105 @@ Int ShadowDepthShader::shutdown()
 	return TRUE;
 }
 
+///Multiplies the shadow map into geometry that has already drawn, for fixed-function receivers.
+class ShadowMultiplyShader : public W3DShaderInterface
+{
+public:
+	ShadowMultiplyShader() : m_dwPixelShader(0) {}
+
+	virtual Int set(Int pass) override;
+	virtual Int init() override;
+	virtual void reset() override;
+	virtual Int shutdown() override;
+
+protected:
+
+	DWORD m_dwPixelShader;
+} shadowMultiplyShader;
+
+W3DShaderInterface *ShadowMultiplyShaderList[]=
+{
+	&shadowMultiplyShader,
+	nullptr
+};
+
+Int ShadowMultiplyShader::init()
+{
+	if (TheW3DShadowMap == nullptr || !TheW3DShadowMap->isAvailable())
+	{
+		return FALSE;
+	}
+
+	const char *file = (TheW3DShadowMap->getDepthMode() == W3DShadowMap::DEPTH_MODE_PACKED)
+		? "shaders\\shadowmultiplypacked.pso" : "shaders\\shadowmultiply.pso";
+
+	if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(file, nullptr, 0, false, &m_dwPixelShader)))
+	{
+		return FALSE;
+	}
+
+	W3DShaders[W3DShaderManager::ST_SHADOW_MULTIPLY]=&shadowMultiplyShader;
+	W3DShadersPassCount[W3DShaderManager::ST_SHADOW_MULTIPLY]=1;
+
+	return TRUE;
+}
+
+// Expects the receiver's geometry and transforms bound and applied, as for the shroud pass.
+Int ShadowMultiplyShader::set(Int pass)
+{
+	if (TheW3DShadowMap == nullptr || !TheW3DShadowMap->bindReceiver(0))
+	{
+		return FALSE;
+	}
+
+	// The geometry is redrawn at the same depth, so EQUAL limits the pass to pixels the
+	// first draw wrote and leaves alpha-tested holes alone.
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, TRUE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZFUNC, D3DCMP_EQUAL);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZWRITEENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHATESTENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE, TRUE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_DESTCOLOR);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_ZERO);
+
+	// Fog would pull the factor toward the fog colour and tint the shadow.
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_FOGENABLE, FALSE);
+
+	DX8Wrapper::Set_Pixel_Shader(m_dwPixelShader);
+
+	return TRUE;
+}
+
+void ShadowMultiplyShader::reset()
+{
+	DX8Wrapper::Set_Pixel_Shader(0);
+
+	if (TheW3DShadowMap != nullptr)
+	{
+		TheW3DShadowMap->unbindReceiver(0);
+	}
+
+	// Z, blend and fog are ShaderClass state, so the next shader set restores them in full.
+	ShaderClass::Invalidate();
+}
+
+Int ShadowMultiplyShader::shutdown()
+{
+	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
+
+	if (device != nullptr)
+	{
+		DX8_DELETE_PIXEL_SHADER(device, m_dwPixelShader);
+	}
+
+	m_dwPixelShader = 0;
+
+	W3DShaders[W3DShaderManager::ST_SHADOW_MULTIPLY]=nullptr;
+	W3DShadersPassCount[W3DShaderManager::ST_SHADOW_MULTIPLY]=0;
+
+	return TRUE;
+}
+
 #endif	// BUILD_WITH_D3D9
 
 /*===========================================================================================*/
@@ -2896,6 +2995,7 @@ W3DShaderInterface **MasterShaderList[]=
 	FlatTerrainShaderList,
 #if defined(BUILD_WITH_D3D9)
 	ShadowDepthShaderList,
+	ShadowMultiplyShaderList,
 #endif
 	nullptr
 };

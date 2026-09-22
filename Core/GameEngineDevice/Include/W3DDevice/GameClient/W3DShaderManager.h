@@ -72,6 +72,7 @@ public:
 		ST_FLAT_TERRAIN_BASE_NOISE12,//shader to apply base texture and both cloud/noise
 		ST_FLAT_SHROUD_TEXTURE,		//shader to apply shroud texture projection.
 		ST_SHADOW_DEPTH,		//shader to write caster depth into the shadow map.
+		ST_SHADOW_MULTIPLY,		//second pass multiplying the shadow map into drawn geometry.
 		ST_MAX
 	};
 

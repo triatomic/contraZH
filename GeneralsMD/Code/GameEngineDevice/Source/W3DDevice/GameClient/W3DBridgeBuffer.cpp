@@ -1179,6 +1179,28 @@ void W3DBridgeBuffer::drawBridges(CameraClass * camera, Bool wireframe, TextureC
 		//Force a cloud texture projection into stage 1
 		W3DShaderManager::resetShader(W3DShaderManager::ST_CLOUD_TEXTURE);
 
+	// Bridges light fixed function, so they receive the sun's shadow as a second pass
+	// that multiplies it into the first, set up the same way as the shroud pass below.
+	if (!wireframe && W3DShaderManager::getShaderPasses(W3DShaderManager::ST_SHADOW_MULTIPLY) > 0)
+	{
+		DX8Wrapper::Invalidate_Cached_Render_States();
+		DX8Wrapper::Set_Shader(ShaderClass::_PresetOpaqueShader);
+		DX8Wrapper::Set_Material(m_vertexMaterial);
+		DX8Wrapper::Set_Index_Buffer(m_indexBridge,0);
+		DX8Wrapper::Set_Vertex_Buffer(m_vertexBridge);
+		DX8Wrapper::Apply_Render_State_Changes();
+		if (W3DShaderManager::setShader(W3DShaderManager::ST_SHADOW_MULTIPLY, 0))
+		{
+			for (curBridge=0; curBridge<m_numBridges; curBridge++) {
+				if (m_bridges[curBridge].isEnabled() && m_bridges[curBridge].isVisible()) {
+					//Pretend we're in wireframe so the bridge texture doesn't replace the shadow map.
+					m_bridges[curBridge].renderBridge(TRUE);
+				}
+			}
+		}
+		W3DShaderManager::resetShader(W3DShaderManager::ST_SHADOW_MULTIPLY);
+	}
+
 	//Render shroud pass over all the bridges
 	if (!wireframe && TheTerrainRenderObject->getShroud())
 	{
