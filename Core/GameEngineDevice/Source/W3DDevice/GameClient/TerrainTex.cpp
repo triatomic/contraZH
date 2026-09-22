@@ -53,6 +53,7 @@
 #include "Common/GlobalData.h"
 #include "WW3D2/dx8wrapper.h"
 #include "d3dx8tex.h"
+#include "WW3D2/formconv.h"
 
 /******************************************************************************
 						TerrainTextureClass
@@ -711,15 +712,15 @@ void LightMapTerrainTextureClass::Apply(unsigned int stage)
 	DX8Wrapper::Set_DX8_Texture_Stage_State( stage, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
 	DX8Wrapper::Set_DX8_Texture_Stage_State( stage, D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
 
-	D3DXMATRIX curView;
+	D3DMATRIX curView;
 	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, curView);
 
-	D3DXMATRIX inv;
+	D3DMATRIX inv;
 	float det;
-	D3DXMatrixInverse(&inv, &det, &curView);
+	Invert_D3DMATRIX(inv, &det, curView);
 
-	D3DXMATRIX scale;
-	D3DXMatrixScaling(&scale, STRETCH_FACTOR, STRETCH_FACTOR,1);
+	D3DMATRIX scale;
+	Set_D3DMATRIX_Scaling(scale, STRETCH_FACTOR, STRETCH_FACTOR,1);
 	inv *=scale;
 	if (stage==0) {
 		DX8Wrapper::_Set_DX8_Transform(D3DTS_TEXTURE0, inv);
@@ -965,17 +966,17 @@ void CloudMapTerrainTextureClass::Apply(unsigned int stage)
 	DX8Wrapper::Set_DX8_Texture_Stage_State( stage,  D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
 	DX8Wrapper::Set_DX8_Texture_Stage_State( stage,  D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
 
-	D3DXMATRIX curView;
+	D3DMATRIX curView;
 	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, curView);
 
-	D3DXMATRIX inv;
+	D3DMATRIX inv;
 	float det;
-	D3DXMatrixInverse(&inv, &det, &curView);
+	Invert_D3DMATRIX(inv, &det, curView);
 
-	D3DXMATRIX scale;
-	D3DXMatrixScaling(&scale, STRETCH_FACTOR, STRETCH_FACTOR,1);
+	D3DMATRIX scale;
+	Set_D3DMATRIX_Scaling(scale, STRETCH_FACTOR, STRETCH_FACTOR,1);
 	inv *=scale;
-	D3DXMATRIX offset;
+	D3DMATRIX offset;
 
 	Int delta = m_curTick;
 	m_curTick = ::GetTickCount();
@@ -989,7 +990,7 @@ void CloudMapTerrainTextureClass::Apply(unsigned int stage)
 	if (m_yOffset < -1) m_yOffset += 1;
 
 
-	D3DXMatrixTranslation(&offset, m_xOffset, m_yOffset,0);
+	Set_D3DMATRIX_Translation(offset, m_xOffset, m_yOffset,0);
 
 	inv *= offset;
 

@@ -49,6 +49,16 @@
 D3DFORMAT WW3DFormat_To_D3DFormat(WW3DFormat ww3d_format);
 WW3DFormat D3DFormat_To_WW3DFormat(D3DFORMAT d3d_format);
 
+// Inverts in place of D3DXMatrixInverse, writing identity when singular
+void Invert_D3DMATRIX(D3DMATRIX& out, float* det_out, const D3DMATRIX& m);
+
+D3DMATRIX operator*(const D3DMATRIX& a, const D3DMATRIX& b);
+D3DMATRIX& operator*=(D3DMATRIX& a, const D3DMATRIX& b);
+void Set_D3DMATRIX_Identity(D3DMATRIX& out);
+void Set_D3DMATRIX_Scaling(D3DMATRIX& out, float x, float y, float z);
+void Set_D3DMATRIX_Translation(D3DMATRIX& out, float x, float y, float z);
+void Transpose_D3DMATRIX(D3DMATRIX& out, const D3DMATRIX& m);
+
 D3DFORMAT WW3DZFormat_To_D3DFormat(WW3DZFormat ww3d_zformat);
 WW3DZFormat D3DFormat_To_WW3DZFormat(D3DFORMAT d3d_format);
 

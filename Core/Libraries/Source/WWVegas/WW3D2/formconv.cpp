@@ -37,6 +37,7 @@
  * Functions:                                                                                  *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 #include "formconv.h"
+#include "WWMath/matrix4.h"
 
 D3DFORMAT WW3DFormatToD3DFormatConversionArray[WW3D_FORMAT_COUNT] = {
 	D3DFMT_UNKNOWN,
@@ -249,3 +250,89 @@ unsigned Surface_Size(const D3DSURFACE_DESC& desc)
 	return desc.Width*desc.Height*Get_Bytes_Per_Pixel(format);
 }
 #endif
+
+void Invert_D3DMATRIX(D3DMATRIX& out, float* det_out, const D3DMATRIX& m)
+{
+	// Matrix inverse commutes with transpose, so the two conventions need no
+	// conversion here; the same bytes are valid input either way.
+	Matrix4x4 inverted;
+	float det=0.0f;
+
+	if (Matrix4x4::Inverse(&inverted, &det, (const Matrix4x4*)&m)==nullptr)
+	{
+		// Singular. D3DX left the output alone, which callers never checked, so
+		// return identity rather than whatever happened to be on the stack.
+		inverted.Make_Identity();
+	}
+
+	memcpy(&out, &inverted, sizeof(out));
+
+	if (det_out)
+	{
+		*det_out=det;
+	}
+}
+
+// These keep D3D's row-vector convention, so expressions built from them read
+// and evaluate exactly as the D3DX originals did.
+
+D3DMATRIX operator*(const D3DMATRIX& a, const D3DMATRIX& b)
+{
+	D3DMATRIX out;
+	for (int row=0; row<4; ++row)
+	{
+		for (int col=0; col<4; ++col)
+		{
+			out.m[row][col]=
+				a.m[row][0]*b.m[0][col]+
+				a.m[row][1]*b.m[1][col]+
+				a.m[row][2]*b.m[2][col]+
+				a.m[row][3]*b.m[3][col];
+		}
+	}
+	return out;
+}
+
+D3DMATRIX& operator*=(D3DMATRIX& a, const D3DMATRIX& b)
+{
+	a = a * b;
+	return a;
+}
+
+void Set_D3DMATRIX_Identity(D3DMATRIX& out)
+{
+	memset(&out, 0, sizeof(out));
+	out.m[0][0]=1.0f;
+	out.m[1][1]=1.0f;
+	out.m[2][2]=1.0f;
+	out.m[3][3]=1.0f;
+}
+
+void Set_D3DMATRIX_Scaling(D3DMATRIX& out, float x, float y, float z)
+{
+	Set_D3DMATRIX_Identity(out);
+	out.m[0][0]=x;
+	out.m[1][1]=y;
+	out.m[2][2]=z;
+}
+
+void Set_D3DMATRIX_Translation(D3DMATRIX& out, float x, float y, float z)
+{
+	Set_D3DMATRIX_Identity(out);
+	out.m[3][0]=x;
+	out.m[3][1]=y;
+	out.m[3][2]=z;
+}
+
+void Transpose_D3DMATRIX(D3DMATRIX& out, const D3DMATRIX& m)
+{
+	D3DMATRIX result;
+	for (int row=0; row<4; ++row)
+	{
+		for (int col=0; col<4; ++col)
+		{
+			result.m[row][col]=m.m[col][row];
+		}
+	}
+	out=result;
+}
