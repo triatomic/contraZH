@@ -68,6 +68,7 @@ set(GAMEENGINEDEVICE_SRC
 #    Include/W3DDevice/GameClient/W3DShadow.h
 #    Include/W3DDevice/GameClient/W3DShroud.h
     Include/W3DDevice/GameClient/W3DSmudge.h
+    Include/W3DDevice/GameClient/W3DShadowMap.h
     Include/W3DDevice/GameClient/W3DSnow.h
 #    Include/W3DDevice/GameClient/W3DStatusCircle.h
     Include/W3DDevice/GameClient/W3DTerrainBackground.h
@@ -173,6 +174,7 @@ set(GAMEENGINEDEVICE_SRC
     Source/W3DDevice/GameClient/W3DBloom.cpp
     Source/W3DDevice/GameClient/W3DShaderManager.cpp
 #    Source/W3DDevice/GameClient/W3DShroud.cpp
+    Source/W3DDevice/GameClient/W3DShadowMap.cpp
     Source/W3DDevice/GameClient/W3DSmudge.cpp
     Source/W3DDevice/GameClient/W3DSnow.cpp
 #    Source/W3DDevice/GameClient/W3DStatusCircle.cpp
