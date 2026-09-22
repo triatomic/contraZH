@@ -104,12 +104,22 @@ typedef void** DX8LockPointer;
 	(dev)->CreateIndexBuffer(length, usage, format, pool, out, nullptr)
 #define DX8_CREATE_VERTEX_BUFFER(dev, length, usage, fvf, pool, out) \
 	(dev)->CreateVertexBuffer(length, usage, fvf, pool, out, nullptr)
+#define DX8_CREATE_TEXTURE(dev, w, h, mips, usage, fmt, pool, out) \
+	(dev)->CreateTexture(w, h, mips, usage, fmt, pool, out, nullptr)
 
 // D3D8 overloaded SetVertexShader with an FVF code; D3D9 has a separate setter
 #define DX8_SET_FVF(dev, fvf) (dev)->SetFVF(fvf)
 
 // Several device getters gained a leading swap chain index in D3D9
 #define DX8_SWAPCHAIN 0,
+#define DX8_ENUM_FORMAT(fmt) fmt,
+// D3D9 reports how many quality levels the sample type supports
+#define DX8_MSAA_QUALITY , nullptr
+// D3D9 dropped COPY_VSYNC; DISCARD is the supported windowed equivalent
+#define DX8_SWAPEFFECT_COPY_VSYNC D3DSWAPEFFECT_DISCARD
+
+// D3D9 renamed this and made it apply to windowed mode too
+#define FullScreen_PresentationInterval PresentationInterval
 
 // D3DSURFACE_DESC lost its Size member in D3D9
 unsigned Surface_Size(const D3DSURFACE_DESC& desc);
@@ -124,10 +134,15 @@ typedef unsigned char** DX8LockPointer;
 	(dev)->CreateIndexBuffer(length, usage, format, pool, out)
 #define DX8_CREATE_VERTEX_BUFFER(dev, length, usage, fvf, pool, out) \
 	(dev)->CreateVertexBuffer(length, usage, fvf, pool, out)
+#define DX8_CREATE_TEXTURE(dev, w, h, mips, usage, fmt, pool, out) \
+	(dev)->CreateTexture(w, h, mips, usage, fmt, pool, out)
 
 #define DX8_SET_FVF(dev, fvf) (dev)->SetVertexShader(fvf)
 
 #define DX8_SWAPCHAIN
+#define DX8_ENUM_FORMAT(fmt)
+#define DX8_MSAA_QUALITY
+#define DX8_SWAPEFFECT_COPY_VSYNC D3DSWAPEFFECT_COPY_VSYNC
 
 inline unsigned Surface_Size(const D3DSURFACE_DESC& desc) { return desc.Size; }
 
