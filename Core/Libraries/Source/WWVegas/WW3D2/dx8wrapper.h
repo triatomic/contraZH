@@ -43,7 +43,7 @@
 
 #include "WWLib/always.h"
 #include "dllist.h"
-#include "d3d8.h"
+#include "dx8compat.h"
 #include "WWMath/matrix4.h"
 #include "statistics.h"
 #include "WWLib/wwstring.h"
