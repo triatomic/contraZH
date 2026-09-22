@@ -44,6 +44,16 @@ public:
 	virtual void UnInstall_Materials() const override;
 };
 
+// Multiplies the sun's shadow into an object after its own passes. Objects light
+// fixed function, so this receives without reproducing their lighting in a shader.
+class W3DShadowReceiveMaterialPassClass : public MaterialPassClass
+{
+public:
+
+	virtual void Install_Materials() const override;
+	virtual void UnInstall_Materials() const override;
+};
+
 class W3DShadowMap
 {
 public:
@@ -102,6 +112,9 @@ public:
 	Bool bindReceiver(Int stage) const;
 	void unbindReceiver(Int stage) const;
 
+	// The pass objects push to receive the shadow, or null when nothing can receive it.
+	MaterialPassClass* getReceivePass();
+
 	const Matrix4x4& getSunViewProjection() const { return m_sunViewProj; }
 	const Matrix4x4& getSunProjection() const { return m_sunProjection; }
 	TextureClass* peekColorTarget() const { return m_colorTarget; }
@@ -137,6 +150,7 @@ protected:
 	CasterStats    m_casterStats;
 
 	W3DShadowDepthMaterialPassClass m_depthPass;
+	W3DShadowReceiveMaterialPassClass m_receivePass;
 };
 
 extern W3DShadowMap* TheW3DShadowMap;

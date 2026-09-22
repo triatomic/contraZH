@@ -877,6 +877,16 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 
 			extraMaterialPops++;
 		}
+
+		// Receive the sun's shadow on opaque drawables. Skipped where the base pass is
+		// suppressed, since the pass only darkens pixels the base pass drew.
+		MaterialPassClass *shadowPass = (TheW3DShadowMap != nullptr) ? TheW3DShadowMap->getReceivePass() : nullptr;
+		if (shadowPass != nullptr && m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop &&
+			draw->getEffectiveOpacity() == 1.0f)
+		{
+			rinfo.Push_Material_Pass(shadowPass);
+			extraMaterialPops++;
+		}
 	}
 	else
 	{

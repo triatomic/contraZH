@@ -253,7 +253,13 @@ Bool W3DShadowMap::bindReceiver(Int stage) const
 	TextureBaseClass *texture = (m_depthMode == DEPTH_MODE_HARDWARE)
 		? (TextureBaseClass *)m_depthTarget : (TextureBaseClass *)m_colorTarget;
 
-	DX8Wrapper::_Get_D3D_Device8()->SetTexture(stage, texture->Peek_D3D_Base_Texture());
+	// Bound through the wrapper so its texture cache stays true for whatever draws next,
+	// since a receiver pass can run between two ordinary passes with no invalidate. The
+	// first call forces the change through when the map is already the cached texture,
+	// and it is applied now because applying a texture also applies its own sampler state.
+	DX8Wrapper::Set_Texture(stage, nullptr);
+	DX8Wrapper::Set_Texture(stage, texture);
+	DX8Wrapper::Apply_Render_State_Changes();
 
 	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
@@ -297,9 +303,28 @@ Bool W3DShadowMap::bindReceiver(Int stage) const
 
 void W3DShadowMap::unbindReceiver(Int stage) const
 {
-	DX8Wrapper::_Get_D3D_Device8()->SetTexture(stage, nullptr);
+	DX8Wrapper::Set_Texture(stage, nullptr);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_PASSTHRU | stage);
+}
+
+MaterialPassClass* W3DShadowMap::getReceivePass()
+{
+	if (!m_hasDepth || W3DShaderManager::getShaderPasses(W3DShaderManager::ST_SHADOW_MULTIPLY) == 0)
+	{
+		return nullptr;
+	}
+	return &m_receivePass;
+}
+
+void W3DShadowReceiveMaterialPassClass::Install_Materials() const
+{
+	W3DShaderManager::setShader(W3DShaderManager::ST_SHADOW_MULTIPLY, 0);
+}
+
+void W3DShadowReceiveMaterialPassClass::UnInstall_Materials() const
+{
+	W3DShaderManager::resetShader(W3DShaderManager::ST_SHADOW_MULTIPLY);
 }
 
 void W3DShadowDepthMaterialPassClass::Install_Materials() const
