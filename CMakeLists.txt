@@ -52,6 +52,8 @@ endif()
 if((WIN32 OR "${CMAKE_SYSTEM}" MATCHES "Windows") AND ${CMAKE_SIZEOF_VOID_P} EQUAL 4)
     if(RTS_D3D_BACKEND STREQUAL "D3D9")
         include(cmake/dx9.cmake)
+        # Shadow mapping needs shaders, which only the D3D9 backend can use
+        include(cmake/shaders.cmake)
     else()
         include(cmake/dx8.cmake)
     endif()
