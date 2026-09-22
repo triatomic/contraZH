@@ -11,6 +11,9 @@ option(RTS_BUILD_OPTION_VC6_FULL_DEBUG "Build VC6 with full debug info." OFF)
 option(RTS_BUILD_OPTION_FFMPEG "Enable FFmpeg support" OFF)
 option(RTS_BUILD_GENERALS_ONLINE "Build the Generals Online services stack for Zero Hour (replaces GameSpy online when ON)" OFF)
 
+set(RTS_D3D_BACKEND "D3D8" CACHE STRING "Direct3D backend to render with.")
+set_property(CACHE RTS_D3D_BACKEND PROPERTY STRINGS "D3D8" "D3D9")
+
 if(NOT RTS_BUILD_ZEROHOUR AND NOT RTS_BUILD_GENERALS)
     set(RTS_BUILD_ZEROHOUR TRUE)
     message("You must select one project to build, building Zero Hour by default.")

@@ -50,7 +50,11 @@ endif()
 
 # Find/Add build dependencies and stubs shared by all projects
 if((WIN32 OR "${CMAKE_SYSTEM}" MATCHES "Windows") AND ${CMAKE_SIZEOF_VOID_P} EQUAL 4)
-    include(cmake/dx8.cmake)
+    if(RTS_D3D_BACKEND STREQUAL "D3D9")
+        include(cmake/dx9.cmake)
+    else()
+        include(cmake/dx8.cmake)
+    endif()
 endif()
 
 # Define a dummy stlport target when not on VC6.
