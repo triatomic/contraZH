@@ -1,5 +1,6 @@
 set(UTILITY_SRC
     Allocator/SystemAllocator.h
+    Utility/aligned_pod.h
     Utility/compat.h
     Utility/comsupp_compat.h
     Utility/endian_compat.h
@@ -8,6 +9,7 @@ set(UTILITY_SRC
     Utility/interlocked_adapter.h
     Utility/intrin_compat.h
     Utility/iostream_adapter.h
+    Utility/lazy_static.h
     Utility/mem_compat.h
     Utility/pseh_compat.h
     Utility/sstream_adapter.h
