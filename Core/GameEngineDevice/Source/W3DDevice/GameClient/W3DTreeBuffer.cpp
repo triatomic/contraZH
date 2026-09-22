@@ -1698,7 +1698,7 @@ void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pD
 		Real mulTwoX = 0.5f;
 		if(TheGlobalData && TheGlobalData->m_useOverbright)
 			mulTwoX = 1.0f;
-		DX8Wrapper::_Get_D3D_Device8()->SetPixelShaderConstant(1, D3DXVECTOR4(mulTwoX, mulTwoX, mulTwoX, mulTwoX), 1);
+		DX8Wrapper::_Get_D3D_Device8()->SetPixelShaderConstant(1, Vector4(mulTwoX, mulTwoX, mulTwoX, mulTwoX), 1);
 #endif
 
 	} else {
