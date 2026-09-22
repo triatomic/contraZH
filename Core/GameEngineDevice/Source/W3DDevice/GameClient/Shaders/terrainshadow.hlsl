@@ -34,8 +34,7 @@ sampler2D ShadowMap : register(s4);
 #define SHADOW_TEXCOORD TEXCOORD4
 #endif
 
-// x = shadow map texel size, y = depth bias, z = shadow strength, w = unused
-float4 ShadowParams : register(c0);
+#include "shadowreceive.hlsli"
 
 struct PsIn
 {
@@ -51,7 +50,7 @@ struct PsIn
     float4 ShadowPos : SHADOW_TEXCOORD;
 };
 
-float4 TerrainColor(PsIn input)
+float4 main(PsIn input) : COLOR
 {
     float4 color = lerp(tex2D(BaseTexture, input.BaseUV), tex2D(BlendTexture, input.BlendUV), input.Diffuse.a);
     color *= input.Diffuse;
@@ -61,55 +60,7 @@ float4 TerrainColor(PsIn input)
 #if NOISE_COUNT >= 2
     color *= tex2D(Noise2Texture, input.Noise2UV);
 #endif
-    return color;
-}
 
-#if PACKED
-
-// Four point-sampled compares, weighted by where the pixel sits inside its texel.
-// That weighting, not the tap count, is what stops shadow edges stair-stepping,
-// because a box of point compares snaps every tap to the texel grid.
-float SampleShadow(float2 uv, float depth)
-{
-    const float4 unshift = float4(1.0f, 1.0f / 255.0f, 1.0f / (255.0f * 255.0f),
-                                  1.0f / (255.0f * 255.0f * 255.0f));
-    float texel = ShadowParams.x;
-    float2 texelPos = uv / texel - 0.5f;
-    float2 weight = frac(texelPos);
-    float2 base = (texelPos - weight + 0.5f) * texel;
-
-    float lit00 = (depth <= dot(tex2D(ShadowMap, base), unshift)) ? 1.0f : 0.0f;
-    float lit10 = (depth <= dot(tex2D(ShadowMap, base + float2(texel, 0.0f)), unshift)) ? 1.0f : 0.0f;
-    float lit01 = (depth <= dot(tex2D(ShadowMap, base + float2(0.0f, texel)), unshift)) ? 1.0f : 0.0f;
-    float lit11 = (depth <= dot(tex2D(ShadowMap, base + float2(texel, texel)), unshift)) ? 1.0f : 0.0f;
-
-    return lerp(lerp(lit00, lit10, weight.x), lerp(lit01, lit11, weight.x), weight.y);
-}
-
-#else
-
-// The sampler does the compare on a depth texture, and its bilinear filter gives
-// 2x2 PCF for one instruction.
-float SampleShadow(float2 uv, float depth)
-{
-    return tex2Dproj(ShadowMap, float4(uv, depth, 1.0f)).r;
-}
-
-#endif
-
-float4 main(PsIn input) : COLOR
-{
-    // Guarded because a zero w turns every later op into NaN, which draws black.
-    float w = max(abs(input.ShadowPos.w), 1e-6f);
-    float2 uv = input.ShadowPos.xy / w;
-    float depth = input.ShadowPos.z / w - ShadowParams.y;
-
-    // Outside the sun's box nothing is shadowed. Applied as a mask rather than an
-    // early out so the texture fetches stay in uniform flow.
-    float inside = (uv.x >= 0.0f && uv.x <= 1.0f && uv.y >= 0.0f && uv.y <= 1.0f) ? 1.0f : 0.0f;
-    float lit = lerp(1.0f, SampleShadow(uv, depth), inside);
-
-    float4 color = TerrainColor(input);
-    color.rgb *= lerp(1.0f, lit, ShadowParams.z);
+    color.rgb *= ShadowFactor(input.ShadowPos);
     return color;
 }

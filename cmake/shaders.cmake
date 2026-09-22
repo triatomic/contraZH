@@ -54,7 +54,7 @@ function(rts_add_shader SOURCE PROFILE ENTRY OUTPUT)
     add_custom_command(
         OUTPUT "${dst}"
         COMMAND "${RTS_FXC_EXECUTABLE}" /nologo /T ${PROFILE} /E ${ENTRY} ${defines} /Fo "${dst}" "${src}"
-        DEPENDS "${src}"
+        DEPENDS "${src}" ${RTS_SHADER_INCLUDES}
         COMMENT "Compiling ${OUTPUT} (${PROFILE})"
         VERBATIM
     )
@@ -64,6 +64,9 @@ endfunction()
 
 set(RTS_SHADER_DIR "Core/GameEngineDevice/Source/W3DDevice/GameClient/Shaders")
 
+# Every shader rebuilds when a shared include changes, since fxc reports no dependencies.
+set(RTS_SHADER_INCLUDES "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/shadowreceive.hlsli")
+
 rts_add_shader("${RTS_SHADER_DIR}/shadowdepth.hlsl"   ps_2_0 mainPackedPS  shadowdepthpacked.pso)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadow.pso             NOISE_COUNT=0 PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadownoise.pso        NOISE_COUNT=1 PACKED=0)
@@ -71,5 +74,11 @@ rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadown
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadowpacked.pso       NOISE_COUNT=0 PACKED=1)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadownoisepacked.pso  NOISE_COUNT=1 PACKED=1)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadownoise2packed.pso NOISE_COUNT=2 PACKED=1)
+rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadow.pso                NOISE_COUNT=0 PACKED=0)
+rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadownoise.pso           NOISE_COUNT=1 PACKED=0)
+rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadownoise2.pso          NOISE_COUNT=2 PACKED=0)
+rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadowpacked.pso          NOISE_COUNT=0 PACKED=1)
+rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadownoisepacked.pso     NOISE_COUNT=1 PACKED=1)
+rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadownoise2packed.pso    NOISE_COUNT=2 PACKED=1)
 
 add_custom_target(rts_shaders ALL DEPENDS ${RTS_SHADER_OUTPUTS})

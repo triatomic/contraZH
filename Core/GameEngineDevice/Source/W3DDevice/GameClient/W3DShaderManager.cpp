@@ -1661,6 +1661,10 @@ class TerrainShader8Stage : public W3DShaderInterface
 ///Pixel shader based terrain shader - fastest method for the newest cards.
 class TerrainShaderPixelShader : public W3DShaderInterface
 {
+public:
+	TerrainShaderPixelShader() : m_shadowStage(-1) {}
+
+private:
 	DWORD					m_dwBasePixelShader;	///<handle to terrain D3D pixel shader
 	DWORD					m_dwBaseNoise1PixelShader;	///<handle to terrain/single noise D3D pixel shader
 	DWORD					m_dwBaseNoise2PixelShader;	///<handle to terrain/double noise D3D pixel shader
@@ -2410,12 +2414,24 @@ void CloudTextureShader::reset()
 /*===========================================================================================*/
 class RoadShaderPixelShader : public W3DShaderInterface
 {
+	friend class RoadShader2Stage;	//the two-stage path hands its passes over when roads receive shadows.
+
+public:
+	RoadShaderPixelShader() : m_shadowStage(-1) {}
+
+private:
+
 	DWORD					m_dwBaseNoise2PixelShader;	///<handle to road/double noise D3D pixel shader
+	DWORD					m_dwShadowPixelShader[3];	///<every road mode, also receiving the shadow map, indexed by noise texture count
+	Int						m_shadowStage;	///<stage the shadow map is bound to, or -1
 
 	virtual Int set(Int pass) override;		///<setup shader for the specified rendering pass.
 	virtual void reset() override;		///<do any custom resetting necessary to bring W3D in sync.
 	virtual Int init() override;			///<perform any one time initialization and validation
 	virtual Int shutdown() override;			///<release resources used by shader
+
+	void initShadowReceiver();
+	Bool setShadowReceiver();
 } roadShaderPixelShader;
 
 class RoadShader2Stage : public W3DShaderInterface
@@ -2441,6 +2457,118 @@ Int RoadShaderPixelShader::shutdown()
 
 	m_dwBaseNoise2PixelShader=0;
 
+	for (Int i=0; i<3; i++)
+	{
+		if (m_dwShadowPixelShader[i])
+			DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_dwShadowPixelShader[i]);
+		m_dwShadowPixelShader[i]=0;
+	}
+
+	return TRUE;
+}
+
+void RoadShaderPixelShader::initShadowReceiver()
+{
+	for (Int i=0; i<3; i++)
+		m_dwShadowPixelShader[i]=0;
+	m_shadowStage = -1;
+
+#if defined(BUILD_WITH_D3D9)
+	if (TheW3DShadowMap == nullptr || !TheW3DShadowMap->isAvailable())
+		return;
+
+	const Bool packed = TheW3DShadowMap->getDepthMode() == W3DShadowMap::DEPTH_MODE_PACKED;
+	const char *files[3][2] =
+	{
+		{ "shaders\\roadshadow.pso",       "shaders\\roadshadowpacked.pso" },
+		{ "shaders\\roadshadownoise.pso",  "shaders\\roadshadownoisepacked.pso" },
+		{ "shaders\\roadshadownoise2.pso", "shaders\\roadshadownoise2packed.pso" }
+	};
+
+	for (Int i=0; i<3; i++)
+	{
+		if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(files[i][packed ? 1 : 0], nullptr, 0, false, &m_dwShadowPixelShader[i])))
+		{
+			// Roads still draw without shadows, so a missing variant only turns them off.
+			for (Int j=0; j<i; j++)
+				DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_dwShadowPixelShader[j]);
+			for (Int j=0; j<3; j++)
+				m_dwShadowPixelShader[j]=0;
+			return;
+		}
+	}
+#endif
+}
+
+Bool RoadShaderPixelShader::setShadowReceiver()
+{
+	const W3DShaderManager::ShaderTypes shader = W3DShaderManager::getCurrentShader();
+	const Bool cloudMap = (shader == W3DShaderManager::ST_ROAD_BASE_NOISE1 || shader == W3DShaderManager::ST_ROAD_BASE_NOISE12);
+	const Bool lightMap = (shader == W3DShaderManager::ST_ROAD_BASE_NOISE2 || shader == W3DShaderManager::ST_ROAD_BASE_NOISE12);
+	const Int noiseCount = (cloudMap ? 1 : 0) + (lightMap ? 1 : 0);
+
+	if (m_dwShadowPixelShader[noiseCount] == 0 || TheW3DShadowMap == nullptr || !TheW3DShadowMap->hasDepth())
+		return FALSE;
+
+	DX8Wrapper::Set_Texture(0,W3DShaderManager::getShaderTexture(0));
+	//force WW3D2 system to set it's states so it won't later overwrite our custom settings.
+	DX8Wrapper::Apply_Render_State_Changes();
+
+	// The first stage after the road and noise textures. Fixed-function vertex processing
+	// hands out texcoord sets in stage order, so this is the set the shader reads.
+	const Int stage = 1 + noiseCount;
+	if (!TheW3DShadowMap->bindReceiver(stage))
+		return FALSE;
+	m_shadowStage = stage;
+
+	DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_TEXCOORDINDEX, 0 );
+
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZFUNC,D3DCMP_LESSEQUAL);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZWRITEENABLE,FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_LIGHTING, FALSE);
+
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE,true);	//blend roads into terrain
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND,D3DBLEND_SRCALPHA);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND,D3DBLEND_INVSRCALPHA);
+
+	const DWORD mipFilter = (TheGlobalData && TheGlobalData->m_trilinearTerrainTex) ? D3DTEXF_LINEAR : D3DTEXF_POINT;
+	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_MIPFILTER, mipFilter);
+
+	D3DMATRIX curView;
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, curView);
+
+	D3DMATRIX inv;
+	float det;
+	Invert_D3DMATRIX(inv, &det, curView);
+
+	// Cloud map first, then light map, matching the order roadnoise2 applies them.
+	Int noiseStage = 1;
+	for (Int map=0; map<2; map++)
+	{
+		const Bool isCloud = (map == 0);
+		if (isCloud ? !cloudMap : !lightMap)
+			continue;
+
+		D3DMATRIX textureTransform = curView;
+		if (isCloud)
+			terrainShader2Stage.updateNoise1(&textureTransform, &inv, false);
+		else
+			terrainShader2Stage.updateNoise2(&textureTransform, &inv, false);
+
+		DX8Wrapper::Set_Texture(noiseStage, W3DShaderManager::getShaderTexture(isCloud ? 1 : 2));
+		DX8Wrapper::_Set_DX8_Transform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + noiseStage), textureTransform);
+
+		DX8Wrapper::Set_DX8_Texture_Stage_State(noiseStage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(noiseStage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT2);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(noiseStage, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(noiseStage, D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(noiseStage, D3DTSS_MIPFILTER, mipFilter);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(noiseStage, D3DTSS_MINFILTER, isCloud ? D3DTEXF_LINEAR : D3DTEXF_POINT);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(noiseStage, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+		noiseStage++;
+	}
+
+	DX8Wrapper::Set_Pixel_Shader(m_dwShadowPixelShader[noiseCount]);
 	return TRUE;
 }
 
@@ -2469,6 +2597,8 @@ Int RoadShaderPixelShader::init()
 			if (FAILED(hr))
 				return FALSE;
 
+			initShadowReceiver();
+
 			//Only set this shader for use in dual noise mode.  The 2Stage shader will take care of
 			//all the other modes.
 			W3DShaders[W3DShaderManager::ST_ROAD_BASE_NOISE12]=&roadShaderPixelShader;
@@ -2481,6 +2611,9 @@ Int RoadShaderPixelShader::init()
 
 Int RoadShaderPixelShader::set(Int pass)
 {
+	if (setShadowReceiver())
+		return TRUE;
+
 	DX8Wrapper::Set_Texture(0,W3DShaderManager::getShaderTexture(0));
 	//force WW3D2 system to set it's states so it won't later overwrite our custom settings.
 	DX8Wrapper::Apply_Render_State_Changes();
@@ -2548,6 +2681,9 @@ Int RoadShaderPixelShader::set(Int pass)
 
 void RoadShaderPixelShader::reset()
 {
+	if (TheW3DShadowMap != nullptr && m_shadowStage >= 0)
+		TheW3DShadowMap->unbindReceiver(m_shadowStage);
+	m_shadowStage = -1;
 
 	DX8Wrapper::Set_Pixel_Shader(0);	//turn off pixel shader
 
@@ -2584,6 +2720,10 @@ Int RoadShader2Stage::init()
 
 Int RoadShader2Stage::set(Int pass)
 {
+	// Receiving the shadow map needs a pixel shader, which covers every mode in one pass.
+	if (pass == 0 && roadShaderPixelShader.setShadowReceiver())
+		return TRUE;
+
 	//First stage always contains base texture.
 	DX8Wrapper::Set_Texture(0,W3DShaderManager::getShaderTexture(0));
 	//Force system to apply world/view transforms.
@@ -2727,6 +2867,12 @@ Int RoadShader2Stage::set(Int pass)
 
 void RoadShader2Stage::reset()
 {
+	if (roadShaderPixelShader.m_shadowStage >= 0)
+	{
+		roadShaderPixelShader.reset();
+		return;
+	}
+
 	ShaderClass::Invalidate();
 
 	DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
