@@ -2231,6 +2231,17 @@ void HeightMapRenderObjClass::renderLightingModifierOverlay(void)
 }
 
 ///Performs additional terrain rendering pass, blending in the black shroud texture.
+// The shadow map's depth pass overrides the rest of the state, so an opaque shader is
+// enough to mark the terrain as a solid caster.
+void HeightMapRenderObjClass::renderShadowMapCaster()
+{
+	DX8Wrapper::Set_Shader(ShaderClass::_PresetOpaqueShader);
+	DX8Wrapper::Set_Material(m_vertexMaterialClass);
+	DX8Wrapper::Set_Texture(0,nullptr);
+	DX8Wrapper::Set_Texture(1,nullptr);
+	renderTerrainPass(nullptr);
+}
+
 void HeightMapRenderObjClass::renderTerrainPass(CameraClass *pCamera)
 {
 	DX8Wrapper::Set_Transform(D3DTS_WORLD,Matrix3D(true));

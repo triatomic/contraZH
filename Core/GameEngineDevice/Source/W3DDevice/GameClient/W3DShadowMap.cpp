@@ -508,6 +508,13 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 	// draw into the map with the sun's matrices, and not into the main view later.
 	SortingRendererClass::Flush();
 
+	// Terrain casts too, so cliffs and hills shadow the ground below them. It receives its
+	// own depth as a result, which the casters' slope-scaled bias keeps from speckling.
+	if (TheTerrainRenderObject != nullptr)
+	{
+		TheTerrainRenderObject->renderShadowMapCaster();
+	}
+
 	W3DShaderManager::resetShader(W3DShaderManager::ST_SHADOW_DEPTH);
 
 	WW3D::Enable_Static_Sort_Lists(staticSortLists);

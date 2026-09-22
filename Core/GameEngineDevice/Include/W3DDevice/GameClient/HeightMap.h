@@ -81,6 +81,7 @@ public:
 	virtual void doPartialUpdate(const IRegion2D &partialRange, WorldHeightMap *htMap, RefRenderObjListIterator *pLightsIterator) override;
 
 	virtual void oversizeTerrain(Int tilesToOversize) override; ///< Oversize the visible terrain area.
+	virtual void renderShadowMapCaster() override;
 	virtual void setTerrainDrawSize(Int width, Int height) override; ///< Resize the visible terrain area. Always defaults to oversize dimensions when oversize is set.
 
 	virtual int updateBlock(Int x0, Int y0, Int x1, Int y1, WorldHeightMap *pMap, RefRenderObjListIterator *pLightsIterator) override;
