@@ -52,7 +52,6 @@
 #include "dx8caps.h"
 #include "missingtexture.h"
 #include "WWLib/TARGA.h"
-#include <d3dx8tex.h>
 #include "WWDebug/wwmemlog.h"
 #include "formconv.h"
 #include "texturethumbnail.h"
