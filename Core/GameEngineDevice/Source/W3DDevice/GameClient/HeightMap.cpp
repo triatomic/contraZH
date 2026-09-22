@@ -57,7 +57,6 @@
 #include <WW3D2/coltest.h>
 #include <WW3D2/rinfo.h>
 #include <WW3D2/camera.h>
-#include <d3dx8core.h>
 #include "Common/GlobalData.h"
 #include "Common/PerfTimer.h"
 
@@ -2044,7 +2043,7 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 				if (m_xformedVertexBuffer) {
 					// Note - m_xformedVertexBuffer should only be used for non T&L hardware.  jba.
 					DX8Wrapper::Apply_Render_State_Changes();
-					DX8Wrapper::Set_DX8_Stream_Source(0, m_xformedVertexBuffer[j*m_numVBTilesX+i], 0, D3DXGetFVFVertexSize(D3DFVF_XYZRHW |D3DFVF_DIFFUSE|D3DFVF_TEX2));
+					DX8Wrapper::Set_DX8_Stream_Source(0, m_xformedVertexBuffer[j*m_numVBTilesX+i], 0, FVFInfoClass(D3DFVF_XYZRHW |D3DFVF_DIFFUSE|D3DFVF_TEX2).Get_FVF_Size());
 					DX8_SET_FVF(DX8Wrapper::_Get_D3D_Device8(), D3DFVF_XYZRHW |D3DFVF_DIFFUSE|D3DFVF_TEX2);
 				}
 #endif
@@ -2254,7 +2253,7 @@ void HeightMapRenderObjClass::renderTerrainPass(CameraClass *pCamera)
 			if (m_xformedVertexBuffer) {
 				// Note - m_xformedVertexBuffer should only be used for non T&L hardware.  jba.
 				DX8Wrapper::Apply_Render_State_Changes();
-				DX8Wrapper::Set_DX8_Stream_Source(0, m_xformedVertexBuffer[j*m_numVBTilesX+i], 0, D3DXGetFVFVertexSize(D3DFVF_XYZRHW |D3DFVF_DIFFUSE|D3DFVF_TEX2));
+				DX8Wrapper::Set_DX8_Stream_Source(0, m_xformedVertexBuffer[j*m_numVBTilesX+i], 0, FVFInfoClass(D3DFVF_XYZRHW |D3DFVF_DIFFUSE|D3DFVF_TEX2).Get_FVF_Size());
 				DX8_SET_FVF(DX8Wrapper::_Get_D3D_Device8(), D3DFVF_XYZRHW |D3DFVF_DIFFUSE|D3DFVF_TEX2);
 			}
 #endif
