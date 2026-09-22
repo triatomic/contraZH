@@ -777,6 +777,7 @@ GlobalData::GlobalData()
   m_bloomDebug = FALSE;
   m_laserRef = FALSE;
   m_useShadowMap = TRUE;
+  m_useSpecular = TRUE;
   m_specularDebug = FALSE;
   m_laserGlowColor = 0;
   m_laserGlowIntensity = 0.7f;
@@ -1605,6 +1606,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_bloomDebug = optionPref.getBloomDebugEnabled();
 	TheWritableGlobalData->m_laserRef = optionPref.getLaserRefEnabled();
 	TheWritableGlobalData->m_useShadowMap = optionPref.getShadowMapEnabled();
+	TheWritableGlobalData->m_useSpecular = optionPref.getSpecularEnabled();
 	TheWritableGlobalData->m_specularDebug = optionPref.getSpecularDebugEnabled();
 	TheWritableGlobalData->m_borderlessWindow = optionPref.getBorderlessWindowEnabled();
 

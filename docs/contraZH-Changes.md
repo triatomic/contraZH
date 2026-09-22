@@ -542,7 +542,13 @@ Vehicles and structures catch a per-pixel highlight from the sun, on top of thei
 The highlight follows the map's own sun direction and colour, scales with how bright the model's
 texture is so metal shines and dark paint barely does, and disappears where the sun's shadow falls
 when shadow mapping is on. Infantry stay matte. Needs the Direct3D 9 build and a shader model 2
-card. Set in the mod's `GameData.ini`:
+card.
+
+* `Specular = Yes` - (No turns the highlights off. Also the `Specular highlights` checkbox in the
+advanced display options, where it applies on Accept without a restart.)
+
+The Game Options control needs the `CheckSpecular` window in `OptionsMenu.wnd`; without it the key
+still works from the file. How the highlight looks is set in the mod's `GameData.ini`:
 
 * `UnitSpecularIntensity = 0.35` - (How bright the highlight is. 0 turns it off.)
 * `UnitSpecularPower = 24` - (How tight it is. Higher values give a smaller, sharper highlight.

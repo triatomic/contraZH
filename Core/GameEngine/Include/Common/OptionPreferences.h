@@ -146,6 +146,8 @@ public:
 	Bool getLaserRefEnabled() const;
 	// Options.ini: ShadowMap = Yes draws shadows from a sun shadow map instead of volumes and blobs
 	Bool getShadowMapEnabled() const;
+	// Options.ini: Specular = Yes adds a per-pixel sun highlight to vehicles and structures
+	Bool getSpecularEnabled() const;
 	// Options.ini: SpecularDebug = Yes tints what the specular pass covers and shows its highlight 8x in magenta
 	Bool getSpecularDebugEnabled() const;
 	Bool getBorderlessWindowEnabled() const;

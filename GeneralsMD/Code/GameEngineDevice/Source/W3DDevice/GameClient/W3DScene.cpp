@@ -890,7 +890,7 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 		}
 
 		// Vehicles and structures catch a per-pixel sun highlight. Infantry stay matte.
-		MaterialPassClass *specularPass = W3DShaderManager::getSpecularPass();
+		MaterialPassClass *specularPass = TheGlobalData->m_useSpecular ? W3DShaderManager::getSpecularPass() : nullptr;
 		if (specularPass != nullptr && m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop &&
 			draw->getEffectiveOpacity() == 1.0f &&
 			(draw->isKindOf(KINDOF_VEHICLE) || draw->isKindOf(KINDOF_STRUCTURE)))

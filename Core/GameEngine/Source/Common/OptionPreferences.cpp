@@ -417,6 +417,11 @@ Bool OptionPreferences::getShadowMapEnabled(void) const
 	return getBool("ShadowMap", TRUE);
 }
 
+Bool OptionPreferences::getSpecularEnabled(void) const
+{
+	return getBool("Specular", TRUE);
+}
+
 Bool OptionPreferences::getSpecularDebugEnabled(void) const
 {
 	return getBool("SpecularDebug", FALSE);
