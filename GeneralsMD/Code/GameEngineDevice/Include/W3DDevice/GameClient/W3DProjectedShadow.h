@@ -135,5 +135,6 @@ class W3DProjectedShadow	: public Shadow
 		Real	m_decalOffsetU;		/// texture coordinate offset so not centered at object origin.
 		Real	m_decalOffsetV;		/// texture coordinate offset so not centered at object origin.
 		Int		m_flags;			/// custom rendering flags
+		Bool	m_replacedByShadowMap;	/// a real shadow, drawn by the shadow map instead while it is active
 		virtual void release() override	{TheW3DProjectedShadowManager->removeShadow(this);}	///<release shadow from manager
 };

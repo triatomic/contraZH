@@ -1363,9 +1363,9 @@ Int W3DProjectedShadowManager::renderShadows(RenderInfoClass & rinfo)
 	nShadowDecalVertsInBuf = 0xffff;
 	nShadowDecalIndicesInBuf = 0xffff;
 
-	// The shadow map replaces this list's decal and projected shadows. The decal list,
-	// which carries selection rings and markers, still draws below.
-	if (TheGlobalData->m_useShadowDecals && !IsShadowMapActive())
+	const Bool shadowMapActive = IsShadowMapActive();
+
+	if (TheGlobalData->m_useShadowDecals)
 	{
 		// Render the object
 		TheDX8MeshRenderer.Set_Camera(&rinfo.Camera);
@@ -1376,6 +1376,10 @@ Int W3DProjectedShadowManager::renderShadows(RenderInfoClass & rinfo)
 
 		for( shadow = m_shadowList; shadow; shadow = shadow->m_next )
 		{
+			// The shadow map draws real shadows instead. Markers and glows keep drawing here.
+			if (shadowMapActive && shadow->m_replacedByShadowMap)
+				continue;
+
 			if (shadow->m_isEnabled && !shadow->m_isInvisibleEnabled)
 			{
 				if (shadow->m_type & SHADOW_DECAL)
@@ -1801,6 +1805,7 @@ W3DProjectedShadow* W3DProjectedShadowManager::addShadow(RenderObjClass *robj, S
 	W3DShadowTexture *st=nullptr;
 	static char	defaultDecalName[]={"shadow.tga"};
 	ShadowType shadowType=SHADOW_NONE;		/// type of projection
+	Bool	isRealShadow=TRUE;	/// darkens the ground under the object, rather than marking or lighting it
 	Bool	allowWorldAlign=FALSE;	/// wrap shadow around world geometry - else align perpendicular to local z-axis.
 	Real	decalSizeX=0.0f;
 	Real	decalSizeY=0.0f;
@@ -1855,6 +1860,9 @@ W3DProjectedShadow* W3DProjectedShadowManager::addShadow(RenderObjClass *robj, S
 					st->setTexture(w3dTexture);
 				}
 				shadowType=SHADOW_DECAL;
+				// Mods also use this type for markers and light glows, such as fake_supply and
+				// shell_light. Only the shadow textures, and the default, are shadows.
+				isRealShadow=(_strnicmp(texture_name,"shadow",6) == 0);
 				allowSunDirection=shadowInfo->m_type & SHADOW_DIRECTIONAL_PROJECTION;
 				decalSizeX=shadowInfo->m_sizeX;
 				decalSizeY=shadowInfo->m_sizeY;
@@ -1955,6 +1963,7 @@ W3DProjectedShadow* W3DProjectedShadowManager::addShadow(RenderObjClass *robj, S
 	shadow->m_decalOffsetV= decalOffsetY;
 
 	shadow->m_flags	= allowSunDirection;
+	shadow->m_replacedByShadowMap = isRealShadow;
 
 	shadow->init();
 
@@ -2189,6 +2198,7 @@ W3DProjectedShadow::W3DProjectedShadow()
 	m_allowWorldAlign = FALSE;	/// wrap shadow around world geometry - else align perpendicular to local z-axis.
 	m_isEnabled = TRUE;
 	m_isInvisibleEnabled = FALSE;
+	m_replacedByShadowMap = FALSE;
 	for (Int i=0; i<MAX_SHADOW_LIGHTS; i++)
 		m_shadowTexture[i]=nullptr;
 }
