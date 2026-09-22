@@ -3646,6 +3646,27 @@ void W3DVolumetricShadowManager::renderShadows( Bool forceStencilFill )
 
 }
 
+//-------------------------------------------------------------------------------------------------
+/** Queue every enabled caster for the shadow map depth pass. Culling is left to the caller
+	because the sun frustum, not the camera frustum, decides what reaches the map. */
+//-------------------------------------------------------------------------------------------------
+void W3DVolumetricShadowManager::renderShadowMapCasters( RenderInfoClass &rinfo )
+{
+	for( W3DVolumetricShadow *shadow = m_shadowList; shadow; shadow = shadow->m_next )
+	{
+		if (!shadow->m_isEnabled || shadow->m_isInvisibleEnabled)
+		{
+			continue;
+		}
+
+		RenderObjClass *robj = shadow->m_robj;
+		if (robj != nullptr)
+		{
+			robj->Render( rinfo );
+		}
+	}
+}
+
 /** This class will manage shadow geometry for each render object.  Shadow geometry may
 be the same as render geometry but doesn't need to be.  This allows lower LOD versions of
 the geometry to be used in shadow calculations.  Shadow geometry also keeps extended vertex

@@ -21,10 +21,22 @@
 #include "WW3D2/camera.h"
 #include "WW3D2/dx8wrapper.h"
 #include "WW3D2/dx8caps.h"
+#include "WW3D2/dx8renderer.h"
+#include "WW3D2/rinfo.h"
 #include "WW3D2/texture.h"
 #include "WW3D2/formconv.h"
 #include "WWMath/wwmath.h"
 #include "Common/Debug.h"
+#include "W3DDevice/GameClient/W3DShaderManager.h"
+
+#if RTS_ZEROHOUR
+#include "Lib/BaseType.h"
+#include "Common/GlobalData.h"
+#include "GameClient/View.h"
+#include "W3DDevice/GameClient/W3DShadow.h"
+#include "W3DDevice/GameClient/W3DVolumetricShadow.h"
+#include "W3DDevice/GameClient/W3DProjectedShadow.h"
+#endif
 
 W3DShadowMap* TheW3DShadowMap = nullptr;
 
@@ -84,6 +96,17 @@ Bool W3DShadowMap::ReAcquireResources()
 		return FALSE;
 	}
 
+	// A colour target is needed either way. The wrapper cannot bind a depth surface on
+	// its own, so the hardware path masks colour writes rather than skipping the target.
+	m_colorTarget = DX8Wrapper::Create_Render_Target(m_resolution, m_resolution,
+		WW3D_FORMAT_A8R8G8B8);
+
+	if (m_colorTarget == nullptr)
+	{
+		DEBUG_LOG(("W3DShadowMap: no usable render target, falling back to legacy shadows"));
+		return FALSE;
+	}
+
 	// Prefer sampling depth directly: the sampler does the compare and its bilinear
 	// filter gives 2x2 PCF for one instruction.
 	if (caps->Support_Depth_Stencil_Format(WW3D_ZFORMAT_D24S8))
@@ -101,20 +124,8 @@ Bool W3DShadowMap::ReAcquireResources()
 
 	if (m_depthMode == DEPTH_MODE_NONE)
 	{
-		// Fall back to encoding depth into a colour target.
-		m_colorTarget = DX8Wrapper::Create_Render_Target(m_resolution, m_resolution,
-			WW3D_FORMAT_A8R8G8B8);
-
-		if (m_colorTarget != nullptr)
-		{
-			m_depthMode = DEPTH_MODE_PACKED;
-		}
-	}
-
-	if (m_depthMode == DEPTH_MODE_NONE)
-	{
-		DEBUG_LOG(("W3DShadowMap: no usable shadow map format, falling back to legacy shadows"));
-		return FALSE;
+		// Fall back to encoding depth into the colour target.
+		m_depthMode = DEPTH_MODE_PACKED;
 	}
 
 	DEBUG_LOG(("W3DShadowMap: %dx%d, %s depth",
@@ -172,6 +183,88 @@ void W3DShadowMap::updateFrustum(const CameraClass& camera, const Vector3& light
 
 	const Real worldPerTexel = (2.0f * radius) / (Real)m_resolution;
 	m_depthBias = (SHADOW_BIAS_TEXELS * worldPerTexel) / (sunElevation * (SHADOW_FAR - SHADOW_NEAR));
+}
+
+void W3DShadowDepthMaterialPassClass::Install_Materials() const
+{
+	W3DShaderManager::setShader(W3DShaderManager::ST_SHADOW_DEPTH, 0);
+}
+
+void W3DShadowDepthMaterialPassClass::UnInstall_Materials() const
+{
+	W3DShaderManager::resetShader(W3DShaderManager::ST_SHADOW_DEPTH);
+}
+
+// The caster lists live in the Zero Hour shadow managers, so Generals keeps its legacy
+// shadows and this pass does nothing there.
+void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
+{
+#if RTS_ZEROHOUR
+	if (!isAvailable())
+	{
+		return;
+	}
+
+	// One level of render target nesting is all the wrapper allows, so this pass must
+	// not run inside another one.
+	if (DX8Wrapper::Is_Render_To_Texture())
+	{
+		return;
+	}
+
+	DX8Wrapper::Set_Render_Target_With_Z(m_colorTarget, m_depthTarget);
+
+	DX8Wrapper::Clear(true, true, Vector3(1.0f, 1.0f, 1.0f), 1.0f);
+
+	// The sun winds triangles opposite to the camera, so an inherited cull mode would
+	// drop the casters out of the map entirely.
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_CULLMODE, D3DCULL_NONE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, TRUE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZWRITEENABLE, TRUE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_FOGENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_FILLMODE, D3DFILL_SOLID);
+
+	// Colour is dead weight on the hardware path, where only depth is read back.
+	if (m_depthMode == DEPTH_MODE_HARDWARE)
+	{
+		DX8Wrapper::Set_DX8_Render_State(D3DRS_COLORWRITEENABLE, 0);
+	}
+
+	// Base passes are suppressed so each caster draws only through the depth pass.
+	rinfo.Push_Override_Flags(RenderInfoClass::RINFO_OVERRIDE_ADDITIONAL_PASSES_ONLY);
+	rinfo.Push_Material_Pass(&m_depthPass);
+
+	if (TheW3DVolumetricShadowManager != nullptr)
+	{
+		TheW3DVolumetricShadowManager->renderShadowMapCasters(rinfo);
+	}
+
+	if (TheW3DProjectedShadowManager != nullptr)
+	{
+		TheW3DProjectedShadowManager->renderShadowMapCasters(rinfo);
+	}
+
+	rinfo.Pop_Material_Pass();
+	rinfo.Pop_Override_Flags();
+
+	TheDX8MeshRenderer.Flush();
+
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_COLORWRITEENABLE, 0x0000000f);
+	DX8Wrapper::Set_Render_Target((IDirect3DSurface8 *)nullptr);
+	DX8Wrapper::Invalidate_Cached_Render_States();
+
+	// Only the hardware path has a depth texture to publish; the packed path carries
+	// its depth in the colour target, which receivers read through peekColorTarget.
+	if (m_depthMode == DEPTH_MODE_HARDWARE)
+	{
+		DX8Wrapper::Set_Shadow_Map(0, m_depthTarget);
+	}
+#else
+	(void)rinfo;
+#endif
 }
 
 void W3DShadowMap::computeSunViewProjection(const Vector3& center, Real radius,

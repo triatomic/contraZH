@@ -79,6 +79,7 @@ static void drawFramerateBar();
 #include "W3DDevice/GameClient/W3DWater.h"
 #include "W3DDevice/GameClient/W3DVideoBuffer.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
+#include "W3DDevice/GameClient/W3DShadowMap.h"
 #include "W3DDevice/GameClient/W3DDebugDisplay.h"
 #include "W3DDevice/GameClient/W3DProjectedShadow.h"
 #include "W3DDevice/GameClient/W3DScreenshot.h"
@@ -469,6 +470,10 @@ W3DDisplay::~W3DDisplay()
 	Debug_Statistics::Shutdown_Statistics();
 	if (!TheGlobalData->m_headless)
 		W3DShaderManager::shutdown();
+
+	delete TheW3DShadowMap;
+	TheW3DShadowMap = nullptr;
+
 	m_assetManager->Free_Assets();
 	delete m_assetManager;
 	if (!TheGlobalData->m_headless)
@@ -973,6 +978,12 @@ void W3DDisplay::init()
 	{
 		init2DScene();
 		init3DScene();
+
+		// Created first because the depth shader picks its pixel shader from the map's
+		// chosen format.
+		TheW3DShadowMap = NEW W3DShadowMap;
+		TheW3DShadowMap->init();
+
 		W3DShaderManager::init();
 
 		// Create and initialize the debug display

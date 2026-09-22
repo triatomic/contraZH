@@ -63,6 +63,7 @@
 #include "W3DDevice/GameClient/HeightMap.h"
 #include "W3DDevice/GameClient/W3DCustomScene.h"
 #include "W3DDevice/GameClient/W3DSmudge.h"
+#include "W3DDevice/GameClient/W3DShadowMap.h"
 #include "GameClient/View.h"
 #include "GameClient/CommandXlat.h"
 #include "GameClient/Display.h"
@@ -1480,6 +1481,139 @@ void MaskTextureShader::reset()
 }
 
 /*===========================================================================================*/
+/*=========      Shadow Map Depth Shader	=================================================*/
+/*===========================================================================================*/
+
+#if defined(BUILD_WITH_D3D9)
+
+// Cutout threshold for the depth pass. Without it a tree billboard casts its whole
+// rectangle as a solid block instead of its canopy.
+static const Real SHADOW_DEPTH_ALPHA_CUTOFF = 0.5f;
+
+///Writes caster depth into the shadow map. Only the D3D9 backend has the shader model for it.
+class ShadowDepthShader : public W3DShaderInterface
+{
+public:
+	ShadowDepthShader() : m_dwVertexShader(0), m_dwPixelShader(0) {}
+
+	virtual Int set(Int pass) override;
+	virtual Int init() override;
+	virtual void reset() override;
+	virtual Int shutdown() override;
+
+	Bool isLoaded() const { return m_dwVertexShader != 0 && m_dwPixelShader != 0; }
+
+protected:
+
+	DWORD m_dwVertexShader;
+	DWORD m_dwPixelShader;
+} shadowDepthShader;
+
+W3DShaderInterface *ShadowDepthShaderList[]=
+{
+	&shadowDepthShader,
+	nullptr
+};
+
+Int ShadowDepthShader::init()
+{
+	if (W3DShaderManager::getChipset() < DC_GENERIC_PIXEL_SHADER_2_0)
+	{
+		return FALSE;
+	}
+
+	// The full vertex layout must be declared even though only position and texcoord
+	// are read, because the converter derives each element's offset from the ones
+	// before it. Register numbers, not the D3D9 usage names, are what the shader sees.
+	DWORD Declaration[] =
+	{
+		D3DVSD_STREAM( 0 ),
+		D3DVSD_REG( 0, D3DVSDT_FLOAT3 ),
+		D3DVSD_REG( 3, D3DVSDT_FLOAT3 ),
+		D3DVSD_REG( 5, D3DVSDT_D3DCOLOR),
+		D3DVSD_REG( 7, D3DVSDT_FLOAT2 ),
+		D3DVSD_END()
+	};
+
+	if (FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\shadowdepth.vso",
+			&Declaration[0], 0, true, &m_dwVertexShader)))
+	{
+		return FALSE;
+	}
+
+	// The packed pixel shader encodes depth into colour for devices that cannot sample
+	// a depth surface, so it pairs with the shadow map's own format choice.
+	const Bool packed = TheW3DShadowMap != nullptr &&
+		TheW3DShadowMap->getDepthMode() == W3DShadowMap::DEPTH_MODE_PACKED;
+
+	const char *pixelShaderFile = packed ? "shaders\\shadowdepthpacked.pso"
+	                                     : "shaders\\shadowdepth.pso";
+
+	if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(pixelShaderFile,
+			&Declaration[0], 0, false, &m_dwPixelShader)))
+	{
+		DX8_DELETE_VERTEX_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_dwVertexShader);
+		m_dwVertexShader = 0;
+		return FALSE;
+	}
+
+	W3DShaders[W3DShaderManager::ST_SHADOW_DEPTH]=&shadowDepthShader;
+	W3DShadersPassCount[W3DShaderManager::ST_SHADOW_DEPTH]=1;
+
+	return TRUE;
+}
+
+Int ShadowDepthShader::set(Int pass)
+{
+	if (!isLoaded() || TheW3DShadowMap == nullptr)
+	{
+		return FALSE;
+	}
+
+	// The vertex shader is set after the render state changes are applied, because
+	// applying them rebinds the vertex buffer and that resets the shader to the FVF.
+	DX8Wrapper::Apply_Render_State_Changes();
+
+	// Matrix4x4 is column-vector and the shader multiplies row-vector, so the
+	// transpose To_D3DMATRIX already performs is exactly what the registers need.
+	D3DMATRIX sunViewProj = To_D3DMATRIX(TheW3DShadowMap->getSunViewProjection());
+	DX8Wrapper::Set_Vertex_Shader_Constant(0, &sunViewProj, 4);
+
+	Vector4 alphaCutoff(SHADOW_DEPTH_ALPHA_CUTOFF, 0.0f, 0.0f, 0.0f);
+	DX8Wrapper::Set_Pixel_Shader_Constant(4, &alphaCutoff, 1);
+
+	DX8Wrapper::Set_Vertex_Shader(m_dwVertexShader);
+	DX8Wrapper::Set_Pixel_Shader(m_dwPixelShader);
+
+	return TRUE;
+}
+
+void ShadowDepthShader::reset()
+{
+	DX8Wrapper::Set_Pixel_Shader(0);
+	DX8Wrapper::Set_Vertex_Shader(DX8_FVF_XYZNDUV1);
+	DX8Wrapper::Invalidate_Cached_Render_States();
+}
+
+Int ShadowDepthShader::shutdown()
+{
+	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
+
+	if (device != nullptr)
+	{
+		DX8_DELETE_VERTEX_SHADER(device, m_dwVertexShader);
+		DX8_DELETE_PIXEL_SHADER(device, m_dwPixelShader);
+	}
+
+	m_dwVertexShader = 0;
+	m_dwPixelShader = 0;
+
+	return TRUE;
+}
+
+#endif	// BUILD_WITH_D3D9
+
+/*===========================================================================================*/
 /*=========      Terrain Shaders	=========================================================*/
 /*===========================================================================================*/
 
@@ -2550,6 +2684,9 @@ W3DShaderInterface **MasterShaderList[]=
 	MaskShaderList,
 	CloudShaderList,
 	FlatTerrainShaderList,
+#if defined(BUILD_WITH_D3D9)
+	ShadowDepthShaderList,
+#endif
 	nullptr
 };
 

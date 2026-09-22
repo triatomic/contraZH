@@ -57,6 +57,8 @@ class W3DProjectedShadowManager	: public ProjectedShadowManager
 		void shutdown();			///<free all assets prior to shutdown of entire game.
 		void prepareShadows();
 		Int	 renderShadows(RenderInfoClass & rinfo);	///<iterate over each object and render its shadow onto affected objects.
+		///submit every visible caster to the mesh renderer for the shadow map depth pass.
+		void renderShadowMapCasters(RenderInfoClass & rinfo);
 		Int	 renderDecals(RenderInfoClass & rinfo, Bool aboveWaterPass);	///<draw the decal list subset for the given water pass (below before water, above after).
 		void ReleaseResources(void);	///<release device dependent D3D resources.
 		Bool ReAcquireResources(void);	///<allocate device dependent D3D resources.

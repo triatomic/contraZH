@@ -26,10 +26,22 @@
 #include "WWLib/always.h"
 #include "WWMath/matrix4.h"
 #include "WWMath/vector3.h"
+#include "WW3D2/matpass.h"
 
 class CameraClass;
+class RenderInfoClass;
 class TextureClass;
 class ZTextureClass;
+
+// Installs the depth shader for one caster. The mesh renderer re-applies material
+// state per object, so the shader has to be installed per pass rather than once.
+class W3DShadowDepthMaterialPassClass : public MaterialPassClass
+{
+public:
+
+	virtual void Install_Materials() const override;
+	virtual void UnInstall_Materials() const override;
+};
 
 class W3DShadowMap
 {
@@ -58,6 +70,9 @@ public:
 	// Fits the sun frustum to the ground the camera can see, for this frame.
 	void updateFrustum(const CameraClass& camera, const Vector3& lightPosWorld);
 
+	// Fills the map with caster depth. Binds its own render target and restores it.
+	void renderDepthPass(RenderInfoClass& rinfo);
+
 	const Matrix4x4& getSunViewProjection() const { return m_sunViewProj; }
 	TextureClass* peekColorTarget() const { return m_colorTarget; }
 	ZTextureClass* peekDepthTarget() const { return m_depthTarget; }
@@ -78,6 +93,8 @@ protected:
 	Matrix4x4      m_sunViewProj;
 	Real           m_depthBias;
 	Real           m_fittedRadius;
+
+	W3DShadowDepthMaterialPassClass m_depthPass;
 };
 
 extern W3DShadowMap* TheW3DShadowMap;

@@ -1488,6 +1488,27 @@ Int W3DProjectedShadowManager::renderShadows(RenderInfoClass & rinfo)
 }
 
 //-------------------------------------------------------------------------------------------------
+/** Queue every enabled caster for the shadow map depth pass. The decal list is skipped: it
+	carries selection rings and status markers, which are not shadow casters. */
+//-------------------------------------------------------------------------------------------------
+void W3DProjectedShadowManager::renderShadowMapCasters(RenderInfoClass & rinfo)
+{
+	for( W3DProjectedShadow *shadow = m_shadowList; shadow; shadow = shadow->m_next )
+	{
+		if (!shadow->m_isEnabled || shadow->m_isInvisibleEnabled)
+		{
+			continue;
+		}
+
+		RenderObjClass *robj = shadow->m_robj;
+		if (robj != nullptr)
+		{
+			robj->Render( rinfo );
+		}
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
 /** Draw the decal list (m_decalList), limited to decals whose effective water ordering matches
 	aboveWaterPass. Called once before water (aboveWaterPass=false) and once after (true), so decals
 	can be ordered above or below water per-decal. */

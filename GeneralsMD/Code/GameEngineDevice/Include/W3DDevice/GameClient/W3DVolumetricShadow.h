@@ -37,6 +37,7 @@ struct Geometry;	//forward reference
 struct PolyNeighbor;	//forward reference
 class W3DVolumetricShadow;	//forward reference
 class Drawable;	//forward reference
+class RenderInfoClass;	//forward reference
 
 struct W3DVolumetricShadowRenderTask : public W3DBufferManager::W3DRenderTask
 {
@@ -70,6 +71,8 @@ public:
 
 	// rendering
 	void renderShadows( Bool forceStencilFill );
+	///submit every enabled caster to the mesh renderer for the shadow map depth pass.
+	void renderShadowMapCasters( RenderInfoClass &rinfo );
 	void ReleaseResources();
 	Bool ReAcquireResources();
 

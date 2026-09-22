@@ -52,6 +52,7 @@
 #include "W3DDevice/GameClient/W3DScene.h"
 #include "W3DDevice/GameClient/W3DDynamicLight.h"
 #include "W3DDevice/GameClient/W3DShadow.h"
+#include "W3DDevice/GameClient/W3DShadowMap.h"
 #include "W3DDevice/GameClient/W3DStatusCircle.h"
 #include "W3DDevice/GameClient/W3DCustomScene.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
@@ -1334,6 +1335,18 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 			// we get 2 frame updates per frame, and it screws up the particle emitters.
 			it.Peek_Obj()->On_Frame_Update();
 		}
+	}
+
+	// Fill the shadow map before anything is queued for the main scene, because the
+	// depth pass flushes the mesh renderer and would otherwise consume those objects.
+	if (TheW3DShadowMap != nullptr && TheW3DShadowMap->isAvailable() &&
+		TheW3DShadowManager != nullptr &&
+		m_customPassMode == SCENE_PASS_DEFAULT &&
+		Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE &&
+		!ShaderClass::Is_Backface_Culling_Inverted())
+	{
+		TheW3DShadowMap->updateFrustum(rinfo.Camera, TheW3DShadowManager->getLightPosWorld(0));
+		TheW3DShadowMap->renderDepthPass(rinfo);
 	}
 
 	//terrain needs to be rendered first
