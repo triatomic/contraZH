@@ -75,7 +75,6 @@
 #include "textureloader.h"
 #include "missingtexture.h"
 #include "WWLib/thread.h"
-#include <d3dx8core.h>
 #include "WWMath/pot.h"
 #include "WWDebug/wwprofile.h"
 #include "WWLib/ffactory.h"
@@ -2549,51 +2548,6 @@ IDirect3DTexture8 * DX8Wrapper::_Create_DX8_Texture
 
 IDirect3DTexture8 * DX8Wrapper::_Create_DX8_Texture
 (
-	const char *filename,
-	MipCountType mip_level_count
-)
-{
-	DX8_THREAD_ASSERT();
-	DX8_Assert();
-	IDirect3DTexture8 *texture = nullptr;
-
-	// NOTE: If the original image format is not supported as a texture format, it will
-	// automatically be converted to an appropriate format.
-	// NOTE: It is possible to get the size and format of the original image file from this
-	// function as well, so if we later want to second-guess D3DX's format conversion decisions
-	// we can do so after this function is called..
-	unsigned result = D3DXCreateTextureFromFileExA(
-		_Get_D3D_Device8(),
-		filename,
-		D3DX_DEFAULT,
-		D3DX_DEFAULT,
-		mip_level_count,//create_mipmaps ? 0 : 1,
-		0,
-		D3DFMT_UNKNOWN,
-		D3DPOOL_MANAGED,
-		D3DX_FILTER_BOX,
-		D3DX_FILTER_BOX,
-		0,
-		nullptr,
-		nullptr,
-		&texture);
-
-	if (result != D3D_OK) {
-		return MissingTexture::_Get_Missing_Texture();
-	}
-
-	// Make sure texture wasn't paletted!
-	D3DSURFACE_DESC desc;
-	texture->GetLevelDesc(0,&desc);
-	if (desc.Format==D3DFMT_P8) {
-		texture->Release();
-		return MissingTexture::_Get_Missing_Texture();
-	}
-	return texture;
-}
-
-IDirect3DTexture8 * DX8Wrapper::_Create_DX8_Texture
-(
 	IDirect3DSurface8 *surface,
 	MipCountType mip_level_count
 )
@@ -2893,15 +2847,8 @@ IDirect3DSurface8 * DX8Wrapper::_Create_DX8_Surface(const char *filename_)
 	DX8_THREAD_ASSERT();
 	DX8_Assert();
 
-	// Note: Since there is no "D3DXCreateSurfaceFromFile" and no "GetSurfaceInfoFromFile" (the
-	// latter is supposed to be added to D3DX in a future version), we create a texture from the
-	// file (w/o mipmaps), check that its surface is equal to the original file data (which it
-	// will not be if the file is not in a texture-supported format or size). If so, copy its
-	// surface (we might be able to just get its surface and add a ref to it but I'm not sure so
-	// I'm not going to risk it) and release the texture. If not, create a surface according to
-	// the file data and use D3DXLoadSurfaceFromFile. This is a horrible hack, but it saves us
-	// having to write file loaders. Will fix this when D3DX provides us with the right functions.
-	// Create a surface the size of the file image data
+	// Falls back to the dds variant when the named file is missing, then hands the
+	// load to TextureLoader.
 	IDirect3DSurface8 *surface = nullptr;
 
 	{

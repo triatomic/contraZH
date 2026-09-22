@@ -70,7 +70,6 @@
 #include "GameLogic/GameLogic.h"
 #include "Common/GlobalData.h"
 #include "Common/GameLOD.h"
-#include "d3dx8tex.h"
 #include "WW3D2/dx8caps.h"
 #include "WW3D2/formconv.h"
 

@@ -87,7 +87,6 @@ enum
 #include "WW3D2/matinfo.h"
 #include "WW3D2/mesh.h"
 #include "WW3D2/meshmdl.h"
-#include "d3dx8tex.h"
 #include "WW3D2/formconv.h"
 
 
