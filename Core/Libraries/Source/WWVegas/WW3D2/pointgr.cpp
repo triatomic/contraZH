@@ -86,7 +86,6 @@
 #include "rinfo.h"
 #include "camera.h"
 #include "dx8fvf.h"
-#include "d3dx8math.h"
 #include "sortingrenderer.h"
 
 // Upgraded to DX8 2/2/01 HY
@@ -1250,8 +1249,17 @@ void PointGroupClass::Update_Arrays(
 				for (i = 0; i < active_points; i++) {
 					if (!Billboard) {
 						// If we're not billboarding, then the coordinate we have is in screen space.
-						Matrix4x4 rotMat;
-						D3DXMatrixRotationZ(&(D3DXMATRIX&) rotMat, ((float)point_orientation[i] / 255.0f * 2 * D3DX_PI));
+						// The rotation is clockwise: the D3DX matrix this replaces was written
+						// into the transposed Matrix4x4 layout, which negated the angle.
+						const float angle = (float)point_orientation[i] / 255.0f * 2 * WWMATH_PI;
+						const float cos_a = cosf(angle);
+						const float sin_a = sinf(angle);
+
+						Matrix4x4 rotMat(
+							Vector4( cos_a, sin_a, 0.0f, 0.0f),
+							Vector4(-sin_a, cos_a, 0.0f, 0.0f),
+							Vector4(  0.0f,  0.0f, 1.0f, 0.0f),
+							Vector4(  0.0f,  0.0f, 0.0f, 1.0f));
 
 						Vector4 orientedVecX = rotMat * GroundMultiplierX;
 						Vector4 orientedVecY = rotMat * GroundMultiplierY;

@@ -41,11 +41,50 @@
 
 #include "dx8fvf.h"
 #include "WWLib/wwstring.h"
-#include <d3dx8core.h>
 
 static unsigned Get_FVF_Vertex_Size(unsigned FVF)
 {
-	return D3DXGetFVFVertexSize(FVF);
+	unsigned size=0;
+
+	switch (FVF&D3DFVF_POSITION_MASK)
+	{
+	case D3DFVF_XYZ:     size+=3*sizeof(float); break;
+	case D3DFVF_XYZRHW:  size+=4*sizeof(float); break;
+	case D3DFVF_XYZB1:   size+=4*sizeof(float); break;
+	case D3DFVF_XYZB2:   size+=5*sizeof(float); break;
+	case D3DFVF_XYZB3:   size+=6*sizeof(float); break;
+	case D3DFVF_XYZB4:   size+=7*sizeof(float); break;
+	case D3DFVF_XYZB5:   size+=8*sizeof(float); break;
+	default: break;
+	}
+
+	// The last blend weight may be packed as a UBYTE4 instead of a float
+	if ((FVF&D3DFVF_LASTBETA_UBYTE4)==D3DFVF_LASTBETA_UBYTE4 &&
+		 (FVF&D3DFVF_POSITION_MASK)>=D3DFVF_XYZB1)
+	{
+		size-=sizeof(float);
+		size+=sizeof(DWORD);
+	}
+
+	if ((FVF&D3DFVF_NORMAL)==D3DFVF_NORMAL)     size+=3*sizeof(float);
+	if ((FVF&D3DFVF_PSIZE)==D3DFVF_PSIZE)       size+=sizeof(float);
+	if ((FVF&D3DFVF_DIFFUSE)==D3DFVF_DIFFUSE)   size+=sizeof(DWORD);
+	if ((FVF&D3DFVF_SPECULAR)==D3DFVF_SPECULAR) size+=sizeof(DWORD);
+
+	const unsigned texcoord_count=(FVF&D3DFVF_TEXCOUNT_MASK)>>D3DFVF_TEXCOUNT_SHIFT;
+	for (unsigned i=0; i<texcoord_count; ++i)
+	{
+		// Two bits per set, defaulting to 2 floats
+		switch ((FVF>>(16+i*2))&0x3)
+		{
+		case 0: size+=2*sizeof(float); break;	// D3DFVF_TEXTUREFORMAT2
+		case 1: size+=3*sizeof(float); break;	// D3DFVF_TEXTUREFORMAT3
+		case 2: size+=4*sizeof(float); break;	// D3DFVF_TEXTUREFORMAT4
+		case 3: size+=1*sizeof(float); break;	// D3DFVF_TEXTUREFORMAT1
+		}
+	}
+
+	return size;
 }
 
 FVFInfoClass::FVFInfoClass(unsigned FVF_)
