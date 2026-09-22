@@ -773,6 +773,7 @@ GlobalData::GlobalData()
   m_bloomStrength = 0.5f;
   m_bloomDebug = FALSE;
   m_laserRef = FALSE;
+  m_useShadowMap = TRUE;
   m_laserGlowColor = 0;
   m_laserGlowIntensity = 0.7f;
 
@@ -1596,6 +1597,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_bloomStrength = optionPref.getBloomStrength();
 	TheWritableGlobalData->m_bloomDebug = optionPref.getBloomDebugEnabled();
 	TheWritableGlobalData->m_laserRef = optionPref.getLaserRefEnabled();
+	TheWritableGlobalData->m_useShadowMap = optionPref.getShadowMapEnabled();
 	TheWritableGlobalData->m_borderlessWindow = optionPref.getBorderlessWindowEnabled();
 
 	Int val=optionPref.getGammaValue();

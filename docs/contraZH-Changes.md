@@ -498,6 +498,36 @@ on screen.
 texture. Turning anti-aliasing off brings it back without a restart.
 * Particles hidden behind terrain or buildings cast no glow, since the second draw shares the
 scene's depth buffer.
+
+### Shadow mapping
+
+Shadows cast from the sun into a shadow map, replacing the stencil shadow volumes on vehicles and
+buildings and the blob decals under infantry. Each shadow takes the shape of its object, including
+the cutouts in trees, fences and other alpha tested or blended meshes, and falls on terrain, roads,
+bridges, units and buildings, with soft filtered edges. Needs the Direct3D 9 build and a shader
+model 2 card.
+
+* `ShadowMap = Yes` - (No goes back to the stencil volumes and blob decals. Also the
+`Shadow mapping` checkbox in Game Options, where it applies on Accept without a restart.)
+
+`3D Shadows` and `2D Shadows` still decide which objects cast: 3D covers the objects authored with
+volume shadows (vehicles, buildings, trees) and 2D the ones authored with decal shadows (mostly
+infantry). With both off there are no shadows, so the detail presets keep controlling shadows as
+before.
+
+The Game Options control needs the `CheckShadowMap` window in `OptionsMenu.wnd`; without it the key
+still works from the file.
+
+Notes:
+* Decals that use the shadow type for something other than a shadow keep drawing, such as the fake
+structure marker and the glow under shells. Only decal textures whose name starts with `shadow` are
+replaced.
+* Units under shroud, and stealthed units, cast no shadow, so a shadow cannot give away a unit the
+player cannot see.
+* Additive and other glow passes cast nothing. Opaque meshes cast solid shapes even when their
+texture has an alpha channel, since unit textures often keep reflection masks there.
+* The map is 4096 texels across and follows the ground in view, so detail drops as the camera zooms
+out.
 * Additive meshes on skinned models (infantry and other bone deformed meshes) do not glow. Their
 vertices only exist for the duration of the normal draw, so there is nothing left to draw again.
 

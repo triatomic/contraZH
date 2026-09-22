@@ -412,6 +412,11 @@ Bool OptionPreferences::getLaserRefEnabled(void) const
 	return getBool("LaserRef", FALSE);
 }
 
+Bool OptionPreferences::getShadowMapEnabled(void) const
+{
+	return getBool("ShadowMap", TRUE);
+}
+
 Bool OptionPreferences::getBorderlessWindowEnabled(void) const
 {
 	return getBool("BorderlessWindow", FALSE);

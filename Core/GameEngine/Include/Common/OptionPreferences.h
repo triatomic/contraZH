@@ -144,6 +144,8 @@ public:
 	Bool getBloomDebugEnabled() const;
 	// Options.ini: LaserRef = Yes lights the ground along each laser beam
 	Bool getLaserRefEnabled() const;
+	// Options.ini: ShadowMap = Yes draws shadows from a sun shadow map instead of volumes and blobs
+	Bool getShadowMapEnabled() const;
 	Bool getBorderlessWindowEnabled() const;
 	Bool getEasyMilitaryDragEnabled() const;
 	Bool getSmartPipsEnabled() const;
