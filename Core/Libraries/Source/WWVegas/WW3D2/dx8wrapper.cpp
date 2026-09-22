@@ -2966,9 +2966,22 @@ void DX8Wrapper::_Copy_DX8_Rects(
 			dest_rect.bottom = dest_point.y + (src_rect.bottom - src_rect.top);
 			DX8CALL(StretchRect(pSourceSurface, &src_rect, pDestinationSurface, &dest_rect, D3DTEXF_NONE));
 		}
-		else
+		else if (src_desc.Pool == D3DPOOL_SYSTEMMEM && dest_desc.Pool == D3DPOOL_DEFAULT &&
+					src_desc.Format == dest_desc.Format)
 		{
 			DX8CALL(UpdateSurface(pSourceSurface, &src_rect, pDestinationSurface, &dest_point));
+		}
+		else
+		{
+			// UpdateSurface only accepts system memory to default pool in a matching
+			// format. Anything else, such as filling a managed texture or converting
+			// between formats, is copied on the CPU instead.
+			RECT dest_rect;
+			dest_rect.left = dest_point.x;
+			dest_rect.top = dest_point.y;
+			dest_rect.right = dest_point.x + (src_rect.right - src_rect.left);
+			dest_rect.bottom = dest_point.y + (src_rect.bottom - src_rect.top);
+			DX8_ErrorCode(Load_Surface_From_Surface(pDestinationSurface, &dest_rect, pSourceSurface, &src_rect));
 		}
 	}
 }

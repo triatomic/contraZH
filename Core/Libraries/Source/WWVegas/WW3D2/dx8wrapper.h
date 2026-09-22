@@ -1064,7 +1064,7 @@ WWINLINE void DX8Wrapper::Set_DX8_Stream_Source(UINT stream, IDirect3DVertexBuff
 WWINLINE void DX8Wrapper::Set_DX8_Indices(IDirect3DIndexBuffer8* index_buffer, UINT base_vertex_index)
 {
 #if defined(BUILD_WITH_D3D9)
-	// D3D9 moved the base vertex index to the draw call
+	// D3D9 takes the base vertex index at the draw call instead, so hold it until then.
 	CurrentBaseVertexIndex = base_vertex_index;
 	DX8CALL(SetIndices(index_buffer));
 #else
@@ -1075,7 +1075,13 @@ WWINLINE void DX8Wrapper::Set_DX8_Indices(IDirect3DIndexBuffer8* index_buffer, U
 WWINLINE void DX8Wrapper::Draw_DX8_Indexed_Primitive(D3DPRIMITIVETYPE type, UINT min_index, UINT vertex_count, UINT start_index, UINT primitive_count)
 {
 #if defined(BUILD_WITH_D3D9)
-	DX8CALL(DrawIndexedPrimitive(type, CurrentBaseVertexIndex, min_index, vertex_count, start_index, primitive_count));
+	// The base vertex index belongs to the vertex buffer, which can change without the
+	// index buffer changing, so prefer the live render state. Callers that drive the
+	// device directly have no render state and supply it through Set_DX8_Indices.
+	const INT base_vertex_index=render_state.index_buffer
+		? (INT)(render_state.index_base_offset+render_state.vba_offset)
+		: (INT)CurrentBaseVertexIndex;
+	DX8CALL(DrawIndexedPrimitive(type, base_vertex_index, min_index, vertex_count, start_index, primitive_count));
 #else
 	DX8CALL(DrawIndexedPrimitive(type, min_index, vertex_count, start_index, primitive_count));
 #endif

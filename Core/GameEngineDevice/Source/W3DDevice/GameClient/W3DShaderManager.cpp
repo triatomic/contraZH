@@ -3032,7 +3032,7 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 		file = TheFileSystem->openFile(strFilePath, File::READ | File::BINARY);
 		if (file == nullptr)
 		{
-			OutputDebugString("Could not find file \n" );
+			DEBUG_LOG(("LoadAndCreateD3DShader: could not open %s", strFilePath));
 			return E_FAIL;
 		}
 
@@ -3043,7 +3043,7 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 		const DWORD* pShader = (DWORD*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dwFileSize);
 		if (!pShader)
 		{
-			OutputDebugString( "Failed to allocate memory to load shader\n " );
+			DEBUG_LOG(("LoadAndCreateD3DShader: out of memory for %s", strFilePath));
 			return E_FAIL;
 		}
 
@@ -3097,16 +3097,17 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 
 		if (FAILED(hr))
 		{
-			OutputDebugString( "Failed to create shader\n ");
+			DEBUG_LOG(("LoadAndCreateD3DShader: failed to create %s, hr=0x%08X", strFilePath, hr));
 			return E_FAIL;
 		}
 	}
 	catch(...)
 	{
-		OutputDebugString( "Error opening file \n" );
+		DEBUG_LOG(("LoadAndCreateD3DShader: exception loading %s", strFilePath));
 		return E_FAIL;
 	}
 
+	DEBUG_LOG(("LoadAndCreateD3DShader: loaded %s -> handle 0x%08X", strFilePath, *pHandle));
 	return S_OK;
 }
 
