@@ -41,14 +41,19 @@ set(RTS_SHADERS_AVAILABLE TRUE CACHE INTERNAL "")
 set(RTS_SHADER_OUTPUT_DIR "${CMAKE_BINARY_DIR}/shaders")
 file(MAKE_DIRECTORY "${RTS_SHADER_OUTPUT_DIR}")
 
-# rts_add_shader(<source.hlsl> <profile> <entry point> <output name>)
+# rts_add_shader(<source.hlsl> <profile> <entry point> <output name> [NAME=VALUE ...])
 function(rts_add_shader SOURCE PROFILE ENTRY OUTPUT)
     set(src "${CMAKE_SOURCE_DIR}/${SOURCE}")
     set(dst "${RTS_SHADER_OUTPUT_DIR}/${OUTPUT}")
 
+    set(defines "")
+    foreach(define ${ARGN})
+        list(APPEND defines /D ${define})
+    endforeach()
+
     add_custom_command(
         OUTPUT "${dst}"
-        COMMAND "${RTS_FXC_EXECUTABLE}" /nologo /T ${PROFILE} /E ${ENTRY} /Fo "${dst}" "${src}"
+        COMMAND "${RTS_FXC_EXECUTABLE}" /nologo /T ${PROFILE} /E ${ENTRY} ${defines} /Fo "${dst}" "${src}"
         DEPENDS "${src}"
         COMMENT "Compiling ${OUTPUT} (${PROFILE})"
         VERBATIM
@@ -60,7 +65,11 @@ endfunction()
 set(RTS_SHADER_DIR "Core/GameEngineDevice/Source/W3DDevice/GameClient/Shaders")
 
 rts_add_shader("${RTS_SHADER_DIR}/shadowdepth.hlsl"   ps_2_0 mainPackedPS  shadowdepthpacked.pso)
-rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main          terrainshadow.pso)
-rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 mainPacked    terrainshadowpacked.pso)
+rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadow.pso             NOISE_COUNT=0 PACKED=0)
+rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadownoise.pso        NOISE_COUNT=1 PACKED=0)
+rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadownoise2.pso       NOISE_COUNT=2 PACKED=0)
+rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadowpacked.pso       NOISE_COUNT=0 PACKED=1)
+rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadownoisepacked.pso  NOISE_COUNT=1 PACKED=1)
+rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadownoise2packed.pso NOISE_COUNT=2 PACKED=1)
 
 add_custom_target(rts_shaders ALL DEPENDS ${RTS_SHADER_OUTPUTS})

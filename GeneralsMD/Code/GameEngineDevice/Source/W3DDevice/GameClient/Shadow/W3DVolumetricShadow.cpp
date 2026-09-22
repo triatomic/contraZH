@@ -3434,7 +3434,11 @@ void W3DVolumetricShadowManager::renderShadows( Bool forceStencilFill )
  	beY = bbox.Extent.Y;
  	beZ = bbox.Extent.Z;
 
-	if (m_shadowList && TheGlobalData->m_useShadowVolumes)
+	// Under the shadow map this takes the no-volumes branch below, which still resolves
+	// the stencil that water and occlusion depend on.
+	const Bool shadowMapActive = IsShadowMapActive();
+
+	if (m_shadowList && TheGlobalData->m_useShadowVolumes && !shadowMapActive)
 	{
 
 		LPDIRECT3DDEVICE8 m_pDev=DX8Wrapper::_Get_D3D_Device8();
@@ -3627,7 +3631,7 @@ void W3DVolumetricShadowManager::renderShadows( Bool forceStencilFill )
 		DX8Wrapper::Invalidate_Cached_Render_States();
 	}
 	else
-	if (forceStencilFill)
+	if (forceStencilFill || shadowMapActive)
 	{	//no shadows to render, but still need to fill stencil buffer
 		//for other effects.
 
@@ -3649,15 +3653,18 @@ void W3DVolumetricShadowManager::renderShadows( Bool forceStencilFill )
 //-------------------------------------------------------------------------------------------------
 /** Queue every enabled caster that can reach the shadow map for its depth pass. */
 //-------------------------------------------------------------------------------------------------
-void W3DVolumetricShadowManager::renderShadowMapCasters( RenderInfoClass &rinfo )
+Int W3DVolumetricShadowManager::renderShadowMapCasters( RenderInfoClass &rinfo )
 {
+	Int count = 0;
 	for( W3DVolumetricShadow *shadow = m_shadowList; shadow; shadow = shadow->m_next )
 	{
-		if (shadow->m_isEnabled && !shadow->m_isInvisibleEnabled && IsShadowMapCaster(shadow->m_robj))
+		if (IsShadowMapCaster(shadow->m_robj, shadow->m_isEnabled && !shadow->m_isInvisibleEnabled))
 		{
 			shadow->m_robj->Render( rinfo );
+			++count;
 		}
 	}
+	return count;
 }
 
 /** This class will manage shadow geometry for each render object.  Shadow geometry may

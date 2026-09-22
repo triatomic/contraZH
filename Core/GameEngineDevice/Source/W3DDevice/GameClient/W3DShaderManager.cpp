@@ -1664,11 +1664,16 @@ class TerrainShaderPixelShader : public W3DShaderInterface
 	DWORD					m_dwBasePixelShader;	///<handle to terrain D3D pixel shader
 	DWORD					m_dwBaseNoise1PixelShader;	///<handle to terrain/single noise D3D pixel shader
 	DWORD					m_dwBaseNoise2PixelShader;	///<handle to terrain/double noise D3D pixel shader
+	DWORD					m_dwShadowPixelShader[3];	///<the same three, also receiving the shadow map, indexed by noise texture count
+	Int						m_shadowStage;	///<stage the shadow map is bound to, or -1
 
 	virtual Int set(Int pass) override;		///<setup shader for the specified rendering pass.
 	virtual void reset() override;		///<do any custom resetting necessary to bring W3D in sync.
 	virtual Int init() override;			///<perform any one time initialization and validation
 	virtual Int shutdown() override;			///<release resources used by shader
+
+	void initShadowReceiver();
+	Bool setShadowReceiver(Int noiseCount);
 } terrainShaderPixelShader;
 
 ///List of different terrain shader implementations in order of preference
@@ -2072,6 +2077,62 @@ Int TerrainShaderPixelShader::shutdown()
 	m_dwBaseNoise1PixelShader=0;
 	m_dwBaseNoise2PixelShader=0;
 
+	for (Int i=0; i<3; i++)
+	{
+		if (m_dwShadowPixelShader[i])
+			DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_dwShadowPixelShader[i]);
+		m_dwShadowPixelShader[i]=0;
+	}
+
+	return TRUE;
+}
+
+void TerrainShaderPixelShader::initShadowReceiver()
+{
+	for (Int i=0; i<3; i++)
+		m_dwShadowPixelShader[i]=0;
+	m_shadowStage = -1;
+
+#if defined(BUILD_WITH_D3D9)
+	if (TheW3DShadowMap == nullptr || !TheW3DShadowMap->isAvailable())
+		return;
+
+	const Bool packed = TheW3DShadowMap->getDepthMode() == W3DShadowMap::DEPTH_MODE_PACKED;
+	const char *files[3][2] =
+	{
+		{ "shaders\\terrainshadow.pso",       "shaders\\terrainshadowpacked.pso" },
+		{ "shaders\\terrainshadownoise.pso",  "shaders\\terrainshadownoisepacked.pso" },
+		{ "shaders\\terrainshadownoise2.pso", "shaders\\terrainshadownoise2packed.pso" }
+	};
+
+	for (Int i=0; i<3; i++)
+	{
+		if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(files[i][packed ? 1 : 0], nullptr, 0, false, &m_dwShadowPixelShader[i])))
+		{
+			// Terrain still draws without shadows, so a missing variant only turns them off.
+			for (Int j=0; j<i; j++)
+				DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_dwShadowPixelShader[j]);
+			for (Int j=0; j<3; j++)
+				m_dwShadowPixelShader[j]=0;
+			return;
+		}
+	}
+#endif
+}
+
+Bool TerrainShaderPixelShader::setShadowReceiver(Int noiseCount)
+{
+	if (m_dwShadowPixelShader[noiseCount] == 0 || TheW3DShadowMap == nullptr)
+		return FALSE;
+
+	// The first stage after the base, blend and noise textures. Fixed-function vertex
+	// processing hands out texcoord sets in stage order, so this is the set the shader reads.
+	const Int stage = 2 + noiseCount;
+	if (!TheW3DShadowMap->bindReceiver(stage))
+		return FALSE;
+
+	m_shadowStage = stage;
+	DX8Wrapper::Set_Pixel_Shader(m_dwShadowPixelShader[noiseCount]);
 	return TRUE;
 }
 
@@ -2112,6 +2173,8 @@ Int TerrainShaderPixelShader::init()
 			hr = W3DShaderManager::LoadAndCreateD3DShader("shaders\\terrainnoise2.pso", &Declaration[0], 0, false, &m_dwBaseNoise2PixelShader);
 			if (FAILED(hr))
 				return FALSE;
+
+			initShadowReceiver();
 
 			W3DShaders[W3DShaderManager::ST_TERRAIN_BASE]=&terrainShaderPixelShader;
 			W3DShaders[W3DShaderManager::ST_TERRAIN_BASE_NOISE1]=&terrainShaderPixelShader;
@@ -2230,11 +2293,23 @@ Int TerrainShaderPixelShader::set(Int pass)
 		DX8Wrapper::Set_Pixel_Shader(m_dwBasePixelShader);
 	}
 
+	// Swap in the matching variant that also receives the shadow map.
+	Int noiseCount = 0;
+	if (W3DShaderManager::getCurrentShader() == W3DShaderManager::ST_TERRAIN_BASE_NOISE12)
+		noiseCount = 2;
+	else if (W3DShaderManager::getCurrentShader() >= W3DShaderManager::ST_TERRAIN_BASE_NOISE1)
+		noiseCount = 1;
+	setShadowReceiver(noiseCount);
+
 	return TRUE;
 }
 
 void TerrainShaderPixelShader::reset()
 {
+	if (TheW3DShadowMap != nullptr && m_shadowStage >= 0)
+		TheW3DShadowMap->unbindReceiver(m_shadowStage);
+	m_shadowStage = -1;
+
 	DX8Wrapper::_Get_D3D_Device8()->SetTexture(2,nullptr);	//release reference to any texture
 	DX8Wrapper::_Get_D3D_Device8()->SetTexture(3,nullptr);	//release reference to any texture
 

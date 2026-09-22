@@ -1345,8 +1345,17 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 		Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE &&
 		!ShaderClass::Is_Backface_Culling_Inverted())
 	{
-		TheW3DShadowMap->updateFrustum(rinfo.Camera, TheW3DShadowManager->getLightPosWorld(0));
-		TheW3DShadowMap->renderDepthPass(rinfo);
+		// Either legacy shadow option turns the map on, so existing preferences carry over.
+		if (TheGlobalData->m_useShadowVolumes || TheGlobalData->m_useShadowDecals)
+		{
+			TheW3DShadowMap->setShadowColor(TheW3DShadowManager->getShadowColor());
+			TheW3DShadowMap->updateFrustum(rinfo.Camera, TheW3DShadowManager->getLightPosWorld(0));
+			TheW3DShadowMap->renderDepthPass(rinfo);
+		}
+		else
+		{
+			TheW3DShadowMap->clearDepth();
+		}
 	}
 
 	//terrain needs to be rendered first

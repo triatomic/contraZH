@@ -111,10 +111,29 @@ void DoDecals(RenderInfoClass & rinfo)
 		TheW3DProjectedShadowManager->renderDecals(rinfo, true);	//above-water subset
 }
 
-Bool IsShadowMapCaster(RenderObjClass *robj)
+Bool IsShadowMapActive()
 {
-	if (robj == nullptr || !robj->Is_Not_Hidden_At_All() || TheW3DShadowMap == nullptr)
+	return TheW3DShadowMap != nullptr && TheW3DShadowMap->hasDepth();
+}
+
+Bool IsShadowMapCaster(RenderObjClass *robj, Bool shadowEnabled)
+{
+	if (TheW3DShadowMap == nullptr)
 		return FALSE;
+
+	W3DShadowMap::CasterStats &stats = TheW3DShadowMap->getCasterStats();
+
+	if (!shadowEnabled || robj == nullptr)
+	{
+		++stats.disabled;
+		return FALSE;
+	}
+
+	if (!robj->Is_Not_Hidden_At_All())
+	{
+		++stats.hidden;
+		return FALSE;
+	}
 
 	// Same test the scene uses to hide drawables, so a unit under shroud or stealth
 	// casts no shadow that would give it away.
@@ -123,10 +142,20 @@ Bool IsShadowMapCaster(RenderObjClass *robj)
 	{
 		Drawable *draw = drawInfo->m_drawable;
 		if (draw->isDrawableEffectivelyHidden() || draw->getFullyObscuredByShroud())
+		{
+			++stats.shrouded;
 			return FALSE;
+		}
 	}
 
-	return TheW3DShadowMap->isCasterInRange(robj->Get_Bounding_Sphere());
+	if (!TheW3DShadowMap->isCasterInRange(robj->Get_Bounding_Sphere()))
+	{
+		++stats.outOfRange;
+		return FALSE;
+	}
+
+	++stats.drawn;
+	return TRUE;
 }
 
 W3DShadowManager::W3DShadowManager( void )

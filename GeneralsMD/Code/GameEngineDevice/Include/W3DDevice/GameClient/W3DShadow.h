@@ -70,4 +70,7 @@ protected:
 extern W3DShadowManager *TheW3DShadowManager;
 
 /// true if robj should be drawn into the shadow map this frame.
-Bool IsShadowMapCaster(RenderObjClass *robj);
+Bool IsShadowMapCaster(RenderObjClass *robj, Bool shadowEnabled);
+
+/// true while the shadow map replaces the volume and decal shadows.
+Bool IsShadowMapActive();

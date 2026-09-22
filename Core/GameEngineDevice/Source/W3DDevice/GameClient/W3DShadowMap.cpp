@@ -18,6 +18,8 @@
 
 #include "W3DDevice/GameClient/W3DShadowMap.h"
 
+#include <stdlib.h>
+
 #include "WW3D2/camera.h"
 #include "WW3D2/dx8wrapper.h"
 #include "WW3D2/dx8caps.h"
@@ -30,6 +32,7 @@
 #include "WWMath/wwmath.h"
 #include "Common/Debug.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
+#include "W3DDevice/GameClient/BaseHeightMap.h"
 
 #if RTS_ZEROHOUR
 #include "Lib/BaseType.h"
@@ -64,6 +67,18 @@ static const Real SHADOW_RADIUS_MAX  = 2600.0f;
 // this far back along the sun ray its frustum is close enough to the ortho box.
 static const Real SHADOW_CULL_DISTANCE = 100000.0f;
 
+// Bisects shadow map faults without a rebuild. CONTRA_SHADOWMAP=0 turns the map off and
+// 1 fills it without letting anything receive it.
+enum { SHADOW_DEBUG_OFF = 0, SHADOW_DEBUG_DEPTH_ONLY = 1, SHADOW_DEBUG_FULL = 2 };
+
+static Int Get_Shadow_Debug_Mode()
+{
+	const char *value = getenv("CONTRA_SHADOWMAP");
+	return (value != nullptr) ? atoi(value) : SHADOW_DEBUG_FULL;
+}
+
+static const Int ShadowDebugMode = Get_Shadow_Debug_Mode();
+
 W3DShadowMap::W3DShadowMap()
 	: m_depthMode(DEPTH_MODE_NONE),
 	  m_resolution(SHADOW_MAP_RESOLUTION),
@@ -73,8 +88,11 @@ W3DShadowMap::W3DShadowMap()
 	  m_fittedCenter(0.0f, 0.0f, 0.0f),
 	  m_lightDirection(0.0f, 0.0f, -1.0f),
 	  m_depthBias(0.0f),
-	  m_fittedRadius(0.0f)
+	  m_fittedRadius(0.0f),
+	  m_shadowStrength(0.0f),
+	  m_hasDepth(FALSE)
 {
+	memset(&m_casterStats, 0, sizeof(m_casterStats));
 	m_sunView.Make_Identity();
 	m_sunProjection.Make_Identity();
 	m_sunViewProj.Make_Identity();
@@ -97,11 +115,18 @@ void W3DShadowMap::ReleaseResources()
 	REF_PTR_RELEASE(m_colorTarget);
 	REF_PTR_RELEASE(m_depthTarget);
 	m_depthMode = DEPTH_MODE_NONE;
+	m_hasDepth = FALSE;
 }
 
 Bool W3DShadowMap::ReAcquireResources()
 {
 	ReleaseResources();
+
+	DEBUG_LOG(("W3DShadowMap: debug mode %d", ShadowDebugMode));
+	if (ShadowDebugMode == SHADOW_DEBUG_OFF)
+	{
+		return FALSE;
+	}
 
 	const DX8Caps* caps = DX8Wrapper::Get_Current_Caps();
 	if (caps == nullptr)
@@ -163,27 +188,19 @@ void W3DShadowMap::updateFrustum(const CameraClass& camera, const Vector3& light
 	Vector3 lightDirection = -lightPosWorld;
 	lightDirection.Normalize();
 
-	// Bound the visible ground with a circle rather than a box. A circle is
-	// invariant under camera rotation, so orbiting does not resize the frustum and
-	// set the shadows crawling.
-	const Vector3* corners = camera.Get_Frustum_Corners();
-
-	Vector3 center(0.0f, 0.0f, 0.0f);
-	for (Int i = 0; i < 8; ++i)
+	// Fit to the terrain the camera can see. The frustum's own corners include the far
+	// plane, thousands of units away and below the ground, which drags the fit off the map.
+	AABoxClass visibleBox;
+	if (TheTerrainRenderObject == nullptr ||
+		!TheTerrainRenderObject->getMaximumVisibleBox(camera.Get_Frustum(), &visibleBox, TRUE))
 	{
-		center += corners[i];
+		return;
 	}
-	center /= 8.0f;
 
-	Real radius = 0.0f;
-	for (Int i = 0; i < 8; ++i)
-	{
-		Real distance = (corners[i] - center).Length();
-		if (distance > radius)
-		{
-			radius = distance;
-		}
-	}
+	// Bounded with a circle rather than the box itself, so orbiting the camera does
+	// not reshape the frustum and set the shadows crawling.
+	const Vector3 center = visibleBox.Center;
+	Real radius = visibleBox.Extent.Length();
 
 	// Quantise so a small zoom leaves the extent alone.
 	radius = WWMath::Ceil(radius / SHADOW_RADIUS_STEP) * SHADOW_RADIUS_STEP;
@@ -220,6 +237,71 @@ Bool W3DShadowMap::isCasterInRange(const SphereClass& bounds) const
 	return offset.Length2() <= reach * reach;
 }
 
+void W3DShadowMap::setShadowColor(UnsignedInt argb)
+{
+	const Real multiplier = (Real)((argb >> 8) & 0xff) / 255.0f;
+	m_shadowStrength = 1.0f - multiplier;
+}
+
+Bool W3DShadowMap::bindReceiver(Int stage) const
+{
+	if (!m_hasDepth || ShadowDebugMode == SHADOW_DEBUG_DEPTH_ONLY)
+	{
+		return FALSE;
+	}
+
+	TextureBaseClass *texture = (m_depthMode == DEPTH_MODE_HARDWARE)
+		? (TextureBaseClass *)m_depthTarget : (TextureBaseClass *)m_colorTarget;
+
+	DX8Wrapper::_Get_D3D_Device8()->SetTexture(stage, texture->Peek_D3D_Base_Texture());
+
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_MIPFILTER, D3DTEXF_NONE);
+
+	// Linear filtering on a depth texture is what gives the hardware path its PCF. The
+	// packed path filters by hand, since blending packed channels corrupts the depth.
+	const DWORD filter = (m_depthMode == DEPTH_MODE_HARDWARE) ? D3DTEXF_LINEAR : D3DTEXF_POINT;
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_MINFILTER, filter);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_MAGFILTER, filter);
+
+	// Camera space back to world, into the sun's clip space, then onto the map. The
+	// half texel lines D3D9's texel centres up with the pixels the depth pass wrote.
+	D3DMATRIX view;
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
+
+	D3DMATRIX inverseView;
+	float det;
+	Invert_D3DMATRIX(inverseView, &det, view);
+
+	const float halfTexel = 0.5f / (float)m_resolution;
+
+	D3DMATRIX toMap;
+	Set_D3DMATRIX_Identity(toMap);
+	toMap.m[0][0] = 0.5f;
+	toMap.m[1][1] = -0.5f;
+	toMap.m[3][0] = 0.5f + halfTexel;
+	toMap.m[3][1] = 0.5f + halfTexel;
+
+	D3DMATRIX textureTransform = (inverseView * To_D3DMATRIX(m_sunViewProj)) * toMap;
+	DX8Wrapper::_Set_DX8_Transform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + stage), textureTransform);
+
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT4);
+
+	Vector4 params(1.0f / (Real)m_resolution, m_depthBias, m_shadowStrength, 0.0f);
+	DX8Wrapper::Set_Pixel_Shader_Constant(0, &params, 1);
+
+	return TRUE;
+}
+
+void W3DShadowMap::unbindReceiver(Int stage) const
+{
+	DX8Wrapper::_Get_D3D_Device8()->SetTexture(stage, nullptr);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_PASSTHRU | stage);
+}
+
 void W3DShadowDepthMaterialPassClass::Install_Materials() const
 {
 	W3DShaderManager::setShader(W3DShaderManager::ST_SHADOW_DEPTH, 0);
@@ -251,8 +333,10 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 	DX8Wrapper::Clear(true, true, Vector3(1.0f, 1.0f, 1.0f), 1.0f);
 
 	// Stencil is outside ShaderClass, so it is the one piece of inherited state that
-	// could reject casters.
-	const unsigned stencilEnable = DX8Wrapper::Get_DX8_Render_State(D3DRS_STENCILENABLE);
+	// could reject casters. Read from the device because the wrapper's cache holds a
+	// sentinel after every invalidate, and restoring that would switch stencil on.
+	DWORD stencilEnable = FALSE;
+	DX8Wrapper::_Get_D3D_Device8()->GetRenderState(D3DRS_STENCILENABLE, &stencilEnable);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, FALSE);
 
 	// Vertex processing stays fixed function, so the device applies each caster's
@@ -271,6 +355,8 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 	sunInfo.Push_Override_Flags(RenderInfoClass::RINFO_OVERRIDE_ADDITIONAL_PASSES_ONLY);
 	sunInfo.Push_Material_Pass(&m_depthPass);
 
+	memset(&m_casterStats, 0, sizeof(m_casterStats));
+
 	if (TheW3DVolumetricShadowManager != nullptr)
 	{
 		TheW3DVolumetricShadowManager->renderShadowMapCasters(sunInfo);
@@ -280,6 +366,17 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 	{
 		TheW3DProjectedShadowManager->renderShadowMapCasters(sunInfo);
 	}
+
+	// Sampled rather than every pass, so a whole match stays readable.
+	static Int passCount = 0;
+	if (passCount % 300 == 0 && passCount <= 300 * 15)
+	{
+		DEBUG_LOG(("W3DShadowMap: pass %d drew %d, dropped %d disabled %d hidden %d shrouded %d out of range, centre (%.0f, %.0f, %.0f) radius %.0f",
+			passCount, m_casterStats.drawn, m_casterStats.disabled, m_casterStats.hidden,
+			m_casterStats.shrouded, m_casterStats.outOfRange,
+			m_fittedCenter.X, m_fittedCenter.Y, m_fittedCenter.Z, m_fittedRadius));
+	}
+	++passCount;
 
 	sunInfo.Pop_Material_Pass();
 	sunInfo.Pop_Override_Flags();
@@ -294,6 +391,9 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 
 	// Restores the viewport, view and projection the scene was rendering with.
 	rinfo.Camera.Apply();
+
+	// Depth-only debugging leaves the map unreceived and the legacy shadows in place.
+	m_hasDepth = (ShadowDebugMode != SHADOW_DEBUG_DEPTH_ONLY);
 #else
 	(void)rinfo;
 #endif

@@ -68,6 +68,10 @@ public:
 	Bool isAvailable() const { return m_depthMode != DEPTH_MODE_NONE; }
 	DepthMode getDepthMode() const { return m_depthMode; }
 
+	// True once the depth pass has filled the map, until clearDepth is called.
+	Bool hasDepth() const { return m_hasDepth; }
+	void clearDepth() { m_hasDepth = FALSE; }
+
 	// Fits the sun frustum to the ground the camera can see, for this frame.
 	void updateFrustum(const CameraClass& camera, const Vector3& lightPosWorld);
 
@@ -77,6 +81,26 @@ public:
 
 	// True if a caster with these bounds can reach the fitted area of the map.
 	Bool isCasterInRange(const SphereClass& bounds) const;
+
+	// Why candidates were kept or dropped in the current depth pass, for the debug log.
+	struct CasterStats
+	{
+		Int disabled;
+		Int hidden;
+		Int shrouded;
+		Int outOfRange;
+		Int drawn;
+	};
+	CasterStats& getCasterStats() { return m_casterStats; }
+
+	// Takes the darkness from the legacy shadow colour, which multiplies the ground.
+	void setShadowColor(UnsignedInt argb);
+
+	// Binds the map to a texture stage for a receiving pixel shader. The shader reads
+	// the sun clip position from that stage's texcoord and its parameters from c0.
+	// Fails when the map holds no depth to receive.
+	Bool bindReceiver(Int stage) const;
+	void unbindReceiver(Int stage) const;
 
 	const Matrix4x4& getSunViewProjection() const { return m_sunViewProj; }
 	const Matrix4x4& getSunProjection() const { return m_sunProjection; }
@@ -108,6 +132,9 @@ protected:
 	Vector3        m_lightDirection;
 	Real           m_depthBias;
 	Real           m_fittedRadius;
+	Real           m_shadowStrength;
+	Bool           m_hasDepth;
+	CasterStats    m_casterStats;
 
 	W3DShadowDepthMaterialPassClass m_depthPass;
 };

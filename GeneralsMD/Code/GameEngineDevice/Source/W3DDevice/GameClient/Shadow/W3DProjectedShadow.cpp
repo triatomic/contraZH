@@ -1363,7 +1363,9 @@ Int W3DProjectedShadowManager::renderShadows(RenderInfoClass & rinfo)
 	nShadowDecalVertsInBuf = 0xffff;
 	nShadowDecalIndicesInBuf = 0xffff;
 
-	if (TheGlobalData->m_useShadowDecals)
+	// The shadow map replaces this list's decal and projected shadows. The decal list,
+	// which carries selection rings and markers, still draws below.
+	if (TheGlobalData->m_useShadowDecals && !IsShadowMapActive())
 	{
 		// Render the object
 		TheDX8MeshRenderer.Set_Camera(&rinfo.Camera);
@@ -1491,15 +1493,18 @@ Int W3DProjectedShadowManager::renderShadows(RenderInfoClass & rinfo)
 /** Queue every enabled caster that can reach the shadow map for its depth pass. The decal list
 	is skipped because it carries selection rings and status markers, which cast nothing. */
 //-------------------------------------------------------------------------------------------------
-void W3DProjectedShadowManager::renderShadowMapCasters(RenderInfoClass & rinfo)
+Int W3DProjectedShadowManager::renderShadowMapCasters(RenderInfoClass & rinfo)
 {
+	Int count = 0;
 	for( W3DProjectedShadow *shadow = m_shadowList; shadow; shadow = shadow->m_next )
 	{
-		if (shadow->m_isEnabled && !shadow->m_isInvisibleEnabled && IsShadowMapCaster(shadow->m_robj))
+		if (IsShadowMapCaster(shadow->m_robj, shadow->m_isEnabled && !shadow->m_isInvisibleEnabled))
 		{
 			shadow->m_robj->Render( rinfo );
+			++count;
 		}
 	}
+	return count;
 }
 
 //-------------------------------------------------------------------------------------------------

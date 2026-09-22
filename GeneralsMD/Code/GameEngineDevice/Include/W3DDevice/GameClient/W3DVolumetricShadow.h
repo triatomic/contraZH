@@ -72,7 +72,7 @@ public:
 	// rendering
 	void renderShadows( Bool forceStencilFill );
 	///submit every enabled caster to the mesh renderer for the shadow map depth pass.
-	void renderShadowMapCasters( RenderInfoClass &rinfo );
+	Int renderShadowMapCasters( RenderInfoClass &rinfo );
 	void ReleaseResources();
 	Bool ReAcquireResources();
 
