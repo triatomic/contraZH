@@ -12,6 +12,5 @@ sampler2D ShadowMap : register(s0);
 
 float4 main(float4 shadowPos : TEXCOORD0) : COLOR
 {
-    float factor = ShadowFactor(shadowPos);
-    return float4(factor, factor, factor, 1.0f);
+    return float4(ShadowFactor(shadowPos), 1.0f);
 }

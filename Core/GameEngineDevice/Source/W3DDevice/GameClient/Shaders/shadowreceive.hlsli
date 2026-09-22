@@ -1,10 +1,13 @@
 // Shadow map lookup shared by every receiving pixel shader.
 //
 // The including shader declares ShadowMap on its shadow stage and defines PACKED.
-// W3DShadowMap::bindReceiver fills c0 and the shadow stage's texcoord.
+// W3DShadowMap::bindReceiver fills c0, c4 and the shadow stage's texcoord.
 
-// x = shadow map texel size, y = depth bias, z = shadow strength, w = filter tap spacing in texels
+// x = shadow map texel size, y = depth bias, z = unused, w = filter tap spacing in texels
 float4 ShadowParams : register(c0);
+
+// The map's shadow colour, which multiplies fully shadowed pixels per channel.
+float4 ShadowColor : register(c4);
 
 #if PACKED
 
@@ -75,9 +78,9 @@ float ShadowLit(float4 shadowPos)
     return lerp(1.0f, SampleShadow(uv, depth), inside);
 }
 
-// The factor to scale colour by, 1 where the pixel is lit and the shadow colour's
-// strength where it is not.
-float ShadowFactor(float4 shadowPos)
+// The factor to scale colour by, white where the pixel is lit and the map's shadow
+// colour where it is not, so a tinted shadow colour tints the shadow.
+float3 ShadowFactor(float4 shadowPos)
 {
-    return lerp(1.0f, ShadowLit(shadowPos), ShadowParams.z);
+    return lerp(ShadowColor.rgb, float3(1.0f, 1.0f, 1.0f), ShadowLit(shadowPos));
 }

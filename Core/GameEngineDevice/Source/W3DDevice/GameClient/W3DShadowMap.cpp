@@ -104,7 +104,7 @@ W3DShadowMap::W3DShadowMap()
 	  m_depthBias(0.0f),
 	  m_casterDepthBias(0.0f),
 	  m_fittedRadius(0.0f),
-	  m_shadowStrength(0.0f),
+	  m_shadowColor(1.0f, 1.0f, 1.0f),
 	  m_hasDepth(FALSE)
 {
 	memset(&m_casterStats, 0, sizeof(m_casterStats));
@@ -347,8 +347,9 @@ Bool W3DShadowMap::isCasterInRange(const SphereClass& bounds) const
 
 void W3DShadowMap::setShadowColor(UnsignedInt argb)
 {
-	const Real multiplier = (Real)((argb >> 8) & 0xff) / 255.0f;
-	m_shadowStrength = 1.0f - multiplier;
+	m_shadowColor.Set((Real)((argb >> 16) & 0xff) / 255.0f,
+		(Real)((argb >> 8) & 0xff) / 255.0f,
+		(Real)(argb & 0xff) / 255.0f);
 }
 
 Bool W3DShadowMap::bindReceiver(Int stage) const
@@ -405,8 +406,11 @@ Bool W3DShadowMap::bindReceiver(Int stage) const
 	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT4);
 
-	Vector4 params(1.0f / (Real)m_resolution, m_depthBias, m_shadowStrength, SHADOW_FILTER_SPACING_TEXELS);
+	Vector4 params(1.0f / (Real)m_resolution, m_depthBias, 0.0f, SHADOW_FILTER_SPACING_TEXELS);
 	DX8Wrapper::Set_Pixel_Shader_Constant(0, &params, 1);
+
+	Vector4 color(m_shadowColor.X, m_shadowColor.Y, m_shadowColor.Z, 1.0f);
+	DX8Wrapper::Set_Pixel_Shader_Constant(4, &color, 1);
 
 	return TRUE;
 }

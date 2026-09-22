@@ -95,11 +95,13 @@ public:
 	};
 	CasterStats& getCasterStats() { return m_casterStats; }
 
-	// Takes the darkness from the legacy shadow colour, which multiplies the ground.
+	// Takes the map's shadow colour, which multiplies shadowed pixels per channel as the
+	// stencil shadows did, so a tinted colour tints the shadow.
 	void setShadowColor(UnsignedInt argb);
 
 	// Binds the map to a texture stage for a receiving pixel shader. The shader reads
-	// the sun clip position from that stage's texcoord and its parameters from c0.
+	// the sun clip position from that stage's texcoord, its parameters from c0 and the
+	// shadow colour from c4.
 	// Fails when the map holds no depth to receive.
 	Bool bindReceiver(Int stage) const;
 	void unbindReceiver(Int stage) const;
@@ -145,7 +147,7 @@ protected:
 	Real           m_depthBias;
 	Real           m_casterDepthBias;
 	Real           m_fittedRadius;
-	Real           m_shadowStrength;
+	Vector3        m_shadowColor;
 	Bool           m_hasDepth;
 	CasterStats    m_casterStats;
 
