@@ -102,18 +102,28 @@ void BezierSegment::evaluateBezSegmentAtT(Real tValue, Coord3D *outResult) const
 	if (!outResult)
 		return;
 
-	D3DXVECTOR4	tVec(tValue * tValue * tValue, tValue * tValue, tValue, 1);
+	const float tVec[4]={ tValue*tValue*tValue, tValue*tValue, tValue, 1.0f };
 
-	D3DXVECTOR4 xCoords(m_controlPoints[0].x, m_controlPoints[1].x, m_controlPoints[2].x, m_controlPoints[3].x);
-	D3DXVECTOR4 yCoords(m_controlPoints[0].y, m_controlPoints[1].y, m_controlPoints[2].y, m_controlPoints[3].y);
-	D3DXVECTOR4 zCoords(m_controlPoints[0].z, m_controlPoints[1].z, m_controlPoints[2].z, m_controlPoints[3].z);
+	// v*M against the row major basis matrix
+	float tResult[4];
+	for (int col=0; col<4; ++col)
+	{
+		tResult[col]=
+			tVec[0]*s_bezBasisMatrix[0][col]+
+			tVec[1]*s_bezBasisMatrix[1][col]+
+			tVec[2]*s_bezBasisMatrix[2][col]+
+			tVec[3]*s_bezBasisMatrix[3][col];
+	}
 
-	D3DXVECTOR4 tResult;
-	D3DXVec4Transform(&tResult, &tVec, &BezierSegment::s_bezBasisMatrix);
-
-	outResult->x = D3DXVec4Dot(&xCoords, &tResult);
-	outResult->y = D3DXVec4Dot(&yCoords, &tResult);
-	outResult->z = D3DXVec4Dot(&zCoords, &tResult);
+	outResult->x = 0.0f;
+	outResult->y = 0.0f;
+	outResult->z = 0.0f;
+	for (int i=0; i<4; ++i)
+	{
+		outResult->x += m_controlPoints[i].x * tResult[i];
+		outResult->y += m_controlPoints[i].y * tResult[i];
+		outResult->z += m_controlPoints[i].z * tResult[i];
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -238,9 +248,9 @@ void BezierSegment::splitSegmentAtT(Real tValue, BezierSegment &outSeg1, BezierS
 
 //-------------------------------------------------------------------------------------------------
 // The Basis Matrix for a bezier segment
-const D3DXMATRIX BezierSegment::s_bezBasisMatrix(
-	-1.0f,  3.0f, -3.0f,  1.0f,
-	 3.0f, -6.0f,  3.0f,  0.0f,
-	-3.0f,  3.0f,  0.0f,  0.0f,
-	 1.0f,  0.0f,  0.0f,  0.0f
-);
+const float BezierSegment::s_bezBasisMatrix[4][4]={
+	{-1.0f,  3.0f, -3.0f,  1.0f},
+	{ 3.0f, -6.0f,  3.0f,  0.0f},
+	{-3.0f,  3.0f,  0.0f,  0.0f},
+	{ 1.0f,  0.0f,  0.0f,  0.0f}
+};

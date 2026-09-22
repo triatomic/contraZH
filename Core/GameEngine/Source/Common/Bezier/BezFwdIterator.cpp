@@ -57,22 +57,33 @@ void BezFwdIterator::start()
 	float d2 = d * d;
 	float d3 = d * d2;
 
-	D3DXVECTOR4 px(mBezSeg.m_controlPoints[0].x, mBezSeg.m_controlPoints[1].x, mBezSeg.m_controlPoints[2].x, mBezSeg.m_controlPoints[3].x);
-	D3DXVECTOR4 py(mBezSeg.m_controlPoints[0].y, mBezSeg.m_controlPoints[1].y, mBezSeg.m_controlPoints[2].y, mBezSeg.m_controlPoints[3].y);
-	D3DXVECTOR4 pz(mBezSeg.m_controlPoints[0].z, mBezSeg.m_controlPoints[1].z, mBezSeg.m_controlPoints[2].z, mBezSeg.m_controlPoints[3].z);
+	const float p[3][4]={
+		{ mBezSeg.m_controlPoints[0].x, mBezSeg.m_controlPoints[1].x, mBezSeg.m_controlPoints[2].x, mBezSeg.m_controlPoints[3].x },
+		{ mBezSeg.m_controlPoints[0].y, mBezSeg.m_controlPoints[1].y, mBezSeg.m_controlPoints[2].y, mBezSeg.m_controlPoints[3].y },
+		{ mBezSeg.m_controlPoints[0].z, mBezSeg.m_controlPoints[1].z, mBezSeg.m_controlPoints[2].z, mBezSeg.m_controlPoints[3].z }
+	};
 
-	D3DXVECTOR4 cVec[3];
-	D3DXVec4Transform(&cVec[0], &px, &BezierSegment::s_bezBasisMatrix);
-	D3DXVec4Transform(&cVec[1], &py, &BezierSegment::s_bezBasisMatrix);
-	D3DXVec4Transform(&cVec[2], &pz, &BezierSegment::s_bezBasisMatrix);
+	// v*M against the row major basis matrix
+	float cVec[3][4];
+	for (int axis=0; axis<3; ++axis)
+	{
+		for (int col=0; col<4; ++col)
+		{
+			cVec[axis][col]=
+				p[axis][0]*BezierSegment::s_bezBasisMatrix[0][col]+
+				p[axis][1]*BezierSegment::s_bezBasisMatrix[1][col]+
+				p[axis][2]*BezierSegment::s_bezBasisMatrix[2][col]+
+				p[axis][3]*BezierSegment::s_bezBasisMatrix[3][col];
+		}
+	}
 
 	mCurrPoint = mBezSeg.m_controlPoints[0];
 
 	int i = 3;
 	while (i--) {
-		float a = cVec[i].x;
-		float b = cVec[i].y;
-		float c = cVec[i].z;
+		float a = cVec[i][0];
+		float b = cVec[i][1];
+		float c = cVec[i][2];
 
 		float *pD, *pDD, *pDDD;
 
