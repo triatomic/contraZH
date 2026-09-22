@@ -54,9 +54,17 @@ static const Int SHADOW_MAP_RESOLUTION = 2048;
 static const Real SHADOW_NEAR = 1.0f;
 static const Real SHADOW_FAR  = 10000.0f;
 
-// Bias expressed in shadow map texels rather than depth units, so it keeps its
-// meaning as the fit changes with zoom.
-static const Real SHADOW_BIAS_TEXELS = 3.0f;
+// Biases in shadow map texels rather than depth units, so they keep their meaning as the
+// fit changes with zoom. Casters carry most of it, scaled by their slope in the depth
+// pass, because steep surfaces are what shadow themselves. Receivers keep a hair, since
+// any more detaches every shadow from its caster's base.
+static const Real SHADOW_CASTER_BIAS_TEXELS   = 1.0f;
+static const Real SHADOW_CASTER_SLOPE_BIAS    = 2.0f;
+static const Real SHADOW_RECEIVER_BIAS_TEXELS = 0.5f;
+
+// Spacing of the receivers' 3x3 filter taps. The edge softens across roughly twice this
+// plus one texel, so larger values blur and smaller ones step.
+static const Real SHADOW_FILTER_SPACING_TEXELS = 0.33f;
 
 // Quantising the fitted radius stops small zoom and scroll changes resizing the
 // frustum, which would make every shadow edge crawl.
@@ -89,6 +97,7 @@ W3DShadowMap::W3DShadowMap()
 	  m_fittedCenter(0.0f, 0.0f, 0.0f),
 	  m_lightDirection(0.0f, 0.0f, -1.0f),
 	  m_depthBias(0.0f),
+	  m_casterDepthBias(0.0f),
 	  m_fittedRadius(0.0f),
 	  m_shadowStrength(0.0f),
 	  m_hasDepth(FALSE)
@@ -214,17 +223,15 @@ void W3DShadowMap::updateFrustum(const CameraClass& camera, const Vector3& light
 	computeSunViewProjection(center, radius, lightDirection);
 	updateCullCamera(center, radius, lightDirection);
 
-	// A texel is square in the sun's view, but the ground it lands on is stretched
-	// along the light by 1/sin(elevation). Without that term a low sun self-shadows
-	// whole hillsides while a high one lifts small casters out of their own shadow.
-	Real sunElevation = WWMath::Fabs(lightDirection.Z);
-	if (sunElevation < 0.15f)
-	{
-		sunElevation = 0.15f;
-	}
-
 	const Real worldPerTexel = (2.0f * radius) / (Real)m_resolution;
-	m_depthBias = (SHADOW_BIAS_TEXELS * worldPerTexel) / (sunElevation * (SHADOW_FAR - SHADOW_NEAR));
+	const Real depthRange = SHADOW_FAR - SHADOW_NEAR;
+	m_depthBias = (SHADOW_RECEIVER_BIAS_TEXELS * worldPerTexel) / depthRange;
+	m_casterDepthBias = (SHADOW_CASTER_BIAS_TEXELS * worldPerTexel) / depthRange;
+}
+
+Real W3DShadowMap::getCasterSlopeBias()
+{
+	return SHADOW_CASTER_SLOPE_BIAS;
 }
 
 Bool W3DShadowMap::isCasterInRange(const SphereClass& bounds) const
@@ -274,8 +281,10 @@ Bool W3DShadowMap::bindReceiver(Int stage) const
 
 	// Camera space back to world, into the sun's clip space, then onto the map. The
 	// half texel lines D3D9's texel centres up with the pixels the depth pass wrote.
+	// The view is read from the device, because every invalidate zeroes the wrapper's copy
+	// and receivers drawn after the terrain would otherwise invert a zero matrix.
 	D3DMATRIX view;
-	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
+	DX8Wrapper::_Get_D3D_Device8()->GetTransform(D3DTS_VIEW, &view);
 
 	D3DMATRIX inverseView;
 	float det;
@@ -296,7 +305,7 @@ Bool W3DShadowMap::bindReceiver(Int stage) const
 	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT4);
 
-	Vector4 params(1.0f / (Real)m_resolution, m_depthBias, m_shadowStrength, 0.0f);
+	Vector4 params(1.0f / (Real)m_resolution, m_depthBias, m_shadowStrength, SHADOW_FILTER_SPACING_TEXELS);
 	DX8Wrapper::Set_Pixel_Shader_Constant(0, &params, 1);
 
 	return TRUE;

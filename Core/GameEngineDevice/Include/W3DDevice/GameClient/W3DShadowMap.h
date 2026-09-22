@@ -111,8 +111,11 @@ public:
 	ZTextureClass* peekDepthTarget() const { return m_depthTarget; }
 	Int getResolution() const { return m_resolution; }
 
-	// Depth bias in light-space units, recomputed with the fit each frame.
+	// Depth biases in light-space units, recomputed with the fit each frame. The caster bias
+	// applies in the depth pass on top of the slope-scaled bias, the other at receivers.
 	Real getDepthBias() const { return m_depthBias; }
+	Real getCasterDepthBias() const { return m_casterDepthBias; }
+	static Real getCasterSlopeBias();
 
 protected:
 
@@ -134,6 +137,7 @@ protected:
 	Vector3        m_fittedCenter;
 	Vector3        m_lightDirection;
 	Real           m_depthBias;
+	Real           m_casterDepthBias;
 	Real           m_fittedRadius;
 	Real           m_shadowStrength;
 	Bool           m_hasDepth;

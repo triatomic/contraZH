@@ -3,7 +3,7 @@
 // The including shader declares ShadowMap on its shadow stage and defines PACKED.
 // W3DShadowMap::bindReceiver fills c0 and the shadow stage's texcoord.
 
-// x = shadow map texel size, y = depth bias, z = shadow strength, w = unused
+// x = shadow map texel size, y = depth bias, z = shadow strength, w = filter tap spacing in texels
 float4 ShadowParams : register(c0);
 
 #if PACKED
@@ -30,11 +30,22 @@ float SampleShadow(float2 uv, float depth)
 
 #else
 
-// The sampler does the compare on a depth texture, and its bilinear filter gives
-// 2x2 PCF for one instruction.
+// The sampler does the compare on a depth texture and its bilinear filter blends each
+// 2x2 result, so a 3x3 grid of those taps smooths the edge instead of stepping at every
+// texel. The tap spacing sets how soft.
 float SampleShadow(float2 uv, float depth)
 {
-    return tex2Dproj(ShadowMap, float4(uv, depth, 1.0f)).r;
+    float texel = ShadowParams.x * ShadowParams.w;
+    float lit = 0.0f;
+
+    for (int y = -1; y <= 1; ++y)
+    {
+        for (int x = -1; x <= 1; ++x)
+        {
+            lit += tex2Dproj(ShadowMap, float4(uv + float2(x, y) * texel, depth, 1.0f)).r;
+        }
+    }
+    return lit / 9.0f;
 }
 
 #endif

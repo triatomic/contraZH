@@ -1583,6 +1583,13 @@ void ShadowDepthShader::applyOverride(const ShaderClass &shader)
 
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZWRITEENABLE, casts);
 
+	// Pushes steep caster surfaces back further than flat ones, which is what keeps them
+	// from shadowing themselves without detaching shadows from their bases.
+	const float constantBias = TheW3DShadowMap->getCasterDepthBias();
+	const float slopeBias = W3DShadowMap::getCasterSlopeBias();
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_DEPTHBIAS, *(const DWORD *)&constantBias);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_SLOPESCALEDEPTHBIAS, *(const DWORD *)&slopeBias);
+
 	if (m_dwPixelShader == 0)
 	{
 		// Only depth is read back, so colour writes are wasted bandwidth.
@@ -1624,6 +1631,8 @@ void ShadowDepthShader::reset()
 {
 	DX8Wrapper::Set_Apply_Hook(nullptr);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_COLORWRITEENABLE, 0x0000000f);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_DEPTHBIAS, 0);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_SLOPESCALEDEPTHBIAS, 0);
 
 	if (m_dwPixelShader != 0)
 	{
