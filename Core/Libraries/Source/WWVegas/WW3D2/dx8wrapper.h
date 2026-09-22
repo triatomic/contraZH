@@ -741,11 +741,17 @@ WWINLINE void DX8Wrapper::Set_Vertex_Shader(DWORD vertex_shader)
 
 	Vertex_Shader=vertex_shader;
 #if defined(BUILD_WITH_D3D9)
-	// D3D8 overloaded this with either an FVF code or a shader handle. D3D9 splits
-	// them, and every caller but the tree buffer passes an FVF. Handles are resolved
-	// through a table in the shader phase; until then the programmable path is off.
-	DX8CALL(SetVertexShader(nullptr));
-	DX8CALL(SetFVF(Vertex_Shader));
+	// D3D8 overloaded this with either an FVF code or a shader handle; D3D9 splits them.
+	if (Vertex_Shader & DX8_SHADER_HANDLE_TAG)
+	{
+		DX8CALL(SetVertexDeclaration(Peek_D3D9_Vertex_Declaration(Vertex_Shader)));
+		DX8CALL(SetVertexShader(Peek_D3D9_Vertex_Shader(Vertex_Shader)));
+	}
+	else
+	{
+		DX8CALL(SetVertexShader(nullptr));
+		DX8CALL(SetFVF(Vertex_Shader));
+	}
 #else
 	DX8CALL(SetVertexShader(Vertex_Shader));
 #endif
@@ -758,9 +764,7 @@ WWINLINE void DX8Wrapper::Set_Pixel_Shader(DWORD pixel_shader)
 
 	Pixel_Shader=pixel_shader;
 #if defined(BUILD_WITH_D3D9)
-	// Handles become COM pointers in the shader phase; the programmable path is off
-	// until then, so the only value reaching here is 0 meaning "no shader".
-	DX8CALL(SetPixelShader(nullptr));
+	DX8CALL(SetPixelShader(Peek_D3D9_Pixel_Shader(Pixel_Shader)));
 #else
 	DX8CALL(SetPixelShader(Pixel_Shader));
 #endif

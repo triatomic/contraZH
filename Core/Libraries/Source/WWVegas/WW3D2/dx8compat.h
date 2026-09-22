@@ -109,6 +109,9 @@ typedef void** DX8LockPointer;
 
 // D3D8 overloaded SetVertexShader with an FVF code; D3D9 has a separate setter
 #define DX8_SET_FVF(dev, fvf) (dev)->SetFVF(fvf)
+// D3D9 shaders are COM objects, so deleting one means releasing it
+#define DX8_DELETE_PIXEL_SHADER(dev, handle)  Release_D3D9_Shader(handle)
+#define DX8_DELETE_VERTEX_SHADER(dev, handle) Release_D3D9_Shader(handle)
 
 // Several device getters gained a leading swap chain index in D3D9
 #define DX8_SWAPCHAIN 0,
@@ -118,11 +121,48 @@ typedef void** DX8LockPointer;
 // D3D9 dropped COPY_VSYNC; DISCARD is the supported windowed equivalent
 #define DX8_SWAPEFFECT_COPY_VSYNC D3DSWAPEFFECT_DISCARD
 
+// The runtime is loaded dynamically, so the backend picks the module here
+#define DX8_D3D_DLL_NAME    "D3D9.DLL"
+#define DX8_D3D_CREATE_NAME "Direct3DCreate9"
+
 // D3D9 renamed this and made it apply to windowed mode too
 #define FullScreen_PresentationInterval PresentationInterval
 
 // D3DSURFACE_DESC lost its Size member in D3D9
 unsigned Surface_Size(const D3DSURFACE_DESC& desc);
+
+// D3D8 identified shaders by DWORD handle and overloaded SetVertexShader to take
+// either a handle or an FVF code. D3D9 uses COM objects and a separate SetFVF, and
+// splits the vertex declaration out of the shader. Keeping the DWORD handle lets the
+
+// The D3D8 declaration tokens survive so the existing declaration arrays compile;
+// Create_D3D9_Declaration_From_D3D8 decodes them into a D3D9 declaration.
+#define D3DVSD_STREAM(n)      (0x20000000u | (n))
+#define D3DVSD_REG(reg, type) (0x40000000u | ((type) << 16) | (reg))
+#define D3DVSD_END()          0xFFFFFFFFu
+
+#define D3DVSDT_FLOAT1   0x00
+#define D3DVSDT_FLOAT2   0x01
+#define D3DVSDT_FLOAT3   0x02
+#define D3DVSDT_FLOAT4   0x03
+#define D3DVSDT_D3DCOLOR 0x04
+#define D3DVSDT_UBYTE4   0x05
+#define D3DVSDT_SHORT2   0x06
+#define D3DVSDT_SHORT4   0x07
+// ~160 engine call sites stay as they are; these resolve it centrally.
+//
+// Handles are tagged so a value is unambiguously a handle rather than an FVF code.
+#define DX8_SHADER_HANDLE_TAG 0x80000000u
+
+DWORD Register_D3D9_Vertex_Shader(IDirect3DVertexShader9* shader, IDirect3DVertexDeclaration9* declaration);
+DWORD Register_D3D9_Pixel_Shader(IDirect3DPixelShader9* shader);
+void Release_D3D9_Shader(DWORD handle);
+IDirect3DVertexShader9* Peek_D3D9_Vertex_Shader(DWORD handle);
+IDirect3DVertexDeclaration9* Peek_D3D9_Vertex_Declaration(DWORD handle);
+IDirect3DPixelShader9* Peek_D3D9_Pixel_Shader(DWORD handle);
+
+// Builds a D3D9 declaration from a D3D8 D3DVSD_* token stream
+HRESULT Create_D3D9_Declaration_From_D3D8(const DWORD* d3d8_declaration, IDirect3DVertexDeclaration9** out);
 
 #else
 
@@ -138,11 +178,16 @@ typedef unsigned char** DX8LockPointer;
 	(dev)->CreateTexture(w, h, mips, usage, fmt, pool, out)
 
 #define DX8_SET_FVF(dev, fvf) (dev)->SetVertexShader(fvf)
+#define DX8_DELETE_PIXEL_SHADER(dev, handle)  (dev)->DeletePixelShader(handle)
+#define DX8_DELETE_VERTEX_SHADER(dev, handle) (dev)->DeleteVertexShader(handle)
 
 #define DX8_SWAPCHAIN
 #define DX8_ENUM_FORMAT(fmt)
 #define DX8_MSAA_QUALITY
 #define DX8_SWAPEFFECT_COPY_VSYNC D3DSWAPEFFECT_COPY_VSYNC
+
+#define DX8_D3D_DLL_NAME    "D3D8.DLL"
+#define DX8_D3D_CREATE_NAME "Direct3DCreate8"
 
 inline unsigned Surface_Size(const D3DSURFACE_DESC& desc) { return desc.Size; }
 

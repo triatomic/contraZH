@@ -566,3 +566,209 @@ HRESULT Load_Surface_From_Surface(
 
 	return D3D_OK;
 }
+
+#if defined(BUILD_WITH_D3D9)
+
+// D3D9 shader objects behind the DWORD handles the engine still passes around.
+struct D3D9ShaderEntry
+{
+	IDirect3DVertexShader9*      VertexShader;
+	IDirect3DVertexDeclaration9* Declaration;
+	IDirect3DPixelShader9*       PixelShader;
+};
+
+// Index 0 is reserved so a handle of 0 keeps meaning "no shader". The engine loads
+// a fixed, small set of shaders, so a flat array avoids any allocation concerns.
+static const unsigned MAX_D3D9_SHADERS=64;
+static D3D9ShaderEntry _D3D9Shaders[MAX_D3D9_SHADERS];
+static unsigned _D3D9ShaderCount=1;
+
+static DWORD Add_Shader_Entry(const D3D9ShaderEntry& entry)
+{
+	if (_D3D9ShaderCount>=MAX_D3D9_SHADERS)
+	{
+		WWASSERT(0);
+		return 0;
+	}
+
+	_D3D9Shaders[_D3D9ShaderCount]=entry;
+	return DX8_SHADER_HANDLE_TAG | (DWORD)(_D3D9ShaderCount++);
+}
+
+static D3D9ShaderEntry* Peek_Shader_Entry(DWORD handle)
+{
+	if ((handle & DX8_SHADER_HANDLE_TAG)==0)
+	{
+		return nullptr;
+	}
+
+	const unsigned index=handle & ~DX8_SHADER_HANDLE_TAG;
+	if (index==0 || index>=_D3D9ShaderCount)
+	{
+		return nullptr;
+	}
+
+	return &_D3D9Shaders[index];
+}
+
+DWORD Register_D3D9_Vertex_Shader(IDirect3DVertexShader9* shader, IDirect3DVertexDeclaration9* declaration)
+{
+	D3D9ShaderEntry entry={ shader, declaration, nullptr };
+	return Add_Shader_Entry(entry);
+}
+
+DWORD Register_D3D9_Pixel_Shader(IDirect3DPixelShader9* shader)
+{
+	D3D9ShaderEntry entry={ nullptr, nullptr, shader };
+	return Add_Shader_Entry(entry);
+}
+
+void Release_D3D9_Shader(DWORD handle)
+{
+	D3D9ShaderEntry* entry=Peek_Shader_Entry(handle);
+	if (entry==nullptr)
+	{
+		return;
+	}
+
+	if (entry->VertexShader) entry->VertexShader->Release();
+	if (entry->Declaration)  entry->Declaration->Release();
+	if (entry->PixelShader)  entry->PixelShader->Release();
+
+	entry->VertexShader=nullptr;
+	entry->Declaration=nullptr;
+	entry->PixelShader=nullptr;
+}
+
+IDirect3DVertexShader9* Peek_D3D9_Vertex_Shader(DWORD handle)
+{
+	const D3D9ShaderEntry* entry=Peek_Shader_Entry(handle);
+	return entry ? entry->VertexShader : nullptr;
+}
+
+IDirect3DVertexDeclaration9* Peek_D3D9_Vertex_Declaration(DWORD handle)
+{
+	const D3D9ShaderEntry* entry=Peek_Shader_Entry(handle);
+	return entry ? entry->Declaration : nullptr;
+}
+
+IDirect3DPixelShader9* Peek_D3D9_Pixel_Shader(DWORD handle)
+{
+	const D3D9ShaderEntry* entry=Peek_Shader_Entry(handle);
+	return entry ? entry->PixelShader : nullptr;
+}
+
+// The D3D8 token stream names a vertex register per element; D3D9 names a usage
+// semantic. The register to semantic mapping is the fixed one documented for
+// converting between the two declaration forms.
+static bool Register_To_Usage(unsigned reg, BYTE& usage, BYTE& usage_index)
+{
+	switch (reg)
+	{
+	case 0:  usage=D3DDECLUSAGE_POSITION;     usage_index=0; return true;
+	case 1:  usage=D3DDECLUSAGE_BLENDWEIGHT;  usage_index=0; return true;
+	case 2:  usage=D3DDECLUSAGE_BLENDINDICES; usage_index=0; return true;
+	case 3:  usage=D3DDECLUSAGE_NORMAL;       usage_index=0; return true;
+	case 4:  usage=D3DDECLUSAGE_PSIZE;        usage_index=0; return true;
+	case 5:  usage=D3DDECLUSAGE_COLOR;        usage_index=0; return true;
+	case 6:  usage=D3DDECLUSAGE_COLOR;        usage_index=1; return true;
+	case 15: usage=D3DDECLUSAGE_POSITION;     usage_index=1; return true;
+	case 16: usage=D3DDECLUSAGE_NORMAL;       usage_index=1; return true;
+	default: break;
+	}
+
+	if (reg>=7 && reg<=14)
+	{
+		usage=D3DDECLUSAGE_TEXCOORD;
+		usage_index=(BYTE)(reg-7);
+		return true;
+	}
+
+	return false;
+}
+
+static bool Data_Type_To_Decl_Type(unsigned data_type, BYTE& decl_type, unsigned& size)
+{
+	switch (data_type)
+	{
+	case 0: decl_type=D3DDECLTYPE_FLOAT1;   size=4;  return true;
+	case 1: decl_type=D3DDECLTYPE_FLOAT2;   size=8;  return true;
+	case 2: decl_type=D3DDECLTYPE_FLOAT3;   size=12; return true;
+	case 3: decl_type=D3DDECLTYPE_FLOAT4;   size=16; return true;
+	case 4: decl_type=D3DDECLTYPE_D3DCOLOR; size=4;  return true;
+	case 5: decl_type=D3DDECLTYPE_UBYTE4;   size=4;  return true;
+	case 6: decl_type=D3DDECLTYPE_SHORT2;   size=4;  return true;
+	case 7: decl_type=D3DDECLTYPE_SHORT4;   size=8;  return true;
+	default: return false;
+	}
+}
+
+HRESULT Create_D3D9_Declaration_From_D3D8(const DWORD* d3d8_declaration, IDirect3DVertexDeclaration9** out)
+{
+	if (d3d8_declaration==nullptr || out==nullptr)
+	{
+		return D3DERR_INVALIDCALL;
+	}
+
+	D3DVERTEXELEMENT9 elements[MAXD3DDECLLENGTH+1];
+	unsigned count=0;
+	WORD stream=0;
+	WORD offset=0;
+
+	for (const DWORD* token=d3d8_declaration; *token!=0xFFFFFFFF; ++token)
+	{
+		const unsigned token_type=(*token & 0xE0000000) >> 29;
+
+		if (token_type==0)			// D3DVSD_TOKEN_NOP
+		{
+			continue;
+		}
+		else if (token_type==1)		// D3DVSD_TOKEN_STREAM
+		{
+			stream=(WORD)(*token & 0xF);
+			offset=0;
+		}
+		else if (token_type==2)		// D3DVSD_TOKEN_STREAMDATA
+		{
+			// The high bit of a stream data token marks a skip rather than a register
+			if (*token & 0x10000000)
+			{
+				offset=(WORD)(offset + ((*token >> 16) & 0xF) * sizeof(DWORD));
+				continue;
+			}
+
+			BYTE usage=0;
+			BYTE usage_index=0;
+			BYTE decl_type=0;
+			unsigned size=0;
+
+			if (!Register_To_Usage(*token & 0xF, usage, usage_index) ||
+				 !Data_Type_To_Decl_Type((*token >> 16) & 0xF, decl_type, size) ||
+				 count>=MAXD3DDECLLENGTH)
+			{
+				return D3DERR_INVALIDCALL;
+			}
+
+			elements[count].Stream=stream;
+			elements[count].Offset=offset;
+			elements[count].Type=decl_type;
+			elements[count].Method=D3DDECLMETHOD_DEFAULT;
+			elements[count].Usage=usage;
+			elements[count].UsageIndex=usage_index;
+			++count;
+			offset=(WORD)(offset+size);
+		}
+		else
+		{
+			// Constant memory and tessellator tokens are unused by this engine
+			return D3DERR_INVALIDCALL;
+		}
+	}
+
+	const D3DVERTEXELEMENT9 end=D3DDECL_END();
+	elements[count]=end;
+
+	return DX8Wrapper::_Get_D3D_Device8()->CreateVertexDeclaration(elements, out);
+}
+
+#endif
