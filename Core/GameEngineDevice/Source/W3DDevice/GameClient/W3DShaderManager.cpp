@@ -73,6 +73,9 @@
 #include "Common/GameLOD.h"
 #include "WW3D2/dx8caps.h"
 #include "WW3D2/formconv.h"
+#include "WW3D2/dx8renderer.h"
+#include "WW3D2/dx8polygonrenderer.h"
+#include "WW3D2/matpass.h"
 
 
 // Turn this on to turn off pixel shaders. jba[4/3/2003]
@@ -1484,6 +1487,13 @@ void MaskTextureShader::reset()
 /*=========      Shadow Map Depth Shader	=================================================*/
 /*===========================================================================================*/
 
+// The sun the specular pass lights with, set once a frame by the scene.
+static Vector3 SpecularToSun(0.0f, 0.0f, 1.0f);
+static Vector3 SpecularColor(0.0f, 0.0f, 0.0f);
+static Real SpecularPower = 24.0f;
+static Bool SpecularDebug = FALSE;
+static Int SpecularPassCount = 0;
+
 #if defined(BUILD_WITH_D3D9)
 
 ///Writes caster depth into the shadow map. Only the D3D9 backend has the shader model for it.
@@ -1762,7 +1772,209 @@ Int ShadowMultiplyShader::shutdown()
 	return TRUE;
 }
 
+///Adds a per-pixel sun highlight over geometry that has already drawn.
+class SpecularShader : public W3DShaderInterface
+{
+public:
+	SpecularShader() : m_dwShadowedShader(0), m_dwUnshadowedShader(0), m_shadowed(FALSE) {}
+
+	virtual Int set(Int pass) override;
+	virtual Int init() override;
+	virtual void reset() override;
+	virtual Int shutdown() override;
+
+protected:
+
+	DWORD m_dwShadowedShader;	///<takes the highlight out in the sun's shadow
+	DWORD m_dwUnshadowedShader;	///<for when the shadow map is off or holds no depth
+	Bool m_shadowed;			///<which of the two the current pass bound
+} specularShader;
+
+W3DShaderInterface *SpecularShaderList[]=
+{
+	&specularShader,
+	nullptr
+};
+
+// Stages the pass generates texcoords on. Each holds one set, in stage order, so the shader
+// finds the normal, position and shadow coordinates on the matching registers.
+#define SPECULAR_NORMAL_STAGE	1
+#define SPECULAR_POSITION_STAGE	2
+#define SPECULAR_SHADOW_STAGE	3
+
+Int SpecularShader::init()
+{
+	const DX8Caps *caps = DX8Wrapper::Get_Current_Caps();
+	if (caps == nullptr || caps->Get_Pixel_Shader_Major_Version() < 2)
+	{
+		return FALSE;
+	}
+
+	if (FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\specularnoshadow.pso",
+			nullptr, 0, false, &m_dwUnshadowedShader)))
+	{
+		return FALSE;
+	}
+
+	// Without the shadowed variant the highlight still draws, just through shadows too.
+	if (TheW3DShadowMap != nullptr && TheW3DShadowMap->isAvailable())
+	{
+		const char *file = (TheW3DShadowMap->getDepthMode() == W3DShadowMap::DEPTH_MODE_PACKED)
+			? "shaders\\specularpacked.pso" : "shaders\\specular.pso";
+		if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(file, nullptr, 0, false, &m_dwShadowedShader)))
+		{
+			m_dwShadowedShader = 0;
+		}
+	}
+
+	W3DShaders[W3DShaderManager::ST_SPECULAR]=&specularShader;
+	W3DShadersPassCount[W3DShaderManager::ST_SPECULAR]=1;
+
+	return TRUE;
+}
+
+static void Set_Camera_Space_Texcoord(Int stage, DWORD source)
+{
+	D3DMATRIX identity;
+	Set_D3DMATRIX_Identity(identity);
+	DX8Wrapper::_Set_DX8_Transform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + stage), identity);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, source);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT3);
+}
+
+// Expects the mesh bound and transformed. Its texture arrives per polygon group, through
+// W3DSpecularMaterialPassClass::Install_Polygon_Materials.
+Int SpecularShader::set(Int pass)
+{
+	m_shadowed = (m_dwShadowedShader != 0 && TheW3DShadowMap != nullptr &&
+		TheW3DShadowMap->bindReceiver(SPECULAR_SHADOW_STAGE));
+
+	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXCOORDINDEX, 0);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+	Set_Camera_Space_Texcoord(SPECULAR_NORMAL_STAGE, D3DTSS_TCI_CAMERASPACENORMAL);
+	Set_Camera_Space_Texcoord(SPECULAR_POSITION_STAGE, D3DTSS_TCI_CAMERASPACEPOSITION);
+
+	// The mesh is redrawn at the same depth, so EQUAL limits the highlight to pixels the first
+	// draw wrote, and it adds to them.
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, TRUE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZFUNC, D3DCMP_EQUAL);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZWRITEENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHATESTENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE, TRUE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_ONE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_ONE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_FOGENABLE, FALSE);
+
+	// The shader lights in camera space, so the sun is turned into it with the view's rotation.
+	D3DMATRIX view;
+	DX8Wrapper::_Get_D3D_Device8()->GetTransform(D3DTS_VIEW, &view);
+	Vector3 toSun(
+		SpecularToSun.X * view.m[0][0] + SpecularToSun.Y * view.m[1][0] + SpecularToSun.Z * view.m[2][0],
+		SpecularToSun.X * view.m[0][1] + SpecularToSun.Y * view.m[1][1] + SpecularToSun.Z * view.m[2][1],
+		SpecularToSun.X * view.m[0][2] + SpecularToSun.Y * view.m[1][2] + SpecularToSun.Z * view.m[2][2]);
+	toSun.Normalize();
+
+	Vector4 sunDirection(toSun.X, toSun.Y, toSun.Z, 0.0f);
+	Vector4 sunColor(SpecularColor.X, SpecularColor.Y, SpecularColor.Z, 0.0f);
+	Vector4 gloss(SpecularPower, SpecularDebug ? 1.0f : 0.0f, 0.0f, 0.0f);
+	DX8Wrapper::Set_Pixel_Shader_Constant(1, &sunDirection, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(2, &sunColor, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(3, &gloss, 1);
+
+	DX8Wrapper::Set_Pixel_Shader(m_shadowed ? m_dwShadowedShader : m_dwUnshadowedShader);
+	++SpecularPassCount;
+	return TRUE;
+}
+
+void SpecularShader::reset()
+{
+	DX8Wrapper::Set_Pixel_Shader(0);
+
+	if (m_shadowed && TheW3DShadowMap != nullptr)
+	{
+		TheW3DShadowMap->unbindReceiver(SPECULAR_SHADOW_STAGE);
+	}
+	m_shadowed = FALSE;
+
+	for (Int stage = SPECULAR_NORMAL_STAGE; stage <= SPECULAR_POSITION_STAGE; stage++)
+	{
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_PASSTHRU | stage);
+	}
+
+	// Z, blend and fog are ShaderClass state, so the next shader set restores them in full.
+	ShaderClass::Invalidate();
+}
+
+Int SpecularShader::shutdown()
+{
+	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
+
+	if (device != nullptr)
+	{
+		DX8_DELETE_PIXEL_SHADER(device, m_dwShadowedShader);
+		DX8_DELETE_PIXEL_SHADER(device, m_dwUnshadowedShader);
+	}
+
+	m_dwShadowedShader = 0;
+	m_dwUnshadowedShader = 0;
+
+	W3DShaders[W3DShaderManager::ST_SPECULAR]=nullptr;
+	W3DShadersPassCount[W3DShaderManager::ST_SPECULAR]=0;
+
+	return TRUE;
+}
+
 #endif	// BUILD_WITH_D3D9
+
+///Adds the specular pass to one mesh, with that mesh's own texture on stage 0.
+class W3DSpecularMaterialPassClass : public MaterialPassClass
+{
+public:
+
+	virtual void Install_Materials() const override
+	{
+		W3DShaderManager::setShader(W3DShaderManager::ST_SPECULAR, 0);
+	}
+
+	virtual void UnInstall_Materials() const override
+	{
+		W3DShaderManager::resetShader(W3DShaderManager::ST_SPECULAR);
+	}
+
+	virtual void Install_Polygon_Materials(DX8PolygonRendererClass *renderer) const override
+	{
+		DX8TextureCategoryClass *category = renderer->Get_Texture_Category();
+		DX8Wrapper::Set_Texture(0, (category != nullptr) ? category->Peek_Texture(0) : nullptr);
+	}
+};
+
+static W3DSpecularMaterialPassClass SpecularMaterialPass;
+
+void W3DShaderManager::setSpecularLight(const Vector3 &toSun, const Vector3 &color, Real intensity, Real power, Bool debug)
+{
+	SpecularToSun = toSun;
+	SpecularToSun.Normalize();
+	SpecularColor = color * intensity;
+	SpecularPower = power;
+	SpecularDebug = debug;
+}
+
+Int W3DShaderManager::takeSpecularPassCount()
+{
+	const Int count = SpecularPassCount;
+	SpecularPassCount = 0;
+	return count;
+}
+
+MaterialPassClass *W3DShaderManager::getSpecularPass()
+{
+	if (W3DShadersPassCount[ST_SPECULAR] == 0 || SpecularColor.Length2() <= 0.0f)
+	{
+		return nullptr;
+	}
+	return &SpecularMaterialPass;
+}
 
 /*===========================================================================================*/
 /*=========      Terrain Shaders	=========================================================*/
@@ -3059,6 +3271,7 @@ W3DShaderInterface **MasterShaderList[]=
 #if defined(BUILD_WITH_D3D9)
 	ShadowDepthShaderList,
 	ShadowMultiplyShaderList,
+	SpecularShaderList,
 #endif
 	nullptr
 };

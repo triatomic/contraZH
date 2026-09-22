@@ -15,6 +15,12 @@ float SampleShadow(float2 uv, float depth)
 {
     const float4 unshift = float4(1.0f, 1.0f / 255.0f, 1.0f / (255.0f * 255.0f),
                                   1.0f / (255.0f * 255.0f * 255.0f));
+
+#if SHADOW_SINGLE_TAP
+    // One tap, for shaders that need the slots and not a soft edge.
+    return (depth <= dot(tex2D(ShadowMap, uv), unshift)) ? 1.0f : 0.0f;
+#endif
+
     float texel = ShadowParams.x;
     float2 texelPos = uv / texel - 0.5f;
     float2 weight = frac(texelPos);
@@ -35,6 +41,11 @@ float SampleShadow(float2 uv, float depth)
 // texel. The tap spacing sets how soft.
 float SampleShadow(float2 uv, float depth)
 {
+#if SHADOW_SINGLE_TAP
+    // One tap, for shaders that need the slots and not a soft edge.
+    return tex2Dproj(ShadowMap, float4(uv, depth, 1.0f)).r;
+#endif
+
     float texel = ShadowParams.x * ShadowParams.w;
     float lit = 0.0f;
 
@@ -50,8 +61,8 @@ float SampleShadow(float2 uv, float depth)
 
 #endif
 
-// The factor to scale colour by, 1 where the pixel is lit.
-float ShadowFactor(float4 shadowPos)
+// How lit the pixel is, from 0 in full shadow to 1.
+float ShadowLit(float4 shadowPos)
 {
     // Guarded because a zero w turns every later op into NaN, which draws black.
     float w = max(abs(shadowPos.w), 1e-6f);
@@ -61,7 +72,12 @@ float ShadowFactor(float4 shadowPos)
     // Outside the sun's box nothing is shadowed. Applied as a mask rather than an
     // early out so the texture fetches stay in uniform flow.
     float inside = (uv.x >= 0.0f && uv.x <= 1.0f && uv.y >= 0.0f && uv.y <= 1.0f) ? 1.0f : 0.0f;
-    float lit = lerp(1.0f, SampleShadow(uv, depth), inside);
+    return lerp(1.0f, SampleShadow(uv, depth), inside);
+}
 
-    return lerp(1.0f, lit, ShadowParams.z);
+// The factor to scale colour by, 1 where the pixel is lit and the shadow colour's
+// strength where it is not.
+float ShadowFactor(float4 shadowPos)
+{
+    return lerp(1.0f, ShadowLit(shadowPos), ShadowParams.z);
 }

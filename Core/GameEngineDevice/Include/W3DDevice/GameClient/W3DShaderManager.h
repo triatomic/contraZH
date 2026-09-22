@@ -43,6 +43,7 @@ enum CpuType CPP_11(: Int);
 enum GraphicsVenderID CPP_11(: Int);
 
 class TextureClass;	///forward reference
+class MaterialPassClass;	///forward reference
 /** System for managing complex rendering settings which are either not handled by
 	WW3D2 or need custom paths depending on the video card.  This system will determine
 	the proper shader given video card limitations and also allow the app to query the
@@ -73,6 +74,7 @@ public:
 		ST_FLAT_SHROUD_TEXTURE,		//shader to apply shroud texture projection.
 		ST_SHADOW_DEPTH,		//shader to write caster depth into the shadow map.
 		ST_SHADOW_MULTIPLY,		//second pass multiplying the shadow map into drawn geometry.
+		ST_SPECULAR,			//second pass adding a per-pixel sun highlight to drawn geometry.
 		ST_MAX
 	};
 
@@ -97,6 +99,14 @@ public:
 	static ShaderTypes getCurrentShader() {return m_currentShader;}
 	/// Loads a .vso file and creates a vertex shader for it
 	static HRESULT LoadAndCreateD3DShader(const char* strFilePath, const DWORD* pDeclaration, DWORD Usage, Bool ShaderType, DWORD* pHandle);
+
+	/// Sets the sun the specular pass lights with, once a frame. toSun is in world space.
+	/// debug tints what the pass covers and shows the highlight 8x in magenta.
+	static void setSpecularLight(const Vector3 &toSun, const Vector3 &color, Real intensity, Real power, Bool debug);
+	/// How many mesh draws the specular pass ran on since the last call.
+	static Int takeSpecularPassCount();
+	/// The pass objects push for a per-pixel sun highlight, or null when it is off or unsupported.
+	static MaterialPassClass *getSpecularPass();
 
 	static Bool testMinimumRequirements(ChipsetType *videoChipType, CpuType *cpuType, Int *cpuFreq, MemValueType *numRAM, Real *intBenchIndex, Real *floatBenchIndex, Real *memBenchIndex);
 	static StaticGameLODLevel getGPUPerformanceIndex();

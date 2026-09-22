@@ -250,6 +250,8 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ "UseShadowVolumes",						INI::parseBool,				nullptr,			offsetof( GlobalData, m_useShadowVolumes ) },
 	{ "UseShadowDecals",						INI::parseBool,				nullptr,			offsetof( GlobalData, m_useShadowDecals ) },
 	{ "ShadowMapMinSunElevation",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_shadowMapMinSunElevation ) },
+	{ "UnitSpecularIntensity",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_unitSpecularIntensity ) },
+	{ "UnitSpecularPower",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_unitSpecularPower ) },
 	{ "TextureReductionFactor",			INI::parseInt,				nullptr,			offsetof( GlobalData, m_textureReductionFactor ) },
 	{ "UseBehindBuildingMarker",		INI::parseBool,				nullptr,			offsetof( GlobalData, m_enableBehindBuildingMarkers ) },
 	{ "WaterPositionX",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_waterPositionX ) },
@@ -775,6 +777,7 @@ GlobalData::GlobalData()
   m_bloomDebug = FALSE;
   m_laserRef = FALSE;
   m_useShadowMap = TRUE;
+  m_specularDebug = FALSE;
   m_laserGlowColor = 0;
   m_laserGlowIntensity = 0.7f;
 
@@ -882,6 +885,8 @@ GlobalData::GlobalData()
 	m_useShadowVolumes = FALSE;
 	m_useShadowDecals = FALSE;
 	m_shadowMapMinSunElevation = 30.0f;
+	m_unitSpecularIntensity = 0.35f;
+	m_unitSpecularPower = 24.0f;
 	m_textureReductionFactor = -1;
 	m_enableBehindBuildingMarkers = TRUE;
 	m_scriptDebug = FALSE;
@@ -1600,6 +1605,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_bloomDebug = optionPref.getBloomDebugEnabled();
 	TheWritableGlobalData->m_laserRef = optionPref.getLaserRefEnabled();
 	TheWritableGlobalData->m_useShadowMap = optionPref.getShadowMapEnabled();
+	TheWritableGlobalData->m_specularDebug = optionPref.getSpecularDebugEnabled();
 	TheWritableGlobalData->m_borderlessWindow = optionPref.getBorderlessWindowEnabled();
 
 	Int val=optionPref.getGammaValue();

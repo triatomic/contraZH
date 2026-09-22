@@ -535,6 +535,21 @@ floor shadows streaked several times their caster's height. At 30 degrees a shad
 about 1.7 times its caster's height. 0 turns the floor off.
 * Terrain casts too, so cliffs and hills shadow the ground below them. Only the terrain loaded
 around the camera casts, and the flat terrain mode does not yet.
+
+### Specular highlights
+
+Vehicles and structures catch a per-pixel highlight from the sun, on top of their usual lighting.
+The highlight follows the map's own sun direction and colour, scales with how bright the model's
+texture is so metal shines and dark paint barely does, and disappears where the sun's shadow falls
+when shadow mapping is on. Infantry stay matte. Needs the Direct3D 9 build and a shader model 2
+card. Set in the mod's `GameData.ini`:
+
+* `UnitSpecularIntensity = 0.35` - (How bright the highlight is. 0 turns it off.)
+* `UnitSpecularPower = 24` - (How tight it is. Higher values give a smaller, sharper highlight.
+Around 4 to 128 is useful; past that the highlight shrinks to nothing.)
+
+`SpecularDebug = Yes` in `Options.ini` tints everything the pass covers a faint magenta and shows
+the highlight 8 times brighter in magenta, to check where it runs and where it lands.
 * Additive meshes on skinned models (infantry and other bone deformed meshes) do not glow. Their
 vertices only exist for the duration of the normal draw, so there is nothing left to draw again.
 

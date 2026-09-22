@@ -46,6 +46,7 @@ class TextureClass;
 class VertexMaterialClass;
 class MeshModelClass;
 class OBBoxClass;
+class DX8PolygonRendererClass;
 
 /**
 ** MaterialPassClass
@@ -70,6 +71,8 @@ public:
 	/// MW: Had to make this virtual so app can perform direct/custom D3D setup.
 	virtual void	Install_Materials() const;
 	virtual void	UnInstall_Materials() const { };	///< reset/cleanup D3D states
+	/// Called before each polygon group of the mesh draws, so a pass can use that group's own textures.
+	virtual void	Install_Polygon_Materials(DX8PolygonRendererClass * renderer) const { }
 
 	void							Set_Texture(TextureClass * Texture,int stage = 0);
 	void							Set_Shader(ShaderClass shader);

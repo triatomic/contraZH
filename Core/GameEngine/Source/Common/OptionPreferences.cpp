@@ -417,6 +417,11 @@ Bool OptionPreferences::getShadowMapEnabled(void) const
 	return getBool("ShadowMap", TRUE);
 }
 
+Bool OptionPreferences::getSpecularDebugEnabled(void) const
+{
+	return getBool("SpecularDebug", FALSE);
+}
+
 Bool OptionPreferences::getBorderlessWindowEnabled(void) const
 {
 	return getBool("BorderlessWindow", FALSE);

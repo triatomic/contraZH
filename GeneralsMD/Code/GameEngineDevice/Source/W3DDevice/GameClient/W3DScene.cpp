@@ -53,6 +53,7 @@
 #include "W3DDevice/GameClient/W3DDynamicLight.h"
 #include "W3DDevice/GameClient/W3DShadow.h"
 #include "W3DDevice/GameClient/W3DShadowMap.h"
+#include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/W3DStatusCircle.h"
 #include "W3DDevice/GameClient/W3DCustomScene.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
@@ -887,6 +888,16 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 			rinfo.Push_Material_Pass(shadowPass);
 			extraMaterialPops++;
 		}
+
+		// Vehicles and structures catch a per-pixel sun highlight. Infantry stay matte.
+		MaterialPassClass *specularPass = W3DShaderManager::getSpecularPass();
+		if (specularPass != nullptr && m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop &&
+			draw->getEffectiveOpacity() == 1.0f &&
+			(draw->isKindOf(KINDOF_VEHICLE) || draw->isKindOf(KINDOF_STRUCTURE)))
+		{
+			rinfo.Push_Material_Pass(specularPass);
+			extraMaterialPops++;
+		}
 	}
 	else
 	{
@@ -1345,6 +1356,27 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 			// we get 2 frame updates per frame, and it screws up the particle emitters.
 			it.Peek_Obj()->On_Frame_Update();
 		}
+	}
+
+	// The specular pass lights with the map's own sun, not the shadow map's lifted one, so
+	// highlights sit where the object lighting says the sun is.
+	if (TheW3DShadowManager != nullptr)
+	{
+		const GlobalData::TerrainLighting &sun = TheGlobalData->m_terrainObjectsLighting[TheGlobalData->m_timeOfDay][0];
+		W3DShaderManager::setSpecularLight(TheW3DShadowManager->getLightPosWorld(0),
+			Vector3(sun.diffuse.red, sun.diffuse.green, sun.diffuse.blue),
+			TheGlobalData->m_unitSpecularIntensity, TheGlobalData->m_unitSpecularPower,
+			TheGlobalData->m_specularDebug);
+
+		// Sampled rather than every frame, so a whole match stays readable.
+		static Int specularFrames = 0;
+		const Int specularDraws = W3DShaderManager::takeSpecularPassCount();
+		if (specularFrames % 300 == 0 && specularFrames <= 300 * 15)
+		{
+			DEBUG_LOG(("Specular: frame %d, %d mesh draws, pass %s", specularFrames, specularDraws,
+				W3DShaderManager::getSpecularPass() != nullptr ? "available" : "unavailable"));
+		}
+		++specularFrames;
 	}
 
 	// Fill the shadow map before anything is queued for the main scene, because the

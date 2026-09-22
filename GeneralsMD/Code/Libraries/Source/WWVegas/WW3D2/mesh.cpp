@@ -875,7 +875,10 @@ void MeshClass::Render_Material_Pass(MaterialPassClass * pass,IndexBufferClass *
 		DX8PolygonRendererListIterator it(&Model->PolygonRendererList);
 		while (!it.Is_Done()) {
 			if (it.Peek_Obj()->Get_Pass() == 0)
+			{
+				pass->Install_Polygon_Materials(it.Peek_Obj());
 				it.Peek_Obj()->Render(BaseVertexOffset);
+			}
 			it.Next();
 		}
 
@@ -1002,7 +1005,10 @@ void MeshClass::Render_Material_Pass(MaterialPassClass * pass,IndexBufferClass *
 		while (!it.Is_Done()) {
 
 			if (it.Peek_Obj()->Get_Pass() == 0)
+			{
+				pass->Install_Polygon_Materials(it.Peek_Obj());
 				it.Peek_Obj()->Render(BaseVertexOffset);
+			}
 			it.Next();
 		}
 

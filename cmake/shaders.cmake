@@ -82,5 +82,8 @@ rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadownois
 rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadownoise2packed.pso    NOISE_COUNT=2 PACKED=1)
 rts_add_shader("${RTS_SHADER_DIR}/shadowmultiply.hlsl" ps_2_0 main shadowmultiply.pso           PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/shadowmultiply.hlsl" ps_2_0 main shadowmultiplypacked.pso     PACKED=1)
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_0 main specular.pso                 SHADOWED=1 PACKED=0)
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_0 main specularpacked.pso           SHADOWED=1 PACKED=1)
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_0 main specularnoshadow.pso         SHADOWED=0 PACKED=0)
 
 add_custom_target(rts_shaders ALL DEPENDS ${RTS_SHADER_OUTPUTS})
