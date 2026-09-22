@@ -2614,13 +2614,13 @@ IDirect3DTexture8 * DX8Wrapper::_Create_DX8_Texture
 	// Copy the surface to the texture
 	IDirect3DSurface8 *tex_surface = nullptr;
 	texture->GetSurfaceLevel(0, &tex_surface);
-	DX8_ErrorCode(D3DXLoadSurfaceFromSurface(tex_surface, nullptr, nullptr, surface, nullptr, nullptr, D3DX_FILTER_BOX, 0));
+	DX8_ErrorCode(Load_Surface_From_Surface(tex_surface, nullptr, surface, nullptr));
 	tex_surface->Release();
 
 	// Create mipmaps if needed
 	if (mip_level_count!=MIP_LEVELS_1)
 	{
-		DX8_ErrorCode(D3DXFilterTexture(texture, nullptr, 0, D3DX_FILTER_BOX));
+		DX8_ErrorCode(Filter_Texture_Mipmaps(texture));
 	}
 
 	return texture;

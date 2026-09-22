@@ -50,6 +50,10 @@ D3DFORMAT WW3DFormat_To_D3DFormat(WW3DFormat ww3d_format);
 WW3DFormat D3DFormat_To_WW3DFormat(D3DFORMAT d3d_format);
 
 // Inverts in place of D3DXMatrixInverse, writing identity when singular
+HRESULT Filter_Texture_Mipmaps(IDirect3DTexture8* texture);
+HRESULT Load_Surface_From_Surface(IDirect3DSurface8* dest_surface, const RECT* dest_rect,
+	IDirect3DSurface8* src_surface, const RECT* src_rect);
+
 WW3DFormat Get_Closest_Supported_Texture_Format(WW3DFormat format, bool render_target);
 
 const char* Get_D3D_Error_Name(unsigned res);

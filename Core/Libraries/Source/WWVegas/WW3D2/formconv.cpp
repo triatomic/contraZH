@@ -40,6 +40,7 @@
 #include "WWMath/matrix4.h"
 #include "dx8wrapper.h"
 #include "dx8caps.h"
+#include "bitmaphandler.h"
 
 D3DFORMAT WW3DFormatToD3DFormatConversionArray[WW3D_FORMAT_COUNT] = {
 	D3DFMT_UNKNOWN,
@@ -428,4 +429,140 @@ WW3DFormat Get_Closest_Supported_Texture_Format(WW3DFormat format, bool render_t
 	}
 
 	return format;
+}
+
+// Stands in for D3DXFilterTexture: box filters each mip level from the one above.
+// Compressed levels cannot be locked, so those textures are left alone.
+HRESULT Filter_Texture_Mipmaps(IDirect3DTexture8* texture)
+{
+	if (texture==nullptr)
+	{
+		return D3DERR_INVALIDCALL;
+	}
+
+	D3DSURFACE_DESC top_desc;
+	HRESULT hr=texture->GetLevelDesc(0, &top_desc);
+	if (FAILED(hr))
+	{
+		return hr;
+	}
+
+	const WW3DFormat format=D3DFormat_To_WW3DFormat(top_desc.Format);
+	if (format==WW3D_FORMAT_UNKNOWN ||
+		 (format>=WW3D_FORMAT_DXT1 && format<=WW3D_FORMAT_DXT5))
+	{
+		return D3D_OK;
+	}
+
+	for (unsigned level=1; level<texture->GetLevelCount(); ++level)
+	{
+		D3DSURFACE_DESC src_desc;
+		D3DSURFACE_DESC dest_desc;
+		if (FAILED(texture->GetLevelDesc(level-1, &src_desc)) ||
+			 FAILED(texture->GetLevelDesc(level, &dest_desc)))
+		{
+			return D3DERR_INVALIDCALL;
+		}
+
+		D3DLOCKED_RECT src_rect;
+		D3DLOCKED_RECT dest_rect;
+		hr=texture->LockRect(level-1, &src_rect, nullptr, D3DLOCK_READONLY);
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+		hr=texture->LockRect(level, &dest_rect, nullptr, 0);
+		if (FAILED(hr))
+		{
+			texture->UnlockRect(level-1);
+			return hr;
+		}
+
+		BitmapHandlerClass::Copy_Image(
+			(unsigned char*)dest_rect.pBits,
+			dest_desc.Width,
+			dest_desc.Height,
+			dest_rect.Pitch,
+			format,
+			(unsigned char*)src_rect.pBits,
+			src_desc.Width,
+			src_desc.Height,
+			src_rect.Pitch,
+			format,
+			nullptr,
+			0,
+			false);
+
+		texture->UnlockRect(level);
+		texture->UnlockRect(level-1);
+	}
+
+	return D3D_OK;
+}
+
+// Stands in for D3DXLoadSurfaceFromSurface, which converted format and scaled as
+// needed. Source and destination must both be lockable.
+HRESULT Load_Surface_From_Surface(
+	IDirect3DSurface8* dest_surface,
+	const RECT* dest_rect,
+	IDirect3DSurface8* src_surface,
+	const RECT* src_rect)
+{
+	if (dest_surface==nullptr || src_surface==nullptr)
+	{
+		return D3DERR_INVALIDCALL;
+	}
+
+	D3DSURFACE_DESC dest_desc;
+	D3DSURFACE_DESC src_desc;
+	if (FAILED(dest_surface->GetDesc(&dest_desc)) || FAILED(src_surface->GetDesc(&src_desc)))
+	{
+		return D3DERR_INVALIDCALL;
+	}
+
+	const WW3DFormat dest_format=D3DFormat_To_WW3DFormat(dest_desc.Format);
+	const WW3DFormat src_format=D3DFormat_To_WW3DFormat(src_desc.Format);
+	if (dest_format==WW3D_FORMAT_UNKNOWN || src_format==WW3D_FORMAT_UNKNOWN)
+	{
+		return D3DERR_WRONGTEXTUREFORMAT;
+	}
+
+	D3DLOCKED_RECT locked_src;
+	D3DLOCKED_RECT locked_dest;
+	HRESULT hr=src_surface->LockRect(&locked_src, src_rect, D3DLOCK_READONLY);
+	if (FAILED(hr))
+	{
+		return hr;
+	}
+	hr=dest_surface->LockRect(&locked_dest, dest_rect, 0);
+	if (FAILED(hr))
+	{
+		src_surface->UnlockRect();
+		return hr;
+	}
+
+	const unsigned src_width=src_rect ? (src_rect->right-src_rect->left) : src_desc.Width;
+	const unsigned src_height=src_rect ? (src_rect->bottom-src_rect->top) : src_desc.Height;
+	const unsigned dest_width=dest_rect ? (dest_rect->right-dest_rect->left) : dest_desc.Width;
+	const unsigned dest_height=dest_rect ? (dest_rect->bottom-dest_rect->top) : dest_desc.Height;
+
+	BitmapHandlerClass::Copy_Image(
+		(unsigned char*)locked_dest.pBits,
+		dest_width,
+		dest_height,
+		locked_dest.Pitch,
+		dest_format,
+		(unsigned char*)locked_src.pBits,
+		src_width,
+		src_height,
+		locked_src.Pitch,
+		src_format,
+		nullptr,
+		0,
+		false);
+
+	dest_surface->UnlockRect();
+	src_surface->UnlockRect();
+
+	return D3D_OK;
 }

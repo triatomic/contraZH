@@ -507,7 +507,7 @@ void SurfaceClass::Copy(
 		if (dest.right>int(sd.Width)) dest.right=int(sd.Width);
 		if (dest.bottom>int(sd.Height)) dest.bottom=int(sd.Height);
 
-		DX8_ErrorCode(D3DXLoadSurfaceFromSurface(D3DSurface,nullptr,&dest,other->D3DSurface,nullptr,&src,D3DX_FILTER_NONE,0));
+		DX8_ErrorCode(Load_Surface_From_Surface(D3DSurface, &dest, other->D3DSurface, &src));
 	}
 }
 
@@ -553,7 +553,7 @@ void SurfaceClass::Stretch_Copy(
 	dest.top=dsty;
 	dest.bottom=dsty+dstheight;
 
-	DX8_ErrorCode(D3DXLoadSurfaceFromSurface(D3DSurface,nullptr,&dest,other->D3DSurface,nullptr,&src,D3DX_FILTER_TRIANGLE ,0));
+	DX8_ErrorCode(Load_Surface_From_Surface(D3DSurface, &dest, other->D3DSurface, &src));
 }
 
 /***********************************************************************************************
