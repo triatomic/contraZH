@@ -142,7 +142,7 @@ Int copyRect(unsigned char *buf, Int bufSize, int oX, int oY, int width, int hei
 	if (!m_pDev)
 		goto error;
 
- 	m_pDev->GetRenderTarget(&surface);
+ 	m_pDev->GetRenderTarget(DX8_SWAPCHAIN &surface);
 
 	if (!surface)
 		goto error;
@@ -161,15 +161,18 @@ Int copyRect(unsigned char *buf, Int bufSize, int oX, int oY, int width, int hei
 	dstPoint.x=0;
 	dstPoint.y=0;
 
+#if defined(BUILD_WITH_D3D9)
+	// The surface is locked and read back on the CPU, so it must be system memory
+	hr=m_pDev->CreateOffscreenPlainSurface(width, height, desc.Format, D3DPOOL_SYSTEMMEM, &tempSurface, nullptr);
+#else
  	hr=m_pDev->CreateImageSurface(  width, height, desc.Format, &tempSurface);
+#endif
 
 	if (hr != S_OK)
 		goto error;
 
- 	hr=m_pDev->CopyRects(surface,&srcRect,1,tempSurface,&dstPoint);
-
-	if (hr != S_OK)
-		goto error;
+	// Logs its own failures and cannot report one back
+	DX8Wrapper::_Copy_DX8_Rects(surface,&srcRect,1,tempSurface,&dstPoint);
 
  	D3DLOCKED_RECT lrect;
 
@@ -180,8 +183,8 @@ Int copyRect(unsigned char *buf, Int bufSize, int oX, int oY, int width, int hei
 
  	tempSurface->GetDesc(&desc);
 
-	if (desc.Size < bufSize)
-		bufSize = desc.Size;
+	if (Surface_Size(desc) < bufSize)
+		bufSize = Surface_Size(desc);
 
 	memcpy(buf,lrect.pBits,bufSize);
 	result = bufSize;
@@ -264,7 +267,7 @@ Bool W3DSmudgeManager::testHardwareSupport()
 
 		//draw polygons like this is very inefficient but for only 2 triangles, it's
 		//not worth bothering with index/vertex buffers.
-		pDev->SetVertexShader(D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1);
+		DX8_SET_FVF(pDev, D3DFVF_XYZRHW | D3DFVF_DIFFUSE | D3DFVF_TEX1);
 
 		pDev->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, v, sizeof(_TRANS_LIT_TEX_VERTEX));
 

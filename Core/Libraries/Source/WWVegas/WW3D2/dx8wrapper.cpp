@@ -2907,7 +2907,12 @@ IDirect3DSurface8 * DX8Wrapper::_Create_DX8_Surface(unsigned int width, unsigned
 	// Paletted surfaces not supported!
 	WWASSERT(format!=D3DFMT_P8);
 
+#if defined(BUILD_WITH_D3D9)
+	// D3DPOOL_SCRATCH matches what D3D8 CreateImageSurface returned
+	DX8CALL(CreateOffscreenPlainSurface(width, height, WW3DFormat_To_D3DFormat(format), D3DPOOL_SCRATCH, &surface, nullptr));
+#else
 	DX8CALL(CreateImageSurface(width, height, WW3DFormat_To_D3DFormat(format), &surface));
+#endif
 
 	return surface;
 }
@@ -3026,7 +3031,15 @@ void DX8Wrapper::_Copy_DX8_Rects(
 		const RECT& src_rect = pSourceRectsArray[i];
 		const POINT dest_point = pDestPointsArray ? pDestPointsArray[i] : origin;
 
-		if (src_desc.Pool == D3DPOOL_DEFAULT && dest_desc.Pool == D3DPOOL_DEFAULT)
+		// Reading a render target back to the CPU is its own call in D3D9, and it
+		// copies whole surfaces only. Callers wanting a sub-rect must size the
+		// destination to match and offset afterwards.
+		if ((src_desc.Usage & D3DUSAGE_RENDERTARGET) && dest_desc.Pool == D3DPOOL_SYSTEMMEM)
+		{
+			WWASSERT(dest_desc.Width == src_desc.Width && dest_desc.Height == src_desc.Height);
+			DX8CALL(GetRenderTargetData(pSourceSurface, pDestinationSurface));
+		}
+		else if (src_desc.Pool == D3DPOOL_DEFAULT && dest_desc.Pool == D3DPOOL_DEFAULT)
 		{
 			RECT dest_rect;
 			dest_rect.left = dest_point.x;
@@ -3224,13 +3237,26 @@ IDirect3DSurface8 * DX8Wrapper::_Get_DX8_Front_Buffer()
 	DX8_THREAD_ASSERT();
 	D3DDISPLAYMODE mode;
 
+#if defined(BUILD_WITH_D3D9)
+	DX8CALL(GetDisplayMode(0,&mode));
+#else
 	DX8CALL(GetDisplayMode(&mode));
+#endif
 
 	IDirect3DSurface8 * fb=nullptr;
 
+#if defined(BUILD_WITH_D3D9)
+	// GetFrontBufferData only writes into system memory
+	DX8CALL(CreateOffscreenPlainSurface(mode.Width,mode.Height,D3DFMT_A8R8G8B8,D3DPOOL_SYSTEMMEM,&fb,nullptr));
+#else
 	DX8CALL(CreateImageSurface(mode.Width,mode.Height,D3DFMT_A8R8G8B8,&fb));
+#endif
 
+#if defined(BUILD_WITH_D3D9)
+	DX8CALL(GetFrontBufferData(0,fb));
+#else
 	DX8CALL(GetFrontBuffer(fb));
+#endif
 	return fb;
 }
 
@@ -3261,7 +3287,7 @@ DX8Wrapper::Create_Render_Target (int width, int height, WW3DFormat format)
 	// Use the current display format if format isn't specified
 	if (format==WW3D_FORMAT_UNKNOWN) {
 		D3DDISPLAYMODE mode;
-		DX8CALL(GetDisplayMode(&mode));
+		DX8CALL(GetDisplayMode(DX8_SWAPCHAIN &mode));
 		format=D3DFormat_To_WW3DFormat(mode.Format);
 	}
 
@@ -3331,7 +3357,7 @@ void DX8Wrapper::Create_Render_Target
 		*depth_buffer=nullptr;
 		return;
 /*		D3DDISPLAYMODE mode;
-		DX8CALL(GetDisplayMode(&mode));
+		DX8CALL(GetDisplayMode(DX8_SWAPCHAIN &mode));
 		format=D3DFormat_To_WW3DFormat(mode.Format);*/
 	}
 

@@ -659,8 +659,7 @@ HRESULT WaterRenderObjClass::generateVertexBuffer( Int sizeX, Int sizeY, Int ver
 	if (m_vertexBufferD3D == nullptr)
 	{	// Create vertex buffer
 
-		if (FAILED(hr=m_pDev->CreateVertexBuffer
-		(
+		if (FAILED(hr=DX8_CREATE_VERTEX_BUFFER(m_pDev, 
 			m_numVertices*vertexSize,
 			usage,
 			fvf,
@@ -680,7 +679,7 @@ HRESULT WaterRenderObjClass::generateVertexBuffer( Int sizeX, Int sizeY, Int ver
 	(
 		0,
 		m_numVertices*sizeof(SEA_PATCH_VERTEX),
-		(BYTE**)&pVertices,
+		(DX8LockPointer)&pVertices,
 		0//D3DLOCK_DISCARD
 	)))
 		return hr;
@@ -724,8 +723,7 @@ HRESULT WaterRenderObjClass::generateIndexBuffer(Int sizeX, Int sizeY)
 	// Create index buffer
 	WORD* pIndices;
 
-	if (FAILED(hr=m_pDev->CreateIndexBuffer
-	(
+	if (FAILED(hr=DX8_CREATE_INDEX_BUFFER(m_pDev, 
 		(m_numIndices+2)*sizeof(WORD),
 		D3DUSAGE_WRITEONLY,
 		D3DFMT_INDEX16,
@@ -738,7 +736,7 @@ HRESULT WaterRenderObjClass::generateIndexBuffer(Int sizeX, Int sizeY)
 	(
 		0,
 		m_numIndices*sizeof(WORD),
-		(BYTE**)&pIndices,
+		(DX8LockPointer)&pIndices,
 		0
 	)))
 		return hr;
@@ -1892,7 +1890,11 @@ void WaterRenderObjClass::drawSea(RenderInfoClass & rinfo)
 	m_pDev->SetVertexShaderConstant(CV_ZERO,   D3DXVECTOR4(0.0f, 0.0f, 0.0f, 0.0f), 1);
 	m_pDev->SetVertexShaderConstant(CV_ONE,    D3DXVECTOR4(1.0f, 1.0f, 1.0f, 1.0f), 1);
 
+#if !defined(BUILD_WITH_D3D9)
 	m_pDev->SetVertexShader(m_dwWaveVertexShader);
+#else
+	// Shader handles become COM pointers in the shader phase
+#endif
 	m_pDev->SetPixelShader(m_dwWavePixelShader);
 
 //	Make reflection brighter to compensate for darker coloring on sea floor
@@ -1967,7 +1969,7 @@ void WaterRenderObjClass::drawSea(RenderInfoClass & rinfo)
 	DX8Wrapper::_Set_DX8_Transform(D3DTS_PROJECTION, matProj);
 
 	m_pDev->SetPixelShader(0);	//turn off pixel shader
-	m_pDev->SetVertexShader(DX8_FVF_XYZDUV1);	//turn off custom vertex shader
+	DX8_SET_FVF(m_pDev, DX8_FVF_XYZDUV1);	//turn off custom vertex shader
 
 	DX8Wrapper::Invalidate_Cached_Render_States();
 
@@ -2305,12 +2307,12 @@ void WaterRenderObjClass::renderWaterMesh()
 	MaterMeshVertexFormat *vb;
 	if (m_vertexBufferD3DOffset < m_numVertices)
 	{	//we have room in current VB, append new verts
-		if(m_vertexBufferD3D->Lock(m_vertexBufferD3DOffset*sizeof(MaterMeshVertexFormat),mx*my*sizeof(MaterMeshVertexFormat),(unsigned char**)&vb,D3DLOCK_NOOVERWRITE) != D3D_OK)
+		if(m_vertexBufferD3D->Lock(m_vertexBufferD3DOffset*sizeof(MaterMeshVertexFormat),mx*my*sizeof(MaterMeshVertexFormat),(DX8LockPointer)&vb,D3DLOCK_NOOVERWRITE) != D3D_OK)
 			return;
 	}
 	else
 	{	//ran out of room in last VB, request a substitute VB.
-		if(m_vertexBufferD3D->Lock(0,mx*my*sizeof(MaterMeshVertexFormat),(unsigned char**)&vb,D3DLOCK_DISCARD) != D3D_OK)
+		if(m_vertexBufferD3D->Lock(0,mx*my*sizeof(MaterMeshVertexFormat),(DX8LockPointer)&vb,D3DLOCK_DISCARD) != D3D_OK)
 			return;
 		m_vertexBufferD3DOffset=0;	//reset start of page to first vertex
 	}
@@ -2416,7 +2418,7 @@ void WaterRenderObjClass::renderWaterMesh()
 
 	DX8Wrapper::Set_DX8_Indices(m_indexBufferD3D, m_vertexBufferD3DOffset);
 	DX8Wrapper::Set_DX8_Stream_Source(0, m_vertexBufferD3D, 0, sizeof(MaterMeshVertexFormat));
-	m_pDev->SetVertexShader(WATER_MESH_FVF);
+	DX8_SET_FVF(m_pDev, WATER_MESH_FVF);
 
 
 	if (TheTerrainRenderObject->getShroud() && !m_trapezoidWaterPixelShader)

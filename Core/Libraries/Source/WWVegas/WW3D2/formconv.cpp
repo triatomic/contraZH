@@ -223,3 +223,29 @@ void Init_D3D_To_WW3_Conversion()
 	D3DFormatToWW3DZFormatConversionArray[D3DFMT_D24X8]=WW3D_ZFORMAT_D24X8;
 	D3DFormatToWW3DZFormatConversionArray[D3DFMT_D24X4S4]=WW3D_ZFORMAT_D24X4S4;
 };
+
+#if defined(BUILD_WITH_D3D9)
+unsigned Surface_Size(const D3DSURFACE_DESC& desc)
+{
+	// Block compressed formats round up to whole 4x4 blocks
+	switch (desc.Format)
+	{
+	case D3DFMT_DXT1:
+		return ((desc.Width+3)/4)*((desc.Height+3)/4)*8;
+	case D3DFMT_DXT2:
+	case D3DFMT_DXT3:
+	case D3DFMT_DXT4:
+	case D3DFMT_DXT5:
+		return ((desc.Width+3)/4)*((desc.Height+3)/4)*16;
+	default:
+		break;
+	}
+
+	const WW3DFormat format=D3DFormat_To_WW3DFormat(desc.Format);
+	if (format==WW3D_FORMAT_UNKNOWN)
+	{
+		return 0;
+	}
+	return desc.Width*desc.Height*Get_Bytes_Per_Pixel(format);
+}
+#endif

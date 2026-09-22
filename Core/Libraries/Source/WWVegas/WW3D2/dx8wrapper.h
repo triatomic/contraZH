@@ -741,7 +741,15 @@ WWINLINE void DX8Wrapper::Set_Vertex_Shader(DWORD vertex_shader)
 #endif
 
 	Vertex_Shader=vertex_shader;
+#if defined(BUILD_WITH_D3D9)
+	// D3D8 overloaded this with either an FVF code or a shader handle. D3D9 splits
+	// them, and every caller but the tree buffer passes an FVF. Handles are resolved
+	// through a table in the shader phase; until then the programmable path is off.
+	DX8CALL(SetVertexShader(nullptr));
+	DX8CALL(SetFVF(Vertex_Shader));
+#else
 	DX8CALL(SetVertexShader(Vertex_Shader));
+#endif
 }
 
 WWINLINE void DX8Wrapper::Set_Pixel_Shader(DWORD pixel_shader)
@@ -750,7 +758,13 @@ WWINLINE void DX8Wrapper::Set_Pixel_Shader(DWORD pixel_shader)
 	if (Pixel_Shader==pixel_shader) return;
 
 	Pixel_Shader=pixel_shader;
+#if defined(BUILD_WITH_D3D9)
+	// Handles become COM pointers in the shader phase; the programmable path is off
+	// until then, so the only value reaching here is 0 meaning "no shader".
+	DX8CALL(SetPixelShader(nullptr));
+#else
 	DX8CALL(SetPixelShader(Pixel_Shader));
+#endif
 }
 
 WWINLINE void DX8Wrapper::Set_Vertex_Shader_Constant(int reg, const void* data, int count)
@@ -761,7 +775,12 @@ WWINLINE void DX8Wrapper::Set_Vertex_Shader_Constant(int reg, const void* data, 
 	if (memcmp(data, &Vertex_Shader_Constants[reg],memsize)==0) return;
 
 	memcpy(&Vertex_Shader_Constants[reg],data,memsize);
+#if defined(BUILD_WITH_D3D9)
+	// D3D9 splits the untyped setter by constant type; the engine only uses floats
+	DX8CALL(SetVertexShaderConstantF(reg,static_cast<const float*>(data),count));
+#else
 	DX8CALL(SetVertexShaderConstant(reg,data,count));
+#endif
 }
 
 WWINLINE void DX8Wrapper::Set_Pixel_Shader_Constant(int reg, const void* data, int count)
@@ -772,7 +791,11 @@ WWINLINE void DX8Wrapper::Set_Pixel_Shader_Constant(int reg, const void* data, i
 	if (memcmp(data, &Pixel_Shader_Constants[reg],memsize)==0) return;
 
 	memcpy(&Pixel_Shader_Constants[reg],data,memsize);
+#if defined(BUILD_WITH_D3D9)
+	DX8CALL(SetPixelShaderConstantF(reg,static_cast<const float*>(data),count));
+#else
 	DX8CALL(SetPixelShaderConstant(reg,data,count));
+#endif
 }
 // shader system updates KJM ^
 

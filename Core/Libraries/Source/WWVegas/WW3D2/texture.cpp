@@ -1028,7 +1028,7 @@ unsigned TextureClass::Get_Texture_Memory_Usage() const
 	{
 		D3DSURFACE_DESC desc;
 		DX8_ErrorCode(Peek_D3D_Texture()->GetLevelDesc(i,&desc));
-		size+=desc.Size;
+		size+=Surface_Size(desc);
 	}
 	return size;
 }
@@ -1320,7 +1320,7 @@ unsigned ZTextureClass::Get_Texture_Memory_Usage() const
 	{
 		D3DSURFACE_DESC desc;
 		DX8_ErrorCode(Peek_D3D_Texture()->GetLevelDesc(i,&desc));
-		size+=desc.Size;
+		size+=Surface_Size(desc);
 	}
 	return size;
 }

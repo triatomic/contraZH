@@ -210,7 +210,7 @@ Bool W3DBloom::begin(RenderInfoClass &rinfo, Bool anythingToDraw)
 	}
 
 	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
-	if (FAILED(device->GetRenderTarget(&m_defaultTarget)) || FAILED(device->GetDepthStencilSurface(&m_defaultDepth)))
+	if (FAILED(device->GetRenderTarget(DX8_SWAPCHAIN &m_defaultTarget)) || FAILED(device->GetDepthStencilSurface(&m_defaultDepth)))
 	{
 		releaseDefaults();
 		return false;

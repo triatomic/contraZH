@@ -88,8 +88,47 @@ typedef IDirect3DIndexBuffer9*  LPDIRECT3DINDEXBUFFER8;
 
 #define D3DENUM_NO_WHQL_LEVEL 0
 
+// D3D8 gated depth bias behind a raster cap. D3D9 always supports D3DRS_DEPTHBIAS,
+// so the cap is gone and the test must read as supported.
+#define D3DPRASTERCAPS_ZBIAS 0
+
+// D3D9 dropped this bump format
+#define D3DFMT_W11V11U10 ((D3DFORMAT)65)
+
+// D3D9 locks hand back void** where D3D8 used BYTE**, and the buffer creators
+// gained a trailing shared-handle argument. These let the call sites keep one
+// spelling for both backends.
+typedef void** DX8LockPointer;
+
+#define DX8_CREATE_INDEX_BUFFER(dev, length, usage, format, pool, out) \
+	(dev)->CreateIndexBuffer(length, usage, format, pool, out, nullptr)
+#define DX8_CREATE_VERTEX_BUFFER(dev, length, usage, fvf, pool, out) \
+	(dev)->CreateVertexBuffer(length, usage, fvf, pool, out, nullptr)
+
+// D3D8 overloaded SetVertexShader with an FVF code; D3D9 has a separate setter
+#define DX8_SET_FVF(dev, fvf) (dev)->SetFVF(fvf)
+
+// Several device getters gained a leading swap chain index in D3D9
+#define DX8_SWAPCHAIN 0,
+
+// D3DSURFACE_DESC lost its Size member in D3D9
+unsigned Surface_Size(const D3DSURFACE_DESC& desc);
+
 #else
 
 #include <d3d8.h>
+
+typedef unsigned char** DX8LockPointer;
+
+#define DX8_CREATE_INDEX_BUFFER(dev, length, usage, format, pool, out) \
+	(dev)->CreateIndexBuffer(length, usage, format, pool, out)
+#define DX8_CREATE_VERTEX_BUFFER(dev, length, usage, fvf, pool, out) \
+	(dev)->CreateVertexBuffer(length, usage, fvf, pool, out)
+
+#define DX8_SET_FVF(dev, fvf) (dev)->SetVertexShader(fvf)
+
+#define DX8_SWAPCHAIN
+
+inline unsigned Surface_Size(const D3DSURFACE_DESC& desc) { return desc.Size; }
 
 #endif

@@ -85,8 +85,7 @@ Bool W3DSnowManager::ReAcquireResources()
 		if (m_VertexBufferD3D == nullptr)
 		{	// Create vertex buffer
 
-			if (FAILED(m_pDev->CreateVertexBuffer
-			(
+			if (FAILED(DX8_CREATE_VERTEX_BUFFER(m_pDev, 
 				SNOW_BUFFER_SIZE*sizeof(POINTVERTEX),
 				D3DUSAGE_WRITEONLY|D3DUSAGE_DYNAMIC|D3DUSAGE_POINTS,
 				D3DFVF_POINTVERTEX,
@@ -268,7 +267,7 @@ void W3DSnowManager::renderSubBox(RenderInfoClass &rinfo, Int originX, Int origi
 		POINTVERTEX* verts;
 
 		if(m_VertexBufferD3D->Lock(m_dwBase * sizeof(POINTVERTEX), batchSize * sizeof(POINTVERTEX),
-			(unsigned char **) &verts, m_dwBase ? D3DLOCK_NOOVERWRITE : D3DLOCK_DISCARD) != D3D_OK )
+			(DX8LockPointer) &verts, m_dwBase ? D3DLOCK_NOOVERWRITE : D3DLOCK_DISCARD) != D3D_OK )
 			return;	//couldn't lock buffer.
 
 		Int numberInBatch=0;
@@ -430,7 +429,7 @@ void W3DSnowManager::render(RenderInfoClass &rinfo)
     DX8Wrapper::Set_DX8_Render_State( D3DRS_POINTSCALE_C,  FtoDW(1.00f) );
 
 	DX8Wrapper::Set_DX8_Stream_Source(0, m_VertexBufferD3D, 0, sizeof(POINTVERTEX));
-    DX8Wrapper::_Get_D3D_Device8()->SetVertexShader( D3DFVF_POINTVERTEX );
+    DX8_SET_FVF(DX8Wrapper::_Get_D3D_Device8(), D3DFVF_POINTVERTEX);
 	m_dwBase = SNOW_BUFFER_SIZE;	//start with a new vertex buffer each frame.
 
 	m_leafDim = 45;	//cull boxes that are 20x20 emitters in size. Making them much smaller will result in too many draw calls.
