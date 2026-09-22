@@ -199,9 +199,9 @@ DX8_Stats	 DX8Wrapper::stats;
 **
 ***********************************************************************************/
 
-void Log_DX8_ErrorCode(unsigned res)
+void Log_DX8_ErrorCode(unsigned res,const char * file,int line)
 {
-	WWDEBUG_SAY((Get_D3D_Error_Name(res)));
+	WWDEBUG_SAY(("DX8 Error: %s, File: %s, Line: %d",Get_D3D_Error_Name(res),file,line));
 
 	WWASSERT(0);
 }
@@ -2833,8 +2833,10 @@ IDirect3DSurface8 * DX8Wrapper::_Create_DX8_Surface(unsigned int width, unsigned
 	WWASSERT(format!=D3DFMT_P8);
 
 #if defined(BUILD_WITH_D3D9)
-	// D3DPOOL_SCRATCH matches what D3D8 CreateImageSurface returned
-	DX8CALL(CreateOffscreenPlainSurface(width, height, WW3DFormat_To_D3DFormat(format), D3DPOOL_SCRATCH, &surface, nullptr));
+	// SCRATCH would match CreateImageSurface most closely, but the device cannot
+	// touch a scratch surface, and callers such as the shroud both lock these and
+	// use them as a copy source. SYSTEMMEM allows both.
+	DX8CALL(CreateOffscreenPlainSurface(width, height, WW3DFormat_To_D3DFormat(format), D3DPOOL_SYSTEMMEM, &surface, nullptr));
 #else
 	DX8CALL(CreateImageSurface(width, height, WW3DFormat_To_D3DFormat(format), &surface));
 #endif

@@ -478,20 +478,36 @@ HRESULT Filter_Texture_Mipmaps(IDirect3DTexture8* texture)
 			return hr;
 		}
 
-		BitmapHandlerClass::Copy_Image(
-			(unsigned char*)dest_rect.pBits,
-			dest_desc.Width,
-			dest_desc.Height,
-			dest_rect.Pitch,
-			format,
-			(unsigned char*)src_rect.pBits,
-			src_desc.Width,
-			src_desc.Height,
-			src_rect.Pitch,
-			format,
-			nullptr,
-			0,
-			false);
+		// Box filter each 2x2 block of the larger level down to one texel. Copy_Image
+		// cannot do this: it writes a same-size destination and takes any downsample
+		// through a separate mip surface.
+		const unsigned bpp=Get_Bytes_Per_Pixel(format);
+		const unsigned char* src=(const unsigned char*)src_rect.pBits;
+		unsigned char* dest=(unsigned char*)dest_rect.pBits;
+
+		for (unsigned y=0; y<dest_desc.Height; ++y)
+		{
+			const unsigned src_y0=(y*2 < src_desc.Height) ? y*2 : src_desc.Height-1;
+			const unsigned src_y1=(y*2+1 < src_desc.Height) ? y*2+1 : src_y0;
+			const unsigned char* row0=src+src_y0*src_rect.Pitch;
+			const unsigned char* row1=src+src_y1*src_rect.Pitch;
+			unsigned char* dest_row=dest+y*dest_rect.Pitch;
+
+			for (unsigned x=0; x<dest_desc.Width; ++x)
+			{
+				const unsigned src_x0=(x*2 < src_desc.Width) ? x*2 : src_desc.Width-1;
+				const unsigned src_x1=(x*2+1 < src_desc.Width) ? x*2+1 : src_x0;
+
+				unsigned p00,p01,p10,p11;
+				BitmapHandlerClass::Read_B8G8R8A8(p00,row0+src_x0*bpp,format,nullptr,0);
+				BitmapHandlerClass::Read_B8G8R8A8(p01,row0+src_x1*bpp,format,nullptr,0);
+				BitmapHandlerClass::Read_B8G8R8A8(p10,row1+src_x0*bpp,format,nullptr,0);
+				BitmapHandlerClass::Read_B8G8R8A8(p11,row1+src_x1*bpp,format,nullptr,0);
+
+				const unsigned averaged=BitmapHandlerClass::Combine_A8R8G8B8(p00,p01,p10,p11);
+				BitmapHandlerClass::Write_B8G8R8A8(dest_row+x*bpp,format,averaged);
+			}
+		}
 
 		texture->UnlockRect(level);
 		texture->UnlockRect(level-1);
@@ -532,11 +548,15 @@ HRESULT Load_Surface_From_Surface(
 	HRESULT hr=src_surface->LockRect(&locked_src, src_rect, D3DLOCK_READONLY);
 	if (FAILED(hr))
 	{
+		DEBUG_LOG(("Load_Surface_From_Surface: src lock failed 0x%08X pool=%d usage=0x%X fmt=%d -> dest pool=%d fmt=%d",
+			hr, src_desc.Pool, src_desc.Usage, src_desc.Format, dest_desc.Pool, dest_desc.Format));
 		return hr;
 	}
 	hr=dest_surface->LockRect(&locked_dest, dest_rect, 0);
 	if (FAILED(hr))
 	{
+		DEBUG_LOG(("Load_Surface_From_Surface: dest lock failed 0x%08X pool=%d usage=0x%X fmt=%d <- src pool=%d fmt=%d",
+			hr, dest_desc.Pool, dest_desc.Usage, dest_desc.Format, src_desc.Pool, src_desc.Format));
 		src_surface->UnlockRect();
 		return hr;
 	}

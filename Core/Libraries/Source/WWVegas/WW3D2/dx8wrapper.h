@@ -143,13 +143,17 @@ extern float DX8_DEPTH_BIAS_SCALE;
 #endif
 
 void DX8_Assert();
-void Log_DX8_ErrorCode(unsigned res);
+void Log_DX8_ErrorCode(unsigned res,const char * file,int line);
+void Non_Fatal_Log_DX8_ErrorCode(unsigned res,const char * file,int line);
 
-WWINLINE void DX8_ErrorCode(unsigned res)
+WWINLINE void DX8_ErrorCode_Impl(unsigned res, const char* file, int line)
 {
 	if (res==D3D_OK) return;
-	Log_DX8_ErrorCode(res);
+	Log_DX8_ErrorCode(res, file, line);
 }
+
+// Reports where the failure happened, which a bare error code does not
+#define DX8_ErrorCode(res) DX8_ErrorCode_Impl((res), __FILE__, __LINE__)
 
 #ifdef WWDEBUG
 #define DX8CALL_HRES(x,res) DX8_Assert(); res = DX8Wrapper::_Get_D3D_Device8()->x; DX8_ErrorCode(res); DX8Wrapper::Increment_DX8_CallCount();
@@ -1075,13 +1079,9 @@ WWINLINE void DX8Wrapper::Set_DX8_Indices(IDirect3DIndexBuffer8* index_buffer, U
 WWINLINE void DX8Wrapper::Draw_DX8_Indexed_Primitive(D3DPRIMITIVETYPE type, UINT min_index, UINT vertex_count, UINT start_index, UINT primitive_count)
 {
 #if defined(BUILD_WITH_D3D9)
-	// The base vertex index belongs to the vertex buffer, which can change without the
-	// index buffer changing, so prefer the live render state. Callers that drive the
-	// device directly have no render state and supply it through Set_DX8_Indices.
-	const INT base_vertex_index=render_state.index_buffer
-		? (INT)(render_state.index_base_offset+render_state.vba_offset)
-		: (INT)CurrentBaseVertexIndex;
-	DX8CALL(DrawIndexedPrimitive(type, base_vertex_index, min_index, vertex_count, start_index, primitive_count));
+	// D3D9 takes the base vertex index here rather than at SetIndices, so it comes
+	// from whichever caller bound the index buffer last.
+	DX8CALL(DrawIndexedPrimitive(type, (INT)CurrentBaseVertexIndex, min_index, vertex_count, start_index, primitive_count));
 #else
 	DX8CALL(DrawIndexedPrimitive(type, min_index, vertex_count, start_index, primitive_count));
 #endif
