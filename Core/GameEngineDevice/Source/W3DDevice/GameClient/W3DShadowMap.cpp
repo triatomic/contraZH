@@ -25,6 +25,8 @@
 #include "WW3D2/rinfo.h"
 #include "WW3D2/texture.h"
 #include "WW3D2/formconv.h"
+#include "WW3D2/ww3d.h"
+#include "WWMath/sphere.h"
 #include "WWMath/wwmath.h"
 #include "Common/Debug.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
@@ -58,20 +60,31 @@ static const Real SHADOW_RADIUS_STEP = 64.0f;
 static const Real SHADOW_RADIUS_MIN  = 600.0f;
 static const Real SHADOW_RADIUS_MAX  = 2600.0f;
 
+// The cull camera is perspective, because that is all CameraClass culls with. Placed
+// this far back along the sun ray its frustum is close enough to the ortho box.
+static const Real SHADOW_CULL_DISTANCE = 100000.0f;
+
 W3DShadowMap::W3DShadowMap()
 	: m_depthMode(DEPTH_MODE_NONE),
 	  m_resolution(SHADOW_MAP_RESOLUTION),
 	  m_colorTarget(nullptr),
 	  m_depthTarget(nullptr),
+	  m_cullCamera(nullptr),
+	  m_fittedCenter(0.0f, 0.0f, 0.0f),
+	  m_lightDirection(0.0f, 0.0f, -1.0f),
 	  m_depthBias(0.0f),
 	  m_fittedRadius(0.0f)
 {
+	m_sunView.Make_Identity();
+	m_sunProjection.Make_Identity();
 	m_sunViewProj.Make_Identity();
+	m_cullCamera = NEW_REF(CameraClass, ());
 }
 
 W3DShadowMap::~W3DShadowMap()
 {
 	ReleaseResources();
+	REF_PTR_RELEASE(m_cullCamera);
 }
 
 Bool W3DShadowMap::init()
@@ -93,6 +106,14 @@ Bool W3DShadowMap::ReAcquireResources()
 	const DX8Caps* caps = DX8Wrapper::Get_Current_Caps();
 	if (caps == nullptr)
 	{
+		return FALSE;
+	}
+
+	// Checked against the device caps because the engine's chipset table files every
+	// NVIDIA card since 2002 under GeForce4.
+	if (caps->Get_Vertex_Shader_Major_Version() < 2 || caps->Get_Pixel_Shader_Major_Version() < 2)
+	{
+		DEBUG_LOG(("W3DShadowMap: shader model 2 unavailable, falling back to legacy shadows"));
 		return FALSE;
 	}
 
@@ -169,8 +190,11 @@ void W3DShadowMap::updateFrustum(const CameraClass& camera, const Vector3& light
 	if (radius < SHADOW_RADIUS_MIN) radius = SHADOW_RADIUS_MIN;
 	if (radius > SHADOW_RADIUS_MAX) radius = SHADOW_RADIUS_MAX;
 	m_fittedRadius = radius;
+	m_fittedCenter = center;
+	m_lightDirection = lightDirection;
 
 	computeSunViewProjection(center, radius, lightDirection);
+	updateCullCamera(center, radius, lightDirection);
 
 	// A texel is square in the sun's view, but the ground it lands on is stretched
 	// along the light by 1/sin(elevation). Without that term a low sun self-shadows
@@ -183,6 +207,17 @@ void W3DShadowMap::updateFrustum(const CameraClass& camera, const Vector3& light
 
 	const Real worldPerTexel = (2.0f * radius) / (Real)m_resolution;
 	m_depthBias = (SHADOW_BIAS_TEXELS * worldPerTexel) / (sunElevation * (SHADOW_FAR - SHADOW_NEAR));
+}
+
+Bool W3DShadowMap::isCasterInRange(const SphereClass& bounds) const
+{
+	// The map is a box along the light, so a caster reaches it when its bounds come
+	// within the fitted radius of the light ray through the fitted centre.
+	Vector3 offset = bounds.Center - m_fittedCenter;
+	offset -= m_lightDirection * Vector3::Dot_Product(offset, m_lightDirection);
+
+	const Real reach = m_fittedRadius + bounds.Radius;
+	return offset.Length2() <= reach * reach;
 }
 
 void W3DShadowDepthMaterialPassClass::Install_Materials() const
@@ -200,7 +235,7 @@ void W3DShadowDepthMaterialPassClass::UnInstall_Materials() const
 void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 {
 #if RTS_ZEROHOUR
-	if (!isAvailable())
+	if (!isAvailable() || W3DShaderManager::getShaderPasses(W3DShaderManager::ST_SHADOW_DEPTH) == 0)
 	{
 		return;
 	}
@@ -213,58 +248,87 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 	}
 
 	DX8Wrapper::Set_Render_Target_With_Z(m_colorTarget, m_depthTarget);
-
 	DX8Wrapper::Clear(true, true, Vector3(1.0f, 1.0f, 1.0f), 1.0f);
 
-	// The sun winds triangles opposite to the camera, so an inherited cull mode would
-	// drop the casters out of the map entirely.
-	DX8Wrapper::Set_DX8_Render_State(D3DRS_CULLMODE, D3DCULL_NONE);
-	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, TRUE);
-	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZWRITEENABLE, TRUE);
-	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
-	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE, FALSE);
+	// Stencil is outside ShaderClass, so it is the one piece of inherited state that
+	// could reject casters.
+	const unsigned stencilEnable = DX8Wrapper::Get_DX8_Render_State(D3DRS_STENCILENABLE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, FALSE);
-	DX8Wrapper::Set_DX8_Render_State(D3DRS_FOGENABLE, FALSE);
-	DX8Wrapper::Set_DX8_Render_State(D3DRS_FILLMODE, D3DFILL_SOLID);
 
-	// Colour is dead weight on the hardware path, where only depth is read back.
-	if (m_depthMode == DEPTH_MODE_HARDWARE)
-	{
-		DX8Wrapper::Set_DX8_Render_State(D3DRS_COLORWRITEENABLE, 0);
-	}
+	// Vertex processing stays fixed function, so the device applies each caster's
+	// world transform. The mesh renderer sets it per mesh after the pass installs,
+	// where a vertex shader could not see it.
+	DX8Wrapper::Set_Transform(D3DTS_VIEW, m_sunView);
+	DX8Wrapper::Set_Transform(D3DTS_PROJECTION, m_sunProjection);
+
+	// A mesh with a sort level would otherwise go onto the static sort list and be
+	// drawn a second time in the main scene.
+	const bool staticSortLists = WW3D::Are_Static_Sort_Lists_Enabled();
+	WW3D::Enable_Static_Sort_Lists(false);
 
 	// Base passes are suppressed so each caster draws only through the depth pass.
-	rinfo.Push_Override_Flags(RenderInfoClass::RINFO_OVERRIDE_ADDITIONAL_PASSES_ONLY);
-	rinfo.Push_Material_Pass(&m_depthPass);
+	RenderInfoClass sunInfo(*m_cullCamera);
+	sunInfo.Push_Override_Flags(RenderInfoClass::RINFO_OVERRIDE_ADDITIONAL_PASSES_ONLY);
+	sunInfo.Push_Material_Pass(&m_depthPass);
 
 	if (TheW3DVolumetricShadowManager != nullptr)
 	{
-		TheW3DVolumetricShadowManager->renderShadowMapCasters(rinfo);
+		TheW3DVolumetricShadowManager->renderShadowMapCasters(sunInfo);
 	}
 
 	if (TheW3DProjectedShadowManager != nullptr)
 	{
-		TheW3DProjectedShadowManager->renderShadowMapCasters(rinfo);
+		TheW3DProjectedShadowManager->renderShadowMapCasters(sunInfo);
 	}
 
-	rinfo.Pop_Material_Pass();
-	rinfo.Pop_Override_Flags();
+	sunInfo.Pop_Material_Pass();
+	sunInfo.Pop_Override_Flags();
 
 	TheDX8MeshRenderer.Flush();
 
+	WW3D::Enable_Static_Sort_Lists(staticSortLists);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, stencilEnable);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_COLORWRITEENABLE, 0x0000000f);
 	DX8Wrapper::Set_Render_Target((IDirect3DSurface8 *)nullptr);
 	DX8Wrapper::Invalidate_Cached_Render_States();
 
-	// Only the hardware path has a depth texture to publish; the packed path carries
-	// its depth in the colour target, which receivers read through peekColorTarget.
-	if (m_depthMode == DEPTH_MODE_HARDWARE)
-	{
-		DX8Wrapper::Set_Shadow_Map(0, m_depthTarget);
-	}
+	// Restores the viewport, view and projection the scene was rendering with.
+	rinfo.Camera.Apply();
 #else
 	(void)rinfo;
 #endif
+}
+
+void W3DShadowMap::updateCullCamera(const Vector3& center, Real radius, const Vector3& lightDirection)
+{
+	// Matches the axes computeSunViewProjection builds, with X flipped because a camera
+	// looks down its own -Z and must stay right-handed.
+	Vector3 up(0.0f, 0.0f, 1.0f);
+	if (WWMath::Fabs(lightDirection.Z) > 0.99f)
+	{
+		up.Set(0.0f, 1.0f, 0.0f);
+	}
+
+	Vector3 xAxis;
+	Vector3::Cross_Product(up, lightDirection, &xAxis);
+	xAxis.Normalize();
+
+	Vector3 yAxis;
+	Vector3::Cross_Product(lightDirection, xAxis, &yAxis);
+
+	const Vector3 position = center - lightDirection * (SHADOW_FAR * 0.5f + SHADOW_CULL_DISTANCE);
+
+	Matrix3D transform(
+		-xAxis.X, yAxis.X, -lightDirection.X, position.X,
+		-xAxis.Y, yAxis.Y, -lightDirection.Y, position.Y,
+		-xAxis.Z, yAxis.Z, -lightDirection.Z, position.Z);
+
+	m_cullCamera->Set_Transform(transform);
+	m_cullCamera->Set_Clip_Planes(SHADOW_CULL_DISTANCE + SHADOW_NEAR, SHADOW_CULL_DISTANCE + SHADOW_FAR);
+
+	// Wide enough at the near plane to cover the corners of the square map.
+	const Real halfExtent = (radius * 1.5f) / SHADOW_CULL_DISTANCE;
+	m_cullCamera->Set_View_Plane(Vector2(-halfExtent, -halfExtent), Vector2(halfExtent, halfExtent));
 }
 
 void W3DShadowMap::computeSunViewProjection(const Vector3& center, Real radius,
@@ -291,43 +355,35 @@ void W3DShadowMap::computeSunViewProjection(const Vector3& center, Real radius,
 	Vector3 yAxis;
 	Vector3::Cross_Product(zAxis, xAxis, &yAxis);
 
-	Matrix4x4 view;
-	view[0].Set(xAxis.X, xAxis.Y, xAxis.Z, -Vector3::Dot_Product(xAxis, eye));
-	view[1].Set(yAxis.X, yAxis.Y, yAxis.Z, -Vector3::Dot_Product(yAxis, eye));
-	view[2].Set(zAxis.X, zAxis.Y, zAxis.Z, -Vector3::Dot_Product(zAxis, eye));
-	view[3].Set(0.0f, 0.0f, 0.0f, 1.0f);
+	m_sunView[0].Set(xAxis.X, xAxis.Y, xAxis.Z, -Vector3::Dot_Product(xAxis, eye));
+	m_sunView[1].Set(yAxis.X, yAxis.Y, yAxis.Z, -Vector3::Dot_Product(yAxis, eye));
+	m_sunView[2].Set(zAxis.X, zAxis.Y, zAxis.Z, -Vector3::Dot_Product(zAxis, eye));
+	m_sunView[3].Set(0.0f, 0.0f, 0.0f, 1.0f);
 
 	// Orthographic projection into the [0,1] depth range D3D expects.
 	const Real invRange = 1.0f / (SHADOW_FAR - SHADOW_NEAR);
 
-	Matrix4x4 projection;
-	projection.Make_Identity();
-	projection[0][0] = 1.0f / radius;
-	projection[1][1] = 1.0f / radius;
-	projection[2][2] = invRange;
-	projection[2][3] = -SHADOW_NEAR * invRange;
+	m_sunProjection.Make_Identity();
+	m_sunProjection[0][0] = 1.0f / radius;
+	m_sunProjection[1][1] = 1.0f / radius;
+	m_sunProjection[2][2] = invRange;
+	m_sunProjection[2][3] = -SHADOW_NEAR * invRange;
 
-	m_sunViewProj = projection * view;
+	// Snap the world origin to a whole texel so the texel grid stays fixed to the world.
+	// Without this, sub-texel drift while scrolling makes every shadow edge shimmer. The
+	// fitted centre cannot be the snap point, because it always projects to zero.
+	Matrix4x4 unsnapped = m_sunProjection * m_sunView;
+	Vector4 projected = unsnapped * Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 
-	// Snap the fitted centre to a whole texel. Without this, sub-texel drift while
-	// scrolling makes every shadow edge shimmer, which in an RTS is constant.
-	Vector4 origin(center.X, center.Y, center.Z, 1.0f);
-	Vector4 projected = m_sunViewProj * origin;
+	const Real halfMap = 0.5f * (Real)m_resolution;
 
-	if (WWMath::Fabs(projected.W) > WWMATH_EPSILON)
-	{
-		const Real halfMap = 0.5f * (Real)m_resolution;
+	Real x = projected.X * halfMap;
+	Real y = projected.Y * halfMap;
 
-		Real x = (projected.X / projected.W) * halfMap;
-		Real y = (projected.Y / projected.W) * halfMap;
+	// Exact in the projection because it is orthographic and the view's last row is
+	// (0,0,0,1), so the offset lands unchanged on every projected point.
+	m_sunProjection[0][3] += (WWMath::Floor(x + 0.5f) - x) / halfMap;
+	m_sunProjection[1][3] += (WWMath::Floor(y + 0.5f) - y) / halfMap;
 
-		Real offsetX = (WWMath::Floor(x + 0.5f) - x) / halfMap;
-		Real offsetY = (WWMath::Floor(y + 0.5f) - y) / halfMap;
-
-		// Exact as a post-projection translation because the projection is
-		// orthographic, and it applies identically to the depth pass and the
-		// lookups since both use this matrix.
-		m_sunViewProj[0][3] += offsetX;
-		m_sunViewProj[1][3] += offsetY;
-	}
+	m_sunViewProj = m_sunProjection * m_sunView;
 }

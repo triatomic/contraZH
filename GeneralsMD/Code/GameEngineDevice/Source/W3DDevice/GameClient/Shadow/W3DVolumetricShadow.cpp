@@ -3647,22 +3647,15 @@ void W3DVolumetricShadowManager::renderShadows( Bool forceStencilFill )
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Queue every enabled caster for the shadow map depth pass. Culling is left to the caller
-	because the sun frustum, not the camera frustum, decides what reaches the map. */
+/** Queue every enabled caster that can reach the shadow map for its depth pass. */
 //-------------------------------------------------------------------------------------------------
 void W3DVolumetricShadowManager::renderShadowMapCasters( RenderInfoClass &rinfo )
 {
 	for( W3DVolumetricShadow *shadow = m_shadowList; shadow; shadow = shadow->m_next )
 	{
-		if (!shadow->m_isEnabled || shadow->m_isInvisibleEnabled)
+		if (shadow->m_isEnabled && !shadow->m_isInvisibleEnabled && IsShadowMapCaster(shadow->m_robj))
 		{
-			continue;
-		}
-
-		RenderObjClass *robj = shadow->m_robj;
-		if (robj != nullptr)
-		{
-			robj->Render( rinfo );
+			shadow->m_robj->Render( rinfo );
 		}
 	}
 }

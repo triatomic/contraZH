@@ -49,6 +49,9 @@
 #include "WW3D2/statistics.h"
 #include "Common/Debug.h"
 #include "Common/PerfTimer.h"
+#include "GameClient/Drawable.h"
+#include "GameClient/DrawableInfo.h"
+#include "W3DDevice/GameClient/W3DShadowMap.h"
 
 #define SUN_DISTANCE_FROM_GROUND	10000.0f	//distance of sun (our only light source).
 
@@ -106,6 +109,24 @@ void DoDecals(RenderInfoClass & rinfo)
 {
 	if (TheW3DProjectedShadowManager)
 		TheW3DProjectedShadowManager->renderDecals(rinfo, true);	//above-water subset
+}
+
+Bool IsShadowMapCaster(RenderObjClass *robj)
+{
+	if (robj == nullptr || !robj->Is_Not_Hidden_At_All() || TheW3DShadowMap == nullptr)
+		return FALSE;
+
+	// Same test the scene uses to hide drawables, so a unit under shroud or stealth
+	// casts no shadow that would give it away.
+	DrawableInfo *drawInfo = (DrawableInfo *)robj->Get_User_Data();
+	if (drawInfo != nullptr && drawInfo->m_drawable != nullptr)
+	{
+		Drawable *draw = drawInfo->m_drawable;
+		if (draw->isDrawableEffectivelyHidden() || draw->getFullyObscuredByShroud())
+			return FALSE;
+	}
+
+	return TheW3DShadowMap->isCasterInRange(robj->Get_Bounding_Sphere());
 }
 
 W3DShadowManager::W3DShadowManager( void )

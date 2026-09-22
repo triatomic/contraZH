@@ -30,11 +30,12 @@
 
 class CameraClass;
 class RenderInfoClass;
+class SphereClass;
 class TextureClass;
 class ZTextureClass;
 
-// Installs the depth shader for one caster. The mesh renderer re-applies material
-// state per object, so the shader has to be installed per pass rather than once.
+// Installs the depth state for one caster. The mesh renderer re-applies material
+// state per object, so it has to be installed per pass rather than once.
 class W3DShadowDepthMaterialPassClass : public MaterialPassClass
 {
 public:
@@ -70,10 +71,15 @@ public:
 	// Fits the sun frustum to the ground the camera can see, for this frame.
 	void updateFrustum(const CameraClass& camera, const Vector3& lightPosWorld);
 
-	// Fills the map with caster depth. Binds its own render target and restores it.
+	// Fills the map with caster depth. Binds its own render target, then restores the
+	// back buffer and the camera in rinfo.
 	void renderDepthPass(RenderInfoClass& rinfo);
 
+	// True if a caster with these bounds can reach the fitted area of the map.
+	Bool isCasterInRange(const SphereClass& bounds) const;
+
 	const Matrix4x4& getSunViewProjection() const { return m_sunViewProj; }
+	const Matrix4x4& getSunProjection() const { return m_sunProjection; }
 	TextureClass* peekColorTarget() const { return m_colorTarget; }
 	ZTextureClass* peekDepthTarget() const { return m_depthTarget; }
 	Int getResolution() const { return m_resolution; }
@@ -84,13 +90,22 @@ public:
 protected:
 
 	void computeSunViewProjection(const Vector3& center, Real radius, const Vector3& lightDirection);
+	void updateCullCamera(const Vector3& center, Real radius, const Vector3& lightDirection);
 
 	DepthMode      m_depthMode;
 	Int            m_resolution;
 	TextureClass*  m_colorTarget;
 	ZTextureClass* m_depthTarget;
 
+	// The mesh renderer culls against a camera, so the depth pass needs one that
+	// contains the sun's box. It never reaches the device.
+	CameraClass*   m_cullCamera;
+
+	Matrix4x4      m_sunView;
+	Matrix4x4      m_sunProjection;
 	Matrix4x4      m_sunViewProj;
+	Vector3        m_fittedCenter;
+	Vector3        m_lightDirection;
 	Real           m_depthBias;
 	Real           m_fittedRadius;
 

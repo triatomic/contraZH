@@ -59,8 +59,6 @@ endfunction()
 
 set(RTS_SHADER_DIR "Core/GameEngineDevice/Source/W3DDevice/GameClient/Shaders")
 
-rts_add_shader("${RTS_SHADER_DIR}/shadowdepth.hlsl"   vs_2_0 mainVS        shadowdepth.vso)
-rts_add_shader("${RTS_SHADER_DIR}/shadowdepth.hlsl"   ps_2_0 mainPS        shadowdepth.pso)
 rts_add_shader("${RTS_SHADER_DIR}/shadowdepth.hlsl"   ps_2_0 mainPackedPS  shadowdepthpacked.pso)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main          terrainshadow.pso)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 mainPacked    terrainshadowpacked.pso)

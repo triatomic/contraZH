@@ -1488,22 +1488,16 @@ Int W3DProjectedShadowManager::renderShadows(RenderInfoClass & rinfo)
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Queue every enabled caster for the shadow map depth pass. The decal list is skipped: it
-	carries selection rings and status markers, which are not shadow casters. */
+/** Queue every enabled caster that can reach the shadow map for its depth pass. The decal list
+	is skipped because it carries selection rings and status markers, which cast nothing. */
 //-------------------------------------------------------------------------------------------------
 void W3DProjectedShadowManager::renderShadowMapCasters(RenderInfoClass & rinfo)
 {
 	for( W3DProjectedShadow *shadow = m_shadowList; shadow; shadow = shadow->m_next )
 	{
-		if (!shadow->m_isEnabled || shadow->m_isInvisibleEnabled)
+		if (shadow->m_isEnabled && !shadow->m_isInvisibleEnabled && IsShadowMapCaster(shadow->m_robj))
 		{
-			continue;
-		}
-
-		RenderObjClass *robj = shadow->m_robj;
-		if (robj != nullptr)
-		{
-			robj->Render( rinfo );
+			shadow->m_robj->Render( rinfo );
 		}
 	}
 }

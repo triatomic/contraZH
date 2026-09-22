@@ -80,6 +80,7 @@
 #include "W3DDevice/GameClient/W3DScorch.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/W3DShadow.h"
+#include "W3DDevice/GameClient/W3DShadowMap.h"
 #include "W3DDevice/GameClient/W3DWater.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
 #include "WW3D2/dx8wrapper.h"
@@ -418,6 +419,8 @@ void BaseHeightMapRenderObjClass::ReleaseResources()
 		TheTerrainTracksRenderObjClassSystem->ReleaseResources();
 	if (TheW3DShadowManager)
 		TheW3DShadowManager->ReleaseResources();
+	if (TheW3DShadowMap)
+		TheW3DShadowMap->ReleaseResources();
 	if (m_shroud)
 	{	m_shroud->reset();
 		m_shroud->ReleaseResources();
@@ -450,6 +453,10 @@ void BaseHeightMapRenderObjClass::ReleaseResources()
 //=============================================================================
 void BaseHeightMapRenderObjClass::ReAcquireResources()
 {
+	// Before the shader manager, whose depth shader picks its variant from the map.
+	if (TheW3DShadowMap)
+		TheW3DShadowMap->ReAcquireResources();
+
 	W3DShaderManager::init();	//reaquire resources which may be needed by custom shaders
 
 	if (TheWaterRenderObj)

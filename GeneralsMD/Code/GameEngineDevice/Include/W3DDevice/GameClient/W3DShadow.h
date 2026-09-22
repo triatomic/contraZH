@@ -68,3 +68,6 @@ protected:
 };
 
 extern W3DShadowManager *TheW3DShadowManager;
+
+/// true if robj should be drawn into the shadow map this frame.
+Bool IsShadowMapCaster(RenderObjClass *robj);
