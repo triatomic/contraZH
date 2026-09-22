@@ -244,6 +244,7 @@ public:
 	Bool m_useCloudPlane;
 	Bool m_useShadowVolumes;
 	Bool m_useShadowDecals;
+	Real m_shadowMapMinSunElevation;	///< GameData ShadowMapMinSunElevation: lowest sun, in degrees, the shadow map uses
 	Int  m_textureReductionFactor;	//how much to cut texture resolution: 2 is half, 3 is quarter, etc.
 	Bool m_enableBehindBuildingMarkers;
 	Real m_waterPositionX;

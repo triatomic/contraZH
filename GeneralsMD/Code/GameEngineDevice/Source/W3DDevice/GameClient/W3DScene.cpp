@@ -1359,7 +1359,8 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 		if (TheGlobalData->m_useShadowMap && (TheGlobalData->m_useShadowVolumes || TheGlobalData->m_useShadowDecals))
 		{
 			TheW3DShadowMap->setShadowColor(TheW3DShadowManager->getShadowColor());
-			TheW3DShadowMap->updateFrustum(rinfo.Camera, TheW3DShadowManager->getLightPosWorld(0));
+			TheW3DShadowMap->updateFrustum(rinfo.Camera, TheW3DShadowManager->getLightPosWorld(0),
+				TheGlobalData->m_shadowMapMinSunElevation);
 			TheW3DShadowMap->renderDepthPass(rinfo);
 		}
 		else

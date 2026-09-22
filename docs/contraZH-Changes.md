@@ -528,6 +528,13 @@ player cannot see.
 texture has an alpha channel, since unit textures often keep reflection masks there.
 * The map is 4096 texels across and follows the ground in view, so detail drops as the camera zooms
 out.
+* The sun is never lower than `ShadowMapMinSunElevation` degrees, 30 unless the mod's
+`GameData.ini` sets it, keeping the direction the map's lighting sets. Maps light their objects with
+low suns that the stencil volumes shortened per object, and one shared sun cannot, so without the
+floor shadows streaked several times their caster's height. At 30 degrees a shadow reaches at most
+about 1.7 times its caster's height. 0 turns the floor off.
+* Terrain casts too, so cliffs and hills shadow the ground below them. Only the terrain loaded
+around the camera casts, and the flat terrain mode does not yet.
 * Additive meshes on skinned models (infantry and other bone deformed meshes) do not glow. Their
 vertices only exist for the duration of the normal draw, so there is nothing left to draw again.
 

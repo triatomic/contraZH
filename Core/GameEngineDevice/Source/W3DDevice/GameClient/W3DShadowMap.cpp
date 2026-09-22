@@ -244,12 +244,24 @@ static Vector3 Ray_At_Height(const Vector3& nearPoint, const Vector3& farPoint, 
 	return nearPoint + (farPoint - nearPoint) * t;
 }
 
-void W3DShadowMap::updateFrustum(const CameraClass& camera, const Vector3& lightPosWorld)
+void W3DShadowMap::updateFrustum(const CameraClass& camera, const Vector3& lightPosWorld, Real minSunElevation)
 {
 	// The light is stored as a point pushed far along the sun ray, so the direction
 	// is simply toward the origin from there.
 	Vector3 lightDirection = -lightPosWorld;
 	lightDirection.Normalize();
+
+	// Shadow length is height over tan(elevation). Maps light their objects with low suns
+	// that the stencil volumes shortened per object, which one shared sun cannot, so the sun
+	// is lifted instead and every shadow shortens alike. Its heading is kept, and a sun
+	// straight overhead has none to keep and is already above any floor.
+	const Real minElevation = DEG_TO_RADF(minSunElevation);
+	const Real horizontal = WWMath::Sqrt(lightDirection.X * lightDirection.X + lightDirection.Y * lightDirection.Y);
+	if (-lightDirection.Z < WWMath::Sin(minElevation) && horizontal > WWMATH_EPSILON)
+	{
+		const Real scale = WWMath::Cos(minElevation) / horizontal;
+		lightDirection.Set(lightDirection.X * scale, lightDirection.Y * scale, -WWMath::Sin(minElevation));
+	}
 
 	// Fit to the terrain the camera can see. The frustum's own corners include the far
 	// plane, thousands of units away and below the ground, which drags the fit off the map.

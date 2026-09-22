@@ -73,8 +73,9 @@ public:
 	Bool hasDepth() const { return m_hasDepth; }
 	void clearDepth() { m_hasDepth = FALSE; }
 
-	// Fits the sun frustum to the ground the camera can see, for this frame.
-	void updateFrustum(const CameraClass& camera, const Vector3& lightPosWorld);
+	// Fits the sun frustum to the ground the camera can see, for this frame. The sun is
+	// lifted to minSunElevation degrees when it sits lower.
+	void updateFrustum(const CameraClass& camera, const Vector3& lightPosWorld, Real minSunElevation);
 
 	// Fills the map with caster depth. Binds its own render target, then restores the
 	// back buffer and the camera in rinfo.
