@@ -46,8 +46,12 @@
 
 W3DShadowMap* TheW3DShadowMap = nullptr;
 
-// 2048 gives ample texel density at RTS zoom for half the bandwidth of 4096.
-static const Int SHADOW_MAP_RESOLUTION = 2048;
+// With a NULL colour target the map costs only its depth, 64 MB at this size.
+static const Int SHADOW_MAP_RESOLUTION = 4096;
+
+#if defined(BUILD_WITH_D3D9)
+static const D3DFORMAT D3DFMT_NULL_TARGET = (D3DFORMAT)MAKEFOURCC('N', 'U', 'L', 'L');
+#endif
 
 // Depth range of the sun frustum. Shallow, because an RTS view covers a bounded
 // slab of ground rather than a deep scene.
@@ -69,7 +73,7 @@ static const Real SHADOW_FILTER_SPACING_TEXELS = 0.33f;
 // Quantising the fitted radius stops small zoom and scroll changes resizing the
 // frustum, which would make every shadow edge crawl.
 static const Real SHADOW_RADIUS_STEP = 64.0f;
-static const Real SHADOW_RADIUS_MIN  = 600.0f;
+static const Real SHADOW_RADIUS_MIN  = 300.0f;
 static const Real SHADOW_RADIUS_MAX  = 2600.0f;
 
 // The cull camera is perspective, because that is all CameraClass culls with. Placed
@@ -93,6 +97,7 @@ W3DShadowMap::W3DShadowMap()
 	  m_resolution(SHADOW_MAP_RESOLUTION),
 	  m_colorTarget(nullptr),
 	  m_depthTarget(nullptr),
+	  m_nullTarget(nullptr),
 	  m_cullCamera(nullptr),
 	  m_fittedCenter(0.0f, 0.0f, 0.0f),
 	  m_lightDirection(0.0f, 0.0f, -1.0f),
@@ -124,6 +129,11 @@ void W3DShadowMap::ReleaseResources()
 {
 	REF_PTR_RELEASE(m_colorTarget);
 	REF_PTR_RELEASE(m_depthTarget);
+	if (m_nullTarget != nullptr)
+	{
+		m_nullTarget->Release();
+		m_nullTarget = nullptr;
+	}
 	m_depthMode = DEPTH_MODE_NONE;
 	m_hasDepth = FALSE;
 }
@@ -152,15 +162,16 @@ Bool W3DShadowMap::ReAcquireResources()
 		return FALSE;
 	}
 
-	// A colour target is needed either way. The wrapper cannot bind a depth surface on
-	// its own, so the hardware path masks colour writes rather than skipping the target.
-	m_colorTarget = DX8Wrapper::Create_Render_Target(m_resolution, m_resolution,
-		WW3D_FORMAT_A8R8G8B8);
-
-	if (m_colorTarget == nullptr)
+	// Every target shares one size, so it is capped here rather than by each creator.
+	const D3DCAPS8 &deviceCaps = caps->Get_DX8_Caps();
+	m_resolution = SHADOW_MAP_RESOLUTION;
+	if (m_resolution > (Int)deviceCaps.MaxTextureWidth)
 	{
-		DEBUG_LOG(("W3DShadowMap: no usable render target, falling back to legacy shadows"));
-		return FALSE;
+		m_resolution = (Int)deviceCaps.MaxTextureWidth;
+	}
+	if (m_resolution > (Int)deviceCaps.MaxTextureHeight)
+	{
+		m_resolution = (Int)deviceCaps.MaxTextureHeight;
 	}
 
 	// Prefer sampling depth directly: the sampler does the compare and its bilinear
@@ -178,17 +189,59 @@ Bool W3DShadowMap::ReAcquireResources()
 		}
 	}
 
+#if defined(BUILD_WITH_D3D9)
+	// The wrapper cannot bind a depth surface alone, so the hardware path still needs a
+	// colour target. Called on the device directly, because an unsupported format is an
+	// expected answer here rather than an error worth logging.
+	if (m_depthMode == DEPTH_MODE_HARDWARE)
+	{
+		DX8Wrapper::_Get_D3D_Device8()->CreateRenderTarget(m_resolution, m_resolution,
+			D3DFMT_NULL_TARGET, D3DMULTISAMPLE_NONE, 0, FALSE, &m_nullTarget, nullptr);
+	}
+#endif
+
+	if (m_nullTarget == nullptr)
+	{
+		m_colorTarget = DX8Wrapper::Create_Render_Target(m_resolution, m_resolution,
+			WW3D_FORMAT_A8R8G8B8);
+
+		if (m_colorTarget == nullptr)
+		{
+			ReleaseResources();
+			DEBUG_LOG(("W3DShadowMap: no usable render target, falling back to legacy shadows"));
+			return FALSE;
+		}
+	}
+
 	if (m_depthMode == DEPTH_MODE_NONE)
 	{
 		// Fall back to encoding depth into the colour target.
 		m_depthMode = DEPTH_MODE_PACKED;
 	}
 
-	DEBUG_LOG(("W3DShadowMap: %dx%d, %s depth",
+	DEBUG_LOG(("W3DShadowMap: %dx%d, %s depth, %s colour target",
 		m_resolution, m_resolution,
-		m_depthMode == DEPTH_MODE_HARDWARE ? "hardware" : "packed"));
+		m_depthMode == DEPTH_MODE_HARDWARE ? "hardware" : "packed",
+		m_nullTarget != nullptr ? "null" : "RGBA8"));
 
 	return TRUE;
+}
+
+// Where the ray from near to far crosses the given height, or the end nearer to it when
+// the ray does not reach, as when it looks over the horizon.
+static Vector3 Ray_At_Height(const Vector3& nearPoint, const Vector3& farPoint, Real height)
+{
+	if (nearPoint.Z <= height)
+	{
+		return nearPoint;
+	}
+	if (farPoint.Z >= height)
+	{
+		return farPoint;
+	}
+
+	const Real t = (nearPoint.Z - height) / (nearPoint.Z - farPoint.Z);
+	return nearPoint + (farPoint - nearPoint) * t;
 }
 
 void W3DShadowMap::updateFrustum(const CameraClass& camera, const Vector3& lightPosWorld)
@@ -207,10 +260,45 @@ void W3DShadowMap::updateFrustum(const CameraClass& camera, const Vector3& light
 		return;
 	}
 
-	// Bounded with a circle rather than the box itself, so orbiting the camera does
-	// not reshape the frustum and set the shadows crawling.
-	const Vector3 center = visibleBox.Center;
-	Real radius = visibleBox.Extent.Length();
+	// Fit to where the camera's edge rays meet the ground, between the lowest and highest
+	// visible terrain. The box itself is far larger than the ground on screen once the
+	// camera tilts, and every unit of slack costs texel density.
+	const Real groundHeights[2] =
+	{
+		visibleBox.Center.Z - visibleBox.Extent.Z,
+		visibleBox.Center.Z + visibleBox.Extent.Z
+	};
+
+	const Vector3 *corners = camera.Get_Frustum_Corners();
+	Vector3 groundPoints[8];
+	Int pointCount = 0;
+
+	for (Int h = 0; h < 2; ++h)
+	{
+		for (Int i = 0; i < 4; ++i)
+		{
+			groundPoints[pointCount++] = Ray_At_Height(corners[i], corners[i + 4], groundHeights[h]);
+		}
+	}
+
+	Vector3 center(0.0f, 0.0f, 0.0f);
+	for (Int i = 0; i < pointCount; ++i)
+	{
+		center += groundPoints[i];
+	}
+	center /= (Real)pointCount;
+
+	// Bounded with a circle rather than the points themselves, so orbiting the camera
+	// does not reshape the frustum and set the shadows crawling.
+	Real radius = 0.0f;
+	for (Int i = 0; i < pointCount; ++i)
+	{
+		const Real distance = (groundPoints[i] - center).Length();
+		if (distance > radius)
+		{
+			radius = distance;
+		}
+	}
 
 	// Quantise so a small zoom leaves the extent alone.
 	radius = WWMath::Ceil(radius / SHADOW_RADIUS_STEP) * SHADOW_RADIUS_STEP;
@@ -354,8 +442,19 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 		return;
 	}
 
-	DX8Wrapper::Set_Render_Target_With_Z(m_colorTarget, m_depthTarget);
-	DX8Wrapper::Clear(true, true, Vector3(1.0f, 1.0f, 1.0f), 1.0f);
+	if (m_nullTarget != nullptr)
+	{
+		IDirect3DSurface8 *depthSurface = m_depthTarget->Get_D3D_Surface_Level();
+		DX8Wrapper::Set_Render_Target(m_nullTarget, depthSurface);
+		depthSurface->Release();
+	}
+	else
+	{
+		DX8Wrapper::Set_Render_Target_With_Z(m_colorTarget, m_depthTarget);
+	}
+
+	// A null colour target has nothing to clear.
+	DX8Wrapper::Clear(m_nullTarget == nullptr, true, Vector3(1.0f, 1.0f, 1.0f), 1.0f);
 
 	// Stencil is outside ShaderClass, so it is the one piece of inherited state that
 	// could reject casters. Read from the device because the wrapper's cache holds a

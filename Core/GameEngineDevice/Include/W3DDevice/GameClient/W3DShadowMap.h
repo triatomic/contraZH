@@ -27,6 +27,7 @@
 #include "WWMath/matrix4.h"
 #include "WWMath/vector3.h"
 #include "WW3D2/matpass.h"
+#include "WW3D2/dx8compat.h"
 
 class CameraClass;
 class RenderInfoClass;
@@ -126,6 +127,10 @@ protected:
 	Int            m_resolution;
 	TextureClass*  m_colorTarget;
 	ZTextureClass* m_depthTarget;
+
+	// A colour target in the driver's NULL format, which takes no memory. Used instead of
+	// m_colorTarget where supported, since the hardware path reads back only depth.
+	IDirect3DSurface8* m_nullTarget;
 
 	// The mesh renderer culls against a camera, so the depth pass needs one that
 	// contains the sun's box. It never reaches the device.
