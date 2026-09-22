@@ -44,7 +44,11 @@
 
 class DX8Wrapper;
 class SortingRendererClass;
+#if defined(BUILD_WITH_D3D9)
+#include "WW3D2/dx8compat.h"
+#else
 struct IDirect3DIndexBuffer8;
+#endif
 class DX8IndexBufferClass;
 class SortingIndexBufferClass;
 

@@ -78,6 +78,14 @@ typedef IDirect3DIndexBuffer9*  LPDIRECT3DINDEXBUFFER8;
 #define D3DTSS_MAXMIPLEVEL   ((D3DTEXTURESTAGESTATETYPE)20)
 #define D3DTSS_MAXANISOTROPY ((D3DTEXTURESTAGESTATETYPE)21)
 
+// D3D9 dropped the cubic filter modes. No hardware ever exposed them, so these
+// survive only to keep the debug name table compiling and to let the wrapper
+// clamp them to linear.
+#define D3DTEXF_FLATCUBIC_D3D8     4
+#define D3DTEXF_GAUSSIANCUBIC_D3D8 5
+#define D3DTEXF_FLATCUBIC          ((D3DTEXTUREFILTERTYPE)D3DTEXF_FLATCUBIC_D3D8)
+#define D3DTEXF_GAUSSIANCUBIC      ((D3DTEXTUREFILTERTYPE)D3DTEXF_GAUSSIANCUBIC_D3D8)
+
 #define D3DENUM_NO_WHQL_LEVEL 0
 
 #else

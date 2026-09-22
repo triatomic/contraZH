@@ -49,7 +49,11 @@
 #define BROWSEROPTION_SCROLLBARS		0x0001
 #define BROWSEROPTION_3DBORDER		0x0002
 
+#if defined(BUILD_WITH_D3D9)
+#include "WW3D2/dx8compat.h"
+#else
 struct IDirect3DDevice8;
+#endif
 
 /**
 ** DX8WebBrowser

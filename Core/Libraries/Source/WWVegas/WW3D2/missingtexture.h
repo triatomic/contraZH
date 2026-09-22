@@ -20,8 +20,12 @@
 
 #include "WWLib/always.h"
 
+#if defined(BUILD_WITH_D3D9)
+#include "WW3D2/dx8compat.h"
+#else
 struct IDirect3DTexture8;
 struct IDirect3DSurface8;
+#endif
 
 class MissingTexture
 {

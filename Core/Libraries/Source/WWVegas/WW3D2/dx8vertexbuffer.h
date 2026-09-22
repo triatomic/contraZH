@@ -53,7 +53,11 @@ class Vector4;
 class StringClass;
 class DX8VertexBufferClass;
 class FVFInfoClass;
+#if defined(BUILD_WITH_D3D9)
+#include "WW3D2/dx8compat.h"
+#else
 struct IDirect3DVertexBuffer8;
+#endif
 class VertexBufferClass;
 struct VertexFormatXYZNDUV2;
 

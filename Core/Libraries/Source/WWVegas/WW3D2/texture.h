@@ -49,10 +49,14 @@
 #include "WWMath/vector3.h"
 #include "texturefilter.h"
 
+#if defined(BUILD_WITH_D3D9)
+#include "WW3D2/dx8compat.h"
+#else
 struct IDirect3DBaseTexture8;
 struct IDirect3DTexture8;
 struct IDirect3DCubeTexture8;
 struct IDirect3DVolumeTexture8;
+#endif
 
 class DX8Wrapper;
 class TextureLoader;

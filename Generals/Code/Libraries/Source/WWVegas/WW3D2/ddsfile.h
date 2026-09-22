@@ -25,8 +25,12 @@
 #include "WWLib/wwstring.h"
 #include "WWMath/vector3.h"
 
+#if defined(BUILD_WITH_D3D9)
+#include "WW3D2/dx8compat.h"
+#else
 struct IDirect3DSurface8;
 struct IDirect3DVolume8;
+#endif
 
 // ----------------------------------------------------------------------------
 //

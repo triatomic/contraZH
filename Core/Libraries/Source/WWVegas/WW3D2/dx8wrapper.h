@@ -135,6 +135,13 @@ struct DX8FrameStatistics
 
 extern bool _DX8SingleThreaded;
 
+#if defined(BUILD_WITH_D3D9)
+// Converts a D3D8 ZBIAS level to a D3D9 depth bias. There is no correct formula,
+// because ZBIAS was driver defined, so this is tuned against the D3D8 build.
+// Only levels 7 and 8 are ever set; see the decal and water track passes.
+extern float DX8_DEPTH_BIAS_SCALE;
+#endif
+
 void DX8_Assert();
 void Log_DX8_ErrorCode(unsigned res);
 
@@ -335,12 +342,20 @@ public:
 	static void Set_DX8_Render_State(D3DRENDERSTATETYPE state, unsigned value);
 	static void Set_DX8_Clip_Plane(DWORD Index, CONST float* pPlane);
 	static void Set_DX8_Texture_Stage_State(unsigned stage, D3DTEXTURESTAGESTATETYPE state, unsigned value);
+#if defined(BUILD_WITH_D3D9)
+	// Remaps the states D3D9 renamed, moved to the sampler, or dropped, so the
+	// call sites keep using the D3D8 names.
+	static void Set_D3D9_Render_State(D3DRENDERSTATETYPE state, unsigned value);
+	static void Set_D3D9_Texture_Stage_State(unsigned stage, D3DTEXTURESTAGESTATETYPE state, unsigned value);
+	static unsigned Filter_To_D3D9(unsigned value);
+#endif
 	static void Set_DX8_Texture(unsigned int stage, IDirect3DBaseTexture8* texture);
 
 	// Single funnels for the binding calls whose signatures differ between D3D8 and D3D9
 	static void Set_DX8_Stream_Source(UINT stream, IDirect3DVertexBuffer8* vertex_buffer, UINT offset, UINT stride);
 	static void Set_DX8_Indices(IDirect3DIndexBuffer8* index_buffer, UINT base_vertex_index);
 	static HRESULT Set_DX8_Render_Target_Surfaces(IDirect3DSurface8* render_target, IDirect3DSurface8* depth_stencil);
+	static void Draw_DX8_Indexed_Primitive(D3DPRIMITIVETYPE type, UINT min_index, UINT vertex_count, UINT start_index, UINT primitive_count);
 
 	static void Set_Light_Environment(LightEnvironmentClass* light_env);
 	static LightEnvironmentClass* Get_Light_Environment() { return Light_Environment; }
@@ -673,6 +688,10 @@ protected:
 
 	static bool								world_identity;
 	static unsigned						RenderStates[256];
+#if defined(BUILD_WITH_D3D9)
+	// D3D9 takes the base vertex index at the draw call rather than at SetIndices
+	static UINT							CurrentBaseVertexIndex;
+#endif
 	static unsigned						TextureStageStates[MAX_TEXTURE_STAGES][32];
 	static IDirect3DBaseTexture8 *	Textures[MAX_TEXTURE_STAGES];
 
@@ -872,9 +891,46 @@ WWINLINE void DX8Wrapper::Set_DX8_Render_State(D3DRENDERSTATETYPE state, unsigne
 #endif
 
 	RenderStates[state]=value;
+#if defined(BUILD_WITH_D3D9)
+	Set_D3D9_Render_State(state, value);
+#else
 	DX8CALL(SetRenderState( state, value ));
+#endif
 	DX8_RECORD_RENDER_STATE_CHANGE();
 }
+
+#if defined(BUILD_WITH_D3D9)
+WWINLINE void DX8Wrapper::Set_D3D9_Render_State(D3DRENDERSTATETYPE state, unsigned value)
+{
+	switch (state)
+	{
+	case D3DRS_ZBIAS:
+		{
+			// D3D8 took a 0..16 integer biased toward the viewer; D3D9 takes a float
+			// bias added to the depth value, so the sign flips.
+			const float bias = -static_cast<float>(value) * DX8_DEPTH_BIAS_SCALE;
+			DX8CALL(SetRenderState( D3DRS_DEPTHBIAS, *reinterpret_cast<const DWORD*>(&bias) ));
+		}
+		return;
+
+	case D3DRS_SOFTWAREVERTEXPROCESSING:
+		DX8CALL(SetSoftwareVertexProcessing( value ));
+		return;
+
+	// No D3D9 equivalent. N-patches are gated on Support_NPatches(), which no
+	// modern driver reports, so that path is already dead.
+	case D3DRS_EDGEANTIALIAS:
+	case D3DRS_LINEPATTERN:
+	case D3DRS_ZVISIBLE:
+	case D3DRS_PATCHSEGMENTS:
+		return;
+
+	default:
+		DX8CALL(SetRenderState( state, value ));
+		return;
+	}
+}
+#endif
 
 WWINLINE void DX8Wrapper::Set_DX8_Clip_Plane(DWORD Index, CONST float* pPlane)
 {
@@ -902,9 +958,53 @@ WWINLINE void DX8Wrapper::Set_DX8_Texture_Stage_State(unsigned stage, D3DTEXTURE
 #endif
 
 	TextureStageStates[stage][(unsigned int)state]=value;
+#if defined(BUILD_WITH_D3D9)
+	Set_D3D9_Texture_Stage_State(stage, state, value);
+#else
 	DX8CALL(SetTextureStageState( stage, state, value ));
+#endif
 	DX8_RECORD_TEXTURE_STAGE_STATE_CHANGE();
 }
+
+#if defined(BUILD_WITH_D3D9)
+WWINLINE void DX8Wrapper::Set_D3D9_Texture_Stage_State(unsigned stage, D3DTEXTURESTAGESTATETYPE state, unsigned value)
+{
+	switch (state)
+	{
+	case D3DTSS_ADDRESSU:  DX8CALL(SetSamplerState( stage, D3DSAMP_ADDRESSU, value ));  return;
+	case D3DTSS_ADDRESSV:  DX8CALL(SetSamplerState( stage, D3DSAMP_ADDRESSV, value ));  return;
+	case D3DTSS_ADDRESSW:  DX8CALL(SetSamplerState( stage, D3DSAMP_ADDRESSW, value ));  return;
+	case D3DTSS_BORDERCOLOR:   DX8CALL(SetSamplerState( stage, D3DSAMP_BORDERCOLOR, value ));   return;
+	case D3DTSS_MIPMAPLODBIAS: DX8CALL(SetSamplerState( stage, D3DSAMP_MIPMAPLODBIAS, value )); return;
+	case D3DTSS_MAXMIPLEVEL:   DX8CALL(SetSamplerState( stage, D3DSAMP_MAXMIPLEVEL, value ));   return;
+	case D3DTSS_MAXANISOTROPY: DX8CALL(SetSamplerState( stage, D3DSAMP_MAXANISOTROPY, value )); return;
+
+	// D3D9 dropped the cubic filter modes
+	case D3DTSS_MAGFILTER:
+		DX8CALL(SetSamplerState( stage, D3DSAMP_MAGFILTER, Filter_To_D3D9(value) ));
+		return;
+	case D3DTSS_MINFILTER:
+		DX8CALL(SetSamplerState( stage, D3DSAMP_MINFILTER, Filter_To_D3D9(value) ));
+		return;
+	case D3DTSS_MIPFILTER:
+		DX8CALL(SetSamplerState( stage, D3DSAMP_MIPFILTER, Filter_To_D3D9(value) ));
+		return;
+
+	default:
+		DX8CALL(SetTextureStageState( stage, state, value ));
+		return;
+	}
+}
+
+WWINLINE unsigned DX8Wrapper::Filter_To_D3D9(unsigned value)
+{
+	if (value == D3DTEXF_FLATCUBIC_D3D8 || value == D3DTEXF_GAUSSIANCUBIC_D3D8)
+	{
+		return D3DTEXF_LINEAR;
+	}
+	return value;
+}
+#endif
 
 WWINLINE void DX8Wrapper::Set_DX8_Texture(unsigned int stage, IDirect3DBaseTexture8* texture)
 {
@@ -926,23 +1026,52 @@ WWINLINE void DX8Wrapper::Set_DX8_Texture(unsigned int stage, IDirect3DBaseTextu
 
 WWINLINE void DX8Wrapper::Set_DX8_Stream_Source(UINT stream, IDirect3DVertexBuffer8* vertex_buffer, UINT offset, UINT stride)
 {
+#if defined(BUILD_WITH_D3D9)
+	DX8CALL(SetStreamSource(stream, vertex_buffer, offset, stride));
+#else
 	// D3D8 has no stream offset; callers must rebase the buffer pointer instead
 	WWASSERT(offset == 0);
 	DX8CALL(SetStreamSource(stream, vertex_buffer, stride));
+#endif
 }
 
 WWINLINE void DX8Wrapper::Set_DX8_Indices(IDirect3DIndexBuffer8* index_buffer, UINT base_vertex_index)
 {
+#if defined(BUILD_WITH_D3D9)
+	// D3D9 moved the base vertex index to the draw call
+	CurrentBaseVertexIndex = base_vertex_index;
+	DX8CALL(SetIndices(index_buffer));
+#else
 	DX8CALL(SetIndices(index_buffer, base_vertex_index));
+#endif
+}
+
+WWINLINE void DX8Wrapper::Draw_DX8_Indexed_Primitive(D3DPRIMITIVETYPE type, UINT min_index, UINT vertex_count, UINT start_index, UINT primitive_count)
+{
+#if defined(BUILD_WITH_D3D9)
+	DX8CALL(DrawIndexedPrimitive(type, CurrentBaseVertexIndex, min_index, vertex_count, start_index, primitive_count));
+#else
+	DX8CALL(DrawIndexedPrimitive(type, min_index, vertex_count, start_index, primitive_count));
+#endif
 }
 
 WWINLINE HRESULT DX8Wrapper::Set_DX8_Render_Target_Surfaces(IDirect3DSurface8* render_target, IDirect3DSurface8* depth_stencil)
 {
 	HRESULT hr;
+#if defined(BUILD_WITH_D3D9)
+	DX8CALL_HRES(SetRenderTarget(0, render_target), hr);
+	if (SUCCEEDED(hr))
+	{
+		// D3D8 passed the depth stencil alongside the target; D3D9 sets it separately
+		DX8CALL_HRES(SetDepthStencilSurface(depth_stencil), hr);
+	}
+#else
 	DX8CALL_HRES(SetRenderTarget(render_target, depth_stencil), hr);
+#endif
 	return hr;
 }
 
+#if !defined(BUILD_WITH_D3D9)
 WWINLINE void DX8Wrapper::_Copy_DX8_Rects(
   IDirect3DSurface8* pSourceSurface,
   CONST RECT* pSourceRectsArray,
@@ -958,6 +1087,7 @@ WWINLINE void DX8Wrapper::_Copy_DX8_Rects(
   pDestinationSurface,
   pDestPointsArray));
 }
+#endif
 
 WWINLINE Vector4 DX8Wrapper::Convert_Color(unsigned color)
 {

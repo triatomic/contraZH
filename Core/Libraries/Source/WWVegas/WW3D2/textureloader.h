@@ -43,7 +43,11 @@
 #include "texture.h"
 
 class StringClass;
+#if defined(BUILD_WITH_D3D9)
+#include "WW3D2/dx8compat.h"
+#else
 struct IDirect3DTexture8;
+#endif
 class TextureLoadTaskClass;
 class TextureLoadTaskListClass;
 

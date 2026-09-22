@@ -41,7 +41,11 @@
 #include "WWLib/always.h"
 #include "ww3dformat.h"
 
+#if defined(BUILD_WITH_D3D9)
+#include "WW3D2/dx8compat.h"
+#else
 struct IDirect3DSurface8;
+#endif
 class Vector2i;
 class Vector3;
 

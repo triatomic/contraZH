@@ -27,7 +27,11 @@
 class TextureClass;
 class RenderInfoClass;
 class DX8IndexBufferClass;
+#if defined(BUILD_WITH_D3D9)
+#include "WW3D2/dx8compat.h"
+#else
 struct IDirect3DSurface8;
+#endif
 struct VertexFormatXYZNDUV2;
 
 // Adds a soft glow around additive particles and additive meshes. The caller draws the particles a

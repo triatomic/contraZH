@@ -137,6 +137,9 @@ Vector3							DX8Wrapper::Ambient_Color;
 
 bool								DX8Wrapper::world_identity;
 unsigned							DX8Wrapper::RenderStates[256];
+#if defined(BUILD_WITH_D3D9)
+UINT								DX8Wrapper::CurrentBaseVertexIndex						= 0;
+#endif
 unsigned							DX8Wrapper::TextureStageStates[MAX_TEXTURE_STAGES][32];
 IDirect3DBaseTexture8 *		DX8Wrapper::Textures[MAX_TEXTURE_STAGES];
 RenderStateStruct				DX8Wrapper::render_state;
@@ -172,6 +175,10 @@ D3DADAPTER_IDENTIFIER8		DX8Wrapper::CurrentAdapterIdentifier;
 unsigned long DX8Wrapper::FrameCount = 0;
 
 bool								_DX8SingleThreaded										= false;
+
+#if defined(BUILD_WITH_D3D9)
+float								DX8_DEPTH_BIAS_SCALE									= 0.000005f;
+#endif
 
 static D3DPRESENT_PARAMETERS								_PresentParameters;
 static DynamicVectorClass<StringClass>					_RenderDeviceNameTable;
@@ -2034,12 +2041,12 @@ void DX8Wrapper::Draw_Sorting_IB_VB(
 	DX8_RECORD_INDEX_BUFFER_CHANGE();
 
 	DX8_RECORD_DRAW_CALLS();
-	DX8CALL(DrawIndexedPrimitive(
+	Draw_DX8_Indexed_Primitive(
 		D3DPT_TRIANGLELIST,
 		0,		// start vertex
 		vertex_count,
 		dyn_ib_access.IndexBufferOffset,
-		polygon_count));
+		polygon_count);
 
 	DX8_RECORD_RENDER(polygon_count,vertex_count,render_state.shader);
 }
@@ -2148,12 +2155,12 @@ void DX8Wrapper::Draw(
 				}*/
 				DX8_RECORD_RENDER(polygon_count,vertex_count,render_state.shader);
 				DX8_RECORD_DRAW_CALLS();
-				DX8CALL(DrawIndexedPrimitive(
+				Draw_DX8_Indexed_Primitive(
 					(D3DPRIMITIVETYPE)primitive_type,
 					min_vertex_index,
 					vertex_count,
 					start_index+render_state.iba_offset,
-					polygon_count));
+					polygon_count);
 			}
 			break;
 		case BUFFER_TYPE_SORTING:
@@ -2978,6 +2985,63 @@ void DX8Wrapper::_Update_Texture(TextureClass *system, TextureClass *video)
 	WWASSERT(video->Get_Pool()==TextureClass::POOL_DEFAULT);
 	DX8CALL(UpdateTexture(system->Peek_D3D_Base_Texture(),video->Peek_D3D_Base_Texture()));
 }
+
+#if defined(BUILD_WITH_D3D9)
+// D3D9 dropped CopyRects. The replacement depends on where the surfaces live:
+// UpdateSurface only reads system memory, StretchRect only reads the default pool.
+void DX8Wrapper::_Copy_DX8_Rects(
+	IDirect3DSurface8* pSourceSurface,
+	CONST RECT* pSourceRectsArray,
+	UINT cRects,
+	IDirect3DSurface8* pDestinationSurface,
+	CONST POINT* pDestPointsArray
+)
+{
+	WWASSERT(pSourceSurface);
+	WWASSERT(pDestinationSurface);
+
+	D3DSURFACE_DESC src_desc;
+	D3DSURFACE_DESC dest_desc;
+	if (FAILED(pSourceSurface->GetDesc(&src_desc)) || FAILED(pDestinationSurface->GetDesc(&dest_desc)))
+	{
+		return;
+	}
+
+	// A null rect array means the whole surface, which D3D9 spells as one full-size rect
+	RECT whole_surface;
+	POINT origin = { 0, 0 };
+	if (cRects == 0 || pSourceRectsArray == nullptr)
+	{
+		whole_surface.left = 0;
+		whole_surface.top = 0;
+		whole_surface.right = src_desc.Width;
+		whole_surface.bottom = src_desc.Height;
+		pSourceRectsArray = &whole_surface;
+		pDestPointsArray = nullptr;
+		cRects = 1;
+	}
+
+	for (UINT i = 0; i < cRects; ++i)
+	{
+		const RECT& src_rect = pSourceRectsArray[i];
+		const POINT dest_point = pDestPointsArray ? pDestPointsArray[i] : origin;
+
+		if (src_desc.Pool == D3DPOOL_DEFAULT && dest_desc.Pool == D3DPOOL_DEFAULT)
+		{
+			RECT dest_rect;
+			dest_rect.left = dest_point.x;
+			dest_rect.top = dest_point.y;
+			dest_rect.right = dest_point.x + (src_rect.right - src_rect.left);
+			dest_rect.bottom = dest_point.y + (src_rect.bottom - src_rect.top);
+			DX8CALL(StretchRect(pSourceSurface, &src_rect, pDestinationSurface, &dest_rect, D3DTEXF_NONE));
+		}
+		else
+		{
+			DX8CALL(UpdateSurface(pSourceSurface, &src_rect, pDestinationSurface, &dest_point));
+		}
+	}
+}
+#endif
 
 void DX8Wrapper::Compute_Caps(WW3DFormat display_format)
 {
