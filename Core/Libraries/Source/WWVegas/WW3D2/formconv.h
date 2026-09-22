@@ -50,6 +50,10 @@ D3DFORMAT WW3DFormat_To_D3DFormat(WW3DFormat ww3d_format);
 WW3DFormat D3DFormat_To_WW3DFormat(D3DFORMAT d3d_format);
 
 // Inverts in place of D3DXMatrixInverse, writing identity when singular
+WW3DFormat Get_Closest_Supported_Texture_Format(WW3DFormat format, bool render_target);
+
+const char* Get_D3D_Error_Name(unsigned res);
+
 void Invert_D3DMATRIX(D3DMATRIX& out, float* det_out, const D3DMATRIX& m);
 
 D3DMATRIX operator*(const D3DMATRIX& a, const D3DMATRIX& b);

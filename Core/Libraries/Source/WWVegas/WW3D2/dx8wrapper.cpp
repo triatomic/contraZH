@@ -202,32 +202,14 @@ DX8_Stats	 DX8Wrapper::stats;
 
 void Log_DX8_ErrorCode(unsigned res)
 {
-	char tmp[256]="";
-
-	HRESULT new_res=D3DXGetErrorStringA(
-		res,
-		tmp,
-		sizeof(tmp));
-
-	if (new_res==D3D_OK) {
-		WWDEBUG_SAY((tmp));
-	}
+	WWDEBUG_SAY((Get_D3D_Error_Name(res)));
 
 	WWASSERT(0);
 }
 
 void Non_Fatal_Log_DX8_ErrorCode(unsigned res,const char * file,int line)
 {
-	char tmp[256]="";
-
-	HRESULT new_res=D3DXGetErrorStringA(
-		res,
-		tmp,
-		sizeof(tmp));
-
-	if (new_res==D3D_OK) {
-		WWDEBUG_SAY(("DX8 Error: %s, File: %s, Line: %d",tmp,file,line));
-	}
+	WWDEBUG_SAY(("DX8 Error: %s, File: %s, Line: %d",Get_D3D_Error_Name(res),file,line));
 }
 
 // TheSuperHackers @info helmutbuhler 14/04/2025
@@ -2397,6 +2379,85 @@ void DX8Wrapper::Apply_Render_State_Changes()
 	SNAPSHOT_SAY(("DX8Wrapper::Apply_Render_State_Changes() - finished"));
 }
 
+// Stands in for D3DXCreateTexture, which picked the nearest supported format when
+// the requested one was unavailable.
+static HRESULT Create_D3D_Texture(
+	unsigned width,
+	unsigned height,
+	unsigned mip_level_count,
+	DWORD usage,
+	WW3DFormat format,
+	D3DPOOL pool,
+	IDirect3DTexture8** texture,
+	bool render_target)
+{
+	const WW3DFormat actual=Get_Closest_Supported_Texture_Format(format, render_target);
+
+	return DX8Wrapper::_Get_D3D_Device8()->CreateTexture(
+		width,
+		height,
+		mip_level_count,
+		usage,
+		WW3DFormat_To_D3DFormat(actual),
+		pool,
+		texture
+#if defined(BUILD_WITH_D3D9)
+		, nullptr
+#endif
+		);
+}
+
+static HRESULT Create_D3D_Cube_Texture(
+	unsigned edge_length,
+	unsigned mip_level_count,
+	DWORD usage,
+	WW3DFormat format,
+	D3DPOOL pool,
+	IDirect3DCubeTexture8** texture,
+	bool render_target)
+{
+	const WW3DFormat actual=Get_Closest_Supported_Texture_Format(format, render_target);
+
+	return DX8Wrapper::_Get_D3D_Device8()->CreateCubeTexture(
+		edge_length,
+		mip_level_count,
+		usage,
+		WW3DFormat_To_D3DFormat(actual),
+		pool,
+		texture
+#if defined(BUILD_WITH_D3D9)
+		, nullptr
+#endif
+		);
+}
+
+static HRESULT Create_D3D_Volume_Texture(
+	unsigned width,
+	unsigned height,
+	unsigned depth,
+	unsigned mip_level_count,
+	DWORD usage,
+	WW3DFormat format,
+	D3DPOOL pool,
+	IDirect3DVolumeTexture8** texture)
+{
+	const WW3DFormat actual=Get_Closest_Supported_Texture_Format(format, false);
+
+	return DX8Wrapper::_Get_D3D_Device8()->CreateVolumeTexture(
+		width,
+		height,
+		depth,
+		mip_level_count,
+		usage,
+		WW3DFormat_To_D3DFormat(actual),
+		pool,
+		texture
+#if defined(BUILD_WITH_D3D9)
+		, nullptr
+#endif
+		);
+}
+
 IDirect3DTexture8 * DX8Wrapper::_Create_DX8_Texture
 (
 	unsigned int width,
@@ -2420,15 +2481,7 @@ IDirect3DTexture8 * DX8Wrapper::_Create_DX8_Texture
 	// Render target may return NOTAVAILABLE, in
 	// which case we return null.
 	if (rendertarget) {
-		unsigned ret=D3DXCreateTexture(
-			DX8Wrapper::_Get_D3D_Device8(),
-			width,
-			height,
-			mip_level_count,
-			D3DUSAGE_RENDERTARGET,
-			WW3DFormat_To_D3DFormat(format),
-			pool,
-			&texture);
+		unsigned ret=Create_D3D_Texture(width, height, mip_level_count, D3DUSAGE_RENDERTARGET, format, pool, &texture, true);
 
 		if (ret==D3DERR_NOTAVAILABLE) {
 			Non_Fatal_Log_DX8_ErrorCode(ret,__FILE__,__LINE__);
@@ -2444,15 +2497,7 @@ IDirect3DTexture8 * DX8Wrapper::_Create_DX8_Texture
 			// Invalidate the mesh cache
 			WW3D::_Invalidate_Mesh_Cache();
 
-			ret=D3DXCreateTexture(
-				DX8Wrapper::_Get_D3D_Device8(),
-				width,
-				height,
-				mip_level_count,
-				D3DUSAGE_RENDERTARGET,
-				WW3DFormat_To_D3DFormat(format),
-				pool,
-				&texture);
+			ret=Create_D3D_Texture(width, height, mip_level_count, D3DUSAGE_RENDERTARGET, format, pool, &texture, true);
 
 			if (SUCCEEDED(ret)) {
 				WWDEBUG_SAY(("...Render target creation successful."));
@@ -2475,15 +2520,7 @@ IDirect3DTexture8 * DX8Wrapper::_Create_DX8_Texture
 	// We should never run out of video memory when allocating a non-rendertarget texture.
 	// However, it seems to happen sometimes when there are a lot of textures in memory and so
 	// if it happens we'll release assets and try again (anything is better than crashing).
-	unsigned ret=D3DXCreateTexture(
-		DX8Wrapper::_Get_D3D_Device8(),
-		width,
-		height,
-		mip_level_count,
-		0,
-		WW3DFormat_To_D3DFormat(format),
-		pool,
-		&texture);
+	unsigned ret=Create_D3D_Texture(width, height, mip_level_count, 0, format, pool, &texture, false);
 
 	// If ran out of texture ram, try invalidating some textures and mesh cache.
 	if (ret==D3DERR_OUTOFVIDEOMEMORY) {
@@ -2494,15 +2531,7 @@ IDirect3DTexture8 * DX8Wrapper::_Create_DX8_Texture
 		// Invalidate the mesh cache
 		WW3D::_Invalidate_Mesh_Cache();
 
-		ret=D3DXCreateTexture(
-			DX8Wrapper::_Get_D3D_Device8(),
-			width,
-			height,
-			mip_level_count,
-			0,
-			WW3DFormat_To_D3DFormat(format),
-			pool,
-			&texture);
+		ret=Create_D3D_Texture(width, height, mip_level_count, 0, format, pool, &texture, false);
 		if (SUCCEEDED(ret)) {
 			WWDEBUG_SAY(("...Texture creation successful."));
 		}
@@ -2707,16 +2736,7 @@ IDirect3DCubeTexture8* DX8Wrapper::_Create_DX8_Cube_Texture
 	// which case we return null.
 	if (rendertarget)
 	{
-		unsigned ret=D3DXCreateCubeTexture
-		(
-			DX8Wrapper::_Get_D3D_Device8(),
-			width,
-			mip_level_count,
-			D3DUSAGE_RENDERTARGET,
-			WW3DFormat_To_D3DFormat(format),
-			pool,
-			&texture
-		);
+		unsigned ret=Create_D3D_Cube_Texture(width, mip_level_count, D3DUSAGE_RENDERTARGET, format, pool, &texture, true);
 
 		if (ret==D3DERR_NOTAVAILABLE)
 		{
@@ -2734,16 +2754,7 @@ IDirect3DCubeTexture8* DX8Wrapper::_Create_DX8_Cube_Texture
 			// Invalidate the mesh cache
 			WW3D::_Invalidate_Mesh_Cache();
 
-			ret=D3DXCreateCubeTexture
-			(
-				DX8Wrapper::_Get_D3D_Device8(),
-				width,
-				mip_level_count,
-				D3DUSAGE_RENDERTARGET,
-				WW3DFormat_To_D3DFormat(format),
-				pool,
-				&texture
-			);
+			ret=Create_D3D_Cube_Texture(width, mip_level_count, D3DUSAGE_RENDERTARGET, format, pool, &texture, true);
 
 			if (SUCCEEDED(ret))
 			{
@@ -2769,16 +2780,7 @@ IDirect3DCubeTexture8* DX8Wrapper::_Create_DX8_Cube_Texture
 	// We should never run out of video memory when allocating a non-rendertarget texture.
 	// However, it seems to happen sometimes when there are a lot of textures in memory and so
 	// if it happens we'll release assets and try again (anything is better than crashing).
-	unsigned ret=D3DXCreateCubeTexture
-	(
-		DX8Wrapper::_Get_D3D_Device8(),
-		width,
-		mip_level_count,
-		0,
-		WW3DFormat_To_D3DFormat(format),
-		pool,
-		&texture
-	);
+	unsigned ret=Create_D3D_Cube_Texture(width, mip_level_count, 0, format, pool, &texture, false);
 
 	// If ran out of texture ram, try invalidating some textures and mesh cache.
 	if (ret==D3DERR_OUTOFVIDEOMEMORY)
@@ -2790,16 +2792,7 @@ IDirect3DCubeTexture8* DX8Wrapper::_Create_DX8_Cube_Texture
 		// Invalidate the mesh cache
 		WW3D::_Invalidate_Mesh_Cache();
 
-		ret=D3DXCreateCubeTexture
-		(
-			DX8Wrapper::_Get_D3D_Device8(),
-			width,
-			mip_level_count,
-			0,
-			WW3DFormat_To_D3DFormat(format),
-			pool,
-			&texture
-		);
+		ret=Create_D3D_Cube_Texture(width, mip_level_count, 0, format, pool, &texture, false);
 		if (SUCCEEDED(ret))
 		{
 			WWDEBUG_SAY(("...Texture creation successful."));
@@ -2844,18 +2837,7 @@ IDirect3DVolumeTexture8* DX8Wrapper::_Create_DX8_Volume_Texture
 	// We should never run out of video memory when allocating a non-rendertarget texture.
 	// However, it seems to happen sometimes when there are a lot of textures in memory and so
 	// if it happens we'll release assets and try again (anything is better than crashing).
-	unsigned ret=D3DXCreateVolumeTexture
-	(
-		DX8Wrapper::_Get_D3D_Device8(),
-		width,
-		height,
-		depth,
-		mip_level_count,
-		0,
-		WW3DFormat_To_D3DFormat(format),
-		pool,
-		&texture
-	);
+	unsigned ret=Create_D3D_Volume_Texture(width, height, depth, mip_level_count, 0, format, pool, &texture);
 
 	// If ran out of texture ram, try invalidating some textures and mesh cache.
 	if (ret==D3DERR_OUTOFVIDEOMEMORY)
@@ -2867,18 +2849,7 @@ IDirect3DVolumeTexture8* DX8Wrapper::_Create_DX8_Volume_Texture
 		// Invalidate the mesh cache
 		WW3D::_Invalidate_Mesh_Cache();
 
-		ret=D3DXCreateVolumeTexture
-		(
-			DX8Wrapper::_Get_D3D_Device8(),
-			width,
-			height,
-			depth,
-			mip_level_count,
-			0,
-			WW3DFormat_To_D3DFormat(format),
-			pool,
-			&texture
-		);
+		ret=Create_D3D_Volume_Texture(width, height, depth, mip_level_count, 0, format, pool, &texture);
 		if (SUCCEEDED(ret))
 		{
 			WWDEBUG_SAY(("...Texture creation successful."));

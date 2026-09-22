@@ -38,6 +38,8 @@
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 #include "formconv.h"
 #include "WWMath/matrix4.h"
+#include "dx8wrapper.h"
+#include "dx8caps.h"
 
 D3DFORMAT WW3DFormatToD3DFormatConversionArray[WW3D_FORMAT_COUNT] = {
 	D3DFMT_UNKNOWN,
@@ -335,4 +337,95 @@ void Transpose_D3DMATRIX(D3DMATRIX& out, const D3DMATRIX& m)
 		}
 	}
 	out=result;
+}
+
+const char* Get_D3D_Error_Name(unsigned res)
+{
+	switch (res)
+	{
+	case D3D_OK:								return "D3D_OK";
+	case D3DERR_WRONGTEXTUREFORMAT:				return "D3DERR_WRONGTEXTUREFORMAT";
+	case D3DERR_UNSUPPORTEDCOLOROPERATION:		return "D3DERR_UNSUPPORTEDCOLOROPERATION";
+	case D3DERR_UNSUPPORTEDCOLORARG:			return "D3DERR_UNSUPPORTEDCOLORARG";
+	case D3DERR_UNSUPPORTEDALPHAOPERATION:		return "D3DERR_UNSUPPORTEDALPHAOPERATION";
+	case D3DERR_UNSUPPORTEDALPHAARG:			return "D3DERR_UNSUPPORTEDALPHAARG";
+	case D3DERR_TOOMANYOPERATIONS:				return "D3DERR_TOOMANYOPERATIONS";
+	case D3DERR_CONFLICTINGTEXTUREFILTER:		return "D3DERR_CONFLICTINGTEXTUREFILTER";
+	case D3DERR_UNSUPPORTEDFACTORVALUE:			return "D3DERR_UNSUPPORTEDFACTORVALUE";
+	case D3DERR_CONFLICTINGRENDERSTATE:			return "D3DERR_CONFLICTINGRENDERSTATE";
+	case D3DERR_UNSUPPORTEDTEXTUREFILTER:		return "D3DERR_UNSUPPORTEDTEXTUREFILTER";
+	case D3DERR_CONFLICTINGTEXTUREPALETTE:		return "D3DERR_CONFLICTINGTEXTUREPALETTE";
+	case D3DERR_DRIVERINTERNALERROR:			return "D3DERR_DRIVERINTERNALERROR";
+	case D3DERR_NOTFOUND:						return "D3DERR_NOTFOUND";
+	case D3DERR_MOREDATA:						return "D3DERR_MOREDATA";
+	case D3DERR_DEVICELOST:						return "D3DERR_DEVICELOST";
+	case D3DERR_DEVICENOTRESET:					return "D3DERR_DEVICENOTRESET";
+	case D3DERR_NOTAVAILABLE:					return "D3DERR_NOTAVAILABLE";
+	case D3DERR_OUTOFVIDEOMEMORY:				return "D3DERR_OUTOFVIDEOMEMORY";
+	case D3DERR_INVALIDDEVICE:					return "D3DERR_INVALIDDEVICE";
+	case D3DERR_INVALIDCALL:					return "D3DERR_INVALIDCALL";
+	case D3DERR_DRIVERINVALIDCALL:				return "D3DERR_DRIVERINVALIDCALL";
+#if defined(BUILD_WITH_D3D9)
+	case D3DERR_DEVICEHUNG:						return "D3DERR_DEVICEHUNG";
+	case D3DERR_DEVICEREMOVED:					return "D3DERR_DEVICEREMOVED";
+	case D3DERR_WASSTILLDRAWING:				return "D3DERR_WASSTILLDRAWING";
+	case D3DERR_UNSUPPORTEDOVERLAY:				return "D3DERR_UNSUPPORTEDOVERLAY";
+	case D3DERR_UNSUPPORTEDOVERLAYFORMAT:		return "D3DERR_UNSUPPORTEDOVERLAYFORMAT";
+	case D3DERR_CANNOTPROTECTCONTENT:			return "D3DERR_CANNOTPROTECTCONTENT";
+	case D3DERR_UNSUPPORTEDCRYPTO:				return "D3DERR_UNSUPPORTEDCRYPTO";
+	case D3DERR_PRESENT_STATISTICS_DISJOINT:	return "D3DERR_PRESENT_STATISTICS_DISJOINT";
+#endif
+	case E_OUTOFMEMORY:							return "E_OUTOFMEMORY";
+	case E_INVALIDARG:							return "E_INVALIDARG";
+	case E_FAIL:								return "E_FAIL";
+	default:									return "Unknown D3D error";
+	}
+}
+
+// D3DXCreateTexture silently substituted the nearest supported format. Nothing in
+// the engine checked what it got back, so the substitution has to be reproduced.
+WW3DFormat Get_Closest_Supported_Texture_Format(WW3DFormat format, bool render_target)
+{
+	const DX8Caps* caps=DX8Wrapper::Get_Current_Caps();
+
+	if (format==WW3D_FORMAT_UNKNOWN)
+	{
+		return WW3D_FORMAT_UNKNOWN;
+	}
+
+	const bool supported=render_target
+		? caps->Support_Render_To_Texture_Format(format)
+		: caps->Support_Texture_Format(format);
+
+	if (supported)
+	{
+		return format;
+	}
+
+	// Ordered by how much of the original each fallback preserves
+	static const WW3DFormat with_alpha[]=
+	{
+		WW3D_FORMAT_A8R8G8B8, WW3D_FORMAT_A1R5G5B5, WW3D_FORMAT_A4R4G4B4, WW3D_FORMAT_UNKNOWN
+	};
+	static const WW3DFormat without_alpha[]=
+	{
+		WW3D_FORMAT_X8R8G8B8, WW3D_FORMAT_R8G8B8, WW3D_FORMAT_R5G6B5, WW3D_FORMAT_X1R5G5B5,
+		WW3D_FORMAT_A8R8G8B8, WW3D_FORMAT_UNKNOWN
+	};
+
+	const WW3DFormat* candidates=Has_Alpha(format) ? with_alpha : without_alpha;
+
+	for (unsigned i=0; candidates[i]!=WW3D_FORMAT_UNKNOWN; ++i)
+	{
+		const bool candidate_supported=render_target
+			? caps->Support_Render_To_Texture_Format(candidates[i])
+			: caps->Support_Texture_Format(candidates[i]);
+
+		if (candidate_supported)
+		{
+			return candidates[i];
+		}
+	}
+
+	return format;
 }
