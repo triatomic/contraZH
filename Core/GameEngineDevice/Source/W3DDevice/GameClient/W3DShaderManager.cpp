@@ -1487,6 +1487,9 @@ void MaskTextureShader::reset()
 #if defined(BUILD_WITH_D3D9)
 
 ///Writes caster depth into the shadow map. Only the D3D9 backend has the shader model for it.
+///
+///Casters draw with their own textures and shaders, and this overrides the state those
+///shaders apply, so a cutout or blended mesh casts its shape rather than a solid block.
 class ShadowDepthShader : public W3DShaderInterface
 {
 public:
@@ -1496,6 +1499,8 @@ public:
 	virtual Int init() override;
 	virtual void reset() override;
 	virtual Int shutdown() override;
+
+	void applyOverride(const ShaderClass &shader);
 
 protected:
 
@@ -1507,6 +1512,15 @@ W3DShaderInterface *ShadowDepthShaderList[]=
 	&shadowDepthShader,
 	nullptr
 };
+
+static void Apply_Shadow_Depth_Override(const ShaderClass &shader)
+{
+	shadowDepthShader.applyOverride(shader);
+}
+
+// Matches the reference ShaderClass uses for its own alpha test, so a shadow's edge lines
+// up with the cutout the player sees.
+static const DWORD SHADOW_DEPTH_ALPHA_REFERENCE = 0x60;
 
 Int ShadowDepthShader::init()
 {
@@ -1531,55 +1545,95 @@ Int ShadowDepthShader::init()
 	return TRUE;
 }
 
+// Set once around the whole depth pass rather than per caster.
 Int ShadowDepthShader::set(Int pass)
 {
-	// Vertex processing stays fixed function, with the sun as view and projection, so
-	// only the fragment side is set up here.
-	ShaderClass shader = ShaderClass::_PresetOpaqueSolidShader;
-	shader.Set_Cull_Mode(ShaderClass::CULL_MODE_DISABLE);
-	DX8Wrapper::Set_Shader(shader);
+	DX8Wrapper::Set_Apply_Hook(&Apply_Shadow_Depth_Override);
+	return TRUE;
+}
 
-	VertexMaterialClass *vmat=VertexMaterialClass::Get_Preset(VertexMaterialClass::PRELIT_DIFFUSE);
-	DX8Wrapper::Set_Material(vmat);
-	REF_PTR_RELEASE(vmat);
+void ShadowDepthShader::applyOverride(const ShaderClass &shader)
+{
+	// The sun winds triangles opposite to the camera, so each shader's cull mode is dropped.
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_CULLMODE, D3DCULL_NONE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, TRUE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZFUNC, D3DCMP_LESSEQUAL);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_FOGENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, FALSE);
 
-	DX8Wrapper::Set_Texture(0,nullptr);
-	DX8Wrapper::Set_Texture(1,nullptr);
+	const ShaderClass::SrcBlendFuncType src = shader.Get_Src_Blend_Func();
+	const ShaderClass::DstBlendFuncType dst = shader.Get_Dst_Blend_Func();
+
+	// Alpha decides the shape only where the mesh's own shader cuts or blends by it. Many
+	// opaque textures carry masks in alpha, so testing those would punch holes in shadows.
+	Bool casts = TRUE;
+	Bool cutout = FALSE;
+	Bool inverted = (src == ShaderClass::SRCBLEND_ONE_MINUS_SRC_ALPHA);
+
+	if (shader.Uses_Alpha())
+	{
+		cutout = TRUE;
+	}
+	else if (src != ShaderClass::SRCBLEND_ONE || dst != ShaderClass::DSTBLEND_ZERO)
+	{
+		// Additive and multiplied passes are glows and effects, which cast nothing.
+		casts = FALSE;
+	}
+
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZWRITEENABLE, casts);
 
 	if (m_dwPixelShader == 0)
 	{
 		// Only depth is read back, so colour writes are wasted bandwidth.
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_COLORWRITEENABLE, 0);
-		return TRUE;
+		DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHATESTENABLE, cutout);
+
+		if (cutout)
+		{
+			DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHAREF, inverted ? 0xff - SHADOW_DEPTH_ALPHA_REFERENCE : SHADOW_DEPTH_ALPHA_REFERENCE);
+			DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHAFUNC, inverted ? D3DCMP_LESSEQUAL : D3DCMP_GREATEREQUAL);
+		}
+		return;
 	}
 
-	// The pixel shader gets the sun view-space position and maps its z to depth with the
-	// projection's z row, which is exact because the projection is orthographic.
-	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
-	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT3);
+	// The packed shader writes depth into colour, so its output alpha is not the mesh's
+	// and it cuts by the texture itself. Stage 1 hands it the sun view-space position,
+	// whose depth maps linearly through the projection's z row because it is orthographic.
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHATESTENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXCOORDINDEX, 0);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT3);
 
-	Matrix4x4 identity;
-	identity.Make_Identity();
-	DX8Wrapper::Set_Transform(D3DTS_TEXTURE0, identity);
+	D3DMATRIX identity;
+	Set_D3DMATRIX_Identity(identity);
+	DX8Wrapper::_Set_DX8_Transform(D3DTS_TEXTURE1, identity);
 
 	const Matrix4x4 &projection = TheW3DShadowMap->getSunProjection();
 	Vector4 depthRow(projection[2][2], projection[2][3], 0.0f, 0.0f);
 	DX8Wrapper::Set_Pixel_Shader_Constant(0, &depthRow, 1);
-	DX8Wrapper::Set_Pixel_Shader(m_dwPixelShader);
 
-	return TRUE;
+	// x is the cutoff, negative for none, and y selects inverted alpha.
+	Vector4 cutoff(cutout ? (Real)SHADOW_DEPTH_ALPHA_REFERENCE / 255.0f : -1.0f, inverted ? 1.0f : 0.0f, 0.0f, 0.0f);
+	DX8Wrapper::Set_Pixel_Shader_Constant(1, &cutoff, 1);
+
+	DX8Wrapper::Set_Pixel_Shader(m_dwPixelShader);
 }
 
 void ShadowDepthShader::reset()
 {
+	DX8Wrapper::Set_Apply_Hook(nullptr);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_COLORWRITEENABLE, 0x0000000f);
 
 	if (m_dwPixelShader != 0)
 	{
 		DX8Wrapper::Set_Pixel_Shader(0);
-		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXCOORDINDEX, 0);
-		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_TEXCOORDINDEX, 1);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
 	}
+
+	// The override changed state behind every shader's back, so they all reapply in full.
+	ShaderClass::Invalidate();
 }
 
 Int ShadowDepthShader::shutdown()

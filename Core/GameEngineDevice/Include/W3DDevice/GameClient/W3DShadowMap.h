@@ -34,16 +34,6 @@ class SphereClass;
 class TextureClass;
 class ZTextureClass;
 
-// Installs the depth state for one caster. The mesh renderer re-applies material
-// state per object, so it has to be installed per pass rather than once.
-class W3DShadowDepthMaterialPassClass : public MaterialPassClass
-{
-public:
-
-	virtual void Install_Materials() const override;
-	virtual void UnInstall_Materials() const override;
-};
-
 // Multiplies the sun's shadow into an object after its own passes. Objects light
 // fixed function, so this receives without reproducing their lighting in a shader.
 class W3DShadowReceiveMaterialPassClass : public MaterialPassClass
@@ -149,7 +139,6 @@ protected:
 	Bool           m_hasDepth;
 	CasterStats    m_casterStats;
 
-	W3DShadowDepthMaterialPassClass m_depthPass;
 	W3DShadowReceiveMaterialPassClass m_receivePass;
 };
 

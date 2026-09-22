@@ -376,6 +376,11 @@ public:
 
 	static void Apply_Render_State_Changes();	// Apply deferred render state changes (will be called automatically by Draw...)
 
+	// Runs at the end of every Apply_Render_State_Changes while set, after the object's own
+	// shader has applied, so a whole pass can override what each shader asks for.
+	typedef void (*ApplyHookType)(const ShaderClass& shader);
+	static void Set_Apply_Hook(ApplyHookType hook) { ApplyHook = hook; }
+
 	static void Draw_Triangles(
 		unsigned buffer_type,
 		unsigned short start_index,
@@ -723,6 +728,7 @@ protected:
 	static unsigned							DrawPolygonLowBoundLimit;
 
 	static bool								IsRenderToTexture;
+	static ApplyHookType					ApplyHook;
 
 	static int								ZBias;
 	static float							ZNear;

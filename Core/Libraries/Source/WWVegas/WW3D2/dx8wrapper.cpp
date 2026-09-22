@@ -154,6 +154,7 @@ IDirect3DSurface8 *			DX8Wrapper::CurrentDepthBuffer						= nullptr;
 IDirect3DSurface8 *			DX8Wrapper::DefaultRenderTarget						= nullptr;
 IDirect3DSurface8 *			DX8Wrapper::DefaultDepthBuffer						= nullptr;
 bool								DX8Wrapper::IsRenderToTexture							= false;
+DX8Wrapper::ApplyHookType			DX8Wrapper::ApplyHook									= nullptr;
 
 unsigned							DX8Wrapper::_MainThreadID								= 0;
 bool								DX8Wrapper::CurrentDX8LightEnables[4];
@@ -2392,6 +2393,11 @@ void DX8Wrapper::Apply_Render_State_Changes()
 	}
 
 	render_state_changed&=((unsigned)WORLD_IDENTITY|(unsigned)VIEW_IDENTITY);
+
+	if (ApplyHook != nullptr)
+	{
+		ApplyHook(render_state.shader);
+	}
 
 	SNAPSHOT_SAY(("DX8Wrapper::Apply_Render_State_Changes() - finished"));
 }

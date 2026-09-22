@@ -25,6 +25,7 @@
 #include "WW3D2/dx8caps.h"
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/rinfo.h"
+#include "WW3D2/sortingrenderer.h"
 #include "WW3D2/texture.h"
 #include "WW3D2/formconv.h"
 #include "WW3D2/ww3d.h"
@@ -327,16 +328,6 @@ void W3DShadowReceiveMaterialPassClass::UnInstall_Materials() const
 	W3DShaderManager::resetShader(W3DShaderManager::ST_SHADOW_MULTIPLY);
 }
 
-void W3DShadowDepthMaterialPassClass::Install_Materials() const
-{
-	W3DShaderManager::setShader(W3DShaderManager::ST_SHADOW_DEPTH, 0);
-}
-
-void W3DShadowDepthMaterialPassClass::UnInstall_Materials() const
-{
-	W3DShaderManager::resetShader(W3DShaderManager::ST_SHADOW_DEPTH);
-}
-
 // The caster lists live in the Zero Hour shadow managers, so Generals keeps its legacy
 // shadows and this pass does nothing there.
 void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
@@ -375,10 +366,10 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 	const bool staticSortLists = WW3D::Are_Static_Sort_Lists_Enabled();
 	WW3D::Enable_Static_Sort_Lists(false);
 
-	// Base passes are suppressed so each caster draws only through the depth pass.
+	// Casters draw with their own textures and shaders so cutouts keep their shape. The
+	// depth shader overrides the rest of each shader's state for as long as it is set.
 	RenderInfoClass sunInfo(*m_cullCamera);
-	sunInfo.Push_Override_Flags(RenderInfoClass::RINFO_OVERRIDE_ADDITIONAL_PASSES_ONLY);
-	sunInfo.Push_Material_Pass(&m_depthPass);
+	W3DShaderManager::setShader(W3DShaderManager::ST_SHADOW_DEPTH, 0);
 
 	memset(&m_casterStats, 0, sizeof(m_casterStats));
 
@@ -403,10 +394,13 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 	}
 	++passCount;
 
-	sunInfo.Pop_Material_Pass();
-	sunInfo.Pop_Override_Flags();
-
 	TheDX8MeshRenderer.Flush();
+
+	// Sorted meshes, often foliage, were deferred rather than drawn. Flushed here they
+	// draw into the map with the sun's matrices, and not into the main view later.
+	SortingRendererClass::Flush();
+
+	W3DShaderManager::resetShader(W3DShaderManager::ST_SHADOW_DEPTH);
 
 	WW3D::Enable_Static_Sort_Lists(staticSortLists);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, stencilEnable);
