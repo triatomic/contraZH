@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="740" height="290" viewBox="0 0 740 290">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker></defs>
+<rect x="20" y="150" width="700" height="130" fill="#3a7bd5" fill-opacity="0.15"/>
+<line x1="20" y1="150" x2="720" y2="150" stroke="#3a7bd5" stroke-width="2"/>
+<path d="M520,150 L540,60 L600,45 L640,70 L660,150 Z" fill="#8aa36b"/>
+<text x="560" y="38" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#333" font-weight="normal" text-anchor="start" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">cliff</text>
+<rect x="73" y="44" width="34" height="22" rx="4" fill="#333"/>
+<rect x="73" y="234" width="34" height="22" rx="4" fill="none" stroke="#333" stroke-dasharray="4 3"/>
+<text x="90" y="37" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#333" font-weight="normal" text-anchor="middle" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">camera</text>
+<text x="90" y="275" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#333" font-weight="normal" text-anchor="middle" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">mirrored camera</text>
+<line x1="107" y1="60" x2="330" y2="150" stroke="#333" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="330" y1="150" x2="560" y2="58.9583" stroke="#333" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="107" y1="240" x2="330" y2="150" stroke="#555" stroke-width="1.2" stroke-dasharray="5 4"/>
+<text x="330" y="172" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#333" font-weight="normal" text-anchor="middle" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">water pixel</text>
+<text x="190" y="210" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#555" font-weight="normal" text-anchor="start" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">Renders the scene upside down at half resolution;</text>
+<text x="190" y="226" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#555" font-weight="normal" text-anchor="start" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">nothing below the water plane goes into the mirror.</text>
+<text x="20" y="20" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#333" font-weight="bold" text-anchor="start" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">Planar reflection</text>
+<text x="720" y="250" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#333" font-weight="normal" text-anchor="end" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">ShaderWaterPlanarStrength: how much of it shows</text>
+<text x="720" y="266" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#333" font-weight="normal" text-anchor="end" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">ShaderWaterPlanarDistortion: how far waves bend it</text>
+</svg>

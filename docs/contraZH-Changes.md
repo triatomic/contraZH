@@ -407,69 +407,8 @@ stronger.
 
 ### Shader water
 
-Lakes, seas and rivers are shaded per pixel. The seabed ripples through the waves and fades into
-the water colour with depth, the surface mirrors the cliffs, trees, units and buildings around it
-against the map's skybox, the sun glints off the waves, and foam gathers along the shore and on swell
-crests. Unit, building and
-cliff shadows darken the water when shadow mapping is on. Needs the Direct3D 9 build and shader model 2.0a;
-other cards get the old water.
-
-* `ShowSoftWaterEdge = Yes` - (`Smooth water` in the options menu. On picks shader water, off the
-old flat water.)
-* `WaterReflections = Yes` - (`Water reflections` in the options menu, applied on Accept. No keeps
-only the skybox in the water. The mirror draws the scene a second time at half resolution. Needs
-`CheckWaterReflections` in `OptionsMenu.wnd` for the menu control.)
-
-The water colour and texture still come from `StandingWaterColor`, `StandingWaterTexture` and the
-time of day `DiffuseColor`. Tuned in the `WaterTransparency` block of `Water.ini`, and per map in
-`map.ini`:
-
-* `TransparentWaterDepth = 3.0` - (Depth over which the seabed fades out. Same key as the old water.)
-* `TransparentWaterMinOpacity = 1.0` - (Opacity of deep water. Same key as the old water.)
-* `ShaderWaterOpacity = 0.95` - (Opacity of deep water, replacing `TransparentWaterMinOpacity` for shader
-water. 0 uses `TransparentWaterMinOpacity` instead.)
-* `ShaderWaterClarity = 1.0` - (Scales `TransparentWaterDepth`. Higher sees deeper.)
-* `ShaderWaterReflection = 3.0` - (Scales the sky reflection. 0 turns it off.)
-* `ShaderWaterSpecular = 1.0` - (Scales the sun glint. 0 turns it off.)
-* `ShaderWaterRefraction = 0.015` - (How far the waves bend the seabed, as a fraction of the screen.)
-* `ShaderWaterWaveScale = 160` - (World units one wave pattern covers. Higher gives broader waves.)
-* `ShaderWaterWaveStrength = 0.3` - (Steepness of the waves. Drives glint, reflection and bending.)
-* `ShaderWaterFoamDepth = 6` - (Depth where shore foam fades out. 0 turns foam off.)
-* `ShaderWaterSwellHeight = 3.0` - (Height of the vertex waves that lift lakes and seas, in world
-units. 0 turns them off. Needs a shader model 3 card.)
-* `ShaderWaterSwellScale = 700` - (World units one swell pattern covers. Higher gives longer swells.)
-* `ShaderWaterPlanarStrength = 0.3` - (Reflection the mirrored scene adds on top of the sky's. 0
-leaves the mirror only at grazing angles.)
-* `ShaderWaterPlanarDistortion = 0.02` - (How far the waves bend the mirrored scene, as a fraction of
-the screen.)
-* `ShaderWaterPlanarFade = 4` - (Water at another height than the one under the view fades from the
-mirror to the skybox over this many world units.)
-
-Notes:
-* A normal map beside the water texture replaces the built-in waves, named like unit normal maps:
-`TWWater01_nrm.dds` for `TWWater01.tga`. It tiles every `ShaderWaterWaveScale` units, in the
-DirectX convention. DXT compressed with mipmaps; the game reads no other DDS layout.
-* The sky in the reflection is the map's skybox (`SkyboxTexture*` in `WaterTransparency`), dimmed by
-the map's lighting.
-* One water height is mirrored at a time, that of the flat water under the middle of the view. Water
-at other heights and sloping rivers show the skybox alone, as does a camera looking nearly level.
-* Particles, decals and shadows are left out of the reflection, and only objects near the view are
-mirrored.
-* Objects standing in or over the water are kept out of the refraction, so hulls and props don't
-smear into the waves.
-* Effects drawn after the water (smoke, fire, translucent models) are not bent by the waves.
-* `AdditiveBlending = Yes` water keeps the old look.
-* The swell heights come from `TWWater01_hgt.dds` beside the water texture when one exists
-(greyscale DXT with mipmaps, mid grey is the resting level), otherwise from the built-in waves.
-The height is read from alpha in a DXT5 file whose alpha varies, and from green otherwise. Rivers stay flat.
-* The vertex waves ride a round grid centred under the camera, fine close by and coarser towards
-the horizon, so the swell stays smooth at any zoom. It covers every flat lake and sea at a level,
-cut to their outlines per map cell. Standing water whose points differ in height by more than a
-unit keeps its own grid.
-* `scripts/water_maps.py` builds both textures from any image (needs Python with numpy and Pillow).
-* The `CONTRA_WATER` environment variable picks the water: `0` the old water, `1` shader water
-without vertex waves, `2` with them on each water area's own grid, `3` (the default) on the round
-grid.
+Lakes, seas and rivers are shaded per pixel, with refraction, reflection, sun glint, foam and
+vertex waves. Its options and `Water.ini` parameters are on [Water](Water.md).
 
 ### Hardware instancing
 
