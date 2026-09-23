@@ -445,6 +445,25 @@ Notes:
 * Terrain and tree textures ignore the texture reduction setting.
 * The `CONTRA_D3D9EX` environment variable set to `0` returns to a plain Direct3D 9 device.
 
+### Faster translucent effects
+
+Additive effects such as fire, glows, lasers and muzzle flashes skip depth sorting and draw in
+batches after the sorted smoke and other alpha blended effects. Sorted effects that share a texture
+and shader draw together instead of one draw per overlapping piece. Models with alpha blended
+materials (soft texture alpha, glass, canopies) sort back to front as whole objects and draw
+straight from video memory, between the sorted effects. Heavy battles with lots of smoke, fire and
+translucent models keep a higher frame rate. Direct3D 9 build only.
+
+Notes:
+* Fire and glows now always show on top of smoke, even smoke in front of them.
+* A translucent model's own triangles draw in file order, so a complex one seen through itself
+may layer wrongly.
+* Skinned translucent models and alpha tested models draw as before.
+* Multiply and screen blended effects still sort with the alpha blended ones.
+* The `CONTRA_BLENDSORT` environment variable helps track down rendering faults: `0` sorts every
+translucent triangle and draws each piece on its own, `1` adds the additive batches and shared
+draws, and `2` (the default) also sorts translucent models as whole objects.
+
 ### Laser ground glow
 
 Each laser beam lights the terrain along its length with up to twelve dynamic lights in the beam's

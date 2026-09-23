@@ -28,7 +28,7 @@ class SortingRendererClass
 	static bool _EnableTriangleDraw;
 
 	static void Flush_Sorting_Pool();
-	static void Insert_To_Sorted_List(SortingNodeStruct* state);
+	static void Flush_Additive_Pool();
 	static void Insert_To_Sorting_Pool(SortingNodeStruct* state);
 
 public:
@@ -49,6 +49,9 @@ public:
 	static void Deinit();
 
 	static void SetMinVertexBufferSize( unsigned val );
+
+	// Rigid translucent meshes keep their own buffers and sort as whole objects.
+	static bool Sorts_Meshes_Per_Object();
 
 	static void _Enable_Triangle_Draw(bool enable) { _EnableTriangleDraw=enable; }
 	static bool _Is_Triangle_Draw_Enabled() { return _EnableTriangleDraw; }

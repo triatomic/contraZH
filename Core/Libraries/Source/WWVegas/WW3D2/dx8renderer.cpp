@@ -3023,7 +3023,8 @@ static void Add_Rigid_Mesh_To_Container(FVFCategoryList* container_list,unsigned
 {
 	WWASSERT(container_list);
 	DX8FVFCategoryContainer * container = nullptr;
-	bool sorting=((!!mmc->Get_Flag(MeshModelClass::SORT)) && WW3D::Is_Sorting_Enabled() && (mmc->Get_Sort_Level() == SORT_LEVEL_NONE));
+	bool sorting=((!!mmc->Get_Flag(MeshModelClass::SORT)) && WW3D::Is_Sorting_Enabled() && (mmc->Get_Sort_Level() == SORT_LEVEL_NONE) &&
+		!SortingRendererClass::Sorts_Meshes_Per_Object());
 
 	FVFCategoryListIterator it(container_list);
 	while (!it.Is_Done()) {
