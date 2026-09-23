@@ -2085,6 +2085,12 @@ AGAIN:
 				if (numRenderTargetPolygons || numRenderTargetVertices)
 					Debug_Statistics::Record_DX8_Polys_And_Vertices(numRenderTargetPolygons,numRenderTargetVertices,ShaderClass::_PresetOpaqueShader);
 
+				// Inside the frame, so the frame count holds, and outside any view filter's render target.
+				if (TheWaterRenderObj)
+				{
+					TheWaterRenderObj->renderPlanarReflection(primaryW3DView->get3DCamera());
+				}
+
 				// draw all views of the world
 				drawViews();
 

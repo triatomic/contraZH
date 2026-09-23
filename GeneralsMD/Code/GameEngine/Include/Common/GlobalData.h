@@ -635,6 +635,7 @@ public:
   Bool m_useShadowMap;            ///< Options.ini ShadowMap: shadows come from a sun shadow map where the hardware allows
   Bool m_useSpecular;             ///< Options.ini Specular: per-pixel sun highlight on vehicles and structures where the hardware allows
   Bool m_useNormalMaps;           ///< Options.ini NormalMaps: bump detail in the sun's light on vehicles, structures and terrain where the hardware allows
+  Bool m_waterReflections;        ///< Options.ini WaterReflections: smooth water mirrors the terrain, units and buildings
   Bool m_specularDebug;           ///< Options.ini SpecularDebug: show what the specular pass covers and its highlight in magenta
   Bool m_normalMapDebug;          ///< Options.ini NormalMapDebug: show only the terrain's bump shading, on grey
   Color m_laserGlowColor;         ///< GameData LaserGroundGlowColor: black takes the beam color

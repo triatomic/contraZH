@@ -110,7 +110,13 @@ rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularnorma
 rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularnormalnoshadow.pso   SHADOWED=0 PACKED=0 BUMP=2)
 rts_add_shader("${RTS_SHADER_DIR}/bloomblur.hlsl"      ps_2_0 main bloomblur.pso)
 # The water shaders outgrow ps_2_0's instruction limit.
-rts_add_shader("${RTS_SHADER_DIR}/shaderwater.hlsl"    ps_2_a main shaderwater.pso              RIVER=0)
-rts_add_shader("${RTS_SHADER_DIR}/shaderwater.hlsl"    ps_2_a main shaderriver.pso              RIVER=1)
+rts_add_shader("${RTS_SHADER_DIR}/shaderwater.hlsl"    ps_2_a main shaderwater.pso              RIVER=0 PACKED=0)
+rts_add_shader("${RTS_SHADER_DIR}/shaderwater.hlsl"    ps_2_a main shaderwaterpacked.pso        RIVER=0 PACKED=1)
+rts_add_shader("${RTS_SHADER_DIR}/shaderwater.hlsl"    ps_2_a main shaderriver.pso              RIVER=1 PACKED=0)
+rts_add_shader("${RTS_SHADER_DIR}/shaderwater.hlsl"    ps_2_a main shaderriverpacked.pso        RIVER=1 PACKED=1)
+# Vertex waves read a texture in the vertex shader, which needs shader model 3 on both ends.
+rts_add_shader("${RTS_SHADER_DIR}/shaderwaterswell.hlsl" vs_3_0 main shaderwaterswell.vso)
+rts_add_shader("${RTS_SHADER_DIR}/shaderwater.hlsl"    ps_3_0 main shaderwaterswell.pso         RIVER=0 SWELL=1 PACKED=0)
+rts_add_shader("${RTS_SHADER_DIR}/shaderwater.hlsl"    ps_3_0 main shaderwaterswellpacked.pso   RIVER=0 SWELL=1 PACKED=1)
 
 add_custom_target(rts_shaders ALL DEPENDS ${RTS_SHADER_OUTPUTS})

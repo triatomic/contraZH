@@ -1474,11 +1474,17 @@ void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pD
 
 	// TheSuperHackers @tweak The tree sway, topple and sink time steps are now decoupled from the render update.
 	const Real timeScale = TheFramePacer->getActualLogicTimeScaleOverFpsRatio();
+
+	// The water reflection draws the trees before the main view, which alone advances them.
+	const Bool mirror = ShaderClass::Is_Backface_Culling_Inverted();
 	Vector3 swayFactor[MAX_SWAY_TYPES];
 	Int i;
 	for (i=0; i<MAX_SWAY_TYPES; i++)
 	{
-		m_curSwayOffset[i] += m_curSwayStep[i] * timeScale;
+		if (!mirror)
+		{
+			m_curSwayOffset[i] += m_curSwayStep[i] * timeScale;
+		}
 		if (m_curSwayOffset[i] > NUM_SWAY_ENTRIES-1) {
 			m_curSwayOffset[i] -= NUM_SWAY_ENTRIES-1;
 		}
@@ -1500,13 +1506,13 @@ void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pD
 	if (m_treeTexture==nullptr) {
 		return;
 	}
-	if (m_updateAllKeys) {
+	if (m_updateAllKeys && !mirror) {
 		cull(camera);
 	}
 
 	Int curTree;
 	// Draw tree shadows.
-	if (m_shadow && TheW3DProjectedShadowManager && TheGlobalData->m_useShadowDecals) {
+	if (m_shadow && TheW3DProjectedShadowManager && TheGlobalData->m_useShadowDecals && !mirror) {
 		for (curTree=0; curTree<m_numTrees; curTree++) {
 			Int type = m_trees[curTree].treeType;
 			if (type<0) { // deleted.
@@ -1528,7 +1534,7 @@ void W3DTreeBuffer::drawTrees(CameraClass * camera, RefRenderObjListIterator *pD
 	}
 
 	// Update pushed aside and toppling trees.
-	for (curTree=0; curTree<m_numTrees; curTree++) {
+	for (curTree=0; curTree<m_numTrees && !mirror; curTree++) {
 		Int type = m_trees[curTree].treeType;
 		if (type<0) { // deleted.
 			continue;

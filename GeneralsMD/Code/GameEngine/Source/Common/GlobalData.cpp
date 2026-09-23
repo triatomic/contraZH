@@ -782,6 +782,7 @@ GlobalData::GlobalData()
   m_useShadowMap = TRUE;
   m_useSpecular = TRUE;
   m_useNormalMaps = TRUE;
+  m_waterReflections = TRUE;
   m_specularDebug = FALSE;
   m_normalMapDebug = FALSE;
   m_laserGlowColor = 0;
@@ -1616,6 +1617,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_useShadowMap = optionPref.getShadowMapEnabled();
 	TheWritableGlobalData->m_useSpecular = optionPref.getSpecularEnabled();
 	TheWritableGlobalData->m_useNormalMaps = optionPref.getNormalMapsEnabled();
+	TheWritableGlobalData->m_waterReflections = optionPref.getWaterReflectionsEnabled();
 	TheWritableGlobalData->m_specularDebug = optionPref.getSpecularDebugEnabled();
 	TheWritableGlobalData->m_normalMapDebug = optionPref.getNormalMapDebugEnabled();
 	TheWritableGlobalData->m_borderlessWindow = optionPref.getBorderlessWindowEnabled();

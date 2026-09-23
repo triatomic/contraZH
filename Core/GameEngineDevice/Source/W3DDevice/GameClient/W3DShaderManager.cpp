@@ -2180,6 +2180,15 @@ Bool W3DShaderManager::supportsPixelShader2a()
 #endif
 }
 
+TextureClass *W3DShaderManager::findNormalMap(TextureClass *texture)
+{
+#if defined(BUILD_WITH_D3D9)
+	return (texture != nullptr) ? Find_Normal_Map(texture) : nullptr;
+#else
+	return nullptr;
+#endif
+}
+
 Int W3DShaderManager::takeTerrainBumpCount()
 {
 	const Int count = TerrainBumpCount;

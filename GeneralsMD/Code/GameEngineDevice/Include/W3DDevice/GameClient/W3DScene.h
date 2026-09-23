@@ -75,6 +75,10 @@ public:
 	void setCustomPassMode (CustomScenePassModes mode) {m_customPassMode = mode;}
 	CustomScenePassModes getCustomPassMode ()	{return m_customPassMode;}
 
+	/// The shader water's reflection draws what the main view would above the water plane
+	void setPlanarMirrorPass(Bool on, Real planeZ, const Region3D &region) {m_planarMirrorPass = on; m_planarMirrorZ = planeZ; m_planarMirrorRegion = region;}
+	Bool isPlanarMirrorPass() const {return m_planarMirrorPass;}
+
 	void Flush(RenderInfoClass & rinfo);	//draw queued up models.
 	/// Drawing control method
 	void drawTerrainOnly(Bool draw) {m_drawTerrainOnly = draw;};
@@ -131,6 +135,9 @@ protected:
 	///Custom rendering passes for each possible player color on the map
 	MaterialPassClass *m_occludedMaterialPass[MAX_PLAYER_COUNT];
 	CustomScenePassModes m_customPassMode;					///< flag used to force a non-standard rendering of scene.
+	Bool m_planarMirrorPass;										///< drawing the shader water's reflection
+	Real m_planarMirrorZ;											///< water plane the reflection mirrors
+	Region3D m_planarMirrorRegion;								///< drawables outside it were not moved this frame
 	Int m_translucentObjectsCount;	///< number of translucent objects to render this frame.
 	RenderObjClass **m_translucentObjectsBuffer;	///< queue of current frame's translucent objects.
 	Int m_occludedObjectsCount;	///<number of objects in current frame that need special rendering because occluded.

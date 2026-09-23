@@ -427,6 +427,11 @@ Bool OptionPreferences::getNormalMapsEnabled(void) const
 	return getBool("NormalMaps", TRUE);
 }
 
+Bool OptionPreferences::getWaterReflectionsEnabled(void) const
+{
+	return getBool("WaterReflections", TRUE);
+}
+
 Bool OptionPreferences::getSpecularDebugEnabled(void) const
 {
 	return getBool("SpecularDebug", FALSE);

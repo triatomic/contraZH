@@ -263,6 +263,8 @@ public:
 
 	virtual void setGuardBandBias( const Coord2D *gb ) override { m_guardBandBias.x = gb->x; m_guardBandBias.y = gb->y; }
 
+	void getAxisAlignedViewRegion(Region3D &axisAlignedRegion);	///< Find 3D Region enclosing all possible drawables.
+
 private:
 
 	CameraClass *m_3DCamera;												///< camera representation for 3D scene
@@ -341,7 +343,6 @@ private:
 	void rotateCameraOneFrame();							///< Do one frame of a rotate camera movement.
 	void zoomCameraOneFrame();							///< Do one frame of a zoom camera movement.
 	void pitchCameraOneFrame();							///< Do one frame of a pitch camera movement.
-	void getAxisAlignedViewRegion(Region3D &axisAlignedRegion);	///< Find 3D Region enclosing all possible drawables.
 	void calcDeltaScroll(Coord2D &screenDelta);
 	bool getDesiredTerrainDrawSize(ICoord2D &dimensions) const;
 	void updateTerrain();

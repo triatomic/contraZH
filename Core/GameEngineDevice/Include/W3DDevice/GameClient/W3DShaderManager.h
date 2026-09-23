@@ -120,6 +120,8 @@ public:
 	static MaterialPassClass *getSpecularPass();
 	/// Whether the device runs ps_2_a shaders, which have gradients and 512 instruction slots.
 	static Bool supportsPixelShader2a();
+	/// The <name>_nrm.dds beside a texture, or null when there is none. Not reference counted.
+	static TextureClass *findNormalMap(TextureClass *texture);
 
 	static Bool testMinimumRequirements(ChipsetType *videoChipType, CpuType *cpuType, Int *cpuFreq, MemValueType *numRAM, Real *intBenchIndex, Real *floatBenchIndex, Real *memBenchIndex);
 	static StaticGameLODLevel getGPUPerformanceIndex();

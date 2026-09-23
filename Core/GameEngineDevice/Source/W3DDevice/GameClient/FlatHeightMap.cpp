@@ -460,10 +460,10 @@ void FlatHeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 	W3DShaderManager::ShaderTypes st;
 	const Bool doCloud = useCloud();
 
-	if (doCloud)
+	if (doCloud && !ShaderClass::Is_Backface_Culling_Inverted())
 	{
 		// TheSuperHackers @tweak Updates the cloud movement before applying it to the world.
-		// Is now decoupled from logic step.
+		// Is now decoupled from logic step. The water reflection pass renders the terrain again.
 		W3DShaderManager::updateCloud();
 	}
 

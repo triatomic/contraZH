@@ -111,6 +111,12 @@ public:
 	Bool bindReceiver(Int stage) const;
 	void unbindReceiver(Int stage) const;
 
+	// Binds the map to a sampler for a shader that finds the shadow position itself, and
+	// hands back the world-to-map transform. The receiver constants go wherever it needs them.
+	Bool bindWorldReceiver(Int stage, D3DMATRIX& worldToMap) const;
+	Vector4 getReceiverParams() const;
+	Vector4 getReceiverColor() const;
+
 	// The pass objects push to receive the shadow, or null when nothing can receive it.
 	MaterialPassClass* getReceivePass();
 

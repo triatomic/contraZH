@@ -125,6 +125,9 @@ RTS3DScene::RTS3DScene()
 
 	m_maskMaterialPass = NEW_REF(W3DMaskMaterialPassClass,());
 	m_customPassMode = SCENE_PASS_DEFAULT;
+	m_planarMirrorPass = FALSE;
+	m_planarMirrorZ = 0.0f;
+	m_planarMirrorRegion.zero();
 
 	m_heatVisionMaterialPass = NEW_REF(MaterialPassClass,());
 	m_heatVisionOnlyPass = NEW_REF(MaterialPassClass,());
@@ -433,7 +436,39 @@ void RTS3DScene::Visibility_Check(CameraClass * camera)
 	if (currentFrame <= TheGlobalData->m_defaultOcclusionDelay)
 		currentFrame = TheGlobalData->m_defaultOcclusionDelay+1;	//make sure occlusion is enabled when game starts (frame 0).
 
-	if (ShaderClass::Is_Backface_Culling_Inverted())
+	if (m_planarMirrorPass)
+	{
+		for (it.First(); !it.Is_Done(); it.Next()) {
+
+			robj = it.Peek_Obj();
+
+			if (robj->Is_Force_Visible()) {
+				robj->Set_Visible(true);
+				continue;
+			}
+
+			const SphereClass &sphere = robj->Get_Bounding_Sphere();
+			Bool isVisible = !robj->Is_Hidden() && sphere.Center.Z + sphere.Radius > m_planarMirrorZ && !camera->Cull_Sphere(sphere);
+
+			drawInfo = (DrawableInfo *)robj->Get_User_Data();
+			if (drawInfo && (draw=drawInfo->m_drawable) != nullptr)
+			{
+				// The main pass flags occluders for delayed drawing, which this pass never does.
+				drawInfo->m_flags = DrawableInfo::ERF_IS_NORMAL;
+				if (isVisible && (draw->isDrawableEffectivelyHidden() || draw->getFullyObscuredByShroud() || !m_planarMirrorRegion.isInRegionNoZ(*draw->getPosition())))
+				{
+					isVisible = FALSE;
+				}
+				if (isVisible && draw->getEffectiveOpacity() != 1.0f && m_translucentObjectsCount < TheGlobalData->m_maxVisibleTranslucentObjects)
+				{
+					drawInfo->m_flags |= DrawableInfo::ERF_IS_TRANSLUCENT;
+					m_translucentObjectsBuffer[m_translucentObjectsCount++] = robj;
+				}
+			}
+			robj->Set_Visible(isVisible);
+		}
+	}
+	else if (ShaderClass::Is_Backface_Culling_Inverted())
 	{
 		//we are rendering reflections
 		///@todo: Have better flag to detect reflection pass
@@ -885,7 +920,7 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 		// Receive the sun's shadow on opaque drawables. Skipped where the base pass is
 		// suppressed, since the pass only darkens pixels the base pass drew.
 		MaterialPassClass *shadowPass = (TheW3DShadowMap != nullptr) ? TheW3DShadowMap->getReceivePass() : nullptr;
-		if (shadowPass != nullptr && m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop &&
+		if (shadowPass != nullptr && m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop && !m_planarMirrorPass &&
 			draw->getEffectiveOpacity() == 1.0f)
 		{
 			rinfo.Push_Material_Pass(shadowPass);
@@ -894,7 +929,7 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 
 		// Vehicles and structures catch a per-pixel sun highlight and bumps. Infantry stay matte.
 		MaterialPassClass *specularPass = W3DShaderManager::getSpecularPass();
-		if (specularPass != nullptr && m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop &&
+		if (specularPass != nullptr && m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop && !m_planarMirrorPass &&
 			draw->getEffectiveOpacity() == 1.0f &&
 			(draw->isKindOf(KINDOF_VEHICLE) || draw->isKindOf(KINDOF_STRUCTURE)))
 		{
@@ -1013,7 +1048,7 @@ void RTS3DScene::Flush(RenderInfoClass & rinfo)
 	PrepareShadows();
 
 	//don't draw shadows in this mode because they interfere with destination alpha or are invisible (wireframe)
-	if (m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE)
+	if (m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE && !m_planarMirrorPass)
 		DoShadows(rinfo, false);	//draw all non-stencil shadows (decals) since they fall under other objects.
 
 	// Special passes change vertex state behind the mesh renderer's back, which the instancing shader would not see.
@@ -1042,14 +1077,14 @@ void RTS3DScene::Flush(RenderInfoClass & rinfo)
 	DoTrees(rinfo);
 
 	//don't draw shadows in this mode because they interfere with destination alpha
-	if (m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE)
+	if (m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE && !m_planarMirrorPass)
 		DoShadows(rinfo, true);	//draw all stencil shadows
 
 	WW3D::Render_And_Clear_Static_Sort_Lists(rinfo);	//draws things like water
 
 	//draw the above-water decal subset AFTER water so those decals show over it (still depth-tested, so
 	//objects stay on top). Which decals qualify is decided per-decal (global flag + per-decal water mode).
-	if (m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE)
+	if (m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE && !m_planarMirrorPass)
 		DoDecals(rinfo);
 
 	if (m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE)
@@ -1059,7 +1094,7 @@ void RTS3DScene::Flush(RenderInfoClass & rinfo)
 		//USE_PERF_TIMER(translucentRender)
 
 		//don't draw transparent in this mode because they interfere with destination alpha
-		if (m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE)
+		if (m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE && !m_planarMirrorPass)
 			DoParticles(rinfo);	//queue up particles for rendering.
 
 		SortingRendererClass::Flush();	//draw sorted translucent polygons like particles.
@@ -1582,7 +1617,7 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 
 	// only render particles once per frame
 	if (terrainObject != nullptr && TheParticleSystemManager != nullptr &&
-		Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE)
+		Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE && !m_planarMirrorPass)
 	{
 		TheParticleSystemManager->queueParticleRender();
 	}

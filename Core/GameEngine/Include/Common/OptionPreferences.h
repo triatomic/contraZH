@@ -150,6 +150,8 @@ public:
 	Bool getSpecularEnabled() const;
 	// Options.ini: NormalMaps = Yes adds bump detail to the sun's light on vehicles, structures and terrain
 	Bool getNormalMapsEnabled() const;
+	// Options.ini: WaterReflections = Yes lets smooth water mirror the terrain, units and buildings
+	Bool getWaterReflectionsEnabled() const;
 	// Options.ini: SpecularDebug = Yes tints what the specular pass covers and shows its highlight 8x in magenta
 	Bool getSpecularDebugEnabled() const;
 	// Options.ini: NormalMapDebug = Yes shows only the terrain's bump shading, on grey

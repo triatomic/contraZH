@@ -450,6 +450,49 @@ void W3DShadowMap::setShadowColor(UnsignedInt argb)
 
 Bool W3DShadowMap::bindReceiver(Int stage) const
 {
+	D3DMATRIX worldToMap;
+	if (!bindWorldReceiver(stage, worldToMap))
+	{
+		return FALSE;
+	}
+
+	// Camera space back to world, then onto the map.
+	// The view is read from the device, because every invalidate zeroes the wrapper's copy
+	// and receivers drawn after the terrain would otherwise invert a zero matrix.
+	D3DMATRIX view;
+	DX8Wrapper::_Get_D3D_Device8()->GetTransform(D3DTS_VIEW, &view);
+
+	D3DMATRIX inverseView;
+	float det;
+	Invert_D3DMATRIX(inverseView, &det, view);
+
+	D3DMATRIX textureTransform = inverseView * worldToMap;
+	DX8Wrapper::_Set_DX8_Transform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + stage), textureTransform);
+
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT4);
+
+	const Vector4 params = getReceiverParams();
+	DX8Wrapper::Set_Pixel_Shader_Constant(0, &params, 1);
+
+	const Vector4 color = getReceiverColor();
+	DX8Wrapper::Set_Pixel_Shader_Constant(4, &color, 1);
+
+	return TRUE;
+}
+
+Vector4 W3DShadowMap::getReceiverParams() const
+{
+	return Vector4(1.0f / (Real)m_resolution, m_depthBias, 0.0f, SHADOW_FILTER_SPACING_TEXELS);
+}
+
+Vector4 W3DShadowMap::getReceiverColor() const
+{
+	return Vector4(m_shadowColor.X, m_shadowColor.Y, m_shadowColor.Z, 1.0f);
+}
+
+Bool W3DShadowMap::bindWorldReceiver(Int stage, D3DMATRIX& worldToMap) const
+{
 	if (!m_hasDepth || ShadowDebugMode == SHADOW_DEBUG_DEPTH_ONLY)
 	{
 		return FALSE;
@@ -476,17 +519,8 @@ Bool W3DShadowMap::bindReceiver(Int stage) const
 	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_MINFILTER, filter);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_MAGFILTER, filter);
 
-	// Camera space back to world, into the sun's clip space, then onto the map. The
-	// half texel lines D3D9's texel centres up with the pixels the depth pass wrote.
-	// The view is read from the device, because every invalidate zeroes the wrapper's copy
-	// and receivers drawn after the terrain would otherwise invert a zero matrix.
-	D3DMATRIX view;
-	DX8Wrapper::_Get_D3D_Device8()->GetTransform(D3DTS_VIEW, &view);
-
-	D3DMATRIX inverseView;
-	float det;
-	Invert_D3DMATRIX(inverseView, &det, view);
-
+	// World into the sun's clip space, then onto the map. The half texel lines D3D9's
+	// texel centres up with the pixels the depth pass wrote.
 	const float halfTexel = 0.5f / (float)m_resolution;
 
 	D3DMATRIX toMap;
@@ -496,18 +530,7 @@ Bool W3DShadowMap::bindReceiver(Int stage) const
 	toMap.m[3][0] = 0.5f + halfTexel;
 	toMap.m[3][1] = 0.5f + halfTexel;
 
-	D3DMATRIX textureTransform = (inverseView * To_D3DMATRIX(m_sunViewProj)) * toMap;
-	DX8Wrapper::_Set_DX8_Transform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + stage), textureTransform);
-
-	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
-	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT4);
-
-	Vector4 params(1.0f / (Real)m_resolution, m_depthBias, 0.0f, SHADOW_FILTER_SPACING_TEXELS);
-	DX8Wrapper::Set_Pixel_Shader_Constant(0, &params, 1);
-
-	Vector4 color(m_shadowColor.X, m_shadowColor.Y, m_shadowColor.Z, 1.0f);
-	DX8Wrapper::Set_Pixel_Shader_Constant(4, &color, 1);
-
+	worldToMap = To_D3DMATRIX(m_sunViewProj) * toMap;
 	return TRUE;
 }
 

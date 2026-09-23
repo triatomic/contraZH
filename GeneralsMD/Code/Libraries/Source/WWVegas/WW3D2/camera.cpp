@@ -97,6 +97,7 @@ CameraClass::CameraClass() :
 	ZFar(1000.0f),										// far clip plane distance
 	ZBufferMin(0.0f),									// smallest value we'll write into the z-buffer
 	ZBufferMax(1.0f),									// largest value we'll write into the z-buffer
+	ObliqueClipEnabled(false),
 	FrustumValid(false)
 {
 	Set_Transform(Matrix3D(true));
@@ -131,7 +132,9 @@ CameraClass::CameraClass(const CameraClass & src) :
 	CameraInvTransform(src.CameraInvTransform),
 	AspectRatio(src.AspectRatio),
 	ZBufferMin(src.ZBufferMin),
-	ZBufferMax(src.ZBufferMax)
+	ZBufferMax(src.ZBufferMax),
+	ObliqueClipEnabled(src.ObliqueClipEnabled),
+	ObliqueClipPlane(src.ObliqueClipPlane)
 {
 	// just being paranoid in case any parent class doesn't completely copy the entire state...
 	FrustumValid = false;
@@ -165,6 +168,8 @@ CameraClass & CameraClass::operator = (const CameraClass & that)
 		NearClipBBox = that.NearClipBBox;
 		ProjectionTransform = that.ProjectionTransform;
 		CameraInvTransform = that.CameraInvTransform;
+		ObliqueClipEnabled = that.ObliqueClipEnabled;
+		ObliqueClipPlane = that.ObliqueClipPlane;
 
 		// just being paranoid in case any parent class doesn't completely copy the entire state...
 		FrustumValid = false;
@@ -810,6 +815,22 @@ void CameraClass::Get_D3D_Projection_Matrix(Matrix4x4 * set_tm)
 		(*set_tm)[2][3] = -ZNear * oozdiff;
 	}
 
+	if (ObliqueClipEnabled && Projection == PERSPECTIVE) {
+		// Lengyel's oblique near plane, scaled so the far corner opposite the plane stays put
+		const Matrix3D & view_to_world = Get_Transform();
+		const Vector4 world_plane(ObliqueClipPlane.N.X, ObliqueClipPlane.N.Y, ObliqueClipPlane.N.Z, -ObliqueClipPlane.D);
+		Vector4 plane(0.0f, 0.0f, 0.0f, world_plane.W);
+		for (int i = 0; i < 4; ++i) {
+			for (int j = 0; j < 3; ++j) {
+				plane[i] += view_to_world[j][i] * world_plane[j];
+			}
+		}
+
+		const Matrix4x4 inverse = set_tm->Inverse();
+		const Vector4 clip_plane = inverse.Transpose() * plane;
+		const Vector4 corner = inverse * Vector4((clip_plane.X < 0.0f) ? -1.0f : 1.0f, (clip_plane.Y < 0.0f) ? -1.0f : 1.0f, 1.0f, 1.0f);
+		(*set_tm)[2] = plane * (1.0f / Vector4::Dot_Product(plane, corner));
+	}
 }
 
 void CameraClass::Get_View_Matrix(Matrix3D * set_tm)

@@ -126,6 +126,7 @@ public:
 	void replaceSkyboxTexture(const AsciiString& oldTexName, const AsciiString& newTextName);
 
 	void markHeightTextureDirty() { m_heightTextureDirty = TRUE; }	///< terrain heights changed under the shader water
+	void renderPlanarReflection(CameraClass *cam);	///< mirrors the scene in the water under the view, before the views draw
 
 protected:
 	DX8IndexBufferClass			*m_indexBuffer;	///<indices defining quad
@@ -257,8 +258,9 @@ protected:
 	void cleanupJbaWaterShader();
 
 	// Per-pixel water over a copy of the scene, on D3D9 with ps_2_a.
-	DWORD m_shaderWaterPixelShader;
-	DWORD m_shaderRiverPixelShader;
+	// Indexed by whether the shadow map packs its depth into colour.
+	DWORD m_shaderWaterPixelShader[2];
+	DWORD m_shaderRiverPixelShader[2];
 	TextureClass *m_heightTexture;		///< terrain heights as high and low bytes
 	TextureClass *m_normalTexture;		///< tiling wave slopes
 	IDirect3DTexture8 *m_refractionTexture;	///< the scene behind the water
@@ -267,13 +269,31 @@ protected:
 	Bool m_shaderWaterActive;			///< the water being drawn uses the shader path
 	UnsignedInt m_refractionFrame;		///< frame the scene was last copied in
 	CameraClass *m_renderCamera;		///< camera of the Render call in progress
+	DWORD m_shaderWaterSwellVertexShader;	///< lifts standing water by a height texture
+	DWORD m_shaderWaterSwellPixelShader[2];
+	Bool m_shaderWaterSwellActive;		///< the standing water being drawn has vertex waves
+	TextureClass *m_swellTexture;		///< <water texture>_hgt.dds, or null
+	TextureClass *m_swellSource;		///< water texture m_swellTexture was looked up for
+	IDirect3DTexture8 *m_reflectionTexture;	///< the scene mirrored in the water plane, alpha 1 where anything drew
+	IDirect3DSurface8 *m_reflectionDepth;
+	CameraClass *m_reflectionCamera;
+	const CameraClass *m_reflectionSource;	///< camera the reflection mirrors, null when there is none
+	UnsignedInt m_reflectionFrame;		///< frame the reflection was rendered in
+	Real m_reflectionPlaneZ;
 
 	Bool useShaderWater() const;
 	Bool isWaterVisible(PolygonTrigger *pTrig) const;
+	Bool isWaterVisible(PolygonTrigger *pTrig, CameraClass *camera) const;
+	Bool pickReflectionPlane(CameraClass *camera, Real &planeZ) const;
+	Bool ensureReflectionTargets(UnsignedInt width, UnsignedInt height);
+	void drawReflectionCoverage(UnsignedInt width, UnsignedInt height);
 	void createNormalTexture();
 	void updateHeightTexture();
 	void grabRefraction();
 	void setupShaderWater(Bool river);
+	void setupSwell(const D3DMATRIX &clip);
+	TextureClass *findSwellTexture();
+	TextureClass *peekSkyboxFace(Int face);
 	void cleanupShaderWater();
 
 	//Methods used for GeForce3 specific water
