@@ -104,10 +104,13 @@ enum D3D8SamplerStageState
 // spelling for both backends.
 typedef void** DX8LockPointer;
 
+// D3D9Ex has no managed pool. Its default pool survives a reset, so static buffers move there.
+D3DPOOL DX8_Buffer_Pool(D3DPOOL pool);
+
 #define DX8_CREATE_INDEX_BUFFER(dev, length, usage, format, pool, out) \
-	(dev)->CreateIndexBuffer(length, usage, format, pool, out, nullptr)
+	(dev)->CreateIndexBuffer(length, usage, format, DX8_Buffer_Pool(pool), out, nullptr)
 #define DX8_CREATE_VERTEX_BUFFER(dev, length, usage, fvf, pool, out) \
-	(dev)->CreateVertexBuffer(length, usage, fvf, pool, out, nullptr)
+	(dev)->CreateVertexBuffer(length, usage, fvf, DX8_Buffer_Pool(pool), out, nullptr)
 #define DX8_CREATE_TEXTURE(dev, w, h, mips, usage, fmt, pool, out) \
 	(dev)->CreateTexture(w, h, mips, usage, fmt, pool, out, nullptr)
 

@@ -432,6 +432,18 @@ overlays.
 off, `1` limits it to the shadow map, `2` adds main view skins without shadow or highlight passes,
 and `3` (the default) covers everything.
 
+### Flip model presentation
+
+The Direct3D 9 build runs on a Direct3D 9Ex device. Windowed and borderless modes present through a
+flip model swap chain, which skips the desktop compositor's copy and lets a borderless window at
+desktop resolution flip straight to the screen. MSAA still works; the scene renders to a
+multisampled target that resolves into the swap chain each frame.
+
+Notes:
+* Fullscreen keeps the classic swap chain.
+* Terrain and tree textures ignore the texture reduction setting.
+* The `CONTRA_D3D9EX` environment variable set to `0` returns to a plain Direct3D 9 device.
+
 ### Laser ground glow
 
 Each laser beam lights the terrain along its length with up to twelve dynamic lights in the beam's

@@ -988,10 +988,18 @@ SurfaceClass *TextureClass::Get_Surface_Level(unsigned int level)
 		return nullptr;
 	}
 
+	// Surfaces are for CPU access, so they come from the lockable copy
+	IDirect3DTexture8 *lockable = DX8Wrapper::_Peek_Lockable_Texture(Peek_D3D_Texture());
 	IDirect3DSurface8 *d3d_surface = nullptr;
-	DX8_ErrorCode(Peek_D3D_Texture()->GetSurfaceLevel(level, &d3d_surface));
+	DX8_ErrorCode(lockable->GetSurfaceLevel(level, &d3d_surface));
 	SurfaceClass *surface = new SurfaceClass(d3d_surface);
 	d3d_surface->Release();
+
+	if (lockable != Peek_D3D_Texture())
+	{
+		surface->UploadTexture = Peek_D3D_Texture();
+		surface->UploadTexture->AddRef();
+	}
 
 	return surface;
 }

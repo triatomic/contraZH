@@ -40,7 +40,7 @@ IDirect3DTexture8* MissingTexture::_Get_Missing_Texture()
 IDirect3DSurface8* MissingTexture::_Create_Missing_Surface()
 {
 	IDirect3DSurface8 *texture_surface = nullptr;
-	DX8_ErrorCode(_MissingTexture->GetSurfaceLevel(0, &texture_surface));
+	DX8_ErrorCode(DX8Wrapper::_Peek_Lockable_Texture(_MissingTexture)->GetSurfaceLevel(0, &texture_surface));
 	D3DSURFACE_DESC texture_surface_desc;
 	::ZeroMemory(&texture_surface_desc, sizeof(D3DSURFACE_DESC));
 	DX8_ErrorCode(texture_surface->GetDesc(&texture_surface_desc));
@@ -81,6 +81,7 @@ void MissingTexture::_Init()
 		WW3D_FORMAT_A8R8G8B8,
 		MIP_LEVELS_ALL
 	);
+	IDirect3DTexture8* lockable=DX8Wrapper::_Peek_Lockable_Texture(tex);
 
 	D3DLOCKED_RECT locked_rect;
 	RECT rect;
@@ -89,7 +90,7 @@ void MissingTexture::_Init()
 	rect.top=0;
 	rect.bottom=missing_image_height;
 	DX8_ErrorCode(
-		tex->LockRect(
+		lockable->LockRect(
 			0,
 			&locked_rect,
 			&rect,
@@ -108,7 +109,7 @@ void MissingTexture::_Init()
 		buffer+=locked_rect.Pitch/sizeof(unsigned)*y;
 	}
 
-	DX8_ErrorCode(tex->UnlockRect(0));
+	DX8_ErrorCode(lockable->UnlockRect(0));
 
 	// Every texel is the same color, so each mip is just that color again
 	for (unsigned i=1;i<tex->GetLevelCount();++i) {
@@ -116,7 +117,7 @@ void MissingTexture::_Init()
 		DX8_ErrorCode(tex->GetLevelDesc(i,&desc));
 
 		D3DLOCKED_RECT mip_rect;
-		DX8_ErrorCode(tex->LockRect(i,&mip_rect,nullptr,0));
+		DX8_ErrorCode(lockable->LockRect(i,&mip_rect,nullptr,0));
 
 		for (unsigned y=0;y<desc.Height;y++)
 		{
@@ -127,8 +128,9 @@ void MissingTexture::_Init()
 			}
 		}
 
-		DX8_ErrorCode(tex->UnlockRect(i));
+		DX8_ErrorCode(lockable->UnlockRect(i));
 	}
+	DX8Wrapper::_Upload_Lockable_Texture(tex);
 
 	_MissingTexture=tex;
 /*

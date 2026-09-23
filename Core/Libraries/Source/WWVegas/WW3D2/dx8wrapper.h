@@ -478,6 +478,17 @@ public:
 	);
 	static IDirect3DTexture8 * _Create_DX8_Texture(IDirect3DSurface8 *surface, MipCountType mip_level_count);
 
+	// D3D9Ex has no managed pool, so a managed texture lives in the default pool with a system
+	// memory copy. Lock the copy, then upload it. Anything else locks and uploads to itself.
+	static IDirect3DBaseTexture8* _Peek_Lockable_Texture(IDirect3DBaseTexture8* texture);
+	static IDirect3DTexture8* _Peek_Lockable_Texture(IDirect3DTexture8* texture) { return (IDirect3DTexture8*)_Peek_Lockable_Texture((IDirect3DBaseTexture8*)texture); }
+	static IDirect3DCubeTexture8* _Peek_Lockable_Texture(IDirect3DCubeTexture8* texture) { return (IDirect3DCubeTexture8*)_Peek_Lockable_Texture((IDirect3DBaseTexture8*)texture); }
+	static IDirect3DVolumeTexture8* _Peek_Lockable_Texture(IDirect3DVolumeTexture8* texture) { return (IDirect3DVolumeTexture8*)_Peek_Lockable_Texture((IDirect3DBaseTexture8*)texture); }
+	static void _Upload_Lockable_Texture(IDirect3DBaseTexture8* texture);
+
+	// True when the device is a D3D9Ex device
+	static bool Is_Ex() { return IsEx; }
+
 	static IDirect3DSurface8 * _Create_DX8_Surface(unsigned int width, unsigned int height, WW3DFormat format);
 	static IDirect3DSurface8 * _Create_DX8_Surface(const char *filename);
 	static IDirect3DSurface8 * _Get_DX8_Front_Buffer();
@@ -756,6 +767,13 @@ protected:
 
 	static IDirect3D8 *					D3DInterface;			//d3d8;
 	static IDirect3DDevice8 *			D3DDevice;				//d3ddevice8;
+	static bool								IsEx;
+
+	// A flip model swap chain cannot be multisampled, so MSAA renders here and resolves at Present
+	static IDirect3DSurface8 *			SceneRenderTarget;
+	static IDirect3DSurface8 *			SceneDepthBuffer;
+	static void Create_Scene_Target();
+	static void Release_Scene_Target();
 
 	static IDirect3DSurface8 *			CurrentRenderTarget;
 	static IDirect3DSurface8 *			CurrentDepthBuffer;

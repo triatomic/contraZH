@@ -100,7 +100,7 @@ int TerrainTextureClass::update(WorldHeightMap *htMap)
 	IDirect3DSurface8 *surface_level;
 	D3DSURFACE_DESC surface_desc;
 	D3DLOCKED_RECT locked_rect;
-	DX8_ErrorCode(Peek_D3D_Texture()->GetSurfaceLevel(0, &surface_level));
+	DX8_ErrorCode(DX8Wrapper::_Peek_Lockable_Texture(Peek_D3D_Texture())->GetSurfaceLevel(0, &surface_level));
 	DX8_ErrorCode(surface_level->GetDesc(&surface_desc));
 	if (surface_desc.Width < TEXTURE_WIDTH) {
 		surface_level->Release();
@@ -195,7 +195,8 @@ int TerrainTextureClass::update(WorldHeightMap *htMap)
 	}
 	surface_level->UnlockRect();
 	surface_level->Release();
-	DX8_ErrorCode(Filter_Texture_Mipmaps(Peek_D3D_Texture()));
+	DX8_ErrorCode(Filter_Texture_Mipmaps(DX8Wrapper::_Peek_Lockable_Texture(Peek_D3D_Texture())));
+	DX8Wrapper::_Upload_Lockable_Texture(Peek_D3D_Texture());
 	if (WW3D::Get_Texture_Reduction()) {
 		Peek_D3D_Texture()->SetLOD(WW3D::Get_Texture_Reduction());
 	}
@@ -382,7 +383,7 @@ TerrainNormalTextureClass::TerrainNormalTextureClass(int height) :
 
 Bool TerrainNormalTextureClass::update(WorldHeightMap *htMap)
 {
-	IDirect3DTexture8 *texture = Peek_D3D_Texture();
+	IDirect3DTexture8 *texture = DX8Wrapper::_Peek_Lockable_Texture(Peek_D3D_Texture());
 	if (texture == nullptr)
 	{
 		return false;
@@ -485,6 +486,7 @@ Bool TerrainNormalTextureClass::update(WorldHeightMap *htMap)
 		texture->UnlockRect(level);
 		texture->UnlockRect(level-1);
 	}
+	DX8Wrapper::_Upload_Lockable_Texture(Peek_D3D_Texture());
 
 	if (WW3D::Get_Texture_Reduction())
 	{
@@ -514,7 +516,7 @@ Bool TerrainTextureClass::updateFlat(WorldHeightMap *htMap, Int xCell, Int yCell
 	IDirect3DSurface8 *surface_level;
 	D3DSURFACE_DESC surface_desc;
 	D3DLOCKED_RECT locked_rect;
-	DX8_ErrorCode(Peek_D3D_Texture()->GetSurfaceLevel(0, &surface_level));
+	DX8_ErrorCode(DX8Wrapper::_Peek_Lockable_Texture(Peek_D3D_Texture())->GetSurfaceLevel(0, &surface_level));
 	DX8_ErrorCode(surface_level->GetDesc(&surface_desc));
 	DEBUG_ASSERTCRASH((Int)surface_desc.Width == cellWidth*pixelsPerCell, ("Bitmap too small."));
 	DEBUG_ASSERTCRASH((Int)surface_desc.Height == cellWidth*pixelsPerCell, ("Bitmap too small."));
@@ -559,7 +561,8 @@ Bool TerrainTextureClass::updateFlat(WorldHeightMap *htMap, Int xCell, Int yCell
 
 	surface_level->UnlockRect();
 	surface_level->Release();
-	DX8_ErrorCode(Filter_Texture_Mipmaps(Peek_D3D_Texture()));
+	DX8_ErrorCode(Filter_Texture_Mipmaps(DX8Wrapper::_Peek_Lockable_Texture(Peek_D3D_Texture())));
+	DX8Wrapper::_Upload_Lockable_Texture(Peek_D3D_Texture());
 	return(surface_desc.Height);
 }
 
@@ -908,7 +911,7 @@ int AlphaEdgeTextureClass::update(WorldHeightMap *htMap)
 	IDirect3DSurface8 *surface_level;
 	D3DSURFACE_DESC surface_desc;
 	D3DLOCKED_RECT locked_rect;
-	DX8_ErrorCode(Peek_D3D_Texture()->GetSurfaceLevel(0, &surface_level));
+	DX8_ErrorCode(DX8Wrapper::_Peek_Lockable_Texture(Peek_D3D_Texture())->GetSurfaceLevel(0, &surface_level));
 	DX8_ErrorCode(surface_level->LockRect(&locked_rect, nullptr, 0));
 	DX8_ErrorCode(surface_level->GetDesc(&surface_desc));
 
@@ -971,7 +974,8 @@ int AlphaEdgeTextureClass::update(WorldHeightMap *htMap)
 	}
 	surface_level->UnlockRect();
 	surface_level->Release();
-	DX8_ErrorCode(Filter_Texture_Mipmaps(Peek_D3D_Texture()));
+	DX8_ErrorCode(Filter_Texture_Mipmaps(DX8Wrapper::_Peek_Lockable_Texture(Peek_D3D_Texture())));
+	DX8Wrapper::_Upload_Lockable_Texture(Peek_D3D_Texture());
 	return(surface_desc.Height);
 }
 

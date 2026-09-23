@@ -135,7 +135,7 @@ int W3DTreeBuffer::W3DTreeTextureClass::update(W3DTreeBuffer *buffer)
 	IDirect3DSurface8 *surface_level;
 	D3DSURFACE_DESC surface_desc;
 	D3DLOCKED_RECT locked_rect;
-	DX8_ErrorCode(Peek_D3D_Texture()->GetSurfaceLevel(0, &surface_level));
+	DX8_ErrorCode(DX8Wrapper::_Peek_Lockable_Texture(Peek_D3D_Texture())->GetSurfaceLevel(0, &surface_level));
 	DX8_ErrorCode(surface_level->GetDesc(&surface_desc));
 
 	DX8_ErrorCode(surface_level->LockRect(&locked_rect, nullptr, 0));
@@ -189,7 +189,8 @@ int W3DTreeBuffer::W3DTreeTextureClass::update(W3DTreeBuffer *buffer)
 	}
 	DX8_ErrorCode(surface_level->UnlockRect());
 	surface_level->Release();
-	DX8_ErrorCode(Filter_Texture_Mipmaps(Peek_D3D_Texture()));
+	DX8_ErrorCode(Filter_Texture_Mipmaps(DX8Wrapper::_Peek_Lockable_Texture(Peek_D3D_Texture())));
+	DX8Wrapper::_Upload_Lockable_Texture(Peek_D3D_Texture());
 	if (WW3D::Get_Texture_Reduction()) {
 		DX8_ErrorCode(Peek_D3D_Texture()->SetLOD((DWORD)WW3D::Get_Texture_Reduction()));
 	}

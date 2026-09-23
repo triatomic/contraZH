@@ -161,6 +161,8 @@ void Convert_Pixel(unsigned char * pixel,const SurfaceClass::SurfaceDescription 
 *************************************************************************/
 SurfaceClass::SurfaceClass(unsigned width, unsigned height, WW3DFormat format):
 	D3DSurface(nullptr),
+	UploadTexture(nullptr),
+	RawAccess(false),
 	SurfaceFormat(format)
 {
 	WWASSERT(width);
@@ -169,7 +171,9 @@ SurfaceClass::SurfaceClass(unsigned width, unsigned height, WW3DFormat format):
 }
 
 SurfaceClass::SurfaceClass(const char *filename):
-	D3DSurface(nullptr)
+	D3DSurface(nullptr),
+	UploadTexture(nullptr),
+	RawAccess(false)
 {
 	D3DSurface = DX8Wrapper::_Create_DX8_Surface(filename);
 	SurfaceDescription desc;
@@ -178,7 +182,9 @@ SurfaceClass::SurfaceClass(const char *filename):
 }
 
 SurfaceClass::SurfaceClass(IDirect3DSurface8 *d3d_surface)	:
-	D3DSurface (nullptr)
+	D3DSurface (nullptr),
+	UploadTexture(nullptr),
+	RawAccess(false)
 {
 	Attach (d3d_surface);
 	SurfaceDescription desc;
@@ -188,10 +194,7 @@ SurfaceClass::SurfaceClass(IDirect3DSurface8 *d3d_surface)	:
 
 SurfaceClass::~SurfaceClass()
 {
-	if (D3DSurface) {
-		D3DSurface->Release();
-		D3DSurface = nullptr;
-	}
+	Detach();
 }
 
 void SurfaceClass::Get_Description(SurfaceDescription &surface_desc)
@@ -249,6 +252,7 @@ void SurfaceClass::Unlock()
 		return;
 	}
 	DX8_ErrorCode(D3DSurface->UnlockRect());
+	Upload();
 }
 
 /***********************************************************************************************
@@ -291,6 +295,7 @@ void SurfaceClass::Clear()
 	}
 
 	DX8_ErrorCode(D3DSurface->UnlockRect());
+	Upload();
 }
 
 
@@ -334,6 +339,7 @@ void SurfaceClass::Copy(const unsigned char *other)
 	}
 
 	DX8_ErrorCode(D3DSurface->UnlockRect());
+	Upload();
 }
 
 
@@ -383,6 +389,7 @@ void SurfaceClass::Copy(const Vector2i &min, const Vector2i &max, const unsigned
 	}
 
 	DX8_ErrorCode(D3DSurface->UnlockRect());
+	Upload();
 }
 
 
@@ -508,6 +515,7 @@ void SurfaceClass::Copy(
 
 		DX8_ErrorCode(Load_Surface_From_Surface(D3DSurface, &dest, other->D3DSurface, &src));
 	}
+	Upload();
 }
 
 /***********************************************************************************************
@@ -553,6 +561,7 @@ void SurfaceClass::Stretch_Copy(
 	dest.bottom=dsty+dstheight;
 
 	DX8_ErrorCode(Load_Surface_From_Surface(D3DSurface, &dest, other->D3DSurface, &src));
+	Upload();
 }
 
 /***********************************************************************************************
@@ -791,6 +800,22 @@ void SurfaceClass::Detach ()
 	}
 
 	D3DSurface = nullptr;
+
+	if (UploadTexture != nullptr) {
+		if (RawAccess) {
+			Upload();
+		}
+		UploadTexture->Release ();
+		UploadTexture = nullptr;
+	}
+	RawAccess = false;
+}
+
+void SurfaceClass::Upload()
+{
+	if (UploadTexture != nullptr) {
+		DX8Wrapper::_Upload_Lockable_Texture(UploadTexture);
+	}
 }
 
 

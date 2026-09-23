@@ -471,7 +471,7 @@ HRESULT WaterRenderObjClass::initBumpMap(LPDIRECT3DTEXTURE8 *pTex, TextureClass 
 		surf->Get_Description(d3dsd);
 		pSrc=(unsigned char *)surf->Lock((int *)&dwSrcPitch);
 
-		pTex[0]->LockRect( level, &d3dlr, nullptr, 0 );
+		DX8Wrapper::_Peek_Lockable_Texture(pTex[0])->LockRect( level, &d3dlr, nullptr, 0 );
 		DWORD dwDstPitch = (DWORD)d3dlr.Pitch;
 		BYTE* pDst       = (BYTE*)d3dlr.pBits;
 
@@ -538,10 +538,11 @@ HRESULT WaterRenderObjClass::initBumpMap(LPDIRECT3DTEXTURE8 *pTex, TextureClass 
 			pSrc += dwSrcPitch;    pDst += dwDstPitch;
 		}
 
-		pTex[0]->UnlockRect(level);
+		DX8Wrapper::_Peek_Lockable_Texture(pTex[0])->UnlockRect(level);
 		surf->Unlock();
 		REF_PTR_RELEASE (surf);
 	}
+	DX8Wrapper::_Upload_Lockable_Texture(pTex[0]);
 
 #else
 	surf=pBumpSource->Get_Surface_Level();
@@ -554,7 +555,7 @@ HRESULT WaterRenderObjClass::initBumpMap(LPDIRECT3DTEXTURE8 *pTex, TextureClass 
     // Fill the bits of the new texture surface with bits from
     // a private format.
 
-    m_pBumpTexture[i]->LockRect( 0, &d3dlr, 0, 0 );
+    DX8Wrapper::_Peek_Lockable_Texture(m_pBumpTexture[i])->LockRect( 0, &d3dlr, 0, 0 );
     DWORD dwDstPitch = (DWORD)d3dlr.Pitch;
     BYTE* pDst       = (BYTE*)d3dlr.pBits;
 
@@ -621,7 +622,8 @@ HRESULT WaterRenderObjClass::initBumpMap(LPDIRECT3DTEXTURE8 *pTex, TextureClass 
         pSrc += dwSrcPitch;    pDst += dwDstPitch;
     }
 
-    m_pBumpTexture[i]->UnlockRect(0);
+    DX8Wrapper::_Peek_Lockable_Texture(m_pBumpTexture[i])->UnlockRect(0);
+    DX8Wrapper::_Upload_Lockable_Texture(m_pBumpTexture[i]);
     surf->Unlock();
 #endif
 

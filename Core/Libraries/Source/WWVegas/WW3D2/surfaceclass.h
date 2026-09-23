@@ -124,7 +124,8 @@ class SurfaceClass : public RefCountClass
 		unsigned char *CreateCopy(int *width,int *height,int*size,bool flip=false);
 
 			// For use by TextureClass:
-		IDirect3DSurface8 *Peek_D3D_Surface() { return D3DSurface; }
+		// Writes through the raw surface are uploaded when this object lets go of it
+		IDirect3DSurface8 *Peek_D3D_Surface() { RawAccess = true; return D3DSurface; }
 
 		// Attaching and detaching a surface pointer
 		void	Attach (IDirect3DSurface8 *surface);
@@ -151,8 +152,14 @@ class SurfaceClass : public RefCountClass
 
 	private:
 
+		void Upload();
+
 		// Direct3D surface object
 		IDirect3DSurface8 *D3DSurface;
+
+		// The texture whose lockable copy this surface belongs to, which writes must be uploaded to
+		IDirect3DBaseTexture8 *UploadTexture;
+		bool RawAccess;
 
 		WW3DFormat SurfaceFormat;
 	friend class TextureClass;
