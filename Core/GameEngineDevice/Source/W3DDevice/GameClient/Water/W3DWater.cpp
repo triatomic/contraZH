@@ -190,8 +190,7 @@ static ShaderClass shaderWaterShader(SC_SHADER_WATER);
 #define RADIAL_LEVEL_COUNT 8
 
 #if defined(BUILD_WITH_D3D9)
-// CONTRA_WATER picks the water: 0 legacy, 1 shader water without vertex waves, 2 with them on each
-// polygon's own grid, 3 with them on a polar grid around the camera.
+// CONTRA_WATER picks 0 legacy, 1 shader water, 2 vertex waves per polygon, or 3 vertex waves on a polar grid.
 static Int Get_Shader_Water_Mode()
 {
 	const char *value = getenv("CONTRA_WATER");
@@ -220,9 +219,7 @@ static Bool Supports_Vertex_Texture(D3DFORMAT format)
 	return supported;
 }
 
-// Vertex shaders can't read DXT on most cards, so a DXT <water texture>_hgt.dds is decoded here
-// into A8R8G8B8 with the height in every channel. The height is DXT5's alpha where that varies,
-// since it keeps more precision, and green otherwise.
+// Decodes a DXT _hgt.dds for vertex fetch, taking height from DXT5 alpha where it varies and green otherwise.
 static TextureClass *Load_Swell_Texture(const char *name)
 {
 	if (!Supports_Vertex_Texture(D3DFMT_A8R8G8B8))
@@ -601,7 +598,9 @@ Bool WaterRenderObjClass::pickReflectionPlane(CameraClass *camera, Real &planeZ)
 	Real bestDistance = 0.0f;
 	for (PolygonTrigger *pTrig=PolygonTrigger::getFirstPolygonTrigger(); pTrig; pTrig = pTrig->getNext())
 	{
-		if (!pTrig->isWaterArea() || pTrig->getNumPoints() < 3 || !isWaterVisible(pTrig, camera))
+		Real level;
+		if (!pTrig->isWaterArea() || pTrig->getNumPoints() < 3 || !Get_Flat_Water_Level(pTrig, level) ||
+			eye.Z <= level + 1.0f || !isWaterVisible(pTrig, camera))
 		{
 			continue;
 		}
@@ -611,8 +610,6 @@ Bool WaterRenderObjClass::pickReflectionPlane(CameraClass *camera, Real &planeZ)
 		Real maxX = minX;
 		Real minY = (Real)first->y;
 		Real maxY = minY;
-		Real minZ = (Real)first->z;
-		Real maxZ = minZ;
 		for (Int i=1; i<pTrig->getNumPoints(); i++)
 		{
 			const ICoord3D *point = pTrig->getPoint(i);
@@ -620,15 +617,9 @@ Bool WaterRenderObjClass::pickReflectionPlane(CameraClass *camera, Real &planeZ)
 			maxX = max(maxX, (Real)point->x);
 			minY = min(minY, (Real)point->y);
 			maxY = max(maxY, (Real)point->y);
-			minZ = min(minZ, (Real)point->z);
-			maxZ = max(maxZ, (Real)point->z);
-		}
-		if (maxZ - minZ > 1.0f || eye.Z <= maxZ)
-		{
-			continue;
 		}
 
-		const Real along = (minZ - eye.Z) / forward.Z;
+		const Real along = (level - eye.Z) / forward.Z;
 		const Real hitX = eye.X + forward.X * along;
 		const Real hitY = eye.Y + forward.Y * along;
 		const Real dx = max(max(minX - hitX, hitX - maxX), 0.0f);
@@ -638,7 +629,7 @@ Bool WaterRenderObjClass::pickReflectionPlane(CameraClass *camera, Real &planeZ)
 		{
 			found = TRUE;
 			bestDistance = distance;
-			planeZ = minZ;
+			planeZ = level;
 		}
 	}
 	return found;
@@ -655,8 +646,7 @@ void WaterRenderObjClass::createNormalTexture()
 		return;
 	}
 
-	// A wind-driven spectrum. Integer wave vectors keep the sum tiling, directions spread
-	// around the wind, and height falls with the square of frequency.
+	// Integer wave vectors spread around the wind keep the sum tiling, and height falls with frequency squared.
 	Real waveX[NORMAL_WAVE_COUNT];
 	Real waveY[NORMAL_WAVE_COUNT];
 	Real waveAmplitude[NORMAL_WAVE_COUNT];
@@ -687,8 +677,7 @@ void WaterRenderObjClass::createNormalTexture()
 		wavePhase[w] = (Real)(seed >> 8) * (2.0f * PI / 16777216.0f);
 	}
 
-	// Slopes of the summed height field, negated so they read as the normal's x and y, and the
-	// height itself for the vertex waves.
+	// Negated slopes of the summed height field give the normal's x and y, and the height feeds the vertex waves.
 	const Int size = NORMAL_TEXTURE_SIZE;
 	Real *texels = NEW Real[size * size * 3];
 	Real slopeSquares = 0.0f;
@@ -915,10 +904,10 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 	const Vector4 shadowParams = shadowed ? TheW3DShadowMap->getReceiverParams() : Vector4(1.0f, 0.0f, 0.0f, 1.0f);
 	const Vector4 shadowColor = shadowed ? TheW3DShadowMap->getReceiverColor() : Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 
-	// Stages 2 to 7 bar the shadow map. The scene copy on stage 5 is a bare D3D texture.
 	// A <water texture>_nrm.dds replaces the generated waves.
 	TextureClass *normalMap = W3DShaderManager::findNormalMap(m_riverTexture);
 
+	// Stages 2 to 7 bar the shadow map. The scene copy on stage 5 is a bare D3D texture.
 	TextureClass *stageTextures[6] =
 	{
 		(normalMap != nullptr) ? normalMap : m_normalTexture,
@@ -1176,7 +1165,7 @@ void WaterRenderObjClass::setupSwell(const D3DMATRIX &clip)
 	const Vector4 swell(1.0f / swellScale, TheWaterTransparency->m_shaderWaterSwellHeight, time * 0.004f, time * 0.0025f);
 	const Vector4 swellSample(step, mipLevel, 0.0f, 0.0f);
 
-	// A greyscale _hgt texture is read from green, which DXT keeps at 6 bits. The generated one holds height in alpha.
+	// A decoded _hgt texture holds height in every channel, and the generated one holds it in alpha.
 	const Vector4 swellChannel = (swellTexture == m_swellTexture) ? Vector4(0.0f, 1.0f, 0.0f, 0.0f) : Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 
 	DX8Wrapper::Set_Vertex_Shader_Constant(0, clipColumns, 4);
@@ -1186,8 +1175,7 @@ void WaterRenderObjClass::setupSwell(const D3DMATRIX &clip)
 
 	if (m_drawingRadial)
 	{
-		// Each vertex picks its mip level from its own cell size, and the texture coordinates and
-		// colour are the ones drawTrapezoidWater would give it.
+		// Each vertex takes its mip level from its cell size, and its texcoords and colour match drawTrapezoidWater's.
 		const Vector3 eye = m_renderCamera->Get_Transform().Get_Translation();
 		const Vector4 radialSample(swellDesc.Width / swellScale, 0.0f, 0.0f, 0.0f);
 		const Vector4 radial(eye.X, eye.Y, m_radialPlaneZ, 0.0f);
@@ -1350,8 +1338,7 @@ Bool WaterRenderObjClass::buildRadialGrid()
 #endif
 }
 
-// Each map cell of flat standing water gets full alpha and its level at 1/16 unit in red and green,
-// on the height texture's layout so the shader shares its mapping.
+// Flat standing water cells get alpha 1 and their level at 1/16 unit in red and green, on the height texture's layout.
 void WaterRenderObjClass::updateWaterMask()
 {
 #if defined(BUILD_WITH_D3D9)
@@ -2301,16 +2288,24 @@ void WaterRenderObjClass::ReleaseResources()
 	for (Int i=0; i<2; i++)
 	{
 		if (m_shaderWaterPixelShader[i])
+		{
 			DX8_DELETE_PIXEL_SHADER(m_pDev, m_shaderWaterPixelShader[i]);
+		}
 
 		if (m_shaderRiverPixelShader[i])
+		{
 			DX8_DELETE_PIXEL_SHADER(m_pDev, m_shaderRiverPixelShader[i]);
+		}
 
 		if (m_shaderWaterSwellPixelShader[i])
+		{
 			DX8_DELETE_PIXEL_SHADER(m_pDev, m_shaderWaterSwellPixelShader[i]);
+		}
 
 		if (m_shaderWaterRadialPixelShader[i])
+		{
 			DX8_DELETE_PIXEL_SHADER(m_pDev, m_shaderWaterRadialPixelShader[i]);
+		}
 
 		m_shaderWaterPixelShader[i]=0;
 		m_shaderRiverPixelShader[i]=0;
@@ -2319,10 +2314,14 @@ void WaterRenderObjClass::ReleaseResources()
 	}
 
 	if (m_shaderWaterSwellVertexShader)
+	{
 		DX8_DELETE_VERTEX_SHADER(m_pDev, m_shaderWaterSwellVertexShader);
+	}
 
 	if (m_shaderWaterRadialVertexShader)
+	{
 		DX8_DELETE_VERTEX_SHADER(m_pDev, m_shaderWaterRadialVertexShader);
+	}
 
 	m_shaderWaterSwellVertexShader=0;
 	m_shaderWaterRadialVertexShader=0;
@@ -2431,9 +2430,13 @@ void WaterRenderObjClass::ReAcquireResources()
 			for (Int i=0; i<2; i++)
 			{
 				if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(waterFiles[i], nullptr, 0, false, &m_shaderWaterPixelShader[i])))
+				{
 					m_shaderWaterPixelShader[i] = 0;
+				}
 				if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(riverFiles[i], nullptr, 0, false, &m_shaderRiverPixelShader[i])))
+				{
 					m_shaderRiverPixelShader[i] = 0;
+				}
 			}
 			createNormalTexture();
 
@@ -2448,21 +2451,29 @@ void WaterRenderObjClass::ReAcquireResources()
 					D3DVSD_END()
 				};
 				if (FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\shaderwaterswell.vso", swellDeclaration, 0, true, &m_shaderWaterSwellVertexShader)))
+				{
 					m_shaderWaterSwellVertexShader = 0;
+				}
 				const char *swellFiles[2] = { "shaders\\shaderwaterswell.pso", "shaders\\shaderwaterswellpacked.pso" };
 				for (Int i=0; i<2; i++)
 				{
 					if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(swellFiles[i], nullptr, 0, false, &m_shaderWaterSwellPixelShader[i])))
+					{
 						m_shaderWaterSwellPixelShader[i] = 0;
+					}
 				}
 
 				if (FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\shaderwaterradial.vso", swellDeclaration, 0, true, &m_shaderWaterRadialVertexShader)))
+				{
 					m_shaderWaterRadialVertexShader = 0;
+				}
 				const char *radialFiles[2] = { "shaders\\shaderwaterradial.pso", "shaders\\shaderwaterradialpacked.pso" };
 				for (Int i=0; i<2; i++)
 				{
 					if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(radialFiles[i], nullptr, 0, false, &m_shaderWaterRadialPixelShader[i])))
+					{
 						m_shaderWaterRadialPixelShader[i] = 0;
+					}
 				}
 			}
 		}
@@ -2656,6 +2667,10 @@ void WaterRenderObjClass::updateMapOverrides()
 	{
 		REF_PTR_RELEASE(m_riverTexture);
 		m_riverTexture = WW3DAssetManager::Get_Instance()->Get_Texture(TheWaterTransparency->m_standingWaterTexture.str());
+
+		// The new texture may reuse the old one's address, which findSwellTexture keys on.
+		REF_PTR_RELEASE(m_swellTexture);
+		m_swellSource = nullptr;
 	}
 }
 
