@@ -346,6 +346,7 @@ fade.
 * The sun is kept at least `ShadowMapMinSunElevation` degrees high (default 30, set in the mod's
 `GameData.ini`; 0 disables). At 30 degrees shadows reach at most about 1.7 times the caster's height.
 * Terrain casts too, but only terrain loaded around the camera, and not in flat terrain mode.
+* Objects whose shadow cannot reach the screen are left out of the map.
 
 ### Specular highlights
 

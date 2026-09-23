@@ -154,6 +154,12 @@ Bool IsShadowMapCaster(RenderObjClass *robj, Bool shadowEnabled)
 		return FALSE;
 	}
 
+	if (!TheW3DShadowMap->isCasterShadowInView(robj->Get_Bounding_Sphere()))
+	{
+		++stats.outOfView;
+		return FALSE;
+	}
+
 	++stats.drawn;
 	return TRUE;
 }

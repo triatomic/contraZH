@@ -26,6 +26,7 @@
 #include "WWLib/always.h"
 #include "WWMath/matrix4.h"
 #include "WWMath/vector3.h"
+#include "WWMath/frustum.h"
 #include "WW3D2/matpass.h"
 #include "WW3D2/dx8compat.h"
 
@@ -84,6 +85,9 @@ public:
 	// True if a caster with these bounds can reach the fitted area of the map.
 	Bool isCasterInRange(const SphereClass& bounds) const;
 
+	// True if a caster's shadow can fall on ground or objects the camera sees.
+	Bool isCasterShadowInView(const SphereClass& bounds) const;
+
 	// Why candidates were kept or dropped in the current depth pass, for the debug log.
 	struct CasterStats
 	{
@@ -91,6 +95,7 @@ public:
 		Int hidden;
 		Int shrouded;
 		Int outOfRange;
+		Int outOfView;
 		Int drawn;
 	};
 	CasterStats& getCasterStats() { return m_casterStats; }
@@ -147,6 +152,9 @@ protected:
 	Real           m_depthBias;
 	Real           m_casterDepthBias;
 	Real           m_fittedRadius;
+	FrustumClass   m_viewFrustum;
+	Real           m_lowestVisibleGround;
+	Bool           m_hasViewFrustum;
 	Vector3        m_shadowColor;
 	Bool           m_hasDepth;
 	CasterStats    m_casterStats;

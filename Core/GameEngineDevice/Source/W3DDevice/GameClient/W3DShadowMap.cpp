@@ -104,6 +104,8 @@ W3DShadowMap::W3DShadowMap()
 	  m_depthBias(0.0f),
 	  m_casterDepthBias(0.0f),
 	  m_fittedRadius(0.0f),
+	  m_lowestVisibleGround(0.0f),
+	  m_hasViewFrustum(FALSE),
 	  m_shadowColor(1.0f, 1.0f, 1.0f),
 	  m_hasDepth(FALSE)
 {
@@ -380,6 +382,9 @@ void W3DShadowMap::updateFrustum(const CameraClass& camera, const Vector3& light
 	m_fittedRadius = radius;
 	m_fittedCenter = center;
 	m_lightDirection = lightDirection;
+	m_viewFrustum = camera.Get_Frustum();
+	m_lowestVisibleGround = groundHeights[0];
+	m_hasViewFrustum = TRUE;
 
 	computeSunViewProjection(center, radius, lightDirection);
 	updateCullCamera(center, radius, lightDirection);
@@ -404,6 +409,36 @@ Bool W3DShadowMap::isCasterInRange(const SphereClass& bounds) const
 
 	const Real reach = m_fittedRadius + bounds.Radius;
 	return offset.Length2() <= reach * reach;
+}
+
+Bool W3DShadowMap::isCasterShadowInView(const SphereClass& bounds) const
+{
+	if (!m_hasViewFrustum || m_lightDirection.Z >= 0.0f)
+	{
+		return TRUE;
+	}
+
+	// Anything the shadow can land on lies along the light between the caster and the
+	// lowest visible ground, so the bounds swept that far must touch the view frustum.
+	const Vector3 &start = bounds.Center;
+	Vector3 end = start;
+	const Real drop = start.Z + bounds.Radius - m_lowestVisibleGround;
+	if (drop > 0.0f)
+	{
+		end += m_lightDirection * (drop / -m_lightDirection.Z);
+	}
+
+	for (Int i = 0; i < 6; ++i)
+	{
+		const PlaneClass &plane = m_viewFrustum.Planes[i];
+		const Real startDistance = Vector3::Dot_Product(start, plane.N) - plane.D;
+		const Real endDistance = Vector3::Dot_Product(end, plane.N) - plane.D;
+		if (startDistance > bounds.Radius && endDistance > bounds.Radius)
+		{
+			return FALSE;
+		}
+	}
+	return TRUE;
 }
 
 void W3DShadowMap::setShadowColor(UnsignedInt argb)
@@ -572,9 +607,9 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 	static Int passCount = 0;
 	if (passCount % 300 == 0 && passCount <= 300 * 15)
 	{
-		DEBUG_LOG(("W3DShadowMap: pass %d drew %d, dropped %d disabled %d hidden %d shrouded %d out of range, centre (%.0f, %.0f, %.0f) radius %.0f",
+		DEBUG_LOG(("W3DShadowMap: pass %d drew %d, dropped %d disabled %d hidden %d shrouded %d out of range %d out of view, centre (%.0f, %.0f, %.0f) radius %.0f",
 			passCount, m_casterStats.drawn, m_casterStats.disabled, m_casterStats.hidden,
-			m_casterStats.shrouded, m_casterStats.outOfRange,
+			m_casterStats.shrouded, m_casterStats.outOfRange, m_casterStats.outOfView,
 			m_fittedCenter.X, m_fittedCenter.Y, m_fittedCenter.Z, m_fittedRadius));
 	}
 	++passCount;
