@@ -401,23 +401,12 @@ WWINLINE void BitmapHandlerClass::Copy_Pixel(
 			*dest_ptr++=src_ptr[1];
 			*dest_ptr++=src_ptr[2];
 			break;
+		// Both sides share the D3D layout, so a same-format pixel copies unchanged. Reordering
+		// the channels here moved alpha into blue and turned font edges to hard 0 or 15.
 		case WW3D_FORMAT_A4R4G4B4:
-			{
-				unsigned short tmp=*(unsigned short*)src_ptr;
-				*(unsigned short*)dest_ptr=((tmp&0x000f)<<12)|((tmp&0x00f0)<<4)|((tmp&0x0f00)>>4)|((tmp&0xf000)>>12);
-			}
-			break;
 		case WW3D_FORMAT_A1R5G5B5:
-			{
-				unsigned short tmp=*(unsigned short*)src_ptr;
-				*(unsigned short*)dest_ptr=((tmp&0x001f)<<11)|((tmp&0x03e0)<<1)|((tmp&0x7c00)>>9)|((tmp&0x8000)>>15);
-			}
-			break;
 		case WW3D_FORMAT_R5G6B5:
-			{
-				unsigned short tmp=*(unsigned short*)src_ptr;
-				*(unsigned short*)dest_ptr=((tmp&0x001f)<<11)|(tmp&0x07e0)|((tmp&0xf800)>>11);
-			}
+			*(unsigned short*)dest_ptr=*(const unsigned short*)src_ptr;
 			break;
 		case WW3D_FORMAT_R3G3B2:
 		case WW3D_FORMAT_L8:
