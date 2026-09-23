@@ -1398,6 +1398,54 @@ void WaterRenderObjClass::updateWaterMask()
 		}
 	}
 
+	UnsignedInt *cells = NEW UnsignedInt[width * height];
+	memset(cells, 0, width * height * sizeof(UnsignedInt));
+
+	const Real border = (Real)map->getBorderSizeInline();
+	for (PolygonTrigger *pTrig=PolygonTrigger::getFirstPolygonTrigger(); pTrig; pTrig = pTrig->getNext())
+	{
+		Real level;
+		if (!pTrig->isWaterArea() || pTrig->isRiver() || pTrig->getNumPoints() < 3 || !Get_Flat_Water_Level(pTrig, level))
+		{
+			continue;
+		}
+		const UnsignedInt value = (UnsignedInt)WWMath::Clamp(level * 16.0f + 0.5f, 0.0f, 65535.0f);
+
+		Int minX = pTrig->getPoint(0)->x;
+		Int maxX = minX;
+		Int minY = pTrig->getPoint(0)->y;
+		Int maxY = minY;
+		for (Int i=1; i<pTrig->getNumPoints(); i++)
+		{
+			minX = min(minX, pTrig->getPoint(i)->x);
+			maxX = max(maxX, pTrig->getPoint(i)->x);
+			minY = min(minY, pTrig->getPoint(i)->y);
+			maxY = max(maxY, pTrig->getPoint(i)->y);
+		}
+		const Int left = max((Int)REAL_TO_INT_FLOOR(minX / MAP_XY_FACTOR + border), 0);
+		const Int right = min((Int)REAL_TO_INT_CEIL(maxX / MAP_XY_FACTOR + border), width - 1);
+		const Int bottom = max((Int)REAL_TO_INT_FLOOR(minY / MAP_XY_FACTOR + border), 0);
+		const Int top = min((Int)REAL_TO_INT_CEIL(maxY / MAP_XY_FACTOR + border), height - 1);
+
+		for (Int y=bottom; y<=top; y++)
+		{
+			UnsignedInt *row = cells + y * width;
+			for (Int x=left; x<=right; x++)
+			{
+				ICoord3D point;
+				point.x = REAL_TO_INT(((Real)x - border) * MAP_XY_FACTOR);
+				point.y = REAL_TO_INT(((Real)y - border) * MAP_XY_FACTOR);
+				point.z = REAL_TO_INT(level);
+				// Where polygons overlap, the higher water wins.
+				if (pTrig->pointInTrigger(point) && (row[x] == 0 || ((row[x] >> 8) & 0xffff) < value))
+				{
+					row[x] = 0xff000000 | (value << 8);
+				}
+			}
+		}
+	}
+
+	// Grown by a cell, the mask ends on dry land instead of in a step short of the polygon's waterline.
 	SurfaceClass *surface = m_waterMaskTexture->Get_Surface_Level(0);
 	int pitch;
 	UnsignedByte *bits = (UnsignedByte *)surface->Lock(&pitch);
@@ -1405,55 +1453,27 @@ void WaterRenderObjClass::updateWaterMask()
 	{
 		for (Int y=0; y<height; y++)
 		{
-			memset(bits + y * pitch, 0, width * 4);
-		}
-
-		const Real border = (Real)map->getBorderSizeInline();
-		for (PolygonTrigger *pTrig=PolygonTrigger::getFirstPolygonTrigger(); pTrig; pTrig = pTrig->getNext())
-		{
-			Real level;
-			if (!pTrig->isWaterArea() || pTrig->isRiver() || pTrig->getNumPoints() < 3 || !Get_Flat_Water_Level(pTrig, level))
+			UnsignedInt *row = (UnsignedInt *)(bits + y * pitch);
+			for (Int x=0; x<width; x++)
 			{
-				continue;
-			}
-			const UnsignedInt value = (UnsignedInt)WWMath::Clamp(level * 16.0f + 0.5f, 0.0f, 65535.0f);
-
-			Int minX = pTrig->getPoint(0)->x;
-			Int maxX = minX;
-			Int minY = pTrig->getPoint(0)->y;
-			Int maxY = minY;
-			for (Int i=1; i<pTrig->getNumPoints(); i++)
-			{
-				minX = min(minX, pTrig->getPoint(i)->x);
-				maxX = max(maxX, pTrig->getPoint(i)->x);
-				minY = min(minY, pTrig->getPoint(i)->y);
-				maxY = max(maxY, pTrig->getPoint(i)->y);
-			}
-			const Int left = max((Int)REAL_TO_INT_FLOOR(minX / MAP_XY_FACTOR + border), 0);
-			const Int right = min((Int)REAL_TO_INT_CEIL(maxX / MAP_XY_FACTOR + border), width - 1);
-			const Int bottom = max((Int)REAL_TO_INT_FLOOR(minY / MAP_XY_FACTOR + border), 0);
-			const Int top = min((Int)REAL_TO_INT_CEIL(maxY / MAP_XY_FACTOR + border), height - 1);
-
-			for (Int y=bottom; y<=top; y++)
-			{
-				UnsignedInt *row = (UnsignedInt *)(bits + y * pitch);
-				for (Int x=left; x<=right; x++)
+				UnsignedInt cell = cells[y * width + x];
+				if (cell == 0)
 				{
-					ICoord3D point;
-					point.x = REAL_TO_INT(((Real)x - border) * MAP_XY_FACTOR);
-					point.y = REAL_TO_INT(((Real)y - border) * MAP_XY_FACTOR);
-					point.z = REAL_TO_INT(level);
-					// Where polygons overlap, the higher water wins.
-					if (pTrig->pointInTrigger(point) && (row[x] == 0 || ((row[x] >> 8) & 0xffff) < value))
+					for (Int ny=max(y - 1, 0); ny<=min(y + 1, height - 1); ny++)
 					{
-						row[x] = 0xff000000 | (value << 8);
+						for (Int nx=max(x - 1, 0); nx<=min(x + 1, width - 1); nx++)
+						{
+							cell = max(cell, cells[ny * width + nx]);
+						}
 					}
 				}
+				row[x] = cell;
 			}
 		}
 		surface->Unlock();
 	}
 	REF_PTR_RELEASE(surface);
+	delete [] cells;
 
 	m_waterMaskSignature = signature;
 	m_waterMaskMap = map;
