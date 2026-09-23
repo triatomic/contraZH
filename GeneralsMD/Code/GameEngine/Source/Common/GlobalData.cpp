@@ -252,6 +252,9 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ "ShadowMapMinSunElevation",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_shadowMapMinSunElevation ) },
 	{ "UnitSpecularIntensity",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_unitSpecularIntensity ) },
 	{ "UnitSpecularPower",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_unitSpecularPower ) },
+	{ "UnitBumpHeight",						INI::parseReal,				nullptr,			offsetof( GlobalData, m_unitBumpHeight ) },
+	{ "UnitNormalMapStrength",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_unitNormalMapStrength ) },
+	{ "TerrainNormalMapStrength",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_terrainNormalMapStrength ) },
 	{ "TextureReductionFactor",			INI::parseInt,				nullptr,			offsetof( GlobalData, m_textureReductionFactor ) },
 	{ "UseBehindBuildingMarker",		INI::parseBool,				nullptr,			offsetof( GlobalData, m_enableBehindBuildingMarkers ) },
 	{ "WaterPositionX",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_waterPositionX ) },
@@ -778,7 +781,9 @@ GlobalData::GlobalData()
   m_laserRef = FALSE;
   m_useShadowMap = TRUE;
   m_useSpecular = TRUE;
+  m_useNormalMaps = TRUE;
   m_specularDebug = FALSE;
+  m_normalMapDebug = FALSE;
   m_laserGlowColor = 0;
   m_laserGlowIntensity = 0.7f;
 
@@ -888,6 +893,9 @@ GlobalData::GlobalData()
 	m_shadowMapMinSunElevation = 30.0f;
 	m_unitSpecularIntensity = 0.35f;
 	m_unitSpecularPower = 24.0f;
+	m_unitBumpHeight = 0.15f;
+	m_unitNormalMapStrength = 1.0f;
+	m_terrainNormalMapStrength = 2.0f;
 	m_textureReductionFactor = -1;
 	m_enableBehindBuildingMarkers = TRUE;
 	m_scriptDebug = FALSE;
@@ -1607,7 +1615,9 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_laserRef = optionPref.getLaserRefEnabled();
 	TheWritableGlobalData->m_useShadowMap = optionPref.getShadowMapEnabled();
 	TheWritableGlobalData->m_useSpecular = optionPref.getSpecularEnabled();
+	TheWritableGlobalData->m_useNormalMaps = optionPref.getNormalMapsEnabled();
 	TheWritableGlobalData->m_specularDebug = optionPref.getSpecularDebugEnabled();
+	TheWritableGlobalData->m_normalMapDebug = optionPref.getNormalMapDebugEnabled();
 	TheWritableGlobalData->m_borderlessWindow = optionPref.getBorderlessWindowEnabled();
 
 	Int val=optionPref.getGammaValue();

@@ -76,6 +76,8 @@
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/dx8polygonrenderer.h"
 #include "WW3D2/matpass.h"
+#include "WW3D2/texture.h"
+#include "WWLib/ffactory.h"
 
 
 // Turn this on to turn off pixel shaders. jba[4/3/2003]
@@ -1494,6 +1496,22 @@ static Real SpecularPower = 24.0f;
 static Bool SpecularDebug = FALSE;
 static Int SpecularPassCount = 0;
 
+// The bump detail the specular pass shades, set once a frame by the scene.
+static Vector3 SpecularSunDiffuse(0.0f, 0.0f, 0.0f);
+static Bool BumpEnabled = FALSE;
+static Real BumpAmbient = 0.0f;
+static Real BumpHeight = 0.0f;
+static Real BumpNormalMapStrength = 1.0f;
+static Bool BumpSupported = FALSE;
+static Int BumpDerivedCount = 0;
+static Int BumpNormalMapCount = 0;
+
+// The terrain normal maps, set once a frame by the scene.
+static Bool TerrainBumpEnabled = FALSE;
+static Real TerrainBumpStrength = 1.0f;
+static Bool TerrainBumpDebug = FALSE;
+static Int TerrainBumpCount = 0;
+
 #if defined(BUILD_WITH_D3D9)
 
 ///Writes caster depth into the shadow map. Only the D3D9 backend has the shader model for it.
@@ -1772,22 +1790,40 @@ Int ShadowMultiplyShader::shutdown()
 	return TRUE;
 }
 
-///Adds a per-pixel sun highlight over geometry that has already drawn.
+///Adds a per-pixel sun highlight and bump shading over geometry that has already drawn.
 class SpecularShader : public W3DShaderInterface
 {
 public:
-	SpecularShader() : m_dwShadowedShader(0), m_dwUnshadowedShader(0), m_shadowed(FALSE) {}
+	enum Bump
+	{
+		BUMP_NONE,
+		BUMP_DERIVED,		///<height taken from the texture's brightness
+		BUMP_NORMAL_MAP,	///<the texture's own _nrm normal map
+		BUMP_COUNT
+	};
+
+	SpecularShader() : m_shadowed(FALSE)
+	{
+		for (Int i = 0; i < BUMP_COUNT; i++)
+		{
+			m_dwShadowedShaders[i] = 0;
+			m_dwUnshadowedShaders[i] = 0;
+		}
+	}
 
 	virtual Int set(Int pass) override;
 	virtual Int init() override;
 	virtual void reset() override;
 	virtual Int shutdown() override;
 
+	/// Binds one polygon group's texture, and its normal map and shader when it is bumped.
+	void setTexture(TextureClass *texture);
+
 protected:
 
-	DWORD m_dwShadowedShader;	///<takes the highlight out in the sun's shadow
-	DWORD m_dwUnshadowedShader;	///<for when the shadow map is off or holds no depth
-	Bool m_shadowed;			///<which of the two the current pass bound
+	DWORD m_dwShadowedShaders[BUMP_COUNT];		///<take the sun out in its shadow
+	DWORD m_dwUnshadowedShaders[BUMP_COUNT];	///<for when the shadow map is off or holds no depth
+	Bool m_shadowed;							///<which of the two the current pass uses
 } specularShader;
 
 W3DShaderInterface *SpecularShaderList[]=
@@ -1801,6 +1837,16 @@ W3DShaderInterface *SpecularShaderList[]=
 #define SPECULAR_NORMAL_STAGE	1
 #define SPECULAR_POSITION_STAGE	2
 #define SPECULAR_SHADOW_STAGE	3
+// The normal map comes last and reads the mesh's UVs from TEXCOORD0.
+#define SPECULAR_NORMAL_MAP_STAGE	4
+
+// The bumped shaders take screen-space derivatives, which only ps_2_a and up have.
+static Bool Supports_Pixel_Shader_2_a(const DX8Caps *caps)
+{
+	const D3DCAPS8 &d3dCaps = caps->Get_DX8_Caps();
+	return (d3dCaps.PS20Caps.Caps & D3DPS20CAPS_GRADIENTINSTRUCTIONS) != 0 &&
+		d3dCaps.PS20Caps.NumTemps >= 22 && d3dCaps.PS20Caps.NumInstructionSlots >= 512;
+}
 
 Int SpecularShader::init()
 {
@@ -1810,22 +1856,46 @@ Int SpecularShader::init()
 		return FALSE;
 	}
 
-	if (FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\specularnoshadow.pso",
-			nullptr, 0, false, &m_dwUnshadowedShader)))
+	static const char *const unshadowedFiles[BUMP_COUNT] =
+	{
+		"shaders\\specularnoshadow.pso", "shaders\\specularderivednoshadow.pso", "shaders\\specularnormalnoshadow.pso"
+	};
+	static const char *const shadowedFiles[BUMP_COUNT] =
+	{
+		"shaders\\specular.pso", "shaders\\specularderived.pso", "shaders\\specularnormal.pso"
+	};
+	static const char *const packedFiles[BUMP_COUNT] =
+	{
+		"shaders\\specularpacked.pso", "shaders\\specularderivedpacked.pso", "shaders\\specularnormalpacked.pso"
+	};
+
+	if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(unshadowedFiles[BUMP_NONE],
+			nullptr, 0, false, &m_dwUnshadowedShaders[BUMP_NONE])))
 	{
 		return FALSE;
 	}
 
-	// Without the shadowed variant the highlight still draws, just through shadows too.
-	if (TheW3DShadowMap != nullptr && TheW3DShadowMap->isAvailable())
+	// Without a shadowed variant the pass still draws, just through shadows too.
+	const Bool shadowMap = (TheW3DShadowMap != nullptr && TheW3DShadowMap->isAvailable());
+	const char *const *shadowedSet = (shadowMap && TheW3DShadowMap->getDepthMode() == W3DShadowMap::DEPTH_MODE_PACKED)
+		? packedFiles : shadowedFiles;
+	const Int bumpCount = Supports_Pixel_Shader_2_a(caps) ? BUMP_COUNT : BUMP_NONE + 1;
+
+	for (Int bump = BUMP_NONE; bump < bumpCount; bump++)
 	{
-		const char *file = (TheW3DShadowMap->getDepthMode() == W3DShadowMap::DEPTH_MODE_PACKED)
-			? "shaders\\specularpacked.pso" : "shaders\\specular.pso";
-		if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(file, nullptr, 0, false, &m_dwShadowedShader)))
+		if (bump != BUMP_NONE && FAILED(W3DShaderManager::LoadAndCreateD3DShader(unshadowedFiles[bump],
+				nullptr, 0, false, &m_dwUnshadowedShaders[bump])))
 		{
-			m_dwShadowedShader = 0;
+			m_dwUnshadowedShaders[bump] = 0;
+		}
+		if (shadowMap && FAILED(W3DShaderManager::LoadAndCreateD3DShader(shadowedSet[bump],
+				nullptr, 0, false, &m_dwShadowedShaders[bump])))
+		{
+			m_dwShadowedShaders[bump] = 0;
 		}
 	}
+
+	BumpSupported = (m_dwUnshadowedShaders[BUMP_DERIVED] != 0 || m_dwUnshadowedShaders[BUMP_NORMAL_MAP] != 0);
 
 	W3DShaders[W3DShaderManager::ST_SPECULAR]=&specularShader;
 	W3DShadersPassCount[W3DShaderManager::ST_SPECULAR]=1;
@@ -1846,23 +1916,25 @@ static void Set_Camera_Space_Texcoord(Int stage, DWORD source)
 // W3DSpecularMaterialPassClass::Install_Polygon_Materials.
 Int SpecularShader::set(Int pass)
 {
-	m_shadowed = (m_dwShadowedShader != 0 && TheW3DShadowMap != nullptr &&
+	m_shadowed = (m_dwShadowedShaders[BUMP_NONE] != 0 && TheW3DShadowMap != nullptr &&
 		TheW3DShadowMap->bindReceiver(SPECULAR_SHADOW_STAGE));
 
 	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXCOORDINDEX, 0);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
 	Set_Camera_Space_Texcoord(SPECULAR_NORMAL_STAGE, D3DTSS_TCI_CAMERASPACENORMAL);
 	Set_Camera_Space_Texcoord(SPECULAR_POSITION_STAGE, D3DTSS_TCI_CAMERASPACEPOSITION);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(SPECULAR_NORMAL_MAP_STAGE, D3DTSS_TEXCOORDINDEX, 0);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(SPECULAR_NORMAL_MAP_STAGE, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
 
-	// The mesh is redrawn at the same depth, so EQUAL limits the highlight to pixels the first
-	// draw wrote, and it adds to them.
+	// The mesh is redrawn at the same depth, so EQUAL limits the pass to pixels the first
+	// draw wrote. It adds its colour to them after scaling them by its alpha.
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, TRUE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZFUNC, D3DCMP_EQUAL);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZWRITEENABLE, FALSE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHATESTENABLE, FALSE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE, TRUE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_ONE);
-	DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_ONE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_SRCALPHA);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_FOGENABLE, FALSE);
 
 	// The shader lights in camera space, so the sun is turned into it with the view's rotation.
@@ -1877,18 +1949,92 @@ Int SpecularShader::set(Int pass)
 	Vector4 sunDirection(toSun.X, toSun.Y, toSun.Z, 0.0f);
 	Vector4 sunColor(SpecularColor.X, SpecularColor.Y, SpecularColor.Z, 0.0f);
 	Vector4 gloss(SpecularPower, SpecularDebug ? 1.0f : 0.0f, 0.0f, 0.0f);
+	Vector4 bump(BumpHeight, BumpNormalMapStrength, BumpAmbient, 0.0f);
+	Vector4 sunDiffuse(SpecularSunDiffuse.X, SpecularSunDiffuse.Y, SpecularSunDiffuse.Z, 0.0f);
 	DX8Wrapper::Set_Pixel_Shader_Constant(1, &sunDirection, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(2, &sunColor, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(3, &gloss, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(5, &sunDiffuse, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(6, &bump, 1);
 
-	DX8Wrapper::Set_Pixel_Shader(m_shadowed ? m_dwShadowedShader : m_dwUnshadowedShader);
+	DX8Wrapper::Set_Pixel_Shader(m_shadowed ? m_dwShadowedShaders[BUMP_NONE] : m_dwUnshadowedShaders[BUMP_NONE]);
 	++SpecularPassCount;
 	return TRUE;
+}
+
+// Looks for <name>_nrm.dds beside the texture, once per texture.
+static TextureClass *Find_Normal_Map(TextureClass *texture)
+{
+	if (!texture->Is_Normal_Map_Checked())
+	{
+		TextureClass *normalMap = nullptr;
+		StringClass name(texture->Get_Texture_Name());
+		const char *dot = strrchr(name.Peek_Buffer(), '.');
+		if (dot != nullptr)
+		{
+			const Int start = (Int)(dot - name.Peek_Buffer());
+			name.Erase(start, name.Get_Length() - start);
+		}
+
+		// A missing file would load as the missing-texture placeholder, so it is checked first.
+		if (!name.Is_Empty())
+		{
+			name += "_nrm.dds";
+			file_auto_ptr file(_TheFileFactory, name.Peek_Buffer());
+			if (file->Is_Available())
+			{
+				normalMap = WW3DAssetManager::Get_Instance()->Get_Texture(name.Peek_Buffer());
+			}
+		}
+
+		texture->Set_Normal_Map(normalMap);
+		REF_PTR_RELEASE(normalMap);
+	}
+	return texture->Peek_Normal_Map();
+}
+
+void SpecularShader::setTexture(TextureClass *texture)
+{
+	DX8Wrapper::Set_Texture(0, texture);
+
+	Int bump = BUMP_NONE;
+	TextureClass *normalMap = nullptr;
+	if (BumpEnabled && texture != nullptr)
+	{
+		normalMap = Find_Normal_Map(texture);
+		if (normalMap != nullptr)
+		{
+			bump = BUMP_NORMAL_MAP;
+		}
+		else if (BumpHeight > 0.0f)
+		{
+			bump = BUMP_DERIVED;
+		}
+	}
+
+	const DWORD *shaders = m_shadowed ? m_dwShadowedShaders : m_dwUnshadowedShaders;
+	if (shaders[bump] == 0)
+	{
+		bump = BUMP_NONE;
+	}
+
+	DX8Wrapper::Set_Texture(SPECULAR_NORMAL_MAP_STAGE, (bump == BUMP_NORMAL_MAP) ? normalMap : nullptr);
+	DX8Wrapper::Set_Pixel_Shader(shaders[bump]);
+
+	if (bump == BUMP_DERIVED)
+	{
+		++BumpDerivedCount;
+	}
+	else if (bump == BUMP_NORMAL_MAP)
+	{
+		++BumpNormalMapCount;
+	}
 }
 
 void SpecularShader::reset()
 {
 	DX8Wrapper::Set_Pixel_Shader(0);
+	DX8Wrapper::Set_Texture(SPECULAR_NORMAL_MAP_STAGE, nullptr);
 
 	if (m_shadowed && TheW3DShadowMap != nullptr)
 	{
@@ -1901,6 +2047,8 @@ void SpecularShader::reset()
 		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
 		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_PASSTHRU | stage);
 	}
+	DX8Wrapper::Set_DX8_Texture_Stage_State(SPECULAR_NORMAL_MAP_STAGE, D3DTSS_TEXCOORDINDEX,
+		D3DTSS_TCI_PASSTHRU | SPECULAR_NORMAL_MAP_STAGE);
 
 	// Z, blend and fog are ShaderClass state, so the next shader set restores them in full.
 	ShaderClass::Invalidate();
@@ -1910,14 +2058,18 @@ Int SpecularShader::shutdown()
 {
 	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
 
-	if (device != nullptr)
+	for (Int bump = BUMP_NONE; bump < BUMP_COUNT; bump++)
 	{
-		DX8_DELETE_PIXEL_SHADER(device, m_dwShadowedShader);
-		DX8_DELETE_PIXEL_SHADER(device, m_dwUnshadowedShader);
+		if (device != nullptr)
+		{
+			DX8_DELETE_PIXEL_SHADER(device, m_dwShadowedShaders[bump]);
+			DX8_DELETE_PIXEL_SHADER(device, m_dwUnshadowedShaders[bump]);
+		}
+		m_dwShadowedShaders[bump] = 0;
+		m_dwUnshadowedShaders[bump] = 0;
 	}
 
-	m_dwShadowedShader = 0;
-	m_dwUnshadowedShader = 0;
+	BumpSupported = FALSE;
 
 	W3DShaders[W3DShaderManager::ST_SPECULAR]=nullptr;
 	W3DShadersPassCount[W3DShaderManager::ST_SPECULAR]=0;
@@ -1945,7 +2097,12 @@ public:
 	virtual void Install_Polygon_Materials(DX8PolygonRendererClass *renderer) const override
 	{
 		DX8TextureCategoryClass *category = renderer->Get_Texture_Category();
-		DX8Wrapper::Set_Texture(0, (category != nullptr) ? category->Peek_Texture(0) : nullptr);
+		TextureClass *texture = (category != nullptr) ? category->Peek_Texture(0) : nullptr;
+#if defined(BUILD_WITH_D3D9)
+		specularShader.setTexture(texture);
+#else
+		DX8Wrapper::Set_Texture(0, texture);
+#endif
 	}
 };
 
@@ -1956,20 +2113,47 @@ void W3DShaderManager::setSpecularLight(const Vector3 &toSun, const Vector3 &col
 	SpecularToSun = toSun;
 	SpecularToSun.Normalize();
 	SpecularColor = color * intensity;
+	SpecularSunDiffuse = color;
 	SpecularPower = power;
 	SpecularDebug = debug;
 }
 
-Int W3DShaderManager::takeSpecularPassCount()
+void W3DShaderManager::setSurfaceBumps(Bool enabled, const Vector3 &ambient, Real height, Real normalMapStrength)
 {
-	const Int count = SpecularPassCount;
-	SpecularPassCount = 0;
+	BumpEnabled = enabled;
+	BumpAmbient = ambient.X * 0.3f + ambient.Y * 0.59f + ambient.Z * 0.11f;
+	BumpHeight = height;
+	BumpNormalMapStrength = normalMapStrength;
+}
+
+void W3DShaderManager::setTerrainBumps(Bool enabled, Real strength, Bool debug)
+{
+	TerrainBumpEnabled = enabled;
+	TerrainBumpStrength = strength;
+	TerrainBumpDebug = debug;
+}
+
+Int W3DShaderManager::takeTerrainBumpCount()
+{
+	const Int count = TerrainBumpCount;
+	TerrainBumpCount = 0;
 	return count;
+}
+
+void W3DShaderManager::takeSpecularCounts(Int &meshes, Int &derived, Int &normalMapped)
+{
+	meshes = SpecularPassCount;
+	derived = BumpDerivedCount;
+	normalMapped = BumpNormalMapCount;
+	SpecularPassCount = 0;
+	BumpDerivedCount = 0;
+	BumpNormalMapCount = 0;
 }
 
 MaterialPassClass *W3DShaderManager::getSpecularPass()
 {
-	if (W3DShadersPassCount[ST_SPECULAR] == 0 || SpecularColor.Length2() <= 0.0f)
+	const Bool bumps = (BumpEnabled && BumpSupported);
+	if (W3DShadersPassCount[ST_SPECULAR] == 0 || (SpecularColor.Length2() <= 0.0f && !bumps))
 	{
 		return nullptr;
 	}
@@ -2036,7 +2220,7 @@ class TerrainShader8Stage : public W3DShaderInterface
 class TerrainShaderPixelShader : public W3DShaderInterface
 {
 public:
-	TerrainShaderPixelShader() : m_shadowStage(-1) {}
+	TerrainShaderPixelShader() : m_shadowStage(-1), m_bumpStage(-1) {}
 
 private:
 	DWORD					m_dwBasePixelShader;	///<handle to terrain D3D pixel shader
@@ -2044,6 +2228,8 @@ private:
 	DWORD					m_dwBaseNoise2PixelShader;	///<handle to terrain/double noise D3D pixel shader
 	DWORD					m_dwShadowPixelShader[3];	///<the same three, also receiving the shadow map, indexed by noise texture count
 	Int						m_shadowStage;	///<stage the shadow map is bound to, or -1
+	DWORD					m_dwBumpPixelShader[2][3];	///<the same three with the normal atlas, unshadowed then shadowed
+	Int						m_bumpStage;	///<stage the world position is generated on, with the normal atlas on the next, or -1
 
 	virtual Int set(Int pass) override;		///<setup shader for the specified rendering pass.
 	virtual void reset() override;		///<do any custom resetting necessary to bring W3D in sync.
@@ -2052,6 +2238,8 @@ private:
 
 	void initShadowReceiver();
 	Bool setShadowReceiver(Int noiseCount);
+	void initBump();
+	Bool setBump(Int noiseCount, Bool shadowed);
 } terrainShaderPixelShader;
 
 ///List of different terrain shader implementations in order of preference
@@ -2462,6 +2650,16 @@ Int TerrainShaderPixelShader::shutdown()
 		m_dwShadowPixelShader[i]=0;
 	}
 
+	for (Int s=0; s<2; s++)
+	{
+		for (Int i=0; i<3; i++)
+		{
+			if (m_dwBumpPixelShader[s][i])
+				DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_dwBumpPixelShader[s][i]);
+			m_dwBumpPixelShader[s][i]=0;
+		}
+	}
+
 	return TRUE;
 }
 
@@ -2514,6 +2712,91 @@ Bool TerrainShaderPixelShader::setShadowReceiver(Int noiseCount)
 	return TRUE;
 }
 
+void TerrainShaderPixelShader::initBump()
+{
+	for (Int s=0; s<2; s++)
+		for (Int i=0; i<3; i++)
+			m_dwBumpPixelShader[s][i]=0;
+	m_bumpStage = -1;
+
+#if defined(BUILD_WITH_D3D9)
+	const DX8Caps *caps = DX8Wrapper::Get_Current_Caps();
+	if (caps == nullptr || !Supports_Pixel_Shader_2_a(caps))
+		return;
+
+	const char *unshadowedFiles[3] =
+	{
+		"shaders\\terrainbumpnoshadow.pso", "shaders\\terrainbumpnoisenoshadow.pso", "shaders\\terrainbumpnoise2noshadow.pso"
+	};
+	const char *shadowedFiles[3][2] =
+	{
+		{ "shaders\\terrainbump.pso",       "shaders\\terrainbumppacked.pso" },
+		{ "shaders\\terrainbumpnoise.pso",  "shaders\\terrainbumpnoisepacked.pso" },
+		{ "shaders\\terrainbumpnoise2.pso", "shaders\\terrainbumpnoise2packed.pso" }
+	};
+
+	// Shadowed variants only go with the shadow receivers they replace.
+	const Bool shadowMap = (m_dwShadowPixelShader[0] != 0 && TheW3DShadowMap != nullptr);
+	const Bool packed = shadowMap && TheW3DShadowMap->getDepthMode() == W3DShadowMap::DEPTH_MODE_PACKED;
+
+	for (Int i=0; i<3; i++)
+	{
+		if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(unshadowedFiles[i], nullptr, 0, false, &m_dwBumpPixelShader[0][i])))
+			m_dwBumpPixelShader[0][i]=0;
+		if (shadowMap && FAILED(W3DShaderManager::LoadAndCreateD3DShader(shadowedFiles[i][packed ? 1 : 0], nullptr, 0, false, &m_dwBumpPixelShader[1][i])))
+			m_dwBumpPixelShader[1][i]=0;
+	}
+#endif
+}
+
+// Expects the shadow map bound already when shadowed, since the stages after it are this one's.
+Bool TerrainShaderPixelShader::setBump(Int noiseCount, Bool shadowed)
+{
+	TextureClass *normalAtlas = W3DShaderManager::getShaderTexture(W3DShaderManager::TERRAIN_NORMAL_TEXTURE);
+	const DWORD shader = m_dwBumpPixelShader[shadowed ? 1 : 0][noiseCount];
+	if (!TerrainBumpEnabled || shader == 0 || normalAtlas == nullptr || normalAtlas->Peek_D3D_Texture() == nullptr)
+		return FALSE;
+
+	// World position is camera space taken back through the view, because the terrain has no world transform.
+	const Int stage = 2 + noiseCount + (shadowed ? 1 : 0);
+	D3DMATRIX view;
+	D3DMATRIX inv;
+	float det;
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
+	Invert_D3DMATRIX(inv, &det, view);
+	DX8Wrapper::_Set_DX8_Transform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + stage), inv);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT3);
+
+	// The atlas is read with the base and blend UVs, so its own texcoords go unused.
+	const Int atlasStage = stage + 1;
+	DX8Wrapper::_Get_D3D_Device8()->SetTexture(atlasStage, normalAtlas->Peek_D3D_Texture());
+	DX8Wrapper::Set_DX8_Texture_Stage_State(atlasStage, D3DTSS_TEXCOORDINDEX, 0);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(atlasStage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(atlasStage, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(atlasStage, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(atlasStage, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(atlasStage, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(atlasStage, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
+
+	// The vertex lighting's first light is the sun, so the bump redoes that one.
+	const Coord3D &lightPos = TheGlobalData->m_terrainLightPos[0];
+	Vector3 toSun(-lightPos.x, -lightPos.y, -lightPos.z);
+	toSun.Normalize();
+	const RGBColor &sunColor = TheGlobalData->m_terrainDiffuse[0];
+	Vector4 sunDirection(toSun.X, toSun.Y, toSun.Z, 0.0f);
+	Vector4 sunDiffuse(sunColor.red, sunColor.green, sunColor.blue, 0.0f);
+	Vector4 bumpParams(TerrainBumpStrength, TerrainBumpDebug ? 1.0f : 0.0f, 0.0f, 0.0f);
+	DX8Wrapper::Set_Pixel_Shader_Constant(1, &sunDirection, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(2, &sunDiffuse, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(3, &bumpParams, 1);
+
+	m_bumpStage = stage;
+	DX8Wrapper::Set_Pixel_Shader(shader);
+	++TerrainBumpCount;
+	return TRUE;
+}
+
 Int TerrainShaderPixelShader::init()
 {
 	Int res;
@@ -2553,6 +2836,7 @@ Int TerrainShaderPixelShader::init()
 				return FALSE;
 
 			initShadowReceiver();
+			initBump();
 
 			W3DShaders[W3DShaderManager::ST_TERRAIN_BASE]=&terrainShaderPixelShader;
 			W3DShaders[W3DShaderManager::ST_TERRAIN_BASE_NOISE1]=&terrainShaderPixelShader;
@@ -2677,7 +2961,8 @@ Int TerrainShaderPixelShader::set(Int pass)
 		noiseCount = 2;
 	else if (W3DShaderManager::getCurrentShader() >= W3DShaderManager::ST_TERRAIN_BASE_NOISE1)
 		noiseCount = 1;
-	setShadowReceiver(noiseCount);
+	const Bool shadowed = setShadowReceiver(noiseCount);
+	setBump(noiseCount, shadowed);
 
 	return TRUE;
 }
@@ -2687,6 +2972,17 @@ void TerrainShaderPixelShader::reset()
 	if (TheW3DShadowMap != nullptr && m_shadowStage >= 0)
 		TheW3DShadowMap->unbindReceiver(m_shadowStage);
 	m_shadowStage = -1;
+
+	if (m_bumpStage >= 0)
+	{
+		for (Int stage = m_bumpStage; stage <= m_bumpStage + 1; stage++)
+		{
+			DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_PASSTHRU|stage);
+		}
+		DX8Wrapper::_Get_D3D_Device8()->SetTexture(m_bumpStage + 1, nullptr);
+	}
+	m_bumpStage = -1;
 
 	DX8Wrapper::_Get_D3D_Device8()->SetTexture(2,nullptr);	//release reference to any texture
 	DX8Wrapper::_Get_D3D_Device8()->SetTexture(3,nullptr);	//release reference to any texture

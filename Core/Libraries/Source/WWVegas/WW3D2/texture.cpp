@@ -102,7 +102,9 @@ TextureBaseClass::TextureBaseClass
 	Dirty(false),
 	TextureLoadTask(nullptr),
 	ThumbnailLoadTask(nullptr),
-	HSVShift(0.0f,0.0f,0.0f)
+	HSVShift(0.0f,0.0f,0.0f),
+	NormalMap(nullptr),
+	NormalMapChecked(false)
 {
 }
 
@@ -118,6 +120,8 @@ TextureBaseClass::~TextureBaseClass()
 	delete ThumbnailLoadTask;
 	ThumbnailLoadTask=nullptr;
 
+	REF_PTR_RELEASE(NormalMap);
+
 	if (D3DTexture)
 	{
 		D3DTexture->Release();
@@ -125,6 +129,12 @@ TextureBaseClass::~TextureBaseClass()
 	}
 
 	DX8TextureManagerClass::Remove(this);
+}
+
+void TextureBaseClass::Set_Normal_Map(TextureClass *normal_map)
+{
+	REF_PTR_SET(NormalMap, normal_map);
+	NormalMapChecked = true;
 }
 
 

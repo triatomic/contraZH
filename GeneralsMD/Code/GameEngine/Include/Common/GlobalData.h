@@ -247,6 +247,9 @@ public:
 	Real m_shadowMapMinSunElevation;	///< GameData ShadowMapMinSunElevation: lowest sun, in degrees, the shadow map uses
 	Real m_unitSpecularIntensity;	///< GameData UnitSpecularIntensity: brightness of the sun highlight on vehicles and structures, 0 for none
 	Real m_unitSpecularPower;		///< GameData UnitSpecularPower: tightness of that highlight, higher is smaller and sharper
+	Real m_unitBumpHeight;			///< GameData UnitBumpHeight: rise, in world units, of full brightness on textures without a normal map, 0 for flat
+	Real m_unitNormalMapStrength;	///< GameData UnitNormalMapStrength: scales the tilt of authored _nrm normal maps
+	Real m_terrainNormalMapStrength;	///< GameData TerrainNormalMapStrength: scales the tilt of terrain _nrm normal maps
 	Int  m_textureReductionFactor;	//how much to cut texture resolution: 2 is half, 3 is quarter, etc.
 	Bool m_enableBehindBuildingMarkers;
 	Real m_waterPositionX;
@@ -631,7 +634,9 @@ public:
   Bool m_laserRef;                ///< Options.ini LaserRef: lasers light the ground along the beam
   Bool m_useShadowMap;            ///< Options.ini ShadowMap: shadows come from a sun shadow map where the hardware allows
   Bool m_useSpecular;             ///< Options.ini Specular: per-pixel sun highlight on vehicles and structures where the hardware allows
+  Bool m_useNormalMaps;           ///< Options.ini NormalMaps: bump detail in the sun's light on vehicles, structures and terrain where the hardware allows
   Bool m_specularDebug;           ///< Options.ini SpecularDebug: show what the specular pass covers and its highlight in magenta
+  Bool m_normalMapDebug;          ///< Options.ini NormalMapDebug: show only the terrain's bump shading, on grey
   Color m_laserGlowColor;         ///< GameData LaserGroundGlowColor: black takes the beam color
   Real m_laserGlowIntensity;      ///< GameData LaserGroundGlowIntensity: how strongly the color is added
 

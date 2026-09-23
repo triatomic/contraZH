@@ -422,9 +422,19 @@ Bool OptionPreferences::getSpecularEnabled(void) const
 	return getBool("Specular", TRUE);
 }
 
+Bool OptionPreferences::getNormalMapsEnabled(void) const
+{
+	return getBool("NormalMaps", TRUE);
+}
+
 Bool OptionPreferences::getSpecularDebugEnabled(void) const
 {
 	return getBool("SpecularDebug", FALSE);
+}
+
+Bool OptionPreferences::getNormalMapDebugEnabled(void) const
+{
+	return getBool("NormalMapDebug", FALSE);
 }
 
 Bool OptionPreferences::getBorderlessWindowEnabled(void) const

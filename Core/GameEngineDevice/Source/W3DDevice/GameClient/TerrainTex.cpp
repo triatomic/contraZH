@@ -366,6 +366,140 @@ void TerrainTextureClass::setLOD(Int LOD)
 {
 	if (Peek_D3D_Texture()) Peek_D3D_Texture()->SetLOD(LOD);
 }
+
+/******************************************************************************
+						TerrainNormalTextureClass
+******************************************************************************/
+
+// Both channels of a flat normal, stored wherever a texture class has no normal map.
+#define FLAT_NORMAL_BYTE 128
+
+TerrainNormalTextureClass::TerrainNormalTextureClass(int height) :
+	TextureClass(TEXTURE_WIDTH, height,
+		WW3D_FORMAT_A8L8, MIP_LEVELS_3 )
+{
+}
+
+Bool TerrainNormalTextureClass::update(WorldHeightMap *htMap)
+{
+	IDirect3DTexture8 *texture = Peek_D3D_Texture();
+	if (texture == nullptr)
+	{
+		return false;
+	}
+
+	D3DSURFACE_DESC surface_desc;
+	DX8_ErrorCode(texture->GetLevelDesc(0, &surface_desc));
+	if (surface_desc.Format != D3DFMT_A8L8 || surface_desc.Width < TEXTURE_WIDTH)
+	{
+		return false;
+	}
+
+	D3DLOCKED_RECT locked_rect;
+	DX8_ErrorCode(texture->LockRect(0, &locked_rect, nullptr, 0));
+	UnsignedByte *bits = (UnsignedByte *)locked_rect.pBits;
+	const Int pitch = locked_rect.Pitch;
+	const Int pixelBytes = 2;
+
+	memset(bits, FLAT_NORMAL_BYTE, pitch*surface_desc.Height);
+
+	// Tiles land where TerrainTextureClass::update puts their colour, rows inverted the same way.
+	for (Int tileNdx=0; tileNdx < htMap->m_numBitmapTiles; tileNdx++)
+	{
+		TileData *pTile = htMap->getSourceTile(tileNdx);
+		TileData *pNormal = htMap->getSourceNormalTile(tileNdx);
+		if (!pTile || !pNormal)
+		{
+			continue;
+		}
+		ICoord2D position = pTile->m_tileLocationInTexture;
+		if (position.x<=0)
+		{
+			continue;
+		}
+
+		for (Int j=0; j<TILE_PIXEL_EXTENT; j++)
+		{
+			const UnsignedByte *pBGR = pNormal->getRGBDataForWidth(TILE_PIXEL_EXTENT) +
+				(TILE_PIXEL_EXTENT-1-j)*TILE_BYTES_PER_PIXEL*TILE_PIXEL_EXTENT;
+			UnsignedByte *pLA = bits + (position.y+j)*pitch + position.x*pixelBytes;
+			for (Int i=0; i<TILE_PIXEL_EXTENT; i++)
+			{
+				pLA[0] = pBGR[2];
+				pLA[1] = pBGR[1];
+				pLA += pixelBytes;
+				pBGR += TILE_BYTES_PER_PIXEL;
+			}
+		}
+	}
+
+	// The same 4 pixel wrap border around each class that the colour texture gets.
+	for (Int texClass=0; texClass<htMap->m_numTextureClasses; texClass++)
+	{
+		Int width = htMap->m_textureClasses[texClass].width*TILE_PIXEL_EXTENT;
+		ICoord2D origin = htMap->m_textureClasses[texClass].positionInTexture;
+		if (origin.x<=0)
+		{
+			continue;
+		}
+
+		for (Int j=0; j<width; j++)
+		{
+			UnsignedByte *row = bits + (origin.y+j)*pitch + origin.x*pixelBytes;
+			memcpy(row-4*pixelBytes, row+(width-4)*pixelBytes, 4*pixelBytes);
+			memcpy(row+width*pixelBytes, row, 4*pixelBytes);
+		}
+		for (Int j=0; j<4; j++)
+		{
+			UnsignedByte *target = bits + (origin.y-j-1)*pitch + (origin.x-4)*pixelBytes;
+			memcpy(target, target+width*pitch, (width+8)*pixelBytes);
+			target = bits + (origin.y+j)*pitch + (origin.x-4)*pixelBytes;
+			memcpy(target+width*pitch, target, (width+8)*pixelBytes);
+		}
+	}
+
+	texture->UnlockRect(0);
+
+	// Box filtered here, because Filter_Texture_Mipmaps cannot read this format.
+	for (UnsignedInt level=1; level<texture->GetLevelCount(); level++)
+	{
+		D3DSURFACE_DESC dest_desc;
+		D3DLOCKED_RECT src_rect;
+		D3DLOCKED_RECT dest_rect;
+		DX8_ErrorCode(texture->GetLevelDesc(level, &dest_desc));
+		DX8_ErrorCode(texture->LockRect(level-1, &src_rect, nullptr, D3DLOCK_READONLY));
+		DX8_ErrorCode(texture->LockRect(level, &dest_rect, nullptr, 0));
+
+		for (UnsignedInt y=0; y<dest_desc.Height; y++)
+		{
+			const UnsignedByte *row0 = (const UnsignedByte *)src_rect.pBits + 2*y*src_rect.Pitch;
+			const UnsignedByte *row1 = row0 + src_rect.Pitch;
+			UnsignedByte *dest = (UnsignedByte *)dest_rect.pBits + y*dest_rect.Pitch;
+			for (UnsignedInt x=0; x<dest_desc.Width*pixelBytes; x++)
+			{
+				const UnsignedInt s = (x/pixelBytes)*2*pixelBytes + x%pixelBytes;
+				dest[x] = (UnsignedByte)((row0[s] + row0[s+pixelBytes] + row1[s] + row1[s+pixelBytes] + 2)/4);
+			}
+		}
+
+		texture->UnlockRect(level);
+		texture->UnlockRect(level-1);
+	}
+
+	if (WW3D::Get_Texture_Reduction())
+	{
+		texture->SetLOD(WW3D::Get_Texture_Reduction());
+	}
+	return true;
+}
+
+void TerrainNormalTextureClass::setLOD(Int LOD)
+{
+	if (Peek_D3D_Texture())
+	{
+		Peek_D3D_Texture()->SetLOD(LOD);
+	}
+}
 //=============================================================================
 // TerrainTextureClass::update
 //=============================================================================

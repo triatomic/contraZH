@@ -94,6 +94,7 @@ class OutputStream;
 class DataChunkInput;
 struct DataChunkInfo;
 class TerrainTextureClass;
+class TerrainNormalTextureClass;
 class AlphaTerrainTextureClass;
 class AlphaEdgeTextureClass;
 
@@ -103,6 +104,7 @@ class WorldHeightMap : public RefCountClass,
                        public WorldHeightMapInterfaceClass
 {
 	friend class TerrainTextureClass;
+	friend class TerrainNormalTextureClass;
 	friend class AlphaTerrainTextureClass;
 	friend class AlphaEdgeTextureClass;
 
@@ -160,6 +162,8 @@ protected:
 
 	TileData			*m_sourceTiles[NUM_SOURCE_TILES];	///< Tiles for m_textureClasses
 	TileData			*m_edgeTiles[NUM_SOURCE_TILES];	///< Tiles for m_textureClasses
+	TileData			*m_sourceNormalTiles[NUM_SOURCE_TILES];	///< Normal map tiles matching m_sourceTiles, null where a class has none
+	Bool				m_hasNormalTiles;	///< Some texture class has a normal map
 
 	TBlendTileInfo	m_blendedTiles[NUM_BLEND_TILES];
 	TBlendTileInfo	m_extraBlendedTiles[NUM_BLEND_TILES];
@@ -184,6 +188,8 @@ protected:
 	 texture. */
 	TerrainTextureClass *m_terrainTex;
 	Int	m_terrainTexHeight; /// Height of m_terrainTex allocated.
+	/** The normal maps laid out like m_terrainTex, so the same UVs index both. */
+	TerrainNormalTextureClass *m_terrainNormalTex;
 	/** The texture that contains the alpha edge tiles that get blended on
 			top of the base texture. getAlphaUVData does the mapping. */
 	AlphaTerrainTextureClass *m_alphaTerrainTex;
@@ -206,11 +212,13 @@ protected:
 protected:
 	TileData *getSourceTile(UnsignedInt ndx) { if (ndx<NUM_SOURCE_TILES) return(m_sourceTiles[ndx]); return(nullptr); };
 	TileData *getEdgeTile(UnsignedInt ndx) { if (ndx<NUM_SOURCE_TILES) return(m_edgeTiles[ndx]); return(nullptr); };
+	TileData *getSourceNormalTile(UnsignedInt ndx) { if (ndx<NUM_SOURCE_TILES) return(m_sourceNormalTiles[ndx]); return(nullptr); };
 	/// UV mapping data for a cell to map into the terrain texture.
 	void getUVForNdx(Int ndx, float *minU, float *minV, float *maxU, float*maxV);
 	Bool getUVForTileIndex(Int ndx, Short tileNdx, float U[4], float V[4]);
 	Int getTextureClassFromNdx(Int tileNdx);
 	void readTexClass(TXTextureClass *texClass, TileData **tileData);
+	void readNormalTiles(TXTextureClass *texClass, const char *textureName, Int numRows);
 	Int updateTileTexturePositions(Int *edgeHeight); ///< Places each tile in the texture.
 	void initCliffFlagsFromHeights();
 	void setCellCliffFlagFromHeights(Int xIndex, Int yIndex);
@@ -287,6 +295,7 @@ public:  // height map info.
 public:  // tile and texture info.
 	void setTextureLOD(Int lod);	///< set maximum lod level sent to the hardware.
 	TextureClass *getTerrainTexture();  //< generates if needed and returns the terrain texture
+	TextureClass *getTerrainNormalTexture();  //< generates if needed and returns the terrain normal maps, or null when there are none
 	TextureClass *getAlphaTerrainTexture(); //< generates if needed and returns alpha terrain texture
 	TextureClass *getEdgeTerrainTexture(); //< generates if needed and returns blend edge texture
 	/// UV mapping data for a cell to map into the terrain texture.  Returns true if the textures had to be stretched for cliffs.

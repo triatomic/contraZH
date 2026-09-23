@@ -559,6 +559,53 @@ the highlight 8 times brighter in magenta, to check where it runs and where it l
 * Additive meshes on skinned models (infantry and other bone deformed meshes) do not glow. Their
 vertices only exist for the duration of the normal draw, so there is nothing left to draw again.
 
+### Surface detail (normal mapping)
+
+Vehicles, structures and terrain get bump detail in the sun's light, so panels, rivets, plating
+and the grain of the ground catch and lose it. On vehicles and structures the bumps shade both
+the sun's diffuse light and the specular highlight, fade out in the sun's shadow, and cost no
+extra draw on top of the highlight. Infantry stay flat. Needs the Direct3D 9 build and a card
+with shader model 2.0a or later; other cards keep plain highlights and flat terrain.
+
+* `NormalMaps = Yes` - (No turns the detail off. Also the `Surface detail` checkbox in the
+advanced display options, where it applies on Accept without a restart.)
+
+The Game Options control needs the `CheckNormalMaps` window in `OptionsMenu.wnd`; without it the
+key still works from the file.
+
+Each texture uses its own normal map when one exists and otherwise derives bumps from its
+brightness, treating light areas as raised. Derived bumps work on every existing model, but
+painted markings emboss as if they were raised too. A normal map is a file named after the
+texture with `_nrm` added, beside it in `Art\Textures`, for example `avtank_nrm.dds` for
+`avtank.tga`:
+
+* Tangent space, in the DirectX convention (green points down the texture).
+* DDS only, DXT5 or uncompressed. Other formats are not looked for.
+* Laid out on the same UVs as the texture it belongs to.
+
+How strong the bumps are is set in the mod's `GameData.ini`:
+
+* `UnitBumpHeight = 0.15` - (How far, in world units, full brightness rises on textures without
+a normal map. 0 leaves them flat, so only textures with normal maps get detail.)
+* `UnitNormalMapStrength = 1.0` - (Scales the tilt of authored normal maps. Above 1 exaggerates
+them, below 1 softens them.)
+
+Terrain only uses normal maps; it never derives bumps. A terrain texture's normal map follows the
+same rules, named after the texture `Terrain.ini` gives, for example `NTGrass1_nrm.dds` for
+`NTGrass1.tga`. It must be at least as large as the part of the texture the game reads, which is
+the bottom-left square of whole 64 pixel tiles; the simplest is the same size as the texture.
+Terrain without one stays flat. The bumps redo the sun's share of the vertex lighting per pixel
+and fade out in the sun's shadow.
+
+* `TerrainNormalMapStrength = 2.0` - (Scales the tilt of terrain normal maps. Terrain is seen
+from further away than units, so it defaults stronger.)
+
+A few terrain draws stay flat: the third texture where three textures meet, the low detail flat
+terrain mode, roads, and the terrain seen in water reflections.
+
+`NormalMapDebug = Yes` in `Options.ini` paints the terrain a flat grey with only the bump shading
+on it, 4 times stronger, to check which ground has normal maps and which way they light.
+
 ### Laser ground glow
 
 Each laser beam lights the terrain along its whole length with a row of small dynamic lights

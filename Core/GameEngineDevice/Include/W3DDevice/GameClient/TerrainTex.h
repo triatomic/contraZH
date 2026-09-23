@@ -60,6 +60,24 @@ public:
 };
 
 
+/** ***********************************************************************
+**                             TerrainNormalTextureClass
+***************************************************************************/
+/// The terrain's normal maps, laid out tile for tile like TerrainTextureClass. Each texel
+/// holds a tangent-space normal's x in luminance and y in alpha, and the shader rebuilds z.
+class TerrainNormalTextureClass : public TextureClass
+{
+	W3DMPO_CODE(TerrainNormalTextureClass)
+public:
+		/// Create texture for a height map, as tall as its TerrainTextureClass.
+		TerrainNormalTextureClass(int height);
+
+public:
+	Bool update(WorldHeightMap *htMap); ///< Sets the pixels, and returns false when the card lacks the format.
+	void setLOD(Int LOD);
+};
+
+
 class AlphaTerrainTextureClass : public TextureClass
 {
 	W3DMPO_CODE(AlphaTerrainTextureClass)

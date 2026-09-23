@@ -91,6 +91,8 @@ public:
 	static Int setShader(ShaderTypes shader, Int pass);	///<enable specific shader pass.
 	static Int setShroudTex(Int stage);	///<Set shroud in a texture stage.
 	static void resetShader(ShaderTypes shader);	///<make sure W3D2 gets restored to normal
+	/// The shader texture slot the terrain's normal atlas goes in.
+	enum { TERRAIN_NORMAL_TEXTURE = 4 };
 	///Specify all textures (up to 8) which can be accessed by the shaders.
 	static void setTexture(Int stage,TextureClass* texture) {m_Textures[stage]=texture;}
 	///Return current texture available to shaders.
@@ -103,9 +105,18 @@ public:
 	/// Sets the sun the specular pass lights with, once a frame. toSun is in world space.
 	/// debug tints what the pass covers and shows the highlight 8x in magenta.
 	static void setSpecularLight(const Vector3 &toSun, const Vector3 &color, Real intensity, Real power, Bool debug);
-	/// How many mesh draws the specular pass ran on since the last call.
-	static Int takeSpecularPassCount();
-	/// The pass objects push for a per-pixel sun highlight, or null when it is off or unsupported.
+	/// Sets the bump detail the specular pass shades, once a frame. height is the rise, in world
+	/// units, of full brightness on textures without a normal map, and 0 leaves them flat.
+	static void setSurfaceBumps(Bool enabled, const Vector3 &ambient, Real height, Real normalMapStrength);
+	/// Sets whether the terrain shaders read the normal atlas in TERRAIN_NORMAL_TEXTURE, and how strongly.
+	/// debug shows only the bump's shading, on grey.
+	static void setTerrainBumps(Bool enabled, Real strength, Bool debug);
+	/// How many terrain draws used the normal atlas since the last call.
+	static Int takeTerrainBumpCount();
+	/// How many mesh draws the specular pass ran on, and how many polygon groups of those it
+	/// bumped from brightness or from a normal map, since the last call.
+	static void takeSpecularCounts(Int &meshes, Int &derived, Int &normalMapped);
+	/// The pass objects push for a per-pixel sun highlight and bumps, or null when both are off or unsupported.
 	static MaterialPassClass *getSpecularPass();
 
 	static Bool testMinimumRequirements(ChipsetType *videoChipType, CpuType *cpuType, Int *cpuFreq, MemValueType *numRAM, Real *intBenchIndex, Real *floatBenchIndex, Real *memBenchIndex);

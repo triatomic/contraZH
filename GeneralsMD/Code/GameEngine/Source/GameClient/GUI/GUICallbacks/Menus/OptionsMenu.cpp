@@ -221,6 +221,7 @@ static GameWindow *   checkBloomDebug             = nullptr;
 static GameWindow *   checkLaserRef               = nullptr;
 static GameWindow *   checkShadowMap              = nullptr;
 static GameWindow *   checkSpecular               = nullptr;
+static GameWindow *   checkNormalMaps             = nullptr;
 
 // Options.ini spellings, indexed by the matching enum and combo box position
 static const char *const HealthBarModeNames[] = { "Classic", "Damaged", "Always" };
@@ -473,6 +474,7 @@ static const BoolOption BoolOptions[] =
 	{ &checkLaserRef, "LaserRef", &OptionPreferences::getLaserRefEnabled, &GlobalData::m_laserRef, FALSE },
 	{ &checkShadowMap, "ShadowMap", &OptionPreferences::getShadowMapEnabled, &GlobalData::m_useShadowMap, TRUE },
 	{ &checkSpecular, "Specular", &OptionPreferences::getSpecularEnabled, &GlobalData::m_useSpecular, TRUE },
+	{ &checkNormalMaps, "NormalMaps", &OptionPreferences::getNormalMapsEnabled, &GlobalData::m_useNormalMaps, TRUE },
 };
 
 // the strength is stored as 0..1 but edited as a percentage
@@ -1546,6 +1548,7 @@ static void initGameOptionsWindows()
 	checkLaserRef = findOptionsWindow( "OptionsMenu.wnd:CheckLaserRef" );
 	checkShadowMap = findOptionsWindow( "OptionsMenu.wnd:CheckShadowMap" );
 	checkSpecular = findOptionsWindow( "OptionsMenu.wnd:CheckSpecular" );
+	checkNormalMaps = findOptionsWindow( "OptionsMenu.wnd:CheckNormalMaps" );
 
 	if (ButtonGameOptions)
 	{
@@ -1593,6 +1596,7 @@ static void initGameOptionsWindows()
 	setTooltip( textEntryBloomStrength, "TOOLTIP:BloomStrength", L"0 to 100. How bright the glow is." );
 	setCheckText( checkLaserRef, "GUI:LaserRef", L"Lasers light the ground", "TOOLTIP:LaserRef", L"Laser beams cast a colored light on the terrain along their length" );
 	setCheckText( checkSpecular, "GUI:Specular", L"Specular highlights", "TOOLTIP:Specular", L"Vehicles and structures catch a highlight from the sun, brightest on metal and gone in shadow. Needs a Direct3D 9 card." );
+	setCheckText( checkNormalMaps, "GUI:NormalMaps", L"Surface detail", "TOOLTIP:NormalMaps", L"Panels, rivets and plating on vehicles and structures, and the ground's grain, catch and lose the sun's light. Uses a texture's normal map where one exists. Needs a Direct3D 9 card with Shader Model 2.0a or later." );
 	setCheckText( checkShadowMap, "GUI:ShadowMap", L"Shadow mapping", "TOOLTIP:ShadowMap", L"Soft shadows shaped like their objects, falling on ground, bridges, units and buildings. 3D and 2D Shadows still choose which objects cast. Needs a Direct3D 9 card." );
 
 	setTooltip( comboBoxHealthBars, "TOOLTIP:HealthBars", L"Which units draw a health bar" );

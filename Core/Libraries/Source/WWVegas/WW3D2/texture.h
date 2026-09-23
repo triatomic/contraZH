@@ -167,6 +167,11 @@ public:
 
 	bool Is_Missing_Texture();
 
+	// The normal map the lighting pass bumps this texture with, looked up once by the game.
+	bool Is_Normal_Map_Checked() const { return NormalMapChecked; }
+	TextureClass *Peek_Normal_Map() const { return NormalMap; }
+	void Set_Normal_Map(TextureClass *normal_map);
+
 	// Support for self managed textures
 	bool Is_Dirty() { WWASSERT(Pool==POOL_DEFAULT); return Dirty; };
 	void Set_Dirty() { WWASSERT(Pool==POOL_DEFAULT); Dirty=true; }
@@ -253,6 +258,9 @@ private:
 	friend class VolumeTextureLoadTaskClass;
 	TextureLoadTaskClass* TextureLoadTask;
 	TextureLoadTaskClass* ThumbnailLoadTask;
+
+	TextureClass *NormalMap;
+	bool NormalMapChecked;
 
 };
 
