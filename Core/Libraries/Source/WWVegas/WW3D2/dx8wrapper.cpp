@@ -1023,6 +1023,12 @@ bool DX8Wrapper::Set_Render_Device(int dev, int width, int height, int bits, int
 	_PresentParameters.Flags=0;											// We're not going to lock the backbuffer
 
 	_PresentParameters.FullScreen_PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT;
+#if defined(BUILD_WITH_D3D9)
+	// D3D8 presented windowed frames without waiting; D3D9 waits for vsync on DEFAULT
+	if (IsWindowed) {
+		_PresentParameters.FullScreen_PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
+	}
+#endif
 	_PresentParameters.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
 
 	/*
@@ -2952,12 +2958,33 @@ void DX8Wrapper::_Copy_DX8_Rects(
 		const POINT dest_point = pDestPointsArray ? pDestPointsArray[i] : origin;
 
 		// Reading a render target back to the CPU is its own call in D3D9, and it
-		// copies whole surfaces only. Callers wanting a sub-rect must size the
-		// destination to match and offset afterwards.
+		// copies whole surfaces only. A sub-rect goes through a full-size copy first.
 		if ((src_desc.Usage & D3DUSAGE_RENDERTARGET) && dest_desc.Pool == D3DPOOL_SYSTEMMEM)
 		{
-			WWASSERT(dest_desc.Width == src_desc.Width && dest_desc.Height == src_desc.Height);
-			DX8CALL(GetRenderTargetData(pSourceSurface, pDestinationSurface));
+			const bool whole = src_rect.left == 0 && src_rect.top == 0 && dest_point.x == 0 && dest_point.y == 0 &&
+				(UINT)src_rect.right == src_desc.Width && (UINT)src_rect.bottom == src_desc.Height &&
+				dest_desc.Width == src_desc.Width && dest_desc.Height == src_desc.Height &&
+				dest_desc.Format == src_desc.Format;
+			if (whole)
+			{
+				DX8CALL(GetRenderTargetData(pSourceSurface, pDestinationSurface));
+			}
+			else
+			{
+				IDirect3DSurface8* full = nullptr;
+				DX8CALL(CreateOffscreenPlainSurface(src_desc.Width, src_desc.Height, src_desc.Format, D3DPOOL_SYSTEMMEM, &full, nullptr));
+				if (full != nullptr)
+				{
+					DX8CALL(GetRenderTargetData(pSourceSurface, full));
+					RECT dest_rect;
+					dest_rect.left = dest_point.x;
+					dest_rect.top = dest_point.y;
+					dest_rect.right = dest_point.x + (src_rect.right - src_rect.left);
+					dest_rect.bottom = dest_point.y + (src_rect.bottom - src_rect.top);
+					DX8_ErrorCode(Load_Surface_From_Surface(pDestinationSurface, &dest_rect, full, &src_rect));
+					full->Release();
+				}
+			}
 		}
 		else if (src_desc.Pool == D3DPOOL_DEFAULT && dest_desc.Pool == D3DPOOL_DEFAULT)
 		{

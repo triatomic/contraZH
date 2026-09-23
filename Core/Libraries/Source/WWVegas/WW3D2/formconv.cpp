@@ -605,6 +605,17 @@ static unsigned _D3D9ShaderCount=1;
 
 static DWORD Add_Shader_Entry(const D3D9ShaderEntry& entry)
 {
+	// Shaders are released and recreated on every device reset, so freed slots are reused
+	for (unsigned index=1; index<_D3D9ShaderCount; ++index)
+	{
+		const D3D9ShaderEntry& slot=_D3D9Shaders[index];
+		if (slot.VertexShader==nullptr && slot.Declaration==nullptr && slot.PixelShader==nullptr)
+		{
+			_D3D9Shaders[index]=entry;
+			return DX8_SHADER_HANDLE_TAG | (DWORD)index;
+		}
+	}
+
 	if (_D3D9ShaderCount>=MAX_D3D9_SHADERS)
 	{
 		WWASSERT(0);
