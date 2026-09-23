@@ -319,7 +319,8 @@ in `OptionsMenu.wnd`.
 
 Notes:
 * Costs fill rate in proportion to on-screen additive particles.
-* Off while `AntiAliasing` is above 1.
+* Off while `AntiAliasing` is above 1 on the Direct3D 8 build. The Direct3D 9 build glows with MSAA
+on too, and blurs through a pixel shader where the card has one.
 * Particles hidden behind terrain or buildings do not glow.
 * Additive meshes on skinned models (infantry and other bone-deformed meshes) do not glow.
 

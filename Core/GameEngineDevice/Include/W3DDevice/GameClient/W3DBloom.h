@@ -60,7 +60,7 @@ private:
 		Real brightness;
 	};
 
-	Bool acquireTargets(Int width, Int height, WW3DFormat format);
+	Bool acquireTargets(Int width, Int height, WW3DFormat format, Int sampleType, UnsignedInt sampleQuality);
 	void releaseTargets();
 	void releaseDefaults();
 	Bool setTarget(Int target);
@@ -72,6 +72,8 @@ private:
 	enum { TARGET_FULL = 0, TARGET_BLUR = 1, TARGET_COUNT = 3 };
 	TextureClass *m_target[TARGET_COUNT];
 	IDirect3DSurface8 *m_targetSurface[TARGET_COUNT];	///< held so binding a target allocates nothing
+	IDirect3DSurface8 *m_sampledSurface;	///< takes the additive draws when the scene is multisampled, then resolves into the full target
+	Int m_sampleType;										///< the scene's multisample type the targets were made for
 	DX8IndexBufferClass *m_quadIndices;	///< the same two triangles for every quad a pass can draw
 	IDirect3DSurface8 *m_defaultTarget;	///< the back buffer, held only between begin and end
 	IDirect3DSurface8 *m_defaultDepth;
