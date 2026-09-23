@@ -1942,6 +1942,8 @@ Int BaseHeightMapRenderObjClass::initHeightData(Int x, Int y, WorldHeightMap *pM
 			updateShorelineTiles(0,0,m_mapDX-1,m_mapDY-1,pMap);
 			if (TheWaterTransparency->m_minWaterOpacity != m_currentMinWaterOpacity)
 				initDestAlphaLUT();
+			if (TheWaterRenderObj)
+				TheWaterRenderObj->markHeightTextureDirty();
 		}
 	}
 

@@ -73,10 +73,12 @@ const unsigned MAX_VERTEX_STREAMS=2;
 #if defined(BUILD_WITH_D3D9)
 // Skinning's bone palette fills the whole vs_2_0 register file.
 const unsigned MAX_VERTEX_SHADER_CONSTANTS=256;
+// The ps_2_0 register file, which the water shader reaches past the first 8 of.
+const unsigned MAX_PIXEL_SHADER_CONSTANTS=32;
 #else
 const unsigned MAX_VERTEX_SHADER_CONSTANTS=96;
-#endif
 const unsigned MAX_PIXEL_SHADER_CONSTANTS=8;
+#endif
 const unsigned MAX_SHADOW_MAPS=1;
 
 enum {

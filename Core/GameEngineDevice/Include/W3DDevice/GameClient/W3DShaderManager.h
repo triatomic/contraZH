@@ -118,6 +118,8 @@ public:
 	static void takeSpecularCounts(Int &meshes, Int &derived, Int &normalMapped);
 	/// The pass objects push for a per-pixel sun highlight and bumps, or null when both are off or unsupported.
 	static MaterialPassClass *getSpecularPass();
+	/// Whether the device runs ps_2_a shaders, which have gradients and 512 instruction slots.
+	static Bool supportsPixelShader2a();
 
 	static Bool testMinimumRequirements(ChipsetType *videoChipType, CpuType *cpuType, Int *cpuFreq, MemValueType *numRAM, Real *intBenchIndex, Real *floatBenchIndex, Real *memBenchIndex);
 	static StaticGameLODLevel getGPUPerformanceIndex();

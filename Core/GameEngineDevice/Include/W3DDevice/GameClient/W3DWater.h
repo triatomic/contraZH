@@ -49,6 +49,7 @@
 #define CV_PATCH_SCALE_OFFSET 10
 
 class PolygonTrigger;
+class WorldHeightMap;
 class WaterTracksRenderSystem;
 class Xfer;
 /// Custom render object that draws mirrors, water, and skies.
@@ -123,6 +124,8 @@ public:
 	inline Bool worldToGridSpace(Real worldX, Real worldY, Real &gridX, Real &gridY);	///<convert from world coordinates to grid's local coordinate system.
 
 	void replaceSkyboxTexture(const AsciiString& oldTexName, const AsciiString& newTextName);
+
+	void markHeightTextureDirty() { m_heightTextureDirty = TRUE; }	///< terrain heights changed under the shader water
 
 protected:
 	DX8IndexBufferClass			*m_indexBuffer;	///<indices defining quad
@@ -252,6 +255,26 @@ protected:
 	void setupFlatWaterShader();
 	void setupJbaWaterShader();
 	void cleanupJbaWaterShader();
+
+	// Per-pixel water over a copy of the scene, on D3D9 with ps_2_a.
+	DWORD m_shaderWaterPixelShader;
+	DWORD m_shaderRiverPixelShader;
+	TextureClass *m_heightTexture;		///< terrain heights as high and low bytes
+	TextureClass *m_normalTexture;		///< tiling wave slopes
+	IDirect3DTexture8 *m_refractionTexture;	///< the scene behind the water
+	Bool m_heightTextureDirty;
+	const WorldHeightMap *m_heightTextureMap;	///< map the height texture was built from
+	Bool m_shaderWaterActive;			///< the water being drawn uses the shader path
+	UnsignedInt m_refractionFrame;		///< frame the scene was last copied in
+	CameraClass *m_renderCamera;		///< camera of the Render call in progress
+
+	Bool useShaderWater() const;
+	Bool isWaterVisible(PolygonTrigger *pTrig) const;
+	void createNormalTexture();
+	void updateHeightTexture();
+	void grabRefraction();
+	void setupShaderWater(Bool river);
+	void cleanupShaderWater();
 
 	//Methods used for GeForce3 specific water
 	HRESULT generateIndexBuffer(int sizeX, int sizeY);	///<Generate static index buufer

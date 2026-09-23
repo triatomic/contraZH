@@ -2170,6 +2170,16 @@ void W3DShaderManager::setTerrainBumps(Bool enabled, Real strength, Bool debug)
 	TerrainBumpDebug = debug;
 }
 
+Bool W3DShaderManager::supportsPixelShader2a()
+{
+#if defined(BUILD_WITH_D3D9)
+	const DX8Caps *caps = DX8Wrapper::Get_Current_Caps();
+	return caps != nullptr && Supports_Pixel_Shader_2_a(caps);
+#else
+	return FALSE;
+#endif
+}
+
 Int W3DShaderManager::takeTerrainBumpCount()
 {
 	const Int count = TerrainBumpCount;

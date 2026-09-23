@@ -89,6 +89,16 @@ class WaterTransparencySetting : public Overridable
 		AsciiString m_skyboxTextureW;
 		AsciiString m_skyboxTextureT;
 
+		// Shader water (D3D9 with Smooth Water on)
+		Real m_shaderWaterReflection;	///< scales the Fresnel sky reflection
+		Real m_shaderWaterSpecular;		///< scales the sun glint
+		Real m_shaderWaterRefraction;	///< how far the waves bend the seabed, in screen fractions
+		Real m_shaderWaterWaveScale;	///< world units one wave tile covers
+		Real m_shaderWaterWaveStrength;	///< steepness of the waves
+		Real m_shaderWaterFoamDepth;	///< depth where shore foam fades out
+		Real m_shaderWaterClarity;		///< scales TransparentWaterDepth, higher sees deeper
+		Real m_shaderWaterOpacity;		///< opacity of deep water, 0 takes TransparentWaterMinOpacity
+
 	public:
 		WaterTransparencySetting()
 		{
@@ -108,6 +118,15 @@ class WaterTransparencySetting : public Overridable
 			m_skyboxTextureS = "TSMorningS.tga";
 			m_skyboxTextureW = "TSMorningW.tga";
 			m_skyboxTextureT = "TSMorningT.tga";
+
+			m_shaderWaterReflection = 6.0f;
+			m_shaderWaterSpecular = 1.0f;
+			m_shaderWaterRefraction = 0.015f;
+			m_shaderWaterWaveScale = 160.0f;
+			m_shaderWaterWaveStrength = 0.3f;
+			m_shaderWaterFoamDepth = 6.0f;
+			m_shaderWaterClarity = 1.0f;
+			m_shaderWaterOpacity = 0.0f;
 		}
 
 		static const FieldParse m_waterTransparencySettingFieldParseTable[];		///< the parse table for INI definition

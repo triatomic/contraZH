@@ -109,5 +109,8 @@ rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularnorma
 rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularnormalpacked.pso     SHADOWED=1 PACKED=1 BUMP=2)
 rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularnormalnoshadow.pso   SHADOWED=0 PACKED=0 BUMP=2)
 rts_add_shader("${RTS_SHADER_DIR}/bloomblur.hlsl"      ps_2_0 main bloomblur.pso)
+# The water shaders outgrow ps_2_0's instruction limit.
+rts_add_shader("${RTS_SHADER_DIR}/shaderwater.hlsl"    ps_2_a main shaderwater.pso              RIVER=0)
+rts_add_shader("${RTS_SHADER_DIR}/shaderwater.hlsl"    ps_2_a main shaderriver.pso              RIVER=1)
 
 add_custom_target(rts_shaders ALL DEPENDS ${RTS_SHADER_OUTPUTS})

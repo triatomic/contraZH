@@ -405,6 +405,38 @@ from further away than units, so it defaults stronger.)
 `NormalMapDebug = Yes` in `Options.ini` paints terrain flat grey with only the bump shading, 4x
 stronger.
 
+### Shader water
+
+Lakes, seas and rivers are shaded per pixel. The seabed ripples through the waves and fades into
+the water colour with depth, the surface reflects the sky more at grazing angles, the sun glints
+off the waves, and foam gathers along the shore. Needs the Direct3D 9 build and shader model 2.0a;
+other cards get the old water.
+
+* `ShowSoftWaterEdge = Yes` - (`Smooth water` in the options menu. On picks shader water, off the
+old flat water.)
+
+The water colour and texture still come from `StandingWaterColor`, `StandingWaterTexture` and the
+time of day `DiffuseColor`. Tuned in the `WaterTransparency` block of `Water.ini`, and per map in
+`map.ini`:
+
+* `TransparentWaterDepth = 3.0` - (Depth over which the seabed fades out. Same key as the old water.)
+* `TransparentWaterMinOpacity = 1.0` - (Opacity of deep water. Same key as the old water.)
+* `ShaderWaterOpacity = 0` - (Overrides `TransparentWaterMinOpacity` for shader water only. 0 keeps it.)
+* `ShaderWaterClarity = 1.0` - (Scales `TransparentWaterDepth`. Higher sees deeper.)
+* `ShaderWaterReflection = 6.0` - (Scales the sky reflection. 0 turns it off.)
+* `ShaderWaterSpecular = 1.0` - (Scales the sun glint. 0 turns it off.)
+* `ShaderWaterRefraction = 0.015` - (How far the waves bend the seabed, as a fraction of the screen.)
+* `ShaderWaterWaveScale = 160` - (World units one wave pattern covers. Higher gives broader waves.)
+* `ShaderWaterWaveStrength = 0.3` - (Steepness of the waves. Drives glint, reflection and bending.)
+* `ShaderWaterFoamDepth = 6` - (Depth where shore foam fades out. 0 turns foam off.)
+
+Notes:
+* The sky reflection is the time of day `SkyTexture` tinted by the sky's vertex colours. Units and
+buildings are not reflected.
+* Effects drawn after the water (smoke, fire, translucent models) are not bent by the waves.
+* `AdditiveBlending = Yes` water keeps the old look.
+* The `CONTRA_WATER` environment variable set to `0` forces the old water, to compare the two.
+
 ### Hardware instancing
 
 Copies of the same vehicle, structure or prop draw together in one call per mesh piece, in the

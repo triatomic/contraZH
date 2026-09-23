@@ -958,6 +958,8 @@ void W3DTerrainVisual::setRawMapHeight(const ICoord2D *gridPos, Int height)
 		{
 			m_logicHeightMap->setRawHeight(x, y, height);
 			m_terrainRenderObject->staticLightingChanged(); // OOH! this could benefit from the new Seismic update code
+			if (TheWaterRenderObj)
+				TheWaterRenderObj->markHeightTextureDirty();
 
 
 #ifdef DO_SEISMIC_SIMULATIONS
