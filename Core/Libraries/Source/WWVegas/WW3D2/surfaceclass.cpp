@@ -813,8 +813,9 @@ void SurfaceClass::Detach ()
 
 void SurfaceClass::Upload()
 {
+	// Only what the locks marked dirty is copied, so reads cost nothing
 	if (UploadTexture != nullptr) {
-		DX8Wrapper::_Upload_Lockable_Texture(UploadTexture);
+		DX8Wrapper::_Upload_Lockable_Texture(UploadTexture, false);
 	}
 }
 

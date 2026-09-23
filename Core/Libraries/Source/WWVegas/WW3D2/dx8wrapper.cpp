@@ -225,8 +225,8 @@ static IDirect3D9* Create_Ex_Interface()
 	return d3d;
 }
 
-// D3D9Ex takes the fullscreen display mode explicitly and none for a windowed device
-static D3DDISPLAYMODEEX* Get_Fullscreen_Mode(const D3DPRESENT_PARAMETERS& params, D3DFORMAT display_format, D3DDISPLAYMODEEX& mode)
+// D3D9Ex takes the fullscreen display mode explicitly and none for a windowed device. Its format must match the back buffer's.
+static D3DDISPLAYMODEEX* Get_Fullscreen_Mode(const D3DPRESENT_PARAMETERS& params, D3DDISPLAYMODEEX& mode)
 {
 	if (params.Windowed)
 	{
@@ -237,13 +237,13 @@ static D3DDISPLAYMODEEX* Get_Fullscreen_Mode(const D3DPRESENT_PARAMETERS& params
 	mode.Width = params.BackBufferWidth;
 	mode.Height = params.BackBufferHeight;
 	mode.RefreshRate = params.FullScreen_RefreshRateInHz;
-	mode.Format = display_format;
+	mode.Format = params.BackBufferFormat;
 	mode.ScanLineOrdering = D3DSCANLINEORDERING_PROGRESSIVE;
 	return &mode;
 }
 #endif
 
-static HRESULT Create_D3D_Device(UINT adapter, HWND hwnd, DWORD behavior, D3DPRESENT_PARAMETERS& params, D3DFORMAT display_format, IDirect3DDevice8** device)
+static HRESULT Create_D3D_Device(UINT adapter, HWND hwnd, DWORD behavior, D3DPRESENT_PARAMETERS& params, IDirect3DDevice8** device)
 {
 #if defined(BUILD_WITH_D3D9)
 	if (DX8Wrapper::Is_Ex())
@@ -251,12 +251,24 @@ static HRESULT Create_D3D_Device(UINT adapter, HWND hwnd, DWORD behavior, D3DPRE
 		D3DDISPLAYMODEEX mode;
 		IDirect3DDevice9Ex* device_ex = nullptr;
 		HRESULT hr = static_cast<IDirect3D9Ex*>(DX8Wrapper::_Get_D3D8())->CreateDeviceEx(
-			adapter, WW3D_DEVTYPE, hwnd, behavior, &params, Get_Fullscreen_Mode(params, display_format, mode), &device_ex);
+			adapter, WW3D_DEVTYPE, hwnd, behavior, &params, Get_Fullscreen_Mode(params, mode), &device_ex);
 		*device = device_ex;
 		return hr;
 	}
 #endif
 	return DX8Wrapper::_Get_D3D8()->CreateDevice(adapter, WW3D_DEVTYPE, hwnd, behavior, &params, device);
+}
+
+static HRESULT Reset_D3D_Device(D3DPRESENT_PARAMETERS& params)
+{
+#if defined(BUILD_WITH_D3D9)
+	if (DX8Wrapper::Is_Ex())
+	{
+		D3DDISPLAYMODEEX mode;
+		return static_cast<IDirect3DDevice9Ex*>(DX8Wrapper::_Get_D3D_Device8())->ResetEx(&params, Get_Fullscreen_Mode(params, mode));
+	}
+#endif
+	return DX8Wrapper::_Get_D3D_Device8()->Reset(&params);
 }
 
 DX8_CleanupHook	 *DX8Wrapper::m_pCleanupHook=nullptr;
@@ -618,20 +630,23 @@ bool DX8Wrapper::Create_Device()
 	// the graphics driver from potentially loading the old game dbghelp.dll and then crashing the game process.
 	DbgHelpGuard dbgHelpGuard;
 
-	HRESULT hr=Create_D3D_Device(CurRenderDevice, _Hwnd, Vertex_Processing_Behavior, _PresentParameters, DisplayFormat, &D3DDevice);
+	HRESULT hr=Create_D3D_Device(CurRenderDevice, _Hwnd, Vertex_Processing_Behavior, _PresentParameters, &D3DDevice);
 
 #if defined(BUILD_WITH_D3D9)
 	if (FAILED(hr) && IsEx)
 	{
-		WWDEBUG_SAY(("D3D9Ex device creation failed, falling back to D3D9"));
+		// A device from the Ex interface still refuses the managed pool, so the fallback needs a plain one
+		WWDEBUG_SAY(("D3D9Ex device creation failed (0x%08x), falling back to D3D9", (unsigned)hr));
 		IsEx = false;
+		D3DInterface->Release();
+		D3DInterface = Direct3DCreate8Ptr(D3D_SDK_VERSION);
 		if (_PresentParameters.SwapEffect == D3DSWAPEFFECT_FLIPEX)
 		{
 			_PresentParameters.SwapEffect = D3DSWAPEFFECT_DISCARD;
 			_PresentParameters.BackBufferCount = 1;
 			_PresentParameters.MultiSampleType = MultiSampleAntiAliasing;
 		}
-		hr=Create_D3D_Device(CurRenderDevice, _Hwnd, Vertex_Processing_Behavior, _PresentParameters, DisplayFormat, &D3DDevice);
+		hr=Create_D3D_Device(CurRenderDevice, _Hwnd, Vertex_Processing_Behavior, _PresentParameters, &D3DDevice);
 	}
 #endif
 
@@ -648,7 +663,7 @@ bool DX8Wrapper::Create_Device()
 			_PresentParameters.AutoDepthStencilFormat==D3DFMT_D24X8))
 		{
 			_PresentParameters.AutoDepthStencilFormat=D3DFMT_D16;
-			hr = Create_D3D_Device(CurRenderDevice, _Hwnd, Vertex_Processing_Behavior, _PresentParameters, DisplayFormat, &D3DDevice);
+			hr = Create_D3D_Device(CurRenderDevice, _Hwnd, Vertex_Processing_Behavior, _PresentParameters, &D3DDevice);
 
 			if (FAILED(hr))
 			{
@@ -733,20 +748,10 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 			// TheSuperHackers @bugfix xezon 13/06/2025 Front load the system dbghelp.dll to prevent
 			// the graphics driver from potentially loading the old game dbghelp.dll and then crashing the game process.
 			DbgHelpGuard dbgHelpGuard;
-#if defined(BUILD_WITH_D3D9)
-			if (IsEx)
-			{
-				D3DDISPLAYMODEEX mode;
-				hr = static_cast<IDirect3DDevice9Ex*>(D3DDevice)->ResetEx(&_PresentParameters, Get_Fullscreen_Mode(_PresentParameters, DisplayFormat, mode));
-				DX8_ErrorCode(hr);
-			}
-			else
-			{
-				DX8CALL_HRES(Reset(&_PresentParameters), hr)
-			}
-#else
-			DX8CALL_HRES(Reset(&_PresentParameters), hr)
-#endif
+			DX8_Assert();
+			hr = Reset_D3D_Device(_PresentParameters);
+			DX8_ErrorCode(hr);
+			Increment_DX8_CallCount();
 				if (hr != D3D_OK)
 					return false;	//reset failed.
 		}
@@ -1240,8 +1245,7 @@ bool DX8Wrapper::Set_Render_Device(int dev, int width, int height, int bits, int
 	_PresentParameters.MultiSampleType = MultiSampleAntiAliasing;
 
 #if defined(BUILD_WITH_D3D9)
-	// The flip model hands frames to the DWM without a copy, and lets a borderless window
-	// take the independent flip path. D3D9Ex allows it only windowed, with a plain back buffer.
+	// Flip model skips the DWM copy and lets borderless take independent flip; it cannot be multisampled
 	if (IsEx && IsWindowed)
 	{
 		_PresentParameters.SwapEffect = D3DSWAPEFFECT_FLIPEX;
@@ -1887,12 +1891,17 @@ void DX8Wrapper::End_Scene(bool flip_frames)
 			}
 		}
 #if defined(BUILD_WITH_D3D9)
-		// D3D9Ex never loses the device. It reports a desktop mode change instead, and a
-		// covered or minimized window with a success code that is not an error.
 		else if (hr==S_PRESENT_MODE_CHANGED) {
-			WWDEBUG_SAY(("DX8Wrapper::End_Scene is resetting the device after a mode change."));
+			WWDEBUG_SAY(("DX8Wrapper::End_Scene is rebuilding the device for the new desktop mode."));
+			Set_Render_Device(-1, -1, -1, -1, -1, false, true, true);
+		}
+		else if (hr==D3DERR_DEVICEHUNG) {
+			// A GPU timeout on D3D9Ex; a reset puts the device back in a default state
+			DX8_ErrorCode(hr);
+			WWDEBUG_SAY(("DX8Wrapper::End_Scene is resetting the device after a GPU timeout."));
 			Reset_Device();
 		}
+		// D3D9Ex reports a covered or minimized window with this success code
 		else if (hr!=S_PRESENT_OCCLUDED) {
 			DX8_ErrorCode(hr);
 		}
@@ -2772,7 +2781,7 @@ static HRESULT Create_D3D_Volume_Texture(
 }
 
 #if defined(BUILD_WITH_D3D9)
-// Stands in for the managed pool on D3D9Ex. The texture holds the copy, so both go away together.
+// The texture holds the copy, so both go away together
 static void Attach_Lockable_Copy(IDirect3DBaseTexture8* texture)
 {
 	IDirect3DDevice8* device = DX8Wrapper::_Get_D3D_Device8();
@@ -2841,7 +2850,10 @@ void DX8Wrapper::Create_Scene_Target()
 	}
 	if (FAILED(hr))
 	{
+		// The swap chain is already single sampled, so MSAA is off for this device
+		WWDEBUG_SAY(("MSAA scene target creation failed, disabling MSAA"));
 		Release_Scene_Target();
+		MultiSampleAntiAliasing = D3DMULTISAMPLE_NONE;
 		return;
 	}
 
@@ -2883,7 +2895,7 @@ IDirect3DBaseTexture8* DX8Wrapper::_Peek_Lockable_Texture(IDirect3DBaseTexture8*
 	return texture;
 }
 
-void DX8Wrapper::_Upload_Lockable_Texture(IDirect3DBaseTexture8* texture)
+void DX8Wrapper::_Upload_Lockable_Texture(IDirect3DBaseTexture8* texture, bool whole_texture)
 {
 #if defined(BUILD_WITH_D3D9)
 	IDirect3DBaseTexture8* copy = _Peek_Lockable_Texture(texture);
@@ -2892,8 +2904,8 @@ void DX8Wrapper::_Upload_Lockable_Texture(IDirect3DBaseTexture8* texture)
 		return;
 	}
 
-	// Locks only mark the top level dirty, and some callers write the lower levels directly
-	switch (copy->GetType())
+	// Locks only mark the top level dirty, so callers that write lower levels directly ask for the whole texture
+	switch (whole_texture ? copy->GetType() : D3DRTYPE_SURFACE)
 	{
 	case D3DRTYPE_TEXTURE:
 		static_cast<IDirect3DTexture8*>(copy)->AddDirtyRect(nullptr);

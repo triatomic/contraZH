@@ -104,7 +104,7 @@ enum D3D8SamplerStageState
 // spelling for both backends.
 typedef void** DX8LockPointer;
 
-// D3D9Ex has no managed pool. Its default pool survives a reset, so static buffers move there.
+// Static buffers use the default pool on D3D9Ex, which keeps it across a reset
 D3DPOOL DX8_Buffer_Pool(D3DPOOL pool);
 
 #define DX8_CREATE_INDEX_BUFFER(dev, length, usage, format, pool, out) \
