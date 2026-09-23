@@ -1404,44 +1404,72 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 	DX8InstancingClass::Set_Instanced_Material_Passes(
 		(TheW3DShadowMap != nullptr) ? TheW3DShadowMap->getReceivePass() : nullptr, W3DShaderManager::getSpecularPass());
 
-	// Shows how many draws hardware instancing could merge. Counts are the previous frame's.
+	// Shows how many draws hardware instancing could merge and how many skins the GPU deformed.
+	// Water reflections render the scene again, so the counts add up every render of the interval.
 	{
 		static Int instancingFrames = 0;
+		static DX8InstancingStatsStruct::SceneStruct scenes[DX8InstancingStatsStruct::SCENE_COUNT];
+		static Int receiveDraws = 0;
+		static Int specularDraws = 0;
+		static Int otherPassDraws = 0;
+		static Int rejections[DX8InstancingClass::REJECT_COUNT];
+		static DX8SkinningClass::StatsStruct skinning;
+
 		DX8InstancingStatsStruct stats;
 		DX8MeshRendererClass::Take_Instancing_Stats(stats);
-		Int rejections[DX8InstancingClass::REJECT_COUNT];
-		DX8InstancingClass::Take_Rejections(rejections);
-		DX8SkinningClass::StatsStruct skinning;
-		DX8SkinningClass::Take_Stats(skinning);
+		Int frameRejections[DX8InstancingClass::REJECT_COUNT];
+		DX8InstancingClass::Take_Rejections(frameRejections);
+		DX8SkinningClass::StatsStruct frameSkinning;
+		DX8SkinningClass::Take_Stats(frameSkinning);
+
+		const MaterialPassClass *receivePass = (TheW3DShadowMap != nullptr) ? TheW3DShadowMap->getReceivePass() : nullptr;
+		const MaterialPassClass *specularPass = W3DShaderManager::getSpecularPass();
+		otherPassDraws += stats.OtherPassDraws;
+		for (Int i = 0; i < DX8InstancingStatsStruct::MAX_PASSES; ++i)
+		{
+			if (stats.Passes[i] == nullptr)
+			{
+				continue;
+			}
+			if (stats.Passes[i] == receivePass)
+			{
+				receiveDraws += stats.PassDraws[i];
+			}
+			else if (stats.Passes[i] == specularPass)
+			{
+				specularDraws += stats.PassDraws[i];
+			}
+			else
+			{
+				otherPassDraws += stats.PassDraws[i];
+			}
+		}
+		for (Int scene = 0; scene < DX8InstancingStatsStruct::SCENE_COUNT; ++scene)
+		{
+			scenes[scene].RigidDraws += stats.Scenes[scene].RigidDraws;
+			for (Int size = 0; size < DX8InstancingStatsStruct::SIZE_CLASSES; ++size)
+			{
+				scenes[scene].EligibleDraws[size] += stats.Scenes[scene].EligibleDraws[size];
+			}
+			scenes[scene].InstancedCalls += stats.Scenes[scene].InstancedCalls;
+			scenes[scene].InstancedMeshes += stats.Scenes[scene].InstancedMeshes;
+		}
+		for (Int i = 0; i < DX8InstancingClass::REJECT_COUNT; ++i)
+		{
+			rejections[i] += frameRejections[i];
+		}
+		skinning.SkinnedMeshes[0] += frameSkinning.SkinnedMeshes[0];
+		skinning.SkinnedMeshes[1] += frameSkinning.SkinnedMeshes[1];
+		for (Int i = 0; i < DX8SkinningClass::REJECT_COUNT; ++i)
+		{
+			skinning.Rejections[i] += frameSkinning.Rejections[i];
+		}
+
 		if (instancingFrames % 600 == 0)
 		{
-			const MaterialPassClass *receivePass = (TheW3DShadowMap != nullptr) ? TheW3DShadowMap->getReceivePass() : nullptr;
-			const MaterialPassClass *specularPass = W3DShaderManager::getSpecularPass();
-			Int receiveDraws = 0;
-			Int specularDraws = 0;
-			Int otherPassDraws = stats.OtherPassDraws;
-			for (Int i = 0; i < DX8InstancingStatsStruct::MAX_PASSES; ++i)
-			{
-				if (stats.Passes[i] == nullptr)
-				{
-					continue;
-				}
-				if (stats.Passes[i] == receivePass)
-				{
-					receiveDraws += stats.PassDraws[i];
-				}
-				else if (stats.Passes[i] == specularPass)
-				{
-					specularDraws += stats.PassDraws[i];
-				}
-				else
-				{
-					otherPassDraws += stats.PassDraws[i];
-				}
-			}
-			const DX8InstancingStatsStruct::SceneStruct &mainScene = stats.Scenes[DX8InstancingStatsStruct::SCENE_MAIN];
-			const DX8InstancingStatsStruct::SceneStruct &depthScene = stats.Scenes[DX8InstancingStatsStruct::SCENE_SHADOW_DEPTH];
-			DEBUG_LOG(("Instancing: frame %d, %d draw calls, %d skins; main %d rigid, eligible by group 1:%d 2-3:%d 4-15:%d 16+:%d, instanced %d meshes in %d calls; depth %d rigid, eligible 1:%d 2-3:%d 4-15:%d 16+:%d, instanced %d meshes in %d calls; passes receive %d specular %d other %d; fallbacks clip %d fog %d resource %d lights %d",
+			const DX8InstancingStatsStruct::SceneStruct &mainScene = scenes[DX8InstancingStatsStruct::SCENE_MAIN];
+			const DX8InstancingStatsStruct::SceneStruct &depthScene = scenes[DX8InstancingStatsStruct::SCENE_SHADOW_DEPTH];
+			DEBUG_LOG(("Instancing: render %d, %d draw calls, %d skins; main %d rigid, eligible by group 1:%d 2-3:%d 4-15:%d 16+:%d, instanced %d meshes in %d calls; depth %d rigid, eligible 1:%d 2-3:%d 4-15:%d 16+:%d, instanced %d meshes in %d calls; passes receive %d specular %d other %d; fallbacks clip %d fog %d resource %d lights %d",
 				instancingFrames, Debug_Statistics::Get_Draw_Calls(), Debug_Statistics::Get_DX8_Skin_Renders(),
 				mainScene.RigidDraws, mainScene.EligibleDraws[0], mainScene.EligibleDraws[1], mainScene.EligibleDraws[2], mainScene.EligibleDraws[3],
 				mainScene.InstancedMeshes, mainScene.InstancedCalls,
@@ -1451,11 +1479,18 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 				rejections[DX8InstancingClass::REJECT_CLIP_PLANE], rejections[DX8InstancingClass::REJECT_FOG],
 				rejections[DX8InstancingClass::REJECT_RESOURCE],
 				rejections[DX8InstancingClass::REJECT_LIGHTS]));
-			DEBUG_LOG(("Skinning: frame %d, skinned %d main %d depth; left to the CPU by state %d model %d mesh %d category %d pass %d",
+			DEBUG_LOG(("Skinning: render %d, skinned %d main %d depth; left to the CPU by state %d model %d mesh %d category %d pass %d",
 				instancingFrames, skinning.SkinnedMeshes[0], skinning.SkinnedMeshes[1],
 				skinning.Rejections[DX8SkinningClass::REJECT_STATE], skinning.Rejections[DX8SkinningClass::REJECT_MODEL],
 				skinning.Rejections[DX8SkinningClass::REJECT_MESH], skinning.Rejections[DX8SkinningClass::REJECT_CATEGORY],
 				skinning.Rejections[DX8SkinningClass::REJECT_PASS]));
+
+			memset(scenes, 0, sizeof(scenes));
+			receiveDraws = 0;
+			specularDraws = 0;
+			otherPassDraws = 0;
+			memset(rejections, 0, sizeof(rejections));
+			memset(&skinning, 0, sizeof(skinning));
 		}
 		++instancingFrames;
 	}
