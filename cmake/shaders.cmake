@@ -108,5 +108,6 @@ rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularderiv
 rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularnormal.pso           SHADOWED=1 PACKED=0 BUMP=2)
 rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularnormalpacked.pso     SHADOWED=1 PACKED=1 BUMP=2)
 rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularnormalnoshadow.pso   SHADOWED=0 PACKED=0 BUMP=2)
+rts_add_shader("${RTS_SHADER_DIR}/bloomblur.hlsl"      ps_2_0 main bloomblur.pso)
 
 add_custom_target(rts_shaders ALL DEPENDS ${RTS_SHADER_OUTPUTS})

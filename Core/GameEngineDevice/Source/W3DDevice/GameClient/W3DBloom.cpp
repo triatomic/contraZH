@@ -17,7 +17,7 @@
 */
 
 // W3DBloom.cpp ////////////////////////////////////////////////////////////////////////////////
-// Bloom post effect for additive particles, built from DX8 render targets and fixed function quads
+// Bloom post effect for additive particles, built from render targets and screen quads
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Lib/BaseType.h"
@@ -35,6 +35,8 @@
 #include "WW3D2/rinfo.h"
 #include "WW3D2/camera.h"
 #include "WW3D2/vertmaterial.h"
+#include "WW3D2/dx8caps.h"
+#include "W3DDevice/GameClient/W3DShaderManager.h"
 
 W3DBloom *TheW3DBloom = nullptr;
 
@@ -98,6 +100,7 @@ W3DBloom::W3DBloom()
 	m_quadIndices = nullptr;
 	m_defaultTarget = nullptr;
 	m_defaultDepth = nullptr;
+	m_blurShader = 0;
 	m_disabled = false;
 }
 
@@ -137,6 +140,14 @@ Bool W3DBloom::acquireTargets(Int width, Int height, WW3DFormat format)
 		REF_PTR_RELEASE(surface);
 	}
 
+#if defined(BUILD_WITH_D3D9)
+	if (DX8Wrapper::Get_Current_Caps()->Get_Pixel_Shader_Major_Version() >= 2 &&
+		FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\bloomblur.pso", nullptr, 0, false, &m_blurShader)))
+	{
+		m_blurShader = 0;
+	}
+#endif
+
 	// quad k uses vertices k*4 to k*4+3, so every pass indexes the same buffer
 	m_quadIndices = NEW_REF(DX8IndexBufferClass, (BLOOM_MAX_TAPS * 6));
 	{
@@ -159,6 +170,11 @@ Bool W3DBloom::acquireTargets(Int width, Int height, WW3DFormat format)
 
 void W3DBloom::releaseTargets()
 {
+	if (m_blurShader != 0)
+	{
+		DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_blurShader);
+		m_blurShader = 0;
+	}
 	REF_PTR_RELEASE(m_quadIndices);
 	for (Int i = 0; i < TARGET_COUNT; ++i)
 	{
@@ -375,8 +391,37 @@ Bool W3DBloom::blurPass(TextureClass *source, Int target, Real offsetU, Real off
 		}
 	}
 
-	drawTaps(source, taps, count, m_copyShader);
+	if (m_blurShader != 0)
+	{
+		drawShaderTaps(source, taps, count);
+	}
+	else
+	{
+		drawTaps(source, taps, count, m_copyShader);
+	}
 	return true;
+}
+
+// one quad whose pixel shader sums the taps, so the target is written once at full precision
+void W3DBloom::drawShaderTaps(TextureClass *source, const Tap *taps, Int count)
+{
+	Vector4 constants[BLOOM_MAX_TAPS];
+	for (Int i = 0; i < BLOOM_MAX_TAPS; ++i)
+	{
+		constants[i] = (i < count) ? Vector4(taps[i].u0, taps[i].v0, taps[i].brightness, 0.0f) : Vector4(0.0f, 0.0f, 0.0f, 0.0f);
+	}
+
+	Tap quad;
+	quad.u0 = 0.0f;
+	quad.v0 = 0.0f;
+	quad.u1 = 1.0f;
+	quad.v1 = 1.0f;
+	quad.brightness = 1.0f;
+
+	DX8Wrapper::Set_Pixel_Shader_Constant(0, constants, BLOOM_MAX_TAPS);
+	DX8Wrapper::Set_Pixel_Shader(m_blurShader);
+	drawTaps(source, &quad, 1, m_copyShader);
+	DX8Wrapper::Set_Pixel_Shader(0);
 }
 
 // every quad of a pass shares one vertex lock; the quads fill the viewport in clip space, so no half
