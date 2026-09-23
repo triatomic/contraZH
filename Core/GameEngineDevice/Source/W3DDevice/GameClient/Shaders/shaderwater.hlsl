@@ -57,6 +57,7 @@ float4 PlanarMap     : register(c19);  // xy = texel centre shift from the scene
 #if RADIAL
 float4 RadialPlane   : register(c20);  // x = water level of this draw
 #endif
+float4 Shore         : register(c21);  // x = 1 / the depth over which the water's surface light fades in from the shore
 
 #include "shadowreceive.hlsli"
 
@@ -176,6 +177,12 @@ float4 main(PsIn input) : COLOR
     float foam = tex2D(FoamTexture, foamUV + time * float2(0.011f, -0.007f)).r;
     foam *= tex2D(FoamTexture, foamUV * 0.8f - time * float2(0.006f, 0.009f)).r * 2.0f;
     foam *= foamMask;
+
+    // As the legacy soft water edge did, the surface fades out at the waterline instead of ending in a line.
+    float edge = saturate(depth * Shore.x);
+    reflection *= edge;
+    glint *= edge;
+    foam *= edge;
 
     // The scene copy is already shrouded, so the shroud only darkens the water's own light.
     float3 shroud = tex2D(ShroudTexture, world.xy * ShroudMapping.xy + ShroudMapping.zw).rgb;

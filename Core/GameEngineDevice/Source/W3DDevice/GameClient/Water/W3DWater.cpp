@@ -1101,6 +1101,11 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 	DX8Wrapper::Set_Pixel_Shader_Constant(18, &planar, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(19, &planarMapping, 1);
 
+	// TransparentWaterDepth sets the soft edge's width, and 0 turns it off as it did for the legacy water.
+	const Real softEdgeDepth = TheWaterTransparency->m_transparentWaterDepth;
+	const Vector4 shore((softEdgeDepth > 0.0f) ? 1.0f / softEdgeDepth : 10000.0f, 0.0f, 0.0f, 0.0f);
+	DX8Wrapper::Set_Pixel_Shader_Constant(21, &shore, 1);
+
 	if (!river && m_shaderWaterSwellActive && m_drawingRadial)
 	{
 		setupSwell(clip);
