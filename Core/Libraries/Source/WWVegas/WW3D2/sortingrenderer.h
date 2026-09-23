@@ -22,6 +22,7 @@
 
 class SortingNodeStruct;
 class SphereClass;
+struct VertexFormatXYZNDUV2;
 
 class SortingRendererClass
 {
@@ -30,6 +31,8 @@ class SortingRendererClass
 	static void Flush_Sorting_Pool();
 	static void Flush_Additive_Pool();
 	static void Insert_To_Sorting_Pool(SortingNodeStruct* state);
+	static const VertexFormatXYZNDUV2* Source_Vertices(const SortingNodeStruct* state);
+	static const unsigned short* Source_Indices(const SortingNodeStruct* state);
 
 public:
 	static void Insert_Triangles(

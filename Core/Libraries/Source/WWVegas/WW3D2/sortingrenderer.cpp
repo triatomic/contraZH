@@ -59,9 +59,7 @@ bool SortingRendererClass::_EnableTriangleDraw=true;
 static unsigned DEFAULT_SORTING_POLY_COUNT = 16384;	// (count * 3) must be less than 65536
 static unsigned DEFAULT_SORTING_VERTEX_COUNT = 32768;	// count must be less than 65536
 
-// Bisects translucency faults without a rebuild. CONTRA_BLENDSORT=0 sorts every translucent triangle
-// and draws each node on its own, 1 batches additive nodes and merges equal state, and 2 adds sorting
-// rigid translucent meshes as whole objects.
+// CONTRA_BLENDSORT: 0 sorts every triangle, 1 batches additive and merges state, 2 sorts rigid meshes per object.
 enum { BLENDSORT_OFF = 0, BLENDSORT_BATCH = 1, BLENDSORT_FULL = 2 };
 
 #if defined(BUILD_WITH_D3D9)
@@ -196,15 +194,20 @@ public:
 	unsigned short vertex_count;			// Number of vertices used in vb
 };
 
-// Nodes in sorting buffers are depth sorted per triangle in the pool, so those lists keep insertion
-// order. Object nodes draw straight from their own buffers, sorted as whole objects.
 typedef std::vector<SortingNodeStruct*> SortingNodeStructList;
-static SortingNodeStructList sorted_list;
 static SortingNodeStructList additive_list;
 static SortingNodeStructList object_list;
 static SortingNodeStructList additive_object_list;
 static SortingNodeStructList clean_list;
 static unsigned total_sorting_vertices;
+
+static void Delete_Nodes(SortingNodeStructList& list)
+{
+	for (size_t i=0;i<list.size();++i) {
+		delete list[i];
+	}
+	list.clear();
+}
 
 static bool Uses_Sorting_Buffers(const RenderStateStruct& state)
 {
@@ -212,13 +215,26 @@ static bool Uses_Sorting_Buffers(const RenderStateStruct& state)
 		(state.vertex_buffer_types[0]==BUFFER_TYPE_SORTING || state.vertex_buffer_types[0]==BUFFER_TYPE_DYNAMIC_SORTING);
 }
 
+const VertexFormatXYZNDUV2* SortingRendererClass::Source_Vertices(const SortingNodeStruct* state)
+{
+	const SortingVertexBufferClass* vertex_buffer=static_cast<const SortingVertexBufferClass*>(state->sorting_state.vertex_buffers[0]);
+	WWASSERT(vertex_buffer);
+	return vertex_buffer->VertexBuffer+state->sorting_state.vba_offset+state->sorting_state.index_base_offset+state->min_vertex_index;
+}
+
+const unsigned short* SortingRendererClass::Source_Indices(const SortingNodeStruct* state)
+{
+	const SortingIndexBufferClass* index_buffer=static_cast<const SortingIndexBufferClass*>(state->sorting_state.index_buffer);
+	WWASSERT(index_buffer);
+	return index_buffer->index_buffer+state->start_index+state->sorting_state.iba_offset;
+}
+
 static bool Object_Depth_Order(const SortingNodeStruct* a, const SortingNodeStruct* b)
 {
 	return a->depth < b->depth;
 }
 
-// The state stays set after the draw, because Release_Render_State clears the wrapper's texture cache
-// but not the device, so a later Set_Texture(nullptr) would be skipped.
+// Release_Render_State would clear the texture cache but not the device, so the state stays set.
 static void Draw_Object_Node(SortingNodeStruct* state)
 {
 	DX8Wrapper::Set_Render_State(state->sorting_state);
@@ -378,22 +394,13 @@ void SortingRendererClass::Insert_Triangles(
 	if (!Uses_Sorting_Buffers(state->sorting_state)) {
 		WWASSERT(Sorts_Meshes_Per_Object());
 		if (bounding_sphere.Is_Valid()) {
-			// Row-vector convention, so only the third column of world*view is needed for depth.
-			const D3DMATRIX product=state->sorting_state.world*state->sorting_state.view;
-			const float (&mtx)[4][4]=product.m;
+			// Mesh bounding spheres are already in world space, so only the view's depth column applies.
+			const float (&view)[4][4]=state->sorting_state.view.m;
 			const Vector3& center=bounding_sphere.Center;
-			state->depth=center.X*mtx[0][2]+center.Y*mtx[1][2]+center.Z*mtx[2][2]+mtx[3][2];
+			state->depth=center.X*view[0][2]+center.Y*view[1][2]+center.Z*view[2][2]+view[3][2];
 		}
 		(additive ? additive_object_list : object_list).push_back(state);
 		return;
-	}
-
-	// The additive pool writes each node's indices as one dynamic IB block, which holds at most 65535.
-	if (additive && polygon_count*3 <= 65535) {
-		additive_list.push_back(state);
-	}
-	else {
-		sorted_list.push_back(state);
 	}
 
 #ifdef WWDEBUG
@@ -418,6 +425,14 @@ void SortingRendererClass::Insert_Triangles(
 		WWASSERT(idx3<state->vertex_count);
 	}
 #endif // WWDEBUG
+
+	// The additive pool writes each node's indices as one dynamic IB block, which holds at most 65535.
+	if (additive && polygon_count*3 <= 65535) {
+		additive_list.push_back(state);
+	}
+	else {
+		Insert_To_Sorting_Pool(state);
+	}
 }
 
 // ----------------------------------------------------------------------------
@@ -453,6 +468,15 @@ void Release_Refs(SortingNodeStruct* state)
 	{
 		REF_PTR_RELEASE(state->sorting_state.Textures[i]);
 	}
+}
+
+static void Recycle_Nodes(SortingNodeStructList& list)
+{
+	for (size_t i=0;i<list.size();++i) {
+		Release_Refs(list[i]);
+		clean_list.push_back(list[i]);
+	}
+	list.clear();
 }
 
 static unsigned overlapping_node_count;
@@ -572,14 +596,7 @@ void SortingRendererClass::Flush_Sorting_Pool()
 		unsigned vertex_array_offset=0;
 		for (unsigned node_id=0;node_id<overlapping_node_count;++node_id) {
 			SortingNodeStruct* state=overlapping_nodes[node_id];
-			VertexFormatXYZNDUV2* src_verts=nullptr;
-			SortingVertexBufferClass* vertex_buffer=static_cast<SortingVertexBufferClass*>(state->sorting_state.vertex_buffers[0]);
-			WWASSERT(vertex_buffer);
-			src_verts=vertex_buffer->VertexBuffer;
-			WWASSERT(src_verts);
-			src_verts+=state->sorting_state.vba_offset;
-			src_verts+=state->sorting_state.index_base_offset;
-			src_verts+=state->min_vertex_index;
+			const VertexFormatXYZNDUV2* src_verts=Source_Vertices(state);
 
 			// If you have a crash in here and "dest_verts" points to illegal memory area,
 			// it is because D3D is in illegal state, and the only known cure is rebooting.
@@ -594,13 +611,7 @@ void SortingRendererClass::Flush_Sorting_Pool()
 			const D3DMATRIX product=world*view;
 			const float (&mtx)[4][4]=product.m;
 
-			unsigned short* indices=nullptr;
-			SortingIndexBufferClass* index_buffer=static_cast<SortingIndexBufferClass*>(state->sorting_state.index_buffer);
-			WWASSERT(index_buffer);
-			indices=index_buffer->index_buffer;
-			WWASSERT(indices);
-			indices+=state->start_index;
-			indices+=state->sorting_state.iba_offset;
+			const unsigned short* indices=Source_Indices(state);
 
 			if (mtx[0][2] == 0.0f && mtx[1][2] == 0.0f && mtx[3][2] == 0.0f && mtx[2][2] == 1.0f) {
 				// The common case for particle systems.
@@ -753,7 +764,9 @@ void SortingRendererClass::Flush_Sorting_Pool()
 
 void SortingRendererClass::Flush_Additive_Pool()
 {
-	if (additive_list.empty()) return;
+	if (additive_list.empty()) {
+		return;
+	}
 
 	std::stable_sort(additive_list.begin(), additive_list.end(), Additive_Draw_Order);
 
@@ -786,20 +799,9 @@ void SortingRendererClass::Flush_Additive_Pool()
 			unsigned index_offset = 0;
 			for (size_t i=first;i<last;++i) {
 				SortingNodeStruct* state = additive_list[i];
+				memcpy(dest_verts+vertex_offset, Source_Vertices(state), sizeof(VertexFormatXYZNDUV2)*state->vertex_count);
 
-				SortingVertexBufferClass* vertex_buffer=static_cast<SortingVertexBufferClass*>(state->sorting_state.vertex_buffers[0]);
-				WWASSERT(vertex_buffer);
-				const VertexFormatXYZNDUV2* src_verts=vertex_buffer->VertexBuffer;
-				src_verts+=state->sorting_state.vba_offset;
-				src_verts+=state->sorting_state.index_base_offset;
-				src_verts+=state->min_vertex_index;
-				memcpy(dest_verts+vertex_offset, src_verts, sizeof(VertexFormatXYZNDUV2)*state->vertex_count);
-
-				SortingIndexBufferClass* index_buffer=static_cast<SortingIndexBufferClass*>(state->sorting_state.index_buffer);
-				WWASSERT(index_buffer);
-				const unsigned short* src_indices=index_buffer->index_buffer;
-				src_indices+=state->start_index;
-				src_indices+=state->sorting_state.iba_offset;
+				const unsigned short* src_indices=Source_Indices(state);
 				const unsigned node_index_count=state->polygon_count*3;
 				for (unsigned j=0;j<node_index_count;++j) {
 					dest_indices[index_offset+j]=(unsigned short)(src_indices[j]-state->min_vertex_index+vertex_offset);
@@ -840,11 +842,7 @@ void SortingRendererClass::Flush_Additive_Pool()
 		first = last;
 	}
 
-	for (size_t i=0;i<additive_list.size();++i) {
-		Release_Refs(additive_list[i]);
-		clean_list.push_back(additive_list[i]);
-	}
-	additive_list.clear();
+	Recycle_Nodes(additive_list);
 }
 
 // ----------------------------------------------------------------------------
@@ -856,11 +854,6 @@ void SortingRendererClass::Flush()
 	Matrix4x4 old_world;
 	DX8Wrapper::Get_Transform(D3DTS_VIEW,old_view);
 	DX8Wrapper::Get_Transform(D3DTS_WORLD,old_world);
-
-	for (size_t i=0;i<sorted_list.size();++i) {
-		Insert_To_Sorting_Pool(sorted_list[i]);
-	}
-	sorted_list.clear();
 
 	std::stable_sort(object_list.begin(), object_list.end(), Object_Depth_Order);
 	next_object=0;
@@ -877,16 +870,8 @@ void SortingRendererClass::Flush()
 	}
 	DX8Wrapper::_Enable_Triangle_Draw(old_enable);
 
-	for (size_t i=0;i<object_list.size();++i) {
-		Release_Refs(object_list[i]);
-		clean_list.push_back(object_list[i]);
-	}
-	object_list.clear();
-	for (size_t i=0;i<additive_object_list.size();++i) {
-		Release_Refs(additive_object_list[i]);
-		clean_list.push_back(additive_object_list[i]);
-	}
-	additive_object_list.clear();
+	Recycle_Nodes(object_list);
+	Recycle_Nodes(additive_object_list);
 
 	DX8Wrapper::Set_Index_Buffer(nullptr,0);
 	DX8Wrapper::Set_Vertex_Buffer(nullptr);
@@ -906,40 +891,19 @@ void SortingRendererClass::Flush()
 void SortingRendererClass::Deinit()
 {
 	//
-	//	Flush the sorted list
+	//	Flush the sorting pool
 	//
-	for (size_t i=0;i<sorted_list.size();++i) {
-		delete sorted_list[i];
+	for (unsigned node_id=0;node_id<overlapping_node_count;++node_id) {
+		delete overlapping_nodes[node_id];
 	}
-	sorted_list.clear();
+	overlapping_node_count=0;
+	overlapping_polygon_count=0;
+	overlapping_vertex_count=0;
 
-	//
-	//	Flush the additive list
-	//
-	for (size_t i=0;i<additive_list.size();++i) {
-		delete additive_list[i];
-	}
-	additive_list.clear();
-
-	//
-	//	Flush the object lists
-	//
-	for (size_t i=0;i<object_list.size();++i) {
-		delete object_list[i];
-	}
-	object_list.clear();
-	for (size_t i=0;i<additive_object_list.size();++i) {
-		delete additive_object_list[i];
-	}
-	additive_object_list.clear();
-
-	//
-	//	Flush the clean list
-	//
-	for (size_t i=0;i<clean_list.size();++i) {
-		delete clean_list[i];
-	}
-	clean_list.clear();
+	Delete_Nodes(additive_list);
+	Delete_Nodes(object_list);
+	Delete_Nodes(additive_object_list);
+	Delete_Nodes(clean_list);
 
 	delete[] temp_index_array;
 	temp_index_array=nullptr;
