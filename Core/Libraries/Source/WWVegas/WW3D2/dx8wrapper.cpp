@@ -52,6 +52,7 @@
 
 #include "dx8wrapper.h"
 #include "dx8instancing.h"
+#include "dx8skinning.h"
 #include "dx8webbrowser.h"
 #include "dx8fvf.h"
 #include "dx8vertexbuffer.h"
@@ -460,6 +461,7 @@ void DX8Wrapper::Do_Onetime_Device_Dependent_Shutdowns()
 	DynamicVBAccessClass::_Deinit();
 	DynamicIBAccessClass::_Deinit();
 	DX8InstancingClass::Shutdown();
+	DX8SkinningClass::Shutdown();
 	ShatterSystem::Shutdown();
 	PointGroupClass::_Shutdown();
 	VertexMaterialClass::Shutdown();
@@ -2067,6 +2069,12 @@ void DX8Wrapper::Draw_Sorting_IB_VB(
 //
 // ----------------------------------------------------------------------------
 
+#if defined(BUILD_WITH_D3D9)
+static IDirect3DVertexDeclaration9* OverrideDeclaration = nullptr;
+static IDirect3DVertexShader9* OverrideShader = nullptr;
+static DX8Wrapper::DrawHookType OverrideHook = nullptr;
+#endif
+
 void DX8Wrapper::Draw(
 	unsigned primitive_type,
 	unsigned short start_index,
@@ -2080,6 +2088,15 @@ void DX8Wrapper::Draw(
 	SNAPSHOT_SAY(("DX8 - draw"));
 
 	Apply_Render_State_Changes();
+#if defined(BUILD_WITH_D3D9)
+	// Set on every draw, since a vertex buffer change or a pass may have put an FVF in its place.
+	if (OverrideShader != nullptr)
+	{
+		DX8CALL(SetVertexDeclaration(OverrideDeclaration));
+		DX8CALL(SetVertexShader(OverrideShader));
+		OverrideHook();
+	}
+#endif
 
 	// Debug feature to disable triangle drawing...
 	if (!_Is_Triangle_Draw_Enabled()) return;
@@ -2317,6 +2334,25 @@ void DX8Wrapper::End_Instanced_Drawing()
 	Set_Vertex_Shader(Vertex_Shader);
 	InstancedDeclaration = nullptr;
 	InstancedShader = nullptr;
+}
+
+void DX8Wrapper::Begin_Vertex_Shader_Override(IDirect3DVertexDeclaration9* declaration, IDirect3DVertexShader9* shader, DrawHookType hook)
+{
+	WWASSERT(hook != nullptr);
+	OverrideDeclaration = declaration;
+	OverrideShader = shader;
+	OverrideHook = hook;
+}
+
+void DX8Wrapper::End_Vertex_Shader_Override()
+{
+	if (OverrideShader != nullptr)
+	{
+		Set_Vertex_Shader(Vertex_Shader);
+	}
+	OverrideDeclaration = nullptr;
+	OverrideShader = nullptr;
+	OverrideHook = nullptr;
 }
 
 #endif

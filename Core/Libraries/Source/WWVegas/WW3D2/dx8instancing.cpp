@@ -22,11 +22,10 @@
 #include "dx8fvf.h"
 #include "dx8polygonrenderer.h"
 #include "dx8rendererdebugger.h"
-#include "formconv.h"
+#include "dx8vertexshading.h"
 #include "lightenvironment.h"
 #include "mesh.h"
 #include "meshmdl.h"
-#include "meshbuild.h"
 #include "vertmaterial.h"
 #include "shader.h"
 #include "matpass.h"
@@ -38,6 +37,11 @@ DX8InstancingClass::PassType DX8InstancingClass::Pass = DX8InstancingClass::PASS
 IDirect3DVertexShader9 * DX8InstancingClass::PassShader = nullptr;
 IDirect3DVertexShader9 * DX8InstancingClass::MainShader = nullptr;
 const MaterialPassClass * DX8InstancingClass::InstancedPasses[2] = { nullptr, nullptr };
+
+bool DX8InstancingClass::Is_Vertex_Shader_Material_Pass(const MaterialPassClass * pass)
+{
+	return pass != nullptr && (pass == InstancedPasses[0] || pass == InstancedPasses[1]);
+}
 
 #if defined(BUILD_WITH_D3D9)
 
@@ -69,22 +73,6 @@ enum
 	INSTANCE_BUFFER_COUNT = 8192,
 	MAX_DECLARATIONS = 16,
 	MAX_DECLARATION_ELEMENTS = 14,
-	MAX_LIGHTS = 4,
-
-	// Vertex shader constants, shared with the shaders in Shaders/instance*.hlsl
-	CONSTANT_VIEW_PROJECTION = 0,
-	CONSTANT_VIEW = 4,
-	CONSTANT_DIFFUSE_ALPHA = 7,
-	CONSTANT_MATERIAL_AMBIENT = 8,
-	CONSTANT_MATERIAL_DIFFUSE = 9,
-	CONSTANT_MATERIAL_EMISSIVE = 10,
-	CONSTANT_COLOR_SOURCE = 11,
-	CONSTANT_FOG = 12,
-	CONSTANT_LIGHT_DIRECTION = 16,
-	CONSTANT_LIGHT_DIFFUSE = 20,
-	CONSTANT_STAGE_SOURCE = 24,
-	CONSTANT_STAGE_COLUMNS = 28,
-	CONSTANT_COUNT = 44,
 };
 
 struct DeclarationEntry
@@ -215,77 +203,6 @@ static InstanceRecord * Lock_Instances(int count, unsigned & offset)
 	return static_cast<InstanceRecord *>(data);
 }
 
-static DWORD Get_Device_Render_State(D3DRENDERSTATETYPE state)
-{
-	// The wrapper's cache can hold a sentinel after an invalidate, and the device is not pure.
-	DWORD value = 0;
-	DX8Wrapper::_Get_D3D_Device8()->GetRenderState(state, &value);
-	return value;
-}
-
-static bool Is_Lit(VertexMaterialClass * material)
-{
-	return material != nullptr && material->Get_Lighting() && !WW3D::Is_Coloring_Enabled();
-}
-
-static float Vertex_Color_Weight(VertexMaterialClass::ColorSourceType source, unsigned fvf)
-{
-	return (source == VertexMaterialClass::COLOR1 && (fvf & D3DFVF_DIFFUSE)) ? 1.0f : 0.0f;
-}
-
-// Vertex fog as the fixed-function pipeline computes it. False when the device fogs in a way the shader cannot match.
-static bool Get_Fog_Constant(Vector4 & fog)
-{
-	fog.Set(1.0f, 0.0f, 0.0f, 0.0f);
-	if (!Get_Device_Render_State(D3DRS_FOGENABLE) || Get_Device_Render_State(D3DRS_FOGTABLEMODE) != D3DFOG_NONE)
-	{
-		return true;
-	}
-	const DWORD mode = Get_Device_Render_State(D3DRS_FOGVERTEXMODE);
-	if (mode == D3DFOG_NONE)
-	{
-		return true;
-	}
-	if (mode != D3DFOG_LINEAR)
-	{
-		return false;
-	}
-	const DWORD start_bits = Get_Device_Render_State(D3DRS_FOGSTART);
-	const DWORD end_bits = Get_Device_Render_State(D3DRS_FOGEND);
-	const float start = *(const float *)&start_bits;
-	const float end = *(const float *)&end_bits;
-	if (end != start)
-	{
-		fog.X = end / (end - start);
-		fog.Y = 1.0f / (end - start);
-	}
-	fog.Z = Get_Device_Render_State(D3DRS_RANGEFOGENABLE) ? 1.0f : 0.0f;
-	return true;
-}
-
-static void Set_Group_Lights(LightEnvironmentClass * environment)
-{
-	Vector4 constants[MAX_LIGHTS * 2];
-	const int light_count = environment->Get_Light_Count();
-	for (int i=0;i<MAX_LIGHTS;++i)
-	{
-		if (i < light_count)
-		{
-			Vector3 direction = environment->Get_Light_Direction(i);
-			direction.Normalize();
-			const Vector3 & diffuse = environment->Get_Light_Diffuse(i);
-			constants[i].Set(direction.X, direction.Y, direction.Z, 1.0f);
-			constants[MAX_LIGHTS + i].Set(diffuse.X, diffuse.Y, diffuse.Z, 0.0f);
-		}
-		else
-		{
-			constants[i].Set(0.0f, 0.0f, 0.0f, 0.0f);
-			constants[MAX_LIGHTS + i].Set(0.0f, 0.0f, 0.0f, 0.0f);
-		}
-	}
-	DX8Wrapper::Set_Vertex_Shader_Constant(CONSTANT_LIGHT_DIRECTION, constants, MAX_LIGHTS * 2);
-}
-
 // Writes each group's world matrices, and with lit set, what its lighting adds to the group's first mesh.
 static bool Write_Instances(MeshClass * const * meshes, const int * counts, int group_count, bool lit, unsigned & offset)
 {
@@ -341,74 +258,6 @@ static bool Write_Instances(MeshClass * const * meshes, const int * counts, int 
 	return true;
 }
 
-// The shaders dot row vectors with these columns, which is the device's own row-vector convention.
-static void Get_View_Constants(Vector4 * constants)
-{
-	D3DMATRIX view;
-	D3DMATRIX projection;
-	DX8Wrapper::_Get_D3D_Device8()->GetTransform(D3DTS_VIEW, &view);
-	DX8Wrapper::_Get_D3D_Device8()->GetTransform(D3DTS_PROJECTION, &projection);
-
-	for (int column=0;column<4;++column)
-	{
-		float value[4];
-		for (int row=0;row<4;++row)
-		{
-			value[row] = view.m[row][0] * projection.m[0][column] + view.m[row][1] * projection.m[1][column] +
-				view.m[row][2] * projection.m[2][column] + view.m[row][3] * projection.m[3][column];
-		}
-		constants[CONSTANT_VIEW_PROJECTION + column].Set(value[0], value[1], value[2], value[3]);
-	}
-	for (int column=0;column<3;++column)
-	{
-		constants[CONSTANT_VIEW + column].Set(view.m[0][column], view.m[1][column], view.m[2][column], view.m[3][column]);
-	}
-}
-
-// Fixed-function texture coordinates for stages 0-3 as the shader's source weights and transform columns.
-// A pass's pixel shader reads only the stages it set up, so a stage with texgen the shader lacks gets zero.
-static void Get_Stage_Constants(Vector4 * sources, Vector4 * columns)
-{
-	IDirect3DDevice9 * device = DX8Wrapper::_Get_D3D_Device8();
-	for (int stage=0;stage<4;++stage)
-	{
-		DWORD index = 0;
-		DWORD flags = 0;
-		device->GetTextureStageState(stage, D3DTSS_TEXCOORDINDEX, &index);
-		device->GetTextureStageState(stage, D3DTSS_TEXTURETRANSFORMFLAGS, &flags);
-
-		switch (index & 0xffff0000)
-		{
-		case D3DTSS_TCI_PASSTHRU:
-			sources[stage].Set((index & 0xffff) == 0 ? 1.0f : 0.0f, (index & 0xffff) == 1 ? 1.0f : 0.0f, 0.0f, 0.0f);
-			break;
-		case D3DTSS_TCI_CAMERASPACENORMAL:
-			sources[stage].Set(0.0f, 0.0f, 1.0f, 0.0f);
-			break;
-		case D3DTSS_TCI_CAMERASPACEPOSITION:
-			sources[stage].Set(0.0f, 0.0f, 0.0f, 1.0f);
-			break;
-		default:
-			sources[stage].Set(0.0f, 0.0f, 0.0f, 0.0f);
-			break;
-		}
-
-		D3DMATRIX transform;
-		if ((flags & 0xff) == D3DTTFF_DISABLE)
-		{
-			Set_D3DMATRIX_Identity(transform);
-		}
-		else
-		{
-			device->GetTransform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + stage), &transform);
-		}
-		for (int column=0;column<4;++column)
-		{
-			columns[stage * 4 + column].Set(transform.m[0][column], transform.m[1][column], transform.m[2][column], transform.m[3][column]);
-		}
-	}
-}
-
 // Issues one draw per group. Lit groups take their first mesh's lights, and a material pass installs each group's own textures.
 static void Draw_Instances(IDirect3DVertexDeclaration9 * declaration, IDirect3DVertexShader9 * shader, DX8PolygonRendererClass * const * renderers,
 	const int * counts, int group_count, MeshClass * const * meshes, unsigned offset, const MaterialPassClass * pass)
@@ -421,7 +270,9 @@ static void Draw_Instances(IDirect3DVertexDeclaration9 * declaration, IDirect3DV
 		DX8PolygonRendererClass * renderer = renderers[group];
 		if (lit)
 		{
-			Set_Group_Lights(meshes[first]->Get_Lighting_Environment());
+			Vector4 lights[DX8VertexShadingClass::MAX_LIGHTS * 2];
+			DX8VertexShadingClass::Get_Light_Constants(meshes[first]->Get_Lighting_Environment(), lights);
+			DX8Wrapper::Set_Vertex_Shader_Constant(DX8VertexShadingClass::CONSTANT_LIGHT_DIRECTION, lights, DX8VertexShadingClass::MAX_LIGHTS * 2);
 		}
 		if (pass != nullptr)
 		{
@@ -506,57 +357,7 @@ void DX8InstancingClass::End_Pass()
 
 bool DX8InstancingClass::Allows_Category(const ShaderClass & shader, VertexMaterialClass * material, unsigned fvf, bool second_stage_textured)
 {
-	if (Pass == PASS_NONE)
-	{
-		return false;
-	}
-
-	if (Pass == PASS_SHADOW_DEPTH)
-	{
-		// A caster's texture only matters when its shader cuts by alpha.
-		if (!shader.Uses_Alpha())
-		{
-			return true;
-		}
-		if ((fvf & D3DFVF_TEXCOUNT_MASK) == 0)
-		{
-			return false;
-		}
-	}
-	else if (shader.Uses_Secondary_Gradient() || (Is_Lit(material) && !(fvf & D3DFVF_NORMAL)))
-	{
-		return false;
-	}
-	if (material != nullptr)
-	{
-		if (material->Get_Diffuse_Color_Source() == VertexMaterialClass::COLOR2 ||
-			material->Get_Ambient_Color_Source() == VertexMaterialClass::COLOR2 ||
-			material->Get_Emissive_Color_Source() == VertexMaterialClass::COLOR2)
-		{
-			return false;
-		}
-		for (int stage=0;stage<MeshBuilderClass::MAX_STAGES;++stage)
-		{
-			if (material->Peek_Mapper(stage) != nullptr)
-			{
-				return false;
-			}
-		}
-
-		// Drivers differ on whether a stage reads its own output or the one TEXCOORDINDEX names. Stage 0
-		// on set 0 reads set 0 either way, and the lit shader gives stage 1 the set it names. An unused
-		// stage names set 0, which does not matter.
-		const int second_source = material->Get_UV_Source(1);
-		if (material->Get_UV_Source(0) != 0 || second_source > 1)
-		{
-			return false;
-		}
-		if (Pass == PASS_SHADOW_DEPTH && second_stage_textured && second_source != 1)
-		{
-			return false;
-		}
-	}
-	return true;
+	return DX8VertexShadingClass::Allows_Category((DX8VertexShadingClass::PassType)Pass, shader, material, fvf, second_stage_textured);
 }
 
 // The instance data carries the world matrix and a tint, so camera-facing, skinned, overridden
@@ -656,12 +457,12 @@ bool DX8InstancingClass::Draw_Groups(DX8PolygonRendererClass * const * renderers
 	if (Pass == PASS_LIT)
 	{
 		// Clip planes are given in world space, which a vertex shader would reinterpret in clip space.
-		if (Get_Device_Render_State(D3DRS_CLIPPLANEENABLE) != 0)
+		if (DX8VertexShadingClass::Get_Device_Render_State(D3DRS_CLIPPLANEENABLE) != 0)
 		{
 			Rejections[REJECT_CLIP_PLANE]++;
 			return false;
 		}
-		if (!Get_Fog_Constant(fog))
+		if (!DX8VertexShadingClass::Get_Fog_Constant(fog))
 		{
 			Rejections[REJECT_FOG]++;
 			return false;
@@ -675,59 +476,10 @@ bool DX8InstancingClass::Draw_Groups(DX8PolygonRendererClass * const * renderers
 		return false;
 	}
 
-	Vector4 constants[CONSTANT_COUNT];
-	Get_View_Constants(constants);
-
-	// Diffuse alpha as fixed-function lighting would produce it, which a cutout caster multiplies into its texture.
-	const bool lit = Is_Lit(material);
-	float constant_alpha = 1.0f;
-	float vertex_alpha = (fvf & D3DFVF_DIFFUSE) ? 1.0f : 0.0f;
-	if (lit)
-	{
-		vertex_alpha = Vertex_Color_Weight(material->Get_Diffuse_Color_Source(), fvf);
-		constant_alpha = (vertex_alpha > 0.0f) ? 1.0f : material->Get_Opacity();
-	}
-	constants[CONSTANT_DIFFUSE_ALPHA].Set(constant_alpha, vertex_alpha, 0.0f, 0.0f);
-
-	int constant_count = CONSTANT_DIFFUSE_ALPHA + 1;
-	if (Pass == PASS_LIT)
-	{
-		Vector3 color(1.0f, 1.0f, 1.0f);
-		constants[CONSTANT_MATERIAL_AMBIENT].Set(1.0f, 1.0f, 1.0f, 1.0f);
-		constants[CONSTANT_MATERIAL_DIFFUSE].Set(1.0f, 1.0f, 1.0f, 1.0f);
-		constants[CONSTANT_MATERIAL_EMISSIVE].Set(0.0f, 0.0f, 0.0f, 1.0f);
-		constants[CONSTANT_COLOR_SOURCE].Set(0.0f, 0.0f, 0.0f, 0.0f);
-		if (lit)
-		{
-			material->Get_Ambient(&color);
-			constants[CONSTANT_MATERIAL_AMBIENT].Set(color.X, color.Y, color.Z, 1.0f);
-			material->Get_Diffuse(&color);
-			constants[CONSTANT_MATERIAL_DIFFUSE].Set(color.X, color.Y, color.Z, material->Get_Opacity());
-			material->Get_Emissive(&color);
-			constants[CONSTANT_MATERIAL_EMISSIVE].Set(color.X, color.Y, color.Z, 1.0f);
-			constants[CONSTANT_COLOR_SOURCE].Set(
-				Vertex_Color_Weight(material->Get_Ambient_Color_Source(), fvf),
-				Vertex_Color_Weight(material->Get_Diffuse_Color_Source(), fvf),
-				Vertex_Color_Weight(material->Get_Emissive_Color_Source(), fvf),
-				1.0f);
-		}
-		constants[CONSTANT_FOG] = fog;
-
-		// Stage 0 takes UV set 0 and stage 1 the set its material names, untransformed.
-		const float second_source = (material != nullptr) ? (float)material->Get_UV_Source(1) : 1.0f;
-		for (int stage=0;stage<4;++stage)
-		{
-			constants[CONSTANT_STAGE_SOURCE + stage].Set(0.0f, 0.0f, 0.0f, 0.0f);
-			for (int column=0;column<4;++column)
-			{
-				constants[CONSTANT_STAGE_COLUMNS + stage * 4 + column].Set(
-					column == 0 ? 1.0f : 0.0f, column == 1 ? 1.0f : 0.0f, column == 2 ? 1.0f : 0.0f, column == 3 ? 1.0f : 0.0f);
-			}
-		}
-		constants[CONSTANT_STAGE_SOURCE].Set(1.0f, 0.0f, 0.0f, 0.0f);
-		constants[CONSTANT_STAGE_SOURCE + 1].Set(1.0f - second_source, second_source, 0.0f, 0.0f);
-		constant_count = CONSTANT_COUNT;
-	}
+	Vector4 constants[DX8VertexShadingClass::CONSTANT_COUNT];
+	DX8VertexShadingClass::Get_View_Constants(constants);
+	DX8VertexShadingClass::Get_Material_Constants((DX8VertexShadingClass::PassType)Pass, material, fvf, fog, constants);
+	const int constant_count = (Pass == PASS_LIT) ? DX8VertexShadingClass::CONSTANT_COUNT : DX8VertexShadingClass::CONSTANT_DIFFUSE_ALPHA + 1;
 	DX8Wrapper::Set_Vertex_Shader_Constant(0, constants, constant_count);
 
 	Draw_Instances(declaration, PassShader, renderers, counts, group_count, meshes, offset, nullptr);
@@ -751,9 +503,9 @@ bool DX8InstancingClass::Draw_Material_Pass_Groups(const MaterialPassClass * pas
 
 	// Only the matrices and stages change. The lighting constants the base pass left behind light
 	// nothing a pass's pixel shader reads.
-	Vector4 constants[CONSTANT_COUNT];
-	Get_View_Constants(constants);
-	Get_Stage_Constants(&constants[CONSTANT_STAGE_SOURCE], &constants[CONSTANT_STAGE_COLUMNS]);
+	Vector4 constants[DX8VertexShadingClass::CONSTANT_COUNT];
+	DX8VertexShadingClass::Get_View_Constants(constants);
+	DX8VertexShadingClass::Get_Stage_Constants(&constants[DX8VertexShadingClass::CONSTANT_STAGE_SOURCE], &constants[DX8VertexShadingClass::CONSTANT_STAGE_COLUMNS]);
 
 	unsigned offset = 0;
 	if (!Write_Instances(meshes, counts, group_count, false, offset))
@@ -761,8 +513,9 @@ bool DX8InstancingClass::Draw_Material_Pass_Groups(const MaterialPassClass * pas
 		Rejections[REJECT_RESOURCE]++;
 		return false;
 	}
-	DX8Wrapper::Set_Vertex_Shader_Constant(CONSTANT_VIEW_PROJECTION, &constants[CONSTANT_VIEW_PROJECTION], CONSTANT_VIEW + 3);
-	DX8Wrapper::Set_Vertex_Shader_Constant(CONSTANT_STAGE_SOURCE, &constants[CONSTANT_STAGE_SOURCE], CONSTANT_COUNT - CONSTANT_STAGE_SOURCE);
+	DX8Wrapper::Set_Vertex_Shader_Constant(DX8VertexShadingClass::CONSTANT_VIEW_PROJECTION, &constants[DX8VertexShadingClass::CONSTANT_VIEW_PROJECTION], DX8VertexShadingClass::CONSTANT_VIEW + 3);
+	DX8Wrapper::Set_Vertex_Shader_Constant(DX8VertexShadingClass::CONSTANT_STAGE_SOURCE, &constants[DX8VertexShadingClass::CONSTANT_STAGE_SOURCE],
+		DX8VertexShadingClass::CONSTANT_COUNT - DX8VertexShadingClass::CONSTANT_STAGE_SOURCE);
 
 	Draw_Instances(declaration, MainShader, renderers, counts, group_count, meshes, offset, pass);
 	return true;

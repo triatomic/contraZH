@@ -49,6 +49,7 @@
 #include "dx8caps.h"
 #include "dx8rendererdebugger.h"
 #include "dx8instancing.h"
+#include "dx8skinning.h"
 #include "WWDebug/wwdebug.h"
 #include "WWDebug/wwprofile.h"
 #include "WWDebug/wwmemlog.h"
@@ -1509,12 +1510,87 @@ void DX8FVFCategoryContainer::Generate_Texture_Categories(Vertex_Split_Table& sp
 
 // ----------------------------------------------------------------------------
 
+// Where a skin model's vertices sit in its container's skinned vertex buffer, and the bones they follow.
+struct SkinnedModelRecord
+{
+	MeshModelClass *						Model;
+	DX8SkinFVFCategoryContainer *		Container;
+	unsigned									VertexOffset;
+	DX8SkinningClass::PaletteStruct	Palette;
+};
+
+static std::vector<SkinnedModelRecord>		_SkinnedModels;
+
+static bool Skinned_Model_Less(const SkinnedModelRecord & record, const MeshModelClass * mmc)
+{
+	return record.Model < mmc;
+}
+
+static std::vector<SkinnedModelRecord>::iterator Find_Skinned_Model(const MeshModelClass * mmc)
+{
+	std::vector<SkinnedModelRecord>::iterator it = std::lower_bound(_SkinnedModels.begin(), _SkinnedModels.end(), mmc, Skinned_Model_Less);
+	return (it != _SkinnedModels.end() && it->Model == mmc) ? it : _SkinnedModels.end();
+}
+
+static const SkinnedModelRecord * Peek_Skinned_Model(const MeshModelClass * mmc)
+{
+	std::vector<SkinnedModelRecord>::iterator it = Find_Skinned_Model(mmc);
+	return (it != _SkinnedModels.end()) ? &*it : nullptr;
+}
+
+static int Find_Palette_Bone(const DX8SkinningClass::PaletteStruct & palette, unsigned short pivot)
+{
+	for (int bone=0;bone<palette.Count;++bone)
+	{
+		if (palette.Pivots[bone] == pivot)
+		{
+			return bone;
+		}
+	}
+	return -1;
+}
+
+// False when the model follows more bones than the palette holds.
+static bool Build_Palette(MeshModelClass * mmc, DX8SkinningClass::PaletteStruct & palette)
+{
+	const uint16 * links = mmc->Get_Vertex_Bone_Links();
+	palette.Count = 0;
+	for (int i=0;i<mmc->Get_Vertex_Count();++i)
+	{
+		if (Find_Palette_Bone(palette, links[i]) >= 0)
+		{
+			continue;
+		}
+		if (palette.Count == DX8SkinningClass::MAX_BONES)
+		{
+			return false;
+		}
+		palette.Pivots[palette.Count++] = links[i];
+	}
+	return true;
+}
+
+// The layout of DX8SkinningClass::Get_Vertex_FVF.
+struct SkinnedVertexStruct
+{
+	float			X, Y, Z;
+	float			NX, NY, NZ;
+	unsigned		Diffuse;
+	unsigned		Bone;
+	float			U1, V1;
+	float			U2, V2;
+};
+
+enum { SKINNED_VERTEX_BUFFER_SIZE = 4000 };
+
 DX8SkinFVFCategoryContainer::DX8SkinFVFCategoryContainer(bool sorting)
 	:
 	DX8FVFCategoryContainer(DX8_FVF_XYZNUV1,sorting),
 	VisibleVertexCount(0),
 	VisibleSkinHead(nullptr),
-	VisibleSkinTail(nullptr)
+	VisibleSkinTail(nullptr),
+	SkinnedVertexBuffer(nullptr),
+	UsedSkinnedVertices(0)
 {
 }
 
@@ -1522,6 +1598,106 @@ DX8SkinFVFCategoryContainer::DX8SkinFVFCategoryContainer(bool sorting)
 
 DX8SkinFVFCategoryContainer::~DX8SkinFVFCategoryContainer()
 {
+	Release_Skinned_Vertices();
+}
+
+// ----------------------------------------------------------------------------
+
+void DX8SkinFVFCategoryContainer::Forget_Skinned_Model(MeshModelClass* mmc)
+{
+	std::vector<SkinnedModelRecord>::iterator it = Find_Skinned_Model(mmc);
+	if (it != _SkinnedModels.end())
+	{
+		_SkinnedModels.erase(it);
+	}
+}
+
+void DX8SkinFVFCategoryContainer::Release_Skinned_Vertices()
+{
+	size_t kept = 0;
+	for (size_t i=0;i<_SkinnedModels.size();++i)
+	{
+		if (_SkinnedModels[i].Container != this)
+		{
+			_SkinnedModels[kept++] = _SkinnedModels[i];
+		}
+	}
+	_SkinnedModels.resize(kept);
+	REF_PTR_RELEASE(SkinnedVertexBuffer);
+	UsedSkinnedVertices = 0;
+}
+
+bool DX8SkinFVFCategoryContainer::Wants_Skinned_Vertices(MeshModelClass* mmc) const
+{
+	if (sorting || mmc->Get_Vertex_Count() > 65535 || !DX8SkinningClass::Is_Supported())
+	{
+		return false;
+	}
+	DX8SkinningClass::PaletteStruct palette;
+	return Build_Palette(mmc, palette);
+}
+
+// Copies the model's vertices in the order the CPU writes them, so the same indices address both.
+void DX8SkinFVFCategoryContainer::Add_Skinned_Vertices(MeshModelClass* mmc)
+{
+	if (!Wants_Skinned_Vertices(mmc))
+	{
+		return;
+	}
+	SkinnedModelRecord record;
+	record.Model = mmc;
+	record.Container = this;
+	Build_Palette(mmc, record.Palette);
+
+	const int vertex_count = mmc->Get_Vertex_Count();
+	if (SkinnedVertexBuffer == nullptr)
+	{
+		const int size = (vertex_count > SKINNED_VERTEX_BUFFER_SIZE) ? vertex_count : SKINNED_VERTEX_BUFFER_SIZE;
+		SkinnedVertexBuffer = NEW_REF(DX8VertexBufferClass,(DX8SkinningClass::Get_Vertex_FVF(), (unsigned short)size));
+		WWASSERT(SkinnedVertexBuffer->FVF_Info().Get_FVF_Size() == sizeof(SkinnedVertexStruct));
+	}
+	if (UsedSkinnedVertices + vertex_count > SkinnedVertexBuffer->Get_Vertex_Count())
+	{
+		return;
+	}
+
+	const Vector3 * locs = mmc->Get_Vertex_Array();
+	const Vector3 * norms = mmc->Get_Vertex_Normal_Array();
+	const Vector2 * uv0 = mmc->Get_UV_Array_By_Index(0);
+	const Vector2 * uv1 = mmc->Get_UV_Array_By_Index(1);
+	const unsigned * diffuse = mmc->Get_Color_Array(0,false);
+	const uint16 * links = mmc->Get_Vertex_Bone_Links();
+	{
+		VertexBufferClass::AppendLockClass l(SkinnedVertexBuffer,UsedSkinnedVertices,vertex_count);
+		SkinnedVertexStruct * verts = (SkinnedVertexStruct *)l.Get_Vertex_Array();
+		for (int v=0;v<vertex_count;++v)
+		{
+			verts[v].X = locs[v].X;
+			verts[v].Y = locs[v].Y;
+			verts[v].Z = locs[v].Z;
+			verts[v].NX = norms[v].X;
+			verts[v].NY = norms[v].Y;
+			verts[v].NZ = norms[v].Z;
+			verts[v].Diffuse = (diffuse != nullptr) ? diffuse[v] : 0;
+			verts[v].Bone = (unsigned)Find_Palette_Bone(record.Palette, links[v]);
+			verts[v].U1 = (uv0 != nullptr) ? uv0[v].X : 0.0f;
+			verts[v].V1 = (uv0 != nullptr) ? uv0[v].Y : 0.0f;
+			verts[v].U2 = (uv1 != nullptr) ? uv1[v].X : 0.0f;
+			verts[v].V2 = (uv1 != nullptr) ? uv1[v].Y : 0.0f;
+		}
+	}
+	record.VertexOffset = UsedSkinnedVertices;
+	UsedSkinnedVertices += vertex_count;
+
+	std::vector<SkinnedModelRecord>::iterator it = std::lower_bound(_SkinnedModels.begin(), _SkinnedModels.end(), mmc, Skinned_Model_Less);
+	if (it != _SkinnedModels.end() && it->Model == mmc)
+	{
+		*it = record;
+	}
+	else
+	{
+		_SkinnedModels.insert(it, record);
+	}
 }
 
 // ----------------------------------------------------------------------------
@@ -1561,6 +1737,16 @@ void DX8SkinFVFCategoryContainer::Render()
 		return;
 	}
 	AnythingToRender=false;
+
+	Render_Skinned_Meshes();
+	if (VisibleVertexCount == 0) {
+		for (unsigned pass=0;pass<passes;++pass) {
+			while (visible_texture_category_list[pass].Remove_Head()) {
+			}
+		}
+		clearVisibleSkinList();
+		return;
+	}
 
 	DX8Wrapper::Set_Vertex_Buffer(nullptr);	// Free up the reference to the current vertex buffer
 														// (in case it is the dynamic, which may have to be resized)
@@ -1704,10 +1890,161 @@ bool DX8SkinFVFCategoryContainer::Check_If_Mesh_Fits(MeshModelClass* mmc)
 		required_polygons+=mmc->Get_Gap_Filler()->Get_Polygon_Count();
 	}
 
-	if ((required_polygons*3*mmc->Get_Pass_Count())<=index_buffer->Get_Index_Count()-used_indices) {
-		return true;
+	if ((required_polygons*3*mmc->Get_Pass_Count())>index_buffer->Get_Index_Count()-used_indices) {
+		return false;
 	}
-	return false;
+	if (SkinnedVertexBuffer != nullptr && Wants_Skinned_Vertices(mmc)) {
+		return mmc->Get_Vertex_Count()<=SkinnedVertexBuffer->Get_Vertex_Count()-UsedSkinnedVertices;
+	}
+	return true;
+}
+
+// Every category a mesh draws in must be one the skin shader reproduces, since all its draws take one path.
+bool DX8SkinFVFCategoryContainer::Allows_Skinning(MeshClass * mesh, const MeshClass * const * pass_meshes, int pass_mesh_count)
+{
+	const SkinnedModelRecord * record = Peek_Skinned_Model(mesh->Peek_Model());
+	if (record == nullptr || record->Container != this)
+	{
+		DX8SkinningClass::Record_Rejection(DX8SkinningClass::REJECT_MODEL);
+		return false;
+	}
+	if (!DX8SkinningClass::Allows_Mesh(mesh))
+	{
+		DX8SkinningClass::Record_Rejection(DX8SkinningClass::REJECT_MESH);
+		return false;
+	}
+	if (std::binary_search(pass_meshes, pass_meshes + pass_mesh_count, mesh))
+	{
+		DX8SkinningClass::Record_Rejection(DX8SkinningClass::REJECT_PASS);
+		return false;
+	}
+	DX8PolygonRendererListIterator it(&mesh->Peek_Model()->PolygonRendererList);
+	for (;!it.Is_Done();it.Next())
+	{
+		DX8TextureCategoryClass * category = it.Peek_Obj()->Get_Texture_Category();
+		if (!DX8SkinningClass::Allows_Category(category->Get_Shader(), const_cast<VertexMaterialClass *>(category->Peek_Material()), category->Peek_Texture(1) != nullptr))
+		{
+			DX8SkinningClass::Record_Rejection(DX8SkinningClass::REJECT_CATEGORY);
+			return false;
+		}
+	}
+	return true;
+}
+
+void DX8SkinFVFCategoryContainer::Render_Skinned_Meshes()
+{
+	if (SkinnedVertexBuffer == nullptr || DX8SkinningClass::Get_Pass() == DX8VertexShadingClass::PASS_NONE)
+	{
+		return;
+	}
+
+	// A pass the skin shader cannot draw keeps its mesh on the CPU, base pass included.
+	static std::vector<MeshClass *> pass_meshes;
+	for (MatPassTaskClass * mpr = visible_matpass_head; mpr != nullptr; mpr = mpr->Get_Next_Visible())
+	{
+		if (!DX8SkinningClass::Allows_Material_Pass(mpr->Peek_Material_Pass()))
+		{
+			pass_meshes.push_back(mpr->Peek_Mesh());
+		}
+	}
+	std::sort(pass_meshes.begin(), pass_meshes.end());
+
+	// Meshes left to the CPU are marked as not yet in a vertex buffer, which holds back their draws.
+	int skinned = 0;
+	for (MeshClass * mesh = VisibleSkinHead; mesh != nullptr; mesh = mesh->Peek_Next_Visible_Skin())
+	{
+		if (Allows_Skinning(mesh, pass_meshes.empty() ? nullptr : &pass_meshes[0], (int)pass_meshes.size()))
+		{
+			mesh->Set_Base_Vertex_Offset(Peek_Skinned_Model(mesh->Peek_Model())->VertexOffset);
+			++skinned;
+		}
+		else
+		{
+			mesh->Set_Base_Vertex_Offset(VERTEX_BUFFER_OVERFLOW);
+		}
+	}
+	pass_meshes.clear();
+
+	if (skinned == 0 || !DX8SkinningClass::Begin_Sweep())
+	{
+		return;
+	}
+	DX8Wrapper::Set_Vertex_Buffer(SkinnedVertexBuffer);
+	DX8Wrapper::Set_Index_Buffer(index_buffer,0);
+	for (unsigned pass=0;pass<passes;++pass)
+	{
+		TextureCategoryListIterator it(&visible_texture_category_list[pass]);
+		for (;!it.Is_Done();it.Next())
+		{
+			it.Peek_Obj()->Render();
+		}
+	}
+	DX8SkinningClass::Begin_Material_Passes();
+	Render_Skinned_Material_Passes();
+	DX8SkinningClass::End_Sweep();
+	DX8SkinningClass::Record_Skinned_Meshes(skinned);
+
+	MeshClass * kept_head = nullptr;
+	MeshClass * kept_tail = nullptr;
+	unsigned int kept_vertices = 0;
+	MeshClass * mesh = VisibleSkinHead;
+	while (mesh != nullptr)
+	{
+		MeshClass * next = mesh->Peek_Next_Visible_Skin();
+		mesh->Set_Next_Visible_Skin(nullptr);
+		if (mesh->Get_Base_Vertex_Offset() == VERTEX_BUFFER_OVERFLOW)
+		{
+			if (kept_tail == nullptr)
+			{
+				kept_head = mesh;
+			}
+			else
+			{
+				kept_tail->Set_Next_Visible_Skin(mesh);
+			}
+			kept_tail = mesh;
+			kept_vertices += mesh->Peek_Model()->Get_Vertex_Count();
+		}
+		mesh = next;
+	}
+	VisibleSkinHead = kept_head;
+	VisibleSkinTail = kept_tail;
+	VisibleVertexCount = kept_vertices;
+}
+
+// The per-mesh material pass loop, with each mesh's palette loaded ahead of its passes.
+void DX8SkinFVFCategoryContainer::Render_Skinned_Material_Passes()
+{
+	MatPassTaskClass * mpr = visible_matpass_head;
+	MatPassTaskClass * last_mpr = nullptr;
+	bool renderTasksRemaining=false;
+
+	while (mpr != nullptr) {
+		MeshClass * mesh = mpr->Peek_Mesh();
+
+		if (mesh->Get_Base_Vertex_Offset() == VERTEX_BUFFER_OVERFLOW)
+		{
+			last_mpr = mpr;
+			mpr = mpr->Get_Next_Visible();
+			renderTasksRemaining = true;
+			continue;
+		}
+
+		DX8SkinningClass::Set_Mesh(mesh, Peek_Skinned_Model(mesh->Peek_Model())->Palette, nullptr);
+		mesh->Render_Material_Pass(mpr->Peek_Material_Pass(),index_buffer);
+		MatPassTaskClass * next_mpr = mpr->Get_Next_Visible();
+
+		if (last_mpr == nullptr) {
+			visible_matpass_head = next_mpr;
+		} else {
+			last_mpr->Set_Next_Visible(next_mpr);
+		}
+
+		delete mpr;
+		mpr = next_mpr;
+	}
+
+	visible_matpass_tail = renderTasksRemaining ? last_mpr : nullptr;
 }
 
 void DX8SkinFVFCategoryContainer::clearVisibleSkinList()
@@ -1752,6 +2089,7 @@ void DX8SkinFVFCategoryContainer::Reset()
 
 	REF_PTR_RELEASE(index_buffer);
 	used_indices=0;
+	Release_Skinned_Vertices();
 }
 
 // ----------------------------------------------------------------------------
@@ -1761,6 +2099,7 @@ void DX8SkinFVFCategoryContainer::Add_Mesh(MeshModelClass* mmc)
 	Vertex_Split_Table split_table(mmc);
 
 	Generate_Texture_Categories(split_table,0);
+	Add_Skinned_Vertices(mmc);
 }
 
 // ----------------------------------------------------------------------------
@@ -2360,11 +2699,14 @@ void DX8TextureCategoryClass::Clear_Bloom_List()
 
 // draws one visible mesh fragment with the category's state already applied
 // the bloom replay of a sorting container cannot go through its buffers, which would only queue the draw
-static void Draw_Polygons(DX8FVFCategoryContainer * container, DX8PolygonRendererClass * renderer, MeshClass * mesh, bool replay)
+static void Draw_Polygons(DX8FVFCategoryContainer * container, DX8PolygonRendererClass * renderer, MeshClass * mesh, VertexMaterialClass * vmaterial, bool replay)
 {
 	if (replay && container->Is_Sorting()) {
 		static_cast<DX8RigidFVFCategoryContainer*>(container)->Draw_Copied(renderer,mesh->Get_Base_Vertex_Offset());
 	} else {
+		if (DX8SkinningClass::Is_Sweeping()) {
+			DX8SkinningClass::Set_Mesh(mesh,Peek_Skinned_Model(mesh->Peek_Model())->Palette,vmaterial);
+		}
 		renderer->Render(mesh->Get_Base_Vertex_Offset());
 	}
 }
@@ -2496,7 +2838,7 @@ void DX8TextureCategoryClass::Render_Task(PolyRenderTaskClass * prt, VertexMater
 				DX8Wrapper::Apply_Render_State_Changes();
 				DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHAREF,(int)((float)0x60*mesh->Get_Alpha_Override()));
 
-				Draw_Polygons(container,renderer,mesh,replay);
+				Draw_Polygons(container,renderer,mesh,vmaterial,replay);
 
 				DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHAREF,0x60);
 				vmaterial->Set_Opacity(oldOpacity);	//restore previous value
@@ -2507,7 +2849,7 @@ void DX8TextureCategoryClass::Render_Task(PolyRenderTaskClass * prt, VertexMater
 				DX8Wrapper::Set_Shader(theShader);	//restore previous value
 			}
 			else
-				Draw_Polygons(container,renderer,mesh,replay);
+				Draw_Polygons(container,renderer,mesh,vmaterial,replay);
 
 			if (oldMapper)	//did we override the uv offset?
 			{	oldMapper->Set_LastUsedSyncTime(oldUVOffsetSyncTime);
@@ -2517,7 +2859,7 @@ void DX8TextureCategoryClass::Render_Task(PolyRenderTaskClass * prt, VertexMater
 			DX8Wrapper::Set_Material(vmaterial);	//restore previous material.
 		}
 		else
-			Draw_Polygons(container,renderer,mesh,replay);
+			Draw_Polygons(container,renderer,mesh,vmaterial,replay);
 	}
 //--------------------------------------------------------------------
 	if (mesh->Get_ObjectScale() != 1.0f)
@@ -2706,6 +3048,7 @@ void DX8MeshRendererClass::Unregister_Mesh_Type(MeshModelClass* mmc)
 		delete n;
 	}
 	_RegisteredMeshList.Remove(mmc);
+	DX8SkinFVFCategoryContainer::Forget_Skinned_Model(mmc);
 
 	// Also remove the gap filler!
 	if (mmc->GapFiller) {

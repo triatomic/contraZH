@@ -303,14 +303,29 @@ public:
 	virtual void Add_Delayed_Visible_Material_Pass(MaterialPassClass * pass, MeshClass * mesh) override { Add_Visible_Material_Pass(pass,mesh); }
 	virtual void Render_Delayed_Procedural_Material_Passes() override { }
 
+	// Drops a model's place in the skinned vertex buffer when it leaves the rendering system.
+	static void Forget_Skinned_Model(MeshModelClass* mmc);
+
 private:
 
 	void Reset();
 	void clearVisibleSkinList();
 
+	// Skins that the vertex shader can deform draw first from the skinned vertex buffer, and leave
+	// the visible list so the CPU deforms only the rest.
+	bool Wants_Skinned_Vertices(MeshModelClass* mmc) const;
+	void Add_Skinned_Vertices(MeshModelClass* mmc);
+	void Release_Skinned_Vertices();
+	bool Allows_Skinning(MeshClass * mesh, const MeshClass * const * pass_meshes, int pass_mesh_count);
+	void Render_Skinned_Meshes();
+	void Render_Skinned_Material_Passes();
+
 	unsigned int								VisibleVertexCount;
 	MeshClass *									VisibleSkinHead;
 	MeshClass *									VisibleSkinTail;
+
+	VertexBufferClass *						SkinnedVertexBuffer;
+	int											UsedSkinnedVertices;
 
 };
 

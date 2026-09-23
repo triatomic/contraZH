@@ -20,6 +20,7 @@
 
 #include "WWLib/always.h"
 #include "dx8compat.h"
+#include "dx8vertexshading.h"
 
 class DX8PolygonRendererClass;
 class MeshClass;
@@ -36,9 +37,9 @@ public:
 
 	enum PassType
 	{
-		PASS_NONE,
-		PASS_SHADOW_DEPTH,
-		PASS_LIT,
+		PASS_NONE = DX8VertexShadingClass::PASS_NONE,
+		PASS_SHADOW_DEPTH = DX8VertexShadingClass::PASS_SHADOW_DEPTH,
+		PASS_LIT = DX8VertexShadingClass::PASS_LIT,
 	};
 
 	// A single mesh draws faster through the fixed-function path.
@@ -64,6 +65,9 @@ public:
 	// The material passes the main scene can instance. A mesh with any other pass draws fixed function throughout.
 	static void			Set_Instanced_Material_Passes(const MaterialPassClass * first, const MaterialPassClass * second);
 	static bool			Is_Instanced_Material_Pass(const MaterialPassClass * pass);
+
+	// Whether the pass is one the vertex shaders can redraw, whatever instancing's own state.
+	static bool			Is_Vertex_Shader_Material_Pass(const MaterialPassClass * pass);
 	static void			Begin_Shadow_Depth_Pass(IDirect3DVertexShader9 * shader);
 	static void			Begin_Lit_Pass();
 	static void			End_Pass();

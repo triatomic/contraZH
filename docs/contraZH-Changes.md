@@ -418,6 +418,20 @@ vision overlays.
 `1` limits it to the shadow map, `2` adds main view objects without shadow or highlight passes, and
 `3` (the default) covers everything.
 
+### GPU skinning
+
+Infantry and other skinned meshes bend on the graphics card instead of the CPU, in the shadow map
+and in the main view along with their shadow and highlight passes. Needs the Direct3D 9 build and a
+shader model 2 card; other cards skin on the CPU as before.
+
+Notes:
+* These still skin on the CPU: meshes following more than 70 bones, camera-facing or sorted meshes,
+objects lit by point or dynamic lights, and objects under shroud, jamming, frozen or heat vision
+overlays.
+* The `CONTRA_GPU_SKINNING` environment variable helps track down rendering faults: `0` turns it
+off, `1` limits it to the shadow map, `2` adds main view skins without shadow or highlight passes,
+and `3` (the default) covers everything.
+
 ### Laser ground glow
 
 Each laser beam lights the terrain along its length with up to twelve dynamic lights in the beam's

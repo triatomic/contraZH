@@ -3,10 +3,12 @@
 //
 // PACKED=1 feeds shadowdepth.hlsl, which reads the sun view-space position from TEXCOORD1.
 // PACKED=0 feeds the fixed-function pixel pipeline, whose stages read both UV sets.
+// SKINNED=1 draws one skin mesh, each vertex taking its world rows from the bone palette.
 
 float4 ViewProjectionColumns[4] : register(c0);
 float4 ViewColumns[3]           : register(c4);
 float2 DiffuseAlpha             : register(c7);   // x = constant alpha, y = weight of the vertex alpha
+float4 Palette[210]             : register(c44);  // three world rows per bone
 
 struct VsIn
 {
@@ -14,9 +16,13 @@ struct VsIn
     float4 Diffuse   : COLOR0;
     float2 TexCoord0 : TEXCOORD0;
     float2 TexCoord1 : TEXCOORD1;
+#if SKINNED
+    float4 Bone      : COLOR1;
+#else
     float4 World0    : TEXCOORD4;
     float4 World1    : TEXCOORD5;
     float4 World2    : TEXCOORD6;
+#endif
 };
 
 struct VsOut
@@ -33,8 +39,19 @@ struct VsOut
 
 VsOut main(VsIn input)
 {
+#if SKINNED
+    int bone = D3DCOLORtoUBYTE4(input.Bone).x * 3;
+    float4 world0 = Palette[bone];
+    float4 world1 = Palette[bone + 1];
+    float4 world2 = Palette[bone + 2];
+#else
+    float4 world0 = input.World0;
+    float4 world1 = input.World1;
+    float4 world2 = input.World2;
+#endif
+
     float4 local = float4(input.Position.xyz, 1.0f);
-    float4 world = float4(dot(input.World0, local), dot(input.World1, local), dot(input.World2, local), 1.0f);
+    float4 world = float4(dot(world0, local), dot(world1, local), dot(world2, local), 1.0f);
 
     VsOut output;
     output.Position = float4(dot(world, ViewProjectionColumns[0]), dot(world, ViewProjectionColumns[1]),

@@ -60,6 +60,7 @@
 #include "WW3D2/camera.h"
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/dx8instancing.h"
+#include "WW3D2/dx8skinning.h"
 #include "WW3D2/statistics.h"
 #include "WW3D2/sortingrenderer.h"
 #include "WW3D2/dx8wrapper.h"
@@ -1018,7 +1019,10 @@ void RTS3DScene::Flush(RenderInfoClass & rinfo)
 	// Special passes change vertex state behind the mesh renderer's back, which the instancing shader would not see.
 	// Most units and structures draw in the occlusion flushes, which only change stencil state.
 	if (m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE)
+	{
 		DX8InstancingClass::Begin_Lit_Pass();
+		DX8SkinningClass::Begin_Lit_Pass();
+	}
 	TheDX8MeshRenderer.Flush();	//draw all non-translucent objects.
 
 	//draw all non-translucent objects which were separated because they are hidden and need custom rendering.
@@ -1029,6 +1033,7 @@ void RTS3DScene::Flush(RenderInfoClass & rinfo)
 		flushOccludedObjectsIntoStencil(rinfo);
 #endif
 	DX8InstancingClass::End_Pass();
+	DX8SkinningClass::End_Pass();
 
 	// (gth) CNC3 Flush the shader meshes
 	SHD_FLUSH;
@@ -1406,6 +1411,8 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 		DX8MeshRendererClass::Take_Instancing_Stats(stats);
 		Int rejections[DX8InstancingClass::REJECT_COUNT];
 		DX8InstancingClass::Take_Rejections(rejections);
+		DX8SkinningClass::StatsStruct skinning;
+		DX8SkinningClass::Take_Stats(skinning);
 		if (instancingFrames % 600 == 0)
 		{
 			const MaterialPassClass *receivePass = (TheW3DShadowMap != nullptr) ? TheW3DShadowMap->getReceivePass() : nullptr;
@@ -1444,6 +1451,11 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 				rejections[DX8InstancingClass::REJECT_CLIP_PLANE], rejections[DX8InstancingClass::REJECT_FOG],
 				rejections[DX8InstancingClass::REJECT_RESOURCE],
 				rejections[DX8InstancingClass::REJECT_LIGHTS]));
+			DEBUG_LOG(("Skinning: frame %d, skinned %d main %d depth; left to the CPU by state %d model %d mesh %d category %d pass %d",
+				instancingFrames, skinning.SkinnedMeshes[0], skinning.SkinnedMeshes[1],
+				skinning.Rejections[DX8SkinningClass::REJECT_STATE], skinning.Rejections[DX8SkinningClass::REJECT_MODEL],
+				skinning.Rejections[DX8SkinningClass::REJECT_MESH], skinning.Rejections[DX8SkinningClass::REJECT_CATEGORY],
+				skinning.Rejections[DX8SkinningClass::REJECT_PASS]));
 		}
 		++instancingFrames;
 	}

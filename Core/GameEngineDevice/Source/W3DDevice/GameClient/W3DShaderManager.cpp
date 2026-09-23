@@ -75,6 +75,7 @@
 #include "WW3D2/formconv.h"
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/dx8instancing.h"
+#include "WW3D2/dx8skinning.h"
 #include "WW3D2/dx8polygonrenderer.h"
 #include "WW3D2/matpass.h"
 #include "WW3D2/texture.h"
@@ -1522,7 +1523,7 @@ static Int TerrainBumpCount = 0;
 class ShadowDepthShader : public W3DShaderInterface
 {
 public:
-	ShadowDepthShader() : m_dwPixelShader(0), m_dwInstanceShader(0) {}
+	ShadowDepthShader() : m_dwPixelShader(0), m_dwInstanceShader(0), m_dwSkinShader(0) {}
 
 	virtual Int set(Int pass) override;
 	virtual Int init() override;
@@ -1535,6 +1536,7 @@ protected:
 
 	DWORD m_dwPixelShader;	///<packed path only; the hardware path writes depth with no shader.
 	DWORD m_dwInstanceShader;	///<draws groups of identical casters in one call; the pass runs without it.
+	DWORD m_dwSkinShader;	///<deforms skinned casters on the GPU; the pass runs without it.
 } shadowDepthShader;
 
 W3DShaderInterface *ShadowDepthShaderList[]=
@@ -1582,6 +1584,11 @@ Int ShadowDepthShader::init()
 	{
 		m_dwInstanceShader = 0;
 	}
+	if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(packed ? "shaders\\skindepthpacked.vso" : "shaders\\skindepth.vso",
+			declaration, 0, true, &m_dwSkinShader)))
+	{
+		m_dwSkinShader = 0;
+	}
 
 	W3DShaders[W3DShaderManager::ST_SHADOW_DEPTH]=&shadowDepthShader;
 	W3DShadersPassCount[W3DShaderManager::ST_SHADOW_DEPTH]=1;
@@ -1596,6 +1603,10 @@ Int ShadowDepthShader::set(Int pass)
 	if (m_dwInstanceShader != 0)
 	{
 		DX8InstancingClass::Begin_Shadow_Depth_Pass(Peek_D3D9_Vertex_Shader(m_dwInstanceShader));
+	}
+	if (m_dwSkinShader != 0)
+	{
+		DX8SkinningClass::Begin_Shadow_Depth_Pass(Peek_D3D9_Vertex_Shader(m_dwSkinShader));
 	}
 	return TRUE;
 }
@@ -1679,6 +1690,7 @@ void ShadowDepthShader::reset()
 {
 	DX8Wrapper::Set_Apply_Hook(nullptr);
 	DX8InstancingClass::End_Pass();
+	DX8SkinningClass::End_Pass();
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_COLORWRITEENABLE, 0x0000000f);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_DEPTHBIAS, 0);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_SLOPESCALEDEPTHBIAS, 0);
@@ -1702,10 +1714,12 @@ Int ShadowDepthShader::shutdown()
 	{
 		DX8_DELETE_PIXEL_SHADER(device, m_dwPixelShader);
 		DX8_DELETE_VERTEX_SHADER(device, m_dwInstanceShader);
+		DX8_DELETE_VERTEX_SHADER(device, m_dwSkinShader);
 	}
 
 	m_dwPixelShader = 0;
 	m_dwInstanceShader = 0;
+	m_dwSkinShader = 0;
 
 	// Cleared so a failed init after a device reset leaves the pass disabled.
 	W3DShaders[W3DShaderManager::ST_SHADOW_DEPTH]=nullptr;
@@ -3594,6 +3608,7 @@ void RoadShader2Stage::reset()
 */
 #if defined(BUILD_WITH_D3D9)
 static DWORD InstancedMainShader = 0;	///<main scene meshes and their passes drawn in groups; the scene draws without it.
+static DWORD SkinnedMainShader = 0;	///<main scene skins and their passes deformed on the GPU; the scene draws without it.
 #endif
 
 W3DShaderInterface **MasterShaderList[]=
@@ -3736,6 +3751,14 @@ void W3DShaderManager::init()
 	{
 		InstancedMainShader = 0;
 	}
+	if (SUCCEEDED(LoadAndCreateD3DShader("shaders\\skinmain.vso", instanceDeclaration, 0, true, &SkinnedMainShader)))
+	{
+		DX8SkinningClass::Set_Main_Shader(Peek_D3D9_Vertex_Shader(SkinnedMainShader));
+	}
+	else
+	{
+		SkinnedMainShader = 0;
+	}
 #endif
 
 	W3DFilterInterface **filters;
@@ -3786,6 +3809,12 @@ void W3DShaderManager::shutdown()
 	{
 		DX8_DELETE_VERTEX_SHADER(DX8Wrapper::_Get_D3D_Device8(), InstancedMainShader);
 		InstancedMainShader = 0;
+	}
+	DX8SkinningClass::Set_Main_Shader(nullptr);
+	if (SkinnedMainShader != 0)
+	{
+		DX8_DELETE_VERTEX_SHADER(DX8Wrapper::_Get_D3D_Device8(), SkinnedMainShader);
+		SkinnedMainShader = 0;
 	}
 #endif
 }

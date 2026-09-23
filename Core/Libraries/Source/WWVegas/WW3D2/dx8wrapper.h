@@ -70,7 +70,12 @@
 
 const unsigned MAX_TEXTURE_STAGES=8;
 const unsigned MAX_VERTEX_STREAMS=2;
+#if defined(BUILD_WITH_D3D9)
+// Skinning's bone palette fills the whole vs_2_0 register file.
+const unsigned MAX_VERTEX_SHADER_CONSTANTS=256;
+#else
 const unsigned MAX_VERTEX_SHADER_CONSTANTS=96;
+#endif
 const unsigned MAX_PIXEL_SHADER_CONSTANTS=8;
 const unsigned MAX_SHADOW_MAPS=1;
 
@@ -419,6 +424,12 @@ public:
 		unsigned instance_stride,
 		unsigned instance_count);
 	static void End_Instanced_Drawing();
+
+	// While set, every indexed draw replaces the FVF with this declaration and shader, and runs the hook
+	// once the device holds the draw's state so it can set constants from it. End puts the FVF back.
+	typedef void (*DrawHookType)();
+	static void Begin_Vertex_Shader_Override(IDirect3DVertexDeclaration9* declaration, IDirect3DVertexShader9* shader, DrawHookType hook);
+	static void End_Vertex_Shader_Override();
 #endif
 
 	/*
@@ -809,6 +820,7 @@ WWINLINE void DX8Wrapper::Set_Pixel_Shader(DWORD pixel_shader)
 
 WWINLINE void DX8Wrapper::Set_Vertex_Shader_Constant(int reg, const void* data, int count)
 {
+	WWASSERT(reg>=0 && reg+count<=(int)MAX_VERTEX_SHADER_CONSTANTS);
 	int memsize=sizeof(Vector4)*count;
 
 	// may be incorrect if shaders are created and destroyed dynamically
