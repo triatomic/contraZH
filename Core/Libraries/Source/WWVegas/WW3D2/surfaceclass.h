@@ -45,6 +45,7 @@
 #include "WW3D2/dx8compat.h"
 #else
 struct IDirect3DSurface8;
+struct IDirect3DBaseTexture8;
 #endif
 class Vector2i;
 class Vector3;
