@@ -280,6 +280,17 @@ protected:
 	const CameraClass *m_reflectionSource;	///< camera the reflection mirrors, null when there is none
 	UnsignedInt m_reflectionFrame;		///< frame the reflection was rendered in
 	Real m_reflectionPlaneZ;
+	DX8VertexBufferClass *m_radialVertices;	///< polar grid around the origin, z holding each vertex's cell size
+	DX8IndexBufferClass *m_radialIndices;
+	Int m_radialVertexCount;
+	Int m_radialTriangleCount;
+	DWORD m_shaderWaterRadialVertexShader;	///< lays the polar grid under the camera and lifts it by the swell
+	DWORD m_shaderWaterRadialPixelShader[2];
+	TextureClass *m_waterMaskTexture;	///< flat standing water per map cell, coverage in alpha and level in red and green
+	UnsignedInt m_waterMaskSignature;	///< hash of the water polygons the mask was built from
+	const WorldHeightMap *m_waterMaskMap;
+	Bool m_drawingRadial;				///< the standing water being drawn is the polar grid
+	Real m_radialPlaneZ;
 
 	Bool useShaderWater() const;
 	Bool isWaterVisible(PolygonTrigger *pTrig) const;
@@ -287,6 +298,10 @@ protected:
 	Bool pickReflectionPlane(CameraClass *camera, Real &planeZ) const;
 	Bool ensureReflectionTargets(UnsignedInt width, UnsignedInt height);
 	void drawReflectionCoverage(UnsignedInt width, UnsignedInt height);
+	Int standingWaterDiffuse() const;
+	Bool buildRadialGrid();
+	void updateWaterMask();
+	void drawRadialWater(Real planeZ);
 	void createNormalTexture();
 	void updateHeightTexture();
 	void grabRefraction();

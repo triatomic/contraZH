@@ -183,13 +183,19 @@ static ShaderClass shaderWaterShader(SC_SHADER_WATER);
 #define SWELL_CELL_SIZE (4*MAP_XY_FACTOR)	// two opposite sides summed, so the grid spacing is half this
 #define NORMAL_WAVE_COUNT 96
 #define WATER_REFLECTION_SAMPLER 13
+#define WATER_MASK_SAMPLER 14
+#define RADIAL_SEGMENTS 96
+#define RADIAL_INNER_RADIUS 32.0f
+#define RADIAL_OUTER_RADIUS 8000.0f
+#define RADIAL_LEVEL_COUNT 8
 
 #if defined(BUILD_WITH_D3D9)
-// CONTRA_WATER picks the water: 0 legacy, 1 shader water without vertex waves, 2 with them.
+// CONTRA_WATER picks the water: 0 legacy, 1 shader water without vertex waves, 2 with them on each
+// polygon's own grid, 3 with them on a polar grid around the camera.
 static Int Get_Shader_Water_Mode()
 {
 	const char *value = getenv("CONTRA_WATER");
-	return (value != nullptr) ? atoi(value) : 2;
+	return (value != nullptr) ? atoi(value) : 3;
 }
 static const Int ShaderWaterMode = Get_Shader_Water_Mode();
 
@@ -407,6 +413,20 @@ static TextureClass *Load_Swell_Texture(const char *name)
 	return texture;
 }
 #endif
+
+// Standing water whose points lie within a unit of each other can share the polar grid at one level.
+static Bool Get_Flat_Water_Level(const PolygonTrigger *pTrig, Real &level)
+{
+	Real low = (Real)pTrig->getPoint(0)->z;
+	Real high = low;
+	for (Int i=1; i<pTrig->getNumPoints(); i++)
+	{
+		low = min(low, (Real)pTrig->getPoint(i)->z);
+		high = max(high, (Real)pTrig->getPoint(i)->z);
+	}
+	level = low;
+	return high - low <= 1.0f;
+}
 
 WaterRenderObjClass *TheWaterRenderObj=nullptr; ///<global water rendering object
 
@@ -1092,7 +1112,22 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 	DX8Wrapper::Set_Pixel_Shader_Constant(18, &planar, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(19, &planarMapping, 1);
 
-	if (!river && m_shaderWaterSwellActive)
+	if (!river && m_shaderWaterSwellActive && m_drawingRadial)
+	{
+		setupSwell(clip);
+		device->SetTexture(WATER_MASK_SAMPLER, m_waterMaskTexture->Peek_D3D_Texture());
+		// Past the map edge the mask reads empty, or water touching the edge would run to the horizon.
+		device->SetSamplerState(WATER_MASK_SAMPLER, D3DSAMP_ADDRESSU, D3DTADDRESS_BORDER);
+		device->SetSamplerState(WATER_MASK_SAMPLER, D3DSAMP_ADDRESSV, D3DTADDRESS_BORDER);
+		device->SetSamplerState(WATER_MASK_SAMPLER, D3DSAMP_BORDERCOLOR, 0);
+		device->SetSamplerState(WATER_MASK_SAMPLER, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+		device->SetSamplerState(WATER_MASK_SAMPLER, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+		device->SetSamplerState(WATER_MASK_SAMPLER, D3DSAMP_MIPFILTER, D3DTEXF_NONE);
+		const Vector4 radialPlane(m_radialPlaneZ, 0.0f, 0.0f, 0.0f);
+		DX8Wrapper::Set_Pixel_Shader_Constant(20, &radialPlane, 1);
+		DX8Wrapper::Set_Pixel_Shader(m_shaderWaterRadialPixelShader[packed]);
+	}
+	else if (!river && m_shaderWaterSwellActive)
 	{
 		setupSwell(clip);
 		DX8Wrapper::Set_Pixel_Shader(m_shaderWaterSwellPixelShader[packed]);
@@ -1148,6 +1183,26 @@ void WaterRenderObjClass::setupSwell(const D3DMATRIX &clip)
 	DX8Wrapper::Set_Vertex_Shader_Constant(4, &swell, 1);
 	DX8Wrapper::Set_Vertex_Shader_Constant(5, &swellSample, 1);
 	DX8Wrapper::Set_Vertex_Shader_Constant(6, &swellChannel, 1);
+
+	if (m_drawingRadial)
+	{
+		// Each vertex picks its mip level from its own cell size, and the texture coordinates and
+		// colour are the ones drawTrapezoidWater would give it.
+		const Vector3 eye = m_renderCamera->Get_Transform().Get_Translation();
+		const Vector4 radialSample(swellDesc.Width / swellScale, 0.0f, 0.0f, 0.0f);
+		const Vector4 radial(eye.X, eye.Y, m_radialPlaneZ, 0.0f);
+		const Vector4 wobble(1.0f / 150.0f, 0.02f * cosf(11.0f * m_riverVOrigin), 0.02f * cosf(5.0f * m_riverVOrigin), 25.0f * m_riverVOrigin);
+		const Vector4 wobbleRate(PI / (4.0f * MAP_XY_FACTOR), 0.0f, 0.0f, 0.0f);
+		const UnsignedInt diffuse = (UnsignedInt)standingWaterDiffuse();
+		const Vector4 color(((diffuse >> 16) & 0xff) / 255.0f, ((diffuse >> 8) & 0xff) / 255.0f, (diffuse & 0xff) / 255.0f, (diffuse >> 24) / 255.0f);
+		DX8Wrapper::Set_Vertex_Shader_Constant(5, &radialSample, 1);
+		DX8Wrapper::Set_Vertex_Shader_Constant(7, &radial, 1);
+		DX8Wrapper::Set_Vertex_Shader_Constant(8, &wobble, 1);
+		DX8Wrapper::Set_Vertex_Shader_Constant(9, &wobbleRate, 1);
+		DX8Wrapper::Set_Vertex_Shader_Constant(10, &color, 1);
+		device->SetVertexShader(Peek_D3D9_Vertex_Shader(m_shaderWaterRadialVertexShader));
+		return;
+	}
 
 	// The fixed-function vertex format stays bound and feeds the shader's inputs.
 	device->SetVertexShader(Peek_D3D9_Vertex_Shader(m_shaderWaterSwellVertexShader));
@@ -1210,6 +1265,7 @@ void WaterRenderObjClass::cleanupShaderWater()
 		device->SetTexture(WATER_SKYBOX_SAMPLER + face, nullptr);
 	}
 	device->SetTexture(WATER_REFLECTION_SAMPLER, nullptr);
+	device->SetTexture(WATER_MASK_SAMPLER, nullptr);
 	DX8Wrapper::Set_Texture(WATER_SHADOW_STAGE, nullptr);
 	for (Int stage=2; stage<8; stage++)
 	{
@@ -1222,6 +1278,222 @@ void WaterRenderObjClass::cleanupShaderWater()
 
 	// Stage 1's ops came from here, not the shader, so the next shader must set them again.
 	ShaderClass::Invalidate();
+#endif
+}
+
+// Rings widen by one segment's arc each step, so every cell stays about square.
+Bool WaterRenderObjClass::buildRadialGrid()
+{
+#if defined(BUILD_WITH_D3D9)
+	const Real growth = 1.0f + 2.0f * PI / (Real)RADIAL_SEGMENTS;
+	Int rings = 1;
+	Real radius = RADIAL_INNER_RADIUS;
+	while (radius < RADIAL_OUTER_RADIUS && (rings * 6 + 3) * RADIAL_SEGMENTS <= 65535)
+	{
+		radius *= growth;
+		rings++;
+	}
+
+	m_radialVertexCount = 1 + rings * RADIAL_SEGMENTS;
+	m_radialTriangleCount = RADIAL_SEGMENTS + (rings - 1) * RADIAL_SEGMENTS * 2;
+	m_radialVertices = NEW_REF(DX8VertexBufferClass, (DX8_FVF_XYZ, m_radialVertexCount));
+	m_radialIndices = NEW_REF(DX8IndexBufferClass, (m_radialTriangleCount * 3));
+
+	{
+		DX8VertexBufferClass::WriteLockClass lock(m_radialVertices);
+		Vector3 *vertex = (Vector3 *)lock.Get_Vertex_Array();
+		vertex->Set(0.0f, 0.0f, RADIAL_INNER_RADIUS);
+		vertex++;
+		radius = RADIAL_INNER_RADIUS;
+		for (Int ring=0; ring<rings; ring++)
+		{
+			for (Int segment=0; segment<RADIAL_SEGMENTS; segment++)
+			{
+				const Real angle = 2.0f * PI * (Real)segment / (Real)RADIAL_SEGMENTS;
+				vertex->Set(radius * cosf(angle), radius * sinf(angle), radius * (growth - 1.0f));
+				vertex++;
+			}
+			radius *= growth;
+		}
+	}
+
+	{
+		DX8IndexBufferClass::WriteLockClass lock(m_radialIndices);
+		UnsignedShort *index = lock.Get_Index_Array();
+		for (Int segment=0; segment<RADIAL_SEGMENTS; segment++)
+		{
+			index[0] = 0;
+			index[1] = (UnsignedShort)(1 + segment);
+			index[2] = (UnsignedShort)(1 + (segment + 1) % RADIAL_SEGMENTS);
+			index += 3;
+		}
+		for (Int ring=0; ring<rings-1; ring++)
+		{
+			const Int inner = 1 + ring * RADIAL_SEGMENTS;
+			const Int outer = inner + RADIAL_SEGMENTS;
+			for (Int segment=0; segment<RADIAL_SEGMENTS; segment++)
+			{
+				const Int next = (segment + 1) % RADIAL_SEGMENTS;
+				index[0] = (UnsignedShort)(inner + segment);
+				index[1] = (UnsignedShort)(outer + segment);
+				index[2] = (UnsignedShort)(outer + next);
+				index[3] = (UnsignedShort)(inner + segment);
+				index[4] = (UnsignedShort)(outer + next);
+				index[5] = (UnsignedShort)(inner + next);
+				index += 6;
+			}
+		}
+	}
+	return TRUE;
+#else
+	return FALSE;
+#endif
+}
+
+// Each map cell of flat standing water gets full alpha and its level at 1/16 unit in red and green,
+// on the height texture's layout so the shader shares its mapping.
+void WaterRenderObjClass::updateWaterMask()
+{
+#if defined(BUILD_WITH_D3D9)
+	WorldHeightMap *map = TheTerrainRenderObject->getMap();
+	if (map == nullptr || m_heightTexture == nullptr)
+	{
+		return;
+	}
+
+	// Scripts can raise and lower water, so the polygons' points are hashed every frame.
+	UnsignedInt signature = 2166136261u;
+	for (PolygonTrigger *pTrig=PolygonTrigger::getFirstPolygonTrigger(); pTrig; pTrig = pTrig->getNext())
+	{
+		if (!pTrig->isWaterArea())
+		{
+			continue;
+		}
+		signature = (signature ^ (UnsignedInt)(pTrig->isRiver() ? 1 : 2)) * 16777619u;
+		for (Int i=0; i<pTrig->getNumPoints(); i++)
+		{
+			const ICoord3D *point = pTrig->getPoint(i);
+			signature = (signature ^ (UnsignedInt)point->x) * 16777619u;
+			signature = (signature ^ (UnsignedInt)point->y) * 16777619u;
+			signature = (signature ^ (UnsignedInt)point->z) * 16777619u;
+		}
+	}
+
+	SurfaceClass::SurfaceDescription heightDesc;
+	m_heightTexture->Get_Level_Description(heightDesc);
+	const Int width = (Int)heightDesc.Width;
+	const Int height = (Int)heightDesc.Height;
+	if (m_waterMaskTexture != nullptr)
+	{
+		SurfaceClass::SurfaceDescription maskDesc;
+		m_waterMaskTexture->Get_Level_Description(maskDesc);
+		if (maskDesc.Width != heightDesc.Width || maskDesc.Height != heightDesc.Height)
+		{
+			REF_PTR_RELEASE(m_waterMaskTexture);
+		}
+		else if (m_waterMaskSignature == signature && m_waterMaskMap == map)
+		{
+			return;
+		}
+	}
+	if (m_waterMaskTexture == nullptr)
+	{
+		m_waterMaskTexture = MSGNEW("TextureClass") TextureClass(width, height, WW3D_FORMAT_A8R8G8B8, MIP_LEVELS_1, TextureClass::POOL_MANAGED, false, false);
+		if (m_waterMaskTexture->Peek_D3D_Texture() == nullptr)
+		{
+			REF_PTR_RELEASE(m_waterMaskTexture);
+			return;
+		}
+	}
+
+	SurfaceClass *surface = m_waterMaskTexture->Get_Surface_Level(0);
+	int pitch;
+	UnsignedByte *bits = (UnsignedByte *)surface->Lock(&pitch);
+	if (bits != nullptr)
+	{
+		for (Int y=0; y<height; y++)
+		{
+			memset(bits + y * pitch, 0, width * 4);
+		}
+
+		const Real border = (Real)map->getBorderSizeInline();
+		for (PolygonTrigger *pTrig=PolygonTrigger::getFirstPolygonTrigger(); pTrig; pTrig = pTrig->getNext())
+		{
+			Real level;
+			if (!pTrig->isWaterArea() || pTrig->isRiver() || pTrig->getNumPoints() < 3 || !Get_Flat_Water_Level(pTrig, level))
+			{
+				continue;
+			}
+			const UnsignedInt value = (UnsignedInt)WWMath::Clamp(level * 16.0f + 0.5f, 0.0f, 65535.0f);
+
+			Int minX = pTrig->getPoint(0)->x;
+			Int maxX = minX;
+			Int minY = pTrig->getPoint(0)->y;
+			Int maxY = minY;
+			for (Int i=1; i<pTrig->getNumPoints(); i++)
+			{
+				minX = min(minX, pTrig->getPoint(i)->x);
+				maxX = max(maxX, pTrig->getPoint(i)->x);
+				minY = min(minY, pTrig->getPoint(i)->y);
+				maxY = max(maxY, pTrig->getPoint(i)->y);
+			}
+			const Int left = max((Int)REAL_TO_INT_FLOOR(minX / MAP_XY_FACTOR + border), 0);
+			const Int right = min((Int)REAL_TO_INT_CEIL(maxX / MAP_XY_FACTOR + border), width - 1);
+			const Int bottom = max((Int)REAL_TO_INT_FLOOR(minY / MAP_XY_FACTOR + border), 0);
+			const Int top = min((Int)REAL_TO_INT_CEIL(maxY / MAP_XY_FACTOR + border), height - 1);
+
+			for (Int y=bottom; y<=top; y++)
+			{
+				UnsignedInt *row = (UnsignedInt *)(bits + y * pitch);
+				for (Int x=left; x<=right; x++)
+				{
+					ICoord3D point;
+					point.x = REAL_TO_INT(((Real)x - border) * MAP_XY_FACTOR);
+					point.y = REAL_TO_INT(((Real)y - border) * MAP_XY_FACTOR);
+					point.z = REAL_TO_INT(level);
+					// Where polygons overlap, the higher water wins.
+					if (pTrig->pointInTrigger(point) && (row[x] == 0 || ((row[x] >> 8) & 0xffff) < value))
+					{
+						row[x] = 0xff000000 | (value << 8);
+					}
+				}
+			}
+		}
+		surface->Unlock();
+	}
+	REF_PTR_RELEASE(surface);
+
+	m_waterMaskSignature = signature;
+	m_waterMaskMap = map;
+#endif
+}
+
+void WaterRenderObjClass::drawRadialWater(Real planeZ)
+{
+#if defined(BUILD_WITH_D3D9)
+	if (m_radialVertices == nullptr && !buildRadialGrid())
+	{
+		return;
+	}
+
+	Matrix3D tm(1);
+	DX8Wrapper::Set_Transform(D3DTS_WORLD, tm);
+	DX8Wrapper::Set_Index_Buffer(m_radialIndices, 0);
+	DX8Wrapper::Set_Vertex_Buffer(m_radialVertices);
+
+	m_drawingRadial = TRUE;
+	m_radialPlaneZ = planeZ;
+	setupShaderWater(FALSE);
+
+	DWORD cull;
+	DX8Wrapper::_Get_D3D_Device8()->GetRenderState(D3DRS_CULLMODE, &cull);
+	DX8Wrapper::_Get_D3D_Device8()->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+	DX8Wrapper::Draw_Triangles(0, m_radialTriangleCount, 0, m_radialVertexCount);
+	cleanupShaderWater();
+	DX8Wrapper::_Get_D3D_Device8()->SetRenderState(D3DRS_CULLMODE, cull);
+	m_drawingRadial = FALSE;
+#else
+	(void)planeZ;
 #endif
 }
 
@@ -1550,6 +1822,18 @@ WaterRenderObjClass::WaterRenderObjClass()
 	m_reflectionSource=nullptr;
 	m_reflectionFrame=0;
 	m_reflectionPlaneZ=0.0f;
+	m_radialVertices=nullptr;
+	m_radialIndices=nullptr;
+	m_radialVertexCount=0;
+	m_radialTriangleCount=0;
+	m_shaderWaterRadialVertexShader=0;
+	m_shaderWaterRadialPixelShader[0]=0;
+	m_shaderWaterRadialPixelShader[1]=0;
+	m_waterMaskTexture=nullptr;
+	m_waterMaskSignature=0;
+	m_waterMaskMap=nullptr;
+	m_drawingRadial=FALSE;
+	m_radialPlaneZ=0.0f;
 	m_shaderWaterSwellVertexShader=0;
 	m_shaderWaterSwellActive=FALSE;
 	m_swellTexture=nullptr;
@@ -2025,15 +2309,27 @@ void WaterRenderObjClass::ReleaseResources()
 		if (m_shaderWaterSwellPixelShader[i])
 			DX8_DELETE_PIXEL_SHADER(m_pDev, m_shaderWaterSwellPixelShader[i]);
 
+		if (m_shaderWaterRadialPixelShader[i])
+			DX8_DELETE_PIXEL_SHADER(m_pDev, m_shaderWaterRadialPixelShader[i]);
+
 		m_shaderWaterPixelShader[i]=0;
 		m_shaderRiverPixelShader[i]=0;
 		m_shaderWaterSwellPixelShader[i]=0;
+		m_shaderWaterRadialPixelShader[i]=0;
 	}
 
 	if (m_shaderWaterSwellVertexShader)
 		DX8_DELETE_VERTEX_SHADER(m_pDev, m_shaderWaterSwellVertexShader);
 
+	if (m_shaderWaterRadialVertexShader)
+		DX8_DELETE_VERTEX_SHADER(m_pDev, m_shaderWaterRadialVertexShader);
+
 	m_shaderWaterSwellVertexShader=0;
+	m_shaderWaterRadialVertexShader=0;
+	REF_PTR_RELEASE(m_radialVertices);
+	REF_PTR_RELEASE(m_radialIndices);
+	REF_PTR_RELEASE(m_waterMaskTexture);
+	m_waterMaskMap=nullptr;
 	REF_PTR_RELEASE(m_swellTexture);
 	m_swellSource=nullptr;
 	SAFE_RELEASE(m_refractionTexture);
@@ -2158,6 +2454,15 @@ void WaterRenderObjClass::ReAcquireResources()
 				{
 					if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(swellFiles[i], nullptr, 0, false, &m_shaderWaterSwellPixelShader[i])))
 						m_shaderWaterSwellPixelShader[i] = 0;
+				}
+
+				if (FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\shaderwaterradial.vso", swellDeclaration, 0, true, &m_shaderWaterRadialVertexShader)))
+					m_shaderWaterRadialVertexShader = 0;
+				const char *radialFiles[2] = { "shaders\\shaderwaterradial.pso", "shaders\\shaderwaterradialpacked.pso" };
+				for (Int i=0; i<2; i++)
+				{
+					if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(radialFiles[i], nullptr, 0, false, &m_shaderWaterRadialPixelShader[i])))
+						m_shaderWaterRadialPixelShader[i] = 0;
 				}
 			}
 		}
@@ -3215,6 +3520,20 @@ void WaterRenderObjClass::renderWater()
 		m_shaderWaterSwellPixelShader[0] != 0 && m_shaderWaterSwellPixelShader[1] != 0 && TheWaterTransparency->m_shaderWaterSwellHeight > 0.0f;
 #endif
 
+	// Flat standing water is gathered by level and drawn afterwards on the polar grid.
+	Bool radial = FALSE;
+	Real radialLevels[RADIAL_LEVEL_COUNT];
+	Int radialLevelCount = 0;
+#if defined(BUILD_WITH_D3D9)
+	if (m_shaderWaterSwellActive && ShaderWaterMode >= 3 && m_shaderWaterRadialVertexShader != 0 &&
+		m_shaderWaterRadialPixelShader[0] != 0 && m_shaderWaterRadialPixelShader[1] != 0 && m_renderCamera != nullptr)
+	{
+		updateHeightTexture();
+		updateWaterMask();
+		radial = m_waterMaskTexture != nullptr;
+	}
+#endif
+
 	for (PolygonTrigger *pTrig=PolygonTrigger::getFirstPolygonTrigger(); pTrig; pTrig = pTrig->getNext()) {
 		if (pTrig->isWaterArea()) {
 			if (pTrig->getNumPoints()>2) {
@@ -3235,6 +3554,24 @@ void WaterRenderObjClass::renderWater()
 				if (pTrig->isRiver()) {
 					drawRiverWater(pTrig);
 					continue;
+				}
+				Real level;
+				if (radial && m_shaderWaterActive && Get_Flat_Water_Level(pTrig, level))
+				{
+					Int match = 0;
+					while (match < radialLevelCount && fabs(radialLevels[match] - level) > 0.5f)
+					{
+						match++;
+					}
+					if (match < radialLevelCount)
+					{
+						continue;
+					}
+					if (radialLevelCount < RADIAL_LEVEL_COUNT)
+					{
+						radialLevels[radialLevelCount++] = level;
+						continue;
+					}
 				}
 				Int k;
 				for (k=1; k<pTrig->getNumPoints()-1; k=k+2) {
@@ -3267,6 +3604,11 @@ void WaterRenderObjClass::renderWater()
 				}
 			}
 		}
+	}
+
+	for (Int i=0; i<radialLevelCount && m_shaderWaterActive; i++)
+	{
+		drawRadialWater(radialLevels[i]);
 	}
 
 	m_shaderWaterActive = FALSE;
@@ -4267,6 +4609,61 @@ void WaterRenderObjClass::setupFlatWaterShader()
 	}
 }
 
+// The standing water colour, from StandingWaterColor or else the map's lighting.
+Int WaterRenderObjClass::standingWaterDiffuse() const
+{
+	Real shadeR=TheWaterTransparency->m_standingWaterColor.red;
+	Real shadeG=TheWaterTransparency->m_standingWaterColor.green;
+	Real shadeB=TheWaterTransparency->m_standingWaterColor.blue;
+
+	//If the water color is not overridden, use legacy lighting code.
+	if ( shadeR==1.0f && shadeG==1.0f && shadeB==1.0f)
+	{
+		shadeR = TheGlobalData->m_terrainAmbient[0].red;
+		shadeG = TheGlobalData->m_terrainAmbient[0].green;
+		shadeB = TheGlobalData->m_terrainAmbient[0].blue;
+
+		//Add in diffuse lighting from each terrain light
+		for (Int lightIndex=0; lightIndex < TheGlobalData->m_numGlobalLights; lightIndex++)
+		{
+			if (-TheGlobalData->m_terrainLightPos[lightIndex].z > 0)
+			{	shadeR += -TheGlobalData->m_terrainLightPos[lightIndex].z * TheGlobalData->m_terrainDiffuse[lightIndex].red;
+				shadeG += -TheGlobalData->m_terrainLightPos[lightIndex].z * TheGlobalData->m_terrainDiffuse[lightIndex].green;
+				shadeB += -TheGlobalData->m_terrainLightPos[lightIndex].z * TheGlobalData->m_terrainDiffuse[lightIndex].blue;
+			}
+		}
+
+		//Get water material colors
+		Real waterShadeR = (m_settings[m_tod].waterDiffuse & 0xff) / 255.0f;
+		Real waterShadeG = ((m_settings[m_tod].waterDiffuse >> 8) & 0xff) / 255.0f;
+		Real waterShadeB = ((m_settings[m_tod].waterDiffuse >> 16) & 0xff) / 255.0f;
+
+		shadeR=shadeR*waterShadeR*255.0f;
+		shadeG=shadeG*waterShadeG*255.0f;
+		shadeB=shadeB*waterShadeB*255.0f;
+	}
+	else
+	{
+		shadeR=shadeR*255.0f;
+		shadeG=shadeG*255.0f;
+		shadeB=shadeB*255.0f;
+
+		if (shadeR == 0 && shadeG == 0 && shadeB == 0)
+		{	//special case where we disable lighting
+			shadeR=255;
+			shadeG=255;
+			shadeB=255;
+		}
+	}
+
+	Int diffuse=REAL_TO_INT(shadeB) | (REAL_TO_INT(shadeG) << 8) | (REAL_TO_INT(shadeR) << 16);
+
+	//Keep diffuse from lighting calculations but substitute custom alpha
+	diffuse |= m_settings[m_tod].waterDiffuse & 0xff000000;	//copy alpha/opacity from ini setting
+
+	return diffuse;
+}
+
 //-------------------------------------------------------------------------------------------------
 //Draw a 4 sided flat water area.
 //-------------------------------------------------------------------------------------------------
@@ -4324,54 +4721,7 @@ void WaterRenderObjClass::drawTrapezoidWater(Vector3 points[4])
 	}
 
 	Real	waterFactor=150;
-	Real shadeR=TheWaterTransparency->m_standingWaterColor.red;
-	Real shadeG=TheWaterTransparency->m_standingWaterColor.green;
-	Real shadeB=TheWaterTransparency->m_standingWaterColor.blue;
-
-	//If the water color is not overridden, use legacy lighting code.
-	if ( shadeR==1.0f && shadeG==1.0f && shadeB==1.0f)
-	{
-		shadeR = TheGlobalData->m_terrainAmbient[0].red;
-		shadeG = TheGlobalData->m_terrainAmbient[0].green;
-		shadeB = TheGlobalData->m_terrainAmbient[0].blue;
-
-		//Add in diffuse lighting from each terrain light
-		for (Int lightIndex=0; lightIndex < TheGlobalData->m_numGlobalLights; lightIndex++)
-		{
-			if (-TheGlobalData->m_terrainLightPos[lightIndex].z > 0)
-			{	shadeR += -TheGlobalData->m_terrainLightPos[lightIndex].z * TheGlobalData->m_terrainDiffuse[lightIndex].red;
-				shadeG += -TheGlobalData->m_terrainLightPos[lightIndex].z * TheGlobalData->m_terrainDiffuse[lightIndex].green;
-				shadeB += -TheGlobalData->m_terrainLightPos[lightIndex].z * TheGlobalData->m_terrainDiffuse[lightIndex].blue;
-			}
-		}
-
-		//Get water material colors
-		Real waterShadeR = (m_settings[m_tod].waterDiffuse & 0xff) / 255.0f;
-		Real waterShadeG = ((m_settings[m_tod].waterDiffuse >> 8) & 0xff) / 255.0f;
-		Real waterShadeB = ((m_settings[m_tod].waterDiffuse >> 16) & 0xff) / 255.0f;
-
-		shadeR=shadeR*waterShadeR*255.0f;
-		shadeG=shadeG*waterShadeG*255.0f;
-		shadeB=shadeB*waterShadeB*255.0f;
-	}
-	else
-	{
-		shadeR=shadeR*255.0f;
-		shadeG=shadeG*255.0f;
-		shadeB=shadeB*255.0f;
-
-		if (shadeR == 0 && shadeG == 0 && shadeB == 0)
-		{	//special case where we disable lighting
-			shadeR=255;
-			shadeG=255;
-			shadeB=255;
-		}
-	}
-
-	Int diffuse=REAL_TO_INT(shadeB) | (REAL_TO_INT(shadeG) << 8) | (REAL_TO_INT(shadeR) << 16);
-
-	//Keep diffuse from lighting calculations but substitute custom alpha
-	diffuse |= m_settings[m_tod].waterDiffuse & 0xff000000;	//copy alpha/opacity from ini setting
+	const Int diffuse = standingWaterDiffuse();
 
 	DynamicVBAccessClass vb_access(BUFFER_TYPE_DYNAMIC_DX8,dynamic_fvf_type,(rectangleCount+1)*2);
 

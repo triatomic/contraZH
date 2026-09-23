@@ -13,6 +13,7 @@
 //
 // PACKED picks the shadow map's depth format. SWELL picks the ps_3_0 build that follows
 // shaderwaterswell.hlsl, whose vertex waves tilt the normal and raise foam on their crests.
+// RADIAL adds the water mask for its camera-centred grid, which spans every lake at one level.
 // RIVER picks the river build. It fades to the untouched scene by the river texture's
 // alpha and its edge texture, and one wave layer follows the flow.
 
@@ -30,6 +31,9 @@ sampler2D SkySouth      : register(s10);
 sampler2D SkyWest       : register(s11);
 sampler2D SkyTop        : register(s12);
 sampler2D Reflection    : register(s13);   // mirrored scene at half size, alpha 1 where anything drew
+#if RADIAL
+sampler2D WaterMask     : register(s14);   // standing water's coverage in alpha, its level at 1/16 unit in red and green times coverage
+#endif
 
 // c0 and c4 belong to shadowreceive.hlsli.
 float4 ScreenU       : register(c1);   // world to scene-copy texcoords, before the divide by ScreenW
@@ -50,6 +54,9 @@ float4 ShadowZ       : register(c16);
 float4 ShadowW       : register(c17);
 float4 Planar        : register(c18);  // x = mirror plane height, y = 1 / fade distance, z = distortion, w = 1 when mirrored
 float4 PlanarMap     : register(c19);  // xy = texel centre shift from the scene copy, z = height tolerance, w = added reflection
+#if RADIAL
+float4 RadialPlane   : register(c20);  // x = water level of this draw
+#endif
 
 #include "shadowreceive.hlsli"
 
@@ -94,9 +101,18 @@ float4 main(PsIn input) : COLOR
     float3 world = input.WorldPos;
     float4 worldPoint = float4(world, 1.0f);
     float time = Camera.w;
+    float2 mapUV = world.xy * HeightMapping.xy + HeightMapping.zw;
+
+#if RADIAL
+    // Dividing by coverage undoes the premultiply, so filtering blends only covered levels.
+    float4 mask = tex2D(WaterMask, mapUV);
+    float maskLevel = dot(mask.rg, float2(255.0f * 256.0f / 16.0f, 255.0f / 16.0f)) / max(mask.a, 0.001f);
+    clip(mask.a - 0.5f);
+    clip(0.5f - abs(maskLevel - RadialPlane.x));
+#endif
 
     // The height texture holds each terrain height as a high and a low byte.
-    float2 heightBytes = tex2D(HeightTexture, world.xy * HeightMapping.xy + HeightMapping.zw).rg;
+    float2 heightBytes = tex2D(HeightTexture, mapUV).rg;
     float depth = max(world.z - dot(heightBytes, HeightDecode.xy), 0.0f);
 
     float2 waveUV = world.xy * HeightDecode.z;

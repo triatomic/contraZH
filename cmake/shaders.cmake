@@ -118,5 +118,8 @@ rts_add_shader("${RTS_SHADER_DIR}/shaderwater.hlsl"    ps_2_a main shaderriverpa
 rts_add_shader("${RTS_SHADER_DIR}/shaderwaterswell.hlsl" vs_3_0 main shaderwaterswell.vso)
 rts_add_shader("${RTS_SHADER_DIR}/shaderwater.hlsl"    ps_3_0 main shaderwaterswell.pso         RIVER=0 SWELL=1 PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/shaderwater.hlsl"    ps_3_0 main shaderwaterswellpacked.pso   RIVER=0 SWELL=1 PACKED=1)
+rts_add_shader("${RTS_SHADER_DIR}/shaderwaterswell.hlsl" vs_3_0 main shaderwaterradial.vso RADIAL=1)
+rts_add_shader("${RTS_SHADER_DIR}/shaderwater.hlsl"    ps_3_0 main shaderwaterradial.pso        RIVER=0 SWELL=1 RADIAL=1 PACKED=0)
+rts_add_shader("${RTS_SHADER_DIR}/shaderwater.hlsl"    ps_3_0 main shaderwaterradialpacked.pso  RIVER=0 SWELL=1 RADIAL=1 PACKED=1)
 
 add_custom_target(rts_shaders ALL DEPENDS ${RTS_SHADER_OUTPUTS})

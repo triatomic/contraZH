@@ -462,9 +462,14 @@ smear into the waves.
 * The swell heights come from `TWWater01_hgt.dds` beside the water texture when one exists
 (greyscale DXT with mipmaps, mid grey is the resting level), otherwise from the built-in waves.
 The height is read from alpha in a DXT5 file whose alpha varies, and from green otherwise. Rivers stay flat.
+* The vertex waves ride a round grid centred under the camera, fine close by and coarser towards
+the horizon, so the swell stays smooth at any zoom. It covers every flat lake and sea at a level,
+cut to their outlines per map cell. Standing water whose points differ in height by more than a
+unit keeps its own grid.
 * `scripts/water_maps.py` builds both textures from any image (needs Python with numpy and Pillow).
 * The `CONTRA_WATER` environment variable picks the water: `0` the old water, `1` shader water
-without vertex waves, `2` (the default) with them.
+without vertex waves, `2` with them on each water area's own grid, `3` (the default) on the round
+grid.
 
 ### Hardware instancing
 
