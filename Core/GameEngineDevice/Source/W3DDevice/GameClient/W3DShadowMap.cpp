@@ -244,6 +244,63 @@ static Vector3 Ray_At_Height(const Vector3& nearPoint, const Vector3& farPoint, 
 	return nearPoint + (farPoint - nearPoint) * t;
 }
 
+// Centre for a footprint wider than the map can cover, as when the camera tilts toward the
+// horizon. The half of the points nearest the camera stay inside the circle, and the
+// centre reaches from them toward the full fit as far as that allows.
+static Vector3 Fit_Near_Ground(const Vector3 *points, Int count, const Vector3& eye,
+	const Vector3& fullCenter, Real radius)
+{
+	Real distances[8];
+	for (Int i = 0; i < count; ++i)
+	{
+		distances[i] = (points[i] - eye).Length2();
+	}
+
+	const Int nearCount = count / 2;
+	Vector3 nearPoints[4];
+	for (Int n = 0; n < nearCount; ++n)
+	{
+		Int closest = -1;
+		for (Int i = 0; i < count; ++i)
+		{
+			if (distances[i] >= 0.0f && (closest < 0 || distances[i] < distances[closest]))
+			{
+				closest = i;
+			}
+		}
+		nearPoints[n] = points[closest];
+		distances[closest] = -1.0f;
+	}
+
+	Vector3 nearCenter(0.0f, 0.0f, 0.0f);
+	for (Int n = 0; n < nearCount; ++n)
+	{
+		nearCenter += nearPoints[n];
+	}
+	nearCenter /= (Real)nearCount;
+
+	Real nearRadius = 0.0f;
+	for (Int n = 0; n < nearCount; ++n)
+	{
+		const Real distance = (nearPoints[n] - nearCenter).Length();
+		if (distance > nearRadius)
+		{
+			nearRadius = distance;
+		}
+	}
+
+	Vector3 forward = fullCenter - nearCenter;
+	const Real forwardLength = forward.Length();
+	const Real reach = radius - nearRadius;
+	if (forwardLength <= WWMATH_EPSILON || reach <= 0.0f)
+	{
+		return nearCenter;
+	}
+
+	forward /= forwardLength;
+	return nearCenter + forward * WWMath::Min(reach, forwardLength);
+}
+
 void W3DShadowMap::updateFrustum(const CameraClass& camera, const Vector3& lightPosWorld, Real minSunElevation)
 {
 	// The light is stored as a point pushed far along the sun ray, so the direction
@@ -315,7 +372,11 @@ void W3DShadowMap::updateFrustum(const CameraClass& camera, const Vector3& light
 	// Quantise so a small zoom leaves the extent alone.
 	radius = WWMath::Ceil(radius / SHADOW_RADIUS_STEP) * SHADOW_RADIUS_STEP;
 	if (radius < SHADOW_RADIUS_MIN) radius = SHADOW_RADIUS_MIN;
-	if (radius > SHADOW_RADIUS_MAX) radius = SHADOW_RADIUS_MAX;
+	if (radius > SHADOW_RADIUS_MAX)
+	{
+		radius = SHADOW_RADIUS_MAX;
+		center = Fit_Near_Ground(groundPoints, pointCount, camera.Get_Position(), center, radius);
+	}
 	m_fittedRadius = radius;
 	m_fittedCenter = center;
 	m_lightDirection = lightDirection;
