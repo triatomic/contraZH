@@ -2655,7 +2655,9 @@ Int TerrainShaderPixelShader::shutdown()
 		for (Int i=0; i<3; i++)
 		{
 			if (m_dwBumpPixelShader[s][i])
+			{
 				DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_dwBumpPixelShader[s][i]);
+			}
 			m_dwBumpPixelShader[s][i]=0;
 		}
 	}
@@ -2715,14 +2717,20 @@ Bool TerrainShaderPixelShader::setShadowReceiver(Int noiseCount)
 void TerrainShaderPixelShader::initBump()
 {
 	for (Int s=0; s<2; s++)
+	{
 		for (Int i=0; i<3; i++)
+		{
 			m_dwBumpPixelShader[s][i]=0;
+		}
+	}
 	m_bumpStage = -1;
 
 #if defined(BUILD_WITH_D3D9)
 	const DX8Caps *caps = DX8Wrapper::Get_Current_Caps();
 	if (caps == nullptr || !Supports_Pixel_Shader_2_a(caps))
+	{
 		return;
+	}
 
 	const char *unshadowedFiles[3] =
 	{
@@ -2742,9 +2750,13 @@ void TerrainShaderPixelShader::initBump()
 	for (Int i=0; i<3; i++)
 	{
 		if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(unshadowedFiles[i], nullptr, 0, false, &m_dwBumpPixelShader[0][i])))
+		{
 			m_dwBumpPixelShader[0][i]=0;
+		}
 		if (shadowMap && FAILED(W3DShaderManager::LoadAndCreateD3DShader(shadowedFiles[i][packed ? 1 : 0], nullptr, 0, false, &m_dwBumpPixelShader[1][i])))
+		{
 			m_dwBumpPixelShader[1][i]=0;
+		}
 	}
 #endif
 }
@@ -2755,7 +2767,9 @@ Bool TerrainShaderPixelShader::setBump(Int noiseCount, Bool shadowed)
 	TextureClass *normalAtlas = W3DShaderManager::getShaderTexture(W3DShaderManager::TERRAIN_NORMAL_TEXTURE);
 	const DWORD shader = m_dwBumpPixelShader[shadowed ? 1 : 0][noiseCount];
 	if (!TerrainBumpEnabled || shader == 0 || normalAtlas == nullptr || normalAtlas->Peek_D3D_Texture() == nullptr)
+	{
 		return FALSE;
+	}
 
 	// World position is camera space taken back through the view, because the terrain has no world transform.
 	const Int stage = 2 + noiseCount + (shadowed ? 1 : 0);
@@ -4085,6 +4099,12 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 					if (SUCCEEDED(hr))
 					{
 						*pHandle = Register_D3D9_Vertex_Shader(vertex_shader, declaration);
+						if (*pHandle == 0)
+						{
+							vertex_shader->Release();
+							declaration->Release();
+							hr = E_OUTOFMEMORY;
+						}
 					}
 					else
 					{
@@ -4099,6 +4119,11 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 				if (SUCCEEDED(hr))
 				{
 					*pHandle = Register_D3D9_Pixel_Shader(pixel_shader);
+					if (*pHandle == 0)
+					{
+						pixel_shader->Release();
+						hr = E_OUTOFMEMORY;
+					}
 				}
 			}
 #else

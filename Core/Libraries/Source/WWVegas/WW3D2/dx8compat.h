@@ -65,18 +65,22 @@ typedef IDirect3DIndexBuffer9*  LPDIRECT3DINDEXBUFFER8;
 #define D3DRS_PATCHSEGMENTS             ((D3DRENDERSTATETYPE)164)
 #define D3DRS_SOFTWAREVERTEXPROCESSING  ((D3DRENDERSTATETYPE)153)
 
-// D3D9 moved these from the texture stage to the sampler; the values are kept so
-// existing call sites compile, and the wrapper routes them to SetSamplerState.
-#define D3DTSS_ADDRESSU      ((D3DTEXTURESTAGESTATETYPE)13)
-#define D3DTSS_ADDRESSV      ((D3DTEXTURESTAGESTATETYPE)14)
-#define D3DTSS_ADDRESSW      ((D3DTEXTURESTAGESTATETYPE)25)
-#define D3DTSS_BORDERCOLOR   ((D3DTEXTURESTAGESTATETYPE)15)
-#define D3DTSS_MAGFILTER     ((D3DTEXTURESTAGESTATETYPE)16)
-#define D3DTSS_MINFILTER     ((D3DTEXTURESTAGESTATETYPE)17)
-#define D3DTSS_MIPFILTER     ((D3DTEXTURESTAGESTATETYPE)18)
-#define D3DTSS_MIPMAPLODBIAS ((D3DTEXTURESTAGESTATETYPE)19)
-#define D3DTSS_MAXMIPLEVEL   ((D3DTEXTURESTAGESTATETYPE)20)
-#define D3DTSS_MAXANISOTROPY ((D3DTEXTURESTAGESTATETYPE)21)
+// D3D9 moved these from the texture stage to the sampler. They keep their D3D8 values
+// but not the D3D9 enum type, so a direct device call fails to compile and only
+// DX8Wrapper::Set_DX8_Texture_Stage_State, which routes them to SetSamplerState, takes them.
+enum D3D8SamplerStageState
+{
+	D3DTSS_ADDRESSU      = 13,
+	D3DTSS_ADDRESSV      = 14,
+	D3DTSS_ADDRESSW      = 25,
+	D3DTSS_BORDERCOLOR   = 15,
+	D3DTSS_MAGFILTER     = 16,
+	D3DTSS_MINFILTER     = 17,
+	D3DTSS_MIPFILTER     = 18,
+	D3DTSS_MIPMAPLODBIAS = 19,
+	D3DTSS_MAXMIPLEVEL   = 20,
+	D3DTSS_MAXANISOTROPY = 21
+};
 
 // D3D9 dropped the cubic filter modes. No hardware ever exposed them, so these
 // survive only to keep the debug name table compiling and to let the wrapper

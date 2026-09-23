@@ -45,6 +45,7 @@
 #include "vertmaterial.h"
 #include "texture.h"
 #include "dx8compat.h"
+#include "formconv.h"
 #include "statistics.h"
 #include <WWDebug/wwprofile.h>
 #include <algorithm>
@@ -247,18 +248,8 @@ void SortingRendererClass::Insert_Triangles(
 		const D3DMATRIX& view=state->sorting_state.view;
 		const Vector3& center=bounding_sphere.Center;
 
-		float world_view[4][4];
-		for (int row=0; row<4; ++row)
-		{
-			for (int col=0; col<4; ++col)
-			{
-				world_view[row][col]=
-					world.m[row][0]*view.m[0][col]+
-					world.m[row][1]*view.m[1][col]+
-					world.m[row][2]*view.m[2][col]+
-					world.m[row][3]*view.m[3][col];
-			}
-		}
+		const D3DMATRIX product=world*view;
+		const float (&world_view)[4][4]=product.m;
 
 		state->transformed_center=Vector3(
 			center.X*world_view[0][0]+center.Y*world_view[1][0]+center.Z*world_view[2][0]+world_view[3][0],
@@ -468,18 +459,8 @@ void SortingRendererClass::Flush_Sorting_Pool()
 			// view depth. Both operands are D3DMATRIX, so this stays row-major.
 			const D3DMATRIX& world=state->sorting_state.world;
 			const D3DMATRIX& view=state->sorting_state.view;
-			float mtx[4][4];
-			for (int row=0; row<4; ++row)
-			{
-				for (int col=0; col<4; ++col)
-				{
-					mtx[row][col]=
-						world.m[row][0]*view.m[0][col]+
-						world.m[row][1]*view.m[1][col]+
-						world.m[row][2]*view.m[2][col]+
-						world.m[row][3]*view.m[3][col];
-				}
-			}
+			const D3DMATRIX product=world*view;
+			const float (&mtx)[4][4]=product.m;
 
 			unsigned short* indices=nullptr;
 			SortingIndexBufferClass* index_buffer=static_cast<SortingIndexBufferClass*>(state->sorting_state.index_buffer);

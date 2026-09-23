@@ -347,6 +347,15 @@ public:
 	static void Set_DX8_Clip_Plane(DWORD Index, CONST float* pPlane);
 	static void Set_DX8_Texture_Stage_State(unsigned stage, D3DTEXTURESTAGESTATETYPE state, unsigned value);
 #if defined(BUILD_WITH_D3D9)
+	// The moved sampler states have their own type, so only the wrapper accepts them
+	static void Set_DX8_Texture_Stage_State(unsigned stage, D3D8SamplerStageState state, unsigned value)
+	{
+		Set_DX8_Texture_Stage_State(stage, (D3DTEXTURESTAGESTATETYPE)state, value);
+	}
+	// Forces the next shader set to reach the device when a released handle was cached
+	static void Forget_Shader_Handle(DWORD handle);
+#endif
+#if defined(BUILD_WITH_D3D9)
 	// Remaps the states D3D9 renamed, moved to the sampler, or dropped, so the
 	// call sites keep using the D3D8 names.
 	static void Set_D3D9_Render_State(D3DRENDERSTATETYPE state, unsigned value);
@@ -449,7 +458,7 @@ public:
 	static IDirect3DSurface8 * _Get_DX8_Front_Buffer();
 	static SurfaceClass * _Get_DX8_Back_Buffer(unsigned int num=0);
 
-	static void _Copy_DX8_Rects(
+	static HRESULT _Copy_DX8_Rects(
 			IDirect3DSurface8* pSourceSurface,
 			CONST RECT* pSourceRectsArray,
 			UINT cRects,
@@ -1110,7 +1119,7 @@ WWINLINE HRESULT DX8Wrapper::Set_DX8_Render_Target_Surfaces(IDirect3DSurface8* r
 }
 
 #if !defined(BUILD_WITH_D3D9)
-WWINLINE void DX8Wrapper::_Copy_DX8_Rects(
+WWINLINE HRESULT DX8Wrapper::_Copy_DX8_Rects(
   IDirect3DSurface8* pSourceSurface,
   CONST RECT* pSourceRectsArray,
   UINT cRects,
@@ -1118,12 +1127,14 @@ WWINLINE void DX8Wrapper::_Copy_DX8_Rects(
   CONST POINT* pDestPointsArray
 )
 {
-	DX8CALL(CopyRects(
+	HRESULT hr;
+	DX8CALL_HRES(CopyRects(
   pSourceSurface,
   pSourceRectsArray,
   cRects,
   pDestinationSurface,
-  pDestPointsArray));
+  pDestPointsArray), hr);
+	return hr;
 }
 #endif
 

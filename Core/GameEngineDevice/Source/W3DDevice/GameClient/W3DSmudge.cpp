@@ -171,8 +171,8 @@ Int copyRect(unsigned char *buf, Int bufSize, int oX, int oY, int width, int hei
 	if (hr != S_OK)
 		goto error;
 
-	// Logs its own failures and cannot report one back
-	DX8Wrapper::_Copy_DX8_Rects(surface,&srcRect,1,tempSurface,&dstPoint);
+	if (FAILED(DX8Wrapper::_Copy_DX8_Rects(surface,&srcRect,1,tempSurface,&dstPoint)))
+		goto error;
 
  	D3DLOCKED_RECT lrect;
 

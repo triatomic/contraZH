@@ -516,6 +516,153 @@ HRESULT Filter_Texture_Mipmaps(IDirect3DTexture8* texture)
 	return D3D_OK;
 }
 
+static unsigned Expand_565(unsigned color)
+{
+	const unsigned r=(color>>11)&31;
+	const unsigned g=(color>>5)&63;
+	const unsigned b=color&31;
+	return (((r<<3)|(r>>2))<<16) | (((g<<2)|(g>>4))<<8) | ((b<<3)|(b>>2));
+}
+
+// Decodes one 4x4 DXT block into A8R8G8B8 texels in row order
+static void Decode_DXT_Block(const unsigned char* block, WW3DFormat format, unsigned argb[16])
+{
+	unsigned alpha[16];
+	const unsigned char* color_block=block;
+	if (format==WW3D_FORMAT_DXT2 || format==WW3D_FORMAT_DXT3)
+	{
+		for (unsigned i=0; i<16; ++i)
+		{
+			const unsigned nibble=(block[i/2]>>((i&1)*4))&15;
+			alpha[i]=nibble*17;
+		}
+		color_block=block+8;
+	}
+	else if (format==WW3D_FORMAT_DXT4 || format==WW3D_FORMAT_DXT5)
+	{
+		const unsigned a0=block[0];
+		const unsigned a1=block[1];
+		unsigned table[8];
+		table[0]=a0;
+		table[1]=a1;
+		if (a0>a1)
+		{
+			for (unsigned k=2; k<8; ++k)
+			{
+				table[k]=((8-k)*a0+(k-1)*a1)/7;
+			}
+		}
+		else
+		{
+			for (unsigned k=2; k<6; ++k)
+			{
+				table[k]=((6-k)*a0+(k-1)*a1)/5;
+			}
+			table[6]=0;
+			table[7]=255;
+		}
+		for (unsigned i=0; i<16; ++i)
+		{
+			const unsigned bit=i*3;
+			const unsigned bits=(block[2+bit/8] | (bit/8+1<6 ? block[2+bit/8+1]<<8 : 0))>>(bit%8);
+			alpha[i]=table[bits&7];
+		}
+		color_block=block+8;
+	}
+	else
+	{
+		for (unsigned i=0; i<16; ++i)
+		{
+			alpha[i]=255;
+		}
+	}
+
+	const unsigned c0=color_block[0] | (color_block[1]<<8);
+	const unsigned c1=color_block[2] | (color_block[3]<<8);
+	const unsigned indices=color_block[4] | (color_block[5]<<8) | (color_block[6]<<16) | ((unsigned)color_block[7]<<24);
+
+	unsigned colors[4];
+	colors[0]=Expand_565(c0);
+	colors[1]=Expand_565(c1);
+	bool transparent=false;
+	if (c0>c1 || format!=WW3D_FORMAT_DXT1)
+	{
+		for (unsigned k=1; k<3; ++k)
+		{
+			unsigned mixed=0;
+			for (unsigned shift=0; shift<24; shift+=8)
+			{
+				const unsigned a=(colors[0]>>shift)&255;
+				const unsigned b=(colors[1]>>shift)&255;
+				mixed|=(((3-k)*a+k*b)/3)<<shift;
+			}
+			colors[1+k]=mixed;
+		}
+	}
+	else
+	{
+		unsigned mixed=0;
+		for (unsigned shift=0; shift<24; shift+=8)
+		{
+			mixed|=((((colors[0]>>shift)&255)+((colors[1]>>shift)&255))/2)<<shift;
+		}
+		colors[2]=mixed;
+		colors[3]=0;
+		transparent=true;
+	}
+
+	for (unsigned i=0; i<16; ++i)
+	{
+		const unsigned index=(indices>>(i*2))&3;
+		const unsigned a=(transparent && index==3) ? 0 : alpha[i];
+		argb[i]=(a<<24) | colors[index];
+	}
+}
+
+// Reads a rect of any readable or DXT surface as A8R8G8B8 texels, width*height of them
+static HRESULT Read_Surface_A8R8G8B8(IDirect3DSurface8* surface, const D3DSURFACE_DESC& desc, WW3DFormat format,
+	const RECT& rect, unsigned* out)
+{
+	const unsigned width=rect.right-rect.left;
+	const unsigned height=rect.bottom-rect.top;
+	const bool compressed=(format>=WW3D_FORMAT_DXT1 && format<=WW3D_FORMAT_DXT5);
+
+	D3DLOCKED_RECT locked;
+	HRESULT hr=surface->LockRect(&locked, compressed ? nullptr : &rect, D3DLOCK_READONLY);
+	if (FAILED(hr))
+	{
+		return hr;
+	}
+
+	if (compressed)
+	{
+		const unsigned block_bytes=(format==WW3D_FORMAT_DXT1) ? 8 : 16;
+		unsigned texels[16];
+		for (unsigned y=0; y<height; ++y)
+		{
+			for (unsigned x=0; x<width; ++x)
+			{
+				const unsigned sx=rect.left+x;
+				const unsigned sy=rect.top+y;
+				if ((sx&3)==0 || x==0)
+				{
+					const unsigned char* block=(const unsigned char*)locked.pBits+(sy/4)*locked.Pitch+(sx/4)*block_bytes;
+					Decode_DXT_Block(block, format, texels);
+				}
+				out[y*width+x]=texels[(sy&3)*4+(sx&3)];
+			}
+		}
+	}
+	else
+	{
+		BitmapHandlerClass::Copy_Image((unsigned char*)out, width, height, width*4, WW3D_FORMAT_A8R8G8B8,
+			(unsigned char*)locked.pBits, width, height, locked.Pitch, format, nullptr, 0, false);
+	}
+
+	surface->UnlockRect();
+	return D3D_OK;
+}
+
 // Stands in for D3DXLoadSurfaceFromSurface, which converted format and scaled as
 // needed. Source and destination must both be lockable.
 HRESULT Load_Surface_From_Surface(
@@ -541,6 +688,123 @@ HRESULT Load_Surface_From_Surface(
 	if (dest_format==WW3D_FORMAT_UNKNOWN || src_format==WW3D_FORMAT_UNKNOWN)
 	{
 		return D3DERR_WRONGTEXTUREFORMAT;
+	}
+
+	const bool src_compressed=(src_format>=WW3D_FORMAT_DXT1 && src_format<=WW3D_FORMAT_DXT5);
+	const bool dest_compressed=(dest_format>=WW3D_FORMAT_DXT1 && dest_format<=WW3D_FORMAT_DXT5);
+
+	RECT whole_src={ 0, 0, (LONG)src_desc.Width, (LONG)src_desc.Height };
+	RECT whole_dest={ 0, 0, (LONG)dest_desc.Width, (LONG)dest_desc.Height };
+	const RECT& src_area=src_rect ? *src_rect : whole_src;
+	const RECT& dest_area=dest_rect ? *dest_rect : whole_dest;
+	const unsigned src_area_width=src_area.right-src_area.left;
+	const unsigned src_area_height=src_area.bottom-src_area.top;
+	const unsigned dest_area_width=dest_area.right-dest_area.left;
+	const unsigned dest_area_height=dest_area.bottom-dest_area.top;
+
+	// A compressed or rescaled source is decoded to A8R8G8B8 and box filtered, as D3DX did
+	if (!dest_compressed && (src_compressed || src_area_width!=dest_area_width || src_area_height!=dest_area_height))
+	{
+		unsigned* src_texels=new unsigned[src_area_width*src_area_height];
+		HRESULT hr=Read_Surface_A8R8G8B8(src_surface, src_desc, src_format, src_area, src_texels);
+		if (FAILED(hr))
+		{
+			delete[] src_texels;
+			return hr;
+		}
+
+		unsigned* dest_texels=new unsigned[dest_area_width*dest_area_height];
+		for (unsigned y=0; y<dest_area_height; ++y)
+		{
+			const unsigned y0=y*src_area_height/dest_area_height;
+			unsigned y1=(y+1)*src_area_height/dest_area_height;
+			if (y1<=y0)
+			{
+				y1=y0+1;
+			}
+			for (unsigned x=0; x<dest_area_width; ++x)
+			{
+				const unsigned x0=x*src_area_width/dest_area_width;
+				unsigned x1=(x+1)*src_area_width/dest_area_width;
+				if (x1<=x0)
+				{
+					x1=x0+1;
+				}
+				unsigned sum[4]={ 0, 0, 0, 0 };
+				for (unsigned sy=y0; sy<y1; ++sy)
+				{
+					for (unsigned sx=x0; sx<x1; ++sx)
+					{
+						const unsigned texel=src_texels[sy*src_area_width+sx];
+						for (unsigned c=0; c<4; ++c)
+						{
+							sum[c]+=(texel>>(c*8))&255;
+						}
+					}
+				}
+				const unsigned count=(y1-y0)*(x1-x0);
+				unsigned averaged=0;
+				for (unsigned c=0; c<4; ++c)
+				{
+					averaged|=((sum[c]+count/2)/count)<<(c*8);
+				}
+				dest_texels[y*dest_area_width+x]=averaged;
+			}
+		}
+		delete[] src_texels;
+
+		D3DLOCKED_RECT locked_dest;
+		hr=dest_surface->LockRect(&locked_dest, dest_rect, 0);
+		if (SUCCEEDED(hr))
+		{
+			BitmapHandlerClass::Copy_Image((unsigned char*)locked_dest.pBits, dest_area_width, dest_area_height,
+				locked_dest.Pitch, dest_format, (unsigned char*)dest_texels, dest_area_width, dest_area_height,
+				dest_area_width*4, WW3D_FORMAT_A8R8G8B8, nullptr, 0, false);
+			dest_surface->UnlockRect();
+		}
+		delete[] dest_texels;
+		return hr;
+	}
+
+	// Compressed destinations are copied block row by block row from the same format and size
+	if (src_compressed || dest_compressed)
+	{
+		const bool src_whole=(src_rect==nullptr) || (src_rect->left==0 && src_rect->top==0 &&
+			(UINT)src_rect->right==src_desc.Width && (UINT)src_rect->bottom==src_desc.Height);
+		const bool dest_whole=(dest_rect==nullptr) || (dest_rect->left==0 && dest_rect->top==0 &&
+			(UINT)dest_rect->right==dest_desc.Width && (UINT)dest_rect->bottom==dest_desc.Height);
+		if (src_format!=dest_format || !src_whole || !dest_whole ||
+			src_desc.Width!=dest_desc.Width || src_desc.Height!=dest_desc.Height)
+		{
+			return D3DERR_WRONGTEXTUREFORMAT;
+		}
+
+		D3DLOCKED_RECT locked_src;
+		D3DLOCKED_RECT locked_dest;
+		HRESULT hr=src_surface->LockRect(&locked_src, nullptr, D3DLOCK_READONLY);
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+		hr=dest_surface->LockRect(&locked_dest, nullptr, 0);
+		if (FAILED(hr))
+		{
+			src_surface->UnlockRect();
+			return hr;
+		}
+
+		const unsigned block_bytes=(src_format==WW3D_FORMAT_DXT1) ? 8 : 16;
+		const unsigned row_bytes=((src_desc.Width+3)/4)*block_bytes;
+		const unsigned block_rows=(src_desc.Height+3)/4;
+		for (unsigned row=0; row<block_rows; ++row)
+		{
+			memcpy((unsigned char*)locked_dest.pBits+row*locked_dest.Pitch,
+				(const unsigned char*)locked_src.pBits+row*locked_src.Pitch, row_bytes);
+		}
+
+		dest_surface->UnlockRect();
+		src_surface->UnlockRect();
+		return D3D_OK;
 	}
 
 	D3DLOCKED_RECT locked_src;
@@ -605,6 +869,17 @@ static unsigned _D3D9ShaderCount=1;
 
 static DWORD Add_Shader_Entry(const D3D9ShaderEntry& entry)
 {
+	// Shaders are released and recreated on every device reset, so freed slots are reused
+	for (unsigned index=1; index<_D3D9ShaderCount; ++index)
+	{
+		const D3D9ShaderEntry& slot=_D3D9Shaders[index];
+		if (slot.VertexShader==nullptr && slot.Declaration==nullptr && slot.PixelShader==nullptr)
+		{
+			_D3D9Shaders[index]=entry;
+			return DX8_SHADER_HANDLE_TAG | (DWORD)index;
+		}
+	}
+
 	if (_D3D9ShaderCount>=MAX_D3D9_SHADERS)
 	{
 		WWASSERT(0);
@@ -651,9 +926,21 @@ void Release_D3D9_Shader(DWORD handle)
 		return;
 	}
 
-	if (entry->VertexShader) entry->VertexShader->Release();
-	if (entry->Declaration)  entry->Declaration->Release();
-	if (entry->PixelShader)  entry->PixelShader->Release();
+	if (entry->VertexShader)
+	{
+		entry->VertexShader->Release();
+	}
+	if (entry->Declaration)
+	{
+		entry->Declaration->Release();
+	}
+	if (entry->PixelShader)
+	{
+		entry->PixelShader->Release();
+	}
+
+	// The slot can be reused, so a cached copy of this handle must not match its successor
+	DX8Wrapper::Forget_Shader_Handle(handle);
 
 	entry->VertexShader=nullptr;
 	entry->Declaration=nullptr;
