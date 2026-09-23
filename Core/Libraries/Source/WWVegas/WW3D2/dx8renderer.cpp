@@ -48,6 +48,7 @@
 #include "dx8fvf.h"
 #include "dx8caps.h"
 #include "dx8rendererdebugger.h"
+#include "dx8instancing.h"
 #include "WWDebug/wwdebug.h"
 #include "WWDebug/wwprofile.h"
 #include "WWDebug/wwmemlog.h"
@@ -60,6 +61,9 @@
 #include "camera.h"
 #include "stripoptimizer.h"
 #include "meshgeometry.h"
+#include "lightenvironment.h"
+#include <algorithm>
+#include <vector>
 
 /*
 ** Global Instance of the DX8MeshRender
@@ -74,6 +78,36 @@ static DynamicVectorClass<Vector3>				_TempNormalBuffer;
 static MultiListClass<MeshModelClass>			_RegisteredMeshList;
 static TextureCategoryList							texture_category_delete_list;
 static FVFCategoryList								fvf_category_container_delete_list;
+
+// Meshes with a material pass that cannot be instanced. Its depth test of EQUAL needs the base
+// pass drawn the same way, so these meshes draw fixed function throughout.
+static std::vector<MeshClass *>					_FixedFunctionPassMeshes;
+static bool												_FixedFunctionPassMeshesSorted = true;
+
+// Base pass fragments drawn instanced in the current flush, whose material passes must be too.
+typedef std::pair<MeshClass *, DX8PolygonRendererClass *> InstancedFragment;
+static std::vector<InstancedFragment>			_InstancedFragments;
+static bool												_InstancedFragmentsSorted = true;
+
+static bool Has_Fixed_Function_Pass(MeshClass * mesh)
+{
+	if (!_FixedFunctionPassMeshesSorted)
+	{
+		std::sort(_FixedFunctionPassMeshes.begin(), _FixedFunctionPassMeshes.end());
+		_FixedFunctionPassMeshesSorted = true;
+	}
+	return std::binary_search(_FixedFunctionPassMeshes.begin(), _FixedFunctionPassMeshes.end(), mesh);
+}
+
+static bool Is_Instanced_Fragment(MeshClass * mesh, DX8PolygonRendererClass * renderer)
+{
+	if (!_InstancedFragmentsSorted)
+	{
+		std::sort(_InstancedFragments.begin(), _InstancedFragments.end());
+		_InstancedFragmentsSorted = true;
+	}
+	return std::binary_search(_InstancedFragments.begin(), _InstancedFragments.end(), InstancedFragment(mesh, renderer));
+}
 
 // helper data structure
 class PolyRemover : public MultiListObjectClass
@@ -288,6 +322,12 @@ void DX8FVFCategoryContainer::Remove_Texture_Category(DX8TextureCategoryClass* t
 
 void DX8FVFCategoryContainer::Add_Visible_Material_Pass(MaterialPassClass * pass,MeshClass * mesh)
 {
+	if (!DX8InstancingClass::Is_Instanced_Material_Pass(pass))
+	{
+		_FixedFunctionPassMeshes.push_back(mesh);
+		_FixedFunctionPassMeshesSorted = false;
+	}
+
 	MatPassTaskClass * new_mpr = new MatPassTaskClass(pass,mesh);
 
 	if (visible_matpass_head == nullptr) {
@@ -302,8 +342,183 @@ void DX8FVFCategoryContainer::Add_Visible_Material_Pass(MaterialPassClass * pass
 	AnythingToRender=true;
 }
 
+static std::vector<MatPassTaskClass *>			_MaterialPassWindow;
+
+static bool Fragment_Renderer_Less(const InstancedFragment & a, const InstancedFragment & b)
+{
+	return (a.second != b.second) ? (a.second < b.second) : (a.first < b.first);
+}
+
+// A whitelisted pass on a mesh drawn with its own transform can join a window. Anything else is
+// drawn by the mesh as before, after the window it would otherwise overtake.
+static bool Allows_Material_Pass_Window(MaterialPassClass * pass, MeshClass * mesh)
+{
+	if (!DX8InstancingClass::Is_Instanced_Material_Pass(pass) || mesh->Has_Material_Pass_Override())
+	{
+		return false;
+	}
+	if (mesh->Peek_Model()->Get_Flag(MeshModelClass::SKIN))
+	{
+		return false;
+	}
+	return pass->Get_Cull_Volume() == nullptr || !MaterialPassClass::Is_Per_Polygon_Culling_Enabled();
+}
+
+void DX8FVFCategoryContainer::Render_Instanced_Material_Passes()
+{
+	MatPassTaskClass * mpr = visible_matpass_head;
+	MatPassTaskClass * last_mpr = nullptr;
+	bool renderTasksRemaining=false;
+
+	while (mpr != nullptr) {
+		MeshClass * mesh = mpr->Peek_Mesh();
+
+		if (mesh->Get_Base_Vertex_Offset() == VERTEX_BUFFER_OVERFLOW)
+		{
+			last_mpr = mpr;
+			mpr = mpr->Get_Next_Visible();
+			renderTasksRemaining = true;
+			continue;
+		}
+
+		MatPassTaskClass * next_mpr = mpr->Get_Next_Visible();
+		if (last_mpr == nullptr) {
+			visible_matpass_head = next_mpr;
+		} else {
+			last_mpr->Set_Next_Visible(next_mpr);
+		}
+
+		if (Allows_Material_Pass_Window(mpr->Peek_Material_Pass(), mesh))
+		{
+			_MaterialPassWindow.push_back(mpr);
+		}
+		else
+		{
+			Render_Material_Pass_Window();
+			mesh->Render_Material_Pass(mpr->Peek_Material_Pass(),index_buffer);
+			delete mpr;
+		}
+		mpr = next_mpr;
+	}
+	Render_Material_Pass_Window();
+
+	visible_matpass_tail = renderTasksRemaining ? last_mpr : nullptr;
+}
+
+// Draws the window one pass at a time, in the order the passes first appear, which keeps each
+// mesh's own passes in order. A fragment whose base pass was instanced is instanced too.
+void DX8FVFCategoryContainer::Render_Material_Pass_Window()
+{
+	std::vector<MatPassTaskClass *> & window = _MaterialPassWindow;
+	if (window.empty())
+	{
+		return;
+	}
+
+	static std::vector<const MaterialPassClass *> passes;
+	static std::vector<InstancedFragment> instanced;
+	static std::vector<InstancedFragment> fixed;
+	static std::vector<MeshClass *> meshes;
+	static std::vector<DX8PolygonRendererClass *> renderers;
+	static std::vector<int> counts;
+
+	for (size_t i=0;i<window.size();++i)
+	{
+		const MaterialPassClass * pass = window[i]->Peek_Material_Pass();
+		if (std::find(passes.begin(), passes.end(), pass) == passes.end())
+		{
+			passes.push_back(pass);
+		}
+	}
+
+	for (size_t p=0;p<passes.size();++p)
+	{
+		MaterialPassClass * pass = const_cast<MaterialPassClass *>(passes[p]);
+		for (size_t i=0;i<window.size();++i)
+		{
+			if (window[i]->Peek_Material_Pass() != pass)
+			{
+				continue;
+			}
+			MeshClass * mesh = window[i]->Peek_Mesh();
+			DX8PolygonRendererListIterator it(&mesh->Peek_Model()->PolygonRendererList);
+			for (;!it.Is_Done();it.Next())
+			{
+				DX8PolygonRendererClass * renderer = it.Peek_Obj();
+				if (renderer->Get_Pass() == 0)
+				{
+					InstancedFragment fragment(mesh, renderer);
+					(Is_Instanced_Fragment(mesh, renderer) ? instanced : fixed).push_back(fragment);
+				}
+			}
+		}
+
+		pass->Install_Materials();
+		DX8Wrapper::Set_Index_Buffer(index_buffer,0);
+
+		int instanced_calls = 0;
+		if (!instanced.empty())
+		{
+			std::sort(instanced.begin(), instanced.end(), Fragment_Renderer_Less);
+			size_t start = 0;
+			for (size_t i=1;i<=instanced.size();++i)
+			{
+				if (i == instanced.size() || instanced[i].second != instanced[start].second)
+				{
+					renderers.push_back(instanced[start].second);
+					counts.push_back((int)(i - start));
+					start = i;
+				}
+				meshes.push_back(instanced[i - 1].first);
+			}
+			if (DX8InstancingClass::Draw_Material_Pass_Groups(pass, &renderers[0], &counts[0], (int)renderers.size(), &meshes[0], FVF))
+			{
+				instanced_calls = (int)renderers.size();
+			}
+			else
+			{
+				fixed.insert(fixed.end(), instanced.begin(), instanced.end());
+			}
+		}
+
+		for (size_t i=0;i<fixed.size();++i)
+		{
+			MeshClass * mesh = fixed[i].first;
+			if (mesh->Get_Lighting_Environment() != nullptr)
+			{
+				DX8Wrapper::Set_Light_Environment(mesh->Get_Lighting_Environment());
+			}
+			DX8Wrapper::Set_Transform(D3DTS_WORLD,mesh->Get_Transform());
+			pass->Install_Polygon_Materials(fixed[i].second);
+			fixed[i].second->Render(mesh->Get_Base_Vertex_Offset());
+		}
+
+		pass->UnInstall_Materials();
+		DX8MeshRendererClass::Record_Material_Pass(pass, instanced_calls + (int)fixed.size());
+
+		instanced.clear();
+		fixed.clear();
+		meshes.clear();
+		renderers.clear();
+		counts.clear();
+	}
+
+	for (size_t i=0;i<window.size();++i)
+	{
+		delete window[i];
+	}
+	window.clear();
+	passes.clear();
+}
+
 void DX8FVFCategoryContainer::Render_Procedural_Material_Passes()
 {
+	if (DX8InstancingClass::Get_Pass() == DX8InstancingClass::PASS_LIT && Bind_Static_Buffers() && !sorting)
+	{
+		Render_Instanced_Material_Passes();
+		return;
+	}
+
 	// additional passes
 	MatPassTaskClass * mpr = visible_matpass_head;
 	MatPassTaskClass * last_mpr = nullptr;
@@ -1729,6 +1944,211 @@ unsigned DX8TextureCategoryClass::Add_Mesh(
 
 // ----------------------------------------------------------------------------
 
+// An instanced draw shares one fixed-function setup, so texgen, specular and blend tricks rule a category out.
+// Without an active pass this measures the lit scene against the rules its instancing will need.
+bool DX8TextureCategoryClass::Allows_Instancing() const
+{
+	if (container->Is_Sorting() || Is_Additive() || m_gForceMultiply)
+	{
+		return false;
+	}
+	if (DX8InstancingClass::Get_Pass() != DX8InstancingClass::PASS_NONE)
+	{
+		return DX8InstancingClass::Allows_Category(shader, material, container->Get_FVF(), textures[1] != nullptr);
+	}
+	if (shader.Uses_Secondary_Gradient())
+	{
+		return false;
+	}
+	if (material != nullptr)
+	{
+		for (int stage=0;stage<MeshBuilderClass::MAX_STAGES;++stage)
+		{
+			if (material->Peek_Mapper(stage) != nullptr)
+			{
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+// The instance data carries a world matrix and a tint, so anything else that varies per mesh rules it out.
+static bool Mesh_Allows_Instancing(MeshClass * mesh)
+{
+	if (DX8InstancingClass::Get_Pass() == DX8InstancingClass::PASS_LIT && Has_Fixed_Function_Pass(mesh))
+	{
+		return false;
+	}
+	if (DX8InstancingClass::Get_Pass() != DX8InstancingClass::PASS_NONE)
+	{
+		return DX8InstancingClass::Allows_Mesh(mesh);
+	}
+	MeshModelClass * model = mesh->Peek_Model();
+	if (model->Get_Flag(MeshModelClass::ALIGNED) || model->Get_Flag(MeshModelClass::ORIENTED) || model->Get_Flag(MeshModelClass::SKIN))
+	{
+		return false;
+	}
+	if (model->Get_Flag(MeshGeometryClass::SORT) && WW3D::Is_Sorting_Enabled())
+	{
+		return false;
+	}
+	if (mesh->Get_Alpha_Override() != 1.0f || (mesh->Get_User_Data() && *(int *)mesh->Get_User_Data() == RenderObjClass::USER_DATA_MATERIAL_OVERRIDE))
+	{
+		return false;
+	}
+	LightEnvironmentClass * lenv = mesh->Get_Lighting_Environment();
+	if (lenv != nullptr)
+	{
+		for (int i=0;i<lenv->Get_Light_Count();++i)
+		{
+			if (lenv->isPointLight(i))
+			{
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+static bool Polygon_Renderer_Less(const DX8PolygonRendererClass * a, const DX8PolygonRendererClass * b)
+{
+	return a < b;
+}
+
+static void Record_Eligible_Groups(std::vector<DX8PolygonRendererClass *> & renderers)
+{
+	std::sort(renderers.begin(), renderers.end(), Polygon_Renderer_Less);
+	size_t start = 0;
+	for (size_t i=1;i<=renderers.size();++i)
+	{
+		if (i == renderers.size() || renderers[i] != renderers[start])
+		{
+			DX8MeshRendererClass::Record_Eligible_Group((int)(i - start));
+			start = i;
+		}
+	}
+	renderers.clear();
+}
+
+static bool Task_Renderer_Less(PolyRenderTaskClass * a, PolyRenderTaskClass * b)
+{
+	return a->Peek_Polygon_Renderer() < b->Peek_Polygon_Renderer();
+}
+
+// Draws each large enough group of meshes sharing a polygon renderer in one call, and takes them off the task list.
+void DX8TextureCategoryClass::Render_Instanced_Groups(VertexMaterialClass * vmaterial)
+{
+	static std::vector<PolyRenderTaskClass *> candidates;
+	static std::vector<PolyRenderTaskClass *> drawn;
+	static std::vector<MeshClass *> meshes;
+	static std::vector<DX8PolygonRendererClass *> renderers;
+	static std::vector<int> counts;
+	static std::vector<PolyRenderTaskClass *> pending;
+	static std::vector<PolyRenderTaskClass *> rest;
+
+	for (PolyRenderTaskClass * prt = render_task_head; prt != nullptr; prt = prt->Get_Next_Visible())
+	{
+		MeshClass * mesh = prt->Peek_Mesh();
+		if (mesh->Get_Base_Vertex_Offset() != VERTEX_BUFFER_OVERFLOW && !prt->Peek_Polygon_Renderer()->Is_Strip() && Mesh_Allows_Instancing(mesh))
+		{
+			candidates.push_back(prt);
+		}
+	}
+	std::sort(candidates.begin(), candidates.end(), Task_Renderer_Less);
+
+	size_t start = 0;
+	for (size_t i=1;i<=candidates.size();++i)
+	{
+		if (i < candidates.size() && candidates[i]->Peek_Polygon_Renderer() == candidates[start]->Peek_Polygon_Renderer())
+		{
+			continue;
+		}
+		// Each group shares its first mesh's lights; meshes that cannot join wait for the next group.
+		pending.assign(candidates.begin() + start, candidates.begin() + i);
+		while ((int)pending.size() >= DX8InstancingClass::MIN_GROUP_SIZE)
+		{
+			MeshClass * reference = pending[0]->Peek_Mesh();
+			const size_t first = meshes.size();
+			rest.clear();
+			for (size_t j=0;j<pending.size();++j)
+			{
+				if (j == 0 || DX8InstancingClass::Can_Share_Group(reference, pending[j]->Peek_Mesh()))
+				{
+					meshes.push_back(pending[j]->Peek_Mesh());
+					drawn.push_back(pending[j]);
+				}
+				else
+				{
+					rest.push_back(pending[j]);
+				}
+			}
+			const int count = (int)(meshes.size() - first);
+			if (count >= DX8InstancingClass::MIN_GROUP_SIZE)
+			{
+				renderers.push_back(pending[0]->Peek_Polygon_Renderer());
+				counts.push_back(count);
+			}
+			else
+			{
+				meshes.resize(first);
+				drawn.resize(drawn.size() - count);
+			}
+			pending.swap(rest);
+		}
+		start = i;
+	}
+	candidates.clear();
+	pending.clear();
+	rest.clear();
+
+	const bool instanced = !renderers.empty() &&
+		DX8InstancingClass::Draw_Groups(&renderers[0], &counts[0], (int)renderers.size(), &meshes[0], vmaterial, container->Get_FVF());
+	if (instanced)
+	{
+		for (size_t group=0;group<counts.size();++group)
+		{
+			DX8MeshRendererClass::Record_Instanced_Group(counts[group]);
+		}
+		if (DX8InstancingClass::Get_Pass() == DX8InstancingClass::PASS_LIT)
+		{
+			for (size_t i=0;i<drawn.size();++i)
+			{
+				_InstancedFragments.push_back(InstancedFragment(drawn[i]->Peek_Mesh(), drawn[i]->Peek_Polygon_Renderer()));
+			}
+			_InstancedFragmentsSorted = false;
+		}
+	}
+	meshes.clear();
+	renderers.clear();
+	counts.clear();
+
+	if (!instanced)
+	{
+		drawn.clear();
+		return;
+	}
+	std::sort(drawn.begin(), drawn.end());
+
+	PolyRenderTaskClass * last_prt = nullptr;
+	PolyRenderTaskClass * prt = render_task_head;
+	while (prt) {
+		PolyRenderTaskClass * next_prt = prt->Get_Next_Visible();
+		if (std::binary_search(drawn.begin(), drawn.end(), prt)) {
+			if (last_prt == nullptr) {
+				render_task_head = next_prt;
+			} else {
+				last_prt->Set_Next_Visible(next_prt);
+			}
+			delete prt;
+		} else {
+			last_prt = prt;
+		}
+		prt = next_prt;
+	}
+	drawn.clear();
+}
+
 void DX8TextureCategoryClass::Render()
 {
 	#ifdef WWDEBUG
@@ -1776,6 +2196,13 @@ void DX8TextureCategoryClass::Render()
 
 	// finished tasks are kept for the bloom replay instead of being freed
 	const bool keepForBloom = DX8MeshRendererClass::Is_Bloom_Capture_Enabled() && Is_Additive();
+
+	static std::vector<DX8PolygonRendererClass *> eligibleRenderers;
+	const bool categoryAllowsInstancing = Allows_Instancing();
+	if (categoryAllowsInstancing && DX8InstancingClass::Get_Pass() != DX8InstancingClass::PASS_NONE)
+	{
+		Render_Instanced_Groups(vmaterial);
+	}
 
 	bool renderTasksRemaining=false;
 
@@ -1852,6 +2279,15 @@ void DX8TextureCategoryClass::Render()
 
 		Render_Task(prt, vmaterial, theShader, theAlphaShader, false);
 
+		if (!mesh->Peek_Model()->Get_Flag(MeshModelClass::SKIN))
+		{
+			DX8MeshRendererClass::Record_Rigid_Draw();
+			if (categoryAllowsInstancing && Mesh_Allows_Instancing(mesh))
+			{
+				eligibleRenderers.push_back(prt->Peek_Polygon_Renderer());
+			}
+		}
+
 		/*
 		** Move to the next render task.  Note that the delete should be fast because prt's are pooled
 		*/
@@ -1879,6 +2315,8 @@ void DX8TextureCategoryClass::Render()
 		}
 		prt = next_prt;
 	}
+
+	Record_Eligible_Groups(eligibleRenderers);
 
 	if (!renderTasksRemaining)
 	{
@@ -2137,6 +2575,64 @@ void DX8MeshRendererClass::Shutdown()
 // ----------------------------------------------------------------------------
 
 bool DX8MeshRendererClass::bloom_capture=false;
+int DX8MeshRendererClass::stats_scene=DX8InstancingStatsStruct::SCENE_MAIN;
+DX8InstancingStatsStruct DX8MeshRendererClass::instancing_stats;
+
+void DX8MeshRendererClass::Record_Eligible_Group(int draws)
+{
+	int size_class = 3;
+	if (draws == 1)
+	{
+		size_class = 0;
+	}
+	else if (draws <= 3)
+	{
+		size_class = 1;
+	}
+	else if (draws <= 15)
+	{
+		size_class = 2;
+	}
+	instancing_stats.Scenes[stats_scene].EligibleDraws[size_class] += draws;
+}
+
+void DX8MeshRendererClass::Record_Instanced_Group(int draws)
+{
+	DX8InstancingStatsStruct::SceneStruct & scene = instancing_stats.Scenes[stats_scene];
+	scene.RigidDraws += draws;
+	scene.InstancedCalls++;
+	scene.InstancedMeshes += draws;
+	Record_Eligible_Group(draws);
+}
+
+void DX8MeshRendererClass::Record_Material_Pass(const MaterialPassClass* pass, int draws)
+{
+	for (int i=0;i<DX8InstancingStatsStruct::MAX_PASSES;++i)
+	{
+		if (instancing_stats.Passes[i] == nullptr)
+		{
+			instancing_stats.Passes[i] = pass;
+		}
+		if (instancing_stats.Passes[i] == pass)
+		{
+			instancing_stats.PassDraws[i] += draws;
+			return;
+		}
+	}
+	instancing_stats.OtherPassDraws += draws;
+}
+
+void DX8MeshRendererClass::Begin_Instancing_Frame()
+{
+	_FixedFunctionPassMeshes.clear();
+	_FixedFunctionPassMeshesSorted = true;
+}
+
+void DX8MeshRendererClass::Take_Instancing_Stats(DX8InstancingStatsStruct& stats)
+{
+	stats = instancing_stats;
+	memset(&instancing_stats, 0, sizeof(instancing_stats));
+}
 
 void DX8MeshRendererClass::Add_Bloom_Category(DX8TextureCategoryClass* category)
 {
@@ -2370,6 +2866,9 @@ void DX8MeshRendererClass::Flush()
 
 	DX8Wrapper::Set_Vertex_Buffer(nullptr);
 	DX8Wrapper::Set_Index_Buffer(nullptr,0);
+
+	_InstancedFragments.clear();
+	_InstancedFragmentsSorted = true;
 }
 
 

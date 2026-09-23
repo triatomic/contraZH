@@ -74,6 +74,7 @@
 #include "WW3D2/dx8caps.h"
 #include "WW3D2/formconv.h"
 #include "WW3D2/dx8renderer.h"
+#include "WW3D2/dx8instancing.h"
 #include "WW3D2/dx8polygonrenderer.h"
 #include "WW3D2/matpass.h"
 #include "WW3D2/texture.h"
@@ -1521,7 +1522,7 @@ static Int TerrainBumpCount = 0;
 class ShadowDepthShader : public W3DShaderInterface
 {
 public:
-	ShadowDepthShader() : m_dwPixelShader(0) {}
+	ShadowDepthShader() : m_dwPixelShader(0), m_dwInstanceShader(0) {}
 
 	virtual Int set(Int pass) override;
 	virtual Int init() override;
@@ -1533,6 +1534,7 @@ public:
 protected:
 
 	DWORD m_dwPixelShader;	///<packed path only; the hardware path writes depth with no shader.
+	DWORD m_dwInstanceShader;	///<draws groups of identical casters in one call; the pass runs without it.
 } shadowDepthShader;
 
 W3DShaderInterface *ShadowDepthShaderList[]=
@@ -1558,13 +1560,27 @@ Int ShadowDepthShader::init()
 		return FALSE;
 	}
 
-	if (TheW3DShadowMap->getDepthMode() == W3DShadowMap::DEPTH_MODE_PACKED)
+	const Bool packed = (TheW3DShadowMap->getDepthMode() == W3DShadowMap::DEPTH_MODE_PACKED);
+	if (packed)
 	{
 		if (FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\shadowdepthpacked.pso",
 				nullptr, 0, false, &m_dwPixelShader)))
 		{
 			return FALSE;
 		}
+	}
+
+	// The instancing module builds its own declarations, so this one only has to be valid.
+	DWORD declaration[] =
+	{
+		D3DVSD_STREAM(0),
+		D3DVSD_REG(0, D3DVSDT_FLOAT3),
+		D3DVSD_END()
+	};
+	if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(packed ? "shaders\\instancedepthpacked.vso" : "shaders\\instancedepth.vso",
+			declaration, 0, true, &m_dwInstanceShader)))
+	{
+		m_dwInstanceShader = 0;
 	}
 
 	W3DShaders[W3DShaderManager::ST_SHADOW_DEPTH]=&shadowDepthShader;
@@ -1577,6 +1593,10 @@ Int ShadowDepthShader::init()
 Int ShadowDepthShader::set(Int pass)
 {
 	DX8Wrapper::Set_Apply_Hook(&Apply_Shadow_Depth_Override);
+	if (m_dwInstanceShader != 0)
+	{
+		DX8InstancingClass::Begin_Shadow_Depth_Pass(Peek_D3D9_Vertex_Shader(m_dwInstanceShader));
+	}
 	return TRUE;
 }
 
@@ -1658,6 +1678,7 @@ void ShadowDepthShader::applyOverride(const ShaderClass &shader)
 void ShadowDepthShader::reset()
 {
 	DX8Wrapper::Set_Apply_Hook(nullptr);
+	DX8InstancingClass::End_Pass();
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_COLORWRITEENABLE, 0x0000000f);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_DEPTHBIAS, 0);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_SLOPESCALEDEPTHBIAS, 0);
@@ -1680,9 +1701,11 @@ Int ShadowDepthShader::shutdown()
 	if (device != nullptr)
 	{
 		DX8_DELETE_PIXEL_SHADER(device, m_dwPixelShader);
+		DX8_DELETE_VERTEX_SHADER(device, m_dwInstanceShader);
 	}
 
 	m_dwPixelShader = 0;
+	m_dwInstanceShader = 0;
 
 	// Cleared so a failed init after a device reset leaves the pass disabled.
 	W3DShaders[W3DShaderManager::ST_SHADOW_DEPTH]=nullptr;
@@ -3569,6 +3592,10 @@ void RoadShader2Stage::reset()
 /** List of all custom shader lists - each list in this list contains variations of the same
 	shader to allow it to work on different hardware configurations.
 */
+#if defined(BUILD_WITH_D3D9)
+static DWORD InstancedMainShader = 0;	///<main scene meshes and their passes drawn in groups; the scene draws without it.
+#endif
+
 W3DShaderInterface **MasterShaderList[]=
 {
 	TerrainShaderList,
@@ -3693,6 +3720,24 @@ void W3DShaderManager::init()
 				break;	//found a working shader
 		}
 	}
+#if defined(BUILD_WITH_D3D9)
+	// The instancing module builds its own declarations, so this one only has to be valid.
+	DWORD instanceDeclaration[] =
+	{
+		D3DVSD_STREAM(0),
+		D3DVSD_REG(0, D3DVSDT_FLOAT3),
+		D3DVSD_END()
+	};
+	if (SUCCEEDED(LoadAndCreateD3DShader("shaders\\instancemain.vso", instanceDeclaration, 0, true, &InstancedMainShader)))
+	{
+		DX8InstancingClass::Set_Main_Shader(Peek_D3D9_Vertex_Shader(InstancedMainShader));
+	}
+	else
+	{
+		InstancedMainShader = 0;
+	}
+#endif
+
 	W3DFilterInterface **filters;
 
 	for (i=0; MasterFilterList[i] != nullptr; i++)
@@ -3734,6 +3779,15 @@ void W3DShaderManager::shutdown()
 			W3DFilters[i]->shutdown();
 		}
 	}
+
+#if defined(BUILD_WITH_D3D9)
+	DX8InstancingClass::Set_Main_Shader(nullptr);
+	if (InstancedMainShader != 0)
+	{
+		DX8_DELETE_VERTEX_SHADER(DX8Wrapper::_Get_D3D_Device8(), InstancedMainShader);
+		InstancedMainShader = 0;
+	}
+#endif
 }
 
 //=============================================================================

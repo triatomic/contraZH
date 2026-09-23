@@ -88,6 +88,7 @@ public:
 	unsigned							Get_Min_Vertex_Index()	{ return min_vertex_index; }
 	unsigned							Get_Vertex_Index_Range()	{ return vertex_index_range; }
 	unsigned						Get_Pass()	{ return pass; }
+	bool								Is_Strip()	{ return strip; }
 
 	MeshModelClass*				Get_Mesh_Model_Class() { return mmc; }
 	DX8TextureCategoryClass*	Get_Texture_Category() { return texture_category; }

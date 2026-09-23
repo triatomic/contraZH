@@ -406,6 +406,20 @@ public:
 		unsigned short index_count,
 		unsigned short min_vertex_index,
 		unsigned short vertex_count);
+#if defined(BUILD_WITH_D3D9)
+	// Instanced draws go between Begin and End, with no other state changes in between.
+	static void Begin_Instanced_Drawing(IDirect3DVertexDeclaration9* declaration, IDirect3DVertexShader9* shader);
+	static void Draw_Instanced_Triangles(
+		unsigned short start_index,
+		unsigned short polygon_count,
+		unsigned short min_vertex_index,
+		unsigned short vertex_count,
+		IDirect3DVertexBuffer9* instance_buffer,
+		unsigned instance_offset,
+		unsigned instance_stride,
+		unsigned instance_count);
+	static void End_Instanced_Drawing();
+#endif
 
 	/*
 	** Resources

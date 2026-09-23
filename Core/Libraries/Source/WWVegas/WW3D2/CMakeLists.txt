@@ -49,6 +49,8 @@ set(WW3D2_SRC
     dx8fvf.h
     dx8indexbuffer.cpp
     dx8indexbuffer.h
+    dx8instancing.cpp
+    dx8instancing.h
     dx8list.h
     dx8polygonrenderer.cpp
     dx8polygonrenderer.h

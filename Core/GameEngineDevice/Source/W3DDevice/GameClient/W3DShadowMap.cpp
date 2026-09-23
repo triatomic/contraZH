@@ -614,7 +614,9 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 	}
 	++passCount;
 
+	DX8MeshRendererClass::Set_Stats_Scene(DX8InstancingStatsStruct::SCENE_SHADOW_DEPTH);
 	TheDX8MeshRenderer.Flush();
+	DX8MeshRendererClass::Set_Stats_Scene(DX8InstancingStatsStruct::SCENE_MAIN);
 
 	// Sorted meshes, often foliage, were deferred rather than drawn. Flushed here they
 	// draw into the map with the sun's matrices, and not into the main view later.

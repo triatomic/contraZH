@@ -59,6 +59,8 @@
 #include "W3DDevice/GameClient/W3DShroud.h"
 #include "WW3D2/camera.h"
 #include "WW3D2/dx8renderer.h"
+#include "WW3D2/dx8instancing.h"
+#include "WW3D2/statistics.h"
 #include "WW3D2/sortingrenderer.h"
 #include "WW3D2/dx8wrapper.h"
 #include "WW3D2/light.h"
@@ -1013,6 +1015,10 @@ void RTS3DScene::Flush(RenderInfoClass & rinfo)
 	if (m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE)
 		DoShadows(rinfo, false);	//draw all non-stencil shadows (decals) since they fall under other objects.
 
+	// Special passes change vertex state behind the mesh renderer's back, which the instancing shader would not see.
+	// Most units and structures draw in the occlusion flushes, which only change stencil state.
+	if (m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE)
+		DX8InstancingClass::Begin_Lit_Pass();
 	TheDX8MeshRenderer.Flush();	//draw all non-translucent objects.
 
 	//draw all non-translucent objects which were separated because they are hidden and need custom rendering.
@@ -1022,6 +1028,7 @@ void RTS3DScene::Flush(RenderInfoClass & rinfo)
 	if (DX8Wrapper::Has_Stencil())
 		flushOccludedObjectsIntoStencil(rinfo);
 #endif
+	DX8InstancingClass::End_Pass();
 
 	// (gth) CNC3 Flush the shader meshes
 	SHD_FLUSH;
@@ -1385,6 +1392,60 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 				W3DShaderManager::getSpecularPass() != nullptr ? "available" : "unavailable", terrainBumpDraws));
 		}
 		++specularFrames;
+	}
+
+	// The shadow receiver and the specular highlight are the passes the instanced main scene redraws itself.
+	DX8MeshRendererClass::Begin_Instancing_Frame();
+	DX8InstancingClass::Set_Instanced_Material_Passes(
+		(TheW3DShadowMap != nullptr) ? TheW3DShadowMap->getReceivePass() : nullptr, W3DShaderManager::getSpecularPass());
+
+	// Shows how many draws hardware instancing could merge. Counts are the previous frame's.
+	{
+		static Int instancingFrames = 0;
+		DX8InstancingStatsStruct stats;
+		DX8MeshRendererClass::Take_Instancing_Stats(stats);
+		Int rejections[DX8InstancingClass::REJECT_COUNT];
+		DX8InstancingClass::Take_Rejections(rejections);
+		if (instancingFrames % 600 == 0)
+		{
+			const MaterialPassClass *receivePass = (TheW3DShadowMap != nullptr) ? TheW3DShadowMap->getReceivePass() : nullptr;
+			const MaterialPassClass *specularPass = W3DShaderManager::getSpecularPass();
+			Int receiveDraws = 0;
+			Int specularDraws = 0;
+			Int otherPassDraws = stats.OtherPassDraws;
+			for (Int i = 0; i < DX8InstancingStatsStruct::MAX_PASSES; ++i)
+			{
+				if (stats.Passes[i] == nullptr)
+				{
+					continue;
+				}
+				if (stats.Passes[i] == receivePass)
+				{
+					receiveDraws += stats.PassDraws[i];
+				}
+				else if (stats.Passes[i] == specularPass)
+				{
+					specularDraws += stats.PassDraws[i];
+				}
+				else
+				{
+					otherPassDraws += stats.PassDraws[i];
+				}
+			}
+			const DX8InstancingStatsStruct::SceneStruct &mainScene = stats.Scenes[DX8InstancingStatsStruct::SCENE_MAIN];
+			const DX8InstancingStatsStruct::SceneStruct &depthScene = stats.Scenes[DX8InstancingStatsStruct::SCENE_SHADOW_DEPTH];
+			DEBUG_LOG(("Instancing: frame %d, %d draw calls, %d skins; main %d rigid, eligible by group 1:%d 2-3:%d 4-15:%d 16+:%d, instanced %d meshes in %d calls; depth %d rigid, eligible 1:%d 2-3:%d 4-15:%d 16+:%d, instanced %d meshes in %d calls; passes receive %d specular %d other %d; fallbacks clip %d fog %d resource %d lights %d",
+				instancingFrames, Debug_Statistics::Get_Draw_Calls(), Debug_Statistics::Get_DX8_Skin_Renders(),
+				mainScene.RigidDraws, mainScene.EligibleDraws[0], mainScene.EligibleDraws[1], mainScene.EligibleDraws[2], mainScene.EligibleDraws[3],
+				mainScene.InstancedMeshes, mainScene.InstancedCalls,
+				depthScene.RigidDraws, depthScene.EligibleDraws[0], depthScene.EligibleDraws[1], depthScene.EligibleDraws[2], depthScene.EligibleDraws[3],
+				depthScene.InstancedMeshes, depthScene.InstancedCalls,
+				receiveDraws, specularDraws, otherPassDraws,
+				rejections[DX8InstancingClass::REJECT_CLIP_PLANE], rejections[DX8InstancingClass::REJECT_FOG],
+				rejections[DX8InstancingClass::REJECT_RESOURCE],
+				rejections[DX8InstancingClass::REJECT_LIGHTS]));
+		}
+		++instancingFrames;
 	}
 
 	// Fill the shadow map before anything is queued for the main scene, because the

@@ -140,6 +140,7 @@ public:
 	LightEnvironmentClass *		Get_Lighting_Environment(void) { return LightEnvironment; }
 	float	Get_Alpha_Override(void) { return m_alphaOverride;}
 	inline float	Get_Emissive_Override(void) { return m_emissiveOverride;}
+	bool	Has_Material_Pass_Override() const { return m_materialPassAlphaOverride != 1.0f || m_materialPassEmissiveOverride != 1.0f; }
 
 	void								Set_Next_Visible_Skin(MeshClass * next_visible) { NextVisibleSkin = next_visible; }
 	MeshClass *						Peek_Next_Visible_Skin() { return NextVisibleSkin; }

@@ -87,6 +87,8 @@ class DX8TextureCategoryClass : public MultiListObjectClass
 	static bool											m_gForceMultiply;  // Forces opaque materials to use the multiply blend - pseudo transparent effect.  jba.
 
 	void									Render_Task(PolyRenderTaskClass * prt, VertexMaterialClass * vmaterial, const ShaderClass & theShader, ShaderClass theAlphaShader, bool replay);
+	bool									Allows_Instancing() const;
+	void									Render_Instanced_Groups(VertexMaterialClass * vmaterial);
 
 public:
 
@@ -170,6 +172,8 @@ protected:
 	bool Any_Delayed_Passes_To_Render()	{ return AnyDelayedPassesToRender; }
 
 	void Render_Procedural_Material_Passes();
+	void Render_Instanced_Material_Passes();
+	void Render_Material_Pass_Window();
 
 	DX8TextureCategoryClass* Find_Matching_Texture_Category(
 		TextureClass* texture,
@@ -312,6 +316,26 @@ private:
 
 
 
+// Per-frame draw counts that measure how many draws hardware instancing could merge.
+struct DX8InstancingStatsStruct
+{
+	enum { SCENE_MAIN, SCENE_SHADOW_DEPTH, SCENE_COUNT };
+	enum { SIZE_CLASSES = 4, MAX_PASSES = 8 };
+
+	struct SceneStruct
+	{
+		int	RigidDraws;
+		int	EligibleDraws[SIZE_CLASSES];	// grouped by how many share a polygon renderer: 1, 2-3, 4-15, 16+
+		int	InstancedCalls;
+		int	InstancedMeshes;
+	};
+
+	SceneStruct						Scenes[SCENE_COUNT];
+	const MaterialPassClass *	Passes[MAX_PASSES];
+	int								PassDraws[MAX_PASSES];
+	int								OtherPassDraws;
+};
+
 /**
 ** DX8MeshRendererClass
 ** This object is controller for the entire DX8 mesh rendering system.  It organizes mesh
@@ -339,6 +363,17 @@ public:
 	void						Clear_Bloom_Lists();
 	bool						Has_Bloom_Tasks() const { return bloom_categories.Count() > 0; }
 
+	static void				Set_Stats_Scene(int scene) { stats_scene=scene; }
+	static int				Get_Stats_Scene() { return stats_scene; }
+	static void				Record_Rigid_Draw() { instancing_stats.Scenes[stats_scene].RigidDraws++; }
+	static void				Record_Eligible_Group(int draws);
+	static void				Record_Instanced_Group(int draws);
+	static void				Record_Material_Pass(const MaterialPassClass* pass, int draws);
+	static void				Take_Instancing_Stats(DX8InstancingStatsStruct& stats);
+
+	// Called before the scene queues its meshes, which note there which of them keep a fixed-function pass.
+	static void				Begin_Instancing_Frame();
+
 	void						Log_Statistics_String(bool only_visible);
 	static void				Request_Log_Statistics();
 
@@ -365,6 +400,8 @@ protected:
 	FVFCategoryList *									texture_category_container_list_skin;
 	SimpleDynVecClass<DX8TextureCategoryClass *>	bloom_categories;		// categories holding kept additive tasks
 	static bool											bloom_capture;
+	static int											stats_scene;
+	static DX8InstancingStatsStruct				instancing_stats;
 
 	DecalMeshClass *									visible_decal_meshes;
 

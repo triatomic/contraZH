@@ -1001,6 +1001,7 @@ void MeshClass::Render_Material_Pass(MaterialPassClass * pass,IndexBufferClass *
 		SNAPSHOT_SAY(("Set_World_Transform"));
 		DX8Wrapper::Set_Transform(D3DTS_WORLD,Transform);
 
+		int draws = 0;
 		DX8PolygonRendererListIterator it(&Model->PolygonRendererList);
 		while (!it.Is_Done()) {
 
@@ -1008,9 +1009,11 @@ void MeshClass::Render_Material_Pass(MaterialPassClass * pass,IndexBufferClass *
 			{
 				pass->Install_Polygon_Materials(it.Peek_Obj());
 				it.Peek_Obj()->Render(BaseVertexOffset);
+				draws++;
 			}
 			it.Next();
 		}
+		DX8MeshRendererClass::Record_Material_Pass(pass, draws);
 
 		if (oldOpacity >= 0)
 		{	//opacity was modified for this mesh instance, so need to restore the material setting which may be shared

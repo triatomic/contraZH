@@ -51,6 +51,7 @@
 #endif
 
 #include "dx8wrapper.h"
+#include "dx8instancing.h"
 #include "dx8webbrowser.h"
 #include "dx8fvf.h"
 #include "dx8vertexbuffer.h"
@@ -458,6 +459,7 @@ void DX8Wrapper::Do_Onetime_Device_Dependent_Shutdowns()
 	SortingRendererClass::Deinit();
 	DynamicVBAccessClass::_Deinit();
 	DynamicIBAccessClass::_Deinit();
+	DX8InstancingClass::Shutdown();
 	ShatterSystem::Shutdown();
 	PointGroupClass::_Shutdown();
 	VertexMaterialClass::Shutdown();
@@ -609,6 +611,7 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 		}
 		DynamicVBAccessClass::_Deinit();
 		DynamicIBAccessClass::_Deinit();
+		DX8InstancingClass::Release_Resources();
 		DX8TextureManagerClass::Release_Textures();
 		SHD_SHUTDOWN_SHADERS;
 
@@ -2251,6 +2254,72 @@ void DX8Wrapper::Draw_Strip(
 {
 	Draw(D3DPT_TRIANGLESTRIP,start_index,polygon_count,min_vertex_index,vertex_count);
 }
+
+#if defined(BUILD_WITH_D3D9)
+
+static IDirect3DVertexDeclaration9* InstancedDeclaration = nullptr;
+static IDirect3DVertexShader9* InstancedShader = nullptr;
+
+void DX8Wrapper::Begin_Instanced_Drawing(IDirect3DVertexDeclaration9* declaration, IDirect3DVertexShader9* shader)
+{
+	DX8_THREAD_ASSERT();
+	Apply_Render_State_Changes();
+
+	InstancedDeclaration = declaration;
+	InstancedShader = shader;
+	DX8CALL(SetVertexDeclaration(declaration));
+	DX8CALL(SetVertexShader(shader));
+	DX8CALL(SetStreamSourceFreq(1, D3DSTREAMSOURCE_INSTANCEDATA | 1u));
+}
+
+void DX8Wrapper::Draw_Instanced_Triangles(
+	unsigned short start_index,
+	unsigned short polygon_count,
+	unsigned short min_vertex_index,
+	unsigned short vertex_count,
+	IDirect3DVertexBuffer9* instance_buffer,
+	unsigned instance_offset,
+	unsigned instance_stride,
+	unsigned instance_count)
+{
+	if (DrawPolygonLowBoundLimit && DrawPolygonLowBoundLimit>=polygon_count) return;
+
+	// A vertex buffer change would put the FVF back in place of the shader.
+	const bool vertex_buffer_changed = (render_state_changed & VERTEX_BUFFER_CHANGED) != 0;
+	Apply_Render_State_Changes();
+	if (vertex_buffer_changed)
+	{
+		DX8CALL(SetVertexDeclaration(InstancedDeclaration));
+		DX8CALL(SetVertexShader(InstancedShader));
+	}
+
+	if (!_Is_Triangle_Draw_Enabled()) return;
+
+	Set_DX8_Stream_Source(1, instance_buffer, instance_offset, instance_stride);
+	DX8CALL(SetStreamSourceFreq(0, D3DSTREAMSOURCE_INDEXEDDATA | instance_count));
+
+	DX8_RECORD_RENDER(polygon_count*instance_count,vertex_count*instance_count,render_state.shader);
+	DX8_RECORD_DRAW_CALLS();
+	Draw_DX8_Indexed_Primitive(
+		D3DPT_TRIANGLELIST,
+		min_vertex_index,
+		vertex_count,
+		start_index+render_state.iba_offset,
+		polygon_count);
+}
+
+void DX8Wrapper::End_Instanced_Drawing()
+{
+	// Stream 1 is never bound by the fixed-function path, which also only sets its FVF when the vertex buffer changes.
+	DX8CALL(SetStreamSourceFreq(0, 1));
+	DX8CALL(SetStreamSourceFreq(1, 1));
+	Set_DX8_Stream_Source(1, nullptr, 0, 0);
+	Set_Vertex_Shader(Vertex_Shader);
+	InstancedDeclaration = nullptr;
+	InstancedShader = nullptr;
+}
+
+#endif
 
 // ----------------------------------------------------------------------------
 //

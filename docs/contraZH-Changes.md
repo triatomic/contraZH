@@ -404,6 +404,20 @@ from further away than units, so it defaults stronger.)
 `NormalMapDebug = Yes` in `Options.ini` paints terrain flat grey with only the bump shading, 4x
 stronger.
 
+### Hardware instancing
+
+Copies of the same vehicle, structure or prop draw together in one call per mesh piece, in the
+shadow map and in the main view along with their shadow and highlight passes. Needs the Direct3D 9
+build and a shader model 3 card; other cards draw as before.
+
+Notes:
+* These still draw one at a time: infantry and other skinned meshes, fading units, camera-facing
+sprites, objects lit by point or dynamic lights, and objects under shroud, jamming, frozen or heat
+vision overlays.
+* The `CONTRA_INSTANCING` environment variable helps track down rendering faults: `0` turns it off,
+`1` limits it to the shadow map, `2` adds main view objects without shadow or highlight passes, and
+`3` (the default) covers everything.
+
 ### Laser ground glow
 
 Each laser beam lights the terrain along its length with up to twelve dynamic lights in the beam's
