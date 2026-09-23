@@ -852,7 +852,7 @@ Try improving the fit to vertical surfaces like cliffs.
 			return;
 		}
 
-		DX8VertexBufferClass::WriteLockClass lockVtxBuffer(m_vertexBuffer);
+		DX8VertexBufferClass::WriteLockClass lockVtxBuffer(m_vertexBuffer, D3DLOCK_DISCARD);
 		VertexFormatXYZDUV1 *verts = (VertexFormatXYZDUV1*)lockVtxBuffer.Get_Vertex_Array();
 
 		if (!verts)
