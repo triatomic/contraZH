@@ -241,10 +241,6 @@ template <class T> T max(T a,T b)
 #include	"borlandc.h"
 #endif
 
-#if defined(_MSC_VER)
-#include	"visualc.h"
-#endif
-
 #if defined(__WATCOMC__)
 #include	"watcom.h"
 #endif

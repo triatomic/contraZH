@@ -1859,7 +1859,7 @@ void W3DView::update()
 					if (cameraLockObj->isUsingAirborneLocomotor() && cameraLockObj->isAboveTerrainOrWater())
 					{
 						Matrix3D camXForm;
-						Real idealZRot = objAngle - M_PI_2;
+						Real idealZRot = objAngle - WWMATH_HALF_PI;
 
 						if (m_snapImmediate)
 						{
@@ -3130,7 +3130,7 @@ void W3DView::setDefaultView(Real pitch, Real angle, Real maxHeight)
 #endif
 {
 	// MDC - we no longer want to rotate maps (design made all of them right to begin with)
-	//	m_defaultAngle = angle * M_PI/180.0f;
+	//	m_defaultAngle = angle * WWMATH_PI/180.0f;
 	setDefaultPitch(pitch);
 #if defined(GENERALS_ONLINE_WIDESCREEN)
 	// A wider aspect than 4:3 shows less map vertically, so the camera may rise to compensate.
