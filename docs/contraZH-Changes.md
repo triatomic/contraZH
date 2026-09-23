@@ -460,8 +460,8 @@ smear into the waves.
 * Effects drawn after the water (smoke, fire, translucent models) are not bent by the waves.
 * `AdditiveBlending = Yes` water keeps the old look.
 * The swell heights come from `TWWater01_hgt.dds` beside the water texture when one exists
-(greyscale DXT with mipmaps, read from green, mid grey is the resting level), otherwise from the
-built-in waves. Rivers stay flat.
+(greyscale DXT with mipmaps, mid grey is the resting level), otherwise from the built-in waves.
+The height is read from alpha in a DXT5 file whose alpha varies, and from green otherwise. Rivers stay flat.
 * `scripts/water_maps.py` builds both textures from any image (needs Python with numpy and Pillow).
 * The `CONTRA_WATER` environment variable picks the water: `0` the old water, `1` shader water
 without vertex waves, `2` (the default) with them.

@@ -215,7 +215,8 @@ static Bool Supports_Vertex_Texture(D3DFORMAT format)
 }
 
 // Vertex shaders can't read DXT on most cards, so a DXT <water texture>_hgt.dds is decoded here
-// into A8R8G8B8, with its green channel copied into every channel.
+// into A8R8G8B8 with the height in every channel. The height is DXT5's alpha where that varies,
+// since it keeps more precision, and green otherwise.
 static TextureClass *Load_Swell_Texture(const char *name)
 {
 	if (!Supports_Vertex_Texture(D3DFMT_A8R8G8B8))
@@ -236,6 +237,7 @@ static TextureClass *Load_Swell_Texture(const char *name)
 	Int width = 0;
 	Int height = 0;
 	Int blockBytes = 0;
+	Bool alphaBlocks = FALSE;
 	if (read && fileSize >= headerSize && memcmp(data, "DDS ", 4) == 0)
 	{
 		height = *(const Int *)(data + 12);
@@ -247,6 +249,7 @@ static TextureClass *Load_Swell_Texture(const char *name)
 		else if (memcmp(data + 84, "DXT3", 4) == 0 || memcmp(data + 84, "DXT5", 4) == 0)
 		{
 			blockBytes = 16;
+			alphaBlocks = (data[87] == '5');
 		}
 	}
 	const Int blocksX = (width + 3) / 4;
@@ -258,10 +261,55 @@ static TextureClass *Load_Swell_Texture(const char *name)
 	}
 
 	Real *heights = NEW Real[width * height];
+	Real *alphas = alphaBlocks ? NEW Real[width * height] : nullptr;
+	UnsignedByte alphaLow = 255;
+	UnsignedByte alphaHigh = 0;
 	for (Int by=0; by<blocksY; by++)
 	{
 		for (Int bx=0; bx<blocksX; bx++)
 		{
+			if (alphas != nullptr)
+			{
+				const UnsignedByte *alphaBlock = data + headerSize + (by * blocksX + bx) * blockBytes;
+				const Real alpha0 = (Real)alphaBlock[0] / 255.0f;
+				const Real alpha1 = (Real)alphaBlock[1] / 255.0f;
+				Real levels[8];
+				levels[0] = alpha0;
+				levels[1] = alpha1;
+				if (alphaBlock[0] > alphaBlock[1])
+				{
+					for (Int k=1; k<7; k++)
+					{
+						levels[k + 1] = ((7 - k) * alpha0 + k * alpha1) / 7.0f;
+					}
+				}
+				else
+				{
+					for (Int k=1; k<5; k++)
+					{
+						levels[k + 1] = ((5 - k) * alpha0 + k * alpha1) / 5.0f;
+					}
+					levels[6] = 0.0f;
+					levels[7] = 1.0f;
+				}
+				alphaLow = min(alphaLow, min(alphaBlock[0], alphaBlock[1]));
+				alphaHigh = max(alphaHigh, max(alphaBlock[0], alphaBlock[1]));
+				UnsignedInt64 bits = 0;
+				for (Int b=0; b<6; b++)
+				{
+					bits |= (UnsignedInt64)alphaBlock[2 + b] << (8 * b);
+				}
+				for (Int i=0; i<16; i++)
+				{
+					const Int x = bx * 4 + (i & 3);
+					const Int y = by * 4 + (i >> 2);
+					if (x < width && y < height)
+					{
+						alphas[y * width + x] = levels[(bits >> (3 * i)) & 7];
+					}
+				}
+			}
+
 			// The colour block comes last, after DXT3 and DXT5's alpha block.
 			const UnsignedByte *block = data + headerSize + (by * blocksX + bx) * blockBytes + blockBytes - 8;
 			const UnsignedInt color0 = block[0] | (block[1] << 8);
@@ -292,6 +340,18 @@ static TextureClass *Load_Swell_Texture(const char *name)
 		}
 	}
 	delete [] data;
+	if (alphas != nullptr)
+	{
+		if (alphaHigh > alphaLow)
+		{
+			delete [] heights;
+			heights = alphas;
+		}
+		else
+		{
+			delete [] alphas;
+		}
+	}
 
 	TextureClass *texture = MSGNEW("TextureClass") TextureClass(width, height, WW3D_FORMAT_A8R8G8B8, MIP_LEVELS_ALL, TextureClass::POOL_MANAGED, false, false);
 	D3DSURFACE_DESC desc;
