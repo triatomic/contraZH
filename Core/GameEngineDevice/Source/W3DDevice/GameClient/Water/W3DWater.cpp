@@ -213,6 +213,139 @@ static Bool Supports_Vertex_Texture(D3DFORMAT format)
 	d3d->Release();
 	return supported;
 }
+
+// Vertex shaders can't read DXT on most cards, so a DXT <water texture>_hgt.dds is decoded here
+// into A8R8G8B8, with its green channel copied into every channel.
+static TextureClass *Load_Swell_Texture(const char *name)
+{
+	if (!Supports_Vertex_Texture(D3DFMT_A8R8G8B8))
+	{
+		return nullptr;
+	}
+	file_auto_ptr file(_TheFileFactory, name);
+	if (!file->Is_Available() || !file->Open())
+	{
+		return nullptr;
+	}
+	const Int fileSize = file->Size();
+	UnsignedByte *data = NEW UnsignedByte[max(fileSize, 1)];
+	const Bool read = file->Read(data, fileSize) == fileSize;
+	file->Close();
+
+	const Int headerSize = 128;
+	Int width = 0;
+	Int height = 0;
+	Int blockBytes = 0;
+	if (read && fileSize >= headerSize && memcmp(data, "DDS ", 4) == 0)
+	{
+		height = *(const Int *)(data + 12);
+		width = *(const Int *)(data + 16);
+		if (memcmp(data + 84, "DXT1", 4) == 0)
+		{
+			blockBytes = 8;
+		}
+		else if (memcmp(data + 84, "DXT3", 4) == 0 || memcmp(data + 84, "DXT5", 4) == 0)
+		{
+			blockBytes = 16;
+		}
+	}
+	const Int blocksX = (width + 3) / 4;
+	const Int blocksY = (height + 3) / 4;
+	if (blockBytes == 0 || width <= 0 || height <= 0 || headerSize + blocksX * blocksY * blockBytes > fileSize)
+	{
+		delete [] data;
+		return nullptr;
+	}
+
+	Real *heights = NEW Real[width * height];
+	for (Int by=0; by<blocksY; by++)
+	{
+		for (Int bx=0; bx<blocksX; bx++)
+		{
+			// The colour block comes last, after DXT3 and DXT5's alpha block.
+			const UnsignedByte *block = data + headerSize + (by * blocksX + bx) * blockBytes + blockBytes - 8;
+			const UnsignedInt color0 = block[0] | (block[1] << 8);
+			const UnsignedInt color1 = block[2] | (block[3] << 8);
+			Real greens[4];
+			greens[0] = (Real)((color0 >> 5) & 63) / 63.0f;
+			greens[1] = (Real)((color1 >> 5) & 63) / 63.0f;
+			if (color0 > color1 || blockBytes == 16)
+			{
+				greens[2] = (2.0f * greens[0] + greens[1]) / 3.0f;
+				greens[3] = (greens[0] + 2.0f * greens[1]) / 3.0f;
+			}
+			else
+			{
+				greens[2] = 0.5f * (greens[0] + greens[1]);
+				greens[3] = 0.0f;
+			}
+			const UnsignedInt indices = block[4] | (block[5] << 8) | (block[6] << 16) | ((UnsignedInt)block[7] << 24);
+			for (Int i=0; i<16; i++)
+			{
+				const Int x = bx * 4 + (i & 3);
+				const Int y = by * 4 + (i >> 2);
+				if (x < width && y < height)
+				{
+					heights[y * width + x] = greens[(indices >> (2 * i)) & 3];
+				}
+			}
+		}
+	}
+	delete [] data;
+
+	TextureClass *texture = MSGNEW("TextureClass") TextureClass(width, height, WW3D_FORMAT_A8R8G8B8, MIP_LEVELS_ALL, TextureClass::POOL_MANAGED, false, false);
+	D3DSURFACE_DESC desc;
+	if (texture->Peek_D3D_Texture() == nullptr || FAILED(texture->Peek_D3D_Texture()->GetLevelDesc(0, &desc)) ||
+		(Int)desc.Width != width || (Int)desc.Height != height)
+	{
+		delete [] heights;
+		REF_PTR_RELEASE(texture);
+		return nullptr;
+	}
+
+	const Int levels = texture->Peek_D3D_Texture()->GetLevelCount();
+	Int levelWidth = width;
+	Int levelHeight = height;
+	for (Int level=0; level<levels; level++)
+	{
+		SurfaceClass *surface = texture->Get_Surface_Level(level);
+		int pitch;
+		UnsignedByte *bits = (UnsignedByte *)surface->Lock(&pitch);
+		if (bits != nullptr)
+		{
+			for (Int y=0; y<levelHeight; y++)
+			{
+				UnsignedInt *row = (UnsignedInt *)(bits + y * pitch);
+				for (Int x=0; x<levelWidth; x++)
+				{
+					const UnsignedInt value = (UnsignedInt)(WWMath::Clamp(heights[y * levelWidth + x], 0.0f, 1.0f) * 255.0f + 0.5f);
+					row[x] = value * 0x01010101;
+				}
+			}
+			surface->Unlock();
+		}
+		REF_PTR_RELEASE(surface);
+
+		// Each smaller level averages 2x2 texels of the one above. Writes never pass the reads.
+		const Int nextWidth = max(levelWidth / 2, 1);
+		const Int nextHeight = max(levelHeight / 2, 1);
+		for (Int y=0; y<nextHeight; y++)
+		{
+			const Int y0 = min(2 * y, levelHeight - 1) * levelWidth;
+			const Int y1 = min(2 * y + 1, levelHeight - 1) * levelWidth;
+			for (Int x=0; x<nextWidth; x++)
+			{
+				const Int x0 = min(2 * x, levelWidth - 1);
+				const Int x1 = min(2 * x + 1, levelWidth - 1);
+				heights[y * nextWidth + x] = 0.25f * (heights[y0 + x0] + heights[y0 + x1] + heights[y1 + x0] + heights[y1 + x1]);
+			}
+		}
+		levelWidth = nextWidth;
+		levelHeight = nextHeight;
+	}
+	delete [] heights;
+	return texture;
+}
 #endif
 
 WaterRenderObjClass *TheWaterRenderObj=nullptr; ///<global water rendering object
@@ -993,25 +1126,7 @@ TextureClass *WaterRenderObjClass::findSwellTexture()
 		if (!name.Is_Empty())
 		{
 			name += "_hgt.dds";
-			file_auto_ptr file(_TheFileFactory, name.Peek_Buffer());
-			if (file->Is_Available())
-			{
-				m_swellTexture = WW3DAssetManager::Get_Instance()->Get_Texture(name.Peek_Buffer());
-			}
-		}
-
-		if (m_swellTexture != nullptr)
-		{
-			if (!m_swellTexture->Is_Initialized())
-			{
-				m_swellTexture->Init();
-			}
-			D3DSURFACE_DESC desc;
-			if (m_swellTexture->Peek_D3D_Texture() == nullptr || FAILED(m_swellTexture->Peek_D3D_Texture()->GetLevelDesc(0, &desc)) ||
-				!Supports_Vertex_Texture(desc.Format))
-			{
-				REF_PTR_RELEASE(m_swellTexture);
-			}
+			m_swellTexture = Load_Swell_Texture(name.Peek_Buffer());
 		}
 	}
 	return (m_swellTexture != nullptr) ? m_swellTexture : m_normalTexture;
