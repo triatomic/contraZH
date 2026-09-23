@@ -24,7 +24,9 @@ time of day `DiffuseColor`. Tuned in the `WaterTransparency` block of `Water.ini
 
 ![Depth, colour and foam](images/water-depth.svg)
 
-* `TransparentWaterDepth = 3.0` - (Depth over which the seabed fades out. Same key as the old water.)
+* `TransparentWaterDepth = 3.0` - (Depth over which the seabed fades out, and over which the
+reflection, glint and foam fade in from the shoreline, so the water meets the ground without a
+line. 0 gives a hard shore edge. Same key as the old water.)
 * `TransparentWaterMinOpacity = 1.0` - (Opacity of deep water. Same key as the old water.)
 * `ShaderWaterOpacity = 0.95` - (Opacity of deep water, replacing `TransparentWaterMinOpacity` for shader
 water. 0 uses `TransparentWaterMinOpacity` instead.)
@@ -52,7 +54,8 @@ units. 0 turns them off. Needs a shader model 3 card.)
 
 The swell rides a round grid centred under the camera, fine close by and coarser towards the
 horizon, so it stays smooth at any zoom. The grid covers every flat lake and sea at a level, cut to
-their outlines per map cell. Standing water whose points differ in height by more than a unit keeps
+their outlines per map cell and one cell wider, so the cut falls on dry land and the shore fades
+as drawn. Standing water whose points differ in height by more than a unit keeps
 its own grid, and rivers stay flat.
 
 ![Radial grid, seen from above](images/water-grid.svg)
