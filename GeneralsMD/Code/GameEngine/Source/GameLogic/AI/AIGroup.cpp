@@ -214,7 +214,7 @@ Bool AIGroup::remove( Object *obj )
 {
 #if !RETAIL_COMPATIBLE_AIGROUP
 	// Defer deletion until the end of this function.
-	AIGroupPtr refThis = Create_Add_Ref(this);
+	AIGroupPtr refThis(this);
 #endif
 
 //	DEBUG_LOG(("***AIGROUP %x is removing Object %x (%s).", this, obj, obj->getTemplate()->getName().str()));
@@ -253,7 +253,7 @@ void AIGroup::removeAll()
 {
 #if !RETAIL_COMPATIBLE_AIGROUP
 	// Defer deletion until the end of this function.
-	AIGroupPtr refThis = Create_Add_Ref(this);
+	AIGroupPtr refThis(this);
 #endif
 
 	std::list<Object *> memberList;
@@ -3194,7 +3194,7 @@ void AIGroup::groupSell( CommandSourceType cmdSource )
 {
 #if !RETAIL_COMPATIBLE_AIGROUP
 	// Defer deletion until the end of this function.
-	AIGroupPtr refThis = Create_Add_Ref(this);
+	AIGroupPtr refThis(this);
 #endif
 
 	std::list<Object *>::iterator i;
