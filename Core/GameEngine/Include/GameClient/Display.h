@@ -195,6 +195,7 @@ public:
 	virtual Real getAverageFPS() = 0;	///< returns the average FPS.
 	virtual Real getCurrentFPS() = 0;	///< returns the current FPS.
 	virtual Int getLastFrameDrawCalls() = 0;  ///< returns the number of draw calls issued in the previous frame
+	virtual Bool toggleFaceCulling() { return TRUE; }	///< toggles back face culling and returns whether it is now on
 
 protected:
 	virtual void onBeginBatch() { }

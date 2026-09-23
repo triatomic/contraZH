@@ -154,6 +154,7 @@ IDirect3DSurface8 *			DX8Wrapper::CurrentDepthBuffer						= nullptr;
 IDirect3DSurface8 *			DX8Wrapper::DefaultRenderTarget						= nullptr;
 IDirect3DSurface8 *			DX8Wrapper::DefaultDepthBuffer						= nullptr;
 bool								DX8Wrapper::IsRenderToTexture							= false;
+bool								DX8Wrapper::FaceCullingDisabled						= false;
 DX8Wrapper::ApplyHookType			DX8Wrapper::ApplyHook									= nullptr;
 
 unsigned							DX8Wrapper::_MainThreadID								= 0;

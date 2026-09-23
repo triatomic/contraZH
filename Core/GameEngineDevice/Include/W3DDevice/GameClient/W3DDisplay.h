@@ -151,6 +151,7 @@ public:
 	virtual Real getAverageFPS() override;						///< return the average FPS.
 	virtual Real getCurrentFPS() override;						///< return the current FPS.
 	virtual Int getLastFrameDrawCalls() override;				///< returns the number of draw calls issued in the previous frame
+	virtual Bool toggleFaceCulling() override;
 
 protected:
 

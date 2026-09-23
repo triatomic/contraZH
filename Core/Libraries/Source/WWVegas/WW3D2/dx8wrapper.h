@@ -529,6 +529,9 @@ public:
 	static void					Set_Render_Target (IDirect3DSwapChain8 *swap_chain);
 	static bool					Is_Render_To_Texture() { return IsRenderToTexture; }
 
+	static void					Set_Face_Culling_Disabled(bool disabled) { FaceCullingDisabled = disabled; }
+	static bool					Is_Face_Culling_Disabled() { return FaceCullingDisabled; }
+
 	// for depth map support KJM V
 	static void Create_Render_Target
 	(
@@ -737,6 +740,7 @@ protected:
 	static unsigned							DrawPolygonLowBoundLimit;
 
 	static bool								IsRenderToTexture;
+	static bool								FaceCullingDisabled;
 	static ApplyHookType					ApplyHook;
 
 	static int								ZBias;
@@ -922,6 +926,11 @@ WWINLINE void DX8Wrapper::Set_DX8_Light(int index, D3DLIGHT8* light)
 
 WWINLINE void DX8Wrapper::Set_DX8_Render_State(D3DRENDERSTATETYPE state, unsigned value)
 {
+	if (state == D3DRS_CULLMODE && FaceCullingDisabled)
+	{
+		value = D3DCULL_NONE;
+	}
+
 	// Can't monitor state changes because setShader call to GERD may change the states!
 	if (RenderStates[state]==value) return;
 

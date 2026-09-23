@@ -4304,6 +4304,22 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			break;
 		}
 
+		// Toggle back face culling for everything drawn on this client.
+		case GameMessage::MSG_CHEAT_TOGGLE_FACE_CULLING:
+		{
+			if (TheDisplay->toggleFaceCulling())
+			{
+				TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugFaceCullingOn", L"Face Culling: On") );
+			}
+			else
+			{
+				TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugFaceCullingOff", L"Face Culling: Off (Double Sided)") );
+			}
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
 #endif
 
 		//-----------------------------------------------------------------------------------------

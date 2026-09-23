@@ -1827,6 +1827,12 @@ Int W3DDisplay::getLastFrameDrawCalls()
 	return Debug_Statistics::Get_Draw_Calls();
 }
 
+Bool W3DDisplay::toggleFaceCulling()
+{
+	DX8Wrapper::Set_Face_Culling_Disabled(!DX8Wrapper::Is_Face_Culling_Disabled());
+	return !DX8Wrapper::Is_Face_Culling_Disabled();
+}
+
 // W3DDisplay::update =========================================================
 /** Update the client state of the W3D Display */
 //=============================================================================
