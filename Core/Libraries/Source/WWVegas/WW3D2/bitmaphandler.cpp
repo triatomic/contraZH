@@ -405,6 +405,11 @@ void BitmapHandlerClass::Copy_Image(
 				}
 			}
 		}
+		else if (src_surface_format==dest_surface_format && src_surface_format!=WW3D_FORMAT_P8 && !has_hsv_shift) {
+			for (unsigned y=0;y<dest_surface_height;++y) {
+				memcpy(dest_surface+y*dest_surface_pitch,src_surface+y*src_surface_pitch,dest_surface_width*dest_bpp);
+			}
+		}
 		else {
 			for (unsigned y=0;y<dest_surface_height;++y) {
 				unsigned char* dest_ptr=dest_surface+y*dest_surface_pitch;

@@ -2416,6 +2416,53 @@ static HRESULT Create_D3D_Texture(
 {
 	const WW3DFormat actual=Get_Closest_Supported_Texture_Format(format, render_target);
 
+	// D3DXCreateTexture also fitted the size to what the device takes, so that is reproduced too
+	const D3DCAPS8& caps=DX8Wrapper::Get_Current_Caps()->Get_DX8_Caps();
+	if ((caps.TextureCaps & D3DPTEXTURECAPS_POW2) &&
+		!((caps.TextureCaps & D3DPTEXTURECAPS_NONPOW2CONDITIONAL) && mip_level_count==1))
+	{
+		unsigned pow2=1;
+		while (pow2<width)
+		{
+			pow2*=2;
+		}
+		width=pow2;
+		pow2=1;
+		while (pow2<height)
+		{
+			pow2*=2;
+		}
+		height=pow2;
+	}
+	if (caps.TextureCaps & D3DPTEXTURECAPS_SQUAREONLY)
+	{
+		width=height=(width>height) ? width : height;
+	}
+	if (caps.MaxTextureWidth!=0 && width>caps.MaxTextureWidth)
+	{
+		width=caps.MaxTextureWidth;
+	}
+	if (caps.MaxTextureHeight!=0 && height>caps.MaxTextureHeight)
+	{
+		height=caps.MaxTextureHeight;
+	}
+	if (actual>=WW3D_FORMAT_DXT1 && actual<=WW3D_FORMAT_DXT5)
+	{
+		width=(width+3)&~3u;
+		height=(height+3)&~3u;
+	}
+
+	// More levels than the size allows fails the call, where D3DX clamped the count
+	unsigned max_levels=1;
+	for (unsigned size=(width>height) ? width : height; size>1; size/=2)
+	{
+		++max_levels;
+	}
+	if (mip_level_count>max_levels)
+	{
+		mip_level_count=max_levels;
+	}
+
 	return DX8Wrapper::_Get_D3D_Device8()->CreateTexture(
 		width,
 		height,
@@ -2587,6 +2634,12 @@ IDirect3DTexture8 * DX8Wrapper::_Create_DX8_Texture
 	// This function will create a texture with a different (but similar) format if the surface is
 	// not in a supported texture format.
 	WW3DFormat format=D3DFormat_To_WW3DFormat(surface_desc.Format);
+
+	// Compressed levels cannot be filtered here, so a compressed copy keeps only its top level
+	if (format>=WW3D_FORMAT_DXT1 && format<=WW3D_FORMAT_DXT5)
+	{
+		mip_level_count=MIP_LEVELS_1;
+	}
 	texture = _Create_DX8_Texture(surface_desc.Width, surface_desc.Height, format, mip_level_count);
 
 	// Copy the surface to the texture
@@ -2918,9 +2971,22 @@ void DX8Wrapper::_Update_Texture(TextureClass *system, TextureClass *video)
 }
 
 #if defined(BUILD_WITH_D3D9)
+void DX8Wrapper::Forget_Shader_Handle(DWORD handle)
+{
+	// No handle or FVF code is all ones, so this never matches a real value
+	if (Vertex_Shader == handle)
+	{
+		Vertex_Shader = 0xFFFFFFFF;
+	}
+	if (Pixel_Shader == handle)
+	{
+		Pixel_Shader = 0xFFFFFFFF;
+	}
+}
+
 // D3D9 dropped CopyRects. The replacement depends on where the surfaces live:
 // UpdateSurface only reads system memory, StretchRect only reads the default pool.
-void DX8Wrapper::_Copy_DX8_Rects(
+HRESULT DX8Wrapper::_Copy_DX8_Rects(
 	IDirect3DSurface8* pSourceSurface,
 	CONST RECT* pSourceRectsArray,
 	UINT cRects,
@@ -2935,8 +3001,11 @@ void DX8Wrapper::_Copy_DX8_Rects(
 	D3DSURFACE_DESC dest_desc;
 	if (FAILED(pSourceSurface->GetDesc(&src_desc)) || FAILED(pDestinationSurface->GetDesc(&dest_desc)))
 	{
-		return;
+		return D3DERR_INVALIDCALL;
 	}
+
+	HRESULT result = D3D_OK;
+	HRESULT hr = D3D_OK;
 
 	// A null rect array means the whole surface, which D3D9 spells as one full-size rect
 	RECT whole_surface;
@@ -2967,21 +3036,25 @@ void DX8Wrapper::_Copy_DX8_Rects(
 				dest_desc.Format == src_desc.Format;
 			if (whole)
 			{
-				DX8CALL(GetRenderTargetData(pSourceSurface, pDestinationSurface));
+				DX8CALL_HRES(GetRenderTargetData(pSourceSurface, pDestinationSurface), hr);
 			}
 			else
 			{
 				IDirect3DSurface8* full = nullptr;
-				DX8CALL(CreateOffscreenPlainSurface(src_desc.Width, src_desc.Height, src_desc.Format, D3DPOOL_SYSTEMMEM, &full, nullptr));
+				DX8CALL_HRES(CreateOffscreenPlainSurface(src_desc.Width, src_desc.Height, src_desc.Format, D3DPOOL_SYSTEMMEM, &full, nullptr), hr);
 				if (full != nullptr)
 				{
-					DX8CALL(GetRenderTargetData(pSourceSurface, full));
-					RECT dest_rect;
-					dest_rect.left = dest_point.x;
-					dest_rect.top = dest_point.y;
-					dest_rect.right = dest_point.x + (src_rect.right - src_rect.left);
-					dest_rect.bottom = dest_point.y + (src_rect.bottom - src_rect.top);
-					DX8_ErrorCode(Load_Surface_From_Surface(pDestinationSurface, &dest_rect, full, &src_rect));
+					DX8CALL_HRES(GetRenderTargetData(pSourceSurface, full), hr);
+					if (SUCCEEDED(hr))
+					{
+						RECT dest_rect;
+						dest_rect.left = dest_point.x;
+						dest_rect.top = dest_point.y;
+						dest_rect.right = dest_point.x + (src_rect.right - src_rect.left);
+						dest_rect.bottom = dest_point.y + (src_rect.bottom - src_rect.top);
+						hr = Load_Surface_From_Surface(pDestinationSurface, &dest_rect, full, &src_rect);
+						DX8_ErrorCode(hr);
+					}
 					full->Release();
 				}
 			}
@@ -2993,12 +3066,12 @@ void DX8Wrapper::_Copy_DX8_Rects(
 			dest_rect.top = dest_point.y;
 			dest_rect.right = dest_point.x + (src_rect.right - src_rect.left);
 			dest_rect.bottom = dest_point.y + (src_rect.bottom - src_rect.top);
-			DX8CALL(StretchRect(pSourceSurface, &src_rect, pDestinationSurface, &dest_rect, D3DTEXF_NONE));
+			DX8CALL_HRES(StretchRect(pSourceSurface, &src_rect, pDestinationSurface, &dest_rect, D3DTEXF_NONE), hr);
 		}
 		else if (src_desc.Pool == D3DPOOL_SYSTEMMEM && dest_desc.Pool == D3DPOOL_DEFAULT &&
 					src_desc.Format == dest_desc.Format)
 		{
-			DX8CALL(UpdateSurface(pSourceSurface, &src_rect, pDestinationSurface, &dest_point));
+			DX8CALL_HRES(UpdateSurface(pSourceSurface, &src_rect, pDestinationSurface, &dest_point), hr);
 		}
 		else
 		{
@@ -3010,9 +3083,16 @@ void DX8Wrapper::_Copy_DX8_Rects(
 			dest_rect.top = dest_point.y;
 			dest_rect.right = dest_point.x + (src_rect.right - src_rect.left);
 			dest_rect.bottom = dest_point.y + (src_rect.bottom - src_rect.top);
-			DX8_ErrorCode(Load_Surface_From_Surface(pDestinationSurface, &dest_rect, pSourceSurface, &src_rect));
+			hr = Load_Surface_From_Surface(pDestinationSurface, &dest_rect, pSourceSurface, &src_rect);
+			DX8_ErrorCode(hr);
+		}
+
+		if (FAILED(hr))
+		{
+			result = hr;
 		}
 	}
+	return result;
 }
 #endif
 

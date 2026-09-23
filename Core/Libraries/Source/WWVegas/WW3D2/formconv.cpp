@@ -543,6 +543,49 @@ HRESULT Load_Surface_From_Surface(
 		return D3DERR_WRONGTEXTUREFORMAT;
 	}
 
+	// Compressed surfaces are copied block row by block row; converting or scaling them is not supported
+	const bool src_compressed=(src_format>=WW3D_FORMAT_DXT1 && src_format<=WW3D_FORMAT_DXT5);
+	const bool dest_compressed=(dest_format>=WW3D_FORMAT_DXT1 && dest_format<=WW3D_FORMAT_DXT5);
+	if (src_compressed || dest_compressed)
+	{
+		const bool src_whole=(src_rect==nullptr) || (src_rect->left==0 && src_rect->top==0 &&
+			(UINT)src_rect->right==src_desc.Width && (UINT)src_rect->bottom==src_desc.Height);
+		const bool dest_whole=(dest_rect==nullptr) || (dest_rect->left==0 && dest_rect->top==0 &&
+			(UINT)dest_rect->right==dest_desc.Width && (UINT)dest_rect->bottom==dest_desc.Height);
+		if (src_format!=dest_format || !src_whole || !dest_whole ||
+			src_desc.Width!=dest_desc.Width || src_desc.Height!=dest_desc.Height)
+		{
+			return D3DERR_WRONGTEXTUREFORMAT;
+		}
+
+		D3DLOCKED_RECT locked_src;
+		D3DLOCKED_RECT locked_dest;
+		HRESULT hr=src_surface->LockRect(&locked_src, nullptr, D3DLOCK_READONLY);
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+		hr=dest_surface->LockRect(&locked_dest, nullptr, 0);
+		if (FAILED(hr))
+		{
+			src_surface->UnlockRect();
+			return hr;
+		}
+
+		const unsigned block_bytes=(src_format==WW3D_FORMAT_DXT1) ? 8 : 16;
+		const unsigned row_bytes=((src_desc.Width+3)/4)*block_bytes;
+		const unsigned block_rows=(src_desc.Height+3)/4;
+		for (unsigned row=0; row<block_rows; ++row)
+		{
+			memcpy((unsigned char*)locked_dest.pBits+row*locked_dest.Pitch,
+				(const unsigned char*)locked_src.pBits+row*locked_src.Pitch, row_bytes);
+		}
+
+		dest_surface->UnlockRect();
+		src_surface->UnlockRect();
+		return D3D_OK;
+	}
+
 	D3DLOCKED_RECT locked_src;
 	D3DLOCKED_RECT locked_dest;
 	HRESULT hr=src_surface->LockRect(&locked_src, src_rect, D3DLOCK_READONLY);
@@ -662,9 +705,21 @@ void Release_D3D9_Shader(DWORD handle)
 		return;
 	}
 
-	if (entry->VertexShader) entry->VertexShader->Release();
-	if (entry->Declaration)  entry->Declaration->Release();
-	if (entry->PixelShader)  entry->PixelShader->Release();
+	if (entry->VertexShader)
+	{
+		entry->VertexShader->Release();
+	}
+	if (entry->Declaration)
+	{
+		entry->Declaration->Release();
+	}
+	if (entry->PixelShader)
+	{
+		entry->PixelShader->Release();
+	}
+
+	// The slot can be reused, so a cached copy of this handle must not match its successor
+	DX8Wrapper::Forget_Shader_Handle(handle);
 
 	entry->VertexShader=nullptr;
 	entry->Declaration=nullptr;

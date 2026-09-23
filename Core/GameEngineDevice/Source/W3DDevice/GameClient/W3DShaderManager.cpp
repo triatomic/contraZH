@@ -3066,6 +3066,12 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 					if (SUCCEEDED(hr))
 					{
 						*pHandle = Register_D3D9_Vertex_Shader(vertex_shader, declaration);
+						if (*pHandle == 0)
+						{
+							vertex_shader->Release();
+							declaration->Release();
+							hr = E_OUTOFMEMORY;
+						}
 					}
 					else
 					{
@@ -3080,6 +3086,11 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 				if (SUCCEEDED(hr))
 				{
 					*pHandle = Register_D3D9_Pixel_Shader(pixel_shader);
+					if (*pHandle == 0)
+					{
+						pixel_shader->Release();
+						hr = E_OUTOFMEMORY;
+					}
 				}
 			}
 #else
