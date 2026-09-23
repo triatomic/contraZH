@@ -1860,6 +1860,13 @@ void DX8Wrapper::End_Scene(bool flip_frames)
 #endif
 		{
 			WWPROFILE("DX8Device::Present()");
+#if defined(BUILD_WITH_D3D9)
+			if (IsEx)
+			{
+				hr=static_cast<IDirect3DDevice9Ex*>(_Get_D3D_Device8())->PresentEx(nullptr, nullptr, nullptr, nullptr, 0);
+			}
+			else
+#endif
 			hr=_Get_D3D_Device8()->Present(nullptr, nullptr, nullptr, nullptr);
 		}
 
