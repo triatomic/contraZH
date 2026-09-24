@@ -49,6 +49,12 @@ the swell picture below shows the ripple pattern.
 * `ShaderWaterWaveScale = 160` - (World units one wave pattern covers. Higher gives broader waves.)
 * `ShaderWaterWaveStrength = 0.3` - (Steepness of the waves. Drives glint, reflection and bending.)
 
+## Animation
+
+* `WaterAnimationFps = 0` - (Moves the water as if the game ran at this rate, 30 to 60. Without it
+the water speeds up with the frame rate when the game logic is uncapped. 30 gives the original
+speed. 0 moves the water every frame.)
+
 ## Swell
 
 ![Swell and ripples](images/water-swell.svg)
