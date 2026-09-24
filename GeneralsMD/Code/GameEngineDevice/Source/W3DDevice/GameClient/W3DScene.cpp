@@ -1419,16 +1419,18 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 			TheGlobalData->m_unitBumpHeight, TheGlobalData->m_unitNormalMapStrength);
 		W3DShaderManager::setTerrainBumps(TheGlobalData->m_useNormalMaps, TheGlobalData->m_terrainNormalMapStrength,
 			TheGlobalData->m_normalMapDebug);
+		W3DShaderManager::setEmissive(TheGlobalData->m_timeOfDay == TIME_OF_DAY_NIGHT
+			? TheGlobalData->m_unitEmissiveNightIntensity : TheGlobalData->m_unitEmissiveIntensity);
 
 		// Sampled rather than every frame, so a whole match stays readable.
 		static Int specularFrames = 0;
-		Int specularDraws, derivedGroups, normalMapGroups;
-		W3DShaderManager::takeSpecularCounts(specularDraws, derivedGroups, normalMapGroups);
+		Int specularDraws, derivedGroups, normalMapGroups, emissiveGroups;
+		W3DShaderManager::takeSpecularCounts(specularDraws, derivedGroups, normalMapGroups, emissiveGroups);
 		const Int terrainBumpDraws = W3DShaderManager::takeTerrainBumpCount();
 		if (specularFrames % 300 == 0 && specularFrames <= 300 * 15)
 		{
-			DEBUG_LOG(("Specular: frame %d, %d mesh draws, %d groups bumped from brightness, %d from normal maps, pass %s, %d terrain draws bumped",
-				specularFrames, specularDraws, derivedGroups, normalMapGroups,
+			DEBUG_LOG(("Specular: frame %d, %d mesh draws, %d groups bumped from brightness, %d from normal maps, %d glowing, pass %s, %d terrain draws bumped",
+				specularFrames, specularDraws, derivedGroups, normalMapGroups, emissiveGroups,
 				W3DShaderManager::getSpecularPass() != nullptr ? "available" : "unavailable", terrainBumpDraws));
 		}
 		++specularFrames;

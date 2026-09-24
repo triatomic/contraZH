@@ -407,6 +407,28 @@ from further away than units, so it defaults stronger.)
 `NormalMapDebug = Yes` in `Options.ini` paints terrain flat grey with only the bump shading, 4x
 stronger.
 
+### Glow masks
+
+Vehicles and structures can have lit windows, lamps and exhausts that ignore sunlight, shadow and
+cloud, and shine brighter at night. With bloom on, the glowing parts also bloom. Needs the Direct3D
+9 build and a shader model 2 card.
+
+A glow mask sits beside its texture in `Art\Textures` with `_emi` added, e.g. `abbarracks_emi.dds`
+for `abbarracks.tga`:
+
+* Black where nothing glows; the colour is the light added on top of the lit texture.
+* DDS only, laid out on the same UVs as the texture it belongs to.
+* Textures without one cost nothing.
+
+Tuned in the mod's `GameData.ini`:
+
+* `UnitEmissiveIntensity = 0.5` - (How bright the masks are by day. 0 turns them off by day.)
+* `UnitEmissiveNightIntensity = 1.5` - (The same at night.)
+
+Notes:
+* Skinned meshes glow but do not bloom.
+* Meshes with a glow mask are not hardware instanced while bloom is on.
+
 ### Shader water
 
 Lakes, seas and rivers are shaded per pixel, with refraction, reflection, sun glint, foam and

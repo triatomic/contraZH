@@ -104,7 +104,9 @@ TextureBaseClass::TextureBaseClass
 	ThumbnailLoadTask(nullptr),
 	HSVShift(0.0f,0.0f,0.0f),
 	NormalMap(nullptr),
-	NormalMapChecked(false)
+	NormalMapChecked(false),
+	EmissiveMap(nullptr),
+	EmissiveMapChecked(false)
 {
 }
 
@@ -121,6 +123,7 @@ TextureBaseClass::~TextureBaseClass()
 	ThumbnailLoadTask=nullptr;
 
 	REF_PTR_RELEASE(NormalMap);
+	REF_PTR_RELEASE(EmissiveMap);
 
 	if (D3DTexture)
 	{
@@ -135,6 +138,12 @@ void TextureBaseClass::Set_Normal_Map(TextureClass *normal_map)
 {
 	REF_PTR_SET(NormalMap, normal_map);
 	NormalMapChecked = true;
+}
+
+void TextureBaseClass::Set_Emissive_Map(TextureClass *emissive_map)
+{
+	REF_PTR_SET(EmissiveMap, emissive_map);
+	EmissiveMapChecked = true;
 }
 
 

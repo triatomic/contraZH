@@ -1508,6 +1508,10 @@ static Bool BumpSupported = FALSE;
 static Int BumpDerivedCount = 0;
 static Int BumpNormalMapCount = 0;
 
+// The glow masks the specular pass adds, set once a frame by the scene.
+static Real EmissiveIntensity = 0.0f;
+static Int EmissiveMapCount = 0;
+
 // The terrain normal maps, set once a frame by the scene.
 static Bool TerrainBumpEnabled = FALSE;
 static Real TerrainBumpStrength = 1.0f;
@@ -1905,8 +1909,9 @@ W3DShaderInterface *SpecularShaderList[]=
 #define SPECULAR_NORMAL_STAGE	1
 #define SPECULAR_POSITION_STAGE	2
 #define SPECULAR_SHADOW_STAGE	3
-// The normal map comes last and reads the mesh's UVs from TEXCOORD0.
+// The normal and glow maps come last and read the mesh's UVs from TEXCOORD0.
 #define SPECULAR_NORMAL_MAP_STAGE	4
+#define SPECULAR_EMISSIVE_STAGE		5
 
 // The bumped shaders take screen-space derivatives, which only ps_2_a and up have.
 static Bool Supports_Pixel_Shader_2_a(const DX8Caps *caps)
@@ -1993,6 +1998,8 @@ Int SpecularShader::set(Int pass)
 	Set_Camera_Space_Texcoord(SPECULAR_POSITION_STAGE, D3DTSS_TCI_CAMERASPACEPOSITION);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(SPECULAR_NORMAL_MAP_STAGE, D3DTSS_TEXCOORDINDEX, 0);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(SPECULAR_NORMAL_MAP_STAGE, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(SPECULAR_EMISSIVE_STAGE, D3DTSS_TEXCOORDINDEX, 0);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(SPECULAR_EMISSIVE_STAGE, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
 
 	// The mesh is redrawn at the same depth, so EQUAL limits the pass to pixels the first
 	// draw wrote. It adds its colour to them after scaling them by its alpha.
@@ -2030,35 +2037,53 @@ Int SpecularShader::set(Int pass)
 	return TRUE;
 }
 
+// Loads <name><suffix> beside the texture, or returns null. The caller releases it.
+static TextureClass *Load_Companion_Texture(TextureClass *texture, const char *suffix)
+{
+	StringClass name(texture->Get_Texture_Name());
+	const char *dot = strrchr(name.Peek_Buffer(), '.');
+	if (dot != nullptr)
+	{
+		const Int start = (Int)(dot - name.Peek_Buffer());
+		name.Erase(start, name.Get_Length() - start);
+	}
+
+	// A missing file would load as the missing-texture placeholder, so it is checked first.
+	if (name.Is_Empty())
+	{
+		return nullptr;
+	}
+	name += suffix;
+	file_auto_ptr file(_TheFileFactory, name.Peek_Buffer());
+	if (!file->Is_Available())
+	{
+		return nullptr;
+	}
+	return WW3DAssetManager::Get_Instance()->Get_Texture(name.Peek_Buffer());
+}
+
 // Looks for <name>_nrm.dds beside the texture, once per texture.
 static TextureClass *Find_Normal_Map(TextureClass *texture)
 {
 	if (!texture->Is_Normal_Map_Checked())
 	{
-		TextureClass *normalMap = nullptr;
-		StringClass name(texture->Get_Texture_Name());
-		const char *dot = strrchr(name.Peek_Buffer(), '.');
-		if (dot != nullptr)
-		{
-			const Int start = (Int)(dot - name.Peek_Buffer());
-			name.Erase(start, name.Get_Length() - start);
-		}
-
-		// A missing file would load as the missing-texture placeholder, so it is checked first.
-		if (!name.Is_Empty())
-		{
-			name += "_nrm.dds";
-			file_auto_ptr file(_TheFileFactory, name.Peek_Buffer());
-			if (file->Is_Available())
-			{
-				normalMap = WW3DAssetManager::Get_Instance()->Get_Texture(name.Peek_Buffer());
-			}
-		}
-
+		TextureClass *normalMap = Load_Companion_Texture(texture, "_nrm.dds");
 		texture->Set_Normal_Map(normalMap);
 		REF_PTR_RELEASE(normalMap);
 	}
 	return texture->Peek_Normal_Map();
+}
+
+// Looks for <name>_emi.dds beside the texture, once per texture.
+static TextureClass *Find_Emissive_Map(TextureClass *texture)
+{
+	if (!texture->Is_Emissive_Map_Checked())
+	{
+		TextureClass *emissiveMap = Load_Companion_Texture(texture, "_emi.dds");
+		texture->Set_Emissive_Map(emissiveMap);
+		REF_PTR_RELEASE(emissiveMap);
+	}
+	return texture->Peek_Emissive_Map();
 }
 
 void SpecularShader::setTexture(TextureClass *texture)
@@ -2089,6 +2114,15 @@ void SpecularShader::setTexture(TextureClass *texture)
 	DX8Wrapper::Set_Texture(SPECULAR_NORMAL_MAP_STAGE, (bump == BUMP_NORMAL_MAP) ? normalMap : nullptr);
 	DX8Wrapper::Set_Pixel_Shader(shaders[bump]);
 
+	TextureClass *emissiveMap = (EmissiveIntensity > 0.0f && texture != nullptr) ? Find_Emissive_Map(texture) : nullptr;
+	DX8Wrapper::Set_Texture(SPECULAR_EMISSIVE_STAGE, emissiveMap);
+	Vector4 emissive((emissiveMap != nullptr) ? EmissiveIntensity : 0.0f, 0.0f, 0.0f, 0.0f);
+	DX8Wrapper::Set_Pixel_Shader_Constant(7, &emissive, 1);
+	if (emissiveMap != nullptr)
+	{
+		++EmissiveMapCount;
+	}
+
 	if (bump == BUMP_DERIVED)
 	{
 		++BumpDerivedCount;
@@ -2103,6 +2137,7 @@ void SpecularShader::reset()
 {
 	DX8Wrapper::Set_Pixel_Shader(0);
 	DX8Wrapper::Set_Texture(SPECULAR_NORMAL_MAP_STAGE, nullptr);
+	DX8Wrapper::Set_Texture(SPECULAR_EMISSIVE_STAGE, nullptr);
 
 	if (m_shadowed && TheW3DShadowMap != nullptr)
 	{
@@ -2117,6 +2152,8 @@ void SpecularShader::reset()
 	}
 	DX8Wrapper::Set_DX8_Texture_Stage_State(SPECULAR_NORMAL_MAP_STAGE, D3DTSS_TEXCOORDINDEX,
 		D3DTSS_TCI_PASSTHRU | SPECULAR_NORMAL_MAP_STAGE);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(SPECULAR_EMISSIVE_STAGE, D3DTSS_TEXCOORDINDEX,
+		D3DTSS_TCI_PASSTHRU | SPECULAR_EMISSIVE_STAGE);
 
 	// Z, blend and fog are ShaderClass state, so the next shader set restores them in full.
 	ShaderClass::Invalidate();
@@ -2194,6 +2231,12 @@ void W3DShaderManager::setSurfaceBumps(Bool enabled, const Vector3 &ambient, Rea
 	BumpNormalMapStrength = normalMapStrength;
 }
 
+void W3DShaderManager::setEmissive(Real intensity)
+{
+	EmissiveIntensity = intensity;
+	DX8MeshRendererClass::Set_Bloom_Emissive_Intensity(intensity);
+}
+
 void W3DShaderManager::setTerrainBumps(Bool enabled, Real strength, Bool debug)
 {
 	TerrainBumpEnabled = enabled;
@@ -2227,20 +2270,22 @@ Int W3DShaderManager::takeTerrainBumpCount()
 	return count;
 }
 
-void W3DShaderManager::takeSpecularCounts(Int &meshes, Int &derived, Int &normalMapped)
+void W3DShaderManager::takeSpecularCounts(Int &meshes, Int &derived, Int &normalMapped, Int &emissive)
 {
 	meshes = SpecularPassCount;
 	derived = BumpDerivedCount;
 	normalMapped = BumpNormalMapCount;
+	emissive = EmissiveMapCount;
 	SpecularPassCount = 0;
 	BumpDerivedCount = 0;
 	BumpNormalMapCount = 0;
+	EmissiveMapCount = 0;
 }
 
 MaterialPassClass *W3DShaderManager::getSpecularPass()
 {
 	const Bool bumps = (BumpEnabled && BumpSupported);
-	if (W3DShadersPassCount[ST_SPECULAR] == 0 || (SpecularColor.Length2() <= 0.0f && !bumps))
+	if (W3DShadersPassCount[ST_SPECULAR] == 0 || (SpecularColor.Length2() <= 0.0f && !bumps && EmissiveIntensity <= 0.0f))
 	{
 		return nullptr;
 	}

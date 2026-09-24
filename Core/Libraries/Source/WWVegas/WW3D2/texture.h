@@ -172,6 +172,11 @@ public:
 	TextureClass *Peek_Normal_Map() const { return NormalMap; }
 	void Set_Normal_Map(TextureClass *normal_map);
 
+	// The _emi glow mask the lighting pass adds over this texture, looked up once by the game.
+	bool Is_Emissive_Map_Checked() const { return EmissiveMapChecked; }
+	TextureClass *Peek_Emissive_Map() const { return EmissiveMap; }
+	void Set_Emissive_Map(TextureClass *emissive_map);
+
 	// Support for self managed textures
 	bool Is_Dirty() { WWASSERT(Pool==POOL_DEFAULT); return Dirty; };
 	void Set_Dirty() { WWASSERT(Pool==POOL_DEFAULT); Dirty=true; }
@@ -261,6 +266,8 @@ private:
 
 	TextureClass *NormalMap;
 	bool NormalMapChecked;
+	TextureClass *EmissiveMap;
+	bool EmissiveMapChecked;
 
 };
 

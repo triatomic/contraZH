@@ -273,6 +273,13 @@ bool DX8TextureCategoryClass::Is_Additive() const
 	return shader.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_ONE || shader.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_SRC_ALPHA;
 }
 
+// A glow mask on the texture replays the category into the bloom target, drawing the mask alone
+bool DX8TextureCategoryClass::Is_Emissive_Glow() const
+{
+	return DX8MeshRendererClass::Get_Bloom_Emissive_Intensity() > 0.0f && textures[0] != nullptr &&
+		textures[0]->Peek_Emissive_Map() != nullptr && !Is_Additive();
+}
+
 void DX8TextureCategoryClass::Add_Render_Task(DX8PolygonRendererClass * p_renderer,MeshClass * p_mesh)
 {
 	PolyRenderTaskClass * new_prt = new PolyRenderTaskClass(p_renderer,p_mesh);
@@ -2534,10 +2541,11 @@ void DX8TextureCategoryClass::Render()
 
 
 	// finished tasks are kept for the bloom replay instead of being freed
-	const bool keepForBloom = DX8MeshRendererClass::Is_Bloom_Capture_Enabled() && Is_Additive();
+	const bool keepForBloom = DX8MeshRendererClass::Is_Bloom_Capture_Enabled() && (Is_Additive() || Is_Emissive_Glow());
 
+	// instanced groups leave the task list, so they would miss the replay
 	static std::vector<DX8PolygonRendererClass *> eligibleRenderers;
-	const bool categoryAllowsInstancing = Allows_Instancing();
+	const bool categoryAllowsInstancing = Allows_Instancing() && !keepForBloom;
 	if (categoryAllowsInstancing && DX8InstancingClass::Get_Pass() != DX8InstancingClass::PASS_NONE)
 	{
 		Render_Instanced_Groups(vmaterial);
@@ -2667,16 +2675,38 @@ void DX8TextureCategoryClass::Render()
 // second draw of the kept tasks into the bloom target, with the container's buffers already bound
 void DX8TextureCategoryClass::Render_Bloom()
 {
+	const bool glow = Is_Emissive_Glow();
 	for (unsigned i=0;i<MeshMatDescClass::MAX_TEX_STAGES;++i)
 	{
-		DX8Wrapper::Set_Texture(i,Peek_Texture(i));
+		TextureClass *texture = Peek_Texture(i);
+		if (glow)
+		{
+			texture = (i == 0) ? texture->Peek_Emissive_Map() : nullptr;
+		}
+		DX8Wrapper::Set_Texture(i,texture);
 	}
 
 	VertexMaterialClass *vmaterial=(VertexMaterialClass *)Peek_Material();
 	DX8Wrapper::Set_Material(vmaterial);
 
-	const ShaderClass theShader = Get_Shader();
+	ShaderClass theShader = Get_Shader();
+	if (glow)
+	{
+		const ShaderClass::CullModeType cullMode = theShader.Get_Cull_Mode();
+		theShader = ShaderClass::_PresetAdditiveShader;
+		theShader.Set_Cull_Mode(cullMode);
+	}
 	DX8Wrapper::Set_Shader(theShader);
+
+	// the mask is scaled by the texture factor in place of the lit vertex colour
+	if (glow)
+	{
+		DX8Wrapper::Apply_Render_State_Changes();
+		const float intensity = WWMath::Clamp(DX8MeshRendererClass::Get_Bloom_Emissive_Intensity(), 0.0f, 1.0f);
+		const unsigned level = (unsigned)(intensity * 255.0f);
+		DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, D3DCOLOR_ARGB(255, level, level, level));
+		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_COLORARG2, D3DTA_TFACTOR);
+	}
 
 	while (bloom_task_head != nullptr)
 	{
@@ -2684,6 +2714,11 @@ void DX8TextureCategoryClass::Render_Bloom()
 		bloom_task_head = prt->Get_Next_Visible();
 		Render_Task(prt, vmaterial, theShader, theShader, true);
 		delete prt;
+	}
+
+	if (glow)
+	{
+		ShaderClass::Invalidate();
 	}
 }
 
@@ -2917,6 +2952,7 @@ void DX8MeshRendererClass::Shutdown()
 // ----------------------------------------------------------------------------
 
 bool DX8MeshRendererClass::bloom_capture=false;
+float DX8MeshRendererClass::bloom_emissive_intensity=0.0f;
 int DX8MeshRendererClass::stats_scene=DX8InstancingStatsStruct::SCENE_MAIN;
 DX8InstancingStatsStruct DX8MeshRendererClass::instancing_stats;
 

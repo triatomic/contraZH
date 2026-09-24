@@ -102,6 +102,7 @@ public:
 	void									Clear_Render_List();
 
 	bool									Is_Additive() const;
+	bool									Is_Emissive_Glow() const;
 	void									Render_Bloom();
 	void									Clear_Bloom_List();
 
@@ -373,6 +374,9 @@ public:
 	// While capture is on, Flush keeps every additive draw so Flush_Bloom can draw it again into the bloom target.
 	static void				Enable_Bloom_Capture(bool enable) { bloom_capture=enable; }
 	static bool				Is_Bloom_Capture_Enabled() { return bloom_capture; }
+	// How brightly _emi glow masks replay into the bloom target, 0 for not at all.
+	static void				Set_Bloom_Emissive_Intensity(float intensity) { bloom_emissive_intensity=intensity; }
+	static float			Get_Bloom_Emissive_Intensity() { return bloom_emissive_intensity; }
 	void						Add_Bloom_Category(DX8TextureCategoryClass* category);
 	void						Flush_Bloom();
 	void						Clear_Bloom_Lists();
@@ -415,6 +419,7 @@ protected:
 	FVFCategoryList *									texture_category_container_list_skin;
 	SimpleDynVecClass<DX8TextureCategoryClass *>	bloom_categories;		// categories holding kept additive tasks
 	static bool											bloom_capture;
+	static float										bloom_emissive_intensity;
 	static int											stats_scene;
 	static DX8InstancingStatsStruct				instancing_stats;
 

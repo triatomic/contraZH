@@ -250,6 +250,8 @@ public:
 	Real m_unitBumpHeight;			///< GameData UnitBumpHeight: rise, in world units, of full brightness on textures without a normal map, 0 for flat
 	Real m_unitNormalMapStrength;	///< GameData UnitNormalMapStrength: scales the tilt of authored _nrm normal maps
 	Real m_terrainNormalMapStrength;	///< GameData TerrainNormalMapStrength: scales the tilt of terrain _nrm normal maps
+	Real m_unitEmissiveIntensity;		///< GameData UnitEmissiveIntensity: brightness of _emi glow masks on vehicles and structures by day, 0 for none
+	Real m_unitEmissiveNightIntensity;	///< GameData UnitEmissiveNightIntensity: the same at night
 	Int  m_textureReductionFactor;	//how much to cut texture resolution: 2 is half, 3 is quarter, etc.
 	Bool m_enableBehindBuildingMarkers;
 	Real m_waterPositionX;

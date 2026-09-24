@@ -255,6 +255,8 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ "UnitBumpHeight",						INI::parseReal,				nullptr,			offsetof( GlobalData, m_unitBumpHeight ) },
 	{ "UnitNormalMapStrength",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_unitNormalMapStrength ) },
 	{ "TerrainNormalMapStrength",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_terrainNormalMapStrength ) },
+	{ "UnitEmissiveIntensity",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_unitEmissiveIntensity ) },
+	{ "UnitEmissiveNightIntensity",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_unitEmissiveNightIntensity ) },
 	{ "TextureReductionFactor",			INI::parseInt,				nullptr,			offsetof( GlobalData, m_textureReductionFactor ) },
 	{ "UseBehindBuildingMarker",		INI::parseBool,				nullptr,			offsetof( GlobalData, m_enableBehindBuildingMarkers ) },
 	{ "WaterPositionX",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_waterPositionX ) },
@@ -897,6 +899,8 @@ GlobalData::GlobalData()
 	m_unitBumpHeight = 0.15f;
 	m_unitNormalMapStrength = 1.0f;
 	m_terrainNormalMapStrength = 2.0f;
+	m_unitEmissiveIntensity = 0.5f;
+	m_unitEmissiveNightIntensity = 1.5f;
 	m_textureReductionFactor = -1;
 	m_enableBehindBuildingMarkers = TRUE;
 	m_scriptDebug = FALSE;

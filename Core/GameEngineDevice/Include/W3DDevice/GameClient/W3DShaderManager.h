@@ -110,15 +110,17 @@ public:
 	/// Sets the bump detail the specular pass shades, once a frame. height is the rise, in world
 	/// units, of full brightness on textures without a normal map, and 0 leaves them flat.
 	static void setSurfaceBumps(Bool enabled, const Vector3 &ambient, Real height, Real normalMapStrength);
+	/// Sets how brightly the specular pass adds _emi glow masks, once a frame. 0 turns them off.
+	static void setEmissive(Real intensity);
 	/// Sets whether the terrain shaders read the normal atlas in TERRAIN_NORMAL_TEXTURE, and how strongly.
 	/// debug shows only the bump's shading, on grey.
 	static void setTerrainBumps(Bool enabled, Real strength, Bool debug);
 	/// How many terrain draws used the normal atlas since the last call.
 	static Int takeTerrainBumpCount();
 	/// How many mesh draws the specular pass ran on, and how many polygon groups of those it
-	/// bumped from brightness or from a normal map, since the last call.
-	static void takeSpecularCounts(Int &meshes, Int &derived, Int &normalMapped);
-	/// The pass objects push for a per-pixel sun highlight and bumps, or null when both are off or unsupported.
+	/// bumped from brightness or from a normal map, or lit with a glow mask, since the last call.
+	static void takeSpecularCounts(Int &meshes, Int &derived, Int &normalMapped, Int &emissive);
+	/// The pass objects push for a per-pixel sun highlight, bumps and glow, or null when all are off or unsupported.
 	static MaterialPassClass *getSpecularPass();
 	/// Whether the device runs ps_2_a shaders, which have gradients and 512 instruction slots.
 	static Bool supportsPixelShader2a();

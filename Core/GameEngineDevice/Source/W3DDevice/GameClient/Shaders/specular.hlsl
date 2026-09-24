@@ -18,6 +18,9 @@
 // and 2 reads a tangent-space normal map from stage 4 on the mesh's own UVs. Both bumped
 // variants build their frame from screen-space derivatives, because meshes carry no
 // tangents, so they need ps_2_a.
+//
+// Every variant adds the texture's _emi glow mask from stage 5, unaffected by shadow and
+// bumps. Meshes without one get zero intensity, so the empty stage adds nothing.
 
 sampler2D MeshTexture : register(s0);
 
@@ -32,11 +35,14 @@ sampler2D ShadowMap : register(s3);
 sampler2D NormalMap : register(s4);
 #endif
 
+sampler2D EmissiveMap : register(s5);
+
 float4 SunDirection : register(c1);   // camera space, towards the sun
 float4 SunColor     : register(c2);   // sun colour times specular intensity
 float4 Gloss        : register(c3);   // x = specular power, y = 1 for the debug view
 float4 Bump         : register(c6);   // x = height of full brightness, y = normal map strength, z = ambient brightness
 float4 SunDiffuse   : register(c5);   // sun colour the mesh was lit with
+float4 Emissive     : register(c7);   // x = glow mask intensity, 0 without a mask
 
 struct PsIn
 {
@@ -151,6 +157,8 @@ float4 main(PsIn input) : COLOR
     darken = saturate(1.0f + sun * min(change, 0.0f) / max(before, 0.05f));
     color += texel * SunDiffuse.rgb * max(change, 0.0f);
 #endif
+
+    color += tex2D(EmissiveMap, input.TexCoord).rgb * Emissive.x;
 
     // The debug view tints everything the pass covers faintly and shows the highlight 8x.
     float3 debugColor = float3(1.0f, 0.0f, 1.0f) * (0.15f + highlight * 8.0f);
