@@ -25,37 +25,15 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-// tell the compiler to only load this file once
-
 #pragma once
 
 #include "Lib/BaseDefines.h"
-#include "Lib/BaseTypeCore.h"
 
-//-----------------------------------------------------------------------------
-typedef wchar_t WideChar;  ///< multi-byte character representations
+#include <math.h>
+#include <string.h>
 
-//-----------------------------------------------------------------------------
-// For twiddling bits
-//-----------------------------------------------------------------------------
-// TheSuperHackers @build xezon 17/03/2025 Renames BitTest to BitIsSet to prevent conflict with BitTest macro from winnt.h
-#define BitIsSet( x, i ) ( ( (x) & (i) ) != 0 )
-#define BitsAreSet( x, i ) ( ( (x) & (i) ) == (i) )
-#define BitSet( x, i ) ( (x) |= (i) )
-#define BitClear( x, i ) ( (x ) &= ~(i) )
-#define BitToggle( x, i ) ( (x) ^= (i) )
-
-//-------------------------------------------------------------------------------------------------
-#define REAL_TO_INT(x)						((Int)(x))
-#define REAL_TO_UNSIGNEDINT(x)		((UnsignedInt)(x))
-#define REAL_TO_SHORT(x)					((Short)(x))
-#define REAL_TO_UNSIGNEDSHORT(x)	((UnsignedShort)(x))
-#define REAL_TO_BYTE(x)						((Byte)(x))
-#define REAL_TO_UNSIGNEDBYTE(x)		((UnsignedByte)(x))
-#define REAL_TO_CHAR(x)						((Char)(x))
-#define DOUBLE_TO_REAL(x)					((Real)(x))
-#define DOUBLE_TO_INT(x)					((Int)(x))
-#define INT_TO_REAL(x)						((Real)(x))
+// TheSuperHackers @build feliwir 07/04/2025 Adds utility macros for cross-platform compatibility
+#include <Utility/compat.h>
 
 #include "BaseFunctions.h"
 #include "RealRange.h"

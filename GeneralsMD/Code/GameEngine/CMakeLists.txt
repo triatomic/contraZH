@@ -1443,7 +1443,7 @@ if(RTS_BUILD_OPTION_GAME_MCP)
 endif()
 
 target_precompile_headers(z_gameengine PRIVATE
-    [["Precompiled/precompiled.h"]] # Must be first
+    [["Precompiled/BasePrecomp.h"]] # Must be first
 )
 
 # Simulation sources may only reach transcendental math through the WWMath and Trig wrappers.
