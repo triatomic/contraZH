@@ -411,7 +411,7 @@ stronger.
 
 Vehicles and structures can have lit windows, lamps and exhausts that ignore sunlight, shadow and
 cloud, and shine brighter at night. With bloom on, the glowing parts also bloom. Needs the Direct3D
-9 build and a shader model 2 card.
+9 build and a shader model 2 card. They draw with the specular pass, so `Specular = No` turns them off too.
 
 A glow mask sits beside its texture in `Art\Textures` with `_emi` added, e.g. `abbarracks_emi.dds`
 for `abbarracks.tga`:

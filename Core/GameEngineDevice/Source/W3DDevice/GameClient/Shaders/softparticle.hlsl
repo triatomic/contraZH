@@ -23,7 +23,7 @@ float4 WorldZ      : register(c2);
 float4 HeightMap   : register(c3);   // xy scale and zw offset from world xy to height texture
 float4 HeightDecode : register(c4);  // weights of the high and low height bytes
 #endif
-float4 Params      : register(c5);   // x = 1 / fade distance, y = 1 to fade colour too, z = 1 to fade towards white
+float4 Params      : register(c5);   // x = 1 / fade distance, y = 1 to fade colour too, z = 1 to fade towards white, w = sign of depth along the view
 
 struct PsIn
 {
@@ -43,7 +43,7 @@ float4 main(PsIn input) : COLOR
 
     // Depth along the view for both, with the sign that makes further away larger.
     float sceneZ = (Linearize.x - stored * Linearize.y) / (stored * Linearize.z - Linearize.w);
-    float gap = (sceneZ - input.Position.z) * Linearize.z;
+    float gap = (sceneZ - input.Position.z) * Params.w;
 #else
     float3 world = float3(dot(position, WorldX), dot(position, WorldY), dot(position, WorldZ));
     float2 heightBytes = tex2D(SurfaceTexture, world.xy * HeightMap.xy + HeightMap.zw).rg;

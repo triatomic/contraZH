@@ -37,7 +37,7 @@ public:
 	void add(const Coord3D &position, Real radius, Real width, Real strength, UnsignedInt durationMs);
 	/// draws the live rings over the scene, after the particles
 	void render(RenderInfoClass &rinfo);
-	void ReleaseResources();	///< drops the scene copy before a device reset; render recreates it
+	void ReleaseResources();	///< drops the scene copy and shader before a device reset; render recreates them
 
 private:
 	enum { MAX_SHOCKWAVES = 16 };
@@ -51,8 +51,6 @@ private:
 		UnsignedInt startMs;
 		UnsignedInt durationMs;
 	};
-
-	Bool copyScene();
 
 	Shockwave m_shockwaves[MAX_SHOCKWAVES];
 	Int m_count;

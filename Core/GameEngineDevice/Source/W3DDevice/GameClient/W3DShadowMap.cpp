@@ -637,9 +637,13 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 	}
 	++passCount;
 
+	// Kept tasks would replay into the bloom target alongside the main pass's.
+	const bool bloomCapture = DX8MeshRendererClass::Is_Bloom_Capture_Enabled();
+	DX8MeshRendererClass::Enable_Bloom_Capture(false);
 	DX8MeshRendererClass::Set_Stats_Scene(DX8InstancingStatsStruct::SCENE_SHADOW_DEPTH);
 	TheDX8MeshRenderer.Flush();
 	DX8MeshRendererClass::Set_Stats_Scene(DX8InstancingStatsStruct::SCENE_MAIN);
+	DX8MeshRendererClass::Enable_Bloom_Capture(bloomCapture);
 
 	// Sorted meshes, often foliage, were deferred rather than drawn. Flushed here they
 	// draw into the map with the sun's matrices, and not into the main view later.

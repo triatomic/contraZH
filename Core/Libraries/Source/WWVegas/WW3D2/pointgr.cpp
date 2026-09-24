@@ -956,10 +956,11 @@ void PointGroupClass::Render(RenderInfoClass &rinfo)
 	                  WW3D::Is_Sorting_Enabled() &&
 	                  !Get_Flag(DISABLE_SORTING);
 
-	// Camera-facing sprites fade where they near the scene behind them. Alpha-tested ones stay crisp.
+	// Camera-facing blended sprites fade where they near the scene behind them. Opaque and alpha-tested ones stay crisp.
 	SoftParticleHookClass *soft_hook = SortingRendererClass::Peek_Soft_Particle_Hook();
 	const bool soft = soft_hook != nullptr && Billboard && Texture != nullptr &&
-	                  Shader.Get_Alpha_Test() == ShaderClass::ALPHATEST_DISABLE;
+	                  Shader.Get_Alpha_Test() == ShaderClass::ALPHATEST_DISABLE &&
+	                  Shader.Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO;
 
 	IndexBufferClass *indexbuffer;
 	int	verticesperprimitive;/// lorenzen fixed

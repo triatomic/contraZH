@@ -40,6 +40,8 @@ public:
 	virtual bool Begin(const ShaderClass &shader) override;
 	virtual void End() override;
 
+	void ReleaseResources();	///< drops the shaders before a device reset; the next draw reloads them
+
 private:
 	Bool loadShaders();
 	Bool bindSceneDepth();

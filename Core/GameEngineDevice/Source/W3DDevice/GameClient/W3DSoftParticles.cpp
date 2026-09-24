@@ -36,8 +36,7 @@
 
 W3DSoftParticles *TheW3DSoftParticles = nullptr;
 
-// Bisects soft particle faults without a rebuild. CONTRA_SOFTPARTICLES=0 draws every sprite hard,
-// 1 fades against the scene's depth where it is readable and the terrain elsewhere, 2 against the terrain only.
+// CONTRA_SOFTPARTICLES bisects faults: 0 hard, 1 scene depth where readable else terrain, 2 terrain only.
 enum { SOFT_PARTICLES_OFF = 0, SOFT_PARTICLES_AUTO = 1, SOFT_PARTICLES_TERRAIN = 2 };
 
 static Int Get_Soft_Particle_Mode()
@@ -45,6 +44,8 @@ static Int Get_Soft_Particle_Mode()
 	const char *value = getenv("CONTRA_SOFTPARTICLES");
 	return (value != nullptr) ? atoi(value) : SOFT_PARTICLES_AUTO;
 }
+
+static const Int SoftParticleMode = Get_Soft_Particle_Mode();
 
 // The sprite's camera-space position comes through this stage, which also holds the surface it fades against.
 static const Int SOFT_STAGE = 1;
@@ -57,7 +58,7 @@ W3DSoftParticles::W3DSoftParticles()
 	Set_D3DMATRIX_Identity(m_view);
 	Set_D3DMATRIX_Identity(m_projection);
 
-	if (Get_Soft_Particle_Mode() != SOFT_PARTICLES_OFF)
+	if (SoftParticleMode != SOFT_PARTICLES_OFF)
 	{
 		SortingRendererClass::Set_Soft_Particle_Hook(this);
 	}
@@ -70,12 +71,21 @@ W3DSoftParticles::~W3DSoftParticles()
 		SortingRendererClass::Set_Soft_Particle_Hook(nullptr);
 	}
 
+	ReleaseResources();
+}
+
+// The next draw loads them again, so a device made anew gets shaders of its own.
+void W3DSoftParticles::ReleaseResources()
+{
 	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
 	if (device != nullptr)
 	{
 		DX8_DELETE_PIXEL_SHADER(device, m_depthShader);
 		DX8_DELETE_PIXEL_SHADER(device, m_heightShader);
 	}
+	m_depthShader = 0;
+	m_heightShader = 0;
+	m_loaded = FALSE;
 }
 
 void W3DSoftParticles::beginPass(RenderInfoClass &rinfo)
@@ -118,7 +128,7 @@ Bool W3DSoftParticles::bindSceneDepth()
 {
 #if defined(BUILD_WITH_D3D9)
 	IDirect3DTexture8 *depthTexture = DX8Wrapper::Peek_Scene_Depth_Texture();
-	if (m_depthShader == 0 || depthTexture == nullptr || Get_Soft_Particle_Mode() != SOFT_PARTICLES_AUTO)
+	if (m_depthShader == 0 || depthTexture == nullptr || SoftParticleMode != SOFT_PARTICLES_AUTO)
 	{
 		return FALSE;
 	}
@@ -142,18 +152,12 @@ Bool W3DSoftParticles::bindSceneDepth()
 
 	D3DSURFACE_DESC desc;
 	depthTexture->GetLevelDesc(0, &desc);
-	D3DVIEWPORT8 viewport;
-	device->GetViewport(&viewport);
 
-	// Clip space onto the viewport's texels, sampled at their centres.
 	const D3DMATRIX &p = m_projection;
 	const Vector4 clipX(p.m[0][0], p.m[1][0], p.m[2][0], p.m[3][0]);
 	const Vector4 clipY(p.m[0][1], p.m[1][1], p.m[2][1], p.m[3][1]);
 	const Vector4 clipW(p.m[0][3], p.m[1][3], p.m[2][3], p.m[3][3]);
-	const Real width = (Real)desc.Width;
-	const Real height = (Real)desc.Height;
-	const Vector4 screenMap(0.5f * viewport.Width / width, -0.5f * viewport.Height / height,
-		(viewport.X + 0.5f * viewport.Width + 0.5f) / width, (viewport.Y + 0.5f * viewport.Height + 0.5f) / height);
+	const Vector4 screenMap = W3DShaderManager::getClipToTargetMapping((Real)desc.Width, (Real)desc.Height);
 	const Vector4 linearize(p.m[3][2], p.m[3][3], p.m[2][3], p.m[2][2]);
 
 	DX8Wrapper::Set_Pixel_Shader_Constant(0, &clipX, 1);
@@ -220,6 +224,10 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader)
 		return false;
 	}
 
+	// Cleared through the wrapper, so its record of stage 1 matches the device once End unbinds it.
+	DX8Wrapper::Set_Texture(SOFT_STAGE, nullptr);
+	DX8Wrapper::Apply_Render_State_Changes();
+
 	if (!bindSceneDepth() && !bindTerrainHeight())
 	{
 		return false;
@@ -234,11 +242,12 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader)
 	DX8Wrapper::Set_DX8_Texture_Stage_State(SOFT_STAGE, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(SOFT_STAGE, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
 
-	// Blending by alpha only needs alpha faded. Adding the colour as it is, it fades too, and
-	// multiplying by it, it fades towards white.
+	// Alpha blending fades alpha alone, adding fades colour too, and multiplying fades towards white.
 	const Bool addsColor = shader.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_ONE;
 	const Bool multiplies = shader.Get_Dst_Blend_Func() == ShaderClass::DSTBLEND_SRC_COLOR;
-	const Vector4 params(1.0f / TheGlobalData->m_softParticleDistance, addsColor ? 1.0f : 0.0f, multiplies ? 1.0f : 0.0f, 0.0f);
+	// The sign that makes depth along the view grow away from the camera, for perspective and ortho alike.
+	const Real forward = (m_projection.m[2][2] < 0.0f) ? -1.0f : 1.0f;
+	const Vector4 params(1.0f / TheGlobalData->m_softParticleDistance, addsColor ? 1.0f : 0.0f, multiplies ? 1.0f : 0.0f, forward);
 	DX8Wrapper::Set_Pixel_Shader_Constant(5, &params, 1);
 	return true;
 }

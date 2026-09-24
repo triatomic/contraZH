@@ -34,6 +34,7 @@
 #pragma once
 
 #include "WW3D2/texture.h"
+#include "WWMath/vector4.h"
 enum FilterTypes CPP_11(: Int);
 enum FilterModes CPP_11(: Int);
 enum CustomScenePassModes CPP_11(: Int);
@@ -160,6 +161,10 @@ public:
 	static void startRenderToTexture(); ///< Sets render target to texture.
 	static IDirect3DTexture8 * endRenderToTexture(); ///< Ends render to texture, & returns texture.
 	static IDirect3DTexture8 * getRenderTexture();	///< returns last used render target texture
+	/// Copies the bound render target into copy, resolving multisampling and recreating copy when the target changes shape.
+	static Bool copyRenderTarget(IDirect3DTexture8 *&copy);
+	/// Scale in xy and offset in zw from clip space to the texel centres of a width by height copy of the render target.
+	static Vector4 getClipToTargetMapping(Real width, Real height);
 	static Bool isRenderingToTexture() {return m_renderingToTexture; }
 	static void drawViewport(Int color);	///<draws 2 triangles covering the current tactical viewport
 

@@ -1419,10 +1419,11 @@ void HeightMapRenderObjClass::On_Frame_Update()
 			} else {
 				pLight->m_processMe = false;
 			}
-			// Nothing of a light the shader drew last frame is in the vertices to take out.
-			if (pLight->m_prevPixelLit && (pLight->m_pixelLit || !pLight->m_enabled)) {
+			// A light the vertices do not hold and will not take needs no update.
+			if (!pLight->m_bakedLastFrame && (pLight->m_pixelLit || !pLight->m_enabled)) {
 				pLight->m_processMe = false;
 			}
+			pLight->m_bakedLastFrame = pLight->m_processMe && pLight->m_enabled && !pLight->m_pixelLit;
 			if (pLight->m_processMe) {
 				enabledLights[numDynaLights] = pLight;
 				numDynaLights++;

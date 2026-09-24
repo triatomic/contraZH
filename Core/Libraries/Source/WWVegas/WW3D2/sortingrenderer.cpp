@@ -372,7 +372,10 @@ static bool Additive_Draw_Order(const SortingNodeStruct* a, const SortingNodeStr
 	if (l.Textures[0] != r.Textures[0]) {
 		return std::less<TextureBaseClass*>()(l.Textures[0], r.Textures[0]);
 	}
-	return std::less<VertexMaterialClass*>()(l.material, r.material);
+	if (l.material != r.material) {
+		return std::less<VertexMaterialClass*>()(l.material, r.material);
+	}
+	return a->soft < b->soft;
 }
 
 // ----------------------------------------------------------------------------

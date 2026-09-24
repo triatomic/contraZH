@@ -509,6 +509,9 @@ public:
   Real m_bloomStrength;           ///< Options.ini BloomStrength: glow brightness, 0 to 1
   Bool m_bloomDebug;              ///< Options.ini BloomDebug: show the glow buffer instead of the scene
   Bool m_laserRef;                ///< Options.ini LaserRef: lasers light the ground along the beam
+  Bool m_useDynamicLights;        ///< Options.ini DynamicLights: explosions, muzzle flashes and lasers light their surroundings
+  Bool m_useSoftParticles;        ///< Options.ini SoftParticles: smoke and fire fade where they meet the ground and buildings
+  Real m_softParticleDistance;    ///< how far in front of a surface a particle starts to fade, 0 for hard edges
   Int m_alliedDecalMode;          ///< Options.ini AlliedDecalMode: how allied power decals are drawn
   Color m_laserGlowColor;         ///< GameData LaserGroundGlowColor: black takes the beam color
   Real m_laserGlowIntensity;      ///< GameData LaserGroundGlowIntensity: how strongly the color is added

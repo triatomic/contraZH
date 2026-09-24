@@ -62,14 +62,9 @@ W3DShockwaveManager::W3DShockwaveManager()
 W3DShockwaveManager::~W3DShockwaveManager()
 {
 	ReleaseResources();
-
-	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
-	if (device != nullptr)
-	{
-		DX8_DELETE_PIXEL_SHADER(device, m_shader);
-	}
 }
 
+// The shader goes too, so a device made anew gets one of its own.
 void W3DShockwaveManager::ReleaseResources()
 {
 	if (m_sceneCopy != nullptr)
@@ -77,6 +72,14 @@ void W3DShockwaveManager::ReleaseResources()
 		m_sceneCopy->Release();
 		m_sceneCopy = nullptr;
 	}
+
+	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
+	if (device != nullptr)
+	{
+		DX8_DELETE_PIXEL_SHADER(device, m_shader);
+	}
+	m_shader = 0;
+	m_loaded = FALSE;
 }
 
 void W3DShockwaveManager::add(const Coord3D &position, Real radius, Real width, Real strength, UnsignedInt durationMs)
@@ -103,50 +106,6 @@ void W3DShockwaveManager::add(const Coord3D &position, Real radius, Real width, 
 	shockwave.strength = strength;
 	shockwave.startMs = WW3D::Get_Sync_Time();
 	shockwave.durationMs = durationMs;
-}
-
-// Copies the render target, resolving it when multisampled, into a texture of the same size.
-Bool W3DShockwaveManager::copyScene()
-{
-#if defined(BUILD_WITH_D3D9)
-	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
-	IDirect3DSurface8 *target = nullptr;
-	if (FAILED(device->GetRenderTarget(0, &target)))
-	{
-		return FALSE;
-	}
-
-	D3DSURFACE_DESC targetDesc;
-	target->GetDesc(&targetDesc);
-	if (m_sceneCopy != nullptr)
-	{
-		D3DSURFACE_DESC copyDesc;
-		m_sceneCopy->GetLevelDesc(0, &copyDesc);
-		if (copyDesc.Width != targetDesc.Width || copyDesc.Height != targetDesc.Height || copyDesc.Format != targetDesc.Format)
-		{
-			ReleaseResources();
-		}
-	}
-	if (m_sceneCopy == nullptr &&
-		FAILED(device->CreateTexture(targetDesc.Width, targetDesc.Height, 1, D3DUSAGE_RENDERTARGET, targetDesc.Format, D3DPOOL_DEFAULT, &m_sceneCopy, nullptr)))
-	{
-		m_sceneCopy = nullptr;
-		target->Release();
-		return FALSE;
-	}
-
-	IDirect3DSurface8 *copySurface = nullptr;
-	Bool copied = FALSE;
-	if (SUCCEEDED(m_sceneCopy->GetSurfaceLevel(0, &copySurface)))
-	{
-		copied = SUCCEEDED(device->StretchRect(target, nullptr, copySurface, nullptr, D3DTEXF_NONE));
-		copySurface->Release();
-	}
-	target->Release();
-	return copied;
-#else
-	return FALSE;
-#endif
 }
 
 void W3DShockwaveManager::render(RenderInfoClass &rinfo)
@@ -185,7 +144,7 @@ void W3DShockwaveManager::render(RenderInfoClass &rinfo)
 
 	// The rings bend whatever is drawn, particles included.
 	SortingRendererClass::Flush();
-	if (!copyScene())
+	if (!W3DShaderManager::copyRenderTarget(m_sceneCopy))
 	{
 		return;
 	}
@@ -200,12 +159,7 @@ void W3DShockwaveManager::render(RenderInfoClass &rinfo)
 
 	D3DSURFACE_DESC copyDesc;
 	m_sceneCopy->GetLevelDesc(0, &copyDesc);
-	D3DVIEWPORT8 viewport;
-	device->GetViewport(&viewport);
-	const Real width = (Real)copyDesc.Width;
-	const Real height = (Real)copyDesc.Height;
-	const Vector4 screenMap(0.5f * viewport.Width / width, -0.5f * viewport.Height / height,
-		(viewport.X + 0.5f * viewport.Width + 0.5f) / width, (viewport.Y + 0.5f * viewport.Height + 0.5f) / height);
+	const Vector4 screenMap = W3DShaderManager::getClipToTargetMapping((Real)copyDesc.Width, (Real)copyDesc.Height);
 
 	Vector3 cameraRight;
 	rinfo.Camera.Get_Transform().Get_X_Vector(&cameraRight);

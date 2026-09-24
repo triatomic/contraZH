@@ -51,7 +51,7 @@ protected:
 	Bool		m_enabled;
 	Bool		m_terrainOnly;
 	Bool		m_pixelLit;			///< the shaders draw it this frame, so the terrain's vertex lighting leaves it out
-	Bool		m_prevPixelLit;
+	Bool		m_bakedLastFrame;	///< the terrain's vertex lighting holds it, so it must be taken out when it leaves
 	Bool		m_unitPixelLit;		///< the specular pass draws it this frame too
 	const void *m_owner;
 
@@ -81,7 +81,7 @@ public:
 	Bool isTerrainOnly() const { return m_terrainOnly; }
 
 	/// set once a frame for every light, before the terrain updates its vertex lighting
-	void setPixelLit(Bool pixelLit, Bool unitPixelLit) { m_prevPixelLit = m_pixelLit; m_pixelLit = pixelLit; m_unitPixelLit = unitPixelLit; }
+	void setPixelLit(Bool pixelLit, Bool unitPixelLit) { m_pixelLit = pixelLit; m_unitPixelLit = unitPixelLit; }
 	Bool isPixelLit() const { return m_pixelLit; }
 	Bool isUnitPixelLit() const { return m_unitPixelLit; }
 

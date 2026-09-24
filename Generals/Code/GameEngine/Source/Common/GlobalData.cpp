@@ -579,6 +579,9 @@ GlobalData::GlobalData()
   m_bloomStrength = 0.5f;
   m_bloomDebug = FALSE;
   m_laserRef = FALSE;
+  m_useDynamicLights = TRUE;
+  m_useSoftParticles = TRUE;
+  m_softParticleDistance = 12.0f;
   m_alliedDecalMode = AlliedDecalMode_Default;
   m_laserGlowColor = 0;
   m_laserGlowIntensity = 0.7f;
@@ -1258,6 +1261,8 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_bloomStrength = optionPref.getBloomStrength();
 	TheWritableGlobalData->m_bloomDebug = optionPref.getBloomDebugEnabled();
 	TheWritableGlobalData->m_laserRef = optionPref.getLaserRefEnabled();
+	TheWritableGlobalData->m_useDynamicLights = optionPref.getDynamicLightsEnabled();
+	TheWritableGlobalData->m_useSoftParticles = optionPref.getSoftParticlesEnabled();
 	TheWritableGlobalData->m_alliedDecalMode = optionPref.getAlliedDecalMode();
 
 	Int val=optionPref.getGammaValue();

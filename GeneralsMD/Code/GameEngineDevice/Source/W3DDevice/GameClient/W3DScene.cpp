@@ -1433,7 +1433,8 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 			TheGlobalData->m_unitBumpHeight, TheGlobalData->m_unitNormalMapStrength);
 		W3DShaderManager::setTerrainBumps(TheGlobalData->m_useNormalMaps, TheGlobalData->m_terrainNormalMapStrength,
 			TheGlobalData->m_normalMapDebug);
-		W3DShaderManager::setEmissive(TheGlobalData->m_timeOfDay == TIME_OF_DAY_NIGHT
+		// Glow masks ride the specular pass, so turning highlights off drops them rather than keeping the pass alive.
+		W3DShaderManager::setEmissive(!TheGlobalData->m_useSpecular ? 0.0f : TheGlobalData->m_timeOfDay == TIME_OF_DAY_NIGHT
 			? TheGlobalData->m_unitEmissiveNightIntensity : TheGlobalData->m_unitEmissiveIntensity);
 
 		// Sampled rather than every frame, so a whole match stays readable.
@@ -2111,13 +2112,7 @@ void RTS3DScene::addDynamicLight(W3DDynamicLight * obj)
 	UpdateList.Add(obj);
 }
 
-//=============================================================================
-// RTS3DScene::addDynamicLight
-//=============================================================================
-/** Adds a dynamic light. */
-//=============================================================================
-// The lights nearest the middle of the view go to the shaders, which draw them per pixel on the
-// terrain and on meshes with the specular pass. The rest stay in the vertex lighting.
+// The lights nearest the middle of the view are drawn per pixel; the rest stay in the vertex lighting.
 namespace
 {
 	struct PixelLightCandidate
@@ -2174,8 +2169,7 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 			continue;
 		}
 
-		// A light whose reach covers the screen centre ranks with one sitting on it. One too close
-		// to the camera to project is treated the same way.
+		// Reach covering the screen centre, or a light too near to project, counts as sitting on it.
 		PixelLightCandidate candidate;
 		candidate.light = light;
 		candidate.score = score;
@@ -2228,7 +2222,7 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 		unitCount += lights[i].unitLit ? 1 : 0;
 	}
 
-	// Once per light and frame, since the terrain compares each light with its last frame.
+	// Every light is marked, so none keeps last frame's choice.
 	for (it.First(); !it.Is_Done(); it.Next())
 	{
 		W3DDynamicLight *light = (W3DDynamicLight *)it.Peek_Obj();
@@ -2266,6 +2260,11 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 	}
 }
 
+//=============================================================================
+// RTS3DScene::addDynamicLight
+//=============================================================================
+/** Adds a dynamic light. */
+//=============================================================================
 W3DDynamicLight * RTS3DScene::getADynamicLight()
 {
 	RefRenderObjListIterator dynaLightIt(&m_dynamicLightList);

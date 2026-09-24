@@ -858,41 +858,10 @@ void WaterRenderObjClass::grabRefraction()
 		return;
 	}
 
-	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
-	IDirect3DSurface8 *target = nullptr;
-	if (FAILED(device->GetRenderTarget(0, &target)))
+	if (W3DShaderManager::copyRenderTarget(m_refractionTexture))
 	{
-		return;
+		m_refractionFrame = WW3D::Get_Frame_Count();
 	}
-
-	D3DSURFACE_DESC targetDesc;
-	target->GetDesc(&targetDesc);
-	if (m_refractionTexture != nullptr)
-	{
-		D3DSURFACE_DESC copyDesc;
-		m_refractionTexture->GetLevelDesc(0, &copyDesc);
-		if (copyDesc.Width != targetDesc.Width || copyDesc.Height != targetDesc.Height || copyDesc.Format != targetDesc.Format)
-		{
-			SAFE_RELEASE(m_refractionTexture);
-		}
-	}
-	if (m_refractionTexture == nullptr &&
-		FAILED(device->CreateTexture(targetDesc.Width, targetDesc.Height, 1, D3DUSAGE_RENDERTARGET, targetDesc.Format, D3DPOOL_DEFAULT, &m_refractionTexture, nullptr)))
-	{
-		m_refractionTexture = nullptr;
-		target->Release();
-		return;
-	}
-
-	// StretchRect also resolves a multisampled target.
-	IDirect3DSurface8 *copy = nullptr;
-	if (SUCCEEDED(m_refractionTexture->GetSurfaceLevel(0, &copy)))
-	{
-		device->StretchRect(target, nullptr, copy, nullptr, D3DTEXF_NONE);
-		copy->Release();
-	}
-	target->Release();
-	m_refractionFrame = WW3D::Get_Frame_Count();
 #endif
 }
 

@@ -1515,6 +1515,11 @@ static Int EmissiveMapCount = 0;
 // The point lights the terrain and specular shaders add, set once a frame by the scene.
 static W3DShaderManager::PixelLight PixelLights[W3DShaderManager::MAX_PIXEL_LIGHTS];
 static Int PixelLightCount = 0;
+enum { PIXEL_LIGHT_REGISTERS = W3DShaderManager::MAX_PIXEL_LIGHTS * 2 + (W3DShaderManager::MAX_PIXEL_LIGHTS + 3) / 4 };
+// The unit lights in camera space, packed once per set of lights and view.
+static Vector4 UnitLightBlock[PIXEL_LIGHT_REGISTERS];
+static D3DMATRIX UnitLightView;
+static Bool UnitLightBlockValid = FALSE;
 static Bool TerrainPixelLightsLoaded = FALSE;
 static Bool UnitPixelLightsLoaded = FALSE;
 
@@ -1528,13 +1533,11 @@ static Int Get_Pixel_Light_Mode()
 	return (value != nullptr) ? atoi(value) : PIXEL_LIGHTS_ALL;
 }
 
-// Packs the lights the way pointlights.hlsli reads them, all of them for the terrain and the
-// unit lights for the specular pass. A view takes them into camera space, and none leaves them in world space.
-static void Set_Pixel_Light_Constants(Int firstRegister, const D3DMATRIX *view, Bool terrain)
+// Packs the lights as pointlights.hlsli reads them, all for the terrain in world space or the unit ones in view space.
+static Int Pack_Pixel_Lights(Vector4 *constants, const D3DMATRIX *view, Bool terrain)
 {
 	const Int slots = terrain ? W3DShaderManager::MAX_PIXEL_LIGHTS : W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS;
-	Vector4 constants[W3DShaderManager::MAX_PIXEL_LIGHTS * 2 + (W3DShaderManager::MAX_PIXEL_LIGHTS + 3) / 4];
-	memset(constants, 0, sizeof(constants));
+	memset(constants, 0, sizeof(Vector4) * PIXEL_LIGHT_REGISTERS);
 
 	Int i = 0;
 	for (Int index = 0; index < PixelLightCount && i < slots; index++)
@@ -1562,7 +1565,13 @@ static void Set_Pixel_Light_Constants(Int firstRegister, const D3DMATRIX *view, 
 		i++;
 	}
 
-	DX8Wrapper::Set_Pixel_Shader_Constant(firstRegister, constants, slots * 2 + (slots + 3) / 4);
+	return slots * 2 + (slots + 3) / 4;
+}
+
+static void Set_Pixel_Light_Constants(Int firstRegister, const D3DMATRIX *view, Bool terrain)
+{
+	Vector4 constants[PIXEL_LIGHT_REGISTERS];
+	DX8Wrapper::Set_Pixel_Shader_Constant(firstRegister, constants, Pack_Pixel_Lights(constants, view, terrain));
 }
 
 // The terrain normal maps, set once a frame by the scene.
@@ -2130,7 +2139,15 @@ Int SpecularShader::set(Int pass)
 	m_lit = (UnitPixelLightsLoaded && PixelLightCount > 0);
 	if (m_lit)
 	{
-		Set_Pixel_Light_Constants(8, &view, FALSE);
+		static Int unitLightRegisters = 0;
+		if (!UnitLightBlockValid || memcmp(&view, &UnitLightView, sizeof(D3DMATRIX)) != 0)
+		{
+			unitLightRegisters = Pack_Pixel_Lights(UnitLightBlock, &view, FALSE);
+			UnitLightView = view;
+			UnitLightBlockValid = TRUE;
+		}
+		// The wrapper skips the upload while the registers still hold these values.
+		DX8Wrapper::Set_Pixel_Shader_Constant(8, UnitLightBlock, unitLightRegisters);
 	}
 
 	DX8Wrapper::Set_Pixel_Shader(m_lit
@@ -2355,6 +2372,7 @@ void W3DShaderManager::setPixelLights(const PixelLight *lights, Int count)
 	{
 		PixelLights[i] = lights[i];
 	}
+	UnitLightBlockValid = FALSE;
 }
 
 Bool W3DShaderManager::supportsTerrainPixelLights()
@@ -4419,6 +4437,59 @@ was applied.  NOTE: This texture does not survive device reset.. so quit effect 
 IDirect3DTexture8 *W3DShaderManager::getRenderTexture()
 {
 	return m_renderTexture;
+}
+
+Bool W3DShaderManager::copyRenderTarget(IDirect3DTexture8 *&copy)
+{
+#if defined(BUILD_WITH_D3D9)
+	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
+	IDirect3DSurface8 *target = nullptr;
+	if (FAILED(device->GetRenderTarget(0, &target)))
+	{
+		return FALSE;
+	}
+
+	D3DSURFACE_DESC targetDesc;
+	target->GetDesc(&targetDesc);
+	if (copy != nullptr)
+	{
+		D3DSURFACE_DESC copyDesc;
+		copy->GetLevelDesc(0, &copyDesc);
+		if (copyDesc.Width != targetDesc.Width || copyDesc.Height != targetDesc.Height || copyDesc.Format != targetDesc.Format)
+		{
+			SAFE_RELEASE(copy);
+		}
+	}
+	if (copy == nullptr &&
+		FAILED(device->CreateTexture(targetDesc.Width, targetDesc.Height, 1, D3DUSAGE_RENDERTARGET, targetDesc.Format, D3DPOOL_DEFAULT, &copy, nullptr)))
+	{
+		copy = nullptr;
+		target->Release();
+		return FALSE;
+	}
+
+	// StretchRect also resolves a multisampled target.
+	IDirect3DSurface8 *copySurface = nullptr;
+	Bool copied = FALSE;
+	if (SUCCEEDED(copy->GetSurfaceLevel(0, &copySurface)))
+	{
+		copied = SUCCEEDED(device->StretchRect(target, nullptr, copySurface, nullptr, D3DTEXF_NONE));
+		copySurface->Release();
+	}
+	target->Release();
+	return copied;
+#else
+	(void)copy;
+	return FALSE;
+#endif
+}
+
+Vector4 W3DShaderManager::getClipToTargetMapping(Real width, Real height)
+{
+	D3DVIEWPORT8 viewport;
+	DX8Wrapper::_Get_D3D_Device8()->GetViewport(&viewport);
+	return Vector4(0.5f * viewport.Width / width, -0.5f * viewport.Height / height,
+		(viewport.X + 0.5f * viewport.Width + 0.5f) / width, (viewport.Y + 0.5f * viewport.Height + 0.5f) / height);
 }
 
 enum GraphicsVenderID CPP_11(: Int)
