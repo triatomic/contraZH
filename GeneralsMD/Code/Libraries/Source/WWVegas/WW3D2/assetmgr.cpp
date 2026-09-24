@@ -1246,14 +1246,13 @@ void WW3DAssetManager::Log_All_Textures()
 		if (!t->Is_Lightmap()) continue;
 
 		StringClass tmp(true);
-		unsigned bytes=t->Get_Texture_Memory_Usage();
 		if (!t->Is_Initialized()) {
 			tmp+="*";
 		}
 		else {
 			tmp+=" ";
 		}
-		WWDEBUG_SAY(("%4.4dkb %s%s",bytes/1024,tmp.str(),t->Get_Texture_Name().str()));
+		WWDEBUG_SAY(("%4.4dkb %s%s",t->Get_Texture_Memory_Usage()/1024,tmp.str(),t->Get_Texture_Name().str()));
 	}
 
 	// Log procedural textures -------------------------------
@@ -1270,14 +1269,13 @@ void WW3DAssetManager::Log_All_Textures()
 		if (!t->Is_Procedural()) continue;
 
 		StringClass tmp(true);
-		unsigned bytes=t->Get_Texture_Memory_Usage();
 		if (!t->Is_Initialized()) {
 			tmp+="*";
 		}
 		else {
 			tmp+=" ";
 		}
-		WWDEBUG_SAY(("%4.4dkb %s%s",bytes/1024,tmp.str(),t->Get_Texture_Name().str()));
+		WWDEBUG_SAY(("%4.4dkb %s%s",t->Get_Texture_Memory_Usage()/1024,tmp.str(),t->Get_Texture_Name().str()));
 	}
 
 	// Log "ordinary" textures -------------------------------
@@ -1295,14 +1293,13 @@ void WW3DAssetManager::Log_All_Textures()
 		if (t->Is_Lightmap()) continue;
 
 		StringClass tmp(true);
-		unsigned bytes=t->Get_Texture_Memory_Usage();
 		if (!t->Is_Initialized()) {
 			tmp+="*";
 		}
 		else {
 			tmp+=" ";
 		}
-		WWDEBUG_SAY(("%4.4dkb %s%s",bytes/1024,tmp.str(),t->Get_Texture_Name().str()));
+		WWDEBUG_SAY(("%4.4dkb %s%s",t->Get_Texture_Memory_Usage()/1024,tmp.str(),t->Get_Texture_Name().str()));
 	}
 
 }

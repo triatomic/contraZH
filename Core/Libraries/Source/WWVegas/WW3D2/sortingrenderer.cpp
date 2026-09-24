@@ -524,7 +524,7 @@ void SortingRendererClass::Insert_Triangles(
 		return;
 	}
 
-#ifdef WWDEBUG
+#ifdef DEBUG_CRASHING
 	SortingVertexBufferClass* vertex_buffer=static_cast<SortingVertexBufferClass*>(state->sorting_state.vertex_buffers[0]);
 	WWASSERT(vertex_buffer);
 	WWASSERT(state->vertex_count<=vertex_buffer->Get_Vertex_Count());
@@ -545,7 +545,7 @@ void SortingRendererClass::Insert_Triangles(
 		WWASSERT(idx2<state->vertex_count);
 		WWASSERT(idx3<state->vertex_count);
 	}
-#endif // WWDEBUG
+#endif // DEBUG_CRASHING
 
 	Insert_To_Sorting_Pool(state);
 }

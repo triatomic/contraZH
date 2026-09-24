@@ -357,7 +357,7 @@ public:
 	static void				Set_Filter_Alpha_Blend_Test(bool onoff);
 	static bool				Get_Filter_Alpha_Blend_Test();
 
-	const StringClass& Get_Description(StringClass& str) const;
+	StringClass Get_Description() const;
 
 	// These are a bunch of predefined shaders for common cases. None of them
 	// have fogging since "no fog" is the surrender default and usage of fog

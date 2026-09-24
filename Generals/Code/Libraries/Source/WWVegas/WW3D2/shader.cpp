@@ -345,7 +345,7 @@ void ShaderClass::Enable_Fog (const char *source)
  *=============================================================================================*/
 void ShaderClass::Report_Unable_To_Fog (const char *source)
 {
-	#ifdef WWDEBUG
+#ifdef DEBUG_LOGGING
 	static unsigned _reportcount = 0;
 
 	const unsigned  maxreportcount		= 10;
@@ -360,7 +360,7 @@ void ShaderClass::Report_Unable_To_Fog (const char *source)
 			_reportcount++;
 		}
 	}
-	#endif
+#endif
 }
 
 class Blend
@@ -1003,9 +1003,9 @@ void ShaderClass::Force_Backface_Tint(bool onoff)
 	Invalidate();
 }
 
-const StringClass& ShaderClass::Get_Description(StringClass& str) const
+StringClass ShaderClass::Get_Description() const
 {
-	str="";
+	StringClass str="";
 	switch (Get_Depth_Compare()) {
 	case PASS_NEVER: str+="DEPTH_COMPARE:PASS_NEVER | "; break;
 	case PASS_LESS: str+="DEPTH_COMPARE:PASS_LESS | "; break;

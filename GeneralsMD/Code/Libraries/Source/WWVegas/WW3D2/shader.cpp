@@ -350,7 +350,7 @@ void ShaderClass::Enable_Fog (const char *source)
  *=============================================================================================*/
 void ShaderClass::Report_Unable_To_Fog (const char *source)
 {
-	#ifdef WWDEBUG
+#ifdef DEBUG_LOGGING
 	static unsigned _reportcount = 0;
 
 	const char		*unabletofogtext		= "WARNING: Unable to fog shader in %s with given blending mode.";
@@ -367,7 +367,7 @@ void ShaderClass::Report_Unable_To_Fog (const char *source)
 			_reportcount++;
 		}
 	}
-	#endif
+#endif
 }
 
 class Blend
@@ -1178,9 +1178,9 @@ bool ShaderClass::Get_Filter_Alpha_Blend()               { return _FilterAlphaBl
 void ShaderClass::Set_Filter_Alpha_Blend_Test(bool onoff){ _FilterAlphaBlendTest = onoff; Invalidate(); }
 bool ShaderClass::Get_Filter_Alpha_Blend_Test()          { return _FilterAlphaBlendTest; }
 
-const StringClass& ShaderClass::Get_Description(StringClass& str) const
+StringClass ShaderClass::Get_Description() const
 {
-	str="";
+	StringClass str="";
 	switch (Get_Depth_Compare()) {
 	case PASS_NEVER: str+="DEPTH_COMPARE:PASS_NEVER | "; break;
 	case PASS_LESS: str+="DEPTH_COMPARE:PASS_LESS | "; break;
