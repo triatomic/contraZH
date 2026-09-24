@@ -185,9 +185,11 @@ static ShaderClass shaderWaterShader(SC_SHADER_WATER);
 #define NORMAL_WAVE_COUNT 96
 #define WATER_REFLECTION_SAMPLER 13
 #define WATER_MASK_SAMPLER 14
-#define RADIAL_SEGMENTS 96
-#define RADIAL_INNER_RADIUS 32.0f
-#define RADIAL_OUTER_RADIUS 8000.0f
+#define WATER_SWELL_SAMPLER 15
+#define CLIPMAP_CELLS 64			// cells along each side of one level, a multiple of 4
+#define CLIPMAP_FINEST_CELL 8.0f	// world units per cell of the finest level
+#define CLIPMAP_REACH 8000.0f		// world units the coarsest level reaches from the camera
+#define CLIPMAP_FOLD_CELLS 8		// cells over which a level's edge folds onto the next
 #define RADIAL_LEVEL_COUNT 8
 
 #if defined(BUILD_WITH_D3D9)
@@ -1181,18 +1183,28 @@ void WaterRenderObjClass::setupSwell(const D3DMATRIX &clip)
 	DX8Wrapper::Set_Vertex_Shader_Constant(5, &swellSample, 1);
 	DX8Wrapper::Set_Vertex_Shader_Constant(6, &swellChannel, 1);
 
+	// The pixel shader reads the swell again at fixed world points, one texel apart for the slope.
+	device->SetTexture(WATER_SWELL_SAMPLER, swellTexture->Peek_D3D_Texture());
+	device->SetSamplerState(WATER_SWELL_SAMPLER, D3DSAMP_ADDRESSU, D3DTADDRESS_WRAP);
+	device->SetSamplerState(WATER_SWELL_SAMPLER, D3DSAMP_ADDRESSV, D3DTADDRESS_WRAP);
+	device->SetSamplerState(WATER_SWELL_SAMPLER, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+	device->SetSamplerState(WATER_SWELL_SAMPLER, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+	device->SetSamplerState(WATER_SWELL_SAMPLER, D3DSAMP_MIPFILTER, D3DTEXF_LINEAR);
+	const Vector4 swellStep(swellScale / (Real)swellDesc.Width, 0.0f, 0.0f, 0.0f);
+	DX8Wrapper::Set_Pixel_Shader_Constant(22, &swell, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(23, &swellChannel, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(24, &swellStep, 1);
+
 	if (m_drawingRadial)
 	{
-		// Each vertex takes its mip level from its cell size, and its texcoords and colour match drawTrapezoidWater's.
+		// drawRadialWater sets each level's placement. The texcoords and colour match drawTrapezoidWater's.
 		const Vector3 eye = m_renderCamera->Get_Transform().Get_Translation();
-		const Vector4 radialSample(swellDesc.Width / swellScale, 0.0f, 0.0f, 0.0f);
-		const Vector4 radial(eye.X, eye.Y, m_radialPlaneZ, 0.0f);
+		const Vector4 eyePosition(eye.X, eye.Y, 0.0f, 0.0f);
 		const Vector4 wobble(1.0f / 150.0f, 0.02f * cosf(11.0f * m_riverVOrigin), 0.02f * cosf(5.0f * m_riverVOrigin), 25.0f * m_riverVOrigin);
 		const Vector4 wobbleRate(PI / (4.0f * MAP_XY_FACTOR), 0.0f, 0.0f, 0.0f);
 		const UnsignedInt diffuse = (UnsignedInt)standingWaterDiffuse();
 		const Vector4 color(((diffuse >> 16) & 0xff) / 255.0f, ((diffuse >> 8) & 0xff) / 255.0f, (diffuse & 0xff) / 255.0f, (diffuse >> 24) / 255.0f);
-		DX8Wrapper::Set_Vertex_Shader_Constant(5, &radialSample, 1);
-		DX8Wrapper::Set_Vertex_Shader_Constant(7, &radial, 1);
+		DX8Wrapper::Set_Vertex_Shader_Constant(12, &eyePosition, 1);
 		DX8Wrapper::Set_Vertex_Shader_Constant(8, &wobble, 1);
 		DX8Wrapper::Set_Vertex_Shader_Constant(9, &wobbleRate, 1);
 		DX8Wrapper::Set_Vertex_Shader_Constant(10, &color, 1);
@@ -1262,6 +1274,7 @@ void WaterRenderObjClass::cleanupShaderWater()
 	}
 	device->SetTexture(WATER_REFLECTION_SAMPLER, nullptr);
 	device->SetTexture(WATER_MASK_SAMPLER, nullptr);
+	device->SetTexture(WATER_SWELL_SAMPLER, nullptr);
 	DX8Wrapper::Set_Texture(WATER_SHADOW_STAGE, nullptr);
 	for (Int stage=2; stage<8; stage++)
 	{
@@ -1277,65 +1290,55 @@ void WaterRenderObjClass::cleanupShaderWater()
 #endif
 }
 
-// Rings widen by one segment's arc each step, so every cell stays about square.
+// A square lattice drawn once per level at double the cell size, whole for the finest and as rings around the finer one.
 Bool WaterRenderObjClass::buildRadialGrid()
 {
 #if defined(BUILD_WITH_D3D9)
-	const Real growth = 1.0f + 2.0f * PI / (Real)RADIAL_SEGMENTS;
-	Int rings = 1;
-	Real radius = RADIAL_INNER_RADIUS;
-	while (radius < RADIAL_OUTER_RADIUS && (rings * 6 + 3) * RADIAL_SEGMENTS <= 65535)
-	{
-		radius *= growth;
-		rings++;
-	}
-
-	m_radialVertexCount = 1 + rings * RADIAL_SEGMENTS;
-	m_radialTriangleCount = RADIAL_SEGMENTS + (rings - 1) * RADIAL_SEGMENTS * 2;
+	const Int size = CLIPMAP_CELLS;
+	const Int hole = CLIPMAP_CELLS / 2;
+	m_radialVertexCount = (size + 1) * (size + 1);
+	m_radialFullTriangles = size * size * 2;
+	m_radialRingTriangles = (size * size - hole * hole) * 2;
 	m_radialVertices = NEW_REF(DX8VertexBufferClass, (DX8_FVF_XYZ, m_radialVertexCount));
-	m_radialIndices = NEW_REF(DX8IndexBufferClass, (m_radialTriangleCount * 3));
 
 	{
 		DX8VertexBufferClass::WriteLockClass lock(m_radialVertices);
 		Vector3 *vertex = (Vector3 *)lock.Get_Vertex_Array();
-		vertex->Set(0.0f, 0.0f, RADIAL_INNER_RADIUS);
-		vertex++;
-		radius = RADIAL_INNER_RADIUS;
-		for (Int ring=0; ring<rings; ring++)
+		for (Int y=0; y<=size; y++)
 		{
-			for (Int segment=0; segment<RADIAL_SEGMENTS; segment++)
+			for (Int x=0; x<=size; x++)
 			{
-				const Real angle = 2.0f * PI * (Real)segment / (Real)RADIAL_SEGMENTS;
-				vertex->Set(radius * cosf(angle), radius * sinf(angle), radius * (growth - 1.0f));
+				vertex->Set((Real)x, (Real)y, 0.0f);
 				vertex++;
 			}
-			radius *= growth;
 		}
 	}
 
+	// Separate buffers, as index counts and draw offsets are 16-bit.
+	for (Int buffer=0; buffer<5; buffer++)
 	{
-		DX8IndexBufferClass::WriteLockClass lock(m_radialIndices);
+		const Int variant = buffer - 1;
+		const Int triangles = (buffer == 0) ? m_radialFullTriangles : m_radialRingTriangles;
+		m_radialIndices[buffer] = NEW_REF(DX8IndexBufferClass, ((unsigned short)(triangles * 3)));
+		DX8IndexBufferClass::WriteLockClass lock(m_radialIndices[buffer]);
 		UnsignedShort *index = lock.Get_Index_Array();
-		for (Int segment=0; segment<RADIAL_SEGMENTS; segment++)
+		const Int holeX = size / 4 + (variant & 1);
+		const Int holeY = size / 4 + ((variant >> 1) & 1);
+		for (Int y=0; y<size; y++)
 		{
-			index[0] = 0;
-			index[1] = (UnsignedShort)(1 + segment);
-			index[2] = (UnsignedShort)(1 + (segment + 1) % RADIAL_SEGMENTS);
-			index += 3;
-		}
-		for (Int ring=0; ring<rings-1; ring++)
-		{
-			const Int inner = 1 + ring * RADIAL_SEGMENTS;
-			const Int outer = inner + RADIAL_SEGMENTS;
-			for (Int segment=0; segment<RADIAL_SEGMENTS; segment++)
+			for (Int x=0; x<size; x++)
 			{
-				const Int next = (segment + 1) % RADIAL_SEGMENTS;
-				index[0] = (UnsignedShort)(inner + segment);
-				index[1] = (UnsignedShort)(outer + segment);
-				index[2] = (UnsignedShort)(outer + next);
-				index[3] = (UnsignedShort)(inner + segment);
-				index[4] = (UnsignedShort)(outer + next);
-				index[5] = (UnsignedShort)(inner + next);
+				if (variant >= 0 && x >= holeX && x < holeX + hole && y >= holeY && y < holeY + hole)
+				{
+					continue;
+				}
+				const Int corner = y * (size + 1) + x;
+				index[0] = (UnsignedShort)corner;
+				index[1] = (UnsignedShort)(corner + 1);
+				index[2] = (UnsignedShort)(corner + size + 2);
+				index[3] = (UnsignedShort)corner;
+				index[4] = (UnsignedShort)(corner + size + 2);
+				index[5] = (UnsignedShort)(corner + size + 1);
 				index += 6;
 			}
 		}
@@ -1493,7 +1496,7 @@ void WaterRenderObjClass::drawRadialWater(Real planeZ)
 
 	Matrix3D tm(1);
 	DX8Wrapper::Set_Transform(D3DTS_WORLD, tm);
-	DX8Wrapper::Set_Index_Buffer(m_radialIndices, 0);
+	DX8Wrapper::Set_Index_Buffer(m_radialIndices[0], 0);
 	DX8Wrapper::Set_Vertex_Buffer(m_radialVertices);
 
 	m_drawingRadial = TRUE;
@@ -1503,7 +1506,43 @@ void WaterRenderObjClass::drawRadialWater(Real planeZ)
 	DWORD cull;
 	DX8Wrapper::_Get_D3D_Device8()->GetRenderState(D3DRS_CULLMODE, &cull);
 	DX8Wrapper::_Get_D3D_Device8()->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
-	DX8Wrapper::Draw_Triangles(0, m_radialTriangleCount, 0, m_radialVertexCount);
+
+	// Each level snaps to its own world lattice, so the vertices stay on fixed world points as the camera moves.
+	D3DSURFACE_DESC swellDesc;
+	findSwellTexture()->Peek_D3D_Texture()->GetLevelDesc(0, &swellDesc);
+	const Real texelsPerUnit = (Real)swellDesc.Width / max(TheWaterTransparency->m_shaderWaterSwellScale, 1.0f);
+	const Vector3 eye = m_renderCamera->Get_Transform().Get_Translation();
+	const Int half = CLIPMAP_CELLS / 2;
+	Real cell = CLIPMAP_FINEST_CELL;
+	for (Int level=0; ; level++)
+	{
+		const Real span = 2.0f * cell;
+		const Bool last = (Real)half * cell >= CLIPMAP_REACH;
+		const Vector4 placement(floorf(eye.X / span) * span - (Real)half * cell, floorf(eye.Y / span) * span - (Real)half * cell, planeZ, cell);
+
+		// Cells near the level's edge fold onto the coarser lattice, reaching it where the coarser level takes over.
+		const Real foldStart = last ? 1.0e9f : (Real)(half - 2 - CLIPMAP_FOLD_CELLS) * cell;
+		const Vector4 fold(foldStart, 1.0f / ((Real)CLIPMAP_FOLD_CELLS * cell), logf(cell * texelsPerUnit) / logf(2.0f), 0.0f);
+		DX8Wrapper::Set_Vertex_Shader_Constant(7, &placement, 1);
+		DX8Wrapper::Set_Vertex_Shader_Constant(11, &fold, 1);
+
+		if (level == 0)
+		{
+			DX8Wrapper::Draw_Triangles(0, (unsigned short)m_radialFullTriangles, 0, (unsigned short)m_radialVertexCount);
+		}
+		else
+		{
+			const Int variant = (((Int)floorf(eye.X / cell)) & 1) | ((((Int)floorf(eye.Y / cell)) & 1) << 1);
+			DX8Wrapper::Set_Index_Buffer(m_radialIndices[1 + variant], 0);
+			DX8Wrapper::Draw_Triangles(0, (unsigned short)m_radialRingTriangles, 0, (unsigned short)m_radialVertexCount);
+		}
+
+		if (last)
+		{
+			break;
+		}
+		cell *= 2.0f;
+	}
 	cleanupShaderWater();
 	DX8Wrapper::_Get_D3D_Device8()->SetRenderState(D3DRS_CULLMODE, cull);
 	m_drawingRadial = FALSE;
@@ -1838,9 +1877,13 @@ WaterRenderObjClass::WaterRenderObjClass()
 	m_reflectionFrame=0;
 	m_reflectionPlaneZ=0.0f;
 	m_radialVertices=nullptr;
-	m_radialIndices=nullptr;
+	for (Int i=0; i<5; i++)
+	{
+		m_radialIndices[i]=nullptr;
+	}
 	m_radialVertexCount=0;
-	m_radialTriangleCount=0;
+	m_radialFullTriangles=0;
+	m_radialRingTriangles=0;
 	m_shaderWaterRadialVertexShader=0;
 	m_shaderWaterRadialPixelShader[0]=0;
 	m_shaderWaterRadialPixelShader[1]=0;
@@ -2358,7 +2401,10 @@ void WaterRenderObjClass::ReleaseResources()
 	m_shaderWaterSwellVertexShader=0;
 	m_shaderWaterRadialVertexShader=0;
 	REF_PTR_RELEASE(m_radialVertices);
-	REF_PTR_RELEASE(m_radialIndices);
+	for (Int i=0; i<5; i++)
+	{
+		REF_PTR_RELEASE(m_radialIndices[i]);
+	}
 	REF_PTR_RELEASE(m_waterMaskTexture);
 	m_waterMaskMap=nullptr;
 	REF_PTR_RELEASE(m_swellTexture);

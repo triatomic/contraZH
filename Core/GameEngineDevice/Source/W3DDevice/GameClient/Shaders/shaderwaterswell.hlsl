@@ -2,12 +2,12 @@
 //
 // The water draws in world space, so the fixed-function vertex format comes straight in. Two
 // layers of the height texture, at different scales and drifting apart, keep the swell from
-// visibly repeating. Its slope and height go out beside the world position, to tilt the pixel
-// normal and raise foam on the crests.
+// visibly repeating. The pixel shader reads the same layers for the slope and the crests.
 //
-// RADIAL draws a polar grid centred under the camera instead, whose cells widen with distance.
-// Each vertex carries its offset from the centre and its cell size, which sets the slope step
-// and the mip level, and the water texture coordinates and colour are made here.
+// RADIAL draws square levels centred under the camera instead, each with twice the cells of the
+// one inside it and snapped to its own world lattice, so vertices never slide across the swell.
+// Near a level's edge the odd vertices fold onto the coarser lattice, and the water texture
+// coordinates and colour are made here.
 
 sampler2D SwellMap : register(s0);   // vertex texture sampler 0
 
@@ -16,18 +16,20 @@ float4 ClipY        : register(c1);
 float4 ClipZ        : register(c2);
 float4 ClipW        : register(c3);
 float4 Swell        : register(c4);   // x = world to texcoord scale, y = height, zw = drift
-float4 SwellSample  : register(c5);   // x = world step for the slope, y = mip level; RADIAL: x = texels per world unit
+float4 SwellSample  : register(c5);   // y = mip level
 float4 SwellChannel : register(c6);   // picks the channel holding height
 
 #if RADIAL
-float4 Radial       : register(c7);   // xy = grid centre, z = water level
+float4 Level        : register(c7);   // xy = this level's lattice origin, z = water level, w = cell size
 float4 Wobble       : register(c8);   // x = texcoords per world unit, yz = wobble size, w = wobble phase
 float4 WobbleRate   : register(c9);   // x = wobble cycles per world unit
 float4 WaterColor   : register(c10);
+float4 Fold         : register(c11);  // x = distance from the eye where folding starts, y = 1 / its width, z = log2 of texels per cell
+float4 Eye          : register(c12);  // xy = camera position
 
 struct VsIn
 {
-    float3 Position : POSITION;   // xy = offset from the centre, z = cell size
+    float3 Position : POSITION;   // xy = cell index within the level
 };
 #else
 struct VsIn
@@ -46,7 +48,6 @@ struct VsOut
     float2 BaseUV     : TEXCOORD0;
     float2 EdgeUV     : TEXCOORD1;
     float3 WorldPos   : TEXCOORD2;
-    float3 Swell      : TEXCOORD3;   // xy = slope, z = height from -1 to 1
 };
 
 float Layer(float2 uv, float mip)
@@ -63,20 +64,19 @@ float Height(float2 world, float mip)
 VsOut main(VsIn input)
 {
 #if RADIAL
-    float2 at = Radial.xy + input.Position.xy;
-    float step = input.Position.z;
-    float mip = log2(max(step * SwellSample.x, 1.0f));
-    float level = Radial.z;
+    float2 grid = input.Position.xy;
+    float2 at = Level.xy + grid * Level.w;
+    float2 away = abs(at - Eye.xy);
+    float fold = saturate((max(away.x, away.y) - Fold.x) * Fold.y);
+    at -= frac(grid * 0.5f) * 2.0f * Level.w * fold;
+    float mip = max(Fold.z + fold, 0.0f);
+    float level = Level.z;
 #else
     float2 at = input.Position.xy;
-    float step = SwellSample.x;
     float mip = SwellSample.y;
     float level = input.Position.z;
 #endif
-    float h = Height(at, mip);
-    float hx = Height(at + float2(step, 0.0f), mip);
-    float hy = Height(at + float2(0.0f, step), mip);
-    float4 world = float4(at, level + h, 1.0f);
+    float4 world = float4(at, level + Height(at, mip), 1.0f);
 
     VsOut output;
     output.Position = float4(dot(world, ClipX), dot(world, ClipY), dot(world, ClipZ), dot(world, ClipW));
@@ -91,6 +91,5 @@ VsOut main(VsIn input)
     output.EdgeUV = input.EdgeUV;
 #endif
     output.WorldPos = world.xyz;
-    output.Swell = float3(float2(h - hx, h - hy) / step, h / max(Swell.y, 0.001f));
     return output;
 }

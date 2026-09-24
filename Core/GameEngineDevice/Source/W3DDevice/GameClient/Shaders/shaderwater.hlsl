@@ -12,7 +12,8 @@
 // coordinates computed from it.
 //
 // PACKED picks the shadow map's depth format. SWELL picks the ps_3_0 build that follows
-// shaderwaterswell.hlsl, whose vertex waves tilt the normal and raise foam on their crests.
+// shaderwaterswell.hlsl. It reads the same swell per pixel at fixed world points, to tilt the
+// normal and raise foam on the crests without shimmering as a camera-centred grid slides.
 // RADIAL adds the water mask for its camera-centred grid, which spans every lake at one level.
 // RIVER picks the river build. It fades to the untouched scene by the river texture's
 // alpha and its edge texture, and one wave layer follows the flow.
@@ -33,6 +34,9 @@ sampler2D SkyTop        : register(s12);
 sampler2D Reflection    : register(s13);   // mirrored scene at half size, alpha 1 where anything drew
 #if RADIAL
 sampler2D WaterMask     : register(s14);   // standing water's coverage in alpha, its level at 1/16 unit in red and green times coverage
+#endif
+#if SWELL
+sampler2D SwellMap      : register(s15);   // the vertex shader's swell texture
 #endif
 
 // c0 and c4 belong to shadowreceive.hlsli.
@@ -58,6 +62,11 @@ float4 PlanarMap     : register(c19);  // xy = texel centre shift from the scene
 float4 RadialPlane   : register(c20);  // x = water level of this draw
 #endif
 float4 Shore         : register(c21);  // x = 1 / the depth over which the water's surface light fades in from the shore
+#if SWELL
+float4 SwellShape    : register(c22);  // as the vertex shader's Swell: x = world to texcoord scale, y = height, zw = drift
+float4 SwellChannel  : register(c23);  // picks the channel holding height
+float4 SwellStep     : register(c24);  // x = world step for the slope
+#endif
 
 #include "shadowreceive.hlsli"
 
@@ -67,15 +76,26 @@ struct PsIn
     float2 BaseUV   : TEXCOORD0;
     float2 EdgeUV   : TEXCOORD1;
     float3 WorldPos : TEXCOORD2;
-#if SWELL
-    float3 Swell    : TEXCOORD3;   // xy = slope, z = height from -1 to 1
-#endif
 };
 
 float2 WaveSlope(float2 uv)
 {
     return tex2D(NormalMap, uv).rg * 2.0f - 1.0f;
 }
+
+#if SWELL
+float SwellLayer(float2 uv)
+{
+    return dot(tex2D(SwellMap, uv), SwellChannel) * 2.0f - 1.0f;
+}
+
+// The height the vertex shader lifts the water by at this world point.
+float SwellHeight(float2 world)
+{
+    float2 uv = world * SwellShape.x;
+    return (0.65f * SwellLayer(uv + SwellShape.zw) + 0.35f * SwellLayer(uv * 1.7f - SwellShape.wz * 1.3f)) * SwellShape.y;
+}
+#endif
 
 // The skybox is a box around the camera with five faces, no bottom, laid out as new_skybox.w3d
 // maps them. Every face is sampled and the one the ray leaves through is kept.
@@ -126,7 +146,10 @@ float4 main(PsIn input) : COLOR
     slope *= 0.5f;
 #endif
 #if SWELL
-    float3 normal = normalize(float3(slope * HeightDecode.w + input.Swell.xy, 1.0f));
+    float swellHere = SwellHeight(world.xy);
+    float2 swellSlope = float2(swellHere - SwellHeight(world.xy + float2(SwellStep.x, 0.0f)),
+        swellHere - SwellHeight(world.xy + float2(0.0f, SwellStep.x))) / SwellStep.x;
+    float3 normal = normalize(float3(slope * HeightDecode.w + swellSlope, 1.0f));
 #else
     float3 normal = normalize(float3(slope * HeightDecode.w, 1.0f));
 #endif
@@ -171,7 +194,7 @@ float4 main(PsIn input) : COLOR
     float foamMask = saturate(1.0f - depth * WaterParams.z);
     foamMask *= foamMask;
 #if SWELL
-    foamMask = max(foamMask, saturate((input.Swell.z - 0.35f) * 2.5f));
+    foamMask = max(foamMask, saturate((swellHere / max(SwellShape.y, 0.001f) - 0.35f) * 2.5f));
 #endif
     float2 foamUV = world.xy * 0.02f + slope * 0.04f;
     float foam = tex2D(FoamTexture, foamUV + time * float2(0.011f, -0.007f)).r;

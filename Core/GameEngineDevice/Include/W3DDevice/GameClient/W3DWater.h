@@ -281,16 +281,17 @@ protected:
 	const CameraClass *m_reflectionSource;	///< camera the reflection mirrors, null when there is none
 	UnsignedInt m_reflectionFrame;		///< frame the reflection was rendered in
 	Real m_reflectionPlaneZ;
-	DX8VertexBufferClass *m_radialVertices;	///< polar grid around the origin, z holding each vertex's cell size
-	DX8IndexBufferClass *m_radialIndices;
+	DX8VertexBufferClass *m_radialVertices;	///< square lattice of cell indices, drawn once per camera-centred level
+	DX8IndexBufferClass *m_radialIndices[5];	///< the whole lattice, then four rings with the middle left out at each offset
 	Int m_radialVertexCount;
-	Int m_radialTriangleCount;
-	DWORD m_shaderWaterRadialVertexShader;	///< lays the polar grid under the camera and lifts it by the swell
+	Int m_radialFullTriangles;
+	Int m_radialRingTriangles;
+	DWORD m_shaderWaterRadialVertexShader;	///< lays the levels under the camera and lifts them by the swell
 	DWORD m_shaderWaterRadialPixelShader[2];
 	TextureClass *m_waterMaskTexture;	///< flat standing water per map cell, coverage in alpha and level in red and green
 	UnsignedInt m_waterMaskSignature;	///< hash of the water polygons the mask was built from
 	const WorldHeightMap *m_waterMaskMap;
-	Bool m_drawingRadial;				///< the standing water being drawn is the polar grid
+	Bool m_drawingRadial;				///< the standing water being drawn is the camera-centred grid
 	Real m_radialPlaneZ;
 	Int64 m_iniTimestamp;				///< Water.ini's last write time, 0 until first seen
 	UnsignedInt m_iniCheckTime;			///< when Water.ini was last looked at, in ms
