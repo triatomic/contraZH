@@ -4330,6 +4330,21 @@ void W3DShaderManager::startRenderToTexture()
 	DEBUG_ASSERTCRASH(!m_renderingToTexture, ("Already rendering to texture - cannot nest calls."));
 
 	if (m_renderingToTexture || m_newRenderSurface==nullptr || m_oldDepthSurface==nullptr) return;
+
+	// The flip model rotates the back buffers, so what is bound now is what endRenderToTexture restores.
+	IDirect3DSurface8 *currentTarget = nullptr;
+	IDirect3DSurface8 *currentDepth = nullptr;
+	if (FAILED(DX8Wrapper::_Get_D3D_Device8()->GetRenderTarget(DX8_SWAPCHAIN &currentTarget)) ||
+		FAILED(DX8Wrapper::_Get_D3D_Device8()->GetDepthStencilSurface(&currentDepth)))
+	{
+		SAFE_RELEASE(currentTarget);
+		return;
+	}
+	SAFE_RELEASE(m_oldRenderSurface);
+	SAFE_RELEASE(m_oldDepthSurface);
+	m_oldRenderSurface = currentTarget;
+	m_oldDepthSurface = currentDepth;
+
 	HRESULT hr = DX8Wrapper::Set_DX8_Render_Target_Surfaces(m_newRenderSurface,m_oldDepthSurface);
 
 	// TheSuperHackers @bugfix If SetRenderTarget fails (e.g. due to MSAA forced by driver
