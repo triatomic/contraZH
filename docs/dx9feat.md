@@ -150,6 +150,33 @@ against the ground only, since a multisampled depth buffer cannot be read.
 * Ground-aligned and alpha-tested sprites keep their edges.
 * Launch with `CONTRA_SOFTPARTICLES=2` to fade against the ground only, or `0` to turn the fade off.
 
+## Ambient occlusion
+
+Creases, corners, and the ground where units and buildings stand fall into soft shade, so objects sit
+on the terrain instead of floating over it. Needs the Direct3D 9 build, shader model 2.0a and
+anti-aliasing off.
+
+* `AmbientOcclusion = Yes` - (No turns the shade off. Also `Ambient occlusion` in the advanced display
+options, greyed out while anti-aliasing is on. Needs `CheckAmbientOcclusion` in `OptionsMenu.wnd` for
+the menu control.)
+
+Tuned in the mod's `GameData.ini`:
+
+* `AmbientOcclusionRadius = 12` - (How far, in world units, geometry shades what is near it. Larger
+values spread the shade wider and soften it.)
+* `AmbientOcclusionStrength = 1.0` - (How dark the shade gets. 0 turns it off.)
+
+`AmbientOcclusionDebug = Yes` in `Options.ini` shows the shade alone, in grey.
+
+Notes:
+* The shade reads the scene's depth, which a multisampled depth buffer hides, so it is off whenever
+anti-aliasing is on.
+* It falls on the terrain, units, buildings and trees. Water, decals, particles and translucent models
+draw over it unshaded.
+* It darkens the whole colour, lit or not, including glow masks and highlights.
+* Launch with `CONTRA_SSAO=0` to turn it off. `CONTRA_SOFTPARTICLES` other than 1 turns it off too,
+since that also removes the readable scene depth.
+
 ## Shader water
 
 Lakes, seas and rivers are shaded per pixel, with refraction, reflection, sun glint, foam and
