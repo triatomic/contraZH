@@ -67,7 +67,9 @@ edges, but their ripples and foam are shifted.
 * `ShaderWaterStochasticSize = 100` - (World units between neighbouring cells. Smaller breaks the
 pattern up more but blends more of the surface. 0 turns it off.)
 * `ShaderWaterStochasticSharpness = 3` - (Narrows the blend between cells. 1 blends everywhere and
-softens the textures, higher keeps each cell's texture crisp up to a narrower seam.)
+softens the textures, higher keeps each cell's texture crisp up to a narrower seam. Between 0 and 1
+the blend spreads further. 0 mixes all three cells evenly and negative values favour the farther
+cells, and both show the cell edges as seams.)
 
 ## Animation
 
@@ -138,7 +140,7 @@ One block. `map.ini` can override any of these keys for its map.
 | `ShaderWaterWaveScale` | number | `160` | `1` **(hard)** - `2000` | World units one ripple pattern covers. Below `50` the ripples shimmer, above `2000` they are too broad to see. |
 | `ShaderWaterWaveStrength` | number | `0.3` | `0` - `2` | Ripple steepness. `0` is flat. Above `2` the surface turns to glitter. |
 | `ShaderWaterStochasticSize` | number | `100` | `0`, or `30` - `1000` | World units between the cells that shift the textures to hide their tiling. `0` turns it off. Below `30` the textures blur, above `1000` the pattern shows within a cell. |
-| `ShaderWaterStochasticSharpness` | number | `3` | `1` **(hard)** - `16` | Narrows the blend between cells. `1` softens the textures, above `16` the cell edges show. |
+| `ShaderWaterStochasticSharpness` | number | `3` | `-15` **(hard)** - `16`, looks right from `1` | Narrows the blend between cells. `1` softens the textures, above `16` the cell edges show. `0` and below show seams along the cell edges. |
 | `ShaderWaterFoamDepth` | number | `6` | `0` - `30` | Depth where shore foam fades out. `0` turns foam off. |
 | `ShaderWaterSwellHeight` | number | `3.0` | `0` - `10` | Height of the vertex waves in world units. `0` turns them off. Waves shrink in water shallower than twice this. Above `10` they cut into hulls. |
 | `ShaderWaterSwellScale` | number | `700` | `1` **(hard)** - `3000` | World units one swell pattern covers. Below `200` the swell looks choppy, above `3000` it is too broad to see. |
