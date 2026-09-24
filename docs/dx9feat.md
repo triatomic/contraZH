@@ -5,6 +5,15 @@ Options live in `Options.ini` and the advanced display options; tuning keys live
 `GameData.ini`. Bloom, vertical sync and laser ground glow work on both builds and are on
 [contraZH Changes](contraZH-Changes.md#rendering).
 
+Cheat builds reload `Data\INI\GameData.ini` about half a second after it is saved, so these tuning
+keys can be adjusted with a map running: `UnitSpecularIntensity`, `UnitSpecularPower`,
+`UnitBumpHeight`, `UnitNormalMapStrength`, `TerrainNormalMapStrength`, `UnitEmissiveIntensity`,
+`UnitEmissiveNightIntensity`, `SoftParticleDistance`, `AmbientOcclusionRadius`,
+`AmbientOcclusionStrength` and the `Flame` and `Haze` keys. Other `GameData.ini` keys keep their
+value until a restart. The saved values win over a map's `map.ini` until the map loads again. A
+deleted key keeps its value until a restart, and a file with an error applies only the keys above
+the error until the next save.
+
 ## Shadow mapping
 
 Sun shadows from a shadow map replace stencil volumes on vehicles and buildings and blob decals
@@ -196,7 +205,8 @@ Notes:
 * A key a `ParticleSystem` block leaves out keeps the `GameData.ini` value.
 * Systems with settings of their own draw apart from other flames, so keep overrides to the systems
 that need them.
-* Changes take effect on the next game launch.
+* The `GameData.ini` keys reload while the game runs in cheat builds, as described at the top of this
+page. `ParticleSystem.ini` overrides take effect on the next launch.
 * Slave systems follow their master, and a system a particle carries follows that particle's system.
 * Streaks, projectile streams, volume particles and terrain-conforming particles stay plain.
 * On a card without shader model 2.0a, flames keep their shading but lose the soft fade.
