@@ -103,6 +103,7 @@ class WaterTransparencySetting : public Overridable
 		Real m_shaderWaterPlanarDistortion;	///< how far the waves bend the mirrored scene, in screen fractions
 		Real m_shaderWaterPlanarFade;	///< height difference over which other water fades from the mirror to the sky
 		Real m_shaderWaterPlanarStrength;	///< reflection the mirrored scene adds on top of the Fresnel term
+		Int m_waterAnimationFps;		///< most steps a second the water moves in, 30 to 60, 0 moves it every frame
 
 	public:
 		WaterTransparencySetting()
@@ -137,6 +138,7 @@ class WaterTransparencySetting : public Overridable
 			m_shaderWaterPlanarDistortion = 0.02f;
 			m_shaderWaterPlanarFade = 4.0f;
 			m_shaderWaterPlanarStrength = 0.3f;
+			m_waterAnimationFps = 0;
 		}
 
 		static const FieldParse m_waterTransparencySettingFieldParseTable[];		///< the parse table for INI definition

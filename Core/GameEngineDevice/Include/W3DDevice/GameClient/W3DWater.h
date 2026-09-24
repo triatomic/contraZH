@@ -294,6 +294,8 @@ protected:
 	Real m_radialPlaneZ;
 	Int64 m_iniTimestamp;				///< Water.ini's last write time, 0 until first seen
 	UnsignedInt m_iniCheckTime;			///< when Water.ini was last looked at, in ms
+	Real m_animationPendingStep;		///< water movement held back by WaterAnimationFps
+	Real m_animationPendingTime;		///< seconds since the water last moved under WaterAnimationFps
 
 	Bool useShaderWater() const;
 	Bool isWaterVisible(PolygonTrigger *pTrig) const;

@@ -1853,6 +1853,8 @@ WaterRenderObjClass::WaterRenderObjClass()
 	m_swellSource=nullptr;
 	m_iniTimestamp=0;
 	m_iniCheckTime=0;
+	m_animationPendingStep=0.0f;
+	m_animationPendingTime=0.0f;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2833,7 +2835,31 @@ void WaterRenderObjClass::update()
 	reloadEditedIni();
 
 	// TheSuperHackers @tweak The water movement time step is now decoupled from the render update.
-	const Real timeScale = TheFramePacer->getActualLogicTimeScaleOverFpsRatio();
+	Real timeScale = TheFramePacer->getActualLogicTimeScaleOverFpsRatio();
+
+	// Uncapped logic speeds the water up with the fps, so WaterAnimationFps moves it at most a logic frame per step.
+	const Int animationFps = TheWaterTransparency->m_waterAnimationFps;
+	if (animationFps > 0)
+	{
+		const Real interval = 1.0f / (Real)clamp(animationFps, 30, 60);
+		m_animationPendingStep += timeScale;
+		m_animationPendingTime += TheFramePacer->getUpdateTime();
+		if (m_animationPendingTime < interval)
+		{
+			timeScale = 0.0f;
+		}
+		else
+		{
+			timeScale = min(m_animationPendingStep, 1.0f);
+			m_animationPendingStep = 0.0f;
+			m_animationPendingTime = min(m_animationPendingTime - interval, interval);
+		}
+	}
+	else
+	{
+		m_animationPendingStep = 0.0f;
+		m_animationPendingTime = 0.0f;
+	}
 
 	{
 		constexpr const Real MagicOffset = 0.0125f * 33 / 5000; ///< the work of top Munkees; do not question it
