@@ -1010,6 +1010,14 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 	const Coord3D &lightPos = TheGlobalData->m_terrainLightPos[0];
 	Vector3 toSun(-lightPos.x, -lightPos.y, -lightPos.z);
 	toSun.Normalize();
+
+	// The virtual sun keeps the real one's height but sits ahead of the camera, where clip-space w grows.
+	const Real forwardLength = sqrtf(clip.m[0][3] * clip.m[0][3] + clip.m[1][3] * clip.m[1][3]);
+	if (TheWaterTransparency->m_shaderWaterVirtualSun && forwardLength > 0.001f)
+	{
+		const Real sunCos = sqrtf(max(1.0f - toSun.Z * toSun.Z, 0.0f));
+		toSun.Set(clip.m[0][3] / forwardLength * sunCos, clip.m[1][3] / forwardLength * sunCos, toSun.Z);
+	}
 	const Vector4 sunDirection(toSun.X, toSun.Y, toSun.Z, 256.0f / max(TheWaterTransparency->m_shaderWaterSpecularSpread, 0.1f));
 	const RGBColor &sunDiffuse = TheGlobalData->m_terrainDiffuse[0];
 	const Real specular = TheWaterTransparency->m_shaderWaterSpecular;

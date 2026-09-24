@@ -49,6 +49,9 @@ the swell picture below shows the ripple pattern.
 only shows when the camera looks toward the sun, and most maps light from behind the default view.
 A wider glint catches more view angles and turns from a sharp sparkle into a broad sheen. Raise
 `ShaderWaterSpecular` with it to keep the sparkle bright.)
+* `ShaderWaterVirtualSun = No` - (Yes glints off a sun placed ahead of the camera at the map sun's
+height, so the sparkle shows from every view. The glint then turns with the camera and no longer
+matches the direction of shadows and lighting. Only the glint moves.)
 * `ShaderWaterRefraction = 0.015` - (How far the waves bend the seabed, as a fraction of the screen.)
 * `ShaderWaterWaveScale = 160` - (World units one wave pattern covers. Higher gives broader waves.)
 * `ShaderWaterWaveStrength = 0.3` - (Steepness of the waves. Drives glint, reflection and bending.)
@@ -129,6 +132,7 @@ One block. `map.ini` can override any of these keys for its map.
 | `ShaderWaterClarity` | number | `1.0` | `0.1` - `10` | Scales `TransparentWaterDepth` for how deep the seabed shows. |
 | `ShaderWaterReflection` | number | `3.0` | `0` - `10` | `0` turns the sky reflection off. Reflection is capped at 80% **(hard)**, so higher values only spread that cap to steeper views. |
 | `ShaderWaterSpecular` | number | `1.0` | `0` - `5` | `0` turns the sun glint off. Above `5` the glint washes out to white. |
+| `ShaderWaterVirtualSun` | Yes/No | `No` | - | `Yes` glints off a sun ahead of the camera at the map sun's height, so the sparkle shows from every view. |
 | `ShaderWaterSpecularSpread` | number | `1.0` | `0.1` **(hard)** - `16` | Widens the sun glint so it shows at more view angles. Below `1` it narrows. Above `16` the glint turns into a haze over the whole surface. |
 | `ShaderWaterRefraction` | number | `0.015` | `0` - `0.1` | Fraction of the screen the waves bend the seabed by. `0` turns it off. Above `0.05` smears. |
 | `ShaderWaterWaveScale` | number | `160` | `1` **(hard)** - `2000` | World units one ripple pattern covers. Below `50` the ripples shimmer, above `2000` they are too broad to see. |
