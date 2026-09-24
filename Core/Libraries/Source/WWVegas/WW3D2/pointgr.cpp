@@ -172,6 +172,7 @@ PointGroupClass::PointGroupClass() :
 {
 	// TheSuperHackers @feature off unless the caller asks for it
 	GroundMorph = false;
+	Effects = 0;
 }
 
 /**************************************************************************
@@ -958,9 +959,13 @@ void PointGroupClass::Render(RenderInfoClass &rinfo)
 
 	// Camera-facing blended sprites fade where they near the scene behind them. Opaque and alpha-tested ones stay crisp.
 	SoftParticleHookClass *soft_hook = SortingRendererClass::Peek_Soft_Particle_Hook();
-	const bool soft = soft_hook != nullptr && Billboard && Texture != nullptr &&
-	                  Shader.Get_Alpha_Test() == ShaderClass::ALPHATEST_DISABLE &&
-	                  Shader.Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO;
+	unsigned effects = 0;
+	if (soft_hook != nullptr && Texture != nullptr &&
+	    Shader.Get_Alpha_Test() == ShaderClass::ALPHATEST_DISABLE &&
+	    Shader.Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO)
+	{
+		effects = Effects | (Billboard ? SoftParticleHookClass::EFFECT_SOFT : 0);
+	}
 
 	IndexBufferClass *indexbuffer;
 	int	verticesperprimitive;/// lorenzen fixed
@@ -1013,17 +1018,17 @@ void PointGroupClass::Render(RenderInfoClass &rinfo)
 
 		if ( sort )
 		{
-				SortingRendererClass::Set_Soft_Insert(soft);
+				SortingRendererClass::Set_Insert_Effects(effects);
 				SortingRendererClass::Insert_Triangles (0, delta / verticesperprimitive, 0, delta);
-				SortingRendererClass::Set_Soft_Insert(false);
+				SortingRendererClass::Set_Insert_Effects(0);
 		}
 		else
 		{
 			bool faded = false;
-			if (soft)
+			if (effects != 0)
 			{
 				DX8Wrapper::Apply_Render_State_Changes();
-				faded = soft_hook->Begin(Shader);
+				faded = soft_hook->Begin(Shader, effects);
 			}
 			DX8Wrapper::Draw_Triangles (0, delta / verticesperprimitive, 0, delta);
 			if (faded)

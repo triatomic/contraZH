@@ -48,8 +48,11 @@
 #include "GameClient/Smudge.h"
 
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Module/BehaviorModule.h"
+#include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/TerrainLogic.h"
+#include "GameLogic/Weapon.h"
 
 
 //------------------------------------------------------------------------------ Performance Timers
@@ -856,6 +859,7 @@ ParticleSystemInfo::ParticleSystemInfo()
 	m_conformToTerrain = false;
 	m_isEmitAboveGroundOnly = false;
 	m_isParticleUpTowardsEmitter = false;
+	m_flameShader = FLAME_SHADER_AUTO;
 
 	m_driftVelocity.zero();
 	m_gravity = 0.0f;
@@ -932,7 +936,8 @@ void ParticleSystemInfo::xfer( Xfer *xfer )
 
 	// version
 	// TheSuperHackers @feature version 2 adds m_conformToTerrain
-	XferVersion currentVersion = 2;
+	// version 3 adds m_flameShader
+	XferVersion currentVersion = 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1167,6 +1172,9 @@ void ParticleSystemInfo::xfer( Xfer *xfer )
 	// wind motion moving to end angle
 	xfer->xferByte( &m_windMotionMovingToEndAngle );
 
+	if( version >= 3 )
+		xfer->xferUser( &m_flameShader, sizeof( FlameShaderMode ) );
+
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1324,6 +1332,8 @@ ParticleSystem::ParticleSystem( const ParticleSystemTemplate *sysTemplate,
 	m_conformToTerrain = sysTemplate->m_conformToTerrain;
 	m_isEmitAboveGroundOnly = sysTemplate->m_isEmitAboveGroundOnly;
 	m_isParticleUpTowardsEmitter = sysTemplate->m_isParticleUpTowardsEmitter;
+	m_flameShader = sysTemplate->m_flameShader;
+	m_flameResolved = -1;
 
 	m_windMotion = sysTemplate->m_windMotion;
 	m_windAngleChange = sysTemplate->m_windAngleChange;
@@ -1581,6 +1591,63 @@ void ParticleSystem::attachToObject( const Object *obj )
 	{
 		m_attachedToObjectID = INVALID_ID;
 	}
+}
+
+// ------------------------------------------------------------------------------------------------
+/** Auto follows the master or controlling particle's system, else the projectile the system rides.
+	* Answered at first draw, once the projectile has been launched, and kept for the system's life. */
+// ------------------------------------------------------------------------------------------------
+Bool ParticleSystem::isFlame()
+{
+	if (m_flameShader != FLAME_SHADER_AUTO)
+	{
+		return m_flameShader == FLAME_SHADER_YES;
+	}
+
+	if (m_flameResolved >= 0)
+	{
+		return m_flameResolved != 0;
+	}
+
+	Bool flame = FALSE;
+	if (m_masterSystem != nullptr)
+	{
+		flame = m_masterSystem->isFlame();
+	}
+	else if (m_controlParticle != nullptr && m_controlParticle->getSystem() != nullptr)
+	{
+		flame = m_controlParticle->getSystem()->isFlame();
+	}
+	else
+	{
+		const Object *obj = nullptr;
+		if (m_attachedToObjectID != INVALID_ID)
+		{
+			obj = TheGameLogic->findObjectByID( m_attachedToObjectID );
+		}
+		else if (m_attachedToDrawableID != INVALID_DRAWABLE_ID)
+		{
+			const Drawable *draw = TheGameClient->findDrawableByID( m_attachedToDrawableID );
+			obj = (draw != nullptr) ? draw->getObject() : nullptr;
+		}
+
+		if (obj != nullptr)
+		{
+			for (BehaviorModule **module = obj->getBehaviorModules(); *module != nullptr; ++module)
+			{
+				ProjectileUpdateInterface *projectile = (*module)->getProjectileUpdateInterface();
+				if (projectile != nullptr)
+				{
+					const WeaponTemplate *weapon = projectile->projectileGetDetonationWeapon();
+					flame = weapon != nullptr && weapon->getDamageType() == DAMAGE_FLAME;
+					break;
+				}
+			}
+		}
+	}
+
+	m_flameResolved = flame ? 1 : 0;
+	return flame;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -2995,6 +3062,7 @@ const FieldParse ParticleSystemTemplate::m_fieldParseTable[] =
 	{ "IsParticleUpTowardsEmitter",	INI::parseBool,																nullptr,		offsetof( ParticleSystemTemplate, m_isParticleUpTowardsEmitter) },
 
 	{ "WindMotion",					INI::parseIndexList, WindMotionNames, offsetof( ParticleSystemTemplate, m_windMotion ) },
+	{ "FlameShader",				INI::parseIndexList, FlameShaderModeNames, offsetof( ParticleSystemTemplate, m_flameShader ) },
 
 	{ "WindAngleChangeMin", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_windAngleChangeMin ) },
 	{ "WindAngleChangeMax", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_windAngleChangeMax ) },

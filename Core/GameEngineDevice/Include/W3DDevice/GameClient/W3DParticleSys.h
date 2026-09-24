@@ -51,9 +51,17 @@ public:
 	virtual Int getOnScreenParticleCount() override { return m_onScreenParticleCount; }
 
 private:
-	void drawSystems(RenderInfoClass &rinfo, Bool additiveOnly);	///< draws m_drawOrder; additiveOnly feeds the bloom pass
-	Bool finishedBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture);
-	void initializeBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture);
+	enum DrawPass
+	{
+		DRAW_MAIN,
+		DRAW_BLOOM,		///< additive systems again, into the bloom target
+		DRAW_HAZE			///< flame systems as heat haze, before the main pass
+	};
+
+	void drawSystems(RenderInfoClass &rinfo, DrawPass pass);	///< draws m_drawOrder
+	unsigned systemEffects(ParticleSystem &system, DrawPass pass);
+	Bool finishedBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, unsigned effects);
+	void initializeBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, unsigned effects);
 	void flushParticleBatch(RenderInfoClass& rinfo, UnsignedInt& pointCount);
 
 	enum { MAX_POINTS_PER_GROUP = 512 };
@@ -79,4 +87,5 @@ private:
 	ParticleSystemInfo::ParticleShaderType m_batchShaderType;
 	Bool m_readyToRender;											///< if true, it is OK to render
 	Bool m_batchBillboard;
+	unsigned m_batchEffects;									///< SoftParticleHookClass effects beyond soft fading
 };

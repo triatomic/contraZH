@@ -25,14 +25,21 @@ class SphereClass;
 class ShaderClass;
 struct VertexFormatXYZNDUV2;
 
-// Fades soft particles where they near the scene behind them, around each of their draws.
+// Shades particle sprites in a pixel shader, around each of their draws.
 class SoftParticleHookClass
 {
 public:
+	enum
+	{
+		EFFECT_SOFT = 1,	// fade where the sprite nears the scene behind it
+		EFFECT_FLAME = 2,	// flicker and heat colouring
+		EFFECT_HAZE = 4		// wobble the scene copy behind the sprite
+	};
+
 	virtual ~SoftParticleHookClass() {}
 
-	// Called with the draw's render state applied. False leaves the draw hard, and End uncalled.
-	virtual bool Begin(const ShaderClass &shader) = 0;
+	// Called with the draw's render state applied. False leaves the draw fixed-function, and End uncalled.
+	virtual bool Begin(const ShaderClass &shader, unsigned effects) = 0;
 	virtual void End() = 0;
 };
 
@@ -71,8 +78,8 @@ public:
 	static void _Enable_Triangle_Draw(bool enable) { _EnableTriangleDraw=enable; }
 	static bool _Is_Triangle_Draw_Enabled() { return _EnableTriangleDraw; }
 
-	// Triangles inserted while this is on are soft particles, drawn through the hook.
+	// Triangles inserted while effects are set are drawn through the hook with those effects.
 	static void Set_Soft_Particle_Hook(SoftParticleHookClass *hook);
 	static SoftParticleHookClass *Peek_Soft_Particle_Hook();
-	static void Set_Soft_Insert(bool soft);
+	static void Set_Insert_Effects(unsigned effects);
 };

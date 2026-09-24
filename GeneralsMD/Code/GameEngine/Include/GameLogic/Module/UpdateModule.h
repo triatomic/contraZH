@@ -260,6 +260,7 @@ public:
 	virtual void projectileFireAtObjectOrPosition( const Object *victim, const Coord3D *victimPos, const WeaponTemplate *detWeap, const ParticleSystemTemplate* exhaustSysOverride ) = 0;
 	virtual Bool projectileIsArmed() const = 0;													///< return true if the projectile is armed and ready to explode
 	virtual ObjectID projectileGetLauncherID() const = 0;								///< All projectiles need to keep track of their firer
+	virtual const WeaponTemplate* projectileGetDetonationWeapon() const { return nullptr; }	///< weapon fired on detonation (or null)
 	virtual Bool projectileGetLaunchPos(Coord3D& pos) const { return false; }	///< launcher's position at launch time (for DamageFactorAtMaxRange); returns false if unknown
 	virtual void projectileSetLaunchVeterancy(VeterancyLevel v) {}			///< snapshot the launcher's veterancy at launch (for veterancy FX/OCL selection)
 	virtual Bool projectileGetLaunchVeterancy(VeterancyLevel& v) const { return false; }	///< launcher's veterancy at launch time; returns false if unknown

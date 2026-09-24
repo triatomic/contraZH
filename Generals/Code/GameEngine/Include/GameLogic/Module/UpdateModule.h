@@ -262,6 +262,7 @@ public:
 	virtual void projectileFireAtObjectOrPosition( const Object *victim, const Coord3D *victimPos, const WeaponTemplate *detWeap, const ParticleSystemTemplate* exhaustSysOverride ) = 0;
 	virtual Bool projectileIsArmed() const = 0;													///< return true if the projectile is armed and ready to explode
 	virtual ObjectID projectileGetLauncherID() const = 0;								///< All projectiles need to keep track of their firer
+	virtual const WeaponTemplate* projectileGetDetonationWeapon() const { return nullptr; }	///< weapon fired on detonation (or null)
 	virtual Bool projectileHandleCollision(Object *other) = 0;
 };
 

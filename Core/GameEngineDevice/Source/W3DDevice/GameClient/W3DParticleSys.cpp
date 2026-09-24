@@ -86,6 +86,7 @@ W3DParticleSystemManager::W3DParticleSystemManager()
 
 	m_batchBillboard = true;
 	m_batchShaderType = ParticleSystemInfo::INVALID_SHADER;
+	m_batchEffects = 0;
 
 	m_pointGroup = nullptr;
 	m_terrainParticles = nullptr;
@@ -198,6 +199,10 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	// whether the glow pass has anything to draw at all this frame
 	Bool hasAdditive = FALSE;
 
+	// whether the haze pass has anything to draw at all this frame
+	const Bool flameShaders = TheW3DSoftParticles != nullptr && TheW3DSoftParticles->flameEnabled();
+	Bool hasFlame = FALSE;
+
 	ParticleSystemManager::ParticleSystemList &particleSysList = TheParticleSystemManager->getAllParticleSystems();
 	for( ParticleSystemManager::ParticleSystemListIt it = particleSysList.begin(); it != particleSysList.end(); ++it)
 	{
@@ -243,6 +248,11 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 			hasAdditive = TRUE;
 		}
 
+		if (flameShaders && !hasFlame && sys->isUsingParticles() && sys->isFlame())
+		{
+			hasFlame = TRUE;
+		}
+
 		DrawEntry entry;
 		entry.sys = sys;
 		entry.depth = 0.0f;
@@ -260,7 +270,18 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 		std::stable_sort(m_drawOrder.begin(), m_drawOrder.end(), isFarther);
 	}
 
-	drawSystems(rinfo, FALSE);
+	// the haze bends a copy of the scene taken before any particle draws, so flames stay crisp over it
+	if (hasFlame && TheW3DSoftParticles->beginHaze())
+	{
+		m_pointGroup->Set_Flag(PointGroupClass::DISABLE_SORTING, true);
+		drawSystems(rinfo, DRAW_HAZE);
+		m_pointGroup->Set_Flag(PointGroupClass::DISABLE_SORTING, false);
+
+		m_onScreenParticleCount = 0;
+		m_fieldParticleCount = 0;
+	}
+
+	drawSystems(rinfo, DRAW_MAIN);
 
 	/// @todo lorenzen sez: this should be debug only:
 	TheParticleSystemManager->setOnScreenParticleCount(m_onScreenParticleCount);
@@ -274,7 +295,7 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 		// the sorter would hold the quads until after the target is gone
 		m_pointGroup->Set_Flag(PointGroupClass::DISABLE_SORTING, true);
 		m_streakLine->Set_Disable_Sorting(true);
-		drawSystems(rinfo, TRUE);
+		drawSystems(rinfo, DRAW_BLOOM);
 		m_streakLine->Set_Disable_Sorting(false);
 		m_pointGroup->Set_Flag(PointGroupClass::DISABLE_SORTING, false);
 
@@ -299,7 +320,17 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	}
 }
 
-void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, Bool additiveOnly)
+// Flame systems shade as fire in every pass but the haze, which draws only them.
+unsigned W3DParticleSystemManager::systemEffects(ParticleSystem &system, DrawPass pass)
+{
+	if (TheW3DSoftParticles == nullptr || !TheW3DSoftParticles->flameEnabled() || !system.isFlame())
+	{
+		return 0;
+	}
+	return (pass == DRAW_HAZE) ? SoftParticleHookClass::EFFECT_HAZE : SoftParticleHookClass::EFFECT_FLAME;
+}
+
+void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass)
 {
 	const Bool drawSmudge = TheSmudgeManager && TheSmudgeManager->getHardwareSupport() && TheGlobalData->m_useHeatEffects;
 	const Bool batchParticles = TheGlobalData->m_batchParticles;
@@ -313,7 +344,13 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, Bool additive
 	{
 		ParticleSystem *sys = entry->sys;
 
-		if (additiveOnly && (sys->isUsingSmudge() || sys->getShaderType() != ParticleSystemInfo::ADDITIVE))
+		if (pass == DRAW_BLOOM && (sys->isUsingSmudge() || sys->getShaderType() != ParticleSystemInfo::ADDITIVE))
+		{
+			continue;
+		}
+
+		const unsigned effects = systemEffects(*sys, pass);
+		if (pass == DRAW_HAZE && (effects == 0 || !sys->isUsingParticles()))
 		{
 			continue;
 		}
@@ -352,8 +389,13 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, Bool additive
 				sys->getVolumeParticleDepth() == 0 &&
 				sys->shouldConformToTerrain();
 
+		if (pass == DRAW_HAZE && useTerrainConformingParticles)
+		{
+			continue;
+		}
+
 		const Bool canBatch = batchParticles && sys->isUsingParticles() && !useTerrainConformingParticles;
-		if (!canBatch || finishedBatch(*sys, texture))
+		if (!canBatch || finishedBatch(*sys, texture, effects))
 		{
 			flushParticleBatch(rinfo, pointCount);
 		}
@@ -361,8 +403,12 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, Bool additive
 		// the batch state always describes the system being filled, batched or not
 		if (m_batchTexture == nullptr)
 		{
-			initializeBatch(*sys, texture);
+			initializeBatch(*sys, texture, effects);
 		}
+
+		// haze spreads a little wider than the flame and rises above it
+		const Real sizeScale = (pass == DRAW_HAZE) ? 1.5f : 1.0f;
+		const Real lift = (pass == DRAW_HAZE) ? 0.3f : 0.0f;
 
 		UnsignedInt startCount = pointCount;
 
@@ -393,9 +439,9 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, Bool additive
 
 			posArray[pointCount].X = pos->x;
 			posArray[pointCount].Y = pos->y;
-			posArray[pointCount].Z = pos->z;
+			posArray[pointCount].Z = pos->z + psize * lift;
 
-			sizeArray[pointCount] = psize;
+			sizeArray[pointCount] = psize * sizeScale;
 
 			color = p->getColor();
 			RGBAArray[pointCount].X = color->red;
@@ -416,7 +462,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, Bool additive
 				// This prevents particles being dropped. Bank the stats first as the flush resets count to 0.
 				m_onScreenParticleCount += (pointCount - startCount);
 				flushParticleBatch(rinfo, pointCount);
-				initializeBatch(*sys, texture);
+				initializeBatch(*sys, texture, effects);
 				startCount = 0;
 			}
 		}
@@ -462,7 +508,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, Bool additive
 		if (sys->isUsingStreak() && (pointCount == 1))
 		{
 			m_onScreenParticleCount += (pointCount - startCount);
-			initializeBatch(*sys, texture);
+			initializeBatch(*sys, texture, effects);
 			flushParticleBatch(rinfo, pointCount);
 			startCount = 0;
 		}
@@ -543,18 +589,20 @@ Bool W3DParticleSystemManager::isFarther(const DrawEntry &a, const DrawEntry &b)
 	return a.depth < b.depth;
 }
 
-Bool W3DParticleSystemManager::finishedBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture)
+Bool W3DParticleSystemManager::finishedBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, unsigned effects)
 {
 	return texture.Peek() != m_batchTexture.Peek() ||
 		system.getShaderType() != m_batchShaderType ||
-		system.shouldBillboard() != m_batchBillboard;
+		system.shouldBillboard() != m_batchBillboard ||
+		effects != m_batchEffects;
 }
 
-void W3DParticleSystemManager::initializeBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture)
+void W3DParticleSystemManager::initializeBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, unsigned effects)
 {
 	m_batchTexture = texture;
 	m_batchShaderType = system.getShaderType();
 	m_batchBillboard = system.shouldBillboard();
+	m_batchEffects = effects;
 }
 
 void W3DParticleSystemManager::flushParticleBatch(RenderInfoClass& rinfo, UnsignedInt& pointCount)
@@ -568,7 +616,9 @@ void W3DParticleSystemManager::flushParticleBatch(RenderInfoClass& rinfo, Unsign
 		m_pointGroup->Set_Arrays(m_posBuffer, m_RGBABuffer, nullptr, m_sizeBuffer, m_angleBuffer, nullptr, pointCount);
 		m_pointGroup->Set_Billboard(m_batchBillboard);
 		m_pointGroup->Set_Point_Frame(0);
+		m_pointGroup->Set_Effects(m_batchEffects);
 		m_pointGroup->Render(rinfo);
+		m_pointGroup->Set_Effects(0);
 
 		pointCount = 0;
 	}
@@ -576,4 +626,5 @@ void W3DParticleSystemManager::flushParticleBatch(RenderInfoClass& rinfo, Unsign
 	m_batchTexture.Clear();
 	m_batchBillboard = false;
 	m_batchShaderType = ParticleSystemInfo::INVALID_SHADER;
+	m_batchEffects = 0;
 }

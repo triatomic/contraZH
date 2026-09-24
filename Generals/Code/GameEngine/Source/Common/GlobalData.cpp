@@ -581,6 +581,7 @@ GlobalData::GlobalData()
   m_laserRef = FALSE;
   m_useDynamicLights = TRUE;
   m_useSoftParticles = TRUE;
+  m_useFlameShaders = TRUE;
   m_softParticleDistance = 12.0f;
   m_useAmbientOcclusion = TRUE;
   m_ambientOcclusionDebug = FALSE;
@@ -1269,6 +1270,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_laserRef = optionPref.getLaserRefEnabled();
 	TheWritableGlobalData->m_useDynamicLights = optionPref.getDynamicLightsEnabled();
 	TheWritableGlobalData->m_useSoftParticles = optionPref.getSoftParticlesEnabled();
+	TheWritableGlobalData->m_useFlameShaders = optionPref.getFlameShadersEnabled();
 	TheWritableGlobalData->m_useAmbientOcclusion = optionPref.getAmbientOcclusionEnabled();
 	TheWritableGlobalData->m_ambientOcclusionDebug = optionPref.getAmbientOcclusionDebugEnabled();
 	TheWritableGlobalData->m_vsync = optionPref.getVSyncMode();

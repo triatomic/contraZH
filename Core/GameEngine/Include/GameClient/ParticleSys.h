@@ -200,6 +200,7 @@ public:
 
 	void controlParticleSystem( ParticleSystem *sys ) { m_systemUnderControl = sys; }
 	void detachControlledParticleSystem() { m_systemUnderControl = nullptr; }
+	ParticleSystem *getSystem() const { return m_system; }
 
 	// get priority of this particle ... which is the priority of the system it belongs to
 	ParticlePriorityType getPriority();
@@ -445,6 +446,18 @@ public:
 	Bool m_conformToTerrain;
 	Bool m_isParticleUpTowardsEmitter;					///< if true, align the up direction to be towards the emitter.
 
+	// Auto shades the system as flame when it rides a projectile of a FLAME weapon.
+	enum FlameShaderMode
+	{
+		FLAME_SHADER_INVALID = 0,
+		FLAME_SHADER_AUTO,
+		FLAME_SHADER_YES,
+		FLAME_SHADER_NO,
+
+		FLAME_SHADER_COUNT
+	};
+	FlameShaderMode m_flameShader;
+
 	enum WindMotion
 	{
 		WIND_MOTION_INVALID = 0,
@@ -510,6 +523,12 @@ static const char *const WindMotionNames[] =
 	"NONE", "Unused", "PingPong", "Circular", nullptr
 };
 static_assert(ARRAY_SIZE(WindMotionNames) == ParticleSystemInfo::WIND_MOTION_COUNT + 1, "Incorrect array size");
+
+static const char *const FlameShaderModeNames[] =
+{
+	"NONE", "Auto", "Yes", "No", nullptr
+};
+static_assert(ARRAY_SIZE(FlameShaderModeNames) == ParticleSystemInfo::FLAME_SHADER_COUNT + 1, "Incorrect array size");
 
 #endif
 
@@ -633,6 +652,8 @@ public:
 	Bool shouldConformToTerrain() const { return m_isGroundAligned && m_conformToTerrain; }
 
 	ParticleShaderType getShaderType() const { return m_shaderType; }
+
+	Bool isFlame();		///< draw with the flame shader
 
 	void setSlave( ParticleSystem *slave );			///< set a slave system for us
 	ParticleSystem *getSlave() { return m_slaveSystem; }
@@ -779,6 +800,7 @@ protected:
 	Bool							m_isFirstPos;													///< true if this system hasn't been drawn before.
 	Bool							m_isSaveable;													///< true if this system should be saved/loaded
 	Bool							m_skipParentXfrm;											///< true if this system is already in world space.
+	Byte							m_flameResolved;											///< isFlame answer: -1 unknown, 0 no, 1 yes
 
 
 	// the actual particle system data is inherited from ParticleSystemInfo

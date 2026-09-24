@@ -143,6 +143,11 @@ rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularlitno
 rts_add_shader("${RTS_SHADER_DIR}/bloomblur.hlsl"      ps_2_0 main bloomblur.pso)
 rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_0 main softparticledepth.pso        DEPTH=1)
 rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_0 main softparticleheight.pso       DEPTH=0)
+# Fading and flame shading together run past ps_2_0's 64 arithmetic slots.
+rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_a main softparticleflamedepth.pso   DEPTH=1 FLAME=1)
+rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_a main softparticleflameheight.pso  DEPTH=0 FLAME=1)
+rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_0 main particleflame.pso            SOFT=0 FLAME=1)
+rts_add_shader("${RTS_SHADER_DIR}/heathaze.hlsl"       ps_2_0 main heathaze.pso)
 rts_add_shader("${RTS_SHADER_DIR}/shockwave.hlsl"      ps_2_0 main shockwave.pso)
 rts_add_shader("${RTS_SHADER_DIR}/ambientocclusion.hlsl" ps_2_a main ambientocclusion.pso      BLUR=0)
 rts_add_shader("${RTS_SHADER_DIR}/ambientocclusion.hlsl" ps_2_a main ambientocclusionblur.pso  BLUR=1)

@@ -789,6 +789,7 @@ GlobalData::GlobalData()
   m_useNormalMaps = TRUE;
   m_waterReflections = TRUE;
   m_useSoftParticles = TRUE;
+  m_useFlameShaders = TRUE;
   m_useDynamicLights = TRUE;
   m_usePixelLights = TRUE;
   m_useAmbientOcclusion = TRUE;
@@ -1636,6 +1637,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_useNormalMaps = optionPref.getNormalMapsEnabled();
 	TheWritableGlobalData->m_waterReflections = optionPref.getWaterReflectionsEnabled();
 	TheWritableGlobalData->m_useSoftParticles = optionPref.getSoftParticlesEnabled();
+	TheWritableGlobalData->m_useFlameShaders = optionPref.getFlameShadersEnabled();
 	TheWritableGlobalData->m_useDynamicLights = optionPref.getDynamicLightsEnabled();
 	TheWritableGlobalData->m_usePixelLights = optionPref.getPixelLightsEnabled();
 	TheWritableGlobalData->m_useAmbientOcclusion = optionPref.getAmbientOcclusionEnabled();

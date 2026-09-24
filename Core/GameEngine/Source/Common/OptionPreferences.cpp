@@ -437,6 +437,11 @@ Bool OptionPreferences::getSoftParticlesEnabled(void) const
 	return getBool("SoftParticles", TRUE);
 }
 
+Bool OptionPreferences::getFlameShadersEnabled(void) const
+{
+	return getBool("FlameShaders", TRUE);
+}
+
 Bool OptionPreferences::getDynamicLightsEnabled(void) const
 {
 	return getBool("DynamicLights", TRUE);

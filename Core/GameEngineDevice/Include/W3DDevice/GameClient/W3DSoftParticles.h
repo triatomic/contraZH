@@ -27,7 +27,8 @@
 class RenderInfoClass;
 
 // Fades particle sprites where they near the surface behind them. With the scene's depth readable
-// that is anything already drawn; otherwise it is the terrain alone.
+// that is anything already drawn; otherwise it is the terrain alone. Also shades flame sprites as
+// fire and draws the heat haze behind them.
 class W3DSoftParticles : public SoftParticleHookClass
 {
 public:
@@ -37,21 +38,40 @@ public:
 	/// Takes this pass's camera, before its particles draw. They draw with an identity view.
 	void beginPass(RenderInfoClass &rinfo);
 
-	virtual bool Begin(const ShaderClass &shader) override;
+	/// Whether flame systems get the flame effect at all.
+	Bool flameEnabled() const;
+
+	/// Copies the scene for the haze pass. False leaves the haze undrawn.
+	Bool beginHaze();
+
+	virtual bool Begin(const ShaderClass &shader, unsigned effects) override;
 	virtual void End() override;
 
-	void ReleaseResources();	///< drops the shaders before a device reset; the next draw reloads them
+	void ReleaseResources();	///< drops the shaders and textures before a device reset; the next draw makes them again
 
 private:
 	Bool loadShaders();
-	Bool bindSceneDepth();
-	Bool bindTerrainHeight();
+	void createNoise();
+	void setClipConstants(Real width, Real height);
+	void setWorldConstants();
+	Bool bindSceneDepth(DWORD shader);
+	Bool bindTerrainHeight(DWORD shader);
+	void bindFlame();
+	Bool bindHaze(const ShaderClass &shader);
 
 	DWORD m_depthShader;
 	DWORD m_heightShader;
+	DWORD m_flameDepthShader;
+	DWORD m_flameHeightShader;
+	DWORD m_flameShader;
+	DWORD m_hazeShader;
+	IDirect3DTexture8 *m_noise;
+	IDirect3DTexture8 *m_sceneCopy;
 	Bool m_loaded;
+	unsigned m_bound;		///< effects the current Begin bound, for End to undo
 	D3DMATRIX m_view;
 	D3DMATRIX m_projection;
+	D3DMATRIX m_toWorld;
 };
 
 extern W3DSoftParticles *TheW3DSoftParticles;

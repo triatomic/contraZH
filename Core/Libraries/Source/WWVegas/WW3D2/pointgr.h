@@ -124,6 +124,9 @@ public:
 	void						Set_Ground_Morph(bool enable);
 	bool						Get_Ground_Morph(void);
 
+	// Hook effects beyond soft fading, from SoftParticleHookClass, for blended textured points.
+	void						Set_Effects(unsigned effects) { Effects = effects; }
+
 	// The frame property is taken from a set of possible frames. The rows/columns in the frame
 	// texture determine the number of possible frames. Since it must be a power of 2, we represent
 	// it as its log base 2. This number cannot be greater than 4 (which corresponds to a 16x16
@@ -199,6 +202,7 @@ protected:
 
 	bool						Billboard;
 	bool						GroundMorph;		// tilt ground aligned quads to the terrain under them
+	unsigned				Effects;
 	static GroundHeightFunc	GroundHeightCallback;
 
 	// Static stuff:

@@ -154,6 +154,8 @@ public:
 	Bool getWaterReflectionsEnabled() const;
 	// Options.ini: SoftParticles = Yes fades smoke and fire where they meet the ground and buildings
 	Bool getSoftParticlesEnabled() const;
+	// Options.ini: FlameShaders = Yes makes flame weapon fire flicker and glow white-hot at its core
+	Bool getFlameShadersEnabled() const;
 	// Options.ini: DynamicLights = Yes lets explosions, muzzle flashes and lasers light their surroundings
 	Bool getDynamicLightsEnabled() const;
 	// Options.ini: PixelLights = Yes draws those lights per pixel where the hardware allows
