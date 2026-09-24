@@ -121,10 +121,11 @@ public:
 		Real outerRadius;	///< nothing past this
 		Vector3 diffuse;
 		Real ambientScale;	///< ambient colour as a fraction of the diffuse
-		Bool terrainOnly;
+		Bool unitLit;		///< the specular pass draws it too, so meshes with that pass go without it in fixed function
 	};
-	enum { MAX_PIXEL_LIGHTS = 8 };
-	/// Sets the lights drawn per pixel, once a frame.
+	/// The terrain shader takes nine lights and the specular pass the first eight marked unitLit, as their registers allow.
+	enum { MAX_PIXEL_LIGHTS = 9, MAX_UNIT_PIXEL_LIGHTS = 8 };
+	/// Sets the lights drawn per pixel, once a frame, most important first.
 	static void setPixelLights(const PixelLight *lights, Int count);
 	/// Whether the terrain draws point lights per pixel, so lights handed over must leave its vertex lighting.
 	static Bool supportsTerrainPixelLights();

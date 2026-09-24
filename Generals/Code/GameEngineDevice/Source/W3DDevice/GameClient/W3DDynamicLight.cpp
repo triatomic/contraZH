@@ -38,6 +38,7 @@ LightClass(LightClass::POINT)
 	m_terrainOnly = false;
 	m_pixelLit = false;
 	m_prevPixelLit = false;
+	m_unitPixelLit = false;
 	m_owner = nullptr;
 
 }

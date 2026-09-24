@@ -521,8 +521,9 @@ light the ground in smooth circles and follow its bumps. Vehicles and structures
 the same way. Needs the Direct3D 9 build and shader model 2.0a; other cards keep the old lighting.
 
 Notes:
-* The eight brightest and widest lights in view each frame are drawn per pixel. The rest keep the
-old lighting, which lights the terrain by its corners, so large ones look blocky.
+* Each frame the lights nearest the middle of the view are drawn per pixel, nine on the terrain
+and eight on vehicles and structures. A light whose reach covers the middle counts as nearest. The
+rest keep the old lighting, which lights the terrain by its corners, so large ones look blocky.
 * Infantry, flat terrain and roads keep the old lighting.
 * Launch with `CONTRA_PIXELLIGHTS=1` to limit per-pixel lights to the terrain, or `0` to turn them off.
 

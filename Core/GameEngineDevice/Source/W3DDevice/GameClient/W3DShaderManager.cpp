@@ -1528,17 +1528,19 @@ static Int Get_Pixel_Light_Mode()
 	return (value != nullptr) ? atoi(value) : PIXEL_LIGHTS_ALL;
 }
 
-// Packs the lights the way pointlights.hlsli reads them. A view takes them into camera space,
-// and none leaves them in world space.
+// Packs the lights the way pointlights.hlsli reads them, all of them for the terrain and the
+// unit lights for the specular pass. A view takes them into camera space, and none leaves them in world space.
 static void Set_Pixel_Light_Constants(Int firstRegister, const D3DMATRIX *view, Bool terrain)
 {
-	Vector4 constants[W3DShaderManager::MAX_PIXEL_LIGHTS * 2 + 2];
+	const Int slots = terrain ? W3DShaderManager::MAX_PIXEL_LIGHTS : W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS;
+	Vector4 constants[W3DShaderManager::MAX_PIXEL_LIGHTS * 2 + (W3DShaderManager::MAX_PIXEL_LIGHTS + 3) / 4];
 	memset(constants, 0, sizeof(constants));
 
-	for (Int i = 0; i < PixelLightCount; i++)
+	Int i = 0;
+	for (Int index = 0; index < PixelLightCount && i < slots; index++)
 	{
-		const W3DShaderManager::PixelLight &light = PixelLights[i];
-		if (light.terrainOnly && !terrain)
+		const W3DShaderManager::PixelLight &light = PixelLights[index];
+		if (!terrain && !light.unitLit)
 		{
 			continue;
 		}
@@ -1556,10 +1558,11 @@ static void Set_Pixel_Light_Constants(Int firstRegister, const D3DMATRIX *view, 
 		const Real scale = 1.0f / (light.outerRadius - light.innerRadius);
 		constants[i * 2].Set(position.X, position.Y, position.Z, scale);
 		constants[i * 2 + 1].Set(light.diffuse.X, light.diffuse.Y, light.diffuse.Z, 1.0f + light.innerRadius * scale);
-		(&constants[W3DShaderManager::MAX_PIXEL_LIGHTS * 2 + i / 4].X)[i % 4] = light.ambientScale;
+		(&constants[slots * 2 + i / 4].X)[i % 4] = light.ambientScale;
+		i++;
 	}
 
-	DX8Wrapper::Set_Pixel_Shader_Constant(firstRegister, constants, W3DShaderManager::MAX_PIXEL_LIGHTS * 2 + 2);
+	DX8Wrapper::Set_Pixel_Shader_Constant(firstRegister, constants, slots * 2 + (slots + 3) / 4);
 }
 
 // The terrain normal maps, set once a frame by the scene.

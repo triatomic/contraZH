@@ -48,7 +48,9 @@ float4 SunDiffuse   : register(c5);   // sun colour the mesh was lit with
 float4 Emissive     : register(c7);   // x = glow mask intensity, 0 without a mask
 
 #if LIGHTS
+// Eight fill c8 to c25, and fxc needs the rest for literals, so W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS must match.
 #define POINT_LIGHT_REGISTER c8
+#define POINT_LIGHT_COUNT 8
 #include "pointlights.hlsli"
 #endif
 

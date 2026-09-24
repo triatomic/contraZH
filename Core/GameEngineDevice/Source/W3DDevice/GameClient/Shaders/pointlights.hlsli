@@ -3,12 +3,14 @@
 // From POINT_LIGHT_REGISTER on, each light takes two registers:
 // - position, and the falloff's scale per unit of distance
 // - diffuse colour, and the falloff's offset
-// Two more registers follow with each light's ambient colour as a fraction of its diffuse.
+// One more register per four lights follows with each light's ambient colour as a fraction of its diffuse.
 // An unused light has zero colour. Position and surface share one space, world or camera.
 
+#ifndef POINT_LIGHT_COUNT
 #define POINT_LIGHT_COUNT 8
+#endif
 
-float4 PointLights[POINT_LIGHT_COUNT * 2 + 2] : register(POINT_LIGHT_REGISTER);
+float4 PointLights[POINT_LIGHT_COUNT * 2 + (POINT_LIGHT_COUNT + 3) / 4] : register(POINT_LIGHT_REGISTER);
 
 float3 PointLighting(float3 position, float3 normal)
 {

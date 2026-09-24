@@ -33,6 +33,8 @@
 
 // SYSTEM INCLUDES ////////////////////////////////////////////////////////////
 #include <stdlib.h>
+#include <algorithm>
+#include <vector>
 
 // USER INCLUDES //////////////////////////////////////////////////////////////
 #include "Lib/BaseType.h"
@@ -988,7 +990,7 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 				  continue;
 			  }
 			  // the specular pass adds this one per pixel
-			  if (pixelLit && pDyna->isPixelLit()) {
+			  if (pixelLit && pDyna->isUnitPixelLit()) {
 				  continue;
 			  }
 			  SphereClass lSph = pDyna->Get_Bounding_Sphere();
@@ -2114,20 +2116,40 @@ void RTS3DScene::addDynamicLight(W3DDynamicLight * obj)
 //=============================================================================
 /** Adds a dynamic light. */
 //=============================================================================
-// The brightest, widest lights in view go to the shaders, which draw them per pixel on the
+// The lights nearest the middle of the view go to the shaders, which draw them per pixel on the
 // terrain and on meshes with the specular pass. The rest stay in the vertex lighting.
+namespace
+{
+	struct PixelLightCandidate
+	{
+		W3DDynamicLight *light;
+		Real gap;		///< how far outside the light's reach the screen centre is, in screen units
+		Real score;		///< reach times brightness, for lights at an equal gap
+	};
+
+	bool Pixel_Light_Before(const PixelLightCandidate &a, const PixelLightCandidate &b)
+	{
+		if (a.gap != b.gap)
+		{
+			return a.gap < b.gap;
+		}
+		return a.score > b.score;
+	}
+}
+
 void RTS3DScene::updatePixelLights(CameraClass &camera)
 {
-	W3DDynamicLight *chosen[W3DShaderManager::MAX_PIXEL_LIGHTS];
-	Real scores[W3DShaderManager::MAX_PIXEL_LIGHTS];
-	Int count = 0;
+	static std::vector<PixelLightCandidate> candidates;
+	candidates.clear();
 
 	const Bool enabled = W3DShaderManager::supportsTerrainPixelLights();
+	Vector3 cameraRight;
+	camera.Get_Transform().Get_X_Vector(&cameraRight);
+
 	RefRenderObjListIterator it(&m_dynamicLightList);
 	for (it.First(); !it.Is_Done(); it.Next())
 	{
 		W3DDynamicLight *light = (W3DDynamicLight *)it.Peek_Obj();
-		light->setPixelLit(FALSE);
 		if (!enabled || !light->isEnabled() || light->Get_Type() != LightClass::POINT)
 		{
 			continue;
@@ -2152,35 +2174,33 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 			continue;
 		}
 
-		Int slot = count;
-		if (count == W3DShaderManager::MAX_PIXEL_LIGHTS)
+		// A light whose reach covers the screen centre ranks with one sitting on it. One too close
+		// to the camera to project is treated the same way.
+		PixelLightCandidate candidate;
+		candidate.light = light;
+		candidate.score = score;
+		candidate.gap = 0.0f;
+		const Vector3 position = light->Get_Position();
+		Vector3 center;
+		Vector3 edge;
+		if (camera.Project(center, position) != CameraClass::OUTSIDE_NEAR_CLIP &&
+			camera.Project(edge, position + cameraRight * (Real)outerRadius) != CameraClass::OUTSIDE_NEAR_CLIP)
 		{
-			slot = 0;
-			for (Int i = 1; i < count; i++)
-			{
-				if (scores[i] < scores[slot])
-				{
-					slot = i;
-				}
-			}
-			if (scores[slot] >= score)
-			{
-				continue;
-			}
+			const Real distance = sqrt(center.X * center.X + center.Y * center.Y);
+			const Real reach = sqrt((edge.X - center.X) * (edge.X - center.X) + (edge.Y - center.Y) * (edge.Y - center.Y));
+			candidate.gap = max(distance - reach, 0.0f);
 		}
-		else
-		{
-			count++;
-		}
-		chosen[slot] = light;
-		scores[slot] = score;
+		candidates.push_back(candidate);
 	}
 
+	std::sort(candidates.begin(), candidates.end(), Pixel_Light_Before);
+	const Int count = min((Int)candidates.size(), (Int)W3DShaderManager::MAX_PIXEL_LIGHTS);
+
 	W3DShaderManager::PixelLight lights[W3DShaderManager::MAX_PIXEL_LIGHTS];
+	Int unitCount = 0;
 	for (Int i = 0; i < count; i++)
 	{
-		W3DDynamicLight *light = chosen[i];
-		light->setPixelLit(TRUE);
+		W3DDynamicLight *light = candidates[i].light;
 
 		double innerRadius, outerRadius;
 		light->Get_Far_Attenuation_Range(innerRadius, outerRadius);
@@ -2204,7 +2224,26 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 		lights[i].position = light->Get_Position();
 		lights[i].innerRadius = (Real)innerRadius;
 		lights[i].outerRadius = (Real)outerRadius;
-		lights[i].terrainOnly = light->isTerrainOnly();
+		lights[i].unitLit = !light->isTerrainOnly() && unitCount < W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS;
+		unitCount += lights[i].unitLit ? 1 : 0;
+	}
+
+	// Once per light and frame, since the terrain compares each light with its last frame.
+	for (it.First(); !it.Is_Done(); it.Next())
+	{
+		W3DDynamicLight *light = (W3DDynamicLight *)it.Peek_Obj();
+		Bool pixelLit = FALSE;
+		Bool unitPixelLit = FALSE;
+		for (Int i = 0; i < count; i++)
+		{
+			if (candidates[i].light == light)
+			{
+				pixelLit = TRUE;
+				unitPixelLit = lights[i].unitLit;
+				break;
+			}
+		}
+		light->setPixelLit(pixelLit, unitPixelLit);
 	}
 	W3DShaderManager::setPixelLights(lights, count);
 

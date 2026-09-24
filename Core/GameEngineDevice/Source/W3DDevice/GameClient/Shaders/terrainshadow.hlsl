@@ -85,7 +85,9 @@ sampler2D ShadowMap : register(s4);
 #endif
 
 #if LIGHTS
+// Nine fill c5 to c25, and fxc needs the rest for literals, so W3DShaderManager::MAX_PIXEL_LIGHTS must match.
 #define POINT_LIGHT_REGISTER c5
+#define POINT_LIGHT_COUNT 9
 #include "pointlights.hlsli"
 #endif
 
