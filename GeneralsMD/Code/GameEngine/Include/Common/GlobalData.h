@@ -134,6 +134,7 @@ public:
 	Bool setTimeOfDay( TimeOfDay tod );		///< Use this function to set the Time of day;
 
 	static void parseGameDataDefinition( INI* ini );
+	static void reloadEditedIni();		///< picks up render tuning keys from GameData.ini saved while the game runs, in cheat builds
 	void parseCustomDefinition();
 
 	//-----------------------------------------------------------------------------------------------

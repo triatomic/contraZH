@@ -49,6 +49,7 @@
 #include "Common/FileSystem.h"
 #include "Common/GameAudio.h"
 #include "Common/INI.h"
+#include "Common/LocalFileSystem.h"
 #include "Common/Registry.h"
 #include "Common/OptionPreferences.h"
 #include "Common/ThingTemplate.h"
@@ -1553,11 +1554,129 @@ void GlobalData::reset()
 
 }
 
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+
+// Keys the renderer reads every frame, so a new value shows at once. The rest are read at load.
+static const char *const LiveGameDataKeys[] =
+{
+	"UnitSpecularIntensity", "UnitSpecularPower", "UnitBumpHeight", "UnitNormalMapStrength", "TerrainNormalMapStrength",
+	"UnitEmissiveIntensity", "UnitEmissiveNightIntensity", "SoftParticleDistance",
+	"AmbientOcclusionRadius", "AmbientOcclusionStrength",
+	"FlameWarp", "FlameHeat", "FlameFlicker", "FlameBreakup", "FlameNoiseSize", "FlameRise",
+	"HazeBend", "HazeSize", "HazeLift", "HazeNoiseSize", "HazeRise", "HazeMask",
+	nullptr
+};
+
+// A key with no value opens a nested block such as SubdualDamageDefaults, which is read through to its End.
+static void parseIgnoredField( INI* ini, void *instance, void *store, const void *userData )
+{
+	if (ini->getNextTokenOrNull() == nullptr)
+	{
+		static const FieldParse noFields[] = { { nullptr, nullptr, nullptr, 0 } };
+		Int unused = 0;
+		ini->initFromINI( &unused, noFields );
+	}
+}
+
+// The GameData field table with every key but the live ones read and dropped, or null outside a reload.
+static const FieldParse *LiveReloadTable = nullptr;
+
+#endif
+
+//-------------------------------------------------------------------------------------------------
+// Tuning the renderer means seeing each change, so cheat builds reload its GameData.ini keys when the
+// file is saved. Only those keys change, so Options.ini choices and map overrides stay as they are.
+//-------------------------------------------------------------------------------------------------
+void GlobalData::reloadEditedIni()
+{
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	static UnsignedInt checkTime = 0;
+	static Int64 lastTimestamp = 0;
+
+	const UnsignedInt now = timeGetTime();
+	if (now - checkTime < 500)
+	{
+		return;
+	}
+	checkTime = now;
+
+	const AsciiString fileName("Data\\INI\\GameData.ini");
+	FileInfo info;
+	if (TheLocalFileSystem == nullptr || !TheLocalFileSystem->getFileInfo(fileName, &info))
+	{
+		return;
+	}
+	const Int64 timestamp = info.timestamp();
+	const Bool firstLook = (lastTimestamp == 0);
+	if (timestamp == lastTimestamp)
+	{
+		return;
+	}
+	lastTimestamp = timestamp;
+	if (firstLook)
+	{
+		return;
+	}
+
+	static FieldParse liveTable[ARRAY_SIZE(s_GlobalDataFieldParseTable)];
+	static Bool built = FALSE;
+	if (!built)
+	{
+		built = TRUE;
+		for (UnsignedInt i = 0; i < ARRAY_SIZE(s_GlobalDataFieldParseTable); ++i)
+		{
+			liveTable[i] = s_GlobalDataFieldParseTable[i];
+			if (liveTable[i].token == nullptr)
+			{
+				break;
+			}
+
+			Bool live = FALSE;
+			for (const char *const *key = LiveGameDataKeys; *key != nullptr; ++key)
+			{
+				if (stricmp(*key, liveTable[i].token) == 0)
+				{
+					live = TRUE;
+					break;
+				}
+			}
+			if (!live)
+			{
+				liveTable[i].parse = parseIgnoredField;
+			}
+		}
+	}
+
+	LiveReloadTable = liveTable;
+	try
+	{
+		INI ini;
+		ini.load( fileName, INI_LOAD_MULTIFILE, nullptr );
+	}
+	catch (...)
+	{
+		LiveReloadTable = nullptr;
+		DEBUG_LOG(("GameData.ini stopped at an error, so only the keys above it took effect until the next save"));
+		return;
+	}
+	LiveReloadTable = nullptr;
+	DEBUG_LOG(("GameData.ini render tuning reloaded"));
+#endif
+}
+
 //-------------------------------------------------------------------------------------------------
 /** Parse GameData entry */
 //-------------------------------------------------------------------------------------------------
 void GlobalData::parseGameDataDefinition( INI* ini )
 {
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	if (LiveReloadTable != nullptr)
+	{
+		ini->initFromINI( TheWritableGlobalData, LiveReloadTable );
+		return;
+	}
+#endif
+
 	if( TheWritableGlobalData && ini->getLoadType() != INI_LOAD_MULTIFILE)
 	{
 
