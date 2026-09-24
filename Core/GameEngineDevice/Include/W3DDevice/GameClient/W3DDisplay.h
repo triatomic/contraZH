@@ -88,6 +88,7 @@ public:
 	virtual void createLightPulse( const Coord3D *pos, const RGBColor *color, Real innerRadius,Real outerRadius,
 																 UnsignedInt increaseFrameTime, UnsignedInt decayFrameTime//, Bool donut = FALSE
 																 ) override;
+	virtual void createShockwave( const Coord3D *pos, Real radius, Real width, Real strength, UnsignedInt durationFrames ) override;
 	virtual void setTimeOfDay ( TimeOfDay tod ) override;
 
 	/// draw a line on the display in screen coordinates

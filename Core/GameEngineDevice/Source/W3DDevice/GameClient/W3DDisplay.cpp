@@ -80,6 +80,7 @@ static void drawFramerateBar();
 #include "W3DDevice/GameClient/W3DVideoBuffer.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/W3DShadowMap.h"
+#include "W3DDevice/GameClient/W3DShockwave.h"
 #include "W3DDevice/GameClient/W3DDebugDisplay.h"
 #include "W3DDevice/GameClient/W3DProjectedShadow.h"
 #include "W3DDevice/GameClient/W3DScreenshot.h"
@@ -2297,6 +2298,14 @@ void W3DDisplay::createLightPulse( const Coord3D *pos, const RGBColor *color,
 	//theDynamicLight->setDonut(donut);
 	// (gth) CNC3 enable far attenuation.  C&C3 defaults to disabled.  Must enable to match Generals. MW 8-06-03
 	theDynamicLight->Set_Flag(LightClass::FAR_ATTENUATION,true);
+}
+
+void W3DDisplay::createShockwave( const Coord3D *pos, Real radius, Real width, Real strength, UnsignedInt durationFrames )
+{
+	if (TheW3DShockwaves != nullptr && pos != nullptr)
+	{
+		TheW3DShockwaves->add(*pos, radius, width, strength, (UnsignedInt)(durationFrames * MSEC_PER_LOGICFRAME_REAL));
+	}
 }
 
 void W3DDisplay::toggleLetterBox()

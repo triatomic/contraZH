@@ -520,6 +520,7 @@ static PoolSizeRec PoolSizes[] =
 	{ "DecalFXNugget", 32, 32 },
 	{ "RayEffectFXNugget", 32, 32 },
 	{ "LightPulseFXNugget", 68, 32 },
+	{ "ShockwaveFXNugget", 32, 32 },
 	{ "ViewShakeFXNugget", 140, 32 },
 	{ "TerrainScorchFXNugget", 48, 32 },
 	{ "ParticleSystemFXNugget", 832, 32 },

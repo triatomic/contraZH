@@ -61,6 +61,7 @@
 #include "W3DDevice/GameClient/W3DSmudge.h"
 #include "W3DDevice/GameClient/W3DBloom.h"
 #include "W3DDevice/GameClient/W3DSoftParticles.h"
+#include "W3DDevice/GameClient/W3DShockwave.h"
 #include "W3DDevice/GameClient/Module/W3DModelDraw.h"
 #include "WW3D2/light.h"
 #include "WW3D2/rendobj.h"
@@ -209,6 +210,9 @@ W3DTerrainVisual::~W3DTerrainVisual()
 	delete TheW3DSoftParticles;
 	TheW3DSoftParticles = nullptr;
 
+	delete TheW3DShockwaves;
+	TheW3DShockwaves = nullptr;
+
 	REF_PTR_RELEASE( m_waterRenderObject );
 	TheWaterRenderObj=nullptr;
 	REF_PTR_RELEASE( m_terrainRenderObject );
@@ -253,6 +257,7 @@ void W3DTerrainVisual::init()
 
 		TheW3DBloom = NEW W3DBloom;
 		TheW3DSoftParticles = NEW W3DSoftParticles;
+		TheW3DShockwaves = NEW W3DShockwaveManager;
 
 #ifdef DO_UNIT_TIMINGS
 #pragma MESSAGE("********************* WARNING- Doing UNIT TIMINGS. ")

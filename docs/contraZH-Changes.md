@@ -750,6 +750,33 @@ Notes:
 `AutoReloadsClip = No` drops the rest.
 * Firing again replaces the queue. Death drops it. Save/load keeps it.
 
+# FXList.ini
+
+## Shockwave nugget
+
+An expanding ring on the ground that bends everything behind it, like the air a big blast pushes
+out. Needs the Direct3D 9 build, a shader model 2 card and `Heat Effects` on.
+
+* `Radius` - (How far the ring travels, in world units.)
+* `Width` - (How thick the ring is, in world units.)
+* `Strength` - (How far it bends the scene, in world units. Around 2 to 6 reads well.)
+* `Duration` - (How long the ring takes to reach `Radius`, in milliseconds. It fades as it goes.)
+
+```
+FXList FX_NukeExplosion
+  Shockwave
+    Radius   = 300
+    Width    = 40
+    Strength = 4
+    Duration = 900
+  End
+End
+```
+
+Notes:
+* At most 16 rings show at once; a new one replaces the oldest.
+* The ring lies flat at the effect's height, so on steep ground it is centred but not draped.
+
 # Animation2D.ini
 
 ## Texture

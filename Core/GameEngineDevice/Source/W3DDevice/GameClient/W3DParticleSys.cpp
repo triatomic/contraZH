@@ -39,6 +39,7 @@
 #include "W3DDevice/GameClient/W3DSnow.h"
 #include "W3DDevice/GameClient/W3DBloom.h"
 #include "W3DDevice/GameClient/W3DSoftParticles.h"
+#include "W3DDevice/GameClient/W3DShockwave.h"
 #include "WW3D2/camera.h"
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/ww3d.h"
@@ -290,6 +291,11 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	if(TheSmudgeManager)
 	{
 		((W3DSmudgeManager *)TheSmudgeManager)->render(rinfo);
+	}
+
+	if (TheW3DShockwaves)
+	{
+		TheW3DShockwaves->render(rinfo);
 	}
 }
 
