@@ -17,6 +17,10 @@
 // RADIAL adds the water mask for its camera-centred grid, which spans every lake at one level.
 // RIVER picks the river build. It fades to the untouched scene by the river texture's
 // alpha and its edge texture, and one wave layer follows the flow.
+//
+// The water texture, waves and foam hide their tiling with hex-tile stochastic texturing. A
+// world-space hex lattice gives each cell a random texture offset, and every pixel blends the
+// three nearest cells while keeping the texture's contrast.
 
 sampler2D WaterTexture  : register(s0);
 sampler2D EdgeTexture   : register(s1);
@@ -61,7 +65,7 @@ float4 PlanarMap     : register(c19);  // xy = texel centre shift from the scene
 #if RADIAL
 float4 RadialPlane   : register(c20);  // x = water level of this draw
 #endif
-float4 Shore         : register(c21);  // x = 1 / the depth over which the water's surface light fades in from the shore
+float4 Surface       : register(c21);  // x = 1 / shore fade depth, y = 1 / hex cell spacing, z = hex weight sharpness, w = 1 when hex tiling is on
 #if SWELL
 float4 SwellShape    : register(c22);  // as the vertex shader's Swell: x = world to texcoord scale, y = height, zw = drift
 float4 SwellChannel  : register(c23);  // picks the channel holding height
@@ -78,9 +82,70 @@ struct PsIn
     float3 WorldPos : TEXCOORD2;
 };
 
+struct HexCells
+{
+    float3 weight;
+    float norm;       // 1 / length of the weights, which keeps the blend's contrast
+    float2 offset0;
+    float2 offset1;
+    float2 offset2;
+};
+
+float2 HexHash(float2 cell)
+{
+    float3 p = frac(float3(cell, cell.x + cell.y) * 0.1031f);
+    p = frac(p + dot(p, p.yzx + 20.0f));
+    p = frac(p + dot(p, p.yzx + 20.0f));
+    return p.xy;
+}
+
+// The three hex cells around a world point, after Mikkelsen's hex-tiling.
+HexCells FindHexCells(float2 world)
+{
+    // A plain half shear gives near-equilateral cells without a sqrt 3 constant, which ps_2_a has no room for.
+    float2 st = world * Surface.y;
+    float2 skewed = float2(st.x - 0.5f * st.y, st.y);
+    float2 base = floor(skewed);
+    float3 corner = float3(frac(skewed), 0.0f);
+    corner.z = 1.0f - corner.x - corner.y;
+    float s = step(0.0f, -corner.z);
+    float s2 = 2.0f * s - 1.0f;
+
+    float3 weight = pow(saturate(float3(-corner.z * s2, s - corner.y * s2, s - corner.x * s2)), Surface.z);
+    weight = lerp(float3(1.0f, 0.0f, 0.0f), weight / dot(weight, 1.0f), Surface.w);
+
+    HexCells cells;
+    cells.weight = weight;
+    cells.norm = rsqrt(dot(weight, weight));
+    cells.offset0 = HexHash(base + float2(s, s)) * Surface.w;
+    cells.offset1 = HexHash(base + float2(s, 1.0f - s)) * Surface.w;
+    cells.offset2 = HexHash(base + float2(1.0f - s, s)) * Surface.w;
+    return cells;
+}
+
+// The offset jumps between cells, so the mip comes from the unshifted texcoords' gradients.
+// Mean is the texture's average, read from its smallest mip by TextureMean.
+float4 HexSample(sampler2D map, HexCells cells, float2 uv, float2 dx, float2 dy, float4 mean)
+{
+    float4 sum = cells.weight.x * (tex2Dgrad(map, uv + cells.offset0, dx, dy) - mean);
+    sum += cells.weight.y * (tex2Dgrad(map, uv + cells.offset1, dx, dy) - mean);
+    sum += cells.weight.z * (tex2Dgrad(map, uv + cells.offset2, dx, dy) - mean);
+    return mean + sum * cells.norm;
+}
+
+float4 TextureMean(sampler2D map)
+{
+    return tex2Dbias(map, float4(0.0f, 0.0f, 0.0f, 20.0f));
+}
+
 float2 WaveSlope(float2 uv)
 {
     return tex2D(NormalMap, uv).rg * 2.0f - 1.0f;
+}
+
+float2 HexWaveSlope(HexCells cells, float2 uv, float2 dx, float2 dy, float4 mean)
+{
+    return HexSample(NormalMap, cells, uv, dx, dy, mean).rg * 2.0f - 1.0f;
 }
 
 #if SWELL
@@ -136,9 +201,13 @@ float4 main(PsIn input) : COLOR
     float2 heightBytes = tex2D(HeightTexture, mapUV).rg;
     float depth = max(world.z - dot(heightBytes, HeightDecode.xy), 0.0f);
 
+    HexCells cells = FindHexCells(world.xy);
     float2 waveUV = world.xy * HeightDecode.z;
-    float2 slope = WaveSlope(waveUV + time * float2(0.031f, 0.017f));
-    slope += WaveSlope(waveUV * 2.7f + time * float2(-0.023f, 0.037f));
+    float2 waveDx = ddx(waveUV);
+    float2 waveDy = ddy(waveUV);
+    float4 waveMean = TextureMean(NormalMap);
+    float2 slope = HexWaveSlope(cells, waveUV + time * float2(0.031f, 0.017f), waveDx, waveDy, waveMean);
+    slope += HexWaveSlope(cells, waveUV * 2.7f + time * float2(-0.023f, 0.037f), waveDx * 2.7f, waveDy * 2.7f, waveMean);
 #if RIVER
     slope += WaveSlope(input.BaseUV * float2(1.0f, 2.0f));
     slope *= 0.33f;
@@ -168,7 +237,11 @@ float4 main(PsIn input) : COLOR
     float lit = lerp(1.0f, ShadowLit(shadowPos), Absorption.w);
     float3 shade = lerp(ShadowColor.rgb, float3(1.0f, 1.0f, 1.0f), lit);
 
+#if RIVER
     float4 water = tex2D(WaterTexture, input.BaseUV);
+#else
+    float4 water = saturate(HexSample(WaterTexture, cells, input.BaseUV, ddx(input.BaseUV), ddy(input.BaseUV), TextureMean(WaterTexture)));
+#endif
     float3 body = water.rgb * input.Diffuse.rgb * shade;
     float3 transmission = exp(-depth * WaterParams.x * Absorption.rgb);
     float3 opacity = WaterParams.y * (1.0f - transmission);
@@ -197,12 +270,15 @@ float4 main(PsIn input) : COLOR
     foamMask = max(foamMask, saturate((swellHere / max(SwellShape.y, 0.001f) - 0.35f) * 2.5f));
 #endif
     float2 foamUV = world.xy * 0.02f + slope * 0.04f;
-    float foam = tex2D(FoamTexture, foamUV + time * float2(0.011f, -0.007f)).r;
-    foam *= tex2D(FoamTexture, foamUV * 0.8f - time * float2(0.006f, 0.009f)).r * 2.0f;
+    float2 foamDx = ddx(foamUV);
+    float2 foamDy = ddy(foamUV);
+    float4 foamMean = TextureMean(FoamTexture);
+    float foam = saturate(HexSample(FoamTexture, cells, foamUV + time * float2(0.011f, -0.007f), foamDx, foamDy, foamMean).r);
+    foam *= saturate(HexSample(FoamTexture, cells, foamUV * 0.8f - time * float2(0.006f, 0.009f), foamDx * 0.8f, foamDy * 0.8f, foamMean).r) * 2.0f;
     foam *= foamMask;
 
     // As the legacy soft water edge did, the surface fades out at the waterline instead of ending in a line.
-    float edge = saturate(depth * Shore.x);
+    float edge = saturate(depth * Surface.x);
     reflection *= edge;
     glint *= edge;
     foam *= edge;

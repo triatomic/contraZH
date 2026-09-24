@@ -553,7 +553,7 @@ Bool WaterRenderObjClass::useShaderWater() const
 	return ShaderWaterMode != 0 && m_shaderWaterPixelShader[0] != 0 && m_shaderWaterPixelShader[1] != 0 &&
 		m_shaderRiverPixelShader[0] != 0 && m_shaderRiverPixelShader[1] != 0 &&
 		m_normalTexture != nullptr && TheTerrainRenderObject != nullptr &&
-		TheGlobalData->m_showSoftWaterEdge && !TheWaterTransparency->m_additiveBlend;
+		TheGlobalData->m_showSoftWaterEdge && !TheWaterTransparency->m_additiveBlend && !TheWaterTransparency->m_notWater;
 #else
 	return FALSE;
 #endif
@@ -1096,9 +1096,12 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 	DX8Wrapper::Set_Pixel_Shader_Constant(19, &planarMapping, 1);
 
 	// TransparentWaterDepth sets the soft edge's width, and 0 turns it off as it did for the legacy water.
+	// The hex tiling rides along in the same constant, as ps_2_a has no register to spare.
 	const Real softEdgeDepth = TheWaterTransparency->m_transparentWaterDepth;
-	const Vector4 shore((softEdgeDepth > 0.0f) ? 1.0f / softEdgeDepth : 10000.0f, 0.0f, 0.0f, 0.0f);
-	DX8Wrapper::Set_Pixel_Shader_Constant(21, &shore, 1);
+	const Real hexSize = TheWaterTransparency->m_shaderWaterStochasticSize;
+	const Vector4 surface((softEdgeDepth > 0.0f) ? 1.0f / softEdgeDepth : 10000.0f, (hexSize > 0.0f) ? 1.0f / hexSize : 0.0f,
+		max(TheWaterTransparency->m_shaderWaterStochasticSharpness, 1.0f), (hexSize > 0.0f) ? 1.0f : 0.0f);
+	DX8Wrapper::Set_Pixel_Shader_Constant(21, &surface, 1);
 
 	if (!river && m_shaderWaterSwellActive && m_drawingRadial)
 	{
