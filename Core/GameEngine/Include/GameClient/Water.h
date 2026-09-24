@@ -100,6 +100,7 @@ class WaterTransparencySetting : public Overridable
 		Real m_shaderWaterOpacity;		///< opacity of deep water, 0 takes TransparentWaterMinOpacity
 		Real m_shaderWaterSwellHeight;	///< height of the vertex waves, 0 turns them off
 		Real m_shaderWaterSwellScale;	///< world units one swell tile covers
+		Real m_shaderWaterSwellSpeed;	///< world units a second the swell drifts
 		Real m_shaderWaterPlanarDistortion;	///< how far the waves bend the mirrored scene, in screen fractions
 		Real m_shaderWaterPlanarFade;	///< height difference over which other water fades from the mirror to the sky
 		Real m_shaderWaterPlanarStrength;	///< reflection the mirrored scene adds on top of the Fresnel term
@@ -135,6 +136,7 @@ class WaterTransparencySetting : public Overridable
 			m_shaderWaterOpacity = 0.95f;
 			m_shaderWaterSwellHeight = 3.0f;
 			m_shaderWaterSwellScale = 700.0f;
+			m_shaderWaterSwellSpeed = 30.0f;
 			m_shaderWaterPlanarDistortion = 0.02f;
 			m_shaderWaterPlanarFade = 4.0f;
 			m_shaderWaterPlanarStrength = 0.3f;

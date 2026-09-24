@@ -1167,8 +1167,10 @@ void WaterRenderObjClass::setupSwell(const D3DMATRIX &clip)
 	const Real texelsPerStep = swellDesc.Width * step / swellScale;
 	const Real mipLevel = (texelsPerStep > 1.0f) ? logf(texelsPerStep) / logf(2.0f) : 0.0f;
 
+	// The water clock ticks one unit a second, and the swell drifts across the diagonal at its speed.
 	const Real time = m_riverVOrigin / 0.06f;
-	const Vector4 swell(1.0f / swellScale, TheWaterTransparency->m_shaderWaterSwellHeight, time * 0.004f, time * 0.0025f);
+	const Real drift = time * TheWaterTransparency->m_shaderWaterSwellSpeed / swellScale;
+	const Vector4 swell(1.0f / swellScale, TheWaterTransparency->m_shaderWaterSwellHeight, drift * 0.848f, drift * 0.530f);
 	const Vector4 swellSample(step, mipLevel, 0.0f, 0.0f);
 
 	// A decoded _hgt texture holds height in every channel, and the generated one holds it in alpha.
