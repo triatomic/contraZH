@@ -19,7 +19,6 @@ set(UTILITY_SRC
     Utility/premultiply_alpha_x86asm.inl
     Utility/pseh_compat.h
     Utility/sstream_adapter.h
-    Utility/stdint_adapter.h
     Utility/stdio_adapter.h
     Utility/STLUtils.h
     Utility/string_adapter.h

@@ -22,7 +22,6 @@
 #ifndef ENDIAN_COMPAT_H
 #define ENDIAN_COMPAT_H
 
-#include <Utility/stdint_adapter.h>
 #include "bit_adapter.h"
 
 #if defined(__linux__) || defined(__CYGWIN__)
