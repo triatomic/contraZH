@@ -10,6 +10,7 @@
 // coordinates and colour are made here.
 
 sampler2D SwellMap : register(s0);   // vertex texture sampler 0
+sampler2D GroundMap : register(s1);  // terrain heights as high and low bytes, vertex texture sampler 1
 
 float4 ClipX        : register(c0);   // world to clip space, one output component each
 float4 ClipY        : register(c1);
@@ -18,6 +19,8 @@ float4 ClipW        : register(c3);
 float4 Swell        : register(c4);   // x = world to texcoord scale, y = height, zw = drift
 float4 SwellSample  : register(c5);   // y = mip level
 float4 SwellChannel : register(c6);   // picks the channel holding height
+float4 GroundMapping : register(c13); // world xy to ground texcoords: xy scale, zw offset
+float4 GroundDecode  : register(c14); // xy = high and low byte weights, z = 1 when the ground is bound
 
 #if RADIAL
 float4 Level        : register(c7);   // xy = this level's lattice origin, z = water level, w = cell size
@@ -61,6 +64,13 @@ float Height(float2 world, float mip)
     return (0.65f * Layer(uv + Swell.zw, mip) + 0.35f * Layer(uv * 1.7f - Swell.wz * 1.3f, mip + 0.77f)) * Swell.y;
 }
 
+// Waves reach full height in water twice their height deep and flatten towards the shore.
+float Shoal(float2 world, float level)
+{
+    float ground = dot(tex2Dlod(GroundMap, float4(world * GroundMapping.xy + GroundMapping.zw, 0.0f, 0.0f)).rg, GroundDecode.xy);
+    return lerp(1.0f, saturate((level - ground) / max(2.0f * Swell.y, 0.001f)), GroundDecode.z);
+}
+
 VsOut main(VsIn input)
 {
 #if RADIAL
@@ -76,7 +86,7 @@ VsOut main(VsIn input)
     float mip = SwellSample.y;
     float level = input.Position.z;
 #endif
-    float4 world = float4(at, level + Height(at, mip), 1.0f);
+    float4 world = float4(at, level + Height(at, mip) * Shoal(at, level), 1.0f);
 
     VsOut output;
     output.Position = float4(dot(world, ClipX), dot(world, ClipY), dot(world, ClipZ), dot(world, ClipW));

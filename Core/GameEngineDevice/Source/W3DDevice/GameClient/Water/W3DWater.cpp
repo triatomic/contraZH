@@ -1143,6 +1143,20 @@ void WaterRenderObjClass::setupSwell(const D3DMATRIX &clip)
 	device->SetSamplerState(D3DVERTEXTEXTURESAMPLER0, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
 	device->SetSamplerState(D3DVERTEXTEXTURESAMPLER0, D3DSAMP_MIPFILTER, D3DTEXF_LINEAR);
 
+	// The swell shoals over the terrain, so its troughs never sink below a shallow seabed.
+	Vector4 groundMapping(0.0f, 0.0f, 0.0f, 0.0f);
+	Vector4 groundDecode(0.0f, 0.0f, 0.0f, 0.0f);
+	TextureClass *groundTexture = getTerrainHeightTexture(groundMapping, groundDecode);
+	groundDecode.Z = (groundTexture != nullptr) ? 1.0f : 0.0f;
+	device->SetTexture(D3DVERTEXTEXTURESAMPLER1, (groundTexture != nullptr) ? groundTexture->Peek_D3D_Texture() : nullptr);
+	device->SetSamplerState(D3DVERTEXTEXTURESAMPLER1, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
+	device->SetSamplerState(D3DVERTEXTEXTURESAMPLER1, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
+	device->SetSamplerState(D3DVERTEXTEXTURESAMPLER1, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+	device->SetSamplerState(D3DVERTEXTEXTURESAMPLER1, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+	device->SetSamplerState(D3DVERTEXTEXTURESAMPLER1, D3DSAMP_MIPFILTER, D3DTEXF_NONE);
+	DX8Wrapper::Set_Vertex_Shader_Constant(13, &groundMapping, 1);
+	DX8Wrapper::Set_Vertex_Shader_Constant(14, &groundDecode, 1);
+
 	float clipColumns[4][4];
 	for (Int column=0; column<4; column++)
 	{
@@ -1255,6 +1269,7 @@ void WaterRenderObjClass::cleanupShaderWater()
 	{
 		device->SetVertexShader(nullptr);
 		device->SetTexture(D3DVERTEXTEXTURESAMPLER0, nullptr);
+		device->SetTexture(D3DVERTEXTEXTURESAMPLER1, nullptr);
 	}
 	for (Int face=0; face<SKYBOX_FACE_COUNT; face++)
 	{
