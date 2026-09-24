@@ -166,7 +166,8 @@ Tuned in the mod's `GameData.ini`:
 values spread the shade wider and soften it.)
 * `AmbientOcclusionStrength = 1.0` - (How dark the shade gets. 0 turns it off.)
 
-`AmbientOcclusionDebug = Yes` in `Options.ini` shows the shade alone, in grey.
+`AmbientOcclusionDebug = Yes` in `Options.ini` shows the shade in grey in place of the terrain, units
+and buildings. Water, decals, particles and the interface still draw over it.
 
 Notes:
 * The shade reads the scene's depth, which a multisampled depth buffer hides, so it is off whenever
