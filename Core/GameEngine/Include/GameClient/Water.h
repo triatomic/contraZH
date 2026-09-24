@@ -107,7 +107,7 @@ class WaterTransparencySetting : public Overridable
 		Real m_shaderWaterPlanarFade;	///< height difference over which other water fades from the mirror to the sky
 		Real m_shaderWaterPlanarStrength;	///< reflection the mirrored scene adds on top of the Fresnel term
 		Real m_shaderWaterStochasticSize;	///< world units between the centres of hex cells with random texture offsets, 0 turns them off
-		Real m_shaderWaterStochasticSharpness;	///< narrows the blend between hex cells, 1 or more
+		Real m_shaderWaterStochasticSharpness;	///< narrows the blend between hex cells, 0 and below show seams
 		Bool m_isWater;					///< FALSE draws the old water without shaders, for lava and the like
 		Int m_waterAnimationFps;		///< most steps a second the water moves in, 30 to 60, 0 moves it every frame
 

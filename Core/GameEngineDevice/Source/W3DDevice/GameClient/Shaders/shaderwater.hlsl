@@ -111,7 +111,8 @@ HexCells FindHexCells(float2 world)
     float s = step(0.0f, -corner.z);
     float s2 = 2.0f * s - 1.0f;
 
-    float3 weight = pow(saturate(float3(-corner.z * s2, s - corner.y * s2, s - corner.x * s2)), Surface.z);
+    // The floor keeps zero and negative sharpness finite; 1/255 is a constant the shader already holds.
+    float3 weight = pow(max(float3(-corner.z * s2, s - corner.y * s2, s - corner.x * s2), 1.0f / 255.0f), Surface.z);
     weight = lerp(float3(1.0f, 0.0f, 0.0f), weight / dot(weight, 1.0f), Surface.w);
 
     HexCells cells;
