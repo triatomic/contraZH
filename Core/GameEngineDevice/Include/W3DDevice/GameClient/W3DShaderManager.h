@@ -112,6 +112,24 @@ public:
 	static void setSurfaceBumps(Bool enabled, const Vector3 &ambient, Real height, Real normalMapStrength);
 	/// Sets how brightly the specular pass adds _emi glow masks, once a frame. 0 turns them off.
 	static void setEmissive(Real intensity);
+
+	/// A dynamic point light the terrain and specular shaders add per pixel, in world space.
+	struct PixelLight
+	{
+		Vector3 position;
+		Real innerRadius;	///< full strength inside this
+		Real outerRadius;	///< nothing past this
+		Vector3 diffuse;
+		Real ambientScale;	///< ambient colour as a fraction of the diffuse
+		Bool terrainOnly;
+	};
+	enum { MAX_PIXEL_LIGHTS = 8 };
+	/// Sets the lights drawn per pixel, once a frame.
+	static void setPixelLights(const PixelLight *lights, Int count);
+	/// Whether the terrain draws point lights per pixel, so lights handed over must leave its vertex lighting.
+	static Bool supportsTerrainPixelLights();
+	/// Whether the specular pass draws point lights per pixel, so its meshes must go without fixed-function ones.
+	static Bool supportsUnitPixelLights();
 	/// Sets whether the terrain shaders read the normal atlas in TERRAIN_NORMAL_TEXTURE, and how strongly.
 	/// debug shows only the bump's shading, on grey.
 	static void setTerrainBumps(Bool enabled, Real strength, Bool debug);

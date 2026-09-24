@@ -1512,6 +1512,56 @@ static Int BumpNormalMapCount = 0;
 static Real EmissiveIntensity = 0.0f;
 static Int EmissiveMapCount = 0;
 
+// The point lights the terrain and specular shaders add, set once a frame by the scene.
+static W3DShaderManager::PixelLight PixelLights[W3DShaderManager::MAX_PIXEL_LIGHTS];
+static Int PixelLightCount = 0;
+static Bool TerrainPixelLightsLoaded = FALSE;
+static Bool UnitPixelLightsLoaded = FALSE;
+
+// Bisects per-pixel light faults without a rebuild. CONTRA_PIXELLIGHTS=0 leaves every light
+// to the vertex lighting, 1 draws them per pixel on the terrain only, 2 on units as well.
+enum { PIXEL_LIGHTS_OFF = 0, PIXEL_LIGHTS_TERRAIN = 1, PIXEL_LIGHTS_ALL = 2 };
+
+static Int Get_Pixel_Light_Mode()
+{
+	const char *value = getenv("CONTRA_PIXELLIGHTS");
+	return (value != nullptr) ? atoi(value) : PIXEL_LIGHTS_ALL;
+}
+
+// Packs the lights the way pointlights.hlsli reads them. A view takes them into camera space,
+// and none leaves them in world space.
+static void Set_Pixel_Light_Constants(Int firstRegister, const D3DMATRIX *view, Bool terrain)
+{
+	Vector4 constants[W3DShaderManager::MAX_PIXEL_LIGHTS * 2 + 2];
+	memset(constants, 0, sizeof(constants));
+
+	for (Int i = 0; i < PixelLightCount; i++)
+	{
+		const W3DShaderManager::PixelLight &light = PixelLights[i];
+		if (light.terrainOnly && !terrain)
+		{
+			continue;
+		}
+
+		Vector3 position = light.position;
+		if (view != nullptr)
+		{
+			const Vector3 world = position;
+			position.X = world.X * view->m[0][0] + world.Y * view->m[1][0] + world.Z * view->m[2][0] + view->m[3][0];
+			position.Y = world.X * view->m[0][1] + world.Y * view->m[1][1] + world.Z * view->m[2][1] + view->m[3][1];
+			position.Z = world.X * view->m[0][2] + world.Y * view->m[1][2] + world.Z * view->m[2][2] + view->m[3][2];
+		}
+
+		// Full strength inside the inner radius, falling to nothing at the outer one.
+		const Real scale = 1.0f / (light.outerRadius - light.innerRadius);
+		constants[i * 2].Set(position.X, position.Y, position.Z, scale);
+		constants[i * 2 + 1].Set(light.diffuse.X, light.diffuse.Y, light.diffuse.Z, 1.0f + light.innerRadius * scale);
+		(&constants[W3DShaderManager::MAX_PIXEL_LIGHTS * 2 + i / 4].X)[i % 4] = light.ambientScale;
+	}
+
+	DX8Wrapper::Set_Pixel_Shader_Constant(firstRegister, constants, W3DShaderManager::MAX_PIXEL_LIGHTS * 2 + 2);
+}
+
 // The terrain normal maps, set once a frame by the scene.
 static Bool TerrainBumpEnabled = FALSE;
 static Real TerrainBumpStrength = 1.0f;
@@ -1874,12 +1924,14 @@ public:
 		BUMP_COUNT
 	};
 
-	SpecularShader() : m_shadowed(FALSE)
+	SpecularShader() : m_shadowed(FALSE), m_lit(FALSE)
 	{
 		for (Int i = 0; i < BUMP_COUNT; i++)
 		{
 			m_dwShadowedShaders[i] = 0;
 			m_dwUnshadowedShaders[i] = 0;
+			m_dwLitShadowedShaders[i] = 0;
+			m_dwLitUnshadowedShaders[i] = 0;
 		}
 	}
 
@@ -1895,7 +1947,10 @@ protected:
 
 	DWORD m_dwShadowedShaders[BUMP_COUNT];		///<take the sun out in its shadow
 	DWORD m_dwUnshadowedShaders[BUMP_COUNT];	///<for when the shadow map is off or holds no depth
+	DWORD m_dwLitShadowedShaders[BUMP_COUNT];	///<the same two, also adding the point lights
+	DWORD m_dwLitUnshadowedShaders[BUMP_COUNT];
 	Bool m_shadowed;							///<which of the two the current pass uses
+	Bool m_lit;									///<whether it uses the point light set
 } specularShader;
 
 W3DShaderInterface *SpecularShaderList[]=
@@ -1970,6 +2025,43 @@ Int SpecularShader::init()
 
 	BumpSupported = (m_dwUnshadowedShaders[BUMP_DERIVED] != 0 || m_dwUnshadowedShaders[BUMP_NORMAL_MAP] != 0);
 
+	// The point lights replace the mesh's fixed-function ones, so every variant has to be there or none is used.
+	static const char *const litUnshadowedFiles[BUMP_COUNT] =
+	{
+		"shaders\\specularlitnoshadow.pso", "shaders\\specularlitderivednoshadow.pso", "shaders\\specularlitnormalnoshadow.pso"
+	};
+	static const char *const litShadowedFiles[BUMP_COUNT] =
+	{
+		"shaders\\specularlit.pso", "shaders\\specularlitderived.pso", "shaders\\specularlitnormal.pso"
+	};
+	static const char *const litPackedFiles[BUMP_COUNT] =
+	{
+		"shaders\\specularlitpacked.pso", "shaders\\specularlitderivedpacked.pso", "shaders\\specularlitnormalpacked.pso"
+	};
+	const char *const *litShadowedSet = (shadowMap && TheW3DShadowMap->getDepthMode() == W3DShadowMap::DEPTH_MODE_PACKED)
+		? litPackedFiles : litShadowedFiles;
+
+	UnitPixelLightsLoaded = FALSE;
+	if (Get_Pixel_Light_Mode() >= PIXEL_LIGHTS_ALL && Supports_Pixel_Shader_2_a(caps))
+	{
+		UnitPixelLightsLoaded = TRUE;
+		for (Int bump = BUMP_NONE; bump < BUMP_COUNT; bump++)
+		{
+			if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(litUnshadowedFiles[bump],
+					nullptr, 0, false, &m_dwLitUnshadowedShaders[bump])))
+			{
+				m_dwLitUnshadowedShaders[bump] = 0;
+				UnitPixelLightsLoaded = FALSE;
+			}
+			if (m_dwShadowedShaders[BUMP_NONE] != 0 && FAILED(W3DShaderManager::LoadAndCreateD3DShader(litShadowedSet[bump],
+					nullptr, 0, false, &m_dwLitShadowedShaders[bump])))
+			{
+				m_dwLitShadowedShaders[bump] = 0;
+				UnitPixelLightsLoaded = FALSE;
+			}
+		}
+	}
+
 	W3DShaders[W3DShaderManager::ST_SPECULAR]=&specularShader;
 	W3DShadersPassCount[W3DShaderManager::ST_SPECULAR]=1;
 
@@ -2032,7 +2124,15 @@ Int SpecularShader::set(Int pass)
 	DX8Wrapper::Set_Pixel_Shader_Constant(5, &sunDiffuse, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(6, &bump, 1);
 
-	DX8Wrapper::Set_Pixel_Shader(m_shadowed ? m_dwShadowedShaders[BUMP_NONE] : m_dwUnshadowedShaders[BUMP_NONE]);
+	m_lit = (UnitPixelLightsLoaded && PixelLightCount > 0);
+	if (m_lit)
+	{
+		Set_Pixel_Light_Constants(8, &view, FALSE);
+	}
+
+	DX8Wrapper::Set_Pixel_Shader(m_lit
+		? (m_shadowed ? m_dwLitShadowedShaders[BUMP_NONE] : m_dwLitUnshadowedShaders[BUMP_NONE])
+		: (m_shadowed ? m_dwShadowedShaders[BUMP_NONE] : m_dwUnshadowedShaders[BUMP_NONE]));
 	++SpecularPassCount;
 	return TRUE;
 }
@@ -2105,7 +2205,9 @@ void SpecularShader::setTexture(TextureClass *texture)
 		}
 	}
 
-	const DWORD *shaders = m_shadowed ? m_dwShadowedShaders : m_dwUnshadowedShaders;
+	const DWORD *shaders = m_lit
+		? (m_shadowed ? m_dwLitShadowedShaders : m_dwLitUnshadowedShaders)
+		: (m_shadowed ? m_dwShadowedShaders : m_dwUnshadowedShaders);
 	if (shaders[bump] == 0)
 	{
 		bump = BUMP_NONE;
@@ -2144,6 +2246,7 @@ void SpecularShader::reset()
 		TheW3DShadowMap->unbindReceiver(SPECULAR_SHADOW_STAGE);
 	}
 	m_shadowed = FALSE;
+	m_lit = FALSE;
 
 	for (Int stage = SPECULAR_NORMAL_STAGE; stage <= SPECULAR_POSITION_STAGE; stage++)
 	{
@@ -2169,12 +2272,17 @@ Int SpecularShader::shutdown()
 		{
 			DX8_DELETE_PIXEL_SHADER(device, m_dwShadowedShaders[bump]);
 			DX8_DELETE_PIXEL_SHADER(device, m_dwUnshadowedShaders[bump]);
+			DX8_DELETE_PIXEL_SHADER(device, m_dwLitShadowedShaders[bump]);
+			DX8_DELETE_PIXEL_SHADER(device, m_dwLitUnshadowedShaders[bump]);
 		}
 		m_dwShadowedShaders[bump] = 0;
 		m_dwUnshadowedShaders[bump] = 0;
+		m_dwLitShadowedShaders[bump] = 0;
+		m_dwLitUnshadowedShaders[bump] = 0;
 	}
 
 	BumpSupported = FALSE;
+	UnitPixelLightsLoaded = FALSE;
 
 	W3DShaders[W3DShaderManager::ST_SPECULAR]=nullptr;
 	W3DShadersPassCount[W3DShaderManager::ST_SPECULAR]=0;
@@ -2237,6 +2345,25 @@ void W3DShaderManager::setEmissive(Real intensity)
 	DX8MeshRendererClass::Set_Bloom_Emissive_Intensity(intensity);
 }
 
+void W3DShaderManager::setPixelLights(const PixelLight *lights, Int count)
+{
+	PixelLightCount = min(count, (Int)MAX_PIXEL_LIGHTS);
+	for (Int i = 0; i < PixelLightCount; i++)
+	{
+		PixelLights[i] = lights[i];
+	}
+}
+
+Bool W3DShaderManager::supportsTerrainPixelLights()
+{
+	return TerrainPixelLightsLoaded;
+}
+
+Bool W3DShaderManager::supportsUnitPixelLights()
+{
+	return UnitPixelLightsLoaded;
+}
+
 void W3DShaderManager::setTerrainBumps(Bool enabled, Real strength, Bool debug)
 {
 	TerrainBumpEnabled = enabled;
@@ -2285,7 +2412,9 @@ void W3DShaderManager::takeSpecularCounts(Int &meshes, Int &derived, Int &normal
 MaterialPassClass *W3DShaderManager::getSpecularPass()
 {
 	const Bool bumps = (BumpEnabled && BumpSupported);
-	if (W3DShadersPassCount[ST_SPECULAR] == 0 || (SpecularColor.Length2() <= 0.0f && !bumps && EmissiveIntensity <= 0.0f))
+	const Bool pointLights = (UnitPixelLightsLoaded && PixelLightCount > 0);
+	if (W3DShadersPassCount[ST_SPECULAR] == 0 ||
+		(SpecularColor.Length2() <= 0.0f && !bumps && EmissiveIntensity <= 0.0f && !pointLights))
 	{
 		return nullptr;
 	}
@@ -2352,7 +2481,7 @@ class TerrainShader8Stage : public W3DShaderInterface
 class TerrainShaderPixelShader : public W3DShaderInterface
 {
 public:
-	TerrainShaderPixelShader() : m_shadowStage(-1), m_bumpStage(-1) {}
+	TerrainShaderPixelShader() : m_shadowStage(-1), m_bumpStage(-1), m_lightStage(-1) {}
 
 private:
 	DWORD					m_dwBasePixelShader;	///<handle to terrain D3D pixel shader
@@ -2362,6 +2491,8 @@ private:
 	Int						m_shadowStage;	///<stage the shadow map is bound to, or -1
 	DWORD					m_dwBumpPixelShader[2][3];	///<the same three with the normal atlas, unshadowed then shadowed
 	Int						m_bumpStage;	///<stage the world position is generated on, with the normal atlas on the next, or -1
+	DWORD					m_dwLitPixelShader[2][2][3];	///<the same again adding the point lights, by bump, shadow and noise count
+	Int						m_lightStage;	///<stage the world position is generated on for unbumped point lights, or -1
 
 	virtual Int set(Int pass) override;		///<setup shader for the specified rendering pass.
 	virtual void reset() override;		///<do any custom resetting necessary to bring W3D in sync.
@@ -2372,6 +2503,8 @@ private:
 	Bool setShadowReceiver(Int noiseCount);
 	void initBump();
 	Bool setBump(Int noiseCount, Bool shadowed);
+	void initPixelLights();
+	Bool setPixelLights(Int noiseCount, Bool shadowed, Bool bumped);
 } terrainShaderPixelShader;
 
 ///List of different terrain shader implementations in order of preference
@@ -2794,6 +2927,22 @@ Int TerrainShaderPixelShader::shutdown()
 		}
 	}
 
+	for (Int b=0; b<2; b++)
+	{
+		for (Int s=0; s<2; s++)
+		{
+			for (Int i=0; i<3; i++)
+			{
+				if (m_dwLitPixelShader[b][s][i])
+				{
+					DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_dwLitPixelShader[b][s][i]);
+				}
+				m_dwLitPixelShader[b][s][i]=0;
+			}
+		}
+	}
+	TerrainPixelLightsLoaded = FALSE;
+
 	return TRUE;
 }
 
@@ -2893,6 +3042,19 @@ void TerrainShaderPixelShader::initBump()
 #endif
 }
 
+// World position is camera space taken back through the view, because the terrain has no world transform.
+static void Set_Terrain_World_Position(Int stage)
+{
+	D3DMATRIX view;
+	D3DMATRIX inv;
+	float det;
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
+	Invert_D3DMATRIX(inv, &det, view);
+	DX8Wrapper::_Set_DX8_Transform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + stage), inv);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT3);
+}
+
 // Expects the shadow map bound already when shadowed, since the stages after it are this one's.
 Bool TerrainShaderPixelShader::setBump(Int noiseCount, Bool shadowed)
 {
@@ -2903,16 +3065,8 @@ Bool TerrainShaderPixelShader::setBump(Int noiseCount, Bool shadowed)
 		return FALSE;
 	}
 
-	// World position is camera space taken back through the view, because the terrain has no world transform.
 	const Int stage = 2 + noiseCount + (shadowed ? 1 : 0);
-	D3DMATRIX view;
-	D3DMATRIX inv;
-	float det;
-	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
-	Invert_D3DMATRIX(inv, &det, view);
-	DX8Wrapper::_Set_DX8_Transform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + stage), inv);
-	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
-	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT3);
+	Set_Terrain_World_Position(stage);
 
 	// The atlas is read with the base and blend UVs, so its own texcoords go unused.
 	const Int atlasStage = stage + 1;
@@ -2940,6 +3094,77 @@ Bool TerrainShaderPixelShader::setBump(Int noiseCount, Bool shadowed)
 	m_bumpStage = stage;
 	DX8Wrapper::Set_Pixel_Shader(shader);
 	++TerrainBumpCount;
+	return TRUE;
+}
+
+void TerrainShaderPixelShader::initPixelLights()
+{
+	for (Int b=0; b<2; b++)
+	{
+		for (Int s=0; s<2; s++)
+		{
+			for (Int i=0; i<3; i++)
+			{
+				m_dwLitPixelShader[b][s][i]=0;
+			}
+		}
+	}
+	m_lightStage = -1;
+	TerrainPixelLightsLoaded = FALSE;
+
+#if defined(BUILD_WITH_D3D9)
+	const DX8Caps *caps = DX8Wrapper::Get_Current_Caps();
+	if (caps == nullptr || !Supports_Pixel_Shader_2_a(caps) || Get_Pixel_Light_Mode() < PIXEL_LIGHTS_TERRAIN)
+	{
+		return;
+	}
+
+	// Shadowed variants only go with the shadow receivers they replace.
+	const Bool shadowMap = (m_dwShadowPixelShader[0] != 0 && TheW3DShadowMap != nullptr);
+	const Bool packed = shadowMap && TheW3DShadowMap->getDepthMode() == W3DShadowMap::DEPTH_MODE_PACKED;
+	static const char *const noiseNames[3] = { "", "noise", "noise2" };
+
+	// Lights handed to the shader leave the vertex lighting, so every variant has to be there or none is used.
+	Bool complete = TRUE;
+	for (Int b=0; b<2; b++)
+	{
+		for (Int s=0; s<(shadowMap ? 2 : 1); s++)
+		{
+			for (Int i=0; i<3; i++)
+			{
+				char file[64];
+				snprintf(file, sizeof(file), "shaders\\terrainlit%s%s%s.pso", b ? "bump" : "", noiseNames[i],
+					s == 0 ? "noshadow" : (packed ? "packed" : ""));
+				if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(file, nullptr, 0, false, &m_dwLitPixelShader[b][s][i])))
+				{
+					m_dwLitPixelShader[b][s][i]=0;
+					complete = FALSE;
+				}
+			}
+		}
+	}
+	TerrainPixelLightsLoaded = complete;
+#endif
+}
+
+// Expects the shadow map and bump already bound, since the stages after them are this one's.
+Bool TerrainShaderPixelShader::setPixelLights(Int noiseCount, Bool shadowed, Bool bumped)
+{
+	const DWORD shader = m_dwLitPixelShader[bumped ? 1 : 0][shadowed ? 1 : 0][noiseCount];
+	if (!TerrainPixelLightsLoaded || PixelLightCount == 0 || shader == 0)
+	{
+		return FALSE;
+	}
+
+	// Bumped terrain already has the world position.
+	if (!bumped)
+	{
+		m_lightStage = 2 + noiseCount + (shadowed ? 1 : 0);
+		Set_Terrain_World_Position(m_lightStage);
+	}
+
+	Set_Pixel_Light_Constants(5, nullptr, TRUE);
+	DX8Wrapper::Set_Pixel_Shader(shader);
 	return TRUE;
 }
 
@@ -2983,6 +3208,7 @@ Int TerrainShaderPixelShader::init()
 
 			initShadowReceiver();
 			initBump();
+			initPixelLights();
 
 			W3DShaders[W3DShaderManager::ST_TERRAIN_BASE]=&terrainShaderPixelShader;
 			W3DShaders[W3DShaderManager::ST_TERRAIN_BASE_NOISE1]=&terrainShaderPixelShader;
@@ -3108,7 +3334,8 @@ Int TerrainShaderPixelShader::set(Int pass)
 	else if (W3DShaderManager::getCurrentShader() >= W3DShaderManager::ST_TERRAIN_BASE_NOISE1)
 		noiseCount = 1;
 	const Bool shadowed = setShadowReceiver(noiseCount);
-	setBump(noiseCount, shadowed);
+	const Bool bumped = setBump(noiseCount, shadowed);
+	setPixelLights(noiseCount, shadowed, bumped);
 
 	return TRUE;
 }
@@ -3129,6 +3356,13 @@ void TerrainShaderPixelShader::reset()
 		DX8Wrapper::_Get_D3D_Device8()->SetTexture(m_bumpStage + 1, nullptr);
 	}
 	m_bumpStage = -1;
+
+	if (m_lightStage >= 0)
+	{
+		DX8Wrapper::Set_DX8_Texture_Stage_State(m_lightStage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(m_lightStage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_PASSTHRU|m_lightStage);
+	}
+	m_lightStage = -1;
 
 	DX8Wrapper::_Get_D3D_Device8()->SetTexture(2,nullptr);	//release reference to any texture
 	DX8Wrapper::_Get_D3D_Device8()->SetTexture(3,nullptr);	//release reference to any texture

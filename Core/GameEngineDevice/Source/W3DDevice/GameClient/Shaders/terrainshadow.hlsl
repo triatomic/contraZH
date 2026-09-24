@@ -17,9 +17,20 @@
 // normal atlas on the one after. The vertex lighting stays, and only the sun's share
 // is redone per pixel, so the normal maps need ps_2_a for the derivatives that build
 // their frame.
+//
+// LIGHTS adds the dynamic point lights the vertex lighting leaves out. They need the
+// world position, on the same stage as for BUMP, and take ps_2_a for their length.
 
 #ifndef SHADOWED
 #define SHADOWED 1
+#endif
+
+#ifndef BUMP
+#define BUMP 0
+#endif
+
+#ifndef LIGHTS
+#define LIGHTS 0
 #endif
 
 #define CONCAT_(a, b) a##b
@@ -54,7 +65,7 @@ sampler2D ShadowMap : register(s4);
 
 #endif
 
-#if BUMP
+#if BUMP || LIGHTS
 
 // Stage numbers, spelled out because register names need a literal digit.
 #if NOISE_COUNT + SHADOWED == 0
@@ -70,6 +81,15 @@ sampler2D ShadowMap : register(s4);
 #define POSITION_INDEX 5
 #define NORMAL_INDEX 6
 #endif
+
+#endif
+
+#if LIGHTS
+#define POINT_LIGHT_REGISTER c5
+#include "pointlights.hlsli"
+#endif
+
+#if BUMP
 
 sampler2D NormalAtlas : register(CONCAT(s, NORMAL_INDEX));
 
@@ -115,7 +135,7 @@ struct PsIn
 #if SHADOWED
     float4 ShadowPos : SHADOW_TEXCOORD;
 #endif
-#if BUMP
+#if BUMP || LIGHTS
     float3 WorldPos  : CONCAT(TEXCOORD, POSITION_INDEX);
 #endif
 };
@@ -130,14 +150,16 @@ float4 main(PsIn input) : COLOR
     float lit = 1.0f;
 #endif
 
-#if BUMP
+#if BUMP || LIGHTS
     // The facet's own normal, turned up, since terrain never faces down.
     float3 dpdx = ddx(input.WorldPos);
     float3 dpdy = ddy(input.WorldPos);
     float3 facet = cross(dpdx, dpdy);
     facet *= (facet.z < 0.0f) ? -1.0f : 1.0f;
     float3 normal = facet * rsqrt(max(dot(facet, facet), 1e-30f));
+#endif
 
+#if BUMP
     float3 dpdyPerp = cross(dpdy, normal);
     float3 dpdxPerp = cross(normal, dpdx);
     float side = (dot(dpdx, dpdyPerp) < 0.0f) ? -1.0f : 1.0f;
@@ -148,8 +170,18 @@ float4 main(PsIn input) : COLOR
 
     // The vertex lighting holds the sun on the smooth surface. The bump only changes the sun's share.
     float change = saturate(dot(bumped, ToSun.xyz)) - saturate(dot(normal, ToSun.xyz));
-    float3 light = saturate(input.Diffuse.rgb + SunColor.rgb * change * lit);
-    color.rgb *= light;
+    float3 light = input.Diffuse.rgb + SunColor.rgb * change * lit;
+#elif LIGHTS
+    float3 bumped = normal;
+    float3 light = input.Diffuse.rgb;
+#endif
+
+#if LIGHTS
+    light += PointLighting(input.WorldPos, bumped);
+#endif
+
+#if BUMP || LIGHTS
+    color.rgb *= saturate(light);
     color.a *= input.Diffuse.a;
 #else
     color *= input.Diffuse;

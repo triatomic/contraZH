@@ -21,6 +21,9 @@
 //
 // Every variant adds the texture's _emi glow mask from stage 5, unaffected by shadow and
 // bumps. Meshes without one get zero intensity, so the empty stage adds nothing.
+//
+// LIGHTS adds the dynamic point lights, in camera space, in place of the fixed-function
+// ones the mesh was drawn without. They need ps_2_a for their length.
 
 sampler2D MeshTexture : register(s0);
 
@@ -43,6 +46,11 @@ float4 Gloss        : register(c3);   // x = specular power, y = 1 for the debug
 float4 Bump         : register(c6);   // x = height of full brightness, y = normal map strength, z = ambient brightness
 float4 SunDiffuse   : register(c5);   // sun colour the mesh was lit with
 float4 Emissive     : register(c7);   // x = glow mask intensity, 0 without a mask
+
+#if LIGHTS
+#define POINT_LIGHT_REGISTER c8
+#include "pointlights.hlsli"
+#endif
 
 struct PsIn
 {
@@ -156,6 +164,10 @@ float4 main(PsIn input) : COLOR
     float before = Bump.z + sun * geometric * lit;
     darken = saturate(1.0f + sun * min(change, 0.0f) / max(before, 0.05f));
     color += texel * SunDiffuse.rgb * max(change, 0.0f);
+#endif
+
+#if LIGHTS
+    color += texel * PointLighting(input.Position, surface);
 #endif
 
     color += tex2D(EmissiveMap, input.TexCoord).rgb * Emissive.x;

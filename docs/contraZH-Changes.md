@@ -514,6 +514,18 @@ Notes:
 15, plus a 6 unit soft edge. Long beams spread and dim their twelve lights.
 * The terrain takes up to 64 dynamic lights a frame, of all kinds.
 
+### Per-pixel dynamic lights
+
+Explosion flashes, muzzle flashes, laser glow and other dynamic lights are drawn per pixel, so they
+light the ground in smooth circles and follow its bumps. Vehicles and structures near them are lit
+the same way. Needs the Direct3D 9 build and shader model 2.0a; other cards keep the old lighting.
+
+Notes:
+* The eight brightest and widest lights in view each frame are drawn per pixel. The rest keep the
+old lighting, which lights the terrain by its corners, so large ones look blocky.
+* Infantry, flat terrain and roads keep the old lighting.
+* Launch with `CONTRA_PIXELLIGHTS=1` to limit per-pixel lights to the terrain, or `0` to turn them off.
+
 # ParticleSystem.ini
 
 ## ConformToTerrain

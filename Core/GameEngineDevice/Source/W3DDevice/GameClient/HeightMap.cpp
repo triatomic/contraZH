@@ -190,8 +190,8 @@ UnsignedInt HeightMapRenderObjClass::doTheDynamicLight(VERTEX_FORMAT *vb, VERTEX
 	Int k;
 	for (k=0; k<numLights; k++) {
 		W3DDynamicLight *pLight = pLights[k];
-		if (!pLight->isEnabled()) {
-			continue; // he is turned off.
+		if (!pLight->isEnabled() || pLight->m_pixelLit) {
+			continue; // he is turned off, or the terrain shader draws him.
 		}
 		Vector3 lightDirection(vbMirror->x, vbMirror->y, vbMirror->z);
 		Real factor = 1.0f;
@@ -1417,6 +1417,10 @@ void HeightMapRenderObjClass::On_Frame_Update()
 					pLight->m_prevMaxY > yCoordMin) {
 				pLight->m_processMe = TRUE;
 			} else {
+				pLight->m_processMe = false;
+			}
+			// Nothing of a light the shader drew last frame is in the vertices to take out.
+			if (pLight->m_prevPixelLit && (pLight->m_pixelLit || !pLight->m_enabled)) {
 				pLight->m_processMe = false;
 			}
 			if (pLight->m_processMe) {

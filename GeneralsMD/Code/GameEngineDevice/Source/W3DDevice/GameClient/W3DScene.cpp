@@ -740,6 +740,7 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 	ObjectShroudStatus ss=OBJECTSHROUD_INVALID;
 	Int extraMaterialPops=0;
 	Bool doExtraFlagsPop=FALSE;
+	Bool pixelLit=FALSE;
 	LightClass **sceneLights=m_globalLight;
 
 	if (robj->Class_ID() == RenderObjClass::CLASSID_IMAGE3D	)
@@ -935,6 +936,7 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 		{
 			rinfo.Push_Material_Pass(specularPass);
 			extraMaterialPops++;
+			pixelLit = W3DShaderManager::supportsUnitPixelLights();
 		}
 	}
 	else
@@ -983,6 +985,10 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 		  {
 			  W3DDynamicLight* pDyna = (W3DDynamicLight*)dynaLightIt.Peek_Obj();
 			  if (!pDyna->isEnabled() || pDyna->isTerrainOnly()) {
+				  continue;
+			  }
+			  // the specular pass adds this one per pixel
+			  if (pixelLit && pDyna->isPixelLit()) {
 				  continue;
 			  }
 			  SphereClass lSph = pDyna->Get_Bounding_Sphere();
@@ -1390,6 +1396,12 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
    }
    Visibility_Checked = false;
 
+
+	// The terrain's vertex lighting reads the choice as it updates below.
+	if (!ShaderClass::Is_Backface_Culling_Inverted())
+	{
+		updatePixelLights(rinfo.Camera);
+	}
 
 	RefRenderObjListIterator it(&UpdateList);
 	// allow all objects in the update list to do their "every frame" processing
@@ -2102,6 +2114,101 @@ void RTS3DScene::addDynamicLight(W3DDynamicLight * obj)
 //=============================================================================
 /** Adds a dynamic light. */
 //=============================================================================
+// The brightest, widest lights in view go to the shaders, which draw them per pixel on the
+// terrain and on meshes with the specular pass. The rest stay in the vertex lighting.
+void RTS3DScene::updatePixelLights(CameraClass &camera)
+{
+	W3DDynamicLight *chosen[W3DShaderManager::MAX_PIXEL_LIGHTS];
+	Real scores[W3DShaderManager::MAX_PIXEL_LIGHTS];
+	Int count = 0;
+
+	const Bool enabled = W3DShaderManager::supportsTerrainPixelLights();
+	RefRenderObjListIterator it(&m_dynamicLightList);
+	for (it.First(); !it.Is_Done(); it.Next())
+	{
+		W3DDynamicLight *light = (W3DDynamicLight *)it.Peek_Obj();
+		light->setPixelLit(FALSE);
+		if (!enabled || !light->isEnabled() || light->Get_Type() != LightClass::POINT)
+		{
+			continue;
+		}
+
+		// The terrain's vertex lighting skips lights with an inner radius this small.
+		double innerRadius, outerRadius;
+		light->Get_Far_Attenuation_Range(innerRadius, outerRadius);
+		if (innerRadius < 0.1 || outerRadius <= innerRadius || camera.Cull_Sphere(light->Get_Bounding_Sphere()))
+		{
+			continue;
+		}
+
+		Vector3 diffuse;
+		Vector3 ambient;
+		light->Get_Diffuse(&diffuse);
+		light->Get_Ambient(&ambient);
+		const Vector3 total = diffuse + ambient;
+		const Real score = (Real)outerRadius * max(total.X, max(total.Y, total.Z));
+		if (score <= 0.0f)
+		{
+			continue;
+		}
+
+		Int slot = count;
+		if (count == W3DShaderManager::MAX_PIXEL_LIGHTS)
+		{
+			slot = 0;
+			for (Int i = 1; i < count; i++)
+			{
+				if (scores[i] < scores[slot])
+				{
+					slot = i;
+				}
+			}
+			if (scores[slot] >= score)
+			{
+				continue;
+			}
+		}
+		else
+		{
+			count++;
+		}
+		chosen[slot] = light;
+		scores[slot] = score;
+	}
+
+	W3DShaderManager::PixelLight lights[W3DShaderManager::MAX_PIXEL_LIGHTS];
+	for (Int i = 0; i < count; i++)
+	{
+		W3DDynamicLight *light = chosen[i];
+		light->setPixelLit(TRUE);
+
+		double innerRadius, outerRadius;
+		light->Get_Far_Attenuation_Range(innerRadius, outerRadius);
+		Vector3 ambient;
+		light->Get_Diffuse(&lights[i].diffuse);
+		light->Get_Ambient(&ambient);
+
+		// Every game light's ambient is a share of its diffuse, taken here by brightness.
+		const Real diffuseBrightness = max(lights[i].diffuse.X, max(lights[i].diffuse.Y, lights[i].diffuse.Z));
+		const Real ambientBrightness = max(ambient.X, max(ambient.Y, ambient.Z));
+		if (diffuseBrightness > 0.0f)
+		{
+			lights[i].ambientScale = ambientBrightness / diffuseBrightness;
+		}
+		else
+		{
+			lights[i].diffuse = ambient;
+			lights[i].ambientScale = 1.0f;
+		}
+
+		lights[i].position = light->Get_Position();
+		lights[i].innerRadius = (Real)innerRadius;
+		lights[i].outerRadius = (Real)outerRadius;
+		lights[i].terrainOnly = light->isTerrainOnly();
+	}
+	W3DShaderManager::setPixelLights(lights, count);
+}
+
 W3DDynamicLight * RTS3DScene::getADynamicLight()
 {
 	RefRenderObjListIterator dynaLightIt(&m_dynamicLightList);
