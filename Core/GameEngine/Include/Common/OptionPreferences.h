@@ -154,6 +154,10 @@ public:
 	Bool getWaterReflectionsEnabled() const;
 	// Options.ini: SoftParticles = Yes fades smoke and fire where they meet the ground and buildings
 	Bool getSoftParticlesEnabled() const;
+	// Options.ini: DynamicLights = Yes lets explosions, muzzle flashes and lasers light their surroundings
+	Bool getDynamicLightsEnabled() const;
+	// Options.ini: PixelLights = Yes draws those lights per pixel where the hardware allows
+	Bool getPixelLightsEnabled() const;
 	// Options.ini: SpecularDebug = Yes tints what the specular pass covers and shows its highlight 8x in magenta
 	Bool getSpecularDebugEnabled() const;
 	// Options.ini: NormalMapDebug = Yes shows only the terrain's bump shading, on grey

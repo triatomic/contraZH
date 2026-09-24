@@ -2279,7 +2279,7 @@ void W3DDisplay::createLightPulse( const Coord3D *pos, const RGBColor *color,
 																	 UnsignedInt decayFrameTime//, Bool donut
 																	 )
 {
-	if (m_3DScene == nullptr)
+	if (m_3DScene == nullptr || !TheGlobalData->m_useDynamicLights)
 		return;
 	if (innerRadius+attenuationWidth<2.0*PATHFIND_CELL_SIZE_F + 1.0f) {
 		return; // it basically won't make any visual difference.  jba.

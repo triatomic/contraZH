@@ -2142,7 +2142,7 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 	static std::vector<PixelLightCandidate> candidates;
 	candidates.clear();
 
-	const Bool enabled = W3DShaderManager::supportsTerrainPixelLights();
+	const Bool enabled = W3DShaderManager::supportsTerrainPixelLights() && TheGlobalData->m_usePixelLights;
 	Vector3 cameraRight;
 	camera.Get_Transform().Get_X_Vector(&cameraRight);
 

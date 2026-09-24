@@ -496,7 +496,7 @@ void W3DLaserDraw::releaseGroundLights()
 void W3DLaserDraw::updateGroundLights( LaserUpdate *update, Bool beamChanged )
 {
 	// the ground is lit from the first frame and goes dark the moment the beam starts to fade or decay
-	if (!TheGlobalData->m_laserRef || update->isEnding() || update->getAlphaScale() <= 0.0f || update->getWidthScale() <= 0.0f)
+	if (!TheGlobalData->m_laserRef || !TheGlobalData->m_useDynamicLights || update->isEnding() || update->getAlphaScale() <= 0.0f || update->getWidthScale() <= 0.0f)
 	{
 		releaseGroundLights();
 		return;

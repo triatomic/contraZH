@@ -31,6 +31,7 @@
 #include <stdlib.h>
 
 #include "Common/FramePacer.h"
+#include "Common/GlobalData.h"
 #include "Common/STLTypedefs.h"
 #include "Common/Thing.h"
 #include "Common/Xfer.h"
@@ -146,6 +147,12 @@ void W3DPoliceCarDraw::doDrawModule(const Matrix3D* transformMtx)
 	if( m_light == nullptr )
 		m_light = createDynamicLight();
 
+
+	// The light stays held while dynamic lights are off, dark, so the pool cannot hand it to anyone else.
+	if( !TheGlobalData->m_useDynamicLights )
+	{
+		red = green = blue = 0.0f;
+	}
 
 	// if we have a search light, position it
 	if( m_light )

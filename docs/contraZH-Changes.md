@@ -520,6 +520,13 @@ Explosion flashes, muzzle flashes, laser glow and other dynamic lights are drawn
 light the ground in smooth circles and follow its bumps. Vehicles and structures near them are lit
 the same way. Needs the Direct3D 9 build and shader model 2.0a; other cards keep the old lighting.
 
+* `DynamicLights = Yes` - (No turns off every dynamic light: explosion and muzzle-flash pulses, laser
+ground glow and the police car's lights. Also `Dynamic lights` in the advanced display options.
+Needs `CheckDynamicLights` in `OptionsMenu.wnd` for the menu control.)
+* `PixelLights = Yes` - (No keeps dynamic lights on the old per-vertex lighting. Also `Per-pixel
+lights` in the advanced display options, greyed out while dynamic lights are off. Needs
+`CheckPixelLights` in `OptionsMenu.wnd` for the menu control.)
+
 Notes:
 * Each frame the lights nearest the middle of the view are drawn per pixel, nine on the terrain
 and eight on vehicles and structures. A light whose reach covers the middle counts as nearest. The
@@ -533,7 +540,8 @@ Smoke, dust, fire and explosion sprites fade out as they near the surface behind
 longer cut a hard line into the ground or the buildings they pass through. Needs the Direct3D 9
 build and a shader model 2 card.
 
-* `SoftParticles = Yes` - (No draws sprites with hard edges. `Options.ini` only.)
+* `SoftParticles = Yes` - (No draws sprites with hard edges. Also `Soft particles` in the advanced
+display options. Needs `CheckSoftParticles` in `OptionsMenu.wnd` for the menu control.)
 
 Tuned in the mod's `GameData.ini`:
 

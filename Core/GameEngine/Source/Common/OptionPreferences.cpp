@@ -437,6 +437,16 @@ Bool OptionPreferences::getSoftParticlesEnabled(void) const
 	return getBool("SoftParticles", TRUE);
 }
 
+Bool OptionPreferences::getDynamicLightsEnabled(void) const
+{
+	return getBool("DynamicLights", TRUE);
+}
+
+Bool OptionPreferences::getPixelLightsEnabled(void) const
+{
+	return getBool("PixelLights", TRUE);
+}
+
 Bool OptionPreferences::getSpecularDebugEnabled(void) const
 {
 	return getBool("SpecularDebug", FALSE);
