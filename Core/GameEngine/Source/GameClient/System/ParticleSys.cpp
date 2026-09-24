@@ -1173,7 +1173,9 @@ void ParticleSystemInfo::xfer( Xfer *xfer )
 	xfer->xferByte( &m_windMotionMovingToEndAngle );
 
 	if( version >= 3 )
+	{
 		xfer->xferUser( &m_flameShader, sizeof( FlameShaderMode ) );
+	}
 
 }
 
@@ -1333,7 +1335,8 @@ ParticleSystem::ParticleSystem( const ParticleSystemTemplate *sysTemplate,
 	m_isEmitAboveGroundOnly = sysTemplate->m_isEmitAboveGroundOnly;
 	m_isParticleUpTowardsEmitter = sysTemplate->m_isParticleUpTowardsEmitter;
 	m_flameShader = sysTemplate->m_flameShader;
-	m_flameResolved = -1;
+	m_flameKnown = FALSE;
+	m_flameAuto = FALSE;
 
 	m_windMotion = sysTemplate->m_windMotion;
 	m_windAngleChange = sysTemplate->m_windAngleChange;
@@ -1594,8 +1597,7 @@ void ParticleSystem::attachToObject( const Object *obj )
 }
 
 // ------------------------------------------------------------------------------------------------
-/** Auto follows the master or controlling particle's system, else the projectile the system rides.
-	* Answered at first draw, once the projectile has been launched, and kept for the system's life. */
+/** Auto follows the master or controlling particle's system, else the projectile the system rides */
 // ------------------------------------------------------------------------------------------------
 Bool ParticleSystem::isFlame()
 {
@@ -1604,9 +1606,9 @@ Bool ParticleSystem::isFlame()
 		return m_flameShader == FLAME_SHADER_YES;
 	}
 
-	if (m_flameResolved >= 0)
+	if (m_flameKnown)
 	{
-		return m_flameResolved != 0;
+		return m_flameAuto;
 	}
 
 	Bool flame = FALSE;
@@ -1646,7 +1648,8 @@ Bool ParticleSystem::isFlame()
 		}
 	}
 
-	m_flameResolved = flame ? 1 : 0;
+	m_flameKnown = TRUE;
+	m_flameAuto = flame;
 	return flame;
 }
 

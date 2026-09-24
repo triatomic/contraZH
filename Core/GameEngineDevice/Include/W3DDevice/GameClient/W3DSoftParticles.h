@@ -25,10 +25,9 @@
 #include "WW3D2/dx8compat.h"
 
 class RenderInfoClass;
+class Vector4;
 
-// Fades particle sprites where they near the surface behind them. With the scene's depth readable
-// that is anything already drawn; otherwise it is the terrain alone. Also shades flame sprites as
-// fire and draws the heat haze behind them.
+// Fades particle sprites near the surface behind them, shades flames as fire, and draws the heat haze behind flames.
 class W3DSoftParticles : public SoftParticleHookClass
 {
 public:
@@ -38,8 +37,8 @@ public:
 	/// Takes this pass's camera, before its particles draw. They draw with an identity view.
 	void beginPass(RenderInfoClass &rinfo);
 
-	/// Whether flame systems get the flame effect at all.
-	Bool flameEnabled() const;
+	/// Whether flame systems get the flame effect at all, loading its shaders on first ask.
+	Bool flameEnabled();
 
 	/// Copies the scene for the haze pass. False leaves the haze undrawn.
 	Bool beginHaze();
@@ -52,8 +51,8 @@ public:
 private:
 	Bool loadShaders();
 	void createNoise();
-	void setClipConstants(Real width, Real height);
-	void setWorldConstants();
+	Vector4 setClipConstants(Real width, Real height);
+	void setWorldConstants(Int firstRegister);
 	Bool bindSceneDepth(DWORD shader);
 	Bool bindTerrainHeight(DWORD shader);
 	void bindFlame();

@@ -800,7 +800,8 @@ protected:
 	Bool							m_isFirstPos;													///< true if this system hasn't been drawn before.
 	Bool							m_isSaveable;													///< true if this system should be saved/loaded
 	Bool							m_skipParentXfrm;											///< true if this system is already in world space.
-	Byte							m_flameResolved;											///< isFlame answer: -1 unknown, 0 no, 1 yes
+	Bool							m_flameKnown;													///< the Auto answer is worked out, at first draw once the projectile has launched
+	Bool							m_flameAuto;													///< the Auto answer
 
 
 	// the actual particle system data is inherited from ParticleSystemInfo

@@ -148,9 +148,14 @@ void W3DSoftParticles::beginPass(RenderInfoClass &rinfo)
 	Invert_D3DMATRIX(m_toWorld, &det, m_view);
 }
 
-Bool W3DSoftParticles::flameEnabled() const
+Bool W3DSoftParticles::flameEnabled()
 {
-	return FlameShaderMode != FLAME_SHADER_OFF && TheGlobalData->m_useFlameShaders;
+	if (FlameShaderMode == FLAME_SHADER_OFF || !TheGlobalData->m_useFlameShaders)
+	{
+		return FALSE;
+	}
+	loadShaders();
+	return m_flameShader != 0 && m_noise != nullptr;
 }
 
 static void Load_Pixel_Shader(const char *path, DWORD &shader)
@@ -258,8 +263,8 @@ void W3DSoftParticles::createNoise()
 #endif
 }
 
-// Camera space to clip space, then to a texture of the given size, at c0 to c3.
-void W3DSoftParticles::setClipConstants(Real width, Real height)
+// Camera space to clip space, then to a texture of the given size, at c0 to c3. Returns the mapping at c3.
+Vector4 W3DSoftParticles::setClipConstants(Real width, Real height)
 {
 	const D3DMATRIX &p = m_projection;
 	const Vector4 clipX(p.m[0][0], p.m[1][0], p.m[2][0], p.m[3][0]);
@@ -271,18 +276,19 @@ void W3DSoftParticles::setClipConstants(Real width, Real height)
 	DX8Wrapper::Set_Pixel_Shader_Constant(1, &clipY, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(2, &clipW, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(3, &screenMap, 1);
+	return screenMap;
 }
 
-// Camera space back to world at c7 to c9, where the flame and haze noise is fixed.
-void W3DSoftParticles::setWorldConstants()
+// Camera space back to world, one row per register from the first.
+void W3DSoftParticles::setWorldConstants(Int firstRegister)
 {
 	const D3DMATRIX &w = m_toWorld;
 	const Vector4 worldX(w.m[0][0], w.m[1][0], w.m[2][0], w.m[3][0]);
 	const Vector4 worldY(w.m[0][1], w.m[1][1], w.m[2][1], w.m[3][1]);
 	const Vector4 worldZ(w.m[0][2], w.m[1][2], w.m[2][2], w.m[3][2]);
-	DX8Wrapper::Set_Pixel_Shader_Constant(7, &worldX, 1);
-	DX8Wrapper::Set_Pixel_Shader_Constant(8, &worldY, 1);
-	DX8Wrapper::Set_Pixel_Shader_Constant(9, &worldZ, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(firstRegister, &worldX, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(firstRegister + 1, &worldY, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(firstRegister + 2, &worldZ, 1);
 }
 
 // Only while the scene's depth is the bound one, which leaves out reflections and shadow maps.
@@ -349,14 +355,7 @@ Bool W3DSoftParticles::bindTerrainHeight(DWORD shader)
 	}
 
 	// Camera space back to world, where the terrain heights are.
-	const D3DMATRIX &toWorld = m_toWorld;
-	const Vector4 worldX(toWorld.m[0][0], toWorld.m[1][0], toWorld.m[2][0], toWorld.m[3][0]);
-	const Vector4 worldY(toWorld.m[0][1], toWorld.m[1][1], toWorld.m[2][1], toWorld.m[3][1]);
-	const Vector4 worldZ(toWorld.m[0][2], toWorld.m[1][2], toWorld.m[2][2], toWorld.m[3][2]);
-
-	DX8Wrapper::Set_Pixel_Shader_Constant(0, &worldX, 1);
-	DX8Wrapper::Set_Pixel_Shader_Constant(1, &worldY, 1);
-	DX8Wrapper::Set_Pixel_Shader_Constant(2, &worldZ, 1);
+	setWorldConstants(0);
 	DX8Wrapper::Set_Pixel_Shader_Constant(3, &heightMap, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(4, &heightDecode, 1);
 
@@ -371,10 +370,10 @@ Bool W3DSoftParticles::bindTerrainHeight(DWORD shader)
 #endif
 }
 
-// Wraps every 1000 seconds so the float keeps its precision.
-static Real Noise_Seconds()
+// The shaders scroll this times 1, 1.3 or 1.4, all whole tiles at 10, so the wrap is seamless for any rate.
+static Real Noise_Rise(Real tilesPerSecond)
 {
-	return (Real)(WW3D::Get_Sync_Time() % 1000000) / 1000.0f;
+	return (Real)fmod(WW3D::Get_Sync_Time() / 1000.0 * tilesPerSecond, 10.0);
 }
 
 static void Bind_Noise(IDirect3DTexture8 *noise)
@@ -402,21 +401,15 @@ static void Bind_Camera_Position()
 
 void W3DSoftParticles::bindFlame()
 {
-	const Vector4 flame(Noise_Seconds() * FLAME_RISE, FLAME_WARP, FLAME_NOISE_SCALE, FLAME_HEAT_GAIN);
+	const Vector4 flame(Noise_Rise(FLAME_RISE), FLAME_WARP, FLAME_NOISE_SCALE, FLAME_HEAT_GAIN);
 	DX8Wrapper::Set_Pixel_Shader_Constant(6, &flame, 1);
-	setWorldConstants();
+	setWorldConstants(7);
 	Bind_Noise(m_noise);
 }
 
 Bool W3DSoftParticles::beginHaze()
 {
-	if (FlameShaderMode != FLAME_SHADER_HAZE || !TheGlobalData->m_useFlameShaders || !TheGlobalData->m_useHeatEffects)
-	{
-		return FALSE;
-	}
-
-	loadShaders();
-	if (m_hazeShader == 0 || m_noise == nullptr)
+	if (FlameShaderMode != FLAME_SHADER_HAZE || !TheGlobalData->m_useHeatEffects || !flameEnabled() || m_hazeShader == 0)
 	{
 		return FALSE;
 	}
@@ -439,13 +432,12 @@ Bool W3DSoftParticles::bindHaze(const ShaderClass &shader)
 
 	D3DSURFACE_DESC desc;
 	m_sceneCopy->GetLevelDesc(0, &desc);
-	setClipConstants((Real)desc.Width, (Real)desc.Height);
-	setWorldConstants();
+	const Vector4 screenMap = setClipConstants((Real)desc.Width, (Real)desc.Height);
+	setWorldConstants(7);
 
 	// A world unit at unit depth, in scene uv. The shader divides by the sprite's depth.
-	const Vector4 screenMap = W3DShaderManager::getClipToTargetMapping((Real)desc.Width, (Real)desc.Height);
 	const Real bend = HAZE_BEND * fabs(m_projection.m[0][0] * screenMap.X);
-	const Vector4 haze(Noise_Seconds() * HAZE_RISE, bend, HAZE_NOISE_SCALE, HAZE_MASK_GAIN);
+	const Vector4 haze(Noise_Rise(HAZE_RISE), bend, HAZE_NOISE_SCALE, HAZE_MASK_GAIN);
 	DX8Wrapper::Set_Pixel_Shader_Constant(4, &haze, 1);
 
 	const Bool addsColor = shader.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_ONE;
@@ -484,15 +476,8 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects)
 
 	const Bool soft = (effects & EFFECT_SOFT) != 0 && SoftParticleMode != SOFT_PARTICLES_OFF &&
 		TheGlobalData->m_useSoftParticles && TheGlobalData->m_softParticleDistance > 0.0f;
-	Bool flame = (effects & EFFECT_FLAME) != 0 && flameEnabled();
+	const Bool flame = (effects & EFFECT_FLAME) != 0 && flameEnabled();
 	if ((!soft && !flame) || !loadShaders())
-	{
-		return false;
-	}
-
-	// Without the ps_2_a variants that also fade, flames keep their shading and lose the fade.
-	flame = flame && m_flameShader != 0 && m_noise != nullptr;
-	if (!soft && !flame)
 	{
 		return false;
 	}
@@ -507,6 +492,7 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects)
 
 	Bool bound = soft && (bindSceneDepth(flame ? m_flameDepthShader : m_depthShader) ||
 		bindTerrainHeight(flame ? m_flameHeightShader : m_heightShader));
+	// Without the ps_2_a variants that also fade, flames keep their shading and lose the fade.
 	if (!bound && flame)
 	{
 		DX8Wrapper::Set_Pixel_Shader(m_flameShader);

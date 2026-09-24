@@ -200,7 +200,6 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	Bool hasAdditive = FALSE;
 
 	// whether the haze pass has anything to draw at all this frame
-	const Bool flameShaders = TheW3DSoftParticles != nullptr && TheW3DSoftParticles->flameEnabled();
 	Bool hasFlame = FALSE;
 
 	ParticleSystemManager::ParticleSystemList &particleSysList = TheParticleSystemManager->getAllParticleSystems();
@@ -248,7 +247,7 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 			hasAdditive = TRUE;
 		}
 
-		if (flameShaders && !hasFlame && sys->isUsingParticles() && sys->isFlame())
+		if (!hasFlame && sys->isUsingParticles() && !sys->shouldConformToTerrain() && systemEffects(*sys, DRAW_HAZE) != 0)
 		{
 			hasFlame = TRUE;
 		}
@@ -320,10 +319,11 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	}
 }
 
-// Flame systems shade as fire in every pass but the haze, which draws only them.
+// Flame systems shade as fire in every pass but the haze, which draws only them. A multiplied flame has no light to shade.
 unsigned W3DParticleSystemManager::systemEffects(ParticleSystem &system, DrawPass pass)
 {
-	if (TheW3DSoftParticles == nullptr || !TheW3DSoftParticles->flameEnabled() || !system.isFlame())
+	if (system.getShaderType() == ParticleSystemInfo::MULTIPLY || TheW3DSoftParticles == nullptr ||
+		!TheW3DSoftParticles->flameEnabled() || !system.isFlame())
 	{
 		return 0;
 	}

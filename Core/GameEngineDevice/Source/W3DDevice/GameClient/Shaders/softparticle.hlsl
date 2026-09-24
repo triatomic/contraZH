@@ -63,7 +63,7 @@ float4 main(PsIn input) : COLOR
     float4 noiseA = tex2D(NoiseTexture, float2(flameWorld.x, flameWorld.z) * Flame.z - float2(0.0f, Flame.x));
     float4 noiseB = tex2D(NoiseTexture, float2(flameWorld.y, flameWorld.z) * (Flame.z * 1.7f) - float2(0.0f, Flame.x * 1.3f));
 
-    float2 uv = input.TexCoord + (noiseA.rg + noiseB.gr - 1.0f) * Flame.y;
+    float2 uv = saturate(input.TexCoord + (noiseA.rg + noiseB.gr - 1.0f) * Flame.y);
     float4 texel = tex2D(ParticleTexture, uv);
     float4 color = texel * input.Diffuse;
 
@@ -79,7 +79,8 @@ float4 main(PsIn input) : COLOR
 
     // Halfway to the squared colour, so dim parts redden without losing much light.
     float3 deep = color.rgb * (color.rgb + peak) / max(2.0f * peak, 0.001f);
-    color.rgb = lerp(deep, peak.xxx, heat * heat) * (keep * (0.85f + 0.3f * noiseB.b));
+    // Alpha blending breaks up through alpha alone, so its fringe does not darken twice.
+    color.rgb = lerp(deep, peak.xxx, heat * heat) * (lerp(1.0f, keep, Params.y) * (0.85f + 0.3f * noiseB.b));
     color.a *= keep;
 #else
     float4 color = tex2D(ParticleTexture, input.TexCoord) * input.Diffuse;
