@@ -126,6 +126,9 @@ public:
 	void replaceSkyboxTexture(const AsciiString& oldTexName, const AsciiString& newTextName);
 
 	void markHeightTextureDirty() { m_heightTextureDirty = TRUE; }	///< terrain heights changed under the shader water
+	/// The terrain heights as high and low bytes, brought up to date, or null. mapping takes world xy to its
+	/// texture coordinates as xy scale and zw offset, and decode weighs the two bytes into a height.
+	TextureClass *getTerrainHeightTexture(Vector4 &mapping, Vector4 &decode);
 	void renderPlanarReflection(CameraClass *cam);	///< mirrors the scene in the water under the view, before the views draw
 
 protected:

@@ -432,6 +432,11 @@ Bool OptionPreferences::getWaterReflectionsEnabled(void) const
 	return getBool("WaterReflections", TRUE);
 }
 
+Bool OptionPreferences::getSoftParticlesEnabled(void) const
+{
+	return getBool("SoftParticles", TRUE);
+}
+
 Bool OptionPreferences::getSpecularDebugEnabled(void) const
 {
 	return getBool("SpecularDebug", FALSE);

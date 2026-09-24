@@ -60,6 +60,7 @@
 #include "W3DDevice/GameClient/FlatHeightMap.h"
 #include "W3DDevice/GameClient/W3DSmudge.h"
 #include "W3DDevice/GameClient/W3DBloom.h"
+#include "W3DDevice/GameClient/W3DSoftParticles.h"
 #include "W3DDevice/GameClient/Module/W3DModelDraw.h"
 #include "WW3D2/light.h"
 #include "WW3D2/rendobj.h"
@@ -205,6 +206,9 @@ W3DTerrainVisual::~W3DTerrainVisual()
 	delete TheW3DBloom;
 	TheW3DBloom = nullptr;
 
+	delete TheW3DSoftParticles;
+	TheW3DSoftParticles = nullptr;
+
 	REF_PTR_RELEASE( m_waterRenderObject );
 	TheWaterRenderObj=nullptr;
 	REF_PTR_RELEASE( m_terrainRenderObject );
@@ -248,6 +252,7 @@ void W3DTerrainVisual::init()
 		TheSmudgeManager->init();
 
 		TheW3DBloom = NEW W3DBloom;
+		TheW3DSoftParticles = NEW W3DSoftParticles;
 
 #ifdef DO_UNIT_TIMINGS
 #pragma MESSAGE("********************* WARNING- Doing UNIT TIMINGS. ")

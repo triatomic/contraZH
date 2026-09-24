@@ -196,6 +196,7 @@ HINSTANCE D3D8Lib = nullptr;
 bool								DX8Wrapper::IsEx											= false;
 IDirect3DSurface8 *			DX8Wrapper::SceneRenderTarget							= nullptr;
 IDirect3DSurface8 *			DX8Wrapper::SceneDepthBuffer							= nullptr;
+IDirect3DTexture8 *			DX8Wrapper::SceneDepthTexture							= nullptr;
 
 #if defined(BUILD_WITH_D3D9)
 // {5B1A4E0C-7C2D-4F3B-9A61-2E8D3C4B7F10}
@@ -2841,8 +2842,13 @@ static void Attach_Lockable_Copy(IDirect3DBaseTexture8* texture)
 void DX8Wrapper::Create_Scene_Target()
 {
 #if defined(BUILD_WITH_D3D9)
-	WWASSERT(SceneRenderTarget == nullptr && SceneDepthBuffer == nullptr);
-	if (_PresentParameters.SwapEffect != D3DSWAPEFFECT_FLIPEX || MultiSampleAntiAliasing == D3DMULTISAMPLE_NONE)
+	WWASSERT(SceneRenderTarget == nullptr && SceneDepthBuffer == nullptr && SceneDepthTexture == nullptr);
+	if (MultiSampleAntiAliasing == D3DMULTISAMPLE_NONE)
+	{
+		Create_Scene_Depth_Texture();
+		return;
+	}
+	if (_PresentParameters.SwapEffect != D3DSWAPEFFECT_FLIPEX)
 	{
 		return;
 	}
@@ -2861,12 +2867,49 @@ void DX8Wrapper::Create_Scene_Target()
 		WWDEBUG_SAY(("MSAA scene target creation failed, disabling MSAA"));
 		Release_Scene_Target();
 		MultiSampleAntiAliasing = D3DMULTISAMPLE_NONE;
+		Create_Scene_Depth_Texture();
 		return;
 	}
 
 	DX8CALL(SetRenderTarget(0, SceneRenderTarget));
 	DX8CALL(SetDepthStencilSurface(SceneDepthBuffer));
 	WWDEBUG_SAY(("Rendering to a %dx MSAA scene target", (int)MultiSampleAntiAliasing));
+#endif
+}
+
+// CONTRA_SOFTPARTICLES=0 or 2 keeps the plain depth buffer, which the soft particles then do without.
+void DX8Wrapper::Create_Scene_Depth_Texture()
+{
+#if defined(BUILD_WITH_D3D9)
+	const char *mode = getenv("CONTRA_SOFTPARTICLES");
+	if (mode != nullptr && atoi(mode) != 1)
+	{
+		return;
+	}
+
+	const D3DFORMAT intz = (D3DFORMAT)MAKEFOURCC('I','N','T','Z');
+	if (FAILED(D3DInterface->CheckDeviceFormat(D3DADAPTER_DEFAULT, WW3D_DEVTYPE, DisplayFormat,
+		D3DUSAGE_DEPTHSTENCIL, D3DRTYPE_TEXTURE, intz)))
+	{
+		WWDEBUG_SAY(("No INTZ depth texture, the scene depth stays unreadable"));
+		return;
+	}
+
+	HRESULT hr;
+	DX8CALL_HRES(CreateTexture(_PresentParameters.BackBufferWidth, _PresentParameters.BackBufferHeight, 1,
+		D3DUSAGE_DEPTHSTENCIL, intz, D3DPOOL_DEFAULT, &SceneDepthTexture, nullptr), hr);
+	if (SUCCEEDED(hr))
+	{
+		hr = SceneDepthTexture->GetSurfaceLevel(0, &SceneDepthBuffer);
+	}
+	if (FAILED(hr))
+	{
+		Release_Scene_Target();
+		return;
+	}
+
+	DX8CALL(SetDepthStencilSurface(SceneDepthBuffer));
+	WWDEBUG_SAY(("Rendering the scene's depth to an INTZ texture"));
 #endif
 }
 
@@ -2881,6 +2924,11 @@ void DX8Wrapper::Release_Scene_Target()
 	{
 		SceneDepthBuffer->Release();
 		SceneDepthBuffer = nullptr;
+	}
+	if (SceneDepthTexture != nullptr)
+	{
+		SceneDepthTexture->Release();
+		SceneDepthTexture = nullptr;
 	}
 }
 

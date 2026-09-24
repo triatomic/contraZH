@@ -22,7 +22,19 @@
 
 class SortingNodeStruct;
 class SphereClass;
+class ShaderClass;
 struct VertexFormatXYZNDUV2;
+
+// Fades soft particles where they near the scene behind them, around each of their draws.
+class SoftParticleHookClass
+{
+public:
+	virtual ~SoftParticleHookClass() {}
+
+	// Called with the draw's render state applied. False leaves the draw hard, and End uncalled.
+	virtual bool Begin(const ShaderClass &shader) = 0;
+	virtual void End() = 0;
+};
 
 class SortingRendererClass
 {
@@ -58,4 +70,9 @@ public:
 
 	static void _Enable_Triangle_Draw(bool enable) { _EnableTriangleDraw=enable; }
 	static bool _Is_Triangle_Draw_Enabled() { return _EnableTriangleDraw; }
+
+	// Triangles inserted while this is on are soft particles, drawn through the hook.
+	static void Set_Soft_Particle_Hook(SoftParticleHookClass *hook);
+	static SoftParticleHookClass *Peek_Soft_Particle_Hook();
+	static void Set_Soft_Insert(bool soft);
 };

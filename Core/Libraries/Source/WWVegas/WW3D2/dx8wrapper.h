@@ -490,6 +490,10 @@ public:
 	// True when the device is a D3D9Ex device
 	static bool Is_Ex() { return IsEx; }
 
+	// The scene's depth as a readable INTZ texture, and its surface, or null when the scene has none
+	static IDirect3DTexture8 * Peek_Scene_Depth_Texture() { return SceneDepthTexture; }
+	static IDirect3DSurface8 * Peek_Scene_Depth_Surface() { return SceneDepthTexture != nullptr ? SceneDepthBuffer : nullptr; }
+
 	static IDirect3DSurface8 * _Create_DX8_Surface(unsigned int width, unsigned int height, WW3DFormat format);
 	static IDirect3DSurface8 * _Create_DX8_Surface(const char *filename);
 	static IDirect3DSurface8 * _Get_DX8_Front_Buffer();
@@ -773,7 +777,10 @@ protected:
 	// A flip model swap chain cannot be multisampled, so MSAA renders here and resolves at Present
 	static IDirect3DSurface8 *			SceneRenderTarget;
 	static IDirect3DSurface8 *			SceneDepthBuffer;
+	// Without MSAA the scene's depth is an INTZ texture where the driver offers one, so shaders can read it
+	static IDirect3DTexture8 *			SceneDepthTexture;
 	static void Create_Scene_Target();
+	static void Create_Scene_Depth_Texture();
 	static void Release_Scene_Target();
 
 	static IDirect3DSurface8 *			CurrentRenderTarget;

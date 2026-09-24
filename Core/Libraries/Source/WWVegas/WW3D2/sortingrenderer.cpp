@@ -56,6 +56,24 @@
 
 
 bool SortingRendererClass::_EnableTriangleDraw=true;
+
+static SoftParticleHookClass *SoftHook = nullptr;
+static bool SoftInsert = false;
+
+void SortingRendererClass::Set_Soft_Particle_Hook(SoftParticleHookClass *hook)
+{
+	SoftHook = hook;
+}
+
+SoftParticleHookClass *SortingRendererClass::Peek_Soft_Particle_Hook()
+{
+	return SoftHook;
+}
+
+void SortingRendererClass::Set_Soft_Insert(bool soft)
+{
+	SoftInsert = soft;
+}
 static unsigned DEFAULT_SORTING_POLY_COUNT = 16384;	// (count * 3) must be less than 65536
 static unsigned DEFAULT_SORTING_VERTEX_COUNT = 32768;	// count must be less than 65536
 
@@ -188,6 +206,7 @@ public:
 	RenderStateStruct sorting_state;
 
 	float depth;								// View space depth of the bounding sphere center, for object nodes
+	bool soft;									// A soft particle, drawn through the soft particle hook
 	unsigned short start_index;			// First index used in the ib
 	unsigned short polygon_count;			// Polygon count to process (3 indices = one polygon)
 	unsigned short min_vertex_index;		// First index used in the vb
@@ -232,6 +251,23 @@ const unsigned short* SortingRendererClass::Source_Indices(const SortingNodeStru
 static bool Object_Depth_Order(const SortingNodeStruct* a, const SortingNodeStruct* b)
 {
 	return a->depth < b->depth;
+}
+
+// The hook binds its own state, so it comes after the node's is applied.
+static bool Begin_Soft(const SortingNodeStruct* state)
+{
+	if (!state->soft || SoftHook == nullptr) {
+		return false;
+	}
+	DX8Wrapper::Apply_Render_State_Changes();
+	return SoftHook->Begin(state->sorting_state.shader);
+}
+
+static void End_Soft(bool soft)
+{
+	if (soft) {
+		SoftHook->End();
+	}
 }
 
 // Release_Render_State would clear the texture cache but not the device, so the state stays set.
@@ -319,6 +355,11 @@ static bool Same_Render_State(const RenderStateStruct& a, const RenderStateStruc
 	return true;
 }
 
+static bool Same_Node_State(const SortingNodeStruct* a, const SortingNodeStruct* b)
+{
+	return a->soft == b->soft && Same_Render_State(a->sorting_state, b->sorting_state);
+}
+
 // ----------------------------------------------------------------------------
 
 static bool Additive_Draw_Order(const SortingNodeStruct* a, const SortingNodeStruct* b)
@@ -388,6 +429,7 @@ void SortingRendererClass::Insert_Triangles(
 	state->min_vertex_index=min_vertex_index;
 	state->vertex_count=vertex_count;
 	state->depth=0.0f;
+	state->soft=SoftInsert && SoftHook != nullptr;
 
 	const bool additive=BlendBatching && Is_Order_Independent(state->sorting_state.shader);
 
@@ -562,12 +604,15 @@ static void Apply_Render_State(RenderStateStruct& render_state)
 static void Draw_Pool_Run(SortingNodeStruct* state, unsigned start_index, unsigned polygon_count, unsigned first_vertex, unsigned end_vertex)
 {
 	Apply_Render_State(state->sorting_state);
+	const bool soft = Begin_Soft(state);
 
 	DX8Wrapper::Draw_Triangles(
 		start_index*3,
 		polygon_count,
 		first_vertex,
 		end_vertex-first_vertex);
+
+	End_Soft(soft);
 }
 
 // ----------------------------------------------------------------------------
@@ -707,7 +752,7 @@ void SortingRendererClass::Flush_Sorting_Pool()
 			SortingNodeStruct* node=overlapping_nodes[tis[i].idx];
 			const bool object_first=Has_Object_Before(tis[i].z);
 			const bool new_state=(tis[i].idx!=node_id) &&
-				!(BlendBatching && Same_Render_State(overlapping_nodes[node_id]->sorting_state, node->sorting_state));
+				!(BlendBatching && Same_Node_State(overlapping_nodes[node_id], node));
 
 			if (count_to_render && (object_first || new_state)) {
 				Draw_Pool_Run(overlapping_nodes[node_id],start_index,count_to_render,first_vertex,end_vertex);
@@ -824,18 +869,20 @@ void SortingRendererClass::Flush_Additive_Pool()
 			unsigned polygon_count = head->polygon_count;
 			unsigned end_vertex = head->min_vertex_index + head->vertex_count;
 			size_t next = run + 1;
-			while (next < last && Same_Render_State(head->sorting_state, additive_list[next]->sorting_state)) {
+			while (next < last && Same_Node_State(head, additive_list[next])) {
 				polygon_count += additive_list[next]->polygon_count;
 				end_vertex = additive_list[next]->min_vertex_index + additive_list[next]->vertex_count;
 				++next;
 			}
 
 			Apply_Render_State(head->sorting_state);
+			const bool soft = Begin_Soft(head);
 			DX8Wrapper::Draw_Triangles(
 				head->start_index,
 				polygon_count,
 				head->min_vertex_index,
 				end_vertex - head->min_vertex_index);
+			End_Soft(soft);
 			run = next;
 		}
 

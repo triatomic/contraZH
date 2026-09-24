@@ -956,6 +956,11 @@ void PointGroupClass::Render(RenderInfoClass &rinfo)
 	                  WW3D::Is_Sorting_Enabled() &&
 	                  !Get_Flag(DISABLE_SORTING);
 
+	// Camera-facing sprites fade where they near the scene behind them. Alpha-tested ones stay crisp.
+	SoftParticleHookClass *soft_hook = SortingRendererClass::Peek_Soft_Particle_Hook();
+	const bool soft = soft_hook != nullptr && Billboard && Texture != nullptr &&
+	                  Shader.Get_Alpha_Test() == ShaderClass::ALPHATEST_DISABLE;
+
 	IndexBufferClass *indexbuffer;
 	int	verticesperprimitive;/// lorenzen fixed
 	int current;
@@ -1007,11 +1012,23 @@ void PointGroupClass::Render(RenderInfoClass &rinfo)
 
 		if ( sort )
 		{
+				SortingRendererClass::Set_Soft_Insert(soft);
 				SortingRendererClass::Insert_Triangles (0, delta / verticesperprimitive, 0, delta);
+				SortingRendererClass::Set_Soft_Insert(false);
 		}
 		else
 		{
+			bool faded = false;
+			if (soft)
+			{
+				DX8Wrapper::Apply_Render_State_Changes();
+				faded = soft_hook->Begin(Shader);
+			}
 			DX8Wrapper::Draw_Triangles (0, delta / verticesperprimitive, 0, delta);
+			if (faded)
+			{
+				soft_hook->End();
+			}
 		}
 
 		current+=delta;

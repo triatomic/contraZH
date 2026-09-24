@@ -829,6 +829,27 @@ void WaterRenderObjClass::updateHeightTexture()
 #endif
 }
 
+TextureClass *WaterRenderObjClass::getTerrainHeightTexture(Vector4 &mapping, Vector4 &decode)
+{
+	if (TheTerrainRenderObject == nullptr || TheTerrainRenderObject->getMap() == nullptr)
+	{
+		return nullptr;
+	}
+	updateHeightTexture();
+	if (m_heightTexture == nullptr)
+	{
+		return nullptr;
+	}
+
+	SurfaceClass::SurfaceDescription heightDesc;
+	m_heightTexture->Get_Level_Description(heightDesc);
+	const Real border = (Real)TheTerrainRenderObject->getMap()->getBorderSizeInline() + 0.5f;
+	mapping.Set(1.0f / (MAP_XY_FACTOR * heightDesc.Width), 1.0f / (MAP_XY_FACTOR * heightDesc.Height),
+		border / heightDesc.Width, border / heightDesc.Height);
+	decode.Set(255.0f * 256.0f * MAP_HEIGHT_SCALE, 255.0f * MAP_HEIGHT_SCALE, 0.0f, 0.0f);
+	return m_heightTexture;
+}
+
 void WaterRenderObjClass::grabRefraction()
 {
 #if defined(BUILD_WITH_D3D9)

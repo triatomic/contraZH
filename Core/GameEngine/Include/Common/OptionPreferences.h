@@ -152,6 +152,8 @@ public:
 	Bool getNormalMapsEnabled() const;
 	// Options.ini: WaterReflections = Yes lets smooth water mirror the terrain, units and buildings
 	Bool getWaterReflectionsEnabled() const;
+	// Options.ini: SoftParticles = Yes fades smoke and fire where they meet the ground and buildings
+	Bool getSoftParticlesEnabled() const;
 	// Options.ini: SpecularDebug = Yes tints what the specular pass covers and shows its highlight 8x in magenta
 	Bool getSpecularDebugEnabled() const;
 	// Options.ini: NormalMapDebug = Yes shows only the terrain's bump shading, on grey

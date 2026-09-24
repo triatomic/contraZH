@@ -38,6 +38,7 @@
 #include "W3DDevice/GameClient/W3DSmudge.h"
 #include "W3DDevice/GameClient/W3DSnow.h"
 #include "W3DDevice/GameClient/W3DBloom.h"
+#include "W3DDevice/GameClient/W3DSoftParticles.h"
 #include "WW3D2/camera.h"
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/ww3d.h"
@@ -154,6 +155,11 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 
 	// external mechanism must tell us when it's OK to render again...
 	m_readyToRender = false;
+
+	if (TheW3DSoftParticles)
+	{
+		TheW3DSoftParticles->beginPass(rinfo);
+	}
 
 	//reset each frame
 	/// @todo lorenzen sez: this should be debug only:

@@ -526,6 +526,25 @@ old lighting, which lights the terrain by its corners, so large ones look blocky
 * Infantry, flat terrain and roads keep the old lighting.
 * Launch with `CONTRA_PIXELLIGHTS=1` to limit per-pixel lights to the terrain, or `0` to turn them off.
 
+### Soft particles
+
+Smoke, dust, fire and explosion sprites fade out as they near the surface behind them, so they no
+longer cut a hard line into the ground or the buildings they pass through. Needs the Direct3D 9
+build and a shader model 2 card.
+
+* `SoftParticles = Yes` - (No draws sprites with hard edges. `Options.ini` only.)
+
+Tuned in the mod's `GameData.ini`:
+
+* `SoftParticleDistance = 12` - (How far in front of a surface, in world units, a sprite starts to
+fade. 0 turns the fade off.)
+
+Notes:
+* With anti-aliasing off, sprites fade against everything already drawn. With it on, they fade
+against the ground only, since a multisampled depth buffer cannot be read.
+* Ground-aligned and alpha-tested sprites keep their edges.
+* Launch with `CONTRA_SOFTPARTICLES=2` to fade against the ground only, or `0` to turn the fade off.
+
 # ParticleSystem.ini
 
 ## ConformToTerrain
