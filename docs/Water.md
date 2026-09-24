@@ -118,7 +118,7 @@ One block. `map.ini` can override any of these keys for its map.
 | `StandingWaterColor` | RGB | `R:255 G:255 B:255` | `0` - `255` each **(hard)** | White tints lakes and rivers by the map's light times the `WaterSet` `DiffuseColor`. Black draws them unlit. Any other colour is used as the tint. |
 | `StandingWaterTexture` | texture | `TWWater01.tga` | - | Surface texture of lakes, seas and rivers. Its `_nrm.dds` and `_hgt.dds` follow its name. |
 | `AdditiveBlending` | Yes/No | `No` | - | `Yes` adds the water onto the scene and keeps the old water, with no shader water. |
-| `NotWater` | Yes/No | `No` | - | `Yes` draws the map's water as the old water, with no shader water, for lava and other liquids that should not reflect, refract or foam. |
+| `IsWater` | Yes/No | `Yes` | - | `No` draws the map's water as the old water, with no shader water, for lava and other liquids that should not reflect, refract or foam. |
 | `RadarWaterColor` | RGB | `R:140 G:140 B:255` | `0` - `255` each **(hard)** | Colour of water on the radar. |
 | `SkyboxTextureN` | texture | `TSMorningN.tga` | - | North face of the skybox, which shader water reflects. Also `SkyboxTextureE`, `S`, `W` and `T` (top), defaulting to `TSMorningE.tga` and so on. |
 | `ShaderWaterOpacity` | number | `0.95` | `0` - `1` | Opacity of deep water. `0` uses `TransparentWaterMinOpacity`. Above `1` over-brightens. |
@@ -185,7 +185,7 @@ mirrored.
 smear into the waves.
 * Effects drawn after the water (smoke, fire, translucent models) are not bent by the waves.
 * `AdditiveBlending = Yes` water keeps the old look.
-* Lava maps should set `NotWater = Yes` in the `WaterTransparency` block of their `map.ini`, so the
+* Lava maps should set `IsWater = No` in the `WaterTransparency` block of their `map.ini`, so the
 lava keeps the old look instead of reflecting the sky and gathering foam. The next map gets shader
 water back.
 * The `CONTRA_WATER` environment variable picks the water: `0` the old water, `1` shader water

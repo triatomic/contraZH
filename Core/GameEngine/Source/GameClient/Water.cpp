@@ -89,7 +89,7 @@ const FieldParse WaterTransparencySetting::m_waterTransparencySettingFieldParseT
 	{ "ShaderWaterPlanarStrength",		INI::parseReal,				nullptr,			offsetof( WaterTransparencySetting, m_shaderWaterPlanarStrength ) },
 	{ "ShaderWaterStochasticSize",		INI::parseReal,				nullptr,			offsetof( WaterTransparencySetting, m_shaderWaterStochasticSize ) },
 	{ "ShaderWaterStochasticSharpness",	INI::parseReal,				nullptr,			offsetof( WaterTransparencySetting, m_shaderWaterStochasticSharpness ) },
-	{ "NotWater",						INI::parseBool,				nullptr,			offsetof( WaterTransparencySetting, m_notWater ) },
+	{ "IsWater",						INI::parseBool,				nullptr,			offsetof( WaterTransparencySetting, m_isWater ) },
 	{ "WaterAnimationFps",				INI::parseInt,				nullptr,			offsetof( WaterTransparencySetting, m_waterAnimationFps ) },
 
 

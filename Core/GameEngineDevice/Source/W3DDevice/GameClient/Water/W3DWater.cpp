@@ -553,7 +553,7 @@ Bool WaterRenderObjClass::useShaderWater() const
 	return ShaderWaterMode != 0 && m_shaderWaterPixelShader[0] != 0 && m_shaderWaterPixelShader[1] != 0 &&
 		m_shaderRiverPixelShader[0] != 0 && m_shaderRiverPixelShader[1] != 0 &&
 		m_normalTexture != nullptr && TheTerrainRenderObject != nullptr &&
-		TheGlobalData->m_showSoftWaterEdge && !TheWaterTransparency->m_additiveBlend && !TheWaterTransparency->m_notWater;
+		TheGlobalData->m_showSoftWaterEdge && !TheWaterTransparency->m_additiveBlend && TheWaterTransparency->m_isWater;
 #else
 	return FALSE;
 #endif
