@@ -862,8 +862,8 @@ struct D3D9ShaderEntry
 };
 
 // Index 0 is reserved so a handle of 0 keeps meaning "no shader". The engine loads
-// a fixed, small set of shaders, so a flat array avoids any allocation concerns.
-static const unsigned MAX_D3D9_SHADERS=64;
+// a fixed set of shaders, so a flat array avoids any allocation concerns.
+static const unsigned MAX_D3D9_SHADERS=256;
 static D3D9ShaderEntry _D3D9Shaders[MAX_D3D9_SHADERS];
 static unsigned _D3D9ShaderCount=1;
 
