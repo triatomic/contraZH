@@ -302,8 +302,8 @@ rounds down to a valid step.
 * Fork fixes on top: settings survive a device reset (alt-tab, window toggle), and a driver that
 supports anisotropic for only min or mag filtering falls back to linear for the other.
 
-Shadow mapping, specular, normal and glow maps, per-pixel lights, soft particles and the other
-features that need the Direct3D 9 build are on [Direct3D 9 Features](dx9feat.md).
+Shadow mapping, specular, normal and glow maps, per-pixel lights, soft particles, flame shading and
+the other features that need the Direct3D 9 build are on [Direct3D 9 Features](dx9feat.md).
 
 ### Bloom
 

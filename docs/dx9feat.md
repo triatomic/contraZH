@@ -150,6 +150,33 @@ against the ground only, since a multisampled depth buffer cannot be read.
 * Ground-aligned and alpha-tested sprites keep their edges.
 * Launch with `CONTRA_SOFTPARTICLES=2` to fade against the ground only, or `0` to turn the fade off.
 
+## Flame shading
+
+Flame weapon fire flickers, licks and breaks up at its edges, and glows white-hot where it is
+brightest. The air behind it shimmers. Blue, green and other coloured flames keep their colour.
+Needs the Direct3D 9 build and a shader model 2 card; the shimmer also needs `Heat Effects` on.
+
+* `FlameShaders = Yes` - (No draws flames as plain sprites. Options.ini only, no menu control.)
+
+Picked per particle system in `ParticleSystem.ini`:
+
+* `FlameShader = Auto` - (Default. On when the system rides a projectile whose weapon has
+`DamageType = FLAME`, such as the Dragon tank, Immolator and flame tower sprays. `Yes` turns it on
+for any system, such as muzzle flames, burning buildings and fire fields. `No` turns it off.)
+
+```
+ParticleSystem TankDragonMuzzleFlame
+  ...
+  FlameShader = Yes
+End
+```
+
+Notes:
+* Slave systems follow their master, and a system a particle carries follows that particle's system.
+* Streaks, projectile streams, volume particles and terrain-conforming particles stay plain.
+* On a card without shader model 2.0a, flames keep their shading but lose the soft fade.
+* Launch with `CONTRA_FLAMESHADER=1` to drop the shimmer, or `0` to turn flame shading off.
+
 ## Ambient occlusion
 
 Creases, corners, and the ground where units and buildings stand fall into soft shade, so objects sit
