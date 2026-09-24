@@ -229,6 +229,7 @@ static GameWindow *   checkPixelLights            = nullptr;
 static GameWindow *   checkSoftParticles          = nullptr;
 static GameWindow *   checkAmbientOcclusion       = nullptr;
 static GameWindow *   checkVSync                  = nullptr;
+static GameWindow *   checkLowLatency             = nullptr;
 
 // Options.ini spellings, indexed by the matching enum and combo box position
 static const char *const HealthBarModeNames[] = { "Classic", "Damaged", "Always" };
@@ -487,6 +488,7 @@ static const BoolOption BoolOptions[] =
 	{ &checkPixelLights, "PixelLights", &OptionPreferences::getPixelLightsEnabled, &GlobalData::m_usePixelLights, TRUE },
 	{ &checkSoftParticles, "SoftParticles", &OptionPreferences::getSoftParticlesEnabled, &GlobalData::m_useSoftParticles, TRUE },
 	{ &checkAmbientOcclusion, "AmbientOcclusion", &OptionPreferences::getAmbientOcclusionEnabled, &GlobalData::m_useAmbientOcclusion, TRUE },
+	{ &checkLowLatency, "LowLatency", &OptionPreferences::getLowLatencyEnabled, &GlobalData::m_lowLatency, FALSE },
 };
 
 // the strength is stored as 0..1 but edited as a percentage
@@ -1081,6 +1083,7 @@ static void saveOptions()
 			(*pref)[option.prefKey] = on ? "yes" : "no";
 			TheWritableGlobalData->*option.field = on;
 		}
+		WW3D::Set_Low_Latency( TheGlobalData->m_lowLatency != FALSE );
 
 		// the radar caches this when it is created, so it waits for the next launch
 		const Bool large = getCheck( checkLargeBlips, pref->getRadarBlipSize() == RadarBlipSize_Large );
@@ -1587,6 +1590,7 @@ static void initGameOptionsWindows()
 	checkSoftParticles = findOptionsWindow( "OptionsMenu.wnd:CheckSoftParticles" );
 	checkAmbientOcclusion = findOptionsWindow( "OptionsMenu.wnd:CheckAmbientOcclusion" );
 	checkVSync = findOptionsWindow( "OptionsMenu.wnd:CheckVSync" );
+	checkLowLatency = findOptionsWindow( "OptionsMenu.wnd:CheckLowLatency" );
 
 	if (ButtonGameOptions)
 	{
@@ -1638,6 +1642,7 @@ static void initGameOptionsWindows()
 	setCheckText( checkWaterReflections, "GUI:WaterReflections", L"Water reflections", "TOOLTIP:WaterReflections", L"Lakes and seas mirror the cliffs, trees, units and buildings around them. Needs Smooth water and a Direct3D 9 card." );
 	setCheckText( checkDynamicLights, "GUI:DynamicLights", L"Dynamic lights", "TOOLTIP:DynamicLights", L"Explosions, muzzle flashes and lasers light the ground, units and buildings around them." );
 	setCheckText( checkPixelLights, "GUI:PixelLights", L"Per-pixel lights", "TOOLTIP:PixelLights", L"Dynamic lights fall in smooth circles that follow the ground's detail, instead of blocky patches. Needs a Direct3D 9 card with Shader Model 2.0a or later." );
+	setCheckText( checkLowLatency, "GUI:LowLatency", L"Low latency mode", "TOOLTIP:LowLatency", L"Lets the game prepare only one frame ahead of the graphics card, so the screen answers the mouse sooner. Can lower the frame rate a little. Needs the Direct3D 9 build." );
 	setCheckText( checkVSync, "GUI:VSync", L"Vertical sync", "TOOLTIP:VSync", L"Waits for the monitor's refresh before showing each frame, which stops tearing but can add a little input delay." );
 	setCheckText( checkAmbientOcclusion, "GUI:AmbientOcclusion", L"Ambient occlusion", "TOOLTIP:AmbientOcclusion", L"Creases, corners and the ground where units and buildings stand fall into soft shade. Off while anti-aliasing is on. Needs a Direct3D 9 card with Shader Model 2.0a or later." );
 	setCheckText( checkSoftParticles, "GUI:SoftParticles", L"Soft particles", "TOOLTIP:SoftParticles", L"Smoke, dust and fire fade where they meet the ground and buildings, instead of cutting a hard line. Needs a Direct3D 9 card." );

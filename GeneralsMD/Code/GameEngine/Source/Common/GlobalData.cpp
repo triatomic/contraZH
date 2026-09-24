@@ -793,6 +793,7 @@ GlobalData::GlobalData()
   m_usePixelLights = TRUE;
   m_useAmbientOcclusion = TRUE;
   m_vsync = -1;
+  m_lowLatency = FALSE;
   m_specularDebug = FALSE;
   m_normalMapDebug = FALSE;
   m_ambientOcclusionDebug = FALSE;
@@ -1639,6 +1640,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_usePixelLights = optionPref.getPixelLightsEnabled();
 	TheWritableGlobalData->m_useAmbientOcclusion = optionPref.getAmbientOcclusionEnabled();
 	TheWritableGlobalData->m_vsync = optionPref.getVSyncMode();
+	TheWritableGlobalData->m_lowLatency = optionPref.getLowLatencyEnabled();
 	TheWritableGlobalData->m_specularDebug = optionPref.getSpecularDebugEnabled();
 	TheWritableGlobalData->m_normalMapDebug = optionPref.getNormalMapDebugEnabled();
 	TheWritableGlobalData->m_ambientOcclusionDebug = optionPref.getAmbientOcclusionDebugEnabled();

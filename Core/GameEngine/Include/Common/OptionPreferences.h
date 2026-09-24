@@ -162,6 +162,8 @@ public:
 	Bool getAmbientOcclusionEnabled() const;
 	// Options.ini: VSync = Yes or No; without it, -1 keeps vsync on in fullscreen and off in a window
 	Int getVSyncMode() const;
+	// Options.ini: LowLatency = Yes keeps at most one frame queued ahead of the GPU
+	Bool getLowLatencyEnabled() const;
 	// Options.ini: SpecularDebug = Yes tints what the specular pass covers and shows its highlight 8x in magenta
 	Bool getSpecularDebugEnabled() const;
 	// Options.ini: NormalMapDebug = Yes shows only the terrain's bump shading, on grey

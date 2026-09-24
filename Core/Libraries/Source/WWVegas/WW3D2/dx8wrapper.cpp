@@ -119,6 +119,11 @@ int								DX8Wrapper::BitDepth										= DEFAULT_BIT_DEPTH;
 int								DX8Wrapper::TextureBitDepth							= DEFAULT_TEXTURE_BIT_DEPTH;
 bool								DX8Wrapper::IsWindowed									= false;
 int								DX8Wrapper::VSyncMode									= -1;
+bool								DX8Wrapper::LowLatency									= false;
+#if defined(BUILD_WITH_D3D9)
+IDirect3DQuery9*				DX8Wrapper::FrameQuery									= nullptr;
+bool								DX8Wrapper::FrameQueryIssued							= false;
+#endif
 D3DFORMAT					DX8Wrapper::DisplayFormat	= D3DFMT_UNKNOWN;
 D3DMULTISAMPLE_TYPE DX8Wrapper::MultiSampleAntiAliasing	= DEFAULT_MSAA;
 
@@ -681,6 +686,7 @@ bool DX8Wrapper::Create_Device()
 	dbgHelpGuard.deactivate();
 
 	Create_Scene_Target();
+	Apply_Frame_Latency();
 
 	/*
 	** Initialize all subsystems
@@ -743,6 +749,7 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 		}
 
 		Release_Scene_Target();
+		Release_Frame_Query();
 
 		HRESULT hr = _Get_D3D_Device8()->TestCooperativeLevel();
 		if (hr != D3DERR_DEVICELOST)
@@ -761,6 +768,7 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 			return false;	//device is lost and can't be reset.
 
 		Create_Scene_Target();
+		Apply_Frame_Latency();
 
 		if (reload_assets)
 		{
@@ -817,6 +825,7 @@ void DX8Wrapper::Release_Device()
 		*/
 		Do_Onetime_Device_Dependent_Shutdowns();
 		Release_Scene_Target();
+		Release_Frame_Query();
 
 		/*
 		** Release the device
@@ -1383,6 +1392,44 @@ void DX8Wrapper::Set_VSync_Mode(int mode)
 	Reset_Device();
 }
 
+void DX8Wrapper::Set_Low_Latency(bool on)
+{
+	LowLatency = on;
+	Apply_Frame_Latency();
+}
+
+void DX8Wrapper::Apply_Frame_Latency()
+{
+	Release_Frame_Query();
+#if defined(BUILD_WITH_D3D9)
+	if (D3DDevice == nullptr)
+	{
+		return;
+	}
+	if (IsEx)
+	{
+		// 0 restores the default of three frames.
+		static_cast<IDirect3DDevice9Ex*>(D3DDevice)->SetMaximumFrameLatency(LowLatency ? 1 : 0);
+	}
+	else if (LowLatency && FAILED(D3DDevice->CreateQuery(D3DQUERYTYPE_EVENT, &FrameQuery)))
+	{
+		FrameQuery = nullptr;
+	}
+#endif
+}
+
+void DX8Wrapper::Release_Frame_Query()
+{
+#if defined(BUILD_WITH_D3D9)
+	if (FrameQuery != nullptr)
+	{
+		FrameQuery->Release();
+		FrameQuery = nullptr;
+	}
+	FrameQueryIssued = false;
+#endif
+}
+
 bool DX8Wrapper::Has_Stencil()
 {
 	bool has_stencil = (_PresentParameters.AutoDepthStencilFormat == D3DFMT_D24S8 ||
@@ -1886,6 +1933,14 @@ void DX8Wrapper::End_Scene(bool flip_frames)
 		{
 			WWPROFILE("DX8Device::Present()");
 #if defined(BUILD_WITH_D3D9)
+			// The GPU finishes the last frame before this one is queued behind it.
+			if (FrameQuery != nullptr && FrameQueryIssued)
+			{
+				while (FrameQuery->GetData(nullptr, 0, D3DGETDATA_FLUSH) == S_FALSE)
+				{
+					::Sleep(0);
+				}
+			}
 			if (IsEx)
 			{
 				hr=static_cast<IDirect3DDevice9Ex*>(_Get_D3D_Device8())->PresentEx(nullptr, nullptr, nullptr, nullptr, 0);
@@ -1898,6 +1953,12 @@ void DX8Wrapper::End_Scene(bool flip_frames)
 		DX8_RECORD_DX8_CALLS();
 
 		if (SUCCEEDED(hr)) {
+#if defined(BUILD_WITH_D3D9)
+			if (FrameQuery != nullptr)
+			{
+				FrameQueryIssued = SUCCEEDED(FrameQuery->Issue(D3DISSUE_END));
+			}
+#endif
 #ifdef EXTENDED_STATS
 			if (stats.m_sleepTime) {
 				::Sleep(stats.m_sleepTime);

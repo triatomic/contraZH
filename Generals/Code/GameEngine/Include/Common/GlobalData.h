@@ -517,6 +517,7 @@ public:
   Real m_ambientOcclusionRadius;  ///< how far, in world units, geometry darkens what is near it
   Real m_ambientOcclusionStrength; ///< how dark the occlusion gets, 0 for none
   Int m_vsync;                    ///< Options.ini VSync: 1 on, 0 off, -1 on in fullscreen and off in a window
+  Bool m_lowLatency;              ///< Options.ini LowLatency: at most one frame queued ahead of the GPU
   Int m_alliedDecalMode;          ///< Options.ini AlliedDecalMode: how allied power decals are drawn
   Color m_laserGlowColor;         ///< GameData LaserGroundGlowColor: black takes the beam color
   Real m_laserGlowIntensity;      ///< GameData LaserGroundGlowIntensity: how strongly the color is added

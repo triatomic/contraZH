@@ -587,6 +587,7 @@ GlobalData::GlobalData()
   m_ambientOcclusionRadius = 12.0f;
   m_ambientOcclusionStrength = 1.0f;
   m_vsync = -1;
+  m_lowLatency = FALSE;
   m_alliedDecalMode = AlliedDecalMode_Default;
   m_laserGlowColor = 0;
   m_laserGlowIntensity = 0.7f;
@@ -1271,6 +1272,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_useAmbientOcclusion = optionPref.getAmbientOcclusionEnabled();
 	TheWritableGlobalData->m_ambientOcclusionDebug = optionPref.getAmbientOcclusionDebugEnabled();
 	TheWritableGlobalData->m_vsync = optionPref.getVSyncMode();
+	TheWritableGlobalData->m_lowLatency = optionPref.getLowLatencyEnabled();
 	TheWritableGlobalData->m_alliedDecalMode = optionPref.getAlliedDecalMode();
 
 	Int val=optionPref.getGammaValue();

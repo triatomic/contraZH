@@ -695,6 +695,8 @@ protected:
 	// -1 keeps vsync on in fullscreen and off in a window, 0 turns it off, 1 on. A change resets a live device.
 	static void	Set_VSync_Mode(int mode);
 	static bool	Is_VSync_On() { return Choose_Present_Interval() != D3DPRESENT_INTERVAL_IMMEDIATE; }
+	// On keeps at most one frame queued ahead of the GPU; off leaves the driver's default. Direct3D 9 only.
+	static void	Set_Low_Latency(bool on);
 	static void Set_Polygon_Mode(int mode);
 
 	/*
@@ -732,6 +734,9 @@ protected:
 	static bool								IsWindowed;
 	static int								VSyncMode;
 	static UINT Choose_Present_Interval();
+	static bool								LowLatency;
+	static void Apply_Frame_Latency();
+	static void Release_Frame_Query();
 	static D3DFORMAT					DisplayFormat;
 	static D3DMULTISAMPLE_TYPE	MultiSampleAntiAliasing;
 
@@ -787,6 +792,12 @@ protected:
 	static void Create_Scene_Target();
 	static void Create_Scene_Depth_Texture();
 	static void Release_Scene_Target();
+
+#if defined(BUILD_WITH_D3D9)
+	// Without D3D9Ex, waiting on the last frame's event query holds the CPU to one frame ahead
+	static IDirect3DQuery9 *				FrameQuery;
+	static bool								FrameQueryIssued;
+#endif
 
 	static IDirect3DSurface8 *			CurrentRenderTarget;
 	static IDirect3DSurface8 *			CurrentDepthBuffer;

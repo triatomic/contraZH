@@ -1248,6 +1248,11 @@ bool WW3D::Is_VSync_On()
 	return DX8Wrapper::Is_VSync_On();
 }
 
+void WW3D::Set_Low_Latency(bool on)
+{
+	DX8Wrapper::Set_Low_Latency(on);
+}
+
 
 /***********************************************************************************************
  * WW3D::Set_Collision_Box_Display_Mask -- control rendering of collision boxes                *

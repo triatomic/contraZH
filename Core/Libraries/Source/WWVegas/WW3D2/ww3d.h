@@ -226,6 +226,8 @@ public:
 	// -1 keeps vsync on in fullscreen and off in a window, 0 turns it off, 1 on
 	static void					Set_VSync_Mode(int mode);
 	static bool					Is_VSync_On();
+	// On keeps at most one frame queued ahead of the GPU
+	static void					Set_Low_Latency(bool on);
 
 	/*
 	** Texture Reduction - all currently loaded textures can be de-resed on the fly

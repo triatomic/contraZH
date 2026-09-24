@@ -461,6 +461,11 @@ Int OptionPreferences::getVSyncMode(void) const
 	return getBool("VSync", FALSE) ? 1 : 0;
 }
 
+Bool OptionPreferences::getLowLatencyEnabled(void) const
+{
+	return getBool("LowLatency", FALSE);
+}
+
 Bool OptionPreferences::getSpecularDebugEnabled(void) const
 {
 	return getBool("SpecularDebug", FALSE);
