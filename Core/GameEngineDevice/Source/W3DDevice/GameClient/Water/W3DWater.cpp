@@ -190,6 +190,7 @@ static ShaderClass shaderWaterShader(SC_SHADER_WATER);
 #define CLIPMAP_FINEST_CELL 8.0f	// world units per cell of the finest level
 #define CLIPMAP_REACH 8000.0f		// world units the coarsest level reaches from the camera
 #define CLIPMAP_FOLD_CELLS 8		// cells over which a level's edge folds onto the next
+static_assert(CLIPMAP_CELLS % 4 == 0 && CLIPMAP_CELLS * CLIPMAP_CELLS * 6 <= 65535, "clipmap index counts must fit 16 bits");
 #define RADIAL_LEVEL_COUNT 8
 
 #if defined(BUILD_WITH_D3D9)
@@ -1173,7 +1174,7 @@ void WaterRenderObjClass::setupSwell(const D3DMATRIX &clip)
 	const Real time = m_riverVOrigin / 0.06f;
 	const Real drift = time * TheWaterTransparency->m_shaderWaterSwellSpeed / swellScale;
 	const Vector4 swell(1.0f / swellScale, TheWaterTransparency->m_shaderWaterSwellHeight, drift * 0.848f, drift * 0.530f);
-	const Vector4 swellSample(step, mipLevel, 0.0f, 0.0f);
+	const Vector4 swellSample(0.0f, mipLevel, 0.0f, 0.0f);
 
 	// A decoded _hgt texture holds height in every channel, and the generated one holds it in alpha.
 	const Vector4 swellChannel = (swellTexture == m_swellTexture) ? Vector4(0.0f, 1.0f, 0.0f, 0.0f) : Vector4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -1197,14 +1198,11 @@ void WaterRenderObjClass::setupSwell(const D3DMATRIX &clip)
 
 	if (m_drawingRadial)
 	{
-		// drawRadialWater sets each level's placement. The texcoords and colour match drawTrapezoidWater's.
-		const Vector3 eye = m_renderCamera->Get_Transform().Get_Translation();
-		const Vector4 eyePosition(eye.X, eye.Y, 0.0f, 0.0f);
+		// drawRadialWater sets the eye and each level's placement. The texcoords and colour match drawTrapezoidWater's.
 		const Vector4 wobble(1.0f / 150.0f, 0.02f * cosf(11.0f * m_riverVOrigin), 0.02f * cosf(5.0f * m_riverVOrigin), 25.0f * m_riverVOrigin);
 		const Vector4 wobbleRate(PI / (4.0f * MAP_XY_FACTOR), 0.0f, 0.0f, 0.0f);
 		const UnsignedInt diffuse = (UnsignedInt)standingWaterDiffuse();
 		const Vector4 color(((diffuse >> 16) & 0xff) / 255.0f, ((diffuse >> 8) & 0xff) / 255.0f, (diffuse & 0xff) / 255.0f, (diffuse >> 24) / 255.0f);
-		DX8Wrapper::Set_Vertex_Shader_Constant(12, &eyePosition, 1);
 		DX8Wrapper::Set_Vertex_Shader_Constant(8, &wobble, 1);
 		DX8Wrapper::Set_Vertex_Shader_Constant(9, &wobbleRate, 1);
 		DX8Wrapper::Set_Vertex_Shader_Constant(10, &color, 1);
@@ -1404,18 +1402,21 @@ void WaterRenderObjClass::updateWaterMask()
 		}
 	}
 
+	// Rivers and sloping water draw their own surface, so their cells are marked to keep the growth below out.
+	const UnsignedInt otherWater = 1;
 	UnsignedInt *cells = NEW UnsignedInt[width * height];
 	memset(cells, 0, width * height * sizeof(UnsignedInt));
 
 	const Real border = (Real)map->getBorderSizeInline();
 	for (PolygonTrigger *pTrig=PolygonTrigger::getFirstPolygonTrigger(); pTrig; pTrig = pTrig->getNext())
 	{
-		Real level;
-		if (!pTrig->isWaterArea() || pTrig->isRiver() || pTrig->getNumPoints() < 3 || !Get_Flat_Water_Level(pTrig, level))
+		if (!pTrig->isWaterArea() || pTrig->getNumPoints() < 3)
 		{
 			continue;
 		}
-		const UnsignedInt value = (UnsignedInt)WWMath::Clamp(level * 16.0f + 0.5f, 0.0f, 65535.0f);
+		Real level = 0.0f;
+		const Bool flat = !pTrig->isRiver() && Get_Flat_Water_Level(pTrig, level);
+		const UnsignedInt value = flat ? (UnsignedInt)WWMath::Clamp(level * 16.0f + 0.5f, 0.0f, 65535.0f) : 0;
 
 		Int minX = pTrig->getPoint(0)->x;
 		Int maxX = minX;
@@ -1442,10 +1443,18 @@ void WaterRenderObjClass::updateWaterMask()
 				point.x = REAL_TO_INT(((Real)x - border) * MAP_XY_FACTOR);
 				point.y = REAL_TO_INT(((Real)y - border) * MAP_XY_FACTOR);
 				point.z = REAL_TO_INT(level);
-				// Where polygons overlap, the higher water wins.
-				if (pTrig->pointInTrigger(point) && (row[x] == 0 || ((row[x] >> 8) & 0xffff) < value))
+				if (!pTrig->pointInTrigger(point))
+				{
+					continue;
+				}
+				// Where polygons overlap, the higher water wins, and flat water wins over the others.
+				if (flat && (row[x] <= otherWater || ((row[x] >> 8) & 0xffff) < value))
 				{
 					row[x] = 0xff000000 | (value << 8);
+				}
+				else if (!flat && row[x] == 0)
+				{
+					row[x] = otherWater;
 				}
 			}
 		}
@@ -1473,7 +1482,7 @@ void WaterRenderObjClass::updateWaterMask()
 						}
 					}
 				}
-				row[x] = cell;
+				row[x] = (cell == otherWater) ? 0 : cell;
 			}
 		}
 		surface->Unlock();
@@ -1512,6 +1521,8 @@ void WaterRenderObjClass::drawRadialWater(Real planeZ)
 	findSwellTexture()->Peek_D3D_Texture()->GetLevelDesc(0, &swellDesc);
 	const Real texelsPerUnit = (Real)swellDesc.Width / max(TheWaterTransparency->m_shaderWaterSwellScale, 1.0f);
 	const Vector3 eye = m_renderCamera->Get_Transform().Get_Translation();
+	const Vector4 eyePosition(eye.X, eye.Y, 0.0f, 0.0f);
+	DX8Wrapper::Set_Vertex_Shader_Constant(12, &eyePosition, 1);
 	const Int half = CLIPMAP_CELLS / 2;
 	Real cell = CLIPMAP_FINEST_CELL;
 	for (Int level=0; ; level++)
@@ -2853,14 +2864,13 @@ void WaterRenderObjClass::reloadEditedIni()
 		return;
 	}
 
-	// A half-saved or mistyped file keeps the current water until the next save.
 	try
 	{
 		reloadWaterINI(fileName);
 	}
 	catch (...)
 	{
-		DEBUG_LOG(("Water.ini could not be reloaded, keeping the current water"));
+		DEBUG_LOG(("Water.ini stopped at an error, so only the keys above it took effect until the next save"));
 		return;
 	}
 
@@ -2885,7 +2895,8 @@ void WaterRenderObjClass::update()
 	// TheSuperHackers @tweak The water movement time step is now decoupled from the render update.
 	Real timeScale = TheFramePacer->getActualLogicTimeScaleOverFpsRatio();
 
-	// Uncapped logic speeds the water up with the fps, so WaterAnimationFps moves it at most a logic frame per step.
+	// Uncapped logic speeds the water up with the fps, so there WaterAnimationFps moves it at most a logic frame per step.
+	const Bool logicUncapped = TheFramePacer->getActualLogicTimeScaleFps() >= RenderFpsPreset::UncappedFpsValue;
 	const Int animationFps = TheWaterTransparency->m_waterAnimationFps;
 	if (animationFps > 0)
 	{
@@ -2898,7 +2909,7 @@ void WaterRenderObjClass::update()
 		}
 		else
 		{
-			timeScale = min(m_animationPendingStep, 1.0f);
+			timeScale = logicUncapped ? min(m_animationPendingStep, 1.0f) : m_animationPendingStep;
 			m_animationPendingStep = 0.0f;
 			m_animationPendingTime = min(m_animationPendingTime - interval, interval);
 		}
