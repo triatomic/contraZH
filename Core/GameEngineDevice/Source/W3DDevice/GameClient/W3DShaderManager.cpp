@@ -2238,8 +2238,22 @@ void SpecularShader::setTexture(TextureClass *texture)
 
 	TextureClass *emissiveMap = (EmissiveIntensity > 0.0f && texture != nullptr) ? Find_Emissive_Map(texture) : nullptr;
 	DX8Wrapper::Set_Texture(SPECULAR_EMISSIVE_STAGE, emissiveMap);
-	Vector4 emissive((emissiveMap != nullptr) ? EmissiveIntensity : 0.0f, 0.0f, 0.0f, 0.0f);
-	DX8Wrapper::Set_Pixel_Shader_Constant(7, &emissive, 1);
+
+	// Derived bumps step at least a texel, so they need its size. The loaded level is read, since the size can still change.
+	Real texelU = 1.0f / 256.0f;
+	Real texelV = 1.0f / 256.0f;
+	IDirect3DTexture8 *meshTexture = (bump == BUMP_DERIVED) ? texture->Peek_D3D_Texture() : nullptr;
+	if (meshTexture != nullptr)
+	{
+		D3DSURFACE_DESC desc;
+		if (SUCCEEDED(meshTexture->GetLevelDesc(0, &desc)) && desc.Width > 0 && desc.Height > 0)
+		{
+			texelU = 1.0f / (Real)desc.Width;
+			texelV = 1.0f / (Real)desc.Height;
+		}
+	}
+	Vector4 textureInfo((emissiveMap != nullptr) ? EmissiveIntensity : 0.0f, texelU, texelV, 0.0f);
+	DX8Wrapper::Set_Pixel_Shader_Constant(7, &textureInfo, 1);
 	if (emissiveMap != nullptr)
 	{
 		++EmissiveMapCount;

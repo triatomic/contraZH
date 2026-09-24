@@ -45,7 +45,7 @@ float4 SunColor     : register(c2);   // sun colour times specular intensity
 float4 Gloss        : register(c3);   // x = specular power, y = 1 for the debug view
 float4 Bump         : register(c6);   // x = height of full brightness, y = normal map strength, z = ambient brightness
 float4 SunDiffuse   : register(c5);   // sun colour the mesh was lit with
-float4 Emissive     : register(c7);   // x = glow mask intensity, 0 without a mask
+float4 TextureInfo  : register(c7);   // x = glow mask intensity, 0 without a mask; yz = one texel of the mesh texture in uv
 
 #if LIGHTS
 // Eight fill c8 to c25, and fxc needs the rest for literals, so W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS must match.
@@ -77,21 +77,38 @@ float3 NormalizeOr(float3 v, float3 fallback)
 
 #if BUMP == 1
 
-// Mikkelsen's surface gradient, with the height sampled one pixel over in each direction.
+// Brightness as height, from one mip blurrier than the pixel needs, so fine texture noise does not sparkle.
+float Height(float2 uv)
+{
+    return Brightness(tex2Dbias(MeshTexture, float4(uv, 0.0f, 1.0f)).rgb);
+}
+
+// Height change per pixel along one screen axis. The samples sit at least a texel apart on either side,
+// so a magnified texture gives smooth slopes rather than one flat facet per texel.
+float HeightSlope(float2 uv, float2 step)
+{
+    float2 texels = step / TextureInfo.yz;
+    float stretch = max(1.0f, rsqrt(max(dot(texels, texels), 1e-8f)));
+    float2 reach = step * stretch;
+    float change = (Height(uv + reach) - Height(uv - reach)) * 0.5f;
+
+    // Paint lines and team colour edges jump far more than surface grain, so large jumps are softened.
+    change /= 1.0f + abs(change) * 6.0f;
+    return change / stretch;
+}
+
+// Mikkelsen's surface gradient.
 float3 BumpNormal(float3 normal, float3 position, float2 uv)
 {
     float3 dpdx = ddx(position);
     float3 dpdy = ddy(position);
-    float2 duvdx = ddx(uv);
-    float2 duvdy = ddy(uv);
 
     float3 r1 = cross(dpdy, normal);
     float3 r2 = cross(normal, dpdx);
     float det = dot(dpdx, r1);
 
-    float centre = Brightness(tex2D(MeshTexture, uv).rgb);
-    float dhdx = Brightness(tex2D(MeshTexture, uv + duvdx).rgb) - centre;
-    float dhdy = Brightness(tex2D(MeshTexture, uv + duvdy).rgb) - centre;
+    float dhdx = HeightSlope(uv, ddx(uv));
+    float dhdy = HeightSlope(uv, ddy(uv));
 
     float3 gradient = sign(det) * (dhdx * r1 + dhdy * r2) * Bump.x;
     return NormalizeOr(abs(det) * normal - gradient, normal);
@@ -172,7 +189,7 @@ float4 main(PsIn input) : COLOR
     color += texel * PointLighting(input.Position, surface);
 #endif
 
-    color += tex2D(EmissiveMap, input.TexCoord).rgb * Emissive.x;
+    color += tex2D(EmissiveMap, input.TexCoord).rgb * TextureInfo.x;
 
     // The debug view tints everything the pass covers faintly and shows the highlight 8x.
     float3 debugColor = float3(1.0f, 0.0f, 1.0f) * (0.15f + highlight * 8.0f);
