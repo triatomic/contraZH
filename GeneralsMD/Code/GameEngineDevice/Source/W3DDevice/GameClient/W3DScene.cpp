@@ -2207,6 +2207,24 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 		lights[i].terrainOnly = light->isTerrainOnly();
 	}
 	W3DShaderManager::setPixelLights(lights, count);
+
+	// Sampled every 300 frames, and only when an interval had lights, so quiet stretches stay out of the log.
+	static Int pixelLightFrames = 0;
+	static Int framesLit = 0;
+	static Int peakCount = 0;
+	framesLit += (count > 0) ? 1 : 0;
+	peakCount = max(peakCount, count);
+	if (++pixelLightFrames % 300 == 0)
+	{
+		if (framesLit > 0)
+		{
+			DEBUG_LOG(("PixelLights: frame %d, terrain %s, units %s, %d of 300 frames lit, at most %d lights at once",
+				pixelLightFrames, enabled ? "per pixel" : "per vertex",
+				W3DShaderManager::supportsUnitPixelLights() ? "per pixel" : "fixed function", framesLit, peakCount));
+		}
+		framesLit = 0;
+		peakCount = 0;
+	}
 }
 
 W3DDynamicLight * RTS3DScene::getADynamicLight()
