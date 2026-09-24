@@ -20,6 +20,11 @@ The water colour and texture still come from `StandingWaterColor`, `StandingWate
 time of day `DiffuseColor`. Tuned in the `WaterTransparency` block of `Water.ini`, and per map in
 `map.ini`.
 
+Cheat builds reload `Data\INI\Water.ini` about half a second after it is saved, so the water can be
+tuned with a map running. The saved values win over the map's `map.ini` until the map loads again.
+A deleted key keeps its value until a restart, skybox textures need a restart, and a file with an
+error is skipped until the next save.
+
 ## Depth and colour
 
 ![Depth, colour and foam](images/water-depth.svg)
