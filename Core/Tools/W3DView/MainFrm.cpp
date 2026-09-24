@@ -980,7 +980,6 @@ CMainFrame::ShowObjectProperties ()
 {
 	// Get a pointer to the 'graphic' pane's window
     CDataTreeView *pCDataTreeView = (CDataTreeView *)m_wndSplitter.GetPane (0, 0);
-    BOOL bReturn = (pCDataTreeView != nullptr);
 
     // Were we successful in getting the view's pointer?
     ASSERT (pCDataTreeView);
@@ -1051,7 +1050,6 @@ CMainFrame::OnUpdateObjectProperties (CCmdUI* pCmdUI)
 {
 	// Get a pointer to the 'graphic' pane's window
     CDataTreeView *pCDataTreeView = (CDataTreeView *)m_wndSplitter.GetPane (0, 0);
-    BOOL bReturn = (pCDataTreeView != nullptr);
 
     // Were we successful in view's getting the pointer?
     ASSERT (pCDataTreeView);
@@ -4060,7 +4058,7 @@ CMainFrame::Update_Emitters_List ()
 {
 	::EnableMenuItem (::GetSubMenu (::GetMenu (m_hWnd), 3), 3, MF_BYPOSITION | MF_ENABLED);
 	HMENU hsub_menu = Get_Emitters_List_Menu ();
-	int index = 0;
+	//int index = 0;
 	while (::RemoveMenu (hsub_menu, 0, MF_BYPOSITION)) {
 		//index ++;
 	}
@@ -4137,7 +4135,7 @@ CMainFrame::OnUpdateAdvancedAnim(CCmdUI* pCmdUI)
 {
 	// Enable the menu item if the selected hierarchy has at least one
 	// animation we can apply.
-	RenderObjClass *prender_obj = ::GetCurrentDocument()->GetDisplayedObject();
+	//RenderObjClass *prender_obj = ::GetCurrentDocument()->GetDisplayedObject();
 }
 
 
