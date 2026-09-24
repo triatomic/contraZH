@@ -164,14 +164,39 @@ Picked per particle system in `ParticleSystem.ini`:
 `DamageType = FLAME`, such as the Dragon tank, Immolator and flame tower sprays. `Yes` turns it on
 for any system, such as muzzle flames, burning buildings and fire fields. `No` turns it off.)
 
+Tuned in the mod's `GameData.ini`. The same keys in a `ParticleSystem` block override them for
+that system alone:
+
+* `FlameWarp = 0.04` - (How far the noise pushes the texture lookup, in texture widths. Higher licks
+more.)
+* `FlameHeat = 2.2` - (How fast bright parts run to white. 0 keeps the flame's own colour.)
+* `FlameFlicker = 0.3` - (How far brightness swings, as a fraction. 0 is steady.)
+* `FlameBreakup = 1` - (How much the faint fringe breaks up. 0 keeps clean edges.)
+* `FlameNoiseSize = 20` - (World units across one tile of flame noise. Smaller gives finer tongues.)
+* `FlameRise = 0.8` - (Noise tiles the flame pattern climbs per second.)
+* `HazeBend = 1.2` - (How far the haze bends the scene, in world units at the flame. The main
+strength control; past about 4 edges smear.)
+* `HazeSize = 1.5` - (Haze sprite size as a multiple of the flame sprite's.)
+* `HazeLift = 0.3` - (How far the haze sits above the flame, as a multiple of the sprite's size.)
+* `HazeNoiseSize = 14` - (World units across one tile of haze noise. Larger gives slower, broader
+waves.)
+* `HazeRise = 1.1` - (Noise tiles the shimmer climbs per second.)
+* `HazeMask = 2` - (How quickly faint parts of the flame reach full haze strength.)
+
 ```
 ParticleSystem TankDragonMuzzleFlame
   ...
   FlameShader = Yes
+  FlameFlicker = 0.5
+  HazeBend = 2.5
 End
 ```
 
 Notes:
+* A key a `ParticleSystem` block leaves out keeps the `GameData.ini` value.
+* Systems with settings of their own draw apart from other flames, so keep overrides to the systems
+that need them.
+* Changes take effect on the next game launch.
 * Slave systems follow their master, and a system a particle carries follows that particle's system.
 * Streaks, projectile streams, volume particles and terrain-conforming particles stay plain.
 * On a card without shader model 2.0a, flames keep their shading but lose the soft fade.
