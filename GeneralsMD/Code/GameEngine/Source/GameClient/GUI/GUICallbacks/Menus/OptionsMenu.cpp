@@ -620,10 +620,7 @@ static void setDefaults()
 	{
 	//-------------------------------------------------------------------------------------------------
 	// LOD
-	if ((TheGameLogic->isInGame() == FALSE) || (TheGameLogic->isInShellGame() == TRUE))
-	{
-		GadgetComboBoxSetSelectedPos(comboBoxDetail, (Int)TheGameLODManager->getRecommendedStaticLODLevel());
-	}
+	GadgetComboBoxSetSelectedPos(comboBoxDetail, (Int)TheGameLODManager->getRecommendedStaticLODLevel());
 
 	//-------------------------------------------------------------------------------------------------
 	// Resolution
@@ -870,7 +867,14 @@ static void saveOptions()
 	if (comboBoxDetail && comboBoxDetail->winGetEnabled())
 	{
 		GadgetComboBoxGetSelectedPos( comboBoxDetail, &index );
+
+		// A match keeps the frame rate limit its game mode set, which the detail presets would overwrite
+		const Bool fpsLimit = TheGlobalData->m_useFpsLimit;
 		const Bool levelChanged = TheGameLODManager->setStaticLODLevel((StaticGameLODLevel)index);
+		if (TheGameLogic->isInGame() && TheGameLogic->getGameMode() != GAME_SHELL)
+		{
+			TheWritableGlobalData->m_useFpsLimit = fpsLimit;
+		}
 
 		if (levelChanged)
 			(*pref)["StaticGameLOD"] = TheGameLODManager->getStaticGameLODLevelName(TheGameLODManager->getStaticLODLevel());
@@ -929,6 +933,14 @@ static void saveOptions()
 		// TheSuperHackers @info We are converting comboBox entry position to MultiSampleModeEnum values
 		index = clamp((int)OptionPreferences::AntiAliasingMode_OFF, index, (int)OptionPreferences::AntiAliasingMode_MSAA_8X);
 		mode = (index > 0) ? 1 << index : 0;
+
+		// The device is rebuilt with the new sample count, which falls back where the card lacks it
+		if (mode != (Int)WW3D::Get_MSAA_Mode())
+		{
+			WW3D::Set_MSAA_Mode( (WW3D::MultiSampleModeEnum)mode );
+			WW3D::Set_Render_Device( -1, -1, -1, -1, -1, false, true, true );
+			mode = (Int)WW3D::Get_MSAA_Mode();
+		}
 
 		TheWritableGlobalData->m_antiAliasLevel = mode;
     AsciiString prefString;
@@ -1955,15 +1967,10 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 
 	// populate anti aliasing modes
 	AsciiString selectedAliasingMode = (*pref)["AntiAliasing"];
-	GadgetComboBoxReset(comboBoxAntiAliasing);
-	AsciiString temp;
-	Int i=0;
-	for (; i < OptionPreferences::AntiAliasingMode_Count; ++i)
-	{
-		temp.format("GUI:AntiAliasing%d", i);
-		str = TheGameText->fetch( temp );
-		index = GadgetComboBoxAddEntry(comboBoxAntiAliasing, str, color);
-	}
+	static const WideChar *const AntiAliasingFallbacks[OptionPreferences::AntiAliasingMode_Count] = { L"Off", L"2x", L"4x", L"8x" };
+	addComboEntries( comboBoxAntiAliasing, "GUI:AntiAliasing", AntiAliasingFallbacks, OptionPreferences::AntiAliasingMode_Count, OptionPreferences::AntiAliasingMode_Count - 1 );
+	setLabelText( "OptionsMenu.wnd:AntiAliasingLabel", "GUI:AntiAliasing", L"Anti-aliasing" );
+	setTooltip( comboBoxAntiAliasing, "TOOLTIP:AntiAliasing", L"Smooths jagged edges. Ambient occlusion needs it off, and soft particles fade only against the ground while it is on." );
 	Int val = atoi(selectedAliasingMode.str());
 	Int pos = 0;
 
@@ -2005,7 +2012,7 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 	UnsignedInt displayWidth = TheDisplay->getWidth();
 	UnsignedInt displayHeight = TheDisplay->getHeight();
 
-	for( i = 0; i < numResolutions; ++i )
+	for( Int i = 0; i < numResolutions; ++i )
 	{	Int xres,yres,bitDepth;
 		TheDisplay->getDisplayModeDescription(i,&xres,&yres,&bitDepth);
 		str.format(L"%d x %d",xres,yres);
@@ -2202,8 +2209,12 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 
 		buttonFirewallRefresh->winEnable(FALSE);
 
-		if (comboBoxDetail)
-			comboBoxDetail->winEnable(FALSE);
+		// Trees are placed and draw modules chosen as the map loads, so these wait for the next one
+		if (TheGameLogic->isInGame() && TheGameLogic->getGameMode() != GAME_SHELL)
+		{
+			enableWindow( checkProps, FALSE );
+			enableWindow( checkExtraAnimations, FALSE );
+		}
 
 		if (comboBoxResolution)
 			comboBoxResolution->winEnable(FALSE);
