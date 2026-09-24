@@ -334,6 +334,13 @@ No shows frames as soon as they are drawn. Without the key, vsync is on in fulls
 window, as before. Also `Vertical sync` in the advanced display options, applied on Accept. Needs
 `CheckVSync` in `OptionsMenu.wnd` for the menu control.)
 
+### Low latency mode
+
+* `LowLatency = No` - (Yes lets the game prepare at most one frame ahead of the graphics card, instead
+of the driver's usual three, so the screen answers the mouse sooner. Can cost a little frame rate. Also
+`Low latency mode` in the advanced display options, applied on Accept. Needs `CheckLowLatency` in
+`OptionsMenu.wnd` for the menu control. Direct3D 9 build only.)
+
 ### Laser ground glow
 
 Each laser beam lights the terrain along its length with up to twelve dynamic lights in the beam's
