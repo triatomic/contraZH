@@ -18,9 +18,7 @@
 // RIVER picks the river build. It fades to the untouched scene by the river texture's
 // alpha and its edge texture, and one wave layer follows the flow.
 //
-// The water texture, waves and foam hide their tiling with hex-tile stochastic texturing. A
-// world-space hex lattice gives each cell a random texture offset, and every pixel blends the
-// three nearest cells while keeping the texture's contrast.
+// Hex-tile stochastic texturing hides the tiling of the water texture, waves and foam.
 
 sampler2D WaterTexture  : register(s0);
 sampler2D EdgeTexture   : register(s1);
@@ -125,7 +123,6 @@ HexCells FindHexCells(float2 world)
 }
 
 // The offset jumps between cells, so the mip comes from the unshifted texcoords' gradients.
-// Mean is the texture's average, read from its smallest mip by TextureMean.
 float4 HexSample(sampler2D map, HexCells cells, float2 uv, float2 dx, float2 dy, float4 mean)
 {
     float4 sum = cells.weight.x * (tex2Dgrad(map, uv + cells.offset0, dx, dy) - mean);
@@ -216,9 +213,12 @@ float4 main(PsIn input) : COLOR
     slope *= 0.5f;
 #endif
 #if SWELL
+    // The vertex shader flattens the swell towards the shore, so its shading and crest foam follow.
+    float shoal = saturate(depth / max(2.0f * SwellShape.y, 0.001f));
     float swellHere = SwellHeight(world.xy);
     float2 swellSlope = float2(swellHere - SwellHeight(world.xy + float2(SwellStep.x, 0.0f)),
-        swellHere - SwellHeight(world.xy + float2(0.0f, SwellStep.x))) / SwellStep.x;
+        swellHere - SwellHeight(world.xy + float2(0.0f, SwellStep.x))) * (shoal / SwellStep.x);
+    swellHere *= shoal;
     float3 normal = normalize(float3(slope * HeightDecode.w + swellSlope, 1.0f));
 #else
     float3 normal = normalize(float3(slope * HeightDecode.w, 1.0f));

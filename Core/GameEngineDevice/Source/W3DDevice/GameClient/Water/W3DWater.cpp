@@ -1103,8 +1103,7 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 	DX8Wrapper::Set_Pixel_Shader_Constant(18, &planar, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(19, &planarMapping, 1);
 
-	// TransparentWaterDepth sets the soft edge's width, and 0 turns it off as it did for the legacy water.
-	// The hex tiling rides along in the same constant, as ps_2_a has no register to spare.
+	// TransparentWaterDepth sets the soft edge's width, 0 turns it off as for the legacy water, and the hex tiling shares its constant.
 	const Real softEdgeDepth = TheWaterTransparency->m_transparentWaterDepth;
 	const Real hexSize = TheWaterTransparency->m_shaderWaterStochasticSize;
 	const Vector4 surface((softEdgeDepth > 0.0f) ? 1.0f / softEdgeDepth : 10000.0f, (hexSize > 0.0f) ? 1.0f / hexSize : 0.0f,
