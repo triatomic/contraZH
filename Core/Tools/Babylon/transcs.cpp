@@ -36,7 +36,7 @@ void CreateTranslationTable ()
 	unichar mb;
 	DWORD last_error;
 
-	if ( ! ( out = fopen ( "utable.c", "wt" )))
+	if ( ( out = fopen ( "utable.c", "wt" )) == nullptr)
 	{
 		return;
 	}
