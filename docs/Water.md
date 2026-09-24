@@ -97,6 +97,9 @@ it the swell uses the built-in waves.)
 
 # Notes
 
+* Many maps pick their own `StandingWaterTexture` in `map.ini`, such as `twwater01trop.tga` on
+tropical maps, `twwater01ice.tga` on winter maps and `twlava.tga` for lava. To change such a map's
+water, replace that texture; its `_nrm.dds` and `_hgt.dds` follow its name.
 * The sky in the reflection is the map's skybox (`SkyboxTexture*` in `WaterTransparency`), dimmed by
 the map's lighting.
 * One water height is mirrored at a time, that of the flat water under the middle of the view. Water
