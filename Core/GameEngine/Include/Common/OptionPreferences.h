@@ -158,12 +158,16 @@ public:
 	Bool getDynamicLightsEnabled() const;
 	// Options.ini: PixelLights = Yes draws those lights per pixel where the hardware allows
 	Bool getPixelLightsEnabled() const;
+	// Options.ini: AmbientOcclusion = Yes darkens creases and the ground where objects meet it
+	Bool getAmbientOcclusionEnabled() const;
 	// Options.ini: VSync = Yes or No; without it, -1 keeps vsync on in fullscreen and off in a window
 	Int getVSyncMode() const;
 	// Options.ini: SpecularDebug = Yes tints what the specular pass covers and shows its highlight 8x in magenta
 	Bool getSpecularDebugEnabled() const;
 	// Options.ini: NormalMapDebug = Yes shows only the terrain's bump shading, on grey
 	Bool getNormalMapDebugEnabled() const;
+	// Options.ini: AmbientOcclusionDebug = Yes shows the occlusion alone, in grey
+	Bool getAmbientOcclusionDebugEnabled() const;
 	Bool getBorderlessWindowEnabled() const;
 	Bool getEasyMilitaryDragEnabled() const;
 	Bool getSmartPipsEnabled() const;

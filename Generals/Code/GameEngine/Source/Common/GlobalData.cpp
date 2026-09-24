@@ -582,6 +582,10 @@ GlobalData::GlobalData()
   m_useDynamicLights = TRUE;
   m_useSoftParticles = TRUE;
   m_softParticleDistance = 12.0f;
+  m_useAmbientOcclusion = TRUE;
+  m_ambientOcclusionDebug = FALSE;
+  m_ambientOcclusionRadius = 12.0f;
+  m_ambientOcclusionStrength = 1.0f;
   m_vsync = -1;
   m_alliedDecalMode = AlliedDecalMode_Default;
   m_laserGlowColor = 0;
@@ -1264,6 +1268,8 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_laserRef = optionPref.getLaserRefEnabled();
 	TheWritableGlobalData->m_useDynamicLights = optionPref.getDynamicLightsEnabled();
 	TheWritableGlobalData->m_useSoftParticles = optionPref.getSoftParticlesEnabled();
+	TheWritableGlobalData->m_useAmbientOcclusion = optionPref.getAmbientOcclusionEnabled();
+	TheWritableGlobalData->m_ambientOcclusionDebug = optionPref.getAmbientOcclusionDebugEnabled();
 	TheWritableGlobalData->m_vsync = optionPref.getVSyncMode();
 	TheWritableGlobalData->m_alliedDecalMode = optionPref.getAlliedDecalMode();
 

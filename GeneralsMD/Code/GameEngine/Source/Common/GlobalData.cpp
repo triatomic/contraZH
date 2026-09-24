@@ -258,6 +258,8 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ "UnitEmissiveIntensity",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_unitEmissiveIntensity ) },
 	{ "UnitEmissiveNightIntensity",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_unitEmissiveNightIntensity ) },
 	{ "SoftParticleDistance",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_softParticleDistance ) },
+	{ "AmbientOcclusionRadius",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_ambientOcclusionRadius ) },
+	{ "AmbientOcclusionStrength",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_ambientOcclusionStrength ) },
 	{ "TextureReductionFactor",			INI::parseInt,				nullptr,			offsetof( GlobalData, m_textureReductionFactor ) },
 	{ "UseBehindBuildingMarker",		INI::parseBool,				nullptr,			offsetof( GlobalData, m_enableBehindBuildingMarkers ) },
 	{ "WaterPositionX",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_waterPositionX ) },
@@ -789,9 +791,11 @@ GlobalData::GlobalData()
   m_useSoftParticles = TRUE;
   m_useDynamicLights = TRUE;
   m_usePixelLights = TRUE;
+  m_useAmbientOcclusion = TRUE;
   m_vsync = -1;
   m_specularDebug = FALSE;
   m_normalMapDebug = FALSE;
+  m_ambientOcclusionDebug = FALSE;
   m_laserGlowColor = 0;
   m_laserGlowIntensity = 0.7f;
 
@@ -907,6 +911,8 @@ GlobalData::GlobalData()
 	m_unitEmissiveIntensity = 0.5f;
 	m_unitEmissiveNightIntensity = 1.5f;
 	m_softParticleDistance = 12.0f;
+	m_ambientOcclusionRadius = 12.0f;
+	m_ambientOcclusionStrength = 1.0f;
 	m_textureReductionFactor = -1;
 	m_enableBehindBuildingMarkers = TRUE;
 	m_scriptDebug = FALSE;
@@ -1631,9 +1637,11 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_useSoftParticles = optionPref.getSoftParticlesEnabled();
 	TheWritableGlobalData->m_useDynamicLights = optionPref.getDynamicLightsEnabled();
 	TheWritableGlobalData->m_usePixelLights = optionPref.getPixelLightsEnabled();
+	TheWritableGlobalData->m_useAmbientOcclusion = optionPref.getAmbientOcclusionEnabled();
 	TheWritableGlobalData->m_vsync = optionPref.getVSyncMode();
 	TheWritableGlobalData->m_specularDebug = optionPref.getSpecularDebugEnabled();
 	TheWritableGlobalData->m_normalMapDebug = optionPref.getNormalMapDebugEnabled();
+	TheWritableGlobalData->m_ambientOcclusionDebug = optionPref.getAmbientOcclusionDebugEnabled();
 	TheWritableGlobalData->m_borderlessWindow = optionPref.getBorderlessWindowEnabled();
 
 	Int val=optionPref.getGammaValue();

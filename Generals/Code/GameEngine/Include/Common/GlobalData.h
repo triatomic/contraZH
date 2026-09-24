@@ -512,6 +512,10 @@ public:
   Bool m_useDynamicLights;        ///< Options.ini DynamicLights: explosions, muzzle flashes and lasers light their surroundings
   Bool m_useSoftParticles;        ///< Options.ini SoftParticles: smoke and fire fade where they meet the ground and buildings
   Real m_softParticleDistance;    ///< how far in front of a surface a particle starts to fade, 0 for hard edges
+  Bool m_useAmbientOcclusion;     ///< Options.ini AmbientOcclusion: creases and the ground beneath objects darken where the hardware allows
+  Bool m_ambientOcclusionDebug;   ///< Options.ini AmbientOcclusionDebug: show only the occlusion, in grey
+  Real m_ambientOcclusionRadius;  ///< how far, in world units, geometry darkens what is near it
+  Real m_ambientOcclusionStrength; ///< how dark the occlusion gets, 0 for none
   Int m_vsync;                    ///< Options.ini VSync: 1 on, 0 off, -1 on in fullscreen and off in a window
   Int m_alliedDecalMode;          ///< Options.ini AlliedDecalMode: how allied power decals are drawn
   Color m_laserGlowColor;         ///< GameData LaserGroundGlowColor: black takes the beam color

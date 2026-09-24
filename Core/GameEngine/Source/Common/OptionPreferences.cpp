@@ -447,6 +447,11 @@ Bool OptionPreferences::getPixelLightsEnabled(void) const
 	return getBool("PixelLights", TRUE);
 }
 
+Bool OptionPreferences::getAmbientOcclusionEnabled(void) const
+{
+	return getBool("AmbientOcclusion", TRUE);
+}
+
 Int OptionPreferences::getVSyncMode(void) const
 {
 	if (find("VSync") == end())
@@ -464,6 +469,11 @@ Bool OptionPreferences::getSpecularDebugEnabled(void) const
 Bool OptionPreferences::getNormalMapDebugEnabled(void) const
 {
 	return getBool("NormalMapDebug", FALSE);
+}
+
+Bool OptionPreferences::getAmbientOcclusionDebugEnabled(void) const
+{
+	return getBool("AmbientOcclusionDebug", FALSE);
 }
 
 Bool OptionPreferences::getBorderlessWindowEnabled(void) const

@@ -227,6 +227,7 @@ static NameKeyType    checkDynamicLightsID        = NAMEKEY_INVALID;
 static GameWindow *   checkDynamicLights          = nullptr;
 static GameWindow *   checkPixelLights            = nullptr;
 static GameWindow *   checkSoftParticles          = nullptr;
+static GameWindow *   checkAmbientOcclusion       = nullptr;
 static GameWindow *   checkVSync                  = nullptr;
 
 // Options.ini spellings, indexed by the matching enum and combo box position
@@ -485,6 +486,7 @@ static const BoolOption BoolOptions[] =
 	{ &checkDynamicLights, "DynamicLights", &OptionPreferences::getDynamicLightsEnabled, &GlobalData::m_useDynamicLights, TRUE },
 	{ &checkPixelLights, "PixelLights", &OptionPreferences::getPixelLightsEnabled, &GlobalData::m_usePixelLights, TRUE },
 	{ &checkSoftParticles, "SoftParticles", &OptionPreferences::getSoftParticlesEnabled, &GlobalData::m_useSoftParticles, TRUE },
+	{ &checkAmbientOcclusion, "AmbientOcclusion", &OptionPreferences::getAmbientOcclusionEnabled, &GlobalData::m_useAmbientOcclusion, TRUE },
 };
 
 // the strength is stored as 0..1 but edited as a percentage
@@ -524,6 +526,14 @@ static void updateGameOptionsEnables()
 	enableWindow( checkBloomDebug, bloom );
 
 	enableWindow( checkPixelLights, getCheck( checkDynamicLights, TRUE ) );
+
+	// the scene depth it reads is multisampled, and so unreadable, with anti-aliasing on
+	Int antiAliasing = 0;
+	if (comboBoxAntiAliasing)
+	{
+		GadgetComboBoxGetSelectedPos( comboBoxAntiAliasing, &antiAliasing );
+	}
+	enableWindow( checkAmbientOcclusion, antiAliasing <= 0 );
 }
 
 static void populateGameOptions()
@@ -1575,6 +1585,7 @@ static void initGameOptionsWindows()
 	checkDynamicLights = findOptionsWindow( "OptionsMenu.wnd:CheckDynamicLights", checkDynamicLightsID );
 	checkPixelLights = findOptionsWindow( "OptionsMenu.wnd:CheckPixelLights" );
 	checkSoftParticles = findOptionsWindow( "OptionsMenu.wnd:CheckSoftParticles" );
+	checkAmbientOcclusion = findOptionsWindow( "OptionsMenu.wnd:CheckAmbientOcclusion" );
 	checkVSync = findOptionsWindow( "OptionsMenu.wnd:CheckVSync" );
 
 	if (ButtonGameOptions)
@@ -1628,6 +1639,7 @@ static void initGameOptionsWindows()
 	setCheckText( checkDynamicLights, "GUI:DynamicLights", L"Dynamic lights", "TOOLTIP:DynamicLights", L"Explosions, muzzle flashes and lasers light the ground, units and buildings around them." );
 	setCheckText( checkPixelLights, "GUI:PixelLights", L"Per-pixel lights", "TOOLTIP:PixelLights", L"Dynamic lights fall in smooth circles that follow the ground's detail, instead of blocky patches. Needs a Direct3D 9 card with Shader Model 2.0a or later." );
 	setCheckText( checkVSync, "GUI:VSync", L"Vertical sync", "TOOLTIP:VSync", L"Waits for the monitor's refresh before showing each frame, which stops tearing but can add a little input delay." );
+	setCheckText( checkAmbientOcclusion, "GUI:AmbientOcclusion", L"Ambient occlusion", "TOOLTIP:AmbientOcclusion", L"Creases, corners and the ground where units and buildings stand fall into soft shade. Off while anti-aliasing is on. Needs a Direct3D 9 card with Shader Model 2.0a or later." );
 	setCheckText( checkSoftParticles, "GUI:SoftParticles", L"Soft particles", "TOOLTIP:SoftParticles", L"Smoke, dust and fire fade where they meet the ground and buildings, instead of cutting a hard line. Needs a Direct3D 9 card." );
 	setCheckText( checkShadowMap, "GUI:ShadowMap", L"Shadow mapping", "TOOLTIP:ShadowMap", L"Soft shadows shaped like their objects, falling on ground, bridges, units and buildings. 3D and 2D Shadows still choose which objects cast. Needs a Direct3D 9 card." );
 
@@ -2361,6 +2373,12 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 					break;
 				GameWindow *control = (GameWindow *)mData1;
 				Int controlID = control->winGetWindowId();
+
+				if (controlID == comboBoxAntiAliasingID)
+				{
+					updateGameOptionsEnables();
+					break;
+				}
 
 				if (controlID == comboBoxDetailID)
 				{

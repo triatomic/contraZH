@@ -59,6 +59,7 @@
 #include "W3DDevice/GameClient/W3DStatusCircle.h"
 #include "W3DDevice/GameClient/W3DCustomScene.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
+#include "W3DDevice/GameClient/W3DAmbientOcclusion.h"
 #include "WW3D2/camera.h"
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/dx8instancing.h"
@@ -1087,6 +1088,12 @@ void RTS3DScene::Flush(RenderInfoClass & rinfo)
 	//don't draw shadows in this mode because they interfere with destination alpha
 	if (m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE && !m_planarMirrorPass)
 		DoShadows(rinfo, true);	//draw all stencil shadows
+
+	// Water, decals and particles come after, so the occlusion darkens only opaque surfaces.
+	if (TheW3DAmbientOcclusion && m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE && !m_planarMirrorPass)
+	{
+		TheW3DAmbientOcclusion->render(rinfo);
+	}
 
 	WW3D::Render_And_Clear_Static_Sort_Lists(rinfo);	//draws things like water
 

@@ -253,6 +253,8 @@ public:
 	Real m_unitEmissiveIntensity;		///< GameData UnitEmissiveIntensity: brightness of _emi glow masks on vehicles and structures by day, 0 for none
 	Real m_unitEmissiveNightIntensity;	///< GameData UnitEmissiveNightIntensity: the same at night
 	Real m_softParticleDistance;		///< GameData SoftParticleDistance: how far in front of a surface a particle starts to fade, 0 for hard edges
+	Real m_ambientOcclusionRadius;		///< GameData AmbientOcclusionRadius: how far, in world units, geometry darkens what is near it
+	Real m_ambientOcclusionStrength;	///< GameData AmbientOcclusionStrength: how dark the occlusion gets, 0 for none
 	Int  m_textureReductionFactor;	//how much to cut texture resolution: 2 is half, 3 is quarter, etc.
 	Bool m_enableBehindBuildingMarkers;
 	Real m_waterPositionX;
@@ -642,9 +644,11 @@ public:
   Bool m_useSoftParticles;        ///< Options.ini SoftParticles: smoke and fire fade where they meet the ground and buildings
   Bool m_useDynamicLights;        ///< Options.ini DynamicLights: explosions, muzzle flashes and lasers light their surroundings
   Bool m_usePixelLights;          ///< Options.ini PixelLights: those lights are drawn per pixel where the hardware allows
+  Bool m_useAmbientOcclusion;     ///< Options.ini AmbientOcclusion: creases and the ground beneath objects darken where the hardware allows
   Int m_vsync;                    ///< Options.ini VSync: 1 on, 0 off, -1 on in fullscreen and off in a window
   Bool m_specularDebug;           ///< Options.ini SpecularDebug: show what the specular pass covers and its highlight in magenta
   Bool m_normalMapDebug;          ///< Options.ini NormalMapDebug: show only the terrain's bump shading, on grey
+  Bool m_ambientOcclusionDebug;   ///< Options.ini AmbientOcclusionDebug: show only the occlusion, in grey
   Color m_laserGlowColor;         ///< GameData LaserGroundGlowColor: black takes the beam color
   Real m_laserGlowIntensity;      ///< GameData LaserGroundGlowIntensity: how strongly the color is added
 
