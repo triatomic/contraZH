@@ -1,9 +1,4 @@
-// Screen-space ambient occlusion from the scene's INTZ depth, drawn over the opaque scene before
-// water, decals and particles.
-//
-// Without BLUR, estimates how much of the hemisphere above each pixel nearby geometry hides. With
-// BLUR, smooths that estimate along one axis, keeping it from bleeding across depth edges.
-// TEXCOORD0 is the pixel's texel centre in the scene-sized targets.
+// Screen-space ambient occlusion from the INTZ depth; BLUR smooths it along one axis without crossing depth edges.
 
 sampler2D SceneDepth : register(s0);
 

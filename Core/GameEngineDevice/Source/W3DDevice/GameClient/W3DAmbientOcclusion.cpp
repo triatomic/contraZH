@@ -57,6 +57,9 @@ static const Real MAX_RADIUS_UV = 0.1f;
 // The blur stops at depth steps larger than this fraction of the pixel's depth.
 static const Real BLUR_DEPTH_TOLERANCE = 0.1f;
 
+// Disc offsets, two per register, spiralling outwards to crowd near the centre where contact shading is strongest.
+static Vector4 Spiral[SPIRAL_SAMPLES / 2];
+
 W3DAmbientOcclusion::W3DAmbientOcclusion()
 	: m_occlusionShader(0),
 	  m_blurShader(0),
@@ -66,6 +69,19 @@ W3DAmbientOcclusion::W3DAmbientOcclusion()
 	{
 		m_target[i] = nullptr;
 		m_targetSurface[i] = nullptr;
+	}
+
+	for (Int i = 0; i < SPIRAL_SAMPLES / 2; i++)
+	{
+		Real offset[4];
+		for (Int j = 0; j < 2; j++)
+		{
+			const Real along = ((Real)(i * 2 + j) + 0.5f) / (Real)SPIRAL_SAMPLES;
+			const Real angle = along * (Real)SPIRAL_TURNS * 2.0f * PI;
+			offset[j * 2 + 0] = along * cos(angle);
+			offset[j * 2 + 1] = along * sin(angle);
+		}
+		Spiral[i].Set(offset[0], offset[1], offset[2], offset[3]);
 	}
 }
 
@@ -209,15 +225,13 @@ void W3DAmbientOcclusion::drawQuad(const Vector4 &clipToTarget)
 void W3DAmbientOcclusion::render(RenderInfoClass &rinfo)
 {
 #if defined(BUILD_WITH_D3D9)
-	if (AmbientOcclusionMode == 0 || !TheGlobalData->m_useAmbientOcclusion ||
-		TheGlobalData->m_ambientOcclusionRadius <= 0.0f || TheGlobalData->m_ambientOcclusionStrength <= 0.0f)
-	{
-		return;
-	}
-
+	// Switched off or without readable depth, the targets are freed rather than held for nothing.
 	IDirect3DTexture8 *depthTexture = DX8Wrapper::Peek_Scene_Depth_Texture();
-	if (depthTexture == nullptr || !loadShaders())
+	if (AmbientOcclusionMode == 0 || !TheGlobalData->m_useAmbientOcclusion ||
+		TheGlobalData->m_ambientOcclusionRadius <= 0.0f || TheGlobalData->m_ambientOcclusionStrength <= 0.0f ||
+		depthTexture == nullptr || !loadShaders())
 	{
+		releaseTargets();
 		return;
 	}
 
@@ -277,21 +291,6 @@ void W3DAmbientOcclusion::render(RenderInfoClass &rinfo)
 	const Vector4 targetSize(width, height, 0.0f, 0.0f);
 	const Vector4 linearize(p.m[3][2], p.m[3][3], p.m[2][3], p.m[2][2]);
 
-	// Samples spiral outwards, crowding near the centre where contact shading is strongest.
-	Vector4 spiral[SPIRAL_SAMPLES / 2];
-	for (Int i = 0; i < SPIRAL_SAMPLES / 2; i++)
-	{
-		Real offset[4];
-		for (Int j = 0; j < 2; j++)
-		{
-			const Real along = ((Real)(i * 2 + j) + 0.5f) / (Real)SPIRAL_SAMPLES;
-			const Real angle = along * (Real)SPIRAL_TURNS * 2.0f * PI;
-			offset[j * 2 + 0] = along * cos(angle);
-			offset[j * 2 + 1] = along * sin(angle);
-		}
-		spiral[i].Set(offset[0], offset[1], offset[2], offset[3]);
-	}
-
 	// Depth reads stay point sampled; filtering the occlusion would blur it across depth edges.
 	DX8Wrapper::Set_Texture(0, nullptr);
 	DX8Wrapper::Set_Texture(1, nullptr);
@@ -310,11 +309,13 @@ void W3DAmbientOcclusion::render(RenderInfoClass &rinfo)
 
 	DX8Wrapper::Set_Shader(replace);
 	DX8Wrapper::Apply_Render_State_Changes();
-	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, FALSE);
 
 	// The device is read because the wrapper's cache can hold a placeholder after an invalidate.
+	DWORD depthTest = D3DZB_TRUE;
 	DWORD stencil = FALSE;
+	device->GetRenderState(D3DRS_ZENABLE, &depthTest);
 	device->GetRenderState(D3DRS_STENCILENABLE, &stencil);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, FALSE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, FALSE);
 	for (Int stage = 0; stage < 2; stage++)
 	{
@@ -337,7 +338,7 @@ void W3DAmbientOcclusion::render(RenderInfoClass &rinfo)
 		DX8Wrapper::Set_Pixel_Shader_Constant(4, &radiusConstant, 1);
 		DX8Wrapper::Set_Pixel_Shader_Constant(5, &params, 1);
 		DX8Wrapper::Set_Pixel_Shader_Constant(6, &targetSize, 1);
-		DX8Wrapper::Set_Pixel_Shader_Constant(7, spiral, SPIRAL_SAMPLES / 2);
+		DX8Wrapper::Set_Pixel_Shader_Constant(7, Spiral, SPIRAL_SAMPLES / 2);
 		drawQuad(fullMap);
 
 		if (SUCCEEDED(DX8Wrapper::Set_DX8_Render_Target_Surfaces(m_targetSurface[TARGET_BLUR], nullptr)))
@@ -370,7 +371,7 @@ void W3DAmbientOcclusion::render(RenderInfoClass &rinfo)
 	DX8Wrapper::Set_Vertex_Buffer(nullptr);
 	DX8Wrapper::Set_Index_Buffer(nullptr, 0);
 	DX8Wrapper::Set_DX8_Render_Target_Surfaces(sceneTarget, sceneDepth);
-	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, TRUE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, depthTest);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, stencil);
 	sceneTarget->Release();
 	sceneDepth->Release();

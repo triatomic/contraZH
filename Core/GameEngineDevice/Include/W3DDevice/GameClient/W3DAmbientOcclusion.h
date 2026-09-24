@@ -26,8 +26,7 @@
 class RenderInfoClass;
 class Vector4;
 
-// Darkens creases and the ground where objects meet it, from the scene's readable depth. Draws
-// over the opaque scene, before water, decals and particles.
+// Darkens creases and contact points from the scene's readable depth, before water, decals and particles.
 class W3DAmbientOcclusion
 {
 public:
