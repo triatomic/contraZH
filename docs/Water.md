@@ -49,6 +49,19 @@ the swell picture below shows the ripple pattern.
 * `ShaderWaterWaveScale = 160` - (World units one wave pattern covers. Higher gives broader waves.)
 * `ShaderWaterWaveStrength = 0.3` - (Steepness of the waves. Drives glint, reflection and bending.)
 
+## Tiling
+
+The water texture, the ripples and the foam repeat on a fixed grid, which shows as a pattern across
+a large lake or sea. Stochastic texturing hides it. The water is split into hex cells, each cell
+shifts the textures by its own random amount, and every point blends the three nearest cells while
+keeping the textures' contrast. Rivers keep their own texture unshifted, since it carries their
+edges, but their ripples and foam are shifted.
+
+* `ShaderWaterStochasticSize = 100` - (World units between neighbouring cells. Smaller breaks the
+pattern up more but blends more of the surface. 0 turns it off.)
+* `ShaderWaterStochasticSharpness = 3` - (Narrows the blend between cells. 1 blends everywhere and
+softens the textures, higher keeps each cell's texture crisp up to a narrower seam.)
+
 ## Animation
 
 * `WaterAnimationFps = 0` - (Moves the water as if the game ran at this rate, 30 to 60. Without it
@@ -105,6 +118,7 @@ One block. `map.ini` can override any of these keys for its map.
 | `StandingWaterColor` | RGB | `R:255 G:255 B:255` | `0` - `255` each **(hard)** | White tints lakes and rivers by the map's light times the `WaterSet` `DiffuseColor`. Black draws them unlit. Any other colour is used as the tint. |
 | `StandingWaterTexture` | texture | `TWWater01.tga` | - | Surface texture of lakes, seas and rivers. Its `_nrm.dds` and `_hgt.dds` follow its name. |
 | `AdditiveBlending` | Yes/No | `No` | - | `Yes` adds the water onto the scene and keeps the old water, with no shader water. |
+| `NotWater` | Yes/No | `No` | - | `Yes` draws the map's water as the old water, with no shader water, for lava and other liquids that should not reflect, refract or foam. |
 | `RadarWaterColor` | RGB | `R:140 G:140 B:255` | `0` - `255` each **(hard)** | Colour of water on the radar. |
 | `SkyboxTextureN` | texture | `TSMorningN.tga` | - | North face of the skybox, which shader water reflects. Also `SkyboxTextureE`, `S`, `W` and `T` (top), defaulting to `TSMorningE.tga` and so on. |
 | `ShaderWaterOpacity` | number | `0.95` | `0` - `1` | Opacity of deep water. `0` uses `TransparentWaterMinOpacity`. Above `1` over-brightens. |
@@ -114,6 +128,8 @@ One block. `map.ini` can override any of these keys for its map.
 | `ShaderWaterRefraction` | number | `0.015` | `0` - `0.1` | Fraction of the screen the waves bend the seabed by. `0` turns it off. Above `0.05` smears. |
 | `ShaderWaterWaveScale` | number | `160` | `1` **(hard)** - `2000` | World units one ripple pattern covers. Below `50` the ripples shimmer, above `2000` they are too broad to see. |
 | `ShaderWaterWaveStrength` | number | `0.3` | `0` - `2` | Ripple steepness. `0` is flat. Above `2` the surface turns to glitter. |
+| `ShaderWaterStochasticSize` | number | `100` | `0`, or `30` - `1000` | World units between the cells that shift the textures to hide their tiling. `0` turns it off. Below `30` the textures blur, above `1000` the pattern shows within a cell. |
+| `ShaderWaterStochasticSharpness` | number | `3` | `1` **(hard)** - `16` | Narrows the blend between cells. `1` softens the textures, above `16` the cell edges show. |
 | `ShaderWaterFoamDepth` | number | `6` | `0` - `30` | Depth where shore foam fades out. `0` turns foam off. |
 | `ShaderWaterSwellHeight` | number | `3.0` | `0` - `10` | Height of the vertex waves in world units. `0` turns them off. Waves shrink in water shallower than twice this. Above `10` they cut into hulls. |
 | `ShaderWaterSwellScale` | number | `700` | `1` **(hard)** - `3000` | World units one swell pattern covers. Below `200` the swell looks choppy, above `3000` it is too broad to see. |
@@ -169,6 +185,9 @@ mirrored.
 smear into the waves.
 * Effects drawn after the water (smoke, fire, translucent models) are not bent by the waves.
 * `AdditiveBlending = Yes` water keeps the old look.
+* Lava maps should set `NotWater = Yes` in the `WaterTransparency` block of their `map.ini`, so the
+lava keeps the old look instead of reflecting the sky and gathering foam. The next map gets shader
+water back.
 * The `CONTRA_WATER` environment variable picks the water: `0` the old water, `1` shader water
 without vertex waves, `2` with them on each water area's own grid, `3` (the default) on the grids
 around the camera.
