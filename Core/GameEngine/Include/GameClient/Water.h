@@ -151,3 +151,6 @@ EMPTY_DTOR(WaterTransparencySetting)
 extern WaterSetting WaterSettings[ TIME_OF_DAY_COUNT ];
 
 extern OVERRIDE<WaterTransparencySetting> TheWaterTransparency;
+
+/// Parses a water INI file again into the water settings and every map override of them. Throws on bad data.
+void reloadWaterINI( const AsciiString& filename );

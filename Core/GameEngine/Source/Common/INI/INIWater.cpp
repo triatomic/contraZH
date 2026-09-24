@@ -85,9 +85,40 @@ void INI::parseWaterSettingDefinition( INI* ini )
 
 }
 
+// The setting reloadWaterINI is filling, or null outside a reload.
+static WaterTransparencySetting *ReloadTarget = nullptr;
+
+//-------------------------------------------------------------------------------------------------
+void reloadWaterINI( const AsciiString& filename )
+{
+	// Each map override gets the file too, so what was saved is what shows.
+	WaterTransparencySetting *setting = (WaterTransparencySetting*) (TheWaterTransparency.getNonOverloadedPointer());
+	try
+	{
+		for (; setting != nullptr; setting = (WaterTransparencySetting*) (setting->friend_getNextOverride()))
+		{
+			ReloadTarget = setting;
+			INI ini;
+			ini.load( filename, INI_LOAD_MULTIFILE, nullptr );
+		}
+	}
+	catch (...)
+	{
+		ReloadTarget = nullptr;
+		throw;
+	}
+	ReloadTarget = nullptr;
+}
+
 //-------------------------------------------------------------------------------------------------
 void INI::parseWaterTransparencyDefinition( INI *ini )
 {
+	if (ReloadTarget != nullptr && ini->getLoadType() == INI_LOAD_MULTIFILE)
+	{
+		ini->initFromINI( ReloadTarget, ReloadTarget->getFieldParse() );
+		return;
+	}
+
 	if (TheWaterTransparency == nullptr) {
 		TheWaterTransparency = newInstance(WaterTransparencySetting);
 	} else if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES) {

@@ -54,6 +54,7 @@
 #include "Common/PerfTimer.h"
 #include "Common/Xfer.h"
 #include "Common/GameLOD.h"
+#include "Common/LocalFileSystem.h"
 
 #include "GameClient/Color.h"
 #include "GameClient/Water.h"
@@ -1850,6 +1851,8 @@ WaterRenderObjClass::WaterRenderObjClass()
 	m_shaderWaterSwellActive=FALSE;
 	m_swellTexture=nullptr;
 	m_swellSource=nullptr;
+	m_iniTimestamp=0;
+	m_iniCheckTime=0;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2770,10 +2773,65 @@ void WaterRenderObjClass::enableWaterGrid(Bool state)
 }
 
 // ------------------------------------------------------------------------------------------------
+// Tuning the water means seeing each change, so cheat builds reload Water.ini when it is saved.
+// ------------------------------------------------------------------------------------------------
+void WaterRenderObjClass::reloadEditedIni()
+{
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	const UnsignedInt now = timeGetTime();
+	if (now - m_iniCheckTime < 500)
+	{
+		return;
+	}
+	m_iniCheckTime = now;
+
+	const AsciiString fileName("Data\\INI\\Water.ini");
+	FileInfo info;
+	if (TheLocalFileSystem == nullptr || !TheLocalFileSystem->getFileInfo(fileName, &info))
+	{
+		return;
+	}
+	const Int64 timestamp = info.timestamp();
+	const Bool firstLook = (m_iniTimestamp == 0);
+	if (timestamp == m_iniTimestamp)
+	{
+		return;
+	}
+	m_iniTimestamp = timestamp;
+	if (firstLook)
+	{
+		return;
+	}
+
+	// A half-saved or mistyped file keeps the current water until the next save.
+	try
+	{
+		reloadWaterINI(fileName);
+	}
+	catch (...)
+	{
+		DEBUG_LOG(("Water.ini could not be reloaded, keeping the current water"));
+		return;
+	}
+
+	for (Int i=TIME_OF_DAY_FIRST; i<TIME_OF_DAY_COUNT; i++)
+	{
+		REF_PTR_RELEASE(m_settings[i].skyTexture);
+		REF_PTR_RELEASE(m_settings[i].waterTexture);
+		loadSetting(&m_settings[i], (TimeOfDay)i);
+	}
+	updateMapOverrides();
+	DEBUG_LOG(("Water.ini reloaded"));
+#endif
+}
+
+// ------------------------------------------------------------------------------------------------
 /** Update phase for water if we need it. */
 // ------------------------------------------------------------------------------------------------
 void WaterRenderObjClass::update()
 {
+	reloadEditedIni();
+
 	// TheSuperHackers @tweak The water movement time step is now decoupled from the render update.
 	const Real timeScale = TheFramePacer->getActualLogicTimeScaleOverFpsRatio();
 

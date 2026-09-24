@@ -243,6 +243,7 @@ protected:
 	void drawRiverWater(PolygonTrigger *pTrig);
 	void drawTrapezoidWater(Vector3 points[4]);
 	void loadSetting ( Setting *skySetting, TimeOfDay timeOfDay );	///<init sky/water settings from GDF
+	void reloadEditedIni();	///< picks up Water.ini saved while the game runs, in cheat builds
 	void renderSky();	///<draw the sky layer (clouds, stars, etc.)
 	void testCurvedWater();	///<draw the sky layer (clouds, stars, etc.)
 	void renderSkyBody(Matrix3D *mat);	///<draw the sky body (sun, moon, etc.)
@@ -291,6 +292,8 @@ protected:
 	const WorldHeightMap *m_waterMaskMap;
 	Bool m_drawingRadial;				///< the standing water being drawn is the polar grid
 	Real m_radialPlaneZ;
+	Int64 m_iniTimestamp;				///< Water.ini's last write time, 0 until first seen
+	UnsignedInt m_iniCheckTime;			///< when Water.ini was last looked at, in ms
 
 	Bool useShaderWater() const;
 	Bool isWaterVisible(PolygonTrigger *pTrig) const;
