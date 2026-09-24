@@ -789,6 +789,7 @@ GlobalData::GlobalData()
   m_useSoftParticles = TRUE;
   m_useDynamicLights = TRUE;
   m_usePixelLights = TRUE;
+  m_vsync = -1;
   m_specularDebug = FALSE;
   m_normalMapDebug = FALSE;
   m_laserGlowColor = 0;
@@ -1630,6 +1631,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_useSoftParticles = optionPref.getSoftParticlesEnabled();
 	TheWritableGlobalData->m_useDynamicLights = optionPref.getDynamicLightsEnabled();
 	TheWritableGlobalData->m_usePixelLights = optionPref.getPixelLightsEnabled();
+	TheWritableGlobalData->m_vsync = optionPref.getVSyncMode();
 	TheWritableGlobalData->m_specularDebug = optionPref.getSpecularDebugEnabled();
 	TheWritableGlobalData->m_normalMapDebug = optionPref.getNormalMapDebugEnabled();
 	TheWritableGlobalData->m_borderlessWindow = optionPref.getBorderlessWindowEnabled();

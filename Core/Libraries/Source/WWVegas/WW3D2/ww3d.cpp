@@ -1238,6 +1238,16 @@ long WW3D::Get_Ext_Swap_Interval()
 	return DX8Wrapper::Get_Swap_Interval();
 }
 
+void WW3D::Set_VSync_Mode(int mode)
+{
+	DX8Wrapper::Set_VSync_Mode(mode);
+}
+
+bool WW3D::Is_VSync_On()
+{
+	return DX8Wrapper::Is_VSync_On();
+}
+
 
 /***********************************************************************************************
  * WW3D::Set_Collision_Box_Display_Mask -- control rendering of collision boxes                *

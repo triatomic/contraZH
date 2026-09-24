@@ -447,6 +447,15 @@ Bool OptionPreferences::getPixelLightsEnabled(void) const
 	return getBool("PixelLights", TRUE);
 }
 
+Int OptionPreferences::getVSyncMode(void) const
+{
+	if (find("VSync") == end())
+	{
+		return -1;
+	}
+	return getBool("VSync", FALSE) ? 1 : 0;
+}
+
 Bool OptionPreferences::getSpecularDebugEnabled(void) const
 {
 	return getBool("SpecularDebug", FALSE);

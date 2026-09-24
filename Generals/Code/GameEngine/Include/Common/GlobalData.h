@@ -512,6 +512,7 @@ public:
   Bool m_useDynamicLights;        ///< Options.ini DynamicLights: explosions, muzzle flashes and lasers light their surroundings
   Bool m_useSoftParticles;        ///< Options.ini SoftParticles: smoke and fire fade where they meet the ground and buildings
   Real m_softParticleDistance;    ///< how far in front of a surface a particle starts to fade, 0 for hard edges
+  Int m_vsync;                    ///< Options.ini VSync: 1 on, 0 off, -1 on in fullscreen and off in a window
   Int m_alliedDecalMode;          ///< Options.ini AlliedDecalMode: how allied power decals are drawn
   Color m_laserGlowColor;         ///< GameData LaserGroundGlowColor: black takes the beam color
   Real m_laserGlowIntensity;      ///< GameData LaserGroundGlowIntensity: how strongly the color is added

@@ -118,6 +118,7 @@ int								DX8Wrapper::ResolutionHeight							= DEFAULT_RESOLUTION_HEIGHT;
 int								DX8Wrapper::BitDepth										= DEFAULT_BIT_DEPTH;
 int								DX8Wrapper::TextureBitDepth							= DEFAULT_TEXTURE_BIT_DEPTH;
 bool								DX8Wrapper::IsWindowed									= false;
+int								DX8Wrapper::VSyncMode									= -1;
 D3DFORMAT					DX8Wrapper::DisplayFormat	= D3DFMT_UNKNOWN;
 D3DMULTISAMPLE_TYPE DX8Wrapper::MultiSampleAntiAliasing	= DEFAULT_MSAA;
 
@@ -1130,13 +1131,7 @@ bool DX8Wrapper::Set_Render_Device(int dev, int width, int height, int bits, int
 	_PresentParameters.EnableAutoDepthStencil = TRUE;				// Driver will attempt to match Z-buffer depth
 	_PresentParameters.Flags=0;											// We're not going to lock the backbuffer
 
-	_PresentParameters.FullScreen_PresentationInterval = D3DPRESENT_INTERVAL_DEFAULT;
-#if defined(BUILD_WITH_D3D9)
-	// D3D8 presented windowed frames without waiting; D3D9 waits for vsync on DEFAULT
-	if (IsWindowed) {
-		_PresentParameters.FullScreen_PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;
-	}
-#endif
+	_PresentParameters.FullScreen_PresentationInterval = Choose_Present_Interval();
 	_PresentParameters.FullScreen_RefreshRateInHz = D3DPRESENT_RATE_DEFAULT;
 
 	/*
@@ -1357,6 +1352,35 @@ void DX8Wrapper::Set_Swap_Interval(int swap)
 int DX8Wrapper::Get_Swap_Interval()
 {
 	return _PresentParameters.FullScreen_PresentationInterval;
+}
+
+UINT DX8Wrapper::Choose_Present_Interval()
+{
+	if (VSyncMode >= 0)
+	{
+		return VSyncMode ? D3DPRESENT_INTERVAL_ONE : D3DPRESENT_INTERVAL_IMMEDIATE;
+	}
+#if defined(BUILD_WITH_D3D9)
+	// D3D8 presented windowed frames without waiting; D3D9 waits for vsync on DEFAULT
+	if (IsWindowed)
+	{
+		return D3DPRESENT_INTERVAL_IMMEDIATE;
+	}
+#endif
+	return D3DPRESENT_INTERVAL_DEFAULT;
+}
+
+void DX8Wrapper::Set_VSync_Mode(int mode)
+{
+	VSyncMode = mode;
+	const UINT interval = Choose_Present_Interval();
+	if (D3DDevice == nullptr || interval == _PresentParameters.FullScreen_PresentationInterval)
+	{
+		return;
+	}
+	_PresentParameters.FullScreen_PresentationInterval = interval;
+	WWDEBUG_SAY(("DX8Wrapper::Set_VSync_Mode is resetting the device."));
+	Reset_Device();
 }
 
 bool DX8Wrapper::Has_Stencil()

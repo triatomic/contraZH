@@ -474,6 +474,13 @@ Notes:
 * Terrain and tree textures ignore the texture reduction setting.
 * The `CONTRA_D3D9EX` environment variable set to `0` returns to a plain Direct3D 9 device.
 
+### Vertical sync
+
+* `VSync = Yes` - (Waits for the monitor's refresh before showing each frame, which stops tearing.
+No shows frames as soon as they are drawn. Without the key, vsync is on in fullscreen and off in a
+window, as before. Also `Vertical sync` in the advanced display options, applied on Accept. Needs
+`CheckVSync` in `OptionsMenu.wnd` for the menu control.)
+
 ### Faster translucent effects
 
 Additive effects such as fire, glows, lasers and muzzle flashes skip depth sorting and draw in

@@ -642,6 +642,7 @@ public:
   Bool m_useSoftParticles;        ///< Options.ini SoftParticles: smoke and fire fade where they meet the ground and buildings
   Bool m_useDynamicLights;        ///< Options.ini DynamicLights: explosions, muzzle flashes and lasers light their surroundings
   Bool m_usePixelLights;          ///< Options.ini PixelLights: those lights are drawn per pixel where the hardware allows
+  Int m_vsync;                    ///< Options.ini VSync: 1 on, 0 off, -1 on in fullscreen and off in a window
   Bool m_specularDebug;           ///< Options.ini SpecularDebug: show what the specular pass covers and its highlight in magenta
   Bool m_normalMapDebug;          ///< Options.ini NormalMapDebug: show only the terrain's bump shading, on grey
   Color m_laserGlowColor;         ///< GameData LaserGroundGlowColor: black takes the beam color

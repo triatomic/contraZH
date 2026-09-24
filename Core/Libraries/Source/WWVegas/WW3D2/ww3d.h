@@ -223,6 +223,9 @@ public:
 	*/
 	static void             Set_Ext_Swap_Interval(long swap);
    static long             Get_Ext_Swap_Interval();
+	// -1 keeps vsync on in fullscreen and off in a window, 0 turns it off, 1 on
+	static void					Set_VSync_Mode(int mode);
+	static bool					Is_VSync_On();
 
 	/*
 	** Texture Reduction - all currently loaded textures can be de-resed on the fly

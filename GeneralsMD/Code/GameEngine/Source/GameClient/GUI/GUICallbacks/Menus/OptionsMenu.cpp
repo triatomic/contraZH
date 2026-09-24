@@ -227,6 +227,7 @@ static NameKeyType    checkDynamicLightsID        = NAMEKEY_INVALID;
 static GameWindow *   checkDynamicLights          = nullptr;
 static GameWindow *   checkPixelLights            = nullptr;
 static GameWindow *   checkSoftParticles          = nullptr;
+static GameWindow *   checkVSync                  = nullptr;
 
 // Options.ini spellings, indexed by the matching enum and combo box position
 static const char *const HealthBarModeNames[] = { "Classic", "Damaged", "Always" };
@@ -725,6 +726,8 @@ static void setDefaults()
 		//
 		GadgetCheckBoxSetChecked( checkHeatEffects, TheGlobalData->m_useHeatEffects);
 
+		setCheck( checkVSync, WW3D::Is_VSync_On() );
+
 		//-------------------------------------------------------------------------------------------------
  		// Building Occlusion checkbox
 		//
@@ -817,6 +820,14 @@ static void saveOptions()
 
 		TheWritableGlobalData->m_useHeatEffects = GadgetCheckBoxIsChecked( checkHeatEffects );
 		(*pref)["HeatEffects"] = TheGlobalData->m_useHeatEffects ? "yes" : "no";
+
+		// Written only once changed, so an untouched Options.ini keeps vsync on in fullscreen and off in a window.
+		if (checkVSync != nullptr && GadgetCheckBoxIsChecked( checkVSync ) != (Bool)WW3D::Is_VSync_On())
+		{
+			TheWritableGlobalData->m_vsync = GadgetCheckBoxIsChecked( checkVSync ) ? 1 : 0;
+			(*pref)["VSync"] = TheGlobalData->m_vsync ? "yes" : "no";
+			WW3D::Set_VSync_Mode( TheGlobalData->m_vsync );
+		}
 
 		// Never write this out
 		//TheWritableGlobalData->m_useFpsLimit = !GadgetCheckBoxIsChecked( checkUnlockFps );
@@ -1564,6 +1575,7 @@ static void initGameOptionsWindows()
 	checkDynamicLights = findOptionsWindow( "OptionsMenu.wnd:CheckDynamicLights", checkDynamicLightsID );
 	checkPixelLights = findOptionsWindow( "OptionsMenu.wnd:CheckPixelLights" );
 	checkSoftParticles = findOptionsWindow( "OptionsMenu.wnd:CheckSoftParticles" );
+	checkVSync = findOptionsWindow( "OptionsMenu.wnd:CheckVSync" );
 
 	if (ButtonGameOptions)
 	{
@@ -1615,6 +1627,7 @@ static void initGameOptionsWindows()
 	setCheckText( checkWaterReflections, "GUI:WaterReflections", L"Water reflections", "TOOLTIP:WaterReflections", L"Lakes and seas mirror the cliffs, trees, units and buildings around them. Needs Smooth water and a Direct3D 9 card." );
 	setCheckText( checkDynamicLights, "GUI:DynamicLights", L"Dynamic lights", "TOOLTIP:DynamicLights", L"Explosions, muzzle flashes and lasers light the ground, units and buildings around them." );
 	setCheckText( checkPixelLights, "GUI:PixelLights", L"Per-pixel lights", "TOOLTIP:PixelLights", L"Dynamic lights fall in smooth circles that follow the ground's detail, instead of blocky patches. Needs a Direct3D 9 card with Shader Model 2.0a or later." );
+	setCheckText( checkVSync, "GUI:VSync", L"Vertical sync", "TOOLTIP:VSync", L"Waits for the monitor's refresh before showing each frame, which stops tearing but can add a little input delay." );
 	setCheckText( checkSoftParticles, "GUI:SoftParticles", L"Soft particles", "TOOLTIP:SoftParticles", L"Smoke, dust and fire fade where they meet the ground and buildings, instead of cutting a hard line. Needs a Direct3D 9 card." );
 	setCheckText( checkShadowMap, "GUI:ShadowMap", L"Shadow mapping", "TOOLTIP:ShadowMap", L"Soft shadows shaped like their objects, falling on ground, bridges, units and buildings. 3D and 2D Shadows still choose which objects cast. Needs a Direct3D 9 card." );
 
@@ -2040,6 +2053,8 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 	GadgetCheckBoxSetChecked( checkNoDynamicLod, !TheGlobalData->m_enableDynamicLOD);
 
 	GadgetCheckBoxSetChecked( checkHeatEffects, TheGlobalData->m_useHeatEffects);
+
+	setCheck( checkVSync, WW3D::Is_VSync_On() );
 
 	GadgetCheckBoxSetChecked( checkUnlockFps, !TheGlobalData->m_useFpsLimit);
 

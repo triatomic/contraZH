@@ -692,6 +692,9 @@ protected:
 
 	static void	Set_Swap_Interval(int swap);
 	static int	Get_Swap_Interval();
+	// -1 keeps vsync on in fullscreen and off in a window, 0 turns it off, 1 on. A change resets a live device.
+	static void	Set_VSync_Mode(int mode);
+	static bool	Is_VSync_On() { return Choose_Present_Interval() != D3DPRESENT_INTERVAL_IMMEDIATE; }
 	static void Set_Polygon_Mode(int mode);
 
 	/*
@@ -727,6 +730,8 @@ protected:
 	static int								BitDepth;
 	static int								TextureBitDepth;
 	static bool								IsWindowed;
+	static int								VSyncMode;
+	static UINT Choose_Present_Interval();
 	static D3DFORMAT					DisplayFormat;
 	static D3DMULTISAMPLE_TYPE	MultiSampleAntiAliasing;
 
