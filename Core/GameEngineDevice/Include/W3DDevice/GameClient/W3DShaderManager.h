@@ -93,6 +93,8 @@ public:
 	static void resetShader(ShaderTypes shader);	///<make sure W3D2 gets restored to normal
 	/// The shader texture slot the terrain's normal atlas goes in.
 	enum { TERRAIN_NORMAL_TEXTURE = 4 };
+	/// ST_SHADOW_MULTIPLY pass that also multiplies in the cloud map, for receivers without their own clouds.
+	enum { SHADOW_MULTIPLY_PASS_CLOUDS = 1 };
 	///Specify all textures (up to 8) which can be accessed by the shaders.
 	static void setTexture(Int stage,TextureClass* texture) {m_Textures[stage]=texture;}
 	///Return current texture available to shaders.

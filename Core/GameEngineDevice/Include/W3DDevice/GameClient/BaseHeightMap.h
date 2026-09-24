@@ -185,6 +185,7 @@ public:
 	void removeTerrainBibHighlighting();
 
 	W3DShroud *getShroud()	{return m_shroud;}
+	TextureClass *getCloudTexture() const;	///< null until the tree buffer creates it, and when clouds are off
 	void updateShorelineTiles(Int minX, Int minY, Int maxX, Int maxY, WorldHeightMap *pMap);	///<figure out which tiles on this map cross water plane
 	void updateShorelineTile(Int X, Int Y, Int Border, WorldHeightMap *pMap);	///<figure out which tiles on this map cross water plane
 	void recordShoreLineSortInfos();

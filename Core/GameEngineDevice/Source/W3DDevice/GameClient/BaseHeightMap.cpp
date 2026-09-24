@@ -2966,3 +2966,9 @@ Bool BaseHeightMapRenderObjClass::useCloud()
 {
 	return TheGlobalData->m_useCloudMap && TheGlobalData->m_timeOfDay != TIME_OF_DAY_NIGHT;
 }
+
+//=============================================================================
+TextureClass *BaseHeightMapRenderObjClass::getCloudTexture() const
+{
+	return useCloud() ? m_stageTwoTexture : nullptr;
+}

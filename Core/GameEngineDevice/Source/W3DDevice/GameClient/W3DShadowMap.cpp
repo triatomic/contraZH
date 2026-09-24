@@ -552,7 +552,7 @@ MaterialPassClass* W3DShadowMap::getReceivePass()
 
 void W3DShadowReceiveMaterialPassClass::Install_Materials() const
 {
-	W3DShaderManager::setShader(W3DShaderManager::ST_SHADOW_MULTIPLY, 0);
+	W3DShaderManager::setShader(W3DShaderManager::ST_SHADOW_MULTIPLY, W3DShaderManager::SHADOW_MULTIPLY_PASS_CLOUDS);
 }
 
 void W3DShadowReceiveMaterialPassClass::UnInstall_Materials() const

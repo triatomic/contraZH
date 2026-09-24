@@ -1728,11 +1728,21 @@ Int ShadowDepthShader::shutdown()
 	return TRUE;
 }
 
+// CONTRA_UNITCLOUDS=0 keeps cloud shadows off objects without a rebuild.
+static Bool Get_Unit_Clouds_Enabled()
+{
+	const char *value = getenv("CONTRA_UNITCLOUDS");
+	return (value != nullptr) ? atoi(value) != 0 : TRUE;
+}
+
+static Bool bindCloudReceiver(Int stage);
+static void unbindCloudReceiver(Int stage);
+
 ///Multiplies the shadow map into geometry that has already drawn, for fixed-function receivers.
 class ShadowMultiplyShader : public W3DShaderInterface
 {
 public:
-	ShadowMultiplyShader() : m_dwPixelShader(0) {}
+	ShadowMultiplyShader() : m_dwPixelShader(0), m_dwCloudPixelShader(0), m_cloudBound(FALSE) {}
 
 	virtual Int set(Int pass) override;
 	virtual Int init() override;
@@ -1742,6 +1752,8 @@ public:
 protected:
 
 	DWORD m_dwPixelShader;
+	DWORD m_dwCloudPixelShader;
+	Bool m_cloudBound;
 } shadowMultiplyShader;
 
 W3DShaderInterface *ShadowMultiplyShaderList[]=
@@ -1757,12 +1769,20 @@ Int ShadowMultiplyShader::init()
 		return FALSE;
 	}
 
-	const char *file = (TheW3DShadowMap->getDepthMode() == W3DShadowMap::DEPTH_MODE_PACKED)
-		? "shaders\\shadowmultiplypacked.pso" : "shaders\\shadowmultiply.pso";
+	const Bool packed = (TheW3DShadowMap->getDepthMode() == W3DShadowMap::DEPTH_MODE_PACKED);
+	const char *file = packed ? "shaders\\shadowmultiplypacked.pso" : "shaders\\shadowmultiply.pso";
 
 	if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(file, nullptr, 0, false, &m_dwPixelShader)))
 	{
 		return FALSE;
+	}
+
+	// Without the cloud variant, receivers fall back to the shadow alone.
+	const char *cloudFile = packed ? "shaders\\shadowmultiplycloudpacked.pso" : "shaders\\shadowmultiplycloud.pso";
+	if (!Get_Unit_Clouds_Enabled() ||
+		FAILED(W3DShaderManager::LoadAndCreateD3DShader(cloudFile, nullptr, 0, false, &m_dwCloudPixelShader)))
+	{
+		m_dwCloudPixelShader = 0;
 	}
 
 	W3DShaders[W3DShaderManager::ST_SHADOW_MULTIPLY]=&shadowMultiplyShader;
@@ -1792,7 +1812,10 @@ Int ShadowMultiplyShader::set(Int pass)
 	// Fog would pull the factor toward the fog colour and tint the shadow.
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_FOGENABLE, FALSE);
 
-	DX8Wrapper::Set_Pixel_Shader(m_dwPixelShader);
+	m_cloudBound = pass == W3DShaderManager::SHADOW_MULTIPLY_PASS_CLOUDS && m_dwCloudPixelShader != 0 &&
+		bindCloudReceiver(1);
+
+	DX8Wrapper::Set_Pixel_Shader(m_cloudBound ? m_dwCloudPixelShader : m_dwPixelShader);
 
 	return TRUE;
 }
@@ -1806,6 +1829,12 @@ void ShadowMultiplyShader::reset()
 		TheW3DShadowMap->unbindReceiver(0);
 	}
 
+	if (m_cloudBound)
+	{
+		unbindCloudReceiver(1);
+		m_cloudBound = FALSE;
+	}
+
 	// Z, blend and fog are ShaderClass state, so the next shader set restores them in full.
 	ShaderClass::Invalidate();
 }
@@ -1817,9 +1846,11 @@ Int ShadowMultiplyShader::shutdown()
 	if (device != nullptr)
 	{
 		DX8_DELETE_PIXEL_SHADER(device, m_dwPixelShader);
+		DX8_DELETE_PIXEL_SHADER(device, m_dwCloudPixelShader);
 	}
 
 	m_dwPixelShader = 0;
+	m_dwCloudPixelShader = 0;
 
 	W3DShaders[W3DShaderManager::ST_SHADOW_MULTIPLY]=nullptr;
 	W3DShadersPassCount[W3DShaderManager::ST_SHADOW_MULTIPLY]=0;
@@ -3147,6 +3178,50 @@ void CloudTextureShader::reset()
 
 	DX8Wrapper::Set_DX8_Texture_Stage_State( m_stageOfSet, D3DTSS_COLOROP,   D3DTOP_DISABLE );
 	DX8Wrapper::Set_DX8_Texture_Stage_State( m_stageOfSet, D3DTSS_ALPHAOP,   D3DTOP_DISABLE );
+}
+
+// Projects the terrain's cloud map onto a pixel shader receiver, the way the terrain samples it.
+static Bool bindCloudReceiver(Int stage)
+{
+	TextureClass *cloudTexture = (TheTerrainRenderObject != nullptr) ? TheTerrainRenderObject->getCloudTexture() : nullptr;
+	if (cloudTexture == nullptr)
+	{
+		return FALSE;
+	}
+
+	// Applied through the wrapper before the sampler state, as bindWorldReceiver explains.
+	DX8Wrapper::Set_Texture(stage, nullptr);
+	DX8Wrapper::Set_Texture(stage, cloudTexture);
+	DX8Wrapper::Apply_Render_State_Changes();
+
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
+
+	// The wrapper's view copy is zeroed by every invalidate, so the device's is read.
+	D3DMATRIX view;
+	DX8Wrapper::_Get_D3D_Device8()->GetTransform(D3DTS_VIEW, &view);
+
+	D3DMATRIX inverseView;
+	float det;
+	Invert_D3DMATRIX(inverseView, &det, view);
+
+	D3DMATRIX textureTransform;
+	terrainShader2Stage.updateNoise1(&textureTransform, &inverseView, false);
+
+	DX8Wrapper::_Set_DX8_Transform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + stage), textureTransform);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT2);
+
+	return TRUE;
+}
+
+static void unbindCloudReceiver(Int stage)
+{
+	DX8Wrapper::Set_Texture(stage, nullptr);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_PASSTHRU | stage);
 }
 
 /*===========================================================================================*/
