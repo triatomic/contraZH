@@ -15,6 +15,7 @@ Changes specific to this fork are on [contraZH Changes](contraZH-Changes.md).
 ## This fork
 
 * [contraZH Changes](contraZH-Changes.md) - Options.ini settings, new command buttons, debug overlays and cheat hotkeys
+* [Direct3D 9 Features](dx9feat.md) - shadow mapping, specular, normal and glow maps, per-pixel lights, soft particles, shockwaves
 * [Water](Water.md) - shader water options, `Water.ini` parameters and textures
 
 ## Upstream reference
