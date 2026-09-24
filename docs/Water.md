@@ -60,7 +60,8 @@ speed. 0 moves the water every frame.)
 ![Swell and ripples](images/water-swell.svg)
 
 * `ShaderWaterSwellHeight = 3.0` - (Height of the vertex waves that lift lakes and seas, in world
-units. 0 turns them off. Needs a shader model 3 card.)
+units. 0 turns them off. Needs a shader model 3 card. The waves reach full height in water twice
+this deep and flatten towards the shore, so their troughs never sink below the seabed.)
 * `ShaderWaterSwellScale = 700` - (World units one swell pattern covers. Higher gives longer swells.)
 * `ShaderWaterSwellSpeed = 30` - (World units a second the swell drifts. 0 holds it still.)
 
@@ -114,7 +115,7 @@ One block. `map.ini` can override any of these keys for its map.
 | `ShaderWaterWaveScale` | number | `160` | `1` **(hard)** - `2000` | World units one ripple pattern covers. Below `50` the ripples shimmer, above `2000` they are too broad to see. |
 | `ShaderWaterWaveStrength` | number | `0.3` | `0` - `2` | Ripple steepness. `0` is flat. Above `2` the surface turns to glitter. |
 | `ShaderWaterFoamDepth` | number | `6` | `0` - `30` | Depth where shore foam fades out. `0` turns foam off. |
-| `ShaderWaterSwellHeight` | number | `3.0` | `0` - `10` | Height of the vertex waves in world units. `0` turns them off. Above `10` the waves cut into shores and hulls. |
+| `ShaderWaterSwellHeight` | number | `3.0` | `0` - `10` | Height of the vertex waves in world units. `0` turns them off. Waves shrink in water shallower than twice this. Above `10` they cut into hulls. |
 | `ShaderWaterSwellScale` | number | `700` | `1` **(hard)** - `3000` | World units one swell pattern covers. Below `200` the swell looks choppy, above `3000` it is too broad to see. |
 | `ShaderWaterSwellSpeed` | number | `30` | `-200` - `200` | World units a second the swell drifts. `0` holds it still. Negative reverses it. |
 | `ShaderWaterPlanarStrength` | number | `0.3` | `0` - `1` | Reflection the mirrored scene adds on top of the sky's. The 80% cap applies to the sum. |
