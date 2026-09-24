@@ -2003,11 +2003,13 @@ void DX8Wrapper::Clear(bool clear_color, bool clear_z_stencil, const Vector3 &co
 	{
 		D3DSURFACE_DESC desc;
 		depthbuffer->GetDesc(&desc);
+		// INTZ, the readable scene depth, carries eight stencil bits like D24S8.
 		has_stencil=
 		(
 			desc.Format==D3DFMT_D15S1 ||
 			desc.Format==D3DFMT_D24S8 ||
-			desc.Format==D3DFMT_D24X4S4
+			desc.Format==D3DFMT_D24X4S4 ||
+			desc.Format==(D3DFORMAT)MAKEFOURCC('I','N','T','Z')
 		);
 
 		// release ref
