@@ -62,14 +62,16 @@ speed. 0 moves the water every frame.)
 * `ShaderWaterSwellHeight = 3.0` - (Height of the vertex waves that lift lakes and seas, in world
 units. 0 turns them off. Needs a shader model 3 card.)
 * `ShaderWaterSwellScale = 700` - (World units one swell pattern covers. Higher gives longer swells.)
+* `ShaderWaterSwellSpeed = 30` - (World units a second the swell drifts. 0 holds it still.)
 
-The swell rides a round grid centred under the camera, fine close by and coarser towards the
-horizon, so it stays smooth at any zoom. The grid covers every flat lake and sea at a level, cut to
-their outlines per map cell and one cell wider, so the cut falls on dry land and the shore fades
-as drawn. Standing water whose points differ in height by more than a unit keeps
-its own grid, and rivers stay flat.
+The swell rides nested square grids centred under the camera, each with cells twice the size of
+the one inside it, so it is fine close by and coarser towards the horizon. Each grid snaps to its
+own world lattice, so moving the camera never makes the waves shift or shimmer. The grids cover
+every flat lake and sea at a level, cut to their outlines per map cell and one cell wider, so the
+cut falls on dry land and the shore fades as drawn. Standing water whose points differ in height by
+more than a unit keeps its own grid, and rivers stay flat.
 
-![Radial grid, seen from above](images/water-grid.svg)
+![Swell grid, seen from above](images/water-grid.svg)
 
 ## Reflection
 
@@ -111,5 +113,5 @@ smear into the waves.
 * Effects drawn after the water (smoke, fire, translucent models) are not bent by the waves.
 * `AdditiveBlending = Yes` water keeps the old look.
 * The `CONTRA_WATER` environment variable picks the water: `0` the old water, `1` shader water
-without vertex waves, `2` with them on each water area's own grid, `3` (the default) on the round
-grid.
+without vertex waves, `2` with them on each water area's own grid, `3` (the default) on the grids
+around the camera.

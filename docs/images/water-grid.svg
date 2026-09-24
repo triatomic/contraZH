@@ -1,17 +1,145 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="740" height="425" viewBox="0 0 740 425">
 <rect width="100%" height="100%" fill="#ffffff"/>
-<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker></defs>
-<clipPath id="lakes"><path d="M120,120 C200,70 330,90 380,150 C430,210 400,300 320,330 C230,360 130,330 110,260 C95,200 90,150 120,120 Z"/><path d="M470,110 C540,80 640,110 650,180 C660,250 590,290 520,270 C460,250 440,150 470,110 Z"/></clipPath>
+<clipPath id="area"><rect x="0" y="45.0" width="740" height="310.0"/></clipPath>
 <path d="M120,120 C200,70 330,90 380,150 C430,210 400,300 320,330 C230,360 130,330 110,260 C95,200 90,150 120,120 Z" fill="#3a7bd5" fill-opacity="0.18"/>
 <path d="M470,110 C540,80 640,110 650,180 C660,250 590,290 520,270 C460,250 440,150 470,110 Z" fill="#3a7bd5" fill-opacity="0.08" stroke="#555" stroke-dasharray="5 4"/>
-<g stroke="#bbb" stroke-width="0.6"><circle cx="180" cy="250" r="6.0" fill="none"/><circle cx="180" cy="250" r="7.2" fill="none"/><circle cx="180" cy="250" r="8.6" fill="none"/><circle cx="180" cy="250" r="10.3" fill="none"/><circle cx="180" cy="250" r="12.3" fill="none"/><circle cx="180" cy="250" r="14.7" fill="none"/><circle cx="180" cy="250" r="17.6" fill="none"/><circle cx="180" cy="250" r="21.0" fill="none"/><circle cx="180" cy="250" r="25.2" fill="none"/><circle cx="180" cy="250" r="30.1" fill="none"/><circle cx="180" cy="250" r="36.0" fill="none"/><circle cx="180" cy="250" r="43.1" fill="none"/><circle cx="180" cy="250" r="51.6" fill="none"/><circle cx="180" cy="250" r="61.7" fill="none"/><circle cx="180" cy="250" r="73.8" fill="none"/><circle cx="180" cy="250" r="88.3" fill="none"/><circle cx="180" cy="250" r="105.7" fill="none"/><circle cx="180" cy="250" r="126.4" fill="none"/><circle cx="180" cy="250" r="151.2" fill="none"/><circle cx="180" cy="250" r="180.9" fill="none"/><circle cx="180" cy="250" r="216.4" fill="none"/><circle cx="180" cy="250" r="258.9" fill="none"/><circle cx="180" cy="250" r="309.8" fill="none"/><circle cx="180" cy="250" r="370.6" fill="none"/><circle cx="180" cy="250" r="443.3" fill="none"/><circle cx="180" cy="250" r="530.4" fill="none"/><circle cx="180" cy="250" r="634.5" fill="none"/><line x1="180" y1="250" x2="880.0" y2="250.0"/><line x1="180" y1="250" x2="866.5" y2="386.6"/><line x1="180" y1="250" x2="826.7" y2="517.9"/><line x1="180" y1="250" x2="762.0" y2="638.9"/><line x1="180" y1="250" x2="675.0" y2="745.0"/><line x1="180" y1="250" x2="568.9" y2="832.0"/><line x1="180" y1="250" x2="447.9" y2="896.7"/><line x1="180" y1="250" x2="316.6" y2="936.5"/><line x1="180" y1="250" x2="180.0" y2="950.0"/><line x1="180" y1="250" x2="43.4" y2="936.5"/><line x1="180" y1="250" x2="-87.9" y2="896.7"/><line x1="180" y1="250" x2="-208.9" y2="832.0"/><line x1="180" y1="250" x2="-315.0" y2="745.0"/><line x1="180" y1="250" x2="-402.0" y2="638.9"/><line x1="180" y1="250" x2="-466.7" y2="517.9"/><line x1="180" y1="250" x2="-506.5" y2="386.6"/><line x1="180" y1="250" x2="-520.0" y2="250.0"/><line x1="180" y1="250" x2="-506.5" y2="113.4"/><line x1="180" y1="250" x2="-466.7" y2="-17.9"/><line x1="180" y1="250" x2="-402.0" y2="-138.9"/><line x1="180" y1="250" x2="-315.0" y2="-245.0"/><line x1="180" y1="250" x2="-208.9" y2="-332.0"/><line x1="180" y1="250" x2="-87.9" y2="-396.7"/><line x1="180" y1="250" x2="43.4" y2="-436.5"/><line x1="180" y1="250" x2="180.0" y2="-450.0"/><line x1="180" y1="250" x2="316.6" y2="-436.5"/><line x1="180" y1="250" x2="447.9" y2="-396.7"/><line x1="180" y1="250" x2="568.9" y2="-332.0"/><line x1="180" y1="250" x2="675.0" y2="-245.0"/><line x1="180" y1="250" x2="762.0" y2="-138.9"/><line x1="180" y1="250" x2="826.7" y2="-17.9"/><line x1="180" y1="250" x2="866.5" y2="113.4"/></g>
-<g stroke="#3a7bd5" stroke-width="0.9" clip-path="url(#lakes)"><circle cx="180" cy="250" r="6.0" fill="none"/><circle cx="180" cy="250" r="7.2" fill="none"/><circle cx="180" cy="250" r="8.6" fill="none"/><circle cx="180" cy="250" r="10.3" fill="none"/><circle cx="180" cy="250" r="12.3" fill="none"/><circle cx="180" cy="250" r="14.7" fill="none"/><circle cx="180" cy="250" r="17.6" fill="none"/><circle cx="180" cy="250" r="21.0" fill="none"/><circle cx="180" cy="250" r="25.2" fill="none"/><circle cx="180" cy="250" r="30.1" fill="none"/><circle cx="180" cy="250" r="36.0" fill="none"/><circle cx="180" cy="250" r="43.1" fill="none"/><circle cx="180" cy="250" r="51.6" fill="none"/><circle cx="180" cy="250" r="61.7" fill="none"/><circle cx="180" cy="250" r="73.8" fill="none"/><circle cx="180" cy="250" r="88.3" fill="none"/><circle cx="180" cy="250" r="105.7" fill="none"/><circle cx="180" cy="250" r="126.4" fill="none"/><circle cx="180" cy="250" r="151.2" fill="none"/><circle cx="180" cy="250" r="180.9" fill="none"/><circle cx="180" cy="250" r="216.4" fill="none"/><circle cx="180" cy="250" r="258.9" fill="none"/><circle cx="180" cy="250" r="309.8" fill="none"/><circle cx="180" cy="250" r="370.6" fill="none"/><circle cx="180" cy="250" r="443.3" fill="none"/><circle cx="180" cy="250" r="530.4" fill="none"/><circle cx="180" cy="250" r="634.5" fill="none"/><line x1="180" y1="250" x2="880.0" y2="250.0"/><line x1="180" y1="250" x2="866.5" y2="386.6"/><line x1="180" y1="250" x2="826.7" y2="517.9"/><line x1="180" y1="250" x2="762.0" y2="638.9"/><line x1="180" y1="250" x2="675.0" y2="745.0"/><line x1="180" y1="250" x2="568.9" y2="832.0"/><line x1="180" y1="250" x2="447.9" y2="896.7"/><line x1="180" y1="250" x2="316.6" y2="936.5"/><line x1="180" y1="250" x2="180.0" y2="950.0"/><line x1="180" y1="250" x2="43.4" y2="936.5"/><line x1="180" y1="250" x2="-87.9" y2="896.7"/><line x1="180" y1="250" x2="-208.9" y2="832.0"/><line x1="180" y1="250" x2="-315.0" y2="745.0"/><line x1="180" y1="250" x2="-402.0" y2="638.9"/><line x1="180" y1="250" x2="-466.7" y2="517.9"/><line x1="180" y1="250" x2="-506.5" y2="386.6"/><line x1="180" y1="250" x2="-520.0" y2="250.0"/><line x1="180" y1="250" x2="-506.5" y2="113.4"/><line x1="180" y1="250" x2="-466.7" y2="-17.9"/><line x1="180" y1="250" x2="-402.0" y2="-138.9"/><line x1="180" y1="250" x2="-315.0" y2="-245.0"/><line x1="180" y1="250" x2="-208.9" y2="-332.0"/><line x1="180" y1="250" x2="-87.9" y2="-396.7"/><line x1="180" y1="250" x2="43.4" y2="-436.5"/><line x1="180" y1="250" x2="180.0" y2="-450.0"/><line x1="180" y1="250" x2="316.6" y2="-436.5"/><line x1="180" y1="250" x2="447.9" y2="-396.7"/><line x1="180" y1="250" x2="568.9" y2="-332.0"/><line x1="180" y1="250" x2="675.0" y2="-245.0"/><line x1="180" y1="250" x2="762.0" y2="-138.9"/><line x1="180" y1="250" x2="826.7" y2="-17.9"/><line x1="180" y1="250" x2="866.5" y2="113.4"/></g>
+<g clip-path="url(#area)">
+<g stroke="#bbb" stroke-width="0.6">
+<line x1="256.0" y1="160.0" x2="256.0" y2="224.0"/>
+<line x1="256.0" y1="160.0" x2="320.0" y2="160.0"/>
+<line x1="264.0" y1="160.0" x2="264.0" y2="224.0"/>
+<line x1="256.0" y1="168.0" x2="320.0" y2="168.0"/>
+<line x1="272.0" y1="160.0" x2="272.0" y2="224.0"/>
+<line x1="256.0" y1="176.0" x2="320.0" y2="176.0"/>
+<line x1="280.0" y1="160.0" x2="280.0" y2="224.0"/>
+<line x1="256.0" y1="184.0" x2="320.0" y2="184.0"/>
+<line x1="288.0" y1="160.0" x2="288.0" y2="224.0"/>
+<line x1="256.0" y1="192.0" x2="320.0" y2="192.0"/>
+<line x1="296.0" y1="160.0" x2="296.0" y2="224.0"/>
+<line x1="256.0" y1="200.0" x2="320.0" y2="200.0"/>
+<line x1="304.0" y1="160.0" x2="304.0" y2="224.0"/>
+<line x1="256.0" y1="208.0" x2="320.0" y2="208.0"/>
+<line x1="312.0" y1="160.0" x2="312.0" y2="224.0"/>
+<line x1="256.0" y1="216.0" x2="320.0" y2="216.0"/>
+<line x1="320.0" y1="160.0" x2="320.0" y2="224.0"/>
+<line x1="256.0" y1="224.0" x2="320.0" y2="224.0"/>
+</g>
+<g stroke="#bbb" stroke-width="0.6">
+<line x1="224.0" y1="128.0" x2="224.0" y2="256.0"/>
+<line x1="224.0" y1="128.0" x2="352.0" y2="128.0"/>
+<line x1="240.0" y1="128.0" x2="240.0" y2="256.0"/>
+<line x1="224.0" y1="144.0" x2="352.0" y2="144.0"/>
+<line x1="256.0" y1="128.0" x2="256.0" y2="256.0"/>
+<line x1="224.0" y1="160.0" x2="352.0" y2="160.0"/>
+<line x1="272.0" y1="128.0" x2="272.0" y2="160.0"/>
+<line x1="272.0" y1="224.0" x2="272.0" y2="256.0"/>
+<line x1="224.0" y1="176.0" x2="256.0" y2="176.0"/>
+<line x1="320.0" y1="176.0" x2="352.0" y2="176.0"/>
+<line x1="288.0" y1="128.0" x2="288.0" y2="160.0"/>
+<line x1="288.0" y1="224.0" x2="288.0" y2="256.0"/>
+<line x1="224.0" y1="192.0" x2="256.0" y2="192.0"/>
+<line x1="320.0" y1="192.0" x2="352.0" y2="192.0"/>
+<line x1="304.0" y1="128.0" x2="304.0" y2="160.0"/>
+<line x1="304.0" y1="224.0" x2="304.0" y2="256.0"/>
+<line x1="224.0" y1="208.0" x2="256.0" y2="208.0"/>
+<line x1="320.0" y1="208.0" x2="352.0" y2="208.0"/>
+<line x1="320.0" y1="128.0" x2="320.0" y2="256.0"/>
+<line x1="224.0" y1="224.0" x2="352.0" y2="224.0"/>
+<line x1="336.0" y1="128.0" x2="336.0" y2="256.0"/>
+<line x1="224.0" y1="240.0" x2="352.0" y2="240.0"/>
+<line x1="352.0" y1="128.0" x2="352.0" y2="256.0"/>
+<line x1="224.0" y1="256.0" x2="352.0" y2="256.0"/>
+</g>
+<g stroke="#bbb" stroke-width="0.6">
+<line x1="128.0" y1="64.0" x2="128.0" y2="320.0"/>
+<line x1="128.0" y1="64.0" x2="384.0" y2="64.0"/>
+<line x1="160.0" y1="64.0" x2="160.0" y2="320.0"/>
+<line x1="128.0" y1="96.0" x2="384.0" y2="96.0"/>
+<line x1="192.0" y1="64.0" x2="192.0" y2="320.0"/>
+<line x1="128.0" y1="128.0" x2="384.0" y2="128.0"/>
+<line x1="224.0" y1="64.0" x2="224.0" y2="320.0"/>
+<line x1="128.0" y1="160.0" x2="224.0" y2="160.0"/>
+<line x1="352.0" y1="160.0" x2="384.0" y2="160.0"/>
+<line x1="256.0" y1="64.0" x2="256.0" y2="128.0"/>
+<line x1="256.0" y1="256.0" x2="256.0" y2="320.0"/>
+<line x1="128.0" y1="192.0" x2="224.0" y2="192.0"/>
+<line x1="352.0" y1="192.0" x2="384.0" y2="192.0"/>
+<line x1="288.0" y1="64.0" x2="288.0" y2="128.0"/>
+<line x1="288.0" y1="256.0" x2="288.0" y2="320.0"/>
+<line x1="128.0" y1="224.0" x2="224.0" y2="224.0"/>
+<line x1="352.0" y1="224.0" x2="384.0" y2="224.0"/>
+<line x1="320.0" y1="64.0" x2="320.0" y2="128.0"/>
+<line x1="320.0" y1="256.0" x2="320.0" y2="320.0"/>
+<line x1="128.0" y1="256.0" x2="384.0" y2="256.0"/>
+<line x1="352.0" y1="64.0" x2="352.0" y2="320.0"/>
+<line x1="128.0" y1="288.0" x2="384.0" y2="288.0"/>
+<line x1="384.0" y1="64.0" x2="384.0" y2="320.0"/>
+<line x1="128.0" y1="320.0" x2="384.0" y2="320.0"/>
+</g>
+<g stroke="#bbb" stroke-width="0.6">
+<line x1="0.0" y1="-128.0" x2="0.0" y2="384.0"/>
+<line x1="0.0" y1="-128.0" x2="512.0" y2="-128.0"/>
+<line x1="64.0" y1="-128.0" x2="64.0" y2="384.0"/>
+<line x1="0.0" y1="-64.0" x2="512.0" y2="-64.0"/>
+<line x1="128.0" y1="-128.0" x2="128.0" y2="384.0"/>
+<line x1="0.0" y1="0.0" x2="512.0" y2="0.0"/>
+<line x1="192.0" y1="-128.0" x2="192.0" y2="64.0"/>
+<line x1="192.0" y1="320.0" x2="192.0" y2="384.0"/>
+<line x1="0.0" y1="64.0" x2="512.0" y2="64.0"/>
+<line x1="256.0" y1="-128.0" x2="256.0" y2="64.0"/>
+<line x1="256.0" y1="320.0" x2="256.0" y2="384.0"/>
+<line x1="0.0" y1="128.0" x2="128.0" y2="128.0"/>
+<line x1="384.0" y1="128.0" x2="512.0" y2="128.0"/>
+<line x1="320.0" y1="-128.0" x2="320.0" y2="64.0"/>
+<line x1="320.0" y1="320.0" x2="320.0" y2="384.0"/>
+<line x1="0.0" y1="192.0" x2="128.0" y2="192.0"/>
+<line x1="384.0" y1="192.0" x2="512.0" y2="192.0"/>
+<line x1="384.0" y1="-128.0" x2="384.0" y2="384.0"/>
+<line x1="0.0" y1="256.0" x2="128.0" y2="256.0"/>
+<line x1="384.0" y1="256.0" x2="512.0" y2="256.0"/>
+<line x1="448.0" y1="-128.0" x2="448.0" y2="384.0"/>
+<line x1="0.0" y1="320.0" x2="512.0" y2="320.0"/>
+<line x1="512.0" y1="-128.0" x2="512.0" y2="384.0"/>
+<line x1="0.0" y1="384.0" x2="512.0" y2="384.0"/>
+</g>
+<g stroke="#bbb" stroke-width="0.6">
+<line x1="-256.0" y1="-512.0" x2="-256.0" y2="512.0"/>
+<line x1="-256.0" y1="-512.0" x2="768.0" y2="-512.0"/>
+<line x1="-128.0" y1="-512.0" x2="-128.0" y2="512.0"/>
+<line x1="-256.0" y1="-384.0" x2="768.0" y2="-384.0"/>
+<line x1="0.0" y1="-512.0" x2="0.0" y2="512.0"/>
+<line x1="-256.0" y1="-256.0" x2="768.0" y2="-256.0"/>
+<line x1="128.0" y1="-512.0" x2="128.0" y2="-128.0"/>
+<line x1="128.0" y1="384.0" x2="128.0" y2="512.0"/>
+<line x1="-256.0" y1="-128.0" x2="768.0" y2="-128.0"/>
+<line x1="256.0" y1="-512.0" x2="256.0" y2="-128.0"/>
+<line x1="256.0" y1="384.0" x2="256.0" y2="512.0"/>
+<line x1="-256.0" y1="0.0" x2="0.0" y2="0.0"/>
+<line x1="512.0" y1="0.0" x2="768.0" y2="0.0"/>
+<line x1="384.0" y1="-512.0" x2="384.0" y2="-128.0"/>
+<line x1="384.0" y1="384.0" x2="384.0" y2="512.0"/>
+<line x1="-256.0" y1="128.0" x2="0.0" y2="128.0"/>
+<line x1="512.0" y1="128.0" x2="768.0" y2="128.0"/>
+<line x1="512.0" y1="-512.0" x2="512.0" y2="512.0"/>
+<line x1="-256.0" y1="256.0" x2="0.0" y2="256.0"/>
+<line x1="512.0" y1="256.0" x2="768.0" y2="256.0"/>
+<line x1="640.0" y1="-512.0" x2="640.0" y2="512.0"/>
+<line x1="-256.0" y1="384.0" x2="768.0" y2="384.0"/>
+<line x1="768.0" y1="-512.0" x2="768.0" y2="512.0"/>
+<line x1="-256.0" y1="512.0" x2="768.0" y2="512.0"/>
+</g>
+<rect x="256.0" y="160.0" width="64.0" height="64.0" fill="none" stroke="#777" stroke-width="1.2"/>
+<rect x="224.0" y="128.0" width="128.0" height="128.0" fill="none" stroke="#777" stroke-width="1.2"/>
+<rect x="128.0" y="64.0" width="256.0" height="256.0" fill="none" stroke="#777" stroke-width="1.2"/>
+<rect x="0.0" y="-128.0" width="512.0" height="512.0" fill="none" stroke="#777" stroke-width="1.2"/>
+<rect x="-256.0" y="-512.0" width="1024.0" height="1024.0" fill="none" stroke="#777" stroke-width="1.2"/>
+</g>
 <path d="M120,120 C200,70 330,90 380,150 C430,210 400,300 320,330 C230,360 130,330 110,260 C95,200 90,150 120,120 Z" fill="none" stroke="#3a7bd5" stroke-width="2"/>
-<circle cx="180" cy="250" r="6" fill="#333"/>
+<circle cx="303.0" cy="207.0" r="5" fill="#333"/>
+<text x="313.0" y="199.0" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#333" font-weight="bold" text-anchor="start" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">under the camera</text>
 <rect x="20" y="360" width="700" height="60" fill="#fff"/>
-<text x="192" y="276" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#333" font-weight="bold" text-anchor="start" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">under the camera</text>
-<text x="20" y="378" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#333" font-weight="normal" text-anchor="start" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">Rings widen with distance, so the swell is fine close by and coarse towards the horizon.</text>
-<text x="20" y="394" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#333" font-weight="normal" text-anchor="start" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">The water mask cuts the grid to each lake at the drawn level (solid). A lake at another</text>
-<text x="20" y="410" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#333" font-weight="normal" text-anchor="start" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">level gets its own draw of the same grid (dashed).</text>
-<text x="20" y="30" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#333" font-weight="bold" text-anchor="start" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">Radial grid, seen from above</text>
+<text x="20" y="378" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#333" font-weight="normal" text-anchor="start" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">Square levels, each with cells twice the size of the one inside it, so the swell is fine close by and coarse far off.</text>
+<text x="20" y="394" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#333" font-weight="normal" text-anchor="start" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">Each level snaps to its own world lattice, so vertices stay on fixed world points as the camera moves.</text>
+<text x="20" y="410" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#333" font-weight="normal" text-anchor="start" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">The water mask cuts the grid to each lake at the drawn level (solid). Other levels get their own draw (dashed).</text>
+<text x="20" y="30" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#333" font-weight="bold" text-anchor="start" stroke="#ffffff" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">Swell grid, seen from above</text>
 </svg>
