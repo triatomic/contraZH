@@ -173,6 +173,7 @@ PointGroupClass::PointGroupClass() :
 	// TheSuperHackers @feature off unless the caller asks for it
 	GroundMorph = false;
 	Effects = 0;
+	EffectData = nullptr;
 }
 
 /**************************************************************************
@@ -1018,9 +1019,9 @@ void PointGroupClass::Render(RenderInfoClass &rinfo)
 
 		if ( sort )
 		{
-				SortingRendererClass::Set_Insert_Effects(effects);
+				SortingRendererClass::Set_Insert_Effects(effects, EffectData);
 				SortingRendererClass::Insert_Triangles (0, delta / verticesperprimitive, 0, delta);
-				SortingRendererClass::Set_Insert_Effects(0);
+				SortingRendererClass::Set_Insert_Effects(0, nullptr);
 		}
 		else
 		{
@@ -1028,7 +1029,7 @@ void PointGroupClass::Render(RenderInfoClass &rinfo)
 			if (effects != 0)
 			{
 				DX8Wrapper::Apply_Render_State_Changes();
-				faded = soft_hook->Begin(Shader, effects);
+				faded = soft_hook->Begin(Shader, effects, EffectData);
 			}
 			DX8Wrapper::Draw_Triangles (0, delta / verticesperprimitive, 0, delta);
 			if (faded)

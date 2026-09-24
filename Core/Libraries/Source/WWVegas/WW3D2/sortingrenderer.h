@@ -39,7 +39,8 @@ public:
 	virtual ~SoftParticleHookClass() {}
 
 	// Called with the draw's render state applied. False leaves the draw fixed-function, and End uncalled.
-	virtual bool Begin(const ShaderClass &shader, unsigned effects) = 0;
+	// The data is whatever the inserter handed over with the effects, opaque to the renderer.
+	virtual bool Begin(const ShaderClass &shader, unsigned effects, const void *effectData) = 0;
 	virtual void End() = 0;
 };
 
@@ -81,5 +82,5 @@ public:
 	// Triangles inserted while effects are set are drawn through the hook with those effects.
 	static void Set_Soft_Particle_Hook(SoftParticleHookClass *hook);
 	static SoftParticleHookClass *Peek_Soft_Particle_Hook();
-	static void Set_Insert_Effects(unsigned effects);
+	static void Set_Insert_Effects(unsigned effects, const void *effectData);
 };

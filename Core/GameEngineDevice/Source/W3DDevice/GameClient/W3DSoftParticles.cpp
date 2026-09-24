@@ -27,6 +27,7 @@
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/W3DWater.h"
 #include "Common/GlobalData.h"
+#include "GameClient/ParticleSys.h"
 #include "WW3D2/dx8wrapper.h"
 #include "WW3D2/dx8caps.h"
 #include "WW3D2/formconv.h"
@@ -59,18 +60,6 @@ static const Int NOISE_STAGE = 2;
 static const Int SCENE_STAGE = 3;
 
 static const Int NOISE_SIZE = 64;
-
-// Flame noise cells span a few world units and rise faster than the sprites move.
-static const Real FLAME_NOISE_SCALE = 1.0f / 20.0f;
-static const Real FLAME_RISE = 0.8f;
-static const Real FLAME_WARP = 0.04f;
-static const Real FLAME_HEAT_GAIN = 2.2f;
-
-// The haze bends the scene by up to this many world units, measured at the flame.
-static const Real HAZE_NOISE_SCALE = 1.0f / 14.0f;
-static const Real HAZE_RISE = 1.1f;
-static const Real HAZE_BEND = 1.2f;
-static const Real HAZE_MASK_GAIN = 2.0f;
 
 W3DSoftParticles::W3DSoftParticles()
 	: m_depthShader(0),
@@ -399,10 +388,18 @@ static void Bind_Camera_Position()
 	DX8Wrapper::Set_DX8_Texture_Stage_State(SOFT_STAGE, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
 }
 
-void W3DSoftParticles::bindFlame()
+// World units across a noise tile, as the scale from world units to tiles.
+static Real Noise_Scale(Real size)
 {
-	const Vector4 flame(Noise_Rise(FLAME_RISE), FLAME_WARP, FLAME_NOISE_SCALE, FLAME_HEAT_GAIN);
+	return 1.0f / ((size > 0.01f) ? size : 0.01f);
+}
+
+void W3DSoftParticles::bindFlame(const FlameShaderTuning &tuning)
+{
+	const Vector4 flame(Noise_Rise(tuning.rise), tuning.warp, Noise_Scale(tuning.noiseSize), tuning.heat);
+	const Vector4 shape(tuning.flicker, tuning.breakup, 0.0f, 0.0f);
 	DX8Wrapper::Set_Pixel_Shader_Constant(6, &flame, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(10, &shape, 1);
 	setWorldConstants(7);
 	Bind_Noise(m_noise);
 }
@@ -417,7 +414,7 @@ Bool W3DSoftParticles::beginHaze()
 }
 
 // The flame's shader tells the mask whether alpha counts. Fog is off because the scene copy already carries it.
-Bool W3DSoftParticles::bindHaze(const ShaderClass &shader)
+Bool W3DSoftParticles::bindHaze(const ShaderClass &shader, const FlameShaderTuning &tuning)
 {
 #if defined(BUILD_WITH_D3D9)
 	if (m_hazeShader == 0 || m_noise == nullptr || m_sceneCopy == nullptr)
@@ -436,8 +433,8 @@ Bool W3DSoftParticles::bindHaze(const ShaderClass &shader)
 	setWorldConstants(7);
 
 	// A world unit at unit depth, in scene uv. The shader divides by the sprite's depth.
-	const Real bend = HAZE_BEND * fabs(m_projection.m[0][0] * screenMap.X);
-	const Vector4 haze(Noise_Rise(HAZE_RISE), bend, HAZE_NOISE_SCALE, HAZE_MASK_GAIN);
+	const Real bend = tuning.hazeBend * fabs(m_projection.m[0][0] * screenMap.X);
+	const Vector4 haze(Noise_Rise(tuning.hazeRise), bend, Noise_Scale(tuning.hazeNoiseSize), tuning.hazeMask);
 	DX8Wrapper::Set_Pixel_Shader_Constant(4, &haze, 1);
 
 	const Bool addsColor = shader.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_ONE;
@@ -466,12 +463,18 @@ Bool W3DSoftParticles::bindHaze(const ShaderClass &shader)
 #endif
 }
 
-bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects)
+bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const void *effectData)
 {
 	m_bound = 0;
+	FlameShaderTuning tuning;
+	if ((effects & (EFFECT_FLAME | EFFECT_HAZE)) != 0)
+	{
+		ParticleSystemTemplate::resolveFlameTuning(static_cast<const ParticleSystemTemplate *>(effectData), tuning);
+	}
+
 	if ((effects & EFFECT_HAZE) != 0)
 	{
-		return bindHaze(shader) != FALSE;
+		return bindHaze(shader, tuning) != FALSE;
 	}
 
 	const Bool soft = (effects & EFFECT_SOFT) != 0 && SoftParticleMode != SOFT_PARTICLES_OFF &&
@@ -505,7 +508,7 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects)
 
 	if (flame)
 	{
-		bindFlame();
+		bindFlame(tuning);
 		m_bound = EFFECT_FLAME;
 	}
 	Bind_Camera_Position();

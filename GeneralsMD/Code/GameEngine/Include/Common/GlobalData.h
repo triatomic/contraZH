@@ -253,6 +253,18 @@ public:
 	Real m_unitEmissiveIntensity;		///< GameData UnitEmissiveIntensity: brightness of _emi glow masks on vehicles and structures by day, 0 for none
 	Real m_unitEmissiveNightIntensity;	///< GameData UnitEmissiveNightIntensity: the same at night
 	Real m_softParticleDistance;		///< GameData SoftParticleDistance: how far in front of a surface a particle starts to fade, 0 for hard edges
+	Real m_flameWarp;					///< GameData FlameWarp and the keys below: flame shading and heat haze defaults, see FlameShaderTuning
+	Real m_flameHeat;
+	Real m_flameFlicker;
+	Real m_flameBreakup;
+	Real m_flameNoiseSize;
+	Real m_flameRise;
+	Real m_hazeBend;
+	Real m_hazeSize;
+	Real m_hazeLift;
+	Real m_hazeNoiseSize;
+	Real m_hazeRise;
+	Real m_hazeMask;
 	Real m_ambientOcclusionRadius;		///< GameData AmbientOcclusionRadius: how far, in world units, geometry darkens what is near it
 	Real m_ambientOcclusionStrength;	///< GameData AmbientOcclusionStrength: how dark the occlusion gets, 0 for none
 	Int  m_textureReductionFactor;	//how much to cut texture resolution: 2 is half, 3 is quarter, etc.

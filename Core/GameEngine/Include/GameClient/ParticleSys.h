@@ -532,6 +532,23 @@ static_assert(ARRAY_SIZE(FlameShaderModeNames) == ParticleSystemInfo::FLAME_SHAD
 
 #endif
 
+// Flame shading and heat haze settings. In ParticleSystem.ini a negative value, the default, takes GameData.ini's.
+struct FlameShaderTuning
+{
+	Real warp;						///< how far the noise pushes the texture lookup, in texture widths
+	Real heat;						///< how fast bright texels run to white
+	Real flicker;					///< how far brightness swings with the noise, 0 for steady
+	Real breakup;					///< how much the faint fringe breaks up, 0 for none
+	Real noiseSize;				///< world units across one tile of flame noise
+	Real rise;						///< flame noise tiles climbed per second
+	Real hazeBend;				///< world units the haze bends the scene, measured at the flame
+	Real hazeSize;				///< haze sprite size as a multiple of the flame's
+	Real hazeLift;				///< haze sprite rise above the flame, as a multiple of its size
+	Real hazeNoiseSize;		///< world units across one tile of haze noise
+	Real hazeRise;				///< haze noise tiles climbed per second
+	Real hazeMask;				///< how quickly the flame's brightness reaches full haze strength
+};
+
 /**
  * A ParticleSystemTemplate, used by the ParticleSystemManager to instantiate ParticleSystems.
  */
@@ -555,6 +572,10 @@ public:
 	static void parseRandomRGBColor( INI* ini, void *instance, void *store, const void* /*userData*/ );
 	static void parseRandomRGBColorRate( INI* ini, void *instance, void *store, const void* /*userData*/ );
 
+	Bool hasFlameTuning() const;	///< any FlameShaderTuning key is set on this system
+	/// GameData.ini's flame settings, with this template's own on top when it is not null.
+	static void resolveFlameTuning( const ParticleSystemTemplate *tmpl, FlameShaderTuning &tuning );
+
 protected:
 	friend class ParticleSystemManager;					///< @todo remove this friendship
 	friend class ParticleSystem;								///< @todo remove this friendship
@@ -572,6 +593,8 @@ protected:
 
 	// This has to be mutable because of the delayed initialization thing in createSlaveSystem
 	mutable const ParticleSystemTemplate *m_slaveTemplate;		///< if non-null, use this to create a slave system
+
+	FlameShaderTuning					m_flameTuning;
 
 	// template attribute data inherited from ParticleSystemInfo class
 };

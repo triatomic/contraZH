@@ -43,6 +43,7 @@ float4 Flame       : register(c6);   // x = noise rise so far, y = texture warp,
 float4 FlameWorldX : register(c7);   // camera space to world x, y and z, one row each
 float4 FlameWorldY : register(c8);
 float4 FlameWorldZ : register(c9);
+float4 FlameShape  : register(c10);  // x = flicker swing, y = fringe breakup
 #endif
 
 struct PsIn
@@ -72,7 +73,7 @@ float4 main(PsIn input) : COLOR
 
     // Only the texture's faintest fringe breaks up, so particles dimming with age keep their size.
     float shape = max(texel.r, max(texel.g, texel.b)) * coverage;
-    float keep = saturate(shape * 4.0f + 1.0f - noiseA.b - noiseB.b);
+    float keep = saturate(1.0f + (shape * 4.0f - noiseA.b - noiseB.b) * FlameShape.y);
 
     float peak = max(color.r, max(color.g, color.b));
     float heat = saturate((peak * lerp(input.Diffuse.a, 1.0f, Params.y) * coverage - 0.5f) * Flame.w);
@@ -80,7 +81,7 @@ float4 main(PsIn input) : COLOR
     // Halfway to the squared colour, so dim parts redden without losing much light.
     float3 deep = color.rgb * (color.rgb + peak) / max(2.0f * peak, 0.001f);
     // Alpha blending breaks up through alpha alone, so its fringe does not darken twice.
-    color.rgb = lerp(deep, peak.xxx, heat * heat) * (lerp(1.0f, keep, Params.y) * (0.85f + 0.3f * noiseB.b));
+    color.rgb = lerp(deep, peak.xxx, heat * heat) * (lerp(1.0f, keep, Params.y) * (1.0f + FlameShape.x * (noiseB.b - 0.5f)));
     color.a *= keep;
 #else
     float4 color = tex2D(ParticleTexture, input.TexCoord) * input.Diffuse;

@@ -3066,6 +3066,18 @@ const FieldParse ParticleSystemTemplate::m_fieldParseTable[] =
 
 	{ "WindMotion",					INI::parseIndexList, WindMotionNames, offsetof( ParticleSystemTemplate, m_windMotion ) },
 	{ "FlameShader",				INI::parseIndexList, FlameShaderModeNames, offsetof( ParticleSystemTemplate, m_flameShader ) },
+	{ "FlameWarp",					INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.warp ) },
+	{ "FlameHeat",					INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.heat ) },
+	{ "FlameFlicker",				INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.flicker ) },
+	{ "FlameBreakup",				INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.breakup ) },
+	{ "FlameNoiseSize",			INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.noiseSize ) },
+	{ "FlameRise",					INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.rise ) },
+	{ "HazeBend",						INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.hazeBend ) },
+	{ "HazeSize",						INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.hazeSize ) },
+	{ "HazeLift",						INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.hazeLift ) },
+	{ "HazeNoiseSize",			INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.hazeNoiseSize ) },
+	{ "HazeRise",						INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.hazeRise ) },
+	{ "HazeMask",						INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.hazeMask ) },
 
 	{ "WindAngleChangeMin", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_windAngleChangeMin ) },
 	{ "WindAngleChangeMax", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_windAngleChangeMax ) },
@@ -3167,6 +3179,60 @@ ParticleSystemTemplate::ParticleSystemTemplate( const AsciiString &name ) :
 	m_name(name)
 {
 	m_slaveTemplate = nullptr;
+
+	Real *setting = &m_flameTuning.warp;
+	for (UnsignedInt i = 0; i < sizeof( m_flameTuning ) / sizeof( Real ); ++i)
+	{
+		setting[i] = -1.0f;
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+Bool ParticleSystemTemplate::hasFlameTuning() const
+{
+	const Real *setting = &m_flameTuning.warp;
+	for (UnsignedInt i = 0; i < sizeof( m_flameTuning ) / sizeof( Real ); ++i)
+	{
+		if (setting[i] >= 0.0f)
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+void ParticleSystemTemplate::resolveFlameTuning( const ParticleSystemTemplate *tmpl, FlameShaderTuning &tuning )
+{
+	tuning.warp = TheGlobalData->m_flameWarp;
+	tuning.heat = TheGlobalData->m_flameHeat;
+	tuning.flicker = TheGlobalData->m_flameFlicker;
+	tuning.breakup = TheGlobalData->m_flameBreakup;
+	tuning.noiseSize = TheGlobalData->m_flameNoiseSize;
+	tuning.rise = TheGlobalData->m_flameRise;
+	tuning.hazeBend = TheGlobalData->m_hazeBend;
+	tuning.hazeSize = TheGlobalData->m_hazeSize;
+	tuning.hazeLift = TheGlobalData->m_hazeLift;
+	tuning.hazeNoiseSize = TheGlobalData->m_hazeNoiseSize;
+	tuning.hazeRise = TheGlobalData->m_hazeRise;
+	tuning.hazeMask = TheGlobalData->m_hazeMask;
+
+	if (tmpl == nullptr)
+	{
+		return;
+	}
+
+	const Real *own = &tmpl->m_flameTuning.warp;
+	Real *resolved = &tuning.warp;
+	for (UnsignedInt i = 0; i < sizeof( tuning ) / sizeof( Real ); ++i)
+	{
+		if (own[i] >= 0.0f)
+		{
+			resolved[i] = own[i];
+		}
+	}
 }
 
 // ------------------------------------------------------------------------------------------------

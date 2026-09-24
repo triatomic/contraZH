@@ -59,6 +59,7 @@ bool SortingRendererClass::_EnableTriangleDraw=true;
 
 static SoftParticleHookClass *SoftHook = nullptr;
 static unsigned InsertEffects = 0;
+static const void *InsertEffectData = nullptr;
 
 void SortingRendererClass::Set_Soft_Particle_Hook(SoftParticleHookClass *hook)
 {
@@ -70,9 +71,10 @@ SoftParticleHookClass *SortingRendererClass::Peek_Soft_Particle_Hook()
 	return SoftHook;
 }
 
-void SortingRendererClass::Set_Insert_Effects(unsigned effects)
+void SortingRendererClass::Set_Insert_Effects(unsigned effects, const void *effectData)
 {
 	InsertEffects = effects;
+	InsertEffectData = effectData;
 }
 static unsigned DEFAULT_SORTING_POLY_COUNT = 16384;	// (count * 3) must be less than 65536
 static unsigned DEFAULT_SORTING_VERTEX_COUNT = 32768;	// count must be less than 65536
@@ -207,6 +209,7 @@ public:
 
 	float depth;								// View space depth of the bounding sphere center, for object nodes
 	unsigned char effects;					// Particle effects drawn through the soft particle hook, 0 for none
+	const void* effect_data;				// Handed back to the hook with the effects
 	unsigned short start_index;			// First index used in the ib
 	unsigned short polygon_count;			// Polygon count to process (3 indices = one polygon)
 	unsigned short min_vertex_index;		// First index used in the vb
@@ -260,7 +263,7 @@ static bool Begin_Soft(const SortingNodeStruct* state)
 		return false;
 	}
 	DX8Wrapper::Apply_Render_State_Changes();
-	return SoftHook->Begin(state->sorting_state.shader, state->effects);
+	return SoftHook->Begin(state->sorting_state.shader, state->effects, state->effect_data);
 }
 
 static void End_Soft(bool soft)
@@ -357,7 +360,7 @@ static bool Same_Render_State(const RenderStateStruct& a, const RenderStateStruc
 
 static bool Same_Node_State(const SortingNodeStruct* a, const SortingNodeStruct* b)
 {
-	return a->effects == b->effects && Same_Render_State(a->sorting_state, b->sorting_state);
+	return a->effects == b->effects && a->effect_data == b->effect_data && Same_Render_State(a->sorting_state, b->sorting_state);
 }
 
 // ----------------------------------------------------------------------------
@@ -375,7 +378,10 @@ static bool Additive_Draw_Order(const SortingNodeStruct* a, const SortingNodeStr
 	if (l.material != r.material) {
 		return std::less<VertexMaterialClass*>()(l.material, r.material);
 	}
-	return a->effects < b->effects;
+	if (a->effects != b->effects) {
+		return a->effects < b->effects;
+	}
+	return std::less<const void*>()(a->effect_data, b->effect_data);
 }
 
 // ----------------------------------------------------------------------------
@@ -433,6 +439,7 @@ void SortingRendererClass::Insert_Triangles(
 	state->vertex_count=vertex_count;
 	state->depth=0.0f;
 	state->effects=(SoftHook != nullptr) ? (unsigned char)InsertEffects : 0;
+	state->effect_data=(state->effects != 0) ? InsertEffectData : nullptr;
 
 	const bool additive=BlendBatching && Is_Order_Independent(state->sorting_state.shader);
 

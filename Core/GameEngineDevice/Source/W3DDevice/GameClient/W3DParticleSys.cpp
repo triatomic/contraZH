@@ -87,6 +87,7 @@ W3DParticleSystemManager::W3DParticleSystemManager()
 	m_batchBillboard = true;
 	m_batchShaderType = ParticleSystemInfo::INVALID_SHADER;
 	m_batchEffects = 0;
+	m_batchTuning = nullptr;
 
 	m_pointGroup = nullptr;
 	m_terrainParticles = nullptr;
@@ -355,6 +356,9 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 			continue;
 		}
 
+		// only systems with settings of their own carry them, so the rest keep batching together
+		const ParticleSystemTemplate *tuning = (effects != 0 && sys->getTemplate()->hasFlameTuning()) ? sys->getTemplate() : nullptr;
+
 		// Handle smudge type particles
 		if (sys->isUsingSmudge())
 		{
@@ -395,7 +399,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		}
 
 		const Bool canBatch = batchParticles && sys->isUsingParticles() && !useTerrainConformingParticles;
-		if (!canBatch || finishedBatch(*sys, texture, effects))
+		if (!canBatch || finishedBatch(*sys, texture, effects, tuning))
 		{
 			flushParticleBatch(rinfo, pointCount);
 		}
@@ -403,12 +407,19 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		// the batch state always describes the system being filled, batched or not
 		if (m_batchTexture == nullptr)
 		{
-			initializeBatch(*sys, texture, effects);
+			initializeBatch(*sys, texture, effects, tuning);
 		}
 
-		// haze spreads a little wider than the flame and rises above it
-		const Real sizeScale = (pass == DRAW_HAZE) ? 1.5f : 1.0f;
-		const Real lift = (pass == DRAW_HAZE) ? 0.3f : 0.0f;
+		// haze spreads wider than the flame and rises above it
+		Real sizeScale = 1.0f;
+		Real lift = 0.0f;
+		if (pass == DRAW_HAZE)
+		{
+			FlameShaderTuning resolved;
+			ParticleSystemTemplate::resolveFlameTuning(tuning, resolved);
+			sizeScale = resolved.hazeSize;
+			lift = resolved.hazeLift;
+		}
 
 		UnsignedInt startCount = pointCount;
 
@@ -462,7 +473,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 				// This prevents particles being dropped. Bank the stats first as the flush resets count to 0.
 				m_onScreenParticleCount += (pointCount - startCount);
 				flushParticleBatch(rinfo, pointCount);
-				initializeBatch(*sys, texture, effects);
+				initializeBatch(*sys, texture, effects, tuning);
 				startCount = 0;
 			}
 		}
@@ -508,7 +519,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		if (sys->isUsingStreak() && (pointCount == 1))
 		{
 			m_onScreenParticleCount += (pointCount - startCount);
-			initializeBatch(*sys, texture, effects);
+			initializeBatch(*sys, texture, effects, tuning);
 			flushParticleBatch(rinfo, pointCount);
 			startCount = 0;
 		}
@@ -589,20 +600,22 @@ Bool W3DParticleSystemManager::isFarther(const DrawEntry &a, const DrawEntry &b)
 	return a.depth < b.depth;
 }
 
-Bool W3DParticleSystemManager::finishedBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, unsigned effects)
+Bool W3DParticleSystemManager::finishedBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, unsigned effects, const ParticleSystemTemplate *tuning)
 {
 	return texture.Peek() != m_batchTexture.Peek() ||
 		system.getShaderType() != m_batchShaderType ||
 		system.shouldBillboard() != m_batchBillboard ||
-		effects != m_batchEffects;
+		effects != m_batchEffects ||
+		tuning != m_batchTuning;
 }
 
-void W3DParticleSystemManager::initializeBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, unsigned effects)
+void W3DParticleSystemManager::initializeBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, unsigned effects, const ParticleSystemTemplate *tuning)
 {
 	m_batchTexture = texture;
 	m_batchShaderType = system.getShaderType();
 	m_batchBillboard = system.shouldBillboard();
 	m_batchEffects = effects;
+	m_batchTuning = tuning;
 }
 
 void W3DParticleSystemManager::flushParticleBatch(RenderInfoClass& rinfo, UnsignedInt& pointCount)
@@ -616,9 +629,9 @@ void W3DParticleSystemManager::flushParticleBatch(RenderInfoClass& rinfo, Unsign
 		m_pointGroup->Set_Arrays(m_posBuffer, m_RGBABuffer, nullptr, m_sizeBuffer, m_angleBuffer, nullptr, pointCount);
 		m_pointGroup->Set_Billboard(m_batchBillboard);
 		m_pointGroup->Set_Point_Frame(0);
-		m_pointGroup->Set_Effects(m_batchEffects);
+		m_pointGroup->Set_Effects(m_batchEffects, m_batchTuning);
 		m_pointGroup->Render(rinfo);
-		m_pointGroup->Set_Effects(0);
+		m_pointGroup->Set_Effects(0, nullptr);
 
 		pointCount = 0;
 	}
@@ -627,4 +640,5 @@ void W3DParticleSystemManager::flushParticleBatch(RenderInfoClass& rinfo, Unsign
 	m_batchBillboard = false;
 	m_batchShaderType = ParticleSystemInfo::INVALID_SHADER;
 	m_batchEffects = 0;
+	m_batchTuning = nullptr;
 }

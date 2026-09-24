@@ -258,6 +258,18 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ "UnitEmissiveIntensity",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_unitEmissiveIntensity ) },
 	{ "UnitEmissiveNightIntensity",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_unitEmissiveNightIntensity ) },
 	{ "SoftParticleDistance",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_softParticleDistance ) },
+	{ "FlameWarp",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_flameWarp ) },
+	{ "FlameHeat",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_flameHeat ) },
+	{ "FlameFlicker",						INI::parseReal,				nullptr,			offsetof( GlobalData, m_flameFlicker ) },
+	{ "FlameBreakup",						INI::parseReal,				nullptr,			offsetof( GlobalData, m_flameBreakup ) },
+	{ "FlameNoiseSize",						INI::parseReal,				nullptr,			offsetof( GlobalData, m_flameNoiseSize ) },
+	{ "FlameRise",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_flameRise ) },
+	{ "HazeBend",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_hazeBend ) },
+	{ "HazeSize",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_hazeSize ) },
+	{ "HazeLift",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_hazeLift ) },
+	{ "HazeNoiseSize",						INI::parseReal,				nullptr,			offsetof( GlobalData, m_hazeNoiseSize ) },
+	{ "HazeRise",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_hazeRise ) },
+	{ "HazeMask",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_hazeMask ) },
 	{ "AmbientOcclusionRadius",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_ambientOcclusionRadius ) },
 	{ "AmbientOcclusionStrength",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_ambientOcclusionStrength ) },
 	{ "TextureReductionFactor",			INI::parseInt,				nullptr,			offsetof( GlobalData, m_textureReductionFactor ) },
@@ -913,6 +925,18 @@ GlobalData::GlobalData()
 	m_unitEmissiveIntensity = 0.5f;
 	m_unitEmissiveNightIntensity = 1.5f;
 	m_softParticleDistance = 12.0f;
+	m_flameWarp = 0.04f;
+	m_flameHeat = 2.2f;
+	m_flameFlicker = 0.3f;
+	m_flameBreakup = 1.0f;
+	m_flameNoiseSize = 20.0f;
+	m_flameRise = 0.8f;
+	m_hazeBend = 1.2f;
+	m_hazeSize = 1.5f;
+	m_hazeLift = 0.3f;
+	m_hazeNoiseSize = 14.0f;
+	m_hazeRise = 1.1f;
+	m_hazeMask = 2.0f;
 	m_ambientOcclusionRadius = 12.0f;
 	m_ambientOcclusionStrength = 1.0f;
 	m_textureReductionFactor = -1;

@@ -26,6 +26,7 @@
 
 class RenderInfoClass;
 class Vector4;
+struct FlameShaderTuning;
 
 // Fades particle sprites near the surface behind them, shades flames as fire, and draws the heat haze behind flames.
 class W3DSoftParticles : public SoftParticleHookClass
@@ -43,7 +44,8 @@ public:
 	/// Copies the scene for the haze pass. False leaves the haze undrawn.
 	Bool beginHaze();
 
-	virtual bool Begin(const ShaderClass &shader, unsigned effects) override;
+	/// The effect data is the ParticleSystemTemplate with flame settings of its own, or null.
+	virtual bool Begin(const ShaderClass &shader, unsigned effects, const void *effectData) override;
 	virtual void End() override;
 
 	void ReleaseResources();	///< drops the shaders and textures before a device reset; the next draw makes them again
@@ -55,8 +57,8 @@ private:
 	void setWorldConstants(Int firstRegister);
 	Bool bindSceneDepth(DWORD shader);
 	Bool bindTerrainHeight(DWORD shader);
-	void bindFlame();
-	Bool bindHaze(const ShaderClass &shader);
+	void bindFlame(const FlameShaderTuning &tuning);
+	Bool bindHaze(const ShaderClass &shader, const FlameShaderTuning &tuning);
 
 	DWORD m_depthShader;
 	DWORD m_heightShader;

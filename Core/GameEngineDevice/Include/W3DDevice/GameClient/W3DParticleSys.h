@@ -60,8 +60,8 @@ private:
 
 	void drawSystems(RenderInfoClass &rinfo, DrawPass pass);	///< draws m_drawOrder
 	unsigned systemEffects(ParticleSystem &system, DrawPass pass);
-	Bool finishedBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, unsigned effects);
-	void initializeBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, unsigned effects);
+	Bool finishedBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, unsigned effects, const ParticleSystemTemplate *tuning);
+	void initializeBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, unsigned effects, const ParticleSystemTemplate *tuning);
 	void flushParticleBatch(RenderInfoClass& rinfo, UnsignedInt& pointCount);
 
 	enum { MAX_POINTS_PER_GROUP = 512 };
@@ -88,4 +88,5 @@ private:
 	Bool m_readyToRender;											///< if true, it is OK to render
 	Bool m_batchBillboard;
 	unsigned m_batchEffects;									///< SoftParticleHookClass effects beyond soft fading
+	const ParticleSystemTemplate *m_batchTuning;	///< the template whose flame settings override GameData.ini's, or null
 };

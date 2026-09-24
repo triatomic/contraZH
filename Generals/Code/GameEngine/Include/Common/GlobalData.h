@@ -513,6 +513,18 @@ public:
   Bool m_useSoftParticles;        ///< Options.ini SoftParticles: smoke and fire fade where they meet the ground and buildings
   Bool m_useFlameShaders;         ///< Options.ini FlameShaders: flame weapon fire flickers and glows white-hot at its core
   Real m_softParticleDistance;    ///< how far in front of a surface a particle starts to fade, 0 for hard edges
+  Real m_flameWarp;               ///< flame shading and heat haze defaults, see FlameShaderTuning
+  Real m_flameHeat;
+  Real m_flameFlicker;
+  Real m_flameBreakup;
+  Real m_flameNoiseSize;
+  Real m_flameRise;
+  Real m_hazeBend;
+  Real m_hazeSize;
+  Real m_hazeLift;
+  Real m_hazeNoiseSize;
+  Real m_hazeRise;
+  Real m_hazeMask;
   Bool m_useAmbientOcclusion;     ///< Options.ini AmbientOcclusion: creases and the ground beneath objects darken where the hardware allows
   Bool m_ambientOcclusionDebug;   ///< Options.ini AmbientOcclusionDebug: show only the occlusion, in grey
   Real m_ambientOcclusionRadius;  ///< how far, in world units, geometry darkens what is near it
