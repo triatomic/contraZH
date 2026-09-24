@@ -92,6 +92,7 @@ class WaterTransparencySetting : public Overridable
 		// Shader water (D3D9 with Smooth Water on)
 		Real m_shaderWaterReflection;	///< scales the Fresnel sky reflection
 		Real m_shaderWaterSpecular;		///< scales the sun glint
+		Real m_shaderWaterSpecularSpread;	///< widens the sun glint, so it shows at more view angles
 		Real m_shaderWaterRefraction;	///< how far the waves bend the seabed, in screen fractions
 		Real m_shaderWaterWaveScale;	///< world units one wave tile covers
 		Real m_shaderWaterWaveStrength;	///< steepness of the waves
@@ -131,6 +132,7 @@ class WaterTransparencySetting : public Overridable
 
 			m_shaderWaterReflection = 3.0f;
 			m_shaderWaterSpecular = 1.0f;
+			m_shaderWaterSpecularSpread = 1.0f;
 			m_shaderWaterRefraction = 0.015f;
 			m_shaderWaterWaveScale = 160.0f;
 			m_shaderWaterWaveStrength = 0.3f;

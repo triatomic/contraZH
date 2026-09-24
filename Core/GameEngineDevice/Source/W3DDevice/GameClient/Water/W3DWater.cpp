@@ -1010,7 +1010,7 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 	const Coord3D &lightPos = TheGlobalData->m_terrainLightPos[0];
 	Vector3 toSun(-lightPos.x, -lightPos.y, -lightPos.z);
 	toSun.Normalize();
-	const Vector4 sunDirection(toSun.X, toSun.Y, toSun.Z, 256.0f);
+	const Vector4 sunDirection(toSun.X, toSun.Y, toSun.Z, 256.0f / max(TheWaterTransparency->m_shaderWaterSpecularSpread, 0.1f));
 	const RGBColor &sunDiffuse = TheGlobalData->m_terrainDiffuse[0];
 	const Real specular = TheWaterTransparency->m_shaderWaterSpecular;
 	const Vector4 sunColor(sunDiffuse.red * specular, sunDiffuse.green * specular, sunDiffuse.blue * specular, 0.0f);

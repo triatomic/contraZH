@@ -75,6 +75,7 @@ const FieldParse WaterTransparencySetting::m_waterTransparencySettingFieldParseT
 	{ "SkyboxTextureT",							INI::parseAsciiString,nullptr,			offsetof( WaterTransparencySetting, m_skyboxTextureT ) },
 	{ "ShaderWaterReflection",			INI::parseReal,				nullptr,			offsetof( WaterTransparencySetting, m_shaderWaterReflection ) },
 	{ "ShaderWaterSpecular",				INI::parseReal,				nullptr,			offsetof( WaterTransparencySetting, m_shaderWaterSpecular ) },
+	{ "ShaderWaterSpecularSpread",		INI::parseReal,				nullptr,			offsetof( WaterTransparencySetting, m_shaderWaterSpecularSpread ) },
 	{ "ShaderWaterRefraction",			INI::parseReal,				nullptr,			offsetof( WaterTransparencySetting, m_shaderWaterRefraction ) },
 	{ "ShaderWaterWaveScale",				INI::parseReal,				nullptr,			offsetof( WaterTransparencySetting, m_shaderWaterWaveScale ) },
 	{ "ShaderWaterWaveStrength",		INI::parseReal,				nullptr,			offsetof( WaterTransparencySetting, m_shaderWaterWaveStrength ) },
