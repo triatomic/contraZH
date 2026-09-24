@@ -334,6 +334,13 @@ No shows frames as soon as they are drawn. Without the key, vsync is on in fulls
 window, as before. Also `Vertical sync` in the advanced display options, applied on Accept. Needs
 `CheckVSync` in `OptionsMenu.wnd` for the menu control.)
 
+### Anti-aliasing
+
+* `AntiAliasing = 0` - (Multisample anti-aliasing: 0 off, 2, 4 or 8 samples. Also `Anti-aliasing` under
+Detail in the options menu, applied on Accept without a restart; a sample count the card lacks falls
+back to off. Needs `AntiAliasingLabel` in `OptionsMenu.wnd` and `ComboBoxAntiAliasing` not hidden
+for the menu control. Ambient occlusion is off while it is on.)
+
 ### Low latency mode
 
 * `LowLatency = No` - (Yes lets the game prepare at most one frame ahead of the graphics card, instead
