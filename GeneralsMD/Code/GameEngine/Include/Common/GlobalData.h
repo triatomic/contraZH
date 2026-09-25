@@ -266,6 +266,13 @@ public:
 	Real m_hazeNoiseSize;
 	Real m_hazeRise;
 	Real m_hazeMask;
+	std::vector<AsciiString> m_electricParticleTextures;	///< GameData ElectricParticleTextures: particle textures that get the electric shader when their system is Auto
+	Real m_electricArcs;				///< GameData ElectricArcs and the keys below: electric shader settings
+	Real m_electricArcSharpness;
+	Real m_electricNoiseSize;
+	Real m_electricJitter;
+	Real m_electricFlicker;
+	Real m_electricRate;
 	Real m_ambientOcclusionRadius;		///< GameData AmbientOcclusionRadius: how far, in world units, geometry darkens what is near it
 	Real m_ambientOcclusionStrength;	///< GameData AmbientOcclusionStrength: how dark the occlusion gets, 0 for none
 	Int  m_textureReductionFactor;	//how much to cut texture resolution: 2 is half, 3 is quarter, etc.
@@ -656,6 +663,7 @@ public:
   Bool m_waterReflections;        ///< Options.ini WaterReflections: smooth water mirrors the terrain, units and buildings
   Bool m_useSoftParticles;        ///< Options.ini SoftParticles: smoke and fire fade where they meet the ground and buildings
   Bool m_useFlameShaders;         ///< Options.ini FlameShaders: flame weapon fire flickers and glows white-hot at its core
+  Bool m_useElectricShaders;      ///< Options.ini ElectricShaders: electric sparks and flares crackle with arcs
   Bool m_useDynamicLights;        ///< Options.ini DynamicLights: explosions, muzzle flashes and lasers light their surroundings
   Bool m_usePixelLights;          ///< Options.ini PixelLights: those lights are drawn per pixel where the hardware allows
   Bool m_useAmbientOcclusion;     ///< Options.ini AmbientOcclusion: creases and the ground beneath objects darken where the hardware allows

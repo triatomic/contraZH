@@ -512,6 +512,7 @@ public:
   Bool m_useDynamicLights;        ///< Options.ini DynamicLights: explosions, muzzle flashes and lasers light their surroundings
   Bool m_useSoftParticles;        ///< Options.ini SoftParticles: smoke and fire fade where they meet the ground and buildings
   Bool m_useFlameShaders;         ///< Options.ini FlameShaders: flame weapon fire flickers and glows white-hot at its core
+  Bool m_useElectricShaders;      ///< Options.ini ElectricShaders: electric sparks and flares crackle with arcs
   Real m_softParticleDistance;    ///< how far in front of a surface a particle starts to fade, 0 for hard edges
   Real m_flameWarp;               ///< flame shading and heat haze defaults, see FlameShaderTuning
   Real m_flameHeat;
@@ -525,6 +526,13 @@ public:
   Real m_hazeNoiseSize;
   Real m_hazeRise;
   Real m_hazeMask;
+  std::vector<AsciiString> m_electricParticleTextures;  ///< particle textures that get the electric shader when their system is Auto
+  Real m_electricArcs;            ///< electric shader settings
+  Real m_electricArcSharpness;
+  Real m_electricNoiseSize;
+  Real m_electricJitter;
+  Real m_electricFlicker;
+  Real m_electricRate;
   Bool m_useAmbientOcclusion;     ///< Options.ini AmbientOcclusion: creases and the ground beneath objects darken where the hardware allows
   Bool m_ambientOcclusionDebug;   ///< Options.ini AmbientOcclusionDebug: show only the occlusion, in grey
   Real m_ambientOcclusionRadius;  ///< how far, in world units, geometry darkens what is near it

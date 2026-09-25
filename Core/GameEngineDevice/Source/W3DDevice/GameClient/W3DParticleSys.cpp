@@ -320,15 +320,23 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	}
 }
 
-// Flame systems shade as fire in every pass but the haze, which draws only them. A multiplied flame has no light to shade.
+// Flame systems shade as fire in every pass but the haze, which draws only them. Electric systems shade
+// in every pass but the haze, and a system that is both is a flame. A multiplied sprite has no light to shade.
 unsigned W3DParticleSystemManager::systemEffects(ParticleSystem &system, DrawPass pass)
 {
-	if (system.getShaderType() == ParticleSystemInfo::MULTIPLY || TheW3DSoftParticles == nullptr ||
-		!TheW3DSoftParticles->flameEnabled() || !system.isFlame())
+	if (system.getShaderType() == ParticleSystemInfo::MULTIPLY || TheW3DSoftParticles == nullptr)
 	{
 		return 0;
 	}
-	return (pass == DRAW_HAZE) ? SoftParticleHookClass::EFFECT_HAZE : SoftParticleHookClass::EFFECT_FLAME;
+	if (TheW3DSoftParticles->flameEnabled() && system.isFlame())
+	{
+		return (pass == DRAW_HAZE) ? SoftParticleHookClass::EFFECT_HAZE : SoftParticleHookClass::EFFECT_FLAME;
+	}
+	if (pass != DRAW_HAZE && TheW3DSoftParticles->electricEnabled() && system.isElectric())
+	{
+		return SoftParticleHookClass::EFFECT_ELECTRIC;
+	}
+	return 0;
 }
 
 void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass)
@@ -357,7 +365,8 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		}
 
 		// only systems with settings of their own carry them, so the rest keep batching together
-		const ParticleSystemTemplate *tuning = (effects != 0 && sys->getTemplate()->hasFlameTuning()) ? sys->getTemplate() : nullptr;
+		const Bool flameEffects = (effects & (SoftParticleHookClass::EFFECT_FLAME | SoftParticleHookClass::EFFECT_HAZE)) != 0;
+		const ParticleSystemTemplate *tuning = (flameEffects && sys->getTemplate()->hasFlameTuning()) ? sys->getTemplate() : nullptr;
 
 		// Handle smudge type particles
 		if (sys->isUsingSmudge())

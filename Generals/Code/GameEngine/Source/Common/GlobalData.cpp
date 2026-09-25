@@ -582,6 +582,7 @@ GlobalData::GlobalData()
   m_useDynamicLights = TRUE;
   m_useSoftParticles = TRUE;
   m_useFlameShaders = TRUE;
+  m_useElectricShaders = TRUE;
   m_softParticleDistance = 12.0f;
   m_flameWarp = 0.04f;
   m_flameHeat = 2.2f;
@@ -595,6 +596,13 @@ GlobalData::GlobalData()
   m_hazeNoiseSize = 14.0f;
   m_hazeRise = 1.1f;
   m_hazeMask = 2.0f;
+  m_electricParticleTextures.clear();
+  m_electricArcs = 1.5f;
+  m_electricArcSharpness = 10.0f;
+  m_electricNoiseSize = 40.0f;
+  m_electricJitter = 0.03f;
+  m_electricFlicker = 0.6f;
+  m_electricRate = 15.0f;
   m_useAmbientOcclusion = TRUE;
   m_ambientOcclusionDebug = FALSE;
   m_ambientOcclusionRadius = 12.0f;
@@ -1283,6 +1291,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_useDynamicLights = optionPref.getDynamicLightsEnabled();
 	TheWritableGlobalData->m_useSoftParticles = optionPref.getSoftParticlesEnabled();
 	TheWritableGlobalData->m_useFlameShaders = optionPref.getFlameShadersEnabled();
+	TheWritableGlobalData->m_useElectricShaders = optionPref.getElectricShadersEnabled();
 	TheWritableGlobalData->m_useAmbientOcclusion = optionPref.getAmbientOcclusionEnabled();
 	TheWritableGlobalData->m_ambientOcclusionDebug = optionPref.getAmbientOcclusionDebugEnabled();
 	TheWritableGlobalData->m_vsync = optionPref.getVSyncMode();

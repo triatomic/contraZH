@@ -271,6 +271,13 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ "HazeNoiseSize",						INI::parseReal,				nullptr,			offsetof( GlobalData, m_hazeNoiseSize ) },
 	{ "HazeRise",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_hazeRise ) },
 	{ "HazeMask",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_hazeMask ) },
+	{ "ElectricParticleTextures",			INI::parseAsciiStringVectorAppend,	nullptr,	offsetof( GlobalData, m_electricParticleTextures ) },
+	{ "ElectricArcs",						INI::parseReal,				nullptr,			offsetof( GlobalData, m_electricArcs ) },
+	{ "ElectricArcSharpness",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_electricArcSharpness ) },
+	{ "ElectricNoiseSize",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_electricNoiseSize ) },
+	{ "ElectricJitter",						INI::parseReal,				nullptr,			offsetof( GlobalData, m_electricJitter ) },
+	{ "ElectricFlicker",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_electricFlicker ) },
+	{ "ElectricRate",						INI::parseReal,				nullptr,			offsetof( GlobalData, m_electricRate ) },
 	{ "AmbientOcclusionRadius",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_ambientOcclusionRadius ) },
 	{ "AmbientOcclusionStrength",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_ambientOcclusionStrength ) },
 	{ "TextureReductionFactor",			INI::parseInt,				nullptr,			offsetof( GlobalData, m_textureReductionFactor ) },
@@ -803,6 +810,7 @@ GlobalData::GlobalData()
   m_waterReflections = TRUE;
   m_useSoftParticles = TRUE;
   m_useFlameShaders = TRUE;
+  m_useElectricShaders = TRUE;
   m_useDynamicLights = TRUE;
   m_usePixelLights = TRUE;
   m_useAmbientOcclusion = TRUE;
@@ -938,6 +946,13 @@ GlobalData::GlobalData()
 	m_hazeNoiseSize = 14.0f;
 	m_hazeRise = 1.1f;
 	m_hazeMask = 2.0f;
+	m_electricParticleTextures.clear();
+	m_electricArcs = 1.5f;
+	m_electricArcSharpness = 10.0f;
+	m_electricNoiseSize = 40.0f;
+	m_electricJitter = 0.03f;
+	m_electricFlicker = 0.6f;
+	m_electricRate = 15.0f;
 	m_ambientOcclusionRadius = 12.0f;
 	m_ambientOcclusionStrength = 1.0f;
 	m_textureReductionFactor = -1;
@@ -1564,6 +1579,7 @@ static const char *const LiveGameDataKeys[] =
 	"AmbientOcclusionRadius", "AmbientOcclusionStrength",
 	"FlameWarp", "FlameHeat", "FlameFlicker", "FlameBreakup", "FlameNoiseSize", "FlameRise",
 	"HazeBend", "HazeSize", "HazeLift", "HazeNoiseSize", "HazeRise", "HazeMask",
+	"ElectricArcs", "ElectricArcSharpness", "ElectricNoiseSize", "ElectricJitter", "ElectricFlicker", "ElectricRate",
 	nullptr
 };
 
@@ -1781,6 +1797,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_waterReflections = optionPref.getWaterReflectionsEnabled();
 	TheWritableGlobalData->m_useSoftParticles = optionPref.getSoftParticlesEnabled();
 	TheWritableGlobalData->m_useFlameShaders = optionPref.getFlameShadersEnabled();
+	TheWritableGlobalData->m_useElectricShaders = optionPref.getElectricShadersEnabled();
 	TheWritableGlobalData->m_useDynamicLights = optionPref.getDynamicLightsEnabled();
 	TheWritableGlobalData->m_usePixelLights = optionPref.getPixelLightsEnabled();
 	TheWritableGlobalData->m_useAmbientOcclusion = optionPref.getAmbientOcclusionEnabled();

@@ -458,6 +458,18 @@ public:
 	};
 	FlameShaderMode m_flameShader;
 
+	// Auto shades the system as electricity when its texture is in GameData.ini's ElectricParticleTextures.
+	enum ElectricShaderMode
+	{
+		ELECTRIC_SHADER_INVALID = 0,
+		ELECTRIC_SHADER_AUTO,
+		ELECTRIC_SHADER_YES,
+		ELECTRIC_SHADER_NO,
+
+		ELECTRIC_SHADER_COUNT
+	};
+	ElectricShaderMode m_electricShader;
+
 	enum WindMotion
 	{
 		WIND_MOTION_INVALID = 0,
@@ -529,6 +541,12 @@ static const char *const FlameShaderModeNames[] =
 	"NONE", "Auto", "Yes", "No", nullptr
 };
 static_assert(ARRAY_SIZE(FlameShaderModeNames) == ParticleSystemInfo::FLAME_SHADER_COUNT + 1, "Incorrect array size");
+
+static const char *const ElectricShaderModeNames[] =
+{
+	"NONE", "Auto", "Yes", "No", nullptr
+};
+static_assert(ARRAY_SIZE(ElectricShaderModeNames) == ParticleSystemInfo::ELECTRIC_SHADER_COUNT + 1, "Incorrect array size");
 
 #endif
 
@@ -677,6 +695,7 @@ public:
 	ParticleShaderType getShaderType() const { return m_shaderType; }
 
 	Bool isFlame();		///< draw with the flame shader
+	Bool isElectric();	///< draw with the electric shader
 
 	void setSlave( ParticleSystem *slave );			///< set a slave system for us
 	ParticleSystem *getSlave() { return m_slaveSystem; }
@@ -825,6 +844,8 @@ protected:
 	Bool							m_skipParentXfrm;											///< true if this system is already in world space.
 	Bool							m_flameKnown;													///< the Auto answer is worked out, at first draw once the projectile has launched
 	Bool							m_flameAuto;													///< the Auto answer
+	Bool							m_electricKnown;											///< the electric Auto answer is worked out
+	Bool							m_electricAuto;												///< the electric Auto answer
 
 
 	// the actual particle system data is inherited from ParticleSystemInfo

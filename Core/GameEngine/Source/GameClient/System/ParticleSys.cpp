@@ -860,6 +860,7 @@ ParticleSystemInfo::ParticleSystemInfo()
 	m_isEmitAboveGroundOnly = false;
 	m_isParticleUpTowardsEmitter = false;
 	m_flameShader = FLAME_SHADER_AUTO;
+	m_electricShader = ELECTRIC_SHADER_AUTO;
 
 	m_driftVelocity.zero();
 	m_gravity = 0.0f;
@@ -937,7 +938,8 @@ void ParticleSystemInfo::xfer( Xfer *xfer )
 	// version
 	// TheSuperHackers @feature version 2 adds m_conformToTerrain
 	// version 3 adds m_flameShader
-	XferVersion currentVersion = 3;
+	// version 4 adds m_electricShader
+	XferVersion currentVersion = 4;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1177,6 +1179,11 @@ void ParticleSystemInfo::xfer( Xfer *xfer )
 		xfer->xferUser( &m_flameShader, sizeof( FlameShaderMode ) );
 	}
 
+	if( version >= 4 )
+	{
+		xfer->xferUser( &m_electricShader, sizeof( ElectricShaderMode ) );
+	}
+
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1337,6 +1344,9 @@ ParticleSystem::ParticleSystem( const ParticleSystemTemplate *sysTemplate,
 	m_flameShader = sysTemplate->m_flameShader;
 	m_flameKnown = FALSE;
 	m_flameAuto = FALSE;
+	m_electricShader = sysTemplate->m_electricShader;
+	m_electricKnown = FALSE;
+	m_electricAuto = FALSE;
 
 	m_windMotion = sysTemplate->m_windMotion;
 	m_windAngleChange = sysTemplate->m_windAngleChange;
@@ -1651,6 +1661,32 @@ Bool ParticleSystem::isFlame()
 	m_flameKnown = TRUE;
 	m_flameAuto = flame;
 	return flame;
+}
+
+// ------------------------------------------------------------------------------------------------
+/** Auto looks the particle texture up in GameData.ini's ElectricParticleTextures, once per system */
+// ------------------------------------------------------------------------------------------------
+Bool ParticleSystem::isElectric()
+{
+	if (m_electricShader != ELECTRIC_SHADER_AUTO)
+	{
+		return m_electricShader == ELECTRIC_SHADER_YES;
+	}
+
+	if (!m_electricKnown)
+	{
+		m_electricKnown = TRUE;
+		const std::vector<AsciiString> &textures = TheGlobalData->m_electricParticleTextures;
+		for (std::vector<AsciiString>::const_iterator it = textures.begin(); it != textures.end(); ++it)
+		{
+			if (m_particleTypeName.compareNoCase( *it ) == 0)
+			{
+				m_electricAuto = TRUE;
+				break;
+			}
+		}
+	}
+	return m_electricAuto;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -3066,6 +3102,7 @@ const FieldParse ParticleSystemTemplate::m_fieldParseTable[] =
 
 	{ "WindMotion",					INI::parseIndexList, WindMotionNames, offsetof( ParticleSystemTemplate, m_windMotion ) },
 	{ "FlameShader",				INI::parseIndexList, FlameShaderModeNames, offsetof( ParticleSystemTemplate, m_flameShader ) },
+	{ "ElectricShader",			INI::parseIndexList, ElectricShaderModeNames, offsetof( ParticleSystemTemplate, m_electricShader ) },
 	{ "FlameWarp",					INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.warp ) },
 	{ "FlameHeat",					INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.heat ) },
 	{ "FlameFlicker",				INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.flicker ) },

@@ -442,6 +442,11 @@ Bool OptionPreferences::getFlameShadersEnabled(void) const
 	return getBool("FlameShaders", TRUE);
 }
 
+Bool OptionPreferences::getElectricShadersEnabled(void) const
+{
+	return getBool("ElectricShaders", TRUE);
+}
+
 Bool OptionPreferences::getDynamicLightsEnabled(void) const
 {
 	return getBool("DynamicLights", TRUE);
