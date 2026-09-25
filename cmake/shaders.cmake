@@ -67,7 +67,8 @@ set(RTS_SHADER_DIR "Core/GameEngineDevice/Source/W3DDevice/GameClient/Shaders")
 # Every shader rebuilds when a shared include changes, since fxc reports no dependencies.
 set(RTS_SHADER_INCLUDES
     "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/shadowreceive.hlsli"
-    "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/pointlights.hlsli")
+    "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/pointlights.hlsli"
+    "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/groundnoise.hlsli")
 
 rts_add_shader("${RTS_SHADER_DIR}/shadowdepth.hlsl"   ps_2_0 mainPackedPS  shadowdepthpacked.pso)
 rts_add_shader("${RTS_SHADER_DIR}/instancedepth.hlsl" vs_2_0 main instancedepth.vso             PACKED=0)
@@ -78,10 +79,12 @@ rts_add_shader("${RTS_SHADER_DIR}/instancedepth.hlsl" vs_2_0 main skindepthpacke
 rts_add_shader("${RTS_SHADER_DIR}/instancemain.hlsl"  vs_2_0 main skinmain.vso                  SKINNED=1)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadow.pso             NOISE_COUNT=0 PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadownoise.pso        NOISE_COUNT=1 PACKED=0)
-rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadownoise2.pso       NOISE_COUNT=2 PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadowpacked.pso       NOISE_COUNT=0 PACKED=1)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadownoisepacked.pso  NOISE_COUNT=1 PACKED=1)
-rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadownoise2packed.pso NOISE_COUNT=2 PACKED=1)
+# The ground noise leaves the shadowed variants with it too long for ps_2_0.
+rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_a main terrainshadownoise2.pso       NOISE_COUNT=2 PACKED=0)
+rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_a main terrainshadownoise2packed.pso NOISE_COUNT=2 PACKED=1)
+rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainnoise2noshadow.pso      NOISE_COUNT=2 SHADOWED=0 PACKED=0)
 # The terrain normal map variants take derivatives, which ps_2_0 lacks.
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_a main terrainbump.pso                 NOISE_COUNT=0 SHADOWED=1 PACKED=0 BUMP=1)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_a main terrainbumpnoise.pso            NOISE_COUNT=1 SHADOWED=1 PACKED=0 BUMP=1)
@@ -145,10 +148,11 @@ foreach(RTS_SEABED_LIT 0 1)
 endforeach()
 rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadow.pso                NOISE_COUNT=0 PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadownoise.pso           NOISE_COUNT=1 PACKED=0)
-rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadownoise2.pso          NOISE_COUNT=2 PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadowpacked.pso          NOISE_COUNT=0 PACKED=1)
 rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadownoisepacked.pso     NOISE_COUNT=1 PACKED=1)
-rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadownoise2packed.pso    NOISE_COUNT=2 PACKED=1)
+# The ground noise leaves the shadowed variants with it too long for ps_2_0.
+rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_a main roadshadownoise2.pso          NOISE_COUNT=2 PACKED=0)
+rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_a main roadshadownoise2packed.pso    NOISE_COUNT=2 PACKED=1)
 rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadnoshadow.pso              NOISE_COUNT=0 SHADOWED=0 PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadnoisenoshadow.pso         NOISE_COUNT=1 SHADOWED=0 PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadnoise2noshadow.pso        NOISE_COUNT=2 SHADOWED=0 PACKED=0)

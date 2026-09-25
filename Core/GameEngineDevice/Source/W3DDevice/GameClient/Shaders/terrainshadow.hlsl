@@ -6,7 +6,9 @@
 // then scales the colour the way the legacy stencil shadow did, by a factor taken
 // from the shadow colour.
 //
-// NOISE_COUNT (0-2) picks the legacy shader and PACKED picks the depth format.
+// NOISE_COUNT (0-2) picks the legacy shader and PACKED picks the depth format. With
+// two, the second map is W3DGroundNoise's texture, read through groundnoise.hlsli, and
+// the first is the cloud map or white.
 // SHADOWED (default 1) picks whether the shadow map is read at all. The shadow map
 // sits on the first stage after the noise maps. Fixed-function vertex processing
 // hands out texcoord sets in stage order, so a gap in the stages would move the
@@ -56,6 +58,10 @@ sampler2D Noise1Texture : register(s2);
 #endif
 #if NOISE_COUNT >= 2
 sampler2D Noise2Texture : register(s3);
+#endif
+
+#if NOISE_COUNT >= 2
+#include "groundnoise.hlsli"
 #endif
 
 #if SHADOWED
@@ -324,7 +330,7 @@ float4 main(PsIn input) : COLOR
     color *= tex2D(Noise1Texture, input.Noise1UV);
 #endif
 #if NOISE_COUNT >= 2
-    color *= tex2D(Noise2Texture, input.Noise2UV);
+    color.rgb *= GroundNoise(Noise2Texture, input.Noise2UV);
 #endif
 
 #if SHADOWED

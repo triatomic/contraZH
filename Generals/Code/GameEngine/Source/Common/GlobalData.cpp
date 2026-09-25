@@ -620,6 +620,10 @@ GlobalData::GlobalData()
   m_ambientOcclusionDebug = FALSE;
   m_ambientOcclusionRadius = 12.0f;
   m_ambientOcclusionStrength = 1.0f;
+  m_groundNoiseStrength = 0.12f;
+  m_groundNoiseSize = 1000.0f;
+  m_groundNoiseTint = 0.03f;
+  m_groundNoiseBrightness = 0.9f;
   m_vsync = -1;
   m_lowLatency = FALSE;
   m_alliedDecalMode = AlliedDecalMode_Default;

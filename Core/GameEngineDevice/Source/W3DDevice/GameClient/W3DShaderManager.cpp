@@ -64,6 +64,7 @@
 #include "W3DDevice/GameClient/W3DCustomScene.h"
 #include "W3DDevice/GameClient/W3DSmudge.h"
 #include "W3DDevice/GameClient/W3DShadowMap.h"
+#include "W3DDevice/GameClient/W3DGroundNoise.h"
 #include "GameClient/View.h"
 #include "GameClient/CommandXlat.h"
 #include "GameClient/Display.h"
@@ -2836,12 +2837,13 @@ class TerrainShader8Stage : public W3DShaderInterface
 class TerrainShaderPixelShader : public W3DShaderInterface
 {
 public:
-	TerrainShaderPixelShader() : m_shadowStage(-1), m_bumpStage(-1), m_lightStage(-1), m_seabedStage(-1) {}
+	TerrainShaderPixelShader() : m_dwGroundPixelShader(0), m_shadowStage(-1), m_bumpStage(-1), m_lightStage(-1), m_seabedStage(-1) {}
 
 private:
 	DWORD					m_dwBasePixelShader;	///<handle to terrain D3D pixel shader
 	DWORD					m_dwBaseNoise1PixelShader;	///<handle to terrain/single noise D3D pixel shader
 	DWORD					m_dwBaseNoise2PixelShader;	///<handle to terrain/double noise D3D pixel shader
+	DWORD					m_dwGroundPixelShader;	///<the double noise shader reading W3DGroundNoise as its second map, or 0 for the legacy light map
 	DWORD					m_dwShadowPixelShader[3];	///<the same three, also receiving the shadow map, indexed by noise texture count
 	Int						m_shadowStage;	///<stage the shadow map is bound to, or -1
 	DWORD					m_dwBumpPixelShader[2][3];	///<the same three with the normal atlas, unshadowed then shadowed
@@ -3266,6 +3268,12 @@ Int TerrainShaderPixelShader::shutdown()
 	m_dwBasePixelShader=0;
 	m_dwBaseNoise1PixelShader=0;
 	m_dwBaseNoise2PixelShader=0;
+
+	if (m_dwGroundPixelShader)
+	{
+		DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_dwGroundPixelShader);
+	}
+	m_dwGroundPixelShader=0;
 
 	for (Int i=0; i<3; i++)
 	{
@@ -3693,6 +3701,14 @@ Int TerrainShaderPixelShader::init()
 			if (FAILED(hr))
 				return FALSE;
 
+			m_dwGroundPixelShader = 0;
+#if defined(BUILD_WITH_D3D9)
+			if (FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\terrainnoise2noshadow.pso", nullptr, 0, false, &m_dwGroundPixelShader)))
+			{
+				m_dwGroundPixelShader = 0;
+			}
+#endif
+
 			initShadowReceiver();
 			initBump();
 			initPixelLights();
@@ -3749,7 +3765,20 @@ Int TerrainShaderPixelShader::set(Int pass)
 		DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
 	}
 
-	if (W3DShaderManager::getCurrentShader() >= W3DShaderManager::ST_TERRAIN_BASE_NOISE1)
+	// Where the ground noise can stand in for the light map it always does, as the second of two maps
+	// behind the clouds or white. When it fails to build, the ground goes without a light map.
+	const W3DShaderManager::ShaderTypes shader = W3DShaderManager::getCurrentShader();
+	const Bool cloudMap = (shader == W3DShaderManager::ST_TERRAIN_BASE_NOISE1 || shader == W3DShaderManager::ST_TERRAIN_BASE_NOISE12);
+	Bool lightMap = (shader == W3DShaderManager::ST_TERRAIN_BASE_NOISE2 || shader == W3DShaderManager::ST_TERRAIN_BASE_NOISE12);
+	const Bool groundNoise = lightMap && m_dwGroundPixelShader != 0 && W3DGroundNoise::getTexture() != nullptr &&
+		(cloudMap || W3DGroundNoise::getWhiteTexture() != nullptr);
+	if (m_dwGroundPixelShader != 0 && !groundNoise)
+	{
+		lightMap = FALSE;
+	}
+	const Bool twoMaps = groundNoise || (cloudMap && lightMap);
+
+	if (cloudMap || lightMap)
 	{
 		D3DMATRIX curView;
 		DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, curView);
@@ -3765,13 +3794,15 @@ Int TerrainShaderPixelShader::set(Int pass)
 		DX8Wrapper::Set_DX8_Texture_Stage_State(2,  D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
 		DX8Wrapper::Set_DX8_Texture_Stage_State(2,  D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
 
-		if (W3DShaderManager::getCurrentShader() == W3DShaderManager::ST_TERRAIN_BASE_NOISE12)
+		if (twoMaps)
 		{	//full shader
 			DX8Wrapper::Set_DX8_Texture_Stage_State(3,  D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
 			DX8Wrapper::Set_DX8_Texture_Stage_State(3,  D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
-			DX8Wrapper::_Get_D3D_Device8()->SetTexture(2, W3DShaderManager::getShaderTexture(2)->Peek_D3D_Texture());
-			DX8Wrapper::_Get_D3D_Device8()->SetTexture(3, W3DShaderManager::getShaderTexture(3)->Peek_D3D_Texture());
-			DX8Wrapper::Set_Pixel_Shader(m_dwBaseNoise2PixelShader);
+			TextureClass *first = cloudMap ? W3DShaderManager::getShaderTexture(2) : W3DGroundNoise::getWhiteTexture();
+			TextureClass *second = groundNoise ? W3DGroundNoise::getTexture() : W3DShaderManager::getShaderTexture(3);
+			DX8Wrapper::_Get_D3D_Device8()->SetTexture(2, first->Peek_D3D_Texture());
+			DX8Wrapper::_Get_D3D_Device8()->SetTexture(3, second->Peek_D3D_Texture());
+			DX8Wrapper::Set_Pixel_Shader(groundNoise ? m_dwGroundPixelShader : m_dwBaseNoise2PixelShader);
 
 			DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
 			DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
@@ -3788,12 +3819,18 @@ Int TerrainShaderPixelShader::set(Int pass)
 			DX8Wrapper::Set_DX8_Texture_Stage_State(3,  D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
 			// Two output coordinates are used.
 			DX8Wrapper::Set_DX8_Texture_Stage_State(3,  D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_COUNT2);
+
+			// The ground noise takes over the light map's texcoords and filtering.
+			if (groundNoise)
+			{
+				W3DGroundNoise::setupStage(3);
+			}
 		}
 		else
 		{	//single noise texture shader
 			DX8Wrapper::Set_Pixel_Shader(m_dwBaseNoise1PixelShader);
 
-			if (W3DShaderManager::getCurrentShader() == W3DShaderManager::ST_TERRAIN_BASE_NOISE1)
+			if (cloudMap)
 			{	//cloud map
 				DX8Wrapper::_Get_D3D_Device8()->SetTexture(2, W3DShaderManager::getShaderTexture(2)->Peek_D3D_Texture());
 				terrainShader2Stage.updateNoise1(&curView,&inv);	//update curView with texture matrix
@@ -3817,14 +3854,25 @@ Int TerrainShaderPixelShader::set(Int pass)
 
 	// Swap in the matching variant that also receives the shadow map.
 	Int noiseCount = 0;
-	if (W3DShaderManager::getCurrentShader() == W3DShaderManager::ST_TERRAIN_BASE_NOISE12)
+	if (twoMaps)
+	{
 		noiseCount = 2;
-	else if (W3DShaderManager::getCurrentShader() >= W3DShaderManager::ST_TERRAIN_BASE_NOISE1)
+	}
+	else if (cloudMap || lightMap)
+	{
 		noiseCount = 1;
+	}
+
+	// The two-map variants read the second map as the ground noise, so the legacy light map keeps the legacy shader.
+	if (twoMaps && !groundNoise)
+	{
+		return TRUE;
+	}
+
 	const Bool shadowed = setShadowReceiver(noiseCount);
 	const Bool bumped = setBump(noiseCount, shadowed);
 
-	const DWORD baseShaders[3] = { m_dwBasePixelShader, m_dwBaseNoise1PixelShader, m_dwBaseNoise2PixelShader };
+	const DWORD baseShaders[3] = { m_dwBasePixelShader, m_dwBaseNoise1PixelShader, m_dwGroundPixelShader };
 	const DWORD unlit = bumped ? m_dwBumpPixelShader[shadowed ? 1 : 0][noiseCount]
 		: (shadowed ? m_dwShadowPixelShader[noiseCount] : baseShaders[noiseCount]);
 	setPixelLights(noiseCount, shadowed, bumped, unlit);
@@ -4023,7 +4071,7 @@ private:
 
 	DWORD					m_dwBaseNoise2PixelShader;	///<handle to road/double noise D3D pixel shader
 	DWORD					m_dwShadowPixelShader[3];	///<every road mode, also receiving the shadow map, indexed by noise texture count
-	DWORD					m_dwPlainPixelShader[3];	///<every road mode without the shadow map, for lit draws' unlit neighbours
+	DWORD					m_dwPlainPixelShader[3];	///<every road mode without the shadow map, for lit draws' unlit neighbours and the ground noise
 	DWORD					m_dwLitPixelShader[2][3];	///<both again adding the point lights, by shadow and noise count
 	Int						m_shadowStage;	///<stage the shadow map is bound to, or -1
 	Int						m_lightStage;	///<stage the world position is generated on, or -1
@@ -4131,18 +4179,9 @@ void RoadShaderPixelShader::initPixelLights()
 	RoadPixelLightsLoaded = FALSE;
 
 #if defined(BUILD_WITH_D3D9)
-	const DX8Caps *caps = DX8Wrapper::Get_Current_Caps();
-	if (caps == nullptr || !Supports_Pixel_Shader_2_a(caps) || Get_Pixel_Light_Mode() < PIXEL_LIGHTS_TERRAIN)
-	{
-		return;
-	}
-
-	// Shadowed variants only go with the shadow receivers they replace.
-	const Bool shadowMap = (m_dwShadowPixelShader[0] != 0 && TheW3DShadowMap != nullptr);
-	const Bool packed = shadowMap && TheW3DShadowMap->getDepthMode() == W3DShadowMap::DEPTH_MODE_PACKED;
 	static const char *const noiseNames[3] = { "", "noise", "noise2" };
 
-	// Roads have no vertex lighting to hand lights over from, so a missing variant only leaves its draws unlit.
+	// The ground noise draws through these too, so they load on any device that runs them.
 	Bool complete = TRUE;
 	for (Int i=0; i<3; i++)
 	{
@@ -4153,6 +4192,22 @@ void RoadShaderPixelShader::initPixelLights()
 			m_dwPlainPixelShader[i]=0;
 			complete = FALSE;
 		}
+	}
+
+	const DX8Caps *caps = DX8Wrapper::Get_Current_Caps();
+	if (caps == nullptr || !Supports_Pixel_Shader_2_a(caps) || Get_Pixel_Light_Mode() < PIXEL_LIGHTS_TERRAIN)
+	{
+		return;
+	}
+
+	// Shadowed variants only go with the shadow receivers they replace.
+	const Bool shadowMap = (m_dwShadowPixelShader[0] != 0 && TheW3DShadowMap != nullptr);
+	const Bool packed = shadowMap && TheW3DShadowMap->getDepthMode() == W3DShadowMap::DEPTH_MODE_PACKED;
+
+	// Roads have no vertex lighting to hand lights over from, so a missing variant only leaves its draws unlit.
+	for (Int i=0; i<3; i++)
+	{
+		char file[64];
 		for (Int s=0; s<(shadowMap ? 2 : 1); s++)
 		{
 			snprintf(file, sizeof(file), "shaders\\roadlit%s%s.pso", noiseNames[i], s == 0 ? "noshadow" : (packed ? "packed" : ""));
@@ -4173,12 +4228,26 @@ Bool RoadShaderPixelShader::setPixelPath()
 {
 	const W3DShaderManager::ShaderTypes shader = W3DShaderManager::getCurrentShader();
 	const Bool cloudMap = (shader == W3DShaderManager::ST_ROAD_BASE_NOISE1 || shader == W3DShaderManager::ST_ROAD_BASE_NOISE12);
-	const Bool lightMap = (shader == W3DShaderManager::ST_ROAD_BASE_NOISE2 || shader == W3DShaderManager::ST_ROAD_BASE_NOISE12);
-	const Int noiseCount = (cloudMap ? 1 : 0) + (lightMap ? 1 : 0);
+	const Bool anyLightMap = (shader == W3DShaderManager::ST_ROAD_BASE_NOISE2 || shader == W3DShaderManager::ST_ROAD_BASE_NOISE12);
+
+	// As on the terrain, the ground noise stands in for the light map as the second of two maps,
+	// behind the clouds or white, and the light map goes when the noise fails to build.
+	const Bool groundCapable = (m_dwPlainPixelShader[0] != 0 && m_dwPlainPixelShader[1] != 0 && m_dwPlainPixelShader[2] != 0);
+	const Bool groundNoise = anyLightMap && groundCapable && W3DGroundNoise::getTexture() != nullptr &&
+		(cloudMap || W3DGroundNoise::getWhiteTexture() != nullptr);
+	const Bool lightMap = anyLightMap && !groundCapable;
+	const Int noiseCount = groundNoise ? 2 : (cloudMap ? 1 : 0) + (lightMap ? 1 : 0);
+
+	// The two-map variants read the second map as the ground noise, so the legacy light map keeps the legacy shaders.
+	if (noiseCount == 2 && !groundNoise)
+	{
+		return FALSE;
+	}
 
 	Bool shadowed = (m_dwShadowPixelShader[noiseCount] != 0 && TheW3DShadowMap != nullptr && TheW3DShadowMap->hasDepth());
 	const Bool lightable = (RoadPixelLightsLoaded && PixelLightCount > 0);
-	if (!shadowed && !lightable)
+	const Bool lightMapReplaced = (anyLightMap && groundCapable);
+	if (!shadowed && !lightable && !lightMapReplaced)
 	{
 		return FALSE;
 	}
@@ -4195,7 +4264,7 @@ Bool RoadShaderPixelShader::setPixelPath()
 		shadowed = TheW3DShadowMap->bindReceiver(stage);
 		m_shadowStage = shadowed ? stage : -1;
 	}
-	if (!shadowed && !lightable)
+	if (!shadowed && !lightable && !lightMapReplaced)
 	{
 		return FALSE;
 	}
@@ -4225,8 +4294,10 @@ Bool RoadShaderPixelShader::setPixelPath()
 	for (Int map=0; map<2; map++)
 	{
 		const Bool isCloud = (map == 0);
-		if (isCloud ? !cloudMap : !lightMap)
+		if (isCloud ? !(cloudMap || groundNoise) : !(lightMap || groundNoise))
+		{
 			continue;
+		}
 
 		D3DMATRIX textureTransform = curView;
 		if (isCloud)
@@ -4234,7 +4305,13 @@ Bool RoadShaderPixelShader::setPixelPath()
 		else
 			terrainShader2Stage.updateNoise2(&textureTransform, &inv, false);
 
-		DX8Wrapper::Set_Texture(noiseStage, W3DShaderManager::getShaderTexture(isCloud ? 1 : 2));
+		// White stands in for missing clouds, and the ground noise for the light map.
+		TextureClass *texture = W3DShaderManager::getShaderTexture(isCloud ? 1 : 2);
+		if (groundNoise)
+		{
+			texture = isCloud ? (cloudMap ? texture : W3DGroundNoise::getWhiteTexture()) : W3DGroundNoise::getTexture();
+		}
+		DX8Wrapper::Set_Texture(noiseStage, texture);
 		DX8Wrapper::_Set_DX8_Transform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + noiseStage), textureTransform);
 
 		DX8Wrapper::Set_DX8_Texture_Stage_State(noiseStage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
@@ -4244,6 +4321,10 @@ Bool RoadShaderPixelShader::setPixelPath()
 		DX8Wrapper::Set_DX8_Texture_Stage_State(noiseStage, D3DTSS_MIPFILTER, mipFilter);
 		DX8Wrapper::Set_DX8_Texture_Stage_State(noiseStage, D3DTSS_MINFILTER, isCloud ? D3DTEXF_LINEAR : D3DTEXF_POINT);
 		DX8Wrapper::Set_DX8_Texture_Stage_State(noiseStage, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+		if (groundNoise && !isCloud)
+		{
+			W3DGroundNoise::setupStage(noiseStage);
+		}
 		noiseStage++;
 	}
 
@@ -4775,6 +4856,8 @@ void W3DShaderManager::shutdown()
 	}
 	ObjectSpecularPasses.clear();
 	ObjectSpecularPassesUsed = 0;
+
+	W3DGroundNoise::releaseResources();
 
 #if defined(BUILD_WITH_D3D9)
 	DX8InstancingClass::Set_Main_Shader(nullptr);

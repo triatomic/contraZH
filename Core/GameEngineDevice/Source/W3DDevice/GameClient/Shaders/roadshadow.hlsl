@@ -5,7 +5,9 @@
 // does it for both maps and the fixed-function two-stage path does it for fewer.
 // Roads blend onto terrain by their alpha, so the shadow scales colour only.
 //
-// NOISE_COUNT (0-2) is how many maps apply and PACKED picks the depth format.
+// NOISE_COUNT (0-2) is how many maps apply and PACKED picks the depth format. With
+// two, the second is W3DGroundNoise's texture, read through groundnoise.hlsli, and the
+// first is the cloud map or white.
 // SHADOWED (default 1) picks whether the shadow map is read at all. The shadow map
 // sits on the first stage after the maps, because fixed-function vertex processing
 // hands out texcoord sets in stage order.
@@ -33,6 +35,10 @@ sampler2D Noise1Texture : register(s1);
 #endif
 #if NOISE_COUNT >= 2
 sampler2D Noise2Texture : register(s2);
+#endif
+
+#if NOISE_COUNT >= 2
+#include "groundnoise.hlsli"
 #endif
 
 #if SHADOWED
@@ -110,7 +116,7 @@ float4 main(PsIn input) : COLOR
     color *= tex2D(Noise1Texture, input.Noise1UV);
 #endif
 #if NOISE_COUNT >= 2
-    color *= tex2D(Noise2Texture, input.Noise2UV);
+    color.rgb *= GroundNoise(Noise2Texture, input.Noise2UV);
 #endif
 
 #if SHADOWED

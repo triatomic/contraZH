@@ -288,6 +288,10 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ "LaserDebug",							INI::parseBool,				nullptr,			offsetof( GlobalData, m_laserDebug ) },
 	{ "AmbientOcclusionRadius",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_ambientOcclusionRadius ) },
 	{ "AmbientOcclusionStrength",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_ambientOcclusionStrength ) },
+	{ "GroundNoiseStrength",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_groundNoiseStrength ) },
+	{ "GroundNoiseSize",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_groundNoiseSize ) },
+	{ "GroundNoiseTint",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_groundNoiseTint ) },
+	{ "GroundNoiseBrightness",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_groundNoiseBrightness ) },
 	{ "TextureReductionFactor",			INI::parseInt,				nullptr,			offsetof( GlobalData, m_textureReductionFactor ) },
 	{ "UseBehindBuildingMarker",		INI::parseBool,				nullptr,			offsetof( GlobalData, m_enableBehindBuildingMarkers ) },
 	{ "WaterPositionX",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_waterPositionX ) },
@@ -980,6 +984,10 @@ GlobalData::GlobalData()
 	m_laserDebug = FALSE;
 	m_ambientOcclusionRadius = 12.0f;
 	m_ambientOcclusionStrength = 1.0f;
+	m_groundNoiseStrength = 0.12f;
+	m_groundNoiseSize = 1000.0f;
+	m_groundNoiseTint = 0.03f;
+	m_groundNoiseBrightness = 0.9f;
 	m_textureReductionFactor = -1;
 	m_enableBehindBuildingMarkers = TRUE;
 	m_scriptDebug = FALSE;
@@ -1602,6 +1610,7 @@ static const char *const LiveGameDataKeys[] =
 	"UnitSpecularIntensity", "UnitSpecularPower", "UnitBumpHeight", "UnitNormalMapStrength", "TerrainNormalMapStrength",
 	"UnitEmissiveIntensity", "UnitEmissiveNightIntensity", "SoftParticleDistance",
 	"AmbientOcclusionRadius", "AmbientOcclusionStrength",
+	"GroundNoiseStrength", "GroundNoiseSize", "GroundNoiseTint", "GroundNoiseBrightness",
 	"FlameWarp", "FlameHeat", "FlameFlicker", "FlameBreakup", "FlameNoiseSize", "FlameRise",
 	"HazeBend", "HazeSize", "HazeLift", "HazeNoiseSize", "HazeRise", "HazeMask",
 	"ElectricArcs", "ElectricArcSharpness", "ElectricNoiseSize", "ElectricJitter", "ElectricFlicker", "ElectricRate",

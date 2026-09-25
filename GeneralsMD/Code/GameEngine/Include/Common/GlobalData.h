@@ -283,6 +283,10 @@ public:
 	Bool m_laserDebug;					///< GameData LaserDebug: shaded beams darken the scene instead of lighting it, to show the shader's shape
 	Real m_ambientOcclusionRadius;		///< GameData AmbientOcclusionRadius: how far, in world units, geometry darkens what is near it
 	Real m_ambientOcclusionStrength;	///< GameData AmbientOcclusionStrength: how dark the occlusion gets, 0 for none
+	Real m_groundNoiseStrength;			///< GameData GroundNoiseStrength and the keys below: the noise that stands in for the light map, see W3DGroundNoise
+	Real m_groundNoiseSize;
+	Real m_groundNoiseTint;
+	Real m_groundNoiseBrightness;
 	Int  m_textureReductionFactor;	//how much to cut texture resolution: 2 is half, 3 is quarter, etc.
 	Bool m_enableBehindBuildingMarkers;
 	Real m_waterPositionX;

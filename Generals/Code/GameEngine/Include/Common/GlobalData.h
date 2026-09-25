@@ -546,6 +546,10 @@ public:
   Bool m_ambientOcclusionDebug;   ///< Options.ini AmbientOcclusionDebug: show only the occlusion, in grey
   Real m_ambientOcclusionRadius;  ///< how far, in world units, geometry darkens what is near it
   Real m_ambientOcclusionStrength; ///< how dark the occlusion gets, 0 for none
+  Real m_groundNoiseStrength;     ///< the noise that stands in for the light map, see W3DGroundNoise
+  Real m_groundNoiseSize;
+  Real m_groundNoiseTint;
+  Real m_groundNoiseBrightness;
   Int m_vsync;                    ///< Options.ini VSync: 1 on, 0 off, -1 on in fullscreen and off in a window
   Bool m_lowLatency;              ///< Options.ini LowLatency: at most one frame queued ahead of the GPU
   Int m_alliedDecalMode;          ///< Options.ini AlliedDecalMode: how allied power decals are drawn

@@ -9,7 +9,7 @@ Cheat builds reload `Data\INI\GameData.ini` about half a second after it is save
 keys can be adjusted with a map running: `UnitSpecularIntensity`, `UnitSpecularPower`,
 `UnitBumpHeight`, `UnitNormalMapStrength`, `TerrainNormalMapStrength`, `UnitEmissiveIntensity`,
 `UnitEmissiveNightIntensity`, `SoftParticleDistance`, `AmbientOcclusionRadius`,
-`AmbientOcclusionStrength` and the `Flame`, `Haze`, `Electric` and `Laser` tuning keys. Other `GameData.ini` keys keep their
+`AmbientOcclusionStrength`, the `GroundNoise` keys and the `Flame`, `Haze`, `Electric` and `Laser` tuning keys. Other `GameData.ini` keys keep their
 value until a restart. The saved values win over a map's `map.ini` until the map loads again. A
 deleted key keeps its value until a restart, and a file with an error applies only the keys above
 the error until the next save.
@@ -401,6 +401,30 @@ draw over it unshaded.
 * It darkens the whole colour, lit or not, including glow masks and highlights.
 * Launch with `CONTRA_SSAO=0` to turn it off. `CONTRA_SOFTPARTICLES` other than 1 turns it off too,
 since that also removes the readable scene depth.
+
+## Ground noise
+
+`Ground Lighting` (`UseLightMap`) no longer multiplies the terrain by `TSNoiseUrb`, a 256 texel grey
+cloud that repeats every 31 tiles. The game builds a noise texture at load instead and reads it at
+three scales, each turned against the last, so no view shows the pattern repeat. Broad patches,
+finer mottling and a slight warm or cool tint break up the tiling of the terrain textures. The
+average brightness matches the old texture. Roads and blend tiles get the same noise, so they meet
+the terrain without a seam.
+
+Tuned in the mod's `GameData.ini`:
+
+* `GroundNoiseStrength = 0.12` - (How far the ground's brightness strays from its average. 0 gives an
+even tone.)
+* `GroundNoiseSize = 1000` - (World units across the broadest patches. The finer layers are 2.2 and 5
+times smaller.)
+* `GroundNoiseTint = 0.03` - (How far patches lean warm or cool. 0 keeps them grey.)
+* `GroundNoiseBrightness = 0.9` - (The ground's average brightness under the noise. 0.9 matches
+`TSNoiseUrb`; 1.0 leaves the terrain as bright as with `Ground Lighting` off.)
+
+Notes:
+* The pattern repeats only across four `GroundNoiseSize` spans, 4000 world units at the default.
+* The Direct3D 8 build and the lower terrain detail settings keep `TSNoiseUrb`.
+* On cards without shader model 2.0a, terrain and road shadows turn off while `Ground Lighting` is on.
 
 ## Shader water
 
