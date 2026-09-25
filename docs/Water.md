@@ -81,6 +81,10 @@ smaller values keep neighbouring cells closer alike, and 0 leaves the plain repe
 * `ShaderWaterStochasticRotation = 1` - (How far each cell also turns the water texture. 1 turns it
 up to 170 degrees either way, and 0 only shifts it. The texture drifts the same way in every cell.
 Only the lake and sea swell builds turn it; rivers, foam and ripples are shifted alone.)
+* `ShaderWaterStochasticSeabed = Yes` - (The same cells also shift and turn the terrain textures under
+standing water, fading in below the waterline over `TransparentWaterDepth`. Cliffs keep their own
+texturing, and ground under rivers is left as it is. Terrain chunks with standing water draw through
+their own shaders, which take six point lights instead of nine. No turns it off.)
 
 ## Animation
 
@@ -154,6 +158,7 @@ One block. `map.ini` can override any of these keys for its map.
 | `ShaderWaterStochasticSharpness` | number | `3` | `-15` **(hard)** - `16` | Narrows the blend between cells. `1` softens the textures, below `1` softens them a little more, above `16` the cell edges show. |
 | `ShaderWaterStochasticRandom` | number | `1` | `0` - `1` **(hard)** | How far each cell shifts the textures. `0` leaves the plain repeating textures. |
 | `ShaderWaterStochasticRotation` | number | `1` | `0` - `1` **(hard)** | How far each cell turns the water texture, up to 170 degrees either way at `1`. Lakes and seas with swell only. |
+| `ShaderWaterStochasticSeabed` | Yes/No | `Yes` | - | `Yes` also hex-tiles the terrain under standing water. Needs pixel shader 2.0a. |
 | `ShaderWaterFoamDepth` | number | `6` | `0` - `30` | Depth where shore foam fades out. `0` turns foam off, crest foam included. |
 | `ShaderWaterFoamReach` | number | `15` | `0` - `40` | World units from land within which water foams as at the shore. `0` leaves foam to the depth alone. |
 | `ShaderWaterFoamScale` | number | `150` | `1` **(hard)** - `600` | World units one foam pattern covers up close. It doubles further out, so the foam stays readable at any zoom. |
