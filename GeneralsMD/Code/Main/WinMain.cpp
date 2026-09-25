@@ -48,7 +48,6 @@
 
 // USER INCLUDES //////////////////////////////////////////////////////////////
 #include "WinMain.h"
-#include "Lib/BaseType.h"
 #include "Common/CommandLine.h"
 #include "Common/CriticalSection.h"
 #include "Common/DedicatedGpuExports.h"

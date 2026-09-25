@@ -31,7 +31,6 @@
 
 #include <math.h>
 
-#include "Lib/BaseType.h"
 #include "Lib/trig.h"
 
 #if USE_DETERMINISTIC_MATH

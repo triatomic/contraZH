@@ -26,9 +26,6 @@
 #define VC_EXTRALEAN		// Exclude rarely-used stuff from Windows headers
 
 
-// To prevent pragma errors.
-#include "Lib/BaseType.h"
-
 // TheSuperHackers @build xezon 24/03/2025 Prevent afxwin.h from loading d3d9types.h, colliding with our own DirectX library.
 // On the D3D9 backend the engine itself includes d3d9.h, so the real d3d9types.h must load;
 // pre-defining its guard there would leave every D3D9 type undeclared.
