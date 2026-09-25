@@ -74,9 +74,10 @@ edges, but their ripples and foam are shifted.
 * `ShaderWaterStochasticSize = 100` - (World units between neighbouring cells. Smaller breaks the
 pattern up more but blends more of the surface. 0 turns it off.)
 * `ShaderWaterStochasticSharpness = 3` - (Narrows the blend between cells. 1 blends everywhere and
-softens the textures, higher keeps each cell's texture crisp up to a narrower seam. Between 0 and 1
-the blend spreads further. 0 mixes all three cells evenly and negative values favour the farther
-cells, and both show the cell edges as seams.)
+softens the textures, higher keeps each cell's texture crisp up to a narrower seam. Below 1 the
+blend spreads a little further, easing to its softest at -15, and never shows the cell edges.)
+* `ShaderWaterStochasticRandom = 1` - (How far each cell shifts the textures. 1 shifts them anywhere,
+smaller values keep neighbouring cells closer alike, and 0 leaves the plain repeating textures.)
 
 ## Animation
 
@@ -147,7 +148,8 @@ One block. `map.ini` can override any of these keys for its map.
 | `ShaderWaterWaveScale` | number | `160` | `1` **(hard)** - `2000` | World units one ripple pattern covers. Below `50` the ripples shimmer, above `2000` they are too broad to see. |
 | `ShaderWaterWaveStrength` | number | `0.3` | `0` - `2` | Ripple steepness. `0` is flat. Above `2` the surface turns to glitter. |
 | `ShaderWaterStochasticSize` | number | `100` | `0`, or `30` - `1000` | World units between the cells that shift the textures to hide their tiling. `0` turns it off. Below `30` the textures blur, above `1000` the pattern shows within a cell. |
-| `ShaderWaterStochasticSharpness` | number | `3` | `-15` **(hard)** - `16`, looks right from `1` | Narrows the blend between cells. `1` softens the textures, above `16` the cell edges show. `0` and below show seams along the cell edges. |
+| `ShaderWaterStochasticSharpness` | number | `3` | `-15` **(hard)** - `16` | Narrows the blend between cells. `1` softens the textures, below `1` softens them a little more, above `16` the cell edges show. |
+| `ShaderWaterStochasticRandom` | number | `1` | `0` - `1` **(hard)** | How far each cell shifts the textures. `0` leaves the plain repeating textures. |
 | `ShaderWaterFoamDepth` | number | `6` | `0` - `30` | Depth where shore foam fades out. `0` turns foam off, crest foam included. |
 | `ShaderWaterFoamReach` | number | `15` | `0` - `40` | World units from land within which water foams as at the shore. `0` leaves foam to the depth alone. |
 | `ShaderWaterFoamScale` | number | `150` | `1` **(hard)** - `600` | World units one foam pattern covers up close. It doubles further out, so the foam stays readable at any zoom. |
