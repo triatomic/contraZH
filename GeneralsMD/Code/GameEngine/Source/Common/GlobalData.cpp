@@ -285,6 +285,7 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ "LaserPulse",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserPulse ) },
 	{ "LaserPulseSize",						INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserPulseSize ) },
 	{ "LaserPulseSpeed",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserPulseSpeed ) },
+	{ "LaserDebug",							INI::parseBool,				nullptr,			offsetof( GlobalData, m_laserDebug ) },
 	{ "AmbientOcclusionRadius",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_ambientOcclusionRadius ) },
 	{ "AmbientOcclusionStrength",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_ambientOcclusionStrength ) },
 	{ "TextureReductionFactor",			INI::parseInt,				nullptr,			offsetof( GlobalData, m_textureReductionFactor ) },
@@ -756,6 +757,7 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ "LaserGroundGlowRadius",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserGlowRadius ) },
 	{ "LaserGroundGlowFalloff",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserGlowFalloff ) },
 	{ "LaserGroundGlowWrap",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserGlowWrap ) },
+	{ "LaserGroundGlowDebug",			INI::parseBool,				nullptr,			offsetof( GlobalData, m_laserGlowDebug ) },
 	
 	// {"ChronoDamageTintStatusType", TintStatusFlags::parseSingleBitFromINI, NULL, offsetof(GlobalData, m_chronoTintStatusType) },
 	{"ChronoDamageParticleSystemLarge", INI::parseAsciiString, NULL, offsetof(GlobalData, m_chronoDisableParticleSystemLarge) },
@@ -835,6 +837,7 @@ GlobalData::GlobalData()
   m_laserGlowRadius = 0.0f;
   m_laserGlowFalloff = 2.0f;
   m_laserGlowWrap = 0.5f;
+  m_laserGlowDebug = FALSE;
 
 #if defined(RTS_DEBUG) || ENABLE_CONFIGURABLE_SHROUD
 	m_shroudOn = TRUE;
@@ -974,6 +977,7 @@ GlobalData::GlobalData()
 	m_laserPulse = 0.4f;
 	m_laserPulseSize = 120.0f;
 	m_laserPulseSpeed = 400.0f;
+	m_laserDebug = FALSE;
 	m_ambientOcclusionRadius = 12.0f;
 	m_ambientOcclusionStrength = 1.0f;
 	m_textureReductionFactor = -1;
@@ -1601,8 +1605,8 @@ static const char *const LiveGameDataKeys[] =
 	"FlameWarp", "FlameHeat", "FlameFlicker", "FlameBreakup", "FlameNoiseSize", "FlameRise",
 	"HazeBend", "HazeSize", "HazeLift", "HazeNoiseSize", "HazeRise", "HazeMask",
 	"ElectricArcs", "ElectricArcSharpness", "ElectricNoiseSize", "ElectricJitter", "ElectricFlicker", "ElectricRate",
-	"LaserCore", "LaserCoreWidth", "LaserShimmer", "LaserPulse", "LaserPulseSize", "LaserPulseSpeed",
-	"LaserGroundGlowRadius", "LaserGroundGlowFalloff", "LaserGroundGlowWrap",
+	"LaserCore", "LaserCoreWidth", "LaserShimmer", "LaserPulse", "LaserPulseSize", "LaserPulseSpeed", "LaserDebug",
+	"LaserGroundGlowRadius", "LaserGroundGlowFalloff", "LaserGroundGlowWrap", "LaserGroundGlowDebug",
 	nullptr
 };
 

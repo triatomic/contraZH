@@ -551,6 +551,7 @@ GlobalData* GlobalData::m_theOriginal = nullptr;
 	{ "LaserGroundGlowRadius",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserGlowRadius ) },
 	{ "LaserGroundGlowFalloff",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserGlowFalloff ) },
 	{ "LaserGroundGlowWrap",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserGlowWrap ) },
+	{ "LaserGroundGlowDebug",			INI::parseBool,				nullptr,			offsetof( GlobalData, m_laserGlowDebug ) },
 
 	{ nullptr,					nullptr,						nullptr,						0 }
 
@@ -614,6 +615,7 @@ GlobalData::GlobalData()
   m_laserPulse = 0.4f;
   m_laserPulseSize = 120.0f;
   m_laserPulseSpeed = 400.0f;
+  m_laserDebug = FALSE;
   m_useAmbientOcclusion = TRUE;
   m_ambientOcclusionDebug = FALSE;
   m_ambientOcclusionRadius = 12.0f;
@@ -626,6 +628,7 @@ GlobalData::GlobalData()
   m_laserGlowRadius = 0.0f;
   m_laserGlowFalloff = 2.0f;
   m_laserGlowWrap = 0.5f;
+  m_laserGlowDebug = FALSE;
 	m_newRadar = FALSE;
 	m_smartSelection = TRUE;
 	m_smartSelectionUseMouse = TRUE;

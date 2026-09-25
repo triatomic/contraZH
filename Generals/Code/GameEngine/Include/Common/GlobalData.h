@@ -541,6 +541,7 @@ public:
   Real m_laserPulse;
   Real m_laserPulseSize;
   Real m_laserPulseSpeed;
+  Bool m_laserDebug;              ///< shaded beams darken the scene instead of lighting it, to show the shader's shape
   Bool m_useAmbientOcclusion;     ///< Options.ini AmbientOcclusion: creases and the ground beneath objects darken where the hardware allows
   Bool m_ambientOcclusionDebug;   ///< Options.ini AmbientOcclusionDebug: show only the occlusion, in grey
   Real m_ambientOcclusionRadius;  ///< how far, in world units, geometry darkens what is near it
@@ -553,6 +554,7 @@ public:
   Real m_laserGlowRadius;         ///< GameData LaserGroundGlowRadius: how far the light reaches from the beam, 0 derives it from the beam width
   Real m_laserGlowFalloff;        ///< GameData LaserGroundGlowFalloff: power the light fades by with distance, Direct3D 9 only
   Real m_laserGlowWrap;           ///< GameData LaserGroundGlowWrap: how much ground facing away from the beam still lights, Direct3D 9 only
+  Bool m_laserGlowDebug;          ///< GameData LaserGroundGlowDebug: the glow darkens the ground instead of lighting it, Direct3D 9 only
 
 	// TheSuperHackers @feature Outline the radar blips and the shoreline, at double radar
 	// resolution. Client side only; the radar never feeds game logic.

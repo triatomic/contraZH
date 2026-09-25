@@ -189,6 +189,7 @@ void W3DLaserGlow::render(RenderInfoClass &rinfo)
 	}
 
 	DX8Wrapper::Set_Pixel_Shader(0);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_BLENDOP, D3DBLENDOP_ADD);
 	DX8Wrapper::Set_Vertex_Buffer(nullptr);
 	DX8Wrapper::Set_Index_Buffer(nullptr, 0);
 
@@ -310,6 +311,8 @@ void W3DLaserGlow::drawGlow(WorldHeightMap *map, const Glow &glow, const Vector3
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE, TRUE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_DESTCOLOR);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_ONE);
+	// LaserGroundGlowDebug turns it into dest * (1 - light), a shadow the shape of the light.
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_BLENDOP, TheGlobalData->m_laserGlowDebug ? D3DBLENDOP_REVSUBTRACT : D3DBLENDOP_ADD);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHATESTENABLE, FALSE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_CULLMODE, D3DCULL_NONE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_FOGENABLE, FALSE);

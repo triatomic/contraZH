@@ -280,6 +280,7 @@ public:
 	Real m_laserPulse;
 	Real m_laserPulseSize;
 	Real m_laserPulseSpeed;
+	Bool m_laserDebug;					///< GameData LaserDebug: shaded beams darken the scene instead of lighting it, to show the shader's shape
 	Real m_ambientOcclusionRadius;		///< GameData AmbientOcclusionRadius: how far, in world units, geometry darkens what is near it
 	Real m_ambientOcclusionStrength;	///< GameData AmbientOcclusionStrength: how dark the occlusion gets, 0 for none
 	Int  m_textureReductionFactor;	//how much to cut texture resolution: 2 is half, 3 is quarter, etc.
@@ -685,6 +686,7 @@ public:
   Real m_laserGlowRadius;         ///< GameData LaserGroundGlowRadius: how far the light reaches from the beam, 0 derives it from the beam width
   Real m_laserGlowFalloff;        ///< GameData LaserGroundGlowFalloff: power the light fades by with distance, Direct3D 9 only
   Real m_laserGlowWrap;           ///< GameData LaserGroundGlowWrap: how much ground facing away from the beam still lights, Direct3D 9 only
+  Bool m_laserGlowDebug;          ///< GameData LaserGroundGlowDebug: the glow darkens the ground instead of lighting it, Direct3D 9 only
 
 #if defined(RTS_DEBUG) || ENABLE_CONFIGURABLE_SHROUD
 	Bool m_shroudOn;

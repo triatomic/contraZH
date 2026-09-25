@@ -661,6 +661,12 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const 
 	{
 		bindLaser();
 		m_bound = EFFECT_LASER;
+
+		// LaserDebug subtracts the beam from the scene, so its core, pulses and edges show dark on anything.
+		if (TheGlobalData->m_laserDebug)
+		{
+			DX8Wrapper::Set_DX8_Render_State(D3DRS_BLENDOP, D3DBLENDOP_REVSUBTRACT);
+		}
 	}
 	Bind_Camera_Position();
 
@@ -690,6 +696,9 @@ void W3DSoftParticles::End()
 	if ((m_bound & EFFECT_LASER) != 0)
 	{
 		DX8Wrapper::Set_DX8_Texture_Stage_State(NOISE_STAGE, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_PASSTHRU | NOISE_STAGE);
+
+		// ShaderClass never sets the blend op, so it is put back here.
+		DX8Wrapper::Set_DX8_Render_State(D3DRS_BLENDOP, D3DBLENDOP_ADD);
 	}
 	if ((m_bound & EFFECT_HAZE) != 0)
 	{
