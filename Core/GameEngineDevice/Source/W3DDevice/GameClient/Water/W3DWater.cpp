@@ -1280,7 +1280,9 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 		}
 
 		// Stored depth is z over w, which a perspective projection makes a + b / w.
-		const Vector4 depthMapping(sceneDepth ? projection._33 / projection._34 : 0.0f, sceneDepth ? projection._43 : 0.0f, 0.0f, 0.0f);
+		// Hex cells turn the water texture by up to 170 degrees each way at full rotation, sent as twice the tangent of half that.
+		const Real hexTurn = WWMath::Clamp(TheWaterTransparency->m_shaderWaterStochasticRotation, 0.0f, 1.0f) * DEG_TO_RADF(85.0f);
+		const Vector4 depthMapping(sceneDepth ? projection._33 / projection._34 : 0.0f, sceneDepth ? projection._43 : 0.0f, 2.0f * tanf(hexTurn), 0.0f);
 		DX8Wrapper::Set_Pixel_Shader_Constant(25, &depthMapping, 1);
 	}
 

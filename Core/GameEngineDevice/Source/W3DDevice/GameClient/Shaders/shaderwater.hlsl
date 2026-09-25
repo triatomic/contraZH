@@ -22,8 +22,11 @@
 //
 // DEPTH_TEST keeps refraction from pulling in anything standing above the water, by the scene's
 // depth. The packed ps_2_a water build has no constant register left for it, nor do rivers.
+// HEX_TURN also turns each hex cell's water texture by its own angle, in the swell builds, which
+// alone have the temps and slots for it.
 
 #define DEPTH_TEST (!RIVER && (SWELL || !PACKED))
+#define HEX_TURN (DEPTH_TEST && SWELL)
 
 sampler2D WaterTexture  : register(s0);
 #if DEPTH_TEST
@@ -79,7 +82,7 @@ float4 SwellChannel  : register(c23);  // picks the channel holding height
 float4 SwellStep     : register(c24);  // x = world step for the slope
 #endif
 #if DEPTH_TEST
-float4 DepthMapping  : register(c25);  // xy = stored scene depth of a point at clip w, as x + y / w
+float4 DepthMapping  : register(c25);  // xy = stored scene depth of a point at clip w, as x + y / w, z = twice the tangent of half the widest hex turn
 #endif
 
 #include "shadowreceive.hlsli"
@@ -99,14 +102,28 @@ struct HexCells
     float2 offset0;
     float2 offset1;
     float2 offset2;
+    float2 turn0;     // cosine and sine of each cell's turn
+    float2 turn1;
+    float2 turn2;
 };
 
-float2 HexHash(float2 cell)
+float3 HexHash(float2 cell)
 {
     float3 p = frac(float3(cell, cell.x + cell.y) * 0.1031f);
     p = frac(p + dot(p, p.yzx + 20.0f));
     p = frac(p + dot(p, p.yzx + 20.0f));
-    return p.xy;
+    return p;
+}
+
+// The half-angle tangent gives an exact cosine and sine without the cost of sincos.
+float2 HexTurn(float random)
+{
+#if HEX_TURN
+    float t = (random - 0.5f) * DepthMapping.z;
+    return float2(1.0f - t * t, 2.0f * t) / (1.0f + t * t);
+#else
+    return float2(1.0f, 0.0f);
+#endif
 }
 
 // The three hex cells around a world point, after Mikkelsen's hex-tiling.
@@ -128,9 +145,15 @@ HexCells FindHexCells(float2 world)
     cells.weight = weight;
     // Shifted samples differ less as the shift shrinks, so the contrast correction shrinks with it.
     cells.norm = lerp(1.0f, rsqrt(dot(weight, weight)), Surface.w);
-    cells.offset0 = HexHash(base + float2(s, s)) * Surface.w;
-    cells.offset1 = HexHash(base + float2(s, 1.0f - s)) * Surface.w;
-    cells.offset2 = HexHash(base + float2(1.0f - s, s)) * Surface.w;
+    float3 random0 = HexHash(base + float2(s, s));
+    float3 random1 = HexHash(base + float2(s, 1.0f - s));
+    float3 random2 = HexHash(base + float2(1.0f - s, s));
+    cells.offset0 = random0.xy * Surface.w;
+    cells.offset1 = random1.xy * Surface.w;
+    cells.offset2 = random2.xy * Surface.w;
+    cells.turn0 = HexTurn(random0.z);
+    cells.turn1 = HexTurn(random1.z);
+    cells.turn2 = HexTurn(random2.z);
     return cells;
 }
 
@@ -140,6 +163,21 @@ float4 HexSample(sampler2D map, HexCells cells, float2 uv, float2 dx, float2 dy,
     float4 sum = cells.weight.x * (tex2Dgrad(map, uv + cells.offset0, dx, dy) - mean);
     sum += cells.weight.y * (tex2Dgrad(map, uv + cells.offset1, dx, dy) - mean);
     sum += cells.weight.z * (tex2Dgrad(map, uv + cells.offset2, dx, dy) - mean);
+    return mean + sum * cells.norm;
+}
+
+float2 Turn(float2 uv, float2 turn)
+{
+    return float2(dot(uv, float2(turn.x, -turn.y)), dot(uv, turn.yx));
+}
+
+// As HexSample, with each cell turning the pattern about its origin before the shared drift, so every cell flows one way.
+// Turning keeps the gradients' lengths, which is all the isotropic filter's mip choice reads.
+float4 HexSampleTurned(sampler2D map, HexCells cells, float2 uv, float2 drift, float2 dx, float2 dy, float4 mean)
+{
+    float4 sum = cells.weight.x * (tex2Dgrad(map, Turn(uv, cells.turn0) + cells.offset0 + drift, dx, dy) - mean);
+    sum += cells.weight.y * (tex2Dgrad(map, Turn(uv, cells.turn1) + cells.offset1 + drift, dx, dy) - mean);
+    sum += cells.weight.z * (tex2Dgrad(map, Turn(uv, cells.turn2) + cells.offset2 + drift, dx, dy) - mean);
     return mean + sum * cells.norm;
 }
 
@@ -223,7 +261,8 @@ float4 main(PsIn input) : COLOR
     float2 waveDy = ddy(waveUV);
     float4 waveMean = TextureMean(NormalMap);
     float2 slope = HexWaveSlope(cells, waveUV + time * float2(0.031f, 0.017f), waveDx, waveDy, waveMean);
-    slope += HexWaveSlope(cells, waveUV * 2.7f + time * float2(-0.023f, 0.037f), waveDx * 2.7f, waveDy * 2.7f, waveMean);
+    // The fine, fast layer repeats too small and moves too quickly to show, so it skips the hex cells.
+    slope += WaveSlope(waveUV * 2.7f + time * float2(-0.023f, 0.037f));
 #if RIVER
     slope += WaveSlope(input.BaseUV * float2(1.0f, 2.0f));
     slope *= 0.33f;
@@ -269,7 +308,7 @@ float4 main(PsIn input) : COLOR
 #if RIVER
     float4 water = tex2D(WaterTexture, input.BaseUV);
 #else
-    float4 water = saturate(HexSample(WaterTexture, cells, input.BaseUV, ddx(input.BaseUV), ddy(input.BaseUV), TextureMean(WaterTexture)));
+    float4 water = saturate(HexSampleTurned(WaterTexture, cells, input.BaseUV, 0.0f, ddx(input.BaseUV), ddy(input.BaseUV), TextureMean(WaterTexture)));
 #endif
     float3 body = water.rgb * input.Diffuse.rgb * shade;
     float3 transmission = exp(-depth * WaterParams.x * Absorption.rgb);
@@ -310,7 +349,12 @@ float4 main(PsIn input) : COLOR
     // Past about two texels a pixel, each doubling of the ground a pixel covers doubles the foam, so its web stays readable from any height.
     float2 worldDx = ddx(world.xy);
     float2 worldDy = ddy(world.xy);
+#if SWELL
+    // Halving the log of the squared length skips a square root, which the radial build has no slot for.
+    float octave = max(0.5f * log2(max(dot(worldDx, worldDx), dot(worldDy, worldDy)) * ShadowParams.z * ShadowParams.z) + 7.0f, 0.0f);
+#else
     float octave = max(log2(sqrt(max(dot(worldDx, worldDx), dot(worldDy, worldDy))) * ShadowParams.z) + 7.0f, 0.0f);
+#endif
     float fineScale = ShadowParams.z * exp2(-floor(octave));
     float coarseScale = fineScale * 0.5f;
 
