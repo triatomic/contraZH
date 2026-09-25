@@ -124,8 +124,9 @@ Notes:
 ## Per-pixel dynamic lights
 
 Explosion flashes, muzzle flashes, laser glow and other dynamic lights are drawn per pixel, so they
-light the ground in smooth circles and follow its bumps. Vehicles and structures near them are lit
-the same way. Needs the Direct3D 9 build and shader model 2.0a; other cards keep the old lighting.
+light the ground in smooth circles and follow its bumps. Roads, bridges, vehicles, structures and
+infantry near them are lit the same way. Needs the Direct3D 9 build and shader model 2.0a; other
+cards keep the old lighting.
 
 * `DynamicLights = Yes` - (No turns off every dynamic light: explosion and muzzle-flash pulses, laser
 ground glow and the police car's lights. Also `Dynamic lights` in the advanced display options.
@@ -135,11 +136,19 @@ lights` in the advanced display options, greyed out while dynamic lights are off
 `CheckPixelLights` in `OptionsMenu.wnd` for the menu control.)
 
 Notes:
-* Each frame the lights nearest the middle of the view are drawn per pixel, nine on the terrain
-and eight on vehicles and structures. A light whose reach covers the middle counts as nearest. The
-rest keep the old lighting, which lights the terrain by its corners, so large ones look blocky.
-* Infantry, flat terrain and roads keep the old lighting.
-* Launch with `CONTRA_PIXELLIGHTS=1` to limit per-pixel lights to the terrain, or `0` to turn them off.
+* Every draw picks its own lights, so a busy battle can light the whole screen per pixel:
+  * The terrain draws in patches of 32 by 32 cells, each taking nine lights.
+  * Each vehicle, structure or soldier takes the eight brightest where it stands.
+  * Each bridge takes nine.
+  * Roads take the nine lights nearest the middle of the view.
+* The lights nearest the middle of the view go first, up to 64 at once. A light whose reach covers
+the middle counts as nearest.
+* A light that would overfill a terrain patch stays on the old lighting, which lights the terrain
+by its corners, so large ones look blocky. Objects light those past their eight the old way too.
+* Infantry and other units without a sun highlight stay matte. They take only the lights.
+* Roads, bridges, the third texture where three meet, and flat terrain mode had no dynamic lighting
+before, so they show none without shader model 2.0a.
+* Launch with `CONTRA_PIXELLIGHTS=1` to limit per-pixel lights to the ground, or `0` to turn them off.
 
 ## Soft particles
 
@@ -334,8 +343,8 @@ Notes:
 ground turns redder and a dark night map lights up as much as a bright day.
 * The light reaches `GroundGlowRadius` on the module, else `LaserGroundGlowRadius`, else 1.25 times
 the laser's `OuterBeamWidth`, at least 15. It is counted from the beam in three dimensions.
-* Lasers no longer take dynamic lights, so the terrain's nine per-pixel lights stay free for
-explosions and muzzle flashes.
+* Lasers no longer take dynamic lights, so the per-pixel lights stay free for explosions and
+muzzle flashes.
 * Water covers the glow on ground beneath it. Units and buildings are not lit.
 * Launch with `CONTRA_LASERGLOW=0` to go back to the dynamic lights.
 
@@ -380,8 +389,8 @@ build and a shader model 3 card; other cards draw as before.
 
 Notes:
 * These still draw one at a time: infantry and other skinned meshes, fading units, camera-facing
-sprites, objects lit by point or dynamic lights, and objects under shroud, jamming, frozen or heat
-vision overlays.
+sprites, objects lit by point lights or by more dynamic lights than they draw per pixel, and
+objects under shroud, jamming, frozen or heat vision overlays.
 * The `CONTRA_INSTANCING` environment variable helps track down rendering faults: `0` turns it off,
 `1` limits it to the shadow map, `2` adds main view objects without shadow or highlight passes, and
 `3` (the default) covers everything.
@@ -394,8 +403,8 @@ shader model 2 card; other cards skin on the CPU as before.
 
 Notes:
 * These still skin on the CPU: meshes following more than 70 bones, camera-facing or sorted meshes,
-objects lit by point or dynamic lights, and objects under shroud, jamming, frozen or heat vision
-overlays.
+objects lit by point lights or by more dynamic lights than they draw per pixel, and objects under
+shroud, jamming, frozen or heat vision overlays.
 * The `CONTRA_GPU_SKINNING` environment variable helps track down rendering faults: `0` turns it
 off, `1` limits it to the shadow map, `2` adds main view skins without shadow or highlight passes,
 and `3` (the default) covers everything.
