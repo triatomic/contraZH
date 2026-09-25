@@ -19,9 +19,18 @@
 // alpha and its edge texture, and one wave layer follows the flow.
 //
 // Hex-tile stochastic texturing hides the tiling of the water texture, waves and foam.
+//
+// DEPTH_TEST keeps refraction from pulling in anything standing above the water, by the scene's
+// depth. The packed ps_2_a water build has no constant register left for it, nor do rivers.
+
+#define DEPTH_TEST (!RIVER && (SWELL || !PACKED))
 
 sampler2D WaterTexture  : register(s0);
+#if DEPTH_TEST
+sampler2D SceneDepth    : register(s1);   // the scene's INTZ depth, or white where it is unavailable
+#else
 sampler2D EdgeTexture   : register(s1);
+#endif
 sampler2D NormalMap     : register(s2);
 sampler2D ShroudTexture : register(s3);
 sampler2D HeightTexture : register(s4);
@@ -47,7 +56,7 @@ float4 ScreenV       : register(c2);
 float4 ScreenW       : register(c3);
 float4 Camera        : register(c5);   // world position, w = time
 float4 ToSun         : register(c6);   // world space, w = specular power
-float4 SunColor      : register(c7);   // sun colour times specular strength
+float4 SunColor      : register(c7);   // sun colour times specular strength, w = how far from land shore foam reaches, in world units
 float4 SkyTint       : register(c8);   // the map's light on the skybox, w = reflection strength
 float4 HeightMapping : register(c9);   // world xy to height texcoords: xy scale, zw offset
 float4 HeightDecode  : register(c10);  // x,y = high and low byte weights, z = wave texcoord scale, w = wave strength
@@ -58,7 +67,7 @@ float4 ShadowU       : register(c14);  // world to shadow map, one output compon
 float4 ShadowV       : register(c15);
 float4 ShadowZ       : register(c16);
 float4 ShadowW       : register(c17);
-float4 Planar        : register(c18);  // x = mirror plane height, y = 1 / fade distance, z = distortion, w = 1 when mirrored
+float4 Planar        : register(c18);  // x = mirror plane height, far below all water without a mirror, y = 1 / fade distance, z = distortion, w = foam strength
 float4 PlanarMap     : register(c19);  // xy = texel centre shift from the scene copy, z = height tolerance, w = added reflection
 #if RADIAL
 float4 RadialPlane   : register(c20);  // x = water level of this draw
@@ -68,6 +77,9 @@ float4 Surface       : register(c21);  // x = 1 / shore fade depth, y = 1 / hex 
 float4 SwellShape    : register(c22);  // as the vertex shader's Swell: x = world to texcoord scale, y = height, zw = drift
 float4 SwellChannel  : register(c23);  // picks the channel holding height
 float4 SwellStep     : register(c24);  // x = world step for the slope
+#endif
+#if DEPTH_TEST
+float4 DepthMapping  : register(c25);  // xy = stored scene depth of a point at clip w, as x + y / w
 #endif
 
 #include "shadowreceive.hlsli"
@@ -146,6 +158,12 @@ float2 HexWaveSlope(HexCells cells, float2 uv, float2 dx, float2 dy, float4 mean
     return HexSample(NormalMap, cells, uv, dx, dy, mean).rg * 2.0f - 1.0f;
 }
 
+// A world-space tilt as a screen offset, with the view's right along u and ahead up the screen.
+float2 TiltOnScreen(float2 tilt, float2 ahead)
+{
+    return float2(tilt.x * ahead.y - tilt.y * ahead.x, -dot(tilt, ahead));
+}
+
 #if SWELL
 float SwellLayer(float2 uv)
 {
@@ -212,6 +230,9 @@ float4 main(PsIn input) : COLOR
 #else
     slope *= 0.5f;
 #endif
+
+    // Distortion follows the ripples about their average, so a lean in the normal map or the swell cannot slide whole images aside.
+    float2 ripple = slope - (waveMean.rg * 2.0f - 1.0f);
 #if SWELL
     // The vertex shader flattens the swell towards the shore, so its shading and crest foam follow.
     float shoal = saturate(depth / max(2.0f * SwellShape.y, 0.001f));
@@ -228,11 +249,18 @@ float4 main(PsIn input) : COLOR
     // over the water, which must not smear into it, so the straight sample is kept there.
     float invW = 1.0f / dot(worldPoint, ScreenW);
     float2 screen = float2(dot(worldPoint, ScreenU), dot(worldPoint, ScreenV)) * invW;
-    float2 bend = slope * WaterParams.w * saturate(depth * 0.125f);
+    // Clip-space w grows along the view, so its world gradient points the camera ahead however it turns.
+    float2 ahead = ScreenW.xy * rsqrt(max(dot(ScreenW.xy, ScreenW.xy), 1.0f / 255.0f));
+    float2 bend = TiltOnScreen(ripple, ahead) * WaterParams.w * saturate(depth * 0.125f);
     float3 straight = tex2D(SceneTexture, screen).rgb;
     float3 bent = tex2D(SceneTexture, screen + bend).rgb;
     float3 delta = bent - straight;
-    float3 scene = lerp(straight, bent, saturate((0.15f - dot(delta, delta)) * 20.0f));
+    float bendable = saturate((0.15f - dot(delta, delta)) * 20.0f);
+#if DEPTH_TEST
+    // Anything nearer than the water surface stands above it, so the bent sample must not pull it in.
+    bendable *= step(DepthMapping.x + DepthMapping.y * invW, tex2D(SceneDepth, screen + bend).r);
+#endif
+    float3 scene = lerp(straight, bent, bendable);
 
     float4 shadowPos = float4(dot(worldPoint, ShadowU), dot(worldPoint, ShadowV), dot(worldPoint, ShadowZ), dot(worldPoint, ShadowW));
     float lit = lerp(1.0f, ShadowLit(shadowPos), Absorption.w);
@@ -253,9 +281,9 @@ float4 main(PsIn input) : COLOR
     float3 sky = SkyboxColor(reflect(-toEye, normal)) * SkyTint.rgb * lerp(0.6f, 1.0f, lit);
 
     // Water off the mirror plane, as on other lakes or sloping rivers, keeps the skybox.
-    float4 mirror = tex2D(Reflection, screen + PlanarMap.xy + normal.xy * Planar.z);
+    float4 mirror = tex2D(Reflection, screen + PlanarMap.xy + TiltOnScreen(ripple * HeightDecode.w, ahead) * Planar.z);
     float onPlane = saturate(1.0f - max(abs(world.z - Planar.x) - PlanarMap.z, 0.0f) * Planar.y);
-    float mirrored = mirror.a * onPlane * Planar.w;
+    float mirrored = mirror.a * onPlane;
     sky = lerp(sky, mirror.rgb * lerp(0.6f, 1.0f, lit), mirrored);
 
     // Some water colour always shows through.
@@ -265,24 +293,43 @@ float4 main(PsIn input) : COLOR
     float highlight = dot(normal, halfway);
     float glint = (pow(saturate(highlight), ToSun.w) + 0.08f * pow(saturate(highlight), ToSun.w * 0.06f)) * lit;
 
-    float foamMask = saturate(1.0f - depth * WaterParams.z);
+    // Land within reach counts as shallow, so walls and jetties rising out of deep water gather foam too.
+    float2 reach = SunColor.w * HeightMapping.xy;
+    float4 ground = float4(dot(tex2D(HeightTexture, mapUV + float2(reach.x, 0.0f)).rg, HeightDecode.xy),
+        dot(tex2D(HeightTexture, mapUV - float2(reach.x, 0.0f)).rg, HeightDecode.xy),
+        dot(tex2D(HeightTexture, mapUV + float2(0.0f, reach.y)).rg, HeightDecode.xy),
+        dot(tex2D(HeightTexture, mapUV - float2(0.0f, reach.y)).rg, HeightDecode.xy));
+    float shallowest = min(depth, max(world.z - max(max(ground.x, ground.y), max(ground.z, ground.w)), 0.0f));
+    float foamMask = saturate(1.0f - shallowest * WaterParams.z);
     foamMask *= foamMask;
 #if SWELL
-    foamMask = max(foamMask, saturate((swellHere / max(SwellShape.y, 0.001f) - 0.35f) * 2.5f));
+    // A foam depth of 0 reaches the shader as 1 / 10000, and turns crest foam off with the rest.
+    foamMask = max(foamMask, saturate((swellHere / max(SwellShape.y, 0.001f) - 0.35f) * 2.5f) * step(WaterParams.z, 1000.0f));
 #endif
-    float2 foamUV = world.xy * 0.02f + slope * 0.04f;
-    float2 foamDx = ddx(foamUV);
-    float2 foamDy = ddy(foamUV);
+    // The shadow receiver leaves ShadowParams.z unused, and W3DWater puts the foam's world to texcoord scale there.
+    // Past about two texels a pixel, each doubling of the ground a pixel covers doubles the foam, so its web stays readable from any height.
+    float2 worldDx = ddx(world.xy);
+    float2 worldDy = ddy(world.xy);
+    float octave = max(log2(sqrt(max(dot(worldDx, worldDx), dot(worldDy, worldDy))) * ShadowParams.z) + 7.0f, 0.0f);
+    float fineScale = ShadowParams.z * exp2(-floor(octave));
+    float coarseScale = fineScale * 0.5f;
+
+    // Both sizes drift alike, so the coarse one becomes the next fine one without a jump.
+    float2 foamShift = slope * 0.04f + time * float2(0.011f, -0.007f);
     float4 foamMean = TextureMean(FoamTexture);
-    float foam = saturate(HexSample(FoamTexture, cells, foamUV + time * float2(0.011f, -0.007f), foamDx, foamDy, foamMean).r);
-    foam *= saturate(HexSample(FoamTexture, cells, foamUV * 0.8f - time * float2(0.006f, 0.009f), foamDx * 0.8f, foamDy * 0.8f, foamMean).r) * 2.0f;
-    foam *= foamMask;
+    float foam = saturate(HexSample(FoamTexture, cells, world.xy * fineScale + foamShift, worldDx * fineScale, worldDy * fineScale, foamMean).r);
+    float foamCoarse = saturate(HexSample(FoamTexture, cells, world.xy * coarseScale + foamShift, worldDx * coarseScale, worldDy * coarseScale, foamMean).r);
+    foam = lerp(foam, foamCoarse, frac(octave));
+    foam *= foamMask * Planar.w;
 
     // As the legacy soft water edge did, the surface fades out at the waterline instead of ending in a line.
     float edge = saturate(depth * Surface.x);
     reflection *= edge;
     glint *= edge;
-    foam *= edge;
+    // Foam gathers at the waterline, so it fades in much sooner, as 1 - (1 - edge)^4.
+    float dry = 1.0f - edge;
+    dry *= dry;
+    foam *= 1.0f - dry * dry;
 
     // The scene copy is already shrouded, so the shroud only darkens the water's own light.
     float3 shroud = tex2D(ShroudTexture, world.xy * ShroudMapping.xy + ShroudMapping.zw).rgb;

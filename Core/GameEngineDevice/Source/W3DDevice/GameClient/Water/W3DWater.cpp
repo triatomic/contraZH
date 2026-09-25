@@ -183,6 +183,9 @@ static ShaderClass shaderWaterShader(SC_SHADER_WATER);
 #define SKYBOX_FACE_COUNT 5
 #define SWELL_CELL_SIZE (4*MAP_XY_FACTOR)	// two opposite sides summed, so the grid spacing is half this
 #define NORMAL_WAVE_COUNT 96
+#define FOAM_TEXTURE_SIZE 256
+#define FOAM_CELLS 12
+#define FOAM_CLUMPS 4
 #define WATER_REFLECTION_SAMPLER 13
 #define WATER_MASK_SAMPLER 14
 #define WATER_SWELL_SAMPLER 15
@@ -772,6 +775,137 @@ void WaterRenderObjClass::createNormalTexture()
 #endif
 }
 
+// Mods often blank the old sparkle texture, so the foam draws from its own web of cell edges, clumped by a coarser noise.
+void WaterRenderObjClass::createFoamTexture()
+{
+#if defined(BUILD_WITH_D3D9)
+	REF_PTR_RELEASE(m_foamTexture);
+	m_foamTexture = MSGNEW("TextureClass") TextureClass(FOAM_TEXTURE_SIZE, FOAM_TEXTURE_SIZE, WW3D_FORMAT_A8R8G8B8, MIP_LEVELS_ALL, TextureClass::POOL_MANAGED, false, false);
+	if (m_foamTexture->Peek_D3D_Texture() == nullptr)
+	{
+		REF_PTR_RELEASE(m_foamTexture);
+		return;
+	}
+
+	Real cellX[FOAM_CELLS][FOAM_CELLS];
+	Real cellY[FOAM_CELLS][FOAM_CELLS];
+	Real clump[FOAM_CLUMPS][FOAM_CLUMPS];
+	UnsignedInt seed = 0x5EED1234;
+	for (Int j=0; j<FOAM_CELLS; j++)
+	{
+		for (Int i=0; i<FOAM_CELLS; i++)
+		{
+			seed = seed * 1664525 + 1013904223;
+			cellX[j][i] = (Real)i + (Real)(seed >> 8) / 16777216.0f;
+			seed = seed * 1664525 + 1013904223;
+			cellY[j][i] = (Real)j + (Real)(seed >> 8) / 16777216.0f;
+		}
+	}
+	for (Int j=0; j<FOAM_CLUMPS; j++)
+	{
+		for (Int i=0; i<FOAM_CLUMPS; i++)
+		{
+			seed = seed * 1664525 + 1013904223;
+			clump[j][i] = (Real)(seed >> 8) / 16777216.0f;
+		}
+	}
+
+	// Brightness falls with the gap between the nearest two cell centres, which is zero along the cell walls.
+	const Int size = FOAM_TEXTURE_SIZE;
+	Real *texels = NEW Real[size * size];
+	for (Int y=0; y<size; y++)
+	{
+		for (Int x=0; x<size; x++)
+		{
+			const Real px = (Real)x * FOAM_CELLS / (Real)size;
+			const Real py = (Real)y * FOAM_CELLS / (Real)size;
+			const Int baseX = (Int)px;
+			const Int baseY = (Int)py;
+			Real nearest = 1000.0f;
+			Real second = 1000.0f;
+			for (Int oy=-1; oy<=1; oy++)
+			{
+				for (Int ox=-1; ox<=1; ox++)
+				{
+					const Int i = (baseX + ox + FOAM_CELLS) % FOAM_CELLS;
+					const Int j = (baseY + oy + FOAM_CELLS) % FOAM_CELLS;
+					const Real dx = cellX[j][i] + (Real)(baseX + ox - i) - px;
+					const Real dy = cellY[j][i] + (Real)(baseY + oy - j) - py;
+					const Real distance = sqrtf(dx * dx + dy * dy);
+					if (distance < nearest)
+					{
+						second = nearest;
+						nearest = distance;
+					}
+					else if (distance < second)
+					{
+						second = distance;
+					}
+				}
+			}
+			const Real wall = WWMath::Clamp(1.0f - (second - nearest) / 0.45f, 0.0f, 1.0f);
+
+			const Real cx = (Real)x * FOAM_CLUMPS / (Real)size;
+			const Real cy = (Real)y * FOAM_CLUMPS / (Real)size;
+			const Int i0 = (Int)cx;
+			const Int j0 = (Int)cy;
+			const Int i1 = (i0 + 1) % FOAM_CLUMPS;
+			const Int j1 = (j0 + 1) % FOAM_CLUMPS;
+			Real fx = cx - (Real)i0;
+			Real fy = cy - (Real)j0;
+			fx = fx * fx * (3.0f - 2.0f * fx);
+			fy = fy * fy * (3.0f - 2.0f * fy);
+			const Real top = clump[j0][i0] + (clump[j0][i1] - clump[j0][i0]) * fx;
+			const Real bottom = clump[j1][i0] + (clump[j1][i1] - clump[j1][i0]) * fx;
+			texels[y * size + x] = wall * sqrtf(wall) * (0.3f + 0.7f * (top + (bottom - top) * fy));
+		}
+	}
+
+	const Int levels = m_foamTexture->Peek_D3D_Texture()->GetLevelCount();
+	Int levelSize = size;
+	for (Int level=0; level<levels; level++)
+	{
+		SurfaceClass *surface = m_foamTexture->Get_Surface_Level(level);
+		int pitch;
+		UnsignedByte *bits = (UnsignedByte *)surface->Lock(&pitch);
+		if (bits != nullptr)
+		{
+			for (Int y=0; y<levelSize; y++)
+			{
+				UnsignedInt *row = (UnsignedInt *)(bits + y * pitch);
+				for (Int x=0; x<levelSize; x++)
+				{
+					const UnsignedInt grey = (UnsignedInt)REAL_TO_INT(texels[y * levelSize + x] * 255.0f);
+					row[x] = 0xff000000 | (grey << 16) | (grey << 8) | grey;
+				}
+			}
+			surface->Unlock();
+		}
+		REF_PTR_RELEASE(surface);
+
+		// Each smaller level averages 2x2 texels of the one above. Writes never pass the reads.
+		if (levelSize > 1)
+		{
+			const Int half = levelSize / 2;
+			for (Int y=0; y<half; y++)
+			{
+				for (Int x=0; x<half; x++)
+				{
+					const Int src = 2 * y * levelSize + 2 * x;
+					texels[y * half + x] = 0.25f * (texels[src] + texels[src + 1] + texels[src + levelSize] + texels[src + levelSize + 1]);
+				}
+			}
+			levelSize = half;
+		}
+	}
+
+	delete [] texels;
+
+	m_foamTexture->Get_Filter().Set_U_Addr_Mode(TextureFilterClass::TEXTURE_ADDRESS_REPEAT);
+	m_foamTexture->Get_Filter().Set_V_Addr_Mode(TextureFilterClass::TEXTURE_ADDRESS_REPEAT);
+#endif
+}
+
 void WaterRenderObjClass::updateHeightTexture()
 {
 #if defined(BUILD_WITH_D3D9)
@@ -895,7 +1029,9 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 		DX8Wrapper::Set_Texture(WATER_SHADOW_STAGE, nullptr);
 		DX8Wrapper::Apply_Render_State_Changes();
 	}
-	const Vector4 shadowParams = shadowed ? TheW3DShadowMap->getReceiverParams() : Vector4(1.0f, 0.0f, 0.0f, 1.0f);
+	// The receiver leaves z unused, so the foam's world to texcoord scale rides there.
+	Vector4 shadowParams = shadowed ? TheW3DShadowMap->getReceiverParams() : Vector4(1.0f, 0.0f, 0.0f, 1.0f);
+	shadowParams.Z = 1.0f / max(TheWaterTransparency->m_shaderWaterFoamScale, 1.0f);
 	const Vector4 shadowColor = shadowed ? TheW3DShadowMap->getReceiverColor() : Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 
 	// A <water texture>_nrm.dds replaces the generated waves.
@@ -909,7 +1045,7 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 		m_heightTexture,
 		nullptr,
 		nullptr,
-		m_waterSparklesTexture
+		(m_foamTexture != nullptr) ? m_foamTexture : m_waterSparklesTexture
 	};
 	const Bool repeat[6] = { TRUE, FALSE, FALSE, FALSE, FALSE, TRUE };
 	const Bool mipmapped[6] = { TRUE, FALSE, FALSE, FALSE, FALSE, TRUE };
@@ -1021,7 +1157,7 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 	const Vector4 sunDirection(toSun.X, toSun.Y, toSun.Z, 256.0f / max(TheWaterTransparency->m_shaderWaterSpecularSpread, 0.1f));
 	const RGBColor &sunDiffuse = TheGlobalData->m_terrainDiffuse[0];
 	const Real specular = TheWaterTransparency->m_shaderWaterSpecular;
-	const Vector4 sunColor(sunDiffuse.red * specular, sunDiffuse.green * specular, sunDiffuse.blue * specular, 0.0f);
+	const Vector4 sunColor(sunDiffuse.red * specular, sunDiffuse.green * specular, sunDiffuse.blue * specular, max(TheWaterTransparency->m_shaderWaterFoamReach, 0.0f));
 
 	// The skybox is lit by the map's light, so a day skybox dims on a night map.
 	const RGBColor &ambient = TheGlobalData->m_terrainAmbient[0];
@@ -1044,7 +1180,8 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 	// Reaches 95% of the deep opacity where the legacy linear ramp reached all of it.
 	const Real deepOpacity = (TheWaterTransparency->m_shaderWaterOpacity > 0.0f) ? TheWaterTransparency->m_shaderWaterOpacity : TheWaterTransparency->m_minWaterOpacity;
 	const Real clearDepth = max(TheWaterTransparency->m_transparentWaterDepth * TheWaterTransparency->m_shaderWaterClarity * deepOpacity, 0.01f);
-	const Vector4 waterParams(3.0f / clearDepth, deepOpacity, 1.0f / max(TheWaterTransparency->m_shaderWaterFoamDepth, 0.01f), TheWaterTransparency->m_shaderWaterRefraction);
+	const Real foamDepth = TheWaterTransparency->m_shaderWaterFoamDepth;
+	const Vector4 waterParams(3.0f / clearDepth, deepOpacity, (foamDepth > 0.01f) ? 1.0f / foamDepth : 10000.0f, TheWaterTransparency->m_shaderWaterRefraction);
 	const Vector4 absorption(1.5f, 1.0f, 0.8f, shadowed ? 1.0f : 0.0f);
 
 	Vector4 shroudMapping(0.0f, 0.0f, 0.0f, 0.0f);
@@ -1083,14 +1220,16 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 
 	// The mirror belongs to one camera and frame, and water drawn for any other gets the skybox alone.
 	const Bool mirrored = m_reflectionTexture != nullptr && m_reflectionSource == m_renderCamera && m_reflectionFrame == WW3D::Get_Frame_Count();
-	Vector4 planar(0.0f, 0.0f, 0.0f, 0.0f);
+	// Without a mirror the plane sits far below all water, so no pixel is on it, and w carries the foam strength.
+	const Real foamStrength = max(TheWaterTransparency->m_shaderWaterFoamStrength, 0.0f);
+	Vector4 planar(-100000.0f, 1.0f, 0.0f, foamStrength);
 	Vector4 planarMapping(0.0f, 0.0f, 0.0f, 0.0f);
 	if (mirrored)
 	{
 		// The mirror is a scaled-down copy of the scene, so only the texel centre moves.
 		D3DSURFACE_DESC reflectionDesc;
 		m_reflectionTexture->GetLevelDesc(0, &reflectionDesc);
-		planar.Set(m_reflectionPlaneZ, 1.0f / max(TheWaterTransparency->m_shaderWaterPlanarFade, 0.01f), TheWaterTransparency->m_shaderWaterPlanarDistortion, 1.0f);
+		planar.Set(m_reflectionPlaneZ, 1.0f / max(TheWaterTransparency->m_shaderWaterPlanarFade, 0.01f), TheWaterTransparency->m_shaderWaterPlanarDistortion, foamStrength);
 		planarMapping.Set(0.5f / reflectionDesc.Width - 0.5f / copyDesc.Width, 0.5f / reflectionDesc.Height - 0.5f / copyDesc.Height,
 			TheWaterTransparency->m_shaderWaterSwellHeight + 1.0f, TheWaterTransparency->m_shaderWaterPlanarStrength);
 	}
@@ -1109,6 +1248,37 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 	const Vector4 surface((softEdgeDepth > 0.0f) ? 1.0f / softEdgeDepth : 10000.0f, (hexSize > 0.0f) ? 1.0f / hexSize : 0.0f,
 		max(TheWaterTransparency->m_shaderWaterStochasticSharpness, -15.0f), (hexSize > 0.0f) ? 1.0f : 0.0f);
 	DX8Wrapper::Set_Pixel_Shader_Constant(21, &surface, 1);
+
+	// Standing water reads the scene's depth on stage 1 where the edge texture would be, and the white texture passes every test.
+	if (!river)
+	{
+		IDirect3DTexture8 *depthTexture = DX8Wrapper::Peek_Scene_Depth_Texture();
+		IDirect3DSurface8 *boundDepth = nullptr;
+		Bool sceneDepth = FALSE;
+		if (depthTexture != nullptr && projection._34 != 0.0f && SUCCEEDED(device->GetDepthStencilSurface(&boundDepth)) && boundDepth != nullptr)
+		{
+			D3DSURFACE_DESC depthDesc;
+			depthTexture->GetLevelDesc(0, &depthDesc);
+			DWORD depthWrites = TRUE;
+			device->GetRenderState(D3DRS_ZWRITEENABLE, &depthWrites);
+			sceneDepth = boundDepth == DX8Wrapper::Peek_Scene_Depth_Surface() && depthWrites == FALSE &&
+				depthDesc.Width == copyDesc.Width && depthDesc.Height == copyDesc.Height;
+			boundDepth->Release();
+		}
+		if (sceneDepth)
+		{
+			device->SetTexture(1, depthTexture);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_MINFILTER, D3DTEXF_POINT);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_MAGFILTER, D3DTEXF_POINT);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_MIPFILTER, D3DTEXF_NONE);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+		}
+
+		// Stored depth is z over w, which a perspective projection makes a + b / w.
+		const Vector4 depthMapping(sceneDepth ? projection._33 / projection._34 : 0.0f, sceneDepth ? projection._43 : 0.0f, 0.0f, 0.0f);
+		DX8Wrapper::Set_Pixel_Shader_Constant(25, &depthMapping, 1);
+	}
 
 	if (!river && m_shaderWaterSwellActive && m_drawingRadial)
 	{
@@ -1289,6 +1459,10 @@ void WaterRenderObjClass::cleanupShaderWater()
 	device->SetTexture(WATER_MASK_SAMPLER, nullptr);
 	device->SetTexture(WATER_SWELL_SAMPLER, nullptr);
 	DX8Wrapper::Set_Texture(WATER_SHADOW_STAGE, nullptr);
+
+	// The scene depth went onto stage 1 behind the wrapper's back, so both forget it.
+	device->SetTexture(1, nullptr);
+	DX8Wrapper::Set_Texture(1, nullptr);
 	for (Int stage=2; stage<8; stage++)
 	{
 		device->SetTexture(stage, nullptr);
@@ -1890,6 +2064,7 @@ WaterRenderObjClass::WaterRenderObjClass()
 	}
 	m_heightTexture=nullptr;
 	m_normalTexture=nullptr;
+	m_foamTexture=nullptr;
 	m_refractionTexture=nullptr;
 	m_heightTextureDirty=TRUE;
 	m_heightTextureMap=nullptr;
@@ -2440,6 +2615,7 @@ void WaterRenderObjClass::ReleaseResources()
 	SAFE_RELEASE(m_reflectionDepth);
 	m_reflectionSource = nullptr;
 	REF_PTR_RELEASE(m_normalTexture);
+	REF_PTR_RELEASE(m_foamTexture);
 	REF_PTR_RELEASE(m_heightTexture);
 	m_heightTextureMap=nullptr;
 }
@@ -2543,6 +2719,7 @@ void WaterRenderObjClass::ReAcquireResources()
 				}
 			}
 			createNormalTexture();
+			createFoamTexture();
 
 			// The vertex waves read the fixed-function vertex format, so the declaration only has to be valid.
 			const DX8Caps *caps = DX8Wrapper::Get_Current_Caps();

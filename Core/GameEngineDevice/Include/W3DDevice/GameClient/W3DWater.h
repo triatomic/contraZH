@@ -267,6 +267,7 @@ protected:
 	DWORD m_shaderRiverPixelShader[2];
 	TextureClass *m_heightTexture;		///< terrain heights as high and low bytes
 	TextureClass *m_normalTexture;		///< tiling wave slopes
+	TextureClass *m_foamTexture;		///< tiling foam web
 	IDirect3DTexture8 *m_refractionTexture;	///< the scene behind the water
 	Bool m_heightTextureDirty;
 	const WorldHeightMap *m_heightTextureMap;	///< map the height texture was built from
@@ -312,6 +313,7 @@ protected:
 	void updateWaterMask();
 	void drawRadialWater(Real planeZ);
 	void createNormalTexture();
+	void createFoamTexture();
 	void updateHeightTexture();
 	void grabRefraction();
 	void setupShaderWater(Bool river);

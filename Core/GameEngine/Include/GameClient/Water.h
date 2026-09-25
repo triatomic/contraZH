@@ -98,6 +98,9 @@ class WaterTransparencySetting : public Overridable
 		Real m_shaderWaterWaveScale;	///< world units one wave tile covers
 		Real m_shaderWaterWaveStrength;	///< steepness of the waves
 		Real m_shaderWaterFoamDepth;	///< depth where shore foam fades out
+		Real m_shaderWaterFoamReach;	///< world units from land within which water foams as if at the shore
+		Real m_shaderWaterFoamScale;	///< world units one foam pattern covers
+		Real m_shaderWaterFoamStrength;	///< scales the foam's brightness
 		Real m_shaderWaterClarity;		///< scales TransparentWaterDepth, higher sees deeper
 		Real m_shaderWaterOpacity;		///< opacity of deep water, 0 takes TransparentWaterMinOpacity
 		Real m_shaderWaterSwellHeight;	///< height of the vertex waves, 0 turns them off
@@ -139,6 +142,9 @@ class WaterTransparencySetting : public Overridable
 			m_shaderWaterWaveScale = 160.0f;
 			m_shaderWaterWaveStrength = 0.3f;
 			m_shaderWaterFoamDepth = 6.0f;
+			m_shaderWaterFoamReach = 15.0f;
+			m_shaderWaterFoamScale = 150.0f;
+			m_shaderWaterFoamStrength = 0.5f;
 			m_shaderWaterClarity = 1.0f;
 			m_shaderWaterOpacity = 0.95f;
 			m_shaderWaterSwellHeight = 3.0f;
