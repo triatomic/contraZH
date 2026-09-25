@@ -78,6 +78,9 @@ softens the textures, higher keeps each cell's texture crisp up to a narrower se
 blend spreads a little further, easing to its softest at -15, and never shows the cell edges.)
 * `ShaderWaterStochasticRandom = 1` - (How far each cell shifts the textures. 1 shifts them anywhere,
 smaller values keep neighbouring cells closer alike, and 0 leaves the plain repeating textures.)
+* `ShaderWaterStochasticRotation = 1` - (How far each cell also turns the water texture. 1 turns it
+up to 170 degrees either way, and 0 only shifts it. The texture drifts the same way in every cell.
+Only the lake and sea swell builds turn it; rivers, foam and ripples are shifted alone.)
 
 ## Animation
 
@@ -150,6 +153,7 @@ One block. `map.ini` can override any of these keys for its map.
 | `ShaderWaterStochasticSize` | number | `100` | `0`, or `30` - `1000` | World units between the cells that shift the textures to hide their tiling. `0` turns it off. Below `30` the textures blur, above `1000` the pattern shows within a cell. |
 | `ShaderWaterStochasticSharpness` | number | `3` | `-15` **(hard)** - `16` | Narrows the blend between cells. `1` softens the textures, below `1` softens them a little more, above `16` the cell edges show. |
 | `ShaderWaterStochasticRandom` | number | `1` | `0` - `1` **(hard)** | How far each cell shifts the textures. `0` leaves the plain repeating textures. |
+| `ShaderWaterStochasticRotation` | number | `1` | `0` - `1` **(hard)** | How far each cell turns the water texture, up to 170 degrees either way at `1`. Lakes and seas with swell only. |
 | `ShaderWaterFoamDepth` | number | `6` | `0` - `30` | Depth where shore foam fades out. `0` turns foam off, crest foam included. |
 | `ShaderWaterFoamReach` | number | `15` | `0` - `40` | World units from land within which water foams as at the shore. `0` leaves foam to the depth alone. |
 | `ShaderWaterFoamScale` | number | `150` | `1` **(hard)** - `600` | World units one foam pattern covers up close. It doubles further out, so the foam stays readable at any zoom. |
