@@ -984,6 +984,46 @@ TextureClass *WaterRenderObjClass::getTerrainHeightTexture(Vector4 &mapping, Vec
 	return m_heightTexture;
 }
 
+// The hex cells' 1 / spacing, weight exponent, shift and turn, as the water and seabed shaders take them.
+// Below 1 the exponent eases towards 0.7, where the cell leaving the blend at a triangle edge still fades out
+// unseen. Cells turn by up to 170 degrees each way at full rotation, sent as twice the tangent of half that.
+static Vector4 Get_Hex_Params()
+{
+	const Real size = TheWaterTransparency->m_shaderWaterStochasticSize;
+	const Real sharpness = max(TheWaterTransparency->m_shaderWaterStochasticSharpness, -15.0f);
+	const Real turn = WWMath::Clamp(TheWaterTransparency->m_shaderWaterStochasticRotation, 0.0f, 1.0f) * DEG_TO_RADF(85.0f);
+	return Vector4((size > 0.0f) ? 1.0f / size : 0.0f, (sharpness >= 1.0f) ? sharpness : 0.7f + 0.3f * powf(2.0f, sharpness - 1.0f),
+		(size > 0.0f) ? WWMath::Clamp(TheWaterTransparency->m_shaderWaterStochasticRandom, 0.0f, 1.0f) : 0.0f, 2.0f * tanf(turn));
+}
+
+TextureClass *WaterRenderObjClass::getSeabedMask(Vector4 &mapping, Vector4 &hex)
+{
+#if defined(BUILD_WITH_D3D9)
+	hex = Get_Hex_Params();
+	Vector4 decode;
+	if (!TheWaterTransparency->m_shaderWaterStochasticSeabed || hex.X <= 0.0f || !useShaderWater() ||
+		getTerrainHeightTexture(mapping, decode) == nullptr)
+	{
+		return nullptr;
+	}
+	updateWaterMask();
+	return (m_waterMaskCells != nullptr) ? m_waterMaskTexture : nullptr;
+#else
+	(void)mapping;
+	(void)hex;
+	return nullptr;
+#endif
+}
+
+Bool WaterRenderObjClass::isSeabedPoint(Int x, Int y) const
+{
+	if (m_waterMaskCells == nullptr || x < 0 || y < 0 || x >= m_waterMaskCellsWidth || y >= m_waterMaskCellsHeight)
+	{
+		return FALSE;
+	}
+	return m_waterMaskCells[y * m_waterMaskCellsWidth + x] != 0;
+}
+
 void WaterRenderObjClass::grabRefraction()
 {
 #if defined(BUILD_WITH_D3D9)
@@ -1244,13 +1284,8 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 
 	// TransparentWaterDepth sets the soft edge's width, 0 turns it off as for the legacy water, and the hex tiling shares its constant.
 	const Real softEdgeDepth = TheWaterTransparency->m_transparentWaterDepth;
-	const Real hexSize = TheWaterTransparency->m_shaderWaterStochasticSize;
-	const Real hexRandom = (hexSize > 0.0f) ? WWMath::Clamp(TheWaterTransparency->m_shaderWaterStochasticRandom, 0.0f, 1.0f) : 0.0f;
-
-	// Below 1 the weight exponent eases towards 0.7, where the cell leaving the blend at a triangle edge still fades out unseen.
-	const Real sharpness = max(TheWaterTransparency->m_shaderWaterStochasticSharpness, -15.0f);
-	const Real hexExponent = (sharpness >= 1.0f) ? sharpness : 0.7f + 0.3f * powf(2.0f, sharpness - 1.0f);
-	const Vector4 surface((softEdgeDepth > 0.0f) ? 1.0f / softEdgeDepth : 10000.0f, (hexSize > 0.0f) ? 1.0f / hexSize : 0.0f, hexExponent, hexRandom);
+	const Vector4 hex = Get_Hex_Params();
+	const Vector4 surface((softEdgeDepth > 0.0f) ? 1.0f / softEdgeDepth : 10000.0f, hex.X, hex.Y, hex.Z);
 	DX8Wrapper::Set_Pixel_Shader_Constant(21, &surface, 1);
 
 	// Standing water reads the scene's depth on stage 1 where the edge texture would be, and the white texture passes every test.
@@ -1280,9 +1315,7 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 		}
 
 		// Stored depth is z over w, which a perspective projection makes a + b / w.
-		// Hex cells turn the water texture by up to 170 degrees each way at full rotation, sent as twice the tangent of half that.
-		const Real hexTurn = WWMath::Clamp(TheWaterTransparency->m_shaderWaterStochasticRotation, 0.0f, 1.0f) * DEG_TO_RADF(85.0f);
-		const Vector4 depthMapping(sceneDepth ? projection._33 / projection._34 : 0.0f, sceneDepth ? projection._43 : 0.0f, 2.0f * tanf(hexTurn), 0.0f);
+		const Vector4 depthMapping(sceneDepth ? projection._33 / projection._34 : 0.0f, sceneDepth ? projection._43 : 0.0f, hex.W, 0.0f);
 		DX8Wrapper::Set_Pixel_Shader_Constant(25, &depthMapping, 1);
 	}
 
@@ -1655,6 +1688,14 @@ void WaterRenderObjClass::updateWaterMask()
 		}
 	}
 
+	if (m_waterMaskCellsWidth != width || m_waterMaskCellsHeight != height)
+	{
+		delete [] m_waterMaskCells;
+		m_waterMaskCells = NEW UnsignedByte[width * height];
+		m_waterMaskCellsWidth = width;
+		m_waterMaskCellsHeight = height;
+	}
+
 	// Grown by a cell, the mask ends on dry land instead of in a step short of the polygon's waterline.
 	SurfaceClass *surface = m_waterMaskTexture->Get_Surface_Level(0);
 	int pitch;
@@ -1678,6 +1719,7 @@ void WaterRenderObjClass::updateWaterMask()
 					}
 				}
 				row[x] = (cell == otherWater) ? 0 : cell;
+				m_waterMaskCells[y * width + x] = (row[x] != 0) ? 1 : 0;
 			}
 		}
 		surface->Unlock();
@@ -1965,6 +2007,7 @@ void WaterRenderObjClass::renderPlanarReflection(CameraClass *cam)
 //-------------------------------------------------------------------------------------------------
 WaterRenderObjClass::~WaterRenderObjClass()
 {
+	delete [] m_waterMaskCells;
 	REF_PTR_RELEASE(m_meshVertexMaterialClass);
 	REF_PTR_RELEASE(m_vertexMaterialClass);
 	REF_PTR_RELEASE(m_meshLight);
@@ -2097,6 +2140,9 @@ WaterRenderObjClass::WaterRenderObjClass()
 	m_waterMaskTexture=nullptr;
 	m_waterMaskSignature=0;
 	m_waterMaskMap=nullptr;
+	m_waterMaskCells=nullptr;
+	m_waterMaskCellsWidth=0;
+	m_waterMaskCellsHeight=0;
 	m_drawingRadial=FALSE;
 	m_radialPlaneZ=0.0f;
 	m_shaderWaterSwellVertexShader=0;

@@ -138,6 +138,7 @@ void HeightMapRenderObjClass::freeIndexVertexBuffers()
 	m_numVertexBufferTiles = 0;
 	m_tilePixelLights.clear();
 	m_tilePixelLightCounts.clear();
+	m_tileSeabed.clear();
 }
 
 //=============================================================================
@@ -398,7 +399,9 @@ void HeightMapRenderObjClass::assignPixelLights(RefRenderObjListIterator &lights
 		{
 			for (Int i = 0; i < m_numVBTilesX; i++)
 			{
-				if (rows[j] && columns[i] && m_tilePixelLightCounts[j*m_numVBTilesX+i] >= slots)
+				const Int tile = j*m_numVBTilesX+i;
+				const Int limit = m_tileSeabed[tile] ? (Int)W3DShaderManager::SEABED_PIXEL_LIGHTS : slots;
+				if (rows[j] && columns[i] && m_tilePixelLightCounts[tile] >= limit)
 				{
 					room = FALSE;
 					break;
@@ -432,7 +435,56 @@ void HeightMapRenderObjClass::setTilePixelLights(Int tile)
 {
 	if (tile < (Int)m_tilePixelLightCounts.size())
 	{
-		W3DShaderManager::setDrawPixelLights(&m_tilePixelLights[tile * W3DShaderManager::MAX_PIXEL_LIGHTS], m_tilePixelLightCounts[tile]);
+		// The mirror draws flat terrain, so it leaves the seabed out.
+		const Bool seabed = m_tileSeabed[tile] && !ShaderClass::Is_Backface_Culling_Inverted();
+		W3DShaderManager::setDrawTerrain(&m_tilePixelLights[tile * W3DShaderManager::MAX_PIXEL_LIGHTS], m_tilePixelLightCounts[tile], seabed);
+	}
+}
+
+//=============================================================================
+// HeightMapRenderObjClass::prepareSeabed
+//=============================================================================
+/** Hands the terrain shader the atlas slot lookup, the standing water mask and the
+constants its seabed variants read, and marks the VB tiles holding standing water.
+Only those draw through the seabed variants, which pay for the hex cells on every pixel. */
+//=============================================================================
+void HeightMapRenderObjClass::prepareSeabed()
+{
+	m_tileSeabed.assign(m_numVertexBufferTiles, FALSE);
+
+	Vector4 constants[W3DShaderManager::SEABED_CONSTANTS];
+	TextureClass *mask = nullptr;
+	if (TheWaterRenderObj != nullptr && W3DShaderManager::supportsTerrainSeabed() && m_numVertexBufferTiles > 0)
+	{
+		mask = TheWaterRenderObj->getSeabedMask(constants[3], constants[2]);
+	}
+	TextureClass *classMap = (mask != nullptr) ? m_map->getTerrainClassMap() : nullptr;
+	if (classMap == nullptr)
+	{
+		W3DShaderManager::setTerrainSeabed(nullptr, nullptr, nullptr);
+		return;
+	}
+
+	// As terrainshadow.hlsl's SeabedAtlas and SeabedWorld: a cell covers half a tile, counted from the border's first point.
+	const Real atlasHeight = (Real)m_map->getTerrainTexHeight();
+	const Real texelsPerCell = TILE_PIXEL_EXTENT / 2;
+	const Real fadeDepth = TheWaterTransparency->m_transparentWaterDepth;
+	constants[0].Set((Real)TEXTURE_WIDTH, atlasHeight, 1.0f / TEXTURE_WIDTH, 1.0f / atlasHeight);
+	constants[1].Set(texelsPerCell / MAP_XY_FACTOR, texelsPerCell * m_map->getBorderSizeInline(),
+		(fadeDepth > 0.0f) ? 1.0f / fadeDepth : 10000.0f, 0.0f);
+	W3DShaderManager::setTerrainSeabed(classMap, mask, constants);
+
+	const Int xOrigin = m_map->getDrawOrgX();
+	const Int yOrigin = m_map->getDrawOrgY();
+	for (Int y = 0; y < m_y-1; y++)
+	{
+		for (Int x = 0; x < m_x-1; x++)
+		{
+			if (TheWaterRenderObj->isSeabedPoint(xOrigin + x, yOrigin + y))
+			{
+				m_tileSeabed[getTileRow(y)*m_numVBTilesX + getTileColumn(x)] = TRUE;
+			}
+		}
 	}
 }
 
@@ -1515,6 +1567,7 @@ void HeightMapRenderObjClass::On_Frame_Update()
 	}
 #endif
 
+	prepareSeabed();
 	assignPixelLights(pDynamicLightsIterator);
 
 	Int numDynaLights=0;

@@ -20,6 +20,12 @@
 //
 // LIGHTS adds the dynamic point lights the vertex lighting leaves out. They need the
 // world position, on the same stage as for BUMP, and take ps_2_a for their length.
+//
+// SEABED hides the atlas textures' tiling under standing water with the water's hex cells.
+// Each atlas texture is a block that wraps seamlessly, so a cell shifts and turns its read
+// within the block. The block comes from a lookup of the atlas slot, and the read follows
+// the world position, which matches the vertex UVs on every cell but cliffs, which keep
+// their own. It needs the world position too, and leaves room for only six point lights.
 
 #ifndef SHADOWED
 #define SHADOWED 1
@@ -31,6 +37,10 @@
 
 #ifndef LIGHTS
 #define LIGHTS 0
+#endif
+
+#ifndef SEABED
+#define SEABED 0
 #endif
 
 #define CONCAT_(a, b) a##b
@@ -65,7 +75,7 @@ sampler2D ShadowMap : register(s4);
 
 #endif
 
-#if BUMP || LIGHTS
+#if BUMP || LIGHTS || SEABED
 
 // Stage numbers, spelled out because register names need a literal digit.
 #if NOISE_COUNT + SHADOWED == 0
@@ -86,9 +96,110 @@ sampler2D ShadowMap : register(s4);
 
 #if LIGHTS
 // Nine fill c5 to c25, and fxc needs the rest for literals, so W3DShaderManager::MAX_PIXEL_LIGHTS must match.
+// The seabed's constants take the last three lights' room, which W3DShaderManager::SEABED_PIXEL_LIGHTS matches.
 #define POINT_LIGHT_REGISTER c5
+#if SEABED
+#define POINT_LIGHT_COUNT 6
+#else
 #define POINT_LIGHT_COUNT 9
+#endif
 #include "pointlights.hlsli"
+#endif
+
+#if SEABED
+
+sampler2D ClassMap  : register(s8);   // per 72-texel atlas slot, its texture block's first slot column and row and its width in tiles, over 255
+sampler2D WaterMask : register(s9);   // standing water's coverage in alpha, its level at 1/16 unit in red and green times coverage
+
+float4 SeabedAtlas : register(c19);   // xy = atlas size in texels, zw = 1 / that
+float4 SeabedWorld : register(c20);   // x = atlas texels per world unit, y = texels of the map border, z = 1 / fade depth under the waterline
+float4 SeabedHex   : register(c21);   // x = 1 / hex cell spacing, y = weight exponent, z = how far cells shift, w = twice the tangent of half the widest turn
+float4 SeabedMask  : register(c22);   // world xy to water mask texcoords: xy scale, zw offset
+
+struct HexCells
+{
+    float3 weight;
+    float2 offset0;
+    float2 offset1;
+    float2 offset2;
+    float2 turn0;     // cosine and sine of each cell's turn
+    float2 turn1;
+    float2 turn2;
+};
+
+float3 HexHash(float2 cell)
+{
+    float3 p = frac(float3(cell, cell.x + cell.y) * 0.1031f);
+    p = frac(p + dot(p, p.yzx + 20.0f));
+    p = frac(p + dot(p, p.yzx + 20.0f));
+    return p;
+}
+
+// The half-angle tangent gives an exact cosine and sine without the cost of sincos.
+float2 HexTurn(float random)
+{
+    float t = (random - 0.5f) * SeabedHex.w;
+    return float2(1.0f - t * t, 2.0f * t) / (1.0f + t * t);
+}
+
+// The water's hex cells, with shifts as fractions of a texture block.
+HexCells FindHexCells(float2 world)
+{
+    float2 st = world * SeabedHex.x;
+    float2 skewed = float2(st.x - 0.5f * st.y, st.y);
+    float2 base = floor(skewed);
+    float3 corner = float3(frac(skewed), 0.0f);
+    corner.z = 1.0f - corner.x - corner.y;
+    float s = step(0.0f, -corner.z);
+    float s2 = 2.0f * s - 1.0f;
+
+    float3 weight = pow(saturate(float3(-corner.z * s2, s - corner.y * s2, s - corner.x * s2)), SeabedHex.y);
+
+    HexCells cells;
+    cells.weight = weight / dot(weight, 1.0f);
+    float3 random0 = HexHash(base + float2(s, s));
+    float3 random1 = HexHash(base + float2(s, 1.0f - s));
+    float3 random2 = HexHash(base + float2(1.0f - s, s));
+    cells.offset0 = random0.xy * SeabedHex.z;
+    cells.offset1 = random1.xy * SeabedHex.z;
+    cells.offset2 = random2.xy * SeabedHex.z;
+    cells.turn0 = HexTurn(random0.z);
+    cells.turn1 = HexTurn(random1.z);
+    cells.turn2 = HexTurn(random2.z);
+    return cells;
+}
+
+float2 Turn(float2 texel, float2 turn)
+{
+    return float2(dot(texel, float2(turn.x, -turn.y)), dot(texel, turn.yx));
+}
+
+// A texel position wrapped into its block, as atlas texcoords.
+float2 BlockUV(float2 texel, float3 block)
+{
+    return (block.xy + texel - block.z * floor(texel / block.z)) * SeabedAtlas.zw;
+}
+
+// One atlas texture read through the hex cells. The blend has no mean to hold contrast against,
+// since the atlas's smallest mip mixes every texture, so it is a plain weighted sum.
+float4 SeabedSample(sampler2D atlas, float4 plain, float2 uv, float2 texel, float2 dx, float2 dy, HexCells cells)
+{
+    float2 atlasTexel = uv * SeabedAtlas.xy;
+    // Point sampling picks the slot, 72 texels to a slot and 32 slots to the lookup.
+    float3 slots = tex2D(ClassMap, (atlasTexel - 4.0f) / (72.0f * 32.0f)).rgb;
+    float3 block = slots * float3(255.0f * 72.0f, 255.0f * 72.0f, 255.0f * 64.0f) + float3(4.0f, 4.0f, 0.0f);
+
+    // Cliff cells lay out their own texels, which the world position does not reach.
+    float2 drift = texel - (atlasTexel - block.xy);
+    drift -= block.z * floor(drift / block.z + 0.5f);
+    float onGrid = step(dot(drift, drift), 1.0f);
+
+    float4 sum = cells.weight.x * tex2Dgrad(atlas, BlockUV(Turn(texel, cells.turn0) + cells.offset0 * block.z, block), dx, dy);
+    sum += cells.weight.y * tex2Dgrad(atlas, BlockUV(Turn(texel, cells.turn1) + cells.offset1 * block.z, block), dx, dy);
+    sum += cells.weight.z * tex2Dgrad(atlas, BlockUV(Turn(texel, cells.turn2) + cells.offset2 * block.z, block), dx, dy);
+    return lerp(plain, sum, onGrid);
+}
+
 #endif
 
 #if BUMP
@@ -137,14 +248,34 @@ struct PsIn
 #if SHADOWED
     float4 ShadowPos : SHADOW_TEXCOORD;
 #endif
-#if BUMP || LIGHTS
+#if BUMP || LIGHTS || SEABED
     float3 WorldPos  : CONCAT(TEXCOORD, POSITION_INDEX);
 #endif
 };
 
 float4 main(PsIn input) : COLOR
 {
-    float4 color = lerp(tex2D(BaseTexture, input.BaseUV), tex2D(BlendTexture, input.BlendUV), input.Diffuse.a);
+    float4 base = tex2D(BaseTexture, input.BaseUV);
+    float4 blend = tex2D(BlendTexture, input.BlendUV);
+
+#if SEABED
+    // The mask's level is premultiplied by its coverage, so dividing it back out blends only water cells.
+    float4 mask = tex2D(WaterMask, input.WorldPos.xy * SeabedMask.xy + SeabedMask.zw);
+    float level = dot(mask.rg, float2(255.0f * 256.0f / 16.0f, 255.0f / 16.0f)) / max(mask.a, 0.001f);
+    float seabed = saturate((level - input.WorldPos.z) * SeabedWorld.z) * step(0.5f, mask.a);
+
+    // The atlas runs u along the world's x and v against its y, SeabedWorld.x texels per unit.
+    float2 texel = float2(input.WorldPos.x, -input.WorldPos.y) * SeabedWorld.x + float2(SeabedWorld.y, -SeabedWorld.y);
+    float2 texelDx = ddx(texel) * SeabedAtlas.zw;
+    float2 texelDy = ddy(texel) * SeabedAtlas.zw;
+
+    // ps_2_a cannot branch, so dry pixels pay for this too, and W3DShaderManager only draws tiles with water through it.
+    HexCells cells = FindHexCells(input.WorldPos.xy);
+    base = lerp(base, SeabedSample(BaseTexture, base, input.BaseUV, texel, texelDx, texelDy, cells), seabed);
+    blend = lerp(blend, SeabedSample(BlendTexture, blend, input.BlendUV, texel, texelDx, texelDy, cells), seabed);
+#endif
+
+    float4 color = lerp(base, blend, input.Diffuse.a);
 
 #if SHADOWED
     float lit = ShadowLit(input.ShadowPos);

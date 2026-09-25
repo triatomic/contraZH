@@ -1528,6 +1528,22 @@ static Bool PointLightPassLoaded = FALSE;
 static DWORD DrawUnlitShader = 0;
 static DWORD DrawLitShader = 0;
 
+// The terrain's seabed hex tiling, set once a frame by the terrain.
+static TextureClass *SeabedClassMap = nullptr;
+static TextureClass *SeabedWaterMask = nullptr;
+static Vector4 SeabedConstants[W3DShaderManager::SEABED_CONSTANTS];
+static Bool TerrainSeabedLoaded = FALSE;
+
+// The terrain shaders setDrawTerrain picks between: the unlit one bound, and the seabed variants without and with the lights.
+static DWORD DrawGroundShader = 0;
+static DWORD DrawSeabedUnlitShader = 0;
+static DWORD DrawSeabedLitShader = 0;
+
+// Where terrainshadow.hlsl reads the seabed, past the six point lights its seabed variants keep.
+#define SEABED_REGISTER 19
+#define SEABED_CLASS_MAP_SAMPLER 8
+#define SEABED_WATER_MASK_SAMPLER 9
+
 // The lights of the object whose specular pass is installed.
 struct SpecularPassLights
 {
@@ -1597,6 +1613,9 @@ static void End_Draw_Pixel_Lights()
 {
 	DrawUnlitShader = 0;
 	DrawLitShader = 0;
+	DrawGroundShader = 0;
+	DrawSeabedUnlitShader = 0;
+	DrawSeabedLitShader = 0;
 }
 
 // The terrain normal maps, set once a frame by the scene.
@@ -2597,6 +2616,51 @@ void W3DShaderManager::setDrawPixelLights(const Int *indices, Int count)
 	DX8Wrapper::Set_Pixel_Shader(DrawLitShader);
 }
 
+void W3DShaderManager::setTerrainSeabed(TextureClass *classMap, TextureClass *waterMask, const Vector4 *constants)
+{
+	SeabedClassMap = (constants != nullptr) ? classMap : nullptr;
+	SeabedWaterMask = (constants != nullptr) ? waterMask : nullptr;
+	for (Int i = 0; i < SEABED_CONSTANTS && constants != nullptr; i++)
+	{
+		SeabedConstants[i] = constants[i];
+	}
+}
+
+Bool W3DShaderManager::supportsTerrainSeabed()
+{
+	return TerrainSeabedLoaded;
+}
+
+void W3DShaderManager::setDrawTerrain(const Int *indices, Int count, Bool seabed)
+{
+	if (seabed && DrawSeabedUnlitShader != 0)
+	{
+		// Point lights for other draws overwrite the seabed's registers, so they go back each draw.
+		DX8Wrapper::Set_Pixel_Shader_Constant(SEABED_REGISTER, SeabedConstants, SEABED_CONSTANTS);
+		if (count > 0 && DrawLitShader != 0 && DrawSeabedLitShader != 0)
+		{
+			Vector4 constants[PIXEL_LIGHT_REGISTERS];
+			const Int registers = Pack_Pixel_Lights(constants, SEABED_PIXEL_LIGHTS, indices, count, nullptr);
+			DX8Wrapper::Set_Pixel_Shader_Constant(GROUND_POINT_LIGHT_REGISTER, constants, registers);
+			DX8Wrapper::Set_Pixel_Shader(DrawSeabedLitShader);
+		}
+		else
+		{
+			DX8Wrapper::Set_Pixel_Shader(DrawSeabedUnlitShader);
+		}
+		return;
+	}
+
+	if (DrawLitShader != 0)
+	{
+		setDrawPixelLights(indices, count);
+	}
+	else if (DrawSeabedUnlitShader != 0)
+	{
+		DX8Wrapper::Set_Pixel_Shader(DrawGroundShader);
+	}
+}
+
 Int W3DShaderManager::pickPixelLights(const AABoxClass &box, Int *lights)
 {
 	Int count = 0;
@@ -2769,7 +2833,7 @@ class TerrainShader8Stage : public W3DShaderInterface
 class TerrainShaderPixelShader : public W3DShaderInterface
 {
 public:
-	TerrainShaderPixelShader() : m_shadowStage(-1), m_bumpStage(-1), m_lightStage(-1) {}
+	TerrainShaderPixelShader() : m_shadowStage(-1), m_bumpStage(-1), m_lightStage(-1), m_seabedStage(-1) {}
 
 private:
 	DWORD					m_dwBasePixelShader;	///<handle to terrain D3D pixel shader
@@ -2781,6 +2845,8 @@ private:
 	Int						m_bumpStage;	///<stage the world position is generated on, with the normal atlas on the next, or -1
 	DWORD					m_dwLitPixelShader[2][2][3];	///<the same again adding the point lights, by bump, shadow and noise count
 	Int						m_lightStage;	///<stage the world position is generated on for unbumped point lights, or -1
+	DWORD					m_dwSeabedPixelShader[2][2][2][3];	///<every variant again hex-tiling the seabed, by lights, bump, shadow and noise count
+	Int						m_seabedStage;	///<stage the world position is generated on for the unbumped seabed, or -1
 
 	virtual Int set(Int pass) override;		///<setup shader for the specified rendering pass.
 	virtual void reset() override;		///<do any custom resetting necessary to bring W3D in sync.
@@ -2793,6 +2859,8 @@ private:
 	Bool setBump(Int noiseCount, Bool shadowed);
 	void initPixelLights();
 	Bool setPixelLights(Int noiseCount, Bool shadowed, Bool bumped, DWORD unlit);
+	void initSeabed();
+	void setSeabed(Int noiseCount, Bool shadowed, Bool bumped, DWORD unlit);
 } terrainShaderPixelShader;
 
 ///List of different terrain shader implementations in order of preference
@@ -3231,6 +3299,25 @@ Int TerrainShaderPixelShader::shutdown()
 	}
 	TerrainPixelLightsLoaded = FALSE;
 
+	for (Int l=0; l<2; l++)
+	{
+		for (Int b=0; b<2; b++)
+		{
+			for (Int s=0; s<2; s++)
+			{
+				for (Int i=0; i<3; i++)
+				{
+					if (m_dwSeabedPixelShader[l][b][s][i])
+					{
+						DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_dwSeabedPixelShader[l][b][s][i]);
+					}
+					m_dwSeabedPixelShader[l][b][s][i]=0;
+				}
+			}
+		}
+	}
+	TerrainSeabedLoaded = FALSE;
+
 	return TRUE;
 }
 
@@ -3456,6 +3543,108 @@ Bool TerrainShaderPixelShader::setPixelLights(Int noiseCount, Bool shadowed, Boo
 	return TRUE;
 }
 
+void TerrainShaderPixelShader::initSeabed()
+{
+	for (Int l=0; l<2; l++)
+	{
+		for (Int b=0; b<2; b++)
+		{
+			for (Int s=0; s<2; s++)
+			{
+				for (Int i=0; i<3; i++)
+				{
+					m_dwSeabedPixelShader[l][b][s][i]=0;
+				}
+			}
+		}
+	}
+	m_seabedStage = -1;
+	TerrainSeabedLoaded = FALSE;
+
+#if defined(BUILD_WITH_D3D9)
+	const DX8Caps *caps = DX8Wrapper::Get_Current_Caps();
+	if (caps == nullptr || !Supports_Pixel_Shader_2_a(caps))
+	{
+		return;
+	}
+
+	// Shadowed variants only go with the shadow receivers they replace.
+	const Bool shadowMap = (m_dwShadowPixelShader[0] != 0 && TheW3DShadowMap != nullptr);
+	const Bool packed = shadowMap && TheW3DShadowMap->getDepthMode() == W3DShadowMap::DEPTH_MODE_PACKED;
+	static const char *const noiseNames[3] = { "", "noise", "noise2" };
+
+	// Tiles under water pick among all of them, so every variant has to be there or none is used.
+	Bool complete = TRUE;
+	for (Int l=0; l<2; l++)
+	{
+		for (Int b=0; b<2; b++)
+		{
+			for (Int s=0; s<(shadowMap ? 2 : 1); s++)
+			{
+				for (Int i=0; i<3; i++)
+				{
+					char file[64];
+					snprintf(file, sizeof(file), "shaders\\seabed%s%s%s%s.pso", l ? "lit" : "", b ? "bump" : "", noiseNames[i],
+						s == 0 ? "noshadow" : (packed ? "packed" : ""));
+					if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(file, nullptr, 0, false, &m_dwSeabedPixelShader[l][b][s][i])))
+					{
+						m_dwSeabedPixelShader[l][b][s][i]=0;
+						complete = FALSE;
+					}
+				}
+			}
+		}
+	}
+	TerrainSeabedLoaded = complete;
+#endif
+}
+
+// Expects the shadow map and bump already bound. Draws with standing water then take these variants in setDrawTerrain.
+void TerrainShaderPixelShader::setSeabed(Int noiseCount, Bool shadowed, Bool bumped, DWORD unlit)
+{
+#if defined(BUILD_WITH_D3D9)
+	if (!TerrainSeabedLoaded || SeabedClassMap == nullptr || SeabedWaterMask == nullptr ||
+		SeabedClassMap->Peek_D3D_Texture() == nullptr || SeabedWaterMask->Peek_D3D_Texture() == nullptr)
+	{
+		return;
+	}
+
+	// Bumped terrain already has the world position.
+	if (!bumped)
+	{
+		m_seabedStage = 2 + noiseCount + (shadowed ? 1 : 0);
+		Set_Terrain_World_Position(m_seabedStage);
+	}
+
+	// Past the fixed-function stages, the lookups only a pixel shader reads.
+	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
+	device->SetTexture(SEABED_CLASS_MAP_SAMPLER, SeabedClassMap->Peek_D3D_Texture());
+	device->SetSamplerState(SEABED_CLASS_MAP_SAMPLER, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
+	device->SetSamplerState(SEABED_CLASS_MAP_SAMPLER, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
+	device->SetSamplerState(SEABED_CLASS_MAP_SAMPLER, D3DSAMP_MINFILTER, D3DTEXF_POINT);
+	device->SetSamplerState(SEABED_CLASS_MAP_SAMPLER, D3DSAMP_MAGFILTER, D3DTEXF_POINT);
+	device->SetSamplerState(SEABED_CLASS_MAP_SAMPLER, D3DSAMP_MIPFILTER, D3DTEXF_NONE);
+
+	// Past the map edge the mask reads empty, as the water's own does.
+	device->SetTexture(SEABED_WATER_MASK_SAMPLER, SeabedWaterMask->Peek_D3D_Texture());
+	device->SetSamplerState(SEABED_WATER_MASK_SAMPLER, D3DSAMP_ADDRESSU, D3DTADDRESS_BORDER);
+	device->SetSamplerState(SEABED_WATER_MASK_SAMPLER, D3DSAMP_ADDRESSV, D3DTADDRESS_BORDER);
+	device->SetSamplerState(SEABED_WATER_MASK_SAMPLER, D3DSAMP_BORDERCOLOR, 0);
+	device->SetSamplerState(SEABED_WATER_MASK_SAMPLER, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+	device->SetSamplerState(SEABED_WATER_MASK_SAMPLER, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+	device->SetSamplerState(SEABED_WATER_MASK_SAMPLER, D3DSAMP_MIPFILTER, D3DTEXF_NONE);
+
+	DrawGroundShader = unlit;
+	DrawSeabedUnlitShader = m_dwSeabedPixelShader[0][bumped ? 1 : 0][shadowed ? 1 : 0][noiseCount];
+	DrawSeabedLitShader = m_dwSeabedPixelShader[1][bumped ? 1 : 0][shadowed ? 1 : 0][noiseCount];
+#else
+	(void)noiseCount;
+	(void)shadowed;
+	(void)bumped;
+	(void)unlit;
+#endif
+}
+
 Int TerrainShaderPixelShader::init()
 {
 	Int res;
@@ -3497,6 +3686,7 @@ Int TerrainShaderPixelShader::init()
 			initShadowReceiver();
 			initBump();
 			initPixelLights();
+			initSeabed();
 
 			W3DShaders[W3DShaderManager::ST_TERRAIN_BASE]=&terrainShaderPixelShader;
 			W3DShaders[W3DShaderManager::ST_TERRAIN_BASE_NOISE1]=&terrainShaderPixelShader;
@@ -3628,6 +3818,7 @@ Int TerrainShaderPixelShader::set(Int pass)
 	const DWORD unlit = bumped ? m_dwBumpPixelShader[shadowed ? 1 : 0][noiseCount]
 		: (shadowed ? m_dwShadowPixelShader[noiseCount] : baseShaders[noiseCount]);
 	setPixelLights(noiseCount, shadowed, bumped, unlit);
+	setSeabed(noiseCount, shadowed, bumped, unlit);
 
 	return TRUE;
 }
@@ -3655,6 +3846,18 @@ void TerrainShaderPixelShader::reset()
 		DX8Wrapper::Set_DX8_Texture_Stage_State(m_lightStage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_PASSTHRU|m_lightStage);
 	}
 	m_lightStage = -1;
+
+	if (m_seabedStage >= 0)
+	{
+		DX8Wrapper::Set_DX8_Texture_Stage_State(m_seabedStage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(m_seabedStage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_PASSTHRU|m_seabedStage);
+	}
+	m_seabedStage = -1;
+	if (DrawSeabedUnlitShader != 0)
+	{
+		DX8Wrapper::_Get_D3D_Device8()->SetTexture(SEABED_CLASS_MAP_SAMPLER, nullptr);
+		DX8Wrapper::_Get_D3D_Device8()->SetTexture(SEABED_WATER_MASK_SAMPLER, nullptr);
+	}
 	End_Draw_Pixel_Lights();
 
 	DX8Wrapper::_Get_D3D_Device8()->SetTexture(2,nullptr);	//release reference to any texture

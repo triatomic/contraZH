@@ -113,6 +113,7 @@ class WaterTransparencySetting : public Overridable
 		Real m_shaderWaterStochasticSharpness;	///< narrows the blend between hex cells, below 1 widens it
 		Real m_shaderWaterStochasticRandom;	///< how far each hex cell shifts the textures, 0 to 1
 		Real m_shaderWaterStochasticRotation;	///< how far each hex cell turns the water texture, 0 to 1
+		Bool m_shaderWaterStochasticSeabed;	///< hex cells also hide the tiling of the terrain under standing water
 		Bool m_isWater;					///< FALSE draws the old water without shaders, for lava and the like
 		Int m_waterAnimationFps;		///< most steps a second the water moves in, 30 to 60, 0 moves it every frame
 
@@ -159,6 +160,7 @@ class WaterTransparencySetting : public Overridable
 			m_shaderWaterStochasticSharpness = 3.0f;
 			m_shaderWaterStochasticRandom = 1.0f;
 			m_shaderWaterStochasticRotation = 1.0f;
+			m_shaderWaterStochasticSeabed = TRUE;
 			m_isWater = TRUE;
 			m_waterAnimationFps = 0;
 		}

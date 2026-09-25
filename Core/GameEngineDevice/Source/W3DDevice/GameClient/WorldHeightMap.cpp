@@ -413,6 +413,7 @@ WorldHeightMap::~WorldHeightMap()
 	}
 	REF_PTR_RELEASE(m_terrainTex);
 	REF_PTR_RELEASE(m_terrainNormalTex);
+	REF_PTR_RELEASE(m_terrainClassMap);
 	REF_PTR_RELEASE(m_alphaTerrainTex);
 	REF_PTR_RELEASE(m_alphaEdgeTex);
 }
@@ -445,7 +446,7 @@ WorldHeightMap::WorldHeightMap():
 #endif
 	m_numCliffInfo(1),
 	m_terrainTex(nullptr), m_alphaTerrainTex(nullptr), m_numBitmapTiles(0), m_numBlendedTiles(1),
-	m_terrainNormalTex(nullptr), m_hasNormalTiles(false)
+	m_terrainNormalTex(nullptr), m_terrainClassMap(nullptr), m_terrainClassMapAtlas(nullptr), m_hasNormalTiles(false)
 {
 	Int i;
 	for (i=0; i<NUM_SOURCE_TILES; i++) {
@@ -486,7 +487,7 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly):
 #endif
 	m_numCliffInfo(1),
 	m_terrainTex(nullptr), m_alphaTerrainTex(nullptr), m_numBitmapTiles(0), m_numBlendedTiles(1),
-	m_terrainNormalTex(nullptr), m_hasNormalTiles(false)
+	m_terrainNormalTex(nullptr), m_terrainClassMap(nullptr), m_terrainClassMapAtlas(nullptr), m_hasNormalTiles(false)
 {
 
 	int i;
@@ -2244,6 +2245,64 @@ TextureClass *WorldHeightMap::getTerrainTexture()
 	}
 
 	return m_terrainTex;
+}
+
+// Red and green hold the first slot column and row of the block a slot belongs to, blue the block's width
+// in tiles, all over 255. Every texel of a block lies in its own slots, since a tile is narrower than a slot.
+TextureClass *WorldHeightMap::getTerrainClassMap()
+{
+	getTerrainTexture();
+	if (m_terrainClassMap != nullptr && m_terrainClassMapAtlas == m_terrainTex)
+	{
+		return m_terrainClassMap;
+	}
+	REF_PTR_RELEASE(m_terrainClassMap);
+	m_terrainClassMapAtlas = m_terrainTex;
+
+	const Int size = CLASS_MAP_SLOTS;
+	m_terrainClassMap = MSGNEW("WorldHeightMap_getTerrainClassMap") TextureClass(size, size, WW3D_FORMAT_A8R8G8B8, MIP_LEVELS_1, TextureClass::POOL_MANAGED, false, false);
+	if (m_terrainClassMap->Peek_D3D_Texture() == nullptr)
+	{
+		REF_PTR_RELEASE(m_terrainClassMap);
+		return nullptr;
+	}
+
+	SurfaceClass *surface = m_terrainClassMap->Get_Surface_Level(0);
+	int pitch;
+	UnsignedByte *bits = (UnsignedByte *)surface->Lock(&pitch);
+	if (bits != nullptr)
+	{
+		for (Int y=0; y<size; y++)
+		{
+			memset(bits + y * pitch, 0, size * sizeof(UnsignedInt));
+		}
+
+		// A class that did not fit sits at 0,0 and is never drawn.
+		const Int slot = TILE_PIXEL_EXTENT + TILE_OFFSET;
+		for (Int i=0; i<m_numTextureClasses; i++)
+		{
+			const TXTextureClass &texClass = m_textureClasses[i];
+			const Int width = texClass.width;
+			if (width <= 0 || (texClass.positionInTexture.x == 0 && texClass.positionInTexture.y == 0))
+			{
+				continue;
+			}
+			const Int column = (texClass.positionInTexture.x - TILE_OFFSET/2) / slot;
+			const Int row = (texClass.positionInTexture.y - TILE_OFFSET/2) / slot;
+			const UnsignedInt texel = 0xff000000 | ((UnsignedInt)column << 16) | ((UnsignedInt)row << 8) | (UnsignedInt)width;
+			for (Int y=row; y<row + width && y<size; y++)
+			{
+				UnsignedInt *line = (UnsignedInt *)(bits + y * pitch);
+				for (Int x=column; x<column + width && x<size; x++)
+				{
+					line[x] = texel;
+				}
+			}
+		}
+		surface->Unlock();
+	}
+	REF_PTR_RELEASE(surface);
+	return m_terrainClassMap;
 }
 
 TextureClass *WorldHeightMap::getTerrainNormalTexture()

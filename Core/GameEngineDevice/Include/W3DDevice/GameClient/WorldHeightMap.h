@@ -86,6 +86,9 @@ typedef struct {
 // too few for mods (Contra defines 309 terrain types).
 #define NUM_TEXTURE_CLASSES 1024
 
+// Atlas slots along each side of the seabed's slot lookup, which terrainshadow.hlsl divides by too.
+#define CLASS_MAP_SLOTS 32
+
 
 class TextureClass;
 class ChunkInputStream;
@@ -190,6 +193,9 @@ protected:
 	Int	m_terrainTexHeight; /// Height of m_terrainTex allocated.
 	/** The normal maps laid out like m_terrainTex, so the same UVs index both. */
 	TerrainNormalTextureClass *m_terrainNormalTex;
+	/** Per atlas slot, the texture block it belongs to, for the seabed's hex tiling. */
+	TextureClass *m_terrainClassMap;
+	TerrainTextureClass *m_terrainClassMapAtlas;	///< the atlas m_terrainClassMap was built for
 	/** The texture that contains the alpha edge tiles that get blended on
 			top of the base texture. getAlphaUVData does the mapping. */
 	AlphaTerrainTextureClass *m_alphaTerrainTex;
@@ -296,6 +302,8 @@ public:  // tile and texture info.
 	void setTextureLOD(Int lod);	///< set maximum lod level sent to the hardware.
 	TextureClass *getTerrainTexture();  //< generates if needed and returns the terrain texture
 	TextureClass *getTerrainNormalTexture();  //< generates if needed and returns the terrain normal maps, or null when there are none
+	TextureClass *getTerrainClassMap();  //< generates if needed and returns the atlas slot lookup the seabed shaders read, or null
+	Int getTerrainTexHeight() const { return m_terrainTexHeight; }
 	TextureClass *getAlphaTerrainTexture(); //< generates if needed and returns alpha terrain texture
 	TextureClass *getEdgeTerrainTexture(); //< generates if needed and returns blend edge texture
 	/// UV mapping data for a cell to map into the terrain texture.  Returns true if the textures had to be stretched for cliffs.

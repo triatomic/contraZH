@@ -129,6 +129,12 @@ public:
 	/// The terrain heights as high and low bytes, brought up to date, or null. mapping takes world xy to its
 	/// texture coordinates as xy scale and zw offset, and decode weighs the two bytes into a height.
 	TextureClass *getTerrainHeightTexture(Vector4 &mapping, Vector4 &decode);
+	/// The standing water mask brought up to date for the terrain under it, or null while the seabed's hex
+	/// tiling is off. mapping takes world xy to its texture coordinates, and hex holds the hex cells' spacing,
+	/// weight exponent, shift and turn as the water shaders take them.
+	TextureClass *getSeabedMask(Vector4 &mapping, Vector4 &hex);
+	/// Whether a height map point lies in flat standing water, as of the last getSeabedMask.
+	Bool isSeabedPoint(Int x, Int y) const;
 	void renderPlanarReflection(CameraClass *cam);	///< mirrors the scene in the water under the view, before the views draw
 
 protected:
@@ -295,6 +301,9 @@ protected:
 	TextureClass *m_waterMaskTexture;	///< flat standing water per map cell, coverage in alpha and level in red and green
 	UnsignedInt m_waterMaskSignature;	///< hash of the water polygons the mask was built from
 	const WorldHeightMap *m_waterMaskMap;
+	UnsignedByte *m_waterMaskCells;		///< the mask's coverage kept on the CPU, 1 per standing water point
+	Int m_waterMaskCellsWidth;
+	Int m_waterMaskCellsHeight;
 	Bool m_drawingRadial;				///< the standing water being drawn is the camera-centred grid
 	Real m_radialPlaneZ;
 	Int64 m_iniTimestamp;				///< Water.ini's last write time, 0 until first seen

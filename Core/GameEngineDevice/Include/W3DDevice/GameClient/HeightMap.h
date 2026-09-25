@@ -108,6 +108,7 @@ protected:
 	Int	m_numBlockRowsInLastVB;///<a VB tile may be partially filled, this indicates how many 2x2 vertex blocks are filled.
 	std::vector<Int> m_tilePixelLights;	///<each VB tile's per-pixel lights, W3DShaderManager::MAX_PIXEL_LIGHTS slots a tile
 	std::vector<Int> m_tilePixelLightCounts;	///<how many of its slots each VB tile fills
+	std::vector<Bool> m_tileSeabed;	///<whether each VB tile has standing water, so it draws through the seabed shaders
 
 	DX8VertexBufferClass *getVertexBufferTile(Int x, Int y);
 	VERTEX_FORMAT *getVertexBufferBackup(Int x, Int y);
@@ -118,6 +119,7 @@ protected:
 	Int getTileRow(Int y);	///<the VB tile row holding a row of cells, counted from the drawn area's edge
 	void assignPixelLights(RefRenderObjListIterator &lights);	///<hands the terrain shader the lights each VB tile has room for
 	void setTilePixelLights(Int tile);	///<lights the draws that follow with one VB tile's lights
+	void prepareSeabed();	///<hands the terrain shader this frame's seabed and marks the VB tiles with standing water
 	///update vertex diffuse color for dynamic lights inside given rectangle
 	Int updateVBForLight(DX8VertexBufferClass *pVB, VERTEX_FORMAT *data, Int x0, Int y0, Int x1, Int y1, Int originX, Int originY, W3DDynamicLight *pLights[], Int numLights);
 	Int updateVBForLightOptimized(DX8VertexBufferClass	*pVB, VERTEX_FORMAT *data, Int x0, Int y0, Int x1, Int y1, Int originX, Int originY, W3DDynamicLight *pLights[], Int numLights);

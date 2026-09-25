@@ -126,8 +126,8 @@ public:
 		Real ambientScale;	///< ambient colour as a fraction of the diffuse
 		Bool terrainOnly;	///< lights the ground and nothing standing on it
 	};
-	/// Each ground draw takes up to nine lights and each mesh up to eight, as their registers allow.
-	enum { MAX_PIXEL_LIGHTS = 9, MAX_UNIT_PIXEL_LIGHTS = 8, MAX_PIXEL_LIGHT_CANDIDATES = 64 };
+	/// Each ground draw takes up to nine lights, six under standing water, and each mesh up to eight, as their registers allow.
+	enum { MAX_PIXEL_LIGHTS = 9, SEABED_PIXEL_LIGHTS = 6, MAX_UNIT_PIXEL_LIGHTS = 8, MAX_PIXEL_LIGHT_CANDIDATES = 64 };
 	/// Sets the lights that may be drawn per pixel this frame, most important first. Draws name theirs by index.
 	static void setPixelLights(const PixelLight *lights, Int count);
 	static Int getPixelLightCount();
@@ -135,6 +135,15 @@ public:
 	/// Lights the draws that follow with the given lights, up to nine, under the terrain, road, flat terrain
 	/// or point light shader in use. Null indices take the first count, the ones nearest the middle of the view.
 	static void setDrawPixelLights(const Int *indices, Int count);
+	/// The registers the terrain's seabed hex tiling reads, as terrainshadow.hlsl lays them out.
+	enum { SEABED_CONSTANTS = 4 };
+	/// Sets, once a frame, the atlas slot lookup, standing water mask and SEABED_CONSTANTS registers the
+	/// terrain's seabed hex tiling reads, or turns it off with nulls.
+	static void setTerrainSeabed(TextureClass *classMap, TextureClass *waterMask, const Vector4 *constants);
+	/// Whether the terrain can hex-tile its textures under standing water.
+	static Bool supportsTerrainSeabed();
+	/// Lights a terrain draw as setDrawPixelLights does, through the seabed shaders when it has standing water.
+	static void setDrawTerrain(const Int *indices, Int count, Bool seabed);
 	/// The first lights, nearest the middle of the view, that reach the box, as many as one ground draw takes.
 	static Int pickPixelLights(const AABoxClass &box, Int *lights);
 	/// Whether any surface draws point lights per pixel, so the scene has to pick them.
