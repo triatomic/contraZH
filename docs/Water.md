@@ -36,7 +36,14 @@ line. 0 gives a hard shore edge. Same key as the old water.)
 * `ShaderWaterOpacity = 0.95` - (Opacity of deep water, replacing `TransparentWaterMinOpacity` for shader
 water. 0 uses `TransparentWaterMinOpacity` instead.)
 * `ShaderWaterClarity = 1.0` - (Scales `TransparentWaterDepth`. Higher sees deeper.)
-* `ShaderWaterFoamDepth = 6` - (Depth where shore foam fades out. 0 turns foam off.)
+* `ShaderWaterFoamDepth = 6` - (Depth where shore foam fades out. 0 turns foam off, crest foam included.)
+* `ShaderWaterFoamReach = 15` - (World units from land within which water foams as if it were at
+the shore, so pier walls, jetties and cliffs rising out of deep water gather foam. 0 leaves foam to
+the depth alone.)
+* `ShaderWaterFoamScale = 150` - (World units one foam pattern covers up close. Further away the
+pattern doubles in size each time a pixel covers twice the ground, fading between sizes, so the foam
+stays readable at any zoom.)
+* `ShaderWaterFoamStrength = 0.5` - (Brightness of the foam. 1 is full white web, 0 turns foam off.)
 
 ## Surface
 
@@ -141,7 +148,10 @@ One block. `map.ini` can override any of these keys for its map.
 | `ShaderWaterWaveStrength` | number | `0.3` | `0` - `2` | Ripple steepness. `0` is flat. Above `2` the surface turns to glitter. |
 | `ShaderWaterStochasticSize` | number | `100` | `0`, or `30` - `1000` | World units between the cells that shift the textures to hide their tiling. `0` turns it off. Below `30` the textures blur, above `1000` the pattern shows within a cell. |
 | `ShaderWaterStochasticSharpness` | number | `3` | `-15` **(hard)** - `16`, looks right from `1` | Narrows the blend between cells. `1` softens the textures, above `16` the cell edges show. `0` and below show seams along the cell edges. |
-| `ShaderWaterFoamDepth` | number | `6` | `0` - `30` | Depth where shore foam fades out. `0` turns foam off. |
+| `ShaderWaterFoamDepth` | number | `6` | `0` - `30` | Depth where shore foam fades out. `0` turns foam off, crest foam included. |
+| `ShaderWaterFoamReach` | number | `15` | `0` - `40` | World units from land within which water foams as at the shore. `0` leaves foam to the depth alone. |
+| `ShaderWaterFoamScale` | number | `150` | `1` **(hard)** - `600` | World units one foam pattern covers up close. It doubles further out, so the foam stays readable at any zoom. |
+| `ShaderWaterFoamStrength` | number | `0.5` | `0` **(hard)** - `2` | Brightness of the foam. `0` turns it off. |
 | `ShaderWaterSwellHeight` | number | `3.0` | `0` - `10` | Height of the vertex waves in world units. `0` turns them off. Waves shrink in water shallower than twice this. Above `10` they cut into hulls. |
 | `ShaderWaterSwellScale` | number | `700` | `1` **(hard)** - `3000` | World units one swell pattern covers. Below `200` the swell looks choppy, above `3000` it is too broad to see. |
 | `ShaderWaterSwellSpeed` | number | `30` | `-200` - `200` | World units a second the swell drifts. `0` holds it still. Negative reverses it. |
