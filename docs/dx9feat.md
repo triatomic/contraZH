@@ -219,6 +219,7 @@ page. `ParticleSystem.ini` overrides take effect on the next launch.
 Tesla, lightning and EMP sparks and flares crackle. Thin arcs jump across each sprite many times a
 second, in its own colour taken halfway to white, while the sprite jitters and its brightness strobes.
 Ported from Red Alert 3's tesla shader. Needs the Direct3D 9 build and a shader model 2 card.
+Each key is pictured on [Electric & Laser Shading](Electric-&-Laser-Shading.md#electric-shading).
 
 * `ElectricShaders = Yes` - (No draws electric sprites plain. Options.ini only, no menu control.)
 
@@ -261,7 +262,8 @@ sprites stay plain.
 Laser beams burn white-hot along their axis and glow out in their own colour. The core wavers in
 width, pulses of brightness run along the beam towards its target, and the flat edges of the beam
 melt into glow. Beams also fade where they meet the ground, like soft particles. Needs the Direct3D 9
-build and a shader model 2 card.
+build and a shader model 2 card. Each key is pictured on
+[Electric & Laser Shading](Electric-&-Laser-Shading.md#laser-shading).
 
 * `LaserShaders = Yes` - (No draws lasers plain. Options.ini only, no menu control.)
 
@@ -312,7 +314,8 @@ the distance to the nearest point on the beam, so a beam skimming the ground lig
 and a beam climbing into the sky lights only the ground near the shooter. Slopes facing the beam
 catch more light, and the laser shader's pulses brighten the ground as they pass. The Direct3D 8
 build keeps the strip of dynamic lights described in
-[Laser ground glow](contraZH-Changes.md#laser-ground-glow). Needs a shader model 2 card.
+[Laser ground glow](contraZH-Changes.md#laser-ground-glow). Needs a shader model 2 card. Each key is
+pictured on [Electric & Laser Shading](Electric-&-Laser-Shading.md#laser-ground-glow).
 
 Uses the same switches and keys as the Direct3D 8 glow: `LaserRef`, `DynamicLights`,
 `LaserGroundGlowColor`, `LaserGroundGlowIntensity`, `LaserGroundGlowRadius`, and `GroundGlowColor`,
