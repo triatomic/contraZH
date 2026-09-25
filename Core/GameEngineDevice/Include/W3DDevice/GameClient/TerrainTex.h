@@ -77,6 +77,19 @@ public:
 	void setLOD(Int LOD);
 };
 
+/// The heights the terrain shaders blend textures by, laid out like TerrainTextureClass.
+class TerrainHeightTextureClass : public TextureClass
+{
+	W3DMPO_CODE(TerrainHeightTextureClass)
+public:
+		/// Create texture for a height map, as tall as its TerrainTextureClass.
+		TerrainHeightTextureClass(int height);
+
+public:
+	Bool update(WorldHeightMap *htMap); ///< Sets the pixels, and returns false when the card lacks the format.
+	void setLOD(Int LOD);
+};
+
 
 class AlphaTerrainTextureClass : public TextureClass
 {

@@ -23,6 +23,9 @@
 // LIGHTS adds the dynamic point lights the vertex lighting leaves out. They need the
 // world position, on the same stage as for BUMP, and take ps_2_a for their length.
 //
+// Every build blends the two textures by height through heightblend.hlsli, which reads c3
+// and sampler s10, and which the constants turn back into the legacy blend when it is off.
+//
 // SEABED hides the atlas textures' tiling under standing water with the water's hex cells.
 // Each atlas texture is a block that wraps seamlessly, so a cell shifts and turns its read
 // within the block. The block comes from a lookup of the atlas slot, and the read follows
@@ -49,6 +52,9 @@
 #define CONCAT(a, b) CONCAT_(a, b)
 
 #define SHADOW_STAGE (2 + NOISE_COUNT)
+
+#define HEIGHT_BLEND_REGISTER c3
+#include "heightblend.hlsli"
 
 sampler2D BaseTexture  : register(s0);
 sampler2D BlendTexture : register(s1);
@@ -212,16 +218,15 @@ float4 SeabedSample(sampler2D atlas, float4 plain, float2 uv, float2 texel, floa
 
 sampler2D NormalAtlas : register(CONCAT(s, NORMAL_INDEX));
 
-float4 ToSun      : register(c1);   // world space
-float4 SunColor   : register(c2);   // the sun's diffuse colour in the vertex lighting
-float4 BumpParams : register(c3);   // x = normal map strength, y = 1 for the debug view
+float4 ToSun      : register(c1);   // world space, w = normal map strength
+float4 SunColor   : register(c2);   // the sun's diffuse colour in the vertex lighting, w = 1 for the debug view
 
 // The atlas holds x in luminance and y in alpha, and z comes back from unit length.
 float3 AtlasNormal(float2 uv)
 {
     float4 texel = tex2D(NormalAtlas, uv);
     float2 xy = float2(texel.r, texel.a) * 2.0f - 1.0f;
-    return float3(xy * BumpParams.x, sqrt(saturate(1.0f - dot(xy, xy))));
+    return float3(xy * ToSun.w, sqrt(saturate(1.0f - dot(xy, xy))));
 }
 
 // Schuler's cotangent frame from the UV derivatives, so cliff cells with their own
@@ -281,7 +286,8 @@ float4 main(PsIn input) : COLOR
     blend = lerp(blend, SeabedSample(BlendTexture, blend, input.BlendUV, texel, texelDx, texelDy, cells), seabed);
 #endif
 
-    float4 color = lerp(base, blend, input.Diffuse.a);
+    float weight = HeightBlendWeight(input.Diffuse.a, tex2D(HeightAtlas, input.BaseUV).r, tex2D(HeightAtlas, input.BlendUV).r);
+    float4 color = lerp(base, blend, weight);
 
 #if SHADOWED
     float lit = ShadowLit(input.ShadowPos);
@@ -304,7 +310,7 @@ float4 main(PsIn input) : COLOR
     float side = (dot(dpdx, dpdyPerp) < 0.0f) ? -1.0f : 1.0f;
 
     float3 bumped = lerp(BumpNormal(normal, dpdyPerp, dpdxPerp, side, input.BaseUV),
-                         BumpNormal(normal, dpdyPerp, dpdxPerp, side, input.BlendUV), input.Diffuse.a);
+                         BumpNormal(normal, dpdyPerp, dpdxPerp, side, input.BlendUV), weight);
     bumped = (dot(bumped, bumped) > 1e-20f) ? normalize(bumped) : normal;
 
     // The vertex lighting holds the sun on the smooth surface. The bump only changes the sun's share.
@@ -339,7 +345,7 @@ float4 main(PsIn input) : COLOR
 
 #if BUMP
     // The debug view shows only the bump's shading, 4x, on grey.
-    color.rgb = lerp(color.rgb, saturate(0.5f + change * 4.0f).xxx, BumpParams.y);
+    color.rgb = lerp(color.rgb, saturate(0.5f + change * 4.0f).xxx, SunColor.w);
 #endif
     return color;
 }

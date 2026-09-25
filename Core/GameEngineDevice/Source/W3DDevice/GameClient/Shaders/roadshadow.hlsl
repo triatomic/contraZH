@@ -12,6 +12,10 @@
 // sits on the first stage after the maps, because fixed-function vertex processing
 // hands out texcoord sets in stage order.
 //
+// Blend tiles of three textures draw through these too, laid over the terrain by their alpha,
+// which heightblend.hlsli shapes by the top texture's height against a middling one below.
+// Roads set its constants to leave their alpha alone.
+//
 // LIGHTS adds the point lights to the vertex lighting. They need the world position,
 // on the stage after the shadow map, and take ps_2_a for their length.
 
@@ -27,6 +31,9 @@
 #define CONCAT(a, b) CONCAT_(a, b)
 
 #define SHADOW_STAGE (1 + NOISE_COUNT)
+
+#define HEIGHT_BLEND_REGISTER c1
+#include "heightblend.hlsli"
 
 sampler2D RoadTexture : register(s0);
 
@@ -99,6 +106,7 @@ struct PsIn
 float4 main(PsIn input) : COLOR
 {
     float4 color = tex2D(RoadTexture, input.RoadUV);
+    float weight = HeightBlendWeight(input.Diffuse.a, 0.5f, tex2D(HeightAtlas, input.RoadUV).r);
 
 #if LIGHTS
     // Roads lie on the terrain, so their facet's normal is turned up.
@@ -107,10 +115,10 @@ float4 main(PsIn input) : COLOR
     float3 normal = facet * rsqrt(max(dot(facet, facet), 1e-30f));
 
     color.rgb *= saturate(input.Diffuse.rgb + PointLighting(input.WorldPos, normal));
-    color.a *= input.Diffuse.a;
 #else
-    color *= input.Diffuse;
+    color.rgb *= input.Diffuse.rgb;
 #endif
+    color.a *= weight;
 
 #if NOISE_COUNT >= 1
     color *= tex2D(Noise1Texture, input.Noise1UV);

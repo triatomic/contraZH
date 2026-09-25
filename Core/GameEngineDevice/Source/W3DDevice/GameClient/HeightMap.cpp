@@ -104,6 +104,16 @@ HeightMapRenderObjClass *TheHeightMap = nullptr;
 
 static ShaderClass detailOpaqueShader(SC_DETAIL_BLEND);
 
+// The heights the terrain shaders blend its textures by, or null for the legacy blend.
+static TextureClass *Height_Blend_Texture(WorldHeightMap *map)
+{
+	if (map == nullptr || !TheGlobalData->m_useHeightBlend || !W3DShaderManager::supportsTerrainHeightBlend())
+	{
+		return nullptr;
+	}
+	return map->getTerrainHeightTexture();
+}
+
 #define DEFAULT_MAX_FRAME_EXTRABLEND_TILES		256	//default number of terrain tiles rendered per call (must fit in one VB)
 #define DEFAULT_MAX_MAP_EXTRABLEND_TILES		2048	//default size of array allocated to hold all map extra blend tiles.
 #define DEFAULT_MAX_BATCH_SHORELINE_TILES		512	//maximum number of terrain tiles rendered per call (must fit in one VB)
@@ -2216,6 +2226,7 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
  		// The reflection pass mirrors the view, and its terrain stays flat.
  		W3DShaderManager::setTexture(W3DShaderManager::TERRAIN_NORMAL_TEXTURE,
  			ShaderClass::Is_Backface_Culling_Inverted() ? nullptr : m_map->getTerrainNormalTexture());
+		W3DShaderManager::setTexture(W3DShaderManager::TERRAIN_HEIGHT_TEXTURE, Height_Blend_Texture(m_map));
 		//Disable writes to destination alpha channel (if there is one)
 		if (DX8Wrapper::getBackBufferFormat() == WW3D_FORMAT_A8R8G8B8)
 			DX8Wrapper::Set_DX8_Render_State(D3DRS_COLORWRITEENABLE,D3DCOLORWRITEENABLE_BLUE|D3DCOLORWRITEENABLE_GREEN|D3DCOLORWRITEENABLE_RED);
@@ -2682,6 +2693,8 @@ void HeightMapRenderObjClass::renderExtraBlendTiles()
 			W3DShaderManager::setTexture(0,m_stageOneTexture);
 			W3DShaderManager::setTexture(1,m_stageTwoTexture);	//cloud
 			W3DShaderManager::setTexture(2,m_stageThreeTexture);	//noise/lightmap
+			W3DShaderManager::setTexture(W3DShaderManager::TERRAIN_HEIGHT_TEXTURE, Height_Blend_Texture(m_map));
+			W3DShaderManager::setRoadHeightBlend(TRUE);
 
 			W3DShaderManager::ShaderTypes st = W3DShaderManager::ST_ROAD_BASE;
 
@@ -2720,6 +2733,7 @@ void HeightMapRenderObjClass::renderExtraBlendTiles()
 				}
 			}
 			W3DShaderManager::resetShader(st);
+			W3DShaderManager::setRoadHeightBlend(FALSE);
 		}
   }
 }

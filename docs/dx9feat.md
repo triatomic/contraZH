@@ -9,7 +9,7 @@ Cheat builds reload `Data\INI\GameData.ini` about half a second after it is save
 keys can be adjusted with a map running: `UnitSpecularIntensity`, `UnitSpecularPower`,
 `UnitBumpHeight`, `UnitNormalMapStrength`, `TerrainNormalMapStrength`, `UnitEmissiveIntensity`,
 `UnitEmissiveNightIntensity`, `SoftParticleDistance`, `AmbientOcclusionRadius`,
-`AmbientOcclusionStrength`, the `GroundNoise` keys and the `Flame`, `Haze`, `Electric` and `Laser` tuning keys. Other `GameData.ini` keys keep their
+`AmbientOcclusionStrength`, the `GroundNoise` and `TerrainHeightBlend` keys and the `Flame`, `Haze`, `Electric` and `Laser` tuning keys. Other `GameData.ini` keys keep their
 value until a restart. The saved values win over a map's `map.ini` until the map loads again. A
 deleted key keeps its value until a restart, and a file with an error applies only the keys above
 the error until the next save.
@@ -425,6 +425,30 @@ Notes:
 * The pattern repeats only across four `GroundNoiseSize` spans, 4000 world units at the default.
 * The Direct3D 8 build and the lower terrain detail settings keep `TSNoiseUrb`.
 * On cards without shader model 2.0a, terrain and road shadows turn off while `Ground Lighting` is on.
+
+## Height blending
+
+Where two terrain textures meet, the taller parts of each push into the other instead of a soft
+10-unit fade. Stones and clumps stand proud of the texture beside them, and the edge follows them.
+Three-texture blend tiles blend the same way. Needs the Direct3D 9 build.
+
+* `HeightBlend = Yes` - (No brings back the soft fade. Also `Height blending` in the advanced display
+options. Needs `CheckHeightBlend` in `OptionsMenu.wnd` for the menu control.)
+
+Tuned in the mod's `GameData.ini`:
+
+* `TerrainHeightBlendStrength = 2` - (How far the taller texture pushes into the other's side. 0 keeps
+the edge where the fade would put it.)
+* `TerrainHeightBlendSharpness = 4` - (How narrow the edge is. 1 is as wide as the soft fade.)
+
+Heights come from `<texture>_hgt.dds` beside a terrain texture, as `_nrm.dds` does for normal maps.
+Its red channel is the height, black low and white high, and it must be at least as large as the
+texture. Textures without one take their own brightness as height, measured against the texture's
+average, so a bright texture does not simply cover a dark one.
+
+Notes:
+* The lower terrain detail settings keep the soft fade.
+* Roads draw as before.
 
 ## Shader water
 

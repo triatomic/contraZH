@@ -68,7 +68,8 @@ set(RTS_SHADER_DIR "Core/GameEngineDevice/Source/W3DDevice/GameClient/Shaders")
 set(RTS_SHADER_INCLUDES
     "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/shadowreceive.hlsli"
     "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/pointlights.hlsli"
-    "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/groundnoise.hlsli")
+    "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/groundnoise.hlsli"
+    "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/heightblend.hlsli")
 
 rts_add_shader("${RTS_SHADER_DIR}/shadowdepth.hlsl"   ps_2_0 mainPackedPS  shadowdepthpacked.pso)
 rts_add_shader("${RTS_SHADER_DIR}/instancedepth.hlsl" vs_2_0 main instancedepth.vso             PACKED=0)
@@ -84,6 +85,8 @@ rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadown
 # The ground noise leaves the shadowed variants with it too long for ps_2_0.
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_a main terrainshadownoise2.pso       NOISE_COUNT=2 PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_a main terrainshadownoise2packed.pso NOISE_COUNT=2 PACKED=1)
+rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainnoshadow.pso           NOISE_COUNT=0 SHADOWED=0 PACKED=0)
+rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainnoisenoshadow.pso      NOISE_COUNT=1 SHADOWED=0 PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainnoise2noshadow.pso      NOISE_COUNT=2 SHADOWED=0 PACKED=0)
 # The terrain normal map variants take derivatives, which ps_2_0 lacks.
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_a main terrainbump.pso                 NOISE_COUNT=0 SHADOWED=1 PACKED=0 BUMP=1)

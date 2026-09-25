@@ -98,6 +98,7 @@ class DataChunkInput;
 struct DataChunkInfo;
 class TerrainTextureClass;
 class TerrainNormalTextureClass;
+class TerrainHeightTextureClass;
 class AlphaTerrainTextureClass;
 class AlphaEdgeTextureClass;
 
@@ -108,6 +109,7 @@ class WorldHeightMap : public RefCountClass,
 {
 	friend class TerrainTextureClass;
 	friend class TerrainNormalTextureClass;
+	friend class TerrainHeightTextureClass;
 	friend class AlphaTerrainTextureClass;
 	friend class AlphaEdgeTextureClass;
 
@@ -167,6 +169,7 @@ protected:
 	TileData			*m_edgeTiles[NUM_SOURCE_TILES];	///< Tiles for m_textureClasses
 	TileData			*m_sourceNormalTiles[NUM_SOURCE_TILES];	///< Normal map tiles matching m_sourceTiles, null where a class has none
 	Bool				m_hasNormalTiles;	///< Some texture class has a normal map
+	TileData			*m_sourceHeightTiles[NUM_SOURCE_TILES];	///< Height map tiles matching m_sourceTiles, null where a class has none
 
 	TBlendTileInfo	m_blendedTiles[NUM_BLEND_TILES];
 	TBlendTileInfo	m_extraBlendedTiles[NUM_BLEND_TILES];
@@ -193,6 +196,8 @@ protected:
 	Int	m_terrainTexHeight; /// Height of m_terrainTex allocated.
 	/** The normal maps laid out like m_terrainTex, so the same UVs index both. */
 	TerrainNormalTextureClass *m_terrainNormalTex;
+	/** The heights the textures blend by, laid out like m_terrainTex. */
+	TerrainHeightTextureClass *m_terrainHeightTex;
 	/** Per atlas slot, the texture block it belongs to, for the seabed's hex tiling. */
 	TextureClass *m_terrainClassMap;
 	TerrainTextureClass *m_terrainClassMapAtlas;	///< the atlas m_terrainClassMap was built for
@@ -219,12 +224,13 @@ protected:
 	TileData *getSourceTile(UnsignedInt ndx) { if (ndx<NUM_SOURCE_TILES) return(m_sourceTiles[ndx]); return(nullptr); };
 	TileData *getEdgeTile(UnsignedInt ndx) { if (ndx<NUM_SOURCE_TILES) return(m_edgeTiles[ndx]); return(nullptr); };
 	TileData *getSourceNormalTile(UnsignedInt ndx) { if (ndx<NUM_SOURCE_TILES) return(m_sourceNormalTiles[ndx]); return(nullptr); };
+	TileData *getSourceHeightTile(UnsignedInt ndx) { if (ndx<NUM_SOURCE_TILES) return(m_sourceHeightTiles[ndx]); return(nullptr); };
 	/// UV mapping data for a cell to map into the terrain texture.
 	void getUVForNdx(Int ndx, float *minU, float *minV, float *maxU, float*maxV);
 	Bool getUVForTileIndex(Int ndx, Short tileNdx, float U[4], float V[4]);
 	Int getTextureClassFromNdx(Int tileNdx);
 	void readTexClass(TXTextureClass *texClass, TileData **tileData);
-	void readNormalTiles(TXTextureClass *texClass, const char *textureName, Int numRows);
+	Bool readMapTiles(TXTextureClass *texClass, const char *textureName, Int numRows, const char *suffix, TileData **tiles);
 	Int updateTileTexturePositions(Int *edgeHeight); ///< Places each tile in the texture.
 	void initCliffFlagsFromHeights();
 	void setCellCliffFlagFromHeights(Int xIndex, Int yIndex);
@@ -302,6 +308,7 @@ public:  // tile and texture info.
 	void setTextureLOD(Int lod);	///< set maximum lod level sent to the hardware.
 	TextureClass *getTerrainTexture();  //< generates if needed and returns the terrain texture
 	TextureClass *getTerrainNormalTexture();  //< generates if needed and returns the terrain normal maps, or null when there are none
+	TextureClass *getTerrainHeightTexture();  //< generates if needed and returns the heights the textures blend by, or null when the card lacks the format
 	TextureClass *getTerrainClassMap();  //< generates if needed and returns the atlas slot lookup the seabed shaders read, or null
 	Int getTerrainTexHeight() const { return m_terrainTexHeight; }
 	TextureClass *getAlphaTerrainTexture(); //< generates if needed and returns alpha terrain texture

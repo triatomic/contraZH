@@ -292,6 +292,8 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ "GroundNoiseSize",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_groundNoiseSize ) },
 	{ "GroundNoiseTint",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_groundNoiseTint ) },
 	{ "GroundNoiseBrightness",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_groundNoiseBrightness ) },
+	{ "TerrainHeightBlendStrength",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_terrainHeightBlendStrength ) },
+	{ "TerrainHeightBlendSharpness",		INI::parseReal,				nullptr,			offsetof( GlobalData, m_terrainHeightBlendSharpness ) },
 	{ "TextureReductionFactor",			INI::parseInt,				nullptr,			offsetof( GlobalData, m_textureReductionFactor ) },
 	{ "UseBehindBuildingMarker",		INI::parseBool,				nullptr,			offsetof( GlobalData, m_enableBehindBuildingMarkers ) },
 	{ "WaterPositionX",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_waterPositionX ) },
@@ -831,6 +833,7 @@ GlobalData::GlobalData()
   m_useDynamicLights = TRUE;
   m_usePixelLights = TRUE;
   m_useAmbientOcclusion = TRUE;
+  m_useHeightBlend = TRUE;
   m_vsync = -1;
   m_lowLatency = FALSE;
   m_specularDebug = FALSE;
@@ -988,6 +991,8 @@ GlobalData::GlobalData()
 	m_groundNoiseSize = 1000.0f;
 	m_groundNoiseTint = 0.03f;
 	m_groundNoiseBrightness = 0.9f;
+	m_terrainHeightBlendStrength = 2.0f;
+	m_terrainHeightBlendSharpness = 4.0f;
 	m_textureReductionFactor = -1;
 	m_enableBehindBuildingMarkers = TRUE;
 	m_scriptDebug = FALSE;
@@ -1611,6 +1616,7 @@ static const char *const LiveGameDataKeys[] =
 	"UnitEmissiveIntensity", "UnitEmissiveNightIntensity", "SoftParticleDistance",
 	"AmbientOcclusionRadius", "AmbientOcclusionStrength",
 	"GroundNoiseStrength", "GroundNoiseSize", "GroundNoiseTint", "GroundNoiseBrightness",
+	"TerrainHeightBlendStrength", "TerrainHeightBlendSharpness",
 	"FlameWarp", "FlameHeat", "FlameFlicker", "FlameBreakup", "FlameNoiseSize", "FlameRise",
 	"HazeBend", "HazeSize", "HazeLift", "HazeNoiseSize", "HazeRise", "HazeMask",
 	"ElectricArcs", "ElectricArcSharpness", "ElectricNoiseSize", "ElectricJitter", "ElectricFlicker", "ElectricRate",
@@ -1838,6 +1844,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_useDynamicLights = optionPref.getDynamicLightsEnabled();
 	TheWritableGlobalData->m_usePixelLights = optionPref.getPixelLightsEnabled();
 	TheWritableGlobalData->m_useAmbientOcclusion = optionPref.getAmbientOcclusionEnabled();
+	TheWritableGlobalData->m_useHeightBlend = optionPref.getHeightBlendEnabled();
 	TheWritableGlobalData->m_vsync = optionPref.getVSyncMode();
 	TheWritableGlobalData->m_lowLatency = optionPref.getLowLatencyEnabled();
 	TheWritableGlobalData->m_specularDebug = optionPref.getSpecularDebugEnabled();

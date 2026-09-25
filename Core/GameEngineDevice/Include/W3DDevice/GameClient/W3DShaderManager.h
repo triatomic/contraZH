@@ -96,6 +96,8 @@ public:
 	static void resetShader(ShaderTypes shader);	///<make sure W3D2 gets restored to normal
 	/// The shader texture slot the terrain's normal atlas goes in.
 	enum { TERRAIN_NORMAL_TEXTURE = 4 };
+	/// The shader texture slot the terrain's height atlas goes in, or null for the legacy blend.
+	enum { TERRAIN_HEIGHT_TEXTURE = 5 };
 	/// ST_SHADOW_MULTIPLY pass that also multiplies in the cloud map, for receivers without their own clouds.
 	enum { SHADOW_MULTIPLY_PASS_CLOUDS = 1 };
 	///Specify all textures (up to 8) which can be accessed by the shaders.
@@ -155,6 +157,11 @@ public:
 	/// Sets whether the terrain shaders read the normal atlas in TERRAIN_NORMAL_TEXTURE, and how strongly.
 	/// debug shows only the bump's shading, on grey.
 	static void setTerrainBumps(Bool enabled, Real strength, Bool debug);
+	/// Whether the terrain shaders can blend by height, so the terrain should hand over its height atlas.
+	static Bool supportsTerrainHeightBlend();
+	/// Sets whether draws through the road shaders are blend tiles, which blend by the height atlas
+	/// in TERRAIN_HEIGHT_TEXTURE, rather than roads.
+	static void setRoadHeightBlend(Bool blendTiles);
 	/// How many terrain draws used the normal atlas since the last call.
 	static Int takeTerrainBumpCount();
 	/// How many mesh draws the specular pass ran on, and how many polygon groups of those it

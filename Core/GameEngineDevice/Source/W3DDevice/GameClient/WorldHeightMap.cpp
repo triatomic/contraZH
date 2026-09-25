@@ -407,12 +407,14 @@ WorldHeightMap::~WorldHeightMap()
 		REF_PTR_RELEASE(m_sourceTiles[i]);
 		REF_PTR_RELEASE(m_edgeTiles[i]);
 		REF_PTR_RELEASE(m_sourceNormalTiles[i]);
+		REF_PTR_RELEASE(m_sourceHeightTiles[i]);
 	}
 	for (i=0; i<NUM_ALPHA_TILES; i++) {
 		REF_PTR_RELEASE(m_alphaTiles[i]);
 	}
 	REF_PTR_RELEASE(m_terrainTex);
 	REF_PTR_RELEASE(m_terrainNormalTex);
+	REF_PTR_RELEASE(m_terrainHeightTex);
 	REF_PTR_RELEASE(m_terrainClassMap);
 	REF_PTR_RELEASE(m_alphaTerrainTex);
 	REF_PTR_RELEASE(m_alphaEdgeTex);
@@ -446,13 +448,14 @@ WorldHeightMap::WorldHeightMap():
 #endif
 	m_numCliffInfo(1),
 	m_terrainTex(nullptr), m_alphaTerrainTex(nullptr), m_numBitmapTiles(0), m_numBlendedTiles(1),
-	m_terrainNormalTex(nullptr), m_terrainClassMap(nullptr), m_terrainClassMapAtlas(nullptr), m_hasNormalTiles(false)
+	m_terrainNormalTex(nullptr), m_terrainHeightTex(nullptr), m_terrainClassMap(nullptr), m_terrainClassMapAtlas(nullptr), m_hasNormalTiles(false)
 {
 	Int i;
 	for (i=0; i<NUM_SOURCE_TILES; i++) {
 		m_sourceTiles[i] = nullptr;
 		m_edgeTiles[i] = nullptr;
 		m_sourceNormalTiles[i] = nullptr;
+		m_sourceHeightTiles[i] = nullptr;
 	}
 
 	TheSidesList->validateSides();
@@ -487,7 +490,7 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly):
 #endif
 	m_numCliffInfo(1),
 	m_terrainTex(nullptr), m_alphaTerrainTex(nullptr), m_numBitmapTiles(0), m_numBlendedTiles(1),
-	m_terrainNormalTex(nullptr), m_terrainClassMap(nullptr), m_terrainClassMapAtlas(nullptr), m_hasNormalTiles(false)
+	m_terrainNormalTex(nullptr), m_terrainHeightTex(nullptr), m_terrainClassMap(nullptr), m_terrainClassMapAtlas(nullptr), m_hasNormalTiles(false)
 {
 
 	int i;
@@ -495,6 +498,7 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly):
 		m_sourceTiles[i]=nullptr;
 		m_edgeTiles[i]=nullptr;
 		m_sourceNormalTiles[i]=nullptr;
+		m_sourceHeightTiles[i]=nullptr;
 	}
 
 	DataChunkInput file( pStrm );
@@ -1040,15 +1044,19 @@ void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData)
 			WorldHeightMap::readTiles(pStr, tileData+texClass->firstTile, width);
 			if (tileData == m_sourceTiles && terrain != nullptr)
 			{
-				readNormalTiles(texClass, terrain->getTexture().str(), width);
+				if (readMapTiles(texClass, terrain->getTexture().str(), width, "_nrm.dds", m_sourceNormalTiles))
+				{
+					m_hasNormalTiles = true;
+				}
+				readMapTiles(texClass, terrain->getTexture().str(), width, "_hgt.dds", m_sourceHeightTiles);
 			}
 		}
 		theFile->close();
 	}
 }
 
-/** Reads <texture>_nrm.dds into the normal tiles for a texture class, sliced like readTiles. */
-void WorldHeightMap::readNormalTiles(TXTextureClass *texClass, const char *textureName, Int numRows)
+/** Reads <texture><suffix>, such as _nrm.dds, into the given tiles for a texture class, sliced like readTiles. */
+Bool WorldHeightMap::readMapTiles(TXTextureClass *texClass, const char *textureName, Int numRows, const char *suffix, TileData **tiles)
 {
 	char name[_MAX_PATH];
 	strlcpy(name, textureName, ARRAY_SIZE(name));
@@ -1057,13 +1065,13 @@ void WorldHeightMap::readNormalTiles(TXTextureClass *texClass, const char *textu
 	{
 		*dot = 0;
 	}
-	strlcat(name, "_nrm.dds", ARRAY_SIZE(name));
+	strlcat(name, suffix, ARRAY_SIZE(name));
 
 	DDSFileClass dds(name, 0);
 	if (!dds.Is_Available() || !dds.Load())
 	{
-		RENDER_LOG(("Terrain normal map %s not found", name));
-		return;
+		RENDER_LOG(("Terrain map %s not found", name));
+		return false;
 	}
 
 	const Int width = dds.Get_Width(0);
@@ -1071,19 +1079,19 @@ void WorldHeightMap::readNormalTiles(TXTextureClass *texClass, const char *textu
 	const Int extent = numRows*TILE_PIXEL_EXTENT;
 	if (width < extent || height < extent)
 	{
-		RENDER_LOG(("Terrain normal map %s is %dx%d, smaller than its texture's %d tiles", name, width, height, numRows));
-		return;
+		RENDER_LOG(("Terrain map %s is %dx%d, smaller than its texture's %d tiles", name, width, height, numRows));
+		return false;
 	}
 
-	UnsignedByte *pixels = MSGNEW("WorldHeightMap_readNormalTiles") UnsignedByte[width*height*TILE_BYTES_PER_PIXEL];
+	UnsignedByte *pixels = MSGNEW("WorldHeightMap_readMapTiles") UnsignedByte[width*height*TILE_BYTES_PER_PIXEL];
 	dds.Copy_Level_To_Surface(0, WW3D_FORMAT_A8R8G8B8, width, height, pixels, width*TILE_BYTES_PER_PIXEL);
 
-	TileData **tiles = m_sourceNormalTiles + texClass->firstTile;
+	tiles += texClass->firstTile;
 	for (Int i=0; i<numRows*numRows; i++)
 	{
 		if (tiles[i] == nullptr)
 		{
-			tiles[i] = MSGNEW("WorldHeightMap_readNormalTiles") TileData;
+			tiles[i] = MSGNEW("WorldHeightMap_readMapTiles") TileData;
 		}
 	}
 
@@ -1104,7 +1112,7 @@ void WorldHeightMap::readNormalTiles(TXTextureClass *texClass, const char *textu
 	{
 		tiles[i]->updateMips();
 	}
-	m_hasNormalTiles = true;
+	return true;
 }
 
 /**
@@ -2198,6 +2206,8 @@ void WorldHeightMap::setTextureLOD(Int lod)
 		m_terrainTex->setLOD(lod);
 	if (m_terrainNormalTex)
 		m_terrainNormalTex->setLOD(lod);
+	if (m_terrainHeightTex)
+		m_terrainHeightTex->setLOD(lod);
 }
 
 TextureClass *WorldHeightMap::getTerrainTexture()
@@ -2347,6 +2357,34 @@ TextureClass *WorldHeightMap::getTerrainNormalTexture()
 		}
 	}
 	return m_terrainNormalTex;
+}
+
+TextureClass *WorldHeightMap::getTerrainHeightTexture()
+{
+	if (m_terrainHeightTex == nullptr)
+	{
+		// Placing the tiles in the colour texture also places them for this one.
+		getTerrainTexture();
+		m_terrainHeightTex = MSGNEW("WorldHeightMap_getTerrainHeightTexture") TerrainHeightTextureClass(m_terrainTexHeight);
+		const Bool built = m_terrainHeightTex->update(this);
+
+		Int authored = 0;
+		for (Int i=0; i<m_numTextureClasses; i++)
+		{
+			if (getSourceHeightTile(m_textureClasses[i].firstTile) != nullptr)
+			{
+				authored++;
+			}
+		}
+		RENDER_LOG(("Terrain height atlas: %d of %d texture classes have height maps, the rest use brightness, %s", authored,
+			m_numTextureClasses, built ? "built" : "not built, the card lacks L8"));
+
+		if (!built)
+		{
+			REF_PTR_RELEASE(m_terrainHeightTex);
+		}
+	}
+	return m_terrainHeightTex;
 }
 
 TextureClass *WorldHeightMap::getAlphaTerrainTexture()

@@ -46,6 +46,8 @@
 //         Includes
 //-----------------------------------------------------------------------------
 #include <stdlib.h>
+#include <math.h>
+#include <vector>
 
 #include "W3DDevice/GameClient/TerrainTex.h"
 #include "W3DDevice/GameClient/WorldHeightMap.h"
@@ -496,6 +498,203 @@ Bool TerrainNormalTextureClass::update(WorldHeightMap *htMap)
 }
 
 void TerrainNormalTextureClass::setLOD(Int LOD)
+{
+	if (Peek_D3D_Texture())
+	{
+		Peek_D3D_Texture()->SetLOD(LOD);
+	}
+}
+
+/******************************************************************************
+						TerrainHeightTextureClass
+******************************************************************************/
+
+// The height of a class with no texture, and the middle of every derived height.
+#define MID_HEIGHT_BYTE 128
+
+// Derived heights spread this far from the middle per standard deviation of a class's brightness.
+static const Real DERIVED_HEIGHT_SPREAD = 0.18f;
+
+// Pixels the brightness is box blurred across, each way, so single texels do not speckle the blend.
+static const Int DERIVED_HEIGHT_BLUR = 2;
+
+TerrainHeightTextureClass::TerrainHeightTextureClass(int height) :
+	TextureClass(TEXTURE_WIDTH, height,
+		WW3D_FORMAT_L8, MIP_LEVELS_3 )
+{
+}
+
+// Box blurs a square that wraps, along rows when step is 1 and along columns when it is the side.
+static void Blur_Wrapped(std::vector<Real> &values, Int side, Int step)
+{
+	std::vector<Real> line(side);
+	const Int lineStep = (step == 1) ? side : 1;
+	for (Int l=0; l<side; l++)
+	{
+		Real *first = &values[l*lineStep];
+		for (Int i=0; i<side; i++)
+		{
+			Real sum = 0.0f;
+			for (Int k=-DERIVED_HEIGHT_BLUR; k<=DERIVED_HEIGHT_BLUR; k++)
+			{
+				sum += first[((i+k+side)%side)*step];
+			}
+			line[i] = sum / (2*DERIVED_HEIGHT_BLUR+1);
+		}
+		for (Int i=0; i<side; i++)
+		{
+			first[i*step] = line[i];
+		}
+	}
+}
+
+Bool TerrainHeightTextureClass::update(WorldHeightMap *htMap)
+{
+	IDirect3DTexture8 *texture = DX8Wrapper::_Peek_Lockable_Texture(Peek_D3D_Texture());
+	if (texture == nullptr)
+	{
+		return false;
+	}
+
+	D3DSURFACE_DESC surface_desc;
+	DX8_ErrorCode(texture->GetLevelDesc(0, &surface_desc));
+	if (surface_desc.Format != D3DFMT_L8 || surface_desc.Width < TEXTURE_WIDTH)
+	{
+		return false;
+	}
+
+	D3DLOCKED_RECT locked_rect;
+	DX8_ErrorCode(texture->LockRect(0, &locked_rect, nullptr, 0));
+	UnsignedByte *bits = (UnsignedByte *)locked_rect.pBits;
+	const Int pitch = locked_rect.Pitch;
+
+	memset(bits, MID_HEIGHT_BYTE, pitch*surface_desc.Height);
+
+	// Each class is a square of tiles that wraps, so its heights are worked out whole.
+	for (Int texClass=0; texClass<htMap->m_numTextureClasses; texClass++)
+	{
+		const TXTextureClass &info = htMap->m_textureClasses[texClass];
+		const Int side = info.width*TILE_PIXEL_EXTENT;
+		const ICoord2D origin = info.positionInTexture;
+		if (origin.x<=0 || side<=0)
+		{
+			continue;
+		}
+
+		// An authored <texture>_hgt.dds is used as it is. Otherwise brightness stands in for height.
+		const Bool authored = htMap->getSourceHeightTile(info.firstTile) != nullptr;
+		std::vector<Real> heights(side*side, 0.5f);
+		for (Int k=0; k<info.width*info.width; k++)
+		{
+			TileData *pTile = htMap->getSourceTile(info.firstTile + k);
+			TileData *pSource = authored ? htMap->getSourceHeightTile(info.firstTile + k) : pTile;
+			if (!pTile || !pSource)
+			{
+				continue;
+			}
+			const Int left = pTile->m_tileLocationInTexture.x - origin.x;
+			const Int top = pTile->m_tileLocationInTexture.y - origin.y;
+			if (left<0 || top<0 || left+TILE_PIXEL_EXTENT>side || top+TILE_PIXEL_EXTENT>side)
+			{
+				continue;
+			}
+
+			// Rows are inverted as TerrainTextureClass::update inverts them.
+			for (Int j=0; j<TILE_PIXEL_EXTENT; j++)
+			{
+				const UnsignedByte *pBGR = pSource->getRGBDataForWidth(TILE_PIXEL_EXTENT) +
+					(TILE_PIXEL_EXTENT-1-j)*TILE_BYTES_PER_PIXEL*TILE_PIXEL_EXTENT;
+				Real *row = &heights[(top+j)*side + left];
+				for (Int i=0; i<TILE_PIXEL_EXTENT; i++)
+				{
+					row[i] = authored ? pBGR[2] / 255.0f : (0.30f*pBGR[2] + 0.59f*pBGR[1] + 0.11f*pBGR[0]) / 255.0f;
+					pBGR += TILE_BYTES_PER_PIXEL;
+				}
+			}
+		}
+
+		// Measured against the class's own brightness, so a bright texture is not simply taller than a dark one.
+		if (!authored)
+		{
+			Blur_Wrapped(heights, side, 1);
+			Blur_Wrapped(heights, side, side);
+			double sum = 0.0;
+			double sumSquares = 0.0;
+			for (size_t i=0; i<heights.size(); i++)
+			{
+				sum += heights[i];
+				sumSquares += (double)heights[i]*heights[i];
+			}
+			const double mean = sum / heights.size();
+			const double variance = sumSquares / heights.size() - mean*mean;
+			const Real scale = (variance > 1e-8) ? (Real)(DERIVED_HEIGHT_SPREAD / sqrt(variance)) : 0.0f;
+			for (size_t i=0; i<heights.size(); i++)
+			{
+				heights[i] = 0.5f + (heights[i] - (Real)mean) * scale;
+			}
+		}
+
+		for (Int j=0; j<side; j++)
+		{
+			UnsignedByte *row = bits + (origin.y+j)*pitch + origin.x;
+			for (Int i=0; i<side; i++)
+			{
+				row[i] = (UnsignedByte)(clamp(0.0f, heights[j*side + i], 1.0f)*255.0f + 0.5f);
+			}
+		}
+
+		// The same 4 pixel wrap border the colour texture gets.
+		for (Int j=0; j<side; j++)
+		{
+			UnsignedByte *row = bits + (origin.y+j)*pitch + origin.x;
+			memcpy(row-4, row+side-4, 4);
+			memcpy(row+side, row, 4);
+		}
+		for (Int j=0; j<4; j++)
+		{
+			UnsignedByte *target = bits + (origin.y-j-1)*pitch + origin.x-4;
+			memcpy(target, target+side*pitch, side+8);
+			target = bits + (origin.y+j)*pitch + origin.x-4;
+			memcpy(target+side*pitch, target, side+8);
+		}
+	}
+
+	texture->UnlockRect(0);
+
+	// Box filtered here, because Filter_Texture_Mipmaps cannot read this format.
+	for (UnsignedInt level=1; level<texture->GetLevelCount(); level++)
+	{
+		D3DSURFACE_DESC dest_desc;
+		D3DLOCKED_RECT src_rect;
+		D3DLOCKED_RECT dest_rect;
+		DX8_ErrorCode(texture->GetLevelDesc(level, &dest_desc));
+		DX8_ErrorCode(texture->LockRect(level-1, &src_rect, nullptr, D3DLOCK_READONLY));
+		DX8_ErrorCode(texture->LockRect(level, &dest_rect, nullptr, 0));
+
+		for (UnsignedInt y=0; y<dest_desc.Height; y++)
+		{
+			const UnsignedByte *row0 = (const UnsignedByte *)src_rect.pBits + 2*y*src_rect.Pitch;
+			const UnsignedByte *row1 = row0 + src_rect.Pitch;
+			UnsignedByte *dest = (UnsignedByte *)dest_rect.pBits + y*dest_rect.Pitch;
+			for (UnsignedInt x=0; x<dest_desc.Width; x++)
+			{
+				dest[x] = (UnsignedByte)((row0[2*x] + row0[2*x+1] + row1[2*x] + row1[2*x+1] + 2)/4);
+			}
+		}
+
+		texture->UnlockRect(level);
+		texture->UnlockRect(level-1);
+	}
+	DX8Wrapper::_Upload_Lockable_Texture(Peek_D3D_Texture());
+
+	if (WW3D::Get_Texture_Reduction())
+	{
+		texture->SetLOD(WW3D::Get_Texture_Reduction());
+	}
+	return true;
+}
+
+void TerrainHeightTextureClass::setLOD(Int LOD)
 {
 	if (Peek_D3D_Texture())
 	{

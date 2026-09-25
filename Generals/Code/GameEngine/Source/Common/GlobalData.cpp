@@ -617,6 +617,7 @@ GlobalData::GlobalData()
   m_laserPulseSpeed = 400.0f;
   m_laserDebug = FALSE;
   m_useAmbientOcclusion = TRUE;
+  m_useHeightBlend = TRUE;
   m_ambientOcclusionDebug = FALSE;
   m_ambientOcclusionRadius = 12.0f;
   m_ambientOcclusionStrength = 1.0f;
@@ -624,6 +625,8 @@ GlobalData::GlobalData()
   m_groundNoiseSize = 1000.0f;
   m_groundNoiseTint = 0.03f;
   m_groundNoiseBrightness = 0.9f;
+  m_terrainHeightBlendStrength = 2.0f;
+  m_terrainHeightBlendSharpness = 4.0f;
   m_vsync = -1;
   m_lowLatency = FALSE;
   m_alliedDecalMode = AlliedDecalMode_Default;
@@ -1315,6 +1318,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_useElectricShaders = optionPref.getElectricShadersEnabled();
 	TheWritableGlobalData->m_useLaserShaders = optionPref.getLaserShadersEnabled();
 	TheWritableGlobalData->m_useAmbientOcclusion = optionPref.getAmbientOcclusionEnabled();
+	TheWritableGlobalData->m_useHeightBlend = optionPref.getHeightBlendEnabled();
 	TheWritableGlobalData->m_ambientOcclusionDebug = optionPref.getAmbientOcclusionDebugEnabled();
 	TheWritableGlobalData->m_vsync = optionPref.getVSyncMode();
 	TheWritableGlobalData->m_lowLatency = optionPref.getLowLatencyEnabled();

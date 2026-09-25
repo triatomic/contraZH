@@ -1545,6 +1545,48 @@ static DWORD DrawSeabedLitShader = 0;
 #define SEABED_CLASS_MAP_SAMPLER 8
 #define SEABED_WATER_MASK_SAMPLER 9
 
+// Where heightblend.hlsli reads the height atlas, and its constants in the terrain and road shaders.
+#define HEIGHT_ATLAS_SAMPLER 10
+#define TERRAIN_HEIGHT_BLEND_REGISTER 3
+#define ROAD_HEIGHT_BLEND_REGISTER 1
+
+// Whether the terrain draws only through shaders that blend by height, and whether road draws are blend tiles.
+static Bool TerrainHeightBlendLoaded = FALSE;
+static Bool RoadHeightBlendTiles = FALSE;
+
+static void Unbind_Height_Atlas()
+{
+#if defined(BUILD_WITH_D3D9)
+	DX8Wrapper::_Get_D3D_Device8()->SetTexture(HEIGHT_ATLAS_SAMPLER, nullptr);
+#endif
+}
+
+// Binds the height atlas, or nothing, and returns the heightblend.hlsli constants to go with it.
+// Without the atlas they give the legacy blend. A sharpness below 1 would spill the blend into cells without one.
+static Vector4 Bind_Height_Blend(TextureClass *heights)
+{
+#if defined(BUILD_WITH_D3D9)
+	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
+	if (heights == nullptr || heights->Peek_D3D_Texture() == nullptr)
+	{
+		device->SetTexture(HEIGHT_ATLAS_SAMPLER, nullptr);
+		return Vector4(0.0f, 1.0f, 0.5f, 0.0f);
+	}
+
+	device->SetTexture(HEIGHT_ATLAS_SAMPLER, heights->Peek_D3D_Texture());
+	device->SetSamplerState(HEIGHT_ATLAS_SAMPLER, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
+	device->SetSamplerState(HEIGHT_ATLAS_SAMPLER, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
+	device->SetSamplerState(HEIGHT_ATLAS_SAMPLER, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+	device->SetSamplerState(HEIGHT_ATLAS_SAMPLER, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+	device->SetSamplerState(HEIGHT_ATLAS_SAMPLER, D3DSAMP_MIPFILTER, D3DTEXF_LINEAR);
+	return Vector4(4.0f * max(TheGlobalData->m_terrainHeightBlendStrength, 0.0f),
+		max(TheGlobalData->m_terrainHeightBlendSharpness, 1.0f), 0.5f, 0.0f);
+#else
+	(void)heights;
+	return Vector4(0.0f, 1.0f, 0.5f, 0.0f);
+#endif
+}
+
 // The lights of the object whose specular pass is installed.
 struct SpecularPassLights
 {
@@ -2697,6 +2739,16 @@ Bool W3DShaderManager::supportsUnitPixelLights()
 	return UnitPixelLightsLoaded;
 }
 
+Bool W3DShaderManager::supportsTerrainHeightBlend()
+{
+	return TerrainHeightBlendLoaded;
+}
+
+void W3DShaderManager::setRoadHeightBlend(Bool blendTiles)
+{
+	RoadHeightBlendTiles = blendTiles;
+}
+
 void W3DShaderManager::setTerrainBumps(Bool enabled, Real strength, Bool debug)
 {
 	TerrainBumpEnabled = enabled;
@@ -2837,13 +2889,16 @@ class TerrainShader8Stage : public W3DShaderInterface
 class TerrainShaderPixelShader : public W3DShaderInterface
 {
 public:
-	TerrainShaderPixelShader() : m_dwGroundPixelShader(0), m_shadowStage(-1), m_bumpStage(-1), m_lightStage(-1), m_seabedStage(-1) {}
+	TerrainShaderPixelShader() : m_shadowStage(-1), m_bumpStage(-1), m_lightStage(-1), m_seabedStage(-1)
+	{
+		m_dwPlainPixelShader[0] = m_dwPlainPixelShader[1] = m_dwPlainPixelShader[2] = 0;
+	}
 
 private:
 	DWORD					m_dwBasePixelShader;	///<handle to terrain D3D pixel shader
 	DWORD					m_dwBaseNoise1PixelShader;	///<handle to terrain/single noise D3D pixel shader
 	DWORD					m_dwBaseNoise2PixelShader;	///<handle to terrain/double noise D3D pixel shader
-	DWORD					m_dwGroundPixelShader;	///<the double noise shader reading W3DGroundNoise as its second map, or 0 for the legacy light map
+	DWORD					m_dwPlainPixelShader[3];	///<the same three in HLSL, blending by height and reading W3DGroundNoise as the second map, or 0 for the legacy ones
 	DWORD					m_dwShadowPixelShader[3];	///<the same three, also receiving the shadow map, indexed by noise texture count
 	Int						m_shadowStage;	///<stage the shadow map is bound to, or -1
 	DWORD					m_dwBumpPixelShader[2][3];	///<the same three with the normal atlas, unshadowed then shadowed
@@ -3269,11 +3324,15 @@ Int TerrainShaderPixelShader::shutdown()
 	m_dwBaseNoise1PixelShader=0;
 	m_dwBaseNoise2PixelShader=0;
 
-	if (m_dwGroundPixelShader)
+	for (Int i=0; i<3; i++)
 	{
-		DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_dwGroundPixelShader);
+		if (m_dwPlainPixelShader[i])
+		{
+			DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_dwPlainPixelShader[i]);
+		}
+		m_dwPlainPixelShader[i]=0;
 	}
-	m_dwGroundPixelShader=0;
+	TerrainHeightBlendLoaded = FALSE;
 
 	for (Int i=0; i<3; i++)
 	{
@@ -3470,12 +3529,10 @@ Bool TerrainShaderPixelShader::setBump(Int noiseCount, Bool shadowed)
 	Vector3 toSun(-lightPos.x, -lightPos.y, -lightPos.z);
 	toSun.Normalize();
 	const RGBColor &sunColor = TheGlobalData->m_terrainDiffuse[0];
-	Vector4 sunDirection(toSun.X, toSun.Y, toSun.Z, 0.0f);
-	Vector4 sunDiffuse(sunColor.red, sunColor.green, sunColor.blue, 0.0f);
-	Vector4 bumpParams(TerrainBumpStrength, TerrainBumpDebug ? 1.0f : 0.0f, 0.0f, 0.0f);
+	Vector4 sunDirection(toSun.X, toSun.Y, toSun.Z, TerrainBumpStrength);
+	Vector4 sunDiffuse(sunColor.red, sunColor.green, sunColor.blue, TerrainBumpDebug ? 1.0f : 0.0f);
 	DX8Wrapper::Set_Pixel_Shader_Constant(1, &sunDirection, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(2, &sunDiffuse, 1);
-	DX8Wrapper::Set_Pixel_Shader_Constant(3, &bumpParams, 1);
 
 	m_bumpStage = stage;
 	DX8Wrapper::Set_Pixel_Shader(shader);
@@ -3701,11 +3758,21 @@ Int TerrainShaderPixelShader::init()
 			if (FAILED(hr))
 				return FALSE;
 
-			m_dwGroundPixelShader = 0;
+			// Every terrain draw takes one of these or a variant with more, so the height blend reaches them all.
+			TerrainHeightBlendLoaded = FALSE;
 #if defined(BUILD_WITH_D3D9)
-			if (FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\terrainnoise2noshadow.pso", nullptr, 0, false, &m_dwGroundPixelShader)))
+			static const char *const plainFiles[3] =
 			{
-				m_dwGroundPixelShader = 0;
+				"shaders\\terrainnoshadow.pso", "shaders\\terrainnoisenoshadow.pso", "shaders\\terrainnoise2noshadow.pso"
+			};
+			TerrainHeightBlendLoaded = TRUE;
+			for (Int i=0; i<3; i++)
+			{
+				if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(plainFiles[i], nullptr, 0, false, &m_dwPlainPixelShader[i])))
+				{
+					m_dwPlainPixelShader[i] = 0;
+					TerrainHeightBlendLoaded = FALSE;
+				}
 			}
 #endif
 
@@ -3770,9 +3837,9 @@ Int TerrainShaderPixelShader::set(Int pass)
 	const W3DShaderManager::ShaderTypes shader = W3DShaderManager::getCurrentShader();
 	const Bool cloudMap = (shader == W3DShaderManager::ST_TERRAIN_BASE_NOISE1 || shader == W3DShaderManager::ST_TERRAIN_BASE_NOISE12);
 	Bool lightMap = (shader == W3DShaderManager::ST_TERRAIN_BASE_NOISE2 || shader == W3DShaderManager::ST_TERRAIN_BASE_NOISE12);
-	const Bool groundNoise = lightMap && m_dwGroundPixelShader != 0 && W3DGroundNoise::getTexture() != nullptr &&
+	const Bool groundNoise = lightMap && m_dwPlainPixelShader[2] != 0 && W3DGroundNoise::getTexture() != nullptr &&
 		(cloudMap || W3DGroundNoise::getWhiteTexture() != nullptr);
-	if (m_dwGroundPixelShader != 0 && !groundNoise)
+	if (m_dwPlainPixelShader[2] != 0 && !groundNoise)
 	{
 		lightMap = FALSE;
 	}
@@ -3802,7 +3869,7 @@ Int TerrainShaderPixelShader::set(Int pass)
 			TextureClass *second = groundNoise ? W3DGroundNoise::getTexture() : W3DShaderManager::getShaderTexture(3);
 			DX8Wrapper::_Get_D3D_Device8()->SetTexture(2, first->Peek_D3D_Texture());
 			DX8Wrapper::_Get_D3D_Device8()->SetTexture(3, second->Peek_D3D_Texture());
-			DX8Wrapper::Set_Pixel_Shader(groundNoise ? m_dwGroundPixelShader : m_dwBaseNoise2PixelShader);
+			DX8Wrapper::Set_Pixel_Shader(groundNoise ? m_dwPlainPixelShader[2] : m_dwBaseNoise2PixelShader);
 
 			DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
 			DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
@@ -3869,10 +3936,21 @@ Int TerrainShaderPixelShader::set(Int pass)
 		return TRUE;
 	}
 
+	const Vector4 heightBlend = Bind_Height_Blend(W3DShaderManager::getShaderTexture(W3DShaderManager::TERRAIN_HEIGHT_TEXTURE));
+	DX8Wrapper::Set_Pixel_Shader_Constant(TERRAIN_HEIGHT_BLEND_REGISTER, &heightBlend, 1);
+
+	const DWORD legacyShaders[3] = { m_dwBasePixelShader, m_dwBaseNoise1PixelShader, m_dwBaseNoise2PixelShader };
+	const DWORD baseShaders[3] =
+	{
+		m_dwPlainPixelShader[0] ? m_dwPlainPixelShader[0] : legacyShaders[0],
+		m_dwPlainPixelShader[1] ? m_dwPlainPixelShader[1] : legacyShaders[1],
+		m_dwPlainPixelShader[2] ? m_dwPlainPixelShader[2] : legacyShaders[2]
+	};
+	DX8Wrapper::Set_Pixel_Shader(baseShaders[noiseCount]);
+
 	const Bool shadowed = setShadowReceiver(noiseCount);
 	const Bool bumped = setBump(noiseCount, shadowed);
 
-	const DWORD baseShaders[3] = { m_dwBasePixelShader, m_dwBaseNoise1PixelShader, m_dwGroundPixelShader };
 	const DWORD unlit = bumped ? m_dwBumpPixelShader[shadowed ? 1 : 0][noiseCount]
 		: (shadowed ? m_dwShadowPixelShader[noiseCount] : baseShaders[noiseCount]);
 	setPixelLights(noiseCount, shadowed, bumped, unlit);
@@ -3917,6 +3995,7 @@ void TerrainShaderPixelShader::reset()
 		DX8Wrapper::_Get_D3D_Device8()->SetTexture(SEABED_WATER_MASK_SAMPLER, nullptr);
 	}
 	End_Draw_Pixel_Lights();
+	Unbind_Height_Atlas();
 
 	DX8Wrapper::_Get_D3D_Device8()->SetTexture(2,nullptr);	//release reference to any texture
 	DX8Wrapper::_Get_D3D_Device8()->SetTexture(3,nullptr);	//release reference to any texture
@@ -4244,10 +4323,13 @@ Bool RoadShaderPixelShader::setPixelPath()
 		return FALSE;
 	}
 
+	TextureClass *heights = W3DShaderManager::getShaderTexture(W3DShaderManager::TERRAIN_HEIGHT_TEXTURE);
+	const Bool heightBlend = RoadHeightBlendTiles && groundCapable && heights != nullptr && heights->Peek_D3D_Texture() != nullptr;
+
 	Bool shadowed = (m_dwShadowPixelShader[noiseCount] != 0 && TheW3DShadowMap != nullptr && TheW3DShadowMap->hasDepth());
 	const Bool lightable = (RoadPixelLightsLoaded && PixelLightCount > 0);
 	const Bool lightMapReplaced = (anyLightMap && groundCapable);
-	if (!shadowed && !lightable && !lightMapReplaced)
+	if (!shadowed && !lightable && !lightMapReplaced && !heightBlend)
 	{
 		return FALSE;
 	}
@@ -4264,10 +4346,14 @@ Bool RoadShaderPixelShader::setPixelPath()
 		shadowed = TheW3DShadowMap->bindReceiver(stage);
 		m_shadowStage = shadowed ? stage : -1;
 	}
-	if (!shadowed && !lightable && !lightMapReplaced)
+	if (!shadowed && !lightable && !lightMapReplaced && !heightBlend)
 	{
 		return FALSE;
 	}
+
+	// Roads get the constants that leave their alpha alone.
+	const Vector4 heightConstants = Bind_Height_Blend(heightBlend ? heights : nullptr);
+	DX8Wrapper::Set_Pixel_Shader_Constant(ROAD_HEIGHT_BLEND_REGISTER, &heightConstants, 1);
 
 	DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_TEXCOORDINDEX, 0 );
 
@@ -4456,6 +4542,10 @@ void RoadShaderPixelShader::reset()
 		TheW3DShadowMap->unbindReceiver(m_shadowStage);
 	m_shadowStage = -1;
 	m_lightStage = -1;
+	if (m_pixelPath)
+	{
+		Unbind_Height_Atlas();
+	}
 	m_pixelPath = FALSE;
 	End_Draw_Pixel_Lights();
 

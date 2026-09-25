@@ -467,6 +467,11 @@ Bool OptionPreferences::getAmbientOcclusionEnabled(void) const
 	return getBool("AmbientOcclusion", TRUE);
 }
 
+Bool OptionPreferences::getHeightBlendEnabled(void) const
+{
+	return getBool("HeightBlend", TRUE);
+}
+
 Int OptionPreferences::getVSyncMode(void) const
 {
 	if (find("VSync") == end())
