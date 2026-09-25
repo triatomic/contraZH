@@ -46,10 +46,12 @@
 #include "W3DDevice/GameClient/Module/W3DLaserDraw.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
 #include "W3DDevice/GameClient/W3DDynamicLight.h"
+#include "W3DDevice/GameClient/W3DLaserGlow.h"
 #include "W3DDevice/GameClient/W3DScene.h"
 #include "WW3D2/rinfo.h"
 #include "WW3D2/camera.h"
 #include "WW3D2/segline.h"
+#include "WW3D2/sortingrenderer.h"
 #include "WWMath/vector3.h"
 #include "WW3D2/assetmgr.h"
 #include "WW3D2/surfaceclass.h"
@@ -141,6 +143,7 @@ W3DLaserDrawModuleData::W3DLaserDrawModuleData()
 	m_groundGlowColor = 0;
 	m_groundGlowRadius = 0.0f;
 	m_groundGlowIntensity = 0.0f;
+	m_laserShader = TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -178,6 +181,7 @@ void W3DLaserDrawModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "GroundGlowColor",					INI::parseColorInt,							nullptr, offsetof(W3DLaserDrawModuleData, m_groundGlowColor) },
 		{ "GroundGlowRadius",					INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_groundGlowRadius) },
 		{ "GroundGlowIntensity",			INI::parsePercentToReal,				nullptr, offsetof(W3DLaserDrawModuleData, m_groundGlowIntensity) },
+		{ "LaserShader",							INI::parseBool,									nullptr, offsetof(W3DLaserDrawModuleData, m_laserShader) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
@@ -304,6 +308,10 @@ W3DLaserDraw::W3DLaserDraw( Thing *thing, const ModuleData* moduleData ) :
 				line->Set_Width( width );
 				line->Set_Color( Vector3( red, green, blue ) );
 				line->Set_UV_Offset_Rate( Vector2(0.0f, data->m_scrollRate) );	//amount to scroll texture on each draw
+				if( data->m_laserShader )
+				{
+					line->Set_Effects( SoftParticleHookClass::EFFECT_SOFT | SoftParticleHookClass::EFFECT_LASER );
+				}
 				if( m_texture )
 				{
 					if (data->m_gridColumnsTotal > 1) {
@@ -502,6 +510,26 @@ void W3DLaserDraw::updateGroundLights( LaserUpdate *update, Bool beamChanged )
 		return;
 	}
 
+	const W3DLaserDrawModuleData *data = getW3DLaserDrawModuleData();
+
+	// A shader lights the ground per pixel where it can, with one light shaped like the beam, so no light strip is needed.
+	if (TheW3DLaserGlow != nullptr && TheW3DLaserGlow->isEnabled())
+	{
+		releaseGroundLights();
+
+		const Real derivedReach = MAX( data->m_outerBeamWidth, MIN_GROUND_LIGHT_RADIUS ) * GROUND_LIGHT_BLUR;
+		const Real reach = pickGlowReal( data->m_groundGlowRadius, TheGlobalData->m_laserGlowRadius, derivedReach ) * update->getWidthScale();
+		const Real intensity = pickGlowReal( data->m_groundGlowIntensity, TheGlobalData->m_laserGlowIntensity, 0.7f );
+		Real glowRed, glowGreen, glowBlue;
+		getGroundGlowColor( glowRed, glowGreen, glowBlue );
+
+		const Coord3D *start = update->getStartPos();
+		const Coord3D *end = update->getEndPos();
+		TheW3DLaserGlow->add( Vector3( start->x, start->y, start->z ), Vector3( end->x, end->y, end->z ), reach,
+			Vector3( glowRed, glowGreen, glowBlue ) * intensity );
+		return;
+	}
+
 	Bool stillOurs = m_numGroundLights > 0;
 	for( Int i = 0; stillOurs && i < m_numGroundLights; i++ )
 	{
@@ -518,7 +546,6 @@ void W3DLaserDraw::updateGroundLights( LaserUpdate *update, Bool beamChanged )
 		return;
 	}
 
-	const W3DLaserDrawModuleData *data = getW3DLaserDrawModuleData();
 	const Coord3D *beamStart = update->getStartPos();
 	const Coord3D *beamEnd = update->getEndPos();
 	Real dx = beamEnd->x - beamStart->x;
@@ -526,7 +553,7 @@ void W3DLaserDraw::updateGroundLights( LaserUpdate *update, Bool beamChanged )
 	Real beamLength = sqrt( dx * dx + dy * dy );
 
 	// terrain lighting is per vertex on a 10 unit grid, so a radius under 1.5 cells lights scattered vertices
-	Real wanted = data->m_groundGlowRadius > 0.0f ? data->m_groundGlowRadius : data->m_outerBeamWidth;
+	Real wanted = pickGlowReal( data->m_groundGlowRadius, TheGlobalData->m_laserGlowRadius, data->m_outerBeamWidth );
 	Real spacing = MAX( wanted, MIN_GROUND_LIGHT_RADIUS );
 
 	// centers one spacing apart so the linear falloffs sum to a level strip; the unscaled spacing keeps the count steady while the beam widens

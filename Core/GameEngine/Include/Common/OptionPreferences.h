@@ -158,6 +158,8 @@ public:
 	Bool getFlameShadersEnabled() const;
 	// Options.ini: ElectricShaders = Yes makes electric sparks and flares crackle with arcs
 	Bool getElectricShadersEnabled() const;
+	// Options.ini: LaserShaders = Yes gives laser beams a white-hot core and pulses running along them
+	Bool getLaserShadersEnabled() const;
 	// Options.ini: DynamicLights = Yes lets explosions, muzzle flashes and lasers light their surroundings
 	Bool getDynamicLightsEnabled() const;
 	// Options.ini: PixelLights = Yes draws those lights per pixel where the hardware allows

@@ -415,6 +415,12 @@ void StreakLineClass::Set_End_Caps(int onoff)
 	LineRenderer.Set_End_Caps(onoff);
 }
 
+void StreakLineClass::Set_Effects(unsigned int effects)
+{
+	LineRenderer.Set_Effects(effects);
+	StreakRenderer.Set_Effects(effects);
+}
+
 /*
 ** RenderObjClass interface:
 */

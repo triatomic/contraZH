@@ -861,6 +861,7 @@ ParticleSystemInfo::ParticleSystemInfo()
 	m_isParticleUpTowardsEmitter = false;
 	m_flameShader = FLAME_SHADER_AUTO;
 	m_electricShader = ELECTRIC_SHADER_AUTO;
+	m_laserShader = LASER_SHADER_AUTO;
 
 	m_driftVelocity.zero();
 	m_gravity = 0.0f;
@@ -939,7 +940,8 @@ void ParticleSystemInfo::xfer( Xfer *xfer )
 	// TheSuperHackers @feature version 2 adds m_conformToTerrain
 	// version 3 adds m_flameShader
 	// version 4 adds m_electricShader
-	XferVersion currentVersion = 4;
+	// version 5 adds m_laserShader
+	XferVersion currentVersion = 5;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1184,6 +1186,11 @@ void ParticleSystemInfo::xfer( Xfer *xfer )
 		xfer->xferUser( &m_electricShader, sizeof( ElectricShaderMode ) );
 	}
 
+	if( version >= 5 )
+	{
+		xfer->xferUser( &m_laserShader, sizeof( LaserShaderMode ) );
+	}
+
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1347,6 +1354,9 @@ ParticleSystem::ParticleSystem( const ParticleSystemTemplate *sysTemplate,
 	m_electricShader = sysTemplate->m_electricShader;
 	m_electricKnown = FALSE;
 	m_electricAuto = FALSE;
+	m_laserShader = sysTemplate->m_laserShader;
+	m_laserKnown = FALSE;
+	m_laserAuto = FALSE;
 
 	m_windMotion = sysTemplate->m_windMotion;
 	m_windAngleChange = sysTemplate->m_windAngleChange;
@@ -1687,6 +1697,32 @@ Bool ParticleSystem::isElectric()
 		}
 	}
 	return m_electricAuto;
+}
+
+// ------------------------------------------------------------------------------------------------
+/** Auto looks the particle texture up in GameData.ini's LaserParticleTextures, once per system */
+// ------------------------------------------------------------------------------------------------
+Bool ParticleSystem::isLaser()
+{
+	if (m_laserShader != LASER_SHADER_AUTO)
+	{
+		return m_laserShader == LASER_SHADER_YES;
+	}
+
+	if (!m_laserKnown)
+	{
+		m_laserKnown = TRUE;
+		const std::vector<AsciiString> &textures = TheGlobalData->m_laserParticleTextures;
+		for (std::vector<AsciiString>::const_iterator it = textures.begin(); it != textures.end(); ++it)
+		{
+			if (m_particleTypeName.compareNoCase( *it ) == 0)
+			{
+				m_laserAuto = TRUE;
+				break;
+			}
+		}
+	}
+	return m_laserAuto;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -3103,6 +3139,7 @@ const FieldParse ParticleSystemTemplate::m_fieldParseTable[] =
 	{ "WindMotion",					INI::parseIndexList, WindMotionNames, offsetof( ParticleSystemTemplate, m_windMotion ) },
 	{ "FlameShader",				INI::parseIndexList, FlameShaderModeNames, offsetof( ParticleSystemTemplate, m_flameShader ) },
 	{ "ElectricShader",			INI::parseIndexList, ElectricShaderModeNames, offsetof( ParticleSystemTemplate, m_electricShader ) },
+	{ "LaserShader",				INI::parseIndexList, LaserShaderModeNames, offsetof( ParticleSystemTemplate, m_laserShader ) },
 	{ "FlameWarp",					INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.warp ) },
 	{ "FlameHeat",					INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.heat ) },
 	{ "FlameFlicker",				INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.flicker ) },

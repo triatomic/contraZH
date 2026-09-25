@@ -117,6 +117,8 @@ public:
 	void					Set_Freeze_Random(int onoff)							{ if (onoff) { Bits |= FREEZE_RANDOM; } else { Bits &= ~FREEZE_RANDOM; }; }
 	void					Set_Disable_Sorting(int onoff)						{ if (onoff) { Bits |= DISABLE_SORTING; } else { Bits &= ~DISABLE_SORTING; }; }
 	void					Set_End_Caps(int onoff)									{ if (onoff) { Bits |= END_CAPS; } else { Bits &= ~END_CAPS; }; }
+	// SoftParticleHookClass effects for a textured, blended streak
+	void					Set_Effects(unsigned int effects)					{ Effects = effects; }
 
 	void					Reset_Line();
 
@@ -185,6 +187,8 @@ private:
 		DEFAULT_BITS = MERGE_INTERSECTIONS | (UNIFORM_WIDTH_TEXTURE_MAP << TEXTURE_MAP_MODE_OFFSET)
 	};
 	unsigned int					Bits;
+
+	unsigned int					Effects;
 
 	friend class SegmentedLineClass;
 

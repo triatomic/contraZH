@@ -500,6 +500,10 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 			m_streakLine->Set_Texture( texture.Peek() );
 			m_streakLine->Set_Shader( shaderForType( sys->getShaderType() ) );
 
+			// Only a streak carries the beam coordinates the laser shader reads. A multiplied streak has no light to shade.
+			const Bool laser = sys->getShaderType() != ParticleSystemInfo::MULTIPLY && sys->isLaser();
+			m_streakLine->Set_Effects( laser ? (SoftParticleHookClass::EFFECT_SOFT | SoftParticleHookClass::EFFECT_LASER) : 0 );
+
 			//UPDATE THE STREAK'S ARRAYS
 			m_streakLine->Set_LocsWidthsColors(
 				pointCount,

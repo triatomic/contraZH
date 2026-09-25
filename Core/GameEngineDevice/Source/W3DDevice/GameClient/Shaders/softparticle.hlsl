@@ -16,6 +16,11 @@
 // ELECTRIC shades the sprite as electricity, after RA3's tesla shader. A noise field in the view
 // plane jumps to a new place many times a second. It jitters the texture lookup, draws thin arcs
 // along its middle contour and strobes the brightness. Arcs take the sprite's hue halfway to white.
+//
+// LASER shades a beam or streak as a laser. Stage 2 hands over the beam coordinates as TEXCOORD2,
+// x from 0 to 1 across the beam and y along it in world units. A thin core in the beam's own hue,
+// taken most of the way to white, runs along the axis and wavers in width. Noise slid along the
+// beam sends pulses of brightness towards its far end, and the edges melt into glow.
 
 #ifndef SOFT
 #define SOFT 1
@@ -25,6 +30,9 @@
 #endif
 #ifndef ELECTRIC
 #define ELECTRIC 0
+#endif
+#ifndef LASER
+#define LASER 0
 #endif
 
 sampler2D ParticleTexture : register(s0);
@@ -54,6 +62,9 @@ float4 FlameShape  : register(c10);  // x = flicker swing, y = fringe breakup
 #elif ELECTRIC
 float4 Electric       : register(c6);   // xy = this jump's noise offset, z = camera space to noise scale, w = texture jitter
 float4 ElectricShape  : register(c7);   // x = strobe swing, y = arc sharpness, z = arc brightness, w = depth where arcs start to widen
+#elif LASER
+float4 Laser      : register(c6);   // x = pulse travel so far, y = world to noise scale, z = -3 / core width squared, w = core brightness
+float4 LaserShape : register(c7);   // x = core waver, y = pulse swing
 #endif
 
 struct PsIn
@@ -61,6 +72,9 @@ struct PsIn
     float4 Diffuse   : COLOR0;
     float2 TexCoord  : TEXCOORD0;
     float3 Position  : TEXCOORD1;
+#if LASER
+    float2 Beam      : TEXCOORD2;
+#endif
 };
 
 float4 main(PsIn input) : COLOR
@@ -119,6 +133,28 @@ float4 main(PsIn input) : COLOR
     float reach = sqrt(peak * coverage);
     float strobe = 1.0f + ElectricShape.x * (noiseB.b - 0.5f);
     color.rgb = color.rgb * strobe + (hue + 1.0f) * (0.5f * arc * reach * ElectricShape.z);
+#elif LASER
+    float side = input.Beam.x * 2.0f - 1.0f;
+    float along = input.Beam.y * Laser.y;
+    float4 noiseA = tex2D(NoiseTexture, float2(along - Laser.x, 0.25f));
+    float4 noiseB = tex2D(NoiseTexture, float2(along * 2.3f - Laser.x * 1.5f, 0.75f));
+
+    float4 texel = tex2D(ParticleTexture, input.TexCoord);
+    float4 color = texel * input.Diffuse;
+
+    // Adding ignores alpha, and additive systems often leave it at zero.
+    float coverage = lerp(texel.a, 1.0f, Params.y);
+
+    // Two fields at different speeds, so pulses swell and fade as they travel.
+    float pulse = 1.0f + LaserShape.y * (noiseA.r + noiseB.g - 1.0f);
+    float core = exp2(side * side * Laser.z * (1.0f + LaserShape.x * (noiseB.b - 0.5f)));
+
+    // Most of the way to white at the beam's own brightness, so the core fades out with the beam.
+    float peak = max(color.r, max(color.g, color.b));
+    float3 hot = color.rgb * 0.35f + peak * 0.65f;
+    float edge = saturate(4.0f - 4.0f * abs(side));
+    color.rgb = (color.rgb * edge + hot * (core * coverage * Laser.w)) * pulse;
+    color.a *= edge;
 #else
     float4 color = tex2D(ParticleTexture, input.TexCoord) * input.Diffuse;
 #endif

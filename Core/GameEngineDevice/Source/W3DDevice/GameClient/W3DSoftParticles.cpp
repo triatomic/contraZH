@@ -18,7 +18,8 @@
 
 // W3DSoftParticles.cpp ///////////////////////////////////////////////////////////////////////////
 // Fades particle sprites where they near the scene's depth or the terrain behind them, shades
-// flame sprites as fire and electric sprites as arcs, and draws the heat haze behind flames
+// flame sprites as fire, electric sprites as arcs and laser beams and streaks as lasers, and draws
+// the heat haze behind flames
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Lib/BaseType.h"
@@ -57,6 +58,9 @@ static const Int FlameShaderMode = Get_Env_Mode("CONTRA_FLAMESHADER", FLAME_SHAD
 // CONTRA_ELECTRICSHADER bisects faults: 0 plain electric sprites, 1 electric shading.
 static const Int ElectricShaderMode = Get_Env_Mode("CONTRA_ELECTRICSHADER", 1);
 
+// CONTRA_LASERSHADER bisects faults: 0 plain lasers, 1 laser shading.
+static const Int LaserShaderMode = Get_Env_Mode("CONTRA_LASERSHADER", 1);
+
 // The sprite's camera-space position comes through this stage, which also holds the surface it fades against.
 static const Int SOFT_STAGE = 1;
 static const Int NOISE_STAGE = 2;
@@ -73,6 +77,9 @@ W3DSoftParticles::W3DSoftParticles()
 	  m_electricDepthShader(0),
 	  m_electricHeightShader(0),
 	  m_electricShader(0),
+	  m_laserDepthShader(0),
+	  m_laserHeightShader(0),
+	  m_laserShader(0),
 	  m_hazeShader(0),
 	  m_noise(nullptr),
 	  m_sceneCopy(nullptr),
@@ -83,7 +90,7 @@ W3DSoftParticles::W3DSoftParticles()
 	Set_D3DMATRIX_Identity(m_projection);
 	Set_D3DMATRIX_Identity(m_toWorld);
 
-	if (SoftParticleMode != SOFT_PARTICLES_OFF || FlameShaderMode != FLAME_SHADER_OFF || ElectricShaderMode != 0)
+	if (SoftParticleMode != SOFT_PARTICLES_OFF || FlameShaderMode != FLAME_SHADER_OFF || ElectricShaderMode != 0 || LaserShaderMode != 0)
 	{
 		SortingRendererClass::Set_Soft_Particle_Hook(this);
 	}
@@ -113,6 +120,9 @@ void W3DSoftParticles::ReleaseResources()
 		DX8_DELETE_PIXEL_SHADER(device, m_electricDepthShader);
 		DX8_DELETE_PIXEL_SHADER(device, m_electricHeightShader);
 		DX8_DELETE_PIXEL_SHADER(device, m_electricShader);
+		DX8_DELETE_PIXEL_SHADER(device, m_laserDepthShader);
+		DX8_DELETE_PIXEL_SHADER(device, m_laserHeightShader);
+		DX8_DELETE_PIXEL_SHADER(device, m_laserShader);
 		DX8_DELETE_PIXEL_SHADER(device, m_hazeShader);
 	}
 	m_depthShader = 0;
@@ -123,6 +133,9 @@ void W3DSoftParticles::ReleaseResources()
 	m_electricDepthShader = 0;
 	m_electricHeightShader = 0;
 	m_electricShader = 0;
+	m_laserDepthShader = 0;
+	m_laserHeightShader = 0;
+	m_laserShader = 0;
 	m_hazeShader = 0;
 
 	if (m_noise != nullptr)
@@ -169,6 +182,16 @@ Bool W3DSoftParticles::electricEnabled()
 	return m_electricShader != 0 && m_noise != nullptr;
 }
 
+Bool W3DSoftParticles::laserEnabled()
+{
+	if (LaserShaderMode == 0 || !TheGlobalData->m_useLaserShaders)
+	{
+		return FALSE;
+	}
+	loadShaders();
+	return m_laserShader != 0 && m_noise != nullptr;
+}
+
 static void Load_Pixel_Shader(const char *path, DWORD &shader)
 {
 	if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(path, nullptr, 0, false, &shader)))
@@ -202,13 +225,19 @@ Bool W3DSoftParticles::loadShaders()
 				Load_Pixel_Shader("shaders\\softparticleelectricheight.pso", m_electricHeightShader);
 				Load_Pixel_Shader("shaders\\particleelectric.pso", m_electricShader);
 			}
-			if (FlameShaderMode != FLAME_SHADER_OFF || ElectricShaderMode != 0)
+			if (LaserShaderMode != 0)
+			{
+				Load_Pixel_Shader("shaders\\softparticlelaserdepth.pso", m_laserDepthShader);
+				Load_Pixel_Shader("shaders\\softparticlelaserheight.pso", m_laserHeightShader);
+				Load_Pixel_Shader("shaders\\particlelaser.pso", m_laserShader);
+			}
+			if (FlameShaderMode != FLAME_SHADER_OFF || ElectricShaderMode != 0 || LaserShaderMode != 0)
 			{
 				createNoise();
 			}
 		}
 	}
-	return m_depthShader != 0 || m_heightShader != 0 || m_flameShader != 0 || m_electricShader != 0;
+	return m_depthShader != 0 || m_heightShader != 0 || m_flameShader != 0 || m_electricShader != 0 || m_laserShader != 0;
 #else
 	return FALSE;
 #endif
@@ -425,6 +454,13 @@ static Real Noise_Scale(Real size)
 	return 1.0f / ((size > 0.01f) ? size : 0.01f);
 }
 
+// Pulses run LaserPulseSpeed world units a second along the beam: x = travel so far, y = world to noise scale, z = swing.
+static Vector4 Laser_Pulse()
+{
+	const Real scale = Noise_Scale(TheGlobalData->m_laserPulseSize);
+	return Vector4(Noise_Rise(TheGlobalData->m_laserPulseSpeed * scale), scale, TheGlobalData->m_laserPulse, 0.0f);
+}
+
 void W3DSoftParticles::bindFlame(const FlameShaderTuning &tuning)
 {
 	const Vector4 flame(Noise_Rise(tuning.rise), tuning.warp, Noise_Scale(tuning.noiseSize), tuning.heat);
@@ -452,6 +488,30 @@ void W3DSoftParticles::bindElectric()
 	DX8Wrapper::Set_Pixel_Shader_Constant(6, &electric, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(7, &shape, 1);
 	Bind_Noise(m_noise);
+}
+
+void W3DSoftParticles::bindLaser()
+{
+	const Vector4 pulse = Laser_Pulse();
+	const Real coreWidth = max(TheGlobalData->m_laserCoreWidth, 0.01f);
+	const Real waver = min(max(TheGlobalData->m_laserShimmer, 0.0f), 1.0f);
+
+	const Vector4 laser(pulse.X, pulse.Y, -3.0f / (coreWidth * coreWidth), TheGlobalData->m_laserCore);
+	const Vector4 shape(waver, pulse.Z, 0.0f, 0.0f);
+	DX8Wrapper::Set_Pixel_Shader_Constant(6, &laser, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(7, &shape, 1);
+	Bind_Noise(m_noise);
+
+	// The beam coordinates are the second uv set, and reach the pixel shader as TEXCOORD2.
+	DX8Wrapper::Set_DX8_Texture_Stage_State(NOISE_STAGE, D3DTSS_TEXCOORDINDEX, 1);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(NOISE_STAGE, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+}
+
+IDirect3DTexture8 *W3DSoftParticles::getLaserPulse(Vector4 &pulse)
+{
+	pulse = laserEnabled() ? Laser_Pulse() : Vector4(0.0f, 0.0f, 0.0f, 0.0f);
+	loadShaders();
+	return m_noise;
 }
 
 Bool W3DSoftParticles::beginHaze()
@@ -527,18 +587,21 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const 
 		return bindHaze(shader, tuning) != FALSE;
 	}
 
-	const Bool soft = (effects & EFFECT_SOFT) != 0 && SoftParticleMode != SOFT_PARTICLES_OFF &&
-		TheGlobalData->m_useSoftParticles && TheGlobalData->m_softParticleDistance > 0.0f;
 	const Bool flame = (effects & EFFECT_FLAME) != 0 && flameEnabled();
 	const Bool electric = !flame && (effects & EFFECT_ELECTRIC) != 0 && electricEnabled();
-	if ((!soft && !flame && !electric) || !loadShaders())
+	const Bool laser = !flame && !electric && (effects & EFFECT_LASER) != 0 && laserEnabled();
+	// A beam fades only as part of the laser look, so with lasers off it draws as it always has.
+	const Bool soft = (effects & EFFECT_SOFT) != 0 && SoftParticleMode != SOFT_PARTICLES_OFF &&
+		TheGlobalData->m_useSoftParticles && TheGlobalData->m_softParticleDistance > 0.0f &&
+		(laser || (effects & EFFECT_LASER) == 0);
+	if ((!soft && !flame && !electric && !laser) || !loadShaders())
 	{
 		return false;
 	}
 
 	// Cleared through the wrapper, so its record of the stages matches the device once End unbinds them.
 	DX8Wrapper::Set_Texture(SOFT_STAGE, nullptr);
-	if (flame || electric)
+	if (flame || electric || laser)
 	{
 		DX8Wrapper::Set_Texture(NOISE_STAGE, nullptr);
 	}
@@ -559,6 +622,12 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const 
 		heightShader = m_electricHeightShader;
 		shadedShader = m_electricShader;
 	}
+	else if (laser)
+	{
+		depthShader = m_laserDepthShader;
+		heightShader = m_laserHeightShader;
+		shadedShader = m_laserShader;
+	}
 
 	Bool bound = soft && (bindSceneDepth(depthShader) || bindTerrainHeight(heightShader));
 	// Without the variants that also fade, shaded sprites keep their shading and lose the fade.
@@ -566,6 +635,12 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const 
 	{
 		DX8Wrapper::Set_Pixel_Shader(shadedShader);
 		bound = TRUE;
+
+		// Texture coordinates arrive packed by textured stage, so the beam's reach TEXCOORD2 only with stage 1 filled.
+		if (laser)
+		{
+			DX8Wrapper::_Get_D3D_Device8()->SetTexture(SOFT_STAGE, m_noise);
+		}
 	}
 	if (!bound)
 	{
@@ -581,6 +656,11 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const 
 	{
 		bindElectric();
 		m_bound = EFFECT_ELECTRIC;
+	}
+	else if (laser)
+	{
+		bindLaser();
+		m_bound = EFFECT_LASER;
 	}
 	Bind_Camera_Position();
 
@@ -606,6 +686,10 @@ void W3DSoftParticles::End()
 	if (m_bound != 0)
 	{
 		device->SetTexture(NOISE_STAGE, nullptr);
+	}
+	if ((m_bound & EFFECT_LASER) != 0)
+	{
+		DX8Wrapper::Set_DX8_Texture_Stage_State(NOISE_STAGE, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_PASSTHRU | NOISE_STAGE);
 	}
 	if ((m_bound & EFFECT_HAZE) != 0)
 	{

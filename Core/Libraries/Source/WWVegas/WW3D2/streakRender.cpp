@@ -68,6 +68,7 @@ StreakRendererClass::StreakRendererClass() :
 		// CurrentUVOffset(0.0f,0.0f),
 		// UVOffsetDeltaPerMS(0.0f, 0.0f),
 		Bits(DEFAULT_BITS),
+		Effects(0),
 		m_vertexBufferSize(0),
 		m_vertexBuffer(nullptr)
 {
@@ -88,6 +89,7 @@ StreakRendererClass::StreakRendererClass(const StreakRendererClass & that) :
 		// CurrentUVOffset(0.0f,0.0f),
 		// UVOffsetDeltaPerMS(0.0f, 0.0f),
 		Bits(DEFAULT_BITS),
+		Effects(0),
 		m_vertexBufferSize(0),
 		m_vertexBuffer(nullptr)
 {
@@ -110,6 +112,7 @@ StreakRendererClass & StreakRendererClass::operator = (const StreakRendererClass
 		// CurrentUVOffset = that.CurrentUVOffset;
 		// UVOffsetDeltaPerMS = that.UVOffsetDeltaPerMS;
 		Bits = that.Bits;
+		Effects = that.Effects;
 		// Don't modify m_vertexBufferSize and m_vertexBuffer.
 	}
 	return *this;
@@ -383,6 +386,19 @@ void StreakRendererClass::RenderStreak
 
 		VectorProcessorClass::Transform(&xformed_pts[0],
 			&points[chunkIndex], modelview, point_cnt);
+
+		// The streak's along coordinate is measured in object space, so it holds still as the camera moves.
+		Vector3 beam_start;
+		Vector3 beam_end;
+		Matrix3D::Transform_Vector(modelview, points[0], &beam_start);
+		Matrix3D::Transform_Vector(modelview, points[num_points - 1], &beam_end);
+		Vector3 beam_dir = beam_end - beam_start;
+		const float beam_length = beam_dir.Length();
+		if (beam_length > 0.0f)
+		{
+			beam_dir *= 1.0f / beam_length;
+		}
+		const float beam_base = Vector3::Dot_Product(modelview.Get_Translation(), beam_dir);
 
 
 		/*
@@ -1296,6 +1312,11 @@ void StreakRendererClass::RenderStreak
 
 		// Enable sorting if sorting has not been disabled and line is translucent and alpha testing is not enabled.
 		bool sorting = (!Is_Sorting_Disabled()) && (Shader.Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO && Shader.Get_Alpha_Test() == ShaderClass::ALPHATEST_DISABLE);
+
+		// Effects shade only textured, blended streaks.
+		SoftParticleHookClass *hook = SortingRendererClass::Peek_Soft_Particle_Hook();
+		const bool blended = Shader.Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO && Shader.Get_Alpha_Test() == ShaderClass::ALPHATEST_DISABLE;
+		const unsigned int effects = (hook != nullptr && Texture != nullptr && blended) ? Effects : 0;
 		///////////////////////////////////////////////////////////////////////////////////////
 		ShaderClass shader = Shader;
 		shader.Set_Cull_Mode(ShaderClass::CULL_MODE_DISABLE);
@@ -1339,6 +1360,7 @@ void StreakRendererClass::RenderStreak
 			const unsigned verticesOffset = fvfinfo.Get_Location_Offset();
 			const unsigned diffuseOffset = fvfinfo.Get_Diffuse_Offset();
 			const unsigned textureOffset = fvfinfo.Get_Tex_Offset(0);
+			const unsigned beamOffset = fvfinfo.Get_Tex_Offset(1);
 			const unsigned vbSize = fvfinfo.Get_FVF_Size();
 
 			for (i=0; i<vnum; i++)
@@ -1353,6 +1375,10 @@ void StreakRendererClass::RenderStreak
 				Vector2 *texture = reinterpret_cast<Vector2 *>(vb + textureOffset);
 				texture->U = vertexArray[i].u1;
 				texture->V = vertexArray[i].v1;
+				// Across the streak from 0 to 1, and along it in world units
+				Vector2 *beam = reinterpret_cast<Vector2 *>(vb + beamOffset);
+				beam->U = vertexArray[i].u1;
+				beam->V = vertexArray[i].x * beam_dir.X + vertexArray[i].y * beam_dir.Y + vertexArray[i].z * beam_dir.Z - beam_base;
 				vb += vbSize;
 			}
 		}
@@ -1379,11 +1405,23 @@ void StreakRendererClass::RenderStreak
 
 		if (sorting)
 		{
+			SortingRendererClass::Set_Insert_Effects(effects, nullptr);
 			SortingRendererClass::Insert_Triangles(obj_sphere,0,triangleIndex,0,vnum);
+			SortingRendererClass::Set_Insert_Effects(0, nullptr);
 		}
 		else
 		{
+			bool shaded = false;
+			if (effects != 0)
+			{
+				DX8Wrapper::Apply_Render_State_Changes();
+				shaded = hook->Begin(shader, effects, nullptr);
+			}
 			DX8Wrapper::Draw_Triangles(0,triangleIndex,0,vnum);
+			if (shaded)
+			{
+				hook->End();
+			}
 		}
 
 	}

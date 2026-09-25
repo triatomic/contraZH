@@ -83,6 +83,7 @@ SegLineRendererClass::SegLineRendererClass() :
 		UScale(1.0f),
 		UVOffsetDeltaPerMS(0.0f, 0.0f),
 		Bits(DEFAULT_BITS),
+		Effects(0),
 		m_vertexBufferSize(0),
 		m_vertexBuffer(nullptr)
 {
@@ -104,6 +105,7 @@ SegLineRendererClass::SegLineRendererClass(const SegLineRendererClass & that) :
 		UScale(1.0f),
 		UVOffsetDeltaPerMS(0.0f, 0.0f),
 		Bits(DEFAULT_BITS),
+		Effects(0),
 		m_vertexBufferSize(0),
 		m_vertexBuffer(nullptr)
 {
@@ -127,6 +129,7 @@ SegLineRendererClass & SegLineRendererClass::operator = (const SegLineRendererCl
 		UScale = that.UScale;
 		UVOffsetDeltaPerMS = that.UVOffsetDeltaPerMS;
 		Bits = that.Bits;
+		Effects = that.Effects;
 		// Don't modify m_vertexBufferSize and m_vertexBuffer
 	}
 	return *this;
@@ -297,6 +300,18 @@ void SegLineRendererClass::Render
 
 		VectorProcessorClass::Transform(&xformed_pts[0],
 			&points[chidx], modelview, point_cnt);
+
+		// The beam's along coordinate is measured in object space, so it holds still as the camera moves.
+		Vector3 beam_start;
+		Vector3 beam_end;
+		Matrix3D::Transform_Vector(modelview, points[0], &beam_start);
+		Matrix3D::Transform_Vector(modelview, points[num_points - 1], &beam_end);
+		Vector3 beam_dir = beam_end - beam_start;
+		const float beam_length = beam_dir.Length();
+		if (beam_length > 0.0f) {
+			beam_dir *= 1.0f / beam_length;
+		}
+		const float beam_base = Vector3::Dot_Product(modelview.Get_Translation(), beam_dir);
 
 
 		/*
@@ -942,7 +957,7 @@ void SegLineRendererClass::Render
 
 		// Configure vertex array and setup renderer.
 		unsigned int vnum = num_intersections[TOP_EDGE] + num_intersections[BOTTOM_EDGE];
-		VertexFormatXYZDUV1 *vArray = getVertexBuffer(vnum);
+		VertexFormatXYZDUV2 *vArray = getVertexBuffer(vnum);
 		TriIndex v_index_array[MAX_SEGLINE_POLY_BUFFER_SIZE];
 
 		// Vertex and triangle indices
@@ -962,6 +977,7 @@ void SegLineRendererClass::Render
 		vArray[vidx].diffuse = DX8Wrapper::Convert_Color(intersection[1][TOP_EDGE].RGBA);
 		vArray[vidx].u1 = u_values[0] + uv_offset.X;
 		vArray[vidx].v1 = intersection[1][TOP_EDGE].TexV + uv_offset.Y;
+		vArray[vidx].u2 = 0.0f;
 		vidx++;
 		vArray[vidx].x = bottom.X;
 		vArray[vidx].y = bottom.Y;
@@ -969,6 +985,7 @@ void SegLineRendererClass::Render
 		vArray[vidx].diffuse = DX8Wrapper::Convert_Color(intersection[1][BOTTOM_EDGE].RGBA);
 		vArray[vidx].u1 = u_values[1] + uv_offset.X;
 		vArray[vidx].v1 = intersection[1][BOTTOM_EDGE].TexV + uv_offset.Y;
+		vArray[vidx].u2 = 1.0f;
 		vidx++;
 
 		unsigned int last_top_vidx = 0;
@@ -1023,6 +1040,7 @@ void SegLineRendererClass::Render
 				vArray[vidx].diffuse = DX8Wrapper::Convert_Color(intersection[top_int_idx][TOP_EDGE].RGBA);
 				vArray[vidx].u1 = u_values[0] + uv_offset.X;
 				vArray[vidx].v1 = intersection[top_int_idx][TOP_EDGE].TexV + uv_offset.Y;
+				vArray[vidx].u2 = 0.0f;
 				vidx++;
 				vArray[vidx].x = bottom.X;
 				vArray[vidx].y = bottom.Y;
@@ -1030,6 +1048,7 @@ void SegLineRendererClass::Render
 				vArray[vidx].diffuse = DX8Wrapper::Convert_Color(intersection[bottom_int_idx][BOTTOM_EDGE].RGBA);
 				vArray[vidx].u1 = u_values[1] + uv_offset.X;
 				vArray[vidx].v1 = intersection[bottom_int_idx][BOTTOM_EDGE].TexV + uv_offset.Y;
+				vArray[vidx].u2 = 1.0f;
 				vidx++;
 			} else {
 				// Exactly one of the pointcounts is greater than one - advance it and draw one triangle
@@ -1059,6 +1078,7 @@ void SegLineRendererClass::Render
 					vArray[vidx].diffuse = DX8Wrapper::Convert_Color(intersection[bottom_int_idx][BOTTOM_EDGE].RGBA);
 					vArray[vidx].u1 = u_values[1] + uv_offset.X;
 					vArray[vidx].v1 = intersection[bottom_int_idx][BOTTOM_EDGE].TexV + uv_offset.Y;
+					vArray[vidx].u2 = 1.0f;
 					vidx++;
 				} else {
 
@@ -1088,6 +1108,7 @@ void SegLineRendererClass::Render
 					vArray[vidx].diffuse = DX8Wrapper::Convert_Color(intersection[top_int_idx][TOP_EDGE].RGBA);
 					vArray[vidx].u1 = u_values[0] + uv_offset.X;
 					vArray[vidx].v1 = intersection[top_int_idx][TOP_EDGE].TexV + uv_offset.Y;
+					vArray[vidx].u2 = 0.0f;
 					vidx++;
 				}
 			}
@@ -1121,6 +1142,11 @@ void SegLineRendererClass::Render
 
 		// Enable sorting if sorting has not been disabled and line is translucent and alpha testing is not enabled.
 		bool sorting = (!Is_Sorting_Disabled()) && (Shader.Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO && Shader.Get_Alpha_Test() == ShaderClass::ALPHATEST_DISABLE);
+
+		// Effects shade only textured, blended lines.
+		SoftParticleHookClass *hook = SortingRendererClass::Peek_Soft_Particle_Hook();
+		const bool blended = Shader.Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO && Shader.Get_Alpha_Test() == ShaderClass::ALPHATEST_DISABLE;
+		const unsigned int effects = (hook != nullptr && Texture != nullptr && blended) ? Effects : 0;
 
 		ShaderClass shader = Shader;
 		shader.Set_Cull_Mode(ShaderClass::CULL_MODE_DISABLE);
@@ -1160,6 +1186,7 @@ void SegLineRendererClass::Render
 			const unsigned int verticesOffset = fvfinfo.Get_Location_Offset();
 			const unsigned diffuseOffset = fvfinfo.Get_Diffuse_Offset();
 			const unsigned textureOffset = fvfinfo.Get_Tex_Offset(0);
+			const unsigned beamOffset = fvfinfo.Get_Tex_Offset(1);
 			const unsigned vbSize = fvfinfo.Get_FVF_Size();
 
 			for (i=0; i<vnum; i++)
@@ -1173,6 +1200,10 @@ void SegLineRendererClass::Render
 				Vector2 *texture = reinterpret_cast<Vector2 *>(vb + textureOffset);
 				texture->U = vArray[i].u1;
 				texture->V = vArray[i].v1;
+				// Across the line from 0 to 1, and along it in world units
+				Vector2 *beam = reinterpret_cast<Vector2 *>(vb + beamOffset);
+				beam->U = vArray[i].u2;
+				beam->V = vArray[i].x * beam_dir.X + vArray[i].y * beam_dir.Y + vArray[i].z * beam_dir.Z - beam_base;
 				vb += vbSize;
 			}
 		}
@@ -1198,9 +1229,19 @@ void SegLineRendererClass::Render
 		DX8Wrapper::Set_Shader(shader);
 
 		if (sorting) {
+			SortingRendererClass::Set_Insert_Effects(effects, nullptr);
 			SortingRendererClass::Insert_Triangles(obj_sphere,0,tidx,0,vnum);
+			SortingRendererClass::Set_Insert_Effects(0, nullptr);
 		} else {
+			bool shaded = false;
+			if (effects != 0) {
+				DX8Wrapper::Apply_Render_State_Changes();
+				shaded = hook->Begin(shader, effects, nullptr);
+			}
 			DX8Wrapper::Draw_Triangles(0,tidx,0,vnum);
+			if (shaded) {
+				hook->End();
+			}
 		}
 
 		REF_PTR_RELEASE(mat);
@@ -1317,14 +1358,14 @@ void SegLineRendererClass::Scale(float scale)
 	NoiseAmplitude *= scale;
 }
 
-VertexFormatXYZDUV1 *SegLineRendererClass::getVertexBuffer(unsigned int number)
+VertexFormatXYZDUV2 *SegLineRendererClass::getVertexBuffer(unsigned int number)
 {
 	// TODO: use a stl vector instead of our own array.
 	if (number > m_vertexBufferSize)
 	{
 		unsigned int numberToAlloc = number + (number >> 1);
 		delete [] m_vertexBuffer;
-		m_vertexBuffer = W3DNEWARRAY VertexFormatXYZDUV1[numberToAlloc];
+		m_vertexBuffer = W3DNEWARRAY VertexFormatXYZDUV2[numberToAlloc];
 		m_vertexBufferSize = numberToAlloc;
 	}
 

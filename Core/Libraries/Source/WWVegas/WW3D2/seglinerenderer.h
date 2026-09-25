@@ -47,7 +47,7 @@
 class RenderInfoClass;
 class SphereClass;
 struct W3dEmitterLinePropertiesStruct;
-struct VertexFormatXYZDUV1;
+struct VertexFormatXYZDUV2;
 
 
 // The maximum allowable level of subdivision. This should be no more than 7 to avoid increasing
@@ -97,6 +97,7 @@ public:
 	int					Is_Freeze_Random(void) const							{ return Bits & FREEZE_RANDOM; }
 	int					Is_Sorting_Disabled(void) const						{ return Bits & DISABLE_SORTING; }
 	int					Are_End_Caps_Enabled(void)	const						{ return Bits & END_CAPS; }
+	unsigned int		Get_Effects(void) const									{ return Effects; }
 
 	// Set properties used to render this line segment
 	void					Set_Texture(TextureClass *texture);
@@ -116,6 +117,8 @@ public:
 	void					Set_Freeze_Random(int onoff)							{ if (onoff) { Bits |= FREEZE_RANDOM; } else { Bits &= ~FREEZE_RANDOM; }; }
 	void					Set_Disable_Sorting(int onoff)						{ if (onoff) { Bits |= DISABLE_SORTING; } else { Bits &= ~DISABLE_SORTING; }; }
 	void					Set_End_Caps(int onoff)									{ if (onoff) { Bits |= END_CAPS; } else { Bits &= ~END_CAPS; }; }
+	// SoftParticleHookClass effects for a textured, blended line
+	void					Set_Effects(unsigned int effects)					{ Effects = effects; }
 
 
 	void					Render(	RenderInfoClass & rinfo,
@@ -181,11 +184,13 @@ private:
 	};
 	unsigned int					Bits;
 
+	unsigned int					Effects;
+
 	friend class SegmentedLineClass;
 
-	VertexFormatXYZDUV1 *getVertexBuffer(unsigned int number);
+	VertexFormatXYZDUV2 *getVertexBuffer(unsigned int number);
 	unsigned int m_vertexBufferSize;
-	VertexFormatXYZDUV1 *m_vertexBuffer;
+	VertexFormatXYZDUV2 *m_vertexBuffer;
 };
 
 

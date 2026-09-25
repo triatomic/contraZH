@@ -99,6 +99,7 @@
 #include "W3DDevice/GameClient/W3DShockwave.h"
 #include "W3DDevice/GameClient/W3DSoftParticles.h"
 #include "W3DDevice/GameClient/W3DAmbientOcclusion.h"
+#include "W3DDevice/GameClient/W3DLaserGlow.h"
 #include "W3DDevice/GameClient/W3DSnow.h"
 
 
@@ -450,6 +451,11 @@ void BaseHeightMapRenderObjClass::ReleaseResources()
 	if (TheW3DAmbientOcclusion)
 	{
 		TheW3DAmbientOcclusion->ReleaseResources();
+	}
+
+	if (TheW3DLaserGlow)
+	{
+		TheW3DLaserGlow->ReleaseResources();
 	}
 
 	if (TheSnowManager)

@@ -72,6 +72,7 @@ set(GAMEENGINEDEVICE_SRC
     Include/W3DDevice/GameClient/W3DSnow.h
     Include/W3DDevice/GameClient/W3DSoftParticles.h
     Include/W3DDevice/GameClient/W3DShockwave.h
+    Include/W3DDevice/GameClient/W3DLaserGlow.h
     Include/W3DDevice/GameClient/W3DAmbientOcclusion.h
 #    Include/W3DDevice/GameClient/W3DStatusCircle.h
     Include/W3DDevice/GameClient/W3DTerrainBackground.h
@@ -182,6 +183,7 @@ set(GAMEENGINEDEVICE_SRC
     Source/W3DDevice/GameClient/W3DSnow.cpp
     Source/W3DDevice/GameClient/W3DSoftParticles.cpp
     Source/W3DDevice/GameClient/W3DShockwave.cpp
+    Source/W3DDevice/GameClient/W3DLaserGlow.cpp
     Source/W3DDevice/GameClient/W3DAmbientOcclusion.cpp
 #    Source/W3DDevice/GameClient/W3DStatusCircle.cpp
     Source/W3DDevice/GameClient/W3DTerrainBackground.cpp

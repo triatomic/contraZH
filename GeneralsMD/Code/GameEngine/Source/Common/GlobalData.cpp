@@ -278,6 +278,13 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ "ElectricJitter",						INI::parseReal,				nullptr,			offsetof( GlobalData, m_electricJitter ) },
 	{ "ElectricFlicker",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_electricFlicker ) },
 	{ "ElectricRate",						INI::parseReal,				nullptr,			offsetof( GlobalData, m_electricRate ) },
+	{ "LaserParticleTextures",				INI::parseAsciiStringVectorAppend,	nullptr,	offsetof( GlobalData, m_laserParticleTextures ) },
+	{ "LaserCore",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserCore ) },
+	{ "LaserCoreWidth",						INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserCoreWidth ) },
+	{ "LaserShimmer",						INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserShimmer ) },
+	{ "LaserPulse",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserPulse ) },
+	{ "LaserPulseSize",						INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserPulseSize ) },
+	{ "LaserPulseSpeed",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserPulseSpeed ) },
 	{ "AmbientOcclusionRadius",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_ambientOcclusionRadius ) },
 	{ "AmbientOcclusionStrength",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_ambientOcclusionStrength ) },
 	{ "TextureReductionFactor",			INI::parseInt,				nullptr,			offsetof( GlobalData, m_textureReductionFactor ) },
@@ -746,6 +753,9 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 
 	{ "LaserGroundGlowColor",				INI::parseColorInt,			nullptr,			offsetof( GlobalData, m_laserGlowColor ) },
 	{ "LaserGroundGlowIntensity",		INI::parsePercentToReal,	nullptr,			offsetof( GlobalData, m_laserGlowIntensity ) },
+	{ "LaserGroundGlowRadius",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserGlowRadius ) },
+	{ "LaserGroundGlowFalloff",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserGlowFalloff ) },
+	{ "LaserGroundGlowWrap",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserGlowWrap ) },
 	
 	// {"ChronoDamageTintStatusType", TintStatusFlags::parseSingleBitFromINI, NULL, offsetof(GlobalData, m_chronoTintStatusType) },
 	{"ChronoDamageParticleSystemLarge", INI::parseAsciiString, NULL, offsetof(GlobalData, m_chronoDisableParticleSystemLarge) },
@@ -811,6 +821,7 @@ GlobalData::GlobalData()
   m_useSoftParticles = TRUE;
   m_useFlameShaders = TRUE;
   m_useElectricShaders = TRUE;
+  m_useLaserShaders = TRUE;
   m_useDynamicLights = TRUE;
   m_usePixelLights = TRUE;
   m_useAmbientOcclusion = TRUE;
@@ -821,6 +832,9 @@ GlobalData::GlobalData()
   m_ambientOcclusionDebug = FALSE;
   m_laserGlowColor = 0;
   m_laserGlowIntensity = 0.7f;
+  m_laserGlowRadius = 0.0f;
+  m_laserGlowFalloff = 2.0f;
+  m_laserGlowWrap = 0.5f;
 
 #if defined(RTS_DEBUG) || ENABLE_CONFIGURABLE_SHROUD
 	m_shroudOn = TRUE;
@@ -953,6 +967,13 @@ GlobalData::GlobalData()
 	m_electricJitter = 0.03f;
 	m_electricFlicker = 0.6f;
 	m_electricRate = 15.0f;
+	m_laserParticleTextures.clear();
+	m_laserCore = 1.2f;
+	m_laserCoreWidth = 0.25f;
+	m_laserShimmer = 0.3f;
+	m_laserPulse = 0.4f;
+	m_laserPulseSize = 120.0f;
+	m_laserPulseSpeed = 400.0f;
 	m_ambientOcclusionRadius = 12.0f;
 	m_ambientOcclusionStrength = 1.0f;
 	m_textureReductionFactor = -1;
@@ -1580,6 +1601,8 @@ static const char *const LiveGameDataKeys[] =
 	"FlameWarp", "FlameHeat", "FlameFlicker", "FlameBreakup", "FlameNoiseSize", "FlameRise",
 	"HazeBend", "HazeSize", "HazeLift", "HazeNoiseSize", "HazeRise", "HazeMask",
 	"ElectricArcs", "ElectricArcSharpness", "ElectricNoiseSize", "ElectricJitter", "ElectricFlicker", "ElectricRate",
+	"LaserCore", "LaserCoreWidth", "LaserShimmer", "LaserPulse", "LaserPulseSize", "LaserPulseSpeed",
+	"LaserGroundGlowRadius", "LaserGroundGlowFalloff", "LaserGroundGlowWrap",
 	nullptr
 };
 
@@ -1798,6 +1821,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_useSoftParticles = optionPref.getSoftParticlesEnabled();
 	TheWritableGlobalData->m_useFlameShaders = optionPref.getFlameShadersEnabled();
 	TheWritableGlobalData->m_useElectricShaders = optionPref.getElectricShadersEnabled();
+	TheWritableGlobalData->m_useLaserShaders = optionPref.getLaserShadersEnabled();
 	TheWritableGlobalData->m_useDynamicLights = optionPref.getDynamicLightsEnabled();
 	TheWritableGlobalData->m_usePixelLights = optionPref.getPixelLightsEnabled();
 	TheWritableGlobalData->m_useAmbientOcclusion = optionPref.getAmbientOcclusionEnabled();

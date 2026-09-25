@@ -470,6 +470,18 @@ public:
 	};
 	ElectricShaderMode m_electricShader;
 
+	// Auto shades a streak system as a laser when its texture is in GameData.ini's LaserParticleTextures.
+	enum LaserShaderMode
+	{
+		LASER_SHADER_INVALID = 0,
+		LASER_SHADER_AUTO,
+		LASER_SHADER_YES,
+		LASER_SHADER_NO,
+
+		LASER_SHADER_COUNT
+	};
+	LaserShaderMode m_laserShader;
+
 	enum WindMotion
 	{
 		WIND_MOTION_INVALID = 0,
@@ -547,6 +559,12 @@ static const char *const ElectricShaderModeNames[] =
 	"NONE", "Auto", "Yes", "No", nullptr
 };
 static_assert(ARRAY_SIZE(ElectricShaderModeNames) == ParticleSystemInfo::ELECTRIC_SHADER_COUNT + 1, "Incorrect array size");
+
+static const char *const LaserShaderModeNames[] =
+{
+	"NONE", "Auto", "Yes", "No", nullptr
+};
+static_assert(ARRAY_SIZE(LaserShaderModeNames) == ParticleSystemInfo::LASER_SHADER_COUNT + 1, "Incorrect array size");
 
 #endif
 
@@ -696,6 +714,7 @@ public:
 
 	Bool isFlame();		///< draw with the flame shader
 	Bool isElectric();	///< draw with the electric shader
+	Bool isLaser();		///< draw streaks with the laser shader
 
 	void setSlave( ParticleSystem *slave );			///< set a slave system for us
 	ParticleSystem *getSlave() { return m_slaveSystem; }
@@ -846,6 +865,8 @@ protected:
 	Bool							m_flameAuto;													///< the Auto answer
 	Bool							m_electricKnown;											///< the electric Auto answer is worked out
 	Bool							m_electricAuto;												///< the electric Auto answer
+	Bool							m_laserKnown;													///< the laser Auto answer is worked out
+	Bool							m_laserAuto;													///< the laser Auto answer
 
 
 	// the actual particle system data is inherited from ParticleSystemInfo

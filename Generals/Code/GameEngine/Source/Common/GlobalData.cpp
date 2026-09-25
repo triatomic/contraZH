@@ -548,6 +548,9 @@ GlobalData* GlobalData::m_theOriginal = nullptr;
 
 	{ "LaserGroundGlowColor",				INI::parseColorInt,			nullptr,			offsetof( GlobalData, m_laserGlowColor ) },
 	{ "LaserGroundGlowIntensity",		INI::parsePercentToReal,	nullptr,			offsetof( GlobalData, m_laserGlowIntensity ) },
+	{ "LaserGroundGlowRadius",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserGlowRadius ) },
+	{ "LaserGroundGlowFalloff",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserGlowFalloff ) },
+	{ "LaserGroundGlowWrap",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_laserGlowWrap ) },
 
 	{ nullptr,					nullptr,						nullptr,						0 }
 
@@ -583,6 +586,7 @@ GlobalData::GlobalData()
   m_useSoftParticles = TRUE;
   m_useFlameShaders = TRUE;
   m_useElectricShaders = TRUE;
+  m_useLaserShaders = TRUE;
   m_softParticleDistance = 12.0f;
   m_flameWarp = 0.04f;
   m_flameHeat = 2.2f;
@@ -603,6 +607,13 @@ GlobalData::GlobalData()
   m_electricJitter = 0.03f;
   m_electricFlicker = 0.6f;
   m_electricRate = 15.0f;
+  m_laserParticleTextures.clear();
+  m_laserCore = 1.2f;
+  m_laserCoreWidth = 0.25f;
+  m_laserShimmer = 0.3f;
+  m_laserPulse = 0.4f;
+  m_laserPulseSize = 120.0f;
+  m_laserPulseSpeed = 400.0f;
   m_useAmbientOcclusion = TRUE;
   m_ambientOcclusionDebug = FALSE;
   m_ambientOcclusionRadius = 12.0f;
@@ -612,6 +623,9 @@ GlobalData::GlobalData()
   m_alliedDecalMode = AlliedDecalMode_Default;
   m_laserGlowColor = 0;
   m_laserGlowIntensity = 0.7f;
+  m_laserGlowRadius = 0.0f;
+  m_laserGlowFalloff = 2.0f;
+  m_laserGlowWrap = 0.5f;
 	m_newRadar = FALSE;
 	m_smartSelection = TRUE;
 	m_smartSelectionUseMouse = TRUE;
@@ -1292,6 +1306,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_useSoftParticles = optionPref.getSoftParticlesEnabled();
 	TheWritableGlobalData->m_useFlameShaders = optionPref.getFlameShadersEnabled();
 	TheWritableGlobalData->m_useElectricShaders = optionPref.getElectricShadersEnabled();
+	TheWritableGlobalData->m_useLaserShaders = optionPref.getLaserShadersEnabled();
 	TheWritableGlobalData->m_useAmbientOcclusion = optionPref.getAmbientOcclusionEnabled();
 	TheWritableGlobalData->m_ambientOcclusionDebug = optionPref.getAmbientOcclusionDebugEnabled();
 	TheWritableGlobalData->m_vsync = optionPref.getVSyncMode();

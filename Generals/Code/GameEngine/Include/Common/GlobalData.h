@@ -513,6 +513,7 @@ public:
   Bool m_useSoftParticles;        ///< Options.ini SoftParticles: smoke and fire fade where they meet the ground and buildings
   Bool m_useFlameShaders;         ///< Options.ini FlameShaders: flame weapon fire flickers and glows white-hot at its core
   Bool m_useElectricShaders;      ///< Options.ini ElectricShaders: electric sparks and flares crackle with arcs
+  Bool m_useLaserShaders;         ///< Options.ini LaserShaders: laser beams get a white-hot core and pulses running along them
   Real m_softParticleDistance;    ///< how far in front of a surface a particle starts to fade, 0 for hard edges
   Real m_flameWarp;               ///< flame shading and heat haze defaults, see FlameShaderTuning
   Real m_flameHeat;
@@ -533,6 +534,13 @@ public:
   Real m_electricJitter;
   Real m_electricFlicker;
   Real m_electricRate;
+  std::vector<AsciiString> m_laserParticleTextures;  ///< streak textures that get the laser shader when their system is Auto
+  Real m_laserCore;               ///< laser shader settings
+  Real m_laserCoreWidth;
+  Real m_laserShimmer;
+  Real m_laserPulse;
+  Real m_laserPulseSize;
+  Real m_laserPulseSpeed;
   Bool m_useAmbientOcclusion;     ///< Options.ini AmbientOcclusion: creases and the ground beneath objects darken where the hardware allows
   Bool m_ambientOcclusionDebug;   ///< Options.ini AmbientOcclusionDebug: show only the occlusion, in grey
   Real m_ambientOcclusionRadius;  ///< how far, in world units, geometry darkens what is near it
@@ -542,6 +550,9 @@ public:
   Int m_alliedDecalMode;          ///< Options.ini AlliedDecalMode: how allied power decals are drawn
   Color m_laserGlowColor;         ///< GameData LaserGroundGlowColor: black takes the beam color
   Real m_laserGlowIntensity;      ///< GameData LaserGroundGlowIntensity: how strongly the color is added
+  Real m_laserGlowRadius;         ///< GameData LaserGroundGlowRadius: how far the light reaches from the beam, 0 derives it from the beam width
+  Real m_laserGlowFalloff;        ///< GameData LaserGroundGlowFalloff: power the light fades by with distance, Direct3D 9 only
+  Real m_laserGlowWrap;           ///< GameData LaserGroundGlowWrap: how much ground facing away from the beam still lights, Direct3D 9 only
 
 	// TheSuperHackers @feature Outline the radar blips and the shoreline, at double radar
 	// resolution. Client side only; the radar never feeds game logic.

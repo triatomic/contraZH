@@ -66,6 +66,7 @@ public:
 	Color m_groundGlowColor;
 	Real m_groundGlowRadius;
 	Real m_groundGlowIntensity;
+	Bool m_laserShader;		///< shade the beam with the laser shader: a hot core and pulses running along it
 
 	W3DLaserDrawModuleData();
 	virtual ~W3DLaserDrawModuleData() override;

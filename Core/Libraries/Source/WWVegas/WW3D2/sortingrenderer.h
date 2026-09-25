@@ -34,7 +34,8 @@ public:
 		EFFECT_SOFT = 1,	// fade where the sprite nears the scene behind it
 		EFFECT_FLAME = 2,	// flicker and heat colouring
 		EFFECT_HAZE = 4,	// wobble the scene copy behind the sprite
-		EFFECT_ELECTRIC = 8	// arcs, jitter and strobe
+		EFFECT_ELECTRIC = 8,	// arcs, jitter and strobe
+		EFFECT_LASER = 16	// hot core and travelling pulses, from the beam coordinates in the second uv set
 	};
 
 	virtual ~SoftParticleHookClass() {}

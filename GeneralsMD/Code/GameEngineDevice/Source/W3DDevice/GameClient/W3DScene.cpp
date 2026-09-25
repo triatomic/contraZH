@@ -60,6 +60,7 @@
 #include "W3DDevice/GameClient/W3DCustomScene.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
 #include "W3DDevice/GameClient/W3DAmbientOcclusion.h"
+#include "W3DDevice/GameClient/W3DLaserGlow.h"
 #include "WW3D2/camera.h"
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/dx8instancing.h"
@@ -1093,6 +1094,12 @@ void RTS3DScene::Flush(RenderInfoClass & rinfo)
 	if (TheW3DAmbientOcclusion && m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE && !m_planarMirrorPass)
 	{
 		TheW3DAmbientOcclusion->render(rinfo);
+	}
+
+	// Laser light lands on the finished ground, and water drawn next covers what lies under it.
+	if (TheW3DLaserGlow && m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE && !m_planarMirrorPass)
+	{
+		TheW3DLaserGlow->render(rinfo);
 	}
 
 	WW3D::Render_And_Clear_Static_Sort_Lists(rinfo);	//draws things like water
