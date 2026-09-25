@@ -9,7 +9,7 @@ Cheat builds reload `Data\INI\GameData.ini` about half a second after it is save
 keys can be adjusted with a map running: `UnitSpecularIntensity`, `UnitSpecularPower`,
 `UnitBumpHeight`, `UnitNormalMapStrength`, `TerrainNormalMapStrength`, `UnitEmissiveIntensity`,
 `UnitEmissiveNightIntensity`, `SoftParticleDistance`, `AmbientOcclusionRadius`,
-`AmbientOcclusionStrength` and the `Flame` and `Haze` keys. Other `GameData.ini` keys keep their
+`AmbientOcclusionStrength` and the `Flame`, `Haze` and `Electric` tuning keys. Other `GameData.ini` keys keep their
 value until a restart. The saved values win over a map's `map.ini` until the map loads again. A
 deleted key keeps its value until a restart, and a file with an error applies only the keys above
 the error until the next save.
@@ -213,6 +213,48 @@ page. `ParticleSystem.ini` overrides take effect on the next launch.
 * Streaks, projectile streams, volume particles and terrain-conforming particles stay plain.
 * On a card without shader model 2.0a, flames keep their shading but lose the soft fade.
 * Launch with `CONTRA_FLAMESHADER=1` to drop the shimmer, or `0` to turn flame shading off.
+
+## Electric shading
+
+Tesla, lightning and EMP sparks and flares crackle. Thin arcs jump across each sprite many times a
+second, in its own colour taken halfway to white, while the sprite jitters and its brightness strobes.
+Ported from Red Alert 3's tesla shader. Needs the Direct3D 9 build and a shader model 2 card.
+
+* `ElectricShaders = Yes` - (No draws electric sprites plain. Options.ini only, no menu control.)
+
+Picked per particle system in `ParticleSystem.ini`:
+
+* `ElectricShader = Auto` - (Default. On when the system's `ParticleName` texture is listed in
+`GameData.ini`'s `ElectricParticleTextures`. `Yes` turns it on for any system, `No` turns it off.)
+
+Listed and tuned in the mod's `GameData.ini`:
+
+* `ElectricParticleTextures = TeslaBlast.tga ...` - (Textures whose systems turn electric. Each line
+adds to the list, so a long list can span several lines. Read at launch.)
+* `ElectricArcs = 1.5` - (Arc brightness. 0 turns the arcs off.)
+* `ElectricArcSharpness = 10` - (Lower gives broad glowing bands, higher thin threads.)
+* `ElectricNoiseSize = 40` - (World units across one tile of arc noise. Smaller gives more, closer arcs.)
+* `ElectricJitter = 0.03` - (How far the texture jumps each crackle, in texture widths.)
+* `ElectricFlicker = 0.6` - (How far brightness swings, as a fraction. 0 is steady.)
+* `ElectricRate = 15` - (Crackles per second. 0 freezes the arcs.)
+
+```
+ParticleSystem EMPRing
+  ...
+  ElectricShader = Yes
+End
+```
+
+Notes:
+* Arcs lie in the view plane and are sized in world units, so ground-aligned rings and bolts, which
+the pitched camera sees at a slant, crackle with the same arcs as upright sprites. Big effects carry
+more arcs than small sparks.
+* Past the default camera's distance, `CameraHeight` over the sine of `CameraPitch`, arcs widen with
+depth, so they stay visible at the top of the screen and when zoomed out.
+* A system that is both flame and electric draws as flame.
+* Streaks such as `TeslaTrail.tga`, volume particles, terrain-conforming particles and multiplied
+sprites stay plain.
+* Launch with `CONTRA_ELECTRICSHADER=0` to turn electric shading off.
 
 ## Ambient occlusion
 
