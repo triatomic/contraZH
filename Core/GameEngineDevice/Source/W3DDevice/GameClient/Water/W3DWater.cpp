@@ -1245,8 +1245,12 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 	// TransparentWaterDepth sets the soft edge's width, 0 turns it off as for the legacy water, and the hex tiling shares its constant.
 	const Real softEdgeDepth = TheWaterTransparency->m_transparentWaterDepth;
 	const Real hexSize = TheWaterTransparency->m_shaderWaterStochasticSize;
-	const Vector4 surface((softEdgeDepth > 0.0f) ? 1.0f / softEdgeDepth : 10000.0f, (hexSize > 0.0f) ? 1.0f / hexSize : 0.0f,
-		max(TheWaterTransparency->m_shaderWaterStochasticSharpness, -15.0f), (hexSize > 0.0f) ? 1.0f : 0.0f);
+	const Real hexRandom = (hexSize > 0.0f) ? WWMath::Clamp(TheWaterTransparency->m_shaderWaterStochasticRandom, 0.0f, 1.0f) : 0.0f;
+
+	// Below 1 the weight exponent eases towards 0.7, where the cell leaving the blend at a triangle edge still fades out unseen.
+	const Real sharpness = max(TheWaterTransparency->m_shaderWaterStochasticSharpness, -15.0f);
+	const Real hexExponent = (sharpness >= 1.0f) ? sharpness : 0.7f + 0.3f * powf(2.0f, sharpness - 1.0f);
+	const Vector4 surface((softEdgeDepth > 0.0f) ? 1.0f / softEdgeDepth : 10000.0f, (hexSize > 0.0f) ? 1.0f / hexSize : 0.0f, hexExponent, hexRandom);
 	DX8Wrapper::Set_Pixel_Shader_Constant(21, &surface, 1);
 
 	// Standing water reads the scene's depth on stage 1 where the edge texture would be, and the white texture passes every test.

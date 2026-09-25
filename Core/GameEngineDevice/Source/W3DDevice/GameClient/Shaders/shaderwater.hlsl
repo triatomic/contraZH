@@ -72,7 +72,7 @@ float4 PlanarMap     : register(c19);  // xy = texel centre shift from the scene
 #if RADIAL
 float4 RadialPlane   : register(c20);  // x = water level of this draw
 #endif
-float4 Surface       : register(c21);  // x = 1 / shore fade depth, y = 1 / hex cell spacing, z = hex weight sharpness, w = 1 when hex tiling is on
+float4 Surface       : register(c21);  // x = 1 / shore fade depth, y = 1 / hex cell spacing, z = hex weight exponent, w = how far hex cells shift, 0 when off
 #if SWELL
 float4 SwellShape    : register(c22);  // as the vertex shader's Swell: x = world to texcoord scale, y = height, zw = drift
 float4 SwellChannel  : register(c23);  // picks the channel holding height
@@ -121,13 +121,13 @@ HexCells FindHexCells(float2 world)
     float s = step(0.0f, -corner.z);
     float s2 = 2.0f * s - 1.0f;
 
-    // The floor keeps zero and negative sharpness finite; 1/255 is a constant the shader already holds.
-    float3 weight = pow(max(float3(-corner.z * s2, s - corner.y * s2, s - corner.x * s2), 1.0f / 255.0f), Surface.z);
-    weight = lerp(float3(1.0f, 0.0f, 0.0f), weight / dot(weight, 1.0f), Surface.w);
+    float3 weight = pow(saturate(float3(-corner.z * s2, s - corner.y * s2, s - corner.x * s2)), Surface.z);
+    weight /= dot(weight, 1.0f);
 
     HexCells cells;
     cells.weight = weight;
-    cells.norm = rsqrt(dot(weight, weight));
+    // Shifted samples differ less as the shift shrinks, so the contrast correction shrinks with it.
+    cells.norm = lerp(1.0f, rsqrt(dot(weight, weight)), Surface.w);
     cells.offset0 = HexHash(base + float2(s, s)) * Surface.w;
     cells.offset1 = HexHash(base + float2(s, 1.0f - s)) * Surface.w;
     cells.offset2 = HexHash(base + float2(1.0f - s, s)) * Surface.w;
