@@ -1201,6 +1201,34 @@ void W3DBridgeBuffer::drawBridges(CameraClass * camera, Bool wireframe, TextureC
 		W3DShaderManager::resetShader(W3DShaderManager::ST_SHADOW_MULTIPLY);
 	}
 
+	// Bridges bake only the sun into their vertices, so a pass adds the dynamic lights that reach each one.
+	if (!wireframe && W3DShaderManager::getShaderPasses(W3DShaderManager::ST_POINT_LIGHTS) > 0)
+	{
+		DX8Wrapper::Invalidate_Cached_Render_States();
+		DX8Wrapper::Set_Shader(detailAlphaShader);
+		DX8Wrapper::Set_Material(m_vertexMaterial);
+		DX8Wrapper::Set_Index_Buffer(m_indexBridge,0);
+		DX8Wrapper::Set_Vertex_Buffer(m_vertexBridge);
+		DX8Wrapper::Apply_Render_State_Changes();
+		if (W3DShaderManager::setShader(W3DShaderManager::ST_POINT_LIGHTS, 0))
+		{
+			for (curBridge=0; curBridge<m_numBridges; curBridge++) {
+				if (m_bridges[curBridge].isEnabled() && m_bridges[curBridge].isVisible()) {
+					const SphereClass &bounds = m_bridges[curBridge].getBounds();
+					const AABoxClass box(bounds.Center, Vector3(bounds.Radius, bounds.Radius, bounds.Radius));
+					Int lights[W3DShaderManager::MAX_PIXEL_LIGHTS];
+					const Int lightCount = W3DShaderManager::pickPixelLights(box, lights);
+					if (lightCount == 0) {
+						continue;
+					}
+					W3DShaderManager::setDrawPixelLights(lights, lightCount);
+					m_bridges[curBridge].renderBridge(FALSE);
+				}
+			}
+		}
+		W3DShaderManager::resetShader(W3DShaderManager::ST_POINT_LIGHTS);
+	}
+
 	//Render shroud pass over all the bridges
 	if (!wireframe && TheTerrainRenderObject->getShroud())
 	{

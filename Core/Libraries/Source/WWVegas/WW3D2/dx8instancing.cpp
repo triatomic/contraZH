@@ -40,7 +40,12 @@ const MaterialPassClass * DX8InstancingClass::InstancedPasses[2] = { nullptr, nu
 
 bool DX8InstancingClass::Is_Vertex_Shader_Material_Pass(const MaterialPassClass * pass)
 {
-	return pass != nullptr && (pass == InstancedPasses[0] || pass == InstancedPasses[1]);
+	if (pass == nullptr)
+	{
+		return false;
+	}
+	const MaterialPassClass * key = pass->Peek_Vertex_Shading_Key();
+	return key == InstancedPasses[0] || key == InstancedPasses[1];
 }
 
 #if defined(BUILD_WITH_D3D9)
@@ -326,7 +331,7 @@ bool DX8InstancingClass::Is_Instanced_Material_Pass(const MaterialPassClass * pa
 	{
 		return false;
 	}
-	return pass != nullptr && (pass == InstancedPasses[0] || pass == InstancedPasses[1]);
+	return Is_Vertex_Shader_Material_Pass(pass);
 }
 
 void DX8InstancingClass::Begin_Shadow_Depth_Pass(IDirect3DVertexShader9 * shader)

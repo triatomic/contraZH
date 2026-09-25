@@ -89,6 +89,7 @@ public:
 	void updateCenter(CameraClass *camera); // notify camera moved [3/24/2003]
 	void updateTexture(); // notify camera moved [3/24/2003]
 	Bool isCulled() {return m_cullStatus==CULL_STATUS_INVISIBLE;}
+	const AABoxClass &getBounds() const {return m_bounds;}
 	Int getTexMultiplier() {return m_texMultiplier;}
 protected:
 	enum {CULL_STATUS_UNKNOWN, CULL_STATUS_VISIBLE, CULL_STATUS_INVISIBLE} m_cullStatus;

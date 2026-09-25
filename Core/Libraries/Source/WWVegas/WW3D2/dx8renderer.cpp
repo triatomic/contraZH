@@ -2985,6 +2985,8 @@ void DX8MeshRendererClass::Record_Instanced_Group(int draws)
 
 void DX8MeshRendererClass::Record_Material_Pass(const MaterialPassClass* pass, int draws)
 {
+	// Copies of a pass count as the pass they copy.
+	pass = pass->Peek_Vertex_Shading_Key();
 	for (int i=0;i<DX8InstancingStatsStruct::MAX_PASSES;++i)
 	{
 		if (instancing_stats.Passes[i] == nullptr)

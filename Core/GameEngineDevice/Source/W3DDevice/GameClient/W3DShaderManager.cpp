@@ -80,6 +80,8 @@
 #include "WW3D2/matpass.h"
 #include "WW3D2/texture.h"
 #include "WWLib/ffactory.h"
+#include "WWMath/aabox.h"
+#include <vector>
 
 
 // Turn this on to turn off pixel shaders. jba[4/3/2003]
@@ -1512,16 +1514,28 @@ static Int BumpNormalMapCount = 0;
 static Real EmissiveIntensity = 0.0f;
 static Int EmissiveMapCount = 0;
 
-// The point lights the terrain and specular shaders add, set once a frame by the scene.
-static W3DShaderManager::PixelLight PixelLights[W3DShaderManager::MAX_PIXEL_LIGHTS];
+// The point lights draws may add, set once a frame by the scene. Each draw names its own.
+static W3DShaderManager::PixelLight PixelLights[W3DShaderManager::MAX_PIXEL_LIGHT_CANDIDATES];
 static Int PixelLightCount = 0;
 enum { PIXEL_LIGHT_REGISTERS = W3DShaderManager::MAX_PIXEL_LIGHTS * 2 + (W3DShaderManager::MAX_PIXEL_LIGHTS + 3) / 4 };
-// The unit lights in camera space, packed once per set of lights and view.
-static Vector4 UnitLightBlock[PIXEL_LIGHT_REGISTERS];
-static D3DMATRIX UnitLightView;
-static Bool UnitLightBlockValid = FALSE;
 static Bool TerrainPixelLightsLoaded = FALSE;
 static Bool UnitPixelLightsLoaded = FALSE;
+static Bool RoadPixelLightsLoaded = FALSE;
+static Bool FlatPixelLightsLoaded = FALSE;
+static Bool PointLightPassLoaded = FALSE;
+
+// The ground shader in use without and with the lights, which setDrawPixelLights picks between draw by draw.
+static DWORD DrawUnlitShader = 0;
+static DWORD DrawLitShader = 0;
+
+// The lights of the object whose specular pass is installed.
+struct SpecularPassLights
+{
+	Int lights[W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS];
+	Int count;
+	Bool lightsOnly;	///< no highlight, bumps or glow
+};
+static const SpecularPassLights *CurrentSpecularLights = nullptr;
 
 // Bisects per-pixel light faults without a rebuild. CONTRA_PIXELLIGHTS=0 leaves every light
 // to the vertex lighting, 1 draws them per pixel on the terrain only, 2 on units as well.
@@ -1533,20 +1547,21 @@ static Int Get_Pixel_Light_Mode()
 	return (value != nullptr) ? atoi(value) : PIXEL_LIGHTS_ALL;
 }
 
-// Packs the lights as pointlights.hlsli reads them, all for the terrain in world space or the unit ones in view space.
-static Int Pack_Pixel_Lights(Vector4 *constants, const D3DMATRIX *view, Bool terrain)
+// Packs the given lights, or the first count without indices, as pointlights.hlsli reads them in a shader
+// with the given slots. A view takes them into camera space, and none leaves them in world space.
+static Int Pack_Pixel_Lights(Vector4 *constants, Int slots, const Int *indices, Int count, const D3DMATRIX *view)
 {
-	const Int slots = terrain ? W3DShaderManager::MAX_PIXEL_LIGHTS : W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS;
 	memset(constants, 0, sizeof(Vector4) * PIXEL_LIGHT_REGISTERS);
 
-	Int i = 0;
-	for (Int index = 0; index < PixelLightCount && i < slots; index++)
+	count = min(count, slots);
+	for (Int i = 0; i < count; i++)
 	{
-		const W3DShaderManager::PixelLight &light = PixelLights[index];
-		if (!terrain && !light.unitLit)
+		const Int index = (indices != nullptr) ? indices[i] : i;
+		if (index < 0 || index >= PixelLightCount)
 		{
 			continue;
 		}
+		const W3DShaderManager::PixelLight &light = PixelLights[index];
 
 		Vector3 position = light.position;
 		if (view != nullptr)
@@ -1562,16 +1577,26 @@ static Int Pack_Pixel_Lights(Vector4 *constants, const D3DMATRIX *view, Bool ter
 		constants[i * 2].Set(position.X, position.Y, position.Z, scale);
 		constants[i * 2 + 1].Set(light.diffuse.X, light.diffuse.Y, light.diffuse.Z, 1.0f + light.innerRadius * scale);
 		(&constants[slots * 2 + i / 4].X)[i % 4] = light.ambientScale;
-		i++;
 	}
 
 	return slots * 2 + (slots + 3) / 4;
 }
 
-static void Set_Pixel_Light_Constants(Int firstRegister, const D3DMATRIX *view, Bool terrain)
+// Every ground shader reads its world-space lights from c5.
+#define GROUND_POINT_LIGHT_REGISTER 5
+
+// Hands draw-by-draw light choice to a ground shader just set, whose unlit variant is bound. A zero
+// unlit shader leaves the lit one bound, for passes that only add the lights.
+static void Begin_Draw_Pixel_Lights(DWORD unlit, DWORD lit)
 {
-	Vector4 constants[PIXEL_LIGHT_REGISTERS];
-	DX8Wrapper::Set_Pixel_Shader_Constant(firstRegister, constants, Pack_Pixel_Lights(constants, view, terrain));
+	DrawUnlitShader = unlit;
+	DrawLitShader = lit;
+}
+
+static void End_Draw_Pixel_Lights()
+{
+	DrawUnlitShader = 0;
+	DrawLitShader = 0;
 }
 
 // The terrain normal maps, set once a frame by the scene.
@@ -1936,7 +1961,7 @@ public:
 		BUMP_COUNT
 	};
 
-	SpecularShader() : m_shadowed(FALSE), m_lit(FALSE)
+	SpecularShader() : m_shadowed(FALSE), m_lit(FALSE), m_lightsOnly(FALSE)
 	{
 		for (Int i = 0; i < BUMP_COUNT; i++)
 		{
@@ -1962,7 +1987,8 @@ protected:
 	DWORD m_dwLitShadowedShaders[BUMP_COUNT];	///<the same two, also adding the point lights
 	DWORD m_dwLitUnshadowedShaders[BUMP_COUNT];
 	Bool m_shadowed;							///<which of the two the current pass uses
-	Bool m_lit;									///<whether it uses the point light set
+	Bool m_lit;									///<whether it adds its object's point lights
+	Bool m_lightsOnly;							///<whether it adds nothing else
 } specularShader;
 
 W3DShaderInterface *SpecularShaderList[]=
@@ -2125,9 +2151,13 @@ Int SpecularShader::set(Int pass)
 		SpecularToSun.X * view.m[0][2] + SpecularToSun.Y * view.m[1][2] + SpecularToSun.Z * view.m[2][2]);
 	toSun.Normalize();
 
+	const SpecularPassLights *passLights = CurrentSpecularLights;
+	m_lightsOnly = (passLights != nullptr && passLights->lightsOnly);
+	const Real highlightScale = m_lightsOnly ? 0.0f : 1.0f;
+
 	Vector4 sunDirection(toSun.X, toSun.Y, toSun.Z, 0.0f);
-	Vector4 sunColor(SpecularColor.X, SpecularColor.Y, SpecularColor.Z, 0.0f);
-	Vector4 gloss(SpecularPower, SpecularDebug ? 1.0f : 0.0f, 0.0f, 0.0f);
+	Vector4 sunColor(SpecularColor.X * highlightScale, SpecularColor.Y * highlightScale, SpecularColor.Z * highlightScale, 0.0f);
+	Vector4 gloss(SpecularPower, (SpecularDebug && !m_lightsOnly) ? 1.0f : 0.0f, 0.0f, 0.0f);
 	Vector4 bump(BumpHeight, BumpNormalMapStrength, BumpAmbient, 0.0f);
 	Vector4 sunDiffuse(SpecularSunDiffuse.X, SpecularSunDiffuse.Y, SpecularSunDiffuse.Z, 0.0f);
 	DX8Wrapper::Set_Pixel_Shader_Constant(1, &sunDirection, 1);
@@ -2136,18 +2166,13 @@ Int SpecularShader::set(Int pass)
 	DX8Wrapper::Set_Pixel_Shader_Constant(5, &sunDiffuse, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(6, &bump, 1);
 
-	m_lit = (UnitPixelLightsLoaded && PixelLightCount > 0);
+	m_lit = (UnitPixelLightsLoaded && passLights != nullptr && passLights->count > 0);
 	if (m_lit)
 	{
-		static Int unitLightRegisters = 0;
-		if (!UnitLightBlockValid || memcmp(&view, &UnitLightView, sizeof(D3DMATRIX)) != 0)
-		{
-			unitLightRegisters = Pack_Pixel_Lights(UnitLightBlock, &view, FALSE);
-			UnitLightView = view;
-			UnitLightBlockValid = TRUE;
-		}
-		// The wrapper skips the upload while the registers still hold these values.
-		DX8Wrapper::Set_Pixel_Shader_Constant(8, UnitLightBlock, unitLightRegisters);
+		Vector4 constants[PIXEL_LIGHT_REGISTERS];
+		const Int registers = Pack_Pixel_Lights(constants, W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS,
+			passLights->lights, passLights->count, &view);
+		DX8Wrapper::Set_Pixel_Shader_Constant(8, constants, registers);
 	}
 
 	DX8Wrapper::Set_Pixel_Shader(m_lit
@@ -2212,7 +2237,7 @@ void SpecularShader::setTexture(TextureClass *texture)
 
 	Int bump = BUMP_NONE;
 	TextureClass *normalMap = nullptr;
-	if (BumpEnabled && texture != nullptr)
+	if (BumpEnabled && texture != nullptr && !m_lightsOnly)
 	{
 		normalMap = Find_Normal_Map(texture);
 		if (normalMap != nullptr)
@@ -2236,7 +2261,7 @@ void SpecularShader::setTexture(TextureClass *texture)
 	DX8Wrapper::Set_Texture(SPECULAR_NORMAL_MAP_STAGE, (bump == BUMP_NORMAL_MAP) ? normalMap : nullptr);
 	DX8Wrapper::Set_Pixel_Shader(shaders[bump]);
 
-	TextureClass *emissiveMap = (EmissiveIntensity > 0.0f && texture != nullptr) ? Find_Emissive_Map(texture) : nullptr;
+	TextureClass *emissiveMap = (EmissiveIntensity > 0.0f && texture != nullptr && !m_lightsOnly) ? Find_Emissive_Map(texture) : nullptr;
 	DX8Wrapper::Set_Texture(SPECULAR_EMISSIVE_STAGE, emissiveMap);
 
 	// Derived bumps step at least a texel, so they need its size. The loaded level is read, since the size can still change.
@@ -2281,6 +2306,7 @@ void SpecularShader::reset()
 	}
 	m_shadowed = FALSE;
 	m_lit = FALSE;
+	m_lightsOnly = FALSE;
 
 	for (Int stage = SPECULAR_NORMAL_STAGE; stage <= SPECULAR_POSITION_STAGE; stage++)
 	{
@@ -2324,6 +2350,120 @@ Int SpecularShader::shutdown()
 	return TRUE;
 }
 
+static void Set_Terrain_World_Position(Int stage);
+
+///Adds dynamic point lights over fixed-function geometry that has already drawn, one light set per draw.
+class PointLightPassShader : public W3DShaderInterface
+{
+public:
+	PointLightPassShader() : m_dwPixelShader(0) {}
+
+	virtual Int set(Int pass) override;
+	virtual Int init() override;
+	virtual void reset() override;
+	virtual Int shutdown() override;
+
+protected:
+
+	DWORD m_dwPixelShader;
+} pointLightPassShader;
+
+W3DShaderInterface *PointLightPassShaderList[]=
+{
+	&pointLightPassShader,
+	nullptr
+};
+
+// The geometry's texture on stage 0 and its world position on stage 1.
+#define POINT_LIGHT_POSITION_STAGE 1
+
+Int PointLightPassShader::init()
+{
+	PointLightPassLoaded = FALSE;
+	const DX8Caps *caps = DX8Wrapper::Get_Current_Caps();
+	if (caps == nullptr || !Supports_Pixel_Shader_2_a(caps) || Get_Pixel_Light_Mode() < PIXEL_LIGHTS_TERRAIN)
+	{
+		return FALSE;
+	}
+
+	if (FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\pointlightpass.pso", nullptr, 0, false, &m_dwPixelShader)))
+	{
+		m_dwPixelShader = 0;
+		return FALSE;
+	}
+
+	PointLightPassLoaded = TRUE;
+	W3DShaders[W3DShaderManager::ST_POINT_LIGHTS]=&pointLightPassShader;
+	W3DShadersPassCount[W3DShaderManager::ST_POINT_LIGHTS]=1;
+
+	return TRUE;
+}
+
+// Expects the geometry bound and transformed, and its texture set on stage 0 draw by draw.
+Int PointLightPassShader::set(Int pass)
+{
+	if (PixelLightCount == 0)
+	{
+		return FALSE;
+	}
+
+	// The geometry is redrawn at the same depth, so EQUAL limits the pass to pixels the first
+	// draw wrote. It adds its light where the texture is opaque.
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, TRUE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZFUNC, D3DCMP_EQUAL);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZWRITEENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHATESTENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE, TRUE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_ONE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_FOGENABLE, FALSE);
+
+	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXCOORDINDEX, 0);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+	Set_Terrain_World_Position(POINT_LIGHT_POSITION_STAGE);
+
+	// Two-sided geometry turns its normal towards the eye, which sits where the view's inverse puts the origin.
+	D3DMATRIX view;
+	D3DMATRIX inverse;
+	float det;
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
+	Invert_D3DMATRIX(inverse, &det, view);
+	Vector4 eye(inverse.m[3][0], inverse.m[3][1], inverse.m[3][2], 1.0f);
+	DX8Wrapper::Set_Pixel_Shader_Constant(1, &eye, 1);
+
+	Begin_Draw_Pixel_Lights(0, m_dwPixelShader);
+	DX8Wrapper::Set_Pixel_Shader(m_dwPixelShader);
+	return TRUE;
+}
+
+void PointLightPassShader::reset()
+{
+	End_Draw_Pixel_Lights();
+	DX8Wrapper::Set_Pixel_Shader(0);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(POINT_LIGHT_POSITION_STAGE, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(POINT_LIGHT_POSITION_STAGE, D3DTSS_TEXCOORDINDEX,
+		D3DTSS_TCI_PASSTHRU | POINT_LIGHT_POSITION_STAGE);
+
+	// Z, blend and fog are ShaderClass state, so the next shader set restores them in full.
+	ShaderClass::Invalidate();
+}
+
+Int PointLightPassShader::shutdown()
+{
+	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
+	if (device != nullptr)
+	{
+		DX8_DELETE_PIXEL_SHADER(device, m_dwPixelShader);
+	}
+	m_dwPixelShader = 0;
+	PointLightPassLoaded = FALSE;
+
+	W3DShaders[W3DShaderManager::ST_POINT_LIGHTS]=nullptr;
+	W3DShadersPassCount[W3DShaderManager::ST_POINT_LIGHTS]=0;
+
+	return TRUE;
+}
+
 #endif	// BUILD_WITH_D3D9
 
 ///Adds the specular pass to one mesh, with that mesh's own texture on stage 0.
@@ -2331,14 +2471,39 @@ class W3DSpecularMaterialPassClass : public MaterialPassClass
 {
 public:
 
+	W3DSpecularMaterialPassClass() : m_key(this)
+	{
+		m_lights.count = 0;
+		m_lights.lightsOnly = FALSE;
+	}
+
+	/// Makes this a copy of key for one object, adding that object's lights.
+	void setObjectLights(const MaterialPassClass *key, const Int *lights, Int count, Bool lightsOnly)
+	{
+		m_key = key;
+		m_lights.count = min(count, (Int)W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS);
+		for (Int i = 0; i < m_lights.count; i++)
+		{
+			m_lights.lights[i] = lights[i];
+		}
+		m_lights.lightsOnly = lightsOnly;
+	}
+
+	virtual const MaterialPassClass *Peek_Vertex_Shading_Key() const override
+	{
+		return m_key;
+	}
+
 	virtual void Install_Materials() const override
 	{
+		CurrentSpecularLights = &m_lights;
 		W3DShaderManager::setShader(W3DShaderManager::ST_SPECULAR, 0);
 	}
 
 	virtual void UnInstall_Materials() const override
 	{
 		W3DShaderManager::resetShader(W3DShaderManager::ST_SPECULAR);
+		CurrentSpecularLights = nullptr;
 	}
 
 	virtual void Install_Polygon_Materials(DX8PolygonRendererClass *renderer) const override
@@ -2351,9 +2516,19 @@ public:
 		DX8Wrapper::Set_Texture(0, texture);
 #endif
 	}
+
+private:
+
+	const MaterialPassClass *m_key;
+	SpecularPassLights m_lights;
 };
 
 static W3DSpecularMaterialPassClass SpecularMaterialPass;
+
+// Passes carrying one object's lights, handed out again from the start each frame. A pass stays
+// valid until the render that took it has flushed.
+static std::vector<W3DSpecularMaterialPassClass *> ObjectSpecularPasses;
+static size_t ObjectSpecularPassesUsed = 0;
 
 void W3DShaderManager::setSpecularLight(const Vector3 &toSun, const Vector3 &color, Real intensity, Real power, Bool debug)
 {
@@ -2381,12 +2556,67 @@ void W3DShaderManager::setEmissive(Real intensity)
 
 void W3DShaderManager::setPixelLights(const PixelLight *lights, Int count)
 {
-	PixelLightCount = min(count, (Int)MAX_PIXEL_LIGHTS);
+	PixelLightCount = min(count, (Int)MAX_PIXEL_LIGHT_CANDIDATES);
 	for (Int i = 0; i < PixelLightCount; i++)
 	{
 		PixelLights[i] = lights[i];
 	}
-	UnitLightBlockValid = FALSE;
+	ObjectSpecularPassesUsed = 0;
+}
+
+Int W3DShaderManager::getPixelLightCount()
+{
+	return PixelLightCount;
+}
+
+const W3DShaderManager::PixelLight &W3DShaderManager::getPixelLight(Int index)
+{
+	return PixelLights[index];
+}
+
+void W3DShaderManager::setDrawPixelLights(const Int *indices, Int count)
+{
+	if (DrawLitShader == 0)
+	{
+		return;
+	}
+
+	if (indices == nullptr)
+	{
+		count = min(count, PixelLightCount);
+	}
+	if (count <= 0 && DrawUnlitShader != 0)
+	{
+		DX8Wrapper::Set_Pixel_Shader(DrawUnlitShader);
+		return;
+	}
+
+	Vector4 constants[PIXEL_LIGHT_REGISTERS];
+	const Int registers = Pack_Pixel_Lights(constants, MAX_PIXEL_LIGHTS, indices, count, nullptr);
+	DX8Wrapper::Set_Pixel_Shader_Constant(GROUND_POINT_LIGHT_REGISTER, constants, registers);
+	DX8Wrapper::Set_Pixel_Shader(DrawLitShader);
+}
+
+Int W3DShaderManager::pickPixelLights(const AABoxClass &box, Int *lights)
+{
+	Int count = 0;
+	for (Int index = 0; index < PixelLightCount && count < MAX_PIXEL_LIGHTS; index++)
+	{
+		const PixelLight &light = PixelLights[index];
+		const Real dx = max((Real)fabs(light.position.X - box.Center.X) - box.Extent.X, 0.0f);
+		const Real dy = max((Real)fabs(light.position.Y - box.Center.Y) - box.Extent.Y, 0.0f);
+		const Real dz = max((Real)fabs(light.position.Z - box.Center.Z) - box.Extent.Z, 0.0f);
+		if (dx * dx + dy * dy + dz * dz < light.outerRadius * light.outerRadius)
+		{
+			lights[count++] = index;
+		}
+	}
+	return count;
+}
+
+Bool W3DShaderManager::supportsPixelLights()
+{
+	return TerrainPixelLightsLoaded || UnitPixelLightsLoaded || RoadPixelLightsLoaded || FlatPixelLightsLoaded || PointLightPassLoaded;
 }
 
 Bool W3DShaderManager::supportsTerrainPixelLights()
@@ -2447,13 +2677,32 @@ void W3DShaderManager::takeSpecularCounts(Int &meshes, Int &derived, Int &normal
 MaterialPassClass *W3DShaderManager::getSpecularPass()
 {
 	const Bool bumps = (BumpEnabled && BumpSupported);
-	const Bool pointLights = (UnitPixelLightsLoaded && PixelLightCount > 0);
-	if (W3DShadersPassCount[ST_SPECULAR] == 0 ||
-		(SpecularColor.Length2() <= 0.0f && !bumps && EmissiveIntensity <= 0.0f && !pointLights))
+	if (W3DShadersPassCount[ST_SPECULAR] == 0 || (SpecularColor.Length2() <= 0.0f && !bumps && EmissiveIntensity <= 0.0f))
 	{
 		return nullptr;
 	}
 	return &SpecularMaterialPass;
+}
+
+MaterialPassClass *W3DShaderManager::getSpecularPass(const Int *lights, Int lightCount, Bool lightsOnly)
+{
+	if (W3DShadersPassCount[ST_SPECULAR] == 0 || !UnitPixelLightsLoaded || lightCount <= 0)
+	{
+		return lightsOnly ? nullptr : getSpecularPass();
+	}
+
+	if (ObjectSpecularPassesUsed == ObjectSpecularPasses.size())
+	{
+		ObjectSpecularPasses.push_back(NEW_REF(W3DSpecularMaterialPassClass, ()));
+	}
+	W3DSpecularMaterialPassClass *pass = ObjectSpecularPasses[ObjectSpecularPassesUsed++];
+	pass->setObjectLights(&SpecularMaterialPass, lights, lightCount, lightsOnly);
+	return pass;
+}
+
+const MaterialPassClass *W3DShaderManager::getSpecularPassKey()
+{
+	return (W3DShadersPassCount[ST_SPECULAR] != 0) ? &SpecularMaterialPass : nullptr;
 }
 
 /*===========================================================================================*/
@@ -2495,10 +2744,14 @@ public:
 	DWORD					m_dwBaseNoise1PixelShader;	///<handle to terrain/single noise D3D pixel shader
 	DWORD					m_dwBaseNoise2PixelShader;	///<handle to terrain/double noise D3D pixel shader
 	DWORD					m_dwBase0PixelShader;	///<handle to terrain only pixel shader
+	DWORD					m_dwLitPixelShader[4];	///<the same four adding the point lights, by texture count
+	Int						m_lightStage;	///<stage the world position is generated on, or -1
+	FlatTerrainShaderPixelShader() : m_lightStage(-1) {}
 	virtual Int set(Int pass) override;		///<setup shader for the specified rendering pass.
 	virtual Int init() override;			///<perform any one time initialization and validation
 	virtual void reset() override;		///<do any custom resetting necessary to bring W3D in sync.
 	virtual Int shutdown() override;			///<release resources used by shader
+	void initPixelLights();
 } flatTerrainShaderPixelShader;
 
 ///8 stage terrain shader which only works on certain Nvidia cards.
@@ -2539,7 +2792,7 @@ private:
 	void initBump();
 	Bool setBump(Int noiseCount, Bool shadowed);
 	void initPixelLights();
-	Bool setPixelLights(Int noiseCount, Bool shadowed, Bool bumped);
+	Bool setPixelLights(Int noiseCount, Bool shadowed, Bool bumped, DWORD unlit);
 } terrainShaderPixelShader;
 
 ///List of different terrain shader implementations in order of preference
@@ -3182,11 +3435,12 @@ void TerrainShaderPixelShader::initPixelLights()
 #endif
 }
 
-// Expects the shadow map and bump already bound, since the stages after them are this one's.
-Bool TerrainShaderPixelShader::setPixelLights(Int noiseCount, Bool shadowed, Bool bumped)
+// Expects the shadow map and bump already bound, since the stages after them are this one's. Each
+// tile then picks its lights, and so this variant or the unlit one bound now.
+Bool TerrainShaderPixelShader::setPixelLights(Int noiseCount, Bool shadowed, Bool bumped, DWORD unlit)
 {
 	const DWORD shader = m_dwLitPixelShader[bumped ? 1 : 0][shadowed ? 1 : 0][noiseCount];
-	if (!TerrainPixelLightsLoaded || PixelLightCount == 0 || shader == 0)
+	if (!TerrainPixelLightsLoaded || PixelLightCount == 0 || shader == 0 || unlit == 0)
 	{
 		return FALSE;
 	}
@@ -3198,8 +3452,7 @@ Bool TerrainShaderPixelShader::setPixelLights(Int noiseCount, Bool shadowed, Boo
 		Set_Terrain_World_Position(m_lightStage);
 	}
 
-	Set_Pixel_Light_Constants(5, nullptr, TRUE);
-	DX8Wrapper::Set_Pixel_Shader(shader);
+	Begin_Draw_Pixel_Lights(unlit, shader);
 	return TRUE;
 }
 
@@ -3370,7 +3623,11 @@ Int TerrainShaderPixelShader::set(Int pass)
 		noiseCount = 1;
 	const Bool shadowed = setShadowReceiver(noiseCount);
 	const Bool bumped = setBump(noiseCount, shadowed);
-	setPixelLights(noiseCount, shadowed, bumped);
+
+	const DWORD baseShaders[3] = { m_dwBasePixelShader, m_dwBaseNoise1PixelShader, m_dwBaseNoise2PixelShader };
+	const DWORD unlit = bumped ? m_dwBumpPixelShader[shadowed ? 1 : 0][noiseCount]
+		: (shadowed ? m_dwShadowPixelShader[noiseCount] : baseShaders[noiseCount]);
+	setPixelLights(noiseCount, shadowed, bumped, unlit);
 
 	return TRUE;
 }
@@ -3398,6 +3655,7 @@ void TerrainShaderPixelShader::reset()
 		DX8Wrapper::Set_DX8_Texture_Stage_State(m_lightStage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_PASSTHRU|m_lightStage);
 	}
 	m_lightStage = -1;
+	End_Draw_Pixel_Lights();
 
 	DX8Wrapper::_Get_D3D_Device8()->SetTexture(2,nullptr);	//release reference to any texture
 	DX8Wrapper::_Get_D3D_Device8()->SetTexture(3,nullptr);	//release reference to any texture
@@ -3546,13 +3804,17 @@ class RoadShaderPixelShader : public W3DShaderInterface
 	friend class RoadShader2Stage;	//the two-stage path hands its passes over when roads receive shadows.
 
 public:
-	RoadShaderPixelShader() : m_shadowStage(-1) {}
+	RoadShaderPixelShader() : m_shadowStage(-1), m_lightStage(-1), m_pixelPath(FALSE) {}
 
 private:
 
 	DWORD					m_dwBaseNoise2PixelShader;	///<handle to road/double noise D3D pixel shader
 	DWORD					m_dwShadowPixelShader[3];	///<every road mode, also receiving the shadow map, indexed by noise texture count
+	DWORD					m_dwPlainPixelShader[3];	///<every road mode without the shadow map, for lit draws' unlit neighbours
+	DWORD					m_dwLitPixelShader[2][3];	///<both again adding the point lights, by shadow and noise count
 	Int						m_shadowStage;	///<stage the shadow map is bound to, or -1
+	Int						m_lightStage;	///<stage the world position is generated on, or -1
+	Bool					m_pixelPath;	///<whether the current pass draws through the shaders above
 
 	virtual Int set(Int pass) override;		///<setup shader for the specified rendering pass.
 	virtual void reset() override;		///<do any custom resetting necessary to bring W3D in sync.
@@ -3560,7 +3822,8 @@ private:
 	virtual Int shutdown() override;			///<release resources used by shader
 
 	void initShadowReceiver();
-	Bool setShadowReceiver();
+	void initPixelLights();
+	Bool setPixelPath();
 } roadShaderPixelShader;
 
 class RoadShader2Stage : public W3DShaderInterface
@@ -3591,7 +3854,21 @@ Int RoadShaderPixelShader::shutdown()
 		if (m_dwShadowPixelShader[i])
 			DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_dwShadowPixelShader[i]);
 		m_dwShadowPixelShader[i]=0;
+		if (m_dwPlainPixelShader[i])
+		{
+			DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_dwPlainPixelShader[i]);
+		}
+		m_dwPlainPixelShader[i]=0;
+		for (Int s=0; s<2; s++)
+		{
+			if (m_dwLitPixelShader[s][i])
+			{
+				DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_dwLitPixelShader[s][i]);
+			}
+			m_dwLitPixelShader[s][i]=0;
+		}
 	}
+	RoadPixelLightsLoaded = FALSE;
 
 	return TRUE;
 }
@@ -3629,15 +3906,69 @@ void RoadShaderPixelShader::initShadowReceiver()
 #endif
 }
 
-Bool RoadShaderPixelShader::setShadowReceiver()
+void RoadShaderPixelShader::initPixelLights()
+{
+	for (Int i=0; i<3; i++)
+	{
+		m_dwPlainPixelShader[i]=0;
+		m_dwLitPixelShader[0][i]=0;
+		m_dwLitPixelShader[1][i]=0;
+	}
+	m_lightStage = -1;
+	RoadPixelLightsLoaded = FALSE;
+
+#if defined(BUILD_WITH_D3D9)
+	const DX8Caps *caps = DX8Wrapper::Get_Current_Caps();
+	if (caps == nullptr || !Supports_Pixel_Shader_2_a(caps) || Get_Pixel_Light_Mode() < PIXEL_LIGHTS_TERRAIN)
+	{
+		return;
+	}
+
+	// Shadowed variants only go with the shadow receivers they replace.
+	const Bool shadowMap = (m_dwShadowPixelShader[0] != 0 && TheW3DShadowMap != nullptr);
+	const Bool packed = shadowMap && TheW3DShadowMap->getDepthMode() == W3DShadowMap::DEPTH_MODE_PACKED;
+	static const char *const noiseNames[3] = { "", "noise", "noise2" };
+
+	// Roads have no vertex lighting to hand lights over from, so a missing variant only leaves its draws unlit.
+	Bool complete = TRUE;
+	for (Int i=0; i<3; i++)
+	{
+		char file[64];
+		snprintf(file, sizeof(file), "shaders\\road%snoshadow.pso", noiseNames[i]);
+		if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(file, nullptr, 0, false, &m_dwPlainPixelShader[i])))
+		{
+			m_dwPlainPixelShader[i]=0;
+			complete = FALSE;
+		}
+		for (Int s=0; s<(shadowMap ? 2 : 1); s++)
+		{
+			snprintf(file, sizeof(file), "shaders\\roadlit%s%s.pso", noiseNames[i], s == 0 ? "noshadow" : (packed ? "packed" : ""));
+			if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(file, nullptr, 0, false, &m_dwLitPixelShader[s][i])))
+			{
+				m_dwLitPixelShader[s][i]=0;
+				complete = FALSE;
+			}
+		}
+	}
+	RoadPixelLightsLoaded = complete;
+#endif
+}
+
+// Sets up the shaders that receive the shadow map, add the point lights, or both. Each road draw
+// then picks its lights, and so the lit variant or the unlit one bound here.
+Bool RoadShaderPixelShader::setPixelPath()
 {
 	const W3DShaderManager::ShaderTypes shader = W3DShaderManager::getCurrentShader();
 	const Bool cloudMap = (shader == W3DShaderManager::ST_ROAD_BASE_NOISE1 || shader == W3DShaderManager::ST_ROAD_BASE_NOISE12);
 	const Bool lightMap = (shader == W3DShaderManager::ST_ROAD_BASE_NOISE2 || shader == W3DShaderManager::ST_ROAD_BASE_NOISE12);
 	const Int noiseCount = (cloudMap ? 1 : 0) + (lightMap ? 1 : 0);
 
-	if (m_dwShadowPixelShader[noiseCount] == 0 || TheW3DShadowMap == nullptr || !TheW3DShadowMap->hasDepth())
+	Bool shadowed = (m_dwShadowPixelShader[noiseCount] != 0 && TheW3DShadowMap != nullptr && TheW3DShadowMap->hasDepth());
+	const Bool lightable = (RoadPixelLightsLoaded && PixelLightCount > 0);
+	if (!shadowed && !lightable)
+	{
 		return FALSE;
+	}
 
 	DX8Wrapper::Set_Texture(0,W3DShaderManager::getShaderTexture(0));
 	//force WW3D2 system to set it's states so it won't later overwrite our custom settings.
@@ -3645,10 +3976,16 @@ Bool RoadShaderPixelShader::setShadowReceiver()
 
 	// The first stage after the road and noise textures. Fixed-function vertex processing
 	// hands out texcoord sets in stage order, so this is the set the shader reads.
-	const Int stage = 1 + noiseCount;
-	if (!TheW3DShadowMap->bindReceiver(stage))
+	if (shadowed)
+	{
+		const Int stage = 1 + noiseCount;
+		shadowed = TheW3DShadowMap->bindReceiver(stage);
+		m_shadowStage = shadowed ? stage : -1;
+	}
+	if (!shadowed && !lightable)
+	{
 		return FALSE;
-	m_shadowStage = stage;
+	}
 
 	DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_TEXCOORDINDEX, 0 );
 
@@ -3697,7 +4034,17 @@ Bool RoadShaderPixelShader::setShadowReceiver()
 		noiseStage++;
 	}
 
-	DX8Wrapper::Set_Pixel_Shader(m_dwShadowPixelShader[noiseCount]);
+	// A complete set of lit variants includes the shadowed ones whenever a receiver loaded.
+	const DWORD unlit = shadowed ? m_dwShadowPixelShader[noiseCount] : m_dwPlainPixelShader[noiseCount];
+	if (lightable)
+	{
+		m_lightStage = 1 + noiseCount + (shadowed ? 1 : 0);
+		Set_Terrain_World_Position(m_lightStage);
+		Begin_Draw_Pixel_Lights(unlit, m_dwLitPixelShader[shadowed ? 1 : 0][noiseCount]);
+	}
+
+	m_pixelPath = TRUE;
+	DX8Wrapper::Set_Pixel_Shader(unlit);
 	return TRUE;
 }
 
@@ -3727,6 +4074,7 @@ Int RoadShaderPixelShader::init()
 				return FALSE;
 
 			initShadowReceiver();
+			initPixelLights();
 
 			//Only set this shader for use in dual noise mode.  The 2Stage shader will take care of
 			//all the other modes.
@@ -3740,7 +4088,7 @@ Int RoadShaderPixelShader::init()
 
 Int RoadShaderPixelShader::set(Int pass)
 {
-	if (setShadowReceiver())
+	if (setPixelPath())
 		return TRUE;
 
 	DX8Wrapper::Set_Texture(0,W3DShaderManager::getShaderTexture(0));
@@ -3813,6 +4161,9 @@ void RoadShaderPixelShader::reset()
 	if (TheW3DShadowMap != nullptr && m_shadowStage >= 0)
 		TheW3DShadowMap->unbindReceiver(m_shadowStage);
 	m_shadowStage = -1;
+	m_lightStage = -1;
+	m_pixelPath = FALSE;
+	End_Draw_Pixel_Lights();
 
 	DX8Wrapper::Set_Pixel_Shader(0);	//turn off pixel shader
 
@@ -3849,8 +4200,8 @@ Int RoadShader2Stage::init()
 
 Int RoadShader2Stage::set(Int pass)
 {
-	// Receiving the shadow map needs a pixel shader, which covers every mode in one pass.
-	if (pass == 0 && roadShaderPixelShader.setShadowReceiver())
+	// Receiving the shadow map or the point lights needs a pixel shader, which covers every mode in one pass.
+	if (pass == 0 && roadShaderPixelShader.setPixelPath())
 		return TRUE;
 
 	//First stage always contains base texture.
@@ -3996,7 +4347,7 @@ Int RoadShader2Stage::set(Int pass)
 
 void RoadShader2Stage::reset()
 {
-	if (roadShaderPixelShader.m_shadowStage >= 0)
+	if (roadShaderPixelShader.m_pixelPath)
 	{
 		roadShaderPixelShader.reset();
 		return;
@@ -4032,6 +4383,7 @@ W3DShaderInterface **MasterShaderList[]=
 	ShadowDepthShaderList,
 	ShadowMultiplyShaderList,
 	SpecularShaderList,
+	PointLightPassShaderList,
 #endif
 	nullptr
 };
@@ -4210,6 +4562,13 @@ void W3DShaderManager::shutdown()
 			W3DFilters[i]->shutdown();
 		}
 	}
+
+	for (size_t pass = 0; pass < ObjectSpecularPasses.size(); pass++)
+	{
+		REF_PTR_RELEASE(ObjectSpecularPasses[pass]);
+	}
+	ObjectSpecularPasses.clear();
+	ObjectSpecularPassesUsed = 0;
 
 #if defined(BUILD_WITH_D3D9)
 	DX8InstancingClass::Set_Main_Shader(nullptr);
@@ -5135,7 +5494,49 @@ Int FlatTerrainShaderPixelShader::shutdown()
 	m_dwBaseNoise1PixelShader=0;
 	m_dwBaseNoise2PixelShader=0;
 
+	for (Int i=0; i<4; i++)
+	{
+		if (m_dwLitPixelShader[i])
+		{
+			DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_dwLitPixelShader[i]);
+		}
+		m_dwLitPixelShader[i]=0;
+	}
+	FlatPixelLightsLoaded = FALSE;
+
 	return TRUE;
+}
+
+void FlatTerrainShaderPixelShader::initPixelLights()
+{
+	for (Int i=0; i<4; i++)
+	{
+		m_dwLitPixelShader[i]=0;
+	}
+	m_lightStage = -1;
+	FlatPixelLightsLoaded = FALSE;
+
+#if defined(BUILD_WITH_D3D9)
+	const DX8Caps *caps = DX8Wrapper::Get_Current_Caps();
+	if (caps == nullptr || !Supports_Pixel_Shader_2_a(caps) || Get_Pixel_Light_Mode() < PIXEL_LIGHTS_TERRAIN)
+	{
+		return;
+	}
+
+	// Flat terrain has no vertex lighting to hand lights over from, so a missing variant only leaves its draws unlit.
+	Bool complete = TRUE;
+	for (Int i=0; i<4; i++)
+	{
+		char file[64];
+		snprintf(file, sizeof(file), "shaders\\flatterrainlit%d.pso", i + 1);
+		if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(file, nullptr, 0, false, &m_dwLitPixelShader[i])))
+		{
+			m_dwLitPixelShader[i]=0;
+			complete = FALSE;
+		}
+	}
+	FlatPixelLightsLoaded = complete;
+#endif
 }
 
 Int FlatTerrainShaderPixelShader::init()
@@ -5182,6 +5583,8 @@ Int FlatTerrainShaderPixelShader::init()
 			hr = W3DShaderManager::LoadAndCreateD3DShader("shaders\\fterrainnoise2.pso", &Declaration[0], 0, false, &m_dwBaseNoise2PixelShader);
 			if (FAILED(hr))
 				return FALSE;
+
+			initPixelLights();
 
 			W3DShaders[W3DShaderManager::ST_FLAT_TERRAIN_BASE]=&flatTerrainShaderPixelShader;
 			W3DShaders[W3DShaderManager::ST_FLAT_TERRAIN_BASE_NOISE1]=&flatTerrainShaderPixelShader;
@@ -5344,6 +5747,17 @@ Int FlatTerrainShaderPixelShader::set(Int pass)
 	}else if (curStage==4) {
 		DX8Wrapper::Set_Pixel_Shader(m_dwBaseNoise2PixelShader);
 	}
+
+	// Each tile then picks its lights. The world position goes on the first stage past the textures,
+	// which is 2 when only the terrain on stage 1 is read.
+	if (FlatPixelLightsLoaded && PixelLightCount > 0)
+	{
+		const Int textureCount = (curStage < 2) ? 1 : curStage;
+		const DWORD unlitShaders[4] = { m_dwBase0PixelShader, m_dwBasePixelShader, m_dwBaseNoise1PixelShader, m_dwBaseNoise2PixelShader };
+		m_lightStage = max(curStage, 2);
+		Set_Terrain_World_Position(m_lightStage);
+		Begin_Draw_Pixel_Lights(unlitShaders[textureCount - 1], m_dwLitPixelShader[textureCount - 1]);
+	}
 	DX8Wrapper::_Get_D3D_Device8()->SetRenderState(D3DRS_ALPHABLENDENABLE, false);
 	DX8Wrapper::Apply_Render_State_Changes();
 	DX8Wrapper::_Get_D3D_Device8()->SetTexture(curStage, W3DShaderManager::getShaderTexture(3)->Peek_D3D_Texture());
@@ -5352,6 +5766,14 @@ Int FlatTerrainShaderPixelShader::set(Int pass)
 
 void FlatTerrainShaderPixelShader::reset()
 {
+	if (m_lightStage >= 0)
+	{
+		DX8Wrapper::Set_DX8_Texture_Stage_State(m_lightStage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(m_lightStage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_PASSTHRU|m_lightStage);
+	}
+	m_lightStage = -1;
+	End_Draw_Pixel_Lights();
+
 	DX8Wrapper::_Get_D3D_Device8()->SetTexture(2,nullptr);	//release reference to any texture
 	DX8Wrapper::_Get_D3D_Device8()->SetTexture(3,nullptr);	//release reference to any texture
 

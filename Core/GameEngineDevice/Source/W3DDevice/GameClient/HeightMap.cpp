@@ -136,6 +136,8 @@ void HeightMapRenderObjClass::freeIndexVertexBuffers()
 	m_vertexBufferBackup = nullptr;
 
 	m_numVertexBufferTiles = 0;
+	m_tilePixelLights.clear();
+	m_tilePixelLightCounts.clear();
 }
 
 //=============================================================================
@@ -293,6 +295,145 @@ Int HeightMapRenderObjClass::getYWithOrigin(Int y)
 	if (y < 0) { DEBUG_CRASH(("Y out of range.")); y = 0; }
 	if (y >= yMax) { DEBUG_CRASH(("Y out of range.")); y = yMax; }
 	return y;
+}
+
+//=============================================================================
+// HeightMapRenderObjClass::getTileColumn
+//=============================================================================
+/** The inverse of getXWithOrigin, divided down to the VB tile. */
+//=============================================================================
+Int HeightMapRenderObjClass::getTileColumn(Int x)
+{
+	const Int xMax = m_x-1;
+	x += m_originX;
+	if (x >= xMax)
+	{
+		x -= xMax;
+	}
+	return x / VERTEX_BUFFER_TILE_LENGTH;
+}
+
+//=============================================================================
+// HeightMapRenderObjClass::getTileRow
+//=============================================================================
+/** The inverse of getYWithOrigin, divided down to the VB tile. */
+//=============================================================================
+Int HeightMapRenderObjClass::getTileRow(Int y)
+{
+	const Int yMax = m_y-1;
+	y += m_originY;
+	if (y >= yMax)
+	{
+		y -= yMax;
+	}
+	return y / VERTEX_BUFFER_TILE_LENGTH;
+}
+
+//=============================================================================
+// HeightMapRenderObjClass::assignPixelLights
+//=============================================================================
+/** Each VB tile draws in one call, so it takes up to MAX_PIXEL_LIGHTS lights of
+its own. The lights nearest the middle of the view go first, each only where every
+tile it reaches has room, and leave the vertex lighting. The rest stay in it. */
+//=============================================================================
+void HeightMapRenderObjClass::assignPixelLights(RefRenderObjListIterator &lights)
+{
+	const Int slots = W3DShaderManager::MAX_PIXEL_LIGHTS;
+	m_tilePixelLightCounts.assign(m_numVertexBufferTiles, 0);
+	m_tilePixelLights.resize(m_numVertexBufferTiles * slots);
+
+	W3DDynamicLight *byIndex[W3DShaderManager::MAX_PIXEL_LIGHT_CANDIDATES];
+	const Bool enabled = W3DShaderManager::supportsTerrainPixelLights() && m_numVertexBufferTiles > 0;
+	const Int count = enabled ? W3DShaderManager::getPixelLightCount() : 0;
+	for (Int index = 0; index < count; index++)
+	{
+		byIndex[index] = nullptr;
+	}
+	for (lights.First(); !lights.Is_Done(); lights.Next())
+	{
+		W3DDynamicLight *pLight = (W3DDynamicLight*)lights.Peek_Obj();
+		pLight->m_pixelLit = false;
+		const Int index = pLight->getPixelIndex();
+		if (index >= 0 && index < count && pLight->m_enabled)
+		{
+			byIndex[index] = pLight;
+		}
+	}
+
+	const Int xCoordMin = m_map->getDrawOrgX() - m_map->getBorderSizeInline();
+	const Int yCoordMin = m_map->getDrawOrgY() - m_map->getBorderSizeInline();
+	for (Int index = 0; index < count; index++)
+	{
+		W3DDynamicLight *pLight = byIndex[index];
+		if (pLight == nullptr)
+		{
+			continue;
+		}
+
+		// The cells the light reaches, bounded as the vertex lighting bounds them, within the drawn area.
+		const W3DShaderManager::PixelLight &light = W3DShaderManager::getPixelLight(index);
+		const Int x0 = max((Int)((light.position.X - light.outerRadius)/MAP_XY_FACTOR) - xCoordMin, 0);
+		const Int x1 = min((Int)((light.position.X + light.outerRadius)/MAP_XY_FACTOR + 1.0f) - xCoordMin, m_x-1);
+		const Int y0 = max((Int)((light.position.Y - light.outerRadius)/MAP_XY_FACTOR) - yCoordMin, 0);
+		const Int y1 = min((Int)((light.position.Y + light.outerRadius)/MAP_XY_FACTOR + 1.0f) - yCoordMin, m_y-1);
+		if (x0 >= x1 || y0 >= y1)
+		{
+			continue;
+		}
+
+		// The tiles holding those cells, which wrap around as the terrain slides.
+		std::vector<Bool> columns(m_numVBTilesX, FALSE);
+		std::vector<Bool> rows(m_numVBTilesY, FALSE);
+		for (Int x = x0; x < x1; x++)
+		{
+			columns[getTileColumn(x)] = TRUE;
+		}
+		for (Int y = y0; y < y1; y++)
+		{
+			rows[getTileRow(y)] = TRUE;
+		}
+
+		Bool room = TRUE;
+		for (Int j = 0; j < m_numVBTilesY && room; j++)
+		{
+			for (Int i = 0; i < m_numVBTilesX; i++)
+			{
+				if (rows[j] && columns[i] && m_tilePixelLightCounts[j*m_numVBTilesX+i] >= slots)
+				{
+					room = FALSE;
+					break;
+				}
+			}
+		}
+		if (!room)
+		{
+			continue;
+		}
+
+		for (Int j = 0; j < m_numVBTilesY; j++)
+		{
+			for (Int i = 0; i < m_numVBTilesX; i++)
+			{
+				if (rows[j] && columns[i])
+				{
+					const Int tile = j*m_numVBTilesX+i;
+					m_tilePixelLights[tile*slots + m_tilePixelLightCounts[tile]++] = index;
+				}
+			}
+		}
+		pLight->m_pixelLit = true;
+	}
+}
+
+//=============================================================================
+// HeightMapRenderObjClass::setTilePixelLights
+//=============================================================================
+void HeightMapRenderObjClass::setTilePixelLights(Int tile)
+{
+	if (tile < (Int)m_tilePixelLightCounts.size())
+	{
+		W3DShaderManager::setDrawPixelLights(&m_tilePixelLights[tile * W3DShaderManager::MAX_PIXEL_LIGHTS], m_tilePixelLightCounts[tile]);
+	}
 }
 
 //=============================================================================
@@ -1374,6 +1515,8 @@ void HeightMapRenderObjClass::On_Frame_Update()
 	}
 #endif
 
+	assignPixelLights(pDynamicLightsIterator);
+
 	Int numDynaLights=0;
 	W3DDynamicLight *enabledLights[MAX_ENABLED_DYNAMIC_LIGHTS];
 
@@ -2056,6 +2199,7 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 				}
 #endif
 				if (Is_Hidden() == 0) {
+					setTilePixelLights(j*m_numVBTilesX+i);
 					DX8Wrapper::Draw_Triangles(0, HEIGHTMAP_POLYGON_NUM, 0, HEIGHTMAP_VERTEX_NUM);
 				}
 
@@ -2305,6 +2449,17 @@ void HeightMapRenderObjClass::renderExtraBlendTiles()
 
 	DynamicVBAccessClass vb_access(BUFFER_TYPE_DYNAMIC_DX8,DX8_FVF_XYZNDUV2,maxBlendTiles*4);
 	DynamicIBAccessClass ib_access(BUFFER_TYPE_DYNAMIC_DX8,maxBlendTiles*6);
+
+	// Indices go in by the VB tile underneath, so each tile's share draws with that tile's lights.
+	static std::vector< std::vector<UnsignedShort> > tileIndices;
+	static std::vector<Int> tileFirstIndex;
+	const Int tileCount = max(m_numVertexBufferTiles, 1);
+	tileIndices.resize(tileCount);
+	tileFirstIndex.assign(tileCount + 1, 0);
+	for (Int tile=0; tile<tileCount; tile++)
+	{
+		tileIndices[tile].clear();
+	}
 	{
 
 		DynamicVBAccessClass::WriteLockClass lock(&vb_access);
@@ -2343,6 +2498,8 @@ void HeightMapRenderObjClass::renderExtraBlendTiles()
 			{	//this tile is inside visible region and has 3rd blend layer.
 
 				Int idx = x+y*xExtent;
+				const Int tile = (m_numVertexBufferTiles > 0) ? getTileRow(y-drawStartY)*m_numVBTilesX + getTileColumn(x-drawStartX) : 0;
+				std::vector<UnsignedShort> &indices = tileIndices[tile];
 
 				Real p0=data[idx]*MAP_HEIGHT_SCALE;
 				Real p1=data[idx+1]*MAP_HEIGHT_SCALE;
@@ -2405,26 +2562,36 @@ void HeightMapRenderObjClass::renderExtraBlendTiles()
 
 				if (flipState)
 				{
-					ib[0]=1+vertexCount;
-					ib[1]=3+vertexCount;
-					ib[2]=0+vertexCount;
-					ib[3]=1+vertexCount;
-					ib[4]=2+vertexCount;
-					ib[5]=3+vertexCount;
+					indices.push_back(1+vertexCount);
+					indices.push_back(3+vertexCount);
+					indices.push_back(0+vertexCount);
+					indices.push_back(1+vertexCount);
+					indices.push_back(2+vertexCount);
+					indices.push_back(3+vertexCount);
 				}
 				else
 				{
-					ib[0]=0+vertexCount;
-					ib[1]=2+vertexCount;
-					ib[2]=3+vertexCount;
-					ib[3]=0+vertexCount;
-					ib[4]=1+vertexCount;
-					ib[5]=2+vertexCount;
+					indices.push_back(0+vertexCount);
+					indices.push_back(2+vertexCount);
+					indices.push_back(3+vertexCount);
+					indices.push_back(0+vertexCount);
+					indices.push_back(1+vertexCount);
+					indices.push_back(2+vertexCount);
 				}
-				ib += 6;
 				vertexCount +=4;
 				indexCount +=6;
 			}
+		}
+
+		for (Int tile=0; tile<tileCount; tile++)
+		{
+			const std::vector<UnsignedShort> &indices = tileIndices[tile];
+			if (!indices.empty())
+			{
+				memcpy(ib, &indices[0], indices.size() * sizeof(UnsignedShort));
+			}
+			ib += indices.size();
+			tileFirstIndex[tile+1] = tileFirstIndex[tile] + (Int)indices.size();
 		}
 	}
 
@@ -2484,7 +2651,16 @@ void HeightMapRenderObjClass::renderExtraBlendTiles()
 			{
 				W3DShaderManager::setShader(st, pass);
 				if (Is_Hidden() == 0) {
-					DX8Wrapper::Draw_Triangles(	0,indexCount/3, 0,	vertexCount);	//draw a quad, 2 triangles, 4 verts
+					for (Int tile=0; tile<tileCount; tile++)
+					{
+						const Int tileIndexCount = tileFirstIndex[tile+1] - tileFirstIndex[tile];
+						if (tileIndexCount == 0)
+						{
+							continue;
+						}
+						setTilePixelLights(tile);
+						DX8Wrapper::Draw_Triangles(	tileFirstIndex[tile],tileIndexCount/3, 0,	vertexCount);	//draw a quad, 2 triangles, 4 verts
+					}
 					m_numVisibleExtraBlendTiles += indexCount/6;
 				}
 			}

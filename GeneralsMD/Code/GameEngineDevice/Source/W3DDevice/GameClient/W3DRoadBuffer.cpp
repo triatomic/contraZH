@@ -3350,6 +3350,8 @@ void W3DRoadBuffer::drawRoads(CameraClass * camera, TextureClass *cloudTexture, 
 			{
 				if (!wireframe)
 		 			W3DShaderManager::setShader(st, pass);
+				// A road type draws in one call, so it takes the lights nearest the middle of the view.
+				W3DShaderManager::setDrawPixelLights(nullptr, W3DShaderManager::MAX_PIXEL_LIGHTS);
 				//Draw all this road type.
 				DX8Wrapper::Draw_Triangles(	0, m_roadTypes[i].getNumIndices()/3, 0,	m_roadTypes[i].getNumVertices());
 #ifdef LOG_STATS

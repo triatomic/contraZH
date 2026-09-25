@@ -36,6 +36,7 @@
 #include "Common/GameType.h"
 #include "W3DDevice/GameClient/WorldHeightMap.h"
 #include "W3DDevice/GameClient/BaseHeightMap.h"
+#include <vector>
 
 
 // Adjust the triangles to make cliff sides most attractive.  jba.
@@ -105,12 +106,18 @@ protected:
 	Int m_numVertexBufferTiles;	///<number of vertex buffers needed to store this heightmap
 	Int	m_numBlockColumnsInLastVB;///<a VB tile may be partially filled, this indicates how many 2x2 vertex blocks are filled.
 	Int	m_numBlockRowsInLastVB;///<a VB tile may be partially filled, this indicates how many 2x2 vertex blocks are filled.
+	std::vector<Int> m_tilePixelLights;	///<each VB tile's per-pixel lights, W3DShaderManager::MAX_PIXEL_LIGHTS slots a tile
+	std::vector<Int> m_tilePixelLightCounts;	///<how many of its slots each VB tile fills
 
 	DX8VertexBufferClass *getVertexBufferTile(Int x, Int y);
 	VERTEX_FORMAT *getVertexBufferBackup(Int x, Int y);
 	UnsignedInt doTheDynamicLight(VERTEX_FORMAT *vb, VERTEX_FORMAT *vbMirror, Vector3*light, Vector3*normal, W3DDynamicLight *pLights[], Int numLights);
 	Int getXWithOrigin(Int x);
 	Int getYWithOrigin(Int x);
+	Int getTileColumn(Int x);	///<the VB tile column holding a column of cells, counted from the drawn area's edge
+	Int getTileRow(Int y);	///<the VB tile row holding a row of cells, counted from the drawn area's edge
+	void assignPixelLights(RefRenderObjListIterator &lights);	///<hands the terrain shader the lights each VB tile has room for
+	void setTilePixelLights(Int tile);	///<lights the draws that follow with one VB tile's lights
 	///update vertex diffuse color for dynamic lights inside given rectangle
 	Int updateVBForLight(DX8VertexBufferClass *pVB, VERTEX_FORMAT *data, Int x0, Int y0, Int x1, Int y1, Int originX, Int originY, W3DDynamicLight *pLights[], Int numLights);
 	Int updateVBForLightOptimized(DX8VertexBufferClass	*pVB, VERTEX_FORMAT *data, Int x0, Int y0, Int x1, Int y1, Int originX, Int originY, W3DDynamicLight *pLights[], Int numLights);

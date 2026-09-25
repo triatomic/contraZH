@@ -45,6 +45,7 @@ enum GraphicsVenderID CPP_11(: Int);
 
 class TextureClass;	///forward reference
 class MaterialPassClass;	///forward reference
+class AABoxClass;	///forward reference
 /** System for managing complex rendering settings which are either not handled by
 	WW3D2 or need custom paths depending on the video card.  This system will determine
 	the proper shader given video card limitations and also allow the app to query the
@@ -76,6 +77,7 @@ public:
 		ST_SHADOW_DEPTH,		//shader to write caster depth into the shadow map.
 		ST_SHADOW_MULTIPLY,		//second pass multiplying the shadow map into drawn geometry.
 		ST_SPECULAR,			//second pass adding a per-pixel sun highlight to drawn geometry.
+		ST_POINT_LIGHTS,		//second pass adding dynamic point lights to geometry lit without them.
 		ST_MAX
 	};
 
@@ -114,7 +116,7 @@ public:
 	/// Sets how brightly the specular pass adds _emi glow masks, once a frame. 0 turns them off.
 	static void setEmissive(Real intensity);
 
-	/// A dynamic point light the terrain and specular shaders add per pixel, in world space.
+	/// A dynamic point light the shaders add per pixel, in world space.
 	struct PixelLight
 	{
 		Vector3 position;
@@ -122,12 +124,21 @@ public:
 		Real outerRadius;	///< nothing past this
 		Vector3 diffuse;
 		Real ambientScale;	///< ambient colour as a fraction of the diffuse
-		Bool unitLit;		///< the specular pass draws it too, so meshes with that pass go without it in fixed function
+		Bool terrainOnly;	///< lights the ground and nothing standing on it
 	};
-	/// The terrain shader takes nine lights and the specular pass the first eight marked unitLit, as their registers allow.
-	enum { MAX_PIXEL_LIGHTS = 9, MAX_UNIT_PIXEL_LIGHTS = 8 };
-	/// Sets the lights drawn per pixel, once a frame, most important first.
+	/// Each ground draw takes up to nine lights and each mesh up to eight, as their registers allow.
+	enum { MAX_PIXEL_LIGHTS = 9, MAX_UNIT_PIXEL_LIGHTS = 8, MAX_PIXEL_LIGHT_CANDIDATES = 64 };
+	/// Sets the lights that may be drawn per pixel this frame, most important first. Draws name theirs by index.
 	static void setPixelLights(const PixelLight *lights, Int count);
+	static Int getPixelLightCount();
+	static const PixelLight &getPixelLight(Int index);
+	/// Lights the draws that follow with the given lights, up to nine, under the terrain, road, flat terrain
+	/// or point light shader in use. Null indices take the first count, the ones nearest the middle of the view.
+	static void setDrawPixelLights(const Int *indices, Int count);
+	/// The first lights, nearest the middle of the view, that reach the box, as many as one ground draw takes.
+	static Int pickPixelLights(const AABoxClass &box, Int *lights);
+	/// Whether any surface draws point lights per pixel, so the scene has to pick them.
+	static Bool supportsPixelLights();
 	/// Whether the terrain draws point lights per pixel, so lights handed over must leave its vertex lighting.
 	static Bool supportsTerrainPixelLights();
 	/// Whether the specular pass draws point lights per pixel, so its meshes must go without fixed-function ones.
@@ -142,6 +153,11 @@ public:
 	static void takeSpecularCounts(Int &meshes, Int &derived, Int &normalMapped, Int &emissive);
 	/// The pass objects push for a per-pixel sun highlight, bumps and glow, or null when all are off or unsupported.
 	static MaterialPassClass *getSpecularPass();
+	/// The same pass for one object this frame, also adding the given lights. lightsOnly leaves out the
+	/// highlight, bumps and glow, and gives null without lights.
+	static MaterialPassClass *getSpecularPass(const Int *lights, Int lightCount, Bool lightsOnly);
+	/// The pass every specular pass above shares its vertex processing with, or null when it is unsupported.
+	static const MaterialPassClass *getSpecularPassKey();
 	/// Whether the device runs ps_2_a shaders, which have gradients and 512 instruction slots.
 	static Bool supportsPixelShader2a();
 	/// The <name>_nrm.dds beside a texture, or null when there is none. Not reference counted.

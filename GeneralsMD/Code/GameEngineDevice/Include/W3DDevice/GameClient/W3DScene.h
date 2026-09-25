@@ -104,7 +104,8 @@ public:
 protected:
 	void renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, Int localPlayerIndex);
 	void updateFixedLightEnvironments(RenderInfoClass & rinfo);
-	void updatePixelLights(CameraClass &camera);	///< picks the dynamic lights the shaders draw per pixel this frame
+	void updatePixelLights(CameraClass &camera);	///< picks the dynamic lights the shaders may draw per pixel this frame
+	Int pickObjectPixelLights(const SphereClass &sphere, Int *lights);	///< the ones the specular pass draws on one object
 	void flushTranslucentObjects(RenderInfoClass & rinfo);
 	void flushOccludedObjects(RenderInfoClass & rinfo);
 	void flagOccludedObjects(CameraClass * camera);

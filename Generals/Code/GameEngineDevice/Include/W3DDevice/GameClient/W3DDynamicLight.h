@@ -49,9 +49,9 @@ protected:
 
 	Bool		m_enabled;
 	Bool		m_terrainOnly;
-	Bool		m_pixelLit;			///< the shaders draw it this frame, so the terrain's vertex lighting leaves it out
+	Bool		m_pixelLit;			///< the terrain shader draws it this frame, so the terrain's vertex lighting leaves it out
 	Bool		m_bakedLastFrame;	///< the terrain's vertex lighting holds it, so it must be taken out when it leaves
-	Bool		m_unitPixelLit;		///< the specular pass draws it this frame too
+	Int			m_pixelIndex;		///< where it sits among this frame's per-pixel lights, or -1
 	const void *m_owner;
 
 	Bool		m_decayRange;
@@ -80,9 +80,9 @@ public:
 	Bool isTerrainOnly() const { return m_terrainOnly; }
 
 	/// set once a frame for every light, before the terrain updates its vertex lighting
-	void setPixelLit(Bool pixelLit, Bool unitPixelLit) { m_pixelLit = pixelLit; m_unitPixelLit = unitPixelLit; }
+	void setPixelIndex(Int index) { m_pixelIndex = index; }
+	Int getPixelIndex() const { return m_pixelIndex; }
 	Bool isPixelLit() const { return m_pixelLit; }
-	Bool isUnitPixelLit() const { return m_unitPixelLit; }
 
 	/// whoever holds the light across frames, cleared when the pool hands it out again
 	void setOwner(const void *owner) { m_owner = owner; }

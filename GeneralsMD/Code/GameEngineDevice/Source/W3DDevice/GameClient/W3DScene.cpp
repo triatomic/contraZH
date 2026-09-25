@@ -744,7 +744,8 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 	ObjectShroudStatus ss=OBJECTSHROUD_INVALID;
 	Int extraMaterialPops=0;
 	Bool doExtraFlagsPop=FALSE;
-	Bool pixelLit=FALSE;
+	Int pixelLights[W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS];
+	Int pixelLightCount=0;
 	LightClass **sceneLights=m_globalLight;
 
 	if (robj->Class_ID() == RenderObjClass::CLASSID_IMAGE3D	)
@@ -932,15 +933,25 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 			extraMaterialPops++;
 		}
 
-		// Vehicles and structures catch a per-pixel sun highlight and bumps. Infantry stay matte.
-		MaterialPassClass *specularPass = W3DShaderManager::getSpecularPass();
-		if (specularPass != nullptr && m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop && !m_planarMirrorPass &&
-			draw->getEffectiveOpacity() == 1.0f &&
-			(draw->isKindOf(KINDOF_VEHICLE) || draw->isKindOf(KINDOF_STRUCTURE)))
+		// Vehicles and structures catch a per-pixel sun highlight and bumps. Infantry and the rest stay
+		// matte, and take the pass only for the dynamic lights it draws.
+		if (m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop && !m_planarMirrorPass && draw->getEffectiveOpacity() == 1.0f)
 		{
-			rinfo.Push_Material_Pass(specularPass);
-			extraMaterialPops++;
-			pixelLit = W3DShaderManager::supportsUnitPixelLights();
+			if (draw->getReceivesDynamicLights() && W3DShaderManager::supportsUnitPixelLights())
+			{
+				pixelLightCount = pickObjectPixelLights(sph, pixelLights);
+			}
+			const Bool lightsOnly = !draw->isKindOf(KINDOF_VEHICLE) && !draw->isKindOf(KINDOF_STRUCTURE);
+			MaterialPassClass *specularPass = W3DShaderManager::getSpecularPass(pixelLights, pixelLightCount, lightsOnly);
+			if (specularPass != nullptr)
+			{
+				rinfo.Push_Material_Pass(specularPass);
+				extraMaterialPops++;
+			}
+			else
+			{
+				pixelLightCount = 0;
+			}
 		}
 	}
 	else
@@ -992,7 +1003,7 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 				  continue;
 			  }
 			  // the specular pass adds this one per pixel
-			  if (pixelLit && pDyna->isUnitPixelLit()) {
+			  if (std::find(pixelLights, pixelLights + pixelLightCount, pDyna->getPixelIndex()) != pixelLights + pixelLightCount) {
 				  continue;
 			  }
 			  SphereClass lSph = pDyna->Get_Bounding_Sphere();
@@ -1468,7 +1479,7 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 	// The shadow receiver and the specular highlight are the passes the instanced main scene redraws itself.
 	DX8MeshRendererClass::Begin_Instancing_Frame();
 	DX8InstancingClass::Set_Instanced_Material_Passes(
-		(TheW3DShadowMap != nullptr) ? TheW3DShadowMap->getReceivePass() : nullptr, W3DShaderManager::getSpecularPass());
+		(TheW3DShadowMap != nullptr) ? TheW3DShadowMap->getReceivePass() : nullptr, W3DShaderManager::getSpecularPassKey());
 
 	// Shows how many draws hardware instancing could merge and how many skins the GPU deformed.
 	// Water reflections render the scene again, so the counts add up every render of the interval.
@@ -1489,7 +1500,7 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 		DX8SkinningClass::Take_Stats(frameSkinning);
 
 		const MaterialPassClass *receivePass = (TheW3DShadowMap != nullptr) ? TheW3DShadowMap->getReceivePass() : nullptr;
-		const MaterialPassClass *specularPass = W3DShaderManager::getSpecularPass();
+		const MaterialPassClass *specularPass = W3DShaderManager::getSpecularPassKey();
 		otherPassDraws += stats.OtherPassDraws;
 		for (Int i = 0; i < DX8InstancingStatsStruct::MAX_PASSES; ++i)
 		{
@@ -2126,7 +2137,8 @@ void RTS3DScene::addDynamicLight(W3DDynamicLight * obj)
 	UpdateList.Add(obj);
 }
 
-// The lights nearest the middle of the view are drawn per pixel; the rest stay in the vertex lighting.
+// The lights nearest the middle of the view may be drawn per pixel. Each draw then takes its own
+// share of them, and the terrain's vertex lighting keeps what its tiles have no room for.
 namespace
 {
 	struct PixelLightCandidate
@@ -2151,7 +2163,7 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 	static std::vector<PixelLightCandidate> candidates;
 	candidates.clear();
 
-	const Bool enabled = W3DShaderManager::supportsTerrainPixelLights() && TheGlobalData->m_usePixelLights;
+	const Bool enabled = W3DShaderManager::supportsPixelLights() && TheGlobalData->m_usePixelLights;
 	Vector3 cameraRight;
 	camera.Get_Transform().Get_X_Vector(&cameraRight);
 
@@ -2159,6 +2171,7 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 	for (it.First(); !it.Is_Done(); it.Next())
 	{
 		W3DDynamicLight *light = (W3DDynamicLight *)it.Peek_Obj();
+		light->setPixelIndex(-1);
 		if (!enabled || !light->isEnabled() || light->Get_Type() != LightClass::POINT)
 		{
 			continue;
@@ -2202,13 +2215,13 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 	}
 
 	std::sort(candidates.begin(), candidates.end(), Pixel_Light_Before);
-	const Int count = min((Int)candidates.size(), (Int)W3DShaderManager::MAX_PIXEL_LIGHTS);
+	const Int count = min((Int)candidates.size(), (Int)W3DShaderManager::MAX_PIXEL_LIGHT_CANDIDATES);
 
-	W3DShaderManager::PixelLight lights[W3DShaderManager::MAX_PIXEL_LIGHTS];
-	Int unitCount = 0;
+	W3DShaderManager::PixelLight lights[W3DShaderManager::MAX_PIXEL_LIGHT_CANDIDATES];
 	for (Int i = 0; i < count; i++)
 	{
 		W3DDynamicLight *light = candidates[i].light;
+		light->setPixelIndex(i);
 
 		double innerRadius, outerRadius;
 		light->Get_Far_Attenuation_Range(innerRadius, outerRadius);
@@ -2232,26 +2245,7 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 		lights[i].position = light->Get_Position();
 		lights[i].innerRadius = (Real)innerRadius;
 		lights[i].outerRadius = (Real)outerRadius;
-		lights[i].unitLit = !light->isTerrainOnly() && unitCount < W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS;
-		unitCount += lights[i].unitLit ? 1 : 0;
-	}
-
-	// Every light is marked, so none keeps last frame's choice.
-	for (it.First(); !it.Is_Done(); it.Next())
-	{
-		W3DDynamicLight *light = (W3DDynamicLight *)it.Peek_Obj();
-		Bool pixelLit = FALSE;
-		Bool unitPixelLit = FALSE;
-		for (Int i = 0; i < count; i++)
-		{
-			if (candidates[i].light == light)
-			{
-				pixelLit = TRUE;
-				unitPixelLit = lights[i].unitLit;
-				break;
-			}
-		}
-		light->setPixelLit(pixelLit, unitPixelLit);
+		lights[i].terrainOnly = light->isTerrainOnly();
 	}
 	W3DShaderManager::setPixelLights(lights, count);
 
@@ -2266,12 +2260,58 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 		if (framesLit > 0)
 		{
 			DEBUG_LOG(("PixelLights: frame %d, terrain %s, units %s, %d of 300 frames lit, at most %d lights at once",
-				pixelLightFrames, enabled ? "per pixel" : "per vertex",
+				pixelLightFrames, W3DShaderManager::supportsTerrainPixelLights() ? "per pixel" : "per vertex",
 				W3DShaderManager::supportsUnitPixelLights() ? "per pixel" : "fixed function", framesLit, peakCount));
 		}
 		framesLit = 0;
 		peakCount = 0;
 	}
+}
+
+// Picks this frame's per-pixel lights that reach the sphere, strongest there first, as many as the specular pass takes.
+Int RTS3DScene::pickObjectPixelLights(const SphereClass &sphere, Int *lights)
+{
+	Real scores[W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS];
+	Int count = 0;
+
+	RefRenderObjListIterator it(&m_dynamicLightList);
+	for (it.First(); !it.Is_Done(); it.Next())
+	{
+		W3DDynamicLight *light = (W3DDynamicLight *)it.Peek_Obj();
+		const Int index = light->getPixelIndex();
+		if (index < 0 || !light->isEnabled() || light->isTerrainOnly() || !Spheres_Intersect(sphere, light->Get_Bounding_Sphere()))
+		{
+			continue;
+		}
+
+		// Brightness at the sphere's nearest point, with the shader's falloff.
+		const W3DShaderManager::PixelLight &pixelLight = W3DShaderManager::getPixelLight(index);
+		const Real distance = max((pixelLight.position - sphere.Center).Length() - sphere.Radius, 0.0f);
+		const Real falloff = WWMath::Clamp((pixelLight.outerRadius - distance) / (pixelLight.outerRadius - pixelLight.innerRadius), 0.0f, 1.0f);
+		const Real brightness = max(pixelLight.diffuse.X, max(pixelLight.diffuse.Y, pixelLight.diffuse.Z)) * (1.0f + pixelLight.ambientScale);
+		const Real score = falloff * brightness;
+
+		// Kept sorted, so a full list drops its weakest.
+		Int slot = count;
+		while (slot > 0 && scores[slot - 1] < score)
+		{
+			slot--;
+		}
+		if (slot >= W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS)
+		{
+			continue;
+		}
+		const Int last = min(count, (Int)W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS - 1);
+		for (Int i = last; i > slot; i--)
+		{
+			scores[i] = scores[i - 1];
+			lights[i] = lights[i - 1];
+		}
+		scores[slot] = score;
+		lights[slot] = index;
+		count = min(count + 1, (Int)W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS);
+	}
+	return count;
 }
 
 //=============================================================================

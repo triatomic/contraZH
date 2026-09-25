@@ -135,6 +135,7 @@ public:
 	Bool cullBridge(CameraClass * camera);						 ///< Culls the bridges.  Returns true if visibility changed.
 	void clearBridge();		///< Frees all objects associated with a bridge.
 	Bool isVisible() {return m_visible;};
+	const SphereClass &getBounds() const {return m_bounds;}
 	Bool isEnabled() {return m_enabled;};
 	void setEnabled(Bool enable) {m_enabled = enable;};
 	void renderBridge(Bool wireframe);
