@@ -35,7 +35,8 @@ public:
 		EFFECT_FLAME = 2,	// flicker and heat colouring
 		EFFECT_HAZE = 4,	// wobble the scene copy behind the sprite
 		EFFECT_ELECTRIC = 8,	// arcs, jitter and strobe
-		EFFECT_LASER = 16	// hot core and travelling pulses, from the beam coordinates in the second uv set
+		EFFECT_LASER = 16,	// hot core and travelling pulses, from the beam coordinates in the second uv set
+		EFFECT_BEAM = 32	// a laser draw's beam, which fades only while shaded
 	};
 
 	virtual ~SoftParticleHookClass() {}

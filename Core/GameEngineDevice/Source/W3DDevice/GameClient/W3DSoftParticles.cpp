@@ -29,6 +29,7 @@
 #include "W3DDevice/GameClient/W3DWater.h"
 #include "Common/GlobalData.h"
 #include "GameClient/ParticleSys.h"
+#include "W3DDevice/GameClient/Module/W3DLaserDraw.h"
 #include "WW3D2/dx8wrapper.h"
 #include "WW3D2/dx8caps.h"
 #include "WW3D2/formconv.h"
@@ -455,10 +456,10 @@ static Real Noise_Scale(Real size)
 }
 
 // Pulses run LaserPulseSpeed world units a second along the beam: x = travel so far, y = world to noise scale, z = swing.
-static Vector4 Laser_Pulse()
+static Vector4 Laser_Pulse(const BeamShaderTuning &tuning)
 {
-	const Real scale = Noise_Scale(TheGlobalData->m_laserPulseSize);
-	return Vector4(Noise_Rise(TheGlobalData->m_laserPulseSpeed * scale), scale, TheGlobalData->m_laserPulse, 0.0f);
+	const Real scale = Noise_Scale(tuning.laserPulseSize);
+	return Vector4(Noise_Rise(tuning.laserPulseSpeed * scale), scale, tuning.laserPulse, 0.0f);
 }
 
 // The default camera's distance to the ground it looks at, past which the flame and electric shaders ease their detail.
@@ -479,27 +480,32 @@ void W3DSoftParticles::bindFlame(const FlameShaderTuning &tuning)
 }
 
 // The field jumps to a fresh spot ElectricRate times a second, so arcs crackle rather than drift.
-void W3DSoftParticles::bindElectric()
+void W3DSoftParticles::bindElectric(const BeamShaderTuning &tuning, Bool beam)
 {
-	const Real rate = TheGlobalData->m_electricRate;
+	const Real rate = tuning.electricRate;
 	const Int jump = (rate > 0.0f) ? (Int)fmod(WW3D::Get_Sync_Time() / 1000.0 * rate, 65536.0) : 0;
 	const Real offsetX = (Hash_Lattice(jump, 0, 7) & 0xffff) / 65536.0f;
 	const Real offsetY = (Hash_Lattice(jump, 1, 7) & 0xffff) / 65536.0f;
 
-	const Vector4 electric(offsetX, offsetY, Noise_Scale(TheGlobalData->m_electricNoiseSize), TheGlobalData->m_electricJitter);
-	const Vector4 shape(TheGlobalData->m_electricFlicker, TheGlobalData->m_electricArcSharpness, TheGlobalData->m_electricArcs, Default_Camera_Distance());
+	const Vector4 electric(offsetX, offsetY, Noise_Scale(tuning.electricNoiseSize), tuning.electricJitter);
+	const Vector4 shape(tuning.electricFlicker, tuning.electricArcSharpness, tuning.electricArcs * 0.5f, Default_Camera_Distance());
+	// A beam's texture tiles along its length in v, so the jitter only stays inside the texture across it.
+	const Vector4 clamp(0.0f, beam ? -1.0e6f : 0.0f, 1.0f, beam ? 1.0e6f : 1.0f);
+	const Vector4 strobe(1.0f - 0.5f * tuning.electricFlicker, 0.0f, 0.0f, 0.0f);
 	DX8Wrapper::Set_Pixel_Shader_Constant(6, &electric, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(7, &shape, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(8, &clamp, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(9, &strobe, 1);
 	Bind_Noise(m_noise);
 }
 
-void W3DSoftParticles::bindLaser()
+void W3DSoftParticles::bindLaser(const BeamShaderTuning &tuning)
 {
-	const Vector4 pulse = Laser_Pulse();
-	const Real coreWidth = max(TheGlobalData->m_laserCoreWidth, 0.01f);
-	const Real waver = min(max(TheGlobalData->m_laserShimmer, 0.0f), 1.0f);
+	const Vector4 pulse = Laser_Pulse(tuning);
+	const Real coreWidth = max(tuning.laserCoreWidth, 0.01f);
+	const Real waver = min(max(tuning.laserShimmer, 0.0f), 1.0f);
 
-	const Vector4 laser(pulse.X, pulse.Y, -3.0f / (coreWidth * coreWidth), TheGlobalData->m_laserCore);
+	const Vector4 laser(pulse.X, pulse.Y, -3.0f / (coreWidth * coreWidth), tuning.laserCore);
 	const Vector4 shape(waver, pulse.Z, 0.0f, 0.0f);
 	DX8Wrapper::Set_Pixel_Shader_Constant(6, &laser, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(7, &shape, 1);
@@ -510,9 +516,15 @@ void W3DSoftParticles::bindLaser()
 	DX8Wrapper::Set_DX8_Texture_Stage_State(NOISE_STAGE, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
 }
 
-IDirect3DTexture8 *W3DSoftParticles::getLaserPulse(Vector4 &pulse)
+IDirect3DTexture8 *W3DSoftParticles::getLaserPulse(const BeamShaderTuning *pulses, Vector4 &pulse)
 {
-	pulse = laserEnabled() ? Laser_Pulse() : Vector4(0.0f, 0.0f, 0.0f, 0.0f);
+	pulse = Vector4(0.0f, 0.0f, 0.0f, 0.0f);
+	if (pulses != nullptr && laserEnabled())
+	{
+		BeamShaderTuning tuning;
+		W3DLaserDrawModuleData::resolveShaderTuning(pulses, tuning);
+		pulse = Laser_Pulse(tuning);
+	}
 	loadShaders();
 	return m_noise;
 }
@@ -593,10 +605,10 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const 
 	const Bool flame = (effects & EFFECT_FLAME) != 0 && flameEnabled();
 	const Bool electric = !flame && (effects & EFFECT_ELECTRIC) != 0 && electricEnabled();
 	const Bool laser = !flame && !electric && (effects & EFFECT_LASER) != 0 && laserEnabled();
-	// A beam fades only as part of the laser look, so with lasers off it draws as it always has.
+	// A beam or streak fades only as part of its shaded look, so with its shader off it draws as it always has.
 	const Bool soft = (effects & EFFECT_SOFT) != 0 && SoftParticleMode != SOFT_PARTICLES_OFF &&
 		TheGlobalData->m_useSoftParticles && TheGlobalData->m_softParticleDistance > 0.0f &&
-		(laser || (effects & EFFECT_LASER) == 0);
+		(laser || electric || (effects & (EFFECT_LASER | EFFECT_BEAM)) == 0);
 	if ((!soft && !flame && !electric && !laser) || !loadShaders())
 	{
 		return false;
@@ -655,20 +667,26 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const 
 		bindFlame(tuning);
 		m_bound = EFFECT_FLAME;
 	}
-	else if (electric)
+	else if (electric || laser)
 	{
-		bindElectric();
-		m_bound = EFFECT_ELECTRIC;
-	}
-	else if (laser)
-	{
-		bindLaser();
-		m_bound = EFFECT_LASER;
-
-		// LaserDebug subtracts the beam from the scene, so its core, pulses and edges show dark on anything.
-		if (TheGlobalData->m_laserDebug)
+		const Bool beam = (effects & EFFECT_BEAM) != 0;
+		BeamShaderTuning beamTuning;
+		W3DLaserDrawModuleData::resolveShaderTuning(beam ? static_cast<const BeamShaderTuning *>(effectData) : nullptr, beamTuning);
+		if (electric)
 		{
-			DX8Wrapper::Set_DX8_Render_State(D3DRS_BLENDOP, D3DBLENDOP_REVSUBTRACT);
+			bindElectric(beamTuning, beam);
+			m_bound = EFFECT_ELECTRIC;
+		}
+		else
+		{
+			bindLaser(beamTuning);
+			m_bound = EFFECT_LASER;
+
+			// LaserDebug subtracts the beam from the scene, so its core, pulses and edges show dark on anything.
+			if (TheGlobalData->m_laserDebug)
+			{
+				DX8Wrapper::Set_DX8_Render_State(D3DRS_BLENDOP, D3DBLENDOP_REVSUBTRACT);
+			}
 		}
 	}
 	Bind_Camera_Position();

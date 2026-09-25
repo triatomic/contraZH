@@ -144,6 +144,13 @@ W3DLaserDrawModuleData::W3DLaserDrawModuleData()
 	m_groundGlowRadius = 0.0f;
 	m_groundGlowIntensity = 0.0f;
 	m_laserShader = TRUE;
+	m_electricShader = FALSE;
+
+	Real *setting = &m_shaderTuning.laserCore;
+	for (UnsignedInt i = 0; i < sizeof( m_shaderTuning ) / sizeof( Real ); ++i)
+	{
+		setting[i] = -1.0f;
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -182,9 +189,55 @@ void W3DLaserDrawModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "GroundGlowRadius",					INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_groundGlowRadius) },
 		{ "GroundGlowIntensity",			INI::parsePercentToReal,				nullptr, offsetof(W3DLaserDrawModuleData, m_groundGlowIntensity) },
 		{ "LaserShader",							INI::parseBool,									nullptr, offsetof(W3DLaserDrawModuleData, m_laserShader) },
+		{ "ElectricShader",						INI::parseBool,									nullptr, offsetof(W3DLaserDrawModuleData, m_electricShader) },
+		{ "LaserCore",								INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.laserCore) },
+		{ "LaserCoreWidth",						INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.laserCoreWidth) },
+		{ "LaserShimmer",							INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.laserShimmer) },
+		{ "LaserPulse",								INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.laserPulse) },
+		{ "LaserPulseSize",						INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.laserPulseSize) },
+		{ "LaserPulseSpeed",					INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.laserPulseSpeed) },
+		{ "ElectricArcs",							INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.electricArcs) },
+		{ "ElectricArcSharpness",			INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.electricArcSharpness) },
+		{ "ElectricNoiseSize",				INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.electricNoiseSize) },
+		{ "ElectricJitter",						INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.electricJitter) },
+		{ "ElectricFlicker",					INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.electricFlicker) },
+		{ "ElectricRate",							INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.electricRate) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
+}
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+void W3DLaserDrawModuleData::resolveShaderTuning( const BeamShaderTuning *own, BeamShaderTuning &tuning )
+{
+	tuning.laserCore = TheGlobalData->m_laserCore;
+	tuning.laserCoreWidth = TheGlobalData->m_laserCoreWidth;
+	tuning.laserShimmer = TheGlobalData->m_laserShimmer;
+	tuning.laserPulse = TheGlobalData->m_laserPulse;
+	tuning.laserPulseSize = TheGlobalData->m_laserPulseSize;
+	tuning.laserPulseSpeed = TheGlobalData->m_laserPulseSpeed;
+	tuning.electricArcs = TheGlobalData->m_electricArcs;
+	tuning.electricArcSharpness = TheGlobalData->m_electricArcSharpness;
+	tuning.electricNoiseSize = TheGlobalData->m_electricNoiseSize;
+	tuning.electricJitter = TheGlobalData->m_electricJitter;
+	tuning.electricFlicker = TheGlobalData->m_electricFlicker;
+	tuning.electricRate = TheGlobalData->m_electricRate;
+
+	if (own == nullptr)
+	{
+		return;
+	}
+
+	const Real *setting = &own->laserCore;
+	Real *resolved = &tuning.laserCore;
+	for (UnsignedInt i = 0; i < sizeof( tuning ) / sizeof( Real ); ++i)
+	{
+		if (setting[i] >= 0.0f)
+		{
+			resolved[i] = setting[i];
+		}
+	}
 }
 
 
@@ -308,9 +361,13 @@ W3DLaserDraw::W3DLaserDraw( Thing *thing, const ModuleData* moduleData ) :
 				line->Set_Width( width );
 				line->Set_Color( Vector3( red, green, blue ) );
 				line->Set_UV_Offset_Rate( Vector2(0.0f, data->m_scrollRate) );	//amount to scroll texture on each draw
-				if( data->m_laserShader )
+				if( data->m_electricShader )
 				{
-					line->Set_Effects( SoftParticleHookClass::EFFECT_SOFT | SoftParticleHookClass::EFFECT_LASER );
+					line->Set_Effects( SoftParticleHookClass::EFFECT_SOFT | SoftParticleHookClass::EFFECT_ELECTRIC | SoftParticleHookClass::EFFECT_BEAM, &data->m_shaderTuning );
+				}
+				else if( data->m_laserShader )
+				{
+					line->Set_Effects( SoftParticleHookClass::EFFECT_SOFT | SoftParticleHookClass::EFFECT_LASER | SoftParticleHookClass::EFFECT_BEAM, &data->m_shaderTuning );
 				}
 				if( m_texture )
 				{
@@ -525,8 +582,10 @@ void W3DLaserDraw::updateGroundLights( LaserUpdate *update, Bool beamChanged )
 
 		const Coord3D *start = update->getStartPos();
 		const Coord3D *end = update->getEndPos();
+		// the glow pulses along with a laser-shaded beam and holds steady under any other
+		const BeamShaderTuning *pulses = (data->m_laserShader && !data->m_electricShader) ? &data->m_shaderTuning : nullptr;
 		TheW3DLaserGlow->add( Vector3( start->x, start->y, start->z ), Vector3( end->x, end->y, end->z ), reach,
-			Vector3( glowRed, glowGreen, glowBlue ) * intensity );
+			Vector3( glowRed, glowGreen, glowBlue ) * intensity, pulses );
 		return;
 	}
 

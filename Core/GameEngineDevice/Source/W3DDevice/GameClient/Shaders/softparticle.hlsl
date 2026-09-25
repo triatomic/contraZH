@@ -13,7 +13,7 @@
 // texels run to white at their own brightness and dim ones deepen toward their hue, so blue and
 // green flames keep their colour.
 //
-// ELECTRIC shades the sprite as electricity, after RA3's tesla shader. A noise field in the view
+// ELECTRIC shades a sprite or beam as electricity, after RA3's tesla shader. A noise field in the view
 // plane jumps to a new place many times a second. It jitters the texture lookup, draws thin arcs
 // along its middle contour and strobes the brightness. Arcs take the sprite's hue halfway to white.
 //
@@ -61,7 +61,9 @@ float4 FlameWorldZ : register(c9);
 float4 FlameShape  : register(c10);  // x = flicker swing, y = fringe breakup, z = the default camera's distance to the ground it looks at
 #elif ELECTRIC
 float4 Electric       : register(c6);   // xy = this jump's noise offset, z = camera space to noise scale, w = texture jitter
-float4 ElectricShape  : register(c7);   // x = strobe swing, y = arc sharpness, z = arc brightness, w = depth where arcs start to widen
+float4 ElectricShape  : register(c7);   // x = strobe swing, y = arc sharpness, z = half the arc brightness, w = depth where arcs start to widen
+float4 ElectricClamp  : register(c8);   // xy = lowest and zw = highest jittered uv, open along a beam whose texture tiles
+float4 ElectricStrobe : register(c9);   // x = 1 - half the strobe swing
 #elif LASER
 float4 Laser      : register(c6);   // x = pulse travel so far, y = world to noise scale, z = -3 / core width squared, w = core brightness
 float4 LaserShape : register(c7);   // x = core waver, y = pulse swing
@@ -117,7 +119,7 @@ float4 main(PsIn input) : COLOR
     float4 noiseA = tex2D(NoiseTexture, field);
     float4 noiseB = tex2D(NoiseTexture, field * 2.0f + Electric.yx);
 
-    float2 uv = saturate(input.TexCoord + (noiseA.rg - 0.5f) * Electric.w);
+    float2 uv = clamp(input.TexCoord + (noiseA.rg - 0.5f) * Electric.w, ElectricClamp.xy, ElectricClamp.zw);
     float4 texel = tex2D(ParticleTexture, uv);
     float4 color = texel * input.Diffuse;
 
@@ -133,10 +135,10 @@ float4 main(PsIn input) : COLOR
 
     // The square root carries arcs out into the faint fringe, and they still fade with the particle.
     float peak = max(color.r, max(color.g, color.b));
-    float3 hue = color.rgb / max(peak, 0.001f);
+    float3 hue = color.rgb / (peak + 0.001f);
     float reach = sqrt(peak * coverage);
-    float strobe = 1.0f + ElectricShape.x * (noiseB.b - 0.5f);
-    color.rgb = color.rgb * strobe + (hue + 1.0f) * (0.5f * arc * reach * ElectricShape.z);
+    float strobe = ElectricShape.x * noiseB.b + ElectricStrobe.x;
+    color.rgb = color.rgb * strobe + (hue + 1.0f) * (arc * reach * ElectricShape.z);
 #elif LASER
     float side = input.Beam.x * 2.0f - 1.0f;
     float along = input.Beam.y * Laser.y;

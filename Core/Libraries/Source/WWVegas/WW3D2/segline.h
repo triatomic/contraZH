@@ -116,8 +116,8 @@ class SegmentedLineClass : public RenderObjClass
 		void					Set_Freeze_Random(int onoff);
 		void					Set_Disable_Sorting(int onoff);
 		void					Set_End_Caps(int onoff);
-		// SoftParticleHookClass effects, drawn when the line is textured and blended
-		void					Set_Effects(unsigned int effects);
+		// SoftParticleHookClass effects, drawn when the line is textured and blended, and the data handed to the hook with them
+		void					Set_Effects(unsigned int effects, const void *effectData = nullptr);
 
 		/////////////////////////////////////////////////////////////////////////////
 		// Render Object Interface - Cloning and Identification

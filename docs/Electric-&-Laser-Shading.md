@@ -7,6 +7,10 @@ All keys go in the mod's `GameData.ini`. Cheat builds reload them about half a s
 is saved, except the `ElectricParticleTextures` and `LaserParticleTextures` lists, which are read at
 launch.
 
+A `W3DLaserDraw` module can also set any electric or laser tuning key. The value it sets overrides
+`GameData.ini` for that beam alone. `ElectricShader = Yes` on the module shades the beam as
+electricity instead of as a laser.
+
 The pictures run the game's shader math offline, on a stand-in flare and beam texture, at the scale
 the default camera sees them. Arc shapes, strengths and colours match the game. The textures are
 not Contra's own.

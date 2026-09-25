@@ -27,6 +27,7 @@
 class RenderInfoClass;
 class Vector4;
 class WorldHeightMap;
+struct BeamShaderTuning;
 
 // Lights the terrain along laser beams per pixel, with a light shaped like the beam. Direct3D 9 only;
 // without it W3DLaserDraw lights the ground with a strip of dynamic lights.
@@ -40,7 +41,8 @@ public:
 	Bool isEnabled();
 
 	/// Lights the ground within reach of the beam this frame. The color carries the light's intensity.
-	void add(const Vector3 &start, const Vector3 &end, Real reach, const Vector3 &color);
+	/// The light pulses with the beam's laser settings, or holds steady with none.
+	void add(const Vector3 &start, const Vector3 &end, Real reach, const Vector3 &color, const BeamShaderTuning *pulses);
 
 	/// Draws this frame's glows over the terrain, then forgets them.
 	void render(RenderInfoClass &rinfo);
@@ -56,6 +58,7 @@ private:
 		Vector3 end;
 		Real reach;
 		Vector3 color;
+		const BeamShaderTuning *pulses;
 	};
 
 	void drawGlow(WorldHeightMap *map, const Glow &glow, const Vector3 &sceneLight, const Vector4 &pulse, IDirect3DTexture8 *noise);

@@ -105,7 +105,7 @@ Bool W3DLaserGlow::isEnabled()
 #endif
 }
 
-void W3DLaserGlow::add(const Vector3 &start, const Vector3 &end, Real reach, const Vector3 &color)
+void W3DLaserGlow::add(const Vector3 &start, const Vector3 &end, Real reach, const Vector3 &color, const BeamShaderTuning *pulses)
 {
 	if (m_count == MAX_GLOWS || reach <= 0.0f)
 	{
@@ -117,6 +117,7 @@ void W3DLaserGlow::add(const Vector3 &start, const Vector3 &end, Real reach, con
 	glow.end = end;
 	glow.reach = reach;
 	glow.color = color;
+	glow.pulses = pulses;
 }
 
 // The height at a heightmap sample, counted from the playable origin and clamped to the map.
@@ -169,8 +170,6 @@ void W3DLaserGlow::render(RenderInfoClass &rinfo)
 		return;
 	}
 
-	Vector4 pulse(0.0f, 0.0f, 0.0f, 0.0f);
-	IDirect3DTexture8 *noise = (TheW3DSoftParticles != nullptr) ? TheW3DSoftParticles->getLaserPulse(pulse) : nullptr;
 	const Vector3 sceneLight = Scene_Light();
 
 	rinfo.Camera.Apply();
@@ -185,6 +184,8 @@ void W3DLaserGlow::render(RenderInfoClass &rinfo)
 
 	for (Int i = 0; i < count; i++)
 	{
+		Vector4 pulse(0.0f, 0.0f, 0.0f, 0.0f);
+		IDirect3DTexture8 *noise = (TheW3DSoftParticles != nullptr) ? TheW3DSoftParticles->getLaserPulse(m_glows[i].pulses, pulse) : nullptr;
 		drawGlow(TheTerrainRenderObject->getMap(), m_glows[i], sceneLight, pulse, noise);
 	}
 

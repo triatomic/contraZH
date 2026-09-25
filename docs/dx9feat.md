@@ -237,6 +237,11 @@ Picked per particle system in `ParticleSystem.ini`:
 * `ElectricShader = Auto` - (Default. On when the system's `ParticleName` texture is listed in
 `GameData.ini`'s `ElectricParticleTextures`. `Yes` turns it on for any system, `No` turns it off.)
 
+Picked per beam in a `W3DLaserDraw` module:
+
+* `ElectricShader = No` - (Default. `Yes` shades the beam as electricity instead of as a laser, for
+tesla and lightning bolts. The beam keeps its texture, which tiles along it as before.)
+
 Listed and tuned in the mod's `GameData.ini`:
 
 * `ElectricParticleTextures = TeslaBlast.tga ...` - (Textures whose systems turn electric. Each line
@@ -248,10 +253,20 @@ adds to the list, so a long list can span several lines. Read at launch.)
 * `ElectricFlicker = 0.6` - (How far brightness swings, as a fraction. 0 is steady.)
 * `ElectricRate = 15` - (Crackles per second. 0 freezes the arcs.)
 
+A `W3DLaserDraw` module takes the same six tuning keys. Each one it sets overrides `GameData.ini`
+for that beam alone, and the keys it leaves out keep `GameData.ini`'s values.
+
 ```
 ParticleSystem EMPRing
   ...
   ElectricShader = Yes
+End
+
+Draw = W3DLaserDraw ModuleTag_Draw
+  ...
+  ElectricShader = Yes
+  ElectricArcs = 2.5
+  ElectricRate = 30
 End
 ```
 
@@ -300,11 +315,21 @@ line adds to the list, so a long list can span several lines. Read at launch.)
 * `LaserDebug = No` - (Yes subtracts shaded beams from the scene instead of adding them, so they
 show dark on any background. Plain beams stay bright, which also shows which beams are shaded.)
 
+A `W3DLaserDraw` module takes the six tuning keys from `LaserCore` to `LaserPulseSpeed`. Each one it
+sets overrides `GameData.ini` for that beam alone, and the keys it leaves out keep `GameData.ini`'s
+values. Laser streaks from particle systems always use `GameData.ini`'s.
+
 ```
 ParticleSystem Red_BurstLaserTrail
   ...
   Type = STREAK
   LaserShader = Yes
+End
+
+Draw = W3DLaserDraw ModuleTag_Draw
+  ...
+  LaserCore = 2
+  LaserPulseSpeed = 800
 End
 ```
 
@@ -321,7 +346,8 @@ the soft edges on top.
 Laser beams light the ground per pixel, with one light shaped like the beam. The light fades with
 the distance to the nearest point on the beam, so a beam skimming the ground lights a bright strip
 and a beam climbing into the sky lights only the ground near the shooter. Slopes facing the beam
-catch more light, and the laser shader's pulses brighten the ground as they pass. The Direct3D 8
+catch more light, and the laser shader's pulses brighten the ground as they pass. Beams drawn plain
+or electric light the ground steadily. The Direct3D 8
 build keeps the strip of dynamic lights described in
 [Laser ground glow](contraZH-Changes.md#laser-ground-glow). Needs a shader model 2 card. Each key is
 pictured on [Electric & Laser Shading](Electric-&-Laser-Shading.md#laser-ground-glow).

@@ -84,6 +84,7 @@ SegLineRendererClass::SegLineRendererClass() :
 		UVOffsetDeltaPerMS(0.0f, 0.0f),
 		Bits(DEFAULT_BITS),
 		Effects(0),
+		EffectData(nullptr),
 		m_vertexBufferSize(0),
 		m_vertexBuffer(nullptr)
 {
@@ -106,6 +107,7 @@ SegLineRendererClass::SegLineRendererClass(const SegLineRendererClass & that) :
 		UVOffsetDeltaPerMS(0.0f, 0.0f),
 		Bits(DEFAULT_BITS),
 		Effects(0),
+		EffectData(nullptr),
 		m_vertexBufferSize(0),
 		m_vertexBuffer(nullptr)
 {
@@ -130,6 +132,7 @@ SegLineRendererClass & SegLineRendererClass::operator = (const SegLineRendererCl
 		UVOffsetDeltaPerMS = that.UVOffsetDeltaPerMS;
 		Bits = that.Bits;
 		Effects = that.Effects;
+		EffectData = that.EffectData;
 		// Don't modify m_vertexBufferSize and m_vertexBuffer
 	}
 	return *this;
@@ -1229,14 +1232,14 @@ void SegLineRendererClass::Render
 		DX8Wrapper::Set_Shader(shader);
 
 		if (sorting) {
-			SortingRendererClass::Set_Insert_Effects(effects, nullptr);
+			SortingRendererClass::Set_Insert_Effects(effects, EffectData);
 			SortingRendererClass::Insert_Triangles(obj_sphere,0,tidx,0,vnum);
 			SortingRendererClass::Set_Insert_Effects(0, nullptr);
 		} else {
 			bool shaded = false;
 			if (effects != 0) {
 				DX8Wrapper::Apply_Render_State_Changes();
-				shaded = hook->Begin(shader, effects, nullptr);
+				shaded = hook->Begin(shader, effects, EffectData);
 			}
 			DX8Wrapper::Draw_Triangles(0,tidx,0,vnum);
 			if (shaded) {

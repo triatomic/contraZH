@@ -27,6 +27,7 @@
 class RenderInfoClass;
 class Vector4;
 struct FlameShaderTuning;
+struct BeamShaderTuning;
 
 // Fades particle sprites near the surface behind them, shades flames as fire, electricity as arcs and beams as lasers, and draws the heat haze behind flames.
 class W3DSoftParticles : public SoftParticleHookClass
@@ -47,13 +48,14 @@ public:
 	/// Whether laser beams and streaks get the laser effect at all, loading its shaders on first ask.
 	Bool laserEnabled();
 
-	/// The noise laser pulses run on, with pulse x = travel so far, y = world to noise scale, z = swing, which is 0 with laser shading off.
-	IDirect3DTexture8 *getLaserPulse(Vector4 &pulse);
+	/// The noise laser pulses run on, with pulse x = travel so far, y = world to noise scale, z = swing, which is 0 with laser shading off or no settings.
+	IDirect3DTexture8 *getLaserPulse(const BeamShaderTuning *pulses, Vector4 &pulse);
 
 	/// Copies the scene for the haze pass. False leaves the haze undrawn.
 	Bool beginHaze();
 
-	/// The effect data is the ParticleSystemTemplate with flame settings of its own, or null.
+	/// With flame or haze the effect data is the ParticleSystemTemplate with flame settings of its own, and with
+	/// EFFECT_BEAM the beam's BeamShaderTuning. Null takes GameData.ini's settings.
 	virtual bool Begin(const ShaderClass &shader, unsigned effects, const void *effectData) override;
 	virtual void End() override;
 
@@ -67,8 +69,8 @@ private:
 	Bool bindSceneDepth(DWORD shader);
 	Bool bindTerrainHeight(DWORD shader);
 	void bindFlame(const FlameShaderTuning &tuning);
-	void bindElectric();
-	void bindLaser();
+	void bindElectric(const BeamShaderTuning &tuning, Bool beam);
+	void bindLaser(const BeamShaderTuning &tuning);
 	Bool bindHaze(const ShaderClass &shader, const FlameShaderTuning &tuning);
 
 	DWORD m_depthShader;
