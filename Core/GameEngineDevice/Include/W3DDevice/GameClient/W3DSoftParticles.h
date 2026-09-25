@@ -54,8 +54,7 @@ public:
 	/// Copies the scene for the haze pass. False leaves the haze undrawn.
 	Bool beginHaze();
 
-	/// With flame or haze the effect data is the ParticleSystemTemplate with flame settings of its own, and with
-	/// EFFECT_BEAM the beam's BeamShaderTuning. Null takes GameData.ini's settings.
+	/// The effect data is the flame's ParticleSystemTemplate, or with EFFECT_BEAM the beam's BeamShaderTuning, and null takes GameData.ini's.
 	virtual bool Begin(const ShaderClass &shader, unsigned effects, const void *effectData) override;
 	virtual void End() override;
 

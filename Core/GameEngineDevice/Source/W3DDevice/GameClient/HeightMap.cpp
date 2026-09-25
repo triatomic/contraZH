@@ -363,6 +363,8 @@ void HeightMapRenderObjClass::assignPixelLights(RefRenderObjListIterator &lights
 
 	const Int xCoordMin = m_map->getDrawOrgX() - m_map->getBorderSizeInline();
 	const Int yCoordMin = m_map->getDrawOrgY() - m_map->getBorderSizeInline();
+	static std::vector<Bool> columns;
+	static std::vector<Bool> rows;
 	for (Int index = 0; index < count; index++)
 	{
 		W3DDynamicLight *pLight = byIndex[index];
@@ -383,8 +385,8 @@ void HeightMapRenderObjClass::assignPixelLights(RefRenderObjListIterator &lights
 		}
 
 		// The tiles holding those cells, which wrap around as the terrain slides.
-		std::vector<Bool> columns(m_numVBTilesX, FALSE);
-		std::vector<Bool> rows(m_numVBTilesY, FALSE);
+		columns.assign(m_numVBTilesX, FALSE);
+		rows.assign(m_numVBTilesY, FALSE);
 		for (Int x = x0; x < x1; x++)
 		{
 			columns[getTileColumn(x)] = TRUE;

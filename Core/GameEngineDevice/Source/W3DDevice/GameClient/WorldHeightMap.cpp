@@ -2259,7 +2259,23 @@ TextureClass *WorldHeightMap::getTerrainClassMap()
 	REF_PTR_RELEASE(m_terrainClassMap);
 	m_terrainClassMapAtlas = m_terrainTex;
 
+	// The shader clamps reads to the lookup, so an atlas reaching past it turns the seabed off rather than read the wrong block.
 	const Int size = CLASS_MAP_SLOTS;
+	const Int slot = TILE_PIXEL_EXTENT + TILE_OFFSET;
+	for (Int i=0; i<m_numTextureClasses; i++)
+	{
+		const TXTextureClass &texClass = m_textureClasses[i];
+		if (texClass.width <= 0 || (texClass.positionInTexture.x == 0 && texClass.positionInTexture.y == 0))
+		{
+			continue;
+		}
+		if ((texClass.positionInTexture.x - TILE_OFFSET/2) / slot + texClass.width > size ||
+			(texClass.positionInTexture.y - TILE_OFFSET/2) / slot + texClass.width > size)
+		{
+			return nullptr;
+		}
+	}
+
 	m_terrainClassMap = MSGNEW("WorldHeightMap_getTerrainClassMap") TextureClass(size, size, WW3D_FORMAT_A8R8G8B8, MIP_LEVELS_1, TextureClass::POOL_MANAGED, false, false);
 	if (m_terrainClassMap->Peek_D3D_Texture() == nullptr)
 	{
@@ -2278,7 +2294,6 @@ TextureClass *WorldHeightMap::getTerrainClassMap()
 		}
 
 		// A class that did not fit sits at 0,0 and is never drawn.
-		const Int slot = TILE_PIXEL_EXTENT + TILE_OFFSET;
 		for (Int i=0; i<m_numTextureClasses; i++)
 		{
 			const TXTextureClass &texClass = m_textureClasses[i];

@@ -984,13 +984,13 @@ TextureClass *WaterRenderObjClass::getTerrainHeightTexture(Vector4 &mapping, Vec
 	return m_heightTexture;
 }
 
-// The hex cells' 1 / spacing, weight exponent, shift and turn, as the water and seabed shaders take them.
-// Below 1 the exponent eases towards 0.7, where the cell leaving the blend at a triangle edge still fades out
-// unseen. Cells turn by up to 170 degrees each way at full rotation, sent as twice the tangent of half that.
+// The hex cells' 1 / spacing, weight exponent, shift and twice the tangent of half the widest turn, 170 degrees, as the shaders take them.
 static Vector4 Get_Hex_Params()
 {
 	const Real size = TheWaterTransparency->m_shaderWaterStochasticSize;
-	const Real sharpness = max(TheWaterTransparency->m_shaderWaterStochasticSharpness, -15.0f);
+
+	// Below 1 the exponent eases towards 0.7, where a cell leaving the blend still fades out unseen. Past 64 a centroid's weights underflow to 0 / 0.
+	const Real sharpness = WWMath::Clamp(TheWaterTransparency->m_shaderWaterStochasticSharpness, -15.0f, 64.0f);
 	const Real turn = WWMath::Clamp(TheWaterTransparency->m_shaderWaterStochasticRotation, 0.0f, 1.0f) * DEG_TO_RADF(85.0f);
 	return Vector4((size > 0.0f) ? 1.0f / size : 0.0f, (sharpness >= 1.0f) ? sharpness : 0.7f + 0.3f * powf(2.0f, sharpness - 1.0f),
 		(size > 0.0f) ? WWMath::Clamp(TheWaterTransparency->m_shaderWaterStochasticRandom, 0.0f, 1.0f) : 0.0f, 2.0f * tanf(turn));
@@ -1695,6 +1695,7 @@ void WaterRenderObjClass::updateWaterMask()
 		m_waterMaskCellsWidth = width;
 		m_waterMaskCellsHeight = height;
 	}
+	memset(m_waterMaskCells, 0, width * height);
 
 	// Grown by a cell, the mask ends on dry land instead of in a step short of the polygon's waterline.
 	SurfaceClass *surface = m_waterMaskTexture->Get_Surface_Level(0);

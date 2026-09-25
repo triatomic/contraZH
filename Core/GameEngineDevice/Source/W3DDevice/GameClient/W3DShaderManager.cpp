@@ -3609,6 +3609,13 @@ void TerrainShaderPixelShader::setSeabed(Int noiseCount, Bool shadowed, Bool bum
 		return;
 	}
 
+	// Shadow receivers that arrived after init have no seabed variants, and reset only unbinds the lookups when one was picked.
+	const DWORD seabedUnlit = m_dwSeabedPixelShader[0][bumped ? 1 : 0][shadowed ? 1 : 0][noiseCount];
+	if (seabedUnlit == 0)
+	{
+		return;
+	}
+
 	// Bumped terrain already has the world position.
 	if (!bumped)
 	{
@@ -3635,7 +3642,7 @@ void TerrainShaderPixelShader::setSeabed(Int noiseCount, Bool shadowed, Bool bum
 	device->SetSamplerState(SEABED_WATER_MASK_SAMPLER, D3DSAMP_MIPFILTER, D3DTEXF_NONE);
 
 	DrawGroundShader = unlit;
-	DrawSeabedUnlitShader = m_dwSeabedPixelShader[0][bumped ? 1 : 0][shadowed ? 1 : 0][noiseCount];
+	DrawSeabedUnlitShader = seabedUnlit;
 	DrawSeabedLitShader = m_dwSeabedPixelShader[1][bumped ? 1 : 0][shadowed ? 1 : 0][noiseCount];
 #else
 	(void)noiseCount;

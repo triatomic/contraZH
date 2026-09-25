@@ -1674,6 +1674,20 @@ Bool ParticleSystem::isFlame()
 }
 
 // ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+static Bool Is_Texture_Listed(const AsciiString &texture, const std::vector<AsciiString> &textures)
+{
+	for (std::vector<AsciiString>::const_iterator it = textures.begin(); it != textures.end(); ++it)
+	{
+		if (texture.compareNoCase( *it ) == 0)
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+// ------------------------------------------------------------------------------------------------
 /** Auto looks the particle texture up in GameData.ini's ElectricParticleTextures, once per system */
 // ------------------------------------------------------------------------------------------------
 Bool ParticleSystem::isElectric()
@@ -1686,15 +1700,7 @@ Bool ParticleSystem::isElectric()
 	if (!m_electricKnown)
 	{
 		m_electricKnown = TRUE;
-		const std::vector<AsciiString> &textures = TheGlobalData->m_electricParticleTextures;
-		for (std::vector<AsciiString>::const_iterator it = textures.begin(); it != textures.end(); ++it)
-		{
-			if (m_particleTypeName.compareNoCase( *it ) == 0)
-			{
-				m_electricAuto = TRUE;
-				break;
-			}
-		}
+		m_electricAuto = Is_Texture_Listed(m_particleTypeName, TheGlobalData->m_electricParticleTextures);
 	}
 	return m_electricAuto;
 }
@@ -1712,15 +1718,7 @@ Bool ParticleSystem::isLaser()
 	if (!m_laserKnown)
 	{
 		m_laserKnown = TRUE;
-		const std::vector<AsciiString> &textures = TheGlobalData->m_laserParticleTextures;
-		for (std::vector<AsciiString>::const_iterator it = textures.begin(); it != textures.end(); ++it)
-		{
-			if (m_particleTypeName.compareNoCase( *it ) == 0)
-			{
-				m_laserAuto = TRUE;
-				break;
-			}
-		}
+		m_laserAuto = Is_Texture_Listed(m_particleTypeName, TheGlobalData->m_laserParticleTextures);
 	}
 	return m_laserAuto;
 }

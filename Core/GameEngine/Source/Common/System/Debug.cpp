@@ -431,6 +431,7 @@ void DebugInit(int flags)
 
 		static_assert(ARRAY_SIZE(theRenderLogFileName) >= ARRAY_SIZE(dirbuf), "Incorrect array size");
 		strcpy(theRenderLogFileName, dirbuf);
+		strlcat(theRenderLogFileName, gAppPrefix, ARRAY_SIZE(theRenderLogFileName));
 		strlcat(theRenderLogFileName, RENDER_LOG_FILE_NAME, ARRAY_SIZE(theRenderLogFileName));
 		if (rts::ClientInstance::getInstanceId() > 1u)
 		{
