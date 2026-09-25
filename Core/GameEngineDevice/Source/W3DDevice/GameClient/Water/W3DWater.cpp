@@ -2885,7 +2885,7 @@ void WaterRenderObjClass::reloadEditedIni()
 	}
 	catch (...)
 	{
-		DEBUG_LOG(("Water.ini stopped at an error, so only the keys above it took effect until the next save"));
+		RENDER_LOG(("Water.ini stopped at an error, so only the keys above it took effect until the next save"));
 		return;
 	}
 
@@ -2896,7 +2896,7 @@ void WaterRenderObjClass::reloadEditedIni()
 		loadSetting(&m_settings[i], (TimeOfDay)i);
 	}
 	updateMapOverrides();
-	DEBUG_LOG(("Water.ini reloaded"));
+	RENDER_LOG(("Water.ini reloaded"));
 #endif
 }
 

@@ -2114,7 +2114,7 @@ Bool W3DView::setViewFilter(FilterTypes filter)
 {
 	FilterTypes oldFilter = m_viewFilter;	//save previous filter in case setup fails.
 
-	DEBUG_LOG(("W3DView::setViewFilter: filter %d mode %d at frame %d", (Int)filter, (Int)m_viewFilterMode, TheGameLogic ? TheGameLogic->getFrame() : 0));
+	RENDER_LOG(("W3DView::setViewFilter: filter %d mode %d at frame %d", (Int)filter, (Int)m_viewFilterMode, TheGameLogic ? TheGameLogic->getFrame() : 0));
 	m_viewFilter = filter;
 	if (m_viewFilterMode != FM_NULL_MODE &&
 		m_viewFilter != FT_NULL_FILTER) {

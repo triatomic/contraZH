@@ -94,6 +94,8 @@ extern const char *gAppPrefix; /// So WB can have a different log file name.
 	#define DEBUG_FILE_NAME_PREV	"DebugLogFilePrev"
 #endif
 
+#define RENDER_LOG_FILE_NAME	"d3d9render"
+
 #endif
 
 // ----------------------------------------------------------------------------
@@ -109,6 +111,8 @@ extern const char *gAppPrefix; /// So WB can have a different log file name.
 static FILE *theLogFile = nullptr;
 static char theLogFileName[ _MAX_PATH ];
 static char theLogFileNamePrev[ _MAX_PATH ];
+static FILE *theRenderLogFile = nullptr;
+static char theRenderLogFileName[ _MAX_PATH ];
 #endif
 #define LARGE_BUFFER	8192
 static char theBuffer[ LARGE_BUFFER ];	// make it big to avoid weird overflow bugs in debug mode
@@ -424,6 +428,22 @@ void DebugInit(int flags)
 		{
 			DebugLog("Log %s opened: %s", theLogFileName, getCurrentTimeString());
 		}
+
+		static_assert(ARRAY_SIZE(theRenderLogFileName) >= ARRAY_SIZE(dirbuf), "Incorrect array size");
+		strcpy(theRenderLogFileName, dirbuf);
+		strlcat(theRenderLogFileName, RENDER_LOG_FILE_NAME, ARRAY_SIZE(theRenderLogFileName));
+		if (rts::ClientInstance::getInstanceId() > 1u)
+		{
+			size_t offset = strlen(theRenderLogFileName);
+			snprintf(theRenderLogFileName + offset, ARRAY_SIZE(theRenderLogFileName) - offset, "_Instance%.2u", rts::ClientInstance::getInstanceId());
+		}
+		strlcat(theRenderLogFileName, ".txt", ARRAY_SIZE(theRenderLogFileName));
+
+		theRenderLogFile = fopen(theRenderLogFileName, "w");
+		if (theRenderLogFile != nullptr)
+		{
+			DebugRenderLog("Log %s opened: %s", theRenderLogFileName, getCurrentTimeString());
+		}
 	#endif
 	}
 
@@ -484,6 +504,38 @@ void DebugLogRaw(const char *format, ...)
 		MessageBoxWrapper("String too long for debug buffer", "", MB_OK|MB_TASKMODAL);
 
 	doLogOutput(theBuffer, "");
+}
+
+/**
+	Print a string to the renderer log file and/or console.
+*/
+void DebugRenderLog(const char *format, ...)
+{
+#ifdef DEBUG_THREADSAFE
+	ScopedCriticalSection scopedCriticalSection(TheDebugLogCriticalSection);
+#endif
+
+	prepBuffer(theBuffer);
+
+	va_list args;
+	va_start(args, format);
+	size_t offset = strlen(theBuffer);
+	vsnprintf(theBuffer + offset, ARRAY_SIZE(theBuffer) - offset, format, args);
+	va_end(args);
+
+	whackFunnyCharacters(theBuffer);
+
+	if ((theDebugFlags & DEBUG_FLAG_LOG_TO_FILE) && theRenderLogFile)
+	{
+		fprintf(theRenderLogFile, "%s\n", theBuffer);
+		fflush(theRenderLogFile);
+	}
+
+	if (theDebugFlags & DEBUG_FLAG_LOG_TO_CONSOLE)
+	{
+		::OutputDebugString(theBuffer);
+		::OutputDebugString("\n");
+	}
 }
 
 const char* DebugGetLogFileName()
@@ -592,6 +644,12 @@ void DebugShutdown()
 		fclose(theLogFile);
 	}
 	theLogFile = nullptr;
+	if (theRenderLogFile)
+	{
+		DebugRenderLog("Log closed: %s", getCurrentTimeString());
+		fclose(theRenderLogFile);
+	}
+	theRenderLogFile = nullptr;
 #endif
 	theDebugFlags = 0;
 }

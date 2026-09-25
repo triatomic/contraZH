@@ -144,7 +144,7 @@ Bool W3DShadowMap::ReAcquireResources()
 {
 	ReleaseResources();
 
-	DEBUG_LOG(("W3DShadowMap: debug mode %d", ShadowDebugMode));
+	RENDER_LOG(("W3DShadowMap: debug mode %d", ShadowDebugMode));
 	if (ShadowDebugMode == SHADOW_DEBUG_OFF)
 	{
 		return FALSE;
@@ -160,7 +160,7 @@ Bool W3DShadowMap::ReAcquireResources()
 	// NVIDIA card since 2002 under GeForce4.
 	if (caps->Get_Vertex_Shader_Major_Version() < 2 || caps->Get_Pixel_Shader_Major_Version() < 2)
 	{
-		DEBUG_LOG(("W3DShadowMap: shader model 2 unavailable, falling back to legacy shadows"));
+		RENDER_LOG(("W3DShadowMap: shader model 2 unavailable, falling back to legacy shadows"));
 		return FALSE;
 	}
 
@@ -210,7 +210,7 @@ Bool W3DShadowMap::ReAcquireResources()
 		if (m_colorTarget == nullptr)
 		{
 			ReleaseResources();
-			DEBUG_LOG(("W3DShadowMap: no usable render target, falling back to legacy shadows"));
+			RENDER_LOG(("W3DShadowMap: no usable render target, falling back to legacy shadows"));
 			return FALSE;
 		}
 	}
@@ -221,7 +221,7 @@ Bool W3DShadowMap::ReAcquireResources()
 		m_depthMode = DEPTH_MODE_PACKED;
 	}
 
-	DEBUG_LOG(("W3DShadowMap: %dx%d, %s depth, %s colour target",
+	RENDER_LOG(("W3DShadowMap: %dx%d, %s depth, %s colour target",
 		m_resolution, m_resolution,
 		m_depthMode == DEPTH_MODE_HARDWARE ? "hardware" : "packed",
 		m_nullTarget != nullptr ? "null" : "RGBA8"));
@@ -630,7 +630,7 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 	static Int passCount = 0;
 	if (passCount % 300 == 0 && passCount <= 300 * 15)
 	{
-		DEBUG_LOG(("W3DShadowMap: pass %d drew %d, dropped %d disabled %d hidden %d shrouded %d out of range %d out of view, centre (%.0f, %.0f, %.0f) radius %.0f",
+		RENDER_LOG(("W3DShadowMap: pass %d drew %d, dropped %d disabled %d hidden %d shrouded %d out of range %d out of view, centre (%.0f, %.0f, %.0f) radius %.0f",
 			passCount, m_casterStats.drawn, m_casterStats.disabled, m_casterStats.hidden,
 			m_casterStats.shrouded, m_casterStats.outOfRange, m_casterStats.outOfView,
 			m_fittedCenter.X, m_fittedCenter.Y, m_fittedCenter.Z, m_fittedRadius));

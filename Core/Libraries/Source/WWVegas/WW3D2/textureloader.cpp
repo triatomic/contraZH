@@ -511,7 +511,7 @@ IDirect3DTexture8* TextureLoader::Load_Thumbnail(const StringClass& filename, co
 	DX8CALL(UpdateTexture(sysmem_texture,d3d_texture));
 	sysmem_texture->Release();
 
-	WWDEBUG_SAY(("Created non-managed texture (%s)",filename));
+	RENDER_LOG(("Created non-managed texture (%s)",filename));
 	return d3d_texture;
 #endif
 }
@@ -1673,7 +1673,7 @@ void TextureLoadTaskClass::Unlock_Surfaces()
 	DX8CALL(UpdateTexture(Peek_D3D_Texture(),tex));
 	Peek_D3D_Texture()->Release();
 	D3DTexture=tex;
-	WWDEBUG_SAY(("Created non-managed texture (%s)",Texture->Get_Full_Path()));
+	RENDER_LOG(("Created non-managed texture (%s)",Texture->Get_Full_Path()));
 #endif
 
 }
@@ -2061,7 +2061,7 @@ void CubeTextureLoadTaskClass::Unlock_Surfaces()
 	DX8CALL(UpdateTexture(Peek_D3D_Volume_Texture(),tex));
 	Peek_D3D_Volume_Texture()->Release();
 	D3DTexture=tex;
-	WWDEBUG_SAY(("Created non-managed texture (%s)",Texture->Get_Full_Path()));
+	RENDER_LOG(("Created non-managed texture (%s)",Texture->Get_Full_Path()));
 #endif
 
 }
@@ -2368,7 +2368,7 @@ void VolumeTextureLoadTaskClass::Unlock_Surfaces()
 	DX8CALL(UpdateTexture(Peek_D3D_Volume_Texture(),tex));
 	Peek_D3D_Volume_Texture()->Release();
 	D3DTexture=tex;
-	WWDEBUG_SAY(("Created non-managed texture (%s)",Texture->Get_Full_Path()));
+	RENDER_LOG(("Created non-managed texture (%s)",Texture->Get_Full_Path()));
 #endif
 
 }

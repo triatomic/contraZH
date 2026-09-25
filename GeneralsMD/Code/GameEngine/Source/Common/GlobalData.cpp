@@ -1699,11 +1699,11 @@ void GlobalData::reloadEditedIni()
 	catch (...)
 	{
 		LiveReloadTable = nullptr;
-		DEBUG_LOG(("GameData.ini stopped at an error, so only the keys above it took effect until the next save"));
+		RENDER_LOG(("GameData.ini stopped at an error, so only the keys above it took effect until the next save"));
 		return;
 	}
 	LiveReloadTable = nullptr;
-	DEBUG_LOG(("GameData.ini render tuning reloaded"));
+	RENDER_LOG(("GameData.ini render tuning reloaded"));
 #endif
 }
 

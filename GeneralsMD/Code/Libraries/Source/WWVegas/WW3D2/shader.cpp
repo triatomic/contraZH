@@ -350,11 +350,11 @@ void ShaderClass::Report_Unable_To_Fog (const char *source)
 
 	// Limit the no. of warning messages to some practical maximum. Suppress all subsequent warnings.
 	if (_reportcount < maxreportcount) {
-		WWDEBUG_SAY ((unabletofogtext, source));
+		RENDER_LOG ((unabletofogtext, source));
 		_reportcount++;
 	} else {
 		if (_reportcount == maxreportcount) {
-			WWDEBUG_SAY ((unabletofogmoretext));
+			RENDER_LOG ((unabletofogmoretext));
 			_reportcount++;
 		}
 	}
@@ -933,7 +933,7 @@ void ShaderClass::Apply()
 			// this is for the bad case of using
 			// stage 0 for diffuse only
 			if ((PricOp==D3DTOP_SELECTARG1)&&(PricArg1==D3DTA_DIFFUSE)) {
-				WWDEBUG_SAY(("Wasted Stage 0 in shader-vertex diffuse only"));
+				RENDER_LOG(("Wasted Stage 0 in shader-vertex diffuse only"));
 				// set stage 0 to disable
 				DX8Wrapper::Set_DX8_Texture_Stage_State(0,D3DTSS_COLOROP,D3DTOP_DISABLE);
 				DX8Wrapper::Set_DX8_Texture_Stage_State(0,D3DTSS_ALPHAOP,D3DTOP_DISABLE);

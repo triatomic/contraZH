@@ -616,7 +616,7 @@ void DX8TextureCategoryClass::Log(bool only_visible)
 	}
 	work2.Format("\n	material: %x (%s)\n	shader: %x", material, material ? material->Get_Name() : "-", shader);
 	work+=work2;
-	WWDEBUG_SAY((work));
+	RENDER_LOG((work));
 
 	work.Format("	%8s %8s %6s %6s %6s %5s %s",
 		"idx_cnt",
@@ -626,7 +626,7 @@ void DX8TextureCategoryClass::Log(bool only_visible)
 		"vi_rng",
 		"ident",
 		"name");
-	WWDEBUG_SAY((work));
+	RENDER_LOG((work));
 
 	DX8PolygonRendererListIterator it(&PolygonRendererList);
 	while (!it.Is_Done()) {
@@ -640,11 +640,11 @@ void DX8TextureCategoryClass::Log(bool only_visible)
 		}
 
 		if (prtc != nullptr) {
-			WWDEBUG_SAY(("+"));
+			RENDER_LOG(("+"));
 			p_renderer->Log();
 		} else {
 			if (!only_visible) {
-				WWDEBUG_SAY(("-"));
+				RENDER_LOG(("-"));
 				p_renderer->Log();
 			}
 		}
@@ -999,26 +999,26 @@ void DX8RigidFVFCategoryContainer::Log(bool only_visible)
 #ifdef ENABLE_CATEGORY_LOG
 	StringClass work(255,true);
 	work.Format("DX8RigidFVFCategoryContainer --------------");
-	WWDEBUG_SAY((work));
+	RENDER_LOG((work));
 	if (vertex_buffer) {
 		StringClass fvfname(255,true);
 		vertex_buffer->FVF_Info().Get_FVF_Name(fvfname);
 		work.Format("VB size (used/total): %d/%d FVF: %s",used_vertices,vertex_buffer->Get_Vertex_Count(),fvfname);
-		WWDEBUG_SAY((work));
+		RENDER_LOG((work));
 	}
 	else {
-		WWDEBUG_SAY(("EMPTY VB"));
+		RENDER_LOG(("EMPTY VB"));
 	}
 	if (index_buffer) {
 		work.Format("IB size (used/total): %d/%d",used_indices,index_buffer->Get_Index_Count());
-		WWDEBUG_SAY((work));
+		RENDER_LOG((work));
 	}
 	else {
-		WWDEBUG_SAY(("EMPTY IB"));
+		RENDER_LOG(("EMPTY IB"));
 	}
 
 	for (unsigned p=0;p<passes;++p) {
-		WWDEBUG_SAY(("Pass: %d",p));
+		RENDER_LOG(("Pass: %d",p));
 
 		TextureCategoryListIterator it(&texture_category_list[p]);
 		while (!it.Is_Done()) {
@@ -1714,14 +1714,14 @@ void DX8SkinFVFCategoryContainer::Log(bool only_visible)
 #ifdef ENABLE_CATEGORY_LOG
 	StringClass work(255,true);
 	work.Format("DX8SkinFVFCategoryContainer --------------");
-	WWDEBUG_SAY((work));
+	RENDER_LOG((work));
 
 	if (index_buffer) {
 		work.Format("IB size (used/total): %d/%d",used_indices,index_buffer->Get_Index_Count());
-		WWDEBUG_SAY((work));
+		RENDER_LOG((work));
 	}
 	else {
-		WWDEBUG_SAY(("EMPTY IB"));
+		RENDER_LOG(("EMPTY IB"));
 	}
 
 	for (unsigned pass=0;pass<passes;++pass) {
@@ -3103,7 +3103,7 @@ void DX8MeshRendererClass::Register_Mesh_Type(MeshModelClass* mmc)
 {
 	WWMEMLOG(MEM_GEOMETRY);
 #ifdef ENABLE_CATEGORY_LOG
-	WWDEBUG_SAY(("Registering mesh: %s (%d polys, %d verts + %d gap polygons)",mmc->Get_Name(),mmc->Get_Polygon_Count(),mmc->Get_Vertex_Count(),mmc->Get_Gap_Filler_Polygon_Count()));
+	RENDER_LOG(("Registering mesh: %s (%d polys, %d verts + %d gap polygons)",mmc->Get_Name(),mmc->Get_Polygon_Count(),mmc->Get_Vertex_Count(),mmc->Get_Gap_Filler_Polygon_Count()));
 #endif
 	bool skin=(mmc->Get_Flag(MeshModelClass::SKIN) && mmc->VertexBoneLink);
 	bool sorting=((!!mmc->Get_Flag(MeshModelClass::SORT)) && WW3D::Is_Sorting_Enabled() && (mmc->Get_Sort_Level() == SORT_LEVEL_NONE));
@@ -3175,7 +3175,7 @@ void DX8MeshRendererClass::Register_Mesh_Type(MeshModelClass* mmc)
 				_RegisteredMeshList.Add_Tail(mmc);
 			}
 			else {
-				WWDEBUG_SAY(("Error: Register_Mesh_Type failed! file: %s line: %d",__FILE__,__LINE__));
+				RENDER_LOG(("Error: Register_Mesh_Type failed! file: %s line: %d",__FILE__,__LINE__));
 			}
 		}
 	}

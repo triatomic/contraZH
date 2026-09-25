@@ -812,14 +812,14 @@ HRESULT Load_Surface_From_Surface(
 	HRESULT hr=src_surface->LockRect(&locked_src, src_rect, D3DLOCK_READONLY);
 	if (FAILED(hr))
 	{
-		DEBUG_LOG(("Load_Surface_From_Surface: src lock failed 0x%08X pool=%d usage=0x%X fmt=%d -> dest pool=%d fmt=%d",
+		RENDER_LOG(("Load_Surface_From_Surface: src lock failed 0x%08X pool=%d usage=0x%X fmt=%d -> dest pool=%d fmt=%d",
 			hr, src_desc.Pool, src_desc.Usage, src_desc.Format, dest_desc.Pool, dest_desc.Format));
 		return hr;
 	}
 	hr=dest_surface->LockRect(&locked_dest, dest_rect, 0);
 	if (FAILED(hr))
 	{
-		DEBUG_LOG(("Load_Surface_From_Surface: dest lock failed 0x%08X pool=%d usage=0x%X fmt=%d <- src pool=%d fmt=%d",
+		RENDER_LOG(("Load_Surface_From_Surface: dest lock failed 0x%08X pool=%d usage=0x%X fmt=%d <- src pool=%d fmt=%d",
 			hr, dest_desc.Pool, dest_desc.Usage, dest_desc.Format, src_desc.Pool, src_desc.Format));
 		src_surface->UnlockRect();
 		return hr;

@@ -39,6 +39,15 @@ void DebugLog(const char *format, ...)
 	printf("\n");
 }
 
+void DebugRenderLog(const char *format, ...)
+{
+	va_list arg;
+	va_start(arg, format);
+	vprintf(format, arg);
+	va_end(arg);
+	printf("\n");
+}
+
 #endif
 
 #ifdef DEBUG_CRASHING

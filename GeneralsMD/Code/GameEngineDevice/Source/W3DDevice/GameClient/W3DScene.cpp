@@ -1469,7 +1469,7 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 		const Int terrainBumpDraws = W3DShaderManager::takeTerrainBumpCount();
 		if (specularFrames % 300 == 0 && specularFrames <= 300 * 15)
 		{
-			DEBUG_LOG(("Specular: frame %d, %d mesh draws, %d groups bumped from brightness, %d from normal maps, %d glowing, pass %s, %d terrain draws bumped",
+			RENDER_LOG(("Specular: frame %d, %d mesh draws, %d groups bumped from brightness, %d from normal maps, %d glowing, pass %s, %d terrain draws bumped",
 				specularFrames, specularDraws, derivedGroups, normalMapGroups, emissiveGroups,
 				W3DShaderManager::getSpecularPass() != nullptr ? "available" : "unavailable", terrainBumpDraws));
 		}
@@ -1546,7 +1546,7 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 		{
 			const DX8InstancingStatsStruct::SceneStruct &mainScene = scenes[DX8InstancingStatsStruct::SCENE_MAIN];
 			const DX8InstancingStatsStruct::SceneStruct &depthScene = scenes[DX8InstancingStatsStruct::SCENE_SHADOW_DEPTH];
-			DEBUG_LOG(("Instancing: render %d, %d draw calls, %d skins; main %d rigid, eligible by group 1:%d 2-3:%d 4-15:%d 16+:%d, instanced %d meshes in %d calls; depth %d rigid, eligible 1:%d 2-3:%d 4-15:%d 16+:%d, instanced %d meshes in %d calls; passes receive %d specular %d other %d; fallbacks clip %d fog %d resource %d lights %d",
+			RENDER_LOG(("Instancing: render %d, %d draw calls, %d skins; main %d rigid, eligible by group 1:%d 2-3:%d 4-15:%d 16+:%d, instanced %d meshes in %d calls; depth %d rigid, eligible 1:%d 2-3:%d 4-15:%d 16+:%d, instanced %d meshes in %d calls; passes receive %d specular %d other %d; fallbacks clip %d fog %d resource %d lights %d",
 				instancingFrames, Debug_Statistics::Get_Draw_Calls(), Debug_Statistics::Get_DX8_Skin_Renders(),
 				mainScene.RigidDraws, mainScene.EligibleDraws[0], mainScene.EligibleDraws[1], mainScene.EligibleDraws[2], mainScene.EligibleDraws[3],
 				mainScene.InstancedMeshes, mainScene.InstancedCalls,
@@ -1556,7 +1556,7 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 				rejections[DX8InstancingClass::REJECT_CLIP_PLANE], rejections[DX8InstancingClass::REJECT_FOG],
 				rejections[DX8InstancingClass::REJECT_RESOURCE],
 				rejections[DX8InstancingClass::REJECT_LIGHTS]));
-			DEBUG_LOG(("Skinning: render %d, skinned %d main %d depth; left to the CPU by state %d model %d mesh %d category %d pass %d",
+			RENDER_LOG(("Skinning: render %d, skinned %d main %d depth; left to the CPU by state %d model %d mesh %d category %d pass %d",
 				instancingFrames, skinning.SkinnedMeshes[0], skinning.SkinnedMeshes[1],
 				skinning.Rejections[DX8SkinningClass::REJECT_STATE], skinning.Rejections[DX8SkinningClass::REJECT_MODEL],
 				skinning.Rejections[DX8SkinningClass::REJECT_MESH], skinning.Rejections[DX8SkinningClass::REJECT_CATEGORY],
@@ -2259,7 +2259,7 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 	{
 		if (framesLit > 0)
 		{
-			DEBUG_LOG(("PixelLights: frame %d, terrain %s, units %s, %d of 300 frames lit, at most %d lights at once",
+			RENDER_LOG(("PixelLights: frame %d, terrain %s, units %s, %d of 300 frames lit, at most %d lights at once",
 				pixelLightFrames, W3DShaderManager::supportsTerrainPixelLights() ? "per pixel" : "per vertex",
 				W3DShaderManager::supportsUnitPixelLights() ? "per pixel" : "fixed function", framesLit, peakCount));
 		}

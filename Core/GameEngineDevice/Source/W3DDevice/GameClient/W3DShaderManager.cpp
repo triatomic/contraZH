@@ -4533,7 +4533,7 @@ void W3DShaderManager::init()
 		}
 	}
 
-	DEBUG_LOG(("ShaderManager ChipsetID %d", res));
+	RENDER_LOG(("ShaderManager ChipsetID %d", res));
 }
 
 // W3DShaderManager::shutdown =======================================================
@@ -4983,7 +4983,7 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 		file = TheFileSystem->openFile(strFilePath, File::READ | File::BINARY);
 		if (file == nullptr)
 		{
-			DEBUG_LOG(("LoadAndCreateD3DShader: could not open %s", strFilePath));
+			RENDER_LOG(("LoadAndCreateD3DShader: could not open %s", strFilePath));
 			return E_FAIL;
 		}
 
@@ -4994,7 +4994,7 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 		const DWORD* pShader = (DWORD*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dwFileSize);
 		if (!pShader)
 		{
-			DEBUG_LOG(("LoadAndCreateD3DShader: out of memory for %s", strFilePath));
+			RENDER_LOG(("LoadAndCreateD3DShader: out of memory for %s", strFilePath));
 			return E_FAIL;
 		}
 
@@ -5059,17 +5059,17 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 
 		if (FAILED(hr))
 		{
-			DEBUG_LOG(("LoadAndCreateD3DShader: failed to create %s, hr=0x%08X", strFilePath, hr));
+			RENDER_LOG(("LoadAndCreateD3DShader: failed to create %s, hr=0x%08X", strFilePath, hr));
 			return E_FAIL;
 		}
 	}
 	catch(...)
 	{
-		DEBUG_LOG(("LoadAndCreateD3DShader: exception loading %s", strFilePath));
+		RENDER_LOG(("LoadAndCreateD3DShader: exception loading %s", strFilePath));
 		return E_FAIL;
 	}
 
-	DEBUG_LOG(("LoadAndCreateD3DShader: loaded %s -> handle 0x%08X", strFilePath, *pHandle));
+	RENDER_LOG(("LoadAndCreateD3DShader: loaded %s -> handle 0x%08X", strFilePath, *pHandle));
 	return S_OK;
 }
 

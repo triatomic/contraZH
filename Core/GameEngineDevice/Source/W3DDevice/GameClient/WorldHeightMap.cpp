@@ -1061,7 +1061,7 @@ void WorldHeightMap::readNormalTiles(TXTextureClass *texClass, const char *textu
 	DDSFileClass dds(name, 0);
 	if (!dds.Is_Available() || !dds.Load())
 	{
-		DEBUG_LOG(("Terrain normal map %s not found", name));
+		RENDER_LOG(("Terrain normal map %s not found", name));
 		return;
 	}
 
@@ -1070,7 +1070,7 @@ void WorldHeightMap::readNormalTiles(TXTextureClass *texClass, const char *textu
 	const Int extent = numRows*TILE_PIXEL_EXTENT;
 	if (width < extent || height < extent)
 	{
-		DEBUG_LOG(("Terrain normal map %s is %dx%d, smaller than its texture's %d tiles", name, width, height, numRows));
+		RENDER_LOG(("Terrain normal map %s is %dx%d, smaller than its texture's %d tiles", name, width, height, numRows));
 		return;
 	}
 
@@ -2263,7 +2263,7 @@ TextureClass *WorldHeightMap::getTerrainNormalTexture()
 				withNormals++;
 			}
 		}
-		DEBUG_LOG(("Terrain normal atlas: %d of %d texture classes have normal maps, %s", withNormals,
+		RENDER_LOG(("Terrain normal atlas: %d of %d texture classes have normal maps, %s", withNormals,
 			m_numTextureClasses, built ? "built" : "not built, the card lacks A8L8"));
 
 		if (!built)
