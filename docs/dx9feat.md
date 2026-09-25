@@ -286,6 +286,8 @@ line adds to the list, so a long list can span several lines. Read at launch.)
 * `LaserPulse = 0.4` - (How far brightness swings along the beam, as a fraction. 0 is steady.)
 * `LaserPulseSize = 120` - (World units across one tile of pulse noise. Smaller gives more, closer pulses.)
 * `LaserPulseSpeed = 400` - (World units a second the pulses travel. 0 freezes them.)
+* `LaserDebug = No` - (Yes subtracts shaded beams from the scene instead of adding them, so they
+show dark on any background. Plain beams stay bright, which also shows which beams are shaded.)
 
 ```
 ParticleSystem Red_BurstLaserTrail
@@ -321,6 +323,8 @@ mod's `GameData.ini`:
 Higher gives a tight bright core, lower a broad wash.)
 * `LaserGroundGlowWrap = 0.5` - (Light on ground facing away from the beam, from 0 to 1. 0 lights
 only slopes facing it, 1 lights all ground evenly.)
+* `LaserGroundGlowDebug = No` - (Yes darkens the ground by as much as the glow would light it, so the
+light's reach and shape show as a shadow.)
 
 Notes:
 * The light lights the ground's own colour, measured against the map's terrain lighting, so red
