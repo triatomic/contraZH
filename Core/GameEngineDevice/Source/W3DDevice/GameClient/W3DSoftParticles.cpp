@@ -461,10 +461,17 @@ static Vector4 Laser_Pulse()
 	return Vector4(Noise_Rise(TheGlobalData->m_laserPulseSpeed * scale), scale, TheGlobalData->m_laserPulse, 0.0f);
 }
 
+// The default camera's distance to the ground it looks at, past which the flame and electric shaders ease their detail.
+static Real Default_Camera_Distance()
+{
+	const Real pitch = DEG_TO_RADF(max(TheGlobalData->m_cameraPitch, 10.0f));
+	return TheGlobalData->m_cameraHeight / sinf(pitch);
+}
+
 void W3DSoftParticles::bindFlame(const FlameShaderTuning &tuning)
 {
 	const Vector4 flame(Noise_Rise(tuning.rise), tuning.warp, Noise_Scale(tuning.noiseSize), tuning.heat);
-	const Vector4 shape(tuning.flicker, tuning.breakup, 0.0f, 0.0f);
+	const Vector4 shape(tuning.flicker, tuning.breakup, Default_Camera_Distance(), 0.0f);
 	DX8Wrapper::Set_Pixel_Shader_Constant(6, &flame, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(10, &shape, 1);
 	setWorldConstants(7);
@@ -479,12 +486,8 @@ void W3DSoftParticles::bindElectric()
 	const Real offsetX = (Hash_Lattice(jump, 0, 7) & 0xffff) / 65536.0f;
 	const Real offsetY = (Hash_Lattice(jump, 1, 7) & 0xffff) / 65536.0f;
 
-	// The default camera's distance to the ground it looks at.
-	const Real pitch = DEG_TO_RADF(max(TheGlobalData->m_cameraPitch, 10.0f));
-	const Real cameraDistance = TheGlobalData->m_cameraHeight / sinf(pitch);
-
 	const Vector4 electric(offsetX, offsetY, Noise_Scale(TheGlobalData->m_electricNoiseSize), TheGlobalData->m_electricJitter);
-	const Vector4 shape(TheGlobalData->m_electricFlicker, TheGlobalData->m_electricArcSharpness, TheGlobalData->m_electricArcs, cameraDistance);
+	const Vector4 shape(TheGlobalData->m_electricFlicker, TheGlobalData->m_electricArcSharpness, TheGlobalData->m_electricArcs, Default_Camera_Distance());
 	DX8Wrapper::Set_Pixel_Shader_Constant(6, &electric, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(7, &shape, 1);
 	Bind_Noise(m_noise);

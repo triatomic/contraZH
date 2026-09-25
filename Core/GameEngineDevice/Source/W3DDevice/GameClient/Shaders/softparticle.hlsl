@@ -58,7 +58,7 @@ float4 Flame       : register(c6);   // x = noise rise so far, y = texture warp,
 float4 FlameWorldX : register(c7);   // camera space to world x, y and z, one row each
 float4 FlameWorldY : register(c8);
 float4 FlameWorldZ : register(c9);
-float4 FlameShape  : register(c10);  // x = flicker swing, y = fringe breakup
+float4 FlameShape  : register(c10);  // x = flicker swing, y = fringe breakup, z = the default camera's distance to the ground it looks at
 #elif ELECTRIC
 float4 Electric       : register(c6);   // xy = this jump's noise offset, z = camera space to noise scale, w = texture jitter
 float4 ElectricShape  : register(c7);   // x = strobe swing, y = arc sharpness, z = arc brightness, w = depth where arcs start to widen
@@ -92,18 +92,22 @@ float4 main(PsIn input) : COLOR
     float4 texel = tex2D(ParticleTexture, uv);
     float4 color = texel * input.Diffuse;
 
+    // Beyond the default camera's distance a flame is small on screen, so the breakup and deepening that
+    // shape it up close ease off with depth, and it keeps the body and brightness that make it readable.
+    float nearness = min(1.0f, FlameShape.z / max(input.Position.z * Params.w, 1.0f));
+
     // Adding ignores alpha, and additive systems often leave it at zero.
     float coverage = lerp(texel.a, 1.0f, Params.y);
 
     // Only the texture's faintest fringe breaks up, so particles dimming with age keep their size.
     float shape = max(texel.r, max(texel.g, texel.b)) * coverage;
-    float keep = saturate(1.0f + (shape * 4.0f - noiseA.b - noiseB.b) * FlameShape.y);
+    float keep = saturate(1.0f + (shape * 4.0f - noiseA.b - noiseB.b) * FlameShape.y * nearness);
 
     float peak = max(color.r, max(color.g, color.b));
     float heat = saturate((peak * lerp(input.Diffuse.a, 1.0f, Params.y) * coverage - 0.5f) * Flame.w);
 
     // Halfway to the squared colour, so dim parts redden without losing much light.
-    float3 deep = color.rgb * (color.rgb + peak) / max(2.0f * peak, 0.001f);
+    float3 deep = lerp(color.rgb, color.rgb * (color.rgb + peak) / max(2.0f * peak, 0.001f), nearness);
     // Alpha blending breaks up through alpha alone, so its fringe does not darken twice.
     color.rgb = lerp(deep, peak.xxx, heat * heat) * (lerp(1.0f, keep, Params.y) * (1.0f + FlameShape.x * (noiseB.b - 0.5f)));
     color.a *= keep;
