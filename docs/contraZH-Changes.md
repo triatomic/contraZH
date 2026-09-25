@@ -302,8 +302,8 @@ rounds down to a valid step.
 * Fork fixes on top: settings survive a device reset (alt-tab, window toggle), and a driver that
 supports anisotropic for only min or mag filtering falls back to linear for the other.
 
-Shadow mapping, specular, normal and glow maps, per-pixel lights, soft particles, flame shading and
-the other features that need the Direct3D 9 build are on [Direct3D 9 Features](dx9feat.md).
+Shadow mapping, specular, normal and glow maps, per-pixel lights, soft particles, flame and laser
+shading and the other features that need the Direct3D 9 build are on [Direct3D 9 Features](dx9feat.md).
 
 ### Bloom
 
@@ -352,6 +352,8 @@ of the driver's usual three, so the screen answers the mouse sooner. Can cost a 
 
 Each laser beam lights the terrain along its length with up to twelve dynamic lights in the beam's
 colour (house coloured when the laser asks). Terrain only; units, buildings and roads are not lit.
+The Direct3D 9 build lights it with a shader instead, see
+[Laser ground glow](dx9feat.md#laser-ground-glow).
 
 * `LaserRef = No` - (Yes turns the glow on. Also `Lasers light the ground` in Game Options, applied
 on Accept. Needs `CheckLaserRef` in `OptionsMenu.wnd` for the menu control.)
@@ -363,10 +365,12 @@ the default:
 * `LaserGroundGlowColor = R:0 G:0 B:0` - (Light colour. Black derives it from the beam layers'
 colours weighted by width, times the laser texture's average colour, normalised to full brightness.)
 * `LaserGroundGlowIntensity = 70%` - (How strongly the colour is added to the ground.)
+* `LaserGroundGlowRadius = 0` - (How far the light reaches from the beam, in world units. 0 takes it
+from the beam, as below. Also `GroundGlowRadius` on the module.)
 
 Notes:
-* Each light's reach is the laser's `OuterBeamWidth`, or `GroundGlowRadius` on the module, at least
-15, plus a 6 unit soft edge. Long beams spread and dim their twelve lights.
+* Each light's reach is `GroundGlowRadius` on the module, else `LaserGroundGlowRadius`, else the
+laser's `OuterBeamWidth`, at least 15, plus a 6 unit soft edge. Long beams spread and dim their twelve lights.
 * The terrain takes up to 64 dynamic lights a frame, of all kinds.
 
 # ParticleSystem.ini

@@ -9,7 +9,7 @@ Cheat builds reload `Data\INI\GameData.ini` about half a second after it is save
 keys can be adjusted with a map running: `UnitSpecularIntensity`, `UnitSpecularPower`,
 `UnitBumpHeight`, `UnitNormalMapStrength`, `TerrainNormalMapStrength`, `UnitEmissiveIntensity`,
 `UnitEmissiveNightIntensity`, `SoftParticleDistance`, `AmbientOcclusionRadius`,
-`AmbientOcclusionStrength` and the `Flame`, `Haze` and `Electric` tuning keys. Other `GameData.ini` keys keep their
+`AmbientOcclusionStrength` and the `Flame`, `Haze`, `Electric` and `Laser` tuning keys. Other `GameData.ini` keys keep their
 value until a restart. The saved values win over a map's `map.ini` until the map loads again. A
 deleted key keeps its value until a restart, and a file with an error applies only the keys above
 the error until the next save.
@@ -255,6 +255,82 @@ depth, so they stay visible at the top of the screen and when zoomed out.
 * Streaks such as `TeslaTrail.tga`, volume particles, terrain-conforming particles and multiplied
 sprites stay plain.
 * Launch with `CONTRA_ELECTRICSHADER=0` to turn electric shading off.
+
+## Laser shading
+
+Laser beams burn white-hot along their axis and glow out in their own colour. The core wavers in
+width, pulses of brightness run along the beam towards its target, and the flat edges of the beam
+melt into glow. Beams also fade where they meet the ground, like soft particles. Needs the Direct3D 9
+build and a shader model 2 card.
+
+* `LaserShaders = Yes` - (No draws lasers plain. Options.ini only, no menu control.)
+
+Beams from `W3DLaserDraw` get it by default. Turned off per beam in the draw module:
+
+* `LaserShader = Yes` - (Default. `No` draws the beam plain, for beams that are not lasers, such as
+the hacker's `EXBinaryStream32.tga` data stream.)
+
+Laser streaks from particle systems are picked in `ParticleSystem.ini`:
+
+* `LaserShader = Auto` - (Default. On when the system is `Type = STREAK` and its `ParticleName` texture
+is listed in `GameData.ini`'s `LaserParticleTextures`. `Yes` turns it on for any streak system, `No`
+turns it off.)
+
+Listed and tuned in the mod's `GameData.ini`:
+
+* `LaserParticleTextures = EXRedLaser.dds ...` - (Streak textures whose systems draw as lasers. Each
+line adds to the list, so a long list can span several lines. Read at launch.)
+* `LaserCore = 1.2` - (Core brightness. 0 turns the core off.)
+* `LaserCoreWidth = 0.25` - (Core width, as a fraction of the beam's half width.)
+* `LaserShimmer = 0.3` - (How far the core's width wavers, as a fraction. 0 keeps it steady, 1 at most.)
+* `LaserPulse = 0.4` - (How far brightness swings along the beam, as a fraction. 0 is steady.)
+* `LaserPulseSize = 120` - (World units across one tile of pulse noise. Smaller gives more, closer pulses.)
+* `LaserPulseSpeed = 400` - (World units a second the pulses travel. 0 freezes them.)
+
+```
+ParticleSystem Red_BurstLaserTrail
+  ...
+  Type = STREAK
+  LaserShader = Yes
+End
+```
+
+Notes:
+* A beam's own texture still gives it its colour and shape. The shader adds the core, the pulses and
+the soft edges on top.
+* Beams made of several `NumBeams` layers get a core in every layer, so the axis runs brightest.
+* Pulses are fixed along the beam in the world, so they keep flowing smoothly while the shooter moves.
+* Sprite particles, such as laser muzzle flares, stay plain.
+* Launch with `CONTRA_LASERSHADER=0` to turn laser shading off.
+
+## Laser ground glow
+
+Laser beams light the ground per pixel, with one light shaped like the beam. The light fades with
+the distance to the nearest point on the beam, so a beam skimming the ground lights a bright strip
+and a beam climbing into the sky lights only the ground near the shooter. Slopes facing the beam
+catch more light, and the laser shader's pulses brighten the ground as they pass. The Direct3D 8
+build keeps the strip of dynamic lights described in
+[Laser ground glow](contraZH-Changes.md#laser-ground-glow). Needs a shader model 2 card.
+
+Uses the same switches and keys as the Direct3D 8 glow: `LaserRef`, `DynamicLights`,
+`LaserGroundGlowColor`, `LaserGroundGlowIntensity`, `LaserGroundGlowRadius`, and `GroundGlowColor`,
+`GroundGlowIntensity` and `GroundGlowRadius` on the `W3DLaserDraw` module. Shaped further in the
+mod's `GameData.ini`:
+
+* `LaserGroundGlowFalloff = 2` - (How fast the light fades with distance from the beam, as a power.
+Higher gives a tight bright core, lower a broad wash.)
+* `LaserGroundGlowWrap = 0.5` - (Light on ground facing away from the beam, from 0 to 1. 0 lights
+only slopes facing it, 1 lights all ground evenly.)
+
+Notes:
+* The light lights the ground's own colour, measured against the map's terrain lighting, so red
+ground turns redder and a dark night map lights up as much as a bright day.
+* The light reaches `GroundGlowRadius` on the module, else `LaserGroundGlowRadius`, else 1.25 times
+the laser's `OuterBeamWidth`, at least 15. It is counted from the beam in three dimensions.
+* Lasers no longer take dynamic lights, so the terrain's nine per-pixel lights stay free for
+explosions and muzzle flashes.
+* Water covers the glow on ground beneath it. Units and buildings are not lit.
+* Launch with `CONTRA_LASERGLOW=0` to go back to the dynamic lights.
 
 ## Ambient occlusion
 
