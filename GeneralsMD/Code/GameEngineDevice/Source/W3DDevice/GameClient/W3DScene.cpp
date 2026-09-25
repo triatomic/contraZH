@@ -1477,7 +1477,6 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 	}
 
 	// The shadow receiver and the specular highlight are the passes the instanced main scene redraws itself.
-	DX8MeshRendererClass::Begin_Instancing_Frame();
 	DX8InstancingClass::Set_Instanced_Material_Passes(
 		(TheW3DShadowMap != nullptr) ? TheW3DShadowMap->getReceivePass() : nullptr, W3DShaderManager::getSpecularPassKey());
 

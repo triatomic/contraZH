@@ -144,6 +144,7 @@ public:
 	void								Set_Lighting_Environment(LightEnvironmentClass * light_env) { if (light_env) {m_localLightEnv=*light_env;LightEnvironment = &m_localLightEnv;} else {LightEnvironment = nullptr;} }
 	LightEnvironmentClass *		Get_Lighting_Environment() { return LightEnvironment; }
 	float	Get_Alpha_Override() { return m_alphaOverride;}
+	bool	Has_Material_Pass_Override() const { return m_materialPassAlphaOverride != 1.0f || m_materialPassEmissiveOverride != 1.0f; }
 
 	void								Set_Next_Visible_Skin(MeshClass * next_visible) { NextVisibleSkin = next_visible; }
 	MeshClass *						Peek_Next_Visible_Skin() { return NextVisibleSkin; }

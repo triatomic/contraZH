@@ -75,7 +75,7 @@ struct InstanceRecord
 
 enum
 {
-	INSTANCE_BUFFER_COUNT = 8192,
+	INSTANCE_BUFFER_COUNT = DX8InstancingClass::MAX_INSTANCES,
 	MAX_DECLARATIONS = 16,
 	MAX_DECLARATION_ELEMENTS = 14,
 };
@@ -422,7 +422,6 @@ bool DX8InstancingClass::Can_Share_Group(MeshClass * reference, MeshClass * mesh
 	const int light_count = a->Get_Light_Count();
 	if (b->Get_Light_Count() != light_count)
 	{
-		Rejections[REJECT_LIGHTS]++;
 		return false;
 	}
 	if (light_count == 0)
@@ -435,7 +434,6 @@ bool DX8InstancingClass::Can_Share_Group(MeshClass * reference, MeshClass * mesh
 		const Vector3 difference = b->Get_Light_Diffuse(i) - a->Get_Light_Diffuse(i) - offset;
 		if (!(a->Get_Light_Direction(i) == b->Get_Light_Direction(i)) || difference.Length2() > 1.0e-8f)
 		{
-			Rejections[REJECT_LIGHTS]++;
 			return false;
 		}
 	}
@@ -484,8 +482,17 @@ bool DX8InstancingClass::Draw_Groups(DX8PolygonRendererClass * const * renderers
 	Vector4 constants[DX8VertexShadingClass::CONSTANT_COUNT];
 	DX8VertexShadingClass::Get_View_Constants(constants);
 	DX8VertexShadingClass::Get_Material_Constants((DX8VertexShadingClass::PassType)Pass, material, fvf, fog, constants);
-	const int constant_count = (Pass == PASS_LIT) ? DX8VertexShadingClass::CONSTANT_COUNT : DX8VertexShadingClass::CONSTANT_DIFFUSE_ALPHA + 1;
-	DX8Wrapper::Set_Vertex_Shader_Constant(0, constants, constant_count);
+	if (Pass == PASS_LIT)
+	{
+		// The registers between fog and the stages were never filled, and the lights go per group.
+		DX8Wrapper::Set_Vertex_Shader_Constant(0, constants, DX8VertexShadingClass::CONSTANT_FOG + 1);
+		DX8Wrapper::Set_Vertex_Shader_Constant(DX8VertexShadingClass::CONSTANT_STAGE_SOURCE, &constants[DX8VertexShadingClass::CONSTANT_STAGE_SOURCE],
+			DX8VertexShadingClass::CONSTANT_COUNT - DX8VertexShadingClass::CONSTANT_STAGE_SOURCE);
+	}
+	else
+	{
+		DX8Wrapper::Set_Vertex_Shader_Constant(0, constants, DX8VertexShadingClass::CONSTANT_DIFFUSE_ALPHA + 1);
+	}
 
 	Draw_Instances(declaration, PassShader, renderers, counts, group_count, meshes, offset, nullptr);
 	return true;
@@ -535,6 +542,11 @@ void DX8InstancingClass::Take_Rejections(int * counts)
 	}
 }
 
+void DX8InstancingClass::Add_Rejections(RejectionType type, int count)
+{
+	Rejections[type] += count;
+}
+
 void DX8InstancingClass::Release_Resources()
 {
 	if (InstanceBuffer != nullptr)
@@ -566,6 +578,7 @@ void DX8InstancingClass::Take_Rejections(int * counts)
 		counts[i] = 0;
 	}
 }
+void DX8InstancingClass::Add_Rejections(RejectionType type, int count) {}
 void DX8InstancingClass::Set_Main_Shader(IDirect3DVertexShader9 * shader) {}
 void DX8InstancingClass::Set_Instanced_Material_Passes(const MaterialPassClass * first, const MaterialPassClass * second) {}
 bool DX8InstancingClass::Is_Instanced_Material_Pass(const MaterialPassClass * pass) { return false; }

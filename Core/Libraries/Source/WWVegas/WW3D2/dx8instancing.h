@@ -45,6 +45,9 @@ public:
 	// A single mesh draws faster through the fixed-function path.
 	enum { MIN_GROUP_SIZE = 2 };
 
+	// The most meshes one Draw_Groups or Draw_Material_Pass_Groups call takes.
+	enum { MAX_INSTANCES = 8192 };
+
 	// Why group draws fell back to fixed function, for the debug log.
 	enum RejectionType
 	{
@@ -55,6 +58,7 @@ public:
 		REJECT_COUNT
 	};
 	static void			Take_Rejections(int * counts);
+	static void			Add_Rejections(RejectionType type, int count);
 
 	static void			Shutdown();
 	static void			Release_Resources();

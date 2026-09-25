@@ -1626,6 +1626,18 @@ static Int TerrainBumpCount = 0;
 
 #if defined(BUILD_WITH_D3D9)
 
+// The instancing and skinning modules build their own declarations, so the one loaded here only has to be valid.
+static HRESULT Load_Vertex_Shading_Shader(const char *file, DWORD *handle)
+{
+	DWORD declaration[] =
+	{
+		D3DVSD_STREAM(0),
+		D3DVSD_REG(0, D3DVSDT_FLOAT3),
+		D3DVSD_END()
+	};
+	return W3DShaderManager::LoadAndCreateD3DShader(file, declaration, 0, true, handle);
+}
+
 ///Writes caster depth into the shadow map. Only the D3D9 backend has the shader model for it.
 ///
 ///Casters draw with their own textures and shaders, and this overrides the state those
@@ -1682,20 +1694,11 @@ Int ShadowDepthShader::init()
 		}
 	}
 
-	// The instancing module builds its own declarations, so this one only has to be valid.
-	DWORD declaration[] =
-	{
-		D3DVSD_STREAM(0),
-		D3DVSD_REG(0, D3DVSDT_FLOAT3),
-		D3DVSD_END()
-	};
-	if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(packed ? "shaders\\instancedepthpacked.vso" : "shaders\\instancedepth.vso",
-			declaration, 0, true, &m_dwInstanceShader)))
+	if (FAILED(Load_Vertex_Shading_Shader(packed ? "shaders\\instancedepthpacked.vso" : "shaders\\instancedepth.vso", &m_dwInstanceShader)))
 	{
 		m_dwInstanceShader = 0;
 	}
-	if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(packed ? "shaders\\skindepthpacked.vso" : "shaders\\skindepth.vso",
-			declaration, 0, true, &m_dwSkinShader)))
+	if (FAILED(Load_Vertex_Shading_Shader(packed ? "shaders\\skindepthpacked.vso" : "shaders\\skindepth.vso", &m_dwSkinShader)))
 	{
 		m_dwSkinShader = 0;
 	}
@@ -4706,14 +4709,7 @@ void W3DShaderManager::init()
 		}
 	}
 #if defined(BUILD_WITH_D3D9)
-	// The instancing module builds its own declarations, so this one only has to be valid.
-	DWORD instanceDeclaration[] =
-	{
-		D3DVSD_STREAM(0),
-		D3DVSD_REG(0, D3DVSDT_FLOAT3),
-		D3DVSD_END()
-	};
-	if (SUCCEEDED(LoadAndCreateD3DShader("shaders\\instancemain.vso", instanceDeclaration, 0, true, &InstancedMainShader)))
+	if (SUCCEEDED(Load_Vertex_Shading_Shader("shaders\\instancemain.vso", &InstancedMainShader)))
 	{
 		DX8InstancingClass::Set_Main_Shader(Peek_D3D9_Vertex_Shader(InstancedMainShader));
 	}
@@ -4721,7 +4717,7 @@ void W3DShaderManager::init()
 	{
 		InstancedMainShader = 0;
 	}
-	if (SUCCEEDED(LoadAndCreateD3DShader("shaders\\skinmain.vso", instanceDeclaration, 0, true, &SkinnedMainShader)))
+	if (SUCCEEDED(Load_Vertex_Shading_Shader("shaders\\skinmain.vso", &SkinnedMainShader)))
 	{
 		DX8SkinningClass::Set_Main_Shader(Peek_D3D9_Vertex_Shader(SkinnedMainShader));
 	}

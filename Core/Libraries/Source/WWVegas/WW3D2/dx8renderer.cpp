@@ -328,9 +328,15 @@ void DX8FVFCategoryContainer::Remove_Texture_Category(DX8TextureCategoryClass* t
 	fvf_category_container_delete_list.Add_Tail(this);
 }
 
+// Per-polygon culling draws fixed function, so a culled pass cannot follow an instanced base.
+static bool Is_Window_Pass(MaterialPassClass * pass)
+{
+	return DX8InstancingClass::Is_Instanced_Material_Pass(pass) && (pass->Get_Cull_Volume() == nullptr || !MaterialPassClass::Is_Per_Polygon_Culling_Enabled());
+}
+
 void DX8FVFCategoryContainer::Add_Visible_Material_Pass(MaterialPassClass * pass,MeshClass * mesh)
 {
-	if (!DX8InstancingClass::Is_Instanced_Material_Pass(pass))
+	if (!Is_Window_Pass(pass))
 	{
 		_FixedFunctionPassMeshes.push_back(mesh);
 		_FixedFunctionPassMeshesSorted = false;
@@ -361,15 +367,11 @@ static bool Fragment_Renderer_Less(const InstancedFragment & a, const InstancedF
 // drawn by the mesh as before, after the window it would otherwise overtake.
 static bool Allows_Material_Pass_Window(MaterialPassClass * pass, MeshClass * mesh)
 {
-	if (!DX8InstancingClass::Is_Instanced_Material_Pass(pass) || mesh->Has_Material_Pass_Override())
+	if (!Is_Window_Pass(pass) || mesh->Has_Material_Pass_Override())
 	{
 		return false;
 	}
-	if (mesh->Peek_Model()->Get_Flag(MeshModelClass::SKIN))
-	{
-		return false;
-	}
-	return pass->Get_Cull_Volume() == nullptr || !MaterialPassClass::Is_Per_Polygon_Culling_Enabled();
+	return !mesh->Peek_Model()->Get_Flag(MeshModelClass::SKIN);
 }
 
 void DX8FVFCategoryContainer::Render_Instanced_Material_Passes()
@@ -423,7 +425,7 @@ void DX8FVFCategoryContainer::Render_Material_Pass_Window()
 		return;
 	}
 
-	static std::vector<const MaterialPassClass *> passes;
+	static std::vector<MaterialPassClass *> passes;
 	static std::vector<InstancedFragment> instanced;
 	static std::vector<InstancedFragment> fixed;
 	static std::vector<MeshClass *> meshes;
@@ -432,7 +434,7 @@ void DX8FVFCategoryContainer::Render_Material_Pass_Window()
 
 	for (size_t i=0;i<window.size();++i)
 	{
-		const MaterialPassClass * pass = window[i]->Peek_Material_Pass();
+		MaterialPassClass * pass = window[i]->Peek_Material_Pass();
 		if (std::find(passes.begin(), passes.end(), pass) == passes.end())
 		{
 			passes.push_back(pass);
@@ -441,7 +443,7 @@ void DX8FVFCategoryContainer::Render_Material_Pass_Window()
 
 	for (size_t p=0;p<passes.size();++p)
 	{
-		MaterialPassClass * pass = const_cast<MaterialPassClass *>(passes[p]);
+		MaterialPassClass * pass = passes[p];
 		for (size_t i=0;i<window.size();++i)
 		{
 			if (window[i]->Peek_Material_Pass() != pass)
@@ -479,13 +481,29 @@ void DX8FVFCategoryContainer::Render_Material_Pass_Window()
 				}
 				meshes.push_back(instanced[i - 1].first);
 			}
-			if (DX8InstancingClass::Draw_Material_Pass_Groups(pass, &renderers[0], &counts[0], (int)renderers.size(), &meshes[0], FVF))
+
+			// A pass spans every category of the container, so its groups go in batches one call can take.
+			size_t group = 0;
+			size_t first = 0;
+			while (group < renderers.size())
 			{
-				instanced_calls = (int)renderers.size();
-			}
-			else
-			{
-				fixed.insert(fixed.end(), instanced.begin(), instanced.end());
+				size_t end = group;
+				int batch = 0;
+				while (end < renderers.size() && (end == group || batch + counts[end] <= DX8InstancingClass::MAX_INSTANCES))
+				{
+					batch += counts[end];
+					++end;
+				}
+				if (DX8InstancingClass::Draw_Material_Pass_Groups(pass, &renderers[group], &counts[group], (int)(end - group), &meshes[first], FVF))
+				{
+					instanced_calls += (int)(end - group);
+				}
+				else
+				{
+					fixed.insert(fixed.end(), instanced.begin() + first, instanced.begin() + first + batch);
+				}
+				first += batch;
+				group = end;
 			}
 		}
 
@@ -2357,14 +2375,9 @@ static bool Mesh_Allows_Instancing(MeshClass * mesh)
 	return true;
 }
 
-static bool Polygon_Renderer_Less(const DX8PolygonRendererClass * a, const DX8PolygonRendererClass * b)
-{
-	return a < b;
-}
-
 static void Record_Eligible_Groups(std::vector<DX8PolygonRendererClass *> & renderers)
 {
-	std::sort(renderers.begin(), renderers.end(), Polygon_Renderer_Less);
+	std::sort(renderers.begin(), renderers.end());
 	size_t start = 0;
 	for (size_t i=1;i<=renderers.size();++i)
 	{
@@ -2412,6 +2425,7 @@ void DX8TextureCategoryClass::Render_Instanced_Groups(VertexMaterialClass * vmat
 		}
 		// Each group shares its first mesh's lights; meshes that cannot join wait for the next group.
 		pending.assign(candidates.begin() + start, candidates.begin() + i);
+		const size_t drawn_before = drawn.size();
 		while ((int)pending.size() >= DX8InstancingClass::MIN_GROUP_SIZE)
 		{
 			MeshClass * reference = pending[0]->Peek_Mesh();
@@ -2441,6 +2455,10 @@ void DX8TextureCategoryClass::Render_Instanced_Groups(VertexMaterialClass * vmat
 				drawn.resize(drawn.size() - count);
 			}
 			pending.swap(rest);
+		}
+		if ((int)(i - start) >= DX8InstancingClass::MIN_GROUP_SIZE)
+		{
+			DX8InstancingClass::Add_Rejections(DX8InstancingClass::REJECT_LIGHTS, (int)(i - start - (drawn.size() - drawn_before)));
 		}
 		start = i;
 	}
@@ -3002,12 +3020,6 @@ void DX8MeshRendererClass::Record_Material_Pass(const MaterialPassClass* pass, i
 	instancing_stats.OtherPassDraws += draws;
 }
 
-void DX8MeshRendererClass::Begin_Instancing_Frame()
-{
-	_FixedFunctionPassMeshes.clear();
-	_FixedFunctionPassMeshesSorted = true;
-}
-
 void DX8MeshRendererClass::Take_Instancing_Stats(DX8InstancingStatsStruct& stats)
 {
 	stats = instancing_stats;
@@ -3251,6 +3263,8 @@ void DX8MeshRendererClass::Flush()
 
 	_InstancedFragments.clear();
 	_InstancedFragmentsSorted = true;
+	_FixedFunctionPassMeshes.clear();
+	_FixedFunctionPassMeshesSorted = true;
 }
 
 

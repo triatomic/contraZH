@@ -390,9 +390,6 @@ public:
 	static void				Record_Material_Pass(const MaterialPassClass* pass, int draws);
 	static void				Take_Instancing_Stats(DX8InstancingStatsStruct& stats);
 
-	// Called before the scene queues its meshes, which note there which of them keep a fixed-function pass.
-	static void				Begin_Instancing_Frame();
-
 	void						Log_Statistics_String(bool only_visible);
 	static void				Request_Log_Statistics();
 

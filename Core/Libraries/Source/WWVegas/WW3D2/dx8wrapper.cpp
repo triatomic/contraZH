@@ -2534,7 +2534,10 @@ void DX8Wrapper::Draw_Instanced_Triangles(
 	unsigned instance_stride,
 	unsigned instance_count)
 {
-	if (DrawPolygonLowBoundLimit && DrawPolygonLowBoundLimit>=polygon_count) return;
+	if (DrawPolygonLowBoundLimit && DrawPolygonLowBoundLimit>=polygon_count)
+	{
+		return;
+	}
 
 	// A vertex buffer change would put the FVF back in place of the shader.
 	const bool vertex_buffer_changed = (render_state_changed & VERTEX_BUFFER_CHANGED) != 0;
@@ -2545,7 +2548,10 @@ void DX8Wrapper::Draw_Instanced_Triangles(
 		DX8CALL(SetVertexShader(InstancedShader));
 	}
 
-	if (!_Is_Triangle_Draw_Enabled()) return;
+	if (!_Is_Triangle_Draw_Enabled())
+	{
+		return;
+	}
 
 	Set_DX8_Stream_Source(1, instance_buffer, instance_offset, instance_stride);
 	DX8CALL(SetStreamSourceFreq(0, D3DSTREAMSOURCE_INDEXEDDATA | instance_count));

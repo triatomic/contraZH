@@ -345,6 +345,7 @@ protected:
 	friend class MeshDeformClass;
 	friend class MeshLoadContextClass;
 	friend class DX8SkinFVFCategoryContainer;
+	friend class DX8FVFCategoryContainer;
 	friend class DX8MeshRendererClass;
 	friend class DX8PolygonRendererClass;
 };
