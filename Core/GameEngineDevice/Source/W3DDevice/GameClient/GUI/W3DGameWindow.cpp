@@ -548,9 +548,6 @@ Int W3DGameWindow::winSetText( UnicodeString newText )
 	// extending functionality
 	GameWindow::winSetText( newText );
 
-	// rebuild the sentence in our text renderer
-	m_textRenderer.Build_Sentence( m_instData.getText().str(),nullptr, nullptr );
-
 	// this is a visual change
 	m_needPolyDraw = TRUE;
 
@@ -641,6 +638,12 @@ void W3DGameWindow::drawText( Color color )
 		m_currTextColor = color;
 		needDraw = TRUE;
 
+	}
+
+	// Built here rather than in winSetText, since most windows never draw through this renderer.
+	if( m_needPolyDraw )
+	{
+		m_textRenderer.Build_Sentence( m_instData.getText().str(), nullptr, nullptr );
 	}
 
 	// draw the quads if needed
