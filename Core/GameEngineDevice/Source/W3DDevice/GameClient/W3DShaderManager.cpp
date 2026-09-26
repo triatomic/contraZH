@@ -1563,8 +1563,7 @@ static void Unbind_Height_Atlas()
 #endif
 }
 
-// Binds the height atlas, or nothing, and returns the heightblend.hlsli constants to go with it.
-// Without the atlas they give the legacy blend. A sharpness below 1 would spill the blend into cells without one.
+// Binds the heights or nothing and returns their constants; a sharpness under 1 would spill the blend into unblended cells.
 static Vector4 Bind_Height_Blend(TextureClass *heights)
 {
 #if defined(BUILD_WITH_D3D9)
@@ -2749,8 +2748,7 @@ void W3DShaderManager::setTerrainTextureFilter(Int stage, Bool bilinearMipLinear
 	DWORD magFilter = minFilter;
 	DWORD mipFilter = (trilinear || bilinearMipLinear) ? D3DTEXF_LINEAR : D3DTEXF_POINT;
 
-	// The player's anisotropic filter wins over the mod's terrain settings, one capability at a time,
-	// as TextureFilterClass decides it for stage 0.
+	// The player's anisotropy wins over the mod's settings per capability, as TextureFilterClass decides stage 0.
 	const DX8Caps *caps = DX8Wrapper::Get_Current_Caps();
 	if (WW3D::Get_Texture_Filter() == TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC && caps != nullptr)
 	{
@@ -3827,8 +3825,7 @@ Int TerrainShaderPixelShader::set(Int pass)
 	W3DShaderManager::setTerrainTextureFilter(0, FALSE);
 	W3DShaderManager::setTerrainTextureFilter(1, TRUE);
 
-	// Where the ground noise can stand in for the light map it always does, as the second of two maps
-	// behind the clouds or white. When it fails to build, the ground goes without a light map.
+	// The ground noise replaces the light map as the second map behind clouds or white; if it fails, the light map goes.
 	const W3DShaderManager::ShaderTypes shader = W3DShaderManager::getCurrentShader();
 	const Bool cloudMap = (shader == W3DShaderManager::ST_TERRAIN_BASE_NOISE1 || shader == W3DShaderManager::ST_TERRAIN_BASE_NOISE12);
 	Bool lightMap = (shader == W3DShaderManager::ST_TERRAIN_BASE_NOISE2 || shader == W3DShaderManager::ST_TERRAIN_BASE_NOISE12);
@@ -3935,19 +3932,14 @@ Int TerrainShaderPixelShader::set(Int pass)
 	DX8Wrapper::Set_Pixel_Shader_Constant(TERRAIN_HEIGHT_BLEND_REGISTER, &heightBlend, 1);
 
 	const DWORD legacyShaders[3] = { m_dwBasePixelShader, m_dwBaseNoise1PixelShader, m_dwBaseNoise2PixelShader };
-	const DWORD baseShaders[3] =
-	{
-		m_dwPlainPixelShader[0] ? m_dwPlainPixelShader[0] : legacyShaders[0],
-		m_dwPlainPixelShader[1] ? m_dwPlainPixelShader[1] : legacyShaders[1],
-		m_dwPlainPixelShader[2] ? m_dwPlainPixelShader[2] : legacyShaders[2]
-	};
-	DX8Wrapper::Set_Pixel_Shader(baseShaders[noiseCount]);
+	const DWORD baseShader = m_dwPlainPixelShader[noiseCount] ? m_dwPlainPixelShader[noiseCount] : legacyShaders[noiseCount];
+	DX8Wrapper::Set_Pixel_Shader(baseShader);
 
 	const Bool shadowed = setShadowReceiver(noiseCount);
 	const Bool bumped = setBump(noiseCount, shadowed);
 
 	const DWORD unlit = bumped ? m_dwBumpPixelShader[shadowed ? 1 : 0][noiseCount]
-		: (shadowed ? m_dwShadowPixelShader[noiseCount] : baseShaders[noiseCount]);
+		: (shadowed ? m_dwShadowPixelShader[noiseCount] : baseShader);
 	setPixelLights(noiseCount, shadowed, bumped, unlit);
 	setSeabed(noiseCount, shadowed, bumped, unlit);
 
@@ -4304,15 +4296,13 @@ Bool RoadShaderPixelShader::setPixelPath()
 	const Bool cloudMap = (shader == W3DShaderManager::ST_ROAD_BASE_NOISE1 || shader == W3DShaderManager::ST_ROAD_BASE_NOISE12);
 	const Bool anyLightMap = (shader == W3DShaderManager::ST_ROAD_BASE_NOISE2 || shader == W3DShaderManager::ST_ROAD_BASE_NOISE12);
 
-	// As on the terrain, the ground noise stands in for the light map as the second of two maps,
-	// behind the clouds or white, and the light map goes when the noise fails to build.
+	// As on the terrain, the ground noise replaces the light map, and the light map goes when the noise fails.
 	const Bool groundCapable = (m_dwPlainPixelShader[0] != 0 && m_dwPlainPixelShader[1] != 0 && m_dwPlainPixelShader[2] != 0);
 	const Bool groundNoise = anyLightMap && groundCapable && W3DGroundNoise::getTexture() != nullptr &&
 		(cloudMap || W3DGroundNoise::getWhiteTexture() != nullptr);
 	const Bool lightMap = anyLightMap && !groundCapable;
 	const Int noiseCount = groundNoise ? 2 : (cloudMap ? 1 : 0) + (lightMap ? 1 : 0);
 
-	// The two-map variants read the second map as the ground noise, so the legacy light map keeps the legacy shaders.
 	if (noiseCount == 2 && !groundNoise)
 	{
 		return FALSE;
@@ -4361,7 +4351,16 @@ Bool RoadShaderPixelShader::setPixelPath()
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND,D3DBLEND_INVSRCALPHA);
 
 	const DWORD mipFilter = (TheGlobalData && TheGlobalData->m_trilinearTerrainTex) ? D3DTEXF_LINEAR : D3DTEXF_POINT;
-	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_MIPFILTER, mipFilter);
+
+	// Blend tiles draw the terrain atlas, so they filter as the terrain does.
+	if (RoadHeightBlendTiles)
+	{
+		W3DShaderManager::setTerrainTextureFilter(0, FALSE);
+	}
+	else
+	{
+		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_MIPFILTER, mipFilter);
+	}
 
 	D3DMATRIX curView;
 	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, curView);

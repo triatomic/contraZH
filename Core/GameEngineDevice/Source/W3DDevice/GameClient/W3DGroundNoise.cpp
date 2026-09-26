@@ -33,8 +33,7 @@
 
 static const Int NOISE_SIZE = 512;
 
-// Each channel's noise: lattice cells across the texture, octaves, the amplitude each octave keeps
-// from the last, how hard the tails are squeezed into patches, and the channel's share of the strength.
+// Lattice cells across the texture, octaves, each octave's gain, how hard tails squeeze into patches, and the share of the strength.
 struct GroundNoiseLayer
 {
 	Int cells;
@@ -44,8 +43,7 @@ struct GroundNoiseLayer
 	Real share;
 };
 
-// Red, green and blue shade the ground, broadest first. groundnoise.hlsli reads green and blue
-// shrunk and turned, so the texels hold finer detail than they seem to. Alpha tints.
+// Red, green and blue shade broadest first, green and blue read shrunk and turned, and alpha tints.
 static const GroundNoiseLayer Layers[4] =
 {
 	{ 4, 5, 0.5f, 0.0f, 0.45f },

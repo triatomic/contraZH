@@ -157,14 +157,11 @@ public:
 	/// Sets whether the terrain shaders read the normal atlas in TERRAIN_NORMAL_TEXTURE, and how strongly.
 	/// debug shows only the bump's shading, on grey.
 	static void setTerrainBumps(Bool enabled, Real strength, Bool debug);
-	/// Sets a terrain texture stage's filters: anisotropic when the player chose it and the card has it,
-	/// else from GameData's BilinearTerrainTex and TrilinearTerrainTex. Without TrilinearTerrainTex the
-	/// mip filter is linear only when bilinearMipLinear is set.
+	/// Sets a terrain stage's filters from the player's anisotropy or the mod's settings, whose mip is linear with bilinearMipLinear.
 	static void setTerrainTextureFilter(Int stage, Bool bilinearMipLinear);
 	/// Whether the terrain shaders can blend by height, so the terrain should hand over its height atlas.
 	static Bool supportsTerrainHeightBlend();
-	/// Sets whether draws through the road shaders are blend tiles, which blend by the height atlas
-	/// in TERRAIN_HEIGHT_TEXTURE, rather than roads.
+	/// Sets whether road shader draws are blend tiles, which blend by the heights in TERRAIN_HEIGHT_TEXTURE.
 	static void setRoadHeightBlend(Bool blendTiles);
 	/// How many terrain draws used the normal atlas since the last call.
 	static Int takeTerrainBumpCount();

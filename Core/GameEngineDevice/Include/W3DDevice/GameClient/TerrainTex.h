@@ -36,8 +36,7 @@
 
 class WorldHeightMap;
 
-// Texels copied around each texture in the terrain atlases, from GameData TerrainAtlasBorder rounded up
-// to a multiple of 4 so every texture starts on a whole texel of the smallest mip.
+// Bounds of GameData TerrainAtlasBorder, the texels copied around each texture in the terrain atlases.
 #define MIN_ATLAS_BORDER 4
 #define MAX_ATLAS_BORDER 32
 #define MAX_ATLAS_SLOTS (TEXTURE_WIDTH/(TILE_PIXEL_EXTENT+2*MIN_ATLAS_BORDER))

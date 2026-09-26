@@ -207,10 +207,10 @@ float4 SeabedSample(sampler2D atlas, float4 plain, float2 uv, float2 texel, floa
     drift -= block.z * floor(drift / block.z + 0.5f);
     float onGrid = step(dot(drift, drift), 1.0f);
 
-    // Each read's gradients turn with it, so anisotropic filtering runs along the right axis.
-    float4 sum = cells.weight.x * tex2Dgrad(atlas, BlockUV(Turn(texel, cells.turn0) + cells.offset0 * block.z, block), Turn(dx, cells.turn0), Turn(dy, cells.turn0));
-    sum += cells.weight.y * tex2Dgrad(atlas, BlockUV(Turn(texel, cells.turn1) + cells.offset1 * block.z, block), Turn(dx, cells.turn1), Turn(dy, cells.turn1));
-    sum += cells.weight.z * tex2Dgrad(atlas, BlockUV(Turn(texel, cells.turn2) + cells.offset2 * block.z, block), Turn(dx, cells.turn2), Turn(dy, cells.turn2));
+    // Each read's gradients turn in texels, then scale, since the atlas need not be square.
+    float4 sum = cells.weight.x * tex2Dgrad(atlas, BlockUV(Turn(texel, cells.turn0) + cells.offset0 * block.z, block), Turn(dx, cells.turn0) * SeabedAtlas.zw, Turn(dy, cells.turn0) * SeabedAtlas.zw);
+    sum += cells.weight.y * tex2Dgrad(atlas, BlockUV(Turn(texel, cells.turn1) + cells.offset1 * block.z, block), Turn(dx, cells.turn1) * SeabedAtlas.zw, Turn(dy, cells.turn1) * SeabedAtlas.zw);
+    sum += cells.weight.z * tex2Dgrad(atlas, BlockUV(Turn(texel, cells.turn2) + cells.offset2 * block.z, block), Turn(dx, cells.turn2) * SeabedAtlas.zw, Turn(dy, cells.turn2) * SeabedAtlas.zw);
     return lerp(plain, sum, onGrid);
 }
 
@@ -279,8 +279,8 @@ float4 main(PsIn input) : COLOR
 
     // The atlas runs u along the world's x and v against its y, SeabedWorld.x texels per unit.
     float2 texel = float2(input.WorldPos.x, -input.WorldPos.y) * SeabedWorld.x + float2(SeabedWorld.y, -SeabedWorld.y);
-    float2 texelDx = ddx(texel) * SeabedAtlas.zw;
-    float2 texelDy = ddy(texel) * SeabedAtlas.zw;
+    float2 texelDx = ddx(texel);
+    float2 texelDy = ddy(texel);
 
     // ps_2_a cannot branch, so dry pixels pay for this too, and W3DShaderManager only draws tiles with water through it.
     HexCells cells = FindHexCells(input.WorldPos.xy);

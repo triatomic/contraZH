@@ -448,7 +448,7 @@ WorldHeightMap::WorldHeightMap():
 #endif
 	m_numCliffInfo(1),
 	m_terrainTex(nullptr), m_alphaTerrainTex(nullptr), m_numBitmapTiles(0), m_numBlendedTiles(1),
-	m_terrainNormalTex(nullptr), m_terrainHeightTex(nullptr), m_terrainClassMap(nullptr), m_terrainClassMapAtlas(nullptr), m_hasNormalTiles(false)
+	m_terrainNormalTex(nullptr), m_terrainHeightTex(nullptr), m_terrainHeightTexFailed(false), m_terrainClassMap(nullptr), m_terrainClassMapAtlas(nullptr), m_hasNormalTiles(false)
 {
 	Int i;
 	for (i=0; i<NUM_SOURCE_TILES; i++) {
@@ -490,7 +490,7 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly):
 #endif
 	m_numCliffInfo(1),
 	m_terrainTex(nullptr), m_alphaTerrainTex(nullptr), m_numBitmapTiles(0), m_numBlendedTiles(1),
-	m_terrainNormalTex(nullptr), m_terrainHeightTex(nullptr), m_terrainClassMap(nullptr), m_terrainClassMapAtlas(nullptr), m_hasNormalTiles(false)
+	m_terrainNormalTex(nullptr), m_terrainHeightTex(nullptr), m_terrainHeightTexFailed(false), m_terrainClassMap(nullptr), m_terrainClassMapAtlas(nullptr), m_hasNormalTiles(false)
 {
 
 	int i;
@@ -1809,8 +1809,6 @@ Bool WorldHeightMap::getUVForTileIndex(Int ndx, Short tileNdx, float U[4], float
 {
 	Real nU, nV, xU, xV;
 	nU=nV=xU=xV = 0.0f;
-	Int tilesPerRow = TEXTURE_WIDTH/(2*TILE_PIXEL_EXTENT+2*m_atlasBorder);
-	tilesPerRow *= 4;
 
 	if ((ndx<m_dataSize) && m_tileNdxes) {
 		getUVForNdx(tileNdx, &nU, &nV, &xU, &xV);
@@ -1869,8 +1867,6 @@ Bool WorldHeightMap::getUVForTileIndex(Int ndx, Short tileNdx, float U[4], float
 
 		Real nU, nV, xU, xV;
 		nU=nV=xU=xV = 0.0f;
-		Int tilesPerRow = TEXTURE_WIDTH/(2*TILE_PIXEL_EXTENT+2*m_atlasBorder);
-		tilesPerRow *= 4;
 
 
 		getUVForNdx(tileNdx, &nU, &nV, &xU, &xV);
@@ -2238,7 +2234,9 @@ void WorldHeightMap::setTextureLOD(Int lod)
 	if (m_terrainNormalTex)
 		m_terrainNormalTex->setLOD(lod);
 	if (m_terrainHeightTex)
+	{
 		m_terrainHeightTex->setLOD(lod);
+	}
 }
 
 TextureClass *WorldHeightMap::getTerrainTexture()
@@ -2392,7 +2390,7 @@ TextureClass *WorldHeightMap::getTerrainNormalTexture()
 
 TextureClass *WorldHeightMap::getTerrainHeightTexture()
 {
-	if (m_terrainHeightTex == nullptr)
+	if (m_terrainHeightTex == nullptr && !m_terrainHeightTexFailed)
 	{
 		// Placing the tiles in the colour texture also places them for this one.
 		getTerrainTexture();
@@ -2413,6 +2411,7 @@ TextureClass *WorldHeightMap::getTerrainHeightTexture()
 		if (!built)
 		{
 			REF_PTR_RELEASE(m_terrainHeightTex);
+			m_terrainHeightTexFailed = true;
 		}
 	}
 	return m_terrainHeightTex;

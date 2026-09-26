@@ -24,8 +24,7 @@
 
 class TextureClass;
 
-// The ground's light and colour variation, which the Direct3D 9 terrain and road shaders read
-// through groundnoise.hlsli in place of the light map. Built from the GameData GroundNoise keys.
+// The ground's light and colour variation from the GameData GroundNoise keys, read through groundnoise.hlsli.
 class W3DGroundNoise
 {
 public:

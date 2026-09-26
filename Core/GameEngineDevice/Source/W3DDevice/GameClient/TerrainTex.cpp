@@ -379,6 +379,53 @@ void TerrainTextureClass::setLOD(Int LOD)
 // Both channels of a flat normal, stored wherever a texture class has no normal map.
 #define FLAT_NORMAL_BYTE 128
 
+// Copies each edge of a square block that wraps into the border beyond the opposite edge.
+static void Copy_Wrap_Border(UnsignedByte *bits, Int pitch, Int pixelBytes, const ICoord2D &origin, Int side, Int border)
+{
+	for (Int j=0; j<side; j++)
+	{
+		UnsignedByte *row = bits + (origin.y+j)*pitch + origin.x*pixelBytes;
+		memcpy(row-border*pixelBytes, row+(side-border)*pixelBytes, border*pixelBytes);
+		memcpy(row+side*pixelBytes, row, border*pixelBytes);
+	}
+	for (Int j=0; j<border; j++)
+	{
+		UnsignedByte *target = bits + (origin.y-j-1)*pitch + (origin.x-border)*pixelBytes;
+		memcpy(target, target+side*pitch, (side+2*border)*pixelBytes);
+		target = bits + (origin.y+j)*pitch + (origin.x-border)*pixelBytes;
+		memcpy(target+side*pitch, target, (side+2*border)*pixelBytes);
+	}
+}
+
+// Box filters each mip from the one above, for the formats Filter_Texture_Mipmaps cannot read.
+static void Box_Filter_Mips(IDirect3DTexture8 *texture, Int pixelBytes)
+{
+	for (UnsignedInt level=1; level<texture->GetLevelCount(); level++)
+	{
+		D3DSURFACE_DESC dest_desc;
+		D3DLOCKED_RECT src_rect;
+		D3DLOCKED_RECT dest_rect;
+		DX8_ErrorCode(texture->GetLevelDesc(level, &dest_desc));
+		DX8_ErrorCode(texture->LockRect(level-1, &src_rect, nullptr, D3DLOCK_READONLY));
+		DX8_ErrorCode(texture->LockRect(level, &dest_rect, nullptr, 0));
+
+		for (UnsignedInt y=0; y<dest_desc.Height; y++)
+		{
+			const UnsignedByte *row0 = (const UnsignedByte *)src_rect.pBits + 2*y*src_rect.Pitch;
+			const UnsignedByte *row1 = row0 + src_rect.Pitch;
+			UnsignedByte *dest = (UnsignedByte *)dest_rect.pBits + y*dest_rect.Pitch;
+			for (UnsignedInt x=0; x<dest_desc.Width*pixelBytes; x++)
+			{
+				const UnsignedInt s = (x/pixelBytes)*2*pixelBytes + x%pixelBytes;
+				dest[x] = (UnsignedByte)((row0[s] + row0[s+pixelBytes] + row1[s] + row1[s+pixelBytes] + 2)/4);
+			}
+		}
+
+		texture->UnlockRect(level);
+		texture->UnlockRect(level-1);
+	}
+}
+
 TerrainNormalTextureClass::TerrainNormalTextureClass(int height) :
 	TextureClass(TEXTURE_WIDTH, height,
 		WW3D_FORMAT_A8L8, MIP_LEVELS_3 )
@@ -439,58 +486,18 @@ Bool TerrainNormalTextureClass::update(WorldHeightMap *htMap)
 	}
 
 	// The same wrap border around each class that the colour texture gets.
-	const Int border = htMap->getAtlasBorder();
 	for (Int texClass=0; texClass<htMap->m_numTextureClasses; texClass++)
 	{
-		Int width = htMap->m_textureClasses[texClass].width*TILE_PIXEL_EXTENT;
-		ICoord2D origin = htMap->m_textureClasses[texClass].positionInTexture;
+		const ICoord2D origin = htMap->m_textureClasses[texClass].positionInTexture;
 		if (origin.x<=0)
 		{
 			continue;
 		}
-
-		for (Int j=0; j<width; j++)
-		{
-			UnsignedByte *row = bits + (origin.y+j)*pitch + origin.x*pixelBytes;
-			memcpy(row-border*pixelBytes, row+(width-border)*pixelBytes, border*pixelBytes);
-			memcpy(row+width*pixelBytes, row, border*pixelBytes);
-		}
-		for (Int j=0; j<border; j++)
-		{
-			UnsignedByte *target = bits + (origin.y-j-1)*pitch + (origin.x-border)*pixelBytes;
-			memcpy(target, target+width*pitch, (width+2*border)*pixelBytes);
-			target = bits + (origin.y+j)*pitch + (origin.x-border)*pixelBytes;
-			memcpy(target+width*pitch, target, (width+2*border)*pixelBytes);
-		}
+		Copy_Wrap_Border(bits, pitch, pixelBytes, origin, htMap->m_textureClasses[texClass].width*TILE_PIXEL_EXTENT, htMap->getAtlasBorder());
 	}
 
 	texture->UnlockRect(0);
-
-	// Box filtered here, because Filter_Texture_Mipmaps cannot read this format.
-	for (UnsignedInt level=1; level<texture->GetLevelCount(); level++)
-	{
-		D3DSURFACE_DESC dest_desc;
-		D3DLOCKED_RECT src_rect;
-		D3DLOCKED_RECT dest_rect;
-		DX8_ErrorCode(texture->GetLevelDesc(level, &dest_desc));
-		DX8_ErrorCode(texture->LockRect(level-1, &src_rect, nullptr, D3DLOCK_READONLY));
-		DX8_ErrorCode(texture->LockRect(level, &dest_rect, nullptr, 0));
-
-		for (UnsignedInt y=0; y<dest_desc.Height; y++)
-		{
-			const UnsignedByte *row0 = (const UnsignedByte *)src_rect.pBits + 2*y*src_rect.Pitch;
-			const UnsignedByte *row1 = row0 + src_rect.Pitch;
-			UnsignedByte *dest = (UnsignedByte *)dest_rect.pBits + y*dest_rect.Pitch;
-			for (UnsignedInt x=0; x<dest_desc.Width*pixelBytes; x++)
-			{
-				const UnsignedInt s = (x/pixelBytes)*2*pixelBytes + x%pixelBytes;
-				dest[x] = (UnsignedByte)((row0[s] + row0[s+pixelBytes] + row1[s] + row1[s+pixelBytes] + 2)/4);
-			}
-		}
-
-		texture->UnlockRect(level);
-		texture->UnlockRect(level-1);
-	}
+	Box_Filter_Mips(texture, pixelBytes);
 	DX8Wrapper::_Upload_Lockable_Texture(Peek_D3D_Texture());
 
 	if (WW3D::Get_Texture_Reduction())
@@ -646,49 +653,11 @@ Bool TerrainHeightTextureClass::update(WorldHeightMap *htMap)
 			}
 		}
 
-		// The same wrap border the colour texture gets.
-		const Int border = htMap->getAtlasBorder();
-		for (Int j=0; j<side; j++)
-		{
-			UnsignedByte *row = bits + (origin.y+j)*pitch + origin.x;
-			memcpy(row-border, row+side-border, border);
-			memcpy(row+side, row, border);
-		}
-		for (Int j=0; j<border; j++)
-		{
-			UnsignedByte *target = bits + (origin.y-j-1)*pitch + origin.x-border;
-			memcpy(target, target+side*pitch, side+2*border);
-			target = bits + (origin.y+j)*pitch + origin.x-border;
-			memcpy(target+side*pitch, target, side+2*border);
-		}
+		Copy_Wrap_Border(bits, pitch, 1, origin, side, htMap->getAtlasBorder());
 	}
 
 	texture->UnlockRect(0);
-
-	// Box filtered here, because Filter_Texture_Mipmaps cannot read this format.
-	for (UnsignedInt level=1; level<texture->GetLevelCount(); level++)
-	{
-		D3DSURFACE_DESC dest_desc;
-		D3DLOCKED_RECT src_rect;
-		D3DLOCKED_RECT dest_rect;
-		DX8_ErrorCode(texture->GetLevelDesc(level, &dest_desc));
-		DX8_ErrorCode(texture->LockRect(level-1, &src_rect, nullptr, D3DLOCK_READONLY));
-		DX8_ErrorCode(texture->LockRect(level, &dest_rect, nullptr, 0));
-
-		for (UnsignedInt y=0; y<dest_desc.Height; y++)
-		{
-			const UnsignedByte *row0 = (const UnsignedByte *)src_rect.pBits + 2*y*src_rect.Pitch;
-			const UnsignedByte *row1 = row0 + src_rect.Pitch;
-			UnsignedByte *dest = (UnsignedByte *)dest_rect.pBits + y*dest_rect.Pitch;
-			for (UnsignedInt x=0; x<dest_desc.Width; x++)
-			{
-				dest[x] = (UnsignedByte)((row0[2*x] + row0[2*x+1] + row1[2*x] + row1[2*x+1] + 2)/4);
-			}
-		}
-
-		texture->UnlockRect(level);
-		texture->UnlockRect(level-1);
-	}
+	Box_Filter_Mips(texture, 1);
 	DX8Wrapper::_Upload_Lockable_Texture(Peek_D3D_Texture());
 
 	if (WW3D::Get_Texture_Reduction())

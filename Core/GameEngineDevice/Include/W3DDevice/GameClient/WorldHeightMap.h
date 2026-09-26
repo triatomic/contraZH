@@ -199,6 +199,7 @@ protected:
 	TerrainNormalTextureClass *m_terrainNormalTex;
 	/** The heights the textures blend by, laid out like m_terrainTex. */
 	TerrainHeightTextureClass *m_terrainHeightTex;
+	Bool m_terrainHeightTexFailed; ///< The height atlas failed to build, so it is not tried again
 	/** Per atlas slot, the texture block it belongs to, for the seabed's hex tiling. */
 	TextureClass *m_terrainClassMap;
 	TerrainTextureClass *m_terrainClassMapAtlas;	///< the atlas m_terrainClassMap was built for
@@ -315,8 +316,7 @@ public:  // tile and texture info.
 	Int getAtlasBorder() const { return m_atlasBorder; }
 	/// The atlas border GameData TerrainAtlasBorder asks for, rounded and bounded as the atlases lay it out.
 	static Int getAtlasBorderSetting();
-	/// Drops the atlases when the border setting has changed since they were built, so the next
-	/// draw lays the tiles out again. True when the caller must update every cell's texture coordinates.
+	/// Drops atlases built at another border, and returns true when every cell's texture coordinates need updating.
 	Bool refreshAtlasBorder();
 	TextureClass *getAlphaTerrainTexture(); //< generates if needed and returns alpha terrain texture
 	TextureClass *getEdgeTerrainTexture(); //< generates if needed and returns blend edge texture
