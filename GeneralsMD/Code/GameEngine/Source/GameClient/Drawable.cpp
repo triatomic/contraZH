@@ -404,12 +404,63 @@ const Int MAX_ENABLED_MODULES								= 16;
 	s_animationTemplates = nullptr;
 }
 
-// TheSuperHackers @feature One shared string for the numerical health text, rebuilt whenever the
-// text changes. Unlike the command bar overlays there is no small fixed set of values to cache
-// per object, and many bars draw per frame, so it is rebuilt as often as it is reused. It stays
-// static purely to avoid allocating every call, and is returned to the manager before the manager
-// itself is torn down -- see Drawable::killStaticDisplayStrings.
-static DisplayString *s_healthString = nullptr;
+// TheSuperHackers @feature Numerical health text strings, pooled by text so units showing the same
+// value share one built sentence. A miss takes the least recently used slot, since every text change
+// rebuilds the sentence textures. Returned to the manager before the manager itself is torn down --
+// see Drawable::killStaticDisplayStrings.
+enum { HEALTH_STRING_COUNT = 32 };
+struct HealthString
+{
+	DisplayString *string;
+	UnsignedInt lastUsed;
+};
+static HealthString s_healthStrings[ HEALTH_STRING_COUNT ];
+static UnsignedInt s_healthStringClock = 0;
+
+//-------------------------------------------------------------------------------------------------
+static DisplayString *getHealthString( const UnicodeString& text )
+{
+	HealthString *slot = &s_healthStrings[ 0 ];
+	for( Int i = 0; i < HEALTH_STRING_COUNT; ++i )
+	{
+		HealthString *entry = &s_healthStrings[ i ];
+		if( entry->string != nullptr && entry->string->getText() == text )
+		{
+			slot = entry;
+			break;
+		}
+		if( entry->string == nullptr || entry->lastUsed < slot->lastUsed )
+		{
+			slot = entry;
+		}
+		if( slot->string == nullptr )
+		{
+			break;
+		}
+	}
+
+	if( slot->string == nullptr )
+	{
+		slot->string = TheDisplayStringManager->newDisplayString();
+		if( slot->string == nullptr )
+		{
+			return nullptr;
+		}
+
+		// Small on purpose: in Always mode this is drawn over every unit on screen at once, so it
+		// has to annotate the bar rather than compete with it.
+		Int pointSize = 6;
+		if( TheGlobalLanguageData )
+		{
+			pointSize = TheGlobalLanguageData->adjustFontSize( pointSize );
+		}
+		slot->string->setFont( TheFontLibrary->getFont( AsciiString( "Arial" ), pointSize, FALSE ) );
+	}
+
+	slot->string->setText( text );
+	slot->lastUsed = ++s_healthStringClock;
+	return slot->string;
+}
 
 //-------------------------------------------------------------------------------------------------
 /** Return the shared display strings to the manager. Must run before TheDisplayStringManager is
@@ -418,10 +469,16 @@ static DisplayString *s_healthString = nullptr;
 //-------------------------------------------------------------------------------------------------
 /*static*/ void Drawable::killStaticDisplayStrings()
 {
-	if( s_healthString != nullptr && TheDisplayStringManager != nullptr )
-		TheDisplayStringManager->freeDisplayString( s_healthString );
-
-	s_healthString = nullptr;
+	for( Int i = 0; i < HEALTH_STRING_COUNT; ++i )
+	{
+		if( s_healthStrings[ i ].string != nullptr && TheDisplayStringManager != nullptr )
+		{
+			TheDisplayStringManager->freeDisplayString( s_healthStrings[ i ].string );
+		}
+		s_healthStrings[ i ].string = nullptr;
+		s_healthStrings[ i ].lastUsed = 0;
+	}
+	s_healthStringClock = 0;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -5187,20 +5244,6 @@ void Drawable::drawNumericalHealth( const IRegion2D *healthBarRegion, Real healt
 	if( healthBarRegion == nullptr || TheDisplayStringManager == nullptr )
 		return;
 
-	if( s_healthString == nullptr )
-	{
-		s_healthString = TheDisplayStringManager->newDisplayString();
-		if( s_healthString == nullptr )
-			return;
-
-		// Small on purpose: in Always mode this is drawn over every unit on screen at once, so it
-		// has to annotate the bar rather than compete with it.
-		Int pointSize = 6;
-		if( TheGlobalLanguageData )
-			pointSize = TheGlobalLanguageData->adjustFontSize( pointSize );
-		s_healthString->setFont( TheFontLibrary->getFont( AsciiString( "Arial" ), pointSize, FALSE ) );
-	}
-
 	// Round rather than truncate, so a sliver of health left does not read as 0 next to a unit
 	// that is plainly still alive.
 	const Int shownHealth = REAL_TO_INT( health + 0.5f );
@@ -5208,10 +5251,12 @@ void Drawable::drawNumericalHealth( const IRegion2D *healthBarRegion, Real healt
 
 	UnicodeString text;
 	text.format( L"%d/%d", shownHealth, shownMax );
-	s_healthString->setText( text );
+	DisplayString *healthString = getHealthString( text );
+	if( healthString == nullptr )
+		return;
 
 	Int width, height;
-	s_healthString->getSize( &width, &height );
+	healthString->getSize( &width, &height );
 
 	// just past the right end of the bar, vertically centred on it
 	const Int healthBoxHeight = max( 3, healthBarRegion->hi.y - healthBarRegion->lo.y );
@@ -5220,7 +5265,7 @@ void Drawable::drawNumericalHealth( const IRegion2D *healthBarRegion, Real healt
 
 	// Black drop shadow rather than a backdrop plate: the number sits over the battlefield rather
 	// than over a cameo, so a filled box would be far more intrusive than the bar it annotates.
-	s_healthString->draw( textX, textY, color, GameMakeColor( 0, 0, 0, 255 ) );
+	healthString->draw( textX, textY, color, GameMakeColor( 0, 0, 0, 255 ) );
 }
 
 //-------------------------------------------------------------------------------------------------
