@@ -443,6 +443,8 @@ W3DDisplay::~W3DDisplay()
 		TheDisplayStringManager->freeDisplayString(m_benchmarkDisplayString);
 	}
 
+	releaseImageTextures();
+
 	// delete 2D renderer
 	if( m_2DRender )
 	{
@@ -736,6 +738,35 @@ void W3DDisplay::setup2DRenderState(TextureClass *tex, DrawImageMode mode, Bool 
 				break;
 		}
 	}
+}
+
+TextureClass *W3DDisplay::getImageTexture(const Image *image)
+{
+	ImageTextureMap::iterator it = m_imageTextures.find(image);
+	if (it != m_imageTextures.end())
+	{
+		if (it->second.filename == image->getFilename())
+		{
+			return it->second.texture;
+		}
+		REF_PTR_RELEASE(it->second.texture);
+		m_imageTextures.erase(it);
+	}
+
+	ImageTexture entry;
+	entry.filename = image->getFilename();
+	entry.texture = WW3DAssetManager::Get_Instance()->Get_Texture(entry.filename.str(), MIP_LEVELS_1);
+	m_imageTextures[image] = entry;
+	return entry.texture;
+}
+
+void W3DDisplay::releaseImageTextures()
+{
+	for (ImageTextureMap::iterator it = m_imageTextures.begin(); it != m_imageTextures.end(); ++it)
+	{
+		REF_PTR_RELEASE(it->second.texture);
+	}
+	m_imageTextures.clear();
 }
 
 // W3DDisplay::initAssets =====================================================
@@ -1049,6 +1080,8 @@ void W3DDisplay::reset()
 	}
 
 	m_isClippedEnabled = FALSE;
+
+	releaseImageTextures();
 
 	// release any unused assets from W3D
 	/// @todo really need that "scene abstraction", having this stuff in the display is icky
@@ -2879,7 +2912,7 @@ void W3DDisplay::drawImage( const Image *image, Int startX, Int startY,
 	if (BitIsSet(image->getStatus(), IMAGE_STATUS_RAW_TEXTURE))
 		tex = (TextureClass *)(image->getRawTextureData());
 	else
-		tex = WW3DAssetManager::Get_Instance()->Get_Texture(image->getFilename().str(), MIP_LEVELS_1);
+		tex = getImageTexture(image);
 
 	Bool grayscale = (mode == DRAW_IMAGE_GRAYSCALE);
 	setup2DRenderState(tex, mode, grayscale);
@@ -2998,11 +3031,6 @@ void W3DDisplay::drawImage( const Image *image, Int startX, Int startY,
 		{
 			m_2DRender->Enable_Alpha(true);
 		}
-	}
-
-	if (tex != nullptr && !BitIsSet(image->getStatus(), IMAGE_STATUS_RAW_TEXTURE))
-	{
-		tex->Release_Ref();
 	}
 
 }
@@ -3327,6 +3355,8 @@ void W3DDisplay::doSmartAssetPurgeAndPreload(const char* usageFileName)
 		}
 		f->close();
 	}
+
+	releaseImageTextures();
 
 	// just free everything if there's no exclusion list file (send in an empty list)
 	m_assetManager->Free_Assets_With_Exclusion_List(names);

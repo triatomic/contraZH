@@ -36,6 +36,7 @@
 #include "GameClient/Display.h"
 #include "WW3D2/lightenvironment.h"
 #include "W3DDevice/GameClient/W3DProfilerFrameCapture.h"
+#include <map>
 
 class VideoBuffer;
 class W3DDebugDisplay;
@@ -166,6 +167,8 @@ protected:
 	void renderLetterBox(UnsignedInt time);							///< draw letter box border
 	void updateAverageFPS();	///< calculate the average fps over the last 30 frames.
 	void setup2DRenderState(TextureClass *tex, DrawImageMode mode, Bool grayscale);
+	TextureClass *getImageTexture(const Image *image);	///< cached texture lookup for mapped images
+	void releaseImageTextures();
 	virtual void onBeginBatch() override;
 	virtual void onEndBatch() override;
 	virtual void onFlush() override;
@@ -182,6 +185,15 @@ protected:
 	DrawImageMode m_batchMode;
 	Bool m_batchGrayscale;
 	Bool m_batchNeedsInit;
+
+	// The filename guards against a freed Image whose address is reused.
+	struct ImageTexture
+	{
+		AsciiString filename;
+		TextureClass *texture;
+	};
+	typedef std::map<const Image *, ImageTexture> ImageTextureMap;
+	ImageTextureMap m_imageTextures;
 
 #if defined(RTS_DEBUG)
 	Int64 m_timerAtCumuFPSStart;
