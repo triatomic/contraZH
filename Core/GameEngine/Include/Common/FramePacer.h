@@ -69,12 +69,17 @@ public:
 
 	Real getLogicFramePhase() const; ///< Get how far the current render step reaches into the current logic frame, in [0,1]. Used to interpolate render updates between logic updates.
 
+	void setDefaultGameSpeed( Int speed ); ///< Set the speed an offline game starts at and apply it.
+	void setGameSpeed( Int speed ); ///< Step logic at this speed in BaseFps units and render up to the GameData limit. 0 restores the default speed.
+	Int  getGameSpeed() const; ///< Get the game speed in BaseFps units: the logic rate when the time scale is on, else the render limit.
+
 protected:
 
 	FrameRateLimit m_frameRateLimit;
 
 	Int m_maxFPS; ///< Maximum frames per second for rendering
 	Int m_logicTimeScaleFPS; ///< Maximum frames per second for logic time scale
+	Int m_defaultGameSpeed; ///< Speed the current offline game started at, in BaseFps units
 
 	Real m_updateTime; ///< Last update delta time in seconds
 	Real m_logicFramePhase; ///< How far the current render step reaches into the current logic frame, ranging 0 to 1.

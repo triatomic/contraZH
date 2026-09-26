@@ -386,8 +386,9 @@ motion` in the advanced display options, applied on Accept. Needs `CheckSmoothUn
 
 Skirmish, campaign and replays run the logic at the game speed and render up to `FramesPerSecondLimit`
 from `GameData.ini`. The skirmish game speed slider sets the logic rate, 30 being normal speed; the
-campaign always runs at 30. Setting the slider to `--` leaves the game uncapped, with the logic
-stepping once per drawn frame, so there is nothing to smooth.
+campaign starts at 30. Mission scripts that set an FPS limit change the logic rate the same way, and
+the main menu map always runs at 30. Setting the slider to `--` leaves the game uncapped, with the
+logic stepping once per drawn frame, so there is nothing to smooth.
 
 Notes:
 * Units are drawn up to one logic frame (33 ms) behind the simulation.

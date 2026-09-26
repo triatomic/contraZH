@@ -196,12 +196,7 @@ static void restartMissionMenu()
 
 	Int rankPointsStartedWith = TheGameLogic->getRankPointsToAddAtGameStart();// must write down before reset
 	GameDifficulty diff = TheScriptEngine->getGlobalDifficulty();
-	Int fps = TheFramePacer->getFramesPerSecondLimit();
-	if (TheFramePacer->isLogicTimeScaleEnabled())
-	{
-		// Offline games run at the logic rate; the render limit is only how often they draw.
-		fps = TheFramePacer->getLogicTimeScaleFps() * BaseFps / LOGICFRAMES_PER_SECOND;
-	}
+	Int fps = TheFramePacer->getGameSpeed();
 
 	TheGameLogic->clearGameData(FALSE);
 	TheGameEngine->setQuitting(FALSE);

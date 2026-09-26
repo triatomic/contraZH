@@ -1059,20 +1059,29 @@ bool GameLogic::onNewGame(MAYBE_UNUSED GameMessage *msg)
 		TheWritableGlobalData->m_useFpsLimit = true;
 	}
 
-	// Offline games step logic at the game speed and render faster, so models blend between logic frames.
-	if (gameMode == GAME_SINGLE_PLAYER || gameMode == GAME_SKIRMISH || gameMode == GAME_REPLAY)
+	// Offline games and the shell map step logic at their own speed and render faster, so none leaks from the last game.
+	if (gameMode == GAME_SINGLE_PLAYER || gameMode == GAME_SKIRMISH || gameMode == GAME_REPLAY || gameMode == GAME_SHELL)
 	{
 		// The skirmish slider's "--" sends this speed, meaning uncapped.
 		const Int UNCAPPED_GAME_SPEED = 1000;
-		const Int gameSpeed = (msg->getArgumentCount() >= 4) ? msg->getArgument( 3 )->integer : BaseFps;
-		const Bool capped = gameSpeed >= 1 && gameSpeed < UNCAPPED_GAME_SPEED;
-
-		TheFramePacer->enableLogicTimeScale(capped);
-		if (capped)
+		Int gameSpeed = BaseFps;
+		if (gameMode != GAME_SHELL && msg->getArgumentCount() >= 4)
 		{
-			TheFramePacer->setLogicTimeScaleFps(gameSpeed * LOGICFRAMES_PER_SECOND / BaseFps);
-			TheFramePacer->setFramesPerSecondLimit(max(gameSpeed, TheGlobalData->m_framesPerSecondLimit));
+			gameSpeed = msg->getArgument( 3 )->integer;
 		}
+
+		if (gameSpeed >= 1 && gameSpeed < UNCAPPED_GAME_SPEED)
+		{
+			TheFramePacer->setDefaultGameSpeed(gameSpeed);
+		}
+		else
+		{
+			TheFramePacer->enableLogicTimeScale(FALSE);
+		}
+	}
+	else
+	{
+		TheFramePacer->enableLogicTimeScale(FALSE);
 	}
 
 	// prepare for new game

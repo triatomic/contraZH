@@ -37,6 +37,7 @@ FramePacer::FramePacer()
 
 	m_maxFPS = BaseFps;
 	m_logicTimeScaleFPS = LOGICFRAMES_PER_SECOND;
+	m_defaultGameSpeed = BaseFps;
 	m_updateTime = 1.0f / (Real)BaseFps; // initialized to something to avoid division by zero on first use
 	m_logicFramePhase = 1.0f;
 	m_enableFpsLimit = FALSE;
@@ -249,4 +250,31 @@ Real FramePacer::getLogicTimeStepMilliseconds(LogicTimeQueryFlags flags) const
 Real FramePacer::getLogicFramePhase() const
 {
 	return m_logicFramePhase;
+}
+
+void FramePacer::setDefaultGameSpeed( Int speed )
+{
+	m_defaultGameSpeed = speed;
+	setGameSpeed(speed);
+}
+
+void FramePacer::setGameSpeed( Int speed )
+{
+	if (speed <= 0)
+	{
+		speed = m_defaultGameSpeed;
+	}
+
+	enableLogicTimeScale(TRUE);
+	setLogicTimeScaleFps(speed * LOGICFRAMES_PER_SECOND / BaseFps);
+	setFramesPerSecondLimit(max(speed, TheGlobalData->m_framesPerSecondLimit));
+}
+
+Int FramePacer::getGameSpeed() const
+{
+	if (isLogicTimeScaleEnabled())
+	{
+		return getLogicTimeScaleFps() * BaseFps / LOGICFRAMES_PER_SECOND;
+	}
+	return getFramesPerSecondLimit();
 }

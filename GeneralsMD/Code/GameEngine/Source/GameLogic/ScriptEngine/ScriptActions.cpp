@@ -7143,6 +7143,12 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 			doSetStoppingDistance(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getReal());
 			return;
 		case ScriptAction::SET_FPS_LIMIT:
+			// With the logic time scale on, the limit is the game speed, as when logic stepped once per drawn frame.
+			if (TheFramePacer->isLogicTimeScaleEnabled())
+			{
+				TheFramePacer->setGameSpeed(pAction->getParameter(0)->getInt());
+				return;
+			}
 			if (!pAction->getParameter(0)->getInt())
 			{
 				TheFramePacer->setFramesPerSecondLimit(TheGlobalData->m_framesPerSecondLimit);
