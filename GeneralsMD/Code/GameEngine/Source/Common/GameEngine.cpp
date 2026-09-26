@@ -959,7 +959,10 @@ Bool GameEngine::canUpdateRegularGameLogic(UnsignedInt logicTimeQueryFlags)
 	const Bool useFastMode = TheGlobalData->m_TiVOFastMode && TheGameLogic->isInReplayGame();
 #endif
 
-	if (useFastMode || logicTimeScaleFps >= maxRenderFps)
+	// Without a running game the logic only handles messages, such as starting the next game, which must not wait.
+	const Bool noGameRunning = !TheGameLogic->isInGame() || TheGameLogic->isStartingNewGame();
+
+	if (useFastMode || noGameRunning || logicTimeScaleFps >= maxRenderFps)
 	{
 		// Logic time scale is uncapped or larger equal Render FPS. Update straight away.
 		m_logicFrameProgress = 1.0f;
