@@ -481,9 +481,12 @@ void HeightMapRenderObjClass::prepareSeabed()
 	const Real atlasHeight = (Real)m_map->getTerrainTexHeight();
 	const Real texelsPerCell = TILE_PIXEL_EXTENT / 2;
 	const Real fadeDepth = TheWaterTransparency->m_transparentWaterDepth;
+	const Real atlasBorder = (Real)m_map->getAtlasBorder();
+	const Real atlasSlot = TILE_PIXEL_EXTENT + 2.0f * atlasBorder;
 	constants[0].Set((Real)TEXTURE_WIDTH, atlasHeight, 1.0f / TEXTURE_WIDTH, 1.0f / atlasHeight);
 	constants[1].Set(texelsPerCell / MAP_XY_FACTOR, texelsPerCell * m_map->getBorderSizeInline(),
 		(fadeDepth > 0.0f) ? 1.0f / fadeDepth : 10000.0f, 0.0f);
+	constants[4].Set(1.0f / (atlasSlot * CLASS_MAP_SLOTS), -atlasBorder / (atlasSlot * CLASS_MAP_SLOTS), 255.0f * atlasSlot, atlasBorder);
 	W3DShaderManager::setTerrainSeabed(classMap, mask, constants);
 
 	const Int xOrigin = m_map->getDrawOrgX();
@@ -1854,6 +1857,12 @@ void HeightMapRenderObjClass::updateCenter(CameraClass *camera, const Vector3 *c
 	}
 	if (m_vertexBufferTiles ==nullptr)
 		return;		//did not initialize resources yet.
+
+	// A live GameData reload can change the atlas border, which moves every tile in the atlases.
+	if (m_map->refreshAtlasBorder())
+	{
+		scheduleFullUpdate();
+	}
 
 	BaseHeightMapRenderObjClass::updateCenter(camera, cameraPivot, pLightsIterator);
 

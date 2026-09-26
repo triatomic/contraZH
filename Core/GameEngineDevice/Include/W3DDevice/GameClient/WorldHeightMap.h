@@ -194,6 +194,7 @@ protected:
 	 texture. */
 	TerrainTextureClass *m_terrainTex;
 	Int	m_terrainTexHeight; /// Height of m_terrainTex allocated.
+	Int	m_atlasBorder; ///< Texels copied around each texture in the atlases, fixed when the tiles are placed
 	/** The normal maps laid out like m_terrainTex, so the same UVs index both. */
 	TerrainNormalTextureClass *m_terrainNormalTex;
 	/** The heights the textures blend by, laid out like m_terrainTex. */
@@ -311,6 +312,12 @@ public:  // tile and texture info.
 	TextureClass *getTerrainHeightTexture();  //< generates if needed and returns the heights the textures blend by, or null when the card lacks the format
 	TextureClass *getTerrainClassMap();  //< generates if needed and returns the atlas slot lookup the seabed shaders read, or null
 	Int getTerrainTexHeight() const { return m_terrainTexHeight; }
+	Int getAtlasBorder() const { return m_atlasBorder; }
+	/// The atlas border GameData TerrainAtlasBorder asks for, rounded and bounded as the atlases lay it out.
+	static Int getAtlasBorderSetting();
+	/// Drops the atlases when the border setting has changed since they were built, so the next
+	/// draw lays the tiles out again. True when the caller must update every cell's texture coordinates.
+	Bool refreshAtlasBorder();
 	TextureClass *getAlphaTerrainTexture(); //< generates if needed and returns alpha terrain texture
 	TextureClass *getEdgeTerrainTexture(); //< generates if needed and returns blend edge texture
 	/// UV mapping data for a cell to map into the terrain texture.  Returns true if the textures had to be stretched for cliffs.

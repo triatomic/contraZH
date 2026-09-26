@@ -138,7 +138,7 @@ public:
 	/// or point light shader in use. Null indices take the first count, the ones nearest the middle of the view.
 	static void setDrawPixelLights(const Int *indices, Int count);
 	/// The registers the terrain's seabed hex tiling reads, as terrainshadow.hlsl lays them out.
-	enum { SEABED_CONSTANTS = 4 };
+	enum { SEABED_CONSTANTS = 5 };
 	/// Sets, once a frame, the atlas slot lookup, standing water mask and SEABED_CONSTANTS registers the
 	/// terrain's seabed hex tiling reads, or turns it off with nulls.
 	static void setTerrainSeabed(TextureClass *classMap, TextureClass *waterMask, const Vector4 *constants);

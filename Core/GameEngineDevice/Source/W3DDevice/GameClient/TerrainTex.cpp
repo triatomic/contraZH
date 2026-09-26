@@ -113,7 +113,8 @@ int TerrainTextureClass::update(WorldHeightMap *htMap)
 	DX8_ErrorCode(surface_level->LockRect(&locked_rect, nullptr, 0));
 
 	Int tilePixelExtent = TILE_PIXEL_EXTENT;
-	Int tilesPerRow = surface_desc.Width/(2*TILE_PIXEL_EXTENT+TILE_OFFSET);
+	const Int border = htMap->getAtlasBorder();
+	Int tilesPerRow = surface_desc.Width/(2*TILE_PIXEL_EXTENT+2*border);
 	tilesPerRow *= 2;
 //	Int numRows = surface_desc.Height/(tilePixelExtent+TILE_OFFSET);
 #ifdef RTS_DEBUG
@@ -155,14 +156,14 @@ int TerrainTextureClass::update(WorldHeightMap *htMap)
 				}
 			}
 		}
-		// Now draw the 4 pixel border around each tile class.
+		// Now draw the border around each tile class.
 		Int texClass;
 		for (texClass=0; texClass<htMap->m_numTextureClasses; texClass++) {
 			Int width = htMap->m_textureClasses[texClass].width;
 			ICoord2D origin = htMap->m_textureClasses[texClass].positionInTexture;
 			if (origin.x<=0) continue;
 			width *= TILE_PIXEL_EXTENT;
-			// Duplicate 4 columns of pixels before and after.
+			// Duplicate border columns of pixels before and after.
 			Int j;
 			for (j=0; j<width; j++) {
 				Int row = origin.y+j;
@@ -172,25 +173,25 @@ int TerrainTextureClass::update(WorldHeightMap *htMap)
 				Int column = origin.x;
 				pBGRX += column*pixelBytes;
 				// copy before
-				memcpy(pBGRX-(4)*pixelBytes, pBGRX+(width-4)*pixelBytes, 4*pixelBytes);
+				memcpy(pBGRX-(border)*pixelBytes, pBGRX+(width-border)*pixelBytes, border*pixelBytes);
 				// copy after
-				memcpy(pBGRX+(width*pixelBytes), pBGRX, 4*pixelBytes);
+				memcpy(pBGRX+(width*pixelBytes), pBGRX, border*pixelBytes);
 			}
 
-			// Duplicate 4 rows of pixels before and after.
-			for (j=0; j<4; j++) {
+			// Duplicate border rows of pixels before and after.
+			for (j=0; j<border; j++) {
 				// copy before.
 				Int row = origin.y-j-1;
 				UnsignedByte *pBGRX = ((UnsignedByte*)locked_rect.pBits) +
 							(row)*surface_desc.Width*pixelBytes;
-				UnsignedByte *target = pBGRX+(origin.x-4)*pixelBytes;
-				memcpy(target, target+width*surface_desc.Width*pixelBytes, (width+8)*pixelBytes);
+				UnsignedByte *target = pBGRX+(origin.x-border)*pixelBytes;
+				memcpy(target, target+width*surface_desc.Width*pixelBytes, (width+2*border)*pixelBytes);
 				// copy after.
 				row = origin.y+j;
 				pBGRX = ((UnsignedByte*)locked_rect.pBits) +
 							(row)*surface_desc.Width*pixelBytes;
-				target = pBGRX+(origin.x-4)*pixelBytes;
-				memcpy(target+width*surface_desc.Width*pixelBytes, target, (width+8)*pixelBytes);
+				target = pBGRX+(origin.x-border)*pixelBytes;
+				memcpy(target+width*surface_desc.Width*pixelBytes, target, (width+2*border)*pixelBytes);
 			}
 
 		}
@@ -437,7 +438,8 @@ Bool TerrainNormalTextureClass::update(WorldHeightMap *htMap)
 		}
 	}
 
-	// The same 4 pixel wrap border around each class that the colour texture gets.
+	// The same wrap border around each class that the colour texture gets.
+	const Int border = htMap->getAtlasBorder();
 	for (Int texClass=0; texClass<htMap->m_numTextureClasses; texClass++)
 	{
 		Int width = htMap->m_textureClasses[texClass].width*TILE_PIXEL_EXTENT;
@@ -450,15 +452,15 @@ Bool TerrainNormalTextureClass::update(WorldHeightMap *htMap)
 		for (Int j=0; j<width; j++)
 		{
 			UnsignedByte *row = bits + (origin.y+j)*pitch + origin.x*pixelBytes;
-			memcpy(row-4*pixelBytes, row+(width-4)*pixelBytes, 4*pixelBytes);
-			memcpy(row+width*pixelBytes, row, 4*pixelBytes);
+			memcpy(row-border*pixelBytes, row+(width-border)*pixelBytes, border*pixelBytes);
+			memcpy(row+width*pixelBytes, row, border*pixelBytes);
 		}
-		for (Int j=0; j<4; j++)
+		for (Int j=0; j<border; j++)
 		{
-			UnsignedByte *target = bits + (origin.y-j-1)*pitch + (origin.x-4)*pixelBytes;
-			memcpy(target, target+width*pitch, (width+8)*pixelBytes);
-			target = bits + (origin.y+j)*pitch + (origin.x-4)*pixelBytes;
-			memcpy(target+width*pitch, target, (width+8)*pixelBytes);
+			UnsignedByte *target = bits + (origin.y-j-1)*pitch + (origin.x-border)*pixelBytes;
+			memcpy(target, target+width*pitch, (width+2*border)*pixelBytes);
+			target = bits + (origin.y+j)*pitch + (origin.x-border)*pixelBytes;
+			memcpy(target+width*pitch, target, (width+2*border)*pixelBytes);
 		}
 	}
 
@@ -644,19 +646,20 @@ Bool TerrainHeightTextureClass::update(WorldHeightMap *htMap)
 			}
 		}
 
-		// The same 4 pixel wrap border the colour texture gets.
+		// The same wrap border the colour texture gets.
+		const Int border = htMap->getAtlasBorder();
 		for (Int j=0; j<side; j++)
 		{
 			UnsignedByte *row = bits + (origin.y+j)*pitch + origin.x;
-			memcpy(row-4, row+side-4, 4);
-			memcpy(row+side, row, 4);
+			memcpy(row-border, row+side-border, border);
+			memcpy(row+side, row, border);
 		}
-		for (Int j=0; j<4; j++)
+		for (Int j=0; j<border; j++)
 		{
-			UnsignedByte *target = bits + (origin.y-j-1)*pitch + origin.x-4;
-			memcpy(target, target+side*pitch, side+8);
-			target = bits + (origin.y+j)*pitch + origin.x-4;
-			memcpy(target+side*pitch, target, side+8);
+			UnsignedByte *target = bits + (origin.y-j-1)*pitch + origin.x-border;
+			memcpy(target, target+side*pitch, side+2*border);
+			target = bits + (origin.y+j)*pitch + origin.x-border;
+			memcpy(target+side*pitch, target, side+2*border);
 		}
 	}
 

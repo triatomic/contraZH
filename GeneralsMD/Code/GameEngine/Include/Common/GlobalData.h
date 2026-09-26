@@ -289,6 +289,7 @@ public:
 	Real m_groundNoiseBrightness;
 	Real m_terrainHeightBlendStrength;	///< GameData TerrainHeightBlendStrength: how far the taller texture pushes into the other's side of a blend
 	Real m_terrainHeightBlendSharpness;	///< GameData TerrainHeightBlendSharpness: how narrow the blend's edge is, 1 as wide as the legacy blend
+	Int m_terrainAtlasBorder;			///< GameData TerrainAtlasBorder: texels copied around each texture in the terrain atlas
 	Int  m_textureReductionFactor;	//how much to cut texture resolution: 2 is half, 3 is quarter, etc.
 	Bool m_enableBehindBuildingMarkers;
 	Real m_waterPositionX;

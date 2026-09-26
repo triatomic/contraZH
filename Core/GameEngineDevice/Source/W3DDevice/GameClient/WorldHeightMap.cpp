@@ -442,7 +442,7 @@ WorldHeightMap::WorldHeightMap():
 	m_numTextureClasses(0),
 	m_drawWidthX(NORMAL_DRAW_WIDTH), m_drawHeightY(NORMAL_DRAW_HEIGHT),
 	m_tileNdxes(nullptr), m_blendTileNdxes(nullptr), m_extraBlendTileNdxes(nullptr), m_cliffInfoNdxes(nullptr),
-	m_terrainTexHeight(1), m_alphaTexHeight(1),	m_cellCliffState(nullptr),
+	m_terrainTexHeight(1), m_atlasBorder(MIN_ATLAS_BORDER), m_alphaTexHeight(1),	m_cellCliffState(nullptr),
 #ifdef EVAL_TILING_MODES
 	m_tileMode(TILE_4x4),
 #endif
@@ -484,7 +484,7 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly):
 	m_numTextureClasses(0),
 	m_drawWidthX(NORMAL_DRAW_WIDTH), m_drawHeightY(NORMAL_DRAW_HEIGHT),
 	m_tileNdxes(nullptr), m_blendTileNdxes(nullptr), m_extraBlendTileNdxes(nullptr), m_cliffInfoNdxes(nullptr),
-	m_terrainTexHeight(1), m_alphaTexHeight(1),
+	m_terrainTexHeight(1), m_atlasBorder(MIN_ATLAS_BORDER), m_alphaTexHeight(1),
 #ifdef EVAL_TILING_MODES
 	m_tileMode(TILE_4x4),
 #endif
@@ -1518,15 +1518,43 @@ Bool WorldHeightMap::readTiles(InputStream *pStr, TileData **tiles, Int numRows)
 
 
 
+Int WorldHeightMap::getAtlasBorderSetting()
+{
+	// Rounded up to a multiple of 4, so every block starts on a whole texel of the smallest mip.
+	const Int requested = TheGlobalData ? TheGlobalData->m_terrainAtlasBorder : MIN_ATLAS_BORDER;
+	return clamp(MIN_ATLAS_BORDER, (requested + 3) / 4 * 4, MAX_ATLAS_BORDER);
+}
+
+Bool WorldHeightMap::refreshAtlasBorder()
+{
+	if (m_terrainTex == nullptr || m_atlasBorder == getAtlasBorderSetting())
+	{
+		return false;
+	}
+
+	// The render object keeps its own references until its update takes the new atlases.
+	REF_PTR_RELEASE(m_terrainTex);
+	REF_PTR_RELEASE(m_alphaTerrainTex);
+	REF_PTR_RELEASE(m_terrainNormalTex);
+	REF_PTR_RELEASE(m_terrainHeightTex);
+	// A new atlas can land at the old one's address, so the lookup cannot tell it is stale.
+	REF_PTR_RELEASE(m_terrainClassMap);
+	m_terrainClassMapAtlas = nullptr;
+	RENDER_LOG(("Terrain atlas border changed to %d, laying the atlases out again", getAtlasBorderSetting()));
+	return true;
+}
+
 /** updateTileTexturePositions - assigns each tile a location in the texture.
 */
 Int WorldHeightMap::updateTileTexturePositions(Int *edgeHeight)
 {
 	Int i, j;
 	Int maxHeight = 0;
-	const Int tilesPerRow = TEXTURE_WIDTH/(TILE_PIXEL_EXTENT+TILE_OFFSET);
+	m_atlasBorder = getAtlasBorderSetting();
+	const Int slot = TILE_PIXEL_EXTENT + 2*m_atlasBorder;
+	const Int tilesPerRow = TEXTURE_WIDTH/slot;
 
-	Bool availableGrid[tilesPerRow][tilesPerRow];
+	Bool availableGrid[MAX_ATLAS_SLOTS][MAX_ATLAS_SLOTS];
 	Int row, column;
 	for (row=0; row<tilesPerRow; row++) {
 		for (column=0; column<tilesPerRow; column++) {
@@ -1568,16 +1596,18 @@ Int WorldHeightMap::updateTileTexturePositions(Int *edgeHeight)
 				if (found) break;
 			}
 			if (!found) {
+				RENDER_LOG(("Terrain atlas full: %s left out, so its cells draw wrong. A smaller TerrainAtlasBorder fits more.",
+					m_textureClasses[texClass].name.str()));
 				m_textureClasses[texClass].positionInTexture.x = 0;
 				m_textureClasses[texClass].positionInTexture.y = 0;
 				continue;
 			}
 
-			Int xOrigin = TILE_OFFSET/2 + column*(TILE_PIXEL_EXTENT+TILE_OFFSET);
-			Int yOrigin = TILE_OFFSET/2 + row*(TILE_PIXEL_EXTENT+TILE_OFFSET);
+			Int xOrigin = m_atlasBorder + column*slot;
+			Int yOrigin = m_atlasBorder + row*slot;
 			m_textureClasses[texClass].positionInTexture.x = xOrigin;
 			m_textureClasses[texClass].positionInTexture.y = yOrigin;
-			Int classHeight = yOrigin + width*TILE_PIXEL_EXTENT+ TILE_OFFSET/2;
+			Int classHeight = yOrigin + width*TILE_PIXEL_EXTENT+ m_atlasBorder;
 			if (maxHeight < classHeight) maxHeight = classHeight;
 
 			for (i=0; i<width; i++) {
@@ -1605,8 +1635,9 @@ Int WorldHeightMap::updateTileTexturePositions(Int *edgeHeight)
 	/* put the blend edge tiles into the blend edges texture */
 	Int maxEdgeHeight = 0;
 	// Reset the grid, cause we're using a different texture now.
-	for (row=0; row<tilesPerRow; row++) {
-		for (column=0; column<tilesPerRow; column++) {
+	const Int edgeTilesPerRow = TEXTURE_WIDTH/(TILE_PIXEL_EXTENT+EDGE_TILE_OFFSET);
+	for (row=0; row<edgeTilesPerRow; row++) {
+		for (column=0; column<edgeTilesPerRow; column++) {
 			availableGrid[row][column] = true;
 		}
 	}
@@ -1614,8 +1645,8 @@ Int WorldHeightMap::updateTileTexturePositions(Int *edgeHeight)
 		Int width = m_edgeTextureClasses[texClass].width;
 		// Find an available block of space.
 		Bool found = false;
-		for (row=0; row<tilesPerRow-width+1 && !found; row++) {
-			for (column=0; column<tilesPerRow-width+1 && !found; column++) {
+		for (row=0; row<edgeTilesPerRow-width+1 && !found; row++) {
+			for (column=0; column<edgeTilesPerRow-width+1 && !found; column++) {
 				if (availableGrid[row][column]) {
 					Bool open = true;
 					for (i=0; i<width && open; i++) {
@@ -1637,11 +1668,11 @@ Int WorldHeightMap::updateTileTexturePositions(Int *edgeHeight)
 			continue;
 		}
 
-		Int xOrigin = TILE_OFFSET/2 + column*(TILE_PIXEL_EXTENT+TILE_OFFSET);
-		Int yOrigin = TILE_OFFSET/2 + row*(TILE_PIXEL_EXTENT+TILE_OFFSET);
+		Int xOrigin = EDGE_TILE_OFFSET/2 + column*(TILE_PIXEL_EXTENT+EDGE_TILE_OFFSET);
+		Int yOrigin = EDGE_TILE_OFFSET/2 + row*(TILE_PIXEL_EXTENT+EDGE_TILE_OFFSET);
 		m_edgeTextureClasses[texClass].positionInTexture.x = xOrigin;
 		m_edgeTextureClasses[texClass].positionInTexture.y = yOrigin;
-		Int classHeight = yOrigin + width*TILE_PIXEL_EXTENT+ TILE_OFFSET/2;
+		Int classHeight = yOrigin + width*TILE_PIXEL_EXTENT+ EDGE_TILE_OFFSET/2;
 		if (maxEdgeHeight < classHeight) maxEdgeHeight = classHeight;
 
 		for (i=0; i<width; i++) {
@@ -1778,7 +1809,7 @@ Bool WorldHeightMap::getUVForTileIndex(Int ndx, Short tileNdx, float U[4], float
 {
 	Real nU, nV, xU, xV;
 	nU=nV=xU=xV = 0.0f;
-	Int tilesPerRow = TEXTURE_WIDTH/(2*TILE_PIXEL_EXTENT+TILE_OFFSET);
+	Int tilesPerRow = TEXTURE_WIDTH/(2*TILE_PIXEL_EXTENT+2*m_atlasBorder);
 	tilesPerRow *= 4;
 
 	if ((ndx<m_dataSize) && m_tileNdxes) {
@@ -1838,7 +1869,7 @@ Bool WorldHeightMap::getUVForTileIndex(Int ndx, Short tileNdx, float U[4], float
 
 		Real nU, nV, xU, xV;
 		nU=nV=xU=xV = 0.0f;
-		Int tilesPerRow = TEXTURE_WIDTH/(2*TILE_PIXEL_EXTENT+TILE_OFFSET);
+		Int tilesPerRow = TEXTURE_WIDTH/(2*TILE_PIXEL_EXTENT+2*m_atlasBorder);
 		tilesPerRow *= 4;
 
 
@@ -2271,7 +2302,7 @@ TextureClass *WorldHeightMap::getTerrainClassMap()
 
 	// The shader clamps reads to the lookup, so an atlas reaching past it turns the seabed off rather than read the wrong block.
 	const Int size = CLASS_MAP_SLOTS;
-	const Int slot = TILE_PIXEL_EXTENT + TILE_OFFSET;
+	const Int slot = TILE_PIXEL_EXTENT + 2*m_atlasBorder;
 	for (Int i=0; i<m_numTextureClasses; i++)
 	{
 		const TXTextureClass &texClass = m_textureClasses[i];
@@ -2279,8 +2310,8 @@ TextureClass *WorldHeightMap::getTerrainClassMap()
 		{
 			continue;
 		}
-		if ((texClass.positionInTexture.x - TILE_OFFSET/2) / slot + texClass.width > size ||
-			(texClass.positionInTexture.y - TILE_OFFSET/2) / slot + texClass.width > size)
+		if ((texClass.positionInTexture.x - m_atlasBorder) / slot + texClass.width > size ||
+			(texClass.positionInTexture.y - m_atlasBorder) / slot + texClass.width > size)
 		{
 			return nullptr;
 		}
@@ -2312,8 +2343,8 @@ TextureClass *WorldHeightMap::getTerrainClassMap()
 			{
 				continue;
 			}
-			const Int column = (texClass.positionInTexture.x - TILE_OFFSET/2) / slot;
-			const Int row = (texClass.positionInTexture.y - TILE_OFFSET/2) / slot;
+			const Int column = (texClass.positionInTexture.x - m_atlasBorder) / slot;
+			const Int row = (texClass.positionInTexture.y - m_atlasBorder) / slot;
 			const UnsignedInt texel = 0xff000000 | ((UnsignedInt)column << 16) | ((UnsignedInt)row << 8) | (UnsignedInt)width;
 			for (Int y=row; y<row + width && y<size; y++)
 			{

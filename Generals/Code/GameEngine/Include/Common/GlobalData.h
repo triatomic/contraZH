@@ -553,6 +553,7 @@ public:
   Real m_groundNoiseBrightness;
   Real m_terrainHeightBlendStrength; ///< how far the taller texture pushes into the other's side of a blend
   Real m_terrainHeightBlendSharpness; ///< how narrow the blend's edge is, 1 as wide as the legacy blend
+  Int m_terrainAtlasBorder;       ///< texels copied around each texture in the terrain atlas
   Int m_vsync;                    ///< Options.ini VSync: 1 on, 0 off, -1 on in fullscreen and off in a window
   Bool m_lowLatency;              ///< Options.ini LowLatency: at most one frame queued ahead of the GPU
   Int m_alliedDecalMode;          ///< Options.ini AlliedDecalMode: how allied power decals are drawn

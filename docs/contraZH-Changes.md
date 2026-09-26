@@ -305,6 +305,28 @@ supports anisotropic for only min or mag filtering falls back to linear for the 
 ground stays sharp. It used to keep the mod's filtering. In the other modes the terrain still filters
 as the mod's `BilinearTerrainTex` and `TrilinearTerrainTex` say.
 
+The terrain draws every texture a map uses from one atlas, with a border of copied pixels around each
+texture so filtering at a texture's edge reads the texture and not its neighbour. Anisotropic filtering
+reads further along the view than the original 4-texel border covers, so steep distant ground can pick
+up a faint line of the next texture every few cells. The mod's `GameData.ini` sets the border:
+
+* `TerrainAtlasBorder = 8` - (Texels around each texture, rounded up to a multiple of 4, from 4 to 32.
+Cheat builds apply a change while a map runs.)
+
+A wider border keeps higher anisotropy clean but fits fewer textures. The atlas is at most 2048 texels
+square:
+
+| `TerrainAtlasBorder` | Clean at the full-size mip | Clean at the next mip | 256-texel textures that fit |
+|---|---|---|---|
+| 4 (the original) | 8x | 4x | 49 |
+| 8 | 16x | 8x | 36 |
+| 12 | 16x | 8x | 25 |
+| 16 | 16x | 16x | 25 |
+| 32 | 16x | 16x | 16 |
+
+A 512-texel texture takes the room of four 256-texel ones. A texture that does not fit draws wrong, and the
+render log names it, so a map with many large textures needs a smaller border.
+
 Shadow mapping, specular, normal and glow maps, per-pixel lights, soft particles, flame and laser
 shading and the other features that need the Direct3D 9 build are on [Direct3D 9 Features](dx9feat.md).
 

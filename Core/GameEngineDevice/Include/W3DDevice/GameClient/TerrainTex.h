@@ -35,7 +35,15 @@
 #include "Common/AsciiString.h"
 
 class WorldHeightMap;
-#define TILE_OFFSET 8
+
+// Texels copied around each texture in the terrain atlases, from GameData TerrainAtlasBorder rounded up
+// to a multiple of 4 so every texture starts on a whole texel of the smallest mip.
+#define MIN_ATLAS_BORDER 4
+#define MAX_ATLAS_BORDER 32
+#define MAX_ATLAS_SLOTS (TEXTURE_WIDTH/(TILE_PIXEL_EXTENT+2*MIN_ATLAS_BORDER))
+
+// The blend edge texture keeps the original spacing, since nothing copies borders into it.
+#define EDGE_TILE_OFFSET 8
 /** ***********************************************************************
 **                             TerrainTextureClass
 ***************************************************************************/

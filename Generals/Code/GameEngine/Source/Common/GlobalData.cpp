@@ -627,6 +627,7 @@ GlobalData::GlobalData()
   m_groundNoiseBrightness = 0.9f;
   m_terrainHeightBlendStrength = 2.0f;
   m_terrainHeightBlendSharpness = 4.0f;
+  m_terrainAtlasBorder = 8;
   m_vsync = -1;
   m_lowLatency = FALSE;
   m_alliedDecalMode = AlliedDecalMode_Default;

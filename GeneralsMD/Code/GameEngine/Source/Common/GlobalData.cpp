@@ -294,6 +294,7 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ "GroundNoiseBrightness",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_groundNoiseBrightness ) },
 	{ "TerrainHeightBlendStrength",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_terrainHeightBlendStrength ) },
 	{ "TerrainHeightBlendSharpness",		INI::parseReal,				nullptr,			offsetof( GlobalData, m_terrainHeightBlendSharpness ) },
+	{ "TerrainAtlasBorder",					INI::parseInt,				nullptr,			offsetof( GlobalData, m_terrainAtlasBorder ) },
 	{ "TextureReductionFactor",			INI::parseInt,				nullptr,			offsetof( GlobalData, m_textureReductionFactor ) },
 	{ "UseBehindBuildingMarker",		INI::parseBool,				nullptr,			offsetof( GlobalData, m_enableBehindBuildingMarkers ) },
 	{ "WaterPositionX",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_waterPositionX ) },
@@ -993,6 +994,7 @@ GlobalData::GlobalData()
 	m_groundNoiseBrightness = 0.9f;
 	m_terrainHeightBlendStrength = 2.0f;
 	m_terrainHeightBlendSharpness = 4.0f;
+	m_terrainAtlasBorder = 8;
 	m_textureReductionFactor = -1;
 	m_enableBehindBuildingMarkers = TRUE;
 	m_scriptDebug = FALSE;
@@ -1616,7 +1618,7 @@ static const char *const LiveGameDataKeys[] =
 	"UnitEmissiveIntensity", "UnitEmissiveNightIntensity", "SoftParticleDistance",
 	"AmbientOcclusionRadius", "AmbientOcclusionStrength",
 	"GroundNoiseStrength", "GroundNoiseSize", "GroundNoiseTint", "GroundNoiseBrightness",
-	"TerrainHeightBlendStrength", "TerrainHeightBlendSharpness",
+	"TerrainHeightBlendStrength", "TerrainHeightBlendSharpness", "TerrainAtlasBorder",
 	"FlameWarp", "FlameHeat", "FlameFlicker", "FlameBreakup", "FlameNoiseSize", "FlameRise",
 	"HazeBend", "HazeSize", "HazeLift", "HazeNoiseSize", "HazeRise", "HazeMask",
 	"ElectricArcs", "ElectricArcSharpness", "ElectricNoiseSize", "ElectricJitter", "ElectricFlicker", "ElectricRate",

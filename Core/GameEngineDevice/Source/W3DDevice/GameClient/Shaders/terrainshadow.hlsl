@@ -120,13 +120,14 @@ sampler2D ShadowMap : register(s4);
 
 #if SEABED
 
-sampler2D ClassMap  : register(s8);   // per 72-texel atlas slot, its texture block's first slot column and row and its width in tiles, over 255
+sampler2D ClassMap  : register(s8);   // per atlas slot, its texture block's first slot column and row and its width in tiles, over 255
 sampler2D WaterMask : register(s9);   // standing water's coverage in alpha, its level at 1/16 unit in red and green times coverage
 
 float4 SeabedAtlas : register(c19);   // xy = atlas size in texels, zw = 1 / that
 float4 SeabedWorld : register(c20);   // x = atlas texels per world unit, y = texels of the map border, z = 1 / fade depth under the waterline
 float4 SeabedHex   : register(c21);   // x = 1 / hex cell spacing, y = weight exponent, z = how far cells shift, w = twice the tangent of half the widest turn
 float4 SeabedMask  : register(c22);   // world xy to water mask texcoords: xy scale, zw offset
+float4 SeabedSlot  : register(c23);   // atlas texels to lookup texcoords: x scale, y offset; z = 255 times the slot's texels, w = the atlas border's
 
 struct HexCells
 {
@@ -197,9 +198,9 @@ float2 BlockUV(float2 texel, float3 block)
 float4 SeabedSample(sampler2D atlas, float4 plain, float2 uv, float2 texel, float2 dx, float2 dy, HexCells cells)
 {
     float2 atlasTexel = uv * SeabedAtlas.xy;
-    // Point sampling picks the slot, 72 texels to a slot and 32 slots to the lookup.
-    float3 slots = tex2D(ClassMap, (atlasTexel - 4.0f) / (72.0f * 32.0f)).rgb;
-    float3 block = slots * float3(255.0f * 72.0f, 255.0f * 72.0f, 255.0f * 64.0f) + float3(4.0f, 4.0f, 0.0f);
+    // Point sampling picks the slot. The slot's size follows TerrainAtlasBorder, so it comes in constants.
+    float3 slots = tex2D(ClassMap, atlasTexel * SeabedSlot.x + SeabedSlot.y).rgb;
+    float3 block = float3(slots.xy * SeabedSlot.z + SeabedSlot.w, slots.z * (255.0f * 64.0f));
 
     // Cliff cells lay out their own texels, which the world position does not reach.
     float2 drift = texel - (atlasTexel - block.xy);
