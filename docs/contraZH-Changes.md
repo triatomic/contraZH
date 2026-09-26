@@ -301,6 +301,9 @@ rounds down to a valid step.
 * The level is clamped to what the device supports.
 * Fork fixes on top: settings survive a device reset (alt-tab, window toggle), and a driver that
 supports anisotropic for only min or mag filtering falls back to linear for the other.
+* The terrain follows `Anisotropic` too, blend edges and the lower detail settings included, so distant
+ground stays sharp. It used to keep the mod's filtering. In the other modes the terrain still filters
+as the mod's `BilinearTerrainTex` and `TrilinearTerrainTex` say.
 
 Shadow mapping, specular, normal and glow maps, per-pixel lights, soft particles, flame and laser
 shading and the other features that need the Direct3D 9 build are on [Direct3D 9 Features](dx9feat.md).

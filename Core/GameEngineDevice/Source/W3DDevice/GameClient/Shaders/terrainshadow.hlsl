@@ -206,9 +206,10 @@ float4 SeabedSample(sampler2D atlas, float4 plain, float2 uv, float2 texel, floa
     drift -= block.z * floor(drift / block.z + 0.5f);
     float onGrid = step(dot(drift, drift), 1.0f);
 
-    float4 sum = cells.weight.x * tex2Dgrad(atlas, BlockUV(Turn(texel, cells.turn0) + cells.offset0 * block.z, block), dx, dy);
-    sum += cells.weight.y * tex2Dgrad(atlas, BlockUV(Turn(texel, cells.turn1) + cells.offset1 * block.z, block), dx, dy);
-    sum += cells.weight.z * tex2Dgrad(atlas, BlockUV(Turn(texel, cells.turn2) + cells.offset2 * block.z, block), dx, dy);
+    // Each read's gradients turn with it, so anisotropic filtering runs along the right axis.
+    float4 sum = cells.weight.x * tex2Dgrad(atlas, BlockUV(Turn(texel, cells.turn0) + cells.offset0 * block.z, block), Turn(dx, cells.turn0), Turn(dy, cells.turn0));
+    sum += cells.weight.y * tex2Dgrad(atlas, BlockUV(Turn(texel, cells.turn1) + cells.offset1 * block.z, block), Turn(dx, cells.turn1), Turn(dy, cells.turn1));
+    sum += cells.weight.z * tex2Dgrad(atlas, BlockUV(Turn(texel, cells.turn2) + cells.offset2 * block.z, block), Turn(dx, cells.turn2), Turn(dy, cells.turn2));
     return lerp(plain, sum, onGrid);
 }
 
