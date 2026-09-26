@@ -27,7 +27,9 @@
 #include "WW3D2/ww3dformat.h"
 #include "WWMath/wwmath.h"
 #include <cstring>
+#if !defined(BUILD_WITH_D3D9)
 #include <d3dx8core.h>
+#endif
 
 W3DProfilerFrameCapture::W3DProfilerFrameCapture()
 {
@@ -62,6 +64,82 @@ void W3DProfilerFrameCapture::Capture(UnsignedInt displayWidth, UnsignedInt disp
 		return;
 	}
 
+#if defined(BUILD_WITH_D3D9)
+	// D3D9 scales the frame with StretchRect and swaps BGRA to RGBA on the CPU, so it needs no D3DX shader.
+	SurfaceClass *backBuffer = DX8Wrapper::_Get_DX8_Back_Buffer();
+	if (!backBuffer)
+	{
+		return;
+	}
+
+	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
+	IDirect3DSurface8 *source = backBuffer->Peek_D3D_Surface();
+	D3DSURFACE_DESC sourceDesc;
+	if (FAILED(source->GetDesc(&sourceDesc)) || (sourceDesc.Format != D3DFMT_X8R8G8B8 && sourceDesc.Format != D3DFMT_A8R8G8B8))
+	{
+		REF_PTR_RELEASE(backBuffer);
+		return;
+	}
+
+	const Real aspectRatio = (Real)displayHeight / (Real)displayWidth;
+	const UnsignedInt imageHeight = min((int)WWMath::Round(PROFILER_FRAME_IMAGE_SIZE * aspectRatio), PROFILER_FRAME_IMAGE_SIZE);
+
+	// StretchRect cannot resolve multisampling and scale at once, so a multisampled frame resolves at full size first.
+	IDirect3DSurface8 *resolved = nullptr;
+	IDirect3DSurface8 *scaled = nullptr;
+	IDirect3DSurface8 *readback = nullptr;
+	IDirect3DSurface8 *scaleFrom = source;
+	Bool copied = TRUE;
+	if (sourceDesc.MultiSampleType != D3DMULTISAMPLE_NONE)
+	{
+		copied = SUCCEEDED(device->CreateRenderTarget(sourceDesc.Width, sourceDesc.Height, sourceDesc.Format, D3DMULTISAMPLE_NONE, 0, FALSE, &resolved, nullptr))
+			&& SUCCEEDED(device->StretchRect(source, nullptr, resolved, nullptr, D3DTEXF_NONE));
+		scaleFrom = resolved;
+	}
+	copied = copied
+		&& SUCCEEDED(device->CreateRenderTarget(PROFILER_FRAME_IMAGE_SIZE, imageHeight, sourceDesc.Format, D3DMULTISAMPLE_NONE, 0, FALSE, &scaled, nullptr))
+		&& SUCCEEDED(device->CreateOffscreenPlainSurface(PROFILER_FRAME_IMAGE_SIZE, imageHeight, sourceDesc.Format, D3DPOOL_SYSTEMMEM, &readback, nullptr))
+		&& SUCCEEDED(device->StretchRect(scaleFrom, nullptr, scaled, nullptr, D3DTEXF_LINEAR))
+		&& SUCCEEDED(device->GetRenderTargetData(scaled, readback));
+	REF_PTR_RELEASE(backBuffer);
+
+	D3DLOCKED_RECT locked;
+	if (copied && SUCCEEDED(readback->LockRect(&locked, nullptr, D3DLOCK_READONLY)))
+	{
+		const size_t rowBytes = (size_t)PROFILER_FRAME_IMAGE_SIZE * 4;
+		m_lastCaptureHeight = imageHeight;
+		m_lastCapturePixels.resize(rowBytes * imageHeight);
+		for (UnsignedInt row = 0; row < imageHeight; ++row)
+		{
+			const UnsignedByte *from = static_cast<const UnsignedByte *>(locked.pBits) + row * locked.Pitch;
+			UnsignedByte *to = m_lastCapturePixels.data() + row * rowBytes;
+			for (UnsignedInt column = 0; column < PROFILER_FRAME_IMAGE_SIZE; ++column)
+			{
+				to[column * 4 + 0] = from[column * 4 + 2];
+				to[column * 4 + 1] = from[column * 4 + 1];
+				to[column * 4 + 2] = from[column * 4 + 0];
+				to[column * 4 + 3] = 255;
+			}
+		}
+		readback->UnlockRect();
+
+		PROFILER_FRAME_IMAGE(m_lastCapturePixels.data(), PROFILER_FRAME_IMAGE_SIZE, m_lastCaptureHeight, 0, false);
+		m_lastCaptureTimeMs = currentTimeMs;
+	}
+
+	if (readback)
+	{
+		readback->Release();
+	}
+	if (scaled)
+	{
+		scaled->Release();
+	}
+	if (resolved)
+	{
+		resolved->Release();
+	}
+#else
 	// compile swizzle shader convert BGRA to RGBA
 	// TheSuperHackers @todo In DX9 with ps2.0 this shader will be much simpler
 	if (!m_swizzleShader)
@@ -250,6 +328,7 @@ void W3DProfilerFrameCapture::Capture(UnsignedInt displayWidth, UnsignedInt disp
 	intermediateTexture = nullptr;
 	REF_PTR_RELEASE(surfaceClass);
 	REF_PTR_RELEASE(renderTarget);
+#endif
 }
 
 #endif // PROFILER_ENABLED
