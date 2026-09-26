@@ -578,6 +578,15 @@ void WeaponTemplate::postProcessLoad()
 	{
 		m_projectileTmpl = TheThingFactory->findTemplate(m_projectileName);
 		DEBUG_ASSERTCRASH(m_projectileTmpl, ("projectile %s not found!",m_projectileName.str()));
+
+#ifdef DEBUG_LOGGING
+		if (m_projectileTmpl && m_primaryDamage > 0.0)
+		{
+			const Real projectileRadius = m_projectileTmpl->getTemplateGeometryInfo().getMajorRadius();
+			if (m_primaryDamageRadius < projectileRadius)
+				DEBUG_LOG(("Weapon template %s has a PrimaryDamageRadius (%f) smaller than its projectile object's GeometryMajorRadius (%f)! This may lead to inconsistent damage application.", getName().str(), m_primaryDamageRadius, projectileRadius));
+		}
+#endif
 	}
 
 	// Veterancy ranks beyond HEROIC (FOUR/FIVE) inherit HEROIC's per-level FX/OCL/exhaust entries unless
