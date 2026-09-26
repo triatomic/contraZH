@@ -195,6 +195,8 @@ protected:
 	typedef std::map<const Image *, ImageTexture> ImageTextureMap;
 	ImageTextureMap m_imageTextures;
 
+	DisplayString *m_cinematicDisplayString;
+
 #if defined(RTS_DEBUG)
 	Int64 m_timerAtCumuFPSStart;
 #endif

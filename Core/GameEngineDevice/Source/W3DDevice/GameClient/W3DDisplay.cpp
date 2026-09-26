@@ -413,6 +413,7 @@ W3DDisplay::W3DDisplay()
 	m_batchMode = DRAW_IMAGE_ALPHA;
 	m_batchGrayscale = FALSE;
 	m_batchNeedsInit = FALSE;
+	m_cinematicDisplayString = nullptr;
 
 #ifdef PROFILER_ENABLED
 	m_profilerFrameCapture = NEW W3DProfilerFrameCapture();
@@ -441,6 +442,12 @@ W3DDisplay::~W3DDisplay()
 	// TheSuperHackers @fix Mauller/Tomsons26 28/04/2025 Free benchmark display string
 	if( m_benchmarkDisplayString ) {
 		TheDisplayStringManager->freeDisplayString(m_benchmarkDisplayString);
+	}
+
+	if( m_cinematicDisplayString )
+	{
+		TheDisplayStringManager->freeDisplayString(m_cinematicDisplayString);
+		m_cinematicDisplayString = nullptr;
 	}
 
 	releaseImageTextures();
@@ -2163,7 +2170,11 @@ AGAIN:
 				// display cinematicText over the black
 				if( m_cinematicText != AsciiString::TheEmptyString && m_cinematicTextFrames != 0)
 				{
-					DisplayString *displayString = TheDisplayStringManager->newDisplayString();
+					if( m_cinematicDisplayString == nullptr )
+					{
+						m_cinematicDisplayString = TheDisplayStringManager->newDisplayString();
+					}
+					DisplayString *displayString = m_cinematicDisplayString;
 
 					// set word wrap if necessary
 
