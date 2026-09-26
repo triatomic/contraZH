@@ -451,6 +451,7 @@ GameMessageDisposition GUICommandTranslator::translateGameMessage(const GameMess
 							if( TheTacticalView->screenToTerrain(&mouse, &worldPos) )
 							{
 								GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_EVACUATE);
+								msg->appendBooleanArgument(false);
 								msg->appendLocationArgument(worldPos);
 
 								pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_EVACUATE );

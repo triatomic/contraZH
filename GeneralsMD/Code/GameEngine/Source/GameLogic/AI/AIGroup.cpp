@@ -35,6 +35,7 @@
 #include "Common/Player.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingTemplate.h"
+#include "Common/TunnelTracker.h"
 #include "Common/Upgrade.h"
 #include "Common/Xfer.h"
 #include "Common/XferCRC.h"
@@ -3237,6 +3238,31 @@ void AIGroup::groupToggleOvercharge( CommandSourceType cmdSource )
 			if( obi )
 				obi->toggle();
 
+		}
+
+	}
+
+}
+
+void AIGroup::groupToggleTunnelAutoPop(CommandSourceType cmdSource)
+{
+	std::list<Object*>::iterator i;
+	Object *obj;
+	TunnelTracker *tunnelSystem;
+
+	for (i = m_memberList.begin(); i != m_memberList.end(); ++i)
+	{
+
+		// get object
+		obj = *i;
+
+		if (obj->getContain() && obj->getContain()->isTunnelContain())
+		{
+			tunnelSystem = obj->getControllingPlayer()->getTunnelSystem();
+			if (tunnelSystem)
+			{
+				tunnelSystem->setTunnelAutoPop(obj, !tunnelSystem->isAutoExitTunnel(obj));
+			}
 		}
 
 	}

@@ -969,6 +969,7 @@ public:
 	void groupCheer( CommandSourceType cmdSource );
 	void groupSell( CommandSourceType cmdSource );
 	void groupToggleOvercharge( CommandSourceType cmdSource );
+	void groupToggleTunnelAutoPop( CommandSourceType cmdSource );
 	// TheSuperHackers @feature Toggle the Hold Fire stance for the whole group.
 	void groupToggleHoldFire( CommandSourceType cmdSource );
 	void groupToggleDeploy( CommandSourceType cmdSource );
