@@ -176,6 +176,10 @@ public:
 
 	void clearExistenceCache();	///< forget every cached probe, for when the archive directory tree changes
 
+	/// Appends the native separator to nonempty paths unless either separator is already at the end.
+	/// Existing separators are not converted.
+	static void appendPathSeparator(AsciiString& path);
+
 protected:
 	Bool isKnownArchiveOnlyRead(const Char *filename, Int access) const;	///< whether a read can skip the loose file the probe already missed
 	void clearArchiveOnly(const Char *filename) const;	///< a loose copy was seen, so reads must try it again
