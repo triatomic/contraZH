@@ -697,16 +697,17 @@ Int parsePreload( char *args[], int num )
 
 	return 1;
 }
-#endif
 
-
-#if defined(RTS_DEBUG)
 Int parseDisplayDebug(char *args[], int)
 {
 	TheWritableGlobalData->m_displayDebug = TRUE;
 
 	return 1;
 }
+#endif
+
+
+#if defined(RTS_DEBUG)
 
 Int parseFile(char *args[], int num)
 {
@@ -1326,7 +1327,6 @@ static CommandLineParam paramsForEngineInit[] =
 	{ "-stateMachineDebug", parseStateMachineDebug },
 	{ "-jabber", parseJabber },
 	{ "-munkee", parseMunkee },
-	{ "-displayDebug", parseDisplayDebug },
 	{ "-file", parseFile },
 
 //	{ "-preload", parsePreload },
@@ -1378,6 +1378,7 @@ static CommandLineParam paramsForEngineInit[] =
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	{ "-preload", parsePreload },
+	{ "-displayDebug", parseDisplayDebug },
 #endif
 
 
