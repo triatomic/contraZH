@@ -766,6 +766,10 @@ protected:
 	static unsigned						TextureStageStates[MAX_TEXTURE_STAGES][32];
 	static IDirect3DBaseTexture8 *	Textures[MAX_TEXTURE_STAGES];
 
+	// Setting a render target or resetting the device resets the viewport, so both invalidate this.
+	static D3DVIEWPORT8					CurrentViewport;
+	static bool								CurrentViewportValid;
+
 	// These fog settings are constant for all objects in a given scene,
 	// unlike the matching renderstates which vary based on shader settings.
 	static bool								FogEnable;
@@ -1182,6 +1186,7 @@ WWINLINE void DX8Wrapper::Draw_DX8_Indexed_Primitive(D3DPRIMITIVETYPE type, UINT
 WWINLINE HRESULT DX8Wrapper::Set_DX8_Render_Target_Surfaces(IDirect3DSurface8* render_target, IDirect3DSurface8* depth_stencil)
 {
 	HRESULT hr;
+	CurrentViewportValid = false;
 #if defined(BUILD_WITH_D3D9)
 	DX8CALL_HRES(SetRenderTarget(0, render_target), hr);
 	if (SUCCEEDED(hr))

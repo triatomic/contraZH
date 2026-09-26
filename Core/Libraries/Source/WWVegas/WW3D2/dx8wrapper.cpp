@@ -149,6 +149,8 @@ UINT								DX8Wrapper::CurrentBaseVertexIndex						= 0;
 #endif
 unsigned							DX8Wrapper::TextureStageStates[MAX_TEXTURE_STAGES][32];
 IDirect3DBaseTexture8 *		DX8Wrapper::Textures[MAX_TEXTURE_STAGES];
+D3DVIEWPORT8					DX8Wrapper::CurrentViewport;
+bool								DX8Wrapper::CurrentViewportValid							= false;
 RenderStateStruct				DX8Wrapper::render_state;
 unsigned							DX8Wrapper::render_state_changed;
 
@@ -533,6 +535,8 @@ void DX8Wrapper::Invalidate_Cached_Render_States()
 
 	// (gth) clear the matrix shadows too
 	memset(&DX8Transforms, 0, sizeof(DX8Transforms));
+
+	CurrentViewportValid = false;
 }
 
 void DX8Wrapper::Do_Onetime_Device_Dependent_Shutdowns()
@@ -2114,7 +2118,13 @@ void DX8Wrapper::Clear(bool clear_color, bool clear_z_stencil, const Vector3 &co
 void DX8Wrapper::Set_Viewport(CONST D3DVIEWPORT8* pViewport)
 {
 	DX8_THREAD_ASSERT();
+	if (CurrentViewportValid && memcmp(&CurrentViewport, pViewport, sizeof(D3DVIEWPORT8)) == 0)
+	{
+		return;
+	}
 	DX8CALL(SetViewport(pViewport));
+	CurrentViewport = *pViewport;
+	CurrentViewportValid = true;
 }
 
 // ----------------------------------------------------------------------------
@@ -2966,6 +2976,7 @@ void DX8Wrapper::Create_Scene_Target()
 
 	DX8CALL(SetRenderTarget(0, SceneRenderTarget));
 	DX8CALL(SetDepthStencilSurface(SceneDepthBuffer));
+	CurrentViewportValid = false;
 	RENDER_LOG(("Rendering to a %dx MSAA scene target", (int)MultiSampleAntiAliasing));
 #endif
 }
