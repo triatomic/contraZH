@@ -73,6 +73,8 @@ public:
 	static Bool isTimeFrozen(); ///< Returns true if a script has frozen time.
 	static Bool isGameHalted(); ///< Returns true if the game is paused or the network is stalling.
 
+	Real getLogicFrameProgress() const; ///< How far rendering is between the last two logic frames, 0 to 1.
+
 	virtual void setQuitting( Bool quitting );				///< set quitting status
 	virtual Bool getQuitting();						///< is app getting ready to quit.
 
@@ -104,6 +106,7 @@ protected:
 	virtual AudioManager *createAudioManager(Bool dummy) = 0;				///< Factory for Audio Manager
 
 	Real m_logicTimeAccumulator; ///< Frame time accumulated towards submitting a new logic frame
+	Real m_logicFrameProgress; ///< Accumulated time over the logic step, 1 when logic steps every render frame
 
 	Bool m_quitting; ///< true when we need to quit the game
 	Bool m_isActive; ///< app has OS focus.

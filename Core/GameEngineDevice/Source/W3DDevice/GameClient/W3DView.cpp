@@ -1795,6 +1795,17 @@ void W3DView::update()
 			}
 			else
 			{	Coord3D objpos = *cameraLockObj->getPosition();
+				Real objAngle = cameraLockObj->getOrientation();
+#if RTS_ZEROHOUR
+				// Follow the model where it is drawn, or it jitters against the camera.
+				if (const Drawable *lockDraw = cameraLockObj->getDrawable())
+				{
+					const Matrix3D *drawnMtx = lockDraw->getDrawnTransformMatrix();
+					const Vector3 drawnPos = drawnMtx->Get_Translation();
+					objpos.set(drawnPos.X, drawnPos.Y, drawnPos.Z);
+					objAngle = drawnMtx->Get_Z_Rotation();
+				}
+#endif
 				Coord3D curpos = getPosition();
 				// don't "snap" directly to the pos, but move there smoothly.
 				Real snapThreshSqr = sqr(TheGlobalData->m_partitionCellSize);
@@ -1848,7 +1859,7 @@ void W3DView::update()
 					if (cameraLockObj->isUsingAirborneLocomotor() && cameraLockObj->isAboveTerrainOrWater())
 					{
 						Matrix3D camXForm;
-						Real idealZRot = cameraLockObj->getOrientation() - M_PI_2;
+						Real idealZRot = objAngle - M_PI_2;
 
 						if (m_snapImmediate)
 						{

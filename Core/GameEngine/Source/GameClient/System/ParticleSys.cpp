@@ -2369,6 +2369,20 @@ Bool ParticleSystem::update( Int localPlayerIndex  )
 }
 
 // ------------------------------------------------------------------------------------------------
+// Emit where the parent model is drawn, which trails its logic transform by up to one logic frame.
+static const Matrix3D *getParentDrawnTransform( const Drawable *draw, Coord3D *pos )
+{
+#if RTS_ZEROHOUR
+	const Matrix3D *mtx = draw->getDrawnTransformMatrix();
+#else
+	const Matrix3D *mtx = draw->getTransformMatrix();
+#endif
+	const Vector3 translation = mtx->Get_Translation();
+	pos->set( translation.X, translation.Y, translation.Z );
+	return mtx;
+}
+
+// ------------------------------------------------------------------------------------------------
 void ParticleSystem::updateTransform()
 {
 	// if this system is attached to a Drawable/Object, update the current transform
@@ -2378,10 +2392,8 @@ void ParticleSystem::updateTransform()
 	{
 		if (Drawable *attachedTo = TheGameClient->findDrawableByID( m_attachedToDrawableID ))
 		{
-			applyParentTransform( *attachedTo->getTransformMatrix() );
-
 			m_lastPos = m_pos;
-			m_pos = *attachedTo->getPosition();
+			applyParentTransform( *getParentDrawnTransform( attachedTo, &m_pos ) );
 		}
 		else
 		{
@@ -2392,17 +2404,17 @@ void ParticleSystem::updateTransform()
 	{
 		if (Object *objectAttachedTo = TheGameLogic->findObjectByID( m_attachedToObjectID ))
 		{
+			m_lastPos = m_pos;
+
 			if (const Drawable * draw = objectAttachedTo->getDrawable())
 			{
-				applyParentTransform( *draw->getTransformMatrix() );
+				applyParentTransform( *getParentDrawnTransform( draw, &m_pos ) );
 			}
 			else
 			{
 				applyParentTransform( *objectAttachedTo->getTransformMatrix() );
+				m_pos = *objectAttachedTo->getPosition();
 			}
-
-			m_lastPos = m_pos;
-			m_pos = *objectAttachedTo->getPosition();
 		}
 		else
 		{

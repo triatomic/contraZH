@@ -231,6 +231,7 @@ static GameWindow *   checkAmbientOcclusion       = nullptr;
 static GameWindow *   checkHeightBlend            = nullptr;
 static GameWindow *   checkVSync                  = nullptr;
 static GameWindow *   checkLowLatency             = nullptr;
+static GameWindow *   checkSmoothUnitMotion       = nullptr;
 
 // Options.ini spellings, indexed by the matching enum and combo box position
 static const char *const HealthBarModeNames[] = { "Classic", "Damaged", "Always" };
@@ -491,6 +492,7 @@ static const BoolOption BoolOptions[] =
 	{ &checkAmbientOcclusion, "AmbientOcclusion", &OptionPreferences::getAmbientOcclusionEnabled, &GlobalData::m_useAmbientOcclusion, TRUE },
 	{ &checkHeightBlend, "HeightBlend", &OptionPreferences::getHeightBlendEnabled, &GlobalData::m_useHeightBlend, TRUE },
 	{ &checkLowLatency, "LowLatency", &OptionPreferences::getLowLatencyEnabled, &GlobalData::m_lowLatency, FALSE },
+	{ &checkSmoothUnitMotion, "SmoothUnitMotion", &OptionPreferences::getSmoothUnitMotionEnabled, &GlobalData::m_smoothUnitMotion, TRUE },
 };
 
 // the strength is stored as 0..1 but edited as a percentage
@@ -1606,6 +1608,7 @@ static void initGameOptionsWindows()
 	checkHeightBlend = findOptionsWindow( "OptionsMenu.wnd:CheckHeightBlend" );
 	checkVSync = findOptionsWindow( "OptionsMenu.wnd:CheckVSync" );
 	checkLowLatency = findOptionsWindow( "OptionsMenu.wnd:CheckLowLatency" );
+	checkSmoothUnitMotion = findOptionsWindow( "OptionsMenu.wnd:CheckSmoothUnitMotion" );
 
 	if (ButtonGameOptions)
 	{
@@ -1658,6 +1661,7 @@ static void initGameOptionsWindows()
 	setCheckText( checkDynamicLights, "GUI:DynamicLights", L"Dynamic lights", "TOOLTIP:DynamicLights", L"Explosions, muzzle flashes and lasers light the ground, units and buildings around them." );
 	setCheckText( checkPixelLights, "GUI:PixelLights", L"Per-pixel lights", "TOOLTIP:PixelLights", L"Dynamic lights fall in smooth circles that follow the ground's detail, instead of blocky patches. Needs a Direct3D 9 card with Shader Model 2.0a or later." );
 	setCheckText( checkLowLatency, "GUI:LowLatency", L"Low latency mode", "TOOLTIP:LowLatency", L"Lets the game prepare only one frame ahead of the graphics card, so the screen answers the mouse sooner. Can lower the frame rate a little. Needs the Direct3D 9 build." );
+	setCheckText( checkSmoothUnitMotion, "GUI:SmoothUnitMotion", L"Smooth unit motion", "TOOLTIP:SmoothUnitMotion", L"Above 30 frames a second, units, projectiles and turrets glide between game updates instead of stepping 30 times a second. Single player, skirmish and replays." );
 	setCheckText( checkVSync, "GUI:VSync", L"Vertical sync", "TOOLTIP:VSync", L"Waits for the monitor's refresh before showing each frame, which stops tearing but can add a little input delay." );
 	setCheckText( checkAmbientOcclusion, "GUI:AmbientOcclusion", L"Ambient occlusion", "TOOLTIP:AmbientOcclusion", L"Creases, corners and the ground where units and buildings stand fall into soft shade. Off while anti-aliasing is on. Needs a Direct3D 9 card with Shader Model 2.0a or later." );
 	setCheckText( checkHeightBlend, "GUI:HeightBlend", L"Height blending", "TOOLTIP:HeightBlend", L"Where two terrain textures meet, the taller one's stones and clumps push into the other instead of a soft fade. Needs a Direct3D 9 card." );

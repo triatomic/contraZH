@@ -2020,6 +2020,8 @@ W3DModelDraw::W3DModelDraw(Thing *thing, const ModuleData* moduleData) : DrawMod
 	m_trackRenderObject = nullptr;
 	m_lastTrackWasBackwards = FALSE;
 	m_isFirstDrawModule = FALSE;
+	m_drawnTurretFrame = 0;
+	m_drawnTurretValid = FALSE;
 	m_whichAnimInCurState = -1;
 	m_nextState = nullptr;
 	m_nextStateAnimLoopDuration = NO_NEXT_DURATION;
@@ -2838,6 +2840,60 @@ void W3DModelDraw::stopClientParticleSystems()
 }
 
 //-------------------------------------------------------------------------------------------------
+void W3DModelDraw::computeDrawnTurretAngles(Real* angles, Real* pitches)
+{
+	const Object *obj = getDrawable()->getObject();
+	const AIUpdateInterface* ai = obj ? obj->getAIUpdateInterface() : nullptr;
+	for (Int i = 0; i < MAX_TURRETS; ++i)
+	{
+		angles[i] = 0;
+		pitches[i] = 0;
+		if (ai)
+		{
+			ai->getTurretRotAndPitch((WhichTurretType)i, &angles[i], &pitches[i]);
+		}
+	}
+
+#if RTS_ZEROHOUR
+	// Turrets blend between their last two logic frames along with the drawable.
+	const Real progress = getDrawable()->getDrawnProgress();
+	if (progress >= 1.0f)
+	{
+		m_drawnTurretValid = FALSE;
+		return;
+	}
+
+	const UnsignedInt frame = TheGameLogic->getFrame();
+	const Bool advance = m_drawnTurretValid && frame == m_drawnTurretFrame + 1;
+	const Bool snap = !advance && !(m_drawnTurretValid && frame == m_drawnTurretFrame);
+
+	for (Int i = 0; i < MAX_TURRETS; ++i)
+	{
+		if (snap)
+		{
+			m_drawnTurretAngle[i][0] = angles[i];
+			m_drawnTurretPitch[i][0] = pitches[i];
+		}
+		else if (advance)
+		{
+			m_drawnTurretAngle[i][0] = m_drawnTurretAngle[i][1];
+			m_drawnTurretPitch[i][0] = m_drawnTurretPitch[i][1];
+		}
+		m_drawnTurretAngle[i][1] = angles[i];
+		m_drawnTurretPitch[i][1] = pitches[i];
+
+		const Real prevAngle = m_drawnTurretAngle[i][0];
+		const Real prevPitch = m_drawnTurretPitch[i][0];
+		angles[i] = prevAngle + normalizeAngle(angles[i] - prevAngle) * progress;
+		pitches[i] = prevPitch + normalizeAngle(pitches[i] - prevPitch) * progress;
+	}
+
+	m_drawnTurretFrame = frame;
+	m_drawnTurretValid = TRUE;
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
 /*
 	DANGER WARNING READ ME
 	DANGER WARNING READ ME
@@ -2858,21 +2914,17 @@ void W3DModelDraw::handleClientTurretPositioning()
 	if (!m_curState || !(m_curState->m_validStuff & ModelConditionInfo::TURRETS_VALID))
 		return;
 
+	Real turretAngles[MAX_TURRETS];
+	Real turretPitches[MAX_TURRETS];
+	computeDrawnTurretAngles(turretAngles, turretPitches);
+
 	for (int tslot = 0; tslot < MAX_TURRETS; ++tslot)
 	{
 		const ModelConditionInfo::TurretInfo& tur = m_curState->m_turrets[tslot];
-		Real turretAngle = 0;
-		Real turretPitch = 0;
+		Real turretAngle = turretAngles[tslot];
+		Real turretPitch = turretPitches[tslot];
 		if (tur.m_turretAngleBone || tur.m_turretPitchBone)
 		{
-			const Object *obj = getDrawable()->getObject();
-			if (obj)
-			{
-				const AIUpdateInterface* ai = obj->getAIUpdateInterface();
-				if (ai)
-					ai->getTurretRotAndPitch((WhichTurretType)tslot, &turretAngle, &turretPitch);
-			}
-
 			// do turret, if any
 			if (tur.m_turretAngleBone != 0)
 			{

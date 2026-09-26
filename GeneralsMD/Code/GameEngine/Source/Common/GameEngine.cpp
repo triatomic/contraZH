@@ -303,6 +303,7 @@ GameEngine::GameEngine()
 {
 	// initialize to non garbage values
 	m_logicTimeAccumulator = 0.0f;
+	m_logicFrameProgress = 1.0f;
 	m_quitting = FALSE;
 #if defined(GENERALS_ONLINE)
 	m_discordRichPresence = nullptr;
@@ -926,6 +927,8 @@ Bool GameEngine::canUpdateNetworkGameLogic()
 {
 	DEBUG_ASSERTCRASH(TheNetwork != nullptr, ("TheNetwork is null"));
 
+	m_logicFrameProgress = 1.0f;
+
 	if (TheNetwork->isFrameDataReady())
 	{
 		// Important: The Network is definitely no longer stalling.
@@ -942,6 +945,7 @@ Bool GameEngine::canUpdateRegularGameLogic(UnsignedInt logicTimeQueryFlags)
 {
 	const Int logicTimeScaleFps = TheFramePacer->getActualLogicTimeScaleFps(logicTimeQueryFlags);
 
+	// A halted game keeps the progress, so the drawn scene holds still.
 	if (logicTimeScaleFps <= 0)
 	{
 		return false;
@@ -958,6 +962,7 @@ Bool GameEngine::canUpdateRegularGameLogic(UnsignedInt logicTimeQueryFlags)
 	if (useFastMode || logicTimeScaleFps >= maxRenderFps)
 	{
 		// Logic time scale is uncapped or larger equal Render FPS. Update straight away.
+		m_logicFrameProgress = 1.0f;
 		return true;
 	}
 	else
@@ -967,14 +972,26 @@ Bool GameEngine::canUpdateRegularGameLogic(UnsignedInt logicTimeQueryFlags)
 		const Real targetFrameTime = 1.0f / logicTimeScaleFps;
 		m_logicTimeAccumulator += min(TheFramePacer->getUpdateTime(), targetFrameTime);
 
+		Bool step = false;
 		if (m_logicTimeAccumulator >= targetFrameTime)
 		{
 			m_logicTimeAccumulator -= targetFrameTime;
-			return true;
+			step = true;
 		}
-	}
 
-	return false;
+		// Frozen time steps the scripts without advancing the logic frame, so the progress holds.
+		if (!TheFramePacer->isTimeFrozen())
+		{
+			m_logicFrameProgress = clamp(0.0f, m_logicTimeAccumulator / targetFrameTime, 1.0f);
+		}
+		return step;
+	}
+}
+
+/// -----------------------------------------------------------------------------------------------
+Real GameEngine::getLogicFrameProgress() const
+{
+	return m_logicFrameProgress;
 }
 
 /// -----------------------------------------------------------------------------------------------

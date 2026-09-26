@@ -41,6 +41,7 @@
 #include "Common/DrawModule.h"
 #include "Common/FramePacer.h"
 #include "Common/GameAudio.h"
+#include "Common/GameEngine.h"
 #include "Common/GameLOD.h"
 #include "Common/GameState.h"
 #include "Common/GameUtility.h"
@@ -570,6 +571,10 @@ Drawable::Drawable( const ThingTemplate *thingTemplate, DrawableStatusBits statu
 	m_locoInfo = nullptr;
 	m_physicsXform = nullptr;
 
+	m_drawnProgress = 1.0f;
+	m_drawnFrame = 0;
+	m_drawnValid = FALSE;
+
 	// sanity
 	if( TheGameClient == nullptr || thingTemplate == nullptr )
 	{
@@ -797,6 +802,8 @@ Bool Drawable::isVisible()
 	* interpolate between frames (e.g. terrain tread marks) don't stretch across the jump. */
 void Drawable::reactToTeleport()
 {
+	m_drawnValid = FALSE;
+
 	for (DrawModule** dm = getDrawModules(); *dm; ++dm)
 	{
 		(*dm)->reactToTeleport();
@@ -2920,7 +2927,7 @@ void Drawable::draw()
 #endif
 
 	// call the database defined draw action method
-	Matrix3D transformMtx = *getTransformMatrix();
+	Matrix3D transformMtx = *getDrawnTransformMatrix();
 	if (!isInstanceIdentity())
 	{
 #ifdef ALLOW_TEMPORARIES
@@ -2958,6 +2965,7 @@ static Bool computeHealthRegion( const Drawable *draw, IRegion2D& region )
 
 	Coord3D p;
 	obj->getHealthBoxPosition(p);
+	draw->addDrawnOffset(&p);
 	ICoord2D screenCenter;
 	if( !TheTacticalView->worldToScreen( &p, &screenCenter ) )
 		return FALSE;
@@ -3231,6 +3239,7 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 
 		Coord3D world;
 		obj->getHealthBoxPosition( world );
+		addDrawnOffset( &world );
 		if( !TheTacticalView->worldToScreen( &world, &anchor ) )
 			return;
 	}
@@ -3793,6 +3802,7 @@ void Drawable::drawAmmo( const IRegion2D *healthBarRegion )
 		pos.x += TheGlobalData->m_ammoPipWorldOffset.x;
 		pos.y += TheGlobalData->m_ammoPipWorldOffset.y;
 		pos.z += TheGlobalData->m_ammoPipWorldOffset.z + obj->getGeometryInfo().getMaxHeightAbovePosition();
+		addDrawnOffset(&pos);
 		if (!TheTacticalView->worldToScreen(&pos, &screenCenter))
 			return;
 
@@ -3847,6 +3857,7 @@ void Drawable::drawAmmo( const IRegion2D *healthBarRegion )
 		pos.x += TheGlobalData->m_ammoPipWorldOffset.x;
 		pos.y += TheGlobalData->m_ammoPipWorldOffset.y;
 		pos.z += TheGlobalData->m_ammoPipWorldOffset.z + obj->getGeometryInfo().getMaxHeightAbovePosition();
+		addDrawnOffset(&pos);
 		if (!TheTacticalView->worldToScreen(&pos, &screenCenter))
 			return;
 
@@ -3994,6 +4005,7 @@ Bool Drawable::getAmmoPipsScreenSpan( const IRegion2D *healthBarRegion, Int &top
 	pos.x += TheGlobalData->m_ammoPipWorldOffset.x;
 	pos.y += TheGlobalData->m_ammoPipWorldOffset.y;
 	pos.z += TheGlobalData->m_ammoPipWorldOffset.z + obj->getGeometryInfo().getMaxHeightAbovePosition();
+	addDrawnOffset(&pos);
 	if (!TheTacticalView->worldToScreen(&pos, &screenCenter))
 	{
 		return FALSE;
@@ -4245,6 +4257,7 @@ void Drawable::drawContained( const IRegion2D *healthBarRegion )
 	pos.x += TheGlobalData->m_containerPipWorldOffset.x;
 	pos.y += TheGlobalData->m_containerPipWorldOffset.y;
 	pos.z += TheGlobalData->m_containerPipWorldOffset.z + obj->getGeometryInfo().getMaxHeightAbovePosition();
+	addDrawnOffset(&pos);
 	if( !TheTacticalView->worldToScreen( &pos, &screenCenter ) )
 		return;
 
@@ -4426,6 +4439,7 @@ void Drawable::drawUIText()
 		Coord3D p;
 		ICoord2D screenCenter;
 		obj->getHealthBoxPosition(p);
+		addDrawnOffset(&p);
 		if( ! TheTacticalView->worldToScreen( &p, &screenCenter ) )
 			return;
 
@@ -5091,6 +5105,7 @@ void Drawable::drawConstructPercent( const IRegion2D *healthBarRegion )
 	ICoord2D screen;
 	Coord3D pos;
 	getDrawableGeometryInfo().getCenterPosition(*getPosition(), pos);
+	addDrawnOffset(&pos);
 
 	// convert drawable center position to screen coords
 	TheTacticalView->worldToScreen( &pos, &screen );
@@ -5118,6 +5133,7 @@ void Drawable::drawCaption( const IRegion2D *healthBarRegion )
 	ICoord2D screen;
 	Coord3D pos;
 	getDrawableGeometryInfo().getCenterPosition(*getPosition(), pos);
+	addDrawnOffset(&pos);
 
 	// convert drawable center position to screen coords
 	TheTacticalView->worldToScreen( &pos, &screen );
@@ -5180,6 +5196,7 @@ void Drawable::drawVeterancy( const IRegion2D *healthBarRegion )
 	Coord3D p;
 	ICoord2D screenCenter;
 	obj->getHealthBoxPosition(p);
+	addDrawnOffset(&p);
 	if( !TheTacticalView->worldToScreen( &p, &screenCenter ) )
 		return;
 
@@ -5606,6 +5623,7 @@ DrawableID Drawable::getID() const
 void Drawable::friend_bindToObject( Object *obj ) ///< bind this drawable to an object ID
 {
 	m_object = obj;
+	m_drawnValid = FALSE;
 	if (getObject())
 	{
 		if (TheGlobalData->m_timeOfDay == TIME_OF_DAY_NIGHT)
@@ -5788,6 +5806,129 @@ const Matrix3D *Drawable::getTransformMatrix() const
 		return obj->getTransformMatrix();
 	else
 		return Thing::getTransformMatrix();
+}
+
+// CONTRA_INTERPOLATION=0 draws every model at its logic transform.
+static Bool Get_Interpolation_Allowed()
+{
+	const char *value = getenv("CONTRA_INTERPOLATION");
+	return (value == nullptr) || (atoi(value) != 0);
+}
+static const Bool InterpolationAllowed = Get_Interpolation_Allowed();
+
+// A move longer than this in one logic frame is a teleport, so the model snaps instead of sliding.
+static const Real MAX_DRAWN_STEP = 100.0f;
+
+//-------------------------------------------------------------------------------------------------
+static Bool isSameRotation( const Matrix3D& a, const Matrix3D& b )
+{
+	for (Int i = 0; i < 3; ++i)
+	{
+		if (a[i][0] != b[i][0] || a[i][1] != b[i][1] || a[i][2] != b[i][2])
+		{
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Blend the object's transforms from the last two logic frames; render only, logic never reads it. */
+//-------------------------------------------------------------------------------------------------
+void Drawable::updateDrawnTransform() const
+{
+	const Object *obj = getObject();
+	if (obj == nullptr || TheGameEngine == nullptr || !InterpolationAllowed || !TheGlobalData->m_smoothUnitMotion)
+	{
+		m_drawnValid = FALSE;
+		return;
+	}
+
+	const Matrix3D *logicMtx = obj->getTransformMatrix();
+	const UnsignedInt frame = TheGameLogic->getFrame();
+	const Real progress = TheGameEngine->getLogicFrameProgress();
+
+	// Snap when new, after a teleport, or after skipping frames while hidden or off screen.
+	Bool snap = !m_drawnValid || (frame != m_drawnFrame && frame != m_drawnFrame + 1);
+
+	if (!snap && frame == m_drawnFrame + 1)
+	{
+		m_drawnPrevious = m_drawnCurrent;
+		m_drawnCurrent = *logicMtx;
+
+		const Vector3 from = m_drawnPrevious.Get_Translation();
+		const Vector3 to = m_drawnCurrent.Get_Translation();
+		const Real dx = to.X - from.X;
+		const Real dy = to.Y - from.Y;
+		const Real dz = to.Z - from.Z;
+		snap = (dx * dx + dy * dy + dz * dz) > MAX_DRAWN_STEP * MAX_DRAWN_STEP;
+	}
+	else if (!snap)
+	{
+		// A change within one logic frame was made outside a logic step, as scripts do in frozen time.
+		if (*logicMtx != m_drawnCurrent)
+		{
+			snap = TRUE;
+		}
+		else if (progress == m_drawnProgress)
+		{
+			return;
+		}
+	}
+
+	if (snap)
+	{
+		m_drawnPrevious = *logicMtx;
+		m_drawnCurrent = *logicMtx;
+		m_drawnValid = TRUE;
+	}
+
+	m_drawnFrame = frame;
+	m_drawnProgress = progress;
+
+	if (progress >= 1.0f || m_drawnPrevious == m_drawnCurrent)
+	{
+		m_drawnBlended = m_drawnCurrent;
+	}
+	else if (isSameRotation(m_drawnPrevious, m_drawnCurrent))
+	{
+		Vector3 pos;
+		Vector3::Lerp(m_drawnPrevious.Get_Translation(), m_drawnCurrent.Get_Translation(), progress, &pos);
+		m_drawnBlended = m_drawnCurrent;
+		m_drawnBlended.Set_Translation(pos);
+	}
+	else
+	{
+		Matrix3D::Lerp(m_drawnPrevious, m_drawnCurrent, progress, m_drawnBlended);
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+const Matrix3D *Drawable::getDrawnTransformMatrix() const
+{
+	updateDrawnTransform();
+	return m_drawnValid ? &m_drawnBlended : getTransformMatrix();
+}
+
+//-------------------------------------------------------------------------------------------------
+void Drawable::addDrawnOffset( Coord3D *pos ) const
+{
+	updateDrawnTransform();
+	if (m_drawnValid)
+	{
+		const Vector3 drawn = m_drawnBlended.Get_Translation();
+		const Vector3 logic = m_drawnCurrent.Get_Translation();
+		pos->x += drawn.X - logic.X;
+		pos->y += drawn.Y - logic.Y;
+		pos->z += drawn.Z - logic.Z;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+Real Drawable::getDrawnProgress() const
+{
+	updateDrawnTransform();
+	return m_drawnValid ? m_drawnProgress : 1.0f;
 }
 
 //-------------------------------------------------------------------------------------------------

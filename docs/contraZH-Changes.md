@@ -373,6 +373,28 @@ of the driver's usual three, so the screen answers the mouse sooner. Can cost a 
 `Low latency mode` in the advanced display options, applied on Accept. Needs `CheckLowLatency` in
 `OptionsMenu.wnd` for the menu control. Direct3D 9 build only.)
 
+### Smooth unit motion
+
+The game logic runs 30 times a second. Above that frame rate, units, projectiles and turrets draw
+between their last two logic positions instead of jumping once per logic frame, so they move smoothly
+at 60, 144 Hz and up. Health bars, status icons, attached effects and the camera lock follow the drawn
+model. Only drawing changes; the simulation does not, so it cannot desync.
+
+* `SmoothUnitMotion = Yes` - (No draws units at their logic positions, as before. Also `Smooth unit
+motion` in the advanced display options, applied on Accept. Needs `CheckSmoothUnitMotion` in
+`OptionsMenu.wnd` for the menu control.)
+
+Skirmish, campaign and replays run the logic at the game speed and render up to `FramesPerSecondLimit`
+from `GameData.ini`. The skirmish game speed slider sets the logic rate, 30 being normal speed; the
+campaign always runs at 30. Setting the slider to `--` leaves the game uncapped, with the logic
+stepping once per drawn frame, so there is nothing to smooth.
+
+Notes:
+* Units are drawn up to one logic frame (33 ms) behind the simulation.
+* Single player, skirmish and replays only. Online and LAN games draw as before.
+* Teleports, transport and tunnel exits, garrison exits and newly spawned objects snap into place.
+* The environment variable `CONTRA_INTERPOLATION=0` turns it off regardless of the option.
+
 ### Laser ground glow
 
 Each laser beam lights the terrain along its length with up to twelve dynamic lights in the beam's

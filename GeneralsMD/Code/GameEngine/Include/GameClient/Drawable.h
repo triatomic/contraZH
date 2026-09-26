@@ -439,6 +439,9 @@ public:
 	void setInstanceScale(Real value) { m_instanceScale = value;}	///< set scale that will be applied to instance matrix before rendering.
 
 	const Matrix3D *getTransformMatrix() const;	///< return the world transform
+	const Matrix3D *getDrawnTransformMatrix() const;	///< world transform the model is drawn at this render frame, between the last two logic frames
+	void addDrawnOffset( Coord3D *pos ) const;	///< move a point anchored to the logic transform to where the model is drawn
+	Real getDrawnProgress() const;	///< blend factor between the last two logic frames, 1 when the drawable is not interpolated
 
 	void draw();													///< render the drawable to the given view
 	void updateDrawable();														///< update the drawable
@@ -694,6 +697,7 @@ protected:
 
 	virtual void reactToTransformChange(const Matrix3D* oldMtx, const Coord3D* oldPos, Real oldAngle) override;
 	void updateHiddenStatus();
+	void updateDrawnTransform() const;
 
 	void replaceModelConditionStateInDrawable();
 
@@ -761,6 +765,13 @@ private:
 
 	Matrix3D m_instance;				///< The instance matrix that holds the initial/default position & orientation
 	Real m_instanceScale;				///< the uniform scale factor applied to the instance matrix before it is sent to W3D.
+
+	mutable Matrix3D m_drawnPrevious;	///< logic transform one logic frame before m_drawnFrame
+	mutable Matrix3D m_drawnCurrent;	///< logic transform at m_drawnFrame
+	mutable Matrix3D m_drawnBlended;	///< transform the model is drawn at this render frame
+	mutable Real m_drawnProgress;			///< blend factor m_drawnBlended was made with
+	mutable UnsignedInt m_drawnFrame;	///< logic frame m_drawnCurrent belongs to
+	mutable Bool m_drawnValid;				///< false until the history is known, or after a snap
 
 	DrawableInfo				m_drawableInfo;		///< structure pointed to by W3D render objects so they know which drawable they belong to.
 

@@ -475,6 +475,7 @@ protected:
 	void setModelState(const ModelConditionInfo* newState);
 	const ModelConditionInfo* findBestInfo(const ModelConditionFlags& c) const;
 	void handleClientTurretPositioning();
+	void computeDrawnTurretAngles(Real* angles, Real* pitches);
 	void handleClientRecoil();
 	void recalcBonesForClientParticleSystems();
 	void stopClientParticleSystems();
@@ -567,6 +568,10 @@ private:
 	Bool													m_pauseAnimation;
 	Int														m_animationMode;
 	Bool													m_isFirstDrawModule;
+	Real													m_drawnTurretAngle[MAX_TURRETS][2];	///< turret angle one logic frame back, and at m_drawnTurretFrame
+	Real													m_drawnTurretPitch[MAX_TURRETS][2];	///< turret pitch one logic frame back, and at m_drawnTurretFrame
+	UnsignedInt										m_drawnTurretFrame;
+	Bool													m_drawnTurretValid;
 
 	void adjustAnimation(const ModelConditionInfo* prevState, Real prevAnimFraction);
 	Real getCurrentAnimFraction() const;

@@ -837,6 +837,7 @@ GlobalData::GlobalData()
   m_useHeightBlend = TRUE;
   m_vsync = -1;
   m_lowLatency = FALSE;
+  m_smoothUnitMotion = TRUE;
   m_specularDebug = FALSE;
   m_normalMapDebug = FALSE;
   m_ambientOcclusionDebug = FALSE;
@@ -1849,6 +1850,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_useHeightBlend = optionPref.getHeightBlendEnabled();
 	TheWritableGlobalData->m_vsync = optionPref.getVSyncMode();
 	TheWritableGlobalData->m_lowLatency = optionPref.getLowLatencyEnabled();
+	TheWritableGlobalData->m_smoothUnitMotion = optionPref.getSmoothUnitMotionEnabled();
 	TheWritableGlobalData->m_specularDebug = optionPref.getSpecularDebugEnabled();
 	TheWritableGlobalData->m_normalMapDebug = optionPref.getNormalMapDebugEnabled();
 	TheWritableGlobalData->m_ambientOcclusionDebug = optionPref.getAmbientOcclusionDebugEnabled();

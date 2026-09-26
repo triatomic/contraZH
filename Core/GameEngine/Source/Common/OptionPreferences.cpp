@@ -486,6 +486,11 @@ Bool OptionPreferences::getLowLatencyEnabled(void) const
 	return getBool("LowLatency", FALSE);
 }
 
+Bool OptionPreferences::getSmoothUnitMotionEnabled(void) const
+{
+	return getBool("SmoothUnitMotion", TRUE);
+}
+
 Bool OptionPreferences::getSpecularDebugEnabled(void) const
 {
 	return getBool("SpecularDebug", FALSE);

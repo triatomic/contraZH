@@ -1059,6 +1059,23 @@ bool GameLogic::onNewGame(MAYBE_UNUSED GameMessage *msg)
 		TheWritableGlobalData->m_useFpsLimit = true;
 	}
 
+	// Offline games step logic at the game speed and render faster, so models blend between logic frames.
+	if (gameMode == GAME_SINGLE_PLAYER || gameMode == GAME_SKIRMISH || gameMode == GAME_REPLAY)
+	{
+		// The skirmish slider's "--" sends a speed above this, meaning uncapped.
+		const Int MAX_GAME_SPEED = 60;
+		const Int gameSpeed = (msg->getArgumentCount() >= 4) ? msg->getArgument( 3 )->integer : BaseFps;
+		const Bool capped = gameSpeed >= 1 && gameSpeed <= MAX_GAME_SPEED;
+
+		TheFramePacer->enableLogicTimeScale(capped);
+		if (capped)
+		{
+			TheFramePacer->setLogicTimeScaleFps(gameSpeed * LOGICFRAMES_PER_SECOND / BaseFps);
+			TheFramePacer->setFramesPerSecondLimit(max(gameSpeed, TheGlobalData->m_framesPerSecondLimit));
+			TheWritableGlobalData->m_useFpsLimit = true;
+		}
+	}
+
 	// prepare for new game
 	prepareNewGame( gameMode, diff, rankPoints );
 
