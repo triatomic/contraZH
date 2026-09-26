@@ -1266,6 +1266,7 @@ Int GameWindowManager::drawWindow( GameWindow *window )
 //-------------------------------------------------------------------------------------------------
 void GameWindowManager::winRepaint()
 {
+	PROFILER_SECTION_NAME("GameWindowManager::winRepaint");
 	GameWindow *window, *next;
 
 	// draw below windows

@@ -387,6 +387,7 @@ void W3DInGameUI::reset()
 //-------------------------------------------------------------------------------------------------
 void W3DInGameUI::draw()
 {
+	PROFILER_SECTION_NAME("W3DInGameUI::draw");
 	TheDisplay->beginBatch();
 	preDraw();
 

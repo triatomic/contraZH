@@ -60,6 +60,11 @@ namespace Debug_Statistics
 	int Get_Sorting_Vertices();
 	int Get_Draw_Calls();
 
+	void Record_2D_Draw();
+	void Record_Text_Texture();
+	int Get_2D_Draws();
+	int Get_Text_Textures();
+
 	void Begin_Statistics();
 	void End_Statistics();
 	void Shutdown_Statistics();

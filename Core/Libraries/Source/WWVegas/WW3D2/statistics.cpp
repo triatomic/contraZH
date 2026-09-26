@@ -281,6 +281,10 @@ static int sorting_vertices;
 static int last_frame_sorting_vertices;
 static int draw_calls;
 static int last_frame_draw_calls;
+static int draws_2d;
+static int last_frame_draws_2d;
+static int text_textures;
+static int last_frame_text_textures;
 
 void Debug_Statistics::Record_DX8_Skin_Polys_And_Vertices(int pcount,int vcount)
 {
@@ -349,6 +353,26 @@ int Debug_Statistics::Get_Draw_Calls()
 	return last_frame_draw_calls;
 }
 
+void Debug_Statistics::Record_2D_Draw()
+{
+	draws_2d++;
+}
+
+void Debug_Statistics::Record_Text_Texture()
+{
+	text_textures++;
+}
+
+int Debug_Statistics::Get_2D_Draws()
+{
+	return last_frame_draws_2d;
+}
+
+int Debug_Statistics::Get_Text_Textures()
+{
+	return last_frame_text_textures;
+}
+
 // ----------------------------------------------------------------------------
 //
 //
@@ -365,6 +389,8 @@ void Debug_Statistics::Begin_Statistics()
 	sorting_polygons=0;
 	sorting_vertices=0;
 	draw_calls=0;
+	draws_2d=0;
+	text_textures=0;
 	Record_Texture_Begin();
 	DX8Wrapper::Begin_Statistics();
 //	DX8MeshRendererClass::Begin_Statistics();
@@ -381,6 +407,8 @@ void Debug_Statistics::End_Statistics()
 	last_frame_sorting_polygons=sorting_polygons;
 	last_frame_sorting_vertices=sorting_vertices;
 	last_frame_draw_calls=draw_calls;
+	last_frame_draws_2d=draws_2d;
+	last_frame_text_textures=text_textures;
 //	DX8MeshRendererClass::End_Statistics();
 	DX8Wrapper::End_Statistics();
 }

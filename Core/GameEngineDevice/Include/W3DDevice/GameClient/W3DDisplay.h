@@ -209,6 +209,7 @@ protected:
 		NetFPSAverages,		///< debug display all players' average fps.
 		SelectedInfo,			///< debug display for the selected object in the UI
 		TerrainStats,			///< debug display for the terrain renderer
+		RenderStats,			///< debug display for 2D draws and device state changes
 
 		DisplayStringCount
 	};

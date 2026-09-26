@@ -1401,6 +1401,18 @@ void W3DDisplay::gatherDebugStats()
 			TheTerrainRenderObject->getNumShoreLineTiles(FALSE));
 		m_displayStrings[TerrainStats]->setText( unibuffer );
 
+		const DX8FrameStatistics &dx8Stats = DX8Wrapper::Get_Last_Frame_Statistics();
+		unibuffer.format( L"2D draws: %d, text textures: %d, changes: tex %u, rs %u, tss %u, mtl %u, matrix %u, vb %u",
+			Debug_Statistics::Get_2D_Draws(),
+			Debug_Statistics::Get_Text_Textures(),
+			dx8Stats.texture_changes,
+			dx8Stats.render_state_changes,
+			dx8Stats.texture_stage_state_changes,
+			dx8Stats.material_changes,
+			dx8Stats.matrix_changes,
+			dx8Stats.vertex_buffer_changes );
+		m_displayStrings[RenderStats]->setText( unibuffer );
+
 		// misc debug info
 		Coord3D camPos = TheTacticalView->getPosition();
 		Real zoom = TheTacticalView->getZoom();

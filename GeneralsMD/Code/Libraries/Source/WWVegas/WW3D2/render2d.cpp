@@ -57,6 +57,7 @@
 #include "WWDebug/wwprofile.h"
 #include "WWDebug/wwmemlog.h"
 #include "assetmgr.h"
+#include "statistics.h"
 
 RectClass							Render2DClass::ScreenResolution( 0,0,0,0 );
 
@@ -691,6 +692,7 @@ void Render2DClass::Render()
 	else
 		DX8Wrapper::Set_Shader(Shader);
 	DX8Wrapper::Draw_Triangles(0,Indices.Count()/3,0,Vertices.Count());
+	Debug_Statistics::Record_2D_Draw();
 
 	DX8Wrapper::Set_Transform(D3DTS_VIEW,view);
 	DX8Wrapper::Set_Transform(D3DTS_PROJECTION,proj);

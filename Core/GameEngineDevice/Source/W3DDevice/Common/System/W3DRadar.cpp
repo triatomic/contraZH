@@ -1783,6 +1783,7 @@ void W3DRadar::endSetShroudLevel()
 //-------------------------------------------------------------------------------------------------
 void W3DRadar::draw( Int pixelX, Int pixelY, Int width, Int height )
 {
+	PROFILER_SECTION_NAME("W3DRadar::draw");
 	// if the local player does not have a radar then we can't draw anything
 	if( !rts::localPlayerHasRadar() )
 		return;
