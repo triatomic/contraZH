@@ -89,6 +89,7 @@ them, below 1 softens them.)
 Terrain uses normal maps only, never derived bumps:
 
 * Named after the `Terrain.ini` texture, e.g. `NTGrass1_nrm.dds` for `NTGrass1.tga`.
+* In `Art\Textures`, not `Art\Terrain` beside the texture.
 * At least as large as the part of the texture the game reads; simplest is the same size.
 * Terrain without one stays flat.
 * Flat regardless: the third texture where three meet, flat terrain mode, roads, water reflections.
@@ -441,9 +442,10 @@ Tuned in the mod's `GameData.ini`:
 the edge where the fade would put it.)
 * `TerrainHeightBlendSharpness = 4` - (How narrow the edge is. 1 is as wide as the soft fade.)
 
-Heights come from `<texture>_hgt.dds` beside a terrain texture, as `_nrm.dds` does for normal maps.
-Its red channel is the height, black low and white high, and it must be at least as large as the
-texture. Textures without one take their own brightness as height, measured against the texture's
+Heights come from `<texture>_hgt.dds` in `Art\Textures`, named after the `Terrain.ini` texture as
+`_nrm.dds` is for normal maps, e.g. `NTGrass1_hgt.dds`. The game does not look for it in
+`Art\Terrain` beside the texture. Its red channel is the height, black low and white high, and it
+must be at least as large as the texture; simplest is the same size. Textures without one take their own brightness as height, measured against the texture's
 average, so a bright texture does not simply cover a dark one.
 
 Notes:
