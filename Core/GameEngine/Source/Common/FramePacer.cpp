@@ -213,7 +213,10 @@ Int FramePacer::getActualLogicTimeScaleFps(LogicTimeQueryFlags flags) const
 		return TheNetwork->getFrameRate();
 	}
 
-	if (isLogicTimeScaleEnabled())
+	// Scripted fast time uncaps the render and expects the logic to follow it.
+	const Bool timeFast = TheTacticalView != nullptr && (TheTacticalView->getTimeMultiplier() > 1 || TheScriptEngine->isTimeFast());
+
+	if (isLogicTimeScaleEnabled() && !timeFast)
 	{
 		return getLogicTimeScaleFps();
 	}

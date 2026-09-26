@@ -979,11 +979,7 @@ Bool GameEngine::canUpdateRegularGameLogic(UnsignedInt logicTimeQueryFlags)
 			step = true;
 		}
 
-		// Frozen time steps the scripts without advancing the logic frame, so the progress holds.
-		if (!TheFramePacer->isTimeFrozen())
-		{
-			m_logicFrameProgress = clamp(0.0f, m_logicTimeAccumulator / targetFrameTime, 1.0f);
-		}
+		m_logicFrameProgress = clamp(0.0f, m_logicTimeAccumulator / targetFrameTime, 1.0f);
 		return step;
 	}
 }

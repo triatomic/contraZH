@@ -5846,7 +5846,7 @@ void Drawable::updateDrawnTransform() const
 
 	const Matrix3D *logicMtx = obj->getTransformMatrix();
 	const UnsignedInt frame = TheGameLogic->getFrame();
-	const Real progress = TheGameEngine->getLogicFrameProgress();
+	Real progress = TheGameEngine->getLogicFrameProgress();
 
 	// Snap when new, after a teleport, or after skipping frames while hidden or off screen.
 	Bool snap = !m_drawnValid || (frame != m_drawnFrame && frame != m_drawnFrame + 1);
@@ -5856,12 +5856,8 @@ void Drawable::updateDrawnTransform() const
 		m_drawnPrevious = m_drawnCurrent;
 		m_drawnCurrent = *logicMtx;
 
-		const Vector3 from = m_drawnPrevious.Get_Translation();
-		const Vector3 to = m_drawnCurrent.Get_Translation();
-		const Real dx = to.X - from.X;
-		const Real dy = to.Y - from.Y;
-		const Real dz = to.Z - from.Z;
-		snap = (dx * dx + dy * dy + dz * dz) > MAX_DRAWN_STEP * MAX_DRAWN_STEP;
+		const Vector3 step = m_drawnCurrent.Get_Translation() - m_drawnPrevious.Get_Translation();
+		snap = step.Length2() > MAX_DRAWN_STEP * MAX_DRAWN_STEP;
 	}
 	else if (!snap)
 	{
@@ -5870,9 +5866,14 @@ void Drawable::updateDrawnTransform() const
 		{
 			snap = TRUE;
 		}
-		else if (progress == m_drawnProgress)
+		else
 		{
-			return;
+			// Progress only wraps with a new logic frame; a step that did not advance it, as in frozen time, holds.
+			progress = max(progress, m_drawnProgress);
+			if (progress == m_drawnProgress)
+			{
+				return;
+			}
 		}
 	}
 
