@@ -1968,8 +1968,14 @@ bool GameLogic::onDoForceAttackGround(MAYBE_UNUSED GameMessage *msg, AIGroupPtr 
 bool GameLogic::onQueueUpgrade(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
 	Player *msgPlayer = getMessagePlayer(msg);
-	Object* producer = TheGameLogic->findObjectByID((ObjectID)msg->getArgument(0)->objectID);
-	const UpgradeTemplate *upgradeT = TheUpgradeCenter->findUpgradeByKey( (NameKeyType)(msg->getArgument( 1 )->integer) );
+	ObjectID objID = (ObjectID)msg->getArgument(0)->objectID;
+	Object *producer = TheGameLogic->findObjectByID(objID);
+	const UpgradeTemplate* upgradeT = TheUpgradeCenter->findUpgradeByKey((NameKeyType)(msg->getArgument(1)->integer));
+
+	//ShigureUi 20/09/2026 go delete cache even if safe check could possibly fail
+	if (TheControlBar)
+		TheControlBar->removeUpgradeFromBuildQueueCache(objID, upgradeT);
+
 	if (!upgradeT)	// sanity
 		return false;
 
@@ -1977,7 +1983,7 @@ bool GameLogic::onQueueUpgrade(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curren
 	if (producer == nullptr || producer->getControllingPlayer() != msgPlayer)
 		return false;
 
-	// ShigureUi 13/9/2026 check added, maybe invalid might be sent
+	// ShigureUi 13/9/2026 check added, invalid might be sent
 	if (!TheUpgradeCenter->canAffordUpgrade(producer->getControllingPlayer(), upgradeT, FALSE))
 	{
 		return false;
@@ -2071,6 +2077,10 @@ bool GameLogic::onQueueUnitCreate(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &cur
 	whatToCreate = TheThingFactory->findByTemplateID( msg->getArgument( 0 )->integer );
 	objID = (ObjectID)msg->getArgument(1)->integer;
 	productionID = (ProductionID)msg->getArgument( 2 )->integer;
+
+	//ShigureUi 20/09/2026 go delete cache even if safe check could possibly fail
+	if (TheControlBar)
+		TheControlBar->removeUnitFromBuildQueueCache(objID, productionID);
 
 	Object* producer = TheGameLogic->findObjectByID(objID);
 

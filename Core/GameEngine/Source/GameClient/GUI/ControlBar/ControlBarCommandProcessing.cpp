@@ -212,9 +212,191 @@ static void selectObjectOfType( Object* obj, void* selectObjectsInfo )
 		}
 	}
 }
-//-------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------
 
+//-------------------------------------------------------------------------------------------------
+// ShigureUi 19/09/2026 calculate estimated production finished time of a production update
+//-------------------------------------------------------------------------------------------------
+Real ControlBar::calcEstimatedProductionFinishedTime(Object *obj)
+{
+	if (!obj || !obj->isLocallyControlled())
+		return -1.0;
+
+	ProductionUpdateInterface *pu = obj->getProductionUpdateInterface();
+	if (!pu)
+		return -1.0;
+
+	Player* player = obj->getControllingPlayer();
+
+	Real curFinishTime = 0.0;
+	Int totalFrames;
+
+	const ProductionEntry *pe = pu->firstProduction();
+
+	if (pe)
+	{
+		totalFrames = 0;
+		if (pe->getProductionType() == PRODUCTION_UNIT)
+		{
+			if (pe->getProductionObject())
+				totalFrames = pe->getProductionObject()->calcTimeToBuild(player);
+		}
+		else if (pe->getProductionUpgrade())
+		{
+			totalFrames = pe->getProductionUpgrade()->calcTimeToBuild(player);
+		}
+		curFinishTime = (100.0f - pe->getPercentComplete()) / 100.f * totalFrames;
+
+		while ((pe = pu->nextProduction(pe)) != nullptr)
+		{
+			if (pe->getProductionType() == PRODUCTION_UNIT)
+			{
+				if (pe->getProductionObject())
+					curFinishTime += pe->getProductionObject()->calcTimeToBuild(player);
+			}
+			else if (pe->getProductionUpgrade())
+			{
+				curFinishTime += pe->getProductionUpgrade()->calcTimeToBuild(player);
+			}
+		}
+	}
+
+	//ShigureUi 20/09/2026 find this object's cache
+	std::multimap<ObjectID, BuildQueueCacheNode>::iterator it;
+	std::pair<std::multimap<ObjectID, BuildQueueCacheNode>::iterator, std::multimap<ObjectID, BuildQueueCacheNode>::iterator> pr;
+	pr = m_multiSelectQueueCache.equal_range(obj->getID());
+
+	for (it = pr.first; it != pr.second; it++)
+	{
+		const BuildQueueCacheNode &bqsn = (*it).second;
+		if (bqsn.m_type == PRODUCTION_UNIT)
+			curFinishTime += bqsn.m_objectToProduce->calcTimeToBuild(player);
+		else
+			curFinishTime += bqsn.m_upgradeToResearch->calcTimeToBuild(player);
+	}
+
+	return curFinishTime;
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// ShigureUi 20/09/2026 calculate how many slots left in a production update
+//-------------------------------------------------------------------------------------------------
+UnsignedInt ControlBar::calcBuildQueueRoomLeft(Object* obj, const ThingTemplate *thing, const UpgradeTemplate *upgrade)
+{
+	if (!obj || !obj->isLocallyControlled())
+		return 0;
+
+	ProductionUpdateInterface* pu = obj->getProductionUpdateInterface();
+	if (!pu)
+		return 0;
+
+	Player* player = obj->getControllingPlayer();
+
+	//ShigureUi 20/09/2026 find this object's cache
+	std::multimap<ObjectID, BuildQueueCacheNode>::iterator it;
+	std::pair<std::multimap<ObjectID, BuildQueueCacheNode>::iterator, std::multimap<ObjectID, BuildQueueCacheNode>::iterator> pr;
+	pr = m_multiSelectQueueCache.equal_range(obj->getID());
+
+	// how many more this producer takes before its queue, or its parking, full
+	Int roomLeft = pu->getMaxQueueEntries() - pu->getProductionCount();
+	if (roomLeft < 0)
+		roomLeft = 0;
+
+	if (thing)
+	{
+
+		for (BehaviorModule** i = obj->getBehaviorModules(); *i; ++i)
+		{
+			ParkingPlaceBehaviorInterface* pp = (*i)->getParkingPlaceBehaviorInterface();
+			if (pp != nullptr)
+			{
+				if (pp->shouldReserveDoorWhenQueued(thing))
+				{
+					while (roomLeft && !pp->hasAvailableSpaceFor(thing, roomLeft))
+					{
+						roomLeft--;
+					}
+
+					for (it = pr.first; it != pr.second; it++)
+					{
+						const BuildQueueCacheNode &bqsn = (*it).second;
+						if (roomLeft && bqsn.m_type == PRODUCTION_UNIT && bqsn.m_objectToProduce == thing)
+							roomLeft--;
+					}
+				}
+				break;
+			}
+		}
+	}
+	else if (upgrade)
+	{
+		roomLeft = 1;
+		if (upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER)
+		{
+			if (player->hasUpgradeComplete(upgrade) || player->hasUpgradeInProduction(upgrade))
+				roomLeft = 0;
+
+			// ShigureUi 20/09/2026 search for upgrade
+			for (it = pr.first; it != pr.second; it++)
+			{
+				const BuildQueueCacheNode& bqsn = (*it).second;
+				if (bqsn.m_type == PRODUCTION_UPGRADE && bqsn.m_upgradeToResearch == upgrade)
+				{
+					roomLeft = 0;
+					break;
+				}
+			}
+		}
+		else
+		{
+			if (obj->hasUpgrade(upgrade) || !obj->affectedByUpgrade(upgrade) || pu->isUpgradeInQueue(upgrade))
+				roomLeft = 0;
+
+			// ShigureUi 20/09/2026 search for upgrade
+			for (it = pr.first; it != pr.second; it++)
+			{
+				const BuildQueueCacheNode& bqsn = (*it).second;
+				if (bqsn.m_type == PRODUCTION_UPGRADE && bqsn.m_upgradeToResearch == upgrade)
+				{
+					roomLeft = 0;
+					break;
+				}
+			}
+		}
+	}
+	else
+		roomLeft = 0;
+
+	return roomLeft;
+}
+
+//-------------------------------------------------------------------------------------------------
+// ShigureUi 20/09/2026 calculate build limit but not more than SHIFT_CLICK_BATCH_SIZE
+//-------------------------------------------------------------------------------------------------
+UnsignedInt ControlBar::calcBuildLimitLeft(Player *player, const ThingTemplate *thing)
+{
+	if (!thing || !player)
+		return 0;
+
+	//ShigureUi 20/09/2026 find this frame cache and remove others
+	std::multimap<ObjectID, BuildQueueCacheNode>::iterator it;
+	std::pair<std::multimap<ObjectID, BuildQueueCacheNode>::iterator, std::multimap<ObjectID, BuildQueueCacheNode>::iterator> pr;
+	pr = std::make_pair(m_multiSelectQueueCache.begin(), m_multiSelectQueueCache.end());
+
+	UnsignedInt limitLeft = SHIFT_CLICK_BATCH_SIZE;
+	while (limitLeft && !player->canBuildMoreOfType(thing, limitLeft))
+		limitLeft--;
+
+	// ShigureUi 20/09/2026 build limit is global so scan all
+	for (it = pr.first; it != pr.second; it++)
+	{
+		const BuildQueueCacheNode& bqsn = (*it).second;
+		if (bqsn.m_type == PRODUCTION_UNIT && bqsn.m_objectToProduce == thing && limitLeft)
+			limitLeft--;
+	}
+
+	return limitLeft;
+}
 
 //-------------------------------------------------------------------------------------------------
 /** Process a button transition message from the window system that should be for one of
@@ -594,9 +776,6 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 			Real curFinishTime;
 			Object *curFactory;
-			ProductionUpdateInterface *pu = nullptr;
-			const ProductionEntry* pe;
-			Int totalFrames = 0;
 			CanMakeType cmt = CANMAKE_FACTORY_IS_DISABLED, curCmt;
 
 			// TheSuperHackers @feature Shift queues a batch instead of a single unit.
@@ -612,38 +791,13 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			// ShigureUi 13/9/2026 find best producer, compare them estimated finish time
 			for (DrawableListCIt it = factorys.begin(); it != factorys.end(); it++)
 			{
-				curFinishTime = 0.0;
 				curFactory = (*it)->getObject();
-				if (!curFactory || !curFactory->isLocallyControlled())
-					break;
-				pu = curFactory->getProductionUpdateInterface();
-				if (!pu)
-					break;
-				pe = pu->firstProduction();
-				if (pe)
-				{
-					totalFrames = 0;
-					if (pe->getProductionType() == PRODUCTION_UNIT)
-					{
-						if (pe->getProductionObject())
-							totalFrames = pe->getProductionObject()->calcTimeToBuild(player);
-					}
-					else if (pe->getProductionUpgrade())
-					{
-						totalFrames = pe->getProductionUpgrade()->calcTimeToBuild(player);
-					}
-					curFinishTime = (100.0f - pe->getPercentComplete()) / 100.f * totalFrames;
+				curFinishTime = calcEstimatedProductionFinishedTime(curFactory);
 
-					while ((pe = pu->nextProduction(pe)) != nullptr)
-						if (pe->getProductionType() == PRODUCTION_UNIT)
-						{
-							if (pe->getProductionObject())
-								curFinishTime += pe->getProductionObject()->calcTimeToBuild(player);
-						}
-						else if (pe->getProductionUpgrade())
-						{
-							curFinishTime += pe->getProductionUpgrade()->calcTimeToBuild(player);
-						}
+				if (curFinishTime < 0)
+				{
+					cmt = CANMAKE_FACTORY_IS_DISABLED;
+					break;
 				}
 
 				curCmt = TheBuildAssistant->canMakeUnit(curFactory, whatToBuild);
@@ -664,22 +818,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 					finishTimes.push_back(curFinishTime);
 
 					// how many more this producer takes before its queue, or its parking, fills
-					Int room = pu->getMaxQueueEntries() - pu->getProductionCount();
-					for (BehaviorModule** i = curFactory->getBehaviorModules(); *i; ++i)
-					{
-						ParkingPlaceBehaviorInterface* pp = (*i)->getParkingPlaceBehaviorInterface();
-						if (pp != nullptr)
-						{
-							if (pp->shouldReserveDoorWhenQueued(whatToBuild))
-							{
-								while (room > 0 && !pp->hasAvailableSpaceFor(whatToBuild, room))
-								{
-									room--;
-								}
-							}
-							break;
-						}
-					}
+					Int room = calcBuildQueueRoomLeft(curFactory, whatToBuild, nullptr);
 					roomToLeft.push_back(room);
 				}
 				// ShigureUi 13/9/2026 queue full is better than parking places full, update if possible
@@ -724,10 +863,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			{
 				unitsToQueue = MIN(unitsToQueue, (Int)(player->getMoney()->countMoney() / unitCost));
 			}
-			while (unitsToQueue > 1 && !player->canBuildMoreOfType(whatToBuild, unitsToQueue))
-			{
-				unitsToQueue--;
-			}
+
+			unitsToQueue = MIN(unitsToQueue, calcBuildLimitLeft(player, whatToBuild));
 
 			const Int unitFrames = whatToBuild->calcTimeToBuild(player);
 			for( Int queued = 0; queued < unitsToQueue; )
@@ -758,6 +895,13 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				msg->appendIntegerArgument( whatToBuild->getTemplateID() );
 				msg->appendObjectIDArgument( factory->getID() );
 				msg->appendIntegerArgument( productionID );
+
+				// ShigureUi 20/09/2026 Send it to cache
+				BuildQueueCacheNode bqcn;
+				bqcn.m_type = PRODUCTION_UNIT;
+				bqcn.m_objectToProduce = whatToBuild;
+				bqcn.m_productionID = productionID;
+				m_multiSelectQueueCache.insert(std::make_pair(factory->getID(), bqcn));
 
 				queued++;
 			}
@@ -876,51 +1020,21 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 			Real minFinishTime = 1e9, curFinishTime;
 			Object* bestFactory = nullptr, * curFactory;
-			ProductionUpdateInterface* pu = nullptr;
-			const ProductionEntry* pe;
-			Int totalFrames = 0;
 			CanMakeType cmt = CANMAKE_QUEUE_FULL, curCmt;
 
 			// ShigureUi 13/9/2026 Find best producer for the upgrade
 			for (DrawableListCIt it = factorys.begin(); it != factorys.end(); it++)
 			{
-				curFinishTime = 0.0;
 				curFactory = (*it)->getObject();
-				if (!curFactory || !curFactory->isLocallyControlled())
-					break;
-				pu = curFactory->getProductionUpdateInterface();
-				if (!pu)
-					break;
-				pe = pu->firstProduction();
+				curFinishTime = calcEstimatedProductionFinishedTime(curFactory);
 
-				// ShigureUi 13/9/2026 calculate best estimated finish time
-				if (pe)
+				if (curFinishTime < 0)
 				{
-					totalFrames = 0;
-					if (pe->getProductionType() == PRODUCTION_UNIT)
-					{
-						if (pe->getProductionObject())
-							totalFrames = pe->getProductionObject()->calcTimeToBuild(player);
-					}
-					else if (pe->getProductionUpgrade())
-					{
-						totalFrames = pe->getProductionUpgrade()->calcTimeToBuild(player);
-					}
-					curFinishTime = (100.0f - pe->getPercentComplete()) / 100.f * totalFrames;
-
-					while ((pe = pu->nextProduction(pe)) != nullptr)
-						if (pe->getProductionType() == PRODUCTION_UNIT)
-						{
-							if (pe->getProductionObject())
-								curFinishTime += pe->getProductionObject()->calcTimeToBuild(player);
-						}
-						else if (pe->getProductionUpgrade())
-						{
-							curFinishTime += pe->getProductionUpgrade()->calcTimeToBuild(player);
-						}
+					cmt = CANMAKE_NO_PREREQ;
+					break;
 				}
 
-				curCmt = pu->canQueueUpgrade(upgradeT);
+				curCmt = calcBuildQueueRoomLeft(curFactory, nullptr, upgradeT) > 0 ? CANMAKE_OK : CANMAKE_QUEUE_FULL;
 
 				// ShigureUi 13/9/2026 update if better
 				if (curCmt == CANMAKE_OK)
@@ -942,11 +1056,21 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				TheInGameUI->message("GUI:ProductionQueueFull");
 				break;
 			}
+			else if (cmt != CANMAKE_OK)
+			{
+				break;
+			}
 
 			// send the message
 			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_QUEUE_UPGRADE );
 			msg->appendObjectIDArgument( bestFactory->getID() );
 			msg->appendIntegerArgument( upgradeT->getUpgradeNameKey() );
+
+			// ShigureUi 20/09/2026 Send it to cache
+			BuildQueueCacheNode bqcn;
+			bqcn.m_type = PRODUCTION_UPGRADE;
+			bqcn.m_upgradeToResearch = upgradeT;
+			m_multiSelectQueueCache.insert(std::make_pair(bestFactory->getID(), bqcn));
 
 			break;
 
@@ -972,9 +1096,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 			Real minFinishTime[SHIFT_CLICK_BATCH_SIZE], curFinishTime;
 			Object *bestFactories[SHIFT_CLICK_BATCH_SIZE], *curFactory;
-			ProductionUpdateInterface* pu = nullptr;
-			const ProductionEntry* pe;
-			Int totalFrames = 0, i, j;
+			Int i, j;
 			CanMakeType cmt = CANMAKE_QUEUE_FULL, curCmt;
 
 			for (i = 0; i < SHIFT_CLICK_BATCH_SIZE; i++)
@@ -988,54 +1110,24 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			if (TheKeyboard && TheKeyboard->isShift())
 				upgradeToQueue = SHIFT_CLICK_BATCH_SIZE;
 
-			Bool upgrading;
-
 			// ShigureUi 13/9/2026 Find 5 best producer, or 1
 			for (DrawableListCIt it = factorys.begin(); it != factorys.end(); it++)
 			{
-				curFinishTime = 0.0;
 				curFactory = (*it)->getObject();
-				if (!curFactory)
-					break;
-				pu = curFactory->getProductionUpdateInterface();
-				if (!pu)
-					break;
-				pe = pu->firstProduction();
-				upgrading = false;
+				curFinishTime = 0.0;
 
-				// ShigureUi 13/9/2026 calulate best estimated finish time
-				if (pe)
+				curFinishTime = calcEstimatedProductionFinishedTime(curFactory);
+
+				if (curFinishTime < 0)
 				{
-					totalFrames = 0;
-					if (pe->getProductionType() == PRODUCTION_UNIT)
-					{
-						if (pe->getProductionObject())
-							totalFrames = pe->getProductionObject()->calcTimeToBuild(player);
-					}
-					else if (pe->getProductionUpgrade())
-					{
-						if (pe->getProductionUpgrade() == upgradeT)
-							upgrading = true;
-						totalFrames = pe->getProductionUpgrade()->calcTimeToBuild(player);
-					}
-					curFinishTime = (100.0f - pe->getPercentComplete()) / 100.f * totalFrames;
-
-					while ((pe = pu->nextProduction(pe)) != nullptr)
-						if (pe->getProductionType() == PRODUCTION_UNIT)
-						{
-							if (pe->getProductionObject())
-								curFinishTime += pe->getProductionObject()->calcTimeToBuild(player);
-						}
-						else if (pe->getProductionUpgrade())
-						{
-							curFinishTime += pe->getProductionUpgrade()->calcTimeToBuild(player);
-						}
+					cmt = CANMAKE_NO_PREREQ;
+					break;
 				}
-
-				curCmt = pu->canQueueUpgrade(upgradeT);
+	
+				curCmt = calcBuildQueueRoomLeft(curFactory, nullptr, upgradeT) > 0 ? CANMAKE_OK : CANMAKE_QUEUE_FULL;
 
 				// ShigureUi 13/9/2026 find best location to insert then update best 5
-				if (curCmt == CANMAKE_OK && !curFactory->hasUpgrade(upgradeT) && curFactory->affectedByUpgrade(upgradeT) && !upgrading)
+				if (curCmt == CANMAKE_OK)
 				{
 					cmt = CANMAKE_OK;
 					for (i = 0; i < upgradeToQueue; i++)
@@ -1064,6 +1156,10 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				TheInGameUI->message("GUI:ProductionQueueFull");
 				break;
 			}
+			else if (cmt != CANMAKE_OK)
+			{
+				break;
+			}
 
 			GameMessage* msg;
 
@@ -1074,6 +1170,12 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				msg = TheMessageStream->appendMessage(GameMessage::MSG_QUEUE_UPGRADE);
 				msg->appendObjectIDArgument(bestFactories[i]->getID());
 				msg->appendIntegerArgument(upgradeT->getUpgradeNameKey());
+
+				// ShigureUi 20/09/2026 Send it to cache
+				BuildQueueCacheNode bqcn;
+				bqcn.m_type = PRODUCTION_UPGRADE;
+				bqcn.m_upgradeToResearch = upgradeT;
+				m_multiSelectQueueCache.insert(std::make_pair(bestFactories[i]->getID(), bqcn));
 			}
 
 			break;
@@ -1545,3 +1647,44 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 }
 
+//-------------------------------------------------------------------------------------------------
+// ShigureUi 19/09/2026 remove unit from cache message is being processed
+//-------------------------------------------------------------------------------------------------
+void ControlBar::removeUnitFromBuildQueueCache(ObjectID objID, ProductionID productionID)
+{
+	//ShigureUi 20/09/2026 find this object's cache
+	std::multimap<ObjectID, BuildQueueCacheNode>::iterator it;
+	std::pair<std::multimap<ObjectID, BuildQueueCacheNode>::iterator, std::multimap<ObjectID, BuildQueueCacheNode>::iterator> pr;
+	pr = m_multiSelectQueueCache.equal_range(objID);
+
+	for (it = pr.first; it != pr.second; it++)
+	{
+		const BuildQueueCacheNode& bqcn = (*it).second;
+		if (bqcn.m_type == PRODUCTION_UNIT && bqcn.m_productionID == productionID)
+		{
+			m_multiSelectQueueCache.erase(it);
+			break;
+		}
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+// ShigureUi 19/09/2026 remove upgrade from cache message is being processed
+//-------------------------------------------------------------------------------------------------
+void ControlBar::removeUpgradeFromBuildQueueCache(ObjectID objID, const UpgradeTemplate *upgrade)
+{
+	//ShigureUi 20/09/2026 find this object's cache
+	std::multimap<ObjectID, BuildQueueCacheNode>::iterator it;
+	std::pair<std::multimap<ObjectID, BuildQueueCacheNode>::iterator, std::multimap<ObjectID, BuildQueueCacheNode>::iterator> pr;
+	pr = m_multiSelectQueueCache.equal_range(objID);
+
+	for (it = pr.first; it != pr.second; it++)
+	{
+		const BuildQueueCacheNode& bqcn = (*it).second;
+		if (bqcn.m_type == PRODUCTION_UPGRADE && bqcn.m_upgradeToResearch == upgrade)
+		{
+			m_multiSelectQueueCache.erase(it);
+			break;
+		}
+	}
+}

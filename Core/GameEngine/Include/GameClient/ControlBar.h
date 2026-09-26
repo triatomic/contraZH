@@ -36,6 +36,7 @@
 #include "Common/Science.h"
 #include "GameClient/Color.h"
 #include "GameClient/GameWindow.h"
+#include "GameLogic/Module/ProductionUpdate.h"
 
 // FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
 class Drawable;
@@ -999,6 +1000,7 @@ protected:
 
 	void setUpDownImages();
 		// methods for flashing cameos
+
 public:
 	void setFlash( Bool b ) { m_flash = b; }
 
@@ -1170,6 +1172,35 @@ private:
 	void setCommandBarBorder( GameWindow *button, CommandButtonMappedBorderType type);
 public:
 	void updateCommandBarBorderColors(Color build, Color action, Color upgrade, Color system );
+
+protected:
+	
+	//ShigureUi 20/09/2026 cache of build unit/upgrade command to avoid sending wrong MSG
+	struct BuildQueueCacheNode
+	{
+		ProductionType m_type;														///< production type
+		ProductionID m_productionID;
+		union
+		{
+			const ThingTemplate* m_objectToProduce;					///< what we're going to produce
+			const UpgradeTemplate* m_upgradeToResearch;			///< what upgrade we're researching
+		};
+
+		BuildQueueCacheNode()
+		{
+			m_type = PRODUCTION_INVALID;
+			m_productionID = PRODUCTIONID_INVALID;
+		}
+	};
+
+	std::multimap<ObjectID, BuildQueueCacheNode> m_multiSelectQueueCache;
+	Real calcEstimatedProductionFinishedTime(Object* obj);
+	UnsignedInt calcBuildQueueRoomLeft(Object* obj, const ThingTemplate* thing, const UpgradeTemplate* upgrade);
+	UnsignedInt calcBuildLimitLeft(Player* player, const ThingTemplate* thing);
+
+public:
+	void removeUnitFromBuildQueueCache(ObjectID objID, ProductionID productionID);
+	void removeUpgradeFromBuildQueueCache(ObjectID objID, const UpgradeTemplate *upgrade);
 
 private:
 
