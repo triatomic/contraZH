@@ -209,6 +209,7 @@ protected:
 	UnsignedInt m_bitDepth;							///< bit depth of the display
 	Bool m_windowed;										///< TRUE when windowed, FALSE when fullscreen
 	Bool m_isBatching;
+	Int m_batchDepth;
 	View *m_viewList;										///< All of the views into the world
 
 	// Cinematic text data

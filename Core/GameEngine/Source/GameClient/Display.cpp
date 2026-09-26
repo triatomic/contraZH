@@ -62,6 +62,7 @@ Display::Display()
 	m_currentlyPlayingMovie.clear();
 	m_letterBoxFadeStartTime = 0;
 	m_isBatching = FALSE;
+	m_batchDepth = 0;
 }
 
 /**
@@ -321,6 +322,8 @@ Display::DebugDisplayCallback *Display::getDebugDisplayCallback()
 
 void Display::beginBatch()
 {
+	// Nested batches join the outer one, so the radar and cameo bars inside winRepaint don't end the UI batch.
+	++m_batchDepth;
 	if (m_isBatching)
 	{
 		return;
@@ -332,6 +335,10 @@ void Display::beginBatch()
 void Display::endBatch()
 {
 	if (!m_isBatching)
+	{
+		return;
+	}
+	if (--m_batchDepth > 0)
 	{
 		return;
 	}
