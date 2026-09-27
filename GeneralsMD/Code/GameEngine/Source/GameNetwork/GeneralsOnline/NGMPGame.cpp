@@ -32,6 +32,8 @@ NGMPGameSlot::NGMPGameSlot()
 
 NGMPGame::NGMPGame()
 {
+	m_isQM = FALSE;
+
 #if defined(GENERALS_ONLINE_HIGH_FPS_RENDER)
 	m_renderSettingsOverridden = FALSE;
 	m_savedFpsLimit = 0;
@@ -622,6 +624,7 @@ void NGMPGame::launchGame(void)
 void NGMPGame::reset(void)
 {
 	GameInfo::reset();
+	m_isQM = FALSE;
 }
 
 void NGMPGame::StartCountdown()
