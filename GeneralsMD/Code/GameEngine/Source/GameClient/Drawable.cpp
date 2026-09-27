@@ -5335,11 +5335,11 @@ void Drawable::drawDisabled(const IRegion2D* healthBarRegion)
 	//
 	// Disabled Emoticon /Lightning
 	//                   7/
-	if( obj->isDisabledByType( DISABLED_HACKED )
-		|| obj->isDisabledByType( DISABLED_PARALYZED )
-		|| obj->isDisabledByType( DISABLED_EMP )
-		|| obj->isDisabledByType( DISABLED_SUBDUED )
-		|| obj->isDisabledByType( DISABLED_UNDERPOWERED )
+	if( obj->isDisabledByType( DISABLED_HACKED ) ||
+		obj->isDisabledByType( DISABLED_PARALYZED ) ||
+		obj->isDisabledByType( DISABLED_EMP ) ||
+		obj->isDisabledByType( DISABLED_SUBDUED ) ||
+		obj->isDisabledByType( DISABLED_UNDERPOWERED )
 		)
 	{
 		// create icon if necessary

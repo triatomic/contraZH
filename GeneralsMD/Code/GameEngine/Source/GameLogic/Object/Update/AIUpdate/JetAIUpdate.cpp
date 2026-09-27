@@ -2839,11 +2839,11 @@ UpdateSleepTime JetAIUpdate::update()
 		Drawable *draw = jet->getDrawable();
 		if( draw )
 		{
-			if( getFlag(TAKEOFF_IN_PROGRESS)
-					|| getFlag(LANDING_IN_PROGRESS)
-					|| getObject()->isSignificantlyAboveTerrain()
-					|| isMoving()
-					|| isWaitingForPath() )
+			if( getFlag(TAKEOFF_IN_PROGRESS) ||
+					getFlag(LANDING_IN_PROGRESS) ||
+					getObject()->isSignificantlyAboveTerrain() ||
+					isMoving() ||
+					isWaitingForPath() )
 			{
 				if( !m_enginesOn )
 				{
@@ -2890,8 +2890,8 @@ Bool JetAIUpdate::chooseLocomotorSet(LocomotorSetType wst)
 //-------------------------------------------------------------------------------------------------
 void JetAIUpdate::setLocomotorGoalNone()
 {
-	if ((getFlag(TAKEOFF_IN_PROGRESS) || getFlag(LANDING_IN_PROGRESS))
-			&& getFlag(ALLOW_AIR_LOCO) && !getFlag(ALLOW_CIRCLING))
+	if ((getFlag(TAKEOFF_IN_PROGRESS) || getFlag(LANDING_IN_PROGRESS)) &&
+			getFlag(ALLOW_AIR_LOCO) && !getFlag(ALLOW_CIRCLING))
 	{
 		Object* jet = getObject();
 		Coord3D desiredPos = *jet->getPosition();

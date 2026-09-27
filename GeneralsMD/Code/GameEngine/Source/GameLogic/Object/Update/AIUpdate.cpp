@@ -3064,11 +3064,11 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 		m_curMaxBlockedSpeed = FAST_AS_POSSIBLE;
 	}
 
-	if (m_curLocomotor != nullptr
-			&& m_locomotorGoalType == NONE
-			&& m_doFinalPosition == FALSE
-			&& m_isBlocked == FALSE
-			&& requiresConstantCalling == FALSE)
+	if (m_curLocomotor != nullptr &&
+			m_locomotorGoalType == NONE &&
+			m_doFinalPosition == FALSE &&
+			m_isBlocked == FALSE &&
+			requiresConstantCalling == FALSE)
 	{
 		return UPDATE_SLEEP_FOREVER;
 	}
@@ -3139,8 +3139,8 @@ void AIUpdateInterface::setLocomotorGoalNone()
 Bool AIUpdateInterface::isDoingGroundMovement() const
 {
 
-  if (getObject()->isDisabledByType( DISABLED_UNMANNED )
-   && getObject()->isKindOf( KINDOF_PRODUCED_AT_HELIPAD ) )
+  if (getObject()->isDisabledByType( DISABLED_UNMANNED ) &&
+   getObject()->isKindOf( KINDOF_PRODUCED_AT_HELIPAD ) )
   {
     return TRUE; // an unmanned helicopter gets grounded, eventually.
   }
@@ -5912,9 +5912,9 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 
 	// Instead of shroud affecting the ability to attack, it affects the ability to target.
 	// The same checks apply as the old WeaponSet check (now commented out, search for getShroudedStatus)
-	if( calledByAI
-			&& obj->getControllingPlayer()
-			&& obj->getControllingPlayer()->getPlayerType() == PLAYER_HUMAN
+	if( calledByAI &&
+			obj->getControllingPlayer() &&
+			obj->getControllingPlayer()->getPlayerType() == PLAYER_HUMAN
 		)
 	{
 		flags |= AI::UNFOGGED;

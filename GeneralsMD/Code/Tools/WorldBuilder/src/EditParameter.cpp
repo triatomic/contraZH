@@ -593,8 +593,8 @@ Bool EditParameter::loadCreateUnitParameter(Script *pScr, CComboBox *pCombo, Asc
 	ScriptAction *pAction;
 	Bool found = false;
 	for (pAction = pScr->getAction(); pAction; pAction = pAction->getNext()) {
-		if (pAction->getActionType() != ScriptAction::CREATE_NAMED_ON_TEAM_AT_WAYPOINT
-				&& pAction->getActionType() != ScriptAction::UNIT_SPAWN_NAMED_LOCATION_ORIENTATION) {
+		if (pAction->getActionType() != ScriptAction::CREATE_NAMED_ON_TEAM_AT_WAYPOINT &&
+				pAction->getActionType() != ScriptAction::UNIT_SPAWN_NAMED_LOCATION_ORIENTATION) {
 			continue;
 		}
 		Int i;
@@ -654,8 +654,8 @@ AsciiString EditParameter::getCreatedUnitTemplateName(AsciiString unitName)
 		ScriptAction *pAction;
 		for (pScr = pSL->getScript(); pScr; pScr=pScr->getNext()) {
 			for (pAction = pScr->getAction(); pAction; pAction = pAction->getNext()) {
-				if (pAction->getActionType() != ScriptAction::CREATE_NAMED_ON_TEAM_AT_WAYPOINT
-						&& pAction->getActionType() != ScriptAction::UNIT_SPAWN_NAMED_LOCATION_ORIENTATION) {
+				if (pAction->getActionType() != ScriptAction::CREATE_NAMED_ON_TEAM_AT_WAYPOINT &&
+						pAction->getActionType() != ScriptAction::UNIT_SPAWN_NAMED_LOCATION_ORIENTATION) {
 					continue;
 				}
 				Int i;
@@ -680,8 +680,8 @@ AsciiString EditParameter::getCreatedUnitTemplateName(AsciiString unitName)
 		for (pGroup = pSL->getScriptGroup(); pGroup; pGroup=pGroup->getNext()) {
 			for (pScr = pSL->getScript(); pScr; pScr=pScr->getNext()) {
 				for (pAction = pScr->getAction(); pAction; pAction = pAction->getNext()) {
-					if (pAction->getActionType() != ScriptAction::CREATE_NAMED_ON_TEAM_AT_WAYPOINT
-							&& pAction->getActionType() != ScriptAction::UNIT_SPAWN_NAMED_LOCATION_ORIENTATION) {
+					if (pAction->getActionType() != ScriptAction::CREATE_NAMED_ON_TEAM_AT_WAYPOINT &&
+							pAction->getActionType() != ScriptAction::UNIT_SPAWN_NAMED_LOCATION_ORIENTATION) {
 						continue;
 					}
 					Int i;

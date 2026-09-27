@@ -1236,8 +1236,8 @@ Bool WorkerAIUpdate::gainOneBox( Int remainingStock )
 // ------------------------------------------------------------------------------------------------
 Bool WorkerAIUpdate::isSupplyTruckBrainActiveAndBusy()
 {
-	return (m_workerMachine->getCurrentStateID() == AS_SUPPLY_TRUCK)
-				&& (m_supplyTruckStateMachine->getCurrentStateID() == ST_BUSY);
+	return (m_workerMachine->getCurrentStateID() == AS_SUPPLY_TRUCK) &&
+				(m_supplyTruckStateMachine->getCurrentStateID() == ST_BUSY);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1387,8 +1387,8 @@ Bool WorkerStateMachine::supplyTruckSubMachineReadyToLeave( State *thisState, vo
 	// so there is no transition out on the way in.  Active and Busy means it isn't doing
 	// anything Supply related.
 
-	return !supplyTruckSubMachineWantsToEnter( thisState, nullptr )
-				&& update->isSupplyTruckBrainActiveAndBusy();
+	return !supplyTruckSubMachineWantsToEnter( thisState, nullptr ) &&
+				update->isSupplyTruckBrainActiveAndBusy();
 }
 
 // ------------------------------------------------------------------------------------------------

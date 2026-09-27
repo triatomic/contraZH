@@ -100,9 +100,9 @@ WindowMsgHandledType LeftHUDInput( GameWindow *window, UnsignedInt msg,
 			//
 			Bool targeting = FALSE;
 			const CommandButton *command = TheInGameUI->getGUICommand();
-			if( command
-					&& (command->getCommandType() == GUI_COMMAND_SPECIAL_POWER || command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT)
-					&& BitIsSet( command->getOptions(), NEED_TARGET_POS ) )
+			if( command &&
+					(command->getCommandType() == GUI_COMMAND_SPECIAL_POWER || command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT) &&
+					BitIsSet( command->getOptions(), NEED_TARGET_POS ) )
 				targeting = TRUE;
 
 			if( targeting == FALSE )
@@ -172,9 +172,9 @@ WindowMsgHandledType LeftHUDInput( GameWindow *window, UnsignedInt msg,
 
 				// keep the cursor for any context commands
 				const CommandButton *command = TheInGameUI->getGUICommand();
-				if( command
-						&& (command->getCommandType() == GUI_COMMAND_SPECIAL_POWER || command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT)
-						&& BitIsSet( command->getOptions(), NEED_TARGET_POS ) )
+				if( command &&
+						(command->getCommandType() == GUI_COMMAND_SPECIAL_POWER || command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT) &&
+						BitIsSet( command->getOptions(), NEED_TARGET_POS ) )
 				{
 					Int index = TheMouse->getCursorIndex( command->getCursorName() );
 
@@ -271,9 +271,9 @@ WindowMsgHandledType LeftHUDInput( GameWindow *window, UnsignedInt msg,
 
 				// evaluate any special powers that can be executed from the radar
 				const CommandButton *command = TheInGameUI->getGUICommand();
-				if( command
-					&& (command->getCommandType() == GUI_COMMAND_SPECIAL_POWER || command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT)
-					&& BitIsSet( command->getOptions(), NEED_TARGET_POS )
+				if( command &&
+					(command->getCommandType() == GUI_COMMAND_SPECIAL_POWER || command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT) &&
+					BitIsSet( command->getOptions(), NEED_TARGET_POS )
 					)
 				{
 
