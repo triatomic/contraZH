@@ -575,6 +575,9 @@ GlobalData::GlobalData()
 		m_theOriginal = this;
 	m_next = nullptr;
 
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	m_specialPowerUsesDelay = TRUE;
+#endif
   m_TiVOFastMode = FALSE;
   m_queueReorder = FALSE;
   m_batchParticles = FALSE;
@@ -728,7 +731,6 @@ GlobalData::GlobalData()
 	m_showCollisionExtents = FALSE;
   m_showAudioLocations = FALSE;
 	m_debugCamera = FALSE;
-	m_specialPowerUsesDelay = TRUE;
 	m_debugVisibility = FALSE;
 	m_debugVisibilityTileCount = 32;	// default to 32.
 	m_debugVisibilityTileDuration = LOGICFRAMES_PER_SECOND;
