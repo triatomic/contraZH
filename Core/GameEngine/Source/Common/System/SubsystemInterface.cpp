@@ -157,10 +157,15 @@ void SubsystemInterfaceList::initSubsystem(SubsystemInterface* sys, const char* 
 	sys->init();
 
 	INI ini;
+	INI::LoadFlags loadFlags = INI::LoadFlags_SearchSubDirs;
+	if (!optional)
+	{
+		loadFlags |= INI::LoadFlags_ExpectFileFound;
+	}
 	if (path1)
-		ini.loadFileDirectory(path1, INI_LOAD_OVERWRITE, pXfer, TRUE, optional);
+		ini.loadFileDirectory(path1, INI_LOAD_OVERWRITE, pXfer, loadFlags);
 	if (path2)
-		ini.loadFileDirectory(path2, INI_LOAD_OVERWRITE, pXfer, TRUE, optional);
+		ini.loadFileDirectory(path2, INI_LOAD_OVERWRITE, pXfer, loadFlags);
 
 	m_subsystems.push_back(sys);
 }
