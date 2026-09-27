@@ -618,7 +618,8 @@ DynamicGameLODLevel GameLODManager::findDynamicLODLevel(Real averageFPS)
 	Int ifps=(Int)(averageFPS);	//convert to integer.
 
 	for (Int i=DYNAMIC_GAME_LOD_VERY_HIGH; i>=DYNAMIC_GAME_LOD_LOW; i--)
-	{	//check which of the LOD levels matches our fps
+	{
+		//check which of the LOD levels matches our fps
 		if (m_dynamicGameLODInfo[i].m_minFPS < ifps)
 			return (DynamicGameLODLevel)i;
 	}

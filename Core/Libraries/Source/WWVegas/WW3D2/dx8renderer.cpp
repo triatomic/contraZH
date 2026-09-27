@@ -575,7 +575,8 @@ void DX8FVFCategoryContainer::Render_Procedural_Material_Passes()
    		MeshClass * mesh = mpr->Peek_Mesh();
 
    		if (mesh->Get_Base_Vertex_Offset() == VERTEX_BUFFER_OVERFLOW)	//check if this mesh is valid
-   		{	//skip this mesh so it gets rendered later after vertices are filled in.
+   		{
+	        //skip this mesh so it gets rendered later after vertices are filled in.
 	        last_mpr = mpr;
    			mpr = mpr->Get_Next_Visible();
    			renderTasksRemaining = true;
@@ -1003,7 +1004,8 @@ unsigned DX8FVFCategoryContainer::Define_FVF(MeshModelClass* mmc,bool enable_lig
 	case 8: fvf|=D3DFVF_TEX8; break;
 	}
 
-	if (!mmc->Needs_Vertex_Normals()) {  //enable_lighting || mmc->Get_Flag(MeshModelClass::PRELIT_MASK)) {
+	if (!mmc->Needs_Vertex_Normals()) {
+		//enable_lighting || mmc->Get_Flag(MeshModelClass::PRELIT_MASK)) {
 		return fvf;
 	}
 
@@ -1796,7 +1798,8 @@ void DX8SkinFVFCategoryContainer::Render()
 	//'Generals' customization to allow more than 65535 vertices
 	unsigned int maxVertexCount=VisibleVertexCount;
 	if (maxVertexCount > 65535)
-	{	//clamp vertex count to maximum size that can be indexed by 16-bit index
+	{
+		//clamp vertex count to maximum size that can be indexed by 16-bit index
 		maxVertexCount = 65535;
 	}
 
@@ -1823,7 +1826,8 @@ void DX8SkinFVFCategoryContainer::Render()
 				int mesh_vertex_count=mmc->Get_Vertex_Count();
 				//'Generals' mod to deal with cases where not all meshes fit in VB.
 				if (vertex_offset+mesh_vertex_count > maxVertexCount || remainingMesh)
-				{	//flag mesh so we know it didn't fit in the vertex buffer
+				{
+					//flag mesh so we know it didn't fit in the vertex buffer
 					mesh->Set_Base_Vertex_Offset(VERTEX_BUFFER_OVERFLOW);
 					if (remainingMesh == nullptr)
 						remainingMesh = mesh;	//start of meshes that didn't fit in buffer
@@ -2649,7 +2653,8 @@ void DX8TextureCategoryClass::Render()
 		MeshClass * mesh = prt->Peek_Mesh();
 
 		if (mesh->Get_Base_Vertex_Offset() == VERTEX_BUFFER_OVERFLOW)	//check if this mesh is valid
-		{	//skip this mesh so it gets rendered later after vertices are filled in.
+		{
+			//skip this mesh so it gets rendered later after vertices are filled in.
 			last_prt = prt;
 			prt = prt->Get_Next_Visible();
 			renderTasksRemaining = true;

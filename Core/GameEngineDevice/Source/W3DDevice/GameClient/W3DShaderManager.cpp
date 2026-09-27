@@ -397,10 +397,12 @@ Int ScreenBWFilter::set(FilterModes mode)
 {
 
 	if (mode > FM_NULL_MODE)
-	{	//rendering a quad with redirected rendering surface tinted by pixel shader
+	{
+		//rendering a quad with redirected rendering surface tinted by pixel shader
 
 		if (m_fadeDirection > 0)
-		{	//turning effect on
+		{
+			//turning effect on
 			m_curFadeFrame++;
 			Int fade = m_curFadeFrame;
 
@@ -417,7 +419,8 @@ Int ScreenBWFilter::set(FilterModes mode)
 		}
 		else
 		if (m_fadeDirection < 0)
-		{	//turning effect off
+		{
+			//turning effect off
 			m_curFadeFrame++;
 			Int fade = m_curFadeFrame;
 			if (fade<m_fadeFrames)
@@ -451,13 +454,15 @@ Int ScreenBWFilter::set(FilterModes mode)
 		Vector4	color(1.0f,1.0f,1.0f,1.0f);	//multiply color
 
 		if (mode == FM_VIEW_BW_BLACK_AND_WHITE)
-		{	//back & white mode
+		{
+			//back & white mode
 			color.X=1.0f;
 			color.Y=1.0f;
 			color.Z=1.0f;
 		}
 		if (mode == FM_VIEW_BW_RED_AND_WHITE)
-		{	//red is on
+		{
+			//red is on
 			color.X = 1.0f;
 			color.Y = 0.0f;
 			color.Z = 0.0f;
@@ -588,7 +593,8 @@ Bool ScreenBWFilterDOT3::postRender(FilterModes mode, Coord2D &scrollDelta,Bool 
 
 	//Draw B&W version first
 	if (DX8Wrapper::Get_Current_Caps()->Support_Dot3())
-	{	//Override W3D states with customizations for grayscale
+	{
+		//Override W3D states with customizations for grayscale
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, 0x80A5CA8E);
 		DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_COLORARG0, D3DTA_TFACTOR | D3DTA_ALPHAREPLICATE);
 		DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
@@ -599,7 +605,8 @@ Bool ScreenBWFilterDOT3::postRender(FilterModes mode, Coord2D &scrollDelta,Bool 
 		DX8Wrapper::Set_DX8_Texture_Stage_State( 1, D3DTSS_COLOROP, D3DTOP_DOTPRODUCT3);
 	}
 	else
-	{	//doesn't have DOT3 blend mode so fake it another way.
+	{
+		//doesn't have DOT3 blend mode so fake it another way.
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, 0x60606060);
 		DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
 		DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_COLORARG2, D3DTA_TFACTOR);
@@ -628,10 +635,12 @@ Bool ScreenBWFilterDOT3::postRender(FilterModes mode, Coord2D &scrollDelta,Bool 
 Int ScreenBWFilterDOT3::set(FilterModes mode)
 {
 	if (mode > FM_NULL_MODE)
-	{	//rendering a quad with redirected rendering surface tinted by pixel shader
+	{
+		//rendering a quad with redirected rendering surface tinted by pixel shader
 
 		if (m_fadeDirection > 0)
-		{	//turning effect on
+		{
+			//turning effect on
 			m_curFadeFrame++;
 			Int fade = m_curFadeFrame;
 
@@ -648,7 +657,8 @@ Int ScreenBWFilterDOT3::set(FilterModes mode)
 		}
 		else
 		if (m_fadeDirection < 0)
-		{	//turning effect off
+		{
+			//turning effect off
 			m_curFadeFrame++;
 			Int fade = m_curFadeFrame;
 			if (fade<m_fadeFrames)
@@ -738,7 +748,8 @@ Int ScreenCrossFadeFilter::init()
 Bool ScreenCrossFadeFilter::updateFadeLevel()
 {
 	if (m_fadeDirection > 0)
-	{	//turning effect on
+	{
+		//turning effect on
 		m_curFadeFrame++;
 		Int fade = m_curFadeFrame;
 
@@ -756,7 +767,8 @@ Bool ScreenCrossFadeFilter::updateFadeLevel()
 	}
 	else
 	if (m_fadeDirection < 0)
-	{	//turning effect off
+	{
+		//turning effect off
 		Int fade = m_curFadeFrame;
 		if (fade<m_fadeFrames)
 		{
@@ -778,7 +790,8 @@ Bool ScreenCrossFadeFilter::updateFadeLevel()
 Bool ScreenCrossFadeFilter::preRender(Bool &skipRender, CustomScenePassModes &scenePassMode)
 {
 	if (updateFadeLevel())
-	{	//if fade has not completed
+	{
+		//if fade has not completed
 		W3DShaderManager::startRenderToTexture();
 		scenePassMode=SCENE_PASS_ALPHA_MASK;
 		skipRender = false;
@@ -884,7 +897,8 @@ Bool ScreenCrossFadeFilter::postRender(FilterModes mode, Coord2D &scrollDelta,Bo
 Int ScreenCrossFadeFilter::set(FilterModes mode)
 {
 	if (mode > FM_NULL_MODE)
-	{	//rendering a quad with redirected rendering surface
+	{
+		//rendering a quad with redirected rendering surface
 		VertexMaterialClass *vmat=VertexMaterialClass::Get_Preset(VertexMaterialClass::PRELIT_DIFFUSE);
 		DX8Wrapper::Set_Material(vmat);
 		REF_PTR_RELEASE(vmat);	//no need to keep a reference since it's a preset.
@@ -897,7 +911,8 @@ Int ScreenCrossFadeFilter::set(FilterModes mode)
 		DX8Wrapper::Set_DX8_Texture_Stage_State( 0, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
 
 		if (mode == FM_VIEW_CROSSFADE_CIRCLE)
-		{	//cross-fading using circle mask stored in stage 1
+		{
+			//cross-fading using circle mask stored in stage 1
 			DX8Wrapper::Set_DX8_Texture_Stage_State( 1, D3DTSS_COLORARG1, D3DTA_TEXTURE );
 			DX8Wrapper::Set_DX8_Texture_Stage_State( 1, D3DTSS_COLORARG2, D3DTA_CURRENT );
 			DX8Wrapper::Set_DX8_Texture_Stage_State( 1, D3DTSS_COLOROP,   D3DTOP_MODULATE );
@@ -1174,7 +1189,8 @@ Bool ScreenMotionBlurFilter::setup(FilterModes mode)
 Int ScreenMotionBlurFilter::set(FilterModes mode)
 {
 	if (mode > FM_NULL_MODE)
-	{	//rendering a quad with redirected rendering surface motion blurred
+	{
+		//rendering a quad with redirected rendering surface motion blurred
 
 		VertexMaterialClass *vmat=VertexMaterialClass::Get_Preset(VertexMaterialClass::PRELIT_DIFFUSE);
 		DX8Wrapper::Set_Material(vmat);
@@ -1262,7 +1278,8 @@ Int ShroudTextureShader::set(Int stage)
 	//is 1/128 the size of full texture. (assuming 128x128 vid-mem texture).
 	W3DShroud *shroud;
 	if ((shroud=TheTerrainRenderObject->getShroud()) != nullptr)
-	{	///@todo: All this code really only need to be done once per camera/view.  Find a way to optimize it out.
+	{
+		///@todo: All this code really only need to be done once per camera/view.  Find a way to optimize it out.
 		D3DMATRIX curView;
 		DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, curView);
 
@@ -1281,7 +1298,8 @@ Int ShroudTextureShader::set(Int stage)
 		Real height=shroud->getCellHeight();
 
 		if (TheTerrainRenderObject->getMap())
-		{	//subtract origin position from all coordinates.  Origin is shifted by 1 cell width/height to allow for unused border texels.
+		{
+			//subtract origin position from all coordinates.  Origin is shifted by 1 cell width/height to allow for unused border texels.
 			xoffset = -(float)shroud->getDrawOriginX() + width;
 			yoffset = -(float)shroud->getDrawOriginY() + height;
 		}
@@ -1354,7 +1372,8 @@ Int FlatShroudTextureShader::set(Int stage)
 	//is 1/128 the size of full texture. (assuming 128x128 vid-mem texture).
 	W3DShroud *shroud;
 	if ((shroud=TheTerrainRenderObject->getShroud()) != nullptr)
-	{	///@todo: All this code really only need to be done once per camera/view.  Find a way to optimize it out.
+	{
+		///@todo: All this code really only need to be done once per camera/view.  Find a way to optimize it out.
 		D3DMATRIX curView;
 		DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, curView);
 
@@ -1373,7 +1392,8 @@ Int FlatShroudTextureShader::set(Int stage)
 		Real height=shroud->getCellHeight();
 
 		if (TheTerrainRenderObject->getMap())
-		{	//subtract origin position from all coordinates.  Origin is shifted by 1 cell width/height to allow for unused border texels.
+		{
+			//subtract origin position from all coordinates.  Origin is shifted by 1 cell width/height to allow for unused border texels.
 			xoffset = -(float)shroud->getDrawOriginX() + width;
 			yoffset = -(float)shroud->getDrawOriginY() + height;
 		}
@@ -4142,10 +4162,12 @@ Int TerrainShader2Stage::set(Int pass)
 				DX8Wrapper::Set_DX8_Texture_Stage_State( 1, D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
 			}
 			else
-			{	//only 1 noise or cloud texture
+			{
+				//only 1 noise or cloud texture
 				// Now setup the texture pipeline.
 				if (W3DShaderManager::getCurrentShader() == W3DShaderManager::ST_TERRAIN_BASE_NOISE1)
-				{	//setup cloud pass
+				{
+					//setup cloud pass
 					DX8Wrapper::_Get_D3D_Device8()->SetTexture(0, W3DShaderManager::getShaderTexture(2)->Peek_D3D_Texture());
 					updateNoise1(&curView,&inv);	//update curView with texture matrix
 					DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
@@ -4280,7 +4302,8 @@ Int TerrainShader8Stage::set(Int pass)
 		DX8Wrapper::Set_DX8_Texture_Stage_State( 7, D3DTSS_ALPHAARG2, D3DTA_TFACTOR);
 	}
 	else
-	{	//setup cloud noise/pass
+	{
+		//setup cloud noise/pass
 		DX8Wrapper::Set_DX8_Texture_Stage_State( 2, D3DTSS_COLOROP, D3DTOP_DISABLE);
 		DX8Wrapper::Set_DX8_Texture_Stage_State( 2, D3DTSS_ALPHAOP, D3DTOP_DISABLE);
 		DX8Wrapper::Set_DX8_Texture_Stage_State( 3, D3DTSS_COLOROP, D3DTOP_DISABLE);
@@ -5001,7 +5024,8 @@ Int TerrainShaderPixelShader::set(Int pass)
 		DX8Wrapper::Set_DX8_Texture_Stage_State(2,  D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
 
 		if (twoMaps)
-		{	//full shader
+		{
+			//full shader
 			DX8Wrapper::Set_DX8_Texture_Stage_State(3,  D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
 			DX8Wrapper::Set_DX8_Texture_Stage_State(3,  D3DTSS_ADDRESSV, D3DTADDRESS_WRAP);
 			TextureClass *first = cloudMap ? W3DShaderManager::getShaderTexture(2) : W3DGroundNoise::getWhiteTexture();
@@ -5033,18 +5057,21 @@ Int TerrainShaderPixelShader::set(Int pass)
 			}
 		}
 		else
-		{	//single noise texture shader
+		{
+			//single noise texture shader
 			DX8Wrapper::Set_Pixel_Shader(m_dwBaseNoise1PixelShader);
 
 			if (cloudMap)
-			{	//cloud map
+			{
+				//cloud map
 				DX8Wrapper::_Get_D3D_Device8()->SetTexture(2, W3DShaderManager::getShaderTexture(2)->Peek_D3D_Texture());
 				terrainShader2Stage.updateNoise1(&curView,&inv);	//update curView with texture matrix
 				DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
 				DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
 			}
 			else
-			{	//light map
+			{
+				//light map
 				DX8Wrapper::_Get_D3D_Device8()->SetTexture(2, W3DShaderManager::getShaderTexture(3)->Peek_D3D_Texture());
 				terrainShader2Stage.updateNoise2(&curView,&inv);	//update curView with texture matrix
 				DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_MINFILTER, D3DTEXF_POINT);
@@ -5054,7 +5081,8 @@ Int TerrainShaderPixelShader::set(Int pass)
 		}
 	}
 	else
-	{	//just base texturing
+	{
+		//just base texturing
 		DX8Wrapper::Set_Pixel_Shader(m_dwBasePixelShader);
 	}
 
@@ -5942,7 +5970,8 @@ Int RoadShader2Stage::set(Int pass)
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND,D3DBLEND_INVSRCALPHA);
 
 		if (W3DShaderManager::getCurrentShader() >= W3DShaderManager::ST_ROAD_BASE_NOISE1)
-		{	//second texture unit will contain a noise pass
+		{
+			//second texture unit will contain a noise pass
 			D3DMATRIX curView;
 			DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, curView);
 
@@ -5970,7 +5999,8 @@ Int RoadShader2Stage::set(Int pass)
 			DX8Wrapper::Set_DX8_Texture_Stage_State( 1, D3DTSS_ALPHAOP,   D3DTOP_MODULATE );
 
 			if (W3DShaderManager::getCurrentShader() == W3DShaderManager::ST_ROAD_BASE_NOISE12)
-			{	//full shader, apply noise 1 in pass 0.
+			{
+				//full shader, apply noise 1 in pass 0.
 				DX8Wrapper::Set_Texture(1,W3DShaderManager::getShaderTexture(1));
 				DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
 				DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
@@ -5979,16 +6009,19 @@ Int RoadShader2Stage::set(Int pass)
 				DX8Wrapper::_Set_DX8_Transform(D3DTS_TEXTURE1, curView);
 			}
 			else
-			{	//single noise texture shader
+			{
+				//single noise texture shader
 				if (W3DShaderManager::getCurrentShader() == W3DShaderManager::ST_ROAD_BASE_NOISE1)
-				{	//cloud map
+				{
+					//cloud map
 					DX8Wrapper::Set_Texture(1,W3DShaderManager::getShaderTexture(1));
 					terrainShader2Stage.updateNoise1(&curView, &inv, false);	//update curView with texture matrix
 					DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
 					DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
 				}
 				else
-				{	//light map
+				{
+					//light map
 					DX8Wrapper::Set_Texture(1,W3DShaderManager::getShaderTexture(2));
 					terrainShader2Stage.updateNoise2(&curView,&inv, false);	//update curView with texture matrix
 					DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_MINFILTER, D3DTEXF_POINT);
@@ -5998,13 +6031,15 @@ Int RoadShader2Stage::set(Int pass)
 			}
 		}
 		else
-		{	//just base texturing
+		{
+			//just base texturing
 			DX8Wrapper::Set_DX8_Texture_Stage_State( 1, D3DTSS_COLOROP,   D3DTOP_DISABLE );
 			DX8Wrapper::Set_DX8_Texture_Stage_State( 1, D3DTSS_ALPHAOP,   D3DTOP_DISABLE );
 		}
 	}
 	else
-	{	//pass 1, apply additional noise pass
+	{
+		//pass 1, apply additional noise pass
 		D3DMATRIX curView;
 		DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, curView);
 
@@ -6493,9 +6528,11 @@ void W3DShaderManager::startRenderToTexture()
 
 	m_renderingToTexture = true;
 	if (TheGlobalData->m_showSoftWaterEdge)
-	{	//Soft water edges use frame buffer destination alpha so we must clear it to a known value.
+	{
+		//Soft water edges use frame buffer destination alpha so we must clear it to a known value.
 		if (m_currentFilter == FT_VIEW_MOTION_BLUR_FILTER || m_currentFilter == FT_VIEW_CROSSFADE)
-		{	//these filters rely on the previous frame being visible so we must be careful about clearing
+		{
+			//these filters rely on the previous frame being visible so we must be careful about clearing
 			//frame buffer.  Only clear the alpha channel
 			DX8Wrapper::Set_DX8_Render_State(D3DRS_COLORWRITEENABLE,D3DCOLORWRITEENABLE_ALPHA);	//only clear alpha
 			ShaderClass shader=ShaderClass::_PresetOpaqueSolidShader;
@@ -6935,7 +6972,8 @@ StaticGameLODLevel W3DShaderManager::getGPUPerformanceIndex()
 	StaticGameLODLevel detailSetting=STATIC_GAME_LOD_LOW;	//assume lowest settings for now.
 
 	if ((chipType=getChipset()) != DC_UNKNOWN)
-	{	//a known video card so we can make some assumptions
+	{
+		//a known video card so we can make some assumptions
 		if (chipType >=	DC_GEFORCE2)
 			detailSetting=STATIC_GAME_LOD_LOW;	//these cards need multiple terrain passes.
 		if (chipType >= DC_GENERIC_PIXEL_SHADER_1_1)	//these cards can do terrain in single pass.
@@ -7034,7 +7072,8 @@ Int W3DShaderManager::setShroudTex(Int stage)
 		Real height=shroud->getCellHeight();
 
 		if (TheTerrainRenderObject->getMap())
-		{	//subtract origin position from all coordinates.  Origin is shifted by 1 cell width/height to allow for unused border texels.
+		{
+			//subtract origin position from all coordinates.  Origin is shifted by 1 cell width/height to allow for unused border texels.
 			xoffset = -(float)shroud->getDrawOriginX() + width;
 			yoffset = -(float)shroud->getDrawOriginY() + height;
 		}
@@ -7147,7 +7186,8 @@ Int FlatTerrainShader2Stage::set(Int pass)
 					Real height=shroud->getCellHeight();
 
 					if (TheTerrainRenderObject->getMap())
-					{	//subtract origin position from all coordinates.  Origin is shifted by 1 cell width/height to allow for unused border texels.
+					{
+						//subtract origin position from all coordinates.  Origin is shifted by 1 cell width/height to allow for unused border texels.
 						xoffset = -(float)shroud->getDrawOriginX() + width;
 						yoffset = -(float)shroud->getDrawOriginY() + height;
 					}
@@ -7237,10 +7277,12 @@ Int FlatTerrainShader2Stage::set(Int pass)
 				DX8Wrapper::_Get_D3D_Device8()->SetTexture(1, W3DShaderManager::getShaderTexture(3)->Peek_D3D_Texture());
 			}
 			else
-			{	//only 1 noise or cloud texture
+			{
+				//only 1 noise or cloud texture
 				// Now setup the texture pipeline.
 				if (W3DShaderManager::getCurrentShader() == W3DShaderManager::ST_FLAT_TERRAIN_BASE_NOISE1)
-				{	//setup cloud pass
+				{
+					//setup cloud pass
 					DX8Wrapper::_Get_D3D_Device8()->SetTexture(0, W3DShaderManager::getShaderTexture(2)->Peek_D3D_Texture());
 					terrainShader2Stage.updateNoise1(&curView,&inv);	//update curView with texture matrix
 					DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
@@ -7448,7 +7490,8 @@ Int FlatTerrainShaderPixelShader::set(Int pass)
 			Real height=shroud->getCellHeight();
 
 			if (TheTerrainRenderObject->getMap())
-			{	//subtract origin position from all coordinates.  Origin is shifted by 1 cell width/height to allow for unused border texels.
+			{
+				//subtract origin position from all coordinates.  Origin is shifted by 1 cell width/height to allow for unused border texels.
 				xoffset = -(float)shroud->getDrawOriginX() + width;
 				yoffset = -(float)shroud->getDrawOriginY() + height;
 			}
@@ -7472,7 +7515,8 @@ Int FlatTerrainShaderPixelShader::set(Int pass)
 
 	Bool doNoise1 = (W3DShaderManager::getCurrentShader() == W3DShaderManager::ST_FLAT_TERRAIN_BASE_NOISE1 ||
 						W3DShaderManager::getCurrentShader() == W3DShaderManager::ST_FLAT_TERRAIN_BASE_NOISE12);
-	if (doNoise1) {	 // Cloud pass.
+	if (doNoise1) {
+		// Cloud pass.
 		D3DMATRIX curView;
 		DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, curView);
 

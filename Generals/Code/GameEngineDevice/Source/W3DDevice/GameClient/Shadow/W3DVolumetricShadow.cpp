@@ -299,7 +299,8 @@ public:
 	void buildPolygonNormals()
 	{
 		if (!m_polygonNormals)
-		{	//need to allocate storage
+		{
+			//need to allocate storage
 			Vector3 *tempVec = NEW Vector3[m_numPolygons];
 			for (int i=0; i<m_numPolygons; i++)
 			{
@@ -538,7 +539,8 @@ void W3DVolumetricShadowManager::loadTerrainShadows()
 			hm_mesh->setPatchSize(patchSize);
 
 			if(isPatchShadowed(hm_mesh))
-			{	//some polygons in this patch cast shadows, need to generate a mesh
+			{
+				//some polygons in this patch cast shadows, need to generate a mesh
 				hm_mesh->buildPolygonNeighbors();
 				numTerrainMeshes++;
 			}
@@ -648,7 +650,8 @@ Int W3DShadowGeometry::initFromHLOD(RenderObjClass *robj)
 				{
 					Vector3 len(*v_curr - geomMesh->m_verts[k]);
 					if (len.Length2() == 0)
-					{	//found duplicate vertex
+					{
+						//found duplicate vertex
 						vertParent[k]=j;
 						newVertexCount--;	//decrease total vertices since duplicate found.
 					}
@@ -716,7 +719,8 @@ Int W3DShadowGeometry::initFromMesh(RenderObjClass *robj)
 		{
 			Vector3 len(*v_curr - geomMesh->m_verts[k]);
 			if (len.Length2() == 0)
-			{	//found duplicate vertex
+			{
+				//found duplicate vertex
 				vertParent[k]=j;
 				newVertexCount--;	//decrease total vertices since duplicate found.
 			}
@@ -903,7 +907,8 @@ void W3DShadowGeometryMesh::buildPolygonNeighbors()
 							index1Pos[1]=b;
 						}
 						else if( index2 == -1 )
-						{	//Check direction of edge in each polygon.  If they are same direction skip it.
+						{
+							//Check direction of edge in each polygon.  If they are same direction skip it.
 							diff1 = a-index1Pos[0];
 							diff2 = b-index1Pos[1];
 							if ( ((diff1&0x80000000)^((abs(diff1)&2)<<30)) != ((diff2&0x80000000)^((abs(diff2)&2)<<30)))
@@ -921,7 +926,8 @@ void W3DShadowGeometryMesh::buildPolygonNeighbors()
 								continue;
 						}
 						else
-						{//This is the same poly facing opposite direction.	//assert( 0 );  // should never match 3 vertices!
+						{
+							//This is the same poly facing opposite direction.	//assert( 0 );  // should never match 3 vertices!
 							index1=index2=-1;
 							continue;
 						}
@@ -1045,12 +1051,14 @@ void W3DVolumetricShadow::updateOptimalExtrusionPadding()
 		// check if object has a limit/clamp on shadow length and adjust light
 		// position of necessary.
 		if (m_shadowLengthScale)
-		{	//Find light's distance from origin in xy plane
+		{
+			//Find light's distance from origin in xy plane
 			Real lightXYDistance = sqrt(lightPosWorld.X*lightPosWorld.X + lightPosWorld.Y * lightPosWorld.Y);
 			Real newZ=lightXYDistance*m_shadowLengthScale;
 
 			if (newZ > lightPosWorld.Z)
-			{	//clamped z component is higher than actual light position allows so adjust it.
+			{
+				//clamped z component is higher than actual light position allows so adjust it.
 				lightPosWorld.Z = newZ;
 			}
 		}
@@ -1094,7 +1102,8 @@ void W3DVolumetricShadow::updateOptimalExtrusionPadding()
 
 			//find out where this ray intersects terrain.
 			if (TheTerrainRenderObject->Cast_Ray(raytest) && !raytest.Result->StartBad)
-			{	//Found intersection point where shadow has its maximum length.  Do a quick
+			{
+				//Found intersection point where shadow has its maximum length.  Do a quick
 				//search to see if terrain falls significantly below the height of the object
 				//anywhere between the base and the intersection point.  If so, we either need
 				//to extend shadow extrusion or make the light angle more vertical.
@@ -1306,7 +1315,8 @@ void W3DVolumetricShadow::RenderDynamicMeshVolume(Int meshIndex, Int lightIndex,
 
 
 	if (nShadowVertsInBuf > (SHADOW_VERTEX_SIZE-numVerts))	//check if room for model verts
-	{	//flush the buffer by drawing the contents and re-locking again
+	{
+		//flush the buffer by drawing the contents and re-locking again
 		if (shadowVertexBufferD3D->Lock(0,numVerts*sizeof(SHADOW_DYNAMIC_VOLUME_VERTEX),(DX8LockPointer)&pvVertices,D3DLOCK_DISCARD) != D3D_OK)
 			return;
 		nShadowVertsInBuf=0;
@@ -1336,7 +1346,8 @@ void W3DVolumetricShadow::RenderDynamicMeshVolume(Int meshIndex, Int lightIndex,
 	shadowVertexBufferD3D->Unlock();
 
 	if (nShadowIndicesInBuf > (SHADOW_INDEX_SIZE-numIndex))	//check if room for model verts
-	{	//flush the buffer by drawing the contents and re-locking again
+	{
+		//flush the buffer by drawing the contents and re-locking again
 		if (shadowIndexBufferD3D->Lock(0,numIndex*sizeof(short),(DX8LockPointer)&pvIndices,D3DLOCK_DISCARD) != D3D_OK)
 			return;
 		nShadowIndicesInBuf=0;
@@ -1456,7 +1467,8 @@ void W3DVolumetricShadow::RenderMeshVolumeBounds(Int meshIndex, Int lightIndex, 
 
 
 	if (nShadowVertsInBuf > (SHADOW_VERTEX_SIZE-numVerts))	//check if room for model verts
-	{	//flush the buffer by drawing the contents and re-locking again
+	{
+		//flush the buffer by drawing the contents and re-locking again
 		if (shadowVertexBufferD3D->Lock(0,numVerts*sizeof(SHADOW_DYNAMIC_VOLUME_VERTEX),(DX8LockPointer)&pvVertices,D3DLOCK_DISCARD) != D3D_OK)
 			return;
 		nShadowVertsInBuf=0;
@@ -1483,7 +1495,8 @@ void W3DVolumetricShadow::RenderMeshVolumeBounds(Int meshIndex, Int lightIndex, 
 	shadowVertexBufferD3D->Unlock();
 
 	if (nShadowIndicesInBuf > (SHADOW_INDEX_SIZE-numIndex))	//check if room for model verts
-	{	//flush the buffer by drawing the contents and re-locking again
+	{
+		//flush the buffer by drawing the contents and re-locking again
 		if (shadowIndexBufferD3D->Lock(0,numIndex*sizeof(short),(DX8LockPointer)&pvIndices,D3DLOCK_DISCARD) != D3D_OK)
 			return;
 		nShadowIndicesInBuf=0;
@@ -1667,7 +1680,8 @@ void W3DVolumetricShadow::Update()
 	{
 		pos=m_robj->Get_Position();
 		if (pos == originCompareVector)
-		{	//the transform on this object was never set so we can't make any determination
+		{
+			//the transform on this object was never set so we can't make any determination
 			//if it's visible or what the shadow looks like.
 			return;
 		}
@@ -1694,7 +1708,8 @@ void W3DVolumetricShadow::Update()
    			updateVolumes(fabs(pos.Z - TheTerrainRenderObject->getMinHeight()) + SHADOW_EXTRUSION_BUFFER);
    		}
    		else
- 		{	//normal object that is not floating above ground so we don't need to extend the shadow lower than the object's
+ 		{
+			//normal object that is not floating above ground so we don't need to extend the shadow lower than the object's
 			//base since it should be sitting directly at ground level.
 
  			if (WWMath::Fabsf_Legacy(pos.X - bcX) > (beX + m_robjExtent) ||
@@ -1760,10 +1775,12 @@ void W3DVolumetricShadow::updateVolumes(Real zoffset)
 				if (m_shadowVolume[i][j])
 				{
 					if(m_shadowVolume[i][j]->getVisibleState() ==	Geometry::STATE_UNKNOWN)
-					{	//Updating the mesh volume didn't update the visibility, must do it here.
+					{
+						//Updating the mesh volume didn't update the visibility, must do it here.
 						//First check against bounding sphere
 						if (parentVis)
- 						{ //parent is visible so most likely all sub_objects are also visible so probably all shadows also visible.
+ 						{
+ 						  //parent is visible so most likely all sub_objects are also visible so probably all shadows also visible.
  						  //skip additional visibility tests
  							m_shadowVolume[i][j]->setVisibleState(Geometry::STATE_VISIBLE);
  						}
@@ -1772,7 +1789,8 @@ void W3DVolumetricShadow::updateVolumes(Real zoffset)
 							sphere.Center += mesh->Get_Transform().Get_Translation();
 							CollisionMath::OverlapType result=CollisionMath::Overlap_Test(*shadowCameraFrustum,sphere);
 							if (result == CollisionMath::OVERLAPPED)
-							{	//do a more accurate test against bounding box.
+							{
+								//do a more accurate test against bounding box.
 								aaBox=m_shadowVolume[i][j]->getBoundingBox();
 								aaBox.Translate(mesh->Get_Transform().Get_Translation());	//translate bounding box to world space.
 								if (CollisionMath::Overlap_Test(*shadowCameraFrustum,aaBox) != CollisionMath::OUTSIDE)
@@ -1785,10 +1803,12 @@ void W3DVolumetricShadow::updateVolumes(Real zoffset)
 						}
 					}
 					if (m_shadowVolume[i][j]->getVisibleState() ==	Geometry::STATE_VISIBLE)
-					{	//shadow volume is visible.  Add it to list of rendertasks.
+					{
+						//shadow volume is visible.  Add it to list of rendertasks.
 						W3DBufferManager::W3DVertexBufferSlot *vbSlot=m_shadowVolumeVB[i][j];
 						if (vbSlot)
-						{	//add to static mesh volume list.
+						{
+							//add to static mesh volume list.
 							W3DBufferManager::W3DRenderTask *oldTask=vbSlot->m_VB->m_renderTaskList;
 							vbSlot->m_VB->m_renderTaskList=&m_shadowVolumeRenderTask[i][j];
 							vbSlot->m_VB->m_renderTaskList->m_nextTask=oldTask;
@@ -1862,18 +1882,21 @@ void W3DVolumetricShadow::updateMeshVolume(Int meshIndex, Int lightIndex, const 
 	// check if object has a limit/clamp on shadow length and adjust light
 	// position of necessary.
 	if (m_shadowLengthScale)
-	{	//Find light's distance from origin in xy plane
+	{
+		//Find light's distance from origin in xy plane
 		Real lightXYDistance = sqrt(lightPosWorld.X*lightPosWorld.X + lightPosWorld.Y * lightPosWorld.Y);
 		Real newZ=lightXYDistance*m_shadowLengthScale;
 
 		if (newZ > lightPosWorld.Z)
-		{	//clamped z component is higher than actual light position allows so adjust it.
+		{
+			//clamped z component is higher than actual light position allows so adjust it.
 			lightPosWorld.Z = newZ;
 		}
 	}
 
 	if (lightPosWorld != m_lightPosHistory[ lightIndex ][meshIndex])
-	{	//Light position has moved, see if enough to matter
+	{
+		//Light position has moved, see if enough to matter
 
 		// compute vector from the light to the current object position
 		toLight = objectCenter - lightPosWorld;
@@ -1978,7 +2001,8 @@ void W3DVolumetricShadow::updateMeshVolume(Int meshIndex, Int lightIndex, const 
 			//
 
 			if (m_numSilhouetteIndices[meshIndex] != 0)
-			{	//this silhouette was built before and is being updated.
+			{
+				//this silhouette was built before and is being updated.
 				//this probably means it will change again in the future.
 				//make future updates faster by pre-caching face normals.
 				m_geometry->getMesh(meshIndex)->buildPolygonNormals();
@@ -1993,12 +2017,14 @@ void W3DVolumetricShadow::updateMeshVolume(Int meshIndex, Int lightIndex, const 
 			if (!m_shadowVolume[ lightIndex ][meshIndex])
 				allocateShadowVolume( lightIndex,meshIndex );
 			if( m_shadowVolumeVB[ lightIndex ][meshIndex] )
-			{	//Updating an existing vertex buffer shadow volume.  This means we're
+			{
+				//Updating an existing vertex buffer shadow volume.  This means we're
 				//probably dealing with an animated mesh.  Update flags to reflect this fact.
 				if (isMeshRotating || isLightMoving)
 				{
 					if (isMeshRotating)
-					{	//rotating meshes will most likely need updates each frame, so stop using static vertex buffers.
+					{
+						//rotating meshes will most likely need updates each frame, so stop using static vertex buffers.
 						m_shadowVolume[ lightIndex ][meshIndex]->SetFlags(
 							m_shadowVolume[ lightIndex ][meshIndex]->GetFlags() | SHADOW_DYNAMIC);
 					}
@@ -2033,7 +2059,8 @@ void W3DVolumetricShadow::updateMeshVolume(Int meshIndex, Int lightIndex, const 
 		}
 		else
 		if (m_shadowVolume[ lightIndex ][meshIndex])
-		{	//outside view frustum, shadow wasn't updated.
+		{
+			//outside view frustum, shadow wasn't updated.
 			box.Translate(-objectCenter);	//translate box to object space.
 			m_shadowVolume[ lightIndex ][meshIndex]->setBoundingBox(box);
 			sphere.Center -= objectCenter;
@@ -2042,7 +2069,8 @@ void W3DVolumetricShadow::updateMeshVolume(Int meshIndex, Int lightIndex, const 
 		}
 	}
 	else
-	{	//not reconstructing volume, so don't know if visible or not.
+	{
+		//not reconstructing volume, so don't know if visible or not.
 		if (m_shadowVolume[ lightIndex ][meshIndex])
 			m_shadowVolume[ lightIndex ][meshIndex]->setVisibleState(Geometry::STATE_UNKNOWN);
 	}
@@ -2490,7 +2518,8 @@ void W3DVolumetricShadow::constructVolume( Vector3 *lightPosObject,Real shadowEx
 		//in index list.  Rendering edges back-to-back improves vertex cache usage.
 		for (k=i+2; k<indicesPerMesh; k+=2)
 			if (silhouetteIndices[k]==currentEdgeEnd)
-			{	//swap the two edges
+			{
+				//swap the two edges
 				Int tempIndex=*(Int *)(&silhouetteIndices[i+2]);
 				*(Int *)&silhouetteIndices[i+2]=*(Int *)&silhouetteIndices[k];
 				*(Int *)&silhouetteIndices[k]=tempIndex;
@@ -2498,10 +2527,12 @@ void W3DVolumetricShadow::constructVolume( Vector3 *lightPosObject,Real shadowEx
 			}
 
 		if (k >= indicesPerMesh)
-		{	//reached end of strip. Insert final edge.
+		{
+			//reached end of strip. Insert final edge.
 			//Check if last edge wraps around to start.
 			if (currentEdgeEnd == stripStartIndex)
-			{	//add end of strip that wraps around to start (forming closed cylinder/shape)
+			{
+				//add end of strip that wraps around to start (forming closed cylinder/shape)
 				//
 				// add the polygon consisting of the two edge vertices and the
 				// first extruded point
@@ -2517,7 +2548,8 @@ void W3DVolumetricShadow::constructVolume( Vector3 *lightPosObject,Real shadowEx
 				shadowVolume->SetPolygonIndex( polygonCount + 1, indexList, 3 );
 			}
 			else
-			{	//add end of strip.  Finishes the last 2 polygons.
+			{
+				//add end of strip.  Finishes the last 2 polygons.
 				geomMesh->GetVertex( currentEdgeEnd, &edgeVertex2 );
 				shadowVolume->SetVertex( vertexCount, &edgeVertex2 );
 
@@ -2548,7 +2580,8 @@ void W3DVolumetricShadow::constructVolume( Vector3 *lightPosObject,Real shadowEx
 			}
 
 			if ((i+2) >= indicesPerMesh)
-			{	//finished with all silhouette edges
+			{
+				//finished with all silhouette edges
 				polygonCount += 2;
 #ifdef RECORD_SHADOW_STRIP_STATS
 				numStrips++;
@@ -2581,7 +2614,8 @@ void W3DVolumetricShadow::constructVolume( Vector3 *lightPosObject,Real shadowEx
 			continue;
 		}
 		else
-		{	//continue existing strip by adding extra vertex and extrusion
+		{
+			//continue existing strip by adding extra vertex and extrusion
 
 			geomMesh->GetVertex( currentEdgeEnd, &edgeVertex2 );
 			shadowVolume->SetVertex( vertexCount, &edgeVertex2 );
@@ -2718,7 +2752,8 @@ void W3DVolumetricShadow::constructVolumeVB( Vector3 *lightPosObject,Real shadow
 			//in index list.  Rendering edges back-to-back improves vertex cache usage.
 			for (k=i+2; k<indicesPerMesh; k+=2)
 				if (silhouetteIndices[k]==currentEdgeEnd)
-				{	//swap the two edges
+				{
+					//swap the two edges
 					Int tempIndex=*(Int *)(&silhouetteIndices[i+2]);
 					*(Int *)&silhouetteIndices[i+2]=*(Int *)&silhouetteIndices[k];
 					*(Int *)&silhouetteIndices[k]=tempIndex;
@@ -2726,24 +2761,28 @@ void W3DVolumetricShadow::constructVolumeVB( Vector3 *lightPosObject,Real shadow
 				}
 
 			if (k >= indicesPerMesh)
-			{	//reached end of strip. Insert final edge.
+			{
+				//reached end of strip. Insert final edge.
 				//Check if last edge wraps around to start.
 				if (currentEdgeEnd == stripStartIndex)
-				{	//add end of strip that wraps around to start (forming closed cylinder/shape)
+				{
+					//add end of strip that wraps around to start (forming closed cylinder/shape)
 					//
 					// add the polygon consisting of the two edge vertices and the
 					// first extruded point
 					//
 				}
 				else
-				{	//add end of strip.  Finishes the last 2 polygons.
+				{
+					//add end of strip.  Finishes the last 2 polygons.
 					lastEdgeVertex2Index=vertexCount;
 					lastExtrude2Index=vertexCount+1;
 					vertexCount += 2;
 				}
 
 				if ((i+2) >= indicesPerMesh)
-				{	//finished with all silhouette edges
+				{
+					//finished with all silhouette edges
 					polygonCount += 2;
 	#ifdef RECORD_SHADOW_STRIP_STATS
 					numStrips++;
@@ -2767,7 +2806,8 @@ void W3DVolumetricShadow::constructVolumeVB( Vector3 *lightPosObject,Real shadow
 				continue;
 			}
 			else
-			{	//continue existing strip by adding extra vertex and extrusion
+			{
+				//continue existing strip by adding extra vertex and extrusion
 
 				lastEdgeVertex2Index=vertexCount;
 				lastExtrude2Index=vertexCount+1;
@@ -2806,7 +2846,8 @@ void W3DVolumetricShadow::constructVolumeVB( Vector3 *lightPosObject,Real shadow
 	}
 
 	if (!ibSlot || !vbSlot)
-	{	//could not allocate storage to hold buffers
+	{
+		//could not allocate storage to hold buffers
 		if (ibSlot)
 			TheW3DBufferManager->releaseSlot(ibSlot);
 		if (vbSlot)
@@ -2864,10 +2905,12 @@ void W3DVolumetricShadow::constructVolumeVB( Vector3 *lightPosObject,Real shadow
 		//Check if another edge is connected to this one, edges were sorted in initial
 		//pass so only need to check the next one.
 		if (((i+2) >= indicesPerMesh) || silhouetteIndices[i+2] != currentEdgeEnd)
-		{	//reached end of strip. Insert final edge.
+		{
+			//reached end of strip. Insert final edge.
 			//Check if last edge wraps around to start.
 			if (currentEdgeEnd == stripStartIndex)
-			{	//add end of strip that wraps around to start (forming closed cylinder/shape)
+			{
+				//add end of strip that wraps around to start (forming closed cylinder/shape)
 				//
 				// add the polygon consisting of the two edge vertices and the
 				// first extruded point
@@ -2879,7 +2922,8 @@ void W3DVolumetricShadow::constructVolumeVB( Vector3 *lightPosObject,Real shadow
 				ib += 6;	//skip past 2 triangles just added.
 			}
 			else
-			{	//add end of strip.  Finishes the last 2 polygons.
+			{
+				//add end of strip.  Finishes the last 2 polygons.
 				geomMesh->GetVertex( currentEdgeEnd, &edgeVertex2 );
 				*vb++ = *(VertexFormatXYZ *)&edgeVertex2;
 
@@ -2906,7 +2950,8 @@ void W3DVolumetricShadow::constructVolumeVB( Vector3 *lightPosObject,Real shadow
 			}
 
 			if ((i+2) >= indicesPerMesh)
-			{	//finished with all silhouette edges
+			{
+				//finished with all silhouette edges
 				polygonCount += 2;
 				break;	//reached end of all edges
 			}
@@ -2932,7 +2977,8 @@ void W3DVolumetricShadow::constructVolumeVB( Vector3 *lightPosObject,Real shadow
 			continue;
 		}
 		else
-		{	//continue existing strip by adding extra vertex and extrusion
+		{
+			//continue existing strip by adding extra vertex and extrusion
 
 			geomMesh->GetVertex( currentEdgeEnd, &edgeVertex2 );
 			*vb++ = *(VertexFormatXYZ *)&edgeVertex2;
@@ -3331,7 +3377,8 @@ void W3DVolumetricShadowManager::renderShadows( Bool forceStencilFill )
 			DX8Wrapper::Set_DX8_Render_State(D3DRS_COLORWRITEENABLE,0);
 		}
 		else
-		{	//device does not support disabling writes to color buffer so fake it through alpha blending
+		{
+			//device does not support disabling writes to color buffer so fake it through alpha blending
 			m_pDev->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_ZERO );
 			m_pDev->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_ONE );
 			m_pDev->SetRenderState(D3DRS_ALPHABLENDENABLE , TRUE);
@@ -3376,7 +3423,8 @@ void W3DVolumetricShadowManager::renderShadows( Bool forceStencilFill )
 				shadow->Update();
 				shadowDynamicTask=m_dynamicShadowVolumesToRender;
 				while (shadowDynamicTask != shadowDynamicTasksStart)
-				{	//update() added a dynamic shadow
+				{
+					//update() added a dynamic shadow
 					//dynamic shadow columns don't need to wait in queue since they
 					//all use the same vertex buffer.  Flush them ASAP.
 					shadow->RenderVolume(shadowDynamicTask->m_meshIndex,shadowDynamicTask->m_lightIndex);
@@ -3428,7 +3476,8 @@ void W3DVolumetricShadowManager::renderShadows( Bool forceStencilFill )
 		//flush any dynamic shadow volumes
 		shadowDynamicTask=m_dynamicShadowVolumesToRender;
 		while (shadowDynamicTask)
-		{	//dynamic shadow columes don't need to wait in queue since they
+		{
+			//dynamic shadow columes don't need to wait in queue since they
 			//all use the same vertex buffer.  Flush them ASAP.
 			shadowDynamicTask->m_parentShadow->RenderVolume(shadowDynamicTask->m_meshIndex,shadowDynamicTask->m_lightIndex);
 			shadowDynamicTask=(W3DVolumetricShadowRenderTask *)shadowDynamicTask->m_nextTask;
@@ -3464,7 +3513,8 @@ void W3DVolumetricShadowManager::renderShadows( Bool forceStencilFill )
 	}
 	else
 	if (forceStencilFill)
-	{	//no shadows to render, but still need to fill stencil buffer
+	{
+		//no shadows to render, but still need to fill stencil buffer
 		//for other effects.
 
 		//Set W3D to some known state
@@ -3605,7 +3655,8 @@ Bool W3DVolumetricShadowManager::ReAcquireResources()
 		return FALSE;
 
 	if (shadowVertexBufferD3D == nullptr)
-	{	// Create vertex buffer
+	{
+		// Create vertex buffer
 
 		if (FAILED(DX8_CREATE_VERTEX_BUFFER(m_pDev, 
 			SHADOW_VERTEX_SIZE*sizeof(SHADOW_DYNAMIC_VOLUME_VERTEX),
@@ -3665,7 +3716,8 @@ W3DVolumetricShadow* W3DVolumetricShadowManager::addShadow(RenderObjClass *robj,
 	sg=m_W3DShadowGeometryManager->Get_Geom(name);
 
 	if (sg==nullptr)
-	{	//did not find a cached copy of the shadow geometry, create a new one
+	{
+		//did not find a cached copy of the shadow geometry, create a new one
 		m_W3DShadowGeometryManager->Load_Geom(robj,name);
 		//try loading again
 		sg=m_W3DShadowGeometryManager->Get_Geom(name);
@@ -3687,7 +3739,8 @@ W3DVolumetricShadow* W3DVolumetricShadowManager::addShadow(RenderObjClass *robj,
 
 	Real sunElevationAngleTan = 0;
 	if (shadowInfo->m_sizeX)
-	{	//need to adjust sun elevation for this model in order to limit shadow length
+	{
+		//need to adjust sun elevation for this model in order to limit shadow length
 		sunElevationAngleTan=tan(shadowInfo->m_sizeX/180.0f*PI);
 	}
 	shadow->setShadowLengthScale(sunElevationAngleTan);
@@ -3868,12 +3921,14 @@ int W3DShadowGeometryManager::Load_Geom(RenderObjClass *robj, const char *name)
 	};
 
 	if (res != TRUE)
-	{	// load failed!
+	{
+		// load failed!
 		newgeom->Release_Ref();
 		//DEBUG_LOG(("****Shadow Volume Creation Failed on %s",name));
 		goto Error;
 	} else if (Peek_Geom(newgeom->Get_Name()) != nullptr)
-	{	// duplicate exists!
+	{
+		// duplicate exists!
 		newgeom->Release_Ref();	// Release the one we just loaded
 		goto Error;
 	} else

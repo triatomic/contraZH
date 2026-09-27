@@ -5630,7 +5630,8 @@ StateReturnType AIAttackAimAtTargetState::onEnter()
 	ContainModuleInterface *contain = containedBy ? containedBy->getContain() : nullptr;
 
 	if( containedBy && weapon && contain && contain->isEnclosingContainerFor( source ) )
-	{                                          // non enclosing garrison containers do not use firepoints. Lorenzen, 6/11/03
+	{
+		// non enclosing garrison containers do not use firepoints. Lorenzen, 6/11/03
 		if (victim)
 		{
 			inFiringRange = contain->attemptBestFirePointPosition( source, weapon, victim );

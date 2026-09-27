@@ -2445,7 +2445,8 @@ void AIPlayer::doBaseBuilding()
 			if (m_readyToBuildStructure) {
 				processBaseBuilding();
 			}
-			if (m_buildDelay<1) {	// processBaseBuilding may reset m_buildDelay.
+			if (m_buildDelay<1) {
+				// processBaseBuilding may reset m_buildDelay.
 				m_buildDelay = 2*LOGICFRAMES_PER_SECOND; // check again in 2 seconds.
 			}
 			// Note that this timer gets shortcut when a building is completed.
@@ -2460,7 +2461,8 @@ void AIPlayer::doBaseBuilding()
 void AIPlayer::checkReadyTeams()
 {
 	// See if any ready teams are gathered at their rally point
-	{	// needed to scope iter.  silly ms c++.
+	{
+		// needed to scope iter.  silly ms c++.
 		for ( DLINK_ITERATOR<TeamInQueue> iter = iterate_TeamReadyQueue(); !iter.done(); iter.advance())
 		{
 			TeamInQueue *team = iter.cur();
@@ -2541,7 +2543,8 @@ void AIPlayer::checkReadyTeams()
 void AIPlayer::checkQueuedTeams()
 {
 	// See if any teams are expired.
-	{	// needed to scope iter.  silly ms c++.
+	{
+		// needed to scope iter.  silly ms c++.
 		for ( DLINK_ITERATOR<TeamInQueue> iter = iterate_TeamBuildQueue(); !iter.done(); iter.advance())
 		{
 			TeamInQueue *team = iter.cur();
@@ -2570,7 +2573,8 @@ void AIPlayer::checkQueuedTeams()
 	}
 
 	// See if any teams are ready.
-	{	// needed to scope iter.  silly ms c++.
+	{
+		// needed to scope iter.  silly ms c++.
 		for ( DLINK_ITERATOR<TeamInQueue> iter = iterate_TeamBuildQueue(); !iter.done(); iter.advance())
 		{
 			TeamInQueue *team = iter.cur();
@@ -2839,7 +2843,8 @@ void AIPlayer::computeCenterAndRadiusOfBase(Coord3D *center, Real *radius)
  */
 Bool AIPlayer::dozerInQueue()
 {
-	{	// needed to scope iter.  silly ms c++.
+	{
+		// needed to scope iter.  silly ms c++.
 		for ( DLINK_ITERATOR<TeamInQueue> iter = iterate_TeamBuildQueue(); !iter.done(); iter.advance())
 		{
 			TeamInQueue *team = iter.cur();
