@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "Lib/BaseDefines.h"
 #include "Lib/BaseTypeCore.h"
 #include "Lib/trig.h"
 
@@ -228,7 +229,7 @@ __forceinline float fast_float_ceil(float f)
 #define INT_TO_REAL(x)						((Real)(x))
 
 // once we've ceiled/floored, trunc and round are identical, and currently, round is faster... (srj)
-#if RTS_GENERALS /*&& RETAIL_COMPATIBLE_CRC*/
+#if RTS_GENERALS && RETAIL_COMPATIBLE_CRC
 #define REAL_TO_INT_CEIL(x)				(fast_float2long_round(ceilf(x)))
 #define REAL_TO_INT_FLOOR(x)			(fast_float2long_round(floorf(x)))
 #else
@@ -354,7 +355,7 @@ inline Coord2D operator-( const Coord2D &a, const Coord2D &b )
 
 inline Real Coord2D::toAngle() const
 {
-#if RTS_GENERALS /*&& RETAIL_COMPATIBLE_CRC*/
+#if RTS_GENERALS && RETAIL_COMPATIBLE_CRC
 	Coord2D vector;
 
 	vector.x = x;
