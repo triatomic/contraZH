@@ -23,8 +23,6 @@ set(LIBRARIES_INCLUDE_SRC
     Precompiled/Precompiled/BaseTypes.h
 )
 
-## core_libraries
-
 add_library(core_libraries INTERFACE)
 
 target_include_directories(core_libraries INTERFACE
