@@ -179,7 +179,7 @@ public:
       { "RequiredTargetKindOf",       KindOfMaskType::parseFromINI,			nullptr, offsetof( SpecialAbilityUpdateModuleData, m_requiredTargetKindOf ) },
       { "ForbiddenTargetKindOf",      KindOfMaskType::parseFromINI,			nullptr, offsetof( SpecialAbilityUpdateModuleData, m_forbiddenTargetKindOf ) },
       { "TargetRelationship",         INI::parseBitString32,						TheWeaponAffectsMaskNames, offsetof( SpecialAbilityUpdateModuleData, m_targetRelationship ) },
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
     p.add(dataFieldParse);
 	}
