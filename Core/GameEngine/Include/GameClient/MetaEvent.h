@@ -63,6 +63,7 @@ static const LookupListRec CategoryListName[] =
 #endif
 	{ nullptr, 0}
 };
+static_assert(ARRAY_SIZE(CategoryListName) == CATEGORY_NUM_CATEGORIES + 1, "Incorrect array size");
 
 
 // -------------------------------------------------------------------------------

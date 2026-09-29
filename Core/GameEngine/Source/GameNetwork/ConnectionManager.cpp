@@ -120,7 +120,7 @@ struct TransferFileRule
 	UnsignedInt maxSize;
 };
 
-static const TransferFileRule transferFileRules[TransferFileType_Count] =
+static const TransferFileRule transferFileRules[] =
 {
 	{ ".map", 5 * 1024 * 1024 },
 	{ ".ini", 2 * 1024 * 1024 },
@@ -129,6 +129,7 @@ static const TransferFileRule transferFileRules[TransferFileType_Count] =
 	{ ".tga", 2 * 1024 * 1024 },
 	{ ".wak", 128 * 1024 },
 };
+static_assert(ARRAY_SIZE(transferFileRules) == TransferFileType_Count, "Incorrect array size");
 
 static TransferFileType getTransferFileType(const char* extension)
 {
