@@ -3267,6 +3267,9 @@ void *AudioFileCache::openFile( AudioEventRTS *eventToOpenFrom )
 
 	UnsignedInt fileSize = file->size();
 	char* buffer = file->readEntireAndClose();
+	if (buffer == nullptr) {
+		return nullptr;
+	}
 
 	OpenAudioFile openedAudioFile;
 	openedAudioFile.m_eventInfo = eventToOpenFrom->getAudioEventInfo();
