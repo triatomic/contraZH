@@ -763,7 +763,9 @@ enum DebrisDisposition CPP_11(: Int)
 	FLOATING								= 0x00000040,
 	INHERIT_VELOCITY				= 0x00000080,
 	WHIRLING								= 0x00000100,
-	ALIGN_Z_UP							= 0x00000200
+	ALIGN_Z_UP							= 0x00000200,
+
+	DEBRIS_DISPOSITION_END // keep after the last named flag
 };
 
 static const char* const DebrisDispositionNames[] =
@@ -780,6 +782,7 @@ static const char* const DebrisDispositionNames[] =
 	"ALIGN_Z_UP",
 	nullptr
 };
+static_assert(equalsEnumBitFlagsCount(ARRAY_SIZE(DebrisDispositionNames) - 1, DEBRIS_DISPOSITION_END), "Incorrect array size");
 
 std::vector<AsciiString>	debrisModelNamesGlobalHack;
 

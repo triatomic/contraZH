@@ -106,3 +106,20 @@ __forceinline float fast_float_ceil(float f)
 inline Real nmod(Real x, Real y) {
     return fmod(fmod(x, y) + y, y);
 }
+
+//-------------------------------------------------------------------------------------------------
+// Checking whether a size matches the bit flags count from an enum definition:
+// enum MyEnum
+// {
+//   MyEnumValue1 = 1<<0,
+//   MyEnumValue2 = 1<<1,
+//   MyEnumValue3 = 1<<2,
+//   MyEnumEnd
+// }
+// static_assert(equalsEnumBitFlagsCount(3, MyEnumEnd), "Incorrect size");
+//
+template <typename EnumType>
+constexpr inline Bool equalsEnumBitFlagsCount(size_t expectedSize, EnumType bitFlagsEnd)
+{
+	return 1 << (expectedSize - 1) == static_cast<size_t>(bitFlagsEnd) - 1;
+}

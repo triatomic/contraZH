@@ -153,7 +153,6 @@ enum WinInputReturnCode CPP_11(: Int)
 enum
 {
 
-	// when you edit this, remember to edit WindowStatusNames[]
 	WIN_STATUS_NONE								= 0x00000000,		// No status bits set at all
 	WIN_STATUS_ACTIVE							= 0x00000001,		// At the top of the window list
 	WIN_STATUS_TOGGLE							= 0x00000002,		// If set, click to toggle
@@ -181,12 +180,14 @@ enum
 	WIN_STATUS_FLASHING						= 0x00800000,   // Used for buttons that do cameo flashes.
 	WIN_STATUS_ALWAYS_COLOR				= 0x01000000,		// Never render these buttons using greyscale renderer when button disabled.
 	WIN_STATUS_ON_MOUSE_DOWN			= 0x02000000,		// Pushbutton triggers on mouse down.
+
+	WIN_STATUS_END, // keep after the last named flag
+
+	// Code only flags without a name in WindowStatusNames[]
 	WIN_STATUS_SHORTCUT_BUTTON		= 0x04000000,   // Oh god... this is a total hack for shortcut buttons to handle rendering text top left corner...
 	WIN_STATUS_COUNT_BADGE				= 0x08000000,		// TheSuperHackers @feature Push button text drawn bottom right on a plate, code only like SHORTCUT_BUTTON
 	WIN_STATUS_RIGHT_CLICK_ON_PRESS	= 0x10000000,		// Push button sends GBM_SELECTED_RIGHT on the right press, even while disabled, code only like SHORTCUT_BUTTON
 	WIN_STATUS_COUNT_FOOTER				= 0x20000000,		// TheSuperHackers @feature Push button text drawn bottom centre inside the button's frame, code only like SHORTCUT_BUTTON
-	// when you edit this, remember to edit WindowStatusNames[]
-
 };
 
 
