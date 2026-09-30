@@ -2422,16 +2422,44 @@ void AIGroup::groupAttackPosition( const Coord3D *pos, Int maxShotsToFire, Comma
  */
 void AIGroup::groupAttackMoveToPosition( const Coord3D *pos, Int maxShotsToFire, CommandSourceType cmdSource )
 {
+	Coord3D center;
+	Coord2D min;
+	Coord2D max;
+	getMinMaxAndCenter( &min, &max, &center );
+
+	// Ground movers each get their own arrival slot so a big group does not spiral out from one cell
+	std::vector<PathfindSlotRequest> requests;
 	std::list<Object *>::iterator i;
+	for( i = m_memberList.begin(); i != m_memberList.end(); ++i )
+	{
+		AIUpdateInterface *ai = (*i)->getAIUpdateInterface();
+		if (ai == nullptr || (*i)->isDisabledByType( DISABLED_HELD ) || (*i)->isKindOf( KINDOF_IMMOBILE ))
+		{
+			continue;
+		}
+		if (!ai->isDoingGroundMovement())
+		{
+			continue;
+		}
+		TheAI->pathfinder()->removeGoal(*i);
+		addSlotRequest(requests, *i, pos);
+	}
+	if (!Coord3DInsideRect2D( pos, &min, &max ))
+	{
+		TheAI->pathfinder()->assignGroupSlots(requests, pos, &center);
+	}
+
 	for( i = m_memberList.begin(); i != m_memberList.end(); ++i )
 	{
 		AIUpdateInterface *ai = (*i)->getAIUpdateInterface();
 		if (ai)
 		{
+			Coord3D dest = *pos;
+			takeAssignedSlot(requests, *i, &dest);
 			if ((*i)->isAbleToAttack())
-				ai->aiAttackMoveToPosition( pos, maxShotsToFire, cmdSource );
+				ai->aiAttackMoveToPosition( &dest, maxShotsToFire, cmdSource );
 			else
-				ai->aiMoveToPosition( pos, cmdSource );
+				ai->aiMoveToPosition( &dest, cmdSource );
 		}
 	}
 }
