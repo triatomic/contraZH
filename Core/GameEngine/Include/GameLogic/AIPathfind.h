@@ -735,6 +735,7 @@ public:
 	Path *getMoveAwayFromPath(Object *obj, Object *otherObj, Path *pathToAvoid, Object *otherObj2, Path *pathToAvoid2);
 
 	void changeBridgeState( PathfindLayerEnum layer, Bool repaired );
+	void removeBridge( PathfindLayerEnum layer ); ///< Releases the layer of a bridge that is being deleted.
 
 	Bool findBrokenBridge(const LocomotorSet &locomotorSet, const Coord3D *from, const Coord3D *to, ObjectID *bridgeID);
 

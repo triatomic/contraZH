@@ -2147,7 +2147,7 @@ void TerrainLogic::deleteBridge( Bridge *bridge )
 	// delete object associated with bridge if present
 	BridgeInfo bridgeInfo;
 	bridge->getBridgeInfo( &bridgeInfo );
-	TheAI->pathfinder()->changeBridgeState(bridge->getLayer(), false);
+	TheAI->pathfinder()->removeBridge(bridge->getLayer());
 
 	Object *bridgeObj = TheGameLogic->findObjectByID( bridgeInfo.bridgeObjectID );
 	if( bridgeObj )

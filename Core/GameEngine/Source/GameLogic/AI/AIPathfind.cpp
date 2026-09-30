@@ -10333,6 +10333,22 @@ void Pathfinder::changeBridgeState( PathfindLayerEnum layer, Bool repaired)
 	}
 }
 
+/**
+ * Disconnects the ground cells from the bridge, frees its layer cells and drops the Bridge pointer
+ */
+void Pathfinder::removeBridge( PathfindLayerEnum layer )
+{
+	if (layer <= LAYER_GROUND || layer > LAYER_LAST) {
+		return;
+	}
+	if (m_layers[layer].isUnused()) {
+		return;
+	}
+	m_layers[layer].setDestroyed(true);
+	m_layers[layer].reset();
+	m_zoneManager.markZonesDirtyNow();
+}
+
 void Pathfinder::getRadiusAndCenter(const Object *obj, Int &iRadius, Bool &center)
 {
 	if (!obj)
