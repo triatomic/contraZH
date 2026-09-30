@@ -229,10 +229,12 @@ public:
 
 	static PathfindCellInfo * getACellInfo(PathfindCell *cell, const ICoord2D &pos);
 	static void releaseACellInfo(PathfindCellInfo *theInfo);
+	static Int getFreeCount() {return s_freeCount;}
 
 protected:
 	static PathfindCellInfo *s_infoArray;
 	static PathfindCellInfo *s_firstFree;							///<
+	static Int s_freeCount;																	///< Records left in the pool
 
 
 	PathfindCellInfo *m_nextOpen, *m_prevOpen;						///< for A* "open" list, shared by closed list
@@ -736,6 +738,8 @@ public:
 
 	void changeBridgeState( PathfindLayerEnum layer, Bool repaired );
 	void removeBridge( PathfindLayerEnum layer ); ///< Releases the layer of a bridge that is being deleted.
+
+	void logStatsIfDue(); ///< Logs the per-second pathfinder counters.
 
 	Bool findBrokenBridge(const LocomotorSet &locomotorSet, const Coord3D *from, const Coord3D *to, ObjectID *bridgeID);
 

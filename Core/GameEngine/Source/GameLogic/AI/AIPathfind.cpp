@@ -123,6 +123,19 @@ constexpr const UnsignedInt CELL_INFOS_TO_ALLOCATE = 30000;
 // The map holds one PathfindCell per 10x10 world units, so its bitfield packing is what keeps memory in check
 static_assert(sizeof(PathfindCell) == sizeof(void*) + 16, "PathfindCell bitfields no longer pack into 20 bytes");
 
+// Counters behind the once-a-second PFSTAT log line
+struct PathfindStats
+{
+	UnsignedInt droppedQueue;      ///< requests refused by a full queue
+	UnsignedInt hierOk;            ///< coarse searches that found a corridor
+	UnsignedInt hierFail;          ///< coarse searches that failed
+	UnsignedInt cells;             ///< cell records released by searches
+	UnsignedInt maxCellsOneSearch; ///< largest single search
+	UnsignedInt zoneOverflow;      ///< cells that ran past the zone table
+	UnsignedInt rawZoneHighWater;  ///< raw zone count of the last zone calculation
+};
+static PathfindStats s_pathfindStats;
+
 //-----------------------------------------------------------------------------------
 PathNode::PathNode() :
 	m_nextOpti(nullptr),
@@ -1113,6 +1126,7 @@ Real Path::computeFlightDistToGoal( const Coord3D *pos, Coord3D& goalPos )
 
 PathfindCellInfo *PathfindCellInfo::s_infoArray = nullptr;
 PathfindCellInfo *PathfindCellInfo::s_firstFree = nullptr;
+Int PathfindCellInfo::s_freeCount = 0;
 
 #if RETAIL_COMPATIBLE_PATHFINDING
 // TheSuperHackers @info This variable is here so the code will run down the retail compatible path till a failure mode is hit
@@ -1176,6 +1190,7 @@ void PathfindCellInfo::allocateCellInfos()
 		s_infoArray[i].m_pathParent = &s_infoArray[i+1];
 		s_infoArray[i].m_isFree = true;
 	}
+	s_freeCount = CELL_INFOS_TO_ALLOCATE;
 }
 
 /**
@@ -1196,6 +1211,7 @@ void PathfindCellInfo::releaseCellInfos()
 	delete[] s_infoArray;
 	s_infoArray = nullptr;
 	s_firstFree = nullptr;
+	s_freeCount = 0;
 }
 
 /**
@@ -1207,6 +1223,7 @@ PathfindCellInfo *PathfindCellInfo::getACellInfo(PathfindCell *cell,const ICoord
 	if (s_firstFree) {
 		DEBUG_ASSERTCRASH(s_firstFree->m_isFree, ("Should be freed."));
 		s_firstFree = s_firstFree->m_pathParent;
+		s_freeCount--;
 		info->m_isFree = false;  // Just allocated it.
 		info->m_cell = cell;
 		info->m_pos = pos;
@@ -1240,6 +1257,7 @@ void PathfindCellInfo::releaseACellInfo(PathfindCellInfo *theInfo)
 	theInfo->m_pathParent = s_firstFree;
 	s_firstFree = theInfo;
 	s_firstFree->m_isFree = true;
+	s_freeCount++;
 }
 
 //-----------------------------------------------------------------------------------
@@ -2784,6 +2802,7 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 						// Past the table size every new zone shares the last id rather than indexing off the end
 						if (m_maxZone >= maxZones) {
 							m_maxZone = maxZones-1;
+							s_pathfindStats.zoneOverflow++;
 						}
 #endif
 						cell->setZone(m_maxZone);
@@ -2805,6 +2824,7 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 	}
 
 	Int totalZones = m_maxZone;
+	s_pathfindStats.rawZoneHighWater = totalZones;
 
 	// Collapse the zones into a 1,2,3... sequence, removing collapsed zones.
 	m_maxZone = 1;
@@ -5227,6 +5247,10 @@ void Pathfinder::cleanOpenAndClosedLists() {
 #endif
 
 	m_cumulativeCellsAllocated += count;
+	s_pathfindStats.cells += count;
+	if ((UnsignedInt)count > s_pathfindStats.maxCellsOneSearch) {
+		s_pathfindStats.maxCellsOneSearch = count;
+	}
 }
 
 
@@ -6066,6 +6090,7 @@ Bool Pathfinder::queueForPath(ObjectID id)
 	}
 	if (nextSlot==m_queuePRHead) {
 		DEBUG_CRASH(("Ran out of pathfind queue slots."));
+		s_pathfindStats.droppedQueue++;
 		return false;
 	}
 	m_queuedPathfindRequests[m_queuePRTail] = id;
@@ -6333,6 +6358,33 @@ void Pathfinder::processPathfindQueue()
 	doDebugIcons();
 #endif
 
+	logStatsIfDue();
+}
+
+/**
+ * Once a second, log the pathfinder counters when anything happened
+ */
+void Pathfinder::logStatsIfDue()
+{
+#ifdef DEBUG_LOGGING
+	if (TheGameLogic->getFrame() % LOGICFRAMES_PER_SECOND != 0) {
+		return;
+	}
+	Int queued = (m_queuePRTail - m_queuePRHead + PATHFIND_QUEUE_LEN) % PATHFIND_QUEUE_LEN;
+	PathfindStats &stats = s_pathfindStats;
+	if (queued == 0 && stats.droppedQueue == 0 && stats.cells == 0 && stats.hierOk == 0 && stats.hierFail == 0 && stats.zoneOverflow == 0) {
+		return;
+	}
+	DEBUG_LOG(("PFSTAT f=%u queued=%d drop=%u hier=%u/%u cells=%u max=%u free=%d zones=%u/%u",
+		TheGameLogic->getFrame(), queued, stats.droppedQueue, stats.hierOk, stats.hierFail, stats.cells, stats.maxCellsOneSearch,
+		PathfindCellInfo::getFreeCount(), stats.rawZoneHighWater, stats.zoneOverflow));
+	stats.droppedQueue = 0;
+	stats.hierOk = 0;
+	stats.hierFail = 0;
+	stats.cells = 0;
+	stats.maxCellsOneSearch = 0;
+	stats.zoneOverflow = 0;
+#endif
 }
 
 
@@ -8046,7 +8098,9 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 			if (goalBlockNdx.x == -1 || (blockX==goalBlockNdx.x && blockY == goalBlockNdx.y)) {
 				reachedGoal = true;
 			} else {
+#ifdef INTENSE_DEBUG
 				DEBUG_LOG(("Hmm, got match before correct cell."));
+#endif
 			}
 		}
 
@@ -8155,6 +8209,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 			// success - found a path to the goal
 
 			m_isTunneling = false;
+			s_pathfindStats.hierOk++;
 			// construct and return path
 			Path *path =  buildHierarchicalPath( from, goalCell );
 #if defined(RTS_DEBUG)
@@ -8344,6 +8399,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 
 	if (closestOK && closestCell) {
 		m_isTunneling = false;
+		s_pathfindStats.hierOk++;
 		// construct and return path
 		Path *path =  buildHierarchicalPath( from, closestCell );
 
@@ -8400,6 +8456,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 	}
 #endif
 
+	s_pathfindStats.hierFail++;
 	DEBUG_LOG(("%d FindHierarchicalPath failed from (%f,%f) to (%f,%f) --", TheGameLogic->getFrame(), from->x, from->y, to->x, to->y));
 	DEBUG_LOG(("time %f", (::GetTickCount()-startTimeMS)/1000.0f));
 
