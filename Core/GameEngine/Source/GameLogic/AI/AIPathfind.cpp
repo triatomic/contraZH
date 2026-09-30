@@ -5906,6 +5906,7 @@ Bool Pathfinder::adjustToLandingDestination(Object *obj, Coord3D *dest)
 struct SlotCandidate
 {
 	ICoord2D cell;
+	PathfindLayerEnum layer;
 	Int ring;
 	Real projection;
 	Int order;
@@ -5932,11 +5933,7 @@ static Bool slotRequestLess(const PathfindSlotRequest &a, const PathfindSlotRequ
 	return a.obj->getID() < b.obj->getID();
 }
 
-/**
- * Hands each unit of a group its own arrival cell around the click point.
- * Slots fill from the innermost ring outward, far side first, and units take them in the same
- * order along the travel direction, so early arrivals park deepest and later ones stop short of them.
- */
+// Slots fill innermost ring first, far side first, and units take them in the same order, so early arrivals park deepest
 Bool Pathfinder::assignGroupSlots(std::vector<PathfindSlotRequest>& units, const Coord3D *click, const Coord3D *centroid)
 {
 	const Int n = units.size();
@@ -5944,8 +5941,10 @@ Bool Pathfinder::assignGroupSlots(std::vector<PathfindSlotRequest>& units, const
 		return false;
 	}
 
+	// One member stands in for the group in occupancy checks, so enemy claims are ignored and allied ones respected
+	const Object *representative = units[0].obj;
 	Bool isHuman = true;
-	const Player *player = units[0].obj->getControllingPlayer();
+	const Player *player = representative->getControllingPlayer();
 	if (player && player->getPlayerType() == PLAYER_COMPUTER) {
 		isHuman = false;
 	}
@@ -6012,7 +6011,9 @@ Bool Pathfinder::assignGroupSlots(std::vector<PathfindSlotRequest>& units, const
 				if (getClearanceShortage(cell, LOCOMOTORSURFACE_GROUND, maxRadius) > 0) {
 					continue;
 				}
-				if (!checkDestination(nullptr, c.x, c.y, destLayer, maxRadius, maxCenter)) {
+				// Off the deck a bridge-layer lookup falls through to the ground cell, so the slot keeps the cell's own layer
+				PathfindLayerEnum slotLayer = cell->getLayer();
+				if (!checkDestination(representative, c.x, c.y, slotLayer, maxRadius, maxCenter)) {
 					continue;
 				}
 				// Every slot has to sit in the zone of the first one, or units would end up on the far side of a wall
@@ -6024,9 +6025,10 @@ Bool Pathfinder::assignGroupSlots(std::vector<PathfindSlotRequest>& units, const
 					continue;
 				}
 				Coord3D slotPos;
-				adjustCoordToCell(c.x, c.y, maxCenter, slotPos, destLayer);
+				adjustCoordToCell(c.x, c.y, maxCenter, slotPos, slotLayer);
 				SlotCandidate candidate;
 				candidate.cell = c;
+				candidate.layer = slotLayer;
 				candidate.ring = ring;
 				candidate.projection = (slotPos.x - click->x)*dir.x + (slotPos.y - click->y)*dir.y;
 				candidate.order = slots.size();
@@ -6051,8 +6053,8 @@ Bool Pathfinder::assignGroupSlots(std::vector<PathfindSlotRequest>& units, const
 		Int radius;
 		Bool center;
 		getRadiusAndCenter(units[i].obj, radius, center);
-		adjustCoordToCell(slots[i].cell.x, slots[i].cell.y, center, units[i].slot, destLayer);
-		updateGoal(units[i].obj, &units[i].slot, destLayer);
+		adjustCoordToCell(slots[i].cell.x, slots[i].cell.y, center, units[i].slot, slots[i].layer);
+		updateGoal(units[i].obj, &units[i].slot, slots[i].layer);
 		units[i].assigned = true;
 	}
 	return true;

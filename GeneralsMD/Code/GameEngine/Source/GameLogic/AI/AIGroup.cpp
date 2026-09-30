@@ -2457,9 +2457,13 @@ void AIGroup::groupAttackMoveToPosition( const Coord3D *pos, Int maxShotsToFire,
 			Coord3D dest = *pos;
 			takeAssignedSlot(requests, *i, &dest);
 			if ((*i)->isAbleToAttack())
+			{
 				ai->aiAttackMoveToPosition( &dest, maxShotsToFire, cmdSource );
+			}
 			else
+			{
 				ai->aiMoveToPosition( &dest, cmdSource );
+			}
 		}
 	}
 }
