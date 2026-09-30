@@ -555,10 +555,15 @@ void AIGroup::computeIndividualDestination( Coord3D *dest, const Coord3D *groupD
 
 	AIUpdateInterface *ai = obj->getAIUpdateInterface();
 	if (ai && ai->isDoingGroundMovement()) {
+		Bool adjusted;
 		if (isFormation) {
-			TheAI->pathfinder()->adjustDestination(obj, ai->getLocomotorSet(), dest, nullptr);
+			adjusted = TheAI->pathfinder()->adjustDestination(obj, ai->getLocomotorSet(), dest, nullptr);
 		}	else {
-			TheAI->pathfinder()->adjustDestination(obj, ai->getLocomotorSet(), dest, groupDest);
+			adjusted = TheAI->pathfinder()->adjustDestination(obj, ai->getLocomotorSet(), dest, groupDest);
+		}
+		if (!adjusted) {
+			// Nothing free within the spiral, so at least land on a cell no parked unit holds
+			TheAI->pathfinder()->snapClosestGoalPosition(obj, dest);
 		}
 		TheAI->pathfinder()->updateGoal(obj, dest, layer);
 	}
@@ -1687,7 +1692,7 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 		isFormation = false;
 		if (!addWaypoint) {
 			Int dx = (max.x-min.x)/PATHFIND_CELL_SIZE_F;
-			Int dy = (max.x-min.x)/PATHFIND_CELL_SIZE_F;
+			Int dy = (max.y-min.y)/PATHFIND_CELL_SIZE_F;
 			Int cells = (dx*dy);
 			if (cells<2000) {
 				groupTightenToPosition(pos, false, cmdSource);
