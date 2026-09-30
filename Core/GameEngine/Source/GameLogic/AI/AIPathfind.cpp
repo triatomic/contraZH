@@ -2123,6 +2123,9 @@ inline Bool PathfindCell::isObstacleFence() const
 
 const Int COST_ORTHOGONAL = 10;
 const Int COST_DIAGONAL = 14;
+
+const Int CLEARANCE_HARD_SHORTAGE = 2;             // Footprint cells past the clearance that make a cell impassable
+const Int CLEARANCE_SOFT_COST = 4*COST_ORTHOGONAL; // Step cost when the footprint only brushes water, cliff or the map edge
 const Real COST_TO_DISTANCE_FACTOR = 1.0f/10.0f;
 const Real COST_TO_DISTANCE_FACTOR_SQR = COST_TO_DISTANCE_FACTOR*COST_TO_DISTANCE_FACTOR;
 
@@ -5301,6 +5304,41 @@ Bool Pathfinder::validMovementTerrain( PathfindLayerEnum layer, const Locomotor*
 	return true;
 }
 
+/**
+ * validMovementTerrain plus the ground clearance the object's footprint needs
+ */
+Bool Pathfinder::validMovementTerrainForObject( const Object *obj, const Locomotor* locomotor, const Coord3D *pos)
+{
+	if (!validMovementTerrain(obj->getLayer(), locomotor, pos)) {
+		return false;
+	}
+	Int x = REAL_TO_INT_FLOOR(pos->x/PATHFIND_CELL_SIZE);
+	Int y = REAL_TO_INT_FLOOR(pos->y/PATHFIND_CELL_SIZE);
+	const PathfindCell *cell = getCell(obj->getLayer(), x, y);
+	if (cell == nullptr) {
+		return false;
+	}
+	Int radius;
+	Bool centerInCell;
+	getRadiusAndCenter(obj, radius, centerInCell);
+	return getClearanceShortage(cell, locomotor->getLegalSurfaces(), radius) < CLEARANCE_HARD_SHORTAGE;
+}
+
+/**
+ * How many footprint cells hang past the ground clearance of this cell, 0 when the unit does not care
+ */
+Int Pathfinder::getClearanceShortage( const PathfindCell *cell, LocomotorSurfaceTypeMask surfaces, Int radius ) const
+{
+	if (radius <= 0 || cell->getLayer() != LAYER_GROUND) {
+		return 0;
+	}
+	if (!(surfaces & LOCOMOTORSURFACE_GROUND) || (surfaces & (LOCOMOTORSURFACE_WATER | LOCOMOTORSURFACE_CLIFF | LOCOMOTORSURFACE_AIR))) {
+		return 0;
+	}
+	Int shortage = radius - (Int)cell->getClearance();
+	return shortage > 0 ? shortage : 0;
+}
+
 //
 // Releases the cells on the open & closed lists.
 //
@@ -5423,6 +5461,10 @@ Bool Pathfinder::checkDestination(const Object *obj, Int cellX, Int cellY, Pathf
 		ignoreId =  obj->getAIUpdateInterface()->getIgnoredObstacleID();
 		checkForAircraft = obj->getAI()->isAircraftThatAdjustsDestination();
 		objID = obj->getID();
+		const PathfindCell *centerCell = getCell(layer, cellX, cellY);
+		if (centerCell && getClearanceShortage(centerCell, obj->getAIUpdateInterface()->getLocomotorSet().getValidSurfaces(), iRadius) >= CLEARANCE_HARD_SHORTAGE) {
+			return false;
+		}
 	}
 	for (i=cellX-iRadius; i<cellX+numCellsAbove; i++) {
 		for (j=cellY-iRadius; j<cellY+numCellsAbove; j++) {
@@ -6563,6 +6605,9 @@ struct ExamineCellsStruct
 			if (to->getPinched()) {
 				return 1; // abort.
 			}
+			if (d->thePathfinder->getClearanceShortage(to, d->theLoco->getValidSurfaces(), d->radius) > 0) {
+				return 1; // abort.
+			}
 			if (d->isHuman) {
 				// check if new cell is in logical map.	(computer can move off logical map)
 				if (to_x < d->thePathfinder->m_logicalExtent.lo.x) return 1; // abort
@@ -6743,6 +6788,11 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 				}
 			}
 
+			Int clearanceShortage = getClearanceShortage(newCell, locomotorSet.getValidSurfaces(), radius);
+			if (clearanceShortage >= CLEARANCE_HARD_SHORTAGE) {
+				movementValid = false;
+			}
+
 			if (!movementValid && !m_isTunneling) {
 				continue;
 			}
@@ -6786,6 +6836,9 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 			newCostSoFar = newCell->costSoFar( parentCell );
 			if (info.allyMoving && dx<10 && dy<10) {
 				newCostSoFar += 3*COST_DIAGONAL;
+			}
+			if (clearanceShortage > 0) {
+				newCostSoFar += CLEARANCE_SOFT_COST;
 			}
 
 			if (newCell->getType() == PathfindCell::CELL_CLIFF && !newCell->getPinched() ) {
@@ -7046,6 +7099,9 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 	// sanity check - if source is invalid, we have to cheat
 	if (!validMovementPosition( isCrusher, layer, locomotorSet, requiredBridgeHeight, from ))	{
 		// somehow we got to an impassable location.
+		m_isTunneling = true;
+	}
+	if (getClearanceShortage(parentCell, locomotorSet.getValidSurfaces(), radius) >= CLEARANCE_HARD_SHORTAGE) {
 		m_isTunneling = true;
 	}
 
@@ -9509,6 +9565,9 @@ Path *Pathfinder::findClosestPath( Object *obj, const LocomotorSet& locomotorSet
 	if (!checkForMovement(obj, info) || info.enemyFixed) {
 		m_isTunneling = true; // We can't move from our current location.  So relax the constraints.
 	}
+	if (getClearanceShortage(parentCell, locomotorSet.getValidSurfaces(), radius) >= CLEARANCE_HARD_SHORTAGE) {
+		m_isTunneling = true;
+	}
 
 	Bool gotHierarchicalPath = false;
 	if (m_isTunneling) {
@@ -10458,6 +10517,12 @@ struct LinePassableStruct
 	}
 
 	if (pathfinder->validMovementPosition( isCrusher, d->acceptableSurfaces, d->requiredWaterDepth, requiredBridgeHeight, to, from ) == false)
+	{
+		return 1;	// bail out
+	}
+
+	Int clearanceShortage = pathfinder->getClearanceShortage(to, d->acceptableSurfaces, d->radius);
+	if (clearanceShortage >= CLEARANCE_HARD_SHORTAGE || (clearanceShortage > 0 && !d->allowPinched))
 	{
 		return 1;	// bail out
 	}
