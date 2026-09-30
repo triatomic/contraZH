@@ -114,11 +114,23 @@ static Int frameToShowObstacles;
 
 constexpr const UnsignedInt ZONE_UPDATE_FREQUENCY = 300;
 constexpr const UnsignedInt MAX_CELL_COUNT = 500;
-constexpr const UnsignedInt MAX_ADJUSTMENT_CELL_COUNT = 400;
+constexpr const UnsignedInt MAX_ADJUSTMENT_CELL_COUNT = 800;
 constexpr const UnsignedInt MAX_SAFE_PATH_CELL_COUNT = 2000;
 
 constexpr const UnsignedInt PATHFIND_CELLS_PER_FRAME = 5000; // Number of cells we will search pathfinding per frame.
 constexpr const UnsignedInt CELL_INFOS_TO_ALLOCATE = 100000;
+
+#if RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING
+constexpr const Int PATHFIND_SEARCH_CELL_CAP = 0x7fffffff;
+constexpr const Int PATHFIND_SEARCH_CELL_MIN = 0x7fffffff;
+constexpr const Int PATHFIND_FRAME_CELL_LIMIT = 0x7fffffff;
+constexpr const Int PATHFIND_HIER_CELL_CAP = 0x7fffffff;
+#else
+constexpr const Int PATHFIND_SEARCH_CELL_CAP = 10000;  // Most cells one search may allocate
+constexpr const Int PATHFIND_SEARCH_CELL_MIN = 3000;   // Every search gets at least this many
+constexpr const Int PATHFIND_FRAME_CELL_LIMIT = 15000; // Frame total the per-search cap is derived from
+constexpr const Int PATHFIND_HIER_CELL_CAP = 4000;     // Cells the coarse block search may allocate
+#endif
 
 // The map holds one PathfindCell per 10x10 world units, so its bitfield packing is what keeps memory in check
 static_assert(sizeof(PathfindCell) == sizeof(void*) + 16, "PathfindCell bitfields no longer pack into 20 bytes");
@@ -127,6 +139,8 @@ static_assert(sizeof(PathfindCell) == sizeof(void*) + 16, "PathfindCell bitfield
 struct PathfindStats
 {
 	UnsignedInt droppedQueue;      ///< requests refused by a full queue
+	UnsignedInt searches;          ///< searches started
+	UnsignedInt cappedSearches;    ///< searches that returned a partial path at their cap
 	UnsignedInt hierOk;            ///< coarse searches that found a corridor
 	UnsignedInt hierFail;          ///< coarse searches that failed
 	UnsignedInt cells;             ///< cell records released by searches
@@ -4140,6 +4154,8 @@ void Pathfinder::reset()
 	// pathfind grid cells have not been classified yet
 	m_isMapReady = false;
 	m_cumulativeCellsAllocated = 0;
+	m_searchCellCap = PATHFIND_SEARCH_CELL_CAP;
+	m_lastSearchHitCap = false;
 
 	debugPathPos.x = 0.0f;
 	debugPathPos.y = 0.0f;
@@ -5251,6 +5267,23 @@ void Pathfinder::cleanOpenAndClosedLists() {
 	if ((UnsignedInt)count > s_pathfindStats.maxCellsOneSearch) {
 		s_pathfindStats.maxCellsOneSearch = count;
 	}
+}
+
+/**
+ * Sets the cell cap for the search about to start from what the frame has left
+ */
+void Pathfinder::beginSearchBudget()
+{
+	Int remaining = PATHFIND_FRAME_CELL_LIMIT - m_cumulativeCellsAllocated;
+	if (remaining < PATHFIND_SEARCH_CELL_MIN) {
+		remaining = PATHFIND_SEARCH_CELL_MIN;
+	}
+	if (remaining > PATHFIND_SEARCH_CELL_CAP) {
+		remaining = PATHFIND_SEARCH_CELL_CAP;
+	}
+	m_searchCellCap = remaining;
+	m_lastSearchHitCap = false;
+	s_pathfindStats.searches++;
 }
 
 
@@ -6372,13 +6405,15 @@ void Pathfinder::logStatsIfDue()
 	}
 	Int queued = (m_queuePRTail - m_queuePRHead + PATHFIND_QUEUE_LEN) % PATHFIND_QUEUE_LEN;
 	PathfindStats &stats = s_pathfindStats;
-	if (queued == 0 && stats.droppedQueue == 0 && stats.cells == 0 && stats.hierOk == 0 && stats.hierFail == 0 && stats.zoneOverflow == 0) {
+	if (queued == 0 && stats.droppedQueue == 0 && stats.searches == 0 && stats.cells == 0 && stats.hierOk == 0 && stats.hierFail == 0 && stats.zoneOverflow == 0) {
 		return;
 	}
-	DEBUG_LOG(("PFSTAT f=%u queued=%d drop=%u hier=%u/%u cells=%u max=%u free=%d zones=%u/%u",
-		TheGameLogic->getFrame(), queued, stats.droppedQueue, stats.hierOk, stats.hierFail, stats.cells, stats.maxCellsOneSearch,
+	DEBUG_LOG(("PFSTAT f=%u queued=%d drop=%u srch=%u cap=%u hier=%u/%u cells=%u max=%u free=%d zones=%u/%u",
+		TheGameLogic->getFrame(), queued, stats.droppedQueue, stats.searches, stats.cappedSearches, stats.hierOk, stats.hierFail, stats.cells, stats.maxCellsOneSearch,
 		PathfindCellInfo::getFreeCount(), stats.rawZoneHighWater, stats.zoneOverflow));
 	stats.droppedQueue = 0;
+	stats.searches = 0;
+	stats.cappedSearches = 0;
 	stats.hierOk = 0;
 	stats.hierFail = 0;
 	stats.cells = 0;
@@ -6775,6 +6810,7 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 Path *Pathfinder::findPath( Object *obj, const LocomotorSet& locomotorSet, const Coord3D *from,
 													 const Coord3D *rawTo)
 {
+	beginSearchBudget();
 	Short requiredBridgeHeight = obj ? obj->getRequiredBridgeHeight() : 0;
 	if (!clientSafeQuickDoesPathExist(locomotorSet, requiredBridgeHeight, from, rawTo)) {
 		return nullptr;
@@ -6958,6 +6994,9 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 	m_closedList.reset();
 
 	Int cellCount = 0;
+	PathfindCell *startCell = parentCell;
+	PathfindCell *closestCell = nullptr;
+	Int closestDistSqr = 0x7fffffff;
 
 	//
 	// Continue search until "open" list is empty, or
@@ -7009,6 +7048,14 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 			return path;
 		}
 
+		// remember the cell nearest the goal in case the search runs out of budget
+		Int dx = goalCell->getXIndex() - parentCell->getXIndex();
+		Int dy = goalCell->getYIndex() - parentCell->getYIndex();
+		if (dx*dx + dy*dy < closestDistSqr) {
+			closestDistSqr = dx*dx + dy*dy;
+			closestCell = parentCell;
+		}
+
 		// put parent cell onto closed list - its evaluation is finished
 		parentCell->putOnClosedList( m_closedList );
 
@@ -7016,7 +7063,29 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 		checkChangeLayers(parentCell);
 
 		cellCount += examineNeighboringCells(parentCell, goalCell, locomotorSet, isHuman, centerInCell, radius, startCellNdx, obj, NO_ATTACK);
+		if (cellCount >= m_searchCellCap) {
+			m_lastSearchHitCap = true;
+			break;
+		}
+	}
 
+	if (m_lastSearchHitCap) {
+		// Hand back a path to the nearest cell reached that the unit may stop on; the caller paths on from there
+		PathfindCell *endCell = closestCell;
+		Int steps = 0;
+		while (endCell && endCell != startCell && steps < 8 &&
+			!checkDestination(obj, endCell->getXIndex(), endCell->getYIndex(), endCell->getLayer(), radius, centerInCell)) {
+			endCell = endCell->getParentCell();
+			steps++;
+		}
+		if (endCell && endCell != startCell) {
+			s_pathfindStats.cappedSearches++;
+			m_isTunneling = false;
+			Path *path = buildActualPath( obj, locomotorSet.getValidSurfaces(), from, endCell, centerInCell, false, locomotorSet.getRequiredWaterLevel() );
+			cleanOpenAndClosedLists();
+			goalCell->releaseInfo();
+			return path;
+		}
 	}
 
 	// failure - goal cannot be reached
@@ -7389,6 +7458,7 @@ Path *Pathfinder::findGroundPath( const Coord3D *from,
 													 const Coord3D *rawTo, Int pathDiameter, Bool crusher)
 {
 	//CRCDEBUG_LOG(("Pathfinder::findGroundPath()"));
+	beginSearchBudget();
 #ifdef DEBUG_LOGGING
 	Int startTimeMS = ::GetTickCount();
 #endif
@@ -7530,6 +7600,10 @@ Path *Pathfinder::findGroundPath( const Coord3D *from,
 	Int cellCount = 0;
 	while( !m_openList.empty() )
 	{
+		if (cellCount >= m_searchCellCap) {
+			m_lastSearchHitCap = true;
+			break;
+		}
 		// take head cell off of open list - it has lowest estimated total path cost
 		parentCell = m_openList.getHead();
 		parentCell->removeFromOpenList(m_openList);
@@ -8079,6 +8153,9 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 	//
 	while( !m_openList.empty() )
 	{
+		if (cellCount >= PATHFIND_HIER_CELL_CAP) {
+			break;
+		}
 		// take head cell off of open list - it has lowest estimated total path cost
 		parentCell = m_openList.getHead();
 		parentCell->removeFromOpenList(m_openList);
@@ -9258,6 +9335,7 @@ Path *Pathfinder::findClosestPath( Object *obj, const LocomotorSet& locomotorSet
 																	Coord3D *rawTo, Bool blocked, Real pathCostMultiplier, Bool moveAllies)
 {
 	//CRCDEBUG_LOG(("Pathfinder::findClosestPath()"));
+	beginSearchBudget();
 #ifdef DEBUG_LOGGING
 	Int startTimeMS = ::GetTickCount();
 #endif
@@ -9524,6 +9602,10 @@ Path *Pathfinder::findClosestPath( Object *obj, const LocomotorSet& locomotorSet
 			// Check to see if we can change layers in this cell.
 			checkChangeLayers(parentCell);
 			count += examineNeighboringCells(parentCell, goalCell, locomotorSet, isHuman, centerInCell, radius, startCellNdx, obj, NO_ATTACK);
+		}
+		if (count >= m_searchCellCap) {
+			m_lastSearchHitCap = true;
+			break;
 		}
 	}
 
@@ -11010,6 +11092,9 @@ Path *Pathfinder::getMoveAwayFromPath(Object* obj, Object *otherObj,
 	// until goal is found.
 	//
 
+	beginSearchBudget();
+	Int awayCellCount = 0;
+
 	Real boxHalfWidth = radius*PATHFIND_CELL_SIZE_F - (PATHFIND_CELL_SIZE_F/4.0f);
 	if (centerInCell) boxHalfWidth+=PATHFIND_CELL_SIZE_F/2;
 	boxHalfWidth += otherRadius*PATHFIND_CELL_SIZE_F;
@@ -11090,8 +11175,11 @@ Path *Pathfinder::getMoveAwayFromPath(Object* obj, Object *otherObj,
 		// Check to see if we can change layers in this cell.
 		checkChangeLayers(parentCell);
 
-		examineNeighboringCells(parentCell, nullptr, locomotorSet, isHuman, centerInCell, radius, startCellNdx, obj, NO_ATTACK);
-
+		awayCellCount += examineNeighboringCells(parentCell, nullptr, locomotorSet, isHuman, centerInCell, radius, startCellNdx, obj, NO_ATTACK);
+		if (awayCellCount >= m_searchCellCap) {
+			m_lastSearchHitCap = true;
+			break;
+		}
 	}
 
 #if defined(RTS_DEBUG)
@@ -11126,6 +11214,7 @@ Path *Pathfinder::patchPath( const Object *obj, const LocomotorSet& locomotorSet
 	Int startTimeMS = ::GetTickCount();
 #endif
 	if (originalPath==nullptr) return nullptr;
+	beginSearchBudget();
 	Bool centerInCell;
 	Int radius;
 	getRadiusAndCenter(obj, radius, centerInCell);
@@ -11358,6 +11447,7 @@ Path *Pathfinder::findAttackPath( const Object *obj, const LocomotorSet& locomot
 	Int radius;
 	Bool centerInCell;
 	getRadiusAndCenter(obj, radius, centerInCell);
+	beginSearchBudget();
 
 	// Quick check:  See if moving couple of cells towards the victim will work.
 	{
@@ -11712,6 +11802,7 @@ Path *Pathfinder::findSafePath( const Object *obj, const LocomotorSet& locomotor
 #endif
 
 	const Int MAX_CELLS = MAX_SAFE_PATH_CELL_COUNT; // this is a rather expensive operation, so limit the search.
+	beginSearchBudget();
 
 	Bool centerInCell;
 	Int radius;

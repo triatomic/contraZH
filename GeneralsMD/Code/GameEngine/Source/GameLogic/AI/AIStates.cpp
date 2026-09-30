@@ -2019,6 +2019,12 @@ StateReturnType AIInternalMoveToState::update()
 			}
 		}
 		// we have reached the end of the path
+		if (ai->takeCappedPathLeg())
+		{
+			// The search stopped short of the goal, so path on from here
+			computePath();
+			return STATE_CONTINUE;
+		}
 		if (getAdjustsDestination())
 		{
 			ai->setLocomotorGoalNone();

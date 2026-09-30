@@ -743,6 +743,7 @@ public:
 	Int getTmpValue() {return m_tmpInt;}
 
 	Bool getRetryPath() {return m_retryPath;}
+	Bool takeCappedPathLeg(); ///< True when the current path stopped at the search cap and another leg toward the goal is allowed.
 
 	void setAllowedToChase( Bool allow ) { m_allowedToChase = allow; }
 	Bool isAllowedToChase() const { return m_allowedToChase; }
@@ -880,6 +881,8 @@ private:
 	Bool				m_isRecruitable;						///< TRUE if recruitable by the ai.
 	Bool				m_executingWaypointQueue;						///< if true, we are moving thru the waypoints
 	Bool				m_retryPath;								///< If true, we need to try the path a second time.  jba.
+	Bool				m_pathWasCapped;						///< True if the current path stopped at the search cell cap short of the goal.
+	UnsignedByte		m_cappedLegs;								///< Capped paths chained so far toward one goal.
 	Bool				m_allowedToChase;						///< Allowed to pursue targets.
 	Bool				m_isInUpdate;								///< If true, we are inside our update method.
 	Bool				m_fixLocoInPostProcess;

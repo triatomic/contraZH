@@ -740,6 +740,8 @@ public:
 	void removeBridge( PathfindLayerEnum layer ); ///< Releases the layer of a bridge that is being deleted.
 
 	void logStatsIfDue(); ///< Logs the per-second pathfinder counters.
+	void beginSearchBudget(); ///< Sets the cell cap for the search about to start.
+	Bool didLastSearchHitCap() const { return m_lastSearchHitCap; }
 
 	Bool findBrokenBridge(const LocomotorSet &locomotorSet, const Coord3D *from, const Coord3D *to, ObjectID *bridgeID);
 
@@ -956,6 +958,8 @@ private:
 	Int						m_queuePRHead;
 	Int						m_queuePRTail;
 	Int						m_cumulativeCellsAllocated;
+	Int						m_searchCellCap;						///< Cells the current search may allocate, set by beginSearchBudget
+	Bool					m_lastSearchHitCap;					///< True if the last search stopped at its cap
 
 #if RTS_ZEROHOUR && RETAIL_COMPATIBLE_CRC
 public:

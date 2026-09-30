@@ -77,6 +77,9 @@
 // Frames to wait before re-queueing a path request the full pathfind queue refused
 static const Int PATHFIND_QUEUE_RETRY_FRAMES = 2;
 
+// Capped partial paths a unit may chain toward one goal before it settles where it is
+static const Int MAX_CAPPED_PATH_LEGS = 8;
+
 
 //-------------------------------------------------------------------------------------------------
 AIUpdateModuleData::AIUpdateModuleData()
@@ -384,6 +387,8 @@ AIUpdateInterface::AIUpdateInterface( Thing *thing, const ModuleData* moduleData
 	m_isRecruitable = TRUE; // Things default to being recruitable.
 	m_executingWaypointQueue = FALSE;
 	m_retryPath = FALSE;
+	m_pathWasCapped = FALSE;
+	m_cappedLegs = 0;
 	m_isInUpdate = FALSE;
 	m_fixLocoInPostProcess = FALSE;
 	m_speedMultiplier = 1.0;
@@ -1153,6 +1158,17 @@ void AIUpdateInterface::queueForPathOrRetry()
 	}
 	// The object id spreads the retries of a whole army over a few frames
 	setQueueForPathTime(PATHFIND_QUEUE_RETRY_FRAMES + (getObject()->getID() & 3));
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool AIUpdateInterface::takeCappedPathLeg()
+{
+	if (!m_pathWasCapped || m_cappedLegs >= MAX_CAPPED_PATH_LEGS)
+	{
+		return FALSE;
+	}
+	m_cappedLegs++;
+	return TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1942,6 +1958,7 @@ Bool AIUpdateInterface::computePath( PathfindServicesInterface *pathServices, Co
 		return computeQuickPath(destination);
 	}
 	m_retryPath = false;
+	m_pathWasCapped = FALSE;
 	Region3D extent;
 	TheTerrainLogic->getMaximumPathfindExtent(&extent);
 	if (!extent.isInRegionNoZ(*destination)) {
@@ -1990,7 +2007,11 @@ Bool AIUpdateInterface::computePath( PathfindServicesInterface *pathServices, Co
 		}	else {
 			theNewPath = pathServices->findPath( getObject(), m_locomotorSet, getObject()->getPosition(),
 				destination);
+			m_pathWasCapped = (theNewPath != nullptr) && TheAI->pathfinder()->didLastSearchHitCap();
 		}
+	}
+	if (!m_pathWasCapped) {
+		m_cappedLegs = 0;
 	}
 	if (theNewPath==nullptr && m_path==nullptr) {
 		Real pathCostFactor = 0.0f;
@@ -5598,7 +5619,7 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 #if RETAIL_COMPATIBLE_CRC || RETAIL_COMPATIBLE_XFER_SAVE
 	const XferVersion currentVersion = 4;
 #else
-	const XferVersion currentVersion = 9;
+	const XferVersion currentVersion = 10;
 #endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
@@ -5847,6 +5868,12 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 	if (version >= 9)
 	{
 		xfer->xferReal(&m_liftMultiplier);
+	}
+
+	if (version >= 10)
+	{
+		xfer->xferBool(&m_pathWasCapped);
+		xfer->xferUnsignedByte(&m_cappedLegs);
 	}
 
 }
