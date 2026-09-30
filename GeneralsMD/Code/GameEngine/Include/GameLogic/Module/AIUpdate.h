@@ -628,6 +628,7 @@ public:
 	void setIgnoreCollisionTime(Int frames) { m_ignoreCollisionsUntil = TheGameLogic->getFrame() + frames; }
 
 	void setQueueForPathTime(Int frames);
+	void queueForPathOrRetry(); ///< Queues a path request, or re-arms it a few frames out when the queue is full.
 
 	// For the attack move, that switches from move to attack, and the attack is CMD_FROM_AI,
 	// while the move is the original command source.  John A.

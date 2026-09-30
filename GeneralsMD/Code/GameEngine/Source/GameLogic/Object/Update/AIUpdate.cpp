@@ -74,6 +74,9 @@
 
 #define SLEEPY_AI
 
+// Frames to wait before re-queueing a path request the full pathfind queue refused
+static const Int PATHFIND_QUEUE_RETRY_FRAMES = 2;
+
 
 //-------------------------------------------------------------------------------------------------
 AIUpdateModuleData::AIUpdateModuleData()
@@ -619,7 +622,7 @@ void AIUpdateInterface::requestPath( Coord3D *destination, Bool isFinalGoal )
 		}
 		return;
 	}
-	TheAI->pathfinder()->queueForPath(getObject()->getID());
+	queueForPathOrRetry();
 
 }
 
@@ -643,7 +646,7 @@ void AIUpdateInterface::requestAttackPath( ObjectID victimID, const Coord3D* vic
 		setLocomotorGoalNone();
 		return;
 	}
-	TheAI->pathfinder()->queueForPath(getObject()->getID());
+	queueForPathOrRetry();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -666,7 +669,7 @@ void AIUpdateInterface::requestApproachPath( Coord3D *destination )
 		setQueueForPathTime(2*LOGICFRAMES_PER_SECOND);
 		return;
 	}
-	TheAI->pathfinder()->queueForPath(getObject()->getID());
+	queueForPathOrRetry();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -690,7 +693,7 @@ void AIUpdateInterface::requestSafePath( ObjectID repulsor )
 		setQueueForPathTime(2*LOGICFRAMES_PER_SECOND);
 		return;
 	}
-	TheAI->pathfinder()->queueForPath(getObject()->getID());
+	queueForPathOrRetry();
 }
 
 enum {WAYPOINT_PATH_LIMIT=1024};
@@ -1142,6 +1145,17 @@ void AIUpdateInterface::setQueueForPathTime(Int frames)
 }
 
 //-------------------------------------------------------------------------------------------------
+void AIUpdateInterface::queueForPathOrRetry()
+{
+	if (TheAI->pathfinder()->queueForPath(getObject()->getID()))
+	{
+		return;
+	}
+	// The object id spreads the retries of a whole army over a few frames
+	setQueueForPathTime(PATHFIND_QUEUE_RETRY_FRAMES + (getObject()->getID() & 3));
+}
+
+//-------------------------------------------------------------------------------------------------
 void AIUpdateInterface::wakeUpNow()
 {
 #ifdef SLEEPY_AI
@@ -1306,18 +1320,17 @@ UpdateSleepTime AIUpdateInterface::update()
 	}
 
 	UnsignedInt now = TheGameLogic->getFrame();
+	if (m_queueForPathFrame != 0 && now >= m_queueForPathFrame)
+	{
+		setQueueForPathTime(0);
+		queueForPathOrRetry();
+	}
 	if (m_queueForPathFrame != 0)
 	{
-		if (now >= m_queueForPathFrame)
+		UnsignedInt sleepForPathDelta = m_queueForPathFrame - now;
+		if (sleepForPathDelta < subMachineSleep)
 		{
-			TheAI->pathfinder()->queueForPath(getObject()->getID());
-			setQueueForPathTime(0);
-		}
-		else
-		{
-			UnsignedInt sleepForPathDelta = m_queueForPathFrame - now;
-			if (sleepForPathDelta < subMachineSleep)
-				subMachineSleep = UPDATE_SLEEP(sleepForPathDelta);
+			subMachineSleep = UPDATE_SLEEP(sleepForPathDelta);
 		}
 	}
 
