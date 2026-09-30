@@ -73,6 +73,7 @@
 #include "Common/PerfMetrics.h"
 
 //-------------------------------------------------------------------------------------------------
+#include <algorithm>
 #include <queue>
 #include <vector>
 
@@ -115,6 +116,7 @@ static Int frameToShowObstacles;
 constexpr const UnsignedInt ZONE_UPDATE_FREQUENCY = 300;
 constexpr const UnsignedInt MAX_CELL_COUNT = 500;
 constexpr const UnsignedInt MAX_ADJUSTMENT_CELL_COUNT = 800;
+constexpr const Int PATHFIND_SLOT_MAX_RING = 12; // Lattice rings around the click that assignGroupSlots may scan
 constexpr const UnsignedInt MAX_SAFE_PATH_CELL_COUNT = 2000;
 
 constexpr const UnsignedInt PATHFIND_CELLS_PER_FRAME = 5000; // Number of cells we will search pathfinding per frame.
@@ -5900,6 +5902,161 @@ Bool Pathfinder::adjustToLandingDestination(Object *obj, Coord3D *dest)
 	return false;
 }
 
+
+struct SlotCandidate
+{
+	ICoord2D cell;
+	Int ring;
+	Real projection;
+	Int order;
+};
+
+// Innermost ring first, then the far side of the ring along the travel direction, then scan order
+static Bool slotCandidateLess(const SlotCandidate &a, const SlotCandidate &b)
+{
+	if (a.ring != b.ring) {
+		return a.ring < b.ring;
+	}
+	if (a.projection != b.projection) {
+		return a.projection > b.projection;
+	}
+	return a.order < b.order;
+}
+
+// Units nearest the goal along the travel direction first, object id breaks ties
+static Bool slotRequestLess(const PathfindSlotRequest &a, const PathfindSlotRequest &b)
+{
+	if (a.projection != b.projection) {
+		return a.projection > b.projection;
+	}
+	return a.obj->getID() < b.obj->getID();
+}
+
+/**
+ * Hands each unit of a group its own arrival cell around the click point.
+ * Slots fill from the innermost ring outward, far side first, and units take them in the same
+ * order along the travel direction, so early arrivals park deepest and later ones stop short of them.
+ */
+Bool Pathfinder::assignGroupSlots(std::vector<PathfindSlotRequest>& units, const Coord3D *click, const Coord3D *centroid)
+{
+	const Int n = units.size();
+	if (n < 2 || !m_isMapReady) {
+		return false;
+	}
+
+	Bool isHuman = true;
+	const Player *player = units[0].obj->getControllingPlayer();
+	if (player && player->getPlayerType() == PLAYER_COMPUTER) {
+		isHuman = false;
+	}
+
+	// The lattice step comes from the largest footprint so any slot fits any unit
+	Int maxRadius = 0;
+	Bool maxCenter = true;
+	Int maxSpan = 1;
+	for (Int i = 0; i < n; i++) {
+		Int radius;
+		Bool center;
+		getRadiusAndCenter(units[i].obj, radius, center);
+		Int span = 2*radius + (center ? 1 : 0);
+		if (span > maxSpan) {
+			maxSpan = span;
+			maxRadius = radius;
+			maxCenter = center;
+		}
+	}
+	const Int step = (maxSpan > 1) ? maxSpan + 1 : 1;
+
+	Coord2D dir;
+	dir.x = click->x - centroid->x;
+	dir.y = click->y - centroid->y;
+	if (dir.length() < PATHFIND_CELL_SIZE_F) {
+		dir.x = 1.0f;
+		dir.y = 0.0f;
+	}
+	dir.normalize();
+
+	PathfindLayerEnum destLayer = TheTerrainLogic->getLayerForDestination(click);
+	ICoord2D clickCell;
+	worldToCell(click, &clickCell);
+
+	std::vector<SlotCandidate> slots;
+	slots.reserve(n);
+	Int scanned = 0;
+	const Int scanLimit = 4*n + 64;
+	Bool haveRefZone = false;
+	zoneStorageType refZone = 0;
+	for (Int ring = 0; ring <= PATHFIND_SLOT_MAX_RING; ring++) {
+		if ((Int)slots.size() >= n || scanned >= scanLimit) {
+			break;
+		}
+		for (Int i = -ring; i <= ring; i++) {
+			for (Int j = -ring; j <= ring; j++) {
+				if (IABS(i) != ring && IABS(j) != ring) {
+					continue;
+				}
+				scanned++;
+				ICoord2D c;
+				c.x = clickCell.x + i*step;
+				c.y = clickCell.y + j*step;
+				PathfindCell *cell = getCell(destLayer, c.x, c.y);
+				if (cell == nullptr || cell->getType() != PathfindCell::CELL_CLEAR) {
+					continue;
+				}
+				if (maxSpan > 1 && cell->getPinched()) {
+					continue;
+				}
+				if (isHuman && (c.x < m_logicalExtent.lo.x || c.x > m_logicalExtent.hi.x || c.y < m_logicalExtent.lo.y || c.y > m_logicalExtent.hi.y)) {
+					continue;
+				}
+				if (getClearanceShortage(cell, LOCOMOTORSURFACE_GROUND, maxRadius) > 0) {
+					continue;
+				}
+				if (!checkDestination(nullptr, c.x, c.y, destLayer, maxRadius, maxCenter)) {
+					continue;
+				}
+				// Every slot has to sit in the zone of the first one, or units would end up on the far side of a wall
+				zoneStorageType zone = m_zoneManager.getEffectiveZone(LOCOMOTORSURFACE_GROUND, false, cell->getZone());
+				if (!haveRefZone) {
+					refZone = zone;
+					haveRefZone = true;
+				} else if (zone != refZone) {
+					continue;
+				}
+				Coord3D slotPos;
+				adjustCoordToCell(c.x, c.y, maxCenter, slotPos, destLayer);
+				SlotCandidate candidate;
+				candidate.cell = c;
+				candidate.ring = ring;
+				candidate.projection = (slotPos.x - click->x)*dir.x + (slotPos.y - click->y)*dir.y;
+				candidate.order = slots.size();
+				slots.push_back(candidate);
+			}
+		}
+	}
+	if (slots.empty()) {
+		return false;
+	}
+	std::sort(slots.begin(), slots.end(), slotCandidateLess);
+
+	for (Int i = 0; i < n; i++) {
+		const Coord3D *pos = units[i].obj->getPosition();
+		units[i].projection = (pos->x - click->x)*dir.x + (pos->y - click->y)*dir.y;
+		units[i].assigned = false;
+	}
+	std::sort(units.begin(), units.end(), slotRequestLess);
+
+	Int count = MIN(n, (Int)slots.size());
+	for (Int i = 0; i < count; i++) {
+		Int radius;
+		Bool center;
+		getRadiusAndCenter(units[i].obj, radius, center);
+		adjustCoordToCell(slots[i].cell.x, slots[i].cell.y, center, units[i].slot, destLayer);
+		updateGoal(units[i].obj, &units[i].slot, destLayer);
+		units[i].assigned = true;
+	}
+	return true;
+}
 
 /**
  * Find an unoccupied spot for a unit to move to.

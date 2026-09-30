@@ -35,6 +35,8 @@
 #include "GameLogic/LocomotorSet.h"
 #include "GameLogic/GameLogic.h"
 
+#include <vector>
+
 class Bridge;
 class Object;
 class Weapon;
@@ -672,6 +674,15 @@ public:
 /**
  * The Pathfinding engine itself.
  */
+/// One unit's entry in Pathfinder::assignGroupSlots
+struct PathfindSlotRequest
+{
+	Object *obj;
+	Real projection;   ///< Distance along the group's travel direction, filled by assignGroupSlots
+	Coord3D slot;      ///< The arrival point handed to this unit
+	Bool assigned;     ///< False when no slot was found for this unit
+};
+
 class Pathfinder : PathfindServicesInterface, public Snapshot
 {
 // The following routines are private, but available through the doPathfind callback to aiInterface. jba.
@@ -810,6 +821,7 @@ public:
 
 	void snapPosition(Object *obj, Coord3D *pos); // Snaps the current position to it's grid location.
 	void snapClosestGoalPosition(Object *obj, Coord3D *pos); // Snaps the current position to a good goal position.
+	Bool assignGroupSlots(std::vector<PathfindSlotRequest>& units, const Coord3D *click, const Coord3D *centroid); ///< Gives each unit of a group its own arrival cell around the click.
 	Bool goalPosition(Object *obj, Coord3D *pos); // Returns the goal position on the grid.
 
 	PathfindLayerEnum addBridge(Bridge *theBridge); // Adds a bridge layer, and returns the layer id.
