@@ -120,6 +120,9 @@ constexpr const UnsignedInt MAX_SAFE_PATH_CELL_COUNT = 2000;
 constexpr const UnsignedInt PATHFIND_CELLS_PER_FRAME = 5000; // Number of cells we will search pathfinding per frame.
 constexpr const UnsignedInt CELL_INFOS_TO_ALLOCATE = 30000;
 
+// The map holds one PathfindCell per 10x10 world units, so its bitfield packing is what keeps memory in check
+static_assert(sizeof(PathfindCell) == sizeof(void*) + 16, "PathfindCell bitfields no longer pack into 20 bytes");
+
 //-----------------------------------------------------------------------------------
 PathNode::PathNode() :
 	m_nextOpti(nullptr),
@@ -2696,6 +2699,15 @@ void PathfindZoneManager::markZonesDirty()  ///< Called when the zones need to b
 #endif
 }
 
+void PathfindZoneManager::markZonesDirtyNow()
+{
+	if (TheGameLogic->getFrame()<2) {
+		m_nextFrameToCalculateZones = 2;
+		return;
+	}
+	m_nextFrameToCalculateZones = TheGameLogic->getFrame();
+}
+
 /**
  * Calculate zones.  A zone is an area of the same terrain - clear, water or cliff.
  * The utility of zones is that if current location and destination are in the same zone,
@@ -2768,6 +2780,12 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 						}
 					}
 					if (cell->getZone()==0) {
+#if !(RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING)
+						// Past the table size every new zone shares the last id rather than indexing off the end
+						if (m_maxZone >= maxZones) {
+							m_maxZone = maxZones-1;
+						}
+#endif
 						cell->setZone(m_maxZone);
 						m_maxZone++;
 #if RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING
@@ -10311,7 +10329,7 @@ void Pathfinder::changeBridgeState( PathfindLayerEnum layer, Bool repaired)
 {
 	if (m_layers[layer].isUnused()) return;
 	if (m_layers[layer].setDestroyed(!repaired)) {
-		m_zoneManager.markZonesDirty();
+		m_zoneManager.markZonesDirtyNow();
 	}
 }
 
