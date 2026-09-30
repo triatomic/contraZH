@@ -7795,13 +7795,11 @@ void Pathfinder::processHierarchicalCell( const ICoord2D &scanCell, const ICoord
 #if RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING
 		if (newCell->hasInfo() && (newCell->getOpen() || newCell->getClosed())) return; // already looked at this one.
 #else
-		if( !newCell->hasInfo() )
+		// A cell without a record has not been visited yet, so it must stay eligible for allocation below
+		if (newCell->hasInfo() && (newCell->getOpen() || newCell->getClosed()))
 		{
- 			return;
+			return;
 		}
-
-		if( newCell->getOpen() || newCell->getClosed() )
-			return; // already looked at this one.
 #endif
 
 		ICoord2D adjacentCell = scanCell;
@@ -7836,7 +7834,10 @@ void Pathfinder::processHierarchicalCell( const ICoord2D &scanCell, const ICoord
 			return;
 		}
 
-		newCell->allocateInfo(scanCell);
+		if (!newCell->allocateInfo(scanCell))
+		{
+			return;
+		}
 #if RETAIL_COMPATIBLE_PATHFINDING
 		if (!s_useFixedPathfinding)
 		{
