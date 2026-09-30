@@ -1773,7 +1773,7 @@ PathfindLayerEnum TerrainLogic::getLayerForDestination(const Coord3D *pos)
 
 	while (pBridge ) {
 		// filter out destroyed bridges or open draw bridges
-		if (pBridge->isPointOnBridge(pos, false) ) {
+		if (TheAI->pathfinder()->isPathfindLayerPassable(pBridge->getLayer()) && pBridge->isPointOnBridge(pos, false) ) {
 			Real delta = fabs(pos->z-pBridge->getBridgeHeight(pos, nullptr));
 			if (delta<bestDistance) {
 				bestLayer = pBridge->getLayer();

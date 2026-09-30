@@ -1888,7 +1888,11 @@ Bool AIUpdateInterface::computeQuickPath( const Coord3D *destination )
 		m_path = TheAI->pathfinder()->getAircraftPath(getObject(), destination);
 	} else {
 		m_path = newInstance(Path);
-		m_path->prependNode( destination, LAYER_GROUND );
+		PathfindLayerEnum destinationLayer = LAYER_GROUND;
+		if (isDoingGroundMovement()) {
+			destinationLayer = TheTerrainLogic->getLayerForDestination(destination);
+		}
+		m_path->prependNode( destination, destinationLayer );
 		Coord3D pos = *getObject()->getPosition();
 		pos.z = destination->z;
 		m_path->prependNode( &pos, getObject()->getLayer() );

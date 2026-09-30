@@ -560,7 +560,7 @@ void AIGroup::computeIndividualDestination( Coord3D *dest, const Coord3D *groupD
 		}	else {
 			TheAI->pathfinder()->adjustDestination(obj, ai->getLocomotorSet(), dest, groupDest);
 		}
-		TheAI->pathfinder()->updateGoal(obj, dest, LAYER_GROUND);
+		TheAI->pathfinder()->updateGoal(obj, dest, layer);
 	}
 
 }
@@ -1085,7 +1085,7 @@ Bool AIGroup::friend_moveInfantryToPos( const Coord3D *pos, CommandSourceType cm
 		}
 		clampToMap(&dest, controllingPlayerType);
 		TheAI->pathfinder()->adjustDestination(theUnit, ai->getLocomotorSet(), &dest, nullptr);
-		TheAI->pathfinder()->updateGoal(theUnit, &dest, LAYER_GROUND);
+		TheAI->pathfinder()->updateGoal(theUnit, &dest, layer);
 		path.push_back(dest);
 		ai->aiFollowPath( &path, nullptr, cmdSource );
 	}
@@ -1568,7 +1568,7 @@ Bool AIGroup::friend_moveVehicleToPos( const Coord3D *pos, CommandSourceType cmd
 		}
 		clampToMap(&dest, controllingPlayerType);
 		TheAI->pathfinder()->adjustDestination(theUnit, ai->getLocomotorSet(), &dest, nullptr);
-		TheAI->pathfinder()->updateGoal(theUnit, &dest, LAYER_GROUND);
+		TheAI->pathfinder()->updateGoal(theUnit, &dest, layer);
 		path.push_back(dest);
 		ai->aiFollowPath( &path, nullptr, cmdSource );
 	}
