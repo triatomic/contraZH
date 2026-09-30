@@ -5908,9 +5908,9 @@ Bool AIUpdateInterface::arePathLayersStillValid() {
 		//Check if going below bridges and if these are still opened/destroyed
 		if (path->needCheckBridges()) {
 			for (UnsignedShort i = PathfindLayerEnum::LAYER_GROUND + 1U; i < PathfindLayerEnum::LAYER_WALL; ++i) {
-				if (path->isPathBelowBridge(i)) {
-					// Path is below bridge -> if Bridge layer is now Passable, no longer valid -> recheck
-					return TheAI->pathfinder()->isPathfindLayerPassable(static_cast<PathfindLayerEnum>(i));
+				// A path under a bridge stays valid until that bridge becomes passable again
+				if (path->isPathBelowBridge(i) && TheAI->pathfinder()->isPathfindLayerPassable(static_cast<PathfindLayerEnum>(i))) {
+					return false;
 				}
 			}
 		}
