@@ -1092,7 +1092,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 	// objects we don't need the pathfinder so we'll ignore this
 	//
 	if( BitIsSet( m_template->m_surfaces, LOCOMOTORSURFACE_AIR ) == false &&
-			!TheAI->pathfinder()->validMovementTerrain(obj->getLayer(), this, obj->getPosition()) &&
+			!TheAI->pathfinder()->validMovementTerrainForObject(obj, this,obj->getPosition()) &&
 			!getFlag(ALLOW_INVALID_POSITION))
 	{
 		// Somehow, we have gotten to an invalid location.
@@ -1607,8 +1607,8 @@ void Locomotor::moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics,
 		halfPos.y = pos->y+offset.y/2;
 		halfPos.z = pos->z;
 
-		if (!TheAI->pathfinder()->validMovementTerrain(obj->getLayer(), this, &halfPos) ||
-			!TheAI->pathfinder()->validMovementTerrain(obj->getLayer(), this, &nextPos))
+		if (!TheAI->pathfinder()->validMovementTerrainForObject(obj, this,&halfPos) ||
+			!TheAI->pathfinder()->validMovementTerrainForObject(obj, this,&nextPos))
 		{
 			PhysicsTurningType rotating = rotateTowardsPosition(obj, goalPos);
 			physics->setTurning(rotating);
@@ -1749,7 +1749,7 @@ Bool Locomotor::fixInvalidPosition(Object* obj, PhysicsBehavior *physics)
 			Coord3D thePos = *obj->getPosition();
 			thePos.x += i*PATHFIND_CELL_SIZE_F;
 			thePos.y += j*PATHFIND_CELL_SIZE_F;
-			if (!TheAI->pathfinder()->validMovementTerrain(obj->getLayer(), this, &thePos)) {
+			if (!TheAI->pathfinder()->validMovementTerrainForObject(obj, this,&thePos)) {
 				if (i<0) dx += 1;
 				if (i>0) dx -= 1;
 				if (j<0) dy += 1;
