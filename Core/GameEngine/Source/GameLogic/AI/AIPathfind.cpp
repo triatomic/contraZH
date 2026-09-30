@@ -1318,6 +1318,7 @@ void PathfindCell::reset()
 	m_zone = 0;
 	m_aircraftGoal = false;
 	m_pinched = false;
+	m_clearance = 0;
 	if (m_info) {
 		m_info->m_obstacleID = INVALID_ID;
 		PathfindCellInfo::releaseACellInfo(m_info);
@@ -4896,6 +4897,76 @@ static void calculateWaterLevels(IRegion2D bounds, PathfindCell** map)
 	}
 }
 
+// Chebyshev distance to the nearest water, cliff or map-edge cell, less one, capped at 15
+static void calculateGroundClearance(IRegion2D bounds, PathfindCell** map)
+{
+	constexpr int MAX_CLEARANCE = 15;
+	const int dirs[8][2] = { {0, 1}, {0, -1}, {1, 0}, {-1, 0}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1} };
+	const int width = bounds.hi.x - bounds.lo.x + 1;
+	const int height = bounds.hi.y - bounds.lo.y + 1;
+	if (width <= 0 || height <= 0) {
+		return;
+	}
+	const UnsignedByte UNVISITED = 255;
+	std::vector<UnsignedByte> dist(width*height, UNVISITED);
+	std::queue<Point> q;
+
+	// water and cliffs seed at distance 0, the border at distance 1 as if the map edge were a source
+	for (int i = bounds.lo.x; i <= bounds.hi.x; ++i) {
+		for (int j = bounds.lo.y; j <= bounds.hi.y; ++j) {
+			PathfindCell::CellType type = map[i][j].getType();
+			if (type == PathfindCell::CELL_WATER || type == PathfindCell::CELL_CLIFF) {
+				dist[(i-bounds.lo.x)*height + (j-bounds.lo.y)] = 0;
+				q.push({ i, j });
+			}
+		}
+	}
+	for (int i = bounds.lo.x; i <= bounds.hi.x; ++i) {
+		for (int j = bounds.lo.y; j <= bounds.hi.y; ++j) {
+			Bool onBorder = (i == bounds.lo.x || i == bounds.hi.x || j == bounds.lo.y || j == bounds.hi.y);
+			UnsignedByte& d = dist[(i-bounds.lo.x)*height + (j-bounds.lo.y)];
+			if (onBorder && d == UNVISITED) {
+				d = 1;
+				q.push({ i, j });
+			}
+		}
+	}
+
+	while (!q.empty()) {
+		Point curr = q.front();
+		q.pop();
+		int currentDist = dist[(curr.x-bounds.lo.x)*height + (curr.y-bounds.lo.y)];
+		if (currentDist > MAX_CLEARANCE) {
+			continue;
+		}
+		for (const auto& dir : dirs) {
+			int nx = curr.x + dir[0];
+			int ny = curr.y + dir[1];
+			if (nx < bounds.lo.x || nx > bounds.hi.x || ny < bounds.lo.y || ny > bounds.hi.y) {
+				continue;
+			}
+			UnsignedByte& nd = dist[(nx-bounds.lo.x)*height + (ny-bounds.lo.y)];
+			if (nd == UNVISITED) {
+				nd = currentDist + 1;
+				q.push({ nx, ny });
+			}
+		}
+	}
+
+	for (int i = bounds.lo.x; i <= bounds.hi.x; ++i) {
+		for (int j = bounds.lo.y; j <= bounds.hi.y; ++j) {
+			int d = dist[(i-bounds.lo.x)*height + (j-bounds.lo.y)];
+			int clearance = MAX_CLEARANCE;
+			if (d == 0) {
+				clearance = 0;
+			} else if (d != UNVISITED && d - 1 < MAX_CLEARANCE) {
+				clearance = d - 1;
+			}
+			map[i][j].setClearance((UnsignedByte)clearance);
+		}
+	}
+}
+
 static void calculateBridgeHeights(IRegion2D bounds, PathfindCell** map)
 {
 	if (!TheTerrainLogic) return;
@@ -5022,6 +5093,8 @@ void Pathfinder::classifyMap()
 			classifyMapCell( i, j, &m_map[i][j]);
 		}
 	}
+	// Clearance is measured from true cliffs, before the dilation below turns their ring into cliff cells
+	calculateGroundClearance(m_extent, m_map);
 #if 1
 	// Expand all cliff cells one step (mark pinched)
 	for( j=m_extent.lo.y; j<=m_extent.hi.y; j++ )
@@ -5212,7 +5285,7 @@ Bool Pathfinder::validMovementTerrain( PathfindLayerEnum layer, const Locomotor*
 	// Only do terrain, not obstacle cells.  jba.
 	if (toCell->getType()==PathfindCell::CELL_OBSTACLE) return true;
 	if (toCell->getType()==PathfindCell::CELL_IMPASSABLE) return true;
-	if (toCell->getLayer()!=LAYER_GROUND && toCell->getLayer() == PathfindCell::CELL_CLEAR) {
+	if (toCell->getLayer()!=LAYER_GROUND && toCell->getType() == PathfindCell::CELL_CLEAR) {
 		return true;
 	}
 	// check validity of destination cell

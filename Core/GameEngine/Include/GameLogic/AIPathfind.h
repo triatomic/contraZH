@@ -404,6 +404,9 @@ public:
 	Bool getPinched() const {return m_pinched;}
 	void setPinched(Bool pinch) {m_pinched = pinch;	}
 
+	UnsignedByte getClearance() const { return m_clearance; }
+	void setClearance(UnsignedByte clearance) { m_clearance = clearance; }
+
 	Short getWaterLevel(void) const { return m_waterLevel; }
 	void setWaterLevel(Short level) { m_waterLevel = level; }
 
@@ -443,6 +446,7 @@ private:
 	UnsignedInt m_obstacleIsTransparent : 1;  ///< True if obstacle is transparent (undefined if obstacleid is invalid)
 	UnsignedInt m_aircraftGoal : 1;           ///< This is an aircraft goal cell.
 	UnsignedInt m_pinched : 1;                ///< This cell is surrounded by obstacle cells.
+	UnsignedInt m_clearance : 4;              ///< Cells between this one and the nearest water, cliff or map edge, capped at 15.
 
 	zoneStorageType m_zone;                   ///< Zone. Each zone is a set of adjacent terrain type.  If from & to in the same zone, you can successfully pathfind.  If not,
 	                                          /// you still may be able to if you can cross multiple terrain types.
