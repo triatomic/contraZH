@@ -944,6 +944,27 @@ Notes:
 * Without a linger, one-shot effects flash past unreadably.
 * The particle overlay is expensive; leave it off when not in use.
 
+## Pathfinding overlay
+
+The engine's AI debug overlay, which retail only had in debug builds. `Ctrl + A` cycles the modes
+and names each one on screen. `DEMO_TOGGLE_AI_DEBUG` in CommandMap.ini.
+
+* Paths - (A yellow line along the last path computed; hovering a unit switches it to that unit's
+path. Each search also leaves the cells it explored: blue for the frontier, magenta for visited, red
+when the search failed.)
+* Terrain - (Cell types: red cliff, blue water, green impassable, magenta broken bridge, orange
+rubble, yellow building, cyan pinched. Shore clearance in white where a cell touches water, cliff or
+the map edge and gray one cell further in.)
+* Cells - (Unit occupancy: red goal claims, white parked units, green moving units, yellow both.)
+* Ground paths - (The shared path a group follows when it moves in columns.)
+* Zones - (Connected zones, drawn when the zones are rebuilt.)
+
+Notes:
+* Singleplayer only.
+* Terrain mode also switches off column group moves, an original debugging hook. Judge group
+movement in Cells or Paths mode.
+* With the overlay on, the camera can scroll past the map edge.
+
 ## Other cheat hotkeys
 
 * ``Ctrl + ` `` - (Instant build, +999999 credits, this general's own sciences, max rank,

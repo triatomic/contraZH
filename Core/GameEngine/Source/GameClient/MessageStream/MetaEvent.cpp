@@ -1110,6 +1110,17 @@ void MetaMap::generateMetaMap()
 			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
 		}
 	}
+	{
+		// Cycle the pathfinding debug overlay. Ctrl+A is retail's debug map binding and is free in Contra's maps.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_META_DEMO_TOGGLE_AI_DEBUG);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_A;
+			map->m_transition = DOWN;
+			map->m_modState = CTRL;
+			map->m_usableIn = COMMANDUSABLE_GAME;
+		}
+	}
 #endif
 	{
 		// TheSuperHackers @feature Cycle the health bar display mode. Ctrl+` is unbound in

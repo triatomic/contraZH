@@ -709,7 +709,7 @@ Bool W3DTerrainVisual::load( AsciiString filename )
 	if (W3DDisplay::m_3DScene != nullptr)
 		W3DDisplay::m_3DScene->Add_Render_Object( m_terrainRenderObject );
 
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	// Icon drawing utility object for pathfinding.
 	if (W3DDisplay::m_3DScene != nullptr)
 	{

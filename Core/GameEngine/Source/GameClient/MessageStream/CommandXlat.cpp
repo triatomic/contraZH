@@ -4361,6 +4361,36 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 
 #endif
 
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+		//-----------------------------------------------------------------------------------------
+		case GameMessage::MSG_META_DEMO_TOGGLE_AI_DEBUG:
+		{
+			// The terrain view also switches off column moves in AIGroup, so it stays out of multiplayer
+			if (!TheGameLogic->isInMultiplayerGame())
+			{
+				static const char *const modeNames[AI_DEBUG_END] = { "Off", "Paths", "Terrain", "Cells", "Ground paths", "Zones" };
+				TheWritableGlobalData->m_debugAI = (AIDebugOptions)((Int)TheGlobalData->m_debugAI + 1);
+				if (TheGlobalData->m_debugAI >= AI_DEBUG_END)
+				{
+					TheWritableGlobalData->m_debugAI=AI_DEBUG_NONE;
+				}
+
+				UnicodeString line;
+				line.format(L"Level %d, %hs", TheGlobalData->m_debugAI, modeNames[TheGlobalData->m_debugAI]);
+				if (TheGlobalData->m_debugAI != AI_DEBUG_NONE)
+				{
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:DebugAiDebugOn", L"Debug AI Mode is %s", line.str()) );
+				}
+				else
+				{
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugAiDebugOff", L"Debug AI Mode is OFF") );
+				}
+				disp = DESTROY_MESSAGE;
+			}
+			break;
+		}
+#endif
+
 		//-----------------------------------------------------------------------------------------
 		case GameMessage::MSG_META_BEGIN_FORCEMOVE:
 			DEBUG_ASSERTCRASH(!TheInGameUI->isInForceMoveToMode(), ("forceMoveToMode mismatch"));
@@ -5609,22 +5639,6 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 
 		//------------------------------------------------------------------------------- DEMO MESSAGES
 		//-----------------------------------------------------------------------------------------
-		case GameMessage::MSG_META_DEMO_TOGGLE_AI_DEBUG:
-		{
-			TheWritableGlobalData->m_debugAI = (AIDebugOptions)((Int)TheGlobalData->m_debugAI + 1);
-			if (TheGlobalData->m_debugAI >= AI_DEBUG_END)
-				TheWritableGlobalData->m_debugAI=AI_DEBUG_NONE;
-
-			UnicodeString line;
-			line.format(L"Level %d", TheGlobalData->m_debugAI);
-			if (TheGlobalData->m_debugAI != AI_DEBUG_NONE)
-				TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:DebugAiDebugOn", L"Debug AI Mode is %s", line.str()) );
-			else
-				TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugAiDebugOff", L"Debug AI Mode is OFF") );
-			disp = DESTROY_MESSAGE;
-			break;
-		}
-
 		//------------------------------------------------------------------------------- DEMO MESSAGES
 		//-----------------------------------------------------------------------------------------
 		case GameMessage::MSG_META_DEMO_TOGGLE_SUPPLY_CENTER_PLACEMENT:

@@ -2919,7 +2919,7 @@ void InGameUI::createGarrisonHint( const GameMessage *msg )
 	}
 }
 
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 #define AI_DEBUG_TOOLTIPS		1
 
 #ifdef AI_DEBUG_TOOLTIPS
@@ -2928,7 +2928,7 @@ void InGameUI::createGarrisonHint( const GameMessage *msg )
 #include "GameLogic/AIPathfind.h"
 #endif // AI_DEBUG_TOOLTIPS
 
-#endif // defined(RTS_DEBUG)
+#endif // defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 
 //-------------------------------------------------------------------------------------------------
 /** Details of what is mouse hovered over right now are in this message.  Terrain might result

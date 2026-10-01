@@ -498,7 +498,7 @@ public:
 	Bool connectsZones(PathfindZoneManager *zm, const LocomotorSet& locomotorSet,Int zone1, Int zone2);
 	Bool isPointOnWall(ObjectID *wallPieces, Int numPieces, const Coord3D *pt);
 
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	void doDebugIcons() ;
 #endif
 protected:
@@ -936,7 +936,7 @@ protected:
 
 	bool checkCellOutsideExtents(ICoord2D& cell);
 
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	void doDebugIcons() ;
 #endif
 

@@ -396,7 +396,7 @@ void Path::xfer( Xfer *xfer )
 
 	xfer->xferUnsignedShort(&m_moveUnderBridges);
 
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	if (TheGlobalData->m_debugAI == AI_DEBUG_PATHS)
 	{
 		extern void addIcon(const Coord3D *pos, Real width, Int numFramesDuration, RGBColor color);
@@ -3074,7 +3074,7 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 
 #endif
 #endif
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	if (TheGlobalData->m_debugAI == AI_DEBUG_ZONES)
 	{
 		extern void addIcon(const Coord3D *pos, Real width, Int numFramesDuration, RGBColor color);
@@ -3213,7 +3213,7 @@ void PathfindZoneManager::updateZonesForModify(PathfindCell **map, PathfindLayer
 	timeToUpdate = ((double)(endTime64-startTime64) / (double)(freq64));
 #endif
 #endif
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	if (TheGlobalData->m_debugAI==AI_DEBUG_ZONES)
 	{
 		extern void addIcon(const Coord3D *pos, Real width, Int numFramesDuration, RGBColor color);
@@ -3529,7 +3529,7 @@ Bool PathfindLayer::isUnused()
 /**
  * Draws debug cell info.
  */
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 void PathfindLayer::doDebugIcons() {
 	if (isUnused()) return;
 	extern void addIcon(const Coord3D *pos, Real width, Int numFramesDuration, RGBColor color);
@@ -5190,7 +5190,7 @@ void Pathfinder::debugShowSearch(  Bool pathFound  )
 	if (!TheGlobalData->m_debugAI) {
 		return;
 	}
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	extern void addIcon(const Coord3D *pos, Real width, Int numFramesDuration, RGBColor color);
 
 	// show all explored cells for debugging
@@ -6405,7 +6405,7 @@ Bool Pathfinder::queueForPath(ObjectID id)
 	return true;
 }
 
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 void Pathfinder::doDebugIcons() {
 	const Int FRAMES_TO_SHOW_OBSTACLES = 100;
 	extern void addIcon(const Coord3D *pos, Real width, Int numFramesDuration, RGBColor color);
@@ -6475,6 +6475,10 @@ void Pathfinder::doDebugIcons() {
 						default:
 							if (cell->getPinched()) {
 								color.blue = color.green = 0.7f;
+								empty = false;
+							} else if (cell->getClearance() <= 1) {
+								// Shore clearance: white touches water, cliff or the map edge, gray is one cell away
+								color.red = color.green = color.blue = (cell->getClearance() == 0) ? 1.0f : 0.5f;
 								empty = false;
 							}
 							break;
@@ -6661,7 +6665,7 @@ void Pathfinder::processPathfindQueue()
 #endif
 	}	
 #endif
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	doDebugIcons();
 #endif
 
@@ -7377,7 +7381,7 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 	}
 
 	// failure - goal cannot be reached
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 #ifdef INTENSE_DEBUG
 	DEBUG_LOG(("internal find path FAILURE..."));
 #endif
@@ -7535,7 +7539,7 @@ Path *Pathfinder::buildGroundPath(Bool isCrusher, const Coord3D *fromPos, Pathfi
 	path->optimizeGroundPath( isCrusher, pathDiameter );
 
 
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	if (TheGlobalData->m_debugAI==AI_DEBUG_GROUND_PATHS)
 	{
 		extern void addIcon(const Coord3D *pos, Real width, Int numFramesDuration, RGBColor color);
@@ -7601,7 +7605,7 @@ Path *Pathfinder::buildHierarchicalPath( const Coord3D *fromPos, PathfindCell *g
 	}
 #endif
 
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	if (TheGlobalData->m_debugAI==AI_DEBUG_PATHS)
 	{
 		extern void addIcon(const Coord3D *pos, Real width, Int numFramesDuration, RGBColor color);
@@ -7903,7 +7907,7 @@ Path *Pathfinder::findGroundPath( const Coord3D *from,
 	DEBUG_LOG((" time %d msec %d cells", (::GetTickCount()-startTimeMS), cellCount));
 	DEBUG_LOG((" SUCCESS"));
 #endif
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 			Bool show = TheGlobalData->m_debugAI==AI_DEBUG_GROUND_PATHS;
 			if (show)
 				debugShowSearch(true);
@@ -8076,7 +8080,7 @@ Path *Pathfinder::findGroundPath( const Coord3D *from,
 #ifdef INTENSE_DEBUG
 	DEBUG_LOG((" FAILURE"));
 #endif
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	if (TheGlobalData->m_debugAI)
 	{
 		extern void addIcon(const Coord3D *pos, Real width, Int numFramesDuration, RGBColor color);
@@ -8578,7 +8582,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 			s_pathfindStats.hierOk++;
 			// construct and return path
 			Path *path =  buildHierarchicalPath( from, goalCell );
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 			Bool show = TheGlobalData->m_debugAI==AI_DEBUG_PATHS;
 			show |= (TheGlobalData->m_debugAI==AI_DEBUG_GROUND_PATHS);
 			if (show)	{
@@ -8604,7 +8608,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 			return path;
 		}
 
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 #if 0
 		Bool show = TheGlobalData->m_debugAI==AI_DEBUG_PATHS;
 		show |= (TheGlobalData->m_debugAI==AI_DEBUG_GROUND_PATHS);
@@ -8788,7 +8792,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 	}
 
 	// failure - goal cannot be reached
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	if (TheGlobalData->m_debugAI)
 	{
 		extern void addIcon(const Coord3D *pos, Real width, Int numFramesDuration, RGBColor color);
@@ -9954,7 +9958,7 @@ Path *Pathfinder::findClosestPath( Object *obj, const LocomotorSet& locomotorSet
 	DEBUG_LOG(("Pathfind(findClosestPath) failed from (%f,%f) to (%f,%f), original valid %d --", TheGameLogic->getFrame(), from->x, from->y, to->x, to->y, valid));
 	DEBUG_LOG(("Unit '%s', time %f", obj->getTemplate()->getName().str(), (::GetTickCount()-startTimeMS)/1000.0f));
 #endif
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	if (TheGlobalData->m_debugAI)
 		debugShowSearch(false);
 #endif
@@ -10017,7 +10021,7 @@ Path *Pathfinder::buildActualPath( const Object *obj, LocomotorSurfaceTypeMask a
 	// cleanup the path by checking line of sight
 	path->optimize(obj, acceptableSurfaces, blocked, requiredWaterLevel);
 
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	if (TheGlobalData->m_debugAI==AI_DEBUG_PATHS)
 	{
 		extern void addIcon(const Coord3D *pos, Real width, Int numFramesDuration, RGBColor color);
@@ -11479,7 +11483,7 @@ Path *Pathfinder::getMoveAwayFromPath(Object* obj, Object *otherObj,
 		}
 	}
 
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	debugShowSearch(true);
 #endif
 
@@ -11572,7 +11576,7 @@ Path *Pathfinder::patchPath( const Object *obj, const LocomotorSet& locomotorSet
 	// until goal is found.
 	//
 
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	extern void addIcon(const Coord3D *pos, Real width, Int numFramesDuration, RGBColor color);
 	if (TheGlobalData->m_debugAI)
 	{
@@ -11595,7 +11599,7 @@ Path *Pathfinder::patchPath( const Object *obj, const LocomotorSet& locomotorSet
 		info.radius = radius;
 		info.considerTransient = blocked;
 		info.acceptableSurfaces = locomotorSet.getValidSurfaces();
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 		if (TheGlobalData->m_debugAI) {
 			RGBColor color;
 			color.setFromInt(0);
@@ -11706,7 +11710,7 @@ Path *Pathfinder::patchPath( const Object *obj, const LocomotorSet& locomotorSet
 	DEBUG_LOG(("%d patchPath Pathfind failed --", TheGameLogic->getFrame()));
 	DEBUG_LOG(("Unit '%s', time %f", obj->getTemplate()->getName().str(), (::GetTickCount()-startTimeMS)/1000.0f));
 
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	if (TheGlobalData->m_debugAI) {
 		debugShowSearch(true);
 	}
