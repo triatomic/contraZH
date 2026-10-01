@@ -1099,6 +1099,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 		if (fixInvalidPosition(obj, physics))
 		{
 			// the we adjusted us toward a legal position, so just return.
+			TheAI->pathfinder()->countStatEvent(PFE_INVALID_FIX);
 			return;
 		}
 	}

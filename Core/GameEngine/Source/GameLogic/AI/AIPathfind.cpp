@@ -149,6 +149,8 @@ struct PathfindStats
 	UnsignedInt maxCellsOneSearch; ///< largest single search
 	UnsignedInt zoneOverflow;      ///< cells that ran past the zone table
 	UnsignedInt rawZoneHighWater;  ///< raw zone count of the last zone calculation
+	UnsignedInt byType[PFS_SEARCH_COUNT];
+	UnsignedInt events[PFE_EVENT_COUNT];
 };
 static PathfindStats s_pathfindStats;
 
@@ -5385,8 +5387,9 @@ void Pathfinder::cleanOpenAndClosedLists() {
 /**
  * Sets the cell cap for the search about to start from what the frame has left
  */
-void Pathfinder::beginSearchBudget()
+void Pathfinder::beginSearchBudget( PathfindSearchType type )
 {
+	s_pathfindStats.byType[type]++;
 	Int remaining = PATHFIND_FRAME_CELL_LIMIT - m_cumulativeCellsAllocated;
 	if (remaining < PATHFIND_SEARCH_CELL_MIN) {
 		remaining = PATHFIND_SEARCH_CELL_MIN;
@@ -5397,6 +5400,11 @@ void Pathfinder::beginSearchBudget()
 	m_searchCellCap = remaining;
 	m_lastSearchHitCap = false;
 	s_pathfindStats.searches++;
+}
+
+void Pathfinder::countStatEvent( PathfindStatEvent event )
+{
+	s_pathfindStats.events[event]++;
 }
 
 
@@ -6686,9 +6694,11 @@ void Pathfinder::logStatsIfDue()
 	if (queued == 0 && stats.droppedQueue == 0 && stats.searches == 0 && stats.cells == 0 && stats.hierOk == 0 && stats.hierFail == 0 && stats.zoneOverflow == 0) {
 		return;
 	}
-	DEBUG_LOG(("PFSTAT f=%u queued=%d drop=%u srch=%u cap=%u hier=%u/%u cells=%u max=%u free=%d zones=%u/%u",
+	DEBUG_LOG(("PFSTAT f=%u queued=%d drop=%u srch=%u cap=%u hier=%u/%u cells=%u max=%u free=%d zones=%u/%u kind=%u/%u/%u/%u/%u/%u/%u zr=%u blk=%u fix=%u",
 		TheGameLogic->getFrame(), queued, stats.droppedQueue, stats.searches, stats.cappedSearches, stats.hierOk, stats.hierFail, stats.cells, stats.maxCellsOneSearch,
-		PathfindCellInfo::getFreeCount(), stats.rawZoneHighWater, stats.zoneOverflow));
+		PathfindCellInfo::getFreeCount(), stats.rawZoneHighWater, stats.zoneOverflow,
+		stats.byType[PFS_FIND], stats.byType[PFS_CLOSEST], stats.byType[PFS_PATCH], stats.byType[PFS_AWAY], stats.byType[PFS_ATTACK], stats.byType[PFS_SAFE], stats.byType[PFS_GROUND],
+		stats.events[PFE_ZONE_REJECT], stats.events[PFE_BLOCKED_REPATH], stats.events[PFE_INVALID_FIX]));
 	stats.droppedQueue = 0;
 	stats.searches = 0;
 	stats.cappedSearches = 0;
@@ -6697,6 +6707,8 @@ void Pathfinder::logStatsIfDue()
 	stats.cells = 0;
 	stats.maxCellsOneSearch = 0;
 	stats.zoneOverflow = 0;
+	memset(stats.byType, 0, sizeof(stats.byType));
+	memset(stats.events, 0, sizeof(stats.events));
 #endif
 }
 
@@ -7099,9 +7111,10 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 Path *Pathfinder::findPath( Object *obj, const LocomotorSet& locomotorSet, const Coord3D *from,
 													 const Coord3D *rawTo)
 {
-	beginSearchBudget();
+	beginSearchBudget(PFS_FIND);
 	Short requiredBridgeHeight = obj ? obj->getRequiredBridgeHeight() : 0;
 	if (!clientSafeQuickDoesPathExist(locomotorSet, requiredBridgeHeight, from, rawTo)) {
+		countStatEvent(PFE_ZONE_REJECT);
 		return nullptr;
 	}
 	Bool isHuman = true;
@@ -7750,7 +7763,7 @@ Path *Pathfinder::findGroundPath( const Coord3D *from,
 													 const Coord3D *rawTo, Int pathDiameter, Bool crusher)
 {
 	//CRCDEBUG_LOG(("Pathfinder::findGroundPath()"));
-	beginSearchBudget();
+	beginSearchBudget(PFS_GROUND);
 #ifdef DEBUG_LOGGING
 	Int startTimeMS = ::GetTickCount();
 #endif
@@ -9627,7 +9640,7 @@ Path *Pathfinder::findClosestPath( Object *obj, const LocomotorSet& locomotorSet
 																	Coord3D *rawTo, Bool blocked, Real pathCostMultiplier, Bool moveAllies)
 {
 	//CRCDEBUG_LOG(("Pathfinder::findClosestPath()"));
-	beginSearchBudget();
+	beginSearchBudget(PFS_CLOSEST);
 #ifdef DEBUG_LOGGING
 	Int startTimeMS = ::GetTickCount();
 #endif
@@ -11393,7 +11406,7 @@ Path *Pathfinder::getMoveAwayFromPath(Object* obj, Object *otherObj,
 	// until goal is found.
 	//
 
-	beginSearchBudget();
+	beginSearchBudget(PFS_AWAY);
 	Int awayCellCount = 0;
 
 	Real boxHalfWidth = radius*PATHFIND_CELL_SIZE_F - (PATHFIND_CELL_SIZE_F/4.0f);
@@ -11515,7 +11528,7 @@ Path *Pathfinder::patchPath( const Object *obj, const LocomotorSet& locomotorSet
 	Int startTimeMS = ::GetTickCount();
 #endif
 	if (originalPath==nullptr) return nullptr;
-	beginSearchBudget();
+	beginSearchBudget(PFS_PATCH);
 	Bool centerInCell;
 	Int radius;
 	getRadiusAndCenter(obj, radius, centerInCell);
@@ -11748,7 +11761,7 @@ Path *Pathfinder::findAttackPath( const Object *obj, const LocomotorSet& locomot
 	Int radius;
 	Bool centerInCell;
 	getRadiusAndCenter(obj, radius, centerInCell);
-	beginSearchBudget();
+	beginSearchBudget(PFS_ATTACK);
 
 	// Quick check:  See if moving couple of cells towards the victim will work.
 	{
@@ -12103,7 +12116,7 @@ Path *Pathfinder::findSafePath( const Object *obj, const LocomotorSet& locomotor
 #endif
 
 	const Int MAX_CELLS = MAX_SAFE_PATH_CELL_COUNT; // this is a rather expensive operation, so limit the search.
-	beginSearchBudget();
+	beginSearchBudget(PFS_SAFE);
 
 	Bool centerInCell;
 	Int radius;

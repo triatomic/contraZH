@@ -674,6 +674,28 @@ public:
 /**
  * The Pathfinding engine itself.
  */
+/// Which search a budget belongs to, for the PFSTAT counters
+enum PathfindSearchType CPP_11(: Int)
+{
+	PFS_FIND = 0,
+	PFS_CLOSEST,
+	PFS_PATCH,
+	PFS_AWAY,
+	PFS_ATTACK,
+	PFS_SAFE,
+	PFS_GROUND,
+	PFS_SEARCH_COUNT
+};
+
+/// Events outside the searches that the PFSTAT counters track
+enum PathfindStatEvent CPP_11(: Int)
+{
+	PFE_ZONE_REJECT = 0,   ///< findPath refused by the zone screen before searching
+	PFE_BLOCKED_REPATH,    ///< a move state repathing because its unit is blocked
+	PFE_INVALID_FIX,       ///< the locomotor shoving a unit off an invalid cell
+	PFE_EVENT_COUNT
+};
+
 /// One unit's entry in Pathfinder::assignGroupSlots
 struct PathfindSlotRequest
 {
@@ -755,7 +777,8 @@ public:
 	void removeBridge( PathfindLayerEnum layer ); ///< Releases the layer of a bridge that is being deleted.
 
 	void logStatsIfDue(); ///< Logs the per-second pathfinder counters.
-	void beginSearchBudget(); ///< Sets the cell cap for the search about to start.
+	void beginSearchBudget( PathfindSearchType type ); ///< Sets the cell cap for the search about to start.
+	void countStatEvent( PathfindStatEvent event ); ///< Adds one to a PFSTAT event counter.
 	Bool didLastSearchHitCap() const { return m_lastSearchHitCap; }
 
 	Bool findBrokenBridge(const LocomotorSet &locomotorSet, const Coord3D *from, const Coord3D *to, ObjectID *bridgeID);

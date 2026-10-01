@@ -1909,6 +1909,7 @@ StateReturnType AIInternalMoveToState::update()
 		forceRecompute = true;
 		blocked = true;
 		m_blockedRepathTimestamp = TheGameLogic->getFrame();
+		TheAI->pathfinder()->countStatEvent(PFE_BLOCKED_REPATH);
 		// Intense debug logging jba.
 		//DEBUG_LOG(("Info - Blocked - recomputing."));
 	}
