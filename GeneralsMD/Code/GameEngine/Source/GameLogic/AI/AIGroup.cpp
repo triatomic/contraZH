@@ -27,6 +27,7 @@
 // Author: Michael S. Booth, January 2002
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include <algorithm>
 
 #include "Common/ActionManager.h"
 #include "Common/BuildAssistant.h"
@@ -596,6 +597,57 @@ static void addSlotRequest(std::vector<PathfindSlotRequest>& requests, Object *o
 	requests.push_back(request);
 }
 
+// A unit joins a column only when its route passes within this reach, else the far half of a split group gets dragged to the leader
+static const Int COLUMN_JOIN_CELLS = 6;
+static const Real COLUMN_JOIN_FRACTION = 0.25f;
+
+static Bool columnPassesNear(Path *path, const Coord3D *unitPos)
+{
+	Real total = 0.0f;
+	for (PathNode *node = path->getFirstNode(); node && node->getNextOptimized(); node = node->getNextOptimized())
+	{
+		Coord2D seg;
+		seg.x = node->getNextOptimized()->getPosition()->x - node->getPosition()->x;
+		seg.y = node->getNextOptimized()->getPosition()->y - node->getPosition()->y;
+		total += seg.length();
+	}
+
+	Real bestDistSqr = -1.0f;
+	Real bestRemaining = 0.0f;
+	Real done = 0.0f;
+	for (PathNode *node = path->getFirstNode(); node; node = node->getNextOptimized())
+	{
+		const Coord3D *a = node->getPosition();
+		PathNode *nextNode = node->getNextOptimized();
+		Coord2D seg;
+		seg.x = 0.0f;
+		seg.y = 0.0f;
+		Real segLen = 0.0f;
+		if (nextNode)
+		{
+			seg.x = nextNode->getPosition()->x - a->x;
+			seg.y = nextNode->getPosition()->y - a->y;
+			segLen = seg.length();
+		}
+		Real t = 0.0f;
+		if (segLen > 0.0f)
+		{
+			t = ((unitPos->x - a->x)*seg.x + (unitPos->y - a->y)*seg.y) / (segLen*segLen);
+			t = MIN(1.0f, MAX(0.0f, t));
+		}
+		Real distSqr = sqr(unitPos->x - (a->x + seg.x*t)) + sqr(unitPos->y - (a->y + seg.y*t));
+		if (bestDistSqr < 0.0f || distSqr < bestDistSqr)
+		{
+			bestDistSqr = distSqr;
+			bestRemaining = total - (done + segLen*t);
+		}
+		done += segLen;
+	}
+
+	Real reach = MAX(COLUMN_JOIN_FRACTION * bestRemaining, COLUMN_JOIN_CELLS * PATHFIND_CELL_SIZE_F);
+	return bestDistSqr <= reach*reach;
+}
+
 //-------------------------------------------------------------------------------------------------
 // Internal function for moving a group of infantry as a column.
 //
@@ -763,7 +815,7 @@ static void clampToMap(Coord3D *dest, PlayerType pt)
 /**
  * Move to given position(s)
  */
-Bool AIGroup::friend_moveInfantryToPos( const Coord3D *pos, CommandSourceType cmdSource )
+Bool AIGroup::friend_moveInfantryToPos( const Coord3D *pos, CommandSourceType cmdSource, std::vector<Object *> &columnUnits )
 
 {
 	if (m_groundPath==nullptr) return false;
@@ -860,6 +912,10 @@ Bool AIGroup::friend_moveInfantryToPos( const Coord3D *pos, CommandSourceType cm
 			controllingPlayerType = (*i)->getControllingPlayer()->getPlayerType();
 		}
 		Coord3D unitPos = *((*i)->getPosition());
+		if (!columnPassesNear(m_groundPath, &unitPos))
+		{
+			continue;
+		}
 		TheAI->pathfinder()->removeGoal(*i);
 		dx = unitPos.x - center.x;
 		dy = unitPos.y - center.y;
@@ -1126,6 +1182,7 @@ Bool AIGroup::friend_moveInfantryToPos( const Coord3D *pos, CommandSourceType cm
 		}
 		path.push_back(dest);
 		ai->aiFollowPath( &path, nullptr, cmdSource );
+		columnUnits.push_back(theUnit);
 	}
 	return true;
 }
@@ -1241,7 +1298,7 @@ void AIGroup::friend_moveFormationToPos( const Coord3D *pos, CommandSourceType c
 /**
  * Move to given position(s)
  */
-Bool AIGroup::friend_moveVehicleToPos( const Coord3D *pos, CommandSourceType cmdSource )
+Bool AIGroup::friend_moveVehicleToPos( const Coord3D *pos, CommandSourceType cmdSource, std::vector<Object *> &columnUnits )
 
 {
 
@@ -1342,6 +1399,10 @@ Bool AIGroup::friend_moveVehicleToPos( const Coord3D *pos, CommandSourceType cmd
 			controllingPlayerType = (*i)->getControllingPlayer()->getPlayerType();
 		}
 		Coord3D unitPos = *((*i)->getPosition());
+		if (!columnPassesNear(m_groundPath, &unitPos))
+		{
+			continue;
+		}
 		TheAI->pathfinder()->removeGoal(*i);
 		Real dx, dy;
 		dx = unitPos.x - center.x;
@@ -1618,6 +1679,7 @@ Bool AIGroup::friend_moveVehicleToPos( const Coord3D *pos, CommandSourceType cmd
 		}
 		path.push_back(dest);
 		ai->aiFollowPath( &path, nullptr, cmdSource );
+		columnUnits.push_back(theUnit);
 	}
 	return true;
 }
@@ -1665,8 +1727,7 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
   Coord3D position = *p_posIn;
   Coord3D *pos = &position;
 
-	Bool didInfantry = false;
-	Bool didVehicles = false;
+	std::vector<Object *> columnUnits;
 	// compute current centroid of the team
 	Coord3D center;
 	Coord2D min;
@@ -1687,8 +1748,8 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 
 	if (!addWaypoint && !isFormation) {
 		friend_computeGroundPath(pos, cmdSource);
-		didInfantry = friend_moveInfantryToPos(pos, cmdSource);
-		didVehicles = friend_moveVehicleToPos(pos, cmdSource);
+		friend_moveInfantryToPos(pos, cmdSource, columnUnits);
+		friend_moveVehicleToPos(pos, cmdSource, columnUnits);
 	}
 	if (m_dirty)
 		recompute();
@@ -1772,19 +1833,12 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 		{
 			continue;
 		}
-		if ((*i)->isKindOf(KINDOF_INFANTRY) && didInfantry) {
-			continue;
-		}
-		if ((*i)->isKindOf(KINDOF_VEHICLE) && didVehicles)
+		// Units already sent down a column keep that order, except cliff jumpers which path on their own
+		if (std::find(columnUnits.begin(), columnUnits.end(), *i) != columnUnits.end())
 		{
-			if( (*i)->getAI()->isDoingGroundMovement() )
+			if ((*i)->isKindOf(KINDOF_INFANTRY) || !(*i)->isKindOf( KINDOF_CLIFF_JUMPER ))
 			{
-				Object *obj = (*i);
-				if( !obj->isKindOf( KINDOF_CLIFF_JUMPER ) )
-				{
-					//Not a cliff-jumper-offer unit.
-					continue;
-				}
+				continue;
 			}
 		}
 		Coord3D unitPos = *((*i)->getPosition());

@@ -130,6 +130,9 @@ and amphibious units are unchanged. Wheeled units no longer spin at the shore.
 an arrival cell in rings around the click, nearest units deepest, so the group arrives as a blob
 instead of spiralling outward. Attack-move and column moves end in the same slots. A click inside
 the group's footprint keeps every unit's relative offset as before.
+* A unit joins a column move only when the column's route passes within a quarter of its remaining
+length, or six cells, whichever is more. The rest path on their own. A group split across a river
+no longer drags its far half round to where the leader started instead of over the bridge.
 * Bridges: a path under a destroyed bridge no longer repaths every second, zone connectivity updates
 the frame after a bridge is destroyed or repaired instead of up to ten seconds later, destinations
 prefer the ground when the bridge above them is out, and a deleted bridge (flooded maps) frees its
