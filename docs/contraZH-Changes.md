@@ -138,9 +138,7 @@ the frame after a bridge is destroyed or repaired instead of up to ten seconds l
 prefer the ground when the bridge above them is out, and a deleted bridge (flooded maps) frees its
 pathfind layer.
 
-`DebugLogFile.txt` gets a `PFSTAT` line once a second while the pathfinder is busy: queue depth,
-dropped requests, searches and how many hit the cap, coarse hits and misses, cells used, free records
-and zone count.
+Cheat builds can log the pathfinder's counters; see [Pathfinding log](#pathfinding-log).
 
 Changes the simulation; affects replays, and all players need this build.
 
@@ -967,6 +965,18 @@ Notes:
 * Terrain mode also switches off column group moves, an original debugging hook. Judge group
 movement in Cells or Paths mode.
 * With the overlay on, the camera can scroll past the map edge.
+
+## Pathfinding log
+
+* `Keypad +` - (Starts writing `pathfinding.txt` next to the exe. `CHEAT_PATHFIND_LOG_ON`)
+* `Keypad -` - (Stops writing. `CHEAT_PATHFIND_LOG_OFF`)
+
+While on, a `PFSTAT` line lands once a second whenever the pathfinder did anything: requests waiting,
+requests refused by a full queue, searches and how many stopped at the cell cap, coarse hits and
+misses, cell records used, the largest search, records left, zone count, searches by kind (find,
+closest, patch, move-away, attack, safe, ground), zone screen refusals, blocked repaths, and units
+shoved off invalid cells. The file explains each field in its header. The first start in a session
+replaces the file, later starts append.
 
 ## Other cheat hotkeys
 

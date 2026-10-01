@@ -236,6 +236,8 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "CHEAT_CYCLE_TERRAIN_MODE",							  GameMessage::MSG_CHEAT_CYCLE_TERRAIN_MODE },
 	{ "CHEAT_TOGGLE_FACE_CULLING",							  GameMessage::MSG_CHEAT_TOGGLE_FACE_CULLING },
 	{ "CHEAT_SHOW_MODEL_NAMES",									  GameMessage::MSG_CHEAT_SHOW_MODEL_NAMES },
+	{ "CHEAT_PATHFIND_LOG_ON",									  GameMessage::MSG_CHEAT_PATHFIND_LOG_ON },
+	{ "CHEAT_PATHFIND_LOG_OFF",									  GameMessage::MSG_CHEAT_PATHFIND_LOG_OFF },
 	{ "CHEAT_ADD_CASH",									          GameMessage::MSG_CHEAT_ADD_CASH },
 	{ "CHEAT_GIVE_ALL_SCIENCES",					        GameMessage::MSG_CHEAT_GIVE_ALL_SCIENCES },
   { "CHEAT_GIVE_SCIENCEPURCHASEPOINTS",        	GameMessage::MSG_CHEAT_GIVE_SCIENCEPURCHASEPOINTS },
@@ -1118,6 +1120,25 @@ void MetaMap::generateMetaMap()
 			map->m_key = MK_A;
 			map->m_transition = DOWN;
 			map->m_modState = CTRL;
+			map->m_usableIn = COMMANDUSABLE_GAME;
+		}
+	}
+	{
+		// Pathfinder counter log on the bare keypad plus and minus, which no map binds without a modifier.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_PATHFIND_LOG_ON);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_KPPLUS;
+			map->m_transition = DOWN;
+			map->m_modState = NONE;
+			map->m_usableIn = COMMANDUSABLE_GAME;
+		}
+		map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_PATHFIND_LOG_OFF);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_KPMINUS;
+			map->m_transition = DOWN;
+			map->m_modState = NONE;
 			map->m_usableIn = COMMANDUSABLE_GAME;
 		}
 	}

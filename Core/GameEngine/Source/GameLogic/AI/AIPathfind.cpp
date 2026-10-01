@@ -153,6 +153,8 @@ struct PathfindStats
 	UnsignedInt events[PFE_EVENT_COUNT];
 };
 static PathfindStats s_pathfindStats;
+static Bool s_statsLogging = false;
+static FILE *s_statsFile = nullptr;
 
 //-----------------------------------------------------------------------------------
 PathNode::PathNode() :
@@ -6681,11 +6683,48 @@ void Pathfinder::processPathfindQueue()
 }
 
 /**
- * Once a second, log the pathfinder counters when anything happened
+ * Opens pathfinding.txt beside the exe on the first enable and appends on later ones
+ */
+void Pathfinder::setStatsLogging( Bool enable )
+{
+	if (enable && s_statsFile == nullptr) {
+		static Bool everOpened = false;
+		char dir[_MAX_PATH];
+		::GetModuleFileName(nullptr, dir, sizeof(dir));
+		char *end = strrchr(dir, '\\');
+		if (end) {
+			*(end + 1) = 0;
+		} else {
+			dir[0] = 0;
+		}
+		char filename[_MAX_PATH];
+		snprintf(filename, sizeof(filename), "%spathfinding.txt", dir);
+		s_statsFile = fopen(filename, everOpened ? "a" : "w");
+		everOpened = true;
+		if (s_statsFile) {
+			fprintf(s_statsFile, "Pathfinding log on at frame %u. One line a second while the pathfinder is busy.\n", TheGameLogic->getFrame());
+			fprintf(s_statsFile, "queued: requests waiting  drop: refused by a full queue  srch: searches  cap: stopped at the cell cap  hier: coarse ok/fail\n");
+			fprintf(s_statsFile, "cells: cell records used  max: largest search  free: records left  zones: raw count/overflow\n");
+			fprintf(s_statsFile, "kind: find/closest/patch/away/attack/safe/ground  zr: zone screen refusals  blk: blocked repaths  fix: shoved off invalid cells\n");
+			fflush(s_statsFile);
+		}
+	}
+	if (!enable && s_statsFile) {
+		fprintf(s_statsFile, "Pathfinding log off at frame %u.\n", TheGameLogic->getFrame());
+		fclose(s_statsFile);
+		s_statsFile = nullptr;
+	}
+	s_statsLogging = enable && s_statsFile != nullptr;
+}
+
+/**
+ * Once a second, write the pathfinder counters when anything happened
  */
 void Pathfinder::logStatsIfDue()
 {
-#ifdef DEBUG_LOGGING
+	if (!s_statsLogging || s_statsFile == nullptr) {
+		return;
+	}
 	if (TheGameLogic->getFrame() % LOGICFRAMES_PER_SECOND != 0) {
 		return;
 	}
@@ -6694,11 +6733,12 @@ void Pathfinder::logStatsIfDue()
 	if (queued == 0 && stats.droppedQueue == 0 && stats.searches == 0 && stats.cells == 0 && stats.hierOk == 0 && stats.hierFail == 0 && stats.zoneOverflow == 0) {
 		return;
 	}
-	DEBUG_LOG(("PFSTAT f=%u queued=%d drop=%u srch=%u cap=%u hier=%u/%u cells=%u max=%u free=%d zones=%u/%u kind=%u/%u/%u/%u/%u/%u/%u zr=%u blk=%u fix=%u",
+	fprintf(s_statsFile, "PFSTAT f=%u queued=%d drop=%u srch=%u cap=%u hier=%u/%u cells=%u max=%u free=%d zones=%u/%u kind=%u/%u/%u/%u/%u/%u/%u zr=%u blk=%u fix=%u\n",
 		TheGameLogic->getFrame(), queued, stats.droppedQueue, stats.searches, stats.cappedSearches, stats.hierOk, stats.hierFail, stats.cells, stats.maxCellsOneSearch,
 		PathfindCellInfo::getFreeCount(), stats.rawZoneHighWater, stats.zoneOverflow,
 		stats.byType[PFS_FIND], stats.byType[PFS_CLOSEST], stats.byType[PFS_PATCH], stats.byType[PFS_AWAY], stats.byType[PFS_ATTACK], stats.byType[PFS_SAFE], stats.byType[PFS_GROUND],
-		stats.events[PFE_ZONE_REJECT], stats.events[PFE_BLOCKED_REPATH], stats.events[PFE_INVALID_FIX]));
+		stats.events[PFE_ZONE_REJECT], stats.events[PFE_BLOCKED_REPATH], stats.events[PFE_INVALID_FIX]);
+	fflush(s_statsFile);
 	stats.droppedQueue = 0;
 	stats.searches = 0;
 	stats.cappedSearches = 0;
@@ -6709,7 +6749,6 @@ void Pathfinder::logStatsIfDue()
 	stats.zoneOverflow = 0;
 	memset(stats.byType, 0, sizeof(stats.byType));
 	memset(stats.events, 0, sizeof(stats.events));
-#endif
 }
 
 

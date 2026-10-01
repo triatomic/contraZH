@@ -776,7 +776,8 @@ public:
 	void changeBridgeState( PathfindLayerEnum layer, Bool repaired );
 	void removeBridge( PathfindLayerEnum layer ); ///< Releases the layer of a bridge that is being deleted.
 
-	void logStatsIfDue(); ///< Logs the per-second pathfinder counters.
+	void logStatsIfDue(); ///< Writes the per-second pathfinder counters while logging is on.
+	void setStatsLogging( Bool enable ); ///< Starts or stops the counter log, written to pathfinding.txt beside the exe.
 	void beginSearchBudget( PathfindSearchType type ); ///< Sets the cell cap for the search about to start.
 	void countStatEvent( PathfindStatEvent event ); ///< Adds one to a PFSTAT event counter.
 	Bool didLastSearchHitCap() const { return m_lastSearchHitCap; }

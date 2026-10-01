@@ -72,6 +72,7 @@
 #include "GameClient/SelectionXlat.h"
 #include "GameClient/TerrainVisual.h"
 
+#include "GameLogic/AIPathfind.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
@@ -4355,6 +4356,26 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 				TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugFaceCullingOff", L"Face Culling: Off (Double Sided)") );
 			}
 
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
+		case GameMessage::MSG_CHEAT_PATHFIND_LOG_ON:
+		case GameMessage::MSG_CHEAT_PATHFIND_LOG_OFF:
+		{
+			const Bool enable = (t == GameMessage::MSG_CHEAT_PATHFIND_LOG_ON);
+			if (TheAI && TheAI->pathfinder())
+			{
+				TheAI->pathfinder()->setStatsLogging(enable);
+			}
+			if (enable)
+			{
+				TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:PathfindLogOn", L"Pathfinding log: On (pathfinding.txt)") );
+			}
+			else
+			{
+				TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:PathfindLogOff", L"Pathfinding log: Off") );
+			}
 			disp = DESTROY_MESSAGE;
 			break;
 		}
