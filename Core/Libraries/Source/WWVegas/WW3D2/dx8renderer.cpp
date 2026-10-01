@@ -2847,13 +2847,20 @@ void DX8TextureCategoryClass::Render_Task(PolyRenderTaskClass * prt, VertexMater
 
 			if (mesh->Get_Alpha_Override() != 1.0)
 			{
+				// an unlit additive layer ignores the material, so the texture factor fades it
+				const bool unlitLayer = !mesh->Is_Additive() && Is_Additive() && !theShader.Uses_Primary_Gradient();
+				if (unlitLayer)
+				{
+					theAlphaShader = theShader;
+					theAlphaShader.Set_Primary_Gradient(ShaderClass::GRADIENT_MODULATE);
+				}
 				if (mesh->Is_Additive())
 				{	//additvie blended mesh can't switch to alpha or we will get a black outline.
 					//so adjust diffuse color instead.
 					//DEBUG_LOG((">>>DX8Renderer: ADDITIVE + ALPHA OVERRIDE - alpha = %f", mesh->Get_Alpha_Override()));
 					vmaterial->Set_Diffuse(mesh->Get_Alpha_Override(),mesh->Get_Alpha_Override(),mesh->Get_Alpha_Override());
 
-					vmaterial->Set_Emissive(mesh->Get_Emissive_Override(), mesh->Get_Emissive_Override(), mesh->Get_Emissive_Override());
+					vmaterial->Set_Emissive(oldEmissive.X * mesh->Get_Emissive_Override(), oldEmissive.Y * mesh->Get_Emissive_Override(), oldEmissive.Z * mesh->Get_Emissive_Override());
 
 					theAlphaShader = theShader;	//keep using additive blending.
 				}
@@ -2861,9 +2868,19 @@ void DX8TextureCategoryClass::Render_Task(PolyRenderTaskClass * prt, VertexMater
 				DX8Wrapper::Set_Shader(theAlphaShader);
 				DX8Wrapper::Apply_Render_State_Changes();
 				DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHAREF,(int)((float)0x60*mesh->Get_Alpha_Override()));
+				if (unlitLayer)
+				{
+					const unsigned level = (unsigned)(WWMath::Clamp(mesh->Get_Alpha_Override(), 0.0f, 1.0f) * 255.0f);
+					DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, D3DCOLOR_ARGB(255, level, level, level));
+					DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_COLORARG2, D3DTA_TFACTOR);
+				}
 
 				Draw_Polygons(container,renderer,mesh,vmaterial,replay);
 
+				if (unlitLayer)
+				{
+					ShaderClass::Invalidate();
+				}
 				DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHAREF,0x60);
 				vmaterial->Set_Opacity(oldOpacity);	//restore previous value
 				vmaterial->Set_Diffuse(oldDiffuse.X,oldDiffuse.Y,oldDiffuse.Z);

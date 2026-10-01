@@ -89,6 +89,7 @@
 #include "WWLib/simplevec.h"
 #include "WWLib/realcrc.h"
 #include "dx8wrapper.h"
+#include <algorithm>
 
 #ifdef _UNIX
 #include "osdep/osdep.h"
@@ -1666,6 +1667,8 @@ void MeshModelClass::post_process()
 
 	}
 
+	post_process_night_lights();
+
 	// fog activation.
 	if (WW3DAssetManager::Get_Instance()->Get_Activate_Fog_On_Load()) {
 		post_process_fog();
@@ -1767,6 +1770,79 @@ void MeshModelClass::post_process_fog()
 		if (DefMatDesc->ShaderArray [pass]) {
 			for (int tri = 0; tri < DefMatDesc->ShaderArray [pass]->Get_Count(); tri++) {
 				DefMatDesc->ShaderArray [pass]->Get_Element (tri).Enable_Fog (Get_Name());
+			}
+		}
+	}
+}
+
+// Retail night models draw unlit lights first and add the lit skin, so bloom and lighting take the wrong pass for the base.
+void MeshModelClass::post_process_night_lights()
+{
+	MeshMatDescClass * desc = DefMatDesc;
+	if (AlternateMatDesc != nullptr || desc->PassCount != 2 || desc->ShaderArray[0] != nullptr || desc->ShaderArray[1] != nullptr)
+	{
+		return;
+	}
+
+	// a mapped pass is a shine or environment layer
+	for (int pass = 0; pass < 2; pass++)
+	{
+		VertexMaterialClass * material = desc->Material[pass];
+		if (material == nullptr || material->Peek_Mapper(0) != nullptr || material->Peek_Mapper(1) != nullptr)
+		{
+			return;
+		}
+	}
+
+	ShaderClass & shader0 = desc->Shader[0];
+	ShaderClass & shader1 = desc->Shader[1];
+
+	const bool unlit_base = shader0.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_ONE &&
+									shader0.Get_Dst_Blend_Func() == ShaderClass::DSTBLEND_ZERO &&
+									shader0.Get_Texturing() == ShaderClass::TEXTURING_ENABLE &&
+									!shader0.Uses_Primary_Gradient();
+
+	const bool lit_additive = shader1.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_ONE &&
+									  shader1.Get_Dst_Blend_Func() == ShaderClass::DSTBLEND_ONE &&
+									  shader1.Get_Alpha_Test() == ShaderClass::ALPHATEST_DISABLE &&
+									  shader1.Get_Texturing() == ShaderClass::TEXTURING_ENABLE &&
+									  shader1.Uses_Primary_Gradient();
+
+	if (!unlit_base || !lit_additive)
+	{
+		return;
+	}
+
+	// each slot keeps its blend, depth write and alpha test
+	const ShaderClass base = shader0;
+	const ShaderClass additive = shader1;
+	desc->Swap_Passes(0, 1);
+	shader0.Set_Dst_Blend_Func(base.Get_Dst_Blend_Func());
+	shader0.Set_Depth_Mask(base.Get_Depth_Mask());
+	shader0.Set_Alpha_Test(base.Get_Alpha_Test());
+	shader1.Set_Dst_Blend_Func(additive.Get_Dst_Blend_Func());
+	shader1.Set_Depth_Mask(additive.Get_Depth_Mask());
+	shader1.Set_Alpha_Test(additive.Get_Alpha_Test());
+
+	// shader lighting needs the base pass on uv set 0
+	const int skin_uv = desc->UVSource[0][0];
+	if (skin_uv > 0)
+	{
+		std::swap(desc->UV[0], desc->UV[skin_uv]);
+		for (int pass = 0; pass < 2; pass++)
+		{
+			for (int stage = 0; stage < MeshMatDescClass::MAX_TEX_STAGES; stage++)
+			{
+				int & source = desc->UVSource[pass][stage];
+				if (source == 0)
+				{
+					source = skin_uv;
+				}
+				else if (source == skin_uv)
+				{
+					source = 0;
+				}
+				desc->Material[pass]->Set_UV_Source(stage, (source == -1) ? 0 : source);
 			}
 		}
 	}

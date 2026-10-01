@@ -193,6 +193,7 @@ protected:
 	void							Configure_Material(VertexMaterialClass * mtl,int pass,bool lighting_enabled);
 	void							Disable_Backface_Culling();
 	void							Delete_Pass(int pass);
+	void							Swap_Passes(int a,int b);
 
 	int													PassCount;
 	int													VertexCount;

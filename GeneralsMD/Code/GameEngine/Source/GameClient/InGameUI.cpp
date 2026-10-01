@@ -1246,6 +1246,7 @@ InGameUI::InGameUI()
 	m_commandSetOverlayOn = FALSE;
 	m_weaponSetOverlayOn = FALSE;
 	m_armorSetOverlayOn = FALSE;
+	m_modelNameOverlayOn = FALSE;
 	m_laserNameOverlayOn = FALSE;
 	m_laserBeamBlockOverlayOn = FALSE;
 #endif

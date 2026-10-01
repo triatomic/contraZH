@@ -303,6 +303,7 @@ protected:
 	// post-processing
 	void post_process();
 	void post_process_fog();
+	void post_process_night_lights();
 
 	unsigned int get_sort_flags(int pass) const;
 	unsigned int get_sort_flags() const;

@@ -235,6 +235,7 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "CHEAT_CYCLE_SKYBOX",									  GameMessage::MSG_CHEAT_CYCLE_SKYBOX },
 	{ "CHEAT_CYCLE_TERRAIN_MODE",							  GameMessage::MSG_CHEAT_CYCLE_TERRAIN_MODE },
 	{ "CHEAT_TOGGLE_FACE_CULLING",							  GameMessage::MSG_CHEAT_TOGGLE_FACE_CULLING },
+	{ "CHEAT_SHOW_MODEL_NAMES",									  GameMessage::MSG_CHEAT_SHOW_MODEL_NAMES },
 	{ "CHEAT_ADD_CASH",									          GameMessage::MSG_CHEAT_ADD_CASH },
 	{ "CHEAT_GIVE_ALL_SCIENCES",					        GameMessage::MSG_CHEAT_GIVE_ALL_SCIENCES },
   { "CHEAT_GIVE_SCIENCEPURCHASEPOINTS",        	GameMessage::MSG_CHEAT_GIVE_SCIENCEPURCHASEPOINTS },
@@ -1014,10 +1015,20 @@ void MetaMap::generateMetaMap()
 		}
 	}
 	{
-		// TheSuperHackers @feature Show the Armor an object currently uses. Ctrl+/ continues the run
-		// of punctuation keys the other overlays took, and is likewise unbound in the engine defaults,
-		// in Contra's CommandMap.ini and in the demo map.
+		// TheSuperHackers @feature Show the Armor an object currently uses. Ctrl+- is unbound in the
+		// engine defaults and in the demo map.
 		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_SHOW_ARMOR_SET);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_MINUS;
+			map->m_transition = DOWN;
+			map->m_modState = CTRL;
+			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
+		}
+	}
+	{
+		// Show the W3D model each draw module has loaded.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_SHOW_MODEL_NAMES);
 		if (map->m_key == MK_NONE)
 		{
 			map->m_key = MK_SLASH;

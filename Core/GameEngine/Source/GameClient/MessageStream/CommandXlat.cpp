@@ -4207,6 +4207,19 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			break;
 		}
 
+		// Toggle the model name overlay, one callout per draw module, pointing at that module's model.
+		case GameMessage::MSG_CHEAT_SHOW_MODEL_NAMES:
+		{
+			TheInGameUI->toggleModelNameOverlay();
+
+			TheInGameUI->messageNoFormat( TheInGameUI->isModelNameOverlayOn()
+				? TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugModelNameOverlayOn", L"Model Names are ON")
+				: TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugModelNameOverlayOff", L"Model Names are OFF") );
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
 		// Toggle the laser name overlay, drawn at the middle of each beam.
 		case GameMessage::MSG_CHEAT_SHOW_LASER_NAME:
 		{

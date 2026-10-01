@@ -4353,6 +4353,24 @@ Int W3DModelDraw::clientOnly_getSubObjectNames(AsciiString* names, Int maxNames)
 
 	return total;
 }
+
+//-------------------------------------------------------------------------------------------------
+Bool W3DModelDraw::clientOnly_getModelNameAndCenter(AsciiString* name, Coord3D* center) const
+{
+	if (m_renderObject == nullptr || m_curState == nullptr)
+	{
+		return false;
+	}
+
+	*name = m_curState->m_modelName;
+
+	const Vector3 &sphereCenter = m_renderObject->Get_Bounding_Sphere().Center;
+	center->x = sphereCenter.X;
+	center->y = sphereCenter.Y;
+	center->z = sphereCenter.Z;
+
+	return true;
+}
 #endif
 
 

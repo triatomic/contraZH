@@ -43,6 +43,7 @@
 #include	"dx8wrapper.h"
 #include "dx8caps.h"
 #include "meshmdl.h"
+#include <algorithm>
 
 
 /**************************************************************************************************
@@ -636,6 +637,23 @@ void MeshMatDescClass::Install_UV_Array(int pass,int stage,Vector2 * uvs,int cou
 			UV[new_index]->Update_CRC();  // update the crc for future comparision
 			Set_UV_Source(pass,stage,new_index);
 		}
+	}
+}
+
+
+void MeshMatDescClass::Swap_Passes(int a,int b)
+{
+	std::swap(Shader[a], Shader[b]);
+	std::swap(ShaderArray[a], ShaderArray[b]);
+	std::swap(Material[a], Material[b]);
+	std::swap(MaterialArray[a], MaterialArray[b]);
+	std::swap(DCGSource[a], DCGSource[b]);
+	std::swap(DIGSource[a], DIGSource[b]);
+
+	for (int stage=0; stage<MAX_TEX_STAGES; stage++) {
+		std::swap(Texture[a][stage], Texture[b][stage]);
+		std::swap(TextureArray[a][stage], TextureArray[b][stage]);
+		std::swap(UVSource[a][stage], UVSource[b][stage]);
 	}
 }
 

@@ -3047,6 +3047,25 @@ static const Int MAX_OVERLAY_PARTICLE_LINES = 4;
 // rather than pretending the list is complete when it does not.
 static const Int MAX_OVERLAY_SUBOBJECT_LINES = 16;
 
+// A model label is a callout: its leader runs this far out and up from the model's centre.
+static const Int MODEL_LABEL_REACH_X = 44;
+static const Int MODEL_LABEL_REACH_Y = 22;
+
+// Pixels between the end of the leader and the text.
+static const Int MODEL_LABEL_GAP = 3;
+
+// A model this close to the middle of its object's models has no side of its own.
+static const Int MODEL_LABEL_SIDE_SLOP = 8;
+
+// Most models labelled on one object.
+static const Int MAX_OVERLAY_MODEL_LABELS = 16;
+
+// Model labels placed this render frame, so labels that would overlap push above each other.
+static const Int MAX_MODEL_OVERLAY_SLOTS = 256;
+static IRegion2D s_modelOverlaySlots[ MAX_MODEL_OVERLAY_SLOTS ];
+static Int s_modelOverlaySlotCount = 0;
+static UnsignedInt s_modelOverlayFrame = 0;
+
 // Most W3DLaserDraw module tags listed for one laser.
 static const Int MAX_OVERLAY_LASER_BLOCK_LINES = 4;
 
@@ -3278,7 +3297,8 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 	const Bool wantCommandSet = TheInGameUI->isCommandSetOverlayOn();
 	const Bool wantWeaponSet = TheInGameUI->isWeaponSetOverlayOn();
 	const Bool wantArmorSet = TheInGameUI->isArmorSetOverlayOn();
-	if( !wantObjectName && !wantParticleNames && !wantCommandSet && !wantWeaponSet && !wantArmorSet )
+	const Bool wantModelNames = TheInGameUI->isModelNameOverlayOn();
+	if( !wantObjectName && !wantParticleNames && !wantCommandSet && !wantWeaponSet && !wantArmorSet && !wantModelNames )
 		return;
 
 	const Object *obj = getObject();
@@ -3331,6 +3351,7 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 	const Color weaponSetColor = GameMakeColor( 225, 110, 110, 255 );
 	// Light blue for the armor line under the weapons, well clear of the red above it.
 	const Color armorSetColor = GameMakeColor( 130, 200, 255, 255 );
+	const Color modelNameColor = GameMakeColor( 90, 225, 195, 255 );
 
 	// Lines stack upward from just above the bar, so adding particle names never pushes the object
 	// name off its anchor.
@@ -3507,6 +3528,113 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 			UnicodeString more;
 			more.format( L"... and %d more", total - shown );
 			drawOverlayLine( s_nameString, more, anchor.x, lineY, subObjectColor, dropColor );
+		}
+	}
+
+	// Each model gets a callout rather than a line in the stack: a leader runs from the model's
+	// centre out to one side, and the name sits at the end of it.
+	if( wantModelNames && TheTacticalView != nullptr )
+	{
+		const UnsignedInt renderFrame = WW3D::Get_Frame_Count();
+		if( renderFrame != s_modelOverlayFrame )
+		{
+			s_modelOverlayFrame = renderFrame;
+			s_modelOverlaySlotCount = 0;
+		}
+
+		AsciiString modelNames[ MAX_OVERLAY_MODEL_LABELS ];
+		ICoord2D modelPoints[ MAX_OVERLAY_MODEL_LABELS ];
+		Int modelCount = 0;
+		Int sumX = 0;
+
+		for( DrawModule **dm = getDrawModulesNonDirty(); dm && *dm && modelCount < MAX_OVERLAY_MODEL_LABELS; ++dm )
+		{
+			const ObjectDrawInterface *di = (*dm)->getObjectDrawInterface();
+			if( di == nullptr )
+			{
+				continue;
+			}
+
+			Coord3D center;
+			if( !di->clientOnly_getModelNameAndCenter( &modelNames[ modelCount ], &center ) )
+			{
+				continue;
+			}
+
+			if( !TheTacticalView->worldToScreen( &center, &modelPoints[ modelCount ] ) )
+			{
+				continue;
+			}
+
+			sumX += modelPoints[ modelCount ].x;
+			++modelCount;
+		}
+
+		const Int middleX = ( modelCount > 0 ) ? ( sumX / modelCount ) : 0;
+
+		for( Int m = 0; m < modelCount; ++m )
+		{
+			const ICoord2D &point = modelPoints[m];
+
+			// A label goes out on the side its model is on, so the leaders fan apart; models at the middle alternate.
+			Bool toLeft = ( ( m & 1 ) == 0 );
+			if( point.x < middleX - MODEL_LABEL_SIDE_SLOP )
+			{
+				toLeft = TRUE;
+			}
+			else if( point.x > middleX + MODEL_LABEL_SIDE_SLOP )
+			{
+				toLeft = FALSE;
+			}
+
+			UnicodeString line;
+			line.format( L"%hs", modelNames[m].str() );
+			s_nameString->setText( line );
+
+			Int width, height;
+			s_nameString->getSize( &width, &height );
+
+			const Int leaderEndX = toLeft ? ( point.x - MODEL_LABEL_REACH_X ) : ( point.x + MODEL_LABEL_REACH_X );
+
+			IRegion2D rect;
+			rect.lo.x = toLeft ? ( leaderEndX - MODEL_LABEL_GAP - width ) : ( leaderEndX + MODEL_LABEL_GAP );
+			rect.hi.x = rect.lo.x + width;
+			rect.lo.y = point.y - MODEL_LABEL_REACH_Y - ( height / 2 );
+			rect.hi.y = rect.lo.y + height;
+
+			// Each push clears one placed label for good, so a pass per slot settles it.
+			for( Int pass = 0; pass <= s_modelOverlaySlotCount; ++pass )
+			{
+				Bool moved = FALSE;
+				for( Int i = 0; i < s_modelOverlaySlotCount; ++i )
+				{
+					const IRegion2D &slot = s_modelOverlaySlots[i];
+					if( rect.lo.x >= slot.hi.x || rect.hi.x <= slot.lo.x ||
+							rect.lo.y >= slot.hi.y || rect.hi.y <= slot.lo.y )
+					{
+						continue;
+					}
+
+					const Int shift = rect.hi.y - slot.lo.y;
+					rect.lo.y -= shift;
+					rect.hi.y -= shift;
+					moved = TRUE;
+				}
+
+				if( !moved )
+				{
+					break;
+				}
+			}
+
+			if( s_modelOverlaySlotCount < MAX_MODEL_OVERLAY_SLOTS )
+			{
+				s_modelOverlaySlots[ s_modelOverlaySlotCount++ ] = rect;
+			}
+
+			// The leader ends level with the middle of the text, wherever the push left it.
+			TheDisplay->drawLine( point.x, point.y, leaderEndX, ( rect.lo.y + rect.hi.y ) / 2, 1.0f, modelNameColor );
+			s_nameString->draw( rect.lo.x, rect.lo.y, modelNameColor, dropColor );
 		}
 	}
 
