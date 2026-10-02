@@ -7,6 +7,8 @@
 #error "GeneralsOnline sources must only be compiled with RTS_BUILD_GENERALS_ONLINE=ON"
 #endif
 
+//#define WORLD_SERIES_CLIENT 1
+
 #define GENERALS_ONLINE_COMMUNITY_PATCH_CHANGES 1
 
 #define GENERALS_ONLINE_USE_PLUGINS_INTERFACE
