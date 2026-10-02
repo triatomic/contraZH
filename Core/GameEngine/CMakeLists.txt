@@ -516,6 +516,7 @@ set(GAMEENGINE_SRC
      Include/GameLogic/Pathfinder/PathfindLayer.h
      Include/GameLogic/Pathfinder/PathfindZoneManager.h
      Include/GameLogic/Pathfinder/PathNode.h
+     Include/GameLogic/Pathfinder/PathThreats.h
      Include/GameLogic/Pathfinder/ZoneBlock.h
 #    Include/GameLogic/PartitionManager.h
     Include/GameLogic/PolygonTrigger.h
@@ -898,6 +899,7 @@ set(GAMEENGINE_SRC
 #    Source/GameLogic/AI/AISkirmishPlayer.cpp
 #    Source/GameLogic/AI/AIStates.cpp
 #    Source/GameLogic/AI/AITNGuard.cpp
+    Source/GameLogic/AI/Pathfinder/Path.cpp
     Source/GameLogic/AI/Pathfinder/PathNode.cpp
 #    Source/GameLogic/AI/Squad.cpp
 #    Source/GameLogic/AI/TurretAI.cpp
