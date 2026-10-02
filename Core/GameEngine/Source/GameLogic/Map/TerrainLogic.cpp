@@ -2931,12 +2931,16 @@ void TerrainLogic::flattenTerrain(Object *obj)
 			iMin.y = REAL_TO_INT_FLOOR(minY/MAP_XY_FACTOR);
 			iMax.x = REAL_TO_INT_FLOOR(maxX/MAP_XY_FACTOR);
 			iMax.y = REAL_TO_INT_FLOOR(maxY/MAP_XY_FACTOR);
+#if RETAIL_COMPATIBLE_CRC
+			// TheSuperHackers @info bobtista 29/09/2026 Retail scans from row 0, so rows below the map edge stay untouched.
+			iMin.y = std::max(0, iMin.y);
+#endif
 
 			Int i, j;
 			Real totalHeight = 0;
 			Int numSamples = 0;
 			for (i=iMin.x; i<=iMax.x; i++) {
-				for (j=0; j<=iMax.y; j++) {
+				for (j=iMin.y; j<=iMax.y; ++j) {
 					Vector3	testPt(i*MAP_XY_FACTOR, j*MAP_XY_FACTOR, 0);
 					Bool match = false;
 					unsigned char flags;
@@ -2962,7 +2966,7 @@ void TerrainLogic::flattenTerrain(Object *obj)
 			if (rawDataHeight>centerHeight) rawDataHeight = centerHeight;
 
 			for (i=iMin.x; i<=iMax.x; i++) {
-				for (j=0; j<=iMax.y; j++) {
+				for (j=iMin.y; j<=iMax.y; ++j) {
 					Vector3	testPt(i*MAP_XY_FACTOR, j*MAP_XY_FACTOR, 0);
 					Bool match = false;
 					unsigned char flags;
@@ -3022,12 +3026,16 @@ void TerrainLogic::flattenTerrain(Object *obj)
 			iMin.y = REAL_TO_INT_FLOOR((pos->y-radius)/MAP_XY_FACTOR);
 			iMax.x = REAL_TO_INT_FLOOR((pos->x+radius)/MAP_XY_FACTOR);
 			iMax.y = REAL_TO_INT_FLOOR((pos->y+radius)/MAP_XY_FACTOR);
+#if RETAIL_COMPATIBLE_CRC
+			// TheSuperHackers @info bobtista 29/09/2026 Retail scans from row 0, so rows below the map edge stay untouched.
+			iMin.y = std::max(0, iMin.y);
+#endif
 
 			Int i, j;
 			Real totalHeight = 0;
 			Int numSamples = 0;
 			for (i=iMin.x; i<=iMax.x; i++) {
-				for (j=0; j<=iMax.y; j++) {
+				for (j=iMin.y; j<=iMax.y; ++j) {
 					Vector3	testPt(i*MAP_XY_FACTOR, j*MAP_XY_FACTOR, 0);
 					Bool match = false;
 					Real dx = testPt.X - pos->x;
@@ -3045,7 +3053,7 @@ void TerrainLogic::flattenTerrain(Object *obj)
 			Real avgHeight = totalHeight/numSamples;
 			Int rawDataHeight = REAL_TO_INT_FLOOR(0.5f + avgHeight/MAP_HEIGHT_SCALE);
 			for (i=iMin.x; i<=iMax.x; i++) {
-				for (j=0; j<=iMax.y; j++) {
+				for (j=iMin.y; j<=iMax.y; ++j) {
 					Vector3	testPt(i*MAP_XY_FACTOR, j*MAP_XY_FACTOR, 0);
 					Bool match = false;
 					Real dx = testPt.X - pos->x;
@@ -3161,12 +3169,16 @@ void TerrainLogic::createCraterInTerrain(Object *obj)
   iMin.y = REAL_TO_INT_FLOOR( ( pos->y - radius ) / MAP_XY_FACTOR );
   iMax.x = REAL_TO_INT_FLOOR( ( pos->x + radius ) / MAP_XY_FACTOR );
 	iMax.y = REAL_TO_INT_FLOOR( ( pos->y + radius ) / MAP_XY_FACTOR );
+#if RETAIL_COMPATIBLE_CRC
+	// TheSuperHackers @info bobtista 29/09/2026 Retail scans from row 0, so rows below the map edge stay untouched.
+	iMin.y = std::max( 0, iMin.y );
+#endif
 
   Real deltaX, deltaY;
 
 	for (Int i = iMin.x; i <= iMax.x; i++ )
   {
-		for ( Int j=0; j <= iMax.y; j++ )
+		for ( Int j=iMin.y; j <= iMax.y; ++j )
     {
 			deltaX = ( i * MAP_XY_FACTOR ) - pos->x;
 			deltaY = ( j * MAP_XY_FACTOR ) - pos->y;
