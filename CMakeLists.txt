@@ -70,7 +70,6 @@ if(NOT TARGET rts_shaders)
         -P "${CMAKE_SOURCE_DIR}/cmake/embed_shaders.cmake")
 endif()
 
-# Define a dummy stlport target when not on VC6.
 if (IS_VS6_BUILD)
     include(cmake/stlport.cmake)
 else()
@@ -87,23 +86,13 @@ endif()
 include(cmake/lzhl.cmake)
 include(cmake/stb.cmake)
 
-if (IS_VS6_BUILD)
-    # The original max sdk does not compile against a modern compiler.
-    # If there is a desire to make this work, then a fixed max sdk needs to be created.
-    add_subdirectory(Dependencies/MaxSDK)
+if(RTS_BUILD_OPTION_PROFILE_TRACY)
+    include(cmake/tracy.cmake)
+else()
+    add_library(core_profile_tracy INTERFACE)
 endif()
 
-add_subdirectory(Dependencies/Precompiled)
-add_subdirectory(Dependencies/Utility)
-add_subdirectory(Dependencies/Bink)
-add_subdirectory(Dependencies/Miles)
-if (WIN32)
-    add_subdirectory(Dependencies/DbgHelp)
-    add_subdirectory(Dependencies/Usp10)
-else()
-    add_library(deps_dbghelp INTERFACE)
-    add_library(deps_usp10 INTERFACE)
-endif()
+add_subdirectory(Dependencies)
 
 add_subdirectory(resources)
 
