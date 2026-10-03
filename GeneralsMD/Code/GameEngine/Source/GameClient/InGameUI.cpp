@@ -9852,7 +9852,13 @@ void InGameUI::drawPlayerInfoList()
 
 		const UnsignedInt currentValues[] = {teamValue, moneyValue, moneyPerMinuteValue, rankValue, xpValue, sciencePointsValue, killsValue, lossesValue, powerValue};
 #else
-		const UnsignedInt currentValues[] = {teamValue, moneyValue, moneyPerMinuteValue, rankValue, xpValue};
+		const UnsignedInt currentValues[] = {
+			teamValue,
+			moneyValue,
+			moneyPerMinuteValue,
+			rankValue,
+			xpValue
+		};
 #endif
 		for (column = 0; column < ARRAY_SIZE(currentValues); ++column)
 		{
