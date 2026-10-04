@@ -731,6 +731,7 @@ public:
   Bool m_useSpecular;             ///< Options.ini Specular: per-pixel sun highlight on vehicles and structures, and the sun's glint on the ground, where the hardware allows
   Bool m_useNormalMaps;           ///< Options.ini NormalMaps: bump detail in the sun's light on vehicles, structures and terrain where the hardware allows
   Bool m_waterReflections;        ///< Options.ini WaterReflections: smooth water mirrors the terrain, units and buildings
+  Bool m_shorelineFoam;           ///< Options.ini ShorelineFoam: smooth water gathers a band of surf where it meets the shore
   Bool m_useSoftParticles;        ///< Options.ini SoftParticles: smoke and fire fade where they meet the ground and buildings
   Bool m_useFlameShaders;         ///< Options.ini FlameShaders: flame weapon fire flickers and glows white-hot at its core
   Bool m_useElectricShaders;      ///< Options.ini ElectricShaders: electric sparks and flares crackle with arcs

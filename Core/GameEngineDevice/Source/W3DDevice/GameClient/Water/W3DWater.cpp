@@ -1382,6 +1382,12 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 	DX8Wrapper::Set_Pixel_Shader_Constant(29, &richParams, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(31, &sparkleSun, 1);
 
+	// The shoreline band follows the foam's strength, and a foam depth of 0 turns it off with the rest.
+	const Bool shoreFoam = TheGlobalData->m_shorelineFoam && foamDepth > 0.01f;
+	const Vector4 shoreFoamParams(shoreFoam ? min(foamStrength * 1.6f, 1.0f) : 0.0f, 1.0f / max(TheWaterTransparency->m_shaderWaterShoreFoamDepth, 0.1f),
+		WWMath::Clamp(TheWaterTransparency->m_shaderWaterShoreFoamSurge, 0.0f, 0.9f), 0.0f);
+	DX8Wrapper::Set_Pixel_Shader_Constant(32, &shoreFoamParams, 1);
+
 	// What enclosed water keeps of the open water's waves, broad layers and swell. Openness is 1 everywhere with the measure off.
 	const Real calm = WWMath::Clamp(TheWaterTransparency->m_shaderWaterEnclosedCalm);
 	const Vector4 enclosed(1.0f - 0.6f * calm, 1.0f - 0.5f * calm, 1.0f - 0.8f * calm, 0.0f);

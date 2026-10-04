@@ -99,6 +99,8 @@ class WaterTransparencySetting : public Overridable
 		Real m_shaderWaterWaveStrength;	///< steepness of the waves
 		Real m_shaderWaterFoamDepth;	///< depth where shore foam fades out
 		Real m_shaderWaterFoamStrength;	///< scales the foam's brightness
+		Real m_shaderWaterShoreFoamDepth;	///< depth the shoreline foam band reaches at the top of its surge
+		Real m_shaderWaterShoreFoamSurge;	///< share of the shoreline foam band the surge pulls back
 		Real m_shaderWaterClarity;		///< scales TransparentWaterDepth, higher sees deeper
 		Real m_shaderWaterOpacity;		///< opacity of deep water, 0 takes TransparentWaterMinOpacity
 		RGBColor m_shaderWaterDeepColor;	///< colour of deep water, negative takes the water texture's average
@@ -150,6 +152,8 @@ class WaterTransparencySetting : public Overridable
 			m_shaderWaterWaveStrength = 0.3f;
 			m_shaderWaterFoamDepth = 6.0f;
 			m_shaderWaterFoamStrength = 0.5f;
+			m_shaderWaterShoreFoamDepth = 2.0f;
+			m_shaderWaterShoreFoamSurge = 0.4f;
 			m_shaderWaterClarity = 1.0f;
 			m_shaderWaterOpacity = 0.95f;
 			m_shaderWaterDeepColor.red = -1.0f;
