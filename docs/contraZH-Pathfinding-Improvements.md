@@ -35,6 +35,15 @@ relative offsets.
 * A unit joins a column only when its route passes within a quarter of its remaining length, or
 six cells, whichever is greater. Units farther away find their own routes.
 
+## Infantry and vehicles
+
+* Moving infantry steer along vehicle hulls and away from contact instead of stopping against them.
+* Vehicles creep past marching infantry without cancelling the infantry's route with a move-aside
+order. A soldier that makes no progress for ten frames can still be asked to move aside.
+* Panicking infantry keep their existing collision response.
+
+Ported from Reforged commit `b7514253ed7cc2ad403cebe6dac64626751cc70f`.
+
 ## Bridges
 
 * A path under a destroyed bridge stays valid while the bridge remains destroyed.

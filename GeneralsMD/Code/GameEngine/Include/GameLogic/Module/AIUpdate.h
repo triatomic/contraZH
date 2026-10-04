@@ -700,6 +700,7 @@ protected:
 	Bool needToRotate(void); ///< Returns true if we are not pointing in the right direction for movement.
 	Real calculateMaxBlockedSpeed(Object* other) const;
 
+	void updateProgress();
 	virtual UpdateSleepTime doLocomotor();	// virtual so subclasses can override
 	virtual void chooseGoodLocomotorFromCurrentSet();
 
@@ -821,6 +822,11 @@ private:
 	ICoord2D		m_pathfindCurCell;					///< Cell we are currently occupying.
 	Int					m_blockedFrames;						///< Number of frames we've been blocked.
 	Real				m_curMaxBlockedSpeed;				///< Max speed we can have and not run into blocking things.
+	Coord2D			m_sideStep;									///< Sum of directions away from vehicles touched this frame.
+	Bool				m_sideStepSeen;
+	Int					m_noProgress;								///< Consecutive frames without movement or a turn toward the goal.
+	Coord3D			m_lastProgressPos;
+	Real				m_lastProgressAngle;
 	Real				m_bumpSpeedLimit;						///< Max speed after bumping a unit.
 	UnsignedInt	m_ignoreCollisionsUntil;		///< Timer to cheat if we get stuck.
 	/**

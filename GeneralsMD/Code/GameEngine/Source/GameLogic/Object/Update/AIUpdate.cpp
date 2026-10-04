@@ -347,6 +347,11 @@ AIUpdateInterface::AIUpdateInterface( Thing *thing, const ModuleData* moduleData
 	m_pathfindCurCell.x = m_pathfindCurCell.y = -1;
 	m_blockedFrames = 0;
 	m_curMaxBlockedSpeed = 0;
+	m_sideStep.x = m_sideStep.y = 0.0f;
+	m_sideStepSeen = FALSE;
+	m_noProgress = 0;
+	m_lastProgressPos.zero();
+	m_lastProgressAngle = 0.0f;
 	m_bumpSpeedLimit = FAST_AS_POSSIBLE;
 	m_ignoreCollisionsUntil = 0;
 	m_queueForPathFrame = 0;
@@ -1752,6 +1757,63 @@ Bool AIUpdateInterface::needToRotate()
 
 
 //-------------------------------------------------------------------------------------------------
+static const Int STUCK_PRESS_FRAMES = 10;
+
+void AIUpdateInterface::updateProgress()
+{
+	Object *self = getObject();
+	const Coord3D *pos = self->getPosition();
+	const Real dx = pos->x - m_lastProgressPos.x;
+	const Real dy = pos->y - m_lastProgressPos.y;
+	const Real moved = WWMath::Sqrt(dx*dx + dy*dy);
+	const Real turned = WWMath::Fabs(normalizeAngle(self->getOrientation() - m_lastProgressAngle));
+	m_lastProgressPos = *pos;
+	m_lastProgressAngle = self->getOrientation();
+
+	if (!self->isKindOf(KINDOF_INFANTRY) || !isDoingGroundMovement() || !getPath() || isWaitingForPath()
+		|| !m_curLocomotor || m_locomotorGoalType != POSITION_ON_PATH)
+	{
+		m_noProgress = 0;
+		return;
+	}
+
+	const BodyDamageType damage = self->getBodyModule()->getDamageState();
+	Real asked = m_curLocomotor->getMaxSpeedForCondition(damage);
+	if (m_desiredSpeed < asked)
+	{
+		asked = m_desiredSpeed;
+	}
+	Real turnBar = m_curLocomotor->getMaxTurnRate(damage) * 0.5f;
+	if (turnBar < 0.004f)
+	{
+		turnBar = 0.004f;
+	}
+
+	Bool comingAbout = FALSE;
+	if (turned >= turnBar)
+	{
+		const Coord3D *dir = self->getUnitDirectionVector2D();
+		const Coord3D *goal = getStateMachine()->getGoalPosition();
+		const Real gx = goal->x - pos->x;
+		const Real gy = goal->y - pos->y;
+		const Real distance = WWMath::Sqrt(gx*gx + gy*gy);
+		comingAbout = distance <= 0.01f || (dir->x*gx + dir->y*gy) / distance < 0.87f;
+	}
+
+	if (asked >= 0.01f && moved < asked * 0.2f && !comingAbout)
+	{
+		if (m_noProgress < STUCK_PRESS_FRAMES)
+		{
+			++m_noProgress;
+		}
+	}
+	else
+	{
+		m_noProgress = 0;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
 /* Returns TRUE if the physics collide should apply the force.  Normally not.
 Also determines whether objects are blocked, and if so, if they are stuck.  jba.*/
 Bool AIUpdateInterface::processCollision(PhysicsBehavior *physics, Object *other)
@@ -1783,6 +1845,21 @@ Bool AIUpdateInterface::processCollision(PhysicsBehavior *physics, Object *other
 	if (!aiOther->isDoingGroundMovement()) return FALSE;
 	if (selfMoving)
 	{
+		// Record every contact so steering along a hull does not flicker between blocked and clear.
+		if (getObject()->isKindOf(KINDOF_INFANTRY) && other->isKindOf(KINDOF_VEHICLE)
+			&& getStateMachine()->getCurrentStateID() != AI_PANIC)
+		{
+			Real ax = getObject()->getPosition()->x - other->getPosition()->x;
+			Real ay = getObject()->getPosition()->y - other->getPosition()->y;
+			const Real len = WWMath::Sqrt(ax*ax + ay*ay);
+			if (len > 0.01f)
+			{
+				m_sideStep.x += ax / len;
+				m_sideStep.y += ay / len;
+				m_sideStepSeen = TRUE;
+				return FALSE;
+			}
+		}
 		Bool blocked = blockedBy(other);
 		if (blocked)
 		{
@@ -1801,6 +1878,21 @@ Bool AIUpdateInterface::processCollision(PhysicsBehavior *physics, Object *other
 			}
 
 			Real maxSpeed = calculateMaxBlockedSpeed(other);
+			// Moving infantry keep their route until they stop making progress.
+			const Bool marchingSoldier = getObject()->isKindOf(KINDOF_VEHICLE) && other->isKindOf(KINDOF_INFANTRY)
+				&& otherMoving && aiOther->m_noProgress < STUCK_PRESS_FRAMES;
+			if (marchingSoldier && getCurLocomotor())
+			{
+				const Real crawl = getCurLocomotor()->getMaxSpeedForCondition(getObject()->getBodyModule()->getDamageState()) * 0.33f;
+				if (maxSpeed < crawl)
+				{
+					maxSpeed = crawl;
+				}
+				if (m_bumpSpeedLimit < crawl)
+				{
+					m_bumpSpeedLimit = crawl;
+				}
+			}
 			if (maxSpeed < m_curMaxBlockedSpeed)
 			{
 				m_curMaxBlockedSpeed = maxSpeed;
@@ -1813,6 +1905,10 @@ Bool AIUpdateInterface::processCollision(PhysicsBehavior *physics, Object *other
 					//Kris: Patch 1.01 -- November 5, 2003
 					//Prevent busy units from being told to move out of the way!
 					if( other->testStatus( OBJECT_STATUS_IS_USING_ABILITY ) || (other->getAI() && other->getAI()->isBusy()) )
+					{
+						return FALSE;
+					}
+					if (marchingSoldier)
 					{
 						return FALSE;
 					}
@@ -2586,7 +2682,13 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 		m_blockedFrames = 0;
 	}
 
+	updateProgress();
+
 	m_isBlocked = FALSE;
+	const Bool sideStep = m_sideStepSeen;
+	const Coord2D sideAway = m_sideStep;
+	m_sideStepSeen = FALSE;
+	m_sideStep.x = m_sideStep.y = 0.0f;
 
 	Bool blocked = m_blockedFrames > 0;
 	Bool requiresConstantCalling = TRUE;	// assume the worst.
@@ -2678,6 +2780,41 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 							}
 							if (speed>m_bumpSpeedLimit) {
 								speed = m_bumpSpeedLimit;
+							}
+						}
+
+						// Slide the goal along the hull and away from the contact.
+						if (sideStep)
+						{
+							const Real len = WWMath::Sqrt(sideAway.x*sideAway.x + sideAway.y*sideAway.y);
+							const Coord3D *here = getObject()->getPosition();
+							Real gx = goalPos.x - here->x;
+							Real gy = goalPos.y - here->y;
+							const Real dist = WWMath::Sqrt(gx*gx + gy*gy);
+							if (len > 0.01f && dist > 0.01f)
+							{
+								const Real nx = sideAway.x / len;
+								const Real ny = sideAway.y / len;
+								const Real into = gx*nx + gy*ny;
+								if (into < 0.0f)
+								{
+									gx -= into*nx;
+									gy -= into*ny;
+									Real t = WWMath::Sqrt(gx*gx + gy*gy);
+									if (t < 0.1f*dist)
+									{
+										// Pick the same side each frame when the goal points straight into the hull.
+										const Real side = (getObject()->getID() & 1) ? 1.0f : -1.0f;
+										gx = -ny*side;
+										gy = nx*side;
+										t = 1.0f;
+									}
+									goalPos.x = here->x + gx*dist/t;
+									goalPos.y = here->y + gy*dist/t;
+								}
+								// Push outward as well as sideways to keep moving vehicles from overlapping infantry.
+								goalPos.x += nx*dist*0.5f;
+								goalPos.y += ny*dist*0.5f;
 							}
 						}
 
