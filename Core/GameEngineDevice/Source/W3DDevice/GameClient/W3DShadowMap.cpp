@@ -647,6 +647,10 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 	RenderInfoClass sunInfo(*m_cullCamera);
 	W3DShaderManager::setShader(W3DShaderManager::ST_SHADOW_DEPTH, 0);
 
+	// Aligned and oriented casters face this view. The renderer still holds the last scene's camera,
+	// which WorldBuilder's top-view captures release before the next one renders.
+	TheDX8MeshRenderer.Set_Camera(&rinfo.Camera);
+
 	memset(&m_casterStats, 0, sizeof(m_casterStats));
 
 	// Each list casts only while its option is on, as the legacy shadows check every frame.
