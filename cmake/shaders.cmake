@@ -331,9 +331,18 @@ rts_add_shader("${RTS_SHADER_DIR}/headlight.hlsl"      vs_3_0 mainVS headlightpo
 rts_add_shader("${RTS_SHADER_DIR}/headlight.hlsl"      ps_3_0 mainPS headlightpool.pso          POOL=1)
 rts_add_shader("${RTS_SHADER_DIR}/headlight.hlsl"      ps_3_0 mainPS headlightpoolmax.pso       POOL=2)
 
+# The tree and classic water shaders are checked in already assembled, so they embed as they are.
+set(RTS_PREBUILT_SHADER_DIR "${CMAKE_SOURCE_DIR}/GeneralsMD/Code/GameEngineDevice/Source/W3DDevice/GameClient/Shaders")
+set(RTS_PREBUILT_SHADERS
+    "${RTS_PREBUILT_SHADER_DIR}/Trees.vso"
+    "${RTS_PREBUILT_SHADER_DIR}/water.pso"
+    "${RTS_PREBUILT_SHADER_DIR}/riverwater.pso"
+    "${RTS_PREBUILT_SHADER_DIR}/trapezoidwater.pso"
+)
+
 # The list file changes only when a shader is added or dropped, which the table must follow too.
 set(RTS_EMBEDDED_SHADERS_LIST "${CMAKE_BINARY_DIR}/generated/EmbeddedShaders.txt")
-string(JOIN "\n" RTS_EMBEDDED_SHADERS_LIST_CONTENT ${RTS_SHADER_OUTPUTS})
+string(JOIN "\n" RTS_EMBEDDED_SHADERS_LIST_CONTENT ${RTS_SHADER_OUTPUTS} ${RTS_PREBUILT_SHADERS})
 file(CONFIGURE OUTPUT "${RTS_EMBEDDED_SHADERS_LIST}" CONTENT "${RTS_EMBEDDED_SHADERS_LIST_CONTENT}\n" @ONLY)
 
 add_custom_command(
@@ -342,7 +351,7 @@ add_custom_command(
         "-DLIST_FILE=${RTS_EMBEDDED_SHADERS_LIST}"
         "-DOUTPUT_FILE=${RTS_EMBEDDED_SHADERS_SOURCE}"
         -P "${CMAKE_SOURCE_DIR}/cmake/embed_shaders.cmake"
-    DEPENDS ${RTS_SHADER_OUTPUTS} "${RTS_EMBEDDED_SHADERS_LIST}" "${CMAKE_SOURCE_DIR}/cmake/embed_shaders.cmake"
+    DEPENDS ${RTS_SHADER_OUTPUTS} ${RTS_PREBUILT_SHADERS} "${RTS_EMBEDDED_SHADERS_LIST}" "${CMAKE_SOURCE_DIR}/cmake/embed_shaders.cmake"
     COMMENT "Embedding the compiled shaders"
     VERBATIM
 )
