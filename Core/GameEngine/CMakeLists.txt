@@ -906,6 +906,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/AI/Pathfinder/PathfindCellInfo.cpp
     Source/GameLogic/AI/Pathfinder/PathfindCellList.cpp
     Source/GameLogic/AI/Pathfinder/PathfindConstants.cpp
+    Source/GameLogic/AI/Pathfinder/PathfindLayer.cpp
     Source/GameLogic/AI/Pathfinder/PathfindZoneManager.cpp
     Source/GameLogic/AI/Pathfinder/PathNode.cpp
     Source/GameLogic/AI/Pathfinder/ZoneBlock.cpp
