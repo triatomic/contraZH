@@ -4,14 +4,17 @@
 
 #include <QDialog>
 #include <QHash>
+#include <QList>
 #include <QStringList>
 
+class QButtonGroup;
 class QLayout;
 class QTreeWidgetItem;
 
 namespace Ui { class WBQtCondActDialog; }	// generated from WBQtCondActDialog.ui
 
-// The template tree with a live filter beside the item's sentence, whose parameters are chips.
+// The template list (catalog, favorites or recent, flat while filtering) beside the item's
+// sentence, whose parameters are chips.
 class WBQtCondActDialog : public QDialog
 {
 	Q_OBJECT
@@ -30,12 +33,19 @@ private slots:
 	void onCurrentItemChanged(QTreeWidgetItem *current, QTreeWidgetItem *previous);
 	void onChipClicked();
 	void onTreeContextMenu(const QPoint &pos);
+	void onItemDoubleClicked(QTreeWidgetItem *item, int column);
+	void onScopeClicked(int scope);
 	void onNotesToggled(bool open);
 
 private:
 	void buildTree(const QString &filter);
-	// A Favorites or Recent folder at the top, listing the saved paths that pass the filter.
-	void addSavedFolder(const QString &title, const QStringList &paths, const QString &filter);
+	// Both return the row for curType, or NULL.
+	QTreeWidgetItem *buildCatalog(int curType);
+	QTreeWidgetItem *buildFlat(const QList<int> &types, bool rank, const QStringList &words, int curType);
+	bool matchesWords(int type, const QStringList &words) const;
+	QTreeWidgetItem *makeLeaf(QTreeWidgetItem *parent, const QString &label, int type, bool favorite);
+	void toggleFavorite(int type);
+	void updateScopeLabels();
 	void selectCurrentType(QTreeWidgetItem *leaf);
 	void selectFirstMatch();
 	void renderSentence();
@@ -51,6 +61,10 @@ private:
 	int m_isAction;
 	bool m_updating;
 	QLayout *m_flow;				///< the sentence's words and chips
+	QButtonGroup *m_scope;			///< All / Favorites / Recent
+	QStringList m_names;			///< template index -> '/'-separated path
+	QStringList m_names2;			///< template index -> alternate path or ""
+	QStringList m_families;			///< template index -> its parameter families, one digit each
 	QHash<QString, int> m_pathIndex;	///< template path -> template index
 };
 

@@ -242,14 +242,9 @@ extern "C" void WBQtCondActData_GetParameterWarning(void *item, int isAction, in
 		buf, cap);
 }
 
-extern "C" int WBQtCondActData_GetParameterFamily(void *item, int isAction, int i)
+static int familyOf(Parameter::ParameterType type)
 {
-	Parameter *param = qtParameterAt(item, isAction, i);
-	if (param == NULL)
-	{
-		return WBQT_PARAM_OTHER;
-	}
-	switch (param->getParameterType())
+	switch (type)
 	{
 		case Parameter::TEAM:
 		case Parameter::UNIT:
@@ -312,6 +307,33 @@ extern "C" int WBQtCondActData_GetParameterFamily(void *item, int isAction, int 
 		default:
 			return WBQT_PARAM_OTHER;
 	}
+}
+
+extern "C" int WBQtCondActData_GetParameterFamily(void *item, int isAction, int i)
+{
+	Parameter *param = qtParameterAt(item, isAction, i);
+	return (param != NULL) ? familyOf(param->getParameterType()) : WBQT_PARAM_OTHER;
+}
+
+extern "C" int WBQtCondActData_GetTemplateFamilies(int isAction, int i, int *out, int cap)
+{
+	const Template *tmpl = isAction
+		? static_cast<const Template *>(TheScriptEngine->getActionTemplate(i))
+		: static_cast<const Template *>(TheScriptEngine->getConditionTemplate(i));
+	if (tmpl == NULL || out == NULL)
+	{
+		return 0;
+	}
+	int count = tmpl->getNumParameters();
+	if (count > cap)
+	{
+		count = cap;
+	}
+	for (int p = 0; p < count; p++)
+	{
+		out[p] = familyOf(tmpl->getParameterType(p));
+	}
+	return count;
 }
 
 // ================= picker preferences =================

@@ -2,12 +2,70 @@
 <ui version="4.0">
  <class>WBQtCondActDialog</class>
  <widget class="QDialog" name="WBQtCondActDialog">
-  <layout class="QVBoxLayout" name="rootLayout" stretch="0,1,0">
+  <layout class="QVBoxLayout" name="rootLayout" stretch="0,0,1,0">
    <item>
     <widget class="QLineEdit" name="searchEdit">
      <property name="clearButtonEnabled">
       <bool>true</bool>
      </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QWidget" name="scopeBar">
+     <layout class="QHBoxLayout" name="scopeLay">
+      <property name="spacing">
+       <number>6</number>
+      </property>
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <item>
+       <widget class="QToolButton" name="scopeAll">
+        <property name="text">
+         <string>All</string>
+        </property>
+        <property name="checkable">
+         <bool>true</bool>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="scopeFavorites">
+        <property name="checkable">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="scopeRecent">
+        <property name="checkable">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="scopeSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QLabel" name="matchLabel"/>
+      </item>
+     </layout>
     </widget>
    </item>
    <item>

@@ -65,6 +65,8 @@ enum
 	WBQT_PARAM_LOGIC		///< scripts, subroutines, counters, flags
 };
 int  WBQtCondActData_GetParameterFamily(void *item, int isAction, int i);
+// Template i's parameter families in order, up to cap; returns how many.
+int  WBQtCondActData_GetTemplateFamilies(int isAction, int i, int *out, int cap);
 
 // --- the "Compress Script" tree-density setting (registry-backed, "CompressScripts") ---
 int  WBQtCondAct_GetCompress(void);
