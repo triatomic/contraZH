@@ -2913,19 +2913,24 @@ Bool W3DShaderManager::supportsUnitPixelLights()
 	return UnitPixelLightsLoaded;
 }
 
-void W3DShaderManager::setTerrainTextureFilter(Int stage, Bool bilinearMipLinear)
+// Returns the device caps when the player picked anisotropic filtering, else null.
+static const D3DCAPS8 *Anisotropic_Caps()
 {
-	const Bool linear = TheGlobalData && (TheGlobalData->m_bilinearTerrainTex || TheGlobalData->m_trilinearTerrainTex);
-	const Bool trilinear = TheGlobalData && TheGlobalData->m_trilinearTerrainTex;
-	DWORD minFilter = linear ? D3DTEXF_LINEAR : D3DTEXF_POINT;
-	DWORD magFilter = minFilter;
-	DWORD mipFilter = (trilinear || bilinearMipLinear) ? D3DTEXF_LINEAR : D3DTEXF_POINT;
-
-	// The player's anisotropy wins over the mod's settings per capability, as TextureFilterClass decides stage 0.
 	const DX8Caps *caps = DX8Wrapper::Get_Current_Caps();
-	if (WW3D::Get_Texture_Filter() == TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC && caps != nullptr)
+	if (WW3D::Get_Texture_Filter() != TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC || caps == nullptr)
 	{
-		const D3DCAPS8 &d3dCaps = caps->Get_DX8_Caps();
+		return nullptr;
+	}
+	return &caps->Get_DX8_Caps();
+}
+
+// The player's anisotropy wins over the given filters per capability, as TextureFilterClass decides stage 0.
+static void Set_Stage_Filter(Int stage, DWORD minFilter, DWORD magFilter, DWORD mipFilter)
+{
+	const D3DCAPS8 *anisotropicCaps = Anisotropic_Caps();
+	if (anisotropicCaps != nullptr)
+	{
+		const D3DCAPS8 &d3dCaps = *anisotropicCaps;
 		if (d3dCaps.TextureFilterCaps & D3DPTFILTERCAPS_MINFANISOTROPIC)
 		{
 			minFilter = D3DTEXF_ANISOTROPIC;
@@ -2951,6 +2956,14 @@ void W3DShaderManager::setTerrainTextureFilter(Int stage, Bool bilinearMipLinear
 	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_MINFILTER, minFilter);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_MAGFILTER, magFilter);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_MIPFILTER, mipFilter);
+}
+
+void W3DShaderManager::setTerrainTextureFilter(Int stage, Bool bilinearMipLinear)
+{
+	const Bool linear = TheGlobalData && (TheGlobalData->m_bilinearTerrainTex || TheGlobalData->m_trilinearTerrainTex);
+	const Bool trilinear = TheGlobalData && TheGlobalData->m_trilinearTerrainTex;
+	const DWORD filter = linear ? D3DTEXF_LINEAR : D3DTEXF_POINT;
+	Set_Stage_Filter(stage, filter, filter, (trilinear || bilinearMipLinear) ? D3DTEXF_LINEAR : D3DTEXF_POINT);
 }
 
 Bool W3DShaderManager::supportsTerrainHeightBlend()
@@ -4789,6 +4802,11 @@ Bool RoadShaderPixelShader::setPixelPath()
 	{
 		W3DShaderManager::setTerrainTextureFilter(0, FALSE);
 	}
+	else if (Anisotropic_Caps() != nullptr)
+	{
+		// Anisotropic filtering needs linear mips, or the road bands where its mips change.
+		Set_Stage_Filter(0, D3DTEXF_LINEAR, D3DTEXF_LINEAR, D3DTEXF_LINEAR);
+	}
 	else
 	{
 		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_MIPFILTER, mipFilter);
@@ -4874,9 +4892,7 @@ Bool RoadShaderPixelShader::setPixelPath()
 		DX8Wrapper::Set_DX8_Texture_Stage_State(m_normalStage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
 		DX8Wrapper::Set_DX8_Texture_Stage_State(m_normalStage, D3DTSS_ADDRESSU, address);
 		DX8Wrapper::Set_DX8_Texture_Stage_State(m_normalStage, D3DTSS_ADDRESSV, address);
-		DX8Wrapper::Set_DX8_Texture_Stage_State(m_normalStage, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
-		DX8Wrapper::Set_DX8_Texture_Stage_State(m_normalStage, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
-		DX8Wrapper::Set_DX8_Texture_Stage_State(m_normalStage, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
+		Set_Stage_Filter(m_normalStage, D3DTEXF_LINEAR, D3DTEXF_LINEAR, D3DTEXF_LINEAR);
 		++RoadBumpCount;
 	}
 	if (lightable)
@@ -4963,6 +4979,10 @@ Int RoadShaderPixelShader::set(Int pass)
 	else
 	{	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_MIPFILTER, D3DTEXF_POINT);
 		DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_MIPFILTER, D3DTEXF_POINT);
+	}
+	if (Anisotropic_Caps() != nullptr)
+	{
+		Set_Stage_Filter(0, D3DTEXF_LINEAR, D3DTEXF_LINEAR, D3DTEXF_LINEAR);
 	}
 
 	DX8Wrapper::Set_DX8_Texture_Stage_State(1,  D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);

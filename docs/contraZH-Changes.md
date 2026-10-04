@@ -315,6 +315,8 @@ supports anisotropic for only min or mag filtering falls back to linear for the 
 * The terrain follows `Anisotropic` too, blend edges and the lower detail settings included, so distant
 ground stays sharp. It used to keep the mod's filtering. In the other modes the terrain still filters
 as the mod's `BilinearTerrainTex` and `TrilinearTerrainTex` say.
+* Roads follow `Anisotropic` as well. Their mips blend smoothly even with `TrilinearTerrainTex = No`,
+and their bump maps stay sharp in the distance.
 
 The terrain draws every texture a map uses from one atlas, with a border of copied pixels around each
 texture so filtering at a texture's edge reads the texture and not its neighbour. Anisotropic filtering
