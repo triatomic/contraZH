@@ -180,6 +180,13 @@ public:
 	/// Get the layer if this cell under a bridge that is currently destroyed or opened or LAYER_INVALID if not
 	PathfindLayerEnum getUnderDestroyedBridgeLayer( void ) const;
 
+	static Bool typesMatch(const PathfindCell& targetCell, const PathfindCell& sourceCell);
+	static Bool waterGround(const PathfindCell& targetCell, const PathfindCell& sourceCell);
+	static Bool groundRubble(const PathfindCell& targetCell, const PathfindCell& sourceCell);
+	static Bool terrain(const PathfindCell& targetCell, const PathfindCell& sourceCell);
+	static Bool crusherGround(const PathfindCell& targetCell, const PathfindCell& sourceCell);
+	static Bool groundCliff(const PathfindCell& targetCell, const PathfindCell& sourceCell);
+
 private:
 	/// Cost of the shortest unobstructed 8-way walk between two cells
 	static Int octileDistance( PathfindCell *start, PathfindCell *finish );
