@@ -152,6 +152,8 @@ public:
 	Bool getNormalMapsEnabled() const;
 	// Options.ini: WaterReflections = Yes lets smooth water mirror the terrain, units and buildings
 	Bool getWaterReflectionsEnabled() const;
+	// Options.ini: ShorelineFoam = Yes edges smooth water with a band of surf where it meets the shore
+	Bool getShorelineFoamEnabled() const;
 	// Options.ini: SoftParticles = Yes fades smoke and fire where they meet the ground and buildings
 	Bool getSoftParticlesEnabled() const;
 	// Options.ini: FlameShaders = Yes makes flame weapon fire flicker and glow white-hot at its core

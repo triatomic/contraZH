@@ -18,6 +18,12 @@ old flat water.)
 * `WaterReflections = Yes` - (`Water reflections` in the options menu, applied on Accept. No keeps
 only the skybox in the water. The mirror draws the scene a second time at half resolution. Needs
 `CheckWaterReflections` in `OptionsMenu.wnd` for the menu control.)
+* `ShorelineFoam = Yes` - (`Shoreline foam` in the options menu. A band of surf runs along the
+waterline, washing up and back out of step along the shore, and breaks into the foam web as the
+water deepens. It follows `ShaderWaterFoamStrength`, `ShaderWaterShoreFoamDepth` and
+`ShaderWaterShoreFoamSurge` shape it, and `ShaderWaterFoamDepth = 0` turns it off.
+Shader model 3 lakes and seas only, not rivers. Needs `CheckShorelineFoam` in `OptionsMenu.wnd` for
+the menu control.)
 
 # Water.ini
 
@@ -79,6 +85,11 @@ colour, 0 to 1. The pattern keeps `ShaderWaterDeepColor` as its average. 1 with 
 four wave layers. Shader model 3 only.)
 * `ShaderWaterFoamDepth = 6` - (Depth where shore foam fades out. 0 turns foam off, crest foam
 included. Pier walls, jetties and cliffs rising out of deep water gather foam within 15 world units.)
+* `ShaderWaterShoreFoamDepth = 2.0` - (Depth the shoreline foam band reaches at the top of its surge.
+Gentle shores show the band wider than steep ones. Needs `ShorelineFoam` in Options.ini. Shader model
+3 only.)
+* `ShaderWaterShoreFoamSurge = 0.4` - (Share of the shoreline foam band the surge pulls back, 0 to 0.9.
+0 holds the band still.)
 
 ### Surface
 
@@ -224,6 +235,8 @@ One block. `map.ini` can override any of these keys for its map.
 | `SkyboxTextureN` | texture | `TSMorningN.tga` | - | North face of the skybox, which shader water reflects. Also `SkyboxTextureE`, `S`, `W` and `T` (top), defaulting to `TSMorningE.tga` and so on. |
 | `ShaderWaterTexturePattern` | number | `0` | `0` - `1` **(hard)** | How much of the water texture's pattern shows over the water colour. `0` is the plain colour, `1` the full pattern. Shader model 3 only. |
 | `ShaderWaterFoamDepth` | number | `6` | `0` - `30` | Depth where shore foam fades out. `0` turns foam off, crest foam included. |
+| `ShaderWaterShoreFoamDepth` | number | `2.0` | `0.1` **(hard)** - `10` | Depth the shoreline foam band reaches at the top of its surge. Shader model 3 only. |
+| `ShaderWaterShoreFoamSurge` | number | `0.4` | `0` - `0.9` **(hard)** | Share of the shoreline foam band the surge pulls back. `0` holds it still. |
 | `ShaderWaterSpecularSpread` | number | `1.0` | `0.1` **(hard)** - `16` | Widens the sun glint so it shows at more view angles. Below `1` it narrows. Above `16` the glint turns into a haze over the whole surface. |
 | `ShaderWaterVirtualSun` | Yes/No | `No` | - | `Yes` glints off a sun ahead of the camera at the map sun's height, so the glint shows from every view. |
 | `ShaderWaterRefraction` | number | `0.015` | `0` - `0.1` | Fraction of the screen the waves bend the seabed by. `0` turns it off. Above `0.05` smears. |

@@ -925,6 +925,7 @@ GlobalData::GlobalData()
   m_useSpecular = TRUE;
   m_useNormalMaps = TRUE;
   m_waterReflections = TRUE;
+  m_shorelineFoam = TRUE;
   m_useSoftParticles = TRUE;
   m_useFlameShaders = TRUE;
   m_useElectricShaders = TRUE;
@@ -2031,6 +2032,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_useSpecular = optionPref.getSpecularEnabled();
 	TheWritableGlobalData->m_useNormalMaps = optionPref.getNormalMapsEnabled();
 	TheWritableGlobalData->m_waterReflections = optionPref.getWaterReflectionsEnabled();
+	TheWritableGlobalData->m_shorelineFoam = optionPref.getShorelineFoamEnabled();
 	TheWritableGlobalData->m_useSoftParticles = optionPref.getSoftParticlesEnabled();
 	TheWritableGlobalData->m_useFlameShaders = optionPref.getFlameShadersEnabled();
 	TheWritableGlobalData->m_useElectricShaders = optionPref.getElectricShadersEnabled();

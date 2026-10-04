@@ -432,6 +432,11 @@ Bool OptionPreferences::getWaterReflectionsEnabled(void) const
 	return getBool("WaterReflections", TRUE);
 }
 
+Bool OptionPreferences::getShorelineFoamEnabled(void) const
+{
+	return getBool("ShorelineFoam", TRUE);
+}
+
 Bool OptionPreferences::getSoftParticlesEnabled(void) const
 {
 	return getBool("SoftParticles", TRUE);

@@ -223,6 +223,7 @@ static GameWindow *   checkShadowMap              = nullptr;
 static GameWindow *   checkSpecular               = nullptr;
 static GameWindow *   checkNormalMaps             = nullptr;
 static GameWindow *   checkWaterReflections       = nullptr;
+static GameWindow *   checkShorelineFoam          = nullptr;
 static NameKeyType    checkDynamicLightsID        = NAMEKEY_INVALID;
 static GameWindow *   checkDynamicLights          = nullptr;
 static GameWindow *   checkPixelLights            = nullptr;
@@ -487,6 +488,7 @@ static const BoolOption BoolOptions[] =
 	{ &checkSpecular, "Specular", &OptionPreferences::getSpecularEnabled, &GlobalData::m_useSpecular, TRUE },
 	{ &checkNormalMaps, "NormalMaps", &OptionPreferences::getNormalMapsEnabled, &GlobalData::m_useNormalMaps, TRUE },
 	{ &checkWaterReflections, "WaterReflections", &OptionPreferences::getWaterReflectionsEnabled, &GlobalData::m_waterReflections, TRUE },
+	{ &checkShorelineFoam, "ShorelineFoam", &OptionPreferences::getShorelineFoamEnabled, &GlobalData::m_shorelineFoam, TRUE },
 	{ &checkDynamicLights, "DynamicLights", &OptionPreferences::getDynamicLightsEnabled, &GlobalData::m_useDynamicLights, TRUE },
 	{ &checkPixelLights, "PixelLights", &OptionPreferences::getPixelLightsEnabled, &GlobalData::m_usePixelLights, TRUE },
 	{ &checkSoftParticles, "SoftParticles", &OptionPreferences::getSoftParticlesEnabled, &GlobalData::m_useSoftParticles, TRUE },
@@ -1610,6 +1612,7 @@ static void initGameOptionsWindows()
 	checkAmbientOcclusion = findOptionsWindow( "OptionsMenu.wnd:CheckAmbientOcclusion" );
 	checkHeightBlend = findOptionsWindow( "OptionsMenu.wnd:CheckHeightBlend" );
 	checkHQSky = findOptionsWindow( "OptionsMenu.wnd:CheckHQSky" );
+	checkShorelineFoam = findOptionsWindow( "OptionsMenu.wnd:CheckShorelineFoam" );
 	checkVSync = findOptionsWindow( "OptionsMenu.wnd:CheckVSync" );
 	checkLowLatency = findOptionsWindow( "OptionsMenu.wnd:CheckLowLatency" );
 	checkSmoothUnitMotion = findOptionsWindow( "OptionsMenu.wnd:CheckSmoothUnitMotion" );
@@ -1662,6 +1665,7 @@ static void initGameOptionsWindows()
 	setCheckText( checkSpecular, "GUI:Specular", L"Specular highlights", "TOOLTIP:Specular", L"Vehicles and structures catch a highlight from the sun, brightest on metal and gone in shadow. Needs a Direct3D 9 card." );
 	setCheckText( checkNormalMaps, "GUI:NormalMaps", L"Surface detail", "TOOLTIP:NormalMaps", L"Panels, rivets and plating on vehicles and structures, and the ground's grain, catch and lose the sun's light. Uses a texture's normal map where one exists. Needs a Direct3D 9 card with Shader Model 2.0a or later." );
 	setCheckText( checkWaterReflections, "GUI:WaterReflections", L"Water reflections", "TOOLTIP:WaterReflections", L"Lakes and seas mirror the cliffs, trees, units and buildings around them. Needs Smooth water and a Direct3D 9 card." );
+	setCheckText( checkShorelineFoam, "GUI:ShorelineFoam", L"Shoreline foam", "TOOLTIP:ShorelineFoam", L"A band of surf washes up and back where lakes and seas meet the shore. Needs Smooth water and a Direct3D 9 card with Shader Model 3." );
 	setCheckText( checkDynamicLights, "GUI:DynamicLights", L"Dynamic lights", "TOOLTIP:DynamicLights", L"Explosions, muzzle flashes and lasers light the ground, units and buildings around them." );
 	setCheckText( checkPixelLights, "GUI:PixelLights", L"Per-pixel lights", "TOOLTIP:PixelLights", L"Dynamic lights fall in smooth circles that follow the ground's detail, instead of blocky patches. Needs a Direct3D 9 card with Shader Model 2.0a or later." );
 	setCheckText( checkLowLatency, "GUI:LowLatency", L"Low latency mode", "TOOLTIP:LowLatency", L"Lets the game prepare only one frame ahead of the graphics card, so the screen answers the mouse sooner. Can lower the frame rate a little. Needs the Direct3D 9 build." );
