@@ -136,6 +136,7 @@ protected:
 	void initKeyNames();  ///< initialize the key names table
 	void updateKeys();  ///< update the state of our key data
 	Bool checkKeyRepeat();  ///< check for repeating keys
+	void readRepeatTiming();  ///< take the repeat delay and rate from the Windows keyboard settings
 	UnsignedByte getKeyStatusData( KeyDefType key );  ///< get key status
 	Bool getKeyStateBit( KeyDefType key, Int bit );  ///< get key state bit
 	void setKeyStateData( KeyDefType key, UnsignedByte data );  ///< get key state
@@ -152,6 +153,8 @@ protected:
 	//Bool m_lAltState;			// 1 if left alt is down
 	//Bool m_rAltState;			// 1 if right alt is down
 	KeyDefType m_shift2Key;  // what key is the secondary shift key
+	UnsignedInt m_repeatDelayMsec;  ///< how long a key is held before it repeats
+	UnsignedInt m_repeatIntervalMsec;  ///< time between repeats of a held key
 
 	enum { NUM_KEYS  = 256 };
 	KeyboardIO m_keys[ NUM_KEYS ];  ///< the keys

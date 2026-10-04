@@ -160,10 +160,11 @@ void Keyboard::updateKeys()
 			m_keyStatus[ m_keys[ index ].key ].state = m_keys[ index ].state;
 			m_keyStatus[ m_keys[ index ].key ].status = m_keys[ index ].status;
 
-			// Update key down time for new key presses
+			// The repeat delay runs from when the key is read, so a key read late after a stall does not repeat at once.
 			if( BitIsSet( m_keys[ index ].state, KEY_STATE_DOWN ) )
 			{
-				m_keyStatus[ m_keys[ index ].key ].keyDownTimeMsec = m_keys[ index ].keyDownTimeMsec;
+				m_keyStatus[ m_keys[ index ].key ].keyDownTimeMsec = timeGetTime();
+				readRepeatTiming();
 			}
 		}
 
@@ -247,9 +248,10 @@ Bool Keyboard::checkKeyRepeat()
 
 			const UnsignedInt now = timeGetTime();
 			const UnsignedInt keyDownTime = m_keyStatus[ key ].keyDownTimeMsec;
-			const UnsignedInt elapsedMsec = now - keyDownTime;
+			// Signed, since a repeat slower than the delay schedules the next one ahead of now.
+			const Int elapsedMsec = (Int)(now - keyDownTime);
 
-			if( elapsedMsec > Keyboard::KEY_REPEAT_DELAY_MSEC )
+			if( elapsedMsec > (Int)m_repeatDelayMsec )
 			{
 				// Add key to this frame
 				m_keys[ index ].key = (UnsignedByte)key;
@@ -268,7 +270,7 @@ Bool Keyboard::checkKeyRepeat()
 				// permanently past the repeat threshold so it repeated EVERY frame and ignored
 				// KEY_REPEAT_INTERVAL_MSEC. At high frame rates (e.g. macOS) that caused runaway
 				// repeats - one backspace tap deleting several characters.
-				m_keyStatus[ key ].keyDownTimeMsec = now - (Keyboard::KEY_REPEAT_DELAY_MSEC - Keyboard::KEY_REPEAT_INTERVAL_MSEC);
+				m_keyStatus[ key ].keyDownTimeMsec = now - (m_repeatDelayMsec - m_repeatIntervalMsec);
 
 				retVal = TRUE;
 				break;  // exit for key
@@ -281,6 +283,24 @@ Bool Keyboard::checkKeyRepeat()
 
 	return retVal;
 
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Take the repeat delay and rate from the Windows keyboard settings */
+//-------------------------------------------------------------------------------------------------
+void Keyboard::readRepeatTiming()
+{
+	// The delay setting is 0 to 3 for 250 to 1000 msec, the speed 0 to 31 for about 2.5 to 30 repeats a second.
+	int delay = 0;
+	int speed = 0;
+	if( SystemParametersInfo( SPI_GETKEYBOARDDELAY, 0, &delay, 0 ) )
+	{
+		m_repeatDelayMsec = 250 * (clamp( 0, delay, 3 ) + 1);
+	}
+	if( SystemParametersInfo( SPI_GETKEYBOARDSPEED, 0, &speed, 0 ) )
+	{
+		m_repeatIntervalMsec = (UnsignedInt)(1000.0f / (2.5f + clamp( 0, speed, 31 ) * (27.5f / 31.0f)));
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -725,6 +745,8 @@ Keyboard::Keyboard()
 	memset( m_keyStatus, 0, sizeof( m_keyStatus ) );
 	m_modifiers = KEY_STATE_NONE;
 	m_shift2Key = KEY_NONE;
+	m_repeatDelayMsec = KEY_REPEAT_DELAY_MSEC;
+	m_repeatIntervalMsec = KEY_REPEAT_INTERVAL_MSEC;
 
 	memset( m_keyNames, 0, sizeof( m_keyNames ) );
 
@@ -745,6 +767,7 @@ void Keyboard::init()
 
 	// initialize the key names
 	initKeyNames();
+	readRepeatTiming();
 
 }
 
