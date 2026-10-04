@@ -111,6 +111,7 @@ void Keyboard::createStreamMessages()
 void Keyboard::updateKeys()
 {
 	Int index = 0;
+	Bool pressed = FALSE;
 
 	// get latest keys
 	do
@@ -164,7 +165,7 @@ void Keyboard::updateKeys()
 			if( BitIsSet( m_keys[ index ].state, KEY_STATE_DOWN ) )
 			{
 				m_keyStatus[ m_keys[ index ].key ].keyDownTimeMsec = timeGetTime();
-				readRepeatTiming();
+				pressed = TRUE;
 			}
 		}
 
@@ -197,6 +198,12 @@ void Keyboard::updateKeys()
 
 		index++;
 
+	}
+
+	// A new press picks up any change to the Windows repeat settings.
+	if( pressed )
+	{
+		readRepeatTiming();
 	}
 
 	// check for key repeats
@@ -248,7 +255,7 @@ Bool Keyboard::checkKeyRepeat()
 
 			const UnsignedInt now = timeGetTime();
 			const UnsignedInt keyDownTime = m_keyStatus[ key ].keyDownTimeMsec;
-			// Signed, since a repeat slower than the delay schedules the next one ahead of now.
+			// The difference is signed because a repeat slower than the delay schedules the next one ahead of now.
 			const Int elapsedMsec = (Int)(now - keyDownTime);
 
 			if( elapsedMsec > (Int)m_repeatDelayMsec )
