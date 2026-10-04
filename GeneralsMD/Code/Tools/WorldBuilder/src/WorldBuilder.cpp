@@ -61,6 +61,7 @@
 #include "Common/LocalFileSystem.h"
 #include "Common/Debug.h"
 #include "Common/StackDump.h"
+#include "Common/MiniDumper.h"
 #include "Common/GameMemory.h"
 #include "Common/Science.h"
 #include "Common/ThingFactory.h"
@@ -350,6 +351,14 @@ CWorldBuilderApp::~CWorldBuilderApp()
 static LONG WINAPI UnHandledExceptionFilter(struct _EXCEPTION_POINTERS* e_info)
 {
 	DumpExceptionInfo(e_info->ExceptionRecord->ExceptionCode, e_info);
+#ifdef RTS_ENABLE_CRASHDUMP
+	if (TheMiniDumper && TheMiniDumper->IsInitialized())
+	{
+		TheMiniDumper->TriggerMiniDumpForException(e_info, DumpType_Minimal);
+		TheMiniDumper->TriggerMiniDumpForException(e_info, DumpType_Full);
+	}
+	MiniDumper::shutdownMiniDumper();
+#endif
 	return EXCEPTION_EXECUTE_HANDLER;
 }
 
@@ -427,6 +436,11 @@ BOOL CWorldBuilderApp::InitInstance()
 	DEBUG_ASSERTCRASH(TheWritableGlobalData, ("TheWritableGlobalData expected to be created"));
 	initSubsystem(TheWritableGlobalData, TheWritableGlobalData, "Data\\INI\\Default\\GameData", "Data\\INI\\GameData");
 	initSubsystem(TheWriteableMapData, new MapData());
+
+#ifdef RTS_ENABLE_CRASHDUMP
+	// Writes into the game's CrashDumps folder, which keeps the newest dumps of both.
+	MiniDumper::initMiniDumper(TheGlobalData->getPath_UserData());
+#endif
 
 	TheFramePacer = new FramePacer();
 
@@ -1670,6 +1684,9 @@ int CWorldBuilderApp::ExitInstance()
 	#ifdef MEMORYPOOL_DEBUG
 		TheMemoryPoolFactory->debugMemoryReport(REPORT_POOLINFO | REPORT_POOL_OVERFLOW | REPORT_SIMPLE_LEAKS, 0, 0);
 	#endif
+#ifdef RTS_ENABLE_CRASHDUMP
+	MiniDumper::shutdownMiniDumper();
+#endif
 	shutdownMemoryManager();
 
 	return CWinApp::ExitInstance();
