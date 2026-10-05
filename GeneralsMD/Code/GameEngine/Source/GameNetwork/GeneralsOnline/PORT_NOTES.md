@@ -175,6 +175,8 @@ Adapted while picking:
 - `d97cfd432` guards the new `ResolveGameListLobbyID` declaration in LobbyUtils.h.
 - `dabb98b81` switches all six login URL sites of the pre-newserver flow to https.
 - `d5124c304` leaves out the `/guard:cf` build flags; the plugin interface is compiled out.
+- `6b4b0185c` turned `GENERALS_ONLINE_USE_PLUGINS_INTERFACE` back on in NextGenMP_defines.h and
+  merged cleanly; it is commented out again. Check that define after every sync.
 
 ### Open: authenticated session is refused by the live service (as of 2026-08-26)
 
