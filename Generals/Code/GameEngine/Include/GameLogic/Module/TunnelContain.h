@@ -130,5 +130,4 @@ protected:
 	void scatterToNearbyPosition(Object* obj);
 	Bool m_needToRunOnBuildComplete;
 	Bool m_isCurrentlyRegistered; ///< Keeps track if this is registered with the player, so we don't double remove and mess up
-
 };
