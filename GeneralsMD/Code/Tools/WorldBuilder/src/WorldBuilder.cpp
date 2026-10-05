@@ -387,6 +387,14 @@ BOOL CWorldBuilderApp::InitInstance()
 
 	CommandLine::parseCommandLineForStartup();
 
+#ifdef RTS_ENABLE_CRASHDUMP
+	// A folder of its own keeps these dumps apart from the game's, which share the file names and pruning.
+	AsciiString dumpRoot = TheGlobalData->getPath_UserData();
+	dumpRoot.concat("WorldBuilder\\");
+	CreateDirectory(dumpRoot.str(), nullptr);
+	MiniDumper::initMiniDumper(dumpRoot);
+#endif
+
 #ifdef DEBUG_LOGGING
 	// Turn on console output jba [3/20/2003]
 	DebugSetFlags(DebugGetFlags() | DEBUG_FLAG_LOG_TO_CONSOLE);
@@ -436,11 +444,6 @@ BOOL CWorldBuilderApp::InitInstance()
 	DEBUG_ASSERTCRASH(TheWritableGlobalData, ("TheWritableGlobalData expected to be created"));
 	initSubsystem(TheWritableGlobalData, TheWritableGlobalData, "Data\\INI\\Default\\GameData", "Data\\INI\\GameData");
 	initSubsystem(TheWriteableMapData, new MapData());
-
-#ifdef RTS_ENABLE_CRASHDUMP
-	// Writes into the game's CrashDumps folder, which keeps the newest dumps of both.
-	MiniDumper::initMiniDumper(TheGlobalData->getPath_UserData());
-#endif
 
 	TheFramePacer = new FramePacer();
 
