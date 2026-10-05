@@ -11,7 +11,8 @@
 
 #define GENERALS_ONLINE_COMMUNITY_PATCH_CHANGES 1
 
-#define GENERALS_ONLINE_USE_PLUGINS_INTERFACE
+// contraZH port: anticheat and networking plugins stay compiled out; GO turns this on upstream.
+//#define GENERALS_ONLINE_USE_PLUGINS_INTERFACE
 
 //#define USE_MAULLER_ONEDRIVE_FIX 1
 //#define USE_STUBBJAX_TRANSPORT_CONTAIN_FIX 1
