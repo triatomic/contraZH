@@ -3624,7 +3624,12 @@ void ParticleSystemManager::draw()
 {
 	// TheSuperHackers @tweak Integrate the part of the logic frame that the render time
 	// has advanced into since the last render update.
+#if defined(GENERALS_ONLINE_HIGH_FPS_RENDER)
+	// Particles step on the legacy frame, so they blend by its phase, not the faster logic frame's.
+	const Real logicFramePhase = TheGameClient->getLegacyFramePhase();
+#else
 	const Real logicFramePhase = TheFramePacer->getLogicFramePhase();
+#endif
 	if (logicFramePhase > m_drawnLogicFramePhase)
 	{
 		const Real timeScale = logicFramePhase - m_drawnLogicFramePhase;

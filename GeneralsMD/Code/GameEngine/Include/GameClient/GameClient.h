@@ -142,6 +142,7 @@ public:
 	// The legacy frame ticks at 30 Hz on the wall clock so client effects keep their retail cadence.
 	UnsignedInt getFrameLegacy() const { return m_frameLegacy; }
 	Bool HasLegacyFrameAdvanced() const { return m_frameLegacy != m_frameLegacyLast; }
+	Real getLegacyFramePhase() const { return min(1.0f, (Real)m_legacyFrameMsAccrued * BaseFps / MSEC_PER_SECOND); }
 #endif
 
 	//---------------------------------------------------------------------------

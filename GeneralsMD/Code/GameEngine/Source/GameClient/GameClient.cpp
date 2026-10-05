@@ -730,7 +730,13 @@ void GameClient::update()
 	// update all particle systems
 	// TheSuperHackers @info The particle update follows the display update, because that
 	// moves bone-attached particle systems to the current client bone transforms of their drawables.
-	if( !freezeTime && TheGameLogic->hasUpdated() )
+#if defined(GENERALS_ONLINE_HIGH_FPS_RENDER)
+	// Particles step on the legacy frame, which can advance on a render frame that steps no logic.
+	const Bool updateParticles = !freezeTime && HasLegacyFrameAdvanced();
+#else
+	const Bool updateParticles = !freezeTime && TheGameLogic->hasUpdated();
+#endif
+	if( updateParticles )
 	{
 		TheParticleSystemManager->setLocalPlayerIndex(localPlayerIndex);
 		TheParticleSystemManager->UPDATE();
