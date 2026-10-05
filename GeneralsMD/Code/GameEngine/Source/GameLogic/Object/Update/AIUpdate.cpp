@@ -1803,6 +1803,16 @@ Bool AIUpdateInterface::processCollision(PhysicsBehavior *physics, Object *other
 		Real dx = getObject()->getPosition()->x - otherPos.x;
 		Real dy = getObject()->getPosition()->y - otherPos.y;
 		Real curDSqr = dx*dx+dy*dy;
+
+		// HOVER and SHIP locomotors brake slowly after a move ends, so an idle one can still slide into the unit it touches.
+		const Bool coasts = m_curLocomotor != nullptr
+			&& (m_curLocomotor->getAppearance() == LOCO_HOVER || m_curLocomotor->getAppearance() == LOCO_SHIP);
+		const Coord3D *vel = physics->getVelocity();
+		if (coasts && vel->x*dx + vel->y*dy < 0.0f)
+		{
+			physics->scrubVelocity2D(0);
+		}
+
 		if (!otherMoving && curDSqr < PATHFIND_CELL_SIZE_F*PATHFIND_CELL_SIZE_F*0.25f)
 		{
 			if (this->getCurrentStateID() == AI_BUSY) {

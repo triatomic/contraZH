@@ -129,6 +129,17 @@ render decoupling, not a retail bug
 
 Only changes what is drawn.
 
+## Hover units stop at the units they touch
+
+* `HOVER` and `SHIP` locomotors brake slowly, so a unit kept sliding for about two cells after its
+move ended. The AI counts it as idle by then and does no blocking, so it slid into nearby units and
+stayed inside them.
+* An idle hover or ship unit that is still sliding toward a unit it touches now stops there.
+* Water units can use `Appearance = HOVER` again instead of `FOUR_WHEELS`
+([#125](https://github.com/triatomic/contraZH/issues/125)).
+
+Changes the simulation; affects replays.
+
 # Game Setup
 
 ## Random army per faction

@@ -485,21 +485,12 @@ void TunnelContain::onObjectCreated()
 	tunnelTracker->onTunnelCreated(getObject());
 	m_isCurrentlyRegistered = TRUE;
 
-	tunnelTracker->doAutoPopRegistion(getObject());
 }
 
 //-------------------------------------------------------------------------------------------------
 void TunnelContain::onBuildComplete()
 {
-	// Tunnels skipped by auto-pop toggles while under construction catch up here.
-	Player* owningPlayer = getObject()->getControllingPlayer();
-	if (owningPlayer == nullptr)
-		return;
-	TunnelTracker* tunnelTracker = owningPlayer->getTunnelSystem();
-	if (tunnelTracker == nullptr)
-		return;
 
-	tunnelTracker->doAutoPopRegistion(getObject());
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -519,7 +510,7 @@ void TunnelContain::onCapture( Player *oldOwner, Player *newOwner )
 		if( newTunnelTracker )
 		{
 			newTunnelTracker->onTunnelCreated(getObject());
-			newTunnelTracker->doAutoPopRegistion(getObject());
+			newTunnelTracker->doAutoPopIconInit(getObject());
 		}
 	}
 
@@ -580,6 +571,12 @@ UpdateSleepTime TunnelContain::update()
 			}
 		}
 
+		if (!m_isAutoPopModelConditionSet && !obj->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION))
+		{
+			tunnelSystem->doAutoPopIconInit(getObject());
+			m_isAutoPopModelConditionSet = TRUE;
+		}
+
 		// check for attacked.
 		BodyModuleInterface *body = obj->getBodyModule();
 		if (body) {
@@ -636,6 +633,8 @@ void TunnelContain::xfer( Xfer *xfer )
 
 	// Currently registered with owning player
 	xfer->xferBool( &m_isCurrentlyRegistered );
+
+	xfer->xferBool( &m_isAutoPopModelConditionSet );
 
 }
 
