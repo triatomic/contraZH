@@ -1628,7 +1628,7 @@ inline Bool isPointOnMap( const Coord3D  *testPos )
 {
 	Region3D mapRegion;
 	TheTerrainLogic->getExtent( &mapRegion );
-	return mapRegion.isInRegionNoZ( *testPos );
+	return mapRegion.isInRegion( testPos->asCoord2D() );
 
 }
 

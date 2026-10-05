@@ -462,7 +462,7 @@ void RTS3DScene::Visibility_Check(CameraClass * camera)
 			{
 				// The main pass flags occluders for delayed drawing, which this pass never does.
 				drawInfo->m_flags = DrawableInfo::ERF_IS_NORMAL;
-				if (isVisible && (draw->isDrawableEffectivelyHidden() || draw->getFullyObscuredByShroud() || !m_planarMirrorRegion.isInRegionNoZ(*draw->getPosition())))
+				if (isVisible && (draw->isDrawableEffectivelyHidden() || draw->getFullyObscuredByShroud() || !m_planarMirrorRegion.isInRegion(draw->getPosition()->asCoord2D())))
 				{
 					isVisible = FALSE;
 				}
