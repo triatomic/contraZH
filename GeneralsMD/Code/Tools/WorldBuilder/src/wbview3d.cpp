@@ -5184,17 +5184,12 @@ Bool WbView3d::presentTopView(Int size, void *window, const Real area[4])
 		D3DSURFACE_DESC desc;
 		back->GetDesc(&desc);
 		dev->ColorFill(back, NULL, D3DCOLOR_XRGB(0, 0, 0));
-		RECT src;
-		src.left = (LONG)(area[0] * size);
-		src.top = (LONG)(area[1] * size);
-		src.right = (LONG)(area[2] * size + 0.5f);
-		src.bottom = (LONG)(area[3] * size + 0.5f);
 		RECT dst;
 		dst.left = (LONG)(area[0] * desc.Width);
 		dst.top = (LONG)(area[1] * desc.Height);
 		dst.right = (LONG)(area[2] * desc.Width + 0.5f);
 		dst.bottom = (LONG)(area[3] * desc.Height + 0.5f);
-		ok = SUCCEEDED(dev->StretchRect(rt, &src, back, &dst, D3DTEXF_LINEAR))
+		ok = SUCCEEDED(dev->StretchRect(rt, NULL, back, &dst, D3DTEXF_LINEAR))
 			&& SUCCEEDED(s.swapChain->Present(NULL, NULL, NULL, NULL, 0));
 		if (!ok)
 		{

@@ -90,6 +90,7 @@ public:
 		m_image->setFixedSize(kDisplaySize, kDisplaySize);
 		m_image->setAlignment(Qt::AlignCenter);
 		m_image->setFrameShape(QFrame::Box);
+		m_image->setStyleSheet("background-color: black;");
 		m_native = new NativeView(this);
 		m_native->setFixedSize(kDisplaySize, kDisplaySize);
 		m_view = new QStackedWidget(this);
@@ -798,8 +799,12 @@ private:
 				return;
 			}
 		}
+		const WBQtHQCaptureParams capture = captureSettings();
+		int width = 0;
+		int height = 0;
+		WBQtHQPreview_FitSize(&capture, kDisplaySize, &width, &height);
 		QImage image(&m_live[0], kDisplaySize, kDisplaySize, kDisplaySize*4, QImage::Format_RGB32);
-		m_image->setPixmap(QPixmap::fromImage(image.copy()));
+		m_image->setPixmap(QPixmap::fromImage(image.scaled(width, height, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)));
 	}
 
 	void showError(const QString &what)
@@ -848,8 +853,11 @@ private:
 		const int size = WBQtHQPreview_Size();
 		m_pixels.resize(size*size*4);
 		WBQtHQPreview_Compose(&params, &m_pixels[0]);
+		int width = 0;
+		int height = 0;
+		WBQtHQPreview_FitSize(&m_rendered, kDisplaySize, &width, &height);
 		QImage image(&m_pixels[0], size, size, size*4, QImage::Format_RGB32);
-		m_image->setPixmap(QPixmap::fromImage(image.scaled(kDisplaySize, kDisplaySize,
+		m_image->setPixmap(QPixmap::fromImage(image.scaled(width, height,
 			Qt::IgnoreAspectRatio, size < kDisplaySize ? Qt::FastTransformation : Qt::SmoothTransformation)));
 	}
 

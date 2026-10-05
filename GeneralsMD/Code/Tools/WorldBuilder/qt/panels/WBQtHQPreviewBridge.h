@@ -57,6 +57,8 @@ int  WBQtHQPreview_Supersample(void);
 int  WBQtHQPreview_MaxCapture(void);
 // The map without its border, and the playable boundary, in cells.
 void WBQtHQPreview_GetMapCells(int *width, int *height, int *playableWidth, int *playableHeight);
+// The area at its own proportions within a size^2 square. Frames stretch the area over the whole square.
+void WBQtHQPreview_FitSize(const WBQtHQCaptureParams *capture, int size, int *width, int *height);
 
 void WBQtHQPreview_GetDefaults(WBQtHQPreviewParams *params, WBQtHQCaptureParams *capture);
 // The settings last saved with, or the defaults.

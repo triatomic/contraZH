@@ -790,7 +790,7 @@ public:
 	/// Sets the scene up for a run of renderTopView frames, holding the editor view still until endTopView.
 	Bool beginTopView(const TopViewCapture &capture, Bool aboveGround);
 	Bool renderTopView(Int size, UnsignedByte *bgra);
-	/// Draws a frame and shows the area, given as fractions of the square with the top row first, in the window.
+	/// Draws a frame and stretches it over the area, given as fractions of the window with the top row first.
 	Bool presentTopView(Int size, void *window, const Real area[4]);
 	void endTopView();
 	Bool isTopViewActive() const { return m_topView.active; }
