@@ -5050,11 +5050,6 @@ Bool WbView3d::drawTopView(Int size)
 			TheW3DShadowMap->updateFrustum(*s.camera, TheW3DShadowManager->getLightPosWorld(0), TheGlobalData->m_shadowMapMinSunElevation);
 			TheW3DShadowMap->renderDepthPass(rinfo);
 		}
-		else if (TheW3DShadowMap != nullptr && TheW3DShadowMap->isAvailable())
-		{
-			// The editor's last frame left its depth, which the ground would still sample.
-			TheW3DShadowMap->clearDepth();
-		}
 
 		DX8Wrapper::Set_Render_Target_With_Z(s.target, s.depth);
 		DX8Wrapper::Clear(true, true, Vector3(0.0f, 0.0f, 0.0f));
