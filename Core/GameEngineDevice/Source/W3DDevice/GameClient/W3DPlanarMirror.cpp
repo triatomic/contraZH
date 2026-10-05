@@ -597,12 +597,7 @@ void W3DPlanarMirrorManager::renderPlane(CameraClass *camera, Int plane, const S
 	for (Int corner = 0; corner < 4 && bounded; corner++)
 	{
 		const Vector3 point((corner & 1) ? sighting.maxX : sighting.minX, (corner & 2) ? sighting.maxY : sighting.minY, sighting.z);
-		Vector3 projected;
-		bounded = camera->Project(projected, point) != CameraClass::OUTSIDE_NEAR_CLIP;
-		const Real u = projected.X * 0.5f + 0.5f;
-		const Real v = 0.5f - projected.Y * 0.5f;
-		readMin.Set(min(readMin.X, u), min(readMin.Y, v));
-		readMax.Set(max(readMax.X, u), max(readMax.Y, v));
+		bounded = WaterRenderObjClass::widenReadRect(camera, point, readMin, readMax);
 	}
 	readMin.Set(max(readMin.X - READ_MARGIN, 0.0f), max(readMin.Y - READ_MARGIN, 0.0f));
 	readMax.Set(min(readMax.X + READ_MARGIN, 1.0f), min(readMax.Y + READ_MARGIN, 1.0f));
@@ -615,7 +610,7 @@ void W3DPlanarMirrorManager::renderPlane(CameraClass *camera, Int plane, const S
 	surface->Release();
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, FALSE);
 	DX8Wrapper::Clear(true, true, Vector3(0.0f, 0.0f, 0.0f), 0.0f, 1.0f, 0);
-	if (bounded && readMax.X > readMin.X && readMax.Y > readMin.Y)
+	if (bounded)
 	{
 		WaterRenderObjClass::narrowReflectionCamera(m_camera, camera, readMin, readMax);
 	}

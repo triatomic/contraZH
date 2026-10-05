@@ -2198,16 +2198,10 @@ Bool WaterRenderObjClass::getMirrorReadRect(CameraClass *camera, Vector2 &lo, Ve
 			const ICoord3D *point = pTrig->getPoint(i);
 			for (Int side=0; side<2; side++)
 			{
-				const Vector3 corner((Real)point->x, (Real)point->y, (Real)point->z + (side ? swell : -swell));
-				Vector3 projected;
-				if (camera->Project(projected, corner) == CameraClass::OUTSIDE_NEAR_CLIP)
+				if (!widenReadRect(camera, Vector3((Real)point->x, (Real)point->y, (Real)point->z + (side ? swell : -swell)), lo, hi))
 				{
 					return FALSE;
 				}
-				const Real u = projected.X * 0.5f + 0.5f;
-				const Real v = 0.5f - projected.Y * 0.5f;
-				lo.Set(min(lo.X, u), min(lo.Y, v));
-				hi.Set(max(hi.X, u), max(hi.Y, v));
 				found = TRUE;
 			}
 		}
@@ -2221,7 +2215,21 @@ Bool WaterRenderObjClass::getMirrorReadRect(CameraClass *camera, Vector2 &lo, Ve
 	const Real margin = 0.02f + 4.0f * TheWaterTransparency->m_shaderWaterPlanarDistortion * max(TheWaterTransparency->m_shaderWaterWaveStrength, 1.0f);
 	lo.Set(max(lo.X - margin, 0.0f), max(lo.Y - margin, 0.0f));
 	hi.Set(min(hi.X + margin, 1.0f), min(hi.Y + margin, 1.0f));
-	return hi.X > lo.X && hi.Y > lo.Y && (hi.X - lo.X) * (hi.Y - lo.Y) < 0.9f;
+	return (hi.X - lo.X) * (hi.Y - lo.Y) < 0.9f;
+}
+
+Bool WaterRenderObjClass::widenReadRect(CameraClass *camera, const Vector3 &point, Vector2 &lo, Vector2 &hi)
+{
+	Vector3 projected;
+	if (camera->Project(projected, point) == CameraClass::OUTSIDE_NEAR_CLIP)
+	{
+		return FALSE;
+	}
+	const Real u = projected.X * 0.5f + 0.5f;
+	const Real v = 0.5f - projected.Y * 0.5f;
+	lo.Set(min(lo.X, u), min(lo.Y, v));
+	hi.Set(max(hi.X, u), max(hi.Y, v));
+	return TRUE;
 }
 
 void WaterRenderObjClass::narrowReflectionCamera(CameraClass *mirror, CameraClass *view, const Vector2 &lo, const Vector2 &hi)

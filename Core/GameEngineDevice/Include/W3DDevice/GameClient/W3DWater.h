@@ -143,6 +143,8 @@ public:
 	/// Narrows a mirror camera, set up as a copy of the view's, to the part of the view between lo and hi, 0 to 1 across it
 	/// with v down. Every pixel keeps its place in the target, so only the frustum and the drawn area shrink.
 	static void narrowReflectionCamera(CameraClass *mirror, CameraClass *view, const Vector2 &lo, const Vector2 &hi);
+	/// Widens lo and hi, 0 to 1 across the view with v down, to take in a world point. False where it lies behind the camera.
+	static Bool widenReadRect(CameraClass *camera, const Vector3 &point, Vector2 &lo, Vector2 &hi);
 	TextureClass *peekSkyboxFace(Int face);	///< north, east, south, west or top, or null without a skybox
 
 protected:

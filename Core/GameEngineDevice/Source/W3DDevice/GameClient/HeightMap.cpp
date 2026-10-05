@@ -154,7 +154,6 @@ void HeightMapRenderObjClass::freeIndexVertexBuffers()
 	m_tileBounds.clear();
 	m_tileBoundsStale.clear();
 	m_tileCulled.clear();
-	m_cullingTiles = FALSE;
 }
 
 //=============================================================================
@@ -2167,7 +2166,7 @@ void HeightMapRenderObjClass::cullReflectedTiles(RenderInfoClass &rinfo)
 	m_cullingTiles = FALSE;
 #if RTS_ZEROHOUR
 	RTS3DScene *scene = (RTS3DScene *)Scene;
-	if (scene == nullptr || !scene->isPlanarMirrorPass() || m_vertexBufferBackup == nullptr || m_numVertexBufferTiles <= 0)
+	if (scene == nullptr || !scene->isPlanarMirrorPass() || m_vertexBufferBackup == nullptr)
 	{
 		return;
 	}
