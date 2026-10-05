@@ -120,6 +120,14 @@ buildings while its hull drove around them.
 
 Changes when units fire; affects replays.
 
+## Wheeled units over water draw level
+
+Wheeled amphibious units (Centurion) stayed frozen at the shore slope's tilt while floating on deep
+water. They draw level again, as in retail. This one is an upstream regression from TheSuperHackers'
+render decoupling, not a retail bug.
+
+Only changes what is drawn.
+
 # Game Setup
 
 ## Random army per faction

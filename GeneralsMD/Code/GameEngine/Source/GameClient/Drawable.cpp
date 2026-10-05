@@ -2291,6 +2291,11 @@ void Drawable::calcPhysicsXformWheels( const Locomotor *locomotor, PhysicsXformI
 		Real width = obj->getGeometryInfo().getMinorRadius();
 		Real pitchHeight = length*Sin(m_locoInfo->m_pitch + m_locoInfo->m_accelerationPitch - groundPitch);
 		Real rollHeight = width*Sin(m_locoInfo->m_roll + m_locoInfo->m_accelerationRoll - groundRoll);
+
+		// Draw level while airborne, as retail did; the persistent transform would otherwise keep the last ground tilt.
+		info.m_totalPitch = 0.0f;
+		info.m_totalRoll = 0.0f;
+		info.m_totalYaw = 0.0f;
 		info.m_totalZ = fabs(pitchHeight)/4 + fabs(rollHeight)/4;
 		return; // maintain the same orientation while we fly through the air.
 	}
