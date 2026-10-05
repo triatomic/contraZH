@@ -2146,7 +2146,8 @@ void Drawable::calcPhysicsXformTreads( const Locomotor *locomotor, PhysicsXformI
 	const DamageInfo *damageInfo = obj->getBodyModule()->getLastDamageInfo();
 	if (damageInfo)
 	{
-		if (obj->getBodyModule()->getLastDamageTimestamp() > m_lastDamageTimestamp && damageInfo->in.m_amount > RECOIL_DAMAGE)
+		const UnsignedInt *lastDamageTimestamp = obj->getBodyModule()->getLastDamageTimestamp();
+		if (lastDamageTimestamp && *lastDamageTimestamp > m_lastDamageTimestamp && damageInfo->in.m_amount > RECOIL_DAMAGE)
 		{
 			Object *attacker = TheGameLogic->getObject( damageInfo->in.m_sourceID );
 			if (attacker)
@@ -2165,7 +2166,7 @@ void Drawable::calcPhysicsXformTreads( const Locomotor *locomotor, PhysicsXformI
 				m_locoInfo->m_accelerationRollRate -= recoil * lateral;
 			}
 
-			m_lastDamageTimestamp = obj->getBodyModule()->getLastDamageTimestamp();
+			m_lastDamageTimestamp = *lastDamageTimestamp;
 		}
 	}
 #endif
@@ -4835,8 +4836,10 @@ void Drawable::drawHealing(const IRegion2D* healthBarRegion)
 //		if( lastDamage != nullptr && lastDamage->in.m_damageType == DAMAGE_HEALING
 //			&&(TheGameLogic->getFrame() - body->getLastHealingTimestamp()) <= HEALING_ICON_DISPLAY_TIME
 //			)
+		const UnsignedInt *lastHealingTimestamp = body->getLastHealingTimestamp();
 		if ( TheGameLogic->getFrame() > HEALING_ICON_DISPLAY_TIME && // because so many things init health early in game
-			(TheGameLogic->getFrame() - body->getLastHealingTimestamp() <= HEALING_ICON_DISPLAY_TIME) )
+			lastHealingTimestamp != nullptr &&
+			(TheGameLogic->getFrame() - *lastHealingTimestamp <= HEALING_ICON_DISPLAY_TIME) )
 
 			showHealing = TRUE;
 	}
