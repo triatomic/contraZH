@@ -56,7 +56,7 @@ public:
 
 	void onTunnelCreated( const Object *newTunnel );		///< A tunnel was made
 	void onTunnelDestroyed( const Object *deadTunnel );	///< A tunnel was destroyed
-	Bool doAutoPopRegistion( const Object *newTunnel ) const;
+	Bool doAutoPopIconInit( const Object *newTunnel ) const;
 
 	static void destroyObject( Object *obj, void *userData ); ///< Callback for Iterate Contained system
 	static void healObject( Object *obj, void *frames ); ///< Callback for Iterate Contained system

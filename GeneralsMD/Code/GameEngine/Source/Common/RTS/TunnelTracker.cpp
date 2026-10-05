@@ -414,7 +414,7 @@ void TunnelTracker::onTunnelDestroyed( const Object *deadTunnel )
 	}
 }
 
-Bool TunnelTracker::doAutoPopRegistion(const Object* newTunnel) const
+Bool TunnelTracker::doAutoPopIconInit(const Object* newTunnel) const
 {
 	Drawable* draw = newTunnel->getDrawable();
 
