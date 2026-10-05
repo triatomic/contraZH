@@ -32,10 +32,7 @@ namespace
 	const int kRecentMax = 10;
 	const int kSavedListCap = 65536;
 
-	// Item data roles: the template index (-1 on folders), the row kind, a folder's leaf count, a
-	// flat row's category path, the template's parameter families, and its favorite flag.
-	// Families travel as a digit string: a QVariantList's nodes would come from WB's pooled
-	// operator new and be freed by Qt5Core's CRT delete, corrupting the heap.
+	// Families travel as a QString because a QVariantList's nodes come from WB's pooled new and Qt5Core frees them.
 	const int kTemplateRole = Qt::UserRole;
 	const int kKindRole = Qt::UserRole + 1;
 	const int kCountRole = Qt::UserRole + 2;
@@ -274,8 +271,7 @@ namespace
 		int m_spacing;
 	};
 
-	// Paints every list row: category headers with counts, folders with chevrons, and leaves with
-	// a bold lead, filter highlights, parameter dots and a favorite star.
+	// Paints headers and folders with counts, and leaves with a bold lead, highlights, parameter dots and a star.
 	class RowDelegate : public QStyledItemDelegate
 	{
 	public:
@@ -418,7 +414,7 @@ namespace
 			painter->setPen(Qt::NoPen);
 			for (int f = families.size() - 1; f >= 0; --f)
 			{
-				painter->setBrush(familyColour(families.at(f).digitValue()).lighter(115));
+				painter->setBrush(familyColour(families.at(f).unicode()).lighter(115));
 				painter->drawEllipse(QPointF(right - kDotRadius, titleMid + 0.5), kDotRadius, kDotRadius);
 				right -= kDotStep;
 			}
@@ -563,7 +559,7 @@ WBQtCondActDialog::WBQtCondActDialog(void *item, bool isAction, QWidget *parent)
 		QString digits;
 		for (int f = 0; f < numFamilies; ++f)
 		{
-			digits += QChar('0' + families[f]);
+			digits += QChar(families[f]);
 		}
 		m_families.append(digits);
 	}
@@ -599,7 +595,7 @@ WBQtCondActDialog::WBQtCondActDialog(void *item, bool isAction, QWidget *parent)
 
 	// The key to the row dots, listing Other only when some template has such a parameter.
 	QString key;
-	const int firstFamily = m_families.join(QString()).contains('0') ? WBQT_PARAM_OTHER : WBQT_PARAM_THING;
+	const int firstFamily = m_families.join(QString()).contains(QChar(WBQT_PARAM_OTHER)) ? WBQT_PARAM_OTHER : WBQT_PARAM_THING;
 	for (int family = firstFamily; family <= WBQT_PARAM_LOGIC; ++family)
 	{
 		key += QString("<span style=\"color:%1\">&#9679;</span>&nbsp;%2&nbsp;&nbsp; ")
@@ -737,7 +733,7 @@ void WBQtCondActDialog::buildTree(const QString &filter)
 	if (scope == kScopeAll && words.isEmpty())
 	{
 		selLeaf = buildCatalog(curType);
-		m_ui->matchLabel->setText(QString("%1 %2").arg(m_names.size()).arg(m_isAction ? "actions" : "conditions"));
+		updateCountLabel(m_names.size());
 	}
 	else
 	{
@@ -764,7 +760,7 @@ void WBQtCondActDialog::buildTree(const QString &filter)
 			}
 		}
 		selLeaf = buildFlat(types, scope == kScopeAll, words, curType);
-		m_ui->matchLabel->setText(QString("%1 %2").arg(types.size()).arg(types.size() == 1 ? "match" : "matches"));
+		updateCountLabel(types.size());
 	}
 
 	static_cast<RowDelegate *>(tree->itemDelegate())->setWords(words);
@@ -815,7 +811,7 @@ QTreeWidgetItem *WBQtCondActDialog::buildCatalog(int curType)
 				}
 				parent = folder;
 			}
-			QTreeWidgetItem *leaf = makeLeaf(parent, leafLabel, i, favorites.contains(m_names.at(i)));
+			QTreeWidgetItem *leaf = makeLeaf(parent, kRowLeaf, leafLabel, i, favorites.contains(m_names.at(i)));
 			if (parent == NULL)
 			{
 				tree->addTopLevelItem(leaf);
@@ -913,8 +909,7 @@ QTreeWidgetItem *WBQtCondActDialog::buildFlat(const QList<int> &types, bool rank
 	for (int o = 0; o < ordered.size(); ++o)
 	{
 		const int type = ordered.at(o).type;
-		QTreeWidgetItem *leaf = makeLeaf(NULL, ordered.at(o).key, type, favorites.contains(m_names.at(type)));
-		leaf->setData(0, kKindRole, kRowMatch);
+		QTreeWidgetItem *leaf = makeLeaf(NULL, kRowMatch, ordered.at(o).key, type, favorites.contains(m_names.at(type)));
 		leaf->setData(0, kCrumbRole, m_names.at(type).section('/', 0, -2).replace("/", separator));
 		tree->addTopLevelItem(leaf);
 		if (type == curType)
@@ -939,9 +934,9 @@ bool WBQtCondActDialog::matchesWords(int type, const QStringList &words) const
 	return true;
 }
 
-QTreeWidgetItem *WBQtCondActDialog::makeLeaf(QTreeWidgetItem *parent, const QString &label, int type, bool favorite)
+QTreeWidgetItem *WBQtCondActDialog::makeLeaf(QTreeWidgetItem *parent, int kind, const QString &label, int type, bool favorite)
 {
-	QTreeWidgetItem *leaf = new CatalogItem(kRowLeaf);
+	QTreeWidgetItem *leaf = new CatalogItem(kind);
 	leaf->setText(0, label);
 	leaf->setData(0, kTemplateRole, type);
 	leaf->setData(0, kFamiliesRole, m_families.at(type));
@@ -954,7 +949,7 @@ QTreeWidgetItem *WBQtCondActDialog::makeLeaf(QTreeWidgetItem *parent, const QStr
 		QStringList needs;
 		for (int f = 0; f < families.size(); ++f)
 		{
-			needs.append(familyName(families.at(f).digitValue()));
+			needs.append(familyName(families.at(f).unicode()));
 		}
 		tip += "\nNeeds: " + needs.join(", ");
 	}
@@ -984,12 +979,30 @@ void WBQtCondActDialog::toggleFavorite(int type)
 	}
 	setSavedList(true, favorites);
 	updateScopeLabels();
-	if (m_scope->checkedId() == kScopeFavorites)
+	QTreeWidget *tree = m_ui->tree;
+	if (m_scope->checkedId() == kScopeFavorites && !favorite)
 	{
-		buildTree(m_ui->searchEdit->text().trimmed());
+		// Only the unstarred row goes, so the list keeps its scroll position.
+		m_updating = true;
+		for (int row = tree->topLevelItemCount() - 1; row >= 0; --row)
+		{
+			if (tree->topLevelItem(row)->data(0, kTemplateRole).toInt() == type)
+			{
+				delete tree->takeTopLevelItem(row);
+			}
+		}
+		m_updating = false;
+		if (tree->topLevelItemCount() == 0)
+		{
+			buildTree(m_ui->searchEdit->text().trimmed());
+		}
+		else
+		{
+			updateCountLabel(tree->topLevelItemCount());
+		}
 		return;
 	}
-	for (QTreeWidgetItemIterator it(m_ui->tree); *it; ++it)
+	for (QTreeWidgetItemIterator it(tree); *it; ++it)
 	{
 		if ((*it)->data(0, kTemplateRole).toInt() == type)
 		{
@@ -1014,6 +1027,15 @@ void WBQtCondActDialog::updateScopeLabels()
 	}
 	m_ui->scopeFavorites->setText(QString(QChar(0x2605)) + QString(" Favorites  %1").arg(counts[0]));
 	m_ui->scopeRecent->setText(QString("Recent  %1").arg(counts[1]));
+}
+
+// Counts matches while filtering, otherwise the templates listed.
+void WBQtCondActDialog::updateCountLabel(int count)
+{
+	const bool filtered = !m_ui->searchEdit->text().trimmed().isEmpty();
+	const QString noun = filtered ? "match" : (m_isAction ? "action" : "condition");
+	const QString plural = filtered ? "es" : "s";
+	m_ui->matchLabel->setText(QString("%1 %2%3").arg(count).arg(noun).arg(count == 1 ? QString() : plural));
 }
 
 void WBQtCondActDialog::onScopeClicked(int scope)

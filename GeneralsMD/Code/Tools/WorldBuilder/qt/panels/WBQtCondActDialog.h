@@ -13,8 +13,7 @@ class QTreeWidgetItem;
 
 namespace Ui { class WBQtCondActDialog; }	// generated from WBQtCondActDialog.ui
 
-// The template list (catalog, favorites or recent, flat while filtering) beside the item's
-// sentence, whose parameters are chips.
+// The template list beside the item's sentence, whose parameters are chips.
 class WBQtCondActDialog : public QDialog
 {
 	Q_OBJECT
@@ -43,9 +42,10 @@ private:
 	QTreeWidgetItem *buildCatalog(int curType);
 	QTreeWidgetItem *buildFlat(const QList<int> &types, bool rank, const QStringList &words, int curType);
 	bool matchesWords(int type, const QStringList &words) const;
-	QTreeWidgetItem *makeLeaf(QTreeWidgetItem *parent, const QString &label, int type, bool favorite);
+	QTreeWidgetItem *makeLeaf(QTreeWidgetItem *parent, int kind, const QString &label, int type, bool favorite);
 	void toggleFavorite(int type);
 	void updateScopeLabels();
+	void updateCountLabel(int count);
 	void selectCurrentType(QTreeWidgetItem *leaf);
 	void selectFirstMatch();
 	void renderSentence();
@@ -64,7 +64,7 @@ private:
 	QButtonGroup *m_scope;			///< All / Favorites / Recent
 	QStringList m_names;			///< template index -> '/'-separated path
 	QStringList m_names2;			///< template index -> alternate path or ""
-	QStringList m_families;			///< template index -> its parameter families, one digit each
+	QStringList m_families;			///< template index -> its parameter families, one QChar each
 	QHash<QString, int> m_pathIndex;	///< template path -> template index
 };
 
