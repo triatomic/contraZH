@@ -784,6 +784,7 @@ public:
 		Bool clouds;
 		Bool macroTexture;
 		Bool stochastic;	///< paints stochastic terrain over all the ground for the capture
+		Bool shadows;
 	};
 	/// Renders the rectangle straight down into size*size BGRA pixels, top row north. Without aboveGround only terrain draws.
 	Bool captureTopView(Int size, const TopViewCapture &capture, Bool aboveGround, UnsignedByte *bgra);
@@ -800,7 +801,7 @@ private:
 	struct TopViewSession
 	{
 		TopViewSession() : active(false), aboveGround(false), camZ(0.0f), camera(NULL), target(NULL), depth(NULL), targetSize(0),
-			oldTimeOfDay(TIME_OF_DAY_INVALID), removedTrees(false), wantShadowVolumes(false), wantClouds(false), wantMacroTexture(false), paint(NULL),
+			oldTimeOfDay(TIME_OF_DAY_INVALID), removedTrees(false), wantShadowVolumes(false), wantShadowDecals(false), wantClouds(false), wantMacroTexture(false), paint(NULL),
 			swapChain(NULL), swapWindow(NULL) {}
 		Bool active;
 		TopViewCapture capture;
@@ -815,6 +816,7 @@ private:
 		std::vector<RenderObjClass *> objects;
 		std::vector<Bool> wasHidden;
 		Bool wantShadowVolumes;
+		Bool wantShadowDecals;
 		Bool wantClouds;
 		Bool wantMacroTexture;
 		std::vector<UnsignedByte> paintEverywhere;

@@ -43,6 +43,7 @@ static void toCapture(const WBQtHQCaptureParams *in, HQCaptureParams *out)
 	out->clouds = in->clouds != 0;
 	out->macroTexture = in->macroTexture != 0;
 	out->stochastic = in->stochastic != 0;
+	out->shadows = in->shadows != 0;
 	out->timeOfDay = in->timeOfDay;
 	out->area = in->area;
 	out->customX0 = in->customX0;
@@ -147,6 +148,7 @@ void WBQtHQPreview_GetDefaults(WBQtHQPreviewParams *params, WBQtHQCaptureParams 
 	capture->clouds = c.clouds ? 1 : 0;
 	capture->macroTexture = c.macroTexture ? 1 : 0;
 	capture->stochastic = c.stochastic ? 1 : 0;
+	capture->shadows = c.shadows ? 1 : 0;
 	capture->timeOfDay = c.timeOfDay;
 	capture->area = c.area;
 	capture->supersample = c.supersample;
@@ -180,6 +182,7 @@ void WBQtHQPreview_GetLast(WBQtHQPreviewParams *params, WBQtHQCaptureParams *cap
 	capture->clouds = getProfileInt("Clouds", capture->clouds);
 	capture->macroTexture = getProfileInt("MacroTexture", capture->macroTexture);
 	capture->stochastic = getProfileInt("Stochastic", capture->stochastic);
+	capture->shadows = getProfileInt("Shadows", capture->shadows);
 	capture->timeOfDay = getProfileInt("TimeOfDay", capture->timeOfDay);
 	capture->supersample = getProfileInt("Supersample", capture->supersample);
 	capture->size = getProfileInt("Size", capture->size);
@@ -338,6 +341,7 @@ int WBQtHQPreview_Save(const WBQtHQPreviewParams *params, const WBQtHQCapturePar
 	writeProfileInt("Clouds", capture->clouds);
 	writeProfileInt("MacroTexture", capture->macroTexture);
 	writeProfileInt("Stochastic", capture->stochastic);
+	writeProfileInt("Shadows", capture->shadows);
 	writeProfileInt("TimeOfDay", capture->timeOfDay);
 	writeProfileInt("Supersample", capture->supersample);
 	writeProfileInt("Size", capture->size);

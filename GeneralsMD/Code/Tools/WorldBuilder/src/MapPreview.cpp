@@ -165,6 +165,7 @@ void MapPreview::getDefaultHQCapture( HQCaptureParams *capture )
 	capture->clouds = true;
 	capture->macroTexture = true;
 	capture->stochastic = false;
+	capture->shadows = true;
 	capture->timeOfDay = TIME_OF_DAY_INVALID;
 	capture->area = HQ_AREA_MAP;
 	capture->customX0 = 0;
@@ -249,6 +250,7 @@ Bool MapPreview::getHQTopView( const HQCaptureParams &capture, WbView3d::TopView
 	view3d->clouds = capture.clouds;
 	view3d->macroTexture = capture.macroTexture;
 	view3d->stochastic = capture.stochastic;
+	view3d->shadows = capture.shadows;
 	view3d->water = capture.shaderWater ? WbView3d::TOP_VIEW_WATER_SHADER
 		: (capture.renderedWater ? WbView3d::TOP_VIEW_WATER_FLAT : WbView3d::TOP_VIEW_WATER_NONE);
 	return true;

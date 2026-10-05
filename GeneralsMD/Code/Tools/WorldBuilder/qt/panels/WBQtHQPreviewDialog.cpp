@@ -280,7 +280,10 @@ private:
 
 		m_stochastic = new QCheckBox(tr("Stochastic filtering"), box);
 		m_stochastic->setToolTip(tr("Shifts and turns the ground textures in hex cells over the whole map, as the Stochastic Terrain brush does, to break up their repeat. The map's own paint is left as it was."));
-		grid->addWidget(m_stochastic, row, 0, 1, 2);
+		m_shadows = new QCheckBox(tr("Shadows"), box);
+		m_shadows->setToolTip(tr("Draws the shadows of objects, trees and buildings."));
+		grid->addWidget(m_stochastic, row, 0);
+		grid->addWidget(m_shadows, row, 1);
 		row++;
 
 		m_timeOfDay = new QComboBox(box);
@@ -343,8 +346,8 @@ private:
 		m_renderInfo->setWordWrap(true);
 		grid->addWidget(m_renderInfo, row, 0, 1, 2);
 
-		QCheckBox *checks[] = { m_objects, m_trees, m_roads, m_colorGrade, m_renderedWater, m_shaderWater, m_clouds, m_macroTexture, m_stochastic };
-		for (int i = 0; i < 9; i++)
+		QCheckBox *checks[] = { m_objects, m_trees, m_roads, m_colorGrade, m_renderedWater, m_shaderWater, m_clouds, m_macroTexture, m_stochastic, m_shadows };
+		for (int i = 0; i < 10; i++)
 		{
 			connect(checks[i], &QCheckBox::toggled, this, [this]() { captureChanged(); });
 		}
@@ -644,6 +647,7 @@ private:
 		m_clouds->setChecked(capture.clouds != 0);
 		m_macroTexture->setChecked(capture.macroTexture != 0);
 		m_stochastic->setChecked(capture.stochastic != 0);
+		m_shadows->setChecked(capture.shadows != 0);
 		m_timeOfDay->setCurrentIndex(qBound(0, capture.timeOfDay, m_timeOfDay->count() - 1));
 		m_area->setCurrentIndex(qBound(0, capture.area, m_area->count() - 1));
 		m_x0->setValue(capture.customX0);
@@ -684,6 +688,7 @@ private:
 		capture.clouds = m_clouds->isChecked() ? 1 : 0;
 		capture.macroTexture = m_macroTexture->isChecked() ? 1 : 0;
 		capture.stochastic = m_stochastic->isChecked() ? 1 : 0;
+		capture.shadows = m_shadows->isChecked() ? 1 : 0;
 		capture.timeOfDay = m_timeOfDay->currentIndex();
 		capture.area = m_area->currentIndex();
 		capture.customX0 = m_x0->value();
@@ -702,7 +707,7 @@ private:
 		return a.objects == b.objects && a.trees == b.trees && a.roads == b.roads && a.colorGrade == b.colorGrade
 			&& a.renderedWater == b.renderedWater && a.shaderWater == b.shaderWater
 			&& a.clouds == b.clouds && a.macroTexture == b.macroTexture && a.stochastic == b.stochastic
-			&& a.timeOfDay == b.timeOfDay && a.area == b.area && sameCustom && a.size == b.size && a.supersample == b.supersample;
+			&& a.shadows == b.shadows && a.timeOfDay == b.timeOfDay && a.area == b.area && sameCustom && a.size == b.size && a.supersample == b.supersample;
 	}
 
 	// A render setting changed, so the live view sets the scene up again with it.
@@ -890,6 +895,7 @@ private:
 	QCheckBox *m_renderedWater;
 	QCheckBox *m_shaderWater;
 	QCheckBox *m_clouds;
+	QCheckBox *m_shadows;
 	QCheckBox *m_macroTexture;
 	QCheckBox *m_stochastic;
 	QComboBox *m_timeOfDay;

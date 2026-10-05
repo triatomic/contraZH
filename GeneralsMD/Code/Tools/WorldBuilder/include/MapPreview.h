@@ -99,6 +99,7 @@ struct HQCaptureParams
 	Bool clouds;		///< the cloud shadows
 	Bool macroTexture;	///< the map's macro texture
 	Bool stochastic;	///< stochastic filtering over all the ground, which breaks up the textures' repeat
+	Bool shadows;		///< object, tree and building shadows
 	Int timeOfDay;		///< TIME_OF_DAY_INVALID keeps the current one
 	Int area;			///< HQPreviewArea
 	Int customX0;		///< HQ_AREA_CUSTOM corners in border-relative cells

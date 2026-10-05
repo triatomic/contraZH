@@ -39,6 +39,7 @@ typedef struct WBQtHQCaptureParams
 	int clouds;
 	int macroTexture;
 	int stochastic;		// stochastic filtering over all the ground
+	int shadows;
 	int timeOfDay;		// 0 keeps the current one, 1 to 4 morning to night
 	int area;			// WBQT_HQ_AREA_*
 	int customX0;		// custom area corners in cells, without the border

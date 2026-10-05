@@ -4962,11 +4962,16 @@ Bool WbView3d::beginTopView(const TopViewCapture &capture, Bool aboveGround)
 	// Volume shadows resolve only inside a back-buffer-sized quad, which a render larger than the window overruns.
 	// Under the shadow map they draw no volumes and cast into the map instead, so they stay on there.
 	s.wantShadowVolumes = TheGlobalData->m_useShadowVolumes;
+	s.wantShadowDecals = TheGlobalData->m_useShadowDecals;
 	s.wantClouds = TheGlobalData->m_useCloudMap;
 	s.wantMacroTexture = TheGlobalData->m_useLightMap;
-	if (!TheGlobalData->m_useShadowMap)
+	if (!TheGlobalData->m_useShadowMap || !capture.shadows)
 	{
 		TheWritableGlobalData->m_useShadowVolumes = false;
+	}
+	if (!capture.shadows)
+	{
+		TheWritableGlobalData->m_useShadowDecals = false;
 	}
 	TheWritableGlobalData->m_useCloudMap = capture.clouds;
 	TheWritableGlobalData->m_useLightMap = capture.macroTexture;
@@ -5044,6 +5049,11 @@ Bool WbView3d::drawTopView(Int size)
 			TheW3DShadowMap->setShadowColor(TheW3DShadowManager->getShadowColor());
 			TheW3DShadowMap->updateFrustum(*s.camera, TheW3DShadowManager->getLightPosWorld(0), TheGlobalData->m_shadowMapMinSunElevation);
 			TheW3DShadowMap->renderDepthPass(rinfo);
+		}
+		else if (TheW3DShadowMap != nullptr && TheW3DShadowMap->isAvailable())
+		{
+			// The editor's last frame left its depth, which the ground would still sample.
+			TheW3DShadowMap->clearDepth();
 		}
 
 		DX8Wrapper::Set_Render_Target_With_Z(s.target, s.depth);
@@ -5228,6 +5238,7 @@ void WbView3d::endTopView()
 	s.targetSize = 0;
 
 	TheWritableGlobalData->m_useShadowVolumes = s.wantShadowVolumes;
+	TheWritableGlobalData->m_useShadowDecals = s.wantShadowDecals;
 	TheWritableGlobalData->m_useCloudMap = s.wantClouds;
 	TheWritableGlobalData->m_useLightMap = s.wantMacroTexture;
 	if (s.capture.stochastic)
