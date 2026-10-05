@@ -40,7 +40,8 @@ public:
 		EFFECT_BEAM = 32,	// a laser draw's beam or a streak, which fades only while shaded
 		EFFECT_CRYO = 64,	// ice tint with teeth and frost bands on a beam, splinters and glints on a sprite
 		EFFECT_DISRUPT = 128,	// ripple and colour-split the scene copy behind the shape, in a pass of its own before the sorted draws
-		EFFECT_MESH = 256	// a model's mesh, whose texture may tile both ways and whose settings come with it
+		EFFECT_MESH = 256,	// a model's mesh, whose texture may tile both ways and whose settings come with it
+		EFFECT_MIRROR = 512	// a planar mirror mesh, shown as the scene behind it bent under its own colour, with the reflection over both
 	};
 
 	virtual ~SoftParticleHookClass() {}

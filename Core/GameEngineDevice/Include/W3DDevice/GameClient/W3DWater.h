@@ -139,6 +139,8 @@ public:
 	/// The hex cells as getSeabedMask gives them, for painted stochastic terrain, which keeps its cells with the water's tiling off.
 	static Vector4 getStochasticHex();
 	void renderPlanarReflection(CameraClass *cam);	///< mirrors the scene in the water under the view, before the views draw
+	static void drawReflectionCoverage(UnsignedInt width, UnsignedInt height);	///< also serves the planar mirrors' targets
+	TextureClass *peekSkyboxFace(Int face);	///< north, east, south, west or top, or null without a skybox
 
 protected:
 	DX8IndexBufferClass			*m_indexBuffer;	///<indices defining quad
@@ -332,7 +334,6 @@ protected:
 	Bool isWaterVisible(PolygonTrigger *pTrig, CameraClass *camera) const;
 	Bool pickReflectionPlane(CameraClass *camera, Real &planeZ) const;
 	Bool ensureReflectionTargets(UnsignedInt width, UnsignedInt height);
-	void drawReflectionCoverage(UnsignedInt width, UnsignedInt height);
 	Int standingWaterDiffuse() const;
 	Bool buildRadialGrid();
 	void updateWaterMask();
@@ -347,7 +348,6 @@ protected:
 	void setupSwell(const D3DMATRIX &clip);
 	TextureClass *findSwellTexture();
 	TextureClass *findFoamTexture();
-	TextureClass *peekSkyboxFace(Int face);
 	void cleanupShaderWater();
 
 	//Methods used for GeForce3 specific water

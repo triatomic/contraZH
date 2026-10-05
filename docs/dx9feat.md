@@ -9,7 +9,7 @@ Cheat builds reload `Data\INI\GameData.ini` about half a second after it is save
 keys can be adjusted with a map running: `UnitSpecularIntensity`, `UnitSpecularPower`,
 `UnitBumpHeight`, `UnitNormalMapStrength`, `TerrainNormalMapStrength`, the `TerrainGlint` keys, `UnitEmissiveIntensity`,
 `UnitEmissiveNightIntensity`, `SoftParticleDistance`, `AmbientOcclusionRadius`,
-`AmbientOcclusionStrength`, the `GroundNoise`, `TerrainHeightBlend` and `SkyCloud` keys, `TerrainAtlasBorder` and the `Flame`, `Haze`, `Electric`, `Laser`, `Cryo` and `Disruption` tuning keys, the `SandStorm` and `SnowStorm` keys, the `Headlight` keys but `HeadlightShader`, and the `ColorLut` keys. Other `GameData.ini` keys keep their
+`AmbientOcclusionStrength`, the `GroundNoise`, `TerrainHeightBlend` and `SkyCloud` keys, `TerrainAtlasBorder` and the `Flame`, `Haze`, `Electric`, `Laser`, `Cryo` and `Disruption` tuning keys, the `SandStorm` and `SnowStorm` keys, the `Headlight` keys but `HeadlightShader`, the `PlanarMirror` keys but `PlanarMirrorShader`, and the `ColorLut` keys. Other `GameData.ini` keys keep their
 value until a restart. The saved values win over a map's `map.ini` until the map loads again. A
 deleted key keeps its value until a restart, and a file with an error applies only the keys above
 the error until the next save.
@@ -37,6 +37,7 @@ them for one effect. Each shader's own section below lists its keys.
 | Distortion disc with no art | [Disruption](#disruption-shading) | `FXList` | A `Disruption` block | The block's keys |
 | Sandstorm or snowstorm | [Storm](#storms) | `FXList`, `W3DStormDraw` | A `Storm` block or the module | `SandStorm` and `SnowStorm` keys |
 | Vehicle headlights | [Headlights](#headlights) | Automatic, `W3DModelDraw` | A `HEADLIGHT` mesh in the model | `Headlight` keys, per model too |
+| Mirror floors, puddles, pools and glass | [Planar mirrors](#planar-mirrors) | `W3DModelDraw` | `PlanarMirror = Yes` | `PlanarMirror` keys, per model too |
 | Soft edges on sprites | [Soft particles](#soft-particles) | Automatic | Nothing | None |
 | Glow around bright effects | [Bloom](contraZH-Changes.md#bloom) | `ParticleSystem` | `Shader = ADDITIVE` | None |
 
@@ -120,7 +121,7 @@ No turns that shader off everywhere.
 * `ParticleSystem.ini` changes and the texture lists apply on the next launch. `GameData.ini` tuning
 reloads in cheat builds.
 * `CONTRA_FLAMESHADER`, `CONTRA_ELECTRICSHADER`, `CONTRA_LASERSHADER`, `CONTRA_CRYOSHADER` or
-`CONTRA_DISRUPTSHADER` set to 0 turns that shader off. `CONTRA_STORMSHADER=0` turns storms off, and `CONTRA_HEADLIGHTSHADER=0` brings back the headlight meshes.
+`CONTRA_DISRUPTSHADER` set to 0 turns that shader off. `CONTRA_STORMSHADER=0` turns storms off, `CONTRA_HEADLIGHTSHADER=0` brings back the headlight meshes, and `CONTRA_PLANARMIRROR=0` draws mirror meshes plain.
 * `LaserDebug = Yes` in `GameData.ini` draws shaded beams dark, so it shows which beams took the
 laser shader.
 
@@ -907,6 +908,67 @@ Draw = W3DTruckDraw ModuleTag_01
   HeadlightPoolAngle     = 34
   DefaultConditionState
     Model = AVOmega
+  End
+End
+```
+
+## Planar mirrors
+
+Chosen meshes of a model act as level mirrors. They reflect the scene above them: units, buildings,
+trees and the sky. Suited to polished floors, wet plazas, metal decks, puddles, pools and glass.
+
+* An opaque mesh keeps its texture, lighting and shadows. The reflection blends over it.
+* A translucent mesh shows what lies under it, bent by its normal map, below its own texture. The
+reflection lies over both.
+* The reflection's share is `PlanarMirrorReflectivity` seen from above and rises towards all of it
+at a grazing angle.
+* A `<texture>_nrm.dds` normal map beside the mesh's texture ripples the reflection and what shows
+through. Without one the mirror is flat.
+
+The game mirrors the scene in at most two heights each frame, those of the mirrors nearest the
+middle of the view. Mirrors within half a unit of each other in height share one. A mirror at
+any other height reflects the sky alone. The mirror's height is the top of the mesh, so the mesh
+should be flat and level. A mirror that turns up on screen shows the sky for its first frame.
+
+Each height costs one more draw of the scene at half resolution, cut down to the mirrors' part of
+the screen. Water reflections are separate and cost their own draw.
+
+Needs the Direct3D 9 build and a pixel shader 2.0a card. Elsewhere, with `PlanarMirrorShader = No`,
+and with water reflections turned off in the options (`WaterReflections = No` in `Options.ini`), the
+meshes draw as before.
+
+Mark the model in its `W3DModelDraw` module, or a module built on it, beside `OkToChangeModelColor`:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `PlanarMirror` | `No` | `Yes` makes the meshes below mirrors. It wins over `FlameShader`, `ElectricShader` and `CryoShader` on those meshes. |
+| `PlanarMirrorMeshes` | every mesh | Mesh names, without the model's name, such as `FLOOR01 POOL`. Case does not matter. |
+| `PlanarMirrorOverrideTexture` | `No` | `Yes` draws the meshes as clear glass in place of their texture, whatever the mesh. They show what lies under them, bent by the normal map, with the reflection over it. A mesh drawn with alpha keeps its texture's alpha as its outline. |
+
+The look keys live in `GameData.ini`. All but `PlanarMirrorShader` reload in cheat builds:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `PlanarMirrorShader` | `Yes` | `No` draws every mirror mesh plain. Read at launch. |
+| `PlanarMirrorReflectivity` | 0.35 | Share of the reflection seen from straight above, 0 to 1. |
+| `PlanarMirrorTint` | `R:255 G:255 B:255` | Multiplies the reflection. Darker for tinted glass or dull metal. |
+| `PlanarMirrorDistortion` | 0.01 | How far the normal map bends the reflection and what shows through, in screen widths. |
+| `PlanarMirrorFrost` | 0 | 0 clear to 1 frosted. Blurs the reflection, and blurs and clouds what shows through glass and translucent mirrors. |
+
+The same four look keys in the model's module override `GameData.ini` for that model. Module keys
+are read at launch.
+
+Glass draws after the opaque scene, from one copy of the screen taken at the first glass or
+translucent mirror. An object that draws later and stands under the glass does not show through it.
+A glass mesh takes no shadows or highlights on itself, though it still casts its shadow.
+
+```
+Draw = W3DModelDraw ModuleTag_01
+  PlanarMirror             = Yes
+  PlanarMirrorMeshes       = FLOOR POOL
+  PlanarMirrorReflectivity = 0.6
+  DefaultConditionState
+    Model = CBPlaza
   End
 End
 ```

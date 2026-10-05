@@ -330,6 +330,10 @@ rts_add_shader("${RTS_SHADER_DIR}/headlight.hlsl"      ps_3_0 mainPS headlightbe
 rts_add_shader("${RTS_SHADER_DIR}/headlight.hlsl"      vs_3_0 mainVS headlightpool.vso          POOL=1)
 rts_add_shader("${RTS_SHADER_DIR}/headlight.hlsl"      ps_3_0 mainPS headlightpool.pso          POOL=1)
 rts_add_shader("${RTS_SHADER_DIR}/headlight.hlsl"      ps_3_0 mainPS headlightpoolmax.pso       POOL=2)
+# The mirrors read the skybox, which runs past ps_2_0's 64 arithmetic slots.
+rts_add_shader("${RTS_SHADER_DIR}/planarmirror.hlsl"   ps_2_a main planarmirror.pso             REFRACT=0)
+rts_add_shader("${RTS_SHADER_DIR}/planarmirror.hlsl"   ps_2_a main planarmirrorrefract.pso      REFRACT=1)
+rts_add_shader("${RTS_SHADER_DIR}/planarmirror.hlsl"   ps_2_a main planarmirrorglass.pso        REFRACT=1 GLASS=1)
 
 # The tree and classic water shaders are checked in already assembled, so they embed as they are.
 set(RTS_PREBUILT_SHADER_DIR "${CMAKE_SOURCE_DIR}/GeneralsMD/Code/GameEngineDevice/Source/W3DDevice/GameClient/Shaders")

@@ -61,6 +61,7 @@
 #include "W3DDevice/GameClient/W3DShroud.h"
 #include "W3DDevice/GameClient/W3DAmbientOcclusion.h"
 #include "W3DDevice/GameClient/W3DLaserGlow.h"
+#include "W3DDevice/GameClient/W3DPlanarMirror.h"
 #include "WW3D2/camera.h"
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/dx8instancing.h"
@@ -966,7 +967,13 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 			//Must be ghost object because we don't fog normal things.  Fogged objects always have a predefined
 			//lighting environment applied which emulates the look of fog.
 			rinfo.light_environment = &m_foggedLightEnv;
+			// A reflection would light a ghost's mirrors past the fog, so they draw plain.
+			const Bool mirrors = TheW3DPlanarMirrors != nullptr && TheW3DPlanarMirrors->suspendScenePass();
 			robj->Render(rinfo);
+			if (mirrors)
+			{
+				TheW3DPlanarMirrors->beginScenePass(FALSE);
+			}
 			rinfo.light_environment = nullptr;
 			return;
 		}
@@ -1133,6 +1140,11 @@ void RTS3DScene::Flush(RenderInfoClass & rinfo)
 		SortingRendererClass::Flush();	//draw sorted translucent polygons like particles.
 	}
 	TheDX8MeshRenderer.Clear_Pending_Delete_Lists();
+
+	if (TheW3DPlanarMirrors != nullptr)
+	{
+		TheW3DPlanarMirrors->endScenePass();
+	}
 }
 
 /**Generate a predefined light environment(s) that will be applied to many objects.  Useful for things like totally fogged
@@ -1594,6 +1606,13 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 		{
 			TheW3DShadowMap->clearDepth();
 		}
+	}
+
+	// Mirrors shade only in the main scene's own draws, which start once the shadow map has its casters.
+	if (TheW3DPlanarMirrors != nullptr && m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE &&
+		!m_planarMirrorPass && !ShaderClass::Is_Backface_Culling_Inverted())
+	{
+		TheW3DPlanarMirrors->beginScenePass();
 	}
 
 	//terrain needs to be rendered first

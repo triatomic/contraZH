@@ -354,6 +354,11 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ "HeadlightPoolPitch",					INI::parseAngleReal,		nullptr,			offsetof( GlobalData, m_headlightTuning.poolPitch ) },
 	{ "HeadlightPoolFalloff",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_headlightTuning.poolFalloff ) },
 	{ "HeadlightPoolClampBrightness",		INI::parseBool,				nullptr,			offsetof( GlobalData, m_headlightTuning.poolClampBrightness ) },
+	{ "PlanarMirrorShader",					INI::parseBool,				nullptr,			offsetof( GlobalData, m_planarMirrorShader ) },
+	{ "PlanarMirrorReflectivity",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_planarMirrorTuning.reflectivity ) },
+	{ "PlanarMirrorTint",					INI::parseRGBColor,			nullptr,			offsetof( GlobalData, m_planarMirrorTuning.tint ) },
+	{ "PlanarMirrorDistortion",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_planarMirrorTuning.distortion ) },
+	{ "PlanarMirrorFrost",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_planarMirrorTuning.frost ) },
 	{ "AmbientOcclusionRadius",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_ambientOcclusionRadius ) },
 	{ "AmbientOcclusionStrength",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_ambientOcclusionStrength ) },
 	{ "GroundNoiseStrength",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_groundNoiseStrength ) },
@@ -1126,6 +1131,8 @@ GlobalData::GlobalData()
 	m_stormTuning[StormShaderInfo::TYPE_SAND].setTypeDefaults(StormShaderInfo::TYPE_SAND);
 	m_stormTuning[StormShaderInfo::TYPE_SNOW].setTypeDefaults(StormShaderInfo::TYPE_SNOW);
 	m_headlightTuning.setDefaults();
+	m_planarMirrorShader = TRUE;
+	m_planarMirrorTuning.setDefaults();
 	m_ambientOcclusionRadius = 12.0f;
 	m_ambientOcclusionStrength = 1.0f;
 	m_groundNoiseStrength = 0.12f;
@@ -1815,6 +1822,7 @@ static const char *const LiveGameDataKeys[] =
 	"HeadlightColor", "HeadlightBeamIntensity", "HeadlightBeamLength", "HeadlightBeamWidth", "HeadlightBeamFalloff", "HeadlightBeamSoftness",
 	"HeadlightPoolIntensity", "HeadlightPoolRange", "HeadlightPoolAngle", "HeadlightPoolPitch", "HeadlightPoolFalloff",
 	"HeadlightPoolClampBrightness",
+	"PlanarMirrorReflectivity", "PlanarMirrorTint", "PlanarMirrorDistortion", "PlanarMirrorFrost",
 	"LaserGroundGlowRadius", "LaserGroundGlowFalloff", "LaserGroundGlowWrap", "LaserGroundGlowDebug", "LaserGroundGlowOverlap",
 	nullptr
 };

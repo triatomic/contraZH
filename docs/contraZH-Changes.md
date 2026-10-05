@@ -361,7 +361,7 @@ A 512-texel texture takes the room of four 256-texel ones. A texture that does n
 render log names it, so a map with many large textures needs a smaller border.
 
 Shadow mapping, specular, terrain glint, HQ sky cloud shadows, stochastic terrain, normal and glow maps, per-pixel lights, soft particles, flame
-and laser shading, per-map colour grading and the other features that need the Direct3D 9 build are on [Direct3D 9 Features](dx9feat.md).
+and laser shading, per-map colour grading, planar mirrors and the other features that need the Direct3D 9 build are on [Direct3D 9 Features](dx9feat.md).
 
 ### Bloom
 
