@@ -300,7 +300,7 @@ void OpenMap::qtListItem(int i, char *buf, int cap)
 }
 
 // Preview archive cache: opening a .big re-parses its whole directory (thousands of
-// 1-byte reads in Win32BIGFileSystem), so doing it per selection change made arrow-key
+// 1-byte reads in BIGFileSystem), so doing it per selection change made arrow-key
 // scrolling pay a full re-parse per step. Keep one parsed handle for the current
 // archive; freed in qtClose and whenever a different .big is opened.
 static ArchiveFile *s_qtPreviewArchive = NULL;
