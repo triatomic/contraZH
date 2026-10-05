@@ -9,7 +9,8 @@ GameNetworkingSockets ICE P2P transport, lobbies/matchmaking/stats).
 
 - Ported from GO commit: `d7f75517dd76c3a4e3de75e988f328a6877621c5` (2026-08-24);
   re-synced to `9c1121bd5` (2026-09) including the 60 Hz simulation and engine-feel changes
-  listed under "Decisions made during the port"
+  listed under "Decisions made during the port"; re-synced to `6ff404436` (2026-10-05) by
+  cherry-picks, see "Not taken in the 2026-10 sync"
 - GO's merge base with TheSuperHackers: `e760b3695` (2026-07-26)
 - contraZH's merge base with TheSuperHackers at port time: `5943d3856` (== tsh HEAD)
 - Future re-syncs: `git fetch go && git diff -w <old-go-sha>..<new-go-sha> -- <ported
@@ -149,6 +150,31 @@ GameNetworkingSockets ICE P2P transport, lobbies/matchmaking/stats).
   StatsExporter pipeline have since been ported.)
 - Log-only hunks (NetworkLog conversions of commented DEBUG_LOGs), `isspace/isdigit`
   cast fixes, `nullptr`->`NULL` reverts, and GO's dead `#else` branches were not taken.
+
+### Not taken in the 2026-10 sync
+
+Range `9c1121bd5..6ff404436`, GO-authored commits only. The TSH commits GO merged arrive
+with contraZH's own TSH syncs. Menu edits land in the `Menus/GeneralsOnline/` copies and
+LobbyUtils.cpp edits in the GO whole-file copy.
+
+| GO commit | Change | Reason |
+|---|---|---|
+| `a9aaa0ac2` `8e8d1cfe5` `4426d37cd` `7f113728c` `fb6cade08` `0ee25cc24` | vcpkg static networking deps, GNS fork with native ICE and WebRTC, CI, install and patch packaging | Vendored libs kept. The vendored header has the ICE implementation switch, and the service default (2, WebRTC) matches the vendored DLL |
+| `4055d287b` | Camera reset to a cached default max height | The fork never widens the max height for observer free-zoom, and the cached value goes stale when the lobby or Options camera height calls `setMaxHeightAboveGround` |
+| `ba7bf541f` `e2f439772` | Camera pitch keys (PgUp/PgDn/Home, numpad), minimum match pitch, slower keyboard rotation, rotate speed option | Unguarded changes to shared controls; would change offline Contra |
+| `4bbd06b70` | Thread list exit guard in Except.cpp | Builds on GO's thread list lock rework, which was never ported |
+| `8657eb2ef` `158104f1b` | Process-wide UTF-8 code page, Unicode window, AsciiString/UnicodeString conversion through the code page | Global encoding change for every build. `f73b0d1bc` (lobby map names as UTF-8) is taken; its helpers check `GetACP()` |
+| `c6f585fb9` | VC++ runtime check that downloads and installs the redistributable | Unguarded startup code with a "Generals Online" dialog |
+| `7322f0acc` `2e3e6b072` | Frameless startup splash window and hand-over | Unguarded WinMain and W3DDisplay changes at device creation |
+
+Adapted while picking:
+
+- `e629eb001` unbinds through `Set_DX8_Stream_Source`/`Set_DX8_Indices` so D3D9 compiles.
+- `03b457c42` guards both rider paths of the multi-addon Overlord draw.
+- `01cdd0cad` adds only the clamps; the surrounding tree code keeps contraZH's text.
+- `d97cfd432` guards the new `ResolveGameListLobbyID` declaration in LobbyUtils.h.
+- `dabb98b81` switches all six login URL sites of the pre-newserver flow to https.
+- `d5124c304` leaves out the `/guard:cf` build flags; the plugin interface is compiled out.
 
 ### Open: authenticated session is refused by the live service (as of 2026-08-26)
 
