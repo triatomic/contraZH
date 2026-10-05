@@ -61,7 +61,7 @@ static const Real PLANE_FADE = 1.0f;
 // Lifting the clip plane a hair keeps the mirror itself out of the scene it reflects.
 static const Real CLIP_LIFT = 0.05f;
 // The normal map bends reads a little past a mirror's own patch of screen, so the mirrored scene draws that far around it.
-static const Real SCISSOR_MARGIN = 0.05f;
+static const Real READ_MARGIN = 0.05f;
 // Full frost blurs over this share of the screen's width, and clouds this much of what shows through.
 static const Real FROST_RADIUS = 0.012f;
 static const Real FROST_CLOUD = 0.55f;
@@ -590,38 +590,22 @@ void W3DPlanarMirrorManager::renderPlane(CameraClass *camera, Int plane, const S
 	m_camera->Set_Transform(Reflect_In_Plane(camera->Get_Transform(), sighting.z));
 	m_camera->Set_Oblique_Clip_Plane(PlaneClass(Vector3(0.0f, 0.0f, 1.0f), sighting.z + CLIP_LIFT));
 
-	// Only the mirrors' patch of the screen reads the target, so the scene draws there alone.
-	Bool clipped = TRUE;
-	Real left = 1.0f;
-	Real right = -1.0f;
-	Real top = 1.0f;
-	Real bottom = -1.0f;
-	for (Int corner = 0; corner < 4 && clipped; corner++)
+	// Only the mirrors' patch of the view reads the target, so the scene draws there alone, and culls to it.
+	Bool bounded = TRUE;
+	Vector2 readMin(1.0f, 1.0f);
+	Vector2 readMax(0.0f, 0.0f);
+	for (Int corner = 0; corner < 4 && bounded; corner++)
 	{
 		const Vector3 point((corner & 1) ? sighting.maxX : sighting.minX, (corner & 2) ? sighting.maxY : sighting.minY, sighting.z);
 		Vector3 projected;
-		if (camera->Project(projected, point) == CameraClass::OUTSIDE_NEAR_CLIP)
-		{
-			clipped = FALSE;
-		}
-		left = min(left, projected.X);
-		right = max(right, projected.X);
-		top = min(top, projected.Y);
-		bottom = max(bottom, projected.Y);
+		bounded = camera->Project(projected, point) != CameraClass::OUTSIDE_NEAR_CLIP;
+		const Real u = projected.X * 0.5f + 0.5f;
+		const Real v = 0.5f - projected.Y * 0.5f;
+		readMin.Set(min(readMin.X, u), min(readMin.Y, v));
+		readMax.Set(max(readMax.X, u), max(readMax.Y, v));
 	}
-	RECT scissor;
-	if (clipped)
-	{
-		const Real spanX = (viewMax.X - viewMin.X) * width;
-		const Real spanY = (viewMax.Y - viewMin.Y) * height;
-		const Real marginX = SCISSOR_MARGIN * width;
-		const Real marginY = SCISSOR_MARGIN * height;
-		scissor.left = (LONG)max(viewMin.X * width + (left * 0.5f + 0.5f) * spanX - marginX, 0.0f);
-		scissor.right = (LONG)min(viewMin.X * width + (right * 0.5f + 0.5f) * spanX + marginX, (Real)width);
-		scissor.top = (LONG)max(viewMin.Y * height + (0.5f - bottom * 0.5f) * spanY - marginY, 0.0f);
-		scissor.bottom = (LONG)min(viewMin.Y * height + (0.5f - top * 0.5f) * spanY + marginY, (Real)height);
-		clipped = scissor.right > scissor.left && scissor.bottom > scissor.top;
-	}
+	readMin.Set(max(readMin.X - READ_MARGIN, 0.0f), max(readMin.Y - READ_MARGIN, 0.0f));
+	readMax.Set(min(readMax.X + READ_MARGIN, 1.0f), min(readMax.Y + READ_MARGIN, 1.0f));
 
 	for (Int i = 0; i < MAX_PLANES; i++)
 	{
@@ -631,10 +615,9 @@ void W3DPlanarMirrorManager::renderPlane(CameraClass *camera, Int plane, const S
 	surface->Release();
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, FALSE);
 	DX8Wrapper::Clear(true, true, Vector3(0.0f, 0.0f, 0.0f), 0.0f, 1.0f, 0);
-	if (clipped)
+	if (bounded && readMax.X > readMin.X && readMax.Y > readMin.Y)
 	{
-		device->SetScissorRect(&scissor);
-		device->SetRenderState(D3DRS_SCISSORTESTENABLE, TRUE);
+		WaterRenderObjClass::narrowReflectionCamera(m_camera, camera, readMin, readMax);
 	}
 
 	// Drawables outside the view region kept last frame's transforms, so they stay out of the mirror.
@@ -654,7 +637,6 @@ void W3DPlanarMirrorManager::renderPlane(CameraClass *camera, Int plane, const S
 	WW3D::Render(scene, m_camera);
 	ShaderClass::Invert_Backface_Culling(false);
 
-	device->SetRenderState(D3DRS_SCISSORTESTENABLE, FALSE);
 	WaterRenderObjClass::drawReflectionCoverage(width, height);
 
 	DX8MeshRendererClass::Enable_Bloom_Capture(bloomCapture);

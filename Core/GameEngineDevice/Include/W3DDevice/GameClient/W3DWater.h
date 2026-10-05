@@ -140,6 +140,9 @@ public:
 	static Vector4 getStochasticHex();
 	void renderPlanarReflection(CameraClass *cam);	///< mirrors the scene in the water under the view, before the views draw
 	static void drawReflectionCoverage(UnsignedInt width, UnsignedInt height);	///< also serves the planar mirrors' targets
+	/// Narrows a mirror camera, set up as a copy of the view's, to the part of the view between lo and hi, 0 to 1 across it
+	/// with v down. Every pixel keeps its place in the target, so only the frustum and the drawn area shrink.
+	static void narrowReflectionCamera(CameraClass *mirror, CameraClass *view, const Vector2 &lo, const Vector2 &hi);
 	TextureClass *peekSkyboxFace(Int face);	///< north, east, south, west or top, or null without a skybox
 
 protected:
@@ -333,6 +336,7 @@ protected:
 	Bool isWaterVisible(PolygonTrigger *pTrig) const;
 	Bool isWaterVisible(PolygonTrigger *pTrig, CameraClass *camera) const;
 	Bool pickReflectionPlane(CameraClass *camera, Real &planeZ) const;
+	Bool getMirrorReadRect(CameraClass *camera, Vector2 &lo, Vector2 &hi) const;
 	Bool ensureReflectionTargets(UnsignedInt width, UnsignedInt height);
 	Int standingWaterDiffuse() const;
 	Bool buildRadialGrid();

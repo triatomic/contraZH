@@ -2171,6 +2171,97 @@ Bool WaterRenderObjClass::ensureReflectionTargets(UnsignedInt width, UnsignedInt
 #endif
 }
 
+// The part of the view the water may read its mirror from: every visible water area, raised and lowered by the swell,
+// widened by how far the ripples bend the read. False where that is most of the view or cannot be bounded.
+Bool WaterRenderObjClass::getMirrorReadRect(CameraClass *camera, Vector2 &lo, Vector2 &hi) const
+{
+	// Grid mesh water spreads over its own grid, not the water areas.
+	if (m_waterType != WATER_TYPE_0_TRANSLUCENT)
+	{
+		return FALSE;
+	}
+
+	const Real swell = max(TheWaterTransparency->m_shaderWaterSwellHeight, 0.0f) + 1.0f;
+	Bool found = FALSE;
+	lo.Set(1.0f, 1.0f);
+	hi.Set(0.0f, 0.0f);
+	for (PolygonTrigger *pTrig=PolygonTrigger::getFirstPolygonTrigger(); pTrig; pTrig = pTrig->getNext())
+	{
+		if (!pTrig->isWaterArea() || pTrig->getNumPoints() < 3 || !isWaterVisible(pTrig, camera))
+		{
+			continue;
+		}
+
+		// A polygon's corners bound its picture as long as none lies behind the camera.
+		for (Int i=0; i<pTrig->getNumPoints(); i++)
+		{
+			const ICoord3D *point = pTrig->getPoint(i);
+			for (Int side=0; side<2; side++)
+			{
+				const Vector3 corner((Real)point->x, (Real)point->y, (Real)point->z + (side ? swell : -swell));
+				Vector3 projected;
+				if (camera->Project(projected, corner) == CameraClass::OUTSIDE_NEAR_CLIP)
+				{
+					return FALSE;
+				}
+				const Real u = projected.X * 0.5f + 0.5f;
+				const Real v = 0.5f - projected.Y * 0.5f;
+				lo.Set(min(lo.X, u), min(lo.Y, v));
+				hi.Set(max(hi.X, u), max(hi.Y, v));
+				found = TRUE;
+			}
+		}
+	}
+	if (!found)
+	{
+		return FALSE;
+	}
+
+	// The ripples' slope stays within a few units, scaled by the wave strength.
+	const Real margin = 0.02f + 4.0f * TheWaterTransparency->m_shaderWaterPlanarDistortion * max(TheWaterTransparency->m_shaderWaterWaveStrength, 1.0f);
+	lo.Set(max(lo.X - margin, 0.0f), max(lo.Y - margin, 0.0f));
+	hi.Set(min(hi.X + margin, 1.0f), min(hi.Y + margin, 1.0f));
+	return hi.X > lo.X && hi.Y > lo.Y && (hi.X - lo.X) * (hi.Y - lo.Y) < 0.9f;
+}
+
+void WaterRenderObjClass::narrowReflectionCamera(CameraClass *mirror, CameraClass *view, const Vector2 &lo, const Vector2 &hi)
+{
+	int width;
+	int height;
+	int bits;
+	bool windowed;
+	WW3D::Get_Render_Target_Resolution(width, height, bits, windowed);
+
+	Vector2 planeMin;
+	Vector2 planeMax;
+	Vector2 portMin;
+	Vector2 portMax;
+	view->Get_View_Plane(planeMin, planeMax);
+	view->Get_Viewport(portMin, portMax);
+
+	// The whole view's pixels as CameraClass::Apply truncates them, and the chosen part of them in whole pixels.
+	const Int x0 = (Int)(portMin.X * (Real)width);
+	const Int y0 = (Int)(portMin.Y * (Real)height);
+	const Int spanX = (Int)((portMax.X - portMin.X) * (Real)width);
+	const Int spanY = (Int)((portMax.Y - portMin.Y) * (Real)height);
+	if (spanX <= 0 || spanY <= 0)
+	{
+		return;
+	}
+	const Int left = min(max((Int)floorf(lo.X * spanX), 0), spanX - 1);
+	const Int right = min(max((Int)ceilf(hi.X * spanX), left + 1), spanX);
+	const Int top = min(max((Int)floorf(lo.Y * spanY), 0), spanY - 1);
+	const Int bottom = min(max((Int)ceilf(hi.Y * spanY), top + 1), spanY);
+
+	// The nudges keep Apply's truncation on those pixels, and the view plane covers exactly them.
+	mirror->Set_Viewport(Vector2((x0 + left + 0.25f) / width, (y0 + top + 0.25f) / height),
+		Vector2((x0 + right + 0.5f) / width, (y0 + bottom + 0.5f) / height));
+	const Real planePerX = (planeMax.X - planeMin.X) / spanX;
+	const Real planePerY = (planeMax.Y - planeMin.Y) / spanY;
+	mirror->Set_View_Plane(Vector2(planeMin.X + left * planePerX, planeMax.Y - bottom * planePerY),
+		Vector2(planeMin.X + right * planePerX, planeMax.Y - top * planePerY));
+}
+
 // Sets alpha to 1 where the mirror drew anything and to 0 over the empty sky, whatever alpha the scene wrote.
 void WaterRenderObjClass::drawReflectionCoverage(UnsignedInt width, UnsignedInt height)
 {
@@ -2287,6 +2378,24 @@ void WaterRenderObjClass::renderPlanarReflection(CameraClass *cam)
 	surface->Release();
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, FALSE);
 	DX8Wrapper::Clear(true, true, Vector3(0.0f, 0.0f, 0.0f), 0.0f, 1.0f, 0);
+
+	// Only the water's part of the view reads the mirror, so the mirror draws there alone, and culls to it.
+	Vector2 readMin;
+	Vector2 readMax;
+	const Bool narrowed = getMirrorReadRect(cam, readMin, readMax);
+	if (narrowed)
+	{
+		narrowReflectionCamera(m_reflectionCamera, cam, readMin, readMax);
+	}
+
+	// Sampled rather than every frame, so a whole match stays readable.
+	static Int passCount = 0;
+	if (passCount % 300 == 0 && passCount <= 300 * 15)
+	{
+		RENDER_LOG(("W3DWater: mirror pass %d at %.1f drew %.0f%% of the view", passCount, planeZ,
+			narrowed ? 100.0f * (readMax.X - readMin.X) * (readMax.Y - readMin.Y) : 100.0f));
+	}
+	++passCount;
 
 	// Drawables outside the view region kept last frame's transforms, so they stay out of the mirror.
 	Region3D region;

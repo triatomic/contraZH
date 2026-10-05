@@ -36,6 +36,7 @@
 #include "Common/GameType.h"
 #include "W3DDevice/GameClient/WorldHeightMap.h"
 #include "W3DDevice/GameClient/BaseHeightMap.h"
+#include "WWMath/aabox.h"
 #include <vector>
 
 
@@ -109,8 +110,14 @@ protected:
 	std::vector<Int> m_tilePixelLights;	///<each VB tile's per-pixel lights, W3DShaderManager::MAX_PIXEL_LIGHTS slots a tile
 	std::vector<Int> m_tilePixelLightCounts;	///<how many of its slots each VB tile fills
 	std::vector<Bool> m_tileSeabed;	///<whether each VB tile has standing water, so it draws through the seabed shaders
+	std::vector<AABoxClass> m_tileBounds;	///<each VB tile's world bounds, for culling it out of reflections
+	std::vector<Bool> m_tileBoundsStale;	///<whether each VB tile's vertices changed since its bounds were taken
+	std::vector<Bool> m_tileCulled;	///<whether the reflection being drawn leaves each VB tile out
+	Bool m_cullingTiles;	///<m_tileCulled holds for the render under way
 
 	DX8VertexBufferClass *getVertexBufferTile(Int x, Int y);
+	void cullReflectedTiles(RenderInfoClass &rinfo);
+	Bool isTileCulled(Int x, Int y) const { return m_cullingTiles && m_tileCulled[y*m_numVBTilesX+x]; }
 	VERTEX_FORMAT *getVertexBufferBackup(Int x, Int y);
 	UnsignedInt doTheDynamicLight(VERTEX_FORMAT *vb, VERTEX_FORMAT *vbMirror, Vector3*light, Vector3*normal, W3DDynamicLight *pLights[], Int numLights);
 	Int getXWithOrigin(Int x);

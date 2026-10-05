@@ -151,6 +151,10 @@ void HeightMapRenderObjClass::freeIndexVertexBuffers()
 	m_tilePixelLights.clear();
 	m_tilePixelLightCounts.clear();
 	m_tileSeabed.clear();
+	m_tileBounds.clear();
+	m_tileBoundsStale.clear();
+	m_tileCulled.clear();
+	m_cullingTiles = FALSE;
 }
 
 //=============================================================================
@@ -590,6 +594,12 @@ Int HeightMapRenderObjClass::updateVB(DX8VertexBufferClass	*pVB, VERTEX_FORMAT *
 		DX8VertexBufferClass::WriteLockClass lockVtxBuffer(pVB);
 		VERTEX_FORMAT *vbHardware = (VERTEX_FORMAT*)lockVtxBuffer.Get_Vertex_Array();
 		VERTEX_FORMAT *vBase = data;
+
+		const size_t tile = (size_t)(data - m_vertexBufferBackup) / HEIGHTMAP_VERTEX_NUM;
+		if (tile < m_tileBoundsStale.size())
+		{
+			m_tileBoundsStale[tile] = TRUE;
+		}
 		// Note that we are building the vertex buffer data in the memory buffer, data.
 		// At the bottom, we will copy the final vertex data for one cell into the
 		// hardware vertex buffer.
@@ -1318,7 +1328,8 @@ m_numVBTilesX(0),
 m_numVBTilesY(0),
 m_numVertexBufferTiles(0),
 m_numBlockColumnsInLastVB(0),
-m_numBlockRowsInLastVB(0)
+m_numBlockRowsInLastVB(0),
+m_cullingTiles(FALSE)
 {
 	TheHeightMap = this;
 }
@@ -1584,6 +1595,8 @@ Int HeightMapRenderObjClass::initHeightData(Int x, Int y, WorldHeightMap *pMap, 
 
 		m_vertexBufferTiles = NEW DX8VertexBufferClass*[m_numVertexBufferTiles];
 		m_vertexBufferBackup = NEW VERTEX_FORMAT [m_numVertexBufferTiles * HEIGHTMAP_VERTEX_NUM];
+		// A tile's unfilled vertices count towards its bounds, so they hold zeros rather than garbage.
+		memset(m_vertexBufferBackup, 0, m_numVertexBufferTiles * HEIGHTMAP_VERTEX_NUM * sizeof(VERTEX_FORMAT));
 
 		for (i=0; i<m_numVertexBufferTiles; i++) {
 #ifdef USE_NORMALS
@@ -2147,6 +2160,51 @@ void HeightMapRenderObjClass::updateCenter(CameraClass *camera, const Vector3 *c
 //=============================================================================
 //DECLARE_PERF_TIMER(Terrain_Render)
 
+// A reflection leaves out tiles wholly under its plane, which its clip plane would throw away, and tiles its frustum misses.
+// Half a unit under the plane covers the water's clip, the lowest any reflection uses.
+void HeightMapRenderObjClass::cullReflectedTiles(RenderInfoClass &rinfo)
+{
+	m_cullingTiles = FALSE;
+#if RTS_ZEROHOUR
+	RTS3DScene *scene = (RTS3DScene *)Scene;
+	if (scene == nullptr || !scene->isPlanarMirrorPass() || m_vertexBufferBackup == nullptr || m_numVertexBufferTiles <= 0)
+	{
+		return;
+	}
+
+	if ((Int)m_tileBounds.size() != m_numVertexBufferTiles)
+	{
+		m_tileBounds.assign(m_numVertexBufferTiles, AABoxClass());
+		m_tileBoundsStale.assign(m_numVertexBufferTiles, TRUE);
+		m_tileCulled.assign(m_numVertexBufferTiles, FALSE);
+	}
+
+	const Real lowest = scene->getPlanarMirrorZ() - 0.5f;
+	const FrustumClass &frustum = rinfo.Camera.Get_Frustum();
+	for (Int tile = 0; tile < m_numVertexBufferTiles; tile++)
+	{
+		if (m_tileBoundsStale[tile])
+		{
+			const VERTEX_FORMAT *vertex = m_vertexBufferBackup + tile * HEIGHTMAP_VERTEX_NUM;
+			Vector3 low(vertex->x, vertex->y, vertex->z);
+			Vector3 high = low;
+			for (Int i = 1; i < HEIGHTMAP_VERTEX_NUM; i++)
+			{
+				low.Update_Min(Vector3(vertex[i].x, vertex[i].y, vertex[i].z));
+				high.Update_Max(Vector3(vertex[i].x, vertex[i].y, vertex[i].z));
+			}
+			m_tileBounds[tile].Init_Min_Max(low, high);
+			m_tileBoundsStale[tile] = FALSE;
+		}
+		const AABoxClass &box = m_tileBounds[tile];
+		m_tileCulled[tile] = box.Center.Z + box.Extent.Z < lowest || CollisionMath::Overlap_Test(frustum, box) == CollisionMath::OUTSIDE;
+	}
+	m_cullingTiles = TRUE;
+#else
+	(void)rinfo;
+#endif
+}
+
 void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 {
 	//USE_PERF_TIMER(Terrain_Render)
@@ -2255,6 +2313,7 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 	{
 		DX8Wrapper::Set_Material(m_vertexMaterialClass);
 		DX8Wrapper::Set_Shader(m_shaderClass);
+		cullReflectedTiles(rinfo);
 
  		st=W3DShaderManager::ST_TERRAIN_BASE; //set default shader
 
@@ -2332,7 +2391,7 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 					DX8_SET_FVF(DX8Wrapper::_Get_D3D_Device8(), D3DFVF_XYZRHW |D3DFVF_DIFFUSE|D3DFVF_TEX2);
 				}
 #endif
-				if (Is_Hidden() == 0) {
+				if (Is_Hidden() == 0 && !isTileCulled(i, j)) {
 					setTilePixelLights(j*m_numVBTilesX+i);
 					DX8Wrapper::Draw_Triangles(0, HEIGHTMAP_POLYGON_NUM, 0, HEIGHTMAP_VERTEX_NUM);
 				}
@@ -2422,6 +2481,7 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 	ShaderClass::Invalidate();
 	DX8Wrapper::Set_Material(nullptr);
 
+	m_cullingTiles = FALSE;
 }
 
 
@@ -2554,7 +2614,7 @@ void HeightMapRenderObjClass::renderTerrainPass(CameraClass *pCamera)
 				DX8_SET_FVF(DX8Wrapper::_Get_D3D_Device8(), D3DFVF_XYZRHW |D3DFVF_DIFFUSE|D3DFVF_TEX2);
 			}
 #endif
-			if (Is_Hidden() == 0) {
+			if (Is_Hidden() == 0 && !isTileCulled(i, j)) {
 				DX8Wrapper::Draw_Triangles(0, HEIGHTMAP_POLYGON_NUM, 0, HEIGHTMAP_VERTEX_NUM);
 			}
 		}
