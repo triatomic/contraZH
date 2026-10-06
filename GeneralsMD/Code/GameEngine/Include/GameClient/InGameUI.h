@@ -786,7 +786,11 @@ public:  // ********************************************************************
 	Bool isInPreferSelectionMode() const { return m_preferSelection; }
 
 	void setClientQuiet( Bool enabled )  { m_clientQuiet = enabled; }
-	void setWaypointMode( Bool enabled )		{ m_waypointMode = enabled; if( enabled ) m_waypointBuildAssignment = 0; else m_waypointFocusUnit = INVALID_ID; }	///< entering the mode restarts the build round-robin; leaving never carries the single-unit focus over: orders go back to the whole selection
+	/// entering the mode restarts the build round-robin; leaving never carries the
+	/// single-unit focus over: orders go back to the whole selection. Implemented out of
+	/// line because the flip must also repopulate the command bar (same-type dozer rows
+	/// drive the builder panel while plotting).
+	void setWaypointMode( Bool enabled );
 	void setForceMoveMode( Bool enabled )		{ m_forceMoveToMode = enabled; }
 	void setForceAttackMode( Bool enabled )		{ m_forceAttackMode = enabled; }
 	void setPreferSelectionMode( Bool enabled )		{ m_preferSelection = enabled; }

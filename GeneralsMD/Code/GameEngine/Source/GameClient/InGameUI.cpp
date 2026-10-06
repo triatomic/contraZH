@@ -3296,6 +3296,26 @@ void InGameUI::discardPendingWaypointCommands()
 }
 
 //-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature (issue #122) entering the mode restarts the build round-robin and
+// leaving drops the single-unit focus. The flip also marks the command bar dirty: while a
+// route is plotted, a row of same-type dozers drives the builder's own panel (the multi select
+// context has no build tab), and that has to appear the moment Alt goes down, not on the next
+// selection change.
+//-------------------------------------------------------------------------------------------------
+void InGameUI::setWaypointMode( Bool enabled )
+{
+	m_waypointMode = enabled;
+
+	if( enabled )
+		m_waypointBuildAssignment = 0;
+	else
+		m_waypointFocusUnit = INVALID_ID;
+
+	if( TheControlBar != nullptr )
+		TheControlBar->markUIDirty();
+}
+
+//-------------------------------------------------------------------------------------------------
 // TheSuperHackers @feature leave single-unit plotting focus in one press: the next plotted
 // order belongs to the whole selection again. Alt+Shift, no third key needed. The selection
 // flashes once so the player sees the hand-back was registered.

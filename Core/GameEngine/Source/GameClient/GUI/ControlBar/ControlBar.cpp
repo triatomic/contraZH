@@ -1958,6 +1958,38 @@ void ControlBar::evaluateContextUI()
 		{
 			drawToEvaluateFor = getSmartSelectionFocusDrawable();
 		}
+
+		// TheSuperHackers @feature (issue #122): a row of same-type dozers selected together is
+		// how the player hands out several builds at once -- plotting needs the builder's own
+		// command panel, and the multi select context has no build tab at all. While a route is
+		// being plotted, drive the bar from the first dozer as if it were alone; panel clicks
+		// then flow into the plotting, which hands the builds to the dozers round-robin.
+		if( drawToEvaluateFor == nullptr && TheInGameUI->isInWaypointMode() )
+		{
+			Drawable *first = selectedDrawables->front();
+			Object *firstObj = ( first != nullptr ) ? first->getObject() : nullptr;
+
+			if( firstObj != nullptr && firstObj->isKindOf( KINDOF_DOZER ) )
+			{
+				Bool allSameDozer = TRUE;
+
+				for( DrawableListCIt it = selectedDrawables->begin(); it != selectedDrawables->end(); ++it )
+				{
+					Object *unit = ( *it != nullptr ) ? ( *it )->getObject() : nullptr;
+					if( unit == nullptr || !unit->isLocallyControlled() ||
+							unit->getTemplate() != firstObj->getTemplate() ||
+							unit->isKindOf( KINDOF_DOZER ) == FALSE )
+					{
+						allSameDozer = FALSE;
+						break;
+					}
+				}
+
+				if( allSameDozer )
+					drawToEvaluateFor = first;
+			}
+		}
+
 		multiSelect = ( drawToEvaluateFor == nullptr );
 
 	}
