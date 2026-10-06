@@ -19,6 +19,7 @@
 #include "Common/ThingTemplate.h"
 #include "GameLogic/Module/DeployStyleAIUpdate.h"
 #include "GameLogic/Module/OverchargeBehavior.h"
+#include "GameLogic/Module/SpecialAbilityUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/WeaponSet.h"
 #include "GameLogic/Weapon.h"
@@ -657,6 +658,25 @@ void CommandSequence::update( Object *subject )
 			Object *foundation = ( TheGameLogic != nullptr ) ? TheGameLogic->findObjectByID( m_activeBuildTargetID ) : nullptr;
 			if( foundation != nullptr && foundation->getConstructionPercent() >= 0.0f )
 				return;	// still under construction -- keep the dozer on this node
+		}
+
+		// P4: special powers are run by a SpecialAbilityUpdate beside the AI -- it even sets
+		// the AI idle itself for the whole approach-and-execute sequence, so the plain idle
+		// rule would advance while a hack/capture/steal is still playing and the next order
+		// would interrupt it. The node is done only when its own ability has finished. Powers
+		// without such an update module (instant or async ones) fall through and advance.
+		if( m_current->m_cmdType == GameMessage::MSG_DO_SPECIAL_POWER ||
+				m_current->m_cmdType == GameMessage::MSG_DO_SPECIAL_POWER_AT_LOCATION ||
+				m_current->m_cmdType == GameMessage::MSG_DO_SPECIAL_POWER_AT_OBJECT )
+		{
+			const SpecialPowerTemplate *spTemplate =
+					TheSpecialPowerStore->findSpecialPowerTemplateByID( (UnsignedInt)m_current->m_param );
+			if( spTemplate != nullptr )
+			{
+				SpecialAbilityUpdate *ability = subject->findSpecialAbilityUpdate( spTemplate->getSpecialPowerType() );
+				if( ability != nullptr && ability->isActive() )
+					return;	// the hack/capture/steal is still running -- hold the node
+			}
 		}
 
 		m_current = m_current->m_next;
