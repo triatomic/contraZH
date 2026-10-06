@@ -41,6 +41,7 @@
 #include "Common/OptionPreferences.h"
 #include "Common/Upgrade.h"
 #include "Common/BuildAssistant.h"
+#include "GameClient/InGameUI.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/BattlePlanUpdate.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
@@ -1212,8 +1213,12 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 			if( dozerAI == nullptr )
 				return COMMAND_RESTRICTED;
 
-			// if building anything at all right now we can't build another
-			if( dozerAI->isTaskPending( DOZER_TASK_BUILD ) == TRUE )
+			// if building anything at all right now we can't build another -- except while a
+			// waypoint route is being plotted: queued builds wait in the chain until the
+			// current construction finishes, so the plot must be able to arm these buttons
+			// no matter how busy the dozer is.
+			if( dozerAI->isTaskPending( DOZER_TASK_BUILD ) == TRUE
+					&& ( TheInGameUI == nullptr || !TheInGameUI->isInWaypointMode() ) )
 				return COMMAND_RESTRICTED;
 
 			if( dozerAI->canBuildTemplate( whatToBuild ) == FALSE )
