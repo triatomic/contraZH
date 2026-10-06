@@ -444,6 +444,11 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 				if (TheKeyboard)
 					TheKeyboard->resetKeys();
 
+				if (TheInGameUI)
+				{
+					TheInGameUI->clearModifierModes();
+				}
+
 				if (TheMouse)
 					TheMouse->regainFocus();
 
@@ -455,6 +460,11 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 			{
 				if (TheKeyboard)
 					TheKeyboard->resetKeys();
+
+				if (TheInGameUI)
+				{
+					TheInGameUI->clearModifierModes();
+				}
 
 				if (TheMouse)
 				{

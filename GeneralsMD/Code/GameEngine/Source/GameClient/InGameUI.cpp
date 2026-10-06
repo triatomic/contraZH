@@ -4470,15 +4470,23 @@ void InGameUI::setInputEnabled( Bool enable )
 			(admittedly, this code will actually do the wrong thing if you were to hold down the ctrl
 			key thru the whole cinematic, but that's even more unlikely...)
 		*/
-		setForceAttackMode( false );			// CTRL
-		setForceMoveMode( false );				// apparently unmapped in current CommandMap.ini
-		setWaypointMode( false );					// ALT
-		setPreferSelectionMode( false );	// SHIFT
-		setCameraRotateLeft( false );			// KP4
-		setCameraRotateRight( false );		// KP6
-		setCameraZoomIn( false );					// KP8
-		setCameraZoomOut( false );				// KP2
+		clearModifierModes();
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Losing focus also eats key releases, so alt-tab would otherwise leave waypoint mode on. */
+//-------------------------------------------------------------------------------------------------
+void InGameUI::clearModifierModes()
+{
+	setForceAttackMode( false );			// CTRL
+	setForceMoveMode( false );				// apparently unmapped in current CommandMap.ini
+	setWaypointMode( false );					// ALT
+	setPreferSelectionMode( false );	// SHIFT
+	setCameraRotateLeft( false );			// KP4
+	setCameraRotateRight( false );		// KP6
+	setCameraZoomIn( false );					// KP8
+	setCameraZoomOut( false );				// KP2
 }
 
 //-------------------------------------------------------------------------------------------------
