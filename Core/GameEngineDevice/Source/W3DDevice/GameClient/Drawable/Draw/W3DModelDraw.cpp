@@ -3731,7 +3731,9 @@ void W3DModelDraw::hideAllHeadlights(Bool hide)
 	if (m_renderObject)
 	{
 		// Where the headlight shader runs it draws the lights, and their meshes stay hidden.
-		const Bool shaded = TheW3DHeadlights != nullptr && TheW3DHeadlights->isActive() && getW3DModelDrawModuleData()->m_headlightTuning.enabled;
+		// Kinds in HeadlightShaderForbiddenKindOf keep the meshes, such as buildings whose HEADLIGHT meshes are lit windows.
+		const Bool shaded = TheW3DHeadlights != nullptr && TheW3DHeadlights->isActive() && getW3DModelDrawModuleData()->m_headlightTuning.enabled &&
+			!getDrawable()->isAnyKindOf(TheGlobalData->m_headlightForbiddenKindOf);
 
 		// The lamps are found once for each render object, since every change of state comes through here.
 		const Bool search = shaded && !hide && m_headlightSource != m_renderObject;

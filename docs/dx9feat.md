@@ -876,11 +876,12 @@ Needs the Direct3D 9 build and a shader model 3 card. Elsewhere, and with `Headl
 the models show their headlight meshes as before. The pool has no shadows, so a lamp also lights
 ground that a hill or building hides from it.
 
-The keys live in `GameData.ini`. All but `HeadlightShader` reload in cheat builds:
+The keys live in `GameData.ini`. All but `HeadlightShader` and `HeadlightShaderForbiddenKindOf` reload in cheat builds:
 
 | Key | Default | Meaning |
 |---|---|---|
 | `HeadlightShader` | `Yes` | `No` keeps the headlight meshes. Read at launch. |
+| `HeadlightShaderForbiddenKindOf` | none | Objects of any of these kinds keep their headlight meshes, such as `STRUCTURE` for buildings that use `HEADLIGHT` meshes as lit windows. Read at launch. `GameData.ini` only. |
 | `HeadlightColor` | `R:255 G:242 B:209` | Colour of the beam and the pool. |
 | `HeadlightBeamIntensity` | 0.35 | Brightness of the beam. 0 draws no beam. |
 | `HeadlightBeamLength` | 1.0 | Beam length, in mesh lengths. |

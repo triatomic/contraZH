@@ -38,6 +38,7 @@
 #include "GameClient/DisruptionShader.h"
 #include "GameClient/StormShader.h"
 #include "GameClient/HeadlightShader.h"
+#include "Common/KindOf.h"
 #include "Common/STLTypedefs.h"
 #include "Common/Money.h"
 
@@ -563,6 +564,7 @@ public:
   Real m_cryoParticleScale;       ///< how much larger or smaller cryo-shaded particles draw, 1 unchanged
   DisruptionShaderTuning m_disruptionTuning;  ///< disruption shader defaults
   HeadlightShaderTuning m_headlightTuning;  ///< headlights drawn in place of HEADLIGHT meshes
+  KindOfMaskType m_headlightForbiddenKindOf;  ///< objects of these kinds keep their HEADLIGHT meshes
   StormShaderInfo m_stormTuning[StormShaderInfo::TYPE_COUNT];  ///< what each storm type takes where its entry sets nothing
   Bool m_useAmbientOcclusion;     ///< Options.ini AmbientOcclusion: creases and the ground beneath objects darken where the hardware allows
   Bool m_useHeightBlend;          ///< Options.ini HeightBlend: terrain textures blend by height where the hardware allows
