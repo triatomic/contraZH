@@ -34,6 +34,8 @@
 #include "Win32Device/Common/Win32GameEngine.h"
 #include "Common/PerfTimer.h"
 
+#include "GameClient/InGameUI.h"
+#include "GameLogic/GameLogic.h"
 #include "GameNetwork/LANAPICallbacks.h"
 
 #if defined(GENERALS_ONLINE)
@@ -41,6 +43,69 @@
 #endif
 
 extern DWORD TheMessageTime;
+extern HWND ApplicationHWnd;
+
+//-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature new waypoint system (issue #122). While the player holds Alt to plot
+// a route, an accidental Alt+Tab hands the game's focus to the task switcher and the whole plot
+// dies with the focus. A low-level keyboard hook swallows Tab while Alt is down -- but only for
+// as long as the player is actually plotting in a running game with input enabled, and only
+// while the game window is the foreground window. Every other moment Alt+Tab stays exactly what
+// Windows users expect it to be, so a stuck game can still be left the usual way. Releasing Alt
+// first and then pressing Alt+Tab remains the deliberate way out of a plotting session.
+//-------------------------------------------------------------------------------------------------
+static HHOOK s_waypointKeyboardHook = nullptr;
+
+static Bool waypointGuardShouldSwallowTab()
+{
+	if( TheGameLogic == nullptr || !TheGameLogic->isInGame() )
+	{
+		return FALSE;
+	}
+
+	if( TheInGameUI == nullptr || !TheInGameUI->isInWaypointMode() || !TheInGameUI->getInputEnabled() )
+	{
+		return FALSE;
+	}
+
+	// the hook sees the whole desktop's keys; keep it from eating the player's Alt+Tab in other
+	// applications when the game window is not the one they are working in
+	return ( GetForegroundWindow() == ApplicationHWnd );
+}
+
+static LRESULT CALLBACK waypointKeyboardHookProc( int code, WPARAM wParam, LPARAM lParam )
+{
+	if( code >= 0 )
+	{
+		const KBDLLHOOKSTRUCT *info = (const KBDLLHOOKSTRUCT *)lParam;
+		if( info != nullptr && info->vkCode == VK_TAB
+				&& ( GetAsyncKeyState( VK_MENU ) & 0x8000 )
+				&& waypointGuardShouldSwallowTab() )
+		{
+			return 1;	// swallow the key: the task switcher never sees it
+		}
+	}
+
+	return CallNextHookEx( s_waypointKeyboardHook, code, wParam, lParam );
+}
+
+static void installWaypointInputGuard()
+{
+	if( s_waypointKeyboardHook == nullptr )
+	{
+		s_waypointKeyboardHook = SetWindowsHookEx( WH_KEYBOARD_LL, waypointKeyboardHookProc,
+				GetModuleHandle( nullptr ), 0 );
+	}
+}
+
+static void removeWaypointInputGuard()
+{
+	if( s_waypointKeyboardHook != nullptr )
+	{
+		UnhookWindowsHookEx( s_waypointKeyboardHook );
+		s_waypointKeyboardHook = nullptr;
+	}
+}
 
 //-------------------------------------------------------------------------------------------------
 /** Constructor for Win32GameEngine */
@@ -56,6 +121,8 @@ Win32GameEngine::Win32GameEngine()
 //-------------------------------------------------------------------------------------------------
 Win32GameEngine::~Win32GameEngine()
 {
+	removeWaypointInputGuard();
+
 	// restore it (this isn't really necessary, but feels good.)
 	SetErrorMode( m_previousErrorMode );
 }
@@ -69,6 +136,10 @@ void Win32GameEngine::init()
 
 	// extending functionality
 	GameEngine::init();
+
+	// TheSuperHackers @feature new waypoint system (issue #122): swallow accidental Alt+Tab
+	// while a route is being plotted; see waypointKeyboardHookProc above for the exact scope.
+	installWaypointInputGuard();
 
 }
 
