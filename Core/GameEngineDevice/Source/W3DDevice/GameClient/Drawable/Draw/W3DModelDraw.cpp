@@ -3748,7 +3748,7 @@ void W3DModelDraw::hideAllHeadlights(Bool hide)
 			RenderObjClass* test = m_renderObject->Get_Sub_Object(subObj);
 			if (strstr(test->Get_Name(),"HEADLIGHT"))
 			{
-				const Bool lamp = shaded && !W3DHeadlightManager::isOpaque(*test);
+				const Bool lamp = shaded && !W3DHeadlightManager::keepsOwnLook(*test);
 				test->Set_Hidden(hide || lamp);
 				if (search && lamp)
 				{

@@ -356,6 +356,7 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ "HeadlightPoolClampBrightness",		INI::parseBool,				nullptr,			offsetof( GlobalData, m_headlightTuning.poolClampBrightness ) },
 	{ "HeadlightPerConeAim",				INI::parseBool,				nullptr,			offsetof( GlobalData, m_headlightTuning.perConeAim ) },
 	{ "HeadlightShaderForbiddenKindOf",		KindOfMaskType::parseFromINI,	nullptr,			offsetof( GlobalData, m_headlightForbiddenKindOf ) },
+	{ "RotrHack",								INI::parseBool,				nullptr,			offsetof( GlobalData, m_rotrHack ) },
 	{ "PlanarMirrorShader",					INI::parseBool,				nullptr,			offsetof( GlobalData, m_planarMirrorShader ) },
 	{ "PlanarMirrorReflectivity",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_planarMirrorTuning.reflectivity ) },
 	{ "PlanarMirrorTint",					INI::parseRGBColor,			nullptr,			offsetof( GlobalData, m_planarMirrorTuning.tint ) },
@@ -1134,6 +1135,7 @@ GlobalData::GlobalData()
 	m_stormTuning[StormShaderInfo::TYPE_SNOW].setTypeDefaults(StormShaderInfo::TYPE_SNOW);
 	m_headlightTuning.setDefaults();
 	m_headlightForbiddenKindOf.clear();
+	m_rotrHack = FALSE;
 	m_planarMirrorShader = TRUE;
 	m_planarMirrorTuning.setDefaults();
 	m_ambientOcclusionRadius = 12.0f;

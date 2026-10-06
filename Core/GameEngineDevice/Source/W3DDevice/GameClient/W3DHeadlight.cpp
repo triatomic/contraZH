@@ -448,7 +448,14 @@ static Int Find_Cone_Beams(MeshModelClass &model, Int partCount, const std::vect
 	return count;
 }
 
-Bool W3DHeadlightManager::isOpaque(RenderObjClass &mesh)
+// Clears opaque unless the shader blends nothing, and additive unless it adds its colour whole.
+static void Note_Shader(const ShaderClass &shader, Bool &opaque, Bool &additive)
+{
+	opaque = opaque && shader.Get_Dst_Blend_Func() == ShaderClass::DSTBLEND_ZERO;
+	additive = additive && shader.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_ONE && shader.Get_Dst_Blend_Func() == ShaderClass::DSTBLEND_ONE;
+}
+
+Bool W3DHeadlightManager::keepsOwnLook(RenderObjClass &mesh)
 {
 	if (mesh.Class_ID() != RenderObjClass::CLASSID_MESH)
 	{
@@ -460,24 +467,23 @@ Bool W3DHeadlightManager::isOpaque(RenderObjClass &mesh)
 		return FALSE;
 	}
 
+	Bool opaque = TRUE;
+	Bool additive = TheGlobalData->m_rotrHack;
 	for (Int pass = 0; pass < model->Get_Pass_Count(); pass++)
 	{
 		if (model->Has_Shader_Array(pass))
 		{
 			for (Int polygon = 0; polygon < model->Get_Polygon_Count(); polygon++)
 			{
-				if (model->Get_Shader(polygon, pass).Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO)
-				{
-					return FALSE;
-				}
+				Note_Shader(model->Get_Shader(polygon, pass), opaque, additive);
 			}
 		}
-		else if (model->Get_Single_Shader(pass).Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO)
+		else
 		{
-			return FALSE;
+			Note_Shader(model->Get_Single_Shader(pass), opaque, additive);
 		}
 	}
-	return TRUE;
+	return opaque || additive;
 }
 
 Int W3DHeadlightManager::findBeams(RenderObjClass &mesh, const Vector3 &modelMiddle, Beam *beams, Int maxBeams)

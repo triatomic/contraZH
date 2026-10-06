@@ -871,7 +871,8 @@ the cone's width gives the beam's width at the far end. A mesh may hold several 
 that stands apart draws as a lamp of its own, and cones that lie within half their radius of each
 other, such as twin lamps set side by side, draw as one. The models need no INI change, and
 headlights still show only at night. An opaque `HEADLIGHT` mesh, which blends nothing, is a lamp body
-rather than light, so it keeps its own look and throws no beam. `HeadlightPerConeAim = Yes` instead gives each cone its own direction, for meshes whose lamps
+rather than light, so it keeps its own look and throws no beam. With `RotrHack = Yes`, an additive
+`HEADLIGHT` mesh does the same. Rise of the Reds draws lit windows and glows that way. `HeadlightPerConeAim = Yes` instead gives each cone its own direction, for meshes whose lamps
 aim different ways, such as a floodlight rig on a roof. The lamp is the middle of a cone's narrow end, and cones
 that aim the same way with lamps within one radius of each other draw as one. A mesh with a lamp that
 has no narrow end keeps the rule above.
@@ -880,7 +881,7 @@ Needs the Direct3D 9 build and a shader model 3 card. Elsewhere, and with `Headl
 the models show their headlight meshes as before. The pool has no shadows, so a lamp also lights
 ground that a hill or building hides from it.
 
-The keys live in `GameData.ini`. All but `HeadlightShader`, `HeadlightShaderForbiddenKindOf` and `HeadlightPerConeAim` reload in cheat builds:
+The keys live in `GameData.ini`. All but `HeadlightShader`, `HeadlightShaderForbiddenKindOf`, `HeadlightPerConeAim` and `RotrHack` reload in cheat builds:
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -899,6 +900,7 @@ The keys live in `GameData.ini`. All but `HeadlightShader`, `HeadlightShaderForb
 | `HeadlightPoolFalloff` | 1.5 | How fast the pool dims with distance. |
 | `HeadlightPoolClampBrightness` | `Yes` | Where pools overlap, the ground takes the brightest one alone, so lamps side by side do not burn it white. `No` stacks them. `GameData.ini` only. |
 | `HeadlightPerConeAim` | `No` | `Yes` aims each cone of a `HEADLIGHT` mesh its own way, as above. Read at launch. `GameData.ini` only. |
+| `RotrHack` | `No` | `Yes` keeps additive `HEADLIGHT` meshes, such as Rise of the Reds' lit windows, as they are, with no beam. Read at launch. `GameData.ini` only. |
 
 A model can override any of these for itself. The same keys go in its `W3DModelDraw` module, or in
 a module built on it such as `W3DTankDraw`, beside `OkToChangeModelColor`. A key left out takes the

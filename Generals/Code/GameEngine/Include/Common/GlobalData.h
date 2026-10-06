@@ -565,6 +565,7 @@ public:
   DisruptionShaderTuning m_disruptionTuning;  ///< disruption shader defaults
   HeadlightShaderTuning m_headlightTuning;  ///< headlights drawn in place of HEADLIGHT meshes
   KindOfMaskType m_headlightForbiddenKindOf;  ///< objects of these kinds keep their HEADLIGHT meshes
+  Bool m_rotrHack;  ///< additive HEADLIGHT meshes keep their own look
   StormShaderInfo m_stormTuning[StormShaderInfo::TYPE_COUNT];  ///< what each storm type takes where its entry sets nothing
   Bool m_useAmbientOcclusion;     ///< Options.ini AmbientOcclusion: creases and the ground beneath objects darken where the hardware allows
   Bool m_useHeightBlend;          ///< Options.ini HeightBlend: terrain textures blend by height where the hardware allows
