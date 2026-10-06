@@ -421,14 +421,12 @@ Bool OptionPreferences::getShadowMapEnabled(void) const
 Int OptionPreferences::getShadowMapResolution(void) const
 {
 	const Int resolution = getInt("ShadowMapResolution", 4096);
-	for (Int size = 512; size < 4096; size *= 2)
+	Int size = 512;
+	while (size < 4096 && size < resolution)
 	{
-		if (resolution <= size)
-		{
-			return size;
-		}
+		size *= 2;
 	}
-	return 4096;
+	return size;
 }
 
 Bool OptionPreferences::getSpecularEnabled(void) const
