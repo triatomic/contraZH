@@ -54,6 +54,7 @@
 
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/CommandSequence.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectCreationList.h"
@@ -941,6 +942,14 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 		case GameMessage::MSG_SET_BEACON_TEXT:
 		{
 			onSetBeaconText(msg, currentlySelectedGroup);
+			break;
+		}
+		case GameMessage::MSG_COMMAND_SEQUENCE_COMMIT:
+		{
+			// TheSuperHackers @feature the player finished plotting: build the sequence that every
+			// machine will execute in lockstep.
+			if( TheCommandSequence != nullptr )
+				TheCommandSequence->onCommitMessage( msg );
 			break;
 		}
 		case GameMessage::MSG_SELF_DESTRUCT:
@@ -2721,6 +2730,7 @@ bool GameLogic::onSetBeaconText(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curre
 
 	return true;
 }
+
 
 bool GameLogic::onSelfDestruct(MAYBE_UNUSED GameMessage *msg)
 {

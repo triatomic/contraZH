@@ -103,6 +103,17 @@ WorkerAIUpdate::WorkerAIUpdate( Thing *thing, const ModuleData* moduleData ) :
 	m_previousTask = DOZER_TASK_INVALID;
 	m_buildSubTask = DOZER_SELECT_BUILD_DOCK_LOCATION;  // irrelevant, but I want non-garbage value
 
+	// TheSuperHackers @feature waypoint build queue
+	m_queuedBuildCount = 0;
+	for( Int q = 0; q < DOZER_MAX_QUEUED_BUILDS; q++ )
+	{
+		m_queuedBuildTemplates[ q ] = nullptr;
+		m_queuedBuildPositions[ q ].zero();
+		m_queuedBuildAngles[ q ] = 0.0f;
+		m_queuedBuildWaypointIndex[ q ] = -1;
+		m_queuedIsMove[ q ] = FALSE;
+	}
+
 	m_supplyTruckStateMachine = nullptr;
 	m_numberBoxes = 0;
 	m_forcePending = FALSE;
@@ -306,6 +317,10 @@ UpdateSleepTime WorkerAIUpdate::update()
 
 		}
 
+		// TheSuperHackers @feature waypoint build queue — start the next queued construction
+		// if we're in dozer mode, idle, and no longer moving
+		processBuildQueue();
+
 		// update dozer behavior
 		m_dozerMachine->updateStateMachine();
 
@@ -347,8 +362,6 @@ Object *WorkerAIUpdate::construct( const ThingTemplate *what,
 
 	// create our machines if they don't yet exist
 	///@todo make 'construct' a real AI command and you won't need a special case
-
-	m_isRebuild = isRebuild;
 
 	createMachines();
 
@@ -400,6 +413,32 @@ Object *WorkerAIUpdate::construct( const ThingTemplate *what,
 		}
 
 	}
+
+	// create the foundation for the new structure (TheSuperHackers @feature: extracted from construct)
+	Object *obj = createConstruction( what, pos, angle, owningPlayer, isRebuild );
+	if( obj == nullptr )
+		return nullptr;
+
+	// we have a construction pending
+	newTask( DOZER_TASK_BUILD, obj );
+
+	return obj;
+
+}
+
+// ------------------------------------------------------------------------------------------------
+/** TheSuperHackers @feature Create the under-construction object at the given location and
+	* withdraw the money for it.  This does NOT assign any task to the worker — callers must
+	* either newTask( DOZER_TASK_BUILD, obj ) or queue the object via queueBuild().
+	* NOTE: If you modify this you must modify the dozer too !!! */
+// ------------------------------------------------------------------------------------------------
+Object *WorkerAIUpdate::createConstruction( const ThingTemplate *what,
+																						const Coord3D *pos,
+																						Real angle,
+																						Player *owningPlayer,
+																						Bool isRebuild )
+{
+	m_isRebuild = isRebuild;
 
 	// what will our initial status bits
 	ObjectStatusMaskType statusBits = MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_UNDER_CONSTRUCTION );
@@ -464,10 +503,341 @@ Object *WorkerAIUpdate::construct( const ThingTemplate *what,
 		MAKE_MODELCONDITION_MASK(MODELCONDITION_AWAITING_CONSTRUCTION)
 	);
 
-	// we have a construction pending
-	newTask( DOZER_TASK_BUILD, obj );
-
 	return obj;
+
+}
+
+// ------------------------------------------------------------------------------------------------
+/** TheSuperHackers @feature Queue a construction: create the foundation now (money is spent
+	* now) but instead of tasking the worker immediately, put it in the build queue.  The worker
+	* will build it once it has arrived at the waypoint it was heading for when the order was
+	* queued (see processBuildQueue).  This allows
+	* waypoint-style orders.  NOTE: If you modify this you must modify the dozer too !!! */
+// ------------------------------------------------------------------------------------------------
+Object *WorkerAIUpdate::queueConstruct( const ThingTemplate *what,
+																				const Coord3D *pos,
+																				Real angle,
+																				Player *owningPlayer )
+{
+
+	// create our machines if they don't yet exist
+	createMachines();
+
+	// sanity
+	if( what == nullptr || pos == nullptr || owningPlayer == nullptr )
+		return nullptr;
+
+	// sanity
+	DEBUG_ASSERTCRASH( getObject()->getControllingPlayer() == owningPlayer,
+										 ("Worker::QueueConstruct - The controlling player of the Worker is not the owning player passed in") );
+
+	// make sure the player is capable of building this
+	if( TheBuildAssistant->canMakeUnit( getObject(), what ) != CANMAKE_OK )
+		return nullptr;
+
+	// validate the the position to build at is valid
+	const LegalBuildCode queueLbc = TheBuildAssistant->isLocationLegalToBuild( pos, what, angle,
+																								 BuildAssistant::TERRAIN_RESTRICTIONS |
+																								 BuildAssistant::CLEAR_PATH |
+																								 BuildAssistant::NO_OBJECT_OVERLAP |
+																								 BuildAssistant::SHROUD_REVEALED,
+																								 getObject(), nullptr );
+	if( queueLbc != LBC_OK )
+	{
+		// TheSuperHackers @bugfix Say why the order was refused instead of silently dropping it.
+		// Nothing was built and no money was taken yet, so there is nothing to undo.
+		if( owningPlayer->isLocalPlayer() && TheInGameUI )
+			TheInGameUI->displayCantBuildMessage( queueLbc );
+		return nullptr;
+	}
+
+	// Do NOT append the build site to our goal path. Walking onto the middle of the future
+	// building leaves the worker standing right on the foundation, which makes
+	// findGoodBuildOrRepairPositionAndTarget() fail inside newTask() — the foundation gets
+	// created but no build task is ever recorded, so the worker just wanders off and never
+	// builds. (privateFollowPathAppend()'s fallback also clears the whole state machine.)
+	// The site is already visible through the ghost preview, so the route line does not need
+	// to reach it.
+	//
+	// What we record instead is where our *current* route ends: the order may only fire once
+	// the player's own movement waypoints are done, so bind it to the last node of the path we
+	// are already walking. With no path at all we bind to nothing, which means build right away.
+	// friend_getWaypointGoalPathSize() already returns 0 unless we are in AI_FOLLOW_PATH.
+	Int goalPathSize = friend_getWaypointGoalPathSize();
+	Int waypointIndex = ( goalPathSize > 0 ) ? ( goalPathSize - 1 ) : -1;
+
+	queueBuild( what, pos, angle, waypointIndex );
+
+	// No object yet — only a ghost order. The foundation is created when the order fires.
+	return nullptr;
+
+}
+
+// ------------------------------------------------------------------------------------------------
+/** TheSuperHackers @feature Add a foundation to the build queue.  If there is no waypoint left
+	* to walk to before this order, the task starts immediately; otherwise it waits in the FIFO
+	* until we arrive at that waypoint. */
+// ------------------------------------------------------------------------------------------------
+void WorkerAIUpdate::queueBuild( const ThingTemplate *what, const Coord3D *pos, Real angle, Int waypointIndex )
+{
+
+	if( what == nullptr || pos == nullptr )
+		return;
+
+	// nothing left to walk to before this order (or there never was a waypoint) — turn it
+	// into a real foundation right away instead of parking it in the queue
+	if( isTaskPending( DOZER_TASK_BUILD ) == FALSE &&
+			hasReachedQueuedWaypoint( waypointIndex ) )
+	{
+		materializeQueuedBuild( what, pos, angle );
+		return;
+	}
+
+	// room left in the queue?
+	if( m_queuedBuildCount >= DOZER_MAX_QUEUED_BUILDS )
+	{
+		// queue is full. Nothing was created and no money was taken for this order yet,
+		// so there is nothing to refund and nothing to destroy — just drop the order.
+		return;
+	}
+
+	m_queuedBuildTemplates[ m_queuedBuildCount ] = what;
+	m_queuedBuildPositions[ m_queuedBuildCount ] = *pos;
+	m_queuedBuildAngles[ m_queuedBuildCount ] = angle;
+	m_queuedBuildWaypointIndex[ m_queuedBuildCount ] = waypointIndex;
+	m_queuedIsMove[ m_queuedBuildCount ] = FALSE;
+	m_queuedBuildCount++;
+
+}
+
+// ------------------------------------------------------------------------------------------------
+/** TheSuperHackers @feature Turn a ghost order into a real foundation. This is the *second*
+	* validation pass: the order was already checked when the player issued it, but by the time
+	* we actually walk to the waypoint the world may have changed — someone else may have
+	* claimed the ground, we may have run out of money, or the site may be shrouded again.
+	* Only if it still checks out do we create the foundation and take the money. */
+// ------------------------------------------------------------------------------------------------
+Bool WorkerAIUpdate::materializeQueuedBuild( const ThingTemplate *what, const Coord3D *pos, Real angle )
+{
+
+	if( what == nullptr || pos == nullptr )
+		return FALSE;
+
+	Object *builder = getObject();
+	if( builder == nullptr )
+		return FALSE;
+
+	Player *owningPlayer = builder->getControllingPlayer();
+	if( owningPlayer == nullptr )
+		return FALSE;
+
+	if( TheBuildAssistant->canMakeUnit( builder, what ) != CANMAKE_OK )
+		return FALSE;
+
+	LegalBuildCode lbc = TheBuildAssistant->isLocationLegalToBuild( pos, what, angle,
+																					BuildAssistant::TERRAIN_RESTRICTIONS |
+																					BuildAssistant::CLEAR_PATH |
+																					BuildAssistant::NO_OBJECT_OVERLAP |
+																					BuildAssistant::SHROUD_REVEALED,
+																					builder, nullptr );
+	if( lbc != LBC_OK )
+	{
+		// Let the local player know why this queued order could not be built after all.
+		// Purely a UI message, it changes no simulation state.
+		if( owningPlayer->isLocalPlayer() )
+			TheInGameUI->displayCantBuildMessage( lbc );
+		return FALSE;
+	}
+
+	// now — and only now — raise the foundation and take the money
+	Object *obj = createConstruction( what, pos, angle, owningPlayer, FALSE );
+	if( obj == nullptr )
+		return FALSE;
+
+	// Hand the construction over to the AI state machine: newTask() records the build task and
+	// its dock points, and the worker machine then drives the worker to the site and builds it.
+	//
+	// Do NOT call aiIdle() here. processBuildQueue() runs from within update(), and resetting
+	// the AI state machine on that stack destroys the context the caller is still using — that
+	// crashed the game the very moment a queued order finally triggered.
+	newTask( DOZER_TASK_BUILD, obj );
+	return TRUE;
+
+}
+
+// ------------------------------------------------------------------------------------------------
+/** TheSuperHackers @feature Read-only accessors for the queued ghost orders. The client uses
+	* these to draw a translucent preview of each pending build at its recorded site and
+	* angle — see W3dWaypointBuffer::drawWaypoints. */
+// ------------------------------------------------------------------------------------------------
+const ThingTemplate *WorkerAIUpdate::getQueuedBuildTemplate( Int i ) const
+{
+	if( i < 0 || i >= m_queuedBuildCount )
+		return nullptr;
+	return m_queuedBuildTemplates[ i ];
+}
+
+const Coord3D *WorkerAIUpdate::getQueuedBuildPosition( Int i ) const
+{
+	if( i < 0 || i >= m_queuedBuildCount )
+		return nullptr;
+	return &m_queuedBuildPositions[ i ];
+}
+
+Real WorkerAIUpdate::getQueuedBuildAngle( Int i ) const
+{
+	if( i < 0 || i >= m_queuedBuildCount )
+		return 0.0f;
+	return m_queuedBuildAngles[ i ];
+}
+
+// ------------------------------------------------------------------------------------------------
+/** TheSuperHackers @feature True once this unit has actually arrived at (or passed) the given
+	* goal path waypoint.
+	*
+	* IMPORTANT: Do not fall back on "isMoving() == FALSE" here. A builder that is momentarily
+	* blocked, or sitting between two pathfinding requests, also stops moving for a frame or
+	* two, and would start building halfway along the route it was ordered to walk first.
+	*
+	* Semantics of the running path, per AIFollowPathState::update(): while travelling to node
+	* i, friend_getCurrentGoalPathIndex() == i; on arrival it becomes i+1, and once it runs off
+	* the end the state finishes and the index is reset to -1.
+	*/
+// ------------------------------------------------------------------------------------------------
+Bool WorkerAIUpdate::hasReachedQueuedWaypoint( Int waypointIndex ) const
+{
+
+	// No waypoint was pending when this order was queued, so there is nothing to wait for.
+	if( waypointIndex < 0 )
+		return TRUE;
+
+	if( getAIStateType() == AI_FOLLOW_PATH )
+	{
+		Int currentIndex = friend_getCurrentGoalPathIndex();
+
+		// The order must fire as soon as the *previous* waypoint is finished, i.e. the moment
+		// this build's waypoint becomes the one we are heading for — not once we have physically
+		// walked all the way onto the build site. Reaching that site is what the resulting
+		// construction task does afterwards.
+		// While travelling to an earlier node (currentIndex < waypointIndex) we are still on our
+		// way, so keep waiting.
+		if( currentIndex >= 0 && currentIndex < waypointIndex )
+		{
+			// TheSuperHackers @bugfix A path that is now shorter than the bound waypoint was
+			// replaced underneath us (e.g. a fresh move order). Keep waiting instead of firing
+			// immediately: the order fires in queue order once this route is walked to its end
+			// (the FOLLOW_PATH state then ends), or once a later route grows past the index.
+			return FALSE;
+		}
+	}
+
+	return TRUE;
+
+}
+
+// ------------------------------------------------------------------------------------------------
+/** TheSuperHackers @feature Promote the next queued construction into a real build task once
+	* the worker has arrived at the waypoint that construction was waiting on.  Skips foundations
+	* that died or were completed by someone else in the meantime. */
+// ------------------------------------------------------------------------------------------------
+void WorkerAIUpdate::processBuildQueue()
+{
+
+	if( m_queuedBuildCount <= 0 )
+		return;
+
+	// TheSuperHackers @feature A disabled builder (EMP-paralysed, driver sniped, subverted...)
+	// has lost control of itself, so its queued orders are voided outright — losing control
+	// cancels the pending intentions. They are only ghost orders (nothing was created,
+	// no money taken), so there is nothing to refund.
+	if( getObject()->isDisabled() )
+	{
+		m_queuedBuildCount = 0;
+		for( Int q = 0; q < DOZER_MAX_QUEUED_BUILDS; q++ )
+		{
+			m_queuedBuildTemplates[ q ] = nullptr;
+			m_queuedBuildPositions[ q ].zero();
+			m_queuedBuildAngles[ q ] = 0.0f;
+			m_queuedBuildWaypointIndex[ q ] = -1;
+			m_queuedIsMove[ q ] = FALSE;
+		}
+		return;
+	}
+
+	// TheSuperHackers @bugfix One pass over the unified order list: construction orders and
+	// movement orders fire strictly in the sequence the player issued them.
+	while( m_queuedBuildCount > 0 )
+	{
+		// --- eligibility of the head entry, per its kind ---
+		if( m_queuedIsMove[ 0 ] )
+		{
+			// movement waits for every running task: a construction (or any other work)
+			// in progress is never abandoned for the sake of a queued destination
+			if( isAnyTaskPending() )
+				return;
+		}
+		else
+		{
+			// never interrupt a running build task
+			if( isTaskPending( DOZER_TASK_BUILD ) == TRUE )
+				return;
+
+			// the head of the queue only becomes eligible once we walked up to its waypoint
+			if( hasReachedQueuedWaypoint( m_queuedBuildWaypointIndex[ 0 ] ) == FALSE )
+				return;
+
+			// still walking a route (movement orders ahead of us that are being walked, or
+			// the player's own earlier route): a ghost order may only become a foundation
+			// once we are ready to actually build it - at the end of that walk
+			if( getAIStateType() == AI_FOLLOW_PATH && friend_getWaypointGoalPathSize() > 0 )
+				return;
+		}
+
+		// pop the front entry
+		const Bool isMove = m_queuedIsMove[ 0 ];
+		const ThingTemplate *what = m_queuedBuildTemplates[ 0 ];
+		Coord3D pos = m_queuedBuildPositions[ 0 ];
+		Real angle = m_queuedBuildAngles[ 0 ];
+
+		for( Int i = 1; i < m_queuedBuildCount; i++ )
+		{
+			m_queuedBuildTemplates[ i - 1 ] = m_queuedBuildTemplates[ i ];
+			m_queuedBuildPositions[ i - 1 ] = m_queuedBuildPositions[ i ];
+			m_queuedBuildAngles[ i - 1 ] = m_queuedBuildAngles[ i ];
+			m_queuedBuildWaypointIndex[ i - 1 ] = m_queuedBuildWaypointIndex[ i ];
+			m_queuedIsMove[ i - 1 ] = m_queuedIsMove[ i ];
+		}
+		m_queuedBuildCount--;
+		m_queuedBuildTemplates[ m_queuedBuildCount ] = nullptr;
+		m_queuedBuildPositions[ m_queuedBuildCount ].zero();
+		m_queuedBuildAngles[ m_queuedBuildCount ] = 0.0f;
+		m_queuedBuildWaypointIndex[ m_queuedBuildCount ] = -1;
+		m_queuedIsMove[ m_queuedBuildCount ] = FALSE;
+
+		if( isMove )
+		{
+			if( getAIStateType() == AI_FOLLOW_PATH && friend_getWaypointGoalPathSize() > 0 )
+			{
+				// already walking a route (this or an earlier queued movement order):
+				// chain onto the end of it instead of replacing the route we are on
+				friend_addToWaypointGoalPath( &pos );
+			}
+			else
+			{
+				// idle: this starts the walk. privateFollowPathAppend()'s fallback used to
+				// be reachable with a build task running (it clears the whole state machine
+				// and cancelled the construction) - the isAnyTaskPending() gate above keeps
+				// that path free of standing work now.
+				privateFollowPathAppend( &pos, CMD_FROM_PLAYER );
+			}
+			continue;	// consecutive movement orders chain together in this same pass
+		}
+
+		// materializeQueuedBuild() re-validates the site; if it is no longer buildable it
+		// reports why and returns FALSE, and we simply drop that order and try the next.
+		if( materializeQueuedBuild( what, &pos, angle ) )
+			return;	// a task was created: the next entry waits for it
+	}
 
 }
 
@@ -729,6 +1099,19 @@ void WorkerAIUpdate::cancelAllTasks()
 
 	for (UnsignedInt task = DOZER_TASK_FIRST; task < DOZER_NUM_TASKS; ++task)
 		internalCancelTask((DozerTask)task);
+
+	// TheSuperHackers @feature also drop any queued waypoint orders (builds and queued
+	// movement). These are ghost orders only — no foundation was ever created and no money
+	// was taken, so there is nothing to refund or destroy here.
+	m_queuedBuildCount = 0;
+	for( Int q = 0; q < DOZER_MAX_QUEUED_BUILDS; q++ )
+	{
+		m_queuedBuildTemplates[ q ] = nullptr;
+		m_queuedBuildPositions[ q ].zero();
+		m_queuedBuildAngles[ q ] = 0.0f;
+		m_queuedBuildWaypointIndex[ q ] = -1;
+		m_queuedIsMove[ q ] = FALSE;
+	}
 
 	m_dozerMachine->resetToDefaultState();
 }
@@ -1072,6 +1455,50 @@ void WorkerAIUpdate::aiDoCommand(const AICommandParms* parms)
 
 	if (!isAllowedToRespondToAiCommands(parms))
 		return;
+
+	// TheSuperHackers @bugfix Same as DozerAIUpdate: a movement order (plain move, waypoint-mode
+	// append) while other orders are standing is appended to the unified FIFO instead of being
+	// executed at once (executing it cancelled the running construction and raised the next
+	// foundation while we were already walking away). Builds and moves execute strictly in the
+	// sequence the player issued them.
+	// Every other player-issued command still abandons the queued ghost
+	// orders (nothing was created, nothing to refund).
+	// queueConstruct() does not go through here, so queueing builds never wipes the queue.
+	if( parms->m_cmdSource == CMD_FROM_PLAYER &&
+			( parms->m_cmd == AICMD_MOVE_TO_POSITION ||
+			parms->m_cmd == AICMD_MOVE_TO_POSITION_EVEN_IF_SLEEPING ||
+			parms->m_cmd == AICMD_FOLLOW_PATH_APPEND ) &&
+			m_queuedBuildCount > 0 )
+	{
+		if( m_queuedBuildCount < DOZER_MAX_QUEUED_BUILDS )
+		{
+			m_queuedBuildTemplates[ m_queuedBuildCount ] = nullptr;
+			m_queuedBuildPositions[ m_queuedBuildCount ] = parms->m_pos;
+			m_queuedBuildAngles[ m_queuedBuildCount ] = 0.0f;
+			m_queuedBuildWaypointIndex[ m_queuedBuildCount ] = -1;
+			m_queuedIsMove[ m_queuedBuildCount ] = TRUE;
+			m_queuedBuildCount++;
+		}
+		// queue full: drop the order (nothing was created, nothing to refund)
+		return;
+	}
+
+	// TheSuperHackers @bugfix Same as DozerAIUpdate: a waypoint-mode append arrives as
+	// AICMD_FOLLOW_PATH_APPEND and must not wipe the standing queued orders.
+	if( parms->m_cmdSource == CMD_FROM_PLAYER &&
+			parms->m_cmd != AICMD_FOLLOW_PATH_APPEND )
+	{
+		// queued movement orders die with the queue: this command takes us over
+		m_queuedBuildCount = 0;
+		for( Int q = 0; q < DOZER_MAX_QUEUED_BUILDS; q++ )
+		{
+			m_queuedBuildTemplates[ q ] = nullptr;
+			m_queuedBuildPositions[ q ].zero();
+			m_queuedBuildAngles[ q ] = 0.0f;
+			m_queuedBuildWaypointIndex[ q ] = -1;
+			m_queuedIsMove[ q ] = FALSE;
+		}
+	}
 
 	// create our machines if they don't yet exist
 	createMachines();
@@ -1524,6 +1951,11 @@ void WorkerAIUpdate::crc( Xfer *xfer )
 	* Version Info:
 	* 1: Initial version
 	* 2: TheSuperHackers @tweak Stubbjax 17/11/2025 Save the worker's previous task
+	* 3: TheSuperHackers @feature Save the waypoint build queue
+	* 4: TheSuperHackers @feature Save the goal path waypoint each queued build is waiting on
+	* 5: TheSuperHackers @feature Queued entries are ghost orders (ThingTemplate + position +
+	*    angle); the foundation is only created once the builder arrives at the waypoint
+	* 6: TheSuperHackers @bugfix Unified build/move FIFO: each queued entry carries a movement flag
 	*/
 // ------------------------------------------------------------------------------------------------
 void WorkerAIUpdate::xfer( Xfer *xfer )
@@ -1531,7 +1963,7 @@ void WorkerAIUpdate::xfer( Xfer *xfer )
 #if RETAIL_COMPATIBLE_XFER_SAVE
 	XferVersion currentVersion = 1;
 #else
-	XferVersion currentVersion = 2;
+	XferVersion currentVersion = 6;
 #endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
@@ -1575,6 +2007,75 @@ void WorkerAIUpdate::xfer( Xfer *xfer )
 		}
 	}
 	xfer->xferUser(&m_buildSubTask, sizeof(m_buildSubTask));
+
+	// TheSuperHackers @feature waypoint build queue (version 3/4)
+	// NOTE: must guard on the STREAM version ("version"), not the compile-time
+	// currentVersion, otherwise loading an older save reads past the v2 layout.
+	if (version >= 3)
+	{
+		Int queuedCount = m_queuedBuildCount;
+		xfer->xferInt(&queuedCount);
+		if (xfer->getXferMode() == XFER_LOAD)
+		{
+			if (queuedCount < 0 || queuedCount > DOZER_MAX_QUEUED_BUILDS)
+			{
+				DEBUG_CRASH(("WorkerAIUpdate::xfer - Invalid queued build count '%d'", queuedCount));
+				throw SC_INVALID_DATA;
+			}
+			m_queuedBuildCount = queuedCount;
+		}
+		if (version < 5)
+		{
+			// Legacy layout (version 3/4): the foundation had already been created when the
+			// order was issued, so entries were plain ObjectIDs. A ghost order has no object,
+			// but we must still consume the data to keep the stream aligned. Queued orders
+			// coming from an older save are therefore dropped — nothing had been refundable
+			// at queue time under the new scheme anyway.
+			for (Int q = 0; q < m_queuedBuildCount; q++)
+			{
+				ObjectID legacyID = INVALID_ID;
+				xfer->xferObjectID(&legacyID);
+				if (version >= 4)
+				{
+					Int legacyWaypointIndex = -1;
+					xfer->xferInt(&legacyWaypointIndex);
+				}
+			}
+			if (xfer->getXferMode() == XFER_LOAD)
+				m_queuedBuildCount = 0;
+		}
+		else
+		{
+			// Ghost orders: what to build, where, and at which angle — the angle is part of
+			// the order so the preview and the finished building face the same way.
+			for (Int q = 0; q < m_queuedBuildCount; q++)
+			{
+				AsciiString tmplName;
+				if (xfer->getXferMode() == XFER_SAVE && m_queuedBuildTemplates[q] != nullptr)
+					tmplName = m_queuedBuildTemplates[q]->getName();
+
+				xfer->xferAsciiString(&tmplName);
+				xfer->xferCoord3D(&m_queuedBuildPositions[q]);
+				xfer->xferReal(&m_queuedBuildAngles[q]);
+				xfer->xferInt(&m_queuedBuildWaypointIndex[q]);
+
+				// version 6: entries may be queued movement orders; a v5 stream only
+				// ever contains construction orders.
+				if (version >= 6)
+					xfer->xferBool(&m_queuedIsMove[q]);
+				else if (xfer->getXferMode() == XFER_LOAD)
+					m_queuedIsMove[q] = FALSE;
+
+				if (xfer->getXferMode() == XFER_LOAD)
+				{
+					// check=FALSE: a mod removing a template must not hard-crash the save load.
+					m_queuedBuildTemplates[q] = TheThingFactory->findTemplate( tmplName, FALSE );
+					if (m_queuedBuildTemplates[q] == nullptr)
+						m_queuedBuildWaypointIndex[q] = -1;	// drop it on next process
+				}
+			}
+		}
+	}
 
 
 	//------------------------- xfer Supply Truck info

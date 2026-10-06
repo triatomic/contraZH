@@ -127,6 +127,20 @@ public:
 														 Player *owningPlayer,
 														 Bool isRebuild ) = 0;
 
+	/// TheSuperHackers @feature queue a construction as a ghost order: no foundation and no
+	/// money spent until the builder arrives at the waypoint the order is bound to
+	virtual Object *queueConstruct( const ThingTemplate *what,
+																	const Coord3D *pos, Real angle,
+																	Player *owningPlayer ) = 0;
+
+	/// TheSuperHackers @feature read-only view of the queued ghost orders, so the client can
+	/// draw a translucent preview at each build site. Defaulted here (rather than pure) so
+	/// dozer-like implementations without a queue do not have to care about it.
+	virtual Int getQueuedBuildCount() const { return 0; }
+	virtual const ThingTemplate *getQueuedBuildTemplate( Int i ) const { return nullptr; }
+	virtual const Coord3D *getQueuedBuildPosition( Int i ) const { return nullptr; }
+	virtual Real getQueuedBuildAngle( Int i ) const { return 0.0f; }
+
 
 	// get task information
 	virtual DozerTask getMostRecentCommand() = 0;				///< return task that was most recently issued
@@ -254,6 +268,9 @@ public:
 														 Player *owningPlayer,
 														 Bool isRebuild ) override;								///< construct an object
 
+	virtual Object* queueConstruct( const ThingTemplate *what,
+																	const Coord3D *pos, Real angle,
+																	Player *owningPlayer ) override;					///< TheSuperHackers @feature queue a construction to build after the current path/tasks
 
 	// get task information
 	virtual DozerTask getMostRecentCommand() override;				///< return task that was most recently issued
@@ -339,8 +356,77 @@ protected:
 
 	DozerBuildSubTask m_buildSubTask;		///< for building and actually docking for the build
 
+	//
+	// TheSuperHackers @feature waypoint build queue — FIFO of foundations to construct after
+	// the current path and any earlier queued builds are finished (waypoint building)
+	//
+	enum { DOZER_MAX_QUEUED_BUILDS = 16 };
+
+	//
+	// What we *intend* to build. Deliberately NOT ObjectIDs: while an order sits in here
+	// no foundation exists and no money has been spent — this is the "ghost" order that the
+	// client renders as a translucent preview. The foundation is only created (and paid for)
+	// once we actually arrive at the waypoint this order is waiting on, which is also when
+	// the placement gets re-validated (the world may have changed since the order was given).
+	//
+	const ThingTemplate *m_queuedBuildTemplates[ DOZER_MAX_QUEUED_BUILDS ];
+	Coord3D m_queuedBuildPositions[ DOZER_MAX_QUEUED_BUILDS ];
+	Real m_queuedBuildAngles[ DOZER_MAX_QUEUED_BUILDS ];
+	Int m_queuedBuildCount;
+
+	//
+	// TheSuperHackers @feature For each queued build, the index into the unit's goal path of the
+	// waypoint that was still ahead of us when the build got queued. The build may only start
+	// once we have actually walked past that waypoint, so that "arrived at the waypoint" rather
+	// than "happens to be standing still this frame" is what triggers the next order. -1 means
+	// there was no path pending at queue time, so nothing has to be waited for.
+	//
+	Int m_queuedBuildWaypointIndex[ DOZER_MAX_QUEUED_BUILDS ];
+
+	//
+	// TheSuperHackers @bugfix For each queued entry, TRUE when it is a movement order rather
+	// than a construction order. Builds and movement orders share one FIFO, so the sequence
+	// the player issued is exactly the sequence that executes (build A, build B, move C,
+	// build D, ...). A movement entry stores its destination in m_queuedBuildPositions[]
+	// with a null template. Movement orders arriving while the queue is non-empty are
+	// appended here instead of being executed at once: executing them immediately cancelled
+	// the running construction and raised the next foundation while the builder was already
+	// walking off to the new destination (see aiDoCommand()).
+	//
+	Bool m_queuedIsMove[ DOZER_MAX_QUEUED_BUILDS ];
+
 private:
 
 	void createMachines();		///< create our behavior machines we need
+
+protected:
+
+	/// TheSuperHackers @feature create the under-construction object at the given location
+	/// (shared by construct and queueConstruct; does NOT assign any task)
+	Object *createConstruction( const ThingTemplate *what, const Coord3D *pos, Real angle,
+															Player *owningPlayer, Bool isRebuild );
+
+	/// TheSuperHackers @feature promote the next queued construction into a real build task
+	/// once the dozer has arrived at the waypoint the build was waiting on
+	void processBuildQueue();
+
+	void queueBuild( const ThingTemplate *what, const Coord3D *pos, Real angle, Int waypointIndex );
+
+	/// TheSuperHackers @feature Turn a ghost order into a real foundation: re-validate the
+	/// placement (the world may have changed since the order was issued), then create the
+	/// under-construction object and take the money. Returns FALSE and reports why if the
+	/// site is no longer buildable — the caller then just drops the order.
+	Bool materializeQueuedBuild( const ThingTemplate *what, const Coord3D *pos, Real angle );
+
+	/// TheSuperHackers @feature read-only view of the queued ghost orders, used by the client
+	/// to draw the translucent build preview at each site (see W3dWaypointBuffer)
+	Int getQueuedBuildCount() const override { return m_queuedBuildCount; }
+	const ThingTemplate *getQueuedBuildTemplate( Int i ) const override;
+	const Coord3D *getQueuedBuildPosition( Int i ) const override;
+	Real getQueuedBuildAngle( Int i ) const override;
+
+	/// TheSuperHackers @feature true once we have reached (or passed) the goal path waypoint
+	/// recorded in the given index for a queued build
+	Bool hasReachedQueuedWaypoint( Int waypointIndex ) const;
 
 };

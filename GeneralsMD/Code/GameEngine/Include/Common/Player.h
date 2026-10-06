@@ -311,6 +311,10 @@ public:
 	// the most ready if none ready.
 	Object* findMostReadyShortcutSpecialPowerOfType( SpecialPowerType spType );
 
+	/// TheSuperHackers @feature smart cast: the unit closest to focusPos that can fire this
+	/// power right now. Returns null when nothing can fire it.
+	Object* findClosestSpecialPowerSourceOfType( SpecialPowerType spType, const Coord3D *focusPos );
+
 	//Find specified thing template's most ready weapon.
 	Object* findMostReadyShortcutWeaponForThing( const ThingTemplate *thing, UnsignedInt &mostReadyPercentage );
 	Object* findMostReadyShortcutSpecialPowerForThing( const ThingTemplate *thing, UnsignedInt &mostReadyPercentage );

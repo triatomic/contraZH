@@ -32,6 +32,8 @@
 
 #include "Common/GameCommon.h"
 #include "Common/GameType.h"
+#include "GameLogic/CommandSequence.h"
+#include <map>
 #include "Common/MessageStream.h"		// for GameMessageTranslator
 #include "Common/KindOf.h"
 #include "Common/SpecialPowerType.h"
@@ -511,6 +513,34 @@ public:  // ********************************************************************
 	// Inherited from subsystem interface -----------------------------------------------------------
 	virtual	void init() override;															///< Initialize the in-game user interface
 	virtual void update() override;														///< Update the UI by calling preDraw(), draw(), and postDraw()
+	void onClientDrawablesPurged();		///< TheSuperHackers @feature drop the cached ghost build preview drawables after a client purge
+
+	// TheSuperHackers @feature new waypoint system (issue #122): the player plots a command
+	// sequence locally -- it is preview only and nothing is broadcast -- and the whole chain
+	// is committed when the plotting ends. The plotted chain is a plain local CommandSequence
+	// that is deliberately NOT registered with TheCommandSequence (that one is logic side and
+	// must stay deterministic).
+	/// TheSuperHackers @feature every selected unit can be given its own plotted route:
+	/// these return/work on the chain belonging to the unit currently in focus.
+	CommandSequence *getPendingCommandSequence() const;
+	Bool appendPendingWaypointCommand( GameMessage::Type type, ObjectID targetID, const Coord3D *pos, Int param );
+	Bool commitPendingWaypointCommands();
+	void discardPendingWaypointCommands();
+
+	/// Move the plotting focus to the next selected unit, leaving the selection itself
+	/// alone. Lets a group be steered unit by unit, each with its own route.
+	void cycleWaypointFocusUnit();
+
+	/// Drops plotted routes whose owner is gone (dead, or no longer ours). Called before
+	/// adding to the map so a chain cannot outlive the unit it belongs to.
+	void prunePendingWaypointSequences();
+	/// INVALID_ID means "every selected unit" -- the ordinary case, where one click gives
+	/// the whole group the same route (each unit still gets its own chain internally).
+	/// A valid id means the player used Tab and is plotting for that one unit alone.
+	ObjectID getWaypointFocusUnit() const { return m_waypointFocusUnit; }
+
+	/// Every chain currently plotted, so the preview can draw the group route as well.
+	const std::map< ObjectID, CommandSequence * > &getPendingSequences() const { return m_pendingSequences; }
 	virtual void reset() override;															///< Reset
 	//-----------------------------------------------------------------------------------------------
 	void validate();
@@ -1006,7 +1036,12 @@ protected:
 	AsciiString									m_currentlyPlayingMovie;											///< Used to push updates to TheScriptEngine
 	DrawableList								m_selectedDrawables;													///< A list of all selected drawables.
 	DrawableList								m_selectedLocalDrawables;											///< A list of all selected drawables owned by the local player
-	Bool												m_isDragSelecting;														///< If TRUE, an area selection is in progress
+	Bool												m_isDragSelecting;												///< If TRUE, an area selection is in progress
+
+	// TheSuperHackers @feature new waypoint system (issue #122): the locally plotted command
+	// chain. Client side only -- see the accessors for why this is not the logic-side one.
+	ObjectID								m_waypointFocusUnit;	///< unit whose route is being plotted right now
+	std::map< ObjectID, CommandSequence * >	m_pendingSequences;	///< one plotted route per subject												
 	IRegion2D										m_dragSelectRegion;														///< if isDragSelecting is TRUE, this contains select region
 	Bool												m_displayedMaxWarning;                        ///< keeps the warning from being shown over and over
 	MoveHintStruct							m_moveHint[ MAX_MOVE_HINTS ];

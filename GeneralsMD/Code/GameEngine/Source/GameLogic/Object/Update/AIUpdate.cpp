@@ -53,6 +53,7 @@
 #include "GameClient/InGameUI.h"  // useful for printing quick debug strings when we need to
 
 #include "GameLogic/AI.h"
+#include "GameLogic/CommandSequence.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
@@ -4935,6 +4936,16 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 	// if we're dead, we can't attack
 	if (obj->isEffectivelyDead())
 		return nullptr;
+
+	// TheSuperHackers @feature issue R7: a base defence can be given an ordered list of priority
+	// targets. One of them being inside weapon range wins over whatever this scan would pick;
+	// when none is in range the query answers null and we carry on exactly as before.
+	if( TheCommandSequence != nullptr )
+	{
+		Object *priorityTarget = TheCommandSequence->getPriorityTarget( obj );
+		if( priorityTarget != nullptr )
+			return priorityTarget;
+	}
 
 	// TheSuperHackers @feature Hold Fire skips the mood scan entirely. The authoritative veto lives
 	// in WeaponSet::getAbleToAttackSpecificObject (so the guard machines' own scans obey it too);

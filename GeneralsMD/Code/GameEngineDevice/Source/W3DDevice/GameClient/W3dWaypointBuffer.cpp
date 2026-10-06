@@ -66,11 +66,15 @@
 #include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/GameClient.h"
+#include "GameLogic/CommandSequence.h"
+#include <map>
+#include "GameLogic/GameLogic.h"
 #include "GameClient/InGameUI.h"
 
 #include "GameLogic/Object.h"
 
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/DozerAIUpdate.h"	// TheSuperHackers @feature DozerAIInterface (queued build orders in the route line)
 
 #include "W3DDevice/GameClient/TerrainTex.h"
 #include "W3DDevice/GameClient/HeightMap.h"
@@ -116,6 +120,81 @@ W3DWaypointBuffer::~W3DWaypointBuffer()
 	REF_PTR_RELEASE( m_waypointNodeRobj );
 	REF_PTR_RELEASE( m_texture );
 	REF_PTR_RELEASE( m_line );
+}
+
+//-------------------------------------------------------------------------------------------------
+/** TheSuperHackers @feature issue #122: preview the plotted command sequence.
+	*
+	* Plotted orders live on the client (see InGameUI) until they are committed, so this is the
+	* only place they can be drawn. A puck marks each order and the line shows the running order,
+	* reusing the same node model and segmented line as everything else in this file.
+	*
+	* An order naming a target the player cannot see right now is skipped: drawing it would hand
+	* out the position of a stealthed unit, or of something hidden by the shroud. That is the
+	* issue's "hiding this node" option, and it has to live here rather than in the logic --
+	* what each player can see differs, so deciding it logic-side would desync the game. */
+//-------------------------------------------------------------------------------------------------
+void W3DWaypointBuffer::drawPendingCommandSequence( RenderInfoClass &rinfo )
+{
+	if( TheInGameUI == nullptr )
+		return;
+
+	const std::map< ObjectID, CommandSequence * > &chains = TheInGameUI->getPendingSequences();
+	if( chains.empty() )
+		return;
+
+	//Create a default light environment with no lights and only full ambient.
+	LightEnvironmentClass lightEnv;
+	lightEnv.Reset( Vector3( 0, 0, 0 ), Vector3( 1.0f, 1.0f, 1.0f ) );
+	lightEnv.Pre_Render_Update( rinfo.Camera.Get_Transform() );
+	RenderInfoClass localRinfo( rinfo.Camera );
+	localRinfo.light_environment = &lightEnv;
+
+	Vector3 points[ MAX_DISPLAY_NODES + 1 ];
+
+	// Draw every chain: in group mode that is the group's route, and after Tab it is the one
+	// unit being steered. Group mode plots the same shape for each unit, so the lines overlap
+	// and read as a single route, which is what the player drew.
+	for( std::map< ObjectID, CommandSequence * >::const_iterator chainIt = chains.begin();
+			 chainIt != chains.end(); ++chainIt )
+	{
+		CommandSequence *pending = chainIt->second;
+		if( pending == nullptr || pending->getPendingCount() < 1 )
+			continue;
+
+		Int count = 0;
+
+		for( CommandNode *node = pending->getPendingHead();
+				 node != nullptr && count < MAX_DISPLAY_NODES;
+				 node = node->getNext() )
+		{
+		// skip an order whose target we are not allowed to see from here
+		if( node->getTargetID() != INVALID_ID )
+		{
+			Object *target = ( TheGameLogic != nullptr ) ? TheGameLogic->findObjectByID( node->getTargetID() ) : nullptr;
+			Drawable *targetDraw = ( target != nullptr ) ? target->getDrawable() : nullptr;
+
+			if( targetDraw == nullptr || targetDraw->isDrawableEffectivelyHidden() ||
+					targetDraw->getFullyObscuredByShroud() )
+				continue;
+		}
+
+		const Coord3D *pos = node->getLocation();
+
+		m_waypointNodeRobj->Set_Position( Vector3( pos->x, pos->y, pos->z ) );
+		WW3D::Render( *m_waypointNodeRobj, localRinfo );
+
+			points[ count ].Set( pos->x, pos->y, pos->z );
+			count++;
+		}
+
+		if( count >= 2 )
+		{
+			m_line->Set_Color( Vector3( 0.25f, 0.5f, 1.0f ) );
+			m_line->Set_Points( count, points );
+			m_line->Render( localRinfo );
+		}
+	}
 }
 
 //=============================================================================
@@ -207,6 +286,64 @@ void W3DWaypointBuffer::drawWaypoints(RenderInfoClass &rinfo)
 					//Now render the lines in one pass!
 					m_line->Set_Points( numPoints, points );
 					m_line->Render( localRinfo );
+				}
+
+				// TheSuperHackers @feature Show the build orders in the route line, so the player
+				// can see the ORDER everything will happen in while plotting waypoints.
+				// Build sites are deliberately NOT part of the unit's goal path (queueConstruct
+				// never appends them - walking onto the middle of a foundation makes newTask()
+				// fail), so without this the route would just stop at the last movement waypoint.
+				// This chain continues exactly where the movement route left off:
+				//   ... movement nodes -> [site under construction] -> queued ghost sites ...
+				// Same plain node style and colour as the rest of the route.
+				DozerAIInterface *dozer = ai ? ai->getDozerAIInterface() : nullptr;
+				if( dozer != nullptr &&
+						obj->getControllingPlayer() == rts::getObservedOrLocalPlayer() )
+				{
+					const Int queued = dozer->getQueuedBuildCount();
+					Object *site = dozer->isTaskPending( DOZER_TASK_BUILD )
+							? TheGameLogic->findObjectByID( dozer->getTaskTarget( DOZER_TASK_BUILD ) )
+							: nullptr;
+
+					// the chain starts where the movement route ended (or at the unit itself)
+					const Coord3D *chainStart = nullptr;
+					if( goalSize > 0 && gpIdx >= 0 )
+						chainStart = ai->friend_getGoalPathPosition( goalSize - 1 );
+					if( chainStart == nullptr )
+						chainStart = obj->getPosition();
+
+					Int numChain = 0;
+					Vector3 chainPoints[ MAX_DISPLAY_NODES + 1 ];
+					if( chainStart != nullptr )
+						chainPoints[ numChain++ ].Set( Vector3( chainStart->x, chainStart->y, chainStart->z ) );
+
+					// the site currently under construction comes first, if there is one
+					if( site != nullptr && numChain < MAX_DISPLAY_NODES + 1 )
+					{
+						const Coord3D *sitePos = site->getPosition();
+						chainPoints[ numChain++ ].Set( Vector3( sitePos->x, sitePos->y, sitePos->z ) );
+						m_waypointNodeRobj->Set_Position( Vector3( sitePos->x, sitePos->y, sitePos->z ) );
+						WW3D::Render( *m_waypointNodeRobj, localRinfo );
+					}
+
+					// then every still-queued order (builds and queued movement), in the
+					// order they will happen
+					for( Int q = 0; q < queued && numChain < MAX_DISPLAY_NODES + 1; q++ )
+					{
+						const Coord3D *ghostPos = dozer->getQueuedBuildPosition( q );
+						if( ghostPos == nullptr )
+							continue;
+						chainPoints[ numChain++ ].Set( Vector3( ghostPos->x, ghostPos->y, ghostPos->z ) );
+						m_waypointNodeRobj->Set_Position( Vector3( ghostPos->x, ghostPos->y, ghostPos->z ) );
+						WW3D::Render( *m_waypointNodeRobj, localRinfo );
+					}
+
+					if( numChain >= 2 )
+					{
+						m_line->Set_Color( Vector3( 0.25f, 0.5f, 1.0f ) );
+						m_line->Set_Points( numChain, chainPoints );
+						m_line->Render( localRinfo );
+					}
 				}
 			}
 		}
@@ -530,6 +667,10 @@ void W3DWaypointBuffer::drawWaypoints(RenderInfoClass &rinfo)
 		}
 
 	}
+
+	// TheSuperHackers @feature issue #122: the sequence being plotted, drawn after the
+	// ordinary waypoint/rally rendering so both can be seen at once.
+	drawPendingCommandSequence( rinfo );
 }
 
 

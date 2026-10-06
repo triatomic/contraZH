@@ -98,6 +98,7 @@ PickDrawableStruct::PickDrawableStruct() : drawableListToFill(nullptr), isPointS
 	easyMilitaryDrag = FALSE;
 	easyMilitaryDragInverted = FALSE;
 	easyMilitaryDragDisabled = FALSE;
+	allowStructuresInDrag = FALSE;
 	if (TheGlobalData && TheGlobalData->m_easyMilitaryDrag)
 	{
 		if (TheKeyboard && TheKeyboard->isCtrl())
@@ -461,6 +462,13 @@ Bool addDrawableToList( Drawable *draw, void *userData )
 		if (isBuilder != wantBuilders)
 			return FALSE;
 	}
+
+	// TheSuperHackers @feature Structures stay out of a drag box unless the box turned out to hold
+	// nothing else -- SelectionTranslator::onMouseLeftClick re-runs the region with
+	// allowStructuresInDrag set in that case, so a box drawn over a cluster of buildings still
+	// selects them while a box over buildings and units keeps selecting the units.
+	if (!pds->isPointSelection && !pds->allowStructuresInDrag && draw->isKindOf(KINDOF_STRUCTURE))
+		return FALSE;
 
 	if (!draw->isSelectable())
   {

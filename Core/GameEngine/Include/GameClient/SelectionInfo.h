@@ -79,6 +79,11 @@ struct PickDrawableStruct
 	// box holding only builders still selects them rather than coming back empty.
 	Bool easyMilitaryDragDisabled;
 
+	// TheSuperHackers @feature Structures are kept out of a drag box on the first pass, so that
+	// boxing your own base still picks the army standing in it. Set for the second pass that runs
+	// when the first pass came back empty, i.e. the box really did hold nothing but buildings.
+	Bool allowStructuresInDrag;
+
 	// Note, this is OR'd with the things we are attempting to select.
 	KindOfMaskType kindofsToMatch;
 

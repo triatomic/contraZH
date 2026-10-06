@@ -213,6 +213,9 @@ public:
 		MSG_META_VIEW_TEAM9,												///< center view on given user-defined team (but do not affect selection)
 
 		MSG_META_SELECT_MATCHING_UNITS,              ///< selects matching units, used for both on screen and across map
+		MSG_META_SELECT_IDLE_BUILDERS,                  ///< TheSuperHackers @feature select my idle builders (dozers/workers)
+		MSG_META_SELECT_COMBAT_UNITS,                  ///< (see above)
+		MSG_META_CYCLE_WAYPOINT_FOCUS,                  ///< TheSuperHackers @feature step the plotted-route focus to the next selected unit                   ///< TheSuperHackers @feature select all my combat units (no builders, harvesters or structures)
 		MSG_META_SMART_SELECTION_NEXT_TYPE,					///< TheSuperHackers @feature narrow the selection to the next type in the smart selection row
 		MSG_META_SMART_SELECTION_PREV_TYPE,					///< TheSuperHackers @feature narrow the selection to the previous type in the smart selection row
 		MSG_META_SELECT_NEXT_UNIT,									///< select 'next' unit
@@ -652,7 +655,8 @@ public:
 		MSG_UPDATE_FOCUSED_GROUP,										///< update and tell every player that we have smart selection focus on this group
 		MSG_DO_REVERSE_MOVETO_HINT,									///< (location) If clicked, a reverse move would be ordered
 		MSG_EVACUATE_TO_WORK,												///< Dump out all of OUR contained objects, supply gatherers among them resume gathering
-
+		MSG_DOZER_WAYPOINT_BUILD,								///< (see above)
+		MSG_COMMAND_SEQUENCE_COMMIT,						///< TheSuperHackers @feature commit a plotted command sequence: (subjectID, nodeCount, then per node: type, targetID, location, param)									///< TheSuperHackers @feature like MSG_DOZER_CONSTRUCT, but queues the construction while in waypoint mode (builder builds it after finishing its current path/tasks). NOTE: new network messages must be appended at the END of this enum, before the debug block, to keep the IDs of all existing messages stable.
 		MSG_BEGIN_DEBUG_NETWORK_MESSAGES = 1900,		///< network messages that exist only in debug/internal builds. all grouped separately.
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)

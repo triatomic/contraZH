@@ -58,6 +58,7 @@
 #include "Common/MiscAudio.h"
 #include "Common/PerfTimer.h"
 #include "Common/Player.h"
+#include "GameLogic/CommandSequence.h"
 #include "Common/PlayerList.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/ProductionPrerequisite.h"
@@ -1467,6 +1468,77 @@ static void doFindExistingObjectWithThingTemplate( Object *obj, void *userData )
 			info->obj = obj;
 		}
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature smart cast: the same availability test as the "most ready" scan
+// above, but choosing by distance to a point instead of by charge time.
+//-------------------------------------------------------------------------------------------------
+struct SpecialPowerSourceFindInfo
+{
+	Player						*player;
+	SpecialPowerType		 spType;
+	const Coord3D			*focusPos;
+	Object					*obj;
+	Real						 bestDistSqr;
+};
+
+static void doFindClosestSpecialPowerSourceObject( Object *obj, void *userData )
+{
+	SpecialPowerSourceFindInfo *info = (SpecialPowerSourceFindInfo *)userData;
+
+	if( obj == nullptr || info->player == nullptr || obj->getControllingPlayer() != info->player )
+		return;
+
+	if( obj->testStatus( OBJECT_STATUS_UNDER_CONSTRUCTION ) || obj->testStatus( OBJECT_STATUS_SOLD ) ||
+			obj->isEffectivelyDead() )
+		return;
+
+	if( !obj->hasSpecialPower( info->spType ) )
+		return;
+
+	SpecialPowerModuleInterface *spmInterface = obj->findSpecialPowerModuleInterface( info->spType );
+	if( spmInterface == nullptr || spmInterface->isScriptOnly() )
+		return;
+
+	// Only a unit that can fire it right now is worth aiming at: one that is still charging
+	// would silently swallow the order.
+	UnsignedInt readyFrame = spmInterface->getReadyFrame();
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	if( !TheGlobalData->m_specialPowerUsesDelay )
+		readyFrame = 0;
+#endif
+	if( obj->isDisabled() || readyFrame > TheGameLogic->getFrame() )
+		return;
+
+	// Do not pull a unit off a plotted route: the player is steering it somewhere and a cast
+	// would quietly interrupt that. A unit with nothing queued is always preferable.
+	if( TheCommandSequence != nullptr && TheCommandSequence->isExecutingSequence( obj->getID() ) )
+		return;
+
+	Real distSqr = 0.0f;
+	if( info->focusPos != nullptr )
+		distSqr = ThePartitionManager->getDistanceSquared( obj, info->focusPos, FROM_CENTER_3D );
+
+	if( info->obj == nullptr || distSqr < info->bestDistSqr )
+	{
+		info->obj = obj;
+		info->bestDistSqr = distSqr;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+Object* Player::findClosestSpecialPowerSourceOfType( SpecialPowerType spType, const Coord3D *focusPos )
+{
+	SpecialPowerSourceFindInfo info;
+	info.player = this;
+	info.spType = spType;
+	info.focusPos = focusPos;
+	info.obj = nullptr;
+	info.bestDistSqr = 0.0f;
+
+	iterateObjects( doFindClosestSpecialPowerSourceObject, &info );
+	return info.obj;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4648,6 +4720,7 @@ void Player::xfer( Xfer *xfer )
 		xfer->xferScienceVec(&m_sciencesDisabled);
 		xfer->xferScienceVec(&m_sciencesHidden);
 	}
+
 
 	// xfer upgrade instances
 	AsciiString upgradeName;

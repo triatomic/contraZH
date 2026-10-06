@@ -90,6 +90,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/PartitionManager.h"
+#include <vector>
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/ProductionUpdate.h"
@@ -1121,6 +1122,8 @@ InGameUI::InGameUI()
 {
 	Int i;
 
+	m_waypointFocusUnit = INVALID_ID;
+
 
   m_inputEnabled = true;
 	m_isDragSelecting = false;
@@ -1378,6 +1381,14 @@ InGameUI::InGameUI()
 //-------------------------------------------------------------------------------------------------
 InGameUI::~InGameUI()
 {
+	discardPendingWaypointCommands();
+	for( std::map< ObjectID, CommandSequence * >::iterator it = m_pendingSequences.begin();
+			 it != m_pendingSequences.end(); ++it )
+	{
+		delete it->second;
+	}
+	m_pendingSequences.clear();
+
 	delete TheControlBar;
 	TheControlBar = nullptr;
 
@@ -2175,6 +2186,144 @@ void InGameUI::preDraw()
 }
 
 //-------------------------------------------------------------------------------------------------
+#include "GameLogic/GameLogic.h"			// TheSuperHackers @feature TheGameLogic
+#include "GameLogic/Module/DozerAIUpdate.h"	// TheSuperHackers @feature DozerAIInterface (queued ghost orders)
+
+enum { MAX_GHOST_BUILD_PREVIEWS_IGUI = 64 };
+
+static Drawable *s_ghostPreviewDrawables[ MAX_GHOST_BUILD_PREVIEWS_IGUI ] = { nullptr };
+static const ThingTemplate *s_ghostPreviewTemplates[ MAX_GHOST_BUILD_PREVIEWS_IGUI ] = { nullptr };
+
+// Ghost drawables are destroyed one frame after they stop being needed — never from inside
+// a drawable walk, and never while the renderer is drawing.
+static Drawable *s_ghostsPendingDestroy[ MAX_GHOST_BUILD_PREVIEWS_IGUI * 2 ] = { nullptr };
+static Int s_ghostsPendingDestroyCount = 0;
+
+static void destroyGhostDeferred( Drawable *ghost )
+{
+	if( ghost != nullptr && s_ghostsPendingDestroyCount < MAX_GHOST_BUILD_PREVIEWS_IGUI * 2 )
+		s_ghostsPendingDestroy[ s_ghostsPendingDestroyCount++ ] = ghost;
+}
+
+static void updateGhostBuildPreviews( Player *localPlayer )
+{
+	Int used = 0;
+
+	// Safe point to destroy: this runs from InGameUI::update(), not from the render walk.
+	for( Int i = 0; i < s_ghostsPendingDestroyCount; i++ )
+	{
+		if( s_ghostsPendingDestroy[ i ] != nullptr )
+			TheGameClient->destroyDrawable( s_ghostsPendingDestroy[ i ] );
+		s_ghostsPendingDestroy[ i ] = nullptr;
+	}
+	s_ghostsPendingDestroyCount = 0;
+
+	if( localPlayer != nullptr )
+	{
+		for( Drawable *draw = TheGameClient->firstDrawable();
+				 draw != nullptr && used < MAX_GHOST_BUILD_PREVIEWS_IGUI;
+				 draw = draw->getNextDrawable() )
+		{
+			Object *obj = draw->getObject();
+			if( obj == nullptr )
+				continue;
+
+			// Only preview orders belonging to ourselves or to an ally.
+			Bool previewVisible = ( obj->getControllingPlayer() == localPlayer );
+			if( !previewVisible && obj->getTeam() != nullptr &&
+					localPlayer->getRelationship( obj->getTeam() ) == ALLIES )
+			{
+				previewVisible = TRUE;
+			}
+			if( !previewVisible )
+				continue;
+
+			// Same rule as the routes: hidden builder means hidden intentions.
+			if( draw->getFullyObscuredByShroud() )
+				continue;
+
+			AIUpdateInterface *ai = obj->getAIUpdateInterface();
+			if( ai == nullptr )
+				continue;
+
+			DozerAIInterface *dozer = ai->getDozerAIInterface();
+			if( dozer == nullptr )
+				continue;
+
+			const Int queued = dozer->getQueuedBuildCount();
+			for( Int q = 0; q < queued && used < MAX_GHOST_BUILD_PREVIEWS_IGUI; q++ )
+			{
+				const ThingTemplate *tmpl = dozer->getQueuedBuildTemplate( q );
+				const Coord3D *pos = dozer->getQueuedBuildPosition( q );
+				if( tmpl == nullptr || pos == nullptr )
+					continue;
+
+				Drawable *ghost = s_ghostPreviewDrawables[ used ];
+
+				// Only rebuild when the template changed; position/angle/colour are cheap to
+				// refresh on the existing drawable every frame.
+				if( ghost != nullptr && s_ghostPreviewTemplates[ used ] != tmpl )
+				{
+					destroyGhostDeferred( ghost );
+					ghost = nullptr;
+				}
+
+				if( ghost == nullptr )
+				{
+					UnsignedInt drawableStatus = DRAWABLE_STATUS_NO_STATE_PARTICLES;
+					drawableStatus |= TheGlobalData->m_objectPlacementShadows ? DRAWABLE_STATUS_SHADOWS : 0;
+					ghost = TheThingFactory->newDrawable( tmpl, drawableStatus );
+					s_ghostPreviewDrawables[ used ] = ghost;
+					s_ghostPreviewTemplates[ used ] = tmpl;
+				}
+
+				if( ghost == nullptr )
+					continue;
+
+				ghost->setPosition( pos );
+				ghost->setDrawableOpacity( TheGlobalData->m_objectPlacementOpacity );
+				ghost->setOrientation( dozer->getQueuedBuildAngle( q ) );
+
+				// House colour of whoever queued the order. Must be setIndicatorColor():
+				// colorTint() is only a colour flash and never touches the house-colour parts.
+				ghost->setIndicatorColor( obj->getControllingPlayer()->getPlayerColor() );
+
+				used++;
+			}
+		}
+	}
+
+	// Release previews left over from orders that have since been built or cancelled.
+	for( Int i = used; i < MAX_GHOST_BUILD_PREVIEWS_IGUI; i++ )
+	{
+		if( s_ghostPreviewDrawables[ i ] != nullptr )
+		{
+			destroyGhostDeferred( s_ghostPreviewDrawables[ i ] );
+			s_ghostPreviewDrawables[ i ] = nullptr;
+			s_ghostPreviewTemplates[ i ] = nullptr;
+		}
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** TheSuperHackers @bugfix Called by GameClient::reset() AFTER it has purged every drawable.
+	* The ghost preview drawables died in that purge, so the static slots here must be cleared
+	* WITHOUT destroying anything again. Forgetting this left dangling pointers behind and the
+	* next updateGhostBuildPreviews() call destroyed freed memory at the score screen. */
+//-------------------------------------------------------------------------------------------------
+void InGameUI::onClientDrawablesPurged()
+{
+	for( Int i = 0; i < MAX_GHOST_BUILD_PREVIEWS_IGUI; i++ )
+	{
+		s_ghostPreviewDrawables[ i ] = nullptr;
+		s_ghostPreviewTemplates[ i ] = nullptr;
+	}
+
+	for( Int i = 0; i < s_ghostsPendingDestroyCount; i++ )
+		s_ghostsPendingDestroy[ i ] = nullptr;
+	s_ghostsPendingDestroyCount = 0;
+}
+
 /** Update the in game user interface */
 //-------------------------------------------------------------------------------------------------
 //DECLARE_PERF_TIMER(InGameUI_update)
@@ -2182,6 +2331,9 @@ void InGameUI::update()
 {
 	//USE_PERF_TIMER(InGameUI_update)
 	Int i;
+
+	// TheSuperHackers @feature manage the ghost build previews here, outside the render walk.
+	updateGhostBuildPreviews( ThePlayerList->getLocalPlayer() );
 
 	// TheSuperHackers @feature Fire a queued quick cast as soon as its ability comes up.
 	updateQueuedQuickCast();
@@ -2514,8 +2666,365 @@ void InGameUI::unregisterWindowLayout( WindowLayout *layout )
 //-------------------------------------------------------------------------------------------------
 /** Reset the in game user interface */
 //-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature new waypoint system (issue #122).
+//
+// Plotting keeps every command on the client: the preview draws it, the player can still edit
+// it, and nothing reaches the logic side (or the network) until the whole chain is committed.
+// Only commands on the CommandSequence whitelist are accepted; anything else falls through and
+// is sent as a normal order, so the plotting mode degrades gracefully.
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature plotting is a client-side convenience, so it is allowed to hold only
+// so much: a hundred units each carrying a full route would ride along in every commit, and
+// nothing here is worth that. Well above what plotting a group realistically needs.
+//-------------------------------------------------------------------------------------------------
+#define MAX_PLOTTED_SEQUENCES	32
+
+//-------------------------------------------------------------------------------------------------
+// A route must not outlive its owner. A unit that died, was sold or is no longer ours cannot be
+// committed anyway, and keeping its chain would only let the map grow unnoticed.
+//-------------------------------------------------------------------------------------------------
+void InGameUI::prunePendingWaypointSequences()
+{
+	for( std::map< ObjectID, CommandSequence * >::iterator it = m_pendingSequences.begin();
+			 it != m_pendingSequences.end(); )
+	{
+		Object *subject = ( TheGameLogic != nullptr ) ? TheGameLogic->findObjectByID( it->first ) : nullptr;
+
+		if( subject == nullptr || subject->isEffectivelyDead() || !subject->isLocallyControlled() )
+		{
+			delete it->second;
+			it = m_pendingSequences.erase( it );
+			continue;
+		}
+
+		++it;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature the route being plotted for whichever unit is in focus.
+//-------------------------------------------------------------------------------------------------
+CommandSequence *InGameUI::getPendingCommandSequence() const
+{
+	std::map< ObjectID, CommandSequence * >::const_iterator it = m_pendingSequences.find( m_waypointFocusUnit );
+	if( it == m_pendingSequences.end() )
+		return nullptr;
+
+	return it->second;
+}
+
+//-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature new waypoint system (issue #122).
+//
+// Plotting keeps every command on the client: the preview draws it, the player can still edit
+// it, and nothing reaches the logic side (or the network) until the chain is committed. Each
+// unit keeps its own chain, so a group can be given different routes one unit at a time.
+// Only commands on the CommandSequence whitelist are accepted; anything else falls through and
+// is sent as a normal order, so the plotting mode degrades gracefully.
+//-------------------------------------------------------------------------------------------------
+Bool InGameUI::appendPendingWaypointCommand( GameMessage::Type type, ObjectID targetID, const Coord3D *pos, Int param )
+{
+	// keep the map honest before deciding what to add to it
+	prunePendingWaypointSequences();
+
+	// TheSuperHackers @feature issue R7: an immobile defence may only be ordered to hit targets
+	// it could actually reach -- twice its weapon range, giving the player room to plan ahead
+	// without letting them queue something the tower can never shoot at.
+	if( type == GameMessage::MSG_DO_ATTACK_OBJECT && targetID != INVALID_ID )
+	{
+		Object *subject = nullptr;
+		CommandSequence *focusSeq = getPendingCommandSequence();
+		if( focusSeq != nullptr && focusSeq->getSubject() != INVALID_ID )
+			subject = ( TheGameLogic != nullptr ) ? TheGameLogic->findObjectByID( focusSeq->getSubject() ) : nullptr;
+
+		Object *target = ( TheGameLogic != nullptr ) ? TheGameLogic->findObjectByID( targetID ) : nullptr;
+
+		if( subject != nullptr && target != nullptr && subject->isKindOf( KINDOF_IMMOBILE ) )
+		{
+			Weapon *weapon = subject->getCurrentWeapon();
+			if( weapon != nullptr )
+			{
+				const Real maxDistSqr = sqr( weapon->getAttackRange( subject ) * 2.0f );
+				if( ThePartitionManager->getDistanceSquared( subject, target, FROM_CENTER_3D ) > maxDistSqr )
+					return FALSE;	// out of plotting reach: refuse rather than queue the impossible
+			}
+		}
+	}
+
+	// work out which unit is being plotted for: the focused one if it is still selected,
+		// otherwise the first selected unit that we control
+	Object *subject = nullptr;
+	const DrawableList *selected = getAllSelectedDrawables();
+	if( selected != nullptr )
+	{
+		for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
+		{
+			Object *obj = ( *it != nullptr ) ? ( *it )->getObject() : nullptr;
+			if( obj == nullptr || !obj->isLocallyControlled() )
+				continue;
+
+			if( m_waypointFocusUnit == INVALID_ID || obj->getID() == m_waypointFocusUnit )
+			{
+				subject = obj;
+				break;
+			}
+
+			if( subject == nullptr )
+				subject = obj;	// fall back to the first controllable one
+		}
+	}
+
+	if( subject == nullptr )
+		return FALSE;
+
+	// Group mode: focus is INVALID, so the order belongs to every selected unit. Each one
+	// still gets its own chain -- the logic side advances them independently and an end
+	// command truncates each chain at its own point, so the nodes cannot be shared. The
+	// player just should not have to press Tab N times to say "everyone go here".
+	if( m_waypointFocusUnit == INVALID_ID && selected != nullptr )
+	{
+		Int applied = 0;
+
+		for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
+		{
+			Object *unit = ( *it != nullptr ) ? ( *it )->getObject() : nullptr;
+			if( unit == nullptr || !unit->isLocallyControlled() )
+				continue;
+
+			std::map< ObjectID, CommandSequence * >::iterator found = m_pendingSequences.find( unit->getID() );
+			CommandSequence *unitSeq = nullptr;
+
+			if( found != m_pendingSequences.end() )
+			{
+				unitSeq = found->second;
+			}
+			else
+			{
+				if( (Int)m_pendingSequences.size() >= MAX_PLOTTED_SEQUENCES )
+					continue;
+
+				unitSeq = new CommandSequence( unit->getID() );
+				m_pendingSequences[ unit->getID() ] = unitSeq;
+			}
+
+			if( unitSeq->appendPending( type, targetID, pos, param ) )
+			{
+				applied++;
+			}
+			else if( unitSeq->getPendingCount() == 0 )
+			{
+				// refused and still empty: do not leave a stray chain behind
+				m_pendingSequences.erase( unit->getID() );
+				delete unitSeq;
+			}
+		}
+
+		return ( applied > 0 );
+	}
+
+	CommandSequence *seq = nullptr;
+	std::map< ObjectID, CommandSequence * >::iterator found = m_pendingSequences.find( m_waypointFocusUnit );
+	if( found != m_pendingSequences.end() )
+	{
+		seq = found->second;
+	}
+	else
+	{
+		if( (Int)m_pendingSequences.size() >= MAX_PLOTTED_SEQUENCES )
+			return FALSE;	// too many units already hold a route to take on another
+
+		seq = new CommandSequence( m_waypointFocusUnit );
+		m_pendingSequences[ m_waypointFocusUnit ] = seq;
+	}
+
+	const Bool appended = seq->appendPending( type, targetID, pos, param );
+
+	// nothing plotted and the command was refused: drop the empty chain again
+	if( !appended && seq->getPendingCount() == 0 )
+	{
+		m_pendingSequences.erase( m_waypointFocusUnit );
+		delete seq;
+	}
+
+	return appended;
+}
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+// Do these two chains describe the same route? Used to decide whether units can share a commit.
+//-------------------------------------------------------------------------------------------------
+static Bool arePlottedChainsEqual( const CommandSequence *a, const CommandSequence *b )
+{
+	if( a == nullptr || b == nullptr )
+		return ( a == b );
+
+	if( a->getPendingCount() != b->getPendingCount() )
+		return FALSE;
+
+	CommandNode *na = a->getPendingHead();
+	CommandNode *nb = b->getPendingHead();
+
+	while( na != nullptr && nb != nullptr )
+	{
+		if( na->getCommandType() != nb->getCommandType() ||
+				na->getTargetID() != nb->getTargetID() ||
+				na->getCommandParam() != nb->getCommandParam() )
+			return FALSE;
+
+		const Coord3D *pa = na->getLocation();
+		const Coord3D *pb = nb->getLocation();
+		if( pa->x != pb->x || pa->y != pb->y || pa->z != pb->z )
+			return FALSE;
+
+		na = na->getNext();
+		nb = nb->getNext();
+	}
+
+	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool InGameUI::commitPendingWaypointCommands()
+{
+	if( m_pendingSequences.empty() || TheMessageStream == nullptr )
+		return FALSE;
+
+	// Units given the same route share ONE message. Sending a hundred identical chains would put
+	// a hundred copies of the same bytes on the wire, which is what a group order would cost.
+	//
+	// This merges the *transport* only. Each unit still ends up with its own chain on the logic
+	// side, because they must: every unit advances on its own, and an end command truncates
+	// each chain at its own point.
+	struct CommitGroup
+	{
+		CommandSequence				*chain;
+		std::vector< ObjectID >	 subjects;
+	};
+
+	std::vector< CommitGroup > groups;
+
+	for( std::map< ObjectID, CommandSequence * >::iterator it = m_pendingSequences.begin();
+			 it != m_pendingSequences.end(); ++it )
+	{
+		CommandSequence *seq = it->second;
+		if( seq == nullptr || seq->getPendingCount() == 0 )
+			continue;
+
+		Bool merged = FALSE;
+		for( size_t g = 0; g < groups.size(); ++g )
+		{
+			if( arePlottedChainsEqual( seq, groups[ g ].chain ) )
+			{
+				groups[ g ].subjects.push_back( it->first );
+				merged = TRUE;
+				break;
+			}
+		}
+
+		if( !merged )
+		{
+			CommitGroup group;
+			group.chain = seq;
+			group.subjects.push_back( it->first );
+			groups.push_back( group );
+		}
+	}
+
+	Int committed = 0;
+	for( size_t g = 0; g < groups.size(); ++g )
+	{
+		GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_COMMAND_SEQUENCE_COMMIT );
+
+		msg->appendIntegerArgument( (Int)groups[ g ].subjects.size() );
+		for( size_t s = 0; s < groups[ g ].subjects.size(); ++s )
+			msg->appendObjectIDArgument( groups[ g ].subjects[ s ] );
+
+		msg->appendIntegerArgument( groups[ g ].chain->getPendingCount() );
+		for( CommandNode *node = groups[ g ].chain->getPendingHead(); node != nullptr; node = node->getNext() )
+		{
+			msg->appendIntegerArgument( (Int)node->getCommandType() );
+			msg->appendObjectIDArgument( node->getTargetID() );
+			msg->appendLocationArgument( *node->getLocation() );
+			msg->appendIntegerArgument( node->getCommandParam() );
+		}
+
+		committed += (Int)groups[ g ].subjects.size();
+	}
+
+	discardPendingWaypointCommands();
+	return ( committed > 0 );
+}
+
+//-------------------------------------------------------------------------------------------------
+void InGameUI::discardPendingWaypointCommands()
+{
+	for( std::map< ObjectID, CommandSequence * >::iterator it = m_pendingSequences.begin();
+			 it != m_pendingSequences.end(); ++it )
+	{
+		delete it->second;
+	}
+	m_pendingSequences.clear();
+}
+
+//-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature step the plotting focus along the selection, one unit per press.
+// The selection itself is deliberately untouched -- this is about *which* of the already
+// selected units the next plotted order belongs to.
+//-------------------------------------------------------------------------------------------------
+void InGameUI::cycleWaypointFocusUnit()
+{
+	const DrawableList *selected = getAllSelectedDrawables();
+	if( selected == nullptr || selected->empty() )
+	{
+		m_waypointFocusUnit = INVALID_ID;
+		return;
+	}
+
+	// The ring is: ALL -> unit 1 -> unit 2 -> ... -> unit N -> ALL. Starting at ALL means the
+	// first press picks the first unit, and pressing past the last one hands the orders back
+	// to the whole group, which is where an ordinary click expects to be.
+	if( m_waypointFocusUnit == INVALID_ID )
+	{
+		for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
+		{
+			Object *obj = ( *it != nullptr ) ? ( *it )->getObject() : nullptr;
+			if( obj != nullptr && obj->isLocallyControlled() )
+			{
+				m_waypointFocusUnit = obj->getID();
+				return;
+			}
+		}
+
+		m_waypointFocusUnit = INVALID_ID;
+		return;
+	}
+
+	// walk the selection, start after whatever is in focus now, wrap to ALL at the end
+	Bool passedCurrent = FALSE;
+	ObjectID nextAfterCurrent = INVALID_ID;
+
+	for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
+	{
+		Object *obj = ( *it != nullptr ) ? ( *it )->getObject() : nullptr;
+		if( obj == nullptr || !obj->isLocallyControlled() )
+			continue;
+
+		if( passedCurrent && nextAfterCurrent == INVALID_ID )
+			nextAfterCurrent = obj->getID();
+
+		if( obj->getID() == m_waypointFocusUnit )
+			passedCurrent = TRUE;
+	}
+
+	m_waypointFocusUnit = nextAfterCurrent;	// INVALID means we came back round to ALL
+}
+
 void InGameUI::reset()
 {
+	discardPendingWaypointCommands();
+
 	m_isQuitMenuVisible = FALSE;
 	m_inputEnabled = true;
 	// reset the command bar

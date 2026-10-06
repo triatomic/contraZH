@@ -3402,7 +3402,11 @@ Bool Object::isSelectable() const
 //-------------------------------------------------------------------------------------------------
 Bool Object::isMassSelectable() const
 {
-	return isSelectable() && !isKindOf(KINDOF_STRUCTURE);
+	// TheSuperHackers @feature Structures participate in mass selection appends: Shift+click
+	// and Shift+drag must be able to add buildings to the current selection group, otherwise
+	// the logical selection group never contains them and they ignore every command
+	// (attack, production queue distribution, ...).
+	return isSelectable();
 }
 
 //-------------------------------------------------------------------------------------------------

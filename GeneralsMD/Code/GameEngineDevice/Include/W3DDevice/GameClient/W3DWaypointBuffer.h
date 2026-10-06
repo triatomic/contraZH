@@ -74,6 +74,10 @@ public:
 	~W3DWaypointBuffer();
 
 	void drawWaypoints(RenderInfoClass &rinfo);
+
+	/// TheSuperHackers @feature issue #122: draw the command sequence the player is still
+	/// plotting. Client side only -- those orders have not been committed yet.
+	void drawPendingCommandSequence(RenderInfoClass &rinfo);
 	void freeWaypointBuffers();
 
 

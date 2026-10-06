@@ -685,6 +685,7 @@ void pickAndPlayUnitVoiceResponse( const DrawableList *list, GameMessage::Type m
 			case GameMessage::MSG_RESUME_CONSTRUCTION:
 			case GameMessage::MSG_DOZER_CONSTRUCT:
 			case GameMessage::MSG_DOZER_CONSTRUCT_LINE:
+			case GameMessage::MSG_DOZER_WAYPOINT_BUILD:
 			{
 				soundToPlayPtr = templ->getPerUnitSound( "VoiceBuildResponse" );
 				objectWithSound = obj;
@@ -1096,11 +1097,10 @@ GameMessage::Type CommandTranslator::issueMoveToLocationCommand( const Coord3D *
 
 	if (m_teamExists)
 	{
-		if( TheInGameUI->isInWaypointMode() )
-		{
-			msgType = GameMessage::MSG_ADD_WAYPOINT;
-		}
-		else if( TheInGameUI->isInAttackMoveToMode())
+		// TheSuperHackers @feature the new waypoint system keeps the real command type here
+		// (move / attack move / force attack ...); plotting mode is applied when the command is
+		// actually sent, further down, where it may be kept on the client instead of broadcast.
+		if( TheInGameUI->isInAttackMoveToMode())
 		{
 			msgType = GameMessage::MSG_DO_ATTACKMOVETO;
 		}
@@ -1122,12 +1122,22 @@ GameMessage::Type CommandTranslator::issueMoveToLocationCommand( const Coord3D *
 		}
 		if( commandType == DO_COMMAND )
 		{
-			GameMessage *movemsg = TheMessageStream->appendMessage( msgType );
-			if (msgType == GameMessage::MSG_DO_ATTACK_OBJECT)
-				movemsg->appendObjectIDArgument( obj->getID() );
-			else
-				movemsg->appendLocationArgument( *pos );
+			// TheSuperHackers @feature new waypoint system (issue #122): while a route is being
+			// plotted the command is kept on the client and shown as preview; the whole chain is
+			// broadcast as MSG_COMMAND_SEQUENCE_COMMIT when plotting ends. Commands outside the
+			// sequence whitelist are refused here and sent normally, as before.
+			const Bool plotted = TheInGameUI->isInWaypointMode() &&
+					TheInGameUI->appendPendingWaypointCommand( msgType,
+							( obj != nullptr ) ? obj->getID() : INVALID_ID, pos, 0 );
 
+			if( !plotted )
+			{
+				GameMessage *movemsg = TheMessageStream->appendMessage( msgType );
+				if (msgType == GameMessage::MSG_DO_ATTACK_OBJECT)
+					movemsg->appendObjectIDArgument( obj->getID() );
+				else
+					movemsg->appendLocationArgument( *pos );
+			}
 		}
 	}
 
@@ -1276,6 +1286,29 @@ GameMessage::Type CommandTranslator::issueSpecialPowerCommand( const CommandButt
 
 	Drawable* sourceDraw = ignoreSelObj ? ignoreSelObj->getDrawable() : TheInGameUI->getFirstSelectedDrawable();
 	ObjectID specificSource = ignoreSelObj ? ignoreSelObj->getID() : INVALID_ID;
+
+	// TheSuperHackers @feature smart cast (issue #122). A power button used to make every
+	// selected unit cast at once, which mostly wasted charges -- the first one to respond
+	// burned the cooldown for the whole group. Unless a specific source was named, the unit
+	// closest to the target casts it; Shift restores the group-wide order for the times when
+	// spreading the power across several units is what the player wants (units that cannot
+	// cast it simply do nothing, so a group of mixed units behaves sensibly).
+	//
+	// Choosing here is safe: the id travels in the message as the source, so every machine
+	// executes the same object instead of re-deriving the choice.
+	if( specificSource == INVALID_ID && commandType == DO_COMMAND &&
+			( TheKeyboard == nullptr || !TheKeyboard->isShift() ) )
+	{
+		const Coord3D *focus = pos;
+		if( focus == nullptr && target != nullptr && target->getObject() != nullptr )
+			focus = target->getObject()->getPosition();
+
+		Object *best = ThePlayerList->getLocalPlayer()->findClosestSpecialPowerSourceOfType(
+				command->getSpecialPowerTemplate()->getSpecialPowerType(), focus );
+
+		if( best != nullptr )
+			specificSource = best->getID();
+	}
 
 	if( BitIsSet( command->getOptions(), COMMAND_OPTION_NEED_OBJECT_TARGET ) )
 	{
@@ -2748,6 +2781,69 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
  * The Command Translator translates mouse events into object command messages
  * such as move_to, attack, etc.
  */
+// TheSuperHackers @feature shared selection helper for the F1/F2/F3 hotkeys.
+// SYNC NOTE: marking a drawable selected is client-only. What actually synchronises the
+// selection is the MSG_CREATE_SELECTED_GROUP message (exactly what a mouse drag sends) -
+// it rebuilds the logic-side selected group that every later attack/move command refers
+// to. First entry rebuilds the group (TRUE), the rest are added (FALSE).
+static void selectUnitsByFilter( Bool builders, Bool harvesters, Bool idleOnly )
+{
+	if( TheInGameUI == nullptr || TheGameClient == nullptr || TheMessageStream == nullptr )
+		return;
+
+	TheInGameUI->deselectAllDrawables();
+
+	Bool first = TRUE;
+	for( Drawable *draw = TheGameClient->firstDrawable(); draw != nullptr; draw = draw->getNextDrawable() )
+	{
+		Object *obj = draw->getObject();
+		if( obj == nullptr || !obj->isLocallyControlled() )
+			continue;
+
+		// same eligibility rules a mouse selection applies
+		if( !obj->isMobile() || obj->isContained() || obj->isKindOf( KINDOF_NO_SELECT ) )
+			continue;
+
+		const Bool isBuilder = obj->isKindOf( KINDOF_DOZER );
+		const Bool isHarvester = obj->isKindOf( KINDOF_HARVESTER );
+
+		if( builders && harvesters )
+		{
+			// economy select: builders AND harvesters, nothing else
+			if( !isBuilder && !isHarvester )
+				continue;
+		}
+		else if( builders )
+		{
+			// F1: idle builders only
+			if( !isBuilder )
+				continue;
+			AIUpdateInterface *ai = obj->getAIUpdateInterface();
+			if( ai == nullptr || !ai->isIdle() )
+				continue;
+		}
+		else
+		{
+			// F2: combat units = everything except builders, harvesters and structures
+			if( isBuilder || isHarvester || obj->isKindOf( KINDOF_STRUCTURE ) )
+				continue;
+
+		}
+
+		GameMessage *teamMsg = TheMessageStream->appendMessage( GameMessage::MSG_CREATE_SELECTED_GROUP );
+		teamMsg->appendBooleanArgument( first );
+		teamMsg->appendObjectIDArgument( obj->getID() );
+
+		TheInGameUI->selectDrawable( draw );
+		first = FALSE;
+
+		// TheSuperHackers @feature F1 picks just ONE idle builder, not all of them.
+		if( builders && !harvesters )
+			break;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
 GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage *msg)
 {
 	GameMessage::Type t = msg->getType();
@@ -2766,6 +2862,33 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 
 	switch (t)
 	{
+		//-----------------------------------------------------------------------------------------
+		case GameMessage::MSG_META_SELECT_IDLE_BUILDERS:
+		{
+			// TheSuperHackers @feature F1 selects one of my IDLE builders (dozers/workers).
+			selectUnitsByFilter( TRUE, FALSE, TRUE );
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
+		//-----------------------------------------------------------------------------------------
+		case GameMessage::MSG_META_CYCLE_WAYPOINT_FOCUS:
+		{
+			// TheSuperHackers @feature step to the next selected unit while plotting a route.
+			TheInGameUI->cycleWaypointFocusUnit();
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
+		case GameMessage::MSG_META_SELECT_COMBAT_UNITS:
+		{
+			// TheSuperHackers @feature F2 selects ALL of my combat units - everything
+			// except builders (dozers/workers), harvesters and structures.
+			selectUnitsByFilter( FALSE, FALSE, FALSE );
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
 		//-----------------------------------------------------------------------------------------
 		case GameMessage::MSG_META_SELECT_MATCHING_UNITS:
 		{

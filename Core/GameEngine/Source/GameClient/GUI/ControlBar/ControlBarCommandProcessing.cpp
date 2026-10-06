@@ -1635,11 +1635,40 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 		case GUI_COMMAND_SPECIAL_POWER:
 		{
+			// TheSuperHackers @feature smart cast (issue #122). This used to make every selected
+			// unit fire the power at once, which mostly wasted charges -- the first one to
+			// respond burned the cooldown for the whole group. Now the nearest unit that can
+			// actually fire it casts the power, centred on what the player is looking at.
+			//
+			// Shift keeps the old group-wide behaviour, for when spreading the power over
+			// several units is what the player wants.
+			//
+			// Choosing the unit here is safe: it travels in the message as the source, so every
+			// machine executes the same object instead of re-deriving the choice. The shortcut
+			// case below has always worked this way.
+			ObjectID sourceID = INVALID_ID;
+			if( TheKeyboard == nullptr || !TheKeyboard->isShift() )
+			{
+				// View::getPosition() hands back a reference, so keep our own copy.
+				Coord3D focus;
+				const Coord3D *focusPtr = nullptr;
+				if( TheTacticalView != nullptr )
+				{
+					focus = TheTacticalView->getPosition();
+					focusPtr = &focus;
+				}
+				Object *best = ThePlayerList->getLocalPlayer()->findClosestSpecialPowerSourceOfType(
+					commandButton->getSpecialPowerTemplate()->getSpecialPowerType(), focusPtr );
+
+				if( best != nullptr )
+					sourceID = best->getID();
+			}
+
 			// command needs no additional data, send the message
 			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_DO_SPECIAL_POWER );
 			msg->appendIntegerArgument( commandButton->getSpecialPowerTemplate()->getID() );
 			msg->appendIntegerArgument( commandButton->getOptions() );
-			msg->appendObjectIDArgument( INVALID_ID );	// no specific source
+			msg->appendObjectIDArgument( sourceID );
 			break;
 
 		}

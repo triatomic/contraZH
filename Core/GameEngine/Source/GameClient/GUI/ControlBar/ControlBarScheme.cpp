@@ -466,7 +466,6 @@ void ControlBarScheme::init()
 		GadgetButtonSetHiliteImage(win, m_idleWorkerButtonHightlited);
 		GadgetButtonSetHiliteSelectedImage(win, m_idleWorkerButtonPushed);
 		GadgetButtonSetDisabledImage(win, m_idleWorkerButtonDisabled);
-
 		Int x, y;
 		GameWindow* parent =win->winGetParent();
 		if(parent)

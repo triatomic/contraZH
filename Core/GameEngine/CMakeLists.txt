@@ -1125,6 +1125,7 @@ set(GAMEENGINE_SRC
 #    Source/GameLogic/ScriptEngine/Scripts.cpp
 #    Source/GameLogic/ScriptEngine/VictoryConditions.cpp
     Source/GameLogic/System/CaveSystem.cpp
+    Source/GameLogic/System/CommandSequence.cpp
     Source/GameLogic/System/CrateSystem.cpp
     Source/GameLogic/System/Damage.cpp
 #    Source/GameLogic/System/GameLogic.cpp

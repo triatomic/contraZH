@@ -141,6 +141,11 @@ public:
 	virtual Object *buildObjectNow( Object *constructorObject, const ThingTemplate *what,
 																	const Coord3D *pos, Real angle, Player *owningPlayer );
 
+	/// TheSuperHackers @feature create the foundation now, but queue the construction on the
+	/// builder (dozer/worker) so it is built after the builder finishes its current path/tasks
+	virtual Object *buildObjectQueued( Object *constructorObject, const ThingTemplate *what,
+																		 const Coord3D *pos, Real angle, Player *owningPlayer );
+
 	/// using the "line placement" for objects (like walls etc) create that line of objects line
 	virtual void buildObjectLineNow( Object *constructorObject, const ThingTemplate *what,
 																	 const Coord3D *start, const Coord3D *end, Real angle,

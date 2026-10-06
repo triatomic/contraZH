@@ -137,6 +137,9 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "VIEW_TEAM8",																GameMessage::MSG_META_VIEW_TEAM8 },
 	{ "VIEW_TEAM9",																GameMessage::MSG_META_VIEW_TEAM9 },
 	{ "SELECT_MATCHING_UNITS",										GameMessage::MSG_META_SELECT_MATCHING_UNITS },
+	{ "SELECT_IDLE_BUILDERS",										GameMessage::MSG_META_SELECT_IDLE_BUILDERS },
+	{ "CYCLE_WAYPOINT_FOCUS",							GameMessage::MSG_META_CYCLE_WAYPOINT_FOCUS },
+	{ "SELECT_COMBAT_UNITS",										GameMessage::MSG_META_SELECT_COMBAT_UNITS },
 	{ "SMART_SELECTION_NEXT_TYPE",								GameMessage::MSG_META_SMART_SELECTION_NEXT_TYPE },
 	{ "SMART_SELECTION_PREV_TYPE",								GameMessage::MSG_META_SMART_SELECTION_PREV_TYPE },
 	{ "SELECT_NEXT_UNIT",													GameMessage::MSG_META_SELECT_NEXT_UNIT },
@@ -909,6 +912,40 @@ void MetaMap::generateMetaMap()
 			map->m_transition = DOWN;
 			map->m_modState = SHIFT_CTRL;
 			map->m_usableIn = COMMANDUSABLE_EVERYWHERE;
+		}
+	}
+	{
+		// TheSuperHackers @feature Default binding (F1) to select all of my idle builders.
+		MetaMapRec *map = getMetaMapRec(GameMessage::MSG_META_SELECT_IDLE_BUILDERS);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_F1;
+			map->m_transition = DOWN;
+			map->m_modState = NONE;
+			map->m_usableIn = COMMANDUSABLE_GAME;
+		}
+	}
+	{
+		// TheSuperHackers @feature Tab moves the plotting focus to the next selected unit, so a
+		// group can be given individual routes without disturbing the selection.
+		MetaMapRec *map = getMetaMapRec(GameMessage::MSG_META_CYCLE_WAYPOINT_FOCUS);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_TAB;
+			map->m_transition = DOWN;
+			map->m_modState = NONE;
+			map->m_usableIn = COMMANDUSABLE_GAME;
+		}
+	}
+	{
+		// TheSuperHackers @feature Default binding (F2) to select all of my combat units.
+		MetaMapRec *map = getMetaMapRec(GameMessage::MSG_META_SELECT_COMBAT_UNITS);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_F2;
+			map->m_transition = DOWN;
+			map->m_modState = NONE;
+			map->m_usableIn = COMMANDUSABLE_GAME;
 		}
 	}
 	{

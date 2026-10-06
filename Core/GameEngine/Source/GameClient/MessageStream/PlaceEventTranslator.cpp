@@ -77,6 +77,19 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 			const ThingTemplate *build = TheInGameUI->getPendingPlaceType();
 			if( build && TheInGameUI->isPlacementAnchored() == FALSE )
 			{
+				// TheSuperHackers @bugfix Sticky placement (waypoint mode) keeps the building
+				// picked after it has been placed, so a double click would anchor, place, anchor
+				// and place again and drop two buildings. Swallow the explicit double click and
+				// any click that lands on the same logic frame as the previous placement: no new
+				// anchor is created, so the matching button up has nothing to place.
+				if( TheInGameUI->isInWaypointMode() &&
+						( msg->getType() == GameMessage::MSG_RAW_MOUSE_LEFT_DOUBLE_CLICK ||
+							m_frameOfUpButton == (Int)TheGameLogic->getFrame() ) )
+				{
+					disp = DESTROY_MESSAGE;
+					break;
+				}
+
 				ICoord2D mouse = msg->getArgument(0)->pixel;
 				Coord3D world;
 
@@ -277,11 +290,16 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 						}
 					}
 
-					// create the right kind of message
-					if( isLineBuild )
-						placeMsg = TheMessageStream->appendMessage( GameMessage::MSG_DOZER_CONSTRUCT_LINE );
-					else
-						placeMsg = TheMessageStream->appendMessage( GameMessage::MSG_DOZER_CONSTRUCT );
+				// create the right kind of message
+				// TheSuperHackers @feature in waypoint mode, queue the construction on the builder
+				// (it will be built after the builder finishes its current path/tasks) instead of
+				// immediately interrupting whatever the builder is doing
+				if( isLineBuild )
+					placeMsg = TheMessageStream->appendMessage( GameMessage::MSG_DOZER_CONSTRUCT_LINE );
+				else if( TheInGameUI->isInWaypointMode() )
+					placeMsg = TheMessageStream->appendMessage( GameMessage::MSG_DOZER_WAYPOINT_BUILD );
+				else
+					placeMsg = TheMessageStream->appendMessage( GameMessage::MSG_DOZER_CONSTRUCT );
 
 					placeMsg->appendIntegerArgument(build->getTemplateID());
 					placeMsg->appendLocationArgument(worldStart);
@@ -293,8 +311,22 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 
 					pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), placeMsg->getType() );
 
-					// get out of pending placement mode, this will also clear the arrow anchor status
-					TheInGameUI->placeBuildAvailable( nullptr, nullptr );
+					// TheSuperHackers @feature In waypoint mode (Alt held) the build selection is
+					// sticky: the building stays picked so that several of them can be placed with
+					// repeated left clicks. Only a right click (or picking another building) ends it.
+					if( TheInGameUI->isInWaypointMode() )
+					{
+						// Clear the angle anchor only. The ghost model keeps following the cursor
+						// (handleBuildPlacements) and the builder stays selected, so the next left
+						// click anchors and places another one.
+						TheInGameUI->setPlacementStart( nullptr );
+						TheInGameUI->setPreventLeftClickDeselectionInAlternateMouseModeForOneClick( TRUE );
+					}
+					else
+					{
+						// get out of pending placement mode, this will also clear the arrow anchor status
+						TheInGameUI->placeBuildAvailable( nullptr, nullptr );
+					}
 
 				}
 				else

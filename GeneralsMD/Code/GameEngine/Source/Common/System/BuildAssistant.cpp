@@ -49,6 +49,7 @@
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/CreateModule.h"
@@ -440,6 +441,49 @@ Object *BuildAssistant::buildObjectNow( Object *constructorObject, const ThingTe
 	}
 
   return nullptr;
+
+}
+
+//-------------------------------------------------------------------------------------------------
+/** TheSuperHackers @feature Create the foundation for the thing right away (money is spent now),
+	* but instead of tasking the builder to go construct it immediately, queue it on the
+	* builder's (dozer/worker) build queue.  The builder will construct it once it is idle
+	* and no longer moving, which allows waypoint-style multi-building orders. */
+//-------------------------------------------------------------------------------------------------
+Object *BuildAssistant::buildObjectQueued( Object *constructorObject, const ThingTemplate *what,
+																					 const Coord3D *pos, Real angle, Player *owningPlayer )
+{
+
+	// sanity
+	if( what == nullptr || pos == nullptr || owningPlayer == nullptr || constructorObject == nullptr )
+		return nullptr;
+
+	// Need to validate that we can make this in case someone fakes their CommandSet
+	if( !isPossibleToMakeUnit(constructorObject, what) )
+		return nullptr;
+
+	// clear out any objects from the building area that are "auto-clearable" when building
+	clearRemovableForConstruction( what, pos, angle );
+
+	if ( moveObjectsForConstruction( what, pos, angle, owningPlayer ) == FALSE )
+	{
+		// totally bogus. We tried to move our units out of the way, but they wouldn't.
+		if (owningPlayer->getPlayerType()==PLAYER_HUMAN) {
+			return nullptr;	// ai gets to cheat.  jba.
+		}
+	}
+
+	// queue the construction on the builder's dozer/worker interface
+	AIUpdateInterface *ai = constructorObject->getAIUpdateInterface();
+	DozerAIInterface *dozerInterface = ai ? ai->getDozerAIInterface() : nullptr;
+
+	if( dozerInterface == nullptr )
+	{
+		// builder has no queue support (not a dozer/worker) — build it now like vanilla
+		return buildObjectNow( constructorObject, what, pos, angle, owningPlayer );
+	}
+
+	return dozerInterface->queueConstruct( what, pos, angle, owningPlayer );
 
 }
 
@@ -1044,6 +1088,36 @@ LegalBuildCode BuildAssistant::isLocationLegalToBuild( const Coord3D *worldPos,
 			return code;
 		}
 
+		// TheSuperHackers @bugfix Waypoint builds are only ghost orders until the builder arrives
+		// and materializes them, so the real-object overlap test above cannot see them. Also
+		// reject a site whose footprint would overlap one of the builder's pending queued builds,
+		// otherwise several waypoint builds can be placed on top of each other.
+		if( builderObject )
+		{
+			const AIUpdateInterface *buildAI = builderObject->getAIUpdateInterface();
+			const DozerAIInterface *dozerAI = buildAI ? buildAI->getDozerAIInterface() : nullptr;
+			if( dozerAI )
+			{
+				const Int queuedCount = dozerAI->getQueuedBuildCount();
+				for( Int queuedIndex = 0; queuedIndex < queuedCount; ++queuedIndex )
+				{
+					const ThingTemplate *queuedWhat = dozerAI->getQueuedBuildTemplate( queuedIndex );
+					const Coord3D *queuedPos = dozerAI->getQueuedBuildPosition( queuedIndex );
+					if( queuedWhat == nullptr || queuedPos == nullptr )
+						continue;
+
+					if( ThePartitionManager->geomCollidesWithGeom( worldPos,
+																													build->getTemplateGeometryInfo(),
+																													angle,
+																													queuedPos,
+																													queuedWhat->getTemplateGeometryInfo(),
+																													dozerAI->getQueuedBuildAngle( queuedIndex ) ) )
+					{
+						return LBC_OBJECTS_IN_THE_WAY;
+					}
+				}
+			}
+		}
 	}
 	//
 	// if NO_ENEMY_OBJECT_OVERLAP is set, we are not allowed to construct 'build' if it would overlap

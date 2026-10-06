@@ -114,6 +114,9 @@ struct SFWRec
  * Returns true if the drawable can be selected under the current rules
  * of the system
  */
+//-----------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------
 Bool CanSelectDrawable( const Drawable *draw, Bool dragSelecting )
 {
 
@@ -188,10 +191,11 @@ Bool CanSelectDrawable( const Drawable *draw, Bool dragSelecting )
 	// user interface ... including all those context sensitive commands that we
 	// can just assume are for a single building selected.
 	//
-	if( dragSelecting && draw->isKindOf( KINDOF_STRUCTURE ) )
-	{
-		return FALSE;
-	}
+	// TheSuperHackers @feature The retail gate that kept structures out of a drag box lives in
+	// addDrawableToList() now, because deciding it needs to know what else the box holds: a drag
+	// over buildings AND units keeps the units, and only a box holding nothing but buildings falls
+	// back to the buildings (see SelectionTranslator::onMouseLeftClick). Clicking a building was
+	// never affected.
 
 	// You cannot select something that has a logic override of unselectability or masked
 	if( obj->getStatusBits().testForAny( MAKE_OBJECT_STATUS_MASK2( OBJECT_STATUS_UNSELECTABLE, OBJECT_STATUS_MASKED ) ) )
@@ -802,6 +806,19 @@ GameMessageDisposition SelectionTranslator::onMouseLeftClick(MAYBE_UNUSED const 
 		}
 	}
 
+	// TheSuperHackers @feature A drag box holding nothing but structures selects them. The first
+	// pass keeps structures out so a box over a base still picks the army standing in it; when
+	// that pass comes back empty the box really did contain only buildings, so run it again with
+	// the structures allowed. Point clicks are unaffected -- a single click already picks a
+	// building -- and this never overrides an EasyMilitaryDrag pass that did find something.
+	if (!isPoint && drawablesThatWillSelect.empty())
+	{
+		drawablesThatWillSelect.clear();
+		pds.allowStructuresInDrag = TRUE;
+		TheTacticalView->iterateDrawablesInRegion(&selectionRegion, addDrawableToList, &pds);
+	}
+
+
 	if (drawablesThatWillSelect.empty())
 	{
 		return KEEP_MESSAGE;
@@ -830,7 +847,7 @@ GameMessageDisposition SelectionTranslator::onMouseLeftClick(MAYBE_UNUSED const 
 	if (si.currentCountEnemies > 0 ||
 			si.currentCountCivilians > 0 ||
 			si.currentCountFriends > 0 ||
-			(si.currentCountMineBuildings > 0 && si.newCountMineBuildings == 0)
+			(si.currentCountMineBuildings > 0 && si.newCountMineBuildings == 0 && !TheInGameUI->isInPreferSelectionMode())
 		  //si.currentCountMineBuildings > 0
 		  //ShigureUi 07/09/2026 this prevent shift select adding new structure into the team.
 		  //Change condition in order to filter illegal selection only.
@@ -853,7 +870,9 @@ GameMessageDisposition SelectionTranslator::onMouseLeftClick(MAYBE_UNUSED const 
       //Change condition in order to filter illegal selection only.
       //This is 2nd of the cases.
 			//addToGroup = FALSE;
-			if (si.currentCountMine > 0 &&
+			// TheSuperHackers @feature Shift+click on a single building appends it to the
+			// current selection (same as units) instead of always replacing the selection.
+			if (!TheInGameUI->isInPreferSelectionMode() && si.currentCountMine > 0 &&
 				(si.currentCountMineBuildings == 0 ||
 				(*currentList->begin())->getTemplate() != (*drawablesThatWillSelect.begin())->getTemplate()))
 			  addToGroup = FALSE;
@@ -922,6 +941,13 @@ GameMessageDisposition SelectionTranslator::onMouseLeftClick(MAYBE_UNUSED const 
 		addToGroup = FALSE;
 		si.selectFriends = TRUE;
 	}
+
+	// TheSuperHackers @feature With Shift (prefer selection) held, a building picked by a click
+	// or a drag box is appended to the current selection -- but only when that selection already
+	// contains buildings, so Shift never turns a group of units into a mixed units+buildings
+	// group. The structures must not be filtered out of the append pass below.
+	if( addToGroup && si.newCountMineBuildings > 0 && si.currentCountMineBuildings > 0 )
+		si.selectMineBuildings = TRUE;
 
 	// If we're not going to select anything, just bail now.
 	if (!(si.selectMine || si.selectEnemies || si.selectCivilians || si.selectFriends))

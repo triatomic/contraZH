@@ -1653,6 +1653,7 @@ void ControlBar::update()
 	}
 
 	//
+
 	// most control bar contexts have one selected thing that we switch on and update
 	// based on if that thing changed in some way ... the exception is when multi selected
 	//

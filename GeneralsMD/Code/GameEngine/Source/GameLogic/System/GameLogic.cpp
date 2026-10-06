@@ -86,6 +86,7 @@
 #include "GameLogic/CrateSystem.h"
 #include "GameLogic/FPUControl.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/CommandSequence.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/AIUpdate.h"
@@ -393,6 +394,10 @@ void GameLogic::init()
 	// create the partition manager
 	ThePartitionManager = NEW PartitionManager;
 	ThePartitionManager->init();
+
+	// TheSuperHackers @feature the queued command sequences (issue #122).
+	TheCommandSequence = NEW CommandSequenceSystem;
+	TheCommandSequence->init();
 	ThePartitionManager->setName("ThePartitionManager");
 
 
@@ -425,6 +430,14 @@ void GameLogic::init()
 //-------------------------------------------------------------------------------------------------
 void GameLogic::reset()
 {
+	// TheSuperHackers @feature drop every queued command sequence with the game.
+	if( TheCommandSequence != nullptr )
+	{
+		TheCommandSequence->reset();
+		delete TheCommandSequence;
+		TheCommandSequence = nullptr;
+	}
+
 	m_thingTemplateBuildableOverrides.clear();
 	m_controlBarOverrides.clear();
 
@@ -3965,6 +3978,14 @@ void GameLogic::update()
 		DEBUG_LOG(("Appended %sCRC on frame %d: %8.8X", isPlayback ? "Playback " : "", m_frame, m_CRC));
 	}
 
+	// TheSuperHackers @feature advance the queued command sequences. This runs after the client
+	// commands of this frame have been processed, so a sequence committed this frame starts on
+	// the next one, and it runs on every machine in lockstep.
+	if( TheCommandSequence != nullptr )
+	{
+		TheCommandSequence->update();
+	}
+
 	// collect stats
 	if(TheStatsCollector)
 	{
@@ -4270,6 +4291,17 @@ void GameLogic::destroyObject( Object *obj )
 {
 	DEBUG_ASSERTCRASH(obj != nullptr, ("destroying null object"));
 
+	// TheSuperHackers @feature issue R6: queued commands that targeted this object have to
+	// be dealt with, on every machine, from the same logic-side event. A target that died
+	// loses its orders; one that was destroyed because it transformed into something else
+	// (a deployed structure) keeps them, re-anchored to where it stood.
+	if( TheCommandSequence != nullptr && obj != nullptr )
+	{
+		const Coord3D lastPos = *obj->getPosition();
+		TheCommandSequence->onTargetInvalid( obj->getID(), obj->isEffectivelyDead(), &lastPos );
+	}
+
+
 	// if already flagged for destruction, ignore
 	if (!obj || obj->isDestroyed())
 		return;
@@ -4387,6 +4419,14 @@ UnsignedInt GameLogic::getCRC( Int mode, AsciiString deepCRCFileName )
 	{
 		xferCRC->xferUnsignedInt( &seed );
 	}
+	// TheSuperHackers @feature the queued command sequences take part in the CRC
+	if( TheCommandSequence != nullptr )
+	{
+		marker = "MARKER:TheCommandSequence";
+		xferCRC->xferAsciiString(&marker);
+		TheCommandSequence->crc( xferCRC );
+	}
+
 	marker = "MARKER:ThePartitionManager";
 	xferCRC->xferAsciiString(&marker);
 	xferCRC->xferSnapshot( ThePartitionManager );
