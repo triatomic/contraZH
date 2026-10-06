@@ -628,11 +628,6 @@ void W3DInGameUI::drawActionLines()
 		return;
 	}
 
-	// a new marker slides up from the bottom right and fades in, on the wall clock since the frame rate is uncapped
-	const UnsignedInt MARKER_SLIDE_MS = 130;
-	const Real MARKER_SLIDE_PIXELS = 13.0f;
-	const UnsignedInt nowMs = timeGetTime();
-
 	for( std::vector<ActionLine>::const_iterator it = lines.begin(); it != lines.end(); ++it )
 	{
 		// off-screen points still project usefully, so drop only those behind the camera
@@ -657,19 +652,12 @@ void W3DInGameUI::drawActionLines()
 			continue;
 		}
 
-		// eased out, so the marker comes in fast and settles
-		const UnsignedInt ageMs = nowMs - it->bornMs;
-		const Real arrival = ( ageMs < MARKER_SLIDE_MS ) ? (Real)ageMs / (Real)MARKER_SLIDE_MS : 1.0f;
-		const Real remaining = ( 1.0f - arrival ) * ( 1.0f - arrival ) * ( 1.0f - arrival );
-
 		// the hot spot goes on the destination, since that is the pixel the player aims with
-		const Int slide = REAL_TO_INT_FLOOR( remaining * MARKER_SLIDE_PIXELS );
-		const Int x = to.x - marker.hotSpot.x + slide;
-		const Int y = to.y - marker.hotSpot.y + slide;
+		const Int x = to.x - marker.hotSpot.x;
+		const Int y = to.y - marker.hotSpot.y;
 
 		// the order cursors keep their own colours; the plain arrow takes the line's
-		const UnsignedInt tint = ( cursor == Mouse::ARROW ) ? ( lineColor & 0x00FFFFFF ) : 0x00FFFFFF;
-		const UnsignedInt markerColor = tint | ( (UnsignedInt)REAL_TO_INT( 255.0f * ( 1.0f - remaining ) ) << 24 );
+		const UnsignedInt markerColor = ( cursor == Mouse::ARROW ) ? ( lineColor | 0xFF000000 ) : 0xFFFFFFFF;
 		TheDisplay->drawImage( marker.image, x, y, x + marker.image->getImageWidth(),
 													 y + marker.image->getImageHeight(), markerColor );
 	}

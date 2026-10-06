@@ -89,7 +89,6 @@
 #include "GameLogic/AIGuard.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/Module/AIUpdate.h"
-#include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/GameLogic.h"
@@ -4517,17 +4516,6 @@ static Bool getGuardedSpot( const AIUpdateInterface *ai, Coord3D& spot )
 			return TRUE;
 		}
 
-		case GUARDTARGET_AREA:
-		{
-			const PolygonTrigger *area = ai->getAreaToGuard();
-			if( area == nullptr )
-			{
-				return FALSE;
-			}
-			area->getCenterPoint( &spot );
-			return TRUE;
-		}
-
 		default:
 			return FALSE;
 	}
@@ -4539,10 +4527,7 @@ static Bool getGuardedSpot( const AIUpdateInterface *ai, Coord3D& spot )
 //-------------------------------------------------------------------------------------------------
 void InGameUI::updateActionLines()
 {
-	// last frame's lines, kept so this frame's markers inherit their age
-	std::vector<ActionLine> previous;
-	previous.swap( m_actionLines );
-	m_drawnActionLines.clear();
+	m_actionLines.clear();
 
 	if( TheGlobalData->m_actionLineMode == ActionLineMode_Off )
 	{
@@ -4572,7 +4557,6 @@ void InGameUI::updateActionLines()
 		}
 
 		ActionLine line;
-		line.owner = obj->getID();
 		line.from = *obj->getPosition();
 		Bool goalResolved = FALSE;
 
@@ -4658,7 +4642,7 @@ void InGameUI::updateActionLines()
 				for( Int i = pathIndex; i < pathSize - 1; ++i )
 				{
 					line.to = *ai->friend_getGoalPathPosition( i );
-					addActionLine( line, previous );
+					m_actionLines.push_back( line );
 					line.from = line.to;
 				}
 				line.to = *ai->friend_getGoalPathPosition( pathSize - 1 );
@@ -4678,39 +4662,10 @@ void InGameUI::updateActionLines()
 			}
 		}
 
-		addActionLine( line, previous );
+		m_actionLines.push_back( line );
 	}
 
 	bunchActionLines();
-}
-
-//-------------------------------------------------------------------------------------------------
-/** The n-th line of a unit inherits the age of its n-th line last frame. */
-//-------------------------------------------------------------------------------------------------
-void InGameUI::addActionLine( ActionLine& line, const std::vector<ActionLine>& previous )
-{
-	Int ordinal = 0;
-	for( std::vector<ActionLine>::const_iterator it = m_actionLines.begin(); it != m_actionLines.end(); ++it )
-	{
-		if( it->owner == line.owner )
-		{
-			++ordinal;
-		}
-	}
-
-	line.bornMs = timeGetTime();
-
-	Int seen = 0;
-	for( std::vector<ActionLine>::const_iterator it = previous.begin(); it != previous.end(); ++it )
-	{
-		if( it->owner == line.owner && seen++ == ordinal )
-		{
-			line.bornMs = it->bornMs;
-			break;
-		}
-	}
-
-	m_actionLines.push_back( line );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4722,13 +4677,14 @@ void InGameUI::bunchActionLines()
 	const Real BUNCH_RADIUS = 100.0f;
 	const Real bunchRadiusSqr = BUNCH_RADIUS * BUNCH_RADIUS;
 
+	std::vector<ActionLine> bunches;
 	std::vector<Int> memberCounts;
 	for( std::vector<ActionLine>::const_iterator line = m_actionLines.begin(); line != m_actionLines.end(); ++line )
 	{
 		Bool joined = FALSE;
-		for( size_t i = 0; i < m_drawnActionLines.size(); ++i )
+		for( size_t i = 0; i < bunches.size(); ++i )
 		{
-			ActionLine& bunch = m_drawnActionLines[ i ];
+			ActionLine& bunch = bunches[ i ];
 			if( bunch.kind != line->kind )
 			{
 				continue;
@@ -4750,19 +4706,18 @@ void InGameUI::bunchActionLines()
 			bunch.to.x += ( line->to.x - bunch.to.x ) * share;
 			bunch.to.y += ( line->to.y - bunch.to.y ) * share;
 			bunch.to.z += ( line->to.z - bunch.to.z ) * share;
-
-			// the oldest member's age, so a unit joining a standing order does not restart the slide
-			bunch.bornMs = min( bunch.bornMs, line->bornMs );
 			joined = TRUE;
 			break;
 		}
 
 		if( !joined )
 		{
-			m_drawnActionLines.push_back( *line );
+			bunches.push_back( *line );
 			memberCounts.push_back( 1 );
 		}
 	}
+
+	m_actionLines.swap( bunches );
 }
 
 //-------------------------------------------------------------------------------------------------
