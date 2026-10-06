@@ -2290,6 +2290,112 @@ static void updateGhostBuildPreviews( Player *localPlayer )
 
 				used++;
 			}
+
+			// TheSuperHackers @feature (issue #122) builds travelling in an EXECUTING sequence
+			// get ghosts as well: the chain lives on the logic side, so this also shows allies
+			// where their (and your) queued foundations will appear, until the dozer arrives.
+			if( TheCommandSequence != nullptr && used < MAX_GHOST_BUILD_PREVIEWS_IGUI )
+			{
+				CommandSequence *seq = TheCommandSequence->getSequence( obj->getID() );
+				if( seq != nullptr && !seq->isPriorityTargetList() )
+				{
+					for( CommandNode *node = seq->getCurrentNode();
+							 node != nullptr && used < MAX_GHOST_BUILD_PREVIEWS_IGUI;
+							 node = node->getNext() )
+					{
+						if( node->getCommandType() != GameMessage::MSG_DOZER_CONSTRUCT )
+							continue;
+
+						const ThingTemplate *tmpl = TheThingFactory->findByTemplateID( node->getCommandParam() );
+						const Coord3D *pos = node->getLocation();
+						if( tmpl == nullptr || pos == nullptr )
+							continue;
+
+						Drawable *ghost = s_ghostPreviewDrawables[ used ];
+						if( ghost != nullptr && s_ghostPreviewTemplates[ used ] != tmpl )
+						{
+							destroyGhostDeferred( ghost );
+							ghost = nullptr;
+						}
+						if( ghost == nullptr )
+						{
+							UnsignedInt drawableStatus = DRAWABLE_STATUS_NO_STATE_PARTICLES;
+							drawableStatus |= TheGlobalData->m_objectPlacementShadows ? DRAWABLE_STATUS_SHADOWS : 0;
+							ghost = TheThingFactory->newDrawable( tmpl, drawableStatus );
+							s_ghostPreviewDrawables[ used ] = ghost;
+							s_ghostPreviewTemplates[ used ] = tmpl;
+						}
+						if( ghost == nullptr )
+							continue;
+
+						ghost->setPosition( pos );
+						ghost->setDrawableOpacity( TheGlobalData->m_objectPlacementOpacity );
+						ghost->setOrientation( node->getAngle() );
+						ghost->setIndicatorColor( obj->getControllingPlayer()->getPlayerColor() );
+
+						used++;
+					}
+				}
+			}
+		}
+	}
+
+	// TheSuperHackers @feature (issue #122) builds plotted in waypoint mode live in the CLIENT
+	// pending chain (one FIFO timeline with the moves around them), not in the dozer's logic
+	// queue — so preview them from there too: every MSG_DOZER_CONSTRUCT node in a plotted
+	// route shows its building as a ghost at the plotted spot, the moment the node is placed.
+	// The ghosts vanish when the chain is committed, because the real foundation appears then.
+	if( TheInGameUI != nullptr && localPlayer != nullptr && used < MAX_GHOST_BUILD_PREVIEWS_IGUI )
+	{
+		const std::map< ObjectID, CommandSequence * > &chains = TheInGameUI->getPendingSequences();
+		for( std::map< ObjectID, CommandSequence * >::const_iterator it = chains.begin();
+				 it != chains.end() && used < MAX_GHOST_BUILD_PREVIEWS_IGUI; ++it )
+		{
+			CommandSequence *pending = it->second;
+			if( pending == nullptr )
+				continue;
+
+			for( CommandNode *node = pending->getPendingHead();
+					 node != nullptr && used < MAX_GHOST_BUILD_PREVIEWS_IGUI;
+					 node = node->getNext() )
+			{
+				if( node->getCommandType() != GameMessage::MSG_DOZER_CONSTRUCT )
+					continue;
+
+				const ThingTemplate *tmpl = TheThingFactory->findByTemplateID( node->getCommandParam() );
+				const Coord3D *pos = node->getLocation();
+				if( tmpl == nullptr || pos == nullptr )
+					continue;
+
+				Drawable *ghost = s_ghostPreviewDrawables[ used ];
+
+				if( ghost != nullptr && s_ghostPreviewTemplates[ used ] != tmpl )
+				{
+					destroyGhostDeferred( ghost );
+					ghost = nullptr;
+				}
+
+				if( ghost == nullptr )
+				{
+					UnsignedInt drawableStatus = DRAWABLE_STATUS_NO_STATE_PARTICLES;
+					drawableStatus |= TheGlobalData->m_objectPlacementShadows ? DRAWABLE_STATUS_SHADOWS : 0;
+					ghost = TheThingFactory->newDrawable( tmpl, drawableStatus );
+					s_ghostPreviewDrawables[ used ] = ghost;
+					s_ghostPreviewTemplates[ used ] = tmpl;
+				}
+
+				if( ghost == nullptr )
+					continue;
+
+				ghost->setPosition( pos );
+				ghost->setDrawableOpacity( TheGlobalData->m_objectPlacementOpacity );
+				ghost->setOrientation( node->getAngle() );
+
+				// Plotted chains only exist on the local client, so the ghost is always ours.
+				ghost->setIndicatorColor( localPlayer->getPlayerColor() );
+
+				used++;
+			}
 		}
 	}
 
@@ -2334,6 +2440,17 @@ void InGameUI::update()
 
 	// TheSuperHackers @feature manage the ghost build previews here, outside the render walk.
 	updateGhostBuildPreviews( ThePlayerList->getLocalPlayer() );
+
+	// TheSuperHackers @feature (issue #122) the unit holding the single-unit plotting focus
+	// glows with the selection flash while it is focused — re-triggering the envelope every
+	// frame keeps it lit until the focus moves back to the whole group.
+	if( m_waypointFocusUnit != INVALID_ID )
+	{
+		Object *focusObj = ( TheGameLogic != nullptr ) ? TheGameLogic->findObjectByID( m_waypointFocusUnit ) : nullptr;
+		Drawable *focusDraw = ( focusObj != nullptr ) ? focusObj->getDrawable() : nullptr;
+		if( focusDraw != nullptr )
+			focusDraw->flashAsSelected();
+	}
 
 	// TheSuperHackers @feature Fire a queued quick cast as soon as its ability comes up.
 	updateQueuedQuickCast();
@@ -2724,7 +2841,7 @@ CommandSequence *InGameUI::getPendingCommandSequence() const
 // Only commands on the CommandSequence whitelist are accepted; anything else falls through and
 // is sent as a normal order, so the plotting mode degrades gracefully.
 //-------------------------------------------------------------------------------------------------
-Bool InGameUI::appendPendingWaypointCommand( GameMessage::Type type, ObjectID targetID, const Coord3D *pos, Int param )
+Bool InGameUI::appendPendingWaypointCommand( GameMessage::Type type, ObjectID targetID, const Coord3D *pos, Int param, Real angle )
 {
 	// keep the map honest before deciding what to add to it
 	prunePendingWaypointSequences();
@@ -2777,7 +2894,9 @@ Bool InGameUI::appendPendingWaypointCommand( GameMessage::Type type, ObjectID ta
 	}
 
 	if( subject == nullptr )
+	{
 		return FALSE;
+	}
 
 	// Group mode: focus is INVALID, so the order belongs to every selected unit. Each one
 	// still gets its own chain -- the logic side advances them independently and an end
@@ -2809,7 +2928,7 @@ Bool InGameUI::appendPendingWaypointCommand( GameMessage::Type type, ObjectID ta
 				m_pendingSequences[ unit->getID() ] = unitSeq;
 			}
 
-			if( unitSeq->appendPending( type, targetID, pos, param ) )
+			if( unitSeq->appendPending( type, targetID, pos, param, angle ) )
 			{
 				applied++;
 			}
@@ -2839,7 +2958,7 @@ Bool InGameUI::appendPendingWaypointCommand( GameMessage::Type type, ObjectID ta
 		m_pendingSequences[ m_waypointFocusUnit ] = seq;
 	}
 
-	const Bool appended = seq->appendPending( type, targetID, pos, param );
+	const Bool appended = seq->appendPending( type, targetID, pos, param, angle );
 
 	// nothing plotted and the command was refused: drop the empty chain again
 	if( !appended && seq->getPendingCount() == 0 )
@@ -2948,6 +3067,7 @@ Bool InGameUI::commitPendingWaypointCommands()
 			msg->appendObjectIDArgument( node->getTargetID() );
 			msg->appendLocationArgument( *node->getLocation() );
 			msg->appendIntegerArgument( node->getCommandParam() );
+			msg->appendRealArgument( node->getAngle() );
 		}
 
 		committed += (Int)groups[ g ].subjects.size();
@@ -2966,6 +3086,27 @@ void InGameUI::discardPendingWaypointCommands()
 		delete it->second;
 	}
 	m_pendingSequences.clear();
+}
+
+//-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature leave single-unit plotting focus in one press: the next plotted
+// order belongs to the whole selection again. Alt+Shift, no third key needed. The selection
+// flashes once so the player sees the hand-back was registered.
+//-------------------------------------------------------------------------------------------------
+void InGameUI::setWaypointFocusToAll()
+{
+	m_waypointFocusUnit = INVALID_ID;
+
+	const DrawableList *selected = getAllSelectedDrawables();
+	if( selected == nullptr )
+		return;
+
+	for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
+	{
+		Drawable *draw = *it;
+		if( draw != nullptr )
+			draw->flashAsSelected();
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4982,6 +5123,10 @@ void InGameUI::setInputEnabled( Bool enable )
 		setForceAttackMode( false );			// CTRL
 		setForceMoveMode( false );				// apparently unmapped in current CommandMap.ini
 		setWaypointMode( false );					// ALT
+		// TheSuperHackers @feature new waypoint system (issue #122): the keyup above was eaten
+		// by the cinematic, so the player never released Alt deliberately — plotted sequences
+		// were never confirmed and must not be broadcast.
+		discardPendingWaypointCommands();
 		setPreferSelectionMode( false );	// SHIFT
 		setCameraRotateLeft( false );			// KP4
 		setCameraRotateRight( false );		// KP6

@@ -291,16 +291,28 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 					}
 
 				// create the right kind of message
-				// TheSuperHackers @feature in waypoint mode, queue the construction on the builder
-				// (it will be built after the builder finishes its current path/tasks) instead of
-				// immediately interrupting whatever the builder is doing
+				// TheSuperHackers @feature (issue #122) a build plotted in waypoint mode joins the
+				// SAME pending chain as the move/attack orders around it, so the whole plotting
+				// session is one FIFO timeline: move, move, build, move... The node's param
+				// carries the template id and the sequence's dispatchCurrent materializes the
+				// building when its turn comes. The old path here sent MSG_DOZER_WAYPOINT_BUILD
+				// immediately instead, which bypassed the chain: builds fired mid-plot and later
+				// orders replaced rather than appended.
 				if( isLineBuild )
 					placeMsg = TheMessageStream->appendMessage( GameMessage::MSG_DOZER_CONSTRUCT_LINE );
+				else if( TheInGameUI->isInWaypointMode() &&
+								 TheInGameUI->appendPendingWaypointCommand( GameMessage::MSG_DOZER_CONSTRUCT,
+									 											INVALID_ID, &worldStart, build->getTemplateID(), angle ) )
+				{
+					placeMsg = nullptr;	// plotted into the pending chain; nothing to broadcast yet
+				}
 				else if( TheInGameUI->isInWaypointMode() )
 					placeMsg = TheMessageStream->appendMessage( GameMessage::MSG_DOZER_WAYPOINT_BUILD );
 				else
 					placeMsg = TheMessageStream->appendMessage( GameMessage::MSG_DOZER_CONSTRUCT );
 
+				if( placeMsg != nullptr )
+				{
 					placeMsg->appendIntegerArgument(build->getTemplateID());
 					placeMsg->appendLocationArgument(worldStart);
 					placeMsg->appendRealArgument(angle);
@@ -308,8 +320,10 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 					{
 						placeMsg->appendLocationArgument( worldEnd );
 					}
+				}
 
-					pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), placeMsg->getType() );
+					pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(),
+																				placeMsg != nullptr ? placeMsg->getType() : GameMessage::MSG_DOZER_CONSTRUCT );
 
 					// TheSuperHackers @feature In waypoint mode (Alt held) the build selection is
 					// sticky: the building stays picked so that several of them can be placed with

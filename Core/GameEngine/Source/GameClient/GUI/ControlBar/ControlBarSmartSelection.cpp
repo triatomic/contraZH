@@ -497,6 +497,11 @@ void ControlBar::updateSmartSelection()
 	}
 
 	// the bars are one shot on the button, so a lone member's health and clip go on every frame
+	// TheSuperHackers @feature the Alt+Space waypoint focus reads on the row too: the cameo
+	// holding the focused unit -- its own cameo, or its type's in a mixed selection -- is pushed
+	// in until focus returns to all. Visual only: the command-bar focus is untouched.
+	const ObjectID waypointFocus = TheInGameUI->getWaypointFocusUnit();
+	const Object *focusObj = waypointFocus != INVALID_ID ? TheGameLogic->findObjectByID( waypointFocus ) : nullptr;
 	for( size_t g = 0; g < m_smartSelectionGroups.size(); g++ )
 	{
 		GameWindow *button = m_smartSelectionButtons[ g ];
@@ -507,6 +512,20 @@ void ControlBar::updateSmartSelection()
 
 		// the overlay stays on the button until replaced, so an unranked cameo clears it
 		GadgetButtonDrawOverlayImage( button, calculateVeterancyOverlayForLevel( bestLevel[ g ] ) );
+
+		// the check state is a one shot as well: the smart selection focus and the waypoint
+		// focus are re-asserted every frame, so either side changing lands on the next frame
+		Bool checked = isIndexSmartSelectionFocused( g );
+		if( focusObj != nullptr )
+		{
+			const SmartSelectionGroup &group = m_smartSelectionGroups[ g ];
+			const Bool inGroup = group.objectID != INVALID_ID ? waypointFocus == group.objectID : focusObj->getTemplate()->getReskinRoot() == group.thingTemplate;
+			if( inGroup )
+			{
+				checked = TRUE;
+			}
+		}
+		GadgetCheckLikeButtonSetVisualCheck( button, checked );
 
 		if( m_smartSelectionGroups[ g ].objectID == INVALID_ID )
 		{

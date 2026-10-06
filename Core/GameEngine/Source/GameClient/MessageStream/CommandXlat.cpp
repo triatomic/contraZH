@@ -1084,6 +1084,26 @@ static Object *iNeedAHero()
 /**
  * Create DO_MOVE_TO messages for each selected object, instructing it to move to the given location.
  */
+//-------------------------------------------------------------------------------------------------
+/** TheSuperHackers @feature new waypoint system (issue #122). While a route is being plotted
+	* (Alt held), a click that resolves to a chainable order is diverted onto the client's pending
+	* chain instead of being broadcast; the whole chain goes out as MSG_COMMAND_SEQUENCE_COMMIT when
+	* plotting ends. appendPendingWaypointCommand refuses commands outside the sequence whitelist,
+	* in which case the caller sends the order normally, as before. Returns TRUE when plotted. */
+//-------------------------------------------------------------------------------------------------
+static Bool plotPendingWaypointCommand( GameMessage::Type msgType, Object *target, const Coord3D *pos, Int param = 0 )
+{
+	if( !TheInGameUI->isInWaypointMode() )
+	{
+		return FALSE;
+	}
+
+	return TheInGameUI->appendPendingWaypointCommand( msgType,
+			( target != nullptr ) ? target->getID() : INVALID_ID,
+			pos, param );
+}
+
+//-------------------------------------------------------------------------------------------------
 GameMessage::Type CommandTranslator::issueMoveToLocationCommand( const Coord3D *pos, Drawable *drawableInWay,
 																																 CommandEvaluateType commandType )
 {
@@ -1126,9 +1146,7 @@ GameMessage::Type CommandTranslator::issueMoveToLocationCommand( const Coord3D *
 			// plotted the command is kept on the client and shown as preview; the whole chain is
 			// broadcast as MSG_COMMAND_SEQUENCE_COMMIT when plotting ends. Commands outside the
 			// sequence whitelist are refused here and sent normally, as before.
-			const Bool plotted = TheInGameUI->isInWaypointMode() &&
-					TheInGameUI->appendPendingWaypointCommand( msgType,
-							( obj != nullptr ) ? obj->getID() : INVALID_ID, pos, 0 );
+			const Bool plotted = plotPendingWaypointCommand( msgType, obj, pos );
 
 			if( !plotted )
 			{
@@ -1233,30 +1251,48 @@ GameMessage::Type CommandTranslator::issueAttackCommand( Drawable *target,
 		// only create the message if our command type is DO_COMMAND
 		if( commandType == DO_COMMAND )
 		{
-			GameMessage *attackMsg;
+			// TheSuperHackers @feature new waypoint system (issue #122): while a route is being
+			// plotted the attack joins the pending chain and waits for the commit broadcast.
+			if( plotPendingWaypointCommand( msgType, targetObj, targetObj->getPosition() ) )
+			{
+				// plotted; nothing is broadcast until Alt is released
+			}
+			else
+			{
+				GameMessage *attackMsg;
 
-			attackMsg = TheMessageStream->appendMessage( msgType );
+				attackMsg = TheMessageStream->appendMessage( msgType );
 
-			attackMsg->appendObjectIDArgument( targetObj->getID() );	// must pass target object ID to logic
+				attackMsg->appendObjectIDArgument( targetObj->getID() );	// must pass target object ID to logic
 
-			// if we have a stats collector, increment the stats
-			if(TheStatsCollector)
-				TheStatsCollector->incrementAttackCount();
+				// if we have a stats collector, increment the stats
+				if(TheStatsCollector)
+					TheStatsCollector->incrementAttackCount();
+			}
 		}
 	}
 	else
 	{
 		DEBUG_LOG(("issuing NON-team-attack cmd against %s",target->getTemplate()->getName().str()));
 
-		// send single attack command for selected drawable
-		const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
-
-		// loop through all the selected drawables
-		Drawable *draw;
-		for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
+		// TheSuperHackers @feature new waypoint system (issue #122): plot one node for the whole
+		// selection instead of one attack message per member; the chain fans out per unit.
+		if( commandType == DO_COMMAND && plotPendingWaypointCommand( GameMessage::MSG_DO_ATTACK_OBJECT, targetObj, targetObj->getPosition() ) )
 		{
-			draw = *it;
-			msgType = createAttackMessage(draw, target, commandType );
+			msgType = GameMessage::MSG_DO_ATTACK_OBJECT;
+		}
+		else
+		{
+			// send single attack command for selected drawable
+			const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
+
+			// loop through all the selected drawables
+			Drawable *draw;
+			for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
+			{
+				draw = *it;
+				msgType = createAttackMessage(draw, target, commandType );
+			}
 		}
 	}
 
@@ -1278,6 +1314,7 @@ GameMessage::Type CommandTranslator::issueAttackCommand( Drawable *target,
 GameMessage::Type CommandTranslator::issueSpecialPowerCommand( const CommandButton *command, CommandEvaluateType commandType, Drawable *target, const Coord3D *pos, Object* ignoreSelObj )
 {
 	GameMessage::Type msgType = GameMessage::MSG_INVALID;
+	Bool plotted = FALSE;	// TheSuperHackers @feature new waypoint system (issue #122): set when the order joins the pending chain
 
 	if( !command || !command->getSpecialPowerTemplate())
 	{
@@ -1319,12 +1356,21 @@ GameMessage::Type CommandTranslator::issueSpecialPowerCommand( const CommandButt
 		msgType = GameMessage::MSG_DO_SPECIAL_POWER_AT_OBJECT;
 		if( commandType == DO_COMMAND )
 		{
-			GameMessage *msg;
-			msg = TheMessageStream->appendMessage( msgType );
-			msg->appendIntegerArgument( command->getSpecialPowerTemplate()->getID() );
-			msg->appendObjectIDArgument( target->getObject()->getID() );
-			msg->appendIntegerArgument( command->getOptions() );
-			msg->appendObjectIDArgument( specificSource );
+			// TheSuperHackers @feature new waypoint system (issue #122): plot instead of send.
+			// The node param carries the power's template id, matching the logic-side dispatch.
+			if( plotPendingWaypointCommand( msgType, target->getObject(), nullptr, command->getSpecialPowerTemplate()->getID() ) )
+			{
+				plotted = TRUE;
+			}
+			else
+			{
+				GameMessage *msg;
+				msg = TheMessageStream->appendMessage( msgType );
+				msg->appendIntegerArgument( command->getSpecialPowerTemplate()->getID() );
+				msg->appendObjectIDArgument( target->getObject()->getID() );
+				msg->appendIntegerArgument( command->getOptions() );
+				msg->appendObjectIDArgument( specificSource );
+			}
 
 			// say   something like " I think I'll put some dynamite on that there tank."
 			PickAndPlayInfo info;
@@ -1393,18 +1439,27 @@ GameMessage::Type CommandTranslator::issueSpecialPowerCommand( const CommandButt
 		msgType = GameMessage::MSG_DO_SPECIAL_POWER_AT_LOCATION;
 		if( commandType == DO_COMMAND )
 		{
-			GameMessage *msg;
-			msg = TheMessageStream->appendMessage( msgType );
-			msg->appendIntegerArgument( command->getSpecialPowerTemplate()->getID() );
-			msg->appendLocationArgument( *pos );
+			// TheSuperHackers @feature new waypoint system (issue #122): plot instead of send.
+			Object *targetObj = ( target && target->getObject() ) ? target->getObject() : nullptr;
+			if( plotPendingWaypointCommand( msgType, targetObj, pos, command->getSpecialPowerTemplate()->getID() ) )
+			{
+				plotted = TRUE;
+			}
+			else
+			{
+				GameMessage *msg;
+				msg = TheMessageStream->appendMessage( msgType );
+				msg->appendIntegerArgument( command->getSpecialPowerTemplate()->getID() );
+				msg->appendLocationArgument( *pos );
 #if !(RTS_GENERALS && RETAIL_COMPATIBLE_NETWORKING)
-			msg->appendRealArgument( INVALID_ANGLE ); //We don't use the angle (unless we're using a construction special in PlaceEventTranslator).
+				msg->appendRealArgument( INVALID_ANGLE ); //We don't use the angle (unless we're using a construction special in PlaceEventTranslator).
 #endif
-			//Object in way.... some specials care, others don't
-			ObjectID targetID = (target && target->getObject()) ? target->getObject()->getID() : INVALID_ID;
-			msg->appendObjectIDArgument( targetID );
-			msg->appendIntegerArgument( command->getOptions() );
-			msg->appendObjectIDArgument( specificSource );
+				//Object in way.... some specials care, others don't
+				ObjectID targetID = (target && target->getObject()) ? target->getObject()->getID() : INVALID_ID;
+				msg->appendObjectIDArgument( targetID );
+				msg->appendIntegerArgument( command->getOptions() );
+				msg->appendObjectIDArgument( specificSource );
+			}
 
 			// say   something like " I think I'll put a timed charge on the ground, here."
 			PickAndPlayInfo info;
@@ -1420,11 +1475,19 @@ GameMessage::Type CommandTranslator::issueSpecialPowerCommand( const CommandButt
 		msgType = GameMessage::MSG_DO_SPECIAL_POWER;
 		if( commandType == DO_COMMAND )
 		{
-			GameMessage *msg;
-			msg = TheMessageStream->appendMessage( msgType );
-			msg->appendIntegerArgument( command->getSpecialPowerTemplate()->getID() );
-			msg->appendIntegerArgument( command->getOptions() );
-			msg->appendObjectIDArgument( specificSource );
+			// TheSuperHackers @feature new waypoint system (issue #122): plot instead of send.
+			if( plotPendingWaypointCommand( msgType, nullptr, nullptr, command->getSpecialPowerTemplate()->getID() ) )
+			{
+				plotted = TRUE;
+			}
+			else
+			{
+				GameMessage *msg;
+				msg = TheMessageStream->appendMessage( msgType );
+				msg->appendIntegerArgument( command->getSpecialPowerTemplate()->getID() );
+				msg->appendIntegerArgument( command->getOptions() );
+				msg->appendObjectIDArgument( specificSource );
+			}
 
 			// say   something like " I think I'll set down my laptop and hack some cash from a bank in the Cayman Islands."
 			PickAndPlayInfo info;
@@ -1439,7 +1502,9 @@ GameMessage::Type CommandTranslator::issueSpecialPowerCommand( const CommandButt
 	// fire-then-steer overridable-destination model, so skip the shortcut auto-select/steer block -
 	// it would deselect/select the firing object, which clears the pending point state and
 	// makes the remaining clicks impossible.
-	if( command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT && commandType == DO_COMMAND
+	// TheSuperHackers @feature new waypoint system (issue #122): a plotted power must not steer
+	// the selection either -- it has not fired yet and the player is mid-plot.
+	if( !plotted && command->getCommandType() == GUI_COMMAND_SPECIAL_POWER_FROM_SHORTCUT && commandType == DO_COMMAND
 			&& !BitIsSet( command->getOptions(), NEED_N_TARGET_POS ) )
 	{
 		Object *obj = sourceDraw->getObject();
@@ -1485,9 +1550,13 @@ GameMessage::Type CommandTranslator::issueCombatDropCommand( const CommandButton
 		GameMessage::Type msgType = GameMessage::MSG_COMBATDROP_AT_OBJECT;
 		if( commandType == DO_COMMAND )
 		{
-			GameMessage *msg = TheMessageStream->appendMessage( msgType );
-			ObjectID targetID = (target && target->getObject()) ? target->getObject()->getID() : INVALID_ID;
-			msg->appendObjectIDArgument( targetID );
+			// TheSuperHackers @feature new waypoint system (issue #122): plot instead of send.
+			if( !plotPendingWaypointCommand( msgType, target->getObject(), target->getObject()->getPosition() ) )
+			{
+				GameMessage *msg = TheMessageStream->appendMessage( msgType );
+				ObjectID targetID = (target && target->getObject()) ? target->getObject()->getID() : INVALID_ID;
+				msg->appendObjectIDArgument( targetID );
+			}
 			pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_COMBATDROP_AT_OBJECT );
 		}
 		return msgType;
@@ -1497,8 +1566,12 @@ GameMessage::Type CommandTranslator::issueCombatDropCommand( const CommandButton
 		GameMessage::Type msgType = GameMessage::MSG_COMBATDROP_AT_LOCATION;
 		if( commandType == DO_COMMAND )
 		{
-			GameMessage *msg = TheMessageStream->appendMessage( msgType );
-			msg->appendLocationArgument( *pos );
+			// TheSuperHackers @feature new waypoint system (issue #122): plot instead of send.
+			if( !plotPendingWaypointCommand( msgType, nullptr, pos ) )
+			{
+				GameMessage *msg = TheMessageStream->appendMessage( msgType );
+				msg->appendLocationArgument( *pos );
+			}
 			pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_COMBATDROP_AT_LOCATION );
 		}
 		return msgType;
@@ -1549,12 +1622,21 @@ GameMessage::Type CommandTranslator::issueFireWeaponCommand( const CommandButton
 			msgType = GameMessage::MSG_DO_WEAPON_AT_OBJECT;
 			if( commandType == DO_COMMAND )
 			{
-				GameMessage *msg;
-				msg = TheMessageStream->appendMessage( msgType );
-				msg->appendIntegerArgument( command->getWeaponSlot() );
-				ObjectID targetID = (target && target->getObject()) ? target->getObject()->getID() : INVALID_ID;
-				msg->appendObjectIDArgument( targetID );
-				msg->appendIntegerArgument( command->getMaxShotsToFire() );
+				// TheSuperHackers @feature new waypoint system (issue #122): plot instead of send.
+				// The node param carries the weapon slot, matching the logic-side dispatch.
+				if( plotPendingWaypointCommand( msgType, target->getObject(), target->getObject()->getPosition(), command->getWeaponSlot() ) )
+				{
+					// plotted; nothing is broadcast until Alt is released
+				}
+				else
+				{
+					GameMessage *msg;
+					msg = TheMessageStream->appendMessage( msgType );
+					msg->appendIntegerArgument( command->getWeaponSlot() );
+					ObjectID targetID = (target && target->getObject()) ? target->getObject()->getID() : INVALID_ID;
+					msg->appendObjectIDArgument( targetID );
+					msg->appendIntegerArgument( command->getMaxShotsToFire() );
+				}
 
 				//play a unit specific sound?
 				PickAndPlayInfo info;
@@ -1570,14 +1652,23 @@ GameMessage::Type CommandTranslator::issueFireWeaponCommand( const CommandButton
 		msgType = GameMessage::MSG_DO_WEAPON_AT_LOCATION;
 		if( commandType == DO_COMMAND )
 		{
-			GameMessage *msg;
-			msg = TheMessageStream->appendMessage( msgType );
-			msg->appendIntegerArgument( command->getWeaponSlot() );
-			msg->appendLocationArgument( *pos );
-			msg->appendIntegerArgument( command->getMaxShotsToFire() );
-			//Object in way.... some location weapons care, others don't
-			ObjectID targetID = (target && target->getObject()) ? target->getObject()->getID() : INVALID_ID;
-			msg->appendObjectIDArgument( targetID );
+			// TheSuperHackers @feature new waypoint system (issue #122): plot instead of send.
+			Object *targetObj = ( target && target->getObject() ) ? target->getObject() : nullptr;
+			if( plotPendingWaypointCommand( msgType, targetObj, pos, command->getWeaponSlot() ) )
+			{
+				// plotted; nothing is broadcast until Alt is released
+			}
+			else
+			{
+				GameMessage *msg;
+				msg = TheMessageStream->appendMessage( msgType );
+				msg->appendIntegerArgument( command->getWeaponSlot() );
+				msg->appendLocationArgument( *pos );
+				msg->appendIntegerArgument( command->getMaxShotsToFire() );
+				//Object in way.... some location weapons care, others don't
+				ObjectID targetID = (target && target->getObject()) ? target->getObject()->getID() : INVALID_ID;
+				msg->appendObjectIDArgument( targetID );
+			}
 		}
 	}
 	else
@@ -1618,9 +1709,13 @@ GameMessage::Type CommandTranslator::createEnterMessage( Drawable *enter,
 		info.m_drawTarget = enter;
 		pickAndPlayUnitVoiceResponse(TheInGameUI->getAllSelectedDrawables(), msgType, &info );
 
-		GameMessage *enterMsg = TheMessageStream->appendMessage( msgType );
-		enterMsg->appendObjectIDArgument( INVALID_ID );		// 0 means current "selection team" of this player
-		enterMsg->appendObjectIDArgument( enter->getObject()->getID() );
+		// TheSuperHackers @feature new waypoint system (issue #122): plot instead of send.
+		if( !plotPendingWaypointCommand( msgType, enter->getObject(), enter->getObject()->getPosition() ) )
+		{
+			GameMessage *enterMsg = TheMessageStream->appendMessage( msgType );
+			enterMsg->appendObjectIDArgument( INVALID_ID );		// 0 means current "selection team" of this player
+			enterMsg->appendObjectIDArgument( enter->getObject()->getID() );
+		}
 
 	}
 	else
@@ -1714,8 +1809,13 @@ GameMessage::Type CommandTranslator::evaluateForceAttack( Drawable *draw, const 
 			if( type == DO_COMMAND )
 			{
 				pickAndPlayUnitVoiceResponse( allSelected, retVal );
-				GameMessage *newMsg = TheMessageStream->appendMessage( retVal );
-				newMsg->appendObjectIDArgument( obj->getID() );
+
+				// TheSuperHackers @feature new waypoint system (issue #122): plot instead of send.
+				if( !plotPendingWaypointCommand( retVal, obj, obj->getPosition() ) )
+				{
+					GameMessage *newMsg = TheMessageStream->appendMessage( retVal );
+					newMsg->appendObjectIDArgument( obj->getID() );
+				}
 
 			}
 			else if( type == DO_HINT )
@@ -1742,8 +1842,14 @@ GameMessage::Type CommandTranslator::evaluateForceAttack( Drawable *draw, const 
 			if( type == DO_COMMAND )
 			{
 				pickAndPlayUnitVoiceResponse( allSelected, retVal );
-				GameMessage *newMsg = TheMessageStream->appendMessage( retVal );
-				newMsg->appendLocationArgument( *pos );
+
+				// TheSuperHackers @feature new waypoint system (issue #122): plot instead of send.
+				if( !plotPendingWaypointCommand( retVal, nullptr, pos ) )
+				{
+					GameMessage *newMsg = TheMessageStream->appendMessage( retVal );
+					newMsg->appendLocationArgument( *pos );
+				}
+
 			}
 			else if( type == DO_HINT )
 			{
@@ -1855,28 +1961,6 @@ void CommandTranslator::resolveGuiCommandTarget( const CommandButton *command, D
 				break;
 		}
 	}
-}
-
-GameMessage::Type CommandTranslator::handleWaypointModeCommand( const Coord3D *pos, Drawable *draw, CommandEvaluateType type )
-{
-	GameMessage::Type msgType = GameMessage::MSG_INVALID;
-
-	//Override any *other* commands with waypoint commands.
-	if( type == DO_COMMAND || type == EVALUATE_ONLY )
-	{
-		if( TheTerrainLogic )
-		{
-			msgType = issueMoveToLocationCommand( pos, draw, type );
-		}
-	}
-	else
-	{
-		msgType = GameMessage::MSG_ADD_WAYPOINT_HINT;
-		GameMessage* hintMessage = TheMessageStream->appendMessage( msgType );
-		hintMessage->appendLocationArgument( *pos );
-	}
-
-	return msgType;
 }
 
 GameMessage::Type CommandTranslator::handleGuiCommand( const CommandButton *command, Drawable *draw, Object *obj, const Coord3D *pos, CommandEvaluateType type )
@@ -2058,9 +2142,13 @@ GameMessage::Type CommandTranslator::handleResumeConstructionCommand( Object *ob
 		msgType = GameMessage::MSG_RESUME_CONSTRUCTION;
 		if( type == DO_COMMAND )
 		{
-			GameMessage *resumeMsg = TheMessageStream->appendMessage( msgType );
+			// TheSuperHackers @feature new waypoint system (issue #122): plot instead of send.
+			if( !plotPendingWaypointCommand( msgType, obj, obj->getPosition() ) )
+			{
+				GameMessage *resumeMsg = TheMessageStream->appendMessage( msgType );
 
-			resumeMsg->appendObjectIDArgument( obj->getID() );
+				resumeMsg->appendObjectIDArgument( obj->getID() );
+			}
 
 			pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_RESUME_CONSTRUCTION );
 
@@ -2095,9 +2183,13 @@ GameMessage::Type CommandTranslator::handleDockAtCommand( Object *obj, CommandEv
 		msgType = GameMessage::MSG_DOCK;
 		if( type == DO_COMMAND )
 		{
-			GameMessage *dockMsg = TheMessageStream->appendMessage( msgType );
+			// TheSuperHackers @feature new waypoint system (issue #122): plot instead of send.
+			if( !plotPendingWaypointCommand( msgType, obj, obj->getPosition() ) )
+			{
+				GameMessage *dockMsg = TheMessageStream->appendMessage( msgType );
 
-			dockMsg->appendObjectIDArgument( obj->getID() );
+				dockMsg->appendObjectIDArgument( obj->getID() );
+			}
 
 			// only make sounds if we really did the command messages
 			pickAndPlayUnitVoiceResponse(TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_DOCK);
@@ -2128,9 +2220,13 @@ GameMessage::Type CommandTranslator::handleRepairObjectCommand( Object *obj, Com
 		msgType = GameMessage::MSG_DO_REPAIR;
 		if( type == DO_COMMAND )
 		{
-			GameMessage *healMsg = TheMessageStream->appendMessage( msgType );
+			// TheSuperHackers @feature new waypoint system (issue #122): plot instead of send.
+			if( !plotPendingWaypointCommand( msgType, obj, obj->getPosition() ) )
+			{
+				GameMessage *healMsg = TheMessageStream->appendMessage( msgType );
 
-			healMsg->appendObjectIDArgument( obj->getID() );
+				healMsg->appendObjectIDArgument( obj->getID() );
+			}
 
 			pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_DO_REPAIR );
 
@@ -2161,9 +2257,13 @@ GameMessage::Type CommandTranslator::handleGetRepairedAtCommand( Object *obj, Co
 		msgType = GameMessage::MSG_GET_REPAIRED;
 		if( type == DO_COMMAND )
 		{
-			GameMessage *healMsg = TheMessageStream->appendMessage( msgType );
+			// TheSuperHackers @feature new waypoint system (issue #122): plot instead of send.
+			if( !plotPendingWaypointCommand( msgType, obj, obj->getPosition() ) )
+			{
+				GameMessage *healMsg = TheMessageStream->appendMessage( msgType );
 
-			healMsg->appendObjectIDArgument( obj->getID() );
+				healMsg->appendObjectIDArgument( obj->getID() );
+			}
 
 
 			pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_GET_REPAIRED );
@@ -2196,9 +2296,13 @@ GameMessage::Type CommandTranslator::handleGetHealedAtCommand( Object *obj, Comm
 		msgType = GameMessage::MSG_GET_HEALED;
 		if( type == DO_COMMAND )
 		{
-			GameMessage *healMsg = TheMessageStream->appendMessage( msgType );
+			// TheSuperHackers @feature new waypoint system (issue #122): plot instead of send.
+			if( !plotPendingWaypointCommand( msgType, obj, obj->getPosition() ) )
+			{
+				GameMessage *healMsg = TheMessageStream->appendMessage( msgType );
 
-			healMsg->appendObjectIDArgument( obj->getID() );
+				healMsg->appendObjectIDArgument( obj->getID() );
+			}
 
 			pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_GET_HEALED );
 
@@ -2292,8 +2396,12 @@ GameMessage::Type CommandTranslator::handleSalvageCommand( Object *obj, CommandE
 	if( type == DO_COMMAND || type == EVALUATE_ONLY ) {
 		msgType = GameMessage::MSG_DO_SALVAGE;
 		if (type == DO_COMMAND) {
-			msg = TheMessageStream->appendMessage(msgType);
-			msg->appendLocationArgument(*obj->getPosition());
+			// TheSuperHackers @feature new waypoint system (issue #122): plot instead of send.
+			if( !plotPendingWaypointCommand( msgType, nullptr, obj->getPosition() ) )
+			{
+				msg = TheMessageStream->appendMessage(msgType);
+				msg->appendLocationArgument(*obj->getPosition());
+			}
 			pickAndPlayUnitVoiceResponse(TheInGameUI->getAllSelectedDrawables(), msgType);
 		}
 
@@ -2565,11 +2673,8 @@ GameMessage::Type CommandTranslator::handleDefaultMoveCommand( Drawable *draw, D
 		{
 			msgType = GameMessage::MSG_DO_INVALID_HINT;
 		}
-		else if( TheInGameUI->isInWaypointMode() )
-		{
-			//Waypoint mode
-			msgType = GameMessage::MSG_ADD_WAYPOINT_HINT;
-		}
+		// TheSuperHackers @feature new waypoint system (issue #122): while plotting, the cursor
+		// shows the order that would actually be given (move/attack/...), not a waypoint icon.
 		else if( TheInGameUI->isInAttackMoveToMode() )
 		{
 			//THIS CODE WILL NEVER EVER GET CALLED! -- it's a context command now (READ: rip code out)
@@ -2651,10 +2756,10 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 		return msgType;
 	}
 
-	if( TheInGameUI->isInWaypointMode() )
-	{
-		return handleWaypointModeCommand( pos, draw, type );
-	}
+	// TheSuperHackers @feature new waypoint system (issue #122): waypoint plotting no longer
+	// short-circuits command evaluation. Every order flows through its normal handler below, so
+	// attacks, capture, special powers and the like keep their own cursors and availability, and
+	// each one's DO_COMMAND site diverts onto the pending chain via plotPendingWaypointCommand.
 
 	CanAttackResult result = ATTACKRESULT_NOT_POSSIBLE;
 
@@ -2876,6 +2981,17 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		{
 			// TheSuperHackers @feature step to the next selected unit while plotting a route.
 			TheInGameUI->cycleWaypointFocusUnit();
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
+		//-----------------------------------------------------------------------------------------
+		case GameMessage::MSG_META_WAYPOINT_FOCUS_ALL:
+		{
+			// TheSuperHackers @feature one press of Alt+Shift hands orders back to the whole
+			// selection, so a player does not have to cycle past every unit to leave
+			// single-unit focus.
+			TheInGameUI->setWaypointFocusToAll();
 			disp = DESTROY_MESSAGE;
 			break;
 		}
@@ -4515,6 +4631,12 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		//-----------------------------------------------------------------------------------------
 		case GameMessage::MSG_META_END_WAYPOINTS:
 //			DEBUG_ASSERTCRASH( TheInGameUI->isInWaypointMode(), ("Clearing m_waypointMode but it's already clear!") );
+			// TheSuperHackers @feature new waypoint system (issue #122): releasing the waypoint
+			// modifier is what confirms the plotted sequences — this is the only player-driven
+			// exit from plotting mode, so the pending chains are broadcast here. Every other
+			// exit (cinematics, scripts, reset) discards them instead because the player never
+			// confirmed anything.
+			TheInGameUI->commitPendingWaypointCommands();
 			TheInGameUI->setWaypointMode( false );
 			break;
 

@@ -523,13 +523,14 @@ public:  // ********************************************************************
 	/// TheSuperHackers @feature every selected unit can be given its own plotted route:
 	/// these return/work on the chain belonging to the unit currently in focus.
 	CommandSequence *getPendingCommandSequence() const;
-	Bool appendPendingWaypointCommand( GameMessage::Type type, ObjectID targetID, const Coord3D *pos, Int param );
+	Bool appendPendingWaypointCommand( GameMessage::Type type, ObjectID targetID, const Coord3D *pos, Int param, Real angle = 0.0f );
 	Bool commitPendingWaypointCommands();
 	void discardPendingWaypointCommands();
 
 	/// Move the plotting focus to the next selected unit, leaving the selection itself
 	/// alone. Lets a group be steered unit by unit, each with its own route.
 	void cycleWaypointFocusUnit();
+	void setWaypointFocusToAll();
 
 	/// Drops plotted routes whose owner is gone (dead, or no longer ours). Called before
 	/// adding to the map so a chain cannot outlive the unit it belongs to.

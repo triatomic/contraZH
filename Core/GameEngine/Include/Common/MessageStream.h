@@ -655,8 +655,9 @@ public:
 		MSG_UPDATE_FOCUSED_GROUP,										///< update and tell every player that we have smart selection focus on this group
 		MSG_DO_REVERSE_MOVETO_HINT,									///< (location) If clicked, a reverse move would be ordered
 		MSG_EVACUATE_TO_WORK,												///< Dump out all of OUR contained objects, supply gatherers among them resume gathering
-		MSG_DOZER_WAYPOINT_BUILD,								///< (see above)
-		MSG_COMMAND_SEQUENCE_COMMIT,						///< TheSuperHackers @feature commit a plotted command sequence: (subjectID, nodeCount, then per node: type, targetID, location, param)									///< TheSuperHackers @feature like MSG_DOZER_CONSTRUCT, but queues the construction while in waypoint mode (builder builds it after finishing its current path/tasks). NOTE: new network messages must be appended at the END of this enum, before the debug block, to keep the IDs of all existing messages stable.
+		MSG_DOZER_WAYPOINT_BUILD,								///< TheSuperHackers @feature like MSG_DOZER_CONSTRUCT, but queues the construction while in waypoint mode (builder builds it after finishing its current path/tasks)
+		MSG_COMMAND_SEQUENCE_COMMIT,						///< TheSuperHackers @feature commit a plotted command sequence: (subjectCount, subjectID[subjectCount], nodeCount, then per node: type, targetID, location, param, angle)
+		MSG_META_WAYPOINT_FOCUS_ALL,					///< TheSuperHackers @feature leave single-unit plotting focus and order the whole selection again. NOTE: new network messages must be appended at the END of this enum, before the debug block, to keep the IDs of all existing messages stable.
 		MSG_BEGIN_DEBUG_NETWORK_MESSAGES = 1900,		///< network messages that exist only in debug/internal builds. all grouped separately.
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)

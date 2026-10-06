@@ -139,6 +139,7 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "SELECT_MATCHING_UNITS",										GameMessage::MSG_META_SELECT_MATCHING_UNITS },
 	{ "SELECT_IDLE_BUILDERS",										GameMessage::MSG_META_SELECT_IDLE_BUILDERS },
 	{ "CYCLE_WAYPOINT_FOCUS",							GameMessage::MSG_META_CYCLE_WAYPOINT_FOCUS },
+	{ "WAYPOINT_FOCUS_ALL",								GameMessage::MSG_META_WAYPOINT_FOCUS_ALL },
 	{ "SELECT_COMBAT_UNITS",										GameMessage::MSG_META_SELECT_COMBAT_UNITS },
 	{ "SMART_SELECTION_NEXT_TYPE",								GameMessage::MSG_META_SMART_SELECTION_NEXT_TYPE },
 	{ "SMART_SELECTION_PREV_TYPE",								GameMessage::MSG_META_SMART_SELECTION_PREV_TYPE },
@@ -926,14 +927,37 @@ void MetaMap::generateMetaMap()
 		}
 	}
 	{
-		// TheSuperHackers @feature Tab moves the plotting focus to the next selected unit, so a
-		// group can be given individual routes without disturbing the selection.
+		// TheSuperHackers @feature Alt+Space steps the plotting focus to the next selected unit,
+		// so a group can be given individual routes without disturbing the selection.
+		//
+		// Both halves of that gesture are deliberate:
+		//  - Tab is out. A bare Tab already drives the smart-selection cycle, and Alt+Tab is
+		//    the Windows task switcher.
+		//  - A bare backtick is out too: it toggles the health bar mode, and Alt+backtick is an
+		//    awkward stretch.
+		//  - A bare Space is unused; under Alt it cannot collide with anything, and Alt is also
+		//    the plotting mode key, so the gesture stays inside the mode where this action means
+		//    anything.
 		MetaMapRec *map = getMetaMapRec(GameMessage::MSG_META_CYCLE_WAYPOINT_FOCUS);
 		if (map->m_key == MK_NONE)
 		{
-			map->m_key = MK_TAB;
+			map->m_key = MK_SPACE;
 			map->m_transition = DOWN;
-			map->m_modState = NONE;
+			map->m_modState = ALT;
+			map->m_usableIn = COMMANDUSABLE_GAME;
+		}
+	}
+	{
+		// TheSuperHackers @feature Alt+Shift leaves single-unit plotting focus: the next order
+		// belongs to the whole selection again. A bare-modifier binding (Key NONE, no mappable
+		// key) fires the moment both modifiers are held down, in either press order; Alt is
+		// still held afterwards, so the plotting session itself is not interrupted.
+		MetaMapRec *map = getMetaMapRec(GameMessage::MSG_META_WAYPOINT_FOCUS_ALL);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_NONE;
+			map->m_transition = DOWN;
+			map->m_modState = SHIFT_ALT;
 			map->m_usableIn = COMMANDUSABLE_GAME;
 		}
 	}

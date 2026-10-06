@@ -69,7 +69,6 @@ private:
 	void resolveContextTarget( Drawable *&draw, Object *&obj, Drawable *&drawableInWay );
 	void resolveGuiCommandTarget( const CommandButton *command, Drawable *&draw, Object *&obj );
 
-	GameMessage::Type handleWaypointModeCommand( const Coord3D *pos, Drawable *draw, CommandEvaluateType type );
 	GameMessage::Type handleGuiCommand( const CommandButton *command, Drawable *draw, Object *obj, const Coord3D *pos, CommandEvaluateType type );
 	GameMessage::Type handleSpecialPowerConstructCommand( const CommandButton *command, Drawable *draw, const Coord3D *pos, CommandEvaluateType type );
 	GameMessage::Type handleSpecialPowerOverrideDestinationCommand( const Coord3D *pos, CommandEvaluateType type );

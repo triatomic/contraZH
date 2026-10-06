@@ -67,6 +67,7 @@
 #include "GameClient/Drawable.h"
 #include "GameClient/GameClient.h"
 #include "GameLogic/CommandSequence.h"
+#include "Common/Player.h"
 #include <map>
 #include "GameLogic/GameLogic.h"
 #include "GameClient/InGameUI.h"
@@ -140,8 +141,10 @@ void W3DWaypointBuffer::drawPendingCommandSequence( RenderInfoClass &rinfo )
 		return;
 
 	const std::map< ObjectID, CommandSequence * > &chains = TheInGameUI->getPendingSequences();
-	if( chains.empty() )
-		return;
+
+	// NOTE: no early return on empty pending chains — the executing-routes pass further down
+	// must still run (it draws committed sequences, which exist precisely when the pending
+	// ones are gone). An empty map simply iterates zero times.
 
 	//Create a default light environment with no lights and only full ambient.
 	LightEnvironmentClass lightEnv;
@@ -163,6 +166,18 @@ void W3DWaypointBuffer::drawPendingCommandSequence( RenderInfoClass &rinfo )
 			continue;
 
 		Int count = 0;
+
+		// TheSuperHackers @feature start each route at the subject unit's current position so
+		// the line from the unit to its FIRST waypoint is drawn too; the array has the +1
+		// slot reserved for exactly this point. Without it the preview reads as a chain
+		// floating in space: segment 1->2 is visible but unit->1 is missing.
+		Object *subject = ( TheGameLogic != nullptr ) ? TheGameLogic->findObjectByID( chainIt->first ) : nullptr;
+		if( subject != nullptr && !subject->isEffectivelyDead() )
+		{
+			const Coord3D *unitPos = subject->getPosition();
+			points[ count ].Set( unitPos->x, unitPos->y, unitPos->z );
+			count++;
+		}
 
 		for( CommandNode *node = pending->getPendingHead();
 				 node != nullptr && count < MAX_DISPLAY_NODES;
@@ -193,6 +208,62 @@ void W3DWaypointBuffer::drawPendingCommandSequence( RenderInfoClass &rinfo )
 			m_line->Set_Color( Vector3( 0.25f, 0.5f, 1.0f ) );
 			m_line->Set_Points( count, points );
 			m_line->Render( localRinfo );
+		}
+	}
+
+	// TheSuperHackers @feature (issue #122) draw the EXECUTING routes too: once a chain is
+	// committed it lives on the logic side, and the player (and their allies) should still
+	// see the remaining route of every unit that is working through one while Alt is held.
+	if( TheInGameUI->isInWaypointMode() &&
+			TheGameLogic != nullptr && TheGameClient != nullptr && TheCommandSequence != nullptr )
+	{
+		const Player *observer = rts::getObservedOrLocalPlayer();
+
+		for( Drawable *draw = TheGameClient->firstDrawable(); draw != nullptr; draw = draw->getNextDrawable() )
+		{
+			Object *obj = draw->getObject();
+			if( obj == nullptr || obj->isEffectivelyDead() )
+				continue;
+
+			// Same visibility rule as the queued-build ghosts: own orders always, allied ones too.
+			Player *controller = obj->getControllingPlayer();
+			if( controller != observer &&
+					( obj->getTeam() == nullptr || observer == nullptr ||
+						observer->getRelationship( obj->getTeam() ) != ALLIES ) )
+				continue;
+
+			CommandSequence *seq = TheCommandSequence->getSequence( obj->getID() );
+			if( seq == nullptr || seq->isPriorityTargetList() )
+				continue;
+
+			Int count = 0;
+			for( CommandNode *node = seq->getCurrentNode(); node != nullptr && count < MAX_DISPLAY_NODES; node = node->getNext() )
+			{
+				// skip an order whose target we are not allowed to see from here
+				if( node->getTargetID() != INVALID_ID )
+				{
+					Object *target = TheGameLogic->findObjectByID( node->getTargetID() );
+					Drawable *targetDraw = ( target != nullptr ) ? target->getDrawable() : nullptr;
+					if( targetDraw == nullptr || targetDraw->isDrawableEffectivelyHidden() ||
+							targetDraw->getFullyObscuredByShroud() )
+						continue;
+				}
+
+				const Coord3D *pos = node->getLocation();
+				m_waypointNodeRobj->Set_Position( Vector3( pos->x, pos->y, pos->z ) );
+				WW3D::Render( *m_waypointNodeRobj, localRinfo );
+				points[ count ].Set( pos->x, pos->y, pos->z );
+				count++;
+			}
+
+			if( count >= 2 )
+			{
+				// executed routes render in a distinct colour so they read differently
+				// from the route currently being plotted
+				m_line->Set_Color( Vector3( 0.9f, 0.6f, 0.1f ) );
+				m_line->Set_Points( count, points );
+				m_line->Render( localRinfo );
+			}
 		}
 	}
 }

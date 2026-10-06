@@ -3284,6 +3284,9 @@ void ScriptActions::doDisableInput()
 		TheInGameUI->deselectAllDrawables();
 		TheInGameUI->clearArmedMoveMode();
 		TheInGameUI->setWaypointMode( FALSE );
+		// TheSuperHackers @feature new waypoint system (issue #122): scripts can yank the player
+		// out of plotting mode at any moment; unconfirmed sequences are dropped, not broadcast.
+		TheInGameUI->discardPendingWaypointCommands();
 		TheControlBar->deleteBuildTooltipLayout();
 		TheLookAtTranslator->resetModes();
 	}
