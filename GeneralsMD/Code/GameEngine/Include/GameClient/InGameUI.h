@@ -786,7 +786,7 @@ public:  // ********************************************************************
 	Bool isInPreferSelectionMode() const { return m_preferSelection; }
 
 	void setClientQuiet( Bool enabled )  { m_clientQuiet = enabled; }
-	void setWaypointMode( Bool enabled )		{ m_waypointMode = enabled; if( !enabled ) m_waypointFocusUnit = INVALID_ID; }	///< leaving the mode never carries the single-unit focus over: orders go back to the whole selection
+	void setWaypointMode( Bool enabled )		{ m_waypointMode = enabled; if( enabled ) m_waypointBuildAssignment = 0; else m_waypointFocusUnit = INVALID_ID; }	///< entering the mode restarts the build round-robin; leaving never carries the single-unit focus over: orders go back to the whole selection
 	void setForceMoveMode( Bool enabled )		{ m_forceMoveToMode = enabled; }
 	void setForceAttackMode( Bool enabled )		{ m_forceAttackMode = enabled; }
 	void setPreferSelectionMode( Bool enabled )		{ m_preferSelection = enabled; }
@@ -1047,7 +1047,8 @@ protected:
 	// TheSuperHackers @feature new waypoint system (issue #122): the locally plotted command
 	// chain. Client side only -- see the accessors for why this is not the logic-side one.
 	ObjectID								m_waypointFocusUnit;	///< unit whose route is being plotted right now
-	std::map< ObjectID, CommandSequence * >	m_pendingSequences;	///< one plotted route per subject												
+	std::map< ObjectID, CommandSequence * >	m_pendingSequences;	///< one plotted route per subject
+	Int											m_waypointBuildAssignment;	///< round-robin cursor handing queued builds to the selected dozers in turn
 	IRegion2D										m_dragSelectRegion;														///< if isDragSelecting is TRUE, this contains select region
 	Bool												m_displayedMaxWarning;                        ///< keeps the warning from being shown over and over
 	MoveHintStruct							m_moveHint[ MAX_MOVE_HINTS ];

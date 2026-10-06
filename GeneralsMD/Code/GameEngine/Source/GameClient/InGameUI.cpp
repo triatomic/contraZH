@@ -1123,6 +1123,7 @@ InGameUI::InGameUI()
 	Int i;
 
 	m_waypointFocusUnit = INVALID_ID;
+	m_waypointBuildAssignment = 0;
 
 
   m_inputEnabled = true;
@@ -2904,6 +2905,61 @@ Bool InGameUI::appendPendingWaypointCommand( GameMessage::Type type, ObjectID ta
 	// player just should not have to press Tab N times to say "everyone go here".
 	if( m_waypointFocusUnit == INVALID_ID && selected != nullptr )
 	{
+		// TheSuperHackers @feature (issue #122) several dozers box-selected together share the
+		// queued builds round-robin instead of every one of them queuing every building (which
+		// only made the dozers arrive at the same sites and fight over them). Each placement
+		// goes to the selected builders in selection order, cycling back to the first when the
+		// row is used up; the cursor restarts with every plotting session. Every other order
+		// type keeps the plain group semantics below.
+		if( type == GameMessage::MSG_DOZER_CONSTRUCT )
+		{
+			std::vector< Object * > builders;
+
+			for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
+			{
+				Object *unit = ( *it != nullptr ) ? ( *it )->getObject() : nullptr;
+				if( unit == nullptr || !unit->isLocallyControlled() )
+					continue;
+
+				if( unit->isKindOf( KINDOF_DOZER ) )
+					builders.push_back( unit );
+			}
+
+			if( builders.empty() == FALSE )
+			{
+				Object *chosen = builders[ m_waypointBuildAssignment % (Int)builders.size() ];
+				++m_waypointBuildAssignment;
+
+				std::map< ObjectID, CommandSequence * >::iterator found = m_pendingSequences.find( chosen->getID() );
+				CommandSequence *unitSeq = nullptr;
+
+				if( found != m_pendingSequences.end() )
+				{
+					unitSeq = found->second;
+				}
+				else
+				{
+					if( (Int)m_pendingSequences.size() >= MAX_PLOTTED_SEQUENCES )
+						return FALSE;
+
+					unitSeq = new CommandSequence( chosen->getID() );
+					m_pendingSequences[ chosen->getID() ] = unitSeq;
+				}
+
+				if( unitSeq->appendPending( type, targetID, pos, param, angle ) )
+					return TRUE;
+
+				if( unitSeq->getPendingCount() == 0 )
+				{
+					// refused and still empty: do not leave a stray chain behind
+					m_pendingSequences.erase( chosen->getID() );
+					delete unitSeq;
+				}
+
+				return FALSE;
+			}
+		}
+
 		Int applied = 0;
 
 		for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
@@ -3165,6 +3221,66 @@ Bool InGameUI::hasPendingBuildOverlapping( const Coord3D *pos, Real angle, const
 		}
 	}
 
+	// TheSuperHackers @fix (issue #122) committed chains must block too. Once a plotting
+	// session ends, its build nodes leave the pending map above -- and until the dozer
+	// actually lays the foundation there is nothing in the world for the legality check to
+	// see, so a second dozer's placement used to sail straight over the first one's planned
+	// footprint. Walk every live sequence (own units only, matching the client-side pending
+	// map) and test its queued build nodes exactly the same way.
+	if( TheCommandSequence != nullptr )
+	{
+		const std::map< ObjectID, CommandSequence * > &live = TheCommandSequence->getAllSequences();
+
+		for( std::map< ObjectID, CommandSequence * >::const_iterator it = live.begin();
+				 it != live.end(); ++it )
+		{
+			CommandSequence *seq = it->second;
+			if( seq == nullptr || seq->isPriorityTargetList() )
+				continue;
+
+			Object *owner = ( TheGameLogic != nullptr ) ? TheGameLogic->findObjectByID( it->first ) : nullptr;
+			if( owner == nullptr || !owner->isLocallyControlled() )
+				continue;
+
+			for( Int pass = 0; pass < 2; ++pass )
+			{
+				// active chain first, then the tail the logic side has not merged yet
+				CommandNode *head = ( pass == 0 ) ? seq->getActiveHead() : seq->getPendingHead();
+
+				for( CommandNode *node = head; node != nullptr; node = node->getNext() )
+				{
+					// only queued builds occupy a future footprint; moves and attacks are free to
+					// cross. A build whose foundation already stands is caught by the legality
+					// check above, so testing it again here cannot change the verdict.
+					if( node->getCommandType() != GameMessage::MSG_DOZER_CONSTRUCT )
+						continue;
+
+					const ThingTemplate *plotted = TheThingFactory->findByTemplateID( node->getCommandParam() );
+					if( plotted == nullptr )
+						continue;
+
+					Real otherHalfW, otherHalfH;
+					const GeometryInfo &otherGeom = plotted->getTemplateGeometryInfo();
+					if( otherGeom.getGeomType() == GEOMETRY_BOX )
+					{
+						otherHalfW = otherGeom.getMajorRadius();
+						otherHalfH = otherGeom.getMinorRadius();
+					}
+					else
+					{
+						otherHalfW = otherHalfH = otherGeom.getBoundingCircleRadius();
+					}
+
+					if( waypointBuildFootprintsOverlap( *pos, angle, halfW, halfH,
+																							*node->getLocation(), node->getAngle(), otherHalfW, otherHalfH ) )
+					{
+						return TRUE;
+					}
+				}
+			}
+		}
+	}
+
 	return FALSE;
 }
 
@@ -3214,9 +3330,11 @@ void InGameUI::cycleWaypointFocusUnit()
 		return;
 	}
 
-	// The ring is: ALL -> unit 1 -> unit 2 -> ... -> unit N -> ALL. Starting at ALL means the
-	// first press picks the first unit, and pressing past the last one hands the orders back
-	// to the whole group, which is where an ordinary click expects to be.
+	// The ring is: ALL -> unit 1 -> unit 2 -> ... -> unit N -> unit 1 -> ... Starting at ALL
+	// means the first press picks the first unit. Cycling NEVER hands the orders back to the
+	// whole group mid-plot: while waypoint mode is up the player steers one unit at a time,
+	// past the last unit the ring wraps straight to the first again, and it is leaving the
+	// mode (or Alt+Shift) that returns the orders to everyone.
 	if( m_waypointFocusUnit == INVALID_ID )
 	{
 		for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
@@ -3233,15 +3351,19 @@ void InGameUI::cycleWaypointFocusUnit()
 		return;
 	}
 
-	// walk the selection, start after whatever is in focus now, wrap to ALL at the end
+	// walk the selection, start after whatever is in focus now, wrap to the FIRST unit
 	Bool passedCurrent = FALSE;
 	ObjectID nextAfterCurrent = INVALID_ID;
+	ObjectID firstControllable = INVALID_ID;
 
 	for( DrawableListCIt it = selected->begin(); it != selected->end(); ++it )
 	{
 		Object *obj = ( *it != nullptr ) ? ( *it )->getObject() : nullptr;
 		if( obj == nullptr || !obj->isLocallyControlled() )
 			continue;
+
+		if( firstControllable == INVALID_ID )
+			firstControllable = obj->getID();
 
 		if( passedCurrent && nextAfterCurrent == INVALID_ID )
 			nextAfterCurrent = obj->getID();
@@ -3250,7 +3372,9 @@ void InGameUI::cycleWaypointFocusUnit()
 			passedCurrent = TRUE;
 	}
 
-	m_waypointFocusUnit = nextAfterCurrent;	// INVALID means we came back round to ALL
+	// past the last unit the ring wraps to the first one; a focus unit that left the
+	// selection (died, deselected) restarts the ring from the front as well.
+	m_waypointFocusUnit = ( nextAfterCurrent != INVALID_ID ) ? nextAfterCurrent : firstControllable;
 }
 
 void InGameUI::reset()

@@ -215,6 +215,12 @@ public:
 
 	Int getSequenceCount() const;
 
+	/// Read-only iteration over every live sequence. The client's build-ghost overlap check
+	/// needs this: once a plotting session ends, its build nodes live here -- no longer in
+	/// the client's pending map, and with no foundation in the world yet for the legality
+	/// check to see -- so a second dozer's placement must still be tested against them.
+	const std::map< ObjectID, CommandSequence * > & getAllSequences( void ) const { return m_sequences; }
+
 	// --- command classification --------------------------------------------
 	static Bool isAllowedCommand( GameMessage::Type type );
 	static Bool isEndCommandType( GameMessage::Type type, Int param );
