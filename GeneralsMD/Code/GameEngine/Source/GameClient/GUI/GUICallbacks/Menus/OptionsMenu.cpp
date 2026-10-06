@@ -587,9 +587,15 @@ static void populateGameOptions()
 	updateGameOptionsEnables();
 }
 
+// The laser and bloom controls sit on the Shaders page, so its Back restores them too
 static void populateShaders()
 {
 	setComboPos( comboBoxShadows, levelIndex( ShadowMapResolutions, ARRAY_SIZE(ShadowMapResolutions), pref->getShadowMapResolution() ) );
+	setCheck( checkLaserRef, pref->getLaserRefEnabled() );
+	setCheck( checkBloom, pref->getBloomEnabled() );
+	setCheck( checkBloomDebug, pref->getBloomDebugEnabled() );
+	setEntryInt( textEntryBloomStrength, bloomPercent( pref->getBloomStrength() ) );
+	updateGameOptionsEnables();
 }
 
 static void setGameOptionsDefaults()

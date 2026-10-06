@@ -369,14 +369,14 @@ Soft glow around additive particles (fire, muzzle flashes, tracers, lasers, expl
 blended meshes such as building lights. Smoke and alpha blended effects do not glow. Needs no shader
 support.
 
-* `Bloom = No` - (Yes turns the glow on. Also `Glow around additive effects` in Game Options,
+* `Bloom = No` - (Yes turns the glow on. Also `Glow around additive effects` on the Shaders page,
 applied on Accept.)
-* `BloomStrength = 0.5` - (0 to 1. 0 is off. `Strength %` in Game Options.)
+* `BloomStrength = 0.5` - (0 to 1. 0 is off. `Strength %` on the Shaders page.)
 * `BloomDebug = No` - (Yes shows only the blurred glow buffer on black, to see what feeds it.
-`Debug view` in Game Options.)
+`Debug view` on the Shaders page.)
 
-Menu controls need `BloomGroupLabel`, `CheckBloom`, `TextEntryBloomStrength` and `CheckBloomDebug`
-in `OptionsMenu.wnd`.
+Menu controls need `CheckBloom`, `TextEntryBloomStrength` and `CheckBloomDebug` in `OptionsMenu.wnd`;
+`build/move_bloom_to_shaders_wnd.py` moves them onto the Shaders page.
 
 Notes:
 * Costs fill rate in proportion to on-screen additive particles.
@@ -438,7 +438,7 @@ colour (house coloured when the laser asks). Terrain only; units, buildings and 
 The Direct3D 9 build lights it with a shader instead, see
 [Laser ground glow](dx9feat.md#laser-ground-glow).
 
-* `LaserRef = No` - (Yes turns the glow on. Also `Lasers light the ground` in Game Options, applied
+* `LaserRef = No` - (Yes turns the glow on. Also `Lasers light the ground` on the Shaders page, applied
 on Accept. Needs `CheckLaserRef` in `OptionsMenu.wnd` for the menu control.)
 
 Colour and intensity come from `GameData.ini`, overridable per `W3DLaserDraw` module with
