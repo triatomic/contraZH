@@ -38,7 +38,6 @@
 #endif
 
 // SYSTEM INCLUDES ////////////////////////////////////////////////////////////
-#define WIN32_LEAN_AND_MEAN  // only bare bones windows stuff wanted
 #include <windows.h>
 #include <stdlib.h>
 #include <crtdbg.h>
