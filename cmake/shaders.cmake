@@ -67,6 +67,7 @@ set(RTS_SHADER_DIR "Core/GameEngineDevice/Source/W3DDevice/GameClient/Shaders")
 set(RTS_SHADER_INCLUDES
     "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/shadowreceive.hlsli"
     "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/pointlights.hlsli"
+    "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/skybox.hlsli"
     "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/groundnoise.hlsli"
     "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/heightblend.hlsli"
     "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/terrainglint.hlsli")

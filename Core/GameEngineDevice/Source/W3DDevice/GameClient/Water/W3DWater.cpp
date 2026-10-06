@@ -1192,22 +1192,7 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
 	}
 
-	// The skybox faces sit past the fixed-function stages, on samplers only a pixel shader reads.
-	for (Int face=0; face<SKYBOX_FACE_COUNT; face++)
-	{
-		TextureClass *texture = peekSkyboxFace(face);
-		if (texture != nullptr && !texture->Is_Initialized())
-		{
-			texture->Init();
-		}
-		const DWORD sampler = WATER_SKYBOX_SAMPLER + face;
-		device->SetTexture(sampler, (texture != nullptr) ? texture->Peek_D3D_Texture() : m_whiteTexture->Peek_D3D_Texture());
-		device->SetSamplerState(sampler, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
-		device->SetSamplerState(sampler, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
-		device->SetSamplerState(sampler, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
-		device->SetSamplerState(sampler, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
-		device->SetSamplerState(sampler, D3DSAMP_MIPFILTER, D3DTEXF_NONE);
-	}
+	bindSkyboxFaces();
 
 	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXCOORDINDEX, 0);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
@@ -1570,6 +1555,29 @@ TextureClass *WaterRenderObjClass::peekSkyboxFace(Int face)
 	TextureClass *texture = (material != nullptr && face < material->Texture_Count()) ? material->Peek_Texture(face) : nullptr;
 	REF_PTR_RELEASE(material);
 	return texture;
+}
+
+// The skybox faces sit past the fixed-function stages, on samplers only a pixel shader reads.
+void WaterRenderObjClass::bindSkyboxFaces()
+{
+#if defined(BUILD_WITH_D3D9)
+	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
+	for (Int face=0; face<SKYBOX_FACE_COUNT; face++)
+	{
+		TextureClass *texture = peekSkyboxFace(face);
+		if (texture != nullptr && !texture->Is_Initialized())
+		{
+			texture->Init();
+		}
+		const DWORD sampler = WATER_SKYBOX_SAMPLER + face;
+		device->SetTexture(sampler, (texture != nullptr) ? texture->Peek_D3D_Texture() : m_whiteTexture->Peek_D3D_Texture());
+		device->SetSamplerState(sampler, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
+		device->SetSamplerState(sampler, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
+		device->SetSamplerState(sampler, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+		device->SetSamplerState(sampler, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+		device->SetSamplerState(sampler, D3DSAMP_MIPFILTER, D3DTEXF_NONE);
+	}
+#endif
 }
 
 TextureClass *WaterRenderObjClass::findSwellTexture()
@@ -2124,19 +2132,6 @@ void WaterRenderObjClass::drawRadialWater(Real planeZ)
 #endif
 }
 
-#if defined(BUILD_WITH_D3D9) && RTS_ZEROHOUR
-// Mirrors a camera in the horizontal plane at planeZ, which leaves its basis left-handed.
-static Matrix3D Reflect_In_Water_Plane(const Matrix3D &transform, Real planeZ)
-{
-	Matrix3D reflected(transform);
-	reflected[2][0] = -transform[2][0];
-	reflected[2][1] = -transform[2][1];
-	reflected[2][2] = -transform[2][2];
-	reflected[2][3] = 2.0f * planeZ - transform[2][3];
-	return reflected;
-}
-#endif
-
 Bool WaterRenderObjClass::ensureReflectionTargets(UnsignedInt width, UnsignedInt height)
 {
 #if defined(BUILD_WITH_D3D9)
@@ -2270,6 +2265,79 @@ void WaterRenderObjClass::narrowReflectionCamera(CameraClass *mirror, CameraClas
 		Vector2(planeMin.X + right * planePerX, planeMax.Y - top * planePerY));
 }
 
+// The copy goes field by field, because the assignment operator leaves out the aspect ratio and depth range.
+void WaterRenderObjClass::reflectCamera(CameraClass *mirror, CameraClass *view, Real planeZ, Real clipZ)
+{
+#if defined(BUILD_WITH_D3D9) && RTS_ZEROHOUR
+	Vector2 rangeMin;
+	Vector2 rangeMax;
+	view->Get_View_Plane(rangeMin, rangeMax);
+	mirror->Set_View_Plane(rangeMin, rangeMax);
+	view->Get_Viewport(rangeMin, rangeMax);
+	mirror->Set_Viewport(rangeMin, rangeMax);
+	float zNear;
+	float zFar;
+	view->Get_Clip_Planes(zNear, zFar);
+	mirror->Set_Clip_Planes(zNear, zFar);
+	view->Get_Zbuffer_Range(zNear, zFar);
+	mirror->Set_Zbuffer_Range(zNear, zFar);
+	mirror->Set_Projection_Type(view->Get_Projection_Type());
+
+	// The reflection leaves the camera's basis left-handed.
+	Matrix3D reflected(view->Get_Transform());
+	reflected[2][0] = -reflected[2][0];
+	reflected[2][1] = -reflected[2][1];
+	reflected[2][2] = -reflected[2][2];
+	reflected[2][3] = 2.0f * planeZ - reflected[2][3];
+	mirror->Set_Transform(reflected);
+	mirror->Set_Oblique_Clip_Plane(PlaneClass(Vector3(0.0f, 0.0f, 1.0f), clipZ));
+#else
+	(void)mirror;
+	(void)view;
+	(void)planeZ;
+	(void)clipZ;
+#endif
+}
+
+void WaterRenderObjClass::renderMirroredScene(RTS3DScene *scene, CameraClass *mirror, CameraClass *view, Real planeZ, UnsignedInt width, UnsignedInt height)
+{
+#if defined(BUILD_WITH_D3D9) && RTS_ZEROHOUR
+	// Drawables outside the view region kept last frame's transforms, so they stay out of the mirror.
+	Region3D region;
+	((W3DView *)TheTacticalView)->getAxisAlignedViewRegion(region);
+
+	const CustomScenePassModes passMode = scene->getCustomPassMode();
+	const SceneClass::ExtraPassPolyRenderType extraPassMode = scene->Get_Extra_Pass_Polygon_Mode();
+	const bool bloomCapture = DX8MeshRendererClass::Is_Bloom_Capture_Enabled();
+	scene->setCustomPassMode(SCENE_PASS_DEFAULT);
+	scene->Set_Extra_Pass_Polygon_Mode(SceneClass::EXTRA_PASS_DISABLE);
+	scene->setPlanarMirrorPass(TRUE, planeZ, region);
+	DX8MeshRendererClass::Enable_Bloom_Capture(false);
+
+	ShaderClass::Invert_Backface_Culling(true);
+	WW3D::Render(scene, mirror);
+	ShaderClass::Invert_Backface_Culling(false);
+
+	drawReflectionCoverage(width, height);
+
+	DX8MeshRendererClass::Enable_Bloom_Capture(bloomCapture);
+	scene->setPlanarMirrorPass(FALSE, planeZ, region);
+	scene->Set_Extra_Pass_Polygon_Mode(extraPassMode);
+	scene->setCustomPassMode(passMode);
+
+	DX8Wrapper::Set_Render_Target((IDirect3DSurface8 *)nullptr);
+	DX8Wrapper::Invalidate_Cached_Render_States();
+	view->Apply();
+#else
+	(void)scene;
+	(void)mirror;
+	(void)view;
+	(void)planeZ;
+	(void)width;
+	(void)height;
+#endif
+}
+
 // Sets alpha to 1 where the mirror drew anything and to 0 over the empty sky, whatever alpha the scene wrote.
 void WaterRenderObjClass::drawReflectionCoverage(UnsignedInt width, UnsignedInt height)
 {
@@ -2362,24 +2430,8 @@ void WaterRenderObjClass::renderPlanarReflection(CameraClass *cam)
 		m_reflectionCamera = NEW_REF(CameraClass, ());
 	}
 
-	// The copy goes field by field, because the assignment operator leaves out the aspect ratio and depth range.
-	Vector2 rangeMin;
-	Vector2 rangeMax;
-	cam->Get_View_Plane(rangeMin, rangeMax);
-	m_reflectionCamera->Set_View_Plane(rangeMin, rangeMax);
-	cam->Get_Viewport(rangeMin, rangeMax);
-	m_reflectionCamera->Set_Viewport(rangeMin, rangeMax);
-	float zNear;
-	float zFar;
-	cam->Get_Clip_Planes(zNear, zFar);
-	m_reflectionCamera->Set_Clip_Planes(zNear, zFar);
-	cam->Get_Zbuffer_Range(zNear, zFar);
-	m_reflectionCamera->Set_Zbuffer_Range(zNear, zFar);
-	m_reflectionCamera->Set_Projection_Type(cam->Get_Projection_Type());
-	m_reflectionCamera->Set_Transform(Reflect_In_Water_Plane(transform, planeZ));
-
 	// Half a unit under the plane keeps shores and hulls whole where they meet the water.
-	m_reflectionCamera->Set_Oblique_Clip_Plane(PlaneClass(Vector3(0.0f, 0.0f, 1.0f), planeZ - 0.5f));
+	reflectCamera(m_reflectionCamera, cam, planeZ, planeZ - 0.5f);
 
 	device->SetTexture(WATER_REFLECTION_SAMPLER, nullptr);
 	DX8Wrapper::Set_Render_Target(surface, m_reflectionDepth);
@@ -2405,33 +2457,7 @@ void WaterRenderObjClass::renderPlanarReflection(CameraClass *cam)
 	}
 	++passCount;
 
-	// Drawables outside the view region kept last frame's transforms, so they stay out of the mirror.
-	Region3D region;
-	((W3DView *)TheTacticalView)->getAxisAlignedViewRegion(region);
-
-	RTS3DScene *scene = (RTS3DScene *)m_parentScene;
-	const CustomScenePassModes passMode = scene->getCustomPassMode();
-	const SceneClass::ExtraPassPolyRenderType extraPassMode = scene->Get_Extra_Pass_Polygon_Mode();
-	const bool bloomCapture = DX8MeshRendererClass::Is_Bloom_Capture_Enabled();
-	scene->setCustomPassMode(SCENE_PASS_DEFAULT);
-	scene->Set_Extra_Pass_Polygon_Mode(SceneClass::EXTRA_PASS_DISABLE);
-	scene->setPlanarMirrorPass(TRUE, planeZ, region);
-	DX8MeshRendererClass::Enable_Bloom_Capture(false);
-
-	ShaderClass::Invert_Backface_Culling(true);
-	WW3D::Render(m_parentScene, m_reflectionCamera);
-	ShaderClass::Invert_Backface_Culling(false);
-
-	drawReflectionCoverage(width, height);
-
-	DX8MeshRendererClass::Enable_Bloom_Capture(bloomCapture);
-	scene->setPlanarMirrorPass(FALSE, planeZ, region);
-	scene->Set_Extra_Pass_Polygon_Mode(extraPassMode);
-	scene->setCustomPassMode(passMode);
-
-	DX8Wrapper::Set_Render_Target((IDirect3DSurface8 *)nullptr);
-	DX8Wrapper::Invalidate_Cached_Render_States();
-	cam->Apply();
+	renderMirroredScene((RTS3DScene *)m_parentScene, m_reflectionCamera, cam, planeZ, width, height);
 
 	m_reflectionSource = cam;
 	m_reflectionFrame = WW3D::Get_Frame_Count();

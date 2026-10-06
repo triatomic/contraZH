@@ -43,10 +43,9 @@ public:
 	/// Mirrors the scene in the planes of the mirrors the last frame showed, before the views draw.
 	void renderReflections(CameraClass *camera);
 
-	/// Brackets the main scene's draws after its shadow map, the only ones that shade mirrors.
+	/// Starts the main scene's draws after its shadow map, the only ones that shade mirrors.
 	void beginScenePass(Bool fresh = TRUE);
-	void endScenePass();
-	/// Holds the shading off for a draw inside the main scene, and says whether to begin again without a fresh start.
+	/// Stops the shading at the scene's end, or for a draw inside it, and says whether to begin again without a fresh start.
 	Bool suspendScenePass();
 
 	/// The pass that lays a mirror's reflection over its opaque mesh, or null. Notes where every mirror the scene draws lies.
@@ -81,12 +80,12 @@ private:
 	Bool loadShaders();
 	void noteSighting(MeshClass *mesh);
 	Bool ensureTargets(UnsignedInt width, UnsignedInt height);
+	void releaseTargets();
 	Bool takeSceneCopy();
 	TextureClass *findFrostTexture();
 	void renderPlane(CameraClass *camera, Int plane, const Sighting &sighting, UnsignedInt width, UnsignedInt height);
 	void bindShading(const PlanarMirrorShaderTuning *own, DWORD shader, Bool refract, Bool flag);
 	void bindNormalMap(TextureClass *texture);
-	void setMirrorFlag(Bool flag);
 	void unbindShading(Bool refract);
 
 	std::vector<Sighting> m_sightings;	///< what this frame's main scene drew, for the next frame's planes

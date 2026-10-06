@@ -49,6 +49,7 @@
 #define CV_PATCH_SCALE_OFFSET 10
 
 class PolygonTrigger;
+class RTS3DScene;
 class WorldHeightMap;
 class WaterTracksRenderSystem;
 class Xfer;
@@ -139,13 +140,18 @@ public:
 	/// The hex cells as getSeabedMask gives them, for painted stochastic terrain, which keeps its cells with the water's tiling off.
 	static Vector4 getStochasticHex();
 	void renderPlanarReflection(CameraClass *cam);	///< mirrors the scene in the water under the view, before the views draw
-	static void drawReflectionCoverage(UnsignedInt width, UnsignedInt height);	///< also serves the planar mirrors' targets
+	static void drawReflectionCoverage(UnsignedInt width, UnsignedInt height);
+	/// Sets mirror up as the view's reflection in the horizontal plane at planeZ, clipped below clipZ.
+	static void reflectCamera(CameraClass *mirror, CameraClass *view, Real planeZ, Real clipZ);
+	/// Draws the scene through mirror into the bound target as a planar mirror pass, then unbinds it and applies view again.
+	static void renderMirroredScene(RTS3DScene *scene, CameraClass *mirror, CameraClass *view, Real planeZ, UnsignedInt width, UnsignedInt height);
 	/// Narrows a mirror camera, set up as a copy of the view's, to the part of the view between lo and hi, 0 to 1 across it
 	/// with v down. Every pixel keeps its place in the target, so only the frustum and the drawn area shrink.
 	static void narrowReflectionCamera(CameraClass *mirror, CameraClass *view, const Vector2 &lo, const Vector2 &hi);
 	/// Widens lo and hi, 0 to 1 across the view with v down, to take in a world point. False where it lies behind the camera.
 	static Bool widenReadRect(CameraClass *camera, const Vector3 &point, Vector2 &lo, Vector2 &hi);
 	TextureClass *peekSkyboxFace(Int face);	///< north, east, south, west or top, or null without a skybox
+	void bindSkyboxFaces();	///< binds the faces to the samplers from 8 on, white where there is no skybox
 
 protected:
 	DX8IndexBufferClass			*m_indexBuffer;	///<indices defining quad

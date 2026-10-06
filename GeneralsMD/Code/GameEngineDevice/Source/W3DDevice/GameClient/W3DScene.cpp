@@ -1143,7 +1143,7 @@ void RTS3DScene::Flush(RenderInfoClass & rinfo)
 
 	if (TheW3DPlanarMirrors != nullptr)
 	{
-		TheW3DPlanarMirrors->endScenePass();
+		TheW3DPlanarMirrors->suspendScenePass();
 	}
 }
 

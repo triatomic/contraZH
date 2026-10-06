@@ -27,8 +27,6 @@
 #include "W3DDevice/GameClient/W3DWater.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
 #include "W3DDevice/GameClient/W3DScene.h"
-#include "W3DDevice/GameClient/W3DCustomScene.h"
-#include "W3DDevice/GameClient/W3DView.h"
 #include "W3DDevice/GameClient/W3DNoiseTexture.h"
 #include "Common/GlobalData.h"
 #include "Common/Debug.h"
@@ -46,7 +44,6 @@
 #include "WW3D2/surfaceclass.h"
 #include "WW3D2/ww3d.h"
 #include "WWMath/aabox.h"
-#include "WWMath/plane.h"
 
 W3DPlanarMirrorManager *TheW3DPlanarMirrors = nullptr;
 
@@ -75,8 +72,6 @@ static const Real NO_PLANE = -1.0e6f;
 static const Int NORMAL_STAGE = 3;
 static const Int MIRROR_STAGE = 4;
 static const Int SCENE_STAGE = 6;
-static const DWORD SKYBOX_SAMPLER = 8;
-static const Int SKYBOX_FACES = 5;
 static const DWORD FROST_SAMPLER = 13;
 
 // Vogel spirals for the frost blur, two taps a register, as planarmirror.hlsl reads them from c13 and c16.
@@ -131,19 +126,6 @@ static Bool Draws_With_Alpha(const ShaderClass &shader)
 	return shader.Get_Alpha_Test() == ShaderClass::ALPHATEST_ENABLE || shader.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_SRC_ALPHA;
 }
 
-#if defined(BUILD_WITH_D3D9) && RTS_ZEROHOUR
-// Mirrors a camera in the horizontal plane at planeZ, which leaves its basis left-handed.
-static Matrix3D Reflect_In_Plane(const Matrix3D &transform, Real planeZ)
-{
-	Matrix3D reflected(transform);
-	reflected[2][0] = -transform[2][0];
-	reflected[2][1] = -transform[2][1];
-	reflected[2][2] = -transform[2][2];
-	reflected[2][3] = 2.0f * planeZ - transform[2][3];
-	return reflected;
-}
-#endif
-
 static void Set_Camera_Space_Texcoord(Int stage, DWORD source)
 {
 	D3DMATRIX identity;
@@ -190,10 +172,7 @@ W3DPlanarMirrorManager::W3DPlanarMirrorManager()
 
 W3DPlanarMirrorManager::~W3DPlanarMirrorManager()
 {
-	if (MeshClass::Mirror_Pass_Hook == Take_Mirror_Pass)
-	{
-		MeshClass::Mirror_Pass_Hook = nullptr;
-	}
+	MeshClass::Mirror_Pass_Hook = nullptr;
 	ReleaseResources();
 
 	for (std::map<const PlanarMirrorShaderTuning *, MaterialPassClass *>::iterator it = m_passes.begin(); it != m_passes.end(); ++it)
@@ -217,11 +196,7 @@ void W3DPlanarMirrorManager::ReleaseResources()
 	m_overlayShader = 0;
 	m_refractShader = 0;
 	m_glassShader = 0;
-	for (Int i = 0; i < MAX_PLANES; i++)
-	{
-		SAFE_RELEASE(m_mirrors[i]);
-	}
-	SAFE_RELEASE(m_depth);
+	releaseTargets();
 	SAFE_RELEASE(m_sceneCopy);
 	REF_PTR_RELEASE(m_frost);
 	m_planeCount = 0;
@@ -316,11 +291,6 @@ void W3DPlanarMirrorManager::beginScenePass(Bool fresh)
 	{
 		m_sceneCopied = FALSE;
 	}
-}
-
-void W3DPlanarMirrorManager::endScenePass()
-{
-	m_sceneArmed = FALSE;
 }
 
 Bool W3DPlanarMirrorManager::suspendScenePass()
@@ -421,11 +391,7 @@ Bool W3DPlanarMirrorManager::ensureTargets(UnsignedInt width, UnsignedInt height
 		{
 			return TRUE;
 		}
-		for (Int i = 0; i < MAX_PLANES; i++)
-		{
-			SAFE_RELEASE(m_mirrors[i]);
-		}
-		SAFE_RELEASE(m_depth);
+		releaseTargets();
 	}
 
 	// The planes share one depth buffer, kept clear of multisampling.
@@ -443,11 +409,7 @@ Bool W3DPlanarMirrorManager::ensureTargets(UnsignedInt width, UnsignedInt height
 	}
 	if (m_mirrors[0] == nullptr || m_mirrors[1] == nullptr || m_depth == nullptr)
 	{
-		for (Int i = 0; i < MAX_PLANES; i++)
-		{
-			SAFE_RELEASE(m_mirrors[i]);
-		}
-		SAFE_RELEASE(m_depth);
+		releaseTargets();
 		return FALSE;
 	}
 	return TRUE;
@@ -456,6 +418,15 @@ Bool W3DPlanarMirrorManager::ensureTargets(UnsignedInt width, UnsignedInt height
 	(void)height;
 	return FALSE;
 #endif
+}
+
+void W3DPlanarMirrorManager::releaseTargets()
+{
+	for (Int i = 0; i < MAX_PLANES; i++)
+	{
+		SAFE_RELEASE(m_mirrors[i]);
+	}
+	SAFE_RELEASE(m_depth);
 }
 
 void W3DPlanarMirrorManager::renderReflections(CameraClass *camera)
@@ -573,22 +544,7 @@ void W3DPlanarMirrorManager::renderPlane(CameraClass *camera, Int plane, const S
 		return;
 	}
 
-	// The copy goes field by field, because the assignment operator leaves out the aspect ratio and depth range.
-	Vector2 viewMin;
-	Vector2 viewMax;
-	camera->Get_View_Plane(viewMin, viewMax);
-	m_camera->Set_View_Plane(viewMin, viewMax);
-	camera->Get_Viewport(viewMin, viewMax);
-	m_camera->Set_Viewport(viewMin, viewMax);
-	float zNear;
-	float zFar;
-	camera->Get_Clip_Planes(zNear, zFar);
-	m_camera->Set_Clip_Planes(zNear, zFar);
-	camera->Get_Zbuffer_Range(zNear, zFar);
-	m_camera->Set_Zbuffer_Range(zNear, zFar);
-	m_camera->Set_Projection_Type(camera->Get_Projection_Type());
-	m_camera->Set_Transform(Reflect_In_Plane(camera->Get_Transform(), sighting.z));
-	m_camera->Set_Oblique_Clip_Plane(PlaneClass(Vector3(0.0f, 0.0f, 1.0f), sighting.z + CLIP_LIFT));
+	WaterRenderObjClass::reflectCamera(m_camera, camera, sighting.z, sighting.z + CLIP_LIFT);
 
 	// Only the mirrors' patch of the view reads the target, so the scene draws there alone, and culls to it.
 	Bool bounded = TRUE;
@@ -615,33 +571,7 @@ void W3DPlanarMirrorManager::renderPlane(CameraClass *camera, Int plane, const S
 		WaterRenderObjClass::narrowReflectionCamera(m_camera, camera, readMin, readMax);
 	}
 
-	// Drawables outside the view region kept last frame's transforms, so they stay out of the mirror.
-	Region3D region;
-	((W3DView *)TheTacticalView)->getAxisAlignedViewRegion(region);
-
-	RTS3DScene *scene = W3DDisplay::m_3DScene;
-	const CustomScenePassModes passMode = scene->getCustomPassMode();
-	const SceneClass::ExtraPassPolyRenderType extraPassMode = scene->Get_Extra_Pass_Polygon_Mode();
-	const bool bloomCapture = DX8MeshRendererClass::Is_Bloom_Capture_Enabled();
-	scene->setCustomPassMode(SCENE_PASS_DEFAULT);
-	scene->Set_Extra_Pass_Polygon_Mode(SceneClass::EXTRA_PASS_DISABLE);
-	scene->setPlanarMirrorPass(TRUE, sighting.z, region);
-	DX8MeshRendererClass::Enable_Bloom_Capture(false);
-
-	ShaderClass::Invert_Backface_Culling(true);
-	WW3D::Render(scene, m_camera);
-	ShaderClass::Invert_Backface_Culling(false);
-
-	WaterRenderObjClass::drawReflectionCoverage(width, height);
-
-	DX8MeshRendererClass::Enable_Bloom_Capture(bloomCapture);
-	scene->setPlanarMirrorPass(FALSE, sighting.z, region);
-	scene->Set_Extra_Pass_Polygon_Mode(extraPassMode);
-	scene->setCustomPassMode(passMode);
-
-	DX8Wrapper::Set_Render_Target((IDirect3DSurface8 *)nullptr);
-	DX8Wrapper::Invalidate_Cached_Render_States();
-	camera->Apply();
+	WaterRenderObjClass::renderMirroredScene(W3DDisplay::m_3DScene, m_camera, camera, sighting.z, width, height);
 
 	m_planeZ[plane] = sighting.z;
 #else
@@ -758,22 +688,8 @@ void W3DPlanarMirrorManager::bindShading(const PlanarMirrorShaderTuning *own, DW
 		Set_Clamped_Linear(SCENE_STAGE);
 	}
 
-	// The skybox faces sit past the fixed-function stages, on samplers only a pixel shader reads.
-	for (Int face = 0; face < SKYBOX_FACES; face++)
-	{
-		TextureClass *texture = (TheWaterRenderObj != nullptr) ? TheWaterRenderObj->peekSkyboxFace(face) : nullptr;
-		if (texture != nullptr && !texture->Is_Initialized())
-		{
-			texture->Init();
-		}
-		const DWORD sampler = SKYBOX_SAMPLER + face;
-		device->SetTexture(sampler, (texture != nullptr) ? texture->Peek_D3D_Texture() : white);
-		device->SetSamplerState(sampler, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
-		device->SetSamplerState(sampler, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
-		device->SetSamplerState(sampler, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
-		device->SetSamplerState(sampler, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
-		device->SetSamplerState(sampler, D3DSAMP_MIPFILTER, D3DTEXF_NONE);
-	}
+	// The water object comes up with the mirrors, and planarmirror.hlsl reads the skybox on its samplers.
+	TheWaterRenderObj->bindSkyboxFaces();
 
 	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXCOORDINDEX, 0);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
@@ -809,12 +725,6 @@ void W3DPlanarMirrorManager::bindNormalMap(TextureClass *texture)
 	TextureClass *normalMap = (texture != nullptr) ? W3DShaderManager::findNormalMap(texture) : nullptr;
 	DX8Wrapper::Set_Texture(NORMAL_STAGE, (normalMap != nullptr) ? normalMap : m_white);
 	m_mirrorParams.Z = (normalMap != nullptr) ? m_tuning.distortion : 0.0f;
-	DX8Wrapper::Set_Pixel_Shader_Constant(8, &m_mirrorParams, 1);
-}
-
-void W3DPlanarMirrorManager::setMirrorFlag(Bool flag)
-{
-	m_mirrorParams.W = flag ? 1.0f : 0.0f;
 	DX8Wrapper::Set_Pixel_Shader_Constant(8, &m_mirrorParams, 1);
 }
 
@@ -871,10 +781,10 @@ void W3DPlanarMirrorManager::beginOverlay(const PlanarMirrorShaderTuning *own, B
 void W3DPlanarMirrorManager::setOverlayTexture(TextureClass *texture, const ShaderClass &shader)
 {
 	DX8Wrapper::Set_Texture(0, texture);
+	m_mirrorParams.W = (m_overlayGlass && Draws_With_Alpha(shader)) ? 1.0f : 0.0f;
 	bindNormalMap(texture);
 	if (m_overlayGlass)
 	{
-		setMirrorFlag(Draws_With_Alpha(shader));
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_CULLMODE, (shader.Get_Cull_Mode() == ShaderClass::CULL_MODE_ENABLE) ? D3DCULL_CW : D3DCULL_NONE);
 
 		// An alpha-tested mesh keeps its hard outline as ShaderClass draws it, and its cut-away texels write no depth.

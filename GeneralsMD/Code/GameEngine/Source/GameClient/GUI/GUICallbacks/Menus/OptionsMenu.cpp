@@ -181,7 +181,6 @@ static GameWindow *   ButtonGameOptionsCancel     = nullptr;
 //Shaders Screen
 static GameWindow *   WinShaders                  = nullptr;
 static NameKeyType    ButtonShadersID             = NAMEKEY_INVALID;
-static GameWindow *   ButtonShaders               = nullptr;
 static NameKeyType    ButtonShadersAcceptID       = NAMEKEY_INVALID;
 static NameKeyType    ButtonShadersCancelID       = NAMEKEY_INVALID;
 static GameWindow *   comboBoxShadows             = nullptr;
@@ -1515,20 +1514,12 @@ static Bool isPanelOpen( GameWindow *panel )
 	return panel && !panel->winIsHidden();
 }
 
-static void cancelGameOptions()
+static void cancelPanel( GameWindow *panel, void (*populate)() )
 {
 	ignoreSelected = TRUE;
-	populateGameOptions();
+	populate();
 	ignoreSelected = FALSE;
-	hidePanel( WinGameOptions );
-}
-
-static void cancelShaders()
-{
-	ignoreSelected = TRUE;
-	populateShaders();
-	ignoreSelected = FALSE;
-	hidePanel( WinShaders );
+	hidePanel( panel );
 }
 
 static GameWindow *findOptionsWindow( const char *name )
@@ -1754,13 +1745,9 @@ static void initGameOptionsWindows()
 static void initShadersWindows()
 {
 	WinShaders = findOptionsWindow( "OptionsMenu.wnd:WinShaders" );
-	ButtonShaders = findOptionsWindow( "OptionsMenu.wnd:ButtonShaders", ButtonShadersID );
+	GameWindow *button = findOptionsWindow( "OptionsMenu.wnd:ButtonShaders", ButtonShadersID );
 	if (!WinShaders)
 	{
-		if (ButtonShaders)
-		{
-			ButtonShaders->winHide( TRUE );
-		}
 		return;
 	}
 
@@ -1769,10 +1756,10 @@ static void initShadersWindows()
 	comboBoxShadows = findOptionsWindow( "OptionsMenu.wnd:ComboBoxShadows" );
 
 	// The layout hides the button, so an exe without this panel never shows it.
-	if (ButtonShaders)
+	if (button)
 	{
-		GadgetButtonSetText( ButtonShaders, TheGameText->FETCH_OR_SUBSTITUTE( "GUI:Shaders", L"Shaders" ) );
-		ButtonShaders->winHide( FALSE );
+		GadgetButtonSetText( button, TheGameText->FETCH_OR_SUBSTITUTE( "GUI:Shaders", L"Shaders" ) );
+		button->winHide( FALSE );
 	}
 	setLabelText( "OptionsMenu.wnd:ShadersTitle", "GUI:Shaders", L"Shaders" );
 	setLabelText( "OptionsMenu.wnd:ShadowsLabel", "GUI:ShadowMapResolution", L"Shadows" );
@@ -1781,8 +1768,6 @@ static void initShadersWindows()
 	static const WideChar *const shadowMapNames[] = { L"512 x 512", L"1024 x 1024", L"2048 x 2048", L"4096 x 4096" };
 	static_assert( ARRAY_SIZE(shadowMapNames) == ARRAY_SIZE(ShadowMapResolutions), "shadowMapNames out of date" );
 	addComboEntries( comboBoxShadows, "GUI:ShadowMapResolution", shadowMapNames, ARRAY_SIZE(ShadowMapResolutions), 3 );
-
-	WinShaders->winHide( TRUE );
 }
 
 // TheSuperHackers @tweak Now prints additional version information in the version label.
@@ -2400,12 +2385,12 @@ WindowMsgHandledType OptionsMenuInput( GameWindow *window, UnsignedInt msg,
 					{
 						if (isPanelOpen( WinGameOptions ))
 						{
-							cancelGameOptions();
+							cancelPanel( WinGameOptions, populateGameOptions );
 							return MSG_HANDLED;
 						}
 						if (isPanelOpen( WinShaders ))
 						{
-							cancelShaders();
+							cancelPanel( WinShaders, populateShaders );
 							return MSG_HANDLED;
 						}
 
@@ -2578,7 +2563,7 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 			}
 			else if (controlID == ButtonGameOptionsCancelID )
 			{
-				cancelGameOptions();
+				cancelPanel( WinGameOptions, populateGameOptions );
 			}
 			else if (controlID == ButtonShadersID )
 			{
@@ -2590,7 +2575,7 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 			}
 			else if (controlID == ButtonShadersCancelID )
 			{
-				cancelShaders();
+				cancelPanel( WinShaders, populateShaders );
 			}
 			else if (controlID == checkGridHotkeysID || controlID == checkKeyboardOverlayBackdropID || controlID == checkBloomID ||
 				controlID == checkDynamicLightsID || controlID == checkCloudShadowsID )

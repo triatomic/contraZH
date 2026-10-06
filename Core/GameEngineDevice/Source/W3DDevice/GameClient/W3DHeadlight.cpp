@@ -271,6 +271,7 @@ struct ConeFit
 {
 	Vector3 start;	///< the middle of the narrow end, where the lamp is
 	Vector3 end;		///< the middle of the wide end
+	Vector3 aim;		///< the unit direction from start to end
 	Real radius;		///< the farthest a vertex lies from the line between them
 	Bool narrow;		///< one end is clearly narrower than the other
 };
@@ -363,18 +364,18 @@ static Bool Fit_Cone(const std::vector<Vector3> &points, ConeFit &fit)
 	fit.start = (lampLow ? lowSum : highSum) / (Real)(lampLow ? lowCount : highCount);
 	fit.end = (lampLow ? highSum : lowSum) / (Real)(lampLow ? highCount : lowCount);
 
-	Vector3 aim = fit.end - fit.start;
-	const Real length = aim.Length();
+	fit.aim = fit.end - fit.start;
+	const Real length = fit.aim.Length();
 	if (length < 0.0001f)
 	{
 		return FALSE;
 	}
-	aim /= length;
+	fit.aim /= length;
 	fit.radius = 0.0f;
 	for (size_t i = 0; i < points.size(); i++)
 	{
 		const Vector3 offset = points[i] - fit.start;
-		fit.radius = max(fit.radius, (offset - aim * Vector3::Dot_Product(offset, aim)).Length());
+		fit.radius = max(fit.radius, (offset - fit.aim * Vector3::Dot_Product(offset, fit.aim)).Length());
 	}
 	return TRUE;
 }
@@ -392,15 +393,12 @@ static Int Find_Cone_Beams(MeshModelClass &model, Int partCount, const std::vect
 	}
 
 	std::vector<ConeFit> fits(partCount);
-	std::vector<Vector3> aims(partCount);
 	for (Int i = 0; i < partCount; i++)
 	{
 		if (!Fit_Cone(partPoints[i], fits[i]))
 		{
 			return 0;
 		}
-		aims[i] = fits[i].end - fits[i].start;
-		aims[i].Normalize();
 	}
 
 	std::vector<Int> lampOfPart(partCount);
@@ -412,7 +410,7 @@ static Int Find_Cone_Beams(MeshModelClass &model, Int partCount, const std::vect
 		{
 			// Cones aiming the same way with lamps within a radius of each other overlap along most of their length.
 			const Real reach = max(fits[i].radius, fits[j].radius);
-			if ((fits[i].start - fits[j].start).Length() < reach && Vector3::Dot_Product(aims[i], aims[j]) > SAME_AIM)
+			if ((fits[i].start - fits[j].start).Length() < reach && Vector3::Dot_Product(fits[i].aim, fits[j].aim) > SAME_AIM)
 			{
 				lampOfPart[i] = lampOfPart[j];
 			}
@@ -509,7 +507,7 @@ Int W3DHeadlightManager::findBeams(RenderObjClass &mesh, const Vector3 &modelMid
 		parts.push_back(whole);
 	}
 
-	if (TheGlobalData->m_headlightTuning.perConeAim && model != nullptr && !partOfVertex.empty())
+	if (TheGlobalData->m_headlightTuning.perConeAim && !partOfVertex.empty())
 	{
 		const Int count = Find_Cone_Beams(*model, (Int)parts.size(), partOfVertex, beams, maxBeams);
 		if (count > 0)
