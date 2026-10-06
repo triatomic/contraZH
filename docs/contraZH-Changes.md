@@ -140,6 +140,14 @@ stayed inside them.
 
 Changes the simulation; affects replays.
 
+## Alt-tab no longer leaves waypoint mode on
+
+Alt-tabbing out hides the alt release from the game, so you came back in waypoint mode and every
+click queued another point. Losing or regaining focus now clears every held-key mode (waypoint,
+force attack, prefer selection, keypad camera).
+
+Only changes input.
+
 # Game Setup
 
 ## Random army per faction
