@@ -1081,10 +1081,41 @@ Also determines whether objects are blocked, and if so, if they are stuck.  jba.
 //-------------------------------------------------------------------------------------------------
 void MissileAIUpdate::airborneTargetGone()
 {
-	// I would really love it if this could retarget, but all of the targeting and legality is done
-	// by the Weapon that fired me.  The safest thing for me to do in this state is to just run out of gas.
-	m_fuelExpirationDate = TheGameLogic->getFrame();
-	switchToState(KILL_SELF);
+	const MissileAIUpdateModuleData* d = getMissileAIUpdateModuleData();
+
+	Bool targetLost = d->m_isTorpedo ? (m_isTrackingTarget && getGoalPosition() == nullptr)
+																		: (m_isTrackingTarget && getGoalObject() == nullptr);
+
+	if (!targetLost)
+	{
+		// The target is still tracked, but we ran out of fuel in the KILL state.
+		// I would really love it if this could retarget, but all of the targeting and legality is done
+		// by the Weapon that fired me.  The safest thing for me to do in this state is to just run out of gas.
+		m_fuelExpirationDate = TheGameLogic->getFrame();
+		switchToState(KILL_SELF);
+		return;
+	}
+
+	// The target is gone (most likely died). Instead of vanishing mid-air, keep flying to the
+	// original target position recorded at launch and detonate there. The existing fuel mechanics
+	// provide the natural endpoint: while out of fuel we simply coast and blow up on whatever we hit.
+	// We only redirect the move once; clearing m_victimID (meaningless now that the target is gone)
+	// marks that the redirect has been issued, so we do not re-issue the move command every frame.
+	if (m_victimID != INVALID_ID)
+	{
+		Coord3D targetPos = m_originalTargetPos;
+		Locomotor* curLoco = getCurLocomotor();
+		if (d->m_isTorpedo && curLoco)
+			targetPos.z = getTorpedoTargetHeight(targetPos, curLoco);
+		aiMoveToPosition(&targetPos, CMD_FROM_AI);
+		m_victimID = INVALID_ID;
+	}
+
+	// We finished the move to the original target position -> blow up there.
+	if (isIdle())
+	{
+		detonate();
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
