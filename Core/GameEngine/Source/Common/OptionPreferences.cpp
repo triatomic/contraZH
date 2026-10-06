@@ -417,6 +417,20 @@ Bool OptionPreferences::getShadowMapEnabled(void) const
 	return getBool("ShadowMap", TRUE);
 }
 
+// Snapped up to the next size the Options menu offers.
+Int OptionPreferences::getShadowMapResolution(void) const
+{
+	const Int resolution = getInt("ShadowMapResolution", 4096);
+	for (Int size = 512; size < 4096; size *= 2)
+	{
+		if (resolution <= size)
+		{
+			return size;
+		}
+	}
+	return 4096;
+}
+
 Bool OptionPreferences::getSpecularEnabled(void) const
 {
 	return getBool("Specular", TRUE);

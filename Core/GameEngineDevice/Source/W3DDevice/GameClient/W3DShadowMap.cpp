@@ -35,10 +35,10 @@
 #include "GameClient/Color.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/BaseHeightMap.h"
+#include "Common/GlobalData.h"
 
 #if RTS_ZEROHOUR
 #include "Lib/BaseType.h"
-#include "Common/GlobalData.h"
 #include "GameClient/View.h"
 #include "W3DDevice/GameClient/W3DShadow.h"
 #include "W3DDevice/GameClient/W3DVolumetricShadow.h"
@@ -47,9 +47,6 @@
 #endif
 
 W3DShadowMap* TheW3DShadowMap = nullptr;
-
-// With a NULL colour target the map costs only its depth, 64 MB at this size.
-static const Int SHADOW_MAP_RESOLUTION = 4096;
 
 #if defined(BUILD_WITH_D3D9)
 static const D3DFORMAT D3DFMT_NULL_TARGET = (D3DFORMAT)MAKEFOURCC('N', 'U', 'L', 'L');
@@ -96,7 +93,8 @@ static const Int ShadowDebugMode = Get_Shadow_Debug_Mode();
 
 W3DShadowMap::W3DShadowMap()
 	: m_depthMode(DEPTH_MODE_NONE),
-	  m_resolution(SHADOW_MAP_RESOLUTION),
+	  m_resolution(0),
+	  m_requestedResolution(0),
 	  m_colorTarget(nullptr),
 	  m_depthTarget(nullptr),
 	  m_nullTarget(nullptr),
@@ -148,9 +146,18 @@ void W3DShadowMap::ReleaseResources()
 	m_hasDepth = FALSE;
 }
 
+void W3DShadowMap::followResolution()
+{
+	if (m_requestedResolution != TheGlobalData->m_shadowMapResolution)
+	{
+		ReAcquireResources();
+	}
+}
+
 Bool W3DShadowMap::ReAcquireResources()
 {
 	ReleaseResources();
+	m_requestedResolution = TheGlobalData->m_shadowMapResolution;
 
 	RENDER_LOG(("W3DShadowMap: debug mode %d", ShadowDebugMode));
 	if (ShadowDebugMode == SHADOW_DEBUG_OFF)
@@ -174,7 +181,7 @@ Bool W3DShadowMap::ReAcquireResources()
 
 	// Every target shares one size, so it is capped here rather than by each creator.
 	const D3DCAPS8 &deviceCaps = caps->Get_DX8_Caps();
-	m_resolution = SHADOW_MAP_RESOLUTION;
+	m_resolution = m_requestedResolution;
 	if (m_resolution > (Int)deviceCaps.MaxTextureWidth)
 	{
 		m_resolution = (Int)deviceCaps.MaxTextureWidth;

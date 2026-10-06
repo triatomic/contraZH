@@ -66,6 +66,7 @@ public:
 	Bool init();
 	void ReleaseResources();
 	Bool ReAcquireResources();
+	void followResolution();	///< rebuilds the map when the Options menu changes its size
 
 	Bool isAvailable() const { return m_depthMode != DEPTH_MODE_NONE; }
 	DepthMode getDepthMode() const { return m_depthMode; }
@@ -138,6 +139,7 @@ protected:
 
 	DepthMode      m_depthMode;
 	Int            m_resolution;
+	Int            m_requestedResolution;	///< the size asked for at the last build, before the device caps it
 	TextureClass*  m_colorTarget;
 	ZTextureClass* m_depthTarget;
 

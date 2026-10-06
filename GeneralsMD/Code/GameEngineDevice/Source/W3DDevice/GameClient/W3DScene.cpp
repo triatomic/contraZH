@@ -1588,6 +1588,10 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 
 	// Fill the shadow map before anything is queued for the main scene, because the
 	// depth pass flushes the mesh renderer and would otherwise consume those objects.
+	if (TheW3DShadowMap != nullptr && m_customPassMode == SCENE_PASS_DEFAULT)
+	{
+		TheW3DShadowMap->followResolution();
+	}
 	if (TheW3DShadowMap != nullptr && TheW3DShadowMap->isAvailable() &&
 		TheW3DShadowManager != nullptr &&
 		m_customPassMode == SCENE_PASS_DEFAULT &&

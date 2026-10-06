@@ -930,6 +930,7 @@ GlobalData::GlobalData()
   m_bloomDebug = FALSE;
   m_laserRef = FALSE;
   m_useShadowMap = TRUE;
+  m_shadowMapResolution = 4096;
   m_useSpecular = TRUE;
   m_useNormalMaps = TRUE;
   m_waterReflections = TRUE;
@@ -2042,6 +2043,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_bloomDebug = optionPref.getBloomDebugEnabled();
 	TheWritableGlobalData->m_laserRef = optionPref.getLaserRefEnabled();
 	TheWritableGlobalData->m_useShadowMap = optionPref.getShadowMapEnabled();
+	TheWritableGlobalData->m_shadowMapResolution = optionPref.getShadowMapResolution();
 	TheWritableGlobalData->m_useSpecular = optionPref.getSpecularEnabled();
 	TheWritableGlobalData->m_useNormalMaps = optionPref.getNormalMapsEnabled();
 	TheWritableGlobalData->m_waterReflections = optionPref.getWaterReflectionsEnabled();

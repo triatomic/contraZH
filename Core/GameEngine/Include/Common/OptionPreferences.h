@@ -146,6 +146,8 @@ public:
 	Bool getLaserRefEnabled() const;
 	// Options.ini: ShadowMap = Yes draws shadows from a sun shadow map instead of volumes and blobs
 	Bool getShadowMapEnabled() const;
+	// Options.ini: ShadowMapResolution = 4096 sets the shadow map's width and height, 512 to 4096
+	Int getShadowMapResolution() const;
 	// Options.ini: Specular = Yes adds a per-pixel sun highlight to vehicles and structures
 	Bool getSpecularEnabled() const;
 	// Options.ini: NormalMaps = Yes adds bump detail to the sun's light on vehicles, structures and terrain
