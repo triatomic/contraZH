@@ -55,6 +55,7 @@ public:
 	const Coord3D	   *getLocation() const			{ return &m_location; }
 	Int								getCommandParam() const	{ return m_param; }
 	Real							getAngle() const				{ return m_angle; }
+	Bool							isEndCommand() const		{ return m_endCommand; }
 
 	CommandNode	     *getNext() const					{ return m_next; }
 	CommandNode	     *getFirstChild() const		{ return m_firstChild; }
@@ -69,6 +70,7 @@ private:
 	Coord3D						m_location;			///< target position, for the location commands
 	Int								m_param;				///< weapon slot, special power id, template key, ...
 	Real							m_angle;				///< placement angle, for the dozer build commands
+	Bool							m_endCommand;		///< a command that never ends: nothing may follow it
 	Bool							m_immediate;		///< a state toggle: done the moment it is dispatched
 
 	CommandNode	     *m_next;
@@ -215,6 +217,7 @@ public:
 
 	// --- command classification --------------------------------------------
 	static Bool isAllowedCommand( GameMessage::Type type );
+	static Bool isEndCommandType( GameMessage::Type type, Int param );
 
 	/// TRUE for commands that are a state flip rather than an errand: they complete the
 	/// instant they are dispatched, so the sequence must not wait for the unit to go idle.
