@@ -1357,8 +1357,9 @@ GameMessage::Type CommandTranslator::issueSpecialPowerCommand( const CommandButt
 		if( commandType == DO_COMMAND )
 		{
 			// TheSuperHackers @feature new waypoint system (issue #122): plot instead of send.
-			// The node param carries the power's template id, matching the logic-side dispatch.
-			if( plotPendingWaypointCommand( msgType, target->getObject(), nullptr, command->getSpecialPowerTemplate()->getID() ) )
+			// The node param carries the power's template id, matching the logic-side dispatch;
+			// the location carries the target's position so the plotted line points at it.
+			if( plotPendingWaypointCommand( msgType, target->getObject(), target->getObject()->getPosition(), command->getSpecialPowerTemplate()->getID() ) )
 			{
 				plotted = TRUE;
 			}

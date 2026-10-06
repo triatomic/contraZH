@@ -201,6 +201,105 @@ static CommandStatus doFireWeaponCommand( const CommandButton *command, const IC
 }
 
 //-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature new waypoint system (issue #122). While a route is being plotted, an
+// armed panel command must join the pending chain instead of firing on this click. Returns TRUE
+// when the command was plotted; FALSE falls through to the direct send, as outside waypoint mode.
+//-------------------------------------------------------------------------------------------------
+static Bool plotArmedWaypointCommand( const CommandButton *command, const ICoord2D *mouse )
+{
+	// sanity
+	if( command == nullptr || mouse == nullptr || !TheInGameUI->isInWaypointMode() )
+		return FALSE;
+
+	// only the types this translator fires directly need the divert here: special powers are
+	// context commands and divert inside CommandXlat, and a rally point is building state
+	// rather than an errand for the chain
+	switch( command->getCommandType() )
+	{
+		case GUI_COMMAND_FIRE_WEAPON:
+		case GUI_COMMAND_EVACUATE:
+		case GUI_COMMAND_GUARD:
+		case GUI_COMMAND_GUARD_WITHOUT_PURSUIT:
+		case GUI_COMMAND_GUARD_FLYING_UNITS_ONLY:
+		case GUI_COMMAND_ATTACK_MOVE:
+		case GUI_COMMAND_REVERSE_MOVE:
+			break;
+		default:
+			return FALSE;
+	}
+
+	// resolve the target: an object under the cursor when the command wants one, otherwise the
+	// terrain point; both feed the node's target id and location
+	Object *target = nullptr;
+	Coord3D world;
+	Bool haveWorld = FALSE;
+
+	if( BitIsSet( command->getOptions(), COMMAND_OPTION_NEED_OBJECT_TARGET ) )
+	{
+		PickType pickType = PICK_TYPE_SELECTABLE;
+
+		if( BitIsSet( command->getOptions(), ALLOW_SHRUBBERY_TARGET ) == TRUE )
+			pickType = (PickType)( (Int)pickType | (Int)PICK_TYPE_SHRUBBERY );
+
+		if( BitIsSet( command->getOptions(), ALLOW_MINE_TARGET ) == TRUE )
+			pickType = (PickType)( (Int)pickType | (Int)PICK_TYPE_MINES );
+
+		target = validUnderCursor( mouse, command, pickType );
+		if( target != nullptr )
+		{
+			world = *target->getPosition();
+			haveWorld = TRUE;
+		}
+	}
+
+	if( !haveWorld && !TheTacticalView->screenToTerrain( mouse, &world ) )
+		return FALSE;
+
+	GameMessage::Type msgType = GameMessage::MSG_INVALID;
+	Int param = 0;
+
+	switch( command->getCommandType() )
+	{
+		case GUI_COMMAND_FIRE_WEAPON:
+			// the node param carries the weapon slot, matching the logic-side dispatch
+			msgType = BitIsSet( command->getOptions(), NEED_TARGET_POS ) ? GameMessage::MSG_DO_WEAPON_AT_LOCATION
+							: ( target != nullptr ) ? GameMessage::MSG_DO_WEAPON_AT_OBJECT : GameMessage::MSG_DO_WEAPON;
+			param = command->getWeaponSlot();
+			break;
+		case GUI_COMMAND_EVACUATE:
+			msgType = GameMessage::MSG_EVACUATE;
+			break;
+		case GUI_COMMAND_GUARD:
+		case GUI_COMMAND_GUARD_WITHOUT_PURSUIT:
+		case GUI_COMMAND_GUARD_FLYING_UNITS_ONLY:
+			// guard closes the sequence, so both flavours are end commands on the whitelist
+			msgType = ( target != nullptr ) ? GameMessage::MSG_DO_GUARD_OBJECT : GameMessage::MSG_DO_GUARD_POSITION;
+			param = ( command->getCommandType() == GUI_COMMAND_GUARD ) ? GUARDMODE_NORMAL
+							: ( command->getCommandType() == GUI_COMMAND_GUARD_WITHOUT_PURSUIT ) ? GUARDMODE_GUARD_WITHOUT_PURSUIT
+							: GUARDMODE_GUARD_FLYING_UNITS_ONLY;
+			break;
+		case GUI_COMMAND_ATTACK_MOVE:
+			msgType = GameMessage::MSG_DO_ATTACKMOVETO;
+			break;
+		case GUI_COMMAND_REVERSE_MOVE:
+			msgType = GameMessage::MSG_DO_REVERSE_MOVETO;
+			break;
+		default:
+			return FALSE;	// unreachable, filtered above
+	}
+
+	const Bool plotted = TheInGameUI->appendPendingWaypointCommand( msgType,
+			( target != nullptr ) ? target->getID() : INVALID_ID,
+			&world, param );
+
+	if( plotted )
+		pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), msgType );
+
+	return plotted;
+
+}
+
+//-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 static CommandStatus doGuardCommand( const CommandButton *command, GuardMode guardMode, const ICoord2D *mouse )
 {
@@ -424,6 +523,12 @@ GameMessageDisposition GUICommandTranslator::translateGameMessage(const GameMess
 			// do the command action
 			if( command && !command->isContextCommand() )
 			{
+				// TheSuperHackers @feature new waypoint system (issue #122): while a route is
+				// being plotted, the armed command joins the pending chain instead of firing on
+				// this click; a refused command falls through to the direct send below.
+				Bool plotted = plotArmedWaypointCommand( command, &mouse );
+
+				if( !plotted )
 				switch( command->getCommandType() )
 				{
 

@@ -55,6 +55,7 @@
 #include "GameClient/MetaEvent.h"
 #include "GameClient/GameWindow.h"
 #include "GameClient/GameWindowManager.h"
+#include "GameClient/InGameUI.h"
 #include "GameClient/Keyboard.h"
 #include "GameClient/GameText.h"
 #include "Common/AudioEventRTS.h"
@@ -109,7 +110,11 @@ GameMessageDisposition HotKeyTranslator::translateGameMessage(const GameMessage 
 		// TheSuperHackers @feature Let Shift through so shift+hotkey batches production the same
 		// way shift+clicking the cameo does. Ctrl and Alt still bail, since those carry their own
 		// bindings (control groups and so on) that must not be shadowed by command hotkeys.
-		if( (newModState & ~SHIFT) != 0 )
+		// TheSuperHackers @feature new waypoint system (issue #122): exception -- while Alt is
+		// held to plot a route, command hotkeys must keep working (a dozer's build hotkey has to
+		// arm mid-plot). Alt's own bindings live in the meta map, not here, so nothing is lost.
+		if( (newModState & ~SHIFT) != 0 &&
+				!( (newModState & ALT) && TheInGameUI && TheInGameUI->isInWaypointMode() ) )
 			return disp;
 		WideChar key = TheKeyboard->getPrintableKey((KeyDefType)msg->getArgument(0)->integer, 0);
 		UnicodeString uKey;

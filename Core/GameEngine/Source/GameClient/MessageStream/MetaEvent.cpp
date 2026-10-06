@@ -569,9 +569,21 @@ void MetaEventTranslator::onMouseEvent(const GameMessage *msg)
 void MetaEventTranslator::onKeyEvent(const GameMessage *msg, GameMessageDisposition &disp)
 {
 	const Int systemKey = msg->getArgument(0)->integer;
-	const Int systemKeyState = msg->getArgument(1)->integer;
+	Int systemKeyState = msg->getArgument(1)->integer;
 
 	const MappableKeyType keyType = getActionKeyType(systemKey);
+
+	// TheSuperHackers @feature new waypoint system (issue #122): while Alt is held to plot a
+	// route, Ctrl must still enter force attack. The meta map matches modifier states exactly,
+	// so the held Alt would make Ctrl-down miss its CTRL binding. Strip Alt from Ctrl's own
+	// events only; Shift keeps its Alt state, so the Alt+Shift "focus all" binding lands in
+	// either press order.
+	if( TheInGameUI != nullptr && TheInGameUI->isInWaypointMode()
+			&& ( systemKey == KEY_LCTRL || systemKey == KEY_RCTRL ) )
+	{
+		systemKeyState &= ~KEY_STATE_ALT;
+	}
+
 	const MappableKeyModState keyModState = getKeyModState(systemKeyState);
 
 	const Bool modStateRemoved = (keyType == MK_NONE) && (msg->getType() == GameMessage::MSG_RAW_KEY_UP);
