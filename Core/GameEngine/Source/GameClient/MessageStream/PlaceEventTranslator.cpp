@@ -307,8 +307,8 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 				if( isLineBuild )
 					placeMsg = TheMessageStream->appendMessage( GameMessage::MSG_DOZER_CONSTRUCT_LINE );
 				else if( TheInGameUI->isInWaypointMode() &&
-								 TheInGameUI->appendPendingWaypointCommand( GameMessage::MSG_DOZER_CONSTRUCT,
-									 											INVALID_ID, &worldStart, build->getTemplateID(), angle ) )
+								TheInGameUI->appendPendingWaypointCommand( GameMessage::MSG_DOZER_CONSTRUCT,
+																				INVALID_ID, &worldStart, build->getTemplateID(), angle ) )
 				{
 					placeMsg = nullptr;	// plotted into the pending chain; nothing to broadcast yet
 				}

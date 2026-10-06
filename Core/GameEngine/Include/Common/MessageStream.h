@@ -214,8 +214,8 @@ public:
 
 		MSG_META_SELECT_MATCHING_UNITS,              ///< selects matching units, used for both on screen and across map
 		MSG_META_SELECT_IDLE_BUILDERS,                  ///< TheSuperHackers @feature select my idle builders (dozers/workers)
-		MSG_META_SELECT_COMBAT_UNITS,                  ///< (see above)
-		MSG_META_CYCLE_WAYPOINT_FOCUS,                  ///< TheSuperHackers @feature step the plotted-route focus to the next selected unit                   ///< TheSuperHackers @feature select all my combat units (no builders, harvesters or structures)
+		MSG_META_SELECT_COMBAT_UNITS,                  ///< TheSuperHackers @feature select all my combat units (no builders, harvesters or structures)
+		MSG_META_CYCLE_WAYPOINT_FOCUS,                  ///< TheSuperHackers @feature step the plotted-route focus to the next selected unit
 		MSG_META_SMART_SELECTION_NEXT_TYPE,					///< TheSuperHackers @feature narrow the selection to the next type in the smart selection row
 		MSG_META_SMART_SELECTION_PREV_TYPE,					///< TheSuperHackers @feature narrow the selection to the previous type in the smart selection row
 		MSG_META_SELECT_NEXT_UNIT,									///< select 'next' unit
