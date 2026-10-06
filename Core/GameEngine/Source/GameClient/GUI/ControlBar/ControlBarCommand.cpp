@@ -1539,7 +1539,17 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 			}
 			else if( SpecialAbilityUpdate *spUpdate = obj->findSpecialAbilityUpdate( command->getSpecialPowerTemplate()->getSpecialPowerType() ) )
 			{
-				if( spUpdate && spUpdate->isPowerCurrentlyInUse( command ) )
+				// TheSuperHackers @feature waypoint system (issue #122): while a route is being
+				// plotted the button must stay clickable even though its ability is running --
+				// queueing the next hack/capture onto the chain while the current one plays is
+				// exactly the point. The chain holds its node until the ability has finished
+				// (the using-ability veto in CommandSequence::update), so the queued order can
+				// never interrupt the running one. The exemption is limited to a genuinely
+				// active ability: isPowerCurrentlyInUse also answers TRUE for the remote-charge
+				// detonate button purely because there is nothing to detonate, and that one
+				// should stay greyed.
+				if( spUpdate && spUpdate->isPowerCurrentlyInUse( command ) &&
+						( TheInGameUI == nullptr || !TheInGameUI->isInWaypointMode() || !spUpdate->isActive() ) )
 				{
 					return COMMAND_RESTRICTED;
 				}
