@@ -1141,7 +1141,7 @@ GlobalData::GlobalData()
 	m_groundNoiseBrightness = 0.9f;
 	m_terrainHeightBlendStrength = 2.0f;
 	m_terrainHeightBlendSharpness = 4.0f;
-	m_terrainAtlasBorder = 8;
+	m_terrainAtlasBorder = 4;
 	m_skyCloudSize = 600.0f;
 	m_skyCloudCoverage = 0.45f;
 	m_skyCloudSoftness = 0.25f;

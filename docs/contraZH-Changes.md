@@ -343,7 +343,7 @@ texture so filtering at a texture's edge reads the texture and not its neighbour
 reads further along the view than the original 4-texel border covers, so steep distant ground can pick
 up a faint line of the next texture every few cells. The mod's `GameData.ini` sets the border:
 
-* `TerrainAtlasBorder = 8` - (Texels around each texture, rounded up to a multiple of 4, from 4 to 32.
+* `TerrainAtlasBorder = 4` - (Texels around each texture, rounded up to a multiple of 4, from 4 to 32.
 Cheat builds apply a change while a map runs.)
 
 A wider border keeps higher anisotropy clean but fits fewer textures. The atlas is at most 2048 texels
