@@ -781,7 +781,7 @@ public:  // ********************************************************************
 	Bool isInPreferSelectionMode() const { return m_preferSelection; }
 
 	void setClientQuiet( Bool enabled )  { m_clientQuiet = enabled; }
-	void setWaypointMode( Bool enabled )		{ m_waypointMode = enabled; }
+	void setWaypointMode( Bool enabled )		{ m_waypointMode = enabled; if( !enabled ) m_waypointFocusUnit = INVALID_ID; }	///< leaving the mode never carries the single-unit focus over: orders go back to the whole selection
 	void setForceMoveMode( Bool enabled )		{ m_forceMoveToMode = enabled; }
 	void setForceAttackMode( Bool enabled )		{ m_forceAttackMode = enabled; }
 	void setPreferSelectionMode( Bool enabled )		{ m_preferSelection = enabled; }
