@@ -369,6 +369,10 @@ GameLogic::~GameLogic()
 	delete ThePartitionManager;
 	ThePartitionManager = nullptr;
 
+	// delete the command sequence system
+	delete TheCommandSequence;
+	TheCommandSequence = nullptr;
+
 	delete TheScriptActions;
 	TheScriptActions = nullptr;
 
@@ -431,12 +435,12 @@ void GameLogic::init()
 void GameLogic::reset()
 {
 	// TheSuperHackers @feature drop every queued command sequence with the game.
+	// The SYSTEM itself survives reset, like ThePartitionManager: it is created once in
+	// init() and must stay alive for the whole process. Deleting it here left every game
+	// session with a null singleton — the dispatch case then silently did nothing and
+	// committed sequences never executed.
 	if( TheCommandSequence != nullptr )
-	{
 		TheCommandSequence->reset();
-		delete TheCommandSequence;
-		TheCommandSequence = nullptr;
-	}
 
 	m_thingTemplateBuildableOverrides.clear();
 	m_controlBarOverrides.clear();
@@ -2719,7 +2723,7 @@ void GameLogic::processCommandList( CommandList *list )
 
 	GameMessage* msg;
 
-	for( msg = list->getFirstMessage(); msg; msg = msg->next() )
+		for( msg = list->getFirstMessage(); msg; msg = msg->next() )
 	{
 #ifdef RTS_DEBUG
 		DEBUG_ASSERTCRASH(msg != nullptr && msg != (GameMessage*)0xdeadbeef, ("bad msg"));

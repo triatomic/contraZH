@@ -141,7 +141,8 @@ CommandSequence::CommandSequence( ObjectID subject ) :
 	m_activeCount( 0 ),
 	m_current( nullptr ),
 	m_currentDispatched( FALSE ),
-	m_priorityTargetList( FALSE )
+	m_priorityTargetList( FALSE ),
+	m_activeBuildTargetID( INVALID_ID )
 {
 }
 
@@ -152,12 +153,13 @@ CommandSequence::~CommandSequence()
 
 //-----------------------------------------------------------------------------
 CommandNode *CommandSequence::buildNode( GameMessage::Type type, ObjectID targetID,
-																				 const Coord3D *pos, Int param ) const
+																				 const Coord3D *pos, Int param, Real angle ) const
 {
 	CommandNode *node = new CommandNode;
 	node->m_cmdType = type;
 	node->m_targetID = targetID;
 	node->m_param = param;
+	node->m_angle = angle;
 	node->m_endCommand = CommandSequenceSystem::isEndCommandType( type, param );
 	node->m_immediate = CommandSequenceSystem::isImmediateCommand( type );
 
@@ -182,7 +184,7 @@ void CommandSequence::destroyChain( CommandNode *head )
 
 //-----------------------------------------------------------------------------
 Bool CommandSequence::appendPending( GameMessage::Type type, ObjectID targetID,
-																		 const Coord3D *pos, Int param )
+																		 const Coord3D *pos, Int param, Real angle )
 {
 	if( !CommandSequenceSystem::isAllowedCommand( type ) )
 		return FALSE;
@@ -194,7 +196,7 @@ Bool CommandSequence::appendPending( GameMessage::Type type, ObjectID targetID,
 	if( m_pendingCount >= COMMAND_SEQUENCE_MAX_NODES_PER_SUBJECT )
 		return FALSE;
 
-	CommandNode *node = buildNode( type, targetID, pos, param );
+	CommandNode *node = buildNode( type, targetID, pos, param, angle );
 
 	if( m_pendingTail != nullptr )
 		m_pendingTail->m_next = node;
@@ -254,6 +256,7 @@ void CommandSequence::clear()
 	m_activeCount = 0;
 	m_current = nullptr;
 	m_currentDispatched = FALSE;
+	m_activeBuildTargetID = INVALID_ID;
 }
 
 //-----------------------------------------------------------------------------
@@ -261,11 +264,13 @@ void CommandSequence::clear()
 // CommandTranslator does for a live order, with the command source marked as
 // the player so the AI treats it with the same priority as a manual order.
 //-----------------------------------------------------------------------------
-Bool CommandSequence::dispatchCurrent( Object *subject ) const
+Bool CommandSequence::dispatchCurrent( Object *subject )
 {
 	AIUpdateInterface *ai = ( subject != nullptr ) ? subject->getAIUpdateInterface() : nullptr;
 	if( ai == nullptr || m_current == nullptr )
 		return FALSE;
+
+	m_activeBuildTargetID = INVALID_ID;
 
 	const Int maxShots = ( m_current->m_param > 0 ) ? m_current->m_param : 1;
 	Object *target = ( m_current->m_targetID != INVALID_ID && TheGameLogic != nullptr )
@@ -547,7 +552,10 @@ Bool CommandSequence::dispatchCurrent( Object *subject ) const
 			const ThingTemplate *place = TheThingFactory->findByTemplateID( m_current->m_param );
 			if( place == nullptr )
 				return FALSE;
-			TheBuildAssistant->buildObjectNow( subject, place, loc, 0.0f, subject->getControllingPlayer() );
+			// P4: remember the foundation so completion is judged on the BUILDING (see
+			// update()), not on the dozer momentarily reporting idle between orders.
+			Object *foundation = TheBuildAssistant->buildObjectNow( subject, place, loc, m_current->getAngle(), subject->getControllingPlayer() );
+			m_activeBuildTargetID = ( foundation != nullptr ) ? foundation->getID() : INVALID_ID;
 			break;
 		}
 
@@ -632,8 +640,19 @@ void CommandSequence::update( Object *subject )
 	// structure exists, not merely when the dozer pauses).
 	if( ai->isIdle() )
 	{
+		// P4: a build node is done when the FOUNDATION is fully constructed (percent goes
+		// negative on completion), not when the dozer briefly reports idle after laying it.
+		// While the structure is still 0..100% the dozer must stay here and finish it.
+		if( m_current->m_cmdType == GameMessage::MSG_DOZER_CONSTRUCT && m_activeBuildTargetID != INVALID_ID )
+		{
+			Object *foundation = ( TheGameLogic != nullptr ) ? TheGameLogic->findObjectByID( m_activeBuildTargetID ) : nullptr;
+			if( foundation != nullptr && foundation->getConstructionPercent() >= 0.0f )
+				return;	// still under construction — keep the dozer on this node
+		}
+
 		m_current = m_current->m_next;
 		m_currentDispatched = FALSE;
+		m_activeBuildTargetID = INVALID_ID;
 	}
 }
 
@@ -782,6 +801,16 @@ void CommandSequenceSystem::update()
 		}
 
 		seq->update( subject );
+
+		// the chain ran dry: the sequence is done — remove it, so isExecutingSequence()
+		// stops reporting the unit as busy and the memory does not linger.
+		if( !seq->isPriorityTargetList() && seq->isFinished() )
+		{
+			delete seq;
+			it = m_sequences.erase( it );
+			continue;
+		}
+
 		++it;
 	}
 }
@@ -848,7 +877,7 @@ Bool CommandSequenceSystem::appendCommand( ObjectID subject, GameMessage::Type t
 
 //-----------------------------------------------------------------------------
 // Decodes MSG_COMMAND_SEQUENCE_COMMIT and builds the active sequence. The wire
-// format is (subjectID, nodeCount, then per node: type, targetID, location, param),
+// format is (subjectID, nodeCount, then per node: type, targetID, location, param, angle),
 // which is what SelectionTranslator/InGameUI encodes when the player commits.
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
@@ -857,7 +886,7 @@ Bool CommandSequenceSystem::appendCommand( ObjectID subject, GameMessage::Type t
 // each unit its own copy -- the state has to be per unit even though the traffic is not.
 //
 // Wire format: subjectCount, subjectID[subjectCount], nodeCount,
-//              then nodeCount x (type, targetID, location, param).
+//              then nodeCount x (type, targetID, location, param, angle).
 //-----------------------------------------------------------------------------
 Bool CommandSequenceSystem::onCommitMessage( const GameMessage *msg )
 {
@@ -885,17 +914,19 @@ Bool CommandSequenceSystem::onCommitMessage( const GameMessage *msg )
 		ObjectID				target;
 		Coord3D					location;
 		Int						param;
+		Real						angle;
 	};
 
 	StagedNode staged[ COMMAND_SEQUENCE_MAX_NODES_PER_SUBJECT ];
 	Int stagedCount = 0;
 
-	for( Int i = 0; i < nodeCount && arg + 3 < msg->getArgumentCount(); ++i )
+	for( Int i = 0; i < nodeCount && arg + 4 < msg->getArgumentCount(); ++i )
 	{
 		staged[ stagedCount ].type = (GameMessage::Type)msg->getArgument( arg++ )->integer;
 		staged[ stagedCount ].target = msg->getArgument( arg++ )->objectID;
 		staged[ stagedCount ].location = msg->getArgument( arg++ )->location;
 		staged[ stagedCount ].param = msg->getArgument( arg++ )->integer;
+		staged[ stagedCount ].angle = msg->getArgument( arg++ )->real;
 		stagedCount++;
 	}
 
@@ -920,7 +951,7 @@ Bool CommandSequenceSystem::onCommitMessage( const GameMessage *msg )
 		}
 
 		for( Int i = 0; i < stagedCount; ++i )
-			seq->appendPending( staged[ i ].type, staged[ i ].target, &staged[ i ].location, staged[ i ].param );
+			seq->appendPending( staged[ i ].type, staged[ i ].target, &staged[ i ].location, staged[ i ].param, staged[ i ].angle );
 
 		seq->commit();
 		anyCommitted = TRUE;
@@ -1003,6 +1034,42 @@ Bool CommandSequenceSystem::isExecutingSequence( ObjectID subject ) const
 		return FALSE;
 
 	return ( seq->getCurrent() != nullptr );
+}
+
+//-----------------------------------------------------------------------------
+// The player orders that REPLACE a plotted sequence. A unit handed a fresh move,
+// attack or build order must not keep firing the remaining nodes of an old route
+// afterwards — that read as "the unit suddenly walks off again when I come back".
+// The sequence dispatch itself issues AI calls directly (not messages), so these
+// can only ever come from a real player order.
+//-----------------------------------------------------------------------------
+Bool CommandSequenceSystem::isCancellingPlayerOrder( GameMessage::Type type )
+{
+	switch( type )
+	{
+		case GameMessage::MSG_DO_MOVETO:
+		case GameMessage::MSG_DO_ATTACKMOVETO:
+		case GameMessage::MSG_DO_FORCEMOVETO:
+		case GameMessage::MSG_DO_REVERSE_MOVETO:
+		case GameMessage::MSG_ADD_WAYPOINT:
+		case GameMessage::MSG_DO_ATTACK_OBJECT:
+		case GameMessage::MSG_DO_FORCE_ATTACK_OBJECT:
+		case GameMessage::MSG_DO_FORCE_ATTACK_GROUND:
+		case GameMessage::MSG_DO_GUARD_POSITION:
+		case GameMessage::MSG_DO_GUARD_OBJECT:
+		case GameMessage::MSG_DO_STOP:
+		case GameMessage::MSG_ENTER:
+		case GameMessage::MSG_DOCK:
+		case GameMessage::MSG_DO_REPAIR:
+		case GameMessage::MSG_RESUME_CONSTRUCTION:
+		case GameMessage::MSG_DOZER_CONSTRUCT:
+		case GameMessage::MSG_DOZER_CONSTRUCT_LINE:
+		case GameMessage::MSG_DOZER_WAYPOINT_BUILD:
+			return TRUE;
+
+		default:
+			return FALSE;
+	}
 }
 
 //-----------------------------------------------------------------------------

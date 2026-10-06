@@ -54,6 +54,7 @@ public:
 	ObjectID					getTargetID() const			{ return m_targetID; }
 	const Coord3D	   *getLocation() const			{ return &m_location; }
 	Int								getCommandParam() const	{ return m_param; }
+	Real							getAngle() const				{ return m_angle; }
 	Bool							isEndCommand() const		{ return m_endCommand; }
 
 	CommandNode	     *getNext() const					{ return m_next; }
@@ -68,6 +69,7 @@ private:
 	ObjectID					m_targetID;			///< target object, for the *_AT_OBJECT commands
 	Coord3D						m_location;			///< target position, for the location commands
 	Int								m_param;				///< weapon slot, special power id, template key, ...
+	Real							m_angle;				///< placement angle, for the dozer build commands
 	Bool							m_endCommand;		///< a command that never ends: nothing may follow it
 	Bool							m_immediate;		///< a state toggle: done the moment it is dispatched
 
@@ -101,10 +103,17 @@ public:
 	//
 	// Returns FALSE when the command cannot be appended: it is not whitelisted,
 	// the sequence already ends in an end command, or the cap was reached.
-	Bool appendPending( GameMessage::Type type, ObjectID targetID, const Coord3D *pos, Int param );
+	Bool appendPending( GameMessage::Type type, ObjectID targetID, const Coord3D *pos, Int param, Real angle = 0.0f );
 	Int  getPendingCount() const { return m_pendingCount; }
 	CommandNode *getPendingHead() const { return m_pendingHead; }
 	void clearPending();
+
+	/// TRUE when every node of the active chain has been consumed — the system then
+	/// destroys the sequence, so isExecutingSequence() does not stay stuck on TRUE.
+	Bool isFinished() const { return m_current == nullptr; }
+	/// The node currently being executed (nullptr when idle/finished); the executing
+	/// route preview draws from here to the end of the active chain.
+	CommandNode *getCurrentNode() const { return m_current; }
 
 	// --- commit -------------------------------------------------------------
 	//
@@ -138,9 +147,9 @@ private:
 
 	static CommandNode *removeTargetFromChain( CommandNode *head, ObjectID targetID,
 																	 Int *countOut, CommandNode **tailOut );
-	Bool dispatchCurrent( Object *subject ) const;	///< FALSE when the node cannot run and should be skipped
+	Bool dispatchCurrent( Object *subject );	///< FALSE when the node cannot run and should be skipped
 
-	CommandNode *buildNode( GameMessage::Type type, ObjectID targetID, const Coord3D *pos, Int param ) const;
+	CommandNode *buildNode( GameMessage::Type type, ObjectID targetID, const Coord3D *pos, Int param, Real angle ) const;
 	static void destroyChain( CommandNode *head );
 
 	ObjectID				m_subject;
@@ -155,6 +164,7 @@ private:
 	CommandNode	   *m_current;
 	Bool					m_currentDispatched;
 	Bool					m_priorityTargetList;	///< the current node has been handed to the AI already
+	ObjectID				m_activeBuildTargetID;	///< foundation created by the current build node (P4 completion)
 };
 
 //-----------------------------------------------------------------------------
@@ -194,6 +204,10 @@ public:
 	/// TRUE while the subject still has committed commands left to run. Smart cast uses it
 	/// to avoid pulling a unit away from the route the player is steering it along.
 	Bool isExecutingSequence( ObjectID subject ) const;
+
+	/// Player orders that REPLACE a plotted sequence instead of joining it: a unit handed
+	/// a fresh move/attack/build order must not keep firing the rest of an old route later.
+	static Bool isCancellingPlayerOrder( GameMessage::Type type );
 
 	/// Contributes the queued sequences to the frame CRC. Without this a divergence in
 	/// the queues would go unnoticed until the units behaved differently.

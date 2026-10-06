@@ -434,6 +434,17 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 					if (currentlySelectedGroup->removeAnyObjectsNotOwnedByPlayer(msgPlayer))
 						currentlySelectedGroup = nullptr;
 
+				// TheSuperHackers @feature (issue #122) a fresh player order replaces a plotted
+				// sequence: without this the remaining nodes of an old route kept firing after
+				// the interruption, and the unit "suddenly moved again" later.
+				if( TheCommandSequence != nullptr && currentlySelectedGroup != nullptr &&
+						CommandSequenceSystem::isCancellingPlayerOrder( msgType ) )
+				{
+					const VecObjectID &cancelIDs = currentlySelectedGroup->getAllIDs();
+					for( size_t ci = 0; ci < cancelIDs.size(); ++ci )
+						TheCommandSequence->destroySequence( cancelIDs[ ci ] );
+				}
+
 				if(TheStatsCollector)
 					TheStatsCollector->collectMsgStats(msg);
 			}
@@ -825,6 +836,11 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 		case GameMessage::MSG_DOZER_CONSTRUCT_LINE:
 		{
 			onDozerConstruct(msg, currentlySelectedGroup);
+			break;
+		}
+		case GameMessage::MSG_DOZER_WAYPOINT_BUILD:
+		{
+			onDozerWaypointBuild(msg, currentlySelectedGroup);
 			break;
 		}
 		case GameMessage::MSG_DOZER_CANCEL_CONSTRUCT:
@@ -2349,6 +2365,42 @@ bool GameLogic::onDozerConstruct(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &curr
 
 	// no, this is bad, don't do here, do when POSTING message
 	//		pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), msg->getType() );
+
+	return true;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** TheSuperHackers @feature waypoint-mode queued construction: the order goes onto the
+	* builder's build queue (bound to the waypoint the builder is currently walking towards)
+	* instead of interrupting it. Nothing is placed here yet — the foundation materializes
+	* once the builder arrives and the site re-validates (see DozerAIUpdate::processBuildQueue).
+	* Without this handler the message had no case in the dispatch and was silently dropped,
+	* which made building in waypoint mode do nothing at all. */
+//-------------------------------------------------------------------------------------------------
+bool GameLogic::onDozerWaypointBuild(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
+{
+	const ThingTemplate *place;
+	Coord3D loc;
+	Real angle;
+
+#if RETAIL_COMPATIBLE_AIGROUP
+	const AIGroup *group = currentlySelectedGroup;
+#else
+	const AIGroup *group = currentlySelectedGroup.Peek();
+#endif
+	if( group == nullptr || group->isEmpty() )
+		return false;
+	const VecObjectID &groupIDs = group->getAllIDs();
+	Object *constructorObject = findObjectByID( groupIDs.front() );
+	place = TheThingFactory->findByTemplateID( msg->getArgument( 0 )->integer );
+	loc = msg->getArgument( 1 )->location;
+	angle = msg->getArgument( 2 )->real;
+
+	if( place == nullptr || constructorObject == nullptr )
+		return false;  //These are not crashes, as the object may have died before this message came in
+
+	TheBuildAssistant->buildObjectQueued( constructorObject, place, &loc, angle,
+																				constructorObject->getControllingPlayer() );
 
 	return true;
 }

@@ -360,6 +360,7 @@ private:
 	bool onMoveUnitCreateEarlier(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onMoveUpgradeEarlier(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onDozerConstruct(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
+	bool onDozerWaypointBuild(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onDozerCancelConstruct(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onSell(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onToggleOvercharge(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
