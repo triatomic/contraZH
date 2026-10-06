@@ -43,65 +43,64 @@
 struct CommandSequenceInfo
 {
 	GameMessage::Type	cmdType;
-	Bool							endCommand;		///< closes the sequence: nothing may follow
 };
 
 static const CommandSequenceInfo s_commandSequenceInfo[] =
 {
 	// --- movement and position ------------------------------------------------
-	{ GameMessage::MSG_DO_MOVETO,															FALSE },
-	{ GameMessage::MSG_DO_ATTACKMOVETO,												FALSE },
-	{ GameMessage::MSG_DO_FORCEMOVETO,												FALSE },
-	{ GameMessage::MSG_DO_REVERSE_MOVETO,											FALSE },
-	{ GameMessage::MSG_DO_AUTO_FILL,													FALSE },
-	{ GameMessage::MSG_SET_RALLY_POINT,												FALSE },
+	{ GameMessage::MSG_DO_MOVETO },
+	{ GameMessage::MSG_DO_ATTACKMOVETO },
+	{ GameMessage::MSG_DO_FORCEMOVETO },
+	{ GameMessage::MSG_DO_REVERSE_MOVETO },
+	{ GameMessage::MSG_DO_AUTO_FILL },
+	{ GameMessage::MSG_SET_RALLY_POINT },
 
 	// --- combat --------------------------------------------------------------
-	{ GameMessage::MSG_DO_ATTACK_OBJECT,											FALSE },
-	{ GameMessage::MSG_DO_FORCE_ATTACK_OBJECT,									FALSE },
-	{ GameMessage::MSG_DO_FORCE_ATTACK_GROUND,									TRUE  },
-	{ GameMessage::MSG_DO_GUARD_POSITION,											TRUE  },
-	{ GameMessage::MSG_DO_GUARD_OBJECT,											TRUE  },
-	{ GameMessage::MSG_DO_WEAPON,														TRUE  },
-	{ GameMessage::MSG_DO_WEAPON_AT_LOCATION,									FALSE },	// end only with infinite shots, see isEndCommandType
-	{ GameMessage::MSG_DO_WEAPON_AT_OBJECT,										FALSE },
-	{ GameMessage::MSG_TOGGLE_FIRE_WEAPON,										FALSE },
-	{ GameMessage::MSG_TOGGLE_HOLD_FIRE,											FALSE },
-	{ GameMessage::MSG_TOGGLE_DEPLOY,													FALSE },
-	{ GameMessage::MSG_TOGGLE_OVERCHARGE,											FALSE },
-	{ GameMessage::MSG_SWITCH_WEAPONS,												FALSE },
-	{ GameMessage::MSG_DO_CHEER,														FALSE },
+	{ GameMessage::MSG_DO_ATTACK_OBJECT },
+	{ GameMessage::MSG_DO_FORCE_ATTACK_OBJECT },
+	{ GameMessage::MSG_DO_FORCE_ATTACK_GROUND },
+	{ GameMessage::MSG_DO_GUARD_POSITION },
+	{ GameMessage::MSG_DO_GUARD_OBJECT },
+	{ GameMessage::MSG_DO_WEAPON },
+	{ GameMessage::MSG_DO_WEAPON_AT_LOCATION },
+	{ GameMessage::MSG_DO_WEAPON_AT_OBJECT },
+	{ GameMessage::MSG_TOGGLE_FIRE_WEAPON },
+	{ GameMessage::MSG_TOGGLE_HOLD_FIRE },
+	{ GameMessage::MSG_TOGGLE_DEPLOY },
+	{ GameMessage::MSG_TOGGLE_OVERCHARGE },
+	{ GameMessage::MSG_SWITCH_WEAPONS },
+	{ GameMessage::MSG_DO_CHEER },
 
 	// --- special powers and abilities -------------------------------------------
-	{ GameMessage::MSG_DO_SPECIAL_POWER,											FALSE },
-	{ GameMessage::MSG_DO_SPECIAL_POWER_AT_LOCATION,					FALSE },
-	{ GameMessage::MSG_DO_SPECIAL_POWER_AT_OBJECT,						FALSE },
-	{ GameMessage::MSG_DO_SPECIAL_POWER_OVERRIDE_DESTINATION,	FALSE },
-	{ GameMessage::MSG_DO_SPECIAL_POWER_AT_MULTIPLE_LOCATIONS,	FALSE },
-	{ GameMessage::MSG_INTERNET_HACK,													TRUE  },
-	{ GameMessage::MSG_DISABLEVEHICLE_HACK,										FALSE },
-	{ GameMessage::MSG_STEALCASH_HACK,												FALSE },
-	{ GameMessage::MSG_DISABLEBUILDING_HACK,									FALSE },
-	{ GameMessage::MSG_SNIPE_VEHICLE,													FALSE },
-	{ GameMessage::MSG_CAPTUREBUILDING,												FALSE },
-	{ GameMessage::MSG_CONVERT_TO_CARBOMB,										FALSE },
-	{ GameMessage::MSG_DO_SALVAGE,														FALSE },
+	{ GameMessage::MSG_DO_SPECIAL_POWER },
+	{ GameMessage::MSG_DO_SPECIAL_POWER_AT_LOCATION },
+	{ GameMessage::MSG_DO_SPECIAL_POWER_AT_OBJECT },
+	{ GameMessage::MSG_DO_SPECIAL_POWER_OVERRIDE_DESTINATION },
+	{ GameMessage::MSG_DO_SPECIAL_POWER_AT_MULTIPLE_LOCATIONS },
+	{ GameMessage::MSG_INTERNET_HACK },
+	{ GameMessage::MSG_DISABLEVEHICLE_HACK },
+	{ GameMessage::MSG_STEALCASH_HACK },
+	{ GameMessage::MSG_DISABLEBUILDING_HACK },
+	{ GameMessage::MSG_SNIPE_VEHICLE },
+	{ GameMessage::MSG_CAPTUREBUILDING },
+	{ GameMessage::MSG_CONVERT_TO_CARBOMB },
+	{ GameMessage::MSG_DO_SALVAGE },
 
 	// --- transport and containment --------------------------------------------
-	{ GameMessage::MSG_ENTER,																FALSE },	// explicitly not an end command
-	{ GameMessage::MSG_EXIT,																FALSE },
-	{ GameMessage::MSG_EVACUATE,														FALSE },
-	{ GameMessage::MSG_DOCK,																FALSE },
-	{ GameMessage::MSG_COMBATDROP_AT_LOCATION,								FALSE },
-	{ GameMessage::MSG_COMBATDROP_AT_OBJECT,									FALSE },
+	{ GameMessage::MSG_ENTER },
+	{ GameMessage::MSG_EXIT },
+	{ GameMessage::MSG_EVACUATE },
+	{ GameMessage::MSG_DOCK },
+	{ GameMessage::MSG_COMBATDROP_AT_LOCATION },
+	{ GameMessage::MSG_COMBATDROP_AT_OBJECT },
 
 	// --- construction and repair -------------------------------------------------
-	{ GameMessage::MSG_DOZER_CONSTRUCT,												FALSE },
-	{ GameMessage::MSG_DOZER_CONSTRUCT_LINE,									FALSE },
-	{ GameMessage::MSG_DO_REPAIR,														FALSE },
-	{ GameMessage::MSG_GET_REPAIRED,												FALSE },
-	{ GameMessage::MSG_GET_HEALED,													FALSE },
-	{ GameMessage::MSG_RESUME_CONSTRUCTION,										FALSE },
+	{ GameMessage::MSG_DOZER_CONSTRUCT },
+	{ GameMessage::MSG_DOZER_CONSTRUCT_LINE },
+	{ GameMessage::MSG_DO_REPAIR },
+	{ GameMessage::MSG_GET_REPAIRED },
+	{ GameMessage::MSG_GET_HEALED },
+	{ GameMessage::MSG_RESUME_CONSTRUCTION },
 };
 
 static const Int s_commandSequenceInfoCount =
@@ -115,7 +114,6 @@ CommandNode::CommandNode() :
 	m_cmdType( GameMessage::MSG_INVALID ),
 	m_targetID( INVALID_ID ),
 	m_param( 0 ),
-	m_endCommand( FALSE ),
 	m_next( nullptr ),
 	m_firstChild( nullptr )
 {
@@ -160,7 +158,6 @@ CommandNode *CommandSequence::buildNode( GameMessage::Type type, ObjectID target
 	node->m_targetID = targetID;
 	node->m_param = param;
 	node->m_angle = angle;
-	node->m_endCommand = CommandSequenceSystem::isEndCommandType( type, param );
 	node->m_immediate = CommandSequenceSystem::isImmediateCommand( type );
 
 	if( pos != nullptr )
@@ -187,10 +184,6 @@ Bool CommandSequence::appendPending( GameMessage::Type type, ObjectID targetID,
 																		 const Coord3D *pos, Int param, Real angle )
 {
 	if( !CommandSequenceSystem::isAllowedCommand( type ) )
-		return FALSE;
-
-	// an end command closes the sequence, so nothing may follow it
-	if( m_pendingTail != nullptr && m_pendingTail->m_endCommand )
 		return FALSE;
 
 	if( m_pendingCount >= COMMAND_SEQUENCE_MAX_NODES_PER_SUBJECT )
@@ -272,7 +265,11 @@ Bool CommandSequence::dispatchCurrent( Object *subject )
 
 	m_activeBuildTargetID = INVALID_ID;
 
-	const Int maxShots = ( m_current->m_param > 0 ) ? m_current->m_param : 1;
+	// A plotted attack carries no shot budget of its own: it inherits the no-limit behaviour of
+	// the direct orders (GameLogicDispatch passes NO_MAX_SHOTS_LIMIT for every attack), so the
+	// unit keeps attacking until the target is gone rather than firing once and standing down.
+	// Weapon-slot nodes store the slot in the param, never a shot count.
+	const Int maxShots = NO_MAX_SHOTS_LIMIT;
 	Object *target = ( m_current->m_targetID != INVALID_ID && TheGameLogic != nullptr )
 			? TheGameLogic->findObjectByID( m_current->m_targetID ) : nullptr;
 	const Coord3D *loc = &m_current->m_location;
@@ -647,7 +644,7 @@ void CommandSequence::update( Object *subject )
 		{
 			Object *foundation = ( TheGameLogic != nullptr ) ? TheGameLogic->findObjectByID( m_activeBuildTargetID ) : nullptr;
 			if( foundation != nullptr && foundation->getConstructionPercent() >= 0.0f )
-				return;	// still under construction — keep the dozer on this node
+				return;	// still under construction -- keep the dozer on this node
 		}
 
 		m_current = m_current->m_next;
@@ -802,7 +799,7 @@ void CommandSequenceSystem::update()
 
 		seq->update( subject );
 
-		// the chain ran dry: the sequence is done — remove it, so isExecutingSequence()
+		// the chain ran dry: the sequence is done -- remove it, so isExecutingSequence()
 		// stops reporting the unit as busy and the memory does not linger.
 		if( !seq->isPriorityTargetList() && seq->isFinished() )
 		{
@@ -1039,7 +1036,7 @@ Bool CommandSequenceSystem::isExecutingSequence( ObjectID subject ) const
 //-----------------------------------------------------------------------------
 // The player orders that REPLACE a plotted sequence. A unit handed a fresh move,
 // attack or build order must not keep firing the remaining nodes of an old route
-// afterwards — that read as "the unit suddenly walks off again when I come back".
+// afterwards -- that read as "the unit suddenly walks off again when I come back".
 // The sequence dispatch itself issues AI calls directly (not messages), so these
 // can only ever come from a real player order.
 //-----------------------------------------------------------------------------
@@ -1151,24 +1148,4 @@ Bool CommandSequenceSystem::isImmediateCommand( GameMessage::Type type )
 		default:
 			return FALSE;
 	}
-}
-
-//-----------------------------------------------------------------------------
-Bool CommandSequenceSystem::isEndCommandType( GameMessage::Type type, Int param )
-{
-	// MSG_DO_WEAPON_AT_LOCATION only ends the sequence when it fires forever;
-	// with a finite shot count the unit eventually stops and can move on. This
-	// case has to be answered before the table lookup, which stores the plain
-	// "not an end command" answer for it.
-	if( type == GameMessage::MSG_DO_WEAPON_AT_LOCATION )
-		return ( param <= 0 );
-
-	// the ones whose end-ness does not depend on their arguments
-	for( Int i = 0; i < s_commandSequenceInfoCount; i++ )
-	{
-		if( s_commandSequenceInfo[ i ].cmdType == type )
-			return s_commandSequenceInfo[ i ].endCommand;
-	}
-
-	return FALSE;
 }
