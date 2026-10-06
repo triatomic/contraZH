@@ -2742,9 +2742,13 @@ GameMessage::Type CommandTranslator::evaluateContextCommand( Drawable *draw,
 	}
 
 	// TheSuperHackers @feature Smart Garrison: holding ALT while hovering a transport the selection
-	// can enter overrides waypoint mode and distributes the units across the target plus nearby
-	// transports.
-	if( draw && obj && BitIsSet( modifiers, KEY_STATE_ALT )
+	// can enter distributes the units across the target plus nearby transports. While a waypoint
+	// route is being plotted the plain enter order wins instead: the garrison joins the chain as a
+	// normal node with its regular cursor. Waypoint mode holds ALT the whole time, so without this
+	// guard the smart garrison branch would hijack every hover and click, showing its own (possibly
+	// absent) cursor and sending MSG_DO_SMART_GARRISON straight past the pending chain.
+	if( draw && obj && !TheInGameUI->isInWaypointMode()
+			&& BitIsSet( modifiers, KEY_STATE_ALT )
 			&& TheInGameUI->canSelectedObjectsDoAction( InGameUI::ACTIONTYPE_ENTER_OBJECT, obj, InGameUI::SELECTION_ANY, true ) )
 	{
 		if( type == DO_COMMAND || type == EVALUATE_ONLY )
