@@ -825,10 +825,8 @@ public:  // ********************************************************************
 		Coord3D from;
 		Coord3D to;
 		ActionLineKind kind;
-		ObjectID owner;
-		UnsignedInt bornMs;				///< when the marker first appeared, so it can slide in
 	};
-	const std::vector<ActionLine>& getActionLines() const { return m_drawnActionLines; }
+	const std::vector<ActionLine>& getActionLines() const { return m_actionLines; }
 
 private:
 	virtual Int getIdleWorkerCount();
@@ -1005,7 +1003,6 @@ protected:
 	void removeMessageAtIndex( Int i );				///< remove the message at index i
 
 	void updateActionLines();							///< read where each selected unit is headed
-	void addActionLine( ActionLine& line, const std::vector<ActionLine>& previous );
 	void bunchActionLines();							///< merge the lines of units going the same way
 
 	void updateFloatingText();						///< Update function to move our floating text
@@ -1036,8 +1033,7 @@ protected:
 	IRegion2D										m_dragSelectRegion;														///< if isDragSelecting is TRUE, this contains select region
 	Bool												m_displayedMaxWarning;                        ///< keeps the warning from being shown over and over
 	MoveHintStruct							m_moveHint[ MAX_MOVE_HINTS ];
-	std::vector<ActionLine>			m_actionLines;																	///< one per selected unit and queued point
-	std::vector<ActionLine>			m_drawnActionLines;															///< the same, units going the same way merged
+	std::vector<ActionLine>			m_actionLines;																	///< one per bunch of selected units going the same way
 	Int													m_nextMoveHint;
 	const CommandButton *				m_pendingGUICommand;										///< GUI command that needs additional interaction from the user
 	std::vector<Coord3D>				m_pendingSpecialPowerLocations;					///< accepted target points for a NEED_N_TARGET_POS power (in click order)
