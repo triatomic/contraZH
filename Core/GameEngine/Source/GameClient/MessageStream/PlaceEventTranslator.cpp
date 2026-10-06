@@ -257,7 +257,13 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 																												 BuildAssistant::IGNORE_STEALTHED |
 																												 BuildAssistant::FAIL_STEALTHED_WITHOUT_FEEDBACK,
 																												 builderObj, nullptr );
-				if( lbc == LBC_OK )
+				// TheSuperHackers @feature (issue #122) a queued build must not sit on top of another
+				// queued build: neither is in the world yet, so the legality check above cannot see
+				// the collision, and the loser would fail silently when its turn comes. Refuse now.
+				Bool pendingOverlap = TheInGameUI->isInWaypointMode() &&
+						TheInGameUI->hasPendingBuildOverlapping( &worldStart, angle, build );
+
+				if( lbc == LBC_OK && !pendingOverlap )
 				{
 					//Are we building this structure via the special power system? (special case for sneak attack)
 					if( builderObj )
@@ -343,10 +349,27 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 					}
 
 				}
-				else
-				{
-					// can't place, display why
-					TheInGameUI->displayCantBuildMessage( lbc );
+			else if( pendingOverlap )
+			{
+				// can't place: a build already queued in the chain occupies this footprint
+				TheInGameUI->displayCantBuildMessage( LBC_OBJECTS_IN_THE_WAY );
+
+				//Cannot build here -- play the voice sound from the dozer
+				AudioEventRTS sound = *builderObj->getTemplate()->getPerUnitSound( "VoiceNoBuild" );
+				sound.setObjectID( builderObj->getID() );
+				TheAudio->addAudioEvent( &sound );
+
+				// play a can't do that sound (UI beep type sound)
+				static AudioEventRTS noCanDoSound( "NoCanDoSound" );
+				TheAudio->addAudioEvent( &noCanDoSound );
+
+				// unhook the anchor so they can try again
+				TheInGameUI->setPlacementStart( nullptr );
+			}
+			else
+			{
+				// can't place, display why
+				TheInGameUI->displayCantBuildMessage( lbc );
 
 					//Cannot build here -- play the voice sound from the dozer
 					AudioEventRTS sound = *builderObj->getTemplate()->getPerUnitSound( "VoiceNoBuild" );

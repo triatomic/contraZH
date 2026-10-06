@@ -3078,6 +3078,97 @@ Bool InGameUI::commitPendingWaypointCommands()
 }
 
 //-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature Separating-axis overlap for two building footprints. Each footprint
+// is the rectangle its template geometry describes (boxes use the two half-extents, anything
+// else its bounding circle radius on both axes), rotated by its placement angle.
+//-------------------------------------------------------------------------------------------------
+static Bool waypointBuildFootprintsOverlap( const Coord3D &posA, Real angleA, Real halfWA, Real halfHA,
+																						const Coord3D &posB, Real angleB, Real halfWB, Real halfHB )
+{
+	const Real axes[ 4 ][ 2 ] = {
+		{ (Real)cos( angleA ), (Real)sin( angleA ) }, { -(Real)sin( angleA ), (Real)cos( angleA ) },
+		{ (Real)cos( angleB ), (Real)sin( angleB ) }, { -(Real)sin( angleB ), (Real)cos( angleB ) },
+	};
+	const Real halfExtents[ 2 ][ 2 ] = { { halfWA, halfHA }, { halfWB, halfHB } };
+
+	const Real dx = posB.x - posA.x;
+	const Real dy = posB.y - posA.y;
+
+	for( Int axis = 0; axis < 4; ++axis )
+	{
+		const Real separation = fabs( dx * axes[ axis ][ 0 ] + dy * axes[ axis ][ 1 ] );
+
+		// project both rectangles onto this axis; the first axis that separates them wins
+		Real reach = 0.0f;
+		for( Int rect = 0; rect < 2; ++rect )
+		{
+			const Int base = ( rect == 0 ) ? 0 : 2;
+			reach += (Real)fabs( halfExtents[ rect ][ 0 ] * axes[ base ][ 0 ] + halfExtents[ rect ][ 1 ] * axes[ base ][ 1 ] )
+					+ (Real)fabs( halfExtents[ rect ][ 0 ] * axes[ base + 1 ][ 0 ] + halfExtents[ rect ][ 1 ] * axes[ base + 1 ][ 1 ] );
+		}
+
+		if( separation >= reach )
+			return FALSE;
+	}
+
+	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool InGameUI::hasPendingBuildOverlapping( const Coord3D *pos, Real angle, const ThingTemplate *build ) const
+{
+	if( pos == nullptr || build == nullptr )
+		return FALSE;
+
+	Real halfW, halfH;
+	const GeometryInfo &geom = build->getTemplateGeometryInfo();
+	if( geom.getGeomType() == GEOMETRY_BOX )
+	{
+		halfW = geom.getMajorRadius();
+		halfH = geom.getMinorRadius();
+	}
+	else
+	{
+		halfW = halfH = geom.getBoundingCircleRadius();
+	}
+
+	for( std::map< ObjectID, CommandSequence * >::const_iterator it = m_pendingSequences.begin();
+			 it != m_pendingSequences.end(); ++it )
+	{
+		for( CommandNode *node = it->second->getPendingHead(); node != nullptr; node = node->getNext() )
+		{
+			// only queued builds occupy a future footprint; moves and attacks are free to cross
+			if( node->getCommandType() != GameMessage::MSG_DOZER_CONSTRUCT )
+				continue;
+
+			const ThingTemplate *plotted = TheThingFactory->findByTemplateID( node->getCommandParam() );
+			if( plotted == nullptr )
+				continue;
+
+			Real otherHalfW, otherHalfH;
+			const GeometryInfo &otherGeom = plotted->getTemplateGeometryInfo();
+			if( otherGeom.getGeomType() == GEOMETRY_BOX )
+			{
+				otherHalfW = otherGeom.getMajorRadius();
+				otherHalfH = otherGeom.getMinorRadius();
+			}
+			else
+			{
+				otherHalfW = otherHalfH = otherGeom.getBoundingCircleRadius();
+			}
+
+			if( waypointBuildFootprintsOverlap( *pos, angle, halfW, halfH,
+																					*node->getLocation(), node->getAngle(), otherHalfW, otherHalfH ) )
+			{
+				return TRUE;
+			}
+		}
+	}
+
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
 void InGameUI::discardPendingWaypointCommands()
 {
 	for( std::map< ObjectID, CommandSequence * >::iterator it = m_pendingSequences.begin();

@@ -542,6 +542,11 @@ public:  // ********************************************************************
 
 	/// Every chain currently plotted, so the preview can draw the group route as well.
 	const std::map< ObjectID, CommandSequence * > &getPendingSequences() const { return m_pendingSequences; }
+
+	/// TheSuperHackers @feature TRUE when a build node already plotted into any pending chain
+	/// would overlap the given placement, so the new one can be refused while plotting instead
+	/// of silently failing later when its turn to be placed comes around.
+	Bool hasPendingBuildOverlapping( const Coord3D *pos, Real angle, const ThingTemplate *build ) const;
 	virtual void reset() override;															///< Reset
 	//-----------------------------------------------------------------------------------------------
 	void validate();
