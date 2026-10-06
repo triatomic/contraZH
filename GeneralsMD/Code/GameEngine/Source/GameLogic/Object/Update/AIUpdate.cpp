@@ -4953,6 +4953,16 @@ Object* AIUpdateInterface::getNextMoodTarget( Bool calledByAI, Bool calledDuring
 	if (isFireSuppressedByHoldFire())
 		return nullptr;
 
+	// TheSuperHackers @feature waypoint system (issue #122): a unit walking a plotted chain must
+	// not pick up targets of opportunity at the pauses between nodes -- a bomber that breaks off
+	// on its own at every waypoint to bomb something nearby reads as "the bombs ignore the route".
+	// The idle scan is vetoed for the whole duration of a sequence; attack-move and explicit
+	// attack orders come through here with calledDuringIdle false and keep working, and once the
+	// chain has run dry the ordinary idle behaviour returns. Priority lists return false from
+	// isExecutingSequence, so a defence reading one keeps its standing order.
+	if( calledDuringIdle && TheCommandSequence != nullptr && TheCommandSequence->isExecutingSequence( obj->getID() ) )
+		return nullptr;
+
 	if (obj->testStatus(OBJECT_STATUS_IS_USING_ABILITY)) {
 		return nullptr;  // we are doing a special ability.  Shouldn't auto-acquire a target at this time.  jba.
 	}
