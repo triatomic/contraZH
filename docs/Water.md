@@ -140,9 +140,9 @@ be painted onto dry ground; see [Stochastic terrain](dx9feat.md#stochastic-terra
 
 ### Animation
 
-* `WaterAnimationFps = 0` - (Moves the water as if the game ran at this rate, 30 to 60. Without it
-the water speeds up with the frame rate when the game logic is uncapped. 30 gives the original
-speed. 0 moves the water every frame.)
+* `WaterAnimationFps = 30` - (Moves the water as if the game ran at this rate, 30 to 60. 30 gives the
+original speed. 0 moves the water every frame, so it speeds up with the frame rate when the game
+logic is uncapped.)
 
 ### Swell
 
@@ -250,7 +250,7 @@ One block. `map.ini` can override any of these keys for its map.
 | `ShaderWaterPlanarDistortion` | number | `0.02` | `0` - `0.1` | Fraction of the screen the waves bend the mirrored scene by. `0` keeps it sharp. |
 | `ShaderWaterClearReflections` | Yes/No | `Yes` | - | Shadows leave the reflections as bright as around them. Shader model 3 only. |
 | `ShaderWaterSoftShadows` | Yes/No | `Yes` | - | Shadows in the water blur with depth and sway with the ripples. Shader model 3 only. |
-| `WaterAnimationFps` | whole number | `0` | `0`, or `30` - `60` **(hard)** | Moves the water as if the game ran at that rate. `0` moves it every frame. Values from `1` to `29` count as `30`, and above `60` as `60`. |
+| `WaterAnimationFps` | whole number | `30` | `0`, or `30` - `60` **(hard)** | Moves the water as if the game ran at that rate. `0` moves it every frame. Values from `1` to `29` count as `30`, and above `60` as `60`. |
 
 ## WaterSet
 

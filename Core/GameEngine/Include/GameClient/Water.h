@@ -176,7 +176,7 @@ class WaterTransparencySetting : public Overridable
 			m_shaderWaterStochasticSize = 100.0f;
 			m_shaderWaterStochasticSeabed = TRUE;
 			m_isWater = TRUE;
-			m_waterAnimationFps = 0;
+			m_waterAnimationFps = 30;
 		}
 
 		static const FieldParse m_waterTransparencySettingFieldParseTable[];		///< the parse table for INI definition
