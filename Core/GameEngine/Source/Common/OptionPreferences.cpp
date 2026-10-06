@@ -702,6 +702,27 @@ BuildTimerDisplayMode OptionPreferences::getBuildTimerDisplayMode(void) const
 	return BuildTimerDisplayMode_Default;
 }
 
+// Options.ini as ActionLines = Off | All | AttackOnly (a plain index also works).
+ActionLineMode OptionPreferences::getActionLineMode(void) const
+{
+	OptionPreferences::const_iterator it = find("ActionLines");
+	if (it == end())
+		return ActionLineMode_Default;
+
+	if (stricmp(it->second.str(), "All") == 0)
+		return ActionLineMode_All;
+	if (stricmp(it->second.str(), "AttackOnly") == 0)
+		return ActionLineMode_AttackOnly;
+	if (stricmp(it->second.str(), "Off") == 0)
+		return ActionLineMode_Off;
+
+	Int mode = atoi(it->second.str());
+	if (mode >= 0 && mode < ActionLineMode_Count)
+		return (ActionLineMode)mode;
+
+	return ActionLineMode_Default;
+}
+
 UnsignedByte OptionPreferences::getColorChannel(const char *keyName, UnsignedByte defaultValue) const
 {
 	OptionPreferences::const_iterator it = find(AsciiString(keyName));

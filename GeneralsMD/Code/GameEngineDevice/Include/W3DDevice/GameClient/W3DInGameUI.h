@@ -44,6 +44,8 @@
 #include "WW3D2/line3d.h"
 
 class HAnimClass;
+class TextureClass;
+class Image;
 
 // W3DInGameUI ----------------------------------------------------------------
 /** Implementation for the W3D game user interface.  This singleton is
@@ -80,10 +82,21 @@ protected:
 	virtual void drawMoveHints( View *view );			///< draw move hint visual feedback
 	virtual void drawAttackHints( View *view );		///< draw attack hint visual feedback
 	virtual void drawPlaceAngle( View *view ); 		///< draw place building angle if needed
+	void drawActionLines();												///< a line from each selected unit to where its order sends it
+
+	struct ActionMarker
+	{
+		TextureClass *texture;
+		Image *image;
+		ICoord2D hotSpot;
+		Bool loaded;
+	};
+	void loadActionMarker( ActionMarker& marker, Mouse::MouseCursor cursor );	///< a cursor as a texture, for the marker on each destination
 
 	RenderObjClass *m_moveHintRenderObj[ MAX_MOVE_HINTS ];
 	HAnimClass		 *m_moveHintAnim[ MAX_MOVE_HINTS ];
 	RenderObjClass *m_buildingPlacementAnchor;
 	RenderObjClass *m_buildingPlacementArrow;
+	ActionMarker m_actionMarkers[ ACTION_LINE_KIND_COUNT ];
 
 };

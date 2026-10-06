@@ -42,6 +42,7 @@
 #include "Common/NameKeyGenerator.h"
 #include "Common/PerfTimer.h"
 #include "Common/Player.h"
+#include "Common/OptionPreferences.h"
 #include "Common/PlayerList.h"
 #include "Common/Radar.h"
 #include "Common/Team.h"
@@ -86,6 +87,9 @@
 #include "GameClient/GlobalLanguage.h"
 
 #include "GameLogic/AIGuard.h"
+#include "GameLogic/AIPathfind.h"
+#include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/GameLogic.h"
@@ -2185,6 +2189,8 @@ void InGameUI::update()
 
 	// TheSuperHackers @feature Fire a queued quick cast as soon as its ability comes up.
 	updateQueuedQuickCast();
+
+	updateActionLines();
 
 	/// @todo make sure this code gets called even when the UI is not being drawn
 	if ( m_videoStream && m_videoBuffer )
@@ -4487,6 +4493,276 @@ void InGameUI::clearModifierModes()
 	setCameraRotateRight( false );		// KP6
 	setCameraZoomIn( false );					// KP8
 	setCameraZoomOut( false );				// KP2
+}
+
+//-------------------------------------------------------------------------------------------------
+/** A guard order clears the goal position, so the guarded spot is read off the AI itself. */
+//-------------------------------------------------------------------------------------------------
+static Bool getGuardedSpot( const AIUpdateInterface *ai, Coord3D& spot )
+{
+	switch( ai->getGuardTargetType() )
+	{
+		case GUARDTARGET_LOCATION:
+			spot = *ai->getGuardLocation();
+			return TRUE;
+
+		case GUARDTARGET_OBJECT:
+		{
+			const Object *guarded = TheGameLogic->findObjectByID( ai->getGuardObject() );
+			if( guarded == nullptr )
+			{
+				return FALSE;
+			}
+			spot = *guarded->getPosition();
+			return TRUE;
+		}
+
+		case GUARDTARGET_AREA:
+		{
+			const PolygonTrigger *area = ai->getAreaToGuard();
+			if( area == nullptr )
+			{
+				return FALSE;
+			}
+			area->getCenterPoint( &spot );
+			return TRUE;
+		}
+
+		default:
+			return FALSE;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Read each selected unit's destination off its AI every frame, so a line lasts exactly as long
+	* as its order. */
+//-------------------------------------------------------------------------------------------------
+void InGameUI::updateActionLines()
+{
+	// last frame's lines, kept so this frame's markers inherit their age
+	std::vector<ActionLine> previous;
+	previous.swap( m_actionLines );
+	m_drawnActionLines.clear();
+
+	if( TheGlobalData->m_actionLineMode == ActionLineMode_Off )
+	{
+		return;
+	}
+	const Bool attackOnly = TheGlobalData->m_actionLineMode == ActionLineMode_AttackOnly;
+
+	Player *local = ThePlayerList->getLocalPlayer();
+	for( DrawableList::const_iterator it = m_selectedDrawables.begin(); it != m_selectedDrawables.end(); ++it )
+	{
+		Object *obj = (*it)->getObject();
+		if( obj == nullptr || obj->getControllingPlayer() != local )
+		{
+			continue;
+		}
+
+		// the nexus holds an angry mob's order, so only it draws
+		if( obj->isKindOf( KINDOF_IGNORED_IN_GUI ) )
+		{
+			continue;
+		}
+
+		AIUpdateInterface *ai = obj->getAIUpdateInterface();
+		if( ai == nullptr )
+		{
+			continue;
+		}
+
+		ActionLine line;
+		line.owner = obj->getID();
+		line.from = *obj->getPosition();
+		Bool goalResolved = FALSE;
+
+		switch( ai->getCurrentStateID() )
+		{
+			case AI_MOVE_TO:
+			case AI_FOLLOW_PATH:
+			case AI_FOLLOW_EXITPRODUCTION_PATH:
+			case AI_MOVE_AND_EVACUATE:
+			case AI_MOVE_AND_EVACUATE_AND_EXIT:
+			case AI_MOVE_AND_DELETE:
+			case AI_MOVE_AND_TIGHTEN:
+			case AI_PICK_UP_CRATE:
+			case AI_FOLLOW_WAYPOINT_PATH_AS_TEAM:
+			case AI_FOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS:
+			case AI_FOLLOW_WAYPOINT_PATH_AS_TEAM_EXACT:
+			case AI_FOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS_EXACT:
+			case AI_ENTER:
+			case AI_RAPPEL_INTO:
+			case AI_COMBATDROP:
+			case AI_DOCK:
+			case AI_GET_REPAIRED:
+			case AI_HACK_INTERNET:
+				line.kind = ACTION_LINE_MOVE;
+				break;
+
+			// the attack move path is replaced whenever the unit stops to fight, so aim at the clicked point
+			case AI_ATTACK_MOVE_TO:
+				line.kind = ACTION_LINE_ATTACK_MOVE;
+				line.to = *ai->getGoalPosition();
+				goalResolved = TRUE;
+				break;
+
+			case AI_ATTACKFOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS:
+			case AI_ATTACKFOLLOW_WAYPOINT_PATH_AS_TEAM:
+			case AI_HUNT:
+				line.kind = ACTION_LINE_ATTACK_MOVE;
+				break;
+
+			case AI_ATTACK_OBJECT:
+			case AI_ATTACK_AND_FOLLOW_OBJECT:
+			case AI_ATTACK_SQUAD:
+			case AI_FORCE_ATTACK_OBJECT:
+			case AI_ATTACK_AREA:
+				line.kind = ACTION_LINE_ATTACK;
+				break;
+
+			case AI_ATTACK_POSITION:
+				line.kind = ACTION_LINE_ATTACK_GROUND;
+				line.to = *ai->getGoalPosition();
+				goalResolved = TRUE;
+				break;
+
+			case AI_GUARD:
+			case AI_GUARD_RETALIATE:
+			case AI_GUARD_TUNNEL_NETWORK:
+				line.kind = ACTION_LINE_GUARD;
+				goalResolved = getGuardedSpot( ai, line.to );
+				if( !goalResolved )
+				{
+					continue;
+				}
+				break;
+
+			default:
+				continue;
+		}
+
+		if( attackOnly && ( line.kind == ACTION_LINE_MOVE || line.kind == ACTION_LINE_GUARD ) )
+		{
+			continue;
+		}
+
+		if( !goalResolved )
+		{
+			const Int pathSize = ai->friend_getWaypointGoalPathSize();
+			const Int pathIndex = ai->friend_getCurrentGoalPathIndex();
+			Object *goalObj = ai->getGoalObject();
+			Path *path = ai->getPath();
+			if( pathSize > 0 && pathIndex >= 0 && pathIndex < pathSize )
+			{
+				// a queued path draws one line per leg
+				for( Int i = pathIndex; i < pathSize - 1; ++i )
+				{
+					line.to = *ai->friend_getGoalPathPosition( i );
+					addActionLine( line, previous );
+					line.from = line.to;
+				}
+				line.to = *ai->friend_getGoalPathPosition( pathSize - 1 );
+			}
+			else if( goalObj )
+			{
+				line.to = *goalObj->getPosition();
+			}
+			else if( path )
+			{
+				// a group sent to one spot spreads over the free cells round it
+				line.to = *path->getLastNode()->getPosition();
+			}
+			else
+			{
+				line.to = *ai->getGoalPosition();
+			}
+		}
+
+		addActionLine( line, previous );
+	}
+
+	bunchActionLines();
+}
+
+//-------------------------------------------------------------------------------------------------
+/** The n-th line of a unit inherits the age of its n-th line last frame. */
+//-------------------------------------------------------------------------------------------------
+void InGameUI::addActionLine( ActionLine& line, const std::vector<ActionLine>& previous )
+{
+	Int ordinal = 0;
+	for( std::vector<ActionLine>::const_iterator it = m_actionLines.begin(); it != m_actionLines.end(); ++it )
+	{
+		if( it->owner == line.owner )
+		{
+			++ordinal;
+		}
+	}
+
+	line.bornMs = timeGetTime();
+
+	Int seen = 0;
+	for( std::vector<ActionLine>::const_iterator it = previous.begin(); it != previous.end(); ++it )
+	{
+		if( it->owner == line.owner && seen++ == ordinal )
+		{
+			line.bornMs = it->bornMs;
+			break;
+		}
+	}
+
+	m_actionLines.push_back( line );
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Lines of one kind that start and end near each other merge into one from their average start
+	* to their average end. */
+//-------------------------------------------------------------------------------------------------
+void InGameUI::bunchActionLines()
+{
+	const Real BUNCH_RADIUS = 100.0f;
+	const Real bunchRadiusSqr = BUNCH_RADIUS * BUNCH_RADIUS;
+
+	std::vector<Int> memberCounts;
+	for( std::vector<ActionLine>::const_iterator line = m_actionLines.begin(); line != m_actionLines.end(); ++line )
+	{
+		Bool joined = FALSE;
+		for( size_t i = 0; i < m_drawnActionLines.size(); ++i )
+		{
+			ActionLine& bunch = m_drawnActionLines[ i ];
+			if( bunch.kind != line->kind )
+			{
+				continue;
+			}
+			const Real fromX = bunch.from.x - line->from.x;
+			const Real fromY = bunch.from.y - line->from.y;
+			const Real toX = bunch.to.x - line->to.x;
+			const Real toY = bunch.to.y - line->to.y;
+			if( fromX * fromX + fromY * fromY > bunchRadiusSqr || toX * toX + toY * toY > bunchRadiusSqr )
+			{
+				continue;
+			}
+
+			// running averages, so later members compare against the middle of the bunch
+			const Real share = 1.0f / (Real)( ++memberCounts[ i ] );
+			bunch.from.x += ( line->from.x - bunch.from.x ) * share;
+			bunch.from.y += ( line->from.y - bunch.from.y ) * share;
+			bunch.from.z += ( line->from.z - bunch.from.z ) * share;
+			bunch.to.x += ( line->to.x - bunch.to.x ) * share;
+			bunch.to.y += ( line->to.y - bunch.to.y ) * share;
+			bunch.to.z += ( line->to.z - bunch.to.z ) * share;
+
+			// the oldest member's age, so a unit joining a standing order does not restart the slide
+			bunch.bornMs = min( bunch.bornMs, line->bornMs );
+			joined = TRUE;
+			break;
+		}
+
+		if( !joined )
+		{
+			m_drawnActionLines.push_back( *line );
+			memberCounts.push_back( 1 );
+		}
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
