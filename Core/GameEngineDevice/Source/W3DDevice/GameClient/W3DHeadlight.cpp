@@ -263,10 +263,6 @@ static Real Box_Radius(const BeamBox &box, Int sideA, Int sideB)
 	return max(box.high[sideA] - box.low[sideA], box.high[sideB] - box.low[sideB]) * 0.5f;
 }
 
-// Cones whose lamps lie closer than this share of their radius, and that aim the same way, draw as one under
-// HeadlightPerConeAim. Their beams overlap along most of their length.
-static const Real CONE_MERGE_SHARE = 1.0f;
-
 // Cones whose directions' cosine is above this aim the same way.
 static const Real SAME_AIM = 0.97f;
 
@@ -282,11 +278,6 @@ struct ConeFit
 // Fits a cone along the points' long axis, which the spread of the points found by power iteration gives.
 static Bool Fit_Cone(const std::vector<Vector3> &points, ConeFit &fit)
 {
-	if (points.empty())
-	{
-		return FALSE;
-	}
-
 	Vector3 middle(0.0f, 0.0f, 0.0f);
 	for (size_t i = 0; i < points.size(); i++)
 	{
@@ -294,36 +285,30 @@ static Bool Fit_Cone(const std::vector<Vector3> &points, ConeFit &fit)
 	}
 	middle /= (Real)points.size();
 
-	Real spread[3][3] = { { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } };
+	const Vector3 zero(0.0f, 0.0f, 0.0f);
+	Matrix3x3 spread(zero, zero, zero);
 	for (size_t i = 0; i < points.size(); i++)
 	{
 		const Vector3 offset = points[i] - middle;
 		for (Int row = 0; row < 3; row++)
 		{
-			for (Int column = 0; column < 3; column++)
-			{
-				spread[row][column] += offset[row] * offset[column];
-			}
+			spread[row] += offset * offset[row];
 		}
 	}
 
+	// The spread is symmetric, so its rows are its columns.
 	Int widest = 0;
-	Real widestLength = -1.0f;
-	for (Int column = 0; column < 3; column++)
+	for (Int row = 1; row < 3; row++)
 	{
-		const Real length = Vector3(spread[0][column], spread[1][column], spread[2][column]).Length();
-		if (length > widestLength)
+		if (spread[row].Length() > spread[widest].Length())
 		{
-			widestLength = length;
-			widest = column;
+			widest = row;
 		}
 	}
-	Vector3 axis(spread[0][widest], spread[1][widest], spread[2][widest]);
+	Vector3 axis = spread[widest];
 	for (Int step = 0; step < 32; step++)
 	{
-		axis = Vector3(spread[0][0] * axis.X + spread[0][1] * axis.Y + spread[0][2] * axis.Z,
-			spread[1][0] * axis.X + spread[1][1] * axis.Y + spread[1][2] * axis.Z,
-			spread[2][0] * axis.X + spread[2][1] * axis.Y + spread[2][2] * axis.Z);
+		axis = spread * axis;
 
 		// The comparison also fails a length that is not a number.
 		const Real length = axis.Length();
@@ -425,7 +410,8 @@ static Int Find_Cone_Beams(MeshModelClass &model, Int partCount, const std::vect
 		lampOfPart[i] = -1;
 		for (Int j = 0; j < i && lampOfPart[i] < 0; j++)
 		{
-			const Real reach = CONE_MERGE_SHARE * max(fits[i].radius, fits[j].radius);
+			// Cones aiming the same way with lamps within a radius of each other overlap along most of their length.
+			const Real reach = max(fits[i].radius, fits[j].radius);
 			if ((fits[i].start - fits[j].start).Length() < reach && Vector3::Dot_Product(aims[i], aims[j]) > SAME_AIM)
 			{
 				lampOfPart[i] = lampOfPart[j];
