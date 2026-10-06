@@ -236,8 +236,13 @@ Bool CommandSequence::commit()
 	m_activeCount += m_pendingCount;
 
 	if( m_current == nullptr )
+	{
 		m_current = m_activeHead;
-	m_currentDispatched = FALSE;
+		m_currentDispatched = FALSE;	// fresh head: needs its first dispatch
+	}
+	// else: a node is already executing (a build under way, an attack being fought).
+	// Appending must not re-arm it: re-dispatching a build node would place the
+	// building a second time and abandon the construction it interrupts.
 
 	m_pendingHead = nullptr;
 	m_pendingTail = nullptr;
@@ -941,10 +946,13 @@ Bool CommandSequenceSystem::onCommitMessage( const GameMessage *msg )
 		if( subjects[ s ] == INVALID_ID )
 			continue;
 
-		CommandSequence *seq = createSequence( subjects[ s ] );
-
-		// a fresh commit replaces whatever this unit was queued to do
-		seq->clear();
+		// The commit carries only the nodes plotted in this session, so it APPENDS to what
+		// the unit is already working through. Clearing here would drop the node currently
+		// being executed -- a build under way would be abandoned and its foundation left
+		// half-built. Replacing a running chain is what ordinary orders are for.
+		CommandSequence *seq = getSequence( subjects[ s ] );
+		if( seq == nullptr )
+			seq = createSequence( subjects[ s ] );
 
 		// An immobile defence cannot run an errand queue -- it cannot walk anywhere, build,
 		// board or repair. What it can be given is an ordered list of things to kill, so its
