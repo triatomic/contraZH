@@ -576,10 +576,15 @@ void MetaEventTranslator::onKeyEvent(const GameMessage *msg, GameMessageDisposit
 	// TheSuperHackers @feature new waypoint system (issue #122): while Alt is held to plot a
 	// route, Ctrl must still enter force attack. The meta map matches modifier states exactly,
 	// so the held Alt would make Ctrl-down miss its CTRL binding. Strip Alt from Ctrl's own
-	// events only; Shift keeps its Alt state, so the Alt+Shift "focus all" binding lands in
-	// either press order.
+	// press events only; Shift keeps its Alt state, so the Alt+Shift "focus all" binding lands
+	// in either press order.
+	// Release events must keep the Alt bit: the modifier tracker (onKeyModStateRemoved) uses
+	// the state of a release to decide which held combos to retire, and a stripped state would
+	// report Alt as gone -- retiring (NONE, ALT) fires END_WAYPOINTS, committing and leaving
+	// waypoint mode while the player is still holding Alt and mid-plot.
 	if( TheInGameUI != nullptr && TheInGameUI->isInWaypointMode()
-			&& ( systemKey == KEY_LCTRL || systemKey == KEY_RCTRL ) )
+			&& ( systemKey == KEY_LCTRL || systemKey == KEY_RCTRL )
+			&& ( systemKeyState & KEY_STATE_DOWN ) )
 	{
 		systemKeyState &= ~KEY_STATE_ALT;
 	}
