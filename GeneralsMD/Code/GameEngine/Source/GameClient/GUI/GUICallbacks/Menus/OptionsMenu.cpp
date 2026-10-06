@@ -1768,6 +1768,9 @@ static void initShadersWindows()
 	static const WideChar *const shadowMapNames[] = { L"512 x 512", L"1024 x 1024", L"2048 x 2048", L"4096 x 4096" };
 	static_assert( ARRAY_SIZE(shadowMapNames) == ARRAY_SIZE(ShadowMapResolutions), "shadowMapNames out of date" );
 	addComboEntries( comboBoxShadows, "GUI:ShadowMapResolution", shadowMapNames, ARRAY_SIZE(ShadowMapResolutions), 3 );
+
+	// not every layout ships the panel hidden
+	WinShaders->winHide( TRUE );
 }
 
 // TheSuperHackers @tweak Now prints additional version information in the version label.
