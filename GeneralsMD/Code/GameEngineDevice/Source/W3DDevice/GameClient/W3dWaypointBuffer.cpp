@@ -142,7 +142,7 @@ void W3DWaypointBuffer::drawPendingCommandSequence( RenderInfoClass &rinfo )
 
 	const std::map< ObjectID, CommandSequence * > &chains = TheInGameUI->getPendingSequences();
 
-	// NOTE: no early return on empty pending chains — the executing-routes pass further down
+	// NOTE: no early return on empty pending chains -- the executing-routes pass further down
 	// must still run (it draws committed sequences, which exist precisely when the pending
 	// ones are gone). An empty map simply iterates zero times.
 
@@ -171,11 +171,45 @@ void W3DWaypointBuffer::drawPendingCommandSequence( RenderInfoClass &rinfo )
 		// the line from the unit to its FIRST waypoint is drawn too; the array has the +1
 		// slot reserved for exactly this point. Without it the preview reads as a chain
 		// floating in space: segment 1->2 is visible but unit->1 is missing.
+		// TheSuperHackers @fix (issue #122) appending to a chain that is already running must
+		// not start at the unit: the unit is somewhere mid-route, while the new orders join
+		// after the plotted ones -- the line has to continue from the original chain's LAST
+		// waypoint, not from where the unit happens to be standing. Walk the committed
+		// sequence's remaining nodes and start at the last one the observer may see (the same
+		// visibility rule the executing pass uses, so a stealthed tail target never leaks into
+		// the line); a unit with no live chain still starts from itself.
 		Object *subject = ( TheGameLogic != nullptr ) ? TheGameLogic->findObjectByID( chainIt->first ) : nullptr;
 		if( subject != nullptr && !subject->isEffectivelyDead() )
 		{
-			const Coord3D *unitPos = subject->getPosition();
-			points[ count ].Set( unitPos->x, unitPos->y, unitPos->z );
+			const Coord3D *startPos = subject->getPosition();
+
+			if( TheCommandSequence != nullptr )
+			{
+				CommandSequence *running = TheCommandSequence->getSequence( subject->getID() );
+				if( running != nullptr && !running->isPriorityTargetList() )
+				{
+					CommandNode *tail = nullptr;
+					for( CommandNode *node = running->getCurrentNode(); node != nullptr; node = node->getNext() )
+					{
+						if( node->getTargetID() != INVALID_ID )
+						{
+							Object *target = ( TheGameLogic != nullptr ) ? TheGameLogic->findObjectByID( node->getTargetID() ) : nullptr;
+							Drawable *targetDraw = ( target != nullptr ) ? target->getDrawable() : nullptr;
+
+							if( targetDraw == nullptr || targetDraw->isDrawableEffectivelyHidden() ||
+									targetDraw->getFullyObscuredByShroud() )
+								continue;	// the executing pass skips these too -- stay consistent
+						}
+
+						tail = node;
+					}
+
+					if( tail != nullptr && tail->getLocation() != nullptr )
+						startPos = tail->getLocation();
+				}
+			}
+
+			points[ count ].Set( startPos->x, startPos->y, startPos->z );
 			count++;
 		}
 

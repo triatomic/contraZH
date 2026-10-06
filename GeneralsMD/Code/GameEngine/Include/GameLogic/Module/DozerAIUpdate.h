@@ -357,14 +357,14 @@ protected:
 	DozerBuildSubTask m_buildSubTask;		///< for building and actually docking for the build
 
 	//
-	// TheSuperHackers @feature waypoint build queue — FIFO of foundations to construct after
+	// TheSuperHackers @feature waypoint build queue -- FIFO of foundations to construct after
 	// the current path and any earlier queued builds are finished (waypoint building)
 	//
 	enum { DOZER_MAX_QUEUED_BUILDS = 16 };
 
 	//
 	// What we *intend* to build. Deliberately NOT ObjectIDs: while an order sits in here
-	// no foundation exists and no money has been spent — this is the "ghost" order that the
+	// no foundation exists and no money has been spent -- this is the "ghost" order that the
 	// client renders as a translucent preview. The foundation is only created (and paid for)
 	// once we actually arrive at the waypoint this order is waiting on, which is also when
 	// the placement gets re-validated (the world may have changed since the order was given).
@@ -415,7 +415,7 @@ protected:
 	/// TheSuperHackers @feature Turn a ghost order into a real foundation: re-validate the
 	/// placement (the world may have changed since the order was issued), then create the
 	/// under-construction object and take the money. Returns FALSE and reports why if the
-	/// site is no longer buildable — the caller then just drops the order.
+	/// site is no longer buildable -- the caller then just drops the order.
 	Bool materializeQueuedBuild( const ThingTemplate *what, const Coord3D *pos, Real angle );
 
 	/// TheSuperHackers @feature read-only view of the queued ghost orders, used by the client

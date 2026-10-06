@@ -317,7 +317,7 @@ UpdateSleepTime WorkerAIUpdate::update()
 
 		}
 
-		// TheSuperHackers @feature waypoint build queue — start the next queued construction
+		// TheSuperHackers @feature waypoint build queue -- start the next queued construction
 		// if we're in dozer mode, idle, and no longer moving
 		processBuildQueue();
 
@@ -428,7 +428,7 @@ Object *WorkerAIUpdate::construct( const ThingTemplate *what,
 
 // ------------------------------------------------------------------------------------------------
 /** TheSuperHackers @feature Create the under-construction object at the given location and
-	* withdraw the money for it.  This does NOT assign any task to the worker — callers must
+	* withdraw the money for it.  This does NOT assign any task to the worker -- callers must
 	* either newTask( DOZER_TASK_BUILD, obj ) or queue the object via queueBuild().
 	* NOTE: If you modify this you must modify the dozer too !!! */
 // ------------------------------------------------------------------------------------------------
@@ -553,7 +553,7 @@ Object *WorkerAIUpdate::queueConstruct( const ThingTemplate *what,
 
 	// Do NOT append the build site to our goal path. Walking onto the middle of the future
 	// building leaves the worker standing right on the foundation, which makes
-	// findGoodBuildOrRepairPositionAndTarget() fail inside newTask() — the foundation gets
+	// findGoodBuildOrRepairPositionAndTarget() fail inside newTask() -- the foundation gets
 	// created but no build task is ever recorded, so the worker just wanders off and never
 	// builds. (privateFollowPathAppend()'s fallback also clears the whole state machine.)
 	// The site is already visible through the ghost preview, so the route line does not need
@@ -568,7 +568,7 @@ Object *WorkerAIUpdate::queueConstruct( const ThingTemplate *what,
 
 	queueBuild( what, pos, angle, waypointIndex );
 
-	// No object yet — only a ghost order. The foundation is created when the order fires.
+	// No object yet -- only a ghost order. The foundation is created when the order fires.
 	return nullptr;
 
 }
@@ -584,7 +584,7 @@ void WorkerAIUpdate::queueBuild( const ThingTemplate *what, const Coord3D *pos, 
 	if( what == nullptr || pos == nullptr )
 		return;
 
-	// nothing left to walk to before this order (or there never was a waypoint) — turn it
+	// nothing left to walk to before this order (or there never was a waypoint) -- turn it
 	// into a real foundation right away instead of parking it in the queue
 	if( isTaskPending( DOZER_TASK_BUILD ) == FALSE &&
 			hasReachedQueuedWaypoint( waypointIndex ) )
@@ -597,7 +597,7 @@ void WorkerAIUpdate::queueBuild( const ThingTemplate *what, const Coord3D *pos, 
 	if( m_queuedBuildCount >= DOZER_MAX_QUEUED_BUILDS )
 	{
 		// queue is full. Nothing was created and no money was taken for this order yet,
-		// so there is nothing to refund and nothing to destroy — just drop the order.
+		// so there is nothing to refund and nothing to destroy -- just drop the order.
 		return;
 	}
 
@@ -613,7 +613,7 @@ void WorkerAIUpdate::queueBuild( const ThingTemplate *what, const Coord3D *pos, 
 // ------------------------------------------------------------------------------------------------
 /** TheSuperHackers @feature Turn a ghost order into a real foundation. This is the *second*
 	* validation pass: the order was already checked when the player issued it, but by the time
-	* we actually walk to the waypoint the world may have changed — someone else may have
+	* we actually walk to the waypoint the world may have changed -- someone else may have
 	* claimed the ground, we may have run out of money, or the site may be shrouded again.
 	* Only if it still checks out do we create the foundation and take the money. */
 // ------------------------------------------------------------------------------------------------
@@ -649,7 +649,7 @@ Bool WorkerAIUpdate::materializeQueuedBuild( const ThingTemplate *what, const Co
 		return FALSE;
 	}
 
-	// now — and only now — raise the foundation and take the money
+	// now -- and only now -- raise the foundation and take the money
 	Object *obj = createConstruction( what, pos, angle, owningPlayer, FALSE );
 	if( obj == nullptr )
 		return FALSE;
@@ -658,7 +658,7 @@ Bool WorkerAIUpdate::materializeQueuedBuild( const ThingTemplate *what, const Co
 	// its dock points, and the worker machine then drives the worker to the site and builds it.
 	//
 	// Do NOT call aiIdle() here. processBuildQueue() runs from within update(), and resetting
-	// the AI state machine on that stack destroys the context the caller is still using — that
+	// the AI state machine on that stack destroys the context the caller is still using -- that
 	// crashed the game the very moment a queued order finally triggered.
 	newTask( DOZER_TASK_BUILD, obj );
 	return TRUE;
@@ -668,7 +668,7 @@ Bool WorkerAIUpdate::materializeQueuedBuild( const ThingTemplate *what, const Co
 // ------------------------------------------------------------------------------------------------
 /** TheSuperHackers @feature Read-only accessors for the queued ghost orders. The client uses
 	* these to draw a translucent preview of each pending build at its recorded site and
-	* angle — see W3dWaypointBuffer::drawWaypoints. */
+	* angle -- see W3dWaypointBuffer::drawWaypoints. */
 // ------------------------------------------------------------------------------------------------
 const ThingTemplate *WorkerAIUpdate::getQueuedBuildTemplate( Int i ) const
 {
@@ -716,7 +716,7 @@ Bool WorkerAIUpdate::hasReachedQueuedWaypoint( Int waypointIndex ) const
 		Int currentIndex = friend_getCurrentGoalPathIndex();
 
 		// The order must fire as soon as the *previous* waypoint is finished, i.e. the moment
-		// this build's waypoint becomes the one we are heading for — not once we have physically
+		// this build's waypoint becomes the one we are heading for -- not once we have physically
 		// walked all the way onto the build site. Reaching that site is what the resulting
 		// construction task does afterwards.
 		// While travelling to an earlier node (currentIndex < waypointIndex) we are still on our
@@ -747,7 +747,7 @@ void WorkerAIUpdate::processBuildQueue()
 		return;
 
 	// TheSuperHackers @feature A disabled builder (EMP-paralysed, driver sniped, subverted...)
-	// has lost control of itself, so its queued orders are voided outright — losing control
+	// has lost control of itself, so its queued orders are voided outright -- losing control
 	// cancels the pending intentions. They are only ghost orders (nothing was created,
 	// no money taken), so there is nothing to refund.
 	if( getObject()->isDisabled() )
@@ -1101,7 +1101,7 @@ void WorkerAIUpdate::cancelAllTasks()
 		internalCancelTask((DozerTask)task);
 
 	// TheSuperHackers @feature also drop any queued waypoint orders (builds and queued
-	// movement). These are ghost orders only — no foundation was ever created and no money
+	// movement). These are ghost orders only -- no foundation was ever created and no money
 	// was taken, so there is nothing to refund or destroy here.
 	m_queuedBuildCount = 0;
 	for( Int q = 0; q < DOZER_MAX_QUEUED_BUILDS; q++ )
@@ -2029,7 +2029,7 @@ void WorkerAIUpdate::xfer( Xfer *xfer )
 			// Legacy layout (version 3/4): the foundation had already been created when the
 			// order was issued, so entries were plain ObjectIDs. A ghost order has no object,
 			// but we must still consume the data to keep the stream aligned. Queued orders
-			// coming from an older save are therefore dropped — nothing had been refundable
+			// coming from an older save are therefore dropped -- nothing had been refundable
 			// at queue time under the new scheme anyway.
 			for (Int q = 0; q < m_queuedBuildCount; q++)
 			{
@@ -2046,7 +2046,7 @@ void WorkerAIUpdate::xfer( Xfer *xfer )
 		}
 		else
 		{
-			// Ghost orders: what to build, where, and at which angle — the angle is part of
+			// Ghost orders: what to build, where, and at which angle -- the angle is part of
 			// the order so the preview and the finished building face the same way.
 			for (Int q = 0; q < m_queuedBuildCount; q++)
 			{
