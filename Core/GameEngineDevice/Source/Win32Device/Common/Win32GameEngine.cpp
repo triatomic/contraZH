@@ -32,6 +32,7 @@
 #include <windows.h>
 
 #include "Win32Device/Common/Win32GameEngine.h"
+#include "Common/MessageStream.h"
 #include "Common/PerfTimer.h"
 
 #include "GameClient/InGameUI.h"
@@ -47,12 +48,14 @@ extern HWND ApplicationHWnd;
 
 //-------------------------------------------------------------------------------------------------
 // TheSuperHackers @feature new waypoint system (issue #122). While the player holds Alt to plot
-// a route, an accidental Alt+Tab hands the game's focus to the task switcher and the whole plot
-// dies with the focus. A low-level keyboard hook swallows Tab while Alt is down -- but only for
-// as long as the player is actually plotting in a running game with input enabled, and only
-// while the game window is the foreground window. Every other moment Alt+Tab stays exactly what
-// Windows users expect it to be, so a stuck game can still be left the usual way. Releasing Alt
-// first and then pressing Alt+Tab remains the deliberate way out of a plotting session.
+// a route, Alt+Tab is the in-game "step the plotting focus to the next selected unit" key -- and
+// an accidental task switch would kill the whole plot. A low-level keyboard hook swallows Tab
+// while Alt is down (the task switcher never engages) and hands one focus step per physical
+// press to the message stream -- but only for as long as the player is actually plotting in a
+// running game with input enabled, and only while the game window is the foreground window.
+// Every other moment Alt+Tab stays exactly what Windows users expect it to be, so a stuck game
+// can still be left the usual way. Releasing Alt first and then pressing Alt+Tab remains the
+// deliberate way out of a plotting session.
 //-------------------------------------------------------------------------------------------------
 static HHOOK s_waypointKeyboardHook = nullptr;
 
@@ -73,16 +76,35 @@ static Bool waypointGuardShouldSwallowTab()
 	return ( GetForegroundWindow() == ApplicationHWnd );
 }
 
+static Bool s_waypointTabWasDown = FALSE;
+
 static LRESULT CALLBACK waypointKeyboardHookProc( int code, WPARAM wParam, LPARAM lParam )
 {
 	if( code >= 0 )
 	{
 		const KBDLLHOOKSTRUCT *info = (const KBDLLHOOKSTRUCT *)lParam;
-		if( info != nullptr && info->vkCode == VK_TAB
-				&& ( GetAsyncKeyState( VK_MENU ) & 0x8000 )
-				&& waypointGuardShouldSwallowTab() )
+		if( info != nullptr && info->vkCode == VK_TAB )
 		{
-			return 1;	// swallow the key: the task switcher never sees it
+			const Bool isKeyUp = ( info->flags & LLKHF_UP ) != 0;
+			const Bool altDown = ( GetAsyncKeyState( VK_MENU ) & 0x8000 ) != 0;
+
+			if( altDown && waypointGuardShouldSwallowTab() )
+			{
+				// Alt+Tab doubles as the in-game "step the plotting focus to the next selected
+				// unit" key: swallow the Tab so the task switcher never engages, and hand one
+				// step per physical press to the message stream. The swallow covers the up
+				// transition too, so nothing dangles half-delivered.
+				if( !isKeyUp && !s_waypointTabWasDown && TheMessageStream != nullptr )
+					TheMessageStream->appendMessage( GameMessage::MSG_META_CYCLE_WAYPOINT_FOCUS );
+
+				s_waypointTabWasDown = !isKeyUp;
+				return 1;
+			}
+
+			// a Tab that reaches the world outside the guard resets the press tracker, so the
+			// next plotting Alt+Tab starts a fresh step
+			if( !altDown && !isKeyUp )
+				s_waypointTabWasDown = FALSE;
 		}
 	}
 

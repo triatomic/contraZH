@@ -589,6 +589,24 @@ void MetaEventTranslator::onKeyEvent(const GameMessage *msg, GameMessageDisposit
 		systemKeyState &= ~KEY_STATE_ALT;
 	}
 
+	// TheSuperHackers @feature new waypoint system (issue #122): Alt+Tab while plotting steps
+	// the focus to the next selected unit. The Win32 low-level hook normally swallows the Tab
+	// (keeping the task switcher out) and emits this same meta event; this safety net covers
+	// the case where that hook never fires, so the key still does its in-game job.
+	if( TheInGameUI != nullptr && TheInGameUI->isInWaypointMode()
+			&& systemKey == KEY_TAB
+			&& ( systemKeyState & KEY_STATE_ALT )
+			&& !( systemKeyState & ( KEY_STATE_CONTROL | KEY_STATE_SHIFT ) ) )
+	{
+		if( ( systemKeyState & KEY_STATE_DOWN ) && !( systemKeyState & KEY_STATE_AUTOREPEAT )
+				&& TheMessageStream != nullptr )
+		{
+			TheMessageStream->appendMessage( GameMessage::MSG_META_CYCLE_WAYPOINT_FOCUS );
+			disp = DESTROY_MESSAGE;
+		}
+		return;
+	}
+
 	const MappableKeyModState keyModState = getKeyModState(systemKeyState);
 
 	const Bool modStateRemoved = (keyType == MK_NONE) && (msg->getType() == GameMessage::MSG_RAW_KEY_UP);
