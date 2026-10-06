@@ -133,6 +133,10 @@ have soft edges. Needs the Direct3D 9 build and a shader model 2 card.
 
 * `ShadowMap = Yes` - (No restores stencil volumes and blob decals. Also `Shadow mapping` in Game
 Options, applied on Accept. Needs `CheckShadowMap` in `OptionsMenu.wnd` for the menu control.)
+* `ShadowMapResolution = 4096` - (The shadow map's width and height: 512, 1024, 2048 or 4096. Other
+values round up to the next of these. Also `Shadows` on the Shaders page of the Options menu, applied
+on Accept without a restart. Larger gives sharper edges and uses more video memory, 64 MB at 4096.
+Needs `ButtonShaders` and `WinShaders` in `OptionsMenu.wnd`, which `build/add_shaders_wnd.py` adds.)
 
 `3D Shadows` and `2D Shadows` still pick the casters: 3D for volume-shadow objects (vehicles,
 buildings, trees), 2D for decal-shadow objects (mostly infantry). Both off means no shadows.
@@ -149,7 +153,7 @@ Notes:
 drawing.
 * Shrouded and stealthed units cast no shadow.
 * Additive and glow passes cast nothing. Opaque meshes cast solid even with an alpha channel.
-* The map is 4096 texels and follows the ground in view, so detail drops when zoomed out. When the
+* The map follows the ground in view, so detail drops when zoomed out. When the
 camera tilts toward the horizon, the map keeps the ground nearest the camera and distant shadows
 fade.
 * The sun is kept at least `ShadowMapMinSunElevation` degrees high (default 30, set in the mod's

@@ -178,6 +178,14 @@ static GameWindow *   ButtonGameOptionsAccept     = nullptr;
 static NameKeyType    ButtonGameOptionsCancelID   = NAMEKEY_INVALID;
 static GameWindow *   ButtonGameOptionsCancel     = nullptr;
 
+//Shaders Screen
+static GameWindow *   WinShaders                  = nullptr;
+static NameKeyType    ButtonShadersID             = NAMEKEY_INVALID;
+static GameWindow *   ButtonShaders               = nullptr;
+static NameKeyType    ButtonShadersAcceptID       = NAMEKEY_INVALID;
+static NameKeyType    ButtonShadersCancelID       = NAMEKEY_INVALID;
+static GameWindow *   comboBoxShadows             = nullptr;
+
 static GameWindow *   buttonMainAccept            = nullptr;
 static GameWindow *   buttonMainBack              = nullptr;
 static GameWindow *   buttonMainDefaults          = nullptr;
@@ -240,6 +248,7 @@ static const char *const HealthBarModeNames[] = { "Classic", "Damaged", "Always"
 static const char *const BuildTimerModeNames[] = { "None", "Seconds", "Auto" };
 static const char *const CastModeNames[] = { "Normal", "QuickCast", "QuickCastWithIndicator" };
 static const Int AnisotropyLevels[] = { 2, 4, 8, 16 };
+static const Int ShadowMapResolutions[] = { 512, 1024, 2048, 4096 };
 static_assert( ARRAY_SIZE(HealthBarModeNames) == HealthBarDisplayMode_Count, "HealthBarModeNames out of date" );
 static const char *const AlliedDecalModeNames[] = { "Hidden", "House", "Army" };
 static_assert( ARRAY_SIZE(AlliedDecalModeNames) == AlliedDecalMode_Count, "AlliedDecalModeNames out of date" );
@@ -505,11 +514,11 @@ static Int bloomPercent( Real strength )
 	return REAL_TO_INT( strength * 100.0f + 0.5f );
 }
 
-static Int anisotropyIndex( Int level )
+static Int levelIndex( const Int *levels, Int count, Int level )
 {
-	for (Int i = 0; i < ARRAY_SIZE(AnisotropyLevels); ++i)
+	for (Int i = 0; i < count; ++i)
 	{
-		if (AnisotropyLevels[i] == level)
+		if (levels[i] == level)
 		{
 			return i;
 		}
@@ -559,7 +568,7 @@ static void populateGameOptions()
 	setComboPos( comboBoxBuildTimers, pref->getBuildTimerDisplayMode() );
 	setComboPos( comboBoxCastMode, pref->getCastMode() );
 	setComboPos( comboBoxTextureFilter, pref->getTextureFilterMode() );
-	setComboPos( comboBoxAnisotropy, anisotropyIndex( pref->getTextureAnisotropyLevel() ) );
+	setComboPos( comboBoxAnisotropy, levelIndex( AnisotropyLevels, ARRAY_SIZE(AnisotropyLevels), pref->getTextureAnisotropyLevel() ) );
 
 	for (Int i = 0; i < ARRAY_SIZE(BoolOptions); ++i)
 	{
@@ -578,6 +587,11 @@ static void populateGameOptions()
 	updateGameOptionsEnables();
 }
 
+static void populateShaders()
+{
+	setComboPos( comboBoxShadows, levelIndex( ShadowMapResolutions, ARRAY_SIZE(ShadowMapResolutions), pref->getShadowMapResolution() ) );
+}
+
 static void setGameOptionsDefaults()
 {
 	if (!WinGameOptions)
@@ -590,7 +604,7 @@ static void setGameOptionsDefaults()
 	setComboPos( comboBoxBuildTimers, BuildTimerDisplayMode_Default );
 	setComboPos( comboBoxCastMode, CastMode_Default );
 	setComboPos( comboBoxTextureFilter, TextureFilterClass::TEXTURE_FILTER_BILINEAR );
-	setComboPos( comboBoxAnisotropy, anisotropyIndex( TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC_2X ) );
+	setComboPos( comboBoxAnisotropy, levelIndex( AnisotropyLevels, ARRAY_SIZE(AnisotropyLevels), TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC_2X ) );
 
 	for (Int i = 0; i < ARRAY_SIZE(BoolOptions); ++i)
 	{
@@ -663,6 +677,7 @@ static void setDefaults()
 
 	showMaxCameraHeight( FALSE, (Int)TheGlobalData->m_defaultMaxCameraHeight );
 	setGameOptionsDefaults();
+	setComboPos( comboBoxShadows, ARRAY_SIZE(ShadowMapResolutions) - 1 );
 
 
 	Int valMin, valMax;
@@ -1149,6 +1164,17 @@ static void saveOptions()
 	}
 
 	//-------------------------------------------------------------------------------------------------
+	// shadow map resolution, which the shadow map takes up on its next frame
+	if (comboBoxShadows)
+	{
+		const Int resolution = ShadowMapResolutions[getComboPos( comboBoxShadows, ARRAY_SIZE(ShadowMapResolutions) - 1 )];
+		AsciiString prefString;
+		prefString.format( "%d", resolution );
+		(*pref)["ShadowMapResolution"] = prefString;
+		TheWritableGlobalData->m_shadowMapResolution = resolution;
+	}
+
+	//-------------------------------------------------------------------------------------------------
 	// draw scroll anchor
 	{
 		if( TheInGameUI->getDrawRMBScrollAnchor() )
@@ -1460,22 +1486,27 @@ static void enableMainButtons( Bool enable )
 	enableWindow( buttonMainDefaults, enable );
 }
 
-static void showGameOptions()
+static void showPanel( GameWindow *panel )
 {
-	if (WinGameOptions)
+	if (panel)
 	{
-		WinGameOptions->winHide( FALSE );
+		panel->winHide( FALSE );
 		enableMainButtons( FALSE );
 	}
 }
 
-static void acceptGameOptions()
+static void hidePanel( GameWindow *panel )
 {
-	if (WinGameOptions)
+	if (panel)
 	{
-		WinGameOptions->winHide( TRUE );
+		panel->winHide( TRUE );
 		enableMainButtons( TRUE );
 	}
+}
+
+static Bool isPanelOpen( GameWindow *panel )
+{
+	return panel && !panel->winIsHidden();
 }
 
 static void cancelGameOptions()
@@ -1483,12 +1514,15 @@ static void cancelGameOptions()
 	ignoreSelected = TRUE;
 	populateGameOptions();
 	ignoreSelected = FALSE;
-	acceptGameOptions();
+	hidePanel( WinGameOptions );
 }
 
-static Bool isGameOptionsOpen()
+static void cancelShaders()
 {
-	return WinGameOptions && !WinGameOptions->winIsHidden();
+	ignoreSelected = TRUE;
+	populateShaders();
+	ignoreSelected = FALSE;
+	hidePanel( WinShaders );
 }
 
 static GameWindow *findOptionsWindow( const char *name )
@@ -1710,6 +1744,41 @@ static void initGameOptionsWindows()
 	addComboEntries( comboBoxAnisotropy, "GUI:Anisotropy", anisotropyNames, ARRAY_SIZE(AnisotropyLevels), 3 );
 }
 
+// Finds the Shaders panel, which a layout without it leaves out along with its button
+static void initShadersWindows()
+{
+	WinShaders = findOptionsWindow( "OptionsMenu.wnd:WinShaders" );
+	ButtonShaders = findOptionsWindow( "OptionsMenu.wnd:ButtonShaders", ButtonShadersID );
+	if (!WinShaders)
+	{
+		if (ButtonShaders)
+		{
+			ButtonShaders->winHide( TRUE );
+		}
+		return;
+	}
+
+	findOptionsWindow( "OptionsMenu.wnd:ButtonShadersAccept", ButtonShadersAcceptID );
+	findOptionsWindow( "OptionsMenu.wnd:ButtonShadersBack", ButtonShadersCancelID );
+	comboBoxShadows = findOptionsWindow( "OptionsMenu.wnd:ComboBoxShadows" );
+
+	// The layout hides the button, so an exe without this panel never shows it.
+	if (ButtonShaders)
+	{
+		GadgetButtonSetText( ButtonShaders, TheGameText->FETCH_OR_SUBSTITUTE( "GUI:Shaders", L"Shaders" ) );
+		ButtonShaders->winHide( FALSE );
+	}
+	setLabelText( "OptionsMenu.wnd:ShadersTitle", "GUI:Shaders", L"Shaders" );
+	setLabelText( "OptionsMenu.wnd:ShadowsLabel", "GUI:ShadowMapResolution", L"Shadows" );
+	setTooltip( comboBoxShadows, "TOOLTIP:ShadowMapResolution", L"Width and height of the sun's shadow map. Larger gives sharper shadow edges and uses more video memory, 64 MB at 4096 x 4096. Needs Shadow mapping." );
+
+	static const WideChar *const shadowMapNames[] = { L"512 x 512", L"1024 x 1024", L"2048 x 2048", L"4096 x 4096" };
+	static_assert( ARRAY_SIZE(shadowMapNames) == ARRAY_SIZE(ShadowMapResolutions), "shadowMapNames out of date" );
+	addComboEntries( comboBoxShadows, "GUI:ShadowMapResolution", shadowMapNames, ARRAY_SIZE(ShadowMapResolutions), 3 );
+
+	WinShaders->winHide( TRUE );
+}
+
 // TheSuperHackers @tweak Now prints additional version information in the version label.
 static void initLabelVersion()
 {
@@ -1833,6 +1902,7 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 	ButtonAdvancedCancel      = TheWindowManager->winGetWindowFromId( nullptr, ButtonAdvancedCancelID );
 
 	initGameOptionsWindows();
+	initShadersWindows();
 
 	sliderTextureResolutionID = TheNameKeyGenerator->nameToKey( "OptionsMenu.wnd:LowResSlider" );
 	sliderTextureResolution = TheWindowManager->winGetWindowFromId( nullptr, sliderTextureResolutionID );
@@ -2192,6 +2262,7 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 
 	showMaxCameraHeight( pref->getUseCustomMaxCameraHeight(), (Int)pref->getMaxCameraHeight() );
 	populateGameOptions();
+	populateShaders();
 
  	// set volume sliders
 
@@ -2321,9 +2392,14 @@ WindowMsgHandledType OptionsMenuInput( GameWindow *window, UnsignedInt msg,
 					//
 					if( BitIsSet( state, KEY_STATE_UP ) )
 					{
-						if (isGameOptionsOpen())
+						if (isPanelOpen( WinGameOptions ))
 						{
 							cancelGameOptions();
+							return MSG_HANDLED;
+						}
+						if (isPanelOpen( WinShaders ))
+						{
+							cancelShaders();
 							return MSG_HANDLED;
 						}
 
@@ -2488,15 +2564,27 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 			}
 			else if (controlID == ButtonGameOptionsID )
 			{
-				showGameOptions();
+				showPanel( WinGameOptions );
 			}
 			else if (controlID == ButtonGameOptionsAcceptID )
 			{
-				acceptGameOptions();
+				hidePanel( WinGameOptions );
 			}
 			else if (controlID == ButtonGameOptionsCancelID )
 			{
 				cancelGameOptions();
+			}
+			else if (controlID == ButtonShadersID )
+			{
+				showPanel( WinShaders );
+			}
+			else if (controlID == ButtonShadersAcceptID )
+			{
+				hidePanel( WinShaders );
+			}
+			else if (controlID == ButtonShadersCancelID )
+			{
+				cancelShaders();
 			}
 			else if (controlID == checkGridHotkeysID || controlID == checkKeyboardOverlayBackdropID || controlID == checkBloomID ||
 				controlID == checkDynamicLightsID || controlID == checkCloudShadowsID )
