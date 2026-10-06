@@ -354,6 +354,7 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ "HeadlightPoolPitch",					INI::parseAngleReal,		nullptr,			offsetof( GlobalData, m_headlightTuning.poolPitch ) },
 	{ "HeadlightPoolFalloff",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_headlightTuning.poolFalloff ) },
 	{ "HeadlightPoolClampBrightness",		INI::parseBool,				nullptr,			offsetof( GlobalData, m_headlightTuning.poolClampBrightness ) },
+	{ "HeadlightPerConeAim",				INI::parseBool,				nullptr,			offsetof( GlobalData, m_headlightTuning.perConeAim ) },
 	{ "HeadlightShaderForbiddenKindOf",		KindOfMaskType::parseFromINI,	nullptr,			offsetof( GlobalData, m_headlightForbiddenKindOf ) },
 	{ "PlanarMirrorShader",					INI::parseBool,				nullptr,			offsetof( GlobalData, m_planarMirrorShader ) },
 	{ "PlanarMirrorReflectivity",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_planarMirrorTuning.reflectivity ) },

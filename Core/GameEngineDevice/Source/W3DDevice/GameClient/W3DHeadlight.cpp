@@ -263,6 +263,205 @@ static Real Box_Radius(const BeamBox &box, Int sideA, Int sideB)
 	return max(box.high[sideA] - box.low[sideA], box.high[sideB] - box.low[sideB]) * 0.5f;
 }
 
+// Cones whose lamps lie closer than this share of their radius, and that aim the same way, draw as one under
+// HeadlightPerConeAim. Their beams overlap along most of their length.
+static const Real CONE_MERGE_SHARE = 1.0f;
+
+// Cones whose directions' cosine is above this aim the same way.
+static const Real SAME_AIM = 0.97f;
+
+// A cone fitted to some of a headlight mesh's vertices, in the mesh's own space.
+struct ConeFit
+{
+	Vector3 start;	///< the middle of the narrow end, where the lamp is
+	Vector3 end;		///< the middle of the wide end
+	Real radius;		///< the farthest a vertex lies from the line between them
+	Bool narrow;		///< one end is clearly narrower than the other
+};
+
+// Fits a cone along the points' long axis, which the spread of the points found by power iteration gives.
+static Bool Fit_Cone(const std::vector<Vector3> &points, ConeFit &fit)
+{
+	if (points.empty())
+	{
+		return FALSE;
+	}
+
+	Vector3 middle(0.0f, 0.0f, 0.0f);
+	for (size_t i = 0; i < points.size(); i++)
+	{
+		middle += points[i];
+	}
+	middle /= (Real)points.size();
+
+	Real spread[3][3] = { { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } };
+	for (size_t i = 0; i < points.size(); i++)
+	{
+		const Vector3 offset = points[i] - middle;
+		for (Int row = 0; row < 3; row++)
+		{
+			for (Int column = 0; column < 3; column++)
+			{
+				spread[row][column] += offset[row] * offset[column];
+			}
+		}
+	}
+
+	Int widest = 0;
+	Real widestLength = -1.0f;
+	for (Int column = 0; column < 3; column++)
+	{
+		const Real length = Vector3(spread[0][column], spread[1][column], spread[2][column]).Length();
+		if (length > widestLength)
+		{
+			widestLength = length;
+			widest = column;
+		}
+	}
+	Vector3 axis(spread[0][widest], spread[1][widest], spread[2][widest]);
+	for (Int step = 0; step < 32; step++)
+	{
+		axis = Vector3(spread[0][0] * axis.X + spread[0][1] * axis.Y + spread[0][2] * axis.Z,
+			spread[1][0] * axis.X + spread[1][1] * axis.Y + spread[1][2] * axis.Z,
+			spread[2][0] * axis.X + spread[2][1] * axis.Y + spread[2][2] * axis.Z);
+
+		// The comparison also fails a length that is not a number.
+		const Real length = axis.Length();
+		if (!(length > 0.0f && length < 1.0e30f))
+		{
+			return FALSE;
+		}
+		axis /= length;
+	}
+
+	Real lowest = Vector3::Dot_Product(points[0] - middle, axis);
+	Real highest = lowest;
+	for (size_t i = 1; i < points.size(); i++)
+	{
+		const Real along = Vector3::Dot_Product(points[i] - middle, axis);
+		lowest = min(lowest, along);
+		highest = max(highest, along);
+	}
+	const Real span = highest - lowest;
+	if (span <= 0.0001f)
+	{
+		return FALSE;
+	}
+
+	Real lowSpread = 0.0f;
+	Real highSpread = 0.0f;
+	Vector3 lowSum(0.0f, 0.0f, 0.0f);
+	Vector3 highSum(0.0f, 0.0f, 0.0f);
+	Int lowCount = 0;
+	Int highCount = 0;
+	for (size_t i = 0; i < points.size(); i++)
+	{
+		const Vector3 offset = points[i] - middle;
+		const Real along = Vector3::Dot_Product(offset, axis);
+		const Real across = (offset - axis * along).Length();
+		if (along <= lowest + END_SHARE * span)
+		{
+			lowSpread = max(lowSpread, across);
+			lowSum += points[i];
+			lowCount++;
+		}
+		if (along >= highest - END_SHARE * span)
+		{
+			highSpread = max(highSpread, across);
+			highSum += points[i];
+			highCount++;
+		}
+	}
+
+	fit.narrow = fabs(lowSpread - highSpread) > 0.1f * max(lowSpread, highSpread);
+	const Bool lampLow = lowSpread < highSpread;
+	fit.start = (lampLow ? lowSum : highSum) / (Real)(lampLow ? lowCount : highCount);
+	fit.end = (lampLow ? highSum : lowSum) / (Real)(lampLow ? highCount : lowCount);
+
+	Vector3 aim = fit.end - fit.start;
+	const Real length = aim.Length();
+	if (length < 0.0001f)
+	{
+		return FALSE;
+	}
+	aim /= length;
+	fit.radius = 0.0f;
+	for (size_t i = 0; i < points.size(); i++)
+	{
+		const Vector3 offset = points[i] - fit.start;
+		fit.radius = max(fit.radius, (offset - aim * Vector3::Dot_Product(offset, aim)).Length());
+	}
+	return TRUE;
+}
+
+// Gives each cone of a mesh its own direction, for meshes whose lamps aim different ways. Zero when a part
+// fits no cone or a lamp has no narrow end, which leaves the mesh to the shared axis.
+static Int Find_Cone_Beams(MeshModelClass &model, Int partCount, const std::vector<Int> &partOfVertex,
+	W3DHeadlightManager::Beam *beams, Int maxBeams)
+{
+	const Vector3 *vertices = model.Get_Vertex_Array();
+	std::vector<std::vector<Vector3> > partPoints(partCount);
+	for (size_t i = 0; i < partOfVertex.size(); i++)
+	{
+		partPoints[partOfVertex[i]].push_back(vertices[i]);
+	}
+
+	std::vector<ConeFit> fits(partCount);
+	std::vector<Vector3> aims(partCount);
+	for (Int i = 0; i < partCount; i++)
+	{
+		if (!Fit_Cone(partPoints[i], fits[i]))
+		{
+			return 0;
+		}
+		aims[i] = fits[i].end - fits[i].start;
+		aims[i].Normalize();
+	}
+
+	std::vector<Int> lampOfPart(partCount);
+	Int lampCount = 0;
+	for (Int i = 0; i < partCount; i++)
+	{
+		lampOfPart[i] = -1;
+		for (Int j = 0; j < i && lampOfPart[i] < 0; j++)
+		{
+			const Real reach = CONE_MERGE_SHARE * max(fits[i].radius, fits[j].radius);
+			if ((fits[i].start - fits[j].start).Length() < reach && Vector3::Dot_Product(aims[i], aims[j]) > SAME_AIM)
+			{
+				lampOfPart[i] = lampOfPart[j];
+			}
+		}
+		if (lampOfPart[i] < 0)
+		{
+			lampOfPart[i] = lampCount++;
+		}
+	}
+
+	std::vector<std::vector<Vector3> > lampPoints(lampCount);
+	for (Int i = 0; i < partCount; i++)
+	{
+		lampPoints[lampOfPart[i]].insert(lampPoints[lampOfPart[i]].end(), partPoints[i].begin(), partPoints[i].end());
+	}
+
+	Int count = 0;
+	for (Int i = 0; i < lampCount; i++)
+	{
+		ConeFit lamp;
+		if (!Fit_Cone(lampPoints[i], lamp) || !lamp.narrow)
+		{
+			return 0;
+		}
+		if (count < maxBeams)
+		{
+			beams[count].start = lamp.start;
+			beams[count].end = lamp.end;
+			beams[count].radius = lamp.radius;
+			count++;
+		}
+	}
+	return count;
+}
+
 Int W3DHeadlightManager::findBeams(RenderObjClass &mesh, const Vector3 &modelMiddle, Beam *beams, Int maxBeams)
 {
 	std::vector<BeamBox> parts;
@@ -284,6 +483,15 @@ Int W3DHeadlightManager::findBeams(RenderObjClass &mesh, const Vector3 &modelMid
 		whole.low = box.Center - box.Extent;
 		whole.high = box.Center + box.Extent;
 		parts.push_back(whole);
+	}
+
+	if (TheGlobalData->m_headlightTuning.perConeAim && model != nullptr && !partOfVertex.empty())
+	{
+		const Int count = Find_Cone_Beams(*model, (Int)parts.size(), partOfVertex, beams, maxBeams);
+		if (count > 0)
+		{
+			return count;
+		}
 	}
 
 	BeamBox all = parts[0];
