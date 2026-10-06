@@ -369,14 +369,15 @@ Soft glow around additive particles (fire, muzzle flashes, tracers, lasers, expl
 blended meshes such as building lights. Smoke and alpha blended effects do not glow. Needs no shader
 support.
 
-* `Bloom = No` - (Yes turns the glow on. Also `Glow around additive effects` on the Shaders page,
+* `Bloom = No` - (Yes turns the glow on. Also `Bloom` on the Shaders page,
 applied on Accept.)
-* `BloomStrength = 0.5` - (0 to 1. 0 is off. `Strength %` on the Shaders page.)
+* `BloomStrength = 0.5` - (0 to 1. 0 is off. The box beside `Bloom` on the Shaders page.)
 * `BloomDebug = No` - (Yes shows only the blurred glow buffer on black, to see what feeds it.
 `Debug view` on the Shaders page.)
 
 Menu controls need `CheckBloom`, `TextEntryBloomStrength` and `CheckBloomDebug` in `OptionsMenu.wnd`;
-`build/move_bloom_to_shaders_wnd.py` moves them onto the Shaders page.
+`build/move_bloom_to_shaders_wnd.py` moves them onto the Shaders page and `build/bloom_row_wnd.py`
+puts the strength box beside the checkbox.
 
 Notes:
 * Costs fill rate in proportion to on-screen additive particles.
