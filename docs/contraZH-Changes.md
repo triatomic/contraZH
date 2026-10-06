@@ -295,6 +295,19 @@ members.
 
 * Left click selects the group; double click also centres the camera on it.
 
+## Action lines
+
+A faint line from each selected unit to where its order sends it, with the order's own cursor
+(move, attack move, attack, force fire) on the destination. Guard gets a blue arrow. Units moving together share one line. Lines last as long as the order and follow a
+chased target.
+
+* `ActionLines = Off` - (`Off` | `All` | `AttackOnly`. Game Options > Action lines. `AttackOnly` draws
+attack and attack move orders only.)
+
+* Green: move, enter, dock, repair. Pink: attack move. Red: attack. Blue: guard.
+* A waypoint path draws one line per leg. With `All` it replaces the white path shown while Alt is
+held.
+
 ## Input
 
 * `CastMode = Normal` - (`Normal` | `QuickCast` | `QuickCastWithIndicator`. `QuickCast` fires a

@@ -1607,6 +1607,7 @@ GlobalData::GlobalData()
 	m_smartSelection = TRUE;
 	m_smartSelectionUseMouse = TRUE;
 	m_smartCommandGroup = TRUE;
+	m_actionLineMode = ActionLineMode_Default;
 	m_doubleClickAttackMove = FALSE;
 
 	m_useOldMoveSpeed = FALSE;  //Fix is enabled by default
@@ -1993,6 +1994,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_smartSelection = optionPref.getSmartSelectionEnabled();
 	TheWritableGlobalData->m_smartSelectionUseMouse = optionPref.getSmartSelectionUseMouse();
 	TheWritableGlobalData->m_smartCommandGroup = optionPref.getSmartCommandGroupEnabled();
+	TheWritableGlobalData->m_actionLineMode = optionPref.getActionLineMode();
 	TheWritableGlobalData->m_jpegQuality = optionPref.getJpegQuality();
 	TheWritableGlobalData->m_keyboardScrollFactor = optionPref.getScrollFactor();
 	TheWritableGlobalData->m_maxCameraHeight = optionPref.getMaxCameraHeight();

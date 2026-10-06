@@ -59,6 +59,7 @@
 
 #include "Common/GameUtility.h"
 #include "Common/GlobalData.h"
+#include "Common/OptionPreferences.h"
 #include "Common/RandomValue.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
@@ -159,7 +160,8 @@ void W3DWaypointBuffer::drawWaypoints(RenderInfoClass &rinfo)
 
 
 
-	if( TheInGameUI->isInWaypointMode() )
+	// action lines for every order already draw the queued path, so this white copy is skipped
+	if( TheInGameUI->isInWaypointMode() && TheGlobalData->m_actionLineMode != ActionLineMode_All )
 	{
 		//Create a default light environment with no lights and only full ambient.
 		//@todo: Fix later by copying default scene light environment from W3DScene.cpp.

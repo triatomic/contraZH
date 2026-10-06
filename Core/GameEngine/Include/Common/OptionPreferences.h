@@ -64,6 +64,17 @@ enum BuildTimerDisplayMode CPP_11(: Int)
 	BuildTimerDisplayMode_Default = BuildTimerDisplayMode_None
 };
 
+// Which orders draw a line from each selected unit to its destination.
+enum ActionLineMode CPP_11(: Int)
+{
+	ActionLineMode_Off = 0,
+	ActionLineMode_All,
+	ActionLineMode_AttackOnly,			///< attack and attack move
+
+	ActionLineMode_Count,
+	ActionLineMode_Default = ActionLineMode_Off
+};
+
 // TheSuperHackers @feature When health bars are shown above objects. Purely a client side
 // display preference -- it never affects game logic, so it is safe in multiplayer and replays.
 // TheSuperHackers @feature How big the NewRadar object blips draw. Small is the size the feature
@@ -133,6 +144,7 @@ public:
 	HealthBarDisplayMode getHealthBarDisplayMode() const;
 	AlliedDecalMode getAlliedDecalMode() const;
 	BuildTimerDisplayMode getBuildTimerDisplayMode() const;
+	ActionLineMode getActionLineMode() const;
 	CastMode getCastMode() const;
 	Bool getSelectionCircleEnabled() const;
 	// Options.ini: DefensesRangeCircle = Yes rings the attack range of an armed structure being placed

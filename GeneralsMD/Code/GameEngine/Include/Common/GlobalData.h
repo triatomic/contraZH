@@ -241,6 +241,7 @@ public:
 	Bool m_smartSelection;
 	Bool m_smartSelectionUseMouse;
 	Bool m_smartCommandGroup;
+	Int m_actionLineMode;						///< holds an ActionLineMode
 	Bool m_doubleClickAttackMove;
 	Bool m_rightMouseAlwaysScrolls;
 	Int m_jpegQuality; // TheSuperHackers @feature Quality for JPEG screenshots.

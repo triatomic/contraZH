@@ -809,6 +809,27 @@ public:  // ********************************************************************
 	void setDrawRMBScrollAnchor(Bool b) { m_drawRMBScrollAnchor = b; }
 	void setMoveRMBScrollAnchor(Bool b) { m_moveRMBScrollAnchor = b; }
 
+	// The colour of an action line says what the order is for.
+	enum ActionLineKind
+	{
+		ACTION_LINE_MOVE = 0,
+		ACTION_LINE_ATTACK_MOVE,
+		ACTION_LINE_ATTACK,
+		ACTION_LINE_ATTACK_GROUND,
+		ACTION_LINE_GUARD,
+
+		ACTION_LINE_KIND_COUNT
+	};
+	struct ActionLine
+	{
+		Coord3D from;
+		Coord3D to;
+		ActionLineKind kind;
+		ObjectID owner;
+		UnsignedInt bornMs;				///< when the marker first appeared, so it can slide in
+	};
+	const std::vector<ActionLine>& getActionLines() const { return m_drawnActionLines; }
+
 private:
 	virtual Int getIdleWorkerCount();
 	virtual Object *findIdleWorker( Object *obj);
@@ -983,6 +1004,10 @@ protected:
 #endif
 	void removeMessageAtIndex( Int i );				///< remove the message at index i
 
+	void updateActionLines();							///< read where each selected unit is headed
+	void addActionLine( ActionLine& line, const std::vector<ActionLine>& previous );
+	void bunchActionLines();							///< merge the lines of units going the same way
+
 	void updateFloatingText();						///< Update function to move our floating text
 	void drawFloatingText();							///< Draw all our floating text
 	void clearFloatingText();							///< clear the floating text list
@@ -1011,6 +1036,8 @@ protected:
 	IRegion2D										m_dragSelectRegion;														///< if isDragSelecting is TRUE, this contains select region
 	Bool												m_displayedMaxWarning;                        ///< keeps the warning from being shown over and over
 	MoveHintStruct							m_moveHint[ MAX_MOVE_HINTS ];
+	std::vector<ActionLine>			m_actionLines;																	///< one per selected unit and queued point
+	std::vector<ActionLine>			m_drawnActionLines;															///< the same, units going the same way merged
 	Int													m_nextMoveHint;
 	const CommandButton *				m_pendingGUICommand;										///< GUI command that needs additional interaction from the user
 	std::vector<Coord3D>				m_pendingSpecialPowerLocations;					///< accepted target points for a NEED_N_TARGET_POS power (in click order)
