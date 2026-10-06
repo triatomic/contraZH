@@ -3748,8 +3748,9 @@ void W3DModelDraw::hideAllHeadlights(Bool hide)
 			RenderObjClass* test = m_renderObject->Get_Sub_Object(subObj);
 			if (strstr(test->Get_Name(),"HEADLIGHT"))
 			{
-				test->Set_Hidden(hide || shaded);
-				if (search)
+				const Bool lamp = shaded && !W3DHeadlightManager::isOpaque(*test);
+				test->Set_Hidden(hide || lamp);
+				if (search && lamp)
 				{
 					// Each level of detail holds its own copy of the lamps, and one copy is enough.
 					const Int lod = getSubObjectLod(m_renderObject, subObj);

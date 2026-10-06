@@ -462,6 +462,38 @@ static Int Find_Cone_Beams(MeshModelClass &model, Int partCount, const std::vect
 	return count;
 }
 
+Bool W3DHeadlightManager::isOpaque(RenderObjClass &mesh)
+{
+	if (mesh.Class_ID() != RenderObjClass::CLASSID_MESH)
+	{
+		return FALSE;
+	}
+	MeshModelClass *model = ((MeshClass &)mesh).Peek_Model();
+	if (model == nullptr || model->Get_Pass_Count() == 0)
+	{
+		return FALSE;
+	}
+
+	for (Int pass = 0; pass < model->Get_Pass_Count(); pass++)
+	{
+		if (model->Has_Shader_Array(pass))
+		{
+			for (Int polygon = 0; polygon < model->Get_Polygon_Count(); polygon++)
+			{
+				if (model->Get_Shader(polygon, pass).Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO)
+				{
+					return FALSE;
+				}
+			}
+		}
+		else if (model->Get_Single_Shader(pass).Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO)
+		{
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
 Int W3DHeadlightManager::findBeams(RenderObjClass &mesh, const Vector3 &modelMiddle, Beam *beams, Int maxBeams)
 {
 	std::vector<BeamBox> parts;

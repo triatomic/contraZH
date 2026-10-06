@@ -870,7 +870,8 @@ shape with no narrow end has its lamp at the end nearer the model's middle. In b
 the cone's width gives the beam's width at the far end. A mesh may hold several cones. Each cone
 that stands apart draws as a lamp of its own, and cones that lie within half their radius of each
 other, such as twin lamps set side by side, draw as one. The models need no INI change, and
-headlights still show only at night. `HeadlightPerConeAim = Yes` instead gives each cone its own direction, for meshes whose lamps
+headlights still show only at night. An opaque `HEADLIGHT` mesh, which blends nothing, is a lamp body
+rather than light, so it keeps its own look and throws no beam. `HeadlightPerConeAim = Yes` instead gives each cone its own direction, for meshes whose lamps
 aim different ways, such as a floodlight rig on a roof. The lamp is the middle of a cone's narrow end, and cones
 that aim the same way with lamps within one radius of each other draw as one. A mesh with a lamp that
 has no narrow end keeps the rule above.
