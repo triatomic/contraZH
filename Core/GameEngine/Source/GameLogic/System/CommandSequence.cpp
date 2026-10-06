@@ -660,11 +660,20 @@ void CommandSequence::update( Object *subject )
 				return;	// still under construction -- keep the dozer on this node
 		}
 
-		// P4: special powers are run by a SpecialAbilityUpdate beside the AI -- it even sets
-		// the AI idle itself for the whole approach-and-execute sequence, so the plain idle
-		// rule would advance while a hack/capture/steal is still playing and the next order
-		// would interrupt it. The node is done only when its own ability has finished. Powers
-		// without such an update module (instant or async ones) fall through and advance.
+		// P4: every ability driven by a SpecialAbilityUpdate parks the AI in idle for its whole
+		// run (the module even calls aiIdle itself at initiation) and raises the canonical
+		// "using ability" status for that time -- the same signal the mood scan reads to veto
+		// auto-acquisition. Reading the status instead of matching skill types makes the hold
+		// universal: any present or future bypass ability keeps its node until it is done,
+		// whatever its SpecialPowerType, and abilities without such a module never raise the
+		// status and advance as before.
+		if( subject->testStatus( OBJECT_STATUS_IS_USING_ABILITY ) )
+			return;	// an ability is preparing or executing -- hold the node
+
+		// P4: the status above is cleared the moment a preparation ends, but a packing ability
+		// keeps running after that (unpack abilities re-pack on success AND on failure). Match
+		// the node's own skill type here so that tail is also waited out; the type is precise,
+		// so unrelated or persistent abilities never stall the chain.
 		if( m_current->m_cmdType == GameMessage::MSG_DO_SPECIAL_POWER ||
 				m_current->m_cmdType == GameMessage::MSG_DO_SPECIAL_POWER_AT_LOCATION ||
 				m_current->m_cmdType == GameMessage::MSG_DO_SPECIAL_POWER_AT_OBJECT )
