@@ -1742,17 +1742,9 @@ Bool WaterRenderObjClass::buildRadialGrid()
 #endif
 }
 
-// Flat standing water cells get alpha 1 and their level at 1/16 unit in red and green, on the height texture's layout.
-void WaterRenderObjClass::updateWaterMask()
+// Scripts can raise and lower water, so the polygons' points are hashed every frame.
+static UnsignedInt Water_Area_Signature()
 {
-#if defined(BUILD_WITH_D3D9)
-	WorldHeightMap *map = TheTerrainRenderObject->getMap();
-	if (map == nullptr || m_heightTexture == nullptr)
-	{
-		return;
-	}
-
-	// Scripts can raise and lower water, so the polygons' points are hashed every frame.
 	UnsignedInt signature = 2166136261u;
 	for (PolygonTrigger *pTrig=PolygonTrigger::getFirstPolygonTrigger(); pTrig; pTrig = pTrig->getNext())
 	{
@@ -1769,6 +1761,20 @@ void WaterRenderObjClass::updateWaterMask()
 			signature = (signature ^ (UnsignedInt)point->z) * 16777619u;
 		}
 	}
+	return signature;
+}
+
+// Flat standing water cells get alpha 1 and their level at 1/16 unit in red and green, on the height texture's layout.
+void WaterRenderObjClass::updateWaterMask()
+{
+#if defined(BUILD_WITH_D3D9)
+	WorldHeightMap *map = TheTerrainRenderObject->getMap();
+	if (map == nullptr || m_heightTexture == nullptr)
+	{
+		return;
+	}
+
+	const UnsignedInt signature = Water_Area_Signature();
 
 	SurfaceClass::SurfaceDescription heightDesc;
 	m_heightTexture->Get_Level_Description(heightDesc);
@@ -2448,16 +2454,24 @@ void WaterRenderObjClass::renderPlanarReflection(CameraClass *cam)
 		narrowReflectionCamera(m_reflectionCamera, cam, readMin, readMax);
 	}
 
+	// Objects whose picture misses the water stay out of the mirror. Grid mesh water spreads past the water areas.
+	m_mirrorCulling = m_waterType == WATER_TYPE_0_TRANSLUCENT && updateMirrorWaterSums();
+	m_mirrorCullingPlaneZ = planeZ;
+	m_mirrorCullingTested = 0;
+	m_mirrorCullingDropped = 0;
+	m_mirrorCullingPastEdge = 0;
+	renderMirroredScene((RTS3DScene *)m_parentScene, m_reflectionCamera, cam, planeZ, width, height);
+	m_mirrorCulling = FALSE;
+
 	// Sampled rather than every frame, so a whole match stays readable.
 	static Int passCount = 0;
 	if (passCount % 300 == 0 && passCount <= 300 * 15)
 	{
-		RENDER_LOG(("W3DWater: mirror pass %d at %.1f drew %.0f%% of the view", passCount, planeZ,
-			narrowed ? 100.0f * (readMax.X - readMin.X) * (readMax.Y - readMin.Y) : 100.0f));
+		RENDER_LOG(("W3DWater: mirror pass %d at %.1f drew %.0f%% of the view, %d of %d objects off the water, %d past the map's edge",
+			passCount, planeZ, narrowed ? 100.0f * (readMax.X - readMin.X) * (readMax.Y - readMin.Y) : 100.0f, m_mirrorCullingDropped,
+			m_mirrorCullingTested, m_mirrorCullingPastEdge));
 	}
 	++passCount;
-
-	renderMirroredScene((RTS3DScene *)m_parentScene, m_reflectionCamera, cam, planeZ, width, height);
 
 	m_reflectionSource = cam;
 	m_reflectionFrame = WW3D::Get_Frame_Count();
@@ -2465,6 +2479,150 @@ void WaterRenderObjClass::renderPlanarReflection(CameraClass *cam)
 #else
 	(void)cam;
 #endif
+}
+
+// Water map cells, rivers included, summed from the map's corner so the mirror pass counts any rectangle's water at once.
+// Flat water counts only above the ground, since maps often lay one water area under all their land.
+Bool WaterRenderObjClass::updateMirrorWaterSums()
+{
+	WorldHeightMap *map = (TheTerrainRenderObject != nullptr) ? TheTerrainRenderObject->getMap() : nullptr;
+	if (map == nullptr)
+	{
+		return FALSE;
+	}
+	const UnsignedInt signature = Water_Area_Signature();
+	if (m_mirrorWaterSums != nullptr && m_mirrorWaterSignature == signature && m_mirrorWaterMap == map)
+	{
+		return TRUE;
+	}
+
+	const Int width = map->getXExtent();
+	const Int height = map->getYExtent();
+	const Real border = (Real)map->getBorderSizeInline();
+	UnsignedByte *water = NEW UnsignedByte[width * height];
+	memset(water, 0, width * height);
+	for (PolygonTrigger *pTrig=PolygonTrigger::getFirstPolygonTrigger(); pTrig; pTrig = pTrig->getNext())
+	{
+		if (!pTrig->isWaterArea() || pTrig->getNumPoints() < 3)
+		{
+			continue;
+		}
+		Real level = 0.0f;
+		const Bool flat = !pTrig->isRiver() && Get_Flat_Water_Level(pTrig, level);
+		Int minX = pTrig->getPoint(0)->x;
+		Int maxX = minX;
+		Int minY = pTrig->getPoint(0)->y;
+		Int maxY = minY;
+		for (Int i=1; i<pTrig->getNumPoints(); i++)
+		{
+			minX = min(minX, pTrig->getPoint(i)->x);
+			maxX = max(maxX, pTrig->getPoint(i)->x);
+			minY = min(minY, pTrig->getPoint(i)->y);
+			maxY = max(maxY, pTrig->getPoint(i)->y);
+		}
+		const Int left = max((Int)REAL_TO_INT_FLOOR(minX / MAP_XY_FACTOR + border), 0);
+		const Int right = min((Int)REAL_TO_INT_CEIL(maxX / MAP_XY_FACTOR + border), width - 1);
+		const Int bottom = max((Int)REAL_TO_INT_FLOOR(minY / MAP_XY_FACTOR + border), 0);
+		const Int top = min((Int)REAL_TO_INT_CEIL(maxY / MAP_XY_FACTOR + border), height - 1);
+		for (Int y=bottom; y<=top; y++)
+		{
+			for (Int x=left; x<=right; x++)
+			{
+				ICoord3D point;
+				point.x = REAL_TO_INT(((Real)x - border) * MAP_XY_FACTOR);
+				point.y = REAL_TO_INT(((Real)y - border) * MAP_XY_FACTOR);
+				point.z = 0;
+				if (pTrig->pointInTrigger(point) && (!flat || level > map->getHeight(x, y) * MAP_HEIGHT_SCALE))
+				{
+					water[y * width + x] = 1;
+				}
+			}
+		}
+	}
+
+	delete [] m_mirrorWaterSums;
+	m_mirrorWaterSums = NEW UnsignedInt[(width + 1) * (height + 1)];
+	memset(m_mirrorWaterSums, 0, (width + 1) * sizeof(UnsignedInt));
+	for (Int y=0; y<height; y++)
+	{
+		UnsignedInt rowSum = 0;
+		m_mirrorWaterSums[(y + 1) * (width + 1)] = 0;
+		for (Int x=0; x<width; x++)
+		{
+			rowSum += water[y * width + x];
+			m_mirrorWaterSums[(y + 1) * (width + 1) + x + 1] = m_mirrorWaterSums[y * (width + 1) + x + 1] + rowSum;
+		}
+	}
+	delete [] water;
+
+	m_mirrorWaterWidth = width;
+	m_mirrorWaterHeight = height;
+	m_mirrorWaterSignature = signature;
+	m_mirrorWaterMap = map;
+	return TRUE;
+}
+
+// The picture of a point above the plane, seen from the mirrored eye under it, lies where the line between them crosses
+// the plane, so the crossings of the box around the sphere's part above the plane bound the sphere's picture.
+Bool WaterRenderObjClass::canReflectOnWater(const SphereClass &sphere, const Vector3 &mirrorEye)
+{
+	if (!m_mirrorCulling)
+	{
+		return TRUE;
+	}
+	++m_mirrorCullingTested;
+
+	const Real planeZ = m_mirrorCullingPlaneZ;
+	if (mirrorEye.Z >= planeZ)
+	{
+		return TRUE;
+	}
+
+	// Bounding spheres reach below the ground, so the box starts at the plane, where a point's picture is the point itself.
+	const Real lowZ = max(sphere.Center.Z - sphere.Radius, planeZ + 0.01f);
+	const Real highZ = max(sphere.Center.Z + sphere.Radius, lowZ);
+	Real minX = 0.0f;
+	Real maxX = 0.0f;
+	Real minY = 0.0f;
+	Real maxY = 0.0f;
+	for (Int corner=0; corner<8; corner++)
+	{
+		const Vector3 point(sphere.Center.X + ((corner & 1) ? sphere.Radius : -sphere.Radius),
+			sphere.Center.Y + ((corner & 2) ? sphere.Radius : -sphere.Radius),
+			(corner & 4) ? highZ : lowZ);
+		const Real along = (planeZ - mirrorEye.Z) / (point.Z - mirrorEye.Z);
+		const Real x = mirrorEye.X + along * (point.X - mirrorEye.X);
+		const Real y = mirrorEye.Y + along * (point.Y - mirrorEye.Y);
+		minX = (corner == 0) ? x : min(minX, x);
+		maxX = (corner == 0) ? x : max(maxX, x);
+		minY = (corner == 0) ? y : min(minY, y);
+		maxY = (corner == 0) ? y : max(maxY, y);
+	}
+
+	// ponytail: a fixed four cells covers the ripples' bend of the read; tie it to WaterPlanarDistortion if strong ripples show gaps
+	const Real margin = 4.0f * MAP_XY_FACTOR;
+	const Real border = (Real)m_mirrorWaterMap->getBorderSizeInline();
+	const Int left = (Int)REAL_TO_INT_FLOOR((minX - margin) / MAP_XY_FACTOR + border);
+	const Int right = (Int)REAL_TO_INT_CEIL((maxX + margin) / MAP_XY_FACTOR + border);
+	const Int bottom = (Int)REAL_TO_INT_FLOOR((minY - margin) / MAP_XY_FACTOR + border);
+	const Int top = (Int)REAL_TO_INT_CEIL((maxY + margin) / MAP_XY_FACTOR + border);
+
+	// Standing water can run on past the map's edge.
+	if (left < 0 || bottom < 0 || right >= m_mirrorWaterWidth || top >= m_mirrorWaterHeight)
+	{
+		++m_mirrorCullingPastEdge;
+		return TRUE;
+	}
+
+	const Int stride = m_mirrorWaterWidth + 1;
+	const UnsignedInt cells = m_mirrorWaterSums[(top + 1) * stride + right + 1] - m_mirrorWaterSums[bottom * stride + right + 1] -
+		m_mirrorWaterSums[(top + 1) * stride + left] + m_mirrorWaterSums[bottom * stride + left];
+	if (cells == 0)
+	{
+		++m_mirrorCullingDropped;
+		return FALSE;
+	}
+	return TRUE;
 }
 
 
@@ -2477,6 +2635,7 @@ WaterRenderObjClass::~WaterRenderObjClass()
 {
 	delete [] m_waterMaskCells;
 	delete [] m_waterCells;
+	delete [] m_mirrorWaterSums;
 	REF_PTR_RELEASE(m_meshVertexMaterialClass);
 	REF_PTR_RELEASE(m_vertexMaterialClass);
 	REF_PTR_RELEASE(m_meshLight);
@@ -2637,6 +2796,16 @@ WaterRenderObjClass::WaterRenderObjClass()
 	m_iniCheckTime=0;
 	m_animationPendingStep=0.0f;
 	m_animationPendingTime=0.0f;
+	m_mirrorWaterSums=nullptr;
+	m_mirrorWaterWidth=0;
+	m_mirrorWaterHeight=0;
+	m_mirrorWaterSignature=0;
+	m_mirrorWaterMap=nullptr;
+	m_mirrorCulling=FALSE;
+	m_mirrorCullingPlaneZ=0.0f;
+	m_mirrorCullingTested=0;
+	m_mirrorCullingDropped=0;
+	m_mirrorCullingPastEdge=0;
 }
 
 //-------------------------------------------------------------------------------------------------

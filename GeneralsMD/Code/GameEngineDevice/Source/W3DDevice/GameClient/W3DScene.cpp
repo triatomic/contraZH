@@ -62,6 +62,7 @@
 #include "W3DDevice/GameClient/W3DAmbientOcclusion.h"
 #include "W3DDevice/GameClient/W3DLaserGlow.h"
 #include "W3DDevice/GameClient/W3DPlanarMirror.h"
+#include "W3DDevice/GameClient/W3DWater.h"
 #include "WW3D2/camera.h"
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/dx8instancing.h"
@@ -453,7 +454,8 @@ void RTS3DScene::Visibility_Check(CameraClass * camera)
 			}
 
 			const SphereClass &sphere = robj->Get_Bounding_Sphere();
-			Bool isVisible = !robj->Is_Hidden() && sphere.Center.Z + sphere.Radius > m_planarMirrorZ && !camera->Cull_Sphere(sphere);
+			Bool isVisible = !robj->Is_Hidden() && sphere.Center.Z + sphere.Radius > m_planarMirrorZ && !camera->Cull_Sphere(sphere) &&
+				(TheWaterRenderObj == nullptr || TheWaterRenderObj->canReflectOnWater(sphere, camera->Get_Position()));
 
 			drawInfo = (DrawableInfo *)robj->Get_User_Data();
 			if (drawInfo && (draw=drawInfo->m_drawable) != nullptr)

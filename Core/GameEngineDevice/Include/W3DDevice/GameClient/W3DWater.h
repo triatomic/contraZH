@@ -140,6 +140,9 @@ public:
 	/// The hex cells as getSeabedMask gives them, for painted stochastic terrain, which keeps its cells with the water's tiling off.
 	static Vector4 getStochasticHex();
 	void renderPlanarReflection(CameraClass *cam);	///< mirrors the scene in the water under the view, before the views draw
+	/// Whether a sphere can show in the water's own mirror pass: seen from the mirrored eye, its picture lands on water.
+	/// True outside that pass.
+	Bool canReflectOnWater(const SphereClass &sphere, const Vector3 &mirrorEye);
 	static void drawReflectionCoverage(UnsignedInt width, UnsignedInt height);
 	/// Sets mirror up as the view's reflection in the horizontal plane at planeZ, clipped below clipZ.
 	static void reflectCamera(CameraClass *mirror, CameraClass *view, Real planeZ, Real clipZ);
@@ -339,6 +342,16 @@ protected:
 	UnsignedInt m_iniCheckTime;			///< when Water.ini was last looked at, in ms
 	Real m_animationPendingStep;		///< water movement held back by WaterAnimationFps
 	Real m_animationPendingTime;		///< seconds since the water last moved under WaterAnimationFps
+	UnsignedInt *m_mirrorWaterSums;		///< water map cells, rivers included, summed from the map's corner
+	Int m_mirrorWaterWidth;
+	Int m_mirrorWaterHeight;
+	UnsignedInt m_mirrorWaterSignature;	///< hash of the water polygons the sums were built from
+	const WorldHeightMap *m_mirrorWaterMap;
+	Bool m_mirrorCulling;				///< the water's own mirror pass is drawing
+	Real m_mirrorCullingPlaneZ;
+	Int m_mirrorCullingTested;			///< spheres tested, dropped and kept for running past the map's edge, for the render log
+	Int m_mirrorCullingDropped;
+	Int m_mirrorCullingPastEdge;
 
 	Bool useShaderWater() const;
 	Bool isWaterVisible(PolygonTrigger *pTrig) const;
@@ -349,6 +362,7 @@ protected:
 	Int standingWaterDiffuse() const;
 	Bool buildRadialGrid();
 	void updateWaterMask();
+	Bool updateMirrorWaterSums();
 	TextureClass *updateOpenWater();
 	void setupOpenWater(Bool river);
 	void drawRadialWater(Real planeZ);

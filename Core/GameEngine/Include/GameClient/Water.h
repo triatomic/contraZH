@@ -149,7 +149,7 @@ class WaterTransparencySetting : public Overridable
 			m_shaderWaterVirtualSun = FALSE;
 			m_shaderWaterRefraction = 0.015f;
 			m_shaderWaterWaveScale = 160.0f;
-			m_shaderWaterWaveStrength = 0.3f;
+			m_shaderWaterWaveStrength = 0.2f;
 			m_shaderWaterFoamDepth = 6.0f;
 			m_shaderWaterFoamStrength = 0.5f;
 			m_shaderWaterShoreFoamDepth = 2.0f;
@@ -173,7 +173,7 @@ class WaterTransparencySetting : public Overridable
 			m_shaderWaterSwellSpeed = 30.0f;
 			m_shaderWaterPlanarDistortion = 0.02f;
 			m_shaderWaterPlanarStrength = 0.3f;
-			m_shaderWaterStochasticSize = 100.0f;
+			m_shaderWaterStochasticSize = 420.0f;
 			m_shaderWaterStochasticSeabed = TRUE;
 			m_isWater = TRUE;
 			m_waterAnimationFps = 30;
