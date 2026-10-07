@@ -42,8 +42,6 @@
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/GadgetSlider.h"
 #include "GameClient/ControlBar.h"
-#include "GameClient/Image.h"
-#include "GameClient/Mouse.h"
 #include "W3DDevice/GameClient/W3DAssetManager.h"
 #include "W3DDevice/GameClient/W3DGUICallbacks.h"
 #include "W3DDevice/GameClient/W3DInGameUI.h"
@@ -52,8 +50,6 @@
 #include "W3DDevice/Common/W3DConvert.h"
 #include "WW3D2/ww3d.h"
 #include "WW3D2/hanim.h"
-#include "WW3D2/surfaceclass.h"
-#include "WW3D2/texture.h"
 
 #include "Common/UnitTimings.h" //Contains the DO_UNIT_TIMINGS define jba.
 
@@ -282,14 +278,6 @@ W3DInGameUI::W3DInGameUI()
 
 	m_buildingPlacementAnchor = nullptr;
 	m_buildingPlacementArrow = nullptr;
-	for( i = 0; i < ACTION_LINE_KIND_COUNT; i++ )
-	{
-		m_actionMarkers[ i ].texture = nullptr;
-		m_actionMarkers[ i ].image = nullptr;
-		m_actionMarkers[ i ].hotSpot.x = 0;
-		m_actionMarkers[ i ].hotSpot.y = 0;
-		m_actionMarkers[ i ].loaded = FALSE;
-	}
 
 }
 
@@ -310,11 +298,6 @@ W3DInGameUI::~W3DInGameUI()
 
 	REF_PTR_RELEASE( m_buildingPlacementAnchor );
 	REF_PTR_RELEASE( m_buildingPlacementArrow );
-	for( i = 0; i < ACTION_LINE_KIND_COUNT; i++ )
-	{
-		REF_PTR_RELEASE( m_actionMarkers[ i ].texture );
-		deleteInstance( m_actionMarkers[ i ].image );
-	}
 
 }
 
@@ -485,98 +468,6 @@ void W3DInGameUI::drawSelectionRegion()
 
 }
 
-extern HCURSOR cursorResources[ Mouse::NUM_MOUSE_CURSORS ][ MAX_2D_CURSOR_DIRECTIONS ];
-
-//-------------------------------------------------------------------------------------------------
-/** Mouse.ini's cursors exist only as .ANI files, so copy the first frame into a texture. */
-//-------------------------------------------------------------------------------------------------
-void W3DInGameUI::loadActionMarker( ActionMarker& marker, Mouse::MouseCursor cursor )
-{
-	marker.loaded = TRUE;
-
-	ICONINFO info;
-	HCURSOR handle = cursorResources[ cursor ][ 0 ];
-	if( handle == nullptr || GetIconInfo( handle, &info ) == FALSE )
-	{
-		return;
-	}
-
-	BITMAP bm;
-	if( info.hbmColor && GetObject( info.hbmColor, sizeof( BITMAP ), &bm ) )
-	{
-		const Int w = bm.bmWidth;
-		const Int h = bm.bmHeight;
-
-		BITMAPINFO bi;
-		memset( &bi, 0, sizeof( bi ) );
-		bi.bmiHeader.biSize = sizeof( BITMAPINFOHEADER );
-		bi.bmiHeader.biWidth = w;
-		bi.bmiHeader.biHeight = -h;			// top down, the row order a texture wants
-		bi.bmiHeader.biPlanes = 1;
-		bi.bmiHeader.biBitCount = 32;
-		bi.bmiHeader.biCompression = BI_RGB;
-
-		std::vector<UnsignedInt> color( w * h );
-		std::vector<UnsignedInt> mask( w * h );
-		HDC dc = GetDC( nullptr );
-		GetDIBits( dc, info.hbmColor, 0, h, &color[ 0 ], &bi, DIB_RGB_COLORS );
-		GetDIBits( dc, info.hbmMask, 0, h, &mask[ 0 ], &bi, DIB_RGB_COLORS );
-		ReleaseDC( nullptr, dc );
-
-		// an older cursor leaves alpha zero and marks holes white in the AND mask instead
-		Bool hasAlpha = FALSE;
-		for( Int i = 0; i < w * h && !hasAlpha; ++i )
-		{
-			hasAlpha = ( color[ i ] & 0xFF000000 ) != 0;
-		}
-		if( !hasAlpha )
-		{
-			for( Int i = 0; i < w * h; ++i )
-			{
-				color[ i ] |= ( mask[ i ] & 0x00FFFFFF ) ? 0x00000000 : 0xFF000000;
-			}
-		}
-
-		marker.texture = MSGNEW("TextureClass") TextureClass( w, h, WW3D_FORMAT_A8R8G8B8, MIP_LEVELS_1 );
-		SurfaceClass *surface = marker.texture->Get_Surface_Level();
-		Int pitch;
-		UnsignedByte *bits = (UnsignedByte *)surface->Lock( &pitch );
-		for( Int row = 0; row < h; ++row )
-		{
-			memcpy( bits + row * pitch, &color[ row * w ], w * sizeof( UnsignedInt ) );
-		}
-		surface->Unlock();
-		REF_PTR_RELEASE( surface );
-
-		marker.image = newInstance(Image);
-		Region2D uv;
-		uv.lo.x = 0.0f;
-		uv.lo.y = 0.0f;
-		uv.hi.x = 1.0f;
-		uv.hi.y = 1.0f;
-		ICoord2D size;
-		size.x = w;
-		size.y = h;
-		marker.image->setStatus( IMAGE_STATUS_RAW_TEXTURE );
-		marker.image->setRawTextureData( marker.texture );
-		marker.image->setUV( &uv );
-		marker.image->setTextureWidth( w );
-		marker.image->setTextureHeight( h );
-		marker.image->setImageSize( &size );
-		marker.hotSpot.x = info.xHotspot;
-		marker.hotSpot.y = info.yHotspot;
-	}
-
-	if( info.hbmColor )
-	{
-		DeleteObject( info.hbmColor );
-	}
-	if( info.hbmMask )
-	{
-		DeleteObject( info.hbmMask );
-	}
-}
-
 //-------------------------------------------------------------------------------------------------
 /** Pink for an attack move, red for an attack, blue for a guard, green for everything else. */
 //-------------------------------------------------------------------------------------------------
@@ -597,28 +488,7 @@ static UnsignedInt actionLineColor( InGameUI::ActionLineKind kind )
 }
 
 //-------------------------------------------------------------------------------------------------
-/** The cursor the order is given with; guard has none of its own, so it gets the arrow. */
-//-------------------------------------------------------------------------------------------------
-static Mouse::MouseCursor actionLineCursor( InGameUI::ActionLineKind kind )
-{
-	switch( kind )
-	{
-		case InGameUI::ACTION_LINE_MOVE:
-			return Mouse::MOVETO;
-		case InGameUI::ACTION_LINE_ATTACK_MOVE:
-			return Mouse::ATTACKMOVETO;
-		case InGameUI::ACTION_LINE_ATTACK:
-			return Mouse::ATTACK_OBJECT;
-		case InGameUI::ACTION_LINE_ATTACK_GROUND:
-			return Mouse::FORCE_ATTACK_GROUND;
-		default:
-			return Mouse::ARROW;
-	}
-}
-
-//-------------------------------------------------------------------------------------------------
-/** A faint line per bunch of selected units, with the order's own cursor standing on the
-	* destination. */
+/** A faint line per bunch of selected units, ending in a dot on the destination. */
 //-------------------------------------------------------------------------------------------------
 void W3DInGameUI::drawActionLines()
 {
@@ -642,25 +512,7 @@ void W3DInGameUI::drawActionLines()
 		const UnsignedInt lineColor = actionLineColor( it->kind );
 		TheDisplay->drawLine( from.x, from.y, to.x, to.y, 1.0f, lineColor & 0x00FFFFFF, lineColor );
 
-		ActionMarker& marker = m_actionMarkers[ it->kind ];
-		const Mouse::MouseCursor cursor = actionLineCursor( it->kind );
-		if( !marker.loaded )
-		{
-			loadActionMarker( marker, cursor );
-		}
-		if( marker.image == nullptr )
-		{
-			continue;
-		}
-
-		// the hot spot goes on the destination, since that is the pixel the player aims with
-		const Int x = to.x - marker.hotSpot.x;
-		const Int y = to.y - marker.hotSpot.y;
-
-		// the order cursors keep their own colours; the plain arrow takes the line's
-		const UnsignedInt markerColor = ( cursor == Mouse::ARROW ) ? ( lineColor | 0xFF000000 ) : 0xFFFFFFFF;
-		TheDisplay->drawImage( marker.image, x, y, x + marker.image->getImageWidth(),
-													 y + marker.image->getImageHeight(), markerColor );
+		TheDisplay->drawFillRect( to.x - 2, to.y - 2, 5, 5, ( lineColor & 0x00FFFFFF ) | 0xCC000000 );
 	}
 }
 

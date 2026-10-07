@@ -297,8 +297,8 @@ members.
 
 ## Action lines
 
-A faint line from each selected unit to where its order sends it, fading in from the unit, with the order's own cursor
-(move, attack move, attack, force fire) on the destination. Guard gets a blue arrow. Units moving together share one line. Lines last as long as the order and follow a
+A faint line from each selected unit to where its order sends it, fading in from the unit and
+ending in a small dot. Units moving together share one line. Lines last as long as the order and follow a
 chased target.
 
 * `ActionLines = Off` - (`Off` | `All` | `AttackOnly`. Game Options > Action lines. `AttackOnly` draws
