@@ -169,6 +169,7 @@ DX8Wrapper::ApplyHookType			DX8Wrapper::ApplyHook									= nullptr;
 
 unsigned							DX8Wrapper::_MainThreadID								= 0;
 bool								DX8Wrapper::CurrentDX8LightEnables[4];
+D3DLIGHT8						DX8Wrapper::CurrentDX8Lights[4];
 bool								DX8Wrapper::IsDeviceLost;
 int								DX8Wrapper::ZBias;
 float								DX8Wrapper::ZNear;
@@ -535,6 +536,9 @@ void DX8Wrapper::Invalidate_Cached_Render_States()
 
 	// (gth) clear the matrix shadows too
 	memset(&DX8Transforms, 0, sizeof(DX8Transforms));
+
+	// A zeroed light has no type, so the next light set reaches the device even where a reset cleared it
+	memset(CurrentDX8Lights, 0, sizeof(CurrentDX8Lights));
 
 	CurrentViewportValid = false;
 }

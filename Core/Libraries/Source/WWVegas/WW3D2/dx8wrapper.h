@@ -776,6 +776,7 @@ protected:
 
 	static DX8FrameStatistics			FrameStatistics;
 	static bool								CurrentDX8LightEnables[4];
+	static D3DLIGHT8							CurrentDX8Lights[4];
 
 	static unsigned long FrameCount;
 
@@ -981,10 +982,15 @@ WWINLINE void DX8Wrapper::Set_DX8_Material(const D3DMATERIAL8* mat)
 WWINLINE void DX8Wrapper::Set_DX8_Light(int index, D3DLIGHT8* light)
 {
 	if (light) {
+		// Most meshes share the scene's lights, so the device usually holds this one already
+		if (CurrentDX8LightEnables[index] && memcmp(&CurrentDX8Lights[index], light, sizeof(D3DLIGHT8)) == 0) {
+			return;
+		}
 		DX8_RECORD_LIGHT_CHANGE();
 		DX8CALL(SetLight(index,light));
 		DX8CALL(LightEnable(index,TRUE));
 		CurrentDX8LightEnables[index]=true;
+		CurrentDX8Lights[index]=*light;
 		SNAPSHOT_SAY(("DX8 - SetLight %d",index));
 	}
 	else if (CurrentDX8LightEnables[index]) {
