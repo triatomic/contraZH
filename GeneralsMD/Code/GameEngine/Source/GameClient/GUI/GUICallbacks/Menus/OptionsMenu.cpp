@@ -590,13 +590,18 @@ static void populateGameOptions()
 	updateGameOptionsEnables();
 }
 
-// The laser and bloom controls sit on the Shaders page, so its Back restores them too
+// Back restores whichever checkboxes the layout puts on the Shaders page
 static void populateShaders()
 {
 	setComboPos( comboBoxShadows, levelIndex( ShadowMapResolutions, ARRAY_SIZE(ShadowMapResolutions), pref->getShadowMapResolution() ) );
-	setCheck( checkLaserRef, pref->getLaserRefEnabled() );
-	setCheck( checkBloom, pref->getBloomEnabled() );
-	setCheck( checkBloomDebug, pref->getBloomDebugEnabled() );
+	for (Int i = 0; i < ARRAY_SIZE(BoolOptions); ++i)
+	{
+		GameWindow *check = *BoolOptions[i].check;
+		if (check && WinShaders && check->winGetParent() == WinShaders)
+		{
+			setCheck( check, (pref->*BoolOptions[i].read)() );
+		}
+	}
 	setEntryInt( textEntryBloomStrength, bloomPercent( pref->getBloomStrength() ) );
 	updateGameOptionsEnables();
 }

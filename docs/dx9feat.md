@@ -131,12 +131,13 @@ Sun shadows from a shadow map replace stencil volumes on vehicles and buildings 
 under infantry. Shadows match their object's shape, alpha cutouts included, fall on everything, and
 have soft edges. Needs the Direct3D 9 build and a shader model 2 card.
 
-* `ShadowMap = Yes` - (No restores stencil volumes and blob decals. Also `Shadow mapping` in Game
-Options, applied on Accept. Needs `CheckShadowMap` in `OptionsMenu.wnd` for the menu control.)
+* `ShadowMap = Yes` - (No restores stencil volumes and blob decals. Also `Shadow mapping` on the
+Shaders page, applied on Accept. Needs `CheckShadowMap` in `OptionsMenu.wnd` for the menu control.)
 * `ShadowMapResolution = 4096` - (The shadow map's width and height: 512, 1024, 2048 or 4096. Other
 values round up to the next of these. Also `Shadows` on the Shaders page of the Options menu, applied
 on Accept without a restart. Larger gives sharper edges and uses more video memory, 64 MB at 4096.
-Needs `ButtonShaders` and `WinShaders` in `OptionsMenu.wnd`, which `build/add_shaders_wnd.py` adds.)
+Needs `ButtonShaders` and `WinShaders` in `OptionsMenu.wnd`, which `build/add_shaders_wnd.py` adds;
+`build/move_shader_checks_wnd.py` moves the shader checkboxes onto that page.)
 
 `3D Shadows` and `2D Shadows` still pick the casters: 3D for volume-shadow objects (vehicles,
 buildings, trees), 2D for decal-shadow objects (mostly infantry). Both off means no shadows.
@@ -170,8 +171,8 @@ Vehicles, structures and bridges get a per-pixel sun highlight, following the ma
 texture areas, and hidden in shadow when shadow mapping is on. Infantry stay matte. Needs the
 Direct3D 9 build and a shader model 2 card.
 
-* `Specular = Yes` - (No turns highlights and the terrain glint off. Also `Specular highlights` in the
-advanced display options, applied on Accept. Needs `CheckSpecular` in `OptionsMenu.wnd` for the menu
+* `Specular = Yes` - (No turns highlights and the terrain glint off. Also `Specular highlights` on the
+Shaders page, applied on Accept. Needs `CheckSpecular` in `OptionsMenu.wnd` for the menu
 control.)
 
 Tuned in the mod's `GameData.ini`:
@@ -239,8 +240,8 @@ and bridges it shades both diffuse light and the specular highlight, fades in sh
 extra draw. Infantry stay flat. Needs the Direct3D 9 build and shader model 2.0a; other cards get plain highlights and
 flat terrain.
 
-* `NormalMaps = Yes` - (No turns the detail off. Also `Surface detail` in the advanced display
-options, applied on Accept. Needs `CheckNormalMaps` in `OptionsMenu.wnd` for the menu control.)
+* `NormalMaps = Yes` - (No turns the detail off. Also `Surface detail` on the Shaders
+page, applied on Accept. Needs `CheckNormalMaps` in `OptionsMenu.wnd` for the menu control.)
 
 Units, structures and bridges use a normal map when one exists and otherwise derive bumps from
 texture brightness (light = raised, so painted markings emboss too). A normal map sits beside its texture in
@@ -317,10 +318,10 @@ infantry near them are lit the same way. Needs the Direct3D 9 build and shader m
 cards keep the old lighting.
 
 * `DynamicLights = Yes` - (No turns off every dynamic light: explosion and muzzle-flash pulses, laser
-ground glow and the police car's lights. Also `Dynamic lights` in the advanced display options.
+ground glow and the police car's lights. Also `Dynamic lights` on the Shaders page.
 Needs `CheckDynamicLights` in `OptionsMenu.wnd` for the menu control.)
 * `PixelLights = Yes` - (No keeps dynamic lights on the old per-vertex lighting. Also `Per-pixel
-lights` in the advanced display options, greyed out while dynamic lights are off. Needs
+lights` on the Shaders page, greyed out while dynamic lights are off. Needs
 `CheckPixelLights` in `OptionsMenu.wnd` for the menu control.)
 
 Notes:
@@ -344,8 +345,8 @@ Smoke, dust, fire and explosion sprites fade out as they near the surface behind
 longer cut a hard line into the ground or the buildings they pass through. Needs the Direct3D 9
 build and a shader model 2 card.
 
-* `SoftParticles = Yes` - (No draws sprites with hard edges. Also `Soft particles` in the advanced
-display options. Needs `CheckSoftParticles` in `OptionsMenu.wnd` for the menu control.)
+* `SoftParticles = Yes` - (No draws sprites with hard edges. Also `Soft particles` on the Shaders
+page. Needs `CheckSoftParticles` in `OptionsMenu.wnd` for the menu control.)
 
 Tuned in the mod's `GameData.ini`:
 
@@ -991,8 +992,8 @@ Creases, corners, and the ground where units and buildings stand fall into soft 
 on the terrain instead of floating over it. Needs the Direct3D 9 build, shader model 2.0a and
 anti-aliasing off.
 
-* `AmbientOcclusion = Yes` - (No turns the shade off. Also `Ambient occlusion` in the advanced display
-options, greyed out while anti-aliasing is on. Needs `CheckAmbientOcclusion` in `OptionsMenu.wnd` for
+* `AmbientOcclusion = Yes` - (No turns the shade off. Also `Ambient occlusion` on the Shaders
+page, greyed out while anti-aliasing is on. Needs `CheckAmbientOcclusion` in `OptionsMenu.wnd` for
 the menu control.)
 
 Tuned in the mod's `GameData.ini`:
@@ -1043,8 +1044,8 @@ Where two terrain textures meet, the taller parts of each push into the other in
 10-unit fade. Stones and clumps stand proud of the texture beside them, and the edge follows them.
 Three-texture blend tiles blend the same way. Needs the Direct3D 9 build.
 
-* `HeightBlend = Yes` - (No brings back the soft fade. Also `Height blending` in the advanced display
-options. Needs `CheckHeightBlend` in `OptionsMenu.wnd` for the menu control.)
+* `HeightBlend = Yes` - (No brings back the soft fade. Also `Height blending` on the Shaders
+page. Needs `CheckHeightBlend` in `OptionsMenu.wnd` for the menu control.)
 
 Tuned in the mod's `GameData.ini`:
 
@@ -1108,8 +1109,8 @@ cloud shapes at unrelated sizes and angles add up to each cloud, a slow warp ben
 finer layer frays their edges. Each layer drifts at its own speed, so clouds form and fade instead
 of sliding as one sheet. Needs the Direct3D 9 build and Cloud shadows on.
 
-* `HQSky = Yes` - (No brings back the tiled cloud texture. Also `HQ sky` in the advanced display
-options, greyed out while Cloud shadows is off. Needs `CheckHQSky` in `OptionsMenu.wnd` for the
+* `HQSky = Yes` - (No brings back the tiled cloud texture. Also `HQ sky` on the Shaders
+page, greyed out while Cloud shadows is off. Needs `CheckHQSky` in `OptionsMenu.wnd` for the
 menu control.)
 
 Tuned in the mod's `GameData.ini`:
