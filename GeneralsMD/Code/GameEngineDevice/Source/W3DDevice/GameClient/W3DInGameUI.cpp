@@ -638,8 +638,9 @@ void W3DInGameUI::drawActionLines()
 			continue;
 		}
 
+		// clear at the unit, so the lines do not crowd the selection
 		const UnsignedInt lineColor = actionLineColor( it->kind );
-		TheDisplay->drawLine( from.x, from.y, to.x, to.y, 1.0f, lineColor );
+		TheDisplay->drawLine( from.x, from.y, to.x, to.y, 1.0f, lineColor & 0x00FFFFFF, lineColor );
 
 		ActionMarker& marker = m_actionMarkers[ it->kind ];
 		const Mouse::MouseCursor cursor = actionLineCursor( it->kind );
