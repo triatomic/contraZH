@@ -305,6 +305,7 @@ chased target.
 attack and attack move orders only.)
 
 * Green: move, enter, dock, repair. Pink: attack move. Red: attack. Blue: guard.
+* No line draws to a target in fog or shroud.
 * A waypoint path draws one line per leg. With `All` it replaces the white path shown while Alt is
 held.
 
