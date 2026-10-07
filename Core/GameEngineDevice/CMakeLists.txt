@@ -274,7 +274,6 @@ target_link_libraries(corei_gameenginedevice_private INTERFACE
 
 target_link_libraries(corei_gameenginedevice_public INTERFACE
     corei_gameengine_public
-    d3d8lib
     deps_bink
     deps_miles
 )
