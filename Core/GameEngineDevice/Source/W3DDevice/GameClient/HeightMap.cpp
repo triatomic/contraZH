@@ -1328,7 +1328,8 @@ m_numVBTilesY(0),
 m_numVertexBufferTiles(0),
 m_numBlockColumnsInLastVB(0),
 m_numBlockRowsInLastVB(0),
-m_cullingTiles(FALSE)
+m_cullingTiles(FALSE),
+m_numCulledTiles(0)
 {
 	TheHeightMap = this;
 }
@@ -2159,14 +2160,13 @@ void HeightMapRenderObjClass::updateCenter(CameraClass *camera, const Vector3 *c
 //=============================================================================
 //DECLARE_PERF_TIMER(Terrain_Render)
 
-// A reflection leaves out tiles wholly under its plane, which its clip plane would throw away, and tiles its frustum misses.
-// Half a unit under the plane covers the water's clip, the lowest any reflection uses.
-void HeightMapRenderObjClass::cullReflectedTiles(RenderInfoClass &rinfo)
+// Leaves out the tiles the frustum misses. A reflection also leaves out tiles wholly under its plane, which its clip
+// plane would throw away, and half a unit under the plane covers the water's clip, the lowest any reflection uses.
+void HeightMapRenderObjClass::cullTiles(const FrustumClass &frustum)
 {
 	m_cullingTiles = FALSE;
-#if RTS_ZEROHOUR
-	RTS3DScene *scene = (RTS3DScene *)Scene;
-	if (scene == nullptr || !scene->isPlanarMirrorPass() || m_vertexBufferBackup == nullptr)
+	m_numCulledTiles = 0;
+	if (m_vertexBufferBackup == nullptr)
 	{
 		return;
 	}
@@ -2178,8 +2178,14 @@ void HeightMapRenderObjClass::cullReflectedTiles(RenderInfoClass &rinfo)
 		m_tileCulled.assign(m_numVertexBufferTiles, FALSE);
 	}
 
-	const Real lowest = scene->getPlanarMirrorZ() - 0.5f;
-	const FrustumClass &frustum = rinfo.Camera.Get_Frustum();
+	Real lowest = -1.0e30f;
+#if RTS_ZEROHOUR
+	RTS3DScene *scene = (RTS3DScene *)Scene;
+	if (scene != nullptr && scene->isPlanarMirrorPass())
+	{
+		lowest = scene->getPlanarMirrorZ() - 0.5f;
+	}
+#endif
 	for (Int tile = 0; tile < m_numVertexBufferTiles; tile++)
 	{
 		if (m_tileBoundsStale[tile])
@@ -2197,11 +2203,12 @@ void HeightMapRenderObjClass::cullReflectedTiles(RenderInfoClass &rinfo)
 		}
 		const AABoxClass &box = m_tileBounds[tile];
 		m_tileCulled[tile] = box.Center.Z + box.Extent.Z < lowest || CollisionMath::Overlap_Test(frustum, box) == CollisionMath::OUTSIDE;
+		if (m_tileCulled[tile])
+		{
+			m_numCulledTiles++;
+		}
 	}
 	m_cullingTiles = TRUE;
-#else
-	(void)rinfo;
-#endif
 }
 
 void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
@@ -2312,7 +2319,18 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 	{
 		DX8Wrapper::Set_Material(m_vertexMaterialClass);
 		DX8Wrapper::Set_Shader(m_shaderClass);
-		cullReflectedTiles(rinfo);
+		cullTiles(rinfo.Camera.Get_Frustum());
+
+		// The main view, sampled rather than every frame, so a whole match stays readable.
+		if (!ShaderClass::Is_Backface_Culling_Inverted())
+		{
+			static Int passCount = 0;
+			if (passCount % 300 == 0 && passCount <= 300 * 15)
+			{
+				RENDER_LOG(("HeightMap: pass %d culled %d of %d tiles", passCount, m_numCulledTiles, m_numVertexBufferTiles));
+			}
+			++passCount;
+		}
 
  		st=W3DShaderManager::ST_TERRAIN_BASE; //set default shader
 
@@ -2563,7 +2581,7 @@ void HeightMapRenderObjClass::renderLightingModifierOverlay(void)
 			for (Int i = 0; i < m_numVBTilesX; i++)
 			{
 				DX8Wrapper::Set_Vertex_Buffer(getVertexBufferTile(i, j));
-				if (Is_Hidden() == 0)
+				if (Is_Hidden() == 0 && !isTileCulled(i, j))
 					DX8Wrapper::Draw_Triangles(0, HEIGHTMAP_POLYGON_NUM, 0, HEIGHTMAP_VERTEX_NUM);
 			}
 	}
@@ -2577,13 +2595,15 @@ void HeightMapRenderObjClass::renderLightingModifierOverlay(void)
 
 // The shadow map's depth pass overrides the rest of the state, so an opaque shader is
 // enough to mark the terrain as a solid caster.
-void HeightMapRenderObjClass::renderShadowMapCaster()
+void HeightMapRenderObjClass::renderShadowMapCaster(const FrustumClass &frustum)
 {
 	DX8Wrapper::Set_Shader(ShaderClass::_PresetOpaqueShader);
 	DX8Wrapper::Set_Material(m_vertexMaterialClass);
 	DX8Wrapper::Set_Texture(0,nullptr);
 	DX8Wrapper::Set_Texture(1,nullptr);
+	cullTiles(frustum);
 	renderTerrainPass(nullptr);
+	m_cullingTiles = FALSE;
 }
 
 ///Performs additional terrain rendering pass, blending in the black shroud texture.

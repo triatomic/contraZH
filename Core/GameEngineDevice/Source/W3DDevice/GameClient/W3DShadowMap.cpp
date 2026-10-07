@@ -698,7 +698,7 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 	// own depth as a result, which the casters' slope-scaled bias keeps from speckling.
 	if (TheTerrainRenderObject != nullptr)
 	{
-		TheTerrainRenderObject->renderShadowMapCaster();
+		TheTerrainRenderObject->renderShadowMapCaster(m_cullCamera->Get_Frustum());
 
 		// Bridges draw from the terrain's own buffer rather than as scene objects, so no caster list holds them.
 		if (TheTerrainRenderObject->getBridgeBuffer() != nullptr)
