@@ -48,6 +48,7 @@
 #include "WW3D2/meshmdl.h"
 #include "Lib/BaseType.h"
 #include "W3DDevice/GameClient/HeightMap.h"
+#include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "Common/GlobalData.h"
 #include "Common/DrawModule.h"
 #include "W3DDevice/GameClient/W3DVolumetricShadow.h"
@@ -3366,11 +3367,12 @@ void W3DVolumetricShadowManager::renderStencilShadows()
 	TheTacticalView->getOrigin(&xpos,&ypos);
 	width=TheTacticalView->getWidth();
 	height=TheTacticalView->getHeight();
+	const Real targetScale = W3DShaderManager::getScreenToTargetScale();
 
-    v[0].p = Vector4( xpos+width, ypos+height, 0.0f, 1.0f );
-    v[1].p = Vector4( xpos+width, 0, 0.0f, 1.0f );
-    v[2].p = Vector4(  xpos, ypos+height, 0.0f, 1.0f );
-    v[3].p = Vector4(  xpos,  0, 0.0f, 1.0f );
+    v[0].p = Vector4( (xpos+width)*targetScale, (ypos+height)*targetScale, 0.0f, 1.0f );
+    v[1].p = Vector4( (xpos+width)*targetScale, 0, 0.0f, 1.0f );
+    v[2].p = Vector4(  xpos*targetScale, (ypos+height)*targetScale, 0.0f, 1.0f );
+    v[3].p = Vector4(  xpos*targetScale,  0, 0.0f, 1.0f );
     v[0].color = TheW3DShadowManager->getShadowColor();
     v[1].color = TheW3DShadowManager->getShadowColor();
     v[2].color = TheW3DShadowManager->getShadowColor();

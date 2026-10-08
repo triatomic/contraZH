@@ -1771,11 +1771,12 @@ void renderStenciledPlayerColor( UnsignedInt color, UnsignedInt stencilRef, Bool
 	TheTacticalView->getOrigin(&xpos,&ypos);
 	width=TheTacticalView->getWidth();
 	height=TheTacticalView->getHeight();
+	const Real targetScale = W3DShaderManager::getScreenToTargetScale();
 
-    v[0].p.Set(xpos+width, ypos+height, 0.0f, 1.0f );
-    v[1].p.Set(xpos+width, 0, 0.0f, 1.0f );
-    v[2].p.Set(xpos, ypos+height, 0.0f, 1.0f );
-    v[3].p.Set(xpos,  0, 0.0f, 1.0f );
+    v[0].p.Set((xpos+width)*targetScale, (ypos+height)*targetScale, 0.0f, 1.0f );
+    v[1].p.Set((xpos+width)*targetScale, 0, 0.0f, 1.0f );
+    v[2].p.Set(xpos*targetScale, (ypos+height)*targetScale, 0.0f, 1.0f );
+    v[3].p.Set(xpos*targetScale,  0, 0.0f, 1.0f );
     v[0].color = color;
     v[1].color = color;
     v[2].color = color;

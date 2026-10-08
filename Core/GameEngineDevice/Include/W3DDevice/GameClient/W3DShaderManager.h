@@ -219,6 +219,8 @@ public:
 	static Bool copyRenderTarget(IDirect3DTexture8 *&copy);
 	/// Scale in xy and offset in zw from clip space to the texel centres of a width by height copy of the render target.
 	static Vector4 getClipToTargetMapping(Real width, Real height);
+	/// Target pixels per screen pixel, above 1 while the scene renders larger than the screen for supersampling.
+	static Real getScreenToTargetScale();
 	/// Draws a quad over the viewport through identity transforms, its uv mapped from clip space by clipToTarget.
 	static void drawClipQuad(const Vector4 &clipToTarget);
 	static Bool isRenderingToTexture() {return m_renderingToTexture; }

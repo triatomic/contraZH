@@ -221,18 +221,19 @@ Bool ScreenDefaultFilter::postRender(FilterModes mode, Coord2D &scrollDelta,Bool
 	TheTacticalView->getOrigin(&xpos,&ypos);
 	width=TheTacticalView->getWidth();
 	height=TheTacticalView->getHeight();
+	const Real targetScale = W3DShaderManager::getScreenToTargetScale();
 
 	//bottom right
-	v[0].p = Vector4( xpos+width-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[0].p = Vector4( (xpos+width)*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[0].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[0].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	//top right
-	v[1].p = Vector4( xpos+width-0.5f, ypos-0.5f, 0.0f, 1.0f );
+	v[1].p = Vector4( (xpos+width)*targetScale-0.5f, ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[1].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[1].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	//bottom left
-	v[2].p = Vector4(  xpos-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[2].p = Vector4(  xpos*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[2].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[2].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	//top left
-	v[3].p = Vector4(  xpos-0.5f,  ypos-0.5f, 0.0f, 1.0f );
+	v[3].p = Vector4(  xpos*targetScale-0.5f,  ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[3].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[3].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	v[0].color = 0xffffffff;
 	v[1].color = 0xffffffff;
@@ -360,18 +361,19 @@ Bool ScreenBWFilter::postRender(FilterModes mode, Coord2D &scrollDelta,Bool &doE
 	TheTacticalView->getOrigin(&xpos,&ypos);
 	width=TheTacticalView->getWidth();
 	height=TheTacticalView->getHeight();
+	const Real targetScale = W3DShaderManager::getScreenToTargetScale();
 
 	//bottom right
-	v[0].p = Vector4( xpos+width-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[0].p = Vector4( (xpos+width)*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[0].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[0].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	//top right
-	v[1].p = Vector4( xpos+width-0.5f, ypos-0.5f, 0.0f, 1.0f );
+	v[1].p = Vector4( (xpos+width)*targetScale-0.5f, ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[1].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[1].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	//bottom left
-	v[2].p = Vector4(  xpos-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[2].p = Vector4(  xpos*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[2].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[2].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	//top left
-	v[3].p = Vector4(  xpos-0.5f,  ypos-0.5f, 0.0f, 1.0f );
+	v[3].p = Vector4(  xpos*targetScale-0.5f,  ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[3].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[3].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	v[0].color = 0xffffffff;
 	v[1].color = 0xffffffff;
@@ -555,18 +557,19 @@ Bool ScreenBWFilterDOT3::postRender(FilterModes mode, Coord2D &scrollDelta,Bool 
 	TheTacticalView->getOrigin(&xpos,&ypos);
 	width=TheTacticalView->getWidth();
 	height=TheTacticalView->getHeight();
+	const Real targetScale = W3DShaderManager::getScreenToTargetScale();
 
 	//bottom right
-	v[0].p = Vector4( xpos+width-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[0].p = Vector4( (xpos+width)*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[0].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[0].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	//top right
-	v[1].p = Vector4( xpos+width-0.5f, ypos-0.5f, 0.0f, 1.0f );
+	v[1].p = Vector4( (xpos+width)*targetScale-0.5f, ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[1].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[1].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	//bottom left
-	v[2].p = Vector4(  xpos-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[2].p = Vector4(  xpos*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[2].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[2].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	//top left
-	v[3].p = Vector4(  xpos-0.5f,  ypos-0.5f, 0.0f, 1.0f );
+	v[3].p = Vector4(  xpos*targetScale-0.5f,  ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[3].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[3].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 
 	DWORD currentFade=(((Int)((1.0f-m_curFadeValue) * 255.0f))<<24) | 0x00ffffff;	//store alpha value
@@ -831,6 +834,7 @@ Bool ScreenCrossFadeFilter::postRender(FilterModes mode, Coord2D &scrollDelta,Bo
 	TheTacticalView->getOrigin(&xpos,&ypos);
 	width=TheTacticalView->getWidth();
 	height=TheTacticalView->getHeight();
+	const Real targetScale = W3DShaderManager::getScreenToTargetScale();
 
 /*	Real radius = (1.0f-m_curFadeValue);
 	if (radius <= 0)
@@ -838,19 +842,19 @@ Bool ScreenCrossFadeFilter::postRender(FilterModes mode, Coord2D &scrollDelta,Bo
 	radius = 25.0f-radius*24.75f;
 */
 	//bottom right
-	v[0].p = Vector4( xpos+width-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[0].p = Vector4( (xpos+width)*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[0].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[0].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	v[0].u1 = 0.5f+radius;	v[0].v1 = 0.5f+radius;
 	//top right
-	v[1].p = Vector4( xpos+width-0.5f, ypos-0.5f, 0.0f, 1.0f );
+	v[1].p = Vector4( (xpos+width)*targetScale-0.5f, ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[1].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[1].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	v[1].u1 = 0.5f+radius;	v[1].v1 = 0.5f-radius;
 	//bottom left
-	v[2].p = Vector4(  xpos-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[2].p = Vector4(  xpos*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[2].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[2].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	v[2].u1 = 0.5f-radius;	v[2].v1 = 0.5f+radius;
 	//top left
-	v[3].p = Vector4(  xpos-0.5f,  ypos-0.5f, 0.0f, 1.0f );
+	v[3].p = Vector4(  xpos*targetScale-0.5f,  ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[3].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[3].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	v[3].u1 = 0.5f-radius;	v[3].v1 = 0.5f-radius;
 
@@ -988,18 +992,19 @@ Bool ScreenMotionBlurFilter::postRender(FilterModes mode, Coord2D &scrollDelta,B
 	TheTacticalView->getOrigin(&xpos,&ypos);
 	width=TheTacticalView->getWidth();
 	height=TheTacticalView->getHeight();
+	const Real targetScale = W3DShaderManager::getScreenToTargetScale();
 
 	//bottom right
-	v[0].p = Vector4( xpos+width-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[0].p = Vector4( (xpos+width)*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[0].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[0].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	//top right
-	v[1].p = Vector4( xpos+width-0.5f, ypos-0.5f, 0.0f, 1.0f );
+	v[1].p = Vector4( (xpos+width)*targetScale-0.5f, ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[1].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[1].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	//bottom left
-	v[2].p = Vector4(  xpos-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[2].p = Vector4(  xpos*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[2].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[2].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	//top left
-	v[3].p = Vector4(  xpos-0.5f,  ypos-0.5f, 0.0f, 1.0f );
+	v[3].p = Vector4(  xpos*targetScale-0.5f,  ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[3].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[3].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	v[0].color = 0xffffffff;
 	v[1].color = 0xffffffff;
@@ -5673,18 +5678,19 @@ void W3DShaderManager::drawViewport(Int color)
 	TheTacticalView->getOrigin(&xpos,&ypos);
 	width=TheTacticalView->getWidth();
 	height=TheTacticalView->getHeight();
+	const Real targetScale = W3DShaderManager::getScreenToTargetScale();
 
 	//bottom right
-	v[0].p = Vector4( xpos+width-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[0].p = Vector4( (xpos+width)*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[0].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[0].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	//top right
-	v[1].p = Vector4( xpos+width-0.5f, ypos-0.5f, 0.0f, 1.0f );
+	v[1].p = Vector4( (xpos+width)*targetScale-0.5f, ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[1].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[1].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	//bottom left
-	v[2].p = Vector4(  xpos-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[2].p = Vector4(  xpos*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[2].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[2].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	//top left
-	v[3].p = Vector4(  xpos-0.5f,  ypos-0.5f, 0.0f, 1.0f );
+	v[3].p = Vector4(  xpos*targetScale-0.5f,  ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[3].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[3].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	v[0].color = color;
 	v[1].color = color;
@@ -5838,6 +5844,15 @@ Bool W3DShaderManager::copyRenderTarget(IDirect3DTexture8 *&copy)
 	(void)copy;
 	return FALSE;
 #endif
+}
+
+Real W3DShaderManager::getScreenToTargetScale()
+{
+	int targetWidth, targetHeight, deviceWidth, deviceHeight, bits;
+	bool windowed;
+	WW3D::Get_Render_Target_Resolution(targetWidth, targetHeight, bits, windowed);
+	WW3D::Get_Device_Resolution(deviceWidth, deviceHeight, bits, windowed);
+	return (deviceWidth > 0) ? (Real)targetWidth / (Real)deviceWidth : 1.0f;
 }
 
 Vector4 W3DShaderManager::getClipToTargetMapping(Real width, Real height)
