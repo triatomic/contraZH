@@ -571,6 +571,10 @@ void INI::skipToEndToken( void )
 			return;
 		}
 	}
+
+	DEBUG_CRASH( ("Error parsing block in INI file '%s'.  Missing '%s' token",
+										 getFilename().str(), getEndToken()) );
+	throw INI_MISSING_END_TOKEN;
 }
 
 //-------------------------------------------------------------------------------------------------
