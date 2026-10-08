@@ -496,6 +496,10 @@ public:
 	/// Filters the supersampled scene down to the back buffer and binds the back buffer, so what follows draws at the screen's size.
 	static void Resolve_Scene_Target();
 
+	// Supersampling renders the scene this many times the back buffer's size each way, 1 to 2, and takes MSAA's place.
+	static void Set_Super_Sampling(float scale) { SuperSampleScale = (scale < 1.0f) ? 1.0f : (scale > 2.0f) ? 2.0f : scale; }
+	static float Get_Super_Sampling() { return SuperSampleScale; }
+
 	static IDirect3DSurface8 * _Create_DX8_Surface(unsigned int width, unsigned int height, WW3DFormat format);
 	static IDirect3DSurface8 * _Create_DX8_Surface(const char *filename);
 	static IDirect3DSurface8 * _Get_DX8_Front_Buffer();
@@ -691,10 +695,6 @@ protected:
 
 	static void Set_MSAA_Mode(D3DMULTISAMPLE_TYPE mode) { MultiSampleAntiAliasing = mode; }
 	static D3DMULTISAMPLE_TYPE Get_MSAA_Mode() { return MultiSampleAntiAliasing; }
-
-	// Supersampling renders the scene this many times the back buffer's size each way, 1 to 2, and takes MSAA's place.
-	static void Set_Super_Sampling(float scale) { SuperSampleScale = (scale < 1.0f) ? 1.0f : (scale > 2.0f) ? 2.0f : scale; }
-	static float Get_Super_Sampling() { return SuperSampleScale; }
 
 	static void	Set_Swap_Interval(int swap);
 	static int	Get_Swap_Interval();

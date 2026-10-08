@@ -78,6 +78,7 @@ static void drawFramerateBar();
 #include "W3DDevice/GameClient/W3DTerrainTracks.h"
 #include "W3DDevice/GameClient/W3DWater.h"
 #include "W3DDevice/GameClient/W3DPlanarMirror.h"
+#include "W3DDevice/GameClient/W3DColorLut.h"
 #include "W3DDevice/GameClient/W3DVideoBuffer.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/W3DShadowMap.h"
@@ -2163,7 +2164,12 @@ AGAIN:
 				drawViews();
 
 				// A supersampled scene comes down to the screen here, so the interface keeps its native pixels
+				// and the colour grade works over the screen's pixels alone
 				DX8Wrapper::Resolve_Scene_Target();
+				if (TheW3DColorLut != nullptr)
+				{
+					TheW3DColorLut->render(*primaryW3DView->get3DCamera());
+				}
 
 				// draw the user interface
 				TheInGameUI->DRAW();
