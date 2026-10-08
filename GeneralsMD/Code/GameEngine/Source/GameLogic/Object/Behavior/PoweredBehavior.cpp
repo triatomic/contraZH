@@ -81,8 +81,8 @@ Bool PoweredBehavior::onPowerChange( Bool hasPower )
 	AIUpdateInterface *ai = obj->getAI();
 	Drawable *draw = obj->getDrawable();
 	Bool immobile = !d->m_isMobile || d->m_movePenalty >= 1.0f;
-	Real speedScalar = (!immobile && d->m_movePenalty > 0.0f) ? 1.0f - d->m_movePenalty : 1.0f;
-	Real liftScalar = (d->m_liftPenalty > 0.0f && d->m_liftPenalty < 1.0f) ? 1.0f - d->m_liftPenalty : 1.0f;
+	Real speedScalar = immobile ? 1.0f : 1.0f - d->m_movePenalty;
+	Real liftScalar = d->m_liftPenalty < 1.0f ? 1.0f - d->m_liftPenalty : 1.0f;
 
 	if (ai)
 	{
