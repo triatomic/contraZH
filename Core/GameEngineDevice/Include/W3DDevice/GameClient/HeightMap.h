@@ -84,6 +84,7 @@ public:
 
 	virtual void oversizeTerrain(Int tilesToOversize) override; ///< Oversize the visible terrain area.
 	virtual void renderShadowMapCaster(const FrustumClass &frustum) override;
+	virtual Bool isCellCulled(Int x, Int y) const override;
 	virtual void setTerrainDrawSize(Int width, Int height) override; ///< Resize the visible terrain area. Always defaults to oversize dimensions when oversize is set.
 
 	virtual int updateBlock(Int x0, Int y0, Int x1, Int y1, WorldHeightMap *pMap, RefRenderObjListIterator *pLightsIterator) override;
@@ -123,8 +124,8 @@ protected:
 	UnsignedInt doTheDynamicLight(VERTEX_FORMAT *vb, VERTEX_FORMAT *vbMirror, Vector3*light, Vector3*normal, W3DDynamicLight *pLights[], Int numLights);
 	Int getXWithOrigin(Int x);
 	Int getYWithOrigin(Int x);
-	Int getTileColumn(Int x);	///<the VB tile column holding a column of cells, counted from the drawn area's edge
-	Int getTileRow(Int y);	///<the VB tile row holding a row of cells, counted from the drawn area's edge
+	Int getTileColumn(Int x) const;	///<the VB tile column holding a column of cells, counted from the drawn area's edge
+	Int getTileRow(Int y) const;	///<the VB tile row holding a row of cells, counted from the drawn area's edge
 	void assignPixelLights(RefRenderObjListIterator &lights);	///<hands the terrain shader the lights each VB tile has room for
 	void setTilePixelLights(Int tile);	///<lights the draws that follow with one VB tile's lights
 	void prepareSeabed();	///<hands the terrain shader this frame's seabed and marks the VB tiles with standing water

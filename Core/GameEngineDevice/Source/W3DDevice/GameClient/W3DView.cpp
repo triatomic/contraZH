@@ -848,11 +848,8 @@ void W3DView::updateCameraClipPlanes(const Matrix3D &transform)
 {
 	Real farZ;
 
-	if (TheGlobalData->m_drawEntireTerrain)
-	{
-		farZ = 100000.0f;
-	}
-	else if (TheTerrainRenderObject && TheTerrainRenderObject->getMap())
+	// DrawEntireTerrain widens the draw region to the map, so the same fit covers it.
+	if (TheTerrainRenderObject && TheTerrainRenderObject->getMap())
 	{
 		WorldHeightMap *heightMap = TheTerrainRenderObject->getMap();
 

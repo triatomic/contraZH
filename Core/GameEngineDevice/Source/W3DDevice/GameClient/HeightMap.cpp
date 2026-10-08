@@ -318,7 +318,7 @@ Int HeightMapRenderObjClass::getYWithOrigin(Int y)
 //=============================================================================
 /** The inverse of getXWithOrigin, divided down to the VB tile. */
 //=============================================================================
-Int HeightMapRenderObjClass::getTileColumn(Int x)
+Int HeightMapRenderObjClass::getTileColumn(Int x) const
 {
 	const Int xMax = m_x-1;
 	x += m_originX;
@@ -334,7 +334,7 @@ Int HeightMapRenderObjClass::getTileColumn(Int x)
 //=============================================================================
 /** The inverse of getYWithOrigin, divided down to the VB tile. */
 //=============================================================================
-Int HeightMapRenderObjClass::getTileRow(Int y)
+Int HeightMapRenderObjClass::getTileRow(Int y) const
 {
 	const Int yMax = m_y-1;
 	y += m_originY;
@@ -343,6 +343,15 @@ Int HeightMapRenderObjClass::getTileRow(Int y)
 		y -= yMax;
 	}
 	return y / VERTEX_BUFFER_TILE_LENGTH;
+}
+
+Bool HeightMapRenderObjClass::isCellCulled(Int x, Int y) const
+{
+	if (!m_cullingTiles)
+	{
+		return FALSE;
+	}
+	return m_tileCulled[getTileRow(y - m_map->getDrawOrgY()) * m_numVBTilesX + getTileColumn(x - m_map->getDrawOrgX())];
 }
 
 //=============================================================================
@@ -2716,6 +2725,7 @@ void HeightMapRenderObjClass::renderExtraBlendTiles()
 
 			if (x >= drawStartX && x < drawEdgeX &&
 				y >= drawStartY && y < drawEdgeY &&
+				!isCellCulled(x, y) &&
 				m_map->getExtraAlphaUVData(x,y,U,V,alpha,&flipState, &cliffState))
 			{	//this tile is inside visible region and has 3rd blend layer.
 
