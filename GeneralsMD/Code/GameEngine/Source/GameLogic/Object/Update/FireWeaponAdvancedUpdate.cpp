@@ -58,6 +58,7 @@ FireWeaponAdvancedUpdateModuleData::FireWeaponAdvancedUpdateModuleData()
 		{ 0, 0, 0, 0 }
 	};
   p.add(dataFieldParse);
+	p.add(UpgradeMuxData::getFieldParse(), offsetof( FireWeaponAdvancedUpdateModuleData, m_upgradeMuxData ));
 }
 
 /*static*/ void FireWeaponAdvancedUpdateModuleData::parseScatterTarget(INI* ini, void* instance, void* /*store*/, const void* /*userData*/)
@@ -420,6 +421,17 @@ Bool FireWeaponAdvancedUpdate::isOkayToFire()
 	if( m_weapon == NULL )
 		return FALSE;
 
+	// tested live rather than latched, so ConflictsWith can switch us off again
+	UpgradeMaskType maskToCheck = me->getObjectCompletedUpgradeMask();
+	const Player *owner = me->getControllingPlayer();
+	if( owner )
+	{
+		maskToCheck.set( owner->getCompletedUpgradeMask() );
+	}
+
+	if( !testUpgradeConditions( maskToCheck ) )
+		return FALSE;
+
 	// Weapon is reloading
 	if( m_weapon->getStatus() != READY_TO_FIRE )
 		return FALSE;
@@ -442,18 +454,23 @@ void FireWeaponAdvancedUpdate::crc( Xfer *xfer )
 	// extend base class
 	UpdateModule::crc( xfer );
 
+	// extend upgrade mux
+	UpgradeMux::upgradeMuxCRC( xfer );
+
 }  // end crc
 
 // ------------------------------------------------------------------------------------------------
 /** Xfer method
 	* Version Info:
-	* 1: Initial version */
+	* 1: Initial version
+	* 2: Added m_initialDelayFrame and the delivery decal
+	* 3: Added upgrade mux state */
 // ------------------------------------------------------------------------------------------------
 void FireWeaponAdvancedUpdate::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 2;
+	XferVersion currentVersion = 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -471,6 +488,9 @@ void FireWeaponAdvancedUpdate::xfer( Xfer *xfer )
 		m_deliveryDecal.xferRadiusDecal(xfer);
 		xfer->xferUnsignedInt(&m_radiusDecalRemoveFrame);
 	}
+
+	if (version >= 3)
+		UpgradeMux::upgradeMuxXfer( xfer );
 }  // end xfer
 
 // ------------------------------------------------------------------------------------------------
@@ -481,5 +501,8 @@ void FireWeaponAdvancedUpdate::loadPostProcess( void )
 
 	// extend base class
 	UpdateModule::loadPostProcess();
+
+	// extend upgrade mux
+	UpgradeMux::upgradeMuxLoadPostProcess();
 
 }  // end loadPostProcess
