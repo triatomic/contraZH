@@ -323,7 +323,6 @@ void ConnectionManager::init()
 	m_smallestPacketArrivalCushion = -1;
 	m_lastRunAheadUpdateTime = 0;
 	m_lowerRunAheadStreak = 0;
-	m_runAheadComputed = FALSE;
 
 	m_frameMetrics.init();
 
@@ -397,13 +396,10 @@ void ConnectionManager::reset()
 
 	for (i = 0; i < MAX_SLOTS; ++i) {
 		m_fpsAverages[i] = -1;
-	}
-	for (i = 0; i < MAX_SLOTS; ++i) {
 		m_latencyAverages[i] = 0.0;
 	}
 	m_lastRunAheadUpdateTime = 0;
 	m_lowerRunAheadStreak = 0;
-	m_runAheadComputed = FALSE;
 
 	for (i = 0; i < (UnsignedInt)MAX_SLOTS; ++i) {
 		m_packetRouterFallback[i] = -1;
@@ -1518,7 +1514,7 @@ void ConnectionManager::updateRunAhead(Int oldRunAhead, Int frameRate, Bool didS
 			newRunAhead = clamp<Int>(MIN_RUNAHEAD, newRunAhead, MAX_FRAMES_AHEAD / 2);
 
 			// Too little run ahead stalls everyone while too much only adds delay, so lower it only once the ping has stayed down
-			if (newRunAhead < oldRunAhead && m_runAheadComputed)
+			if (newRunAhead < oldRunAhead && m_lastRunAheadUpdateTime != 0)
 			{
 				++m_lowerRunAheadStreak;
 				if (m_lowerRunAheadStreak < RUNAHEAD_LOWER_STREAK)
@@ -1530,8 +1526,6 @@ void ConnectionManager::updateRunAhead(Int oldRunAhead, Int frameRate, Bool didS
 			{
 				m_lowerRunAheadStreak = 0;
 			}
-			m_runAheadComputed = TRUE;
-
 			NetRunAheadCommandMsg *msg = newInstance(NetRunAheadCommandMsg);
 			msg->setPlayerID(m_localSlot);
 			if (DoesCommandRequireACommandID(msg->getNetCommandType())) {

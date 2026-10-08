@@ -380,17 +380,8 @@ void Connection::updateRetryTime()
 {
 	// m_averageLatency divides by the full history, so scale it back up while the history is still filling
 	Real meanLatency = m_averageLatency * CONNECTION_LATENCY_HISTORY_LENGTH / m_latencySampleCount;
-	time_t retryTime = (time_t)(meanLatency * 1.5f);
 	time_t minRetryTime = max(RETRY_TIME_MIN, 2 * m_frameGrouping);
-	if (retryTime < minRetryTime)
-	{
-		retryTime = minRetryTime;
-	}
-	if (retryTime > RETRY_TIME_MAX)
-	{
-		retryTime = RETRY_TIME_MAX;
-	}
-	m_retryTime = retryTime;
+	m_retryTime = clamp<time_t>(minRetryTime, (time_t)(meanLatency * 1.5f), RETRY_TIME_MAX);
 }
 
 void Connection::doRetryMetrics() {

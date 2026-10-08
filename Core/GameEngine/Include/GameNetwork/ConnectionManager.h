@@ -231,7 +231,6 @@ private:
 	Bool m_didSelfSlug;
 	time_t m_lastRunAheadUpdateTime;	///< When the run ahead metrics were last exchanged, 0 before the first time.
 	Int  m_lowerRunAheadStreak;			///< Consecutive recalculations that asked for a lower run ahead.
-	Bool m_runAheadComputed;					///< Whether a measured run ahead has replaced the start-up value yet.
 
 	// -----------------------------------------------------------------------------
 	FileCommandMap s_fileCommandMap;
