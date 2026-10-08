@@ -247,9 +247,7 @@ void ControlBar::showBuildTooltipLayout( GameWindow *cmdButton )
 }
 
 
-// TheSuperHackers @feature Format a build time for the tooltip as m:ss, always digital, so
-// the field keeps one shape whatever the length. BuildTimerDisplayMode still hides it
-// entirely when set to None, but does not pick the format here.
+// TheSuperHackers @feature Build time as m:ss always; BuildTimerDisplayMode None still hides it.
 //
 // Note the value passed in should come from calcTimeToBuild(), which for units already folds
 // in the player's current energy penalty -- so a tooltip read while on low power correctly
@@ -274,22 +272,6 @@ static UnicodeString formatBuildTimeForTooltip( Int buildFrames )
 	const Int seconds = ( buildFrames + LOGICFRAMES_PER_SECOND / 2 ) / LOGICFRAMES_PER_SECOND;
 
 	result.format( L"%d:%2.2d", seconds / 60, seconds % 60 );
-
-	return result;
-}
-
-// Format a template's energy figure for the tooltip. The engine stores this signed, with
-// negative meaning the building draws power, so the raw value already reads correctly and
-// only needs a plus added. Templates with no energy at all print nothing, which keeps the
-// line clear for the units and upgrades that make up most of the tooltips.
-static UnicodeString formatPowerForTooltip( Int energyProduction )
-{
-	UnicodeString result = UnicodeString::TheEmptyString;
-
-	if( energyProduction == 0 )
-		return result;
-
-	result.format( L"%+d", energyProduction );
 
 	return result;
 }
@@ -507,7 +489,9 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 			// so this tracks the player's power state as it changes.
 			buildTimeText = formatBuildTimeForTooltip( thingTemplate->calcTimeToBuild( player ) );
 
-			powerText = formatPowerForTooltip( thingTemplate->getEnergyProduction() );
+			// EnergyProduction is already signed, so consumers print as -5 and reactors as +8
+			if( thingTemplate->getEnergyProduction() != 0 )
+				powerText.format( L"%+d", thingTemplate->getEnergyProduction() );
 
 			// ask each prerequisite to give us a list of the non satisfied prerequisites
 			for( Int i=0; i<thingTemplate->getPrereqCount(); i++ )
@@ -708,11 +692,7 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 	win = TheWindowManager->winGetWindowFromId(m_buildToolTipLayout->getFirstWindow(), TheNameKeyGenerator->nameToKey("ControlBarPopupDescription.wnd:StaticTextCost"));
 	if(win)
 	{
-		// TheSuperHackers @feature Show the build time and power draw alongside the cost. Each
-		// field carries a glyph instead of a word, so the three fit on one line. Fields absent
-		// from a template are skipped entirely, since a free item or one with no energy would
-		// otherwise pad the line with meaningless zeroes. The description window sits directly
-		// beneath this one in the .wnd layout, so a second line here overlaps it.
+		// Glyph fields stay on the cost line because the description window sits directly beneath it
 		UnicodeString costLine = cost;
 		if( !buildTimeText.isEmpty() )
 		{
