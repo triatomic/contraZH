@@ -516,6 +516,14 @@ Notes:
 
 # GameData.ini
 
+## Unknown keys and blocks are skipped
+
+An INI key or block the game does not know is logged to `DebugLogFile.txt` and skipped instead of
+crashing the game or WorldBuilder. Retail asserted on an unknown key in debug builds and threw on
+an unknown block in every build, so a mod INI written for a newer exe could not load on an older
+one. An unknown block is skipped up to its `End`, which also covers a new key that opens a nested
+block. A known key with a bad value still fails the load.
+
 ## Subdual damage defaults
 
 Subdual, jamming, frozen and chrono tuning can be set once in GameData.ini instead of on every
