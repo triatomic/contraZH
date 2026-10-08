@@ -129,7 +129,7 @@ static SubsystemInterfaceList TheSubsystemListRecord;
 // does in case a worker allocates via the pool / AsciiString. Uncontended cost
 // is ~14ns per lock pair (measured) -- cheap insurance. Assigned at the very
 // top of InitInstance, before any pooled allocation.
-static CriticalSection critSecUnicode, critSecDma, critSecMemoryPool, critSecDebugLog;
+static CriticalSection critSecUnicode, critSecDma, critSecMemoryPool;
 
 template<class SUBSYSTEM>
 void initSubsystem(SUBSYSTEM*& sysref, SUBSYSTEM* sys, const char* path1 = nullptr, const char* path2 = nullptr)
@@ -380,7 +380,6 @@ BOOL CWorldBuilderApp::InitInstance()
 	TheUnicodeStringCriticalSection = &critSecUnicode;
 	TheDmaCriticalSection = &critSecDma;
 	TheMemoryPoolCriticalSection = &critSecMemoryPool;
-	TheDebugLogCriticalSection = &critSecDebugLog;
 
 	ApplicationHWnd = GetDesktopWindow();
 

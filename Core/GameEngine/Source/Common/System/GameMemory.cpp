@@ -3497,7 +3497,7 @@ void initMemoryManager()
 		userMemoryManagerInitPools();
 		thePreMainInitFlag = false;
 
-		DEBUG_INIT(DEBUG_FLAGS_DEFAULT);
+		GAME_DEBUG_INIT(DEBUG_FLAGS_DEFAULT);
 		DEBUG_LOG(("*** Initialized the Memory Manager"));
 	}
 	else
@@ -3547,7 +3547,7 @@ static NOINLINE void preMainInitMemoryManagerImpl()
 		userMemoryManagerInitPools();
 		thePreMainInitFlag = true;
 
-		DEBUG_INIT(DEBUG_FLAGS_DEFAULT);
+		GAME_DEBUG_INIT(DEBUG_FLAGS_DEFAULT);
 		DEBUG_LOG(("*** Initialized the Memory Manager prior to main!"));
 	}
 }
