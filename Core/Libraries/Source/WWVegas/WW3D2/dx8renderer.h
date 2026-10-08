@@ -338,10 +338,10 @@ struct DX8InstancingStatsStruct
 	enum { SCENE_MAIN, SCENE_SHADOW_DEPTH, SCENE_COUNT };
 	enum { SIZE_CLASSES = 4, MAX_PASSES = 8 };
 
-	// How each mesh's material pass drew: batched in a window, or on its own and why.
+	// Whether each mesh's material pass drew batched in a window, and why it drew alone otherwise.
 	enum
 	{
-		PASS_PATH_WINDOW,
+		PASS_PATH_WINDOW,			// batched in a window
 		PASS_PATH_NOT_LIT,			// outside the instanced main scene
 		PASS_PATH_SORTING,			// a sorting container
 		PASS_PATH_UNBOUND,			// a container without static buffers

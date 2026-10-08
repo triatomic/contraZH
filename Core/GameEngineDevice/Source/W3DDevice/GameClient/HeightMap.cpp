@@ -2322,7 +2322,14 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 		cullTiles(rinfo.Camera.Get_Frustum());
 
 		// The main view, sampled rather than every frame, so a whole match stays readable.
-		if (!ShaderClass::Is_Backface_Culling_Inverted())
+		Bool mainView = !ShaderClass::Is_Backface_Culling_Inverted();
+#if RTS_ZEROHOUR
+		if (Scene != nullptr && ((RTS3DScene *)Scene)->isPlanarMirrorPass())
+		{
+			mainView = FALSE;
+		}
+#endif
+		if (mainView)
 		{
 			static Int passCount = 0;
 			if (passCount % 300 == 0 && passCount <= 300 * 15)
@@ -2582,7 +2589,9 @@ void HeightMapRenderObjClass::renderLightingModifierOverlay(void)
 			{
 				DX8Wrapper::Set_Vertex_Buffer(getVertexBufferTile(i, j));
 				if (Is_Hidden() == 0 && !isTileCulled(i, j))
+				{
 					DX8Wrapper::Draw_Triangles(0, HEIGHTMAP_POLYGON_NUM, 0, HEIGHTMAP_VERTEX_NUM);
+				}
 			}
 	}
 

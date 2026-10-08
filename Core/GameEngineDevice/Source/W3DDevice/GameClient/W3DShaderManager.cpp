@@ -2779,11 +2779,11 @@ class W3DSpecularMaterialPassClass : public MaterialPassClass
 {
 public:
 
-	W3DSpecularMaterialPassClass() : m_key(this)
+	W3DSpecularMaterialPassClass(const MaterialPassClass *key = nullptr, Bool receivesShadow = FALSE) : m_key(key != nullptr ? key : this)
 	{
 		m_lights.count = 0;
 		m_lights.lightsOnly = FALSE;
-		m_lights.receivesShadow = FALSE;
+		m_lights.receivesShadow = receivesShadow;
 	}
 
 	/// Makes this a copy of key for one object, adding that object's lights and the shadow receiver's work.
@@ -2836,7 +2836,7 @@ private:
 static W3DSpecularMaterialPassClass SpecularMaterialPass;
 
 // Draws as the shared pass does, so instancing takes it as that pass, while doing the shadow receiver's work too.
-static W3DSpecularMaterialPassClass SpecularReceiveMaterialPass;
+static W3DSpecularMaterialPassClass SpecularReceiveMaterialPass(&SpecularMaterialPass, TRUE);
 
 // Passes carrying one object's lights, handed out again from the start each frame. A pass stays
 // valid until the render that took it has flushed.
@@ -3155,12 +3155,7 @@ MaterialPassClass *W3DShaderManager::getSpecularPass(const Int *lights, Int ligh
 			receivesShadow = FALSE;
 			return nullptr;
 		}
-		if (!receivesShadow)
-		{
-			return &SpecularMaterialPass;
-		}
-		SpecularReceiveMaterialPass.setObjectLights(&SpecularMaterialPass, nullptr, 0, FALSE, TRUE);
-		return &SpecularReceiveMaterialPass;
+		return receivesShadow ? &SpecularReceiveMaterialPass : &SpecularMaterialPass;
 	}
 
 	// The lit shaders have no constants left for the receiver's work.
@@ -4534,7 +4529,6 @@ void CloudTextureShader::reset()
 	DX8Wrapper::Set_DX8_Texture_Stage_State( m_stageOfSet, D3DTSS_ALPHAOP,   D3DTOP_DISABLE );
 }
 
-// Projects the terrain's cloud map onto a pixel shader receiver, the way the terrain samples it.
 // Binds the cloud map to stage and gives the mapping from camera space onto it.
 static Bool bindCloudTexture(Int stage, D3DMATRIX &cameraToCloud)
 {
@@ -4566,6 +4560,7 @@ static Bool bindCloudTexture(Int stage, D3DMATRIX &cameraToCloud)
 	return TRUE;
 }
 
+// Projects the terrain's cloud map onto a fixed-function receiver, the way the terrain samples it.
 static Bool bindCloudReceiver(Int stage)
 {
 	D3DMATRIX textureTransform;

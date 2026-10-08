@@ -929,14 +929,15 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 		// Receive the sun's shadow on opaque drawables. Skipped where the base pass is
 		// suppressed, since the pass only darkens pixels the base pass drew.
 		MaterialPassClass *shadowPass = (TheW3DShadowMap != nullptr) ? TheW3DShadowMap->getReceivePass() : nullptr;
-		const Bool receivesShadow = shadowPass != nullptr && m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop &&
-			!m_planarMirrorPass && draw->getEffectiveOpacity() == 1.0f;
+		const Bool takesSunPasses = m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop && !m_planarMirrorPass &&
+			draw->getEffectiveOpacity() == 1.0f;
+		const Bool receivesShadow = shadowPass != nullptr && takesSunPasses;
 
 		// Vehicles and structures catch a per-pixel sun highlight and bumps. Infantry and the rest stay
 		// matte, and take the pass only for the dynamic lights it draws.
 		MaterialPassClass *specularPass = nullptr;
 		Bool specularTakesShadow = receivesShadow && W3DShaderManager::canSpecularReceiveShadow();
-		if (m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop && !m_planarMirrorPass && draw->getEffectiveOpacity() == 1.0f)
+		if (takesSunPasses)
 		{
 			if (draw->getReceivesDynamicLights() && W3DShaderManager::supportsUnitPixelLights())
 			{
@@ -948,10 +949,6 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 			{
 				pixelLightCount = 0;
 			}
-		}
-		else
-		{
-			specularTakesShadow = FALSE;
 		}
 
 		// Where the specular pass does the receiver's work, the mesh draws once less.
