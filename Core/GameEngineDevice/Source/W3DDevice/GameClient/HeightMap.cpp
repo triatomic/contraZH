@@ -347,11 +347,7 @@ Int HeightMapRenderObjClass::getTileRow(Int y) const
 
 Bool HeightMapRenderObjClass::isCellCulled(Int x, Int y) const
 {
-	if (!m_cullingTiles)
-	{
-		return FALSE;
-	}
-	return m_tileCulled[getTileRow(y - m_map->getDrawOrgY()) * m_numVBTilesX + getTileColumn(x - m_map->getDrawOrgX())];
+	return isTileCulled(getTileColumn(x - m_map->getDrawOrgX()), getTileRow(y - m_map->getDrawOrgY()));
 }
 
 //=============================================================================
