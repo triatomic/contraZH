@@ -192,8 +192,8 @@ private:
 
 	//	void doPerFrameMetrics(UnsignedInt frame);
 	void getMinimumFps(Int &minFps, Int &minFpsPlayer);			///< Returns the smallest FPS in the m_fpsAverages list.
-	Real getMaximumLatency(); ///< Returns the average of the two highest average latencies between players.
-	Real getAverageOfTwoHighestLatencies();
+	Real getMaximumLatency(); ///< Returns the latency the run ahead has to cover, taken from the slowest players.
+	Real getSlowestPlayersLatency();
 
 	void requestFrameDataResend(Int playerID, UnsignedInt frame); ///< request of this player that he send the specified frame's data.
 
@@ -229,6 +229,9 @@ private:
 	Int  m_minFps;
 	UnsignedInt m_smallestPacketArrivalCushion;
 	Bool m_didSelfSlug;
+	time_t m_lastRunAheadUpdateTime;	///< When the run ahead metrics were last exchanged, 0 before the first time.
+	Int  m_lowerRunAheadStreak;			///< Consecutive recalculations that asked for a lower run ahead.
+	Bool m_runAheadComputed;					///< Whether a measured run ahead has replaced the start-up value yet.
 
 	// -----------------------------------------------------------------------------
 	FileCommandMap s_fileCommandMap;

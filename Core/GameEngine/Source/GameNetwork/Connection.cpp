@@ -38,16 +38,20 @@ enum { MaxQuitFlushTime = 30000 }; // wait this many milliseconds at most to ret
 /**
  * The constructor.
  */
+static const time_t RETRY_TIME_MIN = 50;
+static const time_t RETRY_TIME_MAX = 2000;
+
 Connection::Connection() {
 	m_transport = nullptr;
 	m_user = nullptr;
 	m_netCommandList = nullptr;
-	m_retryTime = 2000; // set retry time to 2 seconds.
+	m_retryTime = RETRY_TIME_MAX; // until a round trip has been measured
 	m_lastTimeSent = 0;
 	m_frameGrouping = 1;
 	m_isQuitting = false;
 	m_quitTime = 0;
 	m_averageLatency = 0.0f;
+	m_latencySampleCount = 0;
 	Int i;
 	for(i = 0; i < CONNECTION_LATENCY_HISTORY_LENGTH; i++)
 	{
@@ -90,6 +94,7 @@ void Connection::init() {
 		m_latencies[i] = 0;
 	}
 	m_averageLatency = 0;
+	m_latencySampleCount = 0;
 	m_isQuitting = FALSE;
 	m_quitTime = 0;
 }
@@ -351,6 +356,11 @@ NetCommandRef * Connection::processAck(UnsignedShort commandID, UnsignedByte ori
 	Real lat = timeGetTime() - temp->getTimeLastSent();
 	m_averageLatency += lat / CONNECTION_LATENCY_HISTORY_LENGTH;
 	m_latencies[index] = lat;
+	if (m_latencySampleCount < CONNECTION_LATENCY_HISTORY_LENGTH)
+	{
+		++m_latencySampleCount;
+	}
+	updateRetryTime();
 
 #if defined(RTS_DEBUG)
 	if (doDebug == TRUE) {
@@ -363,7 +373,24 @@ NetCommandRef * Connection::processAck(UnsignedShort commandID, UnsignedByte ori
 
 void Connection::setFrameGrouping(time_t frameGrouping) {
 	m_frameGrouping = frameGrouping;
-//	m_retryTime = frameGrouping * 4;
+}
+
+// Resend after 1.5 round trips instead of a fixed two seconds, so a lost packet on a slow link costs a fraction of a second
+void Connection::updateRetryTime()
+{
+	// m_averageLatency divides by the full history, so scale it back up while the history is still filling
+	Real meanLatency = m_averageLatency * CONNECTION_LATENCY_HISTORY_LENGTH / m_latencySampleCount;
+	time_t retryTime = (time_t)(meanLatency * 1.5f);
+	time_t minRetryTime = max(RETRY_TIME_MIN, 2 * m_frameGrouping);
+	if (retryTime < minRetryTime)
+	{
+		retryTime = minRetryTime;
+	}
+	if (retryTime > RETRY_TIME_MAX)
+	{
+		retryTime = RETRY_TIME_MAX;
+	}
+	m_retryTime = retryTime;
 }
 
 void Connection::doRetryMetrics() {
@@ -375,7 +402,6 @@ void Connection::doRetryMetrics() {
 		++numSeconds;
 //		DEBUG_LOG(("Retries in the last 10 seconds = %d, average latency = %fms", m_numRetries, m_averageLatency));
 		m_numRetries = 0;
-//		m_retryTime = m_averageLatency * 1.5;
 	}
 }
 

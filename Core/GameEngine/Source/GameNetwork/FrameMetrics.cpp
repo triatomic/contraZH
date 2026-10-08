@@ -42,6 +42,7 @@ FrameMetrics::FrameMetrics()
 {
 	m_averageFps = 0.0f;
 	m_averageLatency = 0.0f;
+	m_latencySampleCount = 0;
 	m_cushionIndex = 0;
 	m_fpsListIndex = 0;
 	m_lastFpsTimeThing = 0;
@@ -121,14 +122,13 @@ void FrameMetrics::init() {
 #endif
 	}
 	m_fpsListIndex = 0;
+	// The history holds measured round trips only; the average above stands in until the first one arrives
+	m_latencySampleCount = 0;
+#if !defined(USE_NEW_FRAMEMETRIC_LOGIC)
 	for (i = 0; i < TheGlobalData->m_networkLatencyHistoryLength; ++i) {
-#if defined(USE_NEW_FRAMEMETRIC_LOGIC)
-		m_mapLatenciesLookup[i] = 0.2;
-		m_mapLatenciesSorted[i] = 0.2;
-#else
-		m_latencyList[i] = (Real)0.2;
-#endif
+		m_latencyList[i] = 0.0f;
 	}
+#endif
 	m_cushionIndex = 0;
 }
 
@@ -208,6 +208,10 @@ void FrameMetrics::processLatencyResponse(UnsignedInt frame) {
 
 	m_mapLatenciesLookup[frame] = (Real)timeDiff / (Real)1000; // convert to seconds from milliseconds.
 	m_mapLatenciesSorted[frame] = (Real)timeDiff / (Real)1000; // convert to seconds from milliseconds.
+	if (m_latencySampleCount < TheGlobalData->m_networkLatencyHistoryLength)
+	{
+		++m_latencySampleCount;
+	}
 
 	// calculate average
 	m_averageLatency = 0.0f;
@@ -227,8 +231,12 @@ void FrameMetrics::processLatencyResponse(UnsignedInt frame) {
 
 	Int latencyListIndex = frame % TheGlobalData->m_networkLatencyHistoryLength;
 	m_latencyList[latencyListIndex] = (Real)timeDiff / (Real)1000; // convert to seconds from milliseconds.
+	if (m_latencySampleCount < TheGlobalData->m_networkLatencyHistoryLength)
+	{
+		++m_latencySampleCount;
+	}
 	const Real latencySum = std::accumulate(m_latencyList, m_latencyList + TheGlobalData->m_networkLatencyHistoryLength, 0.0f);
-	m_averageLatency = latencySum / (Real)TheGlobalData->m_networkLatencyHistoryLength;
+	m_averageLatency = latencySum / (Real)m_latencySampleCount;
 #endif
 
 	if (frame % 16 == 0) {
