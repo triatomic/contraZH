@@ -1521,6 +1521,9 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 		static Int otherPassDraws = 0;
 		static Int rejections[DX8InstancingClass::REJECT_COUNT];
 		static DX8SkinningClass::StatsStruct skinning;
+		static Int passPaths[DX8InstancingStatsStruct::PASS_PATH_COUNT];
+		static Int passWindows = 0;
+		static Int passPeakAlone = 0;
 
 		DX8InstancingStatsStruct stats;
 		DX8MeshRendererClass::Take_Instancing_Stats(stats);
@@ -1565,6 +1568,17 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 		{
 			rejections[i] += frameRejections[i];
 		}
+		Int renderAlone = 0;
+		for (Int i = 0; i < DX8InstancingStatsStruct::PASS_PATH_COUNT; ++i)
+		{
+			passPaths[i] += stats.PassPaths[i];
+			if (i != DX8InstancingStatsStruct::PASS_PATH_WINDOW)
+			{
+				renderAlone += stats.PassPaths[i];
+			}
+		}
+		passWindows += stats.PassWindows;
+		passPeakAlone = max(passPeakAlone, renderAlone);
 		skinning.SkinnedMeshes[0] += frameSkinning.SkinnedMeshes[0];
 		skinning.SkinnedMeshes[1] += frameSkinning.SkinnedMeshes[1];
 		for (Int i = 0; i < DX8SkinningClass::REJECT_COUNT; ++i)
@@ -1591,8 +1605,18 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 				skinning.Rejections[DX8SkinningClass::REJECT_STATE], skinning.Rejections[DX8SkinningClass::REJECT_MODEL],
 				skinning.Rejections[DX8SkinningClass::REJECT_MESH], skinning.Rejections[DX8SkinningClass::REJECT_CATEGORY],
 				skinning.Rejections[DX8SkinningClass::REJECT_PASS]));
+			// Each pass drawn alone installs and removes its shader state for that one mesh.
+			RENDER_LOG(("Material passes: render %d, %d batched in %d windows; alone outside the lit scene %d, sorting %d, unbound %d, not a window pass %d, override %d, skin %d, delayed %d; most alone in one render %d",
+				instancingFrames, passPaths[DX8InstancingStatsStruct::PASS_PATH_WINDOW], passWindows,
+				passPaths[DX8InstancingStatsStruct::PASS_PATH_NOT_LIT], passPaths[DX8InstancingStatsStruct::PASS_PATH_SORTING],
+				passPaths[DX8InstancingStatsStruct::PASS_PATH_UNBOUND], passPaths[DX8InstancingStatsStruct::PASS_PATH_NOT_WINDOW_PASS],
+				passPaths[DX8InstancingStatsStruct::PASS_PATH_OVERRIDE], passPaths[DX8InstancingStatsStruct::PASS_PATH_SKIN],
+				passPaths[DX8InstancingStatsStruct::PASS_PATH_DELAYED], passPeakAlone));
 
 			memset(scenes, 0, sizeof(scenes));
+			memset(passPaths, 0, sizeof(passPaths));
+			passWindows = 0;
+			passPeakAlone = 0;
 			receiveDraws = 0;
 			specularDraws = 0;
 			otherPassDraws = 0;

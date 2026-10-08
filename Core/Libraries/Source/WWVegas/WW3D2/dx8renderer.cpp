@@ -374,6 +374,20 @@ static bool Allows_Material_Pass_Window(MaterialPassClass * pass, MeshClass * me
 	return !mesh->Peek_Model()->Get_Flag(MeshModelClass::SKIN);
 }
 
+// Why Allows_Material_Pass_Window turned a pass away, for the render log.
+static int Lone_Pass_Path(MaterialPassClass * pass, MeshClass * mesh)
+{
+	if (!Is_Window_Pass(pass))
+	{
+		return DX8InstancingStatsStruct::PASS_PATH_NOT_WINDOW_PASS;
+	}
+	if (mesh->Has_Material_Pass_Override())
+	{
+		return DX8InstancingStatsStruct::PASS_PATH_OVERRIDE;
+	}
+	return DX8InstancingStatsStruct::PASS_PATH_SKIN;
+}
+
 void DX8FVFCategoryContainer::Render_Instanced_Material_Passes()
 {
 	MatPassTaskClass * mpr = visible_matpass_head;
@@ -400,10 +414,12 @@ void DX8FVFCategoryContainer::Render_Instanced_Material_Passes()
 
 		if (Allows_Material_Pass_Window(mpr->Peek_Material_Pass(), mesh))
 		{
+			DX8MeshRendererClass::Record_Material_Pass_Path(DX8InstancingStatsStruct::PASS_PATH_WINDOW);
 			_MaterialPassWindow.push_back(mpr);
 		}
 		else
 		{
+			DX8MeshRendererClass::Record_Material_Pass_Path(Lone_Pass_Path(mpr->Peek_Material_Pass(), mesh));
 			Render_Material_Pass_Window();
 			mesh->Render_Material_Pass(mpr->Peek_Material_Pass(),index_buffer);
 			delete mpr;
@@ -424,6 +440,7 @@ void DX8FVFCategoryContainer::Render_Material_Pass_Window()
 	{
 		return;
 	}
+	DX8MeshRendererClass::Record_Material_Pass_Window();
 
 	static std::vector<MaterialPassClass *> passes;
 	static std::vector<InstancedFragment> instanced;
@@ -542,6 +559,8 @@ void DX8FVFCategoryContainer::Render_Procedural_Material_Passes()
 		Render_Instanced_Material_Passes();
 		return;
 	}
+	const int path = (DX8InstancingClass::Get_Pass() != DX8InstancingClass::PASS_LIT) ? DX8InstancingStatsStruct::PASS_PATH_NOT_LIT
+		: (sorting ? DX8InstancingStatsStruct::PASS_PATH_SORTING : DX8InstancingStatsStruct::PASS_PATH_UNBOUND);
 
 	// additional passes
 	MatPassTaskClass * mpr = visible_matpass_head;
@@ -562,6 +581,7 @@ void DX8FVFCategoryContainer::Render_Procedural_Material_Passes()
    		}
 
 		mpr->Peek_Mesh()->Render_Material_Pass(mpr->Peek_Material_Pass(),index_buffer);
+		DX8MeshRendererClass::Record_Material_Pass_Path(path);
 		MatPassTaskClass * next_mpr = mpr->Get_Next_Visible();
 
 		// remove from list, then delete
@@ -609,6 +629,7 @@ void DX8RigidFVFCategoryContainer::Render_Delayed_Procedural_Material_Passes()
 	while (mpr != nullptr) {
 
 		mpr->Peek_Mesh()->Render_Material_Pass(mpr->Peek_Material_Pass(),index_buffer);
+		DX8MeshRendererClass::Record_Material_Pass_Path(DX8InstancingStatsStruct::PASS_PATH_DELAYED);
 		MatPassTaskClass * next_mpr = mpr->Get_Next_Visible();
 
 		delete mpr;
@@ -2055,6 +2076,7 @@ void DX8SkinFVFCategoryContainer::Render_Skinned_Material_Passes()
 
 		DX8SkinningClass::Set_Mesh(mesh, Peek_Skinned_Model(mesh->Peek_Model())->Palette, nullptr);
 		mesh->Render_Material_Pass(mpr->Peek_Material_Pass(),index_buffer);
+		DX8MeshRendererClass::Record_Material_Pass_Path(DX8InstancingStatsStruct::PASS_PATH_SKIN);
 		MatPassTaskClass * next_mpr = mpr->Get_Next_Visible();
 
 		if (last_mpr == nullptr) {
