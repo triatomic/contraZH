@@ -442,6 +442,14 @@ void Network::parseUserList( const GameInfo *game )
 
 	m_conMgr->parseUserList(game);
 
+	// A solo host has nobody to wait for, so skip the one second start-up run ahead
+	if (m_conMgr->getNumPlayers() == 1)
+	{
+		m_runAhead = MIN_RUNAHEAD;
+		m_lastExecutionFrame = m_runAhead - 1;
+		m_lastFrameCompleted = m_runAhead - 1;
+	}
+
 	// Now that we have the players in this game, we need to reset the FrameData stuff.
 	m_conMgr->destroyGameMessages();
 	m_conMgr->zeroFrames(1, m_runAhead-1); ///< we zero out m_runAhead frames +1 because the game actually starts at frame 1.

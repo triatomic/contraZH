@@ -51,6 +51,21 @@ detected stealth unit still shows it.
 
 Presentation only; replays unaffected.
 
+## Solo LAN games respond instantly
+
+A LAN game hosted with no other human player had a noticeable lag between a click and the unit
+obeying: a full second at the start, then about a quarter of a second for the rest of the match. The
+engine schedules every command a number of frames ahead to cover the network round trip, and it
+seeds that round trip with a 200 ms placeholder until real measurements arrive. A solo host has
+nobody to measure against, so the placeholder stood for the whole game.
+
+A host who is alone now counts as having zero latency, and starts the match at the minimum run
+ahead instead of the one second start-up value. The Generals Online build also now uses the same
+latency formula for LAN as the plain build, so both executables give a LAN game the same delay.
+
+This only changes how far ahead commands are scheduled, which the replay records as it happened,
+so older replays still play back identically.
+
 ## Drones stay on their leash
 
 * The leash (twice the guard range from the master) was never checked while the master had a

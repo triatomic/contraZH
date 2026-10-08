@@ -1372,7 +1372,15 @@ void ConnectionManager::updateRunAhead(Int oldRunAhead, Int frameRate, Bool didS
 	if ((lasttimesent == 0) || ((curTime - lasttimesent) > TheGlobalData->m_networkRunAheadMetricsTime)) {
 		if (m_localSlot == m_packetRouterSlot) {
 			// We are the packet router, time to compute a new run ahead for this game.
-			m_latencyAverages[m_localSlot] = m_frameMetrics.getAverageLatency();
+			// A solo host never gets frame acks, so its seeded latency would pass for a real ping
+			if (getNumPlayers() > 1)
+			{
+				m_latencyAverages[m_localSlot] = m_frameMetrics.getAverageLatency();
+			}
+			else
+			{
+				m_latencyAverages[m_localSlot] = 0.0f;
+			}
 
 			// since we are now using the display frame rate rather than the logic frame rate to get our average FPS,
 			// it doesn't make sense to send the desired logic frame rate if we "slugged" ourself.
@@ -1627,6 +1635,12 @@ void ConnectionManager::updateRunAhead(Int oldRunAhead, Int frameRate, Bool didS
 #if defined(GENERALS_ONLINE)
 Real ConnectionManager::getMaximumLatency()
 {
+	// A LAN game has no mesh, so it uses the same latency as a build without Generals Online
+	if (TheNGMPGame == nullptr)
+	{
+		return getAverageOfTwoHighestLatencies();
+	}
+
 	int latencyLogicModel = 0;
 
 	if (TheNGMPGame != nullptr)
@@ -1710,8 +1724,14 @@ Real ConnectionManager::getMaximumLatency()
 	return maxLatency;
 }
 #else
-Real ConnectionManager::getMaximumLatency() {
+Real ConnectionManager::getMaximumLatency()
+{
+	return getAverageOfTwoHighestLatencies();
+}
+#endif
 
+Real ConnectionManager::getAverageOfTwoHighestLatencies()
+{
 	Real lat1 = 0.0f;
 	Real lat2 = 0.0f;
 
@@ -1731,7 +1751,6 @@ Real ConnectionManager::getMaximumLatency() {
 
 	return (lat1 + lat2) / 2.0f;
 }
-#endif
 
 void ConnectionManager::getMinimumFps(Int &minFps, Int &minFpsPlayer) {
 	minFps = -1;
