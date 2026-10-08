@@ -986,6 +986,23 @@ Draw = W3DModelDraw ModuleTag_01
 End
 ```
 
+## Supersampling
+
+`Supersampling` on the Shaders page offers `150%` and `200%`. The world renders to a target that
+many percent of the screen's size each way and is filtered down to the screen with a box filter,
+which smooths edges, alpha-tested cutouts, particles and shader output alike. The interface and
+the mouse draw after that at the screen's own size, so text stays sharp. Unlike MSAA the larger
+target is single sampled, so the scene's depth stays readable and ambient occlusion, soft
+particles, the storm haze and every other depth-reading effect keep working, now supersampled too.
+
+Notes:
+* 200% draws four times the pixels. Zoomed in on a big fight it costs about what MSAA 8x does.
+* Supersampling takes MSAA's place; the Anti-aliasing box greys out while it is on.
+* `Options.ini` stores it as `SuperSampling = 150` or `200`.
+* The `CONTRA_SSAA` environment variable set to a percent overrides the option for one run.
+* The combo needs a layout with the `ComboBoxSuperSampling` row, which `build/add_ssaa_wnd.py` adds
+to a loose `OptionsMenu.wnd`.
+
 ## Ambient occlusion
 
 Creases, corners, and the ground where units and buildings stand fall into soft shade, so objects sit

@@ -184,6 +184,8 @@ static NameKeyType    ButtonShadersID             = NAMEKEY_INVALID;
 static NameKeyType    ButtonShadersAcceptID       = NAMEKEY_INVALID;
 static NameKeyType    ButtonShadersCancelID       = NAMEKEY_INVALID;
 static GameWindow *   comboBoxShadows             = nullptr;
+static GameWindow *   comboBoxSuperSampling       = nullptr;
+static NameKeyType    comboBoxSuperSamplingID     = NAMEKEY_INVALID;
 
 static GameWindow *   buttonMainAccept            = nullptr;
 static GameWindow *   buttonMainBack              = nullptr;
@@ -249,6 +251,7 @@ static const char *const BuildTimerModeNames[] = { "None", "Seconds", "Auto" };
 static const char *const CastModeNames[] = { "Normal", "QuickCast", "QuickCastWithIndicator" };
 static const Int AnisotropyLevels[] = { 2, 4, 8, 16 };
 static const Int ShadowMapResolutions[] = { 512, 1024, 2048, 4096 };
+static const Int SuperSamplingPercents[] = { 100, 150, 200 };
 static_assert( ARRAY_SIZE(HealthBarModeNames) == HealthBarDisplayMode_Count, "HealthBarModeNames out of date" );
 static const char *const AlliedDecalModeNames[] = { "Hidden", "House", "Army" };
 static_assert( ARRAY_SIZE(AlliedDecalModeNames) == AlliedDecalMode_Count, "AlliedDecalModeNames out of date" );
@@ -549,13 +552,15 @@ static void updateGameOptionsEnables()
 	enableWindow( checkPixelLights, getCheck( checkDynamicLights, TRUE ) );
 	enableWindow( checkHQSky, getCheck( checkCloudShadows, TRUE ) );
 
-	// the scene depth it reads is multisampled, and so unreadable, with anti-aliasing on
+	// the scene depth it reads is multisampled, and so unreadable, with MSAA on; supersampling takes MSAA's place and keeps it readable
 	Int antiAliasing = 0;
 	if (comboBoxAntiAliasing)
 	{
 		GadgetComboBoxGetSelectedPos( comboBoxAntiAliasing, &antiAliasing );
 	}
-	enableWindow( checkAmbientOcclusion, antiAliasing <= 0 );
+	const Bool superSampling = comboBoxSuperSampling && getComboPos( comboBoxSuperSampling, 0 ) > 0;
+	enableWindow( comboBoxAntiAliasing, !superSampling );
+	enableWindow( checkAmbientOcclusion, antiAliasing <= 0 || superSampling );
 }
 
 static void populateGameOptions()
@@ -594,6 +599,7 @@ static void populateGameOptions()
 static void populateShaders()
 {
 	setComboPos( comboBoxShadows, levelIndex( ShadowMapResolutions, ARRAY_SIZE(ShadowMapResolutions), pref->getShadowMapResolution() ) );
+	setComboPos( comboBoxSuperSampling, levelIndex( SuperSamplingPercents, ARRAY_SIZE(SuperSamplingPercents), pref->getSuperSampling() ) );
 	for (Int i = 0; i < ARRAY_SIZE(BoolOptions); ++i)
 	{
 		GameWindow *check = *BoolOptions[i].check;
@@ -1194,6 +1200,24 @@ static void saveOptions()
 	}
 
 	//-------------------------------------------------------------------------------------------------
+	// supersampling, which rebuilds the device like a sample count change and falls back where the target cannot be made
+	if (comboBoxSuperSampling)
+	{
+		Int percent = SuperSamplingPercents[getComboPos( comboBoxSuperSampling, 0 )];
+		if (percent != WW3D::Get_Super_Sampling())
+		{
+			WW3D::Set_Super_Sampling( percent );
+			WW3D::Set_Render_Device( -1, -1, -1, -1, -1, false, true, true );
+			percent = WW3D::Get_Super_Sampling();
+			TheWritableGlobalData->m_antiAliasLevel = (UnsignedInt)WW3D::Get_MSAA_Mode();
+		}
+		AsciiString prefString;
+		prefString.format( "%d", percent );
+		(*pref)["SuperSampling"] = prefString;
+		TheWritableGlobalData->m_superSampling = percent;
+	}
+
+	//-------------------------------------------------------------------------------------------------
 	// draw scroll anchor
 	{
 		if( TheInGameUI->getDrawRMBScrollAnchor() )
@@ -1773,6 +1797,7 @@ static void initShadersWindows()
 	findOptionsWindow( "OptionsMenu.wnd:ButtonShadersAccept", ButtonShadersAcceptID );
 	findOptionsWindow( "OptionsMenu.wnd:ButtonShadersBack", ButtonShadersCancelID );
 	comboBoxShadows = findOptionsWindow( "OptionsMenu.wnd:ComboBoxShadows" );
+	comboBoxSuperSampling = findOptionsWindow( "OptionsMenu.wnd:ComboBoxSuperSampling", comboBoxSuperSamplingID );
 
 	// The layout hides the button, so an exe without this panel never shows it.
 	if (button)
@@ -1787,6 +1812,12 @@ static void initShadersWindows()
 	static const WideChar *const shadowMapNames[] = { L"512 x 512", L"1024 x 1024", L"2048 x 2048", L"4096 x 4096" };
 	static_assert( ARRAY_SIZE(shadowMapNames) == ARRAY_SIZE(ShadowMapResolutions), "shadowMapNames out of date" );
 	addComboEntries( comboBoxShadows, "GUI:ShadowMapResolution", shadowMapNames, ARRAY_SIZE(ShadowMapResolutions), 3 );
+
+	setLabelText( "OptionsMenu.wnd:SuperSamplingLabel", "GUI:SuperSampling", L"Supersampling" );
+	setTooltip( comboBoxSuperSampling, "TOOLTIP:SuperSampling", L"Renders the world larger and shrinks it to the screen, which smooths every edge and keeps ambient occlusion and soft particles working. 200% draws four times the pixels. Takes the place of Anti-aliasing." );
+	static const WideChar *const superSamplingNames[] = { L"Off", L"150%", L"200%" };
+	static_assert( ARRAY_SIZE(superSamplingNames) == ARRAY_SIZE(SuperSamplingPercents), "superSamplingNames out of date" );
+	addComboEntries( comboBoxSuperSampling, "GUI:SuperSampling", superSamplingNames, ARRAY_SIZE(SuperSamplingPercents), 2 );
 
 	// not every layout ships the panel hidden
 	WinShaders->winHide( TRUE );
@@ -2070,7 +2101,7 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 	static const WideChar *const AntiAliasingFallbacks[OptionPreferences::AntiAliasingMode_Count] = { L"Off", L"2x", L"4x", L"8x" };
 	addComboEntries( comboBoxAntiAliasing, "GUI:AntiAliasing", AntiAliasingFallbacks, OptionPreferences::AntiAliasingMode_Count, OptionPreferences::AntiAliasingMode_Count - 1 );
 	setLabelText( "OptionsMenu.wnd:AntiAliasingLabel", "GUI:AntiAliasing", L"Anti-aliasing" );
-	setTooltip( comboBoxAntiAliasing, "TOOLTIP:AntiAliasing", L"Smooths jagged edges. Ambient occlusion needs it off, and soft particles fade only against the ground while it is on." );
+	setTooltip( comboBoxAntiAliasing, "TOOLTIP:AntiAliasing", L"Smooths jagged edges. Ambient occlusion needs it off, and soft particles fade only against the ground while it is on. Supersampling on the Shaders page takes its place." );
 	Int val = atoi(selectedAliasingMode.str());
 	Int pos = 0;
 
@@ -2496,7 +2527,7 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 				GameWindow *control = (GameWindow *)mData1;
 				Int controlID = control->winGetWindowId();
 
-				if (controlID == comboBoxAntiAliasingID)
+				if (controlID == comboBoxAntiAliasingID || controlID == comboBoxSuperSamplingID)
 				{
 					updateGameOptionsEnables();
 					break;

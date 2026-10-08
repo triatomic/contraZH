@@ -493,6 +493,9 @@ public:
 	static IDirect3DTexture8 * Peek_Scene_Depth_Texture() { return SceneDepthTexture; }
 	static IDirect3DSurface8 * Peek_Scene_Depth_Surface() { return SceneDepthTexture != nullptr ? SceneDepthBuffer : nullptr; }
 
+	/// Filters the supersampled scene down to the back buffer and binds the back buffer, so what follows draws at the screen's size.
+	static void Resolve_Scene_Target();
+
 	static IDirect3DSurface8 * _Create_DX8_Surface(unsigned int width, unsigned int height, WW3DFormat format);
 	static IDirect3DSurface8 * _Create_DX8_Surface(const char *filename);
 	static IDirect3DSurface8 * _Get_DX8_Front_Buffer();
@@ -689,6 +692,10 @@ protected:
 	static void Set_MSAA_Mode(D3DMULTISAMPLE_TYPE mode) { MultiSampleAntiAliasing = mode; }
 	static D3DMULTISAMPLE_TYPE Get_MSAA_Mode() { return MultiSampleAntiAliasing; }
 
+	// Supersampling renders the scene this many times the back buffer's size each way, 1 to 2, and takes MSAA's place.
+	static void Set_Super_Sampling(float scale) { SuperSampleScale = (scale < 1.0f) ? 1.0f : (scale > 2.0f) ? 2.0f : scale; }
+	static float Get_Super_Sampling() { return SuperSampleScale; }
+
 	static void	Set_Swap_Interval(int swap);
 	static int	Get_Swap_Interval();
 	// -1 keeps vsync on in fullscreen and off in a window, 0 turns it off, 1 on. A change resets a live device.
@@ -738,6 +745,7 @@ protected:
 	static void Release_Frame_Query();
 	static D3DFORMAT					DisplayFormat;
 	static D3DMULTISAMPLE_TYPE	MultiSampleAntiAliasing;
+	static float						SuperSampleScale;
 
 
 	// shader system updates KJM v
@@ -788,14 +796,19 @@ protected:
 	static IDirect3DDevice8 *			D3DDevice;				//d3ddevice8;
 	static bool								IsEx;
 
-	// A flip model swap chain cannot be multisampled, so MSAA renders here and resolves at Present
+	// A flip model swap chain cannot be multisampled, so MSAA renders here and resolves at Present. Supersampling renders here too, larger.
 	static IDirect3DSurface8 *			SceneRenderTarget;
 	static IDirect3DSurface8 *			SceneDepthBuffer;
 	// Without MSAA the scene's depth is an INTZ texture where the driver offers one, so shaders can read it
 	static IDirect3DTexture8 *			SceneDepthTexture;
+	// The device's own depth buffer, which the UI draws with once a supersampled scene is resolved
+	static IDirect3DSurface8 *			DeviceDepthBuffer;
+	// True from the resolve to the next frame's start, while the back buffer is the target
+	static bool							SceneResolved;
 	static void Create_Scene_Target();
-	static void Create_Scene_Depth_Texture();
+	static void Create_Scene_Depth_Texture(unsigned width, unsigned height);
 	static void Release_Scene_Target();
+	static void Bind_Scene_Target();
 
 #if defined(BUILD_WITH_D3D9)
 	// Without D3D9Ex, waiting on the last frame's event query holds the CPU to one frame ahead

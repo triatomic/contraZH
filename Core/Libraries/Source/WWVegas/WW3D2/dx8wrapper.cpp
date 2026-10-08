@@ -126,6 +126,7 @@ bool								DX8Wrapper::FrameQueryIssued							= false;
 #endif
 D3DFORMAT					DX8Wrapper::DisplayFormat	= D3DFMT_UNKNOWN;
 D3DMULTISAMPLE_TYPE DX8Wrapper::MultiSampleAntiAliasing	= DEFAULT_MSAA;
+float						DX8Wrapper::SuperSampleScale					= 1.0f;
 
 // shader system additions KJM v
 DWORD								DX8Wrapper::Vertex_Shader								= 0;
@@ -204,6 +205,8 @@ HINSTANCE D3D8Lib = nullptr;
 
 bool								DX8Wrapper::IsEx											= false;
 IDirect3DSurface8 *			DX8Wrapper::SceneRenderTarget							= nullptr;
+IDirect3DSurface8 *			DX8Wrapper::DeviceDepthBuffer							= nullptr;
+bool							DX8Wrapper::SceneResolved								= false;
 IDirect3DSurface8 *			DX8Wrapper::SceneDepthBuffer							= nullptr;
 IDirect3DTexture8 *			DX8Wrapper::SceneDepthTexture							= nullptr;
 
@@ -1224,6 +1227,17 @@ bool DX8Wrapper::Set_Render_Device(int dev, int width, int height, int bits, int
 		}
 	}
 
+	// Supersampling takes MSAA's place, since its larger target wants a single-sampled, readable depth.
+	const char *ssaaOverride = getenv("CONTRA_SSAA");
+	if (ssaaOverride != nullptr)
+	{
+		Set_Super_Sampling(atoi(ssaaOverride) / 100.0f);
+	}
+	if (SuperSampleScale > 1.0f)
+	{
+		MultiSampleAntiAliasing = D3DMULTISAMPLE_NONE;
+	}
+
 	/*
 	** Check the devices support for the requested MSAA mode then setup the multi sample type
 	*/
@@ -1525,9 +1539,11 @@ void DX8Wrapper::Get_Render_Target_Resolution(int & set_w,int & set_h,int & set_
 {
 	WWASSERT(IsInitted);
 
-	if (CurrentRenderTarget != nullptr) {
+	// Until it is resolved, the frame being drawn lives in the scene target, which supersampling makes larger than the screen
+	IDirect3DSurface8 *target = (CurrentRenderTarget != nullptr) ? CurrentRenderTarget : (!SceneResolved ? SceneRenderTarget : nullptr);
+	if (target != nullptr) {
 		D3DSURFACE_DESC info;
-		CurrentRenderTarget->GetDesc (&info);
+		target->GetDesc (&info);
 
 		set_w				= info.Width;
 		set_h				= info.Height;
@@ -1911,6 +1927,7 @@ void DX8Wrapper::Begin_Scene()
 	DX8WebBrowser::Update();
 #endif
 
+	Bind_Scene_Target();
 	DX8CALL(BeginScene());
 
 	DX8WebBrowser::Update();
@@ -1927,7 +1944,11 @@ void DX8Wrapper::End_Scene(bool flip_frames)
 		DX8_Assert();
 		HRESULT hr;
 #if defined(BUILD_WITH_D3D9)
-		if (SceneRenderTarget != nullptr)
+		if (SceneRenderTarget != nullptr && SuperSampleScale > 1.0f)
+		{
+			Resolve_Scene_Target();
+		}
+		else if (SceneRenderTarget != nullptr)
 		{
 			IDirect3DSurface8* back_buffer = nullptr;
 			DX8CALL(GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &back_buffer));
@@ -2953,9 +2974,40 @@ void DX8Wrapper::Create_Scene_Target()
 {
 #if defined(BUILD_WITH_D3D9)
 	WWASSERT(SceneRenderTarget == nullptr && SceneDepthBuffer == nullptr && SceneDepthTexture == nullptr);
+	SceneResolved = false;
+	DX8CALL(GetDepthStencilSurface(&DeviceDepthBuffer));
+	HRESULT hr;
+
+	if (SuperSampleScale > 1.0f)
+	{
+		const unsigned width = (unsigned)(_PresentParameters.BackBufferWidth * SuperSampleScale + 0.5f);
+		const unsigned height = (unsigned)(_PresentParameters.BackBufferHeight * SuperSampleScale + 0.5f);
+		DX8CALL_HRES(CreateRenderTarget(width, height, _PresentParameters.BackBufferFormat, D3DMULTISAMPLE_NONE, 0, FALSE, &SceneRenderTarget, nullptr), hr);
+		if (SUCCEEDED(hr))
+		{
+			Create_Scene_Depth_Texture(width, height);
+			if (SceneDepthBuffer == nullptr)
+			{
+				DX8CALL_HRES(CreateDepthStencilSurface(width, height, _PresentParameters.AutoDepthStencilFormat, D3DMULTISAMPLE_NONE, 0, FALSE, &SceneDepthBuffer, nullptr), hr);
+			}
+		}
+		if (FAILED(hr))
+		{
+			RENDER_LOG(("Supersampled scene target creation failed, disabling supersampling"));
+			Release_Scene_Target();
+			SuperSampleScale = 1.0f;
+			DX8CALL(GetDepthStencilSurface(&DeviceDepthBuffer));
+			Create_Scene_Depth_Texture(_PresentParameters.BackBufferWidth, _PresentParameters.BackBufferHeight);
+			return;
+		}
+		Bind_Scene_Target();
+		RENDER_LOG(("Rendering to a %ux%u supersampled scene target, %d%%", width, height, (int)(SuperSampleScale * 100.0f + 0.5f)));
+		return;
+	}
+
 	if (MultiSampleAntiAliasing == D3DMULTISAMPLE_NONE)
 	{
-		Create_Scene_Depth_Texture();
+		Create_Scene_Depth_Texture(_PresentParameters.BackBufferWidth, _PresentParameters.BackBufferHeight);
 		return;
 	}
 	if (_PresentParameters.SwapEffect != D3DSWAPEFFECT_FLIPEX)
@@ -2963,7 +3015,6 @@ void DX8Wrapper::Create_Scene_Target()
 		return;
 	}
 
-	HRESULT hr;
 	DX8CALL_HRES(CreateRenderTarget(_PresentParameters.BackBufferWidth, _PresentParameters.BackBufferHeight,
 		_PresentParameters.BackBufferFormat, MultiSampleAntiAliasing, 0, FALSE, &SceneRenderTarget, nullptr), hr);
 	if (SUCCEEDED(hr))
@@ -2977,7 +3028,8 @@ void DX8Wrapper::Create_Scene_Target()
 		RENDER_LOG(("MSAA scene target creation failed, disabling MSAA"));
 		Release_Scene_Target();
 		MultiSampleAntiAliasing = D3DMULTISAMPLE_NONE;
-		Create_Scene_Depth_Texture();
+		DX8CALL(GetDepthStencilSurface(&DeviceDepthBuffer));
+		Create_Scene_Depth_Texture(_PresentParameters.BackBufferWidth, _PresentParameters.BackBufferHeight);
 		return;
 	}
 
@@ -2989,7 +3041,7 @@ void DX8Wrapper::Create_Scene_Target()
 }
 
 // CONTRA_SOFTPARTICLES=0 or 2 keeps the plain depth buffer, which the soft particles then do without.
-void DX8Wrapper::Create_Scene_Depth_Texture()
+void DX8Wrapper::Create_Scene_Depth_Texture(unsigned width, unsigned height)
 {
 #if defined(BUILD_WITH_D3D9)
 	const char *mode = getenv("CONTRA_SOFTPARTICLES");
@@ -3007,7 +3059,7 @@ void DX8Wrapper::Create_Scene_Depth_Texture()
 	}
 
 	HRESULT hr;
-	DX8CALL_HRES(CreateTexture(_PresentParameters.BackBufferWidth, _PresentParameters.BackBufferHeight, 1,
+	DX8CALL_HRES(CreateTexture(width, height, 1,
 		D3DUSAGE_DEPTHSTENCIL, intz, D3DPOOL_DEFAULT, &SceneDepthTexture, nullptr), hr);
 	if (SUCCEEDED(hr))
 	{
@@ -3015,17 +3067,65 @@ void DX8Wrapper::Create_Scene_Depth_Texture()
 	}
 	if (FAILED(hr))
 	{
-		Release_Scene_Target();
+		if (SceneDepthTexture != nullptr)
+		{
+			SceneDepthTexture->Release();
+			SceneDepthTexture = nullptr;
+		}
+		SceneDepthBuffer = nullptr;
 		return;
 	}
 
 	DX8CALL(SetDepthStencilSurface(SceneDepthBuffer));
-	RENDER_LOG(("Rendering the scene's depth to an INTZ texture"));
+	RENDER_LOG(("Rendering the scene's depth to a %ux%u INTZ texture", width, height));
+#endif
+}
+
+// Points the device at the scene target for the frame's 3D part. Harmless when it is bound already.
+void DX8Wrapper::Bind_Scene_Target()
+{
+#if defined(BUILD_WITH_D3D9)
+	if (SceneRenderTarget == nullptr || !SceneResolved)
+	{
+		return;
+	}
+	DX8CALL(SetRenderTarget(0, SceneRenderTarget));
+	DX8CALL(SetDepthStencilSurface(SceneDepthBuffer));
+	CurrentViewportValid = false;
+	SceneResolved = false;
+#endif
+}
+
+void DX8Wrapper::Resolve_Scene_Target()
+{
+#if defined(BUILD_WITH_D3D9)
+	if (SceneRenderTarget == nullptr || SceneResolved || SuperSampleScale <= 1.0f)
+	{
+		return;
+	}
+	IDirect3DSurface8 *back_buffer = nullptr;
+	DX8CALL(GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &back_buffer));
+	if (back_buffer == nullptr)
+	{
+		return;
+	}
+	DX8CALL(StretchRect(SceneRenderTarget, nullptr, back_buffer, nullptr, D3DTEXF_LINEAR));
+	DX8CALL(SetRenderTarget(0, back_buffer));
+	DX8CALL(SetDepthStencilSurface(DeviceDepthBuffer));
+	back_buffer->Release();
+	CurrentViewportValid = false;
+	SceneResolved = true;
 #endif
 }
 
 void DX8Wrapper::Release_Scene_Target()
 {
+	SceneResolved = false;
+	if (DeviceDepthBuffer != nullptr)
+	{
+		DeviceDepthBuffer->Release();
+		DeviceDepthBuffer = nullptr;
+	}
 	if (SceneRenderTarget != nullptr)
 	{
 		SceneRenderTarget->Release();
@@ -3940,8 +4040,8 @@ SurfaceClass * DX8Wrapper::_Get_DX8_Back_Buffer(unsigned int num)
 {
 	DX8_THREAD_ASSERT();
 
-	// Until Present resolves it, the frame being drawn lives in the scene target
-	if (SceneRenderTarget != nullptr && num == 0)
+	// Until it is resolved, the frame being drawn lives in the scene target
+	if (SceneRenderTarget != nullptr && num == 0 && !SceneResolved)
 	{
 		return NEW_REF(SurfaceClass,(SceneRenderTarget));
 	}

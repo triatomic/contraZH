@@ -276,6 +276,9 @@ public:
 
 	static void					Set_MSAA_Mode(MultiSampleModeEnum mode);
 	static MultiSampleModeEnum Get_MSAA_Mode();
+	/// Supersampling as a percent of the screen's size each way, 100 to 200; above 100 it takes MSAA's place. Set before the device is made.
+	static void					Set_Super_Sampling(int percent);
+	static int					Get_Super_Sampling();
 
 	static void					Set_Mesh_Draw_Mode (MeshDrawModeEnum mode)	{ MeshDrawMode = mode; }
 	static MeshDrawModeEnum Get_Mesh_Draw_Mode ()								{ return (MeshDrawMode); }

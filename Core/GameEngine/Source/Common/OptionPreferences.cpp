@@ -80,6 +80,20 @@ WW3D::MultiSampleModeEnum OptionPreferences::getAntiAliasing() const
 	return level;
 }
 
+Int OptionPreferences::getSuperSampling() const
+{
+	const Int percent = getInt("SuperSampling", 100);
+	if (percent >= 200)
+	{
+		return 200;
+	}
+	if (percent >= 150)
+	{
+		return 150;
+	}
+	return 100;
+}
+
 TextureFilterClass::TextureFilterMode OptionPreferences::getTextureFilterMode() const
 {
 	OptionPreferences::const_iterator it = find("TextureFilter");

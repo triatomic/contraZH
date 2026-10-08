@@ -966,6 +966,7 @@ void W3DDisplay::init()
 
 			// TheSuperHackers @feature Mauller 13/03/2026 Add native MSAA support, must be set before creating render device
 			WW3D::Set_MSAA_Mode((WW3D::MultiSampleModeEnum)TheWritableGlobalData->m_antiAliasLevel);
+			WW3D::Set_Super_Sampling(TheGlobalData->m_superSampling);
 			WW3D::Set_VSync_Mode(TheGlobalData->m_vsync);
 			WW3D::Set_Low_Latency(TheGlobalData->m_lowLatency != FALSE);
 
@@ -981,6 +982,7 @@ void W3DDisplay::init()
 			// Texture filtering must also be updated after render device initialization
 			if (renderDeviceError == WW3D_ERROR_OK) {
 				TheWritableGlobalData->m_antiAliasLevel = (UnsignedInt)WW3D::Get_MSAA_Mode();
+				TheWritableGlobalData->m_superSampling = WW3D::Get_Super_Sampling();
 				WW3D::Set_Texture_Filter(TheWritableGlobalData->m_textureFilteringMode);
 				TheWritableGlobalData->m_textureFilteringMode = WW3D::Get_Texture_Filter();
 				WW3D::Set_Anisotropy_Level(TheWritableGlobalData->m_textureAnisotropyLevel);
@@ -2159,6 +2161,9 @@ AGAIN:
 
 				// draw all views of the world
 				drawViews();
+
+				// A supersampled scene comes down to the screen here, so the interface keeps its native pixels
+				DX8Wrapper::Resolve_Scene_Target();
 
 				// draw the user interface
 				TheInGameUI->DRAW();
