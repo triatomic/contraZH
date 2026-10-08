@@ -25,14 +25,26 @@
 //
 // LIGHTS adds the dynamic point lights, in camera space, in place of the fixed-function
 // ones the mesh was drawn without. They need ps_2_a for their length.
+//
+// RECEIVE also does the shadow receiver pass's work, so the mesh draws once less. The soft
+// shadow and the cloud map scale alpha, which carries them exactly only while the map's
+// shadow colour is grey, so W3DShaderManager uses it only then. It needs ps_2_a for the taps.
 
 sampler2D MeshTexture : register(s0);
 
 #if SHADOWED
 sampler2D ShadowMap : register(s3);
+#if !RECEIVE
 // The pass only needs to know it is in shadow, and a soft edge would not fit ps_2_0.
 #define SHADOW_SINGLE_TAP 1
+#endif
 #include "shadowreceive.hlsli"
+#endif
+
+#if RECEIVE
+sampler2D CloudTexture : register(s6);
+float4 CloudU : register(c26);   // camera space position onto the cloud map's u
+float4 CloudV : register(c27);   // and onto its v
 #endif
 
 #if BUMP == 1
@@ -48,7 +60,7 @@ float4 SunColor     : register(c2);   // sun colour times specular intensity
 float4 Gloss        : register(c3);   // x = specular power, y = 1 for the debug view
 float4 Bump         : register(c6);   // x = height of full brightness, y = normal map strength, z = ambient brightness
 float4 SunDiffuse   : register(c5);   // sun colour the mesh was lit with
-float4 TextureInfo  : register(c7);   // x = glow mask intensity, 0 without a mask; yz = the slope map's stored texel to height per uv
+float4 TextureInfo  : register(c7);   // x = glow mask intensity, 0 without a mask; yz = the slope map's stored texel to height per uv; w = 1 where the cloud map shades
 
 #if LIGHTS
 // Eight fill c8 to c25, and fxc needs the rest for literals, so W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS must match.
@@ -174,6 +186,12 @@ float4 main(PsIn input) : COLOR
 #endif
 
     color += tex2D(EmissiveMap, input.TexCoord).rgb * TextureInfo.x;
+
+#if RECEIVE
+    float4 position = float4(input.Position, 1.0f);
+    float clouds = Brightness(tex2D(CloudTexture, float2(dot(position, CloudU), dot(position, CloudV))).rgb);
+    darken *= Brightness(lerp(ShadowColor.rgb, float3(1.0f, 1.0f, 1.0f), lit)) * lerp(1.0f, clouds, TextureInfo.w);
+#endif
 
     // The debug view tints everything the pass covers faintly and shows the highlight 8x.
     float3 debugColor = float3(1.0f, 0.0f, 1.0f) * (0.15f + highlight * 8.0f);

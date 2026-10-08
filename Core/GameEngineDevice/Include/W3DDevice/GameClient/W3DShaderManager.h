@@ -185,8 +185,11 @@ public:
 	/// The pass objects push for a per-pixel sun highlight, bumps and glow, or null when all are off or unsupported.
 	static MaterialPassClass *getSpecularPass();
 	/// The same pass for one object this frame, also adding the given lights. lightsOnly leaves out the
-	/// highlight, bumps and glow, and gives null without lights.
-	static MaterialPassClass *getSpecularPass(const Int *lights, Int lightCount, Bool lightsOnly);
+	/// highlight, bumps and glow, and gives null without lights. receivesShadow asks it to do the shadow
+	/// receiver pass's work as well, which only canSpecularReceiveShadow allows, and comes back true where it does.
+	static MaterialPassClass *getSpecularPass(const Int *lights, Int lightCount, Bool lightsOnly, Bool &receivesShadow);
+	/// Whether the specular pass can take in the shadow receiver's work: its shaders loaded and the map's shadow colour grey.
+	static Bool canSpecularReceiveShadow();
 	/// The pass every specular pass above shares its vertex processing with, or null when it is unsupported.
 	static const MaterialPassClass *getSpecularPassKey();
 	/// Binds the texture, and its normal map and glow mask, for geometry drawn through ST_SPECULAR outside the mesh renderer.

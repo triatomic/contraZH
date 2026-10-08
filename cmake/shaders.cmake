@@ -262,6 +262,13 @@ rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularlitde
 rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularlitnormal.pso          SHADOWED=1 PACKED=0 BUMP=2 LIGHTS=1)
 rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularlitnormalpacked.pso    SHADOWED=1 PACKED=1 BUMP=2 LIGHTS=1)
 rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularlitnormalnoshadow.pso  SHADOWED=0 PACKED=0 BUMP=2 LIGHTS=1)
+# The unlit passes also taking in the shadow receiver's work, with its soft shadow. The lit ones have no constants left for it.
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularreceive.pso                  SHADOWED=1 PACKED=0 BUMP=0 RECEIVE=1)
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularreceivepacked.pso            SHADOWED=1 PACKED=1 BUMP=0 RECEIVE=1)
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularreceivederived.pso           SHADOWED=1 PACKED=0 BUMP=1 RECEIVE=1)
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularreceivederivedpacked.pso     SHADOWED=1 PACKED=1 BUMP=1 RECEIVE=1)
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularreceivenormal.pso            SHADOWED=1 PACKED=0 BUMP=2 RECEIVE=1)
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularreceivenormalpacked.pso      SHADOWED=1 PACKED=1 BUMP=2 RECEIVE=1)
 rts_add_shader("${RTS_SHADER_DIR}/bloomblur.hlsl"      ps_2_0 main bloomblur.pso)
 rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_0 main softparticledepth.pso        DEPTH=1)
 rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_0 main softparticleheight.pso       DEPTH=0)

@@ -929,15 +929,13 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 		// Receive the sun's shadow on opaque drawables. Skipped where the base pass is
 		// suppressed, since the pass only darkens pixels the base pass drew.
 		MaterialPassClass *shadowPass = (TheW3DShadowMap != nullptr) ? TheW3DShadowMap->getReceivePass() : nullptr;
-		if (shadowPass != nullptr && m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop && !m_planarMirrorPass &&
-			draw->getEffectiveOpacity() == 1.0f)
-		{
-			rinfo.Push_Material_Pass(shadowPass);
-			extraMaterialPops++;
-		}
+		const Bool receivesShadow = shadowPass != nullptr && m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop &&
+			!m_planarMirrorPass && draw->getEffectiveOpacity() == 1.0f;
 
 		// Vehicles and structures catch a per-pixel sun highlight and bumps. Infantry and the rest stay
 		// matte, and take the pass only for the dynamic lights it draws.
+		MaterialPassClass *specularPass = nullptr;
+		Bool specularTakesShadow = receivesShadow && W3DShaderManager::canSpecularReceiveShadow();
 		if (m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop && !m_planarMirrorPass && draw->getEffectiveOpacity() == 1.0f)
 		{
 			if (draw->getReceivesDynamicLights() && W3DShaderManager::supportsUnitPixelLights())
@@ -945,16 +943,27 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 				pixelLightCount = pickObjectPixelLights(sph, pixelLights);
 			}
 			const Bool lightsOnly = !draw->isKindOf(KINDOF_VEHICLE) && !draw->isKindOf(KINDOF_STRUCTURE);
-			MaterialPassClass *specularPass = W3DShaderManager::getSpecularPass(pixelLights, pixelLightCount, lightsOnly);
-			if (specularPass != nullptr)
-			{
-				rinfo.Push_Material_Pass(specularPass);
-				extraMaterialPops++;
-			}
-			else
+			specularPass = W3DShaderManager::getSpecularPass(pixelLights, pixelLightCount, lightsOnly, specularTakesShadow);
+			if (specularPass == nullptr)
 			{
 				pixelLightCount = 0;
 			}
+		}
+		else
+		{
+			specularTakesShadow = FALSE;
+		}
+
+		// Where the specular pass does the receiver's work, the mesh draws once less.
+		if (receivesShadow && !specularTakesShadow)
+		{
+			rinfo.Push_Material_Pass(shadowPass);
+			extraMaterialPops++;
+		}
+		if (specularPass != nullptr)
+		{
+			rinfo.Push_Material_Pass(specularPass);
+			extraMaterialPops++;
 		}
 	}
 	else

@@ -1603,6 +1603,7 @@ struct SpecularPassLights
 	Int lights[W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS];
 	Int count;
 	Bool lightsOnly;	///< no highlight, bumps or glow
+	Bool receivesShadow;	///< the pass also does the shadow receiver's work
 };
 static const SpecularPassLights *CurrentSpecularLights = nullptr;
 
@@ -2194,7 +2195,7 @@ public:
 		BUMP_COUNT
 	};
 
-	SpecularShader() : m_shadowed(FALSE), m_lit(FALSE), m_lightsOnly(FALSE), m_bumpHeight(0.0f)
+	SpecularShader() : m_shadowed(FALSE), m_lit(FALSE), m_lightsOnly(FALSE), m_receiving(FALSE), m_clouds(FALSE), m_bumpHeight(0.0f)
 	{
 		for (Int i = 0; i < BUMP_COUNT; i++)
 		{
@@ -2202,6 +2203,7 @@ public:
 			m_dwUnshadowedShaders[i] = 0;
 			m_dwLitShadowedShaders[i] = 0;
 			m_dwLitUnshadowedShaders[i] = 0;
+			m_dwReceiveShaders[i] = 0;
 		}
 	}
 
@@ -2221,10 +2223,15 @@ protected:
 	DWORD m_dwUnshadowedShaders[BUMP_COUNT];	///<for when the shadow map is off or holds no depth
 	DWORD m_dwLitShadowedShaders[BUMP_COUNT];	///<the same two, also adding the point lights
 	DWORD m_dwLitUnshadowedShaders[BUMP_COUNT];
+	DWORD m_dwReceiveShaders[BUMP_COUNT];		///<the unlit shadowed ones also doing the shadow receiver's work
 	Bool m_shadowed;							///<which of the two the current pass uses
 	Bool m_lit;									///<whether it adds its object's point lights
 	Bool m_lightsOnly;							///<whether it adds nothing else
+	Bool m_receiving;							///<whether it does the shadow receiver's work
+	Bool m_clouds;								///<whether that work includes the cloud map, bound on SPECULAR_CLOUD_STAGE
 	Real m_bumpHeight;							///<the derived bumps' rise of full brightness in the current pass
+
+	const DWORD *pickShaders() const;
 } specularShader;
 
 W3DShaderInterface *SpecularShaderList[]=
@@ -2241,6 +2248,19 @@ W3DShaderInterface *SpecularShaderList[]=
 // The normal and glow maps come last and read the mesh's UVs from TEXCOORD0.
 #define SPECULAR_NORMAL_MAP_STAGE	4
 #define SPECULAR_EMISSIVE_STAGE		5
+// The cloud map takes no texcoords, since the shader finds its UVs from the position.
+#define SPECULAR_CLOUD_STAGE		6
+
+static Bool SpecularReceiveLoaded = FALSE;
+
+// CONTRA_SPECULARRECEIVE=0 keeps the shadow receiver as a pass of its own without a rebuild.
+static Bool Get_Specular_Receive_Enabled()
+{
+	const char *value = getenv("CONTRA_SPECULARRECEIVE");
+	return (value != nullptr) ? atoi(value) != 0 : TRUE;
+}
+
+static Bool bindCloudTexture(Int stage, D3DMATRIX &cameraToCloud);
 
 // The bumped shaders take screen-space derivatives, which only ps_2_a and up have.
 static Bool Supports_Pixel_Shader_2_a(const DX8Caps *caps)
@@ -2336,6 +2356,27 @@ Int SpecularShader::init()
 		}
 	}
 
+	// Every variant the pass may pick must be there, or the receiver keeps its own pass.
+	static const char *const receiveFiles[2][BUMP_COUNT] =
+	{
+		{ "shaders\\specularreceive.pso", "shaders\\specularreceivederived.pso", "shaders\\specularreceivenormal.pso" },
+		{ "shaders\\specularreceivepacked.pso", "shaders\\specularreceivederivedpacked.pso", "shaders\\specularreceivenormalpacked.pso" }
+	};
+	SpecularReceiveLoaded = FALSE;
+	if (shadowMap && m_dwShadowedShaders[BUMP_NONE] != 0 && Supports_Pixel_Shader_2_a(caps) && Get_Specular_Receive_Enabled())
+	{
+		const Int packed = (TheW3DShadowMap->getDepthMode() == W3DShadowMap::DEPTH_MODE_PACKED) ? 1 : 0;
+		SpecularReceiveLoaded = TRUE;
+		for (Int bump = BUMP_NONE; bump < BUMP_COUNT; bump++)
+		{
+			if (m_dwShadowedShaders[bump] != 0 && FAILED(W3DShaderManager::LoadAndCreateD3DShader(receiveFiles[packed][bump],
+					nullptr, 0, false, &m_dwReceiveShaders[bump])))
+			{
+				SpecularReceiveLoaded = FALSE;
+			}
+		}
+	}
+
 	W3DShaders[W3DShaderManager::ST_SPECULAR]=&specularShader;
 	W3DShadersPassCount[W3DShaderManager::ST_SPECULAR]=1;
 
@@ -2415,11 +2456,33 @@ Int SpecularShader::set(Int pass)
 		DX8Wrapper::Set_Pixel_Shader_Constant(8, constants, registers);
 	}
 
-	DX8Wrapper::Set_Pixel_Shader(m_lit
-		? (m_shadowed ? m_dwLitShadowedShaders[BUMP_NONE] : m_dwLitUnshadowedShaders[BUMP_NONE])
-		: (m_shadowed ? m_dwShadowedShaders[BUMP_NONE] : m_dwUnshadowedShaders[BUMP_NONE]));
+	// The receiver's cloud map is read through the same camera-space mapping its texgen used.
+	m_receiving = m_shadowed && !m_lit && SpecularReceiveLoaded && passLights != nullptr && passLights->receivesShadow;
+	m_clouds = FALSE;
+	D3DMATRIX cameraToCloud;
+	if (m_receiving && Get_Unit_Clouds_Enabled() && bindCloudTexture(SPECULAR_CLOUD_STAGE, cameraToCloud))
+	{
+		m_clouds = TRUE;
+		Vector4 cloudU(cameraToCloud.m[0][0], cameraToCloud.m[1][0], cameraToCloud.m[2][0], cameraToCloud.m[3][0]);
+		Vector4 cloudV(cameraToCloud.m[0][1], cameraToCloud.m[1][1], cameraToCloud.m[2][1], cameraToCloud.m[3][1]);
+		DX8Wrapper::Set_Pixel_Shader_Constant(26, &cloudU, 1);
+		DX8Wrapper::Set_Pixel_Shader_Constant(27, &cloudV, 1);
+	}
+
+	DX8Wrapper::Set_Pixel_Shader(pickShaders()[BUMP_NONE]);
 	++SpecularPassCount;
 	return TRUE;
+}
+
+const DWORD *SpecularShader::pickShaders() const
+{
+	if (m_receiving)
+	{
+		return m_dwReceiveShaders;
+	}
+	return m_lit
+		? (m_shadowed ? m_dwLitShadowedShaders : m_dwLitUnshadowedShaders)
+		: (m_shadowed ? m_dwShadowedShaders : m_dwUnshadowedShaders);
 }
 
 // Loads <name><suffix> beside the texture, or returns null. The caller releases it.
@@ -2475,9 +2538,7 @@ void SpecularShader::setTexture(TextureClass *texture)
 {
 	DX8Wrapper::Set_Texture(0, texture);
 
-	const DWORD *shaders = m_lit
-		? (m_shadowed ? m_dwLitShadowedShaders : m_dwLitUnshadowedShaders)
-		: (m_shadowed ? m_dwShadowedShaders : m_dwUnshadowedShaders);
+	const DWORD *shaders = pickShaders();
 
 	// A texture's first draws go flat while its slope map waits for the next frame's build.
 	Int bump = BUMP_NONE;
@@ -2508,7 +2569,7 @@ void SpecularShader::setTexture(TextureClass *texture)
 	TextureClass *emissiveMap = (EmissiveIntensity > 0.0f && texture != nullptr && !m_lightsOnly) ? Find_Emissive_Map(texture) : nullptr;
 	DX8Wrapper::Set_Texture(SPECULAR_EMISSIVE_STAGE, emissiveMap);
 
-	Vector4 textureInfo((emissiveMap != nullptr) ? EmissiveIntensity : 0.0f, slopeScaleU, slopeScaleV, 0.0f);
+	Vector4 textureInfo((emissiveMap != nullptr) ? EmissiveIntensity : 0.0f, slopeScaleU, slopeScaleV, m_clouds ? 1.0f : 0.0f);
 	DX8Wrapper::Set_Pixel_Shader_Constant(7, &textureInfo, 1);
 	if (emissiveMap != nullptr)
 	{
@@ -2537,6 +2598,10 @@ void SpecularShader::reset()
 	DX8Wrapper::Set_Pixel_Shader(0);
 	DX8Wrapper::Set_Texture(SPECULAR_NORMAL_MAP_STAGE, nullptr);
 	DX8Wrapper::Set_Texture(SPECULAR_EMISSIVE_STAGE, nullptr);
+	if (m_clouds)
+	{
+		DX8Wrapper::Set_Texture(SPECULAR_CLOUD_STAGE, nullptr);
+	}
 
 	if (m_shadowed && TheW3DShadowMap != nullptr)
 	{
@@ -2545,6 +2610,8 @@ void SpecularShader::reset()
 	m_shadowed = FALSE;
 	m_lit = FALSE;
 	m_lightsOnly = FALSE;
+	m_receiving = FALSE;
+	m_clouds = FALSE;
 
 	for (Int stage = SPECULAR_NORMAL_STAGE; stage <= SPECULAR_POSITION_STAGE; stage++)
 	{
@@ -2572,15 +2639,18 @@ Int SpecularShader::shutdown()
 			DX8_DELETE_PIXEL_SHADER(device, m_dwUnshadowedShaders[bump]);
 			DX8_DELETE_PIXEL_SHADER(device, m_dwLitShadowedShaders[bump]);
 			DX8_DELETE_PIXEL_SHADER(device, m_dwLitUnshadowedShaders[bump]);
+			DX8_DELETE_PIXEL_SHADER(device, m_dwReceiveShaders[bump]);
 		}
 		m_dwShadowedShaders[bump] = 0;
 		m_dwUnshadowedShaders[bump] = 0;
 		m_dwLitShadowedShaders[bump] = 0;
 		m_dwLitUnshadowedShaders[bump] = 0;
+		m_dwReceiveShaders[bump] = 0;
 	}
 
 	BumpSupported = FALSE;
 	UnitPixelLightsLoaded = FALSE;
+	SpecularReceiveLoaded = FALSE;
 
 	W3DShaders[W3DShaderManager::ST_SPECULAR]=nullptr;
 	W3DShadersPassCount[W3DShaderManager::ST_SPECULAR]=0;
@@ -2713,10 +2783,11 @@ public:
 	{
 		m_lights.count = 0;
 		m_lights.lightsOnly = FALSE;
+		m_lights.receivesShadow = FALSE;
 	}
 
-	/// Makes this a copy of key for one object, adding that object's lights.
-	void setObjectLights(const MaterialPassClass *key, const Int *lights, Int count, Bool lightsOnly)
+	/// Makes this a copy of key for one object, adding that object's lights and the shadow receiver's work.
+	void setObjectLights(const MaterialPassClass *key, const Int *lights, Int count, Bool lightsOnly, Bool receivesShadow)
 	{
 		m_key = key;
 		m_lights.count = min(count, (Int)W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS);
@@ -2725,6 +2796,7 @@ public:
 			m_lights.lights[i] = lights[i];
 		}
 		m_lights.lightsOnly = lightsOnly;
+		m_lights.receivesShadow = receivesShadow;
 	}
 
 	virtual const MaterialPassClass *Peek_Vertex_Shading_Key() const override
@@ -2762,6 +2834,9 @@ private:
 };
 
 static W3DSpecularMaterialPassClass SpecularMaterialPass;
+
+// Draws as the shared pass does, so instancing takes it as that pass, while doing the shadow receiver's work too.
+static W3DSpecularMaterialPassClass SpecularReceiveMaterialPass;
 
 // Passes carrying one object's lights, handed out again from the start each frame. A pass stays
 // valid until the render that took it has flushed.
@@ -3071,20 +3146,44 @@ MaterialPassClass *W3DShaderManager::getSpecularPass()
 	return &SpecularMaterialPass;
 }
 
-MaterialPassClass *W3DShaderManager::getSpecularPass(const Int *lights, Int lightCount, Bool lightsOnly)
+MaterialPassClass *W3DShaderManager::getSpecularPass(const Int *lights, Int lightCount, Bool lightsOnly, Bool &receivesShadow)
 {
 	if (W3DShadersPassCount[ST_SPECULAR] == 0 || !UnitPixelLightsLoaded || lightCount <= 0)
 	{
-		return lightsOnly ? nullptr : getSpecularPass();
+		if (lightsOnly || getSpecularPass() == nullptr)
+		{
+			receivesShadow = FALSE;
+			return nullptr;
+		}
+		if (!receivesShadow)
+		{
+			return &SpecularMaterialPass;
+		}
+		SpecularReceiveMaterialPass.setObjectLights(&SpecularMaterialPass, nullptr, 0, FALSE, TRUE);
+		return &SpecularReceiveMaterialPass;
 	}
 
+	// The lit shaders have no constants left for the receiver's work.
+	receivesShadow = FALSE;
 	if (ObjectSpecularPassesUsed == ObjectSpecularPasses.size())
 	{
 		ObjectSpecularPasses.push_back(NEW_REF(W3DSpecularMaterialPassClass, ()));
 	}
 	W3DSpecularMaterialPassClass *pass = ObjectSpecularPasses[ObjectSpecularPassesUsed++];
-	pass->setObjectLights(&SpecularMaterialPass, lights, lightCount, lightsOnly);
+	pass->setObjectLights(&SpecularMaterialPass, lights, lightCount, lightsOnly, FALSE);
 	return pass;
+}
+
+Bool W3DShaderManager::canSpecularReceiveShadow()
+{
+	if (!SpecularReceiveLoaded || TheW3DShadowMap == nullptr)
+	{
+		return FALSE;
+	}
+	// The pass scales by one value, so a tinted shadow keeps the receiver's own pass.
+	const Vector4 color = TheW3DShadowMap->getReceiverColor();
+	const Real tolerance = 0.5f / 255.0f;
+	return fabs(color.X - color.Y) <= tolerance && fabs(color.Y - color.Z) <= tolerance;
 }
 
 const MaterialPassClass *W3DShaderManager::getSpecularPassKey()
@@ -4436,7 +4535,8 @@ void CloudTextureShader::reset()
 }
 
 // Projects the terrain's cloud map onto a pixel shader receiver, the way the terrain samples it.
-static Bool bindCloudReceiver(Int stage)
+// Binds the cloud map to stage and gives the mapping from camera space onto it.
+static Bool bindCloudTexture(Int stage, D3DMATRIX &cameraToCloud)
 {
 	TextureClass *cloudTexture = (TheTerrainRenderObject != nullptr) ? TheTerrainRenderObject->getCloudTexture() : nullptr;
 	if (cloudTexture == nullptr)
@@ -4462,8 +4562,17 @@ static Bool bindCloudReceiver(Int stage)
 	float det;
 	Invert_D3DMATRIX(inverseView, &det, view);
 
+	terrainShader2Stage.updateNoise1(&cameraToCloud, &inverseView, false);
+	return TRUE;
+}
+
+static Bool bindCloudReceiver(Int stage)
+{
 	D3DMATRIX textureTransform;
-	terrainShader2Stage.updateNoise1(&textureTransform, &inverseView, false);
+	if (!bindCloudTexture(stage, textureTransform))
+	{
+		return FALSE;
+	}
 
 	DX8Wrapper::_Set_DX8_Transform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + stage), textureTransform);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
