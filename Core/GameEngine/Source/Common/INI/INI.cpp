@@ -457,29 +457,13 @@ void INI::loadWB(AsciiString filename, INILoadType loadType, Xfer* pXfer)
                     // partial effects are left as-is; WorldBuilder tears the whole override set
                     // down if the user declines the load.
                     s_wbSkippedBlocks.push_back(currentLine);
-                    const char* blockEnd = "End";
-                    Bool skipDone = false;
-                    while (!skipDone && !m_endOfFile)
-                    {
-                        readLine();
-                        const char* endToken = strtok(m_buffer, getSeps());
-                        if (endToken && strcmp(endToken, blockEnd) == 0)
-                            skipDone = true;
-                    }
+                    skipToEndToken();
                 }
             }
             else
             {
                 // --- Skip unreadable/unrecognized blocks ---
-                const char* blockEnd = "End";
-                Bool skipDone = false;
-                while (!skipDone && !m_endOfFile)
-                {
-                    readLine();
-                    const char* endToken = strtok(m_buffer, getSeps());
-                    if (endToken && strcmp(endToken, blockEnd) == 0)
-                        skipDone = true;
-                }
+                skipToEndToken();
             }
         }
     }
@@ -561,15 +545,7 @@ void INI::loadObjectsOnly(AsciiString filename, Xfer* pXfer = NULL)
             {
                 // debug_Log("Skipping unknown block: %s\n", token);
                 // Optional: skip entire block until "End"
-                const char* blockEnd = "End";
-                Bool skipDone = false;
-                while (!skipDone && !m_endOfFile)
-                {
-                    readLine();
-                    const char* endToken = strtok(m_buffer, getSeps());
-                    if (endToken && strcmp(endToken, blockEnd) == 0)
-                        skipDone = true;
-                }
+                skipToEndToken();
             }
         }
     }
@@ -583,9 +559,7 @@ void INI::loadObjectsOnly(AsciiString filename, Xfer* pXfer = NULL)
 }
 
 
-//-------------------------------------------------------------------------------------------------
 /** Discard lines up to and including the next end token. */
-//-------------------------------------------------------------------------------------------------
 void INI::skipToEndToken( void )
 {
 	while( !m_endOfFile )
