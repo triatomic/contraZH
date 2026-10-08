@@ -1075,6 +1075,11 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 		rinfo.Pop_Material_Pass();
 	if (doExtraFlagsPop)
 		rinfo.Pop_Override_Flags();	//flags used to disable base pass and only render custom heat vision pass.
+
+	// The overrides belong to this object's overlay and heat vision passes. Left set, every later mesh would
+	// carry them, scaling its own passes and falling out of instancing and batched passes.
+	rinfo.materialPassEmissiveOverride = 1.0f;
+	rinfo.materialPassAlphaOverride = 1.0f;
 }
 
 //DECLARE_PERF_TIMER(translucentRender)
