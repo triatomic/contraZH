@@ -125,7 +125,7 @@ extern NGMPGame* TheNGMPGame;
 #include "GameNetwork/NetworkInterface.h"
 #include "GameNetwork/GameSpy/PersistentStorageThread.h"
 
-#include <rts/profile.h>
+#include "Lib/Profile.h"
 #include <stdio.h>
 #include <xmmintrin.h>
 #include <pmmintrin.h>
