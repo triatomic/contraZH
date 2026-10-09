@@ -51,6 +51,54 @@ detected stealth unit still shows it.
 
 Presentation only; replays unaffected.
 
+## Solo LAN games respond instantly
+
+A LAN game hosted with no other human player had a noticeable lag between a click and the unit
+obeying: a full second at the start, then about a quarter of a second for the rest of the match. The
+engine schedules every command a number of frames ahead to cover the network round trip, and it
+seeds that round trip with a 200 ms placeholder until real measurements arrive. A solo host has
+nobody to measure against, so the placeholder stood for the whole game.
+
+A host who is alone now counts as having zero latency, and starts the match at the minimum run
+ahead instead of the one second start-up value. The Generals Online build also now uses the same
+latency formula for LAN as the plain build, so both executables give a LAN game the same delay.
+
+This only changes how far ahead commands are scheduled, which the replay records as it happened,
+so older replays still play back identically.
+
+## LAN over a VPN stalls less
+
+Players who meet over Radmin or a similar VPN play a "LAN" game at 100 to 500 ms ping with jitter
+and the odd lost packet. The engine sizes its command delay (the run ahead) from the measured ping,
+but it did so in ways tuned for a real LAN: the first estimate came from a fixed 200 ms placeholder
+mixed into the history, the estimate was refreshed only every five seconds, one very slow player was
+averaged against the next slowest and so under-provisioned, the delay was lowered as eagerly as it
+was raised, and a lost packet was resent only after a fixed two seconds, freezing everyone for that
+long.
+
+Now the history holds measured round trips only and the first run ahead waits for one, the mod's
+`GameData.ini` refreshes the estimate every half second (`NetworkRunAheadMetricsTime = 500`), the
+slowest player alone sets the budget when they are clearly behind the rest, the run ahead rises at
+once but drops only after three consecutive lower readings, and a lost packet is resent after one and
+a half round trips (50 ms to 2 s). A real LAN keeps its minimum delay; the changes only matter once
+pings are long or uneven.
+
+Two modem-era habits are gone as well. Each player used to hold outgoing packets back for half the
+command delay to save bandwidth, which spent half the delay budget on waiting; packets now go out at
+once. And each player now reports its average ping plus twice its jitter (the standard deviation of
+its round trips), so the delay covers the swings of an uneven link instead of only its average. A
+steady LAN adds only a few milliseconds. Online Generals Online games keep the official behaviour.
+
+This changes when commands execute, which the replay records, so older replays still play back
+identically.
+
+## Larger game packets
+
+Network game packets now carry up to about 1100 bytes instead of the 476 bytes sized for a 512-byte
+modem packet, so a burst of orders goes out in one packet instead of several. This applies to every
+multiplayer game. The lobby already refuses a player whose executable differs, so an older build
+cannot join a game hosted on this one.
+
 ## Drones stay on their leash
 
 * The leash (twice the guard range from the master) was never checked while the master had a

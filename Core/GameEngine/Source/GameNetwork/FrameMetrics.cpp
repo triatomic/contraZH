@@ -42,6 +42,8 @@ FrameMetrics::FrameMetrics()
 {
 	m_averageFps = 0.0f;
 	m_averageLatency = 0.0f;
+	m_latencySampleCount = 0;
+	m_latencyDeviation = 0.0f;
 	m_cushionIndex = 0;
 	m_fpsListIndex = 0;
 	m_lastFpsTimeThing = 0;
@@ -121,14 +123,14 @@ void FrameMetrics::init() {
 #endif
 	}
 	m_fpsListIndex = 0;
+	// The history holds measured round trips only; the average above stands in until the first one arrives
+	m_latencySampleCount = 0;
+	m_latencyDeviation = 0.0f;
+#if !defined(USE_NEW_FRAMEMETRIC_LOGIC)
 	for (i = 0; i < TheGlobalData->m_networkLatencyHistoryLength; ++i) {
-#if defined(USE_NEW_FRAMEMETRIC_LOGIC)
-		m_mapLatenciesLookup[i] = 0.2;
-		m_mapLatenciesSorted[i] = 0.2;
-#else
-		m_latencyList[i] = (Real)0.2;
-#endif
+		m_latencyList[i] = 0.0f;
 	}
+#endif
 	m_cushionIndex = 0;
 }
 
@@ -188,6 +190,10 @@ void FrameMetrics::processLatencyResponse(UnsignedInt frame) {
 #endif
 
 	time_t curTime = timeGetTime();
+	if (m_latencySampleCount < TheGlobalData->m_networkLatencyHistoryLength)
+	{
+		++m_latencySampleCount;
+	}
 #if defined(USE_NEW_FRAMEMETRIC_LOGIC)
 	time_t timeDiff = curTime - m_mapPendingLatenciesLookup[frame];
 
@@ -217,6 +223,14 @@ void FrameMetrics::processLatencyResponse(UnsignedInt frame) {
 	}
 	m_averageLatency /= m_mapLatenciesLookup.size();
 
+	Real variance = 0.0f;
+	for (auto kvPair : m_mapLatenciesLookup)
+	{
+		const Real deviation = kvPair.second - m_averageLatency;
+		variance += deviation * deviation;
+	}
+	m_latencyDeviation = sqrtf(variance / m_mapLatenciesLookup.size());
+
 	if (timeDiff > 1000)
 	{
 		NetworkLog(ELogVerbosity::LOG_DEBUG, "WARNING: HIGH processLatencyResponse");
@@ -228,7 +242,7 @@ void FrameMetrics::processLatencyResponse(UnsignedInt frame) {
 	Int latencyListIndex = frame % TheGlobalData->m_networkLatencyHistoryLength;
 	m_latencyList[latencyListIndex] = (Real)timeDiff / (Real)1000; // convert to seconds from milliseconds.
 	const Real latencySum = std::accumulate(m_latencyList, m_latencyList + TheGlobalData->m_networkLatencyHistoryLength, 0.0f);
-	m_averageLatency = latencySum / (Real)TheGlobalData->m_networkLatencyHistoryLength;
+	m_averageLatency = latencySum / (Real)m_latencySampleCount;
 #endif
 
 	if (frame % 16 == 0) {
@@ -253,6 +267,18 @@ Int FrameMetrics::getAverageFPS() {
 
 Real FrameMetrics::getAverageLatency() {
 	return m_averageLatency;
+}
+
+// Two standard deviations above the mean covers about 95% of round trips, so a jittery link does not stall on every swing
+Real FrameMetrics::getRunAheadLatency()
+{
+#if defined(GENERALS_ONLINE)
+	if (TheNGMPGame != nullptr)
+	{
+		return m_averageLatency;
+	}
+#endif
+	return m_averageLatency + 2.0f * m_latencyDeviation;
 }
 
 Int FrameMetrics::getMinimumCushion() {
