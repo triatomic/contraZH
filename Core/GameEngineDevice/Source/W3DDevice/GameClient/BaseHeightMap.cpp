@@ -101,6 +101,7 @@
 #include "W3DDevice/GameClient/W3DStorm.h"
 #include "W3DDevice/GameClient/W3DColorLut.h"
 #include "W3DDevice/GameClient/W3DHeadlight.h"
+#include "W3DDevice/GameClient/W3DPlanarMirror.h"
 #include "W3DDevice/GameClient/W3DSoftParticles.h"
 #include "W3DDevice/GameClient/W3DAmbientOcclusion.h"
 #include "W3DDevice/GameClient/W3DLaserGlow.h"
@@ -467,6 +468,11 @@ void BaseHeightMapRenderObjClass::ReleaseResources()
 	if (TheW3DHeadlights)
 	{
 		TheW3DHeadlights->ReleaseResources();
+	}
+
+	if (TheW3DPlanarMirrors)
+	{
+		TheW3DPlanarMirrors->ReleaseResources();
 	}
 
 	if (TheW3DSoftParticles)
@@ -2745,13 +2751,13 @@ void BaseHeightMapRenderObjClass::renderShoreLinesSorted(CameraClass *pCamera)
 					for (Int k=lastRenderedTile; k<sortInfo->numTiles; k++)
 					{
 						Int tileY = shoreInfo->m_xy >> 16;
-						if (tileY < startY)
+						if (tileY >= edgeY)
+							break;	//since tiles are x-sorted, there will not be any visible ones after this one.
+
+						if (tileY < startY || isCellCulled(x, tileY))
 						{	shoreInfo++;	//advance to next tile.
 							continue;	//this tile is not visible
 						}
-
-						if (tileY >= edgeY)
-							break;	//since tiles are x-sorted, there will not be any visible ones after this one.
 
 						if (vertexCount >= (DEFAULT_MAX_BATCH_SHORELINE_TILES*4))
 						{	lastRenderedTile=k;
@@ -2866,13 +2872,13 @@ flushVertexBuffer0:
 					for (Int k=lastRenderedTile; k<sortInfo->numTiles; k++)
 					{
 						Int tileX = shoreInfo->m_xy & 0xffff;
-						if (tileX < startX)
+						if (tileX >= edgeX)
+							break;	//since tiles are x-sorted, there will not be any visible ones after this one.
+
+						if (tileX < startX || isCellCulled(tileX, y))
 						{	shoreInfo++;	//advance to next tile.
 							continue;	//this tile is not visible
 						}
-
-						if (tileX >= edgeX)
-							break;	//since tiles are x-sorted, there will not be any visible ones after this one.
 
 						if (vertexCount >= (DEFAULT_MAX_BATCH_SHORELINE_TILES*4))
 						{	lastRenderedTile=k;

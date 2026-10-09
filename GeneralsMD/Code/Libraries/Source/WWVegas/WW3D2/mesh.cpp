@@ -118,11 +118,13 @@
 #include "visrasterizer.h"
 #include "WWDebug/wwmemlog.h"
 #include "dx8rendererdebugger.h"
+#include "sortingrenderer.h"
 #include <WWDebug/wwprofile.h>
 
 static unsigned MeshDebugIdCount;
 
 bool MeshClass::Legacy_Meshes_Fogged = true;
+MeshClass::MirrorPassHook MeshClass::Mirror_Pass_Hook = nullptr;
 static SimpleDynVecClass<uint32> temp_apt;
 
 /*
@@ -754,7 +756,18 @@ void MeshClass::Render(RenderInfoClass & rinfo)
 				render_base_passes = true;
 			}
 
-			if (render_base_passes) {
+			MaterialPassClass * mirror_pass = nullptr;
+			bool mirror_replaces = false;
+			if (render_base_passes && Mirror_Pass_Hook != nullptr && (Get_Shader_Effects() & SoftParticleHookClass::EFFECT_MIRROR) != 0) {
+				const bool sorted = Model->Get_Flag(MeshGeometryClass::SORT) && WW3D::Is_Sorting_Enabled();
+				mirror_pass = Mirror_Pass_Hook(this, sorted, mirror_replaces);
+			}
+			if (mirror_replaces) {
+				fvf_container->Add_Delayed_Visible_Material_Pass(mirror_pass, this);
+				rendered_something = true;
+			}
+
+			if (render_base_passes && !mirror_replaces) {
 
 				/*
 				** Link each polygon renderer for this mesh into the visible list
@@ -768,13 +781,18 @@ void MeshClass::Render(RenderInfoClass & rinfo)
 
 				rendered_something = true;
 
+				// The reflection goes on first, so shadows, highlights and shroud darken it as they do the mesh.
+				if (mirror_pass != nullptr) {
+					fvf_container->Add_Visible_Material_Pass(mirror_pass,this);
+				}
+
 			}
 
 			/*
 			** If the rendering context specifies procedural material passes, register them
 			** for rendering
 			*/
-			for (int i=0; i<rinfo.Additional_Pass_Count(); i++) {
+			for (int i=0; !mirror_replaces && i<rinfo.Additional_Pass_Count(); i++) {
 
 				MaterialPassClass * matpass = rinfo.Peek_Additional_Pass(i);
 

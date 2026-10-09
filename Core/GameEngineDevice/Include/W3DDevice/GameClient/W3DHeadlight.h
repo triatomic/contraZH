@@ -46,6 +46,9 @@ public:
 	/// Finds the lamps a HEADLIGHT mesh holds and returns how many it wrote. modelMiddle is the model's origin in world space.
 	static Int findBeams(RenderObjClass &mesh, const Vector3 &modelMiddle, Beam *beams, Int maxBeams);
 
+	/// True for a lamp body that blends nothing, or under GameData RotrHack a mesh that only adds, such as a lit window.
+	static Bool keepsOwnLook(RenderObjClass &mesh);
+
 	Bool isActive();	///< false where the models have to keep their headlight meshes
 	/// One headlight for the coming frame, from the lamp to the far end of its mesh. The radius is the mesh's at that end.
 	/// The model's own settings must outlive the frame.

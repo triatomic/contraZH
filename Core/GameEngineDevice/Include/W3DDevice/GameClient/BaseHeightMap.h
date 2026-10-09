@@ -116,7 +116,8 @@ public:
 	virtual void doPartialUpdate(const IRegion2D &partialRange, WorldHeightMap *htMap, RefRenderObjListIterator *pLightsIterator) = 0;
 	virtual void staticLightingChanged();
 	virtual void oversizeTerrain(Int tilesToOversize) = 0; ///< Oversize the visible terrain area.
-	virtual void renderShadowMapCaster() {} ///< Draws the terrain geometry into the shadow map, so cliffs and hills cast.
+	virtual void renderShadowMapCaster(const FrustumClass &) {} ///< Draws the terrain the frustum takes in into the shadow map, so cliffs and hills cast.
+	virtual Bool isCellCulled(Int x, Int y) const { return FALSE; } ///< Whether the render under way leaves out the terrain tile holding this map cell.
 	virtual void setTerrainDrawSize(Int width, Int height) = 0; ///< Resize the visible terrain area. Always defaults to oversize dimensions when oversize is set.
 	virtual void reset();
 

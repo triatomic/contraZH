@@ -847,6 +847,8 @@ WW3DErrorType WW3D::Begin_Render(bool clear,bool clearz,const Vector3 & color, f
 	WWASSERT(!IsRendering);
 	IsRendering = true;
 
+	DX8Wrapper::Bind_Scene_Target();
+
 	// If we want to clear the screen, we need to set the viewport to include the entire screen:
 	if (clear || clearz) {
 		D3DVIEWPORT8 vp;
@@ -2067,6 +2069,16 @@ void WW3D::Set_MSAA_Mode(MultiSampleModeEnum mode)
 		break;
 
 	}
+}
+
+void WW3D::Set_Super_Sampling(int percent)
+{
+	DX8Wrapper::Set_Super_Sampling(percent / 100.0f);
+}
+
+int WW3D::Get_Super_Sampling()
+{
+	return (int)(DX8Wrapper::Get_Super_Sampling() * 100.0f + 0.5f);
 }
 
 WW3D::MultiSampleModeEnum WW3D::Get_MSAA_Mode()

@@ -650,9 +650,12 @@ GlobalData::GlobalData()
   m_stormTuning[StormShaderInfo::TYPE_SAND].setTypeDefaults(StormShaderInfo::TYPE_SAND);
   m_stormTuning[StormShaderInfo::TYPE_SNOW].setTypeDefaults(StormShaderInfo::TYPE_SNOW);
   m_headlightTuning.setDefaults();
+  m_headlightForbiddenKindOf.clear();
+  m_rotrHack = FALSE;
   m_useAmbientOcclusion = TRUE;
   m_useHeightBlend = TRUE;
   m_useHQSky = TRUE;
+  m_shadowMapResolution = 4096;
   m_ambientOcclusionDebug = FALSE;
   m_ambientOcclusionRadius = 12.0f;
   m_ambientOcclusionStrength = 1.0f;
@@ -662,7 +665,7 @@ GlobalData::GlobalData()
   m_groundNoiseBrightness = 0.9f;
   m_terrainHeightBlendStrength = 2.0f;
   m_terrainHeightBlendSharpness = 4.0f;
-  m_terrainAtlasBorder = 8;
+  m_terrainAtlasBorder = 4;
   m_skyCloudSize = 600.0f;
   m_skyCloudCoverage = 0.45f;
   m_skyCloudSoftness = 0.25f;
@@ -1390,6 +1393,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_useAmbientOcclusion = optionPref.getAmbientOcclusionEnabled();
 	TheWritableGlobalData->m_useHeightBlend = optionPref.getHeightBlendEnabled();
 	TheWritableGlobalData->m_useHQSky = optionPref.getHQSkyEnabled();
+	TheWritableGlobalData->m_shadowMapResolution = optionPref.getShadowMapResolution();
 	TheWritableGlobalData->m_ambientOcclusionDebug = optionPref.getAmbientOcclusionDebugEnabled();
 	TheWritableGlobalData->m_vsync = optionPref.getVSyncMode();
 	TheWritableGlobalData->m_lowLatency = optionPref.getLowLatencyEnabled();

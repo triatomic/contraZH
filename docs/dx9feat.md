@@ -9,7 +9,7 @@ Cheat builds reload `Data\INI\GameData.ini` about half a second after it is save
 keys can be adjusted with a map running: `UnitSpecularIntensity`, `UnitSpecularPower`,
 `UnitBumpHeight`, `UnitNormalMapStrength`, `TerrainNormalMapStrength`, the `TerrainGlint` keys, `UnitEmissiveIntensity`,
 `UnitEmissiveNightIntensity`, `SoftParticleDistance`, `AmbientOcclusionRadius`,
-`AmbientOcclusionStrength`, the `GroundNoise`, `TerrainHeightBlend` and `SkyCloud` keys, `TerrainAtlasBorder` and the `Flame`, `Haze`, `Electric`, `Laser`, `Cryo` and `Disruption` tuning keys, the `SandStorm` and `SnowStorm` keys, the `Headlight` keys but `HeadlightShader`, and the `ColorLut` keys. Other `GameData.ini` keys keep their
+`AmbientOcclusionStrength`, the `GroundNoise`, `TerrainHeightBlend` and `SkyCloud` keys, `TerrainAtlasBorder` and the `Flame`, `Haze`, `Electric`, `Laser`, `Cryo` and `Disruption` tuning keys, the `SandStorm` and `SnowStorm` keys, the `Headlight` keys but `HeadlightShader`, the `PlanarMirror` keys but `PlanarMirrorShader`, and the `ColorLut` keys. Other `GameData.ini` keys keep their
 value until a restart. The saved values win over a map's `map.ini` until the map loads again. A
 deleted key keeps its value until a restart, and a file with an error applies only the keys above
 the error until the next save.
@@ -37,6 +37,7 @@ them for one effect. Each shader's own section below lists its keys.
 | Distortion disc with no art | [Disruption](#disruption-shading) | `FXList` | A `Disruption` block | The block's keys |
 | Sandstorm or snowstorm | [Storm](#storms) | `FXList`, `W3DStormDraw` | A `Storm` block or the module | `SandStorm` and `SnowStorm` keys |
 | Vehicle headlights | [Headlights](#headlights) | Automatic, `W3DModelDraw` | A `HEADLIGHT` mesh in the model | `Headlight` keys, per model too |
+| Mirror floors, puddles, pools and glass | [Planar mirrors](#planar-mirrors) | `W3DModelDraw` | `PlanarMirror = Yes` | `PlanarMirror` keys, per model too |
 | Soft edges on sprites | [Soft particles](#soft-particles) | Automatic | Nothing | None |
 | Glow around bright effects | [Bloom](contraZH-Changes.md#bloom) | `ParticleSystem` | `Shader = ADDITIVE` | None |
 
@@ -120,7 +121,7 @@ No turns that shader off everywhere.
 * `ParticleSystem.ini` changes and the texture lists apply on the next launch. `GameData.ini` tuning
 reloads in cheat builds.
 * `CONTRA_FLAMESHADER`, `CONTRA_ELECTRICSHADER`, `CONTRA_LASERSHADER`, `CONTRA_CRYOSHADER` or
-`CONTRA_DISRUPTSHADER` set to 0 turns that shader off. `CONTRA_STORMSHADER=0` turns storms off, and `CONTRA_HEADLIGHTSHADER=0` brings back the headlight meshes.
+`CONTRA_DISRUPTSHADER` set to 0 turns that shader off. `CONTRA_STORMSHADER=0` turns storms off, `CONTRA_HEADLIGHTSHADER=0` brings back the headlight meshes, and `CONTRA_PLANARMIRROR=0` draws mirror meshes plain.
 * `LaserDebug = Yes` in `GameData.ini` draws shaded beams dark, so it shows which beams took the
 laser shader.
 
@@ -130,8 +131,13 @@ Sun shadows from a shadow map replace stencil volumes on vehicles and buildings 
 under infantry. Shadows match their object's shape, alpha cutouts included, fall on everything, and
 have soft edges. Needs the Direct3D 9 build and a shader model 2 card.
 
-* `ShadowMap = Yes` - (No restores stencil volumes and blob decals. Also `Shadow mapping` in Game
-Options, applied on Accept. Needs `CheckShadowMap` in `OptionsMenu.wnd` for the menu control.)
+* `ShadowMap = Yes` - (No restores stencil volumes and blob decals. Also `Shadow mapping` on the
+Shaders page, applied on Accept. Needs `CheckShadowMap` in `OptionsMenu.wnd` for the menu control.)
+* `ShadowMapResolution = 4096` - (The shadow map's width and height: 512, 1024, 2048 or 4096. Other
+values round up to the next of these. Also `Shadows` on the Shaders page of the Options menu, applied
+on Accept without a restart. Larger gives sharper edges and uses more video memory, 64 MB at 4096.
+Needs `ButtonShaders` and `WinShaders` in `OptionsMenu.wnd`, which `build/add_shaders_wnd.py` adds;
+`build/move_shader_checks_wnd.py` moves the shader checkboxes onto that page.)
 
 `3D Shadows` and `2D Shadows` still pick the casters: 3D for volume-shadow objects (vehicles,
 buildings, trees), 2D for decal-shadow objects (mostly infantry). Both off means no shadows.
@@ -148,7 +154,7 @@ Notes:
 drawing.
 * Shrouded and stealthed units cast no shadow.
 * Additive and glow passes cast nothing. Opaque meshes cast solid even with an alpha channel.
-* The map is 4096 texels and follows the ground in view, so detail drops when zoomed out. When the
+* The map follows the ground in view, so detail drops when zoomed out. When the
 camera tilts toward the horizon, the map keeps the ground nearest the camera and distant shadows
 fade.
 * The sun is kept at least `ShadowMapMinSunElevation` degrees high (default 30, set in the mod's
@@ -165,8 +171,8 @@ Vehicles, structures and bridges get a per-pixel sun highlight, following the ma
 texture areas, and hidden in shadow when shadow mapping is on. Infantry stay matte. Needs the
 Direct3D 9 build and a shader model 2 card.
 
-* `Specular = Yes` - (No turns highlights and the terrain glint off. Also `Specular highlights` in the
-advanced display options, applied on Accept. Needs `CheckSpecular` in `OptionsMenu.wnd` for the menu
+* `Specular = Yes` - (No turns highlights and the terrain glint off. Also `Specular highlights` on the
+Shaders page, applied on Accept. Needs `CheckSpecular` in `OptionsMenu.wnd` for the menu
 control.)
 
 Tuned in the mod's `GameData.ini`:
@@ -234,8 +240,8 @@ and bridges it shades both diffuse light and the specular highlight, fades in sh
 extra draw. Infantry stay flat. Needs the Direct3D 9 build and shader model 2.0a; other cards get plain highlights and
 flat terrain.
 
-* `NormalMaps = Yes` - (No turns the detail off. Also `Surface detail` in the advanced display
-options, applied on Accept. Needs `CheckNormalMaps` in `OptionsMenu.wnd` for the menu control.)
+* `NormalMaps = Yes` - (No turns the detail off. Also `Surface detail` on the Shaders
+page, applied on Accept. Needs `CheckNormalMaps` in `OptionsMenu.wnd` for the menu control.)
 
 Units, structures and bridges use a normal map when one exists and otherwise derive bumps from
 texture brightness (light = raised, so painted markings emboss too). A normal map sits beside its texture in
@@ -312,10 +318,10 @@ infantry near them are lit the same way. Needs the Direct3D 9 build and shader m
 cards keep the old lighting.
 
 * `DynamicLights = Yes` - (No turns off every dynamic light: explosion and muzzle-flash pulses, laser
-ground glow and the police car's lights. Also `Dynamic lights` in the advanced display options.
+ground glow and the police car's lights. Also `Dynamic lights` on the Shaders page.
 Needs `CheckDynamicLights` in `OptionsMenu.wnd` for the menu control.)
 * `PixelLights = Yes` - (No keeps dynamic lights on the old per-vertex lighting. Also `Per-pixel
-lights` in the advanced display options, greyed out while dynamic lights are off. Needs
+lights` on the Shaders page, greyed out while dynamic lights are off. Needs
 `CheckPixelLights` in `OptionsMenu.wnd` for the menu control.)
 
 Notes:
@@ -339,8 +345,8 @@ Smoke, dust, fire and explosion sprites fade out as they near the surface behind
 longer cut a hard line into the ground or the buildings they pass through. Needs the Direct3D 9
 build and a shader model 2 card.
 
-* `SoftParticles = Yes` - (No draws sprites with hard edges. Also `Soft particles` in the advanced
-display options. Needs `CheckSoftParticles` in `OptionsMenu.wnd` for the menu control.)
+* `SoftParticles = Yes` - (No draws sprites with hard edges. Also `Soft particles` on the Shaders
+page. Needs `CheckSoftParticles` in `OptionsMenu.wnd` for the menu control.)
 
 Tuned in the mod's `GameData.ini`:
 
@@ -869,17 +875,23 @@ shape with no narrow end has its lamp at the end nearer the model's middle. In b
 the cone's width gives the beam's width at the far end. A mesh may hold several cones. Each cone
 that stands apart draws as a lamp of its own, and cones that lie within half their radius of each
 other, such as twin lamps set side by side, draw as one. The models need no INI change, and
-headlights still show only at night.
+headlights still show only at night. An opaque `HEADLIGHT` mesh, which blends nothing, is a lamp body
+rather than light, so it keeps its own look and throws no beam. With `RotrHack = Yes`, an additive
+`HEADLIGHT` mesh does the same. Rise of the Reds draws lit windows and glows that way. `HeadlightPerConeAim = Yes` instead gives each cone its own direction, for meshes whose lamps
+aim different ways, such as a floodlight rig on a roof. The lamp is the middle of a cone's narrow end, and cones
+that aim the same way with lamps within one radius of each other draw as one. A mesh with a lamp that
+has no narrow end keeps the rule above.
 
 Needs the Direct3D 9 build and a shader model 3 card. Elsewhere, and with `HeadlightShader = No`,
 the models show their headlight meshes as before. The pool has no shadows, so a lamp also lights
 ground that a hill or building hides from it.
 
-The keys live in `GameData.ini`. All but `HeadlightShader` reload in cheat builds:
+The keys live in `GameData.ini`. All but `HeadlightShader`, `HeadlightShaderForbiddenKindOf`, `HeadlightPerConeAim` and `RotrHack` reload in cheat builds:
 
 | Key | Default | Meaning |
 |---|---|---|
 | `HeadlightShader` | `Yes` | `No` keeps the headlight meshes. Read at launch. |
+| `HeadlightShaderForbiddenKindOf` | none | Objects of any of these kinds keep their headlight meshes, such as `STRUCTURE` for buildings that use `HEADLIGHT` meshes as lit windows. Read at launch. `GameData.ini` only. |
 | `HeadlightColor` | `R:255 G:242 B:209` | Colour of the beam and the pool. |
 | `HeadlightBeamIntensity` | 0.35 | Brightness of the beam. 0 draws no beam. |
 | `HeadlightBeamLength` | 1.0 | Beam length, in mesh lengths. |
@@ -892,6 +904,8 @@ The keys live in `GameData.ini`. All but `HeadlightShader` reload in cheat build
 | `HeadlightPoolPitch` | 11.5 | Degrees the light tilts down from the mesh, so a level lamp reaches the ground. |
 | `HeadlightPoolFalloff` | 1.5 | How fast the pool dims with distance. |
 | `HeadlightPoolClampBrightness` | `Yes` | Where pools overlap, the ground takes the brightest one alone, so lamps side by side do not burn it white. `No` stacks them. `GameData.ini` only. |
+| `HeadlightPerConeAim` | `No` | `Yes` aims each cone of a `HEADLIGHT` mesh its own way, as above. Read at launch. `GameData.ini` only. |
+| `RotrHack` | `No` | `Yes` keeps additive `HEADLIGHT` meshes, such as Rise of the Reds' lit windows, as they are, with no beam. Read at launch. `GameData.ini` only. |
 
 A model can override any of these for itself. The same keys go in its `W3DModelDraw` module, or in
 a module built on it such as `W3DTankDraw`, beside `OkToChangeModelColor`. A key left out takes the
@@ -911,14 +925,92 @@ Draw = W3DTruckDraw ModuleTag_01
 End
 ```
 
+## Planar mirrors
+
+Chosen meshes of a model act as level mirrors. They reflect the scene above them: units, buildings,
+trees and the sky. Suited to polished floors, wet plazas, metal decks, puddles, pools and glass.
+
+* An opaque mesh keeps its texture, lighting and shadows. The reflection blends over it.
+* A translucent mesh shows what lies under it, bent by its normal map, below its own texture. The
+reflection lies over both.
+* The reflection's share is `PlanarMirrorReflectivity` seen from above and rises towards all of it
+at a grazing angle.
+* A `<texture>_nrm.dds` normal map beside the mesh's texture ripples the reflection and what shows
+through. Without one the mirror is flat.
+
+The game mirrors the scene in at most two heights each frame, those of the mirrors nearest the
+middle of the view. Mirrors within half a unit of each other in height share one. A mirror at
+any other height reflects the sky alone. The mirror's height is the top of the mesh, so the mesh
+should be flat and level. A mirror that turns up on screen shows the sky for its first frame.
+
+Each height costs one more draw of the scene at half resolution, cut down to the mirrors' part of
+the screen. Water reflections are separate and cost their own draw.
+
+Needs the Direct3D 9 build and a pixel shader 2.0a card. Elsewhere, with `PlanarMirrorShader = No`,
+and with water reflections turned off in the options (`WaterReflections = No` in `Options.ini`), the
+meshes draw as before.
+
+Mark the model in its `W3DModelDraw` module, or a module built on it, beside `OkToChangeModelColor`:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `PlanarMirror` | `No` | `Yes` makes the meshes below mirrors. It wins over `FlameShader`, `ElectricShader` and `CryoShader` on those meshes. |
+| `PlanarMirrorMeshes` | every mesh | Mesh names, without the model's name, such as `FLOOR01 POOL`. Case does not matter. |
+| `PlanarMirrorOverrideTexture` | `No` | `Yes` draws the meshes as clear glass in place of their texture, whatever the mesh. They show what lies under them, bent by the normal map, with the reflection over it. A mesh drawn with alpha keeps its texture's alpha as its outline. |
+
+The look keys live in `GameData.ini`. All but `PlanarMirrorShader` reload in cheat builds:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `PlanarMirrorShader` | `Yes` | `No` draws every mirror mesh plain. Read at launch. |
+| `PlanarMirrorReflectivity` | 0.35 | Share of the reflection seen from straight above, 0 to 1. |
+| `PlanarMirrorTint` | `R:255 G:255 B:255` | Multiplies the reflection. Darker for tinted glass or dull metal. |
+| `PlanarMirrorDistortion` | 0.01 | How far the normal map bends the reflection and what shows through, in screen widths. |
+| `PlanarMirrorFrost` | 0 | 0 clear to 1 frosted. Blurs the reflection, and blurs and clouds what shows through glass and translucent mirrors. |
+
+The same four look keys in the model's module override `GameData.ini` for that model. Module keys
+are read at launch.
+
+Glass draws after the opaque scene, from one copy of the screen taken at the first glass or
+translucent mirror. An object that draws later and stands under the glass does not show through it.
+A glass mesh takes no shadows or highlights on itself, though it still casts its shadow.
+
+```
+Draw = W3DModelDraw ModuleTag_01
+  PlanarMirror             = Yes
+  PlanarMirrorMeshes       = FLOOR POOL
+  PlanarMirrorReflectivity = 0.6
+  DefaultConditionState
+    Model = CBPlaza
+  End
+End
+```
+
+## Supersampling
+
+`Supersampling` on the Shaders page offers `150%` and `200%`. The world renders to a target that
+many percent of the screen's size each way and is filtered down to the screen with a box filter,
+which smooths edges, alpha-tested cutouts, particles and shader output alike. The interface and
+the mouse draw after that at the screen's own size, so text stays sharp. Unlike MSAA the larger
+target is single sampled, so the scene's depth stays readable and ambient occlusion, soft
+particles, the storm haze and every other depth-reading effect keep working, now supersampled too.
+
+Notes:
+* 200% draws four times the pixels. Zoomed in on a big fight it costs about what MSAA 8x does.
+* Supersampling takes MSAA's place; the Anti-aliasing box greys out while it is on.
+* `Options.ini` stores it as `SuperSampling = 150` or `200`.
+* The `CONTRA_SSAA` environment variable set to a percent overrides the option for one run.
+* The combo needs a layout with the `ComboBoxSuperSampling` row, which `build/add_ssaa_wnd.py` adds
+to a loose `OptionsMenu.wnd`.
+
 ## Ambient occlusion
 
 Creases, corners, and the ground where units and buildings stand fall into soft shade, so objects sit
 on the terrain instead of floating over it. Needs the Direct3D 9 build, shader model 2.0a and
 anti-aliasing off.
 
-* `AmbientOcclusion = Yes` - (No turns the shade off. Also `Ambient occlusion` in the advanced display
-options, greyed out while anti-aliasing is on. Needs `CheckAmbientOcclusion` in `OptionsMenu.wnd` for
+* `AmbientOcclusion = Yes` - (No turns the shade off. Also `Ambient occlusion` on the Shaders
+page, greyed out while anti-aliasing is on. Needs `CheckAmbientOcclusion` in `OptionsMenu.wnd` for
 the menu control.)
 
 Tuned in the mod's `GameData.ini`:
@@ -969,8 +1061,8 @@ Where two terrain textures meet, the taller parts of each push into the other in
 10-unit fade. Stones and clumps stand proud of the texture beside them, and the edge follows them.
 Three-texture blend tiles blend the same way. Needs the Direct3D 9 build.
 
-* `HeightBlend = Yes` - (No brings back the soft fade. Also `Height blending` in the advanced display
-options. Needs `CheckHeightBlend` in `OptionsMenu.wnd` for the menu control.)
+* `HeightBlend = Yes` - (No brings back the soft fade. Also `Height blending` on the Shaders
+page. Needs `CheckHeightBlend` in `OptionsMenu.wnd` for the menu control.)
 
 Tuned in the mod's `GameData.ini`:
 
@@ -1034,8 +1126,8 @@ cloud shapes at unrelated sizes and angles add up to each cloud, a slow warp ben
 finer layer frays their edges. Each layer drifts at its own speed, so clouds form and fade instead
 of sliding as one sheet. Needs the Direct3D 9 build and Cloud shadows on.
 
-* `HQSky = Yes` - (No brings back the tiled cloud texture. Also `HQ sky` in the advanced display
-options, greyed out while Cloud shadows is off. Needs `CheckHQSky` in `OptionsMenu.wnd` for the
+* `HQSky = Yes` - (No brings back the tiled cloud texture. Also `HQ sky` on the Shaders
+page, greyed out while Cloud shadows is off. Needs `CheckHQSky` in `OptionsMenu.wnd` for the
 menu control.)
 
 Tuned in the mod's `GameData.ini`:

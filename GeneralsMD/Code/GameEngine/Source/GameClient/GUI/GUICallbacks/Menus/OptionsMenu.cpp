@@ -178,6 +178,15 @@ static GameWindow *   ButtonGameOptionsAccept     = nullptr;
 static NameKeyType    ButtonGameOptionsCancelID   = NAMEKEY_INVALID;
 static GameWindow *   ButtonGameOptionsCancel     = nullptr;
 
+//Shaders Screen
+static GameWindow *   WinShaders                  = nullptr;
+static NameKeyType    ButtonShadersID             = NAMEKEY_INVALID;
+static NameKeyType    ButtonShadersAcceptID       = NAMEKEY_INVALID;
+static NameKeyType    ButtonShadersCancelID       = NAMEKEY_INVALID;
+static GameWindow *   comboBoxShadows             = nullptr;
+static GameWindow *   comboBoxSuperSampling       = nullptr;
+static NameKeyType    comboBoxSuperSamplingID     = NAMEKEY_INVALID;
+
 static GameWindow *   buttonMainAccept            = nullptr;
 static GameWindow *   buttonMainBack              = nullptr;
 static GameWindow *   buttonMainDefaults          = nullptr;
@@ -241,6 +250,8 @@ static const char *const HealthBarModeNames[] = { "Classic", "Damaged", "Always"
 static const char *const BuildTimerModeNames[] = { "None", "Seconds", "Auto" };
 static const char *const CastModeNames[] = { "Normal", "QuickCast", "QuickCastWithIndicator" };
 static const Int AnisotropyLevels[] = { 2, 4, 8, 16 };
+static const Int ShadowMapResolutions[] = { 512, 1024, 2048, 4096 };
+static const Int SuperSamplingPercents[] = { 100, 150, 200 };
 static_assert( ARRAY_SIZE(HealthBarModeNames) == HealthBarDisplayMode_Count, "HealthBarModeNames out of date" );
 static const char *const AlliedDecalModeNames[] = { "Hidden", "House", "Army" };
 static_assert( ARRAY_SIZE(AlliedDecalModeNames) == AlliedDecalMode_Count, "AlliedDecalModeNames out of date" );
@@ -508,11 +519,11 @@ static Int bloomPercent( Real strength )
 	return REAL_TO_INT( strength * 100.0f + 0.5f );
 }
 
-static Int anisotropyIndex( Int level )
+static Int levelIndex( const Int *levels, Int count, Int level )
 {
-	for (Int i = 0; i < ARRAY_SIZE(AnisotropyLevels); ++i)
+	for (Int i = 0; i < count; ++i)
 	{
-		if (AnisotropyLevels[i] == level)
+		if (levels[i] == level)
 		{
 			return i;
 		}
@@ -541,13 +552,15 @@ static void updateGameOptionsEnables()
 	enableWindow( checkPixelLights, getCheck( checkDynamicLights, TRUE ) );
 	enableWindow( checkHQSky, getCheck( checkCloudShadows, TRUE ) );
 
-	// the scene depth it reads is multisampled, and so unreadable, with anti-aliasing on
+	// the scene depth it reads is multisampled, and so unreadable, with MSAA on; supersampling takes MSAA's place and keeps it readable
 	Int antiAliasing = 0;
 	if (comboBoxAntiAliasing)
 	{
 		GadgetComboBoxGetSelectedPos( comboBoxAntiAliasing, &antiAliasing );
 	}
-	enableWindow( checkAmbientOcclusion, antiAliasing <= 0 );
+	const Bool superSampling = comboBoxSuperSampling && getComboPos( comboBoxSuperSampling, 0 ) > 0;
+	enableWindow( comboBoxAntiAliasing, !superSampling );
+	enableWindow( checkAmbientOcclusion, antiAliasing <= 0 || superSampling );
 }
 
 static void populateGameOptions()
@@ -563,7 +576,7 @@ static void populateGameOptions()
 	setComboPos( comboBoxActionLines, pref->getActionLineMode() );
 	setComboPos( comboBoxCastMode, pref->getCastMode() );
 	setComboPos( comboBoxTextureFilter, pref->getTextureFilterMode() );
-	setComboPos( comboBoxAnisotropy, anisotropyIndex( pref->getTextureAnisotropyLevel() ) );
+	setComboPos( comboBoxAnisotropy, levelIndex( AnisotropyLevels, ARRAY_SIZE(AnisotropyLevels), pref->getTextureAnisotropyLevel() ) );
 
 	for (Int i = 0; i < ARRAY_SIZE(BoolOptions); ++i)
 	{
@@ -582,6 +595,23 @@ static void populateGameOptions()
 	updateGameOptionsEnables();
 }
 
+// Back restores whichever checkboxes the layout puts on the Shaders page
+static void populateShaders()
+{
+	setComboPos( comboBoxShadows, levelIndex( ShadowMapResolutions, ARRAY_SIZE(ShadowMapResolutions), pref->getShadowMapResolution() ) );
+	setComboPos( comboBoxSuperSampling, levelIndex( SuperSamplingPercents, ARRAY_SIZE(SuperSamplingPercents), pref->getSuperSampling() ) );
+	for (Int i = 0; i < ARRAY_SIZE(BoolOptions); ++i)
+	{
+		GameWindow *check = *BoolOptions[i].check;
+		if (check && WinShaders && check->winGetParent() == WinShaders)
+		{
+			setCheck( check, (pref->*BoolOptions[i].read)() );
+		}
+	}
+	setEntryInt( textEntryBloomStrength, bloomPercent( pref->getBloomStrength() ) );
+	updateGameOptionsEnables();
+}
+
 static void setGameOptionsDefaults()
 {
 	if (!WinGameOptions)
@@ -595,7 +625,7 @@ static void setGameOptionsDefaults()
 	setComboPos( comboBoxActionLines, ActionLineMode_Default );
 	setComboPos( comboBoxCastMode, CastMode_Default );
 	setComboPos( comboBoxTextureFilter, TextureFilterClass::TEXTURE_FILTER_BILINEAR );
-	setComboPos( comboBoxAnisotropy, anisotropyIndex( TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC_2X ) );
+	setComboPos( comboBoxAnisotropy, levelIndex( AnisotropyLevels, ARRAY_SIZE(AnisotropyLevels), TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC_2X ) );
 
 	for (Int i = 0; i < ARRAY_SIZE(BoolOptions); ++i)
 	{
@@ -668,6 +698,7 @@ static void setDefaults()
 
 	showMaxCameraHeight( FALSE, (Int)TheGlobalData->m_defaultMaxCameraHeight );
 	setGameOptionsDefaults();
+	setComboPos( comboBoxShadows, ARRAY_SIZE(ShadowMapResolutions) - 1 );
 
 
 	Int valMin, valMax;
@@ -1158,6 +1189,35 @@ static void saveOptions()
 	}
 
 	//-------------------------------------------------------------------------------------------------
+	// shadow map resolution, which the shadow map takes up on its next frame
+	if (comboBoxShadows)
+	{
+		const Int resolution = ShadowMapResolutions[getComboPos( comboBoxShadows, ARRAY_SIZE(ShadowMapResolutions) - 1 )];
+		AsciiString prefString;
+		prefString.format( "%d", resolution );
+		(*pref)["ShadowMapResolution"] = prefString;
+		TheWritableGlobalData->m_shadowMapResolution = resolution;
+	}
+
+	//-------------------------------------------------------------------------------------------------
+	// supersampling, which rebuilds the device like a sample count change and falls back where the target cannot be made
+	if (comboBoxSuperSampling)
+	{
+		Int percent = SuperSamplingPercents[getComboPos( comboBoxSuperSampling, 0 )];
+		if (percent != WW3D::Get_Super_Sampling())
+		{
+			WW3D::Set_Super_Sampling( percent );
+			WW3D::Set_Render_Device( -1, -1, -1, -1, -1, false, true, true );
+			percent = WW3D::Get_Super_Sampling();
+			TheWritableGlobalData->m_antiAliasLevel = (UnsignedInt)WW3D::Get_MSAA_Mode();
+		}
+		AsciiString prefString;
+		prefString.format( "%d", percent );
+		(*pref)["SuperSampling"] = prefString;
+		TheWritableGlobalData->m_superSampling = percent;
+	}
+
+	//-------------------------------------------------------------------------------------------------
 	// draw scroll anchor
 	{
 		if( TheInGameUI->getDrawRMBScrollAnchor() )
@@ -1469,35 +1529,35 @@ static void enableMainButtons( Bool enable )
 	enableWindow( buttonMainDefaults, enable );
 }
 
-static void showGameOptions()
+static void showPanel( GameWindow *panel )
 {
-	if (WinGameOptions)
+	if (panel)
 	{
-		WinGameOptions->winHide( FALSE );
+		panel->winHide( FALSE );
 		enableMainButtons( FALSE );
 	}
 }
 
-static void acceptGameOptions()
+static void hidePanel( GameWindow *panel )
 {
-	if (WinGameOptions)
+	if (panel)
 	{
-		WinGameOptions->winHide( TRUE );
+		panel->winHide( TRUE );
 		enableMainButtons( TRUE );
 	}
 }
 
-static void cancelGameOptions()
+static Bool isPanelOpen( GameWindow *panel )
 {
-	ignoreSelected = TRUE;
-	populateGameOptions();
-	ignoreSelected = FALSE;
-	acceptGameOptions();
+	return panel && !panel->winIsHidden();
 }
 
-static Bool isGameOptionsOpen()
+static void cancelPanel( GameWindow *panel, void (*populate)() )
 {
-	return WinGameOptions && !WinGameOptions->winIsHidden();
+	ignoreSelected = TRUE;
+	populate();
+	ignoreSelected = FALSE;
+	hidePanel( panel );
 }
 
 static GameWindow *findOptionsWindow( const char *name )
@@ -1669,9 +1729,9 @@ static void initGameOptionsWindows()
 	setCheckText( checkGridHotkeys, "GUI:GridHotkeys", L"Use grid hotkeys", "TOOLTIP:GridHotkeys", L"Command bar slots use the layout keys instead of the retail hotkeys" );
 	setCheckText( checkKeyboardOverlay, "GUI:KeyboardOverlay", L"Show hotkey letters on cameos", "TOOLTIP:KeyboardOverlay", L"Draws each cameo's hotkey letter on the cameo" );
 	setCheckText( checkKeyboardOverlayBackdrop, "GUI:KeyboardOverlayBackdrop", L"Backdrop behind letter", "TOOLTIP:KeyboardOverlayBackdrop", L"Draws a plate behind the letter so it stays readable" );
-	setCheckText( checkBloom, "GUI:Bloom", L"Glow around additive effects", "TOOLTIP:Bloom", L"Fire, lasers, muzzle flashes and additive model parts get a soft glow. Off while anti-aliasing is on." );
+	setCheckText( checkBloom, "GUI:Bloom", L"Bloom", "TOOLTIP:Bloom", L"Fire, lasers, muzzle flashes and additive model parts get a soft glow. Off while anti-aliasing is on." );
 	setCheckText( checkBloomDebug, "GUI:BloomDebug", L"Debug view", "TOOLTIP:BloomDebug", L"Shows only the glow buffer on black" );
-	setTooltip( textEntryBloomStrength, "TOOLTIP:BloomStrength", L"0 to 100. How bright the glow is." );
+	setTooltip( textEntryBloomStrength, "TOOLTIP:BloomStrength", L"Bloom strength, 0 to 100. How bright the glow is." );
 	setCheckText( checkLaserRef, "GUI:LaserRef", L"Lasers light the ground", "TOOLTIP:LaserRef", L"Laser beams cast a colored light on the terrain along their length" );
 	setCheckText( checkSpecular, "GUI:Specular", L"Specular highlights", "TOOLTIP:Specular", L"Vehicles and structures catch a highlight from the sun, brightest on metal and gone in shadow. Needs a Direct3D 9 card." );
 	setCheckText( checkNormalMaps, "GUI:NormalMaps", L"Surface detail", "TOOLTIP:NormalMaps", L"Panels, rivets and plating on vehicles and structures, and the ground's grain, catch and lose the sun's light. Uses a texture's normal map where one exists. Needs a Direct3D 9 card with Shader Model 2.0a or later." );
@@ -1722,6 +1782,45 @@ static void initGameOptionsWindows()
 	addComboEntries( comboBoxCastMode, "GUI:CastMode", castModeNames, CastMode_Count, 2 );
 	addComboEntries( comboBoxTextureFilter, "GUI:TextureFilter", textureFilterNames, TextureFilterClass::TEXTURE_FILTER_COUNT, 4 );
 	addComboEntries( comboBoxAnisotropy, "GUI:Anisotropy", anisotropyNames, ARRAY_SIZE(AnisotropyLevels), 3 );
+}
+
+// Finds the Shaders panel, which a layout without it leaves out along with its button
+static void initShadersWindows()
+{
+	WinShaders = findOptionsWindow( "OptionsMenu.wnd:WinShaders" );
+	GameWindow *button = findOptionsWindow( "OptionsMenu.wnd:ButtonShaders", ButtonShadersID );
+	if (!WinShaders)
+	{
+		return;
+	}
+
+	findOptionsWindow( "OptionsMenu.wnd:ButtonShadersAccept", ButtonShadersAcceptID );
+	findOptionsWindow( "OptionsMenu.wnd:ButtonShadersBack", ButtonShadersCancelID );
+	comboBoxShadows = findOptionsWindow( "OptionsMenu.wnd:ComboBoxShadows" );
+	comboBoxSuperSampling = findOptionsWindow( "OptionsMenu.wnd:ComboBoxSuperSampling", comboBoxSuperSamplingID );
+
+	// The layout hides the button, so an exe without this panel never shows it.
+	if (button)
+	{
+		GadgetButtonSetText( button, TheGameText->FETCH_OR_SUBSTITUTE( "GUI:Shaders", L"Shaders" ) );
+		button->winHide( FALSE );
+	}
+	setLabelText( "OptionsMenu.wnd:ShadersTitle", "GUI:Shaders", L"Shaders" );
+	setLabelText( "OptionsMenu.wnd:ShadowsLabel", "GUI:ShadowMapResolution", L"Shadows" );
+	setTooltip( comboBoxShadows, "TOOLTIP:ShadowMapResolution", L"Width and height of the sun's shadow map. Larger gives sharper shadow edges and uses more video memory, 64 MB at 4096 x 4096. Needs Shadow mapping." );
+
+	static const WideChar *const shadowMapNames[] = { L"512 x 512", L"1024 x 1024", L"2048 x 2048", L"4096 x 4096" };
+	static_assert( ARRAY_SIZE(shadowMapNames) == ARRAY_SIZE(ShadowMapResolutions), "shadowMapNames out of date" );
+	addComboEntries( comboBoxShadows, "GUI:ShadowMapResolution", shadowMapNames, ARRAY_SIZE(ShadowMapResolutions), 3 );
+
+	setLabelText( "OptionsMenu.wnd:SuperSamplingLabel", "GUI:SuperSampling", L"Supersampling" );
+	setTooltip( comboBoxSuperSampling, "TOOLTIP:SuperSampling", L"Renders the world larger and shrinks it to the screen, which smooths every edge and keeps ambient occlusion and soft particles working. 200% draws four times the pixels. Takes the place of Anti-aliasing." );
+	static const WideChar *const superSamplingNames[] = { L"Off", L"150%", L"200%" };
+	static_assert( ARRAY_SIZE(superSamplingNames) == ARRAY_SIZE(SuperSamplingPercents), "superSamplingNames out of date" );
+	addComboEntries( comboBoxSuperSampling, "GUI:SuperSampling", superSamplingNames, ARRAY_SIZE(SuperSamplingPercents), 2 );
+
+	// not every layout ships the panel hidden
+	WinShaders->winHide( TRUE );
 }
 
 // TheSuperHackers @tweak Now prints additional version information in the version label.
@@ -1847,6 +1946,7 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 	ButtonAdvancedCancel      = TheWindowManager->winGetWindowFromId( nullptr, ButtonAdvancedCancelID );
 
 	initGameOptionsWindows();
+	initShadersWindows();
 
 	sliderTextureResolutionID = TheNameKeyGenerator->nameToKey( "OptionsMenu.wnd:LowResSlider" );
 	sliderTextureResolution = TheWindowManager->winGetWindowFromId( nullptr, sliderTextureResolutionID );
@@ -2001,7 +2101,7 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 	static const WideChar *const AntiAliasingFallbacks[OptionPreferences::AntiAliasingMode_Count] = { L"Off", L"2x", L"4x", L"8x" };
 	addComboEntries( comboBoxAntiAliasing, "GUI:AntiAliasing", AntiAliasingFallbacks, OptionPreferences::AntiAliasingMode_Count, OptionPreferences::AntiAliasingMode_Count - 1 );
 	setLabelText( "OptionsMenu.wnd:AntiAliasingLabel", "GUI:AntiAliasing", L"Anti-aliasing" );
-	setTooltip( comboBoxAntiAliasing, "TOOLTIP:AntiAliasing", L"Smooths jagged edges. Ambient occlusion needs it off, and soft particles fade only against the ground while it is on." );
+	setTooltip( comboBoxAntiAliasing, "TOOLTIP:AntiAliasing", L"Smooths jagged edges. Ambient occlusion needs it off, and soft particles fade only against the ground while it is on. Supersampling on the Shaders page takes its place." );
 	Int val = atoi(selectedAliasingMode.str());
 	Int pos = 0;
 
@@ -2206,6 +2306,7 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 
 	showMaxCameraHeight( pref->getUseCustomMaxCameraHeight(), (Int)pref->getMaxCameraHeight() );
 	populateGameOptions();
+	populateShaders();
 
  	// set volume sliders
 
@@ -2335,9 +2436,14 @@ WindowMsgHandledType OptionsMenuInput( GameWindow *window, UnsignedInt msg,
 					//
 					if( BitIsSet( state, KEY_STATE_UP ) )
 					{
-						if (isGameOptionsOpen())
+						if (isPanelOpen( WinGameOptions ))
 						{
-							cancelGameOptions();
+							cancelPanel( WinGameOptions, populateGameOptions );
+							return MSG_HANDLED;
+						}
+						if (isPanelOpen( WinShaders ))
+						{
+							cancelPanel( WinShaders, populateShaders );
 							return MSG_HANDLED;
 						}
 
@@ -2421,7 +2527,7 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 				GameWindow *control = (GameWindow *)mData1;
 				Int controlID = control->winGetWindowId();
 
-				if (controlID == comboBoxAntiAliasingID)
+				if (controlID == comboBoxAntiAliasingID || controlID == comboBoxSuperSamplingID)
 				{
 					updateGameOptionsEnables();
 					break;
@@ -2502,15 +2608,27 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 			}
 			else if (controlID == ButtonGameOptionsID )
 			{
-				showGameOptions();
+				showPanel( WinGameOptions );
 			}
 			else if (controlID == ButtonGameOptionsAcceptID )
 			{
-				acceptGameOptions();
+				hidePanel( WinGameOptions );
 			}
 			else if (controlID == ButtonGameOptionsCancelID )
 			{
-				cancelGameOptions();
+				cancelPanel( WinGameOptions, populateGameOptions );
+			}
+			else if (controlID == ButtonShadersID )
+			{
+				showPanel( WinShaders );
+			}
+			else if (controlID == ButtonShadersAcceptID )
+			{
+				hidePanel( WinShaders );
+			}
+			else if (controlID == ButtonShadersCancelID )
+			{
+				cancelPanel( WinShaders, populateShaders );
 			}
 			else if (controlID == checkGridHotkeysID || controlID == checkKeyboardOverlayBackdropID || controlID == checkBloomID ||
 				controlID == checkDynamicLightsID || controlID == checkCloudShadowsID )

@@ -27,6 +27,7 @@
 #include "W3DDevice/GameClient/W3DSoftParticles.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/W3DWater.h"
+#include "W3DDevice/GameClient/W3DPlanarMirror.h"
 #include "Common/GlobalData.h"
 #include "GameClient/ParticleSys.h"
 #include "GameClient/DisruptionShader.h"
@@ -834,6 +835,16 @@ Bool W3DSoftParticles::bindDisruption(const ShaderClass &shader, const Disruptio
 bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const void *effectData)
 {
 	m_bound = 0;
+	if ((effects & EFFECT_MIRROR) != 0)
+	{
+		if (TheW3DPlanarMirrors == nullptr || !TheW3DPlanarMirrors->beginTranslucent(shader, effectData))
+		{
+			return false;
+		}
+		m_bound = EFFECT_MIRROR;
+		return true;
+	}
+
 	if ((effects & EFFECT_DISRUPT) != 0)
 	{
 		return effectData != nullptr && bindDisruption(shader, *static_cast<const DisruptionShaderInfo *>(effectData)) != FALSE;
@@ -968,6 +979,13 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const 
 
 void W3DSoftParticles::End()
 {
+	if ((m_bound & EFFECT_MIRROR) != 0)
+	{
+		TheW3DPlanarMirrors->endTranslucent();
+		m_bound = 0;
+		return;
+	}
+
 	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
 	DX8Wrapper::Set_Pixel_Shader(0);
 	device->SetTexture(SOFT_STAGE, nullptr);

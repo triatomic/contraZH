@@ -185,8 +185,11 @@ public:
 	/// The pass objects push for a per-pixel sun highlight, bumps and glow, or null when all are off or unsupported.
 	static MaterialPassClass *getSpecularPass();
 	/// The same pass for one object this frame, also adding the given lights. lightsOnly leaves out the
-	/// highlight, bumps and glow, and gives null without lights.
-	static MaterialPassClass *getSpecularPass(const Int *lights, Int lightCount, Bool lightsOnly);
+	/// highlight, bumps and glow, and gives null without lights. receivesShadow asks it to do the shadow
+	/// receiver pass's work as well, which only canSpecularReceiveShadow allows, and comes back true where it does.
+	static MaterialPassClass *getSpecularPass(const Int *lights, Int lightCount, Bool lightsOnly, Bool &receivesShadow);
+	/// Whether the specular pass can take in the shadow receiver's work: its shaders loaded and the map's shadow colour grey.
+	static Bool canSpecularReceiveShadow();
 	/// The pass every specular pass above shares its vertex processing with, or null when it is unsupported.
 	static const MaterialPassClass *getSpecularPassKey();
 	/// Binds the texture, and its normal map and glow mask, for geometry drawn through ST_SPECULAR outside the mesh renderer.
@@ -216,6 +219,8 @@ public:
 	static Bool copyRenderTarget(IDirect3DTexture8 *&copy);
 	/// Scale in xy and offset in zw from clip space to the texel centres of a width by height copy of the render target.
 	static Vector4 getClipToTargetMapping(Real width, Real height);
+	/// Target pixels per screen pixel, above 1 while the scene renders larger than the screen for supersampling.
+	static Real getScreenToTargetScale();
 	/// Draws a quad over the viewport through identity transforms, its uv mapped from clip space by clipToTarget.
 	static void drawClipQuad(const Vector4 &clipToTarget);
 	static Bool isRenderingToTexture() {return m_renderingToTexture; }

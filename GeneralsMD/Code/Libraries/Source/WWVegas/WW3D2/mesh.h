@@ -151,6 +151,11 @@ public:
 	// Do old .w3d mesh files get fog turned on or off?
 	static bool						Legacy_Meshes_Fogged;
 
+	// Hands a mesh carrying EFFECT_MIRROR the pass that adds its reflection, or null where it draws plain. Sorted meshes get none.
+	// A pass that replaces the mesh draws after the opaque scene, in place of its base and other passes.
+	typedef MaterialPassClass * (*MirrorPassHook)(MeshClass * mesh, bool sorted, bool & replaces);
+	static MirrorPassHook			Mirror_Pass_Hook;
+
 	void								Replace_Texture(TextureClass* texture,TextureClass* new_texture);
 	void								Replace_VertexMaterial(VertexMaterialClass* vmat,VertexMaterialClass* new_vmat);
 

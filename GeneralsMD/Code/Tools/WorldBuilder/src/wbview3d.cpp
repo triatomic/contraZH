@@ -4962,11 +4962,16 @@ Bool WbView3d::beginTopView(const TopViewCapture &capture, Bool aboveGround)
 	// Volume shadows resolve only inside a back-buffer-sized quad, which a render larger than the window overruns.
 	// Under the shadow map they draw no volumes and cast into the map instead, so they stay on there.
 	s.wantShadowVolumes = TheGlobalData->m_useShadowVolumes;
+	s.wantShadowDecals = TheGlobalData->m_useShadowDecals;
 	s.wantClouds = TheGlobalData->m_useCloudMap;
 	s.wantMacroTexture = TheGlobalData->m_useLightMap;
-	if (!TheGlobalData->m_useShadowMap)
+	if (!TheGlobalData->m_useShadowMap || !capture.shadows)
 	{
 		TheWritableGlobalData->m_useShadowVolumes = false;
+	}
+	if (!capture.shadows)
+	{
+		TheWritableGlobalData->m_useShadowDecals = false;
 	}
 	TheWritableGlobalData->m_useCloudMap = capture.clouds;
 	TheWritableGlobalData->m_useLightMap = capture.macroTexture;
@@ -5184,17 +5189,12 @@ Bool WbView3d::presentTopView(Int size, void *window, const Real area[4])
 		D3DSURFACE_DESC desc;
 		back->GetDesc(&desc);
 		dev->ColorFill(back, NULL, D3DCOLOR_XRGB(0, 0, 0));
-		RECT src;
-		src.left = (LONG)(area[0] * size);
-		src.top = (LONG)(area[1] * size);
-		src.right = (LONG)(area[2] * size + 0.5f);
-		src.bottom = (LONG)(area[3] * size + 0.5f);
 		RECT dst;
 		dst.left = (LONG)(area[0] * desc.Width);
 		dst.top = (LONG)(area[1] * desc.Height);
 		dst.right = (LONG)(area[2] * desc.Width + 0.5f);
 		dst.bottom = (LONG)(area[3] * desc.Height + 0.5f);
-		ok = SUCCEEDED(dev->StretchRect(rt, &src, back, &dst, D3DTEXF_LINEAR))
+		ok = SUCCEEDED(dev->StretchRect(rt, NULL, back, &dst, D3DTEXF_LINEAR))
 			&& SUCCEEDED(s.swapChain->Present(NULL, NULL, NULL, NULL, 0));
 		if (!ok)
 		{
@@ -5233,6 +5233,7 @@ void WbView3d::endTopView()
 	s.targetSize = 0;
 
 	TheWritableGlobalData->m_useShadowVolumes = s.wantShadowVolumes;
+	TheWritableGlobalData->m_useShadowDecals = s.wantShadowDecals;
 	TheWritableGlobalData->m_useCloudMap = s.wantClouds;
 	TheWritableGlobalData->m_useLightMap = s.wantMacroTexture;
 	if (s.capture.stochastic)

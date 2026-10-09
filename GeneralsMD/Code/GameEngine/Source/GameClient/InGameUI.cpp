@@ -4649,6 +4649,11 @@ void InGameUI::updateActionLines()
 			}
 			else if( goalObj )
 			{
+				// a line to a target hidden in fog would give away where it is
+				if( goalObj->getDrawable() && goalObj->getDrawable()->getFullyObscuredByShroud() )
+				{
+					continue;
+				}
 				line.to = *goalObj->getPosition();
 			}
 			else if( path )

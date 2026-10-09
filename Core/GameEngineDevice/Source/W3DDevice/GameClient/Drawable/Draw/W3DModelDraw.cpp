@@ -1065,6 +1065,7 @@ W3DModelDrawModuleData::W3DModelDrawModuleData() :
 	m_disruption(DisruptionShaderInfo::SHAPE_CENTER)
 {
 	m_headlightTuning.setUnset();
+	m_planarMirrorTuning.setUnset();
 	const Real MAX_SHIFT = 3.0f;
 	const Real INITIAL_RECOIL_RATE = 2.0f;
 	const Real RECOIL_DAMPING = 0.4f;
@@ -1086,6 +1087,7 @@ W3DModelDrawModuleData::W3DModelDrawModuleData() :
 	m_flameShader = FALSE;
 	m_electricShader = FALSE;
 	m_cryoShader = FALSE;
+	m_planarMirror = FALSE;
 
 	// m_ignoreConditionStates defaults to all zero, which is what we want
 }
@@ -1221,8 +1223,28 @@ const Vector3* W3DModelDrawModuleData::getAttachToDrawableBoneOffset(const Drawa
 #endif
 
 //-------------------------------------------------------------------------------------------------
+// A sub-object is named <model>.<mesh>, and the mesh part is what PlanarMirrorMeshes lists.
+static Bool isPlanarMirrorMesh(const char *name, const std::vector<AsciiString> &meshes)
+{
+	if (meshes.empty())
+	{
+		return TRUE;
+	}
+	const char *dot = (name != nullptr) ? strrchr(name, '.') : nullptr;
+	const char *meshName = (dot != nullptr) ? dot + 1 : name;
+	for (size_t i = 0; meshName != nullptr && i < meshes.size(); i++)
+	{
+		if (stricmp(meshName, meshes[i].str()) == 0)
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
 // Hands every mesh under the object the module's shader settings, which the module data keeps alive.
-// One shader draws a mesh, so cryo wins over flame and flame over electric, as on a beam.
+// One shader draws a mesh, so a mirror wins over the rest, cryo over flame and flame over electric, as on a beam.
 static void setShaderEffects(RenderObjClass *robj, const W3DModelDrawModuleData &data)
 {
 	if (robj->Class_ID() == RenderObjClass::CLASSID_MESH)
@@ -1232,7 +1254,11 @@ static void setShaderEffects(RenderObjClass *robj, const W3DModelDrawModuleData 
 			robj->Set_Disruption(&data.m_disruption, data.m_disruption.hidesArt());
 		}
 
-		if (data.m_cryoShader)
+		if (data.m_planarMirror && isPlanarMirrorMesh(robj->Get_Name(), data.m_planarMirrorMeshes))
+		{
+			robj->Set_Shader_Effects(SoftParticleHookClass::EFFECT_MIRROR | SoftParticleHookClass::EFFECT_MESH, &data.m_planarMirrorTuning);
+		}
+		else if (data.m_cryoShader)
 		{
 			robj->Set_Shader_Effects(SoftParticleHookClass::EFFECT_CRYO | SoftParticleHookClass::EFFECT_MESH, &data.m_beamTuning);
 		}
@@ -1308,12 +1334,16 @@ void W3DModelDrawModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "FlameShader", INI::parseBool, nullptr, offsetof(W3DModelDrawModuleData, m_flameShader) },
 		{ "ElectricShader", INI::parseBool, nullptr, offsetof(W3DModelDrawModuleData, m_electricShader) },
 		{ "CryoShader", INI::parseBool, nullptr, offsetof(W3DModelDrawModuleData, m_cryoShader) },
+		{ "PlanarMirror", INI::parseBool, nullptr, offsetof(W3DModelDrawModuleData, m_planarMirror) },
+		{ "PlanarMirrorMeshes", INI::parseAsciiStringVector, nullptr, offsetof(W3DModelDrawModuleData, m_planarMirrorMeshes) },
+		{ "PlanarMirrorOverrideTexture", INI::parseBool, nullptr, offsetof(W3DModelDrawModuleData, m_planarMirrorTuning) + offsetof(PlanarMirrorShaderTuning, overrideTexture) },
 		//{ "DisableMovementEffectsOverWater", INI::parseBool, NULL, offsetof(W3DModelDrawModuleData, m_disableMoveEffectsOverWater) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
   p.add(DisruptionShaderInfo::getFieldParse(), offsetof(W3DModelDrawModuleData, m_disruption));
   p.add(HeadlightShaderTuning::getFieldParse(), offsetof(W3DModelDrawModuleData, m_headlightTuning));
+  p.add(PlanarMirrorShaderTuning::getFieldParse(), offsetof(W3DModelDrawModuleData, m_planarMirrorTuning));
   p.add(ParticleSystemTemplate::getFlameTuningFieldParse(), offsetof(W3DModelDrawModuleData, m_flameTuning));
   p.add(W3DLaserDrawModuleData::getShaderTuningFieldParse(), offsetof(W3DModelDrawModuleData, m_beamTuning));
 
@@ -3701,7 +3731,9 @@ void W3DModelDraw::hideAllHeadlights(Bool hide)
 	if (m_renderObject)
 	{
 		// Where the headlight shader runs it draws the lights, and their meshes stay hidden.
-		const Bool shaded = TheW3DHeadlights != nullptr && TheW3DHeadlights->isActive() && getW3DModelDrawModuleData()->m_headlightTuning.enabled;
+		// Kinds in HeadlightShaderForbiddenKindOf keep the meshes, such as buildings whose HEADLIGHT meshes are lit windows.
+		const Bool shaded = TheW3DHeadlights != nullptr && TheW3DHeadlights->isActive() && getW3DModelDrawModuleData()->m_headlightTuning.enabled &&
+			!getDrawable()->isAnyKindOf(TheGlobalData->m_headlightForbiddenKindOf);
 
 		// The lamps are found once for each render object, since every change of state comes through here.
 		const Bool search = shaded && !hide && m_headlightSource != m_renderObject;
@@ -3716,8 +3748,9 @@ void W3DModelDraw::hideAllHeadlights(Bool hide)
 			RenderObjClass* test = m_renderObject->Get_Sub_Object(subObj);
 			if (strstr(test->Get_Name(),"HEADLIGHT"))
 			{
-				test->Set_Hidden(hide || shaded);
-				if (search)
+				const Bool lamp = shaded && !W3DHeadlightManager::keepsOwnLook(*test);
+				test->Set_Hidden(hide || lamp);
+				if (search && lamp)
 				{
 					// Each level of detail holds its own copy of the lamps, and one copy is enough.
 					const Int lod = getSubObjectLod(m_renderObject, subObj);
@@ -3963,7 +3996,8 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 			m_renderObject = W3DDisplay::m_assetManager->Create_Render_Obj(newState->m_modelName.str(), draw->getScale(), m_hexColor);
 			DEBUG_ASSERTCRASH(m_renderObject, ("*** ASSET ERROR: Model %s not found!",newState->m_modelName.str()));
 			const W3DModelDrawModuleData *shaders = getW3DModelDrawModuleData();
-			if (m_renderObject && (shaders->m_disruption.isOn() || shaders->m_flameShader || shaders->m_electricShader || shaders->m_cryoShader))
+			if (m_renderObject && (shaders->m_disruption.isOn() || shaders->m_flameShader || shaders->m_electricShader || shaders->m_cryoShader ||
+				shaders->m_planarMirror))
 			{
 				setShaderEffects(m_renderObject, *shaders);
 			}

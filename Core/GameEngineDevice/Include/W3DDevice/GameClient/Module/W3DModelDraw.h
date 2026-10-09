@@ -54,6 +54,7 @@ public:
 #include "Common/SparseMatchFinder.h"
 #include "GameClient/ParticleSys.h"
 #include "GameClient/HeadlightShader.h"
+#include "GameClient/PlanarMirrorShader.h"
 #include "W3DLaserDraw.h"
 #include "Common/STLTypedefs.h"
 
@@ -346,6 +347,10 @@ public:
 	Bool															m_cryoShader;  ///< shade them as ice, over either
 	FlameShaderTuning									m_flameTuning;
 	BeamShaderTuning									m_beamTuning;  ///< the electric and cryo settings
+
+	Bool															m_planarMirror;  ///< some meshes reflect the scene as level mirrors, over any other mesh shader
+	std::vector<AsciiString>					m_planarMirrorMeshes;  ///< the mirror meshes by name, every mesh where empty
+	PlanarMirrorShaderTuning					m_planarMirrorTuning;  ///< the look keys, unset where the model takes GameData.ini's
 
 	// Bool															m_disableMoveEffectsOverWater;  ///< disable track marks and tread/wheel anims over water
 

@@ -374,14 +374,15 @@ members.
 
 ## Action lines
 
-A faint line from each selected unit to where its order sends it, with the order's own cursor
-(move, attack move, attack, force fire) on the destination. Guard gets a blue arrow. Units moving together share one line. Lines last as long as the order and follow a
+A faint line from each selected unit to where its order sends it, fading in from the unit and
+ending in a small dot. Units moving together share one line. Lines last as long as the order and follow a
 chased target.
 
 * `ActionLines = Off` - (`Off` | `All` | `AttackOnly`. Game Options > Action lines. `AttackOnly` draws
 attack and attack move orders only.)
 
 * Green: move, enter, dock, repair. Pink: attack move. Red: attack. Blue: guard.
+* No line draws to a target in fog or shroud.
 * A waypoint path draws one line per leg. With `All` it replaces the white path shown while Alt is
 held.
 
@@ -441,7 +442,7 @@ texture so filtering at a texture's edge reads the texture and not its neighbour
 reads further along the view than the original 4-texel border covers, so steep distant ground can pick
 up a faint line of the next texture every few cells. The mod's `GameData.ini` sets the border:
 
-* `TerrainAtlasBorder = 8` - (Texels around each texture, rounded up to a multiple of 4, from 4 to 32.
+* `TerrainAtlasBorder = 4` - (Texels around each texture, rounded up to a multiple of 4, from 4 to 32.
 Cheat builds apply a change while a map runs.)
 
 A wider border keeps higher anisotropy clean but fits fewer textures. The atlas is at most 2048 texels
@@ -459,7 +460,7 @@ A 512-texel texture takes the room of four 256-texel ones. A texture that does n
 render log names it, so a map with many large textures needs a smaller border.
 
 Shadow mapping, specular, terrain glint, HQ sky cloud shadows, stochastic terrain, normal and glow maps, per-pixel lights, soft particles, flame
-and laser shading, per-map colour grading and the other features that need the Direct3D 9 build are on [Direct3D 9 Features](dx9feat.md).
+and laser shading, per-map colour grading, planar mirrors and the other features that need the Direct3D 9 build are on [Direct3D 9 Features](dx9feat.md).
 
 ### Bloom
 
@@ -467,14 +468,15 @@ Soft glow around additive particles (fire, muzzle flashes, tracers, lasers, expl
 blended meshes such as building lights. Smoke and alpha blended effects do not glow. Needs no shader
 support.
 
-* `Bloom = No` - (Yes turns the glow on. Also `Glow around additive effects` in Game Options,
+* `Bloom = No` - (Yes turns the glow on. Also `Bloom` on the Shaders page,
 applied on Accept.)
-* `BloomStrength = 0.5` - (0 to 1. 0 is off. `Strength %` in Game Options.)
+* `BloomStrength = 0.5` - (0 to 1. 0 is off. The box beside `Bloom` on the Shaders page.)
 * `BloomDebug = No` - (Yes shows only the blurred glow buffer on black, to see what feeds it.
-`Debug view` in Game Options.)
+`Debug view` on the Shaders page.)
 
-Menu controls need `BloomGroupLabel`, `CheckBloom`, `TextEntryBloomStrength` and `CheckBloomDebug`
-in `OptionsMenu.wnd`.
+Menu controls need `CheckBloom`, `TextEntryBloomStrength` and `CheckBloomDebug` in `OptionsMenu.wnd`;
+`build/move_bloom_to_shaders_wnd.py` moves them onto the Shaders page and `build/bloom_row_wnd.py`
+puts the strength box beside the checkbox.
 
 Notes:
 * Costs fill rate in proportion to on-screen additive particles.
@@ -536,7 +538,7 @@ colour (house coloured when the laser asks). Terrain only; units, buildings and 
 The Direct3D 9 build lights it with a shader instead, see
 [Laser ground glow](dx9feat.md#laser-ground-glow).
 
-* `LaserRef = No` - (Yes turns the glow on. Also `Lasers light the ground` in Game Options, applied
+* `LaserRef = No` - (Yes turns the glow on. Also `Lasers light the ground` on the Shaders page, applied
 on Accept. Needs `CheckLaserRef` in `OptionsMenu.wnd` for the menu control.)
 
 Colour and intensity come from `GameData.ini`, overridable per `W3DLaserDraw` module with

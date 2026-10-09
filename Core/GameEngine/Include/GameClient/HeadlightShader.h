@@ -41,6 +41,7 @@ struct HeadlightShaderTuning
 	Real poolPitch;					///< radians the light tilts down from the mesh
 	Real poolFalloff;				///< how fast the light dims with distance
 	Bool poolClampBrightness;	///< overlapping pools light no more than the brightest one; GameData only
+	Bool perConeAim;				///< each cone of a HEADLIGHT mesh takes its own direction; GameData only
 
 	void setUnset();	///< what a draw module starts with
 	void resolve( HeadlightShaderTuning &resolved ) const;	///< the settings with GameData.ini's where this one sets none
@@ -65,5 +66,6 @@ struct HeadlightShaderTuning
 		poolPitch = 0.2f;
 		poolFalloff = 1.5f;
 		poolClampBrightness = TRUE;
+		perConeAim = FALSE;
 	}
 };

@@ -67,6 +67,7 @@ set(RTS_SHADER_DIR "Core/GameEngineDevice/Source/W3DDevice/GameClient/Shaders")
 set(RTS_SHADER_INCLUDES
     "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/shadowreceive.hlsli"
     "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/pointlights.hlsli"
+    "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/skybox.hlsli"
     "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/groundnoise.hlsli"
     "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/heightblend.hlsli"
     "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/terrainglint.hlsli")
@@ -261,6 +262,13 @@ rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularlitde
 rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularlitnormal.pso          SHADOWED=1 PACKED=0 BUMP=2 LIGHTS=1)
 rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularlitnormalpacked.pso    SHADOWED=1 PACKED=1 BUMP=2 LIGHTS=1)
 rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularlitnormalnoshadow.pso  SHADOWED=0 PACKED=0 BUMP=2 LIGHTS=1)
+# The unlit passes also taking in the shadow receiver's work, with its soft shadow. The lit ones have no constants left for it.
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularreceive.pso                  SHADOWED=1 PACKED=0 BUMP=0 RECEIVE=1)
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularreceivepacked.pso            SHADOWED=1 PACKED=1 BUMP=0 RECEIVE=1)
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularreceivederived.pso           SHADOWED=1 PACKED=0 BUMP=1 RECEIVE=1)
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularreceivederivedpacked.pso     SHADOWED=1 PACKED=1 BUMP=1 RECEIVE=1)
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularreceivenormal.pso            SHADOWED=1 PACKED=0 BUMP=2 RECEIVE=1)
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularreceivenormalpacked.pso      SHADOWED=1 PACKED=1 BUMP=2 RECEIVE=1)
 rts_add_shader("${RTS_SHADER_DIR}/bloomblur.hlsl"      ps_2_0 main bloomblur.pso)
 rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_0 main softparticledepth.pso        DEPTH=1)
 rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_0 main softparticleheight.pso       DEPTH=0)
@@ -330,6 +338,10 @@ rts_add_shader("${RTS_SHADER_DIR}/headlight.hlsl"      ps_3_0 mainPS headlightbe
 rts_add_shader("${RTS_SHADER_DIR}/headlight.hlsl"      vs_3_0 mainVS headlightpool.vso          POOL=1)
 rts_add_shader("${RTS_SHADER_DIR}/headlight.hlsl"      ps_3_0 mainPS headlightpool.pso          POOL=1)
 rts_add_shader("${RTS_SHADER_DIR}/headlight.hlsl"      ps_3_0 mainPS headlightpoolmax.pso       POOL=2)
+# The mirrors read the skybox, which runs past ps_2_0's 64 arithmetic slots.
+rts_add_shader("${RTS_SHADER_DIR}/planarmirror.hlsl"   ps_2_a main planarmirror.pso             REFRACT=0)
+rts_add_shader("${RTS_SHADER_DIR}/planarmirror.hlsl"   ps_2_a main planarmirrorrefract.pso      REFRACT=1)
+rts_add_shader("${RTS_SHADER_DIR}/planarmirror.hlsl"   ps_2_a main planarmirrorglass.pso        REFRACT=1 GLASS=1)
 
 # The tree and classic water shaders are checked in already assembled, so they embed as they are.
 set(RTS_PREBUILT_SHADER_DIR "${CMAKE_SOURCE_DIR}/GeneralsMD/Code/GameEngineDevice/Source/W3DDevice/GameClient/Shaders")

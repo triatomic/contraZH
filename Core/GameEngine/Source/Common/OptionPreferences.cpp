@@ -80,6 +80,20 @@ WW3D::MultiSampleModeEnum OptionPreferences::getAntiAliasing() const
 	return level;
 }
 
+Int OptionPreferences::getSuperSampling() const
+{
+	const Int percent = getInt("SuperSampling", 100);
+	if (percent >= 200)
+	{
+		return 200;
+	}
+	if (percent >= 150)
+	{
+		return 150;
+	}
+	return 100;
+}
+
 TextureFilterClass::TextureFilterMode OptionPreferences::getTextureFilterMode() const
 {
 	OptionPreferences::const_iterator it = find("TextureFilter");
@@ -415,6 +429,18 @@ Bool OptionPreferences::getLaserRefEnabled(void) const
 Bool OptionPreferences::getShadowMapEnabled(void) const
 {
 	return getBool("ShadowMap", TRUE);
+}
+
+// Snapped up to the next size the Options menu offers.
+Int OptionPreferences::getShadowMapResolution(void) const
+{
+	const Int resolution = getInt("ShadowMapResolution", 4096);
+	Int size = 512;
+	while (size < 4096 && size < resolution)
+	{
+		size *= 2;
+	}
+	return size;
 }
 
 Bool OptionPreferences::getSpecularEnabled(void) const

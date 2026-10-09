@@ -99,6 +99,7 @@ struct HQCaptureParams
 	Bool clouds;		///< the cloud shadows
 	Bool macroTexture;	///< the map's macro texture
 	Bool stochastic;	///< stochastic filtering over all the ground, which breaks up the textures' repeat
+	Bool shadows;		///< object, tree and building shadows
 	Int timeOfDay;		///< TIME_OF_DAY_INVALID keeps the current one
 	Int area;			///< HQPreviewArea
 	Int customX0;		///< HQ_AREA_CUSTOM corners in border-relative cells
@@ -119,8 +120,8 @@ public:
 	static void getDefaultHQCapture( HQCaptureParams *capture );
 	/// The map without its border, and its playable boundary within that, in cells.
 	static Bool getHQMapCells( Int *width, Int *height, Int *playableWidth, Int *playableHeight );
-	/// The square top view an HQ preview renders, and the area inside it as world x0, y0, x1, y1.
-	static Bool getHQTopView( const HQCaptureParams &capture, WbView3d::TopViewCapture *view3d, Real area[4] );
+	/// The top view an HQ preview renders, stretched over the square tga.
+	static Bool getHQTopView( const HQCaptureParams &capture, WbView3d::TopViewCapture *view3d );
 	/// Renders the map from above and caches what composeHQ needs.
 	Bool prepareHQ( WbView3d *view, const HQCaptureParams &capture );
 	Int getHQSize() const { return m_hqSize; }
@@ -137,7 +138,7 @@ private:
 	
 	UnsignedInt m_pixelBuffer[MAP_PREVIEW_HEIGHT][MAP_PREVIEW_WIDTH];
 
-	// Per supersampled pixel. A light of -1 marks a bridge or object over water, left unshaded, and -2 a pixel outside the area.
+	// Per supersampled pixel. A light of -1 marks a bridge or object over water, left unshaded.
 	std::vector<UnsignedByte> m_hqScene;
 	std::vector<Real> m_hqLight;
 	std::vector<Real> m_hqHeight;

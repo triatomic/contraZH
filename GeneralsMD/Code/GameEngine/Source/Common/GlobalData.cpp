@@ -354,6 +354,14 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ "HeadlightPoolPitch",					INI::parseAngleReal,		nullptr,			offsetof( GlobalData, m_headlightTuning.poolPitch ) },
 	{ "HeadlightPoolFalloff",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_headlightTuning.poolFalloff ) },
 	{ "HeadlightPoolClampBrightness",		INI::parseBool,				nullptr,			offsetof( GlobalData, m_headlightTuning.poolClampBrightness ) },
+	{ "HeadlightPerConeAim",				INI::parseBool,				nullptr,			offsetof( GlobalData, m_headlightTuning.perConeAim ) },
+	{ "HeadlightShaderForbiddenKindOf",		KindOfMaskType::parseFromINI,	nullptr,			offsetof( GlobalData, m_headlightForbiddenKindOf ) },
+	{ "RotrHack",								INI::parseBool,				nullptr,			offsetof( GlobalData, m_rotrHack ) },
+	{ "PlanarMirrorShader",					INI::parseBool,				nullptr,			offsetof( GlobalData, m_planarMirrorShader ) },
+	{ "PlanarMirrorReflectivity",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_planarMirrorTuning.reflectivity ) },
+	{ "PlanarMirrorTint",					INI::parseRGBColor,			nullptr,			offsetof( GlobalData, m_planarMirrorTuning.tint ) },
+	{ "PlanarMirrorDistortion",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_planarMirrorTuning.distortion ) },
+	{ "PlanarMirrorFrost",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_planarMirrorTuning.frost ) },
 	{ "AmbientOcclusionRadius",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_ambientOcclusionRadius ) },
 	{ "AmbientOcclusionStrength",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_ambientOcclusionStrength ) },
 	{ "GroundNoiseStrength",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_groundNoiseStrength ) },
@@ -922,6 +930,7 @@ GlobalData::GlobalData()
   m_bloomDebug = FALSE;
   m_laserRef = FALSE;
   m_useShadowMap = TRUE;
+  m_shadowMapResolution = 4096;
   m_useSpecular = TRUE;
   m_useNormalMaps = TRUE;
   m_waterReflections = TRUE;
@@ -1126,6 +1135,10 @@ GlobalData::GlobalData()
 	m_stormTuning[StormShaderInfo::TYPE_SAND].setTypeDefaults(StormShaderInfo::TYPE_SAND);
 	m_stormTuning[StormShaderInfo::TYPE_SNOW].setTypeDefaults(StormShaderInfo::TYPE_SNOW);
 	m_headlightTuning.setDefaults();
+	m_headlightForbiddenKindOf.clear();
+	m_rotrHack = FALSE;
+	m_planarMirrorShader = TRUE;
+	m_planarMirrorTuning.setDefaults();
 	m_ambientOcclusionRadius = 12.0f;
 	m_ambientOcclusionStrength = 1.0f;
 	m_groundNoiseStrength = 0.12f;
@@ -1134,7 +1147,7 @@ GlobalData::GlobalData()
 	m_groundNoiseBrightness = 0.9f;
 	m_terrainHeightBlendStrength = 2.0f;
 	m_terrainHeightBlendSharpness = 4.0f;
-	m_terrainAtlasBorder = 8;
+	m_terrainAtlasBorder = 4;
 	m_skyCloudSize = 600.0f;
 	m_skyCloudCoverage = 0.45f;
 	m_skyCloudSoftness = 0.25f;
@@ -1450,6 +1463,7 @@ GlobalData::GlobalData()
 	m_standardPublicBones.clear();
 
 	m_antiAliasLevel = WW3D::MultiSampleModeEnum::MULTISAMPLE_MODE_NONE;
+	m_superSampling = 100;
 	m_textureFilteringMode = TextureFilterClass::TextureFilterMode::TEXTURE_FILTER_BILINEAR;
 	m_textureAnisotropyLevel = TextureFilterClass::AnisotropicFilterMode::TEXTURE_FILTER_ANISOTROPIC_2X;
 
@@ -1816,6 +1830,7 @@ static const char *const LiveGameDataKeys[] =
 	"HeadlightColor", "HeadlightBeamIntensity", "HeadlightBeamLength", "HeadlightBeamWidth", "HeadlightBeamFalloff", "HeadlightBeamSoftness",
 	"HeadlightPoolIntensity", "HeadlightPoolRange", "HeadlightPoolAngle", "HeadlightPoolPitch", "HeadlightPoolFalloff",
 	"HeadlightPoolClampBrightness",
+	"PlanarMirrorReflectivity", "PlanarMirrorTint", "PlanarMirrorDistortion", "PlanarMirrorFrost",
 	"LaserGroundGlowRadius", "LaserGroundGlowFalloff", "LaserGroundGlowWrap", "LaserGroundGlowDebug", "LaserGroundGlowOverlap",
 	nullptr
 };
@@ -2024,6 +2039,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_gameWindowTransitionSpeedMultiplier = optionPref.getGameWindowTransitionSpeedMultiplier();
 
 	TheWritableGlobalData->m_antiAliasLevel = optionPref.getAntiAliasing();
+	TheWritableGlobalData->m_superSampling = optionPref.getSuperSampling();
 	TheWritableGlobalData->m_textureFilteringMode = optionPref.getTextureFilterMode();
 	TheWritableGlobalData->m_textureAnisotropyLevel = optionPref.getTextureAnisotropyLevel();
 	TheWritableGlobalData->m_useBloom = optionPref.getBloomEnabled();
@@ -2031,6 +2047,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_bloomDebug = optionPref.getBloomDebugEnabled();
 	TheWritableGlobalData->m_laserRef = optionPref.getLaserRefEnabled();
 	TheWritableGlobalData->m_useShadowMap = optionPref.getShadowMapEnabled();
+	TheWritableGlobalData->m_shadowMapResolution = optionPref.getShadowMapResolution();
 	TheWritableGlobalData->m_useSpecular = optionPref.getSpecularEnabled();
 	TheWritableGlobalData->m_useNormalMaps = optionPref.getNormalMapsEnabled();
 	TheWritableGlobalData->m_waterReflections = optionPref.getWaterReflectionsEnabled();

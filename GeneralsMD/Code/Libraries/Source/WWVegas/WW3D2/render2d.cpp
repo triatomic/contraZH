@@ -611,11 +611,11 @@ void Render2DClass::Render()
 	DX8Wrapper::Get_Transform(D3DTS_PROJECTION,proj);
 
 	//
-	//	Configure the viewport for entire screen
+	//	Configure the viewport for the entire target, which supersampling makes larger than the screen
 	//
 	int width, height, bits;
 	bool windowed;
-	WW3D::Get_Device_Resolution( width, height, bits, windowed );
+	WW3D::Get_Render_Target_Resolution( width, height, bits, windowed );
 	D3DVIEWPORT8 vp = { 0 };
 	vp.X			= 0;
 	vp.Y			= 0;

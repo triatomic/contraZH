@@ -493,6 +493,13 @@ public:
 	static IDirect3DTexture8 * Peek_Scene_Depth_Texture() { return SceneDepthTexture; }
 	static IDirect3DSurface8 * Peek_Scene_Depth_Surface() { return SceneDepthTexture != nullptr ? SceneDepthBuffer : nullptr; }
 
+	/// Filters the supersampled scene down to the back buffer and binds the back buffer, so what follows draws at the screen's size.
+	static void Resolve_Scene_Target();
+
+	// Supersampling renders the scene this many times the back buffer's size each way, 1 to 2, and takes MSAA's place.
+	static void Set_Super_Sampling(float scale) { SuperSampleScale = (scale < 1.0f) ? 1.0f : (scale > 2.0f) ? 2.0f : scale; }
+	static float Get_Super_Sampling() { return SuperSampleScale; }
+
 	static IDirect3DSurface8 * _Create_DX8_Surface(unsigned int width, unsigned int height, WW3DFormat format);
 	static IDirect3DSurface8 * _Create_DX8_Surface(const char *filename);
 	static IDirect3DSurface8 * _Get_DX8_Front_Buffer();
@@ -738,6 +745,7 @@ protected:
 	static void Release_Frame_Query();
 	static D3DFORMAT					DisplayFormat;
 	static D3DMULTISAMPLE_TYPE	MultiSampleAntiAliasing;
+	static float						SuperSampleScale;
 
 
 	// shader system updates KJM v
@@ -776,6 +784,7 @@ protected:
 
 	static DX8FrameStatistics			FrameStatistics;
 	static bool								CurrentDX8LightEnables[4];
+	static D3DLIGHT8							CurrentDX8Lights[4];
 
 	static unsigned long FrameCount;
 
@@ -787,14 +796,19 @@ protected:
 	static IDirect3DDevice8 *			D3DDevice;				//d3ddevice8;
 	static bool								IsEx;
 
-	// A flip model swap chain cannot be multisampled, so MSAA renders here and resolves at Present
+	// A flip model swap chain cannot be multisampled, so MSAA renders here and resolves at Present. Supersampling renders here too, larger.
 	static IDirect3DSurface8 *			SceneRenderTarget;
 	static IDirect3DSurface8 *			SceneDepthBuffer;
 	// Without MSAA the scene's depth is an INTZ texture where the driver offers one, so shaders can read it
 	static IDirect3DTexture8 *			SceneDepthTexture;
+	// The device's own depth buffer, which the UI draws with once a supersampled scene is resolved
+	static IDirect3DSurface8 *			DeviceDepthBuffer;
+	// True from the resolve to the next frame's start, while the back buffer is the target
+	static bool							SceneResolved;
 	static void Create_Scene_Target();
-	static void Create_Scene_Depth_Texture();
+	static void Create_Scene_Depth_Texture(unsigned width, unsigned height);
 	static void Release_Scene_Target();
+	static void Bind_Scene_Target();
 
 #if defined(BUILD_WITH_D3D9)
 	// Without D3D9Ex, waiting on the last frame's event query holds the CPU to one frame ahead
@@ -981,10 +995,15 @@ WWINLINE void DX8Wrapper::Set_DX8_Material(const D3DMATERIAL8* mat)
 WWINLINE void DX8Wrapper::Set_DX8_Light(int index, D3DLIGHT8* light)
 {
 	if (light) {
+		// Most meshes share the scene's lights, so the device usually holds this one already
+		if (CurrentDX8LightEnables[index] && memcmp(&CurrentDX8Lights[index], light, sizeof(D3DLIGHT8)) == 0) {
+			return;
+		}
 		DX8_RECORD_LIGHT_CHANGE();
 		DX8CALL(SetLight(index,light));
 		DX8CALL(LightEnable(index,TRUE));
 		CurrentDX8LightEnables[index]=true;
+		CurrentDX8Lights[index]=*light;
 		SNAPSHOT_SAY(("DX8 - SetLight %d",index));
 	}
 	else if (CurrentDX8LightEnables[index]) {

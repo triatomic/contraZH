@@ -38,6 +38,7 @@
 #include "GameClient/DisruptionShader.h"
 #include "GameClient/StormShader.h"
 #include "GameClient/HeadlightShader.h"
+#include "GameClient/PlanarMirrorShader.h"
 #include "GameClient/TintStatus.h"
 #include "Common/STLTypedefs.h"
 #include "Common/Money.h"
@@ -307,6 +308,10 @@ public:
 	Real m_cryoParticleScale;			///< GameData CryoParticleScale: how much larger or smaller cryo-shaded particles draw, 1 unchanged
 	DisruptionShaderTuning m_disruptionTuning;	///< GameData DisruptionRingStrength and the keys beside it: disruption shader defaults
 	HeadlightShaderTuning m_headlightTuning;	///< GameData HeadlightShader and the Headlight keys: headlights drawn in place of HEADLIGHT meshes
+	KindOfMaskType m_headlightForbiddenKindOf;	///< GameData HeadlightShaderForbiddenKindOf: objects of these kinds keep their HEADLIGHT meshes
+	Bool m_rotrHack;	///< GameData RotrHack: additive HEADLIGHT meshes keep their own look, for Rise of the Reds' lit windows
+	Bool m_planarMirrorShader;	///< GameData PlanarMirrorShader: whether models' PlanarMirror meshes reflect, read at launch
+	PlanarMirrorShaderTuning m_planarMirrorTuning;	///< GameData PlanarMirrorReflectivity and the keys beside it: what mirrors take where their model sets nothing
 	StormShaderInfo m_stormTuning[StormShaderInfo::TYPE_COUNT];	///< GameData SandStorm and SnowStorm keys: what each storm type takes where its entry sets nothing
 	Real m_ambientOcclusionRadius;		///< GameData AmbientOcclusionRadius: how far, in world units, geometry darkens what is near it
 	Real m_ambientOcclusionStrength;	///< GameData AmbientOcclusionStrength: how dark the occlusion gets, 0 for none
@@ -607,6 +612,7 @@ public:
 																			 smaller area within the rectangle to order the gather. */
 
 	UnsignedInt m_antiAliasLevel;          ///< value of selected antialias level in the game options
+	Int m_superSampling;                   ///< Options.ini SuperSampling: the world's render size as a percent of the screen's, 100 to 200
 	UnsignedInt m_textureFilteringMode;       ///< value related to TextureFilterClass::TextureFilterModeEnum
 	UnsignedInt m_textureAnisotropyLevel;     ///< value related to TextureFilterClass::AnisotropicFilterMode
 
@@ -729,6 +735,7 @@ public:
   Bool m_bloomDebug;              ///< Options.ini BloomDebug: show the glow buffer instead of the scene
   Bool m_laserRef;                ///< Options.ini LaserRef: lasers light the ground along the beam
   Bool m_useShadowMap;            ///< Options.ini ShadowMap: shadows come from a sun shadow map where the hardware allows
+  Int m_shadowMapResolution;      ///< Options.ini ShadowMapResolution: the shadow map's width and height in texels
   Bool m_useSpecular;             ///< Options.ini Specular: per-pixel sun highlight on vehicles and structures, and the sun's glint on the ground, where the hardware allows
   Bool m_useNormalMaps;           ///< Options.ini NormalMaps: bump detail in the sun's light on vehicles, structures and terrain where the hardware allows
   Bool m_waterReflections;        ///< Options.ini WaterReflections: smooth water mirrors the terrain, units and buildings

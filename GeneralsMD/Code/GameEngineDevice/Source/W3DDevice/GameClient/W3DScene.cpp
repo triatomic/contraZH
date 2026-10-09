@@ -61,6 +61,8 @@
 #include "W3DDevice/GameClient/W3DShroud.h"
 #include "W3DDevice/GameClient/W3DAmbientOcclusion.h"
 #include "W3DDevice/GameClient/W3DLaserGlow.h"
+#include "W3DDevice/GameClient/W3DPlanarMirror.h"
+#include "W3DDevice/GameClient/W3DWater.h"
 #include "WW3D2/camera.h"
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/dx8instancing.h"
@@ -452,7 +454,8 @@ void RTS3DScene::Visibility_Check(CameraClass * camera)
 			}
 
 			const SphereClass &sphere = robj->Get_Bounding_Sphere();
-			Bool isVisible = !robj->Is_Hidden() && sphere.Center.Z + sphere.Radius > m_planarMirrorZ && !camera->Cull_Sphere(sphere);
+			Bool isVisible = !robj->Is_Hidden() && sphere.Center.Z + sphere.Radius > m_planarMirrorZ && !camera->Cull_Sphere(sphere) &&
+				(TheWaterRenderObj == nullptr || TheWaterRenderObj->canReflectOnWater(sphere, camera->Get_Position()));
 
 			drawInfo = (DrawableInfo *)robj->Get_User_Data();
 			if (drawInfo && (draw=drawInfo->m_drawable) != nullptr)
@@ -926,32 +929,38 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 		// Receive the sun's shadow on opaque drawables. Skipped where the base pass is
 		// suppressed, since the pass only darkens pixels the base pass drew.
 		MaterialPassClass *shadowPass = (TheW3DShadowMap != nullptr) ? TheW3DShadowMap->getReceivePass() : nullptr;
-		if (shadowPass != nullptr && m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop && !m_planarMirrorPass &&
-			draw->getEffectiveOpacity() == 1.0f)
-		{
-			rinfo.Push_Material_Pass(shadowPass);
-			extraMaterialPops++;
-		}
+		const Bool takesSunPasses = m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop && !m_planarMirrorPass &&
+			draw->getEffectiveOpacity() == 1.0f;
+		const Bool receivesShadow = shadowPass != nullptr && takesSunPasses;
 
 		// Vehicles and structures catch a per-pixel sun highlight and bumps. Infantry and the rest stay
 		// matte, and take the pass only for the dynamic lights it draws.
-		if (m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop && !m_planarMirrorPass && draw->getEffectiveOpacity() == 1.0f)
+		MaterialPassClass *specularPass = nullptr;
+		Bool specularTakesShadow = receivesShadow && W3DShaderManager::canSpecularReceiveShadow();
+		if (takesSunPasses)
 		{
 			if (draw->getReceivesDynamicLights() && W3DShaderManager::supportsUnitPixelLights())
 			{
 				pixelLightCount = pickObjectPixelLights(sph, pixelLights);
 			}
 			const Bool lightsOnly = !draw->isKindOf(KINDOF_VEHICLE) && !draw->isKindOf(KINDOF_STRUCTURE);
-			MaterialPassClass *specularPass = W3DShaderManager::getSpecularPass(pixelLights, pixelLightCount, lightsOnly);
-			if (specularPass != nullptr)
-			{
-				rinfo.Push_Material_Pass(specularPass);
-				extraMaterialPops++;
-			}
-			else
+			specularPass = W3DShaderManager::getSpecularPass(pixelLights, pixelLightCount, lightsOnly, specularTakesShadow);
+			if (specularPass == nullptr)
 			{
 				pixelLightCount = 0;
 			}
+		}
+
+		// Where the specular pass does the receiver's work, the mesh draws once less.
+		if (receivesShadow && !specularTakesShadow)
+		{
+			rinfo.Push_Material_Pass(shadowPass);
+			extraMaterialPops++;
+		}
+		if (specularPass != nullptr)
+		{
+			rinfo.Push_Material_Pass(specularPass);
+			extraMaterialPops++;
 		}
 	}
 	else
@@ -966,7 +975,13 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 			//Must be ghost object because we don't fog normal things.  Fogged objects always have a predefined
 			//lighting environment applied which emulates the look of fog.
 			rinfo.light_environment = &m_foggedLightEnv;
+			// A reflection would light a ghost's mirrors past the fog, so they draw plain.
+			const Bool mirrors = TheW3DPlanarMirrors != nullptr && TheW3DPlanarMirrors->suspendScenePass();
 			robj->Render(rinfo);
+			if (mirrors)
+			{
+				TheW3DPlanarMirrors->beginScenePass(FALSE);
+			}
 			rinfo.light_environment = nullptr;
 			return;
 		}
@@ -1057,6 +1072,11 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 		rinfo.Pop_Material_Pass();
 	if (doExtraFlagsPop)
 		rinfo.Pop_Override_Flags();	//flags used to disable base pass and only render custom heat vision pass.
+
+	// The overrides belong to this object's overlay and heat vision passes. Left set, every later mesh would
+	// carry them, scaling its own passes and falling out of instancing and batched passes.
+	rinfo.materialPassEmissiveOverride = 1.0f;
+	rinfo.materialPassAlphaOverride = 1.0f;
 }
 
 //DECLARE_PERF_TIMER(translucentRender)
@@ -1133,6 +1153,11 @@ void RTS3DScene::Flush(RenderInfoClass & rinfo)
 		SortingRendererClass::Flush();	//draw sorted translucent polygons like particles.
 	}
 	TheDX8MeshRenderer.Clear_Pending_Delete_Lists();
+
+	if (TheW3DPlanarMirrors != nullptr)
+	{
+		TheW3DPlanarMirrors->suspendScenePass();
+	}
 }
 
 /**Generate a predefined light environment(s) that will be applied to many objects.  Useful for things like totally fogged
@@ -1493,6 +1518,9 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 		static Int otherPassDraws = 0;
 		static Int rejections[DX8InstancingClass::REJECT_COUNT];
 		static DX8SkinningClass::StatsStruct skinning;
+		static Int passPaths[DX8InstancingStatsStruct::PASS_PATH_COUNT];
+		static Int passWindows = 0;
+		static Int passPeakAlone = 0;
 
 		DX8InstancingStatsStruct stats;
 		DX8MeshRendererClass::Take_Instancing_Stats(stats);
@@ -1537,6 +1565,17 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 		{
 			rejections[i] += frameRejections[i];
 		}
+		Int renderAlone = 0;
+		for (Int i = 0; i < DX8InstancingStatsStruct::PASS_PATH_COUNT; ++i)
+		{
+			passPaths[i] += stats.PassPaths[i];
+			if (i != DX8InstancingStatsStruct::PASS_PATH_WINDOW)
+			{
+				renderAlone += stats.PassPaths[i];
+			}
+		}
+		passWindows += stats.PassWindows;
+		passPeakAlone = max(passPeakAlone, renderAlone);
 		skinning.SkinnedMeshes[0] += frameSkinning.SkinnedMeshes[0];
 		skinning.SkinnedMeshes[1] += frameSkinning.SkinnedMeshes[1];
 		for (Int i = 0; i < DX8SkinningClass::REJECT_COUNT; ++i)
@@ -1563,8 +1602,18 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 				skinning.Rejections[DX8SkinningClass::REJECT_STATE], skinning.Rejections[DX8SkinningClass::REJECT_MODEL],
 				skinning.Rejections[DX8SkinningClass::REJECT_MESH], skinning.Rejections[DX8SkinningClass::REJECT_CATEGORY],
 				skinning.Rejections[DX8SkinningClass::REJECT_PASS]));
+			// Each pass drawn alone installs and removes its shader state for that one mesh.
+			RENDER_LOG(("Material passes: render %d, %d batched in %d windows; alone outside the lit scene %d, sorting %d, unbound %d, not a window pass %d, override %d, skin %d, delayed %d; most alone in one render %d",
+				instancingFrames, passPaths[DX8InstancingStatsStruct::PASS_PATH_WINDOW], passWindows,
+				passPaths[DX8InstancingStatsStruct::PASS_PATH_NOT_LIT], passPaths[DX8InstancingStatsStruct::PASS_PATH_SORTING],
+				passPaths[DX8InstancingStatsStruct::PASS_PATH_UNBOUND], passPaths[DX8InstancingStatsStruct::PASS_PATH_NOT_WINDOW_PASS],
+				passPaths[DX8InstancingStatsStruct::PASS_PATH_OVERRIDE], passPaths[DX8InstancingStatsStruct::PASS_PATH_SKIN],
+				passPaths[DX8InstancingStatsStruct::PASS_PATH_DELAYED], passPeakAlone));
 
 			memset(scenes, 0, sizeof(scenes));
+			memset(passPaths, 0, sizeof(passPaths));
+			passWindows = 0;
+			passPeakAlone = 0;
 			receiveDraws = 0;
 			specularDraws = 0;
 			otherPassDraws = 0;
@@ -1576,6 +1625,10 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 
 	// Fill the shadow map before anything is queued for the main scene, because the
 	// depth pass flushes the mesh renderer and would otherwise consume those objects.
+	if (TheW3DShadowMap != nullptr && m_customPassMode == SCENE_PASS_DEFAULT)
+	{
+		TheW3DShadowMap->followResolution();
+	}
 	if (TheW3DShadowMap != nullptr && TheW3DShadowMap->isAvailable() &&
 		TheW3DShadowManager != nullptr &&
 		m_customPassMode == SCENE_PASS_DEFAULT &&
@@ -1594,6 +1647,13 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 		{
 			TheW3DShadowMap->clearDepth();
 		}
+	}
+
+	// Mirrors shade only in the main scene's own draws, which start once the shadow map has its casters.
+	if (TheW3DPlanarMirrors != nullptr && m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE &&
+		!m_planarMirrorPass && !ShaderClass::Is_Backface_Culling_Inverted())
+	{
+		TheW3DPlanarMirrors->beginScenePass();
 	}
 
 	//terrain needs to be rendered first
@@ -1711,11 +1771,12 @@ void renderStenciledPlayerColor( UnsignedInt color, UnsignedInt stencilRef, Bool
 	TheTacticalView->getOrigin(&xpos,&ypos);
 	width=TheTacticalView->getWidth();
 	height=TheTacticalView->getHeight();
+	const Real targetScale = W3DShaderManager::getScreenToTargetScale();
 
-    v[0].p.Set(xpos+width, ypos+height, 0.0f, 1.0f );
-    v[1].p.Set(xpos+width, 0, 0.0f, 1.0f );
-    v[2].p.Set(xpos, ypos+height, 0.0f, 1.0f );
-    v[3].p.Set(xpos,  0, 0.0f, 1.0f );
+    v[0].p.Set((xpos+width)*targetScale, (ypos+height)*targetScale, 0.0f, 1.0f );
+    v[1].p.Set((xpos+width)*targetScale, 0, 0.0f, 1.0f );
+    v[2].p.Set(xpos*targetScale, (ypos+height)*targetScale, 0.0f, 1.0f );
+    v[3].p.Set(xpos*targetScale,  0, 0.0f, 1.0f );
     v[0].color = color;
     v[1].color = color;
     v[2].color = color;

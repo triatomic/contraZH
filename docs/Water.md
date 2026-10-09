@@ -47,7 +47,7 @@ These set the look of most maps. The rest are under [Advanced keys](#advanced-ke
 average colour of `StandingWaterTexture`. The map's light and `DiffuseColor` still tint it. Shader
 model 3 only.)
 * `ShaderWaterWaveScale = 160` - (World units one wave pattern covers. Higher gives broader waves.)
-* `ShaderWaterWaveStrength = 0.3` - (Steepness of the waves. Drives glint, sparkles, reflection and
+* `ShaderWaterWaveStrength = 0.2` - (Steepness of the waves. Drives glint, sparkles, reflection and
 bending.)
 * `ShaderWaterSpecular = 1.0` - (Brightness of the broad sun glint. 0 turns it off.)
 * `ShaderWaterSparkle = 2.0` - (Brightness of the small sun specks, times the map's light, sun and
@@ -130,7 +130,7 @@ sea. Stochastic texturing hides it. The water is split into hex cells, each cell
 the patterns by its own random amount, and every point blends the three nearest cells while keeping
 the patterns' contrast. The waves travel the same way in every cell.
 
-* `ShaderWaterStochasticSize = 100` - (World units between neighbouring cells. Smaller breaks the
+* `ShaderWaterStochasticSize = 420` - (World units between neighbouring cells. Smaller breaks the
 pattern up more but blends more of the surface. 0 turns it off.)
 * `ShaderWaterStochasticSeabed = Yes` - (The same cells also shift and turn the terrain textures under
 standing water, fading in below the waterline over `TransparentWaterDepth`. Cliffs keep their own
@@ -140,9 +140,9 @@ be painted onto dry ground; see [Stochastic terrain](dx9feat.md#stochastic-terra
 
 ### Animation
 
-* `WaterAnimationFps = 0` - (Moves the water as if the game ran at this rate, 30 to 60. Without it
-the water speeds up with the frame rate when the game logic is uncapped. 30 gives the original
-speed. 0 moves the water every frame.)
+* `WaterAnimationFps = 30` - (Moves the water as if the game ran at this rate, 30 to 60. 30 gives the
+original speed. 0 moves the water every frame, so it speeds up with the frame rate when the game
+logic is uncapped.)
 
 ### Swell
 
@@ -212,7 +212,7 @@ One block. `map.ini` can override any of these keys for its map.
 | `ShaderWaterClarity` | number | `1.0` | `0.1` - `10` | Scales `TransparentWaterDepth` for how deep the seabed shows. |
 | `ShaderWaterDeepColor` | RGB | unset | `0` - `255` each **(hard)** | Colour of deep water. Unset takes the average colour of `StandingWaterTexture`. Shader model 3 only. |
 | `ShaderWaterWaveScale` | number | `160` | `1` **(hard)** - `2000` | World units one ripple pattern covers. Below `50` the ripples shimmer, above `2000` they are too broad to see. |
-| `ShaderWaterWaveStrength` | number | `0.3` | `0` - `2` | Ripple steepness. `0` is flat. Above `2` the surface turns to glitter. |
+| `ShaderWaterWaveStrength` | number | `0.2` | `0` - `2` | Ripple steepness. `0` is flat. Above `2` the surface turns to glitter. |
 | `ShaderWaterSpecular` | number | `1.0` | `0` - `5` | `0` turns the sun glint off. Above `5` the glint washes out to white. |
 | `ShaderWaterSparkle` | number | `2.0` | `0` **(hard)** - `10` | Brightness of the small sun sparkles. `0` turns them off. Shader model 3 only. |
 | `ShaderWaterReflection` | number | `3.0` | `0` - `10` | `0` turns the sky reflection off. Reflection is capped at 80% **(hard)**, so higher values only spread that cap to steeper views. |
@@ -242,7 +242,7 @@ One block. `map.ini` can override any of these keys for its map.
 | `ShaderWaterRefraction` | number | `0.015` | `0` - `0.1` | Fraction of the screen the waves bend the seabed by. `0` turns it off. Above `0.05` smears. |
 | `ShaderWaterWaveShading` | number | `1.0` | `0` **(hard)** - `3` | How much the waves light and shade the water's colour. `0` leaves it flat. Shader model 3 only. |
 | `ShaderWaterOpenReach` | number | `400` | `1` **(hard)** - `2550` | World units from shore at which water counts as open. Distances past `2550` count as `2550`. |
-| `ShaderWaterStochasticSize` | number | `100` | `0`, or `30` - `1000` | World units between the cells that shift the patterns to hide their tiling. `0` turns it off. Below `30` the patterns blur, above `1000` the pattern shows within a cell. |
+| `ShaderWaterStochasticSize` | number | `420` | `0`, or `30` - `1000` | World units between the cells that shift the patterns to hide their tiling. `0` turns it off. Below `30` the patterns blur, above `1000` the pattern shows within a cell. |
 | `ShaderWaterStochasticSeabed` | Yes/No | `Yes` | - | `Yes` also hex-tiles the terrain under standing water. Needs pixel shader 2.0a. |
 | `ShaderWaterSwellScale` | number | `700` | `1` **(hard)** - `3000` | World units one swell pattern covers. Below `200` the swell looks choppy, above `3000` it is too broad to see. |
 | `ShaderWaterSwellSpeed` | number | `30` | `-200` - `200` | World units a second the swell drifts. `0` holds it still. Negative reverses it. |
@@ -250,7 +250,7 @@ One block. `map.ini` can override any of these keys for its map.
 | `ShaderWaterPlanarDistortion` | number | `0.02` | `0` - `0.1` | Fraction of the screen the waves bend the mirrored scene by. `0` keeps it sharp. |
 | `ShaderWaterClearReflections` | Yes/No | `Yes` | - | Shadows leave the reflections as bright as around them. Shader model 3 only. |
 | `ShaderWaterSoftShadows` | Yes/No | `Yes` | - | Shadows in the water blur with depth and sway with the ripples. Shader model 3 only. |
-| `WaterAnimationFps` | whole number | `0` | `0`, or `30` - `60` **(hard)** | Moves the water as if the game ran at that rate. `0` moves it every frame. Values from `1` to `29` count as `30`, and above `60` as `60`. |
+| `WaterAnimationFps` | whole number | `30` | `0`, or `30` - `60` **(hard)** | Moves the water as if the game ran at that rate. `0` moves it every frame. Values from `1` to `29` count as `30`, and above `60` as `60`. |
 
 ## WaterSet
 

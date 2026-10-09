@@ -362,8 +362,9 @@ void W3DSmudgeManager::render(RenderInfoClass &rinfo)
 	camera.Get_View_Matrix(&view);
 	camera.Get_Projection_Matrix(&proj);
 
-	Real texClampX = (Real)TheTacticalView->getWidth()/(Real)surface_desc.Width;
-	Real texClampY = (Real)TheTacticalView->getHeight()/(Real)surface_desc.Height;
+	const Real targetScale = W3DShaderManager::getScreenToTargetScale();
+	Real texClampX = (Real)TheTacticalView->getWidth()*targetScale/(Real)surface_desc.Width;
+	Real texClampY = (Real)TheTacticalView->getHeight()*targetScale/(Real)surface_desc.Height;
 
 	Real texScaleX = texClampX*0.5f;
 	Real texScaleY = texClampY*0.5f;
