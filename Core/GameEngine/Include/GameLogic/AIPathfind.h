@@ -560,6 +560,8 @@ protected:
 	zoneStorageType *m_groundCliffZones;
 	zoneStorageType *m_groundWaterZones;
 	zoneStorageType *m_groundRubbleZones;
+	zoneStorageType *m_groundCliffRubbleZones;
+	zoneStorageType *m_groundWaterRubbleZones;
 	zoneStorageType *m_crusherZones;
 	Bool					m_interactsWithBridge;
 	Bool					m_markedPassable;
@@ -625,6 +627,8 @@ private:
 	zoneStorageType *m_groundCliffZones;
 	zoneStorageType *m_groundWaterZones;
 	zoneStorageType *m_groundRubbleZones;
+	zoneStorageType *m_groundCliffRubbleZones;
+	zoneStorageType *m_groundWaterRubbleZones;
 	zoneStorageType *m_terrainZones;
 	zoneStorageType *m_crusherZones;
 	zoneStorageType *m_hierarchicalZones;
@@ -824,7 +828,7 @@ protected:
 																PathfindCell *parentCell,
 																PathfindCell *goalCell, zoneStorageType parentZone,
 																zoneStorageType *examinedZones, Int &numExZones,
-																Bool crusher, Int &cellCount);
+																LocomotorSurfaceTypeMask locomotorSurface, Bool crusher, Int &cellCount);
 	Bool checkForAdjust(Object *, const LocomotorSet& locomotorSet, Bool isHuman, Int cellX, Int cellY,
 		PathfindLayerEnum layer, Int iRadius, Bool center,Coord3D *dest, const Coord3D *groupDest) ;
 	Bool checkForLanding(Int cellX, Int cellY,

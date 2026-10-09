@@ -148,6 +148,35 @@ force attack, prefer selection, keypad camera).
 
 Only changes input.
 
+## Rubble and cliff surfaces are honoured
+
+* The coarse route planner only ever looked at ground cells, so units with `RUBBLE` or `CLIFF`
+locomotor surfaces were steered around rubble and cliffs whenever a ground detour existed.
+* Locomotor sets mixing `RUBBLE` with `CLIFF` or `WATER` could not take a destination on rubble at
+all; both combinations now count rubble as connected terrain.
+* Climbers paid a heavy toll on nearly every cliff cell. Only cliff cells that are flat (painted
+impassable in the map editor) still carry it.
+
+Changes the simulation; affects replays.
+([#120](https://github.com/triatomic/contraZH/issues/120))
+
+## Terrain line of sight follows the slope
+
+`ATTACK_NEEDS_LINE_OF_SIGHT` tested each terrain cell by its highest corner, so a smooth slope
+between shooter and target read as a wall and long-range units refused clear shots. The test now
+samples the interpolated surface along the line.
+
+Changes when units fire; affects replays.
+([#120](https://github.com/triatomic/contraZH/issues/120))
+
+## Bridges block fire from both sides
+
+Units under a bridge could shoot units on the deck while the deck stopped fire the other way. A
+sight line that crosses a bridge deck is now blocked in both directions, for every unit.
+
+Changes when units fire; affects replays.
+([#120](https://github.com/triatomic/contraZH/issues/120))
+
 # Game Setup
 
 ## Random army per faction
