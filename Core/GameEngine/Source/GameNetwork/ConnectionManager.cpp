@@ -1384,7 +1384,7 @@ void ConnectionManager::updateRunAhead(Int oldRunAhead, Int frameRate, Bool didS
 			// A solo host never gets frame acks, so its seeded latency would pass for a real ping
 			if (getNumPlayers() > 1)
 			{
-				m_latencyAverages[m_localSlot] = m_frameMetrics.getAverageLatency();
+				m_latencyAverages[m_localSlot] = m_frameMetrics.getRunAheadLatency();
 			}
 			else
 			{
@@ -1623,7 +1623,7 @@ void ConnectionManager::updateRunAhead(Int oldRunAhead, Int frameRate, Bool didS
 			if (DoesCommandRequireACommandID(msg->getNetCommandType())) {
 				msg->setID(GenerateNextCommandID());
 			}
-			msg->setAverageLatency(m_frameMetrics.getAverageLatency());
+			msg->setAverageLatency(m_frameMetrics.getRunAheadLatency());
 
 			// see above for explanation.
 //			if (didSelfSlug) {

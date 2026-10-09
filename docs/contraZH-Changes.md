@@ -83,6 +83,12 @@ once but drops only after three consecutive lower readings, and a lost packet is
 a half round trips (50 ms to 2 s). A real LAN keeps its minimum delay; the changes only matter once
 pings are long or uneven.
 
+Two modem-era habits are gone as well. Each player used to hold outgoing packets back for half the
+command delay to save bandwidth, which spent half the delay budget on waiting; packets now go out at
+once. And each player now reports its average ping plus twice its jitter (the standard deviation of
+its round trips), so the delay covers the swings of an uneven link instead of only its average. A
+steady LAN adds only a few milliseconds. Online Generals Online games keep the official behaviour.
+
 This changes when commands execute, which the replay records, so older replays still play back
 identically. The wire protocol is unchanged, so a player on an older build can still join; only the
 `GameData.ini` has to match, as it always did.

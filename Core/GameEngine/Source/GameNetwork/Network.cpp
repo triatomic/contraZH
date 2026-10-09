@@ -54,6 +54,7 @@
 
 #if defined(GENERALS_ONLINE)
 #include "GameNetwork/GeneralsOnline/NGMP_include.h"
+#include "GameNetwork/GeneralsOnline/NGMP_interfaces.h"
 #endif
 
 
@@ -688,6 +689,13 @@ void Network::processRunAheadCommand(NetRunAheadCommandMsg *msg) {
 	m_frameRate = msg->getFrameRate();
 	time_t frameGrouping = (1000 * m_runAhead) / m_frameRate; // number of miliseconds between packet sends
 	frameGrouping = frameGrouping / 2; // since we only want the latency for one way to be a factor.
+#if defined(GENERALS_ONLINE)
+	if (TheNGMPGame == nullptr)
+#endif
+	{
+		// Holding packets back saved modem bandwidth but spent half the run ahead waiting, so send at once
+		frameGrouping = 1;
+	}
 //	DEBUG_LOG(("Network::processRunAheadCommand - trying to set frame grouping to %d.  run ahead = %d, m_frameRate = %d", frameGrouping, m_runAhead, m_frameRate));
 	if (frameGrouping < 1) {
 		frameGrouping = 1; // Having a value less than 1 doesn't make sense.
