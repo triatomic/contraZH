@@ -51,6 +51,8 @@ public:
 	void addCushion(Int cushion);
 
 	Real getAverageLatency();
+	Real getRunAheadLatency();
+	Bool hasLatencySample() const { return m_latencySampleCount > 0; }
 	Int getAverageFPS();
 	Int getMinimumCushion();
 
@@ -82,6 +84,8 @@ protected:
 	int oldestPendingLatencyInMap = -1;
 	int oldestLatencyInMap = -1;
 #endif
+	UnsignedInt m_latencySampleCount;													///< Measured round trips so far, capped at the history length.
+	Real m_latencyDeviation;																	///< Standard deviation of the measured round trips, in seconds.
 	Real m_averageLatency;																		///< The current average latency, this is used to save calculation time.
 																														///< When a new latency value is received, the old one is subtracted out and the new
 																														///< one is added in.

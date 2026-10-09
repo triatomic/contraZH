@@ -321,6 +321,8 @@ void ConnectionManager::init()
 		m_latencyAverages[i] = 0.0; // using zero since all floating point standards should be able to specify 0.0 accurately.
 	}
 	m_smallestPacketArrivalCushion = -1;
+	m_lastRunAheadUpdateTime = 0;
+	m_lowerRunAheadStreak = 0;
 
 	m_frameMetrics.init();
 
@@ -392,12 +394,12 @@ void ConnectionManager::reset()
 #endif
 	m_packetRouterSlot = -1;
 
-	for (i = 0; i < TheGlobalData->m_networkFPSHistoryLength; ++i) {
+	for (i = 0; i < MAX_SLOTS; ++i) {
 		m_fpsAverages[i] = -1;
-	}
-	for (i = 0; i < TheGlobalData->m_networkLatencyHistoryLength; ++i) {
 		m_latencyAverages[i] = 0.0;
 	}
+	m_lastRunAheadUpdateTime = 0;
+	m_lowerRunAheadStreak = 0;
 
 	for (i = 0; i < (UnsignedInt)MAX_SLOTS; ++i) {
 		m_packetRouterFallback[i] = -1;
@@ -1365,14 +1367,29 @@ void ConnectionManager::update(Bool isInGame) {
 	m_transport->doSend();
 }
 
+static const Int RUNAHEAD_LOWER_STREAK = 3;
+
 void ConnectionManager::updateRunAhead(Int oldRunAhead, Int frameRate, Bool didSelfSlug, Int nextExecutionFrame) {
-	static time_t lasttimesent = 0;
 	time_t curTime = timeGetTime();
 
-	if ((lasttimesent == 0) || ((curTime - lasttimesent) > TheGlobalData->m_networkRunAheadMetricsTime)) {
+	// Size the first run ahead from a measured round trip, not from the seed
+	if (getNumPlayers() > 1 && !m_frameMetrics.hasLatencySample())
+	{
+		return;
+	}
+
+	if ((m_lastRunAheadUpdateTime == 0) || ((curTime - m_lastRunAheadUpdateTime) > TheGlobalData->m_networkRunAheadMetricsTime)) {
 		if (m_localSlot == m_packetRouterSlot) {
 			// We are the packet router, time to compute a new run ahead for this game.
-			m_latencyAverages[m_localSlot] = m_frameMetrics.getAverageLatency();
+			// A solo host never gets frame acks, so its seeded latency would pass for a real ping
+			if (getNumPlayers() > 1)
+			{
+				m_latencyAverages[m_localSlot] = m_frameMetrics.getRunAheadLatency();
+			}
+			else
+			{
+				m_latencyAverages[m_localSlot] = 0.0f;
+			}
 
 			// since we are now using the display frame rate rather than the logic frame rate to get our average FPS,
 			// it doesn't make sense to send the desired logic frame rate if we "slugged" ourself.
@@ -1496,6 +1513,19 @@ void ConnectionManager::updateRunAhead(Int oldRunAhead, Int frameRate, Bool didS
 			// We also limit the upper range of the runahead to prevent it getting out of hand
 			newRunAhead = clamp<Int>(MIN_RUNAHEAD, newRunAhead, MAX_FRAMES_AHEAD / 2);
 
+			// Too little run ahead stalls everyone while too much only adds delay, so lower it only once the ping has stayed down
+			if (newRunAhead < oldRunAhead && m_lastRunAheadUpdateTime != 0)
+			{
+				++m_lowerRunAheadStreak;
+				if (m_lowerRunAheadStreak < RUNAHEAD_LOWER_STREAK)
+				{
+					newRunAhead = oldRunAhead;
+				}
+			}
+			else
+			{
+				m_lowerRunAheadStreak = 0;
+			}
 			NetRunAheadCommandMsg *msg = newInstance(NetRunAheadCommandMsg);
 			msg->setPlayerID(m_localSlot);
 			if (DoesCommandRequireACommandID(msg->getNetCommandType())) {
@@ -1593,7 +1623,7 @@ void ConnectionManager::updateRunAhead(Int oldRunAhead, Int frameRate, Bool didS
 			if (DoesCommandRequireACommandID(msg->getNetCommandType())) {
 				msg->setID(GenerateNextCommandID());
 			}
-			msg->setAverageLatency(m_frameMetrics.getAverageLatency());
+			msg->setAverageLatency(m_frameMetrics.getRunAheadLatency());
 
 			// see above for explanation.
 //			if (didSelfSlug) {
@@ -1620,13 +1650,19 @@ void ConnectionManager::updateRunAhead(Int oldRunAhead, Int frameRate, Bool didS
 #endif
 			msg->detach();
 		}
-		lasttimesent = curTime;
+		m_lastRunAheadUpdateTime = curTime;
 	}
 }
 
 #if defined(GENERALS_ONLINE)
 Real ConnectionManager::getMaximumLatency()
 {
+	// A LAN game has no mesh, so it uses the same latency as a build without Generals Online
+	if (TheNGMPGame == nullptr)
+	{
+		return getSlowestPlayersLatency();
+	}
+
 	int latencyLogicModel = 0;
 
 	if (TheNGMPGame != nullptr)
@@ -1710,8 +1746,14 @@ Real ConnectionManager::getMaximumLatency()
 	return maxLatency;
 }
 #else
-Real ConnectionManager::getMaximumLatency() {
+Real ConnectionManager::getMaximumLatency()
+{
+	return getSlowestPlayersLatency();
+}
+#endif
 
+Real ConnectionManager::getSlowestPlayersLatency()
+{
 	Real lat1 = 0.0f;
 	Real lat2 = 0.0f;
 
@@ -1729,9 +1771,14 @@ Real ConnectionManager::getMaximumLatency() {
 		}
 	}
 
+	// One player far behind the rest sets the budget alone, an average would leave them stalling
+	const Real slackScale = 1.0f + (Real)TheGlobalData->m_networkRunAheadSlack / 100.0f;
+	if (lat1 > lat2 * slackScale)
+	{
+		return lat1;
+	}
 	return (lat1 + lat2) / 2.0f;
 }
-#endif
 
 void ConnectionManager::getMinimumFps(Int &minFps, Int &minFpsPlayer) {
 	minFps = -1;

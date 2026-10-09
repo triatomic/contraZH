@@ -121,7 +121,7 @@
 #define RETAIL_COMPATIBLE_CIRCLE_FILL_ALGORITHM (1) // Use the original circle fill algorithm, which is more efficient but less accurate
 #endif
 
-// Disable non retail fixes in the networking, such as putting more data per UDP packet
+// Disable non retail fixes in the networking; the game packet size has its own switch below
 #ifndef RETAIL_COMPATIBLE_NETWORKING
 #if defined(GENERALS_ONLINE)
 // GeneralsOnline port: the GeneralsOnline netcode uses the larger non-retail packet
@@ -129,6 +129,15 @@
 #define RETAIL_COMPATIBLE_NETWORKING (0)
 #else
 #define RETAIL_COMPATIBLE_NETWORKING (1)
+#endif
+#endif
+
+// Keep the 476 byte retail game packets; Zero Hour uses the larger payload since its exe CRC already keeps retail peers out
+#ifndef RETAIL_COMPATIBLE_PACKET_SIZE
+#if RTS_ZEROHOUR
+#define RETAIL_COMPATIBLE_PACKET_SIZE (0)
+#else
+#define RETAIL_COMPATIBLE_PACKET_SIZE (RETAIL_COMPATIBLE_NETWORKING)
 #endif
 #endif
 
