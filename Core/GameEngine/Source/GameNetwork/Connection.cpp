@@ -276,6 +276,7 @@ UnsignedInt Connection::doSend() {
 					if (CommandRequiresAck(msg->getCommand())) {
 						if (timeLastSent != -1) {
 							++m_numRetries;
+							msg->setResent();
 						}
 						doRetryMetrics();
 						msg->setTimeLastSent(curtime);
@@ -351,16 +352,20 @@ NetCommandRef * Connection::processAck(UnsignedShort commandID, UnsignedByte ori
 	}
 #endif
 
-	Int index = temp->getCommand()->getID() % CONNECTION_LATENCY_HISTORY_LENGTH;
-	m_averageLatency -= ((Real)(m_latencies[index])) / CONNECTION_LATENCY_HISTORY_LENGTH;
-	Real lat = timeGetTime() - temp->getTimeLastSent();
-	m_averageLatency += lat / CONNECTION_LATENCY_HISTORY_LENGTH;
-	m_latencies[index] = lat;
-	if (m_latencySampleCount < CONNECTION_LATENCY_HISTORY_LENGTH)
+	if (!temp->wasResent())
 	{
-		++m_latencySampleCount;
+		Int index = temp->getCommand()->getID() % CONNECTION_LATENCY_HISTORY_LENGTH;
+		// Relayed commands from different players share IDs, so count a slot only the first time it fills
+		if (m_latencies[index] == 0 && m_latencySampleCount < CONNECTION_LATENCY_HISTORY_LENGTH)
+		{
+			++m_latencySampleCount;
+		}
+		m_averageLatency -= ((Real)(m_latencies[index])) / CONNECTION_LATENCY_HISTORY_LENGTH;
+		Real lat = timeGetTime() - temp->getTimeLastSent();
+		m_averageLatency += lat / CONNECTION_LATENCY_HISTORY_LENGTH;
+		m_latencies[index] = lat;
+		updateRetryTime();
 	}
-	updateRetryTime();
 
 #if defined(RTS_DEBUG)
 	if (doDebug == TRUE) {

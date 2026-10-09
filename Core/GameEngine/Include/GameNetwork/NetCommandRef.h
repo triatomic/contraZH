@@ -61,6 +61,8 @@ public:
 
 	time_t getTimeLastSent() const;
 	void setTimeLastSent(time_t timeLastSent);
+	Bool wasResent() const { return m_wasResent; }
+	void setResent() { m_wasResent = TRUE; }
 
 protected:
 	NetCommandMsg *m_msg;
@@ -68,6 +70,7 @@ protected:
 	NetCommandRef *m_prev;
 	UnsignedByte m_relay; ///< Need this in the command reference since the relay value will be different depending on where this particular reference is being sent.
 	time_t m_timeLastSent;
+	Bool m_wasResent; ///< An ack for a resent command cannot tell which copy it answers, so it gives no latency sample.
 
 #ifdef DEBUG_NETCOMMANDREF
 	UnsignedInt m_id;
