@@ -2778,8 +2778,10 @@ void W3DRoadBuffer::insertCrossTypeJoins()
 
 
 		Real nu; // not used.
+		// A near-parallel join line meets the road edge far away and would stretch the join across the map.
+		const Real maxJoinDist = 2.0f * m_roads[i].m_scale * m_roads[i].m_widthInTexture;
 		Vector2 top = m_roads[i].m_pt1.top;
-		if (joinLine.Find_Intersection(roadLine, &pInt1, &nu, &pInt2, &nu) ) {
+		if (joinLine.Find_Intersection(roadLine, &pInt1, &nu, &pInt2, &nu) && Vector3::Distance(pInt1, vLoc1) < maxJoinDist) {
 			if (isPt1) {
 				m_roads[i].m_pt1.top.Set(pInt1.X, pInt1.Y);
 				top = m_roads[i].m_pt1.top;
@@ -2794,7 +2796,7 @@ void W3DRoadBuffer::insertCrossTypeJoins()
 		v2.Set(p2.X, p2.Y, 0);
 		roadLine.Set(v1,v2);
 		Vector2 bottom = m_roads[i].m_pt1.bottom;
-		if (joinLine.Find_Intersection(roadLine, &pInt1, &nu, &pInt2, &nu) ) {
+		if (joinLine.Find_Intersection(roadLine, &pInt1, &nu, &pInt2, &nu) && Vector3::Distance(pInt1, vLoc1) < maxJoinDist) {
 			if (isPt1) {
 				m_roads[i].m_pt1.bottom.Set(pInt1.X, pInt1.Y);
 				bottom = m_roads[i].m_pt1.bottom;
