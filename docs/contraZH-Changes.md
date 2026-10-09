@@ -90,8 +90,14 @@ its round trips), so the delay covers the swings of an uneven link instead of on
 steady LAN adds only a few milliseconds. Online Generals Online games keep the official behaviour.
 
 This changes when commands execute, which the replay records, so older replays still play back
-identically. The wire protocol is unchanged, so a player on an older build can still join; only the
-`GameData.ini` has to match, as it always did.
+identically.
+
+## Larger game packets
+
+Network game packets now carry up to about 1100 bytes instead of the 476 bytes sized for a 512-byte
+modem packet, so a burst of orders goes out in one packet instead of several. This applies to every
+multiplayer game. The lobby already refuses a player whose executable differs, so an older build
+cannot join a game hosted on this one.
 
 ## Drones stay on their leash
 
