@@ -63,7 +63,7 @@
 #include "Common/LocalFileSystem.h"
 #include "Common/Debug.h"
 #include "Common/StackDump.h"
-#include "Common/MiniDumper.h"
+#include "MiniDumper/MiniDumper.h"
 #include "Common/GameMemory.h"
 #include "Common/Science.h"
 #include "Common/ThingFactory.h"
