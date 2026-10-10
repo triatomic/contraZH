@@ -396,7 +396,7 @@ BOOL CWorldBuilderApp::InitInstance()
 	AsciiString dumpRoot = TheGlobalData->getPath_UserData();
 	dumpRoot.concat("WorldBuilder\\");
 	CreateDirectory(dumpRoot.str(), nullptr);
-	MiniDumper::initMiniDumper(dumpRoot);
+	MiniDumper::initMiniDumper(dumpRoot.str(), 'Z');
 #endif
 
 #ifdef DEBUG_LOGGING
