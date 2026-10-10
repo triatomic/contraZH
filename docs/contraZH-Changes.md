@@ -249,6 +249,19 @@ Notes:
 * Saves from before this build load with every object at scale 1.
 ([#121](https://github.com/triatomic/contraZH/issues/121))
 
+## Lightning lights the scene
+
+* Maps fake lightning with the `CAMERA_FADE_ADD` script action, which washed the screen white. An
+additive fade that lasts 1 second or less now lights terrain, roads, bridges and units with a
+bluish-white light above the view instead.
+* Longer additive fades, and all other fade types, still draw on the screen as before.
+* Health bars and tooltips stay visible during the flash.
+
+Notes:
+* Needs `DynamicLights = Yes` in `Options.ini`. Without it the white screen flash is kept.
+* Water surfaces do not take the light.
+([#121](https://github.com/triatomic/contraZH/issues/121))
+
 # Game Setup
 
 ## Random army per faction

@@ -3944,7 +3944,7 @@ void Drawable::drawIconUI()
 		return;
 #endif
 
-	if( TheGameLogic->getDrawIconUI() && (TheScriptEngine->getFade()==ScriptEngine::FADE_NONE) )
+	if( TheGameLogic->getDrawIconUI() && (TheScriptEngine->getFade()==ScriptEngine::FADE_NONE || TheScriptEngine->isLightningFade()) )
 	{
 		IRegion2D healthBarRegionStorage;
 		const IRegion2D* healthBarRegion = nullptr;

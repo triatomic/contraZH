@@ -1164,7 +1164,11 @@ void Mouse::resetTooltipDelay()
 //-------------------------------------------------------------------------------------------------
 void Mouse::drawTooltip()
 {
-	if (TheScriptEngine->getFade()!=ScriptEngine::FADE_NONE) {
+	Bool fading = TheScriptEngine->getFade()!=ScriptEngine::FADE_NONE;
+#if RTS_ZEROHOUR
+	fading = fading && !TheScriptEngine->isLightningFade();
+#endif
+	if (fading) {
 		return;
 	}
 
