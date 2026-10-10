@@ -2069,6 +2069,10 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_normalMapDebug = optionPref.getNormalMapDebugEnabled();
 	TheWritableGlobalData->m_ambientOcclusionDebug = optionPref.getAmbientOcclusionDebugEnabled();
 	TheWritableGlobalData->m_borderlessWindow = optionPref.getBorderlessWindowEnabled();
+	if (optionPref.getWindowedEnabled())
+	{
+		TheWritableGlobalData->m_windowed = TRUE;
+	}
 
 	Int val=optionPref.getGammaValue();
 	//generate a value between 0.6 and 2.0.

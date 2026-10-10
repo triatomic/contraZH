@@ -573,7 +573,7 @@ void W3DDisplay::setGamma(Real gamma, Real bright, Real contrast, Bool calibrate
 }
 
 // Gives the game window the frame its mode needs; the wrapper then sizes and centres it from that style.
-// Only -win keeps the caption, so a windowed device without it is the borderless mode.
+// Only windowed mode (-win or the Windowed option) keeps the caption; a windowed device without it is borderless.
 static void applyWindowStyle( Bool windowed )
 {
 	if (!ApplicationHWnd)
@@ -600,7 +600,8 @@ Bool W3DDisplay::setDisplayMode( UnsignedInt xres, UnsignedInt yres, UnsignedInt
 	const UnsignedInt oldBitDepth = getBitDepth();
 	const Bool oldWindowed = getWindowed();
 
-	if (windowed != oldWindowed)
+	// windowed and borderless share a windowed device, so switching between them changes only the frame
+	if (windowed || windowed != oldWindowed)
 	{
 		applyWindowStyle( windowed );
 	}
@@ -909,7 +910,9 @@ void W3DDisplay::init()
 		WW3D::Set_Screen_UV_Bias( TRUE );  ///< this makes text look good :)
 
 		setWindowed( TheGlobalData->m_windowed || TheGlobalData->m_borderlessWindow );
-		if (getWindowed() && !TheGlobalData->m_windowed)
+
+		// the window was created before Options.ini was read, so only -win gave it the right frame
+		if (getWindowed())
 		{
 			applyWindowStyle( TRUE );
 		}

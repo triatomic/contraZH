@@ -332,6 +332,9 @@ waterline, two-tone ground, 256x256 grid.)
 `NewRadar`.)
 * `BorderlessWindow = No` - (Yes runs a frameless centred window at the selected resolution. Also
 the Borderless checkbox beside Resolution. `-win` still gives a captioned window.)
+* `Windowed = No` - (Yes runs a movable window with a title bar at the selected resolution, like
+`-win`. Also the Windowed checkbox beside Borderless; checking one clears the other. `-win` still
+forces it on. Needs `CheckWindowed` in `OptionsMenu.wnd` for the menu control.)
 
 Notes:
 * A blue bar under a building's health bar shows production progress; on supply gatherers it shows
