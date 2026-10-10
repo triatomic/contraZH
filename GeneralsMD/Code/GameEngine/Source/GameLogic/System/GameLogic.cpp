@@ -83,6 +83,7 @@
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/CaveSystem.h"
+#include "GameLogic/CommandSequence.h"
 #include "GameLogic/CrateSystem.h"
 #include "GameLogic/FPUControl.h"
 #include "GameLogic/GameLogic.h"
@@ -368,6 +369,10 @@ GameLogic::~GameLogic()
 	delete ThePartitionManager;
 	ThePartitionManager = nullptr;
 
+	// ShigureUi 01/10/2026 delete command sequence(advanced waypoint system)
+	delete TheCommandSequence;
+	TheCommandSequence = nullptr;
+
 	delete TheScriptActions;
 	TheScriptActions = nullptr;
 
@@ -394,6 +399,11 @@ void GameLogic::init()
 	ThePartitionManager = NEW PartitionManager;
 	ThePartitionManager->init();
 	ThePartitionManager->setName("ThePartitionManager");
+	
+	//ShigureUi 01/10/2026 create command sequence(advanced waypoint system)
+	TheCommandSequence = NEW CommandSequence;
+	TheCommandSequence->init();
+	TheCommandSequence->setName("TheCommandSequence");
 
 
 	// Create system for holding deleted objects that are
@@ -454,6 +464,7 @@ void GameLogic::reset()
 
 	TheGhostObjectManager->reset();
 	ThePartitionManager->reset();
+	TheCommandSequence->reset();
 	TheTerrainLogic->reset();
 	TheAI->reset();
 	TheScriptEngine->reset();

@@ -4887,6 +4887,39 @@ Bool AIUpdateInterface::canAutoAcquireWhileStealthed() const
   return getAIUpdateModuleData()->m_autoAcquireEnemiesWhenIdle & AAS_Idle_Stealthed;
 }
 
+//ShigureUi 01/10/2026 code reuse from groupMoveToPosition() but it's on single ai so it's here
+void AIUpdateInterface::handleStealthCombatUnitMove()
+{
+	Object *theUnit = getObject();
+
+	if (!getObject())
+		return;
+
+	if (theUnit->getStatusBits().test(OBJECT_STATUS_CAN_STEALTH) && canAutoAcquire())
+	{
+		//When ordering a combat stealth unit to move, there is a single special case we want to handle.
+		//When a stealth unit is currently not stealthed and doesn't autoacquire while stealthed,
+		//then when the player specifically orders the unit to stop, we want to not autoacquire until
+		//he is able to stealth again. Of course, if he's detected, then don't bother trying.
+		if (!theUnit->getStatusBits().test(OBJECT_STATUS_STEALTHED) && !theUnit->getStatusBits().test(OBJECT_STATUS_DETECTED))
+		{
+			//Not stealthed, not detected -- so do auto-acquire while stealthed?
+			if (!canAutoAcquireWhileStealthed())
+			{
+				StealthUpdate* stealth = theUnit->getStealth();
+				if (stealth)
+				{
+					//Delay the mood check time (for autoacquire) until after the unit can stealth again.
+					UnsignedInt stealthFrames = stealth->getStealthDelay();
+					//Skew it a little due to having a large group selected.
+					UnsignedInt randomFrames = GameLogicRandomValue(0, LOGICFRAMES_PER_SECOND);
+					setNextMoodCheckTime(TheGameLogic->getFrame() + stealthFrames + randomFrames);
+				}
+			}
+		}
+	}
+}
+
 
 //----------------------------------------------------------------------------------------------
 void AIUpdateInterface::applySpeedMultiplier(Real scalar) {

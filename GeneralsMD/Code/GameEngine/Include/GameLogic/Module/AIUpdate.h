@@ -641,6 +641,9 @@ public:
 
 	Bool canAutoAcquireWhileStealthed() const;
 
+	//ShigureUi 01/10/2026 code reuse from groupMoveToPosition() but it's on single ai so it's here
+	void handleStealthCombatUnitMove();
+
 	/// True when this object is forbidden from firing while it is moving.
 	Bool mustHoldStillToFire() const { return BitIsSet(getAIUpdateModuleData()->m_autoAcquireEnemiesWhenIdle, AAS_Idle_Not_While_Moving); }
 

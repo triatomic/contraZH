@@ -1397,6 +1397,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			// send message to exit
 			GameMessage *exitMsg = TheMessageStream->appendMessage( GameMessage::MSG_EXIT );
 			exitMsg->appendObjectIDArgument( objWantingExit->getID() ); // 0 is the thing inside coming out
+			exitMsg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 
 			// contraZH: shift click exits every passenger of the clicked unit's type
 			if (TheKeyboard && TheKeyboard->isShift())
@@ -1433,6 +1434,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 					exitMsg = TheMessageStream->appendMessage( GameMessage::MSG_EXIT );
 					exitMsg->appendObjectIDArgument( other->getID() );
+					exitMsg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 				}
 			}
 
@@ -1448,7 +1450,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 
 			if (BitIsSet(commandButton->getOptions(), NEED_TARGET_POS) == FALSE) {
 				pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_EVACUATE );
-				TheMessageStream->appendMessage( GameMessage::MSG_EVACUATE );
+				GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_EVACUATE );
+				msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 			}
 
 			break;
@@ -1469,7 +1472,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		case GUI_COMMAND_AUTO_FILL:
 		{
 			TheInGameUI->setGUICommand( nullptr );
-			TheMessageStream->appendMessage( GameMessage::MSG_DO_AUTO_FILL );
+			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_DO_AUTO_FILL );
+			msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 			break;
 		}
 
@@ -1484,7 +1488,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		case GUI_COMMAND_HACK_INTERNET:
 		{
 			pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_INTERNET_HACK );
-			TheMessageStream->appendMessage( GameMessage::MSG_INTERNET_HACK );
+			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_INTERNET_HACK );
+			msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 			break;
 		}
 
@@ -1509,7 +1514,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		case GUI_COMMAND_TOGGLE_OVERCHARGE:
 		{
 
-			TheMessageStream->appendMessage( GameMessage::MSG_TOGGLE_OVERCHARGE );
+			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_TOGGLE_OVERCHARGE );
+			msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 			break;
 
 		}
@@ -1587,6 +1593,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_SWITCH_WEAPONS, &info );
 
 				msg->appendIntegerArgument( commandButton->getWeaponSlot() );
+				msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 				break;
 		}
 
@@ -1597,6 +1604,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_DO_WEAPON );
 			msg->appendIntegerArgument( commandButton->getWeaponSlot() );
 			msg->appendIntegerArgument( commandButton->getMaxShotsToFire() );
+			msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 
 			break;
 
@@ -1609,6 +1617,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_TOGGLE_FIRE_WEAPON );
 			msg->appendIntegerArgument( commandButton->getWeaponSlot() );
 			msg->appendIntegerArgument( commandButton->getMaxShotsToFire() );
+			msg->appendIntegerArgument(TheInGameUI->isInWaypointMode());
 
 			break;
 
@@ -1629,6 +1638,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			msg->appendIntegerArgument( spTemplate->getID() );
 			msg->appendIntegerArgument( commandButton->getOptions() );
 			msg->appendObjectIDArgument( obj->getID() );
+			msg->appendBooleanArgument(false);
 			break;
 
 		}
@@ -1640,6 +1650,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			msg->appendIntegerArgument( commandButton->getSpecialPowerTemplate()->getID() );
 			msg->appendIntegerArgument( commandButton->getOptions() );
 			msg->appendObjectIDArgument( INVALID_ID );	// no specific source
+			msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 			break;
 
 		}

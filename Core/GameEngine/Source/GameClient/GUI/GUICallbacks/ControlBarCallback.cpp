@@ -261,7 +261,9 @@ WindowMsgHandledType LeftHUDInput( GameWindow *window, UnsignedInt msg,
 				// see if the user wants to move the tactical view
 				if (	drawableList->empty()
 					||	(! TheGlobalData->m_useAlternateMouse && msg == GWM_RIGHT_DOWN)
-					||	(TheGlobalData->m_useAlternateMouse && msg == GWM_LEFT_DOWN)	)
+					||	(TheGlobalData->m_useAlternateMouse && msg == GWM_LEFT_DOWN)
+					// ShigureUi 23/09/2026 Waypoint mode disable any left HUD move
+					||   TheInGameUI->isInWaypointMode() )
 				{
 					TheTacticalView->userLookAt( &world );
 					break;
@@ -312,7 +314,7 @@ WindowMsgHandledType LeftHUDInput( GameWindow *window, UnsignedInt msg,
 //						pickAndPlayUnitVoiceResponse(drawableList, GameMessage::MSG_DO_ATTACKMOVETO);
 //						break;
 //					}
-
+					// SEND_MSG_DO_MOVETO
 					newMsg = TheMessageStream->appendMessage(GameMessage::MSG_DO_MOVETO);
 					newMsg->appendLocationArgument(world);
 					// Play the unit voice response

@@ -265,6 +265,7 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 								placeMsg->appendObjectIDArgument( INVALID_ID ); //There is no object in the way.
 								placeMsg->appendIntegerArgument( commandButton->getOptions() ); //Command button options.
 								placeMsg->appendObjectIDArgument( builderObj->getID() ); //The source object responsible for firing the special.
+								placeMsg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 
 								// get out of pending placement mode, this will also clear the arrow anchor status
 								TheInGameUI->placeBuildAvailable( nullptr, nullptr );
@@ -286,6 +287,7 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 					placeMsg->appendIntegerArgument(build->getTemplateID());
 					placeMsg->appendLocationArgument(worldStart);
 					placeMsg->appendRealArgument(angle);
+					placeMsg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 					if( isLineBuild )
 					{
 						placeMsg->appendLocationArgument( worldEnd );

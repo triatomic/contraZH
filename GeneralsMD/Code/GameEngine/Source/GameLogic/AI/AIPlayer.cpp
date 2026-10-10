@@ -933,7 +933,7 @@ void AIPlayer::guardSupplyCenter( Team *team, Int minSupplies )
 
 		location.x -= offset.x*radius;
 		location.y -= offset.y*radius;
-		theGroup->groupGuardPosition( &location, GUARDMODE_NORMAL, CMD_FROM_SCRIPT );
+		theGroup->groupGuardPosition( &location, GUARDMODE_NORMAL, false, CMD_FROM_SCRIPT );
 
 	}
 }

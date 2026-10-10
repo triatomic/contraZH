@@ -150,10 +150,12 @@ static CommandStatus doFireWeaponCommand( const CommandButton *command, const IC
 		msg->appendLocationArgument( world );
 		msg->appendIntegerArgument( command->getMaxShotsToFire() );
 
-		//Also append the object ID (incase weapon doesn't like obstacles on land).
-		Object *target = validUnderCursor( mouse, command, PICK_TYPE_SELECTABLE );
-		ObjectID targetID = target ? target->getID() : INVALID_ID;
-		msg->appendObjectIDArgument( targetID );
+		//ShigureUi 04/10/2026 comment it cuz no one ever use
+		////Also append the object ID (incase weapon doesn't like obstacles on land).
+		//Object *target = validUnderCursor( mouse, command, PICK_TYPE_SELECTABLE );
+		//ObjectID targetID = target ? target->getID() : INVALID_ID;
+		//msg->appendObjectIDArgument( targetID );
+		msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 	}
 	else if( BitIsSet( command->getOptions(), COMMAND_OPTION_NEED_OBJECT_TARGET ) )
 	{
@@ -178,7 +180,7 @@ static CommandStatus doFireWeaponCommand( const CommandButton *command, const IC
 			msg->appendIntegerArgument( command->getWeaponSlot() );
 			msg->appendObjectIDArgument( target->getID() );
 			msg->appendIntegerArgument( command->getMaxShotsToFire() );
-
+			msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 		}
 
 	}
@@ -187,6 +189,7 @@ static CommandStatus doFireWeaponCommand( const CommandButton *command, const IC
 		msg = TheMessageStream->appendMessage( GameMessage::MSG_DO_WEAPON );
 		msg->appendIntegerArgument( command->getWeaponSlot() );
 		msg->appendIntegerArgument( command->getMaxShotsToFire() );
+		msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 
 		//This could be legit now -- think of firing a self destruct weapon
 		//-----------------------------------------------------------------
@@ -222,6 +225,7 @@ static CommandStatus doGuardCommand( const CommandButton *command, GuardMode gua
 			msg = TheMessageStream->appendMessage( GameMessage::MSG_DO_GUARD_OBJECT );
 			msg->appendObjectIDArgument( target->getID() );
 			msg->appendIntegerArgument(guardMode);
+			msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 			pickAndPlayUnitVoiceResponse(TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_DO_GUARD_OBJECT);
 		}
 	}
@@ -247,6 +251,7 @@ static CommandStatus doGuardCommand( const CommandButton *command, GuardMode gua
 		msg = TheMessageStream->appendMessage( GameMessage::MSG_DO_GUARD_POSITION );
 		msg->appendLocationArgument(world);
 		msg->appendIntegerArgument(guardMode);
+		msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 		pickAndPlayUnitVoiceResponse(TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_DO_GUARD_POSITION);
 	}
 
@@ -452,6 +457,7 @@ GameMessageDisposition GUICommandTranslator::translateGameMessage(const GameMess
 							{
 								GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_EVACUATE);
 								msg->appendLocationArgument(worldPos);
+								msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 
 								pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_EVACUATE );
 							}

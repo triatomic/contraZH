@@ -326,6 +326,7 @@ private:
 	bool onDoAttackmoveto(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onDoForcemoveto(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onDoMoveto(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
+	bool onDoReverseMoveto(GameMessage* msg, AIGroupPtr& currentlySelectedGroup);
 	bool onAddWaypoint(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onDoGuardPosition(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onDoGuardObject(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
@@ -342,6 +343,7 @@ private:
 	bool onEnter(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onExit(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onEvacuate(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
+	bool onAutoFill(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onExecuteRailedTransport(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onInternetHack(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onGetRepaired(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
@@ -363,6 +365,9 @@ private:
 	bool onDozerCancelConstruct(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onSell(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
 	bool onToggleOvercharge(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
+	bool onToggleHoldFire(GameMessage* msg, AIGroupPtr& currentlySelectedGroup);
+	bool onToggleDeploy(GameMessage* msg, AIGroupPtr& currentlySelectedGroup);
+	bool onToggleFireWeapon(GameMessage* msg, AIGroupPtr& currentlySelectedGroup);
 	bool onToggleTunnelAutoPop(GameMessage* msg, AIGroupPtr& currentlySelectedGroup);
 #ifdef ALLOW_SURRENDER
 	bool onDoSurrender(GameMessage *msg, AIGroupPtr &currentlySelectedGroup);
