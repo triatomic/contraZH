@@ -286,6 +286,14 @@ back to `Random <BaseSide>`.
 limit.
 * The `Shift + Ctrl + Z` zoom-limit cheat is unaffected.
 
+## Map search
+
+* The skirmish and LAN map select windows have a search box above the map list, focused on open.
+* Typing filters the list to maps whose name contains the text, ignoring case. It applies to both
+official and custom maps.
+* The box takes its height from the top of the list and copies the look of the setup screen's text
+box (player name in skirmish, chat in LAN), so mod layouts need no `.wnd` change.
+
 # Options.ini
 
 Read at startup. Most can also be changed in game under Options > `Game Options` and apply on
