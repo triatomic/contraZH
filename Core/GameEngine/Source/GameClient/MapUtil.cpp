@@ -998,6 +998,12 @@ Int populateMapListboxNoReset( GameWindow *listbox, Bool useSystemMaps, Bool isM
 	delete lbData.battleHonors;
 	lbData.battleHonors = nullptr;
 
+	// an empty row swallows the selection silently, so an empty list must report -1
+	if (GadgetListBoxGetNumEntries(listbox) == 0)
+	{
+		lbData.selectionIndex = -1;
+	}
+
 	GadgetListBoxSetSelected(listbox, &lbData.selectionIndex, 1);
 
 	if (lbData.selectionIndex >= 0)

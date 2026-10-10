@@ -85,18 +85,18 @@ static void NullifyControls()
 
 extern WindowLayout *skirmishMapSelectLayout;
 
-static void populateSkirmishMapList( Bool useSystemMaps )
+static void populateSkirmishMapList( Bool useSystemMaps, AsciiString mapToSelect )
 {
 	showingSystemMaps = useSystemMaps;
 	const UnicodeString filter = GadgetTextEntryGetText( mapFilter );
 	if (useSystemMaps)
 	{
-		populateMapListbox( mapList, TRUE, TRUE, TheSkirmishGameInfo->getMap(), filter );
+		populateMapListbox( mapList, TRUE, TRUE, mapToSelect, filter );
 	}
 	else
 	{
-		populateMapListbox( mapList, FALSE, FALSE, TheSkirmishGameInfo->getMap(), filter );
-		populateMapListboxNoReset( mapList, FALSE, TRUE, TheSkirmishGameInfo->getMap(), filter );
+		populateMapListbox( mapList, FALSE, FALSE, mapToSelect, filter );
+		populateMapListboxNoReset( mapList, FALSE, TRUE, mapToSelect, filter );
 	}
 }
 
@@ -327,7 +327,7 @@ void SkirmishMapSelectMenuInit( WindowLayout *layout, void *userData )
 
 		if (TheMapCache)
 			TheMapCache->updateCache();
-		populateSkirmishMapList( usesSystemMapDir );
+		populateSkirmishMapList( usesSystemMapDir, TheSkirmishGameInfo->getMap() );
 		mapList->winSetTooltipFunc(mapListTooltipFunc);
 	}
 
@@ -451,7 +451,10 @@ WindowMsgHandledType SkirmishMapSelectMenuSystem( GameWindow *window, UnsignedIn
 		{
 			if( mapFilter && (GameWindow *)mData1 == mapFilter )
 			{
-				populateSkirmishMapList( showingSystemMaps );
+				Int selected = -1;
+				GadgetListBoxGetSelected( mapList, &selected );
+				const char *mapFname = selected >= 0 ? (const char *)GadgetListBoxGetItemData( mapList, selected ) : nullptr;
+				populateSkirmishMapList( showingSystemMaps, mapFname ? AsciiString( mapFname ) : TheSkirmishGameInfo->getMap() );
 			}
 			break;
 		}
@@ -489,7 +492,8 @@ WindowMsgHandledType SkirmishMapSelectMenuSystem( GameWindow *window, UnsignedIn
 					if( rowSelected < 0 )
 					{
 						positionStartSpots( AsciiString::TheEmptyString, buttonMapStartPosition, winMapPreview);
-						//winMapPreview->winClearStatus(WIN_STATUS_IMAGE);
+						winMapPreview->winSetUserData(nullptr);
+						winMapPreview->winClearStatus(WIN_STATUS_IMAGE);
 						break;
 					}
 					winMapPreview->winSetStatus(WIN_STATUS_IMAGE);
@@ -532,7 +536,7 @@ WindowMsgHandledType SkirmishMapSelectMenuSystem( GameWindow *window, UnsignedIn
 			{
 				if (TheMapCache)
 					TheMapCache->updateCache();
-				populateSkirmishMapList( TRUE );
+				populateSkirmishMapList( TRUE, TheSkirmishGameInfo->getMap() );
 				//LANPreferences pref;
 				//pref["UseSystemMapDir"] = "yes";
 				//pref.write();
@@ -541,7 +545,7 @@ WindowMsgHandledType SkirmishMapSelectMenuSystem( GameWindow *window, UnsignedIn
 			{
 				if (TheMapCache)
 					TheMapCache->updateCache();
-				populateSkirmishMapList( FALSE );
+				populateSkirmishMapList( FALSE, TheSkirmishGameInfo->getMap() );
 				//LANPreferences pref;
 				//pref["UseSystemMapDir"] = "no";
 				//pref.write();

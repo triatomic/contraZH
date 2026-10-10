@@ -117,10 +117,10 @@ static void NullifyControls()
 	}
 }
 
-static void populateLanMapList( Bool useSystemMaps )
+static void populateLanMapList( Bool useSystemMaps, AsciiString mapToSelect )
 {
 	showingSystemMaps = useSystemMaps;
-	populateMapListbox( mapList, useSystemMaps, TRUE, TheLAN->GetMyGame()->getMap(), GadgetTextEntryGetText( mapFilter ) );
+	populateMapListbox( mapList, useSystemMaps, TRUE, mapToSelect, GadgetTextEntryGetText( mapFilter ) );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -186,7 +186,7 @@ void LanMapSelectMenuInit( WindowLayout *layout, void *userData )
 
 		if (TheMapCache)
 			TheMapCache->updateCache();
-		populateLanMapList( usesSystemMapDir );
+		populateLanMapList( usesSystemMapDir, TheLAN->GetMyGame()->getMap() );
 	}
 }
 
@@ -314,7 +314,10 @@ WindowMsgHandledType LanMapSelectMenuSystem( GameWindow *window, UnsignedInt msg
 		{
 			if( mapFilter && (GameWindow *)mData1 == mapFilter )
 			{
-				populateLanMapList( showingSystemMaps );
+				Int selected = -1;
+				GadgetListBoxGetSelected( mapList, &selected );
+				const char *mapFname = selected >= 0 ? (const char *)GadgetListBoxGetItemData( mapList, selected ) : nullptr;
+				populateLanMapList( showingSystemMaps, mapFname ? AsciiString( mapFname ) : TheLAN->GetMyGame()->getMap() );
 			}
 			break;
 		}
@@ -349,7 +352,7 @@ WindowMsgHandledType LanMapSelectMenuSystem( GameWindow *window, UnsignedInt msg
 			{
 				if (TheMapCache)
 					TheMapCache->updateCache();
-				populateLanMapList( TRUE );
+				populateLanMapList( TRUE, TheLAN->GetMyGame()->getMap() );
 				LANPreferences pref;
 				pref["UseSystemMapDir"] = "yes";
 				pref.write();
@@ -358,7 +361,7 @@ WindowMsgHandledType LanMapSelectMenuSystem( GameWindow *window, UnsignedInt msg
 			{
 				if (TheMapCache)
 					TheMapCache->updateCache();
-				populateLanMapList( FALSE );
+				populateLanMapList( FALSE, TheLAN->GetMyGame()->getMap() );
 				LANPreferences pref;
 				pref["UseSystemMapDir"] = "no";
 				pref.write();
@@ -447,7 +450,8 @@ WindowMsgHandledType LanMapSelectMenuSystem( GameWindow *window, UnsignedInt msg
 					if( rowSelected < 0 )
 					{
 						positionStartSpots( AsciiString::TheEmptyString, buttonMapStartPosition, winMapPreview);
-//						winMapPreview->winClearStatus(WIN_STATUS_IMAGE);
+						winMapPreview->winSetUserData(nullptr);
+						winMapPreview->winClearStatus(WIN_STATUS_IMAGE);
 						break;
 					}
 					winMapPreview->winSetStatus(WIN_STATUS_IMAGE);
