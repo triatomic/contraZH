@@ -794,7 +794,7 @@ CMainFrame::OnCreateClient
 					gamma=gamma/10.0f;
 					if (gamma<1.0) gamma=1.0;
 					if (gamma>3.0) gamma=3.0;
-					DX8Wrapper::Set_Gamma(gamma,0.0f,1.0f);
+					WW3D::Set_Gamma(gamma,0.0f,1.0f);
 				}
 			}
 		}
@@ -5241,9 +5241,9 @@ void CMainFrame::OnEnableGammaCorrection()
 		gamma=gamma/10.0f;
 		if (gamma<1.0) gamma=1.0;
 		if (gamma>3.0) gamma=3.0;
-		DX8Wrapper::Set_Gamma(gamma,0.0f,1.0f);
+		WW3D::Set_Gamma(gamma,0.0f,1.0f);
 	} else {
-		DX8Wrapper::Set_Gamma(1.0,0.0f,1.0f);
+		WW3D::Set_Gamma(1.0,0.0f,1.0f);
 	}
 }
 

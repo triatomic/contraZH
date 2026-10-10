@@ -97,6 +97,7 @@ static void drawFramerateBar();
 #include "WWLib/registry.h"
 #include "WW3D2/ww3d.h"
 #include "WW3D2/texturefilter.h"
+#include "WW3D2/Renderer.h"
 #include "WW3D2/predlod.h"
 #include "WW3D2/part_emt.h"
 #include "WW3D2/part_ldr.h"
@@ -592,7 +593,7 @@ void W3DDisplay::setGamma(Real gamma, Real bright, Real contrast, Bool calibrate
 	if (m_windowed)
 		return;	//we don't allow gamma to change in window because it would affect desktop.
 
-	DX8Wrapper::Set_Gamma(gamma,bright,contrast,calibrate, false);
+	Renderer::Set_Gamma(gamma,bright,contrast,calibrate, false);
 }
 
 // Gives the game window the frame its mode needs; the wrapper then sizes and centres it from that style.

@@ -24,6 +24,7 @@
 #include "resource.h"
 #include "WWMath/wwmath.h"
 #include "WW3D2/ww3d.h"
+#include "WW3D2/Renderer.h"
 #include <vector>
 #include "WW3D2/texturefilter.h"
 #include "WW3D2/scene.h"
@@ -5098,7 +5099,7 @@ Bool WbView3d::drawTopView(Int size)
 		}
 
 		DX8Wrapper::Set_Render_Target_With_Z(s.target, s.depth);
-		DX8Wrapper::Clear(true, true, Vector3(0.0f, 0.0f, 0.0f));
+		Renderer::Clear(true, true, Vector3(0.0f, 0.0f, 0.0f));
 		WW3D::Render(m_scene, s.camera);
 
 		// Water draws in both passes, so it does not count as something above the ground.

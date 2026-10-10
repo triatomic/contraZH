@@ -43,6 +43,7 @@
 #include "WW3D2/camera.h"
 #include "WW3D2/scene.h"
 #include "WW3D2/dx8wrapper.h"
+#include "WW3D2/Renderer.h"
 #include "WW3D2/light.h"
 #include "WWLib/simplevec.h"
 #include "WW3D2/mesh.h"
@@ -2486,7 +2487,7 @@ void WaterRenderObjClass::renderPlanarReflection(CameraClass *cam)
 	DX8Wrapper::Set_Render_Target(surface, m_reflectionDepth);
 	surface->Release();
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, FALSE);
-	DX8Wrapper::Clear(true, true, Vector3(0.0f, 0.0f, 0.0f), 0.0f, 1.0f, 0);
+	Renderer::Clear(true, true, Vector3(0.0f, 0.0f, 0.0f), 0.0f, 1.0f, 0);
 
 	// Only the water's part of the view reads the mirror, so the mirror draws there alone, and culls to it.
 	Vector2 readMin;
@@ -4401,7 +4402,7 @@ void WaterRenderObjClass::Render(RenderInfoClass & rinfo)
 					rinfo.Camera.Apply();	//force an update of all the camera dependent parameters like frustum clip planes
 
 					//clear the z-buffer to remove changes made by objects inside mirror
-					DX8Wrapper::Clear(false,true,Vector3(0.1f,0.1f,0.1f));
+					Renderer::Clear(false,true,Vector3(0.1f,0.1f,0.1f));
 				}
 			#endif
 

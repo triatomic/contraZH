@@ -28,6 +28,7 @@
 #include "WW3D2/texture.h"
 #include "WW3D2/surfaceclass.h"
 #include "WW3D2/dx8wrapper.h"
+#include "WW3D2/Renderer.h"
 #include "WW3D2/dx8vertexbuffer.h"
 #include "WW3D2/dx8indexbuffer.h"
 #include "WW3D2/dx8renderer.h"
@@ -310,7 +311,7 @@ Bool W3DBloom::begin(RenderInfoClass &rinfo, Bool anythingToDraw)
 	}
 
 	// the new target starts with a full size viewport, so this clears all of it
-	DX8Wrapper::Clear(true, false, Vector3(0.0f, 0.0f, 0.0f));
+	Renderer::Clear(true, false, Vector3(0.0f, 0.0f, 0.0f));
 	rinfo.Camera.Apply();
 	return true;
 }
@@ -372,14 +373,14 @@ void W3DBloom::end(RenderInfoClass &rinfo)
 		Vector2 viewMax;
 		rinfo.Camera.Get_Viewport(viewMin, viewMax);
 
-		D3DVIEWPORT8 viewport;
-		viewport.X = (DWORD)(viewMin.X * (Real)full->Get_Width());
-		viewport.Y = (DWORD)(viewMin.Y * (Real)full->Get_Height());
-		viewport.Width = (DWORD)((viewMax.X - viewMin.X) * (Real)full->Get_Width());
-		viewport.Height = (DWORD)((viewMax.Y - viewMin.Y) * (Real)full->Get_Height());
-		viewport.MinZ = 0.0f;
-		viewport.MaxZ = 1.0f;
-		DX8Wrapper::Set_Viewport(&viewport);
+		RenderViewport viewport;
+		viewport.x = (unsigned int)(viewMin.X * (Real)full->Get_Width());
+		viewport.y = (unsigned int)(viewMin.Y * (Real)full->Get_Height());
+		viewport.width = (unsigned int)((viewMax.X - viewMin.X) * (Real)full->Get_Width());
+		viewport.height = (unsigned int)((viewMax.Y - viewMin.Y) * (Real)full->Get_Height());
+		viewport.min_z = 0.0f;
+		viewport.max_z = 1.0f;
+		Renderer::Set_Viewport(viewport);
 
 		// the debug view shows the glow alone on black, so it is obvious what reached the target
 		const Bool debug = TheGlobalData->m_bloomDebug;

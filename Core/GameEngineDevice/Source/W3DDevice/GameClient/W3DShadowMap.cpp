@@ -22,6 +22,7 @@
 
 #include "WW3D2/camera.h"
 #include "WW3D2/dx8wrapper.h"
+#include "WW3D2/Renderer.h"
 #include "WW3D2/dx8caps.h"
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/rinfo.h"
@@ -869,7 +870,7 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 	}
 
 	// A null colour target has nothing to clear.
-	DX8Wrapper::Clear(m_nullTarget == nullptr, true, Vector3(1.0f, 1.0f, 1.0f), 1.0f);
+	Renderer::Clear(m_nullTarget == nullptr, true, Vector3(1.0f, 1.0f, 1.0f), 1.0f);
 
 	// Stencil is outside ShaderClass, so it is the one piece of inherited state that
 	// could reject casters. Read from the device because the wrapper's cache holds a

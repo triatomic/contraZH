@@ -32,6 +32,7 @@
 #include "Common/Debug.h"
 #include "GameClient/View.h"
 #include "WW3D2/dx8wrapper.h"
+#include "WW3D2/Renderer.h"
 #include "WW3D2/dx8caps.h"
 #include "WW3D2/dx8polygonrenderer.h"
 #include "WW3D2/dx8renderer.h"
@@ -565,7 +566,7 @@ void W3DPlanarMirrorManager::renderPlane(CameraClass *camera, Int plane, const S
 	DX8Wrapper::Set_Render_Target(surface, m_depth);
 	surface->Release();
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, FALSE);
-	DX8Wrapper::Clear(true, true, Vector3(0.0f, 0.0f, 0.0f), 0.0f, 1.0f, 0);
+	Renderer::Clear(true, true, Vector3(0.0f, 0.0f, 0.0f), 0.0f, 1.0f, 0);
 	if (bounded)
 	{
 		WaterRenderObjClass::narrowReflectionCamera(m_camera, camera, readMin, readMax);
