@@ -1470,6 +1470,14 @@ void WbView3d::updateScorches()
 }
 
 // ----------------------------------------------------------------------------
+static Real getMapObjectScale(MapObject *pMapObj)
+{
+	Bool exists;
+	Real scale = pMapObj->getProperties()->getReal(TheKey_objectScale, &exists);
+	return (exists && scale > 0.0f) ? scale : 1.0f;
+}
+
+// ----------------------------------------------------------------------------
 void WbView3d::updateTrees()
 {
 	/** 
@@ -1495,7 +1503,7 @@ void WbView3d::updateTrees()
 		tTemplate = pMapObj->getThingTemplate();
 		if (tTemplate && tTemplate->isKindOf(KINDOF_OPTIMIZED_TREE) )
 		{
-			Real scale = tTemplate->getAssetScale();
+			Real scale = tTemplate->getAssetScale() * getMapObjectScale(pMapObj);
 			const ModuleInfo& mi = tTemplate->getDrawModuleInfo();
 			if (mi.getCount() > 0)
 			{
@@ -1975,7 +1983,7 @@ AsciiString WbView3d::getModelNameAndScale(MapObject *pMapObj, Real *scale,
 
 			// get visual data from the thing template
 			modelName = getBestModelNameWBPrev(tTemplate, state);
-			*scale = tTemplate->getAssetScale();
+			*scale = tTemplate->getAssetScale() * getMapObjectScale(pMapObj);
 
 		}  // end if
 	}  // end else
@@ -2266,6 +2274,7 @@ void WbView3d::invalObjectInView(MapObject *pMapObjIn)
 				if (scale > 2.0 && pMapObj->getThingTemplate()->isKindOf(KINDOF_INFANTRY)) {
 					scale *= 4.0f;  // scale up to 350% 
 				}
+				scale *= getMapObjectScale(pMapObj);
 		
 				// Setup model condition flags from the current damage state
 				ModelConditionFlags state;
@@ -3193,7 +3202,7 @@ MapObject *WbView3d::pickedTreeAlongRay(const Vector3 &rayStart, const Vector3 &
 		}
 
 		// Place it the way addTree() does: terrain height at the trunk, uniform template scale.
-		const Real scale = tt->getAssetScale();
+		const Real scale = tt->getAssetScale() * getMapObjectScale(pObj);
 		Coord3D pos = *pObj->getLocation();
 		pos.z += m_heightMapRenderObj->getHeightMapHeight(pos.x, pos.y, NULL);
 

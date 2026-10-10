@@ -225,6 +225,30 @@ sight line that crosses a bridge deck is now blocked in both directions, for eve
 Changes when units fire; affects replays.
 ([#120](https://github.com/triatomic/contraZH/issues/120))
 
+## Scaled objects keep their size under fog
+
+A scaled object that sat in the fog before it was ever on screen was remembered at its unscaled
+size, so its fogged ghost looked smaller than the real thing. The ghost now matches the object.
+
+Presentation only; replays unaffected.
+([#121](https://github.com/triatomic/contraZH/issues/121))
+
+# Maps
+
+## Per-object scale
+
+* Each placed object has a `Scale` field in WorldBuilder's Object Properties (`objectScale` in the
+map). It multiplies the template `Scale`.
+* WorldBuilder rolls a random scale when it places an object whose template has
+`InstanceScaleFuzziness`, so a forest of one tree type gets mixed sizes. The roll is stored in the
+map; the game never re-rolls it.
+* Works for ordinary objects, optimized trees and props, and under fog of war.
+
+Notes:
+* Visual only. Footprint, collision, selection box and bone positions keep the template size.
+* Saves from before this build load with every object at scale 1.
+([#121](https://github.com/triatomic/contraZH/issues/121))
+
 # Game Setup
 
 ## Random army per faction

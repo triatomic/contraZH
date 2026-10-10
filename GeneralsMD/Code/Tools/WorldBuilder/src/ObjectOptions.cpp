@@ -881,6 +881,14 @@ MapObject *ObjectOptions::duplicateCurMapObjectForPlace(const Coord3D* loc, Real
 																			 pCur->getThingTemplate() );
 			pNew->getProperties()->setAsciiString(TheKey_originalOwner, m_curOwnerName);
 			pNew->setColor(pCur->getColor());
+
+			// Rolled once here so the size is stored in the map; the game never re-rolls it.
+			Real fuzz = tt ? tt->getInstanceScaleFuzziness() : 0.0f;
+			if (fuzz > 0.0f)
+			{
+				Real roll = 2.0f * (Real)rand() / (Real)RAND_MAX - 1.0f;
+				pNew->getProperties()->setReal(TheKey_objectScale, 1.0f + fuzz * roll);
+			}
 			return pNew;
 		}
 	}

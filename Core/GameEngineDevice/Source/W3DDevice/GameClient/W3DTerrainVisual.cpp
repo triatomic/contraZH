@@ -1176,7 +1176,7 @@ void W3DTerrainVisual::removeTreesAndPropsForConstruction(const Coord3D* pos,
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
-void W3DTerrainVisual::addProp(const ThingTemplate *tTemplate, const Coord3D *pos, Real angle)
+void W3DTerrainVisual::addProp(const ThingTemplate *tTemplate, const Coord3D *pos, Real angle, Real objectScale)
 {
 	ModelConditionFlags state;
 	state.clear();
@@ -1189,7 +1189,7 @@ void W3DTerrainVisual::addProp(const ThingTemplate *tTemplate, const Coord3D *po
 		state.set(MODELCONDITION_NIGHT);
 	}
 	AsciiString modelName;
-	Real scale = tTemplate->getAssetScale();
+	Real scale = tTemplate->getAssetScale() * objectScale;
 	const ModuleInfo& mi = tTemplate->getDrawModuleInfo();
 	if (mi.getCount() > 0)
 	{

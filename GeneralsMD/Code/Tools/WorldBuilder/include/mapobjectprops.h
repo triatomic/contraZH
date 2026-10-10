@@ -238,6 +238,7 @@ public:
 	static void qtSetShroudClearingDistance(int dist);
 	static double qtGetStoppingDistance(void);
 	static void qtSetStoppingDistance(double dist);
+	static double qtGetObjectScale(void);
 	// Phase 3a: Visual section. Weather/Time are index combos; XY/Z/Angle drive the same
 	// ModifyObjectUndoable path as the MFC edits (single-object).
 	static int  qtGetWeather(void);
@@ -298,6 +299,7 @@ public:
 	static void qtMSetVisionDistance(int dist);
 	static void qtMSetShroudClearingDistance(int dist);
 	static void qtMSetStoppingDistance(double dist);
+	static void qtMSetObjectScale(double scale);
 	static void qtMSetWeather(int index);
 	static void qtMSetTime(int index);
 	static void qtMSetPosition(const char *text);

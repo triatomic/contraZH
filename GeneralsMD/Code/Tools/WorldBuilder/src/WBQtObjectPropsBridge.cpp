@@ -390,6 +390,39 @@ void MapObjectProps::qtMSetStoppingDistance(double dist)
 	}
 }
 
+double MapObjectProps::qtGetObjectScale(void)
+{
+	if (TheMapObjectProps == NULL || TheMapObjectProps->m_dictToEdit == NULL)
+	{
+		return 1.0;
+	}
+	Bool exists;
+	Real v = TheMapObjectProps->m_dictToEdit->getReal(TheKey_objectScale, &exists);
+	if (!exists)
+	{
+		return 1.0;
+	}
+	return v;
+}
+
+void MapObjectProps::qtMSetObjectScale(double scale)
+{
+	if (TheMapObjectProps == NULL || scale <= 0.0)
+	{
+		return;
+	}
+	TheMapObjectProps->getAllSelectedDicts();
+	CWorldBuilderDoc* pDoc = CWorldBuilderDoc::GetActiveDoc();
+	if ( pDoc != NULL )
+	{
+		Dict newDict;
+		newDict.setReal(TheKey_objectScale, (Real)scale);
+		DictItemUndoable *pUndo = new DictItemUndoable(&TheMapObjectProps->m_allSelectedDicts.front(), newDict, newDict.getNthKey(0), TheMapObjectProps->m_allSelectedDicts.size(), pDoc, true);
+		pDoc->AddAndDoUndoable(pUndo);
+		REF_PTR_RELEASE(pUndo); // belongs to pDoc now.
+	}
+}
+
 // == _WeatherToDict / _TimeToDict minus the combo reads.
 void MapObjectProps::qtMSetWeather(int index)
 {
@@ -1570,6 +1603,16 @@ extern "C" double WBQtObjectProps_GetStoppingDistance(void)
 extern "C" void WBQtObjectProps_SetStoppingDistance(double dist)
 {
 	MapObjectProps::qtMSetStoppingDistance(dist);
+}
+
+extern "C" double WBQtObjectProps_GetObjectScale(void)
+{
+	return MapObjectProps::qtGetObjectScale();
+}
+
+extern "C" void WBQtObjectProps_SetObjectScale(double scale)
+{
+	MapObjectProps::qtMSetObjectScale(scale);
 }
 
 // --- Phase 3a: Visual section ---------------------------------------------------------------

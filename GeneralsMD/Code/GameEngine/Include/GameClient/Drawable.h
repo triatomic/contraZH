@@ -437,6 +437,8 @@ public:
 
 	Real getInstanceScale() const { return m_instanceScale; }		///< get scale that will be applied to instance matrix
 	void setInstanceScale(Real value) { m_instanceScale = value;}	///< set scale that will be applied to instance matrix before rendering.
+	Real getObjectScale() const { return m_objectScale; }		///< map object scale, applied to the drawn transform only
+	void setObjectScale(Real value) { m_objectScale = value; }
 
 	const Matrix3D *getTransformMatrix() const;	///< return the world transform
 	const Matrix3D *getDrawnTransformMatrix() const;	///< world transform the model is drawn at this render frame, between the last two logic frames
@@ -765,6 +767,7 @@ private:
 
 	Matrix3D m_instance;				///< The instance matrix that holds the initial/default position & orientation
 	Real m_instanceScale;				///< the uniform scale factor applied to the instance matrix before it is sent to W3D.
+	Real m_objectScale;
 
 	mutable Matrix3D m_drawnPrevious;	///< logic transform one logic frame before m_drawnFrame
 	mutable Matrix3D m_drawnCurrent;	///< logic transform at m_drawnFrame
