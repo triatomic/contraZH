@@ -545,10 +545,16 @@ namespace
 		memcpy(dst, &footer, sizeof(footer));
 	}
 
-	// Render the fallback into caller-owned TGA bytes (18-byte header + 24-bit BGR,
-	// bottom-up like the real previews). Returns the byte count, 0 on any failure.
-	int qtGenerateHeightPreviewTga(const CString &mapPath, unsigned char *buf, int cap)
+	// Render the fallback from mapFile (owned, may be null) into caller-owned TGA bytes
+	// (18-byte header + 24-bit BGR, bottom-up like the real previews). Returns the byte
+	// count, 0 on any failure.
+	int qtGenerateHeightPreviewTga(File *mapFile, unsigned char *buf, int cap)
 	{
+		CachedFileInputStream strm;
+		if (!strm.open(mapFile))
+		{
+			return 0;
+		}
 		enum { PREV_W = 128, PREV_H = 128 };	// == MAP_PREVIEW_WIDTH/HEIGHT
 		// Header + pixels + the TGA v2 footer: TGA has no leading magic, so Qt's qtga
 		// plugin validates files by the TRUEVISION-XFILE footer -- without it
@@ -562,11 +568,6 @@ namespace
 		QtPreviewHeights hm;
 		try
 		{
-			CachedFileInputStream strm;
-			if (!strm.open(AsciiString((const char *)mapPath)))
-			{
-				return 0;
-			}
 			DataChunkInput file(&strm);
 			file.registerParser(AsciiString("HeightMapData"), AsciiString::TheEmptyString,
 				qtParseHeightMapChunk);
@@ -749,8 +750,10 @@ namespace
 
 // Preview bytes for row i: the <name>.tga next to the .map, read from disk in the
 // system/user modes or straight out of the current .big in packed mode (no extraction).
-// One entry point for every mode, like the other panels' _RenderPreview bridges, so the
-// Qt dialog needs no storage knowledge.
+// A missing or unreadable .tga (pre-preview-era map, or disableMapPreview) falls back to
+// a height-shaded preview generated from the .map itself. One entry point for every
+// mode, like the other panels' _RenderPreview bridges, so the Qt dialog needs no storage
+// knowledge.
 int OpenMap::qtItemPreviewData(int i, unsigned char *buf, int cap)
 {
 	if (buf == NULL || cap <= 0 || i < 0 || i >= (int)s_qtView.GetSize())
@@ -758,86 +761,100 @@ int OpenMap::qtItemPreviewData(int i, unsigned char *buf, int cap)
 		return 0;
 	}
 
+	CString mapPath;	// on disk, or inside the current .big in packed mode
 	if (m_packedMode == PM_OFF)
 	{
+		mapPath = qtMapFilePath(s_qtView[i], ".map");
 		CString tgaPath = qtMapFilePath(s_qtView[i], ".tga");
 		FILE *fp = ::fopen((LPCTSTR)tgaPath, "rb");
-		if (!fp)
+		if (fp)
 		{
-			// No saved preview (pre-preview-era map, or disableMapPreview): generate a
-			// height-shaded one from the map's own heightmap chunk. Remember the last
-			// result -- generating decompresses and chunk-walks the whole .map, so
-			// re-selecting the same row (arrow keys, re-clicks) must not redo it.
-			static CString s_lastGenPath;
-			static std::vector<unsigned char> s_lastGenTga;
-			CString mapPath = qtMapFilePath(s_qtView[i], ".map");
-			if (mapPath == s_lastGenPath && !s_lastGenTga.empty())
+			int got = (int)::fread(buf, 1, cap, fp);
+			Bool complete = (::feof(fp) != 0);	// a cap-sized read that didn't hit EOF = truncated
+			::fclose(fp);
+			int ready = complete ? qtMakeTgaQtReadable(buf, got, cap) : 0;
+			if (ready > 0)
 			{
-				if ((int)s_lastGenTga.size() > cap)
-				{
-					return 0;
-				}
-				memcpy(buf, &s_lastGenTga[0], s_lastGenTga.size());
-				return (int)s_lastGenTga.size();
+				return ready;
 			}
-			int made = qtGenerateHeightPreviewTga(mapPath, buf, cap);
-			if (made > 0)
-			{
-				s_lastGenPath = mapPath;
-				s_lastGenTga.assign(buf, buf + made);
-			}
-			return made;
 		}
-		int got = (int)::fread(buf, 1, cap, fp);
-		Bool complete = (::feof(fp) != 0);	// a cap-sized read that didn't hit EOF = truncated
-		::fclose(fp);
-		return complete ? qtMakeTgaQtReadable(buf, got, cap) : 0;
 	}
+	else
+	{
+		if (m_packedMode != PM_LIST_MAPS_IN_BIG)
+		{
+			return 0;	// the archive-list rows are .bigs, not maps
+		}
 
-	if (m_packedMode != PM_LIST_MAPS_IN_BIG)
-	{
-		return 0;	// the archive-list rows are .bigs, not maps
-	}
-
-	CString archiveMapPath = qtResolveArchiveMapPath(s_qtView[i]);
-	if (archiveMapPath.IsEmpty())
-	{
-		return 0;
-	}
-	int dot = archiveMapPath.ReverseFind('.');
-	if (dot <= 0)
-	{
-		return 0;
-	}
-	CString tgaPath = archiveMapPath.Left(dot) + ".tga";
-
-	if (s_qtPreviewArchive == NULL || s_qtPreviewArchiveBig.CompareNoCase(m_currentBig) != 0)
-	{
-		qtFreePreviewArchive();
-		s_qtPreviewArchive = TheArchiveFileSystem
-			? TheArchiveFileSystem->openArchiveFile((const char *)m_currentBig) : NULL;
-		if (s_qtPreviewArchive == NULL)
+		mapPath = qtResolveArchiveMapPath(s_qtView[i]);
+		if (mapPath.IsEmpty())
 		{
 			return 0;
 		}
-		s_qtPreviewArchiveBig = m_currentBig;
-	}
-	int got = 0;
-	File *pf = s_qtPreviewArchive->openFile((const char *)tgaPath, File::READ | File::BINARY);
-	if (pf)
-	{
-		Int sz = pf->size();
-		if (sz > 0 && sz <= cap)
+		int dot = mapPath.ReverseFind('.');
+		if (dot <= 0)
 		{
-			got = pf->read(buf, sz);
-			if (got < 0)
-			{
-				got = 0;
-			}
+			return 0;
 		}
-		pf->close();
+		CString tgaPath = mapPath.Left(dot) + ".tga";
+
+		if (s_qtPreviewArchive == NULL || s_qtPreviewArchiveBig.CompareNoCase(m_currentBig) != 0)
+		{
+			qtFreePreviewArchive();
+			s_qtPreviewArchive = TheArchiveFileSystem
+				? TheArchiveFileSystem->openArchiveFile((const char *)m_currentBig) : NULL;
+			if (s_qtPreviewArchive == NULL)
+			{
+				return 0;
+			}
+			s_qtPreviewArchiveBig = m_currentBig;
+		}
+		int got = 0;
+		File *pf = s_qtPreviewArchive->openFile((const char *)tgaPath, File::READ | File::BINARY);
+		if (pf)
+		{
+			Int sz = pf->size();
+			if (sz > 0 && sz <= cap)
+			{
+				got = pf->read(buf, sz);
+				if (got < 0)
+				{
+					got = 0;
+				}
+			}
+			pf->close();
+		}
+		int ready = qtMakeTgaQtReadable(buf, got, cap);
+		if (ready > 0)
+		{
+			return ready;
+		}
 	}
-	return qtMakeTgaQtReadable(buf, got, cap);
+
+	// Generating decompresses and chunk-walks the whole .map, so re-selecting the same
+	// row (arrow keys, re-clicks) reuses the last result.
+	static CString s_lastGenKey;
+	static std::vector<unsigned char> s_lastGenTga;
+	CString genKey = (m_packedMode == PM_OFF) ? mapPath : m_currentBig + "|" + mapPath;
+	if (genKey == s_lastGenKey && !s_lastGenTga.empty())
+	{
+		if ((int)s_lastGenTga.size() > cap)
+		{
+			return 0;
+		}
+		memcpy(buf, &s_lastGenTga[0], s_lastGenTga.size());
+		return (int)s_lastGenTga.size();
+	}
+	File *mapFile = (m_packedMode == PM_OFF)
+		? TheFileSystem->openFile((const char *)mapPath, File::READ | File::BINARY)
+		: s_qtPreviewArchive->openFile((const char *)mapPath, File::READ | File::BINARY);
+	int made = qtGenerateHeightPreviewTga(mapFile, buf, cap);
+	if (made > 0)
+	{
+		s_lastGenKey = genKey;
+		s_lastGenTga.assign(buf, buf + made);
+	}
+	return made;
 }
 
 int OpenMap::qtListCurSel(void)

@@ -49,7 +49,11 @@ CachedFileInputStream::~CachedFileInputStream()
 
 Bool CachedFileInputStream::open(AsciiString path)
 {
-	File *file=TheFileSystem->openFile(path.str(), File::READ | File::BINARY);
+	return open(TheFileSystem->openFile(path.str(), File::READ | File::BINARY));
+}
+
+Bool CachedFileInputStream::open(File *file)
+{
 	m_size = 0;
 
 	if (file) {
