@@ -552,6 +552,11 @@ Bool OptionPreferences::getBorderlessWindowEnabled(void) const
 	return getBool("BorderlessWindow", FALSE);
 }
 
+Bool OptionPreferences::getWindowedEnabled(void) const
+{
+	return getBool("Windowed", FALSE);
+}
+
 // TheSuperHackers @feature Options.ini: NumericalHealth = Yes prints the hit points beside the
 // health bar. Follows HealthBarDisplayMode, so the number appears exactly where a bar does.
 Bool OptionPreferences::getNumericalHealthEnabled(void) const

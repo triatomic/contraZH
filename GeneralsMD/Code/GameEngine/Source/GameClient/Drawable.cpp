@@ -615,6 +615,7 @@ Drawable::Drawable( const ThingTemplate *thingTemplate, DrawableStatusBits statu
 	//Real scaleFuzziness = thingTemplate->getInstanceScaleFuzziness();
 	//Real fuzzyScale = ( 1.0f + GameClientRandomValueReal( -scaleFuzziness, scaleFuzziness ));
 	m_instanceScale = thingTemplate->getAssetScale();// * fuzzyScale;
+	m_objectScale = 1.0f;
 
 	// initially not bound to an object
 	m_object = nullptr;
@@ -2979,6 +2980,12 @@ void Drawable::draw()
 #endif
 	}
 
+	// A baked per-instance scale would corrupt the pristine bones every instance of the template shares.
+	if (m_objectScale != 1.0f)
+	{
+		transformMtx.Scale(m_objectScale);
+	}
+
 	if (TheGlobalData->m_showClientPhysics && getObject() && !getObject()->isDisabledByType( DISABLED_HELD ))
 	{
 		applyPhysicsXform(&transformMtx);
@@ -3937,7 +3944,7 @@ void Drawable::drawIconUI()
 		return;
 #endif
 
-	if( TheGameLogic->getDrawIconUI() && (TheScriptEngine->getFade()==ScriptEngine::FADE_NONE) )
+	if( TheGameLogic->getDrawIconUI() && (TheScriptEngine->getFade()==ScriptEngine::FADE_NONE || TheScriptEngine->isLightningFade()) )
 	{
 		IRegion2D healthBarRegionStorage;
 		const IRegion2D* healthBarRegion = nullptr;
@@ -6891,6 +6898,7 @@ void Drawable::xferDrawableModules( Xfer *xfer )
 	* 9: jamming overlay intensity
 	* 10: frozen overlay intensity
 	* 11: TheSuperHackers @tweak m_timeElapsedFade is now serialized as Real instead of UnsignedInt
+	* 12: m_objectScale
 	*/
 // ------------------------------------------------------------------------------------------------
 void Drawable::xfer( Xfer *xfer )
@@ -6902,7 +6910,7 @@ void Drawable::xfer( Xfer *xfer )
 #elif RETAIL_COMPATIBLE_XFER_SAVE
 	const XferVersion currentVersion = 7;
 #else
-	const XferVersion currentVersion = 11;
+	const XferVersion currentVersion = 12;
 #endif
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
@@ -7418,6 +7426,11 @@ void Drawable::xfer( Xfer *xfer )
 	if( version >= 10 )
 	{
 		xfer->xferReal( &m_frozenOverlayIntensity );
+	}
+
+	if( version >= 12 )
+	{
+		xfer->xferReal( &m_objectScale );
 	}
 }
 

@@ -42,6 +42,7 @@
 #include "GameClient/GadgetListBox.h"
 #include "GameClient/GadgetRadioButton.h"
 #include "GameClient/GadgetStaticText.h"
+#include "GameClient/GadgetTextEntry.h"
 #include "GameNetwork/LANAPICallbacks.h"
 #include "GameClient/MapUtil.h"
 
@@ -51,6 +52,8 @@ static NameKeyType buttonOK = NAMEKEY_INVALID;
 static NameKeyType listboxMap = NAMEKEY_INVALID;
 static GameWindow *parent = nullptr;
 static GameWindow *mapList = nullptr;
+static GameWindow *mapFilter = nullptr;
+static Bool showingSystemMaps = TRUE;
 
 static NameKeyType radioButtonSystemMapsID = NAMEKEY_INVALID;
 static NameKeyType radioButtonUserMapsID = NAMEKEY_INVALID;
@@ -68,6 +71,7 @@ static void NullifyControls()
 {
 	parent = nullptr;
 	mapList = nullptr;
+	mapFilter = nullptr;
 	if (winMapPreview)
 	{
 		winMapPreview->winSetUserData(nullptr);
@@ -80,6 +84,21 @@ static void NullifyControls()
 }
 
 extern WindowLayout *skirmishMapSelectLayout;
+
+static void populateSkirmishMapList( Bool useSystemMaps, AsciiString mapToSelect )
+{
+	showingSystemMaps = useSystemMaps;
+	const UnicodeString filter = GadgetTextEntryGetText( mapFilter );
+	if (useSystemMaps)
+	{
+		populateMapListbox( mapList, TRUE, TRUE, mapToSelect, filter );
+	}
+	else
+	{
+		populateMapListbox( mapList, FALSE, FALSE, mapToSelect, filter );
+		populateMapListboxNoReset( mapList, FALSE, TRUE, mapToSelect, filter );
+	}
+}
 
 // Tooltips -------------------------------------------------------------------------------
 
@@ -299,17 +318,16 @@ void SkirmishMapSelectMenuInit( WindowLayout *layout, void *userData )
 	mapList = TheWindowManager->winGetWindowFromId( parent, mapListID );
 	if( mapList )
 	{
+		GameWindow *nameEntry = TheWindowManager->winGetWindowFromId( nullptr, TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:TextEntryPlayerName" ) );
+		mapFilter = createMapListFilter( mapList, nameEntry );
+		if (mapFilter)
+		{
+			TheWindowManager->winSetFocus( mapFilter );
+		}
+
 		if (TheMapCache)
 			TheMapCache->updateCache();
-		if (usesSystemMapDir)
-		{
-			populateMapListbox( mapList, TRUE, TRUE, TheSkirmishGameInfo->getMap() );
-		}
-		else
-		{
-			populateMapListbox( mapList, FALSE, FALSE, TheSkirmishGameInfo->getMap() );
-			populateMapListboxNoReset( mapList, FALSE, TRUE, TheSkirmishGameInfo->getMap() );
-		}
+		populateSkirmishMapList( usesSystemMapDir, TheSkirmishGameInfo->getMap() );
 		mapList->winSetTooltipFunc(mapListTooltipFunc);
 	}
 
@@ -429,6 +447,19 @@ WindowMsgHandledType SkirmishMapSelectMenuSystem( GameWindow *window, UnsignedIn
 		}
 
 		//---------------------------------------------------------------------------------------------
+		case GEM_UPDATE_TEXT:
+		{
+			if( mapFilter && (GameWindow *)mData1 == mapFilter )
+			{
+				Int selected = -1;
+				GadgetListBoxGetSelected( mapList, &selected );
+				const char *mapFname = selected >= 0 ? (const char *)GadgetListBoxGetItemData( mapList, selected ) : nullptr;
+				populateSkirmishMapList( showingSystemMaps, mapFname ? AsciiString( mapFname ) : TheSkirmishGameInfo->getMap() );
+			}
+			break;
+		}
+
+		//---------------------------------------------------------------------------------------------
 		case GLM_DOUBLE_CLICKED:
 			{
 				GameWindow *control = (GameWindow *)mData1;
@@ -461,7 +492,8 @@ WindowMsgHandledType SkirmishMapSelectMenuSystem( GameWindow *window, UnsignedIn
 					if( rowSelected < 0 )
 					{
 						positionStartSpots( AsciiString::TheEmptyString, buttonMapStartPosition, winMapPreview);
-						//winMapPreview->winClearStatus(WIN_STATUS_IMAGE);
+						winMapPreview->winSetUserData(nullptr);
+						winMapPreview->winClearStatus(WIN_STATUS_IMAGE);
 						break;
 					}
 					winMapPreview->winSetStatus(WIN_STATUS_IMAGE);
@@ -504,7 +536,7 @@ WindowMsgHandledType SkirmishMapSelectMenuSystem( GameWindow *window, UnsignedIn
 			{
 				if (TheMapCache)
 					TheMapCache->updateCache();
-				populateMapListbox( mapList, TRUE, TRUE, TheSkirmishGameInfo->getMap() );
+				populateSkirmishMapList( TRUE, TheSkirmishGameInfo->getMap() );
 				//LANPreferences pref;
 				//pref["UseSystemMapDir"] = "yes";
 				//pref.write();
@@ -513,8 +545,7 @@ WindowMsgHandledType SkirmishMapSelectMenuSystem( GameWindow *window, UnsignedIn
 			{
 				if (TheMapCache)
 					TheMapCache->updateCache();
-				populateMapListbox( mapList, FALSE, FALSE, TheSkirmishGameInfo->getMap() );
-				populateMapListboxNoReset( mapList, FALSE, TRUE, TheSkirmishGameInfo->getMap() );
+				populateSkirmishMapList( FALSE, TheSkirmishGameInfo->getMap() );
 				//LANPreferences pref;
 				//pref["UseSystemMapDir"] = "no";
 				//pref.write();

@@ -117,6 +117,8 @@ static GameWindow *		textEntryMaxCameraHeight		= nullptr;
 
 static NameKeyType		checkBorderlessWindowID	= NAMEKEY_INVALID;
 static GameWindow *		checkBorderlessWindow		= nullptr;
+static NameKeyType		checkWindowedID	= NAMEKEY_INVALID;
+static GameWindow *		checkWindowed		= nullptr;
 
 static NameKeyType    checkLanguageFilterID = NAMEKEY_INVALID;
 static GameWindow *   checkLanguageFilter   = nullptr;
@@ -690,6 +692,7 @@ static void setDefaults()
 	GadgetCheckBoxSetChecked(checkRetaliation, TRUE );
 	GadgetCheckBoxSetChecked( checkDoubleClickAttackMove, FALSE );
 	setCheck( checkBorderlessWindow, FALSE );
+	setCheck( checkWindowed, FALSE );
 
 	//-------------------------------------------------------------------------------------------------
 //	// scroll speed val
@@ -1453,16 +1456,20 @@ static void saveOptions()
 	oldDispSettings.yRes = TheDisplay->getHeight();
 	oldDispSettings.bitDepth = TheDisplay->getBitDepth();
 	oldDispSettings.windowed = TheDisplay->getWindowed();
+	oldDispSettings.framed = TheGlobalData->m_windowed;
 
 	if (comboBoxResolution && comboBoxResolution->winGetEnabled() && index < TheDisplay->getDisplayModeCount() && index >= 0)
 	{
 		TheDisplay->getDisplayModeDescription(index,&xres,&yres,&bitDepth);
 
-		const Bool borderless = getCheck( checkBorderlessWindow, TheGlobalData->m_borderlessWindow );
-		const Bool windowed = TheGlobalData->m_windowed || borderless;
+		const Bool framed = getCheck( checkWindowed, TheGlobalData->m_windowed );
+		const Bool borderless = !framed && getCheck( checkBorderlessWindow, TheGlobalData->m_borderlessWindow );
+		const Bool windowed = framed || borderless;
 
-		if (TheGlobalData->m_xResolution != xres || TheGlobalData->m_yResolution != yres || windowed != TheDisplay->getWindowed())
+		if (TheGlobalData->m_xResolution != xres || TheGlobalData->m_yResolution != yres || windowed != TheDisplay->getWindowed() || framed != TheGlobalData->m_windowed)
 		{
+			// the window frame follows m_windowed, so it must change before the mode does
+			TheWritableGlobalData->m_windowed = framed;
 			if (TheDisplay->setDisplayMode(xres,yres,bitDepth,windowed))
 			{
 				dispChanged = TRUE;
@@ -1470,6 +1477,7 @@ static void saveOptions()
 				TheWritableGlobalData->m_yResolution = yres;
 				TheWritableGlobalData->m_borderlessWindow = borderless;
 				(*pref)["BorderlessWindow"] = borderless ? "yes" : "no";
+				(*pref)["Windowed"] = framed ? "yes" : "no";
 
 				TheHeaderTemplateManager->onResolutionChanged();
 				TheMouse->onResolutionChanged();
@@ -1479,6 +1487,7 @@ static void saveOptions()
 				newDispSettings.yRes = yres;
 				newDispSettings.bitDepth = bitDepth;
 				newDispSettings.windowed = TheDisplay->getWindowed();
+				newDispSettings.framed = framed;
 
 				AsciiString prefString;
 				prefString.format("%d %d", xres, yres );
@@ -1488,6 +1497,10 @@ static void saveOptions()
 				TheInGameUI->recreateControlBar();
 				TheShell->recreateWindowLayouts();
 				TheInGameUI->refreshCustomUiResources();
+			}
+			else
+			{
+				TheWritableGlobalData->m_windowed = oldDispSettings.framed;
 			}
 		}
 	}
@@ -1885,7 +1898,8 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 	}
 	checkBorderlessWindow = findOptionsWindow( "OptionsMenu.wnd:CheckBorderlessWindow", checkBorderlessWindowID );
 	setCheckText( checkBorderlessWindow, "GUI:BorderlessWindow", L"Borderless", "TOOLTIP:BorderlessWindow", L"Runs the game in a frameless window at the selected resolution instead of exclusive fullscreen." );
-	enableWindow( checkBorderlessWindow, !TheGlobalData->m_windowed );
+	checkWindowed = findOptionsWindow( "OptionsMenu.wnd:CheckWindowed", checkWindowedID );
+	setCheckText( checkWindowed, "GUI:Windowed", L"Windowed", "TOOLTIP:Windowed", L"Runs the game in a movable window with a title bar at the selected resolution." );
 	comboBoxAntiAliasingID = TheNameKeyGenerator->nameToKey( "OptionsMenu.wnd:ComboBoxAntiAliasing" );
 	comboBoxAntiAliasing   = TheWindowManager->winGetWindowFromId( nullptr, comboBoxAntiAliasingID );
 	comboBoxResolutionID   = TheNameKeyGenerator->nameToKey( "OptionsMenu.wnd:ComboBoxResolution" );
@@ -2289,7 +2303,8 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 	GadgetCheckBoxSetChecked(checkAlternateMouse, TheGlobalData->m_useAlternateMouse);
 	GadgetCheckBoxSetChecked(checkRetaliation, TheGlobalData->m_clientRetaliationModeEnabled);
 	GadgetCheckBoxSetChecked( checkDoubleClickAttackMove, TheGlobalData->m_doubleClickAttackMove );
-	setCheck( checkBorderlessWindow, TheGlobalData->m_borderlessWindow );
+	setCheck( checkBorderlessWindow, TheGlobalData->m_borderlessWindow && !TheGlobalData->m_windowed );
+	setCheck( checkWindowed, TheGlobalData->m_windowed );
 
 	// set scroll speed slider
 	// TheSuperHackers @tweak xezon 11/07/2025 No longer sets the slider position if the user setting
@@ -2352,6 +2367,7 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 			comboBoxResolution->winEnable(FALSE);
 
 		enableWindow( checkBorderlessWindow, FALSE );
+		enableWindow( checkWindowed, FALSE );
 
 		if (textEntryFirewallPortOverride)
 			textEntryFirewallPortOverride->winEnable(FALSE);
@@ -2647,6 +2663,14 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 			else if ( controlID == buttonKeyboardOptionsMenu )
 			{
 				TheShell->push( "Menus/KeyboardOptionsMenu.wnd" );
+			}
+			else if (controlID == checkWindowedID && GadgetCheckBoxIsChecked( control ))
+			{
+				setCheck( checkBorderlessWindow, FALSE );
+			}
+			else if (controlID == checkBorderlessWindowID && GadgetCheckBoxIsChecked( control ))
+			{
+				setCheck( checkWindowed, FALSE );
 			}
 			else if(controlID == checkMaxCameraHeightID )
 			{

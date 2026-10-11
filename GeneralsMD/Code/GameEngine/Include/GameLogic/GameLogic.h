@@ -384,7 +384,7 @@ private:
 	bool onLogicCrc(GameMessage *msg);
 	bool onPurchaseScience(GameMessage *msg);
 
-	static void createOptimizedTree(const ThingTemplate *thingTemplate, Coord3D *pos, Real angle);
+	static void createOptimizedTree(const ThingTemplate *thingTemplate, Coord3D *pos, Real angle, Real scale);
 
 private:
 

@@ -772,6 +772,7 @@ struct MapListBoxData
 		, mapToSelect()
 		, selectionIndex(0) // always select *something*
 		, isMultiplayer(false)
+		, filter()
 	{
 	}
 
@@ -789,7 +790,23 @@ struct MapListBoxData
 	AsciiString mapToSelect;
 	Int selectionIndex;
 	Bool isMultiplayer;
+	UnicodeString filter;
 };
+
+//-------------------------------------------------------------------------------------------------
+static Bool containsNoCase( const UnicodeString& text, const UnicodeString& pattern )
+{
+	const Int patternLen = pattern.getLength();
+	const Int last = text.getLength() - patternLen;
+	for (Int i = 0; i <= last; ++i)
+	{
+		if (_wcsnicmp( text.str() + i, pattern.str(), patternLen ) == 0)
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
 
 //-------------------------------------------------------------------------------------------------
 static Bool addMapToMapListbox(
@@ -798,7 +815,8 @@ static Bool addMapToMapListbox(
 	const AsciiString& mapName,
 	const MapMetaData& mapMetaData)
 {
-	const Bool mapOk = mapName.startsWithNoCase(mapDir.str()) && lbData.isMultiplayer == mapMetaData.m_isMultiplayer && !mapMetaData.m_displayName.isEmpty();
+	const Bool mapOk = mapName.startsWithNoCase(mapDir.str()) && lbData.isMultiplayer == mapMetaData.m_isMultiplayer && !mapMetaData.m_displayName.isEmpty()
+		&& containsNoCase(mapMetaData.m_displayName, lbData.filter);
 
 	if (mapOk)
 	{
@@ -919,7 +937,7 @@ static Bool addMapCollectionToMapListbox(
 //-------------------------------------------------------------------------------------------------
 /** Load the listbox with all the map files available to play */
 //-------------------------------------------------------------------------------------------------
-Int populateMapListboxNoReset( GameWindow *listbox, Bool useSystemMaps, Bool isMultiplayer, AsciiString mapToSelect )
+Int populateMapListboxNoReset( GameWindow *listbox, Bool useSystemMaps, Bool isMultiplayer, AsciiString mapToSelect, const UnicodeString& filter )
 {
 	if(!TheMapCache)
 		return -1;
@@ -933,6 +951,7 @@ Int populateMapListboxNoReset( GameWindow *listbox, Bool useSystemMaps, Bool isM
 	lbData.numColumns = GadgetListBoxGetNumColumns( listbox );
 	lbData.mapToSelect = mapToSelect;
 	lbData.isMultiplayer = isMultiplayer;
+	lbData.filter = filter;
 
 	if (lbData.numColumns > 1)
 	{
@@ -979,6 +998,12 @@ Int populateMapListboxNoReset( GameWindow *listbox, Bool useSystemMaps, Bool isM
 	delete lbData.battleHonors;
 	lbData.battleHonors = nullptr;
 
+	// an empty row swallows the selection silently, so an empty list must report -1
+	if (GadgetListBoxGetNumEntries(listbox) == 0)
+	{
+		lbData.selectionIndex = -1;
+	}
+
 	GadgetListBoxSetSelected(listbox, &lbData.selectionIndex, 1);
 
 	if (lbData.selectionIndex >= 0)
@@ -1001,7 +1026,7 @@ Int populateMapListboxNoReset( GameWindow *listbox, Bool useSystemMaps, Bool isM
 //-------------------------------------------------------------------------------------------------
 /** Load the listbox with all the map files available to play */
 //-------------------------------------------------------------------------------------------------
-Int populateMapListbox( GameWindow *listbox, Bool useSystemMaps, Bool isMultiplayer, AsciiString mapToSelect )
+Int populateMapListbox( GameWindow *listbox, Bool useSystemMaps, Bool isMultiplayer, AsciiString mapToSelect, const UnicodeString& filter )
 {
 	if(!TheMapCache)
 		return -1;
@@ -1012,7 +1037,63 @@ Int populateMapListbox( GameWindow *listbox, Bool useSystemMaps, Bool isMultipla
 	// reset the listbox content
 	GadgetListBoxReset( listbox );
 
-	return populateMapListboxNoReset( listbox, useSystemMaps, isMultiplayer, mapToSelect );
+	return populateMapListboxNoReset( listbox, useSystemMaps, isMultiplayer, mapToSelect, filter );
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Put a search box above the map listbox, taking its height from the top of the list */
+//-------------------------------------------------------------------------------------------------
+GameWindow *createMapListFilter( GameWindow *listbox, GameWindow *lookTemplate )
+{
+	if (!listbox)
+	{
+		return nullptr;
+	}
+
+	WinInstanceData instData;
+	instData.init();
+	instData.m_style = GWS_ENTRY_FIELD | GWS_MOUSE_TRACK;
+
+	UnsignedInt status = WIN_STATUS_ENABLED;
+	Int height = 22;
+	GameFont *font = listbox->winGetFont();
+	if (lookTemplate)
+	{
+		const WinInstanceData *look = lookTemplate->winGetInstanceData();
+		for (Int i = 0; i < MAX_DRAW_DATA; ++i)
+		{
+			instData.m_enabledDrawData[i] = look->m_enabledDrawData[i];
+			instData.m_disabledDrawData[i] = look->m_disabledDrawData[i];
+			instData.m_hiliteDrawData[i] = look->m_hiliteDrawData[i];
+		}
+		instData.m_enabledText = look->m_enabledText;
+		instData.m_disabledText = look->m_disabledText;
+		instData.m_hiliteText = look->m_hiliteText;
+		instData.m_imeCompositeText = look->m_imeCompositeText;
+		status |= lookTemplate->winGetStatus() & WIN_STATUS_IMAGE;
+		font = lookTemplate->winGetFont();
+		Int templateWidth;
+		lookTemplate->winGetSize( &templateWidth, &height );
+	}
+
+	Int x, y, width, listHeight;
+	listbox->winGetPosition( &x, &y );
+	listbox->winGetSize( &width, &listHeight );
+	const Int gap = 4;
+	listbox->winSetPosition( x, y + height + gap );
+	listbox->winSetSize( width, listHeight - height - gap );
+
+	EntryData entryData;
+	memset( &entryData, 0, sizeof( entryData ) );
+	entryData.maxTextLen = 32;
+	GameWindow *entry = TheWindowManager->gogoGadgetTextEntry( listbox->winGetParent(), status, x, y, width, height,
+		&instData, &entryData, font, lookTemplate == nullptr );
+	if (entry)
+	{
+		// messages go where the listbox's go, so the menu sees GEM_UPDATE_TEXT
+		entry->winSetOwner( listbox->winGetOwner() );
+	}
+	return entry;
 }
 
 

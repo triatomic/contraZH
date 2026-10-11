@@ -225,6 +225,43 @@ sight line that crosses a bridge deck is now blocked in both directions, for eve
 Changes when units fire; affects replays.
 ([#120](https://github.com/triatomic/contraZH/issues/120))
 
+## Scaled objects keep their size under fog
+
+A scaled object that sat in the fog before it was ever on screen was remembered at its unscaled
+size, so its fogged ghost looked smaller than the real thing. The ghost now matches the object.
+
+Presentation only; replays unaffected.
+([#121](https://github.com/triatomic/contraZH/issues/121))
+
+# Maps
+
+## Per-object scale
+
+* Each placed object has a `Scale` field in WorldBuilder's Object Properties (`objectScale` in the
+map). It multiplies the template `Scale`.
+* WorldBuilder rolls a random scale when it places an object whose template has
+`InstanceScaleFuzziness`, so a forest of one tree type gets mixed sizes. The roll is stored in the
+map; the game never re-rolls it.
+* Works for ordinary objects, optimized trees and props, and under fog of war.
+
+Notes:
+* Visual only. Footprint, collision, selection box and bone positions keep the template size.
+* Saves from before this build load with every object at scale 1.
+([#121](https://github.com/triatomic/contraZH/issues/121))
+
+## Lightning lights the scene
+
+* Maps fake lightning with the `CAMERA_FADE_ADD` script action, which washed the screen white. An
+additive fade that lasts 1 second or less now lights terrain, roads, bridges and units with a
+bluish-white light above the view instead.
+* Longer additive fades, and all other fade types, still draw on the screen as before.
+* Health bars and tooltips stay visible during the flash.
+
+Notes:
+* Needs `DynamicLights = Yes` in `Options.ini`. Without it the white screen flash is kept.
+* Water surfaces do not take the light.
+([#121](https://github.com/triatomic/contraZH/issues/121))
+
 # Game Setup
 
 ## Random army per faction
@@ -248,6 +285,14 @@ back to `Random <BaseSide>`.
 * Generals Online keeps its `/maxcameraheight` lobby command; GO's default (310) means the mod's own
 limit.
 * The `Shift + Ctrl + Z` zoom-limit cheat is unaffected.
+
+## Map search
+
+* The skirmish and LAN map select windows have a search box above the map list, focused on open.
+* Typing filters the list to maps whose name contains the text, ignoring case. It applies to both
+official and custom maps.
+* The box takes its height from the top of the list and copies the look of the setup screen's text
+box (player name in skirmish, chat in LAN), so mod layouts need no `.wnd` change.
 
 # Options.ini
 
@@ -287,6 +332,9 @@ waterline, two-tone ground, 256x256 grid.)
 `NewRadar`.)
 * `BorderlessWindow = No` - (Yes runs a frameless centred window at the selected resolution. Also
 the Borderless checkbox beside Resolution. `-win` still gives a captioned window.)
+* `Windowed = No` - (Yes runs a movable window with a title bar at the selected resolution, like
+`-win`. Also the Windowed checkbox beside Borderless; checking one clears the other. `-win` still
+forces it on. Needs `CheckWindowed` in `OptionsMenu.wnd` for the menu control.)
 
 Notes:
 * A blue bar under a building's health bar shows production progress; on supply gatherers it shows

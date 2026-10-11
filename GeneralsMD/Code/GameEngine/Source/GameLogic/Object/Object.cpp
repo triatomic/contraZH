@@ -4008,6 +4008,12 @@ void Object::updateObjValuesFromMapProperties(Dict* properties)
       }
     }
 
+    valReal = properties->getReal(TheKey_objectScale, &exists);
+    if (exists && valReal > 0.0f)
+    {
+      drawable->setObjectScale(valReal);
+    }
+
     // See if we are supposed to playing the ambient sound
     Bool soundEnabledExists;
     Bool soundEnabled = properties->getBool( TheKey_objectSoundAmbientEnabled, &soundEnabledExists );

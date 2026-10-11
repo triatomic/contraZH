@@ -94,6 +94,9 @@ int    WBQtObjectProps_GetPosition(char *out, int cap);
 void   WBQtObjectProps_SetPosition(const char *text);
 double WBQtObjectProps_GetZOffset(void);
 void   WBQtObjectProps_SetZOffset(double z);
+// Visual size multiplier on the template Scale (1 == unset), applied to the whole selection.
+double WBQtObjectProps_GetObjectScale(void);
+void   WBQtObjectProps_SetObjectScale(double scale);
 // Scrub batching: between Begin and End, SetZOffset/SetAngle mutate one undoable
 // (== the MFC pop-slider), so a whole scrub drag is a single undo step.
 void   WBQtObjectProps_BeginPosScrub(void);

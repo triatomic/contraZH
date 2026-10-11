@@ -250,4 +250,5 @@ typedef struct _DisplaySettings
 	Int yRes;  //Resolution height
 	Int bitDepth; //Color Depth
 	Bool windowed; //Window mode TRUE: we're windowed, FALSE: we're not windowed
+	Bool framed; //Windowed with a title bar; windowed without one is borderless
 } DisplaySettings;

@@ -1194,6 +1194,14 @@ void GameLogic::setGameMode( GameMode mode )
 }
 
 // ------------------------------------------------------------------------------------------------
+static Real getMapObjectScale(MapObject *pMapObj)
+{
+	Bool exists;
+	Real scale = pMapObj->getProperties()->getReal(TheKey_objectScale, &exists);
+	return (exists && scale > 0.0f) ? scale : 1.0f;
+}
+
+// ------------------------------------------------------------------------------------------------
 /** Entry point for starting a new game, the engine is already in clean state at this
 	* point and ready to load up with all the data */
 // ------------------------------------------------------------------------------------------------
@@ -1935,7 +1943,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			Real angle = normalizeAngle(pMapObj->getAngle());
 
 			if (thingTemplate->isKindOf(KINDOF_OPTIMIZED_TREE)) {
-				createOptimizedTree(thingTemplate, &pos, angle);
+				createOptimizedTree(thingTemplate, &pos, angle, getMapObjectScale(pMapObj));
 			}
 		}
 	}
@@ -1978,7 +1986,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			Real angle = normalizeAngle(pMapObj->getAngle());
 
 			if (thingTemplate->isKindOf(KINDOF_OPTIMIZED_TREE)) {
-				createOptimizedTree(thingTemplate, &pos, angle);
+				createOptimizedTree(thingTemplate, &pos, angle, getMapObjectScale(pMapObj));
 				continue;
 			}
 
@@ -1992,7 +2000,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 				}
 			}
 			if (isProp || (isFluff && forceFluffToProp)) {
-				TheTerrainVisual->addProp(thingTemplate, &pos, angle);
+				TheTerrainVisual->addProp(thingTemplate, &pos, angle, getMapObjectScale(pMapObj));
 				continue;
 			}
 #endif
@@ -2505,7 +2513,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 }
 
 //-----------------------------------------------------------------------------------------
-void GameLogic::createOptimizedTree(const ThingTemplate *thingTemplate, Coord3D *pos, Real angle)
+void GameLogic::createOptimizedTree(const ThingTemplate *thingTemplate, Coord3D *pos, Real angle, Real scale)
 {
 	// Opt trees and props just get drawables to tell the client about it, then deleted. jba [6/5/2003]
 	// This way there is no logic object to slow down partition manager and core logic stuff.
@@ -2514,6 +2522,7 @@ void GameLogic::createOptimizedTree(const ThingTemplate *thingTemplate, Coord3D 
 	if (draw) {
 		draw->setOrientation(angle);
 		draw->setPosition(pos);
+		draw->setObjectScale(scale);
 		TheGameClient->destroyDrawable(draw);
 	}
 }

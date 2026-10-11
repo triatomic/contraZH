@@ -5783,6 +5783,14 @@ void ScriptEngine::updateFades()
 }
 
 //-------------------------------------------------------------------------------------------------
+Bool ScriptEngine::isLightningFade() const
+{
+	// Maps fake lightning with short additive fades; a fade to white runs longer.
+	const Int frames = m_fadeFramesIncrease + m_fadeFramesHold + m_fadeFramesDecrease;
+	return m_fade == FADE_ADD && frames <= LOGICFRAMES_PER_SECOND && TheGlobalData->m_useDynamicLights;
+}
+
+//-------------------------------------------------------------------------------------------------
 /** getCurrentPlayer */
 //-------------------------------------------------------------------------------------------------
 Player *ScriptEngine::getCurrentPlayer()

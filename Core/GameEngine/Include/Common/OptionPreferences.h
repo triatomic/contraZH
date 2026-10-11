@@ -203,6 +203,8 @@ public:
 	// Options.ini: AmbientOcclusionDebug = Yes shows the occlusion alone, in grey
 	Bool getAmbientOcclusionDebugEnabled() const;
 	Bool getBorderlessWindowEnabled() const;
+	// Options.ini: Windowed = Yes runs in a framed window, as -win does
+	Bool getWindowedEnabled() const;
 	Bool getEasyMilitaryDragEnabled() const;
 	Bool getSmartPipsEnabled() const;
 	Bool getNumericalHealthEnabled() const;

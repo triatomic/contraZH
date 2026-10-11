@@ -326,6 +326,7 @@ public:
 
 	TFade getFade() {return m_fade;}
 	Real	getFadeValue() {return m_curFadeValue;}
+	Bool	isLightningFade() const;	///< drawn as scene light instead of a screen layer
 
 	AsciiString getCurrentTrackName() const { return m_currentTrackName; }
 	void setCurrentTrackName(AsciiString a) { m_currentTrackName = a; }

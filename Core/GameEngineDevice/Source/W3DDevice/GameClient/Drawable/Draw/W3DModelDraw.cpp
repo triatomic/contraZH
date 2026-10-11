@@ -4716,6 +4716,18 @@ void W3DModelDraw::reactToTransformChange( const Matrix3D* oldMtx,
 	if( m_renderObject )
 	{
 		Matrix3D mtx = *getDrawable()->getTransformMatrix();
+
+		// Scale like doDrawModule, or a fogged object that was never drawn is ghosted at its unscaled size.
+#if RTS_ZEROHOUR
+		Real scale = getDrawable()->getObjectScale() * getDrawable()->getInstanceScale();
+#else
+		Real scale = getDrawable()->getInstanceScale();
+#endif
+		if (scale != 1.0f)
+		{
+			mtx.Scale(scale);
+		}
+
 		adjustTransformMtx(mtx);
 		m_renderObject->Set_Transform(mtx);
 	}

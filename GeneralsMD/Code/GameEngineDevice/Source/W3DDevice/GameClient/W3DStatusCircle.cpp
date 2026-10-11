@@ -335,7 +335,7 @@ void W3DStatusCircle::Render(RenderInfoClass & rinfo)
 
 
 	ScriptEngine::TFade fade = TheScriptEngine->getFade();
-	if (fade == ScriptEngine::FADE_NONE) {
+	if (fade == ScriptEngine::FADE_NONE || TheScriptEngine->isLightningFade()) {
 		return;
 	}
 

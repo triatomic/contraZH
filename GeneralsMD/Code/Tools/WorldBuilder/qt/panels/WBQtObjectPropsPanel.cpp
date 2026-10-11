@@ -64,6 +64,7 @@ WBQtObjectPropsPanel::WBQtObjectPropsPanel(QWidget *owner)
 	m_weather = m_ui->weather;
 	m_angle = m_ui->angle;
 	m_time = m_ui->time;
+	m_scale = m_ui->scale;
 	m_soundBox = m_ui->soundBox;
 	m_sound = m_ui->sound;
 	m_listen = m_ui->listen;
@@ -95,6 +96,7 @@ WBQtObjectPropsPanel::WBQtObjectPropsPanel(QWidget *owner)
 	m_zOffset->setRange(-100.0, 100.0);	// matches the MFC IDC_HEIGHT_POPUP slider range
 	m_angle->setRange(0.0, 360.0);	// matches the MFC IDC_ANGLE_POPUP slider range
 	m_angle->setWrapping(true);	// 360 wraps to 0, like a compass heading
+	m_scale->setRange(0.1, 10.0);
 
 	// The sound list holds hundreds of long names; without this it forces the whole panel
 	// far wider than the MFC dialog. Cap the field width; the popup can still be wide.
@@ -139,6 +141,8 @@ WBQtObjectPropsPanel::WBQtObjectPropsPanel(QWidget *owner)
 	connect(m_zOffset, SIGNAL(scrubFinished()), this, SLOT(onPosScrubFinished()));
 	connect(m_angle, SIGNAL(scrubStarted()), this, SLOT(onPosScrubStarted()));
 	connect(m_angle, SIGNAL(scrubFinished()), this, SLOT(onPosScrubFinished()));
+	connect(m_scale, SIGNAL(editingFinished()), this, SLOT(onScaleChanged()));
+	connect(m_scale, SIGNAL(scrubFinished()), this, SLOT(onScaleChanged()));
 	connect(m_sound, SIGNAL(currentIndexChanged(int)), this, SLOT(onSoundChanged(int)));
 	connect(m_listen, SIGNAL(clicked()), this, SLOT(onListenClicked()));
 	connect(m_customize, SIGNAL(clicked()), this, SLOT(onSoundFlagToggled()));
@@ -411,6 +415,7 @@ void WBQtObjectPropsPanel::pushRefresh()
 		m_zOffset->setValue(0.0);
 		m_angle->setValue(0.0);
 	}
+	m_scale->setValue(WBQtObjectProps_GetObjectScale());
 
 	// Weather/Time apply to the whole selection; XY/Z/Angle are single-object (like the MFC edits).
 	m_visualBox->setEnabled(selCount > 0);
@@ -802,6 +807,15 @@ void WBQtObjectPropsPanel::onAngleChanged()
 		return;
 	}
 	WBQtObjectProps_SetAngle(m_angle->value());
+}
+
+void WBQtObjectPropsPanel::onScaleChanged()
+{
+	if (m_updating || m_scale->value() == WBQtObjectProps_GetObjectScale())
+	{
+		return;
+	}
+	WBQtObjectProps_SetObjectScale(m_scale->value());
 }
 
 // --- Sound section slots --------------------------------------------------------------------

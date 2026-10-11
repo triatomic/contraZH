@@ -68,6 +68,7 @@ private slots:
 	void onPositionChanged();
 	void onZChanged();
 	void onAngleChanged();
+	void onScaleChanged();
 	void onPosScrubStarted();
 	void onPosScrubFinished();
 	// Sound section.
@@ -123,6 +124,7 @@ private:
 	QComboBox       *m_weather;
 	WBQtScrubSpinBox *m_angle;		// range 0..360 (matches IDC_ANGLE_POPUP)
 	QComboBox       *m_time;
+	WBQtScrubSpinBox *m_scale;		// commits on edit end and scrub end, since each commit rebuilds the view
 
 	// Sound section.
 	QGroupBox   *m_soundBox;

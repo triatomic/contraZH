@@ -716,6 +716,9 @@ void DeclineResolution()
 	//Revert back to old resolution and reset all necessary
 	//parts of the shell
 
+	// the window frame follows m_windowed, so it must change before the mode does
+	const Bool newFramed = TheGlobalData->m_windowed;
+	TheWritableGlobalData->m_windowed = oldDispSettings.framed;
 	if (TheDisplay->setDisplayMode(oldDispSettings.xRes, oldDispSettings.yRes,
 										oldDispSettings.bitDepth, oldDispSettings.windowed))
 	{
@@ -734,13 +737,18 @@ void DeclineResolution()
 		OptionPreferences optionPref;
 		optionPref["Resolution"] = prefString;
 
-		// The options menu already stored the new borderless flag, so declining has to take it back
-		TheWritableGlobalData->m_borderlessWindow = oldDispSettings.windowed && !TheGlobalData->m_windowed;
+		// The options menu already stored the new window flags, so declining has to take them back
+		TheWritableGlobalData->m_borderlessWindow = oldDispSettings.windowed && !oldDispSettings.framed;
 		optionPref["BorderlessWindow"] = TheGlobalData->m_borderlessWindow ? "yes" : "no";
+		optionPref["Windowed"] = oldDispSettings.framed ? "yes" : "no";
 		optionPref.write();
 
 		TheInGameUI->recreateControlBar();
 		TheShell->recreateWindowLayouts();
+	}
+	else
+	{
+		TheWritableGlobalData->m_windowed = newFramed;
 	}
 }
 
@@ -1485,19 +1493,7 @@ WindowMsgHandledType MainMenuSystem( GameWindow *window, UnsignedInt msg,
 			}
 			else if( controlID == exitID )
 			{
-				// If we ever want to add a dialog before we exit out of the game, uncomment this line and kill the quitCallback() line below.
-//#if defined(RTS_DEBUG)
-				if (TheGlobalData->m_windowed)
-				{
-					quitCallback();
-//#else
-				}
-				else
-				{
-					QuitMessageBoxYesNo(TheGameText->fetch("GUI:QuitPopupTitle"), TheGameText->fetch("GUI:QuitPopupMessage"),quitCallback,nullptr);
-				}
-//#endif
-
+				QuitMessageBoxYesNo(TheGameText->fetch("GUI:QuitPopupTitle"), TheGameText->fetch("GUI:QuitPopupMessage"),quitCallback,nullptr);
 			}
 			else if(controlID == buttonChallengeID)
 			{

@@ -573,7 +573,7 @@ void W3DDisplay::setGamma(Real gamma, Real bright, Real contrast, Bool calibrate
 }
 
 // Gives the game window the frame its mode needs; the wrapper then sizes and centres it from that style.
-// Only -win keeps the caption, so a windowed device without it is the borderless mode.
+// Only windowed mode (-win or the Windowed option) keeps the caption; a windowed device without it is borderless.
 static void applyWindowStyle( Bool windowed )
 {
 	if (!ApplicationHWnd)
@@ -600,7 +600,8 @@ Bool W3DDisplay::setDisplayMode( UnsignedInt xres, UnsignedInt yres, UnsignedInt
 	const UnsignedInt oldBitDepth = getBitDepth();
 	const Bool oldWindowed = getWindowed();
 
-	if (windowed != oldWindowed)
+	// windowed and borderless share a windowed device, so switching between them changes only the frame
+	if (windowed || windowed != oldWindowed)
 	{
 		applyWindowStyle( windowed );
 	}
@@ -909,7 +910,9 @@ void W3DDisplay::init()
 		WW3D::Set_Screen_UV_Bias( TRUE );  ///< this makes text look good :)
 
 		setWindowed( TheGlobalData->m_windowed || TheGlobalData->m_borderlessWindow );
-		if (getWindowed() && !TheGlobalData->m_windowed)
+
+		// the window was created before Options.ini was read, so only -win gave it the right frame
+		if (getWindowed())
 		{
 			applyWindowStyle( TRUE );
 		}
@@ -1951,6 +1954,43 @@ void W3DDisplay::step()
 
 //DECLARE_PERF_TIMER(BigAssRenderLoop)
 
+#if RTS_ZEROHOUR
+//-------------------------------------------------------------------------------------------------
+/** Light the scene from above the camera pivot while a script lightning fade runs */
+//-------------------------------------------------------------------------------------------------
+static void updateLightningLight()
+{
+	static RTS3DScene *s_scene = nullptr;
+	static W3DDynamicLight *s_light = nullptr;
+
+	if (W3DDisplay::m_3DScene == nullptr || TheScriptEngine == nullptr || TheTacticalView == nullptr || !TheScriptEngine->isLightningFade())
+	{
+		return;
+	}
+
+	// The scene owns its light pool, so a new scene invalidates the light kept from the old one.
+	if (s_scene != W3DDisplay::m_3DScene || !s_light->isOwnedBy(&s_light))
+	{
+		s_scene = W3DDisplay::m_3DScene;
+		s_light = s_scene->getADynamicLight();
+		s_light->setOwner(&s_light);
+		s_light->Set_Flag(LightClass::FAR_ATTENUATION, true);
+	}
+
+	// shortcut: flash colour, height and reach are fixed, move them to GameData if maps need to tune them
+	const Vector3 color = Vector3(0.8f, 0.85f, 1.0f) * (1.3f * TheScriptEngine->getFadeValue());
+	const Real reach = max(1000.0f, 3.0f * TheTacticalView->getCurrentHeightAboveGround());
+	const Coord3D &pivot = TheTacticalView->getPosition();
+	s_light->Set_Diffuse(color);
+	s_light->Set_Ambient(color * 0.4f);
+	s_light->Set_Position(Vector3(pivot.x, pivot.y, TheTacticalView->getTerrainHeightAtPivot() + 300.0f));
+	s_light->Set_Far_Attenuation_Range(0.5f * reach, reach);
+
+	// expires on its own two frames after the fade ends
+	s_light->setFrameFade(0, 2);
+}
+#endif
+
 // W3DDisplay::draw ===========================================================
 /** Draw the entire W3D Display */
 //=============================================================================
@@ -2149,6 +2189,10 @@ AGAIN:
 				// add the number of verts/polygons drawn before the main scene
 				if (numRenderTargetPolygons || numRenderTargetVertices)
 					Debug_Statistics::Record_DX8_Polys_And_Vertices(numRenderTargetPolygons,numRenderTargetVertices,ShaderClass::_PresetOpaqueShader);
+
+#if RTS_ZEROHOUR
+				updateLightningLight();
+#endif
 
 				// Inside the frame, so the frame count holds, and outside any view filter's render target.
 				if (TheWaterRenderObj)
