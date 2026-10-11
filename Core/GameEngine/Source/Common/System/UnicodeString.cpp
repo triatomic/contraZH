@@ -456,13 +456,18 @@ Bool UnicodeString::nextToken(UnicodeString* tok, const WideChar* separators)
 {
 	DEBUG_ASSERTCRASH(tok != this, ("Tokenizer and Token cannot be the same object"));
 
+	if (tok == this)
+	{
+		return false;
+	}
+
 	if (this->isEmpty())
 	{
 		tok->clear();
 		return false;
 	}
 
-	if (separators == nullptr)
+	if (separators == nullptr || *separators == 0)
 		separators = L" \t\n\r";
 
 	Int offset;

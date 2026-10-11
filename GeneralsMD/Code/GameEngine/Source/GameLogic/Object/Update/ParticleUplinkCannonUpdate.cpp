@@ -370,12 +370,10 @@ Bool ParticleUplinkCannonUpdate::initiateIntentToDoSpecialPower(const SpecialPow
 		{
 			pos.set( *targetObj->getPosition() );
 		}
-#if !(RTS_ZEROHOUR && RETAIL_COMPATIBLE_CRC)
 		else
 		{
 			return false;
 		}
-#endif
 
 #if !RETAIL_COMPATIBLE_CRC
 		m_manualTargetMode = FALSE;

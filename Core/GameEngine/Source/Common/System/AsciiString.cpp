@@ -580,6 +580,11 @@ Bool AsciiString::nextToken(AsciiString* tok, const char* separators)
 {
 	DEBUG_ASSERTCRASH(tok != this, ("Tokenizer and Token cannot be the same object"));
 
+	if (tok == this)
+	{
+		return false;
+	}
+
 	if (this->isEmpty())
 	{
 		tok->clear();
