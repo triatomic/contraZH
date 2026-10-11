@@ -140,7 +140,7 @@ ShipSlowDeathBehaviorModuleData::ShipSlowDeathBehaviorModuleData( void )
 		
 		{ "SoundSinkLoop", INI::parseAudioEventRTS, NULL, offsetof( ShipSlowDeathBehaviorModuleData, m_deathSound) },
 
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 
 	};
 

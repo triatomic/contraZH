@@ -88,7 +88,7 @@ const FieldParse ChatCommand::s_fieldParseTable[] =
 	{ "KillSelectedPilots",		INI::parseBool,			nullptr,	offsetof( ChatCommand, m_killSelectedPilots ) },
 	{ "ControlPlayer",			INI::parseBool,			nullptr,	offsetof( ChatCommand, m_controlPlayer ) },
 	{ "SubdueSelected",			INI::parseBool,			nullptr,	offsetof( ChatCommand, m_subdueSelected ) },
-	{ NULL, NULL, 0, 0 }  // keep this last
+	{ nullptr, nullptr, nullptr, 0 }  // keep this last
 };
 
 //-------------------------------------------------------------------------------------------------

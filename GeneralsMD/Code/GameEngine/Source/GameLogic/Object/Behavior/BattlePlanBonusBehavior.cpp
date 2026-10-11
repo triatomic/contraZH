@@ -162,7 +162,7 @@ void BattlePlanBonusBehaviorModuleData::parseBPStatusToClear(INI* ini, void* ins
 		{ "StatusToSet",	parseBPStatusToSet, NULL, 0 },
 		{ "StatusToClear",	parseBPStatusToClear, NULL, 0 },
 		
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 
 	BehaviorModuleData::buildFieldParse(p);

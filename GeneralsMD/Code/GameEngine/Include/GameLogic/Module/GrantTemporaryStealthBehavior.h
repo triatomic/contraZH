@@ -63,7 +63,7 @@ public:
 			{ "KindOf",								KindOfMaskType::parseFromINI,		nullptr,	offsetof( GrantTemporaryStealthBehaviorModuleData, m_kindOf ) },
 			{ "ForbiddenKindOf",			KindOfMaskType::parseFromINI,		nullptr,	offsetof( GrantTemporaryStealthBehaviorModuleData, m_forbiddenKindOf ) },
 			{ "ActivateOnCreate",			INI::parseBool,									nullptr,	offsetof( GrantTemporaryStealthBehaviorModuleData, m_activateOnCreate ) },
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
 		p.add(dataFieldParse);
 	}

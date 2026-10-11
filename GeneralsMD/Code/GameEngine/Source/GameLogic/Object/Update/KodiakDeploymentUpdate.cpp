@@ -77,7 +77,7 @@ static Real zero = 0.0f;
 /*******BOTH******/		{ "AttackAreaRadius",	        INI::parseReal,				            NULL, offsetof( KodiakDeploymentUpdateModuleData, m_attackAreaRadius ) },
 		{ "CreateLocation", INI::parseIndexList, TheGunshipCreateLocTypeNames, offsetof( KodiakDeploymentUpdateModuleData, m_createLoc ) },
 
-    { 0, 0, 0, 0 }
+    { nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
 }

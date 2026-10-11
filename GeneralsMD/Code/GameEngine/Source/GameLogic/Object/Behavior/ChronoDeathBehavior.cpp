@@ -84,7 +84,7 @@ ChronoDeathBehaviorModuleData::ChronoDeathBehaviorModuleData()
 		{ "StartOpacity",		INI::parsePercentToReal,		NULL, offsetof(ChronoDeathBehaviorModuleData, m_startAlpha) },
 		{ "EndOpacity",			INI::parsePercentToReal,		NULL, offsetof(ChronoDeathBehaviorModuleData, m_endAlpha) },
 		{ "DestructionDelay",	INI::parseDurationUnsignedInt,	NULL, offsetof(ChronoDeathBehaviorModuleData, m_destructionDelay) },
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
     p.add(dataFieldParse);
     p.add(DieMuxData::getFieldParse(), offsetof(ChronoDeathBehaviorModuleData, m_dieMuxData));

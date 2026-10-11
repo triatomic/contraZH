@@ -78,7 +78,7 @@ TeleporterAIUpdateModuleData::TeleporterAIUpdateModuleData( void )
 		{ "TeleportRecoverTint", TintStatusFlags::parseSingleBitFromINI, NULL, offsetof(TeleporterAIUpdateModuleData, m_tintStatus) },
 		{ "TeleportRecoverOpacityStart", INI::parsePercentToReal, NULL, offsetof(TeleporterAIUpdateModuleData, m_opacityStart) },
 		{ "TeleportRecoverOpacityEnd", INI::parsePercentToReal, NULL, offsetof(TeleporterAIUpdateModuleData, m_opacityEnd) },
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
 }

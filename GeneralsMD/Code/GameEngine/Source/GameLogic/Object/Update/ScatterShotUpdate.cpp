@@ -109,7 +109,7 @@ ScatterShotUpdateModuleData::ScatterShotUpdateModuleData()
 
 		//{ "InitialDelay", INI::parseDurationUnsignedInt, NULL, offsetof(ScatterShotUpdateModuleData, m_initialDelayFrames) },
 		//{ "ExclusiveWeaponDelay", INI::parseDurationUnsignedInt, NULL, offsetof(ScatterShotUpdateModuleData, m_exclusiveWeaponDelay) },
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
 }

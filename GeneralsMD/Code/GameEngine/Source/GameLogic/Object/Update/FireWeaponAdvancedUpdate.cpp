@@ -55,7 +55,7 @@ FireWeaponAdvancedUpdateModuleData::FireWeaponAdvancedUpdateModuleData()
 		{ "DecalRadius",						INI::parseReal, NULL, offsetof(FireWeaponAdvancedUpdateModuleData, m_decalRadius) },
 		{ "DecalDuration",					INI::parseDurationUnsignedInt, NULL, offsetof(FireWeaponAdvancedUpdateModuleData, m_decalDuration) },
 		{ "ScatterRadius",					INI::parseReal, NULL, offsetof(FireWeaponAdvancedUpdateModuleData, m_scatterRadius) },
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
 	p.add(UpgradeMuxData::getFieldParse(), offsetof( FireWeaponAdvancedUpdateModuleData, m_upgradeMuxData ));

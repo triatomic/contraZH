@@ -1078,7 +1078,7 @@ public:
 			{ "MaxAllowedHeight",			INI::parseReal,							nullptr, offsetof(ParticleSystemFXNugget, m_maxAllowedHeight) },
 			{ "AllowedSurface",				INI::parseIndexList,				AllowedSurfaceNames, offsetof(ParticleSystemFXNugget, m_allowedSurfaceType) },
 			{ "UseCachedSurfaceInfo", INI::parseBool,							nullptr, offsetof(ParticleSystemFXNugget, m_useSurfaceInfo) },
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
 
 		ParticleSystemFXNugget* nugget = newInstance( ParticleSystemFXNugget );

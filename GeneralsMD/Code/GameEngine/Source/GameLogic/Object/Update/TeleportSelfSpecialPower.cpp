@@ -76,7 +76,7 @@ TeleportSelfSpecialPowerModuleData::TeleportSelfSpecialPowerModuleData( void )
 		{ "TeleportRecoverCondition", ModelConditionFlags::parseSingleBitFromINI, NULL, offsetof(TeleportSelfSpecialPowerModuleData, m_recoverCondition) },
 		{ "TeleportRecoverOpacityStart", INI::parsePercentToReal, NULL, offsetof(TeleportSelfSpecialPowerModuleData, m_opacityStart) },
 		{ "TeleportRecoverOpacityEnd", INI::parsePercentToReal, NULL, offsetof(TeleportSelfSpecialPowerModuleData, m_opacityEnd) },
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
 }

@@ -72,7 +72,7 @@ public:
 			{ "UpgradesToRemove", INI::parseAsciiStringVector,	NULL, offsetof(DelayedUpgradeBehaviorModuleData, m_upgradesToRemove) },
 			{ "TriggerAfterTime",	INI::parseDurationUnsignedInt, NULL, offsetof(DelayedUpgradeBehaviorModuleData, m_triggerDelay) },
 			//{ "TriggerAfterShotsFired",	INI::parseUnsignedInt, NULL, offsetof(DelayedUpgradeBehaviorModuleData, m_triggerNumShots) },
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
 
 		UpdateModuleData::buildFieldParse(p);

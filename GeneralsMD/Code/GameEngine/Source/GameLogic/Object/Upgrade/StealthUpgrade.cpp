@@ -48,7 +48,7 @@ void StealthUpgradeModuleData::buildFieldParse(MultiIniFieldParse& p)
 	{
 		{ "EnableStealth", INI::parseBool, NULL, offsetof(StealthUpgradeModuleData, m_enableStealth) },
 		{ "OverrideStealthForbiddenConditions", INI::parseBitString32, TheStealthLevelNames, offsetof(StealthUpgradeModuleData, m_stealthLevel) },
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
 }
