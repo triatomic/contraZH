@@ -536,6 +536,15 @@ namespace
 		*b += (tb - *b) * t;
 	}
 
+	void qtWriteTgaFooter(unsigned char *dst)
+	{
+		TGA2Footer footer;
+		memset(&footer, 0, sizeof(footer));	// no extension / developer areas
+		memcpy(footer.Signature, TGA2_SIGNATURE, sizeof(footer.Signature));
+		footer.RsvdChar = '.';
+		memcpy(dst, &footer, sizeof(footer));
+	}
+
 	// Render the fallback into caller-owned TGA bytes (18-byte header + 24-bit BGR,
 	// bottom-up like the real previews). Returns the byte count, 0 on any failure.
 	int qtGenerateHeightPreviewTga(const CString &mapPath, unsigned char *buf, int cap)
@@ -654,12 +663,87 @@ namespace
 				*px++ = (unsigned char)REAL_TO_INT(r * 255.0f);
 			}
 		}
-		TGA2Footer footer;
-		memset(&footer, 0, sizeof(footer));	// no extension / developer areas
-		memcpy(footer.Signature, TGA2_SIGNATURE, sizeof(footer.Signature));
-		footer.RsvdChar = '.';
-		memcpy(px, &footer, sizeof(footer));
+		qtWriteTgaFooter(px);
 		return tgaSize;
+	}
+
+	// Qt's qtga plugin reads only uncompressed TGAs with the TGA2 footer, but some maps
+	// ship RLE (type 10) or footerless previews. Rewrites buf[0..n) in place into that
+	// form; returns the new byte count, 0 if the file is malformed or outgrows cap.
+	int qtMakeTgaQtReadable(unsigned char *buf, int n, int cap)
+	{
+		const int footerSize = sizeof(TGA2Footer);
+		if (buf == NULL || n < 18)
+		{
+			return 0;
+		}
+		if (buf[2] == 10)
+		{
+			std::vector<unsigned char> src(buf, buf + n);
+			int w = buf[12] | (buf[13] << 8);
+			int h = buf[14] | (buf[15] << 8);
+			int ps = (buf[16] + 7) / 8;
+			int cmBytes = buf[1] ? (buf[5] | (buf[6] << 8)) * ((buf[7] + 7) / 8) : 0;
+			int s = 18 + buf[0] + cmBytes;
+			int need = w * h * ps;
+			if (ps <= 0 || need <= 0 || 18 + need + footerSize > cap)
+			{
+				return 0;
+			}
+			unsigned char *dst = buf + 18;
+			int written = 0;
+			while (written < need)
+			{
+				if (s >= n)
+				{
+					return 0;
+				}
+				int count = (src[s] & 0x7f) + 1;
+				Bool repeat = (src[s] & 0x80) != 0;
+				s++;
+				if (repeat)
+				{
+					if (s + ps > n)
+					{
+						return 0;
+					}
+					for (int k = 0; k < count && written < need; k++)
+					{
+						memcpy(dst + written, &src[s], ps);
+						written += ps;
+					}
+					s += ps;
+				}
+				else
+				{
+					int bytes = count * ps;
+					if (bytes > need - written)
+					{
+						bytes = need - written;
+					}
+					if (s + bytes > n)
+					{
+						return 0;
+					}
+					memcpy(dst + written, &src[s], bytes);
+					written += bytes;
+					s += count * ps;
+				}
+			}
+			memset(buf, 0, 8);	// drop the id field and colour map spec
+			buf[2] = 2;
+			n = 18 + need;
+		}
+		else if (n >= footerSize && memcmp(buf + n - footerSize + 8, TGA2_SIGNATURE, 16) == 0)
+		{
+			return n;
+		}
+		if (n + footerSize > cap)
+		{
+			return 0;
+		}
+		qtWriteTgaFooter(buf + n);
+		return n + footerSize;
 	}
 }
 
@@ -707,7 +791,7 @@ int OpenMap::qtItemPreviewData(int i, unsigned char *buf, int cap)
 		int got = (int)::fread(buf, 1, cap, fp);
 		Bool complete = (::feof(fp) != 0);	// a cap-sized read that didn't hit EOF = truncated
 		::fclose(fp);
-		return complete ? got : 0;
+		return complete ? qtMakeTgaQtReadable(buf, got, cap) : 0;
 	}
 
 	if (m_packedMode != PM_LIST_MAPS_IN_BIG)
@@ -753,7 +837,7 @@ int OpenMap::qtItemPreviewData(int i, unsigned char *buf, int cap)
 		}
 		pf->close();
 	}
-	return got;
+	return qtMakeTgaQtReadable(buf, got, cap);
 }
 
 int OpenMap::qtListCurSel(void)
