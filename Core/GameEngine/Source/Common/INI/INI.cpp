@@ -460,6 +460,10 @@ void INI::loadWB(AsciiString filename, INILoadType loadType, Xfer* pXfer)
                     skipToEndToken();
                 }
             }
+            else if (stricmp(token, getEndToken()) == 0)
+            {
+                // The skip stopped at a child block's End, so this End closes the skipped block.
+            }
             else
             {
                 // --- Skip unreadable/unrecognized blocks ---
