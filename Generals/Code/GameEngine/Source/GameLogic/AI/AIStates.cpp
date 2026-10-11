@@ -873,8 +873,14 @@ StateReturnType AIStateMachine::updateStateMachine()
 
 			return status;
 		}
-		m_temporaryState->onExit(EXIT_NORMAL);
-		m_temporaryState = nullptr;
+
+		// TheSuperHackers @bugfix Okladnoj 08/10/2026 Check that the temporary state still exists as it can be cleared from the state machine within the states update.
+		// This only happens without RETAIL_COMPATIBLE_CRC, where clear() resets the temporary state.
+		if (m_temporaryState)
+		{
+			m_temporaryState->onExit(EXIT_NORMAL);
+			m_temporaryState = nullptr;
+		}
 	}
 	StateReturnType retType = StateMachine::updateStateMachine();
 
@@ -5326,6 +5332,7 @@ StateReturnType AIAttackState::onEnter()
 	if (m_attackParameters && m_attackParameters->shouldExit(getMachine()))
 		return STATE_SUCCESS;
 
+#if !(RTS_GENERALS && RETAIL_COMPATIBLE_CRC)
 	//Kris: Jan 12, 2005
 	//Don't allow units under construction to attack! The selection/action manager system was responsible for preventing this
 	//from ever happening, but failed in two cases which I fixed. This is an extra check to mitigate cheats.
@@ -5333,6 +5340,7 @@ StateReturnType AIAttackState::onEnter()
 	{
 		return STATE_FAILURE;
 	}
+#endif
 
 	// if all of our weapons are out of ammo, can't attack.
 	// (this can happen for units which never auto-reload, like the Raptor)
