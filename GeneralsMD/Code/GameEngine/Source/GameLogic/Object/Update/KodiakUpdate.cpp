@@ -291,7 +291,7 @@ Bool KodiakUpdate::isPointOffMap( const Coord3D& testPos ) const
 	Region3D mapRegion;
 	TheTerrainLogic->getExtentIncludingBorder( &mapRegion );
 
-	if (!mapRegion.isInRegion( testPos.asCoord2D() ))
+	if (!mapRegion.containsWithin( testPos.asCoord2D() ))
 		return true;
 
 	return false;

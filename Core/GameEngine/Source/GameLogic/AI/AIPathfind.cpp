@@ -287,7 +287,7 @@ void Pathfinder::adjustThreatenedWaypoint(Object *obj, Coord3D &destination)
 			Coord3D point = destination;
 			point.x = threat->position.x + radius * WWMath::Cos(angle);
 			point.y = threat->position.y + radius * WWMath::Sin(angle);
-			if (!extent.isInRegion(point.asCoord2D()))
+			if (!extent.containsWithin(point.asCoord2D()))
 			{
 				continue;
 			}
@@ -2384,8 +2384,8 @@ Bool Pathfinder::adjustToLandingDestination(Object *obj, Coord3D *dest)
 	TheTerrainLogic->getMaximumPathfindExtent(&extent);
 	// If the object is off the map & the goal is off the map, it is a scripted setup, so just
 	// go to the dest.
-	if (!extent.isInRegion(dest->asCoord2D())) {
-		if (!extent.isInRegion(obj->getPosition()->asCoord2D())) {
+	if (!extent.containsWithin(dest->asCoord2D())) {
+		if (!extent.containsWithin(obj->getPosition()->asCoord2D())) {
 			return true;
 		}
 	}
@@ -3123,7 +3123,7 @@ Path *Pathfinder::getAircraftPathImpl( const Object *obj, const Coord3D *to )
 				bend.y += side * (adjDest.x - pos.x) * it->radius * 1.5f / directLength;
 				bend.z = adjDest.z;
 				const Real length = distanceXY(pos, bend) + distanceXY(bend, adjDest);
-				if (length > 1.5f * directLength || !extent.isInRegion(bend.asCoord2D()))
+				if (length > 1.5f * directLength || !extent.containsWithin(bend.asCoord2D()))
 				{
 					continue;
 				}
