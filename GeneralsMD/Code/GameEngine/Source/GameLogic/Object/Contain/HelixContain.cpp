@@ -39,6 +39,7 @@
 #include "Common/ThingFactory.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/Drawable.h"
+#include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/HelixContain.h"
 #include "GameLogic/Object.h"
@@ -292,6 +293,12 @@ void HelixContain::addToContain( Object *obj )
     m_portableStructureID = portable->getID();
     portable->friend_setContainedBy( getObject() );//fool portable into thinking my object is his container
 
+#if !(RETAIL_COMPATIBLE_CRC || PRESERVE_NO_XP_FROM_HELIX_ATTACHMENT_KILLS)
+    // TheSuperHackers @bugfix arcticdolphin 13/09/2026 Portable structures bypass onContaining(), so route their kill experience to the Helix here.
+    if ( portable->getExperienceTracker() )
+      portable->getExperienceTracker()->setExperienceSink( getObject()->getID() );
+#endif
+
 #if RETAIL_COMPATIBLE_CRC
     Object* containedBy = getObject();
 
@@ -326,6 +333,11 @@ void HelixContain::removeFromContain( Object *obj, Bool exposeStealthUnits )
       portable->friend_setContainedByID(INVALID_ID);
 #else
       portable->friend_setContainedBy(nullptr);
+#endif
+
+#if !(RETAIL_COMPATIBLE_CRC || PRESERVE_NO_XP_FROM_HELIX_ATTACHMENT_KILLS)
+      if ( portable->getExperienceTracker() )
+        portable->getExperienceTracker()->setExperienceSink( INVALID_ID );
 #endif
 
       m_portableStructureID = INVALID_ID;
