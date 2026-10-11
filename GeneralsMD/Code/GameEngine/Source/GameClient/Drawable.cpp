@@ -1694,8 +1694,7 @@ void Drawable::applyPhysicsXform(Matrix3D* mtx)
 
 		// TheSuperHackers @tweak bobtista 14/09/2026 Interpolate the rendered transform between
 		// logic frames, so the motion stays smooth when the render rate is above the logic rate.
-		// Blends with the drawn transform's factor, which is 1 whenever smooth unit motion is off.
-		const Real t = getDrawnProgress();
+		const Real t = m_drawnValid ? m_drawnProgress : 1.0f;
 
 		const Real interpPitch = WWMath::Lerp(m_physicsXform->m_prevTotalPitch, m_physicsXform->m_totalPitch, t);
 		const Real interpRoll = WWMath::Lerp(m_physicsXform->m_prevTotalRoll, m_physicsXform->m_totalRoll, t);
