@@ -341,6 +341,10 @@ so maps could carry neutral teams that nobody could see, edit, move or delete.
 `PlayableSide` defaults to `No`. Killing units of a faction without `PlayableSide = Yes` earns no
 general experience and no unit veterancy. This is a retail default, not a code change.
 
+A faction whose `Side` has no matching scheme in `ControlBarScheme.ini` uses the scheme of its
+`BaseSide`. Retail fell back to the art-less `Default` scheme, which left the control bar broken
+for custom factions such as a mod's `AmericaCampaignGeneral`.
+
 # Game Setup
 
 ## Random army per faction

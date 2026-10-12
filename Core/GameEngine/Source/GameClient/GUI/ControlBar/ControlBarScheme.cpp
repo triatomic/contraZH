@@ -1197,6 +1197,27 @@ void ControlBarSchemeManager::setControlBarSchemeByPlayer(Player *p)
 		it ++;
 	}
 
+#if RTS_ZEROHOUR
+	// A faction without its own scheme, such as a mod's campaign faction, uses its base side's scheme
+
+	AsciiString baseSide = p->getBaseSide();
+	if (!tempScheme && !baseSide.isEmpty() && baseSide.compareNoCase(side) != 0)
+	{
+		for (it = m_schemeList.begin(); it != m_schemeList.end(); ++it)
+		{
+			ControlBarScheme *CBScheme = *it;
+			if (CBScheme && CBScheme->m_side.compareNoCase(baseSide) == 0)
+			{
+				if (!tempScheme || tempScheme->m_ScreenCreationRes.x < CBScheme->m_ScreenCreationRes.x)
+				{
+					tempScheme = CBScheme;
+				}
+			}
+		}
+		DEBUG_LOG(("setControlBarSchemeByPlayer fell back from side %s to base side %s", side.str(), baseSide.str()));
+	}
+#endif
+
 	if(tempScheme)
 	{
 		// setup the multiplier value
