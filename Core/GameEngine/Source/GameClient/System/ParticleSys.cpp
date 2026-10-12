@@ -1248,6 +1248,8 @@ void ParticleSystemInfo::validate()
 
 #if !ENABLE_TERRAIN_CONFORMING_PARTICLES
 	m_conformToTerrain = false;
+	if (m_particleAlignment == PARTICLE_ALIGNMENT_CONFORMING)
+		m_particleAlignment = PARTICLE_ALIGNMENT_XYPLANAR;
 #endif
 }
 
