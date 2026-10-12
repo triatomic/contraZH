@@ -50,6 +50,7 @@
 #include "GameLogic/AI.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/OpenContain.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
@@ -1188,6 +1189,51 @@ Bool OpenContain::isValidContainerFor(const Object* obj, Bool checkCapacity) con
 }
 
 // ------------------------------------------------------------------------------------------------
+/** One second plus the time to drive from rest to the exit end, so slow starters clear the stack at the exit start. */
+// ------------------------------------------------------------------------------------------------
+static Int computeExitIgnoreCollisionFrames( Object *exitObj, AIUpdateInterface *ai, const Coord3D &start, const Coord3D &end )
+{
+	const Int MAX_FRAMES = 5 * LOGICFRAMES_PER_SECOND;
+	Int frames = LOGICFRAMES_PER_SECOND;
+
+	const Locomotor *loco = ai->getCurLocomotor();
+	BodyModuleInterface *body = exitObj->getBodyModule();
+	if (loco == nullptr || body == nullptr)
+	{
+		return frames;
+	}
+
+	BodyDamageType damage = body->getDamageState();
+	Real speed = loco->getMaxSpeedForCondition(damage);
+	Real accel = loco->getMaxAcceleration(damage);
+	if (speed <= 0.0f || accel <= 0.0f)
+	{
+		return frames;
+	}
+
+	Real dx = end.x - start.x;
+	Real dy = end.y - start.y;
+	Real dist = sqrtf(dx*dx + dy*dy);
+	Real accelDist = speed*speed / (2.0f*accel);
+	Real travel;
+	if (dist <= accelDist)
+	{
+		travel = sqrtf(2.0f*dist / accel);
+	}
+	else
+	{
+		travel = speed/accel + (dist - accelDist)/speed;
+	}
+
+	frames += REAL_TO_INT_CEIL(travel);
+	if (frames > MAX_FRAMES)
+	{
+		frames = MAX_FRAMES;
+	}
+	return frames;
+}
+
+// ------------------------------------------------------------------------------------------------
 /**
 	This new call is going to replace all game callings of removeFromContain.
 	Consider rFC a 'system' call, while this is a 'game' call.  rFC will pull
@@ -1276,10 +1322,10 @@ void OpenContain::exitObjectViaDoor( Object *exitObj, ExitDoorType exitDoor )
 				TheAI->pathfinder()->updateGoal(me, me->getPosition(), TheTerrainLogic->getLayerForDestination(me->getPosition()));
 			}
 			ai->ignoreObstacle(nullptr);
+			TheAI->pathfinder()->adjustToPossibleDestination(exitObj, ai->getLocomotorSet(), &endPosition);
 			// The units often come out at the same position, and need to ignore collisions briefly
 			// as they move out.  jba.
-			ai->setIgnoreCollisionTime(LOGICFRAMES_PER_SECOND);
-			TheAI->pathfinder()->adjustToPossibleDestination(exitObj, ai->getLocomotorSet(), &endPosition);
+			ai->setIgnoreCollisionTime(computeExitIgnoreCollisionFrames(exitObj, ai, startPosition, endPosition));
 		}
 		std::vector<Coord3D> exitPath;
 		exitPath.push_back(endPosition);
@@ -1381,10 +1427,10 @@ void OpenContain::exitObjectInAHurry( Object *exitObj )
 				TheAI->pathfinder()->updateGoal(me, me->getPosition(), TheTerrainLogic->getLayerForDestination(me->getPosition()));
 			}
 			ai->ignoreObstacle(nullptr);
+			TheAI->pathfinder()->adjustToPossibleDestination(exitObj, ai->getLocomotorSet(), &endPosition);
 			// The units often come out at the same position, and need to ignore collisions briefly
 			// as they move out.  jba.
-			ai->setIgnoreCollisionTime(LOGICFRAMES_PER_SECOND);
-			TheAI->pathfinder()->adjustToPossibleDestination(exitObj, ai->getLocomotorSet(), &endPosition);
+			ai->setIgnoreCollisionTime(computeExitIgnoreCollisionFrames(exitObj, ai, startPosition, endPosition));
 		}
 		exitPath.push_back(endPosition);
 		if (m_rallyPointExists) {

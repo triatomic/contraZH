@@ -188,6 +188,18 @@ stayed inside them.
 
 Changes the simulation; affects replays.
 
+## Slow units leave tunnels and transports cleanly
+
+* A tunnel releases everyone at once on one exit point. A transport does too, unless it has several
+exit paths or an `ExitDelay`. Each unit ignores collisions for one second while they spread out.
+* A unit with low acceleration had barely moved by then, so the stacked units blocked each other
+and crawled or stuck at the exit.
+* The window now also covers the time the unit's locomotor needs to reach its exit spot, up to five
+seconds. Fast units keep about one second
+([#96](https://github.com/triatomic/contraZH/issues/96)).
+
+Changes the simulation; affects replays.
+
 ## Alt-tab no longer leaves waypoint mode on
 
 Alt-tabbing out hides the alt release from the game, so you came back in waypoint mode and every
