@@ -336,6 +336,14 @@ so maps could carry neutral teams that nobody could see, edit, move or delete.
 * Applies to both the classic and the Qt Teams dialog.
 ([#82](https://github.com/triatomic/contraZH/issues/82))
 
+## New factions in PlayerTemplate.ini
+
+Two retail defaults trip up new factions. Neither is a code change.
+* `PlayableSide` defaults to `No`. Killing units of a faction without `PlayableSide = Yes` earns
+no general experience and no unit veterancy.
+* `PreferredColor` defaults to black. It sets the colour of the faction's players in campaign and
+script maps whose player has no colour of its own. Skirmish and online games use the lobby colour.
+
 # Game Setup
 
 ## Random army per faction
