@@ -433,6 +433,7 @@ attack and attack move orders only.)
 * No line draws to a target in fog or shroud.
 * A waypoint path draws one line per leg. With `All` it replaces the white path shown while Alt is
 held.
+* Credit to olcayseygan, author of Generals Reforged.
 
 ## Input
 
