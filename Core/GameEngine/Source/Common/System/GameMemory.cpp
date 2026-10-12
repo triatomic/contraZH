@@ -44,6 +44,8 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#ifndef DISABLE_GAMEMEMORY
+
 // SYSTEM INCLUDES
 
 // USER INCLUDES
@@ -3630,3 +3632,5 @@ void freeFromW3DMemPool(void* pool, void* p)
 	DEBUG_ASSERTCRASH(pool, ("pool is null"));
 	((MemoryPool*)pool)->freeBlock(p);
 }
+
+#endif // DISABLE_GAMEMEMORY
