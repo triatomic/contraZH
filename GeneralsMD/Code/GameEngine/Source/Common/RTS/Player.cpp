@@ -4963,7 +4963,7 @@ void Player::xfer( Xfer *xfer )
 		m_listInScoreScreen = TRUE;
 	}
 	// attacked by
-	xfer->xferUser( m_attackedBy, sizeof( Bool ) * MAX_PLAYER_COUNT );
+	xfer->xferUser( m_attackedBy, sizeof( Bool ) * xfer->getPlayerCount() );
 
 	// cash bounty percent
 	xfer->xferReal( &m_cashBountyPercent );

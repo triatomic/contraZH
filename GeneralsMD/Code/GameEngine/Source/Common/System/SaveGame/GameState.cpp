@@ -1647,15 +1647,28 @@ void GameState::gameStatePostProcessLoad()
 /** Xfer method for the game state itself
 	* Version Info:
 	* 1: Initial version
-	* 2: Added save file type and mission map name (regular save vs automatic mission save) */
+	* 2: Added save file type and mission map name (regular save vs automatic mission save)
+	* 3: Per-player arrays hold MAX_PLAYER_COUNT entries instead of RETAIL_PLAYER_COUNT */
 // ------------------------------------------------------------------------------------------------
 void GameState::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 2;
+	XferVersion currentVersion = 3;
 	XferVersion version = currentVersion;
+#if RETAIL_COMPATIBLE_XFER_SAVE
+	if( xfer->getXferMode() == XFER_SAVE && ThePlayerList->getPlayerCount() <= RETAIL_PLAYER_COUNT )
+	{
+		version = 2;
+	}
+#endif
 	xfer->xferVersion( &version, currentVersion );
+
+	// every later block xfers per-player arrays at this size
+	if( version < 3 )
+	{
+		xfer->setPlayerCount( RETAIL_PLAYER_COUNT );
+	}
 
 	// get structure for our current game info
 	SaveGameInfo *saveGameInfo = getSaveGameInfo();

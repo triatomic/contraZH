@@ -160,7 +160,7 @@ void DamageInfoInput::xfer( Xfer *xfer )
 	xfer->xferObjectID( &m_sourceID );
 
 	// source player mask
-	xfer->xferUser( &m_sourcePlayerMask, sizeof( PlayerMaskType ) );
+	xfer->xferPlayerMask( &m_sourcePlayerMask );
 
 	// damage type
 	xfer->xferUser( &m_damageType, sizeof( DamageType ) );

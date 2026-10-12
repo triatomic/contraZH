@@ -40,6 +40,7 @@
 #pragma once
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
+#include "Common/GameCommon.h"
 #include "Common/Science.h"
 #include "Common/Upgrade.h"
 
@@ -126,6 +127,8 @@ public:
 	virtual void setOptions( UnsignedInt options ) { BitSet( m_options, options ); }
 	virtual void clearOptions( UnsignedInt options ) { BitClear( m_options, options ); }
 	virtual UnsignedInt getOptions() { return m_options; }
+	void setPlayerCount( Int playerCount ) { m_playerCount = playerCount; }
+	Int getPlayerCount() const { return m_playerCount; }
 	virtual void open( AsciiString identifier ) = 0;		///< xfer open event
 	virtual void close() = 0;											///< xfer close event
 	virtual Int beginBlock() = 0;									///< xfer begin block event
@@ -175,6 +178,7 @@ public:
 	virtual void xferScienceVec( ScienceVec *scienceVec );
 	virtual void xferKindOf( KindOfType *kindOfData );
 	virtual void xferUpgradeMask( UpgradeMaskType *upgradeMaskData );
+	virtual void xferPlayerMask( PlayerMaskType *playerMaskData );
 	virtual void xferUser( void *data, Int dataSize );
 	virtual void xferMatrix3D( Matrix3D* mtx );
 	virtual void xferMapName( AsciiString *mapNameData );
@@ -187,5 +191,6 @@ protected:
 	UnsignedInt m_options;					///< xfer options
 	XferMode m_xferMode;						///< the current xfer mode
 	AsciiString m_identifier;				///< the string identifier
+	Int m_playerCount;							///< entries xfered for each per-player array
 
 };

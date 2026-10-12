@@ -2066,7 +2066,7 @@ void OpenContain::xfer( Xfer *xfer )
 	}
 
 	// player entered mask
-	xfer->xferUser( &m_playerEnteredMask, sizeof( PlayerMaskType ) );
+	xfer->xferPlayerMask( &m_playerEnteredMask );
 
 	// last unload sound frame
 	xfer->xferUnsignedInt( &m_lastUnloadSoundFrame );

@@ -1507,7 +1507,7 @@ void PartitionCell::validateCoiList()
 void PartitionCell::crc( Xfer *xfer )
 {
 
-	xfer->xferUser(&m_shroudLevel, sizeof(ShroudLevel) * MAX_PLAYER_COUNT);
+	xfer->xferUser(&m_shroudLevel, sizeof(ShroudLevel) * xfer->getPlayerCount());
 	xfer->xferUser(&m_cellX, sizeof(m_cellX));
 	xfer->xferUser(&m_cellY, sizeof(m_cellY));
 
@@ -1525,7 +1525,7 @@ void PartitionCell::xfer( Xfer *xfer )
 	xfer->xferVersion( &version, currentVersion );
 
 	// xfer shroud data
-	xfer->xferUser( &m_shroudLevel, sizeof( ShroudLevel ) * MAX_PLAYER_COUNT );
+	xfer->xferUser( &m_shroudLevel, sizeof( ShroudLevel ) * xfer->getPlayerCount() );
 
 }
 
@@ -5960,7 +5960,7 @@ void SightingInfo::xfer( Xfer *xfer )
 	xfer->xferReal( &m_howFar );
 
 	// for whom
-	xfer->xferUser( &m_forWhom, sizeof( PlayerMaskType ) );
+	xfer->xferPlayerMask( &m_forWhom );
 
 	// how much
 	xfer->xferUnsignedInt( &m_data );

@@ -640,7 +640,7 @@ void W3DGhostObject::xfer( Xfer *xfer )
 
 	// xfer snapshot array
 	UnsignedByte snapshotCount;
-	for( Int i = 0; i < MAX_PLAYER_COUNT; ++i )
+	for( Int i = 0; i < xfer->getPlayerCount(); ++i )
 	{
 		// count the snapshots at this index
 		snapshotCount = 0;
@@ -736,7 +736,7 @@ void W3DGhostObject::xfer( Xfer *xfer )
 	// count of partition shroudedness info to follow
 	UnsignedByte shroudednessCount = 0;
 	UnsignedByte playerIndex;
-	for( playerIndex = 0; playerIndex < MAX_PLAYER_COUNT; ++playerIndex )
+	for( playerIndex = 0; playerIndex < xfer->getPlayerCount(); ++playerIndex )
 		if( m_parentSnapshots[ playerIndex ] )
 			shroudednessCount++;
 	xfer->xferUnsignedByte( &shroudednessCount );
@@ -746,7 +746,7 @@ void W3DGhostObject::xfer( Xfer *xfer )
 	if( xfer->getXferMode() == XFER_SAVE )
 	{
 		// iterate through all array points
-		for( playerIndex = 0; playerIndex < MAX_PLAYER_COUNT; ++playerIndex )
+		for( playerIndex = 0; playerIndex < xfer->getPlayerCount(); ++playerIndex )
 		{
 			// is this a location with any info
 			if( m_parentSnapshots[ playerIndex ] )

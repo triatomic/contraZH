@@ -91,13 +91,13 @@ void MissionStats::xfer( Xfer *xfer )
 	xfer->xferVersion( &version, currentVersion );
 
 	// units killed
-	xfer->xferUser( m_unitsKilled, sizeof( Int ) * MAX_PLAYER_COUNT );
+	xfer->xferUser( m_unitsKilled, sizeof( Int ) * xfer->getPlayerCount() );
 
 	// units lost
 	xfer->xferInt( &m_unitsLost );
 
 	// buildings killed
-	xfer->xferUser( m_buildingsKilled, sizeof( Int ) * MAX_PLAYER_COUNT );
+	xfer->xferUser( m_buildingsKilled, sizeof( Int ) * xfer->getPlayerCount() );
 
 	// buildings lost
 	xfer->xferInt( &m_buildingsLost );

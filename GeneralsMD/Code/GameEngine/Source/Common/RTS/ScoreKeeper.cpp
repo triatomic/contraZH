@@ -498,7 +498,7 @@ void ScoreKeeper::xfer( Xfer *xfer )
 	xfer->xferInt( &m_totalMoneySpent );
 
 	// units destroyed
-	xfer->xferUser( m_totalUnitsDestroyed, sizeof( Int ) * MAX_PLAYER_COUNT );
+	xfer->xferUser( m_totalUnitsDestroyed, sizeof( Int ) * xfer->getPlayerCount() );
 
 	// units built
 	xfer->xferInt( &m_totalUnitsBuilt );
@@ -507,7 +507,7 @@ void ScoreKeeper::xfer( Xfer *xfer )
 	xfer->xferInt( &m_totalUnitsLost );
 
 	// buildings destroyed
-	xfer->xferUser( m_totalBuildingsDestroyed, sizeof( Int ) * MAX_PLAYER_COUNT );
+	xfer->xferUser( m_totalBuildingsDestroyed, sizeof( Int ) * xfer->getPlayerCount() );
 
 	// buildings built
 	xfer->xferInt( &m_totalBuildingsBuilt );
@@ -531,9 +531,9 @@ void ScoreKeeper::xfer( Xfer *xfer )
 	xferObjectCountMap( xfer, &m_objectsBuilt );
 
 	// objects destroyed
-	UnsignedShort destroyedArraySize = MAX_PLAYER_COUNT;
+	UnsignedShort destroyedArraySize = xfer->getPlayerCount();
 	xfer->xferUnsignedShort( &destroyedArraySize );
-	if( destroyedArraySize != MAX_PLAYER_COUNT )
+	if( destroyedArraySize != xfer->getPlayerCount() )
 	{
 
 		DEBUG_CRASH(( "ScoreKeeper::xfer - size of objects destroyed array has changed" ));

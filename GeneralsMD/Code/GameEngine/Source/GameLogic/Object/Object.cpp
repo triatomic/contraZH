@@ -4503,10 +4503,10 @@ void Object::xfer( Xfer *xfer )
 	xfer->xferSnapshot( m_partitionLastShroud );
 
 	// vision spied by
-	xfer->xferUser( m_visionSpiedBy, sizeof( Int ) * MAX_PLAYER_COUNT );
+	xfer->xferUser( m_visionSpiedBy, sizeof( Int ) * xfer->getPlayerCount() );
 
 	// vision spied by mask
-	xfer->xferUser( &m_visionSpiedMask, sizeof( PlayerMaskType ) );
+	xfer->xferPlayerMask( &m_visionSpiedMask );
 
 	// sighting info, last threat
 	// John M says we don't need to save this (CBD)

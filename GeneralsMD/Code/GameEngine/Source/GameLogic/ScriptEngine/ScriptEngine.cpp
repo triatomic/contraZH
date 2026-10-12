@@ -9140,9 +9140,9 @@ void ScriptEngine::xfer( Xfer *xfer )
 	xferListAsciiString( xfer, &m_uiInteractions );
 
 	// triggered special powers
-	UnsignedShort triggeredSpecialPowersSize = MAX_PLAYER_COUNT;
+	UnsignedShort triggeredSpecialPowersSize = xfer->getPlayerCount();
 	xfer->xferUnsignedShort( &triggeredSpecialPowersSize );
-	if( triggeredSpecialPowersSize != MAX_PLAYER_COUNT )
+	if( triggeredSpecialPowersSize != xfer->getPlayerCount() )
 	{
 
 		DEBUG_CRASH(( "ScriptEngine::xfer - MAX_PLAYER_COUNT has changed, m_triggeredSpecialPowers size is now different and we must version this" ));
@@ -9153,9 +9153,9 @@ void ScriptEngine::xfer( Xfer *xfer )
 		xferListAsciiStringObjectID( xfer, &m_triggeredSpecialPowers[ i ] );
 
 	// midway special powers
-	UnsignedShort midwaySpecialPowersSize = MAX_PLAYER_COUNT;
+	UnsignedShort midwaySpecialPowersSize = xfer->getPlayerCount();
 	xfer->xferUnsignedShort( &midwaySpecialPowersSize );
-	if( midwaySpecialPowersSize != MAX_PLAYER_COUNT )
+	if( midwaySpecialPowersSize != xfer->getPlayerCount() )
 	{
 
 		DEBUG_CRASH(( "ScriptEngine::xfer - MAX_PLAYER_COUNT has changed, m_midwaySpecialPowers size is now different and we must version this" ));
@@ -9166,9 +9166,9 @@ void ScriptEngine::xfer( Xfer *xfer )
 		xferListAsciiStringObjectID( xfer, &m_midwaySpecialPowers[ i ] );
 
 	// finished special powers
-	UnsignedShort finishedSpecialPowersSize = MAX_PLAYER_COUNT;
+	UnsignedShort finishedSpecialPowersSize = xfer->getPlayerCount();
 	xfer->xferUnsignedShort( &finishedSpecialPowersSize );
-	if( finishedSpecialPowersSize != MAX_PLAYER_COUNT )
+	if( finishedSpecialPowersSize != xfer->getPlayerCount() )
 	{
 
 		DEBUG_CRASH(( "ScriptEngine::xfer - MAX_PLAYER_COUNT has changed, m_finishedSpecialPowers size is now different and we must version this" ));
@@ -9179,9 +9179,9 @@ void ScriptEngine::xfer( Xfer *xfer )
 		xferListAsciiStringObjectID( xfer, &m_finishedSpecialPowers[ i ] );
 
 	// completed upgrades
-	UnsignedShort completedUpgradesSize = MAX_PLAYER_COUNT;
+	UnsignedShort completedUpgradesSize = xfer->getPlayerCount();
 	xfer->xferUnsignedShort( &completedUpgradesSize );
-	if( completedUpgradesSize != MAX_PLAYER_COUNT )
+	if( completedUpgradesSize != xfer->getPlayerCount() )
 	{
 
 		DEBUG_CRASH(( "ScriptEngine::xfer - MAX_PLAYER_COUNT has changed, m_completedUpgrades size is now different and we must version this" ));
@@ -9192,9 +9192,9 @@ void ScriptEngine::xfer( Xfer *xfer )
 		xferListAsciiStringObjectID( xfer, &m_completedUpgrades[ i ] );
 
 	// acquired sciences
-	UnsignedShort acquiredSciencesSize = MAX_PLAYER_COUNT;
+	UnsignedShort acquiredSciencesSize = xfer->getPlayerCount();
 	xfer->xferUnsignedShort( &acquiredSciencesSize );
-	if( acquiredSciencesSize != MAX_PLAYER_COUNT )
+	if( acquiredSciencesSize != xfer->getPlayerCount() )
 	{
 
 		DEBUG_CRASH(( "ScriptEngine::xfer - MAX_PLAYER_COUNT has changed, m_acquiredSciences size is now different and we must version this" ));

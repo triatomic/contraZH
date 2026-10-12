@@ -281,7 +281,7 @@ public:
 	PlayerIndex getPlayerIndex() const { return m_playerIndex; }
 
 	/// return a bitmask that is unique to this player.
-	PlayerMaskType getPlayerMask() const { return 1 << m_playerIndex; }
+	PlayerMaskType getPlayerMask() const { return (PlayerMaskType)1 << m_playerIndex; }
 
 	/// a convenience function to test the ThingTemplate against the players canBuild flags
 	/// called by canBuild

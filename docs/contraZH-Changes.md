@@ -307,6 +307,19 @@ Notes:
 * Water surfaces do not take the light.
 ([#121](https://github.com/triatomic/contraZH/issues/121))
 
+## Up to 30 players per map
+
+* A map can hold 32 sides instead of 16. WorldBuilder keeps one free for the replay observer, so
+it adds up to 30 players beside the neutral player (retail stopped at 14).
+* The Add Player button now greys out at the same count where it stops working.
+
+Notes:
+* Games with 16 or fewer sides stay CRC compatible with retail and with older replays.
+* Saves from games with 16 or fewer sides keep the retail format. Saves with more sides use a new
+format that older builds refuse to load.
+* Retail and older contraZH builds cannot load a map with more than 16 sides.
+([#82](https://github.com/triatomic/contraZH/issues/82))
+
 # Game Setup
 
 ## Random army per faction
