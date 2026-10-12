@@ -320,6 +320,15 @@ format that older builds refuse to load.
 * Retail and older contraZH builds cannot load a map with more than 16 sides.
 ([#82](https://github.com/triatomic/contraZH/issues/82))
 
+## Every road type draws
+
+* Every road in `Roads.ini` now gets a slot. Roads past `MaxRoadTypes` in `GameData.ini` used to
+appear in WorldBuilder's list but never drew in the editor or the game.
+* `MaxRoadTypes` still sets the minimum number of slots.
+
+Presentation only; replays unaffected.
+([#82](https://github.com/triatomic/contraZH/issues/82))
+
 # Game Setup
 
 ## Random army per faction
