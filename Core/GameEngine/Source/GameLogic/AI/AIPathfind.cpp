@@ -1593,7 +1593,8 @@ inline ObjectID PathfindCell::getObstacleID() const
  */
 Bool PathfindCell::setTypeAsObstacle( Object *obstacle, Bool isFence, const ICoord2D &pos )
 {
-	if (m_type!=PathfindCell::CELL_CLEAR && m_type != PathfindCell::CELL_IMPASSABLE) {
+	// a structure built over rubble claims its cells, so removing the rubble later leaves them alone
+	if (m_type!=PathfindCell::CELL_CLEAR && m_type != PathfindCell::CELL_IMPASSABLE && m_type != PathfindCell::CELL_RUBBLE) {
 		return false;
 	}
 
@@ -2971,7 +2972,9 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 							applyZone(r_thisCell, r_leftCell, m_groundWaterZones, m_maxZone);
 							applyZone(r_thisCell, r_leftCell, m_groundWaterRubbleZones, m_maxZone);
 						}
-						else if (groundRubble(r_thisCell, r_leftCell))
+
+						// waterGround also matches rubble (0x03 & CELL_WATER), so rubble is checked on its own
+						if (groundRubble(r_thisCell, r_leftCell))
 						{
 							applyZone(r_thisCell, r_leftCell, m_groundRubbleZones, m_maxZone);
 							applyZone(r_thisCell, r_leftCell, m_groundCliffRubbleZones, m_maxZone);
@@ -3038,7 +3041,8 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 							applyZone(r_thisCell, r_topCell, m_groundWaterZones, m_maxZone);
 							applyZone(r_thisCell, r_topCell, m_groundWaterRubbleZones, m_maxZone);
 						}
-						else if (groundRubble(r_thisCell, r_topCell))
+
+						if (groundRubble(r_thisCell, r_topCell))
 						{
 							applyZone(r_thisCell, r_topCell, m_groundRubbleZones, m_maxZone);
 							applyZone(r_thisCell, r_topCell, m_groundCliffRubbleZones, m_maxZone);

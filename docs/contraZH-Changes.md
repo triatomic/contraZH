@@ -155,7 +155,10 @@ A building centred on the rubble of a destroyed structure was refused as unreach
 building shifted so its centre missed the rubble was allowed and cleared it. Placement on rubble is
 now allowed wherever the builder can reach the rubble, and construction clears it.
 
-Changes build legality; affects replays.
+The pathfinder never linked rubble to the ground around it, so infantry and other units that can
+cross rubble were judged unable to reach it. They now path into rubble normally.
+
+Changes build legality and pathfinding; affects replays.
 
 ## Allied scaffolds no longer lure your builders
 
