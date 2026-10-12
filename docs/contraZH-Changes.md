@@ -338,11 +338,8 @@ so maps could carry neutral teams that nobody could see, edit, move or delete.
 
 ## New factions in PlayerTemplate.ini
 
-Two retail defaults trip up new factions. Neither is a code change.
-* `PlayableSide` defaults to `No`. Killing units of a faction without `PlayableSide = Yes` earns
-no general experience and no unit veterancy.
-* `PreferredColor` defaults to black. It sets the colour of the faction's players in campaign and
-script maps whose player has no colour of its own. Skirmish and online games use the lobby colour.
+`PlayableSide` defaults to `No`. Killing units of a faction without `PlayableSide = Yes` earns no
+general experience and no unit veterancy. This is a retail default, not a code change.
 
 # Game Setup
 
