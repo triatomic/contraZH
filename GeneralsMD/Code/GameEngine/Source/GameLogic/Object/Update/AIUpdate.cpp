@@ -2351,7 +2351,7 @@ Bool AIUpdateInterface::isPathAvailable( const Coord3D *destination ) const
 /** Is there a path (computed using the less accurate but quick method )
 	* at all that exists from us to the destination location */
 //-------------------------------------------------------------------------------------------------
-Bool AIUpdateInterface::isQuickPathAvailable( const Coord3D *destination ) const
+Bool AIUpdateInterface::isQuickPathAvailable( const Coord3D *destination, Bool acceptRubble ) const
 {
 
 	// sanity
@@ -2363,7 +2363,7 @@ Bool AIUpdateInterface::isQuickPathAvailable( const Coord3D *destination ) const
 #if RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING
 	return TheAI->pathfinder()->clientSafeQuickDoesPathExist(m_locomotorSet, myPos, destination);
 #else
-	return TheAI->pathfinder()->clientSafeQuickDoesPathExistForUI(m_locomotorSet, myPos, destination);
+	return TheAI->pathfinder()->clientSafeQuickDoesPathExistForUI(m_locomotorSet, myPos, destination, acceptRubble);
 #endif
 
 }

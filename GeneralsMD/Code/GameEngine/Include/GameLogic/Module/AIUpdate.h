@@ -509,7 +509,7 @@ public:
 	void destroyPath( void );												///< destroy the current path, setting it to null
 	UnsignedInt getPathAge( void ) const { return TheGameLogic->getFrame() - m_pathTimestamp; }	///< return the "age" of the path
 	Bool isPathAvailable( const Coord3D *destination ) const; ///< does a path exist between us and the destination
-	Bool isQuickPathAvailable( const Coord3D *destination ) const;  ///< does a path (using quick pathfind) exist between us and the destination
+	Bool isQuickPathAvailable( const Coord3D *destination, Bool acceptRubble = FALSE ) const;  ///< does a path (using quick pathfind) exist between us and the destination
 	Int getNumFramesBlocked(void) const {return m_blockedFrames;}
 	Bool isBlockedAndStuck(void) const {return m_isBlockedAndStuck;}
 	Bool isForcedMoveBackwards(void) const {return m_forceMoveBackwards;}	///< True while a REVERSE_MOVE order is being executed.

@@ -705,7 +705,7 @@ public:
 	virtual void loadPostProcess() override;
 
 	Bool clientSafeQuickDoesPathExist( const LocomotorSet& locomotorSet, Short requiredBridgeHeight, const Coord3D *from, const Coord3D *to );  ///< Can we build any path at all between the locations	(terrain & buildings check - fast)
-	Bool clientSafeQuickDoesPathExistForUI( const LocomotorSet& locomotorSet, const Coord3D *from, const Coord3D *to );  ///< Can we build any path at all between the locations	(terrain only - fast)
+	Bool clientSafeQuickDoesPathExistForUI( const LocomotorSet& locomotorSet, const Coord3D *from, const Coord3D *to, Bool acceptRubble = FALSE );  ///< Can we build any path at all between the locations	(terrain only - fast)
 	Bool slowDoesPathExist( Object *obj, const Coord3D *from,
 		const Coord3D *to, ObjectID ignoreObject=INVALID_ID );  ///< Can we build any path at all between the locations	(terrain, buildings & units check - slower)
 

@@ -8610,7 +8610,8 @@ Bool Pathfinder::clientSafeQuickDoesPathExist( const LocomotorSet& locomotorSet,
  */
 Bool Pathfinder::clientSafeQuickDoesPathExistForUI( const LocomotorSet& locomotorSet,
 																const Coord3D *from,
-																const Coord3D *to )
+																const Coord3D *to,
+																Bool acceptRubble )
 {
 	// See if terrain or building is blocking the destination.
 	PathfindLayerEnum destinationLayer = TheTerrainLogic->getLayerForDestination(to);
@@ -8623,8 +8624,14 @@ Bool Pathfinder::clientSafeQuickDoesPathExistForUI( const LocomotorSet& locomoto
 		return false; // No goals on cliffs.
 	}
 
-	zone1 = m_zoneManager.getEffectiveZone(locomotorSet.getValidSurfaces(), false, parentCell->getZone());
-	zone2 =  m_zoneManager.getEffectiveZone(locomotorSet.getValidSurfaces(), false, goalCell->getZone());
+	LocomotorSurfaceTypeMask surfaces = locomotorSet.getValidSurfaces();
+	if (acceptRubble)
+	{
+		surfaces |= LOCOMOTORSURFACE_RUBBLE;
+	}
+
+	zone1 = m_zoneManager.getEffectiveZone(surfaces, false, parentCell->getZone());
+	zone2 =  m_zoneManager.getEffectiveZone(surfaces, false, goalCell->getZone());
 
 	if (zone1 == PathfindZoneManager::UNINITIALIZED_ZONE ||
 			zone2 == PathfindZoneManager::UNINITIALIZED_ZONE) {
@@ -8637,11 +8644,11 @@ Bool Pathfinder::clientSafeQuickDoesPathExistForUI( const LocomotorSet& locomoto
 		pathing as well. jba. */
 	zone1 = parentCell->getZone();
 	zone1 = m_zoneManager.getEffectiveTerrainZone(zone1);
-	zone1 = m_zoneManager.getEffectiveZone(locomotorSet.getValidSurfaces(), false, zone1);
+	zone1 = m_zoneManager.getEffectiveZone(surfaces, false, zone1);
 	zone1 = m_zoneManager.getEffectiveTerrainZone(zone1);
 	zone2 = goalCell->getZone();
 	zone2 = m_zoneManager.getEffectiveTerrainZone(zone2);
-	zone2 = m_zoneManager.getEffectiveZone(locomotorSet.getValidSurfaces(), false, zone2);
+	zone2 = m_zoneManager.getEffectiveZone(surfaces, false, zone2);
 	zone2 = m_zoneManager.getEffectiveTerrainZone(zone2);
 
 	if (zone1 == PathfindZoneManager::UNINITIALIZED_ZONE) {

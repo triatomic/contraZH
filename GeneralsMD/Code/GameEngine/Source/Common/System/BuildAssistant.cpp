@@ -1107,7 +1107,11 @@ LegalBuildCode BuildAssistant::isLocationLegalToBuild( const Coord3D *worldPos,
 		}
 		else {
 
-			if (ai->isQuickPathAvailable(worldPos) == FALSE)
+			// rubble under the site is cleared when construction starts
+			PathfindCell *cell = TheAI->pathfinder()->getCell( LAYER_GROUND, worldPos );
+			Bool onRubble = cell && cell->getType() == PathfindCell::CELL_RUBBLE;
+
+			if (ai->isQuickPathAvailable(worldPos, onRubble) == FALSE)
 				return LBC_NO_CLEAR_PATH;
 		}
 
@@ -1564,7 +1568,11 @@ void BuildAssistant::clearRemovableForConstruction( const ThingTemplate *whatToB
 		// UI feedback objects (always selectable) never get destroyed by construction, but also should never
 		// trip any of the other side effects of placing them in isRemovableForConstruction()
 		if( isRemovableForConstruction( them ) == TRUE && !them->isKindOf( KINDOF_ALWAYS_SELECTABLE ) )
+		{
+			// leave the pathfind map now, so the new footprint can claim rubble cells this frame
+			TheAI->pathfinder()->removeObjectFromPathfindMap( them );
 			TheGameLogic->destroyObject( them );
+		}
 
 	}
 	TheTerrainVisual->removeTreesAndPropsForConstruction(pos, whatToBuild->getTemplateGeometryInfo(), angle);

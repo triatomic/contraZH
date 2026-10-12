@@ -149,6 +149,14 @@ block.
 
 Changes build legality; affects replays.
 
+## Buildings can be placed on rubble
+
+A building centred on the rubble of a destroyed structure was refused as unreachable, yet the same
+building shifted so its centre missed the rubble was allowed and cleared it. Placement on rubble is
+now allowed wherever the builder can reach the rubble, and construction clears it.
+
+Changes build legality; affects replays.
+
 ## Units chasing a moving target now shoot it
 
 * Fast units ordered onto slow moving targets used to twitch forever without firing.
