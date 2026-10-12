@@ -27,8 +27,10 @@
 
 #include "GameClient/Color.h"
 #include "GameClient/ControlBar.h"
+#include "GameClient/Display.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/GameClient.h"
+#include "GameClient/GUICallbacks.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/ParticleSys.h"
 
@@ -220,6 +222,20 @@ void updateHouseColors()
 	detail::s_relationshipsChanged = false;
 	if (detail::isBasicHouseColorMode())
 		refreshHouseColors();
+}
+
+void enableLetterBox(Bool enable)
+{
+	if (enable)
+	{
+		HideControlBar(TRUE);
+		TheDisplay->enableLetterBox(TRUE);
+	}
+	else
+	{
+		ShowControlBar(FALSE);
+		TheDisplay->enableLetterBox(FALSE);
+	}
 }
 
 } // namespace rts

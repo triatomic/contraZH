@@ -44,4 +44,6 @@ void refreshHouseColors(); ///< Recolor every model and radar blip after HouseCo
 void markRelationshipsChanged(); ///< Cheap, safe from the logic: basic house colors repaint on the next client frame.
 void updateHouseColors(); ///< Once per client frame: does the repaint markRelationshipsChanged asked for.
 
+void enableLetterBox(Bool enable); ///< Enable or disable the letter box for cinematics. Hides the control bar.
+
 } // namespace rts

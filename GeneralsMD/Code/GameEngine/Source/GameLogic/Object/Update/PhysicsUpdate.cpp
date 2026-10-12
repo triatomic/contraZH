@@ -1148,6 +1148,16 @@ Real PhysicsBehavior::getForwardSpeed2D() const
 	Real vy = m_vel.y * dir->y;
 	Real dot = vx + vy;
 
+	// TheSuperHackers @bugfix xezon 30/07/2026 Now returns the dot product instead of +-sqrtf(vx*vx+vy*vy).
+	// The retail formula understates the forward speed by up to 1/sqrt(2) on diagonal headings, which made
+	// the Locomotor overshoot its goal speed there. The dot product is the true projection of the velocity
+	// onto the facing vector, so this now reports real distance per logic frame and can be used for distance
+	// and time calculations. The speeds the Locomotor commands are compensated to match, in LocomotorTemplate.
+	if (!useLegacyForwardSpeed())
+	{
+		return dot;
+	}
+
 	if (TheGlobalData->m_useOldMoveSpeed) {
 
 		Real speedSquared = vx * vx + vy * vy;
@@ -1185,6 +1195,13 @@ Real PhysicsBehavior::getForwardSpeed3D() const
 	Real vz = m_vel.z * dir.Z;
 	Real dot = vx + vy + vz;
 
+	// TheSuperHackers @bugfix xezon 30/07/2026 Now returns the dot product instead of
+	// +-sqrtf(vx*vx+vy*vy+vz*vz). See getForwardSpeed2D for the rationale.
+	if (!useLegacyForwardSpeed())
+	{
+		return dot;
+	}
+
 	if (TheGlobalData->m_useOldMoveSpeed) {
 		Real speed = (Real)WWMath::Sqrtf(vx * vx + vy * vy + vz * vz);
 
@@ -1204,6 +1221,16 @@ Real PhysicsBehavior::getForwardSpeed3D() const
 		return -(Real)sqrtf(sqr(m_vel.x) + sqr(m_vel.y) + sqr(m_vel.z));
 	}
 }
+
+#if USE_RETAIL_PHYSICS_FORWARD_SPEED_DISCREPANCY_IN_CINEMATICS()
+//-------------------------------------------------------------------------------------------------
+Bool PhysicsBehavior::useLegacyForwardSpeedInCinematics()
+{
+	// TheSuperHackers @info The retail speeds are kept for the duration of a cinematic, because
+	// legacy missions time their cinematics against them.
+	return TheScriptEngine->isLetterBoxActive();
+}
+#endif
 
 //-------------------------------------------------------------------------------------------------
 Bool PhysicsBehavior::isCurrentlyOverlapped(Object *obj) const
