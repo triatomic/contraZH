@@ -76,11 +76,8 @@ void showNotificationBox(AsciiString nick, UnicodeString message, bool bPlaySoun
 // contraZH port: GENERALS_ONLINE_HIGH_FPS_SERVER comes from GeneralsMD/Code/CMakeLists.txt
 // so WWLib (built without GO headers) sees the same switch.
 
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-#define GENERALS_ONLINE_CLIENT_ID "gen_online_60hz"
-#else
-#define GENERALS_ONLINE_CLIENT_ID "gen_online_30hz"
-#endif
+// contraZH: the services map this third party id to a full game session.
+#define GENERALS_ONLINE_CLIENT_ID "custom_third_party_client"
 
 #if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
 	#define GENERALS_ONLINE_HIGH_FPS_LIMIT 60

@@ -48,8 +48,10 @@ GameNetworkingSockets ICE P2P transport, lobbies/matchmaking/stats).
 
 ## Decisions made during the port (deviations from upstream GO)
 
-- **60 Hz client**: the simulation runs at 60 Hz like the official client (client id
-  `gen_online_60hz`, `GENERALS_ONLINE_HIGH_FPS_LIMIT` 60). The switch
+- **Client id**: `custom_third_party_client`, which the services map to a full game
+  session, instead of the official client's `gen_online_60hz`.
+- **60 Hz client**: the simulation runs at 60 Hz like the official client
+  (`GENERALS_ONLINE_HIGH_FPS_LIMIT` 60). The switch
   `GENERALS_ONLINE_HIGH_FPS_SERVER` is defined by `GeneralsMD/Code/CMakeLists.txt` next to
   `GENERALS_ONLINE`, not by NextGenMP_defines.h, because `WWSyncPerSecond` lives in
   WWLib's `WWCommon.h` and that static library cannot include GO headers. `GameCommon.h`
