@@ -179,15 +179,12 @@ Next step is a question for the GO team, not a code change - see
 closed source anticheat DLL into a Contra build, which is a deliberate decision, not a
 default.
 
-### Login flow: the repo is AHEAD of production
+### Login flow: server issued login code
 
-GO commit `27da5b89d` ("- New login flow", 2026-08-22) introduced a server issued login
-code via a new `LoginCode` endpoint. Production does not serve it (hard 404) and the
-shipping official client does not contain the string at all - it still uses the older
-handshake: generate the gamecode client side, open the browser, poll `CheckLogin` with
-`{code, client_id}`. The `pre-newserver` branch reverts
-`OnlineServices_Auth.{h,cpp}` to `27da5b89d^` for that reason; `feature/go-port` keeps
-the newer flow for when production catches up.
+GO commit `27da5b89d` ("- New login flow", 2026-08-22) gets the login code from a
+`GET LoginCode` request and opens the browser with it. Production serves `LoginCode`
+since at least 2026-10-12, when `CheckLogin` answered a client generated code with 403,
+`result: 2`. The August revert to the client generated code (`072e4fd6e`) is undone.
 
 ### Vendor DLL fix (found by crash triage)
 
