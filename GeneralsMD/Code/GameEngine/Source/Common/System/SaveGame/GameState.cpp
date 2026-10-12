@@ -662,7 +662,23 @@ SaveCode GameState::loadGame( AvailableGameInfo gameInfo )
 
 	// open the save file
 	XferLoad xferLoad;
-	xferLoad.open( filepath );
+	try
+	{
+		xferLoad.open( filepath );
+	}
+	catch( ... )
+	{
+		// the file vanished or is locked, nothing has been reset yet so just report it
+		UnicodeString ufilepath;
+		ufilepath.translate(filepath);
+
+		UnicodeString msg;
+		msg.format( TheGameText->fetch("GUI:ErrorLoadingGame"), ufilepath.str() );
+
+		MessageBoxOk(TheGameText->fetch("GUI:Error"), msg, nullptr);
+
+		return SC_FILE_NOT_FOUND;
+	}
 
 	// clear out the game engine
 	TheGameEngine->reset();
@@ -1015,7 +1031,7 @@ Bool GameState::doesSaveGameExist( AsciiString filename )
 // ------------------------------------------------------------------------------------------------
 /** Get save game info from the filename specified */
 // ------------------------------------------------------------------------------------------------
-void GameState::getSaveGameInfoFromFile( AsciiString filename, SaveGameInfo *saveGameInfo )
+Bool GameState::getSaveGameInfoFromFile( AsciiString filename, SaveGameInfo *saveGameInfo )
 {
 	AsciiString token;
 	Int blockSize;
@@ -1027,7 +1043,7 @@ void GameState::getSaveGameInfoFromFile( AsciiString filename, SaveGameInfo *sav
 	{
 
 		DEBUG_CRASH(( "GameState::getSaveGameInfoFromFile - Illegal parameters" ));
-		return;
+		return FALSE;
 
 	}
 
@@ -1035,7 +1051,14 @@ void GameState::getSaveGameInfoFromFile( AsciiString filename, SaveGameInfo *sav
 
 	// open file for partial loading
 	XferLoad xferLoad;
-	xferLoad.open( filename );
+	try
+	{
+		xferLoad.open( filename );
+	}
+	catch( ... )
+	{
+		return FALSE;
+	}
 
 	//
 	// disable post processing cause we're not really doing a load of game data that
@@ -1043,7 +1066,11 @@ void GameState::getSaveGameInfoFromFile( AsciiString filename, SaveGameInfo *sav
 	//
 	xferLoad.setOptions( XO_NO_POST_PROCESSING );
 
+	Bool found = FALSE;
+
 	// read all data blocks in the file
+	try
+	{
 	while( done == FALSE )
 	{
 
@@ -1094,6 +1121,7 @@ void GameState::getSaveGameInfoFromFile( AsciiString filename, SaveGameInfo *sav
 
 				// data was found, copy game state info over
 				*saveGameInfo = *tempGameState.getSaveGameInfo();
+				found = TRUE;
 
 				// we're all done with this file now
 				done = TRUE;
@@ -1113,9 +1141,18 @@ void GameState::getSaveGameInfoFromFile( AsciiString filename, SaveGameInfo *sav
 		}
 
 	}
+	}
+	catch( ... )
+	{
+		// a corrupt or truncated file just isn't a usable save
+		xferLoad.close();
+		return FALSE;
+	}
 
 	// close the file
 	xferLoad.close();
+
+	return found;
 
 }
 
@@ -1133,7 +1170,8 @@ static void addGameToAvailableList( AsciiString filename, void *userData )
 	try {
 	// get header info from this listbox
 	SaveGameInfo saveGameInfo;
-	TheGameState->getSaveGameInfoFromFile( filename, &saveGameInfo );
+	if( TheGameState->getSaveGameInfoFromFile( filename, &saveGameInfo ) == FALSE )
+		return;
 
 	// allocate new info
 	AvailableGameInfo *newInfo = new AvailableGameInfo;
@@ -1323,7 +1361,10 @@ void GameState::iterateSaveFiles( IterateSaveFileCallback callback, void *userDa
 			// start search
 			hFile = FindFirstFile( "*", &item );
 			if( hFile == INVALID_HANDLE_VALUE )
+			{
+				SetCurrentDirectory( currentDirectory );
 				return;
+			}
 
 			// we are no longer on our first item
 			first = FALSE;
