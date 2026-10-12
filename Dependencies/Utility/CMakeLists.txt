@@ -2,6 +2,8 @@ set(UTILITY_SRC
     Allocator/SystemAllocator.h
     Utility/aligned_pod.h
     Utility/array_adapter.h
+    Utility/atomic_adapter.h
+    Utility/atomic_x86interlocked.inl
     Utility/bit_adapter.h
     Utility/compat.h
     Utility/comsupp_compat.h
@@ -9,6 +11,7 @@ set(UTILITY_SRC
     Utility/fstream_adapter.h
     Utility/hash_map_adapter.h
     Utility/interlocked_adapter.h
+    Utility/interlocked_x86asm.inl
     Utility/intrin_compat.h
     Utility/iostream_adapter.h
     Utility/lazy_static.h
