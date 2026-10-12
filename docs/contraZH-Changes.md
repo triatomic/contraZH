@@ -157,6 +157,18 @@ now allowed wherever the builder can reach the rubble, and construction clears i
 
 Changes build legality; affects replays.
 
+## Allied scaffolds no longer lure your builders
+
+An ally's unfinished building showed the resume-construction cursor, and a dozer or worker sent
+there drove up and stood idle because only the owner can build. Only the owner's builders are
+offered it now.
+
+The host can tick **Coop Buildings** in the Skirmish or LAN lobby to let allies finish each other's
+buildings. The building stays the owner's. The option is off by default, is not kept in save
+games, and is not available on Generals Online.
+
+Changes the simulation; affects replays.
+
 ## Units chasing a moving target now shoot it
 
 * Fast units ordered onto slow moving targets used to twitch forever without firing.

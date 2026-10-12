@@ -121,6 +121,7 @@ static NameKeyType checkboxLimitSuperweaponsID = NAMEKEY_INVALID;
 static NameKeyType comboBoxStartingCashID = NAMEKEY_INVALID;
 static NameKeyType checkMaxCameraHeightID = NAMEKEY_INVALID;
 static NameKeyType textEntryMaxCameraHeightID = NAMEKEY_INVALID;
+static NameKeyType checkCoopBuildingsID = NAMEKEY_INVALID;
 static NameKeyType windowMapID = NAMEKEY_INVALID;
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *parentLanGameOptions = nullptr;
@@ -134,6 +135,7 @@ static GameWindow *checkboxLimitSuperweapons = nullptr;
 static GameWindow *comboBoxStartingCash = nullptr;
 static GameWindow *checkMaxCameraHeight = nullptr;
 static GameWindow *textEntryMaxCameraHeight = nullptr;
+static GameWindow *checkCoopBuildings = nullptr;
 static GameWindow *windowMap = nullptr;
 
 static GameWindow *comboBoxPlayer[MAX_SLOTS] = {0};
@@ -734,6 +736,30 @@ static void commitLanMaxCameraHeight()
 	}
 }
 
+// Refreshing the checkbox re-sends its message, which the unchanged value turns away
+static void commitLanCoopBuildings()
+{
+	LANGameInfo *myGame = TheLAN->GetMyGame();
+	if (!myGame || !myGame->amIHost() || !checkCoopBuildings)
+	{
+		return;
+	}
+
+	const Bool coopBuildings = GadgetCheckBoxIsChecked(checkCoopBuildings);
+	if (coopBuildings == myGame->getCoopBuildings())
+	{
+		return;
+	}
+	myGame->setCoopBuildings(coopBuildings);
+	myGame->resetAccepted();
+
+	if (!s_isIniting)
+	{
+		TheLAN->RequestGameOptions(GenerateGameOptionsString(), true);
+		lanUpdateSlotList();
+	}
+}
+
 void InitLanGameGadgets()
 {
 	//Initialize the gadget IDs
@@ -749,6 +775,7 @@ void InitLanGameGadgets()
   comboBoxStartingCashID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:ComboBoxStartingCash" );
   checkMaxCameraHeightID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckMaxCameraHeight" );
   textEntryMaxCameraHeightID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:TextEntryMaxCameraHeight" );
+  checkCoopBuildingsID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckCoopBuildings" );
 	windowMapID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:MapWindow" );
 
 	// Initialize the pointers to our gadgets
@@ -785,6 +812,12 @@ void InitLanGameGadgets()
 	if (textEntryMaxCameraHeight)
 	{
 		textEntryMaxCameraHeight->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:MaxCameraHeight", L"Max camera height, 210 to 1000"));
+	}
+	checkCoopBuildings = TheWindowManager->winGetWindowFromId( parentLanGameOptions, checkCoopBuildingsID );
+	if (checkCoopBuildings)
+	{
+		GadgetCheckBoxSetText(checkCoopBuildings, TheGameText->FETCH_OR_SUBSTITUTE("GUI:CoopBuildings", L"Coop Buildings"));
+		checkCoopBuildings->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:CoopBuildings", L"Lets allies finish each other's unfinished buildings"));
 	}
 
 	windowMap = TheWindowManager->winGetWindowFromId( parentLanGameOptions,windowMapID  );
@@ -883,6 +916,7 @@ void DeinitLanGameGadgets()
   comboBoxStartingCash = nullptr;
   checkMaxCameraHeight = nullptr;
   textEntryMaxCameraHeight = nullptr;
+  checkCoopBuildings = nullptr;
 	if (windowMap)
 	{
 		windowMap->winSetUserData(nullptr);
@@ -1063,6 +1097,12 @@ void updateGameOptions()
 		if (checkMaxCameraHeight && textEntryMaxCameraHeight)
 		{
 			showLanMaxCameraHeight(theGame->getMaxCameraHeight(), TheLAN->AmIHost());
+		}
+
+		if (checkCoopBuildings)
+		{
+			GadgetCheckBoxSetChecked( checkCoopBuildings, theGame->getCoopBuildings() );
+			checkCoopBuildings->winEnable( TheLAN->AmIHost() );
 		}
 	}
 }
@@ -1372,6 +1412,10 @@ WindowMsgHandledType LanGameOptionsMenuSystem( GameWindow *window, UnsignedInt m
         else if ( controlID == checkMaxCameraHeightID )
         {
           commitLanMaxCameraHeight();
+        }
+        else if ( controlID == checkCoopBuildingsID )
+        {
+          commitLanCoopBuildings();
         }
 				else
 				{

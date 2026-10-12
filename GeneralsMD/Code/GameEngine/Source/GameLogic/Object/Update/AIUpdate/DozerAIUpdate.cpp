@@ -494,7 +494,12 @@ StateReturnType DozerActionDoActionState::update()
 		{
 			//GS Moved this inside Build, since you are allowed to Repair things that are not your player (canRepairObject handles it)
 			if (dozer->getControllingPlayer() != goalObject->getControllingPlayer())//Yipes, SOmehow I have changed sides in mid build!
-				return STATE_FAILURE;
+			{
+				if( !TheGameLogic->getCoopBuildings() || dozer->getRelationship( goalObject ) != ALLIES )
+				{
+					return STATE_FAILURE;
+				}
+			}
 
 			// if we need to select the dock location and move there do so
 			if( dozerAI->getBuildSubTask() == DOZER_SELECT_BUILD_DOCK_LOCATION )

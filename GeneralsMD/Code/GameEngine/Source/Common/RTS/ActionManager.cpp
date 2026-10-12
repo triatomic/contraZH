@@ -490,16 +490,14 @@ Bool ActionManager::canResumeConstructionOf( const Object *obj,
 		return FALSE;
 
 	// TheSuperHackers @bugfix Stubbjax 06/01/2026 Ensure only the owner of the construction can resume it.
-#if RETAIL_COMPATIBLE_CRC
-	Relationship r = obj->getRelationship(objectBeingConstructed);
-
-	// only available to our allies
-	if( r != ALLIES )
-		return FALSE;
-#else
+	// The build state completes only for the owner, or for allies when the game enables Coop Buildings
 	if (obj->getControllingPlayer() != objectBeingConstructed->getControllingPlayer())
-		return FALSE;
-#endif
+	{
+		if( !TheGameLogic->getCoopBuildings() || obj->getRelationship( objectBeingConstructed ) != ALLIES )
+		{
+			return FALSE;
+		}
+	}
 
 	// if the objectBeingConstructed is not actually under construction we can't resume that!
 	if( !objectBeingConstructed->getStatusBits().test( OBJECT_STATUS_UNDER_CONSTRUCTION ) )

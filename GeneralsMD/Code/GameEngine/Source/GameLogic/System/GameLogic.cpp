@@ -257,6 +257,7 @@ GameLogic::GameLogic()
 	m_isInUpdate = FALSE;
 
 	m_rankPointsToAddAtGameStart = 0;
+	m_coopBuildings = FALSE;
 
 	for(Int i = 0; i < MAX_SLOTS; i++)
 	{
@@ -1360,6 +1361,9 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
       m_superweaponRestriction = 0;
     }
   }
+
+	// Not saved, so a loaded save game plays with it off
+	m_coopBuildings = !loadingSaveGame && TheGameInfo != nullptr && TheGameInfo->getCoopBuildings();
 
 	checkForDuplicateColors( TheGameInfo );
 

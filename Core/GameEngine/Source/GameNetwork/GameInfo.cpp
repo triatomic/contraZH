@@ -395,6 +395,7 @@ void GameInfo::reset()
   m_superweaponRestriction = 0;
   m_startingCash = TheGlobalData->m_defaultStartingCash;
   m_maxCameraHeight = 0;
+  m_coopBuildings = FALSE;
 
 	for (Int i=0; i<MAX_SLOTS; ++i)
 	{
@@ -1067,9 +1068,9 @@ static AsciiString buildGameInfoAsciiString(const GameInfo& game, const AsciiStr
 	optionsString.format("M=%2.2x%s;MC=%X;MS=%d;SD=%d;C=%d;", game.getMapContentsMask(), newMapName.str(),
 		game.getMapCRC(), game.getMapSize(), game.getSeed(), game.getCRCInterval());
 #else
-	optionsString.format("US=%d;M=%2.2x%s;MC=%X;MS=%d;SD=%d;C=%d;SR=%u;SC=%u;CH=%d;O=%c;", game.getUseStats(), game.getMapContentsMask(), newMapName.str(),
+	optionsString.format("US=%d;M=%2.2x%s;MC=%X;MS=%d;SD=%d;C=%d;SR=%u;SC=%u;CH=%d;O=%c;CB=%d;", game.getUseStats(), game.getMapContentsMask(), newMapName.str(),
 		game.getMapCRC(), game.getMapSize(), game.getSeed(), game.getCRCInterval(), game.getSuperweaponRestriction(),
-		game.getStartingCash().countMoney(), game.getMaxCameraHeight(), game.oldFactionsOnly() ? 'Y' : 'N' );
+		game.getStartingCash().countMoney(), game.getMaxCameraHeight(), game.oldFactionsOnly() ? 'Y' : 'N', game.getCoopBuildings() ? 1 : 0 );
 #endif
 
 	//add player info for each slot
@@ -1197,6 +1198,7 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
   Money startingCash = TheGlobalData->m_defaultStartingCash;
   UnsignedShort restriction = 0; // Always the default
   Int maxCameraHeight = 0;
+  Bool coopBuildings = FALSE;
 
 	Bool sawMap = FALSE;
 	Bool sawMapCRC = FALSE;
@@ -1323,6 +1325,10 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
     {
       oldFactionsOnly = ( val.compareNoCase( "Y" ) == 0 );
       sawOldFactions = TRUE;
+    }
+    else if (key.compare("CB") == 0 )
+    {
+      coopBuildings = atoi( val.str() ) != 0;
     }
 		else if (key.getLength() == 1 && *key.str() == slotListID)
 		{
@@ -1693,6 +1699,7 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 		game->setStartingCash(startingCash);
 		game->setMaxCameraHeight(maxCameraHeight);
 		game->setOldFactionsOnly(oldFactionsOnly);
+		game->setCoopBuildings(coopBuildings);
 
 		return true;
 	}
