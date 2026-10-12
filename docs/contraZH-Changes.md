@@ -201,6 +201,15 @@ render decoupling, not a retail bug
 
 Only changes what is drawn.
 
+## Slow aircraft no longer jitter over slopes
+
+Aircraft with `PitchInDirectionOfZVelFactor` (A-10 and other slow jets) shook in straight flight
+over sloped ground. Their height control switches lift fully on and off on alternate frames, and the
+nose pitch followed every switch; the slower the plane, the bigger the swing. The nose now follows
+the averaged climb rate.
+
+Only changes what is drawn.
+
 ## Hover units stop at the units they touch
 
 * `HOVER` and `SHIP` locomotors brake slowly, so a unit kept sliding for about two cells after its

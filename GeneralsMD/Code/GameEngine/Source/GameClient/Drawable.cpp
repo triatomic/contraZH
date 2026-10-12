@@ -273,6 +273,7 @@ DrawableLocoInfo::DrawableLocoInfo()
 
   m_yawModulator = 0.0f;
   m_pitchModulator = 0.0f;
+	m_smoothedVelZ = 0.0f;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1917,10 +1918,14 @@ void Drawable::calcPhysicsXformHoverOrWings( const Locomotor *locomotor, Physics
   {
 		if (Z_VEL_PITCH_COEFF != 0.0f)
 		{
+			// Lift control on a slope alternates full and zero lift each frame, which pitches slow fliers visibly.
+			const Real Z_VEL_SMOOTHING = 0.2f;
+			m_locoInfo->m_smoothedVelZ += Z_VEL_SMOOTHING * (vel->z - m_locoInfo->m_smoothedVelZ);
+
 			const Real TINY_DZ = 0.001f;
-			if (fabs(vel->z) > TINY_DZ)
+			if (fabs(m_locoInfo->m_smoothedVelZ) > TINY_DZ)
 			{
-				Real pitch = atan2(vel->z, sqrt(sqr(vel->x)+sqr(vel->y)));
+				Real pitch = atan2(m_locoInfo->m_smoothedVelZ, sqrt(sqr(vel->x)+sqr(vel->y)));
 				m_locoInfo->m_pitch -= Z_VEL_PITCH_COEFF * pitch;
 			}
 		}

@@ -181,6 +181,7 @@ public:
 	Real m_wobble;							///< for wobbling
   Real m_yawModulator;        ///< for the swimmy soft hover of a helicopter
   Real m_pitchModulator;        ///< for the swimmy soft hover of a helicopter
+	Real m_smoothedVelZ;				///< z velocity filtered for PitchInDirectionOfZVelFactor
 	TWheelInfo m_wheelInfo;			///< Wheel offset & angle info for a wheeled type locomotor.
 
 	DrawableLocoInfo();
