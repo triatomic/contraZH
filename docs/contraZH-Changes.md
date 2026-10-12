@@ -156,7 +156,8 @@ building shifted so its centre missed the rubble was allowed and cleared it. Pla
 now allowed wherever the builder can reach the rubble, and construction clears it.
 
 The pathfinder never linked rubble to the ground around it, so infantry and other units that can
-cross rubble were judged unable to reach it. They now path into rubble normally.
+cross rubble were judged unable to reach it. They now path into rubble normally. Amphibious units
+no longer treat rubble and broken bridge pieces as reachable.
 
 Changes build legality and pathfinding; affects replays.
 

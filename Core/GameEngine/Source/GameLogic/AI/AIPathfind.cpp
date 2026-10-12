@@ -2210,11 +2210,11 @@ inline Bool waterGround(const PathfindCell &targetCell, const PathfindCell &sour
 	PathfindCell::CellType targetType = targetCell.getType();
 	PathfindCell::CellType srcType = sourceCell.getType();
 	if ( (targetType==PathfindCell::CELL_CLEAR &&
-		(srcType&PathfindCell::CELL_WATER ))) {
+		(srcType==PathfindCell::CELL_WATER ))) {
 			return true;
 	}
 	if ( (srcType==PathfindCell::CELL_CLEAR &&
-		(targetType&PathfindCell::CELL_WATER ))) {
+		(targetType==PathfindCell::CELL_WATER ))) {
 			return true;
 	}
 
@@ -2972,9 +2972,7 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 							applyZone(r_thisCell, r_leftCell, m_groundWaterZones, m_maxZone);
 							applyZone(r_thisCell, r_leftCell, m_groundWaterRubbleZones, m_maxZone);
 						}
-
-						// waterGround also matches rubble (0x03 & CELL_WATER), so rubble is checked on its own
-						if (groundRubble(r_thisCell, r_leftCell))
+						else if (groundRubble(r_thisCell, r_leftCell))
 						{
 							applyZone(r_thisCell, r_leftCell, m_groundRubbleZones, m_maxZone);
 							applyZone(r_thisCell, r_leftCell, m_groundCliffRubbleZones, m_maxZone);
@@ -3041,8 +3039,7 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 							applyZone(r_thisCell, r_topCell, m_groundWaterZones, m_maxZone);
 							applyZone(r_thisCell, r_topCell, m_groundWaterRubbleZones, m_maxZone);
 						}
-
-						if (groundRubble(r_thisCell, r_topCell))
+						else if (groundRubble(r_thisCell, r_topCell))
 						{
 							applyZone(r_thisCell, r_topCell, m_groundRubbleZones, m_maxZone);
 							applyZone(r_thisCell, r_topCell, m_groundCliffRubbleZones, m_maxZone);
