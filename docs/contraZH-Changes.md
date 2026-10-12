@@ -329,6 +329,13 @@ appear in WorldBuilder's list but never drew in the editor or the game.
 Presentation only; replays unaffected.
 ([#82](https://github.com/triatomic/contraZH/issues/82))
 
+## Neutral teams show in WorldBuilder
+
+* Selecting the neutral player in the Teams dialog now lists its teams. They were hidden before,
+so maps could carry neutral teams that nobody could see, edit, move or delete.
+* Applies to both the classic and the Qt Teams dialog.
+([#82](https://github.com/triatomic/contraZH/issues/82))
+
 # Game Setup
 
 ## Random army per faction

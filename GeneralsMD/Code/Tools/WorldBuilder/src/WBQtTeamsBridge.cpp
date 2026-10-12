@@ -119,13 +119,16 @@ void CTeamsDialog::qtMRefresh(int rebuildRows)
 		s_qtTeamRows.clear();
 		if (s_qtCurPlayer >= 0 && s_qtCurPlayer < m_sides.getNumSides())
 		{
-			AsciiString playerName = qtmPlayerNameForUI(m_sides, s_qtCurPlayer);
+			// neutral teams store an empty owner name, or its UI label
+			AsciiString ownerName = m_sides.getSideInfo(s_qtCurPlayer)->getDict()->getAsciiString(TheKey_playerName);
+			AsciiString ownerUIName = qtmPlayerNameForUI(m_sides, s_qtCurPlayer);
 			Bool selected = false;
 			Int i;
 			for (i = 0; i < m_sides.getNumTeams(); i++)
 			{
 				TeamsInfo *ti = m_sides.getTeamInfo(i);
-				if (ti->getDict()->getAsciiString(TheKey_teamOwner) == playerName.str())
+				AsciiString teamOwner = ti->getDict()->getAsciiString(TheKey_teamOwner);
+				if (teamOwner == ownerName || teamOwner == ownerUIName)
 				{
 					QtmTeamRow row;
 					Bool exists;
@@ -2018,11 +2021,13 @@ extern "C" int WBQtTeamsData_GetPlayerTeamCount(int i)
 		return 0;
 	}
 	// The same owner match the team rows use.
-	const AsciiString playerName = qtmPlayerNameForUI(*sides, i);
+	const AsciiString ownerName = sides->getSideInfo(i)->getDict()->getAsciiString(TheKey_playerName);
+	const AsciiString ownerUIName = qtmPlayerNameForUI(*sides, i);
 	int count = 0;
 	for (Int t = 0; t < sides->getNumTeams(); t++)
 	{
-		if (sides->getTeamInfo(t)->getDict()->getAsciiString(TheKey_teamOwner) == playerName.str())
+		const AsciiString teamOwner = sides->getTeamInfo(t)->getDict()->getAsciiString(TheKey_teamOwner);
+		if (teamOwner == ownerName || teamOwner == ownerUIName)
 		{
 			++count;
 		}
