@@ -422,6 +422,8 @@ forces it on. Needs `CheckWindowed` in `OptionsMenu.wnd` for the menu control.)
 Notes:
 * A blue bar under a building's health bar shows production progress; on supply gatherers it shows
 cargo. Own objects, when selected or moused over, or always with `HealthBarDisplayMode = Always`.
+* `Damaged` and `Always` bars and `SmartPips` hide while a script letterboxes the screen, as campaign
+cinematics do.
 * `NewRadar` cannot hide roads, since they are painted into the terrain textures. Bridges still
 draw.
 * `SelectionCircle` and `DefensesRangeCircle` need a mod-side `PlainRingSelection.tga` (white or

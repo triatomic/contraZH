@@ -4108,6 +4108,15 @@ void Drawable::drawEmoticon( const IRegion2D *healthBarRegion )
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature Overlays shown without selection or hover hide while a script
+// letterboxes the screen, the way campaign cinematics hide the control bar.
+// ------------------------------------------------------------------------------------------------
+static Bool isScriptHidingUI()
+{
+	return TheDisplay && TheDisplay->isLetterBoxed();
+}
+
+// ------------------------------------------------------------------------------------------------
 void Drawable::drawAmmo( const IRegion2D *healthBarRegion )
 {
 	if (!healthBarRegion)
@@ -4120,7 +4129,7 @@ void Drawable::drawAmmo( const IRegion2D *healthBarRegion )
 	// to the player's own units -- not allies, not enemies -- since standing ammo counts on units
 	// you do not control would be information the game does not otherwise give away. A unit with
 	// no shots left draws nothing at all, so the pips read as "this one is still loaded".
-	const Bool smartPips = TheGlobalData->m_smartPips;
+	const Bool smartPips = TheGlobalData->m_smartPips && !isScriptHidingUI();
 
 	if (!smartPips)
 	{
@@ -4402,7 +4411,7 @@ void Drawable::drawProductionBar( const IRegion2D *healthBarRegion )
 
 	const Object* obj = getObject();
 
-	const Bool alwaysVisible = TheGlobalData->m_healthBarDisplayMode == HealthBarDisplayMode_Always;
+	const Bool alwaysVisible = TheGlobalData->m_healthBarDisplayMode == HealthBarDisplayMode_Always && !isScriptHidingUI();
 
 	if (!(
 				TheGlobalData->m_showObjectHealth &&
@@ -4483,7 +4492,7 @@ void Drawable::drawSupplyBar( const IRegion2D *healthBarRegion )
 
 	const Object* obj = getObject();
 
-	const Bool alwaysVisible = TheGlobalData->m_healthBarDisplayMode == HealthBarDisplayMode_Always;
+	const Bool alwaysVisible = TheGlobalData->m_healthBarDisplayMode == HealthBarDisplayMode_Always && !isScriptHidingUI();
 
 	if (!(
 				TheGlobalData->m_showObjectHealth &&
@@ -4561,7 +4570,7 @@ void Drawable::drawContained( const IRegion2D *healthBarRegion )
 	// allies, not enemies -- so this never reveals cargo the player could not already see. An
 	// empty transport draws nothing either way, thanks to the numFull check below, so the pips
 	// read as "this one is carrying someone".
-	const Bool smartPips = TheGlobalData->m_smartPips;
+	const Bool smartPips = TheGlobalData->m_smartPips && !isScriptHidingUI();
 
 	if (!smartPips)
 	{
@@ -5601,7 +5610,7 @@ static Bool isHealthBarAlwaysVisible( const Object *obj, Real healthRatio )
 {
 	const Int mode = TheGlobalData->m_healthBarDisplayMode;
 
-	if( mode == HealthBarDisplayMode_Classic )
+	if( mode == HealthBarDisplayMode_Classic || isScriptHidingUI() )
 		return FALSE;
 
 	// never label a corpse or a piece of scenery, in any mode
