@@ -19,6 +19,7 @@ extern "C" int WBQtConfig_GetNewSearch(void);
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMap>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QTextBrowser>
@@ -212,6 +213,18 @@ int WBQtCondActDialogClassic::buildTree(const QString &filter)
 		}
 	}
 	m_tree->sortItems(0, Qt::AscendingOrder);
+
+	// Pinned mod folders go first, in rank order.
+	QMap<int, QTreeWidgetItem *> pinned;
+	for (int i = m_tree->topLevelItemCount() - 1; i >= 0; --i)
+	{
+		const int rank = WBQtCondActData_PinnedFolderRank(m_tree->topLevelItem(i)->text(0).toLocal8Bit().constData());
+		if (rank >= 0)
+		{
+			pinned.insert(rank, m_tree->takeTopLevelItem(i));
+		}
+	}
+	m_tree->insertTopLevelItems(0, pinned.values());
 	m_updating = false;
 	selectCurrentType(selLeaf);
 	return matchCount;

@@ -12,6 +12,7 @@
 #include "GameLogic/ScriptEngine.h"
 #include "EditParameter.h"
 #include "qt/panels/WBQtCondActBridge.h"
+#include "ScriptFolderOrder.h"
 
 #define SCRIPT_DIALOG_SECTION "ScriptDialog"
 
@@ -68,6 +69,11 @@ extern "C" void WBQtCondActData_GetTemplateHelp(int isAction, int i, char *buf, 
 	{
 		copyOut(TheScriptEngine->getConditionTemplate(i)->getHelpText(), buf, cap);
 	}
+}
+
+extern "C" int WBQtCondActData_PinnedFolderRank(const char *name)
+{
+	return scriptFolderPinRank(name);
 }
 
 // ================= the edited item =================

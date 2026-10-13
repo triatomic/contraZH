@@ -30,6 +30,7 @@ int  WBQtCondActData_GetTemplateCount(int isAction);
 void WBQtCondActData_GetTemplateName(int isAction, int i, char *buf, int cap);	// '/'-separated path
 void WBQtCondActData_GetTemplateName2(int isAction, int i, char *buf, int cap);	// alt path or ""
 void WBQtCondActData_GetTemplateHelp(int isAction, int i, char *buf, int cap);
+int  WBQtCondActData_PinnedFolderRank(const char *name);	// top-level mod folder position, or -1
 
 // --- the edited item ---
 int  WBQtCondActData_GetType(void *item, int isAction);

@@ -39,6 +39,7 @@ namespace
 	const int kCrumbRole = Qt::UserRole + 3;
 	const int kFamiliesRole = Qt::UserRole + 4;
 	const int kFavoriteRole = Qt::UserRole + 5;
+	const int kPinnedRole = Qt::UserRole + 6;	///< a top-level folder's pin rank, -1 when it sorts by name
 
 	enum RowKind
 	{
@@ -113,6 +114,12 @@ namespace
 		}
 	}
 
+	int pinRank(const QModelIndex &index)
+	{
+		const QVariant rank = index.data(kPinnedRole);
+		return rank.isValid() ? rank.toInt() : -1;
+	}
+
 	QColor withAlpha(const QColor &colour, int alpha)
 	{
 		QColor c(colour);
@@ -151,6 +158,20 @@ namespace
 
 		virtual bool operator<(const QTreeWidgetItem &other) const
 		{
+			// Pinned mod folders go first, in rank order.
+			const QVariant rankData = data(0, kPinnedRole);
+			const QVariant otherRankData = other.data(0, kPinnedRole);
+			const int rank = rankData.isValid() ? rankData.toInt() : -1;
+			const int otherRank = otherRankData.isValid() ? otherRankData.toInt() : -1;
+			if (rank != otherRank)
+			{
+				if (rank < 0 || otherRank < 0)
+				{
+					return rank >= 0;
+				}
+				return rank < otherRank;
+			}
+
 			const bool folder = data(0, kTemplateRole).toInt() < 0;
 			const bool otherFolder = other.data(0, kTemplateRole).toInt() < 0;
 			if (folder != otherFolder)
@@ -382,7 +403,7 @@ namespace
 			QFont font(option.font);
 			font.setBold(header);
 			painter->setFont(font);
-			painter->setPen(text);
+			painter->setPen(header && pinRank(index) >= 0 ? option.palette.color(QPalette::Highlight).lighter(140) : text);
 			const QRect label(area.left(), area.top(), badge.left() - 8 - area.left(), area.height());
 			painter->drawText(label, Qt::AlignLeft | Qt::AlignVCenter,
 				QFontMetrics(font).elidedText(index.data(Qt::DisplayRole).toString(), Qt::ElideRight, label.width()));
@@ -391,6 +412,13 @@ namespace
 			{
 				painter->setPen(withAlpha(text, 40));
 				painter->drawLine(option.rect.left() + 4, option.rect.bottom(), option.rect.right() - 4, option.rect.bottom());
+
+				// The first stock header gets a divider that sets it apart from the pinned mod folders.
+				if (pinRank(index) < 0 && index.row() > 0 && pinRank(index.sibling(index.row() - 1, 0)) >= 0)
+				{
+					painter->setPen(QPen(withAlpha(option.palette.color(QPalette::Highlight), 200), 2));
+					painter->drawLine(option.rect.left() + 4, option.rect.top() + 1, option.rect.right() - 4, option.rect.top() + 1);
+				}
 			}
 		}
 
@@ -799,6 +827,10 @@ QTreeWidgetItem *WBQtCondActDialog::buildCatalog(int curType)
 					folder = new CatalogItem(parent == NULL ? kRowHeader : kRowFolder);
 					folder->setText(0, parts[p]);
 					folder->setData(0, kTemplateRole, -1);
+					if (parent == NULL)
+					{
+						folder->setData(0, kPinnedRole, WBQtCondActData_PinnedFolderRank(parts[p].toLocal8Bit().constData()));
+					}
 					if (parent == NULL)
 					{
 						tree->addTopLevelItem(folder);
