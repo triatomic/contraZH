@@ -652,7 +652,7 @@ public:
 		MSG_UPDATE_FOCUSED_GROUP,										///< update and tell every player that we have smart selection focus on this group
 		MSG_DO_REVERSE_MOVETO_HINT,									///< (location) If clicked, a reverse move would be ordered
 		MSG_EVACUATE_TO_WORK,												///< Dump out all of OUR contained objects, supply gatherers among them resume gathering
-		MSG_SPAWN_OBJECT_AT_POSITION,					///< (thingTemplate NameKey, location) debug/cheat spawn of one object for the local player; must run in the logic so the drawable is initialized correctly
+		MSG_SPAWN_OBJECT_AT_POSITION,					///< (thingTemplate ID, location) debug/cheat spawn of one object for the local player; must run in the logic so the drawable is initialized correctly
 
 		MSG_BEGIN_DEBUG_NETWORK_MESSAGES = 1900,		///< network messages that exist only in debug/internal builds. all grouped separately.
 

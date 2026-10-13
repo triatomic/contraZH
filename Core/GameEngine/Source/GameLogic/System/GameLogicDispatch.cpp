@@ -231,6 +231,23 @@ static Player *getMessagePlayer(GameMessage *msg)
 	return ThePlayerList->getNthPlayer( msg->getPlayerIndex() );
 }
 
+// ------------------------------------------------------------------------------------------------
+// Counts humans from the player list, so a live game and its replay answer the same.
+// ------------------------------------------------------------------------------------------------
+static Bool hasMultipleHumanPlayers()
+{
+	Int humans = 0;
+	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+	{
+		Player *player = ThePlayerList->getNthPlayer( i );
+		if (player != nullptr && player->getPlayerType() == PLAYER_HUMAN)
+		{
+			++humans;
+		}
+	}
+	return humans > 1;
+}
+
 
 static Object * getSingleObjectFromSelection(const AIGroup *currentlySelectedGroup)
 {
@@ -725,10 +742,15 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 		// visible, turrets do not track, and giving the object an order can crash.
 		case GameMessage::MSG_SPAWN_OBJECT_AT_POSITION:
 		{
-			const NameKeyType templateKey = (NameKeyType)msg->getArgument( 0 )->integer;
+			// The chat command only sends this outside multiplayer, so reject one a modified client sent.
+			if( hasMultipleHumanPlayers() )
+			{
+				break;
+			}
+
 			const Coord3D pos = msg->getArgument( 1 )->location;
 
-			const ThingTemplate *tmpl = TheThingFactory->findTemplate( TheNameKeyGenerator->keyToName( templateKey ) );
+			const ThingTemplate *tmpl = TheThingFactory->findByTemplateID( (UnsignedShort)msg->getArgument( 0 )->integer );
 			if( tmpl == nullptr )
 				break;
 

@@ -1089,7 +1089,7 @@ void ThingTemplate::parseRequiredBridgeHeight(INI* ini, void* instance, void* st
 	}
 	else {
 		// rounded up, see Object::getRequiredBridgeHeight.  0 still means "never blocked".
-		self->m_requiredBridgeHeight = std::clamp(static_cast<byte>(REAL_TO_INT_CEIL(value / 10.0f)), static_cast<byte>(0), static_cast<byte>(15));
+		self->m_requiredBridgeHeight = static_cast<byte>(std::clamp(static_cast<Int>(REAL_TO_INT_CEIL(value / 10.0f)), 0, 15));
 	}
 }
 

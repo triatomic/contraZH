@@ -1021,10 +1021,11 @@ void Locomotor::locoUpdate_moveTowardsAngle(Object* obj, Real goalAngle)
 			// Once aligned, fall through to the in-place path (no-op rotation).
 			const Real ALIGNED_THRESH = 0.035f;	// ~2 degrees, same as AI aim/face REL_THRESH
 			Real relAngle = stdAngleDiff(goalAngle, obj->getOrientation());
-			if (fabs(relAngle) > ALIGNED_THRESH)
+			BodyDamageType bdt = obj->getBodyModule()->getDamageState();
+			Real maxSpeed = getMaxSpeedForCondition(bdt);
+			// with no speed to drive at, pivot instead so aim and face states can still finish
+			if (fabs(relAngle) > ALIGNED_THRESH && maxSpeed > 0.0f)
 			{
-				BodyDamageType bdt = obj->getBodyModule()->getDamageState();
-				Real maxSpeed = getMaxSpeedForCondition(bdt);
 				// mirrors the turnSpeed clamp in moveTowardsPositionWheels
 				Real speed = m_template->m_minTurnSpeed;
 				if (speed < maxSpeed/4.0f)

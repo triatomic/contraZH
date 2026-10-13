@@ -358,6 +358,12 @@ void RiftSlowDeathBehavior::doRiftTick(Real strength, UnsignedInt currFrame)
 					&& damageInfo.out.m_actualDamageDealt > 0.0f
 					&& GameLogicRandomValueReal(0.0f, 1.0f) < d->m_structureDebrisChance)
 				debrisSources.push_back(victim->getID());
+
+			// killed just now: the dead-victim pass below steers it if we already hold it
+			if (victim->isEffectivelyDead())
+			{
+				continue;
+			}
 		}
 
 		if (!pullable)

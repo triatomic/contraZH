@@ -46,7 +46,6 @@
 #include "GameClient/View.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/GameLogic.h"
-#include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/WeaponSetType.h"
@@ -54,7 +53,6 @@
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Damage.h"
 #include "GameLogic/Module/BodyModule.h"
-#include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 
 //-------------------------------------------------------------------------------------------------
@@ -370,7 +368,7 @@ void ChatCommand::execute( const AsciiString& args ) const
 				// the object here leaves the drawable uninitialized: muzzle flashes stay visible, turrets
 				// do not track, and giving the object an order can crash. Post it to the logic instead.
 				GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_SPAWN_OBJECT_AT_POSITION );
-				msg->appendIntegerArgument( (Int)TheNameKeyGenerator->nameToKey( tmpl->getName() ) );
+				msg->appendIntegerArgument( (Int)tmpl->getTemplateID() );
 				msg->appendLocationArgument( pos );
 			}
 		}

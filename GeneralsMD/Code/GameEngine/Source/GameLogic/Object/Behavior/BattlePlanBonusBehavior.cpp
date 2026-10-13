@@ -101,7 +101,8 @@ void BattlePlanBonusBehaviorModuleData::parseBPArmorDamageScalar(INI* ini, void*
 	if ((plan) == PLANSTATUS_NONE)
 		return;
 
-	self->m_armorDamageScalarEntries[plan - 1] = INI::scanReal(ini->getNextToken());
+	// floored like the reciprocal in removeBonusForType, so removing the plan restores the value
+	self->m_armorDamageScalarEntries[plan - 1] = __max(INI::scanReal(ini->getNextToken()), 0.01f);
 }
 //-------------------------------------------------------------------------------------------------
 void BattlePlanBonusBehaviorModuleData::parseBPSightRangeScalar(INI* ini, void* instance, void* store, const void* userData)
@@ -111,7 +112,7 @@ void BattlePlanBonusBehaviorModuleData::parseBPSightRangeScalar(INI* ini, void* 
 	if ((plan) == PLANSTATUS_NONE)
 		return;
 
-	self->m_sightRangeScalarEntries[plan - 1] = INI::scanReal(ini->getNextToken());
+	self->m_sightRangeScalarEntries[plan - 1] = __max(INI::scanReal(ini->getNextToken()), 0.01f);
 }
 //-------------------------------------------------------------------------------------------------
 void BattlePlanBonusBehaviorModuleData::parseBPMovementSpeedScalar(INI* ini, void* instance, void* store, const void* userData)
@@ -121,7 +122,7 @@ void BattlePlanBonusBehaviorModuleData::parseBPMovementSpeedScalar(INI* ini, voi
 	if ((plan) == PLANSTATUS_NONE)
 		return;
 
-	self->m_movementSpeedScalarEntries[plan - 1] = INI::scanReal(ini->getNextToken());
+	self->m_movementSpeedScalarEntries[plan - 1] = __max(INI::scanReal(ini->getNextToken()), 0.01f);
 }
 //-------------------------------------------------------------------------------------------------
 void BattlePlanBonusBehaviorModuleData::parseBPStatusToSet(INI* ini, void* instance, void* store, const void* userData)

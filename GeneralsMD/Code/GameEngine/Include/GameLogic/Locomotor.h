@@ -270,7 +270,6 @@ public:
 	Real getMinSpeed() const { return m_template->m_minSpeed;}
 	Real getMinTurnSpeed() const { return m_template->m_minTurnSpeed;}	///< must be going >= this speed to turn (0 = can turn in place)
 	Bool getRequiresMoveToTurn() const { return m_template->m_requiresMoveToTurn; }
-	Bool canTurnInPlace() const { return getMinSpeed() == 0.0f && !getRequiresMoveToTurn(); }
 	Real getAccelPitchLimit() const { return m_template->m_accelPitchLimit;}	///< Maximum amount we will pitch up or down under acceleration (including recoil.)
 	Real getDecelPitchLimit() const { return m_template->m_decelPitchLimit;}	///< Maximum amount we will pitch down under deceleration (including recoil.)
 	Real getBounceKick() const { return m_template->m_bounceKick;}						///< How much simulating rough terrain "bounces" a wheel up.
