@@ -368,6 +368,8 @@ protected:
 	void doAffectObjectPanelFlagsUnit(const AsciiString& unitName, const AsciiString& flagName, Bool enable);
 	void doAffectObjectPanelFlagsTeam(const AsciiString& teamName, const AsciiString& flagName, Bool enable);
 	void doGuardSupplyCenter(const AsciiString& teamName, Int supplies);
+	void doTeamMoveToSupplySource(const AsciiString& teamName, Int supplies);
+	void doNamedMoveToSupplySource(const AsciiString& unitName, Int supplies);
 	void doTeamGuardInTunnelNetwork(const AsciiString& teamName);
 	void doAffectPlayerSkillset(const AsciiString& playerName, Int skillset);
 	void doC3CameraShake( const AsciiString &waypointName, Real amplitude, Real duration_seconds, Real radius );

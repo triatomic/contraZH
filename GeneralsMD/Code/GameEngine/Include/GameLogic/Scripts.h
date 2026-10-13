@@ -557,6 +557,8 @@ public:
 		SHOW_WEATHER,															///< show map defined weather.
 		AI_PLAYER_BUILD_TYPE_NEAREST_TEAM,				///< Tell the ai player to build an object nearest team.
 		SKIRMISH_BUILD_SHIPYARD,                  ///< Tell the ai player to build a shipyard
+		TEAM_MOVE_TO_SUPPLY_SOURCE,								///< Move a team next to the nearest free supply source.
+		NAMED_MOVE_TO_SUPPLY_SOURCE,							///< Move a unit next to the nearest free supply source.
 		// add new items here, please
 		NUM_ITEMS
 	};

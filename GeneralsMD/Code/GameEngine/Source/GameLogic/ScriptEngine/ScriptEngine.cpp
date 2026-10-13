@@ -4098,6 +4098,28 @@ void ScriptEngine::init()
 	curTemplate->m_uiStrings[0] = "Build a shipyard ";
 	curTemplate->m_uiStrings[1] = ", at next free shipyard waypoint.";
 
+	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MOVE_TO_SUPPLY_SOURCE];
+	curTemplate->m_internalName = "TEAM_MOVE_TO_SUPPLY_SOURCE";
+	curTemplate->m_uiName = "Contra/Team_/Move/Set to move to the nearest free supply source.";
+	curTemplate->m_numParameters = 2;
+	curTemplate->m_parameters[0] = Parameter::TEAM;
+	curTemplate->m_parameters[1] = Parameter::INT;
+	curTemplate->m_numUiStrings = 3;
+	curTemplate->m_uiStrings[0] = "Have Team ";
+	curTemplate->m_uiStrings[1] = " move to the nearest free supply source with at least ";
+	curTemplate->m_uiStrings[2] = " available resources.";
+
+	curTemplate = &m_actionTemplates[ScriptAction::NAMED_MOVE_TO_SUPPLY_SOURCE];
+	curTemplate->m_internalName = "NAMED_MOVE_TO_SUPPLY_SOURCE";
+	curTemplate->m_uiName = "Contra/Unit_/Move/Move a specific unit to the nearest free supply source.";
+	curTemplate->m_numParameters = 2;
+	curTemplate->m_parameters[0] = Parameter::UNIT;
+	curTemplate->m_parameters[1] = Parameter::INT;
+	curTemplate->m_numUiStrings = 3;
+	curTemplate->m_uiStrings[0] = "Have ";
+	curTemplate->m_uiStrings[1] = " move to the nearest free supply source with at least ";
+	curTemplate->m_uiStrings[2] = " available resources.";
+
 	///////////////////////////////////////////////////////////////////////////////////////////////////
 
 	/* Recipe for adding a condition:

@@ -336,6 +336,24 @@ so maps could carry neutral teams that nobody could see, edit, move or delete.
 * Applies to both the classic and the Qt Teams dialog.
 ([#82](https://github.com/triatomic/contraZH/issues/82))
 
+## Move to a free supply source
+
+Two script actions send units to the nearest free supply source, for example a GLA Mobile Supply
+Stash that deploys there.
+
+| Action | Parameters |
+|---|---|
+| `Contra/Team_/Move/Set to move to the nearest free supply source` | team, minimum resources |
+| `Contra/Unit_/Move/Move a specific unit to the nearest free supply source` | unit, minimum resources |
+
+* Free means not enemy-owned and no supply center of any player within 20 cells.
+* Nearest is measured from the unit, or from the team's position.
+* If no source holds the minimum resources, the threshold halves until a source qualifies or it
+drops to 100. Empty sources never qualify.
+* Units stop beside the source on the side facing them, outside the `SupplyBuildBorder`.
+* Does nothing when no source qualifies.
+([#134](https://github.com/triatomic/contraZH/issues/134))
+
 ## New factions in PlayerTemplate.ini
 
 `PlayableSide` defaults to `No`. Killing units of a faction without `PlayableSide = Yes` earns no

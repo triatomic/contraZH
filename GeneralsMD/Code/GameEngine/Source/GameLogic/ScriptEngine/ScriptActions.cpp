@@ -6406,6 +6406,155 @@ void ScriptActions::doGuardSupplyCenter(const AsciiString& teamName, Int supplie
 }
 
 //-------------------------------------------------------------------------------------------------
+/** Nearest supply source to pos that is not enemy owned and has no supply center of any player near it. */
+//-------------------------------------------------------------------------------------------------
+static Object *findFreeSupplySource(const Coord3D *pos, const Player *player, Int minimumCash)
+{
+	// Same as SUPPLY_CENTER_CLOSE_DIST in AIPlayer.cpp
+	const Real closeDist = 20*PATHFIND_CELL_SIZE_F;
+	static const NameKeyType key_warehouseUpdate = NAMEKEY("SupplyWarehouseDockUpdate");
+
+	Object *bestSource = nullptr;
+	Real bestDistSqr = 0;
+	do
+	{
+		for (Object *obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
+		{
+			if (!obj->isKindOf(KINDOF_STRUCTURE) || !obj->isKindOf(KINDOF_SUPPLY_SOURCE))
+			{
+				continue;
+			}
+			SupplyWarehouseDockUpdate *warehouseModule = (SupplyWarehouseDockUpdate*)obj->findUpdateModule(key_warehouseUpdate);
+			if (!warehouseModule)
+			{
+				continue;
+			}
+			Int availableCash = warehouseModule->getBoxesStored()*TheGlobalData->m_baseValuePerSupplyBox;
+			if (availableCash <= 0 || availableCash < minimumCash)
+			{
+				continue;
+			}
+			if (player->getRelationship(obj->getTeam()) == ENEMIES)
+			{
+				continue;
+			}
+
+			Real dx = obj->getPosition()->x - pos->x;
+			Real dy = obj->getPosition()->y - pos->y;
+			Real distSqr = dx*dx + dy*dy;
+			if (bestSource && distSqr >= bestDistSqr)
+			{
+				continue;
+			}
+
+			// Structures only, so a moving stash does not claim the source it drives past
+			PartitionFilterAcceptByKindOf filterKind(KindOfMaskType(KindOfMaskType::kInit, KINDOF_STRUCTURE, KINDOF_CASH_GENERATOR), KINDOFMASK_NONE);
+			PartitionFilterAlive filterAlive;
+			PartitionFilterOnMap filterMapStatus;
+			PartitionFilter *filters[] = { &filterKind, &filterAlive, &filterMapStatus, nullptr };
+			Real radius = closeDist + obj->getGeometryInfo().getBoundingCircleRadius();
+			if (ThePartitionManager->getClosestObject(obj->getPosition(), radius, FROM_BOUNDINGSPHERE_2D, filters))
+			{
+				continue;
+			}
+
+			bestSource = obj;
+			bestDistSqr = distSqr;
+		}
+		if (bestSource)
+		{
+			break;
+		}
+		minimumCash /= 2;
+	} while (minimumCash > 100);
+
+	return bestSource;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Point beside the source on the side facing from, clear of its supply build border. */
+//-------------------------------------------------------------------------------------------------
+static Coord3D getSupplySourceApproach(const Object *source, const Coord3D *from, Real moverRadius)
+{
+	Coord3D location = *source->getPosition();
+	Coord2D offset;
+	offset.x = from->x - location.x;
+	offset.y = from->y - location.y;
+	offset.normalize();
+	Real radius = source->getGeometryInfo().getBoundingCircleRadius() + 2*TheGlobalData->m_SupplyBuildBorder + moverRadius;
+	location.x += offset.x*radius;
+	location.y += offset.y*radius;
+	location.z = TheTerrainLogic->getGroundHeight(location.x, location.y);
+	return location;
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScriptActions::doTeamMoveToSupplySource(const AsciiString& teamName, Int supplies)
+{
+	Team *team = TheScriptEngine->getTeamNamed(teamName);
+	if (!team) {
+		return;
+	}
+	Player *player = team->getControllingPlayer();
+	if (!player) {
+		return;
+	}
+	const Coord3D *teamPos = team->getEstimateTeamPosition();
+	if (!teamPos) {
+		return;
+	}
+	Object *source = findFreeSupplySource(teamPos, player, supplies);
+	if (!source) {
+		return;
+	}
+
+	Real moverRadius = 0;
+	for (DLINK_ITERATOR<Object> iter = team->iterate_TeamMemberList(); !iter.done(); iter.advance())
+	{
+		moverRadius = max(moverRadius, iter.cur()->getGeometryInfo().getBoundingCircleRadius());
+	}
+
+	AIGroupPtr theGroup = TheAI->createGroup();
+	if (!theGroup) {
+		return;
+	}
+#if RETAIL_COMPATIBLE_AIGROUP
+	team->getTeamAsAIGroup(theGroup);
+#else
+	team->getTeamAsAIGroup(theGroup.Peek());
+#endif
+	Coord3D destination = getSupplySourceApproach(source, teamPos, moverRadius);
+	theGroup->groupMoveToPosition(&destination, false, CMD_FROM_SCRIPT);
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScriptActions::doNamedMoveToSupplySource(const AsciiString& unitName, Int supplies)
+{
+	Object *theObj = TheScriptEngine->getUnitNamed(unitName);
+	if (!theObj) {
+		return;
+	}
+	Player *player = theObj->getControllingPlayer();
+	if (!player) {
+		return;
+	}
+	AIUpdateInterface *aiUpdate = theObj->getAIUpdateInterface();
+	if (!aiUpdate) {
+		return;
+	}
+	Object *source = findFreeSupplySource(theObj->getPosition(), player, supplies);
+	if (!source) {
+		return;
+	}
+
+	Coord3D destination = getSupplySourceApproach(source, theObj->getPosition(), theObj->getGeometryInfo().getBoundingCircleRadius());
+	aiUpdate->clearWaypointQueue();
+	theObj->leaveGroup();
+	aiUpdate->chooseLocomotorSet(LOCOMOTORSET_NORMAL);
+	aiUpdate->aiMoveToPosition(&destination, CMD_FROM_SCRIPT);
+}
+
+//-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamGuardInTunnelNetwork(const AsciiString& teamName)
 {
 	Team *team = TheScriptEngine->getTeamNamed(teamName);
@@ -7690,6 +7839,14 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 
 		case ScriptAction::TEAM_GUARD_SUPPLY_CENTER:
 			doGuardSupplyCenter(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getInt());
+			return;
+
+		case ScriptAction::TEAM_MOVE_TO_SUPPLY_SOURCE:
+			doTeamMoveToSupplySource(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getInt());
+			return;
+
+		case ScriptAction::NAMED_MOVE_TO_SUPPLY_SOURCE:
+			doNamedMoveToSupplySource(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getInt());
 			return;
 
 		case ScriptAction::OBJECT_ALLOW_BONUSES:
