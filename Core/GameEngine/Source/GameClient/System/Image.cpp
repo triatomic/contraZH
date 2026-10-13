@@ -253,10 +253,10 @@ void ImageCollection::load( Int textureSize )
 	if(TheGlobalData)
 	{
 		userDataPath.format("%sINI\\MappedImages\\*.ini",TheGlobalData->getPath_UserData().str());
-		HANDLE hFind = FindFirstFile(userDataPath.str(), &findData);
-		if(hFind != INVALID_HANDLE_VALUE)
+		HANDLE findHandle = FindFirstFile(userDataPath.str(), &findData);
+		if(findHandle != INVALID_HANDLE_VALUE)
 		{
-			FindClose(hFind);
+			FindClose(findHandle);
 			userDataPath.format("%sINI\\MappedImages",TheGlobalData->getPath_UserData().str());
 			ini.loadDirectory(userDataPath, INI_LOAD_OVERWRITE, nullptr );
 		}
