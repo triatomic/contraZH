@@ -2733,7 +2733,7 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 		default:
 		{
 			Bool result;
-			if (evaluateTEODCondition(pCondition, &result))
+			if (evaluateCLPCondition(pCondition, &result))
 			{
 				return result;
 			}

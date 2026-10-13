@@ -115,7 +115,7 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/ScriptEngine.h"
-#include "GameLogic/ScriptTEOD.h"
+#include "GameLogic/ScriptCLP.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/WeaponSet.h"
 #include "GameLogic/Module/RadarUpdate.h"
@@ -3283,7 +3283,7 @@ void Object::scoreTheKill( const Object *victim, const DamageInfo *damageInfo )
 	if (controller)
 	{
 		controller->getScoreKeeper()->addObjectDestroyed(victim);
-		TheScriptTEODState->onObjectKilled(controller, victim);
+		TheScriptCLPState->onObjectKilled(controller, victim);
 		controller->addSkillPointsForKill(this, victim);
 		controller->doBountyForKill(this, victim);
 #if defined(GENERALS_ONLINE)
@@ -5015,7 +5015,7 @@ void Object::onDie( DamageInfo *damageInfo )
 	if(m_team)
 		m_team->notifyTeamOfObjectDeath();
 
-	TheScriptTEODState->onObjectDied(this);
+	TheScriptCLPState->onObjectDied(this);
 
 	// A unit scuttling itself by its own logic, such as a combat bike whose rider dismounted, is not a
 	// loss to report. The status is only ever set by the module staging that death.

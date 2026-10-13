@@ -48,7 +48,7 @@
 
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/PartitionManager.h"
-#include "GameLogic/ScriptTEODAI.h"
+#include "GameLogic/ScriptCLPAI.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectIter.h"
 #include "GameLogic/WeaponSet.h"
@@ -558,9 +558,9 @@ UpdateSleepTime ParticleUplinkCannonUpdate::update()
 		if ( isFiring )
 		{
 
-			if( TheScriptTEODAI && TheScriptTEODAI->steerParticleCannon( me, m_startAttackFrame, data->m_manualFastDrivingSpeed, &m_currentTargetPosition ) )
+			if( TheScriptCLPAI && TheScriptCLPAI->steerParticleCannon( me, m_startAttackFrame, data->m_manualFastDrivingSpeed, &m_currentTargetPosition ) )
 			{
-				// a TEOD script aimed this beam at object types
+				// a CLP_AI script aimed this beam at object types
 			}
 			else if( !m_manualTargetMode && !m_scriptedWaypointMode )
 			{

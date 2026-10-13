@@ -16,8 +16,8 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// FILE: ScriptActionsTEODAI.cpp //////////////////////////////////////////////////////////////////
-// TEOD script actions that change how the skirmish AI builds.
+// FILE: ScriptActionsCLPAI.cpp ///////////////////////////////////////////////////////////////////
+// CLP_AI script actions that change how the skirmish AI builds.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
@@ -49,28 +49,28 @@
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/ScriptEngine.h"
-#include "GameLogic/ScriptTEOD.h"
-#include "GameLogic/ScriptTEODAI.h"
+#include "GameLogic/ScriptCLP.h"
+#include "GameLogic/ScriptCLPAI.h"
 #include "GameLogic/SidesList.h"
 #include "GameLogic/TerrainLogic.h"
 
 #include <algorithm>
 #include <vector>
 
-ScriptTEODAI *TheScriptTEODAI = nullptr;
+ScriptCLPAI *TheScriptCLPAI = nullptr;
 
-static const Real TEOD_SEARCH_STEP = 2 * PATHFIND_CELL_SIZE_F;
-static const Real TEOD_NEAR_RADIUS = 600 * PATHFIND_CELL_SIZE_F;
-static const Real TEOD_SUPPLY_RADIUS = 300 * PATHFIND_CELL_SIZE_F;
-static const Int TEOD_SEARCH_BUDGET = 2048;					///< legality tests per placement, keeps one script action from stalling a frame
-static const Int TEOD_ANGLE_SEARCH_BUDGET = 256;
-static const Int TEOD_MAX_DEFENSE_ATTEMPTS = 100;
-static const Real TEOD_SUPPLY_CENTER_CLOSE_DIST = 20 * PATHFIND_CELL_SIZE_F;	///< SUPPLY_CENTER_CLOSE_DIST in AIPlayer.cpp
+static const Real CLP_SEARCH_STEP = 2 * PATHFIND_CELL_SIZE_F;
+static const Real CLP_NEAR_RADIUS = 600 * PATHFIND_CELL_SIZE_F;
+static const Real CLP_SUPPLY_RADIUS = 300 * PATHFIND_CELL_SIZE_F;
+static const Int CLP_SEARCH_BUDGET = 2048;					///< legality tests per placement, keeps one script action from stalling a frame
+static const Int CLP_ANGLE_SEARCH_BUDGET = 256;
+static const Int CLP_MAX_DEFENSE_ATTEMPTS = 100;
+static const Real CLP_SUPPLY_CENTER_CLOSE_DIST = 20 * PATHFIND_CELL_SIZE_F;	///< SUPPLY_CENTER_CLOSE_DIST in AIPlayer.cpp
 
 //-------------------------------------------------------------------------------------------------
 /** Angle 361 picks a random diagonal and 362 a random whole degree. Degrees in and out. */
 //-------------------------------------------------------------------------------------------------
-static Real teodResolveAngle(Real angle)
+static Real clpResolveAngle(Real angle)
 {
 	if( angle == 361.0f )
 	{
@@ -100,7 +100,7 @@ static Real teodResolveAngle(Real angle)
 //-------------------------------------------------------------------------------------------------
 /** A template by name, or a random structure from an ObjectTypes list. */
 //-------------------------------------------------------------------------------------------------
-static const ThingTemplate *teodPickStructureTemplate(const AsciiString &name)
+static const ThingTemplate *clpPickStructureTemplate(const AsciiString &name)
 {
 	const ThingTemplate *tmpl = TheThingFactory->findTemplate( name, FALSE );
 	if( tmpl )
@@ -133,7 +133,7 @@ static const ThingTemplate *teodPickStructureTemplate(const AsciiString &name)
 //-------------------------------------------------------------------------------------------------
 /** Every template a name stands for, without duplicates. */
 //-------------------------------------------------------------------------------------------------
-static void teodCollectTemplates(const AsciiString &name, std::vector<const ThingTemplate *> *out)
+static void clpCollectTemplates(const AsciiString &name, std::vector<const ThingTemplate *> *out)
 {
 	const ThingTemplate *tmpl = TheThingFactory->findTemplate( name, FALSE );
 	if( tmpl )
@@ -158,7 +158,7 @@ static void teodCollectTemplates(const AsciiString &name, std::vector<const Thin
 }
 
 //-------------------------------------------------------------------------------------------------
-static void teodRemoveAllBibs()
+static void clpRemoveAllBibs()
 {
 	// isLocationLegalToBuild adds bib feedback; the stock AI clears it the same way.
 	if( TheTerrainVisual )
@@ -170,7 +170,7 @@ static void teodRemoveAllBibs()
 //-------------------------------------------------------------------------------------------------
 /** Cell i of the square ring at Chebyshev distance ring, walked clockwise from the top left corner. */
 //-------------------------------------------------------------------------------------------------
-static void teodRingCell(Int ring, Int i, Int *dx, Int *dy)
+static void clpRingCell(Int ring, Int i, Int *dx, Int *dy)
 {
 	Int side = 2 * ring;
 	if( i < side )
@@ -199,10 +199,10 @@ static void teodRingCell(Int ring, Int i, Int *dx, Int *dy)
 /** Searches square rings outward from center for a spot where tmpl is fully legal to build.
 	budget is the number of legality tests left and may be shared by several searches. */
 //-------------------------------------------------------------------------------------------------
-static Bool teodFindBuildPosition(const Coord3D *center, const ThingTemplate *tmpl, Real angle, Player *player, Real maxRadius, Int *budget, Coord3D *outPos)
+static Bool clpFindBuildPosition(const Coord3D *center, const ThingTemplate *tmpl, Real angle, Player *player, Real maxRadius, Int *budget, Coord3D *outPos)
 {
 	const UnsignedInt flags = BuildAssistant::CLEAR_PATH | BuildAssistant::TERRAIN_RESTRICTIONS | BuildAssistant::NO_OBJECT_OVERLAP;
-	Int maxRing = REAL_TO_INT_FLOOR( maxRadius / TEOD_SEARCH_STEP );
+	Int maxRing = REAL_TO_INT_FLOOR( maxRadius / CLP_SEARCH_STEP );
 	for( Int ring = 0; ring <= maxRing; ++ring )
 	{
 		Int cells = ring == 0 ? 1 : 8 * ring;
@@ -216,10 +216,10 @@ static Bool teodFindBuildPosition(const Coord3D *center, const ThingTemplate *tm
 
 			Int dx = 0;
 			Int dy = 0;
-			teodRingCell( ring, i, &dx, &dy );
+			clpRingCell( ring, i, &dx, &dy );
 			Coord3D pos = *center;
-			pos.x += dx * TEOD_SEARCH_STEP;
-			pos.y += dy * TEOD_SEARCH_STEP;
+			pos.x += dx * CLP_SEARCH_STEP;
+			pos.y += dy * CLP_SEARCH_STEP;
 			pos.z = TheTerrainLogic->getGroundHeight( pos.x, pos.y );
 			if( TheBuildAssistant->isLocationLegalToBuild( &pos, tmpl, angle, flags, nullptr, player ) == LBC_OK )
 			{
@@ -234,7 +234,7 @@ static Bool teodFindBuildPosition(const Coord3D *center, const ThingTemplate *tm
 //-------------------------------------------------------------------------------------------------
 /** The location itself when nothing overlaps it, like the stock AI, else the nearest fully legal spot. */
 //-------------------------------------------------------------------------------------------------
-static Bool teodPlaceNear(const Coord3D *location, const ThingTemplate *tmpl, Real angle, Player *player, Real maxRadius, Int *budget, Coord3D *outPos)
+static Bool clpPlaceNear(const Coord3D *location, const ThingTemplate *tmpl, Real angle, Player *player, Real maxRadius, Int *budget, Coord3D *outPos)
 {
 	Coord3D center = *location;
 	center.z = TheTerrainLogic->getGroundHeight( center.x, center.y );
@@ -244,13 +244,13 @@ static Bool teodPlaceNear(const Coord3D *location, const ThingTemplate *tmpl, Re
 		*outPos = center;
 		return TRUE;
 	}
-	return teodFindBuildPosition( &center, tmpl, angle, player, maxRadius, budget, outPos );
+	return clpFindBuildPosition( &center, tmpl, angle, player, maxRadius, budget, outPos );
 }
 
 //-------------------------------------------------------------------------------------------------
 /** True if the player's build list still has an unbuilt supply center near pos. */
 //-------------------------------------------------------------------------------------------------
-static Bool teodHasPendingSupplyCenter(Player *player, const Coord3D *pos, Real radius)
+static Bool clpHasPendingSupplyCenter(Player *player, const Coord3D *pos, Real radius)
 {
 	for( BuildListInfo *info = player->getBuildList(); info; info = info->getNext() )
 	{
@@ -280,7 +280,7 @@ static Bool teodHasPendingSupplyCenter(Player *player, const Coord3D *pos, Real 
 //-------------------------------------------------------------------------------------------------
 /** Stock getPlayerSuperweaponValue, with objects of objectType worth five times as much. */
 //-------------------------------------------------------------------------------------------------
-static Int teodSuperweaponValueType(const Coord3D *center, Int playerNdx, Real radius, const AsciiString &objectType, Bool includeMilitaryUnits)
+static Int clpSuperweaponValueType(const Coord3D *center, Int playerNdx, Real radius, const AsciiString &objectType, Bool includeMilitaryUnits)
 {
 	if( radius < 4 * PATHFIND_CELL_SIZE_F )
 	{
@@ -364,7 +364,7 @@ static Int teodSuperweaponValueType(const Coord3D *center, Int playerNdx, Real r
 							value = value / 10;
 						}
 					}
-					if( teodObjectMatchesType( pObj, objectType ) )
+					if( clpObjectMatchesType( pObj, objectType ) )
 					{
 						value = value * 5.0f;
 					}
@@ -384,7 +384,7 @@ static Int teodSuperweaponValueType(const Coord3D *center, Int playerNdx, Real r
 }
 
 //-------------------------------------------------------------------------------------------------
-static Bool teodGetStartPosition(Player *player, Coord3D *pos)
+static Bool clpGetStartPosition(Player *player, Coord3D *pos)
 {
 	AsciiString name;
 	name.format( "Player_%d_Start", player->getMpStartIndex() + 1 );
@@ -400,28 +400,28 @@ static Bool teodGetStartPosition(Player *player, Coord3D *pos)
 //-------------------------------------------------------------------------------------------------
 /** Queues buildingType near obj for the player's AI. angle is in degrees and may be 361 or 362. */
 //-------------------------------------------------------------------------------------------------
-static void teodBuildNearObject(Player *player, const AsciiString &buildingType, const Object *obj, Real angle)
+static void clpBuildNearObject(Player *player, const AsciiString &buildingType, const Object *obj, Real angle)
 {
 	AIPlayer *ai = player->getAIPlayer();
 	if( !ai || !obj )
 	{
 		return;
 	}
-	angle = teodResolveAngle( angle );
-	const ThingTemplate *tmpl = teodPickStructureTemplate( buildingType );
+	angle = clpResolveAngle( angle );
+	const ThingTemplate *tmpl = clpPickStructureTemplate( buildingType );
 	if( !tmpl )
 	{
 		return;
 	}
-	ai->teodBuildNearPosition( tmpl, obj->getPosition(), angle * (PI / 180.0f) );
+	ai->clpBuildNearPosition( tmpl, obj->getPosition(), angle * (PI / 180.0f) );
 }
 
 //-------------------------------------------------------------------------------------------------
 /** A random entry of the player's base defense list, or empty if it is empty or not buildable. */
 //-------------------------------------------------------------------------------------------------
-static AsciiString teodPickBaseDefense(Player *player)
+static AsciiString clpPickBaseDefense(Player *player)
 {
-	const std::vector<AsciiString> &defenses = TheScriptTEODAI->getBaseDefenses( player->getPlayerIndex() );
+	const std::vector<AsciiString> &defenses = TheScriptCLPAI->getBaseDefenses( player->getPlayerIndex() );
 	if( defenses.empty() )
 	{
 		return AsciiString::TheEmptyString;
@@ -436,7 +436,7 @@ static AsciiString teodPickBaseDefense(Player *player)
 }
 
 //-------------------------------------------------------------------------------------------------
-static AISkirmishPlayer *teodGetSkirmishAI(Player *player)
+static AISkirmishPlayer *clpGetSkirmishAI(Player *player)
 {
 	AIPlayer *ai = player ? player->getAIPlayer() : nullptr;
 	if( !ai || !ai->isSkirmishAI() )
@@ -449,7 +449,7 @@ static AISkirmishPlayer *teodGetSkirmishAI(Player *player)
 //-------------------------------------------------------------------------------------------------
 // Player
 //-------------------------------------------------------------------------------------------------
-void Player::teodPrependToBuildList(BuildListInfo *info)
+void Player::clpPrependToBuildList(BuildListInfo *info)
 {
 	info->setNextBuildList( m_pBuildList );
 	m_pBuildList = info;
@@ -458,7 +458,7 @@ void Player::teodPrependToBuildList(BuildListInfo *info)
 //-------------------------------------------------------------------------------------------------
 // AIPlayer
 //-------------------------------------------------------------------------------------------------
-Bool AIPlayer::teodTrainUnit(const ThingTemplate *thing)
+Bool AIPlayer::clpTrainUnit(const ThingTemplate *thing)
 {
 	if( !thing )
 	{
@@ -475,17 +475,17 @@ Bool AIPlayer::teodTrainUnit(const ThingTemplate *thing)
 }
 
 //-------------------------------------------------------------------------------------------------
-void AIPlayer::teodBuildNearPosition(const ThingTemplate *tmpl, const Coord3D *location, Real angle)
+void AIPlayer::clpBuildNearPosition(const ThingTemplate *tmpl, const Coord3D *location, Real angle)
 {
 	if( !tmpl || !location )
 	{
 		return;
 	}
 
-	Int budget = TEOD_SEARCH_BUDGET;
+	Int budget = CLP_SEARCH_BUDGET;
 	Coord3D pos;
-	Bool found = teodPlaceNear( location, tmpl, angle, m_player, TEOD_NEAR_RADIUS, &budget, &pos );
-	teodRemoveAllBibs();
+	Bool found = clpPlaceNear( location, tmpl, angle, m_player, CLP_NEAR_RADIUS, &budget, &pos );
+	clpRemoveAllBibs();
 	if( found )
 	{
 		pos.z = 0;
@@ -496,20 +496,20 @@ void AIPlayer::teodBuildNearPosition(const ThingTemplate *tmpl, const Coord3D *l
 //-------------------------------------------------------------------------------------------------
 /** Tries the team first, then every other instance of its prototype. */
 //-------------------------------------------------------------------------------------------------
-void AIPlayer::teodBuildNearestTeam(const ThingTemplate *tmpl, Team *team, Real angle)
+void AIPlayer::clpBuildNearestTeam(const ThingTemplate *tmpl, Team *team, Real angle)
 {
 	if( !tmpl || !team )
 	{
 		return;
 	}
 
-	Int budget = TEOD_SEARCH_BUDGET;
+	Int budget = CLP_SEARCH_BUDGET;
 	Coord3D pos;
 	Bool found = FALSE;
 	const Coord3D *location = team->getEstimateTeamPosition();
 	if( location )
 	{
-		found = teodPlaceNear( location, tmpl, angle, m_player, TEOD_NEAR_RADIUS, &budget, &pos );
+		found = clpPlaceNear( location, tmpl, angle, m_player, CLP_NEAR_RADIUS, &budget, &pos );
 	}
 
 	const TeamPrototype *proto = team->getPrototype();
@@ -525,12 +525,12 @@ void AIPlayer::teodBuildNearestTeam(const ThingTemplate *tmpl, Team *team, Real 
 			location = instance->getEstimateTeamPosition();
 			if( location )
 			{
-				found = teodPlaceNear( location, tmpl, angle, m_player, TEOD_NEAR_RADIUS, &budget, &pos );
+				found = clpPlaceNear( location, tmpl, angle, m_player, CLP_NEAR_RADIUS, &budget, &pos );
 			}
 		}
 	}
 
-	teodRemoveAllBibs();
+	clpRemoveAllBibs();
 	if( found )
 	{
 		pos.z = 0;
@@ -542,14 +542,14 @@ void AIPlayer::teodBuildNearestTeam(const ThingTemplate *tmpl, Team *team, Real 
 /** Stock buildBySupplies with a script angle. Supply centers face their dock and skip docks that
 	already have one queued. */
 //-------------------------------------------------------------------------------------------------
-void AIPlayer::teodBuildBySupplies(Int minimumCash, const ThingTemplate *tTemplate, Real angle)
+void AIPlayer::clpBuildBySupplies(Int minimumCash, const ThingTemplate *tTemplate, Real angle)
 {
 	if( !tTemplate )
 	{
 		return;
 	}
 
-	Object *bestSupplyWarehouse = teodFindSupplyCenter( minimumCash );
+	Object *bestSupplyWarehouse = clpFindSupplyCenter( minimumCash );
 	Bool isCashGenerator = tTemplate->isKindOf( KINDOF_CASH_GENERATOR );
 	if( !isCashGenerator )
 	{
@@ -598,8 +598,8 @@ void AIPlayer::teodBuildBySupplies(Int minimumCash, const ThingTemplate *tTempla
 		for( Int i = 0; i < ARRAY_SIZE( angleOffsetsDeg ) && !valid; ++i )
 		{
 			Real testAngle = normalizeAngle( desiredAngle + angleOffsetsDeg[ i ] * (PI / 180.0f) );
-			Int budget = TEOD_ANGLE_SEARCH_BUDGET;
-			if( teodFindBuildPosition( &location, tTemplate, testAngle, m_player, TEOD_SUPPLY_RADIUS, &budget, &newPos ) )
+			Int budget = CLP_ANGLE_SEARCH_BUDGET;
+			if( clpFindBuildPosition( &location, tTemplate, testAngle, m_player, CLP_SUPPLY_RADIUS, &budget, &newPos ) )
 			{
 				angle = testAngle;
 				valid = TRUE;
@@ -608,10 +608,10 @@ void AIPlayer::teodBuildBySupplies(Int minimumCash, const ThingTemplate *tTempla
 	}
 	else
 	{
-		Int budget = TEOD_SEARCH_BUDGET;
-		valid = teodPlaceNear( &location, tTemplate, angle, m_player, TEOD_SUPPLY_RADIUS, &budget, &newPos );
+		Int budget = CLP_SEARCH_BUDGET;
+		valid = clpPlaceNear( &location, tTemplate, angle, m_player, CLP_SUPPLY_RADIUS, &budget, &newPos );
 	}
-	teodRemoveAllBibs();
+	clpRemoveAllBibs();
 
 	if( valid )
 	{
@@ -630,7 +630,7 @@ void AIPlayer::teodBuildBySupplies(Int minimumCash, const ThingTemplate *tTempla
 //-------------------------------------------------------------------------------------------------
 /** Stock findSupplyCenter that also skips docks with a supply center still waiting in the build list. */
 //-------------------------------------------------------------------------------------------------
-Object *AIPlayer::teodFindSupplyCenter(Int minimumCash)
+Object *AIPlayer::clpFindSupplyCenter(Int minimumCash)
 {
 	Object *bestSupplyWarehouse = nullptr;
 	Real bestDistSqr = 0;
@@ -669,7 +669,7 @@ Object *AIPlayer::teodFindSupplyCenter(Int minimumCash)
 			}
 
 			Coord3D center = *obj->getPosition();
-			Real radius = TEOD_SUPPLY_CENTER_CLOSE_DIST + obj->getGeometryInfo().getBoundingCircleRadius();
+			Real radius = CLP_SUPPLY_CENTER_CLOSE_DIST + obj->getGeometryInfo().getBoundingCircleRadius();
 
 			PartitionFilterAcceptByKindOf f1( MAKE_KINDOF_MASK( KINDOF_CASH_GENERATOR ), KINDOFMASK_NONE );
 			PartitionFilterPlayer f2( m_player, true );
@@ -679,7 +679,7 @@ Object *AIPlayer::teodFindSupplyCenter(Int minimumCash)
 			{
 				continue;
 			}
-			if( teodHasPendingSupplyCenter( m_player, &center, radius ) )
+			if( clpHasPendingSupplyCenter( m_player, &center, radius ) )
 			{
 				continue;
 			}
@@ -714,9 +714,9 @@ Object *AIPlayer::teodFindSupplyCenter(Int minimumCash)
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Stock computeSuperweaponTarget scored by teodSuperweaponValueType. */
+/** Stock computeSuperweaponTarget scored by clpSuperweaponValueType. */
 //-------------------------------------------------------------------------------------------------
-Bool AIPlayer::teodComputeSuperweaponTargetType(const SpecialPowerTemplate *power, Coord3D *retPos, Int playerNdx, Real weaponRadius, const AsciiString &objectType)
+Bool AIPlayer::clpComputeSuperweaponTargetType(const SpecialPowerTemplate *power, Coord3D *retPos, Int playerNdx, Real weaponRadius, const AsciiString &objectType)
 {
 	Region2D bounds;
 	getPlayerStructureBounds( &bounds, playerNdx );
@@ -804,7 +804,7 @@ Bool AIPlayer::teodComputeSuperweaponTargetType(const SpecialPowerTemplate *powe
 			pos.x = bounds.lo.x + (bounds.width() * xIndex) / xCount;
 			pos.y = bounds.lo.y + (bounds.height() * yIndex) / yCount;
 			pos.z = 0;
-			Int curCash = teodSuperweaponValueType( &pos, playerNdx, 2 * weaponRadius, objectType, targetMilitaryUnits );
+			Int curCash = clpSuperweaponValueType( &pos, playerNdx, 2 * weaponRadius, objectType, targetMilitaryUnits );
 			if( curCash > cash )
 			{
 				cash = curCash;
@@ -829,7 +829,7 @@ Bool AIPlayer::teodComputeSuperweaponTargetType(const SpecialPowerTemplate *powe
 			pos.x = bestPos.x + (x - 5) * (weaponRadius / 10);
 			pos.y = bestPos.y + (y - 5) * (weaponRadius / 10);
 			pos.z = 0;
-			Int curCash = teodSuperweaponValueType( &pos, playerNdx, weaponRadius, objectType, targetMilitaryUnits );
+			Int curCash = clpSuperweaponValueType( &pos, playerNdx, weaponRadius, objectType, targetMilitaryUnits );
 			if( curCash > cash )
 			{
 				cash = curCash;
@@ -860,7 +860,7 @@ Bool AIPlayer::teodComputeSuperweaponTargetType(const SpecialPowerTemplate *powe
 /** Stock buildAIBaseDefenseStructure on baseOwner's defense circle, scaled by percent and turned by
 	rotation degrees. The structure goes into this player's build list and baseOwner's slots advance. */
 //-------------------------------------------------------------------------------------------------
-void AISkirmishPlayer::teodBuildBaseDefense(const AsciiString &thingName, Bool flank, Real rotation, Real percent, AISkirmishPlayer *baseOwner)
+void AISkirmishPlayer::clpBuildBaseDefense(const AsciiString &thingName, Bool flank, Real rotation, Real percent, AISkirmishPlayer *baseOwner)
 {
 	const ThingTemplate *tTemplate = TheThingFactory->findTemplate( thingName, FALSE );
 	if( !tTemplate || !baseOwner )
@@ -868,9 +868,9 @@ void AISkirmishPlayer::teodBuildBaseDefense(const AsciiString &thingName, Bool f
 		return;
 	}
 
-	Real placeAngle = teodResolveAngle( rotation ) * (PI / 180.0f);
+	Real placeAngle = clpResolveAngle( rotation ) * (PI / 180.0f);
 	Int startIndex = baseOwner->m_player->getMpStartIndex() + 1;
-	for( Int attempt = 0; attempt < TEOD_MAX_DEFENSE_ATTEMPTS; ++attempt )
+	for( Int attempt = 0; attempt < CLP_MAX_DEFENSE_ATTEMPTS; ++attempt )
 	{
 		AsciiString pathLabel;
 		if( !flank )
@@ -979,7 +979,7 @@ void AISkirmishPlayer::teodBuildBaseDefense(const AsciiString &thingName, Bool f
 
 		Bool canBuild = LBC_OK == TheBuildAssistant->isLocationLegalToBuild( &buildPos, tTemplate, placeAngle,
 			BuildAssistant::TERRAIN_RESTRICTIONS | BuildAssistant::NO_OBJECT_OVERLAP, nullptr, m_player );
-		teodRemoveAllBibs();
+		clpRemoveAllBibs();
 		if( flank )
 		{
 			baseOwner->m_curFlankBaseDefense++;
@@ -999,7 +999,7 @@ void AISkirmishPlayer::teodBuildBaseDefense(const AsciiString &thingName, Bool f
 //-------------------------------------------------------------------------------------------------
 /** Stock buildSpecificAIBuilding, except the entry closest to an idle dozer wins instead of the first. */
 //-------------------------------------------------------------------------------------------------
-void AISkirmishPlayer::teodBuildSpecificBuildingNearDozer(const AsciiString &thingName)
+void AISkirmishPlayer::clpBuildSpecificBuildingNearDozer(const AsciiString &thingName)
 {
 	std::vector<const Object *> dozers;
 	for( Player::PlayerTeamList::const_iterator it = m_player->getPlayerTeams()->begin(); it != m_player->getPlayerTeams()->end(); ++it )
@@ -1110,7 +1110,7 @@ void ScriptActions::doPlayerBuildUnit(const AsciiString& unitName, const AsciiSt
 	{
 		return;
 	}
-	ai->teodTrainUnit( unitTemplate );
+	ai->clpTrainUnit( unitTemplate );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1127,13 +1127,13 @@ void ScriptActions::doBuildObjectNearestTeamAngle(const AsciiString& playerName,
 	{
 		return;
 	}
-	angle = teodResolveAngle( angle );
-	const ThingTemplate *tmpl = teodPickStructureTemplate( buildingType );
+	angle = clpResolveAngle( angle );
+	const ThingTemplate *tmpl = clpPickStructureTemplate( buildingType );
 	if( !tmpl )
 	{
 		return;
 	}
-	ai->teodBuildNearestTeam( tmpl, team, angle * (PI / 180.0f) );
+	ai->clpBuildNearestTeam( tmpl, team, angle * (PI / 180.0f) );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1149,13 +1149,13 @@ void ScriptActions::doBuildSupplyCenterAngle(const AsciiString& player, const As
 	{
 		return;
 	}
-	angle = teodResolveAngle( angle );
-	const ThingTemplate *tmpl = teodPickStructureTemplate( buildingType );
+	angle = clpResolveAngle( angle );
+	const ThingTemplate *tmpl = clpPickStructureTemplate( buildingType );
 	if( !tmpl )
 	{
 		return;
 	}
-	ai->teodBuildBySupplies( cash, tmpl, angle * (PI / 180.0f) );
+	ai->clpBuildBySupplies( cash, tmpl, angle * (PI / 180.0f) );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1163,12 +1163,12 @@ void ScriptActions::doBuildObjectNearestTypeAngle(const AsciiString& playerName,
 {
 	Player *player = TheScriptEngine->getPlayerFromAsciiString( playerName );
 	Coord3D startPos;
-	if( !player || !teodGetStartPosition( player, &startPos ) )
+	if( !player || !clpGetStartPosition( player, &startPos ) )
 	{
 		return;
 	}
-	Object *bestObj = teodSelectObject( &startPos, nullptr, objectType, selectionMode );
-	teodBuildNearObject( player, buildingType, bestObj, angle );
+	Object *bestObj = clpSelectObject( &startPos, nullptr, objectType, selectionMode );
+	clpBuildNearObject( player, buildingType, bestObj, angle );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1176,14 +1176,14 @@ void ScriptActions::doBuildObjectNearestKindOfAngle(const AsciiString& playerNam
 {
 	Player *player = TheScriptEngine->getPlayerFromAsciiString( playerName );
 	Coord3D startPos;
-	if( !player || kindOf < KINDOF_FIRST || kindOf >= KINDOF_COUNT || !teodGetStartPosition( player, &startPos ) )
+	if( !player || kindOf < KINDOF_FIRST || kindOf >= KINDOF_COUNT || !clpGetStartPosition( player, &startPos ) )
 	{
 		return;
 	}
 	PartitionFilterAcceptByKindOf filterKindOf( MAKE_KINDOF_MASK( (KindOfType)kindOf ), KINDOFMASK_NONE );
 	PartitionFilter *filters[] = { &filterKindOf, nullptr };
-	Object *bestObj = teodSelectObject( &startPos, filters, AsciiString::TheEmptyString, selectionMode );
-	teodBuildNearObject( player, buildingType, bestObj, angle );
+	Object *bestObj = clpSelectObject( &startPos, filters, AsciiString::TheEmptyString, selectionMode );
+	clpBuildNearObject( player, buildingType, bestObj, angle );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1192,14 +1192,14 @@ void ScriptActions::doBuildObjectNearestTypeAngleArea(const AsciiString& playerN
 	Player *player = TheScriptEngine->getPlayerFromAsciiString( playerName );
 	PolygonTrigger *trigger = TheScriptEngine->getQualifiedTriggerAreaByName( triggerArea );
 	Coord3D startPos;
-	if( !player || !trigger || !teodGetStartPosition( player, &startPos ) )
+	if( !player || !trigger || !clpGetStartPosition( player, &startPos ) )
 	{
 		return;
 	}
 	PartitionFilterPolygonTrigger filterArea( trigger );
 	PartitionFilter *filters[] = { &filterArea, nullptr };
-	Object *bestObj = teodSelectObject( &startPos, filters, objectType, selectionMode );
-	teodBuildNearObject( player, buildingType, bestObj, angle );
+	Object *bestObj = clpSelectObject( &startPos, filters, objectType, selectionMode );
+	clpBuildNearObject( player, buildingType, bestObj, angle );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1208,15 +1208,15 @@ void ScriptActions::doBuildObjectNearestKindOfAngleArea(const AsciiString& playe
 	Player *player = TheScriptEngine->getPlayerFromAsciiString( playerName );
 	PolygonTrigger *trigger = TheScriptEngine->getQualifiedTriggerAreaByName( triggerArea );
 	Coord3D startPos;
-	if( !player || !trigger || kindOf < KINDOF_FIRST || kindOf >= KINDOF_COUNT || !teodGetStartPosition( player, &startPos ) )
+	if( !player || !trigger || kindOf < KINDOF_FIRST || kindOf >= KINDOF_COUNT || !clpGetStartPosition( player, &startPos ) )
 	{
 		return;
 	}
 	PartitionFilterAcceptByKindOf filterKindOf( MAKE_KINDOF_MASK( (KindOfType)kindOf ), KINDOFMASK_NONE );
 	PartitionFilterPolygonTrigger filterArea( trigger );
 	PartitionFilter *filters[] = { &filterKindOf, &filterArea, nullptr };
-	Object *bestObj = teodSelectObject( &startPos, filters, AsciiString::TheEmptyString, selectionMode );
-	teodBuildNearObject( player, buildingType, bestObj, angle );
+	Object *bestObj = clpSelectObject( &startPos, filters, AsciiString::TheEmptyString, selectionMode );
+	clpBuildNearObject( player, buildingType, bestObj, angle );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1252,7 +1252,7 @@ void ScriptActions::doSkirmishFireSpecialPowerAtMostCostType(const AsciiString& 
 	}
 
 	std::vector<const ThingTemplate *> targets;
-	teodCollectTemplates( objectType, &targets );
+	clpCollectTemplates( objectType, &targets );
 	static const NameKeyType key_cannonUpdate = NAMEKEY( "ParticleUplinkCannonUpdate" );
 
 	for( Player::PlayerTeamList::const_iterator it = pPlayer->getPlayerTeams()->begin(); it != pPlayer->getPlayerTeams()->end(); ++it )
@@ -1284,7 +1284,7 @@ void ScriptActions::doSkirmishFireSpecialPowerAtMostCostType(const AsciiString& 
 				}
 
 				Coord3D location;
-				Bool locationFound = ai->teodComputeSuperweaponTargetType( power, &location, enemyNdx, radius, objectType );
+				Bool locationFound = ai->clpComputeSuperweaponTargetType( power, &location, enemyNdx, radius, objectType );
 				if( locationFound && power->getSpecialPowerType() == SPECIAL_SNEAK_ATTACK )
 				{
 					const ThingTemplate *sneakAttackTemplate = mod->getReferenceThingTemplate();
@@ -1300,11 +1300,11 @@ void ScriptActions::doSkirmishFireSpecialPowerAtMostCostType(const AsciiString& 
 					{
 						if( targets.empty() )
 						{
-							TheScriptTEODAI->clearCannonTargets( pObj );
+							TheScriptCLPAI->clearCannonTargets( pObj );
 						}
 						else
 						{
-							TheScriptTEODAI->setCannonTargets( pObj, &location, targets );
+							TheScriptCLPAI->setCannonTargets( pObj, &location, targets );
 						}
 					}
 					mod->doSpecialPowerAtLocation( &location, INVALID_ANGLE, COMMAND_FIRED_BY_SCRIPT );
@@ -1319,16 +1319,16 @@ void ScriptActions::doSkirmishFireSpecialPowerAtMostCostType(const AsciiString& 
 void ScriptActions::doAIPlayerBuildDefenseStructureFromVector(Bool flank, Real rotation, Real percent)
 {
 	Player *player = TheScriptEngine->getCurrentPlayer();
-	AISkirmishPlayer *skirmishAI = teodGetSkirmishAI( player );
+	AISkirmishPlayer *skirmishAI = clpGetSkirmishAI( player );
 	if( !skirmishAI )
 	{
 		TheScriptEngine->AppendDebugMessage( "Error : Solo ai doesn't support buildAIBaseDefense.", false );
 		return;
 	}
-	AsciiString defense = teodPickBaseDefense( player );
+	AsciiString defense = clpPickBaseDefense( player );
 	if( defense.isNotEmpty() )
 	{
-		skirmishAI->teodBuildBaseDefense( defense, flank, rotation, percent, skirmishAI );
+		skirmishAI->clpBuildBaseDefense( defense, flank, rotation, percent, skirmishAI );
 	}
 }
 
@@ -1336,17 +1336,17 @@ void ScriptActions::doAIPlayerBuildDefenseStructureFromVector(Bool flank, Real r
 void ScriptActions::doAIPlayerBuildDefenseStructureFromVectorAtPlayer(Bool flank, Real rotation, Real percent, const AsciiString& playerName)
 {
 	Player *player = TheScriptEngine->getCurrentPlayer();
-	AISkirmishPlayer *skirmishAI = teodGetSkirmishAI( player );
-	AISkirmishPlayer *targetAI = teodGetSkirmishAI( TheScriptEngine->getPlayerFromAsciiString( playerName ) );
+	AISkirmishPlayer *skirmishAI = clpGetSkirmishAI( player );
+	AISkirmishPlayer *targetAI = clpGetSkirmishAI( TheScriptEngine->getPlayerFromAsciiString( playerName ) );
 	if( !skirmishAI || !targetAI )
 	{
 		TheScriptEngine->AppendDebugMessage( "Error : buildAIBaseDefense at a player needs two skirmish ai players.", false );
 		return;
 	}
-	AsciiString defense = teodPickBaseDefense( player );
+	AsciiString defense = clpPickBaseDefense( player );
 	if( defense.isNotEmpty() )
 	{
-		skirmishAI->teodBuildBaseDefense( defense, flank, rotation, percent, targetAI );
+		skirmishAI->clpBuildBaseDefense( defense, flank, rotation, percent, targetAI );
 	}
 }
 
@@ -1359,10 +1359,10 @@ void ScriptActions::doAIPlayerAddBaseDefenseStructure(const AsciiString& objectT
 		return;
 	}
 	std::vector<const ThingTemplate *> templates;
-	teodCollectTemplates( objectType, &templates );
+	clpCollectTemplates( objectType, &templates );
 	for( size_t i = 0; i < templates.size(); ++i )
 	{
-		TheScriptTEODAI->addBaseDefense( player->getPlayerIndex(), templates[ i ]->getName() );
+		TheScriptCLPAI->addBaseDefense( player->getPlayerIndex(), templates[ i ]->getName() );
 	}
 }
 
@@ -1375,10 +1375,10 @@ void ScriptActions::doAIPlayerRemoveBaseDefenseStructure(const AsciiString& obje
 		return;
 	}
 	std::vector<const ThingTemplate *> templates;
-	teodCollectTemplates( objectType, &templates );
+	clpCollectTemplates( objectType, &templates );
 	for( size_t i = 0; i < templates.size(); ++i )
 	{
-		TheScriptTEODAI->removeBaseDefense( player->getPlayerIndex(), templates[ i ]->getName() );
+		TheScriptCLPAI->removeBaseDefense( player->getPlayerIndex(), templates[ i ]->getName() );
 	}
 }
 
@@ -1390,7 +1390,7 @@ void ScriptActions::doSkirmishUseParticleCannonTeleportMode(const AsciiString& p
 	{
 		return;
 	}
-	TheScriptTEODAI->setCannonTeleportMode( player->getPlayerIndex(), teleportMode );
+	TheScriptCLPAI->setCannonTeleportMode( player->getPlayerIndex(), teleportMode );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1401,7 +1401,7 @@ void ScriptActions::doSetAIDataClosestBuildingToDozerPriority(Bool isUsing)
 	{
 		return;
 	}
-	TheScriptTEODAI->setClosestDozerPriority( player->getPlayerIndex(), isUsing );
+	TheScriptCLPAI->setClosestDozerPriority( player->getPlayerIndex(), isUsing );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1464,24 +1464,24 @@ void ScriptActions::doAIAddToBuildList(const AsciiString& player, const AsciiStr
 		info->setAngle( obj->getOrientation() );
 	}
 
-	thePlayer->teodPrependToBuildList( info );
+	thePlayer->clpPrependToBuildList( info );
 }
 
 //-------------------------------------------------------------------------------------------------
-// ScriptTEODAI
+// ScriptCLPAI
 //-------------------------------------------------------------------------------------------------
-ScriptTEODAI::ScriptTEODAI()
+ScriptCLPAI::ScriptCLPAI()
 {
 	reset();
 }
 
 //-------------------------------------------------------------------------------------------------
-ScriptTEODAI::~ScriptTEODAI()
+ScriptCLPAI::~ScriptCLPAI()
 {
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODAI::reset()
+void ScriptCLPAI::reset()
 {
 	for( Int i = 0; i < MAX_PLAYER_COUNT; ++i )
 	{
@@ -1493,7 +1493,7 @@ void ScriptTEODAI::reset()
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODAI::addBaseDefense(Int playerIndex, const AsciiString &templateName)
+void ScriptCLPAI::addBaseDefense(Int playerIndex, const AsciiString &templateName)
 {
 	if( playerIndex < 0 || playerIndex >= MAX_PLAYER_COUNT )
 	{
@@ -1507,7 +1507,7 @@ void ScriptTEODAI::addBaseDefense(Int playerIndex, const AsciiString &templateNa
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODAI::removeBaseDefense(Int playerIndex, const AsciiString &templateName)
+void ScriptCLPAI::removeBaseDefense(Int playerIndex, const AsciiString &templateName)
 {
 	if( playerIndex < 0 || playerIndex >= MAX_PLAYER_COUNT )
 	{
@@ -1518,7 +1518,7 @@ void ScriptTEODAI::removeBaseDefense(Int playerIndex, const AsciiString &templat
 }
 
 //-------------------------------------------------------------------------------------------------
-const std::vector<AsciiString> &ScriptTEODAI::getBaseDefenses(Int playerIndex) const
+const std::vector<AsciiString> &ScriptCLPAI::getBaseDefenses(Int playerIndex) const
 {
 	static const std::vector<AsciiString> s_none;
 	if( playerIndex < 0 || playerIndex >= MAX_PLAYER_COUNT )
@@ -1529,7 +1529,7 @@ const std::vector<AsciiString> &ScriptTEODAI::getBaseDefenses(Int playerIndex) c
 }
 
 //-------------------------------------------------------------------------------------------------
-Bool ScriptTEODAI::getClosestDozerPriority(Int playerIndex) const
+Bool ScriptCLPAI::getClosestDozerPriority(Int playerIndex) const
 {
 	if( playerIndex < 0 || playerIndex >= MAX_PLAYER_COUNT )
 	{
@@ -1539,7 +1539,7 @@ Bool ScriptTEODAI::getClosestDozerPriority(Int playerIndex) const
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODAI::setClosestDozerPriority(Int playerIndex, Bool enable)
+void ScriptCLPAI::setClosestDozerPriority(Int playerIndex, Bool enable)
 {
 	if( playerIndex >= 0 && playerIndex < MAX_PLAYER_COUNT )
 	{
@@ -1548,7 +1548,7 @@ void ScriptTEODAI::setClosestDozerPriority(Int playerIndex, Bool enable)
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODAI::setCannonTeleportMode(Int playerIndex, Bool teleport)
+void ScriptCLPAI::setCannonTeleportMode(Int playerIndex, Bool teleport)
 {
 	if( playerIndex >= 0 && playerIndex < MAX_PLAYER_COUNT )
 	{
@@ -1559,7 +1559,7 @@ void ScriptTEODAI::setCannonTeleportMode(Int playerIndex, Bool teleport)
 //-------------------------------------------------------------------------------------------------
 /** Arms the cannon's next firing, which must start this frame, to chase targets from firePos. */
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODAI::setCannonTargets(const Object *cannon, const Coord3D *firePos, const std::vector<const ThingTemplate *> &targets)
+void ScriptCLPAI::setCannonTargets(const Object *cannon, const Coord3D *firePos, const std::vector<const ThingTemplate *> &targets)
 {
 	CannonTrackMap::iterator it = m_cannonTracks.begin();
 	while( it != m_cannonTracks.end() )
@@ -1583,13 +1583,13 @@ void ScriptTEODAI::setCannonTargets(const Object *cannon, const Coord3D *firePos
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODAI::clearCannonTargets(const Object *cannon)
+void ScriptCLPAI::clearCannonTargets(const Object *cannon)
 {
 	m_cannonTracks.erase( cannon->getID() );
 }
 
 //-------------------------------------------------------------------------------------------------
-Bool ScriptTEODAI::steerParticleCannon(const Object *cannon, UnsignedInt startAttackFrame, Real fastDrivingSpeed, Coord3D *beamPos)
+Bool ScriptCLPAI::steerParticleCannon(const Object *cannon, UnsignedInt startAttackFrame, Real fastDrivingSpeed, Coord3D *beamPos)
 {
 	if( m_cannonTracks.empty() || !cannon )
 	{
@@ -1694,7 +1694,7 @@ Bool ScriptTEODAI::steerParticleCannon(const Object *cannon, UnsignedInt startAt
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODAI::crc( Xfer *xfer )
+void ScriptCLPAI::crc( Xfer *xfer )
 {
 }
 
@@ -1703,7 +1703,7 @@ void ScriptTEODAI::crc( Xfer *xfer )
 	* Version Info:
 	* 1: Initial version */
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODAI::xfer( Xfer *xfer )
+void ScriptCLPAI::xfer( Xfer *xfer )
 {
 	XferVersion currentVersion = 1;
 	XferVersion version = currentVersion;
@@ -1844,6 +1844,6 @@ void ScriptTEODAI::xfer( Xfer *xfer )
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODAI::loadPostProcess()
+void ScriptCLPAI::loadPostProcess()
 {
 }

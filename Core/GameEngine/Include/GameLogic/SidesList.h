@@ -303,7 +303,7 @@ protected:
 	Int			 m_desiredGatherers;				///< Number of gatherers desired.
 	Int			 m_currentGatherers;				///< Number of gatherers available.
 	Bool		 m_priorityBuild;						///< Is priority build.
-	Bool		 m_exactPositionOnly;				///< AI never shifts the build position, set by TEOD scripts.
+	Bool		 m_exactPositionOnly;				///< AI never shifts the build position, set by CLP_AI scripts.
 
 public:
 	// srj sez: naughty public access to avoid 'friend' -- should be friend for JUST THESE, but hey

@@ -55,9 +55,9 @@
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/ScriptConditions.h"
 #include "GameLogic/ScriptEngine.h"
-#include "GameLogic/ScriptTEOD.h"
-#include "GameLogic/ScriptTEODAI.h"
-#include "GameLogic/ScriptTEODWaypoints.h"
+#include "GameLogic/ScriptCLP.h"
+#include "GameLogic/ScriptCLPAI.h"
+#include "GameLogic/ScriptCLPWaypoints.h"
 #include "GameLogic/SidesList.h"
 
 
@@ -468,9 +468,9 @@ m_ChooseVictimAlwaysUsesNormal(false)
 	// By default, difficulty should be normal.
 	setGlobalDifficulty(DIFFICULTY_NORMAL);
 
-	TheScriptTEODState = NEW ScriptTEODState;
-	TheScriptTEODWaypoints = NEW ScriptTEODWaypoints;
-	TheScriptTEODAI = NEW ScriptTEODAI;
+	TheScriptCLPState = NEW ScriptCLPState;
+	TheScriptCLPWaypoints = NEW ScriptCLPWaypoints;
+	TheScriptCLPAI = NEW ScriptCLPAI;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -516,12 +516,12 @@ ScriptEngine::~ScriptEngine()
 	}
 #endif
 
-	delete TheScriptTEODAI;
-	TheScriptTEODAI = nullptr;
-	delete TheScriptTEODWaypoints;
-	TheScriptTEODWaypoints = nullptr;
-	delete TheScriptTEODState;
-	TheScriptTEODState = nullptr;
+	delete TheScriptCLPAI;
+	TheScriptCLPAI = nullptr;
+	delete TheScriptCLPWaypoints;
+	TheScriptCLPWaypoints = nullptr;
+	delete TheScriptCLPState;
+	TheScriptCLPState = nullptr;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -5285,7 +5285,7 @@ void ScriptEngine::init()
 	curTemplate->m_numUiStrings = 1;
 	curTemplate->m_uiStrings[0] = "Show Weather = ";
 
-	initTEODTemplates();
+	initCLPTemplates();
 
 	Int i;
 	for (i=0; i<Condition::NUM_ITEMS; i++) {
@@ -5322,9 +5322,9 @@ void ScriptEngine::reset()
 	if (TheScriptConditions) {
 		TheScriptConditions->reset();
 	}
-	TheScriptTEODState->reset();
-	TheScriptTEODWaypoints->reset();
-	TheScriptTEODAI->reset();
+	TheScriptCLPState->reset();
+	TheScriptCLPWaypoints->reset();
+	TheScriptCLPAI->reset();
 	m_numCounters = 1;
 	m_numAttackInfo = 1;
 	m_numFlags = 1;
@@ -5659,7 +5659,7 @@ void ScriptEngine::update()
 	// update all sequential stuff.
 	evaluateAndProgressAllSequentialScripts();
 
-	TheScriptTEODState->update();
+	TheScriptCLPState->update();
 
 	// Script debugger stuff
 	st_CurrentFrame++;

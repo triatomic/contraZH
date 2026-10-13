@@ -16,8 +16,8 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// FILE: ScriptConditionsTEODPlayers.cpp //////////////////////////////////////////////////////////
-// TEOD script conditions about players, start spots, map control and kills.
+// FILE: ScriptConditionsCLPPlayers.cpp ///////////////////////////////////////////////////////////
+// CLP_AI script conditions about players, start spots, map control and kills.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
@@ -37,7 +37,7 @@
 #include "GameLogic/ScriptConditions.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Scripts.h"
-#include "GameLogic/ScriptTEOD.h"
+#include "GameLogic/ScriptCLP.h"
 #include "GameLogic/TerrainLogic.h"
 
 #include "GameNetwork/GameInfo.h"
@@ -45,14 +45,14 @@
 #include <float.h>
 #include <vector>
 
-typedef std::vector<const ThingTemplate *> TeodTemplateList;
+typedef std::vector<const ThingTemplate *> ClpTemplateList;
 
-static const Real TEOD_MAP_CONTROL_GRID = 200.0f;
-static const Real TEOD_MAP_CONTROL_RADIUS = 300.0f;
-static const Real TEOD_RATIO_TOLERANCE = 0.1f;
+static const Real CLP_MAP_CONTROL_GRID = 200.0f;
+static const Real CLP_MAP_CONTROL_RADIUS = 300.0f;
+static const Real CLP_RATIO_TOLERANCE = 0.1f;
 
 //-------------------------------------------------------------------------------------------------
-static Bool teodCompareInt(Int comparison, Int value, Int against)
+static Bool clpCompareInt(Int comparison, Int value, Int against)
 {
 	switch (comparison)
 	{
@@ -67,7 +67,7 @@ static Bool teodCompareInt(Int comparison, Int value, Int against)
 }
 
 //-------------------------------------------------------------------------------------------------
-static Bool teodCompareReal(Int comparison, Real value, Real against)
+static Bool clpCompareReal(Int comparison, Real value, Real against)
 {
 	switch (comparison)
 	{
@@ -82,9 +82,9 @@ static Bool teodCompareReal(Int comparison, Real value, Real against)
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Compares count with ratio times countOther. EQUAL and NOT_EQUAL allow TEOD_RATIO_TOLERANCE. */
+/** Compares count with ratio times countOther. EQUAL and NOT_EQUAL allow CLP_RATIO_TOLERANCE. */
 //-------------------------------------------------------------------------------------------------
-static Bool teodCompareRatio(Int comparison, Int count, Int countOther, Real ratio)
+static Bool clpCompareRatio(Int comparison, Int count, Int countOther, Real ratio)
 {
 	Real scaled = (Real)countOther * ratio;
 	Real diff = (Real)count - scaled;
@@ -92,10 +92,10 @@ static Bool teodCompareRatio(Int comparison, Int count, Int countOther, Real rat
 	{
 		case Parameter::LESS_THAN:			return (Real)count < scaled;
 		case Parameter::LESS_EQUAL:			return (Real)count <= scaled;
-		case Parameter::EQUAL:					return fabs(diff) < TEOD_RATIO_TOLERANCE;
+		case Parameter::EQUAL:					return fabs(diff) < CLP_RATIO_TOLERANCE;
 		case Parameter::GREATER_EQUAL:	return (Real)count >= scaled;
 		case Parameter::GREATER:				return (Real)count > scaled;
-		case Parameter::NOT_EQUAL:			return fabs(diff) >= TEOD_RATIO_TOLERANCE;
+		case Parameter::NOT_EQUAL:			return fabs(diff) >= CLP_RATIO_TOLERANCE;
 	}
 	return FALSE;
 }
@@ -103,7 +103,7 @@ static Bool teodCompareRatio(Int comparison, Int count, Int countOther, Real rat
 //-------------------------------------------------------------------------------------------------
 /** Resolves a ThingTemplate or ObjectTypes list name into templates. An empty name gives none. */
 //-------------------------------------------------------------------------------------------------
-static void teodTemplatesFromType(const AsciiString &objectType, TeodTemplateList &out)
+static void clpTemplatesFromType(const AsciiString &objectType, ClpTemplateList &out)
 {
 	out.clear();
 	if (objectType.isEmpty())
@@ -131,7 +131,7 @@ static void teodTemplatesFromType(const AsciiString &objectType, TeodTemplateLis
 }
 
 //-------------------------------------------------------------------------------------------------
-static Bool teodTemplateInList(const ThingTemplate *thing, const TeodTemplateList &list)
+static Bool clpTemplateInList(const ThingTemplate *thing, const ClpTemplateList &list)
 {
 	if (!thing)
 	{
@@ -150,7 +150,7 @@ static Bool teodTemplateInList(const ThingTemplate *thing, const TeodTemplateLis
 //-------------------------------------------------------------------------------------------------
 /** True for a player that takes a start spot: a playable side that is not an observer. */
 //-------------------------------------------------------------------------------------------------
-static Bool teodIsMatchPlayer(const Player *player)
+static Bool clpIsMatchPlayer(const Player *player)
 {
 	return player && player->isPlayableSide() && !player->isPlayerObserver();
 }
@@ -158,7 +158,7 @@ static Bool teodIsMatchPlayer(const Player *player)
 //-------------------------------------------------------------------------------------------------
 /** True if other belongs to subject's forces of relationType. ALLIES includes subject itself. */
 //-------------------------------------------------------------------------------------------------
-static Bool teodIsForcePlayer(Player *subject, Player *other, Int relationType)
+static Bool clpIsForcePlayer(Player *subject, Player *other, Int relationType)
 {
 	if (!other || other->isPlayerObserver())
 	{
@@ -175,9 +175,9 @@ static Bool teodIsForcePlayer(Player *subject, Player *other, Int relationType)
 //-------------------------------------------------------------------------------------------------
 /** True if other is a match player of relationType to subject, never subject itself. */
 //-------------------------------------------------------------------------------------------------
-static Bool teodIsCoPlayer(Player *subject, Player *other, Int relationType)
+static Bool clpIsCoPlayer(Player *subject, Player *other, Int relationType)
 {
-	if (other == subject || !teodIsMatchPlayer(other))
+	if (other == subject || !clpIsMatchPlayer(other))
 	{
 		return FALSE;
 	}
@@ -186,7 +186,7 @@ static Bool teodIsCoPlayer(Player *subject, Player *other, Int relationType)
 }
 
 //-------------------------------------------------------------------------------------------------
-static Int teodRelationTo(const Player *player, const Object *obj)
+static Int clpRelationTo(const Player *player, const Object *obj)
 {
 	if (obj->getControllingPlayer() == player)
 	{
@@ -196,7 +196,7 @@ static Int teodRelationTo(const Player *player, const Object *obj)
 }
 
 //-------------------------------------------------------------------------------------------------
-static Real teodDistance2D(const Coord3D *a, const Coord3D *b)
+static Real clpDistance2D(const Coord3D *a, const Coord3D *b)
 {
 	Real dx = a->x - b->x;
 	Real dy = a->y - b->y;
@@ -204,7 +204,7 @@ static Real teodDistance2D(const Coord3D *a, const Coord3D *b)
 }
 
 //-------------------------------------------------------------------------------------------------
-static Waypoint *teodSpotWaypoint(Int spot)
+static Waypoint *clpSpotWaypoint(Int spot)
 {
 	AsciiString name;
 	name.format("Player_%d_Start", spot);
@@ -212,19 +212,19 @@ static Waypoint *teodSpotWaypoint(Int spot)
 }
 
 //-------------------------------------------------------------------------------------------------
-static Waypoint *teodPlayerSpotWaypoint(Player *player)
+static Waypoint *clpPlayerSpotWaypoint(Player *player)
 {
 	if (!player || player->getMpStartIndex() < 0)
 	{
 		return nullptr;
 	}
-	return teodSpotWaypoint(player->getMpStartIndex() + 1);
+	return clpSpotWaypoint(player->getMpStartIndex() + 1);
 }
 
 //-------------------------------------------------------------------------------------------------
 /** Returns how far another start spot may be to neighbour spot, or a negative value if there is no other spot. */
 //-------------------------------------------------------------------------------------------------
-static Real teodNeighbourRadius(const Waypoint *spot)
+static Real clpNeighbourRadius(const Waypoint *spot)
 {
 	Real minDist = FLT_MAX;
 	for (Waypoint *way = TheTerrainLogic->getFirstWaypoint(); way; way = way->getNext())
@@ -238,7 +238,7 @@ static Real teodNeighbourRadius(const Waypoint *spot)
 		{
 			continue;
 		}
-		Real dist = teodDistance2D(spot->getLocation(), way->getLocation());
+		Real dist = clpDistance2D(spot->getLocation(), way->getLocation());
 		if (dist < minDist)
 		{
 			minDist = dist;
@@ -252,20 +252,20 @@ static Real teodNeighbourRadius(const Waypoint *spot)
 }
 
 //-------------------------------------------------------------------------------------------------
-static Bool teodIsNeighbouring(const Waypoint *from, const Waypoint *to, Real radius)
+static Bool clpIsNeighbouring(const Waypoint *from, const Waypoint *to, Real radius)
 {
-	return from && to && from != to && teodDistance2D(from->getLocation(), to->getLocation()) <= radius;
+	return from && to && from != to && clpDistance2D(from->getLocation(), to->getLocation()) <= radius;
 }
 
 //-------------------------------------------------------------------------------------------------
 /** Counts Player_N_Start waypoints from N = 1 up to the first missing one. */
 //-------------------------------------------------------------------------------------------------
-static Int teodMapSpotCount()
+static Int clpMapSpotCount()
 {
 	Int count = 0;
 	for (Int spot = 1; spot <= MAX_PLAYER_COUNT; ++spot)
 	{
-		if (!teodSpotWaypoint(spot))
+		if (!clpSpotWaypoint(spot))
 		{
 			break;
 		}
@@ -275,12 +275,12 @@ static Int teodMapSpotCount()
 }
 
 //-------------------------------------------------------------------------------------------------
-static Bool teodIsSpotOccupied(Int spot)
+static Bool clpIsSpotOccupied(Int spot)
 {
 	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
 	{
 		Player *player = ThePlayerList->getNthPlayer(i);
-		if (teodIsMatchPlayer(player) && player->getMpStartIndex() + 1 == spot)
+		if (clpIsMatchPlayer(player) && player->getMpStartIndex() + 1 == spot)
 		{
 			return player->isPlayerActive();
 		}
@@ -289,13 +289,13 @@ static Bool teodIsSpotOccupied(Int spot)
 }
 
 //-------------------------------------------------------------------------------------------------
-static Int teodActiveMatchPlayerCount()
+static Int clpActiveMatchPlayerCount()
 {
 	Int count = 0;
 	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
 	{
 		Player *player = ThePlayerList->getNthPlayer(i);
-		if (teodIsMatchPlayer(player) && player->isPlayerActive())
+		if (clpIsMatchPlayer(player) && player->isPlayerActive())
 		{
 			count++;
 		}
@@ -304,24 +304,24 @@ static Int teodActiveMatchPlayerCount()
 }
 
 //-------------------------------------------------------------------------------------------------
-struct TeodCountData
+struct ClpCountData
 {
-	const TeodTemplateList *types;		///< null counts units that are not structures
+	const ClpTemplateList *types;		///< null counts units that are not structures
 	const PolygonTrigger *area;				///< null counts the whole map
 	Int count;
 };
 
 //-------------------------------------------------------------------------------------------------
-static void teodCountObject(Object *obj, void *userData)
+static void clpCountObject(Object *obj, void *userData)
 {
-	TeodCountData *data = (TeodCountData *)userData;
+	ClpCountData *data = (ClpCountData *)userData;
 	if (obj->isEffectivelyDead())
 	{
 		return;
 	}
 	if (data->types)
 	{
-		if (obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) || !teodTemplateInList(obj->getTemplate(), *data->types))
+		if (obj->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION) || !clpTemplateInList(obj->getTemplate(), *data->types))
 		{
 			return;
 		}
@@ -343,30 +343,30 @@ static void teodCountObject(Object *obj, void *userData)
 //-------------------------------------------------------------------------------------------------
 /** Counts the player's live objects of types, or its units when types is null, optionally inside area. */
 //-------------------------------------------------------------------------------------------------
-static Int teodCountObjects(const Player *player, const TeodTemplateList *types, const PolygonTrigger *area)
+static Int clpCountObjects(const Player *player, const ClpTemplateList *types, const PolygonTrigger *area)
 {
 	if (types && types->empty())
 	{
 		return 0;
 	}
-	TeodCountData data;
+	ClpCountData data;
 	data.types = types;
 	data.area = area;
 	data.count = 0;
-	player->iterateObjects(teodCountObject, &data);
+	player->iterateObjects(clpCountObject, &data);
 	return data.count;
 }
 
 //-------------------------------------------------------------------------------------------------
-static Int teodCountForceObjects(Player *subject, Int relationType, const TeodTemplateList *types, const PolygonTrigger *area)
+static Int clpCountForceObjects(Player *subject, Int relationType, const ClpTemplateList *types, const PolygonTrigger *area)
 {
 	Int count = 0;
 	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
 	{
 		Player *player = ThePlayerList->getNthPlayer(i);
-		if (teodIsForcePlayer(subject, player, relationType))
+		if (clpIsForcePlayer(subject, player, relationType))
 		{
-			count += teodCountObjects(player, types, area);
+			count += clpCountObjects(player, types, area);
 		}
 	}
 	return count;
@@ -375,7 +375,7 @@ static Int teodCountForceObjects(Player *subject, Int relationType, const TeodTe
 //-------------------------------------------------------------------------------------------------
 /** Grid of map points, each marked once a player's structure, vehicle or infantry is within reach. */
 //-------------------------------------------------------------------------------------------------
-struct TeodControlGrid
+struct ClpControlGrid
 {
 	Real loX;
 	Real loY;
@@ -385,21 +385,21 @@ struct TeodControlGrid
 };
 
 //-------------------------------------------------------------------------------------------------
-static void teodInitControlGrid(TeodControlGrid &grid)
+static void clpInitControlGrid(ClpControlGrid &grid)
 {
 	Region3D extent;
 	TheTerrainLogic->getExtent(&extent);
 	grid.loX = extent.lo.x;
 	grid.loY = extent.lo.y;
-	grid.cols = MAX(0, (Int)ceilf((extent.hi.x - extent.lo.x) / TEOD_MAP_CONTROL_GRID));
-	grid.rows = MAX(0, (Int)ceilf((extent.hi.y - extent.lo.y) / TEOD_MAP_CONTROL_GRID));
+	grid.cols = MAX(0, (Int)ceilf((extent.hi.x - extent.lo.x) / CLP_MAP_CONTROL_GRID));
+	grid.rows = MAX(0, (Int)ceilf((extent.hi.y - extent.lo.y) / CLP_MAP_CONTROL_GRID));
 	grid.marks.assign(grid.cols * grid.rows, FALSE);
 }
 
 //-------------------------------------------------------------------------------------------------
-static void teodMarkControl(Object *obj, void *userData)
+static void clpMarkControl(Object *obj, void *userData)
 {
-	TeodControlGrid *grid = (TeodControlGrid *)userData;
+	ClpControlGrid *grid = (ClpControlGrid *)userData;
 	if (obj->isEffectivelyDead())
 	{
 		return;
@@ -409,17 +409,17 @@ static void teodMarkControl(Object *obj, void *userData)
 		return;
 	}
 	const Coord3D *pos = obj->getPosition();
-	const Real radius = TEOD_MAP_CONTROL_RADIUS;
-	Int minCol = MAX(0, (Int)ceilf((pos->x - radius - grid->loX) / TEOD_MAP_CONTROL_GRID));
-	Int maxCol = MIN(grid->cols - 1, (Int)floorf((pos->x + radius - grid->loX) / TEOD_MAP_CONTROL_GRID));
-	Int minRow = MAX(0, (Int)ceilf((pos->y - radius - grid->loY) / TEOD_MAP_CONTROL_GRID));
-	Int maxRow = MIN(grid->rows - 1, (Int)floorf((pos->y + radius - grid->loY) / TEOD_MAP_CONTROL_GRID));
+	const Real radius = CLP_MAP_CONTROL_RADIUS;
+	Int minCol = MAX(0, (Int)ceilf((pos->x - radius - grid->loX) / CLP_MAP_CONTROL_GRID));
+	Int maxCol = MIN(grid->cols - 1, (Int)floorf((pos->x + radius - grid->loX) / CLP_MAP_CONTROL_GRID));
+	Int minRow = MAX(0, (Int)ceilf((pos->y - radius - grid->loY) / CLP_MAP_CONTROL_GRID));
+	Int maxRow = MIN(grid->rows - 1, (Int)floorf((pos->y + radius - grid->loY) / CLP_MAP_CONTROL_GRID));
 	for (Int col = minCol; col <= maxCol; ++col)
 	{
-		Real dx = grid->loX + col * TEOD_MAP_CONTROL_GRID - pos->x;
+		Real dx = grid->loX + col * CLP_MAP_CONTROL_GRID - pos->x;
 		for (Int row = minRow; row <= maxRow; ++row)
 		{
-			Real dy = grid->loY + row * TEOD_MAP_CONTROL_GRID - pos->y;
+			Real dy = grid->loY + row * CLP_MAP_CONTROL_GRID - pos->y;
 			if (dx * dx + dy * dy <= radius * radius)
 			{
 				grid->marks[row * grid->cols + col] = TRUE;
@@ -431,7 +431,7 @@ static void teodMarkControl(Object *obj, void *userData)
 //-------------------------------------------------------------------------------------------------
 /** Compares the controlled share of grid points, inside area if given, with percent. */
 //-------------------------------------------------------------------------------------------------
-static Bool teodCompareControl(const TeodControlGrid &grid, PolygonTrigger *area, Int comparison, Real percent)
+static Bool clpCompareControl(const ClpControlGrid &grid, PolygonTrigger *area, Int comparison, Real percent)
 {
 	Int controlled = 0;
 	Int total = 0;
@@ -442,8 +442,8 @@ static Bool teodCompareControl(const TeodControlGrid &grid, PolygonTrigger *area
 			if (area)
 			{
 				ICoord3D point;
-				point.x = REAL_TO_INT_FLOOR(grid.loX + col * TEOD_MAP_CONTROL_GRID);
-				point.y = REAL_TO_INT_FLOOR(grid.loY + row * TEOD_MAP_CONTROL_GRID);
+				point.x = REAL_TO_INT_FLOOR(grid.loX + col * CLP_MAP_CONTROL_GRID);
+				point.y = REAL_TO_INT_FLOOR(grid.loY + row * CLP_MAP_CONTROL_GRID);
 				point.z = 0;
 				if (!area->pointInTrigger(point))
 				{
@@ -461,29 +461,29 @@ static Bool teodCompareControl(const TeodControlGrid &grid, PolygonTrigger *area
 	{
 		return FALSE;
 	}
-	return teodCompareReal(comparison, (Real)controlled / (Real)total, percent / 100.0f);
+	return clpCompareReal(comparison, (Real)controlled / (Real)total, percent / 100.0f);
 }
 
 //-------------------------------------------------------------------------------------------------
-static Bool teodRelationMapControl(Player *subject, Int relationType, Int comparison, Real percent, PolygonTrigger *area)
+static Bool clpRelationMapControl(Player *subject, Int relationType, Int comparison, Real percent, PolygonTrigger *area)
 {
-	TeodControlGrid grid;
-	teodInitControlGrid(grid);
+	ClpControlGrid grid;
+	clpInitControlGrid(grid);
 	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
 	{
 		Player *player = ThePlayerList->getNthPlayer(i);
-		if (teodIsForcePlayer(subject, player, relationType))
+		if (clpIsForcePlayer(subject, player, relationType))
 		{
-			player->iterateObjects(teodMarkControl, &grid);
+			player->iterateObjects(clpMarkControl, &grid);
 		}
 	}
-	return teodCompareControl(grid, area, comparison, percent);
+	return clpCompareControl(grid, area, comparison, percent);
 }
 
 //-------------------------------------------------------------------------------------------------
 /** True if observer currently sees a live object of relationType to it, of types and inside area when given. */
 //-------------------------------------------------------------------------------------------------
-static Bool teodPlayerSighted(const Player *observer, Int relationType, const TeodTemplateList *types, const PolygonTrigger *area)
+static Bool clpPlayerSighted(const Player *observer, Int relationType, const ClpTemplateList *types, const PolygonTrigger *area)
 {
 	if (types && types->empty())
 	{
@@ -495,7 +495,7 @@ static Bool teodPlayerSighted(const Player *observer, Int relationType, const Te
 		{
 			continue;
 		}
-		if (types && !teodTemplateInList(obj->getTemplate(), *types))
+		if (types && !clpTemplateInList(obj->getTemplate(), *types))
 		{
 			continue;
 		}
@@ -503,11 +503,11 @@ static Bool teodPlayerSighted(const Player *observer, Int relationType, const Te
 		{
 			continue;
 		}
-		if (teodRelationTo(observer, obj) != relationType)
+		if (clpRelationTo(observer, obj) != relationType)
 		{
 			continue;
 		}
-		if (teodIsSeenByPlayer(obj, observer))
+		if (clpIsSeenByPlayer(obj, observer))
 		{
 			return TRUE;
 		}
@@ -516,12 +516,12 @@ static Bool teodPlayerSighted(const Player *observer, Int relationType, const Te
 }
 
 //-------------------------------------------------------------------------------------------------
-static Bool teodForceSighted(Player *subject, Int playerRelationType, Int relationType, const TeodTemplateList *types, const PolygonTrigger *area)
+static Bool clpForceSighted(Player *subject, Int playerRelationType, Int relationType, const ClpTemplateList *types, const PolygonTrigger *area)
 {
 	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
 	{
 		Player *player = ThePlayerList->getNthPlayer(i);
-		if (teodIsForcePlayer(subject, player, playerRelationType) && teodPlayerSighted(player, relationType, types, area))
+		if (clpIsForcePlayer(subject, player, playerRelationType) && clpPlayerSighted(player, relationType, types, area))
 		{
 			return TRUE;
 		}
@@ -557,7 +557,7 @@ Bool ScriptConditions::evaluateSkirmishAnyRelationFaction(Parameter* pPlayerParm
 	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
 	{
 		Player *player = ThePlayerList->getNthPlayer(i);
-		if (teodIsCoPlayer(subject, player, relationType) && player->getSide() == pFactionParm->getString())
+		if (clpIsCoPlayer(subject, player, relationType) && player->getSide() == pFactionParm->getString())
 		{
 			return TRUE;
 		}
@@ -570,34 +570,34 @@ Bool ScriptConditions::evaluateStartingCash(Parameter* pComparisonParm, Int pAmo
 {
 	// Player::init deposits this amount when the player template gives no money.
 	UnsignedInt startingCash = TheGameInfo ? TheGameInfo->getStartingCash().countMoney() : TheGlobalData->m_defaultStartingCash.countMoney();
-	return teodCompareInt(pComparisonParm->getInt(), (Int)startingCash, pAmount);
+	return clpCompareInt(pComparisonParm->getInt(), (Int)startingCash, pAmount);
 }
 
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluateMapSize(Parameter* pComparisonParm, Int pMapSize)
 {
-	return teodCompareInt(pComparisonParm->getInt(), teodMapSpotCount(), pMapSize);
+	return clpCompareInt(pComparisonParm->getInt(), clpMapSpotCount(), pMapSize);
 }
 
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluateActivePlayerCount(Parameter* pComparisonParm, Int pPlayerCount)
 {
-	return teodCompareInt(pComparisonParm->getInt(), teodActiveMatchPlayerCount(), pPlayerCount);
+	return clpCompareInt(pComparisonParm->getInt(), clpActiveMatchPlayerCount(), pPlayerCount);
 }
 
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluateEmptySpotCount(Parameter* pComparisonParm, Int pEmptySpotCount)
 {
-	Int spotCount = teodMapSpotCount();
+	Int spotCount = clpMapSpotCount();
 	Int emptyCount = 0;
 	for (Int spot = 1; spot <= spotCount; ++spot)
 	{
-		if (!teodIsSpotOccupied(spot))
+		if (!clpIsSpotOccupied(spot))
 		{
 			emptyCount++;
 		}
 	}
-	return teodCompareInt(pComparisonParm->getInt(), emptyCount, pEmptySpotCount);
+	return clpCompareInt(pComparisonParm->getInt(), emptyCount, pEmptySpotCount);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -608,36 +608,36 @@ Bool ScriptConditions::evaluateEmptySpot(Parameter* pStartNdx, Bool isEmpty)
 	{
 		return !isEmpty;
 	}
-	return teodIsSpotOccupied(spot) ? !isEmpty : isEmpty;
+	return clpIsSpotOccupied(spot) ? !isEmpty : isEmpty;
 }
 
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluateNeighbouringSpot(Parameter* pPlayerParm, Parameter* pStartNdx)
 {
 	Player *player = playerFromParam(pPlayerParm);
-	Waypoint *home = teodPlayerSpotWaypoint(player);
+	Waypoint *home = clpPlayerSpotWaypoint(player);
 	if (!home)
 	{
 		return FALSE;
 	}
-	Real radius = teodNeighbourRadius(home);
+	Real radius = clpNeighbourRadius(home);
 	if (radius < 0.0f || pStartNdx->getInt() < 1)
 	{
 		return FALSE;
 	}
-	return teodIsNeighbouring(home, teodSpotWaypoint(pStartNdx->getInt()), radius);
+	return clpIsNeighbouring(home, clpSpotWaypoint(pStartNdx->getInt()), radius);
 }
 
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluateNeighbouringSpotsEmpty(Parameter* pPlayerParm, Parameter* pComparisonParm, Int pCount)
 {
 	Player *player = playerFromParam(pPlayerParm);
-	Waypoint *home = teodPlayerSpotWaypoint(player);
+	Waypoint *home = clpPlayerSpotWaypoint(player);
 	if (!home)
 	{
 		return FALSE;
 	}
-	Real radius = teodNeighbourRadius(home);
+	Real radius = clpNeighbourRadius(home);
 	if (radius < 0.0f)
 	{
 		return FALSE;
@@ -645,24 +645,24 @@ Bool ScriptConditions::evaluateNeighbouringSpotsEmpty(Parameter* pPlayerParm, Pa
 	Int count = 0;
 	for (Int spot = 1; spot <= MAX_PLAYER_COUNT; ++spot)
 	{
-		if (teodIsNeighbouring(home, teodSpotWaypoint(spot), radius) && !teodIsSpotOccupied(spot))
+		if (clpIsNeighbouring(home, clpSpotWaypoint(spot), radius) && !clpIsSpotOccupied(spot))
 		{
 			count++;
 		}
 	}
-	return teodCompareInt(pComparisonParm->getInt(), count, pCount);
+	return clpCompareInt(pComparisonParm->getInt(), count, pCount);
 }
 
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluateNeighbouringSpotsRelation(Parameter* pPlayerParm, Parameter* pComparisonParm, Int pCount, Int relationType)
 {
 	Player *subject = playerFromParam(pPlayerParm);
-	Waypoint *home = teodPlayerSpotWaypoint(subject);
+	Waypoint *home = clpPlayerSpotWaypoint(subject);
 	if (!home)
 	{
 		return FALSE;
 	}
-	Real radius = teodNeighbourRadius(home);
+	Real radius = clpNeighbourRadius(home);
 	if (radius < 0.0f)
 	{
 		return FALSE;
@@ -671,12 +671,12 @@ Bool ScriptConditions::evaluateNeighbouringSpotsRelation(Parameter* pPlayerParm,
 	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
 	{
 		Player *player = ThePlayerList->getNthPlayer(i);
-		if (teodIsCoPlayer(subject, player, relationType) && teodIsNeighbouring(home, teodPlayerSpotWaypoint(player), radius))
+		if (clpIsCoPlayer(subject, player, relationType) && clpIsNeighbouring(home, clpPlayerSpotWaypoint(player), radius))
 		{
 			count++;
 		}
 	}
-	return teodCompareInt(pComparisonParm->getInt(), count, pCount);
+	return clpCompareInt(pComparisonParm->getInt(), count, pCount);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -687,12 +687,12 @@ Bool ScriptConditions::evaluateSpotNeighbouringRelation(Parameter* pPlayerParm, 
 	{
 		return FALSE;
 	}
-	Waypoint *spot = teodSpotWaypoint(pStartNdx);
+	Waypoint *spot = clpSpotWaypoint(pStartNdx);
 	if (!spot)
 	{
 		return FALSE;
 	}
-	Real radius = teodNeighbourRadius(spot);
+	Real radius = clpNeighbourRadius(spot);
 	if (radius < 0.0f)
 	{
 		return FALSE;
@@ -700,7 +700,7 @@ Bool ScriptConditions::evaluateSpotNeighbouringRelation(Parameter* pPlayerParm, 
 	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
 	{
 		Player *player = ThePlayerList->getNthPlayer(i);
-		if (teodIsCoPlayer(subject, player, relationType) && teodIsNeighbouring(spot, teodPlayerSpotWaypoint(player), radius))
+		if (clpIsCoPlayer(subject, player, relationType) && clpIsNeighbouring(spot, clpPlayerSpotWaypoint(player), radius))
 		{
 			return TRUE;
 		}
@@ -716,7 +716,7 @@ Bool ScriptConditions::evaluateNoTeams(Bool isFFA)
 	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
 	{
 		Player *player = ThePlayerList->getNthPlayer(i);
-		if (!teodIsMatchPlayer(player) || !player->isPlayerActive())
+		if (!clpIsMatchPlayer(player) || !player->isPlayerActive())
 		{
 			continue;
 		}
@@ -724,7 +724,7 @@ Bool ScriptConditions::evaluateNoTeams(Bool isFFA)
 		for (Int j = 0; j < ThePlayerList->getPlayerCount(); ++j)
 		{
 			Player *other = ThePlayerList->getNthPlayer(j);
-			if (other == player || !teodIsMatchPlayer(other) || !other->isPlayerActive())
+			if (other == player || !clpIsMatchPlayer(other) || !other->isPlayerActive())
 			{
 				continue;
 			}
@@ -741,16 +741,16 @@ Bool ScriptConditions::evaluateNoTeams(Bool isFFA)
 }
 
 //-------------------------------------------------------------------------------------------------
-struct TeodClosestData
+struct ClpClosestData
 {
 	Coord3D pos;
 	Real minDistSqr;
 };
 
 //-------------------------------------------------------------------------------------------------
-static void teodFindClosest(Object *obj, void *userData)
+static void clpFindClosest(Object *obj, void *userData)
 {
-	TeodClosestData *data = (TeodClosestData *)userData;
+	ClpClosestData *data = (ClpClosestData *)userData;
 	if (obj->isEffectivelyDead())
 	{
 		return;
@@ -768,31 +768,31 @@ static void teodFindClosest(Object *obj, void *userData)
 Bool ScriptConditions::evaluateClosestRelationUnitToMySpawn(Int relationType, Parameter* pPlayerParm, Parameter* pComparisonParm, Real pDist)
 {
 	Player *subject = playerFromParam(pPlayerParm);
-	Waypoint *home = teodPlayerSpotWaypoint(subject);
+	Waypoint *home = clpPlayerSpotWaypoint(subject);
 	if (!home)
 	{
 		return FALSE;
 	}
-	TeodClosestData data;
+	ClpClosestData data;
 	data.pos = *home->getLocation();
 	data.minDistSqr = FLT_MAX;
 	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
 	{
 		Player *player = ThePlayerList->getNthPlayer(i);
-		if (teodIsCoPlayer(subject, player, relationType))
+		if (clpIsCoPlayer(subject, player, relationType))
 		{
-			player->iterateObjects(teodFindClosest, &data);
+			player->iterateObjects(clpFindClosest, &data);
 		}
 	}
 	if (data.minDistSqr == FLT_MAX)
 	{
 		return FALSE;
 	}
-	return teodCompareReal(pComparisonParm->getInt(), sqrtf(data.minDistSqr), pDist);
+	return clpCompareReal(pComparisonParm->getInt(), sqrtf(data.minDistSqr), pDist);
 }
 
 //-------------------------------------------------------------------------------------------------
-static void teodFindDozerSource(Object *obj, void *userData)
+static void clpFindDozerSource(Object *obj, void *userData)
 {
 	Bool *found = (Bool *)userData;
 	if (*found || obj->isEffectivelyDead())
@@ -825,12 +825,12 @@ Bool ScriptConditions::evaluateHunted(Parameter* pPlayerParm)
 		return FALSE;
 	}
 	Bool found = FALSE;
-	player->iterateObjects(teodFindDozerSource, &found);
+	player->iterateObjects(clpFindDozerSource, &found);
 	return !found;
 }
 
 //-------------------------------------------------------------------------------------------------
-struct TeodAttackedData
+struct ClpAttackedData
 {
 	Player *player;
 	const PolygonTrigger *area;
@@ -839,9 +839,9 @@ struct TeodAttackedData
 };
 
 //-------------------------------------------------------------------------------------------------
-static void teodFindAttacked(Object *obj, void *userData)
+static void clpFindAttacked(Object *obj, void *userData)
 {
-	TeodAttackedData *data = (TeodAttackedData *)userData;
+	ClpAttackedData *data = (ClpAttackedData *)userData;
 	if (data->attacked || obj->isEffectivelyDead() || obj->isKindOf(KINDOF_INERT) || obj->isKindOf(KINDOF_CRATE))
 	{
 		return;
@@ -897,26 +897,26 @@ Bool ScriptConditions::evaluatePlayerAttackedInArea(Parameter* pPlayerParm, Para
 	{
 		return FALSE;
 	}
-	TeodAttackedData data;
+	ClpAttackedData data;
 	data.player = player;
 	data.area = area;
 	data.frame = TheGameLogic->getFrame();
 	data.attacked = FALSE;
-	player->iterateObjects(teodFindAttacked, &data);
+	player->iterateObjects(clpFindAttacked, &data);
 	return data.attacked;
 }
 
 //-------------------------------------------------------------------------------------------------
-struct TeodValueData
+struct ClpValueData
 {
 	const PolygonTrigger *area;
 	Int value;
 };
 
 //-------------------------------------------------------------------------------------------------
-static void teodSumValue(Object *obj, void *userData)
+static void clpSumValue(Object *obj, void *userData)
 {
-	TeodValueData *data = (TeodValueData *)userData;
+	ClpValueData *data = (ClpValueData *)userData;
 	if (obj->isEffectivelyDead() || obj->isKindOf(KINDOF_INERT) || !obj->isInside(data->area))
 	{
 		return;
@@ -937,18 +937,18 @@ Bool ScriptConditions::evaluateRelationPlayerValueArea(Condition* pCondition, Pa
 	{
 		return FALSE;
 	}
-	TeodValueData data;
+	ClpValueData data;
 	data.area = area;
 	data.value = 0;
 	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
 	{
 		Player *player = ThePlayerList->getNthPlayer(i);
-		if (teodIsForcePlayer(subject, player, relationType))
+		if (clpIsForcePlayer(subject, player, relationType))
 		{
-			player->iterateObjects(teodSumValue, &data);
+			player->iterateObjects(clpSumValue, &data);
 		}
 	}
-	return teodCompareInt(pComparisonParm->getInt(), data.value, value);
+	return clpCompareInt(pComparisonParm->getInt(), data.value, value);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -959,10 +959,10 @@ Bool ScriptConditions::evaluateRelationPlayerOwnsComparisonType(Condition* pCond
 	{
 		return FALSE;
 	}
-	TeodTemplateList types;
-	teodTemplatesFromType(objectType->getString(), types);
-	Int count = teodCountForceObjects(subject, relationType, &types, nullptr);
-	return teodCompareInt(pComparisonParm->getInt(), count, value);
+	ClpTemplateList types;
+	clpTemplatesFromType(objectType->getString(), types);
+	Int count = clpCountForceObjects(subject, relationType, &types, nullptr);
+	return clpCompareInt(pComparisonParm->getInt(), count, value);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -978,25 +978,25 @@ Bool ScriptConditions::evaluateRelationPlayerComparisonTypeArea(Condition* pCond
 	{
 		return FALSE;
 	}
-	TeodTemplateList types;
-	teodTemplatesFromType(objectType->getString(), types);
-	Int count = teodCountForceObjects(subject, relationType, &types, area);
-	return teodCompareInt(pComparisonParm->getInt(), count, value);
+	ClpTemplateList types;
+	clpTemplatesFromType(objectType->getString(), types);
+	Int count = clpCountForceObjects(subject, relationType, &types, area);
+	return clpCompareInt(pComparisonParm->getInt(), count, value);
 }
 
 //-------------------------------------------------------------------------------------------------
 /** True if an event newer than since matches the types (null accepts any) and lies in the area (null accepts any). */
 //-------------------------------------------------------------------------------------------------
-static Bool teodHasNewEvent(const ScriptTEODState::EventList &events, UnsignedInt since, const TeodTemplateList *types, PolygonTrigger *area)
+static Bool clpHasNewEvent(const ScriptCLPState::EventList &events, UnsignedInt since, const ClpTemplateList *types, PolygonTrigger *area)
 {
 	for (size_t i = 0; i < events.size(); ++i)
 	{
-		const ScriptTEODState::Event &event = events[i];
+		const ScriptCLPState::Event &event = events[i];
 		if (event.seq <= since)
 		{
 			continue;
 		}
-		if (types && !teodTemplateInList(event.thing, *types))
+		if (types && !clpTemplateInList(event.thing, *types))
 		{
 			continue;
 		}
@@ -1019,7 +1019,7 @@ static Bool teodHasNewEvent(const ScriptTEODState::EventList &events, UnsignedIn
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluatePlayerLostTypeInArea(Condition* pCondition, Parameter* pPlayerParm, Parameter* pObjectType, Parameter* pArea)
 {
-	UnsignedInt since = TheScriptTEODState->readEvents(pCondition);
+	UnsignedInt since = TheScriptCLPState->readEvents(pCondition);
 	Player *player = playerFromParam(pPlayerParm);
 	if (!player)
 	{
@@ -1030,55 +1030,55 @@ Bool ScriptConditions::evaluatePlayerLostTypeInArea(Condition* pCondition, Param
 	{
 		return FALSE;
 	}
-	TeodTemplateList types;
-	teodTemplatesFromType(pObjectType->getString(), types);
+	ClpTemplateList types;
+	clpTemplatesFromType(pObjectType->getString(), types);
 	if (types.empty())
 	{
 		return FALSE;
 	}
-	return teodHasNewEvent(TheScriptTEODState->getPlayerLosses(player->getPlayerIndex()), since, &types, area);
+	return clpHasNewEvent(TheScriptCLPState->getPlayerLosses(player->getPlayerIndex()), since, &types, area);
 }
 
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluatePlayerLostUnit(Condition* pCondition, Parameter* pPlayerParm)
 {
-	UnsignedInt since = TheScriptTEODState->readEvents(pCondition);
+	UnsignedInt since = TheScriptCLPState->readEvents(pCondition);
 	Player *player = playerFromParam(pPlayerParm);
 	if (!player)
 	{
 		return FALSE;
 	}
-	return teodHasNewEvent(TheScriptTEODState->getPlayerLosses(player->getPlayerIndex()), since, nullptr, nullptr);
+	return clpHasNewEvent(TheScriptCLPState->getPlayerLosses(player->getPlayerIndex()), since, nullptr, nullptr);
 }
 
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluatePlayerDestroyedEnemyType(Condition* pCondition, Parameter* pPlayerParm, Parameter* pObjectType)
 {
-	UnsignedInt since = TheScriptTEODState->readEvents(pCondition);
+	UnsignedInt since = TheScriptCLPState->readEvents(pCondition);
 	Player *player = playerFromParam(pPlayerParm);
 	if (!player)
 	{
 		return FALSE;
 	}
-	TeodTemplateList types;
-	teodTemplatesFromType(pObjectType->getString(), types);
+	ClpTemplateList types;
+	clpTemplatesFromType(pObjectType->getString(), types);
 	if (types.empty())
 	{
 		return FALSE;
 	}
-	return teodHasNewEvent(TheScriptTEODState->getPlayerKills(player->getPlayerIndex()), since, &types, nullptr);
+	return clpHasNewEvent(TheScriptCLPState->getPlayerKills(player->getPlayerIndex()), since, &types, nullptr);
 }
 
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluatePlayerDestroyedEnemyUnit(Condition* pCondition, Parameter* pPlayerParm)
 {
-	UnsignedInt since = TheScriptTEODState->readEvents(pCondition);
+	UnsignedInt since = TheScriptCLPState->readEvents(pCondition);
 	Player *player = playerFromParam(pPlayerParm);
 	if (!player)
 	{
 		return FALSE;
 	}
-	return teodHasNewEvent(TheScriptTEODState->getPlayerKills(player->getPlayerIndex()), since, nullptr, nullptr);
+	return clpHasNewEvent(TheScriptCLPState->getPlayerKills(player->getPlayerIndex()), since, nullptr, nullptr);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1089,10 +1089,10 @@ Bool ScriptConditions::evaluateMapControl(Parameter* pPlayerParm, Parameter* pCo
 	{
 		return FALSE;
 	}
-	TeodControlGrid grid;
-	teodInitControlGrid(grid);
-	player->iterateObjects(teodMarkControl, &grid);
-	return teodCompareControl(grid, nullptr, pComparisonParm->getInt(), pValue);
+	ClpControlGrid grid;
+	clpInitControlGrid(grid);
+	player->iterateObjects(clpMarkControl, &grid);
+	return clpCompareControl(grid, nullptr, pComparisonParm->getInt(), pValue);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1103,7 +1103,7 @@ Bool ScriptConditions::evaluateRelationMapControl(Parameter* pPlayerParm, Int re
 	{
 		return FALSE;
 	}
-	return teodRelationMapControl(subject, relationType, pComparisonParm->getInt(), pValue, nullptr);
+	return clpRelationMapControl(subject, relationType, pComparisonParm->getInt(), pValue, nullptr);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1119,10 +1119,10 @@ Bool ScriptConditions::evaluateMapControlArea(Parameter* pPlayerParm, Parameter*
 	{
 		return FALSE;
 	}
-	TeodControlGrid grid;
-	teodInitControlGrid(grid);
-	player->iterateObjects(teodMarkControl, &grid);
-	return teodCompareControl(grid, area, pComparisonParm->getInt(), pValue);
+	ClpControlGrid grid;
+	clpInitControlGrid(grid);
+	player->iterateObjects(clpMarkControl, &grid);
+	return clpCompareControl(grid, area, pComparisonParm->getInt(), pValue);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1138,7 +1138,7 @@ Bool ScriptConditions::evaluateRelationMapControlArea(Parameter* pPlayerParm, In
 	{
 		return FALSE;
 	}
-	return teodRelationMapControl(subject, relationType, pComparisonParm->getInt(), pValue, area);
+	return clpRelationMapControl(subject, relationType, pComparisonParm->getInt(), pValue, area);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1149,9 +1149,9 @@ Bool ScriptConditions::evaluatePlayerSightedRelationType(Parameter* pPlayerParm,
 	{
 		return FALSE;
 	}
-	TeodTemplateList types;
-	teodTemplatesFromType(pObjectType->getString(), types);
-	return teodPlayerSighted(player, relationType, &types, nullptr);
+	ClpTemplateList types;
+	clpTemplatesFromType(pObjectType->getString(), types);
+	return clpPlayerSighted(player, relationType, &types, nullptr);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1162,9 +1162,9 @@ Bool ScriptConditions::evaluateRelationPlayerSightedRelationType(Parameter* pPla
 	{
 		return FALSE;
 	}
-	TeodTemplateList types;
-	teodTemplatesFromType(pObjectType->getString(), types);
-	return teodForceSighted(subject, playerRelationType, relationType, &types, nullptr);
+	ClpTemplateList types;
+	clpTemplatesFromType(pObjectType->getString(), types);
+	return clpForceSighted(subject, playerRelationType, relationType, &types, nullptr);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1180,7 +1180,7 @@ Bool ScriptConditions::evaluateRelationPlayerSightedRelationArea(Parameter* pPla
 	{
 		return FALSE;
 	}
-	return teodForceSighted(subject, playerRelationType, relationType, nullptr, area);
+	return clpForceSighted(subject, playerRelationType, relationType, nullptr, area);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1196,9 +1196,9 @@ Bool ScriptConditions::evaluateRelationPlayerSightedRelationTypeArea(Parameter* 
 	{
 		return FALSE;
 	}
-	TeodTemplateList types;
-	teodTemplatesFromType(pObjectType->getString(), types);
-	return teodForceSighted(subject, playerRelationType, relationType, &types, area);
+	ClpTemplateList types;
+	clpTemplatesFromType(pObjectType->getString(), types);
+	return clpForceSighted(subject, playerRelationType, relationType, &types, area);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1210,9 +1210,9 @@ Bool ScriptConditions::evaluatePlayerHasComparisonRatioOther(Condition* pConditi
 	{
 		return FALSE;
 	}
-	Int count = teodCountObjects(player, nullptr, nullptr);
-	Int countOther = teodCountObjects(other, nullptr, nullptr);
-	return teodCompareRatio(pComparisonParm->getInt(), count, countOther, ratio);
+	Int count = clpCountObjects(player, nullptr, nullptr);
+	Int countOther = clpCountObjects(other, nullptr, nullptr);
+	return clpCompareRatio(pComparisonParm->getInt(), count, countOther, ratio);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1224,13 +1224,13 @@ Bool ScriptConditions::evaluatePlayerHasComparisonRatioTypeOther(Condition* pCon
 	{
 		return FALSE;
 	}
-	TeodTemplateList types;
-	TeodTemplateList typesOther;
-	teodTemplatesFromType(objectType->getString(), types);
-	teodTemplatesFromType(otherObjectType->getString(), typesOther);
-	Int count = teodCountObjects(player, &types, nullptr);
-	Int countOther = teodCountObjects(other, &typesOther, nullptr);
-	return teodCompareRatio(pComparisonParm->getInt(), count, countOther, ratio);
+	ClpTemplateList types;
+	ClpTemplateList typesOther;
+	clpTemplatesFromType(objectType->getString(), types);
+	clpTemplatesFromType(otherObjectType->getString(), typesOther);
+	Int count = clpCountObjects(player, &types, nullptr);
+	Int countOther = clpCountObjects(other, &typesOther, nullptr);
+	return clpCompareRatio(pComparisonParm->getInt(), count, countOther, ratio);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1247,9 +1247,9 @@ Bool ScriptConditions::evaluatePlayerHasComparisonRatioAreaOther(Condition* pCon
 	{
 		return FALSE;
 	}
-	Int count = teodCountObjects(player, nullptr, area);
-	Int countOther = teodCountObjects(other, nullptr, area);
-	return teodCompareRatio(pComparisonParm->getInt(), count, countOther, ratio);
+	Int count = clpCountObjects(player, nullptr, area);
+	Int countOther = clpCountObjects(other, nullptr, area);
+	return clpCompareRatio(pComparisonParm->getInt(), count, countOther, ratio);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1266,13 +1266,13 @@ Bool ScriptConditions::evaluatePlayerHasComparisonRatioTypeAreaOther(Condition* 
 	{
 		return FALSE;
 	}
-	TeodTemplateList types;
-	TeodTemplateList typesOther;
-	teodTemplatesFromType(objectType->getString(), types);
-	teodTemplatesFromType(otherObjectType->getString(), typesOther);
-	Int count = teodCountObjects(player, &types, area);
-	Int countOther = teodCountObjects(other, &typesOther, area);
-	return teodCompareRatio(pComparisonParm->getInt(), count, countOther, ratio);
+	ClpTemplateList types;
+	ClpTemplateList typesOther;
+	clpTemplatesFromType(objectType->getString(), types);
+	clpTemplatesFromType(otherObjectType->getString(), typesOther);
+	Int count = clpCountObjects(player, &types, area);
+	Int countOther = clpCountObjects(other, &typesOther, area);
+	return clpCompareRatio(pComparisonParm->getInt(), count, countOther, ratio);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1283,9 +1283,9 @@ Bool ScriptConditions::evaluateRelationPlayerHasComparisonRatioOtherRelation(Con
 	{
 		return FALSE;
 	}
-	Int count = teodCountForceObjects(subject, pRelation, nullptr, nullptr);
-	Int countOther = teodCountForceObjects(subject, pOtherRelation, nullptr, nullptr);
-	return teodCompareRatio(pComparisonParm->getInt(), count, countOther, ratio);
+	Int count = clpCountForceObjects(subject, pRelation, nullptr, nullptr);
+	Int countOther = clpCountForceObjects(subject, pOtherRelation, nullptr, nullptr);
+	return clpCompareRatio(pComparisonParm->getInt(), count, countOther, ratio);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1296,13 +1296,13 @@ Bool ScriptConditions::evaluateRelationPlayerHasComparisonRatioTypeOtherRelation
 	{
 		return FALSE;
 	}
-	TeodTemplateList types;
-	TeodTemplateList typesOther;
-	teodTemplatesFromType(objectType->getString(), types);
-	teodTemplatesFromType(otherObjectType->getString(), typesOther);
-	Int count = teodCountForceObjects(subject, pRelation, &types, nullptr);
-	Int countOther = teodCountForceObjects(subject, pOtherRelation, &typesOther, nullptr);
-	return teodCompareRatio(pComparisonParm->getInt(), count, countOther, ratio);
+	ClpTemplateList types;
+	ClpTemplateList typesOther;
+	clpTemplatesFromType(objectType->getString(), types);
+	clpTemplatesFromType(otherObjectType->getString(), typesOther);
+	Int count = clpCountForceObjects(subject, pRelation, &types, nullptr);
+	Int countOther = clpCountForceObjects(subject, pOtherRelation, &typesOther, nullptr);
+	return clpCompareRatio(pComparisonParm->getInt(), count, countOther, ratio);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1318,9 +1318,9 @@ Bool ScriptConditions::evaluateRelationPlayerHasComparisonRatioAreaOtherRelation
 	{
 		return FALSE;
 	}
-	Int count = teodCountForceObjects(subject, pRelation, nullptr, area);
-	Int countOther = teodCountForceObjects(subject, pOtherRelation, nullptr, area);
-	return teodCompareRatio(pComparisonParm->getInt(), count, countOther, ratio);
+	Int count = clpCountForceObjects(subject, pRelation, nullptr, area);
+	Int countOther = clpCountForceObjects(subject, pOtherRelation, nullptr, area);
+	return clpCompareRatio(pComparisonParm->getInt(), count, countOther, ratio);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1336,13 +1336,13 @@ Bool ScriptConditions::evaluateRelationPlayerHasComparisonRatioTypeAreaOtherRela
 	{
 		return FALSE;
 	}
-	TeodTemplateList types;
-	TeodTemplateList typesOther;
-	teodTemplatesFromType(objectType->getString(), types);
-	teodTemplatesFromType(otherObjectType->getString(), typesOther);
-	Int count = teodCountForceObjects(subject, pRelation, &types, area);
-	Int countOther = teodCountForceObjects(subject, pOtherRelation, &typesOther, area);
-	return teodCompareRatio(pComparisonParm->getInt(), count, countOther, ratio);
+	ClpTemplateList types;
+	ClpTemplateList typesOther;
+	clpTemplatesFromType(objectType->getString(), types);
+	clpTemplatesFromType(otherObjectType->getString(), typesOther);
+	Int count = clpCountForceObjects(subject, pRelation, &types, area);
+	Int countOther = clpCountForceObjects(subject, pOtherRelation, &typesOther, area);
+	return clpCompareRatio(pComparisonParm->getInt(), count, countOther, ratio);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1370,5 +1370,5 @@ Bool ScriptConditions::evaluatePlayerTeamInstances(Parameter* pPlayerParm, Param
 			}
 		}
 	}
-	return teodCompareInt(pComparisonParm->getInt(), count, value);
+	return clpCompareInt(pComparisonParm->getInt(), count, value);
 }

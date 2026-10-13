@@ -6707,7 +6707,7 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 {
 	switch (pAction->getActionType()) {
 		default:
-			if (executeTEODAction(pAction))
+			if (executeCLPAction(pAction))
 			{
 				return;
 			}

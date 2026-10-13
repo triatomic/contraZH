@@ -16,8 +16,8 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// FILE: ScriptActionsTEODPlayers.cpp /////////////////////////////////////////////////////////////
-// TEOD script actions that manage players' and teams' units, buildings and attack priorities.
+// FILE: ScriptActionsCLPPlayers.cpp //////////////////////////////////////////////////////////////
+// CLP_AI script actions that manage players' and teams' units, buildings and attack priorities.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
@@ -39,7 +39,7 @@
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/ScriptEngine.h"
-#include "GameLogic/ScriptTEOD.h"
+#include "GameLogic/ScriptCLP.h"
 #include "GameLogic/VictoryConditions.h"
 
 #include <map>
@@ -54,7 +54,7 @@ typedef std::map<ObjectID, Int> GarrisonPlan;
 
 //-------------------------------------------------------------------------------------------------
 // Copy of the file static updateTeamAndPlayerStuff in ScriptActions.cpp.
-static void teodUpdateTeamAndPlayerStuff(Object *obj)
+static void clpUpdateTeamAndPlayerStuff(Object *obj)
 {
 	obj->updateUpgradeModules();
 
@@ -73,7 +73,7 @@ static void teodUpdateTeamAndPlayerStuff(Object *obj)
 }
 
 //-------------------------------------------------------------------------------------------------
-static void teodCollectTeamObjects(Team *team, ObjectVector &objs)
+static void clpCollectTeamObjects(Team *team, ObjectVector &objs)
 {
 	for (DLINK_ITERATOR<Object> iter = team->iterate_TeamMemberList(); !iter.done(); iter.advance())
 	{
@@ -86,7 +86,7 @@ static void teodCollectTeamObjects(Team *team, ObjectVector &objs)
 }
 
 //-------------------------------------------------------------------------------------------------
-static void teodCollectPlayerObjects(const Player *player, ObjectVector &objs)
+static void clpCollectPlayerObjects(const Player *player, ObjectVector &objs)
 {
 	const Player::PlayerTeamList *teams = player->getPlayerTeams();
 	for (Player::PlayerTeamList::const_iterator it = teams->begin(); it != teams->end(); ++it)
@@ -96,14 +96,14 @@ static void teodCollectPlayerObjects(const Player *player, ObjectVector &objs)
 			Team *team = iter.cur();
 			if (team)
 			{
-				teodCollectTeamObjects(team, objs);
+				clpCollectTeamObjects(team, objs);
 			}
 		}
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
-static Team *teodFindDestinationTeam(const AsciiString &teamName)
+static Team *clpFindDestinationTeam(const AsciiString &teamName)
 {
 	Team *team = TheScriptEngine->getTeamNamed(teamName);
 	if (!team)
@@ -114,7 +114,7 @@ static Team *teodFindDestinationTeam(const AsciiString &teamName)
 }
 
 //-------------------------------------------------------------------------------------------------
-static Bool teodIsInArea(const Object *obj, PolygonTrigger *area)
+static Bool clpIsInArea(const Object *obj, PolygonTrigger *area)
 {
 	const Coord3D *pos = obj->getPosition();
 	ICoord3D iPos;
@@ -126,17 +126,17 @@ static Bool teodIsInArea(const Object *obj, PolygonTrigger *area)
 
 //-------------------------------------------------------------------------------------------------
 // An empty objectType, a null area or ANY_KINDOF skips that test.
-static Bool teodPassesFilter(const Object *obj, Int kindOf, const AsciiString &objectType, PolygonTrigger *area)
+static Bool clpPassesFilter(const Object *obj, Int kindOf, const AsciiString &objectType, PolygonTrigger *area)
 {
 	if (kindOf != ANY_KINDOF && !obj->isKindOf((KindOfType)kindOf))
 	{
 		return FALSE;
 	}
-	if (objectType.isNotEmpty() && !teodObjectMatchesType(obj, objectType))
+	if (objectType.isNotEmpty() && !clpObjectMatchesType(obj, objectType))
 	{
 		return FALSE;
 	}
-	if (area && !teodIsInArea(obj, area))
+	if (area && !clpIsInArea(obj, area))
 	{
 		return FALSE;
 	}
@@ -144,60 +144,60 @@ static Bool teodPassesFilter(const Object *obj, Int kindOf, const AsciiString &o
 }
 
 //-------------------------------------------------------------------------------------------------
-static Bool teodIsValidKindOf(Int kindOf)
+static Bool clpIsValidKindOf(Int kindOf)
 {
 	return kindOf >= KINDOF_FIRST && kindOf < KINDOF_COUNT;
 }
 
 //-------------------------------------------------------------------------------------------------
-static void teodMoveToTeam(const ObjectVector &objs, Int kindOf, const AsciiString &objectType, Team *dest)
+static void clpMoveToTeam(const ObjectVector &objs, Int kindOf, const AsciiString &objectType, Team *dest)
 {
 	for (size_t i = 0; i < objs.size(); ++i)
 	{
 		Object *obj = objs[i];
-		if (obj->getTeam() == dest || !teodPassesFilter(obj, kindOf, objectType, nullptr))
+		if (obj->getTeam() == dest || !clpPassesFilter(obj, kindOf, objectType, nullptr))
 		{
 			continue;
 		}
 		obj->setTeam(dest);
-		teodUpdateTeamAndPlayerStuff(obj);
+		clpUpdateTeamAndPlayerStuff(obj);
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
-static void teodPlayerMerge(const AsciiString &playerName, Int kindOf, const AsciiString &objectType, const AsciiString &teamName)
+static void clpPlayerMerge(const AsciiString &playerName, Int kindOf, const AsciiString &objectType, const AsciiString &teamName)
 {
 	Player *player = TheScriptEngine->getPlayerFromAsciiString(playerName);
-	Team *dest = teodFindDestinationTeam(teamName);
+	Team *dest = clpFindDestinationTeam(teamName);
 	if (!player || !dest)
 	{
 		return;
 	}
 
 	ObjectVector objs;
-	teodCollectPlayerObjects(player, objs);
-	teodMoveToTeam(objs, kindOf, objectType, dest);
+	clpCollectPlayerObjects(player, objs);
+	clpMoveToTeam(objs, kindOf, objectType, dest);
 	dest->setActive();
 }
 
 //-------------------------------------------------------------------------------------------------
-static void teodTeamMerge(const AsciiString &srcName, Int kindOf, const AsciiString &objectType, const AsciiString &destName)
+static void clpTeamMerge(const AsciiString &srcName, Int kindOf, const AsciiString &objectType, const AsciiString &destName)
 {
 	Team *src = TheScriptEngine->getTeamNamed(srcName);
-	Team *dest = teodFindDestinationTeam(destName);
+	Team *dest = clpFindDestinationTeam(destName);
 	if (!src || !dest || src == dest)
 	{
 		return;
 	}
 
 	ObjectVector objs;
-	teodCollectTeamObjects(src, objs);
-	teodMoveToTeam(objs, kindOf, objectType, dest);
+	clpCollectTeamObjects(src, objs);
+	clpMoveToTeam(objs, kindOf, objectType, dest);
 	dest->setActive();
 }
 
 //-------------------------------------------------------------------------------------------------
-static void teodPlayerDisband(const AsciiString &playerName, Int kindOf, const AsciiString &objectType)
+static void clpPlayerDisband(const AsciiString &playerName, Int kindOf, const AsciiString &objectType)
 {
 	Player *player = TheScriptEngine->getPlayerFromAsciiString(playerName);
 	if (!player || !player->getDefaultTeam())
@@ -206,12 +206,12 @@ static void teodPlayerDisband(const AsciiString &playerName, Int kindOf, const A
 	}
 
 	ObjectVector objs;
-	teodCollectPlayerObjects(player, objs);
-	teodMoveToTeam(objs, kindOf, objectType, player->getDefaultTeam());
+	clpCollectPlayerObjects(player, objs);
+	clpMoveToTeam(objs, kindOf, objectType, player->getDefaultTeam());
 }
 
 //-------------------------------------------------------------------------------------------------
-static void teodTeamDisband(const AsciiString &teamName, Int kindOf, const AsciiString &objectType)
+static void clpTeamDisband(const AsciiString &teamName, Int kindOf, const AsciiString &objectType)
 {
 	Team *team = TheScriptEngine->getTeamNamed(teamName);
 	if (!team || !team->getControllingPlayer())
@@ -225,29 +225,29 @@ static void teodTeamDisband(const AsciiString &teamName, Int kindOf, const Ascii
 	}
 
 	ObjectVector objs;
-	teodCollectTeamObjects(team, objs);
-	teodMoveToTeam(objs, kindOf, objectType, dest);
+	clpCollectTeamObjects(team, objs);
+	clpMoveToTeam(objs, kindOf, objectType, dest);
 }
 
 //-------------------------------------------------------------------------------------------------
-static void teodTeamlessMerge(const AsciiString &playerName, Int kindOf, const AsciiString &objectType, const AsciiString &teamName)
+static void clpTeamlessMerge(const AsciiString &playerName, Int kindOf, const AsciiString &objectType, const AsciiString &teamName)
 {
 	Player *player = TheScriptEngine->getPlayerFromAsciiString(playerName);
-	Team *dest = teodFindDestinationTeam(teamName);
+	Team *dest = clpFindDestinationTeam(teamName);
 	if (!player || !dest || !player->getDefaultTeam())
 	{
 		return;
 	}
 
 	ObjectVector objs;
-	teodCollectTeamObjects(player->getDefaultTeam(), objs);
-	teodMoveToTeam(objs, kindOf, objectType, dest);
+	clpCollectTeamObjects(player->getDefaultTeam(), objs);
+	clpMoveToTeam(objs, kindOf, objectType, dest);
 	dest->setActive();
 }
 
 //-------------------------------------------------------------------------------------------------
 // maxEach caps the units this action sends to one building; spreadCount splits them over that many buildings.
-static void teodGarrisonTeam(Team *team, const AsciiString &buildingType, Int maxEach, Int spreadCount, GarrisonPlan &planned)
+static void clpGarrisonTeam(Team *team, const AsciiString &buildingType, Int maxEach, Int spreadCount, GarrisonPlan &planned)
 {
 	ObjectVector units;
 	for (DLINK_ITERATOR<Object> iter = team->iterate_TeamMemberList(); !iter.done(); iter.advance())
@@ -297,7 +297,7 @@ static void teodGarrisonTeam(Team *team, const AsciiString &buildingType, Int ma
 	Int buildingsLeft = spreadCount;
 	for (Object *building = iter->first(); building && next < units.size(); building = iter->next())
 	{
-		if (buildingType.isNotEmpty() && !teodObjectMatchesType(building, buildingType))
+		if (buildingType.isNotEmpty() && !clpObjectMatchesType(building, buildingType))
 		{
 			continue;
 		}
@@ -334,7 +334,7 @@ static void teodGarrisonTeam(Team *team, const AsciiString &buildingType, Int ma
 }
 
 //-------------------------------------------------------------------------------------------------
-static void teodGarrisonPlayer(const AsciiString &playerName, const AsciiString &buildingType, Int maxEach, Int spreadCount)
+static void clpGarrisonPlayer(const AsciiString &playerName, const AsciiString &buildingType, Int maxEach, Int spreadCount)
 {
 	Player *player = TheScriptEngine->getPlayerFromAsciiString(playerName);
 	if (!player)
@@ -351,14 +351,14 @@ static void teodGarrisonPlayer(const AsciiString &playerName, const AsciiString 
 			Team *team = iter.cur();
 			if (team)
 			{
-				teodGarrisonTeam(team, buildingType, maxEach, spreadCount, planned);
+				clpGarrisonTeam(team, buildingType, maxEach, spreadCount, planned);
 			}
 		}
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
-static void teodGarrisonNamedTeam(const AsciiString &teamName, const AsciiString &buildingType, Int maxEach, Int spreadCount)
+static void clpGarrisonNamedTeam(const AsciiString &teamName, const AsciiString &buildingType, Int maxEach, Int spreadCount)
 {
 	Team *team = TheScriptEngine->getTeamNamed(teamName);
 	if (!team)
@@ -367,18 +367,18 @@ static void teodGarrisonNamedTeam(const AsciiString &teamName, const AsciiString
 	}
 
 	GarrisonPlan planned;
-	teodGarrisonTeam(team, buildingType, maxEach, spreadCount, planned);
+	clpGarrisonTeam(team, buildingType, maxEach, spreadCount, planned);
 }
 
 //-------------------------------------------------------------------------------------------------
-static PolygonTrigger *teodFindArea(const AsciiString &triggerArea)
+static PolygonTrigger *clpFindArea(const AsciiString &triggerArea)
 {
 	return TheScriptEngine->getQualifiedTriggerAreaByName(triggerArea);
 }
 
 //-------------------------------------------------------------------------------------------------
 // With capturedOnly, sells only buildings being captured, each with a percentage chance.
-static void teodSellBuildings(const AsciiString &playerName, const AsciiString &objectType, PolygonTrigger *area, Bool capturedOnly, Int percentage)
+static void clpSellBuildings(const AsciiString &playerName, const AsciiString &objectType, PolygonTrigger *area, Bool capturedOnly, Int percentage)
 {
 	Player *player = TheScriptEngine->getPlayerFromAsciiString(playerName);
 	if (!player)
@@ -387,7 +387,7 @@ static void teodSellBuildings(const AsciiString &playerName, const AsciiString &
 	}
 
 	ObjectVector objs;
-	teodCollectPlayerObjects(player, objs);
+	clpCollectPlayerObjects(player, objs);
 	for (size_t i = 0; i < objs.size(); ++i)
 	{
 		Object *obj = objs[i];
@@ -399,13 +399,13 @@ static void teodSellBuildings(const AsciiString &playerName, const AsciiString &
 		{
 			continue;
 		}
-		if (!teodPassesFilter(obj, ANY_KINDOF, objectType, area))
+		if (!clpPassesFilter(obj, ANY_KINDOF, objectType, area))
 		{
 			continue;
 		}
 		if (capturedOnly)
 		{
-			if (!TheScriptTEODState || !TheScriptTEODState->isBeingCaptured(obj))
+			if (!TheScriptCLPState || !TheScriptCLPState->isBeingCaptured(obj))
 			{
 				continue;
 			}
@@ -420,7 +420,7 @@ static void teodSellBuildings(const AsciiString &playerName, const AsciiString &
 
 //-------------------------------------------------------------------------------------------------
 // Refunds and kills like GameLogic::onDozerCancelConstruct; the dozer drops the job when the building dies.
-static void teodCancelConstructions(const AsciiString &playerName, const AsciiString &objectType, PolygonTrigger *area)
+static void clpCancelConstructions(const AsciiString &playerName, const AsciiString &objectType, PolygonTrigger *area)
 {
 	Player *player = TheScriptEngine->getPlayerFromAsciiString(playerName);
 	if (!player)
@@ -429,7 +429,7 @@ static void teodCancelConstructions(const AsciiString &playerName, const AsciiSt
 	}
 
 	ObjectVector objs;
-	teodCollectPlayerObjects(player, objs);
+	clpCollectPlayerObjects(player, objs);
 	for (size_t i = 0; i < objs.size(); ++i)
 	{
 		Object *obj = objs[i];
@@ -437,7 +437,7 @@ static void teodCancelConstructions(const AsciiString &playerName, const AsciiSt
 		{
 			continue;
 		}
-		if (!teodPassesFilter(obj, ANY_KINDOF, objectType, area))
+		if (!clpPassesFilter(obj, ANY_KINDOF, objectType, area))
 		{
 			continue;
 		}
@@ -454,12 +454,12 @@ static void teodCancelConstructions(const AsciiString &playerName, const AsciiSt
 }
 
 //-------------------------------------------------------------------------------------------------
-static void teodApplyPrioritySet(const ObjectVector &objs, const AttackPriorityInfo *info, const AsciiString &objectType)
+static void clpApplyPrioritySet(const ObjectVector &objs, const AttackPriorityInfo *info, const AsciiString &objectType)
 {
 	for (size_t i = 0; i < objs.size(); ++i)
 	{
 		Object *obj = objs[i];
-		if (!teodPassesFilter(obj, ANY_KINDOF, objectType, nullptr))
+		if (!clpPassesFilter(obj, ANY_KINDOF, objectType, nullptr))
 		{
 			continue;
 		}
@@ -472,12 +472,12 @@ static void teodApplyPrioritySet(const ObjectVector &objs, const AttackPriorityI
 }
 
 //-------------------------------------------------------------------------------------------------
-static void teodHunt(const ObjectVector &objs, const AsciiString &objectType, PolygonTrigger *area)
+static void clpHunt(const ObjectVector &objs, const AsciiString &objectType, PolygonTrigger *area)
 {
 	for (size_t i = 0; i < objs.size(); ++i)
 	{
 		Object *obj = objs[i];
-		if (!teodPassesFilter(obj, ANY_KINDOF, objectType, area))
+		if (!clpPassesFilter(obj, ANY_KINDOF, objectType, area))
 		{
 			continue;
 		}
@@ -530,18 +530,18 @@ void ScriptActions::doPlayerSurrender(const AsciiString& playerName)
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doPlayerMergeKindOf(const AsciiString& playerName, Int kindOf, const AsciiString& teamName)
 {
-	if (teodIsValidKindOf(kindOf))
+	if (clpIsValidKindOf(kindOf))
 	{
-		teodPlayerMerge(playerName, kindOf, AsciiString::TheEmptyString, teamName);
+		clpPlayerMerge(playerName, kindOf, AsciiString::TheEmptyString, teamName);
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamMergeKindOf(const AsciiString& srcName, Int kindOf, const AsciiString& destName)
 {
-	if (teodIsValidKindOf(kindOf))
+	if (clpIsValidKindOf(kindOf))
 	{
-		teodTeamMerge(srcName, kindOf, AsciiString::TheEmptyString, destName);
+		clpTeamMerge(srcName, kindOf, AsciiString::TheEmptyString, destName);
 	}
 }
 
@@ -550,7 +550,7 @@ void ScriptActions::doPlayerMergeType(const AsciiString& playerName, const Ascii
 {
 	if (objectType.isNotEmpty())
 	{
-		teodPlayerMerge(playerName, ANY_KINDOF, objectType, teamName);
+		clpPlayerMerge(playerName, ANY_KINDOF, objectType, teamName);
 	}
 }
 
@@ -559,25 +559,25 @@ void ScriptActions::doTeamMergeType(const AsciiString& srcName, const AsciiStrin
 {
 	if (objectType.isNotEmpty())
 	{
-		teodTeamMerge(srcName, ANY_KINDOF, objectType, destName);
+		clpTeamMerge(srcName, ANY_KINDOF, objectType, destName);
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doPlayerDisbandKindOf(const AsciiString& playerName, Int kindOf)
 {
-	if (teodIsValidKindOf(kindOf))
+	if (clpIsValidKindOf(kindOf))
 	{
-		teodPlayerDisband(playerName, kindOf, AsciiString::TheEmptyString);
+		clpPlayerDisband(playerName, kindOf, AsciiString::TheEmptyString);
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamDisbandKindOf(const AsciiString& teamName, Int kindOf)
 {
-	if (teodIsValidKindOf(kindOf))
+	if (clpIsValidKindOf(kindOf))
 	{
-		teodTeamDisband(teamName, kindOf, AsciiString::TheEmptyString);
+		clpTeamDisband(teamName, kindOf, AsciiString::TheEmptyString);
 	}
 }
 
@@ -586,7 +586,7 @@ void ScriptActions::doPlayerDisbandType(const AsciiString& playerName, const Asc
 {
 	if (objectType.isNotEmpty())
 	{
-		teodPlayerDisband(playerName, ANY_KINDOF, objectType);
+		clpPlayerDisband(playerName, ANY_KINDOF, objectType);
 	}
 }
 
@@ -595,22 +595,22 @@ void ScriptActions::doTeamDisbandType(const AsciiString& teamName, const AsciiSt
 {
 	if (objectType.isNotEmpty())
 	{
-		teodTeamDisband(teamName, ANY_KINDOF, objectType);
+		clpTeamDisband(teamName, ANY_KINDOF, objectType);
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doPlayerTeamlessMerge(const AsciiString& playerName, const AsciiString& teamName)
 {
-	teodTeamlessMerge(playerName, KINDOF_CAN_ATTACK, AsciiString::TheEmptyString, teamName);
+	clpTeamlessMerge(playerName, KINDOF_CAN_ATTACK, AsciiString::TheEmptyString, teamName);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doPlayerTeamlessMergeKindOf(const AsciiString& playerName, Int kindOf, const AsciiString& teamName)
 {
-	if (teodIsValidKindOf(kindOf))
+	if (clpIsValidKindOf(kindOf))
 	{
-		teodTeamlessMerge(playerName, kindOf, AsciiString::TheEmptyString, teamName);
+		clpTeamlessMerge(playerName, kindOf, AsciiString::TheEmptyString, teamName);
 	}
 }
 
@@ -619,7 +619,7 @@ void ScriptActions::doPlayerTeamlessMergeType(const AsciiString& playerName, con
 {
 	if (objectType.isNotEmpty())
 	{
-		teodTeamlessMerge(playerName, ANY_KINDOF, objectType, teamName);
+		clpTeamlessMerge(playerName, ANY_KINDOF, objectType, teamName);
 	}
 }
 
@@ -628,7 +628,7 @@ void ScriptActions::doPlayerGarrisonMaxEach(const AsciiString& playerName, Int m
 {
 	if (maxAmount > 0)
 	{
-		teodGarrisonPlayer(playerName, AsciiString::TheEmptyString, maxAmount, 0);
+		clpGarrisonPlayer(playerName, AsciiString::TheEmptyString, maxAmount, 0);
 	}
 }
 
@@ -637,7 +637,7 @@ void ScriptActions::doTeamGarrisonMaxEach(const AsciiString& teamName, Int maxAm
 {
 	if (maxAmount > 0)
 	{
-		teodGarrisonNamedTeam(teamName, AsciiString::TheEmptyString, maxAmount, 0);
+		clpGarrisonNamedTeam(teamName, AsciiString::TheEmptyString, maxAmount, 0);
 	}
 }
 
@@ -646,7 +646,7 @@ void ScriptActions::doPlayerGarrisonEqually(const AsciiString& playerName, Int a
 {
 	if (amount > 0)
 	{
-		teodGarrisonPlayer(playerName, AsciiString::TheEmptyString, 0, amount);
+		clpGarrisonPlayer(playerName, AsciiString::TheEmptyString, 0, amount);
 	}
 }
 
@@ -655,7 +655,7 @@ void ScriptActions::doTeamGarrisonEqually(const AsciiString& teamName, Int amoun
 {
 	if (amount > 0)
 	{
-		teodGarrisonNamedTeam(teamName, AsciiString::TheEmptyString, 0, amount);
+		clpGarrisonNamedTeam(teamName, AsciiString::TheEmptyString, 0, amount);
 	}
 }
 
@@ -664,7 +664,7 @@ void ScriptActions::doTeamGarrisonType(const AsciiString& teamName, const AsciiS
 {
 	if (objectType.isNotEmpty())
 	{
-		teodGarrisonNamedTeam(teamName, objectType, 0, 0);
+		clpGarrisonNamedTeam(teamName, objectType, 0, 0);
 	}
 }
 
@@ -673,7 +673,7 @@ void ScriptActions::doPlayerGarrisonMaxEachType(const AsciiString& playerName, c
 {
 	if (maxAmount > 0 && objectType.isNotEmpty())
 	{
-		teodGarrisonPlayer(playerName, objectType, maxAmount, 0);
+		clpGarrisonPlayer(playerName, objectType, maxAmount, 0);
 	}
 }
 
@@ -682,7 +682,7 @@ void ScriptActions::doTeamGarrisonMaxEachType(const AsciiString& teamName, const
 {
 	if (maxAmount > 0 && objectType.isNotEmpty())
 	{
-		teodGarrisonNamedTeam(teamName, objectType, maxAmount, 0);
+		clpGarrisonNamedTeam(teamName, objectType, maxAmount, 0);
 	}
 }
 
@@ -691,7 +691,7 @@ void ScriptActions::doPlayerGarrisonEquallyType(const AsciiString& playerName, I
 {
 	if (amount > 0 && objectType.isNotEmpty())
 	{
-		teodGarrisonPlayer(playerName, objectType, 0, amount);
+		clpGarrisonPlayer(playerName, objectType, 0, amount);
 	}
 }
 
@@ -700,7 +700,7 @@ void ScriptActions::doTeamGarrisonEquallyType(const AsciiString& teamName, Int a
 {
 	if (amount > 0 && objectType.isNotEmpty())
 	{
-		teodGarrisonNamedTeam(teamName, objectType, 0, amount);
+		clpGarrisonNamedTeam(teamName, objectType, 0, amount);
 	}
 }
 
@@ -714,8 +714,8 @@ void ScriptActions::doPlayerHuntType(const AsciiString& playerName, const AsciiS
 	}
 
 	ObjectVector objs;
-	teodCollectPlayerObjects(player, objs);
-	teodHunt(objs, objectType, nullptr);
+	clpCollectPlayerObjects(player, objs);
+	clpHunt(objs, objectType, nullptr);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -728,23 +728,23 @@ void ScriptActions::doTeamHuntType(const AsciiString& teamName, const AsciiStrin
 	}
 
 	ObjectVector objs;
-	teodCollectTeamObjects(team, objs);
-	teodHunt(objs, objectType, nullptr);
+	clpCollectTeamObjects(team, objs);
+	clpHunt(objs, objectType, nullptr);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doPlayerHuntArea(const AsciiString& playerName, const AsciiString& triggerArea)
 {
 	Player *player = TheScriptEngine->getPlayerFromAsciiString(playerName);
-	PolygonTrigger *area = teodFindArea(triggerArea);
+	PolygonTrigger *area = clpFindArea(triggerArea);
 	if (!player || !area)
 	{
 		return;
 	}
 
 	ObjectVector objs;
-	teodCollectPlayerObjects(player, objs);
-	teodHunt(objs, AsciiString::TheEmptyString, area);
+	clpCollectPlayerObjects(player, objs);
+	clpHunt(objs, AsciiString::TheEmptyString, area);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -752,34 +752,34 @@ void ScriptActions::doPlayerSellAllBuildingsType(const AsciiString& playerName, 
 {
 	if (objectType.isNotEmpty())
 	{
-		teodSellBuildings(playerName, objectType, nullptr, FALSE, 0);
+		clpSellBuildings(playerName, objectType, nullptr, FALSE, 0);
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doPlayerSellAllBuildingsArea(const AsciiString& playerName, const AsciiString& triggerArea)
 {
-	PolygonTrigger *area = teodFindArea(triggerArea);
+	PolygonTrigger *area = clpFindArea(triggerArea);
 	if (area)
 	{
-		teodSellBuildings(playerName, AsciiString::TheEmptyString, area, FALSE, 0);
+		clpSellBuildings(playerName, AsciiString::TheEmptyString, area, FALSE, 0);
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doPlayerSellAllBuildingsTypeArea(const AsciiString& playerName, const AsciiString& objectType, const AsciiString& triggerArea)
 {
-	PolygonTrigger *area = teodFindArea(triggerArea);
+	PolygonTrigger *area = clpFindArea(triggerArea);
 	if (area && objectType.isNotEmpty())
 	{
-		teodSellBuildings(playerName, objectType, area, FALSE, 0);
+		clpSellBuildings(playerName, objectType, area, FALSE, 0);
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doPlayerSellAllBuildingsInCaptureProcessPercentage(const AsciiString& playerName, Int percentage)
 {
-	teodSellBuildings(playerName, AsciiString::TheEmptyString, nullptr, TRUE, percentage);
+	clpSellBuildings(playerName, AsciiString::TheEmptyString, nullptr, TRUE, percentage);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -787,34 +787,34 @@ void ScriptActions::doPlayerSellAllBuildingsTypeInCaptureProcessPercentage(const
 {
 	if (objectType.isNotEmpty())
 	{
-		teodSellBuildings(playerName, objectType, nullptr, TRUE, percentage);
+		clpSellBuildings(playerName, objectType, nullptr, TRUE, percentage);
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doPlayerSellAllBuildingsAreaInCaptureProcessPercentage(const AsciiString& playerName, const AsciiString& triggerArea, Int percentage)
 {
-	PolygonTrigger *area = teodFindArea(triggerArea);
+	PolygonTrigger *area = clpFindArea(triggerArea);
 	if (area)
 	{
-		teodSellBuildings(playerName, AsciiString::TheEmptyString, area, TRUE, percentage);
+		clpSellBuildings(playerName, AsciiString::TheEmptyString, area, TRUE, percentage);
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doPlayerSellAllBuildingsTypeAreaInCaptureProcessPercentage(const AsciiString& playerName, const AsciiString& objectType, const AsciiString& triggerArea, Int percentage)
 {
-	PolygonTrigger *area = teodFindArea(triggerArea);
+	PolygonTrigger *area = clpFindArea(triggerArea);
 	if (area && objectType.isNotEmpty())
 	{
-		teodSellBuildings(playerName, objectType, area, TRUE, percentage);
+		clpSellBuildings(playerName, objectType, area, TRUE, percentage);
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doPlayerCancelAllConstructions(const AsciiString& playerName)
 {
-	teodCancelConstructions(playerName, AsciiString::TheEmptyString, nullptr);
+	clpCancelConstructions(playerName, AsciiString::TheEmptyString, nullptr);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -822,27 +822,27 @@ void ScriptActions::doPlayerCancelAllConstructionsType(const AsciiString& player
 {
 	if (objectType.isNotEmpty())
 	{
-		teodCancelConstructions(playerName, objectType, nullptr);
+		clpCancelConstructions(playerName, objectType, nullptr);
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doPlayerCancelAllConstructionsArea(const AsciiString& playerName, const AsciiString& triggerArea)
 {
-	PolygonTrigger *area = teodFindArea(triggerArea);
+	PolygonTrigger *area = clpFindArea(triggerArea);
 	if (area)
 	{
-		teodCancelConstructions(playerName, AsciiString::TheEmptyString, area);
+		clpCancelConstructions(playerName, AsciiString::TheEmptyString, area);
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doPlayerCancelAllConstructionsTypeArea(const AsciiString& playerName, const AsciiString& objectType, const AsciiString& triggerArea)
 {
-	PolygonTrigger *area = teodFindArea(triggerArea);
+	PolygonTrigger *area = clpFindArea(triggerArea);
 	if (area && objectType.isNotEmpty())
 	{
-		teodCancelConstructions(playerName, objectType, area);
+		clpCancelConstructions(playerName, objectType, area);
 	}
 }
 
@@ -874,8 +874,8 @@ void ScriptActions::doPlayerApplyPrioritySet(const AsciiString& playerName, cons
 	}
 
 	ObjectVector objs;
-	teodCollectPlayerObjects(player, objs);
-	teodApplyPrioritySet(objs, info, AsciiString::TheEmptyString);
+	clpCollectPlayerObjects(player, objs);
+	clpApplyPrioritySet(objs, info, AsciiString::TheEmptyString);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -894,8 +894,8 @@ void ScriptActions::doPlayerApplyPrioritySetType(const AsciiString& playerName, 
 	}
 
 	ObjectVector objs;
-	teodCollectPlayerObjects(player, objs);
-	teodApplyPrioritySet(objs, info, objectType);
+	clpCollectPlayerObjects(player, objs);
+	clpApplyPrioritySet(objs, info, objectType);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -913,8 +913,8 @@ void ScriptActions::doTeamApplyPrioritySetType(const AsciiString& teamName, cons
 	}
 
 	ObjectVector objs;
-	teodCollectTeamObjects(team, objs);
-	teodApplyPrioritySet(objs, info, objectType);
+	clpCollectTeamObjects(team, objs);
+	clpApplyPrioritySet(objs, info, objectType);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -927,7 +927,7 @@ void ScriptActions::doTeamCustomColor(const AsciiString& teamName, Color c)
 	}
 
 	ObjectVector objs;
-	teodCollectTeamObjects(team, objs);
+	clpCollectTeamObjects(team, objs);
 	for (size_t i = 0; i < objs.size(); ++i)
 	{
 		objs[i]->setCustomIndicatorColor(c);
@@ -944,7 +944,7 @@ void ScriptActions::doPlayerCustomColor(const AsciiString& playerName, Color c)
 	}
 
 	ObjectVector objs;
-	teodCollectPlayerObjects(player, objs);
+	clpCollectPlayerObjects(player, objs);
 	for (size_t i = 0; i < objs.size(); ++i)
 	{
 		objs[i]->setCustomIndicatorColor(c);
@@ -955,19 +955,19 @@ void ScriptActions::doPlayerCustomColor(const AsciiString& playerName, Color c)
 void ScriptActions::doPlayerSetWillingnessToCrush(const AsciiString& playerName, Bool wantsToCrush)
 {
 	Player *player = TheScriptEngine->getPlayerFromAsciiString(playerName);
-	if (!player || !TheScriptTEODState)
+	if (!player || !TheScriptCLPState)
 	{
 		return;
 	}
 
 	// The player setting covers units built later; existing units get their own override like in CLP.
-	TheScriptTEODState->setPlayerCrushesInfantry(player->getPlayerIndex(), wantsToCrush);
+	TheScriptCLPState->setPlayerCrushesInfantry(player->getPlayerIndex(), wantsToCrush);
 
 	ObjectVector objs;
-	teodCollectPlayerObjects(player, objs);
+	clpCollectPlayerObjects(player, objs);
 	for (size_t i = 0; i < objs.size(); ++i)
 	{
-		TheScriptTEODState->setObjectCrushesInfantry(objs[i], wantsToCrush);
+		TheScriptCLPState->setObjectCrushesInfantry(objs[i], wantsToCrush);
 	}
 }
 
@@ -975,16 +975,16 @@ void ScriptActions::doPlayerSetWillingnessToCrush(const AsciiString& playerName,
 void ScriptActions::doTeamSetWillingnessToCrush(const AsciiString& teamName, Bool wantsToCrush)
 {
 	Team *team = TheScriptEngine->getTeamNamed(teamName);
-	if (!team || !TheScriptTEODState)
+	if (!team || !TheScriptCLPState)
 	{
 		return;
 	}
 
 	ObjectVector objs;
-	teodCollectTeamObjects(team, objs);
+	clpCollectTeamObjects(team, objs);
 	for (size_t i = 0; i < objs.size(); ++i)
 	{
-		TheScriptTEODState->setObjectCrushesInfantry(objs[i], wantsToCrush);
+		TheScriptCLPState->setObjectCrushesInfantry(objs[i], wantsToCrush);
 	}
 }
 
@@ -992,16 +992,16 @@ void ScriptActions::doTeamSetWillingnessToCrush(const AsciiString& teamName, Boo
 void ScriptActions::doUnitSetWillingnessToCrush(const AsciiString& unitName, Bool wantsToCrush)
 {
 	Object *obj = TheScriptEngine->getUnitNamed(unitName);
-	if (!obj || !TheScriptTEODState)
+	if (!obj || !TheScriptCLPState)
 	{
 		return;
 	}
 
-	TheScriptTEODState->setObjectCrushesInfantry(obj, wantsToCrush);
+	TheScriptCLPState->setObjectCrushesInfantry(obj, wantsToCrush);
 }
 
 //-------------------------------------------------------------------------------------------------
-static Bool teodCanTransferToPlayer(const Object *obj, const Player *dest)
+static Bool clpCanTransferToPlayer(const Object *obj, const Player *dest)
 {
 	if (obj->isDestroyed() || obj->isEffectivelyDead() || obj->isKindOf(KINDOF_PROJECTILE))
 	{
@@ -1020,7 +1020,7 @@ static Bool teodCanTransferToPlayer(const Object *obj, const Player *dest)
 // Only objects owned by playable sides change hands, so civilian props and neutral buildings stay.
 void ScriptActions::doTransferAreaToPlayer(const AsciiString& areaName, const AsciiString& playerName)
 {
-	PolygonTrigger *area = teodFindArea(areaName);
+	PolygonTrigger *area = clpFindArea(areaName);
 	Player *player = TheScriptEngine->getPlayerFromAsciiString(playerName);
 	if (!area || !player || !player->isPlayerActive())
 	{
@@ -1035,7 +1035,7 @@ void ScriptActions::doTransferAreaToPlayer(const AsciiString& areaName, const As
 	ObjectVector objs;
 	for (Object *obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
 	{
-		if (obj->getContainedBy() || !teodCanTransferToPlayer(obj, player) || !teodIsInArea(obj, area))
+		if (obj->getContainedBy() || !clpCanTransferToPlayer(obj, player) || !clpIsInArea(obj, area))
 		{
 			continue;
 		}
@@ -1050,7 +1050,7 @@ void ScriptActions::doTransferAreaToPlayer(const AsciiString& areaName, const As
 		for (ContainedItemsList::const_iterator it = items->begin(); it != items->end(); ++it)
 		{
 			Object *contained = *it;
-			if (contained && teodCanTransferToPlayer(contained, player))
+			if (contained && clpCanTransferToPlayer(contained, player))
 			{
 				objs.push_back(contained);
 			}
@@ -1060,6 +1060,6 @@ void ScriptActions::doTransferAreaToPlayer(const AsciiString& areaName, const As
 	for (size_t i = 0; i < objs.size(); ++i)
 	{
 		objs[i]->setTeam(dest);
-		teodUpdateTeamAndPlayerStuff(objs[i]);
+		clpUpdateTeamAndPlayerStuff(objs[i]);
 	}
 }

@@ -16,8 +16,8 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// FILE: ScriptTEODAI.h ///////////////////////////////////////////////////////////////////////////
-// Per-player AI build settings that TEOD script actions change at runtime.
+// FILE: ScriptCLPAI.h ////////////////////////////////////////////////////////////////////////////
+// Per-player AI build settings that CLP_AI script actions change at runtime.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
@@ -31,15 +31,15 @@ class Object;
 class ThingTemplate;
 
 //-------------------------------------------------------------------------------------------------
-/** AI state that TEOD scripts set. Everything is off or empty until a script asks for it, so the
+/** AI state that CLP_AI scripts set. Everything is off or empty until a script asks for it, so the
 	stock AI runs unchanged on maps that do not use these actions. */
 //-------------------------------------------------------------------------------------------------
-class ScriptTEODAI : public Snapshot
+class ScriptCLPAI : public Snapshot
 {
 public:
 
-	ScriptTEODAI();
-	virtual ~ScriptTEODAI();
+	ScriptCLPAI();
+	virtual ~ScriptCLPAI();
 
 	void reset();
 
@@ -85,4 +85,4 @@ private:
 	CannonTrackMap m_cannonTracks;
 };
 
-extern ScriptTEODAI *TheScriptTEODAI;
+extern ScriptCLPAI *TheScriptCLPAI;

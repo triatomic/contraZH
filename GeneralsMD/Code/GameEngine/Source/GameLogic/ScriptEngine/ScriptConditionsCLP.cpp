@@ -16,8 +16,8 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// FILE: ScriptConditionsTEOD.cpp /////////////////////////////////////////////////////////////////
-// Dispatch for the TEOD script conditions ported from CookieLandProjects/CLP_AI.
+// FILE: ScriptConditionsCLP.cpp //////////////////////////////////////////////////////////////////
+// Dispatch for the CLP_AI script conditions ported from CookieLandProjects/CLP_AI.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
@@ -26,9 +26,9 @@
 #include "GameLogic/ScriptEngine.h"
 
 //-------------------------------------------------------------------------------------------------
-/** Evaluates a TEOD condition into result. Returns false if the condition is not one of them. */
+/** Evaluates a CLP condition into result. Returns false if the condition is not one of them. */
 //-------------------------------------------------------------------------------------------------
-Bool ScriptConditions::evaluateTEODCondition( Condition *pCondition, Bool *result )
+Bool ScriptConditions::evaluateCLPCondition( Condition *pCondition, Bool *result )
 {
 	switch (pCondition->getConditionType())
 	{

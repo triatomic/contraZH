@@ -16,8 +16,8 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// FILE: ScriptTEODState.cpp //////////////////////////////////////////////////////////////////////
-// Runtime state for the TEOD script actions and conditions ported from CookieLandProjects/CLP_AI.
+// FILE: ScriptCLPState.cpp ///////////////////////////////////////////////////////////////////////
+// Runtime state for the CLP_AI script actions and conditions ported from CookieLandProjects/CLP_AI.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
@@ -36,9 +36,9 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/Scripts.h"
 #include "GameLogic/ScriptEngine.h"
-#include "GameLogic/ScriptTEOD.h"
+#include "GameLogic/ScriptCLP.h"
 
-ScriptTEODState *TheScriptTEODState = nullptr;
+ScriptCLPState *TheScriptCLPState = nullptr;
 
 // Frames an all clear stays true after a team stops seeing enemies.
 static const Int ALL_CLEAR_FRAMES = 10 * LOGICFRAMES_PER_SECOND;
@@ -46,21 +46,21 @@ static const Int ALL_CLEAR_FRAMES = 10 * LOGICFRAMES_PER_SECOND;
 // Frames kill and loss events stay readable.
 static const UnsignedInt EVENT_FRAMES = 5 * 60 * LOGICFRAMES_PER_SECOND;
 
-static const ScriptTEODState::EventList s_noEvents;
+static const ScriptCLPState::EventList s_noEvents;
 
 //-------------------------------------------------------------------------------------------------
 /** Accepts objects whose template is in an ObjectTypes list. */
 //-------------------------------------------------------------------------------------------------
-class PartitionFilterTEODObjectTypes : public PartitionFilter
+class PartitionFilterCLPObjectTypes : public PartitionFilter
 {
 public:
-	PartitionFilterTEODObjectTypes(const ObjectTypes *types) : m_types(types) { }
+	PartitionFilterCLPObjectTypes(const ObjectTypes *types) : m_types(types) { }
 	virtual Bool allow(Object *other) override
 	{
 		return m_types->isInSet(other->getTemplate());
 	}
 #if defined(RTS_DEBUG)
-	virtual const char* debugGetName() override { return "PartitionFilterTEODObjectTypes"; }
+	virtual const char* debugGetName() override { return "PartitionFilterCLPObjectTypes"; }
 #endif
 private:
 	const ObjectTypes *m_types;
@@ -69,23 +69,23 @@ private:
 //-------------------------------------------------------------------------------------------------
 /** Accepts objects equivalent to one template. */
 //-------------------------------------------------------------------------------------------------
-class PartitionFilterTEODThing : public PartitionFilter
+class PartitionFilterCLPThing : public PartitionFilter
 {
 public:
-	PartitionFilterTEODThing(const ThingTemplate *thing) : m_thing(thing) { }
+	PartitionFilterCLPThing(const ThingTemplate *thing) : m_thing(thing) { }
 	virtual Bool allow(Object *other) override
 	{
 		return m_thing->isEquivalentTo(other->getTemplate());
 	}
 #if defined(RTS_DEBUG)
-	virtual const char* debugGetName() override { return "PartitionFilterTEODThing"; }
+	virtual const char* debugGetName() override { return "PartitionFilterCLPThing"; }
 #endif
 private:
 	const ThingTemplate *m_thing;
 };
 
 //-------------------------------------------------------------------------------------------------
-Object *teodSelectObject(const Coord3D *pos, PartitionFilter **filters, const AsciiString &objectType, Int selectionMode)
+Object *clpSelectObject(const Coord3D *pos, PartitionFilter **filters, const AsciiString &objectType, Int selectionMode)
 {
 	if (!pos)
 	{
@@ -120,8 +120,8 @@ Object *teodSelectObject(const Coord3D *pos, PartitionFilter **filters, const As
 
 	PartitionFilterOnMap filterOnMap;
 	PartitionFilterAlive filterAlive;
-	PartitionFilterTEODThing filterThing(thing);
-	PartitionFilterTEODObjectTypes filterTypes(types);
+	PartitionFilterCLPThing filterThing(thing);
+	PartitionFilterCLPObjectTypes filterTypes(types);
 	allFilters[count++] = &filterOnMap;
 	allFilters[count++] = &filterAlive;
 	if (thing)
@@ -174,13 +174,13 @@ Object *teodSelectObject(const Coord3D *pos, PartitionFilter **filters, const As
 		}
 
 		default:
-			DEBUG_CRASH(("teodSelectObject: invalid selection mode %d", selectionMode));
+			DEBUG_CRASH(("clpSelectObject: invalid selection mode %d", selectionMode));
 			return nullptr;
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
-Bool teodObjectMatchesType(const Object *obj, const AsciiString &objectType)
+Bool clpObjectMatchesType(const Object *obj, const AsciiString &objectType)
 {
 	if (!obj)
 	{
@@ -196,7 +196,7 @@ Bool teodObjectMatchesType(const Object *obj, const AsciiString &objectType)
 }
 
 //-------------------------------------------------------------------------------------------------
-Bool teodIsSeenByPlayer(const Object *obj, const Player *player)
+Bool clpIsSeenByPlayer(const Object *obj, const Player *player)
 {
 	if (!obj || !player)
 	{
@@ -215,18 +215,18 @@ Bool teodIsSeenByPlayer(const Object *obj, const Player *player)
 }
 
 //-------------------------------------------------------------------------------------------------
-ScriptTEODState::ScriptTEODState()
+ScriptCLPState::ScriptCLPState()
 {
 	reset();
 }
 
 //-------------------------------------------------------------------------------------------------
-ScriptTEODState::~ScriptTEODState()
+ScriptCLPState::~ScriptCLPState()
 {
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODState::reset()
+void ScriptCLPState::reset()
 {
 	m_kdRatios.clear();
 	m_beingCaptured.clear();
@@ -243,7 +243,7 @@ void ScriptTEODState::reset()
 }
 
 //-------------------------------------------------------------------------------------------------
-static void pruneEvents(ScriptTEODState::EventList &events, UnsignedInt oldestFrame)
+static void pruneEvents(ScriptCLPState::EventList &events, UnsignedInt oldestFrame)
 {
 	size_t keep = 0;
 	while (keep < events.size() && events[keep].frame < oldestFrame)
@@ -257,7 +257,7 @@ static void pruneEvents(ScriptTEODState::EventList &events, UnsignedInt oldestFr
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODState::update()
+void ScriptCLPState::update()
 {
 	UnsignedInt now = TheGameLogic->getFrame();
 	UnsignedInt oldestFrame = now > EVENT_FRAMES ? now - EVENT_FRAMES : 0;
@@ -301,7 +301,7 @@ void ScriptTEODState::update()
 }
 
 //-------------------------------------------------------------------------------------------------
-ScriptTEODState::KDRatio *ScriptTEODState::findKDRatio(const AsciiString &name, Bool create)
+ScriptCLPState::KDRatio *ScriptCLPState::findKDRatio(const AsciiString &name, Bool create)
 {
 	KDRatioMap::iterator it = m_kdRatios.find(name);
 	if (it != m_kdRatios.end())
@@ -324,7 +324,7 @@ ScriptTEODState::KDRatio *ScriptTEODState::findKDRatio(const AsciiString &name, 
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODState::addEvent(EventList &events, const Object *obj)
+void ScriptCLPState::addEvent(EventList &events, const Object *obj)
 {
 	Event event;
 	event.seq = ++m_eventSeq;
@@ -335,7 +335,7 @@ void ScriptTEODState::addEvent(EventList &events, const Object *obj)
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODState::onObjectDied(const Object *victim)
+void ScriptCLPState::onObjectDied(const Object *victim)
 {
 	m_beingCaptured.erase(victim->getID());
 	m_objectCrushes.erase(victim->getID());
@@ -360,7 +360,7 @@ void ScriptTEODState::onObjectDied(const Object *victim)
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODState::onObjectKilled(const Player *killer, const Object *victim)
+void ScriptCLPState::onObjectKilled(const Player *killer, const Object *victim)
 {
 	if (killer)
 	{
@@ -369,7 +369,7 @@ void ScriptTEODState::onObjectKilled(const Player *killer, const Object *victim)
 }
 
 //-------------------------------------------------------------------------------------------------
-const ScriptTEODState::EventList &ScriptTEODState::getPlayerKills(Int playerIndex) const
+const ScriptCLPState::EventList &ScriptCLPState::getPlayerKills(Int playerIndex) const
 {
 	if (playerIndex < 0 || playerIndex >= MAX_PLAYER_COUNT)
 	{
@@ -379,7 +379,7 @@ const ScriptTEODState::EventList &ScriptTEODState::getPlayerKills(Int playerInde
 }
 
 //-------------------------------------------------------------------------------------------------
-const ScriptTEODState::EventList &ScriptTEODState::getPlayerLosses(Int playerIndex) const
+const ScriptCLPState::EventList &ScriptCLPState::getPlayerLosses(Int playerIndex) const
 {
 	if (playerIndex < 0 || playerIndex >= MAX_PLAYER_COUNT)
 	{
@@ -389,7 +389,7 @@ const ScriptTEODState::EventList &ScriptTEODState::getPlayerLosses(Int playerInd
 }
 
 //-------------------------------------------------------------------------------------------------
-const ScriptTEODState::EventList &ScriptTEODState::getTeamLosses(TeamID teamID) const
+const ScriptCLPState::EventList &ScriptCLPState::getTeamLosses(TeamID teamID) const
 {
 	TeamLossMap::const_iterator it = m_teamLosses.find(teamID);
 	if (it == m_teamLosses.end())
@@ -400,7 +400,7 @@ const ScriptTEODState::EventList &ScriptTEODState::getTeamLosses(TeamID teamID) 
 }
 
 //-------------------------------------------------------------------------------------------------
-UnsignedInt ScriptTEODState::readEvents(Condition *pCondition)
+UnsignedInt ScriptCLPState::readEvents(Condition *pCondition)
 {
 	// The custom frame marks that the condition has a read position in its custom data.
 	UnsignedInt since = m_eventSeq;
@@ -414,13 +414,13 @@ UnsignedInt ScriptTEODState::readEvents(Condition *pCondition)
 }
 
 //-------------------------------------------------------------------------------------------------
-Bool ScriptTEODState::isBeingCaptured(const Object *obj) const
+Bool ScriptCLPState::isBeingCaptured(const Object *obj) const
 {
 	return obj && m_beingCaptured.find(obj->getID()) != m_beingCaptured.end();
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODState::setBeingCaptured(const Object *obj, Bool beingCaptured)
+void ScriptCLPState::setBeingCaptured(const Object *obj, Bool beingCaptured)
 {
 	if (!obj)
 	{
@@ -437,7 +437,7 @@ void ScriptTEODState::setBeingCaptured(const Object *obj, Bool beingCaptured)
 }
 
 //-------------------------------------------------------------------------------------------------
-Bool ScriptTEODState::getCrushesInfantry(const Object *obj) const
+Bool ScriptCLPState::getCrushesInfantry(const Object *obj) const
 {
 	ObjectFlagMap::const_iterator it = m_objectCrushes.find(obj->getID());
 	if (it != m_objectCrushes.end())
@@ -453,7 +453,7 @@ Bool ScriptTEODState::getCrushesInfantry(const Object *obj) const
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODState::setPlayerCrushesInfantry(Int playerIndex, Bool crushes)
+void ScriptCLPState::setPlayerCrushesInfantry(Int playerIndex, Bool crushes)
 {
 	if (playerIndex >= 0 && playerIndex < MAX_PLAYER_COUNT)
 	{
@@ -462,7 +462,7 @@ void ScriptTEODState::setPlayerCrushesInfantry(Int playerIndex, Bool crushes)
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODState::setObjectCrushesInfantry(const Object *obj, Bool crushes)
+void ScriptCLPState::setObjectCrushesInfantry(const Object *obj, Bool crushes)
 {
 	if (obj)
 	{
@@ -471,7 +471,7 @@ void ScriptTEODState::setObjectCrushesInfantry(const Object *obj, Bool crushes)
 }
 
 //-------------------------------------------------------------------------------------------------
-ScriptTEODState::TeamTrack *ScriptTEODState::trackTeam(Team *team)
+ScriptCLPState::TeamTrack *ScriptCLPState::trackTeam(Team *team)
 {
 	TeamTrackMap::iterator it = m_teamTracks.find(team->getID());
 	if (it != m_teamTracks.end())
@@ -488,7 +488,7 @@ ScriptTEODState::TeamTrack *ScriptTEODState::trackTeam(Team *team)
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODState::updateTeamTrack(Team *team, TeamTrack *track)
+void ScriptCLPState::updateTeamTrack(Team *team, TeamTrack *track)
 {
 	if (team->isIdle())
 	{
@@ -533,19 +533,19 @@ void ScriptTEODState::updateTeamTrack(Team *team, TeamTrack *track)
 }
 
 //-------------------------------------------------------------------------------------------------
-Int ScriptTEODState::getTeamIdleFrames(Team *team)
+Int ScriptCLPState::getTeamIdleFrames(Team *team)
 {
 	return team ? trackTeam(team)->idleFrames : 0;
 }
 
 //-------------------------------------------------------------------------------------------------
-Bool ScriptTEODState::isTeamAllClear(Team *team)
+Bool ScriptCLPState::isTeamAllClear(Team *team)
 {
 	return team && trackTeam(team)->allClearFrames > 0;
 }
 
 //-------------------------------------------------------------------------------------------------
-Real ScriptTEODState::getTeamHealthPercent(Team *team)
+Real ScriptCLPState::getTeamHealthPercent(Team *team)
 {
 	if (!team)
 	{
@@ -572,7 +572,7 @@ Real ScriptTEODState::getTeamHealthPercent(Team *team)
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODState::crc( Xfer *xfer )
+void ScriptCLPState::crc( Xfer *xfer )
 {
 }
 
@@ -581,7 +581,7 @@ void ScriptTEODState::crc( Xfer *xfer )
 	* Version Info:
 	* 1: Initial version */
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODState::xfer( Xfer *xfer )
+void ScriptCLPState::xfer( Xfer *xfer )
 {
 	XferVersion currentVersion = 1;
 	XferVersion version = currentVersion;
@@ -690,7 +690,7 @@ void ScriptTEODState::xfer( Xfer *xfer )
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODState::loadPostProcess()
+void ScriptCLPState::loadPostProcess()
 {
 	// Drop flags of objects that no longer exist.
 	ObjectFlagMap *flagMaps[] = { &m_beingCaptured, &m_objectCrushes };

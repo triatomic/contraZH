@@ -180,8 +180,8 @@ protected:
 	// Stubs
 	Bool evaluateMissionAttempts(Parameter *pPlayerParm, Parameter *pComparisonParm, Parameter *pAttemptsParm);
 
-	// TEOD script conditions ported from CookieLandProjects/CLP_AI
-	Bool evaluateTEODCondition( Condition *pCondition, Bool *result );
+	// CLP_AI script conditions ported from CookieLandProjects/CLP_AI
+	Bool evaluateCLPCondition( Condition *pCondition, Bool *result );
 	Bool evaluatePlayerRelation(const AsciiString& playerSrcName, Int relationType, const AsciiString& playerDstName);
 	Bool evaluateEmptySpot(Parameter* pStartNdx, Bool isEmpty);
 	Bool evaluateActivePlayerCount(Parameter* pComparisonParm, Int pPlayerCount);

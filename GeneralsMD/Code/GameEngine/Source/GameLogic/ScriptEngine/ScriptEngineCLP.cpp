@@ -16,8 +16,8 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// FILE: ScriptEngineTEOD.cpp /////////////////////////////////////////////////////////////////////
-// TEOD counter, kills to deaths ratio and attack priority set handlers on the script engine.
+// FILE: ScriptEngineCLP.cpp //////////////////////////////////////////////////////////////////////
+// CLP counter, kills to deaths ratio and attack priority set handlers on the script engine.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
@@ -28,24 +28,24 @@
 #include "GameLogic/ObjectTypes.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Scripts.h"
-#include "GameLogic/ScriptTEOD.h"
+#include "GameLogic/ScriptCLP.h"
 
 #include <vector>
 
 //-------------------------------------------------------------------------------------------------
-static ScriptTEODState::KDRatio *teodFindKDRatio(Parameter *param, Bool create)
+static ScriptCLPState::KDRatio *clpFindKDRatio(Parameter *param, Bool create)
 {
-	if (!TheScriptTEODState)
+	if (!TheScriptCLPState)
 	{
 		return nullptr;
 	}
-	return TheScriptTEODState->findKDRatio(param->getString(), create);
+	return TheScriptCLPState->findKDRatio(param->getString(), create);
 }
 
 //-------------------------------------------------------------------------------------------------
 /** Sums the build cost of events newer than *read, then marks them read. */
 //-------------------------------------------------------------------------------------------------
-static Real teodSumBuildCost(const ScriptTEODState::EventList &events, UnsignedInt *read)
+static Real clpSumBuildCost(const ScriptCLPState::EventList &events, UnsignedInt *read)
 {
 	Real total = 0.0f;
 	for (size_t i = 0; i < events.size(); ++i)
@@ -56,12 +56,12 @@ static Real teodSumBuildCost(const ScriptTEODState::EventList &events, UnsignedI
 			total += (Real)thing->friend_getBuildCost();
 		}
 	}
-	*read = TheScriptTEODState->getLastEventSeq();
+	*read = TheScriptCLPState->getLastEventSeq();
 	return total;
 }
 
 //-------------------------------------------------------------------------------------------------
-static void teodFindTemplates(const AsciiString &objectType, std::vector<const ThingTemplate *> &templates)
+static void clpFindTemplates(const AsciiString &objectType, std::vector<const ThingTemplate *> &templates)
 {
 	const ObjectTypes *types = TheScriptEngine->getObjectTypes(objectType);
 	if (types)
@@ -175,7 +175,7 @@ Bool ScriptEngine::evaluateCounterDivisible( Condition *pCondition )
 void ScriptEngine::setKDRatio( ScriptAction *pAction )
 {
 	DEBUG_ASSERTCRASH(pAction->getNumParameters() >= 3, ("Not enough parameters."));
-	ScriptTEODState::KDRatio *ratio = teodFindKDRatio(pAction->getParameter(0), TRUE);
+	ScriptCLPState::KDRatio *ratio = clpFindKDRatio(pAction->getParameter(0), TRUE);
 	if (!ratio)
 	{
 		return;
@@ -188,7 +188,7 @@ void ScriptEngine::setKDRatio( ScriptAction *pAction )
 void ScriptEngine::addKDRatioKills( ScriptAction *pAction )
 {
 	DEBUG_ASSERTCRASH(pAction->getNumParameters() >= 2, ("Not enough parameters."));
-	ScriptTEODState::KDRatio *ratio = teodFindKDRatio(pAction->getParameter(1), TRUE);
+	ScriptCLPState::KDRatio *ratio = clpFindKDRatio(pAction->getParameter(1), TRUE);
 	if (ratio)
 	{
 		ratio->kills += pAction->getParameter(0)->getReal();
@@ -199,7 +199,7 @@ void ScriptEngine::addKDRatioKills( ScriptAction *pAction )
 void ScriptEngine::addKDRatioDeaths( ScriptAction *pAction )
 {
 	DEBUG_ASSERTCRASH(pAction->getNumParameters() >= 2, ("Not enough parameters."));
-	ScriptTEODState::KDRatio *ratio = teodFindKDRatio(pAction->getParameter(1), TRUE);
+	ScriptCLPState::KDRatio *ratio = clpFindKDRatio(pAction->getParameter(1), TRUE);
 	if (ratio)
 	{
 		ratio->deaths += pAction->getParameter(0)->getReal();
@@ -210,7 +210,7 @@ void ScriptEngine::addKDRatioDeaths( ScriptAction *pAction )
 void ScriptEngine::subKDRatioKills( ScriptAction *pAction )
 {
 	DEBUG_ASSERTCRASH(pAction->getNumParameters() >= 2, ("Not enough parameters."));
-	ScriptTEODState::KDRatio *ratio = teodFindKDRatio(pAction->getParameter(1), TRUE);
+	ScriptCLPState::KDRatio *ratio = clpFindKDRatio(pAction->getParameter(1), TRUE);
 	if (ratio)
 	{
 		ratio->kills -= pAction->getParameter(0)->getReal();
@@ -221,7 +221,7 @@ void ScriptEngine::subKDRatioKills( ScriptAction *pAction )
 void ScriptEngine::subKDRatioDeaths( ScriptAction *pAction )
 {
 	DEBUG_ASSERTCRASH(pAction->getNumParameters() >= 2, ("Not enough parameters."));
-	ScriptTEODState::KDRatio *ratio = teodFindKDRatio(pAction->getParameter(1), TRUE);
+	ScriptCLPState::KDRatio *ratio = clpFindKDRatio(pAction->getParameter(1), TRUE);
 	if (ratio)
 	{
 		ratio->deaths -= pAction->getParameter(0)->getReal();
@@ -233,13 +233,13 @@ void ScriptEngine::updateKDRatioKills( ScriptAction *pAction )
 {
 	DEBUG_ASSERTCRASH(pAction->getNumParameters() >= 2, ("Not enough parameters."));
 	Player *player = getPlayerFromAsciiString(pAction->getParameter(1)->getString());
-	ScriptTEODState::KDRatio *ratio = teodFindKDRatio(pAction->getParameter(0), TRUE);
+	ScriptCLPState::KDRatio *ratio = clpFindKDRatio(pAction->getParameter(0), TRUE);
 	if (!player || !ratio)
 	{
 		return;
 	}
 	Int index = player->getPlayerIndex();
-	ratio->kills += teodSumBuildCost(TheScriptTEODState->getPlayerKills(index), &ratio->readKills[index]);
+	ratio->kills += clpSumBuildCost(TheScriptCLPState->getPlayerKills(index), &ratio->readKills[index]);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -247,20 +247,20 @@ void ScriptEngine::updateKDRatioDeaths( ScriptAction *pAction )
 {
 	DEBUG_ASSERTCRASH(pAction->getNumParameters() >= 2, ("Not enough parameters."));
 	Player *player = getPlayerFromAsciiString(pAction->getParameter(1)->getString());
-	ScriptTEODState::KDRatio *ratio = teodFindKDRatio(pAction->getParameter(0), TRUE);
+	ScriptCLPState::KDRatio *ratio = clpFindKDRatio(pAction->getParameter(0), TRUE);
 	if (!player || !ratio)
 	{
 		return;
 	}
 	Int index = player->getPlayerIndex();
-	ratio->deaths += teodSumBuildCost(TheScriptTEODState->getPlayerLosses(index), &ratio->readLosses[index]);
+	ratio->deaths += clpSumBuildCost(TheScriptCLPState->getPlayerLosses(index), &ratio->readLosses[index]);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptEngine::copyKDRatioOntoCounters( ScriptAction *pAction )
 {
 	DEBUG_ASSERTCRASH(pAction->getNumParameters() >= 3, ("Not enough parameters."));
-	ScriptTEODState::KDRatio *ratio = teodFindKDRatio(pAction->getParameter(0), TRUE);
+	ScriptCLPState::KDRatio *ratio = clpFindKDRatio(pAction->getParameter(0), TRUE);
 	if (!ratio)
 	{
 		return;
@@ -285,7 +285,7 @@ void ScriptEngine::copyKDRatioOntoCounters( ScriptAction *pAction )
 Bool ScriptEngine::evaluateKDRatio( Condition *pCondition )
 {
 	DEBUG_ASSERTCRASH(pCondition->getNumParameters() >= 3, ("Not enough parameters."));
-	ScriptTEODState::KDRatio *ratio = teodFindKDRatio(pCondition->getParameter(0), FALSE);
+	ScriptCLPState::KDRatio *ratio = clpFindKDRatio(pCondition->getParameter(0), FALSE);
 	if (!ratio || ratio->kills == 0.0f || ratio->deaths == 0.0f)
 	{
 		return false;
@@ -336,7 +336,7 @@ void ScriptEngine::increasePriorityOfType( ScriptAction *pAction )
 {
 	DEBUG_ASSERTCRASH(pAction->getNumParameters() >= 3, ("Not enough parameters."));
 	std::vector<const ThingTemplate *> templates;
-	teodFindTemplates(pAction->getParameter(1)->getString(), templates);
+	clpFindTemplates(pAction->getParameter(1)->getString(), templates);
 	if (templates.empty())
 	{
 		return;
@@ -359,7 +359,7 @@ void ScriptEngine::decreasePriorityOfType( ScriptAction *pAction )
 {
 	DEBUG_ASSERTCRASH(pAction->getNumParameters() >= 3, ("Not enough parameters."));
 	std::vector<const ThingTemplate *> templates;
-	teodFindTemplates(pAction->getParameter(1)->getString(), templates);
+	clpFindTemplates(pAction->getParameter(1)->getString(), templates);
 	if (templates.empty())
 	{
 		return;

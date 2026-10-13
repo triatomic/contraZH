@@ -16,8 +16,8 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// FILE: ScriptConditionsTEODTeams.cpp ////////////////////////////////////////////////////////////
-// TEOD script conditions about teams, units, ratios and captures.
+// FILE: ScriptConditionsCLPTeams.cpp /////////////////////////////////////////////////////////////
+// CLP_AI script conditions about teams, units, ratios and captures.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
@@ -35,22 +35,22 @@
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/ScriptConditions.h"
 #include "GameLogic/ScriptEngine.h"
-#include "GameLogic/ScriptTEOD.h"
+#include "GameLogic/ScriptCLP.h"
 #include "GameLogic/Scripts.h"
 
 //-------------------------------------------------------------------------------------------------
 /** Accepts objects the player can see right now. */
 //-------------------------------------------------------------------------------------------------
-class PartitionFilterTEODSeenBy : public PartitionFilter
+class PartitionFilterCLPSeenBy : public PartitionFilter
 {
 public:
-	PartitionFilterTEODSeenBy(const Player *player) : m_player(player) { }
+	PartitionFilterCLPSeenBy(const Player *player) : m_player(player) { }
 	virtual Bool allow(Object *other) override
 	{
-		return teodIsSeenByPlayer(other, m_player);
+		return clpIsSeenByPlayer(other, m_player);
 	}
 #if defined(RTS_DEBUG)
-	virtual const char* debugGetName() override { return "PartitionFilterTEODSeenBy"; }
+	virtual const char* debugGetName() override { return "PartitionFilterCLPSeenBy"; }
 #endif
 private:
 	const Player *m_player;
@@ -59,37 +59,37 @@ private:
 //-------------------------------------------------------------------------------------------------
 /** True for units, meaning objects that are not structures, inert objects or projectiles. */
 //-------------------------------------------------------------------------------------------------
-static Bool teodIsUnit(const Object *obj)
+static Bool clpIsUnit(const Object *obj)
 {
 	return !obj->isKindOf(KINDOF_STRUCTURE) && !obj->isKindOf(KINDOF_INERT) && !obj->isKindOf(KINDOF_PROJECTILE);
 }
 
-class PartitionFilterTEODUnits : public PartitionFilter
+class PartitionFilterCLPUnits : public PartitionFilter
 {
 public:
-	PartitionFilterTEODUnits() { }
+	PartitionFilterCLPUnits() { }
 	virtual Bool allow(Object *other) override
 	{
-		return teodIsUnit(other);
+		return clpIsUnit(other);
 	}
 #if defined(RTS_DEBUG)
-	virtual const char* debugGetName() override { return "PartitionFilterTEODUnits"; }
+	virtual const char* debugGetName() override { return "PartitionFilterCLPUnits"; }
 #endif
 };
 
 //-------------------------------------------------------------------------------------------------
 /** Rejects contained objects, members of the team and the object itself. */
 //-------------------------------------------------------------------------------------------------
-class PartitionFilterTEODRejectSelf : public PartitionFilter
+class PartitionFilterCLPRejectSelf : public PartitionFilter
 {
 public:
-	PartitionFilterTEODRejectSelf(const Team *team, const Object *obj) : m_team(team), m_obj(obj) { }
+	PartitionFilterCLPRejectSelf(const Team *team, const Object *obj) : m_team(team), m_obj(obj) { }
 	virtual Bool allow(Object *other) override
 	{
 		return !other->isContained() && other != m_obj && (!m_team || other->getTeam() != m_team);
 	}
 #if defined(RTS_DEBUG)
-	virtual const char* debugGetName() override { return "PartitionFilterTEODRejectSelf"; }
+	virtual const char* debugGetName() override { return "PartitionFilterCLPRejectSelf"; }
 #endif
 private:
 	const Team *m_team;
@@ -97,7 +97,7 @@ private:
 };
 
 //-------------------------------------------------------------------------------------------------
-static Bool teodCompare(Int comparison, Real value, Real target, Real tolerance)
+static Bool clpCompare(Int comparison, Real value, Real target, Real tolerance)
 {
 	switch (comparison)
 	{
@@ -112,13 +112,13 @@ static Bool teodCompare(Int comparison, Real value, Real target, Real tolerance)
 }
 
 //-------------------------------------------------------------------------------------------------
-static Bool teodIsKnownType(const AsciiString &objectType)
+static Bool clpIsKnownType(const AsciiString &objectType)
 {
 	return TheScriptEngine->getObjectTypes(objectType) || TheThingFactory->findTemplate(objectType, FALSE);
 }
 
 //-------------------------------------------------------------------------------------------------
-static Bool teodTemplateMatchesType(const ThingTemplate *tmpl, const AsciiString &objectType)
+static Bool clpTemplateMatchesType(const ThingTemplate *tmpl, const AsciiString &objectType)
 {
 	const ObjectTypes *types = TheScriptEngine->getObjectTypes(objectType);
 	if (types)
@@ -130,7 +130,7 @@ static Bool teodTemplateMatchesType(const ThingTemplate *tmpl, const AsciiString
 }
 
 //-------------------------------------------------------------------------------------------------
-static Object *teodFirstLiveMember(const Team *team)
+static Object *clpFirstLiveMember(const Team *team)
 {
 	for (DLINK_ITERATOR<Object> iter = team->iterate_TeamMemberList(); !iter.done(); iter.advance())
 	{
@@ -146,7 +146,7 @@ static Object *teodFirstLiveMember(const Team *team)
 /** Counts live objects near pos with a relation to observer that match objectType, or are units
 	when objectType is null. With mustBeSeen, only objects the observer's player sees count. */
 //-------------------------------------------------------------------------------------------------
-static Int teodCountInRange(const Object *observer, const Coord3D *pos, Real range, Int relationFlags, Bool mustBeSeen, const AsciiString *objectType)
+static Int clpCountInRange(const Object *observer, const Coord3D *pos, Real range, Int relationFlags, Bool mustBeSeen, const AsciiString *objectType)
 {
 	if (range <= 0.0f)
 	{
@@ -155,7 +155,7 @@ static Int teodCountInRange(const Object *observer, const Coord3D *pos, Real ran
 	PartitionFilterRelationship filterRelation(observer, relationFlags);
 	PartitionFilterAlive filterAlive;
 	PartitionFilterSameMapStatus filterMapStatus(observer);
-	PartitionFilterTEODSeenBy filterSeen(observer->getControllingPlayer());
+	PartitionFilterCLPSeenBy filterSeen(observer->getControllingPlayer());
 	PartitionFilter *filters[] = { &filterRelation, &filterAlive, &filterMapStatus, nullptr, nullptr };
 	if (mustBeSeen)
 	{
@@ -167,7 +167,7 @@ static Int teodCountInRange(const Object *observer, const Coord3D *pos, Real ran
 	Int count = 0;
 	for (Object *obj = iter->first(); obj; obj = iter->next())
 	{
-		if (objectType ? teodObjectMatchesType(obj, *objectType) : teodIsUnit(obj))
+		if (objectType ? clpObjectMatchesType(obj, *objectType) : clpIsUnit(obj))
 		{
 			++count;
 		}
@@ -179,7 +179,7 @@ static Int teodCountInRange(const Object *observer, const Coord3D *pos, Real ran
 /** True if one of the player's structures is being captured. A null objectType or trigger
 	does not filter. */
 //-------------------------------------------------------------------------------------------------
-static Bool teodBuildingBeingCaptured(Player *player, const AsciiString *objectType, const PolygonTrigger *trigger)
+static Bool clpBuildingBeingCaptured(Player *player, const AsciiString *objectType, const PolygonTrigger *trigger)
 {
 	Player::PlayerTeamList::const_iterator it;
 	for (it = player->getPlayerTeams()->begin(); it != player->getPlayerTeams()->end(); ++it)
@@ -189,11 +189,11 @@ static Bool teodBuildingBeingCaptured(Player *player, const AsciiString *objectT
 			for (DLINK_ITERATOR<Object> iter = teamIter.cur()->iterate_TeamMemberList(); !iter.done(); iter.advance())
 			{
 				Object *obj = iter.cur();
-				if (!obj->isKindOf(KINDOF_STRUCTURE) || !TheScriptTEODState->isBeingCaptured(obj))
+				if (!obj->isKindOf(KINDOF_STRUCTURE) || !TheScriptCLPState->isBeingCaptured(obj))
 				{
 					continue;
 				}
-				if (objectType && !teodObjectMatchesType(obj, *objectType))
+				if (objectType && !clpObjectMatchesType(obj, *objectType))
 				{
 					continue;
 				}
@@ -212,7 +212,7 @@ static Bool teodBuildingBeingCaptured(Player *player, const AsciiString *objectT
 /** Compares the 2D distance from pos to the closest live object of objectType that has relation
 	to ref, ignoring contained objects, members of skipTeam and ref itself. */
 //-------------------------------------------------------------------------------------------------
-static Bool teodClosestRelationType(const Object *ref, const Team *skipTeam, const Coord3D *pos, Int relation, const AsciiString &objectType, Int comparison, Real value)
+static Bool clpClosestRelationType(const Object *ref, const Team *skipTeam, const Coord3D *pos, Int relation, const AsciiString &objectType, Int comparison, Real value)
 {
 	if (!ref || !pos || relation < ENEMIES || relation > ALLIES)
 	{
@@ -220,25 +220,25 @@ static Bool teodClosestRelationType(const Object *ref, const Team *skipTeam, con
 	}
 	PartitionFilterRelationship filterRelation(ref, 1 << relation);
 	PartitionFilterSameMapStatus filterMapStatus(ref);
-	PartitionFilterTEODRejectSelf filterSelf(skipTeam, ref);
+	PartitionFilterCLPRejectSelf filterSelf(skipTeam, ref);
 	PartitionFilter *filters[] = { &filterRelation, &filterMapStatus, &filterSelf, nullptr };
-	Object *closest = teodSelectObject(pos, filters, objectType, Parameter::CLOSEST);
+	Object *closest = clpSelectObject(pos, filters, objectType, Parameter::CLOSEST);
 	if (!closest)
 	{
 		return FALSE;
 	}
 	Real dx = closest->getPosition()->x - pos->x;
 	Real dy = closest->getPosition()->y - pos->y;
-	return teodCompare(comparison, sqrtf(dx * dx + dy * dy), value, 0.01f);
+	return clpCompare(comparison, sqrtf(dx * dx + dy * dy), value, 0.01f);
 }
 
 //-------------------------------------------------------------------------------------------------
 /** Finds the team member closest to the closest seen enemy, then compares the enemies it sees to
 	the allies within radius of it times ratio. Null types count units. */
 //-------------------------------------------------------------------------------------------------
-static Bool teodClosestMemberSightedRatio(Team *team, Int comparison, Real ratio, const AsciiString *allyType, const AsciiString *enemyType, Real radius)
+static Bool clpClosestMemberSightedRatio(Team *team, Int comparison, Real ratio, const AsciiString *allyType, const AsciiString *enemyType, Real radius)
 {
-	Object *ref = teodFirstLiveMember(team);
+	Object *ref = clpFirstLiveMember(team);
 	const Coord3D *teamPos = team->getEstimateTeamPosition();
 	if (!ref || !teamPos)
 	{
@@ -247,14 +247,14 @@ static Bool teodClosestMemberSightedRatio(Team *team, Int comparison, Real ratio
 
 	PartitionFilterSameMapStatus filterMapStatus(ref);
 	PartitionFilterRelationship filterEnemies(ref, PartitionFilterRelationship::ALLOW_ENEMIES);
-	PartitionFilterTEODSeenBy filterSeen(team->getControllingPlayer());
-	PartitionFilterTEODUnits filterUnits;
+	PartitionFilterCLPSeenBy filterSeen(team->getControllingPlayer());
+	PartitionFilterCLPUnits filterUnits;
 	PartitionFilter *enemyFilters[] = { &filterMapStatus, &filterEnemies, &filterSeen, nullptr, nullptr };
 	if (!enemyType)
 	{
 		enemyFilters[3] = &filterUnits;
 	}
-	Object *enemy = teodSelectObject(teamPos, enemyFilters, enemyType ? *enemyType : AsciiString::TheEmptyString, Parameter::CLOSEST);
+	Object *enemy = clpSelectObject(teamPos, enemyFilters, enemyType ? *enemyType : AsciiString::TheEmptyString, Parameter::CLOSEST);
 	if (!enemy)
 	{
 		return FALSE;
@@ -262,19 +262,19 @@ static Bool teodClosestMemberSightedRatio(Team *team, Int comparison, Real ratio
 
 	PartitionFilterAcceptOnTeam filterTeam(team);
 	PartitionFilter *memberFilters[] = { &filterMapStatus, &filterTeam, nullptr };
-	Object *member = teodSelectObject(enemy->getPosition(), memberFilters, AsciiString::TheEmptyString, Parameter::CLOSEST);
+	Object *member = clpSelectObject(enemy->getPosition(), memberFilters, AsciiString::TheEmptyString, Parameter::CLOSEST);
 	if (!member)
 	{
 		return FALSE;
 	}
 
-	Real countEnemies = (Real)teodCountInRange(member, member->getPosition(), member->getShroudClearingRange(), PartitionFilterRelationship::ALLOW_ENEMIES, TRUE, enemyType);
+	Real countEnemies = (Real)clpCountInRange(member, member->getPosition(), member->getShroudClearingRange(), PartitionFilterRelationship::ALLOW_ENEMIES, TRUE, enemyType);
 	if (countEnemies < 1.0f)
 	{
 		return FALSE;
 	}
-	Real countAllies = (Real)teodCountInRange(member, member->getPosition(), radius, PartitionFilterRelationship::ALLOW_ALLIES, FALSE, allyType);
-	return teodCompare(comparison, countEnemies, countAllies * ratio, 0.1f);
+	Real countAllies = (Real)clpCountInRange(member, member->getPosition(), radius, PartitionFilterRelationship::ALLOW_ALLIES, FALSE, allyType);
+	return clpCompare(comparison, countEnemies, countAllies * ratio, 0.1f);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -305,14 +305,14 @@ Bool ScriptConditions::evaluateTeamSightedRelationType(Parameter* pTeam, Int rel
 
 		PartitionFilterRelationship filterRelation(member, 1 << relationType);
 		PartitionFilterSameMapStatus filterMapStatus(member);
-		PartitionFilterTEODRejectSelf filterSelf(team, member);
+		PartitionFilterCLPRejectSelf filterSelf(team, member);
 		PartitionFilter *filters[] = { &filterRelation, &filterAlive, &filterStealth, &filterMapStatus, &filterSelf, nullptr };
 
 		SimpleObjectIterator *them = ThePartitionManager->iterateObjectsInRange(member, visionRange, FROM_CENTER_2D, filters);
 		MemoryPoolObjectHolder hold(them);
 		for (Object *other = them->first(); other; other = them->next())
 		{
-			if (teodObjectMatchesType(other, pObjectType->getString()))
+			if (clpObjectMatchesType(other, pObjectType->getString()))
 			{
 				return TRUE;
 			}
@@ -324,16 +324,16 @@ Bool ScriptConditions::evaluateTeamSightedRelationType(Parameter* pTeam, Int rel
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluateTeamLostType(Condition* pCondition, Parameter* pTeamParm, Parameter* objectType)
 {
-	UnsignedInt since = TheScriptTEODState->readEvents(pCondition);
+	UnsignedInt since = TheScriptCLPState->readEvents(pCondition);
 	Team *team = TheScriptEngine->getTeamNamed(pTeamParm->getString());
 	if (!team)
 	{
 		return FALSE;
 	}
-	const ScriptTEODState::EventList &losses = TheScriptTEODState->getTeamLosses(team->getID());
+	const ScriptCLPState::EventList &losses = TheScriptCLPState->getTeamLosses(team->getID());
 	for (size_t i = 0; i < losses.size(); ++i)
 	{
-		if (losses[i].seq > since && teodTemplateMatchesType(losses[i].thing, objectType->getString()))
+		if (losses[i].seq > since && clpTemplateMatchesType(losses[i].thing, objectType->getString()))
 		{
 			return TRUE;
 		}
@@ -344,13 +344,13 @@ Bool ScriptConditions::evaluateTeamLostType(Condition* pCondition, Parameter* pT
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluateTeamLostUnit(Condition* pCondition, Parameter* pTeamParm)
 {
-	UnsignedInt since = TheScriptTEODState->readEvents(pCondition);
+	UnsignedInt since = TheScriptCLPState->readEvents(pCondition);
 	Team *team = TheScriptEngine->getTeamNamed(pTeamParm->getString());
 	if (!team)
 	{
 		return FALSE;
 	}
-	const ScriptTEODState::EventList &losses = TheScriptTEODState->getTeamLosses(team->getID());
+	const ScriptCLPState::EventList &losses = TheScriptCLPState->getTeamLosses(team->getID());
 	return !losses.empty() && losses.back().seq > since;
 }
 
@@ -362,7 +362,7 @@ Bool ScriptConditions::evaluatePlayerBuildingBeingCaptured(Parameter* pPlayerPar
 	{
 		return FALSE;
 	}
-	return teodBuildingBeingCaptured(player, nullptr, nullptr);
+	return clpBuildingBeingCaptured(player, nullptr, nullptr);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -373,7 +373,7 @@ Bool ScriptConditions::evaluatePlayerBuildingBeingCapturedType(Parameter* pPlaye
 	{
 		return FALSE;
 	}
-	return teodBuildingBeingCaptured(player, &objectType->getString(), nullptr);
+	return clpBuildingBeingCaptured(player, &objectType->getString(), nullptr);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -385,7 +385,7 @@ Bool ScriptConditions::evaluatePlayerBuildingBeingCapturedArea(Parameter* pPlaye
 	{
 		return FALSE;
 	}
-	return teodBuildingBeingCaptured(player, nullptr, trigger);
+	return clpBuildingBeingCaptured(player, nullptr, trigger);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -397,7 +397,7 @@ Bool ScriptConditions::evaluatePlayerBuildingBeingCapturedTypeArea(Parameter* pP
 	{
 		return FALSE;
 	}
-	return teodBuildingBeingCaptured(player, &objectType->getString(), trigger);
+	return clpBuildingBeingCaptured(player, &objectType->getString(), trigger);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -408,7 +408,7 @@ Bool ScriptConditions::evaluateTeamIdle(Parameter* pTeamParm)
 	{
 		return FALSE;
 	}
-	Int idleFrames = TheScriptTEODState->getTeamIdleFrames(team);
+	Int idleFrames = TheScriptCLPState->getTeamIdleFrames(team);
 	return idleFrames > 0 && team->hasAnyObjects();
 }
 
@@ -420,7 +420,7 @@ Bool ScriptConditions::evaluateTeamIdleFrames(Parameter* pTeam, Int value)
 	{
 		return FALSE;
 	}
-	Int idleFrames = TheScriptTEODState->getTeamIdleFrames(team);
+	Int idleFrames = TheScriptCLPState->getTeamIdleFrames(team);
 	return idleFrames >= value && team->hasAnyObjects();
 }
 
@@ -452,7 +452,7 @@ Bool ScriptConditions::evaluateTeamSeen(Parameter* pTeamParm)
 		}
 		for (size_t i = 0; i < enemies.size(); ++i)
 		{
-			if (teodIsSeenByPlayer(member, enemies[i]))
+			if (clpIsSeenByPlayer(member, enemies[i]))
 			{
 				return TRUE;
 			}
@@ -471,7 +471,7 @@ Bool ScriptConditions::evaluateTeamContainsType(Parameter* pTeamParm, Parameter*
 	}
 	for (DLINK_ITERATOR<Object> iter = team->iterate_TeamMemberList(); !iter.done(); iter.advance())
 	{
-		if (!iter.cur()->isEffectivelyDead() && teodObjectMatchesType(iter.cur(), objectType->getString()))
+		if (!iter.cur()->isEffectivelyDead() && clpObjectMatchesType(iter.cur(), objectType->getString()))
 		{
 			return TRUE;
 		}
@@ -490,12 +490,12 @@ Bool ScriptConditions::evaluateTeamContainsComparisonType(Parameter* pTeamParm, 
 	Int count = 0;
 	for (DLINK_ITERATOR<Object> iter = team->iterate_TeamMemberList(); !iter.done(); iter.advance())
 	{
-		if (!iter.cur()->isEffectivelyDead() && teodObjectMatchesType(iter.cur(), objectType->getString()))
+		if (!iter.cur()->isEffectivelyDead() && clpObjectMatchesType(iter.cur(), objectType->getString()))
 		{
 			++count;
 		}
 	}
-	return teodCompare(pComparisonParm->getInt(), (Real)count, (Real)value, 0.5f);
+	return clpCompare(pComparisonParm->getInt(), (Real)count, (Real)value, 0.5f);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -530,7 +530,7 @@ Bool ScriptConditions::evaluateTeamBelowHealth(Parameter* pTeamParm, Real value)
 	{
 		return FALSE;
 	}
-	Real healthPercent = TheScriptTEODState->getTeamHealthPercent(team);
+	Real healthPercent = TheScriptCLPState->getTeamHealthPercent(team);
 	return healthPercent < value && team->hasAnyObjects();
 }
 
@@ -566,8 +566,8 @@ Bool ScriptConditions::evaluateTeamHasComparisonRatioSighted(Parameter* pTeamPar
 	{
 		return FALSE;
 	}
-	Real countOther = (Real)teodCountInRange(observer, teamPos, maxVision, PartitionFilterRelationship::ALLOW_ENEMIES, TRUE, nullptr);
-	return teodCompare(pComparisonParm->getInt(), count, countOther * ratio, 0.1f);
+	Real countOther = (Real)clpCountInRange(observer, teamPos, maxVision, PartitionFilterRelationship::ALLOW_ENEMIES, TRUE, nullptr);
+	return clpCompare(pComparisonParm->getInt(), count, countOther * ratio, 0.1f);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -594,7 +594,7 @@ Bool ScriptConditions::evaluateTeamHasComparisonRatioTypeSighted(Parameter* pTea
 			observer = member;
 		}
 		maxVision = max(maxVision, member->getShroudClearingRange());
-		if (teodObjectMatchesType(member, objectType->getString()))
+		if (clpObjectMatchesType(member, objectType->getString()))
 		{
 			count += 1.0f;
 		}
@@ -605,8 +605,8 @@ Bool ScriptConditions::evaluateTeamHasComparisonRatioTypeSighted(Parameter* pTea
 	{
 		return FALSE;
 	}
-	Real countOther = (Real)teodCountInRange(observer, teamPos, maxVision, PartitionFilterRelationship::ALLOW_ENEMIES, TRUE, &otherObjectType->getString());
-	return teodCompare(pComparisonParm->getInt(), count, countOther * ratio, 0.1f);
+	Real countOther = (Real)clpCountInRange(observer, teamPos, maxVision, PartitionFilterRelationship::ALLOW_ENEMIES, TRUE, &otherObjectType->getString());
+	return clpCompare(pComparisonParm->getInt(), count, countOther * ratio, 0.1f);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -617,7 +617,7 @@ Bool ScriptConditions::evaluateTeamClosestRelationType(Parameter* pTeamParm, Int
 	{
 		return FALSE;
 	}
-	return teodClosestRelationType(teodFirstLiveMember(team), team, team->getEstimateTeamPosition(), pRelation, objectType->getString(), pComparisonParm->getInt(), value);
+	return clpClosestRelationType(clpFirstLiveMember(team), team, team->getEstimateTeamPosition(), pRelation, objectType->getString(), pComparisonParm->getInt(), value);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -628,7 +628,7 @@ Bool ScriptConditions::evaluateUnitClosestRelationType(Parameter* pUnitParm, Int
 	{
 		return FALSE;
 	}
-	return teodClosestRelationType(unit, nullptr, unit->getPosition(), pRelation, objectType->getString(), pComparisonParm->getInt(), value);
+	return clpClosestRelationType(unit, nullptr, unit->getPosition(), pRelation, objectType->getString(), pComparisonParm->getInt(), value);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -639,7 +639,7 @@ Bool ScriptConditions::evaluateTeamAllClear(Parameter* pTeamParm)
 	{
 		return FALSE;
 	}
-	return TheScriptTEODState->isTeamAllClear(team);
+	return TheScriptCLPState->isTeamAllClear(team);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -674,7 +674,7 @@ Bool ScriptConditions::evaluateTeamApart(Parameter* pTeamParm, Parameter* pCompa
 	{
 		return FALSE;
 	}
-	return teodCompare(pComparisonParm->getInt(), totalDistSqr / memberCount, value * value, 0.01f);
+	return clpCompare(pComparisonParm->getInt(), totalDistSqr / memberCount, value * value, 0.01f);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -727,18 +727,18 @@ Bool ScriptConditions::evaluateClosestTeamMemberToEnemyHasSightedComparisonRatio
 	{
 		return FALSE;
 	}
-	return teodClosestMemberSightedRatio(team, pComparisonParm->getInt(), ratio, nullptr, nullptr, radius);
+	return clpClosestMemberSightedRatio(team, pComparisonParm->getInt(), ratio, nullptr, nullptr, radius);
 }
 
 //-------------------------------------------------------------------------------------------------
 Bool ScriptConditions::evaluateClosestTeamMemberToEnemyHasSightedComparisonTypeRatioRadius(Parameter* pTeamParm, Parameter* pComparisonParm, Real ratio, Parameter* objectType, Parameter* otherObjectType, Real radius)
 {
 	Team *team = TheScriptEngine->getTeamNamed(pTeamParm->getString());
-	if (!team || !teodIsKnownType(objectType->getString()) || !teodIsKnownType(otherObjectType->getString()))
+	if (!team || !clpIsKnownType(objectType->getString()) || !clpIsKnownType(otherObjectType->getString()))
 	{
 		return FALSE;
 	}
-	return teodClosestMemberSightedRatio(team, pComparisonParm->getInt(), ratio, &objectType->getString(), &otherObjectType->getString(), radius);
+	return clpClosestMemberSightedRatio(team, pComparisonParm->getInt(), ratio, &objectType->getString(), &otherObjectType->getString(), radius);
 }
 
 //-------------------------------------------------------------------------------------------------

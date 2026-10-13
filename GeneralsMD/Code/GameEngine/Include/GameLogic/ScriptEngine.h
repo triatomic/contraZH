@@ -359,7 +359,7 @@ public:
 	void debugVictory();
 //#endif
 
-	// TEOD script actions and conditions ported from CookieLandProjects/CLP_AI
+	// CLP_AI script actions and conditions ported from CookieLandProjects/CLP_AI
 	void setCounterRandom( ScriptAction *pAction );
 	void copyCounter( ScriptAction *pAction );
 	Bool evaluateTwoCounters( Condition *pCondition );
@@ -389,7 +389,7 @@ protected:
 
 	void addActionTemplateInfo(Template *actionTemplate);
 	void addConditionTemplateInfo(Template *conditionTemplate);
-	void initTEODTemplates();
+	void initCLPTemplates();
 
 	Int allocateCounter( const AsciiString& name);
 	Int allocateFlag( const AsciiString& name);

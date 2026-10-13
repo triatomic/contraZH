@@ -65,7 +65,7 @@
 #include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/JumpjetMissileAIUpdate.h"
-#include "GameLogic/ScriptTEOD.h"
+#include "GameLogic/ScriptCLP.h"
 
 
 
@@ -664,7 +664,7 @@ void SpecialAbilityUpdate::onExit( Bool cleanup )
   SpecialPowerType powerType = data->m_specialPowerTemplate->getSpecialPowerType();
   if( powerType == SPECIAL_INFANTRY_CAPTURE_BUILDING || powerType == SPECIAL_BLACKLOTUS_CAPTURE_BUILDING )
   {
-    TheScriptTEODState->setBeingCaptured( TheGameLogic->findObjectByID( m_targetID ), FALSE );
+    TheScriptCLPState->setBeingCaptured( TheGameLogic->findObjectByID( m_targetID ), FALSE );
   }
 
   if( !data->m_specialObjectsPersistent || (cleanup && !data->m_specialObjectsPersistWhenOwnerDies) )
@@ -1099,7 +1099,7 @@ void SpecialAbilityUpdate::startPreparation()
         TheEva->setShouldPlay( EVA_BuildingBeingStolen );
       }
       TheRadar->tryInfiltrationEvent( target );
-      TheScriptTEODState->setBeingCaptured( target, TRUE );
+      TheScriptCLPState->setBeingCaptured( target, TRUE );
 
       break;
     }
@@ -1138,7 +1138,7 @@ void SpecialAbilityUpdate::startPreparation()
 
         if( spTemplate->getSpecialPowerType() == SPECIAL_BLACKLOTUS_CAPTURE_BUILDING )
         {
-          TheScriptTEODState->setBeingCaptured( target, TRUE );
+          TheScriptCLPState->setBeingCaptured( target, TRUE );
         }
       }
       break;

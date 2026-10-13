@@ -16,8 +16,8 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// FILE: ScriptTEOD.h /////////////////////////////////////////////////////////////////////////////
-// Runtime state for the TEOD script actions and conditions ported from CookieLandProjects/CLP_AI.
+// FILE: ScriptCLP.h //////////////////////////////////////////////////////////////////////////////
+// Runtime state for the CLP_AI script actions and conditions ported from CookieLandProjects/CLP_AI.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
@@ -41,19 +41,19 @@ class PartitionFilter;
 	filters is null terminated and may be null. An empty objectType accepts any object; otherwise it
 	names a ThingTemplate or an ObjectTypes list. Dead and off-map objects are always rejected. */
 //-------------------------------------------------------------------------------------------------
-Object *teodSelectObject(const Coord3D *pos, PartitionFilter **filters, const AsciiString &objectType, Int selectionMode);
+Object *clpSelectObject(const Coord3D *pos, PartitionFilter **filters, const AsciiString &objectType, Int selectionMode);
 
 /** True if obj matches objectType, which names a ThingTemplate or an ObjectTypes list. */
-Bool teodObjectMatchesType(const Object *obj, const AsciiString &objectType);
+Bool clpObjectMatchesType(const Object *obj, const AsciiString &objectType);
 
 /** True if the player can see obj right now, meaning it is not shrouded or fogged for that player. */
-Bool teodIsSeenByPlayer(const Object *obj, const Player *player);
+Bool clpIsSeenByPlayer(const Object *obj, const Player *player);
 
 //-------------------------------------------------------------------------------------------------
-/** Runtime state behind the TEOD scripts. Saved in its own block, so Object, Team and Player keep
-	their save formats. Team tracking only runs for teams a TEOD condition has asked about. */
+/** Runtime state behind the CLP_AI scripts. Saved in its own block, so Object, Team and Player keep
+	their save formats. Team tracking only runs for teams a CLP condition has asked about. */
 //-------------------------------------------------------------------------------------------------
-class ScriptTEODState : public Snapshot
+class ScriptCLPState : public Snapshot
 {
 public:
 
@@ -74,8 +74,8 @@ public:
 	};
 	typedef std::vector<Event> EventList;
 
-	ScriptTEODState();
-	virtual ~ScriptTEODState();
+	ScriptCLPState();
+	virtual ~ScriptCLPState();
 
 	void reset();
 
@@ -148,4 +148,4 @@ private:
 	UnsignedInt m_eventSeq;
 };
 
-extern ScriptTEODState *TheScriptTEODState;
+extern ScriptCLPState *TheScriptCLPState;

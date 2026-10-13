@@ -58,7 +58,7 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/ScriptEngine.h"
-#include "GameLogic/ScriptTEOD.h"
+#include "GameLogic/ScriptCLP.h"
 #include "GameLogic/Squad.h"
 #include "GameLogic/TurretAI.h"
 #include "GameLogic/Weapon.h"
@@ -1208,7 +1208,7 @@ Bool wantToSquishTarget( State *thisState, void* userData )
 		if( obj->getAI() && (obj->getAI()->getWhichTurretForCurWeapon() != TURRET_INVALID) )
 		{
 			// I can only decide to crush-attack if I am attacking with a turreted weapon.
-			if (TheScriptTEODState->getCrushesInfantry(obj)) {
+			if (TheScriptCLPState->getCrushesInfantry(obj)) {
 				if (obj && obj->getControllingPlayer() &&
 					obj->getControllingPlayer()->getPlayerType()==PLAYER_COMPUTER) {
 					if (obj->canCrushOrSquish(victim)) {
@@ -2477,7 +2477,7 @@ static Bool canPursue(Object *source, Weapon *weapon, Object *victim)
 		return false;
 	}
 
-	if (TheScriptTEODState->getCrushesInfantry(source)) {
+	if (TheScriptCLPState->getCrushesInfantry(source)) {
 		if ( source->getControllingPlayer() &&
 			(source->getControllingPlayer()->getPlayerType() == PLAYER_COMPUTER) &&
 			source->canCrushOrSquish(victim) ) {

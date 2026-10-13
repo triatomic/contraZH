@@ -16,8 +16,8 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// FILE: ScriptTEODTemplates.cpp //////////////////////////////////////////////////////////////////
-// Templates for the TEOD script actions and conditions ported from CookieLandProjects/CLP_AI.
+// FILE: ScriptCLPTemplates.cpp ///////////////////////////////////////////////////////////////////
+// Templates for the CLP_AI script actions and conditions ported from CookieLandProjects/CLP_AI.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
@@ -25,7 +25,7 @@
 #include "GameLogic/ScriptEngine.h"
 
 //-------------------------------------------------------------------------------------------------
-void ScriptEngine::initTEODTemplates()
+void ScriptEngine::initCLPTemplates()
 {
 	Template *curTemplate;
 

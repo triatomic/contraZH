@@ -487,9 +487,9 @@ set(GAMEENGINE_SRC
     Include/GameLogic/ScriptActions.h
     Include/GameLogic/ScriptConditions.h
     Include/GameLogic/ScriptEngine.h
-    Include/GameLogic/ScriptTEOD.h
-    Include/GameLogic/ScriptTEODAI.h
-    Include/GameLogic/ScriptTEODWaypoints.h
+    Include/GameLogic/ScriptCLP.h
+    Include/GameLogic/ScriptCLPAI.h
+    Include/GameLogic/ScriptCLPWaypoints.h
     Include/GameLogic/Scripts.h
 #    Include/GameLogic/SidesList.h
     Include/GameLogic/Squad.h
@@ -1082,20 +1082,20 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Weapon.cpp
     Source/GameLogic/Object/WeaponSet.cpp
     Source/GameLogic/ScriptEngine/ScriptActions.cpp
-    Source/GameLogic/ScriptEngine/ScriptActionsTEOD.cpp
-    Source/GameLogic/ScriptEngine/ScriptActionsTEODAI.cpp
-    Source/GameLogic/ScriptEngine/ScriptActionsTEODPlayers.cpp
-    Source/GameLogic/ScriptEngine/ScriptActionsTEODUnits.cpp
-    Source/GameLogic/ScriptEngine/ScriptActionsTEODWaypoints.cpp
+    Source/GameLogic/ScriptEngine/ScriptActionsCLP.cpp
+    Source/GameLogic/ScriptEngine/ScriptActionsCLPAI.cpp
+    Source/GameLogic/ScriptEngine/ScriptActionsCLPPlayers.cpp
+    Source/GameLogic/ScriptEngine/ScriptActionsCLPUnits.cpp
+    Source/GameLogic/ScriptEngine/ScriptActionsCLPWaypoints.cpp
     Source/GameLogic/ScriptEngine/ScriptConditions.cpp
-    Source/GameLogic/ScriptEngine/ScriptConditionsTEOD.cpp
-    Source/GameLogic/ScriptEngine/ScriptConditionsTEODPlayers.cpp
-    Source/GameLogic/ScriptEngine/ScriptConditionsTEODTeams.cpp
+    Source/GameLogic/ScriptEngine/ScriptConditionsCLP.cpp
+    Source/GameLogic/ScriptEngine/ScriptConditionsCLPPlayers.cpp
+    Source/GameLogic/ScriptEngine/ScriptConditionsCLPTeams.cpp
     Source/GameLogic/ScriptEngine/ScriptEngine.cpp
-    Source/GameLogic/ScriptEngine/ScriptEngineTEOD.cpp
+    Source/GameLogic/ScriptEngine/ScriptEngineCLP.cpp
     Source/GameLogic/ScriptEngine/Scripts.cpp
-    Source/GameLogic/ScriptEngine/ScriptTEODState.cpp
-    Source/GameLogic/ScriptEngine/ScriptTEODTemplates.cpp
+    Source/GameLogic/ScriptEngine/ScriptCLPState.cpp
+    Source/GameLogic/ScriptEngine/ScriptCLPTemplates.cpp
     Source/GameLogic/ScriptEngine/VictoryConditions.cpp
 #    Source/GameLogic/System/CaveSystem.cpp
 #    Source/GameLogic/System/CrateSystem.cpp

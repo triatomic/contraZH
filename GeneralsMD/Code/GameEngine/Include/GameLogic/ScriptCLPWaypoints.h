@@ -16,8 +16,8 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// FILE: ScriptTEODWaypoints.h ////////////////////////////////////////////////////////////////////
-// Saves waypoints that TEOD script actions create, move, link or remove at runtime.
+// FILE: ScriptCLPWaypoints.h /////////////////////////////////////////////////////////////////////
+// Saves waypoints that CLP_AI script actions create, move, link or remove at runtime.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
@@ -25,12 +25,12 @@
 #include "Common/Snapshot.h"
 
 //-------------------------------------------------------------------------------------------------
-class ScriptTEODWaypoints : public Snapshot
+class ScriptCLPWaypoints : public Snapshot
 {
 public:
 
-	ScriptTEODWaypoints();
-	virtual ~ScriptTEODWaypoints();
+	ScriptCLPWaypoints();
+	virtual ~ScriptCLPWaypoints();
 
 	void reset();
 
@@ -54,4 +54,4 @@ private:
 	UnsignedInt m_nextID;		///< 0 until the first allocation scans the map's IDs
 };
 
-extern ScriptTEODWaypoints *TheScriptTEODWaypoints;
+extern ScriptCLPWaypoints *TheScriptCLPWaypoints;

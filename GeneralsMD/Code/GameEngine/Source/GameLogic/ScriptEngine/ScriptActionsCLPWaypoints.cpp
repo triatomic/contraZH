@@ -16,8 +16,8 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// FILE: ScriptActionsTEODWaypoints.cpp ///////////////////////////////////////////////////////////
-// TEOD script actions that create, move, link and remove waypoints at runtime.
+// FILE: ScriptActionsCLPWaypoints.cpp ////////////////////////////////////////////////////////////
+// CLP_AI script actions that create, move, link and remove waypoints at runtime.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
@@ -29,14 +29,14 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/ScriptEngine.h"
-#include "GameLogic/ScriptTEOD.h"
-#include "GameLogic/ScriptTEODWaypoints.h"
+#include "GameLogic/ScriptCLP.h"
+#include "GameLogic/ScriptCLPWaypoints.h"
 #include "GameLogic/TerrainLogic.h"
 
 #include <map>
 #include <vector>
 
-ScriptTEODWaypoints *TheScriptTEODWaypoints = nullptr;
+ScriptCLPWaypoints *TheScriptCLPWaypoints = nullptr;
 
 //-------------------------------------------------------------------------------------------------
 static void waypointWarning(const char *format, const AsciiString &name)
@@ -94,10 +94,10 @@ static void createWaypoint(const AsciiString &name, const Coord3D *pos, const As
 		return;
 	}
 
-	WaypointID id = (WaypointID)TheScriptTEODWaypoints->allocateID();
+	WaypointID id = (WaypointID)TheScriptCLPWaypoints->allocateID();
 	Waypoint *way = newInstance(Waypoint)(id, name, pos, label1, label2, label3, biDirectional);
 	TheTerrainLogic->insertWaypoint(way);
-	TheScriptTEODWaypoints->markDirty();
+	TheScriptCLPWaypoints->markDirty();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -141,7 +141,7 @@ static Object *selectObjectForCurrentPlayer(const AsciiString &objectType, Int s
 	{
 		return nullptr;
 	}
-	return teodSelectObject(&origin, nullptr, objectType, selectionMode);
+	return clpSelectObject(&origin, nullptr, objectType, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -201,7 +201,7 @@ void ScriptActions::doRemoveWaypoint(const AsciiString& waypointName)
 		return;
 	}
 	TheTerrainLogic->removeWaypoint(way);
-	TheScriptTEODWaypoints->markDirty();
+	TheScriptCLPWaypoints->markDirty();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -221,7 +221,7 @@ void ScriptActions::doConnectWaypoint(const AsciiString& waypointSource, const A
 	{
 		linkWaypoints(target, source);
 	}
-	TheScriptTEODWaypoints->markDirty();
+	TheScriptCLPWaypoints->markDirty();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -236,7 +236,7 @@ void ScriptActions::doDisconnectWaypoint(const AsciiString& waypointSource, cons
 
 	source->removeLink(target);
 	target->removeLink(source);
-	TheScriptTEODWaypoints->markDirty();
+	TheScriptCLPWaypoints->markDirty();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -248,7 +248,7 @@ void ScriptActions::doSetWaypointPathLabels(const AsciiString& waypointName, con
 		return;
 	}
 	way->setPathLabels(label1, label2, label3);
-	TheScriptTEODWaypoints->markDirty();
+	TheScriptCLPWaypoints->markDirty();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -264,7 +264,7 @@ void ScriptActions::doClearWaypointPathLabels(const AsciiString& waypointName, B
 	AsciiString label2 = clear2 ? AsciiString::TheEmptyString : way->getPathLabel2();
 	AsciiString label3 = clear3 ? AsciiString::TheEmptyString : way->getPathLabel3();
 	way->setPathLabels(label1, label2, label3);
-	TheScriptTEODWaypoints->markDirty();
+	TheScriptCLPWaypoints->markDirty();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -280,7 +280,7 @@ void ScriptActions::doRelocateWaypoint(const AsciiString& waypointName, Coord3D 
 		location.z = TheTerrainLogic->getGroundHeight(location.x, location.y);
 	}
 	way->setLocation(&location);
-	TheScriptTEODWaypoints->markDirty();
+	TheScriptCLPWaypoints->markDirty();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -297,7 +297,7 @@ void ScriptActions::doRelocateWaypointUnit(const AsciiString& waypointName, cons
 		return;
 	}
 	way->setLocation(obj->getPosition());
-	TheScriptTEODWaypoints->markDirty();
+	TheScriptCLPWaypoints->markDirty();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -319,7 +319,7 @@ void ScriptActions::doRelocateWaypointTeam(const AsciiString& waypointName, cons
 		return;
 	}
 	way->setLocation(pos);
-	TheScriptTEODWaypoints->markDirty();
+	TheScriptCLPWaypoints->markDirty();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -336,7 +336,7 @@ void ScriptActions::doRelocateWaypointType(const AsciiString& waypointName, cons
 		return;
 	}
 	way->setLocation(obj->getPosition());
-	TheScriptTEODWaypoints->markDirty();
+	TheScriptCLPWaypoints->markDirty();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -363,30 +363,30 @@ void ScriptActions::doSetWaypointBiDirectional(const AsciiString& waypointName, 
 			target->removeLink(way);
 		}
 	}
-	TheScriptTEODWaypoints->markDirty();
+	TheScriptCLPWaypoints->markDirty();
 }
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-ScriptTEODWaypoints::ScriptTEODWaypoints()
+ScriptCLPWaypoints::ScriptCLPWaypoints()
 {
 	reset();
 }
 
 //-------------------------------------------------------------------------------------------------
-ScriptTEODWaypoints::~ScriptTEODWaypoints()
+ScriptCLPWaypoints::~ScriptCLPWaypoints()
 {
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODWaypoints::reset()
+void ScriptCLPWaypoints::reset()
 {
 	m_dirty = FALSE;
 	m_nextID = 0;
 }
 
 //-------------------------------------------------------------------------------------------------
-UnsignedInt ScriptTEODWaypoints::allocateID()
+UnsignedInt ScriptCLPWaypoints::allocateID()
 {
 	if (m_nextID == 0)
 	{
@@ -411,7 +411,7 @@ UnsignedInt ScriptTEODWaypoints::allocateID()
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODWaypoints::crc( Xfer *xfer )
+void ScriptCLPWaypoints::crc( Xfer *xfer )
 {
 }
 
@@ -420,7 +420,7 @@ void ScriptTEODWaypoints::crc( Xfer *xfer )
 	* Version Info:
 	* 1: Initial version */
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODWaypoints::xfer( Xfer *xfer )
+void ScriptCLPWaypoints::xfer( Xfer *xfer )
 {
 	XferVersion currentVersion = 1;
 	XferVersion version = currentVersion;
@@ -546,7 +546,7 @@ static void applySavedWaypoints(const std::vector<SavedWaypoint> &saved)
 //-------------------------------------------------------------------------------------------------
 /** Saves every waypoint, live then removed, with its links by ID. */
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODWaypoints::xferWaypoints( Xfer *xfer )
+void ScriptCLPWaypoints::xferWaypoints( Xfer *xfer )
 {
 	std::vector<SavedWaypoint> saved;
 	if( xfer->getXferMode() != XFER_LOAD )
@@ -590,6 +590,6 @@ void ScriptTEODWaypoints::xferWaypoints( Xfer *xfer )
 }
 
 //-------------------------------------------------------------------------------------------------
-void ScriptTEODWaypoints::loadPostProcess()
+void ScriptCLPWaypoints::loadPostProcess()
 {
 }

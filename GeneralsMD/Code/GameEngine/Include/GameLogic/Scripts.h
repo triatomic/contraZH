@@ -560,7 +560,7 @@ public:
 		TEAM_MOVE_TO_SUPPLY_SOURCE,								///< Move a team next to the nearest free supply source.
 		NAMED_MOVE_TO_SUPPLY_SOURCE,							///< Move a unit next to the nearest free supply source.
 
-		// TEOD script actions ported from CookieLandProjects/CLP_AI
+		// CLP_AI script actions ported from CookieLandProjects/CLP_AI
 		SET_COUNTER_RANDOM,														///< Set a counter to a random value between x and y.
 		COPY_COUNTER,																	///< Copy counter A onto B. If B doesn't yet exist, create a counter.
 		SET_KD_RATIO,																	///< Set a real number variable as a KD ratio to x kills and y deaths.
@@ -1153,7 +1153,7 @@ public:
 
 		SKIRMISH_SHIPS_ENABLED,                 // True if ships are enabled on the played map
 
-		// TEOD script conditions ported from CookieLandProjects/CLP_AI
+		// CLP_AI script conditions ported from CookieLandProjects/CLP_AI
 		KD_RATIO,																			// True if the KD Ratio is <comparison> a value.
 		COMPARE_COUNTERS,															// True if Counter A is <comparison> Counter B.
 		PLAYER_RELATION_FACTION,												// True if one or more of the player's <relation> co-players are a faction.

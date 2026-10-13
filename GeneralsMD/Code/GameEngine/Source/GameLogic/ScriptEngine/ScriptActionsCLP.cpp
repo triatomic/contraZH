@@ -16,8 +16,8 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// FILE: ScriptActionsTEOD.cpp ////////////////////////////////////////////////////////////////////
-// Dispatch for the TEOD script actions ported from CookieLandProjects/CLP_AI.
+// FILE: ScriptActionsCLP.cpp /////////////////////////////////////////////////////////////////////
+// Dispatch for the CLP_AI script actions ported from CookieLandProjects/CLP_AI.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
@@ -26,9 +26,9 @@
 #include "GameLogic/ScriptEngine.h"
 
 //-------------------------------------------------------------------------------------------------
-/** Runs a TEOD action. Returns false if the action is not one of them. */
+/** Runs a CLP action. Returns false if the action is not one of them. */
 //-------------------------------------------------------------------------------------------------
-Bool ScriptActions::executeTEODAction( ScriptAction *pAction )
+Bool ScriptActions::executeCLPAction( ScriptAction *pAction )
 {
 	switch (pAction->getActionType())
 	{

@@ -386,8 +386,8 @@ protected:
 	void doNamedSetTrainHeld( const AsciiString &locoName, const Bool set );
   void doEnableObjectSound(const AsciiString& objectName, Bool enable);
 
-	// TEOD script actions ported from CookieLandProjects/CLP_AI
-	Bool executeTEODAction( ScriptAction *pAction );
+	// CLP_AI script actions ported from CookieLandProjects/CLP_AI
+	Bool executeCLPAction( ScriptAction *pAction );
 	void doPlayerSurrender(const AsciiString& playerName);
 	void doPlayerBuildUnit(const AsciiString& unitName, const AsciiString& playerName);
 	void doBuildObjectNearestTeamAngle(const AsciiString& playerName, const AsciiString& buildingType, const AsciiString& teamName, Real angle);

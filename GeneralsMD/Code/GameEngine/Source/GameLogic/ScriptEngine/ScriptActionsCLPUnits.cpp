@@ -16,8 +16,8 @@
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// FILE: ScriptActionsTEODUnits.cpp ///////////////////////////////////////////////////////////////
-// TEOD script actions that move, attack, load, repair or teleport units and teams.
+// FILE: ScriptActionsCLPUnits.cpp ////////////////////////////////////////////////////////////////
+// CLP_AI script actions that move, attack, load, repair or teleport units and teams.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
@@ -36,7 +36,7 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/ScriptEngine.h"
-#include "GameLogic/ScriptTEOD.h"
+#include "GameLogic/ScriptCLP.h"
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Weapon.h"
 
@@ -48,16 +48,16 @@ namespace
 //-------------------------------------------------------------------------------------------------
 /** Accepts objects the player can see right now. */
 //-------------------------------------------------------------------------------------------------
-class PartitionFilterTEODSeen : public PartitionFilter
+class PartitionFilterCLPSeen : public PartitionFilter
 {
 public:
-	PartitionFilterTEODSeen(const Player *player) : m_player(player) { }
+	PartitionFilterCLPSeen(const Player *player) : m_player(player) { }
 	virtual Bool allow(Object *other) override
 	{
-		return teodIsSeenByPlayer(other, m_player);
+		return clpIsSeenByPlayer(other, m_player);
 	}
 #if defined(RTS_DEBUG)
-	virtual const char* debugGetName() override { return "PartitionFilterTEODSeen"; }
+	virtual const char* debugGetName() override { return "PartitionFilterCLPSeen"; }
 #endif
 private:
 	const Player *m_player;
@@ -66,17 +66,17 @@ private:
 //-------------------------------------------------------------------------------------------------
 /** Accepts objects that are fogged or shrouded for the player, or with underFog FALSE, clear ones. */
 //-------------------------------------------------------------------------------------------------
-class PartitionFilterTEODFog : public PartitionFilter
+class PartitionFilterCLPFog : public PartitionFilter
 {
 public:
-	PartitionFilterTEODFog(const Player *player, Bool underFog) : m_playerIndex(player->getPlayerIndex()), m_underFog(underFog) { }
+	PartitionFilterCLPFog(const Player *player, Bool underFog) : m_playerIndex(player->getPlayerIndex()), m_underFog(underFog) { }
 	virtual Bool allow(Object *other) override
 	{
 		Bool fogged = other->getShroudedStatus(m_playerIndex) != OBJECTSHROUD_CLEAR;
 		return fogged == m_underFog;
 	}
 #if defined(RTS_DEBUG)
-	virtual const char* debugGetName() override { return "PartitionFilterTEODFog"; }
+	virtual const char* debugGetName() override { return "PartitionFilterCLPFog"; }
 #endif
 private:
 	Int m_playerIndex;
@@ -86,46 +86,46 @@ private:
 //-------------------------------------------------------------------------------------------------
 /** Accepts buildings with a capture in progress. */
 //-------------------------------------------------------------------------------------------------
-class PartitionFilterTEODBeingCaptured : public PartitionFilter
+class PartitionFilterCLPBeingCaptured : public PartitionFilter
 {
 public:
 	virtual Bool allow(Object *other) override
 	{
-		return TheScriptTEODState && TheScriptTEODState->isBeingCaptured(other);
+		return TheScriptCLPState && TheScriptCLPState->isBeingCaptured(other);
 	}
 #if defined(RTS_DEBUG)
-	virtual const char* debugGetName() override { return "PartitionFilterTEODBeingCaptured"; }
+	virtual const char* debugGetName() override { return "PartitionFilterCLPBeingCaptured"; }
 #endif
 };
 
 //-------------------------------------------------------------------------------------------------
 /** Rejects one object and the members of one team; either may be null. */
 //-------------------------------------------------------------------------------------------------
-class PartitionFilterTEODRejectSelf : public PartitionFilter
+class PartitionFilterCLPRejectSelf : public PartitionFilter
 {
 public:
-	PartitionFilterTEODRejectSelf(const Team *team, const Object *obj) : m_team(team), m_obj(obj) { }
+	PartitionFilterCLPRejectSelf(const Team *team, const Object *obj) : m_team(team), m_obj(obj) { }
 	virtual Bool allow(Object *other) override
 	{
 		return other != m_obj && (!m_team || other->getTeam() != m_team);
 	}
 #if defined(RTS_DEBUG)
-	virtual const char* debugGetName() override { return "PartitionFilterTEODRejectSelf"; }
+	virtual const char* debugGetName() override { return "PartitionFilterCLPRejectSelf"; }
 #endif
 private:
 	const Team *m_team;
 	const Object *m_obj;
 };
 
-enum TEODRelationMove
+enum CLPRelationMove
 {
-	TEOD_MOVE_AWAY,
-	TEOD_MOVE_TOWARDS,
-	TEOD_KEEP_DISTANCE
+	CLP_MOVE_AWAY,
+	CLP_MOVE_TOWARDS,
+	CLP_KEEP_DISTANCE
 };
 
 //-------------------------------------------------------------------------------------------------
-Object *teodFirstAIMember(Team *team)
+Object *clpFirstAIMember(Team *team)
 {
 	for (DLINK_ITERATOR<Object> iter = team->iterate_TeamMemberList(); !iter.done(); iter.advance())
 	{
@@ -139,7 +139,7 @@ Object *teodFirstAIMember(Team *team)
 }
 
 //-------------------------------------------------------------------------------------------------
-AIGroupPtr teodTeamGroup(Team *team)
+AIGroupPtr clpTeamGroup(Team *team)
 {
 	AIGroupPtr group = TheAI->createGroup();
 	if (!group)
@@ -157,7 +157,7 @@ AIGroupPtr teodTeamGroup(Team *team)
 //-------------------------------------------------------------------------------------------------
 /** Adds the positions of live members matching kindOf (KINDOF_INVALID for any) and objectType (empty for any). */
 //-------------------------------------------------------------------------------------------------
-void teodSumTeamPositions(Team *team, KindOfType kindOf, const AsciiString &objectType, Coord3D *sum, Int *count)
+void clpSumTeamPositions(Team *team, KindOfType kindOf, const AsciiString &objectType, Coord3D *sum, Int *count)
 {
 	for (DLINK_ITERATOR<Object> iter = team->iterate_TeamMemberList(); !iter.done(); iter.advance())
 	{
@@ -170,7 +170,7 @@ void teodSumTeamPositions(Team *team, KindOfType kindOf, const AsciiString &obje
 		{
 			continue;
 		}
-		if (objectType.isNotEmpty() && !teodObjectMatchesType(obj, objectType))
+		if (objectType.isNotEmpty() && !clpObjectMatchesType(obj, objectType))
 		{
 			continue;
 		}
@@ -180,7 +180,7 @@ void teodSumTeamPositions(Team *team, KindOfType kindOf, const AsciiString &obje
 }
 
 //-------------------------------------------------------------------------------------------------
-Bool teodAveragePosition(const Coord3D &sum, Int count, Coord3D *center)
+Bool clpAveragePosition(const Coord3D &sum, Int count, Coord3D *center)
 {
 	if (count <= 0)
 	{
@@ -193,17 +193,17 @@ Bool teodAveragePosition(const Coord3D &sum, Int count, Coord3D *center)
 }
 
 //-------------------------------------------------------------------------------------------------
-Bool teodTeamCenter(Team *team, Coord3D *center)
+Bool clpTeamCenter(Team *team, Coord3D *center)
 {
 	Coord3D sum;
 	sum.zero();
 	Int count = 0;
-	teodSumTeamPositions(team, KINDOF_INVALID, AsciiString::TheEmptyString, &sum, &count);
-	return teodAveragePosition(sum, count, center);
+	clpSumTeamPositions(team, KINDOF_INVALID, AsciiString::TheEmptyString, &sum, &count);
+	return clpAveragePosition(sum, count, center);
 }
 
 //-------------------------------------------------------------------------------------------------
-void teodTeamMoveTo(Team *team, const Coord3D *pos)
+void clpTeamMoveTo(Team *team, const Coord3D *pos)
 {
 	for (DLINK_ITERATOR<Object> iter = team->iterate_TeamMemberList(); !iter.done(); iter.advance())
 	{
@@ -223,7 +223,7 @@ void teodTeamMoveTo(Team *team, const Coord3D *pos)
 }
 
 //-------------------------------------------------------------------------------------------------
-void teodTeamMoveToObject(Team *team, Object *target)
+void clpTeamMoveToObject(Team *team, Object *target)
 {
 	for (DLINK_ITERATOR<Object> iter = team->iterate_TeamMemberList(); !iter.done(); iter.advance())
 	{
@@ -245,7 +245,7 @@ void teodTeamMoveToObject(Team *team, Object *target)
 //-------------------------------------------------------------------------------------------------
 /** Selects an object with the given relation to player, skipping excludeTeam and excludeObj. */
 //-------------------------------------------------------------------------------------------------
-Object *teodSelectByRelation(const Coord3D *pos, const Player *player, Int relationType, const Team *excludeTeam,
+Object *clpSelectByRelation(const Coord3D *pos, const Player *player, Int relationType, const Team *excludeTeam,
 	const Object *excludeObj, const AsciiString &objectType, Int selectionMode)
 {
 	if (!player)
@@ -263,7 +263,7 @@ Object *teodSelectByRelation(const Coord3D *pos, const Player *player, Int relat
 	}
 
 	PartitionFilterPlayerAffiliation filterRelation(player, flags, TRUE);
-	PartitionFilterTEODRejectSelf filterSelf(excludeTeam, excludeObj);
+	PartitionFilterCLPRejectSelf filterSelf(excludeTeam, excludeObj);
 	PartitionFilterPlayer filterNotOwn(player, FALSE);
 	PartitionFilter *filters[4];
 	Int count = 0;
@@ -277,13 +277,13 @@ Object *teodSelectByRelation(const Coord3D *pos, const Player *player, Int relat
 	}
 	filters[count] = nullptr;
 
-	return teodSelectObject(pos, filters, objectType, selectionMode);
+	return clpSelectObject(pos, filters, objectType, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 /** Destination of a relation move from pos with respect to threat; FALSE if there is none. */
 //-------------------------------------------------------------------------------------------------
-Bool teodRelationDestination(TEODRelationMove move, const Coord3D &pos, const Coord3D &threat, Real feet, Coord3D *dest)
+Bool clpRelationDestination(CLPRelationMove move, const Coord3D &pos, const Coord3D &threat, Real feet, Coord3D *dest)
 {
 	Coord3D dir;
 	dir.x = pos.x - threat.x;
@@ -292,7 +292,7 @@ Bool teodRelationDestination(TEODRelationMove move, const Coord3D &pos, const Co
 	Real len = (Real)sqrt(dir.x * dir.x + dir.y * dir.y);
 	if (len < 0.01f)
 	{
-		if (move == TEOD_MOVE_TOWARDS)
+		if (move == CLP_MOVE_TOWARDS)
 		{
 			return FALSE;
 		}
@@ -309,13 +309,13 @@ Bool teodRelationDestination(TEODRelationMove move, const Coord3D &pos, const Co
 
 	switch (move)
 	{
-		case TEOD_MOVE_AWAY:
+		case CLP_MOVE_AWAY:
 			dest->set(pos.x + dir.x * feet, pos.y + dir.y * feet, pos.z);
 			break;
-		case TEOD_MOVE_TOWARDS:
+		case CLP_MOVE_TOWARDS:
 			dest->set(pos.x - dir.x * feet, pos.y - dir.y * feet, pos.z);
 			break;
-		case TEOD_KEEP_DISTANCE:
+		case CLP_KEEP_DISTANCE:
 			dest->set(threat.x + dir.x * feet, threat.y + dir.y * feet, threat.z);
 			break;
 	}
@@ -323,7 +323,7 @@ Bool teodRelationDestination(TEODRelationMove move, const Coord3D &pos, const Co
 }
 
 //-------------------------------------------------------------------------------------------------
-void teodTeamRelationMove(TEODRelationMove move, const AsciiString &teamName, Real feet, Int relationType,
+void clpTeamRelationMove(CLPRelationMove move, const AsciiString &teamName, Real feet, Int relationType,
 	const AsciiString &objectType, Int selectionMode)
 {
 	Team *team = TheScriptEngine->getTeamNamed(teamName);
@@ -331,28 +331,28 @@ void teodTeamRelationMove(TEODRelationMove move, const AsciiString &teamName, Re
 	{
 		return;
 	}
-	Object *teamObj = teodFirstAIMember(team);
+	Object *teamObj = clpFirstAIMember(team);
 	if (!teamObj)
 	{
 		return;
 	}
 
 	Coord3D teamPos = *teamObj->getPosition();
-	Object *bestObj = teodSelectByRelation(&teamPos, teamObj->getControllingPlayer(), relationType, team, nullptr, objectType, selectionMode);
+	Object *bestObj = clpSelectByRelation(&teamPos, teamObj->getControllingPlayer(), relationType, team, nullptr, objectType, selectionMode);
 	if (!bestObj)
 	{
 		return;
 	}
 
 	Coord3D dest;
-	if (teodRelationDestination(move, teamPos, *bestObj->getPosition(), feet, &dest))
+	if (clpRelationDestination(move, teamPos, *bestObj->getPosition(), feet, &dest))
 	{
-		teodTeamMoveTo(team, &dest);
+		clpTeamMoveTo(team, &dest);
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
-void teodUnitRelationMove(TEODRelationMove move, const AsciiString &unitName, Real feet, Int relationType,
+void clpUnitRelationMove(CLPRelationMove move, const AsciiString &unitName, Real feet, Int relationType,
 	const AsciiString &objectType, Int selectionMode)
 {
 	Object *obj = TheScriptEngine->getUnitNamed(unitName);
@@ -367,14 +367,14 @@ void teodUnitRelationMove(TEODRelationMove move, const AsciiString &unitName, Re
 	}
 
 	Coord3D objPos = *obj->getPosition();
-	Object *bestObj = teodSelectByRelation(&objPos, obj->getControllingPlayer(), relationType, nullptr, obj, objectType, selectionMode);
+	Object *bestObj = clpSelectByRelation(&objPos, obj->getControllingPlayer(), relationType, nullptr, obj, objectType, selectionMode);
 	if (!bestObj)
 	{
 		return;
 	}
 
 	Coord3D dest;
-	if (teodRelationDestination(move, objPos, *bestObj->getPosition(), feet, &dest))
+	if (clpRelationDestination(move, objPos, *bestObj->getPosition(), feet, &dest))
 	{
 		ai->chooseLocomotorSet(LOCOMOTORSET_NORMAL);
 		ai->aiMoveToPosition(&dest, CMD_FROM_SCRIPT);
@@ -384,7 +384,7 @@ void teodUnitRelationMove(TEODRelationMove move, const AsciiString &unitName, Re
 //-------------------------------------------------------------------------------------------------
 /** Attacks or attack-moves the team at an enemy, optionally inside an area and seen by the team's player. */
 //-------------------------------------------------------------------------------------------------
-void teodTeamAttack(const AsciiString &teamName, const AsciiString &objectType, const AsciiString *areaName,
+void clpTeamAttack(const AsciiString &teamName, const AsciiString &objectType, const AsciiString *areaName,
 	Bool seenOnly, Bool attackMove, Int selectionMode)
 {
 	Team *team = TheScriptEngine->getTeamNamed(teamName);
@@ -397,7 +397,7 @@ void teodTeamAttack(const AsciiString &teamName, const AsciiString &objectType, 
 	{
 		return;
 	}
-	Object *teamObj = teodFirstAIMember(team);
+	Object *teamObj = clpFirstAIMember(team);
 	if (!teamObj)
 	{
 		return;
@@ -416,7 +416,7 @@ void teodTeamAttack(const AsciiString &teamName, const AsciiString &objectType, 
 	PartitionFilterPlayerAffiliation filterEnemies(player, ALLOW_ENEMIES, TRUE);
 	PartitionFilterPlayer filterNotOwn(player, FALSE);
 	PartitionFilterPolygonTrigger filterArea(area);
-	PartitionFilterTEODSeen filterSeen(player);
+	PartitionFilterCLPSeen filterSeen(player);
 	PartitionFilter *filters[5];
 	Int count = 0;
 	filters[count++] = &filterEnemies;
@@ -432,13 +432,13 @@ void teodTeamAttack(const AsciiString &teamName, const AsciiString &objectType, 
 	filters[count] = nullptr;
 
 	Coord3D teamPos = *teamObj->getPosition();
-	Object *bestObj = teodSelectObject(&teamPos, filters, objectType, selectionMode);
+	Object *bestObj = clpSelectObject(&teamPos, filters, objectType, selectionMode);
 	if (!bestObj)
 	{
 		return;
 	}
 
-	AIGroupPtr theGroup = teodTeamGroup(team);
+	AIGroupPtr theGroup = clpTeamGroup(team);
 	if (!theGroup)
 	{
 		return;
@@ -454,7 +454,7 @@ void teodTeamAttack(const AsciiString &teamName, const AsciiString &objectType, 
 }
 
 //-------------------------------------------------------------------------------------------------
-void teodTeamMoveFog(const AsciiString &teamName, const AsciiString &objectType, const AsciiString *areaName,
+void clpTeamMoveFog(const AsciiString &teamName, const AsciiString &objectType, const AsciiString *areaName,
 	Bool underFog, Int selectionMode)
 {
 	Team *team = TheScriptEngine->getTeamNamed(teamName);
@@ -467,7 +467,7 @@ void teodTeamMoveFog(const AsciiString &teamName, const AsciiString &objectType,
 	{
 		return;
 	}
-	Object *teamObj = teodFirstAIMember(team);
+	Object *teamObj = clpFirstAIMember(team);
 	if (!teamObj)
 	{
 		return;
@@ -483,7 +483,7 @@ void teodTeamMoveFog(const AsciiString &teamName, const AsciiString &objectType,
 		}
 	}
 
-	PartitionFilterTEODFog filterFog(player, underFog);
+	PartitionFilterCLPFog filterFog(player, underFog);
 	PartitionFilterPolygonTrigger filterArea(area);
 	PartitionFilter *filters[3];
 	Int count = 0;
@@ -495,17 +495,17 @@ void teodTeamMoveFog(const AsciiString &teamName, const AsciiString &objectType,
 	filters[count] = nullptr;
 
 	Coord3D teamPos = *teamObj->getPosition();
-	Object *bestObj = teodSelectObject(&teamPos, filters, objectType, selectionMode);
+	Object *bestObj = clpSelectObject(&teamPos, filters, objectType, selectionMode);
 	if (bestObj)
 	{
-		teodTeamMoveToObject(team, bestObj);
+		clpTeamMoveToObject(team, bestObj);
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
 /** Moves the team to the closest own or allied building being captured. */
 //-------------------------------------------------------------------------------------------------
-void teodTeamMoveCaptured(const AsciiString &teamName, const AsciiString &objectType)
+void clpTeamMoveCaptured(const AsciiString &teamName, const AsciiString &objectType)
 {
 	Team *team = TheScriptEngine->getTeamNamed(teamName);
 	if (!team)
@@ -517,7 +517,7 @@ void teodTeamMoveCaptured(const AsciiString &teamName, const AsciiString &object
 	{
 		return;
 	}
-	Object *teamObj = teodFirstAIMember(team);
+	Object *teamObj = clpFirstAIMember(team);
 	if (!teamObj)
 	{
 		return;
@@ -525,17 +525,17 @@ void teodTeamMoveCaptured(const AsciiString &teamName, const AsciiString &object
 
 	// The affiliation filter also accepts the player's own objects.
 	PartitionFilterPlayerAffiliation filterAllies(player, ALLOW_ALLIES, TRUE);
-	PartitionFilterTEODBeingCaptured filterCaptured;
+	PartitionFilterCLPBeingCaptured filterCaptured;
 	PartitionFilter *filters[] = { &filterAllies, &filterCaptured, nullptr };
 
 	Coord3D teamPos = *teamObj->getPosition();
-	Object *bestObj = teodSelectObject(&teamPos, filters, objectType, Parameter::CLOSEST);
+	Object *bestObj = clpSelectObject(&teamPos, filters, objectType, Parameter::CLOSEST);
 	if (!bestObj)
 	{
 		return;
 	}
 
-	AIGroupPtr theGroup = teodTeamGroup(team);
+	AIGroupPtr theGroup = clpTeamGroup(team);
 	if (!theGroup)
 	{
 		return;
@@ -544,7 +544,7 @@ void teodTeamMoveCaptured(const AsciiString &teamName, const AsciiString &object
 }
 
 //-------------------------------------------------------------------------------------------------
-void teodTeleport(Object *obj, const Coord3D *pos)
+void clpTeleport(Object *obj, const Coord3D *pos)
 {
 	AIUpdateInterface *ai = obj->getAIUpdateInterface();
 	if (ai)
@@ -558,24 +558,24 @@ void teodTeleport(Object *obj, const Coord3D *pos)
 }
 
 //-------------------------------------------------------------------------------------------------
-Bool teodCanTeleport(const Object *obj)
+Bool clpCanTeleport(const Object *obj)
 {
 	return obj && !obj->isEffectivelyDead() && !obj->getContainedBy() && !obj->isKindOf(KINDOF_STRUCTURE);
 }
 
 //-------------------------------------------------------------------------------------------------
-Object *teodClosestOwned(const Coord3D *pos, const Player *player, KindOfType kindOf)
+Object *clpClosestOwned(const Coord3D *pos, const Player *player, KindOfType kindOf)
 {
 	PartitionFilterPlayer filterPlayer(player, TRUE);
 	PartitionFilterAcceptByKindOf filterKind(MAKE_KINDOF_MASK(kindOf), KINDOFMASK_NONE);
 	PartitionFilter *filters[] = { &filterPlayer, &filterKind, nullptr };
-	return teodSelectObject(pos, filters, AsciiString::TheEmptyString, Parameter::CLOSEST);
+	return clpSelectObject(pos, filters, AsciiString::TheEmptyString, Parameter::CLOSEST);
 }
 
 //-------------------------------------------------------------------------------------------------
 /** Docks obj at its player's closest airfield, repair pad or heal pad, by its kind. */
 //-------------------------------------------------------------------------------------------------
-void teodDockForRepair(Object *obj, Object *airfield, Object *repairPad, Object *healPad)
+void clpDockForRepair(Object *obj, Object *airfield, Object *repairPad, Object *healPad)
 {
 	AIUpdateInterface *ai = obj->getAIUpdateInterface();
 	if (!ai)
@@ -599,7 +599,7 @@ void teodDockForRepair(Object *obj, Object *airfield, Object *repairPad, Object 
 }
 
 //-------------------------------------------------------------------------------------------------
-void teodTeamSendToRepair(const AsciiString &teamName, const AsciiString &objectType, Bool sendBackFullHP)
+void clpTeamSendToRepair(const AsciiString &teamName, const AsciiString &objectType, Bool sendBackFullHP)
 {
 	Team *team = TheScriptEngine->getTeamNamed(teamName);
 	if (!team)
@@ -611,16 +611,16 @@ void teodTeamSendToRepair(const AsciiString &teamName, const AsciiString &object
 	{
 		return;
 	}
-	Object *teamObj = teodFirstAIMember(team);
+	Object *teamObj = clpFirstAIMember(team);
 	if (!teamObj)
 	{
 		return;
 	}
 
 	const Coord3D *teamPos = teamObj->getPosition();
-	Object *airfield = teodClosestOwned(teamPos, player, KINDOF_FS_AIRFIELD);
-	Object *repairPad = teodClosestOwned(teamPos, player, KINDOF_REPAIR_PAD);
-	Object *healPad = teodClosestOwned(teamPos, player, KINDOF_HEAL_PAD);
+	Object *airfield = clpClosestOwned(teamPos, player, KINDOF_FS_AIRFIELD);
+	Object *repairPad = clpClosestOwned(teamPos, player, KINDOF_REPAIR_PAD);
+	Object *healPad = clpClosestOwned(teamPos, player, KINDOF_HEAL_PAD);
 
 	for (DLINK_ITERATOR<Object> iter = team->iterate_TeamMemberList(); !iter.done(); iter.advance())
 	{
@@ -629,7 +629,7 @@ void teodTeamSendToRepair(const AsciiString &teamName, const AsciiString &object
 		{
 			continue;
 		}
-		if (objectType.isNotEmpty() && !teodObjectMatchesType(obj, objectType))
+		if (objectType.isNotEmpty() && !clpObjectMatchesType(obj, objectType))
 		{
 			continue;
 		}
@@ -643,14 +643,14 @@ void teodTeamSendToRepair(const AsciiString &teamName, const AsciiString &object
 		{
 			continue;
 		}
-		teodDockForRepair(obj, airfield, repairPad, healPad);
+		clpDockForRepair(obj, airfield, repairPad, healPad);
 	}
 }
 
 //-------------------------------------------------------------------------------------------------
 /** Spreads the team's infantry over its transports round robin, within each transport's free slots. */
 //-------------------------------------------------------------------------------------------------
-void teodLoadTransportsEvenly(const AsciiString &teamName, const AsciiString &transportType)
+void clpLoadTransportsEvenly(const AsciiString &teamName, const AsciiString &transportType)
 {
 	Team *team = TheScriptEngine->getTeamNamed(teamName);
 	if (!team)
@@ -670,7 +670,7 @@ void teodLoadTransportsEvenly(const AsciiString &teamName, const AsciiString &tr
 		}
 		if (obj->isKindOf(KINDOF_TRANSPORT))
 		{
-			if (transportType.isNotEmpty() && !teodObjectMatchesType(obj, transportType))
+			if (transportType.isNotEmpty() && !clpObjectMatchesType(obj, transportType))
 			{
 				continue;
 			}
@@ -733,14 +733,14 @@ void ScriptActions::doTeamMoveRelative(const AsciiString& teamName, Coord3D* coo
 	}
 
 	Coord3D center;
-	if (!teodTeamCenter(team, &center))
+	if (!clpTeamCenter(team, &center))
 	{
 		return;
 	}
 	Coord3D dest;
 	dest.set(center.x + coords->x, center.y + coords->y, center.z);
 
-	AIGroupPtr theGroup = teodTeamGroup(team);
+	AIGroupPtr theGroup = clpTeamGroup(team);
 	if (!theGroup)
 	{
 		return;
@@ -782,7 +782,7 @@ void ScriptActions::doTeamMoveNearestBelongingToPlayer(const AsciiString& teamNa
 	{
 		return;
 	}
-	Object *teamObj = teodFirstAIMember(team);
+	Object *teamObj = clpFirstAIMember(team);
 	if (!teamObj)
 	{
 		return;
@@ -791,10 +791,10 @@ void ScriptActions::doTeamMoveNearestBelongingToPlayer(const AsciiString& teamNa
 	PartitionFilterPlayer filterPlayer(targetPlayer, TRUE);
 	PartitionFilter *filters[] = { &filterPlayer, nullptr };
 	Coord3D teamPos = *teamObj->getPosition();
-	Object *bestObj = teodSelectObject(&teamPos, filters, objectType, selectionMode);
+	Object *bestObj = clpSelectObject(&teamPos, filters, objectType, selectionMode);
 	if (bestObj)
 	{
-		teodTeamMoveToObject(team, bestObj);
+		clpTeamMoveToObject(team, bestObj);
 	}
 }
 
@@ -818,9 +818,9 @@ void ScriptActions::doUnitMoveNearestBelongingToPlayer(const AsciiString& unitNa
 	}
 
 	PartitionFilterPlayer filterPlayer(targetPlayer, TRUE);
-	PartitionFilterTEODRejectSelf filterSelf(nullptr, obj);
+	PartitionFilterCLPRejectSelf filterSelf(nullptr, obj);
 	PartitionFilter *filters[] = { &filterPlayer, &filterSelf, nullptr };
-	Object *bestObj = teodSelectObject(obj->getPosition(), filters, objectType, selectionMode);
+	Object *bestObj = clpSelectObject(obj->getPosition(), filters, objectType, selectionMode);
 	if (!bestObj)
 	{
 		return;
@@ -832,73 +832,73 @@ void ScriptActions::doUnitMoveNearestBelongingToPlayer(const AsciiString& unitNa
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamMoveAwayFromRelation(const AsciiString& teamName, Real feet, Int relationType, Int selectionMode)
 {
-	teodTeamRelationMove(TEOD_MOVE_AWAY, teamName, feet, relationType, AsciiString::TheEmptyString, selectionMode);
+	clpTeamRelationMove(CLP_MOVE_AWAY, teamName, feet, relationType, AsciiString::TheEmptyString, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamMoveAwayFromRelationType(const AsciiString& teamName, Real feet, Int relationType, const AsciiString& objectType, Int selectionMode)
 {
-	teodTeamRelationMove(TEOD_MOVE_AWAY, teamName, feet, relationType, objectType, selectionMode);
+	clpTeamRelationMove(CLP_MOVE_AWAY, teamName, feet, relationType, objectType, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doUnitMoveAwayFromRelation(const AsciiString& unitName, Real feet, Int relationType, Int selectionMode)
 {
-	teodUnitRelationMove(TEOD_MOVE_AWAY, unitName, feet, relationType, AsciiString::TheEmptyString, selectionMode);
+	clpUnitRelationMove(CLP_MOVE_AWAY, unitName, feet, relationType, AsciiString::TheEmptyString, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doUnitMoveAwayFromRelationType(const AsciiString& unitName, Real feet, Int relationType, const AsciiString& objectType, Int selectionMode)
 {
-	teodUnitRelationMove(TEOD_MOVE_AWAY, unitName, feet, relationType, objectType, selectionMode);
+	clpUnitRelationMove(CLP_MOVE_AWAY, unitName, feet, relationType, objectType, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamMoveTowardsRelation(const AsciiString& teamName, Real feet, Int relationType, Int selectionMode)
 {
-	teodTeamRelationMove(TEOD_MOVE_TOWARDS, teamName, feet, relationType, AsciiString::TheEmptyString, selectionMode);
+	clpTeamRelationMove(CLP_MOVE_TOWARDS, teamName, feet, relationType, AsciiString::TheEmptyString, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamMoveTowardsRelationType(const AsciiString& teamName, Real feet, Int relationType, const AsciiString& objectType, Int selectionMode)
 {
-	teodTeamRelationMove(TEOD_MOVE_TOWARDS, teamName, feet, relationType, objectType, selectionMode);
+	clpTeamRelationMove(CLP_MOVE_TOWARDS, teamName, feet, relationType, objectType, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doUnitMoveTowardsRelation(const AsciiString& unitName, Real feet, Int relationType, Int selectionMode)
 {
-	teodUnitRelationMove(TEOD_MOVE_TOWARDS, unitName, feet, relationType, AsciiString::TheEmptyString, selectionMode);
+	clpUnitRelationMove(CLP_MOVE_TOWARDS, unitName, feet, relationType, AsciiString::TheEmptyString, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doUnitMoveTowardsRelationType(const AsciiString& unitName, Real feet, Int relationType, const AsciiString& objectType, Int selectionMode)
 {
-	teodUnitRelationMove(TEOD_MOVE_TOWARDS, unitName, feet, relationType, objectType, selectionMode);
+	clpUnitRelationMove(CLP_MOVE_TOWARDS, unitName, feet, relationType, objectType, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamKeepDistanceFromRelation(const AsciiString& teamName, Real feet, Int relationType, Int selectionMode)
 {
-	teodTeamRelationMove(TEOD_KEEP_DISTANCE, teamName, feet, relationType, AsciiString::TheEmptyString, selectionMode);
+	clpTeamRelationMove(CLP_KEEP_DISTANCE, teamName, feet, relationType, AsciiString::TheEmptyString, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamKeepDistanceFromRelationType(const AsciiString& teamName, Real feet, Int relationType, const AsciiString& objectType, Int selectionMode)
 {
-	teodTeamRelationMove(TEOD_KEEP_DISTANCE, teamName, feet, relationType, objectType, selectionMode);
+	clpTeamRelationMove(CLP_KEEP_DISTANCE, teamName, feet, relationType, objectType, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doUnitKeepDistanceFromRelation(const AsciiString& unitName, Real feet, Int relationType, Int selectionMode)
 {
-	teodUnitRelationMove(TEOD_KEEP_DISTANCE, unitName, feet, relationType, AsciiString::TheEmptyString, selectionMode);
+	clpUnitRelationMove(CLP_KEEP_DISTANCE, unitName, feet, relationType, AsciiString::TheEmptyString, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doUnitKeepDistanceFromRelationType(const AsciiString& unitName, Real feet, Int relationType, const AsciiString& objectType, Int selectionMode)
 {
-	teodUnitRelationMove(TEOD_KEEP_DISTANCE, unitName, feet, relationType, objectType, selectionMode);
+	clpUnitRelationMove(CLP_KEEP_DISTANCE, unitName, feet, relationType, objectType, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -911,11 +911,11 @@ void ScriptActions::doTeamMeet(const AsciiString& teamName)
 	}
 
 	Coord3D center;
-	if (!teodTeamCenter(team, &center))
+	if (!clpTeamCenter(team, &center))
 	{
 		return;
 	}
-	AIGroupPtr theGroup = teodTeamGroup(team);
+	AIGroupPtr theGroup = clpTeamGroup(team);
 	if (!theGroup)
 	{
 		return;
@@ -935,13 +935,13 @@ void ScriptActions::doTeamMeetKindOf(const AsciiString& teamName, Int kindOf)
 	Coord3D sum;
 	sum.zero();
 	Int count = 0;
-	teodSumTeamPositions(team, (KindOfType)kindOf, AsciiString::TheEmptyString, &sum, &count);
+	clpSumTeamPositions(team, (KindOfType)kindOf, AsciiString::TheEmptyString, &sum, &count);
 	Coord3D center;
-	if (!teodAveragePosition(sum, count, &center))
+	if (!clpAveragePosition(sum, count, &center))
 	{
 		return;
 	}
-	AIGroupPtr theGroup = teodTeamGroup(team);
+	AIGroupPtr theGroup = clpTeamGroup(team);
 	if (!theGroup)
 	{
 		return;
@@ -961,13 +961,13 @@ void ScriptActions::doTeamMeetType(const AsciiString& teamName, const AsciiStrin
 	Coord3D sum;
 	sum.zero();
 	Int count = 0;
-	teodSumTeamPositions(team, KINDOF_INVALID, objectType, &sum, &count);
+	clpSumTeamPositions(team, KINDOF_INVALID, objectType, &sum, &count);
 	Coord3D center;
-	if (!teodAveragePosition(sum, count, &center))
+	if (!clpAveragePosition(sum, count, &center))
 	{
 		return;
 	}
-	AIGroupPtr theGroup = teodTeamGroup(team);
+	AIGroupPtr theGroup = clpTeamGroup(team);
 	if (!theGroup)
 	{
 		return;
@@ -988,18 +988,18 @@ void ScriptActions::doTeamMeetTeam(const AsciiString& teamNameA, const AsciiStri
 	Coord3D sum;
 	sum.zero();
 	Int count = 0;
-	teodSumTeamPositions(teamA, KINDOF_INVALID, AsciiString::TheEmptyString, &sum, &count);
+	clpSumTeamPositions(teamA, KINDOF_INVALID, AsciiString::TheEmptyString, &sum, &count);
 	if (teamB != teamA)
 	{
-		teodSumTeamPositions(teamB, KINDOF_INVALID, AsciiString::TheEmptyString, &sum, &count);
+		clpSumTeamPositions(teamB, KINDOF_INVALID, AsciiString::TheEmptyString, &sum, &count);
 	}
 	Coord3D center;
-	if (!teodAveragePosition(sum, count, &center))
+	if (!clpAveragePosition(sum, count, &center))
 	{
 		return;
 	}
 
-	AIGroupPtr theGroupA = teodTeamGroup(teamA);
+	AIGroupPtr theGroupA = clpTeamGroup(teamA);
 	if (theGroupA)
 	{
 		theGroupA->groupMoveToPosition(&center, false, CMD_FROM_SCRIPT);
@@ -1008,7 +1008,7 @@ void ScriptActions::doTeamMeetTeam(const AsciiString& teamNameA, const AsciiStri
 	{
 		return;
 	}
-	AIGroupPtr theGroupB = teodTeamGroup(teamB);
+	AIGroupPtr theGroupB = clpTeamGroup(teamB);
 	if (theGroupB)
 	{
 		theGroupB->groupMoveToPosition(&center, false, CMD_FROM_SCRIPT);
@@ -1026,11 +1026,11 @@ void ScriptActions::doTeamMoveToTeam(const AsciiString& teamNameA, const AsciiSt
 	}
 
 	Coord3D center;
-	if (!teodTeamCenter(teamB, &center))
+	if (!clpTeamCenter(teamB, &center))
 	{
 		return;
 	}
-	AIGroupPtr theGroup = teodTeamGroup(teamA);
+	AIGroupPtr theGroup = clpTeamGroup(teamA);
 	if (!theGroup)
 	{
 		return;
@@ -1041,37 +1041,37 @@ void ScriptActions::doTeamMoveToTeam(const AsciiString& teamNameA, const AsciiSt
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamAttackType(const AsciiString& teamName, const AsciiString& objectType, Int selectionMode)
 {
-	teodTeamAttack(teamName, objectType, nullptr, FALSE, FALSE, selectionMode);
+	clpTeamAttack(teamName, objectType, nullptr, FALSE, FALSE, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamAttackTypeArea(const AsciiString& teamName, const AsciiString& objectType, const AsciiString& pTriggerParm, Int selectionMode)
 {
-	teodTeamAttack(teamName, objectType, &pTriggerParm, FALSE, FALSE, selectionMode);
+	clpTeamAttack(teamName, objectType, &pTriggerParm, FALSE, FALSE, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamAttackSeenUnit(const AsciiString& teamName, Int selectionMode)
 {
-	teodTeamAttack(teamName, AsciiString::TheEmptyString, nullptr, TRUE, FALSE, selectionMode);
+	clpTeamAttack(teamName, AsciiString::TheEmptyString, nullptr, TRUE, FALSE, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamAttackSeenType(const AsciiString& teamName, const AsciiString& objectType, Int selectionMode)
 {
-	teodTeamAttack(teamName, objectType, nullptr, TRUE, FALSE, selectionMode);
+	clpTeamAttack(teamName, objectType, nullptr, TRUE, FALSE, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamAttackSeenArea(const AsciiString& teamName, const AsciiString& pTriggerParm, Int selectionMode)
 {
-	teodTeamAttack(teamName, AsciiString::TheEmptyString, &pTriggerParm, TRUE, FALSE, selectionMode);
+	clpTeamAttack(teamName, AsciiString::TheEmptyString, &pTriggerParm, TRUE, FALSE, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamAttackSeenTypeArea(const AsciiString& teamName, const AsciiString& objectType, const AsciiString& pTriggerParm, Int selectionMode)
 {
-	teodTeamAttack(teamName, objectType, &pTriggerParm, TRUE, FALSE, selectionMode);
+	clpTeamAttack(teamName, objectType, &pTriggerParm, TRUE, FALSE, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1088,7 +1088,7 @@ void ScriptActions::doTeamAttackMoveLocation(const AsciiString& teamName, const 
 		return;
 	}
 
-	AIGroupPtr theGroup = teodTeamGroup(team);
+	AIGroupPtr theGroup = clpTeamGroup(team);
 	if (!theGroup)
 	{
 		return;
@@ -1099,43 +1099,43 @@ void ScriptActions::doTeamAttackMoveLocation(const AsciiString& teamName, const 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamAttackMoveArea(const AsciiString& teamName, const AsciiString& pTriggerArea, Int selectionMode)
 {
-	teodTeamAttack(teamName, AsciiString::TheEmptyString, &pTriggerArea, FALSE, TRUE, selectionMode);
+	clpTeamAttack(teamName, AsciiString::TheEmptyString, &pTriggerArea, FALSE, TRUE, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamAttackMoveType(const AsciiString& teamName, const AsciiString& objectType, Int selectionMode)
 {
-	teodTeamAttack(teamName, objectType, nullptr, FALSE, TRUE, selectionMode);
+	clpTeamAttack(teamName, objectType, nullptr, FALSE, TRUE, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamAttackMoveTypeArea(const AsciiString& teamName, const AsciiString& objectType, const AsciiString& pTriggerArea, Int selectionMode)
 {
-	teodTeamAttack(teamName, objectType, &pTriggerArea, FALSE, TRUE, selectionMode);
+	clpTeamAttack(teamName, objectType, &pTriggerArea, FALSE, TRUE, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamAttackMoveSeenUnit(const AsciiString& teamName, Int selectionMode)
 {
-	teodTeamAttack(teamName, AsciiString::TheEmptyString, nullptr, TRUE, TRUE, selectionMode);
+	clpTeamAttack(teamName, AsciiString::TheEmptyString, nullptr, TRUE, TRUE, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamAttackMoveSeenType(const AsciiString& teamName, const AsciiString& objectType, Int selectionMode)
 {
-	teodTeamAttack(teamName, objectType, nullptr, TRUE, TRUE, selectionMode);
+	clpTeamAttack(teamName, objectType, nullptr, TRUE, TRUE, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamAttackMoveSeenArea(const AsciiString& teamName, const AsciiString& pTriggerParm, Int selectionMode)
 {
-	teodTeamAttack(teamName, AsciiString::TheEmptyString, &pTriggerParm, TRUE, TRUE, selectionMode);
+	clpTeamAttack(teamName, AsciiString::TheEmptyString, &pTriggerParm, TRUE, TRUE, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamAttackMoveSeenTypeArea(const AsciiString& teamName, const AsciiString& objectType, const AsciiString& pTriggerParm, Int selectionMode)
 {
-	teodTeamAttack(teamName, objectType, &pTriggerParm, TRUE, TRUE, selectionMode);
+	clpTeamAttack(teamName, objectType, &pTriggerParm, TRUE, TRUE, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1148,7 +1148,7 @@ void ScriptActions::doTeamAttackMovePath(const AsciiString& teamName, const Asci
 	}
 
 	Coord3D center;
-	if (!teodTeamCenter(team, &center))
+	if (!clpTeamCenter(team, &center))
 	{
 		return;
 	}
@@ -1158,7 +1158,7 @@ void ScriptActions::doTeamAttackMovePath(const AsciiString& teamName, const Asci
 		return;
 	}
 
-	AIGroupPtr theGroup = teodTeamGroup(team);
+	AIGroupPtr theGroup = clpTeamGroup(team);
 	if (!theGroup)
 	{
 		return;
@@ -1169,7 +1169,7 @@ void ScriptActions::doTeamAttackMovePath(const AsciiString& teamName, const Asci
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamMoveCaptured(const AsciiString& teamName)
 {
-	teodTeamMoveCaptured(teamName, AsciiString::TheEmptyString);
+	clpTeamMoveCaptured(teamName, AsciiString::TheEmptyString);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1179,38 +1179,38 @@ void ScriptActions::doTeamMoveCapturedType(const AsciiString& teamName, const As
 	{
 		return;
 	}
-	teodTeamMoveCaptured(teamName, objectType);
+	clpTeamMoveCaptured(teamName, objectType);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamMoveNearestUnderFog(const AsciiString& teamName, const AsciiString& objectType, Int selectionMode)
 {
-	teodTeamMoveFog(teamName, objectType, nullptr, TRUE, selectionMode);
+	clpTeamMoveFog(teamName, objectType, nullptr, TRUE, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamMoveNearestUnderFogInArea(const AsciiString& teamName, const AsciiString& objectType, const AsciiString& pTriggerArea, Int selectionMode)
 {
-	teodTeamMoveFog(teamName, objectType, &pTriggerArea, TRUE, selectionMode);
+	clpTeamMoveFog(teamName, objectType, &pTriggerArea, TRUE, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamMoveNearestNotUnderFog(const AsciiString& teamName, const AsciiString& objectType, Int selectionMode)
 {
-	teodTeamMoveFog(teamName, objectType, nullptr, FALSE, selectionMode);
+	clpTeamMoveFog(teamName, objectType, nullptr, FALSE, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamMoveNearestNotUnderFogInArea(const AsciiString& teamName, const AsciiString& objectType, const AsciiString& pTriggerArea, Int selectionMode)
 {
-	teodTeamMoveFog(teamName, objectType, &pTriggerArea, FALSE, selectionMode);
+	clpTeamMoveFog(teamName, objectType, &pTriggerArea, FALSE, selectionMode);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doUnitTeleportLocation(const AsciiString& unitName, const AsciiString& waypointName)
 {
 	Object *obj = TheScriptEngine->getUnitNamed(unitName);
-	if (!teodCanTeleport(obj))
+	if (!clpCanTeleport(obj))
 	{
 		return;
 	}
@@ -1219,7 +1219,7 @@ void ScriptActions::doUnitTeleportLocation(const AsciiString& unitName, const As
 	{
 		return;
 	}
-	teodTeleport(obj, way->getLocation());
+	clpTeleport(obj, way->getLocation());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1241,7 +1241,7 @@ void ScriptActions::doTeamTeleportLocation(const AsciiString& teamName, const As
 	for (DLINK_ITERATOR<Object> iter = team->iterate_TeamMemberList(); !iter.done(); iter.advance())
 	{
 		Object *obj = iter.cur();
-		if (!teodCanTeleport(obj))
+		if (!clpCanTeleport(obj))
 		{
 			continue;
 		}
@@ -1269,7 +1269,7 @@ void ScriptActions::doTeamTeleportLocation(const AsciiString& teamName, const As
 	{
 		Coord3D pos;
 		pos.set(center->x + ((Int)i % side - half) * spacing, center->y + ((Int)i / side - half) * spacing, center->z);
-		teodTeleport(objs[i], &pos);
+		clpTeleport(objs[i], &pos);
 	}
 }
 
@@ -1295,7 +1295,7 @@ void ScriptActions::doTeamUseCommandButtonAbilityOnType(const AsciiString& teamN
 		{
 			continue;
 		}
-		if (teodObjectMatchesType(obj, objectType))
+		if (clpObjectMatchesType(obj, objectType))
 		{
 			users.push_back(obj);
 		}
@@ -1422,7 +1422,7 @@ void ScriptActions::doTeamHuntWithCommandButtonType(const AsciiString& teamName,
 		{
 			continue;
 		}
-		if (!teodObjectMatchesType(obj, objectType))
+		if (!clpObjectMatchesType(obj, objectType))
 		{
 			continue;
 		}
@@ -1500,7 +1500,7 @@ void ScriptActions::doTeamEvacuateDestroyedPercent(const AsciiString& teamName, 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamSendToRepair(const AsciiString& teamName, Bool sendBackFullHP)
 {
-	teodTeamSendToRepair(teamName, AsciiString::TheEmptyString, sendBackFullHP);
+	clpTeamSendToRepair(teamName, AsciiString::TheEmptyString, sendBackFullHP);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1518,10 +1518,10 @@ void ScriptActions::doUnitSendToRepair(const AsciiString& unitName)
 	}
 
 	const Coord3D *pos = obj->getPosition();
-	Object *airfield = teodClosestOwned(pos, player, KINDOF_FS_AIRFIELD);
-	Object *repairPad = teodClosestOwned(pos, player, KINDOF_REPAIR_PAD);
-	Object *healPad = teodClosestOwned(pos, player, KINDOF_HEAL_PAD);
-	teodDockForRepair(obj, airfield, repairPad, healPad);
+	Object *airfield = clpClosestOwned(pos, player, KINDOF_FS_AIRFIELD);
+	Object *repairPad = clpClosestOwned(pos, player, KINDOF_REPAIR_PAD);
+	Object *healPad = clpClosestOwned(pos, player, KINDOF_HEAL_PAD);
+	clpDockForRepair(obj, airfield, repairPad, healPad);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1531,13 +1531,13 @@ void ScriptActions::doTeamSendToRepairType(const AsciiString& teamName, const As
 	{
 		return;
 	}
-	teodTeamSendToRepair(teamName, objectType, sendBackFullHP);
+	clpTeamSendToRepair(teamName, objectType, sendBackFullHP);
 }
 
 //-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamLoadAllTransportsEvenly(const AsciiString& teamName)
 {
-	teodLoadTransportsEvenly(teamName, AsciiString::TheEmptyString);
+	clpLoadTransportsEvenly(teamName, AsciiString::TheEmptyString);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1547,5 +1547,5 @@ void ScriptActions::doTeamLoadAllTransportsEvenlyType(const AsciiString& teamNam
 	{
 		return;
 	}
-	teodLoadTransportsEvenly(teamName, objectType);
+	clpLoadTransportsEvenly(teamName, objectType);
 }
