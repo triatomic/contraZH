@@ -135,6 +135,7 @@ HotKey::HotKey()
 {
 	m_win = nullptr;
 	m_key.clear();
+	m_priority = FALSE;
 }
 
 //-----------------------------------------------------------------------------
@@ -162,19 +163,28 @@ void HotKeyManager::reset()
 }
 
 //-----------------------------------------------------------------------------
-void HotKeyManager::addHotKey( GameWindow *win, const AsciiString& keyIn)
+void HotKeyManager::addHotKey( GameWindow *win, const AsciiString& keyIn, Bool priority )
 {
 	AsciiString key = keyIn;
 	key.toLower();
 	HotKeyMap::iterator it = m_hotKeyMap.find(key);
 	if( it != m_hotKeyMap.end() )
 	{
-		DEBUG_CRASH(("Hotkey %s is already mapped to window %s, current window is %s", key.str(), it->second.m_win->winGetInstanceData()->m_decoratedNameString.str(), win->winGetInstanceData()->m_decoratedNameString.str()));
-		return;
+		// TheSuperHackers @feature A priority key outranks a normal one whichever registers first.
+		if( it->second.m_priority && !priority )
+		{
+			return;
+		}
+		if( it->second.m_priority || !priority )
+		{
+			DEBUG_CRASH(("Hotkey %s is already mapped to window %s, current window is %s", key.str(), it->second.m_win->winGetInstanceData()->m_decoratedNameString.str(), win->winGetInstanceData()->m_decoratedNameString.str()));
+			return;
+		}
 	}
 	HotKey newHK;
 	newHK.m_key.set(key);
 	newHK.m_win = win;
+	newHK.m_priority = priority;
 	m_hotKeyMap[key] = newHK;
 }
 
@@ -301,6 +311,21 @@ AsciiString HotKeyManager::getHotKeyForWindow( const GameWindow *win ) const
 	}
 
 	return AsciiString::TheEmptyString;
+}
+
+//-----------------------------------------------------------------------------
+GameWindow *HotKeyManager::findHotKeyWindow( const AsciiString& keyIn, Bool priority ) const
+{
+	AsciiString key = keyIn;
+	key.toLower();
+
+	HotKeyMap::const_iterator it = m_hotKeyMap.find(key);
+	if( it == m_hotKeyMap.end() || it->second.m_priority != priority )
+	{
+		return nullptr;
+	}
+
+	return it->second.m_win;
 }
 
 //-----------------------------------------------------------------------------

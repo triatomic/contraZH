@@ -77,6 +77,7 @@ public:
 	HotKey();
 	GameWindow *m_win;
 	AsciiString m_key;
+	Bool m_priority;
 	// we may need a checkmark system.
 };
 
@@ -92,7 +93,9 @@ public:
 	virtual void reset() override;															///< Reset
 	//-----------------------------------------------------------------------------------------------
 
-	void addHotKey( GameWindow *win, const AsciiString& key);
+	// TheSuperHackers @feature A priority key takes the key from a normal holder and keeps it
+	// against any later normal claim.
+	void addHotKey( GameWindow *win, const AsciiString& key, Bool priority = FALSE );
 	Bool executeHotKey( const AsciiString& key); // called front eh HotKeyTranslator
 
 	AsciiString searchHotKey( const AsciiString& label);
@@ -102,6 +105,9 @@ public:
 	// Deliberately not derived from the window's label -- addHotKey drops keys that collide
 	// with an earlier button, so only this reports the key that will really work.
 	AsciiString getHotKeyForWindow( const GameWindow *win ) const;
+
+	// TheSuperHackers @feature The window holding this key, if its priority matches.
+	GameWindow *findHotKeyWindow( const AsciiString& key, Bool priority ) const;
 
 	// TheSuperHackers @feature True while a button press is being synthesized from a keyboard
 	// hotkey rather than an actual mouse click. Quick cast needs to tell the two apart.

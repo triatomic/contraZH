@@ -459,6 +459,10 @@ row-ordered layout. 0 disables remapping.)
 An excluded slot falls back to its string file letter, or gets no hotkey if that letter is also a
 grid key.
 
+Stop, Guard, Attack Move and Evacuate always keep their string file letter. A grid slot on the same key swaps
+with them and takes the unit order's grid key. Production buildings have no such buttons, so the
+whole grid works unchanged.
+
 ## Reverse move hotkey
 
 Caps Lock arms a reverse move for the whole selection; the next terrain click drives there in

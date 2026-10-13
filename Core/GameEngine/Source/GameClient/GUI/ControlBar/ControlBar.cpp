@@ -2702,16 +2702,46 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 		// stay in the same place whatever is being built.
 		AsciiString hotKey;
 		Bool isGridSlot = FALSE;
+		const Bool gridEnabled = TheGlobalData && TheGlobalData->m_gridHotkeysEnabled;
 
-		if( TheGlobalData && TheGlobalData->m_gridHotkeysEnabled )
+		// Unit orders keep the player's own letter and swap grid keys with the slot that had it, so
+		// a building without them keeps the whole grid.
+		Bool displaced = FALSE;
+		const GUICommandType commandType = commandButton->getCommandType();
+		Bool isUnitOrder = gridEnabled &&
+				( commandType == GUI_COMMAND_STOP ||
+				commandType == GUI_COMMAND_GUARD ||
+				commandType == GUI_COMMAND_GUARD_WITHOUT_PURSUIT ||
+				commandType == GUI_COMMAND_GUARD_FLYING_UNITS_ONLY ||
+				commandType == GUI_COMMAND_ATTACK_MOVE ||
+				commandType == GUI_COMMAND_EVACUATE ||
+				commandType == GUI_COMMAND_EVACUATE_TO_WORK );
+
+		// A unit order whose label marks no letter keys by the grid like any other slot.
+		if( isUnitOrder )
+		{
+			hotKey = TheHotKeyManager->searchHotKey( commandButton->getTextLabel() );
+			isUnitOrder = hotKey.isNotEmpty();
+		}
+
+		if( gridEnabled && !isUnitOrder )
+		{
 			hotKey = getGridHotKeyForButton( button, &isGridSlot );
+
+			GameWindow *unitOrder = hotKey.isEmpty() ? nullptr : TheHotKeyManager->findHotKeyWindow( hotKey, TRUE );
+			if( unitOrder != nullptr )
+			{
+				hotKey = getGridHotKeyForButton( unitOrder );
+				displaced = TRUE;
+			}
+		}
 
 		// Fall back to the string file letter whenever the grid did not supply one. That covers a
 		// button the grid does not reach -- past the end of the layout, or not in the command bar
 		// at all -- and also a slot whose key the player put on NonGridHotkeys, which is what
 		// excluding a key is for: the key goes back to the game, and the button keys the way it
 		// did before grid hotkeys existed.
-		if( hotKey.isEmpty() )
+		if( hotKey.isEmpty() && !isUnitOrder && !displaced )
 		{
 			const AsciiString strHotKey = TheHotKeyManager->searchHotKey(commandButton->getTextLabel());
 
@@ -2749,7 +2779,20 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 		}
 
 		if(hotKey.isNotEmpty())
-			TheHotKeyManager->addHotKey(button, hotKey);
+		{
+			GameWindow *gridSlot = isUnitOrder ? TheHotKeyManager->findHotKeyWindow( hotKey, FALSE ) : nullptr;
+			TheHotKeyManager->addHotKey(button, hotKey, isUnitOrder);
+
+			// A grid slot registered earlier loses the key here and takes this button's grid key.
+			if( gridSlot != nullptr && getGridHotKeyForButton( gridSlot ).compareNoCase( hotKey ) == 0 )
+			{
+				const AsciiString swapKey = getGridHotKeyForButton( button );
+				if( swapKey.isNotEmpty() )
+				{
+					TheHotKeyManager->addHotKey( gridSlot, swapKey );
+				}
+			}
+		}
 	}
 	GadgetButtonSetAltSound(button, "GUICommandBarClick");
 
