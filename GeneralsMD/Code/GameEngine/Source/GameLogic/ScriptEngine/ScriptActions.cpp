@@ -6707,6 +6707,10 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 {
 	switch (pAction->getActionType()) {
 		default:
+			if (executeTEODAction(pAction))
+			{
+				return;
+			}
 			DEBUG_CRASH(("Unknown ScriptAction type %d", pAction->getActionType())); return;
 		case ScriptAction::DEBUG_MESSAGE_BOX:
 			doDebugMessage(pAction->getParameter(0)->getString(), true);

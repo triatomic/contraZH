@@ -354,6 +354,33 @@ drops to 100. Empty sources never qualify.
 * Does nothing when no source qualifies.
 ([#134](https://github.com/triatomic/contraZH/issues/134))
 
+## TEOD scripts
+
+142 script actions and 67 conditions ported from
+[CookieLandProjects/CLP_AI](https://github.com/CookieLandProjects/CLP_AI), under the `TEOD` folder in
+WorldBuilder's action and condition trees. The scripts were written by toirehantaa and CookieLand
+Projects.
+
+| Group | Examples |
+|---|---|
+| Team and unit orders | move relative, move towards or away from a relation, keep distance, meet, attack or attack-move by type, area or sight, teleport, repair, load transports evenly |
+| Player and team management | merge, disband, garrison, hunt, sell, cancel construction, surrender, transfer an area, custom colour |
+| Counters and KD ratios | random counter, copy counter, kills to deaths ratios fed by real kills and losses |
+| Attack priority sets | apply per player or type, add sets, raise or lower a type |
+| Skirmish AI building | rotated placement near a type, kind, team or supply source; base defense lists; closest-dozer priority; build list editing; particle cannon targeting |
+| Waypoints | create, remove, relocate, link, label at runtime |
+| Conditions | relations, start spots, map control, unit ratios, sighting, losses and kills, captures, team idle, health, reload state |
+
+* Two new parameter types: KD ratio and selection mode (closest, farthest, random, youngest, oldest).
+* Not ported, because they need TEOD data: ID build lists, AI playstyles, Brutal/Absurd/Inhumane
+difficulties.
+* "Seen" means the player can see the unit right now. CLP remembered sightings for 10 seconds, but
+counted any player's units.
+* Kill and loss conditions see every event since their last check, kept for 5 minutes.
+* Runtime waypoint changes survive save and load. Removed waypoints stay valid for units already
+following them.
+* Old saves load unchanged; the new state lives in its own save blocks.
+
 ## New factions in PlayerTemplate.ini
 
 `PlayableSide` defaults to `No`. Killing units of a faction without `PlayableSide = Yes` earns no

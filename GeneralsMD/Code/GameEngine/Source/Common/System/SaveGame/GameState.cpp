@@ -56,6 +56,9 @@
 #include "GameLogic/GhostObject.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/ScriptEngine.h"
+#include "GameLogic/ScriptTEOD.h"
+#include "GameLogic/ScriptTEODAI.h"
+#include "GameLogic/ScriptTEODWaypoints.h"
 #include "GameLogic/SidesList.h"
 #include "GameLogic/TerrainLogic.h"
 #include "Lib/PathUtil.h"
@@ -309,6 +312,7 @@ void GameState::init()
 	addSnapshotBlock( CAMPAIGN_BLOCK_STRING,					TheCampaignManager,				SNAPSHOT_SAVELOAD );
 	addSnapshotBlock( "CHUNK_GameStateMap",						TheGameStateMap,					SNAPSHOT_SAVELOAD );
 	addSnapshotBlock( "CHUNK_TerrainLogic",						TheTerrainLogic,					SNAPSHOT_SAVELOAD );
+	addSnapshotBlock( "CHUNK_ScriptTEODWaypoints",			TheScriptTEODWaypoints,		SNAPSHOT_SAVELOAD );
 	addSnapshotBlock( "CHUNK_TeamFactory",						TheTeamFactory,						SNAPSHOT_SAVELOAD );
 	addSnapshotBlock( "CHUNK_Players",								ThePlayerList,						SNAPSHOT_SAVELOAD );
 	addSnapshotBlock( "CHUNK_GameLogic",							TheGameLogic,							SNAPSHOT_SAVELOAD );
@@ -322,6 +326,8 @@ void GameState::init()
 	addSnapshotBlock( "CHUNK_ParticleSystem",					TheParticleSystemManager,	SNAPSHOT_SAVELOAD );
 	addSnapshotBlock( "CHUNK_TerrainVisual",					TheTerrainVisual,					SNAPSHOT_SAVELOAD );
 	addSnapshotBlock( "CHUNK_GhostObject",						TheGhostObjectManager,		SNAPSHOT_SAVELOAD );
+	addSnapshotBlock( "CHUNK_ScriptTEOD",							TheScriptTEODState,				SNAPSHOT_SAVELOAD );
+	addSnapshotBlock( "CHUNK_ScriptTEODAI",						TheScriptTEODAI,					SNAPSHOT_SAVELOAD );
 
 	// add all the snapshot objects to our list of data blocks for deep CRCs of logic
 	addSnapshotBlock( "CHUNK_TeamFactory",						TheTeamFactory,						SNAPSHOT_DEEPCRC_LOGICONLY );

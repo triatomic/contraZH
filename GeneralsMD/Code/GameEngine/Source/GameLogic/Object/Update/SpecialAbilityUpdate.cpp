@@ -65,6 +65,7 @@
 #include "GameLogic/Module/StealthUpdate.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/JumpjetMissileAIUpdate.h"
+#include "GameLogic/ScriptTEOD.h"
 
 
 
@@ -660,6 +661,12 @@ void SpecialAbilityUpdate::onExit( Bool cleanup )
   TheAudio->removeAudioEvent( m_prepSoundLoop.getPlayingHandle() );
   endPreparation();
 
+  SpecialPowerType powerType = data->m_specialPowerTemplate->getSpecialPowerType();
+  if( powerType == SPECIAL_INFANTRY_CAPTURE_BUILDING || powerType == SPECIAL_BLACKLOTUS_CAPTURE_BUILDING )
+  {
+    TheScriptTEODState->setBeingCaptured( TheGameLogic->findObjectByID( m_targetID ), FALSE );
+  }
+
   if( !data->m_specialObjectsPersistent || (cleanup && !data->m_specialObjectsPersistWhenOwnerDies) )
   {
     //Delete special objects that aren't considered persistent whenever we turn off
@@ -1092,6 +1099,7 @@ void SpecialAbilityUpdate::startPreparation()
         TheEva->setShouldPlay( EVA_BuildingBeingStolen );
       }
       TheRadar->tryInfiltrationEvent( target );
+      TheScriptTEODState->setBeingCaptured( target, TRUE );
 
       break;
     }
@@ -1128,6 +1136,10 @@ void SpecialAbilityUpdate::startPreparation()
         }
         TheRadar->tryInfiltrationEvent( target );
 
+        if( spTemplate->getSpecialPowerType() == SPECIAL_BLACKLOTUS_CAPTURE_BUILDING )
+        {
+          TheScriptTEODState->setBeingCaptured( target, TRUE );
+        }
       }
       break;
     }

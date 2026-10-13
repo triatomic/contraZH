@@ -48,6 +48,7 @@
 
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/PartitionManager.h"
+#include "GameLogic/ScriptTEODAI.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ObjectIter.h"
 #include "GameLogic/WeaponSet.h"
@@ -557,7 +558,11 @@ UpdateSleepTime ParticleUplinkCannonUpdate::update()
 		if ( isFiring )
 		{
 
-			if( !m_manualTargetMode && !m_scriptedWaypointMode )
+			if( TheScriptTEODAI && TheScriptTEODAI->steerParticleCannon( me, m_startAttackFrame, data->m_manualFastDrivingSpeed, &m_currentTargetPosition ) )
+			{
+				// a TEOD script aimed this beam at object types
+			}
+			else if( !m_manualTargetMode && !m_scriptedWaypointMode )
 			{
 				//Calculate the position of the beam because it swaths -- a nice S curve centering at the target location!
 

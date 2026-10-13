@@ -2731,8 +2731,15 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 {
 	switch (pCondition->getConditionType()) {
 		default:
+		{
+			Bool result;
+			if (evaluateTEODCondition(pCondition, &result))
+			{
+				return result;
+			}
 			DEBUG_CRASH(("Unknown ScriptCondition type %d", pCondition->getConditionType()));
 			return false;
+		}
 		case Condition::PLAYER_ALL_DESTROYED:
 			return evaluateAllDestroyed(pCondition->getParameter(0));
 		case Condition::PLAYER_ALL_BUILDFACILITIES_DESTROYED:

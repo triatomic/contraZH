@@ -285,6 +285,7 @@ static int familyOf(Parameter::ParameterType type)
 		case Parameter::ANGLE:
 		case Parameter::PERCENT:
 		case Parameter::COMPARISON:
+		case Parameter::SELECTION_MODE:
 		case Parameter::BOOLEAN:
 		case Parameter::SHAKE_INTENSITY:
 		case Parameter::COLOR:
@@ -302,6 +303,7 @@ static int familyOf(Parameter::ParameterType type)
 		case Parameter::SCRIPT:
 		case Parameter::SCRIPT_SUBROUTINE:
 		case Parameter::COUNTER:
+		case Parameter::KD_RATIO:
 		case Parameter::FLAG:
 			return WBQT_PARAM_LOGIC;
 		default:

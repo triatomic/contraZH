@@ -96,6 +96,52 @@ Waypoint::~Waypoint()
 
 }
 
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+Bool Waypoint::hasLink(const Waypoint *pLink) const
+{
+	for (Int i = 0; i < m_numLinks; ++i)
+	{
+		if (m_links[i] == pLink)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+void Waypoint::removeLink(const Waypoint *pLink)
+{
+	Int count = 0;
+	Int i;
+	for (i = 0; i < m_numLinks; ++i)
+	{
+		if (m_links[i] != pLink)
+		{
+			m_links[count] = m_links[i];
+			++count;
+		}
+	}
+	for (i = count; i < m_numLinks; ++i)
+	{
+		m_links[i] = nullptr;
+	}
+	m_numLinks = count;
+}
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+void Waypoint::clearLinks()
+{
+	for (Int i = 0; i < MAX_LINKS; ++i)
+	{
+		m_links[i] = nullptr;
+	}
+	m_numLinks = 0;
+}
+
 // Bridge ////////////////////////////////////////////////////////////////////////////////////////
 
 // ------------------------------------------------------------------------------------------------
@@ -1027,6 +1073,7 @@ TerrainLogic::TerrainLogic()
 	m_numWaterToUpdate = 0;
 
 	m_waypointListHead = nullptr;
+	m_removedWaypointListHead = nullptr;
 	m_bridgeListHead = nullptr;
 	m_mapData = nullptr;
 	m_bridgeDamageStatesChanged = FALSE;
@@ -1468,6 +1515,89 @@ void TerrainLogic::deleteWaypoints()
 		deleteInstance(pWay);
 	}
 	m_waypointListHead = nullptr;
+	for (pWay = m_removedWaypointListHead; pWay; pWay = pNext) {
+		pNext = pWay->getNext();
+		pWay->setNext(nullptr);
+		deleteInstance(pWay);
+	}
+	m_removedWaypointListHead = nullptr;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Adds a waypoint created at runtime. */
+//-------------------------------------------------------------------------------------------------
+void TerrainLogic::insertWaypoint(Waypoint *pWay)
+{
+	if (pWay == nullptr)
+	{
+		return;
+	}
+	pWay->setNext(m_waypointListHead);
+	m_waypointListHead = pWay;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Moves a waypoint to the removed list and drops every link to it. */
+//-------------------------------------------------------------------------------------------------
+void TerrainLogic::removeWaypoint(Waypoint *pWay)
+{
+	Waypoint *pPrior = nullptr;
+	Waypoint *way;
+	for (way = m_waypointListHead; way; way = way->getNext())
+	{
+		if (way == pWay)
+		{
+			break;
+		}
+		pPrior = way;
+	}
+	if (way == nullptr)
+	{
+		return;
+	}
+
+	if (pPrior)
+	{
+		pPrior->setNext(pWay->getNext());
+	}
+	else
+	{
+		m_waypointListHead = pWay->getNext();
+	}
+
+	for (way = m_waypointListHead; way; way = way->getNext())
+	{
+		way->removeLink(pWay);
+	}
+	for (way = m_removedWaypointListHead; way; way = way->getNext())
+	{
+		way->removeLink(pWay);
+	}
+
+	pWay->setNext(m_removedWaypointListHead);
+	m_removedWaypointListHead = pWay;
+}
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+static Waypoint *chainWaypoints(const std::vector<Waypoint *> &list)
+{
+	Waypoint *pNext = nullptr;
+	for (Int i = (Int)list.size() - 1; i >= 0; --i)
+	{
+		list[i]->setNext(pNext);
+		pNext = list[i];
+	}
+	return pNext;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Rebuilds the waypoint lists, used when a saved game restores runtime waypoint changes. */
+//-------------------------------------------------------------------------------------------------
+void TerrainLogic::setWaypointLists(const std::vector<Waypoint *> &active, const std::vector<Waypoint *> &removed)
+{
+	m_waypointListHead = chainWaypoints(active);
+	m_removedWaypointListHead = chainWaypoints(removed);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1629,6 +1759,14 @@ Waypoint *TerrainLogic::getWaypointByID( UnsignedInt id )
 	for( Waypoint *way = m_waypointListHead; way; way = way->getNext() )
 		if (way->getID() == id)
 			return way;
+
+	for( Waypoint *way = m_removedWaypointListHead; way; way = way->getNext() )
+	{
+		if (way->getID() == id)
+		{
+			return way;
+		}
+	}
 
 	return nullptr;
 }

@@ -53,6 +53,7 @@
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/ScriptEngine.h"
+#include "GameLogic/ScriptTEODAI.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameClient/TerrainVisual.h"
 
@@ -425,6 +426,11 @@ Bool AISkirmishPlayer::selectTeamToBuild()
 void AISkirmishPlayer::buildSpecificAIBuilding(const AsciiString &thingName)
 {
 	//
+	if (TheScriptTEODAI && TheScriptTEODAI->getClosestDozerPriority(m_player->getPlayerIndex()))
+	{
+		teodBuildSpecificBuildingNearDozer(thingName);
+		return;
+	}
 	Bool found = false;
 	Bool foundUnbuilt = false;
 	for( BuildListInfo *info = m_player->getBuildList(); info; info = info->getNext() )

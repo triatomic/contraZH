@@ -275,6 +275,11 @@ AsciiString EditParameter::getWarningText(Parameter *pParm, Bool isAction)
 				warningText.format("Counter/Timer '%s' does not exist.", uiString.str());
 			}
 			break;
+		case Parameter::KD_RATIO:
+			if (!isAction && !loadKDRatios(nullptr, uiString)) {
+				warningText.format("KD ratio '%s' does not exist.", uiString.str());
+			}
+			break;
 		case Parameter::INT:
 			break;
 		case Parameter::COLOR:
@@ -299,6 +304,9 @@ AsciiString EditParameter::getWarningText(Parameter *pParm, Bool isAction)
 			}
 			break;
 		case Parameter::COMPARISON:
+			break;
+
+		case Parameter::SELECTION_MODE:
 			break;
 
 		case Parameter::AI_MOOD:
@@ -435,6 +443,7 @@ AsciiString EditParameter::getInfoText(Parameter *pParm)
 		case Parameter::KIND_OF_PARAM:
 		case Parameter::SIDE:
 		case Parameter::COUNTER:
+		case Parameter::KD_RATIO:
 		case Parameter::INT:
 		case Parameter::COLOR:
 		case Parameter::COORD3D:
@@ -444,6 +453,7 @@ AsciiString EditParameter::getInfoText(Parameter *pParm)
 		case Parameter::REAL:
 		case Parameter::FLAG:
 		case Parameter::COMPARISON:
+		case Parameter::SELECTION_MODE:
 		case Parameter::AI_MOOD:
 		case Parameter::SKIRMISH_WAYPOINT_PATH:
 		case Parameter::RADAR_EVENT_TYPE:
@@ -718,6 +728,35 @@ Bool EditParameter::loadCounters(CComboBox *pCombo, AsciiString match)
 			for (pScr = pGroup->getScript(); pScr; pScr=pScr->getNext()) {
 				loadConditionParameter(pScr, Parameter::COUNTER, pCombo);
 				if (loadActionParameter(pScr, Parameter::COUNTER, pCombo, match)) {
+					found = true;
+				}
+			}
+		}
+	}
+	return found;
+}
+
+Bool EditParameter::loadKDRatios(CComboBox *pCombo, AsciiString match)
+{
+	Bool found = false;
+	if (pCombo) pCombo->ResetContent();
+	Int i;
+	SidesList *sidesListP = m_sidesListP;
+	if (sidesListP==nullptr) sidesListP = TheSidesList;
+	for (i=0; i<sidesListP->getNumSides(); i++) {
+		ScriptList *pSL = sidesListP->getSideInfo(i)->getScriptList();
+		Script *pScr;
+		for (pScr = pSL->getScript(); pScr; pScr=pScr->getNext()) {
+			loadConditionParameter(pScr, Parameter::KD_RATIO, pCombo);
+			if (loadActionParameter(pScr, Parameter::KD_RATIO, pCombo, match)) {
+				found = true;
+			}
+		}
+		ScriptGroup *pGroup;
+		for (pGroup = pSL->getScriptGroup(); pGroup; pGroup=pGroup->getNext()) {
+			for (pScr = pGroup->getScript(); pScr; pScr=pScr->getNext()) {
+				loadConditionParameter(pScr, Parameter::KD_RATIO, pCombo);
+				if (loadActionParameter(pScr, Parameter::KD_RATIO, pCombo, match)) {
 					found = true;
 				}
 			}
@@ -1873,6 +1912,11 @@ BOOL EditParameter::OnInitDialog()
 			showCombo = true;
 			loadCounters(pCombo);
 			break;
+		case Parameter::KD_RATIO:
+			captionText = "KD ratio named:";
+			showCombo = true;
+			loadKDRatios(pCombo);
+			break;
 		case Parameter::INT:
 			captionText = "Integer:";
 			editText.Format("%d", m_parameter->getInt());
@@ -1923,6 +1967,17 @@ BOOL EditParameter::OnInitDialog()
 			pList->InsertString(-1, "GE Greater Than or Equal");
 			pList->InsertString(-1, "GT Greater Than");
 			pList->InsertString(-1, "NE Not Equal To");
+			pList->SetCurSel(m_parameter->getInt());
+			showList = true;
+			break;
+
+		case Parameter::SELECTION_MODE:
+			captionText = "Selection mode:";
+			pList->InsertString(-1, "Closest");
+			pList->InsertString(-1, "Farthest");
+			pList->InsertString(-1, "Random");
+			pList->InsertString(-1, "Youngest");
+			pList->InsertString(-1, "Oldest");
 			pList->SetCurSel(m_parameter->getInt());
 			showList = true;
 			break;
@@ -2250,6 +2305,7 @@ void EditParameter::OnOK()
 		case Parameter::BRIDGE:
 		case Parameter::FLAG:
 		case Parameter::COUNTER:
+		case Parameter::KD_RATIO:
 		case Parameter::DIALOG:
 		case Parameter::MUSIC:
 		case Parameter::SPECIAL_POWER:
@@ -2316,6 +2372,7 @@ void EditParameter::OnOK()
 
 		case Parameter::BOOLEAN:
 		case Parameter::COMPARISON:
+		case Parameter::SELECTION_MODE:
 			m_parameter->friend_setInt(pList->GetCurSel());
 			break;
 		case Parameter::KIND_OF_PARAM:

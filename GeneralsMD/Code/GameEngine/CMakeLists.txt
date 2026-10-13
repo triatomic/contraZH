@@ -487,6 +487,9 @@ set(GAMEENGINE_SRC
     Include/GameLogic/ScriptActions.h
     Include/GameLogic/ScriptConditions.h
     Include/GameLogic/ScriptEngine.h
+    Include/GameLogic/ScriptTEOD.h
+    Include/GameLogic/ScriptTEODAI.h
+    Include/GameLogic/ScriptTEODWaypoints.h
     Include/GameLogic/Scripts.h
 #    Include/GameLogic/SidesList.h
     Include/GameLogic/Squad.h
@@ -1079,9 +1082,20 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Weapon.cpp
     Source/GameLogic/Object/WeaponSet.cpp
     Source/GameLogic/ScriptEngine/ScriptActions.cpp
+    Source/GameLogic/ScriptEngine/ScriptActionsTEOD.cpp
+    Source/GameLogic/ScriptEngine/ScriptActionsTEODAI.cpp
+    Source/GameLogic/ScriptEngine/ScriptActionsTEODPlayers.cpp
+    Source/GameLogic/ScriptEngine/ScriptActionsTEODUnits.cpp
+    Source/GameLogic/ScriptEngine/ScriptActionsTEODWaypoints.cpp
     Source/GameLogic/ScriptEngine/ScriptConditions.cpp
+    Source/GameLogic/ScriptEngine/ScriptConditionsTEOD.cpp
+    Source/GameLogic/ScriptEngine/ScriptConditionsTEODPlayers.cpp
+    Source/GameLogic/ScriptEngine/ScriptConditionsTEODTeams.cpp
     Source/GameLogic/ScriptEngine/ScriptEngine.cpp
+    Source/GameLogic/ScriptEngine/ScriptEngineTEOD.cpp
     Source/GameLogic/ScriptEngine/Scripts.cpp
+    Source/GameLogic/ScriptEngine/ScriptTEODState.cpp
+    Source/GameLogic/ScriptEngine/ScriptTEODTemplates.cpp
     Source/GameLogic/ScriptEngine/VictoryConditions.cpp
 #    Source/GameLogic/System/CaveSystem.cpp
 #    Source/GameLogic/System/CrateSystem.cpp

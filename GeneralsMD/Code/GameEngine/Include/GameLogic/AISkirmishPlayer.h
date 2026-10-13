@@ -75,6 +75,10 @@ public:	// AIPlayer interface methods.
 
 	virtual Player *getAiEnemy() override;	///< Solo AI attacks based on scripting.  Only skirmish auto-acquires an enemy at this point.  jba.
 
+	// TEOD script support, defined in ScriptActionsTEODAI.cpp. baseOwner's defense circle and slots are used.
+	void teodBuildBaseDefense(const AsciiString &thingName, Bool flank, Real rotation, Real percent, AISkirmishPlayer *baseOwner);
+	void teodBuildSpecificBuildingNearDozer(const AsciiString &thingName);
+
 protected:
 
 	// snapshot methods

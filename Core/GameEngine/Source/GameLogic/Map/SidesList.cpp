@@ -930,6 +930,7 @@ m_desiredGatherers(0),
 m_currentGatherers(0),
 m_automaticallyBuild(true),
 m_priorityBuild(false),
+m_exactPositionOnly(false),
 m_buildingName(AsciiString::TheEmptyString)
 {
 	m_location.zero();

@@ -566,6 +566,9 @@ Object *AIPlayer::buildStructureWithDozer(const ThingTemplate *bldgPlan, BuildLi
 			if (isSkirmishAI()) {
 				limit = 120*PATHFIND_CELL_SIZE_F;
 			}
+			if (info->isExactPositionOnly()) {
+				limit = 0;
+			}
 			Coord3D newPos = pos;
 			for (posOffset = 0; posOffset<limit; posOffset += 2*PATHFIND_CELL_SIZE_F) {
 				if (isSkirmishAI()) {

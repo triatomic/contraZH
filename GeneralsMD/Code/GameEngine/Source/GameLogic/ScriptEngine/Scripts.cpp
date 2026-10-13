@@ -1810,6 +1810,7 @@ void Parameter::qualify(const AsciiString& qualifier,
 			FALLTHROUGH; /// otherwise drop down & qualify.
 		case SCRIPT:
 		case COUNTER:
+		case KD_RATIO:
 		case FLAG:
 		case SCRIPT_SUBROUTINE: m_string.concat(qualifier); break;
 		default: break;
@@ -1899,6 +1900,19 @@ AsciiString Parameter::getUiText() const
 			break;
 		case COUNTER:
 			uiText.format("'%s'", uiString.str());
+			break;
+		case KD_RATIO:
+			uiText.format("KD-Ratio '%s'", uiString.str());
+			break;
+		case SELECTION_MODE:
+			switch (m_int) {
+				case CLOSEST: uiText.format("the closest"); break;
+				case FARTHEST: uiText.format("the farthest"); break;
+				case RANDOM: uiText.format("a random"); break;
+				case YOUNGEST: uiText.format("the youngest"); break;
+				case OLDEST: uiText.format("the oldest"); break;
+				default : DEBUG_CRASH(("Unknown selection mode."));
+			}
 			break;
 		case INT:
 			uiText.format(" %d ", m_int);

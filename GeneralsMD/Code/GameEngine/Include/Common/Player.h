@@ -602,6 +602,10 @@ public:
 	void addToBuildList(Object *obj);			///< Adds this to the build list.	 Used for factories placed instead of in build list.
 	void addToPriorityBuildList(AsciiString templateName, Coord3D *pos, Real angle);			///< Adds this to the build list.	 Used for factories placed instead of in build list.
 
+	// TEOD script support; teodPrependToBuildList is defined in ScriptActionsTEODAI.cpp.
+	AIPlayer *getAIPlayer() const { return m_ai; }
+	void teodPrependToBuildList(BuildListInfo *info);
+
 	/// get the relationship between this->that.
 	Relationship getRelationship(const Team *that) const;
 

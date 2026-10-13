@@ -55,6 +55,9 @@
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/ScriptConditions.h"
 #include "GameLogic/ScriptEngine.h"
+#include "GameLogic/ScriptTEOD.h"
+#include "GameLogic/ScriptTEODAI.h"
+#include "GameLogic/ScriptTEODWaypoints.h"
 #include "GameLogic/SidesList.h"
 
 
@@ -465,6 +468,9 @@ m_ChooseVictimAlwaysUsesNormal(false)
 	// By default, difficulty should be normal.
 	setGlobalDifficulty(DIFFICULTY_NORMAL);
 
+	TheScriptTEODState = NEW ScriptTEODState;
+	TheScriptTEODWaypoints = NEW ScriptTEODWaypoints;
+	TheScriptTEODAI = NEW ScriptTEODAI;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -510,6 +516,12 @@ ScriptEngine::~ScriptEngine()
 	}
 #endif
 
+	delete TheScriptTEODAI;
+	TheScriptTEODAI = nullptr;
+	delete TheScriptTEODWaypoints;
+	TheScriptTEODWaypoints = nullptr;
+	delete TheScriptTEODState;
+	TheScriptTEODState = nullptr;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -5273,6 +5285,8 @@ void ScriptEngine::init()
 	curTemplate->m_numUiStrings = 1;
 	curTemplate->m_uiStrings[0] = "Show Weather = ";
 
+	initTEODTemplates();
+
 	Int i;
 	for (i=0; i<Condition::NUM_ITEMS; i++) {
 		AsciiString str;
@@ -5308,6 +5322,9 @@ void ScriptEngine::reset()
 	if (TheScriptConditions) {
 		TheScriptConditions->reset();
 	}
+	TheScriptTEODState->reset();
+	TheScriptTEODWaypoints->reset();
+	TheScriptTEODAI->reset();
 	m_numCounters = 1;
 	m_numAttackInfo = 1;
 	m_numFlags = 1;
@@ -5641,6 +5658,8 @@ void ScriptEngine::update()
 
 	// update all sequential stuff.
 	evaluateAndProgressAllSequentialScripts();
+
+	TheScriptTEODState->update();
 
 	// Script debugger stuff
 	st_CurrentFrame++;

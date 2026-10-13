@@ -359,6 +359,23 @@ public:
 	void debugVictory();
 //#endif
 
+	// TEOD script actions and conditions ported from CookieLandProjects/CLP_AI
+	void setCounterRandom( ScriptAction *pAction );
+	void copyCounter( ScriptAction *pAction );
+	Bool evaluateTwoCounters( Condition *pCondition );
+	Bool evaluateCounterDivisible( Condition *pCondition );
+	void setKDRatio( ScriptAction *pAction );
+	void addKDRatioKills( ScriptAction *pAction );
+	void addKDRatioDeaths( ScriptAction *pAction );
+	void subKDRatioKills( ScriptAction *pAction );
+	void subKDRatioDeaths( ScriptAction *pAction );
+	void updateKDRatioKills( ScriptAction *pAction );
+	void updateKDRatioDeaths( ScriptAction *pAction );
+	void copyKDRatioOntoCounters( ScriptAction *pAction );
+	Bool evaluateKDRatio( Condition *pCondition );
+	void addPrioritySetToOther( ScriptAction *pAction );
+	void increasePriorityOfType( ScriptAction *pAction );
+	void decreasePriorityOfType( ScriptAction *pAction );
 
 	static void parseScriptAction( INI* ini );
 	static void parseScriptCondition( INI* ini );
@@ -372,6 +389,7 @@ protected:
 
 	void addActionTemplateInfo(Template *actionTemplate);
 	void addConditionTemplateInfo(Template *conditionTemplate);
+	void initTEODTemplates();
 
 	Int allocateCounter( const AsciiString& name);
 	Int allocateFlag( const AsciiString& name);

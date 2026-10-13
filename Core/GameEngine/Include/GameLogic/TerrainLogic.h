@@ -89,14 +89,28 @@ public:
 	//{
 	//	if (ndx>=0 && ndx <=MAX_LINKS) m_links[ndx] = pLink;
 	//}
-	void addLink(Waypoint* pLink)
+	Bool addLink(Waypoint* pLink)
 	{
 		if (m_numLinks < MAX_LINKS)
 		{
 			m_links[m_numLinks] = pLink;
 			++m_numLinks;
+			return true;
 		}
+		return false;
 	}
+	Bool hasLink(const Waypoint *pLink) const;
+	/// Removes every link to pLink and closes the gap, so links 0..getNumLinks()-1 stay non-null.
+	void removeLink(const Waypoint *pLink);
+	void clearLinks();
+	void setLocation(const Coord3D *pLoc) { m_location = *pLoc; }
+	void setPathLabels(const AsciiString &label1, const AsciiString &label2, const AsciiString &label3)
+	{
+		m_pathLabel1 = label1;
+		m_pathLabel2 = label2;
+		m_pathLabel3 = label3;
+	}
+	void setBiDirectional(Bool biDirectional) { m_biDirectional = biDirectional; }
 
 public:
 	/// Enumerate all waypoints using getNext.
@@ -269,8 +283,20 @@ public:
 	/// Return the waypoint with the given name
 	virtual Waypoint *getWaypointByName( AsciiString name );
 
-	/// Return the waypoint with the given ID
+	/// Return the waypoint with the given ID, including removed ones, since saved games refer to waypoints by ID
 	virtual Waypoint *getWaypointByID( UnsignedInt id );
+
+	/// Removed waypoints stay allocated until reset so pointers held by AI states stay valid.
+	Waypoint *getFirstRemovedWaypoint() { return m_removedWaypointListHead; }
+
+	/// Add a waypoint created at runtime to the front of the list.
+	void insertWaypoint( Waypoint *pWay );
+
+	/// Unlink a waypoint from the list and from every other waypoint's links.
+	void removeWaypoint( Waypoint *pWay );
+
+	/// Rebuild both waypoint lists in the given order. Every waypoint must appear in exactly one of them.
+	void setWaypointLists( const std::vector<Waypoint *> &active, const std::vector<Waypoint *> &removed );
 
 	/// Return the closest waypoint on the labeled path
 	virtual Waypoint *getClosestWaypointOnPath( const Coord3D *pos, AsciiString label );
@@ -363,6 +389,7 @@ protected:
 	Int m_activeBoundary;
 
 	Waypoint *m_waypointListHead;
+	Waypoint *m_removedWaypointListHead;
 	Bridge *m_bridgeListHead;
 
 	Bool		m_bridgeDamageStatesChanged;

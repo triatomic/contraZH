@@ -211,6 +211,14 @@ public:
 	/// Calculates the closest construction zone location based on a template.
 	Bool calcClosestConstructionZoneLocation( const ThingTemplate *constructTemplate, Coord3D *location );
 
+	// TEOD script support, defined in ScriptActionsTEODAI.cpp. Angles are in radians.
+	Bool teodTrainUnit(const ThingTemplate *thing);
+	void teodBuildNearPosition(const ThingTemplate *tmpl, const Coord3D *location, Real angle);
+	void teodBuildNearestTeam(const ThingTemplate *tmpl, Team *team, Real angle);
+	void teodBuildBySupplies(Int minimumCash, const ThingTemplate *tmpl, Real angle);
+	Bool teodComputeSuperweaponTargetType(const SpecialPowerTemplate *power, Coord3D *retPos, Int playerNdx, Real weaponRadius, const AsciiString &objectType);
+	Object *teodFindSupplyCenter(Int minimumCash);
+
 protected:
 
 	// snapshot methods
