@@ -30,7 +30,7 @@
 //-------------------------------------------------------------------------------------------------
 inline int scriptFolderPinRank(const char *name)
 {
-	static const char *const pinned[] = { "Contra", "TEOD" };
+	static const char *const pinned[] = { "Contra", "CLP_AI" };
 	for (int i = 0; i < (int)(sizeof(pinned) / sizeof(pinned[0])); ++i)
 	{
 		if (strcmp(name, pinned[i]) == 0)

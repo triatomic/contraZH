@@ -31,7 +31,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::SET_COUNTER_RANDOM];
 	curTemplate->m_internalName = "SET_COUNTER_RANDOM";
-	curTemplate->m_uiName = "TEOD/Scripting - Counters/Set counter to a value -- random";
+	curTemplate->m_uiName = "CLP_AI/Scripting - Counters/Set counter to a value -- random";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::COUNTER;
 	curTemplate->m_parameters[1] = Parameter::INT;
@@ -44,7 +44,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::SET_KD_RATIO];
 	curTemplate->m_internalName = "SET_KD_RATIO";
-	curTemplate->m_uiName = "TEOD/Scripting - KD-Ratio/Set KD Ratio to a value";
+	curTemplate->m_uiName = "CLP_AI/Scripting - KD-Ratio/Set KD Ratio to a value";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::KD_RATIO;
 	curTemplate->m_parameters[1] = Parameter::REAL;
@@ -57,7 +57,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::INCREMENT_KD_RATIO_KILLS];
 	curTemplate->m_internalName = "INCREMENT_KD_RATIO_KILLS";
-	curTemplate->m_uiName = "TEOD/Scripting - KD-Ratio/Increment KD-Ratio kills.";
+	curTemplate->m_uiName = "CLP_AI/Scripting - KD-Ratio/Increment KD-Ratio kills.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::REAL;
 	curTemplate->m_parameters[1] = Parameter::KD_RATIO;
@@ -68,7 +68,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::DECREMENT_KD_RATIO_KILLS];
 	curTemplate->m_internalName = "DECREMENT_KD_RATIO_KILLS";
-	curTemplate->m_uiName = "TEOD/Scripting - KD-Ratio/Decrement KD-Ratio kills.";
+	curTemplate->m_uiName = "CLP_AI/Scripting - KD-Ratio/Decrement KD-Ratio kills.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::REAL;
 	curTemplate->m_parameters[1] = Parameter::KD_RATIO;
@@ -79,7 +79,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::INCREMENT_KD_RATIO_DEATHS];
 	curTemplate->m_internalName = "INCREMENT_KD_RATIO_DEATHS";
-	curTemplate->m_uiName = "TEOD/Scripting - KD-Ratio/Increment KD-Ratio deaths.";
+	curTemplate->m_uiName = "CLP_AI/Scripting - KD-Ratio/Increment KD-Ratio deaths.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::REAL;
 	curTemplate->m_parameters[1] = Parameter::KD_RATIO;
@@ -90,7 +90,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::DECREMENT_KD_RATIO_DEATHS];
 	curTemplate->m_internalName = "DECREMENT_KD_RATIO_DEATHS";
-	curTemplate->m_uiName = "TEOD/Scripting - KD-Ratio/Decrement KD-Ratio deaths.";
+	curTemplate->m_uiName = "CLP_AI/Scripting - KD-Ratio/Decrement KD-Ratio deaths.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::REAL;
 	curTemplate->m_parameters[1] = Parameter::KD_RATIO;
@@ -101,7 +101,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_SURRENDER];
 	curTemplate->m_internalName = "PLAYER_SURRENDER";
-	curTemplate->m_uiName = "TEOD/Skirmish Only/Surrender all assets to an allied player if existing; otherwise quit.";
+	curTemplate->m_uiName = "CLP_AI/Skirmish Only/Surrender all assets to an allied player if existing; otherwise quit.";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_numUiStrings = 2;
@@ -110,7 +110,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::AI_PLAYER_BUILDS_UNNAMED];
 	curTemplate->m_internalName = "AI_PLAYER_BUILDS_UNNAMED";
-	curTemplate->m_uiName = "TEOD/Player/AI/Build an unnamed unit.";
+	curTemplate->m_uiName = "CLP_AI/Player/AI/Build an unnamed unit.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -121,7 +121,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MOVE_RELATIVE];
 	curTemplate->m_internalName = "TEAM_MOVE_RELATIVE";
-	curTemplate->m_uiName = "TEOD/Team/Move/Team moves relative to its position";
+	curTemplate->m_uiName = "CLP_AI/Team/Move/Team moves relative to its position";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::COORD3D;
@@ -131,7 +131,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::UNIT_MOVE_RELATIVE];
 	curTemplate->m_internalName = "UNIT_MOVE_RELATIVE";
-	curTemplate->m_uiName = "TEOD/Unit/Move/Unit moves relative to its position";
+	curTemplate->m_uiName = "CLP_AI/Unit/Move/Unit moves relative to its position";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::UNIT;
 	curTemplate->m_parameters[1] = Parameter::COORD3D;
@@ -141,7 +141,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MOVE_NEAREST_BELONGING_TO_PLAYER];
 	curTemplate->m_internalName = "TEAM_MOVE_NEAREST_BELONGING_TO_PLAYER";
-	curTemplate->m_uiName = "TEOD/Team/Move/Move team towards a(n) object type belonging to a player.";
+	curTemplate->m_uiName = "CLP_AI/Team/Move/Move team towards a(n) object type belonging to a player.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -155,7 +155,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::UNIT_MOVE_NEAREST_BELONGING_TO_PLAYER];
 	curTemplate->m_internalName = "UNIT_MOVE_NEAREST_BELONGING_TO_PLAYER";
-	curTemplate->m_uiName = "TEOD/Unit/Move/Move unit towards a(n) object type belonging to a player.";
+	curTemplate->m_uiName = "CLP_AI/Unit/Move/Move unit towards a(n) object type belonging to a player.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::UNIT;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -169,7 +169,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MOVE_AWAY_FROM_RELATION_TYPE];
 	curTemplate->m_internalName = "TEAM_MOVE_AWAY_FROM_RELATION_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Move/Distance/Move team away from a(n) friendly|neutral|enemy object type.";
+	curTemplate->m_uiName = "CLP_AI/Team/Move/Distance/Move team away from a(n) friendly|neutral|enemy object type.";
 	curTemplate->m_numParameters = 5;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::REAL;
@@ -185,7 +185,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::UNIT_MOVE_AWAY_FROM_RELATION_TYPE];
 	curTemplate->m_internalName = "UNIT_MOVE_AWAY_FROM_RELATION_TYPE";
-	curTemplate->m_uiName = "TEOD/Unit/Move/Distance/Move unit away from a(n) friendly|neutral|enemy object type.";
+	curTemplate->m_uiName = "CLP_AI/Unit/Move/Distance/Move unit away from a(n) friendly|neutral|enemy object type.";
 	curTemplate->m_numParameters = 5;
 	curTemplate->m_parameters[0] = Parameter::UNIT;
 	curTemplate->m_parameters[1] = Parameter::REAL;
@@ -201,7 +201,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MOVE_AWAY_FROM_RELATION];
 	curTemplate->m_internalName = "TEAM_MOVE_AWAY_FROM_RELATION";
-	curTemplate->m_uiName = "TEOD/Team/Move/Distance/Move team away from a(n) friendly|neutral|enemy unit.";
+	curTemplate->m_uiName = "CLP_AI/Team/Move/Distance/Move team away from a(n) friendly|neutral|enemy unit.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::REAL;
@@ -215,7 +215,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::UNIT_MOVE_AWAY_FROM_RELATION];
 	curTemplate->m_internalName = "UNIT_MOVE_AWAY_FROM_RELATION";
-	curTemplate->m_uiName = "TEOD/Unit/Move/Distance/Move unit away from a(n) friendly|neutral|enemy unit.";
+	curTemplate->m_uiName = "CLP_AI/Unit/Move/Distance/Move unit away from a(n) friendly|neutral|enemy unit.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::UNIT;
 	curTemplate->m_parameters[1] = Parameter::REAL;
@@ -229,7 +229,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MEET];
 	curTemplate->m_internalName = "TEAM_MEET";
-	curTemplate->m_uiName = "TEOD/Team/Move/Meet/Meet and group together.";
+	curTemplate->m_uiName = "CLP_AI/Team/Move/Meet/Meet and group together.";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_numUiStrings = 2;
@@ -238,7 +238,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MEET_AT_KINDOF];
 	curTemplate->m_internalName = "TEAM_MEET_AT_KINDOF";
-	curTemplate->m_uiName = "TEOD/Team/Move/Meet/Meet and group together at kindOf.";
+	curTemplate->m_uiName = "CLP_AI/Team/Move/Meet/Meet and group together at kindOf.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::KIND_OF_PARAM;
@@ -249,7 +249,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MEET_AT_TYPE];
 	curTemplate->m_internalName = "TEAM_MEET_AT_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Move/Meet/Meet and group together at object type.";
+	curTemplate->m_uiName = "CLP_AI/Team/Move/Meet/Meet and group together at object type.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -260,7 +260,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_USE_COMMAND_BUTTON_ABILITY_WITH_TYPE];
 	curTemplate->m_internalName = "TEAM_USE_COMMAND_BUTTON_ABILITY_WITH_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/CommandButton/Use command ability -- object type";
+	curTemplate->m_uiName = "CLP_AI/Team/CommandButton/Use command ability -- object type";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::COMMANDBUTTON_ALL_ABILITIES;
@@ -272,7 +272,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_USE_COMMAND_BUTTON_ABILITY_ON_TEAM];
 	curTemplate->m_internalName = "TEAM_USE_COMMAND_BUTTON_ABILITY_ON_TEAM";
-	curTemplate->m_uiName = "TEOD/Team/CommandButton/Use command ability -- team";
+	curTemplate->m_uiName = "CLP_AI/Team/CommandButton/Use command ability -- team";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::COMMANDBUTTON_ALL_ABILITIES;
@@ -284,7 +284,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_MERGE_KINDOF];
 	curTemplate->m_internalName = "PLAYER_MERGE_KINDOF";
-	curTemplate->m_uiName = "TEOD/Player/Merge/Merge all units with kindOf into another team.";
+	curTemplate->m_uiName = "CLP_AI/Player/Merge/Merge all units with kindOf into another team.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::KIND_OF_PARAM;
@@ -296,7 +296,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MERGE_KINDOF];
 	curTemplate->m_internalName = "TEAM_MERGE_KINDOF";
-	curTemplate->m_uiName = "TEOD/Team/Merge/Merge all units with kindOf into another team.";
+	curTemplate->m_uiName = "CLP_AI/Team/Merge/Merge all units with kindOf into another team.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::KIND_OF_PARAM;
@@ -308,7 +308,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_MERGE_TYPE];
 	curTemplate->m_internalName = "PLAYER_MERGE_TYPE";
-	curTemplate->m_uiName = "TEOD/Player/Merge/Merge all units of a specific type into another team.";
+	curTemplate->m_uiName = "CLP_AI/Player/Merge/Merge all units of a specific type into another team.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -320,7 +320,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MERGE_TYPE];
 	curTemplate->m_internalName = "TEAM_MERGE_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Merge/Merge all units of a specific type into another team.";
+	curTemplate->m_uiName = "CLP_AI/Team/Merge/Merge all units of a specific type into another team.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -332,7 +332,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_DISBAND_TYPE];
 	curTemplate->m_internalName = "TEAM_DISBAND_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Disband/Disband all units of a specific type.";
+	curTemplate->m_uiName = "CLP_AI/Team/Disband/Disband all units of a specific type.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -342,7 +342,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_DISBAND_KINDOF];
 	curTemplate->m_internalName = "TEAM_DISBAND_KINDOF";
-	curTemplate->m_uiName = "TEOD/Team/Disband/Disband all units with kindOf.";
+	curTemplate->m_uiName = "CLP_AI/Team/Disband/Disband all units with kindOf.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::KIND_OF_PARAM;
@@ -352,7 +352,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_DISBAND_TYPE];
 	curTemplate->m_internalName = "PLAYER_DISBAND_TYPE";
-	curTemplate->m_uiName = "TEOD/Player/Disband/Disband all units of a specific type.";
+	curTemplate->m_uiName = "CLP_AI/Player/Disband/Disband all units of a specific type.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -362,7 +362,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_DISBAND_KINDOF];
 	curTemplate->m_internalName = "PLAYER_DISBAND_KINDOF";
-	curTemplate->m_uiName = "TEOD/Player/Disband/Disband all units with kindOf.";
+	curTemplate->m_uiName = "CLP_AI/Player/Disband/Disband all units with kindOf.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::KIND_OF_PARAM;
@@ -372,7 +372,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::CREATE_TEAM_FROM_TEAMLESS];
 	curTemplate->m_internalName = "CREATE_TEAM_FROM_TEAMLESS";
-	curTemplate->m_uiName = "TEOD/Player/Create/Create a new team from disbanded or teamless units.";
+	curTemplate->m_uiName = "CLP_AI/Player/Create/Create a new team from disbanded or teamless units.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::TEAM;
@@ -382,7 +382,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::CREATE_TEAM_FROM_TEAMLESS_KINDOF];
 	curTemplate->m_internalName = "CREATE_TEAM_FROM_TEAMLESS_KINDOF";
-	curTemplate->m_uiName = "TEOD/Player/Create/Create a new team from disbanded or teamless units with kindOf.";
+	curTemplate->m_uiName = "CLP_AI/Player/Create/Create a new team from disbanded or teamless units with kindOf.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::KIND_OF_PARAM;
@@ -394,7 +394,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::CREATE_TEAM_FROM_TEAMLESS_TYPE];
 	curTemplate->m_internalName = "CREATE_TEAM_FROM_TEAMLESS_TYPE";
-	curTemplate->m_uiName = "TEOD/Player/Create/Create a new team from disbanded or teamless units of object type.";
+	curTemplate->m_uiName = "CLP_AI/Player/Create/Create a new team from disbanded or teamless units of object type.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -406,7 +406,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_GARRISON_BUILDINGS_WITH_MAX_NUMBER];
 	curTemplate->m_internalName = "PLAYER_GARRISON_BUILDINGS_WITH_MAX_NUMBER";
-	curTemplate->m_uiName = "TEOD/Player/Garrison/Garrison nearby buildings with a maximum number.";
+	curTemplate->m_uiName = "CLP_AI/Player/Garrison/Garrison nearby buildings with a maximum number.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::INT;
@@ -417,7 +417,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_GARRISON_BUILDINGS_WITH_MAX_NUMBER];
 	curTemplate->m_internalName = "TEAM_GARRISON_BUILDINGS_WITH_MAX_NUMBER";
-	curTemplate->m_uiName = "TEOD/Team/Garrison/Garrison nearby buildings with a maximum number.";
+	curTemplate->m_uiName = "CLP_AI/Team/Garrison/Garrison nearby buildings with a maximum number.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::INT;
@@ -428,7 +428,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_GARRISON_NUMBER_BUILDINGS];
 	curTemplate->m_internalName = "PLAYER_GARRISON_NUMBER_BUILDINGS";
-	curTemplate->m_uiName = "TEOD/Player/Garrison/Garrison a number of nearby buildings equally.";
+	curTemplate->m_uiName = "CLP_AI/Player/Garrison/Garrison a number of nearby buildings equally.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::INT;
@@ -439,7 +439,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_GARRISON_NUMBER_BUILDINGS];
 	curTemplate->m_internalName = "TEAM_GARRISON_NUMBER_BUILDINGS";
-	curTemplate->m_uiName = "TEOD/Team/Garrison/Garrison a number of nearby buildings equally.";
+	curTemplate->m_uiName = "CLP_AI/Team/Garrison/Garrison a number of nearby buildings equally.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::INT;
@@ -450,7 +450,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::SKIRMISH_FIRE_SPECIAL_POWER_AT_MOST_COST_TYPE];
 	curTemplate->m_internalName = "SKIRMISH_FIRE_SPECIAL_POWER_AT_MOST_COST_TYPE";
-	curTemplate->m_uiName = "TEOD/Player/Special power/Special power -- fire at enemy's highest cost area, computed with a focus on an object type.";
+	curTemplate->m_uiName = "CLP_AI/Player/Special power/Special power -- fire at enemy's highest cost area, computed with a focus on an object type.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::SPECIAL_POWER;
@@ -462,7 +462,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::AI_PLAYER_BUILD_TYPE_NEAREST_TEAM_ROTATED];
 	curTemplate->m_internalName = "AI_PLAYER_BUILD_TYPE_NEAREST_TEAM_ROTATED";
-	curTemplate->m_uiName = "TEOD/Player/AI/Rotated/AI player build nearest team with custom rotation.";
+	curTemplate->m_uiName = "CLP_AI/Player/AI/Rotated/AI player build nearest team with custom rotation.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -477,7 +477,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::AI_PLAYER_BUILD_TYPE_NEAREST_SUPPLY_ROTATED];
 	curTemplate->m_internalName = "AI_PLAYER_BUILD_TYPE_NEAREST_SUPPLY_ROTATED";
-	curTemplate->m_uiName = "TEOD/Player/AI/Rotated/AI player build near a supply source with custom rotation.";
+	curTemplate->m_uiName = "CLP_AI/Player/AI/Rotated/AI player build near a supply source with custom rotation.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -492,7 +492,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::AI_PLAYER_BUILD_TYPE_NEAREST_TYPE_ROTATED];
 	curTemplate->m_internalName = "AI_PLAYER_BUILD_TYPE_NEAREST_TYPE_ROTATED";
-	curTemplate->m_uiName = "TEOD/Player/AI/Rotated/AI player build nearest objectType with custom rotation.";
+	curTemplate->m_uiName = "CLP_AI/Player/AI/Rotated/AI player build nearest objectType with custom rotation.";
 	curTemplate->m_numParameters = 5;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -509,7 +509,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::AI_PLAYER_BUILD_TYPE_NEAREST_KINDOF_ROTATED];
 	curTemplate->m_internalName = "AI_PLAYER_BUILD_TYPE_NEAREST_KINDOF_ROTATED";
-	curTemplate->m_uiName = "TEOD/Player/AI/Rotated/AI player build nearest a(n) kindOf with custom rotation.";
+	curTemplate->m_uiName = "CLP_AI/Player/AI/Rotated/AI player build nearest a(n) kindOf with custom rotation.";
 	curTemplate->m_numParameters = 5;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -526,7 +526,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::AI_PLAYER_BUILD_TYPE_NEAREST_TYPE_ROTATED_AREA];
 	curTemplate->m_internalName = "AI_PLAYER_BUILD_TYPE_NEAREST_TYPE_ROTATED_AREA";
-	curTemplate->m_uiName = "TEOD/Player/AI/Rotated/AI player build nearest a(n) objectType in an area with custom rotation.";
+	curTemplate->m_uiName = "CLP_AI/Player/AI/Rotated/AI player build nearest a(n) objectType in an area with custom rotation.";
 	curTemplate->m_numParameters = 6;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -545,7 +545,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::AI_PLAYER_BUILD_TYPE_NEAREST_KINDOF_ROTATED_AREA];
 	curTemplate->m_internalName = "AI_PLAYER_BUILD_TYPE_NEAREST_KINDOF_ROTATED_AREA";
-	curTemplate->m_uiName = "TEOD/Player/AI/Rotated/AI player build nearest a(n) kindOf in an area with custom rotation.";
+	curTemplate->m_uiName = "CLP_AI/Player/AI/Rotated/AI player build nearest a(n) kindOf in an area with custom rotation.";
 	curTemplate->m_numParameters = 6;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -564,7 +564,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MOVE_TOWARDS_RELATION];
 	curTemplate->m_internalName = "TEAM_MOVE_TOWARDS_RELATION";
-	curTemplate->m_uiName = "TEOD/Team/Move/Distance/Move team towards a(n) friendly|neutral|enemy unit.";
+	curTemplate->m_uiName = "CLP_AI/Team/Move/Distance/Move team towards a(n) friendly|neutral|enemy unit.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::REAL;
@@ -578,7 +578,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::UNIT_MOVE_TOWARDS_RELATION];
 	curTemplate->m_internalName = "UNIT_MOVE_TOWARDS_RELATION";
-	curTemplate->m_uiName = "TEOD/Unit/Move/Distance/Move unit towards a(n) friendly|neutral|enemy unit.";
+	curTemplate->m_uiName = "CLP_AI/Unit/Move/Distance/Move unit towards a(n) friendly|neutral|enemy unit.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::UNIT;
 	curTemplate->m_parameters[1] = Parameter::REAL;
@@ -592,7 +592,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MOVE_TOWARDS_RELATION_TYPE];
 	curTemplate->m_internalName = "TEAM_MOVE_TOWARDS_RELATION_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Move/Distance/Move team towards a(n) friendly|neutral|enemy object type.";
+	curTemplate->m_uiName = "CLP_AI/Team/Move/Distance/Move team towards a(n) friendly|neutral|enemy object type.";
 	curTemplate->m_numParameters = 5;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::REAL;
@@ -608,7 +608,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::UNIT_MOVE_TOWARDS_RELATION_TYPE];
 	curTemplate->m_internalName = "UNIT_MOVE_TOWARDS_RELATION_TYPE";
-	curTemplate->m_uiName = "TEOD/Unit/Move/Distance/Move unit towards a(n) friendly|neutral|enemy object type.";
+	curTemplate->m_uiName = "CLP_AI/Unit/Move/Distance/Move unit towards a(n) friendly|neutral|enemy object type.";
 	curTemplate->m_numParameters = 5;
 	curTemplate->m_parameters[0] = Parameter::UNIT;
 	curTemplate->m_parameters[1] = Parameter::REAL;
@@ -624,7 +624,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::COPY_COUNTER];
 	curTemplate->m_internalName = "COPY_COUNTER";
-	curTemplate->m_uiName = "TEOD/Scripting - Counters/Copy a counter onto another counter.";
+	curTemplate->m_uiName = "CLP_AI/Scripting - Counters/Copy a counter onto another counter.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::COUNTER;
 	curTemplate->m_parameters[1] = Parameter::COUNTER;
@@ -634,7 +634,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::UPDATE_KD_RATIO_KILLS_BUILDCOST];
 	curTemplate->m_internalName = "UPDATE_KD_RATIO_KILLS_BUILDCOST";
-	curTemplate->m_uiName = "TEOD/Scripting - KD-Ratio/Update KD-Ratio kills by build cost.";
+	curTemplate->m_uiName = "CLP_AI/Scripting - KD-Ratio/Update KD-Ratio kills by build cost.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::KD_RATIO;
 	curTemplate->m_parameters[1] = Parameter::SIDE;
@@ -645,7 +645,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::UPDATE_KD_RATIO_DEATHS_BUILDCOST];
 	curTemplate->m_internalName = "UPDATE_KD_RATIO_DEATHS_BUILDCOST";
-	curTemplate->m_uiName = "TEOD/Scripting - KD-Ratio/Update KD-Ratio deaths by build cost.";
+	curTemplate->m_uiName = "CLP_AI/Scripting - KD-Ratio/Update KD-Ratio deaths by build cost.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::KD_RATIO;
 	curTemplate->m_parameters[1] = Parameter::SIDE;
@@ -656,7 +656,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::COPY_KD_RATIO_ONTO_COUNTERS];
 	curTemplate->m_internalName = "COPY_KD_RATIO_ONTO_COUNTERS";
-	curTemplate->m_uiName = "TEOD/Scripting - KD-Ratio/Copy KD-Ratio kills & deaths onto two counters";
+	curTemplate->m_uiName = "CLP_AI/Scripting - KD-Ratio/Copy KD-Ratio kills & deaths onto two counters";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::KD_RATIO;
 	curTemplate->m_parameters[1] = Parameter::COUNTER;
@@ -668,7 +668,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MOVE_TO_TEAM];
 	curTemplate->m_internalName = "TEAM_MOVE_TO_TEAM";
-	curTemplate->m_uiName = "TEOD/Team/Move/A team moves to another team.";
+	curTemplate->m_uiName = "CLP_AI/Team/Move/A team moves to another team.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::TEAM;
@@ -678,7 +678,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MEET_TEAM];
 	curTemplate->m_internalName = "TEAM_MEET_TEAM";
-	curTemplate->m_uiName = "TEOD/Team/Move/Meet/Two teams meet and group together.";
+	curTemplate->m_uiName = "CLP_AI/Team/Move/Meet/Two teams meet and group together.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::TEAM;
@@ -689,7 +689,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_LOAD_EVENLY];
 	curTemplate->m_internalName = "TEAM_LOAD_EVENLY";
-	curTemplate->m_uiName = "TEOD/Team/Transport/Transport -- automatically load evenly.";
+	curTemplate->m_uiName = "CLP_AI/Team/Transport/Transport -- automatically load evenly.";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_numUiStrings = 2;
@@ -698,7 +698,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_CANCEL_ALL_CONSTRUCTIONS];
 	curTemplate->m_internalName = "PLAYER_CANCEL_ALL_CONSTRUCTIONS";
-	curTemplate->m_uiName = "TEOD/Player/AI/Cancel/Cancel all buildings currently under construction";
+	curTemplate->m_uiName = "CLP_AI/Player/AI/Cancel/Cancel all buildings currently under construction";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_numUiStrings = 2;
@@ -707,7 +707,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_CANCEL_ALL_CONSTRUCTIONS_TYPE];
 	curTemplate->m_internalName = "PLAYER_CANCEL_ALL_CONSTRUCTIONS_TYPE";
-	curTemplate->m_uiName = "TEOD/Player/AI/Cancel/Cancel all buildings of a specific type currently under construction";
+	curTemplate->m_uiName = "CLP_AI/Player/AI/Cancel/Cancel all buildings of a specific type currently under construction";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -718,7 +718,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_CANCEL_ALL_CONSTRUCTIONS_AREA];
 	curTemplate->m_internalName = "PLAYER_CANCEL_ALL_CONSTRUCTIONS_AREA";
-	curTemplate->m_uiName = "TEOD/Player/AI/Cancel/Cancel all buildings in an area currently under construction";
+	curTemplate->m_uiName = "CLP_AI/Player/AI/Cancel/Cancel all buildings in an area currently under construction";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::TRIGGER_AREA;
@@ -729,7 +729,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_CANCEL_ALL_CONSTRUCTIONS_TYPE_AREA];
 	curTemplate->m_internalName = "PLAYER_CANCEL_ALL_CONSTRUCTIONS_TYPE_AREA";
-	curTemplate->m_uiName = "TEOD/Player/AI/Cancel/Cancel all buildings of a specific type in an area currently under construction";
+	curTemplate->m_uiName = "CLP_AI/Player/AI/Cancel/Cancel all buildings of a specific type in an area currently under construction";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -742,7 +742,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_SELL_ALL_BUILDINGS_IN_CAPTURE_PROCESS_PERCENTAGE];
 	curTemplate->m_internalName = "PLAYER_SELL_ALL_BUILDINGS_IN_CAPTURE_PROCESS_PERCENTAGE";
-	curTemplate->m_uiName = "TEOD/Player/Sell/Capture/Set a player to sell all buildings currently being captured with % chance";
+	curTemplate->m_uiName = "CLP_AI/Player/Sell/Capture/Set a player to sell all buildings currently being captured with % chance";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::INT;
@@ -753,7 +753,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_SELL_ALL_BUILDINGS_TYPE_IN_CAPTURE_PROCESS_PERCENTAGE];
 	curTemplate->m_internalName = "PLAYER_SELL_ALL_BUILDINGS_TYPE_IN_CAPTURE_PROCESS_PERCENTAGE";
-	curTemplate->m_uiName = "TEOD/Player/Sell/Capture/Set a player to sell all buildings of a type currently being captured with % chance";
+	curTemplate->m_uiName = "CLP_AI/Player/Sell/Capture/Set a player to sell all buildings of a type currently being captured with % chance";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -766,7 +766,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_SELL_ALL_BUILDINGS_AREA_IN_CAPTURE_PROCESS_PERCENTAGE];
 	curTemplate->m_internalName = "PLAYER_SELL_ALL_BUILDINGS_AREA_IN_CAPTURE_PROCESS_PERCENTAGE";
-	curTemplate->m_uiName = "TEOD/Player/Sell/Capture/Set a player to sell all buildings in an area currently being captured with % chance";
+	curTemplate->m_uiName = "CLP_AI/Player/Sell/Capture/Set a player to sell all buildings in an area currently being captured with % chance";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::TRIGGER_AREA;
@@ -779,7 +779,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_SELL_ALL_BUILDINGS_TYPE_AREA_IN_CAPTURE_PROCESS_PERCENTAGE];
 	curTemplate->m_internalName = "PLAYER_SELL_ALL_BUILDINGS_TYPE_AREA_IN_CAPTURE_PROCESS_PERCENTAGE";
-	curTemplate->m_uiName = "TEOD/Player/Sell/Capture/Set a player to sell all buildings of a type in an area currently being captured with % chance";
+	curTemplate->m_uiName = "CLP_AI/Player/Sell/Capture/Set a player to sell all buildings of a type in an area currently being captured with % chance";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -794,7 +794,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_SELL_ALL_BUILDINGS_TYPE_AREA];
 	curTemplate->m_internalName = "PLAYER_SELL_ALL_BUILDINGS_TYPE_AREA";
-	curTemplate->m_uiName = "TEOD/Player/Sell/Set a player to sell all buildings of a type in an area";
+	curTemplate->m_uiName = "CLP_AI/Player/Sell/Set a player to sell all buildings of a type in an area";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -806,7 +806,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_SELL_ALL_BUILDINGS_TYPE];
 	curTemplate->m_internalName = "PLAYER_SELL_ALL_BUILDINGS_TYPE";
-	curTemplate->m_uiName = "TEOD/Player/Sell/Set a player to sell all buildings of a type";
+	curTemplate->m_uiName = "CLP_AI/Player/Sell/Set a player to sell all buildings of a type";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -816,7 +816,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_SELL_ALL_BUILDINGS_AREA];
 	curTemplate->m_internalName = "PLAYER_SELL_ALL_BUILDINGS_AREA";
-	curTemplate->m_uiName = "TEOD/Player/Sell/Set a player to sell all buildings in an area";
+	curTemplate->m_uiName = "CLP_AI/Player/Sell/Set a player to sell all buildings in an area";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::TRIGGER_AREA;
@@ -826,7 +826,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::AI_PLAYER_BUILD_DEFENSE_FRONT_FROM_VECTOR_ROTATED_PERCENT];
 	curTemplate->m_internalName = "AI_PLAYER_BUILD_DEFENSE_FRONT_FROM_VECTOR_ROTATED_PERCENT";
-	curTemplate->m_uiName = "TEOD/Skirmish Only/Build/Build base defense on front perimeter, rotated and at N% distance.";
+	curTemplate->m_uiName = "CLP_AI/Skirmish Only/Build/Build base defense on front perimeter, rotated and at N% distance.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::REAL;
 	curTemplate->m_parameters[1] = Parameter::REAL;
@@ -837,7 +837,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::AI_PLAYER_BUILD_DEFENSE_FLANK_FROM_VECTOR_ROTATED_PERCENT];
 	curTemplate->m_internalName = "AI_PLAYER_BUILD_DEFENSE_FLANK_FROM_VECTOR_ROTATED_PERCENT";
-	curTemplate->m_uiName = "TEOD/Skirmish Only/Build/Build base defense on flank perimeter, rotated and at N% distance.";
+	curTemplate->m_uiName = "CLP_AI/Skirmish Only/Build/Build base defense on flank perimeter, rotated and at N% distance.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::REAL;
 	curTemplate->m_parameters[1] = Parameter::REAL;
@@ -848,7 +848,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::AI_PLAYER_ADD_DEFENSE_TO_VECTOR];
 	curTemplate->m_internalName = "AI_PLAYER_ADD_DEFENSE_TO_VECTOR";
-	curTemplate->m_uiName = "TEOD/Skirmish Only/Build/Add a base defense of type to the vector list.";
+	curTemplate->m_uiName = "CLP_AI/Skirmish Only/Build/Add a base defense of type to the vector list.";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::OBJECT_TYPE;
 	curTemplate->m_numUiStrings = 1;
@@ -856,7 +856,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::AI_PLAYER_REMOVE_DEFENSE_FROM_VECTOR];
 	curTemplate->m_internalName = "AI_PLAYER_REMOVE_DEFENSE_FROM_VECTOR";
-	curTemplate->m_uiName = "TEOD/Skirmish Only/Build/Remove a base defense of type from the vector list.";
+	curTemplate->m_uiName = "CLP_AI/Skirmish Only/Build/Remove a base defense of type from the vector list.";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::OBJECT_TYPE;
 	curTemplate->m_numUiStrings = 1;
@@ -864,7 +864,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::AI_PLAYER_BUILD_DEFENSE_FRONT_FROM_VECTOR_ROTATED_PERCENT_AT_PLAYER];
 	curTemplate->m_internalName = "AI_PLAYER_BUILD_DEFENSE_FRONT_FROM_VECTOR_ROTATED_PERCENT_AT_PLAYER";
-	curTemplate->m_uiName = "TEOD/Skirmish Only/Build/Build base defense on front perimeter, rotated and at N% distance at a player's base.";
+	curTemplate->m_uiName = "CLP_AI/Skirmish Only/Build/Build base defense on front perimeter, rotated and at N% distance at a player's base.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::REAL;
 	curTemplate->m_parameters[1] = Parameter::REAL;
@@ -877,7 +877,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::AI_PLAYER_BUILD_DEFENSE_FLANK_FROM_VECTOR_ROTATED_PERCENT_AT_PLAYER];
 	curTemplate->m_internalName = "AI_PLAYER_BUILD_DEFENSE_FLANK_FROM_VECTOR_ROTATED_PERCENT_AT_PLAYER";
-	curTemplate->m_uiName = "TEOD/Skirmish Only/Build/Build base defense on flank perimeter, rotated and at N% distance at a player's base.";
+	curTemplate->m_uiName = "CLP_AI/Skirmish Only/Build/Build base defense on flank perimeter, rotated and at N% distance at a player's base.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::REAL;
 	curTemplate->m_parameters[1] = Parameter::REAL;
@@ -890,7 +890,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_ATTACK_TYPE];
 	curTemplate->m_internalName = "TEAM_ATTACK_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Attack/Set to attack -- a(n) enemy unit of a type.";
+	curTemplate->m_uiName = "CLP_AI/Team/Attack/Set to attack -- a(n) enemy unit of a type.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -902,7 +902,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_ATTACK_TYPE_AREA];
 	curTemplate->m_internalName = "TEAM_ATTACK_TYPE_AREA";
-	curTemplate->m_uiName = "TEOD/Team/Attack/Set to attack -- a(n) enemy unit of a type in an area.";
+	curTemplate->m_uiName = "CLP_AI/Team/Attack/Set to attack -- a(n) enemy unit of a type in an area.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -916,7 +916,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_ATTACK_SEEN_UNIT];
 	curTemplate->m_internalName = "TEAM_ATTACK_SEEN_UNIT";
-	curTemplate->m_uiName = "TEOD/Team/Attack/Seen/Set to attack -- a(n) enemy unit the player has seen";
+	curTemplate->m_uiName = "CLP_AI/Team/Attack/Seen/Set to attack -- a(n) enemy unit the player has seen";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::SELECTION_MODE;
@@ -926,7 +926,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_ATTACK_SEEN_TYPE];
 	curTemplate->m_internalName = "TEAM_ATTACK_SEEN_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Attack/Seen/Set to attack -- a(n) enemy unit of a type the player has seen";
+	curTemplate->m_uiName = "CLP_AI/Team/Attack/Seen/Set to attack -- a(n) enemy unit of a type the player has seen";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -938,7 +938,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_ATTACK_SEEN_AREA];
 	curTemplate->m_internalName = "TEAM_ATTACK_SEEN_AREA";
-	curTemplate->m_uiName = "TEOD/Team/Attack/Seen/Set to attack -- a(n) enemy unit in an area the player has seen";
+	curTemplate->m_uiName = "CLP_AI/Team/Attack/Seen/Set to attack -- a(n) enemy unit in an area the player has seen";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::TRIGGER_AREA;
@@ -950,7 +950,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_ATTACK_SEEN_TYPE_AREA];
 	curTemplate->m_internalName = "TEAM_ATTACK_SEEN_TYPE_AREA";
-	curTemplate->m_uiName = "TEOD/Team/Attack/Seen/Set to attack -- a(n) enemy unit of a type in an area the player has seen";
+	curTemplate->m_uiName = "CLP_AI/Team/Attack/Seen/Set to attack -- a(n) enemy unit of a type in an area the player has seen";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -964,7 +964,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_ATTACKMOVE_WAYPOINT];
 	curTemplate->m_internalName = "TEAM_ATTACKMOVE_WAYPOINT";
-	curTemplate->m_uiName = "TEOD/Team/Attack/Attack Move/Attack Move -- location.";
+	curTemplate->m_uiName = "CLP_AI/Team/Attack/Attack Move/Attack Move -- location.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::WAYPOINT;
@@ -974,7 +974,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_ATTACKMOVE_AREA];
 	curTemplate->m_internalName = "TEAM_ATTACKMOVE_AREA";
-	curTemplate->m_uiName = "TEOD/Team/Attack/Attack Move/Attack Move -- a(n) enemy unit in an area.";
+	curTemplate->m_uiName = "CLP_AI/Team/Attack/Attack Move/Attack Move -- a(n) enemy unit in an area.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::TRIGGER_AREA;
@@ -986,7 +986,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_ATTACKMOVE_TYPE];
 	curTemplate->m_internalName = "TEAM_ATTACKMOVE_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Attack/Attack Move/Attack Move -- a(n) enemy unit of a type.";
+	curTemplate->m_uiName = "CLP_AI/Team/Attack/Attack Move/Attack Move -- a(n) enemy unit of a type.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -998,7 +998,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_ATTACKMOVE_TYPE_AREA];
 	curTemplate->m_internalName = "TEAM_ATTACKMOVE_TYPE_AREA";
-	curTemplate->m_uiName = "TEOD/Team/Attack/Attack Move/Attack Move -- a(n) enemy unit of a type in an area.";
+	curTemplate->m_uiName = "CLP_AI/Team/Attack/Attack Move/Attack Move -- a(n) enemy unit of a type in an area.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1012,7 +1012,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_EVACUATE_DESTROYED_PERCENT];
 	curTemplate->m_internalName = "TEAM_EVACUATE_DESTROYED_PERCENT";
-	curTemplate->m_uiName = "TEOD/Team/Transport/Transport -- unload team from all transports below N% health.";
+	curTemplate->m_uiName = "CLP_AI/Team/Transport/Transport -- unload team from all transports below N% health.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::REAL;
@@ -1023,7 +1023,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_ATTACKMOVE_SEEN_UNIT];
 	curTemplate->m_internalName = "TEAM_ATTACKMOVE_SEEN_UNIT";
-	curTemplate->m_uiName = "TEOD/Team/Attack/Attack Move/Seen/Attack Move -- a seen unit.";
+	curTemplate->m_uiName = "CLP_AI/Team/Attack/Attack Move/Seen/Attack Move -- a seen unit.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::SELECTION_MODE;
@@ -1033,7 +1033,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_ATTACKMOVE_SEEN_AREA];
 	curTemplate->m_internalName = "TEAM_ATTACKMOVE_SEEN_AREA";
-	curTemplate->m_uiName = "TEOD/Team/Attack/Attack Move/Seen/Attack Move -- a seen enemy unit in an area.";
+	curTemplate->m_uiName = "CLP_AI/Team/Attack/Attack Move/Seen/Attack Move -- a seen enemy unit in an area.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::TRIGGER_AREA;
@@ -1045,7 +1045,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_ATTACKMOVE_SEEN_TYPE];
 	curTemplate->m_internalName = "TEAM_ATTACKMOVE_SEEN_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Attack/Attack Move/Seen/Attack Move -- a seen enemy unit of a type.";
+	curTemplate->m_uiName = "CLP_AI/Team/Attack/Attack Move/Seen/Attack Move -- a seen enemy unit of a type.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1057,7 +1057,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_ATTACKMOVE_SEEN_TYPE_AREA];
 	curTemplate->m_internalName = "TEAM_ATTACKMOVE_SEEN_TYPE_AREA";
-	curTemplate->m_uiName = "TEOD/Team/Attack/Attack Move/Seen/Attack Move -- a seen enemy unit of a type in an area.";
+	curTemplate->m_uiName = "CLP_AI/Team/Attack/Attack Move/Seen/Attack Move -- a seen enemy unit of a type in an area.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1071,7 +1071,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_ATTACKMOVE_PATH];
 	curTemplate->m_internalName = "TEAM_ATTACKMOVE_PATH";
-	curTemplate->m_uiName = "TEOD/Team/Attack/Attack Move/ Attack Move -- approach path.";
+	curTemplate->m_uiName = "CLP_AI/Team/Attack/Attack Move/ Attack Move -- approach path.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::WAYPOINT_PATH;
@@ -1082,7 +1082,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MOVE_CAPTURED];
 	curTemplate->m_internalName = "TEAM_MOVE_CAPTURED";
-	curTemplate->m_uiName = "TEOD/Team/Move/Capture/ Move -- closest allied building in the process of being captured.";
+	curTemplate->m_uiName = "CLP_AI/Team/Move/Capture/ Move -- closest allied building in the process of being captured.";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_numUiStrings = 2;
@@ -1091,7 +1091,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MOVE_CAPTURED_TYPE];
 	curTemplate->m_internalName = "TEAM_MOVE_CAPTURED_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Move/Capture/ Move -- closest allied building of a type in the process of being captured.";
+	curTemplate->m_uiName = "CLP_AI/Team/Move/Capture/ Move -- closest allied building of a type in the process of being captured.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1102,7 +1102,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MOVE_TYPE_UNDER_FOG];
 	curTemplate->m_internalName = "TEAM_MOVE_TYPE_UNDER_FOG";
-	curTemplate->m_uiName = "TEOD/Team/Move/Fog Of War/ Move -- an object of a type under the fog of war.";
+	curTemplate->m_uiName = "CLP_AI/Team/Move/Fog Of War/ Move -- an object of a type under the fog of war.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1114,7 +1114,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MOVE_TYPE_AREA_UNDER_FOG];
 	curTemplate->m_internalName = "TEAM_MOVE_TYPE_AREA_UNDER_FOG";
-	curTemplate->m_uiName = "TEOD/Team/Move/Fog Of War/ Move -- an object of a type in an area under the fog of war.";
+	curTemplate->m_uiName = "CLP_AI/Team/Move/Fog Of War/ Move -- an object of a type in an area under the fog of war.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1128,7 +1128,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MOVE_TYPE_NOT_UNDER_FOG];
 	curTemplate->m_internalName = "TEAM_MOVE_TYPE_NOT_UNDER_FOG";
-	curTemplate->m_uiName = "TEOD/Team/Move/Fog Of War/ Move -- an object of a type NOT under the fog of war.";
+	curTemplate->m_uiName = "CLP_AI/Team/Move/Fog Of War/ Move -- an object of a type NOT under the fog of war.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1140,7 +1140,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MOVE_TYPE_AREA_NOT_UNDER_FOG];
 	curTemplate->m_internalName = "TEAM_MOVE_TYPE_AREA_NOT_UNDER_FOG";
-	curTemplate->m_uiName = "TEOD/Team/Move/Fog Of War/ Move -- an object of a type in an area NOT under the fog of war.";
+	curTemplate->m_uiName = "CLP_AI/Team/Move/Fog Of War/ Move -- an object of a type in an area NOT under the fog of war.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1154,7 +1154,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::UNIT_TELEPORT_TO_LOCATION];
 	curTemplate->m_internalName = "UNIT_TELEPORT_TO_LOCATION";
-	curTemplate->m_uiName = "TEOD/Unit/Move/Teleport/ Teleport -- location.";
+	curTemplate->m_uiName = "CLP_AI/Unit/Move/Teleport/ Teleport -- location.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::UNIT;
 	curTemplate->m_parameters[1] = Parameter::WAYPOINT;
@@ -1165,7 +1165,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_TELEPORT_TO_LOCATION];
 	curTemplate->m_internalName = "TEAM_TELEPORT_TO_LOCATION";
-	curTemplate->m_uiName = "TEOD/Team/Move/Teleport/ Teleport -- location.";
+	curTemplate->m_uiName = "CLP_AI/Team/Move/Teleport/ Teleport -- location.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::WAYPOINT;
@@ -1176,7 +1176,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_APPLY_ATTACK_PRIORITY_SET];
 	curTemplate->m_internalName = "PLAYER_APPLY_ATTACK_PRIORITY_SET";
-	curTemplate->m_uiName = "TEOD/AttackPrioritySet/ApplySet/Apply a player's attack priority set.";
+	curTemplate->m_uiName = "CLP_AI/AttackPrioritySet/ApplySet/Apply a player's attack priority set.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::ATTACK_PRIORITY_SET;
@@ -1187,7 +1187,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_APPLY_ATTACK_PRIORITY_SET_TYPE];
 	curTemplate->m_internalName = "PLAYER_APPLY_ATTACK_PRIORITY_SET_TYPE";
-	curTemplate->m_uiName = "TEOD/AttackPrioritySet/ApplySet/Apply a player's attack priority set to a specific type.";
+	curTemplate->m_uiName = "CLP_AI/AttackPrioritySet/ApplySet/Apply a player's attack priority set to a specific type.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::ATTACK_PRIORITY_SET;
@@ -1200,7 +1200,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_APPLY_ATTACK_PRIORITY_SET_TYPE];
 	curTemplate->m_internalName = "TEAM_APPLY_ATTACK_PRIORITY_SET_TYPE";
-	curTemplate->m_uiName = "TEOD/AttackPrioritySet/ApplySet/Apply a team's attack priority set to a specific type.";
+	curTemplate->m_uiName = "CLP_AI/AttackPrioritySet/ApplySet/Apply a team's attack priority set to a specific type.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::ATTACK_PRIORITY_SET;
@@ -1213,7 +1213,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_KEEP_DISTANCE_RELATION];
 	curTemplate->m_internalName = "TEAM_KEEP_DISTANCE_RELATION";
-	curTemplate->m_uiName = "TEOD/Team/Move/Distance/Move team to keep a distance from a(n) friendly|neutral|enemy unit.";
+	curTemplate->m_uiName = "CLP_AI/Team/Move/Distance/Move team to keep a distance from a(n) friendly|neutral|enemy unit.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::REAL;
@@ -1227,7 +1227,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::UNIT_KEEP_DISTANCE_RELATION];
 	curTemplate->m_internalName = "UNIT_KEEP_DISTANCE_RELATION";
-	curTemplate->m_uiName = "TEOD/Unit/Move/Distance/Move unit to keep a distance from a(n) friendly|neutral|enemy unit.";
+	curTemplate->m_uiName = "CLP_AI/Unit/Move/Distance/Move unit to keep a distance from a(n) friendly|neutral|enemy unit.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::UNIT;
 	curTemplate->m_parameters[1] = Parameter::REAL;
@@ -1241,7 +1241,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_KEEP_DISTANCE_RELATION_TYPE];
 	curTemplate->m_internalName = "TEAM_KEEP_DISTANCE_RELATION_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Move/Distance/Move team to keep a distance from a(n) friendly|neutral|enemy object type.";
+	curTemplate->m_uiName = "CLP_AI/Team/Move/Distance/Move team to keep a distance from a(n) friendly|neutral|enemy object type.";
 	curTemplate->m_numParameters = 5;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::REAL;
@@ -1257,7 +1257,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::UNIT_KEEP_DISTANCE_RELATION_TYPE];
 	curTemplate->m_internalName = "UNIT_KEEP_DISTANCE_RELATION_TYPE";
-	curTemplate->m_uiName = "TEOD/Unit/Move/Distance/Move unit to keep a distance from a(n) friendly|neutral|enemy object type.";
+	curTemplate->m_uiName = "CLP_AI/Unit/Move/Distance/Move unit to keep a distance from a(n) friendly|neutral|enemy object type.";
 	curTemplate->m_numParameters = 5;
 	curTemplate->m_parameters[0] = Parameter::UNIT;
 	curTemplate->m_parameters[1] = Parameter::REAL;
@@ -1273,7 +1273,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::SET_WILLINGNESS_TO_CRUSH_PLAYER];
 	curTemplate->m_internalName = "SET_WILLINGNESS_TO_CRUSH_PLAYER";
-	curTemplate->m_uiName = "TEOD/AIData/Crush/Set a player's willingness to crush infantry.";
+	curTemplate->m_uiName = "CLP_AI/AIData/Crush/Set a player's willingness to crush infantry.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::BOOLEAN;
@@ -1284,7 +1284,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::SET_WILLINGNESS_TO_CRUSH_TEAM];
 	curTemplate->m_internalName = "SET_WILLINGNESS_TO_CRUSH_TEAM";
-	curTemplate->m_uiName = "TEOD/AIData/Crush/Set a team's willingness to crush infantry.";
+	curTemplate->m_uiName = "CLP_AI/AIData/Crush/Set a team's willingness to crush infantry.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::BOOLEAN;
@@ -1295,7 +1295,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::SET_WILLINGNESS_TO_CRUSH_UNIT];
 	curTemplate->m_internalName = "SET_WILLINGNESS_TO_CRUSH_UNIT";
-	curTemplate->m_uiName = "TEOD/AIData/Crush/Set a unit's willingness to crush infantry.";
+	curTemplate->m_uiName = "CLP_AI/AIData/Crush/Set a unit's willingness to crush infantry.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::UNIT;
 	curTemplate->m_parameters[1] = Parameter::BOOLEAN;
@@ -1306,7 +1306,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_HUNT_TYPE];
 	curTemplate->m_internalName = "PLAYER_HUNT_TYPE";
-	curTemplate->m_uiName = "TEOD/Player/Hunt/Set object types to hunt.";
+	curTemplate->m_uiName = "CLP_AI/Player/Hunt/Set object types to hunt.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1317,7 +1317,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_HUNT_TYPE];
 	curTemplate->m_internalName = "TEAM_HUNT_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Hunt/Set object types to hunt.";
+	curTemplate->m_uiName = "CLP_AI/Team/Hunt/Set object types to hunt.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1328,7 +1328,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_HUNT_AREA];
 	curTemplate->m_internalName = "PLAYER_HUNT_AREA";
-	curTemplate->m_uiName = "TEOD/Player/Hunt/Set units inside an area to hunt.";
+	curTemplate->m_uiName = "CLP_AI/Player/Hunt/Set units inside an area to hunt.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::TRIGGER_AREA;
@@ -1339,7 +1339,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_CUSTOM_COLOR];
 	curTemplate->m_internalName = "TEAM_CUSTOM_COLOR";
-	curTemplate->m_uiName = "TEOD/User/Flash/Set a team to use a special indicator color.";
+	curTemplate->m_uiName = "CLP_AI/User/Flash/Set a team to use a special indicator color.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::COLOR;
@@ -1350,7 +1350,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_CUSTOM_COLOR];
 	curTemplate->m_internalName = "PLAYER_CUSTOM_COLOR";
-	curTemplate->m_uiName = "TEOD/User/Flash/Set a player to use a special indicator color.";
+	curTemplate->m_uiName = "CLP_AI/User/Flash/Set a player to use a special indicator color.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::COLOR;
@@ -1361,7 +1361,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::CREATE_WAYPOINT_LOCATION];
 	curTemplate->m_internalName = "CREATE_WAYPOINT_LOCATION";
-	curTemplate->m_uiName = "TEOD/Waypoints/Create/Create a waypoint at a specific location.";
+	curTemplate->m_uiName = "CLP_AI/Waypoints/Create/Create a waypoint at a specific location.";
 	curTemplate->m_numParameters = 7;
 	curTemplate->m_parameters[0] = Parameter::WAYPOINT;
 	curTemplate->m_parameters[1] = Parameter::COORD3D;
@@ -1381,7 +1381,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::CREATE_WAYPOINT_UNIT];
 	curTemplate->m_internalName = "CREATE_WAYPOINT_UNIT";
-	curTemplate->m_uiName = "TEOD/Waypoints/Create/Create a waypoint at a unit's location.";
+	curTemplate->m_uiName = "CLP_AI/Waypoints/Create/Create a waypoint at a unit's location.";
 	curTemplate->m_numParameters = 6;
 	curTemplate->m_parameters[0] = Parameter::WAYPOINT;
 	curTemplate->m_parameters[1] = Parameter::UNIT;
@@ -1399,7 +1399,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::CREATE_WAYPOINT_TEAM];
 	curTemplate->m_internalName = "CREATE_WAYPOINT_TEAM";
-	curTemplate->m_uiName = "TEOD/Waypoints/Create/Create a waypoint at a team's location.";
+	curTemplate->m_uiName = "CLP_AI/Waypoints/Create/Create a waypoint at a team's location.";
 	curTemplate->m_numParameters = 6;
 	curTemplate->m_parameters[0] = Parameter::WAYPOINT;
 	curTemplate->m_parameters[1] = Parameter::TEAM;
@@ -1417,7 +1417,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::CREATE_WAYPOINT_TYPE];
 	curTemplate->m_internalName = "CREATE_WAYPOINT_TYPE";
-	curTemplate->m_uiName = "TEOD/Waypoints/Create/Create a waypoint at an objectType's location.";
+	curTemplate->m_uiName = "CLP_AI/Waypoints/Create/Create a waypoint at an objectType's location.";
 	curTemplate->m_numParameters = 7;
 	curTemplate->m_parameters[0] = Parameter::WAYPOINT;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1437,7 +1437,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::REMOVE_WAYPOINT];
 	curTemplate->m_internalName = "REMOVE_WAYPOINT";
-	curTemplate->m_uiName = "TEOD/Waypoints/Remove/Remove a waypoint.";
+	curTemplate->m_uiName = "CLP_AI/Waypoints/Remove/Remove a waypoint.";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::WAYPOINT;
 	curTemplate->m_numUiStrings = 2;
@@ -1446,7 +1446,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::SET_WAYPOINT_LINK];
 	curTemplate->m_internalName = "SET_WAYPOINT_LINK";
-	curTemplate->m_uiName = "TEOD/Waypoints/Link/Link a waypoint to another.";
+	curTemplate->m_uiName = "CLP_AI/Waypoints/Link/Link a waypoint to another.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::WAYPOINT;
 	curTemplate->m_parameters[1] = Parameter::WAYPOINT;
@@ -1457,7 +1457,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::REMOVE_WAYPOINT_LINK];
 	curTemplate->m_internalName = "REMOVE_WAYPOINT_LINK";
-	curTemplate->m_uiName = "TEOD/Waypoints/Link/Unlink a waypoint from another.";
+	curTemplate->m_uiName = "CLP_AI/Waypoints/Link/Unlink a waypoint from another.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::WAYPOINT;
 	curTemplate->m_parameters[1] = Parameter::WAYPOINT;
@@ -1468,7 +1468,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::SET_WAYPOINT_LABELS];
 	curTemplate->m_internalName = "SET_WAYPOINT_LABELS";
-	curTemplate->m_uiName = "TEOD/Waypoints/Properties/Set a waypoint's path labels.";
+	curTemplate->m_uiName = "CLP_AI/Waypoints/Properties/Set a waypoint's path labels.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::WAYPOINT;
 	curTemplate->m_parameters[1] = Parameter::TEXT_STRING;
@@ -1482,7 +1482,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::CLEAR_WAYPOINT_LABELS];
 	curTemplate->m_internalName = "CLEAR_WAYPOINT_LABELS";
-	curTemplate->m_uiName = "TEOD/Waypoints/Properties/Clear a waypoint's path labels.";
+	curTemplate->m_uiName = "CLP_AI/Waypoints/Properties/Clear a waypoint's path labels.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::WAYPOINT;
 	curTemplate->m_parameters[1] = Parameter::BOOLEAN;
@@ -1496,7 +1496,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::RELOCATE_WAYPOINT_LOCATION];
 	curTemplate->m_internalName = "RELOCATE_WAYPOINT_LOCATION";
-	curTemplate->m_uiName = "TEOD/Waypoints/Relocate/Relocate a waypoint to a specific location.";
+	curTemplate->m_uiName = "CLP_AI/Waypoints/Relocate/Relocate a waypoint to a specific location.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::WAYPOINT;
 	curTemplate->m_parameters[1] = Parameter::COORD3D;
@@ -1509,7 +1509,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::RELOCATE_WAYPOINT_UNIT];
 	curTemplate->m_internalName = "RELOCATE_WAYPOINT_UNIT";
-	curTemplate->m_uiName = "TEOD/Waypoints/Relocate/Relocate a waypoint to a unit's location.";
+	curTemplate->m_uiName = "CLP_AI/Waypoints/Relocate/Relocate a waypoint to a unit's location.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::WAYPOINT;
 	curTemplate->m_parameters[1] = Parameter::UNIT;
@@ -1520,7 +1520,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::RELOCATE_WAYPOINT_TEAM];
 	curTemplate->m_internalName = "RELOCATE_WAYPOINT_TEAM";
-	curTemplate->m_uiName = "TEOD/Waypoints/Relocate/Relocate a waypoint to a team's location.";
+	curTemplate->m_uiName = "CLP_AI/Waypoints/Relocate/Relocate a waypoint to a team's location.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::WAYPOINT;
 	curTemplate->m_parameters[1] = Parameter::TEAM;
@@ -1531,7 +1531,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::RELOCATE_WAYPOINT_TYPE];
 	curTemplate->m_internalName = "RELOCATE_WAYPOINT_TYPE";
-	curTemplate->m_uiName = "TEOD/Waypoints/Relocate/Relocate a waypoint to an objectType's location.";
+	curTemplate->m_uiName = "CLP_AI/Waypoints/Relocate/Relocate a waypoint to an objectType's location.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::WAYPOINT;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1543,7 +1543,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::SET_WAYPOINT_BIDIRECTIONAL];
 	curTemplate->m_internalName = "SET_WAYPOINT_BIDIRECTIONAL";
-	curTemplate->m_uiName = "TEOD/Waypoints/Properties/Set a waypoint to be bi-directional.";
+	curTemplate->m_uiName = "CLP_AI/Waypoints/Properties/Set a waypoint to be bi-directional.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::WAYPOINT;
 	curTemplate->m_parameters[1] = Parameter::BOOLEAN;
@@ -1554,7 +1554,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_HUNT_WITH_COMMAND_BUTTON_TYPE];
 	curTemplate->m_internalName = "TEAM_HUNT_WITH_COMMAND_BUTTON_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Hunt/Set to hunt using commandbutton ability with objects of a type.";
+	curTemplate->m_uiName = "CLP_AI/Team/Hunt/Set to hunt using commandbutton ability with objects of a type.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::COMMANDBUTTON_ALL_ABILITIES;
@@ -1566,7 +1566,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::SKIRMISH_SET_PARTICLE_CANNON_TELEPORT_MODE];
 	curTemplate->m_internalName = "SKIRMISH_SET_PARTICLE_CANNON_TELEPORT_MODE";
-	curTemplate->m_uiName = "TEOD/Player/Special power/Special power -- set teleportation mode for particle uplink cannons";
+	curTemplate->m_uiName = "CLP_AI/Player/Special power/Special power -- set teleportation mode for particle uplink cannons";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::BOOLEAN;
@@ -1577,7 +1577,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_GARRISON_TYPE];
 	curTemplate->m_internalName = "TEAM_GARRISON_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Garrison/Garrison a nearby building of a specific type.";
+	curTemplate->m_uiName = "CLP_AI/Team/Garrison/Garrison a nearby building of a specific type.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1588,7 +1588,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_GARRISON_BUILDINGS_TYPE_WITH_MAX_NUMBER];
 	curTemplate->m_internalName = "PLAYER_GARRISON_BUILDINGS_TYPE_WITH_MAX_NUMBER";
-	curTemplate->m_uiName = "TEOD/Player/Garrison/Garrison nearby buildings of a specific type with a maximum number.";
+	curTemplate->m_uiName = "CLP_AI/Player/Garrison/Garrison nearby buildings of a specific type with a maximum number.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1601,7 +1601,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_GARRISON_BUILDINGS_TYPE_WITH_MAX_NUMBER];
 	curTemplate->m_internalName = "TEAM_GARRISON_BUILDINGS_TYPE_WITH_MAX_NUMBER";
-	curTemplate->m_uiName = "TEOD/Team/Garrison/Garrison nearby buildings of a specific type with a maximum number.";
+	curTemplate->m_uiName = "CLP_AI/Team/Garrison/Garrison nearby buildings of a specific type with a maximum number.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1614,7 +1614,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::PLAYER_GARRISON_NUMBER_BUILDINGS_TYPE];
 	curTemplate->m_internalName = "PLAYER_GARRISON_NUMBER_BUILDINGS_TYPE";
-	curTemplate->m_uiName = "TEOD/Player/Garrison/Garrison a number of nearby buildings of a specific type equally.";
+	curTemplate->m_uiName = "CLP_AI/Player/Garrison/Garrison a number of nearby buildings of a specific type equally.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::INT;
@@ -1627,7 +1627,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_GARRISON_NUMBER_BUILDINGS_TYPE];
 	curTemplate->m_internalName = "TEAM_GARRISON_NUMBER_BUILDINGS_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Garrison/Garrison a number of nearby buildings of a specific type equally.";
+	curTemplate->m_uiName = "CLP_AI/Team/Garrison/Garrison a number of nearby buildings of a specific type equally.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::INT;
@@ -1640,7 +1640,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_LOAD_TYPE_EVENLY];
 	curTemplate->m_internalName = "TEAM_LOAD_TYPE_EVENLY";
-	curTemplate->m_uiName = "TEOD/Team/Transport/Transport -- automatically load into a specific type evenly.";
+	curTemplate->m_uiName = "CLP_AI/Team/Transport/Transport -- automatically load into a specific type evenly.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1651,7 +1651,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_REPAIR];
 	curTemplate->m_internalName = "TEAM_REPAIR";
-	curTemplate->m_uiName = "TEOD/Team/Repair/Send a team to repair at the closest suitable buildings.";
+	curTemplate->m_uiName = "CLP_AI/Team/Repair/Send a team to repair at the closest suitable buildings.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::BOOLEAN;
@@ -1662,7 +1662,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::UNIT_REPAIR];
 	curTemplate->m_internalName = "UNIT_REPAIR";
-	curTemplate->m_uiName = "TEOD/Unit/Repair/Send a unit to repair at the closest suitable buildings.";
+	curTemplate->m_uiName = "CLP_AI/Unit/Repair/Send a unit to repair at the closest suitable buildings.";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::UNIT;
 	curTemplate->m_numUiStrings = 2;
@@ -1671,7 +1671,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::TEAM_REPAIR_TYPE];
 	curTemplate->m_internalName = "TEAM_REPAIR_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Repair/Send a team's objects of a specific type to repair at the closest suitable buildings.";
+	curTemplate->m_uiName = "CLP_AI/Team/Repair/Send a team's objects of a specific type to repair at the closest suitable buildings.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1684,7 +1684,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::ADD_PRIORITY_SET_TO_OTHER];
 	curTemplate->m_internalName = "ADD_PRIORITY_SET_TO_OTHER";
-	curTemplate->m_uiName = "TEOD/AttackPrioritySet/Add an attack priority set's settings to another set.";
+	curTemplate->m_uiName = "CLP_AI/AttackPrioritySet/Add an attack priority set's settings to another set.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::ATTACK_PRIORITY_SET;
 	curTemplate->m_parameters[1] = Parameter::ATTACK_PRIORITY_SET;
@@ -1695,7 +1695,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::INCREASE_PRIORITY_IN_SET_TYPE];
 	curTemplate->m_internalName = "INCREASE_PRIORITY_IN_SET_TYPE";
-	curTemplate->m_uiName = "TEOD/AttackPrioritySet/Increase the priority of objects of a specific type in a set.";
+	curTemplate->m_uiName = "CLP_AI/AttackPrioritySet/Increase the priority of objects of a specific type in a set.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::ATTACK_PRIORITY_SET;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1707,7 +1707,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::DECREASE_PRIORITY_IN_SET_TYPE];
 	curTemplate->m_internalName = "DECREASE_PRIORITY_IN_SET_TYPE";
-	curTemplate->m_uiName = "TEOD/AttackPrioritySet/Decrease the priority of objects of a specific type in a set.";
+	curTemplate->m_uiName = "CLP_AI/AttackPrioritySet/Decrease the priority of objects of a specific type in a set.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::ATTACK_PRIORITY_SET;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1719,7 +1719,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::AI_PLAYER_CLOSEST_DOZER_BUILDING_PRIORITY];
 	curTemplate->m_internalName = "AI_PLAYER_CLOSEST_DOZER_BUILDING_PRIORITY";
-	curTemplate->m_uiName = "TEOD/Skirmish Only/AI prioritizes AIData entries with a close non-busy dozer";
+	curTemplate->m_uiName = "CLP_AI/Skirmish Only/AI prioritizes AIData entries with a close non-busy dozer";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::BOOLEAN;
 	curTemplate->m_numUiStrings = 2;
@@ -1728,7 +1728,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::AI_CLEAR_BUILDLIST];
 	curTemplate->m_internalName = "AI_CLEAR_BUILDLIST";
-	curTemplate->m_uiName = "TEOD/COOP/AI/AI clears everything from its build list.";
+	curTemplate->m_uiName = "CLP_AI/COOP/AI/AI clears everything from its build list.";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_numUiStrings = 2;
@@ -1737,7 +1737,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::AI_ADD_TO_BUILDLIST];
 	curTemplate->m_internalName = "AI_ADD_TO_BUILDLIST";
-	curTemplate->m_uiName = "TEOD/COOP/AI/AI adds a building to its BuildList.";
+	curTemplate->m_uiName = "CLP_AI/COOP/AI/AI adds a building to its BuildList.";
 	curTemplate->m_numParameters = 7;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1757,7 +1757,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_actionTemplates[ScriptAction::AREA_TRANSFER_TO_PLAYER];
 	curTemplate->m_internalName = "AREA_TRANSFER_TO_PLAYER";
-	curTemplate->m_uiName = "TEOD/Transfer Control/Transfer control of all units or structures inside an area to a player.";
+	curTemplate->m_uiName = "CLP_AI/Transfer Control/Transfer control of all units or structures inside an area to a player.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TRIGGER_AREA;
 	curTemplate->m_parameters[1] = Parameter::SIDE;
@@ -1767,7 +1767,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::KD_RATIO];
 	curTemplate->m_internalName = "KD_RATIO";
-	curTemplate->m_uiName = "TEOD/Scripting/KD-Ratio compared to a value.";
+	curTemplate->m_uiName = "CLP_AI/Scripting/KD-Ratio compared to a value.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::KD_RATIO;
 	curTemplate->m_parameters[1] = Parameter::COMPARISON;
@@ -1780,7 +1780,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::RELATION_IS];
 	curTemplate->m_internalName = "RELATION_IS";
-	curTemplate->m_uiName = "TEOD/Alliance/Check the relation of two players.";
+	curTemplate->m_uiName = "CLP_AI/Alliance/Check the relation of two players.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::RELATION;
@@ -1792,7 +1792,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::SPOT_EMPTY];
 	curTemplate->m_internalName = "SPOT_EMPTY";
-	curTemplate->m_uiName = "TEOD/Skirmish/Spot/Check whether spot is empty.";
+	curTemplate->m_uiName = "CLP_AI/Skirmish/Spot/Check whether spot is empty.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::INT;
 	curTemplate->m_parameters[1] = Parameter::BOOLEAN;
@@ -1803,7 +1803,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::SPOT_NEIGHBOURING];
 	curTemplate->m_internalName = "SPOT_NEIGHBOURING";
-	curTemplate->m_uiName = "TEOD/Skirmish/Spot/Check whether spot is neighbouring the player.";
+	curTemplate->m_uiName = "CLP_AI/Skirmish/Spot/Check whether spot is neighbouring the player.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::INT;
@@ -1813,7 +1813,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::NEIGHBOURING_SPOTS_EMPTY];
 	curTemplate->m_internalName = "NEIGHBOURING_SPOTS_EMPTY";
-	curTemplate->m_uiName = "TEOD/Skirmish/Spot/Check if N number of neighbouring spots are empty.";
+	curTemplate->m_uiName = "CLP_AI/Skirmish/Spot/Check if N number of neighbouring spots are empty.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::COMPARISON;
@@ -1826,7 +1826,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::STARTING_CASH_COMPARE];
 	curTemplate->m_internalName = "STARTING_CASH_COMPARE";
-	curTemplate->m_uiName = "TEOD/Skirmish/Starting cash is a value.";
+	curTemplate->m_uiName = "CLP_AI/Skirmish/Starting cash is a value.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::COMPARISON;
 	curTemplate->m_parameters[1] = Parameter::INT;
@@ -1837,7 +1837,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::CLOSEST_ENEMY_DISTANCE];
 	curTemplate->m_internalName = "CLOSEST_ENEMY_DISTANCE";
-	curTemplate->m_uiName = "TEOD/Player/Closest unit with a relation to Player";
+	curTemplate->m_uiName = "CLP_AI/Player/Closest unit with a relation to Player";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::RELATION;
 	curTemplate->m_parameters[1] = Parameter::SIDE;
@@ -1852,7 +1852,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_HUNTED];
 	curTemplate->m_internalName = "PLAYER_HUNTED";
-	curTemplate->m_uiName = "TEOD/Player/Owns/Player is hunted.";
+	curTemplate->m_uiName = "CLP_AI/Player/Owns/Player is hunted.";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_numUiStrings = 2;
@@ -1861,7 +1861,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_LOST_TYPE_AREA];
 	curTemplate->m_internalName = "PLAYER_LOST_TYPE_AREA";
-	curTemplate->m_uiName = "TEOD/Player/Destroyed/Player has lost an object of type in an area.";
+	curTemplate->m_uiName = "CLP_AI/Player/Destroyed/Player has lost an object of type in an area.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1874,7 +1874,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::TEAM_SIGHTED_RELATION_TYPE];
 	curTemplate->m_internalName = "TEAM_SIGHTED_RELATION_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Sighted/Team has sighted a(n) friendly|neutral|enemy unit type.";
+	curTemplate->m_uiName = "CLP_AI/Team/Sighted/Team has sighted a(n) friendly|neutral|enemy unit type.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::RELATION;
@@ -1887,7 +1887,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_RELATION_FACTION];
 	curTemplate->m_internalName = "PLAYER_RELATION_FACTION";
-	curTemplate->m_uiName = "TEOD/Player/Skirmish/One or more of a player's co-players is a faction.";
+	curTemplate->m_uiName = "CLP_AI/Player/Skirmish/One or more of a player's co-players is a faction.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::RELATION;
@@ -1899,7 +1899,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::MAP_COMPARE_SIZE];
 	curTemplate->m_internalName = "MAP_COMPARE_SIZE";
-	curTemplate->m_uiName = "TEOD/Skirmish/Map size is compared to a value.";
+	curTemplate->m_uiName = "CLP_AI/Skirmish/Map size is compared to a value.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::COMPARISON;
 	curTemplate->m_parameters[1] = Parameter::INT;
@@ -1910,7 +1910,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::MAP_ACTIVE_PLAYERS];
 	curTemplate->m_internalName = "MAP_ACTIVE_PLAYERS";
-	curTemplate->m_uiName = "TEOD/Skirmish/Number of active players is compared to a value.";
+	curTemplate->m_uiName = "CLP_AI/Skirmish/Number of active players is compared to a value.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::COMPARISON;
 	curTemplate->m_parameters[1] = Parameter::INT;
@@ -1921,7 +1921,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::MAP_EMPTY_SPOTS];
 	curTemplate->m_internalName = "MAP_EMPTY_SPOTS";
-	curTemplate->m_uiName = "TEOD/Skirmish/Spot/Number of empty spots is compared to a value.";
+	curTemplate->m_uiName = "CLP_AI/Skirmish/Spot/Number of empty spots is compared to a value.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::COMPARISON;
 	curTemplate->m_parameters[1] = Parameter::INT;
@@ -1932,7 +1932,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::NEIGHBOURING_SPOTS_RELATION];
 	curTemplate->m_internalName = "NEIGHBOURING_SPOTS_RELATION";
-	curTemplate->m_uiName = "TEOD/Skirmish/Spot/Check if N number of neighbouring spots are of a relation.";
+	curTemplate->m_uiName = "CLP_AI/Skirmish/Spot/Check if N number of neighbouring spots are of a relation.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::COMPARISON;
@@ -1947,7 +1947,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::COMPARE_COUNTERS];
 	curTemplate->m_internalName = "COMPARE_COUNTERS";
-	curTemplate->m_uiName = "TEOD/Scripting/Counter compared to another counter.";
+	curTemplate->m_uiName = "CLP_AI/Scripting/Counter compared to another counter.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::COUNTER;
 	curTemplate->m_parameters[1] = Parameter::COMPARISON;
@@ -1959,7 +1959,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_DESTROYED_ENEMY_TYPE];
 	curTemplate->m_internalName = "PLAYER_DESTROYED_ENEMY_TYPE";
-	curTemplate->m_uiName = "TEOD/Player/Destroyed/Player destroyed an enemy object of type.";
+	curTemplate->m_uiName = "CLP_AI/Player/Destroyed/Player destroyed an enemy object of type.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -1970,7 +1970,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_LOST_UNIT];
 	curTemplate->m_internalName = "PLAYER_LOST_UNIT";
-	curTemplate->m_uiName = "TEOD/Player/Destroyed/Player lost a unit.";
+	curTemplate->m_uiName = "CLP_AI/Player/Destroyed/Player lost a unit.";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_numUiStrings = 2;
@@ -1979,7 +1979,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_DESTROYED_ENEMY_UNIT];
 	curTemplate->m_internalName = "PLAYER_DESTROYED_ENEMY_UNIT";
-	curTemplate->m_uiName = "TEOD/Player/Destroyed/Player destroyed a unit.";
+	curTemplate->m_uiName = "CLP_AI/Player/Destroyed/Player destroyed a unit.";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_numUiStrings = 2;
@@ -1988,7 +1988,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_MAPCONTROL];
 	curTemplate->m_internalName = "PLAYER_MAPCONTROL";
-	curTemplate->m_uiName = "TEOD/Player/Owns/Control/Player currently has N% map control.";
+	curTemplate->m_uiName = "CLP_AI/Player/Owns/Control/Player currently has N% map control.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::COMPARISON;
@@ -2001,7 +2001,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_RELATION_MAPCONTROL];
 	curTemplate->m_internalName = "PLAYER_RELATION_MAPCONTROL";
-	curTemplate->m_uiName = "TEOD/Player/Owns/Control/All of friendly|neutral|enemy co-players currently have N% map control.";
+	curTemplate->m_uiName = "CLP_AI/Player/Owns/Control/All of friendly|neutral|enemy co-players currently have N% map control.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::RELATION;
@@ -2016,7 +2016,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_MAPCONTROL_AREA];
 	curTemplate->m_internalName = "PLAYER_MAPCONTROL_AREA";
-	curTemplate->m_uiName = "TEOD/Player/Owns/Control/Player currently has N% area control.";
+	curTemplate->m_uiName = "CLP_AI/Player/Owns/Control/Player currently has N% area control.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::COMPARISON;
@@ -2031,7 +2031,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_RELATION_MAPCONTROL_AREA];
 	curTemplate->m_internalName = "PLAYER_RELATION_MAPCONTROL_AREA";
-	curTemplate->m_uiName = "TEOD/Player/Owns/Control/All of friendly|neutral|enemy co-players currently have N% area control.";
+	curTemplate->m_uiName = "CLP_AI/Player/Owns/Control/All of friendly|neutral|enemy co-players currently have N% area control.";
 	curTemplate->m_numParameters = 5;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::RELATION;
@@ -2048,7 +2048,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::TEAM_LOST_TYPE];
 	curTemplate->m_internalName = "TEAM_LOST_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Destroyed/Team lost an object of a specific type.";
+	curTemplate->m_uiName = "CLP_AI/Team/Destroyed/Team lost an object of a specific type.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -2058,7 +2058,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::TEAM_LOST_UNIT];
 	curTemplate->m_internalName = "TEAM_LOST_UNIT";
-	curTemplate->m_uiName = "TEOD/Team/Destroyed/Team lost a unit.";
+	curTemplate->m_uiName = "CLP_AI/Team/Destroyed/Team lost a unit.";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_numUiStrings = 2;
@@ -2067,7 +2067,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_SIGHTED_RELATION_TYPE];
 	curTemplate->m_internalName = "PLAYER_SIGHTED_RELATION_TYPE";
-	curTemplate->m_uiName = "TEOD/Player/Sighted/Player sighted a(n) friendly|neutral|enemy unit of type.";
+	curTemplate->m_uiName = "CLP_AI/Player/Sighted/Player sighted a(n) friendly|neutral|enemy unit of type.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::RELATION;
@@ -2079,7 +2079,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::RELATION_PLAYER_SIGHTED_RELATION_TYPE];
 	curTemplate->m_internalName = "RELATION_PLAYER_SIGHTED_RELATION_TYPE";
-	curTemplate->m_uiName = "TEOD/Player/Sighted/A(n) friendly|neutral|enemy player sighted a(n) friendly|neutral|enemy unit of type.";
+	curTemplate->m_uiName = "CLP_AI/Player/Sighted/A(n) friendly|neutral|enemy player sighted a(n) friendly|neutral|enemy unit of type.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::RELATION;
@@ -2094,7 +2094,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::RELATION_PLAYER_SIGHTED_RELATION_AREA];
 	curTemplate->m_internalName = "RELATION_PLAYER_SIGHTED_RELATION_AREA";
-	curTemplate->m_uiName = "TEOD/Player/Sighted/A(n) friendly|neutral|enemy player sighted a(n) friendly|neutral|enemy unit in an area.";
+	curTemplate->m_uiName = "CLP_AI/Player/Sighted/A(n) friendly|neutral|enemy player sighted a(n) friendly|neutral|enemy unit in an area.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::RELATION;
@@ -2109,7 +2109,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::RELATION_PLAYER_SIGHTED_RELATION_TYPE_AREA];
 	curTemplate->m_internalName = "RELATION_PLAYER_SIGHTED_RELATION_TYPE_AREA";
-	curTemplate->m_uiName = "TEOD/Player/Sighted/A(n) friendly|neutral|enemy player sighted a(n) friendly|neutral|enemy unit of type in an area.";
+	curTemplate->m_uiName = "CLP_AI/Player/Sighted/A(n) friendly|neutral|enemy player sighted a(n) friendly|neutral|enemy unit of type in an area.";
 	curTemplate->m_numParameters = 5;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::RELATION;
@@ -2126,7 +2126,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::RELATION_PLAYER_VALUE_AREA];
 	curTemplate->m_internalName = "RELATION_PLAYER_VALUE_AREA";
-	curTemplate->m_uiName = "TEOD/Player/Area/All friendly|neutral|enemy players combined have a total value in an area.";
+	curTemplate->m_uiName = "CLP_AI/Player/Area/All friendly|neutral|enemy players combined have a total value in an area.";
 	curTemplate->m_numParameters = 5;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::RELATION;
@@ -2142,7 +2142,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::RELATION_PLAYER_OWNS_COMPARISON_TYPE];
 	curTemplate->m_internalName = "RELATION_PLAYER_OWNS_COMPARISON_TYPE";
-	curTemplate->m_uiName = "TEOD/Player/Owns/All of a players friendly|neutral|enemy co-players own a total N object types.";
+	curTemplate->m_uiName = "CLP_AI/Player/Owns/All of a players friendly|neutral|enemy co-players own a total N object types.";
 	curTemplate->m_numParameters = 5;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::RELATION;
@@ -2158,7 +2158,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_ATTACKED_AREA];
 	curTemplate->m_internalName = "PLAYER_ATTACKED_AREA";
-	curTemplate->m_uiName = "TEOD/Player/Player has been attacked in an area.";
+	curTemplate->m_uiName = "CLP_AI/Player/Player has been attacked in an area.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::TRIGGER_AREA;
@@ -2168,7 +2168,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_BUILDING_BEING_CAPTURED];
 	curTemplate->m_internalName = "PLAYER_BUILDING_BEING_CAPTURED";
-	curTemplate->m_uiName = "TEOD/Player/Capture/A Player's building are currently being captured.";
+	curTemplate->m_uiName = "CLP_AI/Player/Capture/A Player's building are currently being captured.";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_numUiStrings = 2;
@@ -2177,7 +2177,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_BUILDING_BEING_CAPTURED_TYPE];
 	curTemplate->m_internalName = "PLAYER_BUILDING_BEING_CAPTURED_TYPE";
-	curTemplate->m_uiName = "TEOD/Player/Capture/A Player's building of a type are currently being captured.";
+	curTemplate->m_uiName = "CLP_AI/Player/Capture/A Player's building of a type are currently being captured.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -2188,7 +2188,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_BUILDING_BEING_CAPTURED_AREA];
 	curTemplate->m_internalName = "PLAYER_BUILDING_BEING_CAPTURED_AREA";
-	curTemplate->m_uiName = "TEOD/Player/Capture/A Player's building in an area are currently being captured.";
+	curTemplate->m_uiName = "CLP_AI/Player/Capture/A Player's building in an area are currently being captured.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::TRIGGER_AREA;
@@ -2199,7 +2199,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_BUILDING_BEING_CAPTURED_TYPE_AREA];
 	curTemplate->m_internalName = "PLAYER_BUILDING_BEING_CAPTURED_TYPE_AREA";
-	curTemplate->m_uiName = "TEOD/Player/Capture/A Player's building of type in an area are currently being captured.";
+	curTemplate->m_uiName = "CLP_AI/Player/Capture/A Player's building of type in an area are currently being captured.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -2212,7 +2212,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::RELATION_PLAYER_COMPARISON_TYPE_AREA];
 	curTemplate->m_internalName = "RELATION_PLAYER_COMPARISON_TYPE_AREA";
-	curTemplate->m_uiName = "TEOD/Player/Owns/All of a player's friendly|neutral|enemy co-players combined have comparison N objects of a type in an area.";
+	curTemplate->m_uiName = "CLP_AI/Player/Owns/All of a player's friendly|neutral|enemy co-players combined have comparison N objects of a type in an area.";
 	curTemplate->m_numParameters = 6;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::RELATION;
@@ -2230,7 +2230,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::TEAM_IDLE];
 	curTemplate->m_internalName = "TEAM_IDLE";
-	curTemplate->m_uiName = "TEOD/Team/Idle/Team is idle.";
+	curTemplate->m_uiName = "CLP_AI/Team/Idle/Team is idle.";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_numUiStrings = 2;
@@ -2239,7 +2239,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_COMPARISON_RATIO_OTHER];
 	curTemplate->m_internalName = "PLAYER_COMPARISON_RATIO_OTHER";
-	curTemplate->m_uiName = "TEOD/Player/Owns/Ratio/A player owns comparison ratio times the units compared to another player.";
+	curTemplate->m_uiName = "CLP_AI/Player/Owns/Ratio/A player owns comparison ratio times the units compared to another player.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::COMPARISON;
@@ -2254,7 +2254,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_COMPARISON_RATIO_TYPE_OTHER];
 	curTemplate->m_internalName = "PLAYER_COMPARISON_RATIO_TYPE_OTHER";
-	curTemplate->m_uiName = "TEOD/Player/Owns/Ratio/A player owns comparison ratio times the units of a type compared to another player.";
+	curTemplate->m_uiName = "CLP_AI/Player/Owns/Ratio/A player owns comparison ratio times the units of a type compared to another player.";
 	curTemplate->m_numParameters = 6;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::COMPARISON;
@@ -2273,7 +2273,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_COMPARISON_RATIO_AREA_OTHER];
 	curTemplate->m_internalName = "PLAYER_COMPARISON_RATIO_AREA_OTHER";
-	curTemplate->m_uiName = "TEOD/Player/Owns/Ratio/A player owns comparison ratio times the units in an area compared to another player.";
+	curTemplate->m_uiName = "CLP_AI/Player/Owns/Ratio/A player owns comparison ratio times the units in an area compared to another player.";
 	curTemplate->m_numParameters = 5;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::COMPARISON;
@@ -2290,7 +2290,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_COMPARISON_RATIO_TYPE_AREA_OTHER];
 	curTemplate->m_internalName = "PLAYER_COMPARISON_RATIO_TYPE_AREA_OTHER";
-	curTemplate->m_uiName = "TEOD/Player/Owns/Ratio/A player owns comparison ratio times the units of a type in an area compared to another player.";
+	curTemplate->m_uiName = "CLP_AI/Player/Owns/Ratio/A player owns comparison ratio times the units of a type in an area compared to another player.";
 	curTemplate->m_numParameters = 7;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::COMPARISON;
@@ -2311,7 +2311,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::RELATION_PLAYER_COMPARISON_RATIO_OTHER_RELATION];
 	curTemplate->m_internalName = "RELATION_PLAYER_COMPARISON_RATIO_OTHER_RELATION";
-	curTemplate->m_uiName = "TEOD/Player/Owns/Ratio/Relation/All of a player's friendly|neutral|enemy co-players combined own comparison ratio times the units compared to another relation's players.";
+	curTemplate->m_uiName = "CLP_AI/Player/Owns/Ratio/Relation/All of a player's friendly|neutral|enemy co-players combined own comparison ratio times the units compared to another relation's players.";
 	curTemplate->m_numParameters = 5;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::RELATION;
@@ -2328,7 +2328,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::RELATION_PLAYER_COMPARISON_RATIO_TYPE_OTHER_RELATION];
 	curTemplate->m_internalName = "RELATION_PLAYER_COMPARISON_RATIO_TYPE_OTHER_RELATION";
-	curTemplate->m_uiName = "TEOD/Player/Owns/Ratio/Relation/All of a player's friendly|neutral|enemy co-players combined own comparison ratio times the units of a type compared to another relation's players.";
+	curTemplate->m_uiName = "CLP_AI/Player/Owns/Ratio/Relation/All of a player's friendly|neutral|enemy co-players combined own comparison ratio times the units of a type compared to another relation's players.";
 	curTemplate->m_numParameters = 7;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::RELATION;
@@ -2349,7 +2349,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::RELATION_PLAYER_COMPARISON_RATIO_AREA_OTHER_RELATION];
 	curTemplate->m_internalName = "RELATION_PLAYER_COMPARISON_RATIO_AREA_OTHER_RELATION";
-	curTemplate->m_uiName = "TEOD/Player/Owns/Ratio/Relation/All of a player's friendly|neutral|enemy co-players combined own comparison ratio times the units in an area compared to another relation's players.";
+	curTemplate->m_uiName = "CLP_AI/Player/Owns/Ratio/Relation/All of a player's friendly|neutral|enemy co-players combined own comparison ratio times the units in an area compared to another relation's players.";
 	curTemplate->m_numParameters = 6;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::RELATION;
@@ -2368,7 +2368,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::RELATION_PLAYER_COMPARISON_RATIO_TYPE_AREA_OTHER_RELATION];
 	curTemplate->m_internalName = "RELATION_PLAYER_COMPARISON_RATIO_TYPE_AREA_OTHER_RELATION";
-	curTemplate->m_uiName = "TEOD/Player/Owns/Ratio/Relation/All of a player's friendly|neutral|enemy co-players combined own comparison ratio times the units of a type in an area compared to another relation's players.";
+	curTemplate->m_uiName = "CLP_AI/Player/Owns/Ratio/Relation/All of a player's friendly|neutral|enemy co-players combined own comparison ratio times the units of a type in an area compared to another relation's players.";
 	curTemplate->m_numParameters = 8;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::RELATION;
@@ -2391,7 +2391,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::TEAM_CONTAINS_TYPE];
 	curTemplate->m_internalName = "TEAM_CONTAINS_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Contains/Team contains a unit of a type.";
+	curTemplate->m_uiName = "CLP_AI/Team/Contains/Team contains a unit of a type.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::OBJECT_TYPE;
@@ -2401,7 +2401,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::TEAM_CONTAINS_COMPARISON_TYPE];
 	curTemplate->m_internalName = "TEAM_CONTAINS_COMPARISON_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Contains/Team contain an amount of units of a type.";
+	curTemplate->m_uiName = "CLP_AI/Team/Contains/Team contain an amount of units of a type.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::COMPARISON;
@@ -2415,7 +2415,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::COUNTER_DIVISIBLE];
 	curTemplate->m_internalName = "COUNTER_DIVISIBLE";
-	curTemplate->m_uiName = "TEOD/Scripting/Counter is divisible by N.";
+	curTemplate->m_uiName = "CLP_AI/Scripting/Counter is divisible by N.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::COUNTER;
 	curTemplate->m_parameters[1] = Parameter::INT;
@@ -2426,7 +2426,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::TEAM_SINGLE_BELOW_HEALTH];
 	curTemplate->m_internalName = "TEAM_SINGLE_BELOW_HEALTH";
-	curTemplate->m_uiName = "TEOD/Team/Health/A member of a team dropped below N% health.";
+	curTemplate->m_uiName = "CLP_AI/Team/Health/A member of a team dropped below N% health.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::REAL;
@@ -2437,7 +2437,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::TEAM_BELOW_HEALTH];
 	curTemplate->m_internalName = "TEAM_BELOW_HEALTH";
-	curTemplate->m_uiName = "TEOD/Team/Health/The entire team dropped below N% health.";
+	curTemplate->m_uiName = "CLP_AI/Team/Health/The entire team dropped below N% health.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::REAL;
@@ -2448,7 +2448,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::TEAM_IDLE_FRAMES];
 	curTemplate->m_internalName = "TEAM_IDLE_FRAMES";
-	curTemplate->m_uiName = "TEOD/Team/Idle/Team has been idle for at least N frames.";
+	curTemplate->m_uiName = "CLP_AI/Team/Idle/Team has been idle for at least N frames.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::INT;
@@ -2459,7 +2459,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::TEAM_SEEN];
 	curTemplate->m_internalName = "TEAM_SEEN";
-	curTemplate->m_uiName = "TEOD/Team/Sighted/A team has been spotted by an enemy player";
+	curTemplate->m_uiName = "CLP_AI/Team/Sighted/A team has been spotted by an enemy player";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_numUiStrings = 2;
@@ -2468,7 +2468,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::PLAYER_COMPARISON_TEAM_INSTANCES];
 	curTemplate->m_internalName = "PLAYER_COMPARISON_TEAM_INSTANCES";
-	curTemplate->m_uiName = "TEOD/Player/Owns/Player owns an amount of a specific team";
+	curTemplate->m_uiName = "CLP_AI/Player/Owns/Player owns an amount of a specific team";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::COMPARISON;
@@ -2482,7 +2482,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::TEAM_CONTAINS_COMPARISON_RATIO_SIGHTED];
 	curTemplate->m_internalName = "TEAM_CONTAINS_COMPARISON_RATIO_SIGHTED";
-	curTemplate->m_uiName = "TEOD/Team/Contains/Ratio/Team contains comparison ratio times the units compared to enemy units in sight.";
+	curTemplate->m_uiName = "CLP_AI/Team/Contains/Ratio/Team contains comparison ratio times the units compared to enemy units in sight.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::COMPARISON;
@@ -2495,7 +2495,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::TEAM_CONTAINS_COMPARISON_TYPE_RATIO_SIGHTED];
 	curTemplate->m_internalName = "TEAM_CONTAINS_COMPARISON_TYPE_RATIO_SIGHTED";
-	curTemplate->m_uiName = "TEOD/Team/Contains/Ratio/Team contains comparison ratio times the units of a type compared to enemy units of a type in sight.";
+	curTemplate->m_uiName = "CLP_AI/Team/Contains/Ratio/Team contains comparison ratio times the units of a type compared to enemy units of a type in sight.";
 	curTemplate->m_numParameters = 5;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::COMPARISON;
@@ -2512,7 +2512,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::SPOT_NEIGHBOURING_RELATION];
 	curTemplate->m_internalName = "SPOT_NEIGHBOURING_RELATION";
-	curTemplate->m_uiName = "TEOD/Skirmish/Spot/Check whether spot is neighbouring a relation player.";
+	curTemplate->m_uiName = "CLP_AI/Skirmish/Spot/Check whether spot is neighbouring a relation player.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::SIDE;
 	curTemplate->m_parameters[1] = Parameter::RELATION;
@@ -2525,7 +2525,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::TEAM_CLOSEST_RELATION_TYPE];
 	curTemplate->m_internalName = "TEAM_CLOSEST_RELATION_TYPE";
-	curTemplate->m_uiName = "TEOD/Team/Distance to the closest unit of a type with a relation.";
+	curTemplate->m_uiName = "CLP_AI/Team/Distance to the closest unit of a type with a relation.";
 	curTemplate->m_numParameters = 5;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::RELATION;
@@ -2542,7 +2542,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::UNIT_CLOSEST_RELATION_TYPE];
 	curTemplate->m_internalName = "UNIT_CLOSEST_RELATION_TYPE";
-	curTemplate->m_uiName = "TEOD/Unit/Distance to the closest unit of a type with a relation.";
+	curTemplate->m_uiName = "CLP_AI/Unit/Distance to the closest unit of a type with a relation.";
 	curTemplate->m_numParameters = 5;
 	curTemplate->m_parameters[0] = Parameter::UNIT;
 	curTemplate->m_parameters[1] = Parameter::RELATION;
@@ -2559,7 +2559,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::TEAM_ALL_CLEAR];
 	curTemplate->m_internalName = "TEAM_ALL_CLEAR";
-	curTemplate->m_uiName = "TEOD/Team/Sighted/A team has just left combat.";
+	curTemplate->m_uiName = "CLP_AI/Team/Sighted/A team has just left combat.";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_numUiStrings = 2;
@@ -2568,7 +2568,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::NO_TEAMS];
 	curTemplate->m_internalName = "NO_TEAMS";
-	curTemplate->m_uiName = "TEOD/Skirmish/Match is an FFA.";
+	curTemplate->m_uiName = "CLP_AI/Skirmish/Match is an FFA.";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::BOOLEAN;
 	curTemplate->m_numUiStrings = 1;
@@ -2576,7 +2576,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::TEAM_COMPARISON_APART];
 	curTemplate->m_internalName = "TEAM_COMPARISON_APART";
-	curTemplate->m_uiName = "TEOD/Team/Distance between members is compared to a value.";
+	curTemplate->m_uiName = "CLP_AI/Team/Distance between members is compared to a value.";
 	curTemplate->m_numParameters = 3;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::COMPARISON;
@@ -2589,7 +2589,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::TEAM_CAN_LOAD_TRANSPORTS];
 	curTemplate->m_internalName = "TEAM_CAN_LOAD_TRANSPORTS";
-	curTemplate->m_uiName = "TEOD/Team/Transport/Team is able to load infantry into transports.";
+	curTemplate->m_uiName = "CLP_AI/Team/Transport/Team is able to load infantry into transports.";
 	curTemplate->m_numParameters = 1;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_numUiStrings = 2;
@@ -2598,7 +2598,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::TEAM_CLOSEST_TO_ENEMY_COMPARISON_RATIO_SIGHTED_RADIUS];
 	curTemplate->m_internalName = "TEAM_CLOSEST_TO_ENEMY_COMPARISON_RATIO_SIGHTED_RADIUS";
-	curTemplate->m_uiName = "TEOD/Team/Sighted/Ratio/Team member closest to enemies sees enemies compared to allied units in a radius.";
+	curTemplate->m_uiName = "CLP_AI/Team/Sighted/Ratio/Team member closest to enemies sees enemies compared to allied units in a radius.";
 	curTemplate->m_numParameters = 4;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::COMPARISON;
@@ -2613,7 +2613,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::TEAM_CLOSEST_TO_ENEMY_COMPARISON_TYPE_RATIO_SIGHTED_RADIUS];
 	curTemplate->m_internalName = "TEAM_CLOSEST_TO_ENEMY_COMPARISON_TYPE_RATIO_SIGHTED_RADIUS";
-	curTemplate->m_uiName = "TEOD/Team/Sighted/Ratio/Team member closest to enemies sees enemies of a type compared to allied units of a type in a radius.";
+	curTemplate->m_uiName = "CLP_AI/Team/Sighted/Ratio/Team member closest to enemies sees enemies of a type compared to allied units of a type in a radius.";
 	curTemplate->m_numParameters = 6;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::COMPARISON;
@@ -2632,7 +2632,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::UNIT_RELOADED];
 	curTemplate->m_internalName = "UNIT_RELOADED";
-	curTemplate->m_uiName = "TEOD/Unit/Unit is reloaded.";
+	curTemplate->m_uiName = "CLP_AI/Unit/Unit is reloaded.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::UNIT;
 	curTemplate->m_parameters[1] = Parameter::BOOLEAN;
@@ -2643,7 +2643,7 @@ void ScriptEngine::initTEODTemplates()
 
 	curTemplate = &m_conditionTemplates[Condition::TEAM_RELOADED];
 	curTemplate->m_internalName = "TEAM_RELOADED";
-	curTemplate->m_uiName = "TEOD/Team/Team is reloaded.";
+	curTemplate->m_uiName = "CLP_AI/Team/Team is reloaded.";
 	curTemplate->m_numParameters = 2;
 	curTemplate->m_parameters[0] = Parameter::TEAM;
 	curTemplate->m_parameters[1] = Parameter::BOOLEAN;

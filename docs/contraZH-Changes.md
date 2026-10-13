@@ -354,10 +354,10 @@ drops to 100. Empty sources never qualify.
 * Does nothing when no source qualifies.
 ([#134](https://github.com/triatomic/contraZH/issues/134))
 
-## TEOD scripts
+## CLP_AI scripts
 
 142 script actions and 67 conditions ported from
-[CookieLandProjects/CLP_AI](https://github.com/CookieLandProjects/CLP_AI), under the `TEOD` folder in
+[CookieLandProjects/CLP_AI](https://github.com/CookieLandProjects/CLP_AI), under the `CLP_AI` folder in
 WorldBuilder's action and condition trees. The scripts were written by toirehantaa and CookieLand
 Projects.
 
@@ -372,8 +372,8 @@ Projects.
 | Conditions | relations, start spots, map control, unit ratios, sighting, losses and kills, captures, team idle, health, reload state |
 
 * Two new parameter types: KD ratio and selection mode (closest, farthest, random, youngest, oldest).
-* Not ported, because they need TEOD data: ID build lists, AI playstyles, Brutal/Absurd/Inhumane
-difficulties.
+* Not ported, because they need data from CLP_AI's own INI files: ID build lists, AI playstyles,
+Brutal/Absurd/Inhumane difficulties.
 * "Seen" means the player can see the unit right now. CLP remembered sightings for 10 seconds, but
 counted any player's units.
 * Kill and loss conditions see every event since their last check, kept for 5 minutes.
