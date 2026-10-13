@@ -919,6 +919,28 @@ Notes:
 * A loaded transport slows its group like any slow unit.
 * Changes the simulation; replays must use the same setting. At `0%` nothing changes.
 
+# Object.ini
+
+## CaptureTimePercent
+
+* `CaptureTimePercent = 100%` - (Default. Scales how long it takes to capture this object.)
+
+Multiplies the capturer's `PreparationTime` when the target is this object. Applies to infantry
+capture (`SPECIAL_INFANTRY_CAPTURE_BUILDING`) and Black Lotus capture
+(`SPECIAL_BLACKLOTUS_CAPTURE_BUILDING`).
+
+```
+Object AmericaCommandCenter
+  CaptureTimePercent = 200%
+End
+```
+
+With `PreparationTime = 17000`, capturing this Command Center takes 34 seconds.
+
+Notes:
+* The capture flash and the raising-flag animation follow the scaled time.
+* Changes the simulation; replays must use the same INI.
+
 # SpecialPower.ini
 
 ## StartCooldownOnFirstShot

@@ -270,6 +270,7 @@ const FieldParse ThingTemplate::s_objectFieldParseTable[] =
 	{ "DecalTexture",					INI::parseAsciiString,	nullptr,	offsetof(ThingTemplate, m_decalTextureName) },
 	{ "DecalColor",						INI::parseColorInt,		nullptr,	offsetof(ThingTemplate, m_decalColor) },
 	{ "DecalOpacity",					INI::parsePercentToReal,	nullptr,	offsetof(ThingTemplate, m_decalOpacity) },
+	{ "CaptureTimePercent",		INI::parsePercentToReal,	nullptr,	offsetof(ThingTemplate, m_captureTimePercent) },
 	{ "OcclusionDelay",					INI::parseDurationUnsignedInt,		nullptr, offsetof( ThingTemplate, m_occlusionDelay ) },
 	{ "AddModule",						ThingTemplate::parseAddModule,			nullptr, 0 },
 	{ "RemoveModule",					ThingTemplate::parseRemoveModule,		nullptr, 0 },
@@ -1160,6 +1161,7 @@ ThingTemplate::ThingTemplate() :
 	m_decalOffsetY = 0.0f;
 	m_decalColor = GameMakeColor(255, 255, 255, 255);
 	m_decalOpacity = 1.0f;
+	m_captureTimePercent = 1.0f;
 
 	m_occlusionDelay = TheGlobalData->m_defaultOcclusionDelay;
 

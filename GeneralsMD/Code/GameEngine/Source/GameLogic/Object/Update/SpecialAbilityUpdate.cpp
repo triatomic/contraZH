@@ -1047,7 +1047,7 @@ void SpecialAbilityUpdate::startPreparation()
   const SpecialPowerTemplate *spTemplate = data->m_specialPowerTemplate;
 
   //Set the preparation timer
-  m_prepFrames = data->m_preparationFrames;
+  m_prepFrames = calcPreparationFrames();
 
   switch( spTemplate->getSpecialPowerType() )
   {
@@ -1091,7 +1091,7 @@ void SpecialAbilityUpdate::startPreparation()
                                                    MAKE_MODELCONDITION_MASK( MODELCONDITION_RAISING_FLAG ) );
       Drawable* draw = getObject()->getDrawable();
       if (draw)
-        draw->setAnimationCompletionTime(data->m_preparationFrames);
+        draw->setAnimationCompletionTime(m_prepFrames);
 
       //Warn the victim so he might have a chance to react!
       if( target && target->isLocallyViewed() )
@@ -1161,6 +1161,27 @@ void SpecialAbilityUpdate::startPreparation()
   m_prepSoundLoop.setObjectID( getObject()->getID() );
   m_prepSoundLoop.setPlayingHandle( TheAudio->addAudioEvent( &m_prepSoundLoop ) );
 
+}
+
+//-------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature triatomic 13/10/2026 A capture target's CaptureTimePercent scales PreparationTime.
+UnsignedInt SpecialAbilityUpdate::calcPreparationFrames() const
+{
+  const SpecialAbilityUpdateModuleData* data = getSpecialAbilityUpdateModuleData();
+  SpecialPowerType type = data->m_specialPowerTemplate->getSpecialPowerType();
+  if( type != SPECIAL_INFANTRY_CAPTURE_BUILDING && type != SPECIAL_BLACKLOTUS_CAPTURE_BUILDING )
+  {
+    return data->m_preparationFrames;
+  }
+
+  const Object *target = TheGameLogic->findObjectByID( m_targetID );
+  if( !target )
+  {
+    return data->m_preparationFrames;
+  }
+
+  Real percent = MAX( 0.0f, target->getTemplate()->getCaptureTimePercent() );
+  return REAL_TO_UNSIGNEDINT( data->m_preparationFrames * percent );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1297,7 +1318,7 @@ Bool SpecialAbilityUpdate::continuePreparation()
         {
           Bool lastPhase = ( ((Int)m_captureFlashPhase) & 1 );// were we in a flashy phase last frame?
 
-          Real denominator = MAX(1, data->m_preparationFrames);
+          Real denominator = MAX(1, calcPreparationFrames());
           Real increment = 1.0f - ((Real)m_prepFrames / denominator );
 #if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
           m_captureFlashPhase += increment / (3.0f * GENERALS_ONLINE_HIGH_FPS_FRAME_MULTIPLIER);

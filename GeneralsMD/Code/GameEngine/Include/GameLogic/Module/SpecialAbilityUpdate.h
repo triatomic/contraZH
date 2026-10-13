@@ -260,6 +260,7 @@ protected:
 	Bool needToUnpack() const;
 
 	Bool isPreparationComplete() const { return !m_prepFrames; }
+	UnsignedInt calcPreparationFrames() const;
 	void endPreparation();
 	Bool isPersistentAbility() const { return getSpecialAbilityUpdateModuleData()->m_persistentPrepFrames > 0; }
 	void resetPreparation() { m_prepFrames = getSpecialAbilityUpdateModuleData()->m_persistentPrepFrames; }

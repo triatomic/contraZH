@@ -500,6 +500,9 @@ public:
 	Color getDecalColor() const { return m_decalColor; }
 	const AsciiString& getDecalTextureName() const { return m_decalTextureName; }
 
+	// TheSuperHackers @feature triatomic 13/10/2026 Scales the PreparationTime of a capture aimed at this object.
+	Real getCaptureTimePercent() const { return m_captureTimePercent; }
+
 	UnsignedInt getOcclusionDelay() const { return m_occlusionDelay;}
 
 	const ModuleInfo& getBehaviorModuleInfo() const { return m_behaviorModuleInfo; }
@@ -813,6 +816,7 @@ private:
 	Real					m_decalOffsetX;				///< world-space offset of the display decal texture
 	Real					m_decalOffsetY;				///< world-space offset of the display decal texture
 	Real					m_decalOpacity;				///< 0..1, fades the display decal
+	Real					m_captureTimePercent;	///< multiplies the PreparationTime of captures aimed at this object
 	Bool					m_displayDecal;				///< draw a display decal under this object, independent of its shadow
 	Bool					m_decalHideWhenDisabled;	///< stop drawing the display decal while the object is disabled
 
