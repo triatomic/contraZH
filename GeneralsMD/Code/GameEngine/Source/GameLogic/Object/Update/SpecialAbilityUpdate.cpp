@@ -1181,7 +1181,7 @@ UnsignedInt SpecialAbilityUpdate::calcPreparationFrames() const
   }
 
   Real percent = MAX( 0.0f, target->getTemplate()->getCaptureTimePercent() );
-  return REAL_TO_UNSIGNEDINT( data->m_preparationFrames * percent );
+  return REAL_TO_UNSIGNEDINT( data->m_preparationFrames * percent + 0.5f );
 }
 
 //-------------------------------------------------------------------------------------------------
