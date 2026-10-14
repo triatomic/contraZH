@@ -19,6 +19,9 @@ plugins:
 extra_css:
   - assets/stylesheets/contra.css
 
+extra_javascript:
+  - assets/javascripts/copy-inline.js
+
 # Theme assets live outside docs/ so the wiki sync never picks them up
 theme:
   name: material

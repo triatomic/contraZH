@@ -135,6 +135,39 @@ body {
   border: 1px solid rgba(224, 179, 73, 0.15);
 }
 
+/* Inline code copies on click (copy-inline.js) */
+
+.md-typeset :not(pre):not(a) > code {
+  cursor: copy;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.md-typeset :not(pre):not(a) > code:hover {
+  border-color: rgba(245, 197, 24, 0.55);
+}
+
+.md-typeset code.contra-copied {
+  position: relative;
+  border-color: var(--contra-yellow);
+  background-color: rgba(245, 197, 24, 0.18);
+}
+
+.md-typeset code.contra-copied::after {
+  content: "Copied";
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translate(-50%, -0.3em);
+  padding: 0.1em 0.5em;
+  font-family: "Exo 2", sans-serif;
+  font-size: 0.7em;
+  white-space: nowrap;
+  color: #160e06;
+  background: var(--contra-yellow);
+  border-radius: 0.2em;
+  pointer-events: none;
+}
+
 .md-typeset table:not([class]) {
   border: 1px solid var(--contra-border);
 }
