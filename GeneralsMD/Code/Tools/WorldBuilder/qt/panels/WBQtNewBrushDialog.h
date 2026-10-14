@@ -27,16 +27,33 @@ public slots:
 
 private slots:
 	void onModeChanged();
+	void onTerrainChanged();
 	void onBrowse();
 	void updatePreview();
+	void updateKeyEnables();
 
 private:
+	struct Keys
+	{
+		bool blendEdges;
+		bool restrictConstruction;
+		bool hasGlintStrength;
+		double glintStrength;
+		bool hasGlintGloss;
+		double glintGloss;
+	};
+
 	static QIcon swatchIcon(int texClass);
 	static QImage bottomUpBgraToImage(const QByteArray &bgra, int extent);
+	Keys readKeys() const;
+	void showKeys(const Keys &keys);
+	void showTerrainKeys();
 
 	Ui::WBQtNewBrushDialog *m_ui;	// owns the static widget tree (WBQtNewBrushDialog.ui)
 	int m_texClass;
 	QString m_name;
+	bool m_textureMode;
+	Keys m_textureKeys;	// what the user set for a new texture, kept while an existing terrain shows its own
 };
 
 #endif // WB_QT_NEW_BRUSH_DIALOG_H

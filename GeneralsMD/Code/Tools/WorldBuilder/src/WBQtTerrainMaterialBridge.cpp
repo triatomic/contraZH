@@ -206,6 +206,28 @@ int WBQtTerrainMaterial_GetTexClassTerrainName(int texClass, char *nameOut, int 
 // WorldBuilder-only brushes (TerrainBrushes): aliases listed beside the texture classes,
 // and the New Brush dialog's create call.
 //----------------------------------------------------------------------------------------
+int WBQtTerrainMaterial_GetTerrainKeys(int texClass, int *blendEdges, int *restrictConstruction, double *glintStrength, double *glintGloss)
+{
+	if (blendEdges == NULL || restrictConstruction == NULL || glintStrength == NULL || glintGloss == NULL)
+	{
+		return 0;
+	}
+	if (texClass < 0 || texClass >= WorldHeightMapEdit::getNumTexClasses())
+	{
+		return 0;
+	}
+	TerrainType *terrain = TheTerrainTypes->findTerrain(WorldHeightMapEdit::getTexClassName(texClass));
+	if (terrain == NULL)
+	{
+		return 0;
+	}
+	*blendEdges = terrain->isBlendEdge() ? 1 : 0;
+	*restrictConstruction = terrain->getRestrictConstruction() ? 1 : 0;
+	*glintStrength = terrain->getGlintStrength();
+	*glintGloss = terrain->getGlintGloss();
+	return 1;
+}
+
 int WBQtTerrainMaterial_GetBrushAliasCount(void)
 {
 	return TerrainBrushes::getNumAliases();

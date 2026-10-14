@@ -17,11 +17,13 @@
 WBQtNewBrushDialog::WBQtNewBrushDialog(const QStringList &categories, const QString &category, const QString &terrain, QWidget *parent)
 	: QDialog(parent),
 	  m_ui(new Ui::WBQtNewBrushDialog),
-	  m_texClass(-1)
+	  m_texClass(-1),
+	  m_textureMode(false)
 {
 	setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
 	m_ui->setupUi(this);
 	WBQtComboStyle::applyPopupScrollRecursive(this);
+	m_textureKeys = readKeys();
 
 	m_ui->categoryCombo->addItems(categories);
 	m_ui->categoryCombo->setEditText(category);
@@ -54,10 +56,10 @@ WBQtNewBrushDialog::WBQtNewBrushDialog(const QStringList &categories, const QStr
 
 	connect(m_ui->useTerrain, SIGNAL(toggled(bool)), this, SLOT(onModeChanged()));
 	connect(m_ui->useTexture, SIGNAL(toggled(bool)), this, SLOT(onModeChanged()));
-	connect(m_ui->terrainCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(updatePreview()));
+	connect(m_ui->terrainCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(onTerrainChanged()));
 	connect(m_ui->textureEdit, SIGNAL(textChanged(QString)), this, SLOT(updatePreview()));
-	connect(m_ui->glintStrengthCheck, SIGNAL(toggled(bool)), this, SLOT(onModeChanged()));
-	connect(m_ui->glintGlossCheck, SIGNAL(toggled(bool)), this, SLOT(onModeChanged()));
+	connect(m_ui->glintStrengthCheck, SIGNAL(toggled(bool)), this, SLOT(updateKeyEnables()));
+	connect(m_ui->glintGlossCheck, SIGNAL(toggled(bool)), this, SLOT(updateKeyEnables()));
 	connect(m_ui->browseBtn, SIGNAL(clicked()), this, SLOT(onBrowse()));
 	connect(m_ui->okButton, SIGNAL(clicked()), this, SLOT(accept()));
 	connect(m_ui->cancelButton, SIGNAL(clicked()), this, SLOT(reject()));
@@ -142,9 +144,86 @@ void WBQtNewBrushDialog::onModeChanged()
 	m_ui->browseBtn->setEnabled(texture);
 	m_ui->textureNote->setEnabled(texture);
 	m_ui->keysBox->setEnabled(texture);
+
+	if (texture && !m_textureMode)
+	{
+		m_ui->keysBox->setTitle("Terrain.ini keys (new texture)");
+		showKeys(m_textureKeys);
+	}
+	else if (!texture)
+	{
+		if (m_textureMode)
+		{
+			m_textureKeys = readKeys();
+		}
+		showTerrainKeys();
+	}
+	m_textureMode = texture;
+	updatePreview();
+}
+
+void WBQtNewBrushDialog::onTerrainChanged()
+{
+	if (!m_textureMode)
+	{
+		showTerrainKeys();
+	}
+	updatePreview();
+}
+
+void WBQtNewBrushDialog::updateKeyEnables()
+{
 	m_ui->glintStrengthSpin->setEnabled(m_ui->glintStrengthCheck->isChecked());
 	m_ui->glintGlossSpin->setEnabled(m_ui->glintGlossCheck->isChecked());
-	updatePreview();
+}
+
+WBQtNewBrushDialog::Keys WBQtNewBrushDialog::readKeys() const
+{
+	Keys keys;
+	keys.blendEdges = m_ui->blendEdgesCheck->isChecked();
+	keys.restrictConstruction = m_ui->restrictCheck->isChecked();
+	keys.hasGlintStrength = m_ui->glintStrengthCheck->isChecked();
+	keys.glintStrength = m_ui->glintStrengthSpin->value();
+	keys.hasGlintGloss = m_ui->glintGlossCheck->isChecked();
+	keys.glintGloss = m_ui->glintGlossSpin->value();
+	return keys;
+}
+
+void WBQtNewBrushDialog::showKeys(const Keys &keys)
+{
+	m_ui->blendEdgesCheck->setChecked(keys.blendEdges);
+	m_ui->restrictCheck->setChecked(keys.restrictConstruction);
+	m_ui->glintStrengthCheck->setChecked(keys.hasGlintStrength);
+	m_ui->glintStrengthSpin->setValue(keys.glintStrength);
+	m_ui->glintGlossCheck->setChecked(keys.hasGlintGloss);
+	m_ui->glintGlossSpin->setValue(keys.glintGloss);
+	updateKeyEnables();
+}
+
+// Read-only view of the selected terrain's keys; an alias paints that terrain as it is.
+void WBQtNewBrushDialog::showTerrainKeys()
+{
+	Keys keys = m_textureKeys;
+	int blendEdges = 0;
+	int restrictConstruction = 0;
+	double glintStrength = 1.0;
+	double glintGloss = 0.0;
+	int texClass = m_ui->terrainCombo->currentData().toInt();
+	if (m_ui->terrainCombo->currentIndex() >= 0
+		&& WBQtTerrainMaterial_GetTerrainKeys(texClass, &blendEdges, &restrictConstruction, &glintStrength, &glintGloss))
+	{
+		keys.blendEdges = (blendEdges != 0);
+		keys.restrictConstruction = (restrictConstruction != 0);
+		keys.hasGlintStrength = (glintStrength != 1.0);
+		keys.glintStrength = glintStrength;
+		keys.hasGlintGloss = (glintGloss > 0.0);
+		if (keys.hasGlintGloss)
+		{
+			keys.glintGloss = glintGloss;
+		}
+	}
+	m_ui->keysBox->setTitle(QString("Terrain.ini keys of %1 (read-only)").arg(m_ui->terrainCombo->currentText()));
+	showKeys(keys);
 }
 
 void WBQtNewBrushDialog::onBrowse()
