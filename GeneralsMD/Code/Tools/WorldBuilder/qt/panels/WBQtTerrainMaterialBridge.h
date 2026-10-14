@@ -32,34 +32,24 @@ int  WBQtTerrainMaterial_GetTexClassEntry(int texClass, char *pathOut, char *lea
 int  WBQtTerrainMaterial_GetTexClassUiName(int texClass, char *nameOut, int cap);
 // The Terrain.ini name of a class. Returns 0 for eval textures and blend edges.
 int  WBQtTerrainMaterial_GetTexClassTerrainName(int texClass, char *nameOut, int cap);
-// The class' Terrain.ini keys as the game parsed them. A glintGloss of 0 means GameData's gloss.
-// Returns 0 for eval textures.
+// The class' Terrain.ini keys as parsed; returns 0 for eval textures.
 int  WBQtTerrainMaterial_GetTerrainKeys(int texClass, int *blendEdges, int *restrictConstruction, double *glintStrength, double *glintGloss);
-// Rewrites the class' keys in the loose Data\INI\Terrain.ini (BlendEdges stays as loaded). A
-// negative glintStrength or a glintGloss of zero or less removes that key. Returns 0 with the
-// reason in errorOut.
-int  WBQtTerrainMaterial_SetTerrainKeys(int texClass, int restrictConstruction, double glintStrength, double glintGloss, char *errorOut, int cap);
+enum { WBQT_TERRAIN_KEY_RESTRICT = 1, WBQT_TERRAIN_KEY_GLINT_STRENGTH = 2, WBQT_TERRAIN_KEY_GLINT_GLOSS = 4 };
+// Writes the changedKeys (WBQT_TERRAIN_KEY_* bits) to the loose Terrain.ini; returns 0 with the reason in errorOut.
+int  WBQtTerrainMaterial_SetTerrainKeys(int texClass, int changedKeys, int restrictConstruction, double glintStrength, double glintGloss, char *errorOut, int cap);
 
-// --- WorldBuilder-only brushes from WorldBuilderQt\*.ini (TerrainBrushes). An alias is a named
-//     tree entry that paints another terrain's texture class. -------------------------------
+// --- WorldBuilder-only brushes from WorldBuilderQt\*.ini (TerrainBrushes). ------------------
 int  WBQtTerrainMaterial_GetBrushAliasCount(void);
-// Fills the alias' texture class, category path, "NN% name" leaf and bare name. Returns 0 if its
-// terrain has no loaded texture.
+// Returns 0 when the alias' terrain has no loaded texture.
 int  WBQtTerrainMaterial_GetBrushAliasEntry(int index, int *texClassOut, char *pathOut, char *leafOut, char *nameOut, int cap);
-// Saves a brush to WorldBuilderQt\TerrainBrushes.ini and loads it. Pass a texture (relative to
-// the terrain texture folder, also appended to the loose Data\INI\Terrain.ini) or a terrain
-// name. Returns the texture class it paints, or -1 with the reason in errorOut. A success can
-// still carry a warning in errorOut. The Terrain.ini keys apply only with a texture; a negative
-// glintStrength or a glintGloss of zero or less leaves that key out.
+// Returns the texture class the new brush paints, or -1; errorOut can hold a warning even on success.
 int  WBQtTerrainMaterial_CreateBrush(const char *name, const char *category, const char *terrain, const char *texture,
 	int blendEdges, int restrictConstruction, double glintStrength, double glintGloss, char *errorOut, int cap);
 // The game-relative terrain texture folder ("Art/Terrain/").
 int  WBQtTerrainMaterial_GetTerrainTextureDir(char *dirOut, int cap);
-// Whole-texture previews as BGRA rows, bottom row first, sized up to GetPreviewMaxExtent on a
-// side. Each returns the side length in pixels, or 0 if there is nothing to show.
+// Previews are bottom-up BGRA; each call returns the side length in pixels, or 0.
 int  WBQtTerrainMaterial_GetPreviewMaxExtent(void);
 int  WBQtTerrainMaterial_GetTexClassPreview(int texClass, unsigned char *bgraOut, int cap);
-// The texture is named relative to the terrain texture folder and need not be loaded yet.
 int  WBQtTerrainMaterial_GetTexturePreview(const char *texture, unsigned char *bgraOut, int cap);
 
 // --- Selection. The fg/bg class indices are the statics the tools read. Selecting a class

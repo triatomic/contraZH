@@ -2,6 +2,7 @@
 #include "WBQtNewBrushDialog.h"
 #include "ui_WBQtNewBrushDialog.h"
 #include "WBQtComboStyle.h"
+#include "WBQtPreviewImage.h"
 #include "WBQtTerrainMaterialBridge.h"
 
 #include <QDir>
@@ -59,6 +60,7 @@ WBQtNewBrushDialog::WBQtNewBrushDialog(const QStringList &categories, const QStr
 	connect(m_ui->useTexture, SIGNAL(toggled(bool)), this, SLOT(onModeChanged()));
 	connect(m_ui->terrainCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(onTerrainChanged()));
 	connect(m_ui->textureEdit, SIGNAL(textChanged(QString)), this, SLOT(onTexturesChanged()));
+	connect(m_ui->textureEdit, SIGNAL(editingFinished()), this, SLOT(updatePreview()));
 	connect(m_ui->glintStrengthCheck, SIGNAL(toggled(bool)), this, SLOT(updateKeyEnables()));
 	connect(m_ui->glintGlossCheck, SIGNAL(toggled(bool)), this, SLOT(updateKeyEnables()));
 	connect(m_ui->restrictCheck, SIGNAL(toggled(bool)), this, SLOT(updateKeyEnables()));
@@ -82,24 +84,7 @@ QIcon WBQtNewBrushDialog::swatchIcon(int texClass)
 	{
 		return QIcon();
 	}
-	return QIcon(QPixmap::fromImage(bottomUpBgraToImage(bgra, extent)));
-}
-
-QImage WBQtNewBrushDialog::bottomUpBgraToImage(const QByteArray &bgra, int extent)
-{
-	QImage img(extent, extent, QImage::Format_RGB888);
-	for (int y = 0; y < extent; ++y)
-	{
-		const unsigned char *src = reinterpret_cast<const unsigned char*>(bgra.constData()) + (extent - 1 - y) * extent * 4;
-		unsigned char *dst = img.scanLine(y);
-		for (int x = 0; x < extent; ++x)
-		{
-			dst[x * 3 + 0] = src[x * 4 + 2];
-			dst[x * 3 + 1] = src[x * 4 + 1];
-			dst[x * 3 + 2] = src[x * 4 + 0];
-		}
-	}
-	return img;
+	return QIcon(QPixmap::fromImage(WBQtPreviewImage::fromBottomUpBgra(reinterpret_cast<const unsigned char*>(bgra.constData()), extent)));
 }
 
 void WBQtNewBrushDialog::updatePreview()
@@ -130,7 +115,7 @@ void WBQtNewBrushDialog::updatePreview()
 		return;
 	}
 
-	QImage img = bottomUpBgraToImage(bgra, extent);
+	QImage img = WBQtPreviewImage::fromBottomUpBgra(pixels, extent);
 	QSize box = m_ui->preview->size();
 	bool upscale = (box.width() > extent);
 	m_ui->preview->setPixmap(QPixmap::fromImage(img).scaled(box, Qt::KeepAspectRatio,
@@ -174,6 +159,7 @@ void WBQtNewBrushDialog::onModeChanged()
 	}
 	m_textureMode = texture;
 	onTexturesChanged();
+	updatePreview();
 }
 
 void WBQtNewBrushDialog::onTerrainChanged()
@@ -189,23 +175,29 @@ void WBQtNewBrushDialog::updateKeyEnables()
 {
 	m_ui->glintStrengthSpin->setEnabled(m_ui->glintStrengthCheck->isChecked());
 	m_ui->glintGlossSpin->setEnabled(m_ui->glintGlossCheck->isChecked());
-	m_ui->saveKeysBtn->setEnabled(!m_textureMode && terrainKeysChanged());
+	m_ui->saveKeysBtn->setEnabled(!m_textureMode && m_ui->terrainCombo->currentIndex() >= 0 && changedTerrainKeys() != 0);
 }
 
-bool WBQtNewBrushDialog::terrainKeysChanged() const
+// WBQT_TERRAIN_KEY_* bits for the keys that differ from the selected terrain's.
+int WBQtNewBrushDialog::changedTerrainKeys() const
 {
 	Keys keys = readKeys();
-	if (keys.restrictConstruction != m_terrainKeys.restrictConstruction
-		|| keys.hasGlintStrength != m_terrainKeys.hasGlintStrength
-		|| keys.hasGlintGloss != m_terrainKeys.hasGlintGloss)
+	int changed = 0;
+	if (keys.restrictConstruction != m_terrainKeys.restrictConstruction)
 	{
-		return true;
+		changed |= WBQT_TERRAIN_KEY_RESTRICT;
 	}
-	if (keys.hasGlintStrength && keys.glintStrength != m_terrainKeys.glintStrength)
+	if (keys.hasGlintStrength != m_terrainKeys.hasGlintStrength
+		|| (keys.hasGlintStrength && keys.glintStrength != m_terrainKeys.glintStrength))
 	{
-		return true;
+		changed |= WBQT_TERRAIN_KEY_GLINT_STRENGTH;
 	}
-	return keys.hasGlintGloss && keys.glintGloss != m_terrainKeys.glintGloss;
+	if (keys.hasGlintGloss != m_terrainKeys.hasGlintGloss
+		|| (keys.hasGlintGloss && keys.glintGloss != m_terrainKeys.glintGloss))
+	{
+		changed |= WBQT_TERRAIN_KEY_GLINT_GLOSS;
+	}
+	return changed;
 }
 
 void WBQtNewBrushDialog::onSaveKeys()
@@ -215,10 +207,14 @@ void WBQtNewBrushDialog::onSaveKeys()
 
 bool WBQtNewBrushDialog::saveTerrainKeys()
 {
+	if (m_ui->terrainCombo->currentIndex() < 0)
+	{
+		return false;
+	}
 	Keys keys = readKeys();
 	char error[512];
 	error[0] = 0;
-	if (!WBQtTerrainMaterial_SetTerrainKeys(m_ui->terrainCombo->currentData().toInt(),
+	if (!WBQtTerrainMaterial_SetTerrainKeys(m_ui->terrainCombo->currentData().toInt(), changedTerrainKeys(),
 		keys.restrictConstruction ? 1 : 0,
 		keys.hasGlintStrength ? keys.glintStrength : -1.0,
 		keys.hasGlintGloss ? keys.glintGloss : 0.0,
@@ -335,6 +331,7 @@ void WBQtNewBrushDialog::onBrowse()
 		return;
 	}
 	m_ui->textureEdit->setText(textures.join("; "));
+	updatePreview();
 
 	if (textures.size() == 1 && m_ui->nameEdit->text().trimmed().isEmpty())
 	{
@@ -382,7 +379,6 @@ void WBQtNewBrushDialog::onTexturesChanged()
 	{
 		m_ui->nameEdit->setPlaceholderText("Letters, digits, _ - .");
 	}
-	updatePreview();
 }
 
 int WBQtNewBrushDialog::createBrush(const QString &name, const QString &texture, QString &error)
@@ -452,7 +448,7 @@ void WBQtNewBrushDialog::accept()
 		return;
 	}
 
-	if (terrainKeysChanged())
+	if (changedTerrainKeys() != 0)
 	{
 		QMessageBox::StandardButton answer = QMessageBox::question(this, "New Terrain Brush",
 			QString("Save the key changes for %1 to Terrain.ini too?").arg(m_ui->terrainCombo->currentText()),

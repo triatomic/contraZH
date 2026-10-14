@@ -3,6 +3,7 @@
 #include "ui_WBQtTerrainMaterialPanel.h"
 #include "WBQtComboStyle.h"
 #include "WBQtNewBrushDialog.h"
+#include "WBQtPreviewImage.h"
 #include "WBQtTerrainMaterialBridge.h"
 #include "WBQtScrubSpinBox.h"
 #include "WBQtTreeStyle.h"
@@ -438,20 +439,7 @@ void WBQtTerrainMaterialPanel::setSwatch(QLabel *label, int texClass)
 		return;
 	}
 
-	QImage img(extent, extent, QImage::Format_RGB888);
-	// The MFC swatch blits the tile as a positive-height (bottom-up) DIB, so read source rows
-	// bottom-to-top; the source pixels are BGRA (drop A).
-	for (int y = 0; y < extent; ++y)
-	{
-		const unsigned char *src = reinterpret_cast<const unsigned char*>(bgra.constData()) + (extent - 1 - y) * extent * 4;
-		unsigned char *dst = img.scanLine(y);
-		for (int x = 0; x < extent; ++x)
-		{
-			dst[x * 3 + 0] = src[x * 4 + 2];	// R <- B
-			dst[x * 3 + 1] = src[x * 4 + 1];	// G
-			dst[x * 3 + 2] = src[x * 4 + 0];	// B <- R
-		}
-	}
+	QImage img = WBQtPreviewImage::fromBottomUpBgra(reinterpret_cast<const unsigned char*>(bgra.constData()), extent);
 	label->setPixmap(QPixmap::fromImage(img).scaled(label->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
 }
 

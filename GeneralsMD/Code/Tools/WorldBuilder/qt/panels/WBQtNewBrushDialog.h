@@ -46,11 +46,10 @@ private:
 	};
 
 	static QIcon swatchIcon(int texClass);
-	static QImage bottomUpBgraToImage(const QByteArray &bgra, int extent);
 	Keys readKeys() const;
 	void showKeys(const Keys &keys);
 	void showTerrainKeys();
-	bool terrainKeysChanged() const;
+	int changedTerrainKeys() const;
 	bool saveTerrainKeys();
 	QStringList textureList() const;
 	static QString nameFromTexture(const QString &texture);

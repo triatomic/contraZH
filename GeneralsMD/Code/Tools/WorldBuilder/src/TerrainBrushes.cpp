@@ -23,6 +23,7 @@
 #include "TerrainBrushes.h"
 #include "WHeightMapEdit.h"
 #include "Common/Debug.h"
+#include "Common/File.h"
 #include "Common/FileSystem.h"
 #include "Common/MapReaderWriterInfo.h"
 #include "Common/TerrainTypes.h"
@@ -137,37 +138,70 @@ namespace
 		}
 	}
 
-	// Sets, adds or removes "key = value" inside the block lines [start, end). Returns the new end.
-	size_t setBlockKey(std::vector<std::string> &lines, size_t start, size_t end, const char *key, const std::string &value, Bool remove, Bool addIfMissing)
+	// Sets or adds "key = value" inside the block lines [start, end). Returns the new end.
+	size_t setBlockKey(std::vector<std::string> &lines, size_t start, size_t end, const char *key, const std::string &value)
 	{
 		Bool found = false;
-		size_t i = start;
-		while (i < end)
+		size_t i;
+		for (i = start; i < end; i++)
 		{
 			std::string first, second;
 			lineWords(lines[i], first, second);
-			if (stricmp(first.c_str(), key) != 0)
+			if (stricmp(first.c_str(), key) == 0)
 			{
-				i++;
-				continue;
+				size_t indent = lines[i].find_first_not_of(" \t");
+				lines[i] = lines[i].substr(0, indent) + key + " = " + value;
+				found = true;
 			}
-			if (remove)
-			{
-				lines.erase(lines.begin() + i);
-				end--;
-				continue;
-			}
-			size_t indent = lines[i].find_first_not_of(" \t");
-			lines[i] = lines[i].substr(0, indent) + key + " = " + value;
-			found = true;
-			i++;
 		}
-		if (!remove && !found && addIfMissing)
+		if (!found)
 		{
 			lines.insert(lines.begin() + end, std::string("  ") + key + " = " + value);
 			end++;
 		}
 		return end;
+	}
+
+	// A file under Data\INI\Terrain\ with a block for the name; the game loads those after Terrain.ini.
+	AsciiString findLaterDefinition(const char *name)
+	{
+		FilenameList files;
+		TheFileSystem->getFileListInDirectory("Data\\INI\\Terrain\\", "*.ini", files, TRUE);
+		FilenameList::const_iterator it;
+		for (it = files.begin(); it != files.end(); ++it)
+		{
+			File *file = TheFileSystem->openFile(it->str(), File::READ);
+			if (file == nullptr)
+			{
+				continue;
+			}
+			Int size = file->size();
+			char *data = file->readEntireAndClose();
+			if (data == nullptr)
+			{
+				continue;
+			}
+			std::string text(data, size);
+			delete[] data;
+			size_t pos = 0;
+			while (pos < text.size())
+			{
+				size_t nl = text.find('\n', pos);
+				size_t stop = (nl == std::string::npos) ? text.size() : nl;
+				std::string first, second;
+				lineWords(text.substr(pos, stop - pos), first, second);
+				if (!second.empty() && second[second.size() - 1] == '\r')
+				{
+					second.erase(second.size() - 1);
+				}
+				if (stricmp(first.c_str(), "Terrain") == 0 && second == name)
+				{
+					return *it;
+				}
+				pos = (nl == std::string::npos) ? text.size() : nl + 1;
+			}
+		}
+		return AsciiString::TheEmptyString;
 	}
 
 	std::string formatReal(Real value)
@@ -490,7 +524,7 @@ Int TerrainBrushes::createTerrain(Block &block, const AsciiString &texture, cons
 }
 
 // BlendEdges is left alone: the loaded texture class already decided how its tiles are used.
-Bool TerrainBrushes::setTerrainKeys(const char *name, const TerrainKeys &keys, AsciiString &error)
+Bool TerrainBrushes::setTerrainKeys(const char *name, const TerrainKeys &keys, UnsignedInt changedKeys, AsciiString &error)
 {
 	TerrainType *terrain = TheTerrainTypes->findTerrain(name ? name : "");
 	if (terrain == nullptr)
@@ -500,6 +534,12 @@ Bool TerrainBrushes::setTerrainKeys(const char *name, const TerrainKeys &keys, A
 	}
 	if (!hasLooseTerrainIni(error))
 	{
+		return false;
+	}
+	AsciiString laterFile = findLaterDefinition(name);
+	if (!laterFile.isEmpty())
+	{
+		error.format("%s also defines Terrain %s and loads after Terrain.ini, so edit it there.", laterFile.str(), name);
 		return false;
 	}
 
@@ -569,9 +609,21 @@ Bool TerrainBrushes::setTerrainKeys(const char *name, const TerrainKeys &keys, A
 		end = start;
 	}
 
-	end = setBlockKey(lines, start, end, "RestrictConstruction", keys.restrictConstruction ? "Yes" : "No", false, keys.restrictConstruction);
-	end = setBlockKey(lines, start, end, "GlintStrength", formatReal(keys.glintStrength), keys.glintStrength < 0.0f, true);
-	end = setBlockKey(lines, start, end, "GlintGloss", formatReal(keys.glintGloss), keys.glintGloss <= 0.0f, true);
+	// An unset key is written as its default, since an earlier block may still set it.
+	Real strength = (keys.glintStrength >= 0.0f) ? keys.glintStrength : 1.0f;
+	Real gloss = (keys.glintGloss > 0.0f) ? keys.glintGloss : 0.0f;
+	if (changedKeys & KEY_RESTRICT_CONSTRUCTION)
+	{
+		end = setBlockKey(lines, start, end, "RestrictConstruction", keys.restrictConstruction ? "Yes" : "No");
+	}
+	if (changedKeys & KEY_GLINT_STRENGTH)
+	{
+		end = setBlockKey(lines, start, end, "GlintStrength", formatReal(strength));
+	}
+	if (changedKeys & KEY_GLINT_GLOSS)
+	{
+		end = setBlockKey(lines, start, end, "GlintGloss", formatReal(gloss));
+	}
 
 	std::string out;
 	for (i = 0; i < lines.size(); i++)
@@ -601,13 +653,12 @@ Bool TerrainBrushes::setTerrainKeys(const char *name, const TerrainKeys &keys, A
 		return false;
 	}
 
-	// A removed key falls back to DefaultTerrain, as the game's parser would leave it.
-	TerrainType *defaults = TheTerrainTypes->findTerrain("DefaultTerrain");
-	Real defaultStrength = defaults ? defaults->getGlintStrength() : 1.0f;
-	Real defaultGloss = defaults ? defaults->getGlintGloss() : 0.0f;
-	terrain->friend_setRestrictConstruction(keys.restrictConstruction);
-	terrain->friend_setGlint(keys.glintStrength >= 0.0f ? keys.glintStrength : defaultStrength,
-		keys.glintGloss > 0.0f ? keys.glintGloss : defaultGloss);
+	if (changedKeys & KEY_RESTRICT_CONSTRUCTION)
+	{
+		terrain->friend_setRestrictConstruction(keys.restrictConstruction);
+	}
+	terrain->friend_setGlint((changedKeys & KEY_GLINT_STRENGTH) ? strength : terrain->getGlintStrength(),
+		(changedKeys & KEY_GLINT_GLOSS) ? gloss : terrain->getGlintGloss());
 	return true;
 }
 

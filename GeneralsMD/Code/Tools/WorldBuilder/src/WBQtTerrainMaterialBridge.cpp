@@ -228,7 +228,11 @@ int WBQtTerrainMaterial_GetTerrainKeys(int texClass, int *blendEdges, int *restr
 	return 1;
 }
 
-int WBQtTerrainMaterial_SetTerrainKeys(int texClass, int restrictConstruction, double glintStrength, double glintGloss, char *errorOut, int cap)
+static_assert((int)WBQT_TERRAIN_KEY_RESTRICT == (int)TerrainBrushes::KEY_RESTRICT_CONSTRUCTION
+	&& (int)WBQT_TERRAIN_KEY_GLINT_STRENGTH == (int)TerrainBrushes::KEY_GLINT_STRENGTH
+	&& (int)WBQT_TERRAIN_KEY_GLINT_GLOSS == (int)TerrainBrushes::KEY_GLINT_GLOSS, "Terrain key bits differ");
+
+int WBQtTerrainMaterial_SetTerrainKeys(int texClass, int changedKeys, int restrictConstruction, double glintStrength, double glintGloss, char *errorOut, int cap)
 {
 	if (texClass < 0 || texClass >= WorldHeightMapEdit::getNumTexClasses())
 	{
@@ -240,7 +244,7 @@ int WBQtTerrainMaterial_SetTerrainKeys(int texClass, int restrictConstruction, d
 	keys.glintStrength = (Real)glintStrength;
 	keys.glintGloss = (Real)glintGloss;
 	AsciiString error;
-	Bool ok = TerrainBrushes::setTerrainKeys(WorldHeightMapEdit::getTexClassName(texClass).str(), keys, error);
+	Bool ok = TerrainBrushes::setTerrainKeys(WorldHeightMapEdit::getTexClassName(texClass).str(), keys, (UnsignedInt)changedKeys, error);
 	copyString(errorOut, cap, error.str());
 	return ok ? 1 : 0;
 }
