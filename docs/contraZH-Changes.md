@@ -294,6 +294,15 @@ campaign and challenge missions keep the old behavior.
 Changes the simulation.
 ([#115](https://github.com/triatomic/contraZH/issues/115))
 
+## Hijackers cannot take stealthed vehicles
+
+A Hijacker no longer picks or seizes a stealthed vehicle that has not been detected, like capture
+and hacking already worked. A disguised vehicle can still be hijacked. This covers hijack-guard,
+hunt, scripts and an order given before the target went stealth.
+
+Changes the simulation.
+([#115](https://github.com/triatomic/contraZH/issues/115))
+
 # Maps
 
 ## Per-object scale

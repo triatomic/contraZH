@@ -112,6 +112,14 @@ Bool ConvertToHijackedVehicleCrateCollide::isValidToExecute( const Object *other
 		return FALSE;
 	}
 
+	// A disguised vehicle is visible as its disguise, so it stays a target.
+	if( other->testStatus( OBJECT_STATUS_STEALTHED ) &&
+			!other->testStatus( OBJECT_STATUS_DETECTED ) &&
+			!other->testStatus( OBJECT_STATUS_DISGUISED ) )
+	{
+		return FALSE;
+	}
+
 	if( other->isKindOf( KINDOF_TRANSPORT ) )
 	{
 		//Kris: Allow empty transports to be hijacked.
