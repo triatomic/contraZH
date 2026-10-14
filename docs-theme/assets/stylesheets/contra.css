@@ -428,3 +428,9 @@ body {
     border-right: none;
   }
 }
+
+/* Wide layout: Material caps the page at 61rem */
+
+.md-grid {
+  max-width: 96rem;
+}
