@@ -23,9 +23,11 @@
 #include "TileTool.h"
 #include "FloodFillTool.h"
 #include "WHeightMapEdit.h"
+#include "TerrainBrushes.h"
 #include "WorldBuilderDoc.h"
 #include "wbview3d.h"
 #include "W3DDevice/GameClient/HeightMap.h"
+#include "Common/FileSystem.h"
 #include "Common/TerrainTypes.h"
 #include "W3DDevice/GameClient/TerrainTex.h"
 #include "W3DDevice/GameClient/TileData.h"
@@ -69,6 +71,14 @@ namespace
 		}
 		strncpy(path + len, segment, cap - 1 - len);
 		path[cap - 1] = 0;
+	}
+
+	// Share of one map's texture atlas the class takes, shown as the "NN%" leaf prefix.
+	Int texClassPercent(Int texClass)
+	{
+		Int tilesPerRow = TEXTURE_WIDTH / (2 * TILE_PIXEL_EXTENT + 2 * WorldHeightMap::getAtlasBorderSetting());
+		Int availableTiles = 4 * tilesPerRow * tilesPerRow;
+		return (WorldHeightMapEdit::getTexClassNumTiles(texClass) * 100 + availableTiles / 2) / availableTiles;
 	}
 }
 
@@ -114,12 +124,20 @@ int WBQtTerrainMaterial_GetTexClassEntry(int texClass, char *pathOut, char *leaf
 		{
 			return 0;	// blend edges are not shown, matching addTerrain
 		}
-		for (TerrainClass i = TERRAIN_NONE; i < TERRAIN_NUM_CLASSES; i = (TerrainClass)(i + 1))
+		AsciiString category = TerrainBrushes::getCategory(terrain->getName());
+		if (!category.isEmpty())
 		{
-			if (terrain->getClass() == i)
+			appendSegment(pathOut, cap, category.str());
+		}
+		else
+		{
+			for (TerrainClass i = TERRAIN_NONE; i < TERRAIN_NUM_CLASSES; i = (TerrainClass)(i + 1))
 			{
-				appendSegment(pathOut, cap, terrainTypeNames[i]);
-				break;
+				if (terrain->getClass() == i)
+				{
+					appendSegment(pathOut, cap, terrainTypeNames[i]);
+					break;
+				}
 			}
 		}
 		strcpy(nameBuf, terrain->getName().str());
@@ -158,13 +176,77 @@ int WBQtTerrainMaterial_GetTexClassEntry(int texClass, char *pathOut, char *leaf
 		return 0;
 	}
 
-	Int tilesPerRow = TEXTURE_WIDTH / (2 * TILE_PIXEL_EXTENT + 2 * WorldHeightMap::getAtlasBorderSetting());
-	Int availableTiles = 4 * tilesPerRow * tilesPerRow;
-	Int percent = (WorldHeightMapEdit::getTexClassNumTiles(texClass) * 100 + availableTiles / 2) / availableTiles;
-
 	char label[_MAX_PATH];
-	sprintf(label, "%d%% %s", percent, nameBuf);
+	sprintf(label, "%d%% %s", texClassPercent(texClass), nameBuf);
 	copyString(leafOut, cap, label);
+	return 1;
+}
+
+int WBQtTerrainMaterial_GetTexClassTerrainName(int texClass, char *nameOut, int cap)
+{
+	if (nameOut == NULL || cap <= 0)
+	{
+		return 0;
+	}
+	nameOut[0] = 0;
+	if (texClass < 0 || texClass >= WorldHeightMapEdit::getNumTexClasses())
+	{
+		return 0;
+	}
+	TerrainType *terrain = TheTerrainTypes->findTerrain(WorldHeightMapEdit::getTexClassName(texClass));
+	if (terrain == NULL || terrain->isBlendEdge())
+	{
+		return 0;
+	}
+	copyString(nameOut, cap, terrain->getName().str());
+	return 1;
+}
+
+//----------------------------------------------------------------------------------------
+// WorldBuilder-only brushes (TerrainBrushes): aliases listed beside the texture classes,
+// and the New Brush dialog's create call.
+//----------------------------------------------------------------------------------------
+int WBQtTerrainMaterial_GetBrushAliasCount(void)
+{
+	return TerrainBrushes::getNumAliases();
+}
+
+int WBQtTerrainMaterial_GetBrushAliasEntry(int index, int *texClassOut, char *pathOut, char *leafOut, char *nameOut, int cap)
+{
+	if (texClassOut == NULL || pathOut == NULL || leafOut == NULL || nameOut == NULL || cap <= 0)
+	{
+		return 0;
+	}
+	if (index < 0 || index >= TerrainBrushes::getNumAliases())
+	{
+		return 0;
+	}
+	const TerrainBrushes::Alias &alias = TerrainBrushes::getAlias(index);
+	Int texClass = WorldHeightMapEdit::findTexClass(alias.terrain);
+	if (texClass < 0)
+	{
+		return 0;
+	}
+	*texClassOut = texClass;
+	copyString(pathOut, cap, alias.category.str());
+	copyString(nameOut, cap, alias.name.str());
+	char label[_MAX_PATH];
+	snprintf(label, ARRAY_SIZE(label), "%d%% %s", texClassPercent(texClass), alias.name.str());
+	copyString(leafOut, cap, label);
+	return 1;
+}
+
+int WBQtTerrainMaterial_CreateBrush(const char *name, const char *category, const char *terrain, const char *texture, char *errorOut, int cap)
+{
+	AsciiString error;
+	Int texClass = TerrainBrushes::create(name, category, terrain, texture, error);
+	copyString(errorOut, cap, error.str());
+	return texClass;
+}
+
+int WBQtTerrainMaterial_GetTerrainTextureDir(char *dirOut, int cap)
+{
+	copyString(dirOut, cap, TERRAIN_TGA_DIR_PATH);
 	return 1;
 }
 

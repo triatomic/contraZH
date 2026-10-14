@@ -54,6 +54,7 @@
 #include "Common/GlobalData.h"
 #include "Common/MapData.h"
 #include "WHeightMapEdit.h"
+#include "TerrainBrushes.h"
 #include "WWLib/WBParallel.h"
 //#include "Common/GameFileSystem.h"
 #include "Common/FileSystem.h"
@@ -494,6 +495,7 @@ BOOL CWorldBuilderApp::InitInstance()
 	initSubsystem(TheTerrainTypes, new TerrainTypeCollection(), "Data\\INI\\Default\\Terrain", "Data\\INI\\Terrain");
 	initSubsystem(TheTerrainRoads, new TerrainRoadCollection(), "Data\\INI\\Default\\Roads", "Data\\INI\\Roads");
 
+	TerrainBrushes::load();
 	WorldHeightMapEdit::init();
 
 	initSubsystem(TheScriptEngine, (ScriptEngine*)(new ScriptEngine()));

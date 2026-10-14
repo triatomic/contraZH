@@ -30,6 +30,22 @@ int  WBQtTerrainMaterial_GetTexClassCount(void);
 int  WBQtTerrainMaterial_GetTexClassEntry(int texClass, char *pathOut, char *leafOut, int cap);
 // The lower-cased UI name, for the search filter (matches TerrainMaterial::OnSearch).
 int  WBQtTerrainMaterial_GetTexClassUiName(int texClass, char *nameOut, int cap);
+// The Terrain.ini name of a class. Returns 0 for eval textures and blend edges.
+int  WBQtTerrainMaterial_GetTexClassTerrainName(int texClass, char *nameOut, int cap);
+
+// --- WorldBuilder-only brushes from WorldBuilderQt\*.ini (TerrainBrushes). An alias is a named
+//     tree entry that paints another terrain's texture class. -------------------------------
+int  WBQtTerrainMaterial_GetBrushAliasCount(void);
+// Fills the alias' texture class, category path, "NN% name" leaf and bare name. Returns 0 if its
+// terrain has no loaded texture.
+int  WBQtTerrainMaterial_GetBrushAliasEntry(int index, int *texClassOut, char *pathOut, char *leafOut, char *nameOut, int cap);
+// Saves a brush to WorldBuilderQt\TerrainBrushes.ini and loads it. Pass a texture (relative to
+// the terrain texture folder, also saved to Data\INI\Terrain\WorldBuilderBrushes.ini) or a terrain
+// name. Returns the texture class it paints, or -1 with the reason in errorOut. A success can
+// still carry a warning in errorOut.
+int  WBQtTerrainMaterial_CreateBrush(const char *name, const char *category, const char *terrain, const char *texture, char *errorOut, int cap);
+// The game-relative terrain texture folder ("Art/Terrain/").
+int  WBQtTerrainMaterial_GetTerrainTextureDir(char *dirOut, int cap);
 
 // --- Selection. The fg/bg class indices are the statics the tools read. Selecting a class
 //     validates the size (canFitTexture) and returns 0 (with the class still set) if it does

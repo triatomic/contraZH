@@ -108,6 +108,8 @@ public: // construction
 
 	static void init();
 	static void shutdown();
+	static Int addTerrainTexture(TerrainType *terrain);	///< Loads a terrain registered after init; returns its class or -1.
+	static Int findTexClass(const AsciiString &name);	///< Class index for a texture class name, or -1.
 
 public: /// Status methods.
 	void clearStatus() {m_warnTooManyTex = false;m_warnTooManyBlend = false;};

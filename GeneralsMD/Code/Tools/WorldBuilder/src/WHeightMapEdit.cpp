@@ -86,6 +86,34 @@ void WorldHeightMapEdit::init()
 
 }
 
+Int WorldHeightMapEdit::addTerrainTexture(TerrainType *terrain)
+{
+	if (terrain == nullptr || m_numGlobalTextureClasses >= NUM_TEXTURE_CLASSES)
+	{
+		return -1;
+	}
+	Int before = m_numGlobalTextureClasses;
+	loadImagesFromTerrainType(terrain);
+	if (m_numGlobalTextureClasses == before)
+	{
+		return -1;
+	}
+	return before;
+}
+
+Int WorldHeightMapEdit::findTexClass(const AsciiString &name)
+{
+	Int i;
+	for (i = 0; i < m_numGlobalTextureClasses; i++)
+	{
+		if (m_globalTextureClasses[i].name == name)
+		{
+			return i;
+		}
+	}
+	return -1;
+}
+
 //
 /// WorldHeightMapEdit - create a new height map .
 //

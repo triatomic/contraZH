@@ -51,6 +51,33 @@ visual size on top of the template `Scale`, for the whole selection.)
 rebuild count and flags. Follow Object moves the view to the selected entry.)
 * Select Similar works on roads and bridges.
 
+## Terrain brushes
+
+Terrain Material's New button defines a brush and appends it to `WorldBuilderQt\TerrainBrushes.ini`
+in the game folder. WorldBuilder reads every `.ini` in `WorldBuilderQt\` at startup; the game never
+reads them.
+
+```
+Brush MyRoadPatch          ; paints an existing terrain under a new name
+  Terrain = AsphaltType1
+  Category = Urban\Roads
+End
+
+Brush GrassType2           ; files an existing terrain under another folder
+  Category = Grass\Green
+End
+```
+
+* Category - (Folder path in the texture tree, levels split by `\` or `/`. Replaces the `Class`
+folder. Brushes without one go under Custom.)
+* Terrain - (Terrain.ini name the brush paints. Maps store that name, so they load in any build.)
+
+A brush made from a new texture also appends a `Terrain` block to
+`Data\INI\Terrain\WorldBuilderBrushes.ini`. The game and WorldBuilder load every `.ini` in
+`Data\INI\Terrain\` after `Terrain.ini`, so maps painted with it draw in-game. Terrain INI is part of
+the multiplayer INI check, so every player needs that file. A texture picked outside `Art\Terrain`
+is copied there.
+
 ## Viewing the map
 
 Under View > Models:
