@@ -30,7 +30,7 @@
 /** Each "Brush <Name>" block holds Category and optionally Terrain. With Terrain it is an
 alias that paints that terrain; without it, it re-files the terrain of the same name. The game
 never reads these files. A brush with a new texture also gets a Terrain block in the game's
-Data\INI\Terrain folder. */
+loose Data\INI\Terrain.ini. */
 class TerrainBrushes
 {
 public:

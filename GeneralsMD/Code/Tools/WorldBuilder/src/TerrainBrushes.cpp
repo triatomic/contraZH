@@ -31,7 +31,7 @@
 
 static const char *const BRUSH_DIR = "WorldBuilderQt\\";
 static const char *const BRUSH_FILE = "WorldBuilderQt\\TerrainBrushes.ini";
-static const char *const GAME_TERRAIN_FILE = "Data\\INI\\Terrain\\WorldBuilderBrushes.ini";
+static const char *const GAME_TERRAIN_FILE = "Data\\INI\\Terrain.ini";
 static const char *const DEFAULT_CATEGORY = "Custom";
 
 std::vector<TerrainBrushes::Alias> TerrainBrushes::s_aliases;
@@ -340,7 +340,7 @@ Int TerrainBrushes::create(const char *name, const char *category, const char *t
 	return WorldHeightMapEdit::findTexClass(terrainName);
 }
 
-// The terrain goes to the game's Terrain INI folder, so maps using it load in-game; only the category stays WorldBuilder-only.
+// The terrain goes to the game's Terrain.ini, so maps using it load in-game; only the category stays WorldBuilder-only.
 Int TerrainBrushes::createTerrain(Block &block, const AsciiString &texture, AsciiString &error)
 {
 	if (TheTerrainTypes->findTerrain(block.name) != nullptr || isAlias(block.name))
@@ -354,9 +354,13 @@ Int TerrainBrushes::createTerrain(Block &block, const AsciiString &texture, Asci
 		return -1;
 	}
 
-	CreateDirectory("Data", nullptr);
-	CreateDirectory("Data\\INI", nullptr);
-	CreateDirectory("Data\\INI\\Terrain", nullptr);
+	// A new loose Terrain.ini would hide the archive copy and every terrain in it.
+	DWORD attributes = GetFileAttributes(GAME_TERRAIN_FILE);
+	if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+	{
+		error.format("%s is not a loose file. Extract Terrain.ini from the mod's .big into Data\\INI\\ and try again.", GAME_TERRAIN_FILE);
+		return -1;
+	}
 	FILE *fp = fopen(GAME_TERRAIN_FILE, "a");
 	if (fp == nullptr)
 	{

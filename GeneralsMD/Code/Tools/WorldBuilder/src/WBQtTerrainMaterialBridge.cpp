@@ -250,6 +250,25 @@ int WBQtTerrainMaterial_GetTerrainTextureDir(char *dirOut, int cap)
 	return 1;
 }
 
+int WBQtTerrainMaterial_GetPreviewMaxExtent(void)
+{
+	return 10 * TILE_PIXEL_EXTENT;	// countTiles caps a texture at 10x10 tiles
+}
+
+int WBQtTerrainMaterial_GetTexClassPreview(int texClass, unsigned char *bgraOut, int cap)
+{
+	return WorldHeightMapEdit::getTexClassPixels(texClass, bgraOut, cap);
+}
+
+int WBQtTerrainMaterial_GetTexturePreview(const char *texture, unsigned char *bgraOut, int cap)
+{
+	if (texture == NULL || texture[0] == 0)
+	{
+		return 0;
+	}
+	return WorldHeightMapEdit::getTextureFilePixels(AsciiString(texture), bgraOut, cap);
+}
+
 int WBQtTerrainMaterial_GetTexClassUiName(int texClass, char *nameOut, int cap)
 {
 	if (nameOut == NULL || cap <= 0)

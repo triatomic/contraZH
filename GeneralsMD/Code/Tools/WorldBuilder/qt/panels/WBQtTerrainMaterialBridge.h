@@ -40,12 +40,18 @@ int  WBQtTerrainMaterial_GetBrushAliasCount(void);
 // terrain has no loaded texture.
 int  WBQtTerrainMaterial_GetBrushAliasEntry(int index, int *texClassOut, char *pathOut, char *leafOut, char *nameOut, int cap);
 // Saves a brush to WorldBuilderQt\TerrainBrushes.ini and loads it. Pass a texture (relative to
-// the terrain texture folder, also saved to Data\INI\Terrain\WorldBuilderBrushes.ini) or a terrain
+// the terrain texture folder, also appended to the loose Data\INI\Terrain.ini) or a terrain
 // name. Returns the texture class it paints, or -1 with the reason in errorOut. A success can
 // still carry a warning in errorOut.
 int  WBQtTerrainMaterial_CreateBrush(const char *name, const char *category, const char *terrain, const char *texture, char *errorOut, int cap);
 // The game-relative terrain texture folder ("Art/Terrain/").
 int  WBQtTerrainMaterial_GetTerrainTextureDir(char *dirOut, int cap);
+// Whole-texture previews as BGRA rows, bottom row first, sized up to GetPreviewMaxExtent on a
+// side. Each returns the side length in pixels, or 0 if there is nothing to show.
+int  WBQtTerrainMaterial_GetPreviewMaxExtent(void);
+int  WBQtTerrainMaterial_GetTexClassPreview(int texClass, unsigned char *bgraOut, int cap);
+// The texture is named relative to the terrain texture folder and need not be loaded yet.
+int  WBQtTerrainMaterial_GetTexturePreview(const char *texture, unsigned char *bgraOut, int cap);
 
 // --- Selection. The fg/bg class indices are the statics the tools read. Selecting a class
 //     validates the size (canFitTexture) and returns 0 (with the class still set) if it does

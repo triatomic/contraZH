@@ -72,11 +72,10 @@ End
 folder. Brushes without one go under Custom.)
 * Terrain - (Terrain.ini name the brush paints. Maps store that name, so they load in any build.)
 
-A brush made from a new texture also appends a `Terrain` block to
-`Data\INI\Terrain\WorldBuilderBrushes.ini`. The game and WorldBuilder load every `.ini` in
-`Data\INI\Terrain\` after `Terrain.ini`, so maps painted with it draw in-game. Terrain INI is part of
-the multiplayer INI check, so every player needs that file. A texture picked outside `Art\Terrain`
-is copied there.
+A brush made from a new texture also appends a `Terrain` block to the loose `Data\INI\Terrain.ini`,
+so maps painted with it draw in-game. When that file is only inside a `.big`, New refuses; extract
+`Terrain.ini` into `Data\INI\` first. Terrain INI is part of the multiplayer INI check, so every
+player needs the edited file. A texture picked outside `Art\Terrain` is copied there.
 
 ## Viewing the map
 

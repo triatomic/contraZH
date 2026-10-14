@@ -110,6 +110,10 @@ public: // construction
 	static void shutdown();
 	static Int addTerrainTexture(TerrainType *terrain);	///< Loads a terrain registered after init; returns its class or -1.
 	static Int findTexClass(const AsciiString &name);	///< Class index for a texture class name, or -1.
+	/// Whole texture as BGRA rows, bottom row first. Returns the side length in pixels, or 0.
+	static Int getTexClassPixels(Int texClass, UnsignedByte *bgraOut, Int cap);
+	/// Same for a terrain texture file that may not be loaded yet, named relative to the terrain folder.
+	static Int getTextureFilePixels(const AsciiString &texture, UnsignedByte *bgraOut, Int cap);
 
 public: /// Status methods.
 	void clearStatus() {m_warnTooManyTex = false;m_warnTooManyBlend = false;};

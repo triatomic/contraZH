@@ -5,6 +5,8 @@
 #define WB_QT_NEW_BRUSH_DIALOG_H
 
 #include <QDialog>
+#include <QIcon>
+#include <QImage>
 #include <QStringList>
 
 namespace Ui { class WBQtNewBrushDialog; }	// generated from WBQtNewBrushDialog.ui
@@ -26,8 +28,12 @@ public slots:
 private slots:
 	void onModeChanged();
 	void onBrowse();
+	void updatePreview();
 
 private:
+	static QIcon swatchIcon(int texClass);
+	static QImage bottomUpBgraToImage(const QByteArray &bgra, int extent);
+
 	Ui::WBQtNewBrushDialog *m_ui;	// owns the static widget tree (WBQtNewBrushDialog.ui)
 	int m_texClass;
 	QString m_name;

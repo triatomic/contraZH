@@ -7,98 +7,168 @@
   </property>
   <layout class="QVBoxLayout" name="rootLayout">
    <item>
-    <layout class="QFormLayout" name="formLayout">
-     <item row="0" column="0">
-      <widget class="QLabel" name="nameLabel">
-       <property name="text">
-        <string>Name:</string>
-       </property>
-      </widget>
+    <layout class="QHBoxLayout" name="bodyRow" stretch="1,0">
+     <item>
+      <layout class="QVBoxLayout" name="settingsColumn">
+       <item>
+        <layout class="QFormLayout" name="formLayout">
+         <item row="0" column="0">
+          <widget class="QLabel" name="nameLabel">
+           <property name="text">
+            <string>Name:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QLineEdit" name="nameEdit">
+           <property name="placeholderText">
+            <string>Letters, digits, _ - .</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="categoryLabel">
+           <property name="text">
+            <string>Category:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QComboBox" name="categoryCombo">
+           <property name="editable">
+            <bool>true</bool>
+           </property>
+           <property name="insertPolicy">
+            <enum>QComboBox::NoInsert</enum>
+           </property>
+           <property name="toolTip">
+            <string>Folder path in the texture tree. Separate levels with \ or /.</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="paintsBox">
+         <property name="title">
+          <string>Paints</string>
+         </property>
+         <layout class="QGridLayout" name="paintsGrid" columnstretch="0,1,0">
+          <item row="0" column="0">
+           <widget class="QRadioButton" name="useTerrain">
+            <property name="text">
+             <string>Existing terrain:</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1" colspan="2">
+           <widget class="QComboBox" name="terrainCombo">
+            <property name="iconSize">
+             <size>
+              <width>24</width>
+              <height>24</height>
+             </size>
+            </property>
+            <property name="maxVisibleItems">
+             <number>16</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QRadioButton" name="useTexture">
+            <property name="text">
+             <string>New texture:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="textureEdit">
+            <property name="placeholderText">
+             <string>File in Art\Terrain, e.g. MyGround.tga</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="2">
+           <widget class="QPushButton" name="browseBtn">
+            <property name="text">
+             <string>Browse...</string>
+            </property>
+            <property name="autoDefault">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0" colspan="3">
+           <widget class="QLabel" name="textureNote">
+            <property name="text">
+             <string>A new texture is also added to the loose Data\INI\Terrain.ini so the game can draw it. Players need that file too; terrain INI is part of the multiplayer INI check.</string>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="settingsSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+        </spacer>
+       </item>
+      </layout>
      </item>
-     <item row="0" column="1">
-      <widget class="QLineEdit" name="nameEdit">
-       <property name="placeholderText">
-        <string>Letters, digits, _ - .</string>
+     <item>
+      <widget class="QGroupBox" name="previewBox">
+       <property name="title">
+        <string>Preview</string>
        </property>
-      </widget>
-     </item>
-     <item row="1" column="0">
-      <widget class="QLabel" name="categoryLabel">
-       <property name="text">
-        <string>Category:</string>
-       </property>
-      </widget>
-     </item>
-     <item row="1" column="1">
-      <widget class="QComboBox" name="categoryCombo">
-       <property name="editable">
-        <bool>true</bool>
-       </property>
-       <property name="insertPolicy">
-        <enum>QComboBox::NoInsert</enum>
-       </property>
-       <property name="toolTip">
-        <string>Folder path in the texture tree. Separate levels with \ or /.</string>
-       </property>
+       <layout class="QVBoxLayout" name="previewLayout">
+        <item>
+         <widget class="QLabel" name="preview">
+          <property name="minimumSize">
+           <size>
+            <width>256</width>
+            <height>256</height>
+           </size>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>256</width>
+            <height>256</height>
+           </size>
+          </property>
+          <property name="frameShape">
+           <enum>QFrame::StyledPanel</enum>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignCenter</set>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="previewInfo">
+          <property name="alignment">
+           <set>Qt::AlignCenter</set>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="previewSpacer">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+         </spacer>
+        </item>
+       </layout>
       </widget>
      </item>
     </layout>
-   </item>
-   <item>
-    <widget class="QGroupBox" name="paintsBox">
-     <property name="title">
-      <string>Paints</string>
-     </property>
-     <layout class="QGridLayout" name="paintsGrid">
-      <item row="0" column="0">
-       <widget class="QRadioButton" name="useTerrain">
-        <property name="text">
-         <string>Existing terrain:</string>
-        </property>
-        <property name="checked">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1" colspan="2">
-       <widget class="QComboBox" name="terrainCombo"/>
-      </item>
-      <item row="1" column="0">
-       <widget class="QRadioButton" name="useTexture">
-        <property name="text">
-         <string>New texture:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <widget class="QLineEdit" name="textureEdit">
-        <property name="placeholderText">
-         <string>File in Art\Terrain, e.g. MyGround.tga</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="2">
-       <widget class="QPushButton" name="browseBtn">
-        <property name="text">
-         <string>Browse...</string>
-        </property>
-        <property name="autoDefault">
-         <bool>false</bool>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="0" colspan="3">
-       <widget class="QLabel" name="textureNote">
-        <property name="text">
-         <string>A new texture is also saved to Data\INI\Terrain\WorldBuilderBrushes.ini so the game can draw it. Players need that file too; terrain INI is part of the multiplayer INI check.</string>
-        </property>
-        <property name="wordWrap">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
    </item>
    <item>
     <layout class="QHBoxLayout" name="buttonsRow">

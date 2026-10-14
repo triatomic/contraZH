@@ -101,6 +101,80 @@ Int WorldHeightMapEdit::addTerrainTexture(TerrainType *terrain)
 	return before;
 }
 
+// Tiles are numRows x numRows, laid out as readTiles fills them.
+static Int stitchTiles(TileData **tiles, Int numRows, UnsignedByte *bgraOut, Int cap)
+{
+	Int extent = numRows * TILE_PIXEL_EXTENT;
+	if (numRows < 1 || bgraOut == nullptr || cap < extent * extent * TILE_BYTES_PER_PIXEL)
+	{
+		return 0;
+	}
+	Int row, column;
+	for (row = 0; row < extent; row++)
+	{
+		for (column = 0; column < extent; column++)
+		{
+			TileData *tile = tiles[(column / TILE_PIXEL_EXTENT) + numRows * (row / TILE_PIXEL_EXTENT)];
+			if (tile == nullptr)
+			{
+				return 0;
+			}
+			Int pixelNdx = (column % TILE_PIXEL_EXTENT) + TILE_PIXEL_EXTENT * (row % TILE_PIXEL_EXTENT);
+			memcpy(bgraOut + (row * extent + column) * TILE_BYTES_PER_PIXEL,
+				tile->getDataPtr() + pixelNdx * TILE_BYTES_PER_PIXEL, TILE_BYTES_PER_PIXEL);
+		}
+	}
+	return extent;
+}
+
+Int WorldHeightMapEdit::getTexClassPixels(Int texClass, UnsignedByte *bgraOut, Int cap)
+{
+	if (texClass < 0 || texClass >= m_numGlobalTextureClasses)
+	{
+		return 0;
+	}
+	return stitchTiles(m_globalTextureClasses[texClass].tiles, m_globalTextureClasses[texClass].width, bgraOut, cap);
+}
+
+Int WorldHeightMapEdit::getTextureFilePixels(const AsciiString &texture, UnsignedByte *bgraOut, Int cap)
+{
+	AsciiString path;
+	path.format("%s%s", TERRAIN_TGA_DIR_PATH, texture.str());
+	CachedFileInputStream stream;
+	if (!stream.open(path))
+	{
+		return 0;
+	}
+	Int numTiles = WorldHeightMap::countTiles(&stream);
+	Int numRows = 0;
+	while ((numRows + 1) * (numRows + 1) <= numTiles)
+	{
+		numRows++;
+	}
+	if (numRows < 1)
+	{
+		return 0;
+	}
+	stream.rewind();
+
+	TileData *tiles[MAX_TILES_PER_CLASS];
+	Int i;
+	for (i = 0; i < MAX_TILES_PER_CLASS; i++)
+	{
+		tiles[i] = nullptr;
+	}
+	Int extent = 0;
+	if (WorldHeightMap::readTiles(&stream, tiles, numRows))
+	{
+		extent = stitchTiles(tiles, numRows, bgraOut, cap);
+	}
+	for (i = 0; i < MAX_TILES_PER_CLASS; i++)
+	{
+		REF_PTR_RELEASE(tiles[i]);
+	}
+	return extent;
+}
+
 Int WorldHeightMapEdit::findTexClass(const AsciiString &name)
 {
 	Int i;
