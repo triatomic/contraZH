@@ -26,8 +26,6 @@
 #include "GameLogic/Pathfinder/PathThreats.h"
 #include "GameLogic/TerrainLogic.h"
 
-inline Int IABS(Int x) {	if (x>=0) return x; return -x;};
-
 //-----------------------------------------------------------------------------------
 Path::Path():
 m_path(nullptr),
