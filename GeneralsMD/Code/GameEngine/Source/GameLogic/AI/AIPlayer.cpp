@@ -56,6 +56,7 @@
 #include "GameLogic/Module/DozerAIUpdate.h"
 #include "GameLogic/Module/UpdateModule.h"
 #include "GameLogic/ScriptEngine.h"
+#include "GameLogic/ScriptCLP.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/RebuildHoleBehavior.h"
 #include "GameLogic/Module/SupplyTruckAIUpdate.h"
@@ -1275,7 +1276,7 @@ Bool AIPlayer::computeSuperweaponTarget(const SpecialPowerTemplate *power, Coord
 			pos.x = bounds.lo.x + ( bounds.width() * xIndex ) / xCount;
 			pos.y = bounds.lo.y + ( bounds.height() * yIndex ) / yCount;
 			pos.z = 0;
-			Int curCash = getPlayerSuperweaponValue( &pos, playerNdx, 2*weaponRadius, targetMilitaryUnits );
+			Int curCash = getPlayerSuperweaponValue( &pos, playerNdx, 2*weaponRadius, targetMilitaryUnits, m_player );
 			if ( curCash > cash)
 			{
 				cash = curCash;
@@ -1287,6 +1288,12 @@ Bool AIPlayer::computeSuperweaponTarget(const SpecialPowerTemplate *power, Coord
 
 	if (!success)
 		return false;
+
+	// Nothing the AI can see is worth firing at.
+	if (cash <= 0 && clpAIRespectsFog(m_player))
+	{
+		return false;
+	}
 
 	//Fine tune that position by looking at a even smaller radius.
 	Coord3D veryBestPos;
@@ -1301,7 +1308,7 @@ Bool AIPlayer::computeSuperweaponTarget(const SpecialPowerTemplate *power, Coord
 			pos.x = bestPos.x + (x-5)*(weaponRadius/10);
 			pos.y = bestPos.y + (x-5)*(weaponRadius/10);
 			pos.z = 0;
-			Int curCash = getPlayerSuperweaponValue( &pos, playerNdx, weaponRadius, targetMilitaryUnits );
+			Int curCash = getPlayerSuperweaponValue( &pos, playerNdx, weaponRadius, targetMilitaryUnits, m_player );
 			if ( curCash > cash)
 			{
 				cash = curCash;
@@ -1335,7 +1342,7 @@ Bool AIPlayer::computeSuperweaponTarget(const SpecialPowerTemplate *power, Coord
 /**
  * Get the target value for structures in an area.
  */
-Int AIPlayer::getPlayerSuperweaponValue(Coord3D *center, Int playerNdx, Real radius, Bool includeMilitaryUnits )
+Int AIPlayer::getPlayerSuperweaponValue(Coord3D *center, Int playerNdx, Real radius, Bool includeMilitaryUnits, const Player *viewer )
 {
 	if (radius < 4*PATHFIND_CELL_SIZE_F)
 	{
@@ -1359,6 +1366,11 @@ Int AIPlayer::getPlayerSuperweaponValue(Coord3D *center, Int playerNdx, Real rad
 				Object *pObj = iter.cur();
 				if (!pObj)
 					continue;
+
+				if (!clpIsFairAITarget(pObj, viewer))
+				{
+					continue;
+				}
 
 				Bool applyNegValue = FALSE;
 				if( !includeMilitaryUnits )

@@ -278,6 +278,22 @@ size, so its fogged ghost looked smaller than the real thing. The ghost now matc
 Presentation only; replays unaffected.
 ([#121](https://github.com/triatomic/contraZH/issues/121))
 
+## AI special powers no longer see through fog
+
+Skirmish and multiplayer AI fired special powers at targets it had never seen. These script
+actions now pick only targets a human in the AI's seat could pick:
+
+* `SKIRMISH_FIRE_SPECIAL_POWER_AT_MOST_COST` and its CLP `..._TYPE` variant
+* `SKIRMISH_PERFORM_COMMANDBUTTON_ON_MOST_VALUABLE_OBJECT`
+* `TEAM_ALL_USE_COMMANDBUTTON_ON_NEAREST_*`
+
+A valid target is in view, or a structure the AI has scouted (its fogged ghost). Undetected
+stealth units and buildings never count. With nothing valid, the superweapon holds its fire. The
+campaign and challenge missions keep the old behavior.
+
+Changes the simulation.
+([#115](https://github.com/triatomic/contraZH/issues/115))
+
 # Maps
 
 ## Per-object scale

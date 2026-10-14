@@ -81,6 +81,7 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/ScriptActions.h"
+#include "GameLogic/ScriptCLP.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/VictoryConditions.h"
@@ -109,6 +110,25 @@ static void updateTeamAndPlayerStuff( Object *obj, void *userData )
 			draw->setIndicatorColor(obj->getIndicatorColor());
 	}
 }
+
+//-------------------------------------------------------------------------------------------------
+/** Accepts objects the player could target as a human would, see clpIsFairAITarget. */
+//-------------------------------------------------------------------------------------------------
+class PartitionFilterFairAITarget : public PartitionFilter
+{
+public:
+	PartitionFilterFairAITarget(const Player *player) : m_player(player) { }
+	virtual Bool allow(Object *other) override
+	{
+		return clpIsFairAITarget(other, m_player);
+	}
+#if defined(RTS_DEBUG)
+	virtual const char* debugGetName() override { return "PartitionFilterFairAITarget"; }
+#endif
+private:
+	const Player *m_player;
+};
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 
@@ -5530,9 +5550,10 @@ void ScriptActions::doSkirmishCommandButtonOnMostValuable( const AsciiString& te
 
 	PartitionFilterPlayerAffiliation f1(team->getControllingPlayer(), ALLOW_ENEMIES, true);
 	PartitionFilterValidCommandButtonTarget f2(srcObj, commandButton, true, CMD_FROM_SCRIPT);
+	PartitionFilterFairAITarget filterFair(team->getControllingPlayer());
 	PartitionFilterSameMapStatus filterMapStatus(srcObj);
 
-	PartitionFilter *filters[] = { &f1, &f2, &filterMapStatus, nullptr };
+	PartitionFilter *filters[] = { &f1, &f2, &filterMapStatus, &filterFair, nullptr };
 	// @todo: Should we add the group's radius to the range? Seems like a possibility.
 	SimpleObjectIterator *iter = ThePartitionManager->iterateObjectsInRange(&pos, range, FROM_CENTER_2D, filters, ITER_SORTED_EXPENSIVE_TO_CHEAP);
 	MemoryPoolObjectHolder hold(iter);
@@ -5633,12 +5654,13 @@ void ScriptActions::doTeamUseCommandButtonOnNearestEnemy( const AsciiString& tea
 
 	PartitionFilterPlayerAffiliation f1(team->getControllingPlayer(), ALLOW_ENEMIES, true);
 	PartitionFilterValidCommandButtonTarget f2(srcObj, commandButton, true, CMD_FROM_SCRIPT);
+	PartitionFilterFairAITarget filterFair(team->getControllingPlayer());
 	PartitionFilterSameMapStatus filterMapStatus(srcObj);
 
 	Coord3D pos;
 	theGroup->getCenter(&pos);
 
-	PartitionFilter *filters[] = { &f1, &f2, &filterMapStatus, nullptr };
+	PartitionFilter *filters[] = { &f1, &f2, &filterMapStatus, &filterFair, nullptr };
 	Object *obj = ThePartitionManager->getClosestObject(&pos, REALLY_FAR, FROM_CENTER_2D, filters);
 	if (!obj) {
 		return;
@@ -5685,12 +5707,13 @@ void ScriptActions::doTeamUseCommandButtonOnNearestGarrisonedBuilding( const Asc
 	PartitionFilterAcceptByKindOf f2(MAKE_KINDOF_MASK(KINDOF_STRUCTURE), KINDOFMASK_NONE);
 	PartitionFilterGarrisonable f3(true);
 	PartitionFilterValidCommandButtonTarget f4(srcObj, commandButton, true, CMD_FROM_SCRIPT);
+	PartitionFilterFairAITarget filterFair(team->getControllingPlayer());
 	PartitionFilterSameMapStatus filterMapStatus(srcObj);
 
 	Coord3D pos;
 	theGroup->getCenter(&pos);
 
-	PartitionFilter *filters[] = { &f1, &f2, &f3, &f4, &filterMapStatus, nullptr };
+	PartitionFilter *filters[] = { &f1, &f2, &f3, &f4, &filterMapStatus, &filterFair, nullptr };
 	Object *obj = ThePartitionManager->getClosestObject(&pos, REALLY_FAR, FROM_CENTER_2D, filters);
 	if (!obj) {
 		return;
@@ -5736,12 +5759,13 @@ void ScriptActions::doTeamUseCommandButtonOnNearestKindof( const AsciiString& te
 	PartitionFilterPlayerAffiliation f1(team->getControllingPlayer(), ALLOW_ENEMIES, true);
 	PartitionFilterAcceptByKindOf f2(MAKE_KINDOF_MASK(kindofBit), KINDOFMASK_NONE);
 	PartitionFilterValidCommandButtonTarget f3(srcObj, commandButton, true, CMD_FROM_SCRIPT);
+	PartitionFilterFairAITarget filterFair(team->getControllingPlayer());
 	PartitionFilterSameMapStatus filterMapStatus(srcObj);
 
 	Coord3D pos;
 	theGroup->getCenter(&pos);
 
-	PartitionFilter *filters[] = { &f1, &f2, &f3, &filterMapStatus, nullptr };
+	PartitionFilter *filters[] = { &f1, &f2, &f3, &filterMapStatus, &filterFair, nullptr };
 	Object *obj = ThePartitionManager->getClosestObject(&pos, REALLY_FAR, FROM_CENTER_2D, filters);
 	if (!obj) {
 		return;
@@ -5787,12 +5811,13 @@ void ScriptActions::doTeamUseCommandButtonOnNearestBuilding( const AsciiString& 
 	PartitionFilterPlayerAffiliation f1(team->getControllingPlayer(), ALLOW_ENEMIES, true);
 	PartitionFilterAcceptByKindOf f2(MAKE_KINDOF_MASK(KINDOF_STRUCTURE), KINDOFMASK_NONE);
 	PartitionFilterValidCommandButtonTarget f3(srcObj, commandButton, true, CMD_FROM_SCRIPT);
+	PartitionFilterFairAITarget filterFair(team->getControllingPlayer());
 	PartitionFilterSameMapStatus filterMapStatus(srcObj);
 
 	Coord3D pos;
 	theGroup->getCenter(&pos);
 
-	PartitionFilter *filters[] = { &f1, &f2, &f3, &filterMapStatus, nullptr };
+	PartitionFilter *filters[] = { &f1, &f2, &f3, &filterMapStatus, &filterFair, nullptr };
 	Object *obj = ThePartitionManager->getClosestObject(&pos, REALLY_FAR, FROM_CENTER_2D, filters);
 	if (!obj) {
 		return;
@@ -5839,12 +5864,13 @@ void ScriptActions::doTeamUseCommandButtonOnNearestBuildingClass( const AsciiStr
 	PartitionFilterAcceptByKindOf f2(MAKE_KINDOF_MASK(KINDOF_STRUCTURE), KINDOFMASK_NONE);
 	PartitionFilterAcceptByKindOf f3(MAKE_KINDOF_MASK(kindofBit), KINDOFMASK_NONE);
 	PartitionFilterValidCommandButtonTarget f4(srcObj, commandButton, true, CMD_FROM_SCRIPT);
+	PartitionFilterFairAITarget filterFair(team->getControllingPlayer());
 	PartitionFilterSameMapStatus filterMapStatus(srcObj);
 
 	Coord3D pos;
 	theGroup->getCenter(&pos);
 
-	PartitionFilter *filters[] = { &f1, &f2, &f3, &f4, &filterMapStatus, nullptr };
+	PartitionFilter *filters[] = { &f1, &f2, &f3, &f4, &filterMapStatus, &filterFair, nullptr };
 	Object *obj = ThePartitionManager->getClosestObject(&pos, REALLY_FAR, FROM_CENTER_2D, filters);
 	if (!obj) {
 		return;
@@ -5896,8 +5922,9 @@ void ScriptActions::doTeamUseCommandButtonOnNearestObjectType( const AsciiString
 		PartitionFilterPlayerAffiliation f1(team->getControllingPlayer(), ALLOW_ENEMIES | ALLOW_NEUTRAL, true);
 		PartitionFilterThing f2(thingTemplate, true);
 		PartitionFilterValidCommandButtonTarget f3(srcObj, commandButton, true, CMD_FROM_SCRIPT);
+		PartitionFilterFairAITarget filterFair(team->getControllingPlayer());
 		PartitionFilterSameMapStatus filterMapStatus(srcObj);
-		PartitionFilter *filters[] = { &f1, &f2, &f3, &filterMapStatus, nullptr };
+		PartitionFilter *filters[] = { &f1, &f2, &f3, &filterMapStatus, &filterFair, nullptr };
 
 		Coord3D pos;
 		theGroup->getCenter(&pos);
@@ -5915,6 +5942,7 @@ void ScriptActions::doTeamUseCommandButtonOnNearestObjectType( const AsciiString
 		{
 			PartitionFilterPlayerAffiliation f1(team->getControllingPlayer(), ALLOW_ENEMIES | ALLOW_NEUTRAL, true);
 			PartitionFilterValidCommandButtonTarget f3(srcObj, commandButton, true, CMD_FROM_SCRIPT);
+			PartitionFilterFairAITarget filterFair(team->getControllingPlayer());
 			PartitionFilterSameMapStatus f4(srcObj);
 
 			Coord3D pos;
@@ -5929,7 +5957,7 @@ void ScriptActions::doTeamUseCommandButtonOnNearestObjectType( const AsciiString
 				if( thisType )
 				{
 					PartitionFilterThing f2( thisType, true );
-					PartitionFilter *filters[] = { &f1, &f2, &f3, &f4, nullptr };
+					PartitionFilter *filters[] = { &f1, &f2, &f3, &f4, &filterFair, nullptr };
 
 					Object *obj = ThePartitionManager->getClosestObject(&pos, REALLY_FAR, FROM_CENTER_2D, filters, &dist );
 					if( obj )

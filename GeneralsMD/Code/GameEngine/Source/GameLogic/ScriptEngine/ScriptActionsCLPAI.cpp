@@ -280,7 +280,7 @@ static Bool clpHasPendingSupplyCenter(Player *player, const Coord3D *pos, Real r
 //-------------------------------------------------------------------------------------------------
 /** Stock getPlayerSuperweaponValue, with objects of objectType worth five times as much. */
 //-------------------------------------------------------------------------------------------------
-static Int clpSuperweaponValueType(const Coord3D *center, Int playerNdx, Real radius, const AsciiString &objectType, Bool includeMilitaryUnits)
+static Int clpSuperweaponValueType(const Coord3D *center, Int playerNdx, Real radius, const AsciiString &objectType, Bool includeMilitaryUnits, const Player *viewer)
 {
 	if( radius < 4 * PATHFIND_CELL_SIZE_F )
 	{
@@ -307,6 +307,10 @@ static Int clpSuperweaponValueType(const Coord3D *center, Int playerNdx, Real ra
 			{
 				Object *pObj = objIter.cur();
 				if( !pObj )
+				{
+					continue;
+				}
+				if( !clpIsFairAITarget( pObj, viewer ) )
 				{
 					continue;
 				}
@@ -804,7 +808,7 @@ Bool AIPlayer::clpComputeSuperweaponTargetType(const SpecialPowerTemplate *power
 			pos.x = bounds.lo.x + (bounds.width() * xIndex) / xCount;
 			pos.y = bounds.lo.y + (bounds.height() * yIndex) / yCount;
 			pos.z = 0;
-			Int curCash = clpSuperweaponValueType( &pos, playerNdx, 2 * weaponRadius, objectType, targetMilitaryUnits );
+			Int curCash = clpSuperweaponValueType( &pos, playerNdx, 2 * weaponRadius, objectType, targetMilitaryUnits, m_player );
 			if( curCash > cash )
 			{
 				cash = curCash;
@@ -814,6 +818,12 @@ Bool AIPlayer::clpComputeSuperweaponTargetType(const SpecialPowerTemplate *power
 		}
 	}
 	if( !success )
+	{
+		return FALSE;
+	}
+
+	// Nothing the AI can see is worth firing at.
+	if( cash <= 0 && clpAIRespectsFog( m_player ) )
 	{
 		return FALSE;
 	}
@@ -829,7 +839,7 @@ Bool AIPlayer::clpComputeSuperweaponTargetType(const SpecialPowerTemplate *power
 			pos.x = bestPos.x + (x - 5) * (weaponRadius / 10);
 			pos.y = bestPos.y + (y - 5) * (weaponRadius / 10);
 			pos.z = 0;
-			Int curCash = clpSuperweaponValueType( &pos, playerNdx, weaponRadius, objectType, targetMilitaryUnits );
+			Int curCash = clpSuperweaponValueType( &pos, playerNdx, weaponRadius, objectType, targetMilitaryUnits, m_player );
 			if( curCash > cash )
 			{
 				cash = curCash;

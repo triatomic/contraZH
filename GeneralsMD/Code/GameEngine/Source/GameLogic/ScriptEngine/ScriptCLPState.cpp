@@ -215,6 +215,42 @@ Bool clpIsSeenByPlayer(const Object *obj, const Player *player)
 }
 
 //-------------------------------------------------------------------------------------------------
+Bool clpAIRespectsFog(const Player *player)
+{
+	return player && player->getPlayerType() == PLAYER_COMPUTER && !TheGameLogic->isInSinglePlayerGame();
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool clpIsFairAITarget(const Object *obj, const Player *player)
+{
+	if (!clpAIRespectsFog(player))
+	{
+		return TRUE;
+	}
+	if (!obj)
+	{
+		return FALSE;
+	}
+	ObjectShroudStatus status = obj->getShroudedStatus(player->getPlayerIndex());
+	if (status == OBJECTSHROUD_SHROUDED)
+	{
+		return FALSE;
+	}
+
+	// A fogged structure stays targetable through the ghost a human would see.
+	if (status == OBJECTSHROUD_FOGGED && !obj->isKindOf(KINDOF_STRUCTURE))
+	{
+		return FALSE;
+	}
+	if (obj->testStatus(OBJECT_STATUS_STEALTHED) && !obj->testStatus(OBJECT_STATUS_DETECTED)
+		&& player->getRelationship(obj->getTeam()) != ALLIES)
+	{
+		return FALSE;
+	}
+	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
 ScriptCLPState::ScriptCLPState()
 {
 	reset();
