@@ -75,3 +75,5 @@ __pycache__/
 *.pyc
 # Local session notes, not part of the source tree
 SESSION_CHANGES.md
+# MkDocs build output
+/site/

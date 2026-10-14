@@ -1,0 +1,88 @@
+site_name: contraZH Docs
+site_url: https://triatomic.github.io/contraZH/
+site_description: Modding documentation for contraZH
+repo_url: https://github.com/triatomic/contraZH
+repo_name: triatomic/contraZH
+edit_uri: edit/main/docs/
+docs_dir: docs
+
+validation:
+  anchors: warn
+
+# Home.md keeps its wiki name, so the site root redirects to it
+plugins:
+  - search
+  - redirects:
+      redirect_maps:
+        index.md: Home.md
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.highlight
+    - search.suggest
+    - toc.follow
+    - content.code.copy
+    - content.action.edit
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue grey
+      accent: deep orange
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue grey
+      accent: deep orange
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  # GitHub-style heading IDs, so anchors work on both the site and the wiki
+  - toc:
+      permalink: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.details
+
+nav:
+  - Home: Home.md
+  - This fork:
+      - contraZH Changes: contraZH-Changes.md
+      - Direct3D 9 Features: dx9feat.md
+      - Water: Water.md
+      - Electric & Laser Shading: Electric-&-Laser-Shading.md
+      - Camera Controls: CameraControls.md
+      - WorldBuilder Qt: WorldBuilder-Qt.md
+  - Upstream reference:
+      - Changes & Bug Fixes: Changes-&-Bug-Fixes.md
+      - Objects & Modules: Objects-&-Modules.md
+      - Weapons: Weapons.md
+      - Armors: Armors.md
+      - Turrets: Turrets.md
+      - SpecialPowers: SpecialPowers.md
+      - Science: Science.md
+      - Upgrades: Upgrades.md
+      - FXList & ParticleSystems: FXList-&-ParticleSystems.md
+      - GameData: GameData.md
+      - CommandButtons: CommandButtons.md
+      - ChatCommands: ChatCommands.md
+      - BuffSystem: BuffSystem.md
+      - Locomotor: Locomotor.md
+      - Naval Support: Naval-Support.md
+      - Object Creation List: Object-Creation-List.md
+      - New Enum Definitions: New-Enum-Definitions.md
+      - Audio: Audio.md
