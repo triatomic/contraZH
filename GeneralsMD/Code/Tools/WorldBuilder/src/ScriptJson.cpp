@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <map>
+#include <new>
 #include <vector>
 
 namespace
@@ -1118,6 +1119,19 @@ private:
 		throw ConvertError(format("JSON line %d: %s", line, what));
 	}
 
+	static bool isDigit(char c)
+	{
+		return c >= '0' && c <= '9';
+	}
+
+	void digits()
+	{
+		while (isDigit(*m_p))
+		{
+			++m_p;
+		}
+	}
+
 	void ws()
 	{
 		while (*m_p == ' ' || *m_p == '\t' || *m_p == '\n' || *m_p == '\r')
@@ -1323,18 +1337,42 @@ private:
 		{
 			++m_p;
 		}
-		bool isInt = true;
-		while ((*m_p >= '0' && *m_p <= '9') || *m_p == '.' || *m_p == 'e' || *m_p == 'E' || *m_p == '+' || *m_p == '-')
+		if (*m_p == '0')
 		{
-			if (*m_p == '.' || *m_p == 'e' || *m_p == 'E')
-			{
-				isInt = false;
-			}
 			++m_p;
 		}
-		if (m_p == start)
+		else if (isDigit(*m_p))
 		{
-			fail("unexpected character");
+			digits();
+		}
+		else
+		{
+			fail(m_p == start ? "unexpected character" : "bad number");
+		}
+		bool isInt = true;
+		if (*m_p == '.')
+		{
+			isInt = false;
+			++m_p;
+			if (!isDigit(*m_p))
+			{
+				fail("bad number");
+			}
+			digits();
+		}
+		if (*m_p == 'e' || *m_p == 'E')
+		{
+			isInt = false;
+			++m_p;
+			if (*m_p == '+' || *m_p == '-')
+			{
+				++m_p;
+			}
+			if (!isDigit(*m_p))
+			{
+				fail("bad number");
+			}
+			digits();
 		}
 		std::string token(start, m_p - start);
 		v.isInt = isInt;
@@ -1928,7 +1966,15 @@ bool readFile(const char *path, std::string &out)
 	fseek(f, 0, SEEK_END);
 	long n = ftell(f);
 	fseek(f, 0, SEEK_SET);
-	out.resize(n > 0 ? n : 0);
+	try
+	{
+		out.resize(n > 0 ? n : 0);
+	}
+	catch (...)
+	{
+		fclose(f);
+		return false;
+	}
 	bool ok = n <= 0 || fread(&out[0], 1, n, f) == (size_t)n;
 	fclose(f);
 	return ok;
@@ -2037,6 +2083,16 @@ bool ScriptJson_ScbToJson(const std::string &scb, std::string &json, std::string
 		error = e.message;
 		return false;
 	}
+	catch (const std::bad_alloc &)
+	{
+		error = "Out of memory while converting the script file";
+		return false;
+	}
+	catch (...)
+	{
+		error = "Unexpected error while converting the script file";
+		return false;
+	}
 }
 
 bool ScriptJson_JsonToScb(const std::string &json, std::string &scb, std::string &error)
@@ -2093,6 +2149,16 @@ bool ScriptJson_JsonToScb(const std::string &json, std::string &scb, std::string
 	catch (const ConvertError &e)
 	{
 		error = e.message;
+		return false;
+	}
+	catch (const std::bad_alloc &)
+	{
+		error = "Out of memory while converting the script file";
+		return false;
+	}
+	catch (...)
+	{
+		error = "Unexpected error while converting the script file";
 		return false;
 	}
 }

@@ -19,7 +19,6 @@
 #include "Common/WellKnownKeys.h"	// TheKey_playerName (force-rename pass)
 #include "Common/DataChunk.h"		// DataChunkInput (import)
 #include "Common/FileSystem.h"		// CachedFileInputStream (import)
-#include "ScriptJson.h"				// .json script files (import)
 #include "qt/WBQtPanelBridge.h"
 #include "qt/panels/WBQtScriptEditBridge.h"	// WBQtScriptEdit_Run (new/edit script sheet)
 #include "qt/panels/WBQtParamBridge.h"		// WBQtEditGroup_Run (edit folder dialog)
@@ -1200,8 +1199,7 @@ void ScriptDialog::qtMSetCheckbox(int which, int checked)
 	}
 }
 
-// == OnLoad minus the final reloadPlayer/updateIcons loop (no tree). The chunk parsers are
-// the same protected statics; the SidesListUndoable commit + m_sides re-copy are verbatim.
+// == OnLoad minus the final reloadPlayer/updateIcons loop (no tree); importScriptFile does the work.
 void ScriptDialog::qtMImportScripts(void)
 {
 	CFileDialog fileDlg(true, ".scb", NULL, 0,
@@ -1222,181 +1220,13 @@ void ScriptDialog::qtMImportScripts(void)
 		}
 		pEnd--;
 	}
-	CWorldBuilderDoc* pDoc = CWorldBuilderDoc::GetActiveDoc();
 	::SetCurrentDirectory(buf);
 	if (IDCANCEL==result)
 	{
 		return;
 	}
 
-	CString path = fileDlg.GetPathName();
-
-	ScriptJsonImportFile importFile;
-	if (!importFile.open(path))
-	{
-		::AfxMessageBox(importFile.error(), MB_OK | MB_ICONERROR);
-		return;
-	}
-
-	Int mode = ::AfxMessageBox(
-		"Edit this script file?\n\n"
-		"Yes: replace this map's players, teams and scripts with the file's, so Export Scripts "
-		"saves back to the file. Undo restores the map's own. Best on an empty map.\n\n"
-		"No: merge the scripts into this map.",
-		MB_YESNOCANCEL | MB_ICONQUESTION);
-	if (mode == IDCANCEL)
-	{
-		return;
-	}
-	m_importEditFile = mode == IDYES;
-	m_importCreatedPlayers.clear();
-	m_importTeamIssues.clear();
-
-	CachedFileInputStream theInputStream;
-	if (theInputStream.open(AsciiString(importFile.scbPath())))
-	try {
-		ChunkInputStream *pStrm = &theInputStream;
-		DataChunkInput file( pStrm );
-		if (m_importEditFile)
-		{
-			// The file's players replace the map's; the commit below makes it one undoable step
-			m_sides.clear();
-			m_sides.validateSides();
-			ensureScriptLists();
-			m_editFileSides = false;
-			m_curSelection = ListType();
-		}
-		m_firstReadObject = NULL;
-		m_firstTrigger = NULL;
-		m_waypointBase = pDoc->getNextWaypointID();
-		m_maxWaypoint = m_waypointBase;
-		file.registerParser( AsciiString("PlayerScriptsList"), AsciiString::TheEmptyString, ScriptList::ParseScriptsDataChunk );
-		file.registerParser( AsciiString("ObjectsList"), AsciiString::TheEmptyString, ParseObjectsDataChunk );
-		file.registerParser( AsciiString("PolygonTriggers"), AsciiString::TheEmptyString, ParsePolygonTriggersDataChunk );
-		file.registerParser( AsciiString("WaypointsList"), AsciiString::TheEmptyString, ParseWaypointDataChunk );
-		file.registerParser( AsciiString("ScriptTeams"), AsciiString::TheEmptyString, ParseTeamsDataChunk );
-		file.registerParser( AsciiString("ScriptsPlayers"), AsciiString::TheEmptyString, ParsePlayersDataChunk );
-		if (!file.parse(this))
-		{
-			throw(ERROR_CORRUPT_FILE_FORMAT);
-		}
-		pDoc->setNextWaypointID(m_maxWaypoint);
-		if (m_importEditFile)
-		{
-			ensureScriptLists();
-		}
-
-		SidesListUndoable *pUndo = new SidesListUndoable(m_sides, pDoc);
-		pDoc->AddAndDoUndoable(pUndo);
-		REF_PTR_RELEASE(pUndo); // belongs to pDoc now.
-		m_sides = *TheSidesList;
-		// The import committed app-level and re-seeded the working copy; editor-local
-		// snapshots from before it would desync the two, so drop them.
-		qtClearUndoHistory();
-
-		if (m_firstReadObject)
-		{
-			AddObjectUndoable *pObjUndo = new AddObjectUndoable(pDoc, m_firstReadObject);
-			pDoc->AddAndDoUndoable(pObjUndo);
-			REF_PTR_RELEASE(pObjUndo); // belongs to pDoc now.
-			m_firstReadObject = NULL; // undoable owns it now.
-		}
-		PolygonTrigger *pTrig;
-		PolygonTrigger *pNextTrig;
-		for (pTrig=m_firstTrigger; pTrig; pTrig = pNextTrig)
-		{
-			pNextTrig = pTrig->getNext();
-			pTrig->setNextPoly(NULL);
-			PolygonTrigger::addPolygonTrigger(pTrig);
-		}
-
-		ScriptList *scripts[MAX_PLAYER_COUNT];
-		Int count = ScriptList::getReadScripts(scripts);
-		Int i;
-		for (i=0; i<count; i++)
-		{
-			if (scripts[i]->getScript() == NULL && scripts[i]->getScriptGroup()==NULL)
-			{
-				continue;
-			}
-			Int curSide = -1;
-			if (count==1 && !m_importEditFile)
-			{
-				curSide = m_curSelection.m_playerIndex;
-			}
-			else
-			{
-				Int j;
-				for (j=0; j<m_sides.getNumSides(); j++)
-				{
-					AsciiString name = m_sides.getSideInfo(j)->getDict()->getAsciiString(TheKey_playerName);
-					if (name == m_readPlayerNames[i])
-					{
-						curSide = j;
-						break;
-					}
-				}
-				if (curSide == -1 && m_importEditFile)
-				{
-					// A partial export names no players, so its scripts go to Neutral
-					curSide = 0;
-				}
-				if (curSide == -1)
-				{
-					CString msg = "Could not find player";
-					msg += m_readPlayerNames[i].str();
-					msg += ", discarding scripts for this player.";
-					::AfxMessageBox(msg);
-					continue;
-				}
-			}
-			if (curSide>= m_sides.getNumSides())
-			{
-				curSide = 0;
-				::AfxMessageBox("Imported scripts came from more players than exist in this map.  Additional scripts moved to Neutral player.");
-			}
-			ScriptList *pSL = m_sides.getSideInfo(curSide)->getScriptList();
-
-			if (pSL)
-			{
-				Script *pScr;
-				Script *pNextScr;
-				Int j=0;
-				for (pScr = scripts[i]->getScript(); pScr; pScr=pNextScr)
-				{
-					pNextScr=pScr->getNext();
-					pScr->setNextScript(NULL);
-					pSL->addScript(pScr, j); //unlink it and add.
-					j++;
-				}
-				j=0;
-				ScriptGroup *pGroup;
-				ScriptGroup *pNextGroup;
-				for (pGroup = scripts[i]->getScriptGroup(); pGroup; pGroup=pNextGroup)
-				{
-					pNextGroup=pGroup->getNext();
-					pGroup->setNextGroup(NULL);
-					pSL->addGroup(pGroup, j);
-					j++;
-				}
-				scripts[i]->discard(); /* Frees the script list, but none of it's children, as they have been
-															copied into the current scripts. */
-				scripts[i] = NULL;
-			}
-		}
-		if (m_importEditFile)
-		{
-			m_editFilePath = path;
-		}
-		showImportReport(path);
-	} catch(...) {
-		DEBUG_CRASH(("threw exception in ScriptDialog::qtMImportScripts"));
-		if (m_importEditFile)
-		{
-			m_sides = *TheSidesList;
-		}
-	}
-	m_importEditFile = false;
+	importScriptFile(fileDlg.GetPathName());
 }
 
 extern "C" {

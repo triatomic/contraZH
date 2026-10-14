@@ -42,6 +42,7 @@
 #include "Common/ThingFactory.h"
 #include "Common/PlayerTemplate.h"
 #include "WaypointOptions.h"
+#include "mapobjectprops.h"
 #include "Common/UnicodeString.h"
 #include "MainFrm.h"
 #ifdef RTS_HAS_QT
@@ -3164,6 +3165,9 @@ void ScriptDialog::OnSave()
 	Int	 i;
 
 	Bool saveToEditFile = false;
+	if (!m_editFilePath.IsEmpty() && !editFileStillOpen()) {
+		m_editFilePath.Empty();
+	}
 	if (!m_editFilePath.IsEmpty()) {
 		CString ask;
 		ask.Format("Save the scripts back to %s?\n\nNo exports to another file instead.", (LPCSTR)m_editFilePath);
@@ -3174,27 +3178,27 @@ void ScriptDialog::OnSave()
 		saveToEditFile = answer == IDYES;
 	}
 
-	if (saveToEditFile) {
-		doSides = m_editFileSides;
-	} else {
 #ifdef RTS_HAS_QT
-		if (WBQtExportScriptsOptions_Run(::AfxGetMainWnd()->GetSafeHwnd()) == 0)
-		{
-			return;
-		}
-		ExportScriptsOptions optionsDlg;
+	if (!saveToEditFile && WBQtExportScriptsOptions_Run(::AfxGetMainWnd()->GetSafeHwnd()) == 0)
+	{
+		return;
+	}
+	ExportScriptsOptions optionsDlg;
 #else
-		ExportScriptsOptions optionsDlg;
-		if (IDCANCEL == optionsDlg.DoModal()) {
-			return;
-		}
+	ExportScriptsOptions optionsDlg;
+	if (!saveToEditFile && IDCANCEL == optionsDlg.DoModal()) {
+		return;
+	}
 #endif
-		doWaypoints = optionsDlg.getDoWaypoints();
-		doUnits = optionsDlg.getDoUnits();
-		doTeams = optionsDlg.getDoTeams(); // you'll implement this getter
-		doTriggerAreas = optionsDlg.getDoTriggers();
-		doAllScripts = optionsDlg.getDoAllScripts();
-		doSides = optionsDlg.getDoSides();
+	doWaypoints = optionsDlg.getDoWaypoints();
+	doUnits = optionsDlg.getDoUnits();
+	doTeams = optionsDlg.getDoTeams(); // you'll implement this getter
+	doTriggerAreas = optionsDlg.getDoTriggers();
+	doAllScripts = optionsDlg.getDoAllScripts();
+	doSides = optionsDlg.getDoSides();
+	if (saveToEditFile) {
+		doWaypoints = doUnits = doTeams = doTriggerAreas = doAllScripts = true;
+		doSides = m_editFileSides;
 	}
 
 	Script *pScript = getCurScript();
@@ -3205,31 +3209,36 @@ void ScriptDialog::OnSave()
 		scripts[i] = nullptr;
 	}
 
-	CString targetPath = m_editFilePath;
-	if (!saveToEditFile) {
-		CFileDialog fileDlg(false, ".scb", nullptr, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
-			"Script files (.scb)|*.scb|Script JSON (.json)|*.json||", this);
+	CFileDialog fileDlg(false, ".scb", nullptr, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
+		"Script files (.scb)|*.scb|Script JSON (.json)|*.json||", this);
 
-		Int result = fileDlg.DoModal();
+	Int result = saveToEditFile ? IDOK : fileDlg.DoModal();
 
-		// Open document dialog may change working directory,
-		// change it back.
-		char buf[_MAX_PATH];
-		::GetModuleFileName(nullptr, buf, sizeof(buf));
-		if (char *pEnd = strrchr(buf, '\\')) {
-			*pEnd = 0;
+	// Open document dialog may change working directory,
+	// change it back.
+	char buf[_MAX_PATH];
+	::GetModuleFileName(nullptr, buf, sizeof(buf));
+	if (char *pEnd = strrchr(buf, '\\')) {
+		*pEnd = 0;
+	}
+	::SetCurrentDirectory(buf);
+	if (IDCANCEL==result) {
+		return;
+	}
+
+	CString targetPath = saveToEditFile ? m_editFilePath : fileDlg.GetPathName();
+	if (!saveToEditFile && fileDlg.m_ofn.nFilterIndex == 2 && !ScriptJson_IsJsonPath(targetPath)) {
+		if (targetPath.Right(4).CompareNoCase(".scb") == 0) {
+			targetPath = targetPath.Left(targetPath.GetLength() - 4);
 		}
-		::SetCurrentDirectory(buf);
-		if (IDCANCEL==result) {
-			return;
-		}
-
-		targetPath = fileDlg.GetPathName();
-		if (fileDlg.m_ofn.nFilterIndex == 2 && !ScriptJson_IsJsonPath(targetPath)) {
-			if (targetPath.Right(4).CompareNoCase(".scb") == 0) {
-				targetPath = targetPath.Left(targetPath.GetLength() - 4);
+		targetPath += ".json";
+		// The dialog only confirmed overwriting the name it returned
+		if (::GetFileAttributes(targetPath) != INVALID_FILE_ATTRIBUTES) {
+			CString ask;
+			ask.Format("%s already exists.\nDo you want to replace it?", (LPCSTR)targetPath);
+			if (::AfxMessageBox(ask, MB_YESNO | MB_ICONWARNING) != IDYES) {
+				return;
 			}
-			targetPath += ".json";
 		}
 	}
 	ScriptJsonExportFile exportFile(targetPath);
@@ -3458,29 +3467,79 @@ void ScriptDialog::OnLoad()
 	if (char *pEnd = strrchr(buf, '\\')) {
 		*pEnd = 0;
 	}
-	CWorldBuilderDoc* pDoc = CWorldBuilderDoc::GetActiveDoc();
 	::SetCurrentDirectory(buf);
 	if (IDCANCEL==result) {
 		return;
 	}
 
-	CString path = fileDlg.GetPathName();
+	if (!importScriptFile(fileDlg.GetPathName())) {
+		return;
+	}
+	for (Int i = 0; i < m_sides.getNumSides(); i++) {
+		// Make sure that the dialog tree is updated.
+		ScriptList *pSL = m_sides.getSideInfo(i)->getScriptList();
+		reloadPlayer(i, pSL);
+		updateIcons(TVI_ROOT);
+	}
+}
+
+/**
+* ScriptDialog::importScriptFile - read an exported .scb or .json into the editor's players.
+* Asks whether to edit the file itself or merge it into the map; false when nothing was imported.
+*/
+Bool ScriptDialog::importScriptFile(const CString &path)
+{
+	CWorldBuilderDoc* pDoc = CWorldBuilderDoc::GetActiveDoc();
 
 	ScriptJsonImportFile importFile;
 	if (!importFile.open(path)) {
 		::AfxMessageBox(importFile.error(), MB_OK | MB_ICONERROR);
-		return;
+		return false;
 	}
 
+	Int mode = ::AfxMessageBox(
+		"Edit this script file?\n\n"
+		"Yes: replace this map's players, teams and scripts with the file's, so Export Scripts "
+		"saves back to the file. Undo restores the map's own. Needs a map without player-owned objects.\n\n"
+		"No: merge the scripts into this map.",
+		MB_YESNOCANCEL | MB_ICONQUESTION);
+	if (mode == IDCANCEL) {
+		return false;
+	}
+	if (mode == IDYES) {
+		Int owned = countOwnedObjects();
+		if (owned > 0) {
+			CString msg;
+			msg.Format("Editing a script file replaces every team, and this map has %d objects owned by its teams.\n\n"
+				"Open a new map first, or import again and choose No to merge.", owned);
+			::AfxMessageBox(msg, MB_OK | MB_ICONWARNING);
+			return false;
+		}
+	}
+	m_importEditFile = mode == IDYES;
+	m_importCreatedPlayers.clear();
+	m_importTeamIssues.clear();
+	Int i;
+	for (i = 0; i < MAX_PLAYER_COUNT; i++) {
+		m_readPlayerNames[i].clear();
+	}
+
+	Bool imported = false;
 	CachedFileInputStream theInputStream;
 	if (theInputStream.open(AsciiString(importFile.scbPath())))
 	try {
 		ChunkInputStream *pStrm = &theInputStream;
 		DataChunkInput file( pStrm );
+		if (m_importEditFile) {
+			// The file's players replace the map's; the commit below makes it one undoable step
+			m_sides.clear();
+			m_sides.validateSides();
+			ensureScriptLists();
+			m_editFileSides = false;
+			m_curSelection = ListType();
+		}
 		m_firstReadObject = nullptr;
 		m_firstTrigger = nullptr;
-		m_importCreatedPlayers.clear();
-		m_importTeamIssues.clear();
 		m_waypointBase = pDoc->getNextWaypointID();
 		m_maxWaypoint = m_waypointBase;
 		file.registerParser( "PlayerScriptsList", AsciiString::TheEmptyString, ScriptList::ParseScriptsDataChunk );
@@ -3493,17 +3552,24 @@ void ScriptDialog::OnLoad()
 			throw(ERROR_CORRUPT_FILE_FORMAT);
 		}
 		pDoc->setNextWaypointID(m_maxWaypoint);
+		if (m_importEditFile) {
+			ensureScriptLists();
+		}
 
-		CWorldBuilderDoc* pDoc = CWorldBuilderDoc::GetActiveDoc();
 		SidesListUndoable *pUndo = new SidesListUndoable(m_sides, pDoc);
 		pDoc->AddAndDoUndoable(pUndo);
 		REF_PTR_RELEASE(pUndo); // belongs to pDoc now.
 		m_sides = *TheSidesList;
+#ifdef RTS_HAS_QT
+		// The import committed app-level and re-seeded the working copy; editor-local
+		// snapshots from before it would desync the two, so drop them.
+		qtClearUndoHistory();
+#endif
 
 		if (m_firstReadObject) {
-			AddObjectUndoable *pUndo = new AddObjectUndoable(pDoc, m_firstReadObject);
-			pDoc->AddAndDoUndoable(pUndo);
-			REF_PTR_RELEASE(pUndo); // belongs to pDoc now.
+			AddObjectUndoable *pObjUndo = new AddObjectUndoable(pDoc, m_firstReadObject);
+			pDoc->AddAndDoUndoable(pObjUndo);
+			REF_PTR_RELEASE(pObjUndo); // belongs to pDoc now.
 			m_firstReadObject = nullptr; // undoable owns it now.
 		}
 		PolygonTrigger *pTrig;
@@ -3516,24 +3582,30 @@ void ScriptDialog::OnLoad()
 
 		ScriptList *scripts[MAX_PLAYER_COUNT];
 		Int count = ScriptList::getReadScripts(scripts);
-		Int i;
 		for (i=0; i<count; i++) {
-			if (scripts[i]->getScript() == nullptr && scripts[i]->getScriptGroup()==nullptr) continue;
+			if (scripts[i]->getScript() == nullptr && scripts[i]->getScriptGroup()==nullptr) {
+				deleteInstance(scripts[i]);
+				scripts[i] = nullptr;
+				continue;
+			}
 			Int curSide = -1;
-			if (count==1) {
+			if (count==1 && !m_importEditFile) {
 				curSide = m_curSelection.m_playerIndex;
 			} else {
 				Int j;
 				for (j=0; j<m_sides.getNumSides(); j++) {
-					// Using i as an index assumes that i < m_sides.getNumSides.  Is that safe???
- 					AsciiString name = m_sides.getSideInfo(j)->getDict()->getAsciiString(TheKey_playerName);
+					AsciiString name = m_sides.getSideInfo(j)->getDict()->getAsciiString(TheKey_playerName);
 					if (name == m_readPlayerNames[i]) {
 						curSide = j;
 						break;
 					}
 				}
+				if (curSide == -1 && m_importEditFile) {
+					// A partial export names no players, so its scripts go to Neutral
+					curSide = 0;
+				}
 				if (curSide == -1) {
-					CString msg = "Could not find player";
+					CString msg = "Could not find player ";
 					msg += m_readPlayerNames[i].str();
 					msg += ", discarding scripts for this player.";
 					::AfxMessageBox(msg);
@@ -3571,25 +3643,69 @@ void ScriptDialog::OnLoad()
 				scripts[i]->discard(); /* Frees the script list, but none of it's children, as they have been
 															copied into the current scripts. */
 				scripts[i] = nullptr;
-				//reloadPlayer(curSide, pSL);
 			} else {
 				deleteInstance(scripts[i]);
 				scripts[i] = nullptr;
 			}
 		}
 
-		for (i = 0; i < m_sides.getNumSides(); i++) {
-			// Make sure that the dialog tree is updated.
-			ScriptList *pSL = m_sides.getSideInfo(i)->getScriptList();
-			reloadPlayer(i, pSL);
-			updateIcons(TVI_ROOT);
+		if (m_importEditFile) {
+			m_editFilePath = path;
+			m_editFileDocPath = pDoc->GetPathName();
+			m_editFilePlayers.clear();
+			for (i = 0; i < TheSidesList->getNumSides(); i++) {
+				m_editFilePlayers.push_back(TheSidesList->getSideInfo(i)->getDict()->getAsciiString(TheKey_playerName));
+			}
 		}
 		showImportReport(path);
-
-
+		imported = true;
 	} catch(...) {
-   	  	DEBUG_CRASH(("threw exception in ScriptDialog::OnLoad"));
+		DEBUG_CRASH(("threw exception in ScriptDialog::importScriptFile"));
+		if (m_importEditFile) {
+			m_sides = *TheSidesList;
+		}
 	}
+	m_importEditFile = false;
+	return imported;
+}
+
+/**
+* ScriptDialog::countOwnedObjects - count map objects on a team other than the neutral one.
+*/
+Int ScriptDialog::countOwnedObjects()
+{
+	Int count = 0;
+	for (MapObject *pObj = MapObject::getFirstMapObject(); pObj; pObj = pObj->getNext()) {
+		if (pObj->isWaypoint()) {
+			continue;
+		}
+		AsciiString owner = pObj->getProperties()->getAsciiString(TheKey_originalOwner);
+		if (!owner.isEmpty() && owner != NEUTRAL_TEAM_INTERNAL_STR) {
+			count++;
+		}
+	}
+	return count;
+}
+
+/**
+* ScriptDialog::editFileStillOpen - true while the map still holds the players the edited file brought.
+* Undo or another map replaces them, and then Export must not offer to save over the file.
+*/
+Bool ScriptDialog::editFileStillOpen()
+{
+	CWorldBuilderDoc* pDoc = CWorldBuilderDoc::GetActiveDoc();
+	if (pDoc == nullptr || pDoc->GetPathName() != m_editFileDocPath) {
+		return false;
+	}
+	if (TheSidesList->getNumSides() != (Int)m_editFilePlayers.size()) {
+		return false;
+	}
+	for (Int i = 0; i < TheSidesList->getNumSides(); i++) {
+		if (TheSidesList->getSideInfo(i)->getDict()->getAsciiString(TheKey_playerName) != m_editFilePlayers[i]) {
+			return false;
+		}
+	}
+	return true;
 }
 
 /**
