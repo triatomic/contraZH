@@ -818,7 +818,7 @@ void ConnectionManager::processRunAheadMetrics(NetRunAheadMetricsCommandMsg *msg
 	if (isPlayerConnected(playerID)) {
 		m_latencyAverages[playerID] = msg->getAverageLatency();
 		m_fpsAverages[playerID] = msg->getAverageFps();
-		//DEBUG_LOG(("ConnectionManager::processRunAheadMetrics - player %d, fps = %d, latency = %f", player, msg->getAverageFps(), msg->getAverageLatency()));
+		//DEBUG_LOG(("ConnectionManager::processRunAheadMetrics - player %d, fps = %d, latency = %f", playerID, msg->getAverageFps(), msg->getAverageLatency()));
 #if defined(GENERALS_ONLINE)
 		// NGMP_CHANGE: Modern machines render games at much higher framerates, 100 is no longer only achievable when a game is in the background
 		if (m_fpsAverages[playerID] > 1000) {
