@@ -19,6 +19,7 @@
 #include "Common/WellKnownKeys.h"	// TheKey_playerName (force-rename pass)
 #include "Common/DataChunk.h"		// DataChunkInput (import)
 #include "Common/FileSystem.h"		// CachedFileInputStream (import)
+#include "ScriptJson.h"				// .json script files (import)
 #include "qt/WBQtPanelBridge.h"
 #include "qt/panels/WBQtScriptEditBridge.h"	// WBQtScriptEdit_Run (new/edit script sheet)
 #include "qt/panels/WBQtParamBridge.h"		// WBQtEditGroup_Run (edit folder dialog)
@@ -1204,7 +1205,7 @@ void ScriptDialog::qtMSetCheckbox(int which, int checked)
 void ScriptDialog::qtMImportScripts(void)
 {
 	CFileDialog fileDlg(true, ".scb", NULL, 0,
-		"Script files (.scb)|*.scb||", this);
+		"Script files (.scb, .json)|*.scb;*.json||", this);
 
 	Int result = fileDlg.DoModal();
 
@@ -1230,11 +1231,41 @@ void ScriptDialog::qtMImportScripts(void)
 
 	CString path = fileDlg.GetPathName();
 
+	ScriptJsonImportFile importFile;
+	if (!importFile.open(path))
+	{
+		::AfxMessageBox(importFile.error(), MB_OK | MB_ICONERROR);
+		return;
+	}
+
+	Int mode = ::AfxMessageBox(
+		"Edit this script file?\n\n"
+		"Yes: replace this map's players, teams and scripts with the file's, so Export Scripts "
+		"saves back to the file. Undo restores the map's own. Best on an empty map.\n\n"
+		"No: merge the scripts into this map.",
+		MB_YESNOCANCEL | MB_ICONQUESTION);
+	if (mode == IDCANCEL)
+	{
+		return;
+	}
+	m_importEditFile = mode == IDYES;
+	m_importCreatedPlayers.clear();
+	m_importTeamIssues.clear();
+
 	CachedFileInputStream theInputStream;
-	if (theInputStream.open(AsciiString(path)))
+	if (theInputStream.open(AsciiString(importFile.scbPath())))
 	try {
 		ChunkInputStream *pStrm = &theInputStream;
 		DataChunkInput file( pStrm );
+		if (m_importEditFile)
+		{
+			// The file's players replace the map's; the commit below makes it one undoable step
+			m_sides.clear();
+			m_sides.validateSides();
+			ensureScriptLists();
+			m_editFileSides = false;
+			m_curSelection = ListType();
+		}
 		m_firstReadObject = NULL;
 		m_firstTrigger = NULL;
 		m_waypointBase = pDoc->getNextWaypointID();
@@ -1250,6 +1281,10 @@ void ScriptDialog::qtMImportScripts(void)
 			throw(ERROR_CORRUPT_FILE_FORMAT);
 		}
 		pDoc->setNextWaypointID(m_maxWaypoint);
+		if (m_importEditFile)
+		{
+			ensureScriptLists();
+		}
 
 		SidesListUndoable *pUndo = new SidesListUndoable(m_sides, pDoc);
 		pDoc->AddAndDoUndoable(pUndo);
@@ -1285,7 +1320,7 @@ void ScriptDialog::qtMImportScripts(void)
 				continue;
 			}
 			Int curSide = -1;
-			if (count==1)
+			if (count==1 && !m_importEditFile)
 			{
 				curSide = m_curSelection.m_playerIndex;
 			}
@@ -1294,13 +1329,17 @@ void ScriptDialog::qtMImportScripts(void)
 				Int j;
 				for (j=0; j<m_sides.getNumSides(); j++)
 				{
-					// Using i as an index assumes that i < m_sides.getNumSides.  Is that safe???
-					AsciiString name = m_sides.getSideInfo(i)->getDict()->getAsciiString(TheKey_playerName);
-					if (name == m_readPlayerNames[j])
+					AsciiString name = m_sides.getSideInfo(j)->getDict()->getAsciiString(TheKey_playerName);
+					if (name == m_readPlayerNames[i])
 					{
 						curSide = j;
 						break;
 					}
+				}
+				if (curSide == -1 && m_importEditFile)
+				{
+					// A partial export names no players, so its scripts go to Neutral
+					curSide = 0;
 				}
 				if (curSide == -1)
 				{
@@ -1345,9 +1384,19 @@ void ScriptDialog::qtMImportScripts(void)
 				scripts[i] = NULL;
 			}
 		}
+		if (m_importEditFile)
+		{
+			m_editFilePath = path;
+		}
+		showImportReport(path);
 	} catch(...) {
 		DEBUG_CRASH(("threw exception in ScriptDialog::qtMImportScripts"));
+		if (m_importEditFile)
+		{
+			m_sides = *TheSidesList;
+		}
 	}
+	m_importEditFile = false;
 }
 
 extern "C" {

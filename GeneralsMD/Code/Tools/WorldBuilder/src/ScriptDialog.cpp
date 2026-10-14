@@ -38,7 +38,9 @@
 #include "EditGroup.h"
 #include "EditParameter.h"
 #include "ExportScriptsOptions.h"
+#include "ScriptJson.h"
 #include "Common/ThingFactory.h"
+#include "Common/PlayerTemplate.h"
 #include "WaypointOptions.h"
 #include "Common/UnicodeString.h"
 #include "MainFrm.h"
@@ -203,6 +205,8 @@ ScriptDialog::ScriptDialog(CWnd* pParent /*=nullptr*/)
 	m_bNewIcons = false;
 	m_bSmartCopyEnabled = false;
 	m_bAutoMergeScripts = false;
+	m_importEditFile = false;
+	m_editFileSides = false;
 	//{{AFX_DATA_INIT(ScriptDialog)
 		// NOTE: the ClassWizard will add member initialization here
 	//}}AFX_DATA_INIT
@@ -3159,24 +3163,39 @@ void ScriptDialog::OnSave()
 	Bool doTeams = true;
 	Int	 i;
 
+	Bool saveToEditFile = false;
+	if (!m_editFilePath.IsEmpty()) {
+		CString ask;
+		ask.Format("Save the scripts back to %s?\n\nNo exports to another file instead.", (LPCSTR)m_editFilePath);
+		Int answer = ::AfxMessageBox(ask, MB_YESNOCANCEL | MB_ICONQUESTION);
+		if (answer == IDCANCEL) {
+			return;
+		}
+		saveToEditFile = answer == IDYES;
+	}
+
+	if (saveToEditFile) {
+		doSides = m_editFileSides;
+	} else {
 #ifdef RTS_HAS_QT
-	if (WBQtExportScriptsOptions_Run(::AfxGetMainWnd()->GetSafeHwnd()) == 0)
-	{
-		return;
-	}
-	ExportScriptsOptions optionsDlg;
+		if (WBQtExportScriptsOptions_Run(::AfxGetMainWnd()->GetSafeHwnd()) == 0)
+		{
+			return;
+		}
+		ExportScriptsOptions optionsDlg;
 #else
-	ExportScriptsOptions optionsDlg;
-	if (IDCANCEL == optionsDlg.DoModal()) {
-		return;
-	}
+		ExportScriptsOptions optionsDlg;
+		if (IDCANCEL == optionsDlg.DoModal()) {
+			return;
+		}
 #endif
-	doWaypoints = optionsDlg.getDoWaypoints();
-	doUnits = optionsDlg.getDoUnits();
-	doTeams = optionsDlg.getDoTeams(); // you'll implement this getter
-	doTriggerAreas = optionsDlg.getDoTriggers();
-	doAllScripts = optionsDlg.getDoAllScripts();
-	doSides = optionsDlg.getDoSides();
+		doWaypoints = optionsDlg.getDoWaypoints();
+		doUnits = optionsDlg.getDoUnits();
+		doTeams = optionsDlg.getDoTeams(); // you'll implement this getter
+		doTriggerAreas = optionsDlg.getDoTriggers();
+		doAllScripts = optionsDlg.getDoAllScripts();
+		doSides = optionsDlg.getDoSides();
+	}
 
 	Script *pScript = getCurScript();
 	ScriptGroup *pGroup = getCurGroup();
@@ -3186,20 +3205,36 @@ void ScriptDialog::OnSave()
 		scripts[i] = nullptr;
 	}
 
-	CFileDialog fileDlg(false, ".scb", nullptr, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
-		"Script files (.scb)|*.scb||", this);
+	CString targetPath = m_editFilePath;
+	if (!saveToEditFile) {
+		CFileDialog fileDlg(false, ".scb", nullptr, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
+			"Script files (.scb)|*.scb|Script JSON (.json)|*.json||", this);
 
-	Int result = fileDlg.DoModal();
+		Int result = fileDlg.DoModal();
 
-	// Open document dialog may change working directory,
-	// change it back.
-	char buf[_MAX_PATH];
-	::GetModuleFileName(nullptr, buf, sizeof(buf));
-	if (char *pEnd = strrchr(buf, '\\')) {
-		*pEnd = 0;
+		// Open document dialog may change working directory,
+		// change it back.
+		char buf[_MAX_PATH];
+		::GetModuleFileName(nullptr, buf, sizeof(buf));
+		if (char *pEnd = strrchr(buf, '\\')) {
+			*pEnd = 0;
+		}
+		::SetCurrentDirectory(buf);
+		if (IDCANCEL==result) {
+			return;
+		}
+
+		targetPath = fileDlg.GetPathName();
+		if (fileDlg.m_ofn.nFilterIndex == 2 && !ScriptJson_IsJsonPath(targetPath)) {
+			if (targetPath.Right(4).CompareNoCase(".scb") == 0) {
+				targetPath = targetPath.Left(targetPath.GetLength() - 4);
+			}
+			targetPath += ".json";
+		}
 	}
-	::SetCurrentDirectory(buf);
-	if (IDCANCEL==result) {
+	ScriptJsonExportFile exportFile(targetPath);
+	if (!exportFile.isValid()) {
+		::AfxMessageBox(exportFile.error(), MB_OK | MB_ICONERROR);
 		return;
 	}
 
@@ -3264,7 +3299,7 @@ void ScriptDialog::OnSave()
 	}
 
 
-	CString path = fileDlg.GetPathName();
+	CString path = exportFile.scbPath();
 
 	CFile theFile(path, CFile::modeCreate|CFile::modeWrite|CFile::shareDenyWrite|CFile::typeBinary);
 	try {
@@ -3404,12 +3439,15 @@ void ScriptDialog::OnSave()
 		deleteInstance(scripts[0]);
 	}
 	theFile.Close();
+	if (!exportFile.finish()) {
+		::AfxMessageBox(exportFile.error(), MB_OK | MB_ICONERROR);
+	}
 }
 
 void ScriptDialog::OnLoad()
 {
 	CFileDialog fileDlg(true, ".scb", nullptr, 0,
-		"Script files (.scb)|*.scb||", this);
+		"Script files (.scb, .json)|*.scb;*.json||", this);
 
 	Int result = fileDlg.DoModal();
 
@@ -3428,13 +3466,21 @@ void ScriptDialog::OnLoad()
 
 	CString path = fileDlg.GetPathName();
 
+	ScriptJsonImportFile importFile;
+	if (!importFile.open(path)) {
+		::AfxMessageBox(importFile.error(), MB_OK | MB_ICONERROR);
+		return;
+	}
+
 	CachedFileInputStream theInputStream;
-	if (theInputStream.open(AsciiString(path)))
+	if (theInputStream.open(AsciiString(importFile.scbPath())))
 	try {
 		ChunkInputStream *pStrm = &theInputStream;
 		DataChunkInput file( pStrm );
 		m_firstReadObject = nullptr;
 		m_firstTrigger = nullptr;
+		m_importCreatedPlayers.clear();
+		m_importTeamIssues.clear();
 		m_waypointBase = pDoc->getNextWaypointID();
 		m_maxWaypoint = m_waypointBase;
 		file.registerParser( "PlayerScriptsList", AsciiString::TheEmptyString, ScriptList::ParseScriptsDataChunk );
@@ -3538,6 +3584,7 @@ void ScriptDialog::OnLoad()
 			reloadPlayer(i, pSL);
 			updateIcons(TVI_ROOT);
 		}
+		showImportReport(path);
 
 
 	} catch(...) {
@@ -3668,13 +3715,24 @@ Bool ScriptDialog::ParseTeamsDataChunk(DataChunkInput &file, DataChunkInfo *info
 	while (!file.atEndOfChunk()) {
 		Dict teamDict = file.readDict();
 		AsciiString teamName = teamDict.getAsciiString(TheKey_teamName);
-		if (pThis->m_sides.findTeamInfo(teamName)) {
+		TeamsInfo *existing = pThis->m_sides.findTeamInfo(teamName);
+		if (existing) {
+			// An edited file's default teams were made with its players; take the file's settings
+			if (pThis->m_importEditFile) {
+				*existing->getDict() = teamDict;
+			}
 			continue;
 		}
 		DEBUG_LOG(("Adding team %s", teamName.str()));
 		AsciiString player = teamDict.getAsciiString(TheKey_teamOwner);
 		if (pThis->m_sides.findSideInfo(player)) {
 			// player exists, so just add it.
+			pThis->m_sides.addTeam(&teamDict);
+		} else if (pThis->m_importEditFile) {
+			AsciiString issue;
+			issue.format("%s: player %s is not in the file, moved to Neutral", teamName.str(), player.str());
+			pThis->m_importTeamIssues.push_back(issue);
+			teamDict.setAsciiString(TheKey_teamOwner, AsciiString::TheEmptyString);
 			pThis->m_sides.addTeam(&teamDict);
 		} else {
 			AsciiString warning;
@@ -3707,6 +3765,11 @@ Bool ScriptDialog::ParseTeamsDataChunk(DataChunkInput &file, DataChunkInfo *info
 				// player doesn't exist, so add it to the neutral player.
 				teamDict.setAsciiString(TheKey_teamOwner, neutralPlayerName);
 			}
+			AsciiString newOwner = teamDict.getAsciiString(TheKey_teamOwner);
+			AsciiString issue;
+			issue.format("%s: player %s does not exist, moved to %s", teamName.str(), player.str(),
+				newOwner.isEmpty() ? "Neutral" : newOwner.str());
+			pThis->m_importTeamIssues.push_back(issue);
 			pThis->m_sides.addTeam(&teamDict);
 		}
 	}
@@ -3729,9 +3792,20 @@ Bool ScriptDialog::ParsePlayersDataChunk(DataChunkInput &file, DataChunkInfo *in
 	}
 	Int numNames = file.readInt();
 	Int i;
+	if (pThis->m_importEditFile) {
+		pThis->m_editFileSides = readDicts != 0;
+	}
 	for (i=0; i<numNames; i++) {
 		if (i>=MAX_PLAYER_COUNT) break;
 		pThis->m_readPlayerNames[i] = file.readAsciiString();
+		if (pThis->m_importEditFile) {
+			Dict sideDict;
+			if (readDicts) {
+				sideDict = file.readDict();
+			}
+			pThis->addEditFilePlayer(pThis->m_readPlayerNames[i], readDicts ? &sideDict : nullptr);
+			continue;
+		}
 		if (readDicts) {
 			Dict sideDict = file.readDict();
 			bool nameFound = false;
@@ -3756,8 +3830,104 @@ Bool ScriptDialog::ParsePlayersDataChunk(DataChunkInput &file, DataChunkInfo *in
 			}
 		}
 	}
+	if (pThis->m_importEditFile) {
+		pThis->m_sides.validateSides();
+		pThis->ensureScriptLists();
+	}
 	DEBUG_ASSERTCRASH(file.atEndOfChunk(), ("Unexpected data left over."));
 	return true;
+}
+
+/**
+* ScriptDialog::addEditFilePlayer - add a player named by an edited script file.
+* A file without player data gets the faction its name implies.
+*/
+void ScriptDialog::addEditFilePlayer(const AsciiString &name, const Dict *fileDict)
+{
+	if (name.isEmpty() || name == "**SELECTION**" || m_sides.findSideInfo(name)) {
+		return;
+	}
+	Dict sideDict;
+	if (fileDict) {
+		sideDict = *fileDict;
+	} else {
+		AsciiString faction("Faction");
+		if (name.startsWith("Skirmish")) {
+			faction.concat(name.str() + 8);
+		} else if (name.startsWith("Plyr")) {
+			faction.concat(name.str() + 4);
+		} else {
+			faction.concat(name);
+		}
+		if (ThePlayerTemplateStore->findPlayerTemplate(NAMEKEY(faction)) == nullptr) {
+			faction.clear();
+		}
+		UnicodeString displayName;
+		displayName.translate(name);
+		sideDict.setAsciiString(TheKey_playerName, name);
+		sideDict.setBool(TheKey_playerIsHuman, false);
+		sideDict.setUnicodeString(TheKey_playerDisplayName, displayName);
+		sideDict.setAsciiString(TheKey_playerFaction, faction);
+		sideDict.setAsciiString(TheKey_playerEnemies, AsciiString::TheEmptyString);
+		sideDict.setAsciiString(TheKey_playerAllies, AsciiString::TheEmptyString);
+	}
+	m_sides.addSide(&sideDict);
+	m_sides.findSideInfo(name)->setScriptList(newInstance(ScriptList));
+
+	AsciiString faction = sideDict.getAsciiString(TheKey_playerFaction);
+	AsciiString line;
+	line.format("%s (%s)", name.str(), faction.isEmpty() ? "no faction" : faction.str());
+	m_importCreatedPlayers.push_back(line);
+}
+
+/**
+* ScriptDialog::ensureScriptLists - give every player a script list; the editor assumes one.
+*/
+void ScriptDialog::ensureScriptLists()
+{
+	for (Int i = 0; i < m_sides.getNumSides(); i++) {
+		if (m_sides.getSideInfo(i)->getScriptList() == nullptr) {
+			m_sides.getSideInfo(i)->setScriptList(newInstance(ScriptList));
+		}
+	}
+}
+
+/**
+* ScriptDialog::showImportReport - list what an import did with each team's owner.
+*/
+void ScriptDialog::showImportReport(const CString &path)
+{
+	const size_t MAX_LINES = 40;
+	CString name = path.Mid(path.ReverseFind('\\') + 1);
+	CString msg;
+	msg.Format(m_importEditFile ? "Editing %s." : "Imported %s.", (LPCSTR)name);
+	if (!m_importCreatedPlayers.empty()) {
+		msg += "\n\nPlayers created from the file:";
+		for (size_t i = 0; i < m_importCreatedPlayers.size(); i++) {
+			msg += "\n  ";
+			msg += m_importCreatedPlayers[i].str();
+		}
+	}
+	if (m_importTeamIssues.empty()) {
+		msg += "\n\nEvery team's owner player exists.";
+	} else {
+		CString head;
+		head.Format("\n\n%d teams had a missing owner player:", (int)m_importTeamIssues.size());
+		msg += head;
+		for (size_t i = 0; i < m_importTeamIssues.size() && i < MAX_LINES; i++) {
+			msg += "\n  ";
+			msg += m_importTeamIssues[i].str();
+		}
+		if (m_importTeamIssues.size() > MAX_LINES) {
+			CString more;
+			more.Format("\n  ...and %d more", (int)(m_importTeamIssues.size() - MAX_LINES));
+			msg += more;
+		}
+	}
+	if (m_importEditFile) {
+		msg += "\n\nExport Scripts saves back to the file. Undo restores the map's own players and scripts.";
+	}
+	::AfxMessageBox(msg, MB_OK | (m_importTeamIssues.empty() ? MB_ICONINFORMATION : MB_ICONWARNING));
 }
 
 /**
