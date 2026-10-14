@@ -1600,6 +1600,12 @@ void ActiveBody::onJammingChange( Bool isNowJammed )
 			me->clearStatus(MAKE_OBJECT_STATUS_MASK(OBJECT_STATUS_UNSELECTABLE));
 		}
 		m_jammingSetUnselectable = FALSE;
+
+		AIUpdateInterface *ai = me->getAI();
+		if( ai )
+		{
+			ai->releaseJammedOrder();
+		}
 	}
 }
 

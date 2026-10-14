@@ -5992,6 +5992,15 @@ void Object::doCommandButton( const CommandButton *commandButton, CommandSourceT
 		return;
 
 	AIUpdateInterface *ai = getAIUpdateInterface();
+	if( ai && cmdSource == CMD_FROM_SCRIPT )
+	{
+		AICommandParms parms( AICMD_COMMANDBUTTON, cmdSource );
+		parms.m_commandButton = commandButton;
+		if( ai->holdOrderWhileJammed( &parms ) )
+		{
+			return;
+		}
+	}
 	if( commandButton )
 	{
 		switch( commandButton->getCommandType() )
@@ -6157,6 +6166,16 @@ void Object::doCommandButtonAtObject( const CommandButton *commandButton, Object
 		return;
 
 	AIUpdateInterface *ai = getAIUpdateInterface();
+	if( ai && cmdSource == CMD_FROM_SCRIPT )
+	{
+		AICommandParms parms( AICMD_COMMANDBUTTON_OBJ, cmdSource );
+		parms.m_commandButton = commandButton;
+		parms.m_obj = obj;
+		if( ai->holdOrderWhileJammed( &parms ) )
+		{
+			return;
+		}
+	}
 	if( commandButton )
 	{
 		switch( commandButton->getCommandType() )
@@ -6289,6 +6308,16 @@ void Object::doCommandButtonAtPosition( const CommandButton *commandButton, cons
 		return;
 
 	AIUpdateInterface *ai = getAIUpdateInterface();
+	if( ai && cmdSource == CMD_FROM_SCRIPT && pos )
+	{
+		AICommandParms parms( AICMD_COMMANDBUTTON_POS, cmdSource );
+		parms.m_commandButton = commandButton;
+		parms.m_pos = *pos;
+		if( ai->holdOrderWhileJammed( &parms ) )
+		{
+			return;
+		}
+	}
 	if( commandButton )
 	{
 		switch( commandButton->getCommandType() )

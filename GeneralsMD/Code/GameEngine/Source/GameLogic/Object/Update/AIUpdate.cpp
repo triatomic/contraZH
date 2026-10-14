@@ -67,6 +67,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
+#include "GameLogic/ScriptCLP.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/TurretAI.h"
 #include "GameLogic/Weapon.h"
@@ -389,6 +390,10 @@ AIUpdateInterface::AIUpdateInterface( Thing *thing, const ModuleData* moduleData
 	m_loadTurnRateFactor = 1.0f;
 	m_loadAccelFactor = 1.0f;
 	m_loadLiftFactor = 1.0f;
+
+	// AICommandParmsStorage has no constructor, and its doXfer keeps stale pointers on load.
+	m_jammedOrder.store(AICommandParms(AICMD_IDLE, CMD_FROM_SCRIPT));
+	m_jammedOrderPlayer = -1;
 
 	// ---------------------------------------------
 
@@ -2916,8 +2921,78 @@ Bool AIUpdateInterface::isAllowedToRespondToAiCommands(const AICommandParms* par
   // ALLOWING ONLY THE SPECTREUPDATE TO COMMAND IT VIA CMD_FROM_AI
   // AUTHOR, LORENZEN... 5/15/03
 
+	if (holdOrderWhileJammed(parms))
+	{
+		return FALSE;
+	}
 
 	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool AIUpdateInterface::holdOrderWhileJammed(const AICommandParms* parms) const
+{
+	if (parms->m_cmdSource != CMD_FROM_SCRIPT)
+	{
+		return FALSE;
+	}
+	const Object *obj = getObject();
+	const BodyModuleInterface *body = obj->getBodyModule();
+	if (!body || !body->isJammed())
+	{
+		return FALSE;
+	}
+	const Player *player = obj->getControllingPlayer();
+	if (!clpAIPlaysFair(player))
+	{
+		return FALSE;
+	}
+	m_jammedOrder.store(*parms);
+	m_jammedOrderPlayer = player->getPlayerIndex();
+	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+void AIUpdateInterface::releaseJammedOrder()
+{
+	if (m_jammedOrderPlayer < 0)
+	{
+		return;
+	}
+	Object *obj = getObject();
+	const Player *player = obj->getControllingPlayer();
+	Bool sameOwner = player && player->getPlayerIndex() == m_jammedOrderPlayer;
+	m_jammedOrderPlayer = -1;
+	if (!sameOwner)
+	{
+		return;
+	}
+
+	AICommandParms parms(AICMD_IDLE, CMD_FROM_SCRIPT);
+	m_jammedOrder.reconstitute(parms);
+
+	// AICommandParmsStorage::doXfer does not save the command source.
+	parms.m_cmdSource = CMD_FROM_SCRIPT;
+
+	// AIUpdate only implements command buttons for combat drop, so these go back through Object.
+	switch (parms.m_cmd)
+	{
+		case AICMD_COMMANDBUTTON:
+			obj->doCommandButton(parms.m_commandButton, CMD_FROM_SCRIPT);
+			break;
+		case AICMD_COMMANDBUTTON_OBJ:
+			if (parms.m_obj)
+			{
+				obj->doCommandButtonAtObject(parms.m_commandButton, parms.m_obj, CMD_FROM_SCRIPT);
+			}
+			break;
+		case AICMD_COMMANDBUTTON_POS:
+			obj->doCommandButtonAtPosition(parms.m_commandButton, &parms.m_pos, CMD_FROM_SCRIPT);
+			break;
+		default:
+			aiDoCommand(&parms);
+			break;
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -5583,6 +5658,7 @@ void AIUpdateInterface::crc( Xfer *x )
 	* 6: Added m_forceMoveBackwards (REVERSE_MOVE order)
 	* 7: Added m_isHoldingFire (HOLD_FIRE stance)
 	* 8: Added the queued shots (OCL Attack FireRegardlessOfOrders)
+	* 10: Added the order held while jammed
 	*/
 // ------------------------------------------------------------------------------------------------
 void AIUpdateInterface::xfer( Xfer *xfer )
@@ -5591,7 +5667,7 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 #if RETAIL_COMPATIBLE_CRC || RETAIL_COMPATIBLE_XFER_SAVE
 	const XferVersion currentVersion = 4;
 #else
-	const XferVersion currentVersion = 9;
+	const XferVersion currentVersion = 10;
 #endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
@@ -5840,6 +5916,15 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 	if (version >= 9)
 	{
 		xfer->xferReal(&m_liftMultiplier);
+	}
+
+	if (version >= 10)
+	{
+		xfer->xferInt(&m_jammedOrderPlayer);
+		if (m_jammedOrderPlayer >= 0)
+		{
+			m_jammedOrder.doXfer(xfer);
+		}
 	}
 
 }

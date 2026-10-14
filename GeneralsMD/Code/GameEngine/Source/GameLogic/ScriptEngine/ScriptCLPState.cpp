@@ -215,7 +215,7 @@ Bool clpIsSeenByPlayer(const Object *obj, const Player *player)
 }
 
 //-------------------------------------------------------------------------------------------------
-Bool clpAIRespectsFog(const Player *player)
+Bool clpAIPlaysFair(const Player *player)
 {
 	return player && player->getPlayerType() == PLAYER_COMPUTER && !TheGameLogic->isInSinglePlayerGame();
 }
@@ -223,7 +223,7 @@ Bool clpAIRespectsFog(const Player *player)
 //-------------------------------------------------------------------------------------------------
 Bool clpIsFairAITarget(const Object *obj, const Player *player)
 {
-	if (!clpAIRespectsFog(player))
+	if (!clpAIPlaysFair(player))
 	{
 		return TRUE;
 	}

@@ -1290,7 +1290,7 @@ Bool AIPlayer::computeSuperweaponTarget(const SpecialPowerTemplate *power, Coord
 		return false;
 
 	// Nothing the AI can see is worth firing at.
-	if (cash <= 0 && clpAIRespectsFog(m_player))
+	if (cash <= 0 && clpAIPlaysFair(m_player))
 	{
 		return false;
 	}

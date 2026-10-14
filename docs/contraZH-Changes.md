@@ -303,6 +303,16 @@ hunt, scripts and an order given before the target went stealth.
 Changes the simulation.
 ([#115](https://github.com/triatomic/contraZH/issues/115))
 
+## Jammed AI units wait out the jam
+
+A human cannot order a jammed unit, because jamming makes it unselectable. Skirmish and
+multiplayer AI now plays by the same rule. A jammed unit ignores script orders, command-button
+abilities included, and keeps doing what it was doing. The newest order it missed runs when the
+jam ends. The campaign and challenge missions keep the old behavior.
+
+Changes the simulation.
+([#115](https://github.com/triatomic/contraZH/issues/115))
+
 # Maps
 
 ## Per-object scale

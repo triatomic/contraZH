@@ -656,6 +656,10 @@ public:
 	inline Real getLoadAccelFactor(void) const { return m_loadAccelFactor; }
 	inline Real getLoadLiftFactor(void) const { return m_loadLiftFactor; }
 
+	/// TRUE if a jammed unit of a fair-play computer player holds this script order until the jam ends.
+	Bool holdOrderWhileJammed(const AICommandParms* parms) const;
+	void releaseJammedOrder();
+
 protected:
 
 	/*
@@ -889,6 +893,9 @@ private:
 	Real        m_loadTurnRateFactor;
 	Real        m_loadAccelFactor;
 	Real        m_loadLiftFactor;
+
+	mutable AICommandParmsStorage m_jammedOrder;	///< newest script order held while jammed, stored from the const command gate
+	mutable Int m_jammedOrderPlayer;				///< player index that gave m_jammedOrder, -1 if none
 };
 
 //------------------------------------------------------------------------------------------------------------
