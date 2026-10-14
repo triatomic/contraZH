@@ -295,7 +295,7 @@ Notes:
 Each laser beam lights the terrain along its length with up to twelve dynamic lights in the beam's
 colour (house coloured when the laser asks). Terrain only; units, buildings and roads are not lit.
 The Direct3D 9 build lights it with a shader instead, see
-[Laser ground glow](dx9feat.md#laser-ground-glow).
+[Laser ground glow](dx9-Effect-Shaders.md#laser-ground-glow).
 
 * `LaserRef = No` - (Yes turns the glow on. Also `Lasers light the ground` on the Shaders page, applied
 on Accept. Needs `CheckLaserRef` in `OptionsMenu.wnd` for the menu control.)
@@ -316,7 +316,7 @@ laser's `OuterBeamWidth`, at least 15, plus a 6 unit soft edge. Long beams sprea
 * The terrain takes up to 64 dynamic lights a frame, of all kinds.
 * In the Direct3D 9 build, beams whose glows overlap light the ground together, so a spot several
 lasers hit brightens modestly instead of compounding. `LaserGroundGlowOverlap = No` in
-`GameData.ini` lights each beam on its own. See [Laser ground glow](dx9feat.md#laser-ground-glow).
+`GameData.ini` lights each beam on its own. See [Laser ground glow](dx9-Effect-Shaders.md#laser-ground-glow).
 
 ## Drag Selection
 
