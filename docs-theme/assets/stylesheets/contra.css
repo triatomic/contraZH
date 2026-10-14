@@ -434,3 +434,17 @@ body {
 .md-grid {
   max-width: 96rem;
 }
+
+/* Narrower sidebars leave more room for the page */
+
+@media screen and (min-width: 76.25em) {
+  .md-sidebar {
+    width: 10rem;
+  }
+}
+
+@media screen and (min-width: 60em) {
+  .md-sidebar--secondary {
+    width: 10rem;
+  }
+}
