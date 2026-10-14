@@ -249,6 +249,8 @@ public:
   inline void setMaxCameraHeight( Int maxCameraHeight );
   inline Bool getCoopBuildings() const;
   inline void setCoopBuildings( Bool coopBuildings );
+  inline Bool getQuickGame() const;
+  inline void setQuickGame( Bool quickGame );
 
 protected:
 	Int m_preorderMask;
@@ -273,6 +275,7 @@ protected:
   Bool m_oldFactionsOnly; // Only USA, China, GLA -- not USA Air Force General, GLA Toxic General, et al
   Int m_maxCameraHeight; // Shared camera limit for every player, 0 when the host set none
   Bool m_coopBuildings; // Allies may resume each other's construction
+  Bool m_quickGame; // Objects use their QuickGamePrerequisites
 };
 
 extern GameInfo *TheGameInfo;
@@ -298,6 +301,8 @@ Int         GameInfo::getMaxCameraHeight() const        { return m_maxCameraHeig
 void        GameInfo::setMaxCameraHeight( Int maxCameraHeight ) { m_maxCameraHeight = maxCameraHeight; }
 Bool        GameInfo::getCoopBuildings() const          { return m_coopBuildings; }
 void        GameInfo::setCoopBuildings( Bool coopBuildings ) { m_coopBuildings = coopBuildings; }
+Bool        GameInfo::getQuickGame() const              { return m_quickGame; }
+void        GameInfo::setQuickGame( Bool quickGame )     { m_quickGame = quickGame; }
 
 AsciiString GameInfoToAsciiString( const GameInfo *game );
 Bool ParseAsciiStringToGameInfo( GameInfo *game, AsciiString options );

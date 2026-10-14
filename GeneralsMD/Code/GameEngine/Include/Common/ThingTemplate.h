@@ -623,8 +623,9 @@ public:
 
 	BuildableStatus getBuildable() const;
 
-	Int getPrereqCount() const { return m_prereqInfo.size(); }
-	const ProductionPrerequisite *getNthPrereq(Int i) const { return &m_prereqInfo[i]; }
+	// Quick Game reads QuickGamePrerequisites when the object defines them
+	Int getPrereqCount() const { return getActivePrereqs().size(); }
+	const ProductionPrerequisite *getNthPrereq(Int i) const { return &getActivePrereqs()[i]; }
 
 	/**
 		return the BuildFacilityTemplate, if any.
@@ -711,6 +712,7 @@ protected:
 	static void parseArmorTemplateSet( INI* ini, void *instance, void *store, const void* /*userData*/ );
 	static void parseWeaponTemplateSet( INI* ini, void *instance, void *store, const void* /*userData*/ );
 	static void parsePrerequisites( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ );
+	static void parseQuickGamePrerequisites( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ );
 	static void parseModuleName(INI* ini, void *instance, void* /*store*/, const void* userData);
 	static void parseIntList(INI* ini, void *instance, void* store, const void* userData);
 	static void parseExperienceValueList(INI* ini, void *instance, void* store, const void* userData);
@@ -736,6 +738,8 @@ private:
 	static const FieldParse s_objectFieldParseTable[];		///< the parse table
 	static const FieldParse s_objectReskinFieldParseTable[];		///< the parse table
 	static AudioEventRTS s_audioEventNoSound;
+
+	const std::vector<ProductionPrerequisite>& getActivePrereqs() const;
 
 private:
 
@@ -779,6 +783,7 @@ private:
 
 	// ---- STL-sized things
 	std::vector<ProductionPrerequisite>	m_prereqInfo;				///< the unit Prereqs for this tech
+	std::vector<ProductionPrerequisite>	m_quickGamePrereqInfo;	///< the unit Prereqs in a Quick Game, used when m_hasQuickGamePrereqs
 	std::vector<AsciiString>						m_buildVariations;	/**< if we build a unit of this type via script or ui, randomly choose one
 																														of these templates instead. (doesn't apply to MapObject-created items) */
 	WeaponTemplateSetVector							m_weaponTemplateSets;					///< our weaponsets
@@ -841,6 +846,7 @@ private:
 	Bool					m_isBridge;										///< True if this model is a bridge.
  	Bool					m_isBuildFacility;						///< is this the build facility for something? (calculated based on other template's prereqs)
 	Bool					m_isTrainable;								///< Whether or not I can even gain experience
+	Bool					m_hasQuickGamePrereqs;				///< QuickGamePrerequisites was given, even if empty
 	Bool          m_enterGuard;									///< Whether or not I can enter objects when guarding
 	Bool          m_hijackGuard;								///< Whether or not I can hijack objects when guarding
 	Bool					m_isForbidden;								///< useful when overriding in <mapfile>.ini

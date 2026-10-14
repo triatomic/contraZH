@@ -396,6 +396,7 @@ void GameInfo::reset()
   m_startingCash = TheGlobalData->m_defaultStartingCash;
   m_maxCameraHeight = 0;
   m_coopBuildings = FALSE;
+  m_quickGame = FALSE;
 
 	for (Int i=0; i<MAX_SLOTS; ++i)
 	{
@@ -1068,9 +1069,9 @@ static AsciiString buildGameInfoAsciiString(const GameInfo& game, const AsciiStr
 	optionsString.format("M=%2.2x%s;MC=%X;MS=%d;SD=%d;C=%d;", game.getMapContentsMask(), newMapName.str(),
 		game.getMapCRC(), game.getMapSize(), game.getSeed(), game.getCRCInterval());
 #else
-	optionsString.format("US=%d;M=%2.2x%s;MC=%X;MS=%d;SD=%d;C=%d;SR=%u;SC=%u;CH=%d;O=%c;CB=%d;", game.getUseStats(), game.getMapContentsMask(), newMapName.str(),
+	optionsString.format("US=%d;M=%2.2x%s;MC=%X;MS=%d;SD=%d;C=%d;SR=%u;SC=%u;CH=%d;O=%c;CB=%d;QG=%d;", game.getUseStats(), game.getMapContentsMask(), newMapName.str(),
 		game.getMapCRC(), game.getMapSize(), game.getSeed(), game.getCRCInterval(), game.getSuperweaponRestriction(),
-		game.getStartingCash().countMoney(), game.getMaxCameraHeight(), game.oldFactionsOnly() ? 'Y' : 'N', game.getCoopBuildings() ? 1 : 0 );
+		game.getStartingCash().countMoney(), game.getMaxCameraHeight(), game.oldFactionsOnly() ? 'Y' : 'N', game.getCoopBuildings() ? 1 : 0, game.getQuickGame() ? 1 : 0 );
 #endif
 
 	//add player info for each slot
@@ -1199,6 +1200,7 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
   UnsignedShort restriction = 0; // Always the default
   Int maxCameraHeight = 0;
   Bool coopBuildings = FALSE;
+  Bool quickGame = FALSE;
 
 	Bool sawMap = FALSE;
 	Bool sawMapCRC = FALSE;
@@ -1329,6 +1331,10 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
     else if (key.compare("CB") == 0 )
     {
       coopBuildings = atoi( val.str() ) != 0;
+    }
+    else if (key.compare("QG") == 0 )
+    {
+      quickGame = atoi( val.str() ) != 0;
     }
 		else if (key.getLength() == 1 && *key.str() == slotListID)
 		{
@@ -1700,6 +1706,7 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 		game->setMaxCameraHeight(maxCameraHeight);
 		game->setOldFactionsOnly(oldFactionsOnly);
 		game->setCoopBuildings(coopBuildings);
+		game->setQuickGame(quickGame);
 
 		return true;
 	}
@@ -1729,9 +1736,16 @@ void SkirmishGameInfo::xfer( Xfer *xfer )
 #if RTS_GENERALS
 	const XferVersion currentVersion = 2;
 #else
-	const XferVersion currentVersion = 4;
+	const XferVersion currentVersion = 5;
 #endif
 	XferVersion version = currentVersion;
+#if !RTS_GENERALS
+	// Version 5 only adds Quick Game, so a save without it stays readable by retail
+	if (xfer->getXferMode() == XFER_SAVE && !m_quickGame)
+	{
+		version = 4;
+	}
+#endif
 	xfer->xferVersion( &version, currentVersion );
 
 
@@ -1830,6 +1844,15 @@ void SkirmishGameInfo::xfer( Xfer *xfer )
   {
     m_superweaponRestriction = 0;
     m_startingCash = TheGlobalData->m_defaultStartingCash;
+  }
+
+  if ( version >= 5 )
+  {
+    xfer->xferBool( &m_quickGame );
+  }
+  else if ( xfer->getXferMode() == XFER_LOAD )
+  {
+    m_quickGame = FALSE;
   }
 
 }

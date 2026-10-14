@@ -116,6 +116,7 @@ static NameKeyType staticTextGameSpeedID = NAMEKEY_INVALID;
 static NameKeyType checkBoxLimitSuperweaponsID = NAMEKEY_INVALID;
 static NameKeyType comboBoxStartingCashID = NAMEKEY_INVALID;
 static NameKeyType checkCoopBuildingsID = NAMEKEY_INVALID;
+static NameKeyType checkQuickGameID = NAMEKEY_INVALID;
 
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *staticTextGameSpeed = nullptr;
@@ -130,6 +131,7 @@ static GameWindow *textEntryPlayerName = nullptr;
 static GameWindow *checkBoxLimitSuperweapons = nullptr;
 static GameWindow *comboBoxStartingCash = nullptr;
 static GameWindow *checkCoopBuildings = nullptr;
+static GameWindow *checkQuickGame = nullptr;
 static GameWindow *comboBoxPlayer[MAX_SLOTS] = {0};
 
 static GameWindow *comboBoxColor[MAX_SLOTS] = {0};
@@ -1026,6 +1028,14 @@ static void handleCoopBuildingsClick()
 	}
 }
 
+static void handleQuickGameClick()
+{
+	if (TheSkirmishGameInfo && checkQuickGame)
+	{
+		TheSkirmishGameInfo->setQuickGame( GadgetCheckBoxIsChecked( checkQuickGame ) );
+	}
+}
+
 
 //-------------------------------------------------------------------------------------------------
 /** Initialize the Gadgets Options Menu */
@@ -1044,6 +1054,7 @@ void InitSkirmishGameGadgets()
   checkBoxLimitSuperweaponsID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckboxLimitSuperweapons" );
   comboBoxStartingCashID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:ComboBoxStartingCash" );
   checkCoopBuildingsID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckCoopBuildings" );
+  checkQuickGameID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckQuickGame" );
 
 	// Initialize the pointers to our gadgets
 	parentSkirmishGameOptions = TheWindowManager->winGetWindowFromId( nullptr, parentSkirmishGameOptionsID );
@@ -1072,6 +1083,12 @@ void InitSkirmishGameGadgets()
 	{
 		GadgetCheckBoxSetText(checkCoopBuildings, TheGameText->FETCH_OR_SUBSTITUTE("GUI:CoopBuildings", L"Coop Buildings"));
 		checkCoopBuildings->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:CoopBuildings", L"Lets allies finish each other's unfinished buildings"));
+	}
+	checkQuickGame = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, checkQuickGameID );
+	if (checkQuickGame)
+	{
+		GadgetCheckBoxSetText(checkQuickGame, TheGameText->FETCH_OR_SUBSTITUTE("GUI:QuickGame", L"Quick Game"));
+		checkQuickGame->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:QuickGame", L"Lifts the rank requirements on advanced structures, superweapons and super units"));
 	}
 
 	textEntryPlayerNameID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:TextEntryPlayerName" );
@@ -1256,6 +1273,10 @@ void updateSkirmishGameOptions()
   if (checkCoopBuildings)
   {
     GadgetCheckBoxSetChecked( checkCoopBuildings, TheSkirmishGameInfo->getCoopBuildings() );
+  }
+  if (checkQuickGame)
+  {
+    GadgetCheckBoxSetChecked( checkQuickGame, TheSkirmishGameInfo->getQuickGame() );
   }
   Int itemCount = GadgetComboBoxGetLength(comboBoxStartingCash);
   Int index = 0;
@@ -1674,6 +1695,10 @@ WindowMsgHandledType SkirmishGameOptionsMenuSystem( GameWindow *window, Unsigned
         else if ( controlID == checkCoopBuildingsID )
         {
           handleCoopBuildingsClick();
+        }
+        else if ( controlID == checkQuickGameID )
+        {
+          handleQuickGameClick();
         }
 				else
 				{

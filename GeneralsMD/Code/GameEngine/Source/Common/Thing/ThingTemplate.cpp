@@ -65,6 +65,7 @@
 #include "GameClient/Shadow.h"
 
 #include "GameLogic/Armor.h"
+#include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Object.h"
@@ -161,6 +162,7 @@ const FieldParse ThingTemplate::s_objectFieldParseTable[] =
 
 // NOTE NOTE NOTE -- s_objectFieldParseTable and s_objectReskinFieldParseTable must be updated in tandem -- see comment above
 	{ "Prerequisites",				ThingTemplate::parsePrerequisites,	nullptr, 0 },
+	{ "QuickGamePrerequisites",	ThingTemplate::parseQuickGamePrerequisites,	nullptr, 0 },
 	{ "Buildable",						INI::parseByteSizedIndexList,				BuildableStatusNames, offsetof( ThingTemplate, m_buildable) },
 	{ "BuildCost",						INI::parseUnsignedShort,						nullptr,		offsetof( ThingTemplate, m_buildCost ) },
 	{ "BuildTime",						INI::parseReal,											nullptr,		offsetof( ThingTemplate, m_buildTime ) },
@@ -768,6 +770,27 @@ void ThingTemplate::parsePrerequisites( INI* ini, void *instance, void *store, c
 	ini->initFromINI(&self->m_prereqInfo, myFieldParse);
 }
 
+//-------------------------------------------------------------------------------------------------
+void ThingTemplate::parseQuickGamePrerequisites( INI* ini, void *instance, void *store, const void* userData )
+{
+	ThingTemplate* self = (ThingTemplate*)instance;
+
+	static const FieldParse myFieldParse[] =
+	{
+		{ "Object", parsePrerequisiteUnit, nullptr, 0 },
+		{ "Science", parsePrerequisiteScience,	nullptr, 0 },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+
+	if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES)
+	{
+		self->m_quickGamePrereqInfo.clear();
+	}
+
+	self->m_hasQuickGamePrereqs = TRUE;
+	ini->initFromINI(&self->m_quickGamePrereqInfo, myFieldParse);
+}
+
 //-------------------------------------------------------------------------------------------Static
 static void parseArbitraryFXIntoMap( INI* ini, void *instance, void* /* store */, const void* userData )
 {
@@ -1130,6 +1153,7 @@ ThingTemplate::ThingTemplate() :
 	// By default an object may reach the highest vanilla rank; MaxVeterancyLevel can cap it lower.
 	m_maxVeterancyLevel = LEVEL_HEROIC;
 	m_isTrainable = FALSE;
+	m_hasQuickGamePrereqs = FALSE;
 	m_enterGuard = FALSE;
 	m_hijackGuard = FALSE;
 
@@ -1435,6 +1459,10 @@ void ThingTemplate::resolveNames()
 	{
 		m_prereqInfo[i].resolveNames();
 	}
+	for (i = 0; i < m_quickGamePrereqInfo.size(); i++)
+	{
+		m_quickGamePrereqInfo[i].resolveNames();
+	}
 
 	const Int MAX_BF = 32;
 	const ThingTemplate* tmpls[MAX_BF];
@@ -1449,6 +1477,19 @@ void ThingTemplate::resolveNames()
 			if( tmpls[ j ] )
 				const_cast<ThingTemplate*>(tmpls[j])->m_isBuildFacility = true;
 			// DEBUG_LOG(("BF: %s is a buildfacility for %s",tmpls[j]->m_nameString.str(),this->m_nameString.str()));
+		}
+	}
+
+	// Templates resolve before the game mode is known, so both lists mark build facilities
+	for (i = 0; i < m_quickGamePrereqInfo.size(); i++)
+	{
+		Int count = m_quickGamePrereqInfo[i].getAllPossibleBuildFacilityTemplates(tmpls, MAX_BF);
+		for (j = 0; j < count; j++)
+		{
+			if (tmpls[j])
+			{
+				const_cast<ThingTemplate*>(tmpls[j])->m_isBuildFacility = true;
+			}
 		}
 	}
 
@@ -1563,11 +1604,21 @@ Int ThingTemplate::getSkillPointValue(Int level) const
 }
 
 //-----------------------------------------------------------------------------
+const std::vector<ProductionPrerequisite>& ThingTemplate::getActivePrereqs() const
+{
+	if (m_hasQuickGamePrereqs && TheGameLogic != nullptr && TheGameLogic->isQuickGame())
+	{
+		return m_quickGamePrereqInfo;
+	}
+	return m_prereqInfo;
+}
+
+//-----------------------------------------------------------------------------
 const ThingTemplate *ThingTemplate::getBuildFacilityTemplate( const Player *player ) const
 {
 	if (getPrereqCount() > 0)
 	{
-		return m_prereqInfo[0].getExistingBuildFacilityTemplate(player);	// might return null
+		return getNthPrereq(0)->getExistingBuildFacilityTemplate(player);	// might return null
 	}
 	else
 	{

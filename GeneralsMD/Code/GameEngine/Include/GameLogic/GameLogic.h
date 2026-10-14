@@ -261,6 +261,7 @@ public:
   UnsignedShort getSuperweaponRestriction() const; ///< Get any optional limits on superweapons
   void setSuperweaponRestriction();
   Bool getCoopBuildings() const { return m_coopBuildings; } ///< May allies resume each other's construction
+  Bool isQuickGame() const { return m_quickGame; } ///< Do objects use their QuickGamePrerequisites
 
 #ifdef DUMP_PERF_STATS
 	void getAIMetricsStatistics( UnsignedInt *numAI, UnsignedInt *numMoving, UnsignedInt *numAttacking, UnsignedInt *numWaitingForPath, UnsignedInt *overallFailedPathfinds );
@@ -466,6 +467,7 @@ private:
 	Int m_rankLevelLimit;
   UnsignedShort m_superweaponRestriction;
   Bool m_coopBuildings;
+  Bool m_quickGame;
 
 	LoadScreen *getLoadScreen( Bool loadSaveGame );
 	LoadScreen *m_loadScreen;

@@ -122,6 +122,7 @@ static NameKeyType comboBoxStartingCashID = NAMEKEY_INVALID;
 static NameKeyType checkMaxCameraHeightID = NAMEKEY_INVALID;
 static NameKeyType textEntryMaxCameraHeightID = NAMEKEY_INVALID;
 static NameKeyType checkCoopBuildingsID = NAMEKEY_INVALID;
+static NameKeyType checkQuickGameID = NAMEKEY_INVALID;
 static NameKeyType windowMapID = NAMEKEY_INVALID;
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *parentLanGameOptions = nullptr;
@@ -136,6 +137,7 @@ static GameWindow *comboBoxStartingCash = nullptr;
 static GameWindow *checkMaxCameraHeight = nullptr;
 static GameWindow *textEntryMaxCameraHeight = nullptr;
 static GameWindow *checkCoopBuildings = nullptr;
+static GameWindow *checkQuickGame = nullptr;
 static GameWindow *windowMap = nullptr;
 
 static GameWindow *comboBoxPlayer[MAX_SLOTS] = {0};
@@ -760,6 +762,29 @@ static void commitLanCoopBuildings()
 	}
 }
 
+static void commitLanQuickGame()
+{
+	LANGameInfo *myGame = TheLAN->GetMyGame();
+	if (!myGame || !myGame->amIHost() || !checkQuickGame)
+	{
+		return;
+	}
+
+	const Bool quickGame = GadgetCheckBoxIsChecked(checkQuickGame);
+	if (quickGame == myGame->getQuickGame())
+	{
+		return;
+	}
+	myGame->setQuickGame(quickGame);
+	myGame->resetAccepted();
+
+	if (!s_isIniting)
+	{
+		TheLAN->RequestGameOptions(GenerateGameOptionsString(), true);
+		lanUpdateSlotList();
+	}
+}
+
 void InitLanGameGadgets()
 {
 	//Initialize the gadget IDs
@@ -776,6 +801,7 @@ void InitLanGameGadgets()
   checkMaxCameraHeightID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckMaxCameraHeight" );
   textEntryMaxCameraHeightID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:TextEntryMaxCameraHeight" );
   checkCoopBuildingsID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckCoopBuildings" );
+  checkQuickGameID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckQuickGame" );
 	windowMapID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:MapWindow" );
 
 	// Initialize the pointers to our gadgets
@@ -818,6 +844,12 @@ void InitLanGameGadgets()
 	{
 		GadgetCheckBoxSetText(checkCoopBuildings, TheGameText->FETCH_OR_SUBSTITUTE("GUI:CoopBuildings", L"Coop Buildings"));
 		checkCoopBuildings->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:CoopBuildings", L"Lets allies finish each other's unfinished buildings"));
+	}
+	checkQuickGame = TheWindowManager->winGetWindowFromId( parentLanGameOptions, checkQuickGameID );
+	if (checkQuickGame)
+	{
+		GadgetCheckBoxSetText(checkQuickGame, TheGameText->FETCH_OR_SUBSTITUTE("GUI:QuickGame", L"Quick Game"));
+		checkQuickGame->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:QuickGame", L"Lifts the rank requirements on advanced structures, superweapons and super units"));
 	}
 
 	windowMap = TheWindowManager->winGetWindowFromId( parentLanGameOptions,windowMapID  );
@@ -917,6 +949,7 @@ void DeinitLanGameGadgets()
   checkMaxCameraHeight = nullptr;
   textEntryMaxCameraHeight = nullptr;
   checkCoopBuildings = nullptr;
+  checkQuickGame = nullptr;
 	if (windowMap)
 	{
 		windowMap->winSetUserData(nullptr);
@@ -1103,6 +1136,12 @@ void updateGameOptions()
 		{
 			GadgetCheckBoxSetChecked( checkCoopBuildings, theGame->getCoopBuildings() );
 			checkCoopBuildings->winEnable( TheLAN->AmIHost() );
+		}
+
+		if (checkQuickGame)
+		{
+			GadgetCheckBoxSetChecked( checkQuickGame, theGame->getQuickGame() );
+			checkQuickGame->winEnable( TheLAN->AmIHost() );
 		}
 	}
 }
@@ -1416,6 +1455,10 @@ WindowMsgHandledType LanGameOptionsMenuSystem( GameWindow *window, UnsignedInt m
         else if ( controlID == checkCoopBuildingsID )
         {
           commitLanCoopBuildings();
+        }
+        else if ( controlID == checkQuickGameID )
+        {
+          commitLanQuickGame();
         }
 				else
 				{

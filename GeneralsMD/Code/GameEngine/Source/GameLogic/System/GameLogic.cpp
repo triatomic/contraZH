@@ -258,6 +258,7 @@ GameLogic::GameLogic()
 
 	m_rankPointsToAddAtGameStart = 0;
 	m_coopBuildings = FALSE;
+	m_quickGame = FALSE;
 
 	for(Int i = 0; i < MAX_SLOTS; i++)
 	{
@@ -1364,6 +1365,9 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	// Not saved, so a loaded save game plays with it off
 	m_coopBuildings = !loadingSaveGame && TheGameInfo != nullptr && TheGameInfo->getCoopBuildings();
+
+	// A save game restores TheSkirmishGameInfo before this runs, so it keeps the setting
+	m_quickGame = TheGameInfo != nullptr && TheGameInfo->getQuickGame();
 
 	checkForDuplicateColors( TheGameInfo );
 

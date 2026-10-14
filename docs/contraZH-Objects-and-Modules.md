@@ -22,6 +22,34 @@ Notes:
 * The capture flash and the raising-flag animation follow the scaled time.
 * Changes the simulation; replays must use the same INI.
 
+### QuickGamePrerequisites
+
+* `QuickGamePrerequisites` - (Default: none. Replaces `Prerequisites` when
+[Quick Game](contraZH-Maps-and-Setup.md#quick-game) is on.)
+
+Takes the same `Object` and `Science` lines as `Prerequisites`. An object that leaves it out uses
+its `Prerequisites` in a Quick Game too.
+
+```
+Object AmericaParticleCannonUplink
+  Prerequisites
+    Object  = AmericaStrategyCenter
+    Science = SCIENCE_Rank5
+  End
+  QuickGamePrerequisites
+    Object  = AmericaStrategyCenter
+  End
+End
+```
+
+In a Quick Game the uplink needs only the Strategy Center; otherwise it also needs rank 5.
+
+Notes:
+* An empty `QuickGamePrerequisites` block lets the object be built with no prerequisites in a
+Quick Game.
+* The build tooltip lists the requirements of the current game.
+* A map.ini override replaces the list, as it does for `Prerequisites`.
+
 ## Turret modules
 
 ### MaxPhysicalPitch

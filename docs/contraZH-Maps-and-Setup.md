@@ -127,6 +127,25 @@ back to `Random <BaseSide>`.
 * Limit Armies still applies; an entry disappears when none of its generals are allowed.
 * All LAN/online players need this build, and so do replays using these entries.
 
+### Quick Game
+
+* The Skirmish and LAN lobbies get a **Quick Game** checkbox, off by default. Only the LAN host can
+change it.
+* In a Quick Game, objects use their `QuickGamePrerequisites` in place of `Prerequisites`, so the mod
+can drop the rank requirements on advanced structures, superweapons and super units. An object
+without `QuickGamePrerequisites` keeps its normal ones. See
+[QuickGamePrerequisites](contraZH-Objects-and-Modules.md#quickgameprerequisites).
+* Skirmish AI scripts that test `SKIRMISH_PLAYER_HAS_PREREQUISITE_TO_BUILD` follow the Quick Game
+list, so the AI builds those structures early too. Scripts that wait on a rank counter still wait.
+
+Notes:
+* Labels are `GUI:QuickGame` and `TOOLTIP:QuickGame`, falling back to English text.
+* The checkbox comes from `CheckQuickGame` in `SkirmishGameOptionsMenu.wnd` and
+`LanGameOptionsMenu.wnd`; a layout without it shows no checkbox.
+* Save games and replays keep the setting. A save without Quick Game stays loadable by retail.
+* All LAN players need this build. Not available on Generals Online.
+* Changes the simulation; affects replays.
+
 ### Host camera height
 
 * The LAN host gets a `Max Camera Height` checkbox and field (210 to 1000) that overrides everyone's
