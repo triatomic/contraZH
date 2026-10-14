@@ -58,7 +58,7 @@ WBQtNewBrushDialog::WBQtNewBrushDialog(const QStringList &categories, const QStr
 	connect(m_ui->useTerrain, SIGNAL(toggled(bool)), this, SLOT(onModeChanged()));
 	connect(m_ui->useTexture, SIGNAL(toggled(bool)), this, SLOT(onModeChanged()));
 	connect(m_ui->terrainCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(onTerrainChanged()));
-	connect(m_ui->textureEdit, SIGNAL(textChanged(QString)), this, SLOT(updatePreview()));
+	connect(m_ui->textureEdit, SIGNAL(textChanged(QString)), this, SLOT(onTexturesChanged()));
 	connect(m_ui->glintStrengthCheck, SIGNAL(toggled(bool)), this, SLOT(updateKeyEnables()));
 	connect(m_ui->glintGlossCheck, SIGNAL(toggled(bool)), this, SLOT(updateKeyEnables()));
 	connect(m_ui->restrictCheck, SIGNAL(toggled(bool)), this, SLOT(updateKeyEnables()));
@@ -108,9 +108,12 @@ void WBQtNewBrushDialog::updatePreview()
 	QByteArray bgra(maxExtent * maxExtent * 4, 0);
 	unsigned char *pixels = reinterpret_cast<unsigned char*>(bgra.data());
 	int extent = 0;
+	int textureCount = 0;
 	if (m_ui->useTexture->isChecked())
 	{
-		QByteArray texture = m_ui->textureEdit->text().trimmed().toLatin1();
+		QStringList textures = textureList();
+		textureCount = textures.size();
+		QByteArray texture = textures.isEmpty() ? QByteArray() : textures.at(0).toLatin1();
 		extent = WBQtTerrainMaterial_GetTexturePreview(texture.constData(), pixels, bgra.size());
 	}
 	else if (m_ui->terrainCombo->currentIndex() >= 0)
@@ -133,7 +136,12 @@ void WBQtNewBrushDialog::updatePreview()
 	m_ui->preview->setPixmap(QPixmap::fromImage(img).scaled(box, Qt::KeepAspectRatio,
 		upscale ? Qt::FastTransformation : Qt::SmoothTransformation));
 	int tiles = extent / WBQtTerrainMaterial_GetSwatchExtent();
-	m_ui->previewInfo->setText(QString("%1 x %1 tiles, %2 x %2 px").arg(tiles).arg(extent));
+	QString info = QString("%1 x %1 tiles, %2 x %2 px").arg(tiles).arg(extent);
+	if (textureCount > 1)
+	{
+		info = QString("First of %1 textures\n%2").arg(textureCount).arg(info);
+	}
+	m_ui->previewInfo->setText(info);
 }
 
 WBQtNewBrushDialog::~WBQtNewBrushDialog()
@@ -165,7 +173,7 @@ void WBQtNewBrushDialog::onModeChanged()
 		showTerrainKeys();
 	}
 	m_textureMode = texture;
-	updatePreview();
+	onTexturesChanged();
 }
 
 void WBQtNewBrushDialog::onTerrainChanged()
@@ -283,61 +291,168 @@ void WBQtNewBrushDialog::onBrowse()
 	QDir texDir(QDir::current().absoluteFilePath(QString::fromLatin1(dirBuf)));
 	QString startIn = texDir.exists() ? texDir.absolutePath() : QDir::currentPath();
 
-	QString path = QFileDialog::getOpenFileName(this, "Terrain Texture", startIn,
+	QStringList paths = QFileDialog::getOpenFileNames(this, "Terrain Textures", startIn,
 		"Terrain textures (*.tga);;All files (*.*)");
-	if (path.isEmpty())
+	if (paths.isEmpty())
 	{
 		return;
 	}
 
-	QFileInfo picked(path);
-	QString rel = texDir.relativeFilePath(picked.absoluteFilePath());
-	if (rel.startsWith("..") || QDir::isAbsolutePath(rel))
+	QStringList textures;
+	QStringList skipped;
+	for (int i = 0; i < paths.size(); ++i)
 	{
-		// The game reads terrain textures only from the texture folder, so bring the file in under
-		// a name its INI reader keeps whole.
-		QString fileName = picked.fileName();
-		fileName.replace(QRegExp("[\\s;=\"]"), "_");
-		QString dest = texDir.filePath(fileName);
-		if (QFile::exists(dest))
+		QFileInfo picked(paths.at(i));
+		QString rel = texDir.relativeFilePath(picked.absoluteFilePath());
+		if (rel.startsWith("..") || QDir::isAbsolutePath(rel))
 		{
-			QMessageBox::warning(this, "New Terrain Brush",
-				QString("%1 already exists. Rename the file and pick it again.").arg(QDir::toNativeSeparators(dest)));
-			return;
+			// The game reads terrain textures only from the texture folder, so bring the file in under
+			// a name its INI reader keeps whole.
+			QString fileName = picked.fileName();
+			fileName.replace(QRegExp("[\\s;=\"]"), "_");
+			QString dest = texDir.filePath(fileName);
+			if (QFile::exists(dest))
+			{
+				skipped.append(QString("%1 already exists; rename the file and pick it again.").arg(QDir::toNativeSeparators(dest)));
+				continue;
+			}
+			QDir().mkpath(texDir.absolutePath());
+			if (!QFile::copy(picked.absoluteFilePath(), dest))
+			{
+				skipped.append(QString("Could not copy the texture to %1.").arg(QDir::toNativeSeparators(dest)));
+				continue;
+			}
+			rel = fileName;
 		}
-		QDir().mkpath(texDir.absolutePath());
-		if (!QFile::copy(picked.absoluteFilePath(), dest))
-		{
-			QMessageBox::warning(this, "New Terrain Brush",
-				QString("Could not copy the texture to %1.").arg(QDir::toNativeSeparators(dest)));
-			return;
-		}
-		rel = fileName;
+		textures.append(rel);
 	}
-	m_ui->textureEdit->setText(rel);
+	if (!skipped.isEmpty())
+	{
+		QMessageBox::warning(this, "New Terrain Brush", skipped.join("\n"));
+	}
+	if (textures.isEmpty())
+	{
+		return;
+	}
+	m_ui->textureEdit->setText(textures.join("; "));
 
-	if (m_ui->nameEdit->text().trimmed().isEmpty())
+	if (textures.size() == 1 && m_ui->nameEdit->text().trimmed().isEmpty())
 	{
-		QString name = picked.completeBaseName();
-		name.replace(QRegExp("[^A-Za-z0-9_.-]"), "_");
-		m_ui->nameEdit->setText(name);
+		m_ui->nameEdit->setText(nameFromTexture(textures.at(0)));
 	}
+}
+
+// ';' separates textures, and no texture name may contain one.
+QStringList WBQtNewBrushDialog::textureList() const
+{
+	QStringList textures;
+	QStringList parts = m_ui->textureEdit->text().split(QChar(';'), QString::SkipEmptyParts);
+	for (int i = 0; i < parts.size(); ++i)
+	{
+		QString texture = parts.at(i).trimmed();
+		if (!texture.isEmpty())
+		{
+			textures.append(texture);
+		}
+	}
+	return textures;
+}
+
+QString WBQtNewBrushDialog::nameFromTexture(const QString &texture)
+{
+	QString name = QFileInfo(texture).completeBaseName();
+	name.replace(QRegExp("[^A-Za-z0-9_.-]"), "_");
+	return name;
+}
+
+// With several textures, every brush takes its texture's file name.
+void WBQtNewBrushDialog::onTexturesChanged()
+{
+	bool bulk = m_ui->useTexture->isChecked() && textureList().size() > 1;
+	m_ui->nameEdit->setEnabled(!bulk);
+	if (bulk)
+	{
+		m_ui->nameEdit->setPlaceholderText("Each brush takes its texture's file name");
+	}
+	else if (m_ui->useTexture->isChecked())
+	{
+		m_ui->nameEdit->setPlaceholderText("Empty: the texture's file name");
+	}
+	else
+	{
+		m_ui->nameEdit->setPlaceholderText("Letters, digits, _ - .");
+	}
+	updatePreview();
+}
+
+int WBQtNewBrushDialog::createBrush(const QString &name, const QString &texture, QString &error)
+{
+	QByteArray nameBytes = name.toLatin1();
+	QByteArray category = m_ui->categoryCombo->currentText().trimmed().toLatin1();
+	QByteArray terrainName = texture.isEmpty() ? m_ui->terrainCombo->currentText().toLatin1() : QByteArray();
+	QByteArray textureName = texture.toLatin1();
+	char buf[512];
+	buf[0] = 0;
+	int texClass = WBQtTerrainMaterial_CreateBrush(nameBytes.constData(), category.constData(),
+		terrainName.constData(), textureName.constData(),
+		m_ui->blendEdgesCheck->isChecked() ? 1 : 0,
+		m_ui->restrictCheck->isChecked() ? 1 : 0,
+		m_ui->glintStrengthCheck->isChecked() ? m_ui->glintStrengthSpin->value() : -1.0,
+		m_ui->glintGlossCheck->isChecked() ? m_ui->glintGlossSpin->value() : 0.0,
+		buf, sizeof(buf));
+	error = QString::fromLatin1(buf);
+	return texClass;
 }
 
 void WBQtNewBrushDialog::accept()
 {
 	bool texture = m_ui->useTexture->isChecked();
-	QByteArray name = m_ui->nameEdit->text().trimmed().toLatin1();
-	QByteArray category = m_ui->categoryCombo->currentText().trimmed().toLatin1();
-	QByteArray terrainName = texture ? QByteArray() : m_ui->terrainCombo->currentText().toLatin1();
-	QByteArray textureName = texture ? m_ui->textureEdit->text().trimmed().toLatin1() : QByteArray();
+	QString name = m_ui->nameEdit->text().trimmed();
 
-	if (texture && textureName.isEmpty())
+	if (texture)
 	{
-		QMessageBox::warning(this, "New Terrain Brush", "Pick a texture file.");
+		QStringList textures = textureList();
+		if (textures.isEmpty())
+		{
+			QMessageBox::warning(this, "New Terrain Brush", "Pick a texture file.");
+			return;
+		}
+
+		// One failure does not stop the rest, so a bulk add reports per texture.
+		bool bulk = (textures.size() > 1);
+		QStringList problems;
+		int created = 0;
+		for (int i = 0; i < textures.size(); ++i)
+		{
+			QString brushName = (bulk || name.isEmpty()) ? nameFromTexture(textures.at(i)) : name;
+			QString error;
+			int texClass = createBrush(brushName, textures.at(i), error);
+			if (texClass >= 0)
+			{
+				created++;
+				m_texClass = texClass;
+				m_name = brushName;
+			}
+			if (!error.isEmpty())
+			{
+				problems.append(QString("%1: %2").arg(brushName, error));
+			}
+		}
+		if (created == 0)
+		{
+			QMessageBox::warning(this, "New Terrain Brush", problems.join("\n"));
+			return;
+		}
+		if (!problems.isEmpty())
+		{
+			QMessageBox::warning(this, "New Terrain Brush",
+				QString("Created %1 of %2 brushes.\n\n%3").arg(created).arg(textures.size()).arg(problems.join("\n")));
+		}
+		QDialog::accept();
 		return;
 	}
-	if (!texture && terrainKeysChanged())
+
+	if (terrainKeysChanged())
 	{
 		QMessageBox::StandardButton answer = QMessageBox::question(this, "New Terrain Brush",
 			QString("Save the key changes for %1 to Terrain.ini too?").arg(m_ui->terrainCombo->currentText()),
@@ -348,25 +463,14 @@ void WBQtNewBrushDialog::accept()
 		}
 	}
 
-	char error[512];
-	error[0] = 0;
-	int texClass = WBQtTerrainMaterial_CreateBrush(name.constData(), category.constData(),
-		terrainName.constData(), textureName.constData(),
-		m_ui->blendEdgesCheck->isChecked() ? 1 : 0,
-		m_ui->restrictCheck->isChecked() ? 1 : 0,
-		m_ui->glintStrengthCheck->isChecked() ? m_ui->glintStrengthSpin->value() : -1.0,
-		m_ui->glintGlossCheck->isChecked() ? m_ui->glintGlossSpin->value() : 0.0,
-		error, sizeof(error));
+	QString error;
+	int texClass = createBrush(name, QString(), error);
 	if (texClass < 0)
 	{
-		QMessageBox::warning(this, "New Terrain Brush", QString::fromLatin1(error));
+		QMessageBox::warning(this, "New Terrain Brush", error);
 		return;
 	}
-	if (error[0] != 0)
-	{
-		QMessageBox::warning(this, "New Terrain Brush", QString("The brush was created. %1").arg(QString::fromLatin1(error)));
-	}
 	m_texClass = texClass;
-	m_name = QString::fromLatin1(name);
+	m_name = name;
 	QDialog::accept();
 }

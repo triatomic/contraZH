@@ -32,6 +32,7 @@ private slots:
 	void updatePreview();
 	void updateKeyEnables();
 	void onSaveKeys();
+	void onTexturesChanged();
 
 private:
 	struct Keys
@@ -51,6 +52,9 @@ private:
 	void showTerrainKeys();
 	bool terrainKeysChanged() const;
 	bool saveTerrainKeys();
+	QStringList textureList() const;
+	static QString nameFromTexture(const QString &texture);
+	int createBrush(const QString &name, const QString &texture, QString &error);
 
 	Ui::WBQtNewBrushDialog *m_ui;	// owns the static widget tree (WBQtNewBrushDialog.ui)
 	int m_texClass;
