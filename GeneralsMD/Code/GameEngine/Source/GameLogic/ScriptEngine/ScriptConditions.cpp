@@ -2997,6 +2997,9 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 		case Condition::SKIRMISH_SHIPS_ENABLED:
 			return evaluateSkirmishShipsEnabled();
 
+		case Condition::QUICK_GAME_ENABLED:
+			return TheGameLogic->isQuickGame();
+
 	}
 }
 

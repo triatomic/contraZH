@@ -1222,6 +1222,8 @@ public:
 		UNIT_RELOADED,																	// True if a unit is (partially if chosen) reloaded.
 		TEAM_RELOADED,																	// True if a team is (partially if chosen) reloaded.
 
+		QUICK_GAME_ENABLED,														// True if the host ticked Quick Game.
+
 		NUM_ITEMS		 // Always the last condition.
 	};
 

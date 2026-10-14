@@ -136,7 +136,13 @@ can drop the rank requirements on advanced structures, superweapons and super un
 without `QuickGamePrerequisites` keeps its normal ones. See
 [QuickGamePrerequisites](contraZH-Objects-and-Modules.md#quickgameprerequisites).
 * Skirmish AI scripts that test `SKIRMISH_PLAYER_HAS_PREREQUISITE_TO_BUILD` follow the Quick Game
-list, so the AI builds those structures early too. Scripts that wait on a rank counter still wait.
+list, so the AI builds those structures early too.
+* The `QUICK_GAME_ENABLED` condition (`Skirmish/ Quick Game is enabled` in WorldBuilder) is true in
+a Quick Game. To stop the AI waiting for a rank before it builds, copy the script's condition clause
+as a new OR clause and swap the rank test for `QUICK_GAME_ENABLED`.
+* Leave rank tests that time attack waves alone. A script that raises a rank counter should not get
+the clause either, or the counter jumps at game start; move its other actions into a new script
+gated by `QUICK_GAME_ENABLED` instead.
 
 Notes:
 * Labels are `GUI:QuickGame` and `TOOLTIP:QuickGame`, falling back to English text.
@@ -144,6 +150,7 @@ Notes:
 `LanGameOptionsMenu.wnd`; a layout without it shows no checkbox.
 * Save games and replays keep the setting. A save without Quick Game stays loadable by retail.
 * All LAN players need this build. Not available on Generals Online.
+* An older exe reads `QUICK_GAME_ENABLED` as false, so a script with it still runs on the rank test.
 * Changes the simulation; affects replays.
 
 ### Host camera height

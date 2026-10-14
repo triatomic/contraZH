@@ -5277,6 +5277,13 @@ void ScriptEngine::init()
 	curTemplate->m_numUiStrings = 1;
 	curTemplate->m_uiStrings[0] = "Ships are enabled on this map";
 
+	curTemplate = &m_conditionTemplates[Condition::QUICK_GAME_ENABLED];
+	curTemplate->m_internalName = "QUICK_GAME_ENABLED";
+	curTemplate->m_uiName = "Skirmish/ Quick Game is enabled.";
+	curTemplate->m_numParameters = 0;
+	curTemplate->m_numUiStrings = 1;
+	curTemplate->m_uiStrings[0] = "Quick Game is enabled";
+
 	curTemplate = &m_actionTemplates[ScriptAction::SHOW_WEATHER];
 	curTemplate->m_internalName = "SHOW_WEATHER";
 	curTemplate->m_uiName = "Map/Environment/Show Weather.";
