@@ -22,6 +22,9 @@ extra_css:
 extra_javascript:
   - assets/javascripts/copy-inline.js
 
+hooks:
+  - docs-theme/hooks/readable.py
+
 # Theme assets live outside docs/ so the wiki sync never picks them up
 theme:
   name: material
@@ -56,7 +59,9 @@ markdown_extensions:
       slugify: !!python/object/apply:pymdownx.slugs.slugify
         kwds:
           case: lower
-  - pymdownx.highlight
+  # Unlabelled fences are Generals INI snippets
+  - pymdownx.highlight:
+      default_lang: ini
   - pymdownx.superfences
   - pymdownx.details
 
