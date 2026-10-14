@@ -1,5 +1,7 @@
 """Build-time readability fixes for the docs site; the .md files stay GitHub Markdown."""
 
+import hashlib
+import os
 import re
 import xml.etree.ElementTree as etree
 
@@ -168,6 +170,25 @@ class ReadableExtension(Extension):
         md.treeprocessors.register(ReadableTreeprocessor(md), 'contra_readable', 4)
 
 
+def asset_hash(config, path):
+    for folder in config.theme.dirs:
+        full = os.path.join(folder, path)
+        if os.path.isfile(full):
+            with open(full, 'rb') as f:
+                return hashlib.sha1(f.read()).hexdigest()[:10]
+    return None
+
+
 def on_config(config, **kwargs):
     config.markdown_extensions.append(ReadableExtension())
+
+    # Pages serves CSS and JS with a 10-minute cache, so stamp each link with its content hash
+    config.extra_css = ['%s?h=%s' % (p, asset_hash(config, p)) if asset_hash(config, p) else p for p in config.extra_css]
+    for i, script in enumerate(config.extra_javascript):
+        path = script if isinstance(script, str) else script.path
+        digest = asset_hash(config, path)
+        if digest and isinstance(script, str):
+            config.extra_javascript[i] = '%s?h=%s' % (path, digest)
+        elif digest:
+            script.path = '%s?h=%s' % (path, digest)
     return config
