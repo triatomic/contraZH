@@ -3,7 +3,7 @@
 Graphics features that need the Direct3D 9 build. The Direct3D 8 build ignores their settings.
 Options live in `Options.ini` and the advanced display options; tuning keys live in the mod's
 `GameData.ini`. Bloom, vertical sync and laser ground glow work on both builds and are on
-[contraZH Changes](contraZH-Changes.md#rendering).
+[contraZH Options.ini](contraZH-Options.md#rendering).
 
 Cheat builds reload `Data\INI\GameData.ini` about half a second after it is saved, so these tuning
 keys can be adjusted with a map running: `UnitSpecularIntensity`, `UnitSpecularPower`,
@@ -39,7 +39,7 @@ them for one effect. Each shader's own section below lists its keys.
 | Vehicle headlights | [Headlights](#headlights) | Automatic, `W3DModelDraw` | A `HEADLIGHT` mesh in the model | `Headlight` keys, per model too |
 | Mirror floors, puddles, pools and glass | [Planar mirrors](#planar-mirrors) | `W3DModelDraw` | `PlanarMirror = Yes` | `PlanarMirror` keys, per model too |
 | Soft edges on sprites | [Soft particles](#soft-particles) | Automatic | Nothing | None |
-| Glow around bright effects | [Bloom](contraZH-Changes.md#bloom) | `ParticleSystem` | `Shader = ADDITIVE` | None |
+| Glow around bright effects | [Bloom](contraZH-Options.md#bloom) | `ParticleSystem` | `Shader = ADDITIVE` | None |
 
 "None" means the effect always uses the `GameData.ini` values.
 
@@ -554,7 +554,7 @@ and a beam climbing into the sky lights only the ground near the shooter. Slopes
 catch more light, and the laser shader's pulses brighten the ground as they pass. Beams drawn plain,
 electric or cryo light the ground steadily, and cryo beams light it in their ice colour. The Direct3D 8
 build keeps the strip of dynamic lights described in
-[Laser ground glow](contraZH-Changes.md#laser-ground-glow). Needs a shader model 2 card. Each key is
+[Laser ground glow](contraZH-Options.md#laser-ground-glow). Needs a shader model 2 card. Each key is
 pictured on [Electric & Laser Shading](Electric-&-Laser-Shading.md#laser-ground-glow).
 
 Uses the same switches and keys as the Direct3D 8 glow: `LaserRef`, `DynamicLights`,

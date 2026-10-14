@@ -115,7 +115,7 @@ only slopes facing it, so hills show dark backs. 1 lights all ground evenly.)
 module overrides it for one laser.)
 
 The glow's colour and strength come from `LaserGroundGlowColor` and `LaserGroundGlowIntensity`,
-described under [Laser ground glow](contraZH-Changes.md#laser-ground-glow).
+described under [Laser ground glow](contraZH-Options.md#laser-ground-glow).
 
 ## Tuner
 

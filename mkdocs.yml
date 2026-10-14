@@ -68,7 +68,20 @@ markdown_extensions:
 nav:
   - Home: Home.md
   - This fork:
-      - contraZH Changes: contraZH-Changes.md
+      - contraZH Changes:
+          - Overview: contraZH-Changes.md
+          - Gameplay Fixes: contraZH-Gameplay-Fixes.md
+          - Maps & Game Setup: contraZH-Maps-and-Setup.md
+          - Options.ini: contraZH-Options.md
+          - Objects & Modules: contraZH-Objects-and-Modules.md
+          - GameData: contraZH-GameData.md
+          - SpecialPowers: contraZH-SpecialPowers.md
+          - CommandButtons & Selection: contraZH-CommandButtons.md
+          - ParticleSystems: contraZH-ParticleSystems.md
+          - Object Creation List: contraZH-Object-Creation-List.md
+          - Animation2D: contraZH-Animation2D.md
+          - Debug & Cheats: contraZH-Debug-and-Cheats.md
+          - Generals Online: contraZH-Generals-Online.md
       - Direct3D 9 Features: dx9feat.md
       - Water: Water.md
       - Electric & Laser Shading: Electric-&-Laser-Shading.md

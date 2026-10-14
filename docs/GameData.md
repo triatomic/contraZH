@@ -189,7 +189,7 @@ This means the listed death types will be excluded from any Death module that us
 Lets the player move a build queue entry (unit or upgrade) one position earlier by
 Ctrl+clicking its cameo, swapping it with the entry before it. The displaced entry loses
 its build progress. A plain click still cancels; a finished unit waiting to exit the
-factory cannot be displaced. See [Queue reorder](contraZH-Changes.md#queue-reorder) for the
+factory cannot be displaced. See [Queue reorder](contraZH-CommandButtons.md#queue-reorder) for the
 full behavior.
 
 * `QueueReorder = No` - (Enables the Ctrl+click build queue reorder. With No, clicking the
