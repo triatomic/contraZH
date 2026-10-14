@@ -195,6 +195,9 @@ public:
 	/// set whether this terrain is blend edge terrain, for use by terrain collection only
 	void friend_setBlendEdge( Bool isBlend ) { m_blendEdgeTexture = isBlend; }
 
+	/// set the sun glint's strength and gloss, for use by terrain collection only
+	void friend_setGlint( Real strength, Real gloss ) { m_glintStrength = strength; m_glintGloss = gloss; }
+
 	/// get the parsing table for INI
 	const FieldParse *getFieldParse() { return m_terrainTypeFieldParseTable; }
 

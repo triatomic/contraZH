@@ -42,8 +42,10 @@ int  WBQtTerrainMaterial_GetBrushAliasEntry(int index, int *texClassOut, char *p
 // Saves a brush to WorldBuilderQt\TerrainBrushes.ini and loads it. Pass a texture (relative to
 // the terrain texture folder, also appended to the loose Data\INI\Terrain.ini) or a terrain
 // name. Returns the texture class it paints, or -1 with the reason in errorOut. A success can
-// still carry a warning in errorOut.
-int  WBQtTerrainMaterial_CreateBrush(const char *name, const char *category, const char *terrain, const char *texture, char *errorOut, int cap);
+// still carry a warning in errorOut. The Terrain.ini keys apply only with a texture; a negative
+// glintStrength or a glintGloss of zero or less leaves that key out.
+int  WBQtTerrainMaterial_CreateBrush(const char *name, const char *category, const char *terrain, const char *texture,
+	int blendEdges, int restrictConstruction, double glintStrength, double glintGloss, char *errorOut, int cap);
 // The game-relative terrain texture folder ("Art/Terrain/").
 int  WBQtTerrainMaterial_GetTerrainTextureDir(char *dirOut, int cap);
 // Whole-texture previews as BGRA rows, bottom row first, sized up to GetPreviewMaxExtent on a

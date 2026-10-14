@@ -277,7 +277,7 @@ Bool TerrainBrushes::apply(const Block &block, AsciiString &error)
 	return true;
 }
 
-Int TerrainBrushes::create(const char *name, const char *category, const char *terrain, const char *texture, AsciiString &error)
+Int TerrainBrushes::create(const char *name, const char *category, const char *terrain, const char *texture, const TerrainKeys &keys, AsciiString &error)
 {
 	Block block;
 	block.name = name ? name : "";
@@ -308,7 +308,7 @@ Int TerrainBrushes::create(const char *name, const char *category, const char *t
 
 	if (!textureName.isEmpty())
 	{
-		return createTerrain(block, textureName, error);
+		return createTerrain(block, textureName, keys, error);
 	}
 
 	AsciiString terrainName = block.terrain.isEmpty() ? block.name : block.terrain;
@@ -341,7 +341,7 @@ Int TerrainBrushes::create(const char *name, const char *category, const char *t
 }
 
 // The terrain goes to the game's Terrain.ini, so maps using it load in-game; only the category stays WorldBuilder-only.
-Int TerrainBrushes::createTerrain(Block &block, const AsciiString &texture, AsciiString &error)
+Int TerrainBrushes::createTerrain(Block &block, const AsciiString &texture, const TerrainKeys &keys, AsciiString &error)
 {
 	if (TheTerrainTypes->findTerrain(block.name) != nullptr || isAlias(block.name))
 	{
@@ -367,7 +367,24 @@ Int TerrainBrushes::createTerrain(Block &block, const AsciiString &texture, Asci
 		error.format("Cannot write '%s'.", GAME_TERRAIN_FILE);
 		return -1;
 	}
-	fprintf(fp, "\nTerrain %s\n  Texture = %s\nEnd\n", block.name.str(), texture.str());
+	fprintf(fp, "\nTerrain %s\n  Texture = %s\n", block.name.str(), texture.str());
+	if (keys.blendEdges)
+	{
+		fprintf(fp, "  BlendEdges = Yes\n");
+	}
+	if (keys.restrictConstruction)
+	{
+		fprintf(fp, "  RestrictConstruction = Yes\n");
+	}
+	if (keys.glintStrength >= 0.0f)
+	{
+		fprintf(fp, "  GlintStrength = %g\n", keys.glintStrength);
+	}
+	if (keys.glintGloss > 0.0f)
+	{
+		fprintf(fp, "  GlintGloss = %g\n", keys.glintGloss);
+	}
+	fprintf(fp, "End\n");
 	Bool ok = (ferror(fp) == 0);
 	fclose(fp);
 	if (!ok)
@@ -376,9 +393,19 @@ Int TerrainBrushes::createTerrain(Block &block, const AsciiString &texture, Asci
 		return -1;
 	}
 
-	// Same steps as the game's Terrain block parser.
+	// Same steps as the game's Terrain block parser: DefaultTerrain values, then the written keys.
 	TerrainType *terrain = TheTerrainTypes->newTerrain(block.name);
 	terrain->friend_setTexture(texture);
+	if (keys.blendEdges)
+	{
+		terrain->friend_setBlendEdge(true);
+	}
+	if (keys.restrictConstruction)
+	{
+		terrain->friend_setRestrictConstruction(true);
+	}
+	terrain->friend_setGlint(keys.glintStrength >= 0.0f ? keys.glintStrength : terrain->getGlintStrength(),
+		keys.glintGloss > 0.0f ? keys.glintGloss : terrain->getGlintGloss());
 	Int texClass = WorldHeightMapEdit::addTerrainTexture(terrain);
 	if (texClass < 0)
 	{

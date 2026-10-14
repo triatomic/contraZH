@@ -75,7 +75,8 @@ folder. Brushes without one go under Custom.)
 A brush made from a new texture also appends a `Terrain` block to the loose `Data\INI\Terrain.ini`,
 so maps painted with it draw in-game. When that file is only inside a `.big`, New refuses; extract
 `Terrain.ini` into `Data\INI\` first. Terrain INI is part of the multiplayer INI check, so every
-player needs the edited file. A texture picked outside `Art\Terrain` is copied there.
+player needs the edited file. A texture picked outside `Art\Terrain` is copied there. Ticked boxes
+add `BlendEdges`, `RestrictConstruction`, `GlintStrength` and `GlintGloss` to the block.
 
 ## Viewing the map
 

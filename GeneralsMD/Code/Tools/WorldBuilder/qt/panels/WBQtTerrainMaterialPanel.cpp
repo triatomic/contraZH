@@ -636,8 +636,9 @@ void WBQtTerrainMaterialPanel::onNewBrush()
 		return;
 	}
 
+	// A blend-edge texture is not a paint texture, so it is left unselected.
 	int texClass = dlg.createdTexClass();
-	if (!WBQtTerrainMaterial_SelectFgTexClass(texClass))
+	if (WBQtTerrainMaterial_GetTexClassTerrainName(texClass, nameBuf, cap) && !WBQtTerrainMaterial_SelectFgTexClass(texClass))
 	{
 		QMessageBox::warning(this, "Terrain Material",
 			"That texture is too large to fit in the remaining texture space.");

@@ -50,9 +50,20 @@ public:
 	static Int getNumAliases() { return (Int)s_aliases.size(); }
 	static const Alias &getAlias(Int ndx) { return s_aliases[ndx]; }
 
+	/// Optional Terrain.ini keys for a brush with a new texture.
+	struct TerrainKeys
+	{
+		Bool blendEdges;
+		Bool restrictConstruction;
+		Real glintStrength;	///< Negative leaves the key out.
+		Real glintGloss;	///< Zero or less leaves the key out, as the game reads it.
+
+		TerrainKeys() : blendEdges(false), restrictConstruction(false), glintStrength(-1.0f), glintGloss(0.0f) {}
+	};
+
 	/// Defines a brush, appends it to the brush files and loads it. Returns its texture class or -1.
 	/** A texture brush can succeed with a warning in error when only its category failed to save. */
-	static Int create(const char *name, const char *category, const char *terrain, const char *texture, AsciiString &error);
+	static Int create(const char *name, const char *category, const char *terrain, const char *texture, const TerrainKeys &keys, AsciiString &error);
 
 private:
 	struct CategoryEntry
@@ -70,7 +81,7 @@ private:
 
 	static void loadFile(const char *path);
 	static Bool apply(const Block &block, AsciiString &error);
-	static Int createTerrain(Block &block, const AsciiString &texture, AsciiString &error);
+	static Int createTerrain(Block &block, const AsciiString &texture, const TerrainKeys &keys, AsciiString &error);
 	static Bool appendToFile(const Block &block, AsciiString &error);
 	static void setCategory(const AsciiString &terrainName, const AsciiString &category);
 	static Bool isAlias(const AsciiString &name);

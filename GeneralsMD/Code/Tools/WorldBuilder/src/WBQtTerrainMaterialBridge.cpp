@@ -236,10 +236,16 @@ int WBQtTerrainMaterial_GetBrushAliasEntry(int index, int *texClassOut, char *pa
 	return 1;
 }
 
-int WBQtTerrainMaterial_CreateBrush(const char *name, const char *category, const char *terrain, const char *texture, char *errorOut, int cap)
+int WBQtTerrainMaterial_CreateBrush(const char *name, const char *category, const char *terrain, const char *texture,
+	int blendEdges, int restrictConstruction, double glintStrength, double glintGloss, char *errorOut, int cap)
 {
+	TerrainBrushes::TerrainKeys keys;
+	keys.blendEdges = (blendEdges != 0);
+	keys.restrictConstruction = (restrictConstruction != 0);
+	keys.glintStrength = (Real)glintStrength;
+	keys.glintGloss = (Real)glintGloss;
 	AsciiString error;
-	Int texClass = TerrainBrushes::create(name, category, terrain, texture, error);
+	Int texClass = TerrainBrushes::create(name, category, terrain, texture, keys, error);
 	copyString(errorOut, cap, error.str());
 	return texClass;
 }

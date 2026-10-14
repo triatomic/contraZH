@@ -115,6 +115,87 @@
         </widget>
        </item>
        <item>
+        <widget class="QGroupBox" name="keysBox">
+         <property name="title">
+          <string>Terrain.ini keys (new texture)</string>
+         </property>
+         <layout class="QGridLayout" name="keysGrid" columnstretch="0,1">
+          <item row="0" column="0" colspan="2">
+           <widget class="QCheckBox" name="blendEdgesCheck">
+            <property name="text">
+             <string>Blend edges</string>
+            </property>
+            <property name="toolTip">
+             <string>BlendEdges: the texture holds custom blend edges. It is listed in Blend Material, not in the texture tree.</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0" colspan="2">
+           <widget class="QCheckBox" name="restrictCheck">
+            <property name="text">
+             <string>Restrict construction</string>
+            </property>
+            <property name="toolTip">
+             <string>RestrictConstruction: nothing can be built on this texture in-game.</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QCheckBox" name="glintStrengthCheck">
+            <property name="text">
+             <string>Glint strength:</string>
+            </property>
+            <property name="toolTip">
+             <string>GlintStrength: multiplies GameData's TerrainGlintIntensity for this texture. 0 leaves it dull. Unticked, it stays 1.</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QDoubleSpinBox" name="glintStrengthSpin">
+            <property name="decimals">
+             <number>2</number>
+            </property>
+            <property name="maximum">
+             <double>10.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.100000000000000</double>
+            </property>
+            <property name="value">
+             <double>1.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QCheckBox" name="glintGlossCheck">
+            <property name="text">
+             <string>Glint gloss:</string>
+            </property>
+            <property name="toolTip">
+             <string>GlintGloss: how tight the glint is; higher is smaller and sharper. Unticked, it takes GameData's TerrainGlintGloss.</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QDoubleSpinBox" name="glintGlossSpin">
+            <property name="decimals">
+             <number>1</number>
+            </property>
+            <property name="minimum">
+             <double>1.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>128.000000000000000</double>
+            </property>
+            <property name="value">
+             <double>12.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
         <spacer name="settingsSpacer">
          <property name="orientation">
           <enum>Qt::Vertical</enum>

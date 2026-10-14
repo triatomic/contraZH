@@ -56,6 +56,8 @@ WBQtNewBrushDialog::WBQtNewBrushDialog(const QStringList &categories, const QStr
 	connect(m_ui->useTexture, SIGNAL(toggled(bool)), this, SLOT(onModeChanged()));
 	connect(m_ui->terrainCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(updatePreview()));
 	connect(m_ui->textureEdit, SIGNAL(textChanged(QString)), this, SLOT(updatePreview()));
+	connect(m_ui->glintStrengthCheck, SIGNAL(toggled(bool)), this, SLOT(onModeChanged()));
+	connect(m_ui->glintGlossCheck, SIGNAL(toggled(bool)), this, SLOT(onModeChanged()));
 	connect(m_ui->browseBtn, SIGNAL(clicked()), this, SLOT(onBrowse()));
 	connect(m_ui->okButton, SIGNAL(clicked()), this, SLOT(accept()));
 	connect(m_ui->cancelButton, SIGNAL(clicked()), this, SLOT(reject()));
@@ -139,6 +141,9 @@ void WBQtNewBrushDialog::onModeChanged()
 	m_ui->textureEdit->setEnabled(texture);
 	m_ui->browseBtn->setEnabled(texture);
 	m_ui->textureNote->setEnabled(texture);
+	m_ui->keysBox->setEnabled(texture);
+	m_ui->glintStrengthSpin->setEnabled(m_ui->glintStrengthCheck->isChecked());
+	m_ui->glintGlossSpin->setEnabled(m_ui->glintGlossCheck->isChecked());
 	updatePreview();
 }
 
@@ -207,7 +212,12 @@ void WBQtNewBrushDialog::accept()
 	char error[512];
 	error[0] = 0;
 	int texClass = WBQtTerrainMaterial_CreateBrush(name.constData(), category.constData(),
-		terrainName.constData(), textureName.constData(), error, sizeof(error));
+		terrainName.constData(), textureName.constData(),
+		m_ui->blendEdgesCheck->isChecked() ? 1 : 0,
+		m_ui->restrictCheck->isChecked() ? 1 : 0,
+		m_ui->glintStrengthCheck->isChecked() ? m_ui->glintStrengthSpin->value() : -1.0,
+		m_ui->glintGlossCheck->isChecked() ? m_ui->glintGlossSpin->value() : 0.0,
+		error, sizeof(error));
 	if (texClass < 0)
 	{
 		QMessageBox::warning(this, "New Terrain Brush", QString::fromLatin1(error));
