@@ -24,6 +24,7 @@ WBQtNewBrushDialog::WBQtNewBrushDialog(const QStringList &categories, const QStr
 	m_ui->setupUi(this);
 	WBQtComboStyle::applyPopupScrollRecursive(this);
 	m_textureKeys = readKeys();
+	m_terrainKeys = m_textureKeys;
 
 	m_ui->categoryCombo->addItems(categories);
 	m_ui->categoryCombo->setEditText(category);
@@ -60,6 +61,10 @@ WBQtNewBrushDialog::WBQtNewBrushDialog(const QStringList &categories, const QStr
 	connect(m_ui->textureEdit, SIGNAL(textChanged(QString)), this, SLOT(updatePreview()));
 	connect(m_ui->glintStrengthCheck, SIGNAL(toggled(bool)), this, SLOT(updateKeyEnables()));
 	connect(m_ui->glintGlossCheck, SIGNAL(toggled(bool)), this, SLOT(updateKeyEnables()));
+	connect(m_ui->restrictCheck, SIGNAL(toggled(bool)), this, SLOT(updateKeyEnables()));
+	connect(m_ui->glintStrengthSpin, SIGNAL(valueChanged(double)), this, SLOT(updateKeyEnables()));
+	connect(m_ui->glintGlossSpin, SIGNAL(valueChanged(double)), this, SLOT(updateKeyEnables()));
+	connect(m_ui->saveKeysBtn, SIGNAL(clicked()), this, SLOT(onSaveKeys()));
 	connect(m_ui->browseBtn, SIGNAL(clicked()), this, SLOT(onBrowse()));
 	connect(m_ui->okButton, SIGNAL(clicked()), this, SLOT(accept()));
 	connect(m_ui->cancelButton, SIGNAL(clicked()), this, SLOT(reject()));
@@ -143,7 +148,8 @@ void WBQtNewBrushDialog::onModeChanged()
 	m_ui->textureEdit->setEnabled(texture);
 	m_ui->browseBtn->setEnabled(texture);
 	m_ui->textureNote->setEnabled(texture);
-	m_ui->keysBox->setEnabled(texture);
+	m_ui->blendEdgesCheck->setEnabled(texture);
+	m_ui->saveKeysBtn->setVisible(!texture);
 
 	if (texture && !m_textureMode)
 	{
@@ -175,6 +181,47 @@ void WBQtNewBrushDialog::updateKeyEnables()
 {
 	m_ui->glintStrengthSpin->setEnabled(m_ui->glintStrengthCheck->isChecked());
 	m_ui->glintGlossSpin->setEnabled(m_ui->glintGlossCheck->isChecked());
+	m_ui->saveKeysBtn->setEnabled(!m_textureMode && terrainKeysChanged());
+}
+
+bool WBQtNewBrushDialog::terrainKeysChanged() const
+{
+	Keys keys = readKeys();
+	if (keys.restrictConstruction != m_terrainKeys.restrictConstruction
+		|| keys.hasGlintStrength != m_terrainKeys.hasGlintStrength
+		|| keys.hasGlintGloss != m_terrainKeys.hasGlintGloss)
+	{
+		return true;
+	}
+	if (keys.hasGlintStrength && keys.glintStrength != m_terrainKeys.glintStrength)
+	{
+		return true;
+	}
+	return keys.hasGlintGloss && keys.glintGloss != m_terrainKeys.glintGloss;
+}
+
+void WBQtNewBrushDialog::onSaveKeys()
+{
+	saveTerrainKeys();
+}
+
+bool WBQtNewBrushDialog::saveTerrainKeys()
+{
+	Keys keys = readKeys();
+	char error[512];
+	error[0] = 0;
+	if (!WBQtTerrainMaterial_SetTerrainKeys(m_ui->terrainCombo->currentData().toInt(),
+		keys.restrictConstruction ? 1 : 0,
+		keys.hasGlintStrength ? keys.glintStrength : -1.0,
+		keys.hasGlintGloss ? keys.glintGloss : 0.0,
+		error, sizeof(error)))
+	{
+		QMessageBox::warning(this, "New Terrain Brush", QString::fromLatin1(error));
+		return false;
+	}
+	m_terrainKeys = keys;
+	updateKeyEnables();
+	return true;
 }
 
 WBQtNewBrushDialog::Keys WBQtNewBrushDialog::readKeys() const
@@ -200,7 +247,6 @@ void WBQtNewBrushDialog::showKeys(const Keys &keys)
 	updateKeyEnables();
 }
 
-// Read-only view of the selected terrain's keys; an alias paints that terrain as it is.
 void WBQtNewBrushDialog::showTerrainKeys()
 {
 	Keys keys = m_textureKeys;
@@ -222,8 +268,12 @@ void WBQtNewBrushDialog::showTerrainKeys()
 			keys.glintGloss = glintGloss;
 		}
 	}
-	m_ui->keysBox->setTitle(QString("Terrain.ini keys of %1 (read-only)").arg(m_ui->terrainCombo->currentText()));
+	m_ui->keysBox->setTitle(QString("Terrain.ini keys of %1").arg(m_ui->terrainCombo->currentText()));
+	// Loaded through the spin boxes, so their rounding does not count as an edit.
+	m_terrainKeys = keys;
 	showKeys(keys);
+	m_terrainKeys = readKeys();
+	updateKeyEnables();
 }
 
 void WBQtNewBrushDialog::onBrowse()
@@ -286,6 +336,16 @@ void WBQtNewBrushDialog::accept()
 	{
 		QMessageBox::warning(this, "New Terrain Brush", "Pick a texture file.");
 		return;
+	}
+	if (!texture && terrainKeysChanged())
+	{
+		QMessageBox::StandardButton answer = QMessageBox::question(this, "New Terrain Brush",
+			QString("Save the key changes for %1 to Terrain.ini too?").arg(m_ui->terrainCombo->currentText()),
+			QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
+		if (answer == QMessageBox::Cancel || (answer == QMessageBox::Yes && !saveTerrainKeys()))
+		{
+			return;
+		}
 	}
 
 	char error[512];

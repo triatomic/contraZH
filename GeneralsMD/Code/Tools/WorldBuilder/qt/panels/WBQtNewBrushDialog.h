@@ -31,6 +31,7 @@ private slots:
 	void onBrowse();
 	void updatePreview();
 	void updateKeyEnables();
+	void onSaveKeys();
 
 private:
 	struct Keys
@@ -48,12 +49,15 @@ private:
 	Keys readKeys() const;
 	void showKeys(const Keys &keys);
 	void showTerrainKeys();
+	bool terrainKeysChanged() const;
+	bool saveTerrainKeys();
 
 	Ui::WBQtNewBrushDialog *m_ui;	// owns the static widget tree (WBQtNewBrushDialog.ui)
 	int m_texClass;
 	QString m_name;
 	bool m_textureMode;
 	Keys m_textureKeys;	// what the user set for a new texture, kept while an existing terrain shows its own
+	Keys m_terrainKeys;	// the selected terrain's keys as last loaded or saved
 };
 
 #endif // WB_QT_NEW_BRUSH_DIALOG_H

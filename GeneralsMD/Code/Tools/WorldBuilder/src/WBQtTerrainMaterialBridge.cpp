@@ -228,6 +228,23 @@ int WBQtTerrainMaterial_GetTerrainKeys(int texClass, int *blendEdges, int *restr
 	return 1;
 }
 
+int WBQtTerrainMaterial_SetTerrainKeys(int texClass, int restrictConstruction, double glintStrength, double glintGloss, char *errorOut, int cap)
+{
+	if (texClass < 0 || texClass >= WorldHeightMapEdit::getNumTexClasses())
+	{
+		copyString(errorOut, cap, "No terrain is selected.");
+		return 0;
+	}
+	TerrainBrushes::TerrainKeys keys;
+	keys.restrictConstruction = (restrictConstruction != 0);
+	keys.glintStrength = (Real)glintStrength;
+	keys.glintGloss = (Real)glintGloss;
+	AsciiString error;
+	Bool ok = TerrainBrushes::setTerrainKeys(WorldHeightMapEdit::getTexClassName(texClass).str(), keys, error);
+	copyString(errorOut, cap, error.str());
+	return ok ? 1 : 0;
+}
+
 int WBQtTerrainMaterial_GetBrushAliasCount(void)
 {
 	return TerrainBrushes::getNumAliases();

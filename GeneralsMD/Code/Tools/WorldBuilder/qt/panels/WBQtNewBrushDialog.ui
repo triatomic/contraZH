@@ -192,6 +192,19 @@
             </property>
            </widget>
           </item>
+          <item row="4" column="0" colspan="2">
+           <widget class="QPushButton" name="saveKeysBtn">
+            <property name="text">
+             <string>Save to Terrain.ini</string>
+            </property>
+            <property name="toolTip">
+             <string>Rewrites this terrain's keys in the loose Data\INI\Terrain.ini. No brush is needed.</string>
+            </property>
+            <property name="autoDefault">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
          </layout>
         </widget>
        </item>

@@ -76,7 +76,9 @@ A brush made from a new texture also appends a `Terrain` block to the loose `Dat
 so maps painted with it draw in-game. When that file is only inside a `.big`, New refuses; extract
 `Terrain.ini` into `Data\INI\` first. Terrain INI is part of the multiplayer INI check, so every
 player needs the edited file. A texture picked outside `Art\Terrain` is copied there. Ticked boxes
-add `BlendEdges`, `RestrictConstruction`, `GlintStrength` and `GlintGloss` to the block.
+add `BlendEdges`, `RestrictConstruction`, `GlintStrength` and `GlintGloss` to the block. With an
+existing terrain picked, the boxes show its keys, and Save to Terrain.ini rewrites them in its block
+(or appends an override block when the terrain is defined in another file).
 
 ## Viewing the map
 

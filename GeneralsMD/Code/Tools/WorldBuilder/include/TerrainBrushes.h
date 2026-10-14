@@ -65,6 +65,9 @@ public:
 	/** A texture brush can succeed with a warning in error when only its category failed to save. */
 	static Int create(const char *name, const char *category, const char *terrain, const char *texture, const TerrainKeys &keys, AsciiString &error);
 
+	/// Rewrites an existing terrain's RestrictConstruction and glint keys in the loose Terrain.ini.
+	static Bool setTerrainKeys(const char *name, const TerrainKeys &keys, AsciiString &error);
+
 private:
 	struct CategoryEntry
 	{

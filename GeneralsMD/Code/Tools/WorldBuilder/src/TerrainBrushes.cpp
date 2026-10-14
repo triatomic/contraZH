@@ -28,6 +28,7 @@
 #include "Common/TerrainTypes.h"
 
 #include <stdio.h>
+#include <string>
 
 static const char *const BRUSH_DIR = "WorldBuilderQt\\";
 static const char *const BRUSH_FILE = "WorldBuilderQt\\TerrainBrushes.ini";
@@ -105,6 +106,75 @@ namespace
 			}
 		}
 		return true;
+	}
+
+	// A new loose Terrain.ini would hide the archive copy and every terrain in it.
+	Bool hasLooseTerrainIni(AsciiString &error)
+	{
+		DWORD attributes = GetFileAttributes(GAME_TERRAIN_FILE);
+		if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+		{
+			error.format("%s is not a loose file. Extract Terrain.ini from the mod's .big into Data\\INI\\ and try again.", GAME_TERRAIN_FILE);
+			return false;
+		}
+		return true;
+	}
+
+	// The line's first two whitespace-separated words.
+	void lineWords(const std::string &line, std::string &first, std::string &second)
+	{
+		first.clear();
+		second.clear();
+		size_t pos = line.find_first_not_of(" \t");
+		while (pos != std::string::npos && pos < line.size() && line[pos] != ' ' && line[pos] != '\t' && line[pos] != ';' && line[pos] != '=')
+		{
+			first += line[pos++];
+		}
+		pos = (pos == std::string::npos) ? pos : line.find_first_not_of(" \t", pos);
+		while (pos != std::string::npos && pos < line.size() && line[pos] != ' ' && line[pos] != '\t' && line[pos] != ';')
+		{
+			second += line[pos++];
+		}
+	}
+
+	// Sets, adds or removes "key = value" inside the block lines [start, end). Returns the new end.
+	size_t setBlockKey(std::vector<std::string> &lines, size_t start, size_t end, const char *key, const std::string &value, Bool remove, Bool addIfMissing)
+	{
+		Bool found = false;
+		size_t i = start;
+		while (i < end)
+		{
+			std::string first, second;
+			lineWords(lines[i], first, second);
+			if (stricmp(first.c_str(), key) != 0)
+			{
+				i++;
+				continue;
+			}
+			if (remove)
+			{
+				lines.erase(lines.begin() + i);
+				end--;
+				continue;
+			}
+			size_t indent = lines[i].find_first_not_of(" \t");
+			lines[i] = lines[i].substr(0, indent) + key + " = " + value;
+			found = true;
+			i++;
+		}
+		if (!remove && !found && addIfMissing)
+		{
+			lines.insert(lines.begin() + end, std::string("  ") + key + " = " + value);
+			end++;
+		}
+		return end;
+	}
+
+	std::string formatReal(Real value)
+	{
+		char buf[32];
+		snprintf(buf, ARRAY_SIZE(buf), "%g", value);
+		return buf;
 	}
 
 	Bool textureHasTiles(const AsciiString &texture)
@@ -354,11 +424,8 @@ Int TerrainBrushes::createTerrain(Block &block, const AsciiString &texture, cons
 		return -1;
 	}
 
-	// A new loose Terrain.ini would hide the archive copy and every terrain in it.
-	DWORD attributes = GetFileAttributes(GAME_TERRAIN_FILE);
-	if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+	if (!hasLooseTerrainIni(error))
 	{
-		error.format("%s is not a loose file. Extract Terrain.ini from the mod's .big into Data\\INI\\ and try again.", GAME_TERRAIN_FILE);
 		return -1;
 	}
 	FILE *fp = fopen(GAME_TERRAIN_FILE, "a");
@@ -420,6 +487,128 @@ Int TerrainBrushes::createTerrain(Block &block, const AsciiString &texture, cons
 	setCategory(block.name, block.category);
 	appendToFile(block, error);
 	return texClass;
+}
+
+// BlendEdges is left alone: the loaded texture class already decided how its tiles are used.
+Bool TerrainBrushes::setTerrainKeys(const char *name, const TerrainKeys &keys, AsciiString &error)
+{
+	TerrainType *terrain = TheTerrainTypes->findTerrain(name ? name : "");
+	if (terrain == nullptr)
+	{
+		error.format("Terrain '%s' is not defined.", name ? name : "");
+		return false;
+	}
+	if (!hasLooseTerrainIni(error))
+	{
+		return false;
+	}
+
+	FILE *fp = fopen(GAME_TERRAIN_FILE, "rb");
+	if (fp == nullptr)
+	{
+		error.format("Cannot read '%s'.", GAME_TERRAIN_FILE);
+		return false;
+	}
+	std::string text;
+	char buf[4096];
+	size_t got;
+	while ((got = fread(buf, 1, sizeof(buf), fp)) > 0)
+	{
+		text.append(buf, got);
+	}
+	fclose(fp);
+
+	std::string eol = (text.find("\r\n") != std::string::npos) ? "\r\n" : "\n";
+	std::vector<std::string> lines;
+	size_t pos = 0;
+	while (pos < text.size())
+	{
+		size_t nl = text.find('\n', pos);
+		size_t stop = (nl == std::string::npos) ? text.size() : nl;
+		std::string line = text.substr(pos, stop - pos);
+		if (!line.empty() && line[line.size() - 1] == '\r')
+		{
+			line.erase(line.size() - 1);
+		}
+		lines.push_back(line);
+		pos = (nl == std::string::npos) ? text.size() : nl + 1;
+	}
+
+	// The last block for the name wins, as in the game.
+	size_t start = lines.size();
+	size_t end = lines.size();
+	size_t i;
+	for (i = 0; i < lines.size(); i++)
+	{
+		std::string first, second;
+		lineWords(lines[i], first, second);
+		if (stricmp(first.c_str(), "Terrain") == 0 && second == name)
+		{
+			start = i + 1;
+		}
+	}
+	if (start < lines.size())
+	{
+		for (end = start; end < lines.size(); end++)
+		{
+			std::string first, second;
+			lineWords(lines[end], first, second);
+			if (stricmp(first.c_str(), "End") == 0)
+			{
+				break;
+			}
+		}
+	}
+	else
+	{
+		// Defined only in another file: a block of the same name overrides the keys it lists.
+		lines.push_back("");
+		lines.push_back(std::string("Terrain ") + name);
+		lines.push_back("End");
+		start = lines.size() - 1;
+		end = start;
+	}
+
+	end = setBlockKey(lines, start, end, "RestrictConstruction", keys.restrictConstruction ? "Yes" : "No", false, keys.restrictConstruction);
+	end = setBlockKey(lines, start, end, "GlintStrength", formatReal(keys.glintStrength), keys.glintStrength < 0.0f, true);
+	end = setBlockKey(lines, start, end, "GlintGloss", formatReal(keys.glintGloss), keys.glintGloss <= 0.0f, true);
+
+	std::string out;
+	for (i = 0; i < lines.size(); i++)
+	{
+		out += lines[i];
+		if (i + 1 < lines.size() || (!text.empty() && text[text.size() - 1] == '\n'))
+		{
+			out += eol;
+		}
+	}
+
+	// Write beside the file and swap it in, so a failed write leaves Terrain.ini whole.
+	AsciiString tempPath;
+	tempPath.format("%s.tmp", GAME_TERRAIN_FILE);
+	fp = fopen(tempPath.str(), "wb");
+	if (fp == nullptr)
+	{
+		error.format("Cannot write '%s'.", tempPath.str());
+		return false;
+	}
+	Bool ok = (fwrite(out.data(), 1, out.size(), fp) == out.size());
+	ok = (fclose(fp) == 0) && ok;
+	if (!ok || !MoveFileEx(tempPath.str(), GAME_TERRAIN_FILE, MOVEFILE_REPLACE_EXISTING))
+	{
+		DeleteFile(tempPath.str());
+		error.format("Cannot write '%s'.", GAME_TERRAIN_FILE);
+		return false;
+	}
+
+	// A removed key falls back to DefaultTerrain, as the game's parser would leave it.
+	TerrainType *defaults = TheTerrainTypes->findTerrain("DefaultTerrain");
+	Real defaultStrength = defaults ? defaults->getGlintStrength() : 1.0f;
+	Real defaultGloss = defaults ? defaults->getGlintGloss() : 0.0f;
+	terrain->friend_setRestrictConstruction(keys.restrictConstruction);
+	terrain->friend_setGlint(keys.glintStrength >= 0.0f ? keys.glintStrength : defaultStrength,
+		keys.glintGloss > 0.0f ? keys.glintGloss : defaultGloss);
+	return true;
 }
 
 Bool TerrainBrushes::appendToFile(const Block &block, AsciiString &error)

@@ -35,6 +35,10 @@ int  WBQtTerrainMaterial_GetTexClassTerrainName(int texClass, char *nameOut, int
 // The class' Terrain.ini keys as the game parsed them. A glintGloss of 0 means GameData's gloss.
 // Returns 0 for eval textures.
 int  WBQtTerrainMaterial_GetTerrainKeys(int texClass, int *blendEdges, int *restrictConstruction, double *glintStrength, double *glintGloss);
+// Rewrites the class' keys in the loose Data\INI\Terrain.ini (BlendEdges stays as loaded). A
+// negative glintStrength or a glintGloss of zero or less removes that key. Returns 0 with the
+// reason in errorOut.
+int  WBQtTerrainMaterial_SetTerrainKeys(int texClass, int restrictConstruction, double glintStrength, double glintGloss, char *errorOut, int cap);
 
 // --- WorldBuilder-only brushes from WorldBuilderQt\*.ini (TerrainBrushes). An alias is a named
 //     tree entry that paints another terrain's texture class. -------------------------------
