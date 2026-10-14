@@ -6,7 +6,8 @@ Modding documentation for [contraZH](https://github.com/triatomic/contraZH).
 
 Most of this is a copy of the [GeneralsGameCode_Modding
 wiki](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki), which contraZH is forked from.
-Those pages document upstream's engine additions and apply here unchanged.
+Those pages document upstream's engine additions and apply here unchanged. Credit for them goes to
+Andi and the other GeneralsGameCode_Modding contributors.
 
 Changes specific to this fork are on [contraZH Changes](contraZH-Changes.md).
 

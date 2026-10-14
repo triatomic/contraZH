@@ -1,6 +1,7 @@
 site_name: contraZH Docs
 site_url: https://triatomic.github.io/contraZH/
 site_description: Modding documentation for contraZH
+copyright: Upstream reference pages by Andi and the <a href="https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki">GeneralsGameCode_Modding</a> contributors
 repo_url: https://github.com/triatomic/contraZH
 repo_name: triatomic/contraZH
 edit_uri: edit/main/docs/
