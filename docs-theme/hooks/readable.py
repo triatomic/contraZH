@@ -1,4 +1,4 @@
-"""Build-time readability fixes for the docs site; the .md files stay GitHub-wiki Markdown."""
+"""Build-time readability fixes for the docs site; the .md files stay GitHub Markdown."""
 
 import re
 import xml.etree.ElementTree as etree

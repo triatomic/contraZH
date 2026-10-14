@@ -25,7 +25,7 @@ extra_javascript:
 hooks:
   - docs-theme/hooks/readable.py
 
-# Theme assets live outside docs/ so the wiki sync never picks them up
+# Theme assets live outside docs/ so docs/ holds only pages and images
 theme:
   name: material
   custom_dir: docs-theme
@@ -53,7 +53,7 @@ markdown_extensions:
   - attr_list
   - md_in_html
   - tables
-  # GitHub-style heading IDs, so anchors work on both the site and the wiki
+  # GitHub-style heading IDs, so anchors match GitHub's own rendering of docs/
   - toc:
       permalink: true
       slugify: !!python/object/apply:pymdownx.slugs.slugify

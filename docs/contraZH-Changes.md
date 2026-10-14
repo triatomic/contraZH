@@ -1,7 +1,7 @@
 # contraZH Changes
 
 Changes in [contraZH](https://github.com/triatomic/contraZH), a fork of GeneralsGameCode_Modding.
-Everything here is additional to upstream; the rest of this wiki still applies.
+Everything here is additional to upstream; the rest of these docs still applies.
 
 * Most changes are client-side, read from `Options.ini`, and default to retail behaviour. An
 untouched `Options.ini` plays exactly as before.
