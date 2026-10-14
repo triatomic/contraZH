@@ -293,6 +293,19 @@ Int TerrainBrushes::create(const char *name, const char *category, const char *t
 		error.format("Brush name '%s' must be letters, digits, '_', '-' or '.'.", block.name.str());
 		return -1;
 	}
+
+	// Both INI readers cut a value at these characters.
+	if (strchr(block.category.str(), ';') != nullptr)
+	{
+		error.format("Category '%s' must not contain ';'.", block.category.str());
+		return -1;
+	}
+	if (strpbrk(textureName.str(), " \t;=\"") != nullptr)
+	{
+		error.format("Texture '%s' must not contain spaces, ';', '=' or quotes. Rename the file.", textureName.str());
+		return -1;
+	}
+
 	if (!textureName.isEmpty())
 	{
 		return createTerrain(block, textureName, error);
@@ -314,14 +327,9 @@ Int TerrainBrushes::create(const char *name, const char *category, const char *t
 		return -1;
 	}
 
-	// A dry run on copies catches duplicate names before anything touches the file.
-	std::vector<Alias> savedAliases = s_aliases;
-	std::vector<CategoryEntry> savedCategories = s_categories;
-	Bool ok = apply(block, error);
-	s_aliases = savedAliases;
-	s_categories = savedCategories;
-	if (!ok)
+	if (!block.terrain.isEmpty() && (TheTerrainTypes->findTerrain(block.name) != nullptr || isAlias(block.name)))
 	{
+		error.format("Brush '%s' is already defined.", block.name.str());
 		return -1;
 	}
 

@@ -84,17 +84,16 @@ void WBQtNewBrushDialog::onBrowse()
 	QString rel = texDir.relativeFilePath(picked.absoluteFilePath());
 	if (rel.startsWith("..") || QDir::isAbsolutePath(rel))
 	{
-		// The game reads terrain textures only from the texture folder, so bring the file in.
-		QString dest = texDir.filePath(picked.fileName());
+		// The game reads terrain textures only from the texture folder, so bring the file in under
+		// a name its INI reader keeps whole.
+		QString fileName = picked.fileName();
+		fileName.replace(QRegExp("[\\s;=\"]"), "_");
+		QString dest = texDir.filePath(fileName);
 		if (QFile::exists(dest))
 		{
-			if (QMessageBox::question(this, "New Terrain Brush",
-				QString("%1 already exists. Replace it?").arg(QDir::toNativeSeparators(dest)),
-				QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes)
-			{
-				return;
-			}
-			QFile::remove(dest);
+			QMessageBox::warning(this, "New Terrain Brush",
+				QString("%1 already exists. Rename the file and pick it again.").arg(QDir::toNativeSeparators(dest)));
+			return;
 		}
 		QDir().mkpath(texDir.absolutePath());
 		if (!QFile::copy(picked.absoluteFilePath(), dest))
@@ -103,7 +102,7 @@ void WBQtNewBrushDialog::onBrowse()
 				QString("Could not copy the texture to %1.").arg(QDir::toNativeSeparators(dest)));
 			return;
 		}
-		rel = picked.fileName();
+		rel = fileName;
 	}
 	m_ui->textureEdit->setText(rel);
 
