@@ -16,8 +16,18 @@ plugins:
       redirect_maps:
         index.md: Home.md
 
+extra_css:
+  - assets/stylesheets/contra.css
+
+# Theme assets live outside docs/ so the wiki sync never picks them up
 theme:
   name: material
+  custom_dir: docs-theme
+  logo: assets/images/logo.svg
+  favicon: assets/images/logo.svg
+  font:
+    text: Exo 2
+    code: JetBrains Mono
   features:
     - navigation.sections
     - navigation.top
@@ -28,20 +38,9 @@ theme:
     - content.code.copy
     - content.action.edit
   palette:
-    - media: "(prefers-color-scheme: light)"
-      scheme: default
-      primary: blue grey
-      accent: deep orange
-      toggle:
-        icon: material/brightness-7
-        name: Switch to dark mode
-    - media: "(prefers-color-scheme: dark)"
-      scheme: slate
-      primary: blue grey
-      accent: deep orange
-      toggle:
-        icon: material/brightness-4
-        name: Switch to light mode
+    scheme: slate
+    primary: custom
+    accent: custom
 
 markdown_extensions:
   - admonition
