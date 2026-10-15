@@ -1584,34 +1584,34 @@ static GameWindow *findOptionsWindow( const char *name, NameKeyType &id )
 	return TheWindowManager->winGetWindowFromId( nullptr, id );
 }
 
-static void setLabelText( const char *name, const char *label, const WideChar *fallback )
+static void setLabelText( const char *name, const char *label )
 {
 	GameWindow *window = findOptionsWindow( name );
 	if (window)
 	{
-		GadgetStaticTextSetText( window, TheGameText->FETCH_OR_SUBSTITUTE( label, fallback ) );
+		GadgetStaticTextSetText( window, TheGameText->fetch( label ) );
 	}
 }
 
-static void setCheckText( GameWindow *check, const char *label, const WideChar *fallback, const char *tip, const WideChar *tipFallback )
+static void setCheckText( GameWindow *check, const char *label, const char *tip )
 {
 	if (check)
 	{
-		GadgetCheckBoxSetText( check, TheGameText->FETCH_OR_SUBSTITUTE( label, fallback ) );
-		check->winSetTooltip( TheGameText->FETCH_OR_SUBSTITUTE( tip, tipFallback ) );
+		GadgetCheckBoxSetText( check, TheGameText->fetch( label ) );
+		check->winSetTooltip( TheGameText->fetch( tip ) );
 	}
 }
 
-static void setTooltip( GameWindow *window, const char *tip, const WideChar *fallback )
+static void setTooltip( GameWindow *window, const char *tip )
 {
 	if (window)
 	{
-		window->winSetTooltip( TheGameText->FETCH_OR_SUBSTITUTE( tip, fallback ) );
+		window->winSetTooltip( TheGameText->fetch( tip ) );
 	}
 }
 
-// maxDisplay stays one short of count so the list shows a scrollbar, as the Detail combo does
-static void addComboEntries( GameWindow *combo, const char *labelPrefix, const WideChar *const *fallbacks, Int count, Int maxDisplay )
+// Entry i reads label labelPrefix<i>; maxDisplay stays one short of count so the list shows a scrollbar, as the Detail combo does
+static void addComboEntries( GameWindow *combo, const char *labelPrefix, Int count, Int maxDisplay )
 {
 	if (!combo)
 	{
@@ -1624,7 +1624,7 @@ static void addComboEntries( GameWindow *combo, const char *labelPrefix, const W
 	{
 		AsciiString label;
 		label.format( "%s%d", labelPrefix, i );
-		GadgetComboBoxAddEntry( combo, TheGameText->FETCH_OR_SUBSTITUTE( label.str(), fallbacks[i] ), white );
+		GadgetComboBoxAddEntry( combo, TheGameText->fetch( label.str() ), white );
 	}
 }
 
@@ -1702,99 +1702,90 @@ static void initGameOptionsWindows()
 
 	if (ButtonGameOptions)
 	{
-		GadgetButtonSetText( ButtonGameOptions, TheGameText->FETCH_OR_SUBSTITUTE( "GUI:GameOptions", L"Game Options" ) );
+		GadgetButtonSetText( ButtonGameOptions, TheGameText->fetch( "GUI:GameOptions" ) );
 	}
-	setLabelText( "OptionsMenu.wnd:GameOptionsTitle", "GUI:GameOptions", L"Game Options" );
-	setLabelText( "OptionsMenu.wnd:DisplayGroupLabel", "GUI:GameOptionsDisplay", L"Display" );
-	setLabelText( "OptionsMenu.wnd:HealthBarsLabel", "GUI:HealthBars", L"Health bars" );
-	setLabelText( "OptionsMenu.wnd:AlliedDecalsLabel", "GUI:AlliedDecals", L"Allied power decals" );
-	setLabelText( "OptionsMenu.wnd:BuildTimersLabel", "GUI:BuildTimers", L"Build timers" );
-	setLabelText( "OptionsMenu.wnd:ActionLinesLabel", "GUI:ActionLines", L"Action lines" );
-	setLabelText( "OptionsMenu.wnd:InputGroupLabel", "GUI:GameOptionsInput", L"Input" );
-	setLabelText( "OptionsMenu.wnd:CastModeLabel", "GUI:CastMode", L"Special powers" );
-	setLabelText( "OptionsMenu.wnd:RadarGroupLabel", "GUI:GameOptionsRadar", L"Radar" );
-	setLabelText( "OptionsMenu.wnd:GraphicsGroupLabel", "GUI:GameOptionsGraphics", L"Graphics" );
-	setLabelText( "OptionsMenu.wnd:TextureFilterLabel", "GUI:TextureFilter", L"Texture filter" );
-	setLabelText( "OptionsMenu.wnd:AnisotropyLabel", "GUI:Anisotropy", L"Anisotropic" );
-	setLabelText( "OptionsMenu.wnd:CameraGroupLabel", "GUI:GameOptionsCamera", L"Camera" );
-	setLabelText( "OptionsMenu.wnd:GridHotkeysGroupLabel", "GUI:GameOptionsGridHotkeys", L"Grid hotkeys" );
-	setLabelText( "OptionsMenu.wnd:GridHotkeyLayoutLabel", "GUI:GridHotkeyLayout", L"Layout" );
-	setLabelText( "OptionsMenu.wnd:GridHotkeyColumnsLabel", "GUI:GridHotkeyColumns", L"Columns" );
-	setLabelText( "OptionsMenu.wnd:NonGridHotkeysLabel", "GUI:NonGridHotkeys", L"Excluded keys" );
-	setLabelText( "OptionsMenu.wnd:KeyboardOverlayGroupLabel", "GUI:GameOptionsKeyboardOverlay", L"Hotkey letters" );
-	setLabelText( "OptionsMenu.wnd:KeyboardOverlayColorLabel", "GUI:KeyboardOverlayColor", L"Letter R G B" );
-	setLabelText( "OptionsMenu.wnd:KeyboardOverlayBackdropColorLabel", "GUI:KeyboardOverlayBackdropColor", L"Backdrop R G B" );
-	setLabelText( "OptionsMenu.wnd:KeyboardOverlayBackdropOpacityLabel", "GUI:KeyboardOverlayBackdropOpacity", L"Backdrop opacity" );
-	setLabelText( "OptionsMenu.wnd:BloomGroupLabel", "GUI:GameOptionsBloom", L"Bloom" );
-	setLabelText( "OptionsMenu.wnd:BloomStrengthLabel", "GUI:BloomStrength", L"Strength %" );
+	setLabelText( "OptionsMenu.wnd:GameOptionsTitle", "GUI:GameOptions" );
+	setLabelText( "OptionsMenu.wnd:DisplayGroupLabel", "GUI:GameOptionsDisplay" );
+	setLabelText( "OptionsMenu.wnd:HealthBarsLabel", "GUI:HealthBars" );
+	setLabelText( "OptionsMenu.wnd:AlliedDecalsLabel", "GUI:AlliedDecals" );
+	setLabelText( "OptionsMenu.wnd:BuildTimersLabel", "GUI:BuildTimers" );
+	setLabelText( "OptionsMenu.wnd:ActionLinesLabel", "GUI:ActionLines" );
+	setLabelText( "OptionsMenu.wnd:InputGroupLabel", "GUI:GameOptionsInput" );
+	setLabelText( "OptionsMenu.wnd:CastModeLabel", "GUI:CastMode" );
+	setLabelText( "OptionsMenu.wnd:RadarGroupLabel", "GUI:GameOptionsRadar" );
+	setLabelText( "OptionsMenu.wnd:GraphicsGroupLabel", "GUI:GameOptionsGraphics" );
+	setLabelText( "OptionsMenu.wnd:TextureFilterLabel", "GUI:TextureFilter" );
+	setLabelText( "OptionsMenu.wnd:AnisotropyLabel", "GUI:Anisotropy" );
+	setLabelText( "OptionsMenu.wnd:CameraGroupLabel", "GUI:GameOptionsCamera" );
+	setLabelText( "OptionsMenu.wnd:GridHotkeysGroupLabel", "GUI:GameOptionsGridHotkeys" );
+	setLabelText( "OptionsMenu.wnd:GridHotkeyLayoutLabel", "GUI:GridHotkeyLayout" );
+	setLabelText( "OptionsMenu.wnd:GridHotkeyColumnsLabel", "GUI:GridHotkeyColumns" );
+	setLabelText( "OptionsMenu.wnd:NonGridHotkeysLabel", "GUI:NonGridHotkeys" );
+	setLabelText( "OptionsMenu.wnd:KeyboardOverlayGroupLabel", "GUI:GameOptionsKeyboardOverlay" );
+	setLabelText( "OptionsMenu.wnd:KeyboardOverlayColorLabel", "GUI:KeyboardOverlayColor" );
+	setLabelText( "OptionsMenu.wnd:KeyboardOverlayBackdropColorLabel", "GUI:KeyboardOverlayBackdropColor" );
+	setLabelText( "OptionsMenu.wnd:KeyboardOverlayBackdropOpacityLabel", "GUI:KeyboardOverlayBackdropOpacity" );
+	setLabelText( "OptionsMenu.wnd:BloomGroupLabel", "GUI:GameOptionsBloom" );
+	setLabelText( "OptionsMenu.wnd:BloomStrengthLabel", "GUI:BloomStrength" );
 
-	setCheckText( checkNumericalHealth, "GUI:NumericalHealth", L"Show health as numbers", "TOOLTIP:NumericalHealth", L"Writes the hit points next to the health bar" );
-	setCheckText( checkSmartPips, "GUI:SmartPips", L"Always show ammo and cargo pips", "TOOLTIP:SmartPips", L"Shows ammo and passenger pips without selecting the unit" );
-	setCheckText( checkSelectionCircle, "GUI:SelectionCircle", L"Selection ring under units", "TOOLTIP:SelectionCircle", L"Draws a ring on the ground under selected units" );
-	setCheckText( checkDefensesRangeCircle, "GUI:DefensesRangeCircle", L"Attack range ring while placing", "TOOLTIP:DefensesRangeCircle", L"Rings the attack range of an armed structure while you position it" );
-	setCheckText( checkObjectDecals, "GUI:ObjectDecals", L"Object decals", "TOOLTIP:ObjectDecals", L"Draws the ground decals objects ask for" );
-	setCheckText( checkEasyMilitaryDrag, "GUI:EasyMilitaryDrag", L"Drag select skips builders", "TOOLTIP:EasyMilitaryDrag", L"A drag box that holds combat units leaves dozers and workers out" );
-	setCheckText( checkSmartSelection, "GUI:SmartSelection", L"Smart selection", "TOOLTIP:SmartSelection", L"Selecting a mixed group shows the command bar of the unit type you pick" );
-	setCheckText( checkSmartSelectionUseMouse, "GUI:SmartSelectionUseMouse", L"Smart selection follows mouse", "TOOLTIP:SmartSelectionUseMouse", L"Right clicking a unit cameo also switches the command bar" );
-	setCheckText( checkSmartCommandGroup, "GUI:SmartCommandGroup", L"Command group row", "TOOLTIP:SmartCommandGroup", L"Shows a cameo for each command group under the smart selection row" );
-	setCheckText( checkNewRadar, "GUI:NewRadar", L"New radar (needs restart)", "TOOLTIP:NewRadar", L"Outlined blips and shoreline on the radar. Takes effect after a restart." );
-	setCheckText( checkLargeBlips, "GUI:LargeBlips", L"Large radar blips (needs restart)", "TOOLTIP:LargeBlips", L"Bigger blips on the new radar. Takes effect after a restart." );
-	setCheckText( checkGridHotkeys, "GUI:GridHotkeys", L"Use grid hotkeys", "TOOLTIP:GridHotkeys", L"Command bar slots use the layout keys instead of the retail hotkeys" );
-	setCheckText( checkKeyboardOverlay, "GUI:KeyboardOverlay", L"Show hotkey letters on cameos", "TOOLTIP:KeyboardOverlay", L"Draws each cameo's hotkey letter on the cameo" );
-	setCheckText( checkKeyboardOverlayBackdrop, "GUI:KeyboardOverlayBackdrop", L"Backdrop behind letter", "TOOLTIP:KeyboardOverlayBackdrop", L"Draws a plate behind the letter so it stays readable" );
-	setCheckText( checkBloom, "GUI:Bloom", L"Bloom", "TOOLTIP:Bloom", L"Fire, lasers, muzzle flashes and additive model parts get a soft glow. Off while anti-aliasing is on." );
-	setCheckText( checkBloomDebug, "GUI:BloomDebug", L"Debug view", "TOOLTIP:BloomDebug", L"Shows only the glow buffer on black" );
-	setTooltip( textEntryBloomStrength, "TOOLTIP:BloomStrength", L"Bloom strength, 0 to 100. How bright the glow is." );
-	setCheckText( checkLaserRef, "GUI:LaserRef", L"Lasers light the ground", "TOOLTIP:LaserRef", L"Laser beams cast a colored light on the terrain along their length" );
-	setCheckText( checkSpecular, "GUI:Specular", L"Specular highlights", "TOOLTIP:Specular", L"Vehicles and structures catch a highlight from the sun, brightest on metal and gone in shadow. Needs a Direct3D 9 card." );
-	setCheckText( checkNormalMaps, "GUI:NormalMaps", L"Surface detail", "TOOLTIP:NormalMaps", L"Panels, rivets and plating on vehicles and structures, and the ground's grain, catch and lose the sun's light. Uses a texture's normal map where one exists. Needs a Direct3D 9 card with Shader Model 2.0a or later." );
-	setCheckText( checkWaterReflections, "GUI:WaterReflections", L"Water reflections", "TOOLTIP:WaterReflections", L"Lakes and seas mirror the cliffs, trees, units and buildings around them. Needs Smooth water and a Direct3D 9 card." );
-	setCheckText( checkShorelineFoam, "GUI:ShorelineFoam", L"Shoreline foam", "TOOLTIP:ShorelineFoam", L"A band of surf washes up and back where lakes and seas meet the shore. Needs Smooth water and a Direct3D 9 card with Shader Model 3." );
-	setCheckText( checkDynamicLights, "GUI:DynamicLights", L"Dynamic lights", "TOOLTIP:DynamicLights", L"Explosions, muzzle flashes and lasers light the ground, units and buildings around them." );
-	setCheckText( checkPixelLights, "GUI:PixelLights", L"Per-pixel lights", "TOOLTIP:PixelLights", L"Dynamic lights fall in smooth circles that follow the ground's detail, instead of blocky patches. Needs a Direct3D 9 card with Shader Model 2.0a or later." );
-	setCheckText( checkLowLatency, "GUI:LowLatency", L"Low latency mode", "TOOLTIP:LowLatency", L"Lets the game prepare only one frame ahead of the graphics card, so the screen answers the mouse sooner. Can lower the frame rate a little. Needs the Direct3D 9 build." );
-	setCheckText( checkSmoothUnitMotion, "GUI:SmoothUnitMotion", L"Smooth unit motion", "TOOLTIP:SmoothUnitMotion", L"Above 30 frames a second, units, projectiles and turrets glide between game updates instead of stepping 30 times a second. Single player, skirmish and replays." );
-	setCheckText( checkVSync, "GUI:VSync", L"Vertical sync", "TOOLTIP:VSync", L"Waits for the monitor's refresh before showing each frame, which stops tearing but can add a little input delay." );
-	setCheckText( checkAmbientOcclusion, "GUI:AmbientOcclusion", L"Ambient occlusion", "TOOLTIP:AmbientOcclusion", L"Creases, corners and the ground where units and buildings stand fall into soft shade. Off while anti-aliasing is on. Needs a Direct3D 9 card with Shader Model 2.0a or later." );
-	setCheckText( checkHeightBlend, "GUI:HeightBlend", L"Height blending", "TOOLTIP:HeightBlend", L"Where two terrain textures meet, the taller one's stones and clumps push into the other instead of a soft fade. Needs a Direct3D 9 card." );
-	setCheckText( checkHQSky, "GUI:HQSky", L"HQ sky", "TOOLTIP:HQSky", L"Cloud shadows drift softly, change shape as they go and never repeat, instead of sliding as one tiled pattern. Needs Cloud shadows and a Direct3D 9 card." );
-	setCheckText( checkSoftParticles, "GUI:SoftParticles", L"Soft particles", "TOOLTIP:SoftParticles", L"Smoke, dust and fire fade where they meet the ground and buildings, instead of cutting a hard line. Needs a Direct3D 9 card." );
-	setCheckText( checkShadowMap, "GUI:ShadowMap", L"Shadow mapping", "TOOLTIP:ShadowMap", L"Soft shadows shaped like their objects, falling on ground, bridges, units and buildings. 3D and 2D Shadows still choose which objects cast. Needs a Direct3D 9 card." );
+	setCheckText( checkNumericalHealth, "GUI:NumericalHealth", "TOOLTIP:NumericalHealth" );
+	setCheckText( checkSmartPips, "GUI:SmartPips", "TOOLTIP:SmartPips" );
+	setCheckText( checkSelectionCircle, "GUI:SelectionCircle", "TOOLTIP:SelectionCircle" );
+	setCheckText( checkDefensesRangeCircle, "GUI:DefensesRangeCircle", "TOOLTIP:DefensesRangeCircle" );
+	setCheckText( checkObjectDecals, "GUI:ObjectDecals", "TOOLTIP:ObjectDecals" );
+	setCheckText( checkEasyMilitaryDrag, "GUI:EasyMilitaryDrag", "TOOLTIP:EasyMilitaryDrag" );
+	setCheckText( checkSmartSelection, "GUI:SmartSelection", "TOOLTIP:SmartSelection" );
+	setCheckText( checkSmartSelectionUseMouse, "GUI:SmartSelectionUseMouse", "TOOLTIP:SmartSelectionUseMouse" );
+	setCheckText( checkSmartCommandGroup, "GUI:SmartCommandGroup", "TOOLTIP:SmartCommandGroup" );
+	setCheckText( checkNewRadar, "GUI:NewRadar", "TOOLTIP:NewRadar" );
+	setCheckText( checkLargeBlips, "GUI:LargeBlips", "TOOLTIP:LargeBlips" );
+	setCheckText( checkGridHotkeys, "GUI:GridHotkeys", "TOOLTIP:GridHotkeys" );
+	setCheckText( checkKeyboardOverlay, "GUI:KeyboardOverlay", "TOOLTIP:KeyboardOverlay" );
+	setCheckText( checkKeyboardOverlayBackdrop, "GUI:KeyboardOverlayBackdrop", "TOOLTIP:KeyboardOverlayBackdrop" );
+	setCheckText( checkBloom, "GUI:Bloom", "TOOLTIP:Bloom" );
+	setCheckText( checkBloomDebug, "GUI:BloomDebug", "TOOLTIP:BloomDebug" );
+	setTooltip( textEntryBloomStrength, "TOOLTIP:BloomStrength" );
+	setCheckText( checkLaserRef, "GUI:LaserRef", "TOOLTIP:LaserRef" );
+	setCheckText( checkSpecular, "GUI:Specular", "TOOLTIP:Specular" );
+	setCheckText( checkNormalMaps, "GUI:NormalMaps", "TOOLTIP:NormalMaps" );
+	setCheckText( checkWaterReflections, "GUI:WaterReflections", "TOOLTIP:WaterReflections" );
+	setCheckText( checkShorelineFoam, "GUI:ShorelineFoam", "TOOLTIP:ShorelineFoam" );
+	setCheckText( checkDynamicLights, "GUI:DynamicLights", "TOOLTIP:DynamicLights" );
+	setCheckText( checkPixelLights, "GUI:PixelLights", "TOOLTIP:PixelLights" );
+	setCheckText( checkLowLatency, "GUI:LowLatency", "TOOLTIP:LowLatency" );
+	setCheckText( checkSmoothUnitMotion, "GUI:SmoothUnitMotion", "TOOLTIP:SmoothUnitMotion" );
+	setCheckText( checkVSync, "GUI:VSync", "TOOLTIP:VSync" );
+	setCheckText( checkAmbientOcclusion, "GUI:AmbientOcclusion", "TOOLTIP:AmbientOcclusion" );
+	setCheckText( checkHeightBlend, "GUI:HeightBlend", "TOOLTIP:HeightBlend" );
+	setCheckText( checkHQSky, "GUI:HQSky", "TOOLTIP:HQSky" );
+	setCheckText( checkSoftParticles, "GUI:SoftParticles", "TOOLTIP:SoftParticles" );
+	setCheckText( checkShadowMap, "GUI:ShadowMap", "TOOLTIP:ShadowMap" );
 
-	setTooltip( comboBoxHealthBars, "TOOLTIP:HealthBars", L"Which units draw a health bar" );
-	setTooltip( comboBoxAlliedDecals, "TOOLTIP:AlliedDecals", L"Show where allies aim their general powers, in their player or faction color" );
-	setTooltip( comboBoxBuildTimers, "TOOLTIP:BuildTimers", L"Countdown numbers on build queue and cooldown cameos" );
-	setTooltip( comboBoxActionLines, "TOOLTIP:ActionLines", L"Lines from each selected unit to where its order sends it" );
-	setTooltip( comboBoxCastMode, "TOOLTIP:CastMode", L"How special power hotkeys fire" );
-	setTooltip( comboBoxTextureFilter, "TOOLTIP:TextureFilter", L"Texture filtering mode" );
-	setTooltip( comboBoxAnisotropy, "TOOLTIP:Anisotropy", L"Anisotropic filtering level" );
-	setTooltip( textEntryGridHotkeyLayout, "TOOLTIP:GridHotkeyLayout", L"One key per command bar slot, left to right, top to bottom" );
-	setTooltip( textEntryGridHotkeyColumns, "TOOLTIP:GridHotkeyColumns", L"Slots per row, 0 to 20. 0 keeps the retail order." );
-	setTooltip( textEntryNonGridHotkeys, "TOOLTIP:NonGridHotkeys", L"Letters that keep their retail binding, e.g. SG" );
-	setTooltip( textEntryKeyboardOverlayRed, "TOOLTIP:ColorChannel", L"0 to 255" );
-	setTooltip( textEntryKeyboardOverlayGreen, "TOOLTIP:ColorChannel", L"0 to 255" );
-	setTooltip( textEntryKeyboardOverlayBlue, "TOOLTIP:ColorChannel", L"0 to 255" );
-	setTooltip( textEntryKeyboardOverlayBackdropRed, "TOOLTIP:ColorChannel", L"0 to 255" );
-	setTooltip( textEntryKeyboardOverlayBackdropGreen, "TOOLTIP:ColorChannel", L"0 to 255" );
-	setTooltip( textEntryKeyboardOverlayBackdropBlue, "TOOLTIP:ColorChannel", L"0 to 255" );
-	setTooltip( textEntryKeyboardOverlayBackdropOpacity, "TOOLTIP:ColorChannel", L"0 to 255" );
+	setTooltip( comboBoxHealthBars, "TOOLTIP:HealthBars" );
+	setTooltip( comboBoxAlliedDecals, "TOOLTIP:AlliedDecals" );
+	setTooltip( comboBoxBuildTimers, "TOOLTIP:BuildTimers" );
+	setTooltip( comboBoxActionLines, "TOOLTIP:ActionLines" );
+	setTooltip( comboBoxCastMode, "TOOLTIP:CastMode" );
+	setTooltip( comboBoxTextureFilter, "TOOLTIP:TextureFilter" );
+	setTooltip( comboBoxAnisotropy, "TOOLTIP:Anisotropy" );
+	setTooltip( textEntryGridHotkeyLayout, "TOOLTIP:GridHotkeyLayout" );
+	setTooltip( textEntryGridHotkeyColumns, "TOOLTIP:GridHotkeyColumns" );
+	setTooltip( textEntryNonGridHotkeys, "TOOLTIP:NonGridHotkeys" );
+	setTooltip( textEntryKeyboardOverlayRed, "TOOLTIP:ColorChannel" );
+	setTooltip( textEntryKeyboardOverlayGreen, "TOOLTIP:ColorChannel" );
+	setTooltip( textEntryKeyboardOverlayBlue, "TOOLTIP:ColorChannel" );
+	setTooltip( textEntryKeyboardOverlayBackdropRed, "TOOLTIP:ColorChannel" );
+	setTooltip( textEntryKeyboardOverlayBackdropGreen, "TOOLTIP:ColorChannel" );
+	setTooltip( textEntryKeyboardOverlayBackdropBlue, "TOOLTIP:ColorChannel" );
+	setTooltip( textEntryKeyboardOverlayBackdropOpacity, "TOOLTIP:ColorChannel" );
 
-	static const WideChar *const healthBarNames[] = { L"Classic", L"Damaged only", L"Always" };
-	static const WideChar *const buildTimerNames[] = { L"Off", L"Seconds", L"Auto (m:ss)" };
-	static const WideChar *const castModeNames[] = { L"Click then target", L"Quick cast", L"Quick cast + indicator" };
-	static const WideChar *const textureFilterNames[] = { L"None", L"Point", L"Bilinear", L"Trilinear", L"Anisotropic" };
-	static const WideChar *const anisotropyNames[] = { L"2x", L"4x", L"8x", L"16x" };
-	static_assert( ARRAY_SIZE(textureFilterNames) == TextureFilterClass::TEXTURE_FILTER_COUNT, "textureFilterNames out of date" );
-	static_assert( ARRAY_SIZE(anisotropyNames) == ARRAY_SIZE(AnisotropyLevels), "anisotropyNames out of date" );
-	addComboEntries( comboBoxHealthBars, "GUI:HealthBars", healthBarNames, HealthBarDisplayMode_Count, 2 );
-	static const WideChar *const alliedDecalNames[] = { L"Hidden", L"House color", L"Army color" };
-	addComboEntries( comboBoxAlliedDecals, "GUI:AlliedDecals", alliedDecalNames, AlliedDecalMode_Count, 2 );
-	addComboEntries( comboBoxBuildTimers, "GUI:BuildTimers", buildTimerNames, BuildTimerDisplayMode_Count, 2 );
-	static const WideChar *const actionLineNames[] = { L"Off", L"All", L"Attack only" };
-	addComboEntries( comboBoxActionLines, "GUI:ActionLines", actionLineNames, ActionLineMode_Count, 2 );
-	addComboEntries( comboBoxCastMode, "GUI:CastMode", castModeNames, CastMode_Count, 2 );
-	addComboEntries( comboBoxTextureFilter, "GUI:TextureFilter", textureFilterNames, TextureFilterClass::TEXTURE_FILTER_COUNT, 4 );
-	addComboEntries( comboBoxAnisotropy, "GUI:Anisotropy", anisotropyNames, ARRAY_SIZE(AnisotropyLevels), 3 );
+	addComboEntries( comboBoxHealthBars, "GUI:HealthBars", HealthBarDisplayMode_Count, 2 );
+	addComboEntries( comboBoxAlliedDecals, "GUI:AlliedDecals", AlliedDecalMode_Count, 2 );
+	addComboEntries( comboBoxBuildTimers, "GUI:BuildTimers", BuildTimerDisplayMode_Count, 2 );
+	addComboEntries( comboBoxActionLines, "GUI:ActionLines", ActionLineMode_Count, 2 );
+	addComboEntries( comboBoxCastMode, "GUI:CastMode", CastMode_Count, 2 );
+	addComboEntries( comboBoxTextureFilter, "GUI:TextureFilter", TextureFilterClass::TEXTURE_FILTER_COUNT, 4 );
+	addComboEntries( comboBoxAnisotropy, "GUI:Anisotropy", ARRAY_SIZE(AnisotropyLevels), 3 );
 }
 
 // Finds the Shaders panel, which a layout without it leaves out along with its button
@@ -1815,22 +1806,17 @@ static void initShadersWindows()
 	// The layout hides the button, so an exe without this panel never shows it.
 	if (button)
 	{
-		GadgetButtonSetText( button, TheGameText->FETCH_OR_SUBSTITUTE( "GUI:Shaders", L"Shaders" ) );
+		GadgetButtonSetText( button, TheGameText->fetch( "GUI:Shaders" ) );
 		button->winHide( FALSE );
 	}
-	setLabelText( "OptionsMenu.wnd:ShadersTitle", "GUI:Shaders", L"Shaders" );
-	setLabelText( "OptionsMenu.wnd:ShadowsLabel", "GUI:ShadowMapResolution", L"Shadows" );
-	setTooltip( comboBoxShadows, "TOOLTIP:ShadowMapResolution", L"Width and height of the sun's shadow map. Larger gives sharper shadow edges and uses more video memory, 64 MB at 4096 x 4096. Needs Shadow mapping." );
+	setLabelText( "OptionsMenu.wnd:ShadersTitle", "GUI:Shaders" );
+	setLabelText( "OptionsMenu.wnd:ShadowsLabel", "GUI:ShadowMapResolution" );
+	setTooltip( comboBoxShadows, "TOOLTIP:ShadowMapResolution" );
+	addComboEntries( comboBoxShadows, "GUI:ShadowMapResolution", ARRAY_SIZE(ShadowMapResolutions), 3 );
 
-	static const WideChar *const shadowMapNames[] = { L"512 x 512", L"1024 x 1024", L"2048 x 2048", L"4096 x 4096" };
-	static_assert( ARRAY_SIZE(shadowMapNames) == ARRAY_SIZE(ShadowMapResolutions), "shadowMapNames out of date" );
-	addComboEntries( comboBoxShadows, "GUI:ShadowMapResolution", shadowMapNames, ARRAY_SIZE(ShadowMapResolutions), 3 );
-
-	setLabelText( "OptionsMenu.wnd:SuperSamplingLabel", "GUI:SuperSampling", L"Supersampling" );
-	setTooltip( comboBoxSuperSampling, "TOOLTIP:SuperSampling", L"Renders the world larger and shrinks it to the screen, which smooths every edge and keeps ambient occlusion and soft particles working. 200% draws four times the pixels. Takes the place of Anti-aliasing." );
-	static const WideChar *const superSamplingNames[] = { L"Off", L"150%", L"200%" };
-	static_assert( ARRAY_SIZE(superSamplingNames) == ARRAY_SIZE(SuperSamplingPercents), "superSamplingNames out of date" );
-	addComboEntries( comboBoxSuperSampling, "GUI:SuperSampling", superSamplingNames, ARRAY_SIZE(SuperSamplingPercents), 2 );
+	setLabelText( "OptionsMenu.wnd:SuperSamplingLabel", "GUI:SuperSampling" );
+	setTooltip( comboBoxSuperSampling, "TOOLTIP:SuperSampling" );
+	addComboEntries( comboBoxSuperSampling, "GUI:SuperSampling", ARRAY_SIZE(SuperSamplingPercents), 2 );
 
 	// not every layout ships the panel hidden
 	WinShaders->winHide( TRUE );
@@ -1889,17 +1875,17 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 	textEntryMaxCameraHeight = findOptionsWindow( "OptionsMenu.wnd:TextEntryMaxCameraHeight", textEntryMaxCameraHeightID );
 	if (checkMaxCameraHeight)
 	{
-		GadgetCheckBoxSetText( checkMaxCameraHeight, TheGameText->FETCH_OR_SUBSTITUTE( "GUI:MaxCameraHeight", L"Max Camera Height" ) );
-		checkMaxCameraHeight->winSetTooltip( TheGameText->FETCH_OR_SUBSTITUTE( "TOOLTIP:CheckMaxCameraHeight", L"Replaces the mod's camera height limit with your own. LAN and online games use the host's limit." ) );
+		GadgetCheckBoxSetText( checkMaxCameraHeight, TheGameText->fetch( "GUI:MaxCameraHeight" ) );
+		checkMaxCameraHeight->winSetTooltip( TheGameText->fetch( "TOOLTIP:CheckMaxCameraHeight" ) );
 	}
 	if (textEntryMaxCameraHeight)
 	{
-		textEntryMaxCameraHeight->winSetTooltip( TheGameText->FETCH_OR_SUBSTITUTE( "TOOLTIP:MaxCameraHeight", L"Max camera height, 210 to 1000" ) );
+		textEntryMaxCameraHeight->winSetTooltip( TheGameText->fetch( "TOOLTIP:MaxCameraHeight" ) );
 	}
 	checkBorderlessWindow = findOptionsWindow( "OptionsMenu.wnd:CheckBorderlessWindow", checkBorderlessWindowID );
-	setCheckText( checkBorderlessWindow, "GUI:BorderlessWindow", L"Borderless", "TOOLTIP:BorderlessWindow", L"Runs the game in a frameless window at the selected resolution instead of exclusive fullscreen." );
+	setCheckText( checkBorderlessWindow, "GUI:BorderlessWindow", "TOOLTIP:BorderlessWindow" );
 	checkWindowed = findOptionsWindow( "OptionsMenu.wnd:CheckWindowed", checkWindowedID );
-	setCheckText( checkWindowed, "GUI:Windowed", L"Windowed", "TOOLTIP:Windowed", L"Runs the game in a movable window with a title bar at the selected resolution." );
+	setCheckText( checkWindowed, "GUI:Windowed", "TOOLTIP:Windowed" );
 	comboBoxAntiAliasingID = TheNameKeyGenerator->nameToKey( "OptionsMenu.wnd:ComboBoxAntiAliasing" );
 	comboBoxAntiAliasing   = TheWindowManager->winGetWindowFromId( nullptr, comboBoxAntiAliasingID );
 	comboBoxResolutionID   = TheNameKeyGenerator->nameToKey( "OptionsMenu.wnd:ComboBoxResolution" );
@@ -2112,10 +2098,9 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 
 	// populate anti aliasing modes
 	AsciiString selectedAliasingMode = (*pref)["AntiAliasing"];
-	static const WideChar *const AntiAliasingFallbacks[OptionPreferences::AntiAliasingMode_Count] = { L"Off", L"2x", L"4x", L"8x" };
-	addComboEntries( comboBoxAntiAliasing, "GUI:AntiAliasing", AntiAliasingFallbacks, OptionPreferences::AntiAliasingMode_Count, OptionPreferences::AntiAliasingMode_Count - 1 );
-	setLabelText( "OptionsMenu.wnd:AntiAliasingLabel", "GUI:AntiAliasing", L"Anti-aliasing" );
-	setTooltip( comboBoxAntiAliasing, "TOOLTIP:AntiAliasing", L"Smooths jagged edges. Ambient occlusion needs it off, and soft particles fade only against the ground while it is on. Supersampling on the Shaders page takes its place." );
+	addComboEntries( comboBoxAntiAliasing, "GUI:AntiAliasing", OptionPreferences::AntiAliasingMode_Count, OptionPreferences::AntiAliasingMode_Count - 1 );
+	setLabelText( "OptionsMenu.wnd:AntiAliasingLabel", "GUI:AntiAliasing" );
+	setTooltip( comboBoxAntiAliasing, "TOOLTIP:AntiAliasing" );
 	Int val = atoi(selectedAliasingMode.str());
 	Int pos = 0;
 

@@ -698,7 +698,7 @@ static void updateLanAcceptButton()
 	}
 	if (isLocalSlotAccepted())
 	{
-		buttonStart->winSetText( TheGameText->FETCH_OR_SUBSTITUTE("GUI:Unready", L"Unready") );
+		buttonStart->winSetText( TheGameText->fetch("GUI:Unready") );
 		buttonStart->winEnable( TRUE );
 	}
 	else
@@ -902,24 +902,24 @@ void InitLanGameGadgets()
 	textEntryMaxCameraHeight = TheWindowManager->winGetWindowFromId( parentLanGameOptions, textEntryMaxCameraHeightID );
 	if (checkMaxCameraHeight)
 	{
-		GadgetCheckBoxSetText(checkMaxCameraHeight, TheGameText->FETCH_OR_SUBSTITUTE("GUI:MaxCameraHeight", L"Max Camera Height"));
-		checkMaxCameraHeight->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:CheckMaxCameraHeight", L"Sets one camera height limit for every player in this game"));
+		GadgetCheckBoxSetText(checkMaxCameraHeight, TheGameText->fetch("GUI:MaxCameraHeight"));
+		checkMaxCameraHeight->winSetTooltip(TheGameText->fetch("TOOLTIP:LobbyMaxCameraHeight"));
 	}
 	if (textEntryMaxCameraHeight)
 	{
-		textEntryMaxCameraHeight->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:MaxCameraHeight", L"Max camera height, 210 to 1000"));
+		textEntryMaxCameraHeight->winSetTooltip(TheGameText->fetch("TOOLTIP:MaxCameraHeight"));
 	}
 	checkCoopBuildings = TheWindowManager->winGetWindowFromId( parentLanGameOptions, checkCoopBuildingsID );
 	if (checkCoopBuildings)
 	{
-		GadgetCheckBoxSetText(checkCoopBuildings, TheGameText->FETCH_OR_SUBSTITUTE("GUI:CoopBuildings", L"Coop Buildings"));
-		checkCoopBuildings->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:CoopBuildings", L"Lets allies finish each other's unfinished buildings"));
+		GadgetCheckBoxSetText(checkCoopBuildings, TheGameText->fetch("GUI:CoopBuildings"));
+		checkCoopBuildings->winSetTooltip(TheGameText->fetch("TOOLTIP:CoopBuildings"));
 	}
 	checkQuickGame = TheWindowManager->winGetWindowFromId( parentLanGameOptions, checkQuickGameID );
 	if (checkQuickGame)
 	{
-		GadgetCheckBoxSetText(checkQuickGame, TheGameText->FETCH_OR_SUBSTITUTE("GUI:QuickGame", L"Quick Game"));
-		checkQuickGame->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:QuickGame", L"Lifts the rank requirements on advanced structures, superweapons and super units"));
+		GadgetCheckBoxSetText(checkQuickGame, TheGameText->fetch("GUI:QuickGame"));
+		checkQuickGame->winSetTooltip(TheGameText->fetch("TOOLTIP:QuickGame"));
 	}
 
 	InitLobbyTabs( lobbyTabs, parentLanGameOptions, "LanGameOptionsMenu.wnd" );

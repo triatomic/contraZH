@@ -436,7 +436,7 @@ void InitLobbyTabs( LobbyTabs &tabs, GameWindow *parent, const char *layoutFilen
 	}
 
 	// The tab buttons start hidden so an exe without this code keeps the Game page
-	GadgetButtonSetText( tabs.buttonRules, TheGameText->FETCH_OR_SUBSTITUTE("GUI:TabRules", L"Rules") );
+	GadgetButtonSetText( tabs.buttonRules, TheGameText->fetch("GUI:TabRules") );
 	tabs.buttonGame->winHide( FALSE );
 	tabs.buttonRules->winHide( FALSE );
 	ShowLobbyTab( tabs, FALSE );
@@ -454,7 +454,7 @@ void ShowLobbyTab( LobbyTabs &tabs, Bool rules )
 	GadgetCheckLikeButtonSetVisualCheck( tabs.buttonRules, rules );
 	if (!rules)
 	{
-		GadgetButtonSetText( tabs.buttonGame, TheGameText->FETCH_OR_SUBSTITUTE("GUI:TabGame", L"Game") );
+		GadgetButtonSetText( tabs.buttonGame, TheGameText->fetch("GUI:TabGame") );
 	}
 }
 
@@ -469,7 +469,7 @@ void MarkLobbyGameTab( LobbyTabs &tabs )
 	{
 		return;
 	}
-	UnicodeString label = TheGameText->FETCH_OR_SUBSTITUTE("GUI:TabGame", L"Game");
+	UnicodeString label = TheGameText->fetch("GUI:TabGame");
 	label.concat( L" *" );
 	GadgetButtonSetText( tabs.buttonGame, label );
 }

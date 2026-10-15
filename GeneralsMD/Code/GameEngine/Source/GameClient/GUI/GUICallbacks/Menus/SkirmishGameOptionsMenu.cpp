@@ -1082,14 +1082,14 @@ void InitSkirmishGameGadgets()
 	checkCoopBuildings = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, checkCoopBuildingsID );
 	if (checkCoopBuildings)
 	{
-		GadgetCheckBoxSetText(checkCoopBuildings, TheGameText->FETCH_OR_SUBSTITUTE("GUI:CoopBuildings", L"Coop Buildings"));
-		checkCoopBuildings->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:CoopBuildings", L"Lets allies finish each other's unfinished buildings"));
+		GadgetCheckBoxSetText(checkCoopBuildings, TheGameText->fetch("GUI:CoopBuildings"));
+		checkCoopBuildings->winSetTooltip(TheGameText->fetch("TOOLTIP:CoopBuildings"));
 	}
 	checkQuickGame = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, checkQuickGameID );
 	if (checkQuickGame)
 	{
-		GadgetCheckBoxSetText(checkQuickGame, TheGameText->FETCH_OR_SUBSTITUTE("GUI:QuickGame", L"Quick Game"));
-		checkQuickGame->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:QuickGame", L"Lifts the rank requirements on advanced structures, superweapons and super units"));
+		GadgetCheckBoxSetText(checkQuickGame, TheGameText->fetch("GUI:QuickGame"));
+		checkQuickGame->winSetTooltip(TheGameText->fetch("TOOLTIP:QuickGame"));
 	}
 
 	InitLobbyTabs( lobbyTabs, parentSkirmishGameOptions, "SkirmishGameOptionsMenu.wnd" );
