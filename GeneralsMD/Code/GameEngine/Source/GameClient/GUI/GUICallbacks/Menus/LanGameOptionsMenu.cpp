@@ -123,6 +123,8 @@ static NameKeyType checkMaxCameraHeightID = NAMEKEY_INVALID;
 static NameKeyType textEntryMaxCameraHeightID = NAMEKEY_INVALID;
 static NameKeyType checkCoopBuildingsID = NAMEKEY_INVALID;
 static NameKeyType checkQuickGameID = NAMEKEY_INVALID;
+static NameKeyType buttonTabGameID = NAMEKEY_INVALID;
+static NameKeyType buttonTabRulesID = NAMEKEY_INVALID;
 static NameKeyType windowMapID = NAMEKEY_INVALID;
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *parentLanGameOptions = nullptr;
@@ -138,6 +140,10 @@ static GameWindow *checkMaxCameraHeight = nullptr;
 static GameWindow *textEntryMaxCameraHeight = nullptr;
 static GameWindow *checkCoopBuildings = nullptr;
 static GameWindow *checkQuickGame = nullptr;
+static GameWindow *buttonTabGame = nullptr;
+static GameWindow *buttonTabRules = nullptr;
+static GameWindow *panelGame = nullptr;
+static GameWindow *panelRules = nullptr;
 static GameWindow *windowMap = nullptr;
 
 static GameWindow *comboBoxPlayer[MAX_SLOTS] = {0};
@@ -785,6 +791,24 @@ static void commitLanQuickGame()
 	}
 }
 
+static void showRulesTab( Bool rules )
+{
+	if (!buttonTabGame || !buttonTabRules || !panelGame || !panelRules)
+	{
+		return;
+	}
+	panelGame->winHide( rules );
+	panelRules->winHide( !rules );
+	GadgetCheckLikeButtonSetVisualCheck( buttonTabGame, !rules );
+	GadgetCheckLikeButtonSetVisualCheck( buttonTabRules, rules );
+
+	// The chat entry lives on the Game page
+	if (!rules && textEntryChat)
+	{
+		TheWindowManager->winSetFocus( textEntryChat );
+	}
+}
+
 void InitLanGameGadgets()
 {
 	//Initialize the gadget IDs
@@ -850,6 +874,22 @@ void InitLanGameGadgets()
 	{
 		GadgetCheckBoxSetText(checkQuickGame, TheGameText->FETCH_OR_SUBSTITUTE("GUI:QuickGame", L"Quick Game"));
 		checkQuickGame->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:QuickGame", L"Lifts the rank requirements on advanced structures, superweapons and super units"));
+	}
+
+	// The tab buttons start hidden so an exe without this code keeps the Game page
+	buttonTabGameID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:ButtonTabGame" );
+	buttonTabRulesID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:ButtonTabRules" );
+	buttonTabGame = TheWindowManager->winGetWindowFromId( parentLanGameOptions, buttonTabGameID );
+	buttonTabRules = TheWindowManager->winGetWindowFromId( parentLanGameOptions, buttonTabRulesID );
+	panelGame = TheWindowManager->winGetWindowFromId( parentLanGameOptions, TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:PanelGame" ) );
+	panelRules = TheWindowManager->winGetWindowFromId( parentLanGameOptions, TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:PanelRules" ) );
+	if (buttonTabGame && buttonTabRules && panelGame && panelRules)
+	{
+		GadgetButtonSetText( buttonTabGame, TheGameText->FETCH_OR_SUBSTITUTE("GUI:TabGame", L"Game") );
+		GadgetButtonSetText( buttonTabRules, TheGameText->FETCH_OR_SUBSTITUTE("GUI:TabRules", L"Rules") );
+		buttonTabGame->winHide( FALSE );
+		buttonTabRules->winHide( FALSE );
+		showRulesTab( FALSE );
 	}
 
 	windowMap = TheWindowManager->winGetWindowFromId( parentLanGameOptions,windowMapID  );
@@ -950,6 +990,10 @@ void DeinitLanGameGadgets()
   textEntryMaxCameraHeight = nullptr;
   checkCoopBuildings = nullptr;
   checkQuickGame = nullptr;
+	buttonTabGame = nullptr;
+	buttonTabRules = nullptr;
+	panelGame = nullptr;
+	panelRules = nullptr;
 	if (windowMap)
 	{
 		windowMap->winSetUserData(nullptr);
@@ -1459,6 +1503,14 @@ WindowMsgHandledType LanGameOptionsMenuSystem( GameWindow *window, UnsignedInt m
         else if ( controlID == checkQuickGameID )
         {
           commitLanQuickGame();
+        }
+        else if ( controlID == buttonTabGameID )
+        {
+          showRulesTab( FALSE );
+        }
+        else if ( controlID == buttonTabRulesID )
+        {
+          showRulesTab( TRUE );
         }
 				else
 				{

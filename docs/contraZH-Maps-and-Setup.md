@@ -127,6 +127,17 @@ back to `Random <BaseSide>`.
 * Limit Armies still applies; an entry disappears when none of its generals are allowed.
 * All LAN/online players need this build, and so do replays using these entries.
 
+### Rules tab
+
+* The Skirmish and LAN lobbies get **Game** and **Rules** tab buttons in the title row.
+* The Rules page holds Quick Game, Coop Buildings and, in LAN, Max Camera Height. It takes the place
+of the battle honors and info box in Skirmish, and of the chat in LAN.
+
+Notes:
+* Labels are `GUI:TabGame` and `GUI:TabRules`, falling back to `Game` and `Rules`.
+* The layouts carry `ButtonTabGame`, `ButtonTabRules`, `PanelGame` and `PanelRules`. The buttons and
+the Rules page start hidden, so an older exe shows the Game page without the new options.
+
 ### Quick Game
 
 * The Skirmish and LAN lobbies get a **Quick Game** checkbox, off by default. Only the LAN host can
