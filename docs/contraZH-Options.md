@@ -290,6 +290,18 @@ Notes:
 * Teleports, transport and tunnel exits, garrison exits and newly spawned objects snap into place.
 * The environment variable `CONTRA_INTERPOLATION=0` turns it off regardless of the option.
 
+### Model animations between keyframes
+
+Model animations advance every drawn frame and blend between keyframes, independent of `Smooth unit
+motion`. A bone that holds still and then jumps, such as a runway light stepping from bulb to bulb,
+jumps instead of sliding along the runway.
+
+Notes:
+* A step counts as a jump when it is at least 1 unit long and more than 4 times the steps before and
+after it, so loop restarts and bones hidden by moving them away jump too.
+* Applies to uncompressed animations; compressed ones mark their jumps in the file.
+* Rotation still blends.
+
 ### Laser ground glow
 
 Each laser beam lights the terrain along its length with up to twelve dynamic lights in the beam's

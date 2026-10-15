@@ -75,7 +75,8 @@ NodeMotionStruct::NodeMotionStruct() :
 	YR(nullptr),
 	ZR(nullptr),
 	Q(nullptr),
-	Vis(nullptr)
+	Vis(nullptr),
+	Teleport(nullptr)
 {
 }
 
@@ -102,6 +103,7 @@ NodeMotionStruct::~NodeMotionStruct()
 	delete ZR;
 	delete Q;
 	delete Vis;
+	delete[] Teleport;
 }
 
 
@@ -284,6 +286,7 @@ int HRawAnimClass::Load_W3D(ChunkLoadClass & cload)
 		cload.Close_Chunk();
 	}
 
+	find_teleports();
 	return OK;
 
 Error:
@@ -477,7 +480,7 @@ void HRawAnimClass::Get_Translation(Vector3& trans, int pividx, float frame ) co
 		motion->Z->Get_Vector((int)frame0,&(trans0[2]));
 	}
 
-	if ( ratio == 0.0f ) {
+	if ( ratio == 0.0f || is_teleport(*motion, frame0) ) {
 		trans=trans0;
 		return;
 	}
@@ -644,9 +647,79 @@ void HRawAnimClass::Get_Transform(Matrix3D& mtx, int pividx, float frame ) const
 	if (motion->Z != nullptr) motion->Z->Get_Vector((int)frame1,&(trans1[2]));
 
 	Vector3 trans;
-	Vector3::Lerp( trans0, trans1, ratio, &trans );
+	if (is_teleport(*motion, frame0))
+	{
+		trans = trans0;
+	}
+	else
+	{
+		Vector3::Lerp( trans0, trans1, ratio, &trans );
+	}
 
 	mtx.Set_Translation(trans);
+}
+
+// A step this short never reads as a jump
+static const float TELEPORT_MIN_STEP = 1.0f;
+
+// A step this many times longer than both neighbouring steps is a jump, not motion
+static const float TELEPORT_STEP_RATIO = 4.0f;
+
+void HRawAnimClass::get_translation_key(const NodeMotionStruct & motion, int frame, Vector3 & trans) const
+{
+	trans.Set(0.0f,0.0f,0.0f);
+	if (motion.X != nullptr) motion.X->Get_Vector(frame,&(trans[0]));
+	if (motion.Y != nullptr) motion.Y->Get_Vector(frame,&(trans[1]));
+	if (motion.Z != nullptr) motion.Z->Get_Vector(frame,&(trans[2]));
+}
+
+// Blending keys made for jumps slides the bone between them, as with runway lights stepping from bulb to bulb
+void HRawAnimClass::find_teleports()
+{
+	if (NumFrames < 2)
+	{
+		return;
+	}
+
+	float *steps = W3DNEWARRAY float[NumFrames];
+	for (int node = 0; node < NumNodes; node++)
+	{
+		NodeMotionStruct &motion = NodeMotion[node];
+		if (motion.X == nullptr && motion.Y == nullptr && motion.Z == nullptr)
+		{
+			continue;
+		}
+
+		Vector3 key0;
+		Vector3 key1;
+		for (int frame = 0; frame < NumFrames; frame++)
+		{
+			get_translation_key(motion, frame, key0);
+			get_translation_key(motion, (frame + 1) % NumFrames, key1);
+			steps[frame] = (key1 - key0).Length();
+		}
+
+		for (int frame = 0; frame < NumFrames; frame++)
+		{
+			const float before = steps[(frame + NumFrames - 1) % NumFrames];
+			const float after = steps[(frame + 1) % NumFrames];
+			if (steps[frame] >= TELEPORT_MIN_STEP && steps[frame] > TELEPORT_STEP_RATIO * max(before, after))
+			{
+				if (motion.Teleport == nullptr)
+				{
+					motion.Teleport = W3DNEWARRAY unsigned char[NumFrames];
+					memset(motion.Teleport, 0, NumFrames);
+				}
+				motion.Teleport[frame] = 1;
+			}
+		}
+	}
+	delete[] steps;
+}
+
+bool HRawAnimClass::is_teleport(const NodeMotionStruct & motion, int frame) const
+{
+	return motion.Teleport != nullptr && frame >= 0 && frame < NumFrames && motion.Teleport[frame] != 0;
 }
 
 /***********************************************************************************************
