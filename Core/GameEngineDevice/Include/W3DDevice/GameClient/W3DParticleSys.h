@@ -79,7 +79,6 @@ private:
 
 	// TheSuperHackers @feature renders ground aligned particles as terrain conforming meshes
 	class W3DTerrainParticle *m_terrainParticles;
-	class W3DParticleAtlas *m_atlas;					///< premultiplied pages that let alpha and additive systems with different textures batch together
 	std::vector<DrawEntry> m_drawOrder;			///< visible systems in the order they draw this frame
 	RefCountPtr<TextureClass> m_batchTexture;		///< the texture used as the drawing surface for batched particle draws
 	PointGroupClass *m_pointGroup;							///< the point group that contains all of the particles

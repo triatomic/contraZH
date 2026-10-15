@@ -82,6 +82,7 @@ static void drawFramerateBar();
 #include "W3DDevice/GameClient/W3DVideoBuffer.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/W3DShadowMap.h"
+#include "W3DDevice/GameClient/W3DParticleAtlas.h"
 #include "W3DDevice/GameClient/W3DSlopeMap.h"
 #include "W3DDevice/GameClient/W3DShockwave.h"
 #include "W3DDevice/GameClient/W3DDisruption.h"
@@ -488,6 +489,9 @@ W3DDisplay::~W3DDisplay()
 
 	delete TheW3DShadowMap;
 	TheW3DShadowMap = nullptr;
+
+	delete TheW3DParticleAtlas;
+	TheW3DParticleAtlas = nullptr;
 
 	m_assetManager->Free_Assets();
 	delete m_assetManager;
@@ -1034,6 +1038,8 @@ void W3DDisplay::init()
 		// chosen format.
 		TheW3DShadowMap = NEW W3DShadowMap;
 		TheW3DShadowMap->init();
+
+		TheW3DParticleAtlas = NEW W3DParticleAtlas;
 
 		W3DShaderManager::init();
 

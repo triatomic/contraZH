@@ -28,10 +28,7 @@
 #include <utility>
 #include <vector>
 
-// Packs particle textures into shared pages for premultiplied blending (ONE, INV_SRC_ALPHA), so alpha
-// and additive systems with different textures draw from one texture and one blend state.
-// Alpha art keeps its alpha and has its colour multiplied by it; additive art keeps its colour and drops alpha.
-// Textures are packed the first time they draw, so a page holds only what has been seen since the last reset.
+// Particle textures packed as they first draw into pages blended ONE, INV_SRC_ALPHA, so alpha and additive art share one draw.
 class W3DParticleAtlas
 {
 public:
@@ -44,9 +41,12 @@ public:
 	/// drops every page, so the next map packs only its own textures
 	void reset();
 
+	/// lets the frame pack a few more textures; the rest wait for later frames
+	void beginFrame() { m_packBudget = PACKS_PER_FRAME; }
+
 private:
 	// Each entry keeps LEVELS mips. Its gutter shrinks to one texel at the last, so filtering never reads a neighbour.
-	enum { PAGE_SIZE = 2048, LEVELS = 5, GUTTER = 1 << (LEVELS - 1), MAX_PAGES = 4 };
+	enum { PAGE_SIZE = 2048, LEVELS = 5, GUTTER = 1 << (LEVELS - 1), MAX_PAGES = 4, PACKS_PER_FRAME = 4 };
 
 	struct Shelf
 	{
@@ -66,17 +66,23 @@ private:
 	{
 		RefCountPtr<TextureClass> source;	///< keeps the key's texture alive
 		Int page;							///< -1 when the texture has no place
+		Int width;							///< the source's size when packed, so a reload at another size packs again
+		Int height;
 		Vector4 rect;
 	};
 
 	typedef std::vector<UnsignedInt> Pixels;
 	typedef std::map<std::pair<TextureClass *, Bool>, Entry> EntryMap;
 
-	Bool place(Int width, Int height, Int &page, Int &x, Int &y);
+	Bool place(Int width, Int height, Int &page, Int &shelf, Int &x, Int &y);
+	void unplace(Int width, Int page, Int shelf);
 	Bool addPage();
 	Bool readLevels(TextureClass *source, Bool additive, std::vector<Pixels> &levels);
 	Bool writeEntry(const Page &page, const std::vector<Pixels> &levels, Int x, Int y, Int width, Int height, Bool wrapU, Bool wrapV);
 
 	std::vector<Page> m_pages;
 	EntryMap m_entries;
+	Int m_packBudget;
 };
+
+extern W3DParticleAtlas *TheW3DParticleAtlas;	///< owned by W3DDisplay, so its textures go before the device; null when headless

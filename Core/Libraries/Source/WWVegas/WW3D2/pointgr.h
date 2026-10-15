@@ -127,7 +127,7 @@ public:
 	// Hook effects beyond soft fading, from SoftParticleHookClass, for blended textured points.
 	void						Set_Effects(unsigned effects, const void *effectData) { Effects = effects; EffectData = effectData; }
 
-	// Per-point (u0,v0,u1,v1) rectangles, indexed like the location array, that Render maps the frame uvs into. Null keeps them as they are.
+	// Per-point (u0,v0,u1,v1) rectangles, indexed like the location array, that the frame uvs map into. Null keeps them as they are.
 	void						Set_Texture_UV_Rects(ShareBufferClass<Vector4> *rects);
 
 	// The frame property is taken from a set of possible frames. The rows/columns in the frame
@@ -143,6 +143,9 @@ public:
 	void						RenderVolumeParticle(RenderInfoClass &rinfo, unsigned int depth);
 
 protected:
+	// A vertex's frame uv, mapped into its point's rectangle when there are any.
+	Vector2					Vertex_UV(int vertex) const;
+
 	// Update arrays.
 	void						Update_Arrays(Vector3 *point_loc,
 									Vector4 *point_diffuse,

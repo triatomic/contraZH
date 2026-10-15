@@ -116,7 +116,6 @@ W3DParticleSystemManager::W3DParticleSystemManager()
 
 	m_pointGroup = NEW PointGroupClass();
 	m_terrainParticles = NEW W3DTerrainParticle();
-	m_atlas = NEW W3DParticleAtlas();
 	//m_streakLine = nullptr;
 	m_streakLine = NEW StreakLineClass();
 
@@ -131,9 +130,6 @@ W3DParticleSystemManager::~W3DParticleSystemManager()
 {
 	delete m_terrainParticles;
 	m_terrainParticles = nullptr;
-
-	delete m_atlas;
-	m_atlas = nullptr;
 
 	delete m_pointGroup;
 
@@ -154,7 +150,10 @@ W3DParticleSystemManager::~W3DParticleSystemManager()
 void W3DParticleSystemManager::reset()
 {
 	ParticleSystemManager::reset();
-	m_atlas->reset();
+	if (TheW3DParticleAtlas)
+	{
+		TheW3DParticleAtlas->reset();
+	}
 }
 
 /**
@@ -188,6 +187,11 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	if (TheW3DSoftParticles)
 	{
 		TheW3DSoftParticles->beginPass(rinfo);
+	}
+
+	if (TheW3DParticleAtlas)
+	{
+		TheW3DParticleAtlas->beginFrame();
 	}
 
 	//reset each frame
@@ -433,7 +437,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 {
 	const Bool drawSmudge = TheSmudgeManager && TheSmudgeManager->getHardwareSupport() && TheGlobalData->m_useHeatEffects;
 	const Bool batchParticles = TheGlobalData->m_batchParticles;
-	const Bool useAtlas = TheGlobalData->m_particleAtlas && pass == DRAW_MAIN;
+	const Bool useAtlas = TheGlobalData->m_particleAtlas && pass == DRAW_MAIN && TheW3DParticleAtlas != nullptr;
 
 	unsigned int personalities[MAX_POINTS_PER_GROUP];
 
@@ -521,7 +525,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		if (useAtlas && effects == 0 && sys->isUsingParticles() && !useTerrainConformingParticles &&
 			(shaderType == ParticleSystemInfo::ALPHA || shaderType == ParticleSystemInfo::ADDITIVE))
 		{
-			TextureClass *page = m_atlas->find(texture.Peek(), shaderType == ParticleSystemInfo::ADDITIVE, atlasRect);
+			TextureClass *page = TheW3DParticleAtlas->find(texture.Peek(), shaderType == ParticleSystemInfo::ADDITIVE, atlasRect);
 			if (page != nullptr)
 			{
 				batchTexture = page;

@@ -69,7 +69,7 @@ Notes:
 * Implies batching for the systems it covers, whatever `BatchParticles` says.
 * Additive particles now depth-sort with smoke instead of drawing after it, so smoke in front of
 a fire covers it.
-* Textures are packed the first time they draw and the pages are cleared between maps. Up to four
+* Textures are packed the first time they draw, at most four per frame, and the pages are cleared between maps. Up to four
 pages per map; textures that do not fit draw as before.
 * Not covered: streak, volume, terrain-conforming, alpha-test and multiply systems, systems with
 the flame, cryo, electric or disruption shaders, non power-of-two textures and ones smaller than

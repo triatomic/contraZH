@@ -90,8 +90,11 @@ std::vector<UnsignedInt> Downsample(const std::vector<UnsignedInt> &input, Int w
 
 }
 
+W3DParticleAtlas *TheW3DParticleAtlas = nullptr;
+
 W3DParticleAtlas::W3DParticleAtlas()
 {
+	m_packBudget = PACKS_PER_FRAME;
 }
 
 W3DParticleAtlas::~W3DParticleAtlas()
@@ -113,15 +116,28 @@ TextureClass *W3DParticleAtlas::find(TextureClass *source, Bool additive, Vector
 	}
 
 	const std::pair<TextureClass *, Bool> key(source, additive);
-	EntryMap::const_iterator found = m_entries.find(key);
+	EntryMap::iterator found = m_entries.find(key);
 	if (found != m_entries.end())
 	{
-		if (found->second.page < 0)
+		// a source reloaded at another size packs again, and its old cell stays unused until the reset
+		if (found->second.width != source->Get_Width() || found->second.height != source->Get_Height())
+		{
+			m_entries.erase(found);
+		}
+		else if (found->second.page < 0)
 		{
 			return nullptr;
 		}
-		rect = found->second.rect;
-		return m_pages[found->second.page].texture.Peek();
+		else
+		{
+			rect = found->second.rect;
+			return m_pages[found->second.page].texture.Peek();
+		}
+	}
+
+	if (m_packBudget <= 0)
+	{
+		return nullptr;
 	}
 
 	// A texture still loading is asked about again later, not refused for good.
@@ -130,10 +146,13 @@ TextureClass *W3DParticleAtlas::find(TextureClass *source, Bool additive, Vector
 	{
 		return nullptr;
 	}
+	--m_packBudget;
 
 	Entry entry;
 	entry.source = source;
 	entry.page = -1;
+	entry.width = source->Get_Width();
+	entry.height = source->Get_Height();
 	entry.rect.Set(0.0f, 0.0f, 1.0f, 1.0f);
 
 	std::vector<Pixels> levels;
@@ -144,11 +163,17 @@ TextureClass *W3DParticleAtlas::find(TextureClass *source, Bool additive, Vector
 		const Bool wrapU = source->Get_Filter().Get_U_Addr_Mode() == TextureFilterClass::TEXTURE_ADDRESS_REPEAT;
 		const Bool wrapV = source->Get_Filter().Get_V_Addr_Mode() == TextureFilterClass::TEXTURE_ADDRESS_REPEAT;
 		Int page = 0;
+		Int shelf = 0;
 		Int x = 0;
 		Int y = 0;
-		if (place(width + 2 * GUTTER, height + 2 * GUTTER, page, x, y) &&
-			writeEntry(m_pages[page], levels, x, y, width, height, wrapU, wrapV))
+		if (place(width + 2 * GUTTER, height + 2 * GUTTER, page, shelf, x, y))
 		{
+			// a failed upload gives its cell back and is tried again later
+			if (!writeEntry(m_pages[page], levels, x, y, width, height, wrapU, wrapV))
+			{
+				unplace(width + 2 * GUTTER, page, shelf);
+				return nullptr;
+			}
 			entry.page = page;
 			const Real scale = 1.0f / (Real)PAGE_SIZE;
 			entry.rect.Set((x + GUTTER) * scale, (y + GUTTER) * scale, (x + GUTTER + width) * scale, (y + GUTTER + height) * scale);
@@ -165,7 +190,7 @@ TextureClass *W3DParticleAtlas::find(TextureClass *source, Bool additive, Vector
 }
 
 // Same-height shelves first, then any taller one with room, then a new shelf, then a new page.
-Bool W3DParticleAtlas::place(Int width, Int height, Int &page, Int &x, Int &y)
+Bool W3DParticleAtlas::place(Int width, Int height, Int &page, Int &shelf, Int &x, Int &y)
 {
 	for (Int pass = 0; pass < 2; ++pass)
 	{
@@ -174,14 +199,15 @@ Bool W3DParticleAtlas::place(Int width, Int height, Int &page, Int &x, Int &y)
 			std::vector<Shelf> &shelves = m_pages[p].shelves;
 			for (size_t s = 0; s < shelves.size(); ++s)
 			{
-				Shelf &shelf = shelves[s];
-				const Bool fits = (pass == 0) ? (shelf.height == height) : (shelf.height > height);
-				if (fits && shelf.used + width <= PAGE_SIZE)
+				Shelf &candidate = shelves[s];
+				const Bool fits = (pass == 0) ? (candidate.height == height) : (candidate.height > height);
+				if (fits && candidate.used + width <= PAGE_SIZE)
 				{
 					page = (Int)p;
-					x = shelf.used;
-					y = shelf.y;
-					shelf.used += width;
+					shelf = (Int)s;
+					x = candidate.used;
+					y = candidate.y;
+					candidate.used += width;
 					return TRUE;
 				}
 			}
@@ -197,19 +223,32 @@ Bool W3DParticleAtlas::place(Int width, Int height, Int &page, Int &x, Int &y)
 		Page &candidate = m_pages[p];
 		if (candidate.bottom + height <= PAGE_SIZE)
 		{
-			Shelf shelf;
-			shelf.y = candidate.bottom;
-			shelf.height = height;
-			shelf.used = width;
-			candidate.shelves.push_back(shelf);
+			Shelf added;
+			added.y = candidate.bottom;
+			added.height = height;
+			added.used = width;
+			candidate.shelves.push_back(added);
 			candidate.bottom += height;
 			page = (Int)p;
+			shelf = (Int)candidate.shelves.size() - 1;
 			x = 0;
-			y = shelf.y;
+			y = added.y;
 			return TRUE;
 		}
 	}
 	return FALSE;
+}
+
+// The cell just placed is always the last on its shelf, and an emptied last shelf frees its rows too.
+void W3DParticleAtlas::unplace(Int width, Int page, Int shelf)
+{
+	Page &owner = m_pages[page];
+	owner.shelves[shelf].used -= width;
+	if (owner.shelves[shelf].used == 0 && shelf == (Int)owner.shelves.size() - 1)
+	{
+		owner.bottom -= owner.shelves[shelf].height;
+		owner.shelves.pop_back();
+	}
 }
 
 Bool W3DParticleAtlas::addPage()
@@ -232,25 +271,7 @@ Bool W3DParticleAtlas::addPage()
 		return FALSE;
 	}
 
-	// Space no entry holds stays transparent black, which draws nothing under premultiplied blending.
-	IDirect3DTexture8 *lockable = DX8Wrapper::_Peek_Lockable_Texture(texture);
-	for (Int level = 0; level < LEVELS; ++level)
-	{
-		D3DLOCKED_RECT locked;
-		if (FAILED(lockable->LockRect(level, &locked, nullptr, 0)))
-		{
-			texture->Release();
-			return FALSE;
-		}
-		const Int size = PAGE_SIZE >> level;
-		for (Int row = 0; row < size; ++row)
-		{
-			memset((UnsignedByte *)locked.pBits + row * locked.Pitch, 0, size * sizeof(UnsignedInt));
-		}
-		lockable->UnlockRect(level);
-	}
-	DX8Wrapper::_Upload_Lockable_Texture(texture);
-
+	// Space no entry holds is left unwritten, since filtering never reads past an entry's gutter.
 	Page page;
 	page.texture.Assign_No_Add_Ref(NEW_REF(TextureClass, (texture)));
 	texture->Release();

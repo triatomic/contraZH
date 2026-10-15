@@ -314,6 +314,19 @@ void PointGroupClass::Set_Texture_UV_Rects(ShareBufferClass<Vector4> *rects)
 	REF_PTR_SET(TextureUVRects,rects);
 }
 
+Vector2 PointGroupClass::Vertex_UV(int vertex) const
+{
+	Vector2 uv=VertexUV[vertex];
+	if (TextureUVRects) {
+		const int point = vertex / (PointMode == QUADS ? 4 : 3);
+		const unsigned index = APT ? APT->Get_Array()[point] : point;
+		WWASSERT(index < (unsigned)TextureUVRects->Get_Count());
+		const Vector4& rect = TextureUVRects->Get_Array()[index];
+		uv.Set(rect.X + uv.X * (rect.Z - rect.X), rect.Y + uv.Y * (rect.W - rect.Y));
+	}
+	return uv;
+}
+
 /**************************************************************************
  * PointGroupClass::Set_Point_Size -- Set default point size.             *
  *                                                                        *
@@ -1016,15 +1029,7 @@ void PointGroupClass::Render(RenderInfoClass &rinfo)
 				else
 					*(unsigned int*)(vb+fvfinfo.Get_Diffuse_Offset())=
 						DX8Wrapper::Convert_Color_Clamp(Vector4(DefaultPointColor[0],DefaultPointColor[1],DefaultPointColor[2],DefaultPointAlpha));
-				Vector2 uv=VertexUV[i];
-				if (TextureUVRects) {
-					const int point = i / (PointMode == QUADS ? 4 : 3);
-					const unsigned index = APT ? APT->Get_Array()[point] : point;
-					WWASSERT(index < (unsigned)TextureUVRects->Get_Count());
-					const Vector4& rect = TextureUVRects->Get_Array()[index];
-					uv.Set(rect.X + uv.X * (rect.Z - rect.X), rect.Y + uv.Y * (rect.W - rect.Y));
-				}
-				*(Vector2*)(vb+fvfinfo.Get_Tex_Offset(0))=uv;
+				*(Vector2*)(vb+fvfinfo.Get_Tex_Offset(0))=Vertex_UV(i);
 				vb+=fvfinfo.Get_FVF_Size();
 			}
 		}
@@ -2012,7 +2017,7 @@ void PointGroupClass::RenderVolumeParticle(RenderInfoClass &rinfo, unsigned int 
 					else
 						*(unsigned int*)(vb+fvfinfo.Get_Diffuse_Offset())=
 							DX8Wrapper::Convert_Color_Clamp(Vector4(DefaultPointColor[0],DefaultPointColor[1],DefaultPointColor[2],DefaultPointAlpha));
-					*(Vector2*)(vb+fvfinfo.Get_Tex_Offset(0))=VertexUV[i];
+					*(Vector2*)(vb+fvfinfo.Get_Tex_Offset(0))=Vertex_UV(i);
 					vb+=fvfinfo.Get_FVF_Size();
 				}
 			}
