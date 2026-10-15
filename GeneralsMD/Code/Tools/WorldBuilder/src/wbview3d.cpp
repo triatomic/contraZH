@@ -1281,6 +1281,7 @@ void WbView3d::resetRenderObjects()
 		BuildListInfo *pBuild = pSide->getBuildList();
 		while (pBuild) {
 			pBuild->setRenderObj(nullptr);
+			pBuild->setShadowObj(nullptr);
 			pBuild = pBuild->getNext();
 		}
 	}
@@ -1798,6 +1799,10 @@ void WbView3d::invalBuildListItemInView(BuildListInfo *pBuildToInval)
 				continue;
 			}
 			if (sideHidden) {
+				if (pBuild->getShadowObj()) {
+					TheW3DShadowManager->removeShadow(pBuild->getShadowObj());
+					pBuild->setShadowObj(nullptr);
+				}
 				if (pBuild->getRenderObj()) {
 					if (m_baseBuildScene->safeContains(pBuild->getRenderObj())) {
 						m_baseBuildScene->Remove_Render_Object(pBuild->getRenderObj());
@@ -1810,7 +1815,7 @@ void WbView3d::invalBuildListItemInView(BuildListInfo *pBuildToInval)
 			Coord3D loc = *pBuild->getLocation();
 			loc.z += m_heightMapRenderObj->getHeightMapHeight(loc.x, loc.y, nullptr);
 			RenderObjClass *renderObj=nullptr;
-			Shadow			*shadowObj=nullptr;
+			Shadow			*shadowObj=pBuild->getShadowObj();
 			// Build list render obj is not refcounted, so check & make sure it exists in the scene.
 			if (pBuild->getRenderObj()) {
 				if (!m_baseBuildScene->safeContains(pBuild->getRenderObj())) {
@@ -1890,6 +1895,10 @@ void WbView3d::invalBuildListItemInView(BuildListInfo *pBuildToInval)
 		if (!m_baseBuildScene->safeContains(pBuildToInval->getRenderObj())) {
 			pBuildToInval->setRenderObj(nullptr);
 		}
+	}
+	if (!found && pBuildToInval && pBuildToInval->getShadowObj()) {
+		TheW3DShadowManager->removeShadow(pBuildToInval->getShadowObj());
+		pBuildToInval->setShadowObj(nullptr);
 	}
 	if (!found && pBuildToInval && pBuildToInval->getRenderObj()) {
 		m_baseBuildScene->Remove_Render_Object(pBuildToInval->getRenderObj());
@@ -7982,6 +7991,11 @@ void WbView3d::OnViewShowshadows()
 		}
 	} else {
 		TheW3DShadowManager->removeAllShadows();
+		for (Int i = 0; i < TheSidesList->getNumSides(); i++) {
+			for (BuildListInfo *pBuild = TheSidesList->getSideInfo(i)->getBuildList(); pBuild; pBuild = pBuild->getNext()) {
+				pBuild->setShadowObj(nullptr);
+			}
+		}
 	}
 
 }
