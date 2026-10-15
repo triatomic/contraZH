@@ -737,7 +737,7 @@ void LANAPI::RequestGameAnnounce()
 	}
 }
 
-void LANAPI::RequestAccept()
+void LANAPI::RequestAccept( Bool accept )
 {
 	if (m_inLobby || !m_currentGame)
 		return;
@@ -745,7 +745,7 @@ void LANAPI::RequestAccept()
 	LANMessage msg;
 	fillInLANMessage( &msg );
 	msg.messageType = LANMessage::MSG_SET_ACCEPT;
-	msg.Accept.isAccepted = true;
+	msg.Accept.isAccepted = accept;
 	wcslcpy(msg.Accept.gameName, m_currentGame->getName().str(), ARRAY_SIZE(msg.Accept.gameName));
 	sendMessage(&msg);
 }

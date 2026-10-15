@@ -117,9 +117,14 @@ void LANAPI::OnAccept( UnsignedInt playerIP, Bool status )
 			if (m_currentGame->getIP(i) == playerIP)
 			{
 				if(status)
+				{
 					m_currentGame->getLANSlot(i)->setAccept();
-				else
+				}
+				// The start countdown has passed the point of taking an accept back
+				else if (m_gameStartTime == 0)
+				{
 					m_currentGame->getLANSlot(i)->unAccept();
+				}
 				break;
 			}
 		}

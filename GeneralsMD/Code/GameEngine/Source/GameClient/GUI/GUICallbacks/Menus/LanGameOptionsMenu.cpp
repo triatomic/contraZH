@@ -649,7 +649,8 @@ static void handleLimitSuperweaponsClick()
 {
   LANGameInfo *myGame = TheLAN->GetMyGame();
 
-  if (myGame)
+  // Setting the checkbox from the host's options also lands here, and must not clear a client's accept
+  if (myGame && myGame->amIHost())
   {
     // At the moment, 1 and 0 are the only choices supported in the GUI, though the system could
     // support more.
@@ -675,12 +676,46 @@ static void handleLimitSuperweaponsClick()
   }
 }
 
+static Bool isLocalSlotAccepted()
+{
+	LANGameInfo *myGame = TheLAN->GetMyGame();
+	if (!myGame)
+	{
+		return FALSE;
+	}
+	const GameSlot *slot = myGame->getConstSlot( myGame->getLocalSlotNum() );
+	return slot && slot->isAccepted();
+}
+
+// What the button shows; menu handlers can clear the local accept afterwards, so a click must not reread it
+static Bool s_buttonShowsUnready = FALSE;
+
+// An accepted client keeps the button enabled so it can take the accept back
+static void updateLanAcceptButton()
+{
+	if (TheLAN->AmIHost() || !buttonStart)
+	{
+		return;
+	}
+	s_buttonShowsUnready = isLocalSlotAccepted();
+	if (s_buttonShowsUnready)
+	{
+		buttonStart->winSetText( TheGameText->FETCH_OR_SUBSTITUTE("GUI:Unready", L"Unready") );
+		buttonStart->winEnable( TRUE );
+	}
+	else
+	{
+		buttonStart->winSetText( TheGameText->fetch("GUI:Accept") );
+	}
+}
+
 void lanUpdateSlotList()
 {
 	if(!AreSlotListUpdatesEnabled() || s_isIniting)
 		return;
 	UpdateSlotList( TheLAN->GetMyGame(), comboBoxPlayer, comboBoxColor,
 		comboBoxPlayerTemplate, comboBoxTeam, buttonAccept, buttonStart, buttonMapStartPosition);
+	updateLanAcceptButton();
 
 	updateMapStartSpots(TheLAN->GetMyGame(), buttonMapStartPosition);
 }
@@ -889,6 +924,7 @@ void InitLanGameGadgets()
 	InitLobbyTabs( lobbyTabs, parentLanGameOptions, "LanGameOptionsMenu.wnd" );
 	lastChatCount = 0;
 	lastChatLine.clear();
+	s_buttonShowsUnready = FALSE;
 
 	windowMap = TheWindowManager->winGetWindowFromId( parentLanGameOptions,windowMapID  );
 	DEBUG_ASSERTCRASH(windowMap, ("Could not find the LanGameOptionsMenu.wnd:MapWindow" ));
@@ -1472,6 +1508,10 @@ WindowMsgHandledType LanGameOptionsMenuSystem( GameWindow *window, UnsignedInt m
 					{
 						StartPressed();
 						//TheLAN->RequestGameStart();
+					}
+					else if (s_buttonShowsUnready)
+					{
+						TheLAN->RequestAccept( FALSE );
 					}
 					else
 					{

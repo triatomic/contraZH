@@ -138,6 +138,16 @@ Notes:
 * The layouts carry `ButtonTabGame`, `ButtonTabRules`, `PanelGame` and `PanelRules`. The buttons and
 the Rules page start hidden, so an older exe shows the Game page without the new options.
 
+### LAN unready
+
+* A LAN client that has accepted sees **Unready** on the Accept button and can take the accept back.
+* The host clears that player's accept, so Start waits for them again.
+
+Notes:
+* The label is `GUI:Unready`, falling back to `Unready`.
+* A host on this build ignores an unready once the start countdown runs.
+* A host on an older exe also clears the accept, so only the client needs this build.
+
 ### Quick Game
 
 * The Skirmish and LAN lobbies get a **Quick Game** checkbox, off by default. Only the LAN host can
