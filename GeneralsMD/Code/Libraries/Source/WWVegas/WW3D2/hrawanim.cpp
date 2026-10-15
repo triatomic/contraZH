@@ -673,6 +673,16 @@ void HRawAnimClass::get_translation_key(const NodeMotionStruct & motion, int fra
 	if (motion.Z != nullptr) motion.Z->Get_Vector(frame,&(trans[2]));
 }
 
+static void markTeleport(NodeMotionStruct & motion, int numFrames, int frame)
+{
+	if (motion.Teleport == nullptr)
+	{
+		motion.Teleport = W3DNEWARRAY unsigned char[numFrames];
+		memset(motion.Teleport, 0, numFrames);
+	}
+	motion.Teleport[frame] = 1;
+}
+
 // Blending keys made for jumps slides the bone between them, as with runway lights stepping from bulb to bulb
 void HRawAnimClass::find_teleports()
 {
@@ -701,16 +711,21 @@ void HRawAnimClass::find_teleports()
 
 		for (int frame = 0; frame < NumFrames; frame++)
 		{
+			const int next = (frame + 1) % NumFrames;
 			const float before = steps[(frame + NumFrames - 1) % NumFrames];
-			const float after = steps[(frame + 1) % NumFrames];
+			const float after = steps[next];
 			if (steps[frame] >= TELEPORT_MIN_STEP && steps[frame] > TELEPORT_STEP_RATIO * max(before, after))
 			{
-				if (motion.Teleport == nullptr)
-				{
-					motion.Teleport = W3DNEWARRAY unsigned char[NumFrames];
-					memset(motion.Teleport, 0, NumFrames);
-				}
-				motion.Teleport[frame] = 1;
+				markTeleport(motion, NumFrames, frame);
+			}
+
+			// A jump split over two frames in a row
+			const float pairStep = min(steps[frame], after);
+			const float pairAfter = steps[(frame + 2) % NumFrames];
+			if (NumFrames >= 4 && pairStep >= TELEPORT_MIN_STEP && pairStep > TELEPORT_STEP_RATIO * max(before, pairAfter))
+			{
+				markTeleport(motion, NumFrames, frame);
+				markTeleport(motion, NumFrames, next);
 			}
 		}
 	}

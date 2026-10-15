@@ -298,7 +298,8 @@ jumps instead of sliding along the runway.
 
 Notes:
 * A step counts as a jump when it is at least 1 unit long and more than 4 times the steps before and
-after it, so loop restarts and bones hidden by moving them away jump too.
+after it, so loop restarts and bones hidden by moving them away jump too. Two such steps in a row
+count as one jump split over two frames.
 * Applies to uncompressed animations; compressed ones mark their jumps in the file.
 * Rotation still blends.
 
