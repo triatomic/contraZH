@@ -190,3 +190,14 @@ limit.
 official and custom maps.
 * The box takes its height from the top of the list and copies the look of the setup screen's text
 box (player name in skirmish, chat in LAN), so mod layouts need no `.wnd` change.
+
+### Campaign chapters
+
+* The single player menu has a `Campaign Chapters` button between Skirmish and Back. It opens a
+screen that starts any mission of a campaign at Easy, Normal or Hard.
+* The left list holds every `Campaign` block in `Campaign.ini` except challenge campaigns, named by
+`CampaignNameLabel`. The right list holds its missions in `NextMission` order from `FirstMission`,
+named by the map's display name.
+* A started mission plays as a normal campaign mission, so winning it moves on to `NextMission`.
+* Needs the loose `MainMenu.wnd`, `CampaignChapters.wnd` and `WindowTransitions.ini`, plus the
+`GUI:CampaignChapters` and `TOOLTIP:CampaignChapters` strings. An older exe ignores the button.

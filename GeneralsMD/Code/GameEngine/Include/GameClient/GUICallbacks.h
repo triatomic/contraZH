@@ -73,6 +73,13 @@ extern void ReplayMenuShutdown( WindowLayout *layout, void *userData );
 extern WindowMsgHandledType ReplayMenuSystem( GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData mData2 );
 extern WindowMsgHandledType ReplayMenuInput( GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData mData2 );
 
+// Campaign Chapters Menu -------------------------------------------------------------------
+extern void CampaignChaptersMenuInit( WindowLayout *layout, void *userData );
+extern void CampaignChaptersMenuUpdate( WindowLayout *layout, void *userData );
+extern void CampaignChaptersMenuShutdown( WindowLayout *layout, void *userData );
+extern WindowMsgHandledType CampaignChaptersMenuSystem( GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData mData2 );
+extern WindowMsgHandledType CampaignChaptersMenuInput( GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData mData2 );
+
 // Credits Menu --------------------------------------------------------------------------------
 extern void CreditsMenuInit( WindowLayout *layout, void *userData );
 extern void CreditsMenuUpdate( WindowLayout *layout, void *userData );

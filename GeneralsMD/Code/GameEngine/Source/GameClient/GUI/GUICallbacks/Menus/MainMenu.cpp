@@ -117,6 +117,7 @@ static NameKeyType worldBuilderID = NAMEKEY_INVALID;
 static NameKeyType getUpdateID = NAMEKEY_INVALID;
 static NameKeyType buttonTRAININGID = NAMEKEY_INVALID;
 static NameKeyType buttonChallengeID = NAMEKEY_INVALID;
+static NameKeyType buttonCampaignChaptersID = NAMEKEY_INVALID;
 static NameKeyType buttonUSAID = NAMEKEY_INVALID;
 static NameKeyType buttonGLAID = NAMEKEY_INVALID;
 static NameKeyType buttonChinaID = NAMEKEY_INVALID;
@@ -471,6 +472,7 @@ void MainMenuInit( WindowLayout *layout, void *userData )
 	getUpdateID = TheNameKeyGenerator->nameToKey( "MainMenu.wnd:ButtonGetUpdate" );
 //	buttonTRAININGID = TheNameKeyGenerator->nameToKey( "MainMenu.wnd:ButtonTRAINING" );
 	buttonChallengeID = TheNameKeyGenerator->nameToKey( "MainMenu.wnd:ButtonChallenge" );
+	buttonCampaignChaptersID = TheNameKeyGenerator->nameToKey( "MainMenu.wnd:ButtonCampaignChapters" );
 	buttonUSAID = TheNameKeyGenerator->nameToKey( "MainMenu.wnd:ButtonUSA" );
 	buttonGLAID = TheNameKeyGenerator->nameToKey( "MainMenu.wnd:ButtonGLA" );
 	buttonChinaID = TheNameKeyGenerator->nameToKey( "MainMenu.wnd:ButtonChina" );
@@ -1435,6 +1437,18 @@ WindowMsgHandledType MainMenuSystem( GameWindow *window, UnsignedInt msg,
 #endif
 				TheShell->push( "Menus/SkirmishGameOptionsMenu.wnd" );
 				TheScriptEngine->signalUIInteract(TheShellHookNames[SHELL_SCRIPT_HOOK_MAIN_MENU_SKIRMISH_SELECTED]);
+			}
+			else if( controlID == buttonCampaignChaptersID )
+			{
+				if(campaignSelected || dontAllowTransitions)
+				{
+					break;
+				}
+				buttonPushed = TRUE;
+				campaignSelected = TRUE;
+				dropDownWindows[DROPDOWN_SINGLE]->winHide(FALSE);
+				TheTransitionHandler->reverse("MainMenuSinglePlayerMenuBackChapters");
+				TheShell->push( "Menus/CampaignChapters.wnd" );
 			}
 			else if( controlID == onlineID )
 			{

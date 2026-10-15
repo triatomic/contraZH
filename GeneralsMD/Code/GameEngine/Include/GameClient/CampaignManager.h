@@ -137,6 +137,7 @@ public:
 	static void parseMissionPart( INI* ini, void *instance, void *store, const void *userData );					///< Parse the Mission Part
 
 	Campaign *newCampaign(AsciiString name);
+	const std::list< Campaign* > &getCampaignList() const { return m_campaignList; }
 	Bool isVictorious() { return m_victorious; }
 	void SetVictorious( Bool victory ) { m_victorious = victory;	}
 
