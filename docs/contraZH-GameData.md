@@ -56,6 +56,27 @@ Notes:
 * Particle systems with nothing on screen are now skipped regardless of the option.
 * Ported from TheSuperHackers commit `de20ae0cb` (Ronin and Mauller).
 
+## ParticleAtlas
+
+* `ParticleAtlas = No` - (Default. `Yes` packs particle textures into shared atlas pages, so alpha
+and additive systems with different textures batch into the same draws.)
+
+Plain alpha and additive particle systems draw from 2048x2048 pages with premultiplied blending.
+One blend state covers both modes, and the translucency sorter merges neighbouring triangles that
+share a page into one draw. Batches no longer break on texture or blend changes.
+
+Notes:
+* Implies batching for the systems it covers, whatever `BatchParticles` says.
+* Additive particles now depth-sort with smoke instead of drawing after it, so smoke in front of
+a fire covers it.
+* Textures are packed the first time they draw and the pages are cleared between maps. Up to four
+pages per map; textures that do not fit draw as before.
+* Not covered: streak, volume, terrain-conforming, alpha-test and multiply systems, systems with
+the flame, cryo, electric or disruption shaders, non power-of-two textures and ones smaller than
+16 pixels. The glow pass also keeps the old path.
+* Each texture keeps five mip levels, so very distant sprites alias a little more.
+* After stephanmeesters' texture atlas prototype for TheSuperHackers.
+
 ## SkipTranslucencySort
 
 * `SkipTranslucencySort = No` - (Default. `Yes` draws translucent triangles in submission order

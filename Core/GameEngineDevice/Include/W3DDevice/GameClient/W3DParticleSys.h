@@ -45,6 +45,8 @@ public:
 	W3DParticleSystemManager();
 	virtual ~W3DParticleSystemManager() override;
 
+	virtual void reset() override;
+
 	virtual void doParticles(RenderInfoClass &rinfo) override;
 	virtual void queueParticleRender() override;
 	///< returns the number of particles shown on screen per frame
@@ -62,8 +64,8 @@ private:
 	void drawSystems(RenderInfoClass &rinfo, DrawPass pass);	///< draws m_drawOrder
 	unsigned systemEffects(ParticleSystem &system, DrawPass pass);
 	Bool disrupts(ParticleSystem &system);	///< whether the disruption pass draws the system
-	Bool finishedBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, unsigned effects, const void *effectData);
-	void initializeBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, unsigned effects, const void *effectData);
+	Bool finishedBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, Bool premultiplied, unsigned effects, const void *effectData);
+	void initializeBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, Bool premultiplied, unsigned effects, const void *effectData);
 	void flushParticleBatch(RenderInfoClass& rinfo, UnsignedInt& pointCount);
 
 	enum { MAX_POINTS_PER_GROUP = 512 };
@@ -77,6 +79,7 @@ private:
 
 	// TheSuperHackers @feature renders ground aligned particles as terrain conforming meshes
 	class W3DTerrainParticle *m_terrainParticles;
+	class W3DParticleAtlas *m_atlas;					///< premultiplied pages that let alpha and additive systems with different textures batch together
 	std::vector<DrawEntry> m_drawOrder;			///< visible systems in the order they draw this frame
 	RefCountPtr<TextureClass> m_batchTexture;		///< the texture used as the drawing surface for batched particle draws
 	PointGroupClass *m_pointGroup;							///< the point group that contains all of the particles
@@ -85,10 +88,12 @@ private:
 	ShareBufferClass<Vector4> *m_RGBABuffer;		///< array of particle color and alpha
 	ShareBufferClass<float> *m_sizeBuffer;			///< array of particle sizes
 	ShareBufferClass<uint8> *m_angleBuffer;			///< array of particle orientations
+	ShareBufferClass<Vector4> *m_uvRectBuffer;		///< array of particle rectangles in an atlas page
 
 	ParticleSystemInfo::ParticleShaderType m_batchShaderType;
 	Bool m_readyToRender;											///< if true, it is OK to render
 	Bool m_batchBillboard;
+	Bool m_batchPremultiplied;								///< the batch draws from an atlas page, so its shader type is only that of its first system
 	unsigned m_batchEffects;									///< SoftParticleHookClass effects beyond soft fading
 	const void *m_batchEffectData;						///< what the hook gets with the effects: a template with flame settings of its own, a DisruptionShaderInfo, or null
 };

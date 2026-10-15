@@ -31,6 +31,7 @@
 #include "GameLogic/TerrainLogic.h"
 #include "GameClient/Color.h"
 #include "W3DDevice/GameClient/W3DParticleSys.h"
+#include "W3DDevice/GameClient/W3DParticleAtlas.h"
 #include "W3DDevice/GameClient/W3DTerrainParticle.h"
 #include "W3DDevice/GameClient/W3DAssetManager.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
@@ -83,11 +84,20 @@ static const ShaderClass &shaderForType(ParticleSystemInfo::ParticleShaderType t
 	}
 }
 
+// Atlas pages hold alpha art with its colour times its alpha and additive art with no alpha, so one blend draws both.
+static ShaderClass premultipliedShader()
+{
+	ShaderClass shader = ShaderClass::_PresetAlphaSpriteShader;
+	shader.Set_Src_Blend_Func(ShaderClass::SRCBLEND_ONE);
+	return shader;
+}
+
 W3DParticleSystemManager::W3DParticleSystemManager()
 {
 	PointGroupClass::Set_Ground_Height_Func(getParticleGroundHeight);
 
 	m_batchBillboard = true;
+	m_batchPremultiplied = false;
 	m_batchShaderType = ParticleSystemInfo::INVALID_SHADER;
 	m_batchEffects = 0;
 	m_batchEffectData = nullptr;
@@ -99,12 +109,14 @@ W3DParticleSystemManager::W3DParticleSystemManager()
 	m_RGBABuffer = nullptr;
 	m_sizeBuffer = nullptr;
 	m_angleBuffer = nullptr;
+	m_uvRectBuffer = nullptr;
 	m_readyToRender = false;
 
 	m_onScreenParticleCount = 0;
 
 	m_pointGroup = NEW PointGroupClass();
 	m_terrainParticles = NEW W3DTerrainParticle();
+	m_atlas = NEW W3DParticleAtlas();
 	//m_streakLine = nullptr;
 	m_streakLine = NEW StreakLineClass();
 
@@ -112,12 +124,16 @@ W3DParticleSystemManager::W3DParticleSystemManager()
 	m_RGBABuffer = NEW_REF( ShareBufferClass<Vector4>, (MAX_POINTS_PER_GROUP, "W3DParticleSystemManager::m_RGBABuffer") );
 	m_sizeBuffer = NEW_REF( ShareBufferClass<float>, (MAX_POINTS_PER_GROUP, "W3DParticleSystemManager::m_sizeBuffer") );
 	m_angleBuffer = NEW_REF( ShareBufferClass<uint8>, (MAX_POINTS_PER_GROUP, "W3DParticleSystemManager::m_angleBuffer") );
+	m_uvRectBuffer = NEW_REF( ShareBufferClass<Vector4>, (MAX_POINTS_PER_GROUP, "W3DParticleSystemManager::m_uvRectBuffer") );
 }
 
 W3DParticleSystemManager::~W3DParticleSystemManager()
 {
 	delete m_terrainParticles;
 	m_terrainParticles = nullptr;
+
+	delete m_atlas;
+	m_atlas = nullptr;
 
 	delete m_pointGroup;
 
@@ -132,6 +148,13 @@ W3DParticleSystemManager::~W3DParticleSystemManager()
 	REF_PTR_RELEASE(m_RGBABuffer);
 	REF_PTR_RELEASE(m_sizeBuffer);
 	REF_PTR_RELEASE(m_angleBuffer);
+	REF_PTR_RELEASE(m_uvRectBuffer);
+}
+
+void W3DParticleSystemManager::reset()
+{
+	ParticleSystemManager::reset();
+	m_atlas->reset();
 }
 
 /**
@@ -410,6 +433,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 {
 	const Bool drawSmudge = TheSmudgeManager && TheSmudgeManager->getHardwareSupport() && TheGlobalData->m_useHeatEffects;
 	const Bool batchParticles = TheGlobalData->m_batchParticles;
+	const Bool useAtlas = TheGlobalData->m_particleAtlas && pass == DRAW_MAIN;
 
 	unsigned int personalities[MAX_POINTS_PER_GROUP];
 
@@ -489,8 +513,25 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 			continue;
 		}
 
-		const Bool canBatch = batchParticles && sys->isUsingParticles() && !useTerrainConformingParticles;
-		if (!canBatch || finishedBatch(*sys, texture, effects, effectData))
+		// plain alpha and additive sprites draw from an atlas page, which batches them across textures and blends
+		const ParticleSystemInfo::ParticleShaderType shaderType = sys->getShaderType();
+		RefCountPtr<TextureClass> batchTexture = texture;
+		Vector4 atlasRect(0.0f, 0.0f, 1.0f, 1.0f);
+		Bool premultiplied = FALSE;
+		if (useAtlas && effects == 0 && sys->isUsingParticles() && !useTerrainConformingParticles &&
+			(shaderType == ParticleSystemInfo::ALPHA || shaderType == ParticleSystemInfo::ADDITIVE))
+		{
+			TextureClass *page = m_atlas->find(texture.Peek(), shaderType == ParticleSystemInfo::ADDITIVE, atlasRect);
+			if (page != nullptr)
+			{
+				batchTexture = page;
+				premultiplied = TRUE;
+			}
+		}
+		const Bool premultipliedAlpha = premultiplied && shaderType == ParticleSystemInfo::ALPHA;
+
+		const Bool canBatch = (batchParticles || premultiplied) && sys->isUsingParticles() && !useTerrainConformingParticles;
+		if (!canBatch || finishedBatch(*sys, batchTexture, premultiplied, effects, effectData))
 		{
 			flushParticleBatch(rinfo, pointCount);
 		}
@@ -498,7 +539,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		// the batch state always describes the system being filled, batched or not
 		if (m_batchTexture == nullptr)
 		{
-			initializeBatch(*sys, texture, effects, effectData);
+			initializeBatch(*sys, batchTexture, premultiplied, effects, effectData);
 		}
 
 		// haze spreads wider than the flame and rises above it
@@ -534,6 +575,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		Real *sizeArray = m_sizeBuffer->Get_Array();
 		Vector4 *RGBAArray = m_RGBABuffer->Get_Array();
 		uint8 *angleArray = m_angleBuffer->Get_Array();
+		Vector4 *uvRectArray = m_uvRectBuffer->Get_Array();
 		const Coord3D *pos;
 		const RGBColor *color;
 		Real psize;
@@ -566,6 +608,19 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 			RGBAArray[pointCount].Z = color->blue;
 			RGBAArray[pointCount].W = p->getAlpha();
 
+			if (premultiplied)
+			{
+				uvRectArray[pointCount] = atlasRect;
+			}
+			if (premultipliedAlpha)
+			{
+				// clamped first, as the vertex colour is clamped before the fixed-function blend weighs it by alpha
+				const Real alpha = clamp(0.0f, RGBAArray[pointCount].W, 1.0f);
+				RGBAArray[pointCount].X = clamp(0.0f, RGBAArray[pointCount].X, 1.0f) * alpha;
+				RGBAArray[pointCount].Y = clamp(0.0f, RGBAArray[pointCount].Y, 1.0f) * alpha;
+				RGBAArray[pointCount].Z = clamp(0.0f, RGBAArray[pointCount].Z, 1.0f) * alpha;
+			}
+
 			angleArray[pointCount] = (uint8)(p->getAngle() * 255.0f / (2.0f * PI));
 
 			if (++pointCount == MAX_POINTS_PER_GROUP)
@@ -579,7 +634,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 				// This prevents particles being dropped. Bank the stats first as the flush resets count to 0.
 				m_onScreenParticleCount += (pointCount - startCount);
 				flushParticleBatch(rinfo, pointCount);
-				initializeBatch(*sys, texture, effects, effectData);
+				initializeBatch(*sys, batchTexture, premultiplied, effects, effectData);
 				startCount = 0;
 			}
 		}
@@ -645,7 +700,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		if (sys->isUsingStreak() && (pointCount == 1))
 		{
 			m_onScreenParticleCount += (pointCount - startCount);
-			initializeBatch(*sys, texture, effects, effectData);
+			initializeBatch(*sys, texture, FALSE, effects, effectData);
 			flushParticleBatch(rinfo, pointCount);
 			startCount = 0;
 		}
@@ -726,18 +781,20 @@ Bool W3DParticleSystemManager::isFarther(const DrawEntry &a, const DrawEntry &b)
 	return a.depth < b.depth;
 }
 
-Bool W3DParticleSystemManager::finishedBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, unsigned effects, const void *effectData)
+Bool W3DParticleSystemManager::finishedBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, Bool premultiplied, unsigned effects, const void *effectData)
 {
 	return texture.Peek() != m_batchTexture.Peek() ||
-		system.getShaderType() != m_batchShaderType ||
+		premultiplied != m_batchPremultiplied ||
+		(!premultiplied && system.getShaderType() != m_batchShaderType) ||
 		system.shouldBillboard() != m_batchBillboard ||
 		effects != m_batchEffects ||
 		effectData != m_batchEffectData;
 }
 
-void W3DParticleSystemManager::initializeBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, unsigned effects, const void *effectData)
+void W3DParticleSystemManager::initializeBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, Bool premultiplied, unsigned effects, const void *effectData)
 {
 	m_batchTexture = texture;
+	m_batchPremultiplied = premultiplied;
 	m_batchShaderType = system.getShaderType();
 	m_batchBillboard = system.shouldBillboard();
 	m_batchEffects = effects;
@@ -749,21 +806,24 @@ void W3DParticleSystemManager::flushParticleBatch(RenderInfoClass& rinfo, Unsign
 	if (pointCount > 0)
 	{
 		m_pointGroup->Set_Texture(m_batchTexture.Peek());
-		m_pointGroup->Set_Shader(shaderForType(m_batchShaderType));
+		m_pointGroup->Set_Shader(m_batchPremultiplied ? premultipliedShader() : shaderForType(m_batchShaderType));
 		m_pointGroup->Set_Flag(PointGroupClass::TRANSFORM, true);
 		m_pointGroup->Set_Point_Mode(PointGroupClass::QUADS);
 		m_pointGroup->Set_Arrays(m_posBuffer, m_RGBABuffer, nullptr, m_sizeBuffer, m_angleBuffer, nullptr, pointCount);
+		m_pointGroup->Set_Texture_UV_Rects(m_batchPremultiplied ? m_uvRectBuffer : nullptr);
 		m_pointGroup->Set_Billboard(m_batchBillboard);
 		m_pointGroup->Set_Point_Frame(0);
 		m_pointGroup->Set_Effects(m_batchEffects, m_batchEffectData);
 		m_pointGroup->Render(rinfo);
 		m_pointGroup->Set_Effects(0, nullptr);
+		m_pointGroup->Set_Texture_UV_Rects(nullptr);
 
 		pointCount = 0;
 	}
 
 	m_batchTexture.Clear();
 	m_batchBillboard = false;
+	m_batchPremultiplied = false;
 	m_batchShaderType = ParticleSystemInfo::INVALID_SHADER;
 	m_batchEffects = 0;
 	m_batchEffectData = nullptr;
