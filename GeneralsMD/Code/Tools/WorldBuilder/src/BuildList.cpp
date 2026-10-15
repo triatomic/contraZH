@@ -895,6 +895,124 @@ static AsciiString buildListSideFor(SidesInfo *pSide)
 	return name;
 }
 
+// Replaces the side's build list with the structures of wantedList, or of every Structure when wantedList is empty
+static int importBuildListInto(FILE *file, const AsciiString &wantedList, SidesInfo *pSide)
+{
+	BuildListInfo *pBuild = pSide->getBuildList();
+	while (pBuild) {
+		BuildListInfo *pNext = pBuild->getNext();
+		pSide->removeFromBuildList(pBuild);
+		pBuild = pNext;
+	}
+	rewind(file);
+
+	char line[512];
+	BuildListInfo *currentBuild = NULL;
+	bool inStructure = false;
+	bool inWantedList = wantedList.isEmpty();
+	int importedCount = 0;
+
+	while (fgets(line, sizeof(line), file)) {
+		// Trim whitespace
+		char *p = line;
+		while (*p && isspace(*p)) p++;
+
+		// Skip comments and empty lines
+		if (*p == ';' || *p == '\0' || *p == '\n')
+			continue;
+
+		AsciiString listName = parseBuildListHeader(p);
+		if (!listName.isEmpty()) {
+			inWantedList = listName == wantedList;
+			continue;
+		}
+
+		// Check for Structure start
+		if (strstr(p, "Structure ") == p) {
+			inStructure = true;
+			if (!inWantedList) {
+				currentBuild = NULL;
+				continue;
+			}
+			currentBuild = newInstance(BuildListInfo);
+
+			// Extract template name
+			char *nameStart = p + 10; // strlen("Structure ")
+			char *nameEnd = strchr(nameStart, '\n');
+			if (nameEnd) *nameEnd = '\0';
+
+			// Trim trailing whitespace
+			char *end = nameStart + strlen(nameStart) - 1;
+			while (end > nameStart && isspace(*end)) *end-- = '\0';
+
+			currentBuild->setTemplateName(AsciiString(nameStart));
+
+			// Set defaults
+			currentBuild->setAngle(0.0f);
+			Coord3D defaultLoc;
+			defaultLoc.set(0.0f, 0.0f, 0.0f);
+			currentBuild->setLocation(defaultLoc);
+			currentBuild->setNumRebuilds(0);
+			currentBuild->setInitiallyBuilt(false);
+			continue;
+		}
+
+		// Check for Structure end
+		if (strstr(p, "END") == p && inStructure) {
+			if (currentBuild) {
+				pSide->addToBuildList(currentBuild, 1000);
+				importedCount++;
+				currentBuild = NULL;
+			}
+			inStructure = false;
+			continue;
+		}
+
+		// Parse structure properties
+		if (inStructure && currentBuild) {
+			if (strstr(p, "Name =") || strstr(p, "Name=")) {
+				char *valueStart = strchr(p, '=') + 1;
+				while (*valueStart && isspace(*valueStart)) valueStart++;
+				char *valueEnd = strchr(valueStart, '\n');
+				if (valueEnd) *valueEnd = '\0';
+				currentBuild->setBuildingName(AsciiString(valueStart));
+			}
+			else if (strstr(p, "Location =") || strstr(p, "Location=")) {
+				float x = 0, y = 0;
+				if (sscanf(p, "%*[^X]X:%f Y:%f", &x, &y) == 2) {
+					Coord3D loc;
+					loc.set(x, y, 0.0f);
+					currentBuild->setLocation(loc);
+				}
+			}
+			else if (strstr(p, "Rebuilds =") || strstr(p, "Rebuilds=")) {
+				int rebuilds = 0;
+				if (sscanf(p, "%*[^=]=%d", &rebuilds) == 1) {
+					currentBuild->setNumRebuilds(rebuilds);
+				}
+			}
+			else if (strstr(p, "Angle =") || strstr(p, "Angle=")) {
+				float angleDeg = 0;
+				if (sscanf(p, "%*[^=]=%f", &angleDeg) == 1) {
+					currentBuild->setAngle(angleDeg * PI / 180);
+				}
+			}
+			else if (strstr(p, "InitiallyBuilt =") || strstr(p, "InitiallyBuilt=")) {
+				char *valueStart = strchr(p, '=') + 1;
+				while (*valueStart && isspace(*valueStart)) valueStart++;
+				bool isBuilt = (strstr(valueStart, "Yes") != NULL || strstr(valueStart, "yes") != NULL);
+				currentBuild->setInitiallyBuilt(isBuilt);
+			}
+		}
+	}
+
+	// Drop a Structure that never reached its END
+	if (currentBuild) {
+		deleteInstance(currentBuild);
+	}
+	return importedCount;
+}
+
 void BuildList::OnImport()
 {
 	CFileDialog dlg(TRUE, _T("ini"), _T("BuildList.ini"), OFN_HIDEREADONLY | OFN_FILEMUSTEXIST,
@@ -914,158 +1032,64 @@ void BuildList::OnImport()
 		// Create a copy of the sides list for undo
 		SidesList sides;
 		sides = *TheSidesList;
-		SidesInfo *pSide = sides.getSideInfo(m_curSide);
-		
-		if (!pSide) {
-			fclose(file);
-			AfxMessageBox(_T("No valid side selected."));
-			return;
-		}
 
-		// A file with several lists imports the one for this player; a single list imports regardless
 		std::vector<AsciiString> listNames;
-		char scanLine[512];
-		while (fgets(scanLine, sizeof(scanLine), file)) {
-			char *p = scanLine;
+		char line[512];
+		while (fgets(line, sizeof(line), file)) {
+			char *p = line;
 			while (*p && isspace(*p)) p++;
 			AsciiString listName = parseBuildListHeader(p);
 			if (!listName.isEmpty()) {
 				listNames.push_back(listName);
 			}
 		}
-		rewind(file);
 
-		AsciiString wantedList;
-		if (!listNames.empty()) {
-			AsciiString side = buildListSideFor(pSide);
-			for (size_t i = 0; i < listNames.size(); i++) {
-				if (listNames[i].compareNoCase(side) == 0) {
-					wantedList = listNames[i];
-					break;
+		CString msg;
+		if (listNames.size() > 1) {
+			// Several lists fill every player whose faction side has one, as in a skirmish script file
+			CString filled;
+			int filledCount = 0;
+			for (Int i = 0; i < sides.getNumSides(); i++) {
+				SidesInfo *pSide = sides.getSideInfo(i);
+				AsciiString playerName = pSide->getDict()->getAsciiString(TheKey_playerName);
+				if (playerName.isEmpty()) {
+					continue;
+				}
+				AsciiString side = buildListSideFor(pSide);
+				for (size_t j = 0; j < listNames.size(); j++) {
+					if (listNames[j].compareNoCase(side) == 0) {
+						int count = importBuildListInto(file, listNames[j], pSide);
+						CString row;
+						row.Format(_T("\n%s: %d buildings from %s"), playerName.str(), count, listNames[j].str());
+						filled += row;
+						filledCount++;
+						break;
+					}
 				}
 			}
-			if (wantedList.isEmpty() && listNames.size() == 1) {
-				wantedList = listNames[0];
-			}
-			if (wantedList.isEmpty()) {
+			if (filledCount == 0) {
 				fclose(file);
-				CString msg;
-				msg.Format(_T("This file has no SkirmishBuildList %s. It lists:\n"), side.str());
-				for (size_t i = 0; i < listNames.size(); i++) {
+				msg = _T("No player's faction side matches a SkirmishBuildList in this file. It lists:\n");
+				for (size_t j = 0; j < listNames.size(); j++) {
 					msg += _T("\n");
-					msg += listNames[i].str();
+					msg += listNames[j].str();
 				}
 				AfxMessageBox(msg);
 				return;
 			}
-		}
-
-		// Clear existing build list for this side
-		BuildListInfo *pBuild = pSide->getBuildList();
-		while (pBuild) {
-			BuildListInfo *pNext = pBuild->getNext();
-			pSide->removeFromBuildList(pBuild);
-			pBuild = pNext;
-		}
-
-		char line[512];
-		BuildListInfo *currentBuild = NULL;
-		bool inStructure = false;
-		bool inWantedList = listNames.empty();
-		int importedCount = 0;
-
-		while (fgets(line, sizeof(line), file)) {
-			// Trim whitespace
-			char *p = line;
-			while (*p && isspace(*p)) p++;
-
-			// Skip comments and empty lines
-			if (*p == ';' || *p == '\0' || *p == '\n')
-				continue;
-
-			AsciiString listName = parseBuildListHeader(p);
-			if (!listName.isEmpty()) {
-				inWantedList = listName == wantedList;
-				continue;
+			msg.Format(_T("Imported build lists for %d players:\n"), filledCount);
+			msg += filled;
+		} else {
+			// One list or none imports into the selected player
+			SidesInfo *pSide = sides.getSideInfo(m_curSide);
+			if (!pSide) {
+				fclose(file);
+				AfxMessageBox(_T("No valid side selected."));
+				return;
 			}
-
-			// Check for Structure start
-			if (strstr(p, "Structure ") == p) {
-				inStructure = true;
-				if (!inWantedList) {
-					currentBuild = NULL;
-					continue;
-				}
-				currentBuild = newInstance(BuildListInfo);
-				
-				// Extract template name
-				char *nameStart = p + 10; // strlen("Structure ")
-				char *nameEnd = strchr(nameStart, '\n');
-				if (nameEnd) *nameEnd = '\0';
-				
-				// Trim trailing whitespace
-				char *end = nameStart + strlen(nameStart) - 1;
-				while (end > nameStart && isspace(*end)) *end-- = '\0';
-				
-				currentBuild->setTemplateName(AsciiString(nameStart));
-				
-				// Set defaults
-				currentBuild->setAngle(0.0f);
-				Coord3D defaultLoc;
-				defaultLoc.set(0.0f, 0.0f, 0.0f);
-				currentBuild->setLocation(defaultLoc);
-				currentBuild->setNumRebuilds(0);
-				currentBuild->setInitiallyBuilt(false);
-				continue;
-			}
-
-			// Check for Structure end
-			if (strstr(p, "END") == p && inStructure) {
-				if (currentBuild) {
-					pSide->addToBuildList(currentBuild, 1000);
-					importedCount++;
-					currentBuild = NULL;
-				}
-				inStructure = false;
-				continue;
-			}
-
-			// Parse structure properties
-			if (inStructure && currentBuild) {
-				if (strstr(p, "Name =") || strstr(p, "Name=")) {
-					char *valueStart = strchr(p, '=') + 1;
-					while (*valueStart && isspace(*valueStart)) valueStart++;
-					char *valueEnd = strchr(valueStart, '\n');
-					if (valueEnd) *valueEnd = '\0';
-					currentBuild->setBuildingName(AsciiString(valueStart));
-				}
-				else if (strstr(p, "Location =") || strstr(p, "Location=")) {
-					float x = 0, y = 0;
-					if (sscanf(p, "%*[^X]X:%f Y:%f", &x, &y) == 2) {
-						Coord3D loc;
-						loc.set(x, y, 0.0f);
-						currentBuild->setLocation(loc);
-					}
-				}
-				else if (strstr(p, "Rebuilds =") || strstr(p, "Rebuilds=")) {
-					int rebuilds = 0;
-					if (sscanf(p, "%*[^=]=%d", &rebuilds) == 1) {
-						currentBuild->setNumRebuilds(rebuilds);
-					}
-				}
-				else if (strstr(p, "Angle =") || strstr(p, "Angle=")) {
-					float angleDeg = 0;
-					if (sscanf(p, "%*[^=]=%f", &angleDeg) == 1) {
-						currentBuild->setAngle(angleDeg * PI / 180);
-					}
-				}
-				else if (strstr(p, "InitiallyBuilt =") || strstr(p, "InitiallyBuilt=")) {
-					char *valueStart = strchr(p, '=') + 1;
-					while (*valueStart && isspace(*valueStart)) valueStart++;
-					bool isBuilt = (strstr(valueStart, "Yes") != NULL || strstr(valueStart, "yes") != NULL);
-					currentBuild->setInitiallyBuilt(isBuilt);
-				}
-			}
+			AsciiString wantedList = listNames.empty() ? AsciiString::TheEmptyString : listNames[0];
+			int importedCount = importBuildListInto(file, wantedList, pSide);
+			msg.Format(_T("Successfully imported %d buildings."), importedCount);
 		}
 
 		fclose(file);
@@ -1078,12 +1102,6 @@ void BuildList::OnImport()
 
 		updateCurSide();
 
-		CString msg;
-		if (wantedList.isEmpty()) {
-			msg.Format(_T("Successfully imported %d buildings."), importedCount);
-		} else {
-			msg.Format(_T("Successfully imported %d buildings from SkirmishBuildList %s."), importedCount, wantedList.str());
-		}
 		AfxMessageBox(msg);
 
 	} catch (...) {
