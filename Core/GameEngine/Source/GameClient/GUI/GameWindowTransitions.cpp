@@ -509,6 +509,10 @@ void GameWindowTransitionsHandler::setGroup(AsciiString groupName, Bool immediat
 void GameWindowTransitionsHandler::reverse( AsciiString groupName )
 {
 	TransitionGroup *g = findGroup(groupName);
+	if( g == nullptr )
+	{
+		return;
+	}
 	if( m_currentGroup == g )
 	{
 		m_currentGroup->reverse();

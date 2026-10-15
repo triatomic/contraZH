@@ -61,6 +61,7 @@ static GameWindow *buttonBack = nullptr;
 
 static GameDifficulty difficulty = DIFFICULTY_NORMAL;
 static Bool isShuttingDown = FALSE;
+static Bool gameStarting = FALSE;
 static Bool justEntered = FALSE;
 static Int initialGadgetDelay = 2;
 
@@ -163,7 +164,7 @@ static void startChapter()
 {
 	Campaign *campaign = getSelectedCampaign();
 	Mission *mission = getSelectedMission();
-	if( campaign == nullptr || mission == nullptr )
+	if( gameStarting || campaign == nullptr || mission == nullptr )
 	{
 		return;
 	}
@@ -171,6 +172,7 @@ static void startChapter()
 	TheCampaignManager->setCampaignAndMission( campaign->m_name, mission->m_name );
 	if( TheCampaignManager->getCurrentMission() != mission )
 	{
+		TheCampaignManager->setCampaign( AsciiString::TheEmptyString );
 		return;
 	}
 
@@ -191,6 +193,7 @@ static void startChapter()
 	msg->appendIntegerArgument( difficulty );
 	msg->appendIntegerArgument( TheCampaignManager->getRankPoints() );
 	InitRandom( 0 );
+	gameStarting = TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -233,9 +236,9 @@ void CampaignChaptersMenuInit( WindowLayout *layout, void *userData )
 		GadgetRadioSetSelection( radio, FALSE );
 	}
 
+	// Selecting the first campaign fills the chapter list through GLM_SELECTED
 	populateCampaigns();
 	GadgetListBoxSetSelected( listboxCampaigns, 0 );
-	populateChapters( getSelectedCampaign() );
 
 	layout->hide( FALSE );
 	TheWindowManager->winSetFocus( parent );
@@ -248,6 +251,7 @@ void CampaignChaptersMenuInit( WindowLayout *layout, void *userData )
 		win->winHide( TRUE );
 	}
 	isShuttingDown = FALSE;
+	gameStarting = FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -294,7 +298,7 @@ WindowMsgHandledType CampaignChaptersMenuInput( GameWindow *window, UnsignedInt 
 {
 	if( msg == GWM_CHAR && mData1 == KEY_ESC )
 	{
-		if( BitIsSet( mData2, KEY_STATE_UP ) )
+		if( buttonBack && BitIsSet( mData2, KEY_STATE_UP ) )
 		{
 			TheWindowManager->winSendSystemMsg( window, GBM_SELECTED, (WindowMsgData)buttonBack, buttonBackID );
 		}
