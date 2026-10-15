@@ -408,6 +408,72 @@ static UnicodeString formatMoneyForStartingCashComboBox( const Money & moneyAmou
   return rtn;
 }
 
+static GameWindow *findLobbyWindow( GameWindow *parent, const char *layoutFilename, const char *name )
+{
+	AsciiString fullName;
+	fullName.format( "%s:%s", layoutFilename, name );
+	return TheWindowManager->winGetWindowFromId( parent, TheNameKeyGenerator->nameToKey( fullName ) );
+}
+
+void InitLobbyTabs( LobbyTabs &tabs, GameWindow *parent, const char *layoutFilename )
+{
+	AsciiString fullName;
+	fullName.format( "%s:ButtonTabGame", layoutFilename );
+	tabs.buttonGameID = TheNameKeyGenerator->nameToKey( fullName );
+	fullName.format( "%s:ButtonTabRules", layoutFilename );
+	tabs.buttonRulesID = TheNameKeyGenerator->nameToKey( fullName );
+	tabs.buttonGame = TheWindowManager->winGetWindowFromId( parent, tabs.buttonGameID );
+	tabs.buttonRules = TheWindowManager->winGetWindowFromId( parent, tabs.buttonRulesID );
+	tabs.panelGame = findLobbyWindow( parent, layoutFilename, "PanelGame" );
+	tabs.panelRules = findLobbyWindow( parent, layoutFilename, "PanelRules" );
+	if (!tabs.buttonGame || !tabs.buttonRules || !tabs.panelGame || !tabs.panelRules)
+	{
+		tabs.buttonGame = nullptr;
+		tabs.buttonRules = nullptr;
+		tabs.panelGame = nullptr;
+		tabs.panelRules = nullptr;
+		return;
+	}
+
+	// The tab buttons start hidden so an exe without this code keeps the Game page
+	GadgetButtonSetText( tabs.buttonRules, TheGameText->FETCH_OR_SUBSTITUTE("GUI:TabRules", L"Rules") );
+	tabs.buttonGame->winHide( FALSE );
+	tabs.buttonRules->winHide( FALSE );
+	ShowLobbyTab( tabs, FALSE );
+}
+
+void ShowLobbyTab( LobbyTabs &tabs, Bool rules )
+{
+	if (!tabs.buttonGame)
+	{
+		return;
+	}
+	tabs.panelGame->winHide( rules );
+	tabs.panelRules->winHide( !rules );
+	GadgetCheckLikeButtonSetVisualCheck( tabs.buttonGame, !rules );
+	GadgetCheckLikeButtonSetVisualCheck( tabs.buttonRules, rules );
+	if (!rules)
+	{
+		GadgetButtonSetText( tabs.buttonGame, TheGameText->FETCH_OR_SUBSTITUTE("GUI:TabGame", L"Game") );
+	}
+}
+
+Bool IsLobbyRulesTabShown( const LobbyTabs &tabs )
+{
+	return tabs.panelRules && !tabs.panelRules->winIsHidden();
+}
+
+void MarkLobbyGameTab( LobbyTabs &tabs )
+{
+	if (!tabs.buttonGame)
+	{
+		return;
+	}
+	UnicodeString label = TheGameText->FETCH_OR_SUBSTITUTE("GUI:TabGame", L"Game");
+	label.concat( L" *" );
+	GadgetButtonSetText( tabs.buttonGame, label );
+}
+
 void PopulateStartingCashComboBox(GameWindow *comboBox, GameInfo *myGame)
 {
   GadgetComboBoxReset(comboBox);

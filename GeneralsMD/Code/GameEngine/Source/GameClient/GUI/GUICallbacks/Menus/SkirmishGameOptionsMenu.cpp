@@ -117,8 +117,6 @@ static NameKeyType checkBoxLimitSuperweaponsID = NAMEKEY_INVALID;
 static NameKeyType comboBoxStartingCashID = NAMEKEY_INVALID;
 static NameKeyType checkCoopBuildingsID = NAMEKEY_INVALID;
 static NameKeyType checkQuickGameID = NAMEKEY_INVALID;
-static NameKeyType buttonTabGameID = NAMEKEY_INVALID;
-static NameKeyType buttonTabRulesID = NAMEKEY_INVALID;
 
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *staticTextGameSpeed = nullptr;
@@ -134,10 +132,7 @@ static GameWindow *checkBoxLimitSuperweapons = nullptr;
 static GameWindow *comboBoxStartingCash = nullptr;
 static GameWindow *checkCoopBuildings = nullptr;
 static GameWindow *checkQuickGame = nullptr;
-static GameWindow *buttonTabGame = nullptr;
-static GameWindow *buttonTabRules = nullptr;
-static GameWindow *panelGame = nullptr;
-static GameWindow *panelRules = nullptr;
+static LobbyTabs lobbyTabs;
 static GameWindow *comboBoxPlayer[MAX_SLOTS] = {0};
 
 static GameWindow *comboBoxColor[MAX_SLOTS] = {0};
@@ -1042,18 +1037,6 @@ static void handleQuickGameClick()
 	}
 }
 
-static void showRulesTab( Bool rules )
-{
-	if (!buttonTabGame || !buttonTabRules || !panelGame || !panelRules)
-	{
-		return;
-	}
-	panelGame->winHide( rules );
-	panelRules->winHide( !rules );
-	GadgetCheckLikeButtonSetVisualCheck( buttonTabGame, !rules );
-	GadgetCheckLikeButtonSetVisualCheck( buttonTabRules, rules );
-}
-
 
 //-------------------------------------------------------------------------------------------------
 /** Initialize the Gadgets Options Menu */
@@ -1109,21 +1092,7 @@ void InitSkirmishGameGadgets()
 		checkQuickGame->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:QuickGame", L"Lifts the rank requirements on advanced structures, superweapons and super units"));
 	}
 
-	// The tab buttons start hidden so an exe without this code keeps the Game page
-	buttonTabGameID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:ButtonTabGame" );
-	buttonTabRulesID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:ButtonTabRules" );
-	buttonTabGame = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, buttonTabGameID );
-	buttonTabRules = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, buttonTabRulesID );
-	panelGame = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:PanelGame" ) );
-	panelRules = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:PanelRules" ) );
-	if (buttonTabGame && buttonTabRules && panelGame && panelRules)
-	{
-		GadgetButtonSetText( buttonTabGame, TheGameText->FETCH_OR_SUBSTITUTE("GUI:TabGame", L"Game") );
-		GadgetButtonSetText( buttonTabRules, TheGameText->FETCH_OR_SUBSTITUTE("GUI:TabRules", L"Rules") );
-		buttonTabGame->winHide( FALSE );
-		buttonTabRules->winHide( FALSE );
-		showRulesTab( FALSE );
-	}
+	InitLobbyTabs( lobbyTabs, parentSkirmishGameOptions, "SkirmishGameOptionsMenu.wnd" );
 
 	textEntryPlayerNameID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:TextEntryPlayerName" );
   textEntryPlayerName = TheWindowManager->winGetWindowFromId( nullptr, textEntryPlayerNameID );
@@ -1734,13 +1703,13 @@ WindowMsgHandledType SkirmishGameOptionsMenuSystem( GameWindow *window, Unsigned
         {
           handleQuickGameClick();
         }
-        else if ( controlID == buttonTabGameID )
+        else if ( controlID == lobbyTabs.buttonGameID )
         {
-          showRulesTab( FALSE );
+          ShowLobbyTab( lobbyTabs, FALSE );
         }
-        else if ( controlID == buttonTabRulesID )
+        else if ( controlID == lobbyTabs.buttonRulesID )
         {
-          showRulesTab( TRUE );
+          ShowLobbyTab( lobbyTabs, TRUE );
         }
 				else
 				{

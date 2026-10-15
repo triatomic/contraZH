@@ -123,8 +123,6 @@ static NameKeyType checkMaxCameraHeightID = NAMEKEY_INVALID;
 static NameKeyType textEntryMaxCameraHeightID = NAMEKEY_INVALID;
 static NameKeyType checkCoopBuildingsID = NAMEKEY_INVALID;
 static NameKeyType checkQuickGameID = NAMEKEY_INVALID;
-static NameKeyType buttonTabGameID = NAMEKEY_INVALID;
-static NameKeyType buttonTabRulesID = NAMEKEY_INVALID;
 static NameKeyType windowMapID = NAMEKEY_INVALID;
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *parentLanGameOptions = nullptr;
@@ -140,10 +138,9 @@ static GameWindow *checkMaxCameraHeight = nullptr;
 static GameWindow *textEntryMaxCameraHeight = nullptr;
 static GameWindow *checkCoopBuildings = nullptr;
 static GameWindow *checkQuickGame = nullptr;
-static GameWindow *buttonTabGame = nullptr;
-static GameWindow *buttonTabRules = nullptr;
-static GameWindow *panelGame = nullptr;
-static GameWindow *panelRules = nullptr;
+static LobbyTabs lobbyTabs;
+static Int lastChatCount = 0;
+static UnicodeString lastChatLine;
 static GameWindow *windowMap = nullptr;
 
 static GameWindow *comboBoxPlayer[MAX_SLOTS] = {0};
@@ -793,19 +790,32 @@ static void commitLanQuickGame()
 
 static void showRulesTab( Bool rules )
 {
-	if (!buttonTabGame || !buttonTabRules || !panelGame || !panelRules)
-	{
-		return;
-	}
-	panelGame->winHide( rules );
-	panelRules->winHide( !rules );
-	GadgetCheckLikeButtonSetVisualCheck( buttonTabGame, !rules );
-	GadgetCheckLikeButtonSetVisualCheck( buttonTabRules, rules );
+	ShowLobbyTab( lobbyTabs, rules );
 
 	// The chat entry lives on the Game page
 	if (!rules && textEntryChat)
 	{
 		TheWindowManager->winSetFocus( textEntryChat );
+	}
+}
+
+// The chat listbox caps its length, so a new line shows as a new count or a new last line
+static void markUnseenChat()
+{
+	if (!listboxChatWindowLanGame)
+	{
+		return;
+	}
+	const Int count = GadgetListBoxGetNumEntries( listboxChatWindowLanGame );
+	const UnicodeString line = count > 0 ? GadgetListBoxGetText( listboxChatWindowLanGame, count - 1 ) : UnicodeString::TheEmptyString;
+	if (count != lastChatCount || line.compare( lastChatLine ) != 0)
+	{
+		lastChatCount = count;
+		lastChatLine = line;
+		if (IsLobbyRulesTabShown( lobbyTabs ))
+		{
+			MarkLobbyGameTab( lobbyTabs );
+		}
 	}
 }
 
@@ -876,21 +886,9 @@ void InitLanGameGadgets()
 		checkQuickGame->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:QuickGame", L"Lifts the rank requirements on advanced structures, superweapons and super units"));
 	}
 
-	// The tab buttons start hidden so an exe without this code keeps the Game page
-	buttonTabGameID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:ButtonTabGame" );
-	buttonTabRulesID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:ButtonTabRules" );
-	buttonTabGame = TheWindowManager->winGetWindowFromId( parentLanGameOptions, buttonTabGameID );
-	buttonTabRules = TheWindowManager->winGetWindowFromId( parentLanGameOptions, buttonTabRulesID );
-	panelGame = TheWindowManager->winGetWindowFromId( parentLanGameOptions, TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:PanelGame" ) );
-	panelRules = TheWindowManager->winGetWindowFromId( parentLanGameOptions, TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:PanelRules" ) );
-	if (buttonTabGame && buttonTabRules && panelGame && panelRules)
-	{
-		GadgetButtonSetText( buttonTabGame, TheGameText->FETCH_OR_SUBSTITUTE("GUI:TabGame", L"Game") );
-		GadgetButtonSetText( buttonTabRules, TheGameText->FETCH_OR_SUBSTITUTE("GUI:TabRules", L"Rules") );
-		buttonTabGame->winHide( FALSE );
-		buttonTabRules->winHide( FALSE );
-		showRulesTab( FALSE );
-	}
+	InitLobbyTabs( lobbyTabs, parentLanGameOptions, "LanGameOptionsMenu.wnd" );
+	lastChatCount = 0;
+	lastChatLine.clear();
 
 	windowMap = TheWindowManager->winGetWindowFromId( parentLanGameOptions,windowMapID  );
 	DEBUG_ASSERTCRASH(windowMap, ("Could not find the LanGameOptionsMenu.wnd:MapWindow" ));
@@ -990,10 +988,7 @@ void DeinitLanGameGadgets()
   textEntryMaxCameraHeight = nullptr;
   checkCoopBuildings = nullptr;
   checkQuickGame = nullptr;
-	buttonTabGame = nullptr;
-	buttonTabRules = nullptr;
-	panelGame = nullptr;
-	panelRules = nullptr;
+	lobbyTabs = LobbyTabs();
 	if (windowMap)
 	{
 		windowMap->winSetUserData(nullptr);
@@ -1284,6 +1279,7 @@ void LanGameOptionsMenuUpdate( WindowLayout * layout, void *userData)
 	if(LANisShuttingDown && TheShell->isAnimFinished() && TheTransitionHandler->isFinished())
 		shutdownComplete(layout);
 	//TheLAN->update(); // this is handled in the lobby
+	markUnseenChat();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1504,11 +1500,11 @@ WindowMsgHandledType LanGameOptionsMenuSystem( GameWindow *window, UnsignedInt m
         {
           commitLanQuickGame();
         }
-        else if ( controlID == buttonTabGameID )
+        else if ( controlID == lobbyTabs.buttonGameID )
         {
           showRulesTab( FALSE );
         }
-        else if ( controlID == buttonTabRulesID )
+        else if ( controlID == lobbyTabs.buttonRulesID )
         {
           showRulesTab( TRUE );
         }

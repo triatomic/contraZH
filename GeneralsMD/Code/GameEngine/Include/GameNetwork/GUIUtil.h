@@ -50,3 +50,19 @@ void EnableAcceptControls(Bool Enabled, GameInfo *myGame, GameWindow *comboPlaye
 										GameWindow *comboColor[], GameWindow *comboPlayerTemplate[],
 										GameWindow *comboTeam[], GameWindow *buttonAccept[], GameWindow *buttonStart,
 										GameWindow *buttonMapStartPosition[], Int slotNum = -1);
+
+// Game and Rules tabs of the Skirmish and LAN lobbies; every pointer is null when the layout lacks them
+struct LobbyTabs
+{
+	NameKeyType buttonGameID;
+	NameKeyType buttonRulesID;
+	GameWindow *buttonGame;
+	GameWindow *buttonRules;
+	GameWindow *panelGame;
+	GameWindow *panelRules;
+};
+
+void InitLobbyTabs( LobbyTabs &tabs, GameWindow *parent, const char *layoutFilename );
+void ShowLobbyTab( LobbyTabs &tabs, Bool rules );
+Bool IsLobbyRulesTabShown( const LobbyTabs &tabs );
+void MarkLobbyGameTab( LobbyTabs &tabs );
