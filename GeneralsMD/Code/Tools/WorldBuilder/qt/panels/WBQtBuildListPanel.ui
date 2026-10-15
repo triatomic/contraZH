@@ -274,6 +274,16 @@
     </widget>
    </item>
    <item>
+    <widget class="QCheckBox" name="sideOnly">
+     <property name="text">
+      <string>Show Selected Player Only</string>
+     </property>
+     <property name="toolTip">
+      <string>Draw only the selected player's buildings in the view while this tool is open.</string>
+     </property>
+    </widget>
+   </item>
+   <item>
     <widget class="QCheckBox" name="forcedShow">
      <property name="text">
       <string>Don't Hide Objects When Tool Is Closed</string>

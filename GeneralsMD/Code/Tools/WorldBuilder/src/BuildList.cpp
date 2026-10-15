@@ -162,6 +162,16 @@ void BuildList::loadSides()
 	updateCurSide();
 }
 
+// Redraws the build lists after a side change when the view shows only the selected player's
+static void refreshSideOnlyView()
+{
+	WbView3d *p3View = CWorldBuilderDoc::GetActive3DView();
+	if (p3View && p3View->getShowBuildListSideOnly())
+	{
+		p3View->invalBuildListItemInView(nullptr);
+	}
+}
+
 /// Updates the current side, loading it's build list.
 void BuildList::updateCurSide()
 {
@@ -211,6 +221,7 @@ void BuildList::OnSelchangeSidesCombo()
 	if (pCombo->GetCurSel() != m_curSide) {
 		m_curSide = pCombo->GetCurSel();
 		updateCurSide();
+		refreshSideOnlyView();
 		CListBox *pList = (CListBox*)GetDlgItem(IDC_BUILD_LIST);
 		if (pList) {
 			pList->SetCurSel(0);
@@ -1177,6 +1188,7 @@ void BuildList::qtSetCurSide(int i)
 	if (i < 0 || i >= TheSidesList->getNumSides()) { return; }
 	m_staticThis->m_curSide = i;
 	m_staticThis->updateCurSide();
+	refreshSideOnlyView();
 }
 
 int BuildList::qtGetBuildCount(void)
@@ -1599,5 +1611,20 @@ int BuildList::qtGetForcedShow(void)
 void BuildList::qtSetForcedShow(int on)
 {
 	::AfxGetApp()->WriteProfileInt(BUILDLIST_OPTION_PANEL, "ForceShowBuildListObjects", on ? 1 : 0);
+}
+
+int BuildList::qtGetSideOnly(void)
+{
+	return ::AfxGetApp()->GetProfileInt(BUILDLIST_OPTION_PANEL, "ShowSelectedSideOnly", 0);
+}
+
+void BuildList::qtSetSideOnly(int on)
+{
+	::AfxGetApp()->WriteProfileInt(BUILDLIST_OPTION_PANEL, "ShowSelectedSideOnly", on ? 1 : 0);
+	WbView3d *p3View = CWorldBuilderDoc::GetActive3DView();
+	if (p3View)
+	{
+		p3View->invalBuildListItemInView(NULL);
+	}
 }
 #endif

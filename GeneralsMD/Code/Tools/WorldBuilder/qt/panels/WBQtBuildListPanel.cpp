@@ -43,6 +43,7 @@ WBQtBuildListPanel::WBQtBuildListPanel(QWidget *owner)
 	m_power = m_ui->power;
 	m_followObject = m_ui->followObject;
 	m_forcedShow = m_ui->forcedShow;
+	m_sideOnly = m_ui->sideOnly;
 
 	// == the MFC IDC_REBUILDS (CBS_DROPDOWN): type to narrow the list. The rest of the panel's
 	// combos were CBS_DROPDOWNLIST, so they stay pick-only -- but all of them scroll (WS_VSCROLL).
@@ -79,6 +80,7 @@ WBQtBuildListPanel::WBQtBuildListPanel(QWidget *owner)
 		connect(m_rebuilds->lineEdit(), SIGNAL(editingFinished()), this, SLOT(onRebuildsTextCommitted()));
 	}
 	connect(m_forcedShow, SIGNAL(clicked()), this, SLOT(onForcedShowToggled()));
+	connect(m_sideOnly, SIGNAL(clicked()), this, SLOT(onSideOnlyToggled()));
 	connect(m_followObject, SIGNAL(clicked()), this, SLOT(onFollowObjectToggled()));
 	m_followObject->setChecked(WBQtConfig_GetBuildListFollow() != 0);
 
@@ -154,6 +156,7 @@ void WBQtBuildListPanel::refresh()
 	}
 
 	m_forcedShow->setChecked(WBQtBuildList_GetForcedShow() != 0);
+	m_sideOnly->setChecked(WBQtBuildList_GetSideOnly() != 0);
 
 	m_updating = false;
 	refreshAttributes();
@@ -417,6 +420,15 @@ void WBQtBuildListPanel::onForcedShowToggled()
 		return;
 	}
 	WBQtBuildList_SetForcedShow(m_forcedShow->isChecked() ? 1 : 0);
+}
+
+void WBQtBuildListPanel::onSideOnlyToggled()
+{
+	if (m_updating)
+	{
+		return;
+	}
+	WBQtBuildList_SetSideOnly(m_sideOnly->isChecked() ? 1 : 0);
 }
 
 // --- Forward push (BuildList refresh -> widget), the Qt-side of WBQtPanelBridge.h ---------

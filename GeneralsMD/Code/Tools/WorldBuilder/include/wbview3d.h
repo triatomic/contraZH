@@ -638,6 +638,8 @@ public:
 	
 	/// Invalidates an build list object.
 	void invalBuildListItemInView(BuildListInfo *pBuild);
+	/// True when the Build List tool limits the view to its selected player and side is another one.
+	Bool isBuildListSideHidden(Int side);
 
 	/// Invalidates the area of one height map cell in the 2d view.
 	virtual void invalidateCellInView(int xIndex, int yIndex) override;
@@ -855,6 +857,7 @@ public:
 	Bool getShowBuildZoneFeedBack(void) { return ::AfxGetApp()->GetProfileInt(OBJECT_OPTION_PANEL, "PreviewBuildZone", 1);}
 	Bool getUseWaterHeight(void) { return ::AfxGetApp()->GetProfileInt(OBJECT_OPTION_PANEL, "UseWaterHeight", 0);}
 	Bool getShowBuildListObjects(void) { return ::AfxGetApp()->GetProfileInt(BUILDLIST_OPTION_PANEL, "ForceShowBuildListObjects", 0);}
+	Bool getShowBuildListSideOnly(void) { return ::AfxGetApp()->GetProfileInt(BUILDLIST_OPTION_PANEL, "ShowSelectedSideOnly", 0);}
 
 	void setObjTracking(MapObject *pMapObj, Coord3D pos, Real angle, Bool show);
 	void setViewLayersList(Bool showLayersList) { m_showLayersList = showLayersList; }

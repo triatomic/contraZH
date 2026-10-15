@@ -1758,6 +1758,12 @@ AsciiString WbView3d::getBestModelName(const ThingTemplate* tt, const ModelCondi
 }
 
 // ----------------------------------------------------------------------------
+Bool WbView3d::isBuildListSideHidden(Int side)
+{
+	return BuildListTool::isActive() && getShowBuildListSideOnly() && side != BuildList::getCurSide();
+}
+
+// ----------------------------------------------------------------------------
 void WbView3d::invalBuildListItemInView(BuildListInfo *pBuildToInval)
 {
 	Int i;
@@ -1765,6 +1771,7 @@ void WbView3d::invalBuildListItemInView(BuildListInfo *pBuildToInval)
 
 	for (i=0; i<TheSidesList->getNumSides(); i++) {
 		SidesInfo *pSide = TheSidesList->getSideInfo(i);
+		Bool sideHidden = isBuildListSideHidden(i);
 
 		// find which player color we should use
 		Int playerColor = 0xFFFFFF;
@@ -1788,6 +1795,15 @@ void WbView3d::invalBuildListItemInView(BuildListInfo *pBuildToInval)
 				continue;
 			}
 			if (!BuildListTool::isActive() && !pBuild->isInitiallyBuilt() && !getShowBuildListObjects()) {
+				continue;
+			}
+			if (sideHidden) {
+				if (pBuild->getRenderObj()) {
+					if (m_baseBuildScene->safeContains(pBuild->getRenderObj())) {
+						m_baseBuildScene->Remove_Render_Object(pBuild->getRenderObj());
+					}
+					pBuild->setRenderObj(nullptr);
+				}
 				continue;
 			}
 			// Update.
@@ -4327,7 +4343,10 @@ BuildListInfo *WbView3d::pickedBuildObjectInView(CPoint viewPt)
 	Int i;
 	viewToDocCoords(viewPt, &cpt, false);
  	for (i=0; i<TheSidesList->getNumSides(); i++) {
-		SidesInfo *pSide = TheSidesList->getSideInfo(i); 
+		if (isBuildListSideHidden(i)) {
+			continue;
+		}
+		SidesInfo *pSide = TheSidesList->getSideInfo(i);
 		for (BuildListInfo *pBuild = pSide->getBuildList(); pBuild; pBuild = pBuild->getNext()) {
 			Coord3D center = *pBuild->getLocation();
 			center.x -= cpt.x;

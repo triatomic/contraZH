@@ -13,6 +13,7 @@ visual size on top of the template `Scale`, for the whole selection.)
 rebuild count and flags. Follow Object moves the view to the selected entry. Import of a file
 with several `SkirmishBuildList` blocks, such as `AIData.ini`, gives every player the list matching
 its faction side, so one import fills all players of a skirmish script file. A file with one list
-imports it into the selected player.)
+imports it into the selected player. Show Selected Player Only draws and picks only the selected
+player's buildings while the tool is open.)
 * Select Similar works on roads and bridges.
 

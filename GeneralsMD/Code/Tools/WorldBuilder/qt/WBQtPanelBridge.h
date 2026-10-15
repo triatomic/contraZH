@@ -118,6 +118,8 @@ void WBQtBuildList_Import(void);
 void WBQtBuildList_EditProps(void);
 int  WBQtBuildList_GetForcedShow(void);
 void WBQtBuildList_SetForcedShow(int on);
+int  WBQtBuildList_GetSideOnly(void);
+void WBQtBuildList_SetSideOnly(int on);
 
 // --- Mound panel: forward push, tool -> Qt widget (implemented Qt-side) ------------------
 void WBQtMound_PushWidth(int v);
