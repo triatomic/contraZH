@@ -341,6 +341,7 @@ public:
 	virtual UnsignedInt GetLocalIP() { return m_localIP; }								///< What's my IP?
 	virtual void fillInLANMessage( LANMessage *msg ) override;																	///< Fill in default params
 	virtual void checkMOTD() override;
+	Bool IsGameStartCountdownRunning();																											///< Has the host started the start countdown?
 protected:
 
 	enum PendingActionType
@@ -361,6 +362,7 @@ protected:
 	AsciiString					m_hostName;						///< machine name
 	UnsignedInt					m_gameStartTime;
 	Int									m_gameStartSeconds;
+	UnsignedInt					m_lastStartTimerHeard;	///< When the last countdown second arrived, for clients
 
 	PendingActionType		m_pendingAction;	///< What action are we performing?
 	UnsignedInt					m_expiration;						///< When should we give up on our action?

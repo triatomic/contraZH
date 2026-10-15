@@ -73,6 +73,9 @@ static bool s_isIniting = FALSE;
 // Blocks the checkbox message from re-entering the commit while the controls are refreshed
 static bool s_isShowingMaxCameraHeight = FALSE;
 
+// Setting a checkbox or combo box sends the same message as a click, so refreshes from the game info ignore them
+static Bool s_isRefreshingControls = FALSE;
+
 // window ids ------------------------------------------------------------------------------
 static NameKeyType parentLanGameOptionsID = NAMEKEY_INVALID;
 
@@ -649,8 +652,7 @@ static void handleLimitSuperweaponsClick()
 {
   LANGameInfo *myGame = TheLAN->GetMyGame();
 
-  // Setting the checkbox from the host's options also lands here, and must not clear a client's accept
-  if (myGame && myGame->amIHost())
+  if (myGame)
   {
     // At the moment, 1 and 0 are the only choices supported in the GUI, though the system could
     // support more.
@@ -687,9 +689,6 @@ static Bool isLocalSlotAccepted()
 	return slot && slot->isAccepted();
 }
 
-// What the button shows; menu handlers can clear the local accept afterwards, so a click must not reread it
-static Bool s_buttonShowsUnready = FALSE;
-
 // An accepted client keeps the button enabled so it can take the accept back
 static void updateLanAcceptButton()
 {
@@ -697,8 +696,7 @@ static void updateLanAcceptButton()
 	{
 		return;
 	}
-	s_buttonShowsUnready = isLocalSlotAccepted();
-	if (s_buttonShowsUnready)
+	if (isLocalSlotAccepted())
 	{
 		buttonStart->winSetText( TheGameText->FETCH_OR_SUBSTITUTE("GUI:Unready", L"Unready") );
 		buttonStart->winEnable( TRUE );
@@ -713,8 +711,11 @@ void lanUpdateSlotList()
 {
 	if(!AreSlotListUpdatesEnabled() || s_isIniting)
 		return;
+	const Bool wasRefreshing = s_isRefreshingControls;
+	s_isRefreshingControls = TRUE;
 	UpdateSlotList( TheLAN->GetMyGame(), comboBoxPlayer, comboBoxColor,
 		comboBoxPlayerTemplate, comboBoxTeam, buttonAccept, buttonStart, buttonMapStartPosition);
+	s_isRefreshingControls = wasRefreshing;
 	updateLanAcceptButton();
 
 	updateMapStartSpots(TheLAN->GetMyGame(), buttonMapStartPosition);
@@ -924,7 +925,6 @@ void InitLanGameGadgets()
 	InitLobbyTabs( lobbyTabs, parentLanGameOptions, "LanGameOptionsMenu.wnd" );
 	lastChatCount = 0;
 	lastChatLine.clear();
-	s_buttonShowsUnready = FALSE;
 
 	windowMap = TheWindowManager->winGetWindowFromId( parentLanGameOptions,windowMapID  );
 	DEBUG_ASSERTCRASH(windowMap, ("Could not find the LanGameOptionsMenu.wnd:MapWindow" ));
@@ -1165,6 +1165,8 @@ void updateGameOptions()
 {
 	LANGameInfo *theGame = TheLAN->GetMyGame();
 	UnicodeString mapDisplayName;
+	const Bool wasRefreshing = s_isRefreshingControls;
+	s_isRefreshingControls = TRUE;
 	if (theGame && AreSlotListUpdatesEnabled())
 	{
 		const GameSlot *localSlot = theGame->getConstSlot(theGame->getLocalSlotNum());
@@ -1219,6 +1221,7 @@ void updateGameOptions()
 			checkQuickGame->winEnable( TheLAN->AmIHost() );
 		}
 	}
+	s_isRefreshingControls = wasRefreshing;
 }
 
 
@@ -1316,6 +1319,12 @@ void LanGameOptionsMenuUpdate( WindowLayout * layout, void *userData)
 		shutdownComplete(layout);
 	//TheLAN->update(); // this is handled in the lobby
 	markUnseenChat();
+
+	// The host ignores an unready once the start countdown runs, and an older host would start without the player
+	if (buttonStart && !TheLAN->AmIHost() && isLocalSlotAccepted())
+	{
+		buttonStart->winEnable( !TheLAN->IsGameStartCountdownRunning() );
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1393,7 +1402,7 @@ WindowMsgHandledType LanGameOptionsMenuSystem( GameWindow *window, UnsignedInt m
 		//-------------------------------------------------------------------------------------------------
 		case GCM_SELECTED:
 			{
-				if (LANbuttonPushed)
+				if (LANbuttonPushed || s_isRefreshingControls)
 					break;
 				GameWindow *control = (GameWindow *)mData1;
 				Int controlID = control->winGetWindowId();
@@ -1461,7 +1470,7 @@ WindowMsgHandledType LanGameOptionsMenuSystem( GameWindow *window, UnsignedInt m
 		//-------------------------------------------------------------------------------------------------
 		case GBM_SELECTED:
 			{
-				if (LANbuttonPushed)
+				if (LANbuttonPushed || s_isRefreshingControls)
 					break;
 				GameWindow *control = (GameWindow *)mData1;
 				Int controlID = control->winGetWindowId();
@@ -1509,7 +1518,7 @@ WindowMsgHandledType LanGameOptionsMenuSystem( GameWindow *window, UnsignedInt m
 						StartPressed();
 						//TheLAN->RequestGameStart();
 					}
-					else if (s_buttonShowsUnready)
+					else if (isLocalSlotAccepted())
 					{
 						TheLAN->RequestAccept( FALSE );
 					}

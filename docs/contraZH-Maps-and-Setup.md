@@ -145,7 +145,7 @@ the Rules page start hidden, so an older exe shows the Game page without the new
 
 Notes:
 * The label is `GUI:Unready`, falling back to `Unready`.
-* A host on this build ignores an unready once the start countdown runs.
+* Unready greys out once the host's start countdown runs, and a host on this build ignores a late one.
 * A host on an older exe also clears the accept, so only the client needs this build.
 
 ### Quick Game

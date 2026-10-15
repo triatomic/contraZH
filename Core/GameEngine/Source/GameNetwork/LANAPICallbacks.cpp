@@ -120,10 +120,14 @@ void LANAPI::OnAccept( UnsignedInt playerIP, Bool status )
 				{
 					m_currentGame->getLANSlot(i)->setAccept();
 				}
-				// The start countdown has passed the point of taking an accept back
 				else if (m_gameStartTime == 0)
 				{
 					m_currentGame->getLANSlot(i)->unAccept();
+				}
+				// The start countdown has passed the point of taking an accept back, so nothing changed
+				else
+				{
+					return;
 				}
 				break;
 			}
@@ -191,6 +195,7 @@ void LANAPI::OnHasMap( UnsignedInt playerIP, Bool status )
 
 void LANAPI::OnGameStartTimer( Int seconds )
 {
+	m_lastStartTimerHeard = timeGetTime();
 	UnicodeString text;
 	if (seconds == 1)
 		text.format(TheGameText->fetch("LAN:GameStartTimerSingular"), seconds);
