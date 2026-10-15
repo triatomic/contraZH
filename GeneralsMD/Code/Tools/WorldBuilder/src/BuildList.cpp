@@ -851,7 +851,51 @@ void BuildList::OnExport()
 	}
 }
 
-void BuildList::OnImport() 
+// Returns the list name when the line opens a SkirmishBuildList block, empty otherwise
+static AsciiString parseBuildListHeader(const char *p)
+{
+	static const char keyword[] = "SkirmishBuildList";
+	const size_t len = sizeof(keyword) - 1;
+	if (strncmp(p, keyword, len) != 0 || !isspace((unsigned char)p[len]))
+	{
+		return AsciiString::TheEmptyString;
+	}
+	char name[256];
+	if (sscanf(p + len, "%255s", name) != 1)
+	{
+		return AsciiString::TheEmptyString;
+	}
+	char *comment = strchr(name, ';');
+	if (comment)
+	{
+		*comment = '\0';
+	}
+	return AsciiString(name);
+}
+
+// The list name OnExport writes for this player; SCB edit mode players without a faction fall back to their name
+static AsciiString buildListSideFor(SidesInfo *pSide)
+{
+	Dict *d = pSide->getDict();
+	AsciiString faction = d->getAsciiString(TheKey_playerFaction);
+	const PlayerTemplate *pt = faction.isEmpty() ? nullptr : ThePlayerTemplateStore->findPlayerTemplate(NAMEKEY(faction));
+	if (pt)
+	{
+		return pt->getSide();
+	}
+	AsciiString name = d->getAsciiString(TheKey_playerName);
+	if (name.startsWith("Skirmish"))
+	{
+		return AsciiString(name.str() + 8);
+	}
+	if (name.startsWith("Plyr"))
+	{
+		return AsciiString(name.str() + 4);
+	}
+	return name;
+}
+
+void BuildList::OnImport()
 {
 	CFileDialog dlg(TRUE, _T("ini"), _T("BuildList.ini"), OFN_HIDEREADONLY | OFN_FILEMUSTEXIST,
 		_T("INI Files (*.ini)|*.ini|All Files (*.*)|*.*||"));
@@ -878,6 +922,44 @@ void BuildList::OnImport()
 			return;
 		}
 
+		// A file with several lists imports the one for this player; a single list imports regardless
+		std::vector<AsciiString> listNames;
+		char scanLine[512];
+		while (fgets(scanLine, sizeof(scanLine), file)) {
+			char *p = scanLine;
+			while (*p && isspace(*p)) p++;
+			AsciiString listName = parseBuildListHeader(p);
+			if (!listName.isEmpty()) {
+				listNames.push_back(listName);
+			}
+		}
+		rewind(file);
+
+		AsciiString wantedList;
+		if (!listNames.empty()) {
+			AsciiString side = buildListSideFor(pSide);
+			for (size_t i = 0; i < listNames.size(); i++) {
+				if (listNames[i].compareNoCase(side) == 0) {
+					wantedList = listNames[i];
+					break;
+				}
+			}
+			if (wantedList.isEmpty() && listNames.size() == 1) {
+				wantedList = listNames[0];
+			}
+			if (wantedList.isEmpty()) {
+				fclose(file);
+				CString msg;
+				msg.Format(_T("This file has no SkirmishBuildList %s. It lists:\n"), side.str());
+				for (size_t i = 0; i < listNames.size(); i++) {
+					msg += _T("\n");
+					msg += listNames[i].str();
+				}
+				AfxMessageBox(msg);
+				return;
+			}
+		}
+
 		// Clear existing build list for this side
 		BuildListInfo *pBuild = pSide->getBuildList();
 		while (pBuild) {
@@ -889,20 +971,31 @@ void BuildList::OnImport()
 		char line[512];
 		BuildListInfo *currentBuild = NULL;
 		bool inStructure = false;
+		bool inWantedList = listNames.empty();
 		int importedCount = 0;
 
 		while (fgets(line, sizeof(line), file)) {
 			// Trim whitespace
 			char *p = line;
 			while (*p && isspace(*p)) p++;
-			
+
 			// Skip comments and empty lines
 			if (*p == ';' || *p == '\0' || *p == '\n')
 				continue;
 
+			AsciiString listName = parseBuildListHeader(p);
+			if (!listName.isEmpty()) {
+				inWantedList = listName == wantedList;
+				continue;
+			}
+
 			// Check for Structure start
 			if (strstr(p, "Structure ") == p) {
 				inStructure = true;
+				if (!inWantedList) {
+					currentBuild = NULL;
+					continue;
+				}
 				currentBuild = newInstance(BuildListInfo);
 				
 				// Extract template name
@@ -986,7 +1079,11 @@ void BuildList::OnImport()
 		updateCurSide();
 
 		CString msg;
-		msg.Format(_T("Successfully imported %d buildings."), importedCount);
+		if (wantedList.isEmpty()) {
+			msg.Format(_T("Successfully imported %d buildings."), importedCount);
+		} else {
+			msg.Format(_T("Successfully imported %d buildings from SkirmishBuildList %s."), importedCount, wantedList.str());
+		}
 		AfxMessageBox(msg);
 
 	} catch (...) {
