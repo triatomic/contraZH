@@ -251,6 +251,8 @@ public:
   inline void setCoopBuildings( Bool coopBuildings );
   inline Bool getQuickGame() const;
   inline void setQuickGame( Bool quickGame );
+  inline Bool getDiplomacy() const;
+  inline void setDiplomacy( Bool diplomacy );
 
 protected:
 	Int m_preorderMask;
@@ -276,6 +278,7 @@ protected:
   Int m_maxCameraHeight; // Shared camera limit for every player, 0 when the host set none
   Bool m_coopBuildings; // Allies may resume each other's construction
   Bool m_quickGame; // Objects use their QuickGamePrerequisites
+  Bool m_diplomacy; // Players may change their stance toward each other mid-match
 };
 
 extern GameInfo *TheGameInfo;
@@ -303,6 +306,8 @@ Bool        GameInfo::getCoopBuildings() const          { return m_coopBuildings
 void        GameInfo::setCoopBuildings( Bool coopBuildings ) { m_coopBuildings = coopBuildings; }
 Bool        GameInfo::getQuickGame() const              { return m_quickGame; }
 void        GameInfo::setQuickGame( Bool quickGame )     { m_quickGame = quickGame; }
+Bool        GameInfo::getDiplomacy() const              { return m_diplomacy; }
+void        GameInfo::setDiplomacy( Bool diplomacy )     { m_diplomacy = diplomacy; }
 
 AsciiString GameInfoToAsciiString( const GameInfo *game );
 Bool ParseAsciiStringToGameInfo( GameInfo *game, AsciiString options );

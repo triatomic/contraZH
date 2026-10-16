@@ -262,6 +262,10 @@ public:
   void setSuperweaponRestriction();
   Bool getCoopBuildings() const { return m_coopBuildings; } ///< May allies resume each other's construction
   Bool isQuickGame() const { return m_quickGame; } ///< Do objects use their QuickGamePrerequisites
+  Bool isDiplomacy() const { return m_diplomacy; } ///< May players change their stance toward each other mid-match
+#if defined(GENERALS_ONLINE)
+  void sendPendingDiplomacyRule(); ///< The Generals Online host turns the rule on once the match runs
+#endif
 
 #ifdef DUMP_PERF_STATS
 	void getAIMetricsStatistics( UnsignedInt *numAI, UnsignedInt *numMoving, UnsignedInt *numAttacking, UnsignedInt *numWaitingForPath, UnsignedInt *overallFailedPathfinds );
@@ -385,6 +389,8 @@ private:
 	bool onAddTeam(GameMessage *msg);
 	bool onLogicCrc(GameMessage *msg);
 	bool onPurchaseScience(GameMessage *msg);
+	bool onSetDiplomacyStance(GameMessage *msg);
+	bool onEnableDiplomacy(GameMessage *msg);
 
 	static void createOptimizedTree(const ThingTemplate *thingTemplate, Coord3D *pos, Real angle, Real scale);
 
@@ -468,6 +474,10 @@ private:
   UnsignedShort m_superweaponRestriction;
   Bool m_coopBuildings;
   Bool m_quickGame;
+  Bool m_diplomacy;
+#if defined(GENERALS_ONLINE)
+  Bool m_sendDiplomacyRule;
+#endif
 
 	LoadScreen *getLoadScreen( Bool loadSaveGame );
 	LoadScreen *m_loadScreen;

@@ -66,6 +66,7 @@
 #include "Common/MapData.h"
 
 #include "GameClient/ControlBar.h"
+#include "GameClient/Diplomacy.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/GameClient.h"
 #include "GameClient/GameText.h"
@@ -259,6 +260,10 @@ GameLogic::GameLogic()
 	m_rankPointsToAddAtGameStart = 0;
 	m_coopBuildings = FALSE;
 	m_quickGame = FALSE;
+	m_diplomacy = FALSE;
+#if defined(GENERALS_ONLINE)
+	m_sendDiplomacyRule = FALSE;
+#endif
 
 	for(Int i = 0; i < MAX_SLOTS; i++)
 	{
@@ -1368,6 +1373,17 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	// A save game restores TheSkirmishGameInfo before this runs, so it keeps the setting
 	m_quickGame = TheGameInfo != nullptr && TheGameInfo->getQuickGame();
+
+	// Not saved, like Coop Buildings; stances already set are kept by the players
+	m_diplomacy = !loadingSaveGame && TheGameInfo != nullptr && TheGameInfo->getDiplomacy();
+#if defined(GENERALS_ONLINE)
+	m_sendDiplomacyRule = FALSE;
+	if (!loadingSaveGame && TheNGMPGame != nullptr && TheGameInfo == TheNGMPGame && !TheRecorder->isPlaybackMode())
+	{
+		NGMP_OnlineServices_LobbyInterface *pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
+		m_sendDiplomacyRule = pLobbyInterface != nullptr && pLobbyInterface->IsHost() && pLobbyInterface->IsDiplomacyRuleOn();
+	}
+#endif
 
 	checkForDuplicateColors( TheGameInfo );
 
@@ -5635,3 +5651,157 @@ void GameLogic::loadPostProcess()
 	remakeSleepyUpdate();
 
 }
+
+//-------------------------------------------------------------------------------------------------
+// DIPLOMACY
+//-------------------------------------------------------------------------------------------------
+
+struct DiplomacyStanceChange
+{
+	const Player *target;
+	Bool ally;
+};
+
+//-------------------------------------------------------------------------------------------------
+// An object's owner decides whom its look reveals to and whether its attack stands
+static void applyDiplomacyStanceToObject(Object *obj, void *userData)
+{
+	const DiplomacyStanceChange *change = (const DiplomacyStanceChange *)userData;
+
+	if (obj->isEffectivelyDead())
+	{
+		return;
+	}
+
+	obj->handlePartitionCellMaintenance();
+
+	if (!change->ally)
+	{
+		return;
+	}
+
+	AIUpdateInterface *ai = obj->getAI();
+	if (ai == nullptr || !ai->isAttacking())
+	{
+		return;
+	}
+
+	const Object *victim = ai->getCurrentVictim();
+	if (victim != nullptr && victim->getControllingPlayer() == change->target)
+	{
+		ai->aiIdle(CMD_FROM_AI);
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+static Bool isDiplomacyParticipant(const Player *player)
+{
+	if (player == nullptr || player == ThePlayerList->getNeutralPlayer() || player->isPlayerObserver())
+	{
+		return FALSE;
+	}
+
+	if (ThePlayerList->getSlotIndex(player->getPlayerIndex()) < 0)
+	{
+		return FALSE;
+	}
+
+	return !TheVictoryConditions->hasSinglePlayerBeenDefeated(const_cast<Player *>(player));
+}
+
+//-------------------------------------------------------------------------------------------------
+bool GameLogic::onSetDiplomacyStance(GameMessage *msg)
+{
+	if (!m_diplomacy || msg->getArgumentCount() < 2)
+	{
+		return false;
+	}
+
+	Player *player = ThePlayerList->getNthPlayer(msg->getPlayerIndex());
+	const Int targetIndex = msg->getArgument(0)->integer;
+	const Bool ally = msg->getArgument(1)->boolean;
+
+	if (targetIndex < 0 || targetIndex >= ThePlayerList->getPlayerCount())
+	{
+		return false;
+	}
+
+	Player *target = ThePlayerList->getNthPlayer(targetIndex);
+	if (target == player || player->getPlayerType() != PLAYER_HUMAN || !isDiplomacyParticipant(player) || !isDiplomacyParticipant(target))
+	{
+		return false;
+	}
+
+	const Relationship stance = ally ? ALLIES : ENEMIES;
+	if (player->getRelationship(target->getDefaultTeam()) == stance)
+	{
+		return false;
+	}
+
+	const Bool targetIsAlly = target->getRelationship(player->getDefaultTeam()) == ALLIES;
+	player->setPlayerRelationship(target, stance);
+
+	DiplomacyStanceChange change;
+	change.target = target;
+	change.ally = ally;
+	player->iterateObjects(applyDiplomacyStanceToObject, &change);
+
+	const UnicodeString playerName = player->getPlayerDisplayName();
+	const UnicodeString targetName = target->getPlayerDisplayName();
+	UnicodeString text;
+	if (ally && targetIsAlly)
+	{
+		text = TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:DiplomacyAllied", L"%ls and %ls are now allies", playerName.str(), targetName.str());
+	}
+	else if (ally)
+	{
+		text = TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:DiplomacyOfferAlly", L"%ls now treats %ls as an ally", playerName.str(), targetName.str());
+	}
+	else if (targetIsAlly)
+	{
+		text = TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:DiplomacyBrokeAlliance", L"%ls broke the alliance with %ls", playerName.str(), targetName.str());
+	}
+	else
+	{
+		text = TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:DiplomacyEnemy", L"%ls now treats %ls as an enemy", playerName.str(), targetName.str());
+	}
+	TheInGameUI->messageNoFormat(text);
+
+	static AudioEventRTS diplomacySound("GUIMessageReceived");
+	TheAudio->addAudioEvent(&diplomacySound);
+
+	PopulateInGameDiplomacyPopup();
+	return true;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool GameLogic::onEnableDiplomacy(GameMessage *msg)
+{
+	// The host sends it on the first frames; a late one would change the rules mid-match
+	if (m_diplomacy || getFrame() > LOGICFRAMES_PER_SECOND * 30)
+	{
+		return false;
+	}
+
+	m_diplomacy = TRUE;
+
+	TheInGameUI->messageNoFormat(TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:DiplomacyRuleEnabled",
+		L"%ls turned on Diplomacy. Players may change alliances.", ThePlayerList->getNthPlayer(msg->getPlayerIndex())->getPlayerDisplayName().str()));
+
+	PopulateInGameDiplomacyPopup();
+	return true;
+}
+
+#if defined(GENERALS_ONLINE)
+//-------------------------------------------------------------------------------------------------
+void GameLogic::sendPendingDiplomacyRule()
+{
+	if (!m_sendDiplomacyRule || !isInGame() || isLoadingMap() || getFrame() == 0)
+	{
+		return;
+	}
+
+	m_sendDiplomacyRule = FALSE;
+	TheMessageStream->appendMessage(GameMessage::MSG_ENABLE_DIPLOMACY);
+}
+#endif

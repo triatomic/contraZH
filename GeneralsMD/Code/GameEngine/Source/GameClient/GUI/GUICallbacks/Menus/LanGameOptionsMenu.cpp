@@ -126,6 +126,7 @@ static NameKeyType checkMaxCameraHeightID = NAMEKEY_INVALID;
 static NameKeyType textEntryMaxCameraHeightID = NAMEKEY_INVALID;
 static NameKeyType checkCoopBuildingsID = NAMEKEY_INVALID;
 static NameKeyType checkQuickGameID = NAMEKEY_INVALID;
+static NameKeyType checkDiplomacyRuleID = NAMEKEY_INVALID;
 static NameKeyType windowMapID = NAMEKEY_INVALID;
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *parentLanGameOptions = nullptr;
@@ -141,6 +142,7 @@ static GameWindow *checkMaxCameraHeight = nullptr;
 static GameWindow *textEntryMaxCameraHeight = nullptr;
 static GameWindow *checkCoopBuildings = nullptr;
 static GameWindow *checkQuickGame = nullptr;
+static GameWindow *checkDiplomacyRule = nullptr;
 static LobbyTabs lobbyTabs;
 static Int lastChatCount = 0;
 static UnicodeString lastChatLine;
@@ -824,6 +826,29 @@ static void commitLanQuickGame()
 	}
 }
 
+static void commitLanDiplomacy()
+{
+	LANGameInfo *myGame = TheLAN->GetMyGame();
+	if (!myGame || !myGame->amIHost() || !checkDiplomacyRule)
+	{
+		return;
+	}
+
+	const Bool diplomacy = GadgetCheckBoxIsChecked(checkDiplomacyRule);
+	if (diplomacy == myGame->getDiplomacy())
+	{
+		return;
+	}
+	myGame->setDiplomacy(diplomacy);
+	myGame->resetAccepted();
+
+	if (!s_isIniting)
+	{
+		TheLAN->RequestGameOptions(GenerateGameOptionsString(), true);
+		lanUpdateSlotList();
+	}
+}
+
 static void showRulesTab( Bool rules )
 {
 	ShowLobbyTab( lobbyTabs, rules );
@@ -872,6 +897,7 @@ void InitLanGameGadgets()
   textEntryMaxCameraHeightID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:TextEntryMaxCameraHeight" );
   checkCoopBuildingsID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckCoopBuildings" );
   checkQuickGameID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckQuickGame" );
+  checkDiplomacyRuleID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckDiplomacyRule" );
 	windowMapID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:MapWindow" );
 
 	// Initialize the pointers to our gadgets
@@ -920,6 +946,12 @@ void InitLanGameGadgets()
 	{
 		GadgetCheckBoxSetText(checkQuickGame, TheGameText->fetch("GUI:QuickGame"));
 		checkQuickGame->winSetTooltip(TheGameText->fetch("TOOLTIP:QuickGame"));
+	}
+	checkDiplomacyRule = TheWindowManager->winGetWindowFromId( parentLanGameOptions, checkDiplomacyRuleID );
+	if (checkDiplomacyRule)
+	{
+		GadgetCheckBoxSetText(checkDiplomacyRule, TheGameText->FETCH_OR_SUBSTITUTE("GUI:DiplomacyRule", L"Diplomacy"));
+		checkDiplomacyRule->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:DiplomacyRule", L"Players may change alliances during the match from the Diplomacy window"));
 	}
 
 	InitLobbyTabs( lobbyTabs, parentLanGameOptions, "LanGameOptionsMenu.wnd" );
@@ -1024,6 +1056,7 @@ void DeinitLanGameGadgets()
   textEntryMaxCameraHeight = nullptr;
   checkCoopBuildings = nullptr;
   checkQuickGame = nullptr;
+  checkDiplomacyRule = nullptr;
 	lobbyTabs = LobbyTabs();
 	if (windowMap)
 	{
@@ -1219,6 +1252,12 @@ void updateGameOptions()
 		{
 			GadgetCheckBoxSetChecked( checkQuickGame, theGame->getQuickGame() );
 			checkQuickGame->winEnable( TheLAN->AmIHost() );
+		}
+
+		if (checkDiplomacyRule)
+		{
+			GadgetCheckBoxSetChecked( checkDiplomacyRule, theGame->getDiplomacy() );
+			checkDiplomacyRule->winEnable( TheLAN->AmIHost() );
 		}
 	}
 	s_isRefreshingControls = wasRefreshing;
@@ -1548,6 +1587,10 @@ WindowMsgHandledType LanGameOptionsMenuSystem( GameWindow *window, UnsignedInt m
         else if ( controlID == checkQuickGameID )
         {
           commitLanQuickGame();
+        }
+        else if ( controlID == checkDiplomacyRuleID )
+        {
+          commitLanDiplomacy();
         }
         else if ( controlID == lobbyTabs.buttonGameID )
         {

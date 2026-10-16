@@ -117,6 +117,7 @@ static NameKeyType checkBoxLimitSuperweaponsID = NAMEKEY_INVALID;
 static NameKeyType comboBoxStartingCashID = NAMEKEY_INVALID;
 static NameKeyType checkCoopBuildingsID = NAMEKEY_INVALID;
 static NameKeyType checkQuickGameID = NAMEKEY_INVALID;
+static NameKeyType checkDiplomacyRuleID = NAMEKEY_INVALID;
 
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *staticTextGameSpeed = nullptr;
@@ -132,6 +133,7 @@ static GameWindow *checkBoxLimitSuperweapons = nullptr;
 static GameWindow *comboBoxStartingCash = nullptr;
 static GameWindow *checkCoopBuildings = nullptr;
 static GameWindow *checkQuickGame = nullptr;
+static GameWindow *checkDiplomacyRule = nullptr;
 static LobbyTabs lobbyTabs;
 static GameWindow *comboBoxPlayer[MAX_SLOTS] = {0};
 
@@ -1037,6 +1039,14 @@ static void handleQuickGameClick()
 	}
 }
 
+static void handleDiplomacyRuleClick()
+{
+	if (TheSkirmishGameInfo && checkDiplomacyRule)
+	{
+		TheSkirmishGameInfo->setDiplomacy( GadgetCheckBoxIsChecked( checkDiplomacyRule ) );
+	}
+}
+
 
 //-------------------------------------------------------------------------------------------------
 /** Initialize the Gadgets Options Menu */
@@ -1056,6 +1066,7 @@ void InitSkirmishGameGadgets()
   comboBoxStartingCashID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:ComboBoxStartingCash" );
   checkCoopBuildingsID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckCoopBuildings" );
   checkQuickGameID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckQuickGame" );
+  checkDiplomacyRuleID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckDiplomacyRule" );
 
 	// Initialize the pointers to our gadgets
 	parentSkirmishGameOptions = TheWindowManager->winGetWindowFromId( nullptr, parentSkirmishGameOptionsID );
@@ -1090,6 +1101,12 @@ void InitSkirmishGameGadgets()
 	{
 		GadgetCheckBoxSetText(checkQuickGame, TheGameText->fetch("GUI:QuickGame"));
 		checkQuickGame->winSetTooltip(TheGameText->fetch("TOOLTIP:QuickGame"));
+	}
+	checkDiplomacyRule = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, checkDiplomacyRuleID );
+	if (checkDiplomacyRule)
+	{
+		GadgetCheckBoxSetText(checkDiplomacyRule, TheGameText->FETCH_OR_SUBSTITUTE("GUI:DiplomacyRule", L"Diplomacy"));
+		checkDiplomacyRule->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:DiplomacyRule", L"Players may change alliances during the match from the Diplomacy window"));
 	}
 
 	InitLobbyTabs( lobbyTabs, parentSkirmishGameOptions, "SkirmishGameOptionsMenu.wnd" );
@@ -1280,6 +1297,10 @@ void updateSkirmishGameOptions()
   if (checkQuickGame)
   {
     GadgetCheckBoxSetChecked( checkQuickGame, TheSkirmishGameInfo->getQuickGame() );
+  }
+  if (checkDiplomacyRule)
+  {
+    GadgetCheckBoxSetChecked( checkDiplomacyRule, TheSkirmishGameInfo->getDiplomacy() );
   }
   Int itemCount = GadgetComboBoxGetLength(comboBoxStartingCash);
   Int index = 0;
@@ -1702,6 +1723,10 @@ WindowMsgHandledType SkirmishGameOptionsMenuSystem( GameWindow *window, Unsigned
         else if ( controlID == checkQuickGameID )
         {
           handleQuickGameClick();
+        }
+        else if ( controlID == checkDiplomacyRuleID )
+        {
+          handleDiplomacyRuleClick();
         }
         else if ( controlID == lobbyTabs.buttonGameID )
         {

@@ -56,6 +56,11 @@
 #include "GameNetwork/NetworkInterface.h"
 #include "GameNetwork/GameSpy/BuddyDefs.h"
 #include "GameNetwork/GameSpy/PeerDefs.h"
+#if RTS_ZEROHOUR
+#include "Common/MessageStream.h"
+#include "GameClient/GadgetPushButton.h"
+#include "GameClient/GameWindowManager.h"
+#endif
 
 
 //-------------------------------------------------------------------------------------------------
@@ -83,6 +88,10 @@ static GameWindow *staticTextStatus[MAX_SLOTS] = {nullptr, nullptr, nullptr, nul
 static GameWindow *buttonMute[MAX_SLOTS] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 static GameWindow *buttonUnMute[MAX_SLOTS] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 static Int slotNumInRow[MAX_SLOTS];
+#if RTS_ZEROHOUR
+static NameKeyType buttonStanceID[MAX_SLOTS];
+static GameWindow *buttonStance[MAX_SLOTS] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+#endif
 
 //-------------------------------------------------------------------------------------------------
 
@@ -97,6 +106,130 @@ void updateBuddyInfo(bool bIsAutoRefresh = false, bool bUseCache = false);
 #else
 void updateBuddyInfo();
 #endif
+
+#if RTS_ZEROHOUR
+//-------------------------------------------------------------------------------------------------
+// The Diplomacy rule's stance button takes the place of the row's team text, styled like the Hide button
+static GameWindow *createStanceButton(Int row)
+{
+	GameWindow *teamText = staticTextTeam[row];
+	GameWindow *style = TheWindowManager->winGetWindowFromId(theWindow, NAMEKEY("Diplomacy.wnd:ButtonHide"));
+	if (teamText == nullptr || teamText->winGetParent() == nullptr)
+	{
+		return nullptr;
+	}
+
+	Int x, y, width, height;
+	teamText->winGetPosition(&x, &y);
+	teamText->winGetSize(&width, &height);
+
+	WinInstanceData instData;
+	instData.init();
+	BitSet(instData.m_style, GWS_PUSH_BUTTON | GWS_MOUSE_TRACK);
+	const UnsignedInt status = WIN_STATUS_ENABLED | WIN_STATUS_HIDDEN | (style ? (style->winGetStatus() & WIN_STATUS_IMAGE) : 0);
+	GameWindow *button = TheWindowManager->gogoGadgetPushButton(teamText->winGetParent(), status, x, y, width, height,
+		&instData, teamText->winGetFont(), style == nullptr);
+	if (button == nullptr)
+	{
+		return nullptr;
+	}
+
+	button->winSetWindowId(buttonStanceID[row]);
+	if (style)
+	{
+		for (Int i = 0; i < MAX_DRAW_DATA; ++i)
+		{
+			button->winSetEnabledImage(i, style->winGetEnabledImage(i));
+			button->winSetEnabledColor(i, style->winGetEnabledColor(i));
+			button->winSetEnabledBorderColor(i, style->winGetEnabledBorderColor(i));
+			button->winSetDisabledImage(i, style->winGetDisabledImage(i));
+			button->winSetDisabledColor(i, style->winGetDisabledColor(i));
+			button->winSetDisabledBorderColor(i, style->winGetDisabledBorderColor(i));
+			button->winSetHiliteImage(i, style->winGetHiliteImage(i));
+			button->winSetHiliteColor(i, style->winGetHiliteColor(i));
+			button->winSetHiliteBorderColor(i, style->winGetHiliteBorderColor(i));
+		}
+		button->winSetHiliteTextColors(style->winGetHiliteTextColor(), style->winGetHiliteTextBorderColor());
+	}
+	return button;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Mirrors the logic's checks so the button only shows where the stance message would be accepted
+static Bool canTakeDiplomacyStance(const Player *player)
+{
+	if (player == nullptr || player->isPlayerObserver() || ThePlayerList->getSlotIndex(player->getPlayerIndex()) < 0)
+	{
+		return FALSE;
+	}
+
+	return !TheVictoryConditions->hasSinglePlayerBeenDefeated(const_cast<Player *>(player));
+}
+
+//-------------------------------------------------------------------------------------------------
+static void updateStanceButton(Int row, const Player *player)
+{
+	GameWindow *button = buttonStance[row];
+	const Player *localPlayer = ThePlayerList->getLocalPlayer();
+	const Bool show = button != nullptr && player != nullptr && player != localPlayer && TheGameLogic->isDiplomacy()
+		&& !TheRecorder->isPlaybackMode() && canTakeDiplomacyStance(localPlayer) && canTakeDiplomacyStance(player);
+
+	if (staticTextTeam[row])
+	{
+		staticTextTeam[row]->winHide(show);
+	}
+	if (button == nullptr)
+	{
+		return;
+	}
+	button->winHide(!show);
+	if (!show)
+	{
+		return;
+	}
+
+	const Bool iAlly = localPlayer->getRelationship(player->getDefaultTeam()) == ALLIES;
+	const Bool theyAlly = player->getRelationship(localPlayer->getDefaultTeam()) == ALLIES;
+	Color color;
+	if (iAlly && theyAlly)
+	{
+		GadgetButtonSetText(button, TheGameText->FETCH_OR_SUBSTITUTE("GUI:DiplomacyStanceAllied", L"Allied"));
+		color = GameMakeColor(0, 255, 0, 255);
+	}
+	else if (iAlly)
+	{
+		GadgetButtonSetText(button, TheGameText->FETCH_OR_SUBSTITUTE("GUI:DiplomacyStanceAlly", L"Ally"));
+		color = GameMakeColor(255, 255, 0, 255);
+	}
+	else
+	{
+		GadgetButtonSetText(button, TheGameText->FETCH_OR_SUBSTITUTE("GUI:DiplomacyStanceEnemy", L"Enemy"));
+		color = GameMakeColor(255, 64, 64, 255);
+	}
+	button->winSetEnabledTextColors(color, GameMakeColor(0, 0, 0, 255));
+
+	button->winSetTooltip(iAlly
+		? TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:DiplomacyStanceToEnemy", L"Treat this player as an enemy")
+		: TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:DiplomacyStanceToAlly", L"Treat this player as an ally. You are allied once they do the same."));
+}
+
+//-------------------------------------------------------------------------------------------------
+static void sendDiplomacyStance(Int slotNum)
+{
+	const Player *player = ThePlayerList->getPlayerFromSlotIndex(slotNum);
+	const Player *localPlayer = ThePlayerList->getLocalPlayer();
+	if (player == nullptr || localPlayer == nullptr || player == localPlayer)
+	{
+		return;
+	}
+
+	const Bool ally = localPlayer->getRelationship(player->getDefaultTeam()) != ALLIES;
+	GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_SET_DIPLOMACY_STANCE);
+	msg->appendIntegerArgument(player->getPlayerIndex());
+	msg->appendBooleanArgument(ally);
+}
+#endif
+
 static void grabWindowPointers()
 {
 	for (Int i=0; i<MAX_SLOTS; ++i)
@@ -123,6 +256,16 @@ static void grabWindowPointers()
 		buttonUnMute[i] = TheWindowManager->winGetWindowFromId(theWindow, buttonUnMuteID[i]);
 
 		slotNumInRow[i] = -1;
+
+#if RTS_ZEROHOUR
+		temp.format("Diplomacy.wnd:ButtonStance%d", i);
+		buttonStanceID[i] = NAMEKEY(temp);
+		buttonStance[i] = TheWindowManager->winGetWindowFromId(theWindow, buttonStanceID[i]);
+		if (buttonStance[i] == nullptr)
+		{
+			buttonStance[i] = createStanceButton(i);
+		}
+#endif
 	}
 }
 
@@ -136,6 +279,9 @@ static void releaseWindowPointers()
 		staticTextStatus[i] = nullptr;
 		buttonMute[i] = nullptr;
 		buttonUnMute[i] = nullptr;
+#if RTS_ZEROHOUR
+		buttonStance[i] = nullptr;
+#endif
 
 		slotNumInRow[i] = -1;
 	}
@@ -443,6 +589,13 @@ WindowMsgHandledType DiplomacySystem( GameWindow *window, UnsignedInt msg,
 					PopulateInGameDiplomacyPopup();
 					break;
 				}
+#if RTS_ZEROHOUR
+				if (controlID == buttonStanceID[i] && slotNumInRow[i] >= 0)
+				{
+					sendDiplomacyStance(slotNumInRow[i]);
+					break;
+				}
+#endif
 			}
 			break;
 
@@ -531,6 +684,9 @@ void PopulateInGameDiplomacyPopup()
 					teamStr = "Team:AI";
 				GadgetStaticTextSetText(staticTextTeam[rowNum], TheGameText->fetch(teamStr) );
 			}
+#if RTS_ZEROHOUR
+			updateStanceButton(rowNum, player);
+#endif
 			if (staticTextStatus[rowNum])
 			{
 				staticTextStatus[rowNum]->winHide(FALSE);
@@ -590,6 +746,12 @@ void PopulateInGameDiplomacyPopup()
 			buttonMute[rowNum]->winHide(TRUE);
 		if (buttonUnMute[rowNum])
 			buttonUnMute[rowNum]->winHide(TRUE);
+#if RTS_ZEROHOUR
+		if (buttonStance[rowNum])
+		{
+			buttonStance[rowNum]->winHide(TRUE);
+		}
+#endif
 
 		++rowNum;
 	}

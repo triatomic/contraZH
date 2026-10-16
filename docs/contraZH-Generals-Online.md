@@ -60,6 +60,12 @@ draw at the wrong scale; with it, the options menu lacks Contra's controls. See 
 `-headless -replay <file> -exportStats` writes a gzipped JSON match summary next to the replay, and
 `-statsUrl <url>` posts it. Only works in headless replay simulation.
 
+### Diplomacy rule
+
+The lobby host types `/diplomacy` to let players change alliances during the match. The GO service
+has no field for it, so the host's game switches it on in the first frames. See
+[Diplomacy](contraZH-Maps-and-Setup.md#diplomacy).
+
 ## Runtime requirements
 
 An `RTS_BUILD_GENERALS_ONLINE=ON` build needs these DLLs **next to the executable**, or it fails at

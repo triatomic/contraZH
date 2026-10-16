@@ -653,6 +653,8 @@ public:
 		MSG_DO_REVERSE_MOVETO_HINT,									///< (location) If clicked, a reverse move would be ordered
 		MSG_EVACUATE_TO_WORK,												///< Dump out all of OUR contained objects, supply gatherers among them resume gathering
 		MSG_SPAWN_OBJECT_AT_POSITION,					///< (thingTemplate ID, location) debug/cheat spawn of one object for the local player; must run in the logic so the drawable is initialized correctly
+		MSG_SET_DIPLOMACY_STANCE,										///< (player index, Bool ally) the sender treats that player as an ally or an enemy
+		MSG_ENABLE_DIPLOMACY,												///< the Generals Online host turns on the Diplomacy rule at the start of a match
 
 		MSG_BEGIN_DEBUG_NETWORK_MESSAGES = 1900,		///< network messages that exist only in debug/internal builds. all grouped separately.
 

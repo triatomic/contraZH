@@ -15,7 +15,7 @@ only casualty was the texture filter option, replaced by TheSuperHackers' versio
 ## Pages
 
 * [Gameplay Fixes](contraZH-Gameplay-Fixes.md) - always-on fixes for retail simulation bugs
-* [Maps & Game Setup](contraZH-Maps-and-Setup.md) - map features, 30-player maps, CLP_AI scripts, factions, game setup and campaign chapters
+* [Maps & Game Setup](contraZH-Maps-and-Setup.md) - map features, 30-player maps, CLP_AI scripts, factions, game setup, the Diplomacy rule and campaign chapters
 * [Options.ini](contraZH-Options.md) - every Options.ini setting: camera, display, hotkeys, selection, input and rendering
 * [Objects & Modules](contraZH-Objects-and-Modules.md) - new object keys, module parameters and behavior modules
 * [GameData.ini](contraZH-GameData.md) - new GameData.ini keys and simulation rules

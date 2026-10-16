@@ -540,6 +540,10 @@ void GameClient::update()
 	GameMessage *frameMsg = TheMessageStream->appendMessage( GameMessage::MSG_FRAME_TICK );
 	frameMsg->appendTimestampArgument( getFrame() );
 
+#if defined(GENERALS_ONLINE)
+	TheGameLogic->sendPendingDiplomacyRule();
+#endif
+
 	// Update intro
 	if (m_intro != nullptr)
 	{

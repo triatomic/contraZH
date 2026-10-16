@@ -374,7 +374,12 @@ public:
 
 	bool IsHost();
 
+	// The service has no lobby field for it, so only the host knows; it sends MSG_ENABLE_DIPLOMACY in the match
+	bool IsDiplomacyRuleOn() const { return m_bDiplomacyRule; }
+	void SetDiplomacyRule(bool bOn) { m_bDiplomacyRule = bOn; }
+
 private:
+	bool m_bDiplomacyRule = false;
 	std::set<int64_t> m_setMembersBeforeUs;
 	bool m_bJoinOrderKnown = false;
 	void ResetJoinOrder();

@@ -397,6 +397,7 @@ void GameInfo::reset()
   m_maxCameraHeight = 0;
   m_coopBuildings = FALSE;
   m_quickGame = FALSE;
+  m_diplomacy = FALSE;
 
 	for (Int i=0; i<MAX_SLOTS; ++i)
 	{
@@ -1072,6 +1073,12 @@ static AsciiString buildGameInfoAsciiString(const GameInfo& game, const AsciiStr
 	optionsString.format("US=%d;M=%2.2x%s;MC=%X;MS=%d;SD=%d;C=%d;SR=%u;SC=%u;CH=%d;O=%c;CB=%d;QG=%d;", game.getUseStats(), game.getMapContentsMask(), newMapName.str(),
 		game.getMapCRC(), game.getMapSize(), game.getSeed(), game.getCRCInterval(), game.getSuperweaponRestriction(),
 		game.getStartingCash().countMoney(), game.getMaxCameraHeight(), game.oldFactionsOnly() ? 'Y' : 'N', game.getCoopBuildings() ? 1 : 0, game.getQuickGame() ? 1 : 0 );
+
+	// Written only when on, so exes that reject the unknown key still read games with the rule off
+	if (game.getDiplomacy())
+	{
+		optionsString.concat("DP=1;");
+	}
 #endif
 
 	//add player info for each slot
@@ -1201,6 +1208,7 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
   Int maxCameraHeight = 0;
   Bool coopBuildings = FALSE;
   Bool quickGame = FALSE;
+  Bool diplomacy = FALSE;
 
 	Bool sawMap = FALSE;
 	Bool sawMapCRC = FALSE;
@@ -1335,6 +1343,10 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
     else if (key.compare("QG") == 0 )
     {
       quickGame = atoi( val.str() ) != 0;
+    }
+    else if (key.compare("DP") == 0 )
+    {
+      diplomacy = atoi( val.str() ) != 0;
     }
 		else if (key.getLength() == 1 && *key.str() == slotListID)
 		{
@@ -1707,6 +1719,7 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 		game->setOldFactionsOnly(oldFactionsOnly);
 		game->setCoopBuildings(coopBuildings);
 		game->setQuickGame(quickGame);
+		game->setDiplomacy(diplomacy);
 
 		return true;
 	}

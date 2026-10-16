@@ -130,7 +130,7 @@ back to `Random <BaseSide>`.
 ### Rules tab
 
 * The Skirmish and LAN lobbies get **Game** and **Rules** tab buttons in the title row.
-* The Rules page holds Quick Game, Coop Buildings and, in LAN, Max Camera Height. It takes the place
+* The Rules page holds Quick Game, Coop Buildings, Diplomacy and, in LAN, Max Camera Height. It takes the place
 of the battle honors and info box in Skirmish, and of the chat in LAN.
 
 Notes:
@@ -172,6 +172,45 @@ Notes:
 * Save games and replays keep the setting. A save without Quick Game stays loadable by retail.
 * All LAN players need this build. Not available on Generals Online.
 * An older exe reads `QUICK_GAME_ENABLED` as false, so a script with it still runs on the rank test.
+* Changes the simulation; affects replays.
+
+### Diplomacy
+
+* The Skirmish and LAN lobbies get a **Diplomacy** checkbox on the Rules page, off by default. Only
+the LAN host can change it.
+* With Diplomacy on, players can change alliances during the match. In the Diplomacy window
+(the in-game player list), each other player's Team column becomes a stance button.
+* The button shows your stance toward that player. **Enemy** means you treat them as an enemy,
+**Ally** means you treat them as an ally but they don't return it, and **Allied** means you both do.
+Click it to switch between ally and enemy.
+* A stance is one-sided and needs no consent. Treating someone as an ally only affects your side.
+Your units hold fire at them, stop any attack on them, and share their vision with them.
+* An alliance counts for victory and ally chat only when both players are allies of each other. The
+match ends once every surviving player is allied with every other one, and they all win.
+* Every player sees a message when a stance changes.
+* The lobby teams set the starting stances.
+* AI players keep their lobby stances. You can treat an AI as an ally, but it never returns the
+stance.
+* Observers and defeated players can't change stances, and nobody can change stance toward them.
+
+Notes:
+* Labels are `GUI:DiplomacyRule`, `TOOLTIP:DiplomacyRule`, `GUI:DiplomacyStanceAlly`,
+`GUI:DiplomacyStanceAllied`, `GUI:DiplomacyStanceEnemy`, `TOOLTIP:DiplomacyStanceToAlly`,
+`TOOLTIP:DiplomacyStanceToEnemy`, `GUI:DiplomacyAllied`, `GUI:DiplomacyOfferAlly`,
+`GUI:DiplomacyBrokeAlliance`, `GUI:DiplomacyEnemy` and `GUI:DiplomacyRuleEnabled`, all falling back
+to English text. The four message labels take two `%ls` player names; `GUI:DiplomacyRuleEnabled`
+takes one.
+* The checkbox comes from `CheckDiplomacyRule` in `SkirmishGameOptionsMenu.wnd` and
+`LanGameOptionsMenu.wnd`. A layout without it shows no checkbox. `build/add_diplomacy_wnd.py` adds it
+under Coop Buildings and needs the Rules tab from `build/add_rules_tab_wnd.py`.
+* The stance buttons are created in code, so `Diplomacy.wnd` needs no change.
+* Generals Online has no lobby field for the rule. Its host types `/diplomacy` in lobby chat to
+switch it on or off, and the lobby sees an announcement. The host's game turns the rule on in the
+first frames of the match, and every player sees a message.
+* The options string carries `DP=1` only when the rule is on. Older exes can't join such a lobby or
+play its replays, but games with the rule off are unaffected.
+* All players need this build. Replays play stance changes back exactly.
+* Save games keep the stances but not the rule, so a loaded save plays with Diplomacy off.
 * Changes the simulation; affects replays.
 
 ### Host camera height

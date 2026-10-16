@@ -1074,6 +1074,18 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			onPurchaseScience(msg);
 			break;
 		}
+#if RTS_ZEROHOUR
+		case GameMessage::MSG_SET_DIPLOMACY_STANCE:
+		{
+			onSetDiplomacyStance(msg);
+			break;
+		}
+		case GameMessage::MSG_ENABLE_DIPLOMACY:
+		{
+			onEnableDiplomacy(msg);
+			break;
+		}
+#endif
 	}
 
 #if RETAIL_COMPATIBLE_AIGROUP

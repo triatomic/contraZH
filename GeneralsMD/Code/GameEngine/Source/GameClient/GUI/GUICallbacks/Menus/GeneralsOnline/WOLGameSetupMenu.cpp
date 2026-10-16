@@ -3644,6 +3644,7 @@ Bool handleGameSetupSlashCommands(UnicodeString uText)
 		GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"/setpassword <password> - Set a lobby password (host only)."), helpColor, -1, -1);
 		GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"/removepassword - Remove the lobby password (host only)."), helpColor, -1, -1);
 		GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"/maxcameraheight <value> - Set the camera height limit (host only)."), helpColor, -1, -1);
+		GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"/diplomacy - Let players change alliances during the match (host only)."), helpColor, -1, -1);
 		// GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"/leave - Return to the main lobby."), helpColor, -1, -1);
 		// GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"/quit - Exit the game."), helpColor, -1, -1);
 		GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"/support - Open the GeneralsOnline Discord."), helpColor, -1, -1);
@@ -3763,6 +3764,27 @@ Bool handleGameSetupSlashCommands(UnicodeString uText)
 			}
 		}
 
+		return TRUE; // was a slash command
+	}
+	else if (token == "diplomacy")
+	{
+		NGMP_OnlineServices_LobbyInterface* pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
+		if (pLobbyInterface != nullptr && pLobbyInterface->IsInLobby())
+		{
+			if (pLobbyInterface->IsHost())
+			{
+				pLobbyInterface->SetDiplomacyRule(!pLobbyInterface->IsDiplomacyRuleOn());
+
+				UnicodeString msg = pLobbyInterface->IsDiplomacyRuleOn()
+					? UnicodeString(L"Diplomacy is ON: players may change alliances during the match.")
+					: UnicodeString(L"Diplomacy is OFF.");
+				pLobbyInterface->SendAnnouncementMessageToCurrentLobby(msg, true);
+			}
+			else
+			{
+				GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"Diplomacy: Only the host can change it."), GameMakeColor(255, 0, 0, 255), -1, -1);
+			}
+		}
 		return TRUE; // was a slash command
 	}
 #endif
