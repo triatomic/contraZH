@@ -118,6 +118,7 @@ static const BlockParse theTypeTable[] =
 	{ "DynamicGameLOD",                 INI::parseDynamicGameLODDefinition },
 	{ "EvaEvent",                       INI::parseEvaEvent },
 	{ "FXList",                         INI::parseFXListDefinition },
+	{ "FXListExtend",                   INI::parseFXListExtendDefinition },
 	{ "GameData",                       INI::parseGameDataDefinition },
 	{ "HeaderTemplate",                 INI::parseHeaderTemplateDefinition },
 	{ "InGameUI",                       INI::parseInGameUIDefinition },
@@ -137,10 +138,14 @@ static const BlockParse theTypeTable[] =
 	{ "MusicTrack",                     INI::parseMusicTrackDefinition },
 	{ "Object",                         INI::parseObjectDefinition },
 	{ "ObjectCreationList",             INI::parseObjectCreationListDefinition },
+#if RTS_ZEROHOUR
+	{ "ObjectCreationListExtend",       INI::parseObjectCreationListExtendDefinition },
+#endif
 	{ "ObjectExtend",                   INI::parseObjectExtendDefinition },
 	{ "ObjectReskin",                   INI::parseObjectReskinDefinition },
 	{ "OnlineChatColors",               INI::parseOnlineChatColorDefinition },
 	{ "ParticleSystem",                 INI::parseParticleSystemDefinition },
+	{ "ParticleSystemExtend",           INI::parseParticleSystemExtendDefinition },
 	{ "PlayerTemplate",                 INI::parsePlayerTemplateDefinition },
 	{ "Rank",                           INI::parseRankDefinition },
 	{ "ReallyLowMHz",                   parseReallyLowMHz },

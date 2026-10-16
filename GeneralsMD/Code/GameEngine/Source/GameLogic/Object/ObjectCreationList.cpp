@@ -1755,7 +1755,36 @@ void ObjectCreationListStore::addObjectCreationNugget(ObjectCreationNugget* nugg
 }
 
 //-------------------------------------------------------------------------------------------------
+/*static */ void ObjectCreationListStore::parseObjectCreationListExtendDefinition(INI *ini)
+{
+	const char *c = ini->getNextToken();
+	const char *parentName = ini->getNextToken();
+	const ObjectCreationList *parent = TheObjectCreationListStore->findObjectCreationList(parentName);
+	if (parent == nullptr)
+	{
+		DEBUG_CRASH(("ObjectCreationListExtend '%s': parent '%s' does not exist", c, parentName));
+		throw INI_INVALID_DATA;
+	}
+
+	NameKeyType key = TheNameKeyGenerator->nameToKey(c);
+	ObjectCreationList& ocl = TheObjectCreationListStore->m_ocls[key];
+
+	// The store owns the nuggets, so the copy shares the parent's and appends its own after them
+	if (&ocl != parent)
+	{
+		ocl = *parent;
+	}
+	ini->initFromINI(&ocl, TheObjectCreationListFieldParse);
+}
+
+//-------------------------------------------------------------------------------------------------
 /*static*/ void INI::parseObjectCreationListDefinition(INI *ini)
 {
 	ObjectCreationListStore::parseObjectCreationListDefinition(ini);
+}
+
+//-------------------------------------------------------------------------------------------------
+/*static*/ void INI::parseObjectCreationListExtendDefinition(INI *ini)
+{
+	ObjectCreationListStore::parseObjectCreationListExtendDefinition(ini);
 }

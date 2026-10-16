@@ -3429,6 +3429,24 @@ void ParticleSystemTemplate::validate()
 }
 
 // ------------------------------------------------------------------------------------------------
+void ParticleSystemTemplate::copyFrom( const ParticleSystemTemplate *other )
+{
+	if (other == this)
+	{
+		return;
+	}
+
+	*static_cast<ParticleSystemInfo *>( this ) = *other;
+	m_flameTuning = other->m_flameTuning;
+	m_cryoParticleScale = other->m_cryoParticleScale;
+	m_electricParticleScale = other->m_electricParticleScale;
+	m_disruption = other->m_disruption;
+
+	// Resolved again from m_slaveSystemName, which the extending block may change
+	m_slaveTemplate = nullptr;
+}
+
+// ------------------------------------------------------------------------------------------------
 /** If returns non-null, it is a slave system for use ... the create slaves parameter
  * tells *this* slave system whether or not it should create any slaves itself
  * automatically during its own constructor */

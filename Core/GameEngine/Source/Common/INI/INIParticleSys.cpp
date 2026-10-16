@@ -56,3 +56,31 @@ void INI::parseParticleSystemDefinition( INI* ini )
 	ini->initFromINI( sysTemplate, sysTemplate->getFieldParse() );
 	sysTemplate->validate();
 }
+
+/**
+ * Parse a system that starts as a copy of a previously defined one
+ */
+void INI::parseParticleSystemExtendDefinition( INI* ini )
+{
+	AsciiString name;
+	AsciiString parentName;
+	name.set( ini->getNextToken() );
+	parentName.set( ini->getNextToken() );
+
+	const ParticleSystemTemplate *parent = TheParticleSystemManager->findTemplate( parentName );
+	if (parent == nullptr)
+	{
+		DEBUG_CRASH(( "ParticleSystemExtend '%s': parent '%s' does not exist", name.str(), parentName.str() ));
+		throw INI_INVALID_DATA;
+	}
+
+	ParticleSystemTemplate *sysTemplate = TheParticleSystemManager->findTemplate( name );
+	if (sysTemplate == nullptr)
+	{
+		sysTemplate = TheParticleSystemManager->newTemplate( name );
+	}
+
+	sysTemplate->copyFrom( parent );
+	ini->initFromINI( sysTemplate, sysTemplate->getFieldParse() );
+	sysTemplate->validate();
+}

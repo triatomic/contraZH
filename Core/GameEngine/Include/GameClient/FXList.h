@@ -160,6 +160,12 @@ public:
 		m_nuggets.push_back(fxn);
 	}
 
+	/**
+		run parent's nuggets before this list's own, for FXListExtend.
+		returns false when parent already runs this list, which would loop forever.
+	*/
+	Bool setParent(const FXList *parent);
+
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	// TheSuperHackers @feature The FXList's own name, kept only so nuggets can stamp it onto the
 	// particle systems they create for the debug name overlay. The name is otherwise held solely
@@ -209,6 +215,7 @@ private:
 	typedef std::list< FXNugget* > FXNuggetList;
 
 	FXNuggetList m_nuggets;
+	const FXList *m_parent;				///< FXListExtend parent, run first; it owns its nuggets
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	AsciiString m_name;						///< this list's own name, debug overlay only
 #endif
@@ -238,6 +245,7 @@ public:
 	const FXList *findFXList( const char* name ) const;
 
 	static void parseFXListDefinition(INI* ini);
+	static void parseFXListExtendDefinition(INI* ini);
 
 private:
 

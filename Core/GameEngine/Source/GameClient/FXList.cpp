@@ -1350,6 +1350,7 @@ static const FieldParse TheFXListFieldParse[] =
 //-------------------------------------------------------------------------------------------------
 FXList::FXList()
 {
+	m_parent = nullptr;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1366,6 +1367,21 @@ void FXList::clear()
 		deleteInstance(*it);
 	}
 	m_nuggets.clear();
+	m_parent = nullptr;
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool FXList::setParent(const FXList *parent)
+{
+	for (const FXList *fx = parent; fx != nullptr; fx = fx->m_parent)
+	{
+		if (fx == this)
+		{
+			return false;
+		}
+	}
+	m_parent = parent;
+	return true;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1375,6 +1391,11 @@ void FXList::doFXPos(const Coord3D *primary, const Matrix3D* primaryMtx, const R
 
 	if (ThePartitionManager->getShroudStatusForPlayer(playerIndex, primary) != CELLSHROUD_CLEAR)
 		return;
+
+	if (m_parent)
+	{
+		m_parent->doFXPos(primary, primaryMtx, primarySpeed, secondary, overrideRadius);
+	}
 
 	FXSurfaceInfo surfaceInfo;  // Cached water/height
 
@@ -1391,6 +1412,11 @@ void FXList::doFXObj(const Object* primary, const Object* secondary) const
 
 	if (primary && primary->getShroudedStatus(playerIndex) > OBJECTSHROUD_PARTIAL_CLEAR)
 		return;	//the primary object is fogged or shrouded so don't bother with the effect.
+
+	if (m_parent)
+	{
+		m_parent->doFXObj(primary, secondary);
+	}
 
 	FXSurfaceInfo surfaceInfo;  // Cached water/height
 
@@ -1445,7 +1471,41 @@ const FXList *FXListStore::findFXList(const char* name) const
 }
 
 //-------------------------------------------------------------------------------------------------
+/*static */ void FXListStore::parseFXListExtendDefinition(INI *ini)
+{
+	const char *c = ini->getNextToken();
+	const char *parentName = ini->getNextToken();
+	const FXList *parent = TheFXListStore->findFXList(parentName);
+	if (parent == nullptr)
+	{
+		DEBUG_CRASH(("FXListExtend '%s': parent '%s' does not exist", c, parentName));
+		throw INI_INVALID_DATA;
+	}
+
+	NameKeyType key = TheNameKeyGenerator->nameToKey(c);
+	FXList& fxl = TheFXListStore->m_fxmap[key];
+
+	// The parent stays linked rather than copied because each list owns and deletes its nuggets
+	if (&fxl != parent)
+	{
+		fxl.clear();
+		if (!fxl.setParent(parent))
+		{
+			DEBUG_CRASH(("FXListExtend '%s': parent '%s' already extends it", c, parentName));
+			throw INI_INVALID_DATA;
+		}
+	}
+	ini->initFromINI(&fxl, TheFXListFieldParse);
+}
+
+//-------------------------------------------------------------------------------------------------
 /*static*/ void INI::parseFXListDefinition(INI *ini)
 {
 	FXListStore::parseFXListDefinition(ini);
+}
+
+//-------------------------------------------------------------------------------------------------
+/*static*/ void INI::parseFXListExtendDefinition(INI *ini)
+{
+	FXListStore::parseFXListExtendDefinition(ini);
 }

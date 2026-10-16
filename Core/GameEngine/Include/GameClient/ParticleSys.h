@@ -617,6 +617,9 @@ public:
 
 	void validate();
 
+	/// Takes every setting from other except the name, for ParticleSystemExtend.
+	void copyFrom( const ParticleSystemTemplate *other );
+
 	const AsciiString& getName() const { return m_name; }
 
 	// This function was made const because of update modules' module data being all const.

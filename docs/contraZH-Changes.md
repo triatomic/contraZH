@@ -21,8 +21,9 @@ only casualty was the texture filter option, replaced by TheSuperHackers' versio
 * [GameData.ini](contraZH-GameData.md) - new GameData.ini keys and simulation rules
 * [SpecialPower.ini](contraZH-SpecialPowers.md) - new SpecialPower.ini keys
 * [CommandButtons & Selection](contraZH-CommandButtons.md) - new command buttons, queue reorder and structure multi-select
-* [ParticleSystem.ini](contraZH-ParticleSystems.md) - new ParticleSystem.ini keys
-* [ObjectCreationList.ini](contraZH-Object-Creation-List.md) - new ObjectCreationList.ini nuggets
+* [ParticleSystem.ini](contraZH-ParticleSystems.md) - new ParticleSystem.ini keys and ParticleSystemExtend
+* [ObjectCreationList.ini](contraZH-Object-Creation-List.md) - new ObjectCreationList.ini nuggets and ObjectCreationListExtend
+* [FXList.ini](contraZH-FXLists.md) - FXListExtend
 * [Animation2D.ini](contraZH-Animation2D.md) - direct textures in Animation2D.ini
 * [Debug and Cheat Features](contraZH-Debug-and-Cheats.md) - debug overlays and cheat hotkeys in cheat builds
 * [Generals Online (experimental)](contraZH-Generals-Online.md) - the experimental Generals Online build

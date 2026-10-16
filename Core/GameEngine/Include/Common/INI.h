@@ -217,6 +217,7 @@ public:
 	static void parseWebpageURLDefinition( INI *ini );
 	static void parseHeaderTemplateDefinition( INI *ini );
 	static void parseParticleSystemDefinition( INI *ini );
+	static void parseParticleSystemExtendDefinition( INI *ini );
 	static void parseWaterSettingDefinition( INI *ini );
 	static void parseWaterTransparencyDefinition( INI *ini );
 	static void parseWeatherDefinition( INI *ini );
@@ -230,9 +231,13 @@ public:
 	static void parseTerrainBridgeDefinition( INI *ini );
 	static void parseMetaMapDefinition( INI *ini );
 	static void parseFXListDefinition( INI *ini );
+	static void parseFXListExtendDefinition( INI *ini );
 	static void parseBuffTemplateDefinition( INI* ini );
 	static void parseChatCommandDefinition( INI* ini );
 	static void parseObjectCreationListDefinition( INI* ini );
+#if RTS_ZEROHOUR
+	static void parseObjectCreationListExtendDefinition( INI* ini );
+#endif
 	static void parseMultiplayerSettingsDefinition( INI* ini );
 	static void parseMultiplayerColorDefinition( INI* ini );
   static void parseMultiplayerStartingMoneyChoiceDefinition( INI* ini );
