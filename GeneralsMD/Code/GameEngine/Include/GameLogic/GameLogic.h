@@ -263,6 +263,7 @@ public:
   Bool getCoopBuildings() const { return m_coopBuildings; } ///< May allies resume each other's construction
   Bool isQuickGame() const { return m_quickGame; } ///< Do objects use their QuickGamePrerequisites
   Bool isDiplomacy() const { return m_diplomacy; } ///< May players change their stance toward each other mid-match
+  Bool isDiplomacyParticipant(const Player *player) const; ///< May this player take or receive a Diplomacy stance
 #if defined(GENERALS_ONLINE)
   void sendPendingDiplomacyRule(); ///< The Generals Online host turns the rule on once the match runs
 #endif

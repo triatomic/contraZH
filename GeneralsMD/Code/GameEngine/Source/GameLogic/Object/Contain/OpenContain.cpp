@@ -1183,6 +1183,12 @@ Bool OpenContain::isValidContainerFor(const Object* obj, Bool checkCapacity) con
  	if( relationshipRestricted == TRUE )
  		return FALSE;
 
+	// A one-sided Diplomacy ally stance does not open the other player's containers
+	if( r == ALLIES && TheGameLogic->isDiplomacy() && us->getRelationship( obj ) != ALLIES )
+	{
+		return FALSE;
+	}
+
 	// all is well
 	return true;
 

@@ -185,6 +185,7 @@ the LAN host can change it.
 Click it to switch between ally and enemy.
 * A stance is one-sided and needs no consent. Treating someone as an ally only affects your side.
 Your units hold fire at them, stop any attack on them, and share their vision with them.
+* Units can enter another player's transports and buildings only when both players are allies.
 * An alliance counts for victory and ally chat only when both players are allies of each other. The
 match ends once every surviving player is allied with every other one, and they all win.
 * Every player sees a message when a stance changes.
@@ -206,7 +207,8 @@ under Coop Buildings and needs the Rules tab from `build/add_rules_tab_wnd.py`.
 * The stance buttons are created in code, so `Diplomacy.wnd` needs no change.
 * Generals Online has no lobby field for the rule. Its host types `/diplomacy` in lobby chat to
 switch it on or off, and the lobby sees an announcement. The host's game turns the rule on in the
-first frames of the match, and every player sees a message.
+first frames of the match, and every player sees a message. The game ignores that switch from anyone
+but the lobby host. A host change turns the rule off, and the lobby sees a message saying so.
 * The options string carries `DP=1` only when the rule is on. Older exes can't join such a lobby or
 play its replays, but games with the rule off are unaffected.
 * All players need this build. Replays play stance changes back exactly.

@@ -2548,6 +2548,9 @@ void WOLGameSetupMenuUpdate( WindowLayout * layout, void *userData)
 							GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"Host: The previous host left. A new host was selected."), GameMakeColor(192, 192, 192, 255), -1, -1);
 						}
 
+						// The rule lives on the host's client, so it left with the previous host
+						GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"Diplomacy is OFF. The new host can type /diplomacy to turn it on."), GameMakeColor(192, 192, 192, 255), -1, -1);
+
 						// re-enable critical buttons for everyone
 						if (buttonBack != nullptr)
 						{

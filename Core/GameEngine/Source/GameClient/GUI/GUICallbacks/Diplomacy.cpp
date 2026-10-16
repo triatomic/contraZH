@@ -155,24 +155,12 @@ static GameWindow *createStanceButton(Int row)
 }
 
 //-------------------------------------------------------------------------------------------------
-// Mirrors the logic's checks so the button only shows where the stance message would be accepted
-static Bool canTakeDiplomacyStance(const Player *player)
-{
-	if (player == nullptr || player->isPlayerObserver() || ThePlayerList->getSlotIndex(player->getPlayerIndex()) < 0)
-	{
-		return FALSE;
-	}
-
-	return !TheVictoryConditions->hasSinglePlayerBeenDefeated(const_cast<Player *>(player));
-}
-
-//-------------------------------------------------------------------------------------------------
 static void updateStanceButton(Int row, const Player *player)
 {
 	GameWindow *button = buttonStance[row];
 	const Player *localPlayer = ThePlayerList->getLocalPlayer();
 	const Bool show = button != nullptr && player != nullptr && player != localPlayer && TheGameLogic->isDiplomacy()
-		&& !TheRecorder->isPlaybackMode() && canTakeDiplomacyStance(localPlayer) && canTakeDiplomacyStance(player);
+		&& !TheRecorder->isPlaybackMode() && TheGameLogic->isDiplomacyParticipant(localPlayer) && TheGameLogic->isDiplomacyParticipant(player);
 
 	if (staticTextTeam[row])
 	{

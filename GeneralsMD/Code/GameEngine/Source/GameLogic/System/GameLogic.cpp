@@ -5694,7 +5694,7 @@ static void applyDiplomacyStanceToObject(Object *obj, void *userData)
 }
 
 //-------------------------------------------------------------------------------------------------
-static Bool isDiplomacyParticipant(const Player *player)
+Bool GameLogic::isDiplomacyParticipant(const Player *player) const
 {
 	if (player == nullptr || player == ThePlayerList->getNeutralPlayer() || player->isPlayerObserver())
 	{
@@ -5775,10 +5775,35 @@ bool GameLogic::onSetDiplomacyStance(GameMessage *msg)
 }
 
 //-------------------------------------------------------------------------------------------------
+// Only the Generals Online lobby owner may send it; a replay has no lobby, so it trusts the recording
+static Bool isDiplomacyRuleSender(Int playerIndex)
+{
+#if defined(GENERALS_ONLINE)
+	if (TheRecorder->isPlaybackMode())
+	{
+		return TRUE;
+	}
+
+	NGMP_OnlineServices_LobbyInterface *pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
+	const Int slotIndex = ThePlayerList->getSlotIndex(playerIndex);
+	if (TheNGMPGame == nullptr || TheGameInfo != TheNGMPGame || pLobbyInterface == nullptr || slotIndex < 0)
+	{
+		return FALSE;
+	}
+
+	const NGMPGameSlot *slot = (const NGMPGameSlot *)TheNGMPGame->getConstSlot(slotIndex);
+	return slot != nullptr && slot->m_userID == pLobbyInterface->GetCurrentLobbyOwnerID();
+#else
+	(void)playerIndex;
+	return FALSE;
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
 bool GameLogic::onEnableDiplomacy(GameMessage *msg)
 {
 	// The host sends it on the first frames; a late one would change the rules mid-match
-	if (m_diplomacy || getFrame() > LOGICFRAMES_PER_SECOND * 30)
+	if (m_diplomacy || getFrame() > LOGICFRAMES_PER_SECOND * 30 || !isDiplomacyRuleSender(msg->getPlayerIndex()))
 	{
 		return false;
 	}
