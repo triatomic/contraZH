@@ -1760,17 +1760,17 @@ void ObjectCreationListStore::addObjectCreationNugget(ObjectCreationNugget* nugg
 	const char *c = ini->getNextToken();
 	const char *parentName = ini->getNextToken();
 	const ObjectCreationList *parent = TheObjectCreationListStore->findObjectCreationList(parentName);
-	if (parent == nullptr)
-	{
-		DEBUG_CRASH(("ObjectCreationListExtend '%s': parent '%s' does not exist", c, parentName));
-		throw INI_INVALID_DATA;
-	}
+	DEBUG_ASSERTCRASH(parent != nullptr, ("ObjectCreationListExtend '%s': parent '%s' does not exist", c, parentName));
 
 	NameKeyType key = TheNameKeyGenerator->nameToKey(c);
 	ObjectCreationList& ocl = TheObjectCreationListStore->m_ocls[key];
 
 	// The store owns the nuggets, so the copy shares the parent's and appends its own after them
-	if (&ocl != parent)
+	if (parent == nullptr)
+	{
+		ocl.clear();
+	}
+	else if (&ocl != parent)
 	{
 		ocl = *parent;
 	}

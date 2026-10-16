@@ -3436,11 +3436,9 @@ void ParticleSystemTemplate::copyFrom( const ParticleSystemTemplate *other )
 		return;
 	}
 
-	*static_cast<ParticleSystemInfo *>( this ) = *other;
-	m_flameTuning = other->m_flameTuning;
-	m_cryoParticleScale = other->m_cryoParticleScale;
-	m_electricParticleScale = other->m_electricParticleScale;
-	m_disruption = other->m_disruption;
+	AsciiString name = m_name;
+	*this = *other;
+	m_name = name;
 
 	// Resolved again from m_slaveSystemName, which the extending block may change
 	m_slaveTemplate = nullptr;

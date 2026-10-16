@@ -179,16 +179,21 @@ static const BlockParse theWbTypeTable[] =
 	// (The naval map.ini declares 166 of them.)
 	{ "ObjectReskin",					INI::parseObjectReskinDefinition },
 	{ "ObjectCreationList",	            INI::parseObjectCreationListDefinition },
+#if RTS_ZEROHOUR
+	{ "ObjectCreationListExtend",       INI::parseObjectCreationListExtendDefinition },
+#endif
 
 	{ "SpecialPower",				    INI::parseSpecialPowerDefinition },
 
 	{ "ParticleSystem",			        INI::parseParticleSystemDefinition },
+	{ "ParticleSystemExtend",           INI::parseParticleSystemExtendDefinition },
 	{ "Science",						INI::parseScienceDefinition },
 
 	{ "Armor",							INI::parseArmorDefinition },
 
 	{ "Weapon",							INI::parseWeaponTemplateDefinition },
 	{ "FXList",							INI::parseFXListDefinition },
+	{ "FXListExtend",                   INI::parseFXListExtendDefinition },
 	{ "DamageFX",						INI::parseDamageFXDefinition },
 	
 	{ "AudioEvent",					    INI::parseAudioEventDefinition },

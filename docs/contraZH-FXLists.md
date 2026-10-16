@@ -14,9 +14,8 @@ End
 ```
 
 Notes:
-* The parent must be defined above the extending block. A missing parent is an INI error.
+* The parent must be defined above the extending block. A missing parent asserts in debug builds and
+the block loads without it.
 * Nuggets only add. A parent nugget cannot be changed or removed.
-* The parent stays linked, so redefining it later, for example in a map.ini, changes the extended
-list too. A plain `FXList` block with the same name drops the link.
-* Naming the list itself as parent appends nuggets to it. A list cannot extend one of its own
-descendants.
+* The copy is taken at load. Redefining the parent later does not change the extended list.
+* Naming the list itself as parent appends nuggets to it.
