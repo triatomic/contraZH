@@ -239,15 +239,6 @@ impassable in the map editor) still carry it.
 Changes the simulation; affects replays.
 ([#120](https://github.com/triatomic/contraZH/issues/120))
 
-## Terrain line of sight follows the slope
-
-`ATTACK_NEEDS_LINE_OF_SIGHT` tested each terrain cell by its highest corner, so a smooth slope
-between shooter and target read as a wall and long-range units refused clear shots. The test now
-samples the interpolated surface along the line.
-
-Changes when units fire; affects replays.
-([#120](https://github.com/triatomic/contraZH/issues/120))
-
 ## Bridges block fire from both sides
 
 Units under a bridge could shoot units on the deck while the deck stopped fire the other way. A
