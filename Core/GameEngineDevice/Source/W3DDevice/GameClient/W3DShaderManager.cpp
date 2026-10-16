@@ -3176,6 +3176,7 @@ MaterialPassClass *W3DShaderManager::getSpecularPass(const Int *lights, Int ligh
 
 Bool W3DShaderManager::canSpecularReceiveShadow()
 {
+#if defined(BUILD_WITH_D3D9)
 	if (!SpecularReceiveLoaded || TheW3DShadowMap == nullptr)
 	{
 		return FALSE;
@@ -3184,6 +3185,9 @@ Bool W3DShaderManager::canSpecularReceiveShadow()
 	const Vector4 color = TheW3DShadowMap->getReceiverColor();
 	const Real tolerance = 0.5f / 255.0f;
 	return fabs(color.X - color.Y) <= tolerance && fabs(color.Y - color.Z) <= tolerance;
+#else
+	return FALSE;
+#endif
 }
 
 const MaterialPassClass *W3DShaderManager::getSpecularPassKey()
