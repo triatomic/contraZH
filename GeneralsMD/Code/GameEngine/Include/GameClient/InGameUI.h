@@ -575,6 +575,9 @@ public:  // ********************************************************************
 	virtual Bool isLaserNameOverlayOn( void ) const { return m_laserNameOverlayOn; }
 	virtual void toggleLaserBeamBlockOverlay( void ) { m_laserBeamBlockOverlayOn = !m_laserBeamBlockOverlayOn; }
 	virtual Bool isLaserBeamBlockOverlayOn( void ) const { return m_laserBeamBlockOverlayOn; }
+	// Outline and name of every visible GUI window, with the full chain under the cursor.
+	virtual void toggleWindowNameOverlay( void ) { m_windowNameOverlayOn = !m_windowNameOverlayOn; }
+	virtual Bool isWindowNameOverlayOn( void ) const { return m_windowNameOverlayOn; }
 #endif
 	void freeMessageResources();				///< free resources for the ui messages
 	void freeCustomUiResources();				///< free resources for custom ui elements
@@ -842,6 +845,9 @@ private:
 	void drawSystemTime(Int &x, Int &y);
 	void drawGameTime();
 	void drawPlayerInfoList();
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	void drawWindowNameOverlay();
+#endif
 #if defined(GENERALS_ONLINE)
 	void drawObserverNotifications();
 	void checkObserverMilestones();
@@ -1264,6 +1270,8 @@ protected:
 	Bool												m_modelNameOverlayOn;
 	Bool												m_laserNameOverlayOn;
 	Bool												m_laserBeamBlockOverlayOn;
+	Bool												m_windowNameOverlayOn;
+	DisplayString *							m_windowNameString;
 #endif
 
 	Color												m_messageColor1;

@@ -4232,6 +4232,19 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			break;
 		}
 
+		// Toggle the window name overlay, drawn over the GUI.
+		case GameMessage::MSG_CHEAT_SHOW_WINDOW_NAMES:
+		{
+			TheInGameUI->toggleWindowNameOverlay();
+
+			TheInGameUI->messageNoFormat( TheInGameUI->isWindowNameOverlayOn()
+				? TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugWindowNameOverlayOn", L"Window Names are ON")
+				: TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugWindowNameOverlayOff", L"Window Names are OFF") );
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
 		// Toggle the laser name overlay, drawn at the middle of each beam.
 		case GameMessage::MSG_CHEAT_SHOW_LASER_NAME:
 		{

@@ -43,6 +43,16 @@ Notes:
 * Without a linger, one-shot effects flash past unreadably.
 * The particle overlay is expensive; leave it off when not in use.
 
+## Window name overlay
+
+* `Shift + Ctrl + /` - (Outlines every visible GUI window in amber and labels it with its `.wnd`
+name. The window under the cursor gets a cyan outline and a readout beside the cursor listing it and
+its parents, root first, with its screen position and size.)
+
+* Top level windows show the full `File.wnd:Name`; child windows show only the part after the colon.
+* A label that would cover one already drawn is skipped. Hover the window to read its name.
+* Also bindable in `CommandMap.ini` as `CHEAT_SHOW_WINDOW_NAMES`.
+
 ## Other cheat hotkeys
 
 * ``Ctrl + ` `` - (Instant build, +999999 credits, this general's own sciences, max rank,

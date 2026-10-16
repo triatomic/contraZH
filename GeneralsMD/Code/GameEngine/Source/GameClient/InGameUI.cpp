@@ -1252,6 +1252,8 @@ InGameUI::InGameUI()
 	m_modelNameOverlayOn = FALSE;
 	m_laserNameOverlayOn = FALSE;
 	m_laserBeamBlockOverlayOn = FALSE;
+	m_windowNameOverlayOn = FALSE;
+	m_windowNameString = nullptr;
 #endif
 
 	// TheSuperHackers @info the default font, size and positions of the various counters were chosen based on GenTools implementation
@@ -2664,6 +2666,10 @@ void InGameUI::freeCustomUiResources()
 #if defined(GENERALS_ONLINE)
 	TheDisplayStringManager->freeDisplayString(m_observerNotificationString);
 	m_observerNotificationString = nullptr;
+#endif
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	TheDisplayStringManager->freeDisplayString(m_windowNameString);
+	m_windowNameString = nullptr;
 #endif
 }
 
@@ -4746,6 +4752,11 @@ void InGameUI::postWindowDraw()
 	// system and game time, network latency and the observer player list.
 	if (TheTacticalView && TheTacticalView->isCameraCheatModeActive())
 		return;
+
+	if (m_windowNameOverlayOn)
+	{
+		drawWindowNameOverlay();
+	}
 #endif
 
 	Int hudOffsetX = 0;
@@ -4790,6 +4801,200 @@ void InGameUI::postWindowDraw()
 	}
 #endif
 }
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+
+// Window labels placed this frame. A label that would overlap one of them is skipped.
+static const Int MAX_WINDOW_LABEL_SLOTS = 512;
+static IRegion2D s_windowLabelSlots[ MAX_WINDOW_LABEL_SLOTS ];
+static Int s_windowLabelSlotCount = 0;
+
+// Most ancestors listed in the cursor readout.
+static const Int MAX_WINDOW_CHAIN = 16;
+
+//-------------------------------------------------------------------------------------------------
+static Bool windowLabelOverlaps( const IRegion2D &rect )
+{
+	for( Int i = 0; i < s_windowLabelSlotCount; ++i )
+	{
+		const IRegion2D &slot = s_windowLabelSlots[i];
+		if( rect.lo.x < slot.hi.x && rect.hi.x > slot.lo.x && rect.lo.y < slot.hi.y && rect.hi.y > slot.lo.y )
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Outline a visible window and label it in its top left corner, then do the same for its children.
+//-------------------------------------------------------------------------------------------------
+static void drawWindowNameTree( GameWindow *window, DisplayString *str, Bool topLevel )
+{
+	if( window->winIsHidden() )
+	{
+		return;
+	}
+
+	Int x, y, width, height;
+	window->winGetScreenPosition( &x, &y );
+	window->winGetSize( &width, &height );
+
+	const AsciiString &name = window->winGetInstanceData()->m_decoratedNameString;
+	if( !name.isEmpty() && width > 0 && height > 0 )
+	{
+		TheDisplay->drawOpenRect( x, y, width, height, 1.0f, GameMakeColor( 255, 190, 0, 150 ) );
+
+		// Top level windows keep their .wnd file prefix, children show only their own name.
+		const char *label = name.str();
+		const char *colon = topLevel ? nullptr : strrchr( label, ':' );
+		if( colon != nullptr )
+		{
+			label = colon + 1;
+		}
+
+		UnicodeString text;
+		text.format( L"%hs", label );
+		str->setText( text );
+
+		Int textWidth, textHeight;
+		str->getSize( &textWidth, &textHeight );
+
+		IRegion2D rect;
+		rect.lo.x = x + 2;
+		rect.lo.y = y + 1;
+		rect.hi.x = rect.lo.x + textWidth;
+		rect.hi.y = rect.lo.y + textHeight;
+
+		if( !windowLabelOverlaps( rect ) && s_windowLabelSlotCount < MAX_WINDOW_LABEL_SLOTS )
+		{
+			s_windowLabelSlots[ s_windowLabelSlotCount++ ] = rect;
+			TheDisplay->drawFillRect( rect.lo.x - 1, rect.lo.y, textWidth + 2, textHeight, GameMakeColor( 0, 0, 0, 170 ) );
+			str->draw( rect.lo.x, rect.lo.y, GameMakeColor( 255, 220, 120, 255 ), GameMakeColor( 0, 0, 0, 255 ) );
+		}
+	}
+
+	for( GameWindow *child = window->winGetChild(); child; child = child->winGetNext() )
+	{
+		drawWindowNameTree( child, str, FALSE );
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+static void setWindowChainText( DisplayString *str, GameWindow *window, Bool withRegion )
+{
+	const AsciiString &name = window->winGetInstanceData()->m_decoratedNameString;
+
+	UnicodeString text;
+	if( name.isEmpty() )
+	{
+		text.format( L"<unnamed id %d>", window->winGetWindowId() );
+	}
+	else
+	{
+		text.format( L"%hs", name.str() );
+	}
+
+	if( withRegion )
+	{
+		Int x, y, width, height;
+		window->winGetScreenPosition( &x, &y );
+		window->winGetSize( &width, &height );
+
+		UnicodeString region;
+		region.format( L"  (%d,%d %dx%d)", x, y, width, height );
+		text.concat( region );
+	}
+
+	str->setText( text );
+}
+
+//-------------------------------------------------------------------------------------------------
+// Every visible window outlined and labelled, plus the window under the cursor highlighted with
+// its parent chain listed beside the cursor, root first.
+//-------------------------------------------------------------------------------------------------
+void InGameUI::drawWindowNameOverlay()
+{
+	if( TheWindowManager == nullptr || TheDisplay == nullptr || TheMouse == nullptr )
+	{
+		return;
+	}
+
+	if( m_windowNameString == nullptr )
+	{
+		m_windowNameString = TheDisplayStringManager->newDisplayString();
+		m_windowNameString->setFont( TheWindowManager->winFindFont( "Tahoma", TheGlobalLanguageData->adjustFontSize( 8 ), FALSE ) );
+	}
+
+	s_windowLabelSlotCount = 0;
+	for( GameWindow *window = TheWindowManager->winGetWindowList(); window; window = window->winGetNext() )
+	{
+		drawWindowNameTree( window, m_windowNameString, TRUE );
+	}
+
+	const MouseIO *mouse = TheMouse->getMouseStatus();
+	GameWindow *hovered = TheWindowManager->getWindowUnderCursor( mouse->pos.x, mouse->pos.y, TRUE );
+	if( hovered == nullptr )
+	{
+		return;
+	}
+
+	Int x, y, width, height;
+	hovered->winGetScreenPosition( &x, &y );
+	hovered->winGetSize( &width, &height );
+	TheDisplay->drawOpenRect( x, y, width, height, 2.0f, GameMakeColor( 0, 255, 255, 255 ) );
+
+	GameWindow *chain[ MAX_WINDOW_CHAIN ];
+	Int depth = 0;
+	for( GameWindow *window = hovered; window && depth < MAX_WINDOW_CHAIN; window = window->winGetParent() )
+	{
+		chain[ depth++ ] = window;
+	}
+
+	Int boxWidth = 0;
+	Int lineHeight = 0;
+	for( Int i = 0; i < depth; ++i )
+	{
+		setWindowChainText( m_windowNameString, chain[i], i == 0 );
+
+		Int textWidth, textHeight;
+		m_windowNameString->getSize( &textWidth, &textHeight );
+		boxWidth = max( boxWidth, textWidth );
+		lineHeight = max( lineHeight, textHeight );
+	}
+
+	const Int padding = 4;
+	const Int boxHeight = depth * lineHeight;
+	Int boxX = mouse->pos.x + 20;
+	Int boxY = mouse->pos.y + 20;
+
+	// Flip to the other side of the cursor rather than run off the screen.
+	if( boxX + boxWidth + padding * 2 > (Int)TheDisplay->getWidth() )
+	{
+		boxX = mouse->pos.x - boxWidth - padding * 2 - 8;
+	}
+	if( boxY + boxHeight + padding * 2 > (Int)TheDisplay->getHeight() )
+	{
+		boxY = mouse->pos.y - boxHeight - padding * 2 - 8;
+	}
+	boxX = max( boxX, 0 );
+	boxY = max( boxY, 0 );
+
+	TheDisplay->drawFillRect( boxX, boxY, boxWidth + padding * 2, boxHeight + padding * 2, GameMakeColor( 0, 0, 0, 200 ) );
+	TheDisplay->drawOpenRect( boxX, boxY, boxWidth + padding * 2, boxHeight + padding * 2, 1.0f, GameMakeColor( 0, 255, 255, 255 ) );
+
+	Int lineY = boxY + padding;
+	for( Int i = depth - 1; i >= 0; --i )
+	{
+		setWindowChainText( m_windowNameString, chain[i], i == 0 );
+
+		const Color color = ( i == 0 ) ? GameMakeColor( 0, 255, 255, 255 ) : GameMakeColor( 255, 220, 120, 255 );
+		m_windowNameString->draw( boxX + padding, lineY, color, GameMakeColor( 0, 0, 0, 255 ) );
+		lineY += lineHeight;
+	}
+}
+
+#endif
 
 //-------------------------------------------------------------------------------------------------
 /** This is called after the UI has been drawn. */

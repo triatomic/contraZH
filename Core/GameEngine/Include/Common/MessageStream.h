@@ -472,6 +472,7 @@ public:
 		MSG_CHEAT_CYCLE_TERRAIN_MODE,		///< cycle the terrain: normal -> hidden on black -> hidden on green
 		MSG_CHEAT_TOGGLE_FACE_CULLING,		///< toggle back face culling, drawing every face double sided when off
 		MSG_CHEAT_SHOW_MODEL_NAMES,			///< show the W3D model each draw module has loaded
+		MSG_CHEAT_SHOW_WINDOW_NAMES,		///< outline and name every visible GUI window
 
 		MSG_END_META_MESSAGES,											///< Marker to delineate "meta" messages
 
