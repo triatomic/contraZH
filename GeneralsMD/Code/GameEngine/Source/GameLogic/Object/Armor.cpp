@@ -217,7 +217,8 @@ AsciiString ArmorStore::getArmorTemplateName(const ArmorTemplate* tmpl) const
 	static const FieldParse myFieldParse[] =
 	{
 		{ "Armor", ArmorTemplate::parseArmorCoefficients, NULL, 0 },
-		{ "ArmorMult", ArmorTemplate::parseArmorMultiplier, NULL, 0 }
+		{ "ArmorMult", ArmorTemplate::parseArmorMultiplier, NULL, 0 },
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 
 	const char* new_armor_name = ini->getNextToken();
