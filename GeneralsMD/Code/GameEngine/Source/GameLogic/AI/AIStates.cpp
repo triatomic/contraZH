@@ -1177,13 +1177,20 @@ Bool outOfWeaponRangeObject( State *thisState, void* userData )
 			//	victim->getID(), victim->getTemplate()->getName().str()));
 			return true;
 		}
-		// We are already engaging, so allow the target some drift before we go back to chasing it.
-		if (!weapon->hasLeechRange() && !weapon->isWithinContinueAttackRange(obj, victim))
+		// Aim is the machine's default state, so only a victim we already reached gets the drift slack.
+		if (!weapon->hasLeechRange())
 		{
-			//CRCDEBUG_LOG(("outOfWeaponRangeObject() - object %d (%s) is out of range for attacking %d (%s)",
-			//	obj->getID(), obj->getTemplate()->getName().str(),
-			//	victim->getID(), victim->getTemplate()->getName().str()));
-			return true;
+			Bool inRange = weapon->isWithinAttackRange(obj, victim)
+				|| (weapon->isEngagedWith(victim) && weapon->isWithinContinueAttackRange(obj, victim));
+			if (!inRange)
+			{
+				weapon->setEngagedVictim(nullptr);
+				//CRCDEBUG_LOG(("outOfWeaponRangeObject() - object %d (%s) is out of range for attacking %d (%s)",
+				//	obj->getID(), obj->getTemplate()->getName().str(),
+				//	victim->getID(), victim->getTemplate()->getName().str()));
+				return true;
+			}
+			weapon->setEngagedVictim(victim);
 		}
 	}
 

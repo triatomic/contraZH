@@ -702,6 +702,11 @@ public:
 	// accumulates between approach recomputes. Never use it to decide whether to start an attack.
 	Bool isWithinContinueAttackRange(const Object *source, const Object *target) const;
 
+	// The AI's range test renews this every frame it holds the victim in range; nullptr clears it.
+	// Only an engaged victim gets the continue-range slack, in the AI test and at the shot.
+	void setEngagedVictim(const Object *victim);
+	Bool isEngagedWith(const Object *victim) const;
+
 	Bool isTooClose(const Object *source, const Object *target) const;
 	Bool isTooClose(const Object *source, const Coord3D *pos) const;
 
@@ -909,6 +914,8 @@ private:
 	ObjectID									m_bonusRefObjID;					///< for weapons fired from projectiles, we compute the bonus from the original source object instead.
 	UnsignedInt								m_gradualRoundStart;				///< frame the round now loading began (GRADUAL only)
 	UnsignedInt								m_gradualRoundFrames;				///< frames per round, rate-of-fire scaled; 0 when no round is loading
+	ObjectID									m_engagedVictimID;					///< victim the AI last held within attack range
+	UnsignedInt								m_engagedFrame;							///< frame that engagement was last renewed
 
 	// setter function for status that should not be used outside this class
 	void setStatus( WeaponStatus status) { m_status = status; }

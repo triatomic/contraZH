@@ -982,6 +982,9 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 	// or a centered add-on aims at a target it then silently refuses to fire on.
 	const Object* rangeSrc = Weapon::getWeaponRangeSource( sourceObj );
 
+	// Read before a sneaky offset swaps the victim for a position, since the AI judged the object.
+	const Bool engaged = !isProjectileDetonation && firingWeapon != nullptr && firingWeapon->isEngagedWith( victimObj );
+
 	Real distSqr;
 	ObjectID victimID;
 	TBridgeAttackInfo info;
@@ -1044,7 +1047,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		// Match the slack the AI used to stay engaged, so a shot it committed to against a moving
 		// victim still lands instead of being dropped here.
 		Real attackRange = getAttackRange(bonus);
-		if (victimObj != nullptr && !isProjectileDetonation)
+		if (engaged)
 		{
 			attackRange += CONTINUE_ATTACK_RANGE_MARGIN;
 		}
@@ -2413,6 +2416,8 @@ Weapon::Weapon(const WeaponTemplate* tmpl, WeaponSlotType wslot)
 	m_bonusRefObjID = INVALID_ID;
 	m_gradualRoundStart = 0;
 	m_gradualRoundFrames = 0;
+	m_engagedVictimID = INVALID_ID;
+	m_engagedFrame = 0;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2439,6 +2444,8 @@ Weapon::Weapon(const Weapon& that)
 	this->m_bonusRefObjID = INVALID_ID;
 	this->m_gradualRoundStart = 0;
 	this->m_gradualRoundFrames = 0;
+	this->m_engagedVictimID = INVALID_ID;
+	this->m_engagedFrame = 0;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2466,6 +2473,8 @@ Weapon& Weapon::operator=(const Weapon& that)
 		this->m_continuousLaserID = INVALID_ID;
 		this->m_gradualRoundStart = 0;
 		this->m_gradualRoundFrames = 0;
+		this->m_engagedVictimID = INVALID_ID;
+		this->m_engagedFrame = 0;
 	}
 	return *this;
 }
@@ -3127,6 +3136,22 @@ Bool Weapon::isWithinContinueAttackRange(const Object *source, const Object *tar
 {
 	// The minimum range stays where it is; only the outer edge moves.
 	return isWithinAttackRangeInternal( source, target, getAttackRange( source ) + CONTINUE_ATTACK_RANGE_MARGIN );
+}
+
+//-------------------------------------------------------------------------------------------------
+void Weapon::setEngagedVictim(const Object *victim)
+{
+	m_engagedVictimID = victim ? victim->getID() : INVALID_ID;
+	m_engagedFrame = TheGameLogic->getFrame();
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool Weapon::isEngagedWith(const Object *victim) const
+{
+	// A short grace covers the frames between state transitions; an older mark belongs to a past attack.
+	return victim != nullptr
+		&& m_engagedVictimID == victim->getID()
+		&& TheGameLogic->getFrame() <= m_engagedFrame + LOGICFRAMES_PER_SECOND;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4616,12 +4641,13 @@ void Weapon::crc( Xfer *xfer )
 	* Version Info:
 	* 1: Initial version
 	* 2-3: Undocumented in the original source
-	* 4: Gradual reload round timer */
+	* 4: Gradual reload round timer
+	* 5: Engaged victim for the continue-range slack */
 // ------------------------------------------------------------------------------------------------
 void Weapon::xfer( Xfer *xfer )
 {
 	// version
-	const XferVersion currentVersion = 4;
+	const XferVersion currentVersion = 5;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -4733,6 +4759,13 @@ void Weapon::xfer( Xfer *xfer )
 	{
 		xfer->xferUnsignedInt( &m_gradualRoundStart );
 		xfer->xferUnsignedInt( &m_gradualRoundFrames );
+	}
+
+	// engaged victim
+	if (version >= 5)
+	{
+		xfer->xferObjectID( &m_engagedVictimID );
+		xfer->xferUnsignedInt( &m_engagedFrame );
 	}
 
 }  // end xfer
