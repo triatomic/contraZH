@@ -20,6 +20,7 @@ only casualty was the texture filter option, replaced by TheSuperHackers' versio
 * [Objects & Modules](contraZH-Objects-and-Modules.md) - new object keys, module parameters and behavior modules
 * [GameData.ini](contraZH-GameData.md) - new GameData.ini keys and simulation rules
 * [SpecialPower.ini](contraZH-SpecialPowers.md) - new SpecialPower.ini keys
+* [Weapon.ini](contraZH-Weapons.md) - new Weapon.ini keys
 * [CommandButtons & Selection](contraZH-CommandButtons.md) - new command buttons, queue reorder and structure multi-select
 * [ParticleSystem.ini](contraZH-ParticleSystems.md) - new ParticleSystem.ini keys
 * [ObjectCreationList.ini](contraZH-Object-Creation-List.md) - new ObjectCreationList.ini nuggets

@@ -477,6 +477,7 @@ public:
 	Bool isScatterTargetCenteredAtShooter() const { return m_scatterTargetCenteredAtShooter; }
 	Bool isScatterOnWaterSurface() const { return m_scatterOnWaterSurface; }
 	Bool isResetFireBonesOnReload() const { return m_resetFireBonesOnReload; }
+	Real getLineOfSightGraceHeight() const { return m_lineOfSightGraceHeight; }
 
 	Bool shouldProjectileCollideWith(
 		const Object* projectileLauncher,
@@ -626,6 +627,8 @@ private:
 	Bool m_scatterOnWaterSurface; ///< Scatter radius and targets include the water surface instead of just the terrain height
 
 	Bool m_resetFireBonesOnReload; ///< When reloading, set the next firebone/barrel to 0
+
+	Real m_lineOfSightGraceHeight; ///< terrain may rise this far above the firing line before it blocks the shot
 
 	mutable HistoricWeaponDamageList m_historicDamage;
 	mutable UnsignedInt m_historicDamageTriggerId;

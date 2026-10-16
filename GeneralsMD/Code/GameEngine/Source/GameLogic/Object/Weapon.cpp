@@ -281,6 +281,7 @@ const FieldParse WeaponTemplate::TheWeaponTemplateFieldParseTable[] =
 	{ "LaserGroundUnitTargetHeight",				INI::parseReal,					NULL,					offsetof(WeaponTemplate, m_laserGroundUnitTargetHeight) },
 	{ "ScatterOnWaterSurface", INI::parseBool, NULL, offsetof(WeaponTemplate, m_scatterOnWaterSurface) },
 	{ "ResetFireBonesOnReload", INI::parseBool, NULL, offsetof(WeaponTemplate, m_resetFireBonesOnReload) },
+	{ "LineOfSightGraceHeight", INI::parseReal, NULL, offsetof(WeaponTemplate, m_lineOfSightGraceHeight) },
 	{ nullptr,												nullptr,																		nullptr,							0 }
 
 };
@@ -385,6 +386,7 @@ WeaponTemplate::WeaponTemplate() : m_nextTemplate(nullptr)
 	m_scatterOnWaterSurface = TheGlobalData ? TheGlobalData->m_weaponScatterOnWaterSurfaceDefault : false;
 	m_historicDamageTriggerId = 0;
 	m_resetFireBonesOnReload = false;
+	m_lineOfSightGraceHeight = 0.0f;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4246,6 +4248,15 @@ void Weapon::getFiringLineOfSightOrigin(const Object* source, Coord3D& origin) c
 }
 
 //-------------------------------------------------------------------------------------------------
+// Lifting both ends by the grace lets terrain rise that far above the firing line.
+static Bool isClearFiringLineTerrain(Coord3D origin, Coord3D victimPos, Real grace)
+{
+	origin.z += grace;
+	victimPos.z += grace;
+	return ThePartitionManager->isClearLineOfSightTerrain(nullptr, origin, nullptr, victimPos);
+}
+
+//-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 Bool Weapon::isClearFiringLineOfSightTerrain(const Object* source, const Object* victim) const
 {
@@ -4259,7 +4270,7 @@ Bool Weapon::isClearFiringLineOfSightTerrain(const Object* source, const Object*
 	//CRCDEBUG_LOG(("Weapon::isClearFiringLineOfSightTerrain() - victimPos is (%g,%g,%g) (%X,%X,%X)",
 	//	victimPos.x, victimPos.y, victimPos.z,
 	//	AS_INT(victimPos.x),AS_INT(victimPos.y),AS_INT(victimPos.z)));
-	return ThePartitionManager->isClearLineOfSightTerrain(nullptr, origin, nullptr, victimPos);
+	return isClearFiringLineTerrain(origin, victimPos, m_template->getLineOfSightGraceHeight());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4271,7 +4282,7 @@ Bool Weapon::isClearFiringLineOfSightTerrain(const Object* source, const Coord3D
 	//CRCDEBUG_LOG(("Weapon::isClearFiringLineOfSightTerrain(Coord3D) for %s", DescribeObject(source).str()));
 	//DUMPCOORD3D(&origin);
 	getFiringLineOfSightOrigin(source, origin);
-	return ThePartitionManager->isClearLineOfSightTerrain(nullptr, origin, nullptr, victimPos);
+	return isClearFiringLineTerrain(origin, victimPos, m_template->getLineOfSightGraceHeight());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4285,7 +4296,7 @@ Bool Weapon::isClearGoalFiringLineOfSightTerrain(const Object* source, const Coo
 	getFiringLineOfSightOrigin(source, origin);
 	Coord3D victimPos;
 	victim->getGeometryInfo().getCenterPosition( *victim->getPosition(), victimPos );
-	return ThePartitionManager->isClearLineOfSightTerrain(nullptr, origin, nullptr, victimPos);
+	return isClearFiringLineTerrain(origin, victimPos, m_template->getLineOfSightGraceHeight());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4300,7 +4311,7 @@ Bool Weapon::isClearGoalFiringLineOfSightTerrain(const Object* source, const Coo
 	//CRCDEBUG_LOG(("Weapon::isClearFiringLineOfSightTerrain() - victimPos is (%g,%g,%g) (%X,%X,%X)",
 	//	victimPos.x, victimPos.y, victimPos.z,
 	//	AS_INT(victimPos.x),AS_INT(victimPos.y),AS_INT(victimPos.z)));
-	return ThePartitionManager->isClearLineOfSightTerrain(nullptr, origin, nullptr, victimPos);
+	return isClearFiringLineTerrain(origin, victimPos, m_template->getLineOfSightGraceHeight());
 }
 
 //-------------------------------------------------------------------------------------------------
