@@ -15,11 +15,19 @@ Notes:
 ## Ships
 ### TODO
 
-# LocomtorExtend
+# LocomotorExtend
 
-Locomotor definitions can be extended via a LocomtorExtend entry:
+Locomotor definitions can be extended via a LocomotorExtend entry:
 
-- `LocomotorExtend <NewLocomotor> <ParentLocomotor>
+- `LocomotorExtend <NewLocomotor> <ParentLocomotor>`
 
-All parameters from Locomotor can be used to override values from the parent Locomotors . It is possible to extend an extended Locomotor.
+All parameters from Locomotor can be used to override values from the parent Locomotor. It is possible to extend an extended Locomotor.
+
+```
+LocomotorExtend CrusaderFastLocomotor CrusaderLocomotor
+  Speed        = 40
+  SpeedDamaged = 30
+End
+```
+
 Note: The extended locomotor needs to be defined below the parent locomotor.
