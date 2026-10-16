@@ -32,17 +32,4 @@ Notes:
 
 ## ParticleSystemExtend
 
-* `ParticleSystemExtend <NewSystem> <ParentSystem>` - (Starts as a copy of the parent. Keys in the
-block override the copied values.)
-
-```
-ParticleSystemExtend RocketBuggyDustRed RocketBuggyDust
-  Color1 = R:200 G:60 B:40 0
-End
-```
-
-Notes:
-* The parent must be defined above the extending block. A missing parent asserts in debug builds and
-the block loads without it.
-* The copy is taken at load. Redefining the parent later does not change the extended system.
-* Extending an extended system works.
+See [Extend Blocks](contraZH-Extend.md#particlesystemini).
