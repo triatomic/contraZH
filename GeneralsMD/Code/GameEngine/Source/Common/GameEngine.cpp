@@ -958,11 +958,7 @@ Bool GameEngine::canUpdateRegularGameLogic(UnsignedInt logicTimeQueryFlags)
 
 	const Int maxRenderFps = TheFramePacer->getActualFramesPerSecondLimit();
 
-#if defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
-	const Bool useFastMode = TheGlobalData->m_TiVOFastMode;
-#else	//always allow this cheat key if we're in a replay game.
 	const Bool useFastMode = TheGlobalData->m_TiVOFastMode && TheGameLogic->isInReplayGame();
-#endif
 
 	// Without a running game the logic only handles messages, such as starting the next game, which must not wait.
 	const Bool noGameRunning = !TheGameLogic->isInGame() || TheGameLogic->isStartingNewGame();

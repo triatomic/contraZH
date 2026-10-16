@@ -122,11 +122,7 @@ Bool FramePacer::isActualFramesPerSecondLimitEnabled() const
 
 	if (TheGameLogic != nullptr)
 	{
-#if defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
-		allowFpsLimit &= !(!TheGameLogic->isGamePaused() && TheGlobalData->m_TiVOFastMode);
-#else	//always allow this cheat key if we're in a replay game.
 		allowFpsLimit &= !(!TheGameLogic->isGamePaused() && TheGlobalData->m_TiVOFastMode && TheGameLogic->isInReplayGame());
-#endif
 	}
 
 	allowFpsLimit &= TheGlobalData->m_useFpsLimit;

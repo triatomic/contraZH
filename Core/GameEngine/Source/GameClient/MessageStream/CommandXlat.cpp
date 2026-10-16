@@ -3800,9 +3800,7 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		{
 			if( TheGlobalData )
 			{
-#if !defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)//may be defined in GameCommon.h
 				if (TheGameLogic->isInReplayGame())
-#endif
 				{
 					TheWritableGlobalData->m_TiVOFastMode = 1 - TheGlobalData->m_TiVOFastMode;
 					TheInGameUI->messageNoFormat( TheGlobalData->m_TiVOFastMode
