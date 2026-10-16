@@ -185,7 +185,6 @@ the LAN host can change it.
 Click it to switch between ally and enemy.
 * A stance is one-sided and needs no consent. Treating someone as an ally only affects your side.
 Your units hold fire at them, stop any attack on them, and share their vision with them.
-* Units can enter another player's transports and buildings only when both players are allies.
 * An alliance counts for victory and ally chat only when both players are allies of each other. The
 match ends once every surviving player is allied with every other one, and they all win.
 * Every player sees a message when a stance changes.
