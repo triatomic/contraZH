@@ -1468,7 +1468,7 @@ public:
 		this only takes terrain into account; it does not consider objects, units,
 		trees, buildings, etc.
 	*/
-	Bool isClearLineOfSightTerrain(const Object* obj, const Coord3D& objPos, const Object* other, const Coord3D& otherPos);
+	Bool isClearLineOfSightTerrain(const Object* obj, const Coord3D& objPos, const Object* other, const Coord3D& otherPos, Real graceHeight = 0.0f);
 
 	Bool isInListDirtyModules(PartitionData* o) const
 	{

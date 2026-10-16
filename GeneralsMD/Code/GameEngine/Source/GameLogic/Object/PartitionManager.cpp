@@ -76,6 +76,7 @@
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/Squad.h"
 #include "GameLogic/GhostObject.h"
+#include "GameLogic/Weapon.h"
 
 #include "GameClient/Line2D.h"
 #include "GameClient/ControlBar.h"
@@ -4625,7 +4626,7 @@ static Real calcDist2D(Real x1, Real y1, Real x2, Real y2)
 }
 
 //-----------------------------------------------------------------------------
-Bool PartitionManager::isClearLineOfSightTerrain(const Object* obj, const Coord3D& objPos, const Object* other, const Coord3D& otherPos)
+Bool PartitionManager::isClearLineOfSightTerrain(const Object* obj, const Coord3D& objPos, const Object* other, const Coord3D& otherPos, Real graceHeight)
 {
 	Coord3D pos, posOther;
 
@@ -4656,6 +4657,10 @@ Bool PartitionManager::isClearLineOfSightTerrain(const Object* obj, const Coord3
 	{
 		posOther = otherPos;
 	}
+
+	// Lifting both ends by the grace lets terrain rise that far above the line.
+	pos.z += graceHeight;
+	posOther.z += graceHeight;
 
 #ifdef NO_BAD_AND_INACCURATE
 /*
@@ -5473,7 +5478,9 @@ Bool PartitionFilterLineOfSight::allow(Object *objOther)
 {
 	// objOther is guaranteed to be non-null, so we don't need to check (srj)
 
-	if (!ThePartitionManager->isClearLineOfSightTerrain(m_obj, *m_obj->getPosition(), objOther, *objOther->getPosition()))
+	const Weapon* weapon = m_obj->getCurrentWeapon();
+	Real graceHeight = weapon ? weapon->getTemplate()->getLineOfSightGraceHeight() : 0.0f;
+	if (!ThePartitionManager->isClearLineOfSightTerrain(m_obj, *m_obj->getPosition(), objOther, *objOther->getPosition(), graceHeight))
 		return false;
 
 	if (TheAI && TheAI->pathfinder()->isViewBlockedByObstacle(m_obj, objOther))

@@ -19,8 +19,10 @@ End
 ```
 
 Notes:
-* Only units with `ATTACK_NEEDS_LINE_OF_SIGHT` test terrain, so the key does nothing for others.
-* Immobile units skip the terrain test and ignore the key.
+* Only units with `ATTACK_NEEDS_LINE_OF_SIGHT` test terrain before an attack, so the key does nothing
+for others there. Immobile units skip that test and ignore the key.
+* The current weapon's grace also applies when a unit scans for enemies it can see.
+* A negative value is an INI error.
 * A hill taller than the grace height still blocks the shot.
 * Works in `WeaponExtend`.
 

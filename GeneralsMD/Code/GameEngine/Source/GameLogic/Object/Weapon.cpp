@@ -172,6 +172,18 @@ static void parseAllVetLevelsPSys( INI* ini, void* /*instance*/, void * store, c
 		s[i] = pst;
 }
 
+//-------------------------------------------------------------------------------------------------
+static void parseNonNegativeReal( INI* ini, void* /*instance*/, void * store, const void* /*userData*/ )
+{
+	Real value = INI::scanReal(ini->getNextToken());
+	if (value < 0.0f)
+	{
+		DEBUG_CRASH(("invalid Real value %f -- expected >= 0", value));
+		throw INI_INVALID_DATA;
+	}
+	*(Real *)store = value;
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -281,7 +293,7 @@ const FieldParse WeaponTemplate::TheWeaponTemplateFieldParseTable[] =
 	{ "LaserGroundUnitTargetHeight",				INI::parseReal,					NULL,					offsetof(WeaponTemplate, m_laserGroundUnitTargetHeight) },
 	{ "ScatterOnWaterSurface", INI::parseBool, NULL, offsetof(WeaponTemplate, m_scatterOnWaterSurface) },
 	{ "ResetFireBonesOnReload", INI::parseBool, NULL, offsetof(WeaponTemplate, m_resetFireBonesOnReload) },
-	{ "LineOfSightGraceHeight", INI::parseReal, NULL, offsetof(WeaponTemplate, m_lineOfSightGraceHeight) },
+	{ "LineOfSightGraceHeight", parseNonNegativeReal, NULL, offsetof(WeaponTemplate, m_lineOfSightGraceHeight) },
 	{ nullptr,												nullptr,																		nullptr,							0 }
 
 };
@@ -4248,15 +4260,6 @@ void Weapon::getFiringLineOfSightOrigin(const Object* source, Coord3D& origin) c
 }
 
 //-------------------------------------------------------------------------------------------------
-// Lifting both ends by the grace lets terrain rise that far above the firing line.
-static Bool isClearFiringLineTerrain(Coord3D origin, Coord3D victimPos, Real grace)
-{
-	origin.z += grace;
-	victimPos.z += grace;
-	return ThePartitionManager->isClearLineOfSightTerrain(nullptr, origin, nullptr, victimPos);
-}
-
-//-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 Bool Weapon::isClearFiringLineOfSightTerrain(const Object* source, const Object* victim) const
 {
@@ -4270,7 +4273,7 @@ Bool Weapon::isClearFiringLineOfSightTerrain(const Object* source, const Object*
 	//CRCDEBUG_LOG(("Weapon::isClearFiringLineOfSightTerrain() - victimPos is (%g,%g,%g) (%X,%X,%X)",
 	//	victimPos.x, victimPos.y, victimPos.z,
 	//	AS_INT(victimPos.x),AS_INT(victimPos.y),AS_INT(victimPos.z)));
-	return isClearFiringLineTerrain(origin, victimPos, m_template->getLineOfSightGraceHeight());
+	return ThePartitionManager->isClearLineOfSightTerrain(nullptr, origin, nullptr, victimPos);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4282,7 +4285,7 @@ Bool Weapon::isClearFiringLineOfSightTerrain(const Object* source, const Coord3D
 	//CRCDEBUG_LOG(("Weapon::isClearFiringLineOfSightTerrain(Coord3D) for %s", DescribeObject(source).str()));
 	//DUMPCOORD3D(&origin);
 	getFiringLineOfSightOrigin(source, origin);
-	return isClearFiringLineTerrain(origin, victimPos, m_template->getLineOfSightGraceHeight());
+	return ThePartitionManager->isClearLineOfSightTerrain(nullptr, origin, nullptr, victimPos);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4296,7 +4299,7 @@ Bool Weapon::isClearGoalFiringLineOfSightTerrain(const Object* source, const Coo
 	getFiringLineOfSightOrigin(source, origin);
 	Coord3D victimPos;
 	victim->getGeometryInfo().getCenterPosition( *victim->getPosition(), victimPos );
-	return isClearFiringLineTerrain(origin, victimPos, m_template->getLineOfSightGraceHeight());
+	return ThePartitionManager->isClearLineOfSightTerrain(nullptr, origin, nullptr, victimPos, m_template->getLineOfSightGraceHeight());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4311,7 +4314,7 @@ Bool Weapon::isClearGoalFiringLineOfSightTerrain(const Object* source, const Coo
 	//CRCDEBUG_LOG(("Weapon::isClearFiringLineOfSightTerrain() - victimPos is (%g,%g,%g) (%X,%X,%X)",
 	//	victimPos.x, victimPos.y, victimPos.z,
 	//	AS_INT(victimPos.x),AS_INT(victimPos.y),AS_INT(victimPos.z)));
-	return isClearFiringLineTerrain(origin, victimPos, m_template->getLineOfSightGraceHeight());
+	return ThePartitionManager->isClearLineOfSightTerrain(nullptr, origin, nullptr, victimPos, m_template->getLineOfSightGraceHeight());
 }
 
 //-------------------------------------------------------------------------------------------------
