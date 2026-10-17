@@ -504,7 +504,8 @@ for missiles.)
 
 Notes:
 * A model blurs at most 32 copies a part.
-* Only opaque meshes blur. Translucent, skinned, stealthed and fading meshes keep their single draw.
+* Opaque and alpha blended meshes blur, so a helicopter's painted rotor disc smears too. Additive, skinned,
+stealthed and fading meshes keep their single draw.
 * Copies cast no shadows and take no specular or other material passes.
 * A spin is read from the model's animation, so parts that code turns, such as tank wheels and
 turrets, do not blur.

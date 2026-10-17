@@ -2757,10 +2757,13 @@ static void Draw_Polygons(DX8FVFCategoryContainer * container, DX8PolygonRendere
 }
 
 // Queues the mesh's earlier poses as translucent copies, which the sorting renderer draws after the opaque scene.
-// Each keeps the mesh's alpha test and blends in by a constant, and none writes depth.
+// An opaque mesh's copies keep its alpha test and blend in by a constant; an alpha blended mesh's keep its blend, as a
+// helicopter's painted rotor disc does. None writes depth, and other blends draw no copies.
 static void Insert_Motion_Ghosts(DX8PolygonRendererClass * renderer, MeshClass * mesh, const Matrix3D & world, const ShaderClass & shader)
 {
-	if (shader.Get_Src_Blend_Func() != ShaderClass::SRCBLEND_ONE || shader.Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO) {
+	const bool opaque = shader.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_ONE && shader.Get_Dst_Blend_Func() == ShaderClass::DSTBLEND_ZERO;
+	const bool alpha = shader.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_SRC_ALPHA && shader.Get_Dst_Blend_Func() == ShaderClass::DSTBLEND_ONE_MINUS_SRC_ALPHA;
+	if (!opaque && !alpha) {
 		return;
 	}
 	const MotionBlurClass::GhostsStruct * ghosts = MotionBlurClass::Peek(mesh);
@@ -2788,7 +2791,7 @@ static void Insert_Motion_Ghosts(DX8PolygonRendererClass * renderer, MeshClass *
 		(unsigned short)(renderer->Get_Index_Count()/3),
 		(unsigned short)renderer->Get_Min_Vertex_Index(),
 		(unsigned short)renderer->Get_Vertex_Index_Range(),
-		worlds,weights,ghosts->Count,MotionBlurClass::Get_Debug_Colour(*ghosts));
+		worlds,weights,ghosts->Count,MotionBlurClass::Get_Debug_Colour(*ghosts),alpha);
 	MotionBlurClass::Note_Queued(ghosts->Count);
 
 	DX8Wrapper::Set_Shader(shader);
@@ -2882,6 +2885,11 @@ void DX8TextureCategoryClass::Render_Task(PolyRenderTaskClass * prt, VertexMater
 			SortingRendererClass::Set_Insert_Effects(mesh->Get_Shader_Effects(),mesh->Peek_Shader_Effect_Data());
 			renderer->Render_Sorted(mesh->Get_Base_Vertex_Offset(),mesh->Get_Bounding_Sphere());
 			SortingRendererClass::Set_Insert_Effects(0,nullptr);
+
+			// sorted copies whose vertices sit in the sorting buffers are turned away by the sorting renderer itself
+			if (mesh->Get_Alpha_Override() == 1.0f && !mesh->Peek_Model()->Get_Flag(MeshModelClass::SKIN) && mesh->Get_Shader_Effects() == 0) {
+				Insert_Motion_Ghosts(renderer,mesh,*world_transform,theShader);
+			}
 		}
 	} else if (!mesh->Is_Disruption_Only() || !SortingRendererClass::Can_Disrupt()) {
 		//non-transparent mesh that will be rendered immediately.  Okay to adjust the shader/material

@@ -243,6 +243,7 @@ public:
 	unsigned ghost_first;					// A motion blur node's first copy in ghost_draws
 	unsigned short ghost_count;			// Its copies, 0 for any other node
 	unsigned flat_colour;					// ARGB its copies draw in place of the lit texture, 0 for none
+	bool own_alpha;							// Its copies keep the mesh's alpha blend, the weight scaling the texture's alpha
 	bool placed;								// A disruption node whose vertices are already in world space, so center says where it is
 	Vector3 center;
 	float disruption_strength;				// How much of its mask a disruption node keeps
@@ -323,33 +324,49 @@ static void End_Soft(bool soft)
 #if defined(BUILD_WITH_D3D9)
 
 // The node's state is applied once, then each copy changes only the world transform and the blend weight.
+// An own alpha copy carries the weight in the texture factor's alpha, which stage 0 multiplies into the texture's.
 static void Draw_Ghost_Node(SortingNodeStruct* state)
 {
 	DX8Wrapper::Apply_Render_State_Changes();
-	DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_BLENDFACTOR);
-	DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_INVBLENDFACTOR);
+	if (!state->own_alpha) {
+		DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_BLENDFACTOR);
+		DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_INVBLENDFACTOR);
+	}
+	else {
+		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_ALPHAARG2, D3DTA_TFACTOR);
+	}
 	if (state->flat_colour != 0) {
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, state->flat_colour);
 		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
 		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_COLORARG1, D3DTA_TFACTOR);
 		DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_COLOROP, D3DTOP_DISABLE);
 	}
+	const unsigned colour=(state->flat_colour != 0) ? (state->flat_colour & 0x00FFFFFF) : 0x00FFFFFF;
 	for (unsigned i=0;i<state->ghost_count;++i) {
 		const GhostDrawStruct& ghost=ghost_draws[state->ghost_first+i];
 		if (ghost.weight == 0) {
 			continue;
 		}
 		DX8Wrapper::Set_Transform(D3DTS_WORLD,ghost.world);
-		DX8Wrapper::Set_DX8_Render_State(D3DRS_BLENDFACTOR, D3DCOLOR_ARGB(ghost.weight, ghost.weight, ghost.weight, ghost.weight));
+		if (state->own_alpha) {
+			DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, ((unsigned)ghost.weight << 24) | colour);
+		}
+		else {
+			DX8Wrapper::Set_DX8_Render_State(D3DRS_BLENDFACTOR, D3DCOLOR_ARGB(ghost.weight, ghost.weight, ghost.weight, ghost.weight));
+		}
 		DX8Wrapper::Draw_Triangles(state->start_index,state->polygon_count,state->min_vertex_index,state->vertex_count);
 	}
-	if (state->flat_colour != 0) {
+	if (state->flat_colour != 0 || state->own_alpha) {
 		ShaderClass::Invalidate();
 	}
 
 	// back to what the node's alpha blend shader set, so the cache still matches it
-	DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
-	DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+	if (!state->own_alpha) {
+		DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+		DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+	}
 }
 
 #endif
@@ -547,6 +564,7 @@ void SortingRendererClass::Insert_Triangles(
 	state->effect_data=(state->effects != 0) ? InsertEffectData : nullptr;
 	state->ghost_count=0;
 	state->flat_colour=0;
+	state->own_alpha=false;
 
 	if (disrupts) {
 		// Skins and lines leave the world transform at identity, so only the bounding sphere says where they are.
@@ -652,7 +670,8 @@ void SortingRendererClass::Insert_Ghosts(
 	const Matrix3D* worlds,
 	const float* weights,
 	int count,
-	unsigned flat_colour)
+	unsigned flat_colour,
+	bool own_alpha)
 {
 	if (count <= 0 || !WW3D::Is_Sorting_Enabled()) {
 		return;
@@ -679,6 +698,7 @@ void SortingRendererClass::Insert_Ghosts(
 	state->ghost_first=(unsigned)ghost_draws.size();
 	state->ghost_count=(unsigned short)count;
 	state->flat_colour=flat_colour;
+	state->own_alpha=own_alpha;
 	Set_Object_Depth(state,bounding_sphere);
 
 	for (int i=0;i<count;++i) {
