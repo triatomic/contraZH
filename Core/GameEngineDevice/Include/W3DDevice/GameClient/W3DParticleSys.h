@@ -78,7 +78,7 @@ private:
 	static Bool isFarther(const DrawEntry &a, const DrawEntry &b);
 
 	// TheSuperHackers @feature renders ground aligned particles as terrain conforming meshes
-	class W3DTerrainParticle *m_terrainParticles;
+	class W3DTerrainParticles *m_terrainParticles;
 	std::vector<DrawEntry> m_drawOrder;			///< visible systems in the order they draw this frame
 	RefCountPtr<TextureClass> m_batchTexture;		///< the texture used as the drawing surface for batched particle draws
 	PointGroupClass *m_pointGroup;							///< the point group that contains all of the particles
@@ -88,6 +88,7 @@ private:
 	ShareBufferClass<float> *m_sizeBuffer;			///< array of particle sizes
 	ShareBufferClass<uint8> *m_angleBuffer;			///< array of particle orientations
 	ShareBufferClass<Vector4> *m_uvRectBuffer;		///< array of particle rectangles in an atlas page
+	AABoxClass m_currentBoundingBox;
 
 	ParticleSystemInfo::ParticleShaderType m_batchShaderType;
 	Bool m_readyToRender;											///< if true, it is OK to render

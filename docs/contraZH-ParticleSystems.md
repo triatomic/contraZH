@@ -9,7 +9,8 @@ decals, instead of a flat quad that cuts through hills.
 
 Notes:
 * Opt-in per effect; retail effects are unchanged.
-* Cost grows with particle size squared. Past 160 cells per side the mesh samples every Nth cell.
+* Flat ground becomes one quad; only uneven ground is meshed cell by cell.
+* Only the part on screen is meshed. Past 160 cells per side the mesh stops at coarser cells.
 
 ## Snow move effects
 
