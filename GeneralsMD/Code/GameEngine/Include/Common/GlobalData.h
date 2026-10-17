@@ -312,12 +312,13 @@ public:
 	Bool m_rotrHack;	///< GameData RotrHack: additive HEADLIGHT meshes keep their own look, for Rise of the Reds' lit windows
 	Bool m_planarMirrorShader;	///< GameData PlanarMirrorShader: whether models' PlanarMirror meshes reflect, read at launch
 	PlanarMirrorShaderTuning m_planarMirrorTuning;	///< GameData PlanarMirrorReflectivity and the keys beside it: what mirrors take where their model sets nothing
-	Real m_motionBlurOpacity;			///< GameData MotionBlurOpacity: how opaque the newest motion blur copy draws, the older ones fading out
+	Real m_motionBlurOpacity;			///< GameData MotionBlurOpacity: how opaque the newest copy of a spinning part draws, the older ones fading out
 	Real m_motionBlurRotorMinSpeed;		///< GameData MotionBlurRotorMinSpeed: degrees a second a part must spin at to blur
 	Real m_motionBlurRotorExposure;		///< GameData MotionBlurRotorExposure: seconds of spin the blur trails behind a part
 	Real m_motionBlurRotorMaxSweep;		///< GameData MotionBlurRotorMaxSweep: the most degrees of spin the blur trails behind a part
 	Real m_motionBlurRotorStep;			///< GameData MotionBlurRotorStep: degrees between the copies of a spinning part
 	Real m_motionBlurMoveMinSpeed;		///< GameData MotionBlurMoveMinSpeed: world units a second an object must move at to blur
+	Real m_motionBlurMoveOpacity;		///< GameData MotionBlurMoveOpacity: how opaque a moving object's trail gets where all its copies overlap
 	Real m_motionBlurMoveExposure;		///< GameData MotionBlurMoveExposure: seconds of movement the blur trails behind an object
 	Real m_motionBlurMoveStep;			///< GameData MotionBlurMoveStep: world units between the copies of a moving object
 	KindOfMaskType m_motionBlurMoveKindOf;	///< GameData MotionBlurMoveKindOf: objects of these kinds blur when they move fast

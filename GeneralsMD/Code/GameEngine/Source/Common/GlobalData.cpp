@@ -369,6 +369,7 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ "MotionBlurRotorMaxSweep",			INI::parseAngleReal,		nullptr,			offsetof( GlobalData, m_motionBlurRotorMaxSweep ) },
 	{ "MotionBlurRotorStep",				INI::parseAngleReal,		nullptr,			offsetof( GlobalData, m_motionBlurRotorStep ) },
 	{ "MotionBlurMoveMinSpeed",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_motionBlurMoveMinSpeed ) },
+	{ "MotionBlurMoveOpacity",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_motionBlurMoveOpacity ) },
 	{ "MotionBlurMoveExposure",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_motionBlurMoveExposure ) },
 	{ "MotionBlurMoveStep",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_motionBlurMoveStep ) },
 	{ "MotionBlurMoveKindOf",				KindOfMaskType::parseFromINI,	nullptr,			offsetof( GlobalData, m_motionBlurMoveKindOf ) },
@@ -1158,6 +1159,7 @@ GlobalData::GlobalData()
 	m_motionBlurRotorMaxSweep = DEG_TO_RADF(120.0f);
 	m_motionBlurRotorStep = DEG_TO_RADF(6.0f);
 	m_motionBlurMoveMinSpeed = 100.0f;
+	m_motionBlurMoveOpacity = 0.5f;
 	m_motionBlurMoveExposure = 0.06f;
 	m_motionBlurMoveStep = 1.5f;
 	m_motionBlurMoveKindOf.clear();
@@ -1855,7 +1857,7 @@ static const char *const LiveGameDataKeys[] =
 	"HeadlightPoolClampBrightness",
 	"PlanarMirrorReflectivity", "PlanarMirrorTint", "PlanarMirrorDistortion", "PlanarMirrorFrost",
 	"MotionBlurOpacity", "MotionBlurRotorMinSpeed", "MotionBlurRotorExposure", "MotionBlurRotorMaxSweep", "MotionBlurRotorStep",
-	"MotionBlurMoveMinSpeed", "MotionBlurMoveExposure", "MotionBlurMoveStep", "MotionBlurMoveKindOf",
+	"MotionBlurMoveMinSpeed", "MotionBlurMoveOpacity", "MotionBlurMoveExposure", "MotionBlurMoveStep", "MotionBlurMoveKindOf",
 	"LaserGroundGlowRadius", "LaserGroundGlowFalloff", "LaserGroundGlowWrap", "LaserGroundGlowDebug", "LaserGroundGlowOverlap",
 	nullptr
 };

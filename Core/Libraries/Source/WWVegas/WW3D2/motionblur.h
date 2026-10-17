@@ -31,11 +31,12 @@ class MotionBlurClass
 public:
 	enum { MAX_GHOSTS = 32 };
 
-	// Ghost i of Count sits at Translate(-Offset * (i+1) / Count) * mesh transform * Spin[i], oldest last.
+	// Ghost i of Count sits at Translate(-Offset * (i+1) / Count) * mesh transform * Spin[i], oldest last,
+	// and blends in by Alpha[i].
 	struct GhostsStruct
 	{
 		int Count;
-		float Opacity;
+		float Alpha[MAX_GHOSTS];
 		Vector3 Offset;
 		bool Spins;
 		Matrix3D Spin[MAX_GHOSTS];

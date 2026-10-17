@@ -482,13 +482,17 @@ it moves faster than `MotionBlurMoveMinSpeed`. Both can apply at once.
 
 Tuned in the mod's `GameData.ini`:
 
-* `MotionBlurOpacity = 0.35` - (How opaque the newest copy draws. Older copies fade towards nothing.)
+* `MotionBlurOpacity = 0.35` - (How opaque the newest copy of a spinning part draws. Older copies fade
+towards nothing.)
 * `MotionBlurRotorMinSpeed = 360` - (Degrees a second a part must spin at to blur.)
 * `MotionBlurRotorExposure = 0.033` - (Seconds of spin the blur trails behind a part.)
 * `MotionBlurRotorMaxSweep = 120` - (The most degrees the blur trails behind a part. 360 fills the
 whole disc.)
 * `MotionBlurRotorStep = 6` - (Degrees between copies. Smaller is smoother and costs more draws.)
 * `MotionBlurMoveMinSpeed = 100` - (World units a second an object must move at to blur.)
+* `MotionBlurMoveOpacity = 0.5` - (How opaque a moving object's trail gets where all its copies overlap.
+The copies share it, so the trail fades towards its tail and a long one stays faint, as the object spent
+little of the exposure over any one spot.)
 * `MotionBlurMoveExposure = 0.06` - (Seconds of movement the blur trails behind an object.)
 * `MotionBlurMoveStep = 1.5` - (World units between copies.)
 * `MotionBlurMoveKindOf = AIRCRAFT` - (Object kinds that blur when they move fast. Add `PROJECTILE`

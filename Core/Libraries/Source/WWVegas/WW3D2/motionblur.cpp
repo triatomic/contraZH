@@ -61,7 +61,6 @@ MotionBlurClass::GhostsStruct * MotionBlurClass::Add(RenderObjClass * mesh)
 	++PoolUsed;
 
 	ghosts.Count = 0;
-	ghosts.Opacity = 0.0f;
 	ghosts.Offset.Set(0.0f, 0.0f, 0.0f);
 	ghosts.Spins = false;
 	return &ghosts;
@@ -127,5 +126,5 @@ void MotionBlurClass::Get_Transform(const GhostsStruct & ghosts, int index, cons
 
 float MotionBlurClass::Get_Alpha(const GhostsStruct & ghosts, int index)
 {
-	return ghosts.Opacity * (1.0f - (float)index / (float)ghosts.Count);
+	return ghosts.Alpha[index];
 }

@@ -3871,6 +3871,27 @@ static Int motionBlurGhostCount(Real span, Real step)
 	return WWMath::Clamp_Int(count, 2, MotionBlurClass::MAX_GHOSTS);
 }
 
+// A spinning part's copies each take the opacity, fading towards the oldest, since a thin blade barely overlaps its neighbours.
+static void motionBlurSpinAlphas(Real *alpha, Int count)
+{
+	for (Int i = 0; i < count; ++i)
+	{
+		alpha[i] = TheGlobalData->m_motionBlurOpacity * (1.0f - (Real)i / (Real)count);
+	}
+}
+
+// A moving object's copies overlap one another along its length, so they share the opacity: where every copy
+// covers a pixel it ends up MotionBlurMoveOpacity, and each copy's share falls off towards the oldest.
+static void motionBlurMoveAlphas(Real *alpha, Int count)
+{
+	const Real clear = 1.0f - WWMath::Clamp(TheGlobalData->m_motionBlurMoveOpacity, 0.0f, 1.0f);
+	const Real shares = (Real)(count * (count + 1)) * 0.5f;
+	for (Int i = 0; i < count; ++i)
+	{
+		alpha[i] = 1.0f - powf(clear, (Real)(count - i) / shares);
+	}
+}
+
 struct MotionBlurSpin
 {
 	Int bone;
@@ -3918,6 +3939,9 @@ void W3DModelDraw::updateMotionBlur()
 	{
 		return;
 	}
+
+	Real moveAlpha[MotionBlurClass::MAX_GHOSTS];
+	motionBlurMoveAlphas(moveAlpha, moveCount);
 
 	// each bone's spin is worked out once, for every mesh on it; a count of 0 marks a bone that does not spin
 	static std::vector<MotionBlurSpin> spins;
@@ -4005,12 +4029,22 @@ void W3DModelDraw::updateMotionBlur()
 				return;
 			}
 			ghosts->Count = count;
-			ghosts->Opacity = TheGlobalData->m_motionBlurOpacity;
 			ghosts->Offset = offset;
 			ghosts->Spins = (spin != nullptr);
-			for (Int i = 0; ghosts->Spins && i < count; ++i)
+			if (ghosts->Spins)
 			{
-				ghosts->Spin[i] = spin->spin[i];
+				motionBlurSpinAlphas(ghosts->Alpha, count);
+				for (Int i = 0; i < count; ++i)
+				{
+					ghosts->Spin[i] = spin->spin[i];
+				}
+			}
+			else
+			{
+				for (Int i = 0; i < count; ++i)
+				{
+					ghosts->Alpha[i] = moveAlpha[i];
+				}
 			}
 		}
 	}
