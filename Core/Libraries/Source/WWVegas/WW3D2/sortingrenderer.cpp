@@ -333,13 +333,14 @@ static void Draw_Ghost_Node(SortingNodeStruct* state)
 		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_COLORARG1, D3DTA_TFACTOR);
 		DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_COLOROP, D3DTOP_DISABLE);
 	}
+	unsigned stage=MAX_TEXTURE_STAGES;
 	if (!state->own_alpha) {
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_BLENDFACTOR);
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_INVBLENDFACTOR);
 	}
 	else {
 		// The texture factor's alpha carries the weight, scaling the mesh's own alpha in the first stage its shader leaves free.
-		unsigned stage=1;
+		stage=1;
 		while (stage<MAX_TEXTURE_STAGES && DX8Wrapper::Get_DX8_Texture_Stage_State(stage, D3DTSS_COLOROP)!=D3DTOP_DISABLE) {
 			++stage;
 		}
@@ -374,6 +375,12 @@ static void Draw_Ghost_Node(SortingNodeStruct* state)
 			DX8Wrapper::Set_DX8_Render_State(D3DRS_BLENDFACTOR, D3DCOLOR_ARGB(ghost.weight, ghost.weight, ghost.weight, ghost.weight));
 		}
 		DX8Wrapper::Draw_Triangles(state->start_index,state->polygon_count,state->min_vertex_index,state->vertex_count);
+	}
+
+	// ShaderClass only sets stages 0 and 1, so a weight stage above them would stay on for every later draw
+	if (stage<MAX_TEXTURE_STAGES) {
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_COLOROP, D3DTOP_DISABLE);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_ALPHAOP, D3DTOP_DISABLE);
 	}
 	if (state->flat_colour != 0 || state->own_alpha) {
 		ShaderClass::Invalidate();
