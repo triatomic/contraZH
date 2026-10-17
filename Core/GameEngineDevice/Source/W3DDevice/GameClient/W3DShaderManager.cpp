@@ -6074,7 +6074,7 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 					hr = DX8Wrapper::_Get_D3D_Device8()->CreateVertexShader(pShader, &vertex_shader);
 					if (SUCCEEDED(hr))
 					{
-						*pHandle = Register_D3D9_Vertex_Shader(vertex_shader, declaration);
+						*pHandle = Register_D3D9_Vertex_Shader(vertex_shader, declaration, strFilePath);
 						if (*pHandle == 0)
 						{
 							vertex_shader->Release();
@@ -6094,7 +6094,7 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 				hr = DX8Wrapper::_Get_D3D_Device8()->CreatePixelShader(pShader, &pixel_shader);
 				if (SUCCEEDED(hr))
 				{
-					*pHandle = Register_D3D9_Pixel_Shader(pixel_shader);
+					*pHandle = Register_D3D9_Pixel_Shader(pixel_shader, strFilePath);
 					if (*pHandle == 0)
 					{
 						pixel_shader->Release();

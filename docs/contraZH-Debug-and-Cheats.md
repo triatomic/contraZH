@@ -63,6 +63,10 @@ Esc opens. Sound stops, music plays on, and the camera still moves)
 * `Ctrl + F1` - (Toggles back face culling, drawing every face double sided when off. Contra also
 binds this key to `SAVE_VIEW1`, so it saves camera bookmark 1 too. `CHEAT_TOGGLE_FACE_CULLING` in
 CommandMap.ini)
+* `Shift + Ctrl + F1` - (D3D9 only. Lists the last frame's draw calls in the top right corner, one
+line per vertex and pixel shader pair with its draw and primitive counts, busiest first. `fixed`
+means the fixed function pipeline. Refreshes twice a second. `CHEAT_SHOW_SHADER_DRAWS` in
+CommandMap.ini)
 * ``Shift + Ctrl + ` `` - (Cycles `HealthBarDisplayMode` live)
 
 Notes:

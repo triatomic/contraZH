@@ -421,6 +421,10 @@ W3DDisplay::W3DDisplay()
 	m_batchNeedsInit = FALSE;
 	m_cinematicDisplayString = nullptr;
 
+	for (i = 0; i < ShaderDrawCounterClass::MAX_LINES; i++)
+		m_shaderDrawStrings[i] = nullptr;
+	m_shaderDrawRefreshTime = 0;
+
 #ifdef PROFILER_ENABLED
 	m_profilerFrameCapture = NEW W3DProfilerFrameCapture();
 #endif
@@ -454,6 +458,14 @@ W3DDisplay::~W3DDisplay()
 	{
 		TheDisplayStringManager->freeDisplayString(m_cinematicDisplayString);
 		m_cinematicDisplayString = nullptr;
+	}
+
+	for (int i = 0; i < ShaderDrawCounterClass::MAX_LINES; i++)
+	{
+		if (m_shaderDrawStrings[i])
+		{
+			TheDisplayStringManager->freeDisplayString(m_shaderDrawStrings[i]);
+		}
 	}
 
 	releaseImageTextures();
@@ -1791,6 +1803,77 @@ void W3DDisplay::drawFPSStats()
 	}
 }
 
+// W3DDisplay::drawShaderDrawCounts ===========================================
+/** Draw the draw call count of each vertex and pixel shader pair in the top right corner */
+//=============================================================================
+void W3DDisplay::drawShaderDrawCounts()
+{
+	const Int lineCount = ShaderDrawCounterClass::Get_Line_Count();
+
+	// Twice a second keeps the numbers readable
+	const UnsignedInt now = timeGetTime();
+	if (now - m_shaderDrawRefreshTime >= 500)
+	{
+		m_shaderDrawRefreshTime = now;
+		for (Int i = 0; i < lineCount; i++)
+		{
+			if (m_shaderDrawStrings[i] == nullptr)
+			{
+				m_shaderDrawStrings[i] = TheDisplayStringManager->newDisplayString();
+				m_shaderDrawStrings[i]->setFont( TheFontLibrary->getFont( "FixedSys", 8, FALSE ) );
+			}
+			UnicodeString text;
+			text.translate( AsciiString( ShaderDrawCounterClass::Get_Line( i ) ) );
+			m_shaderDrawStrings[i]->setText( text );
+		}
+		for (Int i = lineCount; i < ShaderDrawCounterClass::MAX_LINES; i++)
+		{
+			if (m_shaderDrawStrings[i] != nullptr)
+			{
+				m_shaderDrawStrings[i]->setText( UnicodeString::TheEmptyString );
+			}
+		}
+	}
+
+	Int width = 0;
+	Int height = 0;
+	Int shown = 0;
+	for (Int i = 0; i < ShaderDrawCounterClass::MAX_LINES && m_shaderDrawStrings[i] != nullptr; i++)
+	{
+		Int w, h;
+		m_shaderDrawStrings[i]->getSize( &w, &h );
+		if (w == 0 || height + h > (Int)getHeight() - 40)
+		{
+			break;
+		}
+		if (w > width)
+		{
+			width = w;
+		}
+		height += h;
+		shown++;
+	}
+	if (shown == 0)
+	{
+		return;
+	}
+
+	const Int x = getWidth() - width - 8;
+	Int y = 30;
+	drawFillRect( x - 4, y - 2, width + 8, height + 4, GameMakeColor( 0, 0, 0, 160 ) );
+
+	const Color headerColor = GameMakeColor( 255, 220, 120, 255 );
+	const Color textColor = GameMakeColor( 255, 255, 255, 255 );
+	const Color dropColor = GameMakeColor( 0, 0, 0, 255 );
+	for (Int i = 0; i < shown; i++)
+	{
+		Int w, h;
+		m_shaderDrawStrings[i]->getSize( &w, &h );
+		m_shaderDrawStrings[i]->draw( x, y, i < 2 ? headerColor : textColor, dropColor );
+		y += h;
+	}
+}
+
 
 //=============================================================================
 void StatDebugDisplay( DebugDisplayInterface *, void *, FILE *fp )
@@ -1921,6 +2004,13 @@ Bool W3DDisplay::toggleFaceCulling()
 	// Shaders only reapply state that differs from the last one, which could leave the old cull mode in place.
 	ShaderClass::Invalidate();
 	return !DX8Wrapper::Is_Face_Culling_Disabled();
+}
+
+Bool W3DDisplay::toggleShaderDrawCounts()
+{
+	ShaderDrawCounterClass::Set_Enabled(!ShaderDrawCounterClass::Is_Enabled());
+	m_shaderDrawRefreshTime = 0;
+	return ShaderDrawCounterClass::Is_Enabled();
 }
 
 // W3DDisplay::update =========================================================
@@ -2288,6 +2378,11 @@ AGAIN:
 				{
 					// draw the current debug display
 					drawCurrentDebugDisplay();
+				}
+
+				if (ShaderDrawCounterClass::Is_Enabled())
+				{
+					drawShaderDrawCounts();
 				}
 
 #if defined(RTS_DEBUG)

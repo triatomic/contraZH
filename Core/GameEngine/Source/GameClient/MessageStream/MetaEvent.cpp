@@ -237,6 +237,7 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "CHEAT_TOGGLE_FACE_CULLING",							  GameMessage::MSG_CHEAT_TOGGLE_FACE_CULLING },
 	{ "CHEAT_SHOW_MODEL_NAMES",									  GameMessage::MSG_CHEAT_SHOW_MODEL_NAMES },
 	{ "CHEAT_SHOW_WINDOW_NAMES",								  GameMessage::MSG_CHEAT_SHOW_WINDOW_NAMES },
+	{ "CHEAT_SHOW_SHADER_DRAWS",								  GameMessage::MSG_CHEAT_SHOW_SHADER_DRAWS },
 	{ "CHEAT_ADD_CASH",									          GameMessage::MSG_CHEAT_ADD_CASH },
 	{ "CHEAT_GIVE_ALL_SCIENCES",					        GameMessage::MSG_CHEAT_GIVE_ALL_SCIENCES },
   { "CHEAT_GIVE_SCIENCEPURCHASEPOINTS",        	GameMessage::MSG_CHEAT_GIVE_SCIENCEPURCHASEPOINTS },
@@ -1101,6 +1102,17 @@ void MetaMap::generateMetaMap()
 			map->m_key = MK_F1;
 			map->m_transition = DOWN;
 			map->m_modState = CTRL;
+			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
+		}
+	}
+	{
+		// List each frame's draw calls by vertex and pixel shader.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_SHOW_SHADER_DRAWS);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_F1;
+			map->m_transition = DOWN;
+			map->m_modState = SHIFT_CTRL;
 			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
 		}
 	}

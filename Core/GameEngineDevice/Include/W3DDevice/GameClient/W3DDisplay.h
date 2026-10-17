@@ -35,6 +35,7 @@
 
 #include "GameClient/Display.h"
 #include "WW3D2/lightenvironment.h"
+#include "WW3D2/shaderdrawcounter.h"
 #include "W3DDevice/GameClient/W3DProfilerFrameCapture.h"
 #include <map>
 
@@ -156,6 +157,7 @@ public:
 	virtual Real getCurrentFPS() override;						///< return the current FPS.
 	virtual Int getLastFrameDrawCalls() override;				///< returns the number of draw calls issued in the previous frame
 	virtual Bool toggleFaceCulling() override;
+	virtual Bool toggleShaderDrawCounts() override;
 
 protected:
 
@@ -165,6 +167,7 @@ protected:
 	void gatherDebugStats();						///< compute debug stats
 	void drawDebugStats();							///< display debug stats
 	void drawCurrentDebugDisplay();			///< draws current debug display
+	void drawShaderDrawCounts();				///< draws the draw call count of each shader pair
 	void calculateTerrainLOD();						///< Calculate terrain LOD.
 	void renderLetterBox(UnsignedInt time);							///< draw letter box border
 	void updateAverageFPS();	///< calculate the average fps over the last 30 frames.
@@ -233,6 +236,8 @@ protected:
 
 	DisplayString *m_displayStrings[DisplayStringCount];
 	DisplayString *m_benchmarkDisplayString;
+	DisplayString *m_shaderDrawStrings[ShaderDrawCounterClass::MAX_LINES];
+	UnsignedInt m_shaderDrawRefreshTime;
 
 	W3DDebugDisplay *m_nativeDebugDisplay;		///< W3D specific debug display interface
 

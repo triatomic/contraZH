@@ -473,6 +473,7 @@ public:
 		MSG_CHEAT_TOGGLE_FACE_CULLING,		///< toggle back face culling, drawing every face double sided when off
 		MSG_CHEAT_SHOW_MODEL_NAMES,			///< show the W3D model each draw module has loaded
 		MSG_CHEAT_SHOW_WINDOW_NAMES,		///< outline and name every visible GUI window
+		MSG_CHEAT_SHOW_SHADER_DRAWS,		///< list each frame's draw calls by vertex and pixel shader
 
 		MSG_END_META_MESSAGES,											///< Marker to delineate "meta" messages
 

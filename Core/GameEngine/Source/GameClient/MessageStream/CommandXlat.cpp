@@ -4382,6 +4382,17 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			break;
 		}
 
+		// Toggle the overlay listing each frame's draw calls by shader.
+		case GameMessage::MSG_CHEAT_SHOW_SHADER_DRAWS:
+		{
+			TheInGameUI->messageNoFormat( TheDisplay->toggleShaderDrawCounts()
+				? TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugShaderDrawsOn", L"Shader Draws are ON")
+				: TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugShaderDrawsOff", L"Shader Draws are OFF") );
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
 #endif
 
 		//-----------------------------------------------------------------------------------------

@@ -71,6 +71,7 @@
 #include "pointgr.h"
 #include "render2d.h"
 #include "sortingrenderer.h"
+#include "shaderdrawcounter.h"
 #include "shattersystem.h"
 #include "light.h"
 #include "assetmgr.h"
@@ -803,6 +804,7 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 void DX8Wrapper::Release_Device()
 {
 	if (D3DDevice) {
+		ShaderDrawCounterClass::Release_Device();
 
 		for (int a=0;a<MAX_TEXTURE_STAGES;++a)
 		{	//release references to any textures that were used in last rendering call
@@ -1934,6 +1936,7 @@ void DX8Wrapper::End_Scene(bool flip_frames)
 	DX8WebBrowser::Render(0);
 
 	if (flip_frames) {
+		ShaderDrawCounterClass::End_Frame();
 		DX8_Assert();
 		HRESULT hr;
 #if defined(BUILD_WITH_D3D9)
