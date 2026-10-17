@@ -2768,23 +2768,30 @@ static void Insert_Motion_Ghosts(DX8PolygonRendererClass * renderer, MeshClass *
 		return;
 	}
 
+	Matrix3D worlds[MotionBlurClass::MAX_GHOSTS];
+	float weights[MotionBlurClass::MAX_GHOSTS];
+	for (int i=0;i<ghosts->Count;++i) {
+		MotionBlurClass::Get_Transform(*ghosts,i,world,&worlds[i]);
+		weights[i]=MotionBlurClass::Get_Alpha(*ghosts,i);
+	}
+
 	ShaderClass ghostShader = shader;
 	ghostShader.Set_Depth_Mask(ShaderClass::DEPTH_WRITE_DISABLE);
 	ghostShader.Set_Src_Blend_Func(ShaderClass::SRCBLEND_SRC_ALPHA);
 	ghostShader.Set_Dst_Blend_Func(ShaderClass::DSTBLEND_ONE_MINUS_SRC_ALPHA);
 	DX8Wrapper::Set_Shader(ghostShader);
 
-	for (int i=0;i<ghosts->Count;++i) {
-		Matrix3D ghost;
-		MotionBlurClass::Get_Transform(*ghosts,i,world,&ghost);
-		DX8Wrapper::Set_Transform(D3DTS_WORLD,ghost);
-		SortingRendererClass::Set_Insert_Blend_Factor(MotionBlurClass::Get_Alpha(*ghosts,i),MotionBlurClass::Get_Debug_Colour(*ghosts));
-		renderer->Render_Sorted(mesh->Get_Base_Vertex_Offset(),mesh->Get_Bounding_Sphere());
-	}
-	SortingRendererClass::Set_Insert_Blend_Factor(0.0f);
+	DX8Wrapper::Set_Index_Buffer_Index_Offset(mesh->Get_Base_Vertex_Offset());
+	SortingRendererClass::Insert_Ghosts(
+		mesh->Get_Bounding_Sphere(),
+		(unsigned short)renderer->Get_Index_Offset(),
+		(unsigned short)(renderer->Get_Index_Count()/3),
+		(unsigned short)renderer->Get_Min_Vertex_Index(),
+		(unsigned short)renderer->Get_Vertex_Index_Range(),
+		worlds,weights,ghosts->Count,MotionBlurClass::Get_Debug_Colour(*ghosts));
+	MotionBlurClass::Note_Queued(ghosts->Count);
 
 	DX8Wrapper::Set_Shader(shader);
-	DX8Wrapper::Set_Transform(D3DTS_WORLD,world);
 }
 
 void DX8TextureCategoryClass::Render_Task(PolyRenderTaskClass * prt, VertexMaterialClass * vmaterial, const ShaderClass & theShader, ShaderClass theAlphaShader, bool replay)

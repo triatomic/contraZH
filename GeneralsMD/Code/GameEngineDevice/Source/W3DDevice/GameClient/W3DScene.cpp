@@ -1604,6 +1604,12 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 				rejections[DX8InstancingClass::REJECT_CLIP_PLANE], rejections[DX8InstancingClass::REJECT_FOG],
 				rejections[DX8InstancingClass::REJECT_RESOURCE],
 				rejections[DX8InstancingClass::REJECT_LIGHTS]));
+			Int blurMeshes = 0;
+			Int blurCopies = 0;
+			Int blurPeak = 0;
+			MotionBlurClass::Take_Stats(&blurMeshes, &blurCopies, &blurPeak);
+			RENDER_LOG(("Motion blur: render %d, %d copies of %d meshes, each mesh one sorted node; most copies in one frame %d",
+				instancingFrames, blurCopies, blurMeshes, blurPeak));
 			RENDER_LOG(("Skinning: render %d, skinned %d main %d depth; left to the CPU by state %d model %d mesh %d category %d pass %d",
 				instancingFrames, skinning.SkinnedMeshes[0], skinning.SkinnedMeshes[1],
 				skinning.Rejections[DX8SkinningClass::REJECT_STATE], skinning.Rejections[DX8SkinningClass::REJECT_MODEL],

@@ -31,6 +31,10 @@ static size_t PoolUsed = 0;
 static unsigned PoolFrame = 1;
 static bool Armed = false;
 static bool Debug = false;
+static int StatMeshes = 0;
+static int StatCopies = 0;
+static int StatPeak = 0;
+static int FrameCopies = 0;
 
 bool MotionBlurClass::Is_Supported()
 {
@@ -100,8 +104,30 @@ unsigned MotionBlurClass::Get_Debug_Colour(const GhostsStruct & ghosts)
 	return ghosts.Spins ? 0xFF00FFFF : 0xFFFF00FF;
 }
 
+void MotionBlurClass::Note_Queued(int copies)
+{
+	++StatMeshes;
+	StatCopies += copies;
+	FrameCopies += copies;
+}
+
+void MotionBlurClass::Take_Stats(int * meshes, int * copies, int * peak_copies)
+{
+	*meshes = StatMeshes;
+	*copies = StatCopies;
+	*peak_copies = StatPeak;
+	StatMeshes = 0;
+	StatCopies = 0;
+	StatPeak = 0;
+}
+
 void MotionBlurClass::End_Frame()
 {
+	if (FrameCopies > StatPeak)
+	{
+		StatPeak = FrameCopies;
+	}
+	FrameCopies = 0;
 	PoolUsed = 0;
 	++PoolFrame;
 	if (PoolFrame == 0)

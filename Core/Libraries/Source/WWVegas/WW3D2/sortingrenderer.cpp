@@ -63,8 +63,6 @@ static const void *InsertEffectData = nullptr;
 static float InsertDisruptionStrength = 1.0f;
 static const Vector3 *DisruptionCenter = nullptr;
 static float DisruptionStrength = 1.0f;
-static unsigned char InsertBlendFactor = 0;
-static unsigned InsertFlatColour = 0;
 
 void SortingRendererClass::Set_Soft_Particle_Hook(SoftParticleHookClass *hook)
 {
@@ -81,12 +79,6 @@ void SortingRendererClass::Set_Insert_Effects(unsigned effects, const void *effe
 	InsertEffects = effects;
 	InsertEffectData = effectData;
 	InsertDisruptionStrength = disruptionStrength;
-}
-
-void SortingRendererClass::Set_Insert_Blend_Factor(float factor, unsigned flatColour)
-{
-	InsertBlendFactor = (unsigned char)(WWMath::Clamp(factor, 0.0f, 1.0f) * 255.0f + 0.5f);
-	InsertFlatColour = flatColour;
 }
 
 bool SortingRendererClass::Can_Disrupt()
@@ -248,8 +240,9 @@ public:
 
 	float depth;								// View space depth of the bounding sphere center, for object nodes
 	unsigned short effects;					// Particle effects drawn through the soft particle hook, 0 for none
-	unsigned char blend_factor;			// Constant blend weight of an object node, 0 to blend as its shader says
-	unsigned flat_colour;					// ARGB the blend factor node draws in place of its lit texture, 0 for none
+	unsigned ghost_first;					// A motion blur node's first copy in ghost_draws
+	unsigned short ghost_count;			// Its copies, 0 for any other node
+	unsigned flat_colour;					// ARGB its copies draw in place of the lit texture, 0 for none
 	bool placed;								// A disruption node whose vertices are already in world space, so center says where it is
 	Vector3 center;
 	float disruption_strength;				// How much of its mask a disruption node keeps
@@ -259,6 +252,15 @@ public:
 	unsigned short min_vertex_index;		// First index used in the vb
 	unsigned short vertex_count;			// Number of vertices used in vb
 };
+
+// One motion blur copy: where it draws and how much of it blends in.
+struct GhostDrawStruct
+{
+	Matrix3D world;
+	unsigned char weight;
+};
+
+static std::vector<GhostDrawStruct> ghost_draws;
 
 typedef std::vector<SortingNodeStruct*> SortingNodeStructList;
 static SortingNodeStructList additive_list;
@@ -318,31 +320,47 @@ static void End_Soft(bool soft)
 	}
 }
 
+#if defined(BUILD_WITH_D3D9)
+
+// The node's state is applied once, then each copy changes only the world transform and the blend weight.
+static void Draw_Ghost_Node(SortingNodeStruct* state)
+{
+	DX8Wrapper::Apply_Render_State_Changes();
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_BLENDFACTOR);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_INVBLENDFACTOR);
+	if (state->flat_colour != 0) {
+		DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, state->flat_colour);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_COLORARG1, D3DTA_TFACTOR);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_COLOROP, D3DTOP_DISABLE);
+	}
+	for (unsigned i=0;i<state->ghost_count;++i) {
+		const GhostDrawStruct& ghost=ghost_draws[state->ghost_first+i];
+		if (ghost.weight == 0) {
+			continue;
+		}
+		DX8Wrapper::Set_Transform(D3DTS_WORLD,ghost.world);
+		DX8Wrapper::Set_DX8_Render_State(D3DRS_BLENDFACTOR, D3DCOLOR_ARGB(ghost.weight, ghost.weight, ghost.weight, ghost.weight));
+		DX8Wrapper::Draw_Triangles(state->start_index,state->polygon_count,state->min_vertex_index,state->vertex_count);
+	}
+	if (state->flat_colour != 0) {
+		ShaderClass::Invalidate();
+	}
+
+	// back to what the node's alpha blend shader set, so the cache still matches it
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+}
+
+#endif
+
 // Release_Render_State would clear the texture cache but not the device, so the state stays set.
 static void Draw_Object_Node(SortingNodeStruct* state)
 {
 	DX8Wrapper::Set_Render_State(state->sorting_state);
 #if defined(BUILD_WITH_D3D9)
-	if (state->blend_factor != 0) {
-		DX8Wrapper::Apply_Render_State_Changes();
-		const unsigned char f = state->blend_factor;
-		DX8Wrapper::Set_DX8_Render_State(D3DRS_BLENDFACTOR, D3DCOLOR_ARGB(f, f, f, f));
-		DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_BLENDFACTOR);
-		DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_INVBLENDFACTOR);
-		if (state->flat_colour != 0) {
-			DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, state->flat_colour);
-			DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
-			DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_COLORARG1, D3DTA_TFACTOR);
-			DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_COLOROP, D3DTOP_DISABLE);
-		}
-		DX8Wrapper::Draw_Triangles(state->start_index,state->polygon_count,state->min_vertex_index,state->vertex_count);
-		if (state->flat_colour != 0) {
-			ShaderClass::Invalidate();
-		}
-
-		// back to what the node's alpha blend shader set, so the cache still matches it
-		DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
-		DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+	if (state->ghost_count != 0) {
+		Draw_Ghost_Node(state);
 		return;
 	}
 #endif
@@ -364,6 +382,16 @@ static void Draw_Objects_Before(float depth)
 	while (Has_Object_Before(depth)) {
 		Draw_Object_Node(object_list[next_object]);
 		++next_object;
+	}
+}
+
+// Mesh bounding spheres are already in world space, so only the view's depth column applies.
+static void Set_Object_Depth(SortingNodeStruct* state, const SphereClass& bounding_sphere)
+{
+	if (bounding_sphere.Is_Valid()) {
+		const float (&view)[4][4]=state->sorting_state.view.m;
+		const Vector3& center=bounding_sphere.Center;
+		state->depth=center.X*view[0][2]+center.Y*view[1][2]+center.Z*view[2][2]+view[3][2];
 	}
 }
 
@@ -517,8 +545,8 @@ void SortingRendererClass::Insert_Triangles(
 	state->depth=0.0f;
 	state->effects=(SoftHook != nullptr) ? (unsigned short)InsertEffects : 0;
 	state->effect_data=(state->effects != 0) ? InsertEffectData : nullptr;
-	state->blend_factor=InsertBlendFactor;
-	state->flat_colour=InsertFlatColour;
+	state->ghost_count=0;
+	state->flat_colour=0;
 
 	if (disrupts) {
 		// Skins and lines leave the world transform at identity, so only the bounding sphere says where they are.
@@ -532,12 +560,7 @@ void SortingRendererClass::Insert_Triangles(
 	const bool additive=BlendBatching && Is_Order_Independent(state->sorting_state.shader);
 
 	if (!Uses_Sorting_Buffers(state->sorting_state)) {
-		if (bounding_sphere.Is_Valid()) {
-			// Mesh bounding spheres are already in world space, so only the view's depth column applies.
-			const float (&view)[4][4]=state->sorting_state.view.m;
-			const Vector3& center=bounding_sphere.Center;
-			state->depth=center.X*view[0][2]+center.Y*view[1][2]+center.Z*view[2][2]+view[3][2];
-		}
+		Set_Object_Depth(state,bounding_sphere);
 		(additive ? additive_object_list : object_list).push_back(state);
 		return;
 	}
@@ -616,6 +639,55 @@ static void Recycle_Nodes(SortingNodeStructList& list)
 		clean_list.push_back(list[i]);
 	}
 	list.clear();
+}
+
+// ----------------------------------------------------------------------------
+
+void SortingRendererClass::Insert_Ghosts(
+	const SphereClass& bounding_sphere,
+	unsigned short start_index,
+	unsigned short polygon_count,
+	unsigned short min_vertex_index,
+	unsigned short vertex_count,
+	const Matrix3D* worlds,
+	const float* weights,
+	int count,
+	unsigned flat_colour)
+{
+	if (count <= 0 || !WW3D::Is_Sorting_Enabled()) {
+		return;
+	}
+
+	SortingNodeStruct* state=Get_Sorting_Struct();
+	DX8Wrapper::Get_Render_State(state->sorting_state);
+
+	// The copies redraw the mesh's own buffers later, which a sorting buffer's reuse would overwrite.
+	if (Uses_Sorting_Buffers(state->sorting_state)) {
+		Release_Refs(state);
+		clean_list.push_back(state);
+		return;
+	}
+
+	state->start_index=start_index;
+	state->polygon_count=polygon_count;
+	state->min_vertex_index=min_vertex_index;
+	state->vertex_count=vertex_count;
+	state->depth=0.0f;
+	state->effects=0;
+	state->effect_data=nullptr;
+	state->placed=false;
+	state->ghost_first=(unsigned)ghost_draws.size();
+	state->ghost_count=(unsigned short)count;
+	state->flat_colour=flat_colour;
+	Set_Object_Depth(state,bounding_sphere);
+
+	for (int i=0;i<count;++i) {
+		GhostDrawStruct ghost;
+		ghost.world=worlds[i];
+		ghost.weight=(unsigned char)(WWMath::Clamp(weights[i], 0.0f, 1.0f) * 255.0f + 0.5f);
+		ghost_draws.push_back(ghost);
+	}
+	object_list.push_back(state);
 }
 
 static unsigned overlapping_node_count;
@@ -1093,6 +1165,7 @@ void SortingRendererClass::Flush()
 
 	Recycle_Nodes(object_list);
 	Recycle_Nodes(additive_object_list);
+	ghost_draws.clear();
 
 	DX8Wrapper::Set_Index_Buffer(nullptr,0);
 	DX8Wrapper::Set_Vertex_Buffer(nullptr);

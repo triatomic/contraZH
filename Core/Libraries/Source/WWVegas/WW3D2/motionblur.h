@@ -60,6 +60,10 @@ public:
 	// Drops every ghost added before this point.
 	static void End_Frame();
 
+	// Counts what the mesh renderer queued: meshes with copies, the copies, and the most copies in one frame.
+	static void Note_Queued(int copies);
+	static void Take_Stats(int * meshes, int * copies, int * peak_copies);
+
 	static void Get_Transform(const GhostsStruct & ghosts, int index, const Matrix3D & world, Matrix3D * result);
 	static float Get_Alpha(const GhostsStruct & ghosts, int index);
 };
