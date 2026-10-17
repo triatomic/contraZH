@@ -57,7 +57,8 @@ its parents, root first, with its screen position and size.)
 
 * ``Ctrl + ` `` - (Instant build, +999999 credits, this general's own sciences, max rank,
 reveals the map)
-* `Ctrl + \` - (Toggles rendering off and on; the simulation keeps running)
+* `Ctrl + \` - (Pauses or resumes a single player game in place, like `Shift + P`, without the menu
+Esc opens. Sound stops, music plays on, and the camera still moves)
 * `Shift + Ctrl + Z` - (Toggles the camera zoom limit)
 * `Ctrl + F1` - (Toggles back face culling, drawing every face double sided when off. Contra also
 binds this key to `SAVE_VIEW1`, so it saves camera bookmark 1 too. `CHEAT_TOGGLE_FACE_CULLING` in
@@ -65,6 +66,6 @@ CommandMap.ini)
 * ``Shift + Ctrl + ` `` - (Cycles `HealthBarDisplayMode` live)
 
 Notes:
-* The health bar cycle is **not** a cheat and works in a normal release build too.
+* The health bar cycle and the `Ctrl + \` pause are **not** cheats and work in a normal release build too.
 * A second press of the combined cheat resets rank via `resetRank()`, wiping purchased sciences.
 * Sciences granted are only this general's own tree.

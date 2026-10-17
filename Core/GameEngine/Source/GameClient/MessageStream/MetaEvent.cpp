@@ -933,20 +933,6 @@ void MetaMap::generateMetaMap()
 		}
 	}
 	{
-		// TheSuperHackers @feature Toggle rendering off and on. Retail binds this to Ctrl+\ in the
-		// debug command map, but Contra ships an empty CommandMapDebug.ini, so nothing was bound to
-		// it in practice. Defaulted here instead, which is how the other cheats in this fork reach
-		// a key without needing a mod side INI entry.
-		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_META_DEMO_TOGGLE_RENDER);
-		if (map->m_key == MK_NONE)
-		{
-			map->m_key = MK_BACKSLASH;
-			map->m_transition = DOWN;
-			map->m_modState = CTRL;
-			map->m_usableIn = COMMANDUSABLE_GAME;
-		}
-	}
-	{
 		// TheSuperHackers @feature Default binding for the combined cheat. Shift+Ctrl+` is free in
 		// the engine, in the demo command map and in Contra's own, and it does not collide with
 		// the Ctrl+` health bar cycle because the modifier sets differ. Only exists in builds
@@ -1197,6 +1183,41 @@ void MetaMap::generateMetaMap()
 			map->m_transition = DOWN;
 			map->m_modState = SHIFT; // Requires modifier to avoid key conflicts as a player.
 			map->m_usableIn = COMMANDUSABLE_EVERYWHERE;
+		}
+	}
+	{
+		// Ctrl+\ is a second key for that pause, which stops a single player game in place without the menu Esc opens.
+		// A record holds one key, so this one gets its own, appended so lookups by message still find Shift+P.
+		MetaMapRec *last = nullptr;
+		Bool bound = FALSE;
+		for (MetaMapRec *rec = m_metaMaps; rec; rec = rec->m_next)
+		{
+			if (rec->m_key == MK_BACKSLASH && rec->m_modState == CTRL)
+			{
+				bound = TRUE;
+			}
+			last = rec;
+		}
+		if (!bound)
+		{
+			MetaMapRec *map = newInstance(MetaMapRec);
+			map->m_meta = GameMessage::MSG_META_TOGGLE_PAUSE_ALT;
+			map->m_key = MK_BACKSLASH;
+			map->m_transition = DOWN;
+			map->m_modState = CTRL;
+			map->m_usableIn = COMMANDUSABLE_GAME;
+			map->m_category = CATEGORY_MISC;
+			map->m_description.clear();
+			map->m_displayName.clear();
+			map->m_next = nullptr;
+			if (last != nullptr)
+			{
+				last->m_next = map;
+			}
+			else
+			{
+				m_metaMaps = map;
+			}
 		}
 	}
 	{
