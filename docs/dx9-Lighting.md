@@ -9,6 +9,8 @@ Shaders page, applied on Accept. Needs `CheckShadowMap` in `OptionsMenu.wnd` for
 * `ShadowMapResolution = 4096` - (The shadow map's width and height: 512, 1024, 2048 or 4096. Other
 values round up to the next of these. Also `Shadows` on the Shaders page of the Options menu, applied
 on Accept without a restart. Larger gives sharper edges and uses more video memory, 64 MB at 4096.
+The map stretches to the shape of the ground in view, so every size spends its texels on what the
+camera sees.
 Needs `ButtonShaders` and `WinShaders` in `OptionsMenu.wnd`, which `build/add_shaders_wnd.py` adds;
 `build/move_shader_checks_wnd.py` moves the shader checkboxes onto that page.)
 
