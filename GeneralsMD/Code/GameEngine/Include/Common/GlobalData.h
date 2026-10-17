@@ -312,16 +312,6 @@ public:
 	Bool m_rotrHack;	///< GameData RotrHack: additive HEADLIGHT meshes keep their own look, for Rise of the Reds' lit windows
 	Bool m_planarMirrorShader;	///< GameData PlanarMirrorShader: whether models' PlanarMirror meshes reflect, read at launch
 	PlanarMirrorShaderTuning m_planarMirrorTuning;	///< GameData PlanarMirrorReflectivity and the keys beside it: what mirrors take where their model sets nothing
-	Real m_motionBlurOpacity;			///< GameData MotionBlurOpacity: how opaque the newest copy of a spinning part draws, the older ones fading out
-	Real m_motionBlurRotorMinSpeed;		///< GameData MotionBlurRotorMinSpeed: degrees a second a part must spin at to blur
-	Real m_motionBlurRotorExposure;		///< GameData MotionBlurRotorExposure: seconds of spin the blur trails behind a part
-	Real m_motionBlurRotorMaxSweep;		///< GameData MotionBlurRotorMaxSweep: the most degrees of spin the blur trails behind a part
-	Real m_motionBlurRotorStep;			///< GameData MotionBlurRotorStep: degrees between the copies of a spinning part
-	Real m_motionBlurMoveMinSpeed;		///< GameData MotionBlurMoveMinSpeed: world units a second an object must move at to blur
-	Real m_motionBlurMoveOpacity;		///< GameData MotionBlurMoveOpacity: how opaque a moving object's trail gets where all its copies overlap
-	Real m_motionBlurMoveExposure;		///< GameData MotionBlurMoveExposure: seconds of movement the blur trails behind an object
-	Real m_motionBlurMoveStep;			///< GameData MotionBlurMoveStep: world units between the copies of a moving object
-	KindOfMaskType m_motionBlurMoveKindOf;	///< GameData MotionBlurMoveKindOf: objects of these kinds blur when they move fast
 	StormShaderInfo m_stormTuning[StormShaderInfo::TYPE_COUNT];	///< GameData SandStorm and SnowStorm keys: what each storm type takes where its entry sets nothing
 	Real m_ambientOcclusionRadius;		///< GameData AmbientOcclusionRadius: how far, in world units, geometry darkens what is near it
 	Real m_ambientOcclusionStrength;	///< GameData AmbientOcclusionStrength: how dark the occlusion gets, 0 for none
@@ -751,8 +741,6 @@ public:
   Bool m_waterReflections;        ///< Options.ini WaterReflections: smooth water mirrors the terrain, units and buildings
   Bool m_shorelineFoam;           ///< Options.ini ShorelineFoam: smooth water gathers a band of surf where it meets the shore
   Bool m_useSoftParticles;        ///< Options.ini SoftParticles: smoke and fire fade where they meet the ground and buildings
-  Bool m_useMotionBlur;           ///< Options.ini MotionBlur: fast rotors and fast aircraft trail translucent copies of themselves
-  Bool m_motionBlurDebug;         ///< Options.ini MotionBlurDebug: those copies draw flat cyan for a spin and magenta for a move
   Bool m_useFlameShaders;         ///< Options.ini FlameShaders: flame weapon fire flickers and glows white-hot at its core
   Bool m_useElectricShaders;      ///< Options.ini ElectricShaders: electric sparks and flares crackle with arcs
   Bool m_useLaserShaders;         ///< Options.ini LaserShaders: laser beams get a white-hot core and pulses running along them

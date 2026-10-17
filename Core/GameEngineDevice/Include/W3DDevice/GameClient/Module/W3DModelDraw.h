@@ -352,8 +352,6 @@ public:
 	std::vector<AsciiString>					m_planarMirrorMeshes;  ///< the mirror meshes by name, every mesh where empty
 	PlanarMirrorShaderTuning					m_planarMirrorTuning;  ///< the look keys, unset where the model takes GameData.ini's
 
-	Bool															m_motionBlur;  ///< fast spinning parts and fast movement trail translucent copies, while the MotionBlur option is on
-
 	// Bool															m_disableMoveEffectsOverWater;  ///< disable track marks and tread/wheel anims over water
 
 	W3DModelDrawModuleData();
@@ -622,7 +620,6 @@ private:
 	void hideAllHeadlights(Bool hide);
 	void addHeadlight(Int subObject, RenderObjClass* mesh);
 	void submitHeadlights();
-	void updateMotionBlur();
 #if defined(RTS_DEBUG)	//art wants to see buildings without flags as a test.
 	void hideGarrisonFlags(Bool hide);
 #endif

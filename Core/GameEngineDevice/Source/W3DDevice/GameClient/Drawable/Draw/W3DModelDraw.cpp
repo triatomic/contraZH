@@ -71,7 +71,6 @@
 #include "WW3D2/rendobj.h"
 #include "WW3D2/mesh.h"
 #include "WW3D2/meshmdl.h"
-#include "WW3D2/motionblur.h"
 #include "WW3D2/sortingrenderer.h"
 #include "Common/BitFlagsIO.h"
 
@@ -1089,7 +1088,6 @@ W3DModelDrawModuleData::W3DModelDrawModuleData() :
 	m_electricShader = FALSE;
 	m_cryoShader = FALSE;
 	m_planarMirror = FALSE;
-	m_motionBlur = TRUE;
 
 	// m_ignoreConditionStates defaults to all zero, which is what we want
 }
@@ -1339,7 +1337,6 @@ void W3DModelDrawModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "PlanarMirror", INI::parseBool, nullptr, offsetof(W3DModelDrawModuleData, m_planarMirror) },
 		{ "PlanarMirrorMeshes", INI::parseAsciiStringVector, nullptr, offsetof(W3DModelDrawModuleData, m_planarMirrorMeshes) },
 		{ "PlanarMirrorOverrideTexture", INI::parseBool, nullptr, offsetof(W3DModelDrawModuleData, m_planarMirrorTuning) + offsetof(PlanarMirrorShaderTuning, overrideTexture) },
-		{ "MotionBlur", INI::parseBool, nullptr, offsetof(W3DModelDrawModuleData, m_motionBlur) },
 		//{ "DisableMovementEffectsOverWater", INI::parseBool, NULL, offsetof(W3DModelDrawModuleData, m_disableMoveEffectsOverWater) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
@@ -2563,8 +2560,6 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 	handleFXEvents();
 
 	submitHeadlights();
-
-	updateMotionBlur();
 
 	m_prevAnimHelper = getCurrentAnimHelper();
 
@@ -3820,232 +3815,6 @@ void W3DModelDraw::submitHeadlights()
 		// The transform carries the drawable's scale, which the radius has to follow.
 		const Real scale = (end - start).Length() / (light.end - light.start).Length();
 		TheW3DHeadlights->add(start, end, light.radius * scale, &getW3DModelDrawModuleData()->m_headlightTuning);
-	}
-}
-
-//-------------------------------------------------------------------------------------------------
-// Frames a second the animation moves through, negative when it plays backwards and 0 while it holds a frame.
-// A ping-pong loop is taken to play forwards, since the model does not say which way it is going.
-static Real motionBlurFrameRate(HAnimClass *anim, Real frame, Int numFrames, Int mode, Real mult)
-{
-	if (anim == nullptr || numFrames < 2)
-	{
-		return 0.0f;
-	}
-	const Real rate = anim->Get_Frame_Rate() * mult;
-	switch (mode)
-	{
-		case RenderObjClass::ANIM_MODE_LOOP:
-		case RenderObjClass::ANIM_MODE_LOOP_PINGPONG:
-			return rate;
-		case RenderObjClass::ANIM_MODE_ONCE:
-			return (frame < (Real)(numFrames - 1)) ? rate : 0.0f;
-		case RenderObjClass::ANIM_MODE_LOOP_BACKWARDS:
-			return -rate;
-		case RenderObjClass::ANIM_MODE_ONCE_BACKWARDS:
-			return (frame > 0.0f) ? -rate : 0.0f;
-	}
-	return 0.0f;
-}
-
-// The frame the animation showed some frames back, wrapped round a loop and held at the ends otherwise.
-static Real motionBlurEarlierFrame(Real frame, Real back, Int numFrames, Int mode)
-{
-	const Real last = (Real)(numFrames - 1);
-	Real earlier = frame - back;
-	if (mode == RenderObjClass::ANIM_MODE_LOOP || mode == RenderObjClass::ANIM_MODE_LOOP_BACKWARDS)
-	{
-		earlier = fmodf(earlier, last);
-		if (earlier < 0.0f)
-		{
-			earlier += last;
-		}
-		return earlier;
-	}
-	return WWMath::Clamp(earlier, 0.0f, last);
-}
-
-static Int motionBlurGhostCount(Real span, Real step)
-{
-	const Int count = (step > 0.0f) ? (Int)ceilf(span / step) : MotionBlurClass::MAX_GHOSTS;
-	return WWMath::Clamp_Int(count, 2, MotionBlurClass::MAX_GHOSTS);
-}
-
-// A spinning part's copies each take the opacity, fading towards the oldest, since a thin blade barely overlaps its neighbours.
-static void motionBlurSpinAlphas(Real *alpha, Int count)
-{
-	for (Int i = 0; i < count; ++i)
-	{
-		alpha[i] = TheGlobalData->m_motionBlurOpacity * (1.0f - (Real)i / (Real)count);
-	}
-}
-
-// A moving object's overlapping copies add up to MotionBlurMoveOpacity where all cover a pixel, each share smaller towards the oldest.
-static void motionBlurMoveAlphas(Real *alpha, Int count)
-{
-	const Real clear = 1.0f - WWMath::Clamp(TheGlobalData->m_motionBlurMoveOpacity, 0.0f, 1.0f);
-	const Real shares = (Real)(count * (count + 1)) * 0.5f;
-	for (Int i = 0; i < count; ++i)
-	{
-		alpha[i] = 1.0f - powf(clear, (Real)(count - i) / shares);
-	}
-}
-
-struct MotionBlurSpin
-{
-	Int bone;
-	Int count;
-	Matrix3D spin[MotionBlurClass::MAX_GHOSTS];
-};
-
-//-------------------------------------------------------------------------------------------------
-/** Hands the motion blur the earlier poses of every mesh whose bone the animation spins fast,
-	and of every mesh while the object itself moves fast. A spin is measured from the model's own
-	animation, so a rotor turning several blades' widths a frame still blurs round its arc. */
-void W3DModelDraw::updateMotionBlur()
-{
-	const W3DModelDrawModuleData *data = getW3DModelDrawModuleData();
-	if (!TheGlobalData->m_useMotionBlur || !data->m_motionBlur || m_renderObject == nullptr ||
-		m_renderObject->Class_ID() != RenderObjClass::CLASSID_HLOD || m_renderObject->Is_Hidden() || m_fullyObscuredByShroud ||
-		!MotionBlurClass::Is_Supported())
-	{
-		return;
-	}
-	HLodClass *hlod = (HLodClass *)m_renderObject;
-
-	Vector3 offset(0.0f, 0.0f, 0.0f);
-	Int moveCount = 0;
-	const Object *obj = getDrawable()->getObject();
-	if (obj != nullptr && obj->isAnyKindOf(TheGlobalData->m_motionBlurMoveKindOf) && obj->getPhysics() != nullptr)
-	{
-		const Coord3D *velocity = obj->getPhysics()->getVelocity();
-		const Vector3 perSecond(velocity->x * LOGICFRAMES_PER_SECOND, velocity->y * LOGICFRAMES_PER_SECOND, velocity->z * LOGICFRAMES_PER_SECOND);
-		if (perSecond.Length() >= TheGlobalData->m_motionBlurMoveMinSpeed && TheGlobalData->m_motionBlurMoveExposure > 0.0f)
-		{
-			offset = perSecond * TheGlobalData->m_motionBlurMoveExposure;
-			moveCount = motionBlurGhostCount(offset.Length(), TheGlobalData->m_motionBlurMoveStep);
-		}
-	}
-
-	float frame = 0.0f;
-	float mult = 0.0f;
-	int numFrames = 0;
-	int mode = 0;
-	HAnimClass *anim = hlod->Peek_Animation_And_Info(frame, numFrames, mode, mult);
-	const HTreeClass *htree = hlod->Get_HTree();
-	const Real frameRate = (htree != nullptr) ? motionBlurFrameRate(anim, frame, numFrames, mode, mult) : 0.0f;
-	if (moveCount == 0 && frameRate == 0.0f)
-	{
-		return;
-	}
-
-	Real moveAlpha[MotionBlurClass::MAX_GHOSTS];
-	motionBlurMoveAlphas(moveAlpha, moveCount);
-
-	// each bone's spin is worked out once, for every mesh on it; a count of 0 marks a bone that does not spin
-	static std::vector<MotionBlurSpin> spins;
-	spins.clear();
-	const Matrix3D root(true);
-	const Real probe = 1.0f / 120.0f;
-
-	for (Int lod = 0; lod < hlod->Get_Lod_Count(); ++lod)
-	{
-		for (Int model = 0; model < hlod->Get_Lod_Model_Count(lod); ++model)
-		{
-			RenderObjClass *mesh = hlod->Peek_Lod_Model(lod, model);
-			if (mesh == nullptr || mesh->Class_ID() != RenderObjClass::CLASSID_MESH || !mesh->Is_Not_Hidden_At_All())
-			{
-				continue;
-			}
-
-			const MotionBlurSpin *spin = nullptr;
-			if (frameRate != 0.0f)
-			{
-				const Int bone = hlod->Get_Sub_Object_Bone_Index(lod, model);
-				for (size_t i = 0; i < spins.size() && spin == nullptr; ++i)
-				{
-					if (spins[i].bone == bone)
-					{
-						spin = &spins[i];
-					}
-				}
-				if (spin == nullptr)
-				{
-					spins.push_back(MotionBlurSpin());
-					MotionBlurSpin &found = spins.back();
-					found.bone = bone;
-					found.count = 0;
-
-					Matrix3D now;
-					Matrix3D before;
-					if (htree->Simple_Evaluate_Pivot(anim, bone, frame, root, &now) &&
-						htree->Simple_Evaluate_Pivot(anim, bone, motionBlurEarlierFrame(frame, frameRate * probe, numFrames, mode), root, &before))
-					{
-						Matrix3D inverse;
-						now.Get_Orthogonal_Inverse(inverse);
-						Matrix3D delta;
-						Matrix3D::Multiply(inverse, before, &delta);
-						const Real cosine = WWMath::Clamp((delta[0][0] + delta[1][1] + delta[2][2] - 1.0f) * 0.5f, -1.0f, 1.0f);
-						const Real speed = WWMath::Acos(cosine) / probe;
-
-						if (speed > 0.0f && speed >= TheGlobalData->m_motionBlurRotorMinSpeed && TheGlobalData->m_motionBlurRotorExposure > 0.0f)
-						{
-							Real exposure = TheGlobalData->m_motionBlurRotorExposure;
-							if (speed * exposure > TheGlobalData->m_motionBlurRotorMaxSweep)
-							{
-								exposure = TheGlobalData->m_motionBlurRotorMaxSweep / speed;
-							}
-							found.count = motionBlurGhostCount(speed * exposure, TheGlobalData->m_motionBlurRotorStep);
-							if (found.count < moveCount)
-							{
-								found.count = moveCount;
-							}
-							for (Int i = 0; i < found.count; ++i)
-							{
-								const Real back = frameRate * exposure * (Real)(i + 1) / (Real)found.count;
-								Matrix3D earlier;
-								htree->Simple_Evaluate_Pivot(anim, bone, motionBlurEarlierFrame(frame, back, numFrames, mode), root, &earlier);
-								Matrix3D::Multiply(inverse, earlier, &found.spin[i]);
-							}
-						}
-					}
-					spin = &found;
-				}
-				if (spin->count == 0)
-				{
-					spin = nullptr;
-				}
-			}
-
-			const Int count = (spin != nullptr) ? spin->count : moveCount;
-			if (count == 0)
-			{
-				continue;
-			}
-			MotionBlurClass::GhostsStruct *ghosts = MotionBlurClass::Add(mesh);
-			if (ghosts == nullptr)
-			{
-				return;
-			}
-			ghosts->Count = count;
-			ghosts->Offset = offset;
-			ghosts->Spins = (spin != nullptr);
-			if (ghosts->Spins)
-			{
-				motionBlurSpinAlphas(ghosts->Alpha, count);
-				for (Int i = 0; i < count; ++i)
-				{
-					ghosts->Spin[i] = spin->spin[i];
-				}
-			}
-			else
-			{
-				for (Int i = 0; i < count; ++i)
-				{
-					ghosts->Alpha[i] = moveAlpha[i];
-				}
-			}
-		}
 	}
 }
 

@@ -22,7 +22,6 @@
 
 class SortingNodeStruct;
 class SphereClass;
-class Matrix3D;
 class ShaderClass;
 class Vector3;
 struct VertexFormatXYZNDUV2;
@@ -104,17 +103,4 @@ public:
 	static void Set_Soft_Particle_Hook(SoftParticleHookClass *hook);
 	static SoftParticleHookClass *Peek_Soft_Particle_Hook();
 	static void Set_Insert_Effects(unsigned effects, const void *effectData, float disruptionStrength = 1.0f);
-
-	// Queues a rigid mesh's motion blur copies as one node, each blending in by its weight and drawn in flat_colour unless 0.
-	static void Insert_Ghosts(
-		const SphereClass& bounding_sphere,
-		unsigned short start_index,
-		unsigned short polygon_count,
-		unsigned short min_vertex_index,
-		unsigned short vertex_count,
-		const Matrix3D* worlds,
-		const float* weights,
-		int count,
-		unsigned flat_colour,
-		bool own_alpha);
 };

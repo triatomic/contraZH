@@ -9,7 +9,7 @@ Cheat builds reload `Data\INI\GameData.ini` about half a second after it is save
 keys can be adjusted with a map running: `UnitSpecularIntensity`, `UnitSpecularPower`,
 `UnitBumpHeight`, `UnitNormalMapStrength`, `TerrainNormalMapStrength`, the `TerrainGlint` keys, `UnitEmissiveIntensity`,
 `UnitEmissiveNightIntensity`, `SoftParticleDistance`, `AmbientOcclusionRadius`,
-`AmbientOcclusionStrength`, the `GroundNoise`, `TerrainHeightBlend` and `SkyCloud` keys and the `Flame`, `Haze`, `Electric`, `Laser`, `Cryo` and `Disruption` tuning keys, the `SandStorm` and `SnowStorm` keys, the `Headlight` keys but `HeadlightShader`, the `PlanarMirror` keys but `PlanarMirrorShader`, the `MotionBlur` keys, and the `ColorLut` keys. Other `GameData.ini` keys keep their
+`AmbientOcclusionStrength`, the `GroundNoise`, `TerrainHeightBlend` and `SkyCloud` keys and the `Flame`, `Haze`, `Electric`, `Laser`, `Cryo` and `Disruption` tuning keys, the `SandStorm` and `SnowStorm` keys, the `Headlight` keys but `HeadlightShader`, the `PlanarMirror` keys but `PlanarMirrorShader`, and the `ColorLut` keys. Other `GameData.ini` keys keep their
 value until a restart. The saved values win over a map's `map.ini` until the map loads again. A
 deleted key keeps its value until a restart, and a file with an error applies only the keys above
 the error until the next save.
@@ -18,7 +18,7 @@ the error until the next save.
 
 * [Lighting & Surfaces](dx9-Lighting.md) - shadow mapping, specular, terrain glint, normal and glow maps, per-pixel lights, ambient occlusion
 * [Terrain](dx9-Terrain.md) - ground noise, height blending and stochastic tiling
-* [Effect Shaders](dx9-Effect-Shaders.md) - soft particles, flame, electric, laser, cryo, disruption, shockwaves and motion blur
+* [Effect Shaders](dx9-Effect-Shaders.md) - soft particles, flame, electric, laser, cryo, disruption and shockwaves
 * [Weather, Sky & Reflections](dx9-Environment.md) - storms, headlights, planar mirrors, sky, colour grading and water
 * [Performance](dx9-Performance.md) - supersampling, instancing, GPU skinning and presentation
 
@@ -47,7 +47,6 @@ them for one effect. Each shader's own section, linked in the table, lists its k
 | Vehicle headlights | [Headlights](dx9-Environment.md#headlights) | Automatic, `W3DModelDraw` | A `HEADLIGHT` mesh in the model | `Headlight` keys, per model too |
 | Mirror floors, puddles, pools and glass | [Planar mirrors](dx9-Environment.md#planar-mirrors) | `W3DModelDraw` | `PlanarMirror = Yes` | `PlanarMirror` keys, per model too |
 | Soft edges on sprites | [Soft particles](dx9-Effect-Shaders.md#soft-particles) | Automatic | Nothing | None |
-| Blur on fast rotors and aircraft | [Motion blur](dx9-Effect-Shaders.md#motion-blur) | Automatic, `W3DModelDraw` | Nothing | `MotionBlur` keys |
 | Glow around bright effects | [Bloom](contraZH-Options.md#bloom) | `ParticleSystem` | `Shader = ADDITIVE` | None |
 
 "None" means the effect always uses the `GameData.ini` values.

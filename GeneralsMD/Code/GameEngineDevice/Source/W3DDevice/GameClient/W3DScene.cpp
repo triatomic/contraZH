@@ -69,7 +69,6 @@
 #include "WW3D2/dx8skinning.h"
 #include "WW3D2/statistics.h"
 #include "WW3D2/sortingrenderer.h"
-#include "WW3D2/motionblur.h"
 #include "WW3D2/dx8wrapper.h"
 #include "WW3D2/light.h"
 #include "WW3D2/matpass.h"
@@ -1155,12 +1154,6 @@ void RTS3DScene::Flush(RenderInfoClass & rinfo)
 	}
 	TheDX8MeshRenderer.Clear_Pending_Delete_Lists();
 
-	if (MotionBlurClass::Is_Armed())
-	{
-		MotionBlurClass::Set_Armed(false);
-		MotionBlurClass::End_Frame();
-	}
-
 	if (TheW3DPlanarMirrors != nullptr)
 	{
 		TheW3DPlanarMirrors->suspendScenePass();
@@ -1604,12 +1597,6 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 				rejections[DX8InstancingClass::REJECT_CLIP_PLANE], rejections[DX8InstancingClass::REJECT_FOG],
 				rejections[DX8InstancingClass::REJECT_RESOURCE],
 				rejections[DX8InstancingClass::REJECT_LIGHTS]));
-			Int blurMeshes = 0;
-			Int blurCopies = 0;
-			Int blurPeak = 0;
-			MotionBlurClass::Take_Stats(&blurMeshes, &blurCopies, &blurPeak);
-			RENDER_LOG(("Motion blur: render %d, %d copies of %d meshes, each mesh one sorted node; most copies in one frame %d",
-				instancingFrames, blurCopies, blurMeshes, blurPeak));
 			RENDER_LOG(("Skinning: render %d, skinned %d main %d depth; left to the CPU by state %d model %d mesh %d category %d pass %d",
 				instancingFrames, skinning.SkinnedMeshes[0], skinning.SkinnedMeshes[1],
 				skinning.Rejections[DX8SkinningClass::REJECT_STATE], skinning.Rejections[DX8SkinningClass::REJECT_MODEL],
@@ -1667,14 +1654,6 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 		!m_planarMirrorPass && !ShaderClass::Is_Backface_Culling_Inverted())
 	{
 		TheW3DPlanarMirrors->beginScenePass();
-	}
-
-	// Motion blur copies come from the main scene's draws alone, so reflections and the shadow map leave them be.
-	if (m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE &&
-		!m_planarMirrorPass && !ShaderClass::Is_Backface_Culling_Inverted())
-	{
-		MotionBlurClass::Set_Armed(true);
-		MotionBlurClass::Set_Debug(TheGlobalData->m_motionBlurDebug);
 	}
 
 	//terrain needs to be rendered first

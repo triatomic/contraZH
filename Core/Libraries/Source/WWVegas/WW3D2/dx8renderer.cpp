@@ -63,7 +63,6 @@
 #include "stripoptimizer.h"
 #include "meshgeometry.h"
 #include "lightenvironment.h"
-#include "motionblur.h"
 #include <algorithm>
 #include <vector>
 
@@ -2756,47 +2755,6 @@ static void Draw_Polygons(DX8FVFCategoryContainer * container, DX8PolygonRendere
 	}
 }
 
-// Queues the mesh's earlier poses as translucent copies, which the sorting renderer draws after the opaque scene.
-// An opaque mesh's copies keep its alpha test and blend in by a constant; an alpha blended mesh's keep its blend, as a
-// helicopter's painted rotor disc does. None writes depth, and other blends draw no copies.
-static void Insert_Motion_Ghosts(DX8PolygonRendererClass * renderer, MeshClass * mesh, const Matrix3D & world, const ShaderClass & shader)
-{
-	const bool opaque = shader.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_ONE && shader.Get_Dst_Blend_Func() == ShaderClass::DSTBLEND_ZERO;
-	const bool alpha = shader.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_SRC_ALPHA && shader.Get_Dst_Blend_Func() == ShaderClass::DSTBLEND_ONE_MINUS_SRC_ALPHA;
-	if (!opaque && !alpha) {
-		return;
-	}
-	const MotionBlurClass::GhostsStruct * ghosts = MotionBlurClass::Peek(mesh);
-	if (ghosts == nullptr) {
-		return;
-	}
-
-	Matrix3D worlds[MotionBlurClass::MAX_GHOSTS];
-	float weights[MotionBlurClass::MAX_GHOSTS];
-	for (int i=0;i<ghosts->Count;++i) {
-		MotionBlurClass::Get_Transform(*ghosts,i,world,&worlds[i]);
-		weights[i]=MotionBlurClass::Get_Alpha(*ghosts,i);
-	}
-
-	ShaderClass ghostShader = shader;
-	ghostShader.Set_Depth_Mask(ShaderClass::DEPTH_WRITE_DISABLE);
-	ghostShader.Set_Src_Blend_Func(ShaderClass::SRCBLEND_SRC_ALPHA);
-	ghostShader.Set_Dst_Blend_Func(ShaderClass::DSTBLEND_ONE_MINUS_SRC_ALPHA);
-	DX8Wrapper::Set_Shader(ghostShader);
-
-	DX8Wrapper::Set_Index_Buffer_Index_Offset(mesh->Get_Base_Vertex_Offset());
-	SortingRendererClass::Insert_Ghosts(
-		mesh->Get_Bounding_Sphere(),
-		(unsigned short)renderer->Get_Index_Offset(),
-		(unsigned short)(renderer->Get_Index_Count()/3),
-		(unsigned short)renderer->Get_Min_Vertex_Index(),
-		(unsigned short)renderer->Get_Vertex_Index_Range(),
-		worlds,weights,ghosts->Count,MotionBlurClass::Get_Debug_Colour(*ghosts),alpha);
-	MotionBlurClass::Note_Queued(ghosts->Count);
-
-	DX8Wrapper::Set_Shader(shader);
-}
-
 void DX8TextureCategoryClass::Render_Task(PolyRenderTaskClass * prt, VertexMaterialClass * vmaterial, const ShaderClass & theShader, ShaderClass theAlphaShader, bool replay)
 {
 	DX8PolygonRendererClass * renderer = prt->Peek_Polygon_Renderer();
@@ -2972,12 +2930,6 @@ void DX8TextureCategoryClass::Render_Task(PolyRenderTaskClass * prt, VertexMater
 		}
 		else
 			Draw_Polygons(container,renderer,mesh,vmaterial,replay);
-
-		// the sorting renderer would copy a sorting container's vertices, and a skin's sit in a buffer that can wrap first
-		if (!replay && !container->Is_Sorting() && !renderer->Is_Strip() && mesh->Get_Alpha_Override() == 1.0f &&
-			!mesh->Peek_Model()->Get_Flag(MeshModelClass::SKIN) && WW3D::Is_Sorting_Enabled()) {
-			Insert_Motion_Ghosts(renderer,mesh,*world_transform,theShader);
-		}
 	}
 //--------------------------------------------------------------------
 	if (mesh->Get_ObjectScale() != 1.0f)
