@@ -381,7 +381,6 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ "GroundNoiseBrightness",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_groundNoiseBrightness ) },
 	{ "TerrainHeightBlendStrength",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_terrainHeightBlendStrength ) },
 	{ "TerrainHeightBlendSharpness",		INI::parseReal,				nullptr,			offsetof( GlobalData, m_terrainHeightBlendSharpness ) },
-	{ "TerrainAtlasBorder",					INI::parseInt,				nullptr,			offsetof( GlobalData, m_terrainAtlasBorder ) },
 	{ "SkyCloudSize",						INI::parseReal,				nullptr,			offsetof( GlobalData, m_skyCloudSize ) },
 	{ "SkyCloudCoverage",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_skyCloudCoverage ) },
 	{ "SkyCloudSoftness",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_skyCloudSoftness ) },
@@ -1172,7 +1171,6 @@ GlobalData::GlobalData()
 	m_groundNoiseBrightness = 0.9f;
 	m_terrainHeightBlendStrength = 2.0f;
 	m_terrainHeightBlendSharpness = 4.0f;
-	m_terrainAtlasBorder = 4;
 	m_skyCloudSize = 600.0f;
 	m_skyCloudCoverage = 0.45f;
 	m_skyCloudSoftness = 0.25f;
@@ -1835,7 +1833,7 @@ static const char *const LiveGameDataKeys[] =
 	"UnitEmissiveIntensity", "UnitEmissiveNightIntensity", "SoftParticleDistance",
 	"AmbientOcclusionRadius", "AmbientOcclusionStrength",
 	"GroundNoiseStrength", "GroundNoiseSize", "GroundNoiseTint", "GroundNoiseBrightness",
-	"TerrainHeightBlendStrength", "TerrainHeightBlendSharpness", "TerrainAtlasBorder",
+	"TerrainHeightBlendStrength", "TerrainHeightBlendSharpness",
 	"SkyCloudSize", "SkyCloudCoverage", "SkyCloudSoftness", "SkyCloudShadowStrength", "SkyCloudShadowTint",
 	"SkyCloudWindSpeed", "SkyCloudWindAngle", "SkyCloudChurn", "SkyCloudBillow", "SkyCloudDetail",
 	"ColorLut", "ColorLutStrength", "ColorLutBrightness", "ColorLutContrast", "ColorLutSaturation", "ColorLutTint",

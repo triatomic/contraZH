@@ -76,7 +76,7 @@ namespace
 	// Share of one map's texture atlas the class takes, shown as the "NN%" leaf prefix.
 	Int texClassPercent(Int texClass)
 	{
-		Int tilesPerRow = TEXTURE_WIDTH / (2 * TILE_PIXEL_EXTENT + 2 * WorldHeightMap::getAtlasBorderSetting());
+		Int tilesPerRow = TEXTURE_WIDTH / (2 * TILE_PIXEL_EXTENT + 2 * ATLAS_BORDER);
 		Int availableTiles = 4 * tilesPerRow * tilesPerRow;
 		return (WorldHeightMapEdit::getTexClassNumTiles(texClass) * 100 + availableTiles / 2) / availableTiles;
 	}

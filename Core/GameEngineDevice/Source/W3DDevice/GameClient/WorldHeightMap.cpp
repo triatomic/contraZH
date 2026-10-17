@@ -448,7 +448,7 @@ WorldHeightMap::WorldHeightMap():
 	m_drawWidthX(NORMAL_DRAW_WIDTH), m_drawHeightY(NORMAL_DRAW_HEIGHT),
 	m_tileNdxes(nullptr), m_blendTileNdxes(nullptr), m_extraBlendTileNdxes(nullptr), m_cliffInfoNdxes(nullptr),
 	m_stochasticData(nullptr), m_stochasticTex(nullptr), m_stochasticTexDirty(true), m_stochasticTexExponent(0.0f),
-	m_terrainTexHeight(1), m_atlasBorder(MIN_ATLAS_BORDER), m_alphaTexHeight(1),	m_cellCliffState(nullptr),
+	m_terrainTexHeight(1), m_alphaTexHeight(1),	m_cellCliffState(nullptr),
 #ifdef EVAL_TILING_MODES
 	m_tileMode(TILE_4x4),
 #endif
@@ -492,7 +492,7 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly):
 	m_drawWidthX(NORMAL_DRAW_WIDTH), m_drawHeightY(NORMAL_DRAW_HEIGHT),
 	m_tileNdxes(nullptr), m_blendTileNdxes(nullptr), m_extraBlendTileNdxes(nullptr), m_cliffInfoNdxes(nullptr),
 	m_stochasticData(nullptr), m_stochasticTex(nullptr), m_stochasticTexDirty(true), m_stochasticTexExponent(0.0f),
-	m_terrainTexHeight(1), m_atlasBorder(MIN_ATLAS_BORDER), m_alphaTexHeight(1),
+	m_terrainTexHeight(1), m_alphaTexHeight(1),
 #ifdef EVAL_TILING_MODES
 	m_tileMode(TILE_4x4),
 #endif
@@ -1605,37 +1605,13 @@ Bool WorldHeightMap::readTiles(InputStream *pStr, TileData **tiles, Int numRows)
 
 
 
-Int WorldHeightMap::getAtlasBorderSetting()
-{
-	// Rounded up to a multiple of 4, so every block starts on a whole texel of the smallest mip.
-	const Int requested = TheGlobalData ? TheGlobalData->m_terrainAtlasBorder : MIN_ATLAS_BORDER;
-	return clamp(MIN_ATLAS_BORDER, (requested + 3) / 4 * 4, MAX_ATLAS_BORDER);
-}
-
-Bool WorldHeightMap::refreshAtlasBorder()
-{
-	if (m_terrainTex == nullptr || m_atlasBorder == getAtlasBorderSetting())
-	{
-		return false;
-	}
-
-	// The render object keeps its own references until its update takes the new atlases.
-	REF_PTR_RELEASE(m_terrainTex);
-	REF_PTR_RELEASE(m_alphaTerrainTex);
-	REF_PTR_RELEASE(m_terrainNormalTex);
-	REF_PTR_RELEASE(m_terrainHeightTex);
-	RENDER_LOG(("Terrain atlas border changed to %d, laying the atlases out again", getAtlasBorderSetting()));
-	return true;
-}
-
 /** updateTileTexturePositions - assigns each tile a location in the texture.
 */
 Int WorldHeightMap::updateTileTexturePositions(Int *edgeHeight)
 {
 	Int i, j;
 	Int maxHeight = 0;
-	m_atlasBorder = getAtlasBorderSetting();
-	const Int slot = TILE_PIXEL_EXTENT + 2*m_atlasBorder;
+	const Int slot = TILE_PIXEL_EXTENT + 2*ATLAS_BORDER;
 	const Int tilesPerRow = TEXTURE_WIDTH/slot;
 
 	Bool availableGrid[MAX_ATLAS_SLOTS][MAX_ATLAS_SLOTS];
@@ -1680,18 +1656,18 @@ Int WorldHeightMap::updateTileTexturePositions(Int *edgeHeight)
 				if (found) break;
 			}
 			if (!found) {
-				RENDER_LOG(("Terrain atlas full: %s left out, so its cells draw wrong. A smaller TerrainAtlasBorder fits more.",
+				RENDER_LOG(("Terrain atlas full: %s left out, so its cells draw wrong.",
 					m_textureClasses[texClass].name.str()));
 				m_textureClasses[texClass].positionInTexture.x = 0;
 				m_textureClasses[texClass].positionInTexture.y = 0;
 				continue;
 			}
 
-			Int xOrigin = m_atlasBorder + column*slot;
-			Int yOrigin = m_atlasBorder + row*slot;
+			Int xOrigin = ATLAS_BORDER + column*slot;
+			Int yOrigin = ATLAS_BORDER + row*slot;
 			m_textureClasses[texClass].positionInTexture.x = xOrigin;
 			m_textureClasses[texClass].positionInTexture.y = yOrigin;
-			Int classHeight = yOrigin + width*TILE_PIXEL_EXTENT+ m_atlasBorder;
+			Int classHeight = yOrigin + width*TILE_PIXEL_EXTENT+ ATLAS_BORDER;
 			if (maxHeight < classHeight) maxHeight = classHeight;
 
 			for (i=0; i<width; i++) {
@@ -2391,7 +2367,7 @@ TextureClass *WorldHeightMap::getTerrainClassMap()
 
 	// The shader clamps reads to the lookup, so an atlas reaching past it turns the seabed off rather than read the wrong block.
 	const Int size = CLASS_MAP_SLOTS;
-	const Int slot = TILE_PIXEL_EXTENT + 2*m_atlasBorder;
+	const Int slot = TILE_PIXEL_EXTENT + 2*ATLAS_BORDER;
 	for (Int i=0; i<m_numTextureClasses; i++)
 	{
 		const TXTextureClass &texClass = m_textureClasses[i];
@@ -2399,8 +2375,8 @@ TextureClass *WorldHeightMap::getTerrainClassMap()
 		{
 			continue;
 		}
-		if ((texClass.positionInTexture.x - m_atlasBorder) / slot + texClass.width > size ||
-			(texClass.positionInTexture.y - m_atlasBorder) / slot + texClass.width > size)
+		if ((texClass.positionInTexture.x - ATLAS_BORDER) / slot + texClass.width > size ||
+			(texClass.positionInTexture.y - ATLAS_BORDER) / slot + texClass.width > size)
 		{
 			return nullptr;
 		}
@@ -2432,8 +2408,8 @@ TextureClass *WorldHeightMap::getTerrainClassMap()
 			{
 				continue;
 			}
-			const Int column = (texClass.positionInTexture.x - m_atlasBorder) / slot;
-			const Int row = (texClass.positionInTexture.y - m_atlasBorder) / slot;
+			const Int column = (texClass.positionInTexture.x - ATLAS_BORDER) / slot;
+			const Int row = (texClass.positionInTexture.y - ATLAS_BORDER) / slot;
 			const UnsignedInt texel = 0xff000000 | ((UnsignedInt)column << 16) | ((UnsignedInt)row << 8) | (UnsignedInt)width;
 			for (Int y=row; y<row + width && y<size; y++)
 			{
@@ -2576,7 +2552,7 @@ TextureClass *WorldHeightMap::getTerrainGlintMap(Real defaultGloss, Real &streng
 				}
 
 				// A class that did not fit sits at 0,0 and is never drawn.
-				const Int slot = TILE_PIXEL_EXTENT + 2*m_atlasBorder;
+				const Int slot = TILE_PIXEL_EXTENT + 2*ATLAS_BORDER;
 				for (Int i=0; i<m_numTextureClasses; i++)
 				{
 					const TXTextureClass &texClass = m_textureClasses[i];
@@ -2584,8 +2560,8 @@ TextureClass *WorldHeightMap::getTerrainGlintMap(Real defaultGloss, Real &streng
 					{
 						continue;
 					}
-					const Int left = (texClass.positionInTexture.x - m_atlasBorder) / GLINT_MAP_SHRINK;
-					const Int top = (texClass.positionInTexture.y - m_atlasBorder) / GLINT_MAP_SHRINK;
+					const Int left = (texClass.positionInTexture.x - ATLAS_BORDER) / GLINT_MAP_SHRINK;
+					const Int top = (texClass.positionInTexture.y - ATLAS_BORDER) / GLINT_MAP_SHRINK;
 					const Int side = texClass.width * slot / GLINT_MAP_SHRINK;
 					const UnsignedInt texel = 0xff000000 | (Glint_Byte(strengths[i], m_terrainGlintStrengthScale) << 16) |
 						(Glint_Byte(glosses[i], m_terrainGlintGlossScale) << 8);

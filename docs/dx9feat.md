@@ -9,7 +9,7 @@ Cheat builds reload `Data\INI\GameData.ini` about half a second after it is save
 keys can be adjusted with a map running: `UnitSpecularIntensity`, `UnitSpecularPower`,
 `UnitBumpHeight`, `UnitNormalMapStrength`, `TerrainNormalMapStrength`, the `TerrainGlint` keys, `UnitEmissiveIntensity`,
 `UnitEmissiveNightIntensity`, `SoftParticleDistance`, `AmbientOcclusionRadius`,
-`AmbientOcclusionStrength`, the `GroundNoise`, `TerrainHeightBlend` and `SkyCloud` keys, `TerrainAtlasBorder` and the `Flame`, `Haze`, `Electric`, `Laser`, `Cryo` and `Disruption` tuning keys, the `SandStorm` and `SnowStorm` keys, the `Headlight` keys but `HeadlightShader`, the `PlanarMirror` keys but `PlanarMirrorShader`, the `MotionBlur` keys, and the `ColorLut` keys. Other `GameData.ini` keys keep their
+`AmbientOcclusionStrength`, the `GroundNoise`, `TerrainHeightBlend` and `SkyCloud` keys and the `Flame`, `Haze`, `Electric`, `Laser`, `Cryo` and `Disruption` tuning keys, the `SandStorm` and `SnowStorm` keys, the `Headlight` keys but `HeadlightShader`, the `PlanarMirror` keys but `PlanarMirrorShader`, the `MotionBlur` keys, and the `ColorLut` keys. Other `GameData.ini` keys keep their
 value until a restart. The saved values win over a map's `map.ini` until the map loads again. A
 deleted key keeps its value until a restart, and a file with an error applies only the keys above
 the error until the next save.

@@ -286,7 +286,6 @@ m_warnTooManyBlend(false)
 	REF_PTR_SET(m_alphaTerrainTex, pThis->m_alphaTerrainTex);
 	m_dataSize = pThis->m_dataSize;
 	m_terrainTexHeight = pThis->m_terrainTexHeight;
-	m_atlasBorder = pThis->m_atlasBorder;
 	m_alphaTexHeight = pThis->m_alphaTexHeight;
 	m_alphaEdgeHeight = pThis->m_alphaEdgeHeight;
 	m_width = pThis->m_width;
@@ -2081,7 +2080,7 @@ void WorldHeightMapEdit::reloadTextures()
 void WorldHeightMapEdit::showTileStatusInfo()
 {
 	CString message;
-	Int tilesPerRow = TEXTURE_WIDTH/(2*TILE_PIXEL_EXTENT+2*getAtlasBorder());
+	Int tilesPerRow = TEXTURE_WIDTH/(2*TILE_PIXEL_EXTENT+2*ATLAS_BORDER);
 	Int availableTiles = 4 * tilesPerRow * tilesPerRow;
 	Int availableBlends = NUM_BLEND_TILES;
 

@@ -163,8 +163,6 @@ namespace
 			"How far the taller texture pushes into the other's side of a blend. 0 keeps the edge where the soft fade would put it."),
 		RENDER_REAL("Blend", "TerrainHeightBlendSharpness", m_terrainHeightBlendSharpness, 1.0f, 12.0f, 0.1f,
 			"How narrow the blend's edge is. 1 is as wide as the soft fade."),
-		RENDER_INT("Blend", "TerrainAtlasBorder", m_terrainAtlasBorder, 4.0f, 32.0f, 4.0f,
-			"Texels copied around each texture in the terrain atlas, in steps of 4. Wider keeps high anisotropy clean but fits fewer textures."),
 
 		RENDER_REAL("Sky", "SkyCloudSize", m_skyCloudSize, 150.0f, 3000.0f, 10.0f,
 			"World units across a typical cloud."),

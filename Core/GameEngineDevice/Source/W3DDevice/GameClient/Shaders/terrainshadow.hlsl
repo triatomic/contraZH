@@ -215,7 +215,7 @@ float2 BlockUV(float2 texel, float3 block)
 float4 SeabedSample(sampler2D atlas, float4 plain, float2 uv, float2 texel, float2 dx, float2 dy, HexCells cells)
 {
     float2 atlasTexel = uv * SeabedAtlas.xy;
-    // Point sampling picks the slot. The slot's size follows TerrainAtlasBorder, so it comes in constants.
+    // Point sampling picks the slot.
     float3 slots = tex2D(ClassMap, atlasTexel * SeabedSlot.x + SeabedSlot.y).rgb;
     float3 block = float3(slots.xy * SeabedSlot.z + SeabedSlot.w, slots.z * (255.0f * 64.0f));
 

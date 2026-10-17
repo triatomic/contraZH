@@ -66,7 +66,7 @@ from [Water](Water.md), stepped with the - and + buttons or typed. A changed key
 `WaterTransparency` block of the map's `map.ini`; the reset button removes it, so the map follows
 `Water.ini` again. Offers to create `map.ini` when the map has none.)
 * Water tuning > Terrain and sky - (The second tab tunes the `TerrainGlint`, `GroundNoise`,
-`TerrainHeightBlend`, `TerrainAtlasBorder` and `SkyCloud` keys of [Direct3D 9 Features](dx9feat.md)
+`TerrainHeightBlend` and `SkyCloud` keys of [Direct3D 9 Features](dx9feat.md)
 the same way. A changed key is saved to the `GameData` block of `map.ini`, which the game reads per
 map; the reset button returns the map to `GameData.ini`. An effect that is off under Level Of Detail >
 FX Shaders shows no change.)

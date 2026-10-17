@@ -113,7 +113,7 @@ int TerrainTextureClass::update(WorldHeightMap *htMap)
 	DX8_ErrorCode(surface_level->LockRect(&locked_rect, nullptr, 0));
 
 	Int tilePixelExtent = TILE_PIXEL_EXTENT;
-	const Int border = htMap->getAtlasBorder();
+	const Int border = ATLAS_BORDER;
 	Int tilesPerRow = surface_desc.Width/(2*TILE_PIXEL_EXTENT+2*border);
 	tilesPerRow *= 2;
 //	Int numRows = surface_desc.Height/(tilePixelExtent+TILE_OFFSET);
@@ -493,7 +493,7 @@ Bool TerrainNormalTextureClass::update(WorldHeightMap *htMap)
 		{
 			continue;
 		}
-		Copy_Wrap_Border(bits, pitch, pixelBytes, origin, htMap->m_textureClasses[texClass].width*TILE_PIXEL_EXTENT, htMap->getAtlasBorder());
+		Copy_Wrap_Border(bits, pitch, pixelBytes, origin, htMap->m_textureClasses[texClass].width*TILE_PIXEL_EXTENT, ATLAS_BORDER);
 	}
 
 	texture->UnlockRect(0);
@@ -653,7 +653,7 @@ Bool TerrainHeightTextureClass::update(WorldHeightMap *htMap)
 			}
 		}
 
-		Copy_Wrap_Border(bits, pitch, 1, origin, side, htMap->getAtlasBorder());
+		Copy_Wrap_Border(bits, pitch, 1, origin, side, ATLAS_BORDER);
 	}
 
 	texture->UnlockRect(0);

@@ -331,7 +331,6 @@ public:
 	Real m_groundNoiseBrightness;
 	Real m_terrainHeightBlendStrength;	///< GameData TerrainHeightBlendStrength: how far the taller texture pushes into the other's side of a blend
 	Real m_terrainHeightBlendSharpness;	///< GameData TerrainHeightBlendSharpness: how narrow the blend's edge is, 1 as wide as the legacy blend
-	Int m_terrainAtlasBorder;			///< GameData TerrainAtlasBorder: texels copied around each texture in the terrain atlas
 	Real m_skyCloudSize;				///< GameData SkyCloudSize and the keys below: the HQ sky's cloud shadows, see W3DSkyClouds
 	Real m_skyCloudCoverage;
 	Real m_skyCloudSoftness;
