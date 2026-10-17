@@ -1616,8 +1616,8 @@ static void setTooltip( GameWindow *window, const char *tip )
 	}
 }
 
-// Entry i reads label labelPrefix<i>; maxDisplay stays one short of count so the list shows a scrollbar, as the Detail combo does
-static void addComboEntries( GameWindow *combo, const char *labelPrefix, Int count, Int maxDisplay )
+// Entry i reads label labelPrefix<i>; the layout's MAXDISPLAY sizes the list, as it does for the Resolution combo
+static void addComboEntries( GameWindow *combo, const char *labelPrefix, Int count )
 {
 	if (!combo)
 	{
@@ -1625,7 +1625,6 @@ static void addComboEntries( GameWindow *combo, const char *labelPrefix, Int cou
 	}
 	const Color white = GameMakeColor( 255, 255, 255, 255 );
 	GadgetComboBoxReset( combo );
-	GadgetComboBoxSetMaxDisplay( combo, maxDisplay );
 	for (Int i = 0; i < count; ++i)
 	{
 		AsciiString label;
@@ -1789,13 +1788,13 @@ static void initGameOptionsWindows()
 	setTooltip( textEntryKeyboardOverlayBackdropBlue, "TOOLTIP:ColorChannel" );
 	setTooltip( textEntryKeyboardOverlayBackdropOpacity, "TOOLTIP:ColorChannel" );
 
-	addComboEntries( comboBoxHealthBars, "GUI:HealthBars", HealthBarDisplayMode_Count, 2 );
-	addComboEntries( comboBoxAlliedDecals, "GUI:AlliedDecals", AlliedDecalMode_Count, 2 );
-	addComboEntries( comboBoxBuildTimers, "GUI:BuildTimers", BuildTimerDisplayMode_Count, 2 );
-	addComboEntries( comboBoxActionLines, "GUI:ActionLines", ActionLineMode_Count, 2 );
-	addComboEntries( comboBoxCastMode, "GUI:CastMode", CastMode_Count, 2 );
-	addComboEntries( comboBoxTextureFilter, "GUI:TextureFilter", TextureFilterClass::TEXTURE_FILTER_COUNT, 4 );
-	addComboEntries( comboBoxAnisotropy, "GUI:Anisotropy", ARRAY_SIZE(AnisotropyLevels), 3 );
+	addComboEntries( comboBoxHealthBars, "GUI:HealthBars", HealthBarDisplayMode_Count );
+	addComboEntries( comboBoxAlliedDecals, "GUI:AlliedDecals", AlliedDecalMode_Count );
+	addComboEntries( comboBoxBuildTimers, "GUI:BuildTimers", BuildTimerDisplayMode_Count );
+	addComboEntries( comboBoxActionLines, "GUI:ActionLines", ActionLineMode_Count );
+	addComboEntries( comboBoxCastMode, "GUI:CastMode", CastMode_Count );
+	addComboEntries( comboBoxTextureFilter, "GUI:TextureFilter", TextureFilterClass::TEXTURE_FILTER_COUNT );
+	addComboEntries( comboBoxAnisotropy, "GUI:Anisotropy", ARRAY_SIZE(AnisotropyLevels) );
 }
 
 // Finds the Shaders panel, which a layout without it leaves out along with its button
@@ -1822,11 +1821,11 @@ static void initShadersWindows()
 	setLabelText( "OptionsMenu.wnd:ShadersTitle", "GUI:Shaders" );
 	setLabelText( "OptionsMenu.wnd:ShadowsLabel", "GUI:ShadowMapResolution" );
 	setTooltip( comboBoxShadows, "TOOLTIP:ShadowMapResolution" );
-	addComboEntries( comboBoxShadows, "GUI:ShadowMapResolution", ARRAY_SIZE(ShadowMapResolutions), 3 );
+	addComboEntries( comboBoxShadows, "GUI:ShadowMapResolution", ARRAY_SIZE(ShadowMapResolutions) );
 
 	setLabelText( "OptionsMenu.wnd:SuperSamplingLabel", "GUI:SuperSampling" );
 	setTooltip( comboBoxSuperSampling, "TOOLTIP:SuperSampling" );
-	addComboEntries( comboBoxSuperSampling, "GUI:SuperSampling", ARRAY_SIZE(SuperSamplingPercents), 2 );
+	addComboEntries( comboBoxSuperSampling, "GUI:SuperSampling", ARRAY_SIZE(SuperSamplingPercents) );
 
 	// not every layout ships the panel hidden
 	WinShaders->winHide( TRUE );
@@ -2108,7 +2107,7 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 
 	// populate anti aliasing modes
 	AsciiString selectedAliasingMode = (*pref)["AntiAliasing"];
-	addComboEntries( comboBoxAntiAliasing, "GUI:AntiAliasing", OptionPreferences::AntiAliasingMode_Count, OptionPreferences::AntiAliasingMode_Count - 1 );
+	addComboEntries( comboBoxAntiAliasing, "GUI:AntiAliasing", OptionPreferences::AntiAliasingMode_Count );
 	setLabelText( "OptionsMenu.wnd:AntiAliasingLabel", "GUI:AntiAliasing" );
 	setTooltip( comboBoxAntiAliasing, "TOOLTIP:AntiAliasing" );
 	Int val = atoi(selectedAliasingMode.str());

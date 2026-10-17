@@ -3,6 +3,10 @@
 Read at startup. Most can also be changed in game under Options > `Game Options` and apply on
 Accept. `NewRadar` and `BlipSize` need a restart.
 
+The menu's drop-down lists share the Resolution list's look and show every entry without a scrollbar.
+`build/fix_option_combos_wnd.py` restyles them in `OptionsMenu.wnd` and orders them so each open list
+draws over the rows below it; rerun it after adding a drop-down.
+
 ## Camera
 
 * `UseCustomMaxCameraHeight = No` - (`Yes` lets `MaxCameraHeight` replace `GameData.ini`'s value, 670
