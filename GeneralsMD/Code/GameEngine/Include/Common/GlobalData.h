@@ -752,6 +752,7 @@ public:
   Bool m_shorelineFoam;           ///< Options.ini ShorelineFoam: smooth water gathers a band of surf where it meets the shore
   Bool m_useSoftParticles;        ///< Options.ini SoftParticles: smoke and fire fade where they meet the ground and buildings
   Bool m_useMotionBlur;           ///< Options.ini MotionBlur: fast rotors and fast aircraft trail translucent copies of themselves
+  Bool m_motionBlurDebug;         ///< Options.ini MotionBlurDebug: those copies draw flat cyan for a spin and magenta for a move
   Bool m_useFlameShaders;         ///< Options.ini FlameShaders: flame weapon fire flickers and glows white-hot at its core
   Bool m_useElectricShaders;      ///< Options.ini ElectricShaders: electric sparks and flares crackle with arcs
   Bool m_useLaserShaders;         ///< Options.ini LaserShaders: laser beams get a white-hot core and pulses running along them

@@ -52,6 +52,10 @@ public:
 	static bool Is_Armed();
 	static const GhostsStruct * Peek(const RenderObjClass * mesh);
 
+	// Debug draws every ghost in a flat colour, cyan for a spin and magenta for a move, or 0 when off.
+	static void Set_Debug(bool debug);
+	static unsigned Get_Debug_Colour(const GhostsStruct & ghosts);
+
 	// Drops every ghost added before this point.
 	static void End_Frame();
 

@@ -240,7 +240,9 @@ static NameKeyType    checkDynamicLightsID        = NAMEKEY_INVALID;
 static GameWindow *   checkDynamicLights          = nullptr;
 static GameWindow *   checkPixelLights            = nullptr;
 static GameWindow *   checkSoftParticles          = nullptr;
+static NameKeyType    checkMotionBlurID           = NAMEKEY_INVALID;
 static GameWindow *   checkMotionBlur             = nullptr;
+static GameWindow *   checkMotionBlurDebug        = nullptr;
 static GameWindow *   checkAmbientOcclusion       = nullptr;
 static GameWindow *   checkHeightBlend            = nullptr;
 static GameWindow *   checkHQSky                  = nullptr;
@@ -510,6 +512,7 @@ static const BoolOption BoolOptions[] =
 	{ &checkPixelLights, "PixelLights", &OptionPreferences::getPixelLightsEnabled, &GlobalData::m_usePixelLights, TRUE },
 	{ &checkSoftParticles, "SoftParticles", &OptionPreferences::getSoftParticlesEnabled, &GlobalData::m_useSoftParticles, TRUE },
 	{ &checkMotionBlur, "MotionBlur", &OptionPreferences::getMotionBlurEnabled, &GlobalData::m_useMotionBlur, TRUE },
+	{ &checkMotionBlurDebug, "MotionBlurDebug", &OptionPreferences::getMotionBlurDebugEnabled, &GlobalData::m_motionBlurDebug, FALSE },
 	{ &checkAmbientOcclusion, "AmbientOcclusion", &OptionPreferences::getAmbientOcclusionEnabled, &GlobalData::m_useAmbientOcclusion, TRUE },
 	{ &checkHeightBlend, "HeightBlend", &OptionPreferences::getHeightBlendEnabled, &GlobalData::m_useHeightBlend, TRUE },
 	{ &checkHQSky, "HQSky", &OptionPreferences::getHQSkyEnabled, &GlobalData::m_useHQSky, TRUE },
@@ -552,6 +555,7 @@ static void updateGameOptionsEnables()
 	const Bool bloom = getCheck( checkBloom, FALSE );
 	enableWindow( textEntryBloomStrength, bloom );
 	enableWindow( checkBloomDebug, bloom );
+	enableWindow( checkMotionBlurDebug, getCheck( checkMotionBlur, TRUE ) );
 
 	enableWindow( checkPixelLights, getCheck( checkDynamicLights, TRUE ) );
 	enableWindow( checkHQSky, getCheck( checkCloudShadows, TRUE ) );
@@ -1694,7 +1698,8 @@ static void initGameOptionsWindows()
 	checkDynamicLights = findOptionsWindow( "OptionsMenu.wnd:CheckDynamicLights", checkDynamicLightsID );
 	checkPixelLights = findOptionsWindow( "OptionsMenu.wnd:CheckPixelLights" );
 	checkSoftParticles = findOptionsWindow( "OptionsMenu.wnd:CheckSoftParticles" );
-	checkMotionBlur = findOptionsWindow( "OptionsMenu.wnd:CheckMotionBlur" );
+	checkMotionBlur = findOptionsWindow( "OptionsMenu.wnd:CheckMotionBlur", checkMotionBlurID );
+	checkMotionBlurDebug = findOptionsWindow( "OptionsMenu.wnd:CheckMotionBlurDebug" );
 	checkAmbientOcclusion = findOptionsWindow( "OptionsMenu.wnd:CheckAmbientOcclusion" );
 	checkHeightBlend = findOptionsWindow( "OptionsMenu.wnd:CheckHeightBlend" );
 	checkHQSky = findOptionsWindow( "OptionsMenu.wnd:CheckHQSky" );
@@ -1763,6 +1768,7 @@ static void initGameOptionsWindows()
 	setCheckText( checkHQSky, "GUI:HQSky", "TOOLTIP:HQSky" );
 	setCheckText( checkSoftParticles, "GUI:SoftParticles", "TOOLTIP:SoftParticles" );
 	setCheckText( checkMotionBlur, "GUI:MotionBlur", "TOOLTIP:MotionBlur" );
+	setCheckText( checkMotionBlurDebug, "GUI:MotionBlurDebug", "TOOLTIP:MotionBlurDebug" );
 	setCheckText( checkShadowMap, "GUI:ShadowMap", "TOOLTIP:ShadowMap" );
 
 	setTooltip( comboBoxHealthBars, "TOOLTIP:HealthBars" );
@@ -2636,7 +2642,7 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 				cancelPanel( WinShaders, populateShaders );
 			}
 			else if (controlID == checkGridHotkeysID || controlID == checkKeyboardOverlayBackdropID || controlID == checkBloomID ||
-				controlID == checkDynamicLightsID || controlID == checkCloudShadowsID )
+				controlID == checkDynamicLightsID || controlID == checkCloudShadowsID || controlID == checkMotionBlurID )
 			{
 				updateGameOptionsEnables();
 			}

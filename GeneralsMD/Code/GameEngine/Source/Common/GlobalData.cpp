@@ -948,6 +948,7 @@ GlobalData::GlobalData()
   m_shorelineFoam = TRUE;
   m_useSoftParticles = TRUE;
   m_useMotionBlur = TRUE;
+  m_motionBlurDebug = FALSE;
   m_useFlameShaders = TRUE;
   m_useElectricShaders = TRUE;
   m_useLaserShaders = TRUE;
@@ -2078,6 +2079,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_shorelineFoam = optionPref.getShorelineFoamEnabled();
 	TheWritableGlobalData->m_useSoftParticles = optionPref.getSoftParticlesEnabled();
 	TheWritableGlobalData->m_useMotionBlur = optionPref.getMotionBlurEnabled();
+	TheWritableGlobalData->m_motionBlurDebug = optionPref.getMotionBlurDebugEnabled();
 	TheWritableGlobalData->m_useFlameShaders = optionPref.getFlameShadersEnabled();
 	TheWritableGlobalData->m_useElectricShaders = optionPref.getElectricShadersEnabled();
 	TheWritableGlobalData->m_useLaserShaders = optionPref.getLaserShadersEnabled();

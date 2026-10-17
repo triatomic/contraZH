@@ -471,6 +471,9 @@ smears round its arc, and a jet streaks along its path. Needs the Direct3D 9 bui
 
 * `MotionBlur = Yes` - (No draws every model sharp. Also `Motion blur` on the Shaders page. Needs
 `CheckMotionBlur` in `OptionsMenu.wnd` for the menu control.)
+* `MotionBlurDebug = No` - (Yes draws every copy flat, cyan for a spinning part and magenta for a moving
+object, to see what blurs and how far. Also `Motion blur debug` on the Shaders page, with
+`CheckMotionBlurDebug` in `OptionsMenu.wnd`.)
 
 A part blurs when its model's animation spins it faster than `MotionBlurRotorMinSpeed`, whatever the
 axis. The copies come from the animation itself, so a rotor that turns several blade widths a frame

@@ -30,6 +30,7 @@ static std::vector<MotionBlurClass::GhostsStruct> Pool;
 static size_t PoolUsed = 0;
 static unsigned PoolFrame = 1;
 static bool Armed = false;
+static bool Debug = false;
 
 bool MotionBlurClass::Is_Supported()
 {
@@ -84,6 +85,20 @@ const MotionBlurClass::GhostsStruct * MotionBlurClass::Peek(const RenderObjClass
 	}
 	const GhostsStruct & ghosts = Pool[mesh->Get_Motion_Blur_Slot()];
 	return (ghosts.Count > 0) ? &ghosts : nullptr;
+}
+
+void MotionBlurClass::Set_Debug(bool debug)
+{
+	Debug = debug;
+}
+
+unsigned MotionBlurClass::Get_Debug_Colour(const GhostsStruct & ghosts)
+{
+	if (!Debug)
+	{
+		return 0;
+	}
+	return ghosts.Spins ? 0xFF00FFFF : 0xFFFF00FF;
 }
 
 void MotionBlurClass::End_Frame()

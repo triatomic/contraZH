@@ -1668,6 +1668,7 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 		!m_planarMirrorPass && !ShaderClass::Is_Backface_Culling_Inverted())
 	{
 		MotionBlurClass::Set_Armed(true);
+		MotionBlurClass::Set_Debug(TheGlobalData->m_motionBlurDebug);
 	}
 
 	//terrain needs to be rendered first

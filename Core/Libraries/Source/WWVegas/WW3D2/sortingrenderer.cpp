@@ -64,6 +64,7 @@ static float InsertDisruptionStrength = 1.0f;
 static const Vector3 *DisruptionCenter = nullptr;
 static float DisruptionStrength = 1.0f;
 static unsigned char InsertBlendFactor = 0;
+static unsigned InsertFlatColour = 0;
 
 void SortingRendererClass::Set_Soft_Particle_Hook(SoftParticleHookClass *hook)
 {
@@ -82,9 +83,10 @@ void SortingRendererClass::Set_Insert_Effects(unsigned effects, const void *effe
 	InsertDisruptionStrength = disruptionStrength;
 }
 
-void SortingRendererClass::Set_Insert_Blend_Factor(float factor)
+void SortingRendererClass::Set_Insert_Blend_Factor(float factor, unsigned flatColour)
 {
 	InsertBlendFactor = (unsigned char)(WWMath::Clamp(factor, 0.0f, 1.0f) * 255.0f + 0.5f);
+	InsertFlatColour = flatColour;
 }
 
 bool SortingRendererClass::Can_Disrupt()
@@ -247,6 +249,7 @@ public:
 	float depth;								// View space depth of the bounding sphere center, for object nodes
 	unsigned short effects;					// Particle effects drawn through the soft particle hook, 0 for none
 	unsigned char blend_factor;			// Constant blend weight of an object node, 0 to blend as its shader says
+	unsigned flat_colour;					// ARGB the blend factor node draws in place of its lit texture, 0 for none
 	bool placed;								// A disruption node whose vertices are already in world space, so center says where it is
 	Vector3 center;
 	float disruption_strength;				// How much of its mask a disruption node keeps
@@ -326,7 +329,16 @@ static void Draw_Object_Node(SortingNodeStruct* state)
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_BLENDFACTOR, D3DCOLOR_ARGB(f, f, f, f));
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_BLENDFACTOR);
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_INVBLENDFACTOR);
+		if (state->flat_colour != 0) {
+			DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, state->flat_colour);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_COLORARG1, D3DTA_TFACTOR);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_COLOROP, D3DTOP_DISABLE);
+		}
 		DX8Wrapper::Draw_Triangles(state->start_index,state->polygon_count,state->min_vertex_index,state->vertex_count);
+		if (state->flat_colour != 0) {
+			ShaderClass::Invalidate();
+		}
 
 		// back to what the node's alpha blend shader set, so the cache still matches it
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
@@ -506,6 +518,7 @@ void SortingRendererClass::Insert_Triangles(
 	state->effects=(SoftHook != nullptr) ? (unsigned short)InsertEffects : 0;
 	state->effect_data=(state->effects != 0) ? InsertEffectData : nullptr;
 	state->blend_factor=InsertBlendFactor;
+	state->flat_colour=InsertFlatColour;
 
 	if (disrupts) {
 		// Skins and lines leave the world transform at identity, so only the bounding sphere says where they are.

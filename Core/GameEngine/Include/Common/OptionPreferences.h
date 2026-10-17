@@ -174,6 +174,8 @@ public:
 	Bool getSoftParticlesEnabled() const;
 	// Options.ini: MotionBlur = Yes trails translucent copies behind fast rotors and fast aircraft
 	Bool getMotionBlurEnabled() const;
+	// Options.ini: MotionBlurDebug = Yes draws those copies flat cyan for a spin and magenta for a move
+	Bool getMotionBlurDebugEnabled() const;
 	// Options.ini: FlameShaders = Yes makes flame weapon fire flicker and glow white-hot at its core
 	Bool getFlameShadersEnabled() const;
 	// Options.ini: ElectricShaders = Yes makes electric sparks and flares crackle with arcs

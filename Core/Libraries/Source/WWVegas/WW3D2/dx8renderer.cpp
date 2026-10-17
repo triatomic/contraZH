@@ -2778,7 +2778,7 @@ static void Insert_Motion_Ghosts(DX8PolygonRendererClass * renderer, MeshClass *
 		Matrix3D ghost;
 		MotionBlurClass::Get_Transform(*ghosts,i,world,&ghost);
 		DX8Wrapper::Set_Transform(D3DTS_WORLD,ghost);
-		SortingRendererClass::Set_Insert_Blend_Factor(MotionBlurClass::Get_Alpha(*ghosts,i));
+		SortingRendererClass::Set_Insert_Blend_Factor(MotionBlurClass::Get_Alpha(*ghosts,i),MotionBlurClass::Get_Debug_Colour(*ghosts));
 		renderer->Render_Sorted(mesh->Get_Base_Vertex_Offset(),mesh->Get_Bounding_Sphere());
 	}
 	SortingRendererClass::Set_Insert_Blend_Factor(0.0f);
