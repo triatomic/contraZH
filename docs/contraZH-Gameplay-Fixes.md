@@ -289,3 +289,11 @@ jam ends. The campaign and challenge missions keep the old behavior.
 
 Changes the simulation.
 ([#115](https://github.com/triatomic/contraZH/issues/115))
+
+## Wandering units wander in every direction
+
+Objects with `WanderAIUpdate` picked each new spot to the north east of where they stood, so they
+drifted across the map in one direction. Each new spot is now random around the current position
+([TheSuperHackers#3544](https://github.com/TheSuperHackers/GeneralsGameCode/pull/3544)).
+
+Changes the simulation; affects replays.
