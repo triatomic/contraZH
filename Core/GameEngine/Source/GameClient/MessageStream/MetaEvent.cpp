@@ -1106,10 +1106,17 @@ void MetaMap::generateMetaMap()
 		}
 	}
 	{
-		// List each frame's draw calls by vertex and pixel shader.
+		// Contra's CommandMapDemo.ini gives Shift+Ctrl+F1 to CHEAT_RUNSCRIPT1, and only the first matching record fires, so it gives the key up.
 		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_SHOW_SHADER_DRAWS);
 		if (map->m_key == MK_NONE)
 		{
+			for (MetaMapRec *rec = m_metaMaps; rec; rec = rec->m_next)
+			{
+				if (rec->m_key == MK_F1 && rec->m_modState == SHIFT_CTRL)
+				{
+					rec->m_key = MK_NONE;
+				}
+			}
 			map->m_key = MK_F1;
 			map->m_transition = DOWN;
 			map->m_modState = SHIFT_CTRL;
