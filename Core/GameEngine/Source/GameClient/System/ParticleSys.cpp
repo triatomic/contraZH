@@ -1233,6 +1233,10 @@ void ParticleSystemInfo::validate()
 #endif
 
 	validateAlphaKeyframes(m_alphaKey, ARRAY_SIZE(m_alphaKey));
+
+#if !ENABLE_TERRAIN_CONFORMING_PARTICLES
+	m_conformToTerrain = false;
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

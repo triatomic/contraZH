@@ -43,6 +43,10 @@
 #define PRESERVE_NO_XP_FROM_FLAME_KILLS (0) // The fix for this unfavorable behavior was approved by the Game Design Committee.
 #endif
 
+#ifndef PRESERVE_NO_XP_FROM_HELIX_ATTACHMENT_KILLS
+#define PRESERVE_NO_XP_FROM_HELIX_ATTACHMENT_KILLS (1)
+#endif
+
 #ifndef PRESERVE_NO_XP_FROM_OCL_KILLS
 #define PRESERVE_NO_XP_FROM_OCL_KILLS (1)
 #endif
@@ -180,6 +184,11 @@
 // by using the larger resolution textures from Generals. Content wise these textures are identical.
 #ifndef PRIORITIZE_TEXTURES_BY_SIZE
 #define PRIORITIZE_TEXTURES_BY_SIZE (1)
+#endif
+
+// Enable drawing particles as a terrain-conforming overlay.
+#ifndef ENABLE_TERRAIN_CONFORMING_PARTICLES
+#define ENABLE_TERRAIN_CONFORMING_PARTICLES (1)
 #endif
 
 // Enable obsolete code. This mainly refers to code that existed in Generals but was removed in GeneralsMD.

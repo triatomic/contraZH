@@ -88,6 +88,7 @@ set(GAMEENGINEDEVICE_SRC
     Include/W3DDevice/GameClient/W3DSlopeMap.h
 #    Include/W3DDevice/GameClient/W3DStatusCircle.h
     Include/W3DDevice/GameClient/W3DTerrainBackground.h
+    Include/W3DDevice/GameClient/W3DTerrainParticles.h
     Include/W3DDevice/GameClient/W3DTerrainTracks.h
     Include/W3DDevice/GameClient/W3DTerrainVisual.h
     Include/W3DDevice/GameClient/W3DTreeBuffer.h
@@ -211,6 +212,7 @@ set(GAMEENGINEDEVICE_SRC
     Source/W3DDevice/GameClient/W3DSlopeMap.cpp
 #    Source/W3DDevice/GameClient/W3DStatusCircle.cpp
     Source/W3DDevice/GameClient/W3DTerrainBackground.cpp
+    Source/W3DDevice/GameClient/W3DTerrainParticles.cpp
     Source/W3DDevice/GameClient/W3DTerrainTracks.cpp
     Source/W3DDevice/GameClient/W3DTerrainVisual.cpp
     Source/W3DDevice/GameClient/W3DTreeBuffer.cpp

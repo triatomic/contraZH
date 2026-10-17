@@ -515,6 +515,27 @@ struct IRegion2D
 {
 	ICoord2D lo, hi;					// bounds of 2D rectangular region
 
+	// Keep only the overlapping portion of both regions.
+	void intersectWith( const IRegion2D &other )
+	{
+		if (lo.x < other.lo.x)
+		{
+			lo.x = other.lo.x;
+		}
+		if (lo.y < other.lo.y)
+		{
+			lo.y = other.lo.y;
+		}
+		if (hi.x > other.hi.x)
+		{
+			hi.x = other.hi.x;
+		}
+		if (hi.y > other.hi.y)
+		{
+			hi.y = other.hi.y;
+		}
+	}
+
 	void zero()
 	{
 		lo.zero();
@@ -529,6 +550,12 @@ struct IRegion2D
 	Int width() const { return hi.x - lo.x; }
 	Int height() const { return hi.y - lo.y; }
 	Bool isInRegion( Int x, Int y ) const { return (lo.x < x) && (x < hi.x) && (lo.y < y) && (y < hi.y); }
+
+	Bool contains( const IRegion2D& other ) const
+	{
+		return (lo.x <= other.lo.x) && (other.hi.x <= hi.x) &&
+					 (lo.y <= other.lo.y) && (other.hi.y <= hi.y);
+	}
 };
 
 

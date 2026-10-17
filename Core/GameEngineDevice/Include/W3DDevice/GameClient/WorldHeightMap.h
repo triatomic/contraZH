@@ -279,12 +279,23 @@ public:  // Boundary info
 public:  // height map info.
 	static Int getMinHeightValue() {return K_MIN_HEIGHT;}
 	static Int getMaxHeightValue() {return K_MAX_HEIGHT;}
+	static Bool isValidMapSize(Int width, Int height, Int borderSize); ///< Within MAX_MAP_DIMENSION and MAX_MAP_AREA, width and height include the border
 
 	HeightSampleType *getDataPtr() {return m_data;}
 
 
 	Int getXExtent() const {return m_width;}	///<number of vertices in x
 	Int getYExtent() const {return m_height;}	///<number of vertices in y
+
+	IRegion2D getLogicalBounds() const
+	{
+		IRegion2D bounds;
+		bounds.lo.x = -m_borderSize;
+		bounds.lo.y = -m_borderSize;
+		bounds.hi.x = m_width - m_borderSize;
+		bounds.hi.y = m_height - m_borderSize;
+		return bounds;
+	}
 
 	Region2D getDrawRegion2D();
 
@@ -312,6 +323,15 @@ public:  // height map info.
 
 	inline Int getStoredWidth() const {return m_width; }
 	inline Int getStoredHeight() const {return m_height; }
+
+	///Faster version of above function without all the safety checks
+	HeightSampleType getQuickHeight(Int xIndex, Int yIndex) const
+	{
+		return m_data[yIndex * m_width + xIndex];
+	}
+
+	///Check that the map is flat within logical bounds
+	Bool isTerrainFlat(const IRegion2D& bounds) const;
 
 	void getUVForBlend(Int edgeClass, Region2D *range);
 

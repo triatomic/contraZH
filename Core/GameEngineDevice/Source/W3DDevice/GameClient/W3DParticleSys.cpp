@@ -32,7 +32,7 @@
 #include "GameClient/Color.h"
 #include "W3DDevice/GameClient/W3DParticleSys.h"
 #include "W3DDevice/GameClient/W3DParticleAtlas.h"
-#include "W3DDevice/GameClient/W3DTerrainParticle.h"
+#include "W3DDevice/GameClient/W3DTerrainParticles.h"
 #include "W3DDevice/GameClient/W3DAssetManager.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
 #include "W3DDevice/GameClient/HeightMap.h"
@@ -115,7 +115,7 @@ W3DParticleSystemManager::W3DParticleSystemManager()
 	m_onScreenParticleCount = 0;
 
 	m_pointGroup = NEW PointGroupClass();
-	m_terrainParticles = NEW W3DTerrainParticle();
+	m_terrainParticles = NEW W3DTerrainParticles();
 	//m_streakLine = nullptr;
 	m_streakLine = NEW StreakLineClass();
 
@@ -206,6 +206,7 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	//particles falling under the ground.
 
  	TheTerrainRenderObject->getMaximumVisibleBox(frustum, &bbox, TRUE);
+	m_currentBoundingBox = bbox;
 
 	//@todo lorenzen sez: put these in registers for sure
 	Real bcX = bbox.Center.X;
@@ -711,11 +712,11 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 
 		if (useTerrainConformingParticles)
 		{
-			m_terrainParticles->Set_Texture( texture.Peek() );
-			m_terrainParticles->Set_Shader( shaderForType( sys->getShaderType() ) );
-			m_terrainParticles->Set_Arrays( m_posBuffer, m_RGBABuffer, m_sizeBuffer, m_angleBuffer, pointCount );
-
-			m_terrainParticles->Render();
+			m_terrainParticles->setTexture( texture.Peek() );
+			m_terrainParticles->setShader( shaderForType( sys->getShaderType() ) );
+			m_terrainParticles->setArrays( m_posBuffer, m_RGBABuffer, m_sizeBuffer, m_angleBuffer, pointCount );
+			m_terrainParticles->setBoundingBox( m_currentBoundingBox );
+			m_terrainParticles->render();
 			m_onScreenParticleCount += (pointCount - startCount);
 			pointCount = startCount;
 		}
