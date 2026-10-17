@@ -1142,7 +1142,7 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 		DX8Wrapper::Set_Texture(WATER_SHADOW_STAGE, nullptr);
 		DX8Wrapper::Apply_Render_State_Changes();
 	}
-	// The receiver leaves z unused, so the foam's world to texcoord scale rides there.
+	// The water never reads the receiver's cloud switch in z, so the foam's world to texcoord scale rides there.
 	Vector4 shadowParams = shadowed ? TheW3DShadowMap->getReceiverParams() : Vector4(1.0f, 0.0f, 0.0f, 1.0f);
 	shadowParams.Z = 1.0f / WATER_FOAM_SCALE;
 	const Vector4 shadowColor = shadowed ? TheW3DShadowMap->getReceiverColor() : Vector4(1.0f, 1.0f, 1.0f, 1.0f);

@@ -91,6 +91,15 @@ static Int Get_Shadow_Debug_Mode()
 
 static const Int ShadowDebugMode = Get_Shadow_Debug_Mode();
 
+// CONTRA_CLOUDSUN=0 brings back cloud shadows that darken everything, for comparing the looks.
+static Bool Get_Clouds_Block_Sun()
+{
+	const char *value = getenv("CONTRA_CLOUDSUN");
+	return (value != nullptr) ? atoi(value) != 0 : TRUE;
+}
+
+static const Bool CloudsBlockSun = Get_Clouds_Block_Sun();
+
 W3DShadowMap::W3DShadowMap()
 	: m_depthMode(DEPTH_MODE_NONE),
 	  m_resolution(0),
@@ -519,7 +528,7 @@ Bool W3DShadowMap::bindReceiver(Int stage) const
 
 Vector4 W3DShadowMap::getReceiverParams() const
 {
-	return Vector4(1.0f / (Real)m_resolution, m_depthBias, 0.0f, SHADOW_FILTER_SPACING_TEXELS);
+	return Vector4(1.0f / (Real)m_resolution, m_depthBias, CloudsBlockSun ? 1.0f : 0.0f, SHADOW_FILTER_SPACING_TEXELS);
 }
 
 Vector4 W3DShadowMap::getReceiverColor() const

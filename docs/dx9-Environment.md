@@ -226,9 +226,10 @@ Tuned in the mod's `GameData.ini`:
 * `SkyCloudSize = 600` - (World units across a typical cloud.)
 * `SkyCloudCoverage = 0.45` - (Share of the ground in shadow. 0 is a clear sky, 1 overcast.)
 * `SkyCloudSoftness = 0.25` - (How wide the fade at a cloud's edge is. Low gives crisp edges.)
-* `SkyCloudShadowStrength = 0.35` - (How dark a thick cloud's shadow is. 0 for none. The default matches
-the old clouds' darkest.)
-* `SkyCloudShadowTint = R:235 G:242 B:255` - (The shadow's hue. White gives neutral grey.)
+* `SkyCloudShadowStrength = 0.6` - (How much sun a thick cloud blocks. 0 for none, 1 as dark as a cast
+shadow.)
+* `SkyCloudShadowTint = R:235 G:242 B:255` - (The hue of the sunlight a cloud takes away. White gives
+neutral grey.)
 * `SkyCloudWindSpeed = 11` - (World units a second the clouds drift. 0 holds them still.)
 * `SkyCloudWindAngle = 56` - (Degrees the clouds drift towards, 0 along the map's x. The default
 matches the old clouds.)
@@ -238,6 +239,10 @@ matches the old clouds.)
 
 Notes:
 * Night keeps the clouds off, as before.
+* A cloud blocks only the sun, so clouded ground keeps its sky light and a cast shadow under a
+cloud stays as dark as it was. Unit highlights fade under clouds too. With shadow maps off, clouds
+darken everything as the old clouds did.
+* `CONTRA_CLOUDSUN=0` brings back clouds that darken everything, to compare the two looks.
 * Trees and the water's reflected sky keep their old look.
 * `CONTRA_SKYCLOUDS=0` keeps the tiled texture, to rule the HQ sky out of a rendering fault.
 

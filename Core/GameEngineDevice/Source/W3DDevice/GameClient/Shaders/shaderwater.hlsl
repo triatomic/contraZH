@@ -439,7 +439,7 @@ float4 main(PsIn input) : COLOR
     // A foam depth of 0 reaches the shader as 1 / 10000, and turns crest foam off with the rest.
     foamMask = max(foamMask, saturate((swellHere / max(SwellShape.y, 0.001f) - 0.35f) * 2.5f) * step(WaterParams.z, 1000.0f));
 #endif
-    // The shadow receiver leaves ShadowParams.z unused, and W3DWater puts the foam's world to texcoord scale there.
+    // The water never reads the receiver's cloud switch in ShadowParams.z, so W3DWater puts the foam's world to texcoord scale there.
     // Past about two texels a pixel, each doubling of the ground a pixel covers doubles the foam, so its web stays readable from any height.
     float2 worldDx = ddx(world.xy);
     float2 worldDy = ddy(world.xy);

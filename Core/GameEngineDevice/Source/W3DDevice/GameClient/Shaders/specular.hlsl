@@ -165,7 +165,16 @@ float4 main(PsIn input) : COLOR
 #else
     float lit = 1.0f;
 #endif
+
+#if RECEIVE
+    float4 position = float4(input.Position, 1.0f);
+    float clouds = lerp(1.0f, Brightness(tex2D(CloudTexture, float2(dot(position, CloudU), dot(position, CloudV))).rgb), TextureInfo.w);
+
+    // A cloud that blocks the sun takes its highlight too.
+    highlight *= lit * lerp(1.0f, clouds, ShadowParams.z);
+#else
     highlight *= lit;
+#endif
 
     float3 color = SunColor.rgb * highlight;
     float darken = 1.0f;
@@ -188,9 +197,7 @@ float4 main(PsIn input) : COLOR
     color += tex2D(EmissiveMap, input.TexCoord).rgb * TextureInfo.x;
 
 #if RECEIVE
-    float4 position = float4(input.Position, 1.0f);
-    float clouds = Brightness(tex2D(CloudTexture, float2(dot(position, CloudU), dot(position, CloudV))).rgb);
-    darken *= Brightness(lerp(ShadowColor.rgb, float3(1.0f, 1.0f, 1.0f), lit)) * lerp(1.0f, clouds, TextureInfo.w);
+    darken *= Brightness(CloudShadowFactor(lit, clouds.xxx));
 #endif
 
     // The debug view tints everything the pass covers faintly and shows the highlight 8x.

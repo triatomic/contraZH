@@ -1174,7 +1174,7 @@ GlobalData::GlobalData()
 	m_skyCloudSize = 600.0f;
 	m_skyCloudCoverage = 0.45f;
 	m_skyCloudSoftness = 0.25f;
-	m_skyCloudShadowStrength = 0.35f;
+	m_skyCloudShadowStrength = 0.6f;
 	m_skyCloudShadowTint.red = 235.0f / 255.0f;
 	m_skyCloudShadowTint.green = 242.0f / 255.0f;
 	m_skyCloudShadowTint.blue = 1.0f;

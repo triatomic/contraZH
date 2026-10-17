@@ -171,7 +171,7 @@ namespace
 		RENDER_REAL("Sky", "SkyCloudSoftness", m_skyCloudSoftness, 0.02f, 1.0f, 0.01f,
 			"How wide the fade at a cloud's edge is. Low gives crisp edges."),
 		RENDER_REAL("Sky", "SkyCloudShadowStrength", m_skyCloudShadowStrength, 0.0f, 1.0f, 0.01f,
-			"How dark a thick cloud's shadow is. 0 for none."),
+			"How much sun a thick cloud blocks. 0 for none, 1 as dark as a cast shadow."),
 		RENDER_COLOR("Sky", "SkyCloudShadowTint", m_skyCloudShadowTint,
 			"The shadow's hue. White gives neutral grey. Unticked leaves the key out, so GameData.ini decides."),
 		RENDER_REAL("Sky", "SkyCloudWindSpeed", m_skyCloudWindSpeed, 0.0f, 100.0f, 0.5f,

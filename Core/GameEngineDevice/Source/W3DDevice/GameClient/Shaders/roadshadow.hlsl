@@ -232,13 +232,17 @@ float4 main(PsIn input) : COLOR
 
 #if NOISE_COUNT >= 1
     float4 cloud = tex2D(Noise1Texture, input.Noise1UV);
+#if !SHADOWED
     color *= cloud;
+#endif
 #endif
 #if NOISE_COUNT >= 2
     color.rgb *= GroundNoise(Noise2Texture, input.Noise2UV);
 #endif
 
-#if SHADOWED
+#if SHADOWED && NOISE_COUNT >= 1
+    color.rgb *= CloudShadowFactor(lit, cloud.rgb);
+#elif SHADOWED
     color.rgb *= lerp(ShadowColor.rgb, float3(1.0f, 1.0f, 1.0f), lit);
 #endif
 
