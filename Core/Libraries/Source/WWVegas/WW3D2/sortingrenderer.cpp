@@ -324,24 +324,41 @@ static void End_Soft(bool soft)
 #if defined(BUILD_WITH_D3D9)
 
 // The node's state is applied once, then each copy changes only the world transform and the blend weight.
-// An own alpha copy carries the weight in the texture factor's alpha, which stage 0 multiplies into the texture's.
 static void Draw_Ghost_Node(SortingNodeStruct* state)
 {
 	DX8Wrapper::Apply_Render_State_Changes();
-	if (!state->own_alpha) {
-		DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_BLENDFACTOR);
-		DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_INVBLENDFACTOR);
-	}
-	else {
-		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
-		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
-		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_ALPHAARG2, D3DTA_TFACTOR);
-	}
 	if (state->flat_colour != 0) {
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_TEXTUREFACTOR, state->flat_colour);
 		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
 		DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_COLORARG1, D3DTA_TFACTOR);
 		DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_COLOROP, D3DTOP_DISABLE);
+	}
+	if (!state->own_alpha) {
+		DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_BLENDFACTOR);
+		DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_INVBLENDFACTOR);
+	}
+	else {
+		// The texture factor's alpha carries the weight, scaling the mesh's own alpha in the first stage its shader leaves free.
+		unsigned stage=1;
+		while (stage<MAX_TEXTURE_STAGES && DX8Wrapper::Get_DX8_Texture_Stage_State(stage, D3DTSS_COLOROP)!=D3DTOP_DISABLE) {
+			++stage;
+		}
+		if (stage<MAX_TEXTURE_STAGES) {
+			DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_COLORARG1, D3DTA_CURRENT);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_ALPHAARG1, D3DTA_CURRENT);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_ALPHAARG2, D3DTA_TFACTOR);
+			if (stage+1<MAX_TEXTURE_STAGES) {
+				DX8Wrapper::Set_DX8_Texture_Stage_State(stage+1, D3DTSS_COLOROP, D3DTOP_DISABLE);
+				DX8Wrapper::Set_DX8_Texture_Stage_State(stage+1, D3DTSS_ALPHAOP, D3DTOP_DISABLE);
+			}
+		}
+		else {
+			DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_ALPHAOP, D3DTOP_MODULATE);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+			DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_ALPHAARG2, D3DTA_TFACTOR);
+		}
 	}
 	const unsigned colour=(state->flat_colour != 0) ? (state->flat_colour & 0x00FFFFFF) : 0x00FFFFFF;
 	for (unsigned i=0;i<state->ghost_count;++i) {

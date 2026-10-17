@@ -18,19 +18,22 @@
 
 #pragma once
 
-// Counts each frame's draw calls by the vertex and pixel shader bound at the time, one text line per pair.
-// While enabled it hooks the D3D9 device's draw and shader calls, so every caller is counted.
+// Counts each frame's draw calls by bound vertex and pixel shader, hooking the D3D9 device's draw and shader calls while enabled.
 class ShaderDrawCounterClass
 {
 public:
 	enum { MAX_LINES = 64, MAX_LINE_LENGTH = 96 };
 
+	// Stays off in a D3D8 build, which has no shaders to count.
 	static void Set_Enabled(bool enabled);
 	static bool Is_Enabled();
 
 	// Publishes the frame's lines and starts counting the next one.
 	static void End_Frame();
 	static void Release_Device();
+
+	// A reset unbinds the shaders without going through the hooks.
+	static void Device_Reset();
 
 	static int Get_Line_Count();
 	static const char * Get_Line(int index);

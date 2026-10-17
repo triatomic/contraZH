@@ -1810,11 +1810,11 @@ void W3DDisplay::drawShaderDrawCounts()
 {
 	const Int lineCount = ShaderDrawCounterClass::Get_Line_Count();
 
-	// Twice a second keeps the numbers readable
+	// Twice a second keeps the numbers readable, and an empty overlay waits for no timer
 	const UnsignedInt now = timeGetTime();
 	if (now - m_shaderDrawRefreshTime >= 500)
 	{
-		m_shaderDrawRefreshTime = now;
+		m_shaderDrawRefreshTime = (lineCount > 0) ? now : 0;
 		for (Int i = 0; i < lineCount; i++)
 		{
 			if (m_shaderDrawStrings[i] == nullptr)

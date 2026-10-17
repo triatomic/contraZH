@@ -3880,8 +3880,7 @@ static void motionBlurSpinAlphas(Real *alpha, Int count)
 	}
 }
 
-// A moving object's copies overlap one another along its length, so they share the opacity: where every copy
-// covers a pixel it ends up MotionBlurMoveOpacity, and each copy's share falls off towards the oldest.
+// A moving object's overlapping copies add up to MotionBlurMoveOpacity where all cover a pixel, each share smaller towards the oldest.
 static void motionBlurMoveAlphas(Real *alpha, Int count)
 {
 	const Real clear = 1.0f - WWMath::Clamp(TheGlobalData->m_motionBlurMoveOpacity, 0.0f, 1.0f);

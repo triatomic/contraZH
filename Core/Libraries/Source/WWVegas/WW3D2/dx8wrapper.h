@@ -353,6 +353,7 @@ public:
 	static void Set_DX8_Render_State(D3DRENDERSTATETYPE state, unsigned value);
 	static void Set_DX8_Clip_Plane(DWORD Index, CONST float* pPlane);
 	static void Set_DX8_Texture_Stage_State(unsigned stage, D3DTEXTURESTAGESTATETYPE state, unsigned value);
+	static unsigned Get_DX8_Texture_Stage_State(unsigned stage, D3DTEXTURESTAGESTATETYPE state) { return TextureStageStates[stage][(unsigned int)state]; }
 #if defined(BUILD_WITH_D3D9)
 	// The moved sampler states have their own type, so only the wrapper accepts them
 	static void Set_DX8_Texture_Stage_State(unsigned stage, D3D8SamplerStageState state, unsigned value)

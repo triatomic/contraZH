@@ -275,6 +275,7 @@ static HRESULT Create_D3D_Device(UINT adapter, HWND hwnd, DWORD behavior, D3DPRE
 
 static HRESULT Reset_D3D_Device(D3DPRESENT_PARAMETERS& params)
 {
+	ShaderDrawCounterClass::Device_Reset();
 #if defined(BUILD_WITH_D3D9)
 	if (DX8Wrapper::Is_Ex())
 	{

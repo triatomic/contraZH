@@ -105,9 +105,7 @@ public:
 	static SoftParticleHookClass *Peek_Soft_Particle_Hook();
 	static void Set_Insert_Effects(unsigned effects, const void *effectData, float disruptionStrength = 1.0f);
 
-	// Queues a rigid mesh's motion blur copies as one node. It draws them in turn with only the world transform and the
-	// blend weight changing, and in the flat ARGB colour where that is not 0. An opaque mesh blends in by the weight as
-	// a constant; an alpha blended one keeps its blend and scales its texture's alpha by the weight.
+	// Queues a rigid mesh's motion blur copies as one node, each blending in by its weight and drawn in flat_colour unless 0.
 	static void Insert_Ghosts(
 		const SphereClass& bounding_sphere,
 		unsigned short start_index,

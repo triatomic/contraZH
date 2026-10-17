@@ -61,8 +61,8 @@ reveals the map)
 Esc opens. Sound stops, music plays on, and the camera still moves)
 * `Shift + Ctrl + Z` - (Toggles the camera zoom limit)
 * `Ctrl + F1` - (Toggles back face culling, drawing every face double sided when off. Contra also
-binds this key to `SAVE_VIEW1`, so it saves camera bookmark 1 too. `CHEAT_TOGGLE_FACE_CULLING` in
-CommandMap.ini)
+binds this key to `SAVE_VIEW1`, which this cheat build shadows, so camera bookmark 1 is not saved.
+`CHEAT_TOGGLE_FACE_CULLING` in CommandMap.ini)
 * `Shift + Ctrl + F1` - (D3D9 only. Lists the last frame's draw calls in the top right corner, one
 line per vertex and pixel shader pair with its draw and primitive counts, busiest first. `fixed`
 means the fixed function pipeline. Refreshes twice a second. Takes the key from `CHEAT_RUNSCRIPT1` in

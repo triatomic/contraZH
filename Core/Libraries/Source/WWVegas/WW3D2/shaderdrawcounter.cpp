@@ -69,6 +69,8 @@ static int PairCount = 0;
 static int LastPair = 0;
 static unsigned TotalDraws = 0;
 static unsigned TotalPrimitives = 0;
+static unsigned UntrackedDraws = 0;
+static unsigned UntrackedPrimitives = 0;
 
 static void Count_Draw(UINT primitive_count)
 {
@@ -86,6 +88,8 @@ static void Count_Draw(UINT primitive_count)
 		{
 			if (PairCount == MAX_PAIRS)
 			{
+				++UntrackedDraws;
+				UntrackedPrimitives += primitive_count;
 				return;
 			}
 			Pairs[index].VertexShader = CurrentVertexShader;
@@ -185,6 +189,8 @@ static void Reset_Counts()
 	LastPair = 0;
 	TotalDraws = 0;
 	TotalPrimitives = 0;
+	UntrackedDraws = 0;
+	UntrackedPrimitives = 0;
 }
 
 static void Install(IDirect3DDevice9 * device)
@@ -257,25 +263,37 @@ static void Publish()
 
 	qsort(Pairs, PairCount, sizeof(PairStruct), Compare_Pairs);
 
-	snprintf(Lines[0], length, "Shader draws: %u draws, %u prims, %d shader pairs", TotalDraws, TotalPrimitives, PairCount);
+	const bool untracked = UntrackedDraws != 0;
+	snprintf(Lines[0], length, "Shader draws: %u draws, %u prims, %d%s shader pairs", TotalDraws, TotalPrimitives, PairCount, untracked ? "+" : "");
 	snprintf(Lines[1], length, " draws    prims  vertex + pixel");
 	int line = 2;
-	for (int i = 0; i < PairCount; ++i)
+	int i = 0;
+	for (; i < PairCount; ++i)
 	{
-		if (line == max_lines - 1 && i < PairCount - 1)
+		if (line == max_lines - 1 && (i < PairCount - 1 || untracked))
 		{
-			unsigned draws = 0;
-			unsigned primitives = 0;
-			for (int rest = i; rest < PairCount; ++rest)
-			{
-				draws += Pairs[rest].Draws;
-				primitives += Pairs[rest].Primitives;
-			}
-			snprintf(Lines[line++], length, "%6u %8u  ... %d more pairs", draws, primitives, PairCount - i);
 			break;
 		}
 		snprintf(Lines[line++], length, "%6u %8u  %s + %s", Pairs[i].Draws, Pairs[i].Primitives,
 			Shader_Name(Pairs[i].VertexShader), Shader_Name(Pairs[i].PixelShader));
+	}
+	if (i < PairCount || untracked)
+	{
+		unsigned draws = UntrackedDraws;
+		unsigned primitives = UntrackedPrimitives;
+		for (int rest = i; rest < PairCount; ++rest)
+		{
+			draws += Pairs[rest].Draws;
+			primitives += Pairs[rest].Primitives;
+		}
+		if (i < PairCount)
+		{
+			snprintf(Lines[line++], length, "%6u %8u  ... %d more pairs%s", draws, primitives, PairCount - i, untracked ? " and untracked ones" : "");
+		}
+		else
+		{
+			snprintf(Lines[line++], length, "%6u %8u  ... untracked pairs", draws, primitives);
+		}
 	}
 	LineCount = line;
 }
@@ -284,7 +302,9 @@ static void Publish()
 
 void ShaderDrawCounterClass::Set_Enabled(bool enabled)
 {
+#if defined(BUILD_WITH_D3D9)
 	Enabled = enabled;
+#endif
 }
 
 bool ShaderDrawCounterClass::Is_Enabled()
@@ -320,6 +340,14 @@ void ShaderDrawCounterClass::Release_Device()
 {
 #if defined(BUILD_WITH_D3D9)
 	Uninstall();
+#endif
+}
+
+void ShaderDrawCounterClass::Device_Reset()
+{
+#if defined(BUILD_WITH_D3D9)
+	CurrentVertexShader = nullptr;
+	CurrentPixelShader = nullptr;
 #endif
 }
 
