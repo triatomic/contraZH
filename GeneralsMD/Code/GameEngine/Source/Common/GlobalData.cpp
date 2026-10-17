@@ -363,6 +363,15 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ "PlanarMirrorTint",					INI::parseRGBColor,			nullptr,			offsetof( GlobalData, m_planarMirrorTuning.tint ) },
 	{ "PlanarMirrorDistortion",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_planarMirrorTuning.distortion ) },
 	{ "PlanarMirrorFrost",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_planarMirrorTuning.frost ) },
+	{ "MotionBlurOpacity",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_motionBlurOpacity ) },
+	{ "MotionBlurRotorMinSpeed",			INI::parseAngleReal,		nullptr,			offsetof( GlobalData, m_motionBlurRotorMinSpeed ) },
+	{ "MotionBlurRotorExposure",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_motionBlurRotorExposure ) },
+	{ "MotionBlurRotorMaxSweep",			INI::parseAngleReal,		nullptr,			offsetof( GlobalData, m_motionBlurRotorMaxSweep ) },
+	{ "MotionBlurRotorStep",				INI::parseAngleReal,		nullptr,			offsetof( GlobalData, m_motionBlurRotorStep ) },
+	{ "MotionBlurMoveMinSpeed",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_motionBlurMoveMinSpeed ) },
+	{ "MotionBlurMoveExposure",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_motionBlurMoveExposure ) },
+	{ "MotionBlurMoveStep",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_motionBlurMoveStep ) },
+	{ "MotionBlurMoveKindOf",				KindOfMaskType::parseFromINI,	nullptr,			offsetof( GlobalData, m_motionBlurMoveKindOf ) },
 	{ "AmbientOcclusionRadius",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_ambientOcclusionRadius ) },
 	{ "AmbientOcclusionStrength",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_ambientOcclusionStrength ) },
 	{ "GroundNoiseStrength",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_groundNoiseStrength ) },
@@ -938,6 +947,7 @@ GlobalData::GlobalData()
   m_waterReflections = TRUE;
   m_shorelineFoam = TRUE;
   m_useSoftParticles = TRUE;
+  m_useMotionBlur = TRUE;
   m_useFlameShaders = TRUE;
   m_useElectricShaders = TRUE;
   m_useLaserShaders = TRUE;
@@ -1141,6 +1151,16 @@ GlobalData::GlobalData()
 	m_rotrHack = FALSE;
 	m_planarMirrorShader = TRUE;
 	m_planarMirrorTuning.setDefaults();
+	m_motionBlurOpacity = 0.35f;
+	m_motionBlurRotorMinSpeed = DEG_TO_RADF(360.0f);
+	m_motionBlurRotorExposure = 1.0f / 30.0f;
+	m_motionBlurRotorMaxSweep = DEG_TO_RADF(120.0f);
+	m_motionBlurRotorStep = DEG_TO_RADF(6.0f);
+	m_motionBlurMoveMinSpeed = 100.0f;
+	m_motionBlurMoveExposure = 0.06f;
+	m_motionBlurMoveStep = 1.5f;
+	m_motionBlurMoveKindOf.clear();
+	m_motionBlurMoveKindOf.set(KINDOF_AIRCRAFT);
 	m_ambientOcclusionRadius = 12.0f;
 	m_ambientOcclusionStrength = 1.0f;
 	m_groundNoiseStrength = 0.12f;
@@ -1833,6 +1853,8 @@ static const char *const LiveGameDataKeys[] =
 	"HeadlightPoolIntensity", "HeadlightPoolRange", "HeadlightPoolAngle", "HeadlightPoolPitch", "HeadlightPoolFalloff",
 	"HeadlightPoolClampBrightness",
 	"PlanarMirrorReflectivity", "PlanarMirrorTint", "PlanarMirrorDistortion", "PlanarMirrorFrost",
+	"MotionBlurOpacity", "MotionBlurRotorMinSpeed", "MotionBlurRotorExposure", "MotionBlurRotorMaxSweep", "MotionBlurRotorStep",
+	"MotionBlurMoveMinSpeed", "MotionBlurMoveExposure", "MotionBlurMoveStep", "MotionBlurMoveKindOf",
 	"LaserGroundGlowRadius", "LaserGroundGlowFalloff", "LaserGroundGlowWrap", "LaserGroundGlowDebug", "LaserGroundGlowOverlap",
 	nullptr
 };
@@ -2055,6 +2077,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_waterReflections = optionPref.getWaterReflectionsEnabled();
 	TheWritableGlobalData->m_shorelineFoam = optionPref.getShorelineFoamEnabled();
 	TheWritableGlobalData->m_useSoftParticles = optionPref.getSoftParticlesEnabled();
+	TheWritableGlobalData->m_useMotionBlur = optionPref.getMotionBlurEnabled();
 	TheWritableGlobalData->m_useFlameShaders = optionPref.getFlameShadersEnabled();
 	TheWritableGlobalData->m_useElectricShaders = optionPref.getElectricShadersEnabled();
 	TheWritableGlobalData->m_useLaserShaders = optionPref.getLaserShadersEnabled();

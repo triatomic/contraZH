@@ -457,6 +457,11 @@ public:
 	unsigned						Get_Shader_Effects() const { return ShaderEffects; }
 	const void *					Peek_Shader_Effect_Data() const { return ShaderEffectData; }
 
+	// Which of MotionBlurClass's ghost sets is this object's, valid only in the frame it was set for.
+	void							Set_Motion_Blur_Slot(unsigned frame, int slot) { MotionBlurFrame=frame; MotionBlurSlot=slot; }
+	unsigned						Get_Motion_Blur_Frame() const { return MotionBlurFrame; }
+	int								Get_Motion_Blur_Slot() const { return MotionBlurSlot; }
+
    virtual int						Get_Sort_Level() const													{ return 0; /* SORT_LEVEL_NONE */ }
    virtual void					Set_Sort_Level(int level)													{ }
 
@@ -562,6 +567,8 @@ protected:
 	bool								DisruptionOnly;
 	unsigned							ShaderEffects;
 	const void *					ShaderEffectData;
+	unsigned							MotionBlurFrame;
+	int								MotionBlurSlot;
 
 	RenderHookClass *				RenderHook;
 

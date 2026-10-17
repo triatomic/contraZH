@@ -464,3 +464,40 @@ Notes:
 * At most 16 rings show at once; a new one replaces the oldest.
 * The ring lies flat at the effect's height, so on steep ground it is centred but not draped.
 
+# Motion blur
+
+Fast spinning parts and fast aircraft trail fading copies of their earlier poses. A helicopter rotor
+smears round its arc, and a jet streaks along its path. Needs the Direct3D 9 build.
+
+* `MotionBlur = Yes` - (No draws every model sharp. Also `Motion blur` on the Shaders page. Needs
+`CheckMotionBlur` in `OptionsMenu.wnd` for the menu control.)
+
+A part blurs when its model's animation spins it faster than `MotionBlurRotorMinSpeed`, whatever the
+axis. The copies come from the animation itself, so a rotor that turns several blade widths a frame
+still blurs round its arc. An object blurs as a whole when its kind is in `MotionBlurMoveKindOf` and
+it moves faster than `MotionBlurMoveMinSpeed`. Both can apply at once.
+
+Tuned in the mod's `GameData.ini`:
+
+* `MotionBlurOpacity = 0.35` - (How opaque the newest copy draws. Older copies fade towards nothing.)
+* `MotionBlurRotorMinSpeed = 360` - (Degrees a second a part must spin at to blur.)
+* `MotionBlurRotorExposure = 0.033` - (Seconds of spin the blur trails behind a part.)
+* `MotionBlurRotorMaxSweep = 120` - (The most degrees the blur trails behind a part. 360 fills the
+whole disc.)
+* `MotionBlurRotorStep = 6` - (Degrees between copies. Smaller is smoother and costs more draws.)
+* `MotionBlurMoveMinSpeed = 100` - (World units a second an object must move at to blur.)
+* `MotionBlurMoveExposure = 0.06` - (Seconds of movement the blur trails behind an object.)
+* `MotionBlurMoveStep = 1.5` - (World units between copies.)
+* `MotionBlurMoveKindOf = AIRCRAFT` - (Object kinds that blur when they move fast. Add `PROJECTILE`
+for missiles.)
+
+`W3DModelDraw` takes one key:
+
+* `MotionBlur = Yes` - (No keeps the model sharp.)
+
+Notes:
+* A model blurs at most 32 copies a part.
+* Only opaque meshes blur. Translucent, skinned, stealthed and fading meshes keep their single draw.
+* Copies cast no shadows and take no specular or other material passes.
+* A spin is read from the model's animation, so parts that code turns, such as tank wheels and
+turrets, do not blur.

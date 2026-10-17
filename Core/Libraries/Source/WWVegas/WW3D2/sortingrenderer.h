@@ -103,4 +103,7 @@ public:
 	static void Set_Soft_Particle_Hook(SoftParticleHookClass *hook);
 	static SoftParticleHookClass *Peek_Soft_Particle_Hook();
 	static void Set_Insert_Effects(unsigned effects, const void *effectData, float disruptionStrength = 1.0f);
+
+	// Rigid meshes inserted while this is above 0 blend in by it as a constant, whatever their own alpha.
+	static void Set_Insert_Blend_Factor(float factor);
 };

@@ -63,6 +63,7 @@
 #include "stripoptimizer.h"
 #include "meshgeometry.h"
 #include "lightenvironment.h"
+#include "motionblur.h"
 #include <algorithm>
 #include <vector>
 
@@ -2755,6 +2756,37 @@ static void Draw_Polygons(DX8FVFCategoryContainer * container, DX8PolygonRendere
 	}
 }
 
+// Queues the mesh's earlier poses as translucent copies, which the sorting renderer draws after the opaque scene.
+// Each keeps the mesh's alpha test and blends in by a constant, and none writes depth.
+static void Insert_Motion_Ghosts(DX8PolygonRendererClass * renderer, MeshClass * mesh, const Matrix3D & world, const ShaderClass & shader)
+{
+	if (shader.Get_Src_Blend_Func() != ShaderClass::SRCBLEND_ONE || shader.Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO) {
+		return;
+	}
+	const MotionBlurClass::GhostsStruct * ghosts = MotionBlurClass::Peek(mesh);
+	if (ghosts == nullptr) {
+		return;
+	}
+
+	ShaderClass ghostShader = shader;
+	ghostShader.Set_Depth_Mask(ShaderClass::DEPTH_WRITE_DISABLE);
+	ghostShader.Set_Src_Blend_Func(ShaderClass::SRCBLEND_SRC_ALPHA);
+	ghostShader.Set_Dst_Blend_Func(ShaderClass::DSTBLEND_ONE_MINUS_SRC_ALPHA);
+	DX8Wrapper::Set_Shader(ghostShader);
+
+	for (int i=0;i<ghosts->Count;++i) {
+		Matrix3D ghost;
+		MotionBlurClass::Get_Transform(*ghosts,i,world,&ghost);
+		DX8Wrapper::Set_Transform(D3DTS_WORLD,ghost);
+		SortingRendererClass::Set_Insert_Blend_Factor(MotionBlurClass::Get_Alpha(*ghosts,i));
+		renderer->Render_Sorted(mesh->Get_Base_Vertex_Offset(),mesh->Get_Bounding_Sphere());
+	}
+	SortingRendererClass::Set_Insert_Blend_Factor(0.0f);
+
+	DX8Wrapper::Set_Shader(shader);
+	DX8Wrapper::Set_Transform(D3DTS_WORLD,world);
+}
+
 void DX8TextureCategoryClass::Render_Task(PolyRenderTaskClass * prt, VertexMaterialClass * vmaterial, const ShaderClass & theShader, ShaderClass theAlphaShader, bool replay)
 {
 	DX8PolygonRendererClass * renderer = prt->Peek_Polygon_Renderer();
@@ -2930,6 +2962,12 @@ void DX8TextureCategoryClass::Render_Task(PolyRenderTaskClass * prt, VertexMater
 		}
 		else
 			Draw_Polygons(container,renderer,mesh,vmaterial,replay);
+
+		// the sorting renderer would copy a sorting container's vertices, and a skin's sit in a buffer that can wrap first
+		if (!replay && !container->Is_Sorting() && !renderer->Is_Strip() && mesh->Get_Alpha_Override() == 1.0f &&
+			!mesh->Peek_Model()->Get_Flag(MeshModelClass::SKIN) && WW3D::Is_Sorting_Enabled()) {
+			Insert_Motion_Ghosts(renderer,mesh,*world_transform,theShader);
+		}
 	}
 //--------------------------------------------------------------------
 	if (mesh->Get_ObjectScale() != 1.0f)

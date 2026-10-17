@@ -26,6 +26,7 @@
 #include "lightenvironment.h"
 #include "mesh.h"
 #include "meshmdl.h"
+#include "motionblur.h"
 #include "vertmaterial.h"
 #include "shader.h"
 #include "matpass.h"
@@ -71,6 +72,11 @@ bool DX8InstancingClass::Allows_Mesh(MeshClass * mesh)
 	}
 	if (Pass == PASS_LIT)
 	{
+		// its motion blur copies are queued from the mesh renderer's own draw
+		if (MotionBlurClass::Peek(mesh) != nullptr)
+		{
+			return false;
+		}
 		// Later passes of a multi-pass model and per-mesh pass overrides stay fixed function, and
 		// a pass testing depth EQUAL must follow its base pass down the same path.
 		if (model->Get_Pass_Count() != 1 || mesh->Has_Material_Pass_Override())
