@@ -1,6 +1,7 @@
 set(UTILITY_SRC
     Allocator/SystemAllocator.h
     Utility/aligned_pod.h
+    Utility/bit_adapter.h
     Utility/compat.h
     Utility/comsupp_compat.h
     Utility/endian_compat.h
