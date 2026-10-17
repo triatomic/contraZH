@@ -2,6 +2,7 @@ set(PRECOMPILED_SRC
     Precompiled/CppMacros.h
     Precompiled/CppTypes.h
     Precompiled/precompiled.h
+    Precompiled/unichar.h
 )
 
 ## core_precompiled
