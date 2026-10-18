@@ -118,7 +118,7 @@ void W3DDependencyCarrierDraw::adjustTransformMtx(Matrix3D& mtx) const
 			else
 			{
 				mtx = *theirDrawable->getTransformMatrix();
-				logMissingContainerBone(theirDrawable);
+				logMissingContainerBone(theirDrawable, boneName);
 			}
 		}
 	}

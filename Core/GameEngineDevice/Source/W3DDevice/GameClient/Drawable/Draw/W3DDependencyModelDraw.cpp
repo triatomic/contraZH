@@ -39,13 +39,14 @@
 #include "GameLogic/Module/ContainModule.h"
 #include "W3DDevice/GameClient/Module/W3DDependencyModelDraw.h"
 
+#include <map>
+
 
 
 
 
 //-------------------------------------------------------------------------------------------------
 W3DDependencyModelDrawModuleData::W3DDependencyModelDrawModuleData()
-	: m_missingBoneLogCount(0)
 {
 }
 
@@ -159,37 +160,48 @@ void W3DDependencyModelDraw::adjustTransformMtx(Matrix3D& mtx) const
 			else
 			{
         mtx = *theirDrawable->getTransformMatrix();//TransformMatrix();
-				logMissingContainerBone(theirDrawable);
+				logMissingContainerBone(theirDrawable, boneName);
 			}
 		}
 	}
 }
 
 // ------------------------------------------------------------------------------------------------
-void W3DDependencyModelDraw::logMissingContainerBone(const Drawable* container) const
+void W3DDependencyModelDraw::logMissingContainerBone(const Drawable* container, const AsciiString& slotBoneName) const
 {
 #ifdef DEBUG_LOGGING
-	// Logs from every frame the rider is drawn, so cap it per rider template.
-	const W3DDependencyModelDrawModuleData* md = getW3DDependencyModelDrawModuleData();
-	if (md->m_missingBoneLogCount >= 10)
+	// Logs from every frame the rider is drawn, so cap it per rider and container template.
+	static std::map<std::pair<const ThingTemplate*, const ThingTemplate*>, Int> s_logCounts;
+	Int& count = s_logCounts[std::make_pair(getDrawable()->getTemplate(), container->getTemplate())];
+	if (count >= 10)
 	{
 		return;
 	}
-	++md->m_missingBoneLogCount;
+	++count;
 
-	AsciiString modelName = "<none>";
+	AsciiString models;
+	AsciiString modelName;
 	Coord3D center;
 	for (DrawModule const** dm = container->getDrawModules(); dm && *dm; ++dm)
 	{
 		const ObjectDrawInterface* di = (*dm)->getObjectDrawInterface();
 		if (di && di->clientOnly_getModelNameAndCenter(&modelName, &center))
 		{
-			break;
+			if (models.isNotEmpty())
+			{
+				models.concat(", ");
+			}
+			models.concat(modelName);
 		}
 	}
-	DEBUG_LOG(("m_attachToDrawableBoneInContainer %s not found in model %s of %s, carrying %s",
-		md->m_attachToDrawableBoneInContainer.str(), modelName.str(),
+	DEBUG_LOG(("m_attachToDrawableBoneInContainer %s%s%s not found in models %s of %s, carrying %s",
+		slotBoneName.str(), slotBoneName.isEmpty() ? "" : " or ",
+		getW3DDependencyModelDrawModuleData()->m_attachToDrawableBoneInContainer.str(),
+		models.isEmpty() ? "<none>" : models.str(),
 		container->getTemplate()->getName().str(), getDrawable()->getTemplate()->getName().str()));
+#else
+	(void)container;
+	(void)slotBoneName;
 #endif
 }
 
