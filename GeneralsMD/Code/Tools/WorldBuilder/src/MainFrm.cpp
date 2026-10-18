@@ -45,6 +45,7 @@
 #include "qt/panels/WBQtCameraBridge.h"
 #include "qt/panels/WBQtAnimScrubBridge.h"
 #include "qt/panels/WBQtPickUnitBridge.h"
+#include "qt/WBQtMessageBox.h"
 #endif
 #define ADJUST_VIEW_TIMER 6969
 #define COUNTDOWN_TIMER 6910
@@ -740,6 +741,10 @@ void CMainFrame::OnEditGloballightoptions()
 
 void CMainFrame::closeScriptDialog()
 {
+#ifdef RTS_HAS_QT
+	// The Qt window outlives the model; hide it so it never shows a deleted session.
+	WBQtScript_Close();
+#endif
     if (m_scriptDialog) {
         m_scriptDialog->DestroyWindow();
         delete m_scriptDialog;
@@ -976,6 +981,12 @@ void CMainFrame::OnMcpServerInformation()
 		static_cast<unsigned long>(WorldBuilderMcpBridge::BRIDGE_VERSION),
 		static_cast<unsigned long>(GetCurrentProcessId()),
 		"GeneralsWorldBuilderMcp");
+#ifdef RTS_HAS_QT
+	if (WBQtMessageBox_Show(information, "WorldBuilder MCP Server", MB_OK | MB_ICONINFORMATION) != 0)
+	{
+		return;
+	}
+#endif
 	MessageBox(information, "WorldBuilder MCP Server", MB_OK | MB_ICONINFORMATION);
 }
 

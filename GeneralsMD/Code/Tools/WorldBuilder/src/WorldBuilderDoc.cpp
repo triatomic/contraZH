@@ -75,6 +75,7 @@
 #include "qt/panels/WBQtMapGenBridge.h"
 #include "qt/panels/WBQtWaterTuningBridge.h"
 #include "qt/panels/WBQtHQPreviewBridge.h"
+#include "qt/WBQtMessageBox.h"
 #endif
 #include "SaveMap.h"
 #include "ScriptDialog.h"
@@ -2897,14 +2898,24 @@ BOOL CWorldBuilderDoc::DoSave(LPCTSTR lpszPathName, BOOL bReplace)
         if (check)
         {
             MessageBeep(MB_ICONWARNING);
-			int res = MessageBox(
-				AfxGetMainWnd()->GetSafeHwnd(),
+			const char *dupText =
 				"Duplicate / Overlapping objects were detected in the current map.\n"
 				"Are you sure you want to continue saving or fix this monsieur?\n\n"
-				"Click OK to save anyway, or Cancel to return and fix the issue.",
-				"Duplicate / Overlapping Objects Detected",
-				MB_OKCANCEL | MB_ICONERROR | MB_TOPMOST
-			);
+				"Click OK to save anyway, or Cancel to return and fix the issue.";
+			const char *dupCaption = "Duplicate / Overlapping Objects Detected";
+			int res = 0;
+#ifdef RTS_HAS_QT
+			res = WBQtMessageBox_Show(dupText, dupCaption, MB_OKCANCEL | MB_ICONERROR);
+#endif
+			if (res == 0)
+			{
+				res = MessageBox(
+					AfxGetMainWnd()->GetSafeHwnd(),
+					dupText,
+					dupCaption,
+					MB_OKCANCEL | MB_ICONERROR | MB_TOPMOST
+				);
+			}
 
 			g_warnedfordupedforthismap = true;
             if (res == IDCANCEL)
@@ -2962,10 +2973,20 @@ BOOL CWorldBuilderDoc::DoSave(LPCTSTR lpszPathName, BOOL bReplace)
 		}
 #endif
 		if (info.browse) {
+#ifdef RTS_HAS_QT
+			char qtPath[_MAX_PATH];
+			if (WBQtFileDialog_Run(1, bReplace ? "Save As" : "Save Copy As",
+					"Missions (*.map)|*.map|All Files (*.*)|*.*||", "map", newName, qtPath, sizeof(qtPath)) == 0)
+			{
+				return FALSE;       // don't even attempt to save
+			}
+			newName = qtPath;
+#else
 			if (!AfxGetApp()->DoPromptFileName(newName,
 				bReplace ? AFX_IDS_SAVEFILE : AFX_IDS_SAVEFILECOPY,
 				OFN_HIDEREADONLY | OFN_PATHMUSTEXIST, FALSE, pTemplate))
 				return FALSE;       // don't even attempt to save
+#endif
 		} else {
 			// Construct file name of .\Maps\mapname\mapname.map
 			if (info.usingSystemDir)
@@ -3663,6 +3684,14 @@ void CWorldBuilderDoc::Create2DView()
 {
 }
 
+// A new or opened map invalidates the script editor's working copy of the sides.
+static void closeScriptEditor(void)
+{
+	if (CMainFrame::GetMainFrame() && CMainFrame::GetMainFrame()->getScriptDialog()) {
+		CMainFrame::GetMainFrame()->closeScriptDialog();
+	}
+}
+
 void CWorldBuilderDoc::Create3DView()
 {
 	if (Get3DView())
@@ -3813,6 +3842,8 @@ BOOL CWorldBuilderDoc::OnNewDocument()
 
 	Create3DView();
 
+	closeScriptEditor();
+
 	POSITION pos = GetFirstViewPosition();
 	while (pos != nullptr)
 	{
@@ -3888,6 +3919,7 @@ Bool CWorldBuilderDoc::createMapForAutomation(
 	SetHeightMap(m_heightMap, true);
 	TerrainMaterial::updateTextures(m_heightMap);
 	Create3DView();
+	closeScriptEditor();
 	POSITION pos = GetFirstViewPosition();
 	while (pos != NULL) {
 		CView *current_view = GetNextView(pos);
@@ -4130,9 +4162,7 @@ BOOL CWorldBuilderDoc::OnOpenDocument(LPCTSTR lpszPathName)
 
 	LoadEditTime(lpszPathName);
 
-	if (CMainFrame::GetMainFrame() && CMainFrame::GetMainFrame()->getScriptDialog()) {
-		CMainFrame::GetMainFrame()->closeScriptDialog();
-	}
+	closeScriptEditor();
 
 	// WbApp()->OnRefreshAppAbout();
 	// DEBUG_LOG(("strTitle=%s strPathName=%s\n", lpszPathName, m_strPathName));

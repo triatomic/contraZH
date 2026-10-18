@@ -1223,7 +1223,7 @@ void WBQtCondActDialog::onChipClicked()
 	{
 		return;
 	}
-	// Pops the (still MFC) parameter editor; the sentence and warnings re-render on return.
+	// Pops the parameter editor; the sentence and warnings re-render on return.
 	WBQtCondAct_EditParameter(m_item, m_isAction, index);
 	renderSentence();
 }

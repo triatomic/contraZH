@@ -1,8 +1,8 @@
 // WBQtCondActDialogClassic.cpp -- see WBQtCondActDialogClassic.h. Layout and behavior mirror the MFC
 // IDD_ScriptCondition / IDD_ScriptAction dialogs: top command row (search / Compress Script /
 // OK / Cancel), template tree left, sentence + warnings + developer notes right. The parameter
-// links pop the (still MFC) EditParameter modals through the bridge; the sentence and warnings
-// re-render when they return.
+// links pop the Qt parameter editor through the bridge; the sentence and warnings re-render
+// when it returns.
 #include "WBQtCondActDialogClassic.h"
 #include "ui_WBQtCondActDialogClassic.h"
 #include "WBQtCondActBridge.h"
@@ -359,7 +359,7 @@ void WBQtCondActDialogClassic::onLinkClicked(const QUrl &url)
 	{
 		return;
 	}
-	// Pops the (still MFC) parameter editor; the sentence and warnings re-render on return.
+	// Pops the parameter editor; the sentence and warnings re-render on return.
 	WBQtCondAct_EditParameter(m_item, m_isAction, index);
 	renderSentence();
 }

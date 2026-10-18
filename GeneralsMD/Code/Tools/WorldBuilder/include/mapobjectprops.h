@@ -316,6 +316,7 @@ public:
 	static int  qtMSoundCurIndex(void);
 	static void qtMCurSoundName(AsciiString &nameOut, Bool &isNoneOut);
 	static void qtMStopSoundPreview(void);
+	static int  qtMSoundPreviewMs(void);	// length of the loaded preview WAV, 0 if unknown
 	static int  qtMGetSoundCount(void);
 	static int  qtMGetSoundItem(int i, char *out, int cap);
 	static int  qtMGetSoundCurSel(void);

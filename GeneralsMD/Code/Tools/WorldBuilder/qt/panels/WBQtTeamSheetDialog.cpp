@@ -318,7 +318,7 @@ void WBQtTeamSheetDialog::setupMembers()
 		const int pickId = kPickIds[i];
 		connect(pick, &QToolButton::clicked, pick, [this, combo, typeId, pickId, page]()
 		{
-			// Pops the MFC PickUnitDialog; its handler writes the dict and the hidden combo.
+			// Pops the Qt unit picker; the bridge writes the dict.
 			WBQtTeamPage_ClickButton(page, pickId);
 			seedComboCurrent(combo, pageText(page, typeId));
 			tintIfMissing(combo);

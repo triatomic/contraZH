@@ -19,6 +19,7 @@
 #include "Common/MapReaderWriterInfo.h"
 #include "WWLib/TARGA.H"	// TGA2_SIGNATURE / TGA2Footer for the generated fallback preview
 #include "qt/panels/WBQtMapFileBridge.h"
+#include "qt/WBQtMessageBox.h"
 #include <vector>
 
 #ifdef RTS_HAS_QT
@@ -1031,13 +1032,10 @@ int OpenMap::qtBrowsePick(void)
 	s_qtOpenInfo.browse = false;
 	if (m_packedMode != PM_OFF)
 	{
-		CFileDialog dlg(TRUE, "big", NULL,
-			OFN_HIDEREADONLY | OFN_FILEMUSTEXIST,
-			"BIG archives (*.big)|*.big|All files (*.*)|*.*||", this);
-		dlg.m_ofn.lpstrTitle = "Select a .big archive";
-		if (dlg.DoModal() == IDOK)
+		char bigPath[_MAX_PATH];
+		if (WBQtFileDialog_Run(0, "Select a .big archive", "BIG archives (*.big)|*.big|All files (*.*)|*.*||",
+				"big", NULL, bigPath, sizeof(bigPath)) != 0)
 		{
-			CString bigPath = dlg.GetPathName();
 			qtMPopulateMapsInBig(bigPath);
 		}
 	}

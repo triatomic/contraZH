@@ -20,6 +20,10 @@ extern "C" {
 // (the caller then falls back to the MFC default box).
 int WBQtMessageBox_Show(const char *text, const char *caption, unsigned mbType);
 
+// CFileDialog-style filter in; returns the 1-based chosen filter index (path in outPath), 0 on cancel.
+int WBQtFileDialog_Run(int save, const char *title, const char *filter, const char *defExt,
+	const char *initialPath, char *outPath, int outSize);
+
 #ifdef __cplusplus
 }
 #endif

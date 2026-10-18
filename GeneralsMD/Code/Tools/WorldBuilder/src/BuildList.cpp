@@ -28,6 +28,7 @@
 #ifdef RTS_HAS_QT
 #include "qt/panels/WBQtMiscModalsBridge.h"
 #include "qt/panels/WBQtPickUnitBridge.h"	// the name matcher + the shared replace report
+#include "qt/WBQtMessageBox.h"
 #endif
 #include <vector>
 #include "CUndoable.h"
@@ -805,11 +806,13 @@ void BuildList::OnExport()
 	static FILE *theLogFile = nullptr;
 	Bool open = false;
 	try {
+#ifndef RTS_HAS_QT
 		CFileDialog dlg(FALSE, _T("ini"), _T("BuildList.ini"), OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
 			_T("INI Files (*.ini)|*.ini|All Files (*.*)|*.*||"));
+#endif
 
 		// Default file name suggestion based on current side/player
-		SidesInfo *pSide = TheSidesList->getSideInfo(m_curSide); 
+		SidesInfo *pSide = TheSidesList->getSideInfo(m_curSide);
 		if (!pSide) return;
 		Dict *d = pSide->getDict();
 		if (!d) return;
@@ -817,6 +820,16 @@ void BuildList::OnExport()
 		AsciiString name = d->getAsciiString(TheKey_playerName);
 		CString suggested;
 		suggested.Format(_T("%s_BuildList.ini"), name.str());
+#ifdef RTS_HAS_QT
+		char pathBuf[_MAX_PATH];
+		if (WBQtFileDialog_Run(1, "Export Build List", "INI Files (*.ini)|*.ini|All Files (*.*)|*.*||",
+				"ini", suggested, pathBuf, sizeof(pathBuf)) == 0)
+		{
+			return; // User cancelled
+		}
+
+		CString filePath = pathBuf;
+#else
 		dlg.m_ofn.lpstrFile = suggested.GetBuffer(MAX_PATH);
 
 		if (dlg.DoModal() != IDOK)
@@ -825,6 +838,7 @@ void BuildList::OnExport()
 		suggested.ReleaseBuffer();
 
 		CString filePath = dlg.GetPathName();
+#endif
 		theLogFile = fopen(filePath, "w");
 		if (theLogFile == NULL)
 			throw;
@@ -1026,6 +1040,16 @@ static int importBuildListInto(FILE *file, const AsciiString &wantedList, SidesI
 
 void BuildList::OnImport()
 {
+#ifdef RTS_HAS_QT
+	char pathBuf[_MAX_PATH];
+	if (WBQtFileDialog_Run(0, "Import Build List", "INI Files (*.ini)|*.ini|All Files (*.*)|*.*||",
+			"ini", "BuildList.ini", pathBuf, sizeof(pathBuf)) == 0)
+	{
+		return; // User cancelled
+	}
+
+	CString filePath = pathBuf;
+#else
 	CFileDialog dlg(TRUE, _T("ini"), _T("BuildList.ini"), OFN_HIDEREADONLY | OFN_FILEMUSTEXIST,
 		_T("INI Files (*.ini)|*.ini|All Files (*.*)|*.*||"));
 
@@ -1033,6 +1057,7 @@ void BuildList::OnImport()
 		return; // User cancelled
 
 	CString filePath = dlg.GetPathName();
+#endif
 	FILE* file = fopen(filePath, "r");
 	if (file == NULL) {
 		AfxMessageBox(_T("Failed to open file for import."));

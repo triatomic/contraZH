@@ -1,9 +1,8 @@
 // WBQtTeamsBridge.h -- opaque facade for the Qt Teams dialog (Tier 3b-2).
 //
 // Model: the MFC CTeamsDialog is created HIDDEN and stays the model owner -- its working-copy
-// m_sides, the new/copy/delete/move-team logic, the team property sheet (still the MFC
-// CPropertySheet in this stage), the fix-owner validation and the import/export file flow are
-// all reused verbatim. The Qt dialog reads the hidden list-control/listbox contents back
+// m_sides, the new/copy/delete/move-team logic, the fix-owner validation and the import/export
+// file flow are all reused verbatim; the team property sheet is the Qt WBQtTeamSheetDialog. The Qt dialog reads the hidden list-control/listbox contents back
 // (updateUI keeps them canonical) and pushes actions through the real handlers, via qt* member
 // functions defined in src/WBQtTeamsBridge.cpp. Plain C surface (int / const char* only).
 #ifndef WB_QT_TEAMS_BRIDGE_H

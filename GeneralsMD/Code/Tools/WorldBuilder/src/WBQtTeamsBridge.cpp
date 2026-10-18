@@ -22,6 +22,7 @@
 #include "Common/FileSystem.h"
 #include "GameLogic/SidesList.h"
 #include "qt/panels/WBQtTeamsBridge.h"
+#include "qt/WBQtMessageBox.h"
 #include <vector>
 
 #ifdef RTS_HAS_QT
@@ -510,14 +511,13 @@ void CTeamsDialog::qtExportTeams(void)
 	}
 	AsciiString selectedPlayerName = qtmPlayerNameForUI(m_sides, selectedPlayer);
 
-	CFileDialog dlg(FALSE, ".teams", "exportedteams.teams",
-		OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
-		"Team Export (*.teams)|*.teams||");
-	if (dlg.DoModal() == IDCANCEL)
+	char pathBuf[_MAX_PATH];
+	if (WBQtFileDialog_Run(1, "Export Teams", "Team Export (*.teams)|*.teams||", "teams",
+			"exportedteams.teams", pathBuf, sizeof(pathBuf)) == 0)
 	{
 		return;
 	}
-	CString path = dlg.GetPathName();
+	CString path = pathBuf;
 	try {
 		CFile f(path,
 			CFile::modeCreate | CFile::modeWrite |
@@ -568,14 +568,13 @@ void CTeamsDialog::qtImportTeams(void)
 	}
 	m_importTargetPlayer = qtmPlayerNameForUI(m_sides, selectedPlayer);
 
-	CFileDialog dlg(TRUE, ".teams", NULL,
-		OFN_FILEMUSTEXIST | OFN_HIDEREADONLY,
-		"Team Export (*.teams)|*.teams||");
-	if (dlg.DoModal() == IDCANCEL)
+	char pathBuf[_MAX_PATH];
+	if (WBQtFileDialog_Run(0, "Import Teams", "Team Export (*.teams)|*.teams||", "teams",
+			NULL, pathBuf, sizeof(pathBuf)) == 0)
 	{
 		return;
 	}
-	CString path = dlg.GetPathName();
+	CString path = pathBuf;
 	try {
 		CachedFileInputStream in;
 		if (!in.open(AsciiString(path)))
@@ -781,11 +780,6 @@ extern "C" void WBQtTeams_ImportTeams(void)
 }
 
 // ================= the Qt team property sheet (Tier 3b-3) =================
-// Four HIDDEN Team* pages (they are CDialogs) bound to the current team's dict in the hidden
-// CTeamsDialog's working copy. Their OnInitDialog seeds the controls and every handler writes
-// the dict live, so the Qt sheet drives them generically: write the control, then send the
-// real WM_COMMAND notification -- the page's own message map dispatches to the right handler.
-// The unit-pick "..." buttons still pop the MFC PickUnitDialog (owner = the active Qt sheet).
 
 //----------------------------------------------------------------------------------------
 // The team property sheet, de-bridged (T3) -- branch qt-debridge. The four hidden Team*

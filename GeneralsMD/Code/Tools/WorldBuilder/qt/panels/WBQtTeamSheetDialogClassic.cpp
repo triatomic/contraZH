@@ -227,8 +227,7 @@ void WBQtTeamSheetDialogClassic::setupIdentityTab()
 		int pickId = pickIds[i];
 		connect(pickButton, &QPushButton::clicked, pickButton, [combo, typeId, pickId, page]()
 		{
-			// Pops the (still MFC) PickUnitDialog; the page handler writes the dict and the
-			// hidden combo -- mirror the result back.
+			// Pops the Qt unit picker; the bridge writes the dict -- mirror the result back.
 			WBQtTeamPage_ClickButton(page, pickId);
 			seedComboCurrent(combo, pageText(page, typeId));
 			tintIfMissing(combo);

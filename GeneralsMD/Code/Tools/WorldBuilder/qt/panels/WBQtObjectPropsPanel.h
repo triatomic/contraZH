@@ -24,6 +24,7 @@ class QKeyEvent;
 class QLineEdit;
 class QListWidget;
 class QPushButton;
+class QTimer;
 class WBQtScrubSpinBox;
 
 namespace Ui { class WBQtObjectPropsPanel; }	// generated from WBQtObjectPropsPanel.ui
@@ -74,6 +75,7 @@ private slots:
 	// Sound section.
 	void onSoundChanged(int index);
 	void onListenClicked();
+	void onListenFinished();
 	void onSoundFlagToggled();
 	void onLoopCountChanged();
 	void onPriorityChanged(int index);
@@ -130,6 +132,7 @@ private:
 	QGroupBox   *m_soundBox;
 	QComboBox   *m_sound;			// attached-sound combo (mirrors the large MFC combo)
 	QPushButton *m_listen;			// preview toggle (Listen / Stop)
+	QTimer      *m_listenTimer;		// flips Stop back to Listen when a one-shot preview ends
 	QCheckBox   *m_customize;
 	QCheckBox   *m_soundEnabled;
 	QCheckBox   *m_looping;

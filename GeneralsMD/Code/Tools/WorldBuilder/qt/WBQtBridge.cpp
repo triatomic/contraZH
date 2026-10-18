@@ -19,8 +19,10 @@
 #include "WBQtMainWindow.h"
 #include "WBQtTheme.h"
 #include "WBQtChromeBridge.h"
+#include "WBQtShortcuts.h"
 
 #include <QApplication>
+#include <QGuiApplication>
 #include <QResizeEvent>
 #include <QScreen>
 #include <QTimer>
@@ -96,7 +98,16 @@ void WBQt_DisableInversion(void)
 // be oversized -- clamp against the available screen area.
 static void wbClampToAvailableScreen(int &x, int &y, int &w, int &h)
 {
-	QScreen *screen = QApplication::primaryScreen();
+	// The screen the window sits on, so a window closed on a second monitor reopens there.
+	QScreen *screen = QApplication::screenAt(QPoint(x + w / 2, y + h / 2));
+	if (screen == NULL)
+	{
+		screen = QApplication::screenAt(QPoint(x, y));
+	}
+	if (screen == NULL)
+	{
+		screen = QApplication::primaryScreen();
+	}
 	if (screen == NULL)
 	{
 		return;
@@ -299,6 +310,12 @@ void *WBQt_EffectiveOwnerHwnd(void *frameHwnd)
 
 void WBQt_Startup(void)
 {
+	// The main window always refuses close, so Qt's fallback would veto every Windows logoff.
+	QT_WARNING_PUSH
+	QT_WARNING_DISABLE_DEPRECATED
+	QGuiApplication::setFallbackSessionManagementEnabled(false);
+	QT_WARNING_POP
+
 	// pluginInstance(0): WorldBuilder is the executable itself, not a DLL, so there is
 	// no module to pin -- 0 is the documented same-executable usage. This creates the
 	// QApplication and installs the message hook that drives Qt from MFC's loop.
@@ -310,6 +327,8 @@ void WBQt_Startup(void)
 	// Give every Qt top-level (main window + all dialogs / tool windows) the app's title-bar
 	// icon, from the same IDR_MAINFRAME the MFC frame used. App-wide, before any window shows.
 	WBQtChrome_SetAppIcon();
+
+	WBQtShortcuts_InstallQtFallback();
 }
 
 void WBQt_Shutdown(void)

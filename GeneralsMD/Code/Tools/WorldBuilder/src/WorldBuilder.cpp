@@ -1765,7 +1765,16 @@ void CWorldBuilderApp::OnFileOpen()
 		}
 	} catch(...) {}
 
+#ifdef RTS_HAS_QT
+	char qtPath[_MAX_PATH];
+	if (WBQtFileDialog_Run(0, "Open", "Missions (*.map)|*.map|All Files (*.*)|*.*||", "map",
+			NULL, qtPath, sizeof(qtPath)) != 0)
+	{
+		OpenDocumentFile(qtPath);
+	}
+#else
 	CWinApp::OnFileOpen();
+#endif
 }
 
 void CWorldBuilderApp::OnTexturesizingMapclifftextures()

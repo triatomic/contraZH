@@ -50,6 +50,7 @@
 #include "qt/panels/WBQtParamBridge.h"
 #include "qt/panels/WBQtMiscModalsBridge.h"
 #include "qt/panels/WBQtPickUnitBridge.h"	// Replace Missing Entries: name matcher + the report
+#include "qt/WBQtMessageBox.h"
 #endif
 
 #include "Common/GlobalData.h"
@@ -3209,10 +3210,17 @@ void ScriptDialog::OnSave()
 		scripts[i] = nullptr;
 	}
 
+#ifdef RTS_HAS_QT
+	char pathBuf[_MAX_PATH];
+	Int filterIndex = saveToEditFile ? 1 : WBQtFileDialog_Run(1, "Export Scripts",
+		"Script files (.scb)|*.scb|Script JSON (.json)|*.json||", "scb", NULL, pathBuf, sizeof(pathBuf));
+	Int result = filterIndex != 0 ? IDOK : IDCANCEL;
+#else
 	CFileDialog fileDlg(false, ".scb", nullptr, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
 		"Script files (.scb)|*.scb|Script JSON (.json)|*.json||", this);
 
 	Int result = saveToEditFile ? IDOK : fileDlg.DoModal();
+#endif
 
 	// Open document dialog may change working directory,
 	// change it back.
@@ -3226,8 +3234,13 @@ void ScriptDialog::OnSave()
 		return;
 	}
 
+#ifdef RTS_HAS_QT
+	CString targetPath = saveToEditFile ? m_editFilePath : CString(pathBuf);
+	if (!saveToEditFile && filterIndex == 2 && !ScriptJson_IsJsonPath(targetPath)) {
+#else
 	CString targetPath = saveToEditFile ? m_editFilePath : fileDlg.GetPathName();
 	if (!saveToEditFile && fileDlg.m_ofn.nFilterIndex == 2 && !ScriptJson_IsJsonPath(targetPath)) {
+#endif
 		if (targetPath.Right(4).CompareNoCase(".scb") == 0) {
 			targetPath = targetPath.Left(targetPath.GetLength() - 4);
 		}

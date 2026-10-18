@@ -8,6 +8,7 @@
 #define WB_QT_MAIN_WINDOW_H
 
 #include <QMainWindow>
+#include <QStringList>
 
 class QCloseEvent;
 class QDragEnterEvent;
@@ -41,12 +42,14 @@ protected:
 
 private slots:
 	void savePlacement();
+	void openDroppedMaps();
 
 private:
 	static WBQtMainWindow *s_instance;
 
 	void *m_frameHwnd;
 	QTimer *m_placementTimer;	// debounces the [MainFrame] Top/Left/Width/Height writes
+	QStringList m_droppedMaps;	// opened after the drop returns, so Explorer isn't held by the load
 };
 
 #endif // WB_QT_MAIN_WINDOW_H

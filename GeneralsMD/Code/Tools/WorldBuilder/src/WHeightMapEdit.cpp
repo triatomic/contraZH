@@ -43,6 +43,7 @@
 #include "LayersList.h"
 #ifdef RTS_HAS_QT
 #include "qt/panels/WBQtTerrainModalBridge.h"
+#include "qt/WBQtMessageBox.h"
 #endif
 
 #include "Common/DataChunk.h"
@@ -2815,7 +2816,12 @@ Bool WorldHeightMapEdit::selectInvalidTeam()
 	if (anySelected)
 	{
 		DEBUG_LOG(("%s", report.str()));
-		MessageBox(nullptr, report.str(), "Missing team report", MB_OK);
+#ifdef RTS_HAS_QT
+		if (WBQtMessageBox_Show(report.str(), "Missing team report", MB_OK) == 0)
+#endif
+		{
+			MessageBox(nullptr, report.str(), "Missing team report", MB_OK);
+		}
 	}
 
 	return anySelected;

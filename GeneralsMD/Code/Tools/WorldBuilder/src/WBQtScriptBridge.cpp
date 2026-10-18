@@ -12,7 +12,6 @@
 #include "ScriptDialog.h"
 #include "MainFrm.h"
 #include "CUndoable.h"				// SidesListUndoable / AddObjectUndoable (import commit)
-#include "EditGroup.h"				// the New Folder name dialog (same one OnNewFolder pops)
 #include "EditParameter.h"			// setCurSidesList (the param editors resolve sides from it)
 #include "ExportScriptsOptions.h"	// the export options statics (qtM import/export)
 #include "GameLogic/ScriptEngine.h"	// Script/Condition/OrCondition/ScriptAction/Parameter
@@ -23,6 +22,7 @@
 #include "qt/panels/WBQtScriptEditBridge.h"	// WBQtScriptEdit_Run (new/edit script sheet)
 #include "qt/panels/WBQtParamBridge.h"		// WBQtEditGroup_Run (edit folder dialog)
 #include "qt/panels/WBQtEntityFinderBridge.h"	// WBQtEntityFinder_FindByName (entity-jump lookup)
+#include "qt/WBQtMessageBox.h"
 
 #include <vector>
 
@@ -342,8 +342,7 @@ void ScriptDialog::qtMInsertScript(Script *pNewScript)
 	}
 }
 
-// == OnNewFolder minus the tree refresh. Pops the same EditGroup name dialog the MFC path
-// does (OnNewFolder never got a Qt-dialog branch; parity kept).
+// == OnNewFolder minus the tree refresh, with the Qt folder dialog Edit Folder uses.
 void ScriptDialog::qtMNewFolder(void)
 {
 	Int ndx;
@@ -360,8 +359,7 @@ void ScriptDialog::qtMNewFolder(void)
 	{
 		ListType savSel = m_curSelection;
 		ScriptGroup *pNewGroup = newInstance( ScriptGroup);
-		EditGroup editDlg(pNewGroup);
-		if (IDOK==editDlg.DoModal())
+		if (WBQtEditGroup_Run(pNewGroup, ::AfxGetMainWnd()->GetSafeHwnd()) != 0)
 		{
 			AsciiString name = pNewGroup->getName();
 			name.trim();
@@ -1202,10 +1200,9 @@ void ScriptDialog::qtMSetCheckbox(int which, int checked)
 // == OnLoad minus the final reloadPlayer/updateIcons loop (no tree); importScriptFile does the work.
 void ScriptDialog::qtMImportScripts(void)
 {
-	CFileDialog fileDlg(true, ".scb", NULL, 0,
-		"Script files (.scb, .json)|*.scb;*.json||", this);
-
-	Int result = fileDlg.DoModal();
+	char pathBuf[_MAX_PATH];
+	Int result = WBQtFileDialog_Run(0, "Import Scripts", "Script files (.scb, .json)|*.scb;*.json||",
+		"scb", NULL, pathBuf, sizeof(pathBuf)) != 0 ? IDOK : IDCANCEL;
 
 	// Open document dialog may change working directory, change it back.
 	char buf[_MAX_PATH];
@@ -1226,7 +1223,7 @@ void ScriptDialog::qtMImportScripts(void)
 		return;
 	}
 
-	importScriptFile(fileDlg.GetPathName());
+	importScriptFile(pathBuf);
 }
 
 extern "C" {

@@ -777,8 +777,7 @@ int MapObjectProps::qtMGetSoundCurSel(void)
 	return qtMSoundCurIndex();
 }
 
-// == stopSoundPreview minus the button text / window timer (no window; the one-shot
-// auto-reset timer doesn't exist windowless -- the next toggle stops a finished one-shot).
+// == stopSoundPreview minus the button text / window timer (the Qt panel owns the timer).
 void MapObjectProps::qtMStopSoundPreview(void)
 {
 	if (TheMapObjectProps == NULL || !TheMapObjectProps->m_soundPreviewPlaying)
@@ -835,7 +834,9 @@ void MapObjectProps::qtMSetSoundCurSel(int i)
 	}
 }
 
-// == OnPlaySound minus the button text and the one-shot auto-reset timer (window ops).
+static Bool s_qtSoundPreviewLooping = false;
+
+// == OnPlaySound minus the button text and the one-shot auto-reset timer (the panel owns that).
 void MapObjectProps::qtMToggleSoundPreview(void)
 {
 	if (TheMapObjectProps == NULL)
@@ -898,6 +899,7 @@ void MapObjectProps::qtMToggleSoundPreview(void)
 		return;
 	}
 	TheMapObjectProps->m_soundPreviewPlaying = true;
+	s_qtSoundPreviewLooping = looping;
 }
 
 // The derived values the dictTo* seeders used to leave in the hidden controls.
@@ -1707,6 +1709,21 @@ extern "C" int WBQtObjectProps_GetSoundPlaying(void)
 extern "C" void WBQtObjectProps_ToggleSoundPreview(void)
 {
 	MapObjectProps::qtMToggleSoundPreview();
+}
+
+extern "C" void WBQtObjectProps_StopSoundPreview(void)
+{
+	MapObjectProps::qtMStopSoundPreview();
+}
+
+extern "C" int WBQtObjectProps_GetSoundPreviewMs(void)
+{
+	if (!MapObjectProps::qtGetSoundPlaying() || s_qtSoundPreviewLooping)
+	{
+		return 0;
+	}
+	int ms = MapObjectProps::qtMSoundPreviewMs();
+	return (ms > 0) ? ms + 100 : 10000;	// same margin and unknown-length fallback as MFC
 }
 
 extern "C" int WBQtObjectProps_GetSoundFlag(int which)

@@ -9,6 +9,7 @@
 #include <QComboBox>
 #include <QGridLayout>
 #include <QImage>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QPixmap>
 #include <QPushButton>
@@ -75,6 +76,7 @@ WBQtGrovePanel::WBQtGrovePanel(QWidget *owner)
 		WBQtComboStyle::applyTypeToFilter(m_treeType[i]);
 	}
 	WBQtComboStyle::applyTypeToFilter(m_setName);
+	m_setName->installEventFilter(this);
 
 	// Seed everything from the hidden MFC panel under the guard so nothing echoes back.
 	m_updating = true;
@@ -317,8 +319,8 @@ void WBQtGrovePanel::onOpenSettings()
 	WBQtGrove_OpenSettings();
 	// The Settings button opens Grovesets.ini in Notepad for renaming sets. ShellExecute returns
 	// immediately (Notepad is async), so we can't re-read on its close here -- but the panel's
-	// showEvent picks up the renames the next time it is shown, and any set-name drop-down also
-	// re-reads via fillSetCombo(). Re-fill now too so a rename saved before this returns is seen.
+	// showEvent and the set combo's drop-down (eventFilter) re-read it. Re-fill now too so a
+	// rename saved before this returns is seen.
 	m_updating = true;
 	fillSetCombo();
 	m_updating = false;
@@ -331,6 +333,29 @@ void WBQtGrovePanel::showEvent(QShowEvent *event)
 	m_updating = true;
 	fillSetCombo();
 	m_updating = false;
+}
+
+bool WBQtGrovePanel::eventFilter(QObject *watched, QEvent *event)
+{
+	bool opensPopup = false;
+	if (event->type() == QEvent::MouseButtonPress && watched == m_setName)
+	{
+		opensPopup = true;
+	}
+	else if (event->type() == QEvent::KeyPress)
+	{
+		QKeyEvent *ke = static_cast<QKeyEvent *>(event);
+		opensPopup = ke->key() == Qt::Key_F4
+			|| ((ke->modifiers() & Qt::AltModifier) && (ke->key() == Qt::Key_Down || ke->key() == Qt::Key_Up));
+	}
+	if (opensPopup)
+	{
+		bool wasUpdating = m_updating;
+		m_updating = true;
+		fillSetCombo();
+		m_updating = wasUpdating;
+	}
+	return QWidget::eventFilter(watched, event);
 }
 
 void WBQtGrovePanel::pushRefresh()

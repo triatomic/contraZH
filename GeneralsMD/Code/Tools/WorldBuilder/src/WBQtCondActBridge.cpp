@@ -2,9 +2,9 @@
 // TU (no Qt include). Serves both Condition and ScriptAction (selected by isAction), mirroring
 // how EditCondition / EditAction are twins: the template catalog comes from TheScriptEngine,
 // the sentence model from getUiStrings()/getParameter(i)->getUiText(), warnings from
-// EditParameter::getWarningText/getInfoText, and parameter editing pops the (still MFC)
-// EditParameter modal exactly like the rich-edit link click did. Whole body guarded by
-// RTS_HAS_QT so the OFF build compiles it to an empty object.
+// EditParameter::getWarningText/getInfoText, and parameter editing goes through
+// EditParameter::edit (the Qt parameter editor) like the rich-edit link click did. Whole body
+// guarded by RTS_HAS_QT so the OFF build compiles it to an empty object.
 #include "StdAfx.h"
 #include "resource.h"				// IDD_EDIT_PARAMETER (used in EditParameter.h's IDD enum)
 #include "Lib/BaseType.h"
