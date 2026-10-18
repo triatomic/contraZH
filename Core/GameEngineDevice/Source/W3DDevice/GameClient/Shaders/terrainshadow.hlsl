@@ -361,7 +361,9 @@ float4 main(PsIn input) : COLOR
     float3 light = input.Diffuse.rgb;
 #endif
 
-#if LIGHTS
+#if LIGHTS && LIGHTS_DEBUG
+    return float4(PointLighting(input.WorldPos, bumped), color.a * input.Diffuse.a);
+#elif LIGHTS
     light += PointLighting(input.WorldPos, bumped);
 #endif
 

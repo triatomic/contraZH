@@ -547,6 +547,11 @@ Bool OptionPreferences::getAmbientOcclusionDebugEnabled(void) const
 	return getBool("AmbientOcclusionDebug", FALSE);
 }
 
+Bool OptionPreferences::getDynamicLightsDebugEnabled(void) const
+{
+	return getBool("DynamicLightsDebug", FALSE);
+}
+
 Bool OptionPreferences::getBorderlessWindowEnabled(void) const
 {
 	return getBool("BorderlessWindow", FALSE);

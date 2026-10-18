@@ -202,7 +202,7 @@ lights` on the Shaders page, greyed out while dynamic lights are off. Needs
 
 Notes:
 * Every draw picks its own lights, so a busy battle can light the whole screen per pixel:
-  * The terrain draws in patches of 32 by 32 cells, each taking eight lights, or four with standing water.
+  * The terrain draws in patches of 32 by 32 cells, each taking eight lights, or three with standing water.
   * Each vehicle, structure or soldier takes the eight brightest where it stands.
   * Each bridge takes eight.
   * Roads take the eight lights nearest the middle of the view.
@@ -214,6 +214,14 @@ by its corners, so large ones look blocky. Objects light those past their eight 
 * Roads, bridges, the third texture where three meet, and flat terrain mode had no dynamic lighting
 before, so they show none without shader model 2.0a.
 * Launch with `CONTRA_PIXELLIGHTS=1` to limit per-pixel lights to the ground, or `0` to turn them off.
+
+`DynamicLightsDebug = Yes` in `Options.ini` paints the terrain, roads, bridges and units black and
+draws only the per-pixel lights on them, so each light's shape and reach shows. Also `Lights debug
+view` on the Shaders page, greyed out while per-pixel lights are off. Needs `CheckDynamicLightsDebug`
+in `OptionsMenu.wnd` for the menu control; `build/add_lightsdebug_wnd.py` adds it. Notes:
+* Takes effect on the next launch, and needs `PixelLights = Yes`.
+* Lights left on the old lighting do not show.
+* Water, sky, trees, particles and shroud draw as usual.
 
 # Ambient occlusion
 

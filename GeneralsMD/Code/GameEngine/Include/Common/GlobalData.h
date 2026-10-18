@@ -756,6 +756,7 @@ public:
   Bool m_specularDebug;           ///< Options.ini SpecularDebug: show what the specular pass covers and its highlight in magenta
   Bool m_normalMapDebug;          ///< Options.ini NormalMapDebug: show only the terrain's bump shading, on grey
   Bool m_ambientOcclusionDebug;   ///< Options.ini AmbientOcclusionDebug: show only the occlusion, in grey
+  Bool m_dynamicLightsDebug;      ///< Options.ini DynamicLightsDebug: show only the per-pixel dynamic lights, on black
   Color m_laserGlowColor;         ///< GameData LaserGroundGlowColor: black takes the beam color
   Real m_laserGlowIntensity;      ///< GameData LaserGroundGlowIntensity: how strongly the color is added
   Real m_laserGlowRadius;         ///< GameData LaserGroundGlowRadius: how far the light reaches from the beam, 0 derives it from the beam width

@@ -1557,7 +1557,7 @@ void W3DBridgeBuffer::drawBridges(CameraClass * camera, Bool wireframe, TextureC
 					const AABoxClass box(bounds.Center, Vector3(bounds.Radius, bounds.Radius, bounds.Radius));
 					Int lights[W3DShaderManager::MAX_PIXEL_LIGHTS];
 					const Int lightCount = W3DShaderManager::pickPixelLights(box, lights);
-					if (lightCount == 0) {
+					if (lightCount == 0 && !TheGlobalData->m_dynamicLightsDebug) {
 						continue;
 					}
 					W3DShaderManager::setDrawPixelLights(lights, lightCount);

@@ -219,7 +219,9 @@ float4 main(PsIn input) : COLOR
     float3 bumped = normal;
 #endif
 
-#if LIGHTS
+#if LIGHTS && LIGHTS_DEBUG
+    return float4(PointLighting(input.WorldPos, bumped), color.a * weight);
+#elif LIGHTS
     light += PointLighting(input.WorldPos, bumped);
 #endif
 

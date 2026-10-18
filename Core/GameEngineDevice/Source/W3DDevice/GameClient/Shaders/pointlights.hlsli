@@ -14,6 +14,11 @@
 #define POINT_LIGHT_NO_LITERALS 0
 #endif
 
+// The build compiles every lit shader again with LIGHTS_DEBUG, which draws only the lights, on black.
+#ifndef LIGHTS_DEBUG
+#define LIGHTS_DEBUG 0
+#endif
+
 float4 PointLights[POINT_LIGHT_COUNT * 2 + (POINT_LIGHT_COUNT + 3) / 4] : register(POINT_LIGHT_REGISTER);
 
 float3 PointLighting(float3 position, float3 normal)

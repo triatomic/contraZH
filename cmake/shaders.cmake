@@ -58,7 +58,23 @@ function(rts_add_shader SOURCE PROFILE ENTRY OUTPUT)
         VERBATIM
     )
 
-    set(RTS_SHADER_OUTPUTS ${RTS_SHADER_OUTPUTS} "${dst}" PARENT_SCOPE)
+    set(outputs "${dst}")
+
+    # Every lit shader gets a twin that draws only the lights, which W3DShaderManager loads under DynamicLightsDebug.
+    if("LIGHTS=1" IN_LIST ARGN)
+        string(REGEX REPLACE "\\.pso$" "lightsdebug.pso" debugOutput "${OUTPUT}")
+        set(debugDst "${RTS_SHADER_OUTPUT_DIR}/${debugOutput}")
+        add_custom_command(
+            OUTPUT "${debugDst}"
+            COMMAND "${RTS_FXC_EXECUTABLE}" /nologo /T ${PROFILE} /E ${ENTRY} ${defines} /D LIGHTS_DEBUG=1 /Fo "${debugDst}" "${src}"
+            DEPENDS "${src}" ${RTS_SHADER_INCLUDES}
+            COMMENT "Compiling ${debugOutput} (${PROFILE})"
+            VERBATIM
+        )
+        list(APPEND outputs "${debugDst}")
+    endif()
+
+    set(RTS_SHADER_OUTPUTS ${RTS_SHADER_OUTPUTS} ${outputs} PARENT_SCOPE)
 endfunction()
 
 set(RTS_SHADER_DIR "Core/GameEngineDevice/Source/W3DDevice/GameClient/Shaders")
@@ -234,11 +250,11 @@ foreach(RTS_ROAD_BUMP_KIND 1 2)
         endforeach()
     endforeach()
 endforeach()
-rts_add_shader("${RTS_SHADER_DIR}/flatterrain.hlsl"   ps_2_a main flatterrainlit1.pso           TEXTURE_COUNT=1)
-rts_add_shader("${RTS_SHADER_DIR}/flatterrain.hlsl"   ps_2_a main flatterrainlit2.pso           TEXTURE_COUNT=2)
-rts_add_shader("${RTS_SHADER_DIR}/flatterrain.hlsl"   ps_2_a main flatterrainlit3.pso           TEXTURE_COUNT=3)
-rts_add_shader("${RTS_SHADER_DIR}/flatterrain.hlsl"   ps_2_a main flatterrainlit4.pso           TEXTURE_COUNT=4)
-rts_add_shader("${RTS_SHADER_DIR}/pointlightpass.hlsl" ps_2_a main pointlightpass.pso)
+rts_add_shader("${RTS_SHADER_DIR}/flatterrain.hlsl"   ps_2_a main flatterrainlit1.pso           TEXTURE_COUNT=1 LIGHTS=1)
+rts_add_shader("${RTS_SHADER_DIR}/flatterrain.hlsl"   ps_2_a main flatterrainlit2.pso           TEXTURE_COUNT=2 LIGHTS=1)
+rts_add_shader("${RTS_SHADER_DIR}/flatterrain.hlsl"   ps_2_a main flatterrainlit3.pso           TEXTURE_COUNT=3 LIGHTS=1)
+rts_add_shader("${RTS_SHADER_DIR}/flatterrain.hlsl"   ps_2_a main flatterrainlit4.pso           TEXTURE_COUNT=4 LIGHTS=1)
+rts_add_shader("${RTS_SHADER_DIR}/pointlightpass.hlsl" ps_2_a main pointlightpass.pso LIGHTS=1)
 rts_add_shader("${RTS_SHADER_DIR}/shadowmultiply.hlsl" ps_2_0 main shadowmultiply.pso           PACKED=0 CLOUD=0)
 rts_add_shader("${RTS_SHADER_DIR}/shadowmultiply.hlsl" ps_2_0 main shadowmultiplypacked.pso     PACKED=1 CLOUD=0)
 rts_add_shader("${RTS_SHADER_DIR}/shadowmultiply.hlsl" ps_2_0 main shadowmultiplycloud.pso      PACKED=0 CLOUD=1)

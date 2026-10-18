@@ -202,6 +202,8 @@ public:
 	Bool getNormalMapDebugEnabled() const;
 	// Options.ini: AmbientOcclusionDebug = Yes shows the occlusion alone, in grey
 	Bool getAmbientOcclusionDebugEnabled() const;
+	// Options.ini: DynamicLightsDebug = Yes shows only the per-pixel dynamic lights, on black
+	Bool getDynamicLightsDebugEnabled() const;
 	Bool getBorderlessWindowEnabled() const;
 	// Options.ini: Windowed = Yes runs in a framed window, as -win does
 	Bool getWindowedEnabled() const;

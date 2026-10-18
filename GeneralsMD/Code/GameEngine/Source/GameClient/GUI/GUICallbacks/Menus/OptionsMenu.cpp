@@ -238,7 +238,9 @@ static GameWindow *   checkWaterReflections       = nullptr;
 static GameWindow *   checkShorelineFoam          = nullptr;
 static NameKeyType    checkDynamicLightsID        = NAMEKEY_INVALID;
 static GameWindow *   checkDynamicLights          = nullptr;
+static NameKeyType    checkPixelLightsID          = NAMEKEY_INVALID;
 static GameWindow *   checkPixelLights            = nullptr;
+static GameWindow *   checkDynamicLightsDebug     = nullptr;
 static GameWindow *   checkSoftParticles          = nullptr;
 static GameWindow *   checkAmbientOcclusion       = nullptr;
 static GameWindow *   checkHeightBlend            = nullptr;
@@ -507,6 +509,8 @@ static const BoolOption BoolOptions[] =
 	{ &checkShorelineFoam, "ShorelineFoam", &OptionPreferences::getShorelineFoamEnabled, &GlobalData::m_shorelineFoam, TRUE },
 	{ &checkDynamicLights, "DynamicLights", &OptionPreferences::getDynamicLightsEnabled, &GlobalData::m_useDynamicLights, TRUE },
 	{ &checkPixelLights, "PixelLights", &OptionPreferences::getPixelLightsEnabled, &GlobalData::m_usePixelLights, TRUE },
+	// the lights-only shaders are picked as the shaders load, so it waits for the next launch
+	{ &checkDynamicLightsDebug, "DynamicLightsDebug", &OptionPreferences::getDynamicLightsDebugEnabled, &GlobalData::m_dynamicLightsDebug, FALSE },
 	{ &checkSoftParticles, "SoftParticles", &OptionPreferences::getSoftParticlesEnabled, &GlobalData::m_useSoftParticles, TRUE },
 	{ &checkAmbientOcclusion, "AmbientOcclusion", &OptionPreferences::getAmbientOcclusionEnabled, &GlobalData::m_useAmbientOcclusion, TRUE },
 	{ &checkHeightBlend, "HeightBlend", &OptionPreferences::getHeightBlendEnabled, &GlobalData::m_useHeightBlend, TRUE },
@@ -552,6 +556,7 @@ static void updateGameOptionsEnables()
 	enableWindow( checkBloomDebug, bloom );
 
 	enableWindow( checkPixelLights, getCheck( checkDynamicLights, TRUE ) );
+	enableWindow( checkDynamicLightsDebug, getCheck( checkDynamicLights, TRUE ) && getCheck( checkPixelLights, TRUE ) );
 	enableWindow( checkHQSky, getCheck( checkCloudShadows, TRUE ) );
 
 	// the scene depth it reads is multisampled, and so unreadable, with MSAA on; supersampling takes MSAA's place and keeps it readable
@@ -1689,7 +1694,8 @@ static void initGameOptionsWindows()
 	checkNormalMaps = findOptionsWindow( "OptionsMenu.wnd:CheckNormalMaps" );
 	checkWaterReflections = findOptionsWindow( "OptionsMenu.wnd:CheckWaterReflections" );
 	checkDynamicLights = findOptionsWindow( "OptionsMenu.wnd:CheckDynamicLights", checkDynamicLightsID );
-	checkPixelLights = findOptionsWindow( "OptionsMenu.wnd:CheckPixelLights" );
+	checkPixelLights = findOptionsWindow( "OptionsMenu.wnd:CheckPixelLights", checkPixelLightsID );
+	checkDynamicLightsDebug = findOptionsWindow( "OptionsMenu.wnd:CheckDynamicLightsDebug" );
 	checkSoftParticles = findOptionsWindow( "OptionsMenu.wnd:CheckSoftParticles" );
 	checkAmbientOcclusion = findOptionsWindow( "OptionsMenu.wnd:CheckAmbientOcclusion" );
 	checkHeightBlend = findOptionsWindow( "OptionsMenu.wnd:CheckHeightBlend" );
@@ -1751,6 +1757,7 @@ static void initGameOptionsWindows()
 	setCheckText( checkShorelineFoam, "GUI:ShorelineFoam", "TOOLTIP:ShorelineFoam" );
 	setCheckText( checkDynamicLights, "GUI:DynamicLights", "TOOLTIP:DynamicLights" );
 	setCheckText( checkPixelLights, "GUI:PixelLights", "TOOLTIP:PixelLights" );
+	setCheckText( checkDynamicLightsDebug, "GUI:DynamicLightsDebug", "TOOLTIP:DynamicLightsDebug" );
 	setCheckText( checkLowLatency, "GUI:LowLatency", "TOOLTIP:LowLatency" );
 	setCheckText( checkSmoothUnitMotion, "GUI:SmoothUnitMotion", "TOOLTIP:SmoothUnitMotion" );
 	setCheckText( checkVSync, "GUI:VSync", "TOOLTIP:VSync" );
@@ -2631,7 +2638,7 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 				cancelPanel( WinShaders, populateShaders );
 			}
 			else if (controlID == checkGridHotkeysID || controlID == checkKeyboardOverlayBackdropID || controlID == checkBloomID ||
-				controlID == checkDynamicLightsID || controlID == checkCloudShadowsID )
+				controlID == checkDynamicLightsID || controlID == checkPixelLightsID || controlID == checkCloudShadowsID )
 			{
 				updateGameOptionsEnables();
 			}

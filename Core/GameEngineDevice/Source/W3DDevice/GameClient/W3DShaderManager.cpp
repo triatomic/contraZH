@@ -1622,6 +1622,36 @@ static Int Get_Pixel_Light_Mode()
 	return (value != nullptr) ? atoi(value) : PIXEL_LIGHTS_ALL;
 }
 
+// Whether the lit shaders loaded as their lights-only twins, which holds until they load again.
+static Bool LightsDebugLoaded = FALSE;
+
+static Bool Get_Lights_Debug_Wanted()
+{
+#if RTS_ZEROHOUR
+	return TheGlobalData != nullptr && TheGlobalData->m_dynamicLightsDebug;
+#else
+	return FALSE;
+#endif
+}
+
+// DynamicLightsDebug draws every lightable surface through its lit shader, so unlit ground and objects go black too.
+static Bool Get_Lights_Debug()
+{
+	return LightsDebugLoaded;
+}
+
+// Names the lights-only twin the build compiles for a lit pixel shader.
+static Bool Get_Lights_Debug_Path(const char *path, char *debugPath, size_t size)
+{
+	const size_t length = strlen(path);
+	if (length < 4 || _stricmp(path + length - 4, ".pso") != 0 || strstr(path, "lightsdebug") != nullptr)
+	{
+		return FALSE;
+	}
+	snprintf(debugPath, size, "%.*slightsdebug.pso", (int)(length - 4), path);
+	return TRUE;
+}
+
 // Packs the given lights, or the first count without indices, as pointlights.hlsli reads them in a shader
 // with the given slots. A view takes them into camera space, and none leaves them in world space.
 static Int Pack_Pixel_Lights(Vector4 *constants, Int slots, const Int *indices, Int count, const D3DMATRIX *view)
@@ -2452,7 +2482,7 @@ Int SpecularShader::set(Int pass)
 	DX8Wrapper::Set_Pixel_Shader_Constant(5, &sunDiffuse, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(6, &bump, 1);
 
-	m_lit = (UnitPixelLightsLoaded && passLights != nullptr && passLights->count > 0);
+	m_lit = (UnitPixelLightsLoaded && passLights != nullptr && (passLights->count > 0 || Get_Lights_Debug()));
 	if (m_lit)
 	{
 		Vector4 constants[PIXEL_LIGHT_REGISTERS];
@@ -2715,20 +2745,20 @@ Int PointLightPassShader::init()
 // Expects the geometry bound and transformed, and its texture set on stage 0 draw by draw.
 Int PointLightPassShader::set(Int pass)
 {
-	if (PixelLightCount == 0)
+	if (PixelLightCount == 0 && !Get_Lights_Debug())
 	{
 		return FALSE;
 	}
 
 	// The geometry is redrawn at the same depth, so EQUAL limits the pass to pixels the first
-	// draw wrote. It adds its light where the texture is opaque.
+	// draw wrote. It adds its light where the texture is opaque, and replaces what is there in the debug view.
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, TRUE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZFUNC, D3DCMP_EQUAL);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZWRITEENABLE, FALSE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHATESTENABLE, FALSE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE, TRUE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
-	DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_ONE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, Get_Lights_Debug() ? D3DBLEND_ZERO : D3DBLEND_ONE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_FOGENABLE, FALSE);
 
 	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXCOORDINDEX, 0);
@@ -2903,7 +2933,7 @@ void W3DShaderManager::setDrawPixelLights(const Int *indices, Int count)
 	{
 		count = min(count, PixelLightCount);
 	}
-	if (count <= 0 && DrawUnlitShader != 0)
+	if (count <= 0 && DrawUnlitShader != 0 && !Get_Lights_Debug())
 	{
 		DX8Wrapper::Set_Pixel_Shader(DrawUnlitShader);
 		return;
@@ -2937,7 +2967,7 @@ void W3DShaderManager::setDrawTerrain(const Int *indices, Int count, Bool seabed
 	{
 		// Point lights for other draws overwrite the seabed's registers, so they go back each draw.
 		DX8Wrapper::Set_Pixel_Shader_Constant(SEABED_REGISTER, SeabedConstants, SEABED_CONSTANTS);
-		if (count > 0 && DrawLitShader != 0 && DrawSeabedLitShader != 0)
+		if ((count > 0 || Get_Lights_Debug()) && DrawLitShader != 0 && DrawSeabedLitShader != 0)
 		{
 			Vector4 constants[PIXEL_LIGHT_REGISTERS];
 			const Int registers = Pack_Pixel_Lights(constants, SEABED_PIXEL_LIGHTS, indices, count, nullptr);
@@ -3153,7 +3183,7 @@ MaterialPassClass *W3DShaderManager::getSpecularPass()
 
 MaterialPassClass *W3DShaderManager::getSpecularPass(const Int *lights, Int lightCount, Bool lightsOnly, Bool &receivesShadow)
 {
-	if (W3DShadersPassCount[ST_SPECULAR] == 0 || !UnitPixelLightsLoaded || lightCount <= 0)
+	if (W3DShadersPassCount[ST_SPECULAR] == 0 || !UnitPixelLightsLoaded || (lightCount <= 0 && !Get_Lights_Debug()))
 	{
 		if (lightsOnly || getSpecularPass() == nullptr)
 		{
@@ -4031,7 +4061,7 @@ void TerrainShaderPixelShader::initPixelLights()
 Bool TerrainShaderPixelShader::setPixelLights(Int noiseCount, Bool shadowed, Bool bumped, Bool positioned, DWORD unlit)
 {
 	const DWORD shader = m_dwLitPixelShader[bumped ? 1 : 0][shadowed ? 1 : 0][noiseCount];
-	if (!TerrainPixelLightsLoaded || PixelLightCount == 0 || shader == 0 || unlit == 0)
+	if (!TerrainPixelLightsLoaded || (PixelLightCount == 0 && !Get_Lights_Debug()) || shader == 0 || unlit == 0)
 	{
 		return FALSE;
 	}
@@ -4838,7 +4868,7 @@ Bool RoadShaderPixelShader::setPixelPath()
 	const Bool heightBlend = RoadHeightBlendTiles && groundCapable && heights != nullptr && heights->Peek_D3D_Texture() != nullptr;
 
 	Bool shadowed = (m_dwShadowPixelShader[noiseCount] != 0 && TheW3DShadowMap != nullptr && TheW3DShadowMap->hasDepth());
-	const Bool lightable = (RoadPixelLightsLoaded && PixelLightCount > 0);
+	const Bool lightable = (RoadPixelLightsLoaded && (PixelLightCount > 0 || Get_Lights_Debug()));
 	const Bool lightMapReplaced = (anyLightMap && groundCapable);
 	const Bool glintable = Terrain_Glint_Wanted();
 
@@ -6019,6 +6049,18 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 	if (getChipset() < DC_GENERIC_PIXEL_SHADER_1_1)
 		return E_FAIL;	//don't allow loading any shaders if hardware can't handle it.
 
+	char debugPath[_MAX_PATH];
+	const void *debugData = nullptr;
+	DWORD debugSize = 0;
+	if (!ShaderType && Get_Lights_Debug_Path(strFilePath, debugPath, sizeof(debugPath)) && Find_Embedded_Shader(debugPath, debugData, debugSize))
+	{
+		LightsDebugLoaded = Get_Lights_Debug_Wanted();
+		if (LightsDebugLoaded)
+		{
+			return LoadAndCreateD3DShader(debugPath, pDeclaration, Usage, ShaderType, pHandle);
+		}
+	}
+
 	try
 	{
 		File *file = nullptr;
@@ -6795,7 +6837,7 @@ Int FlatTerrainShaderPixelShader::set(Int pass)
 
 	// Each tile then picks its lights. The world position goes on the first stage past the textures,
 	// which is 2 when only the terrain on stage 1 is read.
-	if (FlatPixelLightsLoaded && PixelLightCount > 0)
+	if (FlatPixelLightsLoaded && (PixelLightCount > 0 || Get_Lights_Debug()))
 	{
 		const Int textureCount = (curStage < 2) ? 1 : curStage;
 		const DWORD unlitShaders[4] = { m_dwBase0PixelShader, m_dwBasePixelShader, m_dwBaseNoise1PixelShader, m_dwBaseNoise2PixelShader };

@@ -952,6 +952,7 @@ GlobalData::GlobalData()
   m_specularDebug = FALSE;
   m_normalMapDebug = FALSE;
   m_ambientOcclusionDebug = FALSE;
+  m_dynamicLightsDebug = FALSE;
   m_laserGlowColor = 0;
   m_laserGlowIntensity = 0.7f;
   m_laserGlowRadius = 0.0f;
@@ -2068,6 +2069,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_specularDebug = optionPref.getSpecularDebugEnabled();
 	TheWritableGlobalData->m_normalMapDebug = optionPref.getNormalMapDebugEnabled();
 	TheWritableGlobalData->m_ambientOcclusionDebug = optionPref.getAmbientOcclusionDebugEnabled();
+	TheWritableGlobalData->m_dynamicLightsDebug = optionPref.getDynamicLightsDebugEnabled();
 	TheWritableGlobalData->m_borderlessWindow = optionPref.getBorderlessWindowEnabled();
 	if (optionPref.getWindowedEnabled())
 	{
