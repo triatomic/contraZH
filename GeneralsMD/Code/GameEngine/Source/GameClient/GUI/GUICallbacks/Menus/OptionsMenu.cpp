@@ -232,8 +232,12 @@ static GameWindow *   textEntryBloomStrength      = nullptr;
 static GameWindow *   checkBloomDebug             = nullptr;
 static GameWindow *   checkLaserRef               = nullptr;
 static GameWindow *   checkShadowMap              = nullptr;
+static NameKeyType    checkSpecularID             = NAMEKEY_INVALID;
 static GameWindow *   checkSpecular               = nullptr;
+static GameWindow *   checkSpecularDebug          = nullptr;
+static NameKeyType    checkNormalMapsID           = NAMEKEY_INVALID;
 static GameWindow *   checkNormalMaps             = nullptr;
+static GameWindow *   checkNormalMapDebug         = nullptr;
 static GameWindow *   checkWaterReflections       = nullptr;
 static GameWindow *   checkShorelineFoam          = nullptr;
 static NameKeyType    checkDynamicLightsID        = NAMEKEY_INVALID;
@@ -242,7 +246,9 @@ static NameKeyType    checkPixelLightsID          = NAMEKEY_INVALID;
 static GameWindow *   checkPixelLights            = nullptr;
 static GameWindow *   checkDynamicLightsDebug     = nullptr;
 static GameWindow *   checkSoftParticles          = nullptr;
+static NameKeyType    checkAmbientOcclusionID     = NAMEKEY_INVALID;
 static GameWindow *   checkAmbientOcclusion       = nullptr;
+static GameWindow *   checkAmbientOcclusionDebug  = nullptr;
 static GameWindow *   checkHeightBlend            = nullptr;
 static GameWindow *   checkHQSky                  = nullptr;
 static GameWindow *   checkVSync                  = nullptr;
@@ -504,7 +510,9 @@ static const BoolOption BoolOptions[] =
 	{ &checkLaserRef, "LaserRef", &OptionPreferences::getLaserRefEnabled, &GlobalData::m_laserRef, FALSE },
 	{ &checkShadowMap, "ShadowMap", &OptionPreferences::getShadowMapEnabled, &GlobalData::m_useShadowMap, TRUE },
 	{ &checkSpecular, "Specular", &OptionPreferences::getSpecularEnabled, &GlobalData::m_useSpecular, TRUE },
+	{ &checkSpecularDebug, "SpecularDebug", &OptionPreferences::getSpecularDebugEnabled, &GlobalData::m_specularDebug, FALSE },
 	{ &checkNormalMaps, "NormalMaps", &OptionPreferences::getNormalMapsEnabled, &GlobalData::m_useNormalMaps, TRUE },
+	{ &checkNormalMapDebug, "NormalMapDebug", &OptionPreferences::getNormalMapDebugEnabled, &GlobalData::m_normalMapDebug, FALSE },
 	{ &checkWaterReflections, "WaterReflections", &OptionPreferences::getWaterReflectionsEnabled, &GlobalData::m_waterReflections, TRUE },
 	{ &checkShorelineFoam, "ShorelineFoam", &OptionPreferences::getShorelineFoamEnabled, &GlobalData::m_shorelineFoam, TRUE },
 	{ &checkDynamicLights, "DynamicLights", &OptionPreferences::getDynamicLightsEnabled, &GlobalData::m_useDynamicLights, TRUE },
@@ -512,6 +520,7 @@ static const BoolOption BoolOptions[] =
 	{ &checkDynamicLightsDebug, "DynamicLightsDebug", &OptionPreferences::getDynamicLightsDebugEnabled, &GlobalData::m_dynamicLightsDebug, FALSE },
 	{ &checkSoftParticles, "SoftParticles", &OptionPreferences::getSoftParticlesEnabled, &GlobalData::m_useSoftParticles, TRUE },
 	{ &checkAmbientOcclusion, "AmbientOcclusion", &OptionPreferences::getAmbientOcclusionEnabled, &GlobalData::m_useAmbientOcclusion, TRUE },
+	{ &checkAmbientOcclusionDebug, "AmbientOcclusionDebug", &OptionPreferences::getAmbientOcclusionDebugEnabled, &GlobalData::m_ambientOcclusionDebug, FALSE },
 	{ &checkHeightBlend, "HeightBlend", &OptionPreferences::getHeightBlendEnabled, &GlobalData::m_useHeightBlend, TRUE },
 	{ &checkHQSky, "HQSky", &OptionPreferences::getHQSkyEnabled, &GlobalData::m_useHQSky, TRUE },
 	{ &checkLowLatency, "LowLatency", &OptionPreferences::getLowLatencyEnabled, &GlobalData::m_lowLatency, FALSE },
@@ -556,6 +565,8 @@ static void updateGameOptionsEnables()
 
 	enableWindow( checkPixelLights, getCheck( checkDynamicLights, TRUE ) );
 	enableWindow( checkDynamicLightsDebug, getCheck( checkDynamicLights, TRUE ) && getCheck( checkPixelLights, TRUE ) );
+	enableWindow( checkSpecularDebug, getCheck( checkSpecular, TRUE ) );
+	enableWindow( checkNormalMapDebug, getCheck( checkNormalMaps, TRUE ) );
 	enableWindow( checkHQSky, getCheck( checkCloudShadows, TRUE ) );
 
 	// the scene depth it reads is multisampled, and so unreadable, with MSAA on; supersampling takes MSAA's place and keeps it readable
@@ -567,6 +578,7 @@ static void updateGameOptionsEnables()
 	const Bool superSampling = comboBoxSuperSampling && getComboPos( comboBoxSuperSampling, 0 ) > 0;
 	enableWindow( comboBoxAntiAliasing, !superSampling );
 	enableWindow( checkAmbientOcclusion, antiAliasing <= 0 || superSampling );
+	enableWindow( checkAmbientOcclusionDebug, (antiAliasing <= 0 || superSampling) && getCheck( checkAmbientOcclusion, TRUE ) );
 }
 
 static void populateGameOptions()
@@ -1689,14 +1701,17 @@ static void initGameOptionsWindows()
 	checkBloomDebug = findOptionsWindow( "OptionsMenu.wnd:CheckBloomDebug" );
 	checkLaserRef = findOptionsWindow( "OptionsMenu.wnd:CheckLaserRef" );
 	checkShadowMap = findOptionsWindow( "OptionsMenu.wnd:CheckShadowMap" );
-	checkSpecular = findOptionsWindow( "OptionsMenu.wnd:CheckSpecular" );
-	checkNormalMaps = findOptionsWindow( "OptionsMenu.wnd:CheckNormalMaps" );
+	checkSpecular = findOptionsWindow( "OptionsMenu.wnd:CheckSpecular", checkSpecularID );
+	checkSpecularDebug = findOptionsWindow( "OptionsMenu.wnd:CheckSpecularDebug" );
+	checkNormalMaps = findOptionsWindow( "OptionsMenu.wnd:CheckNormalMaps", checkNormalMapsID );
+	checkNormalMapDebug = findOptionsWindow( "OptionsMenu.wnd:CheckNormalMapDebug" );
 	checkWaterReflections = findOptionsWindow( "OptionsMenu.wnd:CheckWaterReflections" );
 	checkDynamicLights = findOptionsWindow( "OptionsMenu.wnd:CheckDynamicLights", checkDynamicLightsID );
 	checkPixelLights = findOptionsWindow( "OptionsMenu.wnd:CheckPixelLights", checkPixelLightsID );
 	checkDynamicLightsDebug = findOptionsWindow( "OptionsMenu.wnd:CheckDynamicLightsDebug" );
 	checkSoftParticles = findOptionsWindow( "OptionsMenu.wnd:CheckSoftParticles" );
-	checkAmbientOcclusion = findOptionsWindow( "OptionsMenu.wnd:CheckAmbientOcclusion" );
+	checkAmbientOcclusion = findOptionsWindow( "OptionsMenu.wnd:CheckAmbientOcclusion", checkAmbientOcclusionID );
+	checkAmbientOcclusionDebug = findOptionsWindow( "OptionsMenu.wnd:CheckAmbientOcclusionDebug" );
 	checkHeightBlend = findOptionsWindow( "OptionsMenu.wnd:CheckHeightBlend" );
 	checkHQSky = findOptionsWindow( "OptionsMenu.wnd:CheckHQSky" );
 	checkShorelineFoam = findOptionsWindow( "OptionsMenu.wnd:CheckShorelineFoam" );
@@ -1751,7 +1766,9 @@ static void initGameOptionsWindows()
 	setTooltip( textEntryBloomStrength, "TOOLTIP:BloomStrength" );
 	setCheckText( checkLaserRef, "GUI:LaserRef", "TOOLTIP:LaserRef" );
 	setCheckText( checkSpecular, "GUI:Specular", "TOOLTIP:Specular" );
+	setCheckText( checkSpecularDebug, "GUI:SpecularDebug", "TOOLTIP:SpecularDebug" );
 	setCheckText( checkNormalMaps, "GUI:NormalMaps", "TOOLTIP:NormalMaps" );
+	setCheckText( checkNormalMapDebug, "GUI:NormalMapDebug", "TOOLTIP:NormalMapDebug" );
 	setCheckText( checkWaterReflections, "GUI:WaterReflections", "TOOLTIP:WaterReflections" );
 	setCheckText( checkShorelineFoam, "GUI:ShorelineFoam", "TOOLTIP:ShorelineFoam" );
 	setCheckText( checkDynamicLights, "GUI:DynamicLights", "TOOLTIP:DynamicLights" );
@@ -1761,6 +1778,7 @@ static void initGameOptionsWindows()
 	setCheckText( checkSmoothUnitMotion, "GUI:SmoothUnitMotion", "TOOLTIP:SmoothUnitMotion" );
 	setCheckText( checkVSync, "GUI:VSync", "TOOLTIP:VSync" );
 	setCheckText( checkAmbientOcclusion, "GUI:AmbientOcclusion", "TOOLTIP:AmbientOcclusion" );
+	setCheckText( checkAmbientOcclusionDebug, "GUI:AmbientOcclusionDebug", "TOOLTIP:AmbientOcclusionDebug" );
 	setCheckText( checkHeightBlend, "GUI:HeightBlend", "TOOLTIP:HeightBlend" );
 	setCheckText( checkHQSky, "GUI:HQSky", "TOOLTIP:HQSky" );
 	setCheckText( checkSoftParticles, "GUI:SoftParticles", "TOOLTIP:SoftParticles" );
@@ -2637,7 +2655,8 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 				cancelPanel( WinShaders, populateShaders );
 			}
 			else if (controlID == checkGridHotkeysID || controlID == checkKeyboardOverlayBackdropID || controlID == checkBloomID ||
-				controlID == checkDynamicLightsID || controlID == checkPixelLightsID || controlID == checkCloudShadowsID )
+				controlID == checkDynamicLightsID || controlID == checkPixelLightsID || controlID == checkCloudShadowsID ||
+				controlID == checkSpecularID || controlID == checkNormalMapsID || controlID == checkAmbientOcclusionID )
 			{
 				updateGameOptionsEnables();
 			}
