@@ -54,6 +54,7 @@
 #include "Common/NameKeyGenerator.h"
 #include "Common/ModuleFactory.h"
 #include "Common/Debug.h"
+#include <exception>
 #include "Common/GameState.h"
 #include "Common/GameStateMap.h"
 #include "Common/Science.h"
@@ -224,7 +225,19 @@ void initSubsystem(
 	bool optional = FALSE)
 {
 	sysref = sys;
+	DEBUG_LOG(("STARTUP: begin %s%s%s%s%s", name.str(), path1 ? " " : "", path1 ? path1 : "", path2 ? " " : "", path2 ? path2 : ""));
 	TheSubsystemList->initSubsystem(sys, path1, path2, pXfer, name, optional);
+	DEBUG_LOG(("STARTUP: completed %s", name.str()));
+}
+
+//-------------------------------------------------------------------------------------------------
+// The startup step in progress, so a failure in GameEngine::init can say where it happened.
+static const char* s_startupStage = "";
+
+static void setStartupStage(const char* stage)
+{
+	s_startupStage = stage;
+	DEBUG_LOG(("STARTUP: stage=%s", stage));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -429,6 +442,8 @@ Bool GameEngine::isGameHalted()
 void GameEngine::init()
 {
 	try {
+		setStartupStage("Engine bootstrap");
+
 		//create an INI object to use for loading stuff
 		INI ini;
 
@@ -525,13 +540,16 @@ void GameEngine::init()
 
 		DEBUG_ASSERTCRASH(TheWritableGlobalData,("TheWritableGlobalData expected to be created"));
 		initSubsystem(TheWritableGlobalData, "TheWritableGlobalData", TheWritableGlobalData, &xferCRC, "Data\\INI\\Default\\GameData", "Data\\INI\\GameData");
+		setStartupStage("GameData custom definition");
 		TheWritableGlobalData->parseCustomDefinition();
 
 #if defined(GENERALS_ONLINE)
 		// Init sentry ASAP to catch early crashes
+		setStartupStage("Generals Online InitSentry");
 		NGMP_OnlineServicesManager::InitSentry();
 #endif
 
+		setStartupStage("Subsystem initialization");
 		initSubsystem(TheWriteableMapData, "TheWriteableMapData", MapData::createMapDataSystem(), &xferCRC);
 
 	#ifdef DUMP_PERF_STATS///////////////////////////////////////////////////////////////////////////
@@ -548,16 +566,20 @@ void GameEngine::init()
 	#endif
 
 		// special-case: parse command-line parameters after loading global data
+		setStartupStage("Engine command line");
 		CommandLine::parseCommandLineForEngineInit();
 
 #if defined(GENERALS_ONLINE)
 		// NGMP_CHANGE: Init our settings before loadMods, which reads DataPacks_UseCommunityPatch. Needs TheGlobalData for the user data path.
+		setStartupStage("Generals Online settings");
 		NGMP_OnlineServicesManager::Settings.Initialize();
 #endif
 
+		setStartupStage("Mount mod archives");
 		TheArchiveFileSystem->loadMods();
 
 		// doesn't require resets so just create a single instance here.
+		setStartupStage("Game LOD manager and TGA to DDS update");
 		TheGameLODManager = MSGNEW("GameEngineSubsystem") GameLODManager;
 		TheGameLODManager->init();
 
@@ -568,6 +590,7 @@ void GameEngine::init()
 		}
 
 		// read the water settings from INI (must do prior to initing GameClient, apparently)
+		setStartupStage("Water and weather INI");
 		ini.loadFileDirectory( "Data\\INI\\Default\\Water", INI_LOAD_OVERWRITE, &xferCRC );
 		ini.loadFileDirectory( "Data\\INI\\Water", INI_LOAD_OVERWRITE, &xferCRC );
 		ini.loadFileDirectory( "Data\\INI\\Default\\Weather", INI_LOAD_OVERWRITE, &xferCRC );
@@ -582,6 +605,7 @@ void GameEngine::init()
 	#endif/////////////////////////////////////////////////////////////////////////////////////////////
 
 
+		setStartupStage("Subsystem initialization");
 #ifdef DEBUG_CRC
 		initSubsystem(TheDeepCRCSanityCheck, "TheDeepCRCSanityCheck", MSGNEW("GameEngineSubystem") DeepCRCSanityCheck, nullptr);
 #endif // DEBUG_CRC
@@ -605,7 +629,9 @@ void GameEngine::init()
 		initSubsystem(TheTerrainTypes,"TheTerrainTypes", MSGNEW("GameEngineSubsystem") TerrainTypeCollection(), &xferCRC, "Data\\INI\\Default\\Terrain", "Data\\INI\\Terrain");
 		initSubsystem(TheTerrainRoads,"TheTerrainRoads", MSGNEW("GameEngineSubsystem") TerrainRoadCollection(), &xferCRC, "Data\\INI\\Default\\Roads", "Data\\INI\\Roads");
 		initSubsystem(TheGlobalLanguageData,"TheGlobalLanguageData",MSGNEW("GameEngineSubsystem") GlobalLanguage, nullptr); // must be before the game text
+		setStartupStage("Language custom definition");
 		TheGlobalLanguageData->parseCustomDefinition();
+		setStartupStage("Subsystem initialization");
 	#ifdef DUMP_PERF_STATS///////////////////////////////////////////////////////////////////////////
 	GetPrecisionTimer(&endTime64);//////////////////////////////////////////////////////////////////
 	DEBUG_LOG(("----------------------------------------------------------------------------After TheGlobalLanguageData = %f seconds", ((double)(endTime64-startTime64)/(double)(freq64))));////////////////////////////////////////////////////////////////////////////
@@ -715,9 +741,10 @@ void GameEngine::init()
 		ini.loadFileDirectory("Data\\INI\\CommandMapDemo", INI_LOAD_MULTIFILE, nullptr);
 #endif
 
+		setStartupStage("Command map generation and validation");
 		TheMetaMap->generateMetaMap();
 		TheMetaMap->verifyMetaMap();
-
+		setStartupStage("Subsystem initialization");
 
 		initSubsystem(TheActionManager,"TheActionManager", MSGNEW("GameEngineSubsystem") ActionManager(), nullptr);
 		//initSubsystem((CComObject<WebBrowser> *)TheWebBrowser,"(CComObject<WebBrowser> *)TheWebBrowser", (CComObject<WebBrowser> *)createWebBrowser(), nullptr);
@@ -739,8 +766,10 @@ void GameEngine::init()
 		TheWritableGlobalData->m_iniCRC = xferCRC.getCRC();
 		DEBUG_LOG(("INI CRC is 0x%8.8X", TheGlobalData->m_iniCRC));
 
+		setStartupStage("Subsystem postProcessLoadAll");
 		TheSubsystemList->postProcessLoadAll();
 
+		setStartupStage("Frame pacing and audio settings");
 		TheFramePacer->setFramesPerSecondLimit(TheGlobalData->m_framesPerSecondLimit);
 
 		TheAudio->setOn(TheGlobalData->m_audioOn && TheGlobalData->m_musicOn, AudioAffect_Music);
@@ -761,6 +790,7 @@ void GameEngine::init()
 		// m_quitting = FALSE;
 
 		// initialize the MapCache
+		setStartupStage("Map cache update");
 		TheMapCache = MSGNEW("GameEngineSubsystem") MapCache;
 		TheMapCache->updateCache();
 
@@ -783,6 +813,7 @@ void GameEngine::init()
 		//TheShell->push( "Menus/MainMenu.wnd" );
 
 		// This allows us to run a map from the command line
+		setStartupStage("Initial map and shell map validation");
 		if (TheGlobalData->m_initialFile.isEmpty() == FALSE)
 		{
 			AsciiString fname = TheGlobalData->m_initialFile;
@@ -822,6 +853,7 @@ void GameEngine::init()
 	}
 	catch (ErrorCode ec)
 	{
+		DEBUG_LOG(("STARTUP FAILURE: stage=%s ErrorCode=0x%8.8X", s_startupStage, (unsigned int)ec));
 		if (ec == ERROR_INVALID_D3D)
 		{
 			RELEASE_CRASHLOCALIZED("ERROR:D3DFailurePrompt", "ERROR:D3DFailureMessage");
@@ -829,25 +861,35 @@ void GameEngine::init()
 	}
 	catch (INIException e)
 	{
+		DEBUG_LOG(("STARTUP FAILURE: stage=%s INIException=%s", s_startupStage, e.mFailureMessage ? e.mFailureMessage : "<no description>"));
 		if (e.mFailureMessage)
 			RELEASE_CRASH((e.mFailureMessage));
 		else
 			RELEASE_CRASH(("Uncaught Exception during initialization."));
 
 	}
+	catch (const std::exception& e)
+	{
+		DEBUG_LOG(("STARTUP FAILURE: stage=%s std::exception=%s", s_startupStage, e.what()));
+		RELEASE_CRASH(("Uncaught Exception during initialization."));
+	}
 	catch (...)
 	{
+		DEBUG_LOG(("STARTUP FAILURE: stage=%s unknown exception", s_startupStage));
 		RELEASE_CRASH(("Uncaught Exception during initialization."));
 	}
 
+	setStartupStage("Subsystem reset");
 	resetSubsystems();
 
 	HideControlBar();
 
 #if defined(GENERALS_ONLINE)
+	setStartupStage("Discord rich presence");
 	m_discordRichPresence = new GeneralsOnlineDiscordRPC();
 	m_discordRichPresence->Initialize();
 #endif
+	DEBUG_LOG(("STARTUP: engine initialization completed"));
 }
 
 /** -----------------------------------------------------------------------------------------------

@@ -118,7 +118,7 @@ void W3DDependencyCarrierDraw::adjustTransformMtx(Matrix3D& mtx) const
 			else
 			{
 				mtx = *theirDrawable->getTransformMatrix();
-				DEBUG_LOG(("m_attachToDrawableBoneInContainer %s not found", md->m_attachToDrawableBoneInContainer.str()));
+				logMissingContainerBone(theirDrawable);
 			}
 		}
 	}

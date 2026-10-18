@@ -32,6 +32,7 @@
 // draw after he draws.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/Object.h"
@@ -44,6 +45,7 @@
 
 //-------------------------------------------------------------------------------------------------
 W3DDependencyModelDrawModuleData::W3DDependencyModelDrawModuleData()
+	: m_missingBoneLogCount(0)
 {
 }
 
@@ -157,10 +159,38 @@ void W3DDependencyModelDraw::adjustTransformMtx(Matrix3D& mtx) const
 			else
 			{
         mtx = *theirDrawable->getTransformMatrix();//TransformMatrix();
-				DEBUG_LOG(("m_attachToDrawableBoneInContainer %s not found", md->m_attachToDrawableBoneInContainer.str()));
+				logMissingContainerBone(theirDrawable);
 			}
 		}
 	}
+}
+
+// ------------------------------------------------------------------------------------------------
+void W3DDependencyModelDraw::logMissingContainerBone(const Drawable* container) const
+{
+#ifdef DEBUG_LOGGING
+	// Logs from every frame the rider is drawn, so cap it per rider template.
+	const W3DDependencyModelDrawModuleData* md = getW3DDependencyModelDrawModuleData();
+	if (md->m_missingBoneLogCount >= 10)
+	{
+		return;
+	}
+	++md->m_missingBoneLogCount;
+
+	AsciiString modelName = "<none>";
+	Coord3D center;
+	for (DrawModule const** dm = container->getDrawModules(); dm && *dm; ++dm)
+	{
+		const ObjectDrawInterface* di = (*dm)->getObjectDrawInterface();
+		if (di && di->clientOnly_getModelNameAndCenter(&modelName, &center))
+		{
+			break;
+		}
+	}
+	DEBUG_LOG(("m_attachToDrawableBoneInContainer %s not found in model %s of %s, carrying %s",
+		md->m_attachToDrawableBoneInContainer.str(), modelName.str(),
+		container->getTemplate()->getName().str(), getDrawable()->getTemplate()->getName().str()));
+#endif
 }
 
 // ------------------------------------------------------------------------------------------------

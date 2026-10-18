@@ -42,6 +42,7 @@ class W3DDependencyModelDrawModuleData : public W3DModelDrawModuleData
 {
 public:
 	AsciiString	m_attachToDrawableBoneInContainer;// Not just a different draw module, this bone is in our container
+	mutable Int	m_missingBoneLogCount;
 
 	W3DDependencyModelDrawModuleData();
 	virtual ~W3DDependencyModelDrawModuleData() override;
@@ -64,5 +65,7 @@ public:
 	virtual void adjustTransformMtx(Matrix3D& mtx) const override;
 
 protected:
+	void logMissingContainerBone(const Drawable* container) const;
+
 	Bool m_dependencyCleared; // The thing we depend on will clear this, and we will relatch it after we draw.
 };
