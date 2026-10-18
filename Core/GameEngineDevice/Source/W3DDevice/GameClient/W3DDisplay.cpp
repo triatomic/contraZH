@@ -414,6 +414,7 @@ W3DDisplay::W3DDisplay()
 
 	for (i = 0; i < DisplayStringCount; i++)
 		m_displayStrings[i] = nullptr;
+	m_benchmarkDisplayString = nullptr;
 
 	m_batchTexture = nullptr;
 	m_batchMode = DRAW_IMAGE_ALPHA;
