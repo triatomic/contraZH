@@ -2352,7 +2352,8 @@ Int RTS3DScene::pickObjectPixelLights(const SphereClass &sphere, Int *lights)
 		{
 			continue;
 		}
-		const Real falloff = WWMath::Clamp((pixelLight.outerRadius - distance) / (pixelLight.outerRadius - pixelLight.innerRadius), 0.0f, 1.0f);
+		const Real ramp = WWMath::Clamp((pixelLight.outerRadius - distance) / (pixelLight.outerRadius - pixelLight.innerRadius), 0.0f, 1.0f);
+		const Real falloff = ramp * ramp * (3.0f - 2.0f * ramp);
 		const Real brightness = max(pixelLight.diffuse.X, max(pixelLight.diffuse.Y, pixelLight.diffuse.Z)) * (1.0f + pixelLight.ambientScale);
 		const Real score = falloff * brightness;
 

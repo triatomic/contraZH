@@ -188,12 +188,13 @@ Notes:
 # Per-pixel dynamic lights
 
 Explosion flashes, muzzle flashes, laser glow and other dynamic lights are drawn per pixel, so they
-light the ground in smooth circles and follow its bumps. Roads, bridges, vehicles, structures and
-infantry near them are lit the same way. Needs the Direct3D 9 build and shader model 2.0a; other
+light the ground in smooth circles and follow its bumps. Each light fades out softly at its edge,
+with no visible rim. Roads, bridges, vehicles, structures and infantry near them are lit the same
+way. Needs the Direct3D 9 build and shader model 2.0a; other
 cards keep the old lighting.
 
 * `DynamicLights = Yes` - (No turns off every dynamic light: explosion and muzzle-flash pulses, laser
-ground glow and the police car's lights. Also `Dynamic lights` on the Shaders page.
+ground glow, the police car's lights and the flash of map lightning. Also `Dynamic lights` on the Shaders page.
 Needs `CheckDynamicLights` in `OptionsMenu.wnd` for the menu control.)
 * `PixelLights = Yes` - (No keeps dynamic lights on the old per-vertex lighting. Also `Per-pixel
 lights` on the Shaders page, greyed out while dynamic lights are off. Needs

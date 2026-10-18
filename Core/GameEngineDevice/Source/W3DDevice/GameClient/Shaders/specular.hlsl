@@ -66,6 +66,7 @@ float4 TextureInfo  : register(c7);   // x = glow mask intensity, 0 without a ma
 // Eight fill c8 to c25, and fxc needs the rest for literals, so W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS must match.
 #define POINT_LIGHT_REGISTER c8
 #define POINT_LIGHT_COUNT 8
+#define POINT_LIGHT_NO_LITERALS 1
 #include "pointlights.hlsli"
 #endif
 
