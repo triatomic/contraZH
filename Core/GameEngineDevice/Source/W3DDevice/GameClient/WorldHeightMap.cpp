@@ -2318,9 +2318,7 @@ TextureClass *WorldHeightMap::getTerrainTexture()
 		m_terrainGlintMapAtlas = nullptr;
 		m_terrainTex = MSGNEW("WorldHeightMap_getTerrainTexture") TerrainTextureClass(pow2Height);
 		m_terrainTexHeight = m_terrainTex->update(this);
-		char buf[64];
-		sprintf(buf, "Base tex height %d", pow2Height);
-		DEBUG_LOG((buf));
+		DEBUG_LOG(("Base tex height %d", pow2Height));
 		REF_PTR_RELEASE(m_alphaTerrainTex);
 		m_alphaTerrainTex = MSGNEW("WorldHeightMap_getTerrainTexture") AlphaTerrainTextureClass(m_terrainTex);
 

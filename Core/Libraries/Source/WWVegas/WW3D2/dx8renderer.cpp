@@ -653,17 +653,16 @@ void DX8TextureCategoryClass::Log(bool only_visible)
 	}
 	work2.Format("\n	material: %x (%s)\n	shader: %x", material, material ? material->Get_Name() : "-", shader);
 	work+=work2;
-	RENDER_LOG((work));
+	RENDER_LOG(("%s", work.str()));
 
-	work.Format("	%8s %8s %6s %6s %6s %5s %s",
+	RENDER_LOG(("\t%8s %8s %6s %6s %6s %5s %s",
 		"idx_cnt",
 		"poly_cnt",
 		"i_offs",
 		"min_vi",
 		"vi_rng",
 		"ident",
-		"name");
-	RENDER_LOG((work));
+		"name"));
 
 	DX8PolygonRendererListIterator it(&PolygonRendererList);
 	while (!it.Is_Done()) {
@@ -1034,21 +1033,17 @@ DX8RigidFVFCategoryContainer::~DX8RigidFVFCategoryContainer()
 void DX8RigidFVFCategoryContainer::Log(bool only_visible)
 {
 #ifdef ENABLE_CATEGORY_LOG
-	StringClass work(255,true);
-	work.Format("DX8RigidFVFCategoryContainer --------------");
-	RENDER_LOG((work));
+	RENDER_LOG(("DX8RigidFVFCategoryContainer --------------"));
 	if (vertex_buffer) {
 		StringClass fvfname(255,true);
 		vertex_buffer->FVF_Info().Get_FVF_Name(fvfname);
-		work.Format("VB size (used/total): %d/%d FVF: %s",used_vertices,vertex_buffer->Get_Vertex_Count(),fvfname);
-		RENDER_LOG((work));
+		RENDER_LOG(("VB size (used/total): %d/%d FVF: %s",used_vertices,vertex_buffer->Get_Vertex_Count(),fvfname.str()));
 	}
 	else {
 		RENDER_LOG(("EMPTY VB"));
 	}
 	if (index_buffer) {
-		work.Format("IB size (used/total): %d/%d",used_indices,index_buffer->Get_Index_Count());
-		RENDER_LOG((work));
+		RENDER_LOG(("IB size (used/total): %d/%d",used_indices,index_buffer->Get_Index_Count()));
 	}
 	else {
 		RENDER_LOG(("EMPTY IB"));
@@ -1749,13 +1744,10 @@ void DX8SkinFVFCategoryContainer::Add_Skinned_Vertices(MeshModelClass* mmc)
 void DX8SkinFVFCategoryContainer::Log(bool only_visible)
 {
 #ifdef ENABLE_CATEGORY_LOG
-	StringClass work(255,true);
-	work.Format("DX8SkinFVFCategoryContainer --------------");
-	RENDER_LOG((work));
+	RENDER_LOG(("DX8SkinFVFCategoryContainer --------------"));
 
 	if (index_buffer) {
-		work.Format("IB size (used/total): %d/%d",used_indices,index_buffer->Get_Index_Count());
-		RENDER_LOG((work));
+		RENDER_LOG(("IB size (used/total): %d/%d",used_indices,index_buffer->Get_Index_Count()));
 	}
 	else {
 		RENDER_LOG(("EMPTY IB"));
