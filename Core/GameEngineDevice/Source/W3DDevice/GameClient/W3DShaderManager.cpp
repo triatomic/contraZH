@@ -1622,22 +1622,18 @@ static Int Get_Pixel_Light_Mode()
 	return (value != nullptr) ? atoi(value) : PIXEL_LIGHTS_ALL;
 }
 
-// Whether the lit shaders loaded as their lights-only twins, which holds until they load again.
-static Bool LightsDebugLoaded = FALSE;
-
-static Bool Get_Lights_Debug_Wanted()
-{
-#if RTS_ZEROHOUR
-	return TheGlobalData != nullptr && TheGlobalData->m_dynamicLightsDebug;
-#else
-	return FALSE;
-#endif
-}
+// Whether any lit shader carries its lights-only twin.
+static Bool LightsDebugAvailable = FALSE;
 
 // DynamicLightsDebug draws every lightable surface through its lit shader, so unlit ground and objects go black too.
 static Bool Get_Lights_Debug()
 {
-	return LightsDebugLoaded;
+#if RTS_ZEROHOUR
+	return LightsDebugAvailable && TheGlobalData != nullptr && TheGlobalData->m_dynamicLightsDebug &&
+		TheGlobalData->m_useDynamicLights && TheGlobalData->m_usePixelLights;
+#else
+	return FALSE;
+#endif
 }
 
 // Names the lights-only twin the build compiles for a lit pixel shader.
@@ -1650,6 +1646,42 @@ static Bool Get_Lights_Debug_Path(const char *path, char *debugPath, size_t size
 	}
 	snprintf(debugPath, size, "%.*slightsdebug.pso", (int)(length - 4), path);
 	return TRUE;
+}
+
+#if defined(BUILD_WITH_D3D9)
+// Hangs a lit shader's lights-only twin on its handle, which binds it while the debug view is on.
+static void Attach_Lights_Debug_Twin(const char *path, DWORD handle)
+{
+	char debugPath[_MAX_PATH];
+	const void *data = nullptr;
+	DWORD size = 0;
+	if (!Get_Lights_Debug_Path(path, debugPath, sizeof(debugPath)) || !Find_Embedded_Shader(debugPath, data, size))
+	{
+		return;
+	}
+
+	IDirect3DPixelShader9 *shader = nullptr;
+	if (SUCCEEDED(DX8Wrapper::_Get_D3D_Device8()->CreatePixelShader((const DWORD *)data, &shader)))
+	{
+		Attach_D3D9_Debug_Pixel_Shader(handle, shader);
+		LightsDebugAvailable = TRUE;
+	}
+	else
+	{
+		RENDER_LOG(("LoadAndCreateD3DShader: could not create %s", debugPath));
+	}
+}
+#endif
+
+// Switches the lit shaders to their twins or back as the frame starts, and rebinds whatever was bound.
+static void Update_Lights_Debug()
+{
+#if defined(BUILD_WITH_D3D9)
+	if (Set_D3D9_Debug_Pixel_Shaders(Get_Lights_Debug() != FALSE))
+	{
+		DX8Wrapper::Set_Pixel_Shader(0);
+	}
+#endif
 }
 
 // Packs the given lights, or the first count without indices, as pointlights.hlsli reads them in a shader
@@ -2910,6 +2942,7 @@ void W3DShaderManager::setPixelLights(const PixelLight *lights, Int count)
 		PixelLights[i] = lights[i];
 	}
 	ObjectSpecularPassesUsed = 0;
+	Update_Lights_Debug();
 }
 
 Int W3DShaderManager::getPixelLightCount()
@@ -6049,18 +6082,6 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 	if (getChipset() < DC_GENERIC_PIXEL_SHADER_1_1)
 		return E_FAIL;	//don't allow loading any shaders if hardware can't handle it.
 
-	char debugPath[_MAX_PATH];
-	const void *debugData = nullptr;
-	DWORD debugSize = 0;
-	if (!ShaderType && Get_Lights_Debug_Path(strFilePath, debugPath, sizeof(debugPath)) && Find_Embedded_Shader(debugPath, debugData, debugSize))
-	{
-		LightsDebugLoaded = Get_Lights_Debug_Wanted();
-		if (LightsDebugLoaded)
-		{
-			return LoadAndCreateD3DShader(debugPath, pDeclaration, Usage, ShaderType, pHandle);
-		}
-	}
-
 	try
 	{
 		File *file = nullptr;
@@ -6141,6 +6162,10 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 					{
 						pixel_shader->Release();
 						hr = E_OUTOFMEMORY;
+					}
+					else
+					{
+						Attach_Lights_Debug_Twin(strFilePath, *pHandle);
 					}
 				}
 			}

@@ -219,7 +219,7 @@ before, so they show none without shader model 2.0a.
 draws only the per-pixel lights on them, so each light's shape and reach shows. Also `Lights debug
 view` on the Shaders page, greyed out while per-pixel lights are off. Needs `CheckDynamicLightsDebug`
 in `OptionsMenu.wnd` for the menu control; `build/add_lightsdebug_wnd.py` adds it. Notes:
-* Takes effect on the next launch, and needs `PixelLights = Yes`.
+* Applies at once, and needs `PixelLights = Yes`.
 * Lights left on the old lighting do not show.
 * Water, sky, trees, particles and shroud draw as usual.
 

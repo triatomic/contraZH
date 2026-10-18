@@ -509,7 +509,6 @@ static const BoolOption BoolOptions[] =
 	{ &checkShorelineFoam, "ShorelineFoam", &OptionPreferences::getShorelineFoamEnabled, &GlobalData::m_shorelineFoam, TRUE },
 	{ &checkDynamicLights, "DynamicLights", &OptionPreferences::getDynamicLightsEnabled, &GlobalData::m_useDynamicLights, TRUE },
 	{ &checkPixelLights, "PixelLights", &OptionPreferences::getPixelLightsEnabled, &GlobalData::m_usePixelLights, TRUE },
-	// the lights-only shaders are picked as the shaders load, so it waits for the next launch
 	{ &checkDynamicLightsDebug, "DynamicLightsDebug", &OptionPreferences::getDynamicLightsDebugEnabled, &GlobalData::m_dynamicLightsDebug, FALSE },
 	{ &checkSoftParticles, "SoftParticles", &OptionPreferences::getSoftParticlesEnabled, &GlobalData::m_useSoftParticles, TRUE },
 	{ &checkAmbientOcclusion, "AmbientOcclusion", &OptionPreferences::getAmbientOcclusionEnabled, &GlobalData::m_useAmbientOcclusion, TRUE },
