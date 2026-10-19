@@ -30,6 +30,7 @@
 #include "Common/PlayerTemplate.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
+#include "Common/Upgrade.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/Display.h"
 #include "GameClient/Gadget.h"
@@ -47,6 +48,7 @@
 #include "GameClient/KeyDefs.h"
 #include "GameClient/Keyboard.h"
 #include "GameClient/MetaEvent.h"
+#include "GameLogic/Module/CommandSetUpgrade.h"
 
 namespace
 {
@@ -628,8 +630,147 @@ Int sideOf( const PlayerTemplate *side )
 	return base.compareNoCase( "America" ) == 0 ? 0 : -1;
 }
 
-/// The general's build tree from its first building and worker, then every other template its Side owns
-BarGeneral findGeneral( const PlayerTemplate *side )
+/// A starting choice such as Superweapon's tech paths: an upgrade that swaps command sets, named by its button
+struct PathChoice
+{
+	AsciiString upgrade;
+	UnicodeString label;
+};
+
+/// What a general's own templates' CommandSetUpgrades do, for finding its paths
+struct SideSwaps
+{
+	std::map<AsciiString, std::set<AsciiString> > swapped;	///< upgrade to the templates it swaps a command set on
+	std::map<AsciiString, std::set<AsciiString> > holders;	///< lower case command set name to the templates that start on it
+};
+
+/// The command sets a template's CommandSetUpgrades swap in, by the upgrade that triggers each.
+void swapsOf( const ThingTemplate *thing, std::map<AsciiString, AsciiString> *swaps )
+{
+	const ModuleInfo& info = thing->getBehaviorModuleInfo();
+	for( Int i = 0; i < info.getCount(); ++i )
+	{
+		if( info.getNthName( i ).compareNoCase( "CommandSetUpgrade" ) != 0 )
+		{
+			continue;
+		}
+		const CommandSetUpgradeModuleData *data = (const CommandSetUpgradeModuleData *)info.getNthData( i );
+		// copies that need every trigger at once, like the General's Challenge ones, are not a choice
+		if( data == nullptr || data->m_upgradeMuxData.m_requiresAllTriggers )
+		{
+			continue;
+		}
+		const std::vector<AsciiString>& triggers = data->m_upgradeMuxData.m_activationUpgradeNames;
+		for( size_t t = 0; t < triggers.size(); ++t )
+		{
+			( *swaps )[ triggers[t] ] = data->m_newCommandSet;
+		}
+	}
+}
+
+/// The Side the general's own templates carry, read off its starting building, as Contra's base generals say America
+AsciiString ownSide( const PlayerTemplate *side )
+{
+	const ThingTemplate *start = TheThingFactory->findTemplate( side->getStartingBuilding(), FALSE );
+	return start && start->getDefaultOwningSide().isNotEmpty() ? start->getDefaultOwningSide() : side->getSide();
+}
+
+void findSideSwaps( const PlayerTemplate *side, SideSwaps *out )
+{
+	const AsciiString owner = ownSide( side );
+	for( const ThingTemplate *thing = TheThingFactory->firstTemplate(); thing; thing = thing->friend_getNextTemplate() )
+	{
+		if( thing->getDefaultOwningSide().compareNoCase( owner ) != 0 )
+		{
+			continue;
+		}
+		AsciiString setName = thing->friend_getCommandSetString();
+		setName.toLower();
+		out->holders[ setName ].insert( thing->getName() );
+		std::map<AsciiString, AsciiString> swaps;
+		swapsOf( thing, &swaps );
+		for( std::map<AsciiString, AsciiString>::const_iterator it = swaps.begin(); it != swaps.end(); ++it )
+		{
+			out->swapped[ it->first ].insert( thing->getName() );
+		}
+	}
+}
+
+/// The command set a template shows on a path: the one the path's upgrade swaps in, else its own.
+const CommandSet *commandSetOn( const ThingTemplate *thing, const AsciiString& path )
+{
+	if( path.isNotEmpty() )
+	{
+		std::map<AsciiString, AsciiString> swaps;
+		swapsOf( thing, &swaps );
+		std::map<AsciiString, AsciiString>::const_iterator it = swaps.find( path );
+		if( it != swaps.end() )
+		{
+			return TheControlBar->findCommandSet( it->second );
+		}
+	}
+	return TheControlBar->findCommandSet( thing->friend_getCommandSetString() );
+}
+
+/// Rival upgrade buttons on one card that re-card the same other templates: a choice between paths.
+void findPaths( const CommandSet *set, const SideSwaps& swaps, std::vector<PathChoice> *paths )
+{
+	if( !paths->empty() )
+	{
+		return;
+	}
+	AsciiString setName = set->getName();
+	setName.toLower();
+	std::map<AsciiString, std::set<AsciiString> >::const_iterator own = swaps.holders.find( setName );
+	std::vector<PathChoice> found;
+	std::vector<const std::set<AsciiString> *> recards;
+	for( Int slot = 0; slot < MAX_COMMANDS_PER_SET; ++slot )
+	{
+		const CommandButton *button = set->getCommandButton( slot );
+		// a path is bought for the whole player; per-unit add-ons are object upgrades
+		const Bool player = button && button->getCommandType() == GUI_COMMAND_PLAYER_UPGRADE;
+		const UpgradeTemplate *upgrade = player ? button->getUpgradeTemplate() : nullptr;
+		std::map<AsciiString, std::set<AsciiString> >::const_iterator it = upgrade ? swaps.swapped.find( upgrade->getUpgradeName() ) : swaps.swapped.end();
+		if( it == swaps.swapped.end() )
+		{
+			continue;
+		}
+		// an upgrade that re-cards only the card's own holders is no path
+		Bool others = FALSE;
+		for( std::set<AsciiString>::const_iterator name = it->second.begin(); name != it->second.end() && !others; ++name )
+		{
+			others = own == swaps.holders.end() || !own->second.count( *name );
+		}
+		if( !others )
+		{
+			continue;
+		}
+		PathChoice choice;
+		choice.upgrade = upgrade->getUpgradeName();
+		choice.label = buttonName( button );
+		found.push_back( choice );
+		recards.push_back( &it->second );
+	}
+	for( size_t a = 0; a < found.size(); ++a )
+	{
+		for( size_t b = 0; b < found.size(); ++b )
+		{
+			if( a != b && *recards[a] == *recards[b] && found[a].upgrade != found[b].upgrade )
+			{
+				paths->push_back( found[a] );
+				break;
+			}
+		}
+	}
+	if( paths->size() < 2 )
+	{
+		paths->clear();
+	}
+}
+
+/// The general's tree on a path, then its other Side templates no other path reaches; the base walk finds paths
+BarGeneral findGeneral( const PlayerTemplate *side, const AsciiString& path, const std::set<AsciiString> *exclude,
+	std::set<AsciiString> *reached, const SideSwaps *swaps, std::vector<PathChoice> *paths )
 {
 	BarGeneral general;
 	general.name = side->getDisplayName();
@@ -649,9 +790,10 @@ BarGeneral findGeneral( const PlayerTemplate *side )
 				break;
 			}
 			ownedQueued = TRUE;
+			const AsciiString owner = ownSide( side );
 			for( const ThingTemplate *owned = TheThingFactory->firstTemplate(); owned; owned = owned->friend_getNextTemplate() )
 			{
-				if( owned->getDefaultOwningSide().compareNoCase( side->getSide() ) == 0 )
+				if( owned->getDefaultOwningSide().compareNoCase( owner ) == 0 && !( exclude && exclude->count( owned->getName() ) ) )
 				{
 					queue.push_back( owned->getName() );
 				}
@@ -667,11 +809,19 @@ BarGeneral findGeneral( const PlayerTemplate *side )
 			continue;
 		}
 		seen.insert( thingName );
+		if( reached && !ownedQueued )
+		{
+			reached->insert( thingName );
+		}
 		const ThingTemplate *thing = TheThingFactory->findTemplate( thingName, FALSE );
-		const CommandSet *set = thing ? TheControlBar->findCommandSet( thing->friend_getCommandSetString() ) : nullptr;
+		const CommandSet *set = thing ? commandSetOn( thing, path ) : nullptr;
 		if( set == nullptr )
 		{
 			continue;
+		}
+		if( paths && swaps )
+		{
+			findPaths( set, *swaps, paths );
 		}
 		BarObject object;
 		Bool any = FALSE;
@@ -740,6 +890,26 @@ BarGeneral findGeneral( const PlayerTemplate *side )
 	return general;
 }
 
+void addGeneral( Int which, const PlayerTemplate *side, BarGeneral& general )
+{
+	if( general.objects.empty() )
+	{
+		return;
+	}
+	// a boss and a campaign general may share a display name
+	for( size_t i = 0; i < s_sides[ which ].size(); ++i )
+	{
+		if( s_sides[ which ][i].name.compare( general.name ) == 0 )
+		{
+			general.name.concat( L" (" );
+			general.name.concat( wide( side->getSide() ) );
+			general.name.concat( L')' );
+			break;
+		}
+	}
+	s_sides[ which ].push_back( general );
+}
+
 void findBars()
 {
 	s_buttonNames.clear();
@@ -759,23 +929,44 @@ void findBars()
 		{
 			continue;
 		}
-		BarGeneral general = findGeneral( side );
-		if( general.objects.empty() )
+		SideSwaps swaps;
+		findSideSwaps( side, &swaps );
+		std::vector<PathChoice> paths;
+		BarGeneral general = findGeneral( side, AsciiString::TheEmptyString, nullptr, nullptr, &swaps, &paths );
+		if( paths.empty() )
 		{
+			addGeneral( which, side, general );
 			continue;
 		}
-		// a boss and a campaign general may share a display name
-		for( size_t i = 0; i < s_sides[ which ].size(); ++i )
+
+		// a general with paths is listed once per path, each without the units only another path builds
+		std::vector<std::set<AsciiString> > trees( paths.size() );
+		for( size_t p = 0; p < paths.size(); ++p )
 		{
-			if( s_sides[ which ][i].name.compare( general.name ) == 0 )
-			{
-				general.name.concat( L" (" );
-				general.name.concat( wide( side->getSide() ) );
-				general.name.concat( L')' );
-				break;
-			}
+			findGeneral( side, paths[p].upgrade, nullptr, &trees[p], nullptr, nullptr );
 		}
-		s_sides[ which ].push_back( general );
+		for( size_t p = 0; p < paths.size(); ++p )
+		{
+			std::set<AsciiString> exclude;
+			for( size_t q = 0; q < paths.size(); ++q )
+			{
+				if( q == p )
+				{
+					continue;
+				}
+				for( std::set<AsciiString>::const_iterator it = trees[q].begin(); it != trees[q].end(); ++it )
+				{
+					if( !trees[p].count( *it ) )
+					{
+						exclude.insert( *it );
+					}
+				}
+			}
+			BarGeneral onPath = findGeneral( side, paths[p].upgrade, &exclude, nullptr, nullptr, nullptr );
+			onPath.name.concat( L": " );
+			onPath.name.concat( paths[p].label );
+			addGeneral( which, side, onPath );
+		}
 	}
 }
 

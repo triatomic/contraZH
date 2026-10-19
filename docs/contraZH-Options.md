@@ -97,6 +97,10 @@ whole grid works unchanged.
 
 * Left: **USA**, **CHINA**, **GLA**, then **GENERAL** and **KEY CONFLICTS** (red while any key is shared).
 * Middle: a general picker, then the general's heroes, buildings and units as icons.
+* A general that picks a path at the start is listed once per path, e.g. Superweapon General:
+  Classic and Futuristic tech, Cyborg General: Spiders and Angels. Each entry shows the cards that
+  path's upgrade swaps in and leaves out the units only the other path builds. A path is a player
+  upgrade on a card whose rival upgrades swap the command sets of the same buildings.
 * Right: the picked object's portrait, name and command card, laid out like the 2×7 command bar,
   each button showing its letter. **Quick filter** narrows the icons or commands by name.
 * Click a card button, then press its new letter. Backspace takes the key off, Esc cancels.
