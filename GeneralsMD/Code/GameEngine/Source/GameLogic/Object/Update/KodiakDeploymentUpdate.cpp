@@ -191,7 +191,7 @@ Bool KodiakDeploymentUpdate::initiateIntentToDoSpecialPower(const SpecialPowerTe
 		newGunship->setPosition(&creationCoord);
 
 		//ORIENTATION
-		Real orient = atan2(m_initialTargetPosition.y - creationCoord.y, m_initialTargetPosition.x - creationCoord.x);
+		Real orient = WWMath::Atan2f(m_initialTargetPosition.y - creationCoord.y, m_initialTargetPosition.x - creationCoord.x);
 		newGunship->setOrientation(orient);
 
 		// ID
