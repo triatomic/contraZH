@@ -970,9 +970,12 @@ ControlBar::ControlBar()
 	m_commandBarBorderColor = GameMakeColor(0,0,0,100);
 	for( i = 0; i < NUM_CONTEXT_PARENTS; i++ )
 		m_contextParent[ i ] = nullptr;
+	m_gridRows = 0;
 	for( i = 0; i < MAX_COMMANDS_PER_SET; i++ )
 	{
 		m_commandWindows[ i ] = nullptr;
+		m_gridRow[ i ] = 0;
+		m_gridColumn[ i ] = 0;
 	// removed from multiplayer branch
 		//m_commandMarkers[ i ] = nullptr;
 	}
@@ -1226,6 +1229,7 @@ void ControlBar::init()
 
 
 		}
+		findGridSlots();
 
 		if( m_commandWindows[ 0 ] )
 		{
@@ -2566,76 +2570,88 @@ void ControlBar::setCommandBarBorder( GameWindow *button, CommandButtonMappedBor
 //-------------------------------------------------------------------------------------------------
 /** Which grid key belongs to this command bar button, or empty if it is not one of them.
 	*
-	* The button's row and column come from where the bar's buttons sit, so any bar shape works.
-	* The layout string splits evenly over the rows; columns past a row's share get no grid key. */
+	* The layout string splits evenly over the bar's rows; columns past a row's share get no grid key. */
 //-------------------------------------------------------------------------------------------------
 AsciiString ControlBar::getGridHotKeyForButton( GameWindow *button ) const
 {
-	if( button == nullptr || TheGlobalData == nullptr )
+	if( button == nullptr || TheGlobalData == nullptr || m_gridRows == 0 )
 	{
 		return AsciiString::TheEmptyString;
 	}
 
 	const AsciiString &layout = TheGlobalData->m_gridHotkeyLayout;
-	Bool found = FALSE;
-	for( Int i = 0; i < MAX_COMMANDS_PER_SET && !found; ++i )
-	{
-		found = m_commandWindows[ i ] == button;
-	}
-	if( layout.isEmpty() || !found )
-	{
-		return AsciiString::TheEmptyString;
-	}
-
-	Int x, y;
-	button->winGetScreenPosition( &x, &y );
-	Int column = 0;
-	Int row = 0;
-	Int rows = 0;
+	const Int rowLength = layout.getLength() / m_gridRows;
 	for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
 	{
+		if( m_commandWindows[ i ] == button && m_gridColumn[ i ] < rowLength )
+		{
+			AsciiString key;
+			key.concat( layout.getCharAt( m_gridRow[ i ] * rowLength + m_gridColumn[ i ] ) );
+			return key;
+		}
+	}
+	return AsciiString::TheEmptyString;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Ranks each command window among the distinct positions the bar's windows sit at, so the grid
+	* fits any bar shape. */
+//-------------------------------------------------------------------------------------------------
+void ControlBar::findGridSlots()
+{
+	ICoord2D pos[ MAX_COMMANDS_PER_SET ];
+	for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
+	{
+		if( m_commandWindows[ i ] )
+		{
+			m_commandWindows[ i ]->winGetScreenPosition( &pos[ i ].x, &pos[ i ].y );
+		}
+	}
+
+	m_gridRows = 0;
+	for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
+	{
+		m_gridRow[ i ] = 0;
+		m_gridColumn[ i ] = 0;
 		if( m_commandWindows[ i ] == nullptr )
 		{
 			continue;
 		}
-		Int wx, wy;
-		m_commandWindows[ i ]->winGetScreenPosition( &wx, &wy );
-		Bool newX = TRUE;
-		Bool newY = TRUE;
-		for( Int j = 0; j < i; ++j )
+		Bool newRow = TRUE;
+		for( Int j = 0; j < MAX_COMMANDS_PER_SET; ++j )
 		{
 			if( m_commandWindows[ j ] == nullptr )
 			{
 				continue;
 			}
-			Int ox, oy;
-			m_commandWindows[ j ]->winGetScreenPosition( &ox, &oy );
-			newX = newX && ox != wx;
-			newY = newY && oy != wy;
-		}
-		if( newX && wx < x )
-		{
-			++column;
-		}
-		if( newY )
-		{
-			++rows;
-			if( wy < y )
+			Bool firstX = TRUE;
+			Bool firstY = TRUE;
+			for( Int k = 0; k < j; ++k )
 			{
-				++row;
+				if( m_commandWindows[ k ] )
+				{
+					firstX = firstX && pos[ k ].x != pos[ j ].x;
+					firstY = firstY && pos[ k ].y != pos[ j ].y;
+				}
+			}
+			if( firstX && pos[ j ].x < pos[ i ].x )
+			{
+				++m_gridColumn[ i ];
+			}
+			if( firstY && pos[ j ].y < pos[ i ].y )
+			{
+				++m_gridRow[ i ];
+			}
+			if( j < i && pos[ j ].y == pos[ i ].y )
+			{
+				newRow = FALSE;
 			}
 		}
+		if( newRow )
+		{
+			++m_gridRows;
+		}
 	}
-
-	const Int rowLength = layout.getLength() / rows;
-	if( column >= rowLength )
-	{
-		return AsciiString::TheEmptyString;
-	}
-
-	AsciiString key;
-	key.concat( layout.getCharAt( row * rowLength + column ) );
-	return key;
 }
 
 void ControlBar::setControlCommand( GameWindow *button, const CommandButton *commandButton )

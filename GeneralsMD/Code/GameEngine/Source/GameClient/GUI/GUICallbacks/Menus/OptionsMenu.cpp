@@ -1185,9 +1185,15 @@ static void saveOptions()
 		(*pref)["BlipSize"] = large ? "Large" : "Small";
 		TheWritableGlobalData->m_radarBlipSize = large ? RadarBlipSize_Large : RadarBlipSize_Small;
 
-		idx = clamp( 0, getComboPos( comboBoxGridHotkeyLayout, gridLayoutIndex( pref->getGridHotkeyLayout() ) ), (Int)ARRAY_SIZE(GridHotkeyLayouts) - 1 );
-		(*pref)["GridHotkeyLayout"] = GridHotkeyLayouts[idx];
-		TheWritableGlobalData->m_gridHotkeyLayout = GridHotkeyLayouts[idx];
+		// a hand-written layout stays until the player picks a preset
+		const AsciiString storedLayout = pref->getGridHotkeyLayout();
+		const Int storedIdx = gridLayoutIndex( storedLayout );
+		idx = clamp( 0, getComboPos( comboBoxGridHotkeyLayout, storedIdx ), (Int)ARRAY_SIZE(GridHotkeyLayouts) - 1 );
+		if (comboBoxGridHotkeyLayout && (idx != storedIdx || storedLayout.compareNoCase( GridHotkeyLayouts[storedIdx] ) == 0))
+		{
+			(*pref)["GridHotkeyLayout"] = GridHotkeyLayouts[idx];
+			TheWritableGlobalData->m_gridHotkeyLayout = GridHotkeyLayouts[idx];
+		}
 
 		// The command bar bakes the hotkeys in when it fills, so make it fill again
 		if (TheControlBar)

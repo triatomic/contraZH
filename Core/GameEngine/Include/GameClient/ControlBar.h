@@ -869,6 +869,7 @@ public:
 	void setControlCommand( GameWindow *button, const CommandButton *commandButton );
 	// TheSuperHackers @feature Grid hotkey for a command bar slot, empty if not applicable.
 	AsciiString getGridHotKeyForButton( GameWindow *button ) const;
+	void findGridSlots();	///< ranks the command windows by position into rows and columns
 
 	void getForegroundMarkerPos(Int *x, Int *y);
 	void getBackgroundMarkerPos(Int *x, Int *y);
@@ -1097,6 +1098,9 @@ protected:
 	GameWindow *m_commandGroupButtons[ MAX_COMMAND_GROUP_BUTTONS ];
 
 	GameWindow *m_commandWindows[ MAX_COMMANDS_PER_SET ];			///< command window controls for easy access
+	Int m_gridRow[ MAX_COMMANDS_PER_SET ];							///< each command window's row on the bar, for grid hotkeys
+	Int m_gridColumn[ MAX_COMMANDS_PER_SET ];						///< each command window's column on the bar
+	Int m_gridRows;													///< how many rows the command windows form
 	const CommandButton *m_commonCommands[ MAX_COMMANDS_PER_SET ];	///< shared commands we will use for multi-selection
 
 		// removed from multiplayer branch
