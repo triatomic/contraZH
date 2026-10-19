@@ -228,9 +228,8 @@ public:
 	// TheSuperHackers @feature Command bar keys by slot position instead of by string file.
 	Bool m_gridHotkeysEnabled;
 	AsciiString m_gridHotkeyLayout;
-	Int m_gridHotkeyColumns;
-	// Keys the player asked to leave out of the grid; those slots keep their string file letter.
-	AsciiString m_nonGridHotkeys;
+	// Unit orders keep their string file letter and swap grid keys with the slot that had it.
+	Bool m_gridHotkeyUnitOrders;
 	// TheSuperHackers @feature Show each command bar cameo's hotkey letter on the cameo.
 	Bool m_keyboardOverlayEnabled;
 	Color m_keyboardOverlayColor;

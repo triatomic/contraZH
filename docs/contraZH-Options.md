@@ -77,18 +77,18 @@ Shows the hotkey actually registered, so a dropped duplicate is not advertised.
 Keys each cameo by **its slot in the command bar** instead of its ampersand letter, so keys stay put.
 
 * `GridHotkeys = No` - (Yes keys cameos by slot position.)
-* `GridHotkeyLayout = QWERTYUIOASDFGHJKL` - (One key per slot, in reading order.)
-* `GridHotkeyColumns = 9` - (Command bar width, needed to map the column-ordered slots to the
-row-ordered layout. 0 disables remapping.)
-* `NonGridHotkeys =` - (Keys to leave out of the grid, e.g. `SGX`. Separators are ignored, so `SGX`,
-`S,G,X` and `S G X` are all the same.)
+* `GridHotkeyLayout = QWERTYUIOASDFGHJKL` - (The options screen offers `QWERTYUIOASDFGHJKL`
+(QWER / ASDF), `ASDFGHJKLZXCVBNM,.` (ASDF / ZXCV) and `QWERTYUIOZXCVBNM,.` (QWER / ZXCV).)
+* `GridHotkeyUnitOrders = Yes` - (Unit orders keep their own letters.)
 
-An excluded slot falls back to its string file letter, or gets no hotkey if that letter is also a
-grid key.
+The layout splits evenly over the command bar's rows, top row first. Rows and columns come from where
+the bar's buttons sit, so any bar shape works; columns past a row's share of the layout keep their
+string file letter.
 
-Stop, Guard, Attack Move and Evacuate always keep their string file letter. A grid slot on the same key swaps
-with them and takes the unit order's grid key. Production buildings have no such buttons, so the
-whole grid works unchanged.
+With `GridHotkeyUnitOrders` on, Stop, Guard, Attack Move and Evacuate keep their string file letter. A
+grid slot on the same key swaps with them and takes the unit order's grid key. Production buildings
+have no such buttons, so the whole grid works unchanged. Off, unit orders take their slot's grid key
+like any other button.
 
 ## Hotkeys screen
 
@@ -123,7 +123,7 @@ whole grid works unchanged.
   leaves without saving.
 
 A button's letter applies on every bar that has the button. With grid hotkeys on, most slots still
-take their grid key; unit orders and slots on `NonGridHotkeys` use the letter set here. Tooltips mark
+take their grid key; unit orders use the letter set here while `GridHotkeyUnitOrders` is on. Tooltips mark
 the new letter.
 
 `Hotkeys.ini` holds only what differs from the game:
@@ -157,7 +157,7 @@ Notes:
 * **Grid keys win over bare-letter commands.** With grid hotkeys on, a command bound to a bare grid
   letter does nothing while a visible cameo sits on that letter. Example: Next Idle Worker on plain
   `I` (in `QWERTYUIOASDFGHJKL`) fails whenever a worker or building is selected. Use a modifier
-  (Ctrl + I) or a key outside the grid layout, or add the letter to `NonGridHotkeys`.
+  (Ctrl + I) or a key outside the grid layout.
 * **A bare-letter command and a cameo on the same letter both fire.** Without grid hotkeys, the
   command fires on key down and the cameo on key up. KEY CONFLICTS does not report this clash; it
   only checks cards against themselves and commands against each other.

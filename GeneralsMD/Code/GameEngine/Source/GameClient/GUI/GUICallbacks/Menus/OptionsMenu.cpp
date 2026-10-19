@@ -216,9 +216,8 @@ static GameWindow *   checkNewRadar               = nullptr;
 static GameWindow *   checkLargeBlips             = nullptr;
 static NameKeyType    checkGridHotkeysID          = NAMEKEY_INVALID;
 static GameWindow *   checkGridHotkeys            = nullptr;
-static GameWindow *   textEntryGridHotkeyLayout   = nullptr;
-static GameWindow *   textEntryGridHotkeyColumns  = nullptr;
-static GameWindow *   textEntryNonGridHotkeys     = nullptr;
+static GameWindow *   comboBoxGridHotkeyLayout    = nullptr;
+static GameWindow *   checkGridHotkeyUnitOrders   = nullptr;
 static GameWindow *   checkKeyboardOverlay        = nullptr;
 static NameKeyType    checkKeyboardOverlayBackdropID = NAMEKEY_INVALID;
 static GameWindow *   checkKeyboardOverlayBackdrop = nullptr;
@@ -272,6 +271,9 @@ static_assert( ARRAY_SIZE(BuildTimerModeNames) == BuildTimerDisplayMode_Count, "
 static const char *const ActionLineModeNames[] = { "Off", "All", "AttackOnly" };
 static_assert( ARRAY_SIZE(ActionLineModeNames) == ActionLineMode_Count, "ActionLineModeNames out of date" );
 static_assert( ARRAY_SIZE(CastModeNames) == CastMode_Count, "CastModeNames out of date" );
+static const char *const GridHotkeyLayouts[] = { GRID_HOTKEY_LAYOUT_DEFAULT,"ASDFGHJKLZXCVBNM,.", "QWERTYUIOZXCVBNM,." };
+static const wchar_t *const GridHotkeyLayoutNames[] = { L"QWER / ASDF", L"ASDF / ZXCV", L"QWER / ZXCV" };
+static_assert( ARRAY_SIZE(GridHotkeyLayoutNames) == ARRAY_SIZE(GridHotkeyLayouts), "GridHotkeyLayoutNames out of date" );
 
 static NameKeyType    sliderTextureResolutionID = NAMEKEY_INVALID;
 static GameWindow *   sliderTextureResolution = nullptr;
@@ -506,6 +508,7 @@ static const BoolOption BoolOptions[] =
 	// the radar caches this when it is created, so it waits for the next launch
 	{ &checkNewRadar, "NewRadar", &OptionPreferences::getNewRadarEnabled, &GlobalData::m_newRadar, FALSE },
 	{ &checkGridHotkeys, "GridHotkeys", &OptionPreferences::getGridHotkeysEnabled, &GlobalData::m_gridHotkeysEnabled, FALSE },
+	{ &checkGridHotkeyUnitOrders, "GridHotkeyUnitOrders", &OptionPreferences::getGridHotkeyUnitOrders, &GlobalData::m_gridHotkeyUnitOrders, TRUE },
 	{ &checkKeyboardOverlay, "KeyboardOverlay", &OptionPreferences::getKeyboardOverlayEnabled, &GlobalData::m_keyboardOverlayEnabled, FALSE },
 	{ &checkKeyboardOverlayBackdrop, "KeyboardOverlayBackdrop", &OptionPreferences::getKeyboardOverlayBackdropEnabled, &GlobalData::m_keyboardOverlayBackdrop, TRUE },
 	{ &checkBloom, "Bloom", &OptionPreferences::getBloomEnabled, &GlobalData::m_useBloom, FALSE },
@@ -536,6 +539,19 @@ static Int bloomPercent( Real strength )
 	return REAL_TO_INT( strength * 100.0f + 0.5f );
 }
 
+// A layout the combo does not offer shows as the first one
+static Int gridLayoutIndex( const AsciiString& layout )
+{
+	for (Int i = 0; i < ARRAY_SIZE(GridHotkeyLayouts); ++i)
+	{
+		if (layout.compareNoCase( GridHotkeyLayouts[i] ) == 0)
+		{
+			return i;
+		}
+	}
+	return 0;
+}
+
 static Int levelIndex( const Int *levels, Int count, Int level )
 {
 	for (Int i = 0; i < count; ++i)
@@ -552,9 +568,8 @@ static Int levelIndex( const Int *levels, Int count, Int level )
 static void updateGameOptionsEnables()
 {
 	const Bool grid = getCheck( checkGridHotkeys, FALSE );
-	enableWindow( textEntryGridHotkeyLayout, grid );
-	enableWindow( textEntryGridHotkeyColumns, grid );
-	enableWindow( textEntryNonGridHotkeys, grid );
+	enableWindow( comboBoxGridHotkeyLayout, grid );
+	enableWindow( checkGridHotkeyUnitOrders, grid );
 
 	const Bool backdrop = getCheck( checkKeyboardOverlayBackdrop, FALSE );
 	enableWindow( textEntryKeyboardOverlayBackdropRed, backdrop );
@@ -606,9 +621,7 @@ static void populateGameOptions()
 	}
 	setCheck( checkLargeBlips, pref->getRadarBlipSize() == RadarBlipSize_Large );
 
-	setEntryAscii( textEntryGridHotkeyLayout, pref->getGridHotkeyLayout() );
-	setEntryInt( textEntryGridHotkeyColumns, pref->getGridHotkeyColumns() );
-	setEntryAscii( textEntryNonGridHotkeys, pref->getNonGridHotkeys() );
+	setComboPos( comboBoxGridHotkeyLayout, gridLayoutIndex( pref->getGridHotkeyLayout() ) );
 
 	showColorEntries( pref->getKeyboardOverlayColor(), textEntryKeyboardOverlayRed, textEntryKeyboardOverlayGreen, textEntryKeyboardOverlayBlue, nullptr );
 	showColorEntries( pref->getKeyboardOverlayBackdropColor(), textEntryKeyboardOverlayBackdropRed, textEntryKeyboardOverlayBackdropGreen, textEntryKeyboardOverlayBackdropBlue, textEntryKeyboardOverlayBackdropOpacity );
@@ -655,9 +668,7 @@ static void setGameOptionsDefaults()
 	}
 	setCheck( checkLargeBlips, RadarBlipSize_Default == RadarBlipSize_Large );
 
-	setEntryAscii( textEntryGridHotkeyLayout, "QWERTYUIOASDFGHJKL" );
-	setEntryInt( textEntryGridHotkeyColumns, 9 );
-	setEntryAscii( textEntryNonGridHotkeys, AsciiString::TheEmptyString );
+	setComboPos( comboBoxGridHotkeyLayout, gridLayoutIndex( GRID_HOTKEY_LAYOUT_DEFAULT ) );
 
 	showColorEntries( GameMakeColor( 255, 255, 255, 255 ), textEntryKeyboardOverlayRed, textEntryKeyboardOverlayGreen, textEntryKeyboardOverlayBlue, nullptr );
 	showColorEntries( GameMakeColor( 0, 0, 0, 128 ), textEntryKeyboardOverlayBackdropRed, textEntryKeyboardOverlayBackdropGreen, textEntryKeyboardOverlayBackdropBlue, textEntryKeyboardOverlayBackdropOpacity );
@@ -1174,25 +1185,9 @@ static void saveOptions()
 		(*pref)["BlipSize"] = large ? "Large" : "Small";
 		TheWritableGlobalData->m_radarBlipSize = large ? RadarBlipSize_Large : RadarBlipSize_Small;
 
-		AsciiString layout = getEntryAscii( textEntryGridHotkeyLayout, pref->getGridHotkeyLayout() );
-		if (layout.isEmpty())
-		{
-			layout = "QWERTYUIOASDFGHJKL";
-		}
-		layout.toUpper();
-		(*pref)["GridHotkeyLayout"] = layout;
-		TheWritableGlobalData->m_gridHotkeyLayout = layout;
-
-		const Int columns = getEntryInt( textEntryGridHotkeyColumns, 0, 20, pref->getGridHotkeyColumns() );
-		AsciiString prefString;
-		prefString.format( "%d", columns );
-		(*pref)["GridHotkeyColumns"] = prefString;
-		TheWritableGlobalData->m_gridHotkeyColumns = columns;
-
-		AsciiString excluded = getEntryAscii( textEntryNonGridHotkeys, pref->getNonGridHotkeys() );
-		excluded.toUpper();
-		(*pref)["NonGridHotkeys"] = excluded;
-		TheWritableGlobalData->m_nonGridHotkeys = excluded;
+		idx = clamp( 0, getComboPos( comboBoxGridHotkeyLayout, gridLayoutIndex( pref->getGridHotkeyLayout() ) ), (Int)ARRAY_SIZE(GridHotkeyLayouts) - 1 );
+		(*pref)["GridHotkeyLayout"] = GridHotkeyLayouts[idx];
+		TheWritableGlobalData->m_gridHotkeyLayout = GridHotkeyLayouts[idx];
 
 		// The command bar bakes the hotkeys in when it fills, so make it fill again
 		if (TheControlBar)
@@ -1206,6 +1201,7 @@ static void saveOptions()
 			textEntryKeyboardOverlayBackdropRed, textEntryKeyboardOverlayBackdropGreen, textEntryKeyboardOverlayBackdropBlue, textEntryKeyboardOverlayBackdropOpacity );
 
 		const Int percent = getEntryInt( textEntryBloomStrength, 0, 100, bloomPercent( pref->getBloomStrength() ) );
+		AsciiString prefString;
 		prefString.format( "%.2f", percent / 100.0f );
 		(*pref)["BloomStrength"] = prefString;
 		TheWritableGlobalData->m_bloomStrength = percent / 100.0f;
@@ -1688,9 +1684,8 @@ static void initGameOptionsWindows()
 	checkNewRadar = findOptionsWindow( "OptionsMenu.wnd:CheckNewRadar" );
 	checkLargeBlips = findOptionsWindow( "OptionsMenu.wnd:CheckLargeBlips" );
 	checkGridHotkeys = findOptionsWindow( "OptionsMenu.wnd:CheckGridHotkeys", checkGridHotkeysID );
-	textEntryGridHotkeyLayout = findOptionsWindow( "OptionsMenu.wnd:TextEntryGridHotkeyLayout" );
-	textEntryGridHotkeyColumns = findOptionsWindow( "OptionsMenu.wnd:TextEntryGridHotkeyColumns" );
-	textEntryNonGridHotkeys = findOptionsWindow( "OptionsMenu.wnd:TextEntryNonGridHotkeys" );
+	comboBoxGridHotkeyLayout = findOptionsWindow( "OptionsMenu.wnd:ComboBoxGridHotkeyLayout" );
+	checkGridHotkeyUnitOrders = findOptionsWindow( "OptionsMenu.wnd:CheckGridHotkeyUnitOrders" );
 	checkKeyboardOverlay = findOptionsWindow( "OptionsMenu.wnd:CheckKeyboardOverlay" );
 	checkKeyboardOverlayBackdrop = findOptionsWindow( "OptionsMenu.wnd:CheckKeyboardOverlayBackdrop", checkKeyboardOverlayBackdropID );
 	textEntryKeyboardOverlayRed = findOptionsWindow( "OptionsMenu.wnd:TextEntryKeyboardOverlayRed" );
@@ -1742,8 +1737,6 @@ static void initGameOptionsWindows()
 	setLabelText( "OptionsMenu.wnd:CameraGroupLabel", "GUI:GameOptionsCamera" );
 	setLabelText( "OptionsMenu.wnd:GridHotkeysGroupLabel", "GUI:GameOptionsGridHotkeys" );
 	setLabelText( "OptionsMenu.wnd:GridHotkeyLayoutLabel", "GUI:GridHotkeyLayout" );
-	setLabelText( "OptionsMenu.wnd:GridHotkeyColumnsLabel", "GUI:GridHotkeyColumns" );
-	setLabelText( "OptionsMenu.wnd:NonGridHotkeysLabel", "GUI:NonGridHotkeys" );
 	setLabelText( "OptionsMenu.wnd:KeyboardOverlayGroupLabel", "GUI:GameOptionsKeyboardOverlay" );
 	setLabelText( "OptionsMenu.wnd:KeyboardOverlayColorLabel", "GUI:KeyboardOverlayColor" );
 	setLabelText( "OptionsMenu.wnd:KeyboardOverlayBackdropColorLabel", "GUI:KeyboardOverlayBackdropColor" );
@@ -1763,6 +1756,12 @@ static void initGameOptionsWindows()
 	setCheckText( checkNewRadar, "GUI:NewRadar", "TOOLTIP:NewRadar" );
 	setCheckText( checkLargeBlips, "GUI:LargeBlips", "TOOLTIP:LargeBlips" );
 	setCheckText( checkGridHotkeys, "GUI:GridHotkeys", "TOOLTIP:GridHotkeys" );
+	if (checkGridHotkeyUnitOrders)
+	{
+		GadgetCheckBoxSetText( checkGridHotkeyUnitOrders, TheGameText->FETCH_OR_SUBSTITUTE( "GUI:GridHotkeyUnitOrders", L"Unit orders keep their keys" ) );
+		checkGridHotkeyUnitOrders->winSetTooltip( TheGameText->FETCH_OR_SUBSTITUTE( "TOOLTIP:GridHotkeyUnitOrders",
+			L"Stop, guard, attack move and evacuate keep their own letters instead of their slot's grid key" ) );
+	}
 	setCheckText( checkKeyboardOverlay, "GUI:KeyboardOverlay", "TOOLTIP:KeyboardOverlay" );
 	setCheckText( checkKeyboardOverlayBackdrop, "GUI:KeyboardOverlayBackdrop", "TOOLTIP:KeyboardOverlayBackdrop" );
 	setCheckText( checkBloom, "GUI:Bloom", "TOOLTIP:Bloom" );
@@ -1795,9 +1794,11 @@ static void initGameOptionsWindows()
 	setTooltip( comboBoxCastMode, "TOOLTIP:CastMode" );
 	setTooltip( comboBoxTextureFilter, "TOOLTIP:TextureFilter" );
 	setTooltip( comboBoxAnisotropy, "TOOLTIP:Anisotropy" );
-	setTooltip( textEntryGridHotkeyLayout, "TOOLTIP:GridHotkeyLayout" );
-	setTooltip( textEntryGridHotkeyColumns, "TOOLTIP:GridHotkeyColumns" );
-	setTooltip( textEntryNonGridHotkeys, "TOOLTIP:NonGridHotkeys" );
+	if (comboBoxGridHotkeyLayout)
+	{
+		comboBoxGridHotkeyLayout->winSetTooltip( TheGameText->FETCH_OR_SUBSTITUTE( "TOOLTIP:GridHotkeyRows",
+			L"The keyboard rows that key the command bar's top and bottom rows" ) );
+	}
 	setTooltip( textEntryKeyboardOverlayRed, "TOOLTIP:ColorChannel" );
 	setTooltip( textEntryKeyboardOverlayGreen, "TOOLTIP:ColorChannel" );
 	setTooltip( textEntryKeyboardOverlayBlue, "TOOLTIP:ColorChannel" );
@@ -1813,6 +1814,14 @@ static void initGameOptionsWindows()
 	addComboEntries( comboBoxCastMode, "GUI:CastMode", CastMode_Count );
 	addComboEntries( comboBoxTextureFilter, "GUI:TextureFilter", TextureFilterClass::TEXTURE_FILTER_COUNT );
 	addComboEntries( comboBoxAnisotropy, "GUI:Anisotropy", ARRAY_SIZE(AnisotropyLevels) );
+	if (comboBoxGridHotkeyLayout)
+	{
+		GadgetComboBoxReset( comboBoxGridHotkeyLayout );
+		for (Int i = 0; i < ARRAY_SIZE(GridHotkeyLayoutNames); ++i)
+		{
+			GadgetComboBoxAddEntry( comboBoxGridHotkeyLayout, UnicodeString( GridHotkeyLayoutNames[i] ), GameMakeColor( 255, 255, 255, 255 ) );
+		}
+	}
 }
 
 // Finds the Shaders panel, which a layout without it leaves out along with its button

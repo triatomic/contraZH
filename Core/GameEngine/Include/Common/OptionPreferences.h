@@ -108,6 +108,8 @@ enum AlliedDecalMode CPP_11(: Int)
 	AlliedDecalMode_Default = AlliedDecalMode_HouseColor
 };
 
+#define GRID_HOTKEY_LAYOUT_DEFAULT "QWERTYUIOASDFGHJKL"
+
 //-----------------------------------------------------------------------------
 // OptionsPreferences options menu class
 //-----------------------------------------------------------------------------
@@ -218,12 +220,7 @@ public:
 	Int getParticleNameLingerMS() const;
 	Bool getGridHotkeysEnabled() const;
 	AsciiString getGridHotkeyLayout() const;
-	Int getGridHotkeyColumns() const;
-	AsciiString getNonGridHotkeys() const;
-	Bool isNonGridHotkey(const AsciiString& key) const;
-	// TheSuperHackers @feature Exposed statically so GlobalData can test its cached copy of the
-	// list without re-reading Options.ini on every command bar rebuild.
-	static Bool isNonGridHotkeyInList(const AsciiString& list, const AsciiString& key);
+	Bool getGridHotkeyUnitOrders() const;
 	Bool getKeyboardOverlayEnabled() const;
 	Color getKeyboardOverlayColor() const;
 	Bool getKeyboardOverlayBackdropEnabled() const;

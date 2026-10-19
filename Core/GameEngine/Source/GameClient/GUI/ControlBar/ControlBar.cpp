@@ -2566,64 +2566,76 @@ void ControlBar::setCommandBarBorder( GameWindow *button, CommandButtonMappedBor
 //-------------------------------------------------------------------------------------------------
 /** Which grid key belongs to this command bar button, or empty if it is not one of them.
 	*
-	* The slot is found by looking the window up in m_commandWindows, so the mapping follows the
-	* bar's own ordering and needs no assumption about how many slots a mod uses. Slots past the
-	* end of the configured layout simply get no grid key. */
+	* The button's row and column come from where the bar's buttons sit, so any bar shape works.
+	* The layout string splits evenly over the rows; columns past a row's share get no grid key. */
 //-------------------------------------------------------------------------------------------------
-AsciiString ControlBar::getGridHotKeyForButton( GameWindow *button, Bool *isGridSlot ) const
+AsciiString ControlBar::getGridHotKeyForButton( GameWindow *button ) const
 {
 	if( button == nullptr || TheGlobalData == nullptr )
-		return AsciiString::TheEmptyString;
-
-	const AsciiString &layout = TheGlobalData->m_gridHotkeyLayout;
-	if( layout.isEmpty() )
-		return AsciiString::TheEmptyString;
-
-	for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
 	{
-		if( m_commandWindows[ i ] != button )
-			continue;
-
-		// The command bar numbers its slots down each column, but the layout string is written
-		// in reading order, so translate between the two. Without this, sequential letters land
-		// on alternating rows.
-		Int layoutIndex = i;
-		const Int columns = TheGlobalData->m_gridHotkeyColumns;
-		if( columns > 0 )
-		{
-			// Rows come from the layout's own length, not MAX_COMMANDS_PER_SET, which is the
-			// internal cap of 32 rather than however many slots the mod actually shows.
-			const Int rows = ( layout.getLength() + columns - 1 ) / columns;
-			if( rows > 0 )
-			{
-				const Int column = i / rows;	// slots run down a column before moving right
-				const Int row = i % rows;
-				layoutIndex = row * columns + column;
-			}
-		}
-
-		if( layoutIndex >= layout.getLength() )
-			break;	// this mod has more slots than the layout covers
-
-		// this slot belongs to the grid, whatever we decide its key is
-		if( isGridSlot != nullptr )
-			*isGridSlot = TRUE;
-
-		AsciiString key;
-		key.concat( layout.getCharAt( layoutIndex ) );
-
-		// A key on the exclusion list is not used for this slot, so the slot falls back to its
-		// string file letter -- which is the point of the exclusion list: the key is freed for
-		// whatever the player wants it for, and the button keys the way it did before grid
-		// hotkeys existed. isGridSlot stays set, so the caller knows to check for a collision
-		// before handing the slot a letter the grid is already using.
-		if( OptionPreferences::isNonGridHotkeyInList( TheGlobalData->m_nonGridHotkeys, key ) )
-			return AsciiString::TheEmptyString;
-
-		return key;
+		return AsciiString::TheEmptyString;
 	}
 
-	return AsciiString::TheEmptyString;
+	const AsciiString &layout = TheGlobalData->m_gridHotkeyLayout;
+	Bool found = FALSE;
+	for( Int i = 0; i < MAX_COMMANDS_PER_SET && !found; ++i )
+	{
+		found = m_commandWindows[ i ] == button;
+	}
+	if( layout.isEmpty() || !found )
+	{
+		return AsciiString::TheEmptyString;
+	}
+
+	Int x, y;
+	button->winGetScreenPosition( &x, &y );
+	Int column = 0;
+	Int row = 0;
+	Int rows = 0;
+	for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
+	{
+		if( m_commandWindows[ i ] == nullptr )
+		{
+			continue;
+		}
+		Int wx, wy;
+		m_commandWindows[ i ]->winGetScreenPosition( &wx, &wy );
+		Bool newX = TRUE;
+		Bool newY = TRUE;
+		for( Int j = 0; j < i; ++j )
+		{
+			if( m_commandWindows[ j ] == nullptr )
+			{
+				continue;
+			}
+			Int ox, oy;
+			m_commandWindows[ j ]->winGetScreenPosition( &ox, &oy );
+			newX = newX && ox != wx;
+			newY = newY && oy != wy;
+		}
+		if( newX && wx < x )
+		{
+			++column;
+		}
+		if( newY )
+		{
+			++rows;
+			if( wy < y )
+			{
+				++row;
+			}
+		}
+	}
+
+	const Int rowLength = layout.getLength() / rows;
+	if( column >= rowLength )
+	{
+		return AsciiString::TheEmptyString;
+	}
+
+	AsciiString key;
+	key.concat( layout.getCharAt( row * rowLength + column ) );
+	return key;
 }
 
 void ControlBar::setControlCommand( GameWindow *button, const CommandButton *commandButton )
@@ -2701,14 +2713,13 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 		// bar rather than by the letter its string file marked with an ampersand, so the keys
 		// stay in the same place whatever is being built.
 		AsciiString hotKey;
-		Bool isGridSlot = FALSE;
 		const Bool gridEnabled = TheGlobalData && TheGlobalData->m_gridHotkeysEnabled;
 
-		// Unit orders keep the player's own letter and swap grid keys with the slot that had it, so
-		// a building without them keeps the whole grid.
+		// Unit orders can keep the player's own letter and swap grid keys with the slot that had it,
+		// so a building without them keeps the whole grid.
 		Bool displaced = FALSE;
 		const GUICommandType commandType = commandButton->getCommandType();
-		Bool isUnitOrder = gridEnabled &&
+		Bool isUnitOrder = gridEnabled && TheGlobalData->m_gridHotkeyUnitOrders &&
 				( commandType == GUI_COMMAND_STOP ||
 				commandType == GUI_COMMAND_GUARD ||
 				commandType == GUI_COMMAND_GUARD_WITHOUT_PURSUIT ||
@@ -2726,7 +2737,7 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 
 		if( gridEnabled && !isUnitOrder )
 		{
-			hotKey = getGridHotKeyForButton( button, &isGridSlot );
+			hotKey = getGridHotKeyForButton( button );
 
 			GameWindow *unitOrder = hotKey.isEmpty() ? nullptr : TheHotKeyManager->findHotKeyWindow( hotKey, TRUE );
 			if( unitOrder != nullptr )
@@ -2736,46 +2747,10 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 			}
 		}
 
-		// Fall back to the string file letter whenever the grid did not supply one. That covers a
-		// button the grid does not reach -- past the end of the layout, or not in the command bar
-		// at all -- and also a slot whose key the player put on NonGridHotkeys, which is what
-		// excluding a key is for: the key goes back to the game, and the button keys the way it
-		// did before grid hotkeys existed.
+		// A button the grid does not reach keeps its string file letter
 		if( hotKey.isEmpty() && !isUnitOrder && !displaced )
 		{
-			const AsciiString strHotKey = TheHotKeyManager->getButtonHotKey(commandButton->getName(), commandButton->getTextLabel());
-
-			// A string file letter that the grid layout also uses would be a straight collision:
-			// addHotKey keeps whichever slot registered first and silently drops the other, so one
-			// of the two buttons would end up with no key and no overlay letter, seemingly at
-			// random. Leave the excluded slot without a hotkey instead -- the grid keeps its own
-			// letters, which is the behaviour the fixed layout is there to guarantee.
-			//
-			// Tested against the layout rather than against what is currently registered, so the
-			// result does not depend on the order the slots happen to be populated in.
-			Bool collidesWithGrid = FALSE;
-			if( isGridSlot && strHotKey.getLength() == 1 && TheGlobalData )
-			{
-				const AsciiString &layout = TheGlobalData->m_gridHotkeyLayout;
-				const char wanted = tolower( strHotKey.getCharAt( 0 ) );
-				for( const char *c = layout.str(); *c; ++c )
-				{
-					// A letter the player excluded is no longer the grid's, so it does not collide.
-					if( tolower( *c ) != wanted )
-						continue;
-
-					AsciiString gridKey;
-					gridKey.concat( *c );
-					if( !OptionPreferences::isNonGridHotkeyInList( TheGlobalData->m_nonGridHotkeys, gridKey ) )
-					{
-						collidesWithGrid = TRUE;
-					}
-					break;
-				}
-			}
-
-			if( !collidesWithGrid )
-				hotKey = strHotKey;
+			hotKey = TheHotKeyManager->getButtonHotKey(commandButton->getName(), commandButton->getTextLabel());
 		}
 
 		if(hotKey.isNotEmpty())

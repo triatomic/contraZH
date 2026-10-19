@@ -303,77 +303,28 @@ Bool OptionPreferences::getGridHotkeysEnabled(void) const
 	return FALSE;
 }
 
-// TheSuperHackers @feature The key for each slot, in slot order. Defaults to two rows of nine,
-// matching a command bar that is two rows deep. Mods with a different bar can set their own,
-// and the count is whatever the string is long -- slots past the end simply get no grid key.
+// TheSuperHackers @feature The grid keys in reading order, split evenly over the command bar's rows.
+// The options screen offers the presets in OptionsMenu.cpp's GridHotkeyLayouts.
 // Options.ini: GridHotkeyLayout = QWERTYUIOASDFGHJKL
 AsciiString OptionPreferences::getGridHotkeyLayout(void) const
 {
 	OptionPreferences::const_iterator it = find("GridHotkeyLayout");
 	if (it == end() || it->second.isEmpty())
-		return AsciiString("QWERTYUIOASDFGHJKL");
+		return AsciiString(GRID_HOTKEY_LAYOUT_DEFAULT);
 
 	return it->second;
 }
 
-// TheSuperHackers @feature Keys listed here opt out of the grid entirely. The slot that would
-// have taken such a key falls back to its string file letter, and the key keeps whatever it
-// normally does -- so a mod can leave S, G and friends on their usual bindings while everything
-// else grids. Letters only, case insensitive, separators optional: "SG" and "S,G" both work.
-// Options.ini: NonGridHotkeys = SG
-AsciiString OptionPreferences::getNonGridHotkeys(void) const
+// TheSuperHackers @feature Unit orders (stop, guard, attack move, evacuate) keep their string file
+// letter instead of taking their slot's grid key.
+// Options.ini: GridHotkeyUnitOrders = Yes
+Bool OptionPreferences::getGridHotkeyUnitOrders(void) const
 {
-	OptionPreferences::const_iterator it = find("NonGridHotkeys");
+	OptionPreferences::const_iterator it = find("GridHotkeyUnitOrders");
 	if (it == end())
-		return AsciiString::TheEmptyString;
+		return TRUE;
 
-	return it->second;
-}
-
-// TheSuperHackers @feature Is this key one the player asked to keep out of the grid?
-Bool OptionPreferences::isNonGridHotkey(const AsciiString& key) const
-{
-	if (key.isEmpty())
-		return FALSE;
-
-	return isNonGridHotkeyInList(getNonGridHotkeys(), key);
-}
-
-// TheSuperHackers @feature Shared by the option lookup above and by GlobalData's cached copy,
-// so both read the exclusion list exactly the same way.
-Bool OptionPreferences::isNonGridHotkeyInList(const AsciiString& list, const AsciiString& key)
-{
-	if (list.isEmpty() || key.isEmpty())
-		return FALSE;
-
-	const char wanted = tolower(key.getCharAt(0));
-	const char *c = list.str();
-	for (; *c; ++c)
-	{
-		// a plain scan, so commas, spaces or nothing at all all work as separators
-		if (tolower(*c) == wanted)
-			return TRUE;
-	}
-
-	return FALSE;
-}
-
-// TheSuperHackers @feature How many columns the command bar is wide. The engine numbers command
-// slots down each column rather than across each row, so the layout string -- which is written in
-// reading order -- has to be mapped through this to land the right key on the right button.
-// 0 means do not remap, i.e. the layout string is already in slot order.
-// Options.ini: GridHotkeyColumns = 9
-Int OptionPreferences::getGridHotkeyColumns(void) const
-{
-	OptionPreferences::const_iterator it = find("GridHotkeyColumns");
-	if (it == end())
-		return 9;	// two rows of nine, matching a bar two rows deep
-
-	Int columns = atoi(it->second.str());
-	if (columns < 0)
-		columns = 0;
-
-	return columns;
+	return stricmp(it->second.str(), "yes") == 0;
 }
 
 // TheSuperHackers @feature Options.ini: SelectionCircle = Yes draws a green hexagon under
