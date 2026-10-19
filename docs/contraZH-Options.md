@@ -146,6 +146,27 @@ End
   Hotkeys button right of Shaders when `OptionsMenu.wnd` has no `ButtonHotkeys`, and shows built-in
   English for any `GUI:Hotkeys*` label the string file lacks.
 
+### Limitations
+
+Notes:
+
+* **Grid keys win over bare-letter commands.** With grid hotkeys on, a command bound to a bare grid
+  letter does nothing while a visible cameo sits on that letter. Example: Next Idle Worker on plain
+  `I` (in `QWERTYUIOASDFGHJKL`) fails whenever a worker or building is selected. Use a modifier
+  (Ctrl + I) or a key outside the grid layout, or add the letter to `NonGridHotkeys`.
+* **A bare-letter command and a cameo on the same letter both fire.** Without grid hotkeys, the
+  command fires on key down and the cameo on key up. KEY CONFLICTS does not report this clash; it
+  only checks cards against themselves and commands against each other.
+* **Cameo keys ignore Ctrl and Alt.** A card button fires on its letter alone or with Shift
+  (Shift batches production), so a card cannot take Ctrl + letter.
+* **Upgrades that swap command sets are not shown.** Cards come from each object's base
+  `CommandSet`. A set swapped in by an upgrade or a state change keeps the letters set for the same
+  buttons, but its own new buttons are not listed.
+* **Mouse binds have no hold on the middle button or the wheel.** Both fire once per click or notch;
+  only the side buttons can hold a command such as Force Attack.
+* **Hand edits during a session are overwritten.** SAVE writes the screen's keys, which were read
+  when the game started; edit `Hotkeys.ini` by hand only while the game is closed.
+
 ## Reverse move hotkey
 
 Caps Lock arms a reverse move for the whole selection; the next terrain click drives there in
