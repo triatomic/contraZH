@@ -163,9 +163,14 @@ Notes:
   only checks cards against themselves and commands against each other.
 * **Cameo keys ignore Ctrl and Alt.** A card button fires on its letter alone or with Shift
   (Shift batches production), so a card cannot take Ctrl + letter.
-* **Upgrades that swap command sets are not shown.** Cards come from each object's base
-  `CommandSet`. A set swapped in by an upgrade or a state change keeps the letters set for the same
-  buttons, but its own new buttons are not listed.
+* **Only path upgrades show their swapped cards.** A general's starting path choice (Superweapon's
+  tech, Cyborg's Spiders or Angels) gets its own entry with the cards it swaps in. Every other
+  command set swap, from an Overlord add-on, a mines or promotion upgrade, or a state change, is not
+  listed: cards show each object's own `CommandSet`. Letters still carry over to a swapped set for
+  every button it shares, but its new buttons cannot be set here; add them to `Hotkeys.ini` by hand.
+* **Path detection follows the INI.** A path is a player upgrade on a card whose rival upgrades swap
+  the command sets of the same buildings. A mod that builds a choice another way, such as through a
+  science or an object upgrade, is listed as one general.
 * **Mouse binds have no hold on the middle button or the wheel.** Both fire once per click or notch;
   only the side buttons can hold a command such as Force Attack.
 * **Hand edits during a session are overwritten.** SAVE writes the screen's keys, which were read
