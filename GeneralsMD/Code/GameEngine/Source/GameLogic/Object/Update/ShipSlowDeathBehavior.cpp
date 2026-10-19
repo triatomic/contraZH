@@ -645,9 +645,9 @@ void ShipSlowDeathBehavior::doWobble()
 		//Real yaw = progressInterval * progressTotal * d->m_initWobbleMaxYaw;
 		//Real roll = progressInterval * progressTotal * d->m_initWobbleMaxRoll;
 
-		Real pitch = sin(pInterval * TWO_PI) * progressTotal * d->m_wobbleMaxPitch;
-		Real yaw = cos(pInterval * TWO_PI) * progressTotal * d->m_wobbleMaxYaw;
-		Real roll = -sin(pInterval * TWO_PI * 2) * progressTotal * d->m_wobbleMaxRoll;
+		Real pitch = WWMath::Sinf(pInterval * TWO_PI) * progressTotal * d->m_wobbleMaxPitch;
+		Real yaw = WWMath::Cosf(pInterval * TWO_PI) * progressTotal * d->m_wobbleMaxYaw;
+		Real roll = -WWMath::Sinf(pInterval * TWO_PI * 2) * progressTotal * d->m_wobbleMaxRoll;
 
 		mx.Make_Identity();
 		mx.Rotate_Z(roll);
