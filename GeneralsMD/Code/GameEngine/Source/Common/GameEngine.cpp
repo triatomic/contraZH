@@ -92,6 +92,7 @@
 #include "GameClient/ClientInstance.h"
 #include "GameClient/FXList.h"
 #include "GameClient/GameClient.h"
+#include "GameClient/HotKey.h"
 #include "GameClient/Keyboard.h"
 #include "GameClient/Shell.h"
 #include "GameClient/GameText.h"
@@ -744,6 +745,11 @@ void GameEngine::init()
 		setStartupStage("Command map generation and validation");
 		TheMetaMap->generateMetaMap();
 		TheMetaMap->verifyMetaMap();
+
+		// the player's Hotkeys.ini goes over the shipped keys, which the Hotkeys menu restores from
+		TheMetaMap->rememberDefaults();
+		HotKeyManager::loadPlayerKeys();
+
 		setStartupStage("Subsystem initialization");
 
 		initSubsystem(TheActionManager,"TheActionManager", MSGNEW("GameEngineSubsystem") ActionManager(), nullptr);

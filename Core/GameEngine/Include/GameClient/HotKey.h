@@ -60,6 +60,7 @@
 //-----------------------------------------------------------------------------
 class AsciiString;
 class GameWindow;
+class INI;
 //-----------------------------------------------------------------------------
 // TYPE DEFINES ///////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
@@ -124,11 +125,26 @@ public:
 	// letter, but only while a button actually wants it.
 	Bool isHotKeyClaimed( const AsciiString& key ) const;
 
+	// A command button's letter: the player's from Hotkeys.ini, else the one its label marks with '&'
+	AsciiString getButtonHotKey( const AsciiString& buttonName, const AsciiString& label );
+	// The label with '&' moved to the player's letter, or added after it when the label lacks the letter
+	UnicodeString getButtonLabel( const AsciiString& buttonName, const AsciiString& label );
+
+	// Player letters by lower case button name; an empty letter means the button has no key
+	typedef std::map<AsciiString, AsciiString> ButtonKeyMap;
+	static const ButtonKeyMap& getPlayerButtonKeys() { return s_playerButtonKeys; }
+	static void parsePlayerButtonKey( INI *ini );
+
+	// Hotkeys.ini in the user data folder, laid over the shipped command map and button letters
+	static AsciiString getPlayerKeysPath();
+	static void loadPlayerKeys();
+
 private:
 	typedef std::map<AsciiString, HotKey> HotKeyMap;
 	HotKeyMap m_hotKeyMap;
 	static Bool s_executingHotKey;
 	static Bool s_quickCastAiming;
+	static ButtonKeyMap s_playerButtonKeys;
 };
 extern HotKeyManager *TheHotKeyManager;
 //-----------------------------------------------------------------------------

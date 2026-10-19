@@ -106,6 +106,7 @@ static const BlockParse theTypeTable[] =
 	{ "ChallengeGenerals",              INI::parseChallengeModeDefinition },
 	{ "ChatCommand",                    INI::parseChatCommandDefinition },
 	{ "CommandButton",                  INI::parseCommandButtonDefinition },
+	{ "CommandButtonHotKey",            INI::parseCommandButtonHotKeyDefinition },
 	{ "CommandMap",                     INI::parseMetaMapDefinition },
 	{ "CommandSet",                     INI::parseCommandSetDefinition },
 	{ "ControlBarResizer",              INI::parseControlBarResizerDefinition },

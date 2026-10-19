@@ -90,6 +90,54 @@ Stop, Guard, Attack Move and Evacuate always keep their string file letter. A gr
 with them and takes the unit order's grid key. Production buildings have no such buttons, so the
 whole grid works unchanged.
 
+## Hotkeys screen
+
+**Options > Hotkeys** rebinds keys and writes them to `Hotkeys.ini` in the user data folder, beside
+`Options.ini`. Ported from Zero Hour Reforged.
+
+* Left: **USA**, **CHINA**, **GLA**, then **GENERAL** and **KEY CONFLICTS** (red while any key is shared).
+* Middle: a general picker, then the general's heroes, buildings and units as icons.
+* Right: the picked object's portrait, name and command card, laid out like the 2×7 command bar,
+  each button showing its letter. **Quick filter** narrows the icons or commands by name.
+* Click a card button, then press its new letter. Backspace takes the key off, Esc cancels.
+* **GENERAL** lists every command that needs no unit (selection, control groups, camera, chat,
+  beacons, holds such as Force Attack). **Change**, a double click or Enter waits for a key; **No key** unbinds.
+* A hold command (Force Attack, Waypoints, Prefer Selection) also takes Ctrl, Alt or Shift alone:
+  press it and let go with no other key.
+* **KEY CONFLICTS** lists every card with a shared letter and every shared command chord; a double
+  click opens it.
+* Card borders: gold for the selected button, red for a shared letter, amber for a changed one.
+* **RESET TO DEFAULT** restores the selected object's card or the selected command. **RESET ALL**
+  restores everything.
+* **SAVE** writes the file and applies it at once, also from Esc > Options in a match. **BACK**
+  leaves without saving.
+
+A button's letter applies on every bar that has the button. With grid hotkeys on, most slots still
+take their grid key; unit orders and slots on `NonGridHotkeys` use the letter set here. Tooltips mark
+the new letter.
+
+`Hotkeys.ini` holds only what differs from the game:
+
+```ini
+CommandMap SELECT_ALL
+  Key = KEY_Q
+  Transition = DOWN
+  Modifiers = CTRL
+  UseableIn = GAME
+End
+
+CommandButtonHotKey Command_ConstructAmericaBarracks
+  Key = K
+End
+```
+
+* `CommandMap` blocks use `CommandMap.ini` syntax. `Key = KEY_NONE` with `UseableIn = NONE` unbinds.
+* `CommandButtonHotKey <button>` takes one letter or digit, or `NONE` for no key.
+* Not part of the multiplayer checksum. A block that fails to parse drops the keys from there on.
+* Needs no files: the exe builds the screen in the look of the options menu beneath it, adds the
+  Hotkeys button right of Shaders when `OptionsMenu.wnd` has no `ButtonHotkeys`, and shows built-in
+  English for any `GUI:Hotkeys*` label the string file lacks.
+
 ## Reverse move hotkey
 
 Caps Lock arms a reverse move for the whole selection; the next terrain click drives there in

@@ -187,6 +187,9 @@ static NameKeyType    ButtonShadersAcceptID       = NAMEKEY_INVALID;
 static NameKeyType    ButtonShadersCancelID       = NAMEKEY_INVALID;
 static GameWindow *   comboBoxShadows             = nullptr;
 static GameWindow *   comboBoxSuperSampling       = nullptr;
+
+//Hotkeys Screen
+static NameKeyType    ButtonHotkeysID             = NAMEKEY_INVALID;
 static NameKeyType    comboBoxSuperSamplingID     = NAMEKEY_INVALID;
 
 static GameWindow *   buttonMainAccept            = nullptr;
@@ -1846,6 +1849,19 @@ static void initShadersWindows()
 	WinShaders->winHide( TRUE );
 }
 
+// The Hotkeys button: the layout's own, hidden for older exes, or one made beside Shaders
+static void initHotkeysButton()
+{
+	ButtonHotkeysID = TheNameKeyGenerator->nameToKey( "OptionsMenu.wnd:ButtonHotkeys" );
+	GameWindow *button = HotkeysMenuOptionsButton();
+	if (button)
+	{
+		GadgetButtonSetText( button, HotkeysMenuText( "GUI:Hotkeys" ) );
+		button->winSetTooltip( HotkeysMenuText( "TOOLTIP:Hotkeys" ) );
+		button->winHide( FALSE );
+	}
+}
+
 // TheSuperHackers @tweak Now prints additional version information in the version label.
 static void initLabelVersion()
 {
@@ -1971,6 +1987,7 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 
 	initGameOptionsWindows();
 	initShadersWindows();
+	initHotkeysButton();
 
 	sliderTextureResolutionID = TheNameKeyGenerator->nameToKey( "OptionsMenu.wnd:LowResSlider" );
 	sliderTextureResolution = TheWindowManager->winGetWindowFromId( nullptr, sliderTextureResolutionID );
@@ -2646,6 +2663,10 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 			else if (controlID == ButtonShadersID )
 			{
 				showPanel( WinShaders );
+			}
+			else if (controlID == ButtonHotkeysID )
+			{
+				HotkeysMenuOpen();
 			}
 			else if (controlID == ButtonShadersAcceptID )
 			{

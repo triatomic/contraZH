@@ -1368,6 +1368,76 @@ void MetaMap::verifyMetaMap()
 }
 
 //-------------------------------------------------------------------------------------------------
+void MetaMap::rememberDefaults()
+{
+	m_defaults.clear();
+	for (const MetaMapRec *map = m_metaMaps; map; map = map->m_next)
+	{
+		DefaultKey key;
+		key.key = map->m_key;
+		key.transition = map->m_transition;
+		key.modState = map->m_modState;
+		key.usableIn = map->m_usableIn;
+		m_defaults[map->m_meta] = key;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+void MetaMap::restoreDefaults()
+{
+	for (MetaMapRec *map = m_metaMaps; map; map = map->m_next)
+	{
+		DefaultKeyMap::const_iterator it = m_defaults.find(map->m_meta);
+		if (it == m_defaults.end())
+		{
+			// a record only the player's file made
+			map->m_key = MK_NONE;
+			map->m_transition = DOWN;
+			map->m_modState = NONE;
+			map->m_usableIn = COMMANDUSABLE_NONE;
+			continue;
+		}
+		map->m_key = it->second.key;
+		map->m_transition = it->second.transition;
+		map->m_modState = it->second.modState;
+		map->m_usableIn = it->second.usableIn;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool MetaMap::getDefaultKey(GameMessage::Type t, DefaultKey *key) const
+{
+	DefaultKeyMap::const_iterator it = m_defaults.find(t);
+	if (it == m_defaults.end())
+	{
+		key->key = MK_NONE;
+		key->transition = DOWN;
+		key->modState = NONE;
+		key->usableIn = COMMANDUSABLE_NONE;
+		return FALSE;
+	}
+	*key = it->second;
+	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+const LookupListRec *MetaMap::getMetaTypeNames()
+{
+	return GameMessageMetaTypeNames;
+}
+
+//-------------------------------------------------------------------------------------------------
+const char *MetaMap::findMetaTypeName(GameMessage::Type t)
+{
+	for (const LookupListRec *metaNames = GameMessageMetaTypeNames; metaNames->name; metaNames++)
+	{
+		if (metaNames->value == t)
+			return metaNames->name;
+	}
+	return nullptr;
+}
+
+//-------------------------------------------------------------------------------------------------
 /*static*/ void INI::parseMetaMapDefinition( INI* ini )
 {
 	MetaMap::parseMetaMap(ini);

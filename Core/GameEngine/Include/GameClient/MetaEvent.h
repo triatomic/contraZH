@@ -485,6 +485,25 @@ public:
 	void verifyMetaMap();
 
 	const MetaMapRec *getFirstMetaMapRec() const { return m_metaMaps; }
+
+	// The keys as shipped, before Hotkeys.ini, so the player's file can be laid over them again
+	struct DefaultKey
+	{
+		MappableKeyType key;
+		MappableKeyTransition transition;
+		MappableKeyModState modState;
+		CommandUsableInType usableIn;
+	};
+	void rememberDefaults();
+	void restoreDefaults();
+	Bool getDefaultKey( GameMessage::Type t, DefaultKey *key ) const;
+
+	static const LookupListRec *getMetaTypeNames();
+	static const char *findMetaTypeName( GameMessage::Type t );
+
+private:
+	typedef std::map<Int, DefaultKey> DefaultKeyMap;
+	DefaultKeyMap m_defaults;
 };
 
 extern MetaMap *TheMetaMap;

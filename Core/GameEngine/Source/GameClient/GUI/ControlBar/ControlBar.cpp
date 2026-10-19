@@ -2720,7 +2720,7 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 		// A unit order whose label marks no letter keys by the grid like any other slot.
 		if( isUnitOrder )
 		{
-			hotKey = TheHotKeyManager->searchHotKey( commandButton->getTextLabel() );
+			hotKey = TheHotKeyManager->getButtonHotKey( commandButton->getName(), commandButton->getTextLabel() );
 			isUnitOrder = hotKey.isNotEmpty();
 		}
 
@@ -2743,7 +2743,7 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 		// did before grid hotkeys existed.
 		if( hotKey.isEmpty() && !isUnitOrder && !displaced )
 		{
-			const AsciiString strHotKey = TheHotKeyManager->searchHotKey(commandButton->getTextLabel());
+			const AsciiString strHotKey = TheHotKeyManager->getButtonHotKey(commandButton->getName(), commandButton->getTextLabel());
 
 			// A string file letter that the grid layout also uses would be a straight collision:
 			// addHotKey keeps whichever slot registered first and silently drops the other, so one

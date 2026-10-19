@@ -85,6 +85,7 @@
 #include "GameClient/GameClient.h"
 #include "GameClient/GameText.h"
 #include "GameClient/GUICallbacks.h"
+#include "GameClient/HotKey.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/DisplayStringManager.h"
@@ -471,7 +472,7 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 
 		}
 
-		name = TheGameText->fetch(commandButton->getTextLabel().str());
+		name = TheHotKeyManager->getButtonLabel(commandButton->getName(), commandButton->getTextLabel());
 
 		if( thingTemplate && commandButton->getCommandType() != GUI_COMMAND_PURCHASE_SCIENCE )
 		{
