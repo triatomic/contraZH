@@ -39,7 +39,7 @@
 #include "GameLogic/Module/ContainModule.h"
 #include "W3DDevice/GameClient/Module/W3DDependencyModelDraw.h"
 
-#include <map>
+#include <set>
 
 
 
@@ -74,6 +74,7 @@ void W3DDependencyModelDrawModuleData::buildFieldParse(MultiIniFieldParse& p)
 W3DDependencyModelDraw::W3DDependencyModelDraw( Thing *thing, const ModuleData* moduleData ) : W3DModelDraw( thing, moduleData )
 {
 	m_dependencyCleared = FALSE;
+	m_missingBoneContainerID = INVALID_DRAWABLE_ID;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -103,7 +104,7 @@ void W3DDependencyModelDraw::doDrawModule(const Matrix3D* transformMtx)
 
 	  Drawable *theirDrawable = nullptr;
 
-	  if( me->getContainedBy() && !me->getContainedBy()->getContain()->isEnclosingContainerFor(me) )
+	  if( me->getContainedBy() && me->getContainedBy()->getContain() && !me->getContainedBy()->getContain()->isEnclosingContainerFor(me) )
 		  theirDrawable = me->getContainedBy()->getDrawable();
 
     if( ! theirDrawable )
@@ -132,6 +133,7 @@ void W3DDependencyModelDraw::adjustTransformMtx(Matrix3D& mtx) const
 	if( md->m_attachToDrawableBoneInContainer.isNotEmpty()
 		&& me
 		&& me->getContainedBy()
+		&& me->getContainedBy()->getContain()
 		&& !me->getContainedBy()->getContain()->isEnclosingContainerFor(me)
 		)
 	{
@@ -159,7 +161,11 @@ void W3DDependencyModelDraw::adjustTransformMtx(Matrix3D& mtx) const
 			}
 			else
 			{
+#if RTS_ZEROHOUR
+				mtx = *theirDrawable->getDrawnTransformMatrix();
+#else
         mtx = *theirDrawable->getTransformMatrix();//TransformMatrix();
+#endif
 				logMissingContainerBone(theirDrawable, boneName);
 			}
 		}
@@ -170,40 +176,46 @@ void W3DDependencyModelDraw::adjustTransformMtx(Matrix3D& mtx) const
 void W3DDependencyModelDraw::logMissingContainerBone(const Drawable* container, const AsciiString& slotBoneName) const
 {
 #ifdef DEBUG_LOGGING
-	// Logs from every frame the rider is drawn, so cap it per rider and container template.
-	static std::map<std::pair<const ThingTemplate*, const ThingTemplate*>, Int> s_logCounts;
-	Int& count = s_logCounts[std::make_pair(getDrawable()->getTemplate(), container->getTemplate())];
-	if (count >= 10)
+	// Drawing the rider and moving it in logic both reach this every frame.
+	if (container->getID() == m_missingBoneContainerID
+		&& container->getModelConditionFlags() == m_missingBoneConditions
+		&& slotBoneName == m_missingBoneSlotName)
 	{
 		return;
 	}
-	++count;
+	m_missingBoneContainerID = container->getID();
+	m_missingBoneConditions = container->getModelConditionFlags();
+	m_missingBoneSlotName = slotBoneName;
 
+	// W3DModelDraw is the only ObjectDrawInterface.
 	AsciiString models;
-
-	// The model-name accessor exists only in Zero Hour debug and cheats builds.
-#if defined(RTS_ZEROHOUR) && (defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE))
-	AsciiString modelName;
-	Coord3D center;
 	for (DrawModule const** dm = container->getDrawModules(); dm && *dm; ++dm)
 	{
 		const ObjectDrawInterface* di = (*dm)->getObjectDrawInterface();
-		if (di && di->clientOnly_getModelNameAndCenter(&modelName, &center))
+		const RenderObjClass* robj = di ? ((const W3DModelDraw*)di)->getRenderObject() : nullptr;
+		if (robj)
 		{
 			if (models.isNotEmpty())
 			{
 				models.concat(", ");
 			}
-			models.concat(modelName);
+			models.concat(robj->Get_Name());
 		}
 	}
-#endif
 
-	DEBUG_LOG(("m_attachToDrawableBoneInContainer %s%s%s not found in models %s of %s, carrying %s",
+	AsciiString line;
+	line.format("m_attachToDrawableBoneInContainer %s%s%s not found in models %s of %s, carrying %s",
 		slotBoneName.str(), slotBoneName.isEmpty() ? "" : " or ",
 		getW3DDependencyModelDrawModuleData()->m_attachToDrawableBoneInContainer.str(),
 		models.isEmpty() ? "<none>" : models.str(),
-		container->getTemplate()->getName().str(), getDrawable()->getTemplate()->getName().str()));
+		container->getTemplate()->getName().str(), getDrawable()->getTemplate()->getName().str());
+
+	// Every rider of a template repeats the same miss, so each distinct line logs once.
+	static std::set<AsciiString> s_loggedLines;
+	if (s_loggedLines.insert(line).second)
+	{
+		DEBUG_LOG(("%s", line.str()));
+	}
 #else
 	(void)container;
 	(void)slotBoneName;

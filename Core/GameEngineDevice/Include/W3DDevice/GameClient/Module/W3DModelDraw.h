@@ -476,6 +476,7 @@ public:
 
 	///@todo: I had to make this public because W3DDevice needs access for casting shadows -MW
 	RenderObjClass *getRenderObject() { return m_renderObject; }
+	const RenderObjClass *getRenderObject() const { return m_renderObject; }
 	virtual Bool updateBonesForClientParticleSystems() override;///< this will reposition particle systems on the fly ML
 
 	virtual void handleFXEvents();  // Check frame times and trigger FX events at correct positions
