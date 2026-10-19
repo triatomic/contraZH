@@ -11,6 +11,14 @@ define_tristate_option(RTS_BUILD_OPTION_RETAIL_COMPATIBLE_GAME RetailCompatibleG
 unset(_retail_guards)
 unset(_retail_base_guards)
 
+# Retail CRC needs the original math, and VC6 cannot build GameMath.
+if(IS_VS6_BUILD OR NOT RTS_BUILD_OPTION_DETERMINISTIC_MATH OR RTS_BUILD_OPTION_RETAIL_COMPATIBLE_GAME STREQUAL "ON")
+    set(RTS_USE_DETERMINISTIC_MATH OFF)
+    target_compile_definitions(core_config INTERFACE USE_DETERMINISTIC_MATH=0)
+else()
+    set(RTS_USE_DETERMINISTIC_MATH ON)
+endif()
+
 if(NOT CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL "12.0.8804" AND NOT RTS_BUILD_OPTION_RETAIL_COMPATIBLE_GAME STREQUAL "OFF")
     message(NOTICE "")
     message(NOTICE "  Retail compatibility: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION} is not CRC-compatible with retail.")

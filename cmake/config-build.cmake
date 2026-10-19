@@ -90,10 +90,6 @@ if(RTS_BUILD_OPTION_PROFILE)
     target_compile_definitions(core_config INTERFACE RTS_PROFILE_LEGACY)
 endif()
 
-if(NOT RTS_BUILD_OPTION_DETERMINISTIC_MATH)
-    target_compile_definitions(core_config INTERFACE USE_DETERMINISTIC_MATH=0)
-endif()
-
 # Define a dummy Tracy target when the build option is disabled.
 if(RTS_BUILD_OPTION_PROFILE_TRACY)
     include(cmake/tracy.cmake)
