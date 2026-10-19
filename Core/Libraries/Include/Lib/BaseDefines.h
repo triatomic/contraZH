@@ -32,6 +32,6 @@
 #endif
 #endif
 
-#if !HAS_GAMEMATH || RETAIL_COMPATIBLE_CRC
+#if !HAS_GAMEMATH
 #undef USE_DETERMINISTIC_MATH // Unfortunately cannot actually use deterministic math
 #endif
