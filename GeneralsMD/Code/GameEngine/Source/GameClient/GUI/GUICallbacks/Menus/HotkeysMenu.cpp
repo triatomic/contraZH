@@ -23,6 +23,7 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/File.h"
 #include "Common/FileSystem.h"
 #include "Common/GlobalData.h"
 #include "Common/NameKeyGenerator.h"
@@ -1673,14 +1674,15 @@ void save()
 {
 	const AsciiString path = HotKeyManager::getPlayerKeysPath();
 	const AsciiString text = formatFile();
-	FILE *file = fopen( path.str(), "wb" );
+	// through TheFileSystem, whose existence cache would otherwise keep a file made here unread
+	File *file = TheFileSystem->openFile( path.str(), File::WRITE | File::CREATE | File::TRUNCATE | File::BINARY );
 	if( file == nullptr )
 	{
 		DEBUG_LOG(( "HOTKEYS: %s could not be written", path.str() ));
 		return;
 	}
-	fwrite( text.str(), 1, text.getLength(), file );
-	fclose( file );
+	file->write( text.str(), text.getLength() );
+	file->close();
 	DEBUG_LOG(( "HOTKEYS: wrote %s", path.str() ));
 	HotKeyManager::loadPlayerKeys();
 	s_dirty = FALSE;
