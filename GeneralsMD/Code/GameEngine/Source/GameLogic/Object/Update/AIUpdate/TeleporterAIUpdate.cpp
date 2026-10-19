@@ -323,7 +323,7 @@ Bool TeleporterAIUpdate::findAttackLocation(Object* victim, const Coord3D* victi
 	Coord2D direction;
 	direction.x = -dir.x;
 	direction.y = -dir.y;
-	Real initAngle = atan2(direction.y, direction.x);  // angle from victim to target
+	Real initAngle = WWMath::Atan2f(direction.y, direction.x);  // angle from victim to target
 
 	direction.normalize();
 
@@ -344,8 +344,8 @@ Bool TeleporterAIUpdate::findAttackLocation(Object* victim, const Coord3D* victi
 			Real angle = initAngle + (step * sign * step_size_angle);
 
 			//polar offset
-			newPos.x = victimPos->x + radius * cos(angle);
-			newPos.y = victimPos->y + radius * sin(angle);
+			newPos.x = victimPos->x + radius * WWMath::Cosf(angle);
+			newPos.y = victimPos->y + radius * WWMath::Sinf(angle);
 			newPos.z = TheTerrainLogic->getGroundHeight(newPos.x, newPos.y);
 
 			//viewBlocked = TheAI->pathfinder()->isAttackViewBlockedByObstacle(obj, newPos, victim, *victimPos);
@@ -530,7 +530,7 @@ UpdateSleepTime TeleporterAIUpdate::doLocomotor(void)
 	// Get initial dist and dir
 	// distSq = ThePartitionManager->getDistanceSquared(obj, &targetPos, FROM_CENTER_2D, &dir);
 	Real dist = sqrt(distSq);
-	Real targetAngle = atan2(dir.y, dir.x);
+	Real targetAngle = WWMath::Atan2f(dir.y, dir.x);
 	dir.normalize();
 
 	// We are within min range
@@ -597,7 +597,7 @@ UpdateSleepTime TeleporterAIUpdate::doLocomotor(void)
 		distSq = ThePartitionManager->getDistanceSquared(obj, &targetPos, FROM_CENTER_2D, &dir);
 
 		// targetAngle = atan2(dir.y, dir.x);
-		targetAngle = atan2(goalPos->y - targetPos.y, goalPos->x - targetPos.x);
+		targetAngle = WWMath::Atan2f(goalPos->y - targetPos.y, goalPos->x - targetPos.x);
 		dist = sqrt(distSq);
 	}
 	else {
@@ -606,7 +606,7 @@ UpdateSleepTime TeleporterAIUpdate::doLocomotor(void)
 
 		//recompute distance and angle
 		distSq = ThePartitionManager->getDistanceSquared(obj, &targetPos, FROM_CENTER_2D, &dir);
-		targetAngle = atan2(dir.y, dir.x);
+		targetAngle = WWMath::Atan2f(dir.y, dir.x);
 		dist = sqrt(distSq);
 
 		// We are within min range (Not sure why, but we need to check this again here)
