@@ -2534,8 +2534,8 @@ Coord3D TerrainLogic::findEdgePointForAngle(const Coord3D* pos, Real angle, bool
 	const Real y0 = pos->y;
 
 	// Direction from angle
-	const Real dx = std::cos(angle);
-	const Real dy = std::sin(angle);
+	const Real dx = WWMath::Cosf(angle);
+	const Real dy = WWMath::Sinf(angle);
 
 	// Small epsilon for float comparisons
 	const Real eps = static_cast<Real>(1e-6);
