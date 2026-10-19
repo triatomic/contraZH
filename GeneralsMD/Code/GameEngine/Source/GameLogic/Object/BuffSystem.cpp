@@ -116,12 +116,12 @@ public:
 		if (m_armorDamageScalar != 1.0) {
 			BodyModuleInterface* body = targetObj->getBodyModule();
 			if (body) {
-				body->applyDamageScalar(1.0f / pow(m_armorDamageScalar, exp));
+				body->applyDamageScalar(1.0f / WWMath::Powf(m_armorDamageScalar, exp));
 			}
 		}
 
 		if (m_sightRangeScalar != 1.0) {
-			Real scalar = 1.0f / pow(m_sightRangeScalar, exp);
+			Real scalar = 1.0f / WWMath::Powf(m_sightRangeScalar, exp);
 			targetObj->setVisionRange(targetObj->getVisionRange() * scalar);
 			targetObj->setShroudClearingRange(targetObj->getShroudClearingRange() * scalar);
 		}
@@ -129,7 +129,7 @@ public:
 		if (m_moveSpeedScalar != 1.0) {
 			AIUpdateInterface* ai = targetObj->getAI();
 			if (ai) {
-				ai->applySpeedMultiplier(1.0f / pow(m_moveSpeedScalar, exp));
+				ai->applySpeedMultiplier(1.0f / WWMath::Powf(m_moveSpeedScalar, exp));
 			}
 		}
 
