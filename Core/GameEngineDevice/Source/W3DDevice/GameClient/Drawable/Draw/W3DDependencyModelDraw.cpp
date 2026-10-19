@@ -180,6 +180,9 @@ void W3DDependencyModelDraw::logMissingContainerBone(const Drawable* container, 
 	++count;
 
 	AsciiString models;
+
+	// The model-name accessor exists only in Zero Hour debug and cheats builds.
+#if defined(RTS_ZEROHOUR) && (defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE))
 	AsciiString modelName;
 	Coord3D center;
 	for (DrawModule const** dm = container->getDrawModules(); dm && *dm; ++dm)
@@ -194,6 +197,8 @@ void W3DDependencyModelDraw::logMissingContainerBone(const Drawable* container, 
 			models.concat(modelName);
 		}
 	}
+#endif
+
 	DEBUG_LOG(("m_attachToDrawableBoneInContainer %s%s%s not found in models %s of %s, carrying %s",
 		slotBoneName.str(), slotBoneName.isEmpty() ? "" : " or ",
 		getW3DDependencyModelDrawModuleData()->m_attachToDrawableBoneInContainer.str(),

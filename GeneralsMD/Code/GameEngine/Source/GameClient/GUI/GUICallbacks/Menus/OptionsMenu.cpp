@@ -565,7 +565,8 @@ static void updateGameOptionsEnables()
 
 	enableWindow( checkPixelLights, getCheck( checkDynamicLights, TRUE ) );
 	enableWindow( checkDynamicLightsDebug, getCheck( checkDynamicLights, TRUE ) && getCheck( checkPixelLights, TRUE ) );
-	enableWindow( checkSpecularDebug, getCheck( checkSpecular, TRUE ) );
+	// the specular pass also draws normal maps, so its debug tint shows while either is on
+	enableWindow( checkSpecularDebug, getCheck( checkSpecular, TRUE ) || getCheck( checkNormalMaps, TRUE ) );
 	enableWindow( checkNormalMapDebug, getCheck( checkNormalMaps, TRUE ) );
 	enableWindow( checkHQSky, getCheck( checkCloudShadows, TRUE ) );
 
