@@ -1224,6 +1224,10 @@ target_precompile_headers(corei_gameengine_private INTERFACE
     Include/Precompiled/PreRTS.h
 )
 
+target_compile_options(corei_gameengine_private INTERFACE
+    $<$<CXX_COMPILER_ID:MSVC>:/wd4995>
+)
+
 target_include_directories(corei_gameengine_public INTERFACE
     Include
 )

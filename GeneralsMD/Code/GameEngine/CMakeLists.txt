@@ -1404,3 +1404,12 @@ target_link_libraries(z_gameengine PUBLIC
 target_precompile_headers(z_gameengine PRIVATE
     [["Precompiled/precompiled.h"]] # Must be first
 )
+
+# Simulation sources may only reach transcendental math through the WWMath and Trig wrappers.
+if(MSVC)
+    file(GLOB_RECURSE RTS_SIMULATION_SOURCES CONFIGURE_DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/Source/GameLogic/*.cpp
+        ${CMAKE_SOURCE_DIR}/Core/GameEngine/Source/GameLogic/*.cpp
+    )
+    set_source_files_properties(${RTS_SIMULATION_SOURCES} PROPERTIES COMPILE_OPTIONS "/we4995")
+endif()
