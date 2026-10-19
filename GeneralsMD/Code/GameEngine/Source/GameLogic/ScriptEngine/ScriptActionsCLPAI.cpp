@@ -598,7 +598,7 @@ void AIPlayer::clpBuildBySupplies(Int minimumCash, const ThingTemplate *tTemplat
 	if( isCashGenerator )
 	{
 		static const Real angleOffsetsDeg[] = { 0.0f, 15.0f, -15.0f, 30.0f, -30.0f, 45.0f, -45.0f, 90.0f, -90.0f };
-		Real desiredAngle = normalizeAngle( (Real)atan2( warehousePos->y - location.y, warehousePos->x - location.x ) );
+		Real desiredAngle = normalizeAngle( (Real)WWMath::Atan2f( warehousePos->y - location.y, warehousePos->x - location.x ) );
 		for( Int i = 0; i < ARRAY_SIZE( angleOffsetsDeg ) && !valid; ++i )
 		{
 			Real testAngle = normalizeAngle( desiredAngle + angleOffsetsDeg[ i ] * (PI / 180.0f) );
@@ -980,8 +980,8 @@ void AISkirmishPlayer::clpBuildBaseDefense(const AsciiString &thingName, Bool fl
 		{
 			break;
 		}
-		Real s = sin( angle );
-		Real c = cos( angle );
+		Real s = WWMath::Sinf( angle );
+		Real c = WWMath::Cosf( angle );
 
 		Coord3D buildPos = baseOwner->m_baseCenter;
 		buildPos.x += (offset.x * c - offset.y * s) * (percent / 100.0f);
