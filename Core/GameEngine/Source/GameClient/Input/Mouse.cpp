@@ -44,6 +44,7 @@
 #include "GameClient/InGameUI.h"
 #include "GameClient/Keyboard.h"
 #include "GameClient/Mouse.h"
+#include "GameClient/MetaEvent.h"
 #include "GameClient/GlobalLanguage.h"
 
 #include "GameLogic/GameLogic.h"
@@ -687,6 +688,19 @@ void Mouse::update()
 }
 
 //-------------------------------------------------------------------------------------------------
+void Mouse::postSideButton( MouseButtonState state, Int key )
+{
+	if( state == MBS_None )
+	{
+		return;
+	}
+	const Bool down = state != MBS_Up;
+	GameMessage *msg = TheMessageStream->appendMessage( down ? GameMessage::MSG_RAW_KEY_DOWN : GameMessage::MSG_RAW_KEY_UP );
+	msg->appendIntegerArgument( key );
+	msg->appendIntegerArgument( ( down ? KEY_STATE_DOWN : KEY_STATE_UP ) | TheKeyboard->getModifierFlags() );
+}
+
+//-------------------------------------------------------------------------------------------------
 /** Given the current state of this input device, turn the raw input
 	* data into raw stream messages and place those messages on the stream.
 	* NOTE that the click messages replace up messages in the mouse, so we
@@ -843,6 +857,9 @@ void Mouse::createStreamMessages()
 				break;
 
 		}
+
+		postSideButton( m_mouseEvents[ i ].x1State, MK_MOUSE4 );
+		postSideButton( m_mouseEvents[ i ].x2State, MK_MOUSE5 );
 
 		// wheel pos
 		msg = nullptr;

@@ -135,6 +135,13 @@ public:
 	static const ButtonKeyMap& getPlayerButtonKeys() { return s_playerButtonKeys; }
 	static void parsePlayerButtonKey( INI *ini );
 
+	// Mouse inputs bound like keys: their names in Hotkeys.ini and the hotkey map, and their labels
+	static const char *mouseKeyName( Int key );	///< "mouse4" for a mouse key code, null for anything else
+	static Int mouseKeyFromName( const AsciiString& name );	///< the mouse key code a name stands for, 0 for none
+	static const WideChar *mouseKeyText( Int key );	///< "Mouse 4" for a mouse key code, null for anything else
+	static Char cornerOf( const AsciiString& key );	///< the one character a cameo corner shows for a key, 0 for none
+	static const char *cornerText( Char corner );	///< "M4" for a mouse key's corner character, null for a letter
+
 	// Hotkeys.ini in the user data folder, laid over the shipped command map and button letters
 	static AsciiString getPlayerKeysPath();
 	static void loadPlayerKeys();

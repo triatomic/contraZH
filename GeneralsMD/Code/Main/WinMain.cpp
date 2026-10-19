@@ -564,6 +564,19 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 			}
 
 			//-------------------------------------------------------------------------
+			case 0x020B: // WM_XBUTTONDOWN
+			case 0x020C: // WM_XBUTTONUP
+			case 0x020D: // WM_XBUTTONDBLCLK
+			{
+				if( TheWin32Mouse )
+				{
+					TheWin32Mouse->addWin32Event( message, wParam, lParam, TheMessageTime );
+				}
+				// a handled side button returns TRUE, which keeps Windows from also sending browser back
+				return TRUE;
+			}
+
+			//-------------------------------------------------------------------------
 			case 0x020A: // WM_MOUSEWHEEL
 			{
 				if( TheWin32Mouse == nullptr )

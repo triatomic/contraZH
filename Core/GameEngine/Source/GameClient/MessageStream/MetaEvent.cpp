@@ -474,6 +474,15 @@ GameMessageDisposition MetaEventTranslator::translateGameMessage(const GameMessa
 	{
 		onKeyEvent(msg, disp);
 	}
+	else if (t == GameMessage::MSG_RAW_MOUSE_WHEEL)
+	{
+		// only a wheel no window used reaches here, and one that fires a binding does not zoom
+		const Real spin = msg->getArgument(1)->real;
+		if (spin != 0.0f && onMouseKeyPressed(spin > 0.0f ? MK_WHEELUP : MK_WHEELDOWN, msg->getArgument(2)->integer))
+		{
+			disp = DESTROY_MESSAGE;
+		}
+	}
 	else if (t > GameMessage::MSG_RAW_MOUSE_BEGIN && t < GameMessage::MSG_RAW_MOUSE_END )
 	{
 		onMouseEvent(msg);
@@ -555,6 +564,12 @@ void MetaEventTranslator::onMouseEvent(const GameMessage *msg)
 
 			// append the modifier keys to the message.
 			newMessage->appendIntegerArgument( msg->getArgument(1)->integer );
+
+			// a middle click that did not drag the camera fires what is bound to the middle button
+			if (index == 1 && pixelRegion.hi.x == pixelRegion.lo.x && pixelRegion.hi.y == pixelRegion.lo.y)
+			{
+				onMouseKeyPressed(MK_MOUSE3, msg->getArgument(1)->integer);
+			}
 
 			// append the time to the message.
 			//newMessage->appendIntegerArgument( msg->getArgument(2)->integer );
@@ -741,6 +756,26 @@ void MetaEventTranslator::onKeyPressed(GameMessageDisposition &disp, Int systemK
 			m_keyDownInfos[keyType].clearKeyModState(keyModState);
 		}
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool MetaEventTranslator::onMouseKeyPressed(MappableKeyType keyType, Int systemModifiers)
+{
+	GameMessageDisposition disp = KEEP_MESSAGE;
+	const MappableKeyModState keyModState = getKeyModState(systemModifiers);
+	onKeyPressed(disp, KEY_STATE_DOWN | systemModifiers, keyType, keyModState);
+	onKeyPressed(disp, KEY_STATE_UP | systemModifiers, keyType, keyModState);
+	if (disp == DESTROY_MESSAGE)
+	{
+		return TRUE;
+	}
+
+	// a cameo on this input, by the rules HotKeyTranslator keeps for keys
+	if ((keyModState & ~SHIFT) != 0 || TheHotKeyManager == nullptr)
+	{
+		return FALSE;
+	}
+	return TheHotKeyManager->executeHotKey(AsciiString(HotKeyManager::mouseKeyName(keyType)));
 }
 
 //-------------------------------------------------------------------------------------------------

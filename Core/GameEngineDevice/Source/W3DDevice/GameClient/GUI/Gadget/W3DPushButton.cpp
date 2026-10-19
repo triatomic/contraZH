@@ -261,8 +261,15 @@ static void drawButtonCornerLetter( GameWindow *window, UnsignedByte index, Game
 
 		// the manager stores keys lowercased, but shortcuts read better as capitals
 		UnicodeString text;
-		WideChar upper = (WideChar)toupper( (Int)index );
-		text.concat( upper );
+		const char *mouseText = HotKeyManager::cornerText( (Char)index );
+		if( mouseText )
+		{
+			text.translate( AsciiString( mouseText ) );
+		}
+		else
+		{
+			text.concat( (WideChar)toupper( (Int)index ) );
+		}
 		letterString->setText( text );
 
 		s_letterStrings[ index ] = letterString;
@@ -315,10 +322,11 @@ static void drawButtonHotKeyOverlay( GameWindow *window )
 	if( hotKey.isEmpty() )
 		return;
 
-	// Only a single byte printable key can be shown faithfully. A localized mnemonic outside
+	// Only a single byte printable key or a mouse key can be shown faithfully. A localized mnemonic outside
 	// ASCII arrives as a multi byte sequence here, and drawing its first byte would show a
 	// wrong or garbled shortcut - better to draw nothing for those.
-	if( hotKey.getLength() != 1 || !isprint( (unsigned char)hotKey.getCharAt( 0 ) ) )
+	const Char corner = HotKeyManager::cornerOf( hotKey );
+	if( corner == 0 )
 		return;
 
 	Int pointSize = 10;
@@ -326,7 +334,7 @@ static void drawButtonHotKeyOverlay( GameWindow *window )
 		pointSize = TheGlobalLanguageData->adjustFontSize( pointSize );
 	GameFont *font = TheFontLibrary->getFont( AsciiString( "Arial" ), pointSize, TRUE );
 
-	drawButtonCornerLetter( window, (UnsignedByte)hotKey.getCharAt( 0 ), font, TheGlobalData->m_keyboardOverlayBackdrop,
+	drawButtonCornerLetter( window, (UnsignedByte)corner, font, TheGlobalData->m_keyboardOverlayBackdrop,
 		TheGlobalData->m_keyboardOverlayBackdropColor, TheGlobalData->m_keyboardOverlayColor );
 }
 

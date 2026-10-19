@@ -100,6 +100,12 @@ whole grid works unchanged.
 * Right: the picked object's portrait, name and command card, laid out like the 2×7 command bar,
   each button showing its letter. **Quick filter** narrows the icons or commands by name.
 * Click a card button, then press its new letter. Backspace takes the key off, Esc cancels.
+* Mouse inputs bind like keys, to commands and card buttons alike: the middle button, the two side
+  buttons and the wheel up or down. Card corners show `M3`, `M4`, `M5`, `WU` or `WD`.
+  * The middle button fires on a click that did not drag, so middle-drag camera panning still works.
+  * A wheel direction that fires a binding does not zoom; every unbound combination still zooms, so
+    Ctrl + Wheel up can take a command while the plain wheel keeps zooming.
+  * A wheel notch over a menu or list still scrolls it and fires nothing.
 * **GENERAL** lists every command that needs no unit (selection, control groups, camera, chat,
   beacons, holds such as Force Attack). **Change**, a double click or Enter waits for a key; **No key** unbinds.
 * A hold command (Force Attack, Waypoints, Prefer Selection) also takes Ctrl, Alt or Shift alone:
@@ -131,8 +137,10 @@ CommandButtonHotKey Command_ConstructAmericaBarracks
 End
 ```
 
-* `CommandMap` blocks use `CommandMap.ini` syntax. `Key = KEY_NONE` with `UseableIn = NONE` unbinds.
-* `CommandButtonHotKey <button>` takes one letter or digit, or `NONE` for no key.
+* `CommandMap` blocks use `CommandMap.ini` syntax, plus `KEY_MOUSE3`, `KEY_MOUSE4`, `KEY_MOUSE5`,
+  `KEY_WHEELUP` and `KEY_WHEELDOWN`. `Key = KEY_NONE` with `UseableIn = NONE` unbinds.
+* `CommandButtonHotKey <button>` takes one letter, a mouse key (`MOUSE3`, `MOUSE4`, `MOUSE5`, `WHEELUP`,
+  `WHEELDOWN`) or `NONE` for no key. Digits are left out because they are control group keys.
 * Not part of the multiplayer checksum. A block that fails to parse drops the keys from there on.
 * Needs no files: the exe builds the screen in the look of the options menu beneath it, adds the
   Hotkeys button right of Shaders when `OptionsMenu.wnd` has no `ButtonHotkeys`, and shows built-in

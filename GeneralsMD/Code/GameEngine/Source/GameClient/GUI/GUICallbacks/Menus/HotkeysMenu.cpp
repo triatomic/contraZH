@@ -44,6 +44,7 @@
 #include "GameClient/GUICallbacks.h"
 #include "GameClient/HotKey.h"
 #include "GameClient/KeyDefs.h"
+#include "GameClient/Keyboard.h"
 #include "GameClient/MetaEvent.h"
 
 namespace
@@ -155,9 +156,9 @@ const BuiltInText BUILT_IN_TEXT[] =
 	{ "TOOLTIP:HotkeyDefault", L"Put back the game's keys for the selected building or unit, or the selected command." },
 	{ "TOOLTIP:HotkeyResetAll", L"Put back the game's own key for every command and button." },
 	{ "GUI:HotkeysNone", L"none" },
-	{ "GUI:HotkeysPressKey", L"Press a key, with Ctrl, Alt or Shift if you like. Esc cancels." },
-	{ "GUI:HotkeysPressHold", L"Press a key, or press and let go of Ctrl, Alt or Shift alone to hold it. Esc cancels." },
-	{ "GUI:HotkeysPressLetter", L"Press a letter. Backspace takes the key off, Esc cancels." },
+	{ "GUI:HotkeysPressKey", L"Press a key, a mouse button or the wheel, with Ctrl, Alt or Shift if you like. Esc cancels." },
+	{ "GUI:HotkeysPressHold", L"Press a key or side mouse button, or press and let go of Ctrl, Alt or Shift alone to hold it. Esc cancels." },
+	{ "GUI:HotkeysPressLetter", L"Press a letter, a side or middle mouse button, or the wheel. Backspace takes the key off, Esc cancels." },
 	{ "GUI:HotkeysClash", L"%s is on %s, and only one of them gets it." },
 	{ "GUI:HotkeysAlsoOn", L"Same key as %s." },
 	{ "GUI:HotkeysGameKey", L"The game's own key is %s." },
@@ -286,6 +287,7 @@ GameWindow *s_resetDefault = nullptr;
 
 GameWindow *s_back = nullptr;
 GameWindow *s_resetAll = nullptr;
+GameWindow *s_catcher = nullptr;	///< over everything while a key is awaited, so the wheel and middle button reach the wait
 
 std::vector<CommandRow> s_rows;
 std::map<Int, Binding> s_keys;	///< the page's key for every command, by message type
@@ -414,6 +416,7 @@ UnicodeString chordText( const Binding& binding )
 		{ "PGUP", "Page Up" }, { "PGDN", "Page Down" }, { "INS", "Insert" }, { "DEL", "Delete" }, { "CAPS", "Caps Lock" },
 		{ "KPPLUS", "Num +" }, { "KPMINUS", "Num -" }, { "KPSLASH", "Num /" }, { "KPSTAR", "Num *" },
 		{ "KPDEL", "Num Del" }, { "KPENTER", "Num Enter" },
+		{ "MOUSE3", "Middle mouse" }, { "MOUSE4", "Mouse 4" }, { "MOUSE5", "Mouse 5" }, { "WHEELUP", "Wheel up" }, { "WHEELDOWN", "Wheel down" },
 	};
 	AsciiString text;
 	if( binding.modState & CTRL )
@@ -562,6 +565,15 @@ AsciiString lowerName( const CommandButton *button )
 	AsciiString name = button->getName();
 	name.toLower();
 	return name;
+}
+
+UnicodeString keyText( const AsciiString& letter )
+{
+	if( letter.getLength() > 1 )
+	{
+		return UnicodeString( HotKeyManager::mouseKeyText( HotKeyManager::mouseKeyFromName( letter ) ) );
+	}
+	return wide( letter );
 }
 
 AsciiString shippedLetter( const CommandButton *button )
@@ -1035,7 +1047,7 @@ void fillCard()
 		const AsciiString letter = buttonLetter( button );
 		const Bool waiting = s_capture == CAPTURE_BUTTON && slot == s_slot;
 		setButtonImage( s_card[ slot ], button->getButtonImage() );
-		GadgetButtonSetCornerLetter( s_card[ slot ], waiting ? '?' : ( letter.isEmpty() ? 0 : letter.getCharAt( 0 ) ) );
+		GadgetButtonSetCornerLetter( s_card[ slot ], waiting ? '?' : HotKeyManager::cornerOf( letter ) );
 		Color border = GAME_COLOR_UNDEFINED;
 		if( slot == s_slot )
 		{
@@ -1057,7 +1069,7 @@ void fillCard()
 		if( letter.isNotEmpty() )
 		{
 			tip.concat( L" (" );
-			tip.concat( wide( letter ) );
+			tip.concat( keyText( letter ) );
 			tip.concat( L')' );
 		}
 		s_card[ slot ]->winSetTooltip( tip );
@@ -1143,7 +1155,7 @@ Int fillConflicts()
 				for( std::map<AsciiString, UnicodeString>::const_iterator it = clashes.begin(); it != clashes.end(); ++it )
 				{
 					line.format( HotkeysMenuText( "GUI:HotkeysConflictCard" ), bar.name.str(), bar.objects[object].name.str(),
-						wide( it->first ).str(), it->second.str() );
+						keyText( it->first ).str(), it->second.str() );
 					GadgetListBoxAddEntryText( s_conflictList, line, TEXT_COLOR, -1, 0 );
 					ConflictRef ref = { side, (Int)general, (Int)object };
 					s_conflicts.push_back( ref );
@@ -1202,7 +1214,7 @@ void updateInfo()
 			else
 			{
 				const AsciiString letter = buttonLetter( button );
-				line.format( HotkeysMenuText( "GUI:HotkeysKeyIs" ), letter.isEmpty() ? HotkeysMenuText( "GUI:HotkeysNone" ).str() : wide( letter ).str() );
+				line.format( HotkeysMenuText( "GUI:HotkeysKeyIs" ), letter.isEmpty() ? HotkeysMenuText( "GUI:HotkeysNone" ).str() : keyText( letter ).str() );
 				appendLine( text, line );
 				if( s_buttons.count( lowerName( button ) ) )
 				{
@@ -1233,7 +1245,7 @@ void updateInfo()
 			const std::map<AsciiString, UnicodeString> clashes = cardClashes( object );
 			for( std::map<AsciiString, UnicodeString>::const_iterator it = clashes.begin(); it != clashes.end(); ++it )
 			{
-				line.format( HotkeysMenuText( "GUI:HotkeysClash" ), wide( it->first ).str(), it->second.str() );
+				line.format( HotkeysMenuText( "GUI:HotkeysClash" ), keyText( it->first ).str(), it->second.str() );
 				appendLine( text, line );
 			}
 			if( TheGlobalData->m_gridHotkeysEnabled )
@@ -1302,6 +1314,7 @@ void refresh()
 	showWindow( s_note, !side );
 	showWindow( s_change, s_view != VIEW_CONFLICTS );
 	showWindow( s_clear, s_view != VIEW_CONFLICTS );
+	showWindow( s_catcher, s_capture != CAPTURE_NONE );
 
 	for( Int i = 0; i < SIDE_COUNT; ++i )
 	{
@@ -1578,11 +1591,26 @@ void captureKey( UnsignedByte key, Int state )
 		return;
 	}
 	const char *letter = name + 4;
-	if( ( mods & ( CTRL | ALT ) ) == 0 && strlen( letter ) == 1 && isalpha( (unsigned char)letter[0] ) )
+	const Bool mouse = HotKeyManager::mouseKeyName( key ) != nullptr;
+	if( ( mods & ( CTRL | ALT ) ) == 0 && ( mouse || ( strlen( letter ) == 1 && isalpha( (unsigned char)letter[0] ) ) ) )
 	{
-		AsciiString text;
-		text.format( "%c", letter[0] );
-		applyKey( MK_NONE, NONE, text );
+		applyKey( MK_NONE, NONE, AsciiString( letter ) );
+	}
+}
+
+/// A wheel notch or middle click while a key is awaited.
+void captureMouse( MappableKeyType key )
+{
+	const Int mods = modifiersOf( TheKeyboard->getModifierFlags() );
+	if( s_capture == CAPTURE_COMMAND )
+	{
+		applyKey( key, mods, AsciiString::TheEmptyString );
+	}
+	else if( ( mods & ( CTRL | ALT ) ) == 0 )
+	{
+		AsciiString name = HotKeyManager::mouseKeyName( key );
+		name.toUpper();
+		applyKey( MK_NONE, NONE, name );
 	}
 }
 
@@ -2021,6 +2049,13 @@ Bool buildScreen()
 	s_filter = makeEntry( 580, 58, 770, 82 );
 	// the combo last: it draws over its siblings and takes the clicks its open list covers
 	s_generalCombo = makeCombo( 194, 62, 470, 86, 8 );
+
+	s_catcher = TheWindowManager->winCreate( s_parent, WIN_STATUS_ENABLED, 0, 0, TheDisplay->getWidth(), TheDisplay->getHeight(), nullptr );
+	WinInstanceData catcher;
+	catcher.m_style = GWS_USER_WINDOW;
+	s_catcher->winSetInstanceData( &catcher );
+	s_catcher->winSetInputFunc( HotkeysMenuInput );
+	s_catcher->winHide( TRUE );
 	return TRUE;
 }
 
@@ -2107,6 +2142,24 @@ void HotkeysMenuOpen()
 //-------------------------------------------------------------------------------------------------
 WindowMsgHandledType HotkeysMenuInput( GameWindow *window, UnsignedInt msg, WindowMsgData mData1, WindowMsgData mData2 )
 {
+	if( s_capture != CAPTURE_NONE && msg != GWM_CHAR )
+	{
+		if( msg == GWM_WHEEL_UP || msg == GWM_WHEEL_DOWN )
+		{
+			captureMouse( msg == GWM_WHEEL_UP ? MK_WHEELUP : MK_WHEELDOWN );
+		}
+		else if( msg == GWM_MIDDLE_UP )
+		{
+			captureMouse( MK_MOUSE3 );
+		}
+		else if( msg == GWM_LEFT_UP || msg == GWM_RIGHT_UP )
+		{
+			// a click anywhere lets go of the wait
+			s_capture = CAPTURE_NONE;
+			refresh();
+		}
+		return MSG_HANDLED;
+	}
 	if( msg != GWM_CHAR )
 	{
 		return MSG_IGNORED;

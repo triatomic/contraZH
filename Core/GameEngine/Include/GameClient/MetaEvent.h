@@ -160,6 +160,12 @@ enum MappableKeyType CPP_11(: Int)
 	MK_PGDN					= KEY_PGDN,
 	MK_INS					= KEY_INS,
 	MK_DEL					= KEY_DEL,
+	// mouse inputs bound like keys, in codes no keyboard key uses
+	MK_MOUSE3				= 0xF1,
+	MK_MOUSE4				= 0xF2,
+	MK_MOUSE5				= 0xF3,
+	MK_WHEELUP			= 0xF4,
+	MK_WHEELDOWN		= 0xF5,
 	MK_NONE					= KEY_NONE
 
 };
@@ -259,6 +265,11 @@ static const LookupListRec KeyNames[] =
 	{ "KEY_PGDN", MK_PGDN },
 	{ "KEY_INS", MK_INS },
 	{ "KEY_DEL", MK_DEL },
+	{ "KEY_MOUSE3", MK_MOUSE3 },
+	{ "KEY_MOUSE4", MK_MOUSE4 },
+	{ "KEY_MOUSE5", MK_MOUSE5 },
+	{ "KEY_WHEELUP", MK_WHEELUP },
+	{ "KEY_WHEELDOWN", MK_WHEELDOWN },
 	{ "KEY_NONE", MK_NONE },
 	{ nullptr, 0	}
 };
@@ -450,6 +461,7 @@ private:
 	void onKeyEvent(const GameMessage *msg, GameMessageDisposition &disp);
 	void onKeyModStateRemoved(GameMessageDisposition &disp, MappableKeyModState keyModState);
 	void onKeyPressed(GameMessageDisposition &disp, Int systemKeyState, MappableKeyType keyType, MappableKeyModState keyModState);
+	Bool onMouseKeyPressed(MappableKeyType keyType, Int systemModifiers); ///< a wheel notch or middle click, which has no key down and up of its own
 
 	static MappableKeyType getActionKeyType(Int systemKey); ///< CRTL, ALT, SHIFT will be treated as MK_NONE
 	static MappableKeyModState getKeyModState(Int systemKeyState); ///< Extract CTRL, ALT, SHIFT key mod state

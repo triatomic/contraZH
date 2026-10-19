@@ -119,6 +119,13 @@ GameMessageDisposition HotKeyTranslator::translateGameMessage(const GameMessage 
 		uKey.concat(key);
 		AsciiString aKey;
 		aKey.translate(uKey);
+
+		// a side button arrives as a key press of a mouse key code, which has no printable letter
+		const char *mouseKey = HotKeyManager::mouseKeyName( msg->getArgument(0)->integer );
+		if( mouseKey )
+		{
+			aKey = mouseKey;
+		}
 		if( TheHotKeyManager )
 		{
 			// key down arms and previews, key up commits at wherever the cursor ended up
@@ -364,6 +371,84 @@ AsciiString HotKeyManager::searchHotKey( const UnicodeString& uStr )
 HotKeyManager::ButtonKeyMap HotKeyManager::s_playerButtonKeys;
 
 //-----------------------------------------------------------------------------
+namespace
+{
+	struct MouseKey
+	{
+		Int key;
+		const char *name;
+		const char *corner;
+		const WideChar *text;
+	};
+
+	// a mouse key's corner character is its place here plus one
+	const MouseKey MOUSE_KEYS[] =
+	{
+		{ MK_MOUSE3, "mouse3", "M3", L"Middle mouse" },
+		{ MK_MOUSE4, "mouse4", "M4", L"Mouse 4" },
+		{ MK_MOUSE5, "mouse5", "M5", L"Mouse 5" },
+		{ MK_WHEELUP, "wheelup", "WU", L"Wheel up" },
+		{ MK_WHEELDOWN, "wheeldown", "WD", L"Wheel down" },
+	};
+
+	Int mouseKeyIndex( Int key )
+	{
+		for( Int i = 0; i < ARRAY_SIZE( MOUSE_KEYS ); ++i )
+		{
+			if( MOUSE_KEYS[i].key == key )
+			{
+				return i;
+			}
+		}
+		return -1;
+	}
+}
+
+//-----------------------------------------------------------------------------
+const char *HotKeyManager::mouseKeyName( Int key )
+{
+	const Int index = mouseKeyIndex( key );
+	return index >= 0 ? MOUSE_KEYS[ index ].name : nullptr;
+}
+
+//-----------------------------------------------------------------------------
+Int HotKeyManager::mouseKeyFromName( const AsciiString& name )
+{
+	for( Int i = 0; i < ARRAY_SIZE( MOUSE_KEYS ); ++i )
+	{
+		if( name.compareNoCase( MOUSE_KEYS[i].name ) == 0 )
+		{
+			return MOUSE_KEYS[i].key;
+		}
+	}
+	return 0;
+}
+
+//-----------------------------------------------------------------------------
+const WideChar *HotKeyManager::mouseKeyText( Int key )
+{
+	const Int index = mouseKeyIndex( key );
+	return index >= 0 ? MOUSE_KEYS[ index ].text : nullptr;
+}
+
+//-----------------------------------------------------------------------------
+Char HotKeyManager::cornerOf( const AsciiString& key )
+{
+	if( key.getLength() == 1 )
+	{
+		return isprint( (unsigned char)key.getCharAt( 0 ) ) ? key.getCharAt( 0 ) : 0;
+	}
+	const Int index = mouseKeyIndex( mouseKeyFromName( key ) );
+	return index >= 0 ? (Char)( index + 1 ) : 0;
+}
+
+//-----------------------------------------------------------------------------
+const char *HotKeyManager::cornerText( Char corner )
+{
+	return corner >= 1 && corner <= ARRAY_SIZE( MOUSE_KEYS ) ? MOUSE_KEYS[ corner - 1 ].corner : nullptr;
+}
+
+//-----------------------------------------------------------------------------
 AsciiString HotKeyManager::getButtonHotKey( const AsciiString& buttonName, const AsciiString& label )
 {
 	AsciiString name = buttonName;
@@ -398,6 +483,13 @@ UnicodeString HotKeyManager::getButtonLabel( const AsciiString& buttonName, cons
 	}
 	if( it->second.isEmpty() )
 	{
+		return plain;
+	}
+	if( it->second.getLength() > 1 )
+	{
+		plain.concat( L" (" );
+		plain.concat( mouseKeyText( mouseKeyFromName( it->second ) ) );
+		plain.concat( L')' );
 		return plain;
 	}
 
@@ -435,7 +527,7 @@ namespace
 	{
 		PlayerButtonKey *button = (PlayerButtonKey *)store;
 		const char *value = ini->getNextToken();
-		// NONE takes the key off; anything but one letter is ignored, as digits are control groups
+		// NONE takes the key off; anything but one letter or a mouse key is ignored, as digits are control groups
 		if( stricmp( value, "NONE" ) == 0 )
 		{
 			button->key.clear();
@@ -444,6 +536,12 @@ namespace
 		else if( strlen( value ) == 1 && isalpha( (unsigned char)value[0] ) )
 		{
 			button->key.format( "%c", toupper( (unsigned char)value[0] ) );
+			button->found = TRUE;
+		}
+		else if( HotKeyManager::mouseKeyFromName( value ) != 0 )
+		{
+			button->key = value;
+			button->key.toUpper();
 			button->found = TRUE;
 		}
 	}

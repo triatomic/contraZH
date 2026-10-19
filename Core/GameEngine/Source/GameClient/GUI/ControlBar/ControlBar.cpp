@@ -2754,7 +2754,7 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 			// Tested against the layout rather than against what is currently registered, so the
 			// result does not depend on the order the slots happen to be populated in.
 			Bool collidesWithGrid = FALSE;
-			if( isGridSlot && strHotKey.isNotEmpty() && TheGlobalData )
+			if( isGridSlot && strHotKey.getLength() == 1 && TheGlobalData )
 			{
 				const AsciiString &layout = TheGlobalData->m_gridHotkeyLayout;
 				const char wanted = tolower( strHotKey.getCharAt( 0 ) );
