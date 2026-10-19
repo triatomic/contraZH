@@ -1383,7 +1383,7 @@ void Locomotor::moveTowardsPositionTreads(Object* obj, PhysicsBehavior *physics,
 //	Real relAngle = ThePartitionManager->getRelativeAngle2D( obj, &goalPos );
 //	Real desiredAngle = angle + relAngle;
 	// Decide whether to reverse toward a goal that is behind us.
-	Real desiredAngle = atan2(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
+	Real desiredAngle = WWMath::Atan2f(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
 	Real relAngle = stdAngleDiff(desiredAngle, obj->getOrientation());
 	Real actualSpeed = physics->getForwardSpeed2D();
 	Bool moveBackwards = shouldMoveBackwards(obj, relAngle, onPathDistToGoal, actualSpeed);
@@ -2669,7 +2669,7 @@ void Locomotor::moveTowardsPositionOther(Object* obj, PhysicsBehavior *physics, 
 	Coord3D dirToApplyForce = *obj->getUnitDirectionVector2D();
 
 	// Decide whether to reverse toward a goal that is behind us (opt-in via CanMoveBackwards).
-	Real desiredAngle = atan2(goalPos.y - pos->y, goalPos.x - pos->x);
+	Real desiredAngle = WWMath::Atan2f(goalPos.y - pos->y, goalPos.x - pos->x);
 	Real relAngle = stdAngleDiff(desiredAngle, obj->getOrientation());
 	Bool moveBackwards = shouldMoveBackwards(obj, relAngle, onPathDistToGoal, actualSpeed);
 	if (moveBackwards)
