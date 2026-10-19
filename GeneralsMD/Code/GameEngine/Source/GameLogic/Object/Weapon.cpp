@@ -1297,7 +1297,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 
 			VeterancyLevel vet = getEffectiveFXVeterancy(sourceObj);
 			const ObjectCreationList* detOCL = getProjectileDetonationOCL(vet);
-			Real laserAngle = atan2(v.y, v.x);  //TODO: check if this should be inverted
+			Real laserAngle = WWMath::Atan2f(v.y, v.x);  //TODO: check if this should be inverted
 			if (detOCL) {
 				//TODO: should we consider a proper 3D matrix?
 				ObjectCreationList::create(detOCL, sourceObj, &targetPos, NULL, laserAngle);
@@ -3700,7 +3700,7 @@ Bool Weapon::privateFireWeapon(
 
 				Real angle = m_scatterTargetsAngle;
 				if (m_template->isScatterTargetAligned()) {
-					angle += atan2(targetPos.y - srcPos.y, targetPos.x - srcPos.x);
+					angle += WWMath::Atan2f(targetPos.y - srcPos.y, targetPos.x - srcPos.x);
 					// angle += atan2(srcPos.y - targetPos.y, srcPos.x - targetPos.x);
 				}
 
