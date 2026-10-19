@@ -549,7 +549,7 @@ CW3DViewDoc::LoadAssetsFromFile (LPCTSTR lpszPathName)
 	//
 	if (::strrchr (lpszPathName, '\\')) {
 		CString stringTemp = lpszPathName;
-		stringTemp = stringTemp.Left ((long)::strrchr (lpszPathName, '\\') - (long)lpszPathName);
+		stringTemp = stringTemp.Left ((int)(::strrchr (lpszPathName, '\\') - lpszPathName));
 		::SetCurrentDirectory (stringTemp);
 		// TheSuperHackers @performance Tria 18/04/2026 Only rebuild search paths when the directory
 		// changes, avoids clearing the path cache on every file during batch loading.

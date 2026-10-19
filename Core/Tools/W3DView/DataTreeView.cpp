@@ -550,7 +550,7 @@ CDataTreeView::Insert_Object_Nodes (std::vector<ObjectEntry> &entries)
 		}
 
 		HTREEITEM hitem = tree.InsertItem (entry.name, entry.icon, entry.icon, TVI_ROOT, hprevious);
-		tree.SetItemData (hitem, (ULONG)new AssetInfoClass (entry.name, entry.type));
+		tree.SetItemData (hitem, (uintptr_t)new AssetInfoClass (entry.name, entry.type));
 		Populate_Object_Node (hitem);
 		if (entry.parts_only && !Keep_Matching_Parts (hitem))
 		{
@@ -790,7 +790,7 @@ CDataTreeView::Add_Parts (HTREEITEM hobject, RenderObjClass *render_obj)
 		if (has_part)
 		{
 			HTREEITEM hitem = tree.InsertItem (pivot_name, m_iMeshIcon, m_iMeshIcon, hparent, TVI_SORT);
-			tree.SetItemData (hitem, (ULONG)new AssetInfoClass (part->second, TypeMesh));
+			tree.SetItemData (hitem, (uintptr_t)new AssetInfoClass (part->second, TypeMesh));
 			tree.SetItemState (hitem, INDEXTOSTATEIMAGEMASK (2), TVIS_STATEIMAGEMASK);
 			pivot_items[pivot] = hitem;
 			placed.insert (key);
@@ -798,7 +798,7 @@ CDataTreeView::Add_Parts (HTREEITEM hobject, RenderObjClass *render_obj)
 		else if (FindChildItem (hparent, pivot_name) == nullptr)
 		{
 			HTREEITEM hitem = tree.InsertItem (pivot_name, m_iBoneIcon, m_iBoneIcon, hparent, TVI_SORT);
-			tree.SetItemData (hitem, (ULONG)new AssetInfoClass (pivot_name, TypeBone));
+			tree.SetItemData (hitem, (uintptr_t)new AssetInfoClass (pivot_name, TypeBone));
 			pivot_items[pivot] = hitem;
 		}
 	}
@@ -809,7 +809,7 @@ CDataTreeView::Add_Parts (HTREEITEM hobject, RenderObjClass *render_obj)
 		if (placed.find (part->first) == placed.end ())
 		{
 			HTREEITEM hitem = tree.InsertItem (part->first, m_iMeshIcon, m_iMeshIcon, hmeshes, TVI_SORT);
-			tree.SetItemData (hitem, (ULONG)new AssetInfoClass (part->second, TypeMesh));
+			tree.SetItemData (hitem, (uintptr_t)new AssetInfoClass (part->second, TypeMesh));
 			tree.SetItemState (hitem, INDEXTOSTATEIMAGEMASK (2), TVIS_STATEIMAGEMASK);
 		}
 	}
@@ -879,7 +879,7 @@ CDataTreeView::Add_Textures (HTREEITEM hobject, RenderObjClass *render_obj)
 
 		HTREEITEM hitem = tree.InsertItem (texture->first, m_iMaterialIcon, m_iMaterialIcon, hfolder, TVI_LAST);
 		texture->second->Add_Ref ();
-		tree.SetItemData (hitem, (ULONG)new AssetInfoClass (texture->first, TypeMaterial, nullptr, (DWORD)texture->second));
+		tree.SetItemData (hitem, (uintptr_t)new AssetInfoClass (texture->first, TypeMaterial, nullptr, (uintptr_t)texture->second));
 
 		const std::map<CString, CString> &parts = users[texture->first];
 		for (std::map<CString, CString>::const_iterator part = parts.begin (); part != parts.end (); ++part)
@@ -888,7 +888,7 @@ CDataTreeView::Add_Textures (HTREEITEM hobject, RenderObjClass *render_obj)
 			AssetInfoClass *part_info = new AssetInfoClass (part->second, TypeMaterial);
 			part_info->Set_Type (TypeMesh);
 			HTREEITEM hpart = tree.InsertItem (part->first, m_iMeshIcon, m_iMeshIcon, hitem, TVI_LAST);
-			tree.SetItemData (hpart, (ULONG)part_info);
+			tree.SetItemData (hpart, (uintptr_t)part_info);
 		}
 
 		StringClass listed_key = Name_Key (texture->first);
@@ -1043,7 +1043,7 @@ CDataTreeView::LoadAssetsIntoTree ()
 			{
 				HTREEITEM hroot = Get_Category_Root ((Category)category, true);
 				HTREEITEM hitem = tree.InsertItem (name, icon, icon, hroot, TVI_LAST);
-				tree.SetItemData (hitem, (ULONG)new AssetInfoClass (name, type));
+				tree.SetItemData (hitem, (uintptr_t)new AssetInfoClass (name, type));
 				existing_items[category].Insert (key, 1);
 				category_changed[category] = true;
 			}
@@ -1131,7 +1131,7 @@ CDataTreeView::LoadAssetsIntoTree ()
 		HTREEITEM hroot = Get_Category_Root (CATEGORY_TEXTURE, true);
 		HTREEITEM htexture = tree.InsertItem (texture->Get_Full_Path (), m_iMaterialIcon, m_iMaterialIcon, hroot, TVI_LAST);
 		texture->Add_Ref ();
-		tree.SetItemData (htexture, (ULONG)new AssetInfoClass (texture->Get_Full_Path (), TypeMaterial, nullptr, (DWORD)texture));
+		tree.SetItemData (htexture, (uintptr_t)new AssetInfoClass (texture->Get_Full_Path (), TypeMaterial, nullptr, (uintptr_t)texture));
 		existing_items[CATEGORY_TEXTURE].Insert (key, 1);
 		category_changed[CATEGORY_TEXTURE] = true;
 	}
@@ -1217,7 +1217,7 @@ CDataTreeView::LoadAnimationsIntoTree ()
 					if (FindChildItem (htarget, anim_name) == nullptr)
 					{
 						HTREEITEM hanim = tree.InsertItem (anim_name, m_iAnimationIcon, m_iAnimationIcon, htarget, TVI_LAST);
-						tree.SetItemData (hanim, (ULONG)new AssetInfoClass (anim_name, TypeAnimation));
+						tree.SetItemData (hanim, (uintptr_t)new AssetInfoClass (anim_name, TypeAnimation));
 						changed.insert (htarget);
 					}
 				}
@@ -1279,7 +1279,7 @@ CDataTreeView::LoadAnimationsIntoTree (HTREEITEM hItem)
 				if (FindChildItem (htarget, anim_name) == nullptr)
 				{
 					HTREEITEM hanim = GetTreeCtrl ().InsertItem (anim_name, m_iAnimationIcon, m_iAnimationIcon, htarget, TVI_SORT);
-					GetTreeCtrl ().SetItemData (hanim, (ULONG)new AssetInfoClass (anim_name, TypeAnimation));
+					GetTreeCtrl ().SetItemData (hanim, (uintptr_t)new AssetInfoClass (anim_name, TypeAnimation));
 				}
 			}
 
@@ -1400,7 +1400,7 @@ CDataTreeView::Add_Asset_To_Tree
 																	 TVI_SORT);
 
 				// Associate the render object with its entry in the tree
-				GetTreeCtrl ().SetItemData (htree_item, (ULONG)new AssetInfoClass (name, type));
+				GetTreeCtrl ().SetItemData (htree_item, (uintptr_t)new AssetInfoClass (name, type));
 			}
 
 			// Load the object's animations into the tree (if necessary)

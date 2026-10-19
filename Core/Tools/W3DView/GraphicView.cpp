@@ -1690,7 +1690,7 @@ CGraphicView::OnLButtonUp
     }
     else
     {
-        ::SetCursor (::LoadCursor (nullptr, MAKEINTRESOURCE (IDC_ARROW)));
+        ::SetCursor (::LoadCursor (nullptr, IDC_ARROW));
 		  ((CW3DViewDoc *)GetDocument())->Set_Cursor ("cursor.tga");
     }
 
@@ -2382,7 +2382,7 @@ CGraphicView::OnRButtonUp
 	if (m_bMouseDown) {
 		((CW3DViewDoc *)GetDocument())->Set_Cursor ("orbit.tga");
 	} else {
-		::SetCursor (::LoadCursor (nullptr, MAKEINTRESOURCE (IDC_ARROW)));
+		::SetCursor (::LoadCursor (nullptr, IDC_ARROW));
 		((CW3DViewDoc *)GetDocument())->Set_Cursor ("cursor.tga");
 		if (!m_bMMouseDown)
 		{
