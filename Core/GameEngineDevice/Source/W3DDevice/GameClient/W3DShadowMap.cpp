@@ -310,8 +310,8 @@ static void Light_Axes(const CameraClass& camera, const Vector3& lightDirection,
 	}
 	if (heading.Length2() >= 1e-4f)
 	{
-		const Real angle = WWMath::Floor(WWMath::Atan2(heading.Y, heading.X) / SHADOW_HEADING_STEP + 0.5f) * SHADOW_HEADING_STEP;
-		heading.Set(WWMath::Cos(angle), WWMath::Sin(angle), 0.0f);
+		const Real angle = WWMath::Floorf(WWMath::Atan2(heading.Y, heading.X) / SHADOW_HEADING_STEP + 0.5f) * SHADOW_HEADING_STEP;
+		heading.Set(WWMath::Cosf_Legacy(angle), WWMath::Sinf_Legacy(angle), 0.0f);
 	}
 	heading -= lightDirection * Vector3::Dot_Product(heading, lightDirection);
 
@@ -345,7 +345,7 @@ static void Fit_Interval(Real lo, Real hi, Real eye, Real *middle, Real *halfExt
 		return;
 	}
 
-	*halfExtent = WWMath::Ceil(half / SHADOW_EXTENT_STEP) * SHADOW_EXTENT_STEP;
+	*halfExtent = WWMath::Ceilf(half / SHADOW_EXTENT_STEP) * SHADOW_EXTENT_STEP;
 	*halfExtent = WWMath::Clamp(*halfExtent, SHADOW_EXTENT_MIN, SHADOW_EXTENT_MAX);
 	*middle = 0.5f * (lo + hi);
 }
@@ -363,10 +363,10 @@ void W3DShadowMap::updateFrustum(const CameraClass& camera, const Vector3& light
 	// straight overhead has none to keep and is already above any floor.
 	const Real minElevation = DEG_TO_RADF(minSunElevation);
 	const Real horizontal = WWMath::Sqrt(lightDirection.X * lightDirection.X + lightDirection.Y * lightDirection.Y);
-	if (-lightDirection.Z < WWMath::Sin(minElevation) && horizontal > WWMATH_EPSILON)
+	if (-lightDirection.Z < WWMath::Sinf_Legacy(minElevation) && horizontal > WWMATH_EPSILON)
 	{
-		const Real scale = WWMath::Cos(minElevation) / horizontal;
-		lightDirection.Set(lightDirection.X * scale, lightDirection.Y * scale, -WWMath::Sin(minElevation));
+		const Real scale = WWMath::Cosf_Legacy(minElevation) / horizontal;
+		lightDirection.Set(lightDirection.X * scale, lightDirection.Y * scale, -WWMath::Sinf_Legacy(minElevation));
 	}
 
 	// Fit to the terrain the camera can see. The frustum's own corners include the far
@@ -815,8 +815,8 @@ void W3DShadowMap::computeSunViewProjection()
 
 	// Exact in the projection because it is orthographic and the view's last row is
 	// (0,0,0,1), so the offset lands unchanged on every projected point.
-	m_sunProjection[0][3] += (WWMath::Floor(x + 0.5f) - x) / halfMap;
-	m_sunProjection[1][3] += (WWMath::Floor(y + 0.5f) - y) / halfMap;
+	m_sunProjection[0][3] += (WWMath::Floorf(x + 0.5f) - x) / halfMap;
+	m_sunProjection[1][3] += (WWMath::Floorf(y + 0.5f) - y) / halfMap;
 
 	m_sunViewProj = m_sunProjection * m_sunView;
 }

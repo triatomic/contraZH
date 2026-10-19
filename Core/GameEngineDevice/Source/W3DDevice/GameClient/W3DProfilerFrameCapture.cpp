@@ -82,7 +82,7 @@ void W3DProfilerFrameCapture::Capture(UnsignedInt displayWidth, UnsignedInt disp
 	}
 
 	const Real aspectRatio = (Real)displayHeight / (Real)displayWidth;
-	const UnsignedInt imageHeight = min((int)WWMath::Round(PROFILER_FRAME_IMAGE_SIZE * aspectRatio), PROFILER_FRAME_IMAGE_SIZE);
+	const UnsignedInt imageHeight = min((int)WWMath::Roundf(PROFILER_FRAME_IMAGE_SIZE * aspectRatio), PROFILER_FRAME_IMAGE_SIZE);
 
 	// StretchRect cannot resolve multisampling and scale at once, so a multisampled frame resolves at full size first.
 	IDirect3DSurface8 *resolved = nullptr;
