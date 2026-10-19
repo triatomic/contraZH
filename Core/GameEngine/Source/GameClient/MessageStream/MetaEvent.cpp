@@ -1432,7 +1432,9 @@ const char *MetaMap::findMetaTypeName(GameMessage::Type t)
 	for (const LookupListRec *metaNames = GameMessageMetaTypeNames; metaNames->name; metaNames++)
 	{
 		if (metaNames->value == t)
+		{
 			return metaNames->name;
+		}
 	}
 	return nullptr;
 }

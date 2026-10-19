@@ -370,7 +370,9 @@ AsciiString HotKeyManager::getButtonHotKey( const AsciiString& buttonName, const
 	name.toLower();
 	ButtonKeyMap::const_iterator it = s_playerButtonKeys.find( name );
 	if( it != s_playerButtonKeys.end() )
+	{
 		return it->second;
+	}
 	return searchHotKey( label );
 }
 
@@ -382,16 +384,22 @@ UnicodeString HotKeyManager::getButtonLabel( const AsciiString& buttonName, cons
 	name.toLower();
 	ButtonKeyMap::const_iterator it = s_playerButtonKeys.find( name );
 	if( it == s_playerButtonKeys.end() )
+	{
 		return text;
+	}
 
 	UnicodeString plain;
 	for( const WideChar *c = text.str(); *c; ++c )
 	{
 		if( *c != L'&' )
+		{
 			plain.concat( *c );
+		}
 	}
 	if( it->second.isEmpty() )
+	{
 		return plain;
+	}
 
 	const WideChar letter = (WideChar)towlower( it->second.getCharAt( 0 ) );
 	UnicodeString marked;
@@ -427,13 +435,13 @@ namespace
 	{
 		PlayerButtonKey *button = (PlayerButtonKey *)store;
 		const char *value = ini->getNextToken();
-		// NONE takes the key off; anything but one letter or digit is ignored
+		// NONE takes the key off; anything but one letter is ignored, as digits are control groups
 		if( stricmp( value, "NONE" ) == 0 )
 		{
 			button->key.clear();
 			button->found = TRUE;
 		}
-		else if( strlen( value ) == 1 && isalnum( (unsigned char)value[0] ) )
+		else if( strlen( value ) == 1 && isalpha( (unsigned char)value[0] ) )
 		{
 			button->key.format( "%c", toupper( (unsigned char)value[0] ) );
 			button->found = TRUE;
@@ -456,7 +464,9 @@ void HotKeyManager::parsePlayerButtonKey( INI *ini )
 	button.found = FALSE;
 	ini->initFromINI( &button, PlayerButtonKeyFieldParseTable );
 	if( button.found )
+	{
 		s_playerButtonKeys[ name ] = button.key;
+	}
 }
 
 //-----------------------------------------------------------------------------

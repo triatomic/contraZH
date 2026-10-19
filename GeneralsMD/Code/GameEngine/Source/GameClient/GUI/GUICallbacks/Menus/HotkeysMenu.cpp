@@ -18,10 +18,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////
 // FILE: HotkeysMenu.cpp
-// Description: Options > Hotkeys, which rebinds commands and command bar letters into
-// Hotkeys.ini in the user data folder. Ported from C&C Generals Zero Hour Reforged. Sides on
-// the left, the general's heroes, buildings and units in the middle, the picked object's
-// command card on the right.
+// Description: Options > Hotkeys, rebinding commands and command bar letters into Hotkeys.ini
 ///////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
@@ -160,7 +157,7 @@ const BuiltInText BUILT_IN_TEXT[] =
 	{ "GUI:HotkeysNone", L"none" },
 	{ "GUI:HotkeysPressKey", L"Press a key, with Ctrl, Alt or Shift if you like. Esc cancels." },
 	{ "GUI:HotkeysPressHold", L"Press a key, or press and let go of Ctrl, Alt or Shift alone to hold it. Esc cancels." },
-	{ "GUI:HotkeysPressLetter", L"Press a letter or digit. Backspace takes the key off, Esc cancels." },
+	{ "GUI:HotkeysPressLetter", L"Press a letter. Backspace takes the key off, Esc cancels." },
 	{ "GUI:HotkeysClash", L"%s is on %s, and only one of them gets it." },
 	{ "GUI:HotkeysAlsoOn", L"Same key as %s." },
 	{ "GUI:HotkeysGameKey", L"The game's own key is %s." },
@@ -308,12 +305,18 @@ Int s_holdMods = 0;	///< modifiers pressed alone while a hold command waits for 
 Bool s_holdBroken = FALSE;
 UnsignedByte s_boundKey = KEY_NONE;	///< the key that just ended a wait, whose release must not start another
 Bool s_dirty = FALSE;
+Bool s_conflictsDirty = TRUE;	///< a key changed since the conflicts list was filled
+Int s_conflictCount = 0;
 Bool s_filling = FALSE;
 
 //-------------------------------------------------------------------------------------------------
+// Hotkeys.ini can only name these, so COMMANDUSABLE_EVERYWHERE's other bits never come back
+const UnsignedInt NAMED_USABLE = COMMANDUSABLE_SHELL | COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER;
+
 Bool sameBinding( const Binding& a, const Binding& b )
 {
-	return a.key == b.key && a.modState == b.modState && a.usableIn == b.usableIn && a.transition == b.transition;
+	return a.key == b.key && a.modState == b.modState && ( a.usableIn & NAMED_USABLE ) == ( b.usableIn & NAMED_USABLE )
+		&& a.transition == b.transition;
 }
 
 Bool isBound( const Binding& binding )
@@ -612,8 +615,7 @@ Int sideOf( const PlayerTemplate *side )
 	return base.compareNoCase( "America" ) == 0 ? 0 : -1;
 }
 
-/// Every building and unit a general's first building and worker lead to through each build button,
-/// then everything else its Side owns, which reaches objects no build button makes and generals with no start.
+/// The general's build tree from its first building and worker, then every other template its Side owns
 BarGeneral findGeneral( const PlayerTemplate *side )
 {
 	BarGeneral general;
@@ -839,7 +841,8 @@ UnicodeString sameChord( const CommandRow& row )
 	for( size_t i = 0; i < s_rows.size(); ++i )
 	{
 		const Binding other = bindingOf( s_rows[i].meta );
-		if( s_rows[i].meta == row.meta || !isBound( other ) || other.key != binding.key || other.modState != binding.modState )
+		if( s_rows[i].meta == row.meta || !isBound( other ) || other.key != binding.key || other.modState != binding.modState
+			|| ( other.usableIn & binding.usableIn ) == 0 )
 		{
 			continue;
 		}
@@ -1313,8 +1316,12 @@ void refresh()
 	{
 		fillCommands();
 	}
-	const Int conflicts = fillConflicts();
-	s_conflictsButton->winSetEnabledTextColors( s_view == VIEW_CONFLICTS ? SELECTED_COLOR : ( conflicts > 0 ? CLASH_COLOR : TEXT_COLOR ), BLACK_COLOR );
+	if( s_conflictsDirty )
+	{
+		s_conflictCount = fillConflicts();
+		s_conflictsDirty = FALSE;
+	}
+	s_conflictsButton->winSetEnabledTextColors( s_view == VIEW_CONFLICTS ? SELECTED_COLOR : ( s_conflictCount > 0 ? CLASH_COLOR : TEXT_COLOR ), BLACK_COLOR );
 	updateInfo();
 }
 
@@ -1407,6 +1414,7 @@ void applyKey( MappableKeyType key, Int mods, const AsciiString& letter )
 	}
 	s_capture = CAPTURE_NONE;
 	s_dirty = TRUE;
+	s_conflictsDirty = TRUE;
 	refresh();
 }
 
@@ -1429,6 +1437,7 @@ void clearSelected()
 		return;
 	}
 	s_dirty = TRUE;
+	s_conflictsDirty = TRUE;
 	refresh();
 }
 
@@ -1458,6 +1467,7 @@ void resetSelected()
 		return;
 	}
 	s_dirty = TRUE;
+	s_conflictsDirty = TRUE;
 	refresh();
 }
 
@@ -1470,6 +1480,7 @@ void resetAll()
 	s_buttons.clear();
 	s_capture = CAPTURE_NONE;
 	s_dirty = TRUE;
+	s_conflictsDirty = TRUE;
 	refresh();
 }
 
@@ -1560,14 +1571,14 @@ void captureKey( UnsignedByte key, Int state )
 		return;
 	}
 
-	// a button takes one bare letter or digit, which is all the command bar reads; Backspace takes it off
+	// a button takes one bare letter, as digits are control groups; Backspace takes it off
 	if( key == KEY_BACKSPACE || key == KEY_DEL )
 	{
 		applyKey( MK_NONE, NONE, AsciiString::TheEmptyString );
 		return;
 	}
 	const char *letter = name + 4;
-	if( ( mods & ( CTRL | ALT ) ) == 0 && strlen( letter ) == 1 && isalnum( (unsigned char)letter[0] ) )
+	if( ( mods & ( CTRL | ALT ) ) == 0 && strlen( letter ) == 1 && isalpha( (unsigned char)letter[0] ) )
 	{
 		AsciiString text;
 		text.format( "%c", letter[0] );
@@ -1647,9 +1658,21 @@ void save()
 	s_dirty = FALSE;
 }
 
+const char *const ROOT_NAME = "HotkeysMenu:Root";
+
+/// Whether the root still exists; a GUI reset can destroy it without close()
+Bool screenOpen()
+{
+	if( s_parent && TheWindowManager->winGetWindowFromId( nullptr, TheNameKeyGenerator->nameToKey( ROOT_NAME ) ) != s_parent )
+	{
+		s_parent = nullptr;
+	}
+	return s_parent != nullptr;
+}
+
 void close()
 {
-	if( s_parent == nullptr )
+	if( !screenOpen() )
 	{
 		return;
 	}
@@ -1679,8 +1702,7 @@ Int indexOf( GameWindow *control, GameWindow *const *windows, Int count )
 }
 
 //-------------------------------------------------------------------------------------------------
-// The screen is built here rather than read from a .wnd, and takes its look from the options menu
-// beneath it, so it matches any mod's skin and needs no files of its own.
+// Built in code with the options menu's look, so any mod's skin fits and no files are needed
 //-------------------------------------------------------------------------------------------------
 
 /// Options menu windows every layout has, whose images, colours and fonts the screen copies
@@ -1928,6 +1950,7 @@ Bool buildScreen()
 	WinInstanceData root;
 	root.m_style = GWS_USER_WINDOW;
 	s_parent->winSetInstanceData( &root );
+	s_parent->winSetWindowId( TheNameKeyGenerator->nameToKey( ROOT_NAME ) );
 	s_parent->winSetInputFunc( HotkeysMenuInput );
 
 	// each window is created above the ones before it
@@ -2054,7 +2077,7 @@ GameWindow *HotkeysMenuOptionsButton()
 //-------------------------------------------------------------------------------------------------
 void HotkeysMenuOpen()
 {
-	if( s_parent )
+	if( screenOpen() )
 	{
 		return;
 	}
@@ -2071,6 +2094,7 @@ void HotkeysMenuOpen()
 	s_commandRow = -1;
 	s_capture = CAPTURE_NONE;
 	s_dirty = FALSE;
+	s_conflictsDirty = TRUE;
 	buildRows();
 	findBars();
 	showSide( 0 );
@@ -2165,11 +2189,11 @@ WindowMsgHandledType HotkeysMenuSystem( GameWindow *window, UnsignedInt msg, Win
 				if( index >= 0 )
 				{
 					s_commandRow = index;
-				}
-				if( msg == GLM_DOUBLE_CLICKED )
-				{
-					startCapture();
-					return MSG_HANDLED;
+					if( msg == GLM_DOUBLE_CLICKED )
+					{
+						startCapture();
+						return MSG_HANDLED;
+					}
 				}
 			}
 			else if( row >= 0 && row < (Int)s_conflicts.size() && control == s_conflictList && msg == GLM_DOUBLE_CLICKED )
