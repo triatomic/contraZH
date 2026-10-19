@@ -703,7 +703,7 @@ UpdateSleepTime KodiakUpdate::update()
 
                 const Coord3D srcPos = *getObject()->getPosition();  
                 Real angle = 0.0f; // getObject()->getOrientation();
-                angle += atan2(targetPos.y - srcPos.y, targetPos.x - srcPos.x);
+                angle += WWMath::Atan2f(targetPos.y - srcPos.y, targetPos.x - srcPos.x);
   
                 Real cosA = Cos(angle);
                 Real sinA = Sin(angle);
