@@ -274,6 +274,7 @@ const char* const ModelConditionFlags::s_bitNameList[] =
 	"TUNNEL_AUTO_EXIT",
 	"FROZEN",
 	"UNMANNED",
+	"MOVING_BACKWARDS",
 
 	"RESERVED_UNIQUE_SIZE_PAD",
 

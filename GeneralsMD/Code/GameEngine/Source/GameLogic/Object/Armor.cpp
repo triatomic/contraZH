@@ -196,6 +196,19 @@ AsciiString ArmorStore::getArmorTemplateName(const ArmorTemplate* tmpl) const
 #endif
 
 //-------------------------------------------------------------------------------------------------
+AsciiString ArmorStore::friend_findArmorTemplateName(const ArmorTemplate* tmpl) const
+{
+	for (ArmorTemplateMap::const_iterator it = m_armorTemplates.begin(); it != m_armorTemplates.end(); ++it)
+	{
+		if (&(*it).second == tmpl)
+		{
+			return TheNameKeyGenerator->keyToName((*it).first);
+		}
+	}
+	return AsciiString::TheEmptyString;
+}
+
+//-------------------------------------------------------------------------------------------------
 /*static */ void ArmorStore::parseArmorDefinition(INI *ini)
 {
 	static const FieldParse myFieldParse[] =

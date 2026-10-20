@@ -122,6 +122,8 @@ public:
 	// build.
 	AsciiString getArmorTemplateName(const ArmorTemplate* tmpl) const;
 #endif
+	/// Name of a template of this store, or an empty string. Slow; for tools.
+	AsciiString friend_findArmorTemplateName(const ArmorTemplate* tmpl) const;
 
 	inline Armor makeArmor(const ArmorTemplate *tmpl) const
 	{

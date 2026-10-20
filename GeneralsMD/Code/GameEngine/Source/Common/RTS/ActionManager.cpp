@@ -2170,6 +2170,7 @@ SpecialPowerType ActionManager::getFallbackBehaviorType(SpecialPowerType type) {
 		return SPECIAL_PARADROP_AMERICA;
 
 	case SECW_SPECIAL_HUNTER_SEEKER:
+	case SPECIAL_ALL_BATTLE_PLANS:
 		return SPECIAL_CIA_INTELLIGENCE;
 
 	// Borrows the jumpjet position check: a ground target, never water or a cliff

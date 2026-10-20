@@ -439,6 +439,8 @@ public:
 	Int getGradualRoundFrames(const WeaponBonus& bonus) const;
 	Int getClipReloadDelayFrames(const WeaponBonus& bonus) const;
 	Int getClipSize() const { return m_clipSize; }
+	Int getMinDelayBetweenShots() const { return m_minDelayBetweenShots; }	///< frames, without bonus or random spread
+	Int getMaxDelayBetweenShots() const { return m_maxDelayBetweenShots; }
 	Int getContinuousFireOneShotsNeeded() const { return m_continuousFireOneShotsNeeded; }
 	Int getContinuousFireTwoShotsNeeded() const { return m_continuousFireTwoShotsNeeded; }
 	UnsignedInt getContinuousFireCoastFrames() const { return m_continuousFireCoastFrames; }
@@ -749,6 +751,7 @@ public:
 
 	// do not ever use this unless you are weaponset.cpp
 	void setPossibleNextShotFrame( UnsignedInt frameNum ) { m_whenWeCanFireAgain = frameNum; }
+	void holdFiringUntil( UnsignedInt frameNum );	///< don't fire before frameNum (never shortens an existing delay)
 	void setPreAttackFinishedFrame( UnsignedInt frameNum ) { m_whenPreAttackFinished = frameNum; }
 	void setLastReloadStartedFrame( UnsignedInt frameNum ) { m_whenLastReloadStarted = frameNum; }
 	void setNextPreAttackFXFrame(UnsignedInt frameNum) { m_nextPreAttackFXFrame = frameNum; }

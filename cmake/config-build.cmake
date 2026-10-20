@@ -19,6 +19,7 @@ set_property(CACHE RTS_D3D_BACKEND PROPERTY STRINGS "D3D8" "D3D9")
 # coexists with MFC (Phase 1 of an incremental MFC -> Qt migration). OFF leaves the
 # normal MFC build completely unchanged. Requires a 32-bit Qt5 (-DCMAKE_PREFIX_PATH).
 option(RTS_ENABLE_WORLDBUILDER_QT "Build WorldBuilder with an embedded Qt event loop (experimental Phase 1 Qt migration)." OFF)
+option(RTS_BUILD_OPTION_GAME_MCP "Build the game with the MCP bridge that tools can drive it through (-mcp)." ON)
 
 if(NOT RTS_BUILD_ZEROHOUR AND NOT RTS_BUILD_GENERALS)
     set(RTS_BUILD_ZEROHOUR TRUE)
@@ -37,6 +38,7 @@ add_feature_info(Vc6FullDebug RTS_BUILD_OPTION_VC6_FULL_DEBUG "Building VC6 with
 add_feature_info(FFmpegSupport RTS_BUILD_OPTION_FFMPEG "Building with FFmpeg support")
 add_feature_info(GeneralsOnline RTS_BUILD_GENERALS_ONLINE "Building the Generals Online network stack")
 add_feature_info(DeterministicMath RTS_BUILD_OPTION_DETERMINISTIC_MATH "Building with GameMath deterministic math")
+add_feature_info(GameMcp RTS_BUILD_OPTION_GAME_MCP "Building the game with the MCP bridge")
 
 set(RTS_BUILD_OUTPUT_SUFFIX "" CACHE STRING "Suffix appended to output names of installable targets")
 
@@ -88,6 +90,10 @@ endif()
 
 if(RTS_BUILD_OPTION_PROFILE)
     target_compile_definitions(core_config INTERFACE RTS_PROFILE_LEGACY)
+endif()
+
+if(RTS_BUILD_OPTION_GAME_MCP)
+    target_compile_definitions(core_config INTERFACE RTS_GAME_MCP)
 endif()
 
 # Define a dummy Tracy target when the build option is disabled.

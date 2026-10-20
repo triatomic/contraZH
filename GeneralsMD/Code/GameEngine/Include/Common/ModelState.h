@@ -311,6 +311,8 @@ enum ModelConditionFlagType CPP_11(: Int)
 	MODELCONDITION_FROZEN,
 	// Set while the object is DISABLED_UNMANNED (pilot sniped, drone with no carrier)
 	MODELCONDITION_UNMANNED,
+	// Set by AnimationSteeringUpdate (BackwardsCondition) while the unit reverses (appended to preserve existing save values).
+	MODELCONDITION_MOVING_BACKWARDS,
 
 	// Reserved padding: keeps MODELCONDITION_COUNT distinct from KINDOF_COUNT. BitFlags<N> is keyed only
 	// on its bit count, so two flag enums with an equal COUNT would share one name list (see the guard in

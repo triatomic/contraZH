@@ -163,6 +163,7 @@
 #include "GameLogic/Module/KodiakDeploymentUpdate.h"
 #include "GameLogic/Module/BaikonurLaunchPower.h"
 #include "GameLogic/Module/BattlePlanUpdate.h"
+#include "GameLogic/Module/AllBattlePlansUpdate.h"
 #include "GameLogic/Module/LifetimeUpdate.h"
 #include "GameLogic/Module/RadiusDecalUpdate.h"
 #include "GameLogic/Module/RadiusDecalBehavior.h"
@@ -508,6 +509,7 @@ void ModuleFactory::init()
 	addModule( KodiakDeploymentUpdate );
 	addModule( BaikonurLaunchPower );
 	addModule( BattlePlanUpdate );
+	addModule( AllBattlePlansUpdate );
 	addModule( ProjectileStreamUpdate );
 	addModule( QueueProductionExitUpdate );
 	addModule( RepairDockUpdate );
