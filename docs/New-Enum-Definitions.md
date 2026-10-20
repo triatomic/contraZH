@@ -32,6 +32,7 @@ For synced weapons (AutoChooseSources) you can use "SYNC_TO_WEAPON_FOUR", etc.
 * `SEISMIC`
 * `RAD_BEAM`
 * `TESLA`
+* `BLACK_HOLE`
 
 ### Functional DamageTypes
 
@@ -129,6 +130,9 @@ Conditionstate used for TeleporterAIUpdate
 Conditionstate set while a unit is disabled by `SUBDUAL_FROZEN` damage
 * `FROZEN`
 
+Conditionstate set by [AnimationSteeringUpdate](Objects-&-Modules.md#animationsteeringupdate-new) with `BackwardsCondition = Yes` while the unit reverses
+* `MOVING_BACKWARDS`
+
 ## WeaponBonus types
 
 Added new WeaponBonus types for the following conditions:
@@ -179,10 +183,10 @@ The cursor type named on a generic `RadiusCursor <TYPE>` block in GameData.ini. 
 
 `VIRUS`, `CHEMTRAILS`, `AIRSTRIKE_GLA`, `CHEMICALBOMB`, `TOXINDROP`, `JUMPJET`
 
-`ATTACK_DAMAGE_AREA2`, `ATTACK_DAMAGE_AREA3`, `ATTACK_DAMAGE_AREA4`
+`ATTACK_DAMAGE_AREA2`, `ATTACK_DAMAGE_AREA3`, `ATTACK_DAMAGE_AREA4`, `NEUTRON_BOMB`, `RIFT_GENERATOR`
 
-`JUMPJET` and `ATTACK_DAMAGE_AREA2` / `3` / `4` are new; the extra ATTACK_DAMAGE_AREA slots let a
-unit use a different damage-area cursor per weapon.
+`JUMPJET`, `ATTACK_DAMAGE_AREA2` / `3` / `4`, `NEUTRON_BOMB` and `RIFT_GENERATOR` are new; the extra
+ATTACK_DAMAGE_AREA slots let a unit use a different damage-area cursor per weapon.
 
 ## Veterancy Levels
 

@@ -8,9 +8,11 @@ untouched `Options.ini` plays exactly as before.
 * [Gameplay Fixes](contraZH-Gameplay-Fixes.md) are always on and fix retail simulation bugs.
 * A few simulation rules are read from the mod's `GameData.ini`; each states its default.
 * The map editor has its own page, [WorldBuilder Qt](WorldBuilder-Qt.md).
-* Synced with TheSuperHackers/GeneralsGameCode and GeneralsGameCode_Modding as of August 2026. The
-only casualty was the texture filter option, replaced by TheSuperHackers' version - see
-[Rendering](contraZH-Options.md#rendering) for the renamed `AnisotropyLevel` key.
+* Synced with TheSuperHackers/GeneralsGameCode as of August 2026 and with GeneralsGameCode_Modding
+as of October 2026. The only casualty was the texture filter option, replaced by TheSuperHackers'
+version - see [Rendering](contraZH-Options.md#rendering) for the renamed `AnisotropyLevel` key.
+* Upstream's WorldBuilder MCP server is not included; contraZH has its own, see
+[Map Generator & MCP](WorldBuilder-Qt-Map-Generator.md#mcp-server).
 
 ## Pages
 

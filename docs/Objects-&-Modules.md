@@ -116,6 +116,13 @@ then keeps aiming, without firing, until it has actually come to rest. It holds 
 fires the moment it settles, so any PreAttackDelay wind-up plays where the shot is taken rather than being
 spent on the approach.
 
+New parameters for vehicles with a minimum attack range (`AimByReversing` needs `CanMoveBackwards = Yes` on the locomotor):
+* `MinRangeRetreatStraight = No` - When the target is inside the weapon's minimum range, back straight away from it, just far enough, instead of driving to the nearest valid cell (often to the side, a long arc for slow-turning vehicles).
+* `AimByReversing = No` - A unit without a turret whose target is in front but a forward turn would carry it inside its minimum range turns by reversing instead.
+* `AimByReversingMaxAngle = 90` - Only reverse to aim if the target is at most this many degrees off the nose.
+* `AimByReversingMargin = 10.0` - Distance added to the minimum range in the "would a forward turn get too close" test. Default is one pathfinding cell.
+* `AimByReversingTurnFactor = 1.0` - Scales the estimate of how much a forward turn closes in (turn radius × sine of the angle).
+
 ### DeployStyleAIUpdate
 New command for deploying artillery, replacing the old trick of pointing a `FIRE_WEAPON` button at a dummy
 weapon slot. That worked, but it went through the weapon lock and brought its bugs with it.
@@ -338,6 +345,8 @@ New parameters:
 
 * `DynamicHeightMinScale = 1.0` - (Scales the projectile's arc height based on the distance to the target. At maximum weapon range the full arc height is used; the closer the target, the more the height is scaled down towards this value. `1.0` = no scaling (default). Useful so short-range shots don't arc as high, e.g. for torpedoes/arcing guns.)
 * `DynamicHeightMinRange = 1.0` - (The target distance at/below which `DynamicHeightMinScale` is fully reached. The height scale interpolates between this range and the weapon's max range.)
+* `LinearFlightPath = No` - Fly a straight line to the target at constant speed instead of the Bezier arc.
+* `KillSelfDelay = 0` - Time in ms the projectile lingers at the impact point after detonating, hidden and frozen in place, so attached particle trails (exhaust and model-condition particle systems) can catch up before it dies. While lingering it cannot collide and nothing can target it.
 
 ## FreeFallProjectileBehavior
 New type of projectile module that mimics the behavior of Bombs dropped by genpowers.
@@ -939,6 +948,24 @@ End
 This adds no additional effects, but makes the unit skip default BattlePlan effects (and paralyze) initially, and applies them only after the upgrade.
 Note: For this to work, the unit needs to be inlcuded in the BattlePlan's valid KindOfs, even though the intention is to not give them the battlePlan effects by default.
 
+## AllBattlePlansUpdate (New)
+
+Grants the controlling player the army bonuses of all three battle plans (Bombardment, Hold the Line,
+Search & Destroy) while this object exists. It counts as an extra battle plan source next to the
+Strategy Centers, so the plan a Strategy Center runs is untouched. The bonus values and the member
+KindOfs are read from the `BattlePlanUpdate` of the given Strategy Center template, so they match the
+permanent plans exactly.
+
+```
+Behavior = AllBattlePlansUpdate ModuleTag_AllPlans
+  StrategyCenterTemplate = AmericaStrategyCenter   ; object whose BattlePlanUpdate supplies the values
+End
+```
+
+Intended use: an `OCLSpecialPower` with `Enum = SPECIAL_ALL_BATTLE_PLANS` spawns an invisible marker
+object with this module and a `DeletionUpdate` for the duration. The bonuses move with the marker if
+it is captured and end when it is deleted.
+
 ## WeaponBonusUpdate
 
 Added Parameters:
@@ -1504,8 +1531,12 @@ A client update that drives steering/lean animations based on the unit's turning
 ClientUpdate = AnimationSteeringUpdate ModuleTag_AnimSteer
   MinAngle = 0           ; minimum turn angle (degrees) before a steering animation is used
   SkipCenteringAnims = No   ; if Yes, do not play the "return to center" animations
+  BackwardsCondition = No   ; if Yes, set the MOVING_BACKWARDS condition while the unit reverses
+  BackwardsTurnAnims = No   ; with BackwardsCondition, keep playing turn animations while reversing
 End
 ```
+
+While reversing, `MinAngle` is measured against the rear of the unit, since the goal is behind it.
 
 ## W3DDecalDraw (New)
 
@@ -1963,6 +1994,17 @@ End
 - The effects follow the owner. A captured object takes the new owner's power state.
 - No disabled tint is shown; use `Icon` for feedback.
 
+## RiftSlowDeathBehavior
+
+Damage falloff for the rift's continuous damage:
+
+* `MaximumDamageRadius = 0` - Victims within this 2D distance take the full `DamagePerSecond`.
+* `OuterDamagePerSecond = -1` - Damage per second at `Radius`. Between `MaximumDamageRadius` and `Radius` the damage falls off linearly from `DamagePerSecond` to this value. Negative means no falloff.
+
+Objects the rift can never destroy (indestructible bodies, `ImmortalBody`, `HighlanderBody`) no longer
+spawn structure debris. A consumed victim stays held until it is destroyed, so a death that plays out
+over time (e.g. a shrinking `ChronoDeathBehavior`) is swallowed instead of dropping out under gravity.
+
 ## ParticleUplinkCannonUpdate (Tornado)
 
 * `TornadoObjectName = <object>` - (Creates this object at the beam ground point when the orbital
@@ -2301,6 +2343,30 @@ A static icon wants `NumberImages = 1`, `AnimationMode = ONCE` and `AnimationDel
 
 # Misc Improvements
 
+## PointDefenseLaserUpdate
+
+Can now be switched on by an upgrade, with the generic upgrade parameters:
+
+```
+Behavior = PointDefenseLaserUpdate ModuleTag_PDL
+  ; ... existing parameters ...
+  TriggeredBy = <Upgrade>   ; laser is off until this upgrade
+  StartsActive = No   ; only matters with TriggeredBy
+End
+```
+
+Without `TriggeredBy` the laser is always active, as before. Removing the upgrade switches it off again.
+The laser ignores projectiles that already detonated and only linger for their trail
+(`KillSelfDelay`).
+
+## StealthDetectorUpdate
+
+New parameters:
+
+* `TriggeredBy = <Upgrade>` (plus the other generic upgrade parameters) - The detector is off until the upgrade. Without it the detector is always active, as before. Removing the upgrade switches it off again.
+* `StartsActive = No` - Only matters with `TriggeredBy`.
+* `RequiresPlayerOwner = No` - Inactive while owned by a non-playable side (neutral, civilian), e.g. a civilian building that detects only once captured.
+
 ## ObjectExtend
 Allows to use inheritence in the parser. `ObjectExtend` is similar to `ObjectReskin` but inherit all modules and allow modifications. The parent object must be defined before the ObjectExtend.  
 
@@ -2309,6 +2375,7 @@ Syntax: `ObjectExtend NewObject ObjectToInheritFrom`
 Use `RemoveModule ModuleTag_xx` to remove a module inherited from the parent.  
 WeaponSet and ArmorSet are inherited, but if you define another one in the child, the inherited sets are removed.  
 If the parent has multiple WeaponSets all will be removed from the child if the child defines one. 
+`Prerequisites` work the same way: a child that defines a `Prerequisites` block replaces the inherited ones instead of adding to them.
 
 Examples:  
 ```

@@ -8,6 +8,9 @@
 * SPECIAL_PUNISHER_CANNON
 * SPECIAL_CHEMICAL_MISSILE
 * SPECIAL_CHRONOSPHERE
+* SPECIAL_RIFT_GENERATOR
+* SPECIAL_ALL_BATTLE_PLANS - grants all battle plans for a time, see [AllBattlePlansUpdate](Objects-&-Modules.md#allbattleplansupdate-new). Behaves like `SPECIAL_CIA_INTELLIGENCE` (no target).
+* SPECIAL_ALL_BATTLE_PLANS_ACTIVE - for the countdown that shows how long the all-battle-plans effect lasts
 
 ## New Parser Fields:
 `BehaviorEnum = <OTHER ENUM>`  
@@ -23,6 +26,12 @@ Used to set how a new SpecialPower behaves, new enums will be like "SPECIAL_NEUT
 `EvaReadyAlly = <Name of eva event>`  
 `EvaReadyEnemy = <Name of eva event>`  
 These allow to specify eva events for a special power. When not set, vanilla special power still have their hardcoded events. 
+
+`OwnerOnlyTimer = No`  
+With `PublicTimer = Yes`, the countdown is drawn only for the player that owns it, and it is registered for any object that carries the power, not only structures (needs `SharedSyncedTimer = No`).
+
+`FlashingTimer = No`  
+The countdown is drawn bold and flashing like a ready superweapon the whole time. Together with `OwnerOnlyTimer` this lets a marker object show its owner how long a temporary effect still lasts.
 
 `Cost = 0`  
 Optional credits cost to activate the special power. When set (> 0), the player must have enough money, and the cost is deducted when the power is fired. The command button is disabled/greyed out when the player cannot afford it, and the cost is shown in the button tooltip. Default = 0 (free).
@@ -146,6 +155,16 @@ Added CommandButton parameters to let a special power be aimed at **multiple tar
 * SUPERWEAPONREADY_ALLY_CHRONOSPHERE
 * SUPERWEAPONREADY_ENEMY_CHRONOSPHERE
 
+* SUPERWEAPONDETECTED_OWN_RIFT_GENERATOR
+* SUPERWEAPONDETECTED_ALLY_RIFT_GENERATOR
+* SUPERWEAPONDETECTED_ENEMY_RIFT_GENERATOR
+* SUPERWEAPONLAUNCHED_OWN_RIFT_GENERATOR
+* SUPERWEAPONLAUNCHED_ALLY_RIFT_GENERATOR
+* SUPERWEAPONLAUNCHED_ENEMY_RIFT_GENERATOR
+* SUPERWEAPONREADY_OWN_RIFT_GENERATOR
+* SUPERWEAPONREADY_ALLY_RIFT_GENERATOR
+* SUPERWEAPONREADY_ENEMY_RIFT_GENERATOR
+
 Events for the remaining Contra superweapons. These are not tied to a special power enum, so any
 template can use them, including several templates sharing one set.
 
@@ -267,6 +286,8 @@ Example Code in the gunship unit:
     SideTurrets = 2 ; how many turrets are side, must be contained after mainTurrets
     AATurrets = 2 ; how many turrets are aa, must be contained after sideTurrets
     MainTargetingRate = 200     ; how often target for main turrets can change
+    MainTurretsFireInSequence = No ; Yes: main turrets take turns, one shot each, instead of firing together
+    MainTurretSequenceDelay = 0 ; minimum ms between two main turret shots in sequence mode (at least one frame)
     AttackAreaRadius = 250.0 ; Attack area around target like spectre
     SideTargetingRate = 150     ; how often target for side turrets can change
     SideAttackAreaRadius = 250.0 ; which radius side turrets can shoot at, calculated from current gunship pos

@@ -86,3 +86,22 @@ Fixed and added safeguards for `LocomotorWorksWhenDisabled`, so disabled units w
 
 ## Veterancy weapon FX for scatter/secondary projectiles
 Projectiles (`DumbProjectileBehavior`, `FreeFallProjectileBehavior`, `MissileAIUpdate`, `NeutronMissileUpdate`) now snapshot the **launcher's** veterancy level and use it to pick the per-veterancy weapon FX (`VeterancyProjectileExhaust`, `VeterancyFireFX`, `VeterancyProjectileDetonationFX`, `VeterancyFireOCL`, ...). This makes veterancy-based exhaust/FX work correctly for ScatterShot and other secondary weapon effects.
+
+## Fixed battle plan bonuses clearing or stacking
+### Module: BattlePlanBonusBehavior
+* Activating one battle plan no longer clears the weapon bonuses of other active plans, e.g. with two Strategy Centers on different plans.
+* A plan that is already applied is not applied again, and a plan that was never applied is not removed. Armor, sight and speed scalars no longer stack or invert when an upgrade or science activates the module.
+* Unused `StatusToSet` / `StatusToClear` entries no longer set and clear status bit 0.
+* Loading a game with Search & Destroy active no longer multiplies vision and shroud clearing range again on every load.
+
+## Fixed vanilla superweapon EVA playing on top of custom events
+A power using the Particle Cannon, Neutron Missile or Scud Storm enum played the vanilla "detected" and "launched" EVA events, and GPS Scrambler or Sneak Attack the vanilla "launched" event, even when it set its own `Eva*` keys. Now only its own events play. Powers without `Eva*` keys still use the vanilla events.
+
+## Particle Uplink Cannon beam sound height
+The beam sound now plays from 250 units above the beam target instead of 500, so it sounds closer.
+
+## Fixed audio deadlock
+Loading a sound while the audio cache was full could deadlock the game when a playing sample finished at the same moment.
+
+## ObjectExtend Prerequisites
+An `ObjectExtend` child that defines `Prerequisites` replaces the inherited ones instead of adding to them.

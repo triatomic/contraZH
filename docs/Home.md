@@ -33,6 +33,7 @@ Changes specific to this fork are on [contraZH Changes](contraZH-Changes.md).
 * [BuffSystem](BuffSystem.md) / [Locomotor](Locomotor.md) / [Naval Support](Naval-Support.md)
 * [Object Creation List](Object-Creation-List.md) / [New Enum Definitions](New-Enum-Definitions.md)
 * [Audio](Audio.md)
+* [Game MCP & AI Matches](Game-MCP-and-AI-Matches.md) - driving the game from tools and logging AI-only skirmishes
 
 # Contact
 
