@@ -80,6 +80,7 @@ public:
 	AsciiString m_missionObjectivesLabel[MAX_OBJECTIVE_LINES];
 	AudioEventRTS m_briefingVoice;
 	AsciiString m_locationNameLabel;
+	AsciiString m_nameLabel;						///< mission name label from string manager
 	AsciiString m_unitNames[MAX_DISPLAYED_UNITS];
 	Int m_voiceLength;
 	AsciiString m_generalName;

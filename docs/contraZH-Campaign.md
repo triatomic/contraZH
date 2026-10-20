@@ -13,8 +13,10 @@ without the key share a `Campaign` tab. The tab row stays hidden while every cam
 tab; the screen holds six tabs, and with more groups the sixth becomes a `Campaign` tab holding
 every group past the fifth.
 * The left list holds the tab's campaigns, named by `CampaignNameLabel`. The right list holds the
-missions in `NextMission` order from `FirstMission`, named by the map's display name, with the map
-preview beside them when the map cache knows the map.
+missions in `NextMission` order from `FirstMission`, numbered, and named by the new
+`MissionNameLabel` key on the `Mission` block. A mission without the key takes the map's display
+name, or the mission id when the map cache does not know the map. The map preview sits beside the
+list when the cache knows the map.
 * A mission unlocks once a mission leading to it has been won, and `FirstMission` is always open.
 Locked missions are greyed out and the Play button refuses them. Won missions are recorded in
 `CampaignProgress.ini` in the user data folder next to `Options.ini`, one `campaign.mission = 1`
@@ -36,6 +38,11 @@ Campaign USA
   CampaignNameLabel CAMPAIGN:USA
   CampaignGroupLabel CAMPAIGN:Generals
   FirstMission Mission01
+  Mission Mission01
+    Map Maps\USA01\USA01.map
+    MissionNameLabel CAMPAIGN:USA01
+    NextMission Mission02
+  END
   ...
 END
 

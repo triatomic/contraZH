@@ -286,13 +286,19 @@ static void populateChapters( Campaign *campaign )
 	Int number = 1;
 	for( std::list< Mission* >::iterator it = ordered.begin(); it != ordered.end(); ++it, ++number )
 	{
+		// MissionNameLabel first, then the map's display name, then the mission id
 		UnicodeString title;
+		Bool exists = FALSE;
 		const MapMetaData *map = TheMapCache ? TheMapCache->findMap( (*it)->m_mapName ) : nullptr;
-		if( map && !map->m_displayName.isEmpty() )
+		if( !(*it)->m_nameLabel.isEmpty() )
+		{
+			title = TheGameText->fetch( (*it)->m_nameLabel, &exists );
+		}
+		if( !exists && map && !map->m_displayName.isEmpty() )
 		{
 			title = map->m_displayName;
 		}
-		else
+		else if( !exists )
 		{
 			title.translate( (*it)->m_name );
 		}

@@ -451,6 +451,7 @@ void CampaignManager::parseMissionPart( INI* ini, void *instance, void *store, c
 			{ "UnitNames2",				INI::parseAsciiString,				nullptr, offsetof( Mission, m_unitNames[2] ) },
 			{ "GeneralName",			INI::parseAsciiString,			nullptr, offsetof( Mission, m_generalName)	},
 			{ "LocationNameLabel",INI::parseAsciiString,				nullptr, offsetof( Mission, m_locationNameLabel ) },
+			{ "MissionNameLabel",	INI::parseAsciiString,				nullptr, offsetof( Mission, m_nameLabel ) },
 			{ "VoiceLength",			INI::parseInt ,								nullptr, offsetof( Mission, m_voiceLength ) },
 
 			{ nullptr,							nullptr,											nullptr, 0 }
