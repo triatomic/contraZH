@@ -80,6 +80,9 @@ std::string gameMcpArgString(const McpJson &args, const char *key, const char *d
 /// Fails unless a game is running.
 void gameMcpRequireGame();
 
+/// Fails unless a game is running that is not LAN or online; direct changes would desync those.
+void gameMcpRequireLocalGame();
+
 /// Object by id; fails if there is none.
 Object *gameMcpRequireObject(int id);
 /// Object ids from "ids" (array) or "id" (number); fails on unknown ids or when none are given.

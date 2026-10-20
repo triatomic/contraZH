@@ -644,7 +644,8 @@ void DumbProjectileBehavior::detonate( Object *victim )
 		// Linger hidden at the impact point for a few frames so attached particle trails
 		// (weapon exhaust and model-condition particle systems) can catch up before we die.
 		m_killSelfFrame = TheGameLogic->getFrame() + killSelfDelay;
-		obj->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_NO_COLLISIONS ) );
+		// MASKED keeps every weapon and target scan from attacking what is left of us
+		obj->setStatus( MAKE_OBJECT_STATUS_MASK2( OBJECT_STATUS_NO_COLLISIONS, OBJECT_STATUS_MASKED ) );
 
 		// Freeze in place: Physics has been accumulating gravity while our flight path overrode the
 		// position each frame. Clear it, and hold the object so physics doesn't move it while lingering.

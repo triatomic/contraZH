@@ -351,7 +351,7 @@ void RiftSlowDeathBehavior::doRiftTick(Real strength, UnsignedInt currFrame)
 		if (damageThisFrame)
 		{
 			// falloff is measured on the ground, like Radius itself
-			Real dist2D = sqrtf(toRift.x * toRift.x + toRift.y * toRift.y);
+			Real dist2D = WWMath::Sqrt(toRift.x * toRift.x + toRift.y * toRift.y);
 			damageInfo.in.m_amount = getDamagePerSecondAt(dist2D) * damageTickScale;
 
 			// only things that can actually fall in may die the consume death

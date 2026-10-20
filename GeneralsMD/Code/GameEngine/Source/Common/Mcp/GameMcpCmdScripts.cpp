@@ -34,7 +34,7 @@ namespace
 
 McpJson cmdRun(const McpJson &args)
 {
-	gameMcpRequireGame();
+	gameMcpRequireLocalGame();
 	const std::string name = gameMcpArgString(args, "name");
 	TheScriptEngine->runScript(name.c_str());
 	return McpJson::makeObject().set("ran", name).set("frame", TheGameLogic->getFrame());
@@ -42,7 +42,7 @@ McpJson cmdRun(const McpJson &args)
 
 McpJson cmdSetActive(const McpJson &args)
 {
-	gameMcpRequireGame();
+	gameMcpRequireLocalGame();
 	const std::string name = gameMcpArgString(args, "name");
 	const bool active = gameMcpArgBool(args, "active", true);
 	if (!TheScriptEngine->setScriptActive(name.c_str(), active)) {
@@ -55,6 +55,7 @@ McpJson cmdFlags(const McpJson &args)
 {
 	gameMcpRequireGame();
 	if (args.has("set")) {
+		gameMcpRequireLocalGame();
 		const McpJson &values = args.get("set");
 		for (size_t i = 0; i < values.numKeys(); i++) {
 			if (!values.valueAt(i).isBool()) {
@@ -78,6 +79,7 @@ McpJson cmdCounters(const McpJson &args)
 {
 	gameMcpRequireGame();
 	if (args.has("set")) {
+		gameMcpRequireLocalGame();
 		const McpJson &values = args.get("set");
 		for (size_t i = 0; i < values.numKeys(); i++) {
 			if (!values.valueAt(i).isNumber()) {

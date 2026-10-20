@@ -64,8 +64,7 @@
 // enormous camera heights cannot see above the laser origin.
 constexpr const Real ORBITAL_BEAM_Z_OFFSET = 3500.0f;
 // TheSuperHackers @fix The positional audio is now decoupled from the beam origin.
-// 500 units represent the height of the original audio emitter.
-
+// The original audio emitter sat 500 units up; half that keeps the beam sound closer to the ground.
 constexpr const Real ORBITAL_BEAM_AUDIO_Z_OFFSET = 250.0f;
 
 //-------------------------------------------------------------------------------------------------

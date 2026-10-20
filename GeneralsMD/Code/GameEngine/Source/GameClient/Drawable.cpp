@@ -3663,7 +3663,7 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 
 		AsciiString armorName;
 		if( armorSet != NULL && TheArmorStore != NULL )
-			armorName = TheArmorStore->getArmorTemplateName( armorSet->getArmorTemplate() );
+			armorName = TheArmorStore->friend_findArmorTemplateName( armorSet->getArmorTemplate() );
 
 		UnicodeString armorLine;
 		// An object with no armor at all is normal for props and rubble, so say so rather than

@@ -218,6 +218,15 @@ void gameMcpRequireGame()
 }
 
 //-------------------------------------------------------------------------------------------------
+void gameMcpRequireLocalGame()
+{
+	gameMcpRequireGame();
+	if (TheGameLogic->isInMultiplayerGame()) {
+		gameMcpFail("a LAN or online game cannot be changed directly");
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
 Object *gameMcpRequireObject(int id)
 {
 	gameMcpRequireGame();

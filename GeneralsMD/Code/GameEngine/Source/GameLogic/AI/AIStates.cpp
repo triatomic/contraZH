@@ -5426,7 +5426,7 @@ StateReturnType AIAttackAimAtTargetState::update()
 						Real edgeDistSqr = m_isAttackingObject
 							? ThePartitionManager->getDistanceSquared(source, victim, FROM_BOUNDINGSPHERE_2D)
 							: ThePartitionManager->getDistanceSquared(source, getMachineGoalPosition(), FROM_BOUNDINGSPHERE_2D);
-						Real edgeDist = sqrtf(edgeDistSqr);
+						Real edgeDist = WWMath::Sqrt(edgeDistSqr);
 						Real maxRange = weapon->getAttackRange(source);
 
 						// don't back out of max range while turning

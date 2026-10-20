@@ -85,7 +85,7 @@ ScienceType requireScience(const std::string &name)
 
 McpJson cmdSpawn(const McpJson &args)
 {
-	gameMcpRequireGame();
+	gameMcpRequireLocalGame();
 	const ThingTemplate *tmpl = gameMcpRequireTemplate(gameMcpArgString(args, "template"));
 	Player *player = gameMcpPlayerArg(args, "player");
 	Team *team = player->getDefaultTeam();
@@ -141,6 +141,7 @@ McpJson cmdSpawn(const McpJson &args)
 
 McpJson cmdDestroy(const McpJson &args)
 {
+	gameMcpRequireLocalGame();
 	std::vector<Object *> objects;
 	gameMcpRequireObjects(args, objects);
 	// kill lets the object die as if it were destroyed (death effects, rubble); remove takes it away silently.
@@ -157,6 +158,7 @@ McpJson cmdDestroy(const McpJson &args)
 
 McpJson cmdSet(const McpJson &args)
 {
+	gameMcpRequireLocalGame();
 	std::vector<Object *> objects;
 	gameMcpRequireObjects(args, objects);
 	for (size_t i = 0; i < objects.size(); i++) {
@@ -205,6 +207,7 @@ McpJson cmdSet(const McpJson &args)
 
 McpJson cmdPlayerSet(const McpJson &args)
 {
+	gameMcpRequireLocalGame();
 	Player *player = gameMcpPlayerArg(args, "player");
 	Money *money = player->getMoney();
 	if (args.has("money")) {
