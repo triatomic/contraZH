@@ -154,6 +154,7 @@ public:
 	Bool doesFileExist(const Char *filename, FileInstance instance = 0) const; ///< returns TRUE if the file exists.  filename should have no directory.
 	void getFileListInDirectory(const AsciiString& directory, const AsciiString& searchName, FilenameList &filenameList, Bool searchSubdirectories) const; ///< search the given directory for files matching the searchName (egs. *.ini, *.rep).  Possibly search subdirectories.
 	Bool getFileInfo(const AsciiString& filename, FileInfo *fileInfo, FileInstance instance = 0) const; ///< fills in the FileInfo struct for the file given. returns TRUE if successful.
+	Bool getLooseFileInfo(const AsciiString& filename, FileInfo *fileInfo) const; ///< fills in the FileInfo of the loose file only. Once seen, later reads load it before any archived copy.
 
 	Bool createDirectory(AsciiString directory); ///< create a directory of the given name.
 
@@ -163,13 +164,21 @@ public:
 	static bool removeExtension(AsciiString& path);
 	static bool removeExtension(UnicodeString& path);
 
+	static void setLiveLooseFiles(Bool live);	///< check the loose file on every read, even when a probe found only the archived one
+
 protected:
+	Bool isKnownArchiveOnlyRead(const Char *filename, Int access) const;	///< whether a read can skip the loose file the probe already missed
+	void clearArchiveOnly(const Char *filename) const;	///< a loose copy was seen, so reads must try it again
+
+	static Bool s_liveLooseFiles;
+
 #if ENABLE_FILESYSTEM_EXISTENCE_CACHE
 	struct FileExistData
 	{
-		FileExistData() : instanceExists(0), instanceDoesNotExist(~FileInstance(0)) {}
+		FileExistData() : instanceExists(0), instanceDoesNotExist(~FileInstance(0)), archiveOnly(FALSE) {}
 		FileInstance instanceExists;
 		FileInstance instanceDoesNotExist;
+		Bool archiveOnly;	///< an archive has the file and no loose copy did when probed
 	};
 	typedef std::hash_map<
 		rts::string_key<AsciiString>, FileExistData,

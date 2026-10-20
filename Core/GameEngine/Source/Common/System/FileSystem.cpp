@@ -186,7 +186,7 @@ File*		FileSystem::openFile( const Char *filename, Int access, size_t bufferSize
 				--instance;
 			}
 		}
-		else
+		else if (!isKnownArchiveOnlyRead(filename, access))
 		{
 			file = TheLocalFileSystem->openFile( filename, access, bufferSize );
 
@@ -197,6 +197,7 @@ File*		FileSystem::openFile( const Char *filename, Int access, size_t bufferSize
 				FileExistMap::iterator it = m_fileExist.find(FileExistMap::key_type::temporary(filename));
 				if (it != m_fileExist.end())
 				{
+					it->second.archiveOnly = FALSE;
 					++it->second.instanceExists;
 					if (it->second.instanceDoesNotExist != ~FileInstance(0))
 						++it->second.instanceDoesNotExist;
@@ -217,6 +218,65 @@ File*		FileSystem::openFile( const Char *filename, Int access, size_t bufferSize
 	}
 
 	return file;
+}
+
+//============================================================================
+// FileSystem::isKnownArchiveOnlyRead
+//============================================================================
+
+Bool FileSystem::s_liveLooseFiles = FALSE;
+
+void FileSystem::setLiveLooseFiles(Bool live)
+{
+	s_liveLooseFiles = live;
+}
+
+Bool FileSystem::isKnownArchiveOnlyRead(const Char *filename, Int access) const
+{
+#if ENABLE_FILESYSTEM_EXISTENCE_CACHE
+	if (!s_liveLooseFiles && (access & (File::WRITE | File::CREATE)) == 0)
+	{
+		FastCriticalSectionClass::LockClass lock(m_fileExistMutex);
+		FileExistMap::const_iterator it = m_fileExist.find(FileExistMap::key_type::temporary(filename));
+		return it != m_fileExist.end() && it->second.archiveOnly;
+	}
+#else
+	(void)filename;
+	(void)access;
+#endif
+	return FALSE;
+}
+
+//============================================================================
+// FileSystem::clearArchiveOnly
+//============================================================================
+
+void FileSystem::clearArchiveOnly(const Char *filename) const
+{
+#if ENABLE_FILESYSTEM_EXISTENCE_CACHE
+	FastCriticalSectionClass::LockClass lock(m_fileExistMutex);
+	FileExistMap::iterator it = m_fileExist.find(FileExistMap::key_type::temporary(filename));
+	if (it != m_fileExist.end())
+	{
+		it->second.archiveOnly = FALSE;
+	}
+#else
+	(void)filename;
+#endif
+}
+
+//============================================================================
+// FileSystem::getLooseFileInfo
+//============================================================================
+
+Bool FileSystem::getLooseFileInfo(const AsciiString& filename, FileInfo *fileInfo) const
+{
+	if (!TheLocalFileSystem->getFileInfo(filename, fileInfo))
+	{
+		return FALSE;
+	}
+	clearArchiveOnly(filename.str());
+	return TRUE;
 }
 
 //============================================================================
@@ -242,7 +302,8 @@ Bool FileSystem::doesFileExist(const Char *filename, FileInstance instance) cons
 	}
 #endif
 
-	if (TheLocalFileSystem->doesFileExist(filename))
+	const Bool localExists = TheLocalFileSystem->doesFileExist(filename);
+	if (localExists)
 	{
 		if (instance == 0)
 		{
@@ -265,6 +326,10 @@ Bool FileSystem::doesFileExist(const Char *filename, FileInstance instance) cons
 			FastCriticalSectionClass::LockClass lock(m_fileExistMutex);
 			FileExistMap::mapped_type& value = m_fileExist[filename];
 			value.instanceExists = max(value.instanceExists, instance);
+			if (!localExists)
+			{
+				value.archiveOnly = TRUE;
+			}
 		}
 #endif
 		return TRUE;
@@ -305,6 +370,7 @@ Bool FileSystem::getFileInfo(const AsciiString& filename, FileInfo *fileInfo, Fi
 	memset(fileInfo, 0, sizeof(*fileInfo));
 
 	if (TheLocalFileSystem->getFileInfo(filename, fileInfo)) {
+		clearArchiveOnly(filename.str());
 		if (instance == 0) {
 			return TRUE;
 		}

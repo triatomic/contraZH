@@ -28,6 +28,7 @@
 #include "Common/ArchiveFileSystem.h"
 #include "Common/CommandLine.h"
 #include "Common/CRCDebug.h"
+#include "Common/FileSystem.h"
 #include "Common/LocalFileSystem.h"
 #include "Common/version.h"
 #include "Common/WorkingDirectory.h"
@@ -118,6 +119,15 @@ Int parseNoLogOrCrash(char *args[], int)
 Int parseWin(char *args[], int)
 {
 	TheWritableGlobalData->m_windowed = true;
+
+	return 1;
+}
+
+//=============================================================================
+//=============================================================================
+Int parseLiveLooseFiles(char *args[], int)
+{
+	FileSystem::setLiveLooseFiles(TRUE);
 
 	return 1;
 }
@@ -1222,6 +1232,9 @@ static CommandLineParam paramsForStartup[] =
 	// The last successful selection wins; otherwise use the executable directory.
 	{ "-setCwd", parseSetCwd },
 	{ "-useCwd", parseUseCwd },
+
+	// Check the loose file before the archive on every read, so overrides added while running take effect.
+	{ "-live", parseLiveLooseFiles },
 };
 
 // These Params are parsed during Engine Init before INI data is loaded

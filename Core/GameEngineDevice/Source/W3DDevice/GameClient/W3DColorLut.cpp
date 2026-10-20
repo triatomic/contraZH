@@ -57,7 +57,7 @@ static Int64 Table_File_Stamp(const AsciiString &name)
 	AsciiString path(TGA_DIR_PATH);
 	path.concat(name.str());
 	FileInfo info;
-	if (TheLocalFileSystem == nullptr || !TheLocalFileSystem->getFileInfo(path, &info))
+	if (TheFileSystem == nullptr || !TheFileSystem->getLooseFileInfo(path, &info))
 	{
 		return 0;
 	}

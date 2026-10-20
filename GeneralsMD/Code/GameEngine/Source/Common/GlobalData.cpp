@@ -1871,7 +1871,7 @@ void GlobalData::reloadEditedIni()
 
 	const AsciiString fileName("Data\\INI\\GameData.ini");
 	FileInfo info;
-	if (TheLocalFileSystem == nullptr || !TheLocalFileSystem->getFileInfo(fileName, &info))
+	if (TheFileSystem == nullptr || !TheFileSystem->getLooseFileInfo(fileName, &info))
 	{
 		return;
 	}

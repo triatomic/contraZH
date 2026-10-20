@@ -54,6 +54,7 @@
 #include "Common/PerfTimer.h"
 #include "Common/Xfer.h"
 #include "Common/GameLOD.h"
+#include "Common/FileSystem.h"
 #include "Common/LocalFileSystem.h"
 
 #include "GameClient/Color.h"
@@ -3790,7 +3791,7 @@ void WaterRenderObjClass::reloadEditedIni()
 
 	const AsciiString fileName("Data\\INI\\Water.ini");
 	FileInfo info;
-	if (TheLocalFileSystem == nullptr || !TheLocalFileSystem->getFileInfo(fileName, &info))
+	if (TheFileSystem == nullptr || !TheFileSystem->getLooseFileInfo(fileName, &info))
 	{
 		return;
 	}

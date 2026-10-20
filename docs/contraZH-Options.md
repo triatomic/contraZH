@@ -265,6 +265,9 @@ Notes:
 name in the Replays folder or an absolute path. Unreadable replays or missing maps show a message
 box.
 * `-loadsave <file>` also accepts an absolute path, and shows a message box on failure.
+* `-live` checks the loose file before the `.big` on every read. Without it, a file
+first found only in a `.big` keeps loading from there, so a loose override dropped into the game
+folder while the game runs needs a restart. Loading opens fewer files without the flag.
 
 ## Rendering
 
