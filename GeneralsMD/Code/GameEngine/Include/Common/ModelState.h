@@ -309,6 +309,8 @@ enum ModelConditionFlagType CPP_11(: Int)
 	MODELCONDITION_TUNNEL_AUTO_EXIT,
 	// Set while SUBDUAL_FROZEN damage holds the unit disabled
 	MODELCONDITION_FROZEN,
+	// Set while the object is DISABLED_UNMANNED (pilot sniped, drone with no carrier)
+	MODELCONDITION_UNMANNED,
 
 	// Reserved padding: keeps MODELCONDITION_COUNT distinct from KINDOF_COUNT. BitFlags<N> is keyed only
 	// on its bit count, so two flag enums with an equal COUNT would share one name list (see the guard in

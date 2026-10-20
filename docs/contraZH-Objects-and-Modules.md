@@ -138,6 +138,26 @@ or drone release, dozer finishing a structure).
 
 Each breaks stealth for one frame; `StealthDelay` decides when it can cloak again.
 
+## Model conditions
+
+### UNMANNED
+
+Set while an object is `DISABLED_UNMANNED` (pilot sniped, drone whose carrier died, or the
+`NAMED_SET_UNMANNED_STATUS` script action) and cleared when it is manned again. A
+`ConditionState = UNMANNED` block on a draw module can hide crew art, such as the gunner on a
+technical, while the vehicle sits empty.
+
+```ini
+  Draw = W3DModelDraw ModuleTag_Gunner
+    DefaultConditionState
+      Model = GunnerMesh
+    End
+    ConditionState = UNMANNED
+      Model = NONE
+    End
+  End
+```
+
 ## New Behavior Modules
 
 ### TimeOfDayOverrideUpdate

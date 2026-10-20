@@ -2449,6 +2449,11 @@ void Object::setDisabledUntil( DisabledType type, UnsignedInt frame )
 		m_disabledTillFrame[ type ] = frame;
 		m_disabledMask.set( type, frame > TheGameLogic->getFrame() );
 
+		if( type == DISABLED_UNMANNED && m_disabledMask.test( type ) )
+		{
+			setModelConditionState( MODELCONDITION_UNMANNED );
+		}
+
 		if( m_drawable )
 		{
 			if( isDisabled() )
@@ -2643,6 +2648,11 @@ Bool Object::clearDisabled( DisabledType type )
 
 	m_disabledTillFrame[ type ] = NEVER;
 	m_disabledMask.set( type, 0 );
+
+	if( type == DISABLED_UNMANNED )
+	{
+		clearModelConditionState( MODELCONDITION_UNMANNED );
+	}
 
 	DisabledMaskType exceptions;
 	exceptions.set(DISABLED_HELD);
