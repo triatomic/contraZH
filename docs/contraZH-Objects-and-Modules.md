@@ -123,6 +123,38 @@ off.
 * `RemovesUpgrades` and `FXListUpgrade` still run only once, on the frame the trigger completes.
 * Both the object's own upgrades and its owning player's upgrades count toward the gate.
 
+## MinefieldBehavior
+
+### KindOf filters
+
+Which objects can set the mine off, checked on top of `DetonatedBy` and `WorkersDetonate`:
+
+```ini
+  Behavior = MinefieldBehavior ModuleTag_Mine
+    DetonationWeapon = AntiTankMineWeapon
+    DetonatedBy      = ENEMIES NEUTRAL
+    RequiredKindOf   = VEHICLE
+    ForbiddenKindOf  = HUGE_VEHICLE
+  End
+```
+
+* `RequiredKindOf` - (A detonator needs at least one of these. Default = everything.)
+* `ForbiddenKindOf` - (A detonator may have none of these. Default = none.)
+
+An object that fails the filter walks over the mine without triggering it. Mine clearing is
+unaffected.
+
+## GenerateMinefieldBehavior
+
+### Placement blockers
+
+`SkipIfThisMuchUnderStructure` used to skip a mine only under a `STRUCTURE`. Two keys now pick the
+blocking objects:
+
+* `BlockedByKindOf = STRUCTURE` - (Default. A mine is skipped when an object with any of these
+overlaps it. `NONE` places mines under anything; `+VEHICLE` adds to the default.)
+* `NotBlockedByKindOf` - (An object with any of these never blocks a mine. Default = none.)
+
 ## StealthUpdate
 
 ### New StealthForbiddenConditions

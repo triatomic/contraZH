@@ -64,6 +64,8 @@ MinefieldBehaviorModuleData::MinefieldBehaviorModuleData()
 	m_numVirtualMines = 1;
 	m_healthPercentToDrainPerSecond = 0.0f;
 	m_ocl = nullptr;
+	m_requiredKindOf.clear();
+	m_forbiddenKindOf.clear();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -86,6 +88,8 @@ MinefieldBehaviorModuleData::MinefieldBehaviorModuleData()
 		{ "RepeatDetonateMoveThresh", INI::parseReal, nullptr, offsetof( MinefieldBehaviorModuleData, m_repeatDetonateMoveThresh ) },
 		{ "DegenPercentPerSecondAfterCreatorDies", INI::parsePercentToReal,	nullptr, offsetof( MinefieldBehaviorModuleData, m_healthPercentToDrainPerSecond ) },
 		{ "CreationList",	INI::parseObjectCreationList,	nullptr,	offsetof( MinefieldBehaviorModuleData, m_ocl ) },
+		{ "RequiredKindOf", KindOfMaskType::parseFromINI, nullptr, offsetof( MinefieldBehaviorModuleData, m_requiredKindOf ) },
+		{ "ForbiddenKindOf", KindOfMaskType::parseFromINI, nullptr, offsetof( MinefieldBehaviorModuleData, m_forbiddenKindOf ) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 
@@ -366,6 +370,16 @@ void MinefieldBehavior::onCollide( Object *other, const Coord3D *loc, const Coor
 		// infantry+dozer=worker.
 		if (other->isKindOf(KINDOF_INFANTRY) && other->isKindOf(KINDOF_DOZER))
 			return;
+	}
+
+	if (d->m_requiredKindOf.any() && !other->isAnyKindOf(d->m_requiredKindOf))
+	{
+		return;
+	}
+
+	if (other->isAnyKindOf(d->m_forbiddenKindOf))
+	{
+		return;
 	}
 
 	Int requiredMask = 0;
