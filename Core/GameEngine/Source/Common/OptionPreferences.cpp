@@ -303,9 +303,7 @@ Bool OptionPreferences::getGridHotkeysEnabled(void) const
 	return FALSE;
 }
 
-// TheSuperHackers @feature The grid keys in reading order, split evenly over the command bar's rows.
-// The options screen offers the presets in OptionsMenu.cpp's GridHotkeyLayouts.
-// Options.ini: GridHotkeyLayout = QWERTYUIOASDFGHJKL
+// TheSuperHackers @feature Grid keys in reading order, presets in OptionsMenu.cpp. Options.ini: GridHotkeyLayout = QWERTYUIOASDFGHJKL
 AsciiString OptionPreferences::getGridHotkeyLayout(void) const
 {
 	OptionPreferences::const_iterator it = find("GridHotkeyLayout");
@@ -315,9 +313,7 @@ AsciiString OptionPreferences::getGridHotkeyLayout(void) const
 	return it->second;
 }
 
-// TheSuperHackers @feature Unit orders (stop, guard, attack move, evacuate) keep their string file
-// letter instead of taking their slot's grid key.
-// Options.ini: GridHotkeyUnitOrders = Yes
+// TheSuperHackers @feature Unit orders keep their own letter, not a grid key. Options.ini: GridHotkeyUnitOrders = Yes
 Bool OptionPreferences::getGridHotkeyUnitOrders(void) const
 {
 	OptionPreferences::const_iterator it = find("GridHotkeyUnitOrders");

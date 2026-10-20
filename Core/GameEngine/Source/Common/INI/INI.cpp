@@ -579,6 +579,49 @@ void INI::loadObjectsOnly(AsciiString filename, Xfer* pXfer = NULL)
     unPrepFile();
 }
 
+//-------------------------------------------------------------------------------------------------
+void INI::loadHotKeys( AsciiString filename )
+{
+	setFPMode();
+
+	s_xfer = nullptr;
+	prepFile( filename, INI_LOAD_MULTIFILE );
+
+	try
+	{
+		while( m_endOfFile == FALSE )
+		{
+			readLine();
+			const char *token = strtok( m_buffer, getSeps() );
+			if( token == nullptr || stricmp( token, getEndToken() ) == 0 )
+			{
+				continue;
+			}
+
+			// the player's file is not CRC checked, so it must not reach game data
+			if( strcmp( token, "CommandMap" ) == 0 )
+			{
+				parseMetaMapDefinition( this );
+			}
+			else if( strcmp( token, "CommandButtonHotKey" ) == 0 )
+			{
+				parseCommandButtonHotKeyDefinition( this );
+			}
+			else
+			{
+				skipToEndToken();
+			}
+		}
+	}
+	catch( ... )
+	{
+		unPrepFile();
+		throw;
+	}
+
+	unPrepFile();
+}
+
 
 /** Discard lines up to and including the next end token. */
 void INI::skipToEndToken( void )

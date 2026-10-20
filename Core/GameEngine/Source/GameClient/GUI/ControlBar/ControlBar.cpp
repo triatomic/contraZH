@@ -2568,9 +2568,7 @@ void ControlBar::setCommandBarBorder( GameWindow *button, CommandButtonMappedBor
 //-------------------------------------------------------------------------------------------------
 // TheSuperHackers @feature Grid hotkeys.
 //-------------------------------------------------------------------------------------------------
-/** Which grid key belongs to this command bar button, or empty if it is not one of them.
-	*
-	* The layout string splits evenly over the bar's rows; columns past a row's share get no grid key. */
+/** The button's grid key; the layout splits evenly over the rows, and columns past a row's share get none. */
 //-------------------------------------------------------------------------------------------------
 AsciiString ControlBar::getGridHotKeyForButton( GameWindow *button ) const
 {
@@ -2594,21 +2592,42 @@ AsciiString ControlBar::getGridHotKeyForButton( GameWindow *button ) const
 }
 
 //-------------------------------------------------------------------------------------------------
-/** Ranks each command window among the distinct positions the bar's windows sit at, so the grid
-	* fits any bar shape. */
+/** Ranks each command window into a row, by height within half a button, and a column within its row. */
 //-------------------------------------------------------------------------------------------------
 void ControlBar::findGridSlots()
 {
 	ICoord2D pos[ MAX_COMMANDS_PER_SET ];
+	Int tolerance = 0;
 	for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
 	{
 		if( m_commandWindows[ i ] )
 		{
+			ICoord2D size;
 			m_commandWindows[ i ]->winGetScreenPosition( &pos[ i ].x, &pos[ i ].y );
+			m_commandWindows[ i ]->winGetSize( &size.x, &size.y );
+			tolerance = size.y / 2;
 		}
 	}
 
+	// the first window at each height leads its row
+	Bool leads[ MAX_COMMANDS_PER_SET ];
 	m_gridRows = 0;
+	for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
+	{
+		leads[ i ] = m_commandWindows[ i ] != nullptr;
+		for( Int j = 0; j < i && leads[ i ]; ++j )
+		{
+			if( m_commandWindows[ j ] && abs( pos[ j ].y - pos[ i ].y ) <= tolerance )
+			{
+				leads[ i ] = FALSE;
+			}
+		}
+		if( leads[ i ] )
+		{
+			++m_gridRows;
+		}
+	}
+
 	for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
 	{
 		m_gridRow[ i ] = 0;
@@ -2617,39 +2636,21 @@ void ControlBar::findGridSlots()
 		{
 			continue;
 		}
-		Bool newRow = TRUE;
 		for( Int j = 0; j < MAX_COMMANDS_PER_SET; ++j )
 		{
-			if( m_commandWindows[ j ] == nullptr )
+			if( m_commandWindows[ j ] == nullptr || j == i )
 			{
 				continue;
 			}
-			Bool firstX = TRUE;
-			Bool firstY = TRUE;
-			for( Int k = 0; k < j; ++k )
-			{
-				if( m_commandWindows[ k ] )
-				{
-					firstX = firstX && pos[ k ].x != pos[ j ].x;
-					firstY = firstY && pos[ k ].y != pos[ j ].y;
-				}
-			}
-			if( firstX && pos[ j ].x < pos[ i ].x )
+			const Bool sameRow = abs( pos[ j ].y - pos[ i ].y ) <= tolerance;
+			if( sameRow && pos[ j ].x < pos[ i ].x )
 			{
 				++m_gridColumn[ i ];
 			}
-			if( firstY && pos[ j ].y < pos[ i ].y )
+			if( !sameRow && leads[ j ] && pos[ j ].y < pos[ i ].y )
 			{
 				++m_gridRow[ i ];
 			}
-			if( j < i && pos[ j ].y == pos[ i ].y )
-			{
-				newRow = FALSE;
-			}
-		}
-		if( newRow )
-		{
-			++m_gridRows;
 		}
 	}
 }
@@ -2731,8 +2732,7 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 		AsciiString hotKey;
 		const Bool gridEnabled = TheGlobalData && TheGlobalData->m_gridHotkeysEnabled;
 
-		// Unit orders can keep the player's own letter and swap grid keys with the slot that had it,
-		// so a building without them keeps the whole grid.
+		// Unit orders can keep their own letter and swap grid keys with the slot that had it
 		Bool displaced = FALSE;
 		const GUICommandType commandType = commandButton->getCommandType();
 		Bool isUnitOrder = gridEnabled && TheGlobalData->m_gridHotkeyUnitOrders &&
@@ -2767,6 +2767,25 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 		if( hotKey.isEmpty() && !isUnitOrder && !displaced )
 		{
 			hotKey = TheHotKeyManager->getButtonHotKey(commandButton->getName(), commandButton->getTextLabel());
+
+			// a bar slot past the layout's reach must not take a letter the grid gives another slot
+			if( gridEnabled && hotKey.getLength() == 1 )
+			{
+				Bool barSlot = FALSE;
+				for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
+				{
+					barSlot = barSlot || m_commandWindows[ i ] == button;
+				}
+				const char wanted = (char)tolower( (unsigned char)hotKey.getCharAt( 0 ) );
+				for( const char *c = TheGlobalData->m_gridHotkeyLayout.str(); barSlot && *c; ++c )
+				{
+					if( (char)tolower( (unsigned char)*c ) == wanted )
+					{
+						hotKey.clear();
+						break;
+					}
+				}
+			}
 		}
 
 		if(hotKey.isNotEmpty())

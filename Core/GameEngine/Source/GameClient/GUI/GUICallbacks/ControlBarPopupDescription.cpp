@@ -474,6 +474,20 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 
 		name = TheHotKeyManager->getButtonLabel(commandButton->getName(), commandButton->getTextLabel());
 
+		// grid hotkeys key a bar slot by its place, so mark the key the slot really holds
+		if( TheGlobalData->m_gridHotkeysEnabled )
+		{
+			for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
+			{
+				if( m_commandWindows[ i ] && GadgetButtonGetData( m_commandWindows[ i ] ) == commandButton )
+				{
+					name = HotKeyManager::markLabel( TheGameText->fetch( commandButton->getTextLabel() ),
+							TheHotKeyManager->getHotKeyForWindow( m_commandWindows[ i ] ) );
+					break;
+				}
+			}
+		}
+
 		if( thingTemplate && commandButton->getCommandType() != GUI_COMMAND_PURCHASE_SCIENCE )
 		{
 			//We are either looking at building a unit or a structure that may or may not have any

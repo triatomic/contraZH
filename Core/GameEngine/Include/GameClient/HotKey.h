@@ -129,6 +129,7 @@ public:
 	AsciiString getButtonHotKey( const AsciiString& buttonName, const AsciiString& label );
 	// The label with '&' moved to the player's letter, or added after it when the label lacks the letter
 	UnicodeString getButtonLabel( const AsciiString& buttonName, const AsciiString& label );
+	static UnicodeString markLabel( const UnicodeString& text, const AsciiString& key );	///< the text with '&' on this key, or the key's name added
 
 	// Player letters by lower case button name; an empty letter means the button has no key
 	typedef std::map<AsciiString, AsciiString> ButtonKeyMap;

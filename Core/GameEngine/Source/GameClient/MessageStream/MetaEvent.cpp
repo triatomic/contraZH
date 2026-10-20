@@ -43,6 +43,7 @@
 #include "GameClient/GameClient.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/KeyDefs.h"
+#include "GameClient/LookAtXlat.h"
 #include "GameClient/ParticleSys.h"	// for ParticleSystemDebugDisplay
 #include "GameClient/Shell.h"
 #include "GameClient/WindowLayout.h"
@@ -417,6 +418,9 @@ MetaEventTranslator::MetaEventTranslator()
 	for (Int i = 0; i < NUM_MOUSE_BUTTONS; ++i) {
 		m_nextUpShouldCreateDoubleClick[i] = FALSE;
 	}
+	m_middleDragged = FALSE;
+	m_middleDownTime = 0;
+	m_wheelSpin = 0.0f;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -427,9 +431,11 @@ MetaEventTranslator::~MetaEventTranslator()
 //-------------------------------------------------------------------------------------------------
 static const char * findGameMessageNameByType(GameMessage::Type type)
 {
-	for (const LookupListRec* metaNames = GameMessageMetaTypeNames; metaNames->name; metaNames++)
-		if (metaNames->value == (Int)type)
-			return metaNames->name;
+	const char *name = MetaMap::findMetaTypeName(type);
+	if (name)
+	{
+		return name;
+	}
 
 	DEBUG_CRASH(("MetaTypeName %d not found -- did you remember to add it to GameMessageMetaTypeNames[] ?", (Int)type));
 	return "???";
@@ -478,9 +484,21 @@ GameMessageDisposition MetaEventTranslator::translateGameMessage(const GameMessa
 	{
 		// only a wheel no window used reaches here, and one that fires a binding does not zoom
 		const Real spin = msg->getArgument(1)->real;
-		if (spin != 0.0f && onMouseKeyPressed(spin > 0.0f ? MK_WHEELUP : MK_WHEELDOWN, msg->getArgument(2)->integer))
+		if ((spin > 0.0f) != (m_wheelSpin > 0.0f))
 		{
-			disp = DESTROY_MESSAGE;
+			m_wheelSpin = 0.0f;
+		}
+		m_wheelSpin += spin;
+
+		// touchpads and smooth wheels send fractions of a notch; a binding fires once per whole notch
+		if (fabs(m_wheelSpin) >= 1.0f)
+		{
+			const Bool up = m_wheelSpin > 0.0f;
+			m_wheelSpin -= up ? 1.0f : -1.0f;
+			if (onMouseKeyPressed(up ? MK_WHEELUP : MK_WHEELDOWN, msg->getArgument(2)->integer))
+			{
+				disp = DESTROY_MESSAGE;
+			}
 		}
 	}
 	else if (t > GameMessage::MSG_RAW_MOUSE_BEGIN && t < GameMessage::MSG_RAW_MOUSE_END )
@@ -508,6 +526,21 @@ void MetaEventTranslator::onMouseEvent(const GameMessage *msg)
 			--index;
 			m_mouseDownPosition[index] = msg->getArgument(0)->pixel;
 			m_nextUpShouldCreateDoubleClick[index] = FALSE;
+			if (index == 1)
+			{
+				m_middleDragged = FALSE;
+				m_middleDownTime = msg->getArgument(2)->integer;
+			}
+			break;
+		}
+
+		case GameMessage::MSG_RAW_MOUSE_MIDDLE_DRAG:
+		{
+			// a rotate that comes back to where it started is still a drag
+			if (!TheMouse->isClick(0, 0, m_mouseDownPosition[1], msg->getArgument(0)->pixel))
+			{
+				m_middleDragged = TRUE;
+			}
 			break;
 		}
 
@@ -566,9 +599,13 @@ void MetaEventTranslator::onMouseEvent(const GameMessage *msg)
 			newMessage->appendIntegerArgument( msg->getArgument(1)->integer );
 
 			// a middle click that did not drag the camera fires what is bound to the middle button
-			if (index == 1 && pixelRegion.hi.x == pixelRegion.lo.x && pixelRegion.hi.y == pixelRegion.lo.y)
+			if (index == 1 && !m_middleDragged &&
+					TheMouse->isClick(m_middleDownTime, msg->getArgument(2)->integer, m_mouseDownPosition[index], location))
 			{
-				onMouseKeyPressed(MK_MOUSE3, msg->getArgument(1)->integer);
+				if (onMouseKeyPressed(MK_MOUSE3, msg->getArgument(1)->integer) && TheLookAtTranslator)
+				{
+					TheLookAtTranslator->consumeMiddleClick();
+				}
 			}
 
 			// append the time to the message.
@@ -688,6 +725,11 @@ void MetaEventTranslator::onKeyPressed(GameMessageDisposition &disp, Int systemK
 					uKey.concat( wKey );
 					AsciiString aKey;
 					aKey.translate( uKey );
+					const char *mouseKey = HotKeyManager::mouseKeyName( keyType );
+					if( mouseKey )
+					{
+						aKey = mouseKey;
+					}
 
 					if( aKey.isNotEmpty() && TheHotKeyManager->isHotKeyClaimed( aKey ) )
 					{

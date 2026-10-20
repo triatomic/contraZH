@@ -451,6 +451,10 @@ const char *HotKeyManager::cornerText( Char corner )
 //-----------------------------------------------------------------------------
 AsciiString HotKeyManager::getButtonHotKey( const AsciiString& buttonName, const AsciiString& label )
 {
+	if( s_playerButtonKeys.empty() )
+	{
+		return searchHotKey( label );
+	}
 	AsciiString name = buttonName;
 	name.toLower();
 	ButtonKeyMap::const_iterator it = s_playerButtonKeys.find( name );
@@ -465,6 +469,10 @@ AsciiString HotKeyManager::getButtonHotKey( const AsciiString& buttonName, const
 UnicodeString HotKeyManager::getButtonLabel( const AsciiString& buttonName, const AsciiString& label )
 {
 	const UnicodeString text = TheGameText->fetch( label );
+	if( s_playerButtonKeys.empty() )
+	{
+		return text;
+	}
 	AsciiString name = buttonName;
 	name.toLower();
 	ButtonKeyMap::const_iterator it = s_playerButtonKeys.find( name );
@@ -472,7 +480,12 @@ UnicodeString HotKeyManager::getButtonLabel( const AsciiString& buttonName, cons
 	{
 		return text;
 	}
+	return markLabel( text, it->second );
+}
 
+//-----------------------------------------------------------------------------
+UnicodeString HotKeyManager::markLabel( const UnicodeString& text, const AsciiString& key )
+{
 	UnicodeString plain;
 	for( const WideChar *c = text.str(); *c; ++c )
 	{
@@ -481,19 +494,19 @@ UnicodeString HotKeyManager::getButtonLabel( const AsciiString& buttonName, cons
 			plain.concat( *c );
 		}
 	}
-	if( it->second.isEmpty() )
+	if( key.isEmpty() )
 	{
 		return plain;
 	}
-	if( it->second.getLength() > 1 )
+	if( key.getLength() > 1 )
 	{
 		plain.concat( L" (" );
-		plain.concat( mouseKeyText( mouseKeyFromName( it->second ) ) );
+		plain.concat( mouseKeyText( mouseKeyFromName( key ) ) );
 		plain.concat( L')' );
 		return plain;
 	}
 
-	const WideChar letter = (WideChar)towlower( it->second.getCharAt( 0 ) );
+	const WideChar letter = (WideChar)towlower( key.getCharAt( 0 ) );
 	UnicodeString marked;
 	Bool placed = FALSE;
 	for( const WideChar *c = plain.str(); *c; ++c )
@@ -588,7 +601,7 @@ void HotKeyManager::loadPlayerKeys()
 		INI ini;
 		try
 		{
-			ini.load( path, INI_LOAD_MULTIFILE, nullptr );
+			ini.loadHotKeys( path );
 			DEBUG_LOG(( "HOTKEYS: read %s", path.str() ));
 		}
 		catch( ... )
@@ -599,7 +612,9 @@ void HotKeyManager::loadPlayerKeys()
 
 	// the bar hands out its letters again on its next update
 	if( TheControlBar )
+	{
 		TheControlBar->markUIDirty();
+	}
 }
 
 //-----------------------------------------------------------------------------

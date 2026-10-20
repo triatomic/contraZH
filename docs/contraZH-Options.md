@@ -106,14 +106,16 @@ like any other button.
 * Click a card button, then press its new letter. Backspace takes the key off, Esc cancels.
 * Mouse inputs bind like keys, to commands and card buttons alike: the middle button, the two side
   buttons and the wheel up or down. Card corners show `M3`, `M4`, `M5`, `WU` or `WD`.
-  * The middle button fires on a click that did not drag, so middle-drag camera panning still works.
+  * The middle button fires on a quick click that did not drag, so middle-drag camera rotation still
+    works. A click that fires a binding does not reset the camera.
   * A wheel direction that fires a binding does not zoom; every unbound combination still zooms, so
     Ctrl + Wheel up can take a command while the plain wheel keeps zooming.
+  * A binding fires once per whole wheel notch, so a touchpad swipe does not repeat it.
   * A wheel notch over a menu or list still scrolls it and fires nothing.
 * **GENERAL** lists every command that needs no unit (selection, control groups, camera, chat,
   beacons, holds such as Force Attack). **Change**, a double click or Enter waits for a key; **No key** unbinds.
 * A hold command (Force Attack, Waypoints, Prefer Selection) also takes Ctrl, Alt or Shift alone:
-  press it and let go with no other key.
+  press it and let go with no other key. It does not take the middle button or the wheel.
 * **KEY CONFLICTS** lists every card with a shared letter and every shared command chord; a double
   click opens it.
 * Card borders: gold for the selected button, red for a shared letter, amber for a changed one.
