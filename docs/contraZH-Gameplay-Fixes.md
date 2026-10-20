@@ -297,13 +297,3 @@ drifted across the map in one direction. Each new spot is now random around the 
 ([TheSuperHackers#3544](https://github.com/TheSuperHackers/GeneralsGameCode/pull/3544)).
 
 Changes the simulation; affects replays.
-
-## Simulation math matches on every CPU
-
-The simulation computes sine, cosine, square roots and the other math functions with
-TheSuperHackers' GameMath library, instead of the C runtime, so every CPU gets the same results
-([TheSuperHackers#2670](https://github.com/TheSuperHackers/GeneralsGameCode/pull/2670)). Builds
-can turn this off with the CMake option `RTS_BUILD_OPTION_DETERMINISTIC_MATH=OFF`.
-
-Changes the simulation; affects replays. A build with this change cannot play against an older
-build or against a build with the option turned off.

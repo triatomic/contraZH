@@ -23,7 +23,7 @@
 #endif
 
 #ifndef USE_DETERMINISTIC_MATH
-#define USE_DETERMINISTIC_MATH (1) // Game uses deterministic math for game simulation compatibility among different system architectures in peer to peer networks. Independent of RETAIL_COMPATIBLE_CRC; CMake sets 0 for retail and VC6 builds
+#define USE_DETERMINISTIC_MATH (1) // Game uses deterministic math for game simulation compatibility among different system architectures in peer to peer networks
 #endif
 
 #if defined(__has_include)
@@ -32,6 +32,6 @@
 #endif
 #endif
 
-#if USE_DETERMINISTIC_MATH && !HAS_GAMEMATH
-#error "USE_DETERMINISTIC_MATH needs GameMath's gmath.h on the include path"
+#if !HAS_GAMEMATH || RETAIL_COMPATIBLE_CRC
+#undef USE_DETERMINISTIC_MATH // Unfortunately cannot actually use deterministic math
 #endif
