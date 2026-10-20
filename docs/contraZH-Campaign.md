@@ -26,9 +26,9 @@ going back to an earlier chapter is one click.
 * Easy, Medium and Hard radios pick the difficulty, remembered as `CampaignDifficulty` in
 `Options.ini`. A started mission plays as a normal campaign mission, so winning it moves on to
 `NextMission`.
-* Needs the loose `MainMenu.wnd`, `CampaignChapters.wnd` and `WindowTransitions.ini` written by
-`build/add_campaign_chapters_wnd.py`, plus the `TOOLTIP:CampaignChapters` string. An older exe
-ignores the button.
+* The Contra mod ships the loose `MainMenu.wnd`, `CampaignChapters.wnd` and
+`WindowTransitions.ini` the screen needs, plus the `TOOLTIP:CampaignChapters`, `CAMPAIGN:Generals`
+and `CAMPAIGN:ZeroHour` strings. An older exe ignores the button.
 
 Contra puts its vanilla campaigns under a Generals tab and the training mission under a Zero Hour
 tab, with `CAMPAIGN:Generals` and `CAMPAIGN:ZeroHour` defined in `Generals.str`:

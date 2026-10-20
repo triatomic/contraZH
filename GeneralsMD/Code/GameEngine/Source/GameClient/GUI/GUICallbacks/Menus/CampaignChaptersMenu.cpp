@@ -238,19 +238,15 @@ static void showMapPreview( const Mission *mission )
 	{
 		return;
 	}
-	// Maps the cache does not know draw an empty frame, so the preview hides until one is found
+	// Without a preview picture the window is an empty frame, so it hides until one is found
 	const MapMetaData *map = ( mission && TheMapCache ) ? TheMapCache->findMap( mission->m_mapName ) : nullptr;
 	Image *image = map ? getMapPreviewImage( mission->m_mapName ) : nullptr;
 	mapWindow->winSetUserData( (void *)map );
-	mapWindow->winHide( map == nullptr );
+	mapWindow->winHide( image == nullptr );
 	if( image )
 	{
 		mapWindow->winSetStatus( WIN_STATUS_IMAGE );
 		mapWindow->winSetEnabledImage( 0, image );
-	}
-	else
-	{
-		mapWindow->winClearStatus( WIN_STATUS_IMAGE );
 	}
 }
 
