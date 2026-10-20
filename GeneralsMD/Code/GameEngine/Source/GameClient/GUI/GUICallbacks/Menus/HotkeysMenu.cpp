@@ -166,7 +166,8 @@ const BuiltInText BUILT_IN_TEXT[] =
 	{ "GUI:HotkeysAlsoOn", L"Same key as %s." },
 	{ "GUI:HotkeysGameKey", L"The game's own key is %s." },
 	{ "GUI:HotkeysButtonEverywhere", L"A letter holds on every bar that has the button." },
-	{ "GUI:HotkeysGridOn", L"Grid hotkeys are on, so most buttons take the key of their place. Unit orders use these letters." },
+	{ "GUI:HotkeysGridKeys", L"Grid hotkeys are on, so buttons take the key of their place." },
+	{ "GUI:HotkeysGridUnitOrders", L"Grid hotkeys are on, so most buttons take the key of their place. Unit orders use these letters." },
 	{ "GUI:HotkeysPick", L"Pick a command or a button, then double-click it or press Change." },
 	{ "GUI:HotkeysCategorySELECTION", L"Selection" },
 	{ "GUI:HotkeysCategoryTEAM", L"Control groups" },
@@ -1442,7 +1443,7 @@ void updateInfo()
 			}
 			if( TheGlobalData->m_gridHotkeysEnabled )
 			{
-				appendLine( text, HotkeysMenuText( "GUI:HotkeysGridOn" ) );
+				appendLine( text, HotkeysMenuText( TheGlobalData->m_gridHotkeyUnitOrders ? "GUI:HotkeysGridUnitOrders" : "GUI:HotkeysGridKeys" ) );
 			}
 		}
 		GadgetStaticTextSetText( s_info, text );
