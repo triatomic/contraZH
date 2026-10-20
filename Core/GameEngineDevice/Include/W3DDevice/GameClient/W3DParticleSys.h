@@ -74,6 +74,7 @@ private:
 	{
 		ParticleSystem *sys;
 		Real depth;												///< view space Z of the visible particles' mean, only filled when ordering back to front
+		RefCountPtr<TextureClass> texture;		///< the particle texture, null for smudges
 	};
 	static Bool isFarther(const DrawEntry &a, const DrawEntry &b);
 

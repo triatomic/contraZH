@@ -237,6 +237,10 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	// whether any particle system masks the disruption pass this frame
 	Bool hasDisruption = FALSE;
 
+	// The lookup hashes the name under a lock, so a run of systems with the same texture shares one.
+	AsciiString lastTextureName;
+	RefCountPtr<TextureClass> lastTexture;
+
 	ParticleSystemManager::ParticleSystemList &particleSysList = TheParticleSystemManager->getAllParticleSystems();
 	for( ParticleSystemManager::ParticleSystemListIt it = particleSysList.begin(); it != particleSysList.end(); ++it)
 	{
@@ -301,6 +305,16 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 			// only the view Z row matters, and the row's translation is the same for every system
 			const Vector4 &viewZ = rinfo.Camera.Get_View_Matrix()[2];
 			entry.depth = (viewZ.X * visibleSum.X + viewZ.Y * visibleSum.Y + viewZ.Z * visibleSum.Z) / particleCount;
+		}
+		if (!sys->isUsingSmudge())
+		{
+			const AsciiString &textureName = sys->getParticleTypeName();
+			if (lastTexture == nullptr || textureName != lastTextureName)
+			{
+				lastTexture.Assign_No_Add_Ref(W3DDisplay::m_assetManager->Get_Texture(textureName.str()));
+				lastTextureName = textureName;
+			}
+			entry.texture = lastTexture;
 		}
 		m_drawOrder.push_back(entry);
 	}
@@ -373,6 +387,9 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 		m_fieldParticleCount = fieldCount;
 		TheW3DBloom->end(rinfo);
 	}
+
+	// the entries hold texture references, which must not outlive the frame
+	m_drawOrder.clear();
 
 	//Draw any particles belonging to weather effects
 	if (TheSnowManager)
@@ -502,8 +519,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		// TheSuperHackers @performance Ronin/Mauller 09/08/2026 Implement batched rendering for similar particles.
 		// Particles with the same properties will now be batched onto a single texture surface before being drawn.
 		// If a different particle type appears before the batch is filled, the previous batch will be drawn first.
-		RefCountPtr<TextureClass> texture;
-		texture.Assign_No_Add_Ref(W3DDisplay::m_assetManager->Get_Texture(sys->getParticleTypeName().str()));
+		const RefCountPtr<TextureClass> &texture = entry->texture;
 
 		// TheSuperHackers @feature A ground aligned particle drawn as a quad can only ever be a
 		// flat plane, so a wide one cuts through a hillside no matter how its corners are placed.
