@@ -1,0 +1,51 @@
+# Campaign
+
+How the single player campaigns are listed, started and unlocked, and the `Campaign.ini` keys
+behind it.
+
+## Campaign screen
+
+* The single player menu has one `Campaign` button in place of the USA, China and GLA buttons. It
+opens a screen listing every `Campaign` block in `Campaign.ini` except challenge campaigns, so a mod
+adds a campaign by adding a block.
+* `CampaignGroupLabel` on a `Campaign` block names the tab the campaign sits under. Campaigns
+without the key share a `Campaign` tab. The tab row stays hidden while every campaign is in one
+tab; the screen holds six tabs, and with more groups the sixth becomes a `Campaign` tab holding
+every group past the fifth.
+* The left list holds the tab's campaigns, named by `CampaignNameLabel`. The right list holds the
+missions in `NextMission` order from `FirstMission`, named by the map's display name, with the map
+preview beside them when the map cache knows the map.
+* A mission unlocks once a mission leading to it has been won, and `FirstMission` is always open.
+Locked missions are greyed out and the Play button refuses them. Won missions are recorded in
+`CampaignProgress.ini` in the user data folder next to `Options.ini`, one `campaign.mission = 1`
+line each.
+* Opening the screen selects the campaign last played and its first mission still to be won, so
+going back to an earlier chapter is one click.
+* Easy, Medium and Hard radios pick the difficulty, remembered as `CampaignDifficulty` in
+`Options.ini`. A started mission plays as a normal campaign mission, so winning it moves on to
+`NextMission`.
+* Needs the loose `MainMenu.wnd`, `CampaignChapters.wnd` and `WindowTransitions.ini` written by
+`build/add_campaign_chapters_wnd.py`, plus the `TOOLTIP:CampaignChapters` string. An older exe
+ignores the button.
+
+Contra puts its vanilla campaigns under a Generals tab and the training mission under a Zero Hour
+tab, with `CAMPAIGN:Generals` and `CAMPAIGN:ZeroHour` defined in `Generals.str`:
+
+```ini
+Campaign USA
+  CampaignNameLabel CAMPAIGN:USA
+  CampaignGroupLabel CAMPAIGN:Generals
+  FirstMission Mission01
+  ...
+END
+
+Campaign TRAINING
+  CampaignNameLabel CAMPAIGN:TRAINING
+  CampaignGroupLabel CAMPAIGN:ZeroHour
+  FirstMission Mission01
+  ...
+END
+```
+
+Note: to open every mission, for testing or after a reinstall, put `UnlockAll = yes` on its own
+line in `CampaignProgress.ini` (create the file if it does not exist) and reopen the screen.
