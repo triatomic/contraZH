@@ -2127,6 +2127,8 @@ static Bool Get_Unit_Clouds_Enabled()
 	return (value != nullptr) ? atoi(value) != 0 : TRUE;
 }
 
+static const Bool UnitCloudsEnabled = Get_Unit_Clouds_Enabled();
+
 static Bool bindCloudReceiver(Int stage);
 static void unbindCloudReceiver(Int stage);
 
@@ -2171,7 +2173,7 @@ Int ShadowMultiplyShader::init()
 
 	// Without the cloud variant, receivers fall back to the shadow alone.
 	const char *cloudFile = packed ? "shaders\\shadowmultiplycloudpacked.pso" : "shaders\\shadowmultiplycloud.pso";
-	if (!Get_Unit_Clouds_Enabled() ||
+	if (!UnitCloudsEnabled ||
 		FAILED(W3DShaderManager::LoadAndCreateD3DShader(cloudFile, nullptr, 0, false, &m_dwCloudPixelShader)))
 	{
 		m_dwCloudPixelShader = 0;
@@ -2527,7 +2529,7 @@ Int SpecularShader::set(Int pass)
 	m_receiving = m_shadowed && !m_lit && SpecularReceiveLoaded && passLights != nullptr && passLights->receivesShadow;
 	m_clouds = FALSE;
 	D3DMATRIX cameraToCloud;
-	if (m_receiving && Get_Unit_Clouds_Enabled() && bindCloudTexture(SPECULAR_CLOUD_STAGE, cameraToCloud))
+	if (m_receiving && UnitCloudsEnabled && bindCloudTexture(SPECULAR_CLOUD_STAGE, cameraToCloud))
 	{
 		m_clouds = TRUE;
 		Vector4 cloudU(cameraToCloud.m[0][0], cameraToCloud.m[1][0], cameraToCloud.m[2][0], cameraToCloud.m[3][0]);
