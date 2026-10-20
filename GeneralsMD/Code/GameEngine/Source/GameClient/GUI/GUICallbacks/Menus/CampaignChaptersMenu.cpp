@@ -152,13 +152,14 @@ static void buildTabs()
 
 static void layoutTabs()
 {
-	// One tab is no choice, so the row stays hidden; more than fit are folded into the last tab
+	// One tab is no choice, so the row stays hidden; more than fit share a plain Campaign tab
 	Int shown = (Int)tabs.size();
 	if( shown > MAX_CAMPAIGN_TABS )
 	{
+		CampaignTab &last = tabs[MAX_CAMPAIGN_TABS - 1];
+		last.label = "GUI:Campaign";
 		for( size_t tab = MAX_CAMPAIGN_TABS; tab < tabs.size(); ++tab )
 		{
-			CampaignTab &last = tabs[MAX_CAMPAIGN_TABS - 1];
 			last.campaigns.insert( last.campaigns.end(), tabs[tab].campaigns.begin(), tabs[tab].campaigns.end() );
 		}
 		tabs.resize( MAX_CAMPAIGN_TABS );

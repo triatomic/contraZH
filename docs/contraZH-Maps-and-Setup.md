@@ -238,14 +238,14 @@ opens a screen listing every `Campaign` block in `Campaign.ini` except challenge
 adds a campaign by adding a block.
 * `CampaignGroupLabel` on a `Campaign` block names the tab the campaign sits under, for example one
 tab each for Generals, Zero Hour and Contra campaigns. Campaigns without the key share a `Campaign`
-tab. The tab row stays hidden while every campaign is in one tab; the screen holds six tabs and
-folds later groups into the sixth.
+tab. The tab row stays hidden while every campaign is in one tab; the screen holds six tabs, and
+with more groups the sixth becomes a `Campaign` tab holding every group past the fifth.
 * The left list holds the tab's campaigns, named by `CampaignNameLabel`. The right list holds the
 missions in `NextMission` order from `FirstMission`, named by the map's display name, with the map
 preview beside them.
 * A mission unlocks once a mission leading to it has been won, and `FirstMission` is always open.
 Locked missions are greyed out and the Play button refuses them. Won missions are recorded in
-`CampaignProgress.ini` in the user data folder next to `Options.ini`, one `campaign.mission = yes`
+`CampaignProgress.ini` in the user data folder next to `Options.ini`, one `campaign.mission = 1`
 line each; `UnlockAll = yes` in that file opens every mission.
 * Opening the screen selects the campaign last played and its first mission still to be won, so
 going back to an earlier chapter is one click.
