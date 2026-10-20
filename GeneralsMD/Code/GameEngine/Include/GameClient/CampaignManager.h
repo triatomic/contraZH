@@ -105,6 +105,7 @@ public:
 	AsciiString m_name;
 	AsciiString m_firstMission;
 	AsciiString m_campaignNameLabel;		///< campaign name label from string manager
+	AsciiString m_groupLabel;						///< campaign tab label from string manager
 	MissionList m_missions;
 	AsciiString m_finalMovieName;
 	Bool m_isChallengeCampaign;
@@ -138,6 +139,11 @@ public:
 
 	Campaign *newCampaign(AsciiString name);
 	const std::list< Campaign* > &getCampaignList() const { return m_campaignList; }
+
+	// Completed missions persist in CampaignProgress.ini; a mission unlocks once a mission leading to it is complete
+	Bool isMissionCompleted( const Campaign *campaign, const Mission *mission );
+	Bool isMissionUnlocked( const Campaign *campaign, const Mission *mission );
+	void markCurrentMissionCompleted();
 	Bool isVictorious() { return m_victorious; }
 	void SetVictorious( Bool victory ) { m_victorious = victory;	}
 

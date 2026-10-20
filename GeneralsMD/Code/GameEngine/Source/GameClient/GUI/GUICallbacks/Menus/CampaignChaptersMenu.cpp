@@ -18,7 +18,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////
 // FILE: CampaignChaptersMenu.cpp
-// Description: Starts any mission of a Campaign.ini campaign
+// Description: Campaign screen listing Campaign.ini campaigns by tab and their unlocked missions
 ///////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
@@ -32,6 +32,7 @@
 #include "GameClient/CampaignManager.h"
 #include "GameClient/Gadget.h"
 #include "GameClient/GadgetListBox.h"
+#include "GameClient/GadgetPushButton.h"
 #include "GameClient/GadgetRadioButton.h"
 #include "GameClient/GameText.h"
 #include "GameClient/GameWindowManager.h"
@@ -43,6 +44,8 @@
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/ScriptEngine.h"
 
+enum { MAX_CAMPAIGN_TABS = 6 };
+
 // window ids -------------------------------------------------------------------------------------
 static NameKeyType parentID = NAMEKEY_INVALID;
 static NameKeyType listboxCampaignsID = NAMEKEY_INVALID;
@@ -52,12 +55,25 @@ static NameKeyType buttonBackID = NAMEKEY_INVALID;
 static NameKeyType radioEasyID = NAMEKEY_INVALID;
 static NameKeyType radioMediumID = NAMEKEY_INVALID;
 static NameKeyType radioHardID = NAMEKEY_INVALID;
+static NameKeyType buttonTabID[MAX_CAMPAIGN_TABS];
 
 // window pointers --------------------------------------------------------------------------------
 static GameWindow *parent = nullptr;
 static GameWindow *listboxCampaigns = nullptr;
 static GameWindow *listboxChapters = nullptr;
+static GameWindow *buttonPlay = nullptr;
 static GameWindow *buttonBack = nullptr;
+static GameWindow *mapWindow = nullptr;
+static GameWindow *buttonTab[MAX_CAMPAIGN_TABS];
+
+// Campaigns sharing a CampaignGroupLabel share a tab, in Campaign.ini order
+struct CampaignTab
+{
+	AsciiString label;
+	std::vector< Campaign* > campaigns;
+};
+static std::vector< CampaignTab > tabs;
+static Int activeTab = 0;
 
 static GameDifficulty difficulty = DIFFICULTY_NORMAL;
 static Bool isShuttingDown = FALSE;
@@ -66,6 +82,7 @@ static Bool justEntered = FALSE;
 static Int initialGadgetDelay = 2;
 
 static const Color textColor = GameMakeColor( 255, 255, 255, 255 );
+static const Color lockedColor = GameMakeColor( 110, 110, 110, 255 );
 
 static Campaign *getSelectedCampaign()
 {
@@ -89,9 +106,20 @@ static Mission *getSelectedMission()
 	return (Mission *)GadgetListBoxGetItemData( listboxChapters, row );
 }
 
-static void populateCampaigns()
+static UnicodeString fetchLabel( const AsciiString &label, const AsciiString &fallback )
 {
-	GadgetListBoxReset( listboxCampaigns );
+	Bool exists = FALSE;
+	UnicodeString text = TheGameText->fetch( label, &exists );
+	if( !exists )
+	{
+		text.translate( fallback );
+	}
+	return text;
+}
+
+static void buildTabs()
+{
+	tabs.clear();
 
 	// Challenge campaigns need a general picked in the challenge menu, so they are left out
 	const std::list< Campaign* > &campaigns = TheCampaignManager->getCampaignList();
@@ -103,14 +131,123 @@ static void populateCampaigns()
 			continue;
 		}
 
-		Bool exists = FALSE;
-		UnicodeString name = TheGameText->fetch( campaign->m_campaignNameLabel, &exists );
-		if( !exists )
+		AsciiString label = campaign->m_groupLabel;
+		if( label.isEmpty() )
 		{
-			name.translate( campaign->m_name );
+			label = "GUI:Campaign";
 		}
-		Int row = GadgetListBoxAddEntryText( listboxCampaigns, name, textColor, -1 );
+		size_t tab = 0;
+		while( tab < tabs.size() && tabs[tab].label.compareNoCase( label ) != 0 )
+		{
+			++tab;
+		}
+		if( tab == tabs.size() )
+		{
+			tabs.push_back( CampaignTab() );
+			tabs.back().label = label;
+		}
+		tabs[tab].campaigns.push_back( campaign );
+	}
+}
+
+static void layoutTabs()
+{
+	// One tab is no choice, so the row stays hidden; more than fit are folded into the last tab
+	Int shown = (Int)tabs.size();
+	if( shown > MAX_CAMPAIGN_TABS )
+	{
+		for( size_t tab = MAX_CAMPAIGN_TABS; tab < tabs.size(); ++tab )
+		{
+			CampaignTab &last = tabs[MAX_CAMPAIGN_TABS - 1];
+			last.campaigns.insert( last.campaigns.end(), tabs[tab].campaigns.begin(), tabs[tab].campaigns.end() );
+		}
+		tabs.resize( MAX_CAMPAIGN_TABS );
+		shown = MAX_CAMPAIGN_TABS;
+	}
+	if( shown < 2 )
+	{
+		shown = 0;
+	}
+
+	Int x = 0, y = 0, width = 0, height = 0, right = 0;
+	if( buttonTab[0] )
+	{
+		buttonTab[0]->winGetPosition( &x, &y );
+		buttonTab[0]->winGetSize( &width, &height );
+		right = x + width;
+	}
+	if( buttonBack )
+	{
+		Int backX = 0, backY = 0, backWidth = 0, backHeight = 0;
+		buttonBack->winGetPosition( &backX, &backY );
+		buttonBack->winGetSize( &backWidth, &backHeight );
+		right = backX + backWidth;
+	}
+	const Int gap = 4;
+	if( shown > 0 && ( right - x - gap * ( shown - 1 ) ) / shown < width )
+	{
+		width = ( right - x - gap * ( shown - 1 ) ) / shown;
+	}
+
+	for( Int tab = 0; tab < MAX_CAMPAIGN_TABS; ++tab )
+	{
+		if( buttonTab[tab] == nullptr )
+		{
+			continue;
+		}
+		if( tab >= shown )
+		{
+			buttonTab[tab]->winHide( TRUE );
+			continue;
+		}
+		buttonTab[tab]->winSetPosition( x + tab * ( width + gap ), y );
+		buttonTab[tab]->winSetSize( width, height );
+		GadgetButtonSetText( buttonTab[tab], fetchLabel( tabs[tab].label, tabs[tab].label ) );
+		buttonTab[tab]->winHide( FALSE );
+	}
+}
+
+static void populateCampaigns()
+{
+	GadgetListBoxReset( listboxCampaigns );
+	for( Int tab = 0; tab < (Int)tabs.size() && tab < MAX_CAMPAIGN_TABS; ++tab )
+	{
+		if( buttonTab[tab] )
+		{
+			buttonTab[tab]->winEnable( tab != activeTab );
+		}
+	}
+	if( activeTab < 0 || activeTab >= (Int)tabs.size() )
+	{
+		return;
+	}
+
+	const std::vector< Campaign* > &campaigns = tabs[activeTab].campaigns;
+	for( size_t i = 0; i < campaigns.size(); ++i )
+	{
+		Campaign *campaign = campaigns[i];
+		Int row = GadgetListBoxAddEntryText( listboxCampaigns, fetchLabel( campaign->m_campaignNameLabel, campaign->m_name ), textColor, -1 );
 		GadgetListBoxSetItemData( listboxCampaigns, campaign, row );
+	}
+}
+
+static void showMapPreview( const Mission *mission )
+{
+	if( mapWindow == nullptr )
+	{
+		return;
+	}
+	const MapMetaData *map = ( mission && TheMapCache ) ? TheMapCache->findMap( mission->m_mapName ) : nullptr;
+	Image *image = map ? getMapPreviewImage( mission->m_mapName ) : nullptr;
+	mapWindow->winSetUserData( (void *)map );
+	if( image )
+	{
+		mapWindow->winSetStatus( WIN_STATUS_IMAGE );
+		mapWindow->winSetEnabledImage( 0, image );
+	}
+	else
+	{
+		mapWindow->winClearStatus( WIN_STATUS_IMAGE );
 	}
 }
 
@@ -119,6 +256,7 @@ static void populateChapters( Campaign *campaign )
 	GadgetListBoxReset( listboxChapters );
 	if( campaign == nullptr )
 	{
+		showMapPreview( nullptr );
 		return;
 	}
 
@@ -138,6 +276,10 @@ static void populateChapters( Campaign *campaign )
 		}
 	}
 
+	// The default row is the first open mission still to be won, else the last open one
+	Int select = 0;
+	Int lastUnlocked = 0;
+	Bool foundNext = FALSE;
 	Int number = 1;
 	for( std::list< Mission* >::iterator it = ordered.begin(); it != ordered.end(); ++it, ++number )
 	{
@@ -152,12 +294,70 @@ static void populateChapters( Campaign *campaign )
 			title.translate( (*it)->m_name );
 		}
 
+		Bool unlocked = TheCampaignManager->isMissionUnlocked( campaign, *it );
 		UnicodeString text;
 		text.format( L"%d. %s", number, title.str() );
-		Int row = GadgetListBoxAddEntryText( listboxChapters, text, textColor, -1 );
+		Int row = GadgetListBoxAddEntryText( listboxChapters, text, unlocked ? textColor : lockedColor, -1 );
 		GadgetListBoxSetItemData( listboxChapters, *it, row );
+		if( unlocked )
+		{
+			lastUnlocked = row;
+			if( !foundNext && !TheCampaignManager->isMissionCompleted( campaign, *it ) )
+			{
+				select = row;
+				foundNext = TRUE;
+			}
+		}
 	}
-	GadgetListBoxSetSelected( listboxChapters, 0 );
+	if( !foundNext )
+	{
+		select = lastUnlocked;
+	}
+	GadgetListBoxSetSelected( listboxChapters, select );
+}
+
+static void updatePlayButton()
+{
+	Campaign *campaign = getSelectedCampaign();
+	Mission *mission = getSelectedMission();
+	showMapPreview( mission );
+	if( buttonPlay )
+	{
+		buttonPlay->winEnable( TheCampaignManager->isMissionUnlocked( campaign, mission ) );
+	}
+}
+
+static void selectTab( Int tab )
+{
+	if( tab < 0 || tab >= (Int)tabs.size() )
+	{
+		return;
+	}
+	activeTab = tab;
+
+	// Selecting the campaign fills the chapter list through GLM_SELECTED
+	populateCampaigns();
+	GadgetListBoxSetSelected( listboxCampaigns, 0 );
+}
+
+static void selectCurrentCampaign()
+{
+	// Coming back from a mission reopens its campaign so the next chapter is the default row
+	Campaign *current = TheCampaignManager->getCurrentCampaign();
+	for( size_t tab = 0; tab < tabs.size(); ++tab )
+	{
+		const std::vector< Campaign* > &campaigns = tabs[tab].campaigns;
+		for( size_t i = 0; i < campaigns.size(); ++i )
+		{
+			if( campaigns[i] == current )
+			{
+				selectTab( (Int)tab );
+				GadgetListBoxSetSelected( listboxCampaigns, (Int)i );
+				return;
+			}
+		}
+	}
+	selectTab( 0 );
 }
 
 static void startChapter()
@@ -165,6 +365,10 @@ static void startChapter()
 	Campaign *campaign = getSelectedCampaign();
 	Mission *mission = getSelectedMission();
 	if( gameStarting || campaign == nullptr || mission == nullptr )
+	{
+		return;
+	}
+	if( !TheCampaignManager->isMissionUnlocked( campaign, mission ) )
 	{
 		return;
 	}
@@ -213,7 +417,16 @@ void CampaignChaptersMenuInit( WindowLayout *layout, void *userData )
 	parent = TheWindowManager->winGetWindowFromId( nullptr, parentID );
 	listboxCampaigns = TheWindowManager->winGetWindowFromId( parent, listboxCampaignsID );
 	listboxChapters = TheWindowManager->winGetWindowFromId( parent, listboxChaptersID );
+	buttonPlay = TheWindowManager->winGetWindowFromId( parent, buttonPlayID );
 	buttonBack = TheWindowManager->winGetWindowFromId( parent, buttonBackID );
+	mapWindow = TheWindowManager->winGetWindowFromId( parent, TheNameKeyGenerator->nameToKey( "CampaignChapters.wnd:MapWindow" ) );
+	for( Int tab = 0; tab < MAX_CAMPAIGN_TABS; ++tab )
+	{
+		AsciiString name;
+		name.format( "CampaignChapters.wnd:ButtonTab%d", tab );
+		buttonTabID[tab] = TheNameKeyGenerator->nameToKey( name );
+		buttonTab[tab] = TheWindowManager->winGetWindowFromId( parent, buttonTabID[tab] );
+	}
 
 	OptionPreferences pref;
 	difficulty = (GameDifficulty)pref.getCampaignDifficulty();
@@ -236,9 +449,9 @@ void CampaignChaptersMenuInit( WindowLayout *layout, void *userData )
 		GadgetRadioSetSelection( radio, FALSE );
 	}
 
-	// Selecting the first campaign fills the chapter list through GLM_SELECTED
-	populateCampaigns();
-	GadgetListBoxSetSelected( listboxCampaigns, 0 );
+	buildTabs();
+	layoutTabs();
+	selectCurrentCampaign();
 
 	layout->hide( FALSE );
 	TheWindowManager->winSetFocus( parent );
@@ -328,6 +541,7 @@ WindowMsgHandledType CampaignChaptersMenuSystem( GameWindow *window, UnsignedInt
 			{
 				populateChapters( getSelectedCampaign() );
 			}
+			updatePlayButton();
 			break;
 		}
 
@@ -364,6 +578,17 @@ WindowMsgHandledType CampaignChaptersMenuSystem( GameWindow *window, UnsignedInt
 			else if( controlID == radioHardID )
 			{
 				difficulty = DIFFICULTY_HARD;
+			}
+			else
+			{
+				for( Int tab = 0; tab < MAX_CAMPAIGN_TABS; ++tab )
+				{
+					if( controlID == buttonTabID[tab] )
+					{
+						selectTab( tab );
+						break;
+					}
+				}
 			}
 			break;
 		}

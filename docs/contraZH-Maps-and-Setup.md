@@ -231,13 +231,27 @@ official and custom maps.
 * The box takes its height from the top of the list and copies the look of the setup screen's text
 box (player name in skirmish, chat in LAN), so mod layouts need no `.wnd` change.
 
-### Campaign chapters
+### Campaign screen
 
-* The single player menu has a `Campaign Chapters` button between Skirmish and Back. It opens a
-screen that starts any mission of a campaign at Easy, Normal or Hard.
-* The left list holds every `Campaign` block in `Campaign.ini` except challenge campaigns, named by
-`CampaignNameLabel`. The right list holds its missions in `NextMission` order from `FirstMission`,
-named by the map's display name.
-* A started mission plays as a normal campaign mission, so winning it moves on to `NextMission`.
-* Needs the loose `MainMenu.wnd`, `CampaignChapters.wnd` and `WindowTransitions.ini`, plus the
-`GUI:CampaignChapters` and `TOOLTIP:CampaignChapters` strings. An older exe ignores the button.
+* The single player menu has one `Campaign` button in place of the USA, China and GLA buttons. It
+opens a screen listing every `Campaign` block in `Campaign.ini` except challenge campaigns, so a mod
+adds a campaign by adding a block.
+* `CampaignGroupLabel` on a `Campaign` block names the tab the campaign sits under, for example one
+tab each for Generals, Zero Hour and Contra campaigns. Campaigns without the key share a `Campaign`
+tab. The tab row stays hidden while every campaign is in one tab; the screen holds six tabs and
+folds later groups into the sixth.
+* The left list holds the tab's campaigns, named by `CampaignNameLabel`. The right list holds the
+missions in `NextMission` order from `FirstMission`, named by the map's display name, with the map
+preview beside them.
+* A mission unlocks once a mission leading to it has been won, and `FirstMission` is always open.
+Locked missions are greyed out and the Play button refuses them. Won missions are recorded in
+`CampaignProgress.ini` in the user data folder next to `Options.ini`, one `campaign.mission = yes`
+line each; `UnlockAll = yes` in that file opens every mission.
+* Opening the screen selects the campaign last played and its first mission still to be won, so
+going back to an earlier chapter is one click.
+* Easy, Medium and Hard radios pick the difficulty, remembered as `CampaignDifficulty` in
+`Options.ini`. A started mission plays as a normal campaign mission, so winning it moves on to
+`NextMission`.
+* Needs the loose `MainMenu.wnd`, `CampaignChapters.wnd` and `WindowTransitions.ini` written by
+`build/add_campaign_chapters_wnd.py`, plus the `TOOLTIP:CampaignChapters` string. An older exe
+ignores the button.

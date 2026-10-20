@@ -55,6 +55,7 @@
 #include "GameClient/CampaignManager.h"
 
 #include "Common/INI.h"
+#include "Common/UserPreferences.h"
 #include "Common/Xfer.h"
 #include "GameClient/ChallengeGenerals.h"//For TheChallengeGenerals, so I can save it too.
 #include "GameClient/GameClient.h"
@@ -74,6 +75,7 @@ const FieldParse CampaignManager::m_campaignFieldParseTable[] =
 	{ "Mission",						CampaignManager::parseMissionPart,	nullptr, 0 },
 	{ "FirstMission",				INI::parseAsciiString,							nullptr,	offsetof( Campaign, m_firstMission )  },
 	{ "CampaignNameLabel",	INI::parseAsciiString,							nullptr, offsetof( Campaign, m_campaignNameLabel ) },
+	{ "CampaignGroupLabel",	INI::parseAsciiString,							nullptr, offsetof( Campaign, m_groupLabel ) },
 	{ "FinalVictoryMovie",	INI::parseAsciiString,							nullptr, offsetof( Campaign, m_finalMovieName ) },
 	{ "IsChallengeCampaign",			INI::parseBool,				nullptr, offsetof( Campaign, m_isChallengeCampaign ) },
 	{ "PlayerFaction",		INI::parseAsciiString,					nullptr, offsetof( Campaign, m_playerFactionName ) },
@@ -267,6 +269,83 @@ Mission *CampaignManager::gotoNextMission()
 	m_currentMission = m_currentCampaign->getNextMission(m_currentMission);
 	return m_currentMission;
 
+}
+
+//-----------------------------------------------------------------------------
+static UserPreferences &getCampaignProgress()
+{
+	static UserPreferences progress;
+	static Bool loaded = FALSE;
+	if( !loaded )
+	{
+		progress.load( "CampaignProgress.ini" );
+		loaded = TRUE;
+	}
+	return progress;
+}
+
+static AsciiString campaignProgressKey( const Campaign *campaign, const Mission *mission )
+{
+	AsciiString key;
+	key.format( "%s.%s", campaign->m_name.str(), mission->m_name.str() );
+	return key;
+}
+
+//-----------------------------------------------------------------------------
+Bool CampaignManager::isMissionCompleted( const Campaign *campaign, const Mission *mission )
+{
+	if( !campaign || !mission )
+	{
+		return FALSE;
+	}
+	return getCampaignProgress().getBool( campaignProgressKey( campaign, mission ), FALSE );
+}
+
+//-----------------------------------------------------------------------------
+Bool CampaignManager::isMissionUnlocked( const Campaign *campaign, const Mission *mission )
+{
+	if( !campaign || !mission )
+	{
+		return FALSE;
+	}
+	if( getCampaignProgress().getBool( "UnlockAll", FALSE ) )
+	{
+		return TRUE;
+	}
+
+	// A mission nothing leads to is a chain start and always open
+	Bool hasPredecessor = FALSE;
+	for( Campaign::MissionList::const_iterator it = campaign->m_missions.begin(); it != campaign->m_missions.end(); ++it )
+	{
+		const Mission *previous = *it;
+		if( previous == mission || previous->m_nextMission.compareNoCase( mission->m_name ) != 0 )
+		{
+			continue;
+		}
+		hasPredecessor = TRUE;
+		if( isMissionCompleted( campaign, previous ) )
+		{
+			return TRUE;
+		}
+	}
+	return !hasPredecessor;
+}
+
+//-----------------------------------------------------------------------------
+void CampaignManager::markCurrentMissionCompleted()
+{
+	if( !m_currentCampaign || !m_currentMission || m_currentCampaign->isChallengeCampaign() )
+	{
+		return;
+	}
+	UserPreferences &progress = getCampaignProgress();
+	AsciiString key = campaignProgressKey( m_currentCampaign, m_currentMission );
+	if( progress.getBool( key, FALSE ) )
+	{
+		return;
+	}
+	progress.setBool( key, TRUE );
+	progress.write();
 }
 
 //-----------------------------------------------------------------------------
