@@ -73,6 +73,8 @@ public:
 
 	Bool m_isTorpedo; ///< die outside of water, strike objects from below.
 
+	Bool m_detonateOnTargetLost; ///< fly on and detonate at the launch target pos when the target dies; No kills self with a NORMAL death
+
     MissileAIUpdateModuleData();
 
 	static void buildFieldParse(MultiIniFieldParse& p);

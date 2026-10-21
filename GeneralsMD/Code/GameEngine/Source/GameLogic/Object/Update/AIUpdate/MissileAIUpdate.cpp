@@ -15,7 +15,7 @@
 **	You should have received a copy of the GNU General Public License
 **	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-  
+
 ////////////////////////////////////////////////////////////////////////////////
 //																																						//
 //  (c) 2001-2003 Electronic Arts Inc.																				//
@@ -97,6 +97,7 @@ MissileAIUpdateModuleData::MissileAIUpdateModuleData()
 	// m_turnRateAttacking = BIGNUM;
 	m_zDirFactor = 2.0f;
 	m_applyLauncherBonus = FALSE;
+	m_detonateOnTargetLost = TRUE;
 }
 
 //-----------------------------------------------------------------------------
@@ -133,6 +134,7 @@ void MissileAIUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "ZCorrectionFactor", INI::parseReal,   nullptr, offsetof(MissileAIUpdateModuleData, m_zDirFactor) },
 		{ "ApplyLauncherBonus", INI::parseBool,  nullptr, offsetof(MissileAIUpdateModuleData, m_applyLauncherBonus) },
 		{ "IsTorpedo",         INI::parseBool,   nullptr, offsetof(MissileAIUpdateModuleData, m_isTorpedo) },
+		{ "DetonateOnTargetLost", INI::parseBool, nullptr, offsetof(MissileAIUpdateModuleData, m_detonateOnTargetLost) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 
@@ -1088,9 +1090,9 @@ void MissileAIUpdate::airborneTargetGone()
 	Bool targetLost = d->m_isTorpedo ? (m_isTrackingTarget && getGoalPosition() == nullptr)
 																		: (m_isTrackingTarget && getGoalObject() == nullptr);
 
-	if (!targetLost)
+	// The NORMAL death of KILL_SELF is what INI die modules hook to retarget, as frog missiles do.
+	if (!targetLost || !d->m_detonateOnTargetLost)
 	{
-		// The target is still tracked, but we ran out of fuel in the KILL state.
 		// I would really love it if this could retarget, but all of the targeting and legality is done
 		// by the Weapon that fired me.  The safest thing for me to do in this state is to just run out of gas.
 		m_fuelExpirationDate = TheGameLogic->getFrame();
@@ -1108,7 +1110,9 @@ void MissileAIUpdate::airborneTargetGone()
 		Coord3D targetPos = m_originalTargetPos;
 		Locomotor* curLoco = getCurLocomotor();
 		if (d->m_isTorpedo && curLoco)
+		{
 			targetPos.z = getTorpedoTargetHeight(targetPos, curLoco);
+		}
 		aiMoveToPosition(&targetPos, CMD_FROM_AI);
 		m_victimID = INVALID_ID;
 	}

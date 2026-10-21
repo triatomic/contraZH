@@ -84,6 +84,19 @@ A dismount scuttle no longer triggers "Unit Lost", a radar ping or an "under att
 killed by an enemy still announces. Kill credit and score are unchanged. Not needed with
 `SurviveScuttle = Yes`.
 
+## MissileAIUpdate
+
+### DetonateOnTargetLost
+
+* `DetonateOnTargetLost = Yes` - (Default. `No` keeps the retail lost-target behaviour.)
+
+A missile whose target dies in flight flies on to where the target stood at launch and detonates
+there. Retail missiles vanished without exploding.
+
+`No` makes the missile kill itself on the spot with a `NORMAL` death, as retail did. Set it on any
+missile whose die modules react to that death, such as a `CreateObjectDie` with
+`DeathTypes = NONE +NORMAL` that spawns a retarget object.
+
 ## FireWeaponWhenDamagedBehavior
 
 ### NoHealthLoss
