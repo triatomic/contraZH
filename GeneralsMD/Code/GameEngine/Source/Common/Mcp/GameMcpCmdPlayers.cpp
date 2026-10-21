@@ -88,7 +88,9 @@ McpJson describeFull(Player *player)
 		.set("consumption", player->getEnergy()->getConsumption()));
 	result.set("rank", player->getRankLevel()).set("skill_points", player->getSkillPoints())
 		.set("science_points", player->getSciencePurchasePoints());
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	result.set("instant_build", player->buildsInstantly() != FALSE);
+#endif
 
 	McpJson sciences = McpJson::makeArray();
 	const std::vector<AsciiString> scienceNames = TheScienceStore->friend_getScienceNames();
