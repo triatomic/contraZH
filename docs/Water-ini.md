@@ -14,7 +14,7 @@ error is skipped until the next save.
 
 These set the look of most maps. The rest are under [Advanced keys](Water-Key-Reference.md#advanced-keys).
 
-* `ShaderWaterOpacity = 0.95` - (Opacity of deep water. 1 hides the seabed.)
+* `ShaderWaterOpacity = 0.6` - (Opacity of deep water. 1 hides the seabed.)
 * `ShaderWaterClarity = 1.0` - (How deep the seabed shows. Higher sees deeper.)
 * `ShaderWaterDeepColor` - (Colour of deep water, as `R:0-255 G:0-255 B:0-255`. Unset takes the
 average colour of `StandingWaterTexture`. The map's light and `DiffuseColor` still tint it. Shader
@@ -23,17 +23,17 @@ model 3 only.)
 * `ShaderWaterWaveStrength = 0.2` - (Steepness of the waves. Drives glint, sparkles, reflection and
 bending.)
 * `ShaderWaterSpecular = 1.0` - (Brightness of the broad sun glint. 0 turns it off.)
-* `ShaderWaterSparkle = 2.0` - (Brightness of the small sun specks, times the map's light, sun and
+* `ShaderWaterSparkle = 0.6` - (Brightness of the small sun specks, times the map's light, sun and
 ambient together. 0 turns them off. The specks are a narrow highlight off the ripples, from a sun
 ahead of the camera, so they show from every view. More of them show as `ShaderWaterWaveStrength`
 rises. Shader model 3 only.)
 * `ShaderWaterReflection = 3.0` - (Scales the sky reflection. 0 turns it off.)
 * `ShaderWaterSwellHeight = 3.0` - (Height of the vertex waves that lift lakes and seas, in world
 units. 0 turns them off. Needs a shader model 3 card.)
-* `ShaderWaterFoamStrength = 0.5` - (Brightness of the foam. 1 is full white web, 0 turns foam off.)
-* `ShaderWaterAutoMeasure = Yes` - (Calms water by its distance from shore, so ponds, harbours and
+* `ShaderWaterFoamStrength = 0.15` - (Brightness of the foam. 1 is full white web, 0 turns foam off.)
+* `ShaderWaterAutoMeasure = No` - (Calms water by its distance from shore, so ponds, harbours and
 rivers are calmer than open sea. See [Open water](#open-water).)
-* `ShaderWaterEnclosedCalm = 1.0` - (How much calmer enclosed water is, 0 to 1. At 1 it keeps 40% of
+* `ShaderWaterEnclosedCalm = 0.8` - (How much calmer enclosed water is, 0 to 1. At 1 it keeps 40% of
 the wave strength, half the broad waves and 20% of the swell.)
 * `ShaderWaterZoomCompensation = Yes` - (Keeps the ripples and sun specks as they look up close at any
 zoom and camera pitch. Zoomed out, the ripples double in size each time a pixel covers twice the
@@ -52,13 +52,13 @@ reflection, glint and foam fade in from the shoreline, so the water meets the gr
 line. 0 gives a hard shore edge. `ShaderWaterClarity` scales it. Same key as the old water.)
 * `TransparentWaterMinOpacity = 1.0` - (Opacity of deep water for the old water, and for shader
 water when `ShaderWaterOpacity` is 0.)
-* `ShaderWaterTexturePattern = 0` - (How much of `StandingWaterTexture`'s pattern shows over the water
+* `ShaderWaterTexturePattern = 0.1` - (How much of `StandingWaterTexture`'s pattern shows over the water
 colour, 0 to 1. The pattern keeps `ShaderWaterDeepColor` as its average. 1 with no deep colour set,
 `ShaderWaterWaveShading = 0` and `ShaderWaterSparkle = 0` gives the shader model 2.0a look with the
 four wave layers. Shader model 3 only.)
 * `ShaderWaterFoamDepth = 6` - (Depth where shore foam fades out. 0 turns foam off, crest foam
 included. Pier walls, jetties and cliffs rising out of deep water gather foam within 15 world units.)
-* `ShaderWaterShoreFoamDepth = 2.0` - (Depth the shoreline foam band reaches at the top of its surge.
+* `ShaderWaterShoreFoamDepth = 3.0` - (Depth the shoreline foam band reaches at the top of its surge.
 Gentle shores show the band wider than steep ones. Needs `ShorelineFoam` in Options.ini. Shader model
 3 only.)
 * `ShaderWaterShoreFoamSurge = 0.4` - (Share of the shoreline foam band the surge pulls back, 0 to 0.9.
@@ -69,15 +69,15 @@ Gentle shores show the band wider than steep ones. Needs `ShorelineFoam` in Opti
 These keys control the glint and how far the waves bend the seabed. The inset in the swell picture
 below shows the ripple pattern.
 
-* `ShaderWaterSpecularSpread = 1.0` - (Widens the sun glint. The glint is the sun's reflection, so it
+* `ShaderWaterSpecularSpread = 0.3` - (Widens the sun glint. The glint is the sun's reflection, so it
 only shows when the camera looks toward the sun, and most maps light from behind the default view.
 A wider glint catches more view angles and turns from a sharp sparkle into a broad sheen. Raise
 `ShaderWaterSpecular` with it to keep the glint bright.)
-* `ShaderWaterVirtualSun = No` - (Yes glints off a sun placed ahead of the camera at the map sun's
+* `ShaderWaterVirtualSun = Yes` - (Yes glints off a sun placed ahead of the camera at the map sun's
 height, so the glint shows from every view. The glint then turns with the camera and no longer
 matches the direction of shadows and lighting. Only the glint moves.)
 * `ShaderWaterRefraction = 0.015` - (How far the waves bend the seabed, as a fraction of the screen.)
-* `ShaderWaterWaveShading = 1.0` - (How much the waves light and shade the water's own colour, so
+* `ShaderWaterWaveShading = 0.1` - (How much the waves light and shade the water's own colour, so
 they show from straight above where the reflection is weak. 0 leaves the colour flat. Shader model 3
 only.)
 
@@ -93,7 +93,7 @@ set the open sea's look. Rivers count as enclosed. The distances are measured ag
 raise or lower water or the terrain changes. Shader model 3 only, and the distance reading needs
 vertex texture support.
 
-* `ShaderWaterOpenReach = 400` - (World units from shore at which water counts as fully open. The
+* `ShaderWaterOpenReach = 371` - (World units from shore at which water counts as fully open. The
 enclosed look fades into the open look over this distance. Distances stop at 2550.)
 
 ### Tiling
@@ -103,7 +103,7 @@ sea. Stochastic texturing hides it. The water is split into hex cells, each cell
 the patterns by its own random amount, and every point blends the three nearest cells while keeping
 the patterns' contrast. The waves travel the same way in every cell.
 
-* `ShaderWaterStochasticSize = 420` - (World units between neighbouring cells. Smaller breaks the
+* `ShaderWaterStochasticSize = 502` - (World units between neighbouring cells. Smaller breaks the
 pattern up more but blends more of the surface. 0 turns it off.)
 * `ShaderWaterStochasticSeabed = Yes` - (The same cells also shift and turn the terrain textures under
 standing water, fading in below the waterline over `TransparentWaterDepth`. Cliffs keep their own
@@ -150,7 +150,7 @@ ground. Shader model 3 only.)
 * `ShaderWaterPlanarStrength = 0.3` - (Reflection the mirrored scene adds on top of the sky's. 0
 leaves the mirror only at grazing angles. Water at another height than the one under the view fades
 to the skybox over 4 world units.)
-* `ShaderWaterPlanarDistortion = 0.02` - (How far the waves bend the mirrored scene, as a fraction of
+* `ShaderWaterPlanarDistortion = 0.025` - (How far the waves bend the mirrored scene, as a fraction of
 the screen. It follows the wave slopes, so `ShaderWaterWaveStrength` and calmer enclosed water scale
 it too. 0 keeps the mirror sharp.)
 
