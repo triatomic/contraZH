@@ -112,6 +112,33 @@ A faction whose `Side` has no matching scheme in `ControlBarScheme.ini` uses the
 `BaseSide`, with `USA` read as `America`. Retail fell back to the art-less `Default` scheme, which
 left the control bar broken for custom factions such as a mod's `AmericaCampaignGeneral`.
 
+### Command sets swapped by upgrade
+
+A player upgrade can replace the general's powers purchase sets and the powers shortcut bar, so a
+tech-path choice can change which powers a general offers. Each key names an upgrade and the set
+that stands in for the template's once the player has completed it. A key may repeat; when several
+listed upgrades are complete, the last line wins.
+
+```ini
+PlayerTemplate FactionAmericaSuperWeapon
+  PurchaseScienceCommandSetRank1 = SupW_SCIENCE_AMERICA_CommandSetRank1
+  PurchaseScienceCommandSetRank3 = SupW_SCIENCE_AMERICA_CommandSetRank3
+  PurchaseScienceCommandSetRank8 = SupW_SCIENCE_AMERICA_CommandSetRank8
+  SpecialPowerShortcutCommandSet = SupW_SpecialPowerShortcutUSA
+  PurchaseScienceCommandSetRank1Upgrade = Upgrade_AmericaSelectAngels SupW_SCIENCE_AMERICA_Angels_CommandSetRank1
+  PurchaseScienceCommandSetRank3Upgrade = Upgrade_AmericaSelectAngels SupW_SCIENCE_AMERICA_Angels_CommandSetRank3
+  PurchaseScienceCommandSetRank8Upgrade = Upgrade_AmericaSelectAngels SupW_SCIENCE_AMERICA_Angels_CommandSetRank8
+  SpecialPowerShortcutCommandSetUpgrade = Upgrade_AmericaSelectAngels SupW_SpecialPowerShortcutUSA_Angels
+End
+```
+
+* The four `...Upgrade` keys each take `<UpgradeName> <CommandSetName>`.
+* Only player upgrades count (`Type = PLAYER` in `Upgrade.ini`), the kind a `PLAYER_UPGRADE`
+button researches. Object upgrades never swap the sets.
+* The shortcut bar and an open purchase panel refresh on the frame the upgrade completes. Powers
+already bought stay bought; the swap only changes which buttons are shown.
+* Presentation only; the simulation and replays are unaffected.
+
 ## Game Setup
 
 ### Random army per faction

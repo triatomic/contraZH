@@ -3427,6 +3427,30 @@ Bool Player::hasUpgradeComplete( const UpgradeMaskType& testMask ) const
 }
 
 //=================================================================================================
+AsciiString Player::getPurchaseScienceCommandSetRank1() const
+{
+	return m_playerTemplate ? m_playerTemplate->getPurchaseScienceCommandSetRank1( this ) : AsciiString::TheEmptyString;
+}
+
+//=================================================================================================
+AsciiString Player::getPurchaseScienceCommandSetRank3() const
+{
+	return m_playerTemplate ? m_playerTemplate->getPurchaseScienceCommandSetRank3( this ) : AsciiString::TheEmptyString;
+}
+
+//=================================================================================================
+AsciiString Player::getPurchaseScienceCommandSetRank8() const
+{
+	return m_playerTemplate ? m_playerTemplate->getPurchaseScienceCommandSetRank8( this ) : AsciiString::TheEmptyString;
+}
+
+//=================================================================================================
+AsciiString Player::getSpecialPowerShortcutCommandSet() const
+{
+	return m_playerTemplate ? m_playerTemplate->getSpecialPowerShortcutCommandSet( this ) : AsciiString::TheEmptyString;
+}
+
+//=================================================================================================
 /** Does the player have this upgrade In Production*/
 //=================================================================================================
 Bool Player::hasUpgradeInProduction( const UpgradeTemplate *upgradeTemplate )

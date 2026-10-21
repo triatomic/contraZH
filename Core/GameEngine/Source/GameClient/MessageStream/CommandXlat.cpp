@@ -158,14 +158,10 @@ static void giveOwnFactionSciences(Player* player)
 	if (player == NULL)
 		return;
 
-	const PlayerTemplate* tmpl = player->getPlayerTemplate();
-	if (tmpl == NULL)
-		return;
-
 	AsciiString setNames[3];
-	setNames[0] = tmpl->getPurchaseScienceCommandSetRank1();
-	setNames[1] = tmpl->getPurchaseScienceCommandSetRank3();
-	setNames[2] = tmpl->getPurchaseScienceCommandSetRank8();
+	setNames[0] = player->getPurchaseScienceCommandSetRank1();
+	setNames[1] = player->getPurchaseScienceCommandSetRank3();
+	setNames[2] = player->getPurchaseScienceCommandSetRank8();
 
 	for (Int setIndex = 0; setIndex < 3; ++setIndex)
 	{

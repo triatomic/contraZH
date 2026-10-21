@@ -202,13 +202,13 @@ void ControlBar::populatePurchaseScience( Player* player )
 	if(TheScriptEngine->isGameEnding())
 		return;
 	// get command set
-	if(!player ||!player->getPlayerTemplate() || player->getPlayerTemplate()->getPurchaseScienceCommandSetRank1().isEmpty() ||
-			player->getPlayerTemplate()->getPurchaseScienceCommandSetRank3().isEmpty() ||
-			player->getPlayerTemplate()->getPurchaseScienceCommandSetRank8().isEmpty())
+	if(!player ||!player->getPlayerTemplate() || player->getPurchaseScienceCommandSetRank1().isEmpty() ||
+			player->getPurchaseScienceCommandSetRank3().isEmpty() ||
+			player->getPurchaseScienceCommandSetRank8().isEmpty())
 		return;
-	commandSet1 = findCommandSet(player->getPlayerTemplate()->getPurchaseScienceCommandSetRank1()); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
-	commandSet3 = findCommandSet(player->getPlayerTemplate()->getPurchaseScienceCommandSetRank3()); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
-	commandSet8 = findCommandSet(player->getPlayerTemplate()->getPurchaseScienceCommandSetRank8()); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
+	commandSet1 = findCommandSet(player->getPurchaseScienceCommandSetRank1()); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
+	commandSet3 = findCommandSet(player->getPurchaseScienceCommandSetRank3()); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
+	commandSet8 = findCommandSet(player->getPurchaseScienceCommandSetRank8()); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
 
 	for( i = 0; i < MAX_PURCHASE_SCIENCE_RANK_1; i++ )
 		if (m_sciencePurchaseWindowsRank1[i]!=nullptr)
@@ -1628,6 +1628,11 @@ void ControlBar::update()
 		populateSmartSelection();
 		evaluateContextUI();
 		populateSpecialPowerShortcut(ThePlayerList->getLocalPlayer());
+		// an upgrade can swap the purchase sets, so an open purchase panel follows along
+		if( m_contextParent[ CP_PURCHASE_SCIENCE ] && !m_contextParent[ CP_PURCHASE_SCIENCE ]->winIsHidden() )
+		{
+			populatePurchaseScience(ThePlayerList->getLocalPlayer());
+		}
 		// if we have a build tooltip layout, update it with the new data.
 		repopulateBuildTooltipLayout();
 	}
@@ -3627,9 +3632,9 @@ void ControlBar::populateSpecialPowerShortcut( Player *player)
 	}
 
 	// get command set
-	if(player->getPlayerTemplate()->getSpecialPowerShortcutCommandSet().isEmpty() )
+	if(player->getSpecialPowerShortcutCommandSet().isEmpty() )
 		return;
-	commandSet = findCommandSet(player->getPlayerTemplate()->getSpecialPowerShortcutCommandSet()); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
+	commandSet = findCommandSet(player->getSpecialPowerShortcutCommandSet()); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
 	if(!commandSet)
 		return;
 	// populate the button with commands defined
@@ -3727,15 +3732,15 @@ void ControlBar::populateSpecialPowerShortcut( Player *player)
 
 							// get command set
 							if( !player || !player->getPlayerTemplate()
-									|| player->getPlayerTemplate()->getPurchaseScienceCommandSetRank1().isEmpty()
-									|| player->getPlayerTemplate()->getPurchaseScienceCommandSetRank3().isEmpty()
-									|| player->getPlayerTemplate()->getPurchaseScienceCommandSetRank8().isEmpty() )
+									|| player->getPurchaseScienceCommandSetRank1().isEmpty()
+									|| player->getPurchaseScienceCommandSetRank3().isEmpty()
+									|| player->getPurchaseScienceCommandSetRank8().isEmpty() )
 							{
 								continue;
 							}
-							commandSet1 = findCommandSet( player->getPlayerTemplate()->getPurchaseScienceCommandSetRank1() );
-							commandSet3 = findCommandSet( player->getPlayerTemplate()->getPurchaseScienceCommandSetRank3() );
-							commandSet8 = findCommandSet( player->getPlayerTemplate()->getPurchaseScienceCommandSetRank8() );
+							commandSet1 = findCommandSet( player->getPurchaseScienceCommandSetRank1() );
+							commandSet3 = findCommandSet( player->getPurchaseScienceCommandSetRank3() );
+							commandSet8 = findCommandSet( player->getPurchaseScienceCommandSetRank8() );
 
 							if( !commandSet1 || !commandSet3 || !commandSet8 )
 							{

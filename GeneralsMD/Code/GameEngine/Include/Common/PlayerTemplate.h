@@ -61,10 +61,21 @@
 class INI;
 struct FieldParse;
 class Image;
+class Player;
 
 // ----------------------------------------------------------------------------------------------
 
 #define MAX_MP_STARTING_UNITS 10
+
+// ----------------------------------------------------------------------------------------------
+
+/// A command set that stands in for one of the template's once the player owns the upgrade
+struct UpgradeCommandSet
+{
+	AsciiString m_upgradeName;
+	AsciiString m_commandSet;
+};
+typedef std::vector<UpgradeCommandSet> UpgradeCommandSetList;
 
 // ----------------------------------------------------------------------------------------------
 class PlayerTemplate
@@ -127,6 +138,13 @@ public:
 	AsciiString getPurchaseScienceCommandSetRank8() const {return m_purchaseScienceCommandSetRank8;	}
 
 	AsciiString getSpecialPowerShortcutCommandSet() const {return m_specialPowerShortcutCommandSet;	}
+
+	// The same sets as seen by one player, after the CommandSetUpgrade swaps that player has completed
+	AsciiString getPurchaseScienceCommandSetRank1( const Player *player ) const { return pickCommandSet( m_purchaseScienceCommandSetRank1Upgrades, m_purchaseScienceCommandSetRank1, player ); }
+	AsciiString getPurchaseScienceCommandSetRank3( const Player *player ) const { return pickCommandSet( m_purchaseScienceCommandSetRank3Upgrades, m_purchaseScienceCommandSetRank3, player ); }
+	AsciiString getPurchaseScienceCommandSetRank8( const Player *player ) const { return pickCommandSet( m_purchaseScienceCommandSetRank8Upgrades, m_purchaseScienceCommandSetRank8, player ); }
+	AsciiString getSpecialPowerShortcutCommandSet( const Player *player ) const { return pickCommandSet( m_specialPowerShortcutCommandSetUpgrades, m_specialPowerShortcutCommandSet, player ); }
+
 	AsciiString getSpecialPowerShortcutWinName() const {return m_specialPowerShortcutWinName;	}
 	Int getSpecialPowerShortcutButtonCount() const {return m_specialPowerShortcutButtonCount;	}
 
@@ -145,8 +163,11 @@ protected:
 	static void parseProductionCostChange( INI* ini, void *instance, void *store, const void* /*userData*/ );
 	static void parseProductionTimeChange( INI* ini, void *instance, void *store, const void* /*userData*/ );
 	static void parseProductionVeterancyLevel( INI* ini, void *instance, void *store, const void* /*userData*/ );
+	static void parseUpgradeCommandSet( INI* ini, void *instance, void *store, const void* /*userData*/ );
 
 private:
+
+	AsciiString pickCommandSet( const UpgradeCommandSetList& swaps, const AsciiString& base, const Player *player ) const;
 
 	NameKeyType			m_nameKey;
 	UnicodeString		m_displayName;
@@ -165,6 +186,10 @@ private:
 	AsciiString				m_purchaseScienceCommandSetRank8;		///< the command set we'll use when we want to purchase sciences
 
 	AsciiString				m_specialPowerShortcutCommandSet;		///< the command set we'll use when we want to show the shortcut to the special powers
+	UpgradeCommandSetList	m_purchaseScienceCommandSetRank1Upgrades;	///< per-upgrade swaps of the sets above, last completed one wins
+	UpgradeCommandSetList	m_purchaseScienceCommandSetRank3Upgrades;
+	UpgradeCommandSetList	m_purchaseScienceCommandSetRank8Upgrades;
+	UpgradeCommandSetList	m_specialPowerShortcutCommandSetUpgrades;
 	AsciiString				m_specialPowerShortcutWinName;			///< The name of the window we'll be using for the shortcut bar
 	Int								m_specialPowerShortcutButtonCount;	///< The number of buttons located on the shortcut bar
 	AsciiString				m_loadScreenMusic;									///< the load screen music we want to play

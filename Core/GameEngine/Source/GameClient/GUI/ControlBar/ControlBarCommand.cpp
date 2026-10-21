@@ -394,15 +394,15 @@ void ControlBar::populateCommand( Object *obj )
 
 									// get command set
 									if( !player || !player->getPlayerTemplate()
-											|| player->getPlayerTemplate()->getPurchaseScienceCommandSetRank1().isEmpty()
-											|| player->getPlayerTemplate()->getPurchaseScienceCommandSetRank3().isEmpty()
-											|| player->getPlayerTemplate()->getPurchaseScienceCommandSetRank8().isEmpty() )
+											|| player->getPurchaseScienceCommandSetRank1().isEmpty()
+											|| player->getPurchaseScienceCommandSetRank3().isEmpty()
+											|| player->getPurchaseScienceCommandSetRank8().isEmpty() )
 									{
 										continue;
 									}
-									commandSet1 = findCommandSet( player->getPlayerTemplate()->getPurchaseScienceCommandSetRank1() );
-									commandSet3 = findCommandSet( player->getPlayerTemplate()->getPurchaseScienceCommandSetRank3() );
-									commandSet8 = findCommandSet( player->getPlayerTemplate()->getPurchaseScienceCommandSetRank8() );
+									commandSet1 = findCommandSet( player->getPurchaseScienceCommandSetRank1() );
+									commandSet3 = findCommandSet( player->getPurchaseScienceCommandSetRank3() );
+									commandSet8 = findCommandSet( player->getPurchaseScienceCommandSetRank8() );
 
 									if( !commandSet1 || !commandSet3 || !commandSet8 )
 									{

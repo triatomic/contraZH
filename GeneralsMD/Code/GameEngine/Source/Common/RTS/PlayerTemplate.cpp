@@ -51,6 +51,7 @@
 #include "Common/Player.h"
 #include "Common/INI.h"
 #include "Common/Science.h"
+#include "Common/Upgrade.h"
 #include "GameClient/Image.h"
 
 
@@ -92,6 +93,10 @@
 		{ "PurchaseScienceCommandSetRank3",INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_purchaseScienceCommandSetRank3 ) },
 		{ "PurchaseScienceCommandSetRank8",INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_purchaseScienceCommandSetRank8 ) },
 		{ "SpecialPowerShortcutCommandSet",INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_specialPowerShortcutCommandSet ) },
+		{ "PurchaseScienceCommandSetRank1Upgrade",PlayerTemplate::parseUpgradeCommandSet,	nullptr, offsetof( PlayerTemplate, m_purchaseScienceCommandSetRank1Upgrades ) },
+		{ "PurchaseScienceCommandSetRank3Upgrade",PlayerTemplate::parseUpgradeCommandSet,	nullptr, offsetof( PlayerTemplate, m_purchaseScienceCommandSetRank3Upgrades ) },
+		{ "PurchaseScienceCommandSetRank8Upgrade",PlayerTemplate::parseUpgradeCommandSet,	nullptr, offsetof( PlayerTemplate, m_purchaseScienceCommandSetRank8Upgrades ) },
+		{ "SpecialPowerShortcutCommandSetUpgrade",PlayerTemplate::parseUpgradeCommandSet,	nullptr, offsetof( PlayerTemplate, m_specialPowerShortcutCommandSetUpgrades ) },
 		{ "SpecialPowerShortcutWinName"		,INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_specialPowerShortcutWinName) },
 		{ "SpecialPowerShortcutButtonCount",INI::parseInt,												nullptr, offsetof( PlayerTemplate, m_specialPowerShortcutButtonCount ) },
 		{ "IsObserver",								INI::parseBool,																	nullptr, offsetof( PlayerTemplate, m_observer ) },
@@ -166,6 +171,39 @@ AsciiString PlayerTemplate::getStartingUnit( Int i ) const
 
 	VeterancyLevel startLevel = (VeterancyLevel)INI::scanIndexList(ini->getNextToken(), TheVeterancyNames);
 	self->m_productionVeterancyLevels[buildTemplateKey] = startLevel;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Format is UpgradeName CommandSetName
+/*static*/ void PlayerTemplate::parseUpgradeCommandSet( INI* ini, void *instance, void *store, const void* /*userData*/ )
+{
+	UpgradeCommandSetList *swaps = (UpgradeCommandSetList*)store;
+
+	UpgradeCommandSet swap;
+	swap.m_upgradeName = ini->getNextToken();
+	swap.m_commandSet = ini->getNextToken();
+	swaps->push_back( swap );
+}
+
+//-------------------------------------------------------------------------------------------------
+// Upgrades are looked up by name here because PlayerTemplate.ini may load before Upgrade.ini.
+AsciiString PlayerTemplate::pickCommandSet( const UpgradeCommandSetList& swaps, const AsciiString& base, const Player *player ) const
+{
+	AsciiString result = base;
+	if( player == nullptr )
+	{
+		return result;
+	}
+
+	for( UpgradeCommandSetList::const_iterator it = swaps.begin(); it != swaps.end(); ++it )
+	{
+		const UpgradeTemplate *upgrade = TheUpgradeCenter->findUpgrade( it->m_upgradeName );
+		if( upgrade && player->hasUpgradeComplete( upgrade ) )
+		{
+			result = it->m_commandSet;
+		}
+	}
+	return result;
 }
 
 //-------------------------------------------------------------------------------------------------
