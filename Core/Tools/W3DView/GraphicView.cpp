@@ -1304,71 +1304,74 @@ CGraphicView::RepaintView
 		//
 		//	Render the background BMP
 		//
-		WW3D::Begin_Render (TRUE, TRUE, doc->GetBackgroundColor ());
-		WW3D::Render (doc->Get2DScene (), doc->Get2DCamera (), FALSE, FALSE);
-
-		//
-		// Render the background scene
-		//
-		if (doc->GetBackgroundObjectName ().GetLength () > 0) {
-			WW3D::Render (doc->GetBackObjectScene (), doc->GetBackObjectCamera (), FALSE, FALSE);
-		}
-
-		//
-		// TheSuperHackers @feature Tria Ground plane under the displayed object
-		// (Ground menu). Drawn before the scene so its depth is in place; see
-		// Render_Ground for the ordering rationale.
-		//
-		if (m_bShowGround) {
-			Render_Ground (m_pCamera.Peek (), doc->GetDisplayedObject (), m_ViewedSphere, m_GroundZ,
-				doc->GetScene ()->Get_Ambient_Light (), doc->GetSceneLight ());
-		}
-
-		//
-		// Render the main scene
-		//
-		DWORD pt_high = 0L;
-
-		// Wait for all previous rendering to complete before starting benchmark.
-		DWORD profile_time = ::Get_CPU_Clock (pt_high);
-
-		WW3D::Render (doc->GetScene (), m_pCamera.Peek(), FALSE, FALSE);
-
-		// TheSuperHackers @feature Tria Second pass: tint the normally-culled back
-		// faces (gated by the View > W3D Shaders menu toggle).
-		Render_Backface_Tint_Pass (doc->GetScene (), m_pCamera.Peek ());
-
-		// Wait for all rendering to complete before stopping benchmark.
-		DWORD milliseconds = (::Get_CPU_Clock (pt_high) - profile_time) / 1000;
-
-		// TheSuperHackers @feature Tria 18/04/2026 Render bone overlays after main scene.
-		Render_Bone_Overlays (doc);
-
-		//
-		// Render the cursor
-		//
-		WW3D::Render (doc->GetCursorScene (), doc->Get2DCamera (), FALSE, FALSE);
-
-		// Render the dazzles
-		doc->Render_Dazzles(m_pCamera.Peek());
-
-		// TheSuperHackers @feature Tria 22/04/2026 Blit sub-object name labels onto the back buffer
-		// before Present, so the text is part of the frame and doesn't flicker.
-		Render_SubObj_Name_Overlays (this, doc, m_pCamera.Peek ());
-		Render_Bone_Name_Overlays (this, doc, m_pCamera.Peek ());
-
-		// TheSuperHackers @feature Tria 23/04/2026 Highlight selected bone or sub-object in viewport.
-		Render_Selected_Item_Overlay (this, doc, m_pCamera.Peek ());
-
-		// View cube and the 7 key statistics, over everything else
-		m_ViewCube.Render (m_hWnd, m_pCamera->Get_Transform ());
-		if (ViewportStats::Is_Visible ())
+		DWORD milliseconds = 0;
+		if (WW3D::Begin_Render (TRUE, TRUE, doc->GetBackgroundColor ()) == WW3D_ERROR_OK)
 		{
-			ViewportStats::Render (prender_obj);
-		}
+			WW3D::Render (doc->Get2DScene (), doc->Get2DCamera (), FALSE, FALSE);
 
-		// Finish out the rendering process
-		WW3D::End_Render ();
+			//
+			// Render the background scene
+			//
+			if (doc->GetBackgroundObjectName ().GetLength () > 0) {
+				WW3D::Render (doc->GetBackObjectScene (), doc->GetBackObjectCamera (), FALSE, FALSE);
+			}
+
+			//
+			// TheSuperHackers @feature Tria Ground plane under the displayed object
+			// (Ground menu). Drawn before the scene so its depth is in place; see
+			// Render_Ground for the ordering rationale.
+			//
+			if (m_bShowGround) {
+				Render_Ground (m_pCamera.Peek (), doc->GetDisplayedObject (), m_ViewedSphere, m_GroundZ,
+					doc->GetScene ()->Get_Ambient_Light (), doc->GetSceneLight ());
+			}
+
+			//
+			// Render the main scene
+			//
+			DWORD pt_high = 0L;
+
+			// Wait for all previous rendering to complete before starting benchmark.
+			DWORD profile_time = ::Get_CPU_Clock (pt_high);
+
+			WW3D::Render (doc->GetScene (), m_pCamera.Peek(), FALSE, FALSE);
+
+			// TheSuperHackers @feature Tria Second pass: tint the normally-culled back
+			// faces (gated by the View > W3D Shaders menu toggle).
+			Render_Backface_Tint_Pass (doc->GetScene (), m_pCamera.Peek ());
+
+			// Wait for all rendering to complete before stopping benchmark.
+			milliseconds = (::Get_CPU_Clock (pt_high) - profile_time) / 1000;
+
+			// TheSuperHackers @feature Tria 18/04/2026 Render bone overlays after main scene.
+			Render_Bone_Overlays (doc);
+
+			//
+			// Render the cursor
+			//
+			WW3D::Render (doc->GetCursorScene (), doc->Get2DCamera (), FALSE, FALSE);
+
+			// Render the dazzles
+			doc->Render_Dazzles(m_pCamera.Peek());
+
+			// TheSuperHackers @feature Tria 22/04/2026 Blit sub-object name labels onto the back buffer
+			// before Present, so the text is part of the frame and doesn't flicker.
+			Render_SubObj_Name_Overlays (this, doc, m_pCamera.Peek ());
+			Render_Bone_Name_Overlays (this, doc, m_pCamera.Peek ());
+
+			// TheSuperHackers @feature Tria 23/04/2026 Highlight selected bone or sub-object in viewport.
+			Render_Selected_Item_Overlay (this, doc, m_pCamera.Peek ());
+
+			// View cube and the 7 key statistics, over everything else
+			m_ViewCube.Render (m_hWnd, m_pCamera->Get_Transform ());
+			if (ViewportStats::Is_Visible ())
+			{
+				ViewportStats::Render (prender_obj);
+			}
+
+			// Finish out the rendering process
+			WW3D::End_Render ();
+		}
 
 		//
 		//	Let the audio class think
