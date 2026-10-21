@@ -1585,6 +1585,21 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			const Bool isLocalPlayer = slot->isHuman() && i == TheGameInfo->getLocalSlotNum();
 			d.setBool(TheKey_multiplayerIsLocal, isLocalPlayer);
 
+			// A challenge map colors the local player with its ThePlayer placeholder's color
+			if (isChallengeCampaign && isLocalPlayer)
+			{
+				SidesInfo *thePlayerSide = TheSidesList->findSideInfo("ThePlayer");
+				Bool hasColor = FALSE;
+				Int color = thePlayerSide ? thePlayerSide->getDict()->getInt(TheKey_playerColor, &hasColor) : 0;
+				if (hasColor)
+				{
+					Bool hasNightColor = FALSE;
+					Int nightColor = thePlayerSide->getDict()->getInt(TheKey_playerNightColor, &hasNightColor);
+					d.setInt(TheKey_playerColor, color);
+					d.setInt(TheKey_playerNightColor, hasNightColor ? nightColor : color);
+				}
+			}
+
 /*
 			if (slot->getIP() == game->getLocalIP())
 			{
