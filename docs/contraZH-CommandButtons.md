@@ -119,6 +119,11 @@ finished units of a batch stay finished.
 * No effect on the first entry or a finished unit waiting to exit.
 * Plain click still cancels; Shift+click still cancels all of that type.
 
+## REVERSE_MOVE hotkey
+
+Caps Lock arms upstream's `REVERSE_MOVE` order for any selection, without the button. See
+[Reverse move hotkey](contraZH-Options.md#reverse-move-hotkey).
+
 ## Structure Multi-Select
 
 Structures of one type can be selected together.

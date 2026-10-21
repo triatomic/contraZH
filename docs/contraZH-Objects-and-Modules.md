@@ -397,7 +397,7 @@ weighed by what is inside it.
 * A loaded transport moving with a group slows the whole group, the same way any slow unit does.
 * Leaving every penalty at `0%` is the previous behavior exactly, so existing INI is unaffected.
 
-### Filtering by object name
+### Filtering passengers by object name
 
 `AllowInsideKindOf` and `ForbidInsideKindOf` can only speak in whole KindOfs. These two name
 individual objects instead, and work on every contain module -- TunnelContain, TransportContain,
@@ -432,7 +432,7 @@ so changing them does not affect units that are already loaded.
 
 ## ParkingPlaceBehavior
 
-### Filtering by object name
+### Filtering aircraft by object name
 
 `RequiredKindOf` and `ForbiddenKindOf` can only speak in whole KindOfs. These two name individual
 objects instead, so a single aircraft can be kept off an airfield without inventing a KindOf for it.
@@ -1079,7 +1079,7 @@ until the next move.
 Jamming damage that accumulates on the body like subdual damage, interacts with armor, and disables
 the unit when the threshold is reached. Healing ticks remove the damage over time.
 
-### New Damage Types
+### Jamming New Damage Types
 
 Two new entries in `DamageType`:
 
@@ -1102,7 +1102,7 @@ Jamming is independent of the `DISABLED_*` states: it neither waits for them nor
 disabled unit stays disabled through a jam. On unjam it only clears `UNSELECTABLE` if the jam was
 what set it, so a docked, slaved, or status-held unit keeps that state.
 
-### ActiveBody Fields
+### Jamming ActiveBody Fields
 
 ```
 Body = ActiveBody ModuleTag_Body
@@ -1141,7 +1141,7 @@ evaluated against the unit's current max health. ActiveBody also accepts `Chrono
 and `ChronoDamageHealAmount` in the same forms, which override the global chrono keys for that
 unit. See [Subdual Damage Defaults](contraZH-GameData.md#subdual-damage-defaults).
 
-### Armor
+### Jamming Armor
 
 `SUBDUAL_JAMMING` interacts with armor normally. Define coefficients in `Armor.ini`:
 
@@ -1153,7 +1153,7 @@ End
 
 `SUBDUAL_JAMMING_UNRESISTABLE` bypasses armor (like `UNRESISTABLE` and `SUBDUAL_UNRESISTABLE`).
 
-### Overlay Texture
+### Jamming Overlay Texture
 
 A scrolling texture can be drawn over units taking jamming damage. Its opacity is the stored
 jamming damage divided by `MaxHealth`, clamped to 1, so it fades in as the unit is jammed, holds
@@ -1177,7 +1177,7 @@ engine carries one opacity value per render call, so the two effects cannot be l
 independent strengths. The [frozen overlay](#subdual-frozen) stacks with this one and shares
 that single value.
 
-### Icon
+### Jamming Icon
 
 A jammed unit shows its own icon beside the health bar, next to the disabled icon when both
 apply. Define an `Animation Jammed` block in `Animation2D.ini`; the icon is not drawn until this
@@ -1193,7 +1193,7 @@ Animation Jammed
 End
 ```
 
-### Per-Unit Sounds
+### Jamming Per-Unit Sounds
 
 Units can define custom jam/unjam sounds via their `UnitSpecificSounds` block:
 
@@ -1217,7 +1217,7 @@ UnitUnjammed = UnjammedSoundEvent
 Jamming never borrows the building-disabled or vehicle-disabled sounds, so an EMP'd unit that
 is also jammed plays two distinct cues rather than a repeated one.
 
-### Example Weapon
+### Jamming Example Weapon
 
 ```
 Weapon JammerGun
@@ -1237,7 +1237,7 @@ once it reaches the threshold. Healing ticks remove the damage over time. The th
 independent: each has its own counter, cap, heal rate and effect, and a unit can be subdued,
 jammed and frozen at the same time.
 
-### New Damage Types
+### Frozen New Damage Types
 
 Two new entries in `DamageType`:
 
@@ -1266,7 +1266,7 @@ frozen overlay and any `FROZEN` art carry the look on their own.
 
 Projectiles take frozen damage but are never disabled by it; only the sound plays.
 
-### ActiveBody Fields
+### Frozen ActiveBody Fields
 
 ```
 Body = ActiveBody ModuleTag_Body
@@ -1286,7 +1286,7 @@ Any of these keys may be omitted. An omitted key takes its value from the matchi
 keys accept `MaxHealth * 2` or `MaxHealth / 16.25` as well as a plain number. See
 [Subdual Damage Defaults](contraZH-GameData.md#subdual-damage-defaults).
 
-### Armor
+### Frozen Armor
 
 `SUBDUAL_FROZEN` interacts with armor normally. Define coefficients in `Armor.ini`:
 
@@ -1298,7 +1298,7 @@ End
 
 `SUBDUAL_FROZEN_UNRESISTABLE` bypasses armor (like `UNRESISTABLE` and `SUBDUAL_UNRESISTABLE`).
 
-### Overlay Texture
+### Frozen Overlay Texture
 
 A texture can be drawn over units taking frozen damage, with the same fade rule as the jamming
 overlay: opacity is the stored frozen damage divided by `MaxHealth`, clamped to 1. Configured
@@ -1321,7 +1321,7 @@ textures. The engine carries one opacity value per render call, so both passes u
 of the two intensities and fade together. A unit that is also stealth-detected shows the subdual
 overlays only.
 
-### Icon
+### Frozen Icon
 
 A frozen unit shows its own icon beside the health bar, after the disabled and jammed icons when
 those apply. Define an `Animation Frozen` block in `Animation2D.ini`; the icon is not drawn until
@@ -1336,7 +1336,7 @@ Animation Frozen
 End
 ```
 
-### Per-Unit Sounds
+### Frozen Per-Unit Sounds
 
 Units can define custom freeze/thaw sounds via their `UnitSpecificSounds` block:
 
@@ -1359,7 +1359,7 @@ UnitUnfrozen = UnfrozenSoundEvent
 
 Freezing never borrows the building-disabled or vehicle-disabled sounds.
 
-### Example Weapon
+### Frozen Example Weapon
 
 ```
 Weapon FreezeGun

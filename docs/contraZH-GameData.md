@@ -69,22 +69,7 @@ Precedence for each value on each unit:
    `ChronoDamageHealAmountPercent` from GameData.
 
 The same value forms are accepted on ActiveBody itself, and ActiveBody also accepts
-`ChronoDamageHealRate` and `ChronoDamageHealAmount`; see [ActiveBody subdual fields](contraZH-Objects-and-Modules.md#activebody-fields).
-
-## Subdual frozen
-
-`SUBDUAL_FROZEN` is a third subdual pool beside subdual and jamming. It disables via
-`DISABLED_FROZEN` and sets a `FROZEN` condition state. Customisable like jamming:
-
-* `FrozenDamageCap`, `FrozenDamageHealRate`, `FrozenDamageHealAmount` on ActiveBody or in
-`SubdualDamageDefaults`
-* armor coefficient
-* `Frozen` health-bar icon in Animation2D.ini
-* `SoundFrozen` / `SoundUnfrozen` per unit, `UnitFrozen` / `UnitUnfrozen` in MiscAudio.ini as
-fallback
-* `FrozenOverlay*` texture block in GameData.ini (stacks with the jamming overlay)
-
-Details in [Subdual Frozen](contraZH-Objects-and-Modules.md#subdual-frozen).
+`ChronoDamageHealRate` and `ChronoDamageHealAmount`; see the [jamming](contraZH-Objects-and-Modules.md#jamming-activebody-fields) and [frozen](contraZH-Objects-and-Modules.md#frozen-activebody-fields) ActiveBody fields.
 
 ## Subdual Overlay Textures
 

@@ -13,6 +13,13 @@ LIST_ITEM = re.compile(r'^(\s*)([*+-]|\d+\.)\s+')
 NOTE_LINE = re.compile(r'^(Note|NOTE|Notes?):\s*(.*)$')
 HEADING_TAG = re.compile(r'\s*\((New(?: - EXPERIMENTAL| Command)?|EXPERIMENTAL)\)\s*$')
 KEY_SEPARATOR = re.compile(r'^\s*[-–]\s+')
+UPSTREAM_WIKI = re.compile(r'https://github\.com/Andreas-W/GeneralsGameCode_Modding/wiki/([^)#\s]+)(#[^)\s]*)?')
+
+# The upstream pages stay verbatim, so their contraZH corrections are linked in here
+CORRECTIONS = {
+    'FXList-&-ParticleSystems.md': 'Undocumented-Upstream-Features.md#fxlist-decal-scale',
+    'ChatCommands.md': 'Undocumented-Upstream-Features.md#chatcommands',
+}
 
 
 def gfm_lists(lines):
@@ -90,8 +97,29 @@ def note_admonitions(lines):
     return out
 
 
-def on_page_markdown(markdown, **kwargs):
-    lines = markdown.split('\n')
+def local_wiki_links(markdown, docs_dir):
+    """Point upstream wiki links at this site's copy of the page."""
+    def local(match):
+        if os.path.isfile(os.path.join(docs_dir, match.group(1) + '.md')):
+            return match.group(1) + '.md' + (match.group(2) or '')
+        return match.group(0)
+    return UPSTREAM_WIKI.sub(local, markdown)
+
+
+def correction_note(lines, src):
+    target = CORRECTIONS.get(src)
+    if target is None:
+        return lines
+    for i, line in enumerate(lines):
+        if line.startswith('# '):
+            note = 'Note: contraZH corrects part of this page, see [Corrections to upstream pages](%s).' % target
+            return lines[:i + 1] + ['', note] + lines[i + 1:]
+    return lines
+
+
+def on_page_markdown(markdown, page, config, **kwargs):
+    markdown = local_wiki_links(markdown, config['docs_dir'])
+    lines = correction_note(markdown.split('\n'), page.file.src_uri)
     lines = note_admonitions(gfm_lists(lines))
     return '\n'.join(lines)
 
