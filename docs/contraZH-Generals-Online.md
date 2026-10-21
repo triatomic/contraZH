@@ -62,8 +62,10 @@ draw at the wrong scale; with it, the options menu lacks Contra's controls. See 
 
 ### Lobby rules
 
-The GO service has no field for Contra's lobby rules, so the host types a chat command and the
-host's game switches the rule on in the first frames of the match. A host change turns them all off.
+The lobby gets a **Rules** tab with Diplomacy, Free Radar and Reveal Map. The GO service has no
+field for them, so the host's client keeps the state, mirrors it to everyone's Rules tab through a
+hidden lobby message, and switches each rule on in the first frames of the match. Only the host can
+tick them; a host change turns them all off. The chat commands still work:
 
 * `/diplomacy` lets players change alliances during the match. See
 [Diplomacy](contraZH-Maps-and-Setup.md#diplomacy).
@@ -71,6 +73,9 @@ host's game switches the rule on in the first frames of the match. A host change
 [Free Radar](contraZH-Maps-and-Setup.md#free-radar).
 * `/revealmap` reveals the whole map to every player. See
 [Reveal Map](contraZH-Maps-and-Setup.md#reveal-map).
+
+The tab comes from a loose `GameSpyGameOptionsMenu.wnd` written by `build/add_go_rules_tab_wnd.py`;
+without it the lobby shows the Game page alone.
 
 ## Runtime requirements
 

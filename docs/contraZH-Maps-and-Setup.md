@@ -156,15 +156,18 @@ back to `Random <BaseSide>`.
 
 ### Rules tab
 
-* The Skirmish and LAN lobbies get **Game** and **Rules** tab buttons in the title row.
+* The Skirmish, LAN and Generals Online lobbies get **Game** and **Rules** tab buttons in the title
+row.
 * The Rules page holds Quick Game, Coop Buildings, Diplomacy, Free Radar, Reveal Map and, in LAN,
 Max Camera Height. It takes the place of the battle honors and info box in Skirmish, and of the chat
-in LAN.
+in LAN and Generals Online. The Generals Online page holds only Diplomacy, Free Radar and Reveal Map.
 
 Notes:
 * Labels are `GUI:TabGame` and `GUI:TabRules`, falling back to `Game` and `Rules`.
 * The layouts carry `ButtonTabGame`, `ButtonTabRules`, `PanelGame` and `PanelRules`. The buttons and
 the Rules page start hidden, so an older exe shows the Game page without the new options.
+* `build/add_go_rules_tab_wnd.py` writes a loose `GameSpyGameOptionsMenu.wnd` with the tab pair and
+the three Generals Online checkboxes; the other two layouts get theirs from `build/add_rules_tab_wnd.py`.
 
 ### LAN unready
 
@@ -232,8 +235,9 @@ takes one.
 `LanGameOptionsMenu.wnd`. A layout without it shows no checkbox. `build/add_diplomacy_wnd.py` adds it
 under Coop Buildings and needs the Rules tab from `build/add_rules_tab_wnd.py`.
 * The stance buttons are created in code, so `Diplomacy.wnd` needs no change.
-* Generals Online has no lobby field for the rule. Its host types `/diplomacy` in lobby chat to
-switch it on or off, and the lobby sees an announcement. The host's game turns the rule on in the
+* Generals Online has no lobby field for the rule. Its host ticks it on the Rules tab or types
+`/diplomacy` in lobby chat, and the lobby sees an announcement. The host's client mirrors the state
+to everyone's Rules tab through a hidden lobby message. The host's game turns the rule on in the
 first frames of the match, and every player sees a message. The game ignores that switch from anyone
 but the lobby host. A host change turns the rule off, and the lobby sees a message saying so.
 * The options string carries `DP=1` only when the rule is on. Older exes can't join such a lobby or
@@ -256,8 +260,9 @@ English text. `GUI:FreeRadarEnabled` takes one `%ls` player name.
 `LanGameOptionsMenu.wnd`. A layout without it shows no checkbox. `build/add_game_rules_wnd.py` adds
 it and Reveal Map in a second column of the Rules page and needs the Diplomacy checkbox from
 `build/add_diplomacy_wnd.py`.
-* Generals Online has no lobby field for the rule. Its host types `/freeradar` in lobby chat, as with
-`/diplomacy`, and the host's game turns the rule on in the first frames of the match.
+* Generals Online has no lobby field for the rule. Its host ticks it on the Rules tab or types
+`/freeradar` in lobby chat, as with Diplomacy, and the host's game turns the rule on in the first
+frames of the match.
 * The options string carries `FR=1` only when the rule is on. Older exes can't join such a lobby or
 play its replays, but games with the rule off are unaffected.
 * Save games keep the rule.
@@ -275,8 +280,8 @@ Notes:
 English text. `GUI:RevealMapEnabled` takes one `%ls` player name.
 * The checkbox comes from `CheckRevealMap` in both lobby layouts; `build/add_game_rules_wnd.py` adds
 it beside Free Radar.
-* Generals Online has no lobby field for the rule. Its host types `/revealmap` in lobby chat, and the
-map opens up in the first frames of the match.
+* Generals Online has no lobby field for the rule. Its host ticks it on the Rules tab or types
+`/revealmap` in lobby chat, and the map opens up in the first frames of the match.
 * The options string carries `RM=1` only when the rule is on. Older exes can't join such a lobby or
 play its replays, but games with the rule off are unaffected.
 * A save game brings the revealed map back on its own.

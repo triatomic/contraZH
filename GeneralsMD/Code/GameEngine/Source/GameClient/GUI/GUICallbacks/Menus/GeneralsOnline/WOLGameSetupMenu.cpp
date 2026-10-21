@@ -228,6 +228,49 @@ static GameWindow *checkBoxUseStats = NULL;
 static GameWindow *checkBoxLimitSuperweapons = NULL;
 static GameWindow *comboBoxStartingCash = NULL;
 static GameWindow *checkBoxLimitArmies = NULL;
+static LobbyTabs lobbyTabs;
+
+// A host-only rule the service can't store; the host's client keeps it and mirrors it to the others' Rules page
+struct LobbyRule
+{
+	const char *window;
+	const char *label;
+	const wchar_t *labelText;
+	const char *tip;
+	const wchar_t *tipText;
+	const wchar_t *name;
+	const wchar_t *onText;
+	bool (NGMP_OnlineServices_LobbyInterface::*isOn)() const;
+	void (NGMP_OnlineServices_LobbyInterface::*set)(bool);
+	NameKeyType id;
+	GameWindow *check;
+};
+
+enum { LOBBY_RULE_DIPLOMACY, LOBBY_RULE_FREE_RADAR, LOBBY_RULE_REVEAL_MAP, LOBBY_RULE_COUNT };
+
+static LobbyRule s_lobbyRules[LOBBY_RULE_COUNT] =
+{
+	{ "CheckDiplomacyRule", "GUI:DiplomacyRule", L"Diplomacy", "TOOLTIP:DiplomacyRule", L"Players may change alliances during the match from the Diplomacy window",
+		L"Diplomacy", L" is ON: players may change alliances during the match.",
+		&NGMP_OnlineServices_LobbyInterface::IsDiplomacyRuleOn, &NGMP_OnlineServices_LobbyInterface::SetDiplomacyRule, NAMEKEY_INVALID, NULL },
+	{ "CheckFreeRadar", "GUI:FreeRadar", L"Free Radar", "TOOLTIP:FreeRadar", L"Every player has radar from the start without building a radar source",
+		L"Free Radar", L" is ON: every player has radar.",
+		&NGMP_OnlineServices_LobbyInterface::IsFreeRadarRuleOn, &NGMP_OnlineServices_LobbyInterface::SetFreeRadarRule, NAMEKEY_INVALID, NULL },
+	{ "CheckRevealMap", "GUI:RevealMap", L"Reveal Map", "TOOLTIP:RevealMap", L"No shroud: every player sees the whole map from the start",
+		L"Reveal Map", L" is ON: every player sees the whole map.",
+		&NGMP_OnlineServices_LobbyInterface::IsRevealMapRuleOn, &NGMP_OnlineServices_LobbyInterface::SetRevealMapRule, NAMEKEY_INVALID, NULL },
+};
+
+// A hidden announcement carrying one digit per rule, in table order
+static const wchar_t *LOBBY_RULES_SYNC = L"[rules] ";
+static size_t s_lobbyRulesSyncedMembers = 0;
+
+static void initLobbyRules();
+static void deinitLobbyRules();
+static void refreshLobbyRules();
+static void resetLobbyRules();
+static Bool receiveLobbyRulesSync(const UnicodeString &message);
+static void syncLobbyRulesToNewcomers();
 
 static GameWindow *comboBoxPlayer[MAX_SLOTS] = {NULL,NULL,NULL,NULL,
 																									 NULL,NULL,NULL,NULL };
@@ -1319,6 +1362,8 @@ void WOLDisplayGameOptions()
 		return;
 	}
 
+	refreshLobbyRules();
+
 	const GameSlot *localSlot = NULL;
 	if (theGame->getLocalSlotNum() >= 0)
 		localSlot = theGame->getConstSlot(theGame->getLocalSlotNum());
@@ -1656,6 +1701,9 @@ void InitWOLGameGadgets()
   checkBoxLimitArmies = TheWindowManager->winGetWindowFromId( parentWOLGameSetup, checkBoxLimitArmiesID );
   DEBUG_ASSERTCRASH(windowMap, ("Could not find the GameSpyGameOptionsMenu.wnd:CheckBoxLimitArmies" ));
 
+  InitLobbyTabs( lobbyTabs, parentWOLGameSetup, "GameSpyGameOptionsMenu.wnd" );
+  initLobbyRules();
+
   // Limit Armies can ONLY be set in the Host Game window (PopupHostGame.wnd)
   checkBoxLimitArmies->winEnable( false );
   // Ditto use stats
@@ -1853,6 +1901,8 @@ void DeinitWOLGameGadgets()
 	checkBoxUseStats = NULL;
   checkBoxLimitSuperweapons = NULL;
   comboBoxStartingCash = NULL;
+  lobbyTabs = LobbyTabs();
+  deinitLobbyRules();
 
 //	GameWindow *staticTextTitle = NULL;
 	for (Int i = 0; i < MAX_SLOTS; i++)
@@ -1887,6 +1937,14 @@ void WOLGameSetupMenuInit( WindowLayout *layout, void *userData )
 	// register for chat events
 	pLobbyInterface->RegisterForChatCallback([](UnicodeString strMessage, Color color)
 		{
+			if (receiveLobbyRulesSync(strMessage))
+			{
+				return;
+			}
+			if (IsLobbyRulesTabShown(lobbyTabs))
+			{
+				MarkLobbyGameTab(lobbyTabs);
+			}
 			GadgetListBoxAddEntryText(listboxGameSetupChat, strMessage, color, -1, -1);
 		});
 
@@ -2005,6 +2063,7 @@ void WOLGameSetupMenuInit( WindowLayout *layout, void *userData )
 		{
 			WOLDisplaySlotList();
 			WOLDisplayGameOptions();
+			syncLobbyRulesToNewcomers();
 		});
 
 	pLobbyInterface->RegisterForGameStartPacket([]()
@@ -2549,7 +2608,8 @@ void WOLGameSetupMenuUpdate( WindowLayout * layout, void *userData)
 						}
 
 						// The rules live on the host's client, so they left with the previous host
-						GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"Diplomacy, Free Radar and Reveal Map are OFF. The new host can type /diplomacy, /freeradar or /revealmap to turn them on."), GameMakeColor(192, 192, 192, 255), -1, -1);
+						resetLobbyRules();
+						GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"Diplomacy, Free Radar and Reveal Map are OFF. The new host can turn them on from the Rules tab."), GameMakeColor(192, 192, 192, 255), -1, -1);
 
 						// re-enable critical buttons for everyone
 						if (buttonBack != nullptr)
@@ -3600,9 +3660,143 @@ int getQR2HostingStatus();
 }
 extern int isThreadHosting;
 
-#if defined(GENERALS_ONLINE)
-// Flips a host-only rule the service can't store and tells the lobby the new state
-static void toggleLobbyRule(const wchar_t *name, bool (NGMP_OnlineServices_LobbyInterface::*isOn)() const, void (NGMP_OnlineServices_LobbyInterface::*set)(bool), const wchar_t *onText)
+static void initLobbyRules()
+{
+	s_lobbyRulesSyncedMembers = 0;
+	for (Int i = 0; i < LOBBY_RULE_COUNT; ++i)
+	{
+		LobbyRule &rule = s_lobbyRules[i];
+		AsciiString fullName;
+		fullName.format("GameSpyGameOptionsMenu.wnd:%s", rule.window);
+		rule.id = TheNameKeyGenerator->nameToKey(fullName);
+		rule.check = TheWindowManager->winGetWindowFromId(parentWOLGameSetup, rule.id);
+		if (rule.check != NULL)
+		{
+			GadgetCheckBoxSetText(rule.check, TheGameText->FETCH_OR_SUBSTITUTE(rule.label, rule.labelText));
+			rule.check->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE(rule.tip, rule.tipText));
+		}
+	}
+}
+
+static void deinitLobbyRules()
+{
+	for (Int i = 0; i < LOBBY_RULE_COUNT; ++i)
+	{
+		s_lobbyRules[i].check = NULL;
+	}
+}
+
+// Only the host may change them; a refresh echoes each checkbox's message, which the unchanged value turns away
+static void refreshLobbyRules()
+{
+	NGMP_OnlineServices_LobbyInterface* pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
+	if (pLobbyInterface == nullptr)
+	{
+		return;
+	}
+
+	const Bool host = pLobbyInterface->IsHost();
+	for (Int i = 0; i < LOBBY_RULE_COUNT; ++i)
+	{
+		const LobbyRule &rule = s_lobbyRules[i];
+		if (rule.check != NULL)
+		{
+			GadgetCheckBoxSetChecked(rule.check, (pLobbyInterface->*rule.isOn)());
+			rule.check->winEnable(host);
+		}
+	}
+}
+
+static void sendLobbyRulesSync()
+{
+	NGMP_OnlineServices_LobbyInterface* pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
+	if (pLobbyInterface == nullptr || !pLobbyInterface->IsHost())
+	{
+		return;
+	}
+
+	UnicodeString msg(LOBBY_RULES_SYNC);
+	for (Int i = 0; i < LOBBY_RULE_COUNT; ++i)
+	{
+		msg.concat((pLobbyInterface->*s_lobbyRules[i].isOn)() ? L"1" : L"0");
+	}
+	pLobbyInterface->SendAnnouncementMessageToCurrentLobby(msg, false);
+}
+
+// TRUE when the line was the host's sync, which the chat never shows
+static Bool receiveLobbyRulesSync(const UnicodeString &message)
+{
+	const size_t markerLength = wcslen(LOBBY_RULES_SYNC);
+	if (wcsncmp(message.str(), LOBBY_RULES_SYNC, markerLength) != 0)
+	{
+		return FALSE;
+	}
+
+	NGMP_OnlineServices_LobbyInterface* pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
+	const WideChar *flags = message.str() + markerLength;
+	if (pLobbyInterface == nullptr || pLobbyInterface->IsHost() || wcslen(flags) < LOBBY_RULE_COUNT)
+	{
+		return TRUE;
+	}
+
+	for (Int i = 0; i < LOBBY_RULE_COUNT; ++i)
+	{
+		(pLobbyInterface->*s_lobbyRules[i].set)(flags[i] == L'1');
+	}
+	refreshLobbyRules();
+	return TRUE;
+}
+
+// A newcomer's Rules page starts blank, so the host repeats the rules when the roster grows
+static void syncLobbyRulesToNewcomers()
+{
+	NGMP_OnlineServices_LobbyInterface* pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
+	if (pLobbyInterface == nullptr)
+	{
+		return;
+	}
+
+	const size_t members = pLobbyInterface->GetMembersListForCurrentRoom().size();
+	if (members > s_lobbyRulesSyncedMembers)
+	{
+		sendLobbyRulesSync();
+	}
+	s_lobbyRulesSyncedMembers = members;
+}
+
+static void resetLobbyRules()
+{
+	NGMP_OnlineServices_LobbyInterface* pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
+	if (pLobbyInterface == nullptr)
+	{
+		return;
+	}
+
+	for (Int i = 0; i < LOBBY_RULE_COUNT; ++i)
+	{
+		(pLobbyInterface->*s_lobbyRules[i].set)(false);
+	}
+	refreshLobbyRules();
+}
+
+static void setLobbyRule(const LobbyRule &rule, bool on)
+{
+	NGMP_OnlineServices_LobbyInterface* pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
+	if (pLobbyInterface == nullptr || !pLobbyInterface->IsHost())
+	{
+		return;
+	}
+
+	(pLobbyInterface->*rule.set)(on);
+	UnicodeString msg(rule.name);
+	msg.concat(on ? rule.onText : L" is OFF.");
+	pLobbyInterface->SendAnnouncementMessageToCurrentLobby(msg, true);
+	sendLobbyRulesSync();
+	refreshLobbyRules();
+}
+
+// The slash commands flip a rule for the host and explain themselves to anyone else
+static void toggleLobbyRule(const LobbyRule &rule)
 {
 	NGMP_OnlineServices_LobbyInterface* pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
 	if (pLobbyInterface == nullptr || !pLobbyInterface->IsInLobby())
@@ -3610,19 +3804,52 @@ static void toggleLobbyRule(const wchar_t *name, bool (NGMP_OnlineServices_Lobby
 		return;
 	}
 
-	UnicodeString msg(name);
 	if (!pLobbyInterface->IsHost())
 	{
+		UnicodeString msg(rule.name);
 		msg.concat(L": Only the host can change it.");
 		GadgetListBoxAddEntryText(listboxGameSetupChat, msg, GameMakeColor(255, 0, 0, 255), -1, -1);
 		return;
 	}
 
-	(pLobbyInterface->*set)(!(pLobbyInterface->*isOn)());
-	msg.concat((pLobbyInterface->*isOn)() ? onText : L" is OFF.");
-	pLobbyInterface->SendAnnouncementMessageToCurrentLobby(msg, true);
+	setLobbyRule(rule, !(pLobbyInterface->*rule.isOn)());
 }
-#endif
+
+// TRUE when the control is one of the Rules page checkboxes
+static Bool handleLobbyRuleClick(Int controlID)
+{
+	for (Int i = 0; i < LOBBY_RULE_COUNT; ++i)
+	{
+		const LobbyRule &rule = s_lobbyRules[i];
+		if (rule.id != controlID)
+		{
+			continue;
+		}
+
+		NGMP_OnlineServices_LobbyInterface* pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
+		if (pLobbyInterface != nullptr && pLobbyInterface->IsHost() && rule.check != NULL)
+		{
+			const bool on = GadgetCheckBoxIsChecked(rule.check) != FALSE;
+			if (on != (pLobbyInterface->*rule.isOn)())
+			{
+				setLobbyRule(rule, on);
+			}
+		}
+		return TRUE;
+	}
+	return FALSE;
+}
+
+static void showRulesTab(Bool rules)
+{
+	ShowLobbyTab(lobbyTabs, rules);
+
+	// The chat entry lives on the Game page
+	if (!rules && textEntryChat != NULL)
+	{
+		TheWindowManager->winSetFocus(textEntryChat);
+	}
+}
 
 Bool handleGameSetupSlashCommands(UnicodeString uText)
 {
@@ -3797,17 +4024,17 @@ Bool handleGameSetupSlashCommands(UnicodeString uText)
 	}
 	else if (token == "diplomacy")
 	{
-		toggleLobbyRule(L"Diplomacy", &NGMP_OnlineServices_LobbyInterface::IsDiplomacyRuleOn, &NGMP_OnlineServices_LobbyInterface::SetDiplomacyRule, L" is ON: players may change alliances during the match.");
+		toggleLobbyRule(s_lobbyRules[LOBBY_RULE_DIPLOMACY]);
 		return TRUE; // was a slash command
 	}
 	else if (token == "freeradar")
 	{
-		toggleLobbyRule(L"Free Radar", &NGMP_OnlineServices_LobbyInterface::IsFreeRadarRuleOn, &NGMP_OnlineServices_LobbyInterface::SetFreeRadarRule, L" is ON: every player has radar.");
+		toggleLobbyRule(s_lobbyRules[LOBBY_RULE_FREE_RADAR]);
 		return TRUE; // was a slash command
 	}
 	else if (token == "revealmap")
 	{
-		toggleLobbyRule(L"Reveal Map", &NGMP_OnlineServices_LobbyInterface::IsRevealMapRuleOn, &NGMP_OnlineServices_LobbyInterface::SetRevealMapRule, L" is ON: every player sees the whole map.");
+		toggleLobbyRule(s_lobbyRules[LOBBY_RULE_REVEAL_MAP]);
 		return TRUE; // was a slash command
 	}
 #endif
@@ -4138,7 +4365,19 @@ WindowMsgHandledType WOLGameSetupMenuSystem( GameWindow *window, UnsignedInt msg
 				Int controlID = control->winGetWindowId();
 				static int buttonCommunicatorID = NAMEKEY("GameSpyGameOptionsMenu.wnd:ButtonCommunicator");
 
-				if ( controlID == buttonBackID )
+				if (handleLobbyRuleClick( controlID ))
+				{
+					break;
+				}
+				if ( controlID == lobbyTabs.buttonGameID )
+				{
+					showRulesTab( FALSE );
+				}
+				else if ( controlID == lobbyTabs.buttonRulesID )
+				{
+					showRulesTab( TRUE );
+				}
+				else if ( controlID == buttonBackID )
 				{
 					savePlayerInfo();
 					if( WOLMapSelectLayout )
