@@ -204,7 +204,6 @@ static Int  showFrames = 0;
 static Int  showSide = SHOW_NONE;
 static Bool logoIsShown = FALSE;
 static Bool justEntered = FALSE;
-static Bool launchChallengeMenu = FALSE;
 
 static Bool dontAllowTransitions = FALSE;
 
@@ -281,22 +280,10 @@ void setupGameStart(AsciiString mapName, GameDifficulty diff)
 {
 	TheCampaignManager->setGameDifficulty(diff);
 
-	if (launchChallengeMenu)
-	{
-		if (TheChallengeGenerals)
-			TheChallengeGenerals->setCurrentDifficulty(diff);
-
-		campaignSelected = TRUE;
-		TheShell->push( "Menus/ChallengeMenu.wnd" );
-		TheTransitionHandler->reverse("MainMenuDifficultyMenuTraining");
-	}
-	else
-	{
-		startGame = TRUE;
-		TheWritableGlobalData->m_pendingFile = mapName;
-		TheShell->reverseAnimatewindow();
-		TheTransitionHandler->setGroup("FadeWholeScreen");
-	}
+	startGame = TRUE;
+	TheWritableGlobalData->m_pendingFile = mapName;
+	TheShell->reverseAnimatewindow();
+	TheTransitionHandler->setGroup("FadeWholeScreen");
 }
 
 void prepareCampaignGame(GameDifficulty diff)
@@ -1297,16 +1284,6 @@ WindowMsgHandledType MainMenuSystem( GameWindow *window, UnsignedInt msg,
 			else
 #endif
 
-			// don't allow mouse click slop that occurs during transitions to unset this flag
-			if (TheTransitionHandler->isFinished()
-				&& controlID != buttonEasyID && controlID != buttonMediumID && controlID != buttonHardID)
-			{
-				// this toggle must only be reset if one of these buttons have not been pressed
-				// ...the difficulty selection behavior must have a chance to act upon this toggle
-				launchChallengeMenu = FALSE;
-			}
-
-
 			if( controlID == buttonSinglePlayerID )
 			{
 				if(dontAllowTransitions)
@@ -1514,17 +1491,16 @@ WindowMsgHandledType MainMenuSystem( GameWindow *window, UnsignedInt msg,
 				if(campaignSelected || dontAllowTransitions)
 					break;
 
-				// set up for the difficulty select into challenge menu
-				TheTransitionHandler->setGroup("MainMenuFactionTraining");
+				// The challenge menu has its own difficulty buttons
+				buttonPushed = TRUE;
+				campaignSelected = TRUE;
+				dropDownWindows[DROPDOWN_SINGLE]->winHide(FALSE);
+				TheTransitionHandler->remove("MainMenuFactionTraining");
 				GameWindow *win = TheWindowManager->winGetWindowFromId(parentMainMenu, TheNameKeyGenerator->nameToKey("MainMenu.wnd:WinFactionTraining"));
 				if(win)
 					win->winHide(TRUE);
 				TheTransitionHandler->reverse("MainMenuSinglePlayerMenuBackTraining");
-				TheTransitionHandler->setGroup("MainMenuDifficultyMenuTraining");
-				campaignSelected = TRUE;
-				showLogo = FALSE;
-				showSide = SHOW_TRAINING;
-				launchChallengeMenu = TRUE;
+				TheShell->push( "Menus/ChallengeMenu.wnd" );
 			}
 
 
