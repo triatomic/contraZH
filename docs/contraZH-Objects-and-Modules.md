@@ -94,8 +94,30 @@ A missile whose target dies in flight flies on to where the target stood at laun
 there. Retail missiles vanished without exploding.
 
 `No` makes the missile kill itself on the spot with a `NORMAL` death, as retail did. Set it on any
-missile whose die modules react to that death, such as a `CreateObjectDie` with
-`DeathTypes = NONE +NORMAL` that spawns a retarget object.
+missile whose die modules react to that death. The frog missile upgrade retargets this way, so its
+missile opts out:
+
+```
+Object F18MissileFrog
+  Behavior = MissileAIUpdate ModuleTag_08
+    DetonateOnTargetLost = No
+    TryToFollowTarget    = Yes
+    DetonateCallsKill    = Yes
+  End
+  Behavior = CreateObjectDie ModuleTag_03A
+    DeathTypes   = NONE +NORMAL
+    CreationList = OCL_F18RetargetObject
+  End
+End
+```
+
+When the target dies, the missile dies a `NORMAL` death where it is, and `OCL_F18RetargetObject`
+spawns a new attacker there. With `Yes` the missile would detonate at the launch-time target
+position instead, die a `DETONATED` death and never spawn the retarget object.
+
+Notes:
+* `DetonateCallsKill = Yes` is needed, or the missile is destroyed without running its die modules.
+* Changes the simulation; replays must use the same INI.
 
 ## FireWeaponWhenDamagedBehavior
 

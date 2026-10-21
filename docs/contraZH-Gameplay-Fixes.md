@@ -170,6 +170,18 @@ attack still uses exact range, so nothing gains reach.
 
 Changes when units fire; affects replays.
 
+## Missiles whose target dies still explode
+
+A guided missile whose target died in flight used to vanish mid-air with no explosion or damage.
+Nuke Tank Hunter and Nuke Overlord anti-tank missiles lost the most. The missile now flies on to
+where the target stood at launch and detonates there. Out of fuel, it coasts and detonates on
+whatever it hits.
+
+Missiles that retarget when their target dies, like the frog missiles, opt out with
+[DetonateOnTargetLost](contraZH-Objects-and-Modules.md#detonateontargetlost) `= No`.
+
+Changes the simulation. Contributed by MayeAmiya.
+
 ## Force fire respects line of sight
 
 * A turreted unit with `ATTACK_NEEDS_LINE_OF_SIGHT` used to force fire at the ground through
