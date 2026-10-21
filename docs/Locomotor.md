@@ -11,23 +11,21 @@ Locomotors that can rotate in place (e.g. `TREADS`, `HOVER`) can now reverse tow
 Notes:
 * Defaults match the values the hardcoded backwards-movement logic used before these were configurable.
 * A global override exists in GameData: [`ReverseMoveIgnoreAngleThreshold`](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/GameData#reverse-movement).
+* AIUpdate can use reversing to stay out of a weapon's minimum range: [`MinRangeRetreatStraight` / `AimByReversing`](Objects-&-Modules.md#minimum-range-handling-reversing).
+* `AnimationSteeringUpdate` can set the `MOVING_BACKWARDS` condition state while reversing: [`BackwardsCondition`](Objects-&-Modules.md#animationsteeringupdate).
+
+## Turning without pivoting
+
+* `RequiresMoveToTurn = No` - (If Yes, the unit cannot rotate in place even when `MinSpeed = 0`. When it has to face a direction (aiming, facing, PreferredAttackAngle) it drives forward and turns through its normal movement, using `MinTurnSpeed` (at least 1/4 of max speed), until it is within about 2° of the goal. Meant for `WHEELS` vehicles that should not spin on the spot.)
 
 ## Ships
 ### TODO
 
-# LocomotorExtend
+# LocomtorExtend
 
-Locomotor definitions can be extended via a LocomotorExtend entry:
+Locomotor definitions can be extended via a LocomtorExtend entry:
 
-- `LocomotorExtend <NewLocomotor> <ParentLocomotor>`
+- `LocomotorExtend <NewLocomotor> <ParentLocomotor>
 
-All parameters from Locomotor can be used to override values from the parent Locomotor. It is possible to extend an extended Locomotor.
-
-```
-LocomotorExtend CrusaderFastLocomotor CrusaderLocomotor
-  Speed        = 40
-  SpeedDamaged = 30
-End
-```
-
+All parameters from Locomotor can be used to override values from the parent Locomotors . It is possible to extend an extended Locomotor.
 Note: The extended locomotor needs to be defined below the parent locomotor.

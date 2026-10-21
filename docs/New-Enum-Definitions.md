@@ -32,17 +32,23 @@ For synced weapons (AutoChooseSources) you can use "SYNC_TO_WEAPON_FOUR", etc.
 * `SEISMIC`
 * `RAD_BEAM`
 * `TESLA`
-* `BLACK_HOLE`
+* `JET_TORPEDO`
+* `ANTI_SHIP`
+* `CRYO`
+* `BLACK_HOLE` - (used by [RiftSlowDeathBehavior](Objects-&-Modules.md#riftslowdeathbehavior-new), no special logic)
 
 ### Functional DamageTypes
 
 * `CHRONO_GUN` - Disables units and removes them after a health treshold is reached. Uses parameters from GameData. TODO: detailed tutorial
-* `SUBDUAL_JAMMING` / `SUBDUAL_JAMMING_UNRESISTABLE` - Jamming damage pool; see [Subdual Jamming](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Objects-&-Modules#subdual-jamming)
-* `SUBDUAL_FROZEN` / `SUBDUAL_FROZEN_UNRESISTABLE` - Frozen damage pool that disables like retail subdual; see [Subdual Frozen](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Objects-&-Modules#subdual-frozen)
+* `CHRONO_UNRESISTABLE` - Used internally for units recovering from `CHRONO_GUN` damage. Ignores armor and damage scalars. Not meant for weapons.
+* `TORPEDO` - A weapon with this damage type cannot target units that are not over water.
+* `ANTI_TORPEDO` - Meant for weapons that destroy torpedoes. Currently has no hardcoded logic, so it behaves like a generic type.
 
 ## DeathTypes
 
 * `CHRONO`
+* `CRYO`
+* `BLACK_HOLE` - (used by [RiftSlowDeathBehavior](Objects-&-Modules.md#riftslowdeathbehavior-new))
 
 ## KindOfs
 
@@ -54,6 +60,8 @@ These kindofs have some hardcoded functions attached to them and should not be u
 * `DISABLE_INFANTRY_LIGHTING` - Disables infantry ambient lighting for infantry
 * `TELEPORTER` - Used with TeleportAIUpdate module. Required for pathfinding tweaks.
 * `SHOW_PROGRESS_BAR` - Allows the object to show progress bar above healthbar (used for EnergyShields)
+* `NO_ATTACK_WARNING` - Suppresses the "under attack" EVA/radar alarm event when this object is attacked.
+* `IMMUNE_TO_PULL` - Never dragged around by pulling effects such as [RiftSlowDeathBehavior](Objects-&-Modules.md#riftslowdeathbehavior-new). Still takes their damage.
 
 ### Generic KindOfs
 
@@ -87,6 +95,14 @@ New generic kindofs were added. These do not serve any internal purposes beyond 
 * `EXTRA14`
 * `EXTRA15`
 * `EXTRA16`
+
+## RadiusCursorType
+
+New radius cursor types were added, usable in `RadiusCursorType =` fields (Weapon/SpecialPower):
+
+* `JUMPJET` - used for Jumpjet-related abilities
+* `ATTACK_DAMAGE_AREA2`, `ATTACK_DAMAGE_AREA3`, `ATTACK_DAMAGE_AREA4` - extra tiers alongside the vanilla `ATTACK_DAMAGE_AREA`, for weapons/powers that need more than one distinctly-styled damage-area cursor.
+* `NEUTRON_BOMB`, `RIFT_GENERATOR` - superweapon target cursors.
 
 ## Locomotor Sets
 
@@ -127,10 +143,7 @@ Conditionstates that are used for VTOL aircraft (i.e. JetAIUpdate with NeedsRunw
 Conditionstate used for TeleporterAIUpdate
 * `TELEPORT_RECOVER`
 
-Conditionstate set while a unit is disabled by `SUBDUAL_FROZEN` damage
-* `FROZEN`
-
-Conditionstate set by [AnimationSteeringUpdate](Objects-&-Modules.md#animationsteeringupdate-new) with `BackwardsCondition = Yes` while the unit reverses
+Conditionstate set by AnimationSteeringUpdate (`BackwardsCondition = Yes`) while the unit drives in reverse
 * `MOVING_BACKWARDS`
 
 ## WeaponBonus types
@@ -138,55 +151,18 @@ Conditionstate set by [AnimationSteeringUpdate](Objects-&-Modules.md#animationst
 Added new WeaponBonus types for the following conditions:
 
 * `CONTAINED` - this bonus is applied to passengers in TransportContain (similar to GARRISONED)
-* `BATTLEPLAN_BOMBARDMENT_TWO`, `BATTLEPLAN_HOLDTHELINE_TWO`, `BATTLEPLAN_SEARCHANDDESTROY_TWO` -
-a second set of battle plan bonus flags. These are not applied by the battle plans themselves; they
-are set manually, so a second tier of bonus can be granted on top of the existing
-`BATTLEPLAN_*` conditions.
+* `FRENZY_FOUR`, `FRENZY_FIVE` - extra tiers above the vanilla FRENZY_ONE/TWO/THREE
+* `BOOST_ONE`, `BOOST_TWO`, `BOOST_THREE` - generic "boost" bonus tiers, for use with the `BuffTemplate` `WeaponBonus` FlagModifier (see [BuffSystem](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/BuffSystem))
+* `DEMORALIZED_ONE`, `DEMORALIZED_TWO`, `DEMORALIZED_THREE` - generic "demoralized" penalty tiers
+* `TARGET_PAINT_ONE`, `TARGET_PAINT_TWO`, `TARGET_PAINT_THREE` - bonus applied to a target that has been "painted" (e.g. by a target designator)
+* `CRYO_ONE`, `CRYO_TWO`, `CRYO_THREE` - generic "cryo/slow" penalty tiers (used e.g. by the Cryo Bomb buff example in [BuffSystem](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/BuffSystem))
+* `VETERANCY_FOUR`, `VETERANCY_FIVE` - bonus tiers matching the new `LEVEL_FOUR`/`LEVEL_FIVE` veterancy ranks
+* `BATTLEPLAN_BOMBARDMENT_TWO`, `BATTLEPLAN_HOLDTHELINE_TWO`, `BATTLEPLAN_SEARCHANDDESTROY_TWO` - second-tier battle plan bonuses
+* `EXTRA1` ... `EXTRA8` - free-to-use slots reserved for mods
 
 Bonus values can be defined in GameData.ini (no bonus by default). Example:
 
 `WeaponBonus = CONTAINED RANGE 125%`
-
-## Radius Cursor types
-
-The cursor type named on a generic `RadiusCursor <TYPE>` block in GameData.ini. The full list:
-
-`NONE`, `ATTACK_DAMAGE_AREA`, `ATTACK_SCATTER_AREA`, `ATTACK_CONTINUE_AREA`, `GUARD_AREA`
-
-`EMERGENCY_REPAIR`, `FRIENDLY_SPECIALPOWER`, `OFFENSIVE_SPECIALPOWER`
-
-`SUPERWEAPON_SCATTER_AREA`, `PARTICLECANNON`, `A10STRIKE`, `CARPETBOMB`, `DAISYCUTTER`
-
-`PARADROP`, `SPYSATELLITE`, `SPECTREGUNSHIP`, `HELIX_NAPALM_BOMB`, `NUCLEARMISSILE`, `EMPPULSE`
-
-`ARTILLERYBARRAGE`, `NAPALMSTRIKE`, `CLUSTERMINES`, `SCUDSTORM`, `ANTHRAXBOMB`, `AMBUSH`
-
-`RADAR`, `SPYDRONE`, `FRENZY`, `CLEARMINES`, `AMBULANCE`, `IONCANNON`, `CLUSTERMISSILE`
-
-`SUNSTORM`, `METEORSTRIKE`, `PUNISHER`, `CHEMICALMISSILE`, `CARPETBOMB_USA`, `MOAB`
-
-`SUPERSONICSTRIKE`, `HELISUPPORT`, `INTERCEPTORS`, `HOLOGRAMS`, `PARADROP_AIRF`
-
-`COASTALBARRAGE`, `PARADROP_COMMANDOS`, `IONSTRIKE`, `CRYOBOMB`, `FORCEFIELD`, `SPACESHIP`
-
-`ORBITALSTRIKE`, `DROPPODS`, `DROPPODS_SUPER`, `LASERSTRIKE`, `ANTIMATTERBOMB`, `CHRONOAMBUSH`
-
-`CHRONOSPHERE`, `SUBORBITALSTRIKE`, `NANOSWARM`, `SPYPLANE`, `OBSERVATION`, `AIRSTRIKE_NUKE`
-
-`ICBM_NUKE`, `CARPETBOMB_NUKE`, `ARTILLERYBARRAGE_NUKE`, `SUPERHACK`, `SYSTEMHACK`
-
-`CARPETBOMB_NAPALM`, `DRAGONSTAR`, `SPIDERMINES`, `EARTHSHAKER`, `IRONCURTAIN`, `PARADROP_TANK`
-
-`MORTARBARRAGE`, `NAPALMBOMB`, `PARADROP_LARGE`, `DEMOTRAPS`, `FRENZY_GLA`, `GPSSCRAMBLER`
-
-`JUNKREPAIR`, `ROCKETBARRAGE`, `CARPETBOMB_CLUSTER`, `SUICIDEPLANE`, `ARTILLERYBARRAGE_GLA`
-
-`VIRUS`, `CHEMTRAILS`, `AIRSTRIKE_GLA`, `CHEMICALBOMB`, `TOXINDROP`, `JUMPJET`
-
-`ATTACK_DAMAGE_AREA2`, `ATTACK_DAMAGE_AREA3`, `ATTACK_DAMAGE_AREA4`, `NEUTRON_BOMB`, `RIFT_GENERATOR`
-
-`JUMPJET`, `ATTACK_DAMAGE_AREA2` / `3` / `4`, `NEUTRON_BOMB` and `RIFT_GENERATOR` are new; the extra
-ATTACK_DAMAGE_AREA slots let a unit use a different damage-area cursor per weapon.
 
 ## Veterancy Levels
 
@@ -225,6 +201,12 @@ Values:
 * `SHIELDED`
 * `DEMORALIZED`
 * `BOOST`
+* `TELEPORT_RECOVER` - Chrono Legionnaire-style teleport recovery tint
+* `DISABLED_CHRONO` - see [GameData ChronoGun parameters](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/GameData#chronogun-parameters)
+* `GAINING_CHRONO_DAMAGE` - see [GameData ChronoGun parameters](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/GameData#chronogun-parameters)
+* `FORCE_FIELD`
+* `IRON_CURTAIN`
+* `FROZEN`
 * `EXTRA1`
 * `EXTRA2`
 * `EXTRA3`
@@ -233,5 +215,5 @@ Values:
 * `EXTRA6`
 * `EXTRA7`
 * `EXTRA8`
-
-
+* `EXTRA9`
+* `EXTRA10`

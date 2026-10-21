@@ -82,6 +82,7 @@ nav:
           - CommandButtons & Selection: contraZH-CommandButtons.md
           - ParticleSystems: contraZH-ParticleSystems.md
           - Object Creation List: contraZH-Object-Creation-List.md
+          - ChatCommands: contraZH-ChatCommands.md
           - Extend Blocks: contraZH-Extend.md
           - Animation2D: contraZH-Animation2D.md
           - Debug & Cheats: contraZH-Debug-and-Cheats.md
@@ -129,4 +130,6 @@ nav:
       - Object Creation List: Object-Creation-List.md
       - New Enum Definitions: New-Enum-Definitions.md
       - Audio: Audio.md
+      - MapData: MapData.md
+      - Undocumented Upstream Features: Undocumented-Upstream-Features.md
       - Game MCP & AI Matches: Game-MCP-and-AI-Matches.md

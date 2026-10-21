@@ -23,6 +23,9 @@ Changes specific to this fork are on [contraZH Changes](contraZH-Changes.md).
 
 ## Upstream reference
 
+Copied unchanged from the GeneralsGameCode_Modding wiki. Pages marked "Written by contraZH" cover
+upstream features that wiki leaves out.
+
 * [Changes & Bug Fixes](Changes-&-Bug-Fixes.md) - changes to default engine behaviour
 * [Objects & Modules](Objects-&-Modules.md) - object parameters and every new module type
 * [Weapons](Weapons.md) / [Armors](Armors.md) / [Turrets](Turrets.md)
@@ -32,7 +35,8 @@ Changes specific to this fork are on [contraZH Changes](contraZH-Changes.md).
 * [CommandButtons](CommandButtons.md) / [ChatCommands](ChatCommands.md)
 * [BuffSystem](BuffSystem.md) / [Locomotor](Locomotor.md) / [Naval Support](Naval-Support.md)
 * [Object Creation List](Object-Creation-List.md) / [New Enum Definitions](New-Enum-Definitions.md)
-* [Audio](Audio.md)
+* [Audio](Audio.md) / [MapData](MapData.md)
+* [Undocumented Upstream Features](Undocumented-Upstream-Features.md) - written by contraZH: upstream features missing from upstream's wiki, and corrections
 * [Game MCP & AI Matches](Game-MCP-and-AI-Matches.md) - driving the game from tools and logging AI-only skirmishes
 
 # Contact

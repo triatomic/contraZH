@@ -50,6 +50,8 @@ Flag modifiers are binary modifiers, i.e. multiple stacks from the same buff wil
 
 - ParticleSystem = <ParticleSystemEntry>   ; attaches the particlesystem to the object
 
+### 
+
 # Examples
 
 ```

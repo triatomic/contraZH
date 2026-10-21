@@ -27,6 +27,7 @@ version - see [Rendering](contraZH-Options.md#rendering) for the renamed `Anisot
 * [CommandButtons & Selection](contraZH-CommandButtons.md) - new command buttons, queue reorder and structure multi-select
 * [ParticleSystem.ini](contraZH-ParticleSystems.md) - new ParticleSystem.ini keys
 * [ObjectCreationList.ini](contraZH-Object-Creation-List.md) - new ObjectCreationList.ini nuggets
+* [ChatCommands.ini](contraZH-ChatCommands.md) - new chat command fields: health, ownership, EMP, crew kill, player control and typed spawns
 * [Extend Blocks](contraZH-Extend.md) - inheriting Armor, Locomotor, Weapon, Object, OCL, FXList and ParticleSystem entries
 * [Animation2D.ini](contraZH-Animation2D.md) - direct textures in Animation2D.ini
 * [Debug and Cheat Features](contraZH-Debug-and-Cheats.md) - debug overlays and cheat hotkeys in cheat builds

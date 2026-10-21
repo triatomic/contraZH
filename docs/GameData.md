@@ -45,123 +45,10 @@ Tint Colors:
 * `ChronoDamageParticleSystemLarge = ChronoSparksLarge`   ; ParticleSystem applied to STRUCTURES. (BOX volume scales to unit geometry)
 * `ChronoDamageParticleSystemMedium = ChronoSparksMedium`  ; ParticleSystem applied to everyting else. (BOX volume scales to unit geometry)
 * `ChronoDamageParticleSystemSmall = ChronoSparksSmall`   ; ParticleSystem applied to INFANTRY. (BOX volume scales to unit geometry)
-
-`ChronoDamageHealRate` and `ChronoDamageHealAmountPercent` are the default of last resort. A
-`SubdualDamageDefaults` block or an object's own ActiveBody can override both (see below).
-
-## Subdual Damage Defaults
-
-Global defaults for the subdual, jamming, frozen and chrono values that otherwise repeat on every
-ActiveBody. Any number of blocks may appear; each one can be restricted to a KindOf and can
-exclude a KindOf.
-
-```
-SubdualDamageDefaults
-  SubdualDamageCap        = MaxHealth * 2
-  SubdualDamageHealRate   = 500
-  SubdualDamageHealAmount = MaxHealth / 16.25
-  JammingDamageCap        = MaxHealth * 2
-  JammingDamageHealRate   = 500
-  JammingDamageHealAmount = MaxHealth / 16.25
-  FrozenDamageCap         = MaxHealth * 2
-  FrozenDamageHealRate    = 500
-  FrozenDamageHealAmount  = MaxHealth / 16.25
-  ChronoDamageHealRate    = 500
-  ChronoDamageHealAmount  = MaxHealth * 0.1
-End
-
-SubdualDamageDefaults
-  KindOf                  = PROJECTILE
-  SubdualDamageCap        = MaxHealth
-  SubdualDamageHealRate   = 1000
-End
-
-SubdualDamageDefaults
-  KindOf                  = VEHICLE
-  ForbiddenKindOf         = AIRCRAFT DRONE
-  FrozenDamageCap         = MaxHealth * 3
-End
-```
-
-Every key is optional. `KindOf` takes a list of KindOf bits and matches an object that has any of
-them; a block without `KindOf` matches every object. `ForbiddenKindOf` takes the same list and
-skips the block for any object that has any of those bits, whatever `KindOf` says. Both may be
-omitted. Blocks are searched from last to first, so
-put general blocks first and specific ones after them. A map's own `GameData` block appends its
-`SubdualDamageDefaults` after the global ones and therefore wins.
-
-Cap and HealAmount values take one of these forms:
-
-* `1000` - (A fixed value.)
-* `MaxHealth` - (The unit's max health.)
-* `MaxHealth * 2` - (A multiple of max health.)
-* `MaxHealth / 16.25` - (A fraction of max health.)
-
-`MaxHealth` is the unit's max health at the moment it is used, so a cap written as `MaxHealth * 2`
-grows with veterancy health bonuses just as the subdue threshold does. HealRate values are
-durations in milliseconds as before.
-
-Precedence for each value on each unit:
-
-1. The value written on the unit's ActiveBody, if present. An explicit `SubdualDamageCap = 0`
-   still means immune.
-2. The last matching `SubdualDamageDefaults` block that sets that value.
-3. Zero for subdual, jamming and frozen. For chrono, `ChronoDamageHealRate` and
-   `ChronoDamageHealAmountPercent` from GameData.
-
-The same value forms are accepted on ActiveBody itself, and ActiveBody also accepts
-`ChronoDamageHealRate` and `ChronoDamageHealAmount`; see [ActiveBody subdual fields](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Objects-&-Modules#activebody-fields).
   
-## Subdual Overlay Textures
-
-A texture can be drawn over units taking jamming or frozen damage. Each overlay has its own key
-set; the effect is off until a texture is named.
-
-```
-JammingOverlayTexture  = JammingFX.tga
-JammingOverlayScrollU  = 0.5
-JammingOverlayScrollV  = 0.0
-JammingOverlayScale    = 1.0
-JammingOverlayColor    = R:255 G:255 B:255
-JammingOverlayAdditive = Yes
-
-FrozenOverlayTexture   = FrostFX.tga
-FrozenOverlayScrollU   = 0.0
-FrozenOverlayScrollV   = 0.0
-FrozenOverlayScale     = 1.0
-FrozenOverlayColor     = R:255 G:255 B:255
-FrozenOverlayAdditive  = No
-```
-
-The values shown are the defaults apart from the texture names. See
-[Subdual Jamming](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Objects-&-Modules#overlay-texture)
-and [Subdual Frozen](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Objects-&-Modules#subdual-frozen)
-for what each key does and how the two overlays stack.
-
 ## Water Depth Terrain Lighting
 
-Note: these keys now live in the map's `MapData` entry rather than in GameData, which is what
-previously caused issues when set from map.ini. Set them per map:
-
-```
-MapData
-  TerrainHeightAmbientLightStart = -1
-  TerrainHeightAmbientLightColor1 = R:0 G:0 B:0
-End
-```
-
-Added support to tint terrain ambient lighting based on terrain height. The main purpose is to darken terrain the deeper it is below the water surface, to create an underwater depth effect.
-
-* `TerrainHeightAmbientLightStart = -1` - (Terrain height at which the effect begins. Above this height no tint is applied. Default = -1 = disabled)
-* `TerrainHeightAmbientLightHeight1 = -1` - (Height at which `TerrainHeightAmbientLightColor1` is fully reached)
-* `TerrainHeightAmbientLightHeight2 = -1` - (Height at which `TerrainHeightAmbientLightColor2` is fully reached)
-* `TerrainHeightAmbientLightColor1 = R:0 G:0 B:0` - (Tint color reached at Height1)
-* `TerrainHeightAmbientLightColor2 = R:0 G:0 B:0` - (Tint color reached at Height2)
-* `TerrainHeightAmbientLightAdditive = No` - (If Yes, the colors are added to the ambient light instead of blended/multiplied)
-
-Notes:
-* The tint blends from no effect at `...Start`, towards Color1 at `...Height1`, and towards Color2 at `...Height2`, allowing a two-step gradient (e.g. shallow water vs. deep water).
-* The whole feature is disabled by default (start height = -1).
+**Moved:** this feature was reworked and is no longer configured in `GameData.ini`. It is now a per-map setting in a `MapData` block — see [MapData](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/MapData#water-depth-terrain-lighting). The "work in progress" issues from the old `GameData.ini`-based version are resolved.
 
 ## Default Excluded Death types
 
@@ -184,17 +71,6 @@ This means the listed death types will be excluded from any Death module that us
 
 * `SmartGarrisonRange = 100.0` - (Radius searched around the clicked target for additional transports/structures to distribute units into. Default = 100.0)
 
-## Queue Reorder
-
-Lets the player move a build queue entry (unit or upgrade) one position earlier by
-Ctrl+clicking its cameo, swapping it with the entry before it. The displaced entry loses
-its build progress. A plain click still cancels; a finished unit waiting to exit the
-factory cannot be displaced. See [Queue reorder](contraZH-CommandButtons.md#queue-reorder) for the
-full behavior.
-
-* `QueueReorder = No` - (Enables the Ctrl+click build queue reorder. With No, clicking the
-  queue behaves exactly like retail, Ctrl held or not. Default = No)
-
 ## Extra Veterancy Levels
 
 Added two extra veterancy levels above HEROIC (see [New Enum Definitions](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/New-Enum-Definitions#veterancy-levels)). Health bonuses for the new levels are defined here:
@@ -206,57 +82,22 @@ Notes:
 * These extend the existing `HealthBonus_Veteran` / `HealthBonus_Elite` / `HealthBonus_Heroic` parameters.
 * See [ThingTemplate veterancy parameters](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Objects-&-Modules#veterancy-object-parameters) for per-object level configuration.
 
-## Transport Load Slowdown
-
-A container can be slowed by what it carries: the fuller it is, the worse it moves, and it recovers as passengers leave. These four set the default penalty, as the fraction of each value lost at a full load. Each is `0%` by default, so transports behave exactly as before until a value is set.
-
-* `TransportLoadSpeedPenalty = 0%` - (Fraction of `Speed` lost at a full load. Default = 0%)
-* `TransportLoadTurnRatePenalty = 0%` - (Fraction of `TurnRate` lost at a full load. Default = 0%)
-* `TransportLoadAccelerationPenalty = 0%` - (Fraction of `Acceleration` lost at a full load. Default = 0%)
-* `TransportLoadLiftPenalty = 0%` - (Fraction of `Lift` lost at a full load. Default = 0%)
-
-Each penalty covers the damaged variant of its value too, so `SpeedDamaged` scales by the same percentage as `Speed`. Any container can override these or opt out entirely - see [Contain module load slowdown](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Objects-&-Modules#load-slowdown-from-occupants).
-
 ## Weapon Scatter on Water
 
 * `WeaponScatterOnWaterSurfaceDefault = No` - (Default value for the per-weapon `ScatterOnWaterSurface` flag when it is not set explicitly on a WeaponTemplate. Controls whether scattered shots that land on water detonate at the water surface. Individual weapons can still override this via `ScatterOnWaterSurface` in Weapon.ini. Default = No)
 
+## Radius Decals Above Water
+
+* `RadiusDecalsAboveWater = No` - (Global default. If Yes, radius decals (e.g. weapon/special-power range indicators, [RadiusDecalBehavior](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Objects-&-Modules#radiusdecalbehavior-new)) render above the water surface instead of being hidden/clipped by it. Default = No)
+
+Note: a separate per-decal override exists for FXList-driven decals — see [W3DDecalDraw `RenderAboveWater`](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Objects-&-Modules#w3ddecaldraw-new).
+
 ## Singleplayer Chat Window
 
 * `EnableSingleplayerChatwindow = No` - (If Yes, the in-game chat window (Enter key) can be opened in singleplayer and skirmish games. This is required to use [Chat Commands](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/ChatCommands). Default = No)
-
-# InGameUI.ini
-
-## Generic RadiusCursor definitions
-
-Radius cursors used to need one hardcoded keyword each (`AttackDamageAreaRadiusCursor`,
-`AttackScatterAreaRadiusCursor`, `AttackContinueAreaRadiusCursor` and so on), so a new cursor could
-not be added from INI alone. A generic form is now accepted, where the cursor type is named on the
-header line:
-
-```
-RadiusCursor GUARD_AREA
-  Texture = SCCommandCenterRadiusCursor
-  Style = SHADOW_ALPHA_DECAL
-  OpacityMin = 20%
-  OpacityMax = 40%
-End
-```
-
-The old per-cursor keywords still work. The cursor type must be a name from the radius cursor list;
-see [New Enum Definitions](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/New-Enum-Definitions).
-
-## Radius decals above water
-
-Radius cursors and FX decals previously always projected onto the terrain, so they disappeared under
-water. They can now be drawn on the water surface instead — see `RenderAboveWater` on
-[W3DDecalDraw](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Objects-&-Modules#w3ddecaldraw-new).
 
 # MiscAudio.ini
 
 The following new entries in MiscAudio.ini are available
 
 *`ChronoDisabledSoundAmbient = <AudioEvent>` - (looping) audio to play when an object is being removed/disabled by a CHRONO_GUN
-*`UnitJammed = <AudioEvent>` / `UnitUnjammed = <AudioEvent>` - fallback jam and unjam cues when the unit defines no `SoundJammed` / `SoundUnjammed`
-*`UnitFrozen = <AudioEvent>` / `UnitUnfrozen = <AudioEvent>` - fallback freeze and thaw cues when the unit defines no `SoundFrozen` / `SoundUnfrozen`
-

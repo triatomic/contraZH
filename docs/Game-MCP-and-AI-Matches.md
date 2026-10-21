@@ -1,5 +1,7 @@
 # Game MCP Bridge
 
+Written by contraZH. The bridge is an upstream feature that upstream's wiki does not cover.
+
 A localhost command bridge that lets a tool drive the running game: pause and step it, inspect
 objects and players, give orders, change values, run scripts, move the camera and take screenshots.
 The game is built with it by default (`RTS_BUILD_OPTION_GAME_MCP`), but it only exists when the game

@@ -9,8 +9,8 @@
 * SPECIAL_CHEMICAL_MISSILE
 * SPECIAL_CHRONOSPHERE
 * SPECIAL_RIFT_GENERATOR
-* SPECIAL_ALL_BATTLE_PLANS - grants all battle plans for a time, see [AllBattlePlansUpdate](Objects-&-Modules.md#allbattleplansupdate-new). Behaves like `SPECIAL_CIA_INTELLIGENCE` (no target).
-* SPECIAL_ALL_BATTLE_PLANS_ACTIVE - for the countdown that shows how long the all-battle-plans effect lasts
+* SPECIAL_ALL_BATTLE_PLANS - behaves like the no-target CIA Intelligence power; meant for [AllBattlePlansUpdate](Objects-&-Modules.md#allbattleplansupdate-new)
+* SPECIAL_ALL_BATTLE_PLANS_ACTIVE - display-only power for the remaining time of the above
 
 ## New Parser Fields:
 `BehaviorEnum = <OTHER ENUM>`  
@@ -25,13 +25,13 @@ Used to set how a new SpecialPower behaves, new enums will be like "SPECIAL_NEUT
 `EvaReadyOwn = <Name of eva event>`  
 `EvaReadyAlly = <Name of eva event>`  
 `EvaReadyEnemy = <Name of eva event>`  
-These allow to specify eva events for a special power. When not set, vanilla special power still have their hardcoded events. 
+These allow to specify eva events for a special power. When not set, vanilla special power still have their hardcoded events. When set, only the given event plays (the hardcoded detected/launched events of the vanilla superweapons are no longer played in addition).
 
 `OwnerOnlyTimer = No`  
-With `PublicTimer = Yes`, the countdown is drawn only for the player that owns it, and it is registered for any object that carries the power, not only structures (needs `SharedSyncedTimer = No`).
+Used with `PublicTimer = Yes`: the countdown is shown only to the player who owns the power. Such a timer is also shown for objects that are not structures, e.g. a helper object that shows its owner how long a temporary effect still lasts. Default = No.
 
 `FlashingTimer = No`  
-The countdown is drawn bold and flashing like a ready superweapon the whole time. Together with `OwnerOnlyTimer` this lets a marker object show its owner how long a temporary effect still lasts.
+Used with `PublicTimer = Yes`: the countdown is drawn like a ready timer (ready font, flashing) the whole time, e.g. while an effect is active. Default = No.
 
 `Cost = 0`  
 Optional credits cost to activate the special power. When set (> 0), the player must have enough money, and the cost is deducted when the power is fired. The command button is disabled/greyed out when the player cannot afford it, and the cost is shown in the button tooltip. Default = 0 (free).
@@ -39,10 +39,8 @@ Optional credits cost to activate the special power. When set (> 0), the player 
 `NeedsTargetDesignator = No`  
 When Yes, this special power can only be fired while a valid target designator is active for the player (see the [SpecialPowerDesignatorUpdate](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Objects-&-Modules#specialpowerdesignatorupdate-new) module). Used to gate a superweapon behind a "designate target" unit/ability. Default = No.
 
-`StartCooldownOnFirstShot = No`  
-When Yes, `ReloadTime` starts after the unit fires the shots this power's OCL ordered, instead of starting when the player uses the power. Until then the power is locked: the cameo shows it as unavailable and the player cannot use it again. Use this when the OCL has an `Attack` nugget, because the unit needs time to line up and shoot. Default = No.
-
-If the unit fires nothing at all, the engine treats the use as cancelled and gives the power back ready, instead of charging a cooldown. Should the engine somehow miss the cancel, the power gives up waiting after `ReloadTime` and starts its cooldown, so it can never get stuck.
+`StartsReady = No`  
+If Yes, the special power is ready to fire immediately once available (no initial reload wait). Default = No (normal reload-on-creation behavior).
 
 ### Code Example: 
 ```
@@ -165,98 +163,6 @@ Added CommandButton parameters to let a special power be aimed at **multiple tar
 * SUPERWEAPONREADY_ALLY_RIFT_GENERATOR
 * SUPERWEAPONREADY_ENEMY_RIFT_GENERATOR
 
-Events for the remaining Contra superweapons. These are not tied to a special power enum, so any
-template can use them, including several templates sharing one set.
-
-* SUPERWEAPONDETECTED_OWN_NUCLEAR_STORM
-* SUPERWEAPONDETECTED_ALLY_NUCLEAR_STORM
-* SUPERWEAPONDETECTED_ENEMY_NUCLEAR_STORM
-* SUPERWEAPONLAUNCHED_OWN_NUCLEAR_STORM
-* SUPERWEAPONLAUNCHED_ALLY_NUCLEAR_STORM
-* SUPERWEAPONLAUNCHED_ENEMY_NUCLEAR_STORM
-* SUPERWEAPONREADY_OWN_NUCLEAR_STORM
-* SUPERWEAPONREADY_ALLY_NUCLEAR_STORM
-* SUPERWEAPONREADY_ENEMY_NUCLEAR_STORM
-
-* SUPERWEAPONDETECTED_OWN_WEATHER_CONTROL
-* SUPERWEAPONDETECTED_ALLY_WEATHER_CONTROL
-* SUPERWEAPONDETECTED_ENEMY_WEATHER_CONTROL
-* SUPERWEAPONLAUNCHED_OWN_WEATHER_CONTROL
-* SUPERWEAPONLAUNCHED_ALLY_WEATHER_CONTROL
-* SUPERWEAPONLAUNCHED_ENEMY_WEATHER_CONTROL
-* SUPERWEAPONREADY_OWN_WEATHER_CONTROL
-* SUPERWEAPONREADY_ALLY_WEATHER_CONTROL
-* SUPERWEAPONREADY_ENEMY_WEATHER_CONTROL
-
-* SUPERWEAPONDETECTED_OWN_HATF_MISSILE
-* SUPERWEAPONDETECTED_ALLY_HATF_MISSILE
-* SUPERWEAPONDETECTED_ENEMY_HATF_MISSILE
-* SUPERWEAPONLAUNCHED_OWN_HATF_MISSILE
-* SUPERWEAPONLAUNCHED_ALLY_HATF_MISSILE
-* SUPERWEAPONLAUNCHED_ENEMY_HATF_MISSILE
-* SUPERWEAPONREADY_OWN_HATF_MISSILE
-* SUPERWEAPONREADY_ALLY_HATF_MISSILE
-* SUPERWEAPONREADY_ENEMY_HATF_MISSILE
-
-* SUPERWEAPONDETECTED_OWN_COMMAND_UPLINK
-* SUPERWEAPONDETECTED_ALLY_COMMAND_UPLINK
-* SUPERWEAPONDETECTED_ENEMY_COMMAND_UPLINK
-* SUPERWEAPONLAUNCHED_OWN_COMMAND_UPLINK
-* SUPERWEAPONLAUNCHED_ALLY_COMMAND_UPLINK
-* SUPERWEAPONLAUNCHED_ENEMY_COMMAND_UPLINK
-* SUPERWEAPONREADY_OWN_COMMAND_UPLINK
-* SUPERWEAPONREADY_ALLY_COMMAND_UPLINK
-* SUPERWEAPONREADY_ENEMY_COMMAND_UPLINK
-
-* SUPERWEAPONDETECTED_OWN_ATMOSPHERIC_LENS
-* SUPERWEAPONDETECTED_ALLY_ATMOSPHERIC_LENS
-* SUPERWEAPONDETECTED_ENEMY_ATMOSPHERIC_LENS
-* SUPERWEAPONLAUNCHED_OWN_ATMOSPHERIC_LENS
-* SUPERWEAPONLAUNCHED_ALLY_ATMOSPHERIC_LENS
-* SUPERWEAPONLAUNCHED_ENEMY_ATMOSPHERIC_LENS
-* SUPERWEAPONREADY_OWN_ATMOSPHERIC_LENS
-* SUPERWEAPONREADY_ALLY_ATMOSPHERIC_LENS
-* SUPERWEAPONREADY_ENEMY_ATMOSPHERIC_LENS
-
-* SUPERWEAPONDETECTED_OWN_ICBM
-* SUPERWEAPONDETECTED_ALLY_ICBM
-* SUPERWEAPONDETECTED_ENEMY_ICBM
-* SUPERWEAPONLAUNCHED_OWN_ICBM
-* SUPERWEAPONLAUNCHED_ALLY_ICBM
-* SUPERWEAPONLAUNCHED_ENEMY_ICBM
-* SUPERWEAPONREADY_OWN_ICBM
-* SUPERWEAPONREADY_ALLY_ICBM
-* SUPERWEAPONREADY_ENEMY_ICBM
-
-* SUPERWEAPONDETECTED_OWN_TOMAHAWK_STORM
-* SUPERWEAPONDETECTED_ALLY_TOMAHAWK_STORM
-* SUPERWEAPONDETECTED_ENEMY_TOMAHAWK_STORM
-* SUPERWEAPONLAUNCHED_OWN_TOMAHAWK_STORM
-* SUPERWEAPONLAUNCHED_ALLY_TOMAHAWK_STORM
-* SUPERWEAPONLAUNCHED_ENEMY_TOMAHAWK_STORM
-* SUPERWEAPONREADY_OWN_TOMAHAWK_STORM
-* SUPERWEAPONREADY_ALLY_TOMAHAWK_STORM
-* SUPERWEAPONREADY_ENEMY_TOMAHAWK_STORM
-
-## Which template uses which event set
-
-The Contra superweapon templates these were added for. Several templates share one `Enum`, so the
-event set is chosen per template, not per enum.
-
-| Template | Event set |
-| --- | --- |
-| SuperweaponNuclearStorm | NUCLEAR_STORM |
-| SuperweaponEMPStorm (weather control device) | WEATHER_CONTROL |
-| SuperweaponHatfMissile, SuperweaponHatfVMissile | HATF_MISSILE |
-| SuperweaponStrategicBombing (strategic command uplink) | COMMAND_UPLINK |
-| SuperweaponAtmoLenzWeapon | ATMOSPHERIC_LENS |
-| SuperweaponICBMMissile | ICBM |
-| SuperweaponTomahawkStorm | TOMAHAWK_STORM |
-
-`SuperweaponParticleUplinkCannon`, `SuperweaponParticleUplinkCannonSupW`, `SuperweaponNeutronMissile`,
-`Nuke_SuperweaponNeutronMissile` and `SuperweaponScudStorm` keep the vanilla hardcoded events, so they
-got no new set.
-
 # New SpecialPower "Kodiak"
 based on spectre gunship, a unit with multiple turrets and a primary weapon are fired in the target area
 * **MainTurrets**: Follow manual targetting (spectre)
@@ -282,12 +188,13 @@ Example Code in the gunship unit:
     ; Locomotorset change happens at reaching the target and end of OrbitTime (NORMAL to PANIC like spectre) 
     TargetingReticleRadius = 25 ; Like spectre
     GunshipOrbitRadius = 400 ;radius from target point at where to go in attack mode
+    AreaDecalRadius = 250 ; radius of the AttackAreaDecal, independent of AttackAreaRadius
     MainTurrets = 2 ; how many turrets are main, should have at least one, must be first x contained objects
+    MainTurretsFireInSequence = No ; if Yes, main turrets take turns: each fires one shot, then the next one may fire
+    MainTurretSequenceDelay = 0 ; min time in ms between consecutive main turret shots in sequence mode (never the same frame)
     SideTurrets = 2 ; how many turrets are side, must be contained after mainTurrets
     AATurrets = 2 ; how many turrets are aa, must be contained after sideTurrets
     MainTargetingRate = 200     ; how often target for main turrets can change
-    MainTurretsFireInSequence = No ; Yes: main turrets take turns, one shot each, instead of firing together
-    MainTurretSequenceDelay = 0 ; minimum ms between two main turret shots in sequence mode (at least one frame)
     AttackAreaRadius = 250.0 ; Attack area around target like spectre
     SideTargetingRate = 150     ; how often target for side turrets can change
     SideAttackAreaRadius = 250.0 ; which radius side turrets can shoot at, calculated from current gunship pos
@@ -347,6 +254,3 @@ Coresponding CommandCenter Code:
   ; other choices are: *NEAR_SOURCE *FARTHEST_FROM_SOURCE *NEAR_TARGET
   End
 ```
-
-
-

@@ -16,7 +16,7 @@ End
 ```
 
 ArmorExtend also allows to use ArmorMult instead of armor, this will multiply the armor value inherited by the parent with this factor
-
+###
 ```
 ArmorExtend DozerArmorExtended DozerArmor
   ArmorMult = EXPLOSION 1%

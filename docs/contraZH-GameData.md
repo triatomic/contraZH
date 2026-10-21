@@ -8,26 +8,68 @@ an unknown block in every build, so a mod INI written for a newer exe could not 
 one. An unknown block is skipped up to its `End`, which also covers a new key that opens a nested
 block. A known key with a bad value still fails the load.
 
-## Subdual damage defaults
+## Subdual Damage Defaults
 
-Subdual, jamming, frozen and chrono tuning can be set once in GameData.ini instead of on every
-ActiveBody. Any number of `SubdualDamageDefaults` blocks, each optionally limited by `KindOf` /
-`ForbiddenKindOf`, with values relative to max health:
+Global defaults for the subdual, jamming, frozen and chrono values that otherwise repeat on every
+ActiveBody. Any number of blocks may appear; each one can be restricted to a KindOf and can
+exclude a KindOf.
 
 ```
 SubdualDamageDefaults
   SubdualDamageCap        = MaxHealth * 2
   SubdualDamageHealRate   = 500
   SubdualDamageHealAmount = MaxHealth / 16.25
+  JammingDamageCap        = MaxHealth * 2
+  JammingDamageHealRate   = 500
+  JammingDamageHealAmount = MaxHealth / 16.25
+  FrozenDamageCap         = MaxHealth * 2
+  FrozenDamageHealRate    = 500
+  FrozenDamageHealAmount  = MaxHealth / 16.25
+  ChronoDamageHealRate    = 500
+  ChronoDamageHealAmount  = MaxHealth * 0.1
+End
+
+SubdualDamageDefaults
+  KindOf                  = PROJECTILE
+  SubdualDamageCap        = MaxHealth
+  SubdualDamageHealRate   = 1000
+End
+
+SubdualDamageDefaults
+  KindOf                  = VEHICLE
+  ForbiddenKindOf         = AIRCRAFT DRONE
+  FrozenDamageCap         = MaxHealth * 3
 End
 ```
 
-* An ActiveBody key still wins; `SubdualDamageCap = 0` still means immune.
-* An ActiveBody without the key falls back to the global block instead of zero.
-* `MaxHealth` forms work on ActiveBody too, which also gains `ChronoDamageHealRate` and
-`ChronoDamageHealAmount`.
+Every key is optional. `KindOf` takes a list of KindOf bits and matches an object that has any of
+them; a block without `KindOf` matches every object. `ForbiddenKindOf` takes the same list and
+skips the block for any object that has any of those bits, whatever `KindOf` says. Both may be
+omitted. Blocks are searched from last to first, so
+put general blocks first and specific ones after them. A map's own `GameData` block appends its
+`SubdualDamageDefaults` after the global ones and therefore wins.
 
-Details in [GameData](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/GameData#subdual-damage-defaults).
+Cap and HealAmount values take one of these forms:
+
+* `1000` - (A fixed value.)
+* `MaxHealth` - (The unit's max health.)
+* `MaxHealth * 2` - (A multiple of max health.)
+* `MaxHealth / 16.25` - (A fraction of max health.)
+
+`MaxHealth` is the unit's max health at the moment it is used, so a cap written as `MaxHealth * 2`
+grows with veterancy health bonuses just as the subdue threshold does. HealRate values are
+durations in milliseconds as before.
+
+Precedence for each value on each unit:
+
+1. The value written on the unit's ActiveBody, if present. An explicit `SubdualDamageCap = 0`
+   still means immune.
+2. The last matching `SubdualDamageDefaults` block that sets that value.
+3. Zero for subdual, jamming and frozen. For chrono, `ChronoDamageHealRate` and
+   `ChronoDamageHealAmountPercent` from GameData.
+
+The same value forms are accepted on ActiveBody itself, and ActiveBody also accepts
+`ChronoDamageHealRate` and `ChronoDamageHealAmount`; see [ActiveBody subdual fields](contraZH-Objects-and-Modules.md#activebody-fields).
 
 ## Subdual frozen
 
@@ -42,7 +84,33 @@ Details in [GameData](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki
 fallback
 * `FrozenOverlay*` texture block in GameData.ini (stacks with the jamming overlay)
 
-Details in [Subdual Frozen](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Objects-&-Modules#subdual-frozen).
+Details in [Subdual Frozen](contraZH-Objects-and-Modules.md#subdual-frozen).
+
+## Subdual Overlay Textures
+
+A texture can be drawn over units taking jamming or frozen damage. Each overlay has its own key
+set; the effect is off until a texture is named.
+
+```
+JammingOverlayTexture  = JammingFX.tga
+JammingOverlayScrollU  = 0.5
+JammingOverlayScrollV  = 0.0
+JammingOverlayScale    = 1.0
+JammingOverlayColor    = R:255 G:255 B:255
+JammingOverlayAdditive = Yes
+
+FrozenOverlayTexture   = FrostFX.tga
+FrozenOverlayScrollU   = 0.0
+FrozenOverlayScrollV   = 0.0
+FrozenOverlayScale     = 1.0
+FrozenOverlayColor     = R:255 G:255 B:255
+FrozenOverlayAdditive  = No
+```
+
+The values shown are the defaults apart from the texture names. See
+[Subdual Jamming](contraZH-Objects-and-Modules.md#subdual-jamming)
+and [Subdual Frozen](contraZH-Objects-and-Modules.md#subdual-frozen)
+for what each key does and how the two overlays stack.
 
 ## BatchParticles
 
@@ -155,7 +223,7 @@ End
 
 A container's own `LoadPenaltyKindOf` and `LoadPenaltyForbidKindOf` replace the global `KindOf`
 keys. Per-container overrides and opt-outs: see
-[Load slowdown from occupants](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Objects-&-Modules#load-slowdown-from-occupants).
+[Load slowdown from occupants](contraZH-Objects-and-Modules.md#load-slowdown-from-occupants).
 
 Notes:
 * Damaged values (`SpeedDamaged`) scale by the same amount; no double penalty.
