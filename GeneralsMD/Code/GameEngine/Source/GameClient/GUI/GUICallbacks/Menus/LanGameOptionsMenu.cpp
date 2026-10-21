@@ -789,112 +789,20 @@ static void commitLanMaxCameraHeight()
 }
 
 // Refreshing the checkbox re-sends its message, which the unchanged value turns away
-static void commitLanCoopBuildings()
+static void commitLanRule( GameWindow *check, Bool (GameInfo::*get)() const, void (GameInfo::*set)( Bool ) )
 {
 	LANGameInfo *myGame = TheLAN->GetMyGame();
-	if (!myGame || !myGame->amIHost() || !checkCoopBuildings)
+	if (!myGame || !myGame->amIHost() || !check)
 	{
 		return;
 	}
 
-	const Bool coopBuildings = GadgetCheckBoxIsChecked(checkCoopBuildings);
-	if (coopBuildings == myGame->getCoopBuildings())
+	const Bool on = GadgetCheckBoxIsChecked(check);
+	if (on == (myGame->*get)())
 	{
 		return;
 	}
-	myGame->setCoopBuildings(coopBuildings);
-	myGame->resetAccepted();
-
-	if (!s_isIniting)
-	{
-		TheLAN->RequestGameOptions(GenerateGameOptionsString(), true);
-		lanUpdateSlotList();
-	}
-}
-
-static void commitLanQuickGame()
-{
-	LANGameInfo *myGame = TheLAN->GetMyGame();
-	if (!myGame || !myGame->amIHost() || !checkQuickGame)
-	{
-		return;
-	}
-
-	const Bool quickGame = GadgetCheckBoxIsChecked(checkQuickGame);
-	if (quickGame == myGame->getQuickGame())
-	{
-		return;
-	}
-	myGame->setQuickGame(quickGame);
-	myGame->resetAccepted();
-
-	if (!s_isIniting)
-	{
-		TheLAN->RequestGameOptions(GenerateGameOptionsString(), true);
-		lanUpdateSlotList();
-	}
-}
-
-static void commitLanDiplomacy()
-{
-	LANGameInfo *myGame = TheLAN->GetMyGame();
-	if (!myGame || !myGame->amIHost() || !checkDiplomacyRule)
-	{
-		return;
-	}
-
-	const Bool diplomacy = GadgetCheckBoxIsChecked(checkDiplomacyRule);
-	if (diplomacy == myGame->getDiplomacy())
-	{
-		return;
-	}
-	myGame->setDiplomacy(diplomacy);
-	myGame->resetAccepted();
-
-	if (!s_isIniting)
-	{
-		TheLAN->RequestGameOptions(GenerateGameOptionsString(), true);
-		lanUpdateSlotList();
-	}
-}
-
-static void commitLanFreeRadar()
-{
-	LANGameInfo *myGame = TheLAN->GetMyGame();
-	if (!myGame || !myGame->amIHost() || !checkFreeRadar)
-	{
-		return;
-	}
-
-	const Bool freeRadar = GadgetCheckBoxIsChecked(checkFreeRadar);
-	if (freeRadar == myGame->getFreeRadar())
-	{
-		return;
-	}
-	myGame->setFreeRadar(freeRadar);
-	myGame->resetAccepted();
-
-	if (!s_isIniting)
-	{
-		TheLAN->RequestGameOptions(GenerateGameOptionsString(), true);
-		lanUpdateSlotList();
-	}
-}
-
-static void commitLanRevealMap()
-{
-	LANGameInfo *myGame = TheLAN->GetMyGame();
-	if (!myGame || !myGame->amIHost() || !checkRevealMap)
-	{
-		return;
-	}
-
-	const Bool revealMap = GadgetCheckBoxIsChecked(checkRevealMap);
-	if (revealMap == myGame->getRevealMap())
-	{
-		return;
-	}
-	myGame->setRevealMap(revealMap);
+	(myGame->*set)(on);
 	myGame->resetAccepted();
 
 	if (!s_isIniting)
@@ -1665,23 +1573,23 @@ WindowMsgHandledType LanGameOptionsMenuSystem( GameWindow *window, UnsignedInt m
         }
         else if ( controlID == checkCoopBuildingsID )
         {
-          commitLanCoopBuildings();
+          commitLanRule( checkCoopBuildings, &GameInfo::getCoopBuildings, &GameInfo::setCoopBuildings );
         }
         else if ( controlID == checkQuickGameID )
         {
-          commitLanQuickGame();
+          commitLanRule( checkQuickGame, &GameInfo::getQuickGame, &GameInfo::setQuickGame );
         }
         else if ( controlID == checkDiplomacyRuleID )
         {
-          commitLanDiplomacy();
+          commitLanRule( checkDiplomacyRule, &GameInfo::getDiplomacy, &GameInfo::setDiplomacy );
         }
         else if ( controlID == checkFreeRadarID )
         {
-          commitLanFreeRadar();
+          commitLanRule( checkFreeRadar, &GameInfo::getFreeRadar, &GameInfo::setFreeRadar );
         }
         else if ( controlID == checkRevealMapID )
         {
-          commitLanRevealMap();
+          commitLanRule( checkRevealMap, &GameInfo::getRevealMap, &GameInfo::setRevealMap );
         }
         else if ( controlID == lobbyTabs.buttonGameID )
         {

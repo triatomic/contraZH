@@ -1027,43 +1027,11 @@ static void handleLimitSuperweaponsClick()
   }
 }
 
-static void handleCoopBuildingsClick()
+static void setSkirmishRule( GameWindow *check, void (GameInfo::*set)( Bool ) )
 {
-	if (TheSkirmishGameInfo && checkCoopBuildings)
+	if (TheSkirmishGameInfo && check)
 	{
-		TheSkirmishGameInfo->setCoopBuildings( GadgetCheckBoxIsChecked( checkCoopBuildings ) );
-	}
-}
-
-static void handleQuickGameClick()
-{
-	if (TheSkirmishGameInfo && checkQuickGame)
-	{
-		TheSkirmishGameInfo->setQuickGame( GadgetCheckBoxIsChecked( checkQuickGame ) );
-	}
-}
-
-static void handleDiplomacyRuleClick()
-{
-	if (TheSkirmishGameInfo && checkDiplomacyRule)
-	{
-		TheSkirmishGameInfo->setDiplomacy( GadgetCheckBoxIsChecked( checkDiplomacyRule ) );
-	}
-}
-
-static void handleFreeRadarClick()
-{
-	if (TheSkirmishGameInfo && checkFreeRadar)
-	{
-		TheSkirmishGameInfo->setFreeRadar( GadgetCheckBoxIsChecked( checkFreeRadar ) );
-	}
-}
-
-static void handleRevealMapClick()
-{
-	if (TheSkirmishGameInfo && checkRevealMap)
-	{
-		TheSkirmishGameInfo->setRevealMap( GadgetCheckBoxIsChecked( checkRevealMap ) );
+		(TheSkirmishGameInfo->*set)( GadgetCheckBoxIsChecked( check ) );
 	}
 }
 
@@ -1760,23 +1728,23 @@ WindowMsgHandledType SkirmishGameOptionsMenuSystem( GameWindow *window, Unsigned
         }
         else if ( controlID == checkCoopBuildingsID )
         {
-          handleCoopBuildingsClick();
+          setSkirmishRule( checkCoopBuildings, &GameInfo::setCoopBuildings );
         }
         else if ( controlID == checkQuickGameID )
         {
-          handleQuickGameClick();
+          setSkirmishRule( checkQuickGame, &GameInfo::setQuickGame );
         }
         else if ( controlID == checkDiplomacyRuleID )
         {
-          handleDiplomacyRuleClick();
+          setSkirmishRule( checkDiplomacyRule, &GameInfo::setDiplomacy );
         }
         else if ( controlID == checkFreeRadarID )
         {
-          handleFreeRadarClick();
+          setSkirmishRule( checkFreeRadar, &GameInfo::setFreeRadar );
         }
         else if ( controlID == checkRevealMapID )
         {
-          handleRevealMapClick();
+          setSkirmishRule( checkRevealMap, &GameInfo::setRevealMap );
         }
         else if ( controlID == lobbyTabs.buttonGameID )
         {
