@@ -14,7 +14,7 @@ error is skipped until the next save.
 
 These set the look of most maps. The rest are under [Advanced keys](Water-Key-Reference.md#advanced-keys).
 
-* `ShaderWaterOpacity = 0.6` - (Opacity of deep water. 1 hides the seabed.)
+* `ShaderWaterOpacity = 0.95` - (Opacity of deep water. 1 hides the seabed.)
 * `ShaderWaterClarity = 1.0` - (How deep the seabed shows. Higher sees deeper.)
 * `ShaderWaterDeepColor` - (Colour of deep water, as `R:0-255 G:0-255 B:0-255`. Unset takes the
 average colour of `StandingWaterTexture`. The map's light and `DiffuseColor` still tint it. Shader

@@ -155,7 +155,7 @@ class WaterTransparencySetting : public Overridable
 			m_shaderWaterShoreFoamDepth = 3.0f;
 			m_shaderWaterShoreFoamSurge = 0.4f;
 			m_shaderWaterClarity = 1.0f;
-			m_shaderWaterOpacity = 0.6f;
+			m_shaderWaterOpacity = 0.95f;
 			m_shaderWaterDeepColor.red = -1.0f;
 			m_shaderWaterDeepColor.green = -1.0f;
 			m_shaderWaterDeepColor.blue = -1.0f;
