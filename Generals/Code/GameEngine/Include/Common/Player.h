@@ -227,13 +227,6 @@ public:
 	AsciiString getSide() const { return m_side; }
 
 	const PlayerTemplate* getPlayerTemplate() const { return m_playerTemplate;	}
-
-	// Zero Hour swaps these per upgrade; vanilla keeps the template's sets so shared Core code reads one name
-	AsciiString getPurchaseScienceCommandSetRank1() const { return m_playerTemplate ? m_playerTemplate->getPurchaseScienceCommandSetRank1() : AsciiString::TheEmptyString; }
-	AsciiString getPurchaseScienceCommandSetRank3() const { return m_playerTemplate ? m_playerTemplate->getPurchaseScienceCommandSetRank3() : AsciiString::TheEmptyString; }
-	AsciiString getPurchaseScienceCommandSetRank8() const { return m_playerTemplate ? m_playerTemplate->getPurchaseScienceCommandSetRank8() : AsciiString::TheEmptyString; }
-	AsciiString getSpecialPowerShortcutCommandSet() const { return m_playerTemplate ? m_playerTemplate->getSpecialPowerShortcutCommandSet() : AsciiString::TheEmptyString; }
-
 	/// return the Player's Handicap sub-object
 	const Handicap *getHandicap() const { return &m_handicap; }
 	Handicap *getHandicap() { return &m_handicap; }

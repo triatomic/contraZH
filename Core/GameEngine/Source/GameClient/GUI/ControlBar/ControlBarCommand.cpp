@@ -393,16 +393,26 @@ void ControlBar::populateCommand( Object *obj )
 									Int i;
 
 									// get command set
-									if( !player || !player->getPlayerTemplate()
-											|| player->getPurchaseScienceCommandSetRank1().isEmpty()
-											|| player->getPurchaseScienceCommandSetRank3().isEmpty()
-											|| player->getPurchaseScienceCommandSetRank8().isEmpty() )
+									if( !player || !player->getPlayerTemplate() )
 									{
 										continue;
 									}
-									commandSet1 = findCommandSet( player->getPurchaseScienceCommandSetRank1() );
-									commandSet3 = findCommandSet( player->getPurchaseScienceCommandSetRank3() );
-									commandSet8 = findCommandSet( player->getPurchaseScienceCommandSetRank8() );
+#if RTS_ZEROHOUR
+									AsciiString setName1 = player->getPlayerTemplate()->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK1, player );
+									AsciiString setName3 = player->getPlayerTemplate()->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK3, player );
+									AsciiString setName8 = player->getPlayerTemplate()->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK8, player );
+#else
+									AsciiString setName1 = player->getPlayerTemplate()->getPurchaseScienceCommandSetRank1();
+									AsciiString setName3 = player->getPlayerTemplate()->getPurchaseScienceCommandSetRank3();
+									AsciiString setName8 = player->getPlayerTemplate()->getPurchaseScienceCommandSetRank8();
+#endif
+									if( setName1.isEmpty() || setName3.isEmpty() || setName8.isEmpty() )
+									{
+										continue;
+									}
+									commandSet1 = findCommandSet( setName1 );
+									commandSet3 = findCommandSet( setName3 );
+									commandSet8 = findCommandSet( setName8 );
 
 									if( !commandSet1 || !commandSet3 || !commandSet8 )
 									{

@@ -792,6 +792,7 @@ public:
 	const CommandSet *findCommandSet( const AsciiString& name );
 
 	void showPurchaseScience();
+	void refreshPurchaseScience();	///< repopulate the panel only while it is showing
 	void hidePurchaseScience();
 	void togglePurchaseScience();
 

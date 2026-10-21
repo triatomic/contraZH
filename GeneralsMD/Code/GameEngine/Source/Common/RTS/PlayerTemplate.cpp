@@ -93,10 +93,10 @@
 		{ "PurchaseScienceCommandSetRank3",INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_purchaseScienceCommandSetRank3 ) },
 		{ "PurchaseScienceCommandSetRank8",INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_purchaseScienceCommandSetRank8 ) },
 		{ "SpecialPowerShortcutCommandSet",INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_specialPowerShortcutCommandSet ) },
-		{ "PurchaseScienceCommandSetRank1Upgrade",PlayerTemplate::parseUpgradeCommandSet,	nullptr, offsetof( PlayerTemplate, m_purchaseScienceCommandSetRank1Upgrades ) },
-		{ "PurchaseScienceCommandSetRank3Upgrade",PlayerTemplate::parseUpgradeCommandSet,	nullptr, offsetof( PlayerTemplate, m_purchaseScienceCommandSetRank3Upgrades ) },
-		{ "PurchaseScienceCommandSetRank8Upgrade",PlayerTemplate::parseUpgradeCommandSet,	nullptr, offsetof( PlayerTemplate, m_purchaseScienceCommandSetRank8Upgrades ) },
-		{ "SpecialPowerShortcutCommandSetUpgrade",PlayerTemplate::parseUpgradeCommandSet,	nullptr, offsetof( PlayerTemplate, m_specialPowerShortcutCommandSetUpgrades ) },
+		{ "PurchaseScienceCommandSetRank1Upgrade",PlayerTemplate::parseUpgradeCommandSet,	nullptr, offsetof( PlayerTemplate, m_commandSetUpgrades[PLAYER_COMMANDSET_PURCHASE_RANK1] ) },
+		{ "PurchaseScienceCommandSetRank3Upgrade",PlayerTemplate::parseUpgradeCommandSet,	nullptr, offsetof( PlayerTemplate, m_commandSetUpgrades[PLAYER_COMMANDSET_PURCHASE_RANK3] ) },
+		{ "PurchaseScienceCommandSetRank8Upgrade",PlayerTemplate::parseUpgradeCommandSet,	nullptr, offsetof( PlayerTemplate, m_commandSetUpgrades[PLAYER_COMMANDSET_PURCHASE_RANK8] ) },
+		{ "SpecialPowerShortcutCommandSetUpgrade",PlayerTemplate::parseUpgradeCommandSet,	nullptr, offsetof( PlayerTemplate, m_commandSetUpgrades[PLAYER_COMMANDSET_SHORTCUT] ) },
 		{ "SpecialPowerShortcutWinName"		,INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_specialPowerShortcutWinName) },
 		{ "SpecialPowerShortcutButtonCount",INI::parseInt,												nullptr, offsetof( PlayerTemplate, m_specialPowerShortcutButtonCount ) },
 		{ "IsObserver",								INI::parseBool,																	nullptr, offsetof( PlayerTemplate, m_observer ) },
@@ -182,28 +182,59 @@ AsciiString PlayerTemplate::getStartingUnit( Int i ) const
 	UpgradeCommandSet swap;
 	swap.m_upgradeName = ini->getNextToken();
 	swap.m_commandSet = ini->getNextToken();
+	swap.m_upgrade = nullptr;
 	swaps->push_back( swap );
 }
 
 //-------------------------------------------------------------------------------------------------
-// Upgrades are looked up by name here because PlayerTemplate.ini may load before Upgrade.ini.
-AsciiString PlayerTemplate::pickCommandSet( const UpgradeCommandSetList& swaps, const AsciiString& base, const Player *player ) const
+AsciiString PlayerTemplate::getCommandSet( PlayerCommandSetType type, const Player *player ) const
 {
-	AsciiString result = base;
+	AsciiString result;
+	switch( type )
+	{
+		case PLAYER_COMMANDSET_PURCHASE_RANK1:
+			result = m_purchaseScienceCommandSetRank1;
+			break;
+		case PLAYER_COMMANDSET_PURCHASE_RANK3:
+			result = m_purchaseScienceCommandSetRank3;
+			break;
+		case PLAYER_COMMANDSET_PURCHASE_RANK8:
+			result = m_purchaseScienceCommandSetRank8;
+			break;
+		case PLAYER_COMMANDSET_SHORTCUT:
+			result = m_specialPowerShortcutCommandSet;
+			break;
+		default:
+			return result;
+	}
+
 	if( player == nullptr )
 	{
 		return result;
 	}
 
+	const UpgradeCommandSetList& swaps = m_commandSetUpgrades[ type ];
 	for( UpgradeCommandSetList::const_iterator it = swaps.begin(); it != swaps.end(); ++it )
 	{
-		const UpgradeTemplate *upgrade = TheUpgradeCenter->findUpgrade( it->m_upgradeName );
-		if( upgrade && player->hasUpgradeComplete( upgrade ) )
+		if( it->m_upgrade == nullptr )
+		{
+			it->m_upgrade = TheUpgradeCenter->findUpgrade( it->m_upgradeName );
+		}
+		if( it->m_upgrade && player->hasUpgradeComplete( it->m_upgrade ) )
 		{
 			result = it->m_commandSet;
 		}
 	}
 	return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+void PlayerTemplate::clearCommandSetUpgrades()
+{
+	for( Int i = 0; i < PLAYER_COMMANDSET_COUNT; ++i )
+	{
+		m_commandSetUpgrades[ i ].clear();
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -430,6 +461,8 @@ void PlayerTemplateStore::getAllSideStrings(AsciiStringList *outStringList)
 	PlayerTemplate* pt = const_cast<PlayerTemplate*>(ThePlayerTemplateStore->findPlayerTemplate(namekey));
 	if (pt)
 	{
+		// a redefinition replaces the swap lists; the scalar keys below overwrite theirs anyway
+		pt->clearCommandSetUpgrades();
 		ini->initFromINI(pt, pt->getFieldParse() );
 		pt->setNameKey(namekey);
 	}

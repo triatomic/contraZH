@@ -337,12 +337,6 @@ public:
 	Bool hasUpgradeComplete( const UpgradeTemplate *upgradeTemplate ) const;		///< does player have totally done and produced upgrade
 	Bool hasUpgradeComplete( const UpgradeMaskType& testMask ) const;		///< does player have totally done and produced upgrade
 	const UpgradeMaskType& getCompletedUpgradeMask() const { return m_upgradesCompleted; }	///< get list of upgrades that are completed
-
-	// The template's science purchase and power shortcut sets, after the swaps our completed upgrades grant
-	AsciiString getPurchaseScienceCommandSetRank1() const;
-	AsciiString getPurchaseScienceCommandSetRank3() const;
-	AsciiString getPurchaseScienceCommandSetRank8() const;
-	AsciiString getSpecialPowerShortcutCommandSet() const;
 	Bool hasUpgradeInProduction( const UpgradeTemplate *upgradeTemplate );		///< does player have this upgrade in progress right now
 	Upgrade *addUpgrade( const UpgradeTemplate *upgradeTemplate,
 											 UpgradeStatusType status );		///< add upgrade, or update existing upgrade status

@@ -158,10 +158,20 @@ static void giveOwnFactionSciences(Player* player)
 	if (player == NULL)
 		return;
 
+	const PlayerTemplate* tmpl = player->getPlayerTemplate();
+	if (tmpl == NULL)
+		return;
+
 	AsciiString setNames[3];
-	setNames[0] = player->getPurchaseScienceCommandSetRank1();
-	setNames[1] = player->getPurchaseScienceCommandSetRank3();
-	setNames[2] = player->getPurchaseScienceCommandSetRank8();
+#if RTS_ZEROHOUR
+	setNames[0] = tmpl->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK1, player );
+	setNames[1] = tmpl->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK3, player );
+	setNames[2] = tmpl->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK8, player );
+#else
+	setNames[0] = tmpl->getPurchaseScienceCommandSetRank1();
+	setNames[1] = tmpl->getPurchaseScienceCommandSetRank3();
+	setNames[2] = tmpl->getPurchaseScienceCommandSetRank8();
+#endif
 
 	for (Int setIndex = 0; setIndex < 3; ++setIndex)
 	{

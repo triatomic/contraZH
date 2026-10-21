@@ -202,13 +202,22 @@ void ControlBar::populatePurchaseScience( Player* player )
 	if(TheScriptEngine->isGameEnding())
 		return;
 	// get command set
-	if(!player ||!player->getPlayerTemplate() || player->getPurchaseScienceCommandSetRank1().isEmpty() ||
-			player->getPurchaseScienceCommandSetRank3().isEmpty() ||
-			player->getPurchaseScienceCommandSetRank8().isEmpty())
+	if(!player ||!player->getPlayerTemplate())
 		return;
-	commandSet1 = findCommandSet(player->getPurchaseScienceCommandSetRank1()); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
-	commandSet3 = findCommandSet(player->getPurchaseScienceCommandSetRank3()); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
-	commandSet8 = findCommandSet(player->getPurchaseScienceCommandSetRank8()); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
+#if RTS_ZEROHOUR
+	AsciiString setName1 = player->getPlayerTemplate()->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK1, player );
+	AsciiString setName3 = player->getPlayerTemplate()->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK3, player );
+	AsciiString setName8 = player->getPlayerTemplate()->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK8, player );
+#else
+	AsciiString setName1 = player->getPlayerTemplate()->getPurchaseScienceCommandSetRank1();
+	AsciiString setName3 = player->getPlayerTemplate()->getPurchaseScienceCommandSetRank3();
+	AsciiString setName8 = player->getPlayerTemplate()->getPurchaseScienceCommandSetRank8();
+#endif
+	if(setName1.isEmpty() || setName3.isEmpty() || setName8.isEmpty())
+		return;
+	commandSet1 = findCommandSet(setName1); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
+	commandSet3 = findCommandSet(setName3); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
+	commandSet8 = findCommandSet(setName8); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
 
 	for( i = 0; i < MAX_PURCHASE_SCIENCE_RANK_1; i++ )
 		if (m_sciencePurchaseWindowsRank1[i]!=nullptr)
@@ -1628,11 +1637,6 @@ void ControlBar::update()
 		populateSmartSelection();
 		evaluateContextUI();
 		populateSpecialPowerShortcut(ThePlayerList->getLocalPlayer());
-		// an upgrade can swap the purchase sets, so an open purchase panel follows along
-		if( m_contextParent[ CP_PURCHASE_SCIENCE ] && !m_contextParent[ CP_PURCHASE_SCIENCE ]->winIsHidden() )
-		{
-			populatePurchaseScience(ThePlayerList->getLocalPlayer());
-		}
 		// if we have a build tooltip layout, update it with the new data.
 		repopulateBuildTooltipLayout();
 	}
@@ -3274,6 +3278,14 @@ void ControlBar::updatePurchaseScience()
 //	}
 }
 
+void ControlBar::refreshPurchaseScience()
+{
+	if( m_contextParent[ CP_PURCHASE_SCIENCE ] && !m_contextParent[ CP_PURCHASE_SCIENCE ]->winIsHidden() )
+	{
+		populatePurchaseScience(ThePlayerList->getLocalPlayer());
+	}
+}
+
 void ControlBar::showPurchaseScience()
 {
 
@@ -3632,9 +3644,14 @@ void ControlBar::populateSpecialPowerShortcut( Player *player)
 	}
 
 	// get command set
-	if(player->getSpecialPowerShortcutCommandSet().isEmpty() )
+#if RTS_ZEROHOUR
+	AsciiString shortcutSetName = player->getPlayerTemplate()->getCommandSet( PLAYER_COMMANDSET_SHORTCUT, player );
+#else
+	AsciiString shortcutSetName = player->getPlayerTemplate()->getSpecialPowerShortcutCommandSet();
+#endif
+	if(shortcutSetName.isEmpty() )
 		return;
-	commandSet = findCommandSet(player->getSpecialPowerShortcutCommandSet()); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
+	commandSet = findCommandSet(shortcutSetName); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
 	if(!commandSet)
 		return;
 	// populate the button with commands defined
@@ -3731,16 +3748,26 @@ void ControlBar::populateSpecialPowerShortcut( Player *player)
 							Int i;
 
 							// get command set
-							if( !player || !player->getPlayerTemplate()
-									|| player->getPurchaseScienceCommandSetRank1().isEmpty()
-									|| player->getPurchaseScienceCommandSetRank3().isEmpty()
-									|| player->getPurchaseScienceCommandSetRank8().isEmpty() )
+							if( !player || !player->getPlayerTemplate() )
 							{
 								continue;
 							}
-							commandSet1 = findCommandSet( player->getPurchaseScienceCommandSetRank1() );
-							commandSet3 = findCommandSet( player->getPurchaseScienceCommandSetRank3() );
-							commandSet8 = findCommandSet( player->getPurchaseScienceCommandSetRank8() );
+#if RTS_ZEROHOUR
+							AsciiString setName1 = player->getPlayerTemplate()->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK1, player );
+							AsciiString setName3 = player->getPlayerTemplate()->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK3, player );
+							AsciiString setName8 = player->getPlayerTemplate()->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK8, player );
+#else
+							AsciiString setName1 = player->getPlayerTemplate()->getPurchaseScienceCommandSetRank1();
+							AsciiString setName3 = player->getPlayerTemplate()->getPurchaseScienceCommandSetRank3();
+							AsciiString setName8 = player->getPlayerTemplate()->getPurchaseScienceCommandSetRank8();
+#endif
+							if( setName1.isEmpty() || setName3.isEmpty() || setName8.isEmpty() )
+							{
+								continue;
+							}
+							commandSet1 = findCommandSet( setName1 );
+							commandSet3 = findCommandSet( setName3 );
+							commandSet8 = findCommandSet( setName8 );
 
 							if( !commandSet1 || !commandSet3 || !commandSet8 )
 							{
