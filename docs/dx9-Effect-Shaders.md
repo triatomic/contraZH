@@ -4,7 +4,7 @@ Smoke, dust, fire and explosion sprites fade out as they near the surface behind
 longer cut a hard line into the ground or the buildings they pass through. Needs the Direct3D 9
 build and a shader model 2 card.
 
-* `SoftParticles = Yes` - (No draws sprites with hard edges. Also `Soft particles` on the Shaders
+* `SoftParticles = Yes` - (No draws sprites with hard edges. Also `Soft particles` on the Graphics
 page. Needs `CheckSoftParticles` in `OptionsMenu.wnd` for the menu control.)
 
 Tuned in the mod's `GameData.ini`:

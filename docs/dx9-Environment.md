@@ -217,7 +217,7 @@ cloud shapes at unrelated sizes and angles add up to each cloud, a slow warp ben
 finer layer frays their edges. Each layer drifts at its own speed, so clouds form and fade instead
 of sliding as one sheet. Needs the Direct3D 9 build and Cloud shadows on.
 
-* `HQSky = Yes` - (No brings back the tiled cloud texture. Also `HQ sky` on the Shaders
+* `HQSky = Yes` - (No brings back the tiled cloud texture. Also `HQ sky` on the Graphics
 page, greyed out while Cloud shadows is off. Needs `CheckHQSky` in `OptionsMenu.wnd` for the
 menu control.)
 

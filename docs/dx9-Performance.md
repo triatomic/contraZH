@@ -1,6 +1,6 @@
 # Supersampling
 
-`Supersampling` on the Shaders page offers `150%` and `200%`. The world renders to a target that
+`Supersampling` on the Graphics page offers `150%` and `200%`. The world renders to a target that
 many percent of the screen's size each way and is filtered down to the screen with a box filter,
 which smooths edges, alpha-tested cutouts, particles and shader output alike. The interface and
 the mouse draw after that at the screen's own size, so text stays sharp. Unlike MSAA the larger

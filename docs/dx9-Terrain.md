@@ -28,7 +28,7 @@ Where two terrain textures meet, the taller parts of each push into the other in
 10-unit fade. Stones and clumps stand proud of the texture beside them, and the edge follows them.
 Three-texture blend tiles blend the same way. Needs the Direct3D 9 build.
 
-* `HeightBlend = Yes` - (No brings back the soft fade. Also `Height blending` on the Shaders
+* `HeightBlend = Yes` - (No brings back the soft fade. Also `Height blending` on the Graphics
 page. Needs `CheckHeightBlend` in `OptionsMenu.wnd` for the menu control.)
 
 Tuned in the mod's `GameData.ini`:

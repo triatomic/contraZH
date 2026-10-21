@@ -5,9 +5,9 @@ under infantry. Shadows match their object's shape, alpha cutouts included, fall
 have soft edges. Needs the Direct3D 9 build and a shader model 2 card.
 
 * `ShadowMap = Yes` - (No restores stencil volumes and blob decals. Also `Shadow mapping` on the
-Shaders page, applied on Accept. Needs `CheckShadowMap` in `OptionsMenu.wnd` for the menu control.)
+Graphics page, applied on Accept. Needs `CheckShadowMap` in `OptionsMenu.wnd` for the menu control.)
 * `ShadowMapResolution = 4096` - (The shadow map's width and height: 512, 1024, 2048 or 4096. Other
-values round up to the next of these. Also `Shadows` on the Shaders page of the Options menu, applied
+values round up to the next of these. Also `Shadows` on the Graphics page of the Options menu, applied
 on Accept without a restart. Larger gives sharper edges and uses more video memory, 64 MB at 4096.
 The map stretches to the shape of the ground in view, so every size spends its texels on what the
 camera sees.
@@ -47,7 +47,7 @@ texture areas, and hidden in shadow when shadow mapping is on. Infantry stay mat
 Direct3D 9 build and a shader model 2 card.
 
 * `Specular = Yes` - (No turns highlights and the terrain glint off. Also `Specular highlights` on the
-Shaders page, applied on Accept. Needs `CheckSpecular` in `OptionsMenu.wnd` for the menu
+Graphics page, applied on Accept. Needs `CheckSpecular` in `OptionsMenu.wnd` for the menu
 control.)
 
 Tuned in the mod's `GameData.ini`:
@@ -57,7 +57,7 @@ Tuned in the mod's `GameData.ini`:
 Around 4 to 128 is useful; past that the highlight shrinks to nothing.)
 
 `SpecularDebug = Yes` in `Options.ini` tints covered surfaces magenta and shows the highlight 8x
-brighter. Also `Specular debug view` on the Shaders page, which needs `CheckSpecularDebug` in
+brighter. Also `Specular debug view` on the Graphics page, which needs `CheckSpecularDebug` in
 `OptionsMenu.wnd`.
 
 # Terrain glint
@@ -116,7 +116,7 @@ and bridges it shades both diffuse light and the specular highlight, fades in sh
 extra draw. Infantry stay flat. Needs the Direct3D 9 build and shader model 2.0a; other cards get plain highlights and
 flat terrain.
 
-* `NormalMaps = Yes` - (No turns the detail off. Also `Surface detail` on the Shaders
+* `NormalMaps = Yes` - (No turns the detail off. Also `Surface detail` on the Graphics
 page, applied on Accept. Needs `CheckNormalMaps` in `OptionsMenu.wnd` for the menu control.)
 
 Units, structures and bridges use a normal map when one exists and otherwise derive bumps from
@@ -162,7 +162,7 @@ units.)
 from further away than units, so it defaults stronger.)
 
 `NormalMapDebug = Yes` in `Options.ini` paints terrain flat grey with only the bump shading, 4x
-stronger. Also `Normal map debug view` on the Shaders page, which needs `CheckNormalMapDebug` in
+stronger. Also `Normal map debug view` on the Graphics page, which needs `CheckNormalMapDebug` in
 `OptionsMenu.wnd`.
 
 # Glow masks
@@ -196,10 +196,10 @@ way. Needs the Direct3D 9 build and shader model 2.0a; other
 cards keep the old lighting.
 
 * `DynamicLights = Yes` - (No turns off every dynamic light: explosion and muzzle-flash pulses, laser
-ground glow, the police car's lights and the flash of map lightning. Also `Dynamic lights` on the Shaders page.
+ground glow, the police car's lights and the flash of map lightning. Also `Dynamic lights` on the Graphics page.
 Needs `CheckDynamicLights` in `OptionsMenu.wnd` for the menu control.)
 * `PixelLights = Yes` - (No keeps dynamic lights on the old per-vertex lighting. Also `Per-pixel
-lights` on the Shaders page, greyed out while dynamic lights are off. Needs
+lights` on the Graphics page, greyed out while dynamic lights are off. Needs
 `CheckPixelLights` in `OptionsMenu.wnd` for the menu control.)
 
 Notes:
@@ -219,7 +219,7 @@ before, so they show none without shader model 2.0a.
 
 `DynamicLightsDebug = Yes` in `Options.ini` paints the terrain, roads, bridges and units black and
 draws only the per-pixel lights on them, so each light's shape and reach shows. Also `Lights debug
-view` on the Shaders page, greyed out while per-pixel lights are off. Needs `CheckDynamicLightsDebug`
+view` on the Graphics page, greyed out while per-pixel lights are off. Needs `CheckDynamicLightsDebug`
 in `OptionsMenu.wnd` for the menu control. Notes:
 * Applies at once, and needs `PixelLights = Yes`.
 * Lights left on the old lighting do not show.
@@ -231,7 +231,7 @@ Creases, corners, and the ground where units and buildings stand fall into soft 
 on the terrain instead of floating over it. Needs the Direct3D 9 build, shader model 2.0a and
 anti-aliasing off.
 
-* `AmbientOcclusion = Yes` - (No turns the shade off. Also `Ambient occlusion` on the Shaders
+* `AmbientOcclusion = Yes` - (No turns the shade off. Also `Ambient occlusion` on the Graphics
 page, greyed out while anti-aliasing is on. Needs `CheckAmbientOcclusion` in `OptionsMenu.wnd` for
 the menu control.)
 
@@ -243,7 +243,7 @@ values spread the shade wider and soften it.)
 
 `AmbientOcclusionDebug = Yes` in `Options.ini` shows the shade in grey in place of the terrain, units
 and buildings. Water, decals, particles and the interface still draw over it. Also `Occlusion debug
-view` on the Shaders page, which needs `CheckAmbientOcclusionDebug` in `OptionsMenu.wnd`.
+view` on the Graphics page, which needs `CheckAmbientOcclusionDebug` in `OptionsMenu.wnd`.
 
 Notes:
 * The shade reads the scene's depth, which a multisampled depth buffer hides, so it is off whenever
