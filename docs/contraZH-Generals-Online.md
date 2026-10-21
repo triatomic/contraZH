@@ -62,10 +62,11 @@ draw at the wrong scale; with it, the options menu lacks Contra's controls. See 
 
 ### Lobby rules
 
-The lobby gets a **Rules** tab with Diplomacy, Free Radar and Reveal Map. The GO service has no
-field for them, so the host's client keeps the state, mirrors it to everyone's Rules tab through a
-hidden lobby message, and switches each rule on in the first frames of the match. Only the host can
-tick them; a host change turns them all off. The chat commands still work:
+The lobby gets a **Rules** tab with Diplomacy, Free Radar, Reveal Map, Coop Buildings and Quick
+Game. The GO service has no field for them, so the host's client keeps the state, mirrors it to
+everyone's Rules tab through a hidden lobby message, and switches each rule on in the first frames
+of the match. Only the host can tick them; a host change turns them all off. The chat commands still
+work:
 
 * `/diplomacy` lets players change alliances during the match. See
 [Diplomacy](contraZH-Maps-and-Setup.md#diplomacy).
@@ -73,6 +74,10 @@ tick them; a host change turns them all off. The chat commands still work:
 [Free Radar](contraZH-Maps-and-Setup.md#free-radar).
 * `/revealmap` reveals the whole map to every player. See
 [Reveal Map](contraZH-Maps-and-Setup.md#reveal-map).
+* `/coopbuildings` lets allies finish each other's buildings. See
+[Allied scaffolds](contraZH-Gameplay-Fixes.md#allied-scaffolds-no-longer-lure-your-builders).
+* `/quickgame` lifts the rank requirements on advanced units and structures. See
+[Quick Game](contraZH-Maps-and-Setup.md#quick-game).
 
 The tab comes from a loose `GameSpyGameOptionsMenu.wnd` written by `build/add_go_rules_tab_wnd.py`;
 without it the lobby shows the Game page alone.

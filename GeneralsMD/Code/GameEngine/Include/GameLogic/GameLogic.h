@@ -392,9 +392,7 @@ private:
 	bool onLogicCrc(GameMessage *msg);
 	bool onPurchaseScience(GameMessage *msg);
 	bool onSetDiplomacyStance(GameMessage *msg);
-	bool onEnableDiplomacy(GameMessage *msg);
-	bool onEnableFreeRadar(GameMessage *msg);
-	bool onEnableRevealMap(GameMessage *msg);
+	bool onEnableLobbyRule(GameMessage *msg);
 	void revealMapForAllPlayers();
 
 	static void createOptimizedTree(const ThingTemplate *thingTemplate, Coord3D *pos, Real angle, Real scale);
@@ -483,9 +481,7 @@ private:
   Bool m_freeRadar;
   Bool m_revealMap;
 #if defined(GENERALS_ONLINE)
-  Bool m_sendDiplomacyRule;
-  Bool m_sendFreeRadarRule;
-  Bool m_sendRevealMapRule;
+  UnsignedInt m_pendingLobbyRules; ///< LobbyRule bits the host has yet to send
 #endif
 
 	LoadScreen *getLoadScreen( Bool loadSaveGame );

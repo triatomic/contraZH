@@ -153,9 +153,10 @@ An ally's unfinished building showed the resume-construction cursor, and a dozer
 there drove up and stood idle because only the owner can build. Only the owner's builders are
 offered it now.
 
-The host can tick **Coop Buildings** in the Skirmish or LAN lobby to let allies finish each other's
-buildings. The building stays the owner's. The option is off by default, is not kept in save
-games, and is not available on Generals Online.
+The host can tick **Coop Buildings** in the Skirmish, LAN or Generals Online lobby to let allies
+finish each other's buildings. The building stays the owner's. The option is off by default and is
+not kept in save games. On Generals Online the host's game turns it on in the first frames of the
+match, as with the other Rules tab rules.
 
 Changes the simulation; affects replays.
 

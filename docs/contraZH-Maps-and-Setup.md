@@ -160,14 +160,14 @@ back to `Random <BaseSide>`.
 row.
 * The Rules page holds Quick Game, Coop Buildings, Diplomacy, Free Radar, Reveal Map and, in LAN,
 Max Camera Height. It takes the place of the battle honors and info box in Skirmish, and of the chat
-in LAN and Generals Online. The Generals Online page holds only Diplomacy, Free Radar and Reveal Map.
+in LAN and Generals Online. The Generals Online page holds every rule but Max Camera Height.
 
 Notes:
 * Labels are `GUI:TabGame` and `GUI:TabRules`, falling back to `Game` and `Rules`.
 * The layouts carry `ButtonTabGame`, `ButtonTabRules`, `PanelGame` and `PanelRules`. The buttons and
 the Rules page start hidden, so an older exe shows the Game page without the new options.
 * `build/add_go_rules_tab_wnd.py` writes a loose `GameSpyGameOptionsMenu.wnd` with the tab pair and
-the three Generals Online checkboxes; the other two layouts get theirs from `build/add_rules_tab_wnd.py`.
+the five Generals Online checkboxes; the other two layouts get theirs from `build/add_rules_tab_wnd.py`.
 
 ### LAN unready
 
@@ -181,8 +181,8 @@ Notes:
 
 ### Quick Game
 
-* The Skirmish and LAN lobbies get a **Quick Game** checkbox, off by default. Only the LAN host can
-change it.
+* The Skirmish, LAN and Generals Online lobbies get a **Quick Game** checkbox, off by default. Only
+the host can change it.
 * In a Quick Game, objects use their `QuickGamePrerequisites` in place of `Prerequisites`, so the mod
 can drop the rank requirements on advanced structures, superweapons and super units. An object
 without `QuickGamePrerequisites` keeps its normal ones. See
@@ -201,7 +201,10 @@ Notes:
 * The checkbox comes from `CheckQuickGame` in `SkirmishGameOptionsMenu.wnd` and
 `LanGameOptionsMenu.wnd`; a layout without it shows no checkbox.
 * Save games and replays keep the setting. A save without Quick Game stays loadable by retail.
-* All LAN players need this build. Not available on Generals Online.
+* All LAN players need this build.
+* Generals Online has no lobby field for the rule. Its host ticks it on the Rules tab or types
+`/quickgame` in lobby chat, as with Diplomacy, and the host's game turns the rule on in the first
+frames of the match.
 * An older exe reads `QUICK_GAME_ENABLED` as false, so a script with it still runs on the rank test.
 * Changes the simulation; affects replays.
 

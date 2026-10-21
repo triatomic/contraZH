@@ -110,6 +110,7 @@
 
 #include "GameNetwork/GameSpy/BuddyThread.h"
 #include "GameNetwork/GameSpy/PeerDefs.h"
+#include "GameNetwork/LobbyRules.h"
 
 #if defined(GENERALS_ONLINE)
 #include "GameNetwork/GeneralsOnline/NGMPGame.h"
@@ -265,9 +266,7 @@ GameLogic::GameLogic()
 	m_freeRadar = FALSE;
 	m_revealMap = FALSE;
 #if defined(GENERALS_ONLINE)
-	m_sendDiplomacyRule = FALSE;
-	m_sendFreeRadarRule = FALSE;
-	m_sendRevealMapRule = FALSE;
+	m_pendingLobbyRules = 0;
 #endif
 
 	for(Int i = 0; i < MAX_SLOTS; i++)
@@ -1387,17 +1386,19 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	m_freeRadar = TheGameInfo != nullptr && TheGameInfo->getFreeRadar();
 	m_revealMap = TheGameInfo != nullptr && TheGameInfo->getRevealMap();
 #if defined(GENERALS_ONLINE)
-	m_sendDiplomacyRule = FALSE;
-	m_sendFreeRadarRule = FALSE;
-	m_sendRevealMapRule = FALSE;
+	m_pendingLobbyRules = 0;
 	if (!loadingSaveGame && TheNGMPGame != nullptr && TheGameInfo == TheNGMPGame && !TheRecorder->isPlaybackMode())
 	{
 		NGMP_OnlineServices_LobbyInterface *pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
 		if (pLobbyInterface != nullptr && pLobbyInterface->IsHost())
 		{
-			m_sendDiplomacyRule = pLobbyInterface->IsDiplomacyRuleOn();
-			m_sendFreeRadarRule = pLobbyInterface->IsFreeRadarRuleOn();
-			m_sendRevealMapRule = pLobbyInterface->IsRevealMapRuleOn();
+			for (Int rule = 0; rule < LOBBY_RULE_COUNT; ++rule)
+			{
+				if (pLobbyInterface->IsLobbyRuleOn((LobbyRule)rule))
+				{
+					m_pendingLobbyRules |= 1u << rule;
+				}
+			}
 		}
 	}
 #endif
@@ -5821,55 +5822,51 @@ static Bool isLobbyHostSender(Int playerIndex)
 }
 
 //-------------------------------------------------------------------------------------------------
-bool GameLogic::onEnableDiplomacy(GameMessage *msg)
+// LOBBY RULES
+//-------------------------------------------------------------------------------------------------
+
+//-------------------------------------------------------------------------------------------------
+bool GameLogic::onEnableLobbyRule(GameMessage *msg)
 {
-	// The host sends it on the first frames; a late one would change the rules mid-match
-	if (m_diplomacy || getFrame() > LOGICFRAMES_PER_SECOND * 30 || !isLobbyHostSender(msg->getPlayerIndex()))
+	struct Enable
+	{
+		Bool GameLogic::*flag;
+		const char *label;
+		const WideChar *fallback;
+	};
+	static const Enable enables[LOBBY_RULE_COUNT] =
+	{
+		{ &GameLogic::m_diplomacy, "GUI:DiplomacyRuleEnabled", L"%ls turned on Diplomacy. Players may change alliances." },
+		{ &GameLogic::m_freeRadar, "GUI:FreeRadarEnabled", L"%ls turned on Free Radar. Every player has radar." },
+		{ &GameLogic::m_revealMap, "GUI:RevealMapEnabled", L"%ls turned on Reveal Map. Every player sees the whole map." },
+		{ &GameLogic::m_coopBuildings, "GUI:CoopBuildingsEnabled", L"%ls turned on Coop Buildings. Allies may finish each other's buildings." },
+		{ &GameLogic::m_quickGame, "GUI:QuickGameEnabled", L"%ls turned on Quick Game. Rank requirements are lifted." },
+	};
+
+	// The host sends them on the first frames; a late one would change the rules mid-match
+	const Int rule = msg->getArgumentCount() > 0 ? msg->getArgument(0)->integer : -1;
+	if (rule < 0 || rule >= LOBBY_RULE_COUNT || getFrame() > LOGICFRAMES_PER_SECOND * 30 || !isLobbyHostSender(msg->getPlayerIndex()))
 	{
 		return false;
 	}
 
-	m_diplomacy = TRUE;
-
-	TheInGameUI->messageNoFormat(TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:DiplomacyRuleEnabled",
-		L"%ls turned on Diplomacy. Players may change alliances.", ThePlayerList->getNthPlayer(msg->getPlayerIndex())->getPlayerDisplayName().str()));
-
-	PopulateInGameDiplomacyPopup();
-	return true;
-}
-
-//-------------------------------------------------------------------------------------------------
-// FREE RADAR AND REVEAL MAP
-//-------------------------------------------------------------------------------------------------
-
-//-------------------------------------------------------------------------------------------------
-bool GameLogic::onEnableFreeRadar(GameMessage *msg)
-{
-	if (m_freeRadar || getFrame() > LOGICFRAMES_PER_SECOND * 30 || !isLobbyHostSender(msg->getPlayerIndex()))
+	Bool &flag = this->*enables[rule].flag;
+	if (flag)
 	{
 		return false;
 	}
+	flag = TRUE;
 
-	m_freeRadar = TRUE;
-
-	TheInGameUI->messageNoFormat(TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:FreeRadarEnabled",
-		L"%ls turned on Free Radar. Every player has radar.", ThePlayerList->getNthPlayer(msg->getPlayerIndex())->getPlayerDisplayName().str()));
-	return true;
-}
-
-//-------------------------------------------------------------------------------------------------
-bool GameLogic::onEnableRevealMap(GameMessage *msg)
-{
-	if (m_revealMap || getFrame() > LOGICFRAMES_PER_SECOND * 30 || !isLobbyHostSender(msg->getPlayerIndex()))
+	if (rule == LOBBY_RULE_REVEAL_MAP)
 	{
-		return false;
+		revealMapForAllPlayers();
 	}
-
-	m_revealMap = TRUE;
-	revealMapForAllPlayers();
-
-	TheInGameUI->messageNoFormat(TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:RevealMapEnabled",
-		L"%ls turned on Reveal Map. Every player sees the whole map.", ThePlayerList->getNthPlayer(msg->getPlayerIndex())->getPlayerDisplayName().str()));
+	TheInGameUI->messageNoFormat(TheGameText->FETCH_OR_SUBSTITUTE_FORMAT(enables[rule].label, enables[rule].fallback,
+		ThePlayerList->getNthPlayer(msg->getPlayerIndex())->getPlayerDisplayName().str()));
+	if (rule == LOBBY_RULE_DIPLOMACY)
+	{
+		PopulateInGameDiplomacyPopup();
+	}
 	return true;
 }
 
@@ -5898,25 +5895,19 @@ void GameLogic::revealMapForAllPlayers()
 //-------------------------------------------------------------------------------------------------
 void GameLogic::sendPendingLobbyRules()
 {
-	if (!isInGame() || isLoadingMap() || getFrame() == 0)
+	if (m_pendingLobbyRules == 0 || !isInGame() || isLoadingMap() || getFrame() == 0)
 	{
 		return;
 	}
 
-	if (m_sendDiplomacyRule)
+	for (Int rule = 0; rule < LOBBY_RULE_COUNT; ++rule)
 	{
-		m_sendDiplomacyRule = FALSE;
-		TheMessageStream->appendMessage(GameMessage::MSG_ENABLE_DIPLOMACY);
+		if (m_pendingLobbyRules & (1u << rule))
+		{
+			GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_ENABLE_LOBBY_RULE);
+			msg->appendIntegerArgument(rule);
+		}
 	}
-	if (m_sendFreeRadarRule)
-	{
-		m_sendFreeRadarRule = FALSE;
-		TheMessageStream->appendMessage(GameMessage::MSG_ENABLE_FREE_RADAR);
-	}
-	if (m_sendRevealMapRule)
-	{
-		m_sendRevealMapRule = FALSE;
-		TheMessageStream->appendMessage(GameMessage::MSG_ENABLE_REVEAL_MAP);
-	}
+	m_pendingLobbyRules = 0;
 }
 #endif

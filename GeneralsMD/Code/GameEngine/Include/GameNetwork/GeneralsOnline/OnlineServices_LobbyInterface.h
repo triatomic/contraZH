@@ -3,6 +3,7 @@
 #include "NGMP_include.h"
 #include "OnlineServices_RoomsInterface.h"
 #include "GameNetwork/GameInfo.h"
+#include "GameNetwork/LobbyRules.h"
 #include <chrono>
 #include "Common/PlayerList.h"
 #include "Common/Player.h"
@@ -374,18 +375,19 @@ public:
 
 	bool IsHost();
 
-	// The service has no lobby field for these, so only the host knows; it sends an MSG_ENABLE_* per rule in the match
-	bool IsDiplomacyRuleOn() const { return m_bDiplomacyRule; }
-	void SetDiplomacyRule(bool bOn) { m_bDiplomacyRule = bOn; }
-	bool IsFreeRadarRuleOn() const { return m_bFreeRadarRule; }
-	void SetFreeRadarRule(bool bOn) { m_bFreeRadarRule = bOn; }
-	bool IsRevealMapRuleOn() const { return m_bRevealMapRule; }
-	void SetRevealMapRule(bool bOn) { m_bRevealMapRule = bOn; }
+	// The service has no lobby field for these, so only the host knows; it sends MSG_ENABLE_LOBBY_RULE per rule in the match
+	bool IsLobbyRuleOn(LobbyRule rule) const { return m_lobbyRules[rule]; }
+	void SetLobbyRule(LobbyRule rule, bool bOn) { m_lobbyRules[rule] = bOn; }
+	void ResetLobbyRules()
+	{
+		for (int rule = 0; rule < LOBBY_RULE_COUNT; ++rule)
+		{
+			m_lobbyRules[rule] = false;
+		}
+	}
 
 private:
-	bool m_bDiplomacyRule = false;
-	bool m_bFreeRadarRule = false;
-	bool m_bRevealMapRule = false;
+	bool m_lobbyRules[LOBBY_RULE_COUNT] = {};
 	std::set<int64_t> m_setMembersBeforeUs;
 	bool m_bJoinOrderKnown = false;
 	void ResetJoinOrder();

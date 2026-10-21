@@ -1148,9 +1148,7 @@ void NGMP_OnlineServices_LobbyInterface::JoinLobby(LobbyEntry lobbyInfo, std::st
 	m_bAttemptingToJoinLobby = true;
 	m_CurrentLobby = LobbyEntry();
 	ResetJoinOrder();
-	m_bDiplomacyRule = false;
-	m_bFreeRadarRule = false;
-	m_bRevealMapRule = false;
+	ResetLobbyRules();
 
 	NGMP_OnlineServicesManager::GetInstance()->GetAndParseServiceConfig([=]()
 		{
@@ -1372,9 +1370,7 @@ void NGMP_OnlineServices_LobbyInterface::LeaveCurrentLobby()
 {
 	m_bCannotConnectToLobbyPending = false;
 	ResetJoinOrder();
-	m_bDiplomacyRule = false;
-	m_bFreeRadarRule = false;
-	m_bRevealMapRule = false;
+	ResetLobbyRules();
 
 	// invalidate any join/create still in flight
 	++m_LobbyJoinGeneration;
@@ -1503,9 +1499,7 @@ struct CreateLobbyResponse
 void NGMP_OnlineServices_LobbyInterface::CreateLobby(UnicodeString strLobbyName, UnicodeString strInitialMapName, AsciiString strInitialMapPath, bool bIsOfficial, int initialMaxSize, bool bVanillaTeamsOnly, bool bTrackStats, uint32_t startingCash, bool bPassworded, std::string strPassword, bool bAllowObservers)
 {
 	AnticheatPlugInterface::EndSession();
-	m_bDiplomacyRule = false;
-	m_bFreeRadarRule = false;
-	m_bRevealMapRule = false;
+	ResetLobbyRules();
 
 	// shares the join generation counter with JoinLobby
 	const uint64_t lobbyCreateGeneration = ++m_LobbyJoinGeneration;

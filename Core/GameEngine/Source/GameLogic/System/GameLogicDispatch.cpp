@@ -1080,19 +1080,9 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			onSetDiplomacyStance(msg);
 			break;
 		}
-		case GameMessage::MSG_ENABLE_DIPLOMACY:
+		case GameMessage::MSG_ENABLE_LOBBY_RULE:
 		{
-			onEnableDiplomacy(msg);
-			break;
-		}
-		case GameMessage::MSG_ENABLE_FREE_RADAR:
-		{
-			onEnableFreeRadar(msg);
-			break;
-		}
-		case GameMessage::MSG_ENABLE_REVEAL_MAP:
-		{
-			onEnableRevealMap(msg);
+			onEnableLobbyRule(msg);
 			break;
 		}
 #endif
