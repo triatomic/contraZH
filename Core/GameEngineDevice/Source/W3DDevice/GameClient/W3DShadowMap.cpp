@@ -649,7 +649,7 @@ MaterialPassClass* W3DShadowMap::getReceivePass()
 Bool W3DShadowMap::canUseScreenReceiver()
 {
 #if defined(BUILD_WITH_D3D9)
-	if (!ScreenShadowEnabled || m_depthMode != DEPTH_MODE_HARDWARE || !DX8Wrapper::Has_Stencil() ||
+	if (!ScreenShadowEnabled || m_depthMode != DEPTH_MODE_HARDWARE || !Renderer::Has_Stencil() ||
 		DX8Wrapper::Peek_Scene_Depth_Texture() == nullptr)
 	{
 		return FALSE;
