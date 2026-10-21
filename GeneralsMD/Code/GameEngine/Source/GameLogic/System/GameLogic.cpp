@@ -262,8 +262,12 @@ GameLogic::GameLogic()
 	m_coopBuildings = FALSE;
 	m_quickGame = FALSE;
 	m_diplomacy = FALSE;
+	m_freeRadar = FALSE;
+	m_revealMap = FALSE;
 #if defined(GENERALS_ONLINE)
 	m_sendDiplomacyRule = FALSE;
+	m_sendFreeRadarRule = FALSE;
+	m_sendRevealMapRule = FALSE;
 #endif
 
 	for(Int i = 0; i < MAX_SLOTS; i++)
@@ -1378,12 +1382,23 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	// Not saved, like Coop Buildings; stances already set are kept by the players
 	m_diplomacy = !loadingSaveGame && TheGameInfo != nullptr && TheGameInfo->getDiplomacy();
+
+	// Both saved with the skirmish setup, like Quick Game
+	m_freeRadar = TheGameInfo != nullptr && TheGameInfo->getFreeRadar();
+	m_revealMap = TheGameInfo != nullptr && TheGameInfo->getRevealMap();
 #if defined(GENERALS_ONLINE)
 	m_sendDiplomacyRule = FALSE;
+	m_sendFreeRadarRule = FALSE;
+	m_sendRevealMapRule = FALSE;
 	if (!loadingSaveGame && TheNGMPGame != nullptr && TheGameInfo == TheNGMPGame && !TheRecorder->isPlaybackMode())
 	{
 		NGMP_OnlineServices_LobbyInterface *pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
-		m_sendDiplomacyRule = pLobbyInterface != nullptr && pLobbyInterface->IsHost() && pLobbyInterface->IsDiplomacyRuleOn();
+		if (pLobbyInterface != nullptr && pLobbyInterface->IsHost())
+		{
+			m_sendDiplomacyRule = pLobbyInterface->IsDiplomacyRuleOn();
+			m_sendFreeRadarRule = pLobbyInterface->IsFreeRadarRuleOn();
+			m_sendRevealMapRule = pLobbyInterface->IsRevealMapRuleOn();
+		}
 	}
 #endif
 
@@ -1943,6 +1958,12 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 					ThePartitionManager->revealMapForPlayer( player->getPlayerIndex() );
 			}
 		}
+	}
+
+	// A save game brings its revealed cells back on its own
+	if (!loadingSaveGame && m_revealMap)
+	{
+		revealMapForAllPlayers();
 	}
 
 	#ifdef DUMP_PERF_STATS
@@ -5775,8 +5796,8 @@ bool GameLogic::onSetDiplomacyStance(GameMessage *msg)
 }
 
 //-------------------------------------------------------------------------------------------------
-// Only the Generals Online lobby owner may send it; a replay has no lobby, so it trusts the recording
-static Bool isDiplomacyRuleSender(Int playerIndex)
+// Only the Generals Online lobby owner may turn a rule on; a replay has no lobby, so it trusts the recording
+static Bool isLobbyHostSender(Int playerIndex)
 {
 #if defined(GENERALS_ONLINE)
 	if (TheRecorder->isPlaybackMode())
@@ -5803,7 +5824,7 @@ static Bool isDiplomacyRuleSender(Int playerIndex)
 bool GameLogic::onEnableDiplomacy(GameMessage *msg)
 {
 	// The host sends it on the first frames; a late one would change the rules mid-match
-	if (m_diplomacy || getFrame() > LOGICFRAMES_PER_SECOND * 30 || !isDiplomacyRuleSender(msg->getPlayerIndex()))
+	if (m_diplomacy || getFrame() > LOGICFRAMES_PER_SECOND * 30 || !isLobbyHostSender(msg->getPlayerIndex()))
 	{
 		return false;
 	}
@@ -5817,16 +5838,85 @@ bool GameLogic::onEnableDiplomacy(GameMessage *msg)
 	return true;
 }
 
-#if defined(GENERALS_ONLINE)
 //-------------------------------------------------------------------------------------------------
-void GameLogic::sendPendingDiplomacyRule()
+// FREE RADAR AND REVEAL MAP
+//-------------------------------------------------------------------------------------------------
+
+//-------------------------------------------------------------------------------------------------
+bool GameLogic::onEnableFreeRadar(GameMessage *msg)
 {
-	if (!m_sendDiplomacyRule || !isInGame() || isLoadingMap() || getFrame() == 0)
+	if (m_freeRadar || getFrame() > LOGICFRAMES_PER_SECOND * 30 || !isLobbyHostSender(msg->getPlayerIndex()))
+	{
+		return false;
+	}
+
+	m_freeRadar = TRUE;
+
+	TheInGameUI->messageNoFormat(TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:FreeRadarEnabled",
+		L"%ls turned on Free Radar. Every player has radar.", ThePlayerList->getNthPlayer(msg->getPlayerIndex())->getPlayerDisplayName().str()));
+	return true;
+}
+
+//-------------------------------------------------------------------------------------------------
+bool GameLogic::onEnableRevealMap(GameMessage *msg)
+{
+	if (m_revealMap || getFrame() > LOGICFRAMES_PER_SECOND * 30 || !isLobbyHostSender(msg->getPlayerIndex()))
+	{
+		return false;
+	}
+
+	m_revealMap = TRUE;
+	revealMapForAllPlayers();
+
+	TheInGameUI->messageNoFormat(TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:RevealMapEnabled",
+		L"%ls turned on Reveal Map. Every player sees the whole map.", ThePlayerList->getNthPlayer(msg->getPlayerIndex())->getPlayerDisplayName().str()));
+	return true;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Every slot's player looks at every cell for good, the way an observer does
+void GameLogic::revealMapForAllPlayers()
+{
+	if (TheGameInfo == nullptr)
 	{
 		return;
 	}
 
-	m_sendDiplomacyRule = FALSE;
-	TheMessageStream->appendMessage(GameMessage::MSG_ENABLE_DIPLOMACY);
+	for (Int i = 0; i < MAX_SLOTS; ++i)
+	{
+		GameSlot *slot = TheGameInfo->getSlot(i);
+		if (slot == nullptr || !slot->isOccupied() || slot->getPlayerTemplate() == PLAYERTEMPLATE_OBSERVER)
+		{
+			continue;
+		}
+
+		ThePartitionManager->revealMapForPlayerPermanently(ThePlayerList->getPlayerFromSlotIndex(i)->getPlayerIndex());
+	}
+}
+
+#if defined(GENERALS_ONLINE)
+//-------------------------------------------------------------------------------------------------
+void GameLogic::sendPendingLobbyRules()
+{
+	if (!isInGame() || isLoadingMap() || getFrame() == 0)
+	{
+		return;
+	}
+
+	if (m_sendDiplomacyRule)
+	{
+		m_sendDiplomacyRule = FALSE;
+		TheMessageStream->appendMessage(GameMessage::MSG_ENABLE_DIPLOMACY);
+	}
+	if (m_sendFreeRadarRule)
+	{
+		m_sendFreeRadarRule = FALSE;
+		TheMessageStream->appendMessage(GameMessage::MSG_ENABLE_FREE_RADAR);
+	}
+	if (m_sendRevealMapRule)
+	{
+		m_sendRevealMapRule = FALSE;
+		TheMessageStream->appendMessage(GameMessage::MSG_ENABLE_REVEAL_MAP);
+	}
 }
 #endif

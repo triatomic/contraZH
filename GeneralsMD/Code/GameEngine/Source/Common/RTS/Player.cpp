@@ -3646,6 +3646,12 @@ void Player::enableRadar()
 //-------------------------------------------------------------------------------------------------
 Bool Player::hasRadar() const
 {
+	// The Free Radar rule stands in for a radar source and shrugs off brownouts
+	if( TheGameLogic->isFreeRadar() )
+	{
+		return TRUE;
+	}
+
 	if( m_radarDisabled  && (m_disableProofRadarCount == 0) )
 		return FALSE;// Nope, no matter how many you have, if I say no, you don't have it
 

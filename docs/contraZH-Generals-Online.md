@@ -60,12 +60,17 @@ draw at the wrong scale; with it, the options menu lacks Contra's controls. See 
 `-headless -replay <file> -exportStats` writes a gzipped JSON match summary next to the replay, and
 `-statsUrl <url>` posts it. Only works in headless replay simulation.
 
-### Diplomacy rule
+### Lobby rules
 
-The lobby host types `/diplomacy` to let players change alliances during the match. The GO service
-has no field for it, so the host's game switches it on in the first frames. A host change turns it
-off. See
+The GO service has no field for Contra's lobby rules, so the host types a chat command and the
+host's game switches the rule on in the first frames of the match. A host change turns them all off.
+
+* `/diplomacy` lets players change alliances during the match. See
 [Diplomacy](contraZH-Maps-and-Setup.md#diplomacy).
+* `/freeradar` gives every player radar without a radar source. See
+[Free Radar](contraZH-Maps-and-Setup.md#free-radar).
+* `/revealmap` reveals the whole map to every player. See
+[Reveal Map](contraZH-Maps-and-Setup.md#reveal-map).
 
 ## Runtime requirements
 

@@ -127,6 +127,8 @@ static NameKeyType textEntryMaxCameraHeightID = NAMEKEY_INVALID;
 static NameKeyType checkCoopBuildingsID = NAMEKEY_INVALID;
 static NameKeyType checkQuickGameID = NAMEKEY_INVALID;
 static NameKeyType checkDiplomacyRuleID = NAMEKEY_INVALID;
+static NameKeyType checkFreeRadarID = NAMEKEY_INVALID;
+static NameKeyType checkRevealMapID = NAMEKEY_INVALID;
 static NameKeyType windowMapID = NAMEKEY_INVALID;
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *parentLanGameOptions = nullptr;
@@ -143,6 +145,8 @@ static GameWindow *textEntryMaxCameraHeight = nullptr;
 static GameWindow *checkCoopBuildings = nullptr;
 static GameWindow *checkQuickGame = nullptr;
 static GameWindow *checkDiplomacyRule = nullptr;
+static GameWindow *checkFreeRadar = nullptr;
+static GameWindow *checkRevealMap = nullptr;
 static LobbyTabs lobbyTabs;
 static Int lastChatCount = 0;
 static UnicodeString lastChatLine;
@@ -854,6 +858,52 @@ static void commitLanDiplomacy()
 	}
 }
 
+static void commitLanFreeRadar()
+{
+	LANGameInfo *myGame = TheLAN->GetMyGame();
+	if (!myGame || !myGame->amIHost() || !checkFreeRadar)
+	{
+		return;
+	}
+
+	const Bool freeRadar = GadgetCheckBoxIsChecked(checkFreeRadar);
+	if (freeRadar == myGame->getFreeRadar())
+	{
+		return;
+	}
+	myGame->setFreeRadar(freeRadar);
+	myGame->resetAccepted();
+
+	if (!s_isIniting)
+	{
+		TheLAN->RequestGameOptions(GenerateGameOptionsString(), true);
+		lanUpdateSlotList();
+	}
+}
+
+static void commitLanRevealMap()
+{
+	LANGameInfo *myGame = TheLAN->GetMyGame();
+	if (!myGame || !myGame->amIHost() || !checkRevealMap)
+	{
+		return;
+	}
+
+	const Bool revealMap = GadgetCheckBoxIsChecked(checkRevealMap);
+	if (revealMap == myGame->getRevealMap())
+	{
+		return;
+	}
+	myGame->setRevealMap(revealMap);
+	myGame->resetAccepted();
+
+	if (!s_isIniting)
+	{
+		TheLAN->RequestGameOptions(GenerateGameOptionsString(), true);
+		lanUpdateSlotList();
+	}
+}
+
 static void showRulesTab( Bool rules )
 {
 	ShowLobbyTab( lobbyTabs, rules );
@@ -903,6 +953,8 @@ void InitLanGameGadgets()
   checkCoopBuildingsID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckCoopBuildings" );
   checkQuickGameID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckQuickGame" );
   checkDiplomacyRuleID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckDiplomacyRule" );
+  checkFreeRadarID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckFreeRadar" );
+  checkRevealMapID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckRevealMap" );
 	windowMapID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:MapWindow" );
 
 	// Initialize the pointers to our gadgets
@@ -957,6 +1009,18 @@ void InitLanGameGadgets()
 	{
 		GadgetCheckBoxSetText(checkDiplomacyRule, TheGameText->FETCH_OR_SUBSTITUTE("GUI:DiplomacyRule", L"Diplomacy"));
 		checkDiplomacyRule->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:DiplomacyRule", L"Players may change alliances during the match from the Diplomacy window"));
+	}
+	checkFreeRadar = TheWindowManager->winGetWindowFromId( parentLanGameOptions, checkFreeRadarID );
+	if (checkFreeRadar)
+	{
+		GadgetCheckBoxSetText(checkFreeRadar, TheGameText->FETCH_OR_SUBSTITUTE("GUI:FreeRadar", L"Free Radar"));
+		checkFreeRadar->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:FreeRadar", L"Every player has radar from the start without building a radar source"));
+	}
+	checkRevealMap = TheWindowManager->winGetWindowFromId( parentLanGameOptions, checkRevealMapID );
+	if (checkRevealMap)
+	{
+		GadgetCheckBoxSetText(checkRevealMap, TheGameText->FETCH_OR_SUBSTITUTE("GUI:RevealMap", L"Reveal Map"));
+		checkRevealMap->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:RevealMap", L"No shroud: every player sees the whole map from the start"));
 	}
 
 	InitLobbyTabs( lobbyTabs, parentLanGameOptions, "LanGameOptionsMenu.wnd" );
@@ -1062,6 +1126,8 @@ void DeinitLanGameGadgets()
   checkCoopBuildings = nullptr;
   checkQuickGame = nullptr;
   checkDiplomacyRule = nullptr;
+  checkFreeRadar = nullptr;
+  checkRevealMap = nullptr;
 	lobbyTabs = LobbyTabs();
 	if (windowMap)
 	{
@@ -1263,6 +1329,18 @@ void updateGameOptions()
 		{
 			GadgetCheckBoxSetChecked( checkDiplomacyRule, theGame->getDiplomacy() );
 			checkDiplomacyRule->winEnable( TheLAN->AmIHost() );
+		}
+
+		if (checkFreeRadar)
+		{
+			GadgetCheckBoxSetChecked( checkFreeRadar, theGame->getFreeRadar() );
+			checkFreeRadar->winEnable( TheLAN->AmIHost() );
+		}
+
+		if (checkRevealMap)
+		{
+			GadgetCheckBoxSetChecked( checkRevealMap, theGame->getRevealMap() );
+			checkRevealMap->winEnable( TheLAN->AmIHost() );
 		}
 	}
 	s_isRefreshingControls = wasRefreshing;
@@ -1596,6 +1674,14 @@ WindowMsgHandledType LanGameOptionsMenuSystem( GameWindow *window, UnsignedInt m
         else if ( controlID == checkDiplomacyRuleID )
         {
           commitLanDiplomacy();
+        }
+        else if ( controlID == checkFreeRadarID )
+        {
+          commitLanFreeRadar();
+        }
+        else if ( controlID == checkRevealMapID )
+        {
+          commitLanRevealMap();
         }
         else if ( controlID == lobbyTabs.buttonGameID )
         {

@@ -374,12 +374,18 @@ public:
 
 	bool IsHost();
 
-	// The service has no lobby field for it, so only the host knows; it sends MSG_ENABLE_DIPLOMACY in the match
+	// The service has no lobby field for these, so only the host knows; it sends an MSG_ENABLE_* per rule in the match
 	bool IsDiplomacyRuleOn() const { return m_bDiplomacyRule; }
 	void SetDiplomacyRule(bool bOn) { m_bDiplomacyRule = bOn; }
+	bool IsFreeRadarRuleOn() const { return m_bFreeRadarRule; }
+	void SetFreeRadarRule(bool bOn) { m_bFreeRadarRule = bOn; }
+	bool IsRevealMapRuleOn() const { return m_bRevealMapRule; }
+	void SetRevealMapRule(bool bOn) { m_bRevealMapRule = bOn; }
 
 private:
 	bool m_bDiplomacyRule = false;
+	bool m_bFreeRadarRule = false;
+	bool m_bRevealMapRule = false;
 	std::set<int64_t> m_setMembersBeforeUs;
 	bool m_bJoinOrderKnown = false;
 	void ResetJoinOrder();

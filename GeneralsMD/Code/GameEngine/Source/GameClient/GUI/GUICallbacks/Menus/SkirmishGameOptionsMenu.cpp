@@ -118,6 +118,8 @@ static NameKeyType comboBoxStartingCashID = NAMEKEY_INVALID;
 static NameKeyType checkCoopBuildingsID = NAMEKEY_INVALID;
 static NameKeyType checkQuickGameID = NAMEKEY_INVALID;
 static NameKeyType checkDiplomacyRuleID = NAMEKEY_INVALID;
+static NameKeyType checkFreeRadarID = NAMEKEY_INVALID;
+static NameKeyType checkRevealMapID = NAMEKEY_INVALID;
 
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *staticTextGameSpeed = nullptr;
@@ -134,6 +136,8 @@ static GameWindow *comboBoxStartingCash = nullptr;
 static GameWindow *checkCoopBuildings = nullptr;
 static GameWindow *checkQuickGame = nullptr;
 static GameWindow *checkDiplomacyRule = nullptr;
+static GameWindow *checkFreeRadar = nullptr;
+static GameWindow *checkRevealMap = nullptr;
 static LobbyTabs lobbyTabs;
 static GameWindow *comboBoxPlayer[MAX_SLOTS] = {0};
 
@@ -1047,6 +1051,22 @@ static void handleDiplomacyRuleClick()
 	}
 }
 
+static void handleFreeRadarClick()
+{
+	if (TheSkirmishGameInfo && checkFreeRadar)
+	{
+		TheSkirmishGameInfo->setFreeRadar( GadgetCheckBoxIsChecked( checkFreeRadar ) );
+	}
+}
+
+static void handleRevealMapClick()
+{
+	if (TheSkirmishGameInfo && checkRevealMap)
+	{
+		TheSkirmishGameInfo->setRevealMap( GadgetCheckBoxIsChecked( checkRevealMap ) );
+	}
+}
+
 
 //-------------------------------------------------------------------------------------------------
 /** Initialize the Gadgets Options Menu */
@@ -1067,6 +1087,8 @@ void InitSkirmishGameGadgets()
   checkCoopBuildingsID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckCoopBuildings" );
   checkQuickGameID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckQuickGame" );
   checkDiplomacyRuleID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckDiplomacyRule" );
+  checkFreeRadarID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckFreeRadar" );
+  checkRevealMapID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckRevealMap" );
 
 	// Initialize the pointers to our gadgets
 	parentSkirmishGameOptions = TheWindowManager->winGetWindowFromId( nullptr, parentSkirmishGameOptionsID );
@@ -1107,6 +1129,18 @@ void InitSkirmishGameGadgets()
 	{
 		GadgetCheckBoxSetText(checkDiplomacyRule, TheGameText->FETCH_OR_SUBSTITUTE("GUI:DiplomacyRule", L"Diplomacy"));
 		checkDiplomacyRule->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:DiplomacyRule", L"Players may change alliances during the match from the Diplomacy window"));
+	}
+	checkFreeRadar = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, checkFreeRadarID );
+	if (checkFreeRadar)
+	{
+		GadgetCheckBoxSetText(checkFreeRadar, TheGameText->FETCH_OR_SUBSTITUTE("GUI:FreeRadar", L"Free Radar"));
+		checkFreeRadar->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:FreeRadar", L"Every player has radar from the start without building a radar source"));
+	}
+	checkRevealMap = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, checkRevealMapID );
+	if (checkRevealMap)
+	{
+		GadgetCheckBoxSetText(checkRevealMap, TheGameText->FETCH_OR_SUBSTITUTE("GUI:RevealMap", L"Reveal Map"));
+		checkRevealMap->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:RevealMap", L"No shroud: every player sees the whole map from the start"));
 	}
 
 	InitLobbyTabs( lobbyTabs, parentSkirmishGameOptions, "SkirmishGameOptionsMenu.wnd" );
@@ -1301,6 +1335,14 @@ void updateSkirmishGameOptions()
   if (checkDiplomacyRule)
   {
     GadgetCheckBoxSetChecked( checkDiplomacyRule, TheSkirmishGameInfo->getDiplomacy() );
+  }
+  if (checkFreeRadar)
+  {
+    GadgetCheckBoxSetChecked( checkFreeRadar, TheSkirmishGameInfo->getFreeRadar() );
+  }
+  if (checkRevealMap)
+  {
+    GadgetCheckBoxSetChecked( checkRevealMap, TheSkirmishGameInfo->getRevealMap() );
   }
   Int itemCount = GadgetComboBoxGetLength(comboBoxStartingCash);
   Int index = 0;
@@ -1727,6 +1769,14 @@ WindowMsgHandledType SkirmishGameOptionsMenuSystem( GameWindow *window, Unsigned
         else if ( controlID == checkDiplomacyRuleID )
         {
           handleDiplomacyRuleClick();
+        }
+        else if ( controlID == checkFreeRadarID )
+        {
+          handleFreeRadarClick();
+        }
+        else if ( controlID == checkRevealMapID )
+        {
+          handleRevealMapClick();
         }
         else if ( controlID == lobbyTabs.buttonGameID )
         {

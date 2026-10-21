@@ -253,6 +253,10 @@ public:
   inline void setQuickGame( Bool quickGame );
   inline Bool getDiplomacy() const;
   inline void setDiplomacy( Bool diplomacy );
+  inline Bool getFreeRadar() const;
+  inline void setFreeRadar( Bool freeRadar );
+  inline Bool getRevealMap() const;
+  inline void setRevealMap( Bool revealMap );
 
 protected:
 	Int m_preorderMask;
@@ -279,6 +283,8 @@ protected:
   Bool m_coopBuildings; // Allies may resume each other's construction
   Bool m_quickGame; // Objects use their QuickGamePrerequisites
   Bool m_diplomacy; // Players may change their stance toward each other mid-match
+  Bool m_freeRadar; // Every player has radar without a radar source
+  Bool m_revealMap; // Every player sees the whole map from the start
 };
 
 extern GameInfo *TheGameInfo;
@@ -308,6 +314,10 @@ Bool        GameInfo::getQuickGame() const              { return m_quickGame; }
 void        GameInfo::setQuickGame( Bool quickGame )     { m_quickGame = quickGame; }
 Bool        GameInfo::getDiplomacy() const              { return m_diplomacy; }
 void        GameInfo::setDiplomacy( Bool diplomacy )     { m_diplomacy = diplomacy; }
+Bool        GameInfo::getFreeRadar() const              { return m_freeRadar; }
+void        GameInfo::setFreeRadar( Bool freeRadar )     { m_freeRadar = freeRadar; }
+Bool        GameInfo::getRevealMap() const              { return m_revealMap; }
+void        GameInfo::setRevealMap( Bool revealMap )     { m_revealMap = revealMap; }
 
 AsciiString GameInfoToAsciiString( const GameInfo *game );
 Bool ParseAsciiStringToGameInfo( GameInfo *game, AsciiString options );

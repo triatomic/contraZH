@@ -1085,6 +1085,16 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			onEnableDiplomacy(msg);
 			break;
 		}
+		case GameMessage::MSG_ENABLE_FREE_RADAR:
+		{
+			onEnableFreeRadar(msg);
+			break;
+		}
+		case GameMessage::MSG_ENABLE_REVEAL_MAP:
+		{
+			onEnableRevealMap(msg);
+			break;
+		}
 #endif
 	}
 

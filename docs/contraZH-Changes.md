@@ -17,7 +17,7 @@ version - see [Rendering](contraZH-Options.md#rendering) for the renamed `Anisot
 ## Pages
 
 * [Gameplay Fixes](contraZH-Gameplay-Fixes.md) - always-on fixes for retail simulation bugs
-* [Maps & Game Setup](contraZH-Maps-and-Setup.md) - map features, 30-player maps, CLP_AI scripts, factions, game setup and the Diplomacy rule
+* [Maps & Game Setup](contraZH-Maps-and-Setup.md) - map features, 30-player maps, CLP_AI scripts, factions, game setup and the Diplomacy, Free Radar and Reveal Map rules
 * [Campaign](contraZH-Campaign.md) - the campaign screen, campaign tabs, mission unlocks, mission save names and the challenge screen
 * [Options.ini](contraZH-Options.md) - every Options.ini setting: camera, display, hotkeys, selection, input and rendering, plus the Hotkeys screen and Hotkeys.ini
 * [Objects & Modules](contraZH-Objects-and-Modules.md) - new object keys, module parameters and behavior modules

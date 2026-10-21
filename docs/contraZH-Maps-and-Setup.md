@@ -157,8 +157,9 @@ back to `Random <BaseSide>`.
 ### Rules tab
 
 * The Skirmish and LAN lobbies get **Game** and **Rules** tab buttons in the title row.
-* The Rules page holds Quick Game, Coop Buildings, Diplomacy and, in LAN, Max Camera Height. It takes the place
-of the battle honors and info box in Skirmish, and of the chat in LAN.
+* The Rules page holds Quick Game, Coop Buildings, Diplomacy, Free Radar, Reveal Map and, in LAN,
+Max Camera Height. It takes the place of the battle honors and info box in Skirmish, and of the chat
+in LAN.
 
 Notes:
 * Labels are `GUI:TabGame` and `GUI:TabRules`, falling back to `Game` and `Rules`.
@@ -239,6 +240,46 @@ but the lobby host. A host change turns the rule off, and the lobby sees a messa
 play its replays, but games with the rule off are unaffected.
 * All players need this build. Replays play stance changes back exactly.
 * Save games keep the stances but not the rule, so a loaded save plays with Diplomacy off.
+* Changes the simulation; affects replays.
+
+### Free Radar
+
+* The Skirmish and LAN lobbies get a **Free Radar** checkbox on the Rules page, off by default. Only
+the LAN host can change it.
+* With Free Radar on, every player has radar from the first frame without building a radar source,
+and a power brownout does not take it away.
+
+Notes:
+* Labels are `GUI:FreeRadar`, `TOOLTIP:FreeRadar` and `GUI:FreeRadarEnabled`, all falling back to
+English text. `GUI:FreeRadarEnabled` takes one `%ls` player name.
+* The checkbox comes from `CheckFreeRadar` in `SkirmishGameOptionsMenu.wnd` and
+`LanGameOptionsMenu.wnd`. A layout without it shows no checkbox. `build/add_game_rules_wnd.py` adds
+it and Reveal Map in a second column of the Rules page and needs the Diplomacy checkbox from
+`build/add_diplomacy_wnd.py`.
+* Generals Online has no lobby field for the rule. Its host types `/freeradar` in lobby chat, as with
+`/diplomacy`, and the host's game turns the rule on in the first frames of the match.
+* The options string carries `FR=1` only when the rule is on. Older exes can't join such a lobby or
+play its replays, but games with the rule off are unaffected.
+* Save games keep the rule.
+* The simulation is unchanged; a replay carries the rule and shows the radar.
+
+### Reveal Map
+
+* The Skirmish and LAN lobbies get a **Reveal Map** checkbox on the Rules page, off by default. Only
+the LAN host can change it.
+* With Reveal Map on there is no shroud: every player sees the whole map and everything on it from
+the first frame, the way an observer does.
+
+Notes:
+* Labels are `GUI:RevealMap`, `TOOLTIP:RevealMap` and `GUI:RevealMapEnabled`, all falling back to
+English text. `GUI:RevealMapEnabled` takes one `%ls` player name.
+* The checkbox comes from `CheckRevealMap` in both lobby layouts; `build/add_game_rules_wnd.py` adds
+it beside Free Radar.
+* Generals Online has no lobby field for the rule. Its host types `/revealmap` in lobby chat, and the
+map opens up in the first frames of the match.
+* The options string carries `RM=1` only when the rule is on. Older exes can't join such a lobby or
+play its replays, but games with the rule off are unaffected.
+* A save game brings the revealed map back on its own.
 * Changes the simulation; affects replays.
 
 ### Host camera height

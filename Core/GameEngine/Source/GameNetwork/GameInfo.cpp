@@ -399,6 +399,8 @@ void GameInfo::reset()
   m_coopBuildings = FALSE;
   m_quickGame = FALSE;
   m_diplomacy = FALSE;
+  m_freeRadar = FALSE;
+  m_revealMap = FALSE;
 
 	for (Int i=0; i<MAX_SLOTS; ++i)
 	{
@@ -1075,10 +1077,18 @@ static AsciiString buildGameInfoAsciiString(const GameInfo& game, const AsciiStr
 		game.getMapCRC(), game.getMapSize(), game.getSeed(), game.getCRCInterval(), game.getSuperweaponRestriction(),
 		game.getStartingCash().countMoney(), game.getMaxCameraHeight(), game.oldFactionsOnly() ? 'Y' : 'N', game.getCoopBuildings() ? 1 : 0, game.getQuickGame() ? 1 : 0 );
 
-	// Written only when on, so exes that reject the unknown key still read games with the rule off
+	// Each written only when on, so exes that reject an unknown key still read games with the rules off
 	if (game.getDiplomacy())
 	{
 		optionsString.concat("DP=1;");
+	}
+	if (game.getFreeRadar())
+	{
+		optionsString.concat("FR=1;");
+	}
+	if (game.getRevealMap())
+	{
+		optionsString.concat("RM=1;");
 	}
 #endif
 
@@ -1210,6 +1220,8 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
   Bool coopBuildings = FALSE;
   Bool quickGame = FALSE;
   Bool diplomacy = FALSE;
+  Bool freeRadar = FALSE;
+  Bool revealMap = FALSE;
 
 	Bool sawMap = FALSE;
 	Bool sawMapCRC = FALSE;
@@ -1348,6 +1360,14 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
     else if (key.compare("DP") == 0 )
     {
       diplomacy = atoi( val.str() ) != 0;
+    }
+    else if (key.compare("FR") == 0 )
+    {
+      freeRadar = atoi( val.str() ) != 0;
+    }
+    else if (key.compare("RM") == 0 )
+    {
+      revealMap = atoi( val.str() ) != 0;
     }
 		else if (key.getLength() == 1 && *key.str() == slotListID)
 		{
@@ -1721,6 +1741,8 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 		game->setCoopBuildings(coopBuildings);
 		game->setQuickGame(quickGame);
 		game->setDiplomacy(diplomacy);
+		game->setFreeRadar(freeRadar);
+		game->setRevealMap(revealMap);
 
 		return true;
 	}
@@ -1750,14 +1772,14 @@ void SkirmishGameInfo::xfer( Xfer *xfer )
 #if RTS_GENERALS
 	const XferVersion currentVersion = 2;
 #else
-	const XferVersion currentVersion = 5;
+	const XferVersion currentVersion = 6;
 #endif
 	XferVersion version = currentVersion;
 #if !RTS_GENERALS
-	// Version 5 only adds Quick Game, so a save without it stays readable by retail
-	if (xfer->getXferMode() == XFER_SAVE && !m_quickGame)
+	// Versions 5 and 6 only add rules, so a save with them off stays readable by older exes
+	if (xfer->getXferMode() == XFER_SAVE && !m_freeRadar && !m_revealMap)
 	{
-		version = 4;
+		version = m_quickGame ? 5 : 4;
 	}
 #endif
 	xfer->xferVersion( &version, currentVersion );
@@ -1867,6 +1889,17 @@ void SkirmishGameInfo::xfer( Xfer *xfer )
   else if ( xfer->getXferMode() == XFER_LOAD )
   {
     m_quickGame = FALSE;
+  }
+
+  if ( version >= 6 )
+  {
+    xfer->xferBool( &m_freeRadar );
+    xfer->xferBool( &m_revealMap );
+  }
+  else if ( xfer->getXferMode() == XFER_LOAD )
+  {
+    m_freeRadar = FALSE;
+    m_revealMap = FALSE;
   }
 
 }

@@ -541,7 +541,7 @@ void GameClient::update()
 	frameMsg->appendTimestampArgument( getFrame() );
 
 #if defined(GENERALS_ONLINE)
-	TheGameLogic->sendPendingDiplomacyRule();
+	TheGameLogic->sendPendingLobbyRules();
 #endif
 
 	// Update intro

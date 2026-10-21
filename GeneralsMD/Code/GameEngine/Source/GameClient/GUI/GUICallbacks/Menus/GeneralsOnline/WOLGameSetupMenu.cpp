@@ -2548,8 +2548,8 @@ void WOLGameSetupMenuUpdate( WindowLayout * layout, void *userData)
 							GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"Host: The previous host left. A new host was selected."), GameMakeColor(192, 192, 192, 255), -1, -1);
 						}
 
-						// The rule lives on the host's client, so it left with the previous host
-						GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"Diplomacy is OFF. The new host can type /diplomacy to turn it on."), GameMakeColor(192, 192, 192, 255), -1, -1);
+						// The rules live on the host's client, so they left with the previous host
+						GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"Diplomacy, Free Radar and Reveal Map are OFF. The new host can type /diplomacy, /freeradar or /revealmap to turn them on."), GameMakeColor(192, 192, 192, 255), -1, -1);
 
 						// re-enable critical buttons for everyone
 						if (buttonBack != nullptr)
@@ -3600,6 +3600,30 @@ int getQR2HostingStatus();
 }
 extern int isThreadHosting;
 
+#if defined(GENERALS_ONLINE)
+// Flips a host-only rule the service can't store and tells the lobby the new state
+static void toggleLobbyRule(const wchar_t *name, bool (NGMP_OnlineServices_LobbyInterface::*isOn)() const, void (NGMP_OnlineServices_LobbyInterface::*set)(bool), const wchar_t *onText)
+{
+	NGMP_OnlineServices_LobbyInterface* pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
+	if (pLobbyInterface == nullptr || !pLobbyInterface->IsInLobby())
+	{
+		return;
+	}
+
+	UnicodeString msg(name);
+	if (!pLobbyInterface->IsHost())
+	{
+		msg.concat(L": Only the host can change it.");
+		GadgetListBoxAddEntryText(listboxGameSetupChat, msg, GameMakeColor(255, 0, 0, 255), -1, -1);
+		return;
+	}
+
+	(pLobbyInterface->*set)(!(pLobbyInterface->*isOn)());
+	msg.concat((pLobbyInterface->*isOn)() ? onText : L" is OFF.");
+	pLobbyInterface->SendAnnouncementMessageToCurrentLobby(msg, true);
+}
+#endif
+
 Bool handleGameSetupSlashCommands(UnicodeString uText)
 {
 	AsciiString message;
@@ -3648,6 +3672,8 @@ Bool handleGameSetupSlashCommands(UnicodeString uText)
 		GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"/removepassword - Remove the lobby password (host only)."), helpColor, -1, -1);
 		GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"/maxcameraheight <value> - Set the camera height limit (host only)."), helpColor, -1, -1);
 		GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"/diplomacy - Let players change alliances during the match (host only)."), helpColor, -1, -1);
+		GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"/freeradar - Give every player radar without a radar source (host only)."), helpColor, -1, -1);
+		GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"/revealmap - Reveal the whole map to every player (host only)."), helpColor, -1, -1);
 		// GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"/leave - Return to the main lobby."), helpColor, -1, -1);
 		// GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"/quit - Exit the game."), helpColor, -1, -1);
 		GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"/support - Open the GeneralsOnline Discord."), helpColor, -1, -1);
@@ -3771,23 +3797,17 @@ Bool handleGameSetupSlashCommands(UnicodeString uText)
 	}
 	else if (token == "diplomacy")
 	{
-		NGMP_OnlineServices_LobbyInterface* pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
-		if (pLobbyInterface != nullptr && pLobbyInterface->IsInLobby())
-		{
-			if (pLobbyInterface->IsHost())
-			{
-				pLobbyInterface->SetDiplomacyRule(!pLobbyInterface->IsDiplomacyRuleOn());
-
-				UnicodeString msg = pLobbyInterface->IsDiplomacyRuleOn()
-					? UnicodeString(L"Diplomacy is ON: players may change alliances during the match.")
-					: UnicodeString(L"Diplomacy is OFF.");
-				pLobbyInterface->SendAnnouncementMessageToCurrentLobby(msg, true);
-			}
-			else
-			{
-				GadgetListBoxAddEntryText(listboxGameSetupChat, UnicodeString(L"Diplomacy: Only the host can change it."), GameMakeColor(255, 0, 0, 255), -1, -1);
-			}
-		}
+		toggleLobbyRule(L"Diplomacy", &NGMP_OnlineServices_LobbyInterface::IsDiplomacyRuleOn, &NGMP_OnlineServices_LobbyInterface::SetDiplomacyRule, L" is ON: players may change alliances during the match.");
+		return TRUE; // was a slash command
+	}
+	else if (token == "freeradar")
+	{
+		toggleLobbyRule(L"Free Radar", &NGMP_OnlineServices_LobbyInterface::IsFreeRadarRuleOn, &NGMP_OnlineServices_LobbyInterface::SetFreeRadarRule, L" is ON: every player has radar.");
+		return TRUE; // was a slash command
+	}
+	else if (token == "revealmap")
+	{
+		toggleLobbyRule(L"Reveal Map", &NGMP_OnlineServices_LobbyInterface::IsRevealMapRuleOn, &NGMP_OnlineServices_LobbyInterface::SetRevealMapRule, L" is ON: every player sees the whole map.");
 		return TRUE; // was a slash command
 	}
 #endif
