@@ -56,3 +56,19 @@ END
 
 Note: to open every mission, for testing or after a reinstall, put `UnlockAll = yes` on its own
 line in `CampaignProgress.ini` (create the file if it does not exist) and reopen the screen.
+
+## Mission saves
+
+* The automatic save made between missions ends its name with the difficulty, as in
+`Mission Start - USA 2 - Hard`. The labels come from `GUI:DifficultyEasy`, `GUI:DifficultyNormal`
+and `GUI:DifficultyHard` in `Generals.str`, and read `Easy`, `Normal` and `Hard` when the strings
+are missing.
+
+## Generals' Challenge
+
+* The single player `Challenge` button opens the challenge screen directly. Easy, Medium and Hard
+buttons sit left of Play there and share the campaign's `CampaignDifficulty` in `Options.ini`.
+* `ChallengeMenu.wnd` may define `ButtonEasy`, `ButtonMedium` and `ButtonHard` push buttons to
+place them itself; any it lacks are built in the Play button's look.
+* A challenge map colors the player like its `ThePlayer` placeholder when WorldBuilder gives that
+player a color. Maps without one keep the random color.
