@@ -22,6 +22,7 @@
 
 #include <math.h>
 #include <cmath>
+#include <valarray> // json.hpp pulls it in; parsed here so its acos and pow overloads escape the pragma
 #include "WWMath/wwmath.h"
 #include "WWMath/matrix4.h"
 
