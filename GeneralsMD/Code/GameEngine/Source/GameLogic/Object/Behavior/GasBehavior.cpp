@@ -28,6 +28,8 @@
 #include "Common/Upgrade.h"
 #include "Common/Xfer.h"
 #include "GameClient/FXList.h"
+#include "GameLogic/AI.h"
+#include "GameLogic/AIPathfind.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
@@ -69,6 +71,8 @@ static void resolveUpgradeNames( const std::vector<AsciiString>& names, std::vec
 	}
 }
 
+Bool GasBehavior::s_anyInstance = FALSE;
+
 //-------------------------------------------------------------------------------------------------
 GasBehaviorModuleData::GasBehaviorModuleData()
 {
@@ -84,7 +88,6 @@ GasBehaviorModuleData::GasBehaviorModuleData()
 	m_disorientInterval = 0;
 	m_hallucinationInterval = LOGICFRAMES_PER_SECOND;
 	m_hallucinationDuration = 0;
-	m_hallucinationTriggeredByUpgrade = FALSE;
 	m_fxListUpgrade = nullptr;
 	m_requiresAllTriggers = FALSE;
 	m_upgradesResolved = FALSE;
@@ -112,7 +115,6 @@ GasBehaviorModuleData::GasBehaviorModuleData()
 		{ "DisorientInterval", INI::parseDurationUnsignedInt, nullptr, offsetof(GasBehaviorModuleData, m_disorientInterval) },
 		{ "HallucinationEffectInterval", INI::parseDurationUnsignedInt, nullptr, offsetof(GasBehaviorModuleData, m_hallucinationInterval) },
 		{ "HallucinationDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(GasBehaviorModuleData, m_hallucinationDuration) },
-		{ "HallucinationTriggeredByUpgrade", INI::parseBool, nullptr, offsetof(GasBehaviorModuleData, m_hallucinationTriggeredByUpgrade) },
 		{ "TriggeredBy", INI::parseAsciiStringVector, nullptr, offsetof(GasBehaviorModuleData, m_triggeredBy) },
 		{ "ConflictsWith", INI::parseAsciiStringVector, nullptr, offsetof(GasBehaviorModuleData, m_conflictsWith) },
 		{ "FXListUpgrade", INI::parseFXList, nullptr, offsetof(GasBehaviorModuleData, m_fxListUpgrade) },
@@ -152,6 +154,7 @@ GasBehavior::GasBehavior( Thing *thing, const ModuleData* moduleData ) : UpdateM
 	m_hallucinateStopFrame = 0;
 	m_issuedOrders = FALSE;
 	m_applyingTickDamage = FALSE;
+	s_anyInstance = TRUE;
 	setWakeFrame(getObject(), UPDATE_SLEEP_FOREVER);
 }
 
@@ -177,23 +180,22 @@ void GasBehavior::onDamage( DamageInfo *damageInfo )
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
-void GasBehavior::onHealing( DamageInfo *damageInfo )
-{
-	stopGasEffects();
-	m_hallucinateFrame = 0;
-	m_hallucinateStopFrame = 0;
-	releaseOrders();
-
-	setWakeFrame(getObject(), UPDATE_SLEEP_FOREVER);
-}
-
-// ------------------------------------------------------------------------------------------------
-// ------------------------------------------------------------------------------------------------
 /*static*/ Bool GasBehavior::blocksPlayerOrders( const Object *obj )
 {
+	if( !s_anyInstance )
+	{
+		return FALSE;
+	}
+
 	static const NameKeyType key_GasBehavior = NAMEKEY( "GasBehavior" );
-	const GasBehavior *gas = static_cast<const GasBehavior *>( obj->findUpdateModule( key_GasBehavior ) );
-	return gas != nullptr && gas->isBlockingPlayerOrders();
+	for( BehaviorModule **m = obj->getBehaviorModules(); *m; ++m )
+	{
+		if( (*m)->getModuleNameKey() == key_GasBehavior && static_cast<const GasBehavior *>( *m )->isBlockingPlayerOrders() )
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -355,7 +357,7 @@ Bool GasBehavior::attackerMeetsTriggers( const Object *attacker, const Player *p
 
 	if( d->m_triggerUpgrades.empty() )
 	{
-		return FALSE;
+		return TRUE;
 	}
 
 	for( std::vector<const UpgradeTemplate *>::const_iterator it = d->m_triggerUpgrades.begin(); it != d->m_triggerUpgrades.end(); ++it )
@@ -423,8 +425,7 @@ void GasBehavior::startGasEffects( const DamageInfo *damageInfo )
 			m_disorientFrame = now + 1;
 		}
 
-		if( d->m_hallucinationDuration != 0 && me->isAbleToAttack() &&
-				( !d->m_hallucinationTriggeredByUpgrade || attackerMeetsTriggers( attacker, player ) ) )
+		if( d->m_hallucinationDuration != 0 && me->isAbleToAttack() && attackerMeetsTriggers( attacker, player ) )
 		{
 			if( m_hallucinateStopFrame == 0 )
 			{
@@ -488,11 +489,10 @@ void GasBehavior::doHallucination()
 		return;
 	}
 
-	// a script source keeps Hold Fire, which vetoes only CMD_FROM_AI, from cancelling the attack
 	PartitionFilterAlive filterAlive;
 	PartitionFilterSameMapStatus filterMapStatus( me );
 	PartitionFilterRejectByKindOf filterStructures( MAKE_KINDOF_MASK( KINDOF_STRUCTURE ), KINDOFMASK_NONE );
-	PartitionFilterPossibleToAttack filterAttack( ATTACK_NEW_TARGET_FORCED, me, CMD_FROM_SCRIPT );
+	PartitionFilterPossibleToAttack filterAttack( ATTACK_NEW_TARGET_FORCED, me, CMD_FROM_AI );
 	PartitionFilter *filters[] = { &filterAlive, &filterMapStatus, &filterStructures, &filterAttack, nullptr };
 
 	Object *target = ThePartitionManager->getClosestObject( me, me->getLargestWeaponRange(), FROM_BOUNDINGSPHERE_2D, filters );
@@ -507,7 +507,7 @@ void GasBehavior::doHallucination()
 		return;
 	}
 
-	ai->aiForceAttackObject( target, NO_MAX_SHOTS_LIMIT, CMD_FROM_SCRIPT );
+	ai->aiForceAttackObject( target, NO_MAX_SHOTS_LIMIT, CMD_FROM_AI );
 	m_issuedOrders = TRUE;
 }
 
@@ -534,6 +534,11 @@ void GasBehavior::doDisorientation()
 	Coord3D pos = *me->getPosition();
 	pos.x += dist * Cos( angle );
 	pos.y += dist * Sin( angle );
+
+	if( !TheAI->pathfinder()->adjustDestination( me, ai->getLocomotorSet(), &pos, nullptr ) )
+	{
+		return;
+	}
 
 	ai->aiMoveToPosition( &pos, CMD_FROM_AI );
 	m_issuedOrders = TRUE;

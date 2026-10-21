@@ -402,7 +402,6 @@ Behavior = GasBehavior ModuleTag_Gas01
   DisorientInterval              = 1500
   HallucinationEffectInterval    = 1000
   HallucinationDuration          = 6000
-  HallucinationTriggeredByUpgrade = Yes
   TriggeredBy                    = Upgrade_ChinaHallucinationGas
   FXListUpgrade                  = FX_HallucinationStart
 End
@@ -446,9 +445,8 @@ Hallucination:
 picks one target when the hallucination starts.)
 * `HallucinationDuration = 0` - (In milliseconds. How long it lasts after the last qualifying hit.
 `0` disables hallucination.)
-* `HallucinationTriggeredByUpgrade = No` - (Yes requires the upgrades below. No lets every gas hit
-cause hallucination.)
-* `TriggeredBy` - (Upgrades the attacker needs.)
+* `TriggeredBy` - (Upgrades the attacker needs. Leave it out and every gas hit can cause
+hallucination.)
 * `ConflictsWith` - (Upgrades that stop it when the attacker has any of them.)
 * `RequiresAllTriggers = No` - (Yes needs every `TriggeredBy`, No needs one of them.)
 * `FXListUpgrade` - (Plays on the gassed object when a hallucination starts. A refresh does not
@@ -477,5 +475,7 @@ attacking player has researched it or the attacking object carries it.
 Computer players and map scripts can still order it, and the next move or pick takes over again.
 * A unit goes idle when the last of these effects ends.
 * Units inside a transport or building are not moved and can still be evacuated.
-* Healing of any kind cures every gas effect, as it cures poison.
+* A disoriented unit only moves to spots its locomotor can reach. With none nearby it stays put
+until the next move.
+* Healing does not cure gas, unlike poison. Every effect runs until its duration ends.
 * Multiplayer and replay safe.

@@ -645,7 +645,8 @@ CanAttackResult WeaponSet::getAbleToAttackSpecificObject( AbleToAttackType attac
 	// and anyone we are carrying. Player issued orders arrive with a different command source and
 	// are deliberately unaffected. This is the mirror of NO_ATTACK_FROM_AI above, seen from the
 	// attacker rather than the victim, and covers every automatic acquisition path at once.
-	if (commandSource == CMD_FROM_AI)
+	// A forced attack is an order, never an acquisition, so it passes even from CMD_FROM_AI.
+	if (commandSource == CMD_FROM_AI && !isForcedAttack(attackType))
 	{
 		const AIUpdateInterface* sourceAI = source->getAI();
 		if (sourceAI && sourceAI->isFireSuppressedByHoldFire())

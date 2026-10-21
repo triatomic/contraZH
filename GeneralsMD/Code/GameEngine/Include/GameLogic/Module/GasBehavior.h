@@ -58,7 +58,6 @@ public:
 
 	UnsignedInt m_hallucinationInterval;
 	UnsignedInt m_hallucinationDuration;
-	Bool m_hallucinationTriggeredByUpgrade;
 	std::vector<AsciiString> m_triggeredBy;
 	std::vector<AsciiString> m_conflictsWith;
 	const FXList *m_fxListUpgrade;
@@ -97,7 +96,7 @@ public:
 
 	// DamageModuleInterface
 	virtual void onDamage( DamageInfo *damageInfo ) override;
-	virtual void onHealing( DamageInfo *damageInfo ) override;
+	virtual void onHealing( DamageInfo *damageInfo ) override { }
 	virtual void onBodyDamageStateChange(const DamageInfo* damageInfo, BodyDamageType oldState, BodyDamageType newState) override { }
 
 	// UpdateInterface
@@ -132,5 +131,7 @@ private:
 	UnsignedInt		m_hallucinateStopFrame;
 	Bool					m_issuedOrders;
 	Bool					m_applyingTickDamage;	// guards against our own gas ticks retriggering us
+
+	static Bool		s_anyInstance;	// lets games without gas skip the module scan in blocksPlayerOrders
 
 };
