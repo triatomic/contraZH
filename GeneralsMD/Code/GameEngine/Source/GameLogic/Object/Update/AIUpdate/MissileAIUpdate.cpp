@@ -796,11 +796,10 @@ void MissileAIUpdate::doAttackState(Bool turnOK, Bool randomPath)
 
 	// If I was fired at a flyer and have lost target (most likely they died), then I need to do something better
 	// than cloverleaf around their last spot.
-	if( m_isTrackingTarget && (getGoalObject() == NULL) && !d->m_isTorpedo)
-		airborneTargetGone();
-
-	if (m_isTrackingTarget && (getGoalPosition() == NULL) && d->m_isTorpedo)
-		airborneTargetGone();
+	if (isTargetLost())
+	{
+		airborneTargetGone(TRUE);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -816,7 +815,7 @@ void MissileAIUpdate::doKillState()
 		}
 
 		// srj sez: killstate missiles should not be allowed to live forever.
-		airborneTargetGone();
+		airborneTargetGone(isTargetLost());
 		return;
 	}
 
@@ -880,11 +879,10 @@ void MissileAIUpdate::doKillState()
 	}
 	// If I was fired at a flyer and have lost target (most likely they died), then I need to do something better
 	// than cloverleaf around their last spot.
-	if( m_isTrackingTarget && (getGoalObject() == NULL) && !d->m_isTorpedo)
-		airborneTargetGone();
-
-	if (m_isTrackingTarget && (getGoalPosition() == nullptr) && d->m_isTorpedo)
-		airborneTargetGone();
+	if (isTargetLost())
+	{
+		airborneTargetGone(TRUE);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -923,10 +921,10 @@ UpdateSleepTime MissileAIUpdate::update()
 	{
 		Object *missile = getObject();
 		m_framesTillDecoyed = 0;
-		m_noDamage = TRUE;
 		Object *victim = TheGameLogic->findObjectByID( m_victimID );
 		if( victim )
 		{
+			m_noDamage = TRUE;
 			ObjectID targetID = missile->calculateCountermeasureToDivertTo( *victim );
 			if( targetID != INVALID_ID )
 			{
@@ -983,6 +981,12 @@ UpdateSleepTime MissileAIUpdate::update()
 			m_originalTargetPos = targetPos;
 			m_isTrackingTarget = true;
 		}
+	}
+
+	// A lost-target missile flies to where its target was last seen.
+	if (!d->m_isTorpedo && m_isTrackingTarget && getGoalObject() != nullptr)
+	{
+		m_originalTargetPos = *getGoalObject()->getPosition();
 	}
 
 	switch( m_state )
@@ -1083,15 +1087,17 @@ Also determines whether objects are blocked, and if so, if they are stuck.  jba.
 }
 
 //-------------------------------------------------------------------------------------------------
-void MissileAIUpdate::airborneTargetGone()
+Bool MissileAIUpdate::isTargetLost()
 {
-	const MissileAIUpdateModuleData* d = getMissileAIUpdateModuleData();
-
 	// Torpedoes chase their goal position, which is never null, so they keep the old path.
-	Bool targetLost = !d->m_isTorpedo && m_isTrackingTarget && getGoalObject() == nullptr;
+	return !getMissileAIUpdateModuleData()->m_isTorpedo && m_isTrackingTarget && getGoalObject() == nullptr;
+}
 
+//-------------------------------------------------------------------------------------------------
+void MissileAIUpdate::airborneTargetGone(Bool targetLost)
+{
 	// The NORMAL death of KILL_SELF is what INI die modules hook to retarget, as frog missiles do.
-	if (!targetLost || !d->m_detonateOnTargetLost)
+	if (!targetLost || !getMissileAIUpdateModuleData()->m_detonateOnTargetLost)
 	{
 		// I would really love it if this could retarget, but all of the targeting and legality is done
 		// by the Weapon that fired me.  The safest thing for me to do in this state is to just run out of gas.
@@ -1100,19 +1106,15 @@ void MissileAIUpdate::airborneTargetGone()
 		return;
 	}
 
-	// The target is gone (most likely died). Instead of vanishing mid-air, keep flying to the
-	// original target position recorded at launch and detonate there. The existing fuel mechanics
-	// provide the natural endpoint: while out of fuel we simply coast and blow up on whatever we hit.
-	// We only redirect the move once; clearing m_victimID (meaningless now that the target is gone)
-	// marks that the redirect has been issued, so we do not re-issue the move command every frame.
+	// A cleared m_victimID marks the redirect as issued; KILL's braking move cannot overshoot and orbit.
 	if (m_victimID != INVALID_ID)
 	{
 		aiMoveToPosition(&m_originalTargetPos, CMD_FROM_AI);
 		m_victimID = INVALID_ID;
+		switchToState(KILL);
 	}
 
-	// We finished the move to the original target position -> blow up there.
-	if (isIdle() && m_state != KILL_SELF)
+	if (m_state != KILL_SELF && (isIdle() || TheGameLogic->getFrame() >= m_fuelExpirationDate))
 	{
 		detonate();
 	}

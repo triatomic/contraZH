@@ -73,7 +73,7 @@ public:
 
 	Bool m_isTorpedo; ///< die outside of water, strike objects from below.
 
-	Bool m_detonateOnTargetLost; ///< fly on and detonate at the launch target pos when the target dies; No kills self with a NORMAL death
+	Bool m_detonateOnTargetLost; ///< fly on and detonate where the target was last seen when it dies; No kills self with a NORMAL death
 
     MissileAIUpdateModuleData();
 
@@ -165,7 +165,8 @@ private:
 	void doKillSelfState();
 	void doDeadState();
 
-	void airborneTargetGone();											///< My airborne target has died, so I have to do something cool to make up for that
+	Bool isTargetLost();									///< I was tracking an object and it is gone; torpedoes never count
+	void airborneTargetGone(Bool targetLost);			///< My airborne target has died, so I have to do something cool to make up for that
 
 	void tossExhaust();
 

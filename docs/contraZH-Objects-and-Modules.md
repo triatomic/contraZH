@@ -90,8 +90,9 @@ killed by an enemy still announces. Kill credit and score are unchanged. Not nee
 
 * `DetonateOnTargetLost = Yes` - (Default. `No` keeps the retail lost-target behaviour.)
 
-A missile whose target dies in flight flies on to where the target stood at launch and detonates
-there. Retail missiles vanished without exploding.
+A missile whose target dies in flight flies straight to where the target was last seen and detonates
+there. A missile already out of fuel detonates where it is. Retail missiles vanished without
+exploding.
 
 `No` makes the missile kill itself on the spot with a `NORMAL` death, as retail did. Set it on any
 missile whose die modules react to that death. The frog missile upgrade retargets this way, so its
@@ -112,13 +113,15 @@ End
 ```
 
 When the target dies, the missile dies a `NORMAL` death where it is, and `OCL_F18RetargetObject`
-spawns a new attacker there. With `Yes` the missile would detonate at the launch-time target
-position instead, die a `DETONATED` death and never spawn the retarget object.
+spawns a new attacker there. With `Yes` the missile would detonate where the target was last
+seen instead, die a `DETONATED` death and never spawn the retarget object.
 
 Notes:
 * `DetonateCallsKill = Yes` is needed, or the missile is destroyed without running its die modules.
 * Torpedoes (`IsTorpedo = Yes`) ignore the key. They chase the target's last position and detonate
 there.
+* A missile diverted to a flare still deals no damage. One whose target died before the flare
+diversion keeps its damage.
 * Changes the simulation; replays must use the same INI.
 
 ## FireWeaponWhenDamagedBehavior
