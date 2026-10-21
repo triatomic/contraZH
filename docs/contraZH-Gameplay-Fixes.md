@@ -175,7 +175,7 @@ Changes when units fire; affects replays.
 A guided missile whose target died in flight used to vanish mid-air with no explosion or damage.
 Nuke Tank Hunter and Nuke Overlord anti-tank missiles lost the most. The missile now flies on to
 where the target stood at launch and detonates there. Out of fuel, it coasts and detonates on
-whatever it hits.
+whatever it hits. Torpedoes already detonated at the target's last position and are unchanged.
 
 Missiles that retarget when their target dies, like the frog missiles, opt out with
 [DetonateOnTargetLost](contraZH-Objects-and-Modules.md#detonateontargetlost) `= No`.

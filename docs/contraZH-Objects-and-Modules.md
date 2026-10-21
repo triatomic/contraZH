@@ -117,6 +117,8 @@ position instead, die a `DETONATED` death and never spawn the retarget object.
 
 Notes:
 * `DetonateCallsKill = Yes` is needed, or the missile is destroyed without running its die modules.
+* Torpedoes (`IsTorpedo = Yes`) ignore the key. They chase the target's last position and detonate
+there.
 * Changes the simulation; replays must use the same INI.
 
 ## FireWeaponWhenDamagedBehavior

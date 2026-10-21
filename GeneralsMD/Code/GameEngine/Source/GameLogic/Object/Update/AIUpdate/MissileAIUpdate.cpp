@@ -1087,8 +1087,8 @@ void MissileAIUpdate::airborneTargetGone()
 {
 	const MissileAIUpdateModuleData* d = getMissileAIUpdateModuleData();
 
-	Bool targetLost = d->m_isTorpedo ? (m_isTrackingTarget && getGoalPosition() == nullptr)
-																		: (m_isTrackingTarget && getGoalObject() == nullptr);
+	// Torpedoes chase their goal position, which is never null, so they keep the old path.
+	Bool targetLost = !d->m_isTorpedo && m_isTrackingTarget && getGoalObject() == nullptr;
 
 	// The NORMAL death of KILL_SELF is what INI die modules hook to retarget, as frog missiles do.
 	if (!targetLost || !d->m_detonateOnTargetLost)
@@ -1107,13 +1107,7 @@ void MissileAIUpdate::airborneTargetGone()
 	// marks that the redirect has been issued, so we do not re-issue the move command every frame.
 	if (m_victimID != INVALID_ID)
 	{
-		Coord3D targetPos = m_originalTargetPos;
-		Locomotor* curLoco = getCurLocomotor();
-		if (d->m_isTorpedo && curLoco)
-		{
-			targetPos.z = getTorpedoTargetHeight(targetPos, curLoco);
-		}
-		aiMoveToPosition(&targetPos, CMD_FROM_AI);
+		aiMoveToPosition(&m_originalTargetPos, CMD_FROM_AI);
 		m_victimID = INVALID_ID;
 	}
 
