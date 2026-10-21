@@ -816,13 +816,37 @@ CanAttackResult WeaponSet::getAbleToUseWeaponAgainstTarget( AbleToAttackType att
 	const Object *containedBy = source->getContainedBy();
 	Bool hasAWeaponInRange = FALSE;
 	Bool hasAWeapon				 = FALSE;
-	for (Int slot = 0; slot < WEAPONSLOT_COUNT - 1; ++slot)
+
+	// Only the slots chooseBestWeaponForTarget may pick: every slot when free, else the locked or requested one.
+	Int first, last;
+	if( isCurWeaponLocked() )
 	{
-		Weapon *weaponToTestForRange = m_weapons[ m_curWeapon ];
+		first = m_curWeapon;
+		last = m_curWeapon;
+	}
+	else if( specificSlot != (WeaponSlotType)-1 )
+	{
+		first = specificSlot;
+		last = specificSlot;
+	}
+	else
+	{
+		first = WEAPONSLOT_COUNT - 1;
+		last = PRIMARY_WEAPON;
+	}
+
+	// Range is per weapon, so a short-ranged current weapon must not hide a longer one that fits the target.
+	for (Int slot = first; slot >= last; --slot)
+	{
+		Weapon *weaponToTestForRange = m_weapons[ slot ];
 		if ( weaponToTestForRange )
 		{
 			hasAWeapon = TRUE;
-			if ((m_totalAntiMask & targetAntiMask) == 0)//we don't care to check for this weapon
+			if ((weaponToTestForRange->getAntiMask() & targetAntiMask) == 0)//this weapon cannot hit the target
+				continue;
+
+			// A lock or a requested slot bypasses the picker, so only a free choice honours AutoChooseSources.
+			if( !isCurWeaponLocked() && specificSlot == (WeaponSlotType)-1 && !isSlotAllowedForCommandSource( (WeaponSlotType)slot, commandSource ) )
 				continue;
 
 			Bool handled = FALSE;
@@ -875,23 +899,6 @@ CanAttackResult WeaponSet::getAbleToUseWeaponAgainstTarget( AbleToAttackType att
 
 		if (!isAnyWithinTargetPitch(source, victim))
 			return ATTACKRESULT_INVALID_SHOT;
-
-		Int first, last;
-		if( isCurWeaponLocked() )
-		{
-			first = m_curWeapon;
-			last = m_curWeapon;
-		}
-		else if( specificSlot != (WeaponSlotType)-1 )
-		{
-			first = specificSlot;
-			last = specificSlot;
-		}
-		else
-		{
-			first = WEAPONSLOT_COUNT - 1;
-			last = PRIMARY_WEAPON;
-		}
 
 		//Check each weapon, until we find one that can do damage (or fail)
 		for( Int i = first; i >= last ; --i )

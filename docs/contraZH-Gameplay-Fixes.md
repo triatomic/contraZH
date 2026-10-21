@@ -309,3 +309,14 @@ drifted across the map in one direction. Each new spot is now random around the 
 ([TheSuperHackers#3544](https://github.com/TheSuperHackers/GeneralsGameCode/pull/3544)).
 
 Changes the simulation; affects replays.
+
+## Longer weapons no longer wait for the shorter one
+
+A unit that cannot move to its target (base defences, Stinger Sites, garrisoned infantry) only
+checked the range of the weapon it fired last. A Gatling Cannon that had just shot infantry would
+ignore an aircraft inside its anti-air range until the aircraft came within its shorter ground
+range, and ordering it onto the aircraft was refused. Every weapon that can hit the target now
+counts for range, and the attack cursor agrees.
+
+Changes the simulation; affects replays.
+([#66](https://github.com/triatomic/contraZH/issues/66))
