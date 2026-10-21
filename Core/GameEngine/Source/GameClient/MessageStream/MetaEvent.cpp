@@ -442,7 +442,7 @@ static const char * findGameMessageNameByType(GameMessage::Type type)
 }
 
 //-------------------------------------------------------------------------------------------------
-static Bool isMessageUsable(CommandUsableInType usableIn)
+static Bool isMessageUsable(CommandUsableInType usableIn, GameMessage::Type type)
 {
 	// We will ignore all commands if the game client has not yet incremented to frame 1.
 	// It prevents the user from doing commands during a map load, which throws the input
@@ -465,6 +465,10 @@ static Bool isMessageUsable(CommandUsableInType usableIn)
 		return true;
 
 	if (usableAsObserver && isObserving)
+		return true;
+
+	// The shell map runs with the shell active, so a game-only cheat key would never fire there.
+	if ((usableInGame || usableAsObserver) && GameMessage::isDebugCheatHotkey(type) && TheGameLogic->isInShellGame())
 		return true;
 
 	return false;
@@ -665,7 +669,7 @@ void MetaEventTranslator::onKeyModStateRemoved(GameMessageDisposition &disp, Map
 
 			for (const MetaMapRec *map = TheMetaMap->getFirstMetaMapRec(); map; map = map->m_next)
 			{
-				if (!isMessageUsable(map->m_usableIn))
+				if (!isMessageUsable(map->m_usableIn, map->m_meta))
 					continue;
 
 				const Bool isMatchingKeyCombo = map->m_key == keyDown && map->m_modState == keyDownModState;
@@ -689,7 +693,7 @@ void MetaEventTranslator::onKeyPressed(GameMessageDisposition &disp, Int systemK
 
 	for (const MetaMapRec *map = TheMetaMap->getFirstMetaMapRec(); map; map = map->m_next)
 	{
-		if (!isMessageUsable(map->m_usableIn))
+		if (!isMessageUsable(map->m_usableIn, map->m_meta))
 			continue;
 
 		const Bool isMatchingKeyCombo = map->m_key == keyType && map->m_modState == keyModState;
@@ -1287,7 +1291,7 @@ void MetaMap::generateMetaMap()
 			map->m_key = MK_BACKSLASH;
 			map->m_transition = DOWN;
 			map->m_modState = CTRL;
-			map->m_usableIn = COMMANDUSABLE_GAME;
+			map->m_usableIn = COMMANDUSABLE_EVERYWHERE;
 			map->m_category = CATEGORY_MISC;
 			map->m_description.clear();
 			map->m_displayName.clear();

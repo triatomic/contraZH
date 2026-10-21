@@ -699,6 +699,9 @@ public:
 	/// ShigureUi 11/09/2026 a plain order acts on the whole selection, never the smart selection focus
 	static Bool isPlainOrder(GameMessage::Type t);
 
+	/// The debug cheat hotkeys appended at the end of the meta range, which also work in the shell map and cinematics
+	static Bool isDebugCheatHotkey(GameMessage::Type t) { return t >= MSG_CHEAT_KITCHEN_SINK && t <= MSG_CHEAT_SHOW_SHADER_DRAWS; }
+
 	Int getPlayerIndex() const { return m_playerIndex; }		///< Return the originating player
 
 	// access methods for GameMessageArgumentType enum

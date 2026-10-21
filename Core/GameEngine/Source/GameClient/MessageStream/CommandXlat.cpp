@@ -2766,7 +2766,7 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 	GameMessageDisposition disp = KEEP_MESSAGE;
 	// We want to always be able to get to the options menu even during no input times and a clear game data message should always go through
 	if (t != GameMessage::MSG_META_OPTIONS && t != GameMessage::MSG_CLEAR_GAME_DATA &&
-			!TheInGameUI->getInputEnabled() && !isSystemMessage(msg))
+			!TheInGameUI->getInputEnabled() && !isSystemMessage(msg) && !GameMessage::isDebugCheatHotkey(t))
 	{
 		return DESTROY_MESSAGE;
 	}
