@@ -39,6 +39,7 @@
 #include "GameClient/GadgetTextEntry.h"
 #include "GameClient/GadgetStaticText.h"
 #include "GameClient/GadgetPushButton.h"
+#include "GameClient/GadgetCheckBox.h"
 #include "GameClient/GameText.h"
 #include "GameLogic/GameLogic.h" // SUPERWEAPON_RESTRICT_COUNT
 #include "GameNetwork/GameInfo.h"
@@ -472,6 +473,38 @@ void MarkLobbyGameTab( LobbyTabs &tabs )
 	UnicodeString label = TheGameText->fetch("GUI:TabGame");
 	label.concat( L" *" );
 	GadgetButtonSetText( tabs.buttonGame, label );
+}
+
+struct LobbyRuleCaption
+{
+	const char *label;
+	const WideChar *labelText;
+	const char *tip;
+	const WideChar *tipText;
+};
+
+static const LobbyRuleCaption s_lobbyRuleCaptions[LOBBY_RULE_COUNT] =
+{
+	{ "GUI:DiplomacyRule", L"Diplomacy", "TOOLTIP:DiplomacyRule", L"Players may change alliances during the match from the Diplomacy window" },
+	{ "GUI:FreeRadar", L"Free Radar", "TOOLTIP:FreeRadar", L"Every player has radar from the start without building a radar source" },
+	{ "GUI:RevealMap", L"Reveal Map", "TOOLTIP:RevealMap", L"No shroud: every player sees the whole map from the start" },
+	{ "GUI:CoopBuildings", L"Coop Buildings", "TOOLTIP:CoopBuildings", L"Lets allies finish each other's unfinished buildings" },
+	{ "GUI:QuickGame", L"Quick Game", "TOOLTIP:QuickGame", L"Lifts the rank requirements on advanced structures, superweapons and super units" },
+};
+
+UnicodeString LobbyRuleName( LobbyRule rule )
+{
+	return TheGameText->FETCH_OR_SUBSTITUTE( s_lobbyRuleCaptions[rule].label, s_lobbyRuleCaptions[rule].labelText );
+}
+
+void SetLobbyRuleCaption( GameWindow *check, LobbyRule rule )
+{
+	if (!check)
+	{
+		return;
+	}
+	GadgetCheckBoxSetText( check, LobbyRuleName( rule ) );
+	check->winSetTooltip( TheGameText->FETCH_OR_SUBSTITUTE( s_lobbyRuleCaptions[rule].tip, s_lobbyRuleCaptions[rule].tipText ) );
 }
 
 void PopulateStartingCashComboBox(GameWindow *comboBox, GameInfo *myGame)

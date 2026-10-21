@@ -1081,35 +1081,15 @@ void InitSkirmishGameGadgets()
 
 	// The layout may predate this control, so it stays optional
 	checkCoopBuildings = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, checkCoopBuildingsID );
-	if (checkCoopBuildings)
-	{
-		GadgetCheckBoxSetText(checkCoopBuildings, TheGameText->fetch("GUI:CoopBuildings"));
-		checkCoopBuildings->winSetTooltip(TheGameText->fetch("TOOLTIP:CoopBuildings"));
-	}
+	SetLobbyRuleCaption( checkCoopBuildings, LOBBY_RULE_COOP_BUILDINGS );
 	checkQuickGame = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, checkQuickGameID );
-	if (checkQuickGame)
-	{
-		GadgetCheckBoxSetText(checkQuickGame, TheGameText->fetch("GUI:QuickGame"));
-		checkQuickGame->winSetTooltip(TheGameText->fetch("TOOLTIP:QuickGame"));
-	}
+	SetLobbyRuleCaption( checkQuickGame, LOBBY_RULE_QUICK_GAME );
 	checkDiplomacyRule = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, checkDiplomacyRuleID );
-	if (checkDiplomacyRule)
-	{
-		GadgetCheckBoxSetText(checkDiplomacyRule, TheGameText->FETCH_OR_SUBSTITUTE("GUI:DiplomacyRule", L"Diplomacy"));
-		checkDiplomacyRule->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:DiplomacyRule", L"Players may change alliances during the match from the Diplomacy window"));
-	}
+	SetLobbyRuleCaption( checkDiplomacyRule, LOBBY_RULE_DIPLOMACY );
 	checkFreeRadar = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, checkFreeRadarID );
-	if (checkFreeRadar)
-	{
-		GadgetCheckBoxSetText(checkFreeRadar, TheGameText->FETCH_OR_SUBSTITUTE("GUI:FreeRadar", L"Free Radar"));
-		checkFreeRadar->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:FreeRadar", L"Every player has radar from the start without building a radar source"));
-	}
+	SetLobbyRuleCaption( checkFreeRadar, LOBBY_RULE_FREE_RADAR );
 	checkRevealMap = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, checkRevealMapID );
-	if (checkRevealMap)
-	{
-		GadgetCheckBoxSetText(checkRevealMap, TheGameText->FETCH_OR_SUBSTITUTE("GUI:RevealMap", L"Reveal Map"));
-		checkRevealMap->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:RevealMap", L"No shroud: every player sees the whole map from the start"));
-	}
+	SetLobbyRuleCaption( checkRevealMap, LOBBY_RULE_REVEAL_MAP );
 
 	InitLobbyTabs( lobbyTabs, parentSkirmishGameOptions, "SkirmishGameOptionsMenu.wnd" );
 

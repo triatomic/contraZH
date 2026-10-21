@@ -234,11 +234,6 @@ static LobbyTabs lobbyTabs;
 struct LobbyRuleControl
 {
 	const char *window;
-	const char *label;
-	const wchar_t *labelText;
-	const char *tip;
-	const wchar_t *tipText;
-	const wchar_t *name;
 	const wchar_t *onText;
 	const char *command;
 	const wchar_t *help;
@@ -248,20 +243,15 @@ struct LobbyRuleControl
 
 static LobbyRuleControl s_lobbyRules[LOBBY_RULE_COUNT] =
 {
-	{ "CheckDiplomacyRule", "GUI:DiplomacyRule", L"Diplomacy", "TOOLTIP:DiplomacyRule", L"Players may change alliances during the match from the Diplomacy window",
-		L"Diplomacy", L" is ON: players may change alliances during the match.",
+	{ "CheckDiplomacyRule", L" is ON: players may change alliances during the match.",
 		"diplomacy", L"/diplomacy - Let players change alliances during the match (host only).", NAMEKEY_INVALID, NULL },
-	{ "CheckFreeRadar", "GUI:FreeRadar", L"Free Radar", "TOOLTIP:FreeRadar", L"Every player has radar from the start without building a radar source",
-		L"Free Radar", L" is ON: every player has radar.",
+	{ "CheckFreeRadar", L" is ON: every player has radar.",
 		"freeradar", L"/freeradar - Give every player radar without a radar source (host only).", NAMEKEY_INVALID, NULL },
-	{ "CheckRevealMap", "GUI:RevealMap", L"Reveal Map", "TOOLTIP:RevealMap", L"No shroud: every player sees the whole map from the start",
-		L"Reveal Map", L" is ON: every player sees the whole map.",
+	{ "CheckRevealMap", L" is ON: every player sees the whole map.",
 		"revealmap", L"/revealmap - Reveal the whole map to every player (host only).", NAMEKEY_INVALID, NULL },
-	{ "CheckCoopBuildings", "GUI:CoopBuildings", L"Coop Buildings", "TOOLTIP:CoopBuildings", L"Lets allies finish each other's unfinished buildings",
-		L"Coop Buildings", L" is ON: allies may finish each other's buildings.",
+	{ "CheckCoopBuildings", L" is ON: allies may finish each other's buildings.",
 		"coopbuildings", L"/coopbuildings - Let allies finish each other's buildings (host only).", NAMEKEY_INVALID, NULL },
-	{ "CheckQuickGame", "GUI:QuickGame", L"Quick Game", "TOOLTIP:QuickGame", L"Lifts the rank requirements on advanced structures, superweapons and super units",
-		L"Quick Game", L" is ON: rank requirements are lifted.",
+	{ "CheckQuickGame", L" is ON: rank requirements are lifted.",
 		"quickgame", L"/quickgame - Lift the rank requirements on advanced units and structures (host only).", NAMEKEY_INVALID, NULL },
 };
 
@@ -3674,11 +3664,7 @@ static void initLobbyRules()
 		fullName.format("GameSpyGameOptionsMenu.wnd:%s", rule.window);
 		rule.id = TheNameKeyGenerator->nameToKey(fullName);
 		rule.check = TheWindowManager->winGetWindowFromId(parentWOLGameSetup, rule.id);
-		if (rule.check != NULL)
-		{
-			GadgetCheckBoxSetText(rule.check, TheGameText->FETCH_OR_SUBSTITUTE(rule.label, rule.labelText));
-			rule.check->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE(rule.tip, rule.tipText));
-		}
+		SetLobbyRuleCaption(rule.check, (LobbyRule)i);
 	}
 }
 
@@ -3789,7 +3775,7 @@ static void setLobbyRule(LobbyRule rule, bool on)
 	}
 
 	pLobbyInterface->SetLobbyRule(rule, on);
-	UnicodeString msg(s_lobbyRules[rule].name);
+	UnicodeString msg = LobbyRuleName(rule);
 	msg.concat(on ? s_lobbyRules[rule].onText : L" is OFF.");
 	pLobbyInterface->SendAnnouncementMessageToCurrentLobby(msg, true);
 	sendLobbyRulesSync();
@@ -3807,7 +3793,7 @@ static void toggleLobbyRule(LobbyRule rule)
 
 	if (!pLobbyInterface->IsHost())
 	{
-		UnicodeString msg(s_lobbyRules[rule].name);
+		UnicodeString msg = LobbyRuleName(rule);
 		msg.concat(L": Only the host can change it.");
 		GadgetListBoxAddEntryText(listboxGameSetupChat, msg, GameMakeColor(255, 0, 0, 255), -1, -1);
 		return;

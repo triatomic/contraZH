@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include "GameNetwork/LobbyRules.h"
+
 class GameWindow;
 class GameInfo;
 
@@ -66,3 +68,6 @@ void InitLobbyTabs( LobbyTabs &tabs, GameWindow *parent, const char *layoutFilen
 void ShowLobbyTab( LobbyTabs &tabs, Bool rules );
 Bool IsLobbyRulesTabShown( const LobbyTabs &tabs );
 void MarkLobbyGameTab( LobbyTabs &tabs );
+
+UnicodeString LobbyRuleName( LobbyRule rule ); ///< The caption of a Rules page checkbox, the same in every lobby
+void SetLobbyRuleCaption( GameWindow *check, LobbyRule rule ); ///< Caption and tooltip; a null check is left alone
