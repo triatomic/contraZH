@@ -384,6 +384,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/PilotFindVehicleUpdate.h
     Include/GameLogic/Module/PointDefenseLaserUpdate.h
     Include/GameLogic/Module/PoisonedBehavior.h
+    Include/GameLogic/Module/GasBehavior.h
     Include/GameLogic/Module/PoweredBehavior.h
     Include/GameLogic/Module/PowerPlantUpdate.h
     Include/GameLogic/Module/PowerPlantUpgrade.h
@@ -876,6 +877,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Behavior/OverchargeBehavior.cpp
     Source/GameLogic/Object/Behavior/ParkingPlaceBehavior.cpp
     Source/GameLogic/Object/Behavior/PoisonedBehavior.cpp
+    Source/GameLogic/Object/Behavior/GasBehavior.cpp
     Source/GameLogic/Object/Behavior/PoweredBehavior.cpp
     Source/GameLogic/Object/Behavior/POWTruckBehavior.cpp
     Source/GameLogic/Object/Behavior/PrisonBehavior.cpp

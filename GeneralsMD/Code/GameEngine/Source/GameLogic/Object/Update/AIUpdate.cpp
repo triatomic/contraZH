@@ -58,6 +58,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/GasBehavior.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/ProneUpdate.h"
 #include "GameLogic/Module/DeliverPayloadAIUpdate.h"
@@ -3008,6 +3009,11 @@ Bool AIUpdateInterface::isAllowedToRespondToAiCommands(const AICommandParms* par
   // IT LOCKS OUT USER INPUT,
   // ALLOWING ONLY THE SPECTREUPDATE TO COMMAND IT VIA CMD_FROM_AI
   // AUTHOR, LORENZEN... 5/15/03
+
+	if (parms->m_cmdSource == CMD_FROM_PLAYER && GasBehavior::blocksPlayerOrders(getObject()))
+	{
+		return FALSE;
+	}
 
 	if (holdOrderWhileJammed(parms))
 	{

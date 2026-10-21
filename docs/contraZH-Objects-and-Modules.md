@@ -384,3 +384,98 @@ time the carrier has left, not permanent stealth.
 * Disguisers such as the Bomb Truck are skipped.
 * List the module before the power's own update module (e.g. `SpecialAbilityUpdate`), which stops
 later modules from seeing the power fire.
+
+### GasBehavior
+
+Reacts to the new `GAS` damage type. A gassed object takes damage over time like poison and can
+also be slowed, disoriented and made to hallucinate. Every effect is optional.
+
+```
+Behavior = GasBehavior ModuleTag_Gas01
+  AffectAirborne                 = No
+  GasDamageInterval              = 500
+  GasDuration                    = 4000
+  MoveSpeedReduction             = 30%
+  MoveSpeedRequiredAffectKindOf  = INFANTRY
+  DisorientKindOf                = INFANTRY
+  DisorientRadius                = 60
+  DisorientInterval              = 1500
+  HallucinationEffectInterval    = 1000
+  HallucinationDuration          = 6000
+  HallucinationTriggeredByUpgrade = Yes
+  TriggeredBy                    = Upgrade_ChinaHallucinationGas
+  FXListUpgrade                  = FX_HallucinationStart
+End
+```
+
+A weapon sets it off with `DamageType = GAS`. Armor scales it with `Armor = GAS 100%`.
+
+Who is affected:
+
+* `RequiredAffectKindOf` - (Default = everything.)
+* `RequiresAllKindOfs = No` - (Yes needs every `RequiredAffectKindOf`, No needs one of them.)
+* `ForbiddenAffectKindOf` - (Default = none.)
+* `AffectsTargets = ENEMIES NEUTRALS` - (The gassed object's relationship to the gas owner. Add
+`ALLIES` to let gas work on the owner's own side.)
+* `AffectAirborne = Yes` - (No ignores objects that count as airborne targets.)
+
+Damage over time:
+
+* `GasDamageInterval = 0` - (In milliseconds. The hit's damage repeats this often. `0` disables
+the repeats.)
+* `GasDuration = 0` - (In milliseconds. How long the gas lasts after the last hit. The repeats,
+the slow and disorientation all end with it.)
+
+Slow:
+
+* `MoveSpeedReduction = 0%` - (Speed loss while gassed. `30%` moves at 70% speed.)
+* `MoveSpeedRequiredAffectKindOf` - (Default = everything gassed.)
+* `MoveSpeedRequiresAllKindOfs = No`
+* `MoveSpeedForbiddenAffectKindOf` - (Default = none.)
+
+Disorientation:
+
+* `DisorientKindOf = INFANTRY` - (Disoriented objects need one of these.)
+* `DisorientRadius = 50` - (Each move goes half to all of this distance in a random direction.)
+* `DisorientInterval = 0` - (In milliseconds. A new random move this often. `0` disables
+disorientation.)
+
+Hallucination:
+
+* `HallucinationEffectInterval = 1000` - (In milliseconds. How often a new target is picked. `0`
+picks one target when the hallucination starts.)
+* `HallucinationDuration = 0` - (In milliseconds. How long it lasts after the last qualifying hit.
+`0` disables hallucination.)
+* `HallucinationTriggeredByUpgrade = No` - (Yes requires the upgrades below. No lets every gas hit
+cause hallucination.)
+* `TriggeredBy` - (Upgrades the attacker needs.)
+* `ConflictsWith` - (Upgrades that stop it when the attacker has any of them.)
+* `RequiresAllTriggers = No` - (Yes needs every `TriggeredBy`, No needs one of them.)
+* `FXListUpgrade` - (Plays on the gassed object when a hallucination starts. A refresh does not
+play it again.)
+
+Notes:
+* The module reacts only when a hit lowers health. A `GAS` hit that armor cuts to zero does
+nothing.
+* Each repeat deals the first hit's damage after armor, and armor applies again to the repeat, as
+with poison.
+* Gas never stacks. A new hit refreshes the damage amount and `GasDuration`, and never delays a
+repeat that is already due.
+* An owner that no longer exists still counts through its player. Gas with no owner at all counts
+as an enemy's.
+* The slow is applied once per gassing and lifted when the gas ends. It multiplies with other speed
+changes such as battle plans.
+* Hallucination needs an armed unit. It force-attacks the nearest unit of any side within its
+longest weapon range, structures excepted. With nothing in range it waits for the next pick.
+Hold Fire does not stop it.
+* A hallucinating gas unit that shoots its own side passes the gas on only when `AffectsTargets`
+lists `ALLIES`, so by default hallucination cannot spread through a squad.
+* A hallucinating unit that is busy attacking does not wander off when disorientation is also on.
+* The upgrade check looks at the attacker, like the poison tiers. An upgrade counts when the
+attacking player has researched it or the attacking object carries it.
+* Player orders and abilities are ignored while an object is disoriented or hallucinating.
+Computer players and map scripts can still order it, and the next move or pick takes over again.
+* A unit goes idle when the last of these effects ends.
+* Units inside a transport or building are not moved and can still be evacuated.
+* Healing of any kind cures every gas effect, as it cures poison.
+* Multiplayer and replay safe.

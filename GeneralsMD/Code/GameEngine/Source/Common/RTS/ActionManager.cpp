@@ -54,6 +54,7 @@
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/CollideModule.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
+#include "GameLogic/Module/GasBehavior.h"
 #include "GameLogic/Module/RailroadGuideAIUpdate.h"
 #include "GameLogic/Module/RailedTransportDockUpdate.h"
 #include "GameLogic/Module/SpawnBehavior.h"
@@ -1631,6 +1632,11 @@ inline Bool isPointOnMap( const Coord3D  *testPos )
 // ------------------------------------------------------------------------------------------------
 Bool ActionManager::canDoSpecialPowerAtLocation( const Object *obj, const Coord3D *loc, CommandSourceType commandSource, const SpecialPowerTemplate *spTemplate, const Object *objectInWay, UnsignedInt commandOptions, Bool checkSourceRequirements )
 {
+	if( commandSource == CMD_FROM_PLAYER && GasBehavior::blocksPlayerOrders( obj ) )
+	{
+		return false;
+	}
+
 	if (checkSourceRequirements)
 	{
 		//First check, if our object can do this special power.
@@ -1866,6 +1872,11 @@ Bool ActionManager::canDoSpecialPowerAtLocation( const Object *obj, const Coord3
 // ------------------------------------------------------------------------------------------------
 Bool ActionManager::canDoSpecialPowerAtObject( const Object *obj, const Object *target, CommandSourceType commandSource, const SpecialPowerTemplate *spTemplate, UnsignedInt commandOptions, Bool checkSourceRequirements )
 {
+	if( commandSource == CMD_FROM_PLAYER && GasBehavior::blocksPlayerOrders( obj ) )
+	{
+		return false;
+	}
+
 	if (checkSourceRequirements)
 	{
 		//First check, if our object can do this special power.
@@ -2279,6 +2290,11 @@ SpecialPowerType ActionManager::getFallbackBehaviorType(SpecialPowerType type) {
 // ------------------------------------------------------------------------------------------------
 Bool ActionManager::canDoSpecialPower( const Object *obj, const SpecialPowerTemplate *spTemplate, CommandSourceType commandSource, UnsignedInt commandOptions, Bool checkSourceRequirements )
 {
+	if( commandSource == CMD_FROM_PLAYER && GasBehavior::blocksPlayerOrders( obj ) )
+	{
+		return false;
+	}
+
 	if (checkSourceRequirements)
 	{
 		//First check, if our object can do this special power.

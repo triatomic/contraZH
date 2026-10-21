@@ -111,6 +111,7 @@ enum DamageType CPP_11(: Int)
 	DAMAGE_SUBDUAL_JAMMING_UNRESISTABLE,  ///< Used for recovery from SUBDUAL_JAMMING
 	DAMAGE_SUBDUAL_FROZEN,  ///< Accumulates frozen damage; disables target when threshold is reached
 	DAMAGE_SUBDUAL_FROZEN_UNRESISTABLE,  ///< Used for recovery from SUBDUAL_FROZEN
+	DAMAGE_GAS,  ///< Drives GasBehavior: damage over time, slow, disorientation and hallucination
 	// DAMAGE_ZOMBIE_VIRUS,  // TODO
 	// DAMAGE_MIND_CONTROL,  // TODO
 

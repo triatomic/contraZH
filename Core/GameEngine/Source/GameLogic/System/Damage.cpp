@@ -106,6 +106,7 @@ const char* const DamageTypeFlags::s_bitNameList[] =
 	"SUBDUAL_JAMMING_UNRESISTABLE",
 	"SUBDUAL_FROZEN",
 	"SUBDUAL_FROZEN_UNRESISTABLE",
+	"GAS",
 	//"ZOMBIE_VIRUS",  // TODO
 	//"MIND_CONTROL",  // TODO
 	nullptr

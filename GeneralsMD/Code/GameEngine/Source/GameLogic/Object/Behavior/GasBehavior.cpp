@@ -1,0 +1,591 @@
+/*
+**	Command & Conquer Generals Zero Hour(tm)
+**	Copyright 2025 Electronic Arts Inc.
+**
+**	This program is free software: you can redistribute it and/or modify
+**	it under the terms of the GNU General Public License as published by
+**	the Free Software Foundation, either version 3 of the License, or
+**	(at your option) any later version.
+**
+**	This program is distributed in the hope that it will be useful,
+**	but WITHOUT ANY WARRANTY; without even the implied warranty of
+**	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**	GNU General Public License for more details.
+**
+**	You should have received a copy of the GNU General Public License
+**	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+// FILE: GasBehavior.cpp ///////////////////////////////////////////////////////////////////////////
+// Desc:   Behavior that reacts to GAS damage with damage over time, a slow, disorientation and
+//         hallucination
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+// INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
+#include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
+#include "Common/Player.h"
+#include "Common/Upgrade.h"
+#include "Common/Xfer.h"
+#include "GameClient/FXList.h"
+#include "GameLogic/GameLogic.h"
+#include "GameLogic/Object.h"
+#include "GameLogic/PartitionManager.h"
+#include "GameLogic/Weapon.h"
+#include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/GasBehavior.h"
+#include "GameLogic/Module/PoisonedBehavior.h"
+
+
+//-------------------------------------------------------------------------------------------------
+static Bool matchesKindOf( const Object *obj, const KindOfMaskType& required, Bool requiresAll, const KindOfMaskType& forbidden )
+{
+	if( obj->isAnyKindOf( forbidden ) )
+	{
+		return FALSE;
+	}
+	if( !required.any() )
+	{
+		return TRUE;
+	}
+	if( requiresAll )
+	{
+		return obj->isKindOfMulti( required, KINDOFMASK_NONE );
+	}
+	return obj->isAnyKindOf( required );
+}
+
+//-------------------------------------------------------------------------------------------------
+static void resolveUpgradeNames( const std::vector<AsciiString>& names, std::vector<const UpgradeTemplate *>& out )
+{
+	for( std::vector<AsciiString>::const_iterator it = names.begin(); it != names.end(); ++it )
+	{
+		const UpgradeTemplate *upgrade = TheUpgradeCenter->findUpgrade( *it );
+		DEBUG_ASSERTCRASH( upgrade != nullptr, ("GasBehavior references '%s', which is not an Upgrade", it->str()) );
+		if( upgrade != nullptr )
+		{
+			out.push_back( upgrade );
+		}
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+GasBehaviorModuleData::GasBehaviorModuleData()
+{
+	m_requiresAllKindOfs = FALSE;
+	m_targetsMask = WEAPON_AFFECTS_ENEMIES | WEAPON_AFFECTS_NEUTRALS;
+	m_affectAirborne = TRUE;
+	m_damageInterval = 0;
+	m_duration = 0;
+	m_moveSpeedReduction = 0.0f;
+	m_moveSpeedRequiresAllKindOfs = FALSE;
+	m_disorientKindOf.set( KINDOF_INFANTRY );
+	m_disorientRadius = 50.0f;
+	m_disorientInterval = 0;
+	m_hallucinationInterval = LOGICFRAMES_PER_SECOND;
+	m_hallucinationDuration = 0;
+	m_hallucinationTriggeredByUpgrade = FALSE;
+	m_fxListUpgrade = nullptr;
+	m_requiresAllTriggers = FALSE;
+	m_upgradesResolved = FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
+/*static*/ void GasBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
+{
+
+	static const FieldParse dataFieldParse[] =
+	{
+		{ "RequiredAffectKindOf", KindOfMaskType::parseFromINI, nullptr, offsetof(GasBehaviorModuleData, m_requiredAffectKindOf) },
+		{ "RequiresAllKindOfs", INI::parseBool, nullptr, offsetof(GasBehaviorModuleData, m_requiresAllKindOfs) },
+		{ "ForbiddenAffectKindOf", KindOfMaskType::parseFromINI, nullptr, offsetof(GasBehaviorModuleData, m_forbiddenAffectKindOf) },
+		{ "AffectsTargets", INI::parseBitString32, TheWeaponAffectsMaskNames, offsetof(GasBehaviorModuleData, m_targetsMask) },
+		{ "AffectAirborne", INI::parseBool, nullptr, offsetof(GasBehaviorModuleData, m_affectAirborne) },
+		{ "GasDamageInterval", INI::parseDurationUnsignedInt, nullptr, offsetof(GasBehaviorModuleData, m_damageInterval) },
+		{ "GasDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(GasBehaviorModuleData, m_duration) },
+		{ "MoveSpeedReduction", INI::parsePercentToReal, nullptr, offsetof(GasBehaviorModuleData, m_moveSpeedReduction) },
+		{ "MoveSpeedRequiredAffectKindOf", KindOfMaskType::parseFromINI, nullptr, offsetof(GasBehaviorModuleData, m_moveSpeedRequiredAffectKindOf) },
+		{ "MoveSpeedRequiresAllKindOfs", INI::parseBool, nullptr, offsetof(GasBehaviorModuleData, m_moveSpeedRequiresAllKindOfs) },
+		{ "MoveSpeedForbiddenAffectKindOf", KindOfMaskType::parseFromINI, nullptr, offsetof(GasBehaviorModuleData, m_moveSpeedForbiddenAffectKindOf) },
+		{ "DisorientKindOf", KindOfMaskType::parseFromINI, nullptr, offsetof(GasBehaviorModuleData, m_disorientKindOf) },
+		{ "DisorientRadius", INI::parseReal, nullptr, offsetof(GasBehaviorModuleData, m_disorientRadius) },
+		{ "DisorientInterval", INI::parseDurationUnsignedInt, nullptr, offsetof(GasBehaviorModuleData, m_disorientInterval) },
+		{ "HallucinationEffectInterval", INI::parseDurationUnsignedInt, nullptr, offsetof(GasBehaviorModuleData, m_hallucinationInterval) },
+		{ "HallucinationDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(GasBehaviorModuleData, m_hallucinationDuration) },
+		{ "HallucinationTriggeredByUpgrade", INI::parseBool, nullptr, offsetof(GasBehaviorModuleData, m_hallucinationTriggeredByUpgrade) },
+		{ "TriggeredBy", INI::parseAsciiStringVector, nullptr, offsetof(GasBehaviorModuleData, m_triggeredBy) },
+		{ "ConflictsWith", INI::parseAsciiStringVector, nullptr, offsetof(GasBehaviorModuleData, m_conflictsWith) },
+		{ "FXListUpgrade", INI::parseFXList, nullptr, offsetof(GasBehaviorModuleData, m_fxListUpgrade) },
+		{ "RequiresAllTriggers", INI::parseBool, nullptr, offsetof(GasBehaviorModuleData, m_requiresAllTriggers) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+
+	UpdateModuleData::buildFieldParse(p);
+	p.add(dataFieldParse);
+}
+
+//-------------------------------------------------------------------------------------------------
+void GasBehaviorModuleData::resolveUpgrades() const
+{
+	if( m_upgradesResolved )
+	{
+		return;
+	}
+
+	resolveUpgradeNames( m_triggeredBy, m_triggerUpgrades );
+	resolveUpgradeNames( m_conflictsWith, m_conflictUpgrades );
+	m_upgradesResolved = TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+GasBehavior::GasBehavior( Thing *thing, const ModuleData* moduleData ) : UpdateModule( thing, moduleData )
+{
+	m_gasDamageFrame = 0;
+	m_gasStopFrame = 0;
+	m_gasDamageAmount = 0.0f;
+	m_gasSource = INVALID_ID;
+	m_deathType = DEATH_NORMAL;
+	m_appliedSpeedScalar = 1.0f;
+	m_disorientFrame = 0;
+	m_hallucinateFrame = 0;
+	m_hallucinateStopFrame = 0;
+	m_issuedOrders = FALSE;
+	m_applyingTickDamage = FALSE;
+	setWakeFrame(getObject(), UPDATE_SLEEP_FOREVER);
+}
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+GasBehavior::~GasBehavior()
+{
+}
+
+//-------------------------------------------------------------------------------------------------
+void GasBehavior::onDamage( DamageInfo *damageInfo )
+{
+	if( m_applyingTickDamage )
+	{
+		return;
+	}
+
+	if( damageInfo->in.m_damageType == DAMAGE_GAS )
+	{
+		startGasEffects( damageInfo );
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+void GasBehavior::onHealing( DamageInfo *damageInfo )
+{
+	stopGasEffects();
+	m_hallucinateFrame = 0;
+	m_hallucinateStopFrame = 0;
+	releaseOrders();
+
+	setWakeFrame(getObject(), UPDATE_SLEEP_FOREVER);
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+/*static*/ Bool GasBehavior::blocksPlayerOrders( const Object *obj )
+{
+	static const NameKeyType key_GasBehavior = NAMEKEY( "GasBehavior" );
+	const GasBehavior *gas = static_cast<const GasBehavior *>( obj->findUpdateModule( key_GasBehavior ) );
+	return gas != nullptr && gas->isBlockingPlayerOrders();
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+Bool GasBehavior::isBlockingPlayerOrders() const
+{
+	if( getObject()->isContained() )
+	{
+		return FALSE;
+	}
+	return m_disorientFrame != 0 || m_hallucinateStopFrame != 0;
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+UpdateSleepTime GasBehavior::update()
+{
+	const GasBehaviorModuleData* d = getGasBehaviorModuleData();
+	UnsignedInt now = TheGameLogic->getFrame();
+	Object *me = getObject();
+
+	if( me->isEffectivelyDead() )
+	{
+		return UPDATE_SLEEP_FOREVER;
+	}
+
+	if( m_gasDamageFrame != 0 && now >= m_gasDamageFrame )
+	{
+		DamageInfo damage;
+		damage.in.m_amount = m_gasDamageAmount;
+		damage.in.m_sourceID = m_gasSource;
+		damage.in.m_damageType = DAMAGE_GAS;
+		damage.in.m_damageFXOverride = DAMAGE_GAS;
+		damage.in.m_deathType = m_deathType;
+		m_applyingTickDamage = TRUE;
+		me->attemptDamage( &damage );
+		m_applyingTickDamage = FALSE;
+
+		m_gasDamageFrame = now + d->m_damageInterval;
+
+		if( me->isEffectivelyDead() )
+		{
+			return UPDATE_SLEEP_FOREVER;
+		}
+	}
+
+	if( m_gasStopFrame != 0 && now >= m_gasStopFrame )
+	{
+		stopGasEffects();
+	}
+
+	if( m_hallucinateStopFrame != 0 && now >= m_hallucinateStopFrame )
+	{
+		m_hallucinateFrame = 0;
+		m_hallucinateStopFrame = 0;
+	}
+
+	if( m_hallucinateFrame != 0 && now >= m_hallucinateFrame )
+	{
+		doHallucination();
+		m_hallucinateFrame = d->m_hallucinationInterval != 0 ? now + d->m_hallucinationInterval : 0;
+	}
+
+	if( m_disorientFrame != 0 && now >= m_disorientFrame )
+	{
+		doDisorientation();
+		m_disorientFrame = now + d->m_disorientInterval;
+	}
+
+	if( !isBlockingPlayerOrders() )
+	{
+		releaseOrders();
+	}
+
+	return calcSleepTime();
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+UpdateSleepTime GasBehavior::calcSleepTime() const
+{
+	UnsignedInt frames[] = { m_gasDamageFrame, m_gasStopFrame, m_disorientFrame, m_hallucinateFrame, m_hallucinateStopFrame };
+	UnsignedInt next = 0;
+	for( Int i = 0; i < (Int)ARRAY_SIZE(frames); ++i )
+	{
+		if( frames[i] != 0 && (next == 0 || frames[i] < next) )
+		{
+			next = frames[i];
+		}
+	}
+
+	if( next == 0 )
+	{
+		return UPDATE_SLEEP_FOREVER;
+	}
+
+	UnsignedInt now = TheGameLogic->getFrame();
+	if( next <= now )
+	{
+		return UPDATE_SLEEP_NONE;
+	}
+	return UPDATE_SLEEP( next - now );
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+Bool GasBehavior::isAffectedBy( const Object *attacker, const Player *player ) const
+{
+	const GasBehaviorModuleData* d = getGasBehaviorModuleData();
+	const Object *me = getObject();
+
+	if( !d->m_affectAirborne && me->isAirborneTarget() )
+	{
+		return FALSE;
+	}
+
+	if( !matchesKindOf( me, d->m_requiredAffectKindOf, d->m_requiresAllKindOfs, d->m_forbiddenAffectKindOf ) )
+	{
+		return FALSE;
+	}
+
+	// gas with no known owner counts as hostile
+	Relationship r = ENEMIES;
+	if( attacker != nullptr )
+	{
+		r = attacker->getRelationship( me );
+	}
+	else if( player != nullptr )
+	{
+		r = player->getRelationship( me->getTeam() );
+	}
+
+	Int need = WEAPON_AFFECTS_NEUTRALS;
+	if( r == ALLIES )
+	{
+		need = WEAPON_AFFECTS_ALLIES;
+	}
+	else if( r == ENEMIES )
+	{
+		need = WEAPON_AFFECTS_ENEMIES;
+	}
+	return (d->m_targetsMask & need) != 0;
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+Bool GasBehavior::attackerMeetsTriggers( const Object *attacker, const Player *player ) const
+{
+	const GasBehaviorModuleData* d = getGasBehaviorModuleData();
+	d->resolveUpgrades();
+
+	for( std::vector<const UpgradeTemplate *>::const_iterator it = d->m_conflictUpgrades.begin(); it != d->m_conflictUpgrades.end(); ++it )
+	{
+		if( PoisonedBehavior::attackerHasUpgrade( *it, player, attacker ) )
+		{
+			return FALSE;
+		}
+	}
+
+	if( d->m_triggerUpgrades.empty() )
+	{
+		return FALSE;
+	}
+
+	for( std::vector<const UpgradeTemplate *>::const_iterator it = d->m_triggerUpgrades.begin(); it != d->m_triggerUpgrades.end(); ++it )
+	{
+		Bool has = PoisonedBehavior::attackerHasUpgrade( *it, player, attacker );
+		if( d->m_requiresAllTriggers && !has )
+		{
+			return FALSE;
+		}
+		if( !d->m_requiresAllTriggers && has )
+		{
+			return TRUE;
+		}
+	}
+	return d->m_requiresAllTriggers;
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+void GasBehavior::startGasEffects( const DamageInfo *damageInfo )
+{
+	const GasBehaviorModuleData* d = getGasBehaviorModuleData();
+	UnsignedInt now = TheGameLogic->getFrame();
+	Object *me = getObject();
+
+	const Object *attacker;
+	const Player *player;
+	PoisonedBehavior::findAttacker( damageInfo, attacker, player );
+
+	if( !isAffectedBy( attacker, player ) )
+	{
+		return;
+	}
+
+	m_gasDamageAmount = damageInfo->out.m_actualDamageDealt;
+	m_gasSource = damageInfo->in.m_sourceID;
+	m_deathType = damageInfo->in.m_deathType;
+	m_gasStopFrame = now + d->m_duration;
+
+	// a fresh dose never pushes back a tick that is already due sooner
+	if( d->m_damageInterval != 0 )
+	{
+		if( m_gasDamageFrame != 0 )
+		{
+			m_gasDamageFrame = min( m_gasDamageFrame, now + d->m_damageInterval );
+		}
+		else
+		{
+			m_gasDamageFrame = now + d->m_damageInterval;
+		}
+	}
+
+	AIUpdateInterface *ai = me->getAI();
+	if( ai != nullptr )
+	{
+		if( m_appliedSpeedScalar == 1.0f && d->m_moveSpeedReduction > 0.0f &&
+				matchesKindOf( me, d->m_moveSpeedRequiredAffectKindOf, d->m_moveSpeedRequiresAllKindOfs, d->m_moveSpeedForbiddenAffectKindOf ) )
+		{
+			m_appliedSpeedScalar = max( 1.0f - d->m_moveSpeedReduction, 0.01f );
+			ai->applySpeedMultiplier( m_appliedSpeedScalar );
+		}
+
+		if( d->m_disorientInterval != 0 && m_disorientFrame == 0 && me->isAnyKindOf( d->m_disorientKindOf ) )
+		{
+			m_disorientFrame = now + 1;
+		}
+
+		if( d->m_hallucinationDuration != 0 && me->isAbleToAttack() &&
+				( !d->m_hallucinationTriggeredByUpgrade || attackerMeetsTriggers( attacker, player ) ) )
+		{
+			if( m_hallucinateStopFrame == 0 )
+			{
+				FXList::doFXObj( d->m_fxListUpgrade, me );
+				m_hallucinateFrame = now + 1;
+			}
+			m_hallucinateStopFrame = now + d->m_hallucinationDuration;
+		}
+	}
+
+	setWakeFrame(me, calcSleepTime());
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+void GasBehavior::stopGasEffects()
+{
+	m_gasDamageFrame = 0;
+	m_gasStopFrame = 0;
+	m_gasDamageAmount = 0.0f;
+	m_gasSource = INVALID_ID;
+	m_disorientFrame = 0;
+
+	if( m_appliedSpeedScalar != 1.0f )
+	{
+		AIUpdateInterface *ai = getObject()->getAI();
+		if( ai != nullptr )
+		{
+			ai->applySpeedMultiplier( 1.0f / m_appliedSpeedScalar );
+		}
+		m_appliedSpeedScalar = 1.0f;
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+void GasBehavior::releaseOrders()
+{
+	if( !m_issuedOrders )
+	{
+		return;
+	}
+	m_issuedOrders = FALSE;
+
+	Object *me = getObject();
+	AIUpdateInterface *ai = me->getAI();
+	if( ai != nullptr && !me->isContained() && !me->isEffectivelyDead() )
+	{
+		ai->aiIdle( CMD_FROM_AI );
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+void GasBehavior::doHallucination()
+{
+	Object *me = getObject();
+	AIUpdateInterface *ai = me->getAI();
+	if( ai == nullptr || me->isContained() || !me->isAbleToAttack() )
+	{
+		return;
+	}
+
+	// a script source keeps Hold Fire, which vetoes only CMD_FROM_AI, from cancelling the attack
+	PartitionFilterAlive filterAlive;
+	PartitionFilterSameMapStatus filterMapStatus( me );
+	PartitionFilterRejectByKindOf filterStructures( MAKE_KINDOF_MASK( KINDOF_STRUCTURE ), KINDOFMASK_NONE );
+	PartitionFilterPossibleToAttack filterAttack( ATTACK_NEW_TARGET_FORCED, me, CMD_FROM_SCRIPT );
+	PartitionFilter *filters[] = { &filterAlive, &filterMapStatus, &filterStructures, &filterAttack, nullptr };
+
+	Object *target = ThePartitionManager->getClosestObject( me, me->getLargestWeaponRange(), FROM_BOUNDINGSPHERE_2D, filters );
+	if( target == nullptr )
+	{
+		return;
+	}
+
+	// re-ordering the same target would restart the aim
+	if( ai->getGoalObject() == target && me->testStatus( OBJECT_STATUS_IS_ATTACKING ) )
+	{
+		return;
+	}
+
+	ai->aiForceAttackObject( target, NO_MAX_SHOTS_LIMIT, CMD_FROM_SCRIPT );
+	m_issuedOrders = TRUE;
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+void GasBehavior::doDisorientation()
+{
+	const GasBehaviorModuleData* d = getGasBehaviorModuleData();
+	Object *me = getObject();
+	AIUpdateInterface *ai = me->getAI();
+	if( ai == nullptr || me->isContained() )
+	{
+		return;
+	}
+
+	// a hallucinating unit keeps shooting instead of wandering off
+	if( m_hallucinateStopFrame != 0 && me->testStatus( OBJECT_STATUS_IS_ATTACKING ) )
+	{
+		return;
+	}
+
+	Real angle = GameLogicRandomValueReal( 0.0f, 2.0f * PI );
+	Real dist = GameLogicRandomValueReal( 0.5f * d->m_disorientRadius, d->m_disorientRadius );
+	Coord3D pos = *me->getPosition();
+	pos.x += dist * Cos( angle );
+	pos.y += dist * Sin( angle );
+
+	ai->aiMoveToPosition( &pos, CMD_FROM_AI );
+	m_issuedOrders = TRUE;
+}
+
+// ------------------------------------------------------------------------------------------------
+/** CRC */
+// ------------------------------------------------------------------------------------------------
+void GasBehavior::crc( Xfer *xfer )
+{
+
+	// extend base class
+	UpdateModule::crc( xfer );
+
+}
+
+// ------------------------------------------------------------------------------------------------
+/** Xfer method
+	* Version Info:
+	* 1: Initial version
+	*/
+// ------------------------------------------------------------------------------------------------
+void GasBehavior::xfer( Xfer *xfer )
+{
+
+	// version
+	const XferVersion currentVersion = 1;
+	XferVersion version = currentVersion;
+	xfer->xferVersion( &version, currentVersion );
+
+	// extend base class
+	UpdateModule::xfer( xfer );
+
+	xfer->xferUnsignedInt( &m_gasDamageFrame );
+	xfer->xferUnsignedInt( &m_gasStopFrame );
+	xfer->xferReal( &m_gasDamageAmount );
+	xfer->xferObjectID( &m_gasSource );
+	xfer->xferUser( &m_deathType, sizeof(m_deathType) );
+	xfer->xferReal( &m_appliedSpeedScalar );
+	xfer->xferUnsignedInt( &m_disorientFrame );
+	xfer->xferUnsignedInt( &m_hallucinateFrame );
+	xfer->xferUnsignedInt( &m_hallucinateStopFrame );
+	xfer->xferBool( &m_issuedOrders );
+}
+
+// ------------------------------------------------------------------------------------------------
+/** Load post process */
+// ------------------------------------------------------------------------------------------------
+void GasBehavior::loadPostProcess()
+{
+
+	// extend base class
+	UpdateModule::loadPostProcess();
+
+}
