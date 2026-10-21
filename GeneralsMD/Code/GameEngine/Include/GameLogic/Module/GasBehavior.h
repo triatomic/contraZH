@@ -24,6 +24,7 @@
 #pragma once
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
+#include "Common/GlobalData.h"
 #include "Common/KindOf.h"
 #include "GameLogic/Damage.h"
 #include "GameLogic/Module/BehaviorModule.h"
@@ -57,7 +58,9 @@ public:
 	UnsignedInt m_disorientInterval;
 
 	UnsignedInt m_hallucinationInterval;
-	UnsignedInt m_hallucinationDuration;
+	SubdualValue m_hallucinationDamageCap;
+	SubdualValue m_hallucinationHealRate;
+	SubdualValue m_hallucinationHealAmount;
 	std::vector<AsciiString> m_triggeredBy;
 	std::vector<AsciiString> m_conflictsWith;
 	const FXList *m_fxListUpgrade;
@@ -115,6 +118,8 @@ protected:
 	void startGasEffects( const DamageInfo *damageInfo );
 	void stopGasEffects();
 	void releaseOrders();
+	void addHallucinationDamage( Real amount );
+	void updateHallucinating();
 	void doHallucination();
 	void doDisorientation();
 	UpdateSleepTime calcSleepTime() const;
@@ -128,7 +133,9 @@ private:
 	Real					m_appliedSpeedScalar;	// 1 while no slow is applied
 	UnsignedInt		m_disorientFrame;
 	UnsignedInt		m_hallucinateFrame;
-	UnsignedInt		m_hallucinateStopFrame;
+	Real					m_hallucinationDamage;	// subdual-style pool; hallucinating while it reaches max health
+	UnsignedInt		m_hallucinationHealFrame;
+	Bool					m_hallucinating;
 	Bool					m_issuedOrders;
 	Bool					m_applyingTickDamage;	// guards against our own gas ticks retriggering us
 

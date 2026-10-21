@@ -35,6 +35,7 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/Module/AIUpdate.h"
+#include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/GasBehavior.h"
 #include "GameLogic/Module/PoisonedBehavior.h"
 
@@ -55,6 +56,13 @@ static Bool matchesKindOf( const Object *obj, const KindOfMaskType& required, Bo
 		return obj->isKindOfMulti( required, KINDOFMASK_NONE );
 	}
 	return obj->isAnyKindOf( required );
+}
+
+//-------------------------------------------------------------------------------------------------
+static Real maxHealthOf( const Object *obj )
+{
+	const BodyModuleInterface *body = obj->getBodyModule();
+	return body != nullptr ? body->getMaxHealth() : 0.0f;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -87,7 +95,6 @@ GasBehaviorModuleData::GasBehaviorModuleData()
 	m_disorientRadius = 50.0f;
 	m_disorientInterval = 0;
 	m_hallucinationInterval = LOGICFRAMES_PER_SECOND;
-	m_hallucinationDuration = 0;
 	m_fxListUpgrade = nullptr;
 	m_requiresAllTriggers = FALSE;
 	m_upgradesResolved = FALSE;
@@ -114,7 +121,9 @@ GasBehaviorModuleData::GasBehaviorModuleData()
 		{ "DisorientRadius", INI::parseReal, nullptr, offsetof(GasBehaviorModuleData, m_disorientRadius) },
 		{ "DisorientInterval", INI::parseDurationUnsignedInt, nullptr, offsetof(GasBehaviorModuleData, m_disorientInterval) },
 		{ "HallucinationEffectInterval", INI::parseDurationUnsignedInt, nullptr, offsetof(GasBehaviorModuleData, m_hallucinationInterval) },
-		{ "HallucinationDuration", INI::parseDurationUnsignedInt, nullptr, offsetof(GasBehaviorModuleData, m_hallucinationDuration) },
+		{ "HallucinationDamageCap", SubdualValue::parseFromINI, nullptr, offsetof(GasBehaviorModuleData, m_hallucinationDamageCap) },
+		{ "HallucinationHealRate", SubdualValue::parseDurationFromINI, nullptr, offsetof(GasBehaviorModuleData, m_hallucinationHealRate) },
+		{ "HallucinationHealAmount", SubdualValue::parseFromINI, nullptr, offsetof(GasBehaviorModuleData, m_hallucinationHealAmount) },
 		{ "TriggeredBy", INI::parseAsciiStringVector, nullptr, offsetof(GasBehaviorModuleData, m_triggeredBy) },
 		{ "ConflictsWith", INI::parseAsciiStringVector, nullptr, offsetof(GasBehaviorModuleData, m_conflictsWith) },
 		{ "FXListUpgrade", INI::parseFXList, nullptr, offsetof(GasBehaviorModuleData, m_fxListUpgrade) },
@@ -151,7 +160,9 @@ GasBehavior::GasBehavior( Thing *thing, const ModuleData* moduleData ) : UpdateM
 	m_appliedSpeedScalar = 1.0f;
 	m_disorientFrame = 0;
 	m_hallucinateFrame = 0;
-	m_hallucinateStopFrame = 0;
+	m_hallucinationDamage = 0.0f;
+	m_hallucinationHealFrame = 0;
+	m_hallucinating = FALSE;
 	m_issuedOrders = FALSE;
 	m_applyingTickDamage = FALSE;
 	s_anyInstance = TRUE;
@@ -206,7 +217,7 @@ Bool GasBehavior::isBlockingPlayerOrders() const
 	{
 		return FALSE;
 	}
-	return m_disorientFrame != 0 || m_hallucinateStopFrame != 0;
+	return m_disorientFrame != 0 || m_hallucinating;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -247,10 +258,12 @@ UpdateSleepTime GasBehavior::update()
 		stopGasEffects();
 	}
 
-	if( m_hallucinateStopFrame != 0 && now >= m_hallucinateStopFrame )
+	if( m_hallucinationHealFrame != 0 && now >= m_hallucinationHealFrame )
 	{
-		m_hallucinateFrame = 0;
-		m_hallucinateStopFrame = 0;
+		m_hallucinationDamage = max( m_hallucinationDamage - d->m_hallucinationHealAmount.evaluate( maxHealthOf( me ) ), 0.0f );
+		UnsignedInt healRate = (UnsignedInt)d->m_hallucinationHealRate.evaluate( 0.0f );
+		m_hallucinationHealFrame = m_hallucinationDamage > 0.0f ? now + healRate : 0;
+		updateHallucinating();
 	}
 
 	if( m_hallucinateFrame != 0 && now >= m_hallucinateFrame )
@@ -277,7 +290,7 @@ UpdateSleepTime GasBehavior::update()
 // ------------------------------------------------------------------------------------------------
 UpdateSleepTime GasBehavior::calcSleepTime() const
 {
-	UnsignedInt frames[] = { m_gasDamageFrame, m_gasStopFrame, m_disorientFrame, m_hallucinateFrame, m_hallucinateStopFrame };
+	UnsignedInt frames[] = { m_gasDamageFrame, m_gasStopFrame, m_disorientFrame, m_hallucinateFrame, m_hallucinationHealFrame };
 	UnsignedInt next = 0;
 	for( Int i = 0; i < (Int)ARRAY_SIZE(frames); ++i )
 	{
@@ -425,14 +438,9 @@ void GasBehavior::startGasEffects( const DamageInfo *damageInfo )
 			m_disorientFrame = now + 1;
 		}
 
-		if( d->m_hallucinationDuration != 0 && me->isAbleToAttack() && attackerMeetsTriggers( attacker, player ) )
+		if( me->isAbleToAttack() && attackerMeetsTriggers( attacker, player ) )
 		{
-			if( m_hallucinateStopFrame == 0 )
-			{
-				FXList::doFXObj( d->m_fxListUpgrade, me );
-				m_hallucinateFrame = now + 1;
-			}
-			m_hallucinateStopFrame = now + d->m_hallucinationDuration;
+			addHallucinationDamage( damageInfo->out.m_actualDamageDealt );
 		}
 	}
 
@@ -476,6 +484,45 @@ void GasBehavior::releaseOrders()
 	{
 		ai->aiIdle( CMD_FROM_AI );
 	}
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+void GasBehavior::addHallucinationDamage( Real amount )
+{
+	const GasBehaviorModuleData* d = getGasBehaviorModuleData();
+
+	// a zero cap means immune, as with subdual
+	Real cap = d->m_hallucinationDamageCap.evaluate( maxHealthOf( getObject() ) );
+	if( cap <= 0.0f || amount <= 0.0f )
+	{
+		return;
+	}
+
+	m_hallucinationDamage = min( m_hallucinationDamage + amount, cap );
+
+	// as with subdual, every new dose restarts the drain countdown
+	UnsignedInt healRate = (UnsignedInt)d->m_hallucinationHealRate.evaluate( 0.0f );
+	m_hallucinationHealFrame = healRate != 0 ? TheGameLogic->getFrame() + healRate : 0;
+	updateHallucinating();
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+void GasBehavior::updateHallucinating()
+{
+	Real maxHealth = maxHealthOf( getObject() );
+	Bool hallucinating = maxHealth > 0.0f && m_hallucinationDamage >= maxHealth;
+	if( hallucinating && !m_hallucinating )
+	{
+		FXList::doFXObj( getGasBehaviorModuleData()->m_fxListUpgrade, getObject() );
+		m_hallucinateFrame = TheGameLogic->getFrame() + 1;
+	}
+	else if( !hallucinating && m_hallucinating )
+	{
+		m_hallucinateFrame = 0;
+	}
+	m_hallucinating = hallucinating;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -524,7 +571,7 @@ void GasBehavior::doDisorientation()
 	}
 
 	// a hallucinating unit keeps shooting instead of wandering off
-	if( m_hallucinateStopFrame != 0 && me->testStatus( OBJECT_STATUS_IS_ATTACKING ) )
+	if( m_hallucinating && me->testStatus( OBJECT_STATUS_IS_ATTACKING ) )
 	{
 		return;
 	}
@@ -559,13 +606,14 @@ void GasBehavior::crc( Xfer *xfer )
 /** Xfer method
 	* Version Info:
 	* 1: Initial version
+	* 2: Hallucination pool replaces the hallucination stop frame
 	*/
 // ------------------------------------------------------------------------------------------------
 void GasBehavior::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = 1;
+	const XferVersion currentVersion = 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -580,8 +628,18 @@ void GasBehavior::xfer( Xfer *xfer )
 	xfer->xferReal( &m_appliedSpeedScalar );
 	xfer->xferUnsignedInt( &m_disorientFrame );
 	xfer->xferUnsignedInt( &m_hallucinateFrame );
-	xfer->xferUnsignedInt( &m_hallucinateStopFrame );
+	if( version < 2 )
+	{
+		UnsignedInt legacyStopFrame = 0;
+		xfer->xferUnsignedInt( &legacyStopFrame );
+	}
 	xfer->xferBool( &m_issuedOrders );
+	if( version >= 2 )
+	{
+		xfer->xferReal( &m_hallucinationDamage );
+		xfer->xferUnsignedInt( &m_hallucinationHealFrame );
+		xfer->xferBool( &m_hallucinating );
+	}
 }
 
 // ------------------------------------------------------------------------------------------------

@@ -995,7 +995,9 @@ Behavior = GasBehavior ModuleTag_Gas01
   DisorientRadius                = 60
   DisorientInterval              = 1500
   HallucinationEffectInterval    = 1000
-  HallucinationDuration          = 6000
+  HallucinationDamageCap         = MaxHealth * 2
+  HallucinationHealRate          = 500
+  HallucinationHealAmount        = MaxHealth / 10
   TriggeredBy                    = Upgrade_ChinaHallucinationGas
   FXListUpgrade                  = FX_HallucinationStart
 End
@@ -1033,18 +1035,23 @@ Disorientation:
 * `DisorientInterval = 0` - (In milliseconds. A new random move this often. `0` disables
 disorientation.)
 
-Hallucination:
+Hallucination works like subdual damage. Each qualifying hit adds its damage to a hallucination
+pool; the unit hallucinates while the pool is at or above its max health, and stops once the pool
+drains below it.
 
 * `HallucinationEffectInterval = 1000` - (In milliseconds. How often a new target is picked. `0`
 picks one target when the hallucination starts.)
-* `HallucinationDuration = 0` - (In milliseconds. How long it lasts after the last qualifying hit.
-`0` disables hallucination.)
+* `HallucinationDamageCap = 0` - (Most the pool can hold. `0` disables hallucination. Takes the
+[MaxHealth forms](contraZH-GameData.md#subdual-damage-defaults): `MaxHealth * 2`, `MaxHealth / 4`,
+`MaxHealth` or a plain number. Below `MaxHealth` the unit can never hallucinate.)
+* `HallucinationHealRate = 0` - (In milliseconds. The pool drains this often, starting this long
+after the last hit. `0` never drains, so a hallucination never ends.)
+* `HallucinationHealAmount = 0` - (Drained per step. Takes the same MaxHealth forms.)
 * `TriggeredBy` - (Upgrades the attacker needs. Leave it out and every gas hit can cause
 hallucination.)
 * `ConflictsWith` - (Upgrades that stop it when the attacker has any of them.)
 * `RequiresAllTriggers = No` - (Yes needs every `TriggeredBy`, No needs one of them.)
-* `FXListUpgrade` - (Plays on the gassed object when a hallucination starts. A refresh does not
-play it again.)
+* `FXListUpgrade` - (Plays on the gassed object each time the pool reaches max health.)
 
 Notes:
 * The module reacts only when a hit lowers health. A `GAS` hit that armor cuts to zero does
@@ -1060,6 +1067,10 @@ changes such as battle plans.
 * Hallucination needs an armed unit. It force-attacks the nearest unit of any side within its
 longest weapon range, structures excepted. With nothing in range it waits for the next pick.
 Hold Fire does not stop it.
+* Only hits that pass `TriggeredBy` and `ConflictsWith` fill the pool, and only the damage left
+after armor counts. The `GasDamageInterval` repeats do not add to it.
+* `MaxHealth` is read when it is used, so veterancy health bonuses raise the threshold, as with
+subdual.
 * A hallucinating gas unit that shoots its own side passes the gas on only when `AffectsTargets`
 lists `ALLIES`, so by default hallucination cannot spread through a squad.
 * A hallucinating unit that is busy attacking does not wander off when disorientation is also on.
