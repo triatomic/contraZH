@@ -59,7 +59,7 @@ public:
 
 	UnsignedInt m_hallucinationInterval;
 	SubdualValue m_hallucinationDamageCap;
-	SubdualValue m_hallucinationHealRate;
+	UnsignedInt m_hallucinationHealRate;
 	SubdualValue m_hallucinationHealAmount;
 	std::vector<AsciiString> m_triggeredBy;
 	std::vector<AsciiString> m_conflictsWith;

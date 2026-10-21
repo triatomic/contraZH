@@ -95,6 +95,7 @@ GasBehaviorModuleData::GasBehaviorModuleData()
 	m_disorientRadius = 50.0f;
 	m_disorientInterval = 0;
 	m_hallucinationInterval = LOGICFRAMES_PER_SECOND;
+	m_hallucinationHealRate = 0;
 	m_fxListUpgrade = nullptr;
 	m_requiresAllTriggers = FALSE;
 	m_upgradesResolved = FALSE;
@@ -122,7 +123,7 @@ GasBehaviorModuleData::GasBehaviorModuleData()
 		{ "DisorientInterval", INI::parseDurationUnsignedInt, nullptr, offsetof(GasBehaviorModuleData, m_disorientInterval) },
 		{ "HallucinationEffectInterval", INI::parseDurationUnsignedInt, nullptr, offsetof(GasBehaviorModuleData, m_hallucinationInterval) },
 		{ "HallucinationDamageCap", SubdualValue::parseFromINI, nullptr, offsetof(GasBehaviorModuleData, m_hallucinationDamageCap) },
-		{ "HallucinationHealRate", SubdualValue::parseDurationFromINI, nullptr, offsetof(GasBehaviorModuleData, m_hallucinationHealRate) },
+		{ "HallucinationHealRate", INI::parseDurationUnsignedInt, nullptr, offsetof(GasBehaviorModuleData, m_hallucinationHealRate) },
 		{ "HallucinationHealAmount", SubdualValue::parseFromINI, nullptr, offsetof(GasBehaviorModuleData, m_hallucinationHealAmount) },
 		{ "TriggeredBy", INI::parseAsciiStringVector, nullptr, offsetof(GasBehaviorModuleData, m_triggeredBy) },
 		{ "ConflictsWith", INI::parseAsciiStringVector, nullptr, offsetof(GasBehaviorModuleData, m_conflictsWith) },
@@ -261,8 +262,7 @@ UpdateSleepTime GasBehavior::update()
 	if( m_hallucinationHealFrame != 0 && now >= m_hallucinationHealFrame )
 	{
 		m_hallucinationDamage = max( m_hallucinationDamage - d->m_hallucinationHealAmount.evaluate( maxHealthOf( me ) ), 0.0f );
-		UnsignedInt healRate = (UnsignedInt)d->m_hallucinationHealRate.evaluate( 0.0f );
-		m_hallucinationHealFrame = m_hallucinationDamage > 0.0f ? now + healRate : 0;
+		m_hallucinationHealFrame = m_hallucinationDamage > 0.0f ? now + d->m_hallucinationHealRate : 0;
 		updateHallucinating();
 	}
 
@@ -502,8 +502,7 @@ void GasBehavior::addHallucinationDamage( Real amount )
 	m_hallucinationDamage = min( m_hallucinationDamage + amount, cap );
 
 	// as with subdual, every new dose restarts the drain countdown
-	UnsignedInt healRate = (UnsignedInt)d->m_hallucinationHealRate.evaluate( 0.0f );
-	m_hallucinationHealFrame = healRate != 0 ? TheGameLogic->getFrame() + healRate : 0;
+	m_hallucinationHealFrame = d->m_hallucinationHealRate != 0 ? TheGameLogic->getFrame() + d->m_hallucinationHealRate : 0;
 	updateHallucinating();
 }
 
@@ -632,6 +631,7 @@ void GasBehavior::xfer( Xfer *xfer )
 	{
 		UnsignedInt legacyStopFrame = 0;
 		xfer->xferUnsignedInt( &legacyStopFrame );
+		m_hallucinateFrame = 0;
 	}
 	xfer->xferBool( &m_issuedOrders );
 	if( version >= 2 )
