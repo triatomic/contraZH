@@ -634,6 +634,27 @@ SaveResult GameState::missionSave()
 	UnicodeString desc;
 	desc.format( format, TheGameText->fetch( campaign->m_campaignNameLabel ).str(), missionNumber );
 
+	UnicodeString difficulty;
+	switch( TheCampaignManager->getGameDifficulty() )
+	{
+		case DIFFICULTY_EASY:
+			difficulty = TheGameText->FETCH_OR_SUBSTITUTE( "GUI:DifficultyEasy", L"Easy" );
+			break;
+		case DIFFICULTY_NORMAL:
+			difficulty = TheGameText->FETCH_OR_SUBSTITUTE( "GUI:DifficultyNormal", L"Normal" );
+			break;
+		case DIFFICULTY_HARD:
+			difficulty = TheGameText->FETCH_OR_SUBSTITUTE( "GUI:DifficultyHard", L"Hard" );
+			break;
+		default:
+			break;
+	}
+	if( !difficulty.isEmpty() )
+	{
+		desc.concat( L" - " );
+		desc.concat( difficulty );
+	}
+
 	// do an automatic mission save
 	return saveGame( "", desc, SAVE_FILE_TYPE_MISSION );
 
