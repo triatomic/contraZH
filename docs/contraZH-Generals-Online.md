@@ -12,6 +12,7 @@ Notes:
 * Needs a Generals Online backend; without one login fails and returns to the main menu. Using the
 official `playgenerals.online` service with Contra needs coordination with the GO team.
 * Upstream crash reporting, anti-cheat and hardware fingerprinting are compiled out.
+* Fixed lobby network initialization failing silently and leaving Launch Game unresponsive.
 * See `PORT_NOTES.md` beside the GeneralsOnline sources for details and deviations.
 
 ## Engine differences in the online build
