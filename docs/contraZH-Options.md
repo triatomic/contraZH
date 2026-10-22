@@ -35,7 +35,8 @@ something to show.)
 * `BuildTimerDisplayMode = None` - (`None` | `Seconds` | `Auto`. Countdowns on build queue and special
 power cameos. `Auto` switches to MM:SS past a minute.)
 * `NewRadar = No` - (Yes gives an RA3 style radar: outlined blips, larger structures, dark
-waterline, two-tone ground, 256x256 grid.)
+waterline, flat ground in three tones (olive, tan for desert sand, grey for rock and pavement),
+256x256 grid.)
 * `BlipSize = Large` - (`Small` | `Large`. `Small` is 3/5 px unit/structure, `Large` 5/7. Only with
 `NewRadar`.)
 * `BorderlessWindow = No` - (Yes runs a frameless centred window at the selected resolution. Also

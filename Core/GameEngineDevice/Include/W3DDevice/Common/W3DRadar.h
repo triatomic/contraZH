@@ -104,7 +104,8 @@ protected:
 	void drawObjectListBlips( const RadarObject *listHead, RadarBlipPass pass,
 												Int pixelX, Int pixelY, Int width, Int height );
 	Bool isManMadeTerrainColor( const RGBColor *color ) const;	///< does this sample read as man made
-	void getTerrainTone( RGBColor *color, Real manMadeFraction ) const;	///< mix of the two tones
+	Bool isSandTerrainColor( const RGBColor *color ) const;	///< does this sample read as desert sand
+	void getTerrainTone( RGBColor *color, Real manMadeFraction, Real sandFraction ) const;	///< mix of the three tones
 	void interpolateColorForHeight( RGBColor *color,
 																	Real height,
 																	Real hiZ,
