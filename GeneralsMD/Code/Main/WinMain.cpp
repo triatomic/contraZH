@@ -956,7 +956,7 @@ Int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 #if defined(GENERALS_ONLINE)
 		// TODO_NGMP: Better solution
 		TheVersion->setVersion(VERSION_MAJOR, VERSION_MINOR, GENERALS_ONLINE_VERSION, GENERALS_ONLINE_NET_VERSION,
-			AsciiString("Generals Online Development Team"), AsciiString(""),
+			AsciiString("triatomic"), AsciiString(""),
 			AsciiString(__TIME__), AsciiString(__DATE__));
 #else
 		TheVersion->setVersion(VERSION_MAJOR, VERSION_MINOR, VERSION_BUILDNUM, VERSION_LOCALBUILDNUM,
