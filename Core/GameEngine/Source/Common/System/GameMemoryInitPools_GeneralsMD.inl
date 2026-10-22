@@ -115,6 +115,7 @@ static PoolSizeRec PoolSizes[] =
 	{ "CountermeasuresBehavior", 256, 32 },
 	{ "BattlePlanBonusBehavior", 256, 32 },
 	{ "EnergyShieldBehavior", 256, 32 },
+	{ "ShieldFieldBehavior", 32, 32 },
 	{ "BaseRegenerateUpdate", 128, 32 },
 	{ "BoneFXDamage", 64, 32 },
 	{ "BoneFXUpdate", 64, 32 },
