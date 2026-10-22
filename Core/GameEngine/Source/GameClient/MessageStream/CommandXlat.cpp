@@ -146,6 +146,42 @@ void giveAllSciences(Player* player)
 	}
 }
 
+// Put text on the Windows clipboard as Unicode text. Windows synthesizes the ANSI form from it
+// on demand, so plain text consumers read it too. Returns FALSE when another window holds the
+// clipboard or the allocation fails.
+static Bool copyTextToClipboard(const AsciiString& text)
+{
+#ifdef _WIN32
+	UnicodeString wide;
+	wide.translate(text);
+
+	if (!OpenClipboard(NULL))
+		return FALSE;
+
+	Bool copied = FALSE;
+	const size_t bytes = ((size_t)wide.getLength() + 1) * sizeof(WideChar);
+	HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, bytes);
+	if (hMem != NULL)
+	{
+		void *dst = GlobalLock(hMem);
+		if (dst != NULL)
+		{
+			memcpy(dst, wide.str(), bytes);
+			GlobalUnlock(hMem);
+			// the clipboard owns the memory once SetClipboardData succeeds
+			copied = EmptyClipboard() && SetClipboardData(CF_UNICODETEXT, hMem) != NULL;
+		}
+		if (!copied)
+			GlobalFree(hMem);
+	}
+
+	CloseClipboard();
+	return copied;
+#else
+	return FALSE;
+#endif
+}
+
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 // TheSuperHackers @feature Grant only the sciences that belong to this player's own general.
 //
@@ -4244,6 +4280,62 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			TheInGameUI->messageNoFormat( TheInGameUI->isWindowNameOverlayOn()
 				? TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugWindowNameOverlayOn", L"Window Names are ON")
 				: TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugWindowNameOverlayOff", L"Window Names are OFF") );
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
+		// Copy the template (INI) name of the selected objects to the clipboard, so it can be pasted
+		// into an INI, a search or a chat instead of being retyped from the Ctrl+[ overlay. One name
+		// per line, duplicates folded, so a selected squad copies its type once.
+		//
+		// Client side only -- it reads the selection and posts nothing to the logic, so it is
+		// replay and multiplayer safe.
+		case GameMessage::MSG_CHEAT_COPY_OBJECT_NAME:
+		{
+			std::vector<AsciiString> names;
+			const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
+			for (DrawableListCIt it = selected->begin(); it != selected->end(); ++it)
+			{
+				const Drawable *draw = *it;
+				if (draw == NULL || draw->getTemplate() == NULL)
+					continue;
+
+				const AsciiString &name = draw->getTemplate()->getName();
+				if (std::find(names.begin(), names.end(), name) == names.end())
+					names.push_back(name);
+			}
+
+			if (names.empty())
+			{
+				TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE(
+						"GUI:DebugCopyObjectNameNone", L"Nothing selected to copy") );
+			}
+			else
+			{
+				AsciiString text;
+				for (size_t i = 0; i < names.size(); ++i)
+				{
+					if (i > 0)
+						text.concat("\r\n");
+					text.concat(names[i]);
+				}
+
+				if (copyTextToClipboard(text))
+				{
+					if (names.size() == 1)
+						TheInGameUI->message( TheGameText->FETCH_OR_SUBSTITUTE_FORMAT(
+								"GUI:DebugCopyObjectNameOne", L"Copied %hs", names[0].str()) );
+					else
+						TheInGameUI->message( TheGameText->FETCH_OR_SUBSTITUTE_FORMAT(
+								"GUI:DebugCopyObjectNameMany", L"Copied %d object names", (Int)names.size()) );
+				}
+				else
+				{
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE(
+							"GUI:DebugCopyObjectNameFailed", L"Could not open the clipboard") );
+				}
+			}
 
 			disp = DESTROY_MESSAGE;
 			break;

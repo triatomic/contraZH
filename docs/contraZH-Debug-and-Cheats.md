@@ -67,6 +67,8 @@ binds this key to `SAVE_VIEW1`, which this cheat build shadows, so camera bookma
 line per vertex and pixel shader pair with its draw and primitive counts, busiest first. `fixed`
 means the fixed function pipeline. Refreshes twice a second. Takes the key from `CHEAT_RUNSCRIPT1` in
 CommandMapDemo.ini. `CHEAT_SHOW_SHADER_DRAWS` in CommandMap.ini)
+* `Alt + V` - (Copies the template (INI) name of the selected objects to the clipboard, one per
+line with duplicates folded, and confirms with a message. `CHEAT_COPY_OBJECT_NAME` in CommandMap.ini)
 * ``Shift + Ctrl + ` `` - (Cycles `HealthBarDisplayMode` live)
 
 Notes:

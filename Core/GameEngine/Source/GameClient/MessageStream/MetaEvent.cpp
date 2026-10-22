@@ -239,6 +239,7 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "CHEAT_SHOW_MODEL_NAMES",									  GameMessage::MSG_CHEAT_SHOW_MODEL_NAMES },
 	{ "CHEAT_SHOW_WINDOW_NAMES",								  GameMessage::MSG_CHEAT_SHOW_WINDOW_NAMES },
 	{ "CHEAT_SHOW_SHADER_DRAWS",								  GameMessage::MSG_CHEAT_SHOW_SHADER_DRAWS },
+	{ "CHEAT_COPY_OBJECT_NAME",								  GameMessage::MSG_CHEAT_COPY_OBJECT_NAME },
 	{ "CHEAT_ADD_CASH",									          GameMessage::MSG_CHEAT_ADD_CASH },
 	{ "CHEAT_GIVE_ALL_SCIENCES",					        GameMessage::MSG_CHEAT_GIVE_ALL_SCIENCES },
   { "CHEAT_GIVE_SCIENCEPURCHASEPOINTS",        	GameMessage::MSG_CHEAT_GIVE_SCIENCEPURCHASEPOINTS },
@@ -1187,6 +1188,19 @@ void MetaMap::generateMetaMap()
 			map->m_key = MK_F1;
 			map->m_transition = DOWN;
 			map->m_modState = SHIFT_CTRL;
+			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
+		}
+	}
+	{
+		// Copy the template names of the selected objects to the clipboard. Alt+V is unbound in
+		// the engine defaults, in Contra's CommandMap.ini and in the demo map, which already puts
+		// its own cheats on Alt+F, Alt+G, Alt+H and Alt+T. Observer usable too, like the overlays.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_COPY_OBJECT_NAME);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_V;
+			map->m_transition = DOWN;
+			map->m_modState = ALT;
 			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
 		}
 	}
