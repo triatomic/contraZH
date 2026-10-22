@@ -1606,6 +1606,22 @@ static GameWindow *findOptionsWindow( const char *name, NameKeyType &id )
 	return TheWindowManager->winGetWindowFromId( nullptr, id );
 }
 
+// The debug view checkboxes are developer aids, so only a cheats build shows them. The layout
+// still holds them; a build without cheats hides the box and forgets it, and the option then
+// reads and saves as off.
+static GameWindow *findDebugViewCheck( const char *name )
+{
+	GameWindow *check = findOptionsWindow( name );
+#if !(defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE))
+	if (check)
+	{
+		check->winHide( TRUE );
+		check = nullptr;
+	}
+#endif
+	return check;
+}
+
 static void setLabelText( const char *name, const char *label )
 {
 	GameWindow *window = findOptionsWindow( name );
@@ -1703,20 +1719,20 @@ static void initGameOptionsWindows()
 	textEntryKeyboardOverlayBackdropOpacity = findOptionsWindow( "OptionsMenu.wnd:TextEntryKeyboardOverlayBackdropOpacity" );
 	checkBloom = findOptionsWindow( "OptionsMenu.wnd:CheckBloom", checkBloomID );
 	textEntryBloomStrength = findOptionsWindow( "OptionsMenu.wnd:TextEntryBloomStrength" );
-	checkBloomDebug = findOptionsWindow( "OptionsMenu.wnd:CheckBloomDebug" );
+	checkBloomDebug = findDebugViewCheck( "OptionsMenu.wnd:CheckBloomDebug" );
 	checkLaserRef = findOptionsWindow( "OptionsMenu.wnd:CheckLaserRef" );
 	checkShadowMap = findOptionsWindow( "OptionsMenu.wnd:CheckShadowMap" );
 	checkSpecular = findOptionsWindow( "OptionsMenu.wnd:CheckSpecular", checkSpecularID );
-	checkSpecularDebug = findOptionsWindow( "OptionsMenu.wnd:CheckSpecularDebug" );
+	checkSpecularDebug = findDebugViewCheck( "OptionsMenu.wnd:CheckSpecularDebug" );
 	checkNormalMaps = findOptionsWindow( "OptionsMenu.wnd:CheckNormalMaps", checkNormalMapsID );
-	checkNormalMapDebug = findOptionsWindow( "OptionsMenu.wnd:CheckNormalMapDebug" );
+	checkNormalMapDebug = findDebugViewCheck( "OptionsMenu.wnd:CheckNormalMapDebug" );
 	checkWaterReflections = findOptionsWindow( "OptionsMenu.wnd:CheckWaterReflections" );
 	checkDynamicLights = findOptionsWindow( "OptionsMenu.wnd:CheckDynamicLights", checkDynamicLightsID );
 	checkPixelLights = findOptionsWindow( "OptionsMenu.wnd:CheckPixelLights", checkPixelLightsID );
-	checkDynamicLightsDebug = findOptionsWindow( "OptionsMenu.wnd:CheckDynamicLightsDebug" );
+	checkDynamicLightsDebug = findDebugViewCheck( "OptionsMenu.wnd:CheckDynamicLightsDebug" );
 	checkSoftParticles = findOptionsWindow( "OptionsMenu.wnd:CheckSoftParticles" );
 	checkAmbientOcclusion = findOptionsWindow( "OptionsMenu.wnd:CheckAmbientOcclusion", checkAmbientOcclusionID );
-	checkAmbientOcclusionDebug = findOptionsWindow( "OptionsMenu.wnd:CheckAmbientOcclusionDebug" );
+	checkAmbientOcclusionDebug = findDebugViewCheck( "OptionsMenu.wnd:CheckAmbientOcclusionDebug" );
 	checkHeightBlend = findOptionsWindow( "OptionsMenu.wnd:CheckHeightBlend" );
 	checkHQSky = findOptionsWindow( "OptionsMenu.wnd:CheckHQSky" );
 	checkShorelineFoam = findOptionsWindow( "OptionsMenu.wnd:CheckShorelineFoam" );

@@ -305,7 +305,8 @@ support.
 applied on Accept.)
 * `BloomStrength = 0.5` - (0 to 1. 0 is off. The box beside `Bloom` on the Graphics page.)
 * `BloomDebug = No` - (Yes shows only the blurred glow buffer on black, to see what feeds it.
-`Bloom debug view` on the Graphics page.)
+`Bloom debug view` on the Graphics page. Cheat builds only: a release build hides the checkbox and
+ignores the key.)
 
 Menu controls need `CheckBloom`, `TextEntryBloomStrength` and `CheckBloomDebug` in `OptionsMenu.wnd`;
 `build/move_bloom_to_shaders_wnd.py` moves them onto the Graphics page and `build/bloom_row_wnd.py`

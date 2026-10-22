@@ -363,9 +363,19 @@ Real OptionPreferences::getBloomStrength(void) const
 	return clamp(0.0f, strength, 1.0f);
 }
 
+// The debug views are developer aids: a build without cheats never turns one on, whatever Options.ini says
+static Bool debugViewEnabled(const UserPreferences &pref, const char *key)
+{
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	return pref.getBool(key, FALSE);
+#else
+	return FALSE;
+#endif
+}
+
 Bool OptionPreferences::getBloomDebugEnabled(void) const
 {
-	return getBool("BloomDebug", FALSE);
+	return debugViewEnabled(*this, "BloomDebug");
 }
 
 Bool OptionPreferences::getLaserRefEnabled(void) const
@@ -481,22 +491,22 @@ Bool OptionPreferences::getSmoothUnitMotionEnabled(void) const
 
 Bool OptionPreferences::getSpecularDebugEnabled(void) const
 {
-	return getBool("SpecularDebug", FALSE);
+	return debugViewEnabled(*this, "SpecularDebug");
 }
 
 Bool OptionPreferences::getNormalMapDebugEnabled(void) const
 {
-	return getBool("NormalMapDebug", FALSE);
+	return debugViewEnabled(*this, "NormalMapDebug");
 }
 
 Bool OptionPreferences::getAmbientOcclusionDebugEnabled(void) const
 {
-	return getBool("AmbientOcclusionDebug", FALSE);
+	return debugViewEnabled(*this, "AmbientOcclusionDebug");
 }
 
 Bool OptionPreferences::getDynamicLightsDebugEnabled(void) const
 {
-	return getBool("DynamicLightsDebug", FALSE);
+	return debugViewEnabled(*this, "DynamicLightsDebug");
 }
 
 Bool OptionPreferences::getBorderlessWindowEnabled(void) const

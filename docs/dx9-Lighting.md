@@ -58,7 +58,7 @@ Around 4 to 128 is useful; past that the highlight shrinks to nothing.)
 
 `SpecularDebug = Yes` in `Options.ini` tints covered surfaces magenta and shows the highlight 8x
 brighter. Also `Specular debug view` on the Graphics page, which needs `CheckSpecularDebug` in
-`OptionsMenu.wnd`.
+`OptionsMenu.wnd`. Cheat builds only: a release build hides the checkbox and ignores the key.
 
 # Terrain glint
 
@@ -163,7 +163,7 @@ from further away than units, so it defaults stronger.)
 
 `NormalMapDebug = Yes` in `Options.ini` paints terrain flat grey with only the bump shading, 4x
 stronger. Also `Normal map debug view` on the Graphics page, which needs `CheckNormalMapDebug` in
-`OptionsMenu.wnd`.
+`OptionsMenu.wnd`. Cheat builds only: a release build hides the checkbox and ignores the key.
 
 # Glow masks
 
@@ -220,7 +220,8 @@ before, so they show none without shader model 2.0a.
 `DynamicLightsDebug = Yes` in `Options.ini` paints the terrain, roads, bridges and units black and
 draws only the per-pixel lights on them, so each light's shape and reach shows. Also `Lights debug
 view` on the Graphics page, greyed out while per-pixel lights are off. Needs `CheckDynamicLightsDebug`
-in `OptionsMenu.wnd` for the menu control. Notes:
+in `OptionsMenu.wnd` for the menu control. Cheat builds only: a release build hides the checkbox and
+ignores the key. Notes:
 * Applies at once, and needs `PixelLights = Yes`.
 * Lights left on the old lighting do not show.
 * Water, sky, trees, particles and shroud draw as usual.
@@ -243,7 +244,8 @@ values spread the shade wider and soften it.)
 
 `AmbientOcclusionDebug = Yes` in `Options.ini` shows the shade in grey in place of the terrain, units
 and buildings. Water, decals, particles and the interface still draw over it. Also `Occlusion debug
-view` on the Graphics page, which needs `CheckAmbientOcclusionDebug` in `OptionsMenu.wnd`.
+view` on the Graphics page, which needs `CheckAmbientOcclusionDebug` in `OptionsMenu.wnd`. Cheat
+builds only: a release build hides the checkbox and ignores the key.
 
 Notes:
 * The shade reads the scene's depth, which a multisampled depth buffer hides, so it is off whenever

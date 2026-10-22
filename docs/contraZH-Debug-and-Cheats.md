@@ -75,3 +75,12 @@ Notes:
 * The health bar cycle and the `Ctrl + \` pause are **not** cheats and work in a normal release build too.
 * A second press of the combined cheat resets rank via `resetRank()`, wiping purchased sciences.
 * Sciences granted are only this general's own tree.
+
+## Debug views
+
+The Graphics page of the Options menu has five debug view checkboxes: `Bloom debug view`,
+`Specular debug view`, `Normal map debug view`, `Lights debug view` and `Occlusion debug view`.
+Each one draws a single render pass alone so it can be judged; the shader pages describe what each
+shows. A release build hides the five checkboxes and ignores their `Options.ini` keys (`BloomDebug`,
+`SpecularDebug`, `NormalMapDebug`, `DynamicLightsDebug`, `AmbientOcclusionDebug`), so a key left on
+by a cheat build cannot stick in a release build.
