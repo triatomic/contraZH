@@ -119,6 +119,32 @@ finished units of a batch stay finished.
 * No effect on the first entry or a finished unit waiting to exit.
 * Plain click still cancels; Shift+click still cancels all of that type.
 
+## New CommandButton Options
+
+### SKIP_CLEAR_PATH_CHECK
+
+For `SPECIAL_POWER_CONSTRUCT` and `SPECIAL_POWER_CONSTRUCT_FROM_SHORTCUT` on a unit. The placement
+cursor normally turns red where the unit cannot path to, so a unit on an island cannot use the
+command at all. Structures never had that check. With the option the unit skips it too; every other
+placement rule still applies.
+
+```
+CommandButton Command_Dig
+  Command       = SPECIAL_POWER_CONSTRUCT
+  Options       = NEED_SPECIAL_POWER_SCIENCE SKIP_CLEAR_PATH_CHECK
+  SpecialPower  = SpecialPowerDig
+  Object        = GLASneakAttackTunnelNetwork
+  TextLabel     = CONTROLBAR:Dig
+  ButtonImage   = SUDig
+  ButtonBorderType = ACTION
+  DescriptLabel = CONTROLBAR:ToolTipGLADig
+End
+```
+
+A unit power that places its object through an `Attack` nugget and the weapon's `FireOCL` now
+spawns that object at the placed spot and rotation. See
+[Attack nugget: placed shots](contraZH-Object-Creation-List.md#attack-nugget-placed-shots).
+
 ## REVERSE_MOVE hotkey
 
 Caps Lock arms upstream's `REVERSE_MOVE` order for any selection, without the button. See

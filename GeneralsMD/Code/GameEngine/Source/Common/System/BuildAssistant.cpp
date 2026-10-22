@@ -1002,6 +1002,17 @@ LegalBuildCode BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos
 }
 
 //-------------------------------------------------------------------------------------------------
+/** True while the builder is placing a SPECIAL_POWER_CONSTRUCT button that has SKIP_CLEAR_PATH_CHECK */
+//-------------------------------------------------------------------------------------------------
+static Bool placementSkipsClearPath( const Object *builder )
+{
+	// the construction button is UI state parked on the logic module, so the read never mutates
+	ProductionUpdateInterface *pu = const_cast<Object *>( builder )->getProductionUpdateInterface();
+	const CommandButton *button = pu ? pu->getSpecialPowerConstructionCommandButton() : nullptr;
+	return button && BitIsSet( button->getOptions(), SKIP_CLEAR_PATH_CHECK );
+}
+
+//-------------------------------------------------------------------------------------------------
 /** Query if we can build at this location.  Note that 'build' may be null and is NOT required
 	* to be valid to know if a location is legal to build at.  'builderObject' is used
 	* for queries that require a pathfind check and should be null if not required */
@@ -1115,7 +1126,8 @@ LegalBuildCode BuildAssistant::isLocationLegalToBuild( const Coord3D *worldPos,
 #if RTS_GENERALS && RETAIL_COMPATIBLE_CRC
 	if( BitIsSet( options, CLEAR_PATH ) && builderObject )
 #else
-	if( BitIsSet( options, CLEAR_PATH ) && builderObject && !builderObject->isKindOf( KINDOF_IMMOBILE ) )
+	if( BitIsSet( options, CLEAR_PATH ) && builderObject && !builderObject->isKindOf( KINDOF_IMMOBILE )
+			&& !placementSkipsClearPath( builderObject ) )
 #endif
 	{
 		const AIUpdateInterface *ai = builderObject->getAIUpdateInterface();

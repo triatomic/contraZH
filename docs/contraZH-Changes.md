@@ -24,7 +24,7 @@ version - see [Rendering](contraZH-Options.md#rendering) for the renamed `Anisot
 * [GameData.ini](contraZH-GameData.md) - new GameData.ini keys and simulation rules
 * [SpecialPower.ini](contraZH-SpecialPowers.md) - new SpecialPower.ini keys
 * [Weapon.ini](contraZH-Weapons.md) - new Weapon.ini keys
-* [CommandButtons & Selection](contraZH-CommandButtons.md) - new command buttons, queue reorder and structure multi-select
+* [CommandButtons & Selection](contraZH-CommandButtons.md) - new command buttons and options, queue reorder and structure multi-select
 * [ParticleSystem.ini](contraZH-ParticleSystems.md) - new ParticleSystem.ini keys
 * [ObjectCreationList.ini](contraZH-Object-Creation-List.md) - new ObjectCreationList.ini nuggets
 * [ChatCommands.ini](contraZH-ChatCommands.md) - new chat command fields: health, ownership, EMP, crew kill, player control and typed spawns

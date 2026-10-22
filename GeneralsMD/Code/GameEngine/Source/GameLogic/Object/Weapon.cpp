@@ -1166,7 +1166,20 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		VeterancyLevel v = getEffectiveFXVeterancy(sourceObj);
 		const ObjectCreationList *oclToUse = isProjectileDetonation ? getProjectileDetonationOCL(v) : getFireOCL(v);
 		if( oclToUse )
-			ObjectCreationList::create( oclToUse, sourceObj, nullptr );
+		{
+			// a shot placed through SPECIAL_POWER_CONSTRUCT spawns its FireOCL at the placed spot and angle, not at the shooter
+			Coord3D placePos;
+			Real placeAngle;
+			AIUpdateInterface *ai = isProjectileDetonation ? nullptr : const_cast<Object *>( sourceObj )->getAI();
+			if( ai && ai->friend_takeAttackPlacement( &placePos, &placeAngle ) )
+			{
+				ObjectCreationList::create( oclToUse, sourceObj, &placePos, &placePos, placeAngle );
+			}
+			else
+			{
+				ObjectCreationList::create( oclToUse, sourceObj, nullptr );
+			}
+		}
 	}
 
 	Coord3D projectileDestination = *victimPos; //Need to copy this, as we have a pointer to their actual position

@@ -105,6 +105,7 @@ enum CommandOption CPP_11(: Int)
 	MUST_BE_STOPPED							= 0x00800000, // Unit must be stopped in order to be able to use button.
 	FORMATION_LAUNCH						= 0x01000000, // code-only: jumpjet group launch, keep formation offset instead of random scatter.
 	NEED_N_TARGET_POS						= 0x02000000, // command needs the user to select N target positions (NumberOfTargets); only the final click commits (chronosphere = 2).
+	SKIP_CLEAR_PATH_CHECK				= 0x04000000, // SPECIAL_POWER_CONSTRUCT placement does not require the unit to be able to path to the spot
 };
 
 #ifdef DEFINE_COMMAND_OPTION_NAMES
@@ -140,6 +141,7 @@ static const char *const TheCommandOptionNames[] =
 	"MUST_BE_STOPPED",
 	"FORMATION_LAUNCH",
 	"NEED_N_TARGET_POS",
+	"SKIP_CLEAR_PATH_CHECK",
 
 	nullptr
 };

@@ -367,6 +367,9 @@ AIUpdateInterface::AIUpdateInterface( Thing *thing, const ModuleData* moduleData
 	m_queuedShotsLeft = 0;
 	m_queuedShotsPos.zero();
 	m_clearFiringStatusFrame = 0;
+	m_attackPlacementPos.zero();
+	m_attackPlacementAngle = INVALID_ANGLE;
+	m_attackPlacementShotsLeft = 0;
 #ifdef ALLOW_DEMORALIZE
 	m_demoralizedFramesLeft = 0;
 #endif
@@ -1188,6 +1191,28 @@ void AIUpdateInterface::friend_queueShots(WeaponSlotType slot, Int shots, const 
 	m_queuedShotsLeft = shots;
 	m_queuedShotsPos = *pos;
 	wakeUpNow();
+}
+
+//-------------------------------------------------------------------------------------------------
+void AIUpdateInterface::friend_setAttackPlacement(const Coord3D* pos, Real angle, Int shots)
+{
+	m_attackPlacementPos = *pos;
+	m_attackPlacementAngle = angle;
+	m_attackPlacementShotsLeft = shots > 0 ? shots : 1;
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool AIUpdateInterface::friend_takeAttackPlacement(Coord3D* pos, Real* angle)
+{
+	if (m_attackPlacementShotsLeft <= 0)
+	{
+		return FALSE;
+	}
+
+	--m_attackPlacementShotsLeft;
+	*pos = m_attackPlacementPos;
+	*angle = m_attackPlacementAngle;
+	return TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3124,6 +3149,12 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 
 	// Any new order cancels a forced-reverse move; the REVERSE_MOVE case below re-sets it.
 	m_forceMoveBackwards = FALSE;
+
+	// A new order cancels the placed attack too, unless its shots are queued and outlive orders.
+	if (m_queuedShotsLeft <= 0)
+	{
+		m_attackPlacementShotsLeft = 0;
+	}
 
 	switch (parms->m_cmd)
 	{
@@ -5753,6 +5784,7 @@ void AIUpdateInterface::crc( Xfer *x )
 	* 7: Added m_isHoldingFire (HOLD_FIRE stance)
 	* 8: Added the queued shots (OCL Attack FireRegardlessOfOrders)
 	* 10: Added the order held while jammed
+	* 11: Added the attack placement (OCL Attack through SPECIAL_POWER_CONSTRUCT)
 	*/
 // ------------------------------------------------------------------------------------------------
 void AIUpdateInterface::xfer( Xfer *xfer )
@@ -5761,7 +5793,7 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 #if RETAIL_COMPATIBLE_CRC || RETAIL_COMPATIBLE_XFER_SAVE
 	const XferVersion currentVersion = 4;
 #else
-	const XferVersion currentVersion = 10;
+	const XferVersion currentVersion = 11;
 #endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
@@ -6019,6 +6051,13 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 		{
 			m_jammedOrder.doXfer(xfer);
 		}
+	}
+
+	if (version >= 11)
+	{
+		xfer->xferCoord3D(&m_attackPlacementPos);
+		xfer->xferReal(&m_attackPlacementAngle);
+		xfer->xferInt(&m_attackPlacementShotsLeft);
 	}
 
 }

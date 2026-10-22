@@ -213,6 +213,12 @@ public:
 				primaryObject->setWeaponLock( m_weaponSlot, LOCKED_TEMPORARILY );
 				ai->aiAttackPosition( secondary, m_numberOfShots, CMD_FROM_AI );
 			}
+
+			// only the SPECIAL_POWER_CONSTRUCT placement interface sends a valid angle
+			if( angle != INVALID_ANGLE )
+			{
+				ai->friend_setAttackPlacement( secondary, angle, m_numberOfShots );
+			}
 		}
 
 		static NameKeyType key_RadiusDecalUpdate = NAMEKEY("RadiusDecalUpdate");

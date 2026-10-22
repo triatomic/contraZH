@@ -649,6 +649,10 @@ public:
 	void friend_queueShots(WeaponSlotType slot, Int shots, const Coord3D* pos);
 	Int friend_getQueuedShotsLeft() const { return m_queuedShotsLeft; }
 
+	// OCL Attack placed through SPECIAL_POWER_CONSTRUCT: the FireOCL of the next shots spawns at the placed spot and angle
+	void friend_setAttackPlacement(const Coord3D* pos, Real angle, Int shots);
+	Bool friend_takeAttackPlacement(Coord3D* pos, Real* angle);
+
 	Bool canAutoAcquire() const { return getAIUpdateModuleData()->m_autoAcquireEnemiesWhenIdle; }
 
 	Bool canAutoAcquireWhileStealthed() const;
@@ -862,6 +866,9 @@ private:
 	Coord3D				m_queuedShotsPos;
 	UnsignedInt		m_clearFiringStatusFrame;
 	void fireQueuedShots();
+	Coord3D				m_attackPlacementPos;
+	Real					m_attackPlacementAngle;
+	Int						m_attackPlacementShotsLeft;
 
 	// Common AI "status" effects -------------------------------------------------------------------
 #ifdef ALLOW_DEMORALIZE
