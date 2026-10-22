@@ -867,9 +867,12 @@ usual, and its shots leave the sphere freely.
 * Allies pass. Enemies and neutrals are stopped.
 * A stopped projectile is removed without detonating and without running its die modules. A
 stopped beam deals no damage to its target. With `DamageSelf = No` the shot is simply gone.
-* The field is down while the object is dead, under construction or disabled (EMP, no power and
-the like).
-* Projectiles are caught once per frame, so a fast one stops up to one step inside the surface.
+* The field is down while the object is dead, under construction or has its systems cut (EMP,
+hack, no power, subdual, frozen, paralysed). Being held, carried or unmanned keeps it up.
+* Projectiles are caught once per frame, one frame of flight ahead of the surface, so a fast one
+stops at the surface and one that would hit its target in the same frame is still caught. A
+projectile with no launch point on record is stopped as if it came from outside.
+* With `TriggeredBy`, the scan sleeps until the upgrade lands.
 * Weapons with `DamageDealtAtSelfPosition` are never stopped, nor is a projectile's own
 detonation.
 * The AI keeps firing at shielded targets, as it did with the weapon-based shields.

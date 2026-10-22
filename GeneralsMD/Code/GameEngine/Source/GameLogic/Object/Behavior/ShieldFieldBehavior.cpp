@@ -32,6 +32,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/Weapon.h"
+#include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/ShieldFieldBehavior.h"
 
 // Every live field, so a shot can ask them all; construction order keeps the walk deterministic.
@@ -94,10 +95,21 @@ ShieldFieldBehavior::~ShieldFieldBehavior()
 UpdateSleepTime ShieldFieldBehavior::update()
 {
 	const ShieldFieldBehaviorModuleData *d = getShieldFieldBehaviorModuleData();
-	if( !d->m_blockProjectiles || !isUp() )
+	if( !d->m_blockProjectiles )
 	{
-		return UPDATE_SLEEP_NONE;
+		return UPDATE_SLEEP_FOREVER;
 	}
+	if( !isUp() )
+	{
+		// an upgrade-gated field sleeps until upgradeImplementation wakes it
+		UpgradeMaskType activation, conflicting;
+		getUpgradeActivationMasks( activation, conflicting );
+		return (activation.any() && !isAlreadyUpgraded()) ? UPDATE_SLEEP_FOREVER : UPDATE_SLEEP_NONE;
+	}
+
+	// Projectiles about to enter next frame are caught too, so a fast one cannot step over the
+	// surface or hit its target before this update runs. The margin is one frame of flight.
+	const Real stepMargin = 100.0f;
 
 	Object *me = getObject();
 	PartitionFilterRelationship relationship( me, PartitionFilterRelationship::ALLOW_ENEMIES | PartitionFilterRelationship::ALLOW_NEUTRAL );
@@ -105,7 +117,7 @@ UpdateSleepTime ShieldFieldBehavior::update()
 	PartitionFilterAcceptByKindOf filterKindOf( MAKE_KINDOF_MASK( KINDOF_PROJECTILE ), KINDOFMASK_NONE );
 	PartitionFilter *filters[] = { &relationship, &filterAlive, &filterKindOf, nullptr };
 
-	ObjectIterator *iter = ThePartitionManager->iterateObjectsInRange( me->getPosition(), d->m_radius, FROM_CENTER_3D, filters );
+	ObjectIterator *iter = ThePartitionManager->iterateObjectsInRange( me->getPosition(), d->m_radius + stepMargin, FROM_CENTER_3D, filters );
 	MemoryPoolObjectHolder hold( iter );
 	for( Object *other = iter->first(); other; other = iter->next() )
 	{
@@ -120,18 +132,40 @@ UpdateSleepTime ShieldFieldBehavior::update()
 			continue;
 		}
 
-		// A shot fired inside the sphere never crossed its surface.
+		// A shot fired inside the sphere never crossed its surface. With no launch point on record
+		// the projectile's own position stands in for the coverage test only.
 		Coord3D origin;
-		if( pui == nullptr || !pui->projectileGetLaunchPos( origin ) )
+		const Bool originKnown = pui && pui->projectileGetLaunchPos( origin );
+		if( originKnown && isInside( &origin ) )
 		{
-			origin = *other->getPosition();
+			continue;
 		}
-		if( isInside( &origin ) || !covers( &origin ) )
+		if( !covers( originKnown ? &origin : other->getPosition() ) )
 		{
 			continue;
 		}
 
-		stopProjectile( other );
+		Coord3D hit = *other->getPosition();
+		if( !isInside( &hit ) )
+		{
+			const PhysicsBehavior *physics = other->getPhysics();
+			if( physics == nullptr )
+			{
+				continue;
+			}
+			Coord3D next = hit;
+			next.add( *physics->getVelocity() );
+			Real t;
+			if( !findEntry( &hit, &next, &t ) )
+			{
+				continue;
+			}
+			hit.x += (next.x - hit.x) * t;
+			hit.y += (next.y - hit.y) * t;
+			hit.z += (next.z - hit.z) * t;
+		}
+
+		stopProjectile( other, &hit );
 	}
 
 	return UPDATE_SLEEP_NONE;
@@ -145,6 +179,21 @@ UpdateSleepTime ShieldFieldBehavior::update()
 	for( size_t i = 0; i < s_fields.size(); ++i )
 	{
 		ShieldFieldBehavior *field = s_fields[i];
+
+		// A sphere farther from the shot's start than the shot's length plus the radius cannot touch it; (a+b)^2 <= 2(a^2+b^2) keeps this sqrt-free.
+		const Coord3D *center = field->getObject()->getPosition();
+		Real radius = field->getShieldFieldBehaviorModuleData()->m_radius;
+		Real fx = from->x - center->x;
+		Real fy = from->y - center->y;
+		Real fz = from->z - center->z;
+		Real sx = to->x - from->x;
+		Real sy = to->y - from->y;
+		Real sz = to->z - from->z;
+		if( fx * fx + fy * fy + fz * fz > 2.0f * (sx * sx + sy * sy + sz * sz + radius * radius) )
+		{
+			continue;
+		}
+
 		if( !field->getShieldFieldBehaviorModuleData()->m_blockBeams || !field->isUp() || !field->blocksShotsFrom( shooter ) || !field->covers( from ) )
 		{
 			continue;
@@ -174,13 +223,13 @@ UpdateSleepTime ShieldFieldBehavior::update()
 }
 
 //-------------------------------------------------------------------------------------------------
-void ShieldFieldBehavior::absorbShot( const WeaponTemplate* weapon, const WeaponBonus& bonus, ObjectID sourceID, const Coord3D* at, Bool inflictDamage )
+void ShieldFieldBehavior::absorbShot( const WeaponTemplate* weapon, const WeaponBonus& bonus, ObjectID sourceID, const Coord3D* at )
 {
 	const ShieldFieldBehaviorModuleData *d = getShieldFieldBehaviorModuleData();
 
 	FXList::doFXPos( d->m_hitFX, at );
 
-	if( !inflictDamage || !d->m_damageSelf || weapon == nullptr )
+	if( !d->m_damageSelf || weapon == nullptr )
 	{
 		return;
 	}
@@ -205,8 +254,12 @@ void ShieldFieldBehavior::absorbShot( const WeaponTemplate* weapon, const Weapon
 //-------------------------------------------------------------------------------------------------
 Bool ShieldFieldBehavior::isUp() const
 {
+	// Only states that cut the object's systems drop the field; being held, carried or unmanned does not.
+	DisabledMaskType systemsDown = MAKE_DISABLED_MASK5( DISABLED_DEFAULT, DISABLED_HACKED, DISABLED_EMP, DISABLED_UNDERPOWERED, DISABLED_SUBDUED );
+	systemsDown.set( MAKE_DISABLED_MASK3( DISABLED_PARALYZED, DISABLED_SCRIPT_UNDERPOWERED, DISABLED_FROZEN ) );
+
 	const Object *me = getObject();
-	if( me->isEffectivelyDead() || me->isDisabled() || me->testStatus( OBJECT_STATUS_UNDER_CONSTRUCTION ) )
+	if( me->isEffectivelyDead() || me->getDisabledFlags().testForAny( systemsDown ) || me->testStatus( OBJECT_STATUS_UNDER_CONSTRUCTION ) )
 	{
 		return FALSE;
 	}
@@ -307,7 +360,7 @@ Bool ShieldFieldBehavior::findEntry( const Coord3D* from, const Coord3D* to, Rea
 
 //-------------------------------------------------------------------------------------------------
 // The projectile vanishes without detonating or dying, so its warhead and die modules stay quiet.
-void ShieldFieldBehavior::stopProjectile( Object* projectile )
+void ShieldFieldBehavior::stopProjectile( Object* projectile, const Coord3D* at )
 {
 	const WeaponTemplate *weapon = nullptr;
 	ObjectID launcherID = INVALID_ID;
@@ -339,7 +392,7 @@ void ShieldFieldBehavior::stopProjectile( Object* projectile )
 		}
 	}
 
-	absorbShot( weapon, bonus, launcherID != INVALID_ID ? launcherID : projectile->getID(), projectile->getPosition(), TRUE );
+	absorbShot( weapon, bonus, launcherID != INVALID_ID ? launcherID : projectile->getID(), at );
 	TheGameLogic->destroyObject( projectile );
 }
 

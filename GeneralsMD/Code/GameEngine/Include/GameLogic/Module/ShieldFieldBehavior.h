@@ -70,14 +70,15 @@ public:
 	/// The field whose surface a shot from shooter crosses first on its way from from to to, with the crossing point.
 	static ShieldFieldBehavior* findBlockingField( const Object* shooter, const Coord3D* from, const Coord3D* to, Coord3D* hitPos );
 
-	/// Plays the hit FX at the stop point and, with DamageSelf, lands the shot's damage on the object.
-	void absorbShot( const WeaponTemplate* weapon, const WeaponBonus& bonus, ObjectID sourceID, const Coord3D* at, Bool inflictDamage );
+	/// Plays the hit FX at the stop point and, with DamageSelf and a weapon, lands the shot's damage on the object.
+	void absorbShot( const WeaponTemplate* weapon, const WeaponBonus& bonus, ObjectID sourceID, const Coord3D* at );
 
 protected:
 
-	// the field is gated on the live upgrade mask, so the upgrade itself only drives FX and removal
+	// the field is gated on the live upgrade mask; the upgrade only wakes a sleeping scan
 	virtual void upgradeImplementation() override
 	{
+		setWakeFrame( getObject(), UPDATE_SLEEP_NONE );
 	}
 
 	virtual void getUpgradeActivationMasks(UpgradeMaskType& activation, UpgradeMaskType& conflicting) const override
@@ -109,6 +110,6 @@ private:
 	Bool isInside( const Coord3D* pos ) const;
 	Bool covers( const Coord3D* origin ) const;
 	Bool findEntry( const Coord3D* from, const Coord3D* to, Real* t ) const;
-	void stopProjectile( Object* projectile );
+	void stopProjectile( Object* projectile, const Coord3D* at );
 
 };

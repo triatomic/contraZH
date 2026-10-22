@@ -1294,8 +1294,9 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 					firingWeapon->createLaser( sourceObj, nullptr, &shieldHitPos, TRUE );
 				}
 			}
-			shieldField->absorbShot( this, bonus, sourceID, &shieldHitPos, inflictDamage );
-			return TheGameLogic->getFrame();
+			shieldField->absorbShot( inflictDamage ? this : nullptr, bonus, sourceID, &shieldHitPos );
+			// the shot still takes its flight time to reach the surface
+			return TheGameLogic->getFrame() + REAL_TO_INT_CEIL(delayInFrames);
 		}
 
 		if( firingWeapon->isLaser() )
@@ -3468,7 +3469,9 @@ ObjectID Weapon::createLaser( const Object *sourceObj, const Object *victimObj, 
 					pos.z += getTemplate()->getLaserGroundUnitTargetHeight();
 				}
 			}
-			else if( !exactEnd ) { // We target the ground
+			else if( !exactEnd )
+			{
+				// We target the ground
 				pos.z += getTemplate()->getLaserGroundTargetHeight();
 			}
 			update->initLaser( sourceObj, victimObj, sourceObj->getPosition(), &pos, m_template->getLaserBoneName() );
