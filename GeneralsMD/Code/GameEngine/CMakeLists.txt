@@ -333,6 +333,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/GrantStealthBehavior.h
     Include/GameLogic/Module/GrantTemporaryStealthBehavior.h
     Include/GameLogic/Module/GrantUpgradeCreate.h
+    Include/GameLogic/Module/ShieldFieldBehavior.h
     Include/GameLogic/Module/HackInternetAIUpdate.h
     Include/GameLogic/Module/HealContain.h
     Include/GameLogic/Module/HealCrateCollide.h
@@ -871,6 +872,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Behavior/GrantStealthBehavior.cpp
     Source/GameLogic/Object/Behavior/GrantTemporaryStealthBehavior.cpp
     Source/GameLogic/Object/Behavior/InstantDeathBehavior.cpp
+    Source/GameLogic/Object/Behavior/ShieldFieldBehavior.cpp
     Source/GameLogic/Object/Behavior/JetSlowDeathBehavior.cpp
     Source/GameLogic/Object/Behavior/MinefieldBehavior.cpp
     Source/GameLogic/Object/Behavior/NeutonBlastBehavior.cpp

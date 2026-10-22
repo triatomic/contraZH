@@ -828,6 +828,53 @@ time the carrier has left, not permanent stealth.
 * List the module before the power's own update module (e.g. `SpecialAbilityUpdate`), which stops
 later modules from seeing the power fire.
 
+### ShieldFieldBehavior
+
+A projected shield. A sphere around the object stops enemy fire at its surface. Projectiles that
+fly into the sphere vanish where they cross it. Lasers, tracer guns and every other weapon without
+a `ProjectileObject` stop at the surface, beam and all. This replaces the `FireWeaponUpdate` plus
+anti-projectile radius weapon setup, which pulsed every few frames and let instant-hit weapons
+through.
+
+```
+Behavior = ShieldFieldBehavior ModuleTag_Shield01
+  Radius           = 200
+  CoverageAngle    = 180          ; degrees each side of the facing; 180 covers all round
+  BlockProjectiles = Yes
+  BlockBeams       = Yes
+  DamageSelf       = No
+  HitFX            = FX_ShieldHit
+  TriggeredBy      = Upgrade_Shield   ; optional, see below
+End
+```
+
+* `Radius` - (Sphere radius around the object's position. Required.)
+* `CoverageAngle = 180` - (Degrees each side of the object's facing. A shot is stopped only when
+it comes from inside that arc, measured from the shield centre to the shooter, or to a projectile's
+launch point. 180 covers the whole sphere, 45 gives a 90 degree front shield.)
+* `BlockProjectiles = Yes` - (Stop missiles, shells and bombs.)
+* `BlockBeams = Yes` - (Stop weapons without a `ProjectileObject`: lasers, beams, tracer guns.)
+* `DamageSelf = No` - (`Yes` lands each stopped shot's `PrimaryDamage` on the object itself,
+through its armor. With a `ShieldBody` that drains the shield health pool.)
+* `HitFX` - (Played where a shot stops.)
+* The upgrade keys `TriggeredBy`, `ConflictsWith`, `RequiresAllTriggers`, `RemovesUpgrades` and
+`FXListUpgrade` work as in [FireWeaponUpdate](#upgrade-parameters). Without `TriggeredBy` the
+field is always up.
+
+Notes:
+* Only fire crossing the surface from outside is stopped. A shooter inside the sphere hits as
+usual, and its shots leave the sphere freely.
+* Allies pass. Enemies and neutrals are stopped.
+* A stopped projectile is removed without detonating and without running its die modules. A
+stopped beam deals no damage to its target. With `DamageSelf = No` the shot is simply gone.
+* The field is down while the object is dead, under construction or disabled (EMP, no power and
+the like).
+* Projectiles are caught once per frame, so a fast one stops up to one step inside the surface.
+* Weapons with `DamageDealtAtSelfPosition` are never stopped, nor is a projectile's own
+detonation.
+* The AI keeps firing at shielded targets, as it did with the weapon-based shields.
+* The logic is deterministic and runs in game logic only, so it is multiplayer and replay safe.
+
 ### TeleportSelfSpecialPower
 
 Special power update module that teleports its own object to a clicked ground position. This is the activated-ability counterpart to [TeleporterAIUpdate](Objects-&-Modules.md#teleporteraiupdate-new---experimental), which instead replaces all normal movement with teleporting; a unit with this module walks normally the rest of the time.

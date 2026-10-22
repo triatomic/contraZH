@@ -782,8 +782,8 @@ public:
 
 	Bool isLaser() const { return m_template->getLaserName().isNotEmpty(); }
 	// void createLaser( const Object *sourceObj, const Object *victimObj, const Coord3D *victimPos );
-	ObjectID createLaser(const Object* sourceObj, const Object* victimObj, const Coord3D* victimPos); //now returns the object ID
-	void handleContinuousLaser(const Object* sourceObj, const Object* victimObj, const Coord3D* victimPos);
+	ObjectID createLaser(const Object* sourceObj, const Object* victimObj, const Coord3D* victimPos, Bool exactEnd = FALSE); //now returns the object ID
+	void handleContinuousLaser(const Object* sourceObj, const Object* victimObj, const Coord3D* victimPos, Bool exactEnd = FALSE);
 
 	const WeaponTemplate* getTemplate() const { return m_template; }
 	WeaponSlotType getWeaponSlot() const { return m_wslot; }

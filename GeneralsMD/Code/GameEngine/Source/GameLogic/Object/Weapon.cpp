@@ -76,6 +76,7 @@
 #include "GameLogic/Module/ProjectileStreamUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/LifetimeUpdate.h"
+#include "GameLogic/Module/ShieldFieldBehavior.h"
 #include "GameLogic/Module/SpawnBehavior.h"
 #include "GameLogic/TerrainLogic.h"
 
@@ -1103,11 +1104,23 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		}
 	}
 
+	// A shield field between the shooter and the target stops an instant-hit shot at its surface.
+	ShieldFieldBehavior *shieldField = nullptr;
+	Coord3D shieldHitPos;
+	if( getProjectileTemplate() == nullptr && !isProjectileDetonation && !getDamageDealtAtSelfPosition() )
+	{
+		shieldField = ShieldFieldBehavior::findBlockingField( sourceObj, sourcePos, victimPos, &shieldHitPos );
+	}
+
 	// call this even if FXList is null, because this also handles stuff like Gun Barrel Recoil
 	if (sourceObj && sourceObj->getDrawable())
 	{
 		Coord3D targetPos;
-		if( victimObj )
+		if( shieldField )
+		{
+			targetPos.set( shieldHitPos );
+		}
+		else if( victimObj )
 		{
 			victimObj->getGeometryInfo().getCenterPosition( *victimObj->getPosition(), targetPos );
 		}
@@ -1267,6 +1280,23 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		Real delayInFrames = WWMath::Div_Safe(v.length(), getWeaponSpeed());
 
 		ObjectID damageID = getDamageDealtAtSelfPosition() ? INVALID_ID : victimID;
+
+		if( shieldField )
+		{
+			if( firingWeapon->isLaser() )
+			{
+				if( firingWeapon->getContinuousLaserLoopTime() > 0 )
+				{
+					firingWeapon->handleContinuousLaser( sourceObj, nullptr, &shieldHitPos, TRUE );
+				}
+				else
+				{
+					firingWeapon->createLaser( sourceObj, nullptr, &shieldHitPos, TRUE );
+				}
+			}
+			shieldField->absorbShot( this, bonus, sourceID, &shieldHitPos, inflictDamage );
+			return TheGameLogic->getFrame();
+		}
 
 		if( firingWeapon->isLaser() )
 		{
@@ -3406,7 +3436,7 @@ void Weapon::newProjectileFired(const Object *sourceObj, const Object *projectil
 }
 
 //-------------------------------------------------------------------------------------------------
-ObjectID Weapon::createLaser( const Object *sourceObj, const Object *victimObj, const Coord3D *victimPos )
+ObjectID Weapon::createLaser( const Object *sourceObj, const Object *victimObj, const Coord3D *victimPos, Bool exactEnd )
 {
 	const ThingTemplate* pst = TheThingFactory->findTemplate(m_template->getLaserName());
 	if( !pst )
@@ -3438,7 +3468,7 @@ ObjectID Weapon::createLaser( const Object *sourceObj, const Object *victimObj, 
 					pos.z += getTemplate()->getLaserGroundUnitTargetHeight();
 				}
 			}
-			else { // We target the ground
+			else if( !exactEnd ) { // We target the ground
 				pos.z += getTemplate()->getLaserGroundTargetHeight();
 			}
 			update->initLaser( sourceObj, victimObj, sourceObj->getPosition(), &pos, m_template->getLaserBoneName() );
@@ -3448,7 +3478,7 @@ ObjectID Weapon::createLaser( const Object *sourceObj, const Object *victimObj, 
 	return laser->getID();
 }
 //-------------------------------------------------------------------------------------------------
-void Weapon::handleContinuousLaser(const Object* sourceObj, const Object* victimObj, const Coord3D* victimPos)
+void Weapon::handleContinuousLaser(const Object* sourceObj, const Object* victimObj, const Coord3D* victimPos, Bool exactEnd)
 {
 	UnsignedInt frameNow = TheGameLogic->getFrame();
 	Object* continuousLaser = TheGameLogic->findObjectByID(m_continuousLaserID);
@@ -3456,7 +3486,7 @@ void Weapon::handleContinuousLaser(const Object* sourceObj, const Object* victim
 	if (m_lastFireFrame + m_template->getContinuousLaserLoopTime() < frameNow ||
 		continuousLaser == NULL) {
 		// We are outside the loop time, or the laser doesn't exist -> create a new laser
-		ObjectID laserId = createLaser(sourceObj, victimObj, victimPos);
+		ObjectID laserId = createLaser(sourceObj, victimObj, victimPos, exactEnd);
 		continuousLaser = TheGameLogic->findObjectByID(laserId);
 		if (continuousLaser == NULL) {
 			return;
