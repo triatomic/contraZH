@@ -58,7 +58,7 @@ typedef MetaMap::DefaultKey Binding;
 enum
 {
 	SIDE_COUNT = 3,
-	CARD_SLOTS = 14,	///< the command bar's two rows of seven; slots past these are for scripts
+	CARD_SLOTS = 18,
 	ICON_POOL = 200,	///< object icons the layout holds for the middle grid
 	SECTION_COUNT = 3
 };
@@ -241,10 +241,10 @@ const Int GRID_HEIGHT = 448;
 const Int CARD_LEFT = 494;
 const Int CARD_TOP = 150;
 // the gaps between cells hold the selection ring
-const Int CARD_CELL_WIDTH = 35;
-const Int CARD_CELL_HEIGHT = 27;
-const Int CARD_STEP_X = 38;
-const Int CARD_STEP_Y = 31;
+const Int CARD_CELL_WIDTH = 27;
+const Int CARD_CELL_HEIGHT = 21;
+const Int CARD_STEP_X = 30;
+const Int CARD_STEP_Y = 25;
 
 // commands the engine names but Zero Hour never acts on
 const char *const HIDDEN_COMMANDS[] =
