@@ -232,7 +232,9 @@ static Player *getMessagePlayer(GameMessage *msg)
 }
 
 // ------------------------------------------------------------------------------------------------
-// Counts humans from the player list, so a live game and its replay answer the same.
+// Counts humans from the player list, so a live game and its replay answer the same. Observers
+// do not count: every skirmish and LAN game adds a hidden ReplayObserver player flagged human,
+// which would otherwise make a single player skirmish look like a two human game.
 // ------------------------------------------------------------------------------------------------
 static Bool hasMultipleHumanPlayers()
 {
@@ -240,7 +242,7 @@ static Bool hasMultipleHumanPlayers()
 	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
 	{
 		Player *player = ThePlayerList->getNthPlayer( i );
-		if (player != nullptr && player->getPlayerType() == PLAYER_HUMAN)
+		if (player != nullptr && player->getPlayerType() == PLAYER_HUMAN && !player->isPlayerObserver())
 		{
 			++humans;
 		}
