@@ -321,3 +321,19 @@ counts for range, and the attack cursor agrees.
 
 Changes the simulation; affects replays.
 ([#66](https://github.com/triatomic/contraZH/issues/66))
+
+## Empty jets fly their move orders
+
+A parked jet with no ammo that was told to move, or to land at another airfield, took off, turned
+round and landed again to reload, and the order was lost. Orders that need no ammo are now flown
+first; the jet returns to reload once it is idle again. An empty jet flies with its return-for-ammo
+locomotor, so an Aurora stays sluggish until it has reloaded.
+
+Orders that fire or guard still need the reload first. A parked empty jet now stays parked until it
+has reloaded and then takes off for the order
+([TheSuperHackers#2174](https://github.com/TheSuperHackers/GeneralsGameCode/pull/2174), always on
+here). An airborne empty jet lands, reloads and takes off for the order instead of flying there
+with nothing to fire.
+
+Changes the simulation; affects replays.
+([#80](https://github.com/triatomic/contraZH/issues/80))
