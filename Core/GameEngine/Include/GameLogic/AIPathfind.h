@@ -961,7 +961,8 @@ protected:
 	void debugShowSearch( Bool pathFound );				///< Show all cells touched in the last search
 	static LocomotorSurfaceTypeMask validLocomotorSurfacesForCellType(PathfindCell::CellType t);
 
-	void checkChangeLayers(PathfindCell *parentCell);
+	void checkChangeLayers(PathfindCell *parentCell, Bool limitCells = false);
+	Bool isSearchBudgetExhausted();
 
 	bool checkCellOutsideExtents(ICoord2D& cell);
 
@@ -1006,6 +1007,7 @@ private:
 	Int						m_queuePRTail;
 	Int						m_cumulativeCellsAllocated;
 	Int						m_searchCellCap;						///< Cells the current search may allocate, set by beginSearchBudget
+	Int						m_searchStartFreeCount;
 	Bool					m_lastSearchHitCap;					///< True if the last search stopped at its cap
 
 #if RTS_ZEROHOUR && RETAIL_COMPATIBLE_CRC

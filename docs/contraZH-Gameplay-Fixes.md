@@ -340,30 +340,5 @@ Changes the simulation; affects replays.
 
 ## Pathfinding
 
-* A full pathfind queue no longer freezes units. A refused request is retried a few frames later,
-and the queue holds 2048 requests instead of 511.
-* One search may use at most 10,000 cells. Past that it returns a partial path toward the goal and
-the unit paths on from there, up to eight legs. The per-frame budget now bounds each search, not just
-the gap between searches.
-* Zero Hour's coarse block search never expanded past its first block, so every long path was a
-map-wide search. It works now and gives the fine search a corridor.
-* Search costs are 32-bit (they wrapped at 65535 with the off-corridor penalty) and the cell record
-pool is 100,000 instead of 30,000.
-* Vehicles keep their footprint off water edges, cliffs and the map edge. Every ground cell knows its
-clearance: a 3x3 vehicle pays extra to drive along a shoreline, a 5x5 one may not enter it. Infantry
-and amphibious units are unchanged. Wheeled units no longer spin at the shore.
-* Group moves pack into slots. Ordering a group to a point outside its own footprint gives each unit
-an arrival cell in rings around the click, nearest units deepest, so the group arrives as a blob
-instead of spiralling outward. Attack-move and column moves end in the same slots. A click inside
-the group's footprint keeps every unit's relative offset as before.
-* A unit joins a column move only when the column's route passes within a quarter of its remaining
-length, or six cells, whichever is more. The rest path on their own. A group split across a river
-no longer drags its far half round to where the leader started instead of over the bridge.
-* Bridges: a path under a destroyed bridge no longer repaths every second, zone connectivity updates
-the frame after a bridge is destroyed or repaired instead of up to ten seconds later, destinations
-prefer the ground when the bridge above them is out, and a deleted bridge (flooded maps) frees its
-pathfind layer.
-
-Cheat builds can log the pathfinder's counters; see [Pathfinding log](contraZH-Debug-and-Cheats.md#pathfinding-log).
-
-Changes the simulation; affects replays, and all players need this build.
+See [Pathfinding Improvements](contraZH-Pathfinding-Improvements.md) for search limits, queue retries,
+shoreline clearance, group movement and bridge handling.

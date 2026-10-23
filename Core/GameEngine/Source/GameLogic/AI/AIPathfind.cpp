@@ -4257,6 +4257,7 @@ void Pathfinder::reset()
 	m_isMapReady = false;
 	m_cumulativeCellsAllocated = 0;
 	m_searchCellCap = PATHFIND_SEARCH_CELL_CAP;
+	m_searchStartFreeCount = PathfindCellInfo::getFreeCount();
 	m_lastSearchHitCap = false;
 
 	debugPathPos.x = 0.0f;
@@ -5505,8 +5506,19 @@ void Pathfinder::beginSearchBudget( PathfindSearchType type )
 		remaining = PATHFIND_SEARCH_CELL_CAP;
 	}
 	m_searchCellCap = remaining;
+	m_searchStartFreeCount = PathfindCellInfo::getFreeCount();
 	m_lastSearchHitCap = false;
 	s_pathfindStats.searches++;
+}
+
+Bool Pathfinder::isSearchBudgetExhausted()
+{
+	if (m_searchStartFreeCount - PathfindCellInfo::getFreeCount() < m_searchCellCap)
+	{
+		return false;
+	}
+	m_lastSearchHitCap = true;
+	return true;
 }
 
 void Pathfinder::countStatEvent( PathfindStatEvent event )
@@ -6857,7 +6869,7 @@ void Pathfinder::logStatsIfDue()
 }
 
 
-void Pathfinder::checkChangeLayers(PathfindCell *parentCell)
+void Pathfinder::checkChangeLayers(PathfindCell *parentCell, Bool limitCells)
 {
 	if (parentCell->getConnectLayer() == LAYER_INVALID)
 		return;
@@ -6875,6 +6887,10 @@ void Pathfinder::checkChangeLayers(PathfindCell *parentCell)
 		return;
 	}
 
+	if (limitCells && !newCell->hasInfo() && isSearchBudgetExhausted())
+	{
+		return;
+	}
 	if (!newCell->allocateInfo(newCellCoord)) {
 		// Out of cells for pathing...
 		return;
@@ -6963,6 +6979,10 @@ struct ExamineCellsStruct
 			newCellCoord.x = to_x;
 			newCellCoord.y = to_y;
 
+			if (!to->hasInfo() && pathfinder->isSearchBudgetExhausted())
+			{
+				return 1;
+			}
 			if (!to->allocateInfo(newCellCoord)) {
 				// Out of cells for pathing...
  				return 1;
@@ -7006,6 +7026,11 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 																				 Bool isHuman, Bool centerInCell, Int radius, const ICoord2D &startCellNdx,
 																				 const Object *obj, Int attackDistance)
 {
+		const Int freeCellsAtStart = PathfindCellInfo::getFreeCount();
+		if (isSearchBudgetExhausted())
+		{
+			return 0;
+		}
 	  Short requiredBridgeHeight = obj ? obj->getRequiredBridgeHeight() : 0;
 		Bool canPathThroughUnits = false;
 		if (obj && obj->getAIUpdateInterface()) {
@@ -7029,7 +7054,6 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 			iterateCellsAlongLine(start, end, parentCell->getLayer(), examineCellsCallback, &info);
 		}
 
-		Int cellCount = 0;
 		// expand search to neighboring orthogonal cells
 		static ICoord2D delta[] =
 		{
@@ -7047,6 +7071,10 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 
 		for( int i=0; i<numNeighbors; i++ )
 		{
+			if (isSearchBudgetExhausted())
+			{
+				break;
+			}
 			neighborFlags[i] = false;
 			// determine neighbor cell to try
 			newCellCoord.x = parentCell->getXIndex() + delta[i].x;
@@ -7147,9 +7175,8 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 			if (!newCell->hasInfo()) {
 				if (!newCell->allocateInfo(newCellCoord)) {
 					// Out of cells for pathing...
- 					return cellCount;
+					return freeCellsAtStart - PathfindCellInfo::getFreeCount();
 				}
-				cellCount++;
 			}
 
 			newCostSoFar = newCell->costSoFar( parentCell );
@@ -7245,7 +7272,7 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 			// insert newCell in open list such that open list is sorted, smallest total path cost first
 			newCell->putOnSortedOpenList( m_openList );
 		}
-	return cellCount;
+	return freeCellsAtStart - PathfindCellInfo::getFreeCount();
 }
 
 
@@ -7510,11 +7537,11 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 		parentCell->putOnClosedList( m_closedList );
 
 		// Check to see if we can change layers in this cell.
-		checkChangeLayers(parentCell);
+		checkChangeLayers(parentCell, true);
 
 		cellCount += examineNeighboringCells(parentCell, goalCell, locomotorSet, isHuman, centerInCell, radius, startCellNdx, obj, NO_ATTACK);
-		if (cellCount >= m_searchCellCap) {
-			m_lastSearchHitCap = true;
+		if (isSearchBudgetExhausted())
+		{
 			break;
 		}
 	}
@@ -7878,6 +7905,10 @@ struct GroundCellsStruct
 			ICoord2D newCellCoord;
 			newCellCoord.x = to_x;
 			newCellCoord.y = to_y;
+			if (!to->hasInfo() && pathfinder->isSearchBudgetExhausted())
+			{
+				return 1;
+			}
 			if (!to->allocateInfo(newCellCoord)) {
 				// Out of cells for pathing...
  				return 1;
@@ -8050,8 +8081,8 @@ Path *Pathfinder::findGroundPath( const Coord3D *from,
 	Int cellCount = 0;
 	while( !m_openList.empty() )
 	{
-		if (cellCount >= m_searchCellCap) {
-			m_lastSearchHitCap = true;
+		if (isSearchBudgetExhausted())
+		{
 			break;
 		}
 		// take head cell off of open list - it has lowest estimated total path cost
@@ -8092,7 +8123,7 @@ Path *Pathfinder::findGroundPath( const Coord3D *from,
 		parentCell->putOnClosedList( m_closedList );
 
 		// Check to see if we can change layers in this cell.
-		checkChangeLayers(parentCell);
+		checkChangeLayers(parentCell, true);
 
 		GroundCellsStruct info;
 		info.thePathfinder = this;
@@ -8129,6 +8160,10 @@ Path *Pathfinder::findGroundPath( const Coord3D *from,
 
 		for( int i=0; i<numNeighbors; i++ )
 		{
+			if (isSearchBudgetExhausted())
+			{
+				break;
+			}
 			neighborFlags[i] = false;
 			// determine neighbor cell to try
 			newCellCoord.x = parentCell->getXIndex() + delta[i].x;
@@ -10060,11 +10095,11 @@ Path *Pathfinder::findClosestPath( Object *obj, const LocomotorSet& locomotorSet
 		// If we haven't already found the goal cell, continue examining. [8/25/2003]
 		if (!foundGoal) {
 			// Check to see if we can change layers in this cell.
-			checkChangeLayers(parentCell);
+			checkChangeLayers(parentCell, true);
 			count += examineNeighboringCells(parentCell, goalCell, locomotorSet, isHuman, centerInCell, radius, startCellNdx, obj, NO_ATTACK);
 		}
-		if (count >= m_searchCellCap) {
-			m_lastSearchHitCap = true;
+		if (isSearchBudgetExhausted())
+		{
 			break;
 		}
 	}
@@ -11596,6 +11631,7 @@ Path *Pathfinder::getMoveAwayFromPath(Object* obj, Object *otherObj,
 		m_isTunneling = true; // We can't move from our current location.  So relax the constraints.
 	}
 
+	beginSearchBudget(PFS_AWAY);
 	if (!parentCell->allocateInfo(startCellNdx)) {
 		return nullptr;
 	}
@@ -11621,8 +11657,6 @@ Path *Pathfinder::getMoveAwayFromPath(Object* obj, Object *otherObj,
 	// until goal is found.
 	//
 
-	beginSearchBudget(PFS_AWAY);
-	Int awayCellCount = 0;
 
 	Real boxHalfWidth = radius*PATHFIND_CELL_SIZE_F - (PATHFIND_CELL_SIZE_F/4.0f);
 	if (centerInCell) boxHalfWidth+=PATHFIND_CELL_SIZE_F/2;
@@ -11702,11 +11736,11 @@ Path *Pathfinder::getMoveAwayFromPath(Object* obj, Object *otherObj,
 		parentCell->putOnClosedList( m_closedList );
 
 		// Check to see if we can change layers in this cell.
-		checkChangeLayers(parentCell);
+		checkChangeLayers(parentCell, true);
 
-		awayCellCount += examineNeighboringCells(parentCell, nullptr, locomotorSet, isHuman, centerInCell, radius, startCellNdx, obj, NO_ATTACK);
-		if (awayCellCount >= m_searchCellCap) {
-			m_lastSearchHitCap = true;
+		examineNeighboringCells(parentCell, nullptr, locomotorSet, isHuman, centerInCell, radius, startCellNdx, obj, NO_ATTACK);
+		if (isSearchBudgetExhausted())
+		{
 			break;
 		}
 	}
@@ -11930,7 +11964,7 @@ Path *Pathfinder::patchPath( const Object *obj, const LocomotorSet& locomotorSet
 
 		if (cellCount < CELL_LIMIT) {
 			// Check to see if we can change layers in this cell.
-			checkChangeLayers(parentCell);
+			checkChangeLayers(parentCell, true);
 			cellCount += examineNeighboringCells(parentCell, nullptr, locomotorSet, isHuman, centerInCell, radius, startCellNdx, obj, NO_ATTACK);
 		}
 	}
@@ -12305,7 +12339,7 @@ Path *Pathfinder::findAttackPath( const Object *obj, const LocomotorSet& locomot
 
 		if (cellCount < ATTACK_CELL_LIMIT) {
 				// Check to see if we can change layers in this cell.
-			checkChangeLayers(parentCell);
+			checkChangeLayers(parentCell, true);
 			cellCount += examineNeighboringCells(parentCell, goalCell, locomotorSet, isHuman, centerInCell,
 				radius, startCellNdx, obj, attackDistance);
 		}
@@ -12502,7 +12536,7 @@ Path *Pathfinder::findSafePath( const Object *obj, const LocomotorSet& locomotor
 		parentCell->putOnClosedList( m_closedList );
 
 		// Check to see if we can change layers in this cell.
-		checkChangeLayers(parentCell);
+		checkChangeLayers(parentCell, true);
 
 		cellCount += examineNeighboringCells(parentCell, nullptr, locomotorSet, isHuman, centerInCell, radius, startCellNdx, obj, NO_ATTACK);
 

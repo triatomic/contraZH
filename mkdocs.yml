@@ -72,6 +72,7 @@ nav:
       - contraZH Changes:
           - Overview: contraZH-Changes.md
           - Gameplay Fixes: contraZH-Gameplay-Fixes.md
+          - Pathfinding Improvements: contraZH-Pathfinding-Improvements.md
           - Maps & Game Setup: contraZH-Maps-and-Setup.md
           - Campaign: contraZH-Campaign.md
           - Options.ini: contraZH-Options.md

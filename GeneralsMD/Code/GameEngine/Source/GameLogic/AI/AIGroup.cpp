@@ -591,6 +591,11 @@ static Bool takeAssignedSlot(const std::vector<PathfindSlotRequest>& requests, c
 
 static void addSlotRequest(std::vector<PathfindSlotRequest>& requests, Object *obj, const Coord3D *pos)
 {
+	const LocomotorSurfaceTypeMask surfaces = obj->getAIUpdateInterface()->getLocomotorSet().getValidSurfaces();
+	if (!(surfaces & LOCOMOTORSURFACE_GROUND) || (surfaces & (LOCOMOTORSURFACE_WATER | LOCOMOTORSURFACE_CLIFF | LOCOMOTORSURFACE_AIR)))
+	{
+		return;
+	}
 	PathfindSlotRequest request;
 	request.obj = obj;
 	request.projection = 0.0f;

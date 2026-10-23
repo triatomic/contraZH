@@ -614,6 +614,10 @@ will be processed when we get to the front of the pathfind queue. jba */
 void AIUpdateInterface::requestPath( Coord3D *destination, Bool isFinalGoal )
 {
 
+	if (destination->x != m_requestedDestination.x || destination->y != m_requestedDestination.y || destination->z != m_requestedDestination.z)
+	{
+		m_cappedLegs = 0;
+	}
 	if (m_locomotorSet.getValidSurfaces() == 0) {
 		DEBUG_CRASH(("Attempting to path immobile unit."));
 	}
@@ -1947,6 +1951,7 @@ Bool AIUpdateInterface::canComputeQuickPath()
  */
 Bool AIUpdateInterface::computeQuickPath( const Coord3D *destination )
 {
+	m_pathWasCapped = FALSE;
 	// for now, quick path objects don't pathfind, generally airborne units
 	// build a trivial one-node path containing destination
 
@@ -2014,6 +2019,7 @@ Bool AIUpdateInterface::computePath( PathfindServicesInterface *pathServices, Co
 		return computeQuickPath(destination);
 	}
 	m_retryPath = false;
+	const Bool patchingCappedPath = m_isBlockedAndStuck && m_pathWasCapped;
 	m_pathWasCapped = FALSE;
 	Region3D extent;
 	TheTerrainLogic->getMaximumPathfindExtent(&extent);
@@ -2060,27 +2066,31 @@ Bool AIUpdateInterface::computePath( PathfindServicesInterface *pathServices, Co
 		if (m_isBlockedAndStuck) {
 			theNewPath = pathServices->patchPath( getObject(), m_locomotorSet,
 				getPath(), m_isBlockedAndStuck);
+			m_pathWasCapped = (theNewPath != nullptr) && patchingCappedPath;
 		}	else {
 			theNewPath = pathServices->findPath( getObject(), m_locomotorSet, getObject()->getPosition(),
 				destination);
 			m_pathWasCapped = (theNewPath != nullptr) && TheAI->pathfinder()->didLastSearchHitCap();
 		}
 	}
-	if (!m_pathWasCapped) {
-		m_cappedLegs = 0;
-	}
 	if (theNewPath==nullptr && m_path==nullptr) {
 		Real pathCostFactor = 0.0f;
+		Coord3D closestDestination = *destination;
 		theNewPath = pathServices->findClosestPath( getObject(), m_locomotorSet, getObject()->getPosition(),
-			destination, m_isBlockedAndStuck, pathCostFactor, FALSE );
+			&closestDestination, m_isBlockedAndStuck, pathCostFactor, FALSE );
+		m_pathWasCapped = (theNewPath != nullptr) && TheAI->pathfinder()->didLastSearchHitCap();
 		m_retryPath = true;
+	}
+	if (theNewPath && !m_pathWasCapped)
+	{
+		m_cappedLegs = 0;
 	}
 	TheAI->pathfinder()->setIgnoreObstacleID( INVALID_ID );
 	if (theNewPath) {
 		// destroy previous path
 		destroyPath();
 		m_path = theNewPath;
-		if (getCurLocomotor() && getCurLocomotor()->isUltraAccurate()) {
+		if (!m_pathWasCapped && getCurLocomotor() && getCurLocomotor()->isUltraAccurate()) {
 			// Move exactly to the destination.  Normal ground pathfinding moves to a gridded location.
 			theNewPath->updateLastNode(&originalDestination);
 		}
@@ -3184,6 +3194,8 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 	}
 #endif
 
+
+	m_cappedLegs = 0;
 
 	// Any new order cancels a forced-reverse move; the REVERSE_MOVE case below re-sets it.
 	m_forceMoveBackwards = FALSE;
