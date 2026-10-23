@@ -38,6 +38,8 @@ six cells, whichever is greater. Units farther away find their own routes.
 ## Infantry and vehicles
 
 * Moving infantry steer along vehicle hulls and away from contact instead of stopping against them.
+* Sidesteps must stay on a passable route. Infantry try the other side when the preferred side is
+blocked, and stop and request a new route if neither side is clear.
 * Vehicles creep past marching infantry without cancelling the infantry's route with a move-aside
 order. A soldier that makes no progress for ten frames can still be asked to move aside.
 * Panicking infantry keep their existing collision response.
