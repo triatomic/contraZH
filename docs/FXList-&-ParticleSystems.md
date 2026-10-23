@@ -38,21 +38,23 @@ The same restrictions as for ParticleSystem nuggets (see above) were added for S
 
 Added a new FX nugget that spawns a ground decal at the FX location. The decal itself is an object template that uses the new [W3DDecalDraw](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Objects-&-Modules#w3ddecaldraw-new) module.
 
-* `DecalName = <ObjectTemplate>` - (Name of the object template to spawn for the decal. Default = `GenericDecal`)
+* `DecalName = <ObjectTemplate>` - (Name of the object template to spawn for the decal. Default = `GenericDecal`. Can be listed **multiple times** - one is picked at random each time the nugget fires.)
 * `Lifetime = <ms>` - (Lifetime of the decal in milliseconds)
 * `Offset = X:0 Y:0 Z:0` - (Offset of the decal relative to the FX location)
+* `Scale = 1.0` - (Scale applied to the decal. Accepts a [GameClientRandomVariable](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/FXList-&-ParticleSystems) range, e.g. `Scale = Min:0.8 Max:1.2`, to randomize the size per spawn.)
 * `Angle = 0.0` - (Fixed rotation angle of the decal)
 * `RandomAngle = No` - (If Yes, use a random rotation angle instead of `Angle`)
 * `OrientToObject = No` - (If Yes, orient the decal to the parent object's facing)
 * `Probability = 1.0` - (Chance (0.0 - 1.0) for the decal to be created)
-* `Scale = 1.0 1.0` - (Random variable scaling the decal's size. Use two values for a random range)
 
 Example:
 ```
 FXList FX_ScorchDecal
   Decal
     DecalName = ScorchDecalSmall
+    DecalName = ScorchDecalSmall2   ; picked at random alongside the one above
     Lifetime = 20000
+    Scale = Min:0.8 Max:1.2
     RandomAngle = Yes
     Probability = 0.5
   End

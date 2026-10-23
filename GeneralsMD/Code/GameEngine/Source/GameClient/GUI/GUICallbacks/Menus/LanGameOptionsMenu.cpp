@@ -73,6 +73,9 @@ static bool s_isIniting = FALSE;
 // Blocks the checkbox message from re-entering the commit while the controls are refreshed
 static bool s_isShowingMaxCameraHeight = FALSE;
 
+// Setting a checkbox or combo box sends the same message as a click, so refreshes from the game info ignore them
+static Bool s_isRefreshingControls = FALSE;
+
 // window ids ------------------------------------------------------------------------------
 static NameKeyType parentLanGameOptionsID = NAMEKEY_INVALID;
 
@@ -121,6 +124,11 @@ static NameKeyType checkboxLimitSuperweaponsID = NAMEKEY_INVALID;
 static NameKeyType comboBoxStartingCashID = NAMEKEY_INVALID;
 static NameKeyType checkMaxCameraHeightID = NAMEKEY_INVALID;
 static NameKeyType textEntryMaxCameraHeightID = NAMEKEY_INVALID;
+static NameKeyType checkCoopBuildingsID = NAMEKEY_INVALID;
+static NameKeyType checkQuickGameID = NAMEKEY_INVALID;
+static NameKeyType checkDiplomacyRuleID = NAMEKEY_INVALID;
+static NameKeyType checkFreeRadarID = NAMEKEY_INVALID;
+static NameKeyType checkRevealMapID = NAMEKEY_INVALID;
 static NameKeyType windowMapID = NAMEKEY_INVALID;
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *parentLanGameOptions = nullptr;
@@ -134,6 +142,14 @@ static GameWindow *checkboxLimitSuperweapons = nullptr;
 static GameWindow *comboBoxStartingCash = nullptr;
 static GameWindow *checkMaxCameraHeight = nullptr;
 static GameWindow *textEntryMaxCameraHeight = nullptr;
+static GameWindow *checkCoopBuildings = nullptr;
+static GameWindow *checkQuickGame = nullptr;
+static GameWindow *checkDiplomacyRule = nullptr;
+static GameWindow *checkFreeRadar = nullptr;
+static GameWindow *checkRevealMap = nullptr;
+static LobbyTabs lobbyTabs;
+static Int lastChatCount = 0;
+static UnicodeString lastChatLine;
 static GameWindow *windowMap = nullptr;
 
 static GameWindow *comboBoxPlayer[MAX_SLOTS] = {0};
@@ -212,14 +228,19 @@ static void playerTooltip(GameWindow *window,
 	if (idx == -1)
 		return;
 
-	LANGameSlot *slot = TheLAN->GetMyGame()->getLANSlot(i);
+	// TheSuperHackers @bugfix Okladnoj 17/10/2026 Check that the game still exists as it is deleted while the setup screen fades out after the host left.
+	LANGameInfo *myGame = TheLAN->GetMyGame();
+	if (!myGame)
+		return;
+
+	LANGameSlot *slot = myGame->getLANSlot(i);
 	if (!slot)
 		return;
 
 	LANPlayer *player = slot->getUser();
 	if (!player)
 	{
-		DEBUG_ASSERTCRASH(TheLAN->GetMyGame()->getIP(i) == 0, ("No player info in listbox!"));
+		DEBUG_ASSERTCRASH(myGame->getIP(i) == 0, ("No player info in listbox!"));
 		TheMouse->setCursorTooltip( UnicodeString::TheEmptyString );
 		return;
 	}
@@ -668,12 +689,45 @@ static void handleLimitSuperweaponsClick()
   }
 }
 
+static Bool isLocalSlotAccepted()
+{
+	LANGameInfo *myGame = TheLAN->GetMyGame();
+	if (!myGame)
+	{
+		return FALSE;
+	}
+	const GameSlot *slot = myGame->getConstSlot( myGame->getLocalSlotNum() );
+	return slot && slot->isAccepted();
+}
+
+// An accepted client keeps the button enabled so it can take the accept back
+static void updateLanAcceptButton()
+{
+	if (TheLAN->AmIHost() || !buttonStart)
+	{
+		return;
+	}
+	if (isLocalSlotAccepted())
+	{
+		buttonStart->winSetText( TheGameText->fetch("GUI:Unready") );
+		buttonStart->winEnable( TRUE );
+	}
+	else
+	{
+		buttonStart->winSetText( TheGameText->fetch("GUI:Accept") );
+	}
+}
+
 void lanUpdateSlotList()
 {
 	if(!AreSlotListUpdatesEnabled() || s_isIniting)
 		return;
+	const Bool wasRefreshing = s_isRefreshingControls;
+	s_isRefreshingControls = TRUE;
 	UpdateSlotList( TheLAN->GetMyGame(), comboBoxPlayer, comboBoxColor,
 		comboBoxPlayerTemplate, comboBoxTeam, buttonAccept, buttonStart, buttonMapStartPosition);
+	s_isRefreshingControls = wasRefreshing;
+	updateLanAcceptButton();
 
 	updateMapStartSpots(TheLAN->GetMyGame(), buttonMapStartPosition);
 }
@@ -734,6 +788,61 @@ static void commitLanMaxCameraHeight()
 	}
 }
 
+// Refreshing the checkbox re-sends its message, which the unchanged value turns away
+static void commitLanRule( GameWindow *check, Bool (GameInfo::*get)() const, void (GameInfo::*set)( Bool ) )
+{
+	LANGameInfo *myGame = TheLAN->GetMyGame();
+	if (!myGame || !myGame->amIHost() || !check)
+	{
+		return;
+	}
+
+	const Bool on = GadgetCheckBoxIsChecked(check);
+	if (on == (myGame->*get)())
+	{
+		return;
+	}
+	(myGame->*set)(on);
+	myGame->resetAccepted();
+
+	if (!s_isIniting)
+	{
+		TheLAN->RequestGameOptions(GenerateGameOptionsString(), true);
+		lanUpdateSlotList();
+	}
+}
+
+static void showRulesTab( Bool rules )
+{
+	ShowLobbyTab( lobbyTabs, rules );
+
+	// The chat entry lives on the Game page
+	if (!rules && textEntryChat)
+	{
+		TheWindowManager->winSetFocus( textEntryChat );
+	}
+}
+
+// The chat listbox caps its length, so a new line shows as a new count or a new last line
+static void markUnseenChat()
+{
+	if (!listboxChatWindowLanGame)
+	{
+		return;
+	}
+	const Int count = GadgetListBoxGetNumEntries( listboxChatWindowLanGame );
+	const UnicodeString line = count > 0 ? GadgetListBoxGetText( listboxChatWindowLanGame, count - 1 ) : UnicodeString::TheEmptyString;
+	if (count != lastChatCount || line.compare( lastChatLine ) != 0)
+	{
+		lastChatCount = count;
+		lastChatLine = line;
+		if (IsLobbyRulesTabShown( lobbyTabs ))
+		{
+			MarkLobbyGameTab( lobbyTabs );
+		}
+	}
+}
+
 void InitLanGameGadgets()
 {
 	//Initialize the gadget IDs
@@ -749,6 +858,11 @@ void InitLanGameGadgets()
   comboBoxStartingCashID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:ComboBoxStartingCash" );
   checkMaxCameraHeightID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckMaxCameraHeight" );
   textEntryMaxCameraHeightID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:TextEntryMaxCameraHeight" );
+  checkCoopBuildingsID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckCoopBuildings" );
+  checkQuickGameID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckQuickGame" );
+  checkDiplomacyRuleID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckDiplomacyRule" );
+  checkFreeRadarID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckFreeRadar" );
+  checkRevealMapID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:CheckRevealMap" );
 	windowMapID = TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:MapWindow" );
 
 	// Initialize the pointers to our gadgets
@@ -779,13 +893,27 @@ void InitLanGameGadgets()
 	textEntryMaxCameraHeight = TheWindowManager->winGetWindowFromId( parentLanGameOptions, textEntryMaxCameraHeightID );
 	if (checkMaxCameraHeight)
 	{
-		GadgetCheckBoxSetText(checkMaxCameraHeight, TheGameText->FETCH_OR_SUBSTITUTE("GUI:MaxCameraHeight", L"Max Camera Height"));
-		checkMaxCameraHeight->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:CheckMaxCameraHeight", L"Sets one camera height limit for every player in this game"));
+		GadgetCheckBoxSetText(checkMaxCameraHeight, TheGameText->fetch("GUI:MaxCameraHeight"));
+		checkMaxCameraHeight->winSetTooltip(TheGameText->fetch("TOOLTIP:LobbyMaxCameraHeight"));
 	}
 	if (textEntryMaxCameraHeight)
 	{
-		textEntryMaxCameraHeight->winSetTooltip(TheGameText->FETCH_OR_SUBSTITUTE("TOOLTIP:MaxCameraHeight", L"Max camera height, 210 to 1000"));
+		textEntryMaxCameraHeight->winSetTooltip(TheGameText->fetch("TOOLTIP:MaxCameraHeight"));
 	}
+	checkCoopBuildings = TheWindowManager->winGetWindowFromId( parentLanGameOptions, checkCoopBuildingsID );
+	SetLobbyRuleCaption( checkCoopBuildings, LOBBY_RULE_COOP_BUILDINGS );
+	checkQuickGame = TheWindowManager->winGetWindowFromId( parentLanGameOptions, checkQuickGameID );
+	SetLobbyRuleCaption( checkQuickGame, LOBBY_RULE_QUICK_GAME );
+	checkDiplomacyRule = TheWindowManager->winGetWindowFromId( parentLanGameOptions, checkDiplomacyRuleID );
+	SetLobbyRuleCaption( checkDiplomacyRule, LOBBY_RULE_DIPLOMACY );
+	checkFreeRadar = TheWindowManager->winGetWindowFromId( parentLanGameOptions, checkFreeRadarID );
+	SetLobbyRuleCaption( checkFreeRadar, LOBBY_RULE_FREE_RADAR );
+	checkRevealMap = TheWindowManager->winGetWindowFromId( parentLanGameOptions, checkRevealMapID );
+	SetLobbyRuleCaption( checkRevealMap, LOBBY_RULE_REVEAL_MAP );
+
+	InitLobbyTabs( lobbyTabs, parentLanGameOptions, "LanGameOptionsMenu.wnd" );
+	lastChatCount = 0;
+	lastChatLine.clear();
 
 	windowMap = TheWindowManager->winGetWindowFromId( parentLanGameOptions,windowMapID  );
 	DEBUG_ASSERTCRASH(windowMap, ("Could not find the LanGameOptionsMenu.wnd:MapWindow" ));
@@ -883,6 +1011,12 @@ void DeinitLanGameGadgets()
   comboBoxStartingCash = nullptr;
   checkMaxCameraHeight = nullptr;
   textEntryMaxCameraHeight = nullptr;
+  checkCoopBuildings = nullptr;
+  checkQuickGame = nullptr;
+  checkDiplomacyRule = nullptr;
+  checkFreeRadar = nullptr;
+  checkRevealMap = nullptr;
+	lobbyTabs = LobbyTabs();
 	if (windowMap)
 	{
 		windowMap->winSetUserData(nullptr);
@@ -1023,6 +1157,8 @@ void updateGameOptions()
 {
 	LANGameInfo *theGame = TheLAN->GetMyGame();
 	UnicodeString mapDisplayName;
+	const Bool wasRefreshing = s_isRefreshingControls;
+	s_isRefreshingControls = TRUE;
 	if (theGame && AreSlotListUpdatesEnabled())
 	{
 		const GameSlot *localSlot = theGame->getConstSlot(theGame->getLocalSlotNum());
@@ -1064,7 +1200,38 @@ void updateGameOptions()
 		{
 			showLanMaxCameraHeight(theGame->getMaxCameraHeight(), TheLAN->AmIHost());
 		}
+
+		if (checkCoopBuildings)
+		{
+			GadgetCheckBoxSetChecked( checkCoopBuildings, theGame->getCoopBuildings() );
+			checkCoopBuildings->winEnable( TheLAN->AmIHost() );
+		}
+
+		if (checkQuickGame)
+		{
+			GadgetCheckBoxSetChecked( checkQuickGame, theGame->getQuickGame() );
+			checkQuickGame->winEnable( TheLAN->AmIHost() );
+		}
+
+		if (checkDiplomacyRule)
+		{
+			GadgetCheckBoxSetChecked( checkDiplomacyRule, theGame->getDiplomacy() );
+			checkDiplomacyRule->winEnable( TheLAN->AmIHost() );
+		}
+
+		if (checkFreeRadar)
+		{
+			GadgetCheckBoxSetChecked( checkFreeRadar, theGame->getFreeRadar() );
+			checkFreeRadar->winEnable( TheLAN->AmIHost() );
+		}
+
+		if (checkRevealMap)
+		{
+			GadgetCheckBoxSetChecked( checkRevealMap, theGame->getRevealMap() );
+			checkRevealMap->winEnable( TheLAN->AmIHost() );
+		}
 	}
+	s_isRefreshingControls = wasRefreshing;
 }
 
 
@@ -1161,6 +1328,13 @@ void LanGameOptionsMenuUpdate( WindowLayout * layout, void *userData)
 	if(LANisShuttingDown && TheShell->isAnimFinished() && TheTransitionHandler->isFinished())
 		shutdownComplete(layout);
 	//TheLAN->update(); // this is handled in the lobby
+	markUnseenChat();
+
+	// The host ignores an unready once the start countdown runs, and an older host would start without the player
+	if (buttonStart && !TheLAN->AmIHost() && isLocalSlotAccepted())
+	{
+		buttonStart->winEnable( !TheLAN->IsGameStartCountdownRunning() );
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1238,7 +1412,7 @@ WindowMsgHandledType LanGameOptionsMenuSystem( GameWindow *window, UnsignedInt m
 		//-------------------------------------------------------------------------------------------------
 		case GCM_SELECTED:
 			{
-				if (LANbuttonPushed)
+				if (LANbuttonPushed || s_isRefreshingControls)
 					break;
 				GameWindow *control = (GameWindow *)mData1;
 				Int controlID = control->winGetWindowId();
@@ -1306,7 +1480,7 @@ WindowMsgHandledType LanGameOptionsMenuSystem( GameWindow *window, UnsignedInt m
 		//-------------------------------------------------------------------------------------------------
 		case GBM_SELECTED:
 			{
-				if (LANbuttonPushed)
+				if (LANbuttonPushed || s_isRefreshingControls)
 					break;
 				GameWindow *control = (GameWindow *)mData1;
 				Int controlID = control->winGetWindowId();
@@ -1354,6 +1528,10 @@ WindowMsgHandledType LanGameOptionsMenuSystem( GameWindow *window, UnsignedInt m
 						StartPressed();
 						//TheLAN->RequestGameStart();
 					}
+					else if (isLocalSlotAccepted())
+					{
+						TheLAN->RequestAccept( FALSE );
+					}
 					else
 					{
 						//I'm the Client... send an accept message to the host.
@@ -1372,6 +1550,34 @@ WindowMsgHandledType LanGameOptionsMenuSystem( GameWindow *window, UnsignedInt m
         else if ( controlID == checkMaxCameraHeightID )
         {
           commitLanMaxCameraHeight();
+        }
+        else if ( controlID == checkCoopBuildingsID )
+        {
+          commitLanRule( checkCoopBuildings, &GameInfo::getCoopBuildings, &GameInfo::setCoopBuildings );
+        }
+        else if ( controlID == checkQuickGameID )
+        {
+          commitLanRule( checkQuickGame, &GameInfo::getQuickGame, &GameInfo::setQuickGame );
+        }
+        else if ( controlID == checkDiplomacyRuleID )
+        {
+          commitLanRule( checkDiplomacyRule, &GameInfo::getDiplomacy, &GameInfo::setDiplomacy );
+        }
+        else if ( controlID == checkFreeRadarID )
+        {
+          commitLanRule( checkFreeRadar, &GameInfo::getFreeRadar, &GameInfo::setFreeRadar );
+        }
+        else if ( controlID == checkRevealMapID )
+        {
+          commitLanRule( checkRevealMap, &GameInfo::getRevealMap, &GameInfo::setRevealMap );
+        }
+        else if ( controlID == lobbyTabs.buttonGameID )
+        {
+          showRulesTab( FALSE );
+        }
+        else if ( controlID == lobbyTabs.buttonRulesID )
+        {
+          showRulesTab( TRUE );
         }
 				else
 				{

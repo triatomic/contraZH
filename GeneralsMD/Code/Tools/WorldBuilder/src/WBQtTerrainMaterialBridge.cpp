@@ -23,9 +23,11 @@
 #include "TileTool.h"
 #include "FloodFillTool.h"
 #include "WHeightMapEdit.h"
+#include "TerrainBrushes.h"
 #include "WorldBuilderDoc.h"
 #include "wbview3d.h"
 #include "W3DDevice/GameClient/HeightMap.h"
+#include "Common/FileSystem.h"
 #include "Common/TerrainTypes.h"
 #include "W3DDevice/GameClient/TerrainTex.h"
 #include "W3DDevice/GameClient/TileData.h"
@@ -69,6 +71,14 @@ namespace
 		}
 		strncpy(path + len, segment, cap - 1 - len);
 		path[cap - 1] = 0;
+	}
+
+	// Share of one map's texture atlas the class takes, shown as the "NN%" leaf prefix.
+	Int texClassPercent(Int texClass)
+	{
+		Int tilesPerRow = TEXTURE_WIDTH / (2 * TILE_PIXEL_EXTENT + 2 * ATLAS_BORDER);
+		Int availableTiles = 4 * tilesPerRow * tilesPerRow;
+		return (WorldHeightMapEdit::getTexClassNumTiles(texClass) * 100 + availableTiles / 2) / availableTiles;
 	}
 }
 
@@ -114,12 +124,20 @@ int WBQtTerrainMaterial_GetTexClassEntry(int texClass, char *pathOut, char *leaf
 		{
 			return 0;	// blend edges are not shown, matching addTerrain
 		}
-		for (TerrainClass i = TERRAIN_NONE; i < TERRAIN_NUM_CLASSES; i = (TerrainClass)(i + 1))
+		AsciiString category = TerrainBrushes::getCategory(terrain->getName());
+		if (!category.isEmpty())
 		{
-			if (terrain->getClass() == i)
+			appendSegment(pathOut, cap, category.str());
+		}
+		else
+		{
+			for (TerrainClass i = TERRAIN_NONE; i < TERRAIN_NUM_CLASSES; i = (TerrainClass)(i + 1))
 			{
-				appendSegment(pathOut, cap, terrainTypeNames[i]);
-				break;
+				if (terrain->getClass() == i)
+				{
+					appendSegment(pathOut, cap, terrainTypeNames[i]);
+					break;
+				}
 			}
 		}
 		strcpy(nameBuf, terrain->getName().str());
@@ -158,14 +176,146 @@ int WBQtTerrainMaterial_GetTexClassEntry(int texClass, char *pathOut, char *leaf
 		return 0;
 	}
 
-	Int tilesPerRow = TEXTURE_WIDTH / (2 * TILE_PIXEL_EXTENT + 2 * WorldHeightMap::getAtlasBorderSetting());
-	Int availableTiles = 4 * tilesPerRow * tilesPerRow;
-	Int percent = (WorldHeightMapEdit::getTexClassNumTiles(texClass) * 100 + availableTiles / 2) / availableTiles;
-
 	char label[_MAX_PATH];
-	sprintf(label, "%d%% %s", percent, nameBuf);
+	sprintf(label, "%d%% %s", texClassPercent(texClass), nameBuf);
 	copyString(leafOut, cap, label);
 	return 1;
+}
+
+int WBQtTerrainMaterial_GetTexClassTerrainName(int texClass, char *nameOut, int cap)
+{
+	if (nameOut == NULL || cap <= 0)
+	{
+		return 0;
+	}
+	nameOut[0] = 0;
+	if (texClass < 0 || texClass >= WorldHeightMapEdit::getNumTexClasses())
+	{
+		return 0;
+	}
+	TerrainType *terrain = TheTerrainTypes->findTerrain(WorldHeightMapEdit::getTexClassName(texClass));
+	if (terrain == NULL || terrain->isBlendEdge())
+	{
+		return 0;
+	}
+	copyString(nameOut, cap, terrain->getName().str());
+	return 1;
+}
+
+//----------------------------------------------------------------------------------------
+// WorldBuilder-only brushes (TerrainBrushes): aliases listed beside the texture classes,
+// and the New Brush dialog's create call.
+//----------------------------------------------------------------------------------------
+int WBQtTerrainMaterial_GetTerrainKeys(int texClass, int *blendEdges, int *restrictConstruction, double *glintStrength, double *glintGloss)
+{
+	if (blendEdges == NULL || restrictConstruction == NULL || glintStrength == NULL || glintGloss == NULL)
+	{
+		return 0;
+	}
+	if (texClass < 0 || texClass >= WorldHeightMapEdit::getNumTexClasses())
+	{
+		return 0;
+	}
+	TerrainType *terrain = TheTerrainTypes->findTerrain(WorldHeightMapEdit::getTexClassName(texClass));
+	if (terrain == NULL)
+	{
+		return 0;
+	}
+	*blendEdges = terrain->isBlendEdge() ? 1 : 0;
+	*restrictConstruction = terrain->getRestrictConstruction() ? 1 : 0;
+	*glintStrength = terrain->getGlintStrength();
+	*glintGloss = terrain->getGlintGloss();
+	return 1;
+}
+
+static_assert((int)WBQT_TERRAIN_KEY_RESTRICT == (int)TerrainBrushes::KEY_RESTRICT_CONSTRUCTION
+	&& (int)WBQT_TERRAIN_KEY_GLINT_STRENGTH == (int)TerrainBrushes::KEY_GLINT_STRENGTH
+	&& (int)WBQT_TERRAIN_KEY_GLINT_GLOSS == (int)TerrainBrushes::KEY_GLINT_GLOSS, "Terrain key bits differ");
+
+int WBQtTerrainMaterial_SetTerrainKeys(int texClass, int changedKeys, int restrictConstruction, double glintStrength, double glintGloss, char *errorOut, int cap)
+{
+	if (texClass < 0 || texClass >= WorldHeightMapEdit::getNumTexClasses())
+	{
+		copyString(errorOut, cap, "No terrain is selected.");
+		return 0;
+	}
+	TerrainBrushes::TerrainKeys keys;
+	keys.restrictConstruction = (restrictConstruction != 0);
+	keys.glintStrength = (Real)glintStrength;
+	keys.glintGloss = (Real)glintGloss;
+	AsciiString error;
+	Bool ok = TerrainBrushes::setTerrainKeys(WorldHeightMapEdit::getTexClassName(texClass).str(), keys, (UnsignedInt)changedKeys, error);
+	copyString(errorOut, cap, error.str());
+	return ok ? 1 : 0;
+}
+
+int WBQtTerrainMaterial_GetBrushAliasCount(void)
+{
+	return TerrainBrushes::getNumAliases();
+}
+
+int WBQtTerrainMaterial_GetBrushAliasEntry(int index, int *texClassOut, char *pathOut, char *leafOut, char *nameOut, int cap)
+{
+	if (texClassOut == NULL || pathOut == NULL || leafOut == NULL || nameOut == NULL || cap <= 0)
+	{
+		return 0;
+	}
+	if (index < 0 || index >= TerrainBrushes::getNumAliases())
+	{
+		return 0;
+	}
+	const TerrainBrushes::Alias &alias = TerrainBrushes::getAlias(index);
+	Int texClass = WorldHeightMapEdit::findTexClass(alias.terrain);
+	if (texClass < 0)
+	{
+		return 0;
+	}
+	*texClassOut = texClass;
+	copyString(pathOut, cap, alias.category.str());
+	copyString(nameOut, cap, alias.name.str());
+	char label[_MAX_PATH];
+	snprintf(label, ARRAY_SIZE(label), "%d%% %s", texClassPercent(texClass), alias.name.str());
+	copyString(leafOut, cap, label);
+	return 1;
+}
+
+int WBQtTerrainMaterial_CreateBrush(const char *name, const char *category, const char *terrain, const char *texture,
+	int blendEdges, int restrictConstruction, double glintStrength, double glintGloss, char *errorOut, int cap)
+{
+	TerrainBrushes::TerrainKeys keys;
+	keys.blendEdges = (blendEdges != 0);
+	keys.restrictConstruction = (restrictConstruction != 0);
+	keys.glintStrength = (Real)glintStrength;
+	keys.glintGloss = (Real)glintGloss;
+	AsciiString error;
+	Int texClass = TerrainBrushes::create(name, category, terrain, texture, keys, error);
+	copyString(errorOut, cap, error.str());
+	return texClass;
+}
+
+int WBQtTerrainMaterial_GetTerrainTextureDir(char *dirOut, int cap)
+{
+	copyString(dirOut, cap, TERRAIN_TGA_DIR_PATH);
+	return 1;
+}
+
+int WBQtTerrainMaterial_GetPreviewMaxExtent(void)
+{
+	return 10 * TILE_PIXEL_EXTENT;	// countTiles caps a texture at 10x10 tiles
+}
+
+int WBQtTerrainMaterial_GetTexClassPreview(int texClass, unsigned char *bgraOut, int cap)
+{
+	return WorldHeightMapEdit::getTexClassPixels(texClass, bgraOut, cap);
+}
+
+int WBQtTerrainMaterial_GetTexturePreview(const char *texture, unsigned char *bgraOut, int cap)
+{
+	if (texture == NULL || texture[0] == 0)
+	{
+		return 0;
+	}
+	return WorldHeightMapEdit::getTextureFilePixels(AsciiString(texture), bgraOut, cap);
 }
 
 int WBQtTerrainMaterial_GetTexClassUiName(int texClass, char *nameOut, int cap)
@@ -453,6 +603,19 @@ void WBQtTerrainMaterial_SetNoMixing(int on)
 int WBQtTerrainMaterial_IsNoMixing(void)
 {
 	return BigTileTool::getEnableNoMixing() ? 1 : 0;
+}
+
+//----------------------------------------------------------------------------------------
+// Water-only painting.
+//----------------------------------------------------------------------------------------
+void WBQtTerrainMaterial_SetPaintWaterOnly(int on)
+{
+	WorldHeightMapEdit::setPaintWaterOnly(on != 0);
+}
+
+int WBQtTerrainMaterial_IsPaintWaterOnly(void)
+{
+	return WorldHeightMapEdit::isPaintWaterOnly() ? 1 : 0;
 }
 
 //----------------------------------------------------------------------------------------

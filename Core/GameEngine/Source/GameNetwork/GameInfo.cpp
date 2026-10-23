@@ -364,6 +364,14 @@ GameInfo::GameInfo()
 	reset();
 }
 
+GameInfo::~GameInfo()
+{
+	if (TheGameInfo == this)
+	{
+		TheGameInfo = nullptr;
+	}
+}
+
 void GameInfo::init()
 {
 	reset();
@@ -388,6 +396,11 @@ void GameInfo::reset()
   m_superweaponRestriction = 0;
   m_startingCash = TheGlobalData->m_defaultStartingCash;
   m_maxCameraHeight = 0;
+  m_coopBuildings = FALSE;
+  m_quickGame = FALSE;
+  m_diplomacy = FALSE;
+  m_freeRadar = FALSE;
+  m_revealMap = FALSE;
 
 	for (Int i=0; i<MAX_SLOTS; ++i)
 	{
@@ -1060,9 +1073,23 @@ static AsciiString buildGameInfoAsciiString(const GameInfo& game, const AsciiStr
 	optionsString.format("M=%2.2x%s;MC=%X;MS=%d;SD=%d;C=%d;", game.getMapContentsMask(), newMapName.str(),
 		game.getMapCRC(), game.getMapSize(), game.getSeed(), game.getCRCInterval());
 #else
-	optionsString.format("US=%d;M=%2.2x%s;MC=%X;MS=%d;SD=%d;C=%d;SR=%u;SC=%u;CH=%d;O=%c;", game.getUseStats(), game.getMapContentsMask(), newMapName.str(),
+	optionsString.format("US=%d;M=%2.2x%s;MC=%X;MS=%d;SD=%d;C=%d;SR=%u;SC=%u;CH=%d;O=%c;CB=%d;QG=%d;", game.getUseStats(), game.getMapContentsMask(), newMapName.str(),
 		game.getMapCRC(), game.getMapSize(), game.getSeed(), game.getCRCInterval(), game.getSuperweaponRestriction(),
-		game.getStartingCash().countMoney(), game.getMaxCameraHeight(), game.oldFactionsOnly() ? 'Y' : 'N' );
+		game.getStartingCash().countMoney(), game.getMaxCameraHeight(), game.oldFactionsOnly() ? 'Y' : 'N', game.getCoopBuildings() ? 1 : 0, game.getQuickGame() ? 1 : 0 );
+
+	// Each written only when on, so exes that reject an unknown key still read games with the rules off
+	if (game.getDiplomacy())
+	{
+		optionsString.concat("DP=1;");
+	}
+	if (game.getFreeRadar())
+	{
+		optionsString.concat("FR=1;");
+	}
+	if (game.getRevealMap())
+	{
+		optionsString.concat("RM=1;");
+	}
 #endif
 
 	//add player info for each slot
@@ -1190,6 +1217,11 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
   Money startingCash = TheGlobalData->m_defaultStartingCash;
   UnsignedShort restriction = 0; // Always the default
   Int maxCameraHeight = 0;
+  Bool coopBuildings = FALSE;
+  Bool quickGame = FALSE;
+  Bool diplomacy = FALSE;
+  Bool freeRadar = FALSE;
+  Bool revealMap = FALSE;
 
 	Bool sawMap = FALSE;
 	Bool sawMapCRC = FALSE;
@@ -1316,6 +1348,26 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
     {
       oldFactionsOnly = ( val.compareNoCase( "Y" ) == 0 );
       sawOldFactions = TRUE;
+    }
+    else if (key.compare("CB") == 0 )
+    {
+      coopBuildings = atoi( val.str() ) != 0;
+    }
+    else if (key.compare("QG") == 0 )
+    {
+      quickGame = atoi( val.str() ) != 0;
+    }
+    else if (key.compare("DP") == 0 )
+    {
+      diplomacy = atoi( val.str() ) != 0;
+    }
+    else if (key.compare("FR") == 0 )
+    {
+      freeRadar = atoi( val.str() ) != 0;
+    }
+    else if (key.compare("RM") == 0 )
+    {
+      revealMap = atoi( val.str() ) != 0;
     }
 		else if (key.getLength() == 1 && *key.str() == slotListID)
 		{
@@ -1686,6 +1738,11 @@ Bool ParseAsciiStringToGameInfo(GameInfo *game, AsciiString options)
 		game->setStartingCash(startingCash);
 		game->setMaxCameraHeight(maxCameraHeight);
 		game->setOldFactionsOnly(oldFactionsOnly);
+		game->setCoopBuildings(coopBuildings);
+		game->setQuickGame(quickGame);
+		game->setDiplomacy(diplomacy);
+		game->setFreeRadar(freeRadar);
+		game->setRevealMap(revealMap);
 
 		return true;
 	}
@@ -1715,9 +1772,16 @@ void SkirmishGameInfo::xfer( Xfer *xfer )
 #if RTS_GENERALS
 	const XferVersion currentVersion = 2;
 #else
-	const XferVersion currentVersion = 4;
+	const XferVersion currentVersion = 6;
 #endif
 	XferVersion version = currentVersion;
+#if !RTS_GENERALS
+	// Versions 5 and 6 only add rules, so a save with them off stays readable by older exes
+	if (xfer->getXferMode() == XFER_SAVE && !m_freeRadar && !m_revealMap)
+	{
+		version = m_quickGame ? 5 : 4;
+	}
+#endif
 	xfer->xferVersion( &version, currentVersion );
 
 
@@ -1816,6 +1880,26 @@ void SkirmishGameInfo::xfer( Xfer *xfer )
   {
     m_superweaponRestriction = 0;
     m_startingCash = TheGlobalData->m_defaultStartingCash;
+  }
+
+  if ( version >= 5 )
+  {
+    xfer->xferBool( &m_quickGame );
+  }
+  else if ( xfer->getXferMode() == XFER_LOAD )
+  {
+    m_quickGame = FALSE;
+  }
+
+  if ( version >= 6 )
+  {
+    xfer->xferBool( &m_freeRadar );
+    xfer->xferBool( &m_revealMap );
+  }
+  else if ( xfer->getXferMode() == XFER_LOAD )
+  {
+    m_freeRadar = FALSE;
+    m_revealMap = FALSE;
   }
 
 }

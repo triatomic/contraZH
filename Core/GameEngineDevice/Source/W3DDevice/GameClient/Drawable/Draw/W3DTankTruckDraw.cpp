@@ -182,9 +182,8 @@ void W3DTankTruckDraw::setFullyObscuredByShroud(Bool fullyObscured)
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-static ParticleSystemID createParticleSystem( const AsciiString &name, const Drawable *drawable )
+static ParticleSystemID createParticleSystem( const ParticleSystemTemplate *sysTemplate, const Drawable *drawable )
 {
-	const ParticleSystemTemplate *sysTemplate = TheParticleSystemManager->findTemplate(name);
 	ParticleSystem *particleSys = TheParticleSystemManager->createParticleSystem( sysTemplate );
 	if (!particleSys)
 		return INVALID_PARTICLE_SYSTEM_ID;
@@ -206,11 +205,11 @@ void W3DTankTruckDraw::createTreadEmitters()
 
 		if (m_treadDebrisIDs[0] == INVALID_PARTICLE_SYSTEM_ID)
 		{
-			m_treadDebrisIDs[0] = createParticleSystem(getW3DTankTruckDrawModuleData()->m_treadDebrisNameLeft, getDrawable());
+			m_treadDebrisIDs[0] = createParticleSystem(findMoveEffectTemplate(getW3DTankTruckDrawModuleData()->m_treadDebrisNameLeft), getDrawable());
 		}
 		if (m_treadDebrisIDs[1] == INVALID_PARTICLE_SYSTEM_ID)
 		{
-			m_treadDebrisIDs[1] = createParticleSystem(getW3DTankTruckDrawModuleData()->m_treadDebrisNameRight, getDrawable());
+			m_treadDebrisIDs[1] = createParticleSystem(findMoveEffectTemplate(getW3DTankTruckDrawModuleData()->m_treadDebrisNameRight), getDrawable());
 		}
 	}
 }
@@ -248,7 +247,7 @@ void W3DTankTruckDraw::createWheelEmitters()
 		{
 			if (m_truckEffectIDs[i] == INVALID_PARTICLE_SYSTEM_ID)
 			{
-				const ParticleSystemTemplate *sysTemplate = TheParticleSystemManager->findTemplate(*effectNames[i]);
+				const ParticleSystemTemplate *sysTemplate = findMoveEffectTemplate(*effectNames[i]);
 				ParticleSystem *particleSys = TheParticleSystemManager->createParticleSystem( sysTemplate );
 				if (particleSys)
 				{
@@ -404,7 +403,7 @@ void W3DTankTruckDraw::updateTreadPositions(Real uvDelta)
 		}
 
 		// ensure coordinates of offset are in [0, 1] range:
-		offset_u = offset_u - WWMath::Floor(offset_u);
+		offset_u = offset_u - WWMath::Floorf(offset_u);
 		pTread->m_materialSettings.customUVOffset.Set(offset_u,0);
 		pTread++;
 	}
@@ -741,7 +740,7 @@ void W3DTankTruckDraw::doDrawModule(const Matrix3D* transformMtx)
 			{
 				offset_u = pTread->m_materialSettings.customUVOffset.X + treadDir;
 				// ensure coordinates of offset are in [0, 1] range:
-				offset_u = offset_u - WWMath::Floor(offset_u);
+				offset_u = offset_u - WWMath::Floorf(offset_u);
 				pTread->m_materialSettings.customUVOffset.Set(offset_u,0);
 				pTread++;
 			}

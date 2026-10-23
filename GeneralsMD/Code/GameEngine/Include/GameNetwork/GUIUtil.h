@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include "GameNetwork/LobbyRules.h"
+
 class GameWindow;
 class GameInfo;
 
@@ -50,3 +52,22 @@ void EnableAcceptControls(Bool Enabled, GameInfo *myGame, GameWindow *comboPlaye
 										GameWindow *comboColor[], GameWindow *comboPlayerTemplate[],
 										GameWindow *comboTeam[], GameWindow *buttonAccept[], GameWindow *buttonStart,
 										GameWindow *buttonMapStartPosition[], Int slotNum = -1);
+
+// Game and Rules tabs of the Skirmish and LAN lobbies; every pointer is null when the layout lacks them
+struct LobbyTabs
+{
+	NameKeyType buttonGameID;
+	NameKeyType buttonRulesID;
+	GameWindow *buttonGame;
+	GameWindow *buttonRules;
+	GameWindow *panelGame;
+	GameWindow *panelRules;
+};
+
+void InitLobbyTabs( LobbyTabs &tabs, GameWindow *parent, const char *layoutFilename );
+void ShowLobbyTab( LobbyTabs &tabs, Bool rules );
+Bool IsLobbyRulesTabShown( const LobbyTabs &tabs );
+void MarkLobbyGameTab( LobbyTabs &tabs );
+
+UnicodeString LobbyRuleName( LobbyRule rule ); ///< The caption of a Rules page checkbox, the same in every lobby
+void SetLobbyRuleCaption( GameWindow *check, LobbyRule rule ); ///< Caption and tooltip; a null check is left alone

@@ -1233,6 +1233,10 @@ void ParticleSystemInfo::validate()
 #endif
 
 	validateAlphaKeyframes(m_alphaKey, ARRAY_SIZE(m_alphaKey));
+
+#if !ENABLE_TERRAIN_CONFORMING_PARTICLES
+	m_conformToTerrain = false;
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3193,6 +3197,19 @@ const FieldParse ParticleSystemTemplate::m_fieldParseTable[] =
 	{ "HazeMask",						INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.hazeMask ) },
 	{ "CryoParticleScale",		INI::parsePercentToReal, nullptr, offsetof( ParticleSystemTemplate, m_cryoParticleScale ) },
 	{ "ElectricParticleScale",	INI::parsePercentToReal, nullptr, offsetof( ParticleSystemTemplate, m_electricParticleScale ) },
+	{ "DisruptionShader",				INI::parseIndexList, DisruptionShaderModeNames, offsetof( ParticleSystemTemplate, m_disruption.mode ) },
+	{ "DisruptionRingStrength",	INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_disruption.tuning.ringStrength ) },
+	{ "DisruptionRingSize",			INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_disruption.tuning.ringSize ) },
+	{ "DisruptionRingSpeed",		INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_disruption.tuning.ringSpeed ) },
+	{ "DisruptionWobble",				INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_disruption.tuning.wobble ) },
+	{ "DisruptionWobbleSize",		INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_disruption.tuning.wobbleSize ) },
+	{ "DisruptionWobbleSpeed",	INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_disruption.tuning.wobbleSpeed ) },
+	{ "DisruptionGlitch",				INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_disruption.tuning.glitch ) },
+	{ "DisruptionGlitchSize",		INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_disruption.tuning.glitchSize ) },
+	{ "DisruptionGlitchRate",		INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_disruption.tuning.glitchRate ) },
+	{ "DisruptionChroma",				INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_disruption.tuning.chroma ) },
+	{ "DisruptionChromaSpread",	INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_disruption.tuning.chromaSpread ) },
+	{ "DisruptionMask",					INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_disruption.tuning.mask ) },
 
 	{ "WindAngleChangeMin", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_windAngleChangeMin ) },
 	{ "WindAngleChangeMax", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_windAngleChangeMax ) },
@@ -3291,7 +3308,8 @@ void ParticleSystemTemplate::parseRandomRGBColor( INI* ini, void *instance,
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
 ParticleSystemTemplate::ParticleSystemTemplate( const AsciiString &name ) :
-	m_name(name)
+	m_name(name),
+	m_disruption(DisruptionShaderInfo::SHAPE_SPRITE)
 {
 	m_slaveTemplate = nullptr;
 	m_cryoParticleScale = -1.0f;
@@ -3321,7 +3339,42 @@ Bool ParticleSystemTemplate::hasFlameTuning() const
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+FlameShaderTuning::FlameShaderTuning()
+{
+	Real *setting = &warp;
+	for (UnsignedInt i = 0; i < sizeof( FlameShaderTuning ) / sizeof( Real ); ++i)
+	{
+		setting[i] = -1.0f;
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+const FieldParse *ParticleSystemTemplate::getFlameTuningFieldParse()
+{
+	static const FieldParse flameFieldParse[] =
+	{
+		{ "FlameWarp",					INI::parseReal, nullptr, offsetof( FlameShaderTuning, warp ) },
+		{ "FlameHeat",					INI::parseReal, nullptr, offsetof( FlameShaderTuning, heat ) },
+		{ "FlameFlicker",				INI::parseReal, nullptr, offsetof( FlameShaderTuning, flicker ) },
+		{ "FlameBreakup",				INI::parseReal, nullptr, offsetof( FlameShaderTuning, breakup ) },
+		{ "FlameNoiseSize",			INI::parseReal, nullptr, offsetof( FlameShaderTuning, noiseSize ) },
+		{ "FlameRise",					INI::parseReal, nullptr, offsetof( FlameShaderTuning, rise ) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	return flameFieldParse;
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 void ParticleSystemTemplate::resolveFlameTuning( const ParticleSystemTemplate *tmpl, FlameShaderTuning &tuning )
+{
+	resolveFlameTuning( (tmpl != nullptr) ? &tmpl->m_flameTuning : nullptr, tuning );
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
+void ParticleSystemTemplate::resolveFlameTuning( const FlameShaderTuning *own, FlameShaderTuning &tuning )
 {
 	tuning.warp = TheGlobalData->m_flameWarp;
 	tuning.heat = TheGlobalData->m_flameHeat;
@@ -3336,18 +3389,18 @@ void ParticleSystemTemplate::resolveFlameTuning( const ParticleSystemTemplate *t
 	tuning.hazeRise = TheGlobalData->m_hazeRise;
 	tuning.hazeMask = TheGlobalData->m_hazeMask;
 
-	if (tmpl == nullptr)
+	if (own == nullptr)
 	{
 		return;
 	}
 
-	const Real *own = &tmpl->m_flameTuning.warp;
+	const Real *setting = &own->warp;
 	Real *resolved = &tuning.warp;
 	for (UnsignedInt i = 0; i < sizeof( tuning ) / sizeof( Real ); ++i)
 	{
-		if (own[i] >= 0.0f)
+		if (setting[i] >= 0.0f)
 		{
-			resolved[i] = own[i];
+			resolved[i] = setting[i];
 		}
 	}
 }
@@ -3377,6 +3430,22 @@ ParticleSystemTemplate::~ParticleSystemTemplate()
 void ParticleSystemTemplate::validate()
 {
 	ParticleSystemInfo::validate();
+}
+
+// ------------------------------------------------------------------------------------------------
+void ParticleSystemTemplate::copyFrom( const ParticleSystemTemplate *other )
+{
+	if (other == this)
+	{
+		return;
+	}
+
+	AsciiString name = m_name;
+	*this = *other;
+	m_name = name;
+
+	// Resolved again from m_slaveSystemName, which the extending block may change
+	m_slaveTemplate = nullptr;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -3575,7 +3644,12 @@ void ParticleSystemManager::draw()
 {
 	// TheSuperHackers @tweak Integrate the part of the logic frame that the render time
 	// has advanced into since the last render update.
+#if defined(GENERALS_ONLINE_HIGH_FPS_RENDER)
+	// Particles step on the legacy frame, so they blend by its phase, not the faster logic frame's.
+	const Real logicFramePhase = TheGameClient->getLegacyFramePhase();
+#else
 	const Real logicFramePhase = TheFramePacer->getLogicFramePhase();
+#endif
 	if (logicFramePhase > m_drawnLogicFramePhase)
 	{
 		const Real timeScale = logicFramePhase - m_drawnLogicFramePhase;

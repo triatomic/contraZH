@@ -181,6 +181,7 @@ public:
 	Real m_wobble;							///< for wobbling
   Real m_yawModulator;        ///< for the swimmy soft hover of a helicopter
   Real m_pitchModulator;        ///< for the swimmy soft hover of a helicopter
+	Real m_smoothedVelZ;				///< z velocity filtered for PitchInDirectionOfZVelFactor
 	TWheelInfo m_wheelInfo;			///< Wheel offset & angle info for a wheeled type locomotor.
 
 	DrawableLocoInfo();
@@ -263,6 +264,7 @@ enum DrawableStatus CPP_11(: DrawableStatusBits)
 	DRAWABLE_STATUS_NONE									= 0x00000000,		///< no status
 	DRAWABLE_STATUS_DRAWS_IN_MIRROR				=	0x00000001,		///< drawable can reflect
 	DRAWABLE_STATUS_SHADOWS								=	0x00000002,		///< use setShadowsEnabled() access method
+	DRAWABLE_STATUS_KEEP_PARTICLES_WHEN_HIDDEN = 0x00000004,		///< model-condition particle systems keep emitting while the drawable is hidden
 	DRAWABLE_STATUS_NO_STATE_PARTICLES		= 0x00000008,		///< do *not* auto-create particle systems based on model condition
 	DRAWABLE_STATUS_NO_SAVE								= 0x00000010,		///< do *not* save this drawable (UI fluff only). ignored (error, actually) if attached to an object
 
@@ -353,6 +355,7 @@ public:
 	DrawableInfo *getDrawableInfo() {return &m_drawableInfo;}
 
 	void setDrawableHidden( Bool hidden );																		///< hide or unhide drawable
+	void setKeepParticlesWhenHidden( Bool keep );															///< let model-condition particle systems keep emitting while hidden
 	//
 	// note that this is not necessarily the 'get' reflection of setDrawableHidden, since drawables
 	// can spontaneously hide via stealth. (srj)
@@ -437,6 +440,8 @@ public:
 
 	Real getInstanceScale() const { return m_instanceScale; }		///< get scale that will be applied to instance matrix
 	void setInstanceScale(Real value) { m_instanceScale = value;}	///< set scale that will be applied to instance matrix before rendering.
+	Real getObjectScale() const { return m_objectScale; }		///< map object scale, applied to the drawn transform only
+	void setObjectScale(Real value) { m_objectScale = value; }
 
 	const Matrix3D *getTransformMatrix() const;	///< return the world transform
 	const Matrix3D *getDrawnTransformMatrix() const;	///< world transform the model is drawn at this render frame, between the last two logic frames
@@ -677,7 +682,23 @@ protected:
 		Real m_totalYaw;						///< Current total yaw for this frame
 		Real m_totalZ;
 
-		PhysicsXformInfo() : m_totalPitch(0), m_totalRoll(0), m_totalYaw(0), m_totalZ(0) { }
+		Real m_prevTotalPitch;
+		Real m_prevTotalRoll;
+		Real m_prevTotalYaw;
+		Real m_prevTotalZ;
+
+		UnsignedInt m_syncTime;			///< WW3D sync time of the last calculation.
+
+		PhysicsXformInfo() : m_totalPitch(0), m_totalRoll(0), m_totalYaw(0), m_totalZ(0),
+			m_prevTotalPitch(0), m_prevTotalRoll(0), m_prevTotalYaw(0), m_prevTotalZ(0), m_syncTime(~0u) { }
+
+		void setPrevTotals()
+		{
+			m_prevTotalPitch = m_totalPitch;
+			m_prevTotalRoll = m_totalRoll;
+			m_prevTotalYaw = m_totalYaw;
+			m_prevTotalZ = m_totalZ;
+		}
 	};
 
 	Bool calcPhysicsXform(PhysicsXformInfo& info);
@@ -765,6 +786,7 @@ private:
 
 	Matrix3D m_instance;				///< The instance matrix that holds the initial/default position & orientation
 	Real m_instanceScale;				///< the uniform scale factor applied to the instance matrix before it is sent to W3D.
+	Real m_objectScale;
 
 	mutable Matrix3D m_drawnPrevious;	///< logic transform one logic frame before m_drawnFrame
 	mutable Matrix3D m_drawnCurrent;	///< logic transform at m_drawnFrame

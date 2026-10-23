@@ -72,6 +72,9 @@ GenerateMinefieldBehaviorModuleData::GenerateMinefieldBehaviorModuleData()
 	m_smartBorderSkipInterior = true;
 	m_randomJitter = 0.0f;
 	m_skipIfThisMuchUnderStructure = 0.33f;
+	m_blockedByKindOf.clear();
+	m_blockedByKindOf.set(KINDOF_STRUCTURE);
+	m_notBlockedByKindOf.clear();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -94,6 +97,8 @@ GenerateMinefieldBehaviorModuleData::GenerateMinefieldBehaviorModuleData()
 		{ "Upgradable", INI::parseBool, nullptr, offsetof(GenerateMinefieldBehaviorModuleData, m_upgradable) },
 		{ "RandomJitter", INI::parsePercentToReal, nullptr, offsetof(GenerateMinefieldBehaviorModuleData, m_randomJitter) },
 		{ "SkipIfThisMuchUnderStructure", INI::parsePercentToReal, nullptr, offsetof(GenerateMinefieldBehaviorModuleData, m_skipIfThisMuchUnderStructure) },
+		{ "BlockedByKindOf", KindOfMaskType::parseFromINI, nullptr, offsetof(GenerateMinefieldBehaviorModuleData, m_blockedByKindOf) },
+		{ "NotBlockedByKindOf", KindOfMaskType::parseFromINI, nullptr, offsetof(GenerateMinefieldBehaviorModuleData, m_notBlockedByKindOf) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 
@@ -210,8 +215,10 @@ Object* GenerateMinefieldBehavior::placeMineAt(const Coord3D& pt, const ThingTem
 	MemoryPoolObjectHolder hold(iter);
 	for (Object* them = iter->first(); them; them = iter->next())
 	{
-		if (them->isKindOf(KINDOF_STRUCTURE))
+		if (them->isAnyKindOf(d->m_blockedByKindOf) && !them->isAnyKindOf(d->m_notBlockedByKindOf))
+		{
 			return nullptr;
+		}
 	}
 
 	Object* mine = TheThingFactory->newObject(mineTemplate, team);
@@ -248,11 +255,11 @@ void GenerateMinefieldBehavior::placeMinesAlongLine(const Coord3D& posStart, con
 
 	Real dx = posEnd.x - posStart.x;
 	Real dy = posEnd.y - posStart.y;
-	Real len = sqrt(sqr(dx) + sqr(dy));
+	Real len = WWMath::Sqrt(sqr(dx) + sqr(dy));
 	Real mineRadius = mineTemplate->getTemplateGeometryInfo().getBoundingCircleRadius();
 	Real mineDiameter = mineRadius * 2.0f;
 	Real mineJitter = mineRadius*d->m_randomJitter;
-	Int numMines = REAL_TO_INT_CEIL(len / mineDiameter);
+	Int numMines = REAL_TO_INT_CEIL(WWMath::Div_Safe(len, mineDiameter, 1.0f));
 	if (numMines < 1)
 		numMines = 1;
 	Real inc = len/numMines;
@@ -312,7 +319,7 @@ void GenerateMinefieldBehavior::placeMinesAroundCircle(const Coord3D& pos, Real 
 	Real mineRadius = mineTemplate->getTemplateGeometryInfo().getBoundingCircleRadius();
 	Real mineDiameter = mineRadius * 2.0f;
 	Real mineJitter = mineRadius*d->m_randomJitter;
-	Int numMines = REAL_TO_INT_CEIL(circum / mineDiameter);
+	Int numMines = REAL_TO_INT_CEIL(WWMath::Div_Safe(circum, mineDiameter, 1.0f));
 	if (numMines < 1)
 		numMines = 1;
 	Real angleInc = (2*PI)/numMines;

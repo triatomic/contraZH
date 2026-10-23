@@ -78,7 +78,7 @@ public:
 			{ "TurretsMustCenterBeforePacking", INI::parseBool,			nullptr, offsetof( DeployStyleAIUpdateModuleData, m_turretsMustCenterBeforePacking ) },
 			{ "ManualDeployAnimations",	INI::parseBool,							nullptr, offsetof( DeployStyleAIUpdateModuleData, m_manualDeployAnimations ) },
 			{ "TurnBeforeUnpacking",	INI::parseBool,							NULL, offsetof( DeployStyleAIUpdateModuleData, m_turnBeforeUnpacking ) },
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
 		p.add(dataFieldParse);
 	}

@@ -1,0 +1,135 @@
+site_name: contraZH Docs
+site_url: https://triatomic.github.io/contraZH/
+site_description: Modding documentation for contraZH
+copyright: Upstream reference pages by Andi and the <a href="https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki">GeneralsGameCode_Modding</a> contributors
+repo_url: https://github.com/triatomic/contraZH
+repo_name: triatomic/contraZH
+edit_uri: edit/main/docs/
+docs_dir: docs
+
+validation:
+  anchors: warn
+
+# Home.md keeps its wiki name, so the site root redirects to it
+plugins:
+  - search
+  - redirects:
+      redirect_maps:
+        index.md: Home.md
+
+extra_css:
+  - assets/stylesheets/contra.css
+
+extra_javascript:
+  - assets/javascripts/copy-inline.js
+
+hooks:
+  - docs-theme/hooks/readable.py
+
+# Theme assets live outside docs/ so docs/ holds only pages and images
+theme:
+  name: material
+  custom_dir: docs-theme
+  logo: assets/images/logo.svg
+  favicon: assets/images/logo.svg
+  font:
+    text: Exo 2
+    code: JetBrains Mono
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.highlight
+    - search.suggest
+    - toc.follow
+    - content.code.copy
+    - content.action.edit
+  palette:
+    scheme: slate
+    primary: custom
+    accent: custom
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  # GitHub-style heading IDs, so anchors match GitHub's own rendering of docs/
+  - toc:
+      permalink: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  # Unlabelled fences are Generals INI snippets
+  - pymdownx.highlight:
+      default_lang: ini
+  - pymdownx.superfences
+  - pymdownx.details
+
+nav:
+  - Home: Home.md
+  - This fork:
+      - contraZH Changes:
+          - Overview: contraZH-Changes.md
+          - Gameplay Fixes: contraZH-Gameplay-Fixes.md
+          - Maps & Game Setup: contraZH-Maps-and-Setup.md
+          - Campaign: contraZH-Campaign.md
+          - Options.ini: contraZH-Options.md
+          - Objects & Modules: contraZH-Objects-and-Modules.md
+          - GameData: contraZH-GameData.md
+          - SpecialPowers: contraZH-SpecialPowers.md
+          - Weapons: contraZH-Weapons.md
+          - CommandButtons & Selection: contraZH-CommandButtons.md
+          - ParticleSystems: contraZH-ParticleSystems.md
+          - Object Creation List: contraZH-Object-Creation-List.md
+          - ChatCommands: contraZH-ChatCommands.md
+          - Extend Blocks: contraZH-Extend.md
+          - Animation2D: contraZH-Animation2D.md
+          - Debug & Cheats: contraZH-Debug-and-Cheats.md
+          - Generals Online: contraZH-Generals-Online.md
+      - Direct3D 9 Features:
+          - Overview: dx9feat.md
+          - Lighting & Surfaces: dx9-Lighting.md
+          - Terrain: dx9-Terrain.md
+          - Effect Shaders: dx9-Effect-Shaders.md
+          - Weather, Sky & Reflections: dx9-Environment.md
+          - Performance: dx9-Performance.md
+      - Water:
+          - Overview: Water.md
+          - Water.ini: Water-ini.md
+          - Key Reference: Water-Key-Reference.md
+          - Textures & Notes: Water-Textures.md
+      - Electric & Laser Shading:
+          - Overview: Electric-&-Laser-Shading.md
+          - Electric Shading: Electric-Shading.md
+          - Laser Shading: Laser-Shading.md
+      - Camera Controls: CameraControls.md
+      - WorldBuilder Qt:
+          - Overview: WorldBuilder-Qt.md
+          - Selection & Objects: WorldBuilder-Qt-Objects.md
+          - Terrain Brushes: WorldBuilder-Qt-Terrain-Brushes.md
+          - Viewing & D3D9 Effects: WorldBuilder-Qt-Viewing.md
+          - Scripts & INI: WorldBuilder-Qt-Scripts-and-INI.md
+          - Map Generator & MCP: WorldBuilder-Qt-Map-Generator.md
+  - Upstream reference:
+      - Changes & Bug Fixes: Changes-&-Bug-Fixes.md
+      - Objects & Modules: Objects-&-Modules.md
+      - Weapons: Weapons.md
+      - Armors: Armors.md
+      - Turrets: Turrets.md
+      - SpecialPowers: SpecialPowers.md
+      - Science: Science.md
+      - Upgrades: Upgrades.md
+      - FXList & ParticleSystems: FXList-&-ParticleSystems.md
+      - GameData: GameData.md
+      - CommandButtons: CommandButtons.md
+      - ChatCommands: ChatCommands.md
+      - BuffSystem: BuffSystem.md
+      - Locomotor: Locomotor.md
+      - Naval Support: Naval-Support.md
+      - Object Creation List: Object-Creation-List.md
+      - New Enum Definitions: New-Enum-Definitions.md
+      - Audio: Audio.md
+      - MapData: MapData.md
+      - Undocumented Upstream Features: Undocumented-Upstream-Features.md
+      - Game MCP & AI Matches: Game-MCP-and-AI-Matches.md

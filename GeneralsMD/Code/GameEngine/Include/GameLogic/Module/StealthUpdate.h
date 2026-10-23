@@ -159,9 +159,12 @@ public:
 	Object* calcStealthOwner(); //Is it me that can stealth or is it my rider?
 	Bool allowedToStealth( Object *stealthOwner ) const;
   void receiveGrant( Bool active = TRUE, UnsignedInt frames = 0 );
+	void receiveTemporaryGrant( UnsignedInt frames );
+	void inheritGrant( const Object *source );
 
   Bool isGrantedBySpecialPower() { return getStealthUpdateModuleData()->m_grantedBySpecialPower; }
 	Bool isTemporaryGrant() { return m_framesGranted > 0; }
+	Bool hasTemporaryStealth() const;
 
 	inline void setStealthLevelOverride(UnsignedInt stealthLevel) { m_stealthLevelOverride = stealthLevel; }
 
@@ -196,6 +199,8 @@ private:
 	Bool									m_transitioningToDisguise;	//Set when we are disguising -- clear when we're transitioning out of.
 	Bool									m_disguised;								//We're disguised as far as other players are concerned.
 	UnsignedInt						m_framesGranted;						//0 means forever... everything else is number of frames before stealth lost.
+	UnsignedInt						m_temporaryStealthEndFrame;	//Frame the temporary stealth runs out, 0 when there is none. Leaves m_enabled and CAN_STEALTH alone.
+	Bool									m_temporaryStealthWoke;			//The temporary stealth woke a sleeping module, which goes back to sleep when it runs out.
 
 	// runtime xfer members (does not need saving)
 	Bool									m_xferRestoreDisguise;			//Tells us we need to restore our disguise

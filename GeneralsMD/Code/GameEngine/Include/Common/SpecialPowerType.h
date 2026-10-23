@@ -138,6 +138,7 @@ enum SpecialPowerType CPP_11(: Int)
 	SPECIAL_PUNISHER_CANNON,
 	SPECIAL_CHEMICAL_MISSILE,
 	SPECIAL_CHRONOSPHERE,
+	SPECIAL_RIFT_GENERATOR,
 
 	AIRF_SPECIAL_HOLO_PLANES,
 	AIRF_SPECIAL_PARADROP_AMERICA,
@@ -225,6 +226,8 @@ enum SpecialPowerType CPP_11(: Int)
 	SPECIAL_JUMPJET,
 
 	SPECIAL_TELEPORT_SELF,
+	SPECIAL_ALL_BATTLE_PLANS,
+	SPECIAL_ALL_BATTLE_PLANS_ACTIVE,
 
 	SPECIALPOWER_COUNT,
 	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

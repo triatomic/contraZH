@@ -211,6 +211,14 @@ public:
 	/// Calculates the closest construction zone location based on a template.
 	Bool calcClosestConstructionZoneLocation( const ThingTemplate *constructTemplate, Coord3D *location );
 
+	// CLP_AI script support, defined in ScriptActionsCLPAI.cpp. Angles are in radians.
+	Bool clpTrainUnit(const ThingTemplate *thing);
+	void clpBuildNearPosition(const ThingTemplate *tmpl, const Coord3D *location, Real angle);
+	void clpBuildNearestTeam(const ThingTemplate *tmpl, Team *team, Real angle);
+	void clpBuildBySupplies(Int minimumCash, const ThingTemplate *tmpl, Real angle);
+	Bool clpComputeSuperweaponTargetType(const SpecialPowerTemplate *power, Coord3D *retPos, Int playerNdx, Real weaponRadius, const AsciiString &objectType);
+	Object *clpFindSupplyCenter(Int minimumCash);
+
 protected:
 
 	// snapshot methods
@@ -231,7 +239,7 @@ protected:
 	virtual Bool isAGoodIdeaToBuildTeam( TeamPrototype *proto );		///< return true if team should be built
 	virtual void processBaseBuilding();		///< do base-building behaviors
 	virtual void processTeamBuilding();		///< do team-building behaviors
- 	static Int getPlayerSuperweaponValue( Coord3D *center, Int playerNdx, Real radius, Bool includeMilitaryUnits = TRUE );
+ 	static Int getPlayerSuperweaponValue( Coord3D *center, Int playerNdx, Real radius, Bool includeMilitaryUnits = TRUE, const Player *viewer = nullptr );
 // End of aiplayer interface.
 
 protected:

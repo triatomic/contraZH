@@ -43,6 +43,10 @@
 #define PRESERVE_NO_XP_FROM_FLAME_KILLS (0) // The fix for this unfavorable behavior was approved by the Game Design Committee.
 #endif
 
+#ifndef PRESERVE_NO_XP_FROM_HELIX_ATTACHMENT_KILLS
+#define PRESERVE_NO_XP_FROM_HELIX_ATTACHMENT_KILLS (1)
+#endif
+
 #ifndef PRESERVE_NO_XP_FROM_OCL_KILLS
 #define PRESERVE_NO_XP_FROM_OCL_KILLS (1)
 #endif
@@ -95,9 +99,7 @@
 #define PRESERVE_RETAIL_PARTICLES (1) // Preserve original look of particles present in retail Generals 1.08 and Zero Hour 1.04
 #endif
 
-#ifndef RETAIL_COMPATIBLE_CRC
-#define RETAIL_COMPATIBLE_CRC (1) // Game is expected to be CRC compatible with retail Generals 1.08, Zero Hour 1.04
-#endif
+// RETAIL_COMPATIBLE_CRC is default defined in BaseDefines.h
 
 #ifndef RETAIL_COMPATIBLE_DATA
 #define RETAIL_COMPATIBLE_DATA (1) // Game and tool data files are expected to be compatible with retail Generals 1.08 and Zero Hour 1.04
@@ -121,7 +123,7 @@
 #define RETAIL_COMPATIBLE_CIRCLE_FILL_ALGORITHM (1) // Use the original circle fill algorithm, which is more efficient but less accurate
 #endif
 
-// Disable non retail fixes in the networking, such as putting more data per UDP packet
+// Disable non retail fixes in the networking; the game packet size has its own switch below
 #ifndef RETAIL_COMPATIBLE_NETWORKING
 #if defined(GENERALS_ONLINE)
 // GeneralsOnline port: the GeneralsOnline netcode uses the larger non-retail packet
@@ -129,6 +131,15 @@
 #define RETAIL_COMPATIBLE_NETWORKING (0)
 #else
 #define RETAIL_COMPATIBLE_NETWORKING (1)
+#endif
+#endif
+
+// Keep the 476 byte retail game packets; Zero Hour uses the larger payload since its exe CRC already keeps retail peers out
+#ifndef RETAIL_COMPATIBLE_PACKET_SIZE
+#if RTS_ZEROHOUR
+#define RETAIL_COMPATIBLE_PACKET_SIZE (0)
+#else
+#define RETAIL_COMPATIBLE_PACKET_SIZE (RETAIL_COMPATIBLE_NETWORKING)
 #endif
 #endif
 
@@ -171,6 +182,11 @@
 // by using the larger resolution textures from Generals. Content wise these textures are identical.
 #ifndef PRIORITIZE_TEXTURES_BY_SIZE
 #define PRIORITIZE_TEXTURES_BY_SIZE (1)
+#endif
+
+// Enable drawing particles as a terrain-conforming overlay.
+#ifndef ENABLE_TERRAIN_CONFORMING_PARTICLES
+#define ENABLE_TERRAIN_CONFORMING_PARTICLES (1)
 #endif
 
 // Enable obsolete code. This mainly refers to code that existed in Generals but was removed in GeneralsMD.

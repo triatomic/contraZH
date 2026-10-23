@@ -36,6 +36,7 @@
 #include "Common/Player.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingTemplate.h"
+#include "Common/TunnelTracker.h"
 #include "Common/Upgrade.h"
 #include "Common/Xfer.h"
 #include "Common/XferCRC.h"
@@ -56,6 +57,7 @@
 #include "GameLogic/Module/SpawnBehavior.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Module/StealthUpdate.h"
+#include "GameLogic/Module/SupplyTruckAIUpdate.h"
 #include "GameLogic/Module/SpecialPowerUpdateModule.h"
 #include "GameLogic/ObjectIter.h"
 #include "GameLogic/PartitionManager.h"
@@ -2027,8 +2029,8 @@ void getHelicopterOffset( Coord3D& posOut, Int idx )
   }
 
   Coord3D tempCtr = posOut;
-  posOut.x = tempCtr.x + (sin(angle) * radius);
-  posOut.y = tempCtr.y + (cos(angle) * radius);
+  posOut.x = tempCtr.x + (WWMath::Sin(angle) * radius);
+  posOut.y = tempCtr.y + (WWMath::Cos(angle) * radius);
 
 }
 
@@ -2958,6 +2960,46 @@ void AIGroup::groupEvacuate( CommandSourceType cmdSource )
 }
 
 /**
+ * Empty its contents, supply gatherers among them resume gathering
+ */
+void AIGroup::groupEvacuateToWork( CommandSourceType cmdSource )
+{
+	std::list<Object *>::iterator i;
+	for( i = m_memberList.begin(); i != m_memberList.end(); ++i )
+	{
+		ContainModuleInterface *contain = (*i)->getContain();
+		if( contain == nullptr )
+		{
+			continue;
+		}
+
+		// A subdued or frozen container refuses to evacuate.
+		if( (*i)->isDisabledByType( DISABLED_SUBDUED ) || (*i)->isDisabledByType( DISABLED_FROZEN ) )
+		{
+			continue;
+		}
+
+		const ContainedItemsList *riders = contain->getContainedItemsList();
+		if( riders == nullptr )
+		{
+			continue;
+		}
+
+		for( ContainedItemsList::const_iterator it = riders->begin(); it != riders->end(); ++it )
+		{
+			AIUpdateInterface *riderAI = (*it)->getAIUpdateInterface();
+			SupplyTruckAIInterface *supplyTruckAI = riderAI ? riderAI->getSupplyTruckAIInterface() : nullptr;
+			if( supplyTruckAI )
+			{
+				supplyTruckAI->setForceWantingState( TRUE );
+			}
+		}
+	}
+
+	groupEvacuate( cmdSource );
+}
+
+/**
 	* Execute railed transport behavior
 	*/
 void AIGroup::groupExecuteRailedTransport( CommandSourceType cmdSource )
@@ -3386,6 +3428,47 @@ void AIGroup::groupToggleOvercharge( CommandSourceType cmdSource )
 			if( obi )
 				obi->toggle();
 
+		}
+
+	}
+
+}
+
+void AIGroup::groupToggleTunnelAutoPop(CommandSourceType cmdSource)
+{
+	std::list<Object*>::iterator i;
+	Object *obj;
+	TunnelTracker *tunnelSystem;
+	Bool hasAutoExit = false;
+
+	// ShigureUi first pass -- is there any auto-pop tunnel?
+	for (i = m_memberList.begin(); i != m_memberList.end(); ++i)
+	{
+		obj = *i;
+
+		tunnelSystem = obj->getControllingPlayer()->getTunnelSystem();
+		if (tunnelSystem)
+		{
+			if (tunnelSystem->isAutoExitTunnel(obj))
+			{
+				hasAutoExit = true;
+				break;
+			}
+		}
+	}
+
+	for (i = m_memberList.begin(); i != m_memberList.end(); ++i)
+	{
+		// get object
+		obj = *i;
+
+		if (obj->getContain() && obj->getContain()->isTunnelContain() && !obj->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION))
+		{
+			tunnelSystem = obj->getControllingPlayer()->getTunnelSystem();
+			if (tunnelSystem)
+			{
+				tunnelSystem->setTunnelAutoPop(obj, hasAutoExit ? false : true);
+			}
 		}
 
 	}

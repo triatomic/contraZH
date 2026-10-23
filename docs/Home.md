@@ -6,7 +6,8 @@ Modding documentation for [contraZH](https://github.com/triatomic/contraZH).
 
 Most of this is a copy of the [GeneralsGameCode_Modding
 wiki](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki), which contraZH is forked from.
-Those pages document upstream's engine additions and apply here unchanged.
+Those pages document upstream's engine additions and apply here unchanged. Credit for them goes to
+Andi and the other GeneralsGameCode_Modding contributors.
 
 Changes specific to this fork are on [contraZH Changes](contraZH-Changes.md).
 
@@ -14,13 +15,16 @@ Changes specific to this fork are on [contraZH Changes](contraZH-Changes.md).
 
 ## This fork
 
-* [contraZH Changes](contraZH-Changes.md) - Options.ini settings, new command buttons, debug overlays and cheat hotkeys
+* [contraZH Changes](contraZH-Changes.md) - fork changes by topic: gameplay fixes, Options.ini, new INI keys and modules, debug and Generals Online
 * [Direct3D 9 Features](dx9feat.md) - shadow mapping, specular, normal and glow maps, per-pixel lights, soft particles, shockwaves
 * [Water](Water.md) - shader water options, `Water.ini` parameters and textures
 * [Electric & Laser Shading](Electric-&-Laser-Shading.md) - pictured electric, laser and laser ground glow keys
 * [WorldBuilder Qt](WorldBuilder-Qt.md) - the Qt map editor, its D3D9 effects, script and INI tools, map generator and MCP server
 
 ## Upstream reference
+
+Copied unchanged from the GeneralsGameCode_Modding wiki. Pages marked "Written by contraZH" cover
+upstream features that wiki leaves out.
 
 * [Changes & Bug Fixes](Changes-&-Bug-Fixes.md) - changes to default engine behaviour
 * [Objects & Modules](Objects-&-Modules.md) - object parameters and every new module type
@@ -31,7 +35,9 @@ Changes specific to this fork are on [contraZH Changes](contraZH-Changes.md).
 * [CommandButtons](CommandButtons.md) / [ChatCommands](ChatCommands.md)
 * [BuffSystem](BuffSystem.md) / [Locomotor](Locomotor.md) / [Naval Support](Naval-Support.md)
 * [Object Creation List](Object-Creation-List.md) / [New Enum Definitions](New-Enum-Definitions.md)
-* [Audio](Audio.md)
+* [Audio](Audio.md) / [MapData](MapData.md)
+* [Undocumented Upstream Features](Undocumented-Upstream-Features.md) - written by contraZH: upstream features missing from upstream's wiki, and corrections
+* [Game MCP & AI Matches](Game-MCP-and-AI-Matches.md) - driving the game from tools and logging AI-only skirmishes
 
 # Contact
 

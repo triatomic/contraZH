@@ -118,6 +118,8 @@ void WBQtBuildList_Import(void);
 void WBQtBuildList_EditProps(void);
 int  WBQtBuildList_GetForcedShow(void);
 void WBQtBuildList_SetForcedShow(int on);
+int  WBQtBuildList_GetSideOnly(void);
+void WBQtBuildList_SetSideOnly(int on);
 
 // --- Mound panel: forward push, tool -> Qt widget (implemented Qt-side) ------------------
 void WBQtMound_PushWidth(int v);
@@ -337,6 +339,10 @@ enum {
 };
 int  WBQtScript_GetCheckbox(int which);
 void WBQtScript_SetCheckbox(int which, int checked);
+
+// The script editor's "New design" setting: 1 the redesigned windows, 0 the originals.
+int  WBQtScript_GetNewDesign(void);
+void WBQtScript_SetNewDesign(int on);
 
 // 9d remaining buttons -> the existing handlers (each may pop MFC dialogs / mutate the model).
 void WBQtScript_AddDebug(void);

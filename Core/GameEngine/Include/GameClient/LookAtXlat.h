@@ -55,6 +55,7 @@ public:
 	void setScreenEdgeScrollMode(ScreenEdgeScrollMode mode);
 
 	void resetModes(); //Used when disabling input, so when we reenable it we aren't stuck in a mode.
+	void consumeMiddleClick() { m_middleButtonDownTimeMsec = 0; }	///< the coming middle up fired a binding, so it does not reset the camera
 
 private:
 	enum

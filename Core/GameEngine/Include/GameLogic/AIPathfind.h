@@ -568,6 +568,8 @@ protected:
 	zoneStorageType *m_groundCliffZones;
 	zoneStorageType *m_groundWaterZones;
 	zoneStorageType *m_groundRubbleZones;
+	zoneStorageType *m_groundCliffRubbleZones;
+	zoneStorageType *m_groundWaterRubbleZones;
 	zoneStorageType *m_crusherZones;
 	Bool					m_interactsWithBridge;
 	Bool					m_markedPassable;
@@ -634,6 +636,8 @@ private:
 	zoneStorageType *m_groundCliffZones;
 	zoneStorageType *m_groundWaterZones;
 	zoneStorageType *m_groundRubbleZones;
+	zoneStorageType *m_groundCliffRubbleZones;
+	zoneStorageType *m_groundWaterRubbleZones;
 	zoneStorageType *m_terrainZones;
 	zoneStorageType *m_crusherZones;
 	zoneStorageType *m_hierarchicalZones;
@@ -741,7 +745,7 @@ public:
 	virtual void loadPostProcess() override;
 
 	Bool clientSafeQuickDoesPathExist( const LocomotorSet& locomotorSet, Short requiredBridgeHeight, const Coord3D *from, const Coord3D *to );  ///< Can we build any path at all between the locations	(terrain & buildings check - fast)
-	Bool clientSafeQuickDoesPathExistForUI( const LocomotorSet& locomotorSet, const Coord3D *from, const Coord3D *to );  ///< Can we build any path at all between the locations	(terrain only - fast)
+	Bool clientSafeQuickDoesPathExistForUI( const LocomotorSet& locomotorSet, const Coord3D *from, const Coord3D *to, Bool acceptRubble = FALSE );  ///< Can we build any path at all between the locations	(terrain only - fast)
 	Bool slowDoesPathExist( Object *obj, const Coord3D *from,
 		const Coord3D *to, ObjectID ignoreObject=INVALID_ID );  ///< Can we build any path at all between the locations	(terrain, buildings & units check - slower)
 
@@ -808,6 +812,7 @@ public:
 	Bool isViewBlockedByObstacle(const Object* obj, const Object* objOther);	///< Return true if the straight line between the given points contains any obstacle, and thus blocks vision
 
 	Bool isAttackViewBlockedByObstacle(const Object* obj, const Coord3D& attackerPos,  const Object* victim, const Coord3D& victimPos);	///< Return true if the straight line between the given points contains any obstacle, and thus blocks vision
+	Bool isValidAttackGoal(const Object* obj, const LocomotorSet& locomotorSet, const Coord3D& goalPos, const Object* victim, const Coord3D* victimPos, const Weapon* weapon);	///< true if obj can stand at goalPos (on its layer) and attack from there (same checks as findAttackPath's quick check)
 
 	Bool isLinePassable( const Object *obj, LocomotorSurfaceTypeMask acceptableSurfaces,
 		PathfindLayerEnum layer, const Coord3D& startWorld, const Coord3D& endWorld,
@@ -874,7 +879,7 @@ protected:
 																PathfindCell *parentCell,
 																PathfindCell *goalCell, zoneStorageType parentZone,
 																zoneStorageType *examinedZones, Int &numExZones,
-																Bool crusher, Int &cellCount);
+																LocomotorSurfaceTypeMask locomotorSurface, Bool crusher, Int &cellCount);
 	Bool checkForAdjust(Object *, const LocomotorSet& locomotorSet, Bool isHuman, Int cellX, Int cellY,
 		PathfindLayerEnum layer, Int iRadius, Bool center,Coord3D *dest, const Coord3D *groupDest) ;
 	Bool checkForLanding(Int cellX, Int cellY,

@@ -18,6 +18,7 @@
 #ifndef WB_QT_TERRAIN_MATERIAL_PANEL_H
 #define WB_QT_TERRAIN_MATERIAL_PANEL_H
 
+#include <QStringList>
 #include <QWidget>
 
 class QCheckBox;
@@ -61,6 +62,7 @@ private slots:
 	void onSearch();
 	void onReset();
 	void onSwap();
+	void onNewBrush();
 	void onSetFavorite();
 	void onDeleteFavorite();
 	void onImportFavorites();
@@ -75,6 +77,7 @@ private slots:
 	void onPaintModeChanged(int index);
 	void onDensityChanged(int v);
 	void onNoMixingToggled();
+	void onPaintWaterOnlyToggled();
 	void onCopyTextureToggled();
 	void onCopyTerrainToggled();
 	void onRaiseOnlyToggled();
@@ -94,6 +97,8 @@ private:
 	void setWidthRow(int v);
 	void setSwatch(QLabel *label, int texClass);
 	QTreeWidgetItem *findOrAddChild(QTreeWidgetItem *parent, const QString &label);
+	QTreeWidgetItem *addLeaf(const QString &path, const QString &label, int texClass);
+	QStringList categoryPaths() const;
 
 	Ui::WBQtTerrainMaterialPanel *m_ui;	// owns the static widget tree (WBQtTerrainMaterialPanel.ui)
 
@@ -101,6 +106,7 @@ private:
 	QLineEdit    *m_search;
 	QPushButton  *m_searchBtn;
 	QPushButton  *m_resetBtn;
+	QPushButton  *m_newBrushBtn;
 	QTreeWidget  *m_tree;
 	QLabel       *m_nameLabel;
 
@@ -136,6 +142,9 @@ private:
 
 	// No mixing.
 	QCheckBox    *m_noMixing;
+
+	// Water-only painting.
+	QCheckBox    *m_paintWaterOnly;
 
 	// Copy mode.
 	QCheckBox    *m_copyTexture;

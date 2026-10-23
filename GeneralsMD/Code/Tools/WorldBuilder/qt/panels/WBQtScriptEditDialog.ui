@@ -2,189 +2,182 @@
 <ui version="4.0">
  <class>WBQtScriptEditDialog</class>
  <widget class="QDialog" name="WBQtScriptEditDialog">
-  <layout class="QVBoxLayout" name="rootLayout" stretch="1,0">
+  <layout class="QVBoxLayout" name="rootLayout" stretch="0,1,0,0">
    <item>
-    <widget class="QTabWidget" name="tabs">
-     <property name="currentIndex">
-      <number>0</number>
+    <widget class="QFrame" name="propsStrip">
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
      </property>
-     <widget class="QWidget" name="propertiesTab">
-      <attribute name="title">
-       <string>Script Properties</string>
-      </attribute>
-      <layout class="QVBoxLayout" name="propertiesLayout" stretch="0,0,1">
-       <item>
-        <layout class="QHBoxLayout" name="nameRow" stretch="0,1">
-         <item>
-          <widget class="QLabel" name="nameLabel">
-           <property name="text">
-            <string>Script Name:</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLineEdit" name="nameEdit"/>
-         </item>
-        </layout>
-       </item>
-       <item>
-        <layout class="QHBoxLayout" name="middleRow" stretch="1,0,0">
-         <item>
-          <widget class="QGroupBox" name="flagsBox">
-           <property name="title">
-            <string>Script Flags:</string>
-           </property>
-           <layout class="QVBoxLayout" name="flagsLay">
-            <item>
-             <widget class="QCheckBox" name="subroutineCheck">
-              <property name="text">
-               <string>Script is Subroutine (Make this script usable by teams, read the manual for more info)</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QCheckBox" name="activeCheck">
-              <property name="text">
-               <string>Script is Active</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QCheckBox" name="oneShotCheck">
-              <property name="text">
-               <string>Deactivate upon success (automatically disables itself after completing successfully)</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <spacer name="flagsSpacer">
-              <property name="orientation">
-               <enum>Qt::Vertical</enum>
-              </property>
-             </spacer>
-            </item>
-           </layout>
-          </widget>
-         </item>
-         <item>
-          <widget class="QGroupBox" name="activeInBox">
-           <property name="title">
-            <string>Active in:</string>
-           </property>
-           <layout class="QVBoxLayout" name="activeInLay">
-            <item>
-             <widget class="QCheckBox" name="easyCheck">
-              <property name="text">
-               <string>Easy</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QCheckBox" name="normalCheck">
-              <property name="text">
-               <string>Normal</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QCheckBox" name="hardCheck">
-              <property name="text">
-               <string>Hard</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <spacer name="activeInSpacer">
-              <property name="orientation">
-               <enum>Qt::Vertical</enum>
-              </property>
-             </spacer>
-            </item>
-           </layout>
-          </widget>
-         </item>
-         <item>
-          <widget class="QGroupBox" name="evalBox">
-           <property name="title">
-            <string>Evaluate script:</string>
-           </property>
-           <layout class="QVBoxLayout" name="evalLay">
-            <item>
-             <widget class="QRadioButton" name="everyFrameRadio">
-              <property name="text">
-               <string>Every Frame</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <layout class="QHBoxLayout" name="secondsRow">
-              <item>
-               <widget class="QRadioButton" name="everySecondRadio">
-                <property name="text">
-                 <string>Every</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QSpinBox" name="secondsSpin">
-                <property name="minimum">
-                 <number>1</number>
-                </property>
-                <property name="maximum">
-                 <number>9999</number>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QLabel" name="secondsLabel">
-                <property name="text">
-                 <string>seconds.</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <spacer name="secondsSpacer">
-                <property name="orientation">
-                 <enum>Qt::Horizontal</enum>
-                </property>
-               </spacer>
-              </item>
-             </layout>
-            </item>
-            <item>
-             <spacer name="evalSpacer">
-              <property name="orientation">
-               <enum>Qt::Vertical</enum>
-              </property>
-             </spacer>
-            </item>
-           </layout>
-          </widget>
-         </item>
-        </layout>
-       </item>
-       <item>
-        <widget class="QGroupBox" name="commentBox">
-         <property name="title">
-          <string>Script Comment:</string>
-         </property>
-         <layout class="QVBoxLayout" name="commentLay">
+     <layout class="QVBoxLayout" name="propsLayout">
+      <item>
+       <layout class="QHBoxLayout" name="nameRow">
+        <item>
+         <widget class="QLabel" name="nameLabel">
+          <property name="text">
+           <string>Name</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="nameEdit"/>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="flagsRow">
+        <item>
+         <widget class="QToolButton" name="activeChip">
+          <property name="text">
+           <string>Active</string>
+          </property>
+          <property name="toolTip">
+           <string>Script is Active</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="subroutineChip">
+          <property name="text">
+           <string>Subroutine</string>
+          </property>
+          <property name="toolTip">
+           <string>Make this script usable by teams; read the manual for more info.</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="oneShotChip">
+          <property name="text">
+           <string>Deactivate upon success</string>
+          </property>
+          <property name="toolTip">
+           <string>The script disables itself after completing successfully.</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="Line" name="flagsSep">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="easyChip">
+          <property name="text">
+           <string>Easy</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="normalChip">
+          <property name="text">
+           <string>Normal</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="hardChip">
+          <property name="text">
+           <string>Hard</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="flagsSpacer">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QLabel" name="evalLabel">
+          <property name="text">
+           <string>Evaluate</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="evalCombo">
           <item>
-           <widget class="QPlainTextEdit" name="commentEdit"/>
+           <property name="text">
+            <string>every frame</string>
+           </property>
           </item>
-         </layout>
-        </widget>
-       </item>
-      </layout>
-     </widget>
+          <item>
+           <property name="text">
+            <string>every N seconds</string>
+           </property>
+          </item>
+         </widget>
+        </item>
+        <item>
+         <widget class="QSpinBox" name="secondsSpin">
+          <property name="minimum">
+           <number>1</number>
+          </property>
+          <property name="maximum">
+           <number>9999</number>
+          </property>
+          <property name="suffix">
+           <string> s</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QPlainTextEdit" name="commentEdit">
+        <property name="placeholderText">
+         <string>Script comment</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </widget>
    </item>
    <item>
-    <widget class="QDialogButtonBox" name="buttonBox">
-     <property name="standardButtons">
-      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+    <widget class="QWidget" name="sectionsHost">
+     <layout class="QVBoxLayout" name="sectionsLayout">
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPlainTextEdit" name="actionNoteEdit">
+     <property name="placeholderText">
+      <string>Actions note (shared by THEN and ELSE)</string>
      </property>
     </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="bottomRow">
+     <item>
+      <widget class="QCheckBox" name="smartCopyCheck">
+       <property name="text">
+        <string>Smart Copy</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QDialogButtonBox" name="buttonBox">
+       <property name="standardButtons">
+        <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+       </property>
+      </widget>
+     </item>
+    </layout>
    </item>
   </layout>
  </widget>

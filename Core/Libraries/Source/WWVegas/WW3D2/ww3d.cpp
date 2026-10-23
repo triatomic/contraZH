@@ -847,6 +847,8 @@ WW3DErrorType WW3D::Begin_Render(bool clear,bool clearz,const Vector3 & color, f
 	WWASSERT(!IsRendering);
 	IsRendering = true;
 
+	DX8Wrapper::Bind_Scene_Target();
+
 	// If we want to clear the screen, we need to set the viewport to include the entire screen:
 	if (clear || clearz) {
 		D3DVIEWPORT8 vp;
@@ -1386,7 +1388,7 @@ void WW3D::Make_Screen_Shot( const char * filename_base , const float gamma, con
 	SurfaceClass::SurfaceDescription surfaceDesc;
 	surface->Get_Description(surfaceDesc);
 
-	SurfaceClass* surfaceCopy = NEW_REF(SurfaceClass, (DX8Wrapper::_Create_DX8_Surface(surfaceDesc.Width, surfaceDesc.Height, surfaceDesc.Format)));
+	SurfaceClass* surfaceCopy = NEW_REF(SurfaceClass, (surfaceDesc.Width, surfaceDesc.Height, surfaceDesc.Format));
 	DX8Wrapper::_Copy_DX8_Rects(surface->Peek_D3D_Surface(), nullptr, 0, surfaceCopy->Peek_D3D_Surface(), nullptr);
 
 	surface->Release_Ref();
@@ -1736,7 +1738,7 @@ void WW3D::Update_Movie_Capture()
 	SurfaceClass::SurfaceDescription surfaceDesc;
 	surface->Get_Description(surfaceDesc);
 
-	SurfaceClass* surfaceCopy = NEW_REF(SurfaceClass, (DX8Wrapper::_Create_DX8_Surface(surfaceDesc.Width, surfaceDesc.Height, surfaceDesc.Format)));
+	SurfaceClass* surfaceCopy = NEW_REF(SurfaceClass, (surfaceDesc.Width, surfaceDesc.Height, surfaceDesc.Format));
 	DX8Wrapper::_Copy_DX8_Rects(surface->Peek_D3D_Surface(), nullptr, 0, surfaceCopy->Peek_D3D_Surface(), nullptr);
 
 	surface->Release_Ref();
@@ -2067,6 +2069,16 @@ void WW3D::Set_MSAA_Mode(MultiSampleModeEnum mode)
 		break;
 
 	}
+}
+
+void WW3D::Set_Super_Sampling(int percent)
+{
+	DX8Wrapper::Set_Super_Sampling(percent / 100.0f);
+}
+
+int WW3D::Get_Super_Sampling()
+{
+	return (int)(DX8Wrapper::Get_Super_Sampling() * 100.0f + 0.5f);
 }
 
 WW3D::MultiSampleModeEnum WW3D::Get_MSAA_Mode()

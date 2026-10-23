@@ -27,10 +27,12 @@ Add the button to the unit's `CommandSet` like any other command button.
 **Notes:**
 * Requires a locomotor that can rotate in place / reverse (e.g. `TREADS`, `HOVER`). The reverse speed and behavior are tuned via the [Locomotor backwards-movement parameters](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Locomotor#reverse-backwards-movement).
 * Plays the normal move voice response.
-* Caps Lock arms the same order for any selection without the button; see the reverse move hotkey
-section in contraZH-Changes.md.
 * A manual `REVERSE_MOVE` order forces reversing for the entire path. The GameData flag [`ReverseMoveIgnoreAngleThreshold`](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/GameData#reverse-movement) controls whether a manual order reverses regardless of heading.
 
 ## Multi-Target Special Powers
 
 CommandButton parameters were added to aim a special power at multiple target points in one activation (`NumberOfTargets`, anchor/target radii, markers, ...). See [Multi-Target Special Powers](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/SpecialPowers#multi-target-special-powers).
+
+## Sidebar Button Capacity
+
+A `CommandSet` (sidebar) can now hold up to **32** command buttons, up from the vanilla limit of 18.

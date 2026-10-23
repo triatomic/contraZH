@@ -79,7 +79,7 @@ void ShieldBodyModuleData::buildFieldParse(MultiIniFieldParse& p)
 
 		{ "ShieldPassThroughDamageTypes",   INI::parseDamageTypeFlags, NULL, offsetof(ShieldBodyModuleData, m_damageTypesToPassThrough) },
 		{ "DefaultShieldPassThroughDamageTypes",   INI::parseDamageTypeFlags, NULL, offsetof(ShieldBodyModuleData, m_defaultDamageTypesToPassThrough) },
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
 }

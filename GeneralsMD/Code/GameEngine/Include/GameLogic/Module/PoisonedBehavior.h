@@ -109,13 +109,16 @@ public:
 	// Disabled conditions to process (we should still poison disabled things)
 	virtual DisabledMaskType getDisabledTypesToProcess() const override { return DISABLEDMASK_ALL; }
 
+	// Shared with GasBehavior, so both read attacker upgrades the same way
+	static void findAttacker( const DamageInfo *damageInfo, const Object *&attacker, const Player *&player );
+	static Bool attackerHasUpgrade( const UpgradeTemplate *upgrade, const Player *player, const Object *attacker );
+
 protected:
 
 	void startPoisonedEffects( const DamageInfo *damageInfo );
 	void stopPoisonedEffects();
 	UpdateSleepTime calcSleepTime();
 	PoisonTier resolveTier( const DamageInfo *damageInfo ) const;
-	static Bool attackerHasUpgrade( const UpgradeTemplate *upgrade, const Player *player, const Object *attacker );
 
 private:
 	UnsignedInt		m_poisonDamageFrame;

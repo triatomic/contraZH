@@ -453,6 +453,26 @@
         </item>
        </widget>
       </item>
+      <item row="2" column="2">
+       <widget class="QLabel" name="scaleLabel">
+        <property name="text">
+         <string>Scale:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="3">
+       <widget class="WBQtScrubSpinBox" name="scale">
+        <property name="toolTip">
+         <string>Visual size multiplier on the template Scale. Drag to scrub, or type a value.</string>
+        </property>
+        <property name="decimals">
+         <number>2</number>
+        </property>
+        <property name="singleStep">
+         <double>0.050000000000000</double>
+        </property>
+       </widget>
+      </item>
      </layout>
     </widget>
    </item>

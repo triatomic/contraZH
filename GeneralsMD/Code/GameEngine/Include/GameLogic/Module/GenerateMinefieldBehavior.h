@@ -54,6 +54,8 @@ public:
 	Bool									m_upgradable;
 	Bool									m_smartBorder;
 	Bool									m_smartBorderSkipInterior;
+	KindOfMaskType				m_blockedByKindOf;						///< an object under a mine blocks it if it is any of these
+	KindOfMaskType				m_notBlockedByKindOf;					///< but never if it is any of these
 
 	GenerateMinefieldBehaviorModuleData();
 

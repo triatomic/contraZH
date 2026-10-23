@@ -107,7 +107,7 @@ public:
 	virtual void removeAllBibs() override;
 	virtual void removeBibHighlighting() override;
 
-	virtual void addProp(const ThingTemplate *tt, const Coord3D *pos, Real angle) override;
+	virtual void addProp(const ThingTemplate *tt, const Coord3D *pos, Real angle, Real scale) override;
 
 	virtual void removeTreesAndPropsForConstruction(
 		const Coord3D* pos,

@@ -44,6 +44,7 @@ Xfer::Xfer()
 
 	m_options = XO_NONE;
 	m_xferMode = XFER_INVALID;
+	m_playerCount = MAX_PLAYER_COUNT;
 
 }
 
@@ -836,6 +837,27 @@ void Xfer::xferUpgradeMask( UpgradeMaskType *upgradeMaskData )
 		DEBUG_CRASH(( "xferUpgradeMask - Unknown xfer mode '%d'", getXferMode() ));
 		throw XFER_MODE_UNKNOWN;
 
+	}
+
+}
+
+// ------------------------------------------------------------------------------------------------
+/** Xfer a player mask at the width that matches the per-player array size */
+// ------------------------------------------------------------------------------------------------
+void Xfer::xferPlayerMask( PlayerMaskType *playerMaskData )
+{
+
+	if( m_playerCount > RETAIL_PLAYER_COUNT )
+	{
+		xferImplementation( playerMaskData, sizeof( PlayerMaskType ) );
+		return;
+	}
+
+	UnsignedShort retailMask = (UnsignedShort)*playerMaskData;
+	xferUnsignedShort( &retailMask );
+	if( getXferMode() == XFER_LOAD )
+	{
+		*playerMaskData = retailMask;
 	}
 
 }

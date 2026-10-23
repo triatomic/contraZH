@@ -22,6 +22,7 @@
 #include "Common/FileSystem.h"
 #include "GameLogic/SidesList.h"
 #include "qt/panels/WBQtTeamsBridge.h"
+#include "qt/WBQtMessageBox.h"
 #include <vector>
 
 #ifdef RTS_HAS_QT
@@ -119,13 +120,16 @@ void CTeamsDialog::qtMRefresh(int rebuildRows)
 		s_qtTeamRows.clear();
 		if (s_qtCurPlayer >= 0 && s_qtCurPlayer < m_sides.getNumSides())
 		{
-			AsciiString playerName = qtmPlayerNameForUI(m_sides, s_qtCurPlayer);
+			// neutral teams store an empty owner name, or its UI label
+			AsciiString ownerName = m_sides.getSideInfo(s_qtCurPlayer)->getDict()->getAsciiString(TheKey_playerName);
+			AsciiString ownerUIName = qtmPlayerNameForUI(m_sides, s_qtCurPlayer);
 			Bool selected = false;
 			Int i;
 			for (i = 0; i < m_sides.getNumTeams(); i++)
 			{
 				TeamsInfo *ti = m_sides.getTeamInfo(i);
-				if (ti->getDict()->getAsciiString(TheKey_teamOwner) == playerName.str())
+				AsciiString teamOwner = ti->getDict()->getAsciiString(TheKey_teamOwner);
+				if (teamOwner == ownerName || teamOwner == ownerUIName)
 				{
 					QtmTeamRow row;
 					Bool exists;
@@ -507,14 +511,13 @@ void CTeamsDialog::qtExportTeams(void)
 	}
 	AsciiString selectedPlayerName = qtmPlayerNameForUI(m_sides, selectedPlayer);
 
-	CFileDialog dlg(FALSE, ".teams", "exportedteams.teams",
-		OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
-		"Team Export (*.teams)|*.teams||");
-	if (dlg.DoModal() == IDCANCEL)
+	char pathBuf[_MAX_PATH];
+	if (WBQtFileDialog_Run(1, "Export Teams", "Team Export (*.teams)|*.teams||", "teams",
+			"exportedteams.teams", pathBuf, sizeof(pathBuf)) == 0)
 	{
 		return;
 	}
-	CString path = dlg.GetPathName();
+	CString path = pathBuf;
 	try {
 		CFile f(path,
 			CFile::modeCreate | CFile::modeWrite |
@@ -565,14 +568,13 @@ void CTeamsDialog::qtImportTeams(void)
 	}
 	m_importTargetPlayer = qtmPlayerNameForUI(m_sides, selectedPlayer);
 
-	CFileDialog dlg(TRUE, ".teams", NULL,
-		OFN_FILEMUSTEXIST | OFN_HIDEREADONLY,
-		"Team Export (*.teams)|*.teams||");
-	if (dlg.DoModal() == IDCANCEL)
+	char pathBuf[_MAX_PATH];
+	if (WBQtFileDialog_Run(0, "Import Teams", "Team Export (*.teams)|*.teams||", "teams",
+			NULL, pathBuf, sizeof(pathBuf)) == 0)
 	{
 		return;
 	}
-	CString path = dlg.GetPathName();
+	CString path = pathBuf;
 	try {
 		CachedFileInputStream in;
 		if (!in.open(AsciiString(path)))
@@ -778,11 +780,6 @@ extern "C" void WBQtTeams_ImportTeams(void)
 }
 
 // ================= the Qt team property sheet (Tier 3b-3) =================
-// Four HIDDEN Team* pages (they are CDialogs) bound to the current team's dict in the hidden
-// CTeamsDialog's working copy. Their OnInitDialog seeds the controls and every handler writes
-// the dict live, so the Qt sheet drives them generically: write the control, then send the
-// real WM_COMMAND notification -- the page's own message map dispatches to the right handler.
-// The unit-pick "..." buttons still pop the MFC PickUnitDialog (owner = the active Qt sheet).
 
 //----------------------------------------------------------------------------------------
 // The team property sheet, de-bridged (T3) -- branch qt-debridge. The four hidden Team*
@@ -1963,6 +1960,130 @@ extern "C" int WBQtTeams_ReplaceMissingUnits(void)
 		WBQtReplaceReport_Add(missing[i].str(), picks[i].str(), hits);
 	}
 	return (int)missing.size();
+}
+
+extern "C" void WBQtTeamsData_GetTeamField(int row, const char *key, char *buf, int cap)
+{
+	copyOut("", buf, cap);
+	CTeamsDialog *dlg = CTeamsDialog::qtInstance();
+	if (dlg == NULL || key == NULL || row < 0 || row >= (int)s_qtTeamRows.size())
+	{
+		return;
+	}
+	SidesList *sides = static_cast<SidesList *>(dlg->qtSides());
+	const Int teamIndex = s_qtTeamRows[row].teamIndex;
+	if (sides == NULL || teamIndex < 0 || teamIndex >= sides->getNumTeams())
+	{
+		return;
+	}
+	Dict *dict = sides->getTeamInfo(teamIndex)->getDict();
+	const NameKeyType nameKey = TheNameKeyGenerator->nameToKey(AsciiString(key));
+	AsciiString value;
+	switch (dict->getType(nameKey))
+	{
+		case Dict::DICT_BOOL:
+			value = dict->getBool(nameKey) ? "1" : "0";
+			break;
+		case Dict::DICT_INT:
+			value.format("%d", dict->getInt(nameKey));
+			break;
+		case Dict::DICT_REAL:
+			value.format("%g", dict->getReal(nameKey));
+			break;
+		case Dict::DICT_ASCIISTRING:
+			value = dict->getAsciiString(nameKey);
+			break;
+		case Dict::DICT_UNICODESTRING:
+			value.translate(dict->getUnicodeString(nameKey));
+			break;
+		default:
+			break;
+	}
+	copyOut(value.str(), buf, cap);
+}
+
+extern "C" int WBQtTeamsData_GetPlayerTeamCount(int i)
+{
+	CTeamsDialog *dlg = CTeamsDialog::qtInstance();
+	if (dlg == NULL)
+	{
+		return 0;
+	}
+	SidesList *sides = static_cast<SidesList *>(dlg->qtSides());
+	if (sides == NULL || i < 0 || i >= sides->getNumSides())
+	{
+		return 0;
+	}
+	// The same owner match the team rows use.
+	const AsciiString ownerName = sides->getSideInfo(i)->getDict()->getAsciiString(TheKey_playerName);
+	const AsciiString ownerUIName = qtmPlayerNameForUI(*sides, i);
+	int count = 0;
+	for (Int t = 0; t < sides->getNumTeams(); t++)
+	{
+		const AsciiString teamOwner = sides->getTeamInfo(t)->getDict()->getAsciiString(TheKey_teamOwner);
+		if (teamOwner == ownerName || teamOwner == ownerUIName)
+		{
+			++count;
+		}
+	}
+	return count;
+}
+
+extern "C" int WBQtTeams_GetNewDesign(void)
+{
+	return ::AfxGetApp()->GetProfileInt("TeamBuilder", "NewDesign", 0) ? 1 : 0;
+}
+
+extern "C" void WBQtTeams_SetNewDesign(int on)
+{
+	::AfxGetApp()->WriteProfileInt("TeamBuilder", "NewDesign", on ? 1 : 0);
+}
+
+extern "C" int WBQtTeamsData_IsTemplate(const char *name)
+{
+	if (name == NULL || name[0] == 0 || TheThingFactory == NULL)
+	{
+		return 0;
+	}
+	return (TheThingFactory->findTemplate(AsciiString(name)) != NULL) ? 1 : 0;
+}
+
+extern "C" void WBQtTeamsData_GetScriptText(const char *name, char *buf, int cap)
+{
+	copyOut("", buf, cap);
+	CTeamsDialog *dlg = CTeamsDialog::qtInstance();
+	SidesList *sides = (dlg != NULL) ? static_cast<SidesList *>(dlg->qtSides()) : NULL;
+	if (sides == NULL || name == NULL || name[0] == 0)
+	{
+		return;
+	}
+	for (Int s = 0; s < sides->getNumSides(); s++)
+	{
+		ScriptList *list = sides->getSideInfo(s)->getScriptList();
+		if (list == NULL)
+		{
+			continue;
+		}
+		for (Script *script = list->getScript(); script != NULL; script = script->getNext())
+		{
+			if (script->getName() == name)
+			{
+				copyOut(script->getUiText().str(), buf, cap);
+				return;
+			}
+		}
+		for (ScriptGroup *group = list->getScriptGroup(); group != NULL; group = group->getNext())
+		{
+			for (Script *script = group->getScript(); script != NULL; script = script->getNext())
+			{
+				if (script->getName() == name)
+				{
+					copyOut(script->getUiText().str(), buf, cap);
+					return;
+				}
+			}
+		}
+	}
 }
 
 #endif // RTS_HAS_QT

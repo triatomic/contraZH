@@ -118,7 +118,7 @@ public:
 	void					Set_Disable_Sorting(int onoff)						{ if (onoff) { Bits |= DISABLE_SORTING; } else { Bits &= ~DISABLE_SORTING; }; }
 	void					Set_End_Caps(int onoff)									{ if (onoff) { Bits |= END_CAPS; } else { Bits &= ~END_CAPS; }; }
 	// SoftParticleHookClass effects for a textured, blended streak
-	void					Set_Effects(unsigned int effects)					{ Effects = effects; }
+	void					Set_Effects(unsigned int effects, const void *effectData = nullptr)	{ Effects = effects; EffectData = effectData; }
 
 	void					Reset_Line();
 
@@ -189,6 +189,7 @@ private:
 	unsigned int					Bits;
 
 	unsigned int					Effects;
+	const void *					EffectData;
 
 	friend class SegmentedLineClass;
 

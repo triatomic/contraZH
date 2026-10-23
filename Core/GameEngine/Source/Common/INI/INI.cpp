@@ -70,7 +70,7 @@
 
 #if USE_STD_FROM_CHARS_PARSING
 #include <charconv>
-#include <limits>
+#include <cstdlib>
 #include <string_view>
 #include <type_traits>
 #endif
@@ -106,6 +106,7 @@ static const BlockParse theTypeTable[] =
 	{ "ChallengeGenerals",              INI::parseChallengeModeDefinition },
 	{ "ChatCommand",                    INI::parseChatCommandDefinition },
 	{ "CommandButton",                  INI::parseCommandButtonDefinition },
+	{ "CommandButtonHotKey",            INI::parseCommandButtonHotKeyDefinition },
 	{ "CommandMap",                     INI::parseMetaMapDefinition },
 	{ "CommandSet",                     INI::parseCommandSetDefinition },
 	{ "ControlBarResizer",              INI::parseControlBarResizerDefinition },
@@ -118,6 +119,7 @@ static const BlockParse theTypeTable[] =
 	{ "DynamicGameLOD",                 INI::parseDynamicGameLODDefinition },
 	{ "EvaEvent",                       INI::parseEvaEvent },
 	{ "FXList",                         INI::parseFXListDefinition },
+	{ "FXListExtend",                   INI::parseFXListExtendDefinition },
 	{ "GameData",                       INI::parseGameDataDefinition },
 	{ "HeaderTemplate",                 INI::parseHeaderTemplateDefinition },
 	{ "InGameUI",                       INI::parseInGameUIDefinition },
@@ -137,10 +139,14 @@ static const BlockParse theTypeTable[] =
 	{ "MusicTrack",                     INI::parseMusicTrackDefinition },
 	{ "Object",                         INI::parseObjectDefinition },
 	{ "ObjectCreationList",             INI::parseObjectCreationListDefinition },
+#if RTS_ZEROHOUR
+	{ "ObjectCreationListExtend",       INI::parseObjectCreationListExtendDefinition },
+#endif
 	{ "ObjectExtend",                   INI::parseObjectExtendDefinition },
 	{ "ObjectReskin",                   INI::parseObjectReskinDefinition },
 	{ "OnlineChatColors",               INI::parseOnlineChatColorDefinition },
 	{ "ParticleSystem",                 INI::parseParticleSystemDefinition },
+	{ "ParticleSystemExtend",           INI::parseParticleSystemExtendDefinition },
 	{ "PlayerTemplate",                 INI::parsePlayerTemplateDefinition },
 	{ "Rank",                           INI::parseRankDefinition },
 	{ "ReallyLowMHz",                   parseReallyLowMHz },
@@ -174,16 +180,21 @@ static const BlockParse theWbTypeTable[] =
 	// (The naval map.ini declares 166 of them.)
 	{ "ObjectReskin",					INI::parseObjectReskinDefinition },
 	{ "ObjectCreationList",	            INI::parseObjectCreationListDefinition },
+#if RTS_ZEROHOUR
+	{ "ObjectCreationListExtend",       INI::parseObjectCreationListExtendDefinition },
+#endif
 
 	{ "SpecialPower",				    INI::parseSpecialPowerDefinition },
 
 	{ "ParticleSystem",			        INI::parseParticleSystemDefinition },
+	{ "ParticleSystemExtend",           INI::parseParticleSystemExtendDefinition },
 	{ "Science",						INI::parseScienceDefinition },
 
 	{ "Armor",							INI::parseArmorDefinition },
 
 	{ "Weapon",							INI::parseWeaponTemplateDefinition },
 	{ "FXList",							INI::parseFXListDefinition },
+	{ "FXListExtend",                   INI::parseFXListExtendDefinition },
 	{ "DamageFX",						INI::parseDamageFXDefinition },
 	
 	{ "AudioEvent",					    INI::parseAudioEventDefinition },
@@ -339,6 +350,12 @@ void INI::prepFile( AsciiString filename, INILoadType loadType, Bool optional /*
 	m_readBufferNext = 0;
 	m_readBufferUsed = file->size();
 	m_readBuffer = file->readEntireAndClose();
+	if (m_readBuffer == nullptr)
+	{
+		m_readBufferUsed = 0;
+		DEBUG_CRASH(( "INI::load, cannot read file '%s'", filename.str() ));
+		throw INI_CANT_OPEN_FILE;
+	}
 
 	// save our filename
 	m_filename = filename;
@@ -412,6 +429,16 @@ const std::vector<AsciiString>& INI::friend_getWBSkippedBlocks(void)
     return s_wbSkippedBlocks;
 }
 
+Bool INI::friend_isBlockType(const char *token)
+{
+    return findBlockParse(token) != nullptr;
+}
+
+Bool INI::friend_isWBBlockType(const char *token)
+{
+    return findWBBlockParse(token) != nullptr;
+}
+
 void INI::loadWB(AsciiString filename, INILoadType loadType, Xfer* pXfer)
 {
     setFPMode();
@@ -447,29 +474,17 @@ void INI::loadWB(AsciiString filename, INILoadType loadType, Xfer* pXfer)
                     // partial effects are left as-is; WorldBuilder tears the whole override set
                     // down if the user declines the load.
                     s_wbSkippedBlocks.push_back(currentLine);
-                    const char* blockEnd = "End";
-                    Bool skipDone = false;
-                    while (!skipDone && !m_endOfFile)
-                    {
-                        readLine();
-                        const char* endToken = strtok(m_buffer, getSeps());
-                        if (endToken && strcmp(endToken, blockEnd) == 0)
-                            skipDone = true;
-                    }
+                    skipToEndToken();
                 }
+            }
+            else if (stricmp(token, getEndToken()) == 0)
+            {
+                // The skip stopped at a child block's End, so this End closes the skipped block.
             }
             else
             {
                 // --- Skip unreadable/unrecognized blocks ---
-                const char* blockEnd = "End";
-                Bool skipDone = false;
-                while (!skipDone && !m_endOfFile)
-                {
-                    readLine();
-                    const char* endToken = strtok(m_buffer, getSeps());
-                    if (endToken && strcmp(endToken, blockEnd) == 0)
-                        skipDone = true;
-                }
+                skipToEndToken();
             }
         }
     }
@@ -551,15 +566,7 @@ void INI::loadObjectsOnly(AsciiString filename, Xfer* pXfer = NULL)
             {
                 // debug_Log("Skipping unknown block: %s\n", token);
                 // Optional: skip entire block until "End"
-                const char* blockEnd = "End";
-                Bool skipDone = false;
-                while (!skipDone && !m_endOfFile)
-                {
-                    readLine();
-                    const char* endToken = strtok(m_buffer, getSeps());
-                    if (endToken && strcmp(endToken, blockEnd) == 0)
-                        skipDone = true;
-                }
+                skipToEndToken();
             }
         }
     }
@@ -572,6 +579,67 @@ void INI::loadObjectsOnly(AsciiString filename, Xfer* pXfer = NULL)
     unPrepFile();
 }
 
+//-------------------------------------------------------------------------------------------------
+void INI::loadHotKeys( AsciiString filename )
+{
+	setFPMode();
+
+	s_xfer = nullptr;
+	prepFile( filename, INI_LOAD_MULTIFILE );
+
+	try
+	{
+		while( m_endOfFile == FALSE )
+		{
+			readLine();
+			const char *token = strtok( m_buffer, getSeps() );
+			if( token == nullptr || stricmp( token, getEndToken() ) == 0 )
+			{
+				continue;
+			}
+
+			// the player's file is not CRC checked, so it must not reach game data
+			if( strcmp( token, "CommandMap" ) == 0 )
+			{
+				parseMetaMapDefinition( this );
+			}
+			else if( strcmp( token, "CommandButtonHotKey" ) == 0 )
+			{
+				parseCommandButtonHotKeyDefinition( this );
+			}
+			else
+			{
+				skipToEndToken();
+			}
+		}
+	}
+	catch( ... )
+	{
+		unPrepFile();
+		throw;
+	}
+
+	unPrepFile();
+}
+
+
+/** Discard lines up to and including the next end token. */
+void INI::skipToEndToken( void )
+{
+	while( !m_endOfFile )
+	{
+		readLine();
+		const char *token = strtok( m_buffer, getSeps() );
+		if( token && stricmp( token, getEndToken() ) == 0 )
+		{
+			return;
+		}
+	}
+
+	DEBUG_CRASH( ("Error parsing block in INI file '%s'.  Missing '%s' token",
+										 getFilename().str(), getEndToken()) );
+	throw INI_MISSING_END_TOKEN;
+}
 
 //-------------------------------------------------------------------------------------------------
 /** Load and parse an INI file */
@@ -631,11 +699,17 @@ UnsignedInt INI::load( AsciiString filename, INILoadType loadType, Xfer *pXfer, 
 						strcpy(m_curBlockStart, "NO_BLOCK");
 					#endif
 				}
+				else if( stricmp( token, getEndToken() ) == 0 )
+				{
+					// The skip stopped at a child block's End, so this End closes the skipped block.
+					DEBUG_LOG( ("[LINE: %d - FILE: '%s'] Stray '%s' after a skipped block, ignored",
+														 getLineNum(), getFilename().str(), token ) );
+				}
 				else
 				{
-					DEBUG_CRASH( ("[LINE: %d - FILE: '%s'] Unknown block '%s'",
-														 getLineNum(), getFilename().str(), token ) );
-					throw INI_UNKNOWN_TOKEN;
+					DEBUG_LOG( ("[LINE: %d - FILE: '%s'] Unknown block '%s', skipped to its '%s'",
+														 getLineNum(), getFilename().str(), token, getEndToken() ) );
+					skipToEndToken();
 				}
 
 			}
@@ -1868,8 +1942,8 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 
 				if (!found)
 				{
-					DEBUG_CRASH( ("[LINE: %d - FILE: '%s'] Unknown field '%s' in block '%s'",
-														 INI::getLineNum(), INI::getFilename().str(), field, m_curBlockStart) );
+					DEBUG_LOG( ("[LINE: %d - FILE: '%s'] Unknown field '%s', skipped",
+														 INI::getLineNum(), INI::getFilename().str(), field) );
 				}
 
 			}
@@ -1916,53 +1990,42 @@ void INI::initFromINIMulti( void *what, const MultiIniFieldParse& parseTableList
 #if USE_STD_FROM_CHARS_PARSING
 
 template <typename Type>
-Type scanType(std::string_view token)
+Type scanType(const char* tokenString)
 {
+	std::string_view token(tokenString);
 	DEBUG_ASSERTCRASH(!token.empty(), ("token is not expected to be empty"));
 
-	// Capture the sign before any prefix stripping so overflow saturation stays correct.
-	const Bool negative = !token.empty() && token[0] == '-';
-
 	// Unlike sscanf, std::from_chars cannot parse "+".
-	// Consume the plus symbol to accommodate custom ini files that have numbers prefixed with a plus.
-	if (token[0] == '+')
-	{
-		token.remove_prefix(1);
-	}
+	// Skip it for from_chars while preserving the original token for the fallback.
+	const size_t tokenOffset = (token[0] == '+');
+	if (tokenOffset && token.size() > 1 && token[1] == '-')
+		throw INI_INVALID_DATA;
 
 	// Unlike sscanf, std::from_chars cannot parse "-" as unsigned integer.
-	using WideType = std::conditional_t<std::is_integral_v<Type>, Int64, Type>;
-	WideType result{};
-	const auto [ptr, ec] = std::from_chars(token.data(), token.data() + token.size(), result);
+	std::conditional_t<std::is_integral_v<Type>, Int64, Type> result{};
+	const auto [ptr, ec] = std::from_chars(token.data() + tokenOffset, token.data() + token.size(), result);
 
-	// Saturate out of range numbers instead of failing, so custom ini files that rely on
-	// the old lenient parsing still load. Signed types clamp to their bounds; unsigned
-	// negatives clamp to zero rather than wrapping the way legacy sscanf did.
+	// Preserve legacy range handling with defined strto* conversions.
 	if (ec == std::errc::result_out_of_range)
 	{
-		return negative ? std::numeric_limits<Type>::lowest() : (std::numeric_limits<Type>::max)();
+		char* end;
+		Type value;
+		if constexpr (std::is_floating_point_v<Type>)
+			value = std::strtof(tokenString, &end);
+		else if constexpr (std::is_signed_v<Type>)
+			value = static_cast<Type>(std::strtoll(tokenString, &end, 10));
+		else
+			value = static_cast<Type>(std::strtoull(tokenString, &end, 10));
+
+		if (end == tokenString)
+			throw INI_INVALID_DATA;
+
+		return value;
 	}
 
 	if (ec != std::errc{})
 	{
 		throw INI_INVALID_DATA;
-	}
-
-	// The wide type parses values that no longer fit once narrowed, so clamp rather than wrap.
-	if constexpr (std::is_integral_v<Type>)
-	{
-		const WideType lowest = static_cast<WideType>(std::numeric_limits<Type>::lowest());
-		const WideType highest = static_cast<WideType>((std::numeric_limits<Type>::max)());
-
-		if (result < lowest)
-		{
-			return std::numeric_limits<Type>::lowest();
-		}
-
-		if (result > highest)
-		{
-			return (std::numeric_limits<Type>::max)();
-		}
 	}
 
 	return static_cast<Type>(result);
@@ -2132,7 +2195,7 @@ void INI::parseDurationReal( INI *ini, void * /*instance*/, void *store, const v
 void INI::parseDurationUnsignedInt( INI *ini, void * /*instance*/, void *store, const void* /*userData*/ )
 {
 	UnsignedInt val = scanUnsignedInt(ini->getNextToken());
-	*(UnsignedInt *)store = (UnsignedInt)ceilf(ConvertDurationFromMsecsToFrames((Real)val));
+	*(UnsignedInt *)store = (UnsignedInt)WWMath::Ceilf(ConvertDurationFromMsecsToFrames((Real)val));
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -2140,7 +2203,7 @@ void INI::parseDurationUnsignedInt( INI *ini, void * /*instance*/, void *store, 
 void INI::parseDurationUnsignedShort( INI *ini, void * /*instance*/, void *store, const void* /*userData*/ )
 {
 	UnsignedInt val = scanUnsignedInt(ini->getNextToken());
-	*(UnsignedShort *)store = (UnsignedShort)ceilf(ConvertDurationFromMsecsToFrames((Real)val));
+	*(UnsignedShort *)store = (UnsignedShort)WWMath::Ceilf(ConvertDurationFromMsecsToFrames((Real)val));
 }
 
 //-------------------------------------------------------------------------------------------------

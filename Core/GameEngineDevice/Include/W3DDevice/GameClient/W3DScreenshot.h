@@ -1,6 +1,6 @@
 /*
 **	Command & Conquer Generals Zero Hour(tm)
-**	Copyright 2025 TheSuperHackers
+**	Copyright 2026 TheSuperHackers
 **
 **	This program is free software: you can redistribute it and/or modify
 **	it under the terms of the GNU General Public License as published by
@@ -21,6 +21,11 @@
 #include "GameClient/Display.h"
 
 void W3D_TakeCompressedScreenshot(ScreenshotFormat format, Int jpegQuality);
+
+#ifdef RTS_GAME_MCP
+// Writes the current back buffer to a file right away, for the game's MCP bridge.
+bool W3D_WriteScreenshotFile(const char* pathname, ScreenshotFormat format, Int jpegQuality);
+#endif
 
 // Called once per frame on the main thread to show messages for screenshots
 // that the screenshot thread has finished writing.

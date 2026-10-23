@@ -66,6 +66,7 @@
 #include "Common/MapData.h"
 
 #include "GameClient/ControlBar.h"
+#include "GameClient/Diplomacy.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/GameClient.h"
 #include "GameClient/GameText.h"
@@ -81,6 +82,7 @@
 #include "GameClient/GameWindowTransitions.h"
 
 #include "GameLogic/AI.h"
+#include "GameLogic/AIMatch.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/CaveSystem.h"
 #include "GameLogic/CrateSystem.h"
@@ -108,6 +110,7 @@
 
 #include "GameNetwork/GameSpy/BuddyThread.h"
 #include "GameNetwork/GameSpy/PeerDefs.h"
+#include "GameNetwork/LobbyRules.h"
 
 #if defined(GENERALS_ONLINE)
 #include "GameNetwork/GeneralsOnline/NGMPGame.h"
@@ -257,6 +260,14 @@ GameLogic::GameLogic()
 	m_isInUpdate = FALSE;
 
 	m_rankPointsToAddAtGameStart = 0;
+	m_coopBuildings = FALSE;
+	m_quickGame = FALSE;
+	m_diplomacy = FALSE;
+	m_freeRadar = FALSE;
+	m_revealMap = FALSE;
+#if defined(GENERALS_ONLINE)
+	m_pendingLobbyRules = 0;
+#endif
 
 	for(Int i = 0; i < MAX_SLOTS; i++)
 	{
@@ -297,6 +308,10 @@ GameLogic::GameLogic()
 	m_loadingSave = FALSE;
 	m_clearingGameData = FALSE;
 	m_quitToDesktopAfterMatch = FALSE;
+
+#if RTS_GENERALS && defined(_MSC_VER) && _MSC_VER < 1300
+	m_onUnitProducedZeroInit = false;
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -334,6 +349,9 @@ void GameLogic::destroyAllObjectsImmediate()
 	// process the destroy list immediately
 	processDestroyList();
 	DEBUG_ASSERTCRASH( m_objList == nullptr, ("destroyAllObjectsImmediate: Object list not cleared") );
+
+//	m_objHash.clear();
+	m_objVector.clear();
 
 }
 
@@ -428,12 +446,6 @@ void GameLogic::reset()
 	m_thingTemplateBuildableOverrides.clear();
 	m_controlBarOverrides.clear();
 
-	// set the hash to be rather large. We need to optimize this value later.
-//	m_objHash.clear();
-//	m_objHash.resize(OBJ_HASH_SIZE);
-	m_objVector.clear();
-	m_objVector.resize(OBJ_HASH_SIZE, nullptr);
-
 	m_pauseFrame = 0;
 	m_pauseSound = FALSE;
 	m_pauseMusic = FALSE;
@@ -447,6 +459,10 @@ void GameLogic::reset()
 
 	// destroy all objects
 	destroyAllObjectsImmediate();
+
+	// set the hash to be rather large. We need to optimize this value later.
+//	m_objHash.resize(OBJ_HASH_SIZE);
+	m_objVector.resize(OBJ_HASH_SIZE, nullptr);
 
 	m_nextObjID = (ObjectID)1;
 
@@ -914,7 +930,7 @@ static void populateRandomStartPosition( GameInfo *game )
 				{
 					Coord3D p1 = c1->second;
 					Coord3D p2 = c2->second;
-					startSpotDistance[i][j] = sqrt( sqr(p1.x-p2.x) + sqr(p1.y-p2.y) );
+					startSpotDistance[i][j] = WWMath::Sqrt( sqr(p1.x-p2.x) + sqr(p1.y-p2.y) );
 				}
 			}
 			else
@@ -1194,6 +1210,14 @@ void GameLogic::setGameMode( GameMode mode )
 }
 
 // ------------------------------------------------------------------------------------------------
+static Real getMapObjectScale(MapObject *pMapObj)
+{
+	Bool exists;
+	Real scale = pMapObj->getProperties()->getReal(TheKey_objectScale, &exists);
+	return (exists && scale > 0.0f) ? scale : 1.0f;
+}
+
+// ------------------------------------------------------------------------------------------------
 /** Entry point for starting a new game, the engine is already in clean state at this
 	* point and ready to load up with all the data */
 // ------------------------------------------------------------------------------------------------
@@ -1349,6 +1373,36 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
     }
   }
 
+	// Not saved, so a loaded save game plays with it off
+	m_coopBuildings = !loadingSaveGame && TheGameInfo != nullptr && TheGameInfo->getCoopBuildings();
+
+	// A save game restores TheSkirmishGameInfo before this runs, so it keeps the setting
+	m_quickGame = TheGameInfo != nullptr && TheGameInfo->getQuickGame();
+
+	// Not saved, like Coop Buildings; stances already set are kept by the players
+	m_diplomacy = !loadingSaveGame && TheGameInfo != nullptr && TheGameInfo->getDiplomacy();
+
+	// Both saved with the skirmish setup, like Quick Game
+	m_freeRadar = TheGameInfo != nullptr && TheGameInfo->getFreeRadar();
+	m_revealMap = TheGameInfo != nullptr && TheGameInfo->getRevealMap();
+#if defined(GENERALS_ONLINE)
+	m_pendingLobbyRules = 0;
+	if (!loadingSaveGame && TheNGMPGame != nullptr && TheGameInfo == TheNGMPGame && !TheRecorder->isPlaybackMode())
+	{
+		NGMP_OnlineServices_LobbyInterface *pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
+		if (pLobbyInterface != nullptr && pLobbyInterface->IsHost())
+		{
+			for (Int rule = 0; rule < LOBBY_RULE_COUNT; ++rule)
+			{
+				if (pLobbyInterface->IsLobbyRuleOn((LobbyRule)rule))
+				{
+					m_pendingLobbyRules |= 1u << rule;
+				}
+			}
+		}
+	}
+#endif
+
 	checkForDuplicateColors( TheGameInfo );
 
 	Bool isSkirmishOrSkirmishReplay = FALSE;
@@ -1434,10 +1488,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	#ifdef DUMP_PERF_STATS
 	GetPrecisionTimer(&endTime64);
-	char Buf[256];
-	sprintf(Buf,"After terrainlogic->loadmap=%f",((double)(endTime64-startTime64)/(double)(freq64)*1000.0));
-		//DEBUG_LOG(("Placed a starting building for %s at waypoint %s", playerName.str(), waypointName.str()));
-	DEBUG_LOG(("%s", Buf));
+	DEBUG_LOG(("After terrainlogic->loadmap=%f", ((double)(endTime64-startTime64)/(double)(freq64)*1000.0)));
 	#endif
 
 	Int localSlot = 0;
@@ -1549,6 +1600,21 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 //			d.setBool(TheKey_multiplayerIsLocal, slot->getIP() == game->getLocalIP());
 			const Bool isLocalPlayer = slot->isHuman() && i == TheGameInfo->getLocalSlotNum();
 			d.setBool(TheKey_multiplayerIsLocal, isLocalPlayer);
+
+			// A challenge map colors the local player with its ThePlayer placeholder's color
+			if (isChallengeCampaign && isLocalPlayer)
+			{
+				SidesInfo *thePlayerSide = TheSidesList->findSideInfo("ThePlayer");
+				Bool hasColor = FALSE;
+				Int color = thePlayerSide ? thePlayerSide->getDict()->getInt(TheKey_playerColor, &hasColor) : 0;
+				if (hasColor)
+				{
+					Bool hasNightColor = FALSE;
+					Int nightColor = thePlayerSide->getDict()->getInt(TheKey_playerNightColor, &hasNightColor);
+					d.setInt(TheKey_playerColor, color);
+					d.setInt(TheKey_playerNightColor, hasNightColor ? nightColor : color);
+				}
+			}
 
 /*
 			if (slot->getIP() == game->getLocalIP())
@@ -1808,8 +1874,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	#ifdef DUMP_PERF_STATS
 	GetPrecisionTimer(&endTime64);
-	sprintf(Buf,"After terrainlogic->newmap=%f",((double)(endTime64-startTime64)/(double)(freq64)*1000.0));
-	DEBUG_LOG(("%s", Buf));
+	DEBUG_LOG(("After terrainlogic->newmap=%f", ((double)(endTime64-startTime64)/(double)(freq64)*1000.0)));
 	#endif
 
 		// Special case, load any bridge map objects.
@@ -1896,10 +1961,15 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 		}
 	}
 
+	// A save game brings its revealed cells back on its own
+	if (!loadingSaveGame && m_revealMap)
+	{
+		revealMapForAllPlayers();
+	}
+
 	#ifdef DUMP_PERF_STATS
 	GetPrecisionTimer(&endTime64);
-	sprintf(Buf,"Before loading objects=%f",((double)(endTime64-startTime64)/(double)(freq64)*1000.0));
-	DEBUG_LOG(("%s", Buf));
+	DEBUG_LOG(("Before loading objects=%f", ((double)(endTime64-startTime64)/(double)(freq64)*1000.0)));
 	#endif
 
 	Bool useTrees = TheGlobalData->m_useTrees;
@@ -1935,7 +2005,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			Real angle = normalizeAngle(pMapObj->getAngle());
 
 			if (thingTemplate->isKindOf(KINDOF_OPTIMIZED_TREE)) {
-				createOptimizedTree(thingTemplate, &pos, angle);
+				createOptimizedTree(thingTemplate, &pos, angle, getMapObjectScale(pMapObj));
 			}
 		}
 	}
@@ -1978,7 +2048,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 			Real angle = normalizeAngle(pMapObj->getAngle());
 
 			if (thingTemplate->isKindOf(KINDOF_OPTIMIZED_TREE)) {
-				createOptimizedTree(thingTemplate, &pos, angle);
+				createOptimizedTree(thingTemplate, &pos, angle, getMapObjectScale(pMapObj));
 				continue;
 			}
 
@@ -1992,7 +2062,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 				}
 			}
 			if (isProp || (isFluff && forceFluffToProp)) {
-				TheTerrainVisual->addProp(thingTemplate, &pos, angle);
+				TheTerrainVisual->addProp(thingTemplate, &pos, angle, getMapObjectScale(pMapObj));
 				continue;
 			}
 #endif
@@ -2052,8 +2122,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	#ifdef DUMP_PERF_STATS
 	GetPrecisionTimer(&endTime64);
-	sprintf(Buf,"After loading objects=%f",((double)(endTime64-startTime64)/(double)(freq64)*1000.0));
-	DEBUG_LOG(("%s", Buf));
+	DEBUG_LOG(("After loading objects=%f", ((double)(endTime64-startTime64)/(double)(freq64)*1000.0)));
 	#endif
 
 	// place initial network buildings/units
@@ -2213,8 +2282,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	#ifdef DUMP_PERF_STATS
 	GetPrecisionTimer(&endTime64);
-	sprintf(Buf,"After partition manager update=%f",((double)(endTime64-startTime64)/(double)(freq64)*1000.0));
-	DEBUG_LOG(("%s", Buf));
+	DEBUG_LOG(("After partition manager update=%f", ((double)(endTime64-startTime64)/(double)(freq64)*1000.0)));
 	#endif
 
 
@@ -2340,8 +2408,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 	#ifdef DUMP_PERF_STATS
 	GetPrecisionTimer(&endTime64);
-	sprintf(Buf,"After delete load screen=%f",((double)(endTime64-startTime64)/(double)(freq64)*1000.0));
-	DEBUG_LOG(("%s", Buf));
+	DEBUG_LOG(("After delete load screen=%f", ((double)(endTime64-startTime64)/(double)(freq64)*1000.0)));
 	#endif
 
 	if(m_gameMode == GAME_SHELL)
@@ -2482,8 +2549,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
 #ifdef DUMP_PERF_STATS
 	GetPrecisionTimer(&endTime64);
-	sprintf(Buf,"Total startnewgame=%f",((double)(endTime64-startTime64)/(double)(freq64)*1000.0));
-	DEBUG_LOG(("%s", Buf));
+	DEBUG_LOG(("Total startnewgame=%f", ((double)(endTime64-startTime64)/(double)(freq64)*1000.0)));
 #endif
 
 	//Assume that getting this far means we've successfully entered an online game.
@@ -2505,7 +2571,7 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 }
 
 //-----------------------------------------------------------------------------------------
-void GameLogic::createOptimizedTree(const ThingTemplate *thingTemplate, Coord3D *pos, Real angle)
+void GameLogic::createOptimizedTree(const ThingTemplate *thingTemplate, Coord3D *pos, Real angle, Real scale)
 {
 	// Opt trees and props just get drawables to tell the client about it, then deleted. jba [6/5/2003]
 	// This way there is no logic object to slow down partition manager and core logic stuff.
@@ -2514,6 +2580,7 @@ void GameLogic::createOptimizedTree(const ThingTemplate *thingTemplate, Coord3D 
 	if (draw) {
 		draw->setOrientation(angle);
 		draw->setPosition(pos);
+		draw->setObjectScale(scale);
 		TheGameClient->destroyDrawable(draw);
 	}
 }
@@ -3354,7 +3421,7 @@ void drawGraph( const char* style, Real scale, double value )
 {
   for ( Int t = 0; t < value*scale; ++t)
   {
-    DEBUG_LOG((style));
+    DEBUG_LOG(("%s", style));
     if ( t%200 == 199 )
       DEBUG_LOG(("..."));
   }
@@ -3518,40 +3585,32 @@ static void unitTimings()
 			thingName = "No Object";
 		}
 
-    sprintf(remark, "All %f: (%d ms) for %d %s's\n", timeAll, (Int)(timeAll*1000/TIME_FRAMES), TOTAL_UNITS, thingName.str() );
-    DEBUG_LOG((remark));
+    DEBUG_LOG(("All %f: (%d ms) for %d %s's\n", timeAll, (Int)(timeAll*1000/TIME_FRAMES), TOTAL_UNITS, thingName.str() ));
     drawGraph( "@", graphScale, timeAll );
 
-		sprintf(remark, "Without Particles %f\n", timeNoPart);
-    DEBUG_LOG((remark));
+		DEBUG_LOG(("Without Particles %f\n", timeNoPart));
     drawGraph( "@", graphScale, timeNoPart );
 
- 		sprintf(remark, "Without Spawn %f  \n", timeNoSpawn );
-    DEBUG_LOG((remark));
+		DEBUG_LOG(("Without Spawn %f  \n", timeNoSpawn ));
     drawGraph( "@", graphScale, timeNoSpawn );
 
- 		sprintf(remark, "Logic %f \n", timeLogic);
-    DEBUG_LOG((remark));
+		DEBUG_LOG(("Logic %f \n", timeLogic));
     drawGraph( "@", graphScale, timeLogic );
 
 
-		sprintf(remark, "DrawCalls for %s \n", thingName.str() ) ;
-		DEBUG_LOG((remark));
+		DEBUG_LOG(("DrawCalls for %s \n", thingName.str() ));
 
-		sprintf(remark, "All %f\n", drawCallAll );
-		DEBUG_LOG((remark));
+		DEBUG_LOG(("All %f\n", drawCallAll ));
     drawGraph( "#", graphScale, drawCallAll );
 
-		sprintf(remark, "Without Particles %f\n", drawCallNoPart );
-		DEBUG_LOG((remark));
+		DEBUG_LOG(("Without Particles %f\n", drawCallNoPart ));
     drawGraph( "#", graphScale, drawCallNoPart );
 
-		sprintf(remark, "Without Spawn %f \n", drawCallNoSpawn );
-		DEBUG_LOG((remark));
+		DEBUG_LOG(("Without Spawn %f \n", drawCallNoSpawn ));
     drawGraph( "#", graphScale, drawCallNoSpawn );
 
 		sprintf(remark, "Draw Call Logic %f \n", drawCallLogic );
-		DEBUG_LOG((remark));
+		DEBUG_LOG(("%s", remark));
     drawGraph( "#", graphScale, drawCallLogic );
 
 
@@ -3896,17 +3955,13 @@ void GameLogic::update()
 		m_startNewGame = FALSE;
 
 	#ifdef DUMP_PERF_STATS
-		char Buf[1024];
 		__int64 freq64;
 		GetPrecisionTimerTicksPerSec(&freq64);
 
-		sprintf(Buf,"Texture=%f, Anim=%f, CreateRobj=%f, Load3DAssets=%f",
-			((double)Total_Get_Texture_Time/(double)(freq64)*1000.0),
+		DEBUG_LOG(("Texture=%f, Anim=%f, CreateRobj=%f, Load3DAssets=%f", ((double)Total_Get_Texture_Time/(double)(freq64)*1000.0),
 			((double)Total_Get_HAnim_Time/(double)(freq64)*1000.0),
 			((double)Total_Create_Render_Obj_Time/(double)(freq64)*1000.0),
-			((double)Total_Load_3D_Assets/(double)(freq64)*1000.0));
-
-	DEBUG_LOG(("%s", Buf));
+			((double)Total_Load_3D_Assets/(double)(freq64)*1000.0)));
 	#endif
 	}
 
@@ -3919,6 +3974,10 @@ void GameLogic::update()
 	// update (execute) scripts
 	{
 		TheScriptEngine->UPDATE();
+	}
+
+	if (TheAIMatch) {
+		TheAIMatch->update();
 	}
 
 	// TheSuperHackers @info Updates the frozen time status because it may have changed after the script engine update.
@@ -5614,3 +5673,241 @@ void GameLogic::loadPostProcess()
 	remakeSleepyUpdate();
 
 }
+
+//-------------------------------------------------------------------------------------------------
+// DIPLOMACY
+//-------------------------------------------------------------------------------------------------
+
+struct DiplomacyStanceChange
+{
+	const Player *target;
+	Bool ally;
+};
+
+//-------------------------------------------------------------------------------------------------
+// An object's owner decides whom its look reveals to and whether its attack stands
+static void applyDiplomacyStanceToObject(Object *obj, void *userData)
+{
+	const DiplomacyStanceChange *change = (const DiplomacyStanceChange *)userData;
+
+	if (obj->isEffectivelyDead())
+	{
+		return;
+	}
+
+	obj->handlePartitionCellMaintenance();
+
+	if (!change->ally)
+	{
+		return;
+	}
+
+	AIUpdateInterface *ai = obj->getAI();
+	if (ai == nullptr || !ai->isAttacking())
+	{
+		return;
+	}
+
+	const Object *victim = ai->getCurrentVictim();
+	if (victim != nullptr && victim->getControllingPlayer() == change->target)
+	{
+		ai->aiIdle(CMD_FROM_AI);
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool GameLogic::isDiplomacyParticipant(const Player *player) const
+{
+	if (player == nullptr || player == ThePlayerList->getNeutralPlayer() || player->isPlayerObserver())
+	{
+		return FALSE;
+	}
+
+	if (ThePlayerList->getSlotIndex(player->getPlayerIndex()) < 0)
+	{
+		return FALSE;
+	}
+
+	return !TheVictoryConditions->hasSinglePlayerBeenDefeated(const_cast<Player *>(player));
+}
+
+//-------------------------------------------------------------------------------------------------
+bool GameLogic::onSetDiplomacyStance(GameMessage *msg)
+{
+	if (!m_diplomacy || msg->getArgumentCount() < 2)
+	{
+		return false;
+	}
+
+	Player *player = ThePlayerList->getNthPlayer(msg->getPlayerIndex());
+	const Int targetIndex = msg->getArgument(0)->integer;
+	const Bool ally = msg->getArgument(1)->boolean;
+
+	if (targetIndex < 0 || targetIndex >= ThePlayerList->getPlayerCount())
+	{
+		return false;
+	}
+
+	Player *target = ThePlayerList->getNthPlayer(targetIndex);
+	if (target == player || player->getPlayerType() != PLAYER_HUMAN || !isDiplomacyParticipant(player) || !isDiplomacyParticipant(target))
+	{
+		return false;
+	}
+
+	const Relationship stance = ally ? ALLIES : ENEMIES;
+	if (player->getRelationship(target->getDefaultTeam()) == stance)
+	{
+		return false;
+	}
+
+	const Bool targetIsAlly = target->getRelationship(player->getDefaultTeam()) == ALLIES;
+	player->setPlayerRelationship(target, stance);
+
+	DiplomacyStanceChange change;
+	change.target = target;
+	change.ally = ally;
+	player->iterateObjects(applyDiplomacyStanceToObject, &change);
+
+	const UnicodeString playerName = player->getPlayerDisplayName();
+	const UnicodeString targetName = target->getPlayerDisplayName();
+	UnicodeString text;
+	if (ally && targetIsAlly)
+	{
+		text = TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:DiplomacyAllied", L"%ls and %ls are now allies", playerName.str(), targetName.str());
+	}
+	else if (ally)
+	{
+		text = TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:DiplomacyOfferAlly", L"%ls now treats %ls as an ally", playerName.str(), targetName.str());
+	}
+	else if (targetIsAlly)
+	{
+		text = TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:DiplomacyBrokeAlliance", L"%ls broke the alliance with %ls", playerName.str(), targetName.str());
+	}
+	else
+	{
+		text = TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:DiplomacyEnemy", L"%ls now treats %ls as an enemy", playerName.str(), targetName.str());
+	}
+	TheInGameUI->messageNoFormat(text);
+
+	static AudioEventRTS diplomacySound("GUIMessageReceived");
+	TheAudio->addAudioEvent(&diplomacySound);
+
+	PopulateInGameDiplomacyPopup();
+	return true;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Only the Generals Online lobby owner may turn a rule on; a replay has no lobby, so it trusts the recording
+static Bool isLobbyHostSender(Int playerIndex)
+{
+#if defined(GENERALS_ONLINE)
+	if (TheRecorder->isPlaybackMode())
+	{
+		return TRUE;
+	}
+
+	NGMP_OnlineServices_LobbyInterface *pLobbyInterface = NGMP_OnlineServicesManager::GetInterface<NGMP_OnlineServices_LobbyInterface>();
+	const Int slotIndex = ThePlayerList->getSlotIndex(playerIndex);
+	if (TheNGMPGame == nullptr || TheGameInfo != TheNGMPGame || pLobbyInterface == nullptr || slotIndex < 0)
+	{
+		return FALSE;
+	}
+
+	const NGMPGameSlot *slot = (const NGMPGameSlot *)TheNGMPGame->getConstSlot(slotIndex);
+	return slot != nullptr && slot->m_userID == pLobbyInterface->GetCurrentLobbyOwnerID();
+#else
+	(void)playerIndex;
+	return FALSE;
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+// LOBBY RULES
+//-------------------------------------------------------------------------------------------------
+
+//-------------------------------------------------------------------------------------------------
+bool GameLogic::onEnableLobbyRule(GameMessage *msg)
+{
+	struct Enable
+	{
+		Bool GameLogic::*flag;
+		const char *label;
+		const WideChar *fallback;
+	};
+	static const Enable enables[LOBBY_RULE_COUNT] =
+	{
+		{ &GameLogic::m_diplomacy, "GUI:DiplomacyRuleEnabled", L"%ls turned on Diplomacy. Players may change alliances." },
+		{ &GameLogic::m_freeRadar, "GUI:FreeRadarEnabled", L"%ls turned on Free Radar. Every player has radar." },
+		{ &GameLogic::m_revealMap, "GUI:RevealMapEnabled", L"%ls turned on Reveal Map. Every player sees the whole map." },
+		{ &GameLogic::m_coopBuildings, "GUI:CoopBuildingsEnabled", L"%ls turned on Coop Buildings. Allies may finish each other's buildings." },
+		{ &GameLogic::m_quickGame, "GUI:QuickGameEnabled", L"%ls turned on Quick Game. Rank requirements are lifted." },
+	};
+
+	// The host sends them on the first frames; a late one would change the rules mid-match
+	const Int rule = msg->getArgumentCount() > 0 ? msg->getArgument(0)->integer : -1;
+	if (rule < 0 || rule >= LOBBY_RULE_COUNT || getFrame() > LOGICFRAMES_PER_SECOND * 30 || !isLobbyHostSender(msg->getPlayerIndex()))
+	{
+		return false;
+	}
+
+	Bool &flag = this->*enables[rule].flag;
+	if (flag)
+	{
+		return false;
+	}
+	flag = TRUE;
+
+	if (rule == LOBBY_RULE_REVEAL_MAP)
+	{
+		revealMapForAllPlayers();
+	}
+	TheInGameUI->messageNoFormat(TheGameText->FETCH_OR_SUBSTITUTE_FORMAT(enables[rule].label, enables[rule].fallback,
+		ThePlayerList->getNthPlayer(msg->getPlayerIndex())->getPlayerDisplayName().str()));
+	if (rule == LOBBY_RULE_DIPLOMACY)
+	{
+		PopulateInGameDiplomacyPopup();
+	}
+	return true;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Every slot's player looks at every cell for good, the way an observer does
+void GameLogic::revealMapForAllPlayers()
+{
+	if (TheGameInfo == nullptr)
+	{
+		return;
+	}
+
+	for (Int i = 0; i < MAX_SLOTS; ++i)
+	{
+		GameSlot *slot = TheGameInfo->getSlot(i);
+		if (slot == nullptr || !slot->isOccupied() || slot->getPlayerTemplate() == PLAYERTEMPLATE_OBSERVER)
+		{
+			continue;
+		}
+
+		ThePartitionManager->revealMapForPlayerPermanently(ThePlayerList->getPlayerFromSlotIndex(i)->getPlayerIndex());
+	}
+}
+
+#if defined(GENERALS_ONLINE)
+//-------------------------------------------------------------------------------------------------
+void GameLogic::sendPendingLobbyRules()
+{
+	if (m_pendingLobbyRules == 0 || !isInGame() || isLoadingMap() || getFrame() == 0)
+	{
+		return;
+	}
+
+	for (Int rule = 0; rule < LOBBY_RULE_COUNT; ++rule)
+	{
+		if (m_pendingLobbyRules & (1u << rule))
+		{
+			GameMessage *msg = TheMessageStream->appendMessage(GameMessage::MSG_ENABLE_LOBBY_RULE);
+			msg->appendIntegerArgument(rule);
+		}
+	}
+	m_pendingLobbyRules = 0;
+}
+#endif

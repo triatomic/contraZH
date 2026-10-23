@@ -96,7 +96,7 @@ ProductionTimeModifierUpgradeModuleData::ProductionTimeModifierUpgradeModuleData
 		{ "Percentage",			INI::parsePercentToReal, NULL, offsetof(ProductionTimeModifierUpgradeModuleData, m_percentage ) },
 		{ "IsOneShotUpgrade",		INI::parseBool, NULL, offsetof(ProductionTimeModifierUpgradeModuleData, m_isOneShot) },
 		{ "BonusStacksWith",		INI::parseIndexList, TheBonusStackingTypeNames, offsetof(ProductionTimeModifierUpgradeModuleData, m_stackingType) },
-		{ 0, 0, 0, 0 } 
+		{ nullptr, nullptr, nullptr, 0 } 
 	};
 	p.add(dataFieldParse);
 

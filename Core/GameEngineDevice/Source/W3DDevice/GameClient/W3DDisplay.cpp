@@ -77,10 +77,16 @@ static void drawFramerateBar();
 #include "W3DDevice/GameClient/W3DScene.h"
 #include "W3DDevice/GameClient/W3DTerrainTracks.h"
 #include "W3DDevice/GameClient/W3DWater.h"
+#include "W3DDevice/GameClient/W3DPlanarMirror.h"
+#include "W3DDevice/GameClient/W3DColorLut.h"
 #include "W3DDevice/GameClient/W3DVideoBuffer.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/W3DShadowMap.h"
+#include "W3DDevice/GameClient/W3DParticleAtlas.h"
+#include "W3DDevice/GameClient/W3DSlopeMap.h"
 #include "W3DDevice/GameClient/W3DShockwave.h"
+#include "W3DDevice/GameClient/W3DDisruption.h"
+#include "W3DDevice/GameClient/W3DStorm.h"
 #include "W3DDevice/GameClient/W3DDebugDisplay.h"
 #include "W3DDevice/GameClient/W3DProjectedShadow.h"
 #include "W3DDevice/GameClient/W3DScreenshot.h"
@@ -110,6 +116,9 @@ static void drawFramerateBar();
 #include "GameLogic/GameLogic.h"
 #ifdef DUMP_PERF_STATS
 #include "GameLogic/PartitionManager.h"
+#endif
+#ifdef RTS_GAME_MCP
+#include "Common/GameMcp.h"
 #endif
 
 #include "WinMain.h"
@@ -408,12 +417,17 @@ W3DDisplay::W3DDisplay()
 
 	for (i = 0; i < DisplayStringCount; i++)
 		m_displayStrings[i] = nullptr;
+	m_benchmarkDisplayString = nullptr;
 
 	m_batchTexture = nullptr;
 	m_batchMode = DRAW_IMAGE_ALPHA;
 	m_batchGrayscale = FALSE;
 	m_batchNeedsInit = FALSE;
 	m_cinematicDisplayString = nullptr;
+
+	for (i = 0; i < ShaderDrawCounterClass::MAX_LINES; i++)
+		m_shaderDrawStrings[i] = nullptr;
+	m_shaderDrawRefreshTime = 0;
 
 #ifdef PROFILER_ENABLED
 	m_profilerFrameCapture = NEW W3DProfilerFrameCapture();
@@ -450,6 +464,14 @@ W3DDisplay::~W3DDisplay()
 		m_cinematicDisplayString = nullptr;
 	}
 
+	for (int i = 0; i < ShaderDrawCounterClass::MAX_LINES; i++)
+	{
+		if (m_shaderDrawStrings[i])
+		{
+			TheDisplayStringManager->freeDisplayString(m_shaderDrawStrings[i]);
+		}
+	}
+
 	releaseImageTextures();
 
 	// delete 2D renderer
@@ -483,6 +505,9 @@ W3DDisplay::~W3DDisplay()
 
 	delete TheW3DShadowMap;
 	TheW3DShadowMap = nullptr;
+
+	delete TheW3DParticleAtlas;
+	TheW3DParticleAtlas = nullptr;
 
 	m_assetManager->Free_Assets();
 	delete m_assetManager;
@@ -568,7 +593,7 @@ void W3DDisplay::setGamma(Real gamma, Real bright, Real contrast, Bool calibrate
 }
 
 // Gives the game window the frame its mode needs; the wrapper then sizes and centres it from that style.
-// Only -win keeps the caption, so a windowed device without it is the borderless mode.
+// Only windowed mode (-win or the Windowed option) keeps the caption; a windowed device without it is borderless.
 static void applyWindowStyle( Bool windowed )
 {
 	if (!ApplicationHWnd)
@@ -595,7 +620,8 @@ Bool W3DDisplay::setDisplayMode( UnsignedInt xres, UnsignedInt yres, UnsignedInt
 	const UnsignedInt oldBitDepth = getBitDepth();
 	const Bool oldWindowed = getWindowed();
 
-	if (windowed != oldWindowed)
+	// windowed and borderless share a windowed device, so switching between them changes only the frame
+	if (windowed || windowed != oldWindowed)
 	{
 		applyWindowStyle( windowed );
 	}
@@ -603,6 +629,12 @@ Bool W3DDisplay::setDisplayMode( UnsignedInt xres, UnsignedInt yres, UnsignedInt
 	{
 		Render2DClass::Set_Screen_Resolution(RectClass(0, 0, xres, yres));
 		Display::setDisplayMode(xres, yres, bitdepth, windowed);
+
+		// TheSuperHackers @tweak Font point sizes are scaled from the resolution, so every glyph
+		// cached for the old resolution is now dead weight. Discard the current glyphs and start
+		// with a clean slate.
+		WW3DAssetManager::Get_Instance()->Free_All_FontChars_Glyph_Caches();
+
 		return TRUE;
 	}
 
@@ -807,6 +839,10 @@ void W3DDisplay::init2DScene()
 //=============================================================================
 void W3DDisplay::init()
 {
+#ifdef RTS_GAME_MCP
+	TheGameMcpScreenshot = W3D_WriteScreenshotFile;
+#endif
+
 
 	//
 	// call our base class init, this method should be able to handle re-entry
@@ -904,7 +940,9 @@ void W3DDisplay::init()
 		WW3D::Set_Screen_UV_Bias( TRUE );  ///< this makes text look good :)
 
 		setWindowed( TheGlobalData->m_windowed || TheGlobalData->m_borderlessWindow );
-		if (getWindowed() && !TheGlobalData->m_windowed)
+
+		// the window was created before Options.ini was read, so only -win gave it the right frame
+		if (getWindowed())
 		{
 			applyWindowStyle( TRUE );
 		}
@@ -962,6 +1000,7 @@ void W3DDisplay::init()
 
 			// TheSuperHackers @feature Mauller 13/03/2026 Add native MSAA support, must be set before creating render device
 			WW3D::Set_MSAA_Mode((WW3D::MultiSampleModeEnum)TheWritableGlobalData->m_antiAliasLevel);
+			WW3D::Set_Super_Sampling(TheGlobalData->m_superSampling);
 			WW3D::Set_VSync_Mode(TheGlobalData->m_vsync);
 			WW3D::Set_Low_Latency(TheGlobalData->m_lowLatency != FALSE);
 
@@ -977,6 +1016,7 @@ void W3DDisplay::init()
 			// Texture filtering must also be updated after render device initialization
 			if (renderDeviceError == WW3D_ERROR_OK) {
 				TheWritableGlobalData->m_antiAliasLevel = (UnsignedInt)WW3D::Get_MSAA_Mode();
+				TheWritableGlobalData->m_superSampling = WW3D::Get_Super_Sampling();
 				WW3D::Set_Texture_Filter(TheWritableGlobalData->m_textureFilteringMode);
 				TheWritableGlobalData->m_textureFilteringMode = WW3D::Get_Texture_Filter();
 				WW3D::Set_Anisotropy_Level(TheWritableGlobalData->m_textureAnisotropyLevel);
@@ -1025,6 +1065,8 @@ void W3DDisplay::init()
 		TheW3DShadowMap = NEW W3DShadowMap;
 		TheW3DShadowMap->init();
 
+		TheW3DParticleAtlas = NEW W3DParticleAtlas;
+
 		W3DShaderManager::init();
 
 		// Create and initialize the debug display
@@ -1069,6 +1111,10 @@ void W3DDisplay::reset()
 {
 
 	Display::reset();
+
+	// TheSuperHackers @tweak Discard the current glyphs and start with a clean slate.
+	// This can reduce the memory overhead from glyphs that are no longer needed from here on.
+	WW3DAssetManager::Get_Instance()->Free_All_FontChars_Glyph_Caches();
 
 	// Remove all render objects.
 
@@ -1574,6 +1620,12 @@ void W3DDisplay::gatherDebugStats()
 		unibuffer.format( L"Particles: %d in world, %d being displayed", totalParticles, onScreenParticleCount );
 		m_displayStrings[Particles]->setText( unibuffer );
 
+		//display the terrain-conforming particle load
+		unibuffer.format( L"Terrain Particles: %d tris, %d draws",
+			Debug_Statistics::Get_Terrain_Particle_Triangles(),
+			Debug_Statistics::Get_Terrain_Particle_Batches() );
+		m_displayStrings[TerrainParticles]->setText( unibuffer );
+
 		//display the number of objects in the world
 		UnsignedInt objCount = TheGameLogic->getObjectCount();
 		UnsignedInt objScreenCount = TheGameClient->getRenderedObjectCount();
@@ -1759,6 +1811,77 @@ void W3DDisplay::drawFPSStats()
 	}
 }
 
+// W3DDisplay::drawShaderDrawCounts ===========================================
+/** Draw the draw call count of each vertex and pixel shader pair in the top right corner */
+//=============================================================================
+void W3DDisplay::drawShaderDrawCounts()
+{
+	const Int lineCount = ShaderDrawCounterClass::Get_Line_Count();
+
+	// Twice a second keeps the numbers readable, and an empty overlay waits for no timer
+	const UnsignedInt now = timeGetTime();
+	if (now - m_shaderDrawRefreshTime >= 500)
+	{
+		m_shaderDrawRefreshTime = (lineCount > 0) ? now : 0;
+		for (Int i = 0; i < lineCount; i++)
+		{
+			if (m_shaderDrawStrings[i] == nullptr)
+			{
+				m_shaderDrawStrings[i] = TheDisplayStringManager->newDisplayString();
+				m_shaderDrawStrings[i]->setFont( TheFontLibrary->getFont( "FixedSys", 8, FALSE ) );
+			}
+			UnicodeString text;
+			text.translate( AsciiString( ShaderDrawCounterClass::Get_Line( i ) ) );
+			m_shaderDrawStrings[i]->setText( text );
+		}
+		for (Int i = lineCount; i < ShaderDrawCounterClass::MAX_LINES; i++)
+		{
+			if (m_shaderDrawStrings[i] != nullptr)
+			{
+				m_shaderDrawStrings[i]->setText( UnicodeString::TheEmptyString );
+			}
+		}
+	}
+
+	Int width = 0;
+	Int height = 0;
+	Int shown = 0;
+	for (Int i = 0; i < ShaderDrawCounterClass::MAX_LINES && m_shaderDrawStrings[i] != nullptr; i++)
+	{
+		Int w, h;
+		m_shaderDrawStrings[i]->getSize( &w, &h );
+		if (w == 0 || height + h > (Int)getHeight() - 40)
+		{
+			break;
+		}
+		if (w > width)
+		{
+			width = w;
+		}
+		height += h;
+		shown++;
+	}
+	if (shown == 0)
+	{
+		return;
+	}
+
+	const Int x = getWidth() - width - 8;
+	Int y = 30;
+	drawFillRect( x - 4, y - 2, width + 8, height + 4, GameMakeColor( 0, 0, 0, 160 ) );
+
+	const Color headerColor = GameMakeColor( 255, 220, 120, 255 );
+	const Color textColor = GameMakeColor( 255, 255, 255, 255 );
+	const Color dropColor = GameMakeColor( 0, 0, 0, 255 );
+	for (Int i = 0; i < shown; i++)
+	{
+		Int w, h;
+		m_shaderDrawStrings[i]->getSize( &w, &h );
+		m_shaderDrawStrings[i]->draw( x, y, i < 2 ? headerColor : textColor, dropColor );
+		y += h;
+	}
+}
+
 
 //=============================================================================
 void StatDebugDisplay( DebugDisplayInterface *, void *, FILE *fp )
@@ -1891,6 +2014,13 @@ Bool W3DDisplay::toggleFaceCulling()
 	return !DX8Wrapper::Is_Face_Culling_Disabled();
 }
 
+Bool W3DDisplay::toggleShaderDrawCounts()
+{
+	ShaderDrawCounterClass::Set_Enabled(!ShaderDrawCounterClass::Is_Enabled());
+	m_shaderDrawRefreshTime = 0;
+	return ShaderDrawCounterClass::Is_Enabled();
+}
+
 // W3DDisplay::update =========================================================
 /** Update the client state of the W3D Display */
 //=============================================================================
@@ -1943,6 +2073,43 @@ void W3DDisplay::step()
 }
 
 //DECLARE_PERF_TIMER(BigAssRenderLoop)
+
+#if RTS_ZEROHOUR
+//-------------------------------------------------------------------------------------------------
+/** Light the scene from above the camera pivot while a script lightning fade runs */
+//-------------------------------------------------------------------------------------------------
+static void updateLightningLight()
+{
+	static RTS3DScene *s_scene = nullptr;
+	static W3DDynamicLight *s_light = nullptr;
+
+	if (W3DDisplay::m_3DScene == nullptr || TheScriptEngine == nullptr || TheTacticalView == nullptr || !TheScriptEngine->isLightningFade())
+	{
+		return;
+	}
+
+	// The scene owns its light pool, so a new scene invalidates the light kept from the old one.
+	if (s_scene != W3DDisplay::m_3DScene || !s_light->isOwnedBy(&s_light))
+	{
+		s_scene = W3DDisplay::m_3DScene;
+		s_light = s_scene->getADynamicLight();
+		s_light->setOwner(&s_light);
+		s_light->Set_Flag(LightClass::FAR_ATTENUATION, true);
+	}
+
+	// shortcut: flash colour, height and reach are fixed, move them to GameData if maps need to tune them
+	const Vector3 color = Vector3(0.8f, 0.85f, 1.0f) * (1.3f * TheScriptEngine->getFadeValue());
+	const Real reach = max(1000.0f, 3.0f * TheTacticalView->getCurrentHeightAboveGround());
+	const Coord3D &pivot = TheTacticalView->getPosition();
+	s_light->Set_Diffuse(color);
+	s_light->Set_Ambient(color * 0.4f);
+	s_light->Set_Position(Vector3(pivot.x, pivot.y, TheTacticalView->getTerrainHeightAtPivot() + 300.0f));
+	s_light->Set_Far_Attenuation_Range(0.5f * reach, reach);
+
+	// expires on its own two frames after the fade ends
+	s_light->setFrameFade(0, 2);
+}
+#endif
 
 // W3DDisplay::draw ===========================================================
 /** Draw the entire W3D Display */
@@ -2110,11 +2277,7 @@ AGAIN:
 		Int numRenderTargetVertices=Debug_Statistics::Get_DX8_Vertices();
 
 		// start render block
-		#if defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
-    if ( (TheGameLogic->getFrame() % 30 == 1) || ( ! ( !TheGameLogic->isGamePaused() && TheGlobalData->m_TiVOFastMode) ) )
-		#else
 	    if ( (TheGameLogic->getFrame() % 30 == 1) || ( ! (!TheGameLogic->isGamePaused() && TheGlobalData->m_TiVOFastMode && TheGameLogic->isInReplayGame())) )
-    #endif
 		{
 			//USE_PERF_TIMER(BigAssRenderLoop)
 			static Bool couldRender = true;
@@ -2143,14 +2306,30 @@ AGAIN:
 				if (numRenderTargetPolygons || numRenderTargetVertices)
 					Debug_Statistics::Record_DX8_Polys_And_Vertices(numRenderTargetPolygons,numRenderTargetVertices,ShaderClass::_PresetOpaqueShader);
 
+#if RTS_ZEROHOUR
+				updateLightningLight();
+#endif
+
 				// Inside the frame, so the frame count holds, and outside any view filter's render target.
 				if (TheWaterRenderObj)
 				{
 					TheWaterRenderObj->renderPlanarReflection(primaryW3DView->get3DCamera());
 				}
+				if (TheW3DPlanarMirrors)
+				{
+					TheW3DPlanarMirrors->renderReflections(primaryW3DView->get3DCamera());
+				}
 
 				// draw all views of the world
 				drawViews();
+
+				// A supersampled scene comes down to the screen here, so the interface keeps its native pixels
+				// and the colour grade works over the screen's pixels alone
+				DX8Wrapper::Resolve_Scene_Target();
+				if (TheW3DColorLut != nullptr)
+				{
+					TheW3DColorLut->render(*primaryW3DView->get3DCamera());
+				}
 
 				// draw the user interface
 				TheInGameUI->DRAW();
@@ -2207,6 +2386,11 @@ AGAIN:
 				{
 					// draw the current debug display
 					drawCurrentDebugDisplay();
+				}
+
+				if (ShaderDrawCounterClass::Is_Enabled())
+				{
+					drawShaderDrawCounts();
 				}
 
 #if defined(RTS_DEBUG)
@@ -2366,6 +2550,22 @@ void W3DDisplay::createShockwave( const Coord3D *pos, Real radius, Real width, R
 	if (TheW3DShockwaves != nullptr && pos != nullptr)
 	{
 		TheW3DShockwaves->add(*pos, radius, width, strength, strengthInPixels, (UnsignedInt)(durationFrames * MSEC_PER_LOGICFRAME_REAL));
+	}
+}
+
+void W3DDisplay::createDisruption( const Coord3D *pos, Real radius, const DisruptionShaderInfo *info, UnsignedInt durationFrames, Real fade )
+{
+	if (TheW3DDisruption != nullptr && pos != nullptr)
+	{
+		TheW3DDisruption->add(*pos, radius, info, (UnsignedInt)(durationFrames * MSEC_PER_LOGICFRAME_REAL), fade);
+	}
+}
+
+void W3DDisplay::createStorm( const Coord3D *pos, const StormShaderInfo *info, UnsignedInt durationFrames )
+{
+	if (TheW3DStorms != nullptr && pos != nullptr && info != nullptr && durationFrames != 0)
+	{
+		TheW3DStorms->add(*pos, *info, (UnsignedInt)(durationFrames * MSEC_PER_LOGICFRAME_REAL));
 	}
 }
 
@@ -3371,6 +3571,9 @@ void W3DDisplay::doSmartAssetPurgeAndPreload(const char* usageFileName)
 	}
 
 	releaseImageTextures();
+
+	// The slope maps hold their textures, which would otherwise outlive the purge.
+	W3DSlopeMap::releaseResources();
 
 	// just free everything if there's no exclusion list file (send in an empty list)
 	m_assetManager->Free_Assets_With_Exclusion_List(names);

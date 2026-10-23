@@ -472,6 +472,9 @@ public:
 		MSG_CHEAT_CYCLE_TERRAIN_MODE,		///< cycle the terrain: normal -> hidden on black -> hidden on green
 		MSG_CHEAT_TOGGLE_FACE_CULLING,		///< toggle back face culling, drawing every face double sided when off
 		MSG_CHEAT_SHOW_MODEL_NAMES,			///< show the W3D model each draw module has loaded
+		MSG_CHEAT_SHOW_WINDOW_NAMES,		///< outline and name every visible GUI window
+		MSG_CHEAT_SHOW_SHADER_DRAWS,		///< list each frame's draw calls by vertex and pixel shader
+		MSG_CHEAT_COPY_OBJECT_NAME,		///< copy the selected object template names to the clipboard
 		MSG_CHEAT_PATHFIND_LOG_ON,			///< start writing the per-second pathfinder counters to pathfinding.txt
 		MSG_CHEAT_PATHFIND_LOG_OFF,			///< stop writing the pathfinder counters
 
@@ -647,11 +650,16 @@ public:
 		MSG_DO_AUTO_FILL,												///< TheSuperHackers @feature fill the selected containers from nearby idle infantry
 		MSG_TOGGLE_HOLD_FIRE,												///< Toggle the Hold Fire stance of the selected group
 		MSG_TOGGLE_DEPLOY,													///< Toggle the deployed state of the selected group
+		MSG_TOGGLE_TUNNEL_AUTO_POP,									///< Toggle the auto pop state of tunnel
 		MSG_MOVE_UNIT_CREATE_EARLIER,								///< (productionID) move the queued unit one position earlier in its production queue
 		MSG_MOVE_UPGRADE_EARLIER,										///< (upgrade name key) move the queued upgrade one position earlier in its production queue
 		MSG_TOGGLE_FIRE_WEAPON,											///< (weapon slot, max shots) start the selected group firing a weapon, or stop it
 		MSG_UPDATE_FOCUSED_GROUP,										///< update and tell every player that we have smart selection focus on this group
 		MSG_DO_REVERSE_MOVETO_HINT,									///< (location) If clicked, a reverse move would be ordered
+		MSG_EVACUATE_TO_WORK,												///< Dump out all of OUR contained objects, supply gatherers among them resume gathering
+		MSG_SPAWN_OBJECT_AT_POSITION,					///< (thingTemplate ID, location) debug/cheat spawn of one object for the local player; must run in the logic so the drawable is initialized correctly
+		MSG_SET_DIPLOMACY_STANCE,										///< (player index, Bool ally) the sender treats that player as an ally or an enemy
+		MSG_ENABLE_LOBBY_RULE,												///< (LobbyRule) the Generals Online host turns a lobby rule on at the start of a match
 
 		MSG_BEGIN_DEBUG_NETWORK_MESSAGES = 1900,		///< network messages that exist only in debug/internal builds. all grouped separately.
 
@@ -693,6 +701,9 @@ public:
 
 	/// ShigureUi 11/09/2026 a plain order acts on the whole selection, never the smart selection focus
 	static Bool isPlainOrder(GameMessage::Type t);
+
+	/// The debug cheat hotkeys appended at the end of the meta range, which also work in the shell map and cinematics
+	static Bool isDebugCheatHotkey(GameMessage::Type t) { return t >= MSG_CHEAT_KITCHEN_SINK && t <= MSG_CHEAT_SHOW_SHADER_DRAWS; }
 
 	Int getPlayerIndex() const { return m_playerIndex; }		///< Return the originating player
 

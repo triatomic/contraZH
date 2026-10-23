@@ -62,6 +62,11 @@
 #include "W3DDevice/GameClient/W3DBloom.h"
 #include "W3DDevice/GameClient/W3DSoftParticles.h"
 #include "W3DDevice/GameClient/W3DShockwave.h"
+#include "W3DDevice/GameClient/W3DDisruption.h"
+#include "W3DDevice/GameClient/W3DStorm.h"
+#include "W3DDevice/GameClient/W3DColorLut.h"
+#include "W3DDevice/GameClient/W3DHeadlight.h"
+#include "W3DDevice/GameClient/W3DPlanarMirror.h"
 #include "W3DDevice/GameClient/W3DAmbientOcclusion.h"
 #include "W3DDevice/GameClient/W3DSkyClouds.h"
 #include "W3DDevice/GameClient/W3DLaserGlow.h"
@@ -216,6 +221,21 @@ W3DTerrainVisual::~W3DTerrainVisual()
 	delete TheW3DShockwaves;
 	TheW3DShockwaves = nullptr;
 
+	delete TheW3DDisruption;
+	TheW3DDisruption = nullptr;
+
+	delete TheW3DStorms;
+	TheW3DStorms = nullptr;
+
+	delete TheW3DColorLut;
+	TheW3DColorLut = nullptr;
+
+	delete TheW3DHeadlights;
+	TheW3DHeadlights = nullptr;
+
+	delete TheW3DPlanarMirrors;
+	TheW3DPlanarMirrors = nullptr;
+
 	delete TheW3DAmbientOcclusion;
 	TheW3DAmbientOcclusion = nullptr;
 	delete TheW3DSkyClouds;
@@ -269,6 +289,11 @@ void W3DTerrainVisual::init()
 		TheW3DBloom = NEW W3DBloom;
 		TheW3DSoftParticles = NEW W3DSoftParticles;
 		TheW3DShockwaves = NEW W3DShockwaveManager;
+		TheW3DDisruption = NEW W3DDisruptionManager;
+		TheW3DStorms = NEW W3DStormManager;
+		TheW3DColorLut = NEW W3DColorLut;
+		TheW3DHeadlights = NEW W3DHeadlightManager;
+		TheW3DPlanarMirrors = NEW W3DPlanarMirrorManager;
 		TheW3DAmbientOcclusion = NEW W3DAmbientOcclusion;
 		TheW3DSkyClouds = NEW W3DSkyClouds;
 		TheW3DLaserGlow = NEW W3DLaserGlow;
@@ -359,6 +384,11 @@ void W3DTerrainVisual::reset()
 
 	if (TheSmudgeManager)
 		TheSmudgeManager->reset();
+
+	if (TheW3DStorms)
+	{
+		TheW3DStorms->reset();
+	}
 
 	if (TheTerrainTracksRenderObjClassSystem)
 		TheTerrainTracksRenderObjClassSystem->Reset();
@@ -1146,7 +1176,7 @@ void W3DTerrainVisual::removeTreesAndPropsForConstruction(const Coord3D* pos,
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
-void W3DTerrainVisual::addProp(const ThingTemplate *tTemplate, const Coord3D *pos, Real angle)
+void W3DTerrainVisual::addProp(const ThingTemplate *tTemplate, const Coord3D *pos, Real angle, Real objectScale)
 {
 	ModelConditionFlags state;
 	state.clear();
@@ -1159,7 +1189,7 @@ void W3DTerrainVisual::addProp(const ThingTemplate *tTemplate, const Coord3D *po
 		state.set(MODELCONDITION_NIGHT);
 	}
 	AsciiString modelName;
-	Real scale = tTemplate->getAssetScale();
+	Real scale = tTemplate->getAssetScale() * objectScale;
 	const ModuleInfo& mi = tTemplate->getDrawModuleInfo();
 	if (mi.getCount() > 0)
 	{

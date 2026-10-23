@@ -1,0 +1,429 @@
+// WBQtCondActDialogClassic.cpp -- see WBQtCondActDialogClassic.h. Layout and behavior mirror the MFC
+// IDD_ScriptCondition / IDD_ScriptAction dialogs: top command row (search / Compress Script /
+// OK / Cancel), template tree left, sentence + warnings + developer notes right. The parameter
+// links pop the Qt parameter editor through the bridge; the sentence and warnings re-render
+// when it returns.
+#include "WBQtCondActDialogClassic.h"
+#include "ui_WBQtCondActDialogClassic.h"
+#include "WBQtCondActBridge.h"
+#include "WBQtTreeStyle.h"
+
+// NewSearch toggle (WBQtObjectBridge.cpp): live-filter search when on.
+extern "C" int WBQtConfig_GetNewSearch(void);
+
+#include <QApplication>
+#include <QCheckBox>
+#include <QEvent>
+#include <QGroupBox>
+#include <QHash>
+#include <QKeyEvent>
+#include <QLabel>
+#include <QLineEdit>
+#include <QMap>
+#include <QMessageBox>
+#include <QPushButton>
+#include <QTextBrowser>
+#include <QTreeWidget>
+#include <QUrl>
+
+namespace
+{
+	const int kNameCap = 512;
+	const int kTextCap = 1024;
+	const int kBigCap = 4096;
+
+	// Item data role holding the template index on leaves (-1 on category folders).
+	const int kTemplateRole = Qt::UserRole;
+
+	QString templateName(int isAction, int i)
+	{
+		char buf[kNameCap];
+		buf[0] = 0;
+		WBQtCondActData_GetTemplateName(isAction, i, buf, sizeof(buf));
+		return QString::fromLocal8Bit(buf);
+	}
+
+	QString templateName2(int isAction, int i)
+	{
+		char buf[kNameCap];
+		buf[0] = 0;
+		WBQtCondActData_GetTemplateName2(isAction, i, buf, sizeof(buf));
+		return QString::fromLocal8Bit(buf);
+	}
+
+	QString templateHelp(int isAction, int i)
+	{
+		char buf[kBigCap];
+		buf[0] = 0;
+		WBQtCondActData_GetTemplateHelp(isAction, i, buf, sizeof(buf));
+		// == ParseHelpText: the help strings carry literal "\n" escapes.
+		return QString::fromLocal8Bit(buf).replace("\\n", "\n");
+	}
+}
+
+WBQtCondActDialogClassic::WBQtCondActDialogClassic(void *item, bool isAction, QWidget *parent)
+	: QDialog(parent),
+	m_ui(new Ui::WBQtCondActDialogClassic),
+	m_item(item),
+	m_isAction(isAction ? 1 : 0),
+	m_updating(false)
+{
+	// The static widget tree lives in WBQtCondActDialogClassic.ui; bind the members the
+	// logic below uses, then wire what Designer can't express.
+	m_ui->setupUi(this);
+	setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
+	setWindowTitle(isAction ? "Edit Action:" : "Edit Condition:");
+
+	m_searchEdit = m_ui->searchEdit;
+	m_compressCheck = m_ui->compressCheck;
+	m_tree = m_ui->tree;
+	m_sentence = m_ui->sentence;
+	m_warningsBox = m_ui->warningsBox;
+	m_warningsLabel = m_ui->warningsLabel;
+	m_helpLabel = m_ui->helpLabel;
+
+	m_searchEdit->installEventFilter(this);
+	WBQtTreeStyle::applyTreeLines(m_tree);
+
+	connect(m_tree, SIGNAL(currentItemChanged(QTreeWidgetItem*,QTreeWidgetItem*)),
+			this, SLOT(onCurrentItemChanged(QTreeWidgetItem*,QTreeWidgetItem*)));
+	connect(m_sentence, SIGNAL(anchorClicked(QUrl)), this, SLOT(onLinkClicked(QUrl)));
+	connect(m_ui->findBtn, SIGNAL(clicked()), this, SLOT(onSearch()));
+	connect(m_ui->resetBtn, SIGNAL(clicked()), this, SLOT(onReset()));
+	if (WBQtConfig_GetNewSearch() != 0)
+	{
+		// NewSearch: filter live as the user types (Find button still works).
+		connect(m_searchEdit, SIGNAL(textChanged(QString)), this, SLOT(onSearchLive(QString)));
+	}
+	connect(m_compressCheck, SIGNAL(toggled(bool)), this, SLOT(onCompressToggled(bool)));
+	connect(m_ui->okBtn, SIGNAL(clicked()), this, SLOT(accept()));
+	connect(m_ui->cancelBtn, SIGNAL(clicked()), this, SLOT(reject()));
+
+	m_updating = true;
+	m_compressCheck->setChecked(WBQtCondAct_GetCompress() != 0);
+	m_updating = false;
+	applyTreeFont();
+
+	populateTree();
+	renderSentence();
+	showHelpForType(WBQtCondActData_GetType(m_item, m_isAction));
+	m_tree->setFocus();
+
+	resize(900, 560);
+}
+
+WBQtCondActDialogClassic::~WBQtCondActDialogClassic()
+{
+	delete m_ui;
+}
+
+bool WBQtCondActDialogClassic::eventFilter(QObject *watched, QEvent *event)
+{
+	// == the MFC OnOK special case: Enter in the search box searches instead of closing.
+	if (watched == m_searchEdit && event->type() == QEvent::KeyPress)
+	{
+		QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
+		if (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter)
+		{
+			onSearch();
+			return true;
+		}
+	}
+	return QDialog::eventFilter(watched, event);
+}
+
+void WBQtCondActDialogClassic::populateTree()
+{
+	buildTree(QString());	// empty filter == the full catalog
+}
+
+// Build the category tree from the templates' '/'-separated name paths (== the MFC
+// OnInitDialog/OnReset walk): each path builds sorted category folders with the leaf at the end,
+// and name2 (if any) adds a second leaf. When filter is non-empty, only templates whose name or
+// name2 contains it are included -- folders with no surviving leaf are never created, so the
+// result keeps the SAME nested tree design as the full list, just pruned to the matches (rather
+// than a flat list of full-path leaves). Returns the number of matching templates. This builds
+// structure only; the caller sets expansion (a filtered result expands so nested matches show).
+int WBQtCondActDialogClassic::buildTree(const QString &filter)
+{
+	m_updating = true;
+	m_tree->clear();
+
+	QHash<QString, QTreeWidgetItem *> folders;
+	QTreeWidgetItem *selLeaf = NULL;
+	int curType = WBQtCondActData_GetType(m_item, m_isAction);
+	int count = WBQtCondActData_GetTemplateCount(m_isAction);
+	int matchCount = 0;
+	for (int i = 0; i < count; i++)
+	{
+		QString name = templateName(m_isAction, i);
+		QString name2 = templateName2(m_isAction, i);
+		if (!filter.isEmpty()
+			&& !name.toLower().contains(filter)
+			&& !name2.toLower().contains(filter))
+		{
+			continue;
+		}
+		matchCount++;
+		for (int pass = 0; pass < 2; pass++)
+		{
+			QString path = (pass == 0) ? name : name2;
+			if (path.isEmpty())
+			{
+				continue;
+			}
+			QStringList parts = path.split('/');
+			QString leafLabel = parts.takeLast();
+			QTreeWidgetItem *parent = NULL;
+			QString key;
+			for (int p = 0; p < parts.size(); p++)
+			{
+				key += parts[p];
+				key += '/';
+				QTreeWidgetItem *folder = folders.value(key, NULL);
+				if (folder == NULL)
+				{
+					if (parent == NULL)
+					{
+						folder = new QTreeWidgetItem(m_tree, QStringList(parts[p]));
+					}
+					else
+					{
+						folder = new QTreeWidgetItem(parent, QStringList(parts[p]));
+					}
+					folder->setData(0, kTemplateRole, -1);
+					folders.insert(key, folder);
+				}
+				parent = folder;
+			}
+			QTreeWidgetItem *leaf;
+			if (parent == NULL)
+			{
+				leaf = new QTreeWidgetItem(m_tree, QStringList(leafLabel));
+			}
+			else
+			{
+				leaf = new QTreeWidgetItem(parent, QStringList(leafLabel));
+			}
+			leaf->setData(0, kTemplateRole, i);
+			if (pass == 0 && i == curType)
+			{
+				selLeaf = leaf;
+			}
+		}
+	}
+	m_tree->sortItems(0, Qt::AscendingOrder);
+
+	// Pinned mod folders go first, in rank order.
+	QMap<int, QTreeWidgetItem *> pinned;
+	for (int i = m_tree->topLevelItemCount() - 1; i >= 0; --i)
+	{
+		const int rank = WBQtCondActData_PinnedFolderRank(m_tree->topLevelItem(i)->text(0).toLocal8Bit().constData());
+		if (rank >= 0)
+		{
+			pinned.insert(rank, m_tree->takeTopLevelItem(i));
+		}
+	}
+	m_tree->insertTopLevelItems(0, pinned.values());
+	m_updating = false;
+	selectCurrentType(selLeaf);
+	return matchCount;
+}
+
+void WBQtCondActDialogClassic::selectCurrentType(QTreeWidgetItem *leaf)
+{
+	if (leaf != NULL)
+	{
+		m_updating = true;
+		m_tree->setCurrentItem(leaf);
+		m_tree->scrollToItem(leaf, QAbstractItemView::PositionAtTop);
+		m_updating = false;
+	}
+}
+
+void WBQtCondActDialogClassic::onCurrentItemChanged(QTreeWidgetItem *current, QTreeWidgetItem *previous)
+{
+	Q_UNUSED(previous);
+	if (m_updating || current == NULL)
+	{
+		return;
+	}
+	int type = current->data(0, kTemplateRole).toInt();
+	if (type < 0)
+	{
+		return;
+	}
+	// == the TVN_SELCHANGED handler: only react when the type actually changes.
+	if (type != WBQtCondActData_GetType(m_item, m_isAction))
+	{
+		WBQtCondActData_SetType(m_item, m_isAction, type);
+		renderSentence();
+		showHelpForType(type);
+	}
+}
+
+void WBQtCondActDialogClassic::renderSentence()
+{
+	// The sentence interleaves uiStrings[0], param[0], uiStrings[1], param[1], ... with each
+	// parameter as a link (== the rich edit's blue CFE_LINK ranges).
+	int numStrings = WBQtCondActData_GetUiStringCount(m_item, m_isAction);
+	int numParams = WBQtCondActData_GetParameterCount(m_item, m_isAction);
+	char buf[kTextCap];
+	QString html;
+	int total = (numStrings > numParams) ? numStrings : numParams;
+	for (int i = 0; i < total; i++)
+	{
+		if (i < numStrings)
+		{
+			buf[0] = 0;
+			WBQtCondActData_GetUiString(m_item, m_isAction, i, buf, sizeof(buf));
+			html += QString::fromLocal8Bit(buf).toHtmlEscaped();
+		}
+		if (i < numParams)
+		{
+			buf[0] = 0;
+			WBQtCondActData_GetParameterText(m_item, m_isAction, i, buf, sizeof(buf));
+			QString text = QString::fromLocal8Bit(buf);
+			if (text.isEmpty())
+			{
+				text = "???";
+			}
+			// A parameter the warning panel is complaining about renders red rather than the
+			// normal link colour, so the offending one is obvious without matching the warning
+			// text up by name. The inner <span> is needed because Qt paints <a> with the palette
+			// link colour and ignores a colour set on the anchor itself.
+			const QString escaped = text.toHtmlEscaped();
+			if (WBQtCondActData_ParameterHasWarning(m_item, m_isAction, i))
+			{
+				html += QString("<a href=\"%1\"><span style=\"color:#c00000;\">%2</span></a>")
+					.arg(i).arg(escaped);
+			}
+			else
+			{
+				html += QString("<a href=\"%1\">%2</a>").arg(i).arg(escaped);
+			}
+		}
+	}
+	m_sentence->setHtml(html);
+	updateWarnings();
+}
+
+void WBQtCondActDialogClassic::updateWarnings()
+{
+	// == the formatConditionText/formatActionText warning panel logic (captions from the
+	// IDS_SCRIPT_* string table).
+	char warnBuf[kBigCap];
+	char infoBuf[kBigCap];
+	warnBuf[0] = 0;
+	infoBuf[0] = 0;
+	WBQtCondActData_GetWarnings(m_item, m_isAction, warnBuf, sizeof(warnBuf), infoBuf, sizeof(infoBuf));
+	QString warnings = QString::fromLocal8Bit(warnBuf);
+	QString information = QString::fromLocal8Bit(infoBuf);
+	if (!warnings.isEmpty())
+	{
+		m_warningsBox->setTitle("Warnings:");
+		m_warningsBox->setEnabled(true);
+		m_warningsLabel->setText(warnings);
+	}
+	else if (!information.isEmpty())
+	{
+		m_warningsBox->setTitle("Information:");
+		m_warningsBox->setEnabled(true);
+		m_warningsLabel->setText(information);
+	}
+	else
+	{
+		m_warningsBox->setTitle("No Warnings");
+		m_warningsBox->setEnabled(false);
+		m_warningsLabel->setText("");
+	}
+}
+
+void WBQtCondActDialogClassic::showHelpForType(int type)
+{
+	if (type >= 0 && type < WBQtCondActData_GetTemplateCount(m_isAction))
+	{
+		m_helpLabel->setText(templateHelp(m_isAction, type));
+	}
+	else
+	{
+		m_helpLabel->setText("");
+	}
+}
+
+void WBQtCondActDialogClassic::onLinkClicked(const QUrl &url)
+{
+	bool ok = false;
+	int index = url.toString().toInt(&ok);
+	if (!ok)
+	{
+		return;
+	}
+	// Pops the parameter editor; the sentence and warnings re-render on return.
+	WBQtCondAct_EditParameter(m_item, m_isAction, index);
+	renderSentence();
+}
+
+// NewSearch: filter live as the user types -- empty box restores the full tree, no
+// beep and no "No matches" box (both are jarring on every keystroke).
+void WBQtCondActDialogClassic::onSearchLive(const QString &text)
+{
+	if (text.trimmed().isEmpty())
+	{
+		populateTree();
+		return;
+	}
+	applyFilter(text.toLower(), false);
+}
+
+void WBQtCondActDialogClassic::onSearch()
+{
+	// == the MFC OnSearch: flatten the catalog to full-path leaves matching the search text
+	// (in name or name2, case-insensitive).
+	QString searchText = m_searchEdit->text().toLower();
+	if (searchText.isEmpty())
+	{
+		QApplication::beep();
+		onReset();
+		return;
+	}
+	applyFilter(searchText, true);
+}
+
+void WBQtCondActDialogClassic::applyFilter(const QString &searchText, bool announce)
+{
+	// Rebuild the tree restricted to matches -- same nested category design as the full list, just
+	// pruned (not a flat full-path leaf list).
+	int matchCount = buildTree(searchText);
+	// A filtered tree starts collapsed, which would hide matches nested in folders -- expand it so
+	// every match is visible (the full unfiltered list keeps its default collapsed state).
+	m_tree->expandAll();
+	if (matchCount == 0 && announce)
+	{
+		QMessageBox::information(this, "Search", "No matches found.");
+	}
+}
+
+void WBQtCondActDialogClassic::onReset()
+{
+	m_searchEdit->clear();
+	populateTree();
+	m_tree->setFocus();
+}
+
+void WBQtCondActDialogClassic::onCompressToggled(bool checked)
+{
+	if (!m_updating)
+	{
+		WBQtCondAct_SetCompress(checked ? 1 : 0);
+	}
+	applyTreeFont();
+}
+
+void WBQtCondActDialogClassic::applyTreeFont()
+{
+	// == OnCompress: a tree-density toggle done via font height (14px compressed, 16px not).
+	QFont font = m_tree->font();
+	font.setPixelSize(m_compressCheck->isChecked() ? 14 : 16);
+	m_tree->setFont(font);
+}

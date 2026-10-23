@@ -58,6 +58,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/GasBehavior.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/ProneUpdate.h"
 #include "GameLogic/Module/DeliverPayloadAIUpdate.h"
@@ -67,6 +68,7 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
+#include "GameLogic/ScriptCLP.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/TurretAI.h"
 #include "GameLogic/Weapon.h"
@@ -102,6 +104,11 @@ AIUpdateModuleData::AIUpdateModuleData()
 	m_useAttackAngle = FALSE;
 	m_attackAngles.clear();
 	//m_attackAngleMirrored = FALSE;
+	m_minRangeRetreatStraight = FALSE;
+	m_aimByReversing = FALSE;
+	m_aimByReversingMaxAngle = PI/2;
+	m_aimByReversingMargin = PATHFIND_CELL_SIZE_F;
+	m_aimByReversingTurnFactor = 1.0f;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -169,6 +176,11 @@ struct AttackAngleData
     // TheSuperHackers @feature If No, this object stays silent even when attacked while holding fire.
     { "HoldFireAllowsRetaliation",	INI::parseBool,										nullptr, offsetof( AIUpdateModuleData, m_holdFireAllowsRetaliation ) },
 		{ "PreferredAttackAngle",				AIUpdateModuleData::parseAttackAngle,					NULL, NULL },
+		{ "MinRangeRetreatStraight",		INI::parseBool,										nullptr, offsetof( AIUpdateModuleData, m_minRangeRetreatStraight ) },
+		{ "AimByReversing",							INI::parseBool,										nullptr, offsetof( AIUpdateModuleData, m_aimByReversing ) },
+		{ "AimByReversingMaxAngle",			INI::parseAngleReal,							nullptr, offsetof( AIUpdateModuleData, m_aimByReversingMaxAngle ) },
+		{ "AimByReversingMargin",				INI::parseReal,										nullptr, offsetof( AIUpdateModuleData, m_aimByReversingMargin ) },
+		{ "AimByReversingTurnFactor",		INI::parseReal,										nullptr, offsetof( AIUpdateModuleData, m_aimByReversingTurnFactor ) },
 
 		{ nullptr, nullptr, nullptr, 0 }
 	};
@@ -348,6 +360,7 @@ AIUpdateInterface::AIUpdateInterface( Thing *thing, const ModuleData* moduleData
 	m_curLocomotor = nullptr;
 	m_curLocomotorSet = LOCOMOTORSET_INVALID;
 	m_locomotorGoalType = NONE;
+	m_locomotorGoalTurnByReversing = FALSE;
 	m_locomotorGoalData.zero();
 	for (i = 0; i < MAX_TURRETS; i++)
 		m_turretAI[i] = nullptr;
@@ -360,6 +373,9 @@ AIUpdateInterface::AIUpdateInterface( Thing *thing, const ModuleData* moduleData
 	m_queuedShotsLeft = 0;
 	m_queuedShotsPos.zero();
 	m_clearFiringStatusFrame = 0;
+	m_attackPlacementPos.zero();
+	m_attackPlacementAngle = INVALID_ANGLE;
+	m_attackPlacementShotsLeft = 0;
 #ifdef ALLOW_DEMORALIZE
 	m_demoralizedFramesLeft = 0;
 #endif
@@ -397,6 +413,10 @@ AIUpdateInterface::AIUpdateInterface( Thing *thing, const ModuleData* moduleData
 	m_loadTurnRateFactor = 1.0f;
 	m_loadAccelFactor = 1.0f;
 	m_loadLiftFactor = 1.0f;
+
+	// AICommandParmsStorage has no constructor, and its doXfer keeps stale pointers on load.
+	m_jammedOrder.store(AICommandParms(AICMD_IDLE, CMD_FROM_SCRIPT));
+	m_jammedOrderPlayer = -1;
 
 	// ---------------------------------------------
 
@@ -1070,12 +1090,16 @@ void AIUpdateInterface::chooseGoodLocomotorFromCurrentSet()
 }
 
 //----------------------------------------------------------------------------------------------------------
+// TheSuperHackers @bugfix WebbontheWeb 07/10/2026 The function can now return the crate object.
 Object* AIUpdateInterface::checkForCrateToPickup()
 {
 	if (m_crateCreated != INVALID_ID)
 	{
+#if RETAIL_COMPATIBLE_CRC
 		m_crateCreated = INVALID_ID; // we have processed it, so clear it.
+#endif
 		Object* crate = TheGameLogic->findObjectByID(m_crateCreated);
+		m_crateCreated = INVALID_ID; // we have processed it, so clear it.
 		if (crate)
 		{
 			for (BehaviorModule** m = crate->getBehaviorModules(); *m; ++m)
@@ -1197,6 +1221,28 @@ void AIUpdateInterface::friend_queueShots(WeaponSlotType slot, Int shots, const 
 	m_queuedShotsLeft = shots;
 	m_queuedShotsPos = *pos;
 	wakeUpNow();
+}
+
+//-------------------------------------------------------------------------------------------------
+void AIUpdateInterface::friend_setAttackPlacement(const Coord3D* pos, Real angle, Int shots)
+{
+	m_attackPlacementPos = *pos;
+	m_attackPlacementAngle = angle;
+	m_attackPlacementShotsLeft = shots > 0 ? shots : 1;
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool AIUpdateInterface::friend_takeAttackPlacement(Coord3D* pos, Real* angle)
+{
+	if (m_attackPlacementShotsLeft <= 0)
+	{
+		return FALSE;
+	}
+
+	--m_attackPlacementShotsLeft;
+	*pos = m_attackPlacementPos;
+	*angle = m_attackPlacementAngle;
+	return TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1576,8 +1622,8 @@ Bool AIUpdateInterface::blockedBy(Object *other)
 
 	// If we are near our final goal, don't get stuck.
 	if (goalCell.x>0 && goalCell.y>0) {
-		Real dx = fabs(goalPos.x-pos.x);
-		Real dy = fabs(goalPos.y-pos.y);
+		Real dx = WWMath::Fabs(goalPos.x-pos.x);
+		Real dy = WWMath::Fabs(goalPos.y-pos.y);
 		if (dx<PATHFIND_CELL_SIZE_F && dy<PATHFIND_CELL_SIZE_F) {
 			return FALSE; // If we're approaching our goal, ignore obstacles.
 		}
@@ -1692,7 +1738,7 @@ Bool AIUpdateInterface::needToRotate()
 		deltaAngle = ThePartitionManager->getRelativeAngle2D( getObject(), &info.posOnPath );
 	}
 
-	if (fabs(deltaAngle)>PI/30)
+	if (WWMath::Fabs(deltaAngle)>PI/30)
 	{
 		return TRUE;
 	}
@@ -1832,6 +1878,16 @@ Bool AIUpdateInterface::processCollision(PhysicsBehavior *physics, Object *other
 		Real dx = getObject()->getPosition()->x - otherPos.x;
 		Real dy = getObject()->getPosition()->y - otherPos.y;
 		Real curDSqr = dx*dx+dy*dy;
+
+		// HOVER and SHIP locomotors brake slowly after a move ends, so an idle one can still slide into the unit it touches.
+		const Bool coasts = m_curLocomotor != nullptr
+			&& (m_curLocomotor->getAppearance() == LOCO_HOVER || m_curLocomotor->getAppearance() == LOCO_SHIP);
+		const Coord3D *vel = physics->getVelocity();
+		if (coasts && vel->x*dx + vel->y*dy < 0.0f)
+		{
+			physics->scrubVelocity2D(0);
+		}
+
 		if (!otherMoving && curDSqr < PATHFIND_CELL_SIZE_F*PATHFIND_CELL_SIZE_F*0.25f)
 		{
 			if (this->getCurrentStateID() == AI_BUSY) {
@@ -2207,6 +2263,62 @@ Bool AIUpdateInterface::computeAttackPath( PathfindServicesInterface *pathServic
 
 	localVictimPos.z = TheTerrainLogic->getLayerHeight( localVictimPos.x, localVictimPos.y, victimLayer );
 
+	// MinRangeRetreatStraight: we're inside our minimum range. Back off straight away from the target,
+	// just far enough, instead of letting the pathfinder pick the nearest valid cell (often to the side,
+	// which is a long arc for slow-turning vehicles and leaves us facing the wrong way).
+	if (isMinRangeRetreatStraight() && landBound && !source->isAboveTerrain()
+		&& (victim ? weapon->isTooClose(source, victim) : weapon->isTooClose(source, &localVictimPos)))
+	{
+		const Coord3D* srcPos = source->getPosition();
+		Coord3D dir;
+		dir.set(srcPos->x - localVictimPos.x, srcPos->y - localVictimPos.y, 0.0f);
+		Real curDist = dir.length();
+		if (curDist < 0.01f)
+		{
+			// on top of the target: back off along our reversed heading
+			const Coord3D* fwd = source->getUnitDirectionVector2D();
+			dir.set(-fwd->x, -fwd->y, 0.0f);
+			curDist = 0.0f;
+		}
+		else
+		{
+			dir.x /= curDist;
+			dir.y /= curDist;
+		}
+
+		// attack range is measured between bounding circles (ATTACK_RANGE_IS_2D), plus a margin of one cell
+		Real wantedDist = weapon->getTemplate()->getMinimumAttackRange() + PATHFIND_CELL_SIZE_F
+			+ source->getGeometryInfo().getBoundingCircleRadius();
+		if (victim && !victim->isKindOf(KINDOF_BRIDGE))
+			wantedDist += victim->getGeometryInfo().getBoundingCircleRadius();
+
+		Coord3D goal;
+		goal.x = srcPos->x + dir.x * (wantedDist - curDist);
+		goal.y = srcPos->y + dir.y * (wantedDist - curDist);
+		goal.z = TheTerrainLogic->getLayerHeight(goal.x, goal.y, source->getLayer());
+
+		if (TheAI->pathfinder()->isValidAttackGoal(source, m_locomotorSet, goal, victim, &localVictimPos, weapon))
+		{
+			destroyPath();
+			m_path = newInstance(Path);
+			m_path->prependNode(&goal, source->getLayer());
+			Coord3D pos = *srcPos;
+			m_path->prependNode(&pos, source->getLayer());
+			m_path->getFirstNode()->setNextOptimized(m_path->getFirstNode()->getNext());
+			if (TheGlobalData->m_debugAI == AI_DEBUG_PATHS)
+			{
+				TheAI->pathfinder()->setDebugPath(m_path);
+			}
+			TheAI->pathfinder()->updateGoal(source, &goal, source->getLayer());
+
+			m_pathTimestamp = TheGameLogic->getFrame();
+			m_blockedFrames = 0;
+			m_isBlockedAndStuck = FALSE;
+			return TRUE;
+		}
+		// blocked: fall through to the normal attack pathfinding
+	}
+
 	if (getObject()->isAboveTerrain() && !landBound)
 	{
 		// for now, airborne objects don't pathfind
@@ -2379,7 +2491,7 @@ Bool AIUpdateInterface::isPathAvailable( const Coord3D *destination ) const
 /** Is there a path (computed using the less accurate but quick method )
 	* at all that exists from us to the destination location */
 //-------------------------------------------------------------------------------------------------
-Bool AIUpdateInterface::isQuickPathAvailable( const Coord3D *destination ) const
+Bool AIUpdateInterface::isQuickPathAvailable( const Coord3D *destination, Bool acceptRubble ) const
 {
 
 	// sanity
@@ -2391,7 +2503,7 @@ Bool AIUpdateInterface::isQuickPathAvailable( const Coord3D *destination ) const
 #if RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING
 	return TheAI->pathfinder()->clientSafeQuickDoesPathExist(m_locomotorSet, myPos, destination);
 #else
-	return TheAI->pathfinder()->clientSafeQuickDoesPathExistForUI(m_locomotorSet, myPos, destination);
+	return TheAI->pathfinder()->clientSafeQuickDoesPathExistForUI(m_locomotorSet, myPos, destination, acceptRubble);
 #endif
 
 }
@@ -2568,7 +2680,7 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 
 				case ANGLE:
 					{
-						m_curLocomotor->locoUpdate_moveTowardsAngle(getObject(), m_locomotorGoalData.x);
+						m_curLocomotor->locoUpdate_moveTowardsAngle(getObject(), m_locomotorGoalData.x, m_locomotorGoalTurnByReversing);
 						m_doFinalPosition = FALSE;
 					}
 					break;
@@ -2594,7 +2706,7 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 							}
 							else
 							{
-								Real dist = sqrtf(dSqr);
+								Real dist = WWMath::Sqrtf(dSqr);
 								if (dist<1) dist = 1;
 								pos.x += 2*PATHFIND_CELL_SIZE_F*dx/(dist*LOGICFRAMES_PER_SECOND);
 								pos.y += 2*PATHFIND_CELL_SIZE_F*dy/(dist*LOGICFRAMES_PER_SECOND);
@@ -2665,6 +2777,22 @@ void AIUpdateInterface::setLocomotorGoalOrientation(Real angle)
 {
 	m_locomotorGoalType = ANGLE;
 	m_locomotorGoalData.x = angle;
+	m_locomotorGoalTurnByReversing = FALSE;
+#ifdef RTS_DEBUG
+if (_isnan(m_locomotorGoalData.x) || _isnan(m_locomotorGoalData.y) || _isnan(m_locomotorGoalData.z))
+{
+	DEBUG_CRASH(("NAN in setLocomotorGoalOrientation"));
+}
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void AIUpdateInterface::setLocomotorGoalOrientationByReversing(Real angle)
+{
+	m_locomotorGoalType = ANGLE;
+	m_locomotorGoalData.x = angle;
+	// Not saved/CRC'd (keeps retail CRC): the aim state re-issues this goal every update.
+	m_locomotorGoalTurnByReversing = TRUE;
 #ifdef RTS_DEBUG
 if (_isnan(m_locomotorGoalData.x) || _isnan(m_locomotorGoalData.y) || _isnan(m_locomotorGoalData.z))
 {
@@ -2677,6 +2805,7 @@ if (_isnan(m_locomotorGoalData.x) || _isnan(m_locomotorGoalData.y) || _isnan(m_l
 void AIUpdateInterface::setLocomotorGoalNone()
 {
 	m_locomotorGoalType = NONE;
+	m_locomotorGoalTurnByReversing = FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2803,7 +2932,7 @@ Real AIUpdateInterface::getLocomotorDistanceToGoal()
 					dest = m_path->getLastNode()->getPosition();
 				}
 				Real distance = ThePartitionManager->getDistanceSquared( me, dest, FROM_CENTER_3D );
-				return sqrt( distance );// Other paths return dots of normalized vectors, so one sqrt ain't so bad
+				return WWMath::Sqrt( distance );// Other paths return dots of normalized vectors, so one sqrt ain't so bad
 			}
 			else
 			{
@@ -2835,7 +2964,7 @@ Real AIUpdateInterface::getLocomotorDistanceToGoal()
 				{
 					if (sqr(dist) > distSqr)
 					{
-						return sqrt(distSqr);
+						return WWMath::Sqrt(distSqr);
 					}
 					else
 					{
@@ -2844,7 +2973,7 @@ Real AIUpdateInterface::getLocomotorDistanceToGoal()
 				}
 
 				if (dist<PATHFIND_CELL_SIZE_F || sqr(dist) < distSqr)
-					return sqrtf(distSqr);
+					return WWMath::Sqrtf(distSqr);
 				else
 					return dist;
 
@@ -2944,8 +3073,83 @@ Bool AIUpdateInterface::isAllowedToRespondToAiCommands(const AICommandParms* par
   // ALLOWING ONLY THE SPECTREUPDATE TO COMMAND IT VIA CMD_FROM_AI
   // AUTHOR, LORENZEN... 5/15/03
 
+	if (parms->m_cmdSource == CMD_FROM_PLAYER && GasBehavior::blocksPlayerOrders(getObject()))
+	{
+		return FALSE;
+	}
+
+	if (holdOrderWhileJammed(parms))
+	{
+		return FALSE;
+	}
 
 	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool AIUpdateInterface::holdOrderWhileJammed(const AICommandParms* parms) const
+{
+	if (parms->m_cmdSource != CMD_FROM_SCRIPT)
+	{
+		return FALSE;
+	}
+	const Object *obj = getObject();
+	const BodyModuleInterface *body = obj->getBodyModule();
+	if (!body || !body->isJammed())
+	{
+		return FALSE;
+	}
+	const Player *player = obj->getControllingPlayer();
+	if (!clpAIPlaysFair(player))
+	{
+		return FALSE;
+	}
+	m_jammedOrder.store(*parms);
+	m_jammedOrderPlayer = player->getPlayerIndex();
+	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+void AIUpdateInterface::releaseJammedOrder()
+{
+	if (m_jammedOrderPlayer < 0)
+	{
+		return;
+	}
+	Object *obj = getObject();
+	const Player *player = obj->getControllingPlayer();
+	Bool sameOwner = player && player->getPlayerIndex() == m_jammedOrderPlayer;
+	m_jammedOrderPlayer = -1;
+	if (!sameOwner)
+	{
+		return;
+	}
+
+	AICommandParms parms(AICMD_IDLE, CMD_FROM_SCRIPT);
+	m_jammedOrder.reconstitute(parms);
+
+	// AICommandParmsStorage::doXfer does not save the command source.
+	parms.m_cmdSource = CMD_FROM_SCRIPT;
+
+	// AIUpdate only implements command buttons for combat drop, so these go back through Object.
+	switch (parms.m_cmd)
+	{
+		case AICMD_COMMANDBUTTON:
+			obj->doCommandButton(parms.m_commandButton, CMD_FROM_SCRIPT);
+			break;
+		case AICMD_COMMANDBUTTON_OBJ:
+			if (parms.m_obj)
+			{
+				obj->doCommandButtonAtObject(parms.m_commandButton, parms.m_obj, CMD_FROM_SCRIPT);
+			}
+			break;
+		case AICMD_COMMANDBUTTON_POS:
+			obj->doCommandButtonAtPosition(parms.m_commandButton, &parms.m_pos, CMD_FROM_SCRIPT);
+			break;
+		default:
+			aiDoCommand(&parms);
+			break;
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2983,6 +3187,12 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 
 	// Any new order cancels a forced-reverse move; the REVERSE_MOVE case below re-sets it.
 	m_forceMoveBackwards = FALSE;
+
+	// A new order cancels the placed attack too, unless its shots are queued and outlive orders.
+	if (m_queuedShotsLeft <= 0)
+	{
+		m_attackPlacementShotsLeft = 0;
+	}
 
 	switch (parms->m_cmd)
 	{
@@ -5611,6 +5821,8 @@ void AIUpdateInterface::crc( Xfer *x )
 	* 6: Added m_forceMoveBackwards (REVERSE_MOVE order)
 	* 7: Added m_isHoldingFire (HOLD_FIRE stance)
 	* 8: Added the queued shots (OCL Attack FireRegardlessOfOrders)
+	* 10: Added the order held while jammed
+	* 11: Added the attack placement (OCL Attack through SPECIAL_POWER_CONSTRUCT)
 	*/
 // ------------------------------------------------------------------------------------------------
 void AIUpdateInterface::xfer( Xfer *xfer )
@@ -5619,7 +5831,7 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 #if RETAIL_COMPATIBLE_CRC || RETAIL_COMPATIBLE_XFER_SAVE
 	const XferVersion currentVersion = 4;
 #else
-	const XferVersion currentVersion = 10;
+	const XferVersion currentVersion = 12;
 #endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
@@ -5871,6 +6083,22 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 	}
 
 	if (version >= 10)
+	{
+		xfer->xferInt(&m_jammedOrderPlayer);
+		if (m_jammedOrderPlayer >= 0)
+		{
+			m_jammedOrder.doXfer(xfer);
+		}
+	}
+
+	if (version >= 11)
+	{
+		xfer->xferCoord3D(&m_attackPlacementPos);
+		xfer->xferReal(&m_attackPlacementAngle);
+		xfer->xferInt(&m_attackPlacementShotsLeft);
+	}
+
+	if (version >= 12)
 	{
 		xfer->xferBool(&m_pathWasCapped);
 		xfer->xferUnsignedByte(&m_cappedLegs);

@@ -559,7 +559,7 @@ static void paintOctopus(WorldHeightMapEdit* map, int x, int y, int radius, int 
 
     for (int arm = 0; arm < numArms; ++arm)
     {
-        double angle = (2 * M_PI / numArms) * arm;
+        double angle = (2 * PI / numArms) * arm;
         int cx = x;
         int cy = y;
 

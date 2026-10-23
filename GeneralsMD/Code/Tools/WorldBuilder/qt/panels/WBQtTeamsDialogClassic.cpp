@@ -1,0 +1,289 @@
+// WBQtTeamsDialogClassic.cpp -- see WBQtTeamsDialogClassic.h. Layout mirrors IDD_TEAMS_DIALOG ("Team
+// Builder"): players list left, the teams table right, the command row on top. The dialog
+// re-reads its whole state from the hidden MFC dialog after every action (all bridge calls
+// are synchronous). The Expand/Shrink button is dropped -- the Qt dialog resizes natively.
+#include "WBQtTeamsDialogClassic.h"
+#include "ui_WBQtTeamsDialogClassic.h"
+#include "WBQtTeamsBridge.h"
+#include "WBQtTeamSheetDialogClassic.h"
+#include "WBQtPickUnitBridge.h"		// the shared "replaced missing" report
+#include "../WBQtWindowPos.h"
+
+#include <QCheckBox>
+#include <QHeaderView>
+#include <QListWidget>
+#include <QMessageBox>
+#include <QPushButton>
+#include <QTreeWidget>
+
+#include <qt_windows.h>
+
+// Stage 1 phase 3: modal-dialog parent (active modal if nested, else main window). WBQtBridge.cpp.
+QWidget *WBQt_DialogParent(void);
+
+namespace
+{
+	const int kTextCap = 1024;
+	const int kTeamColumns = 6;	// name / script / trigger / priority / origin / index
+}
+
+WBQtTeamsDialogClassic::WBQtTeamsDialogClassic(QWidget *parent)
+	: QDialog(parent),
+	m_ui(new Ui::WBQtTeamsDialogClassic),
+	m_updating(false),
+	m_hasMissingUnits(false)
+{
+	setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
+
+	// The static widget tree lives in WBQtTeamsDialogClassic.ui; bind the members the
+	// logic below uses, then wire what Designer can't express.
+	m_ui->setupUi(this);
+
+	m_players = m_ui->players;
+	m_teams = m_ui->teams;
+	m_newButton = m_ui->newButton;
+	m_copyButton = m_ui->copyButton;
+	m_deleteButton = m_ui->deleteButton;
+	m_moveUpButton = m_ui->moveUpButton;
+	m_moveDownButton = m_ui->moveDownButton;
+
+	// == the MFC InsertColumn widths (Origin and Index were the narrow 50px pair).
+	m_teams->header()->resizeSection(0, 200);
+	m_teams->header()->resizeSection(1, 200);
+	m_teams->header()->resizeSection(2, 200);
+	m_teams->header()->resizeSection(3, 60);
+	m_teams->header()->resizeSection(4, 60);
+	m_teams->header()->resizeSection(5, 60);
+
+	connect(m_players, SIGNAL(currentRowChanged(int)), this, SLOT(onPlayerRowChanged(int)));
+	connect(m_teams, SIGNAL(itemSelectionChanged()), this, SLOT(onTeamRowChanged()));
+	connect(m_teams, SIGNAL(itemDoubleClicked(QTreeWidgetItem*,int)), this, SLOT(onTeamDoubleClicked(QTreeWidgetItem*,int)));
+	connect(m_ui->membersButton, SIGNAL(clicked()), this, SLOT(onSelectTeamMembers()));
+	connect(m_newButton, SIGNAL(clicked()), this, SLOT(onNewTeam()));
+	connect(m_copyButton, SIGNAL(clicked()), this, SLOT(onCopyTeam()));
+	connect(m_deleteButton, SIGNAL(clicked()), this, SLOT(onDeleteTeam()));
+	connect(m_moveUpButton, SIGNAL(clicked()), this, SLOT(onMoveUpTeam()));
+	connect(m_moveDownButton, SIGNAL(clicked()), this, SLOT(onMoveDownTeam()));
+	connect(m_ui->exportButton, SIGNAL(clicked()), this, SLOT(onExportTeams()));
+	connect(m_ui->importButton, SIGNAL(clicked()), this, SLOT(onImportTeams()));
+	connect(m_ui->fixMissingButton, SIGNAL(clicked()), this, SLOT(onFixMissingUnits()));
+	connect(m_ui->okButton, SIGNAL(clicked()), this, SLOT(accept()));
+	m_ui->newDesignCheck->setChecked(WBQtTeams_GetNewDesign() != 0);
+	connect(m_ui->newDesignCheck, &QCheckBox::toggled, m_ui->newDesignCheck, [](bool on)
+	{
+		WBQtTeams_SetNewDesign(on ? 1 : 0);
+	});
+	connect(m_ui->cancelButton, SIGNAL(clicked()), this, SLOT(reject()));
+
+	refreshAll();
+	// Modal, so size only -- it keeps centering fresh on each open.
+	WBQtWindowPos_TrackSize(this, "TeamBuilder");
+}
+
+WBQtTeamsDialogClassic::~WBQtTeamsDialogClassic()
+{
+	delete m_ui;
+}
+
+void WBQtTeamsDialogClassic::refreshAll()
+{
+	refreshPlayers();
+	refreshTeamsTable();
+	refreshMissingUnits();
+	refreshButtons();
+}
+
+// Re-scan the team templates for unit types with no matching template. Only called from
+// refreshAll (i.e. after an action that could have changed a slot), never from the
+// selection-change handlers -- see the note in refreshButtons.
+void WBQtTeamsDialogClassic::refreshMissingUnits()
+{
+	m_hasMissingUnits = (WBQtTeamsData_HasMissingUnits() != 0);
+}
+
+void WBQtTeamsDialogClassic::refreshPlayers()
+{
+	m_updating = true;
+
+	// players (rows == side indices)
+	int curPlayer = WBQtTeamsData_GetPlayerIndex();
+	m_players->clear();
+	char buf[kTextCap];
+	int playerCount = WBQtTeamsData_GetPlayerCount();
+	for (int i = 0; i < playerCount; i++)
+	{
+		buf[0] = 0;
+		WBQtTeamsData_GetPlayerName(i, buf, sizeof(buf));
+		new QListWidgetItem(QString::fromLocal8Bit(buf), m_players);
+	}
+	if (curPlayer >= 0 && curPlayer < playerCount)
+	{
+		m_players->setCurrentRow(curPlayer);
+	}
+
+	m_updating = false;
+}
+
+void WBQtTeamsDialogClassic::refreshTeamsTable()
+{
+	m_updating = true;
+
+	// the teams table (rows mirror the hidden list control)
+	char buf[kTextCap];
+	m_teams->clear();
+	int rowCount = WBQtTeamsData_GetTeamRowCount();
+	QTreeWidgetItem *selected = NULL;
+	for (int row = 0; row < rowCount; row++)
+	{
+		QTreeWidgetItem *item = new QTreeWidgetItem(m_teams);
+		for (int col = 0; col < kTeamColumns; col++)
+		{
+			buf[0] = 0;
+			WBQtTeamsData_GetTeamRowText(row, col, buf, sizeof(buf));
+			item->setText(col, QString::fromLocal8Bit(buf));
+		}
+		if (WBQtTeamsData_GetTeamRowSelected(row) != 0)
+		{
+			selected = item;
+		}
+	}
+	if (selected != NULL)
+	{
+		m_teams->setCurrentItem(selected);
+		m_teams->scrollToItem(selected);
+	}
+
+	m_updating = false;
+}
+
+void WBQtTeamsDialogClassic::refreshButtons()
+{
+	m_newButton->setEnabled(WBQtTeamsData_GetNewEnabled() != 0);
+	m_copyButton->setEnabled(WBQtTeamsData_GetCopyEnabled() != 0);
+	m_deleteButton->setEnabled(WBQtTeamsData_GetDeleteEnabled() != 0);
+	m_moveUpButton->setEnabled(WBQtTeamsData_GetMoveEnabled() != 0);
+	m_moveDownButton->setEnabled(WBQtTeamsData_GetMoveEnabled() != 0);
+	// NOT re-scanned here: refreshButtons runs on every player/team click, and the scan is
+	// teams x 7 slots x a findTemplate lookup. refreshMissingUnits() re-runs it only after
+	// something could have changed the slots.
+	m_ui->fixMissingButton->setEnabled(m_hasMissingUnits);
+}
+
+void WBQtTeamsDialogClassic::onPlayerRowChanged(int row)
+{
+	if (m_updating || row < 0)
+	{
+		return;
+	}
+	WBQtTeams_SelectPlayer(row);
+	// The player names don't change from selecting one -- rebuilding m_players mid-click
+	// (as refreshAll did) is wasted work; only the teams table content follows the player.
+	refreshTeamsTable();
+	refreshButtons();
+}
+
+void WBQtTeamsDialogClassic::onTeamRowChanged()
+{
+	if (m_updating)
+	{
+		return;
+	}
+	int row = m_teams->indexOfTopLevelItem(m_teams->currentItem());
+	if (row >= 0)
+	{
+		WBQtTeams_SelectTeamRow(row);
+		// Selecting a row changes no table content -- refreshAll here rebuilt the whole
+		// mirror on every click (O(teams) cell read-backs); only the button enables
+		// depend on whether the row is a default team.
+		refreshButtons();
+	}
+}
+
+void WBQtTeamsDialogClassic::runTeamSheet()
+{
+	// Binds the four hidden Team* pages to the current team; refuses default teams.
+	if (WBQtTeamSheet_Open() != 0)
+	{
+		WBQtTeamSheetDialogClassic dlg(this);
+		dlg.exec();
+		WBQtTeamSheet_Close();
+	}
+}
+
+void WBQtTeamsDialogClassic::onTeamDoubleClicked(QTreeWidgetItem *item, int column)
+{
+	Q_UNUSED(column);
+	int row = m_teams->indexOfTopLevelItem(item);
+	if (row >= 0)
+	{
+		WBQtTeams_SelectTeamRow(row);
+		runTeamSheet();		// the Qt team template sheet (== OnEditTemplate)
+		refreshAll();
+	}
+}
+
+void WBQtTeamsDialogClassic::onNewTeam()
+{
+	WBQtTeams_NewTeam();	// creates + selects the team (no sheet pop)
+	runTeamSheet();			// == OnNewteam's OnEditTemplate on the fresh team
+	refreshAll();
+}
+
+void WBQtTeamsDialogClassic::onCopyTeam()
+{
+	WBQtTeams_CopyTeam();
+	refreshAll();
+}
+
+void WBQtTeamsDialogClassic::onDeleteTeam()
+{
+	WBQtTeams_DeleteTeam();	// may pop the in-use confirmation
+	refreshAll();
+}
+
+void WBQtTeamsDialogClassic::onSelectTeamMembers()
+{
+	WBQtTeams_SelectTeamMembers();	// pops the count info box + centers the 3D view
+	refreshAll();
+}
+
+void WBQtTeamsDialogClassic::onMoveUpTeam()
+{
+	WBQtTeams_MoveUpTeam();
+	refreshAll();
+}
+
+void WBQtTeamsDialogClassic::onMoveDownTeam()
+{
+	WBQtTeams_MoveDownTeam();
+	refreshAll();
+}
+
+// Replace every team member unit type whose template is gone with its closest existing template,
+// then show the shared replace report so the guesses can be reviewed and corrected. The edits land
+// in the working-copy sides list, so OK commits them and Cancel discards them like any other team
+// edit made here.
+void WBQtTeamsDialogClassic::onFixMissingUnits()
+{
+	const int found = WBQtTeams_ReplaceMissingUnits();
+	if (found == 0)
+	{
+		QMessageBox::information(this, tr("Fix Missing Units"),
+			tr("No missing unit types were found in the team templates."));
+		return;
+	}
+	WBQtReplaceReport_Run(NULL);
+	refreshAll();
+}
+
+void WBQtTeamsDialogClassic::onExportTeams()
+{
+	WBQtTeams_ExportTeams();	// MFC file dialog + info boxes
+	refreshAll();
+}
+
+void WBQtTeamsDialogClassic::onImportTeams()
+{
+	WBQtTeams_ImportTeams();	// MFC file dialog; may pop fix-owner dialogs
+	refreshAll();
+}

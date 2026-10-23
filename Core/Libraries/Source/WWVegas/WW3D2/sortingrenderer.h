@@ -23,7 +23,9 @@
 class SortingNodeStruct;
 class SphereClass;
 class ShaderClass;
+class Vector3;
 struct VertexFormatXYZNDUV2;
+struct BillboardInstance;
 
 // Shades particle sprites in a pixel shader, around each of their draws.
 class SoftParticleHookClass
@@ -37,7 +39,10 @@ public:
 		EFFECT_ELECTRIC = 8,	// arcs, jitter and strobe
 		EFFECT_LASER = 16,	// hot core and travelling pulses, from the beam coordinates in the second uv set
 		EFFECT_BEAM = 32,	// a laser draw's beam or a streak, which fades only while shaded
-		EFFECT_CRYO = 64	// ice tint with teeth and frost bands on a beam, splinters and glints on a sprite
+		EFFECT_CRYO = 64,	// ice tint with teeth and frost bands on a beam, splinters and glints on a sprite
+		EFFECT_DISRUPT = 128,	// ripple and colour-split the scene copy behind the shape, in a pass of its own before the sorted draws
+		EFFECT_MESH = 256,	// a model's mesh, whose texture may tile both ways and whose settings come with it
+		EFFECT_MIRROR = 512	// a planar mirror mesh, shown as the scene behind it bent under its own colour, with the reflection over both
 	};
 
 	virtual ~SoftParticleHookClass() {}
@@ -46,6 +51,9 @@ public:
 	// The data is whatever the inserter handed over with the effects, opaque to the renderer.
 	virtual bool Begin(const ShaderClass &shader, unsigned effects, const void *effectData) = 0;
 	virtual void End() = 0;
+
+	// Whether EFFECT_DISRUPT draws at all. Where it cannot, a shape that would only disrupt draws its own art instead.
+	virtual bool Can_Disrupt() = 0;
 };
 
 class SortingRendererClass
@@ -59,6 +67,10 @@ class SortingRendererClass
 	static const unsigned short* Source_Indices(const SortingNodeStruct* state);
 
 public:
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+	static void Insert_Billboards(const BillboardInstance *instances, unsigned count);
+#endif
+
 	static void Insert_Triangles(
 		const SphereClass& bounding_sphere,
 		unsigned short start_index,
@@ -75,6 +87,15 @@ public:
 	static void Flush();
 	static void Deinit();
 
+	// Triangles inserted with EFFECT_DISRUPT wait here and draw through the hook alone. Flush drops any left undrawn.
+	static bool Has_Disruption();
+	static void Flush_Disruption();
+	static bool Can_Disrupt();
+
+	// For the hook, while a disruption node draws: where a draw with world-space vertices sits, or null to read the world transform, and how much of its mask it keeps.
+	static const Vector3 *Peek_Disruption_Center();
+	static float Get_Disruption_Strength();
+
 	static void SetMinVertexBufferSize( unsigned val );
 
 	// Rigid translucent meshes keep their own buffers and sort as whole objects.
@@ -86,5 +107,5 @@ public:
 	// Triangles inserted while effects are set are drawn through the hook with those effects.
 	static void Set_Soft_Particle_Hook(SoftParticleHookClass *hook);
 	static SoftParticleHookClass *Peek_Soft_Particle_Hook();
-	static void Set_Insert_Effects(unsigned effects, const void *effectData);
+	static void Set_Insert_Effects(unsigned effects, const void *effectData, float disruptionStrength = 1.0f);
 };

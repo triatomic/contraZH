@@ -63,7 +63,7 @@ void AdvancedCollideModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "ChanceToTriggerPercent",  INI::parsePercentToReal, NULL, offsetof(AdvancedCollideModuleData, m_triggerChance) },
 		{ "RollOnceForTrigger",  INI::parseBool, NULL, offsetof(AdvancedCollideModuleData, m_rollOnce) },
 
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
 }

@@ -240,6 +240,9 @@ W3DView::~W3DView()
 	REF_PTR_RELEASE( m_2DCamera );
 	REF_PTR_RELEASE( m_3DCamera );
 
+	// Empty the global shaker list while its pools are alive; its static destructor runs too late at exit.
+	CameraShakerSystem.Reset();
+
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -847,11 +850,8 @@ void W3DView::updateCameraClipPlanes(const Matrix3D &transform)
 {
 	Real farZ;
 
-	if (TheGlobalData->m_drawEntireTerrain)
-	{
-		farZ = 100000.0f;
-	}
-	else if (TheTerrainRenderObject && TheTerrainRenderObject->getMap())
+	// DrawEntireTerrain widens the draw region to the map, so the same fit covers it.
+	if (TheTerrainRenderObject && TheTerrainRenderObject->getMap())
 	{
 		WorldHeightMap *heightMap = TheTerrainRenderObject->getMap();
 
@@ -1859,7 +1859,7 @@ void W3DView::update()
 					if (cameraLockObj->isUsingAirborneLocomotor() && cameraLockObj->isAboveTerrainOrWater())
 					{
 						Matrix3D camXForm;
-						Real idealZRot = objAngle - M_PI_2;
+						Real idealZRot = objAngle - WWMATH_HALF_PI;
 
 						if (m_snapImmediate)
 						{
@@ -3130,7 +3130,7 @@ void W3DView::setDefaultView(Real pitch, Real angle, Real maxHeight)
 #endif
 {
 	// MDC - we no longer want to rotate maps (design made all of them right to begin with)
-	//	m_defaultAngle = angle * M_PI/180.0f;
+	//	m_defaultAngle = angle * WWMATH_PI/180.0f;
 	setDefaultPitch(pitch);
 #if defined(GENERALS_ONLINE_WIDESCREEN)
 	// A wider aspect than 4:3 shows less map vertically, so the camera may rise to compensate.

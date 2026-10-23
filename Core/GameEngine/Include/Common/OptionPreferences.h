@@ -64,6 +64,17 @@ enum BuildTimerDisplayMode CPP_11(: Int)
 	BuildTimerDisplayMode_Default = BuildTimerDisplayMode_None
 };
 
+// Which orders draw a line from each selected unit to its destination.
+enum ActionLineMode CPP_11(: Int)
+{
+	ActionLineMode_Off = 0,
+	ActionLineMode_All,
+	ActionLineMode_AttackOnly,			///< attack and attack move
+
+	ActionLineMode_Count,
+	ActionLineMode_Default = ActionLineMode_Off
+};
+
 // TheSuperHackers @feature When health bars are shown above objects. Purely a client side
 // display preference -- it never affects game logic, so it is safe in multiplayer and replays.
 // TheSuperHackers @feature How big the NewRadar object blips draw. Small is the size the feature
@@ -97,6 +108,8 @@ enum AlliedDecalMode CPP_11(: Int)
 	AlliedDecalMode_Default = AlliedDecalMode_HouseColor
 };
 
+#define GRID_HOTKEY_LAYOUT_DEFAULT "QWERTYUIOASDFGHJKL"
+
 //-----------------------------------------------------------------------------
 // OptionsPreferences options menu class
 //-----------------------------------------------------------------------------
@@ -118,6 +131,8 @@ public:
 	Bool loadFromIniFile();
 
 	WW3D::MultiSampleModeEnum getAntiAliasing() const;
+	// Options.ini: SuperSampling = 150 or 200 renders the world that percent of the screen's size each way, 100 for off
+	Int getSuperSampling() const;
 	TextureFilterClass::TextureFilterMode getTextureFilterMode() const;
 	TextureFilterClass::AnisotropicFilterMode getTextureAnisotropyLevel() const;
 	UnsignedInt getLANIPAddress();
@@ -133,6 +148,7 @@ public:
 	HealthBarDisplayMode getHealthBarDisplayMode() const;
 	AlliedDecalMode getAlliedDecalMode() const;
 	BuildTimerDisplayMode getBuildTimerDisplayMode() const;
+	ActionLineMode getActionLineMode() const;
 	CastMode getCastMode() const;
 	Bool getSelectionCircleEnabled() const;
 	// Options.ini: DefensesRangeCircle = Yes rings the attack range of an armed structure being placed
@@ -146,12 +162,16 @@ public:
 	Bool getLaserRefEnabled() const;
 	// Options.ini: ShadowMap = Yes draws shadows from a sun shadow map instead of volumes and blobs
 	Bool getShadowMapEnabled() const;
+	// Options.ini: ShadowMapResolution = 4096 sets the shadow map's width and height, 512 to 4096
+	Int getShadowMapResolution() const;
 	// Options.ini: Specular = Yes adds a per-pixel sun highlight to vehicles and structures
 	Bool getSpecularEnabled() const;
 	// Options.ini: NormalMaps = Yes adds bump detail to the sun's light on vehicles, structures and terrain
 	Bool getNormalMapsEnabled() const;
 	// Options.ini: WaterReflections = Yes lets smooth water mirror the terrain, units and buildings
 	Bool getWaterReflectionsEnabled() const;
+	// Options.ini: ShorelineFoam = Yes edges smooth water with a band of surf where it meets the shore
+	Bool getShorelineFoamEnabled() const;
 	// Options.ini: SoftParticles = Yes fades smoke and fire where they meet the ground and buildings
 	Bool getSoftParticlesEnabled() const;
 	// Options.ini: FlameShaders = Yes makes flame weapon fire flicker and glow white-hot at its core
@@ -184,7 +204,11 @@ public:
 	Bool getNormalMapDebugEnabled() const;
 	// Options.ini: AmbientOcclusionDebug = Yes shows the occlusion alone, in grey
 	Bool getAmbientOcclusionDebugEnabled() const;
+	// Options.ini: DynamicLightsDebug = Yes shows only the per-pixel dynamic lights, on black
+	Bool getDynamicLightsDebugEnabled() const;
 	Bool getBorderlessWindowEnabled() const;
+	// Options.ini: Windowed = Yes runs in a framed window, as -win does
+	Bool getWindowedEnabled() const;
 	Bool getEasyMilitaryDragEnabled() const;
 	Bool getSmartPipsEnabled() const;
 	Bool getNumericalHealthEnabled() const;
@@ -196,12 +220,7 @@ public:
 	Int getParticleNameLingerMS() const;
 	Bool getGridHotkeysEnabled() const;
 	AsciiString getGridHotkeyLayout() const;
-	Int getGridHotkeyColumns() const;
-	AsciiString getNonGridHotkeys() const;
-	Bool isNonGridHotkey(const AsciiString& key) const;
-	// TheSuperHackers @feature Exposed statically so GlobalData can test its cached copy of the
-	// list without re-reading Options.ini on every command bar rebuild.
-	static Bool isNonGridHotkeyInList(const AsciiString& list, const AsciiString& key);
+	Bool getGridHotkeyUnitOrders() const;
 	Bool getKeyboardOverlayEnabled() const;
 	Color getKeyboardOverlayColor() const;
 	Bool getKeyboardOverlayBackdropEnabled() const;

@@ -18,6 +18,7 @@
 #include <QListWidget>
 #include <QPalette>
 #include <QPushButton>
+#include <QTimer>
 
 // Header colour for an object whose template the loaded map.ini invented. Must match the Object
 // Options tree's green for the same state (WBQtObjectPanel.cpp) -- one meaning, one colour.
@@ -64,6 +65,7 @@ WBQtObjectPropsPanel::WBQtObjectPropsPanel(QWidget *owner)
 	m_weather = m_ui->weather;
 	m_angle = m_ui->angle;
 	m_time = m_ui->time;
+	m_scale = m_ui->scale;
 	m_soundBox = m_ui->soundBox;
 	m_sound = m_ui->sound;
 	m_listen = m_ui->listen;
@@ -95,6 +97,10 @@ WBQtObjectPropsPanel::WBQtObjectPropsPanel(QWidget *owner)
 	m_zOffset->setRange(-100.0, 100.0);	// matches the MFC IDC_HEIGHT_POPUP slider range
 	m_angle->setRange(0.0, 360.0);	// matches the MFC IDC_ANGLE_POPUP slider range
 	m_angle->setWrapping(true);	// 360 wraps to 0, like a compass heading
+	// Typed values commit once on Enter or focus loss (MFC EN_KILLFOCUS), not one undo per keystroke.
+	m_zOffset->setKeyboardTracking(false);
+	m_angle->setKeyboardTracking(false);
+	m_scale->setRange(0.1, 10.0);
 
 	// The sound list holds hundreds of long names; without this it forces the whole panel
 	// far wider than the MFC dialog. Cap the field width; the popup can still be wide.
@@ -139,8 +145,13 @@ WBQtObjectPropsPanel::WBQtObjectPropsPanel(QWidget *owner)
 	connect(m_zOffset, SIGNAL(scrubFinished()), this, SLOT(onPosScrubFinished()));
 	connect(m_angle, SIGNAL(scrubStarted()), this, SLOT(onPosScrubStarted()));
 	connect(m_angle, SIGNAL(scrubFinished()), this, SLOT(onPosScrubFinished()));
+	connect(m_scale, SIGNAL(editingFinished()), this, SLOT(onScaleChanged()));
+	connect(m_scale, SIGNAL(scrubFinished()), this, SLOT(onScaleChanged()));
 	connect(m_sound, SIGNAL(currentIndexChanged(int)), this, SLOT(onSoundChanged(int)));
 	connect(m_listen, SIGNAL(clicked()), this, SLOT(onListenClicked()));
+	m_listenTimer = new QTimer(this);
+	m_listenTimer->setSingleShot(true);
+	connect(m_listenTimer, SIGNAL(timeout()), this, SLOT(onListenFinished()));
 	connect(m_customize, SIGNAL(clicked()), this, SLOT(onSoundFlagToggled()));
 	connect(m_soundEnabled, SIGNAL(clicked()), this, SLOT(onSoundFlagToggled()));
 	connect(m_looping, SIGNAL(clicked()), this, SLOT(onSoundFlagToggled()));
@@ -411,6 +422,7 @@ void WBQtObjectPropsPanel::pushRefresh()
 		m_zOffset->setValue(0.0);
 		m_angle->setValue(0.0);
 	}
+	m_scale->setValue(WBQtObjectProps_GetObjectScale());
 
 	// Weather/Time apply to the whole selection; XY/Z/Angle are single-object (like the MFC edits).
 	m_visualBox->setEnabled(selCount > 0);
@@ -804,6 +816,15 @@ void WBQtObjectPropsPanel::onAngleChanged()
 	WBQtObjectProps_SetAngle(m_angle->value());
 }
 
+void WBQtObjectPropsPanel::onScaleChanged()
+{
+	if (m_updating || m_scale->value() == WBQtObjectProps_GetObjectScale())
+	{
+		return;
+	}
+	WBQtObjectProps_SetObjectScale(m_scale->value());
+}
+
 // --- Sound section slots --------------------------------------------------------------------
 
 void WBQtObjectPropsPanel::onSoundChanged(int index)
@@ -822,6 +843,21 @@ void WBQtObjectPropsPanel::onListenClicked()
 {
 	WBQtObjectProps_ToggleSoundPreview();
 	m_listen->setText(WBQtObjectProps_GetSoundPlaying() ? "Stop" : "Listen");
+	int ms = WBQtObjectProps_GetSoundPreviewMs();
+	if (ms > 0)
+	{
+		m_listenTimer->start(ms);
+	}
+	else
+	{
+		m_listenTimer->stop();
+	}
+}
+
+void WBQtObjectPropsPanel::onListenFinished()
+{
+	WBQtObjectProps_StopSoundPreview();
+	m_listen->setText("Listen");
 }
 
 void WBQtObjectPropsPanel::onSoundFlagToggled()

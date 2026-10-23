@@ -174,6 +174,15 @@ Bool TransitionWindow::init()
 //		return FALSE;
 
 	delete m_transition;
+	m_transition = nullptr;
+
+	// A window the layout lacks gets no transition, so a stale WindowTransitions.ini cannot crash
+	if(!m_win)
+	{
+		DEBUG_LOG(("TransitionWindow::init: no window %s, skipping its transition", m_winName.str()));
+		return TRUE;
+	}
+
 	m_transition = getTransitionForStyle( m_style );
 	m_transition->init(m_win);
 
@@ -186,11 +195,12 @@ Bool TransitionWindow::init()
 
 void TransitionWindow::update( Int frame )
 {
-	if(frame < m_currentFrameDelay || frame > (m_currentFrameDelay + m_transition->getFrameLength()))
+	if(!m_transition || frame < m_currentFrameDelay || frame > (m_currentFrameDelay + m_transition->getFrameLength()))
+	{
 		return;
+	}
 
-	if(m_transition)
-		m_transition->update( frame - m_currentFrameDelay);
+	m_transition->update( frame - m_currentFrameDelay);
 }
 
 Bool TransitionWindow::isFinished()
@@ -224,7 +234,9 @@ void TransitionWindow::unlinkGameWindow(GameWindow* win)
 	if (m_win != win)
 		return;
 
-	m_transition->unlinkGameWindow(win);
+	// the styles draw through their window, so a destroyed window ends its transition
+	delete m_transition;
+	m_transition = nullptr;
 	m_win = nullptr;
 }
 
@@ -509,6 +521,10 @@ void GameWindowTransitionsHandler::setGroup(AsciiString groupName, Bool immediat
 void GameWindowTransitionsHandler::reverse( AsciiString groupName )
 {
 	TransitionGroup *g = findGroup(groupName);
+	if( g == nullptr )
+	{
+		return;
+	}
 	if( m_currentGroup == g )
 	{
 		m_currentGroup->reverse();

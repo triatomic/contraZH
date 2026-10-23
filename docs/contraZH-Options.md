@@ -1,0 +1,423 @@
+# Options.ini
+
+Read at startup. Most can also be changed in game under Options > `Game Options` and apply on
+Accept. `NewRadar` and `BlipSize` need a restart.
+
+The menu's drop-down lists share the Resolution list's look and show every entry without a scrollbar.
+`build/fix_option_combos_wnd.py` restyles them in `OptionsMenu.wnd` and orders them so each open list
+draws over the rows below it; rerun it after adding a drop-down.
+
+## Camera
+
+* `UseCustomMaxCameraHeight = No` - (`Yes` lets `MaxCameraHeight` replace `GameData.ini`'s value, 670
+in Contra. Also `Max Camera Height` in Options.)
+* `MaxCameraHeight = 670` - (210 to 1000. Single player, skirmish and campaign. Multiplayer uses the
+host's limit, or `GameData.ini`'s.)
+
+## Display
+
+* `HealthBarDisplayMode = Classic` - (`Classic` | `Damaged` | `Always`. `Damaged` shows bars only on
+hurt objects, `Always` on everything.)
+* `AlliedDecalMode = House` - (`Hidden` | `House` | `Army`. Shows allies' general power decals once
+fired, tinted in player colour (`House`) or faction colour (`Army`). `Hidden` is retail. Enemy
+decals stay hidden. Needs `ComboBoxAlliedDecals` and `AlliedDecalsLabel` in `OptionsMenu.wnd` for
+the menu control.)
+* `NumericalHealth = No` - (Yes prints hit points beside the health bar, wherever a bar shows.)
+* `SelectionCircle = No` - (Yes draws a green ring under selected objects. The D3D9 build draws
+a hexagon fitted to the object's collision shape with a shader instead, on cards with `ps_2_a`.)
+* `DefensesRangeCircle = No` - (Yes shows an armed structure's widest attack range, upgrades
+included, while placing it. Wall pieces get one ring each. The D3D9 build draws the ring with the
+same shader as `SelectionCircle`, on cards with `ps_2_a`.)
+* `ObjectDecals = Yes` - (No hides ground decals requested with `DisplayDecal`. Independent of shadow
+settings.)
+* `SmartPips = No` - (Yes keeps ammo and passenger pips visible on own units whenever there is
+something to show.)
+* `BuildTimerDisplayMode = None` - (`None` | `Seconds` | `Auto`. Countdowns on build queue and special
+power cameos. `Auto` switches to MM:SS past a minute.)
+* `NewRadar = No` - (Yes gives an RA3 style radar: outlined blips, larger structures, dark
+waterline, flat ground in three tones (olive, tan for desert sand, grey for rock and pavement),
+256x256 grid.)
+* `BlipSize = Large` - (`Small` | `Large`. `Small` is 3/5 px unit/structure, `Large` 5/7. Only with
+`NewRadar`.)
+* `BorderlessWindow = No` - (Yes runs a frameless centred window at the selected resolution. Also
+the Borderless checkbox beside Resolution. `-win` still gives a captioned window.)
+* `Windowed = No` - (Yes runs a movable window with a title bar at the selected resolution, like
+`-win`. Also the Windowed checkbox beside Borderless; checking one clears the other. `-win` still
+forces it on. Needs `CheckWindowed` in `OptionsMenu.wnd` for the menu control.)
+
+Notes:
+* A blue bar under a building's health bar shows production progress; on supply gatherers it shows
+cargo. Own objects, when selected or moused over, or always with `HealthBarDisplayMode = Always`.
+* `Damaged` and `Always` bars and `SmartPips` hide while a script letterboxes the screen, as campaign
+cinematics do.
+* `NewRadar` cannot hide roads, since they are painted into the terrain textures. Bridges still
+draw.
+* `SelectionCircle` and `DefensesRangeCircle` need a mod-side `PlainRingSelection.tga` (white or
+greyscale ring with alpha).
+* `DisplayDecal` needs the `.tga` named by `DecalTexture`; there is no default.
+* The `DefensesRangeCircle` checkbox needs `CheckDefensesRangeCircle` in `OptionsMenu.wnd`.
+
+## Hotkey overlay
+
+Draws each cameo's hotkey letter on the cameo.
+
+* `KeyboardOverlay = No` - (Yes shows the letters.)
+* `KeyboardOverlayRed = 255` - (Letter colour, 0-255 per channel.)
+* `KeyboardOverlayGreen = 255`
+* `KeyboardOverlayBlue = 255`
+* `KeyboardOverlayBackdrop = Yes` - (Draw a translucent plate behind the letter.)
+* `KeyboardOverlayBackdropRed = 0` - (Backdrop colour, 0-255 per channel.)
+* `KeyboardOverlayBackdropGreen = 0`
+* `KeyboardOverlayBackdropBlue = 0`
+* `KeyboardOverlayBackdropOpacity = 128` - (0-255; 128 is 50%.)
+
+Shows the hotkey actually registered, so a dropped duplicate is not advertised.
+
+## Grid hotkeys
+
+Keys each cameo by **its slot in the command bar** instead of its ampersand letter, so keys stay put.
+
+* `GridHotkeys = No` - (Yes keys cameos by slot position.)
+* `GridHotkeyLayout = QWERTYUIOASDFGHJKL` - (The options screen offers `QWERTYUIOASDFGHJKL`
+(QWER / ASDF), `ASDFGHJKLZXCVBNM,.` (ASDF / ZXCV) and `QWERTYUIOZXCVBNM,.` (QWER / ZXCV).)
+* `GridHotkeyUnitOrders = Yes` - (Unit orders keep their own letters.)
+
+The layout splits evenly over the command bar's rows, top row first. Rows and columns come from where
+the bar's buttons sit, so any bar shape works; columns past a row's share of the layout keep their
+string file letter.
+
+With `GridHotkeyUnitOrders` on, Stop, Guard, Attack Move and Evacuate keep their string file letter. A
+grid slot on the same key swaps with them and takes the unit order's grid key. Production buildings
+have no such buttons, so the whole grid works unchanged. Off, unit orders take their slot's grid key
+like any other button.
+
+## Hotkeys screen
+
+**Options > Hotkeys** rebinds keys and writes them to `Hotkeys.ini` in the user data folder, beside
+`Options.ini`. Ported from Zero Hour Reforged.
+
+* Left: **USA**, **CHINA**, **GLA**, then **GENERAL** and **KEY CONFLICTS** (red while any key is shared).
+* Middle: a general picker, then the general's heroes, buildings and units as icons.
+* A general that picks a path at the start is listed once per path, e.g. Superweapon General:
+  Classic and Futuristic tech, Cyborg General: Spiders and Angels. Each entry shows the cards that
+  path's upgrade swaps in and leaves out the units only the other path builds. A path is a player
+  upgrade on a card whose rival upgrades swap the command sets of the same buildings.
+* Right: the picked object's portrait, name and command card, showing slots 1–18 in two rows of nine,
+  each button showing its letter. **Quick filter** narrows the icons or commands by name.
+* Click a card button, then press its new letter. Backspace takes the key off, Esc cancels.
+* Mouse inputs bind like keys, to commands and card buttons alike: the middle button, the two side
+  buttons and the wheel up or down. Card corners show `M3`, `M4`, `M5`, `WU` or `WD`.
+  * The middle button fires on a quick click that did not drag, so middle-drag camera rotation still
+    works. A click that fires a binding does not reset the camera.
+  * A wheel direction that fires a binding does not zoom; every unbound combination still zooms, so
+    Ctrl + Wheel up can take a command while the plain wheel keeps zooming.
+  * A binding fires once per whole wheel notch, so a touchpad swipe does not repeat it.
+  * A wheel notch over a menu or list still scrolls it and fires nothing.
+* **GENERAL** lists every command that needs no unit (selection, control groups, camera, chat,
+  beacons, holds such as Force Attack). **Change**, a double click or Enter waits for a key; **No key** unbinds.
+* A hold command (Force Attack, Waypoints, Prefer Selection) also takes Ctrl, Alt or Shift alone:
+  press it and let go with no other key. It does not take the middle button or the wheel.
+* **KEY CONFLICTS** lists every card with a shared letter and every shared command chord; a double
+  click opens it.
+* Card borders: gold for the selected button, red for a shared letter, amber for a changed one.
+* **RESET TO DEFAULT** restores the selected object's card or the selected command. **RESET ALL**
+  restores everything.
+* **SAVE** writes the file and applies it at once, also from Esc > Options in a match. **BACK**
+  leaves without saving.
+
+A button's letter applies on every bar that has the button. With grid hotkeys on, most slots still
+take their grid key; unit orders use the letter set here while `GridHotkeyUnitOrders` is on. Tooltips mark
+the new letter.
+
+`Hotkeys.ini` holds only what differs from the game:
+
+```ini
+CommandMap SELECT_ALL
+  Key = KEY_Q
+  Transition = DOWN
+  Modifiers = CTRL
+  UseableIn = GAME
+End
+
+CommandButtonHotKey Command_ConstructAmericaBarracks
+  Key = K
+End
+```
+
+* `CommandMap` blocks use `CommandMap.ini` syntax, plus `KEY_MOUSE3`, `KEY_MOUSE4`, `KEY_MOUSE5`,
+  `KEY_WHEELUP` and `KEY_WHEELDOWN`. `Key = KEY_NONE` with `UseableIn = NONE` unbinds.
+* `CommandButtonHotKey <button>` takes one letter, a mouse key (`MOUSE3`, `MOUSE4`, `MOUSE5`, `WHEELUP`,
+  `WHEELDOWN`) or `NONE` for no key. Digits are left out because they are control group keys.
+* Not part of the multiplayer checksum. A block that fails to parse drops the keys from there on.
+* Needs no files: the exe builds the screen in the look of the options menu beneath it, adds the
+  Hotkeys button right of Shaders when `OptionsMenu.wnd` has no `ButtonHotkeys`, and shows built-in
+  English for any `GUI:Hotkeys*` label the string file lacks.
+
+### Limitations
+
+Notes:
+
+* **Grid keys win over bare-letter commands.** With grid hotkeys on, a command bound to a bare grid
+  letter does nothing while a visible cameo sits on that letter. Example: Next Idle Worker on plain
+  `I` (in `QWERTYUIOASDFGHJKL`) fails whenever a worker or building is selected. Use a modifier
+  (Ctrl + I) or a key outside the grid layout.
+* **A bare-letter command and a cameo on the same letter both fire.** Without grid hotkeys, the
+  command fires on key down and the cameo on key up. KEY CONFLICTS does not report this clash; it
+  only checks cards against themselves and commands against each other.
+* **Cameo keys ignore Ctrl and Alt.** A card button fires on its letter alone or with Shift
+  (Shift batches production), so a card cannot take Ctrl + letter.
+* **Only path upgrades show their swapped cards.** A general's starting path choice (Superweapon's
+  tech, Cyborg's Spiders or Angels) gets its own entry with the cards it swaps in. Every other
+  command set swap, from an Overlord add-on, a mines or promotion upgrade, or a state change, is not
+  listed: cards show each object's own `CommandSet`. Letters still carry over to a swapped set for
+  every button it shares, but its new buttons cannot be set here; add them to `Hotkeys.ini` by hand.
+* **Path detection follows the INI.** A path is a player upgrade on a card whose rival upgrades swap
+  the command sets of the same buildings. A mod that builds a choice another way, such as through a
+  science or an object upgrade, is listed as one general.
+* **Mouse binds have no hold on the middle button or the wheel.** Both fire once per click or notch;
+  only the side buttons can hold a command such as Force Attack.
+* **Hand edits during a session are overwritten.** SAVE writes the screen's keys, which were read
+  when the game started; edit `Hotkeys.ini` by hand only while the game is closed.
+
+## Reverse move hotkey
+
+Caps Lock arms a reverse move for the whole selection; the next terrain click drives there in
+reverse, like the `REVERSE_MOVE` button. Pressing Caps Lock again or arming attack move cancels it.
+
+* `TOGGLE_REVERSEMOVE` in CommandMap.ini rebinds it. The Caps Lock default only fills an empty slot.
+* `KEY_CAPS` is a new CommandMap key name. The Caps Lock state still toggles.
+* The cursor uses a `MouseCursor ReverseMove` block from Mouse.ini if present (e.g. `Image = SCCMove`,
+`Texture = SCCMove`), else the move cursor.
+
+Needs a locomotor with `CanMoveBackwards = Yes`. `ReverseMoveIgnoreAngleThreshold` in GameData
+decides whether goals in front are also reversed to.
+
+## Smart selection
+
+A row of small cameos above the command bar: one per unit type with a count, or one per object for
+a single-type selection. Single-object cameos show health, ammo clip segments and veterancy. Up to
+16 cameos; counts past 999 show no badge. Reskins share a cameo.
+
+* `SmartSelection = Yes` - (No hides the row and unbinds its keys.)
+* `SmartSelectionUseMouse = Yes` - (Yes keeps only a cameo's units on double click, No on
+Ctrl+Shift+click.)
+
+* Left click: show that type's (or object's) command set. The whole group stays selected; map
+orders go to everyone, bar commands go to the focused object or type. Plain orders (move, attack
+move, guard, stop, scatter, cheer, formation, waypoints, enter, dock, repair, heal) always go to
+everyone. A building placed from a focused dozer is built by it, with the other dozers helping.
+* Right click the pushed-in cameo: back to the group's common commands. Right click another cameo:
+drop it from the selection.
+* Double click (or Ctrl+Shift+click with `SmartSelectionUseMouse = No`): keep only that cameo's
+units.
+* Tab and Shift+Tab (`SMART_SELECTION_NEXT_TYPE` / `SMART_SELECTION_PREV_TYPE` in CommandMap.ini)
+step the focus through the row.
+
+### Command group row
+
+A row on the command bar frame with one cameo per non-empty command group (1-9, then 0). Each shows
+the group's most common unit, its number and live member count. Shown whenever any group has
+members.
+
+* `SmartCommandGroup = Yes` - (No hides the row. `SmartSelection = No` hides it too.)
+
+* Left click selects the group; double click also centres the camera on it.
+
+## Action lines
+
+A faint line from each selected unit to where its order sends it, fading in from the unit and
+ending in a small dot. Units moving together share one line. Lines last as long as the order and follow a
+chased target.
+
+* `ActionLines = Off` - (`Off` | `All` | `AttackOnly`. Game Options > Action lines. `AttackOnly` draws
+attack and attack move orders only.)
+
+* Green: move, enter, dock, repair. Pink: attack move. Red: attack. Blue: guard.
+* No line draws to a target in fog or shroud.
+* A waypoint path draws one line per leg. With `All` it replaces the white path shown while Alt is
+held.
+* Credit to olcayseygan, author of Generals Reforged.
+
+## Input
+
+* `CastMode = Normal` - (`Normal` | `QuickCast` | `QuickCastWithIndicator`. `QuickCast` fires a
+targeted ability at the cursor on the hotkey press. `QuickCastWithIndicator` aims with a decal while
+held and fires on release.)
+
+Notes:
+* Superweapons, structure placement, rally points and beacons are excluded from quick cast.
+* A cast pressed during cooldown is queued and fires when the ability is ready, never earlier.
+* Shift+click queues five units. Shift+click a queue entry cancels all of that type; Shift+click a
+passenger cameo unloads all of that type.
+
+## Clipboard paste
+
+`Ctrl + V` pastes into any text field: in game chat (Enter, Shift+Enter for allies), lobby chat,
+names, and so on.
+
+Notes:
+* Pastes obey the field's filters; hidden fields still show asterisks.
+* Text is truncated to fit the field.
+* A multi-line paste stops at the first line break.
+
+## Command line
+
+* `-loadreplay <file>` starts straight into a replay with menus and Options loaded. `<file>` is a
+name in the Replays folder or an absolute path. Unreadable replays or missing maps show a message
+box.
+* `-loadsave <file>` also accepts an absolute path, and shows a message box on failure.
+* `-live` checks the loose file before the `.big` on every read. Without it, a file
+first found only in a `.big` keeps loading from there, so a loose override dropped into the game
+folder while the game runs needs a restart. Loading opens fewer files without the flag.
+
+## Rendering
+
+TheSuperHackers' texture filter option replaced this fork's version in the August 2026 merge:
+
+* `TextureFilter = Bilinear` - (`None` | `Point` | `Bilinear` | `Trilinear` | `Anisotropic`. Also in
+the in-game options menu.)
+* `AnisotropyLevel = 2` - (`2` | `4` | `8` | `16`. Only with `TextureFilter = Anisotropic`.
+**Renamed from the pre-merge `AnisotropicLevel`** — update Options.ini by hand; the old key is
+silently ignored.)
+
+Notes:
+* An unknown `TextureFilter` value falls back to `None`, so typos are visible. `AnisotropyLevel`
+rounds down to a valid step.
+* The level is clamped to what the device supports.
+* Fork fixes on top: settings survive a device reset (alt-tab, window toggle), and a driver that
+supports anisotropic for only min or mag filtering falls back to linear for the other.
+* The terrain follows `Anisotropic` too, blend edges and the lower detail settings included, so distant
+ground stays sharp. It used to keep the mod's filtering. In the other modes the terrain still filters
+as the mod's `BilinearTerrainTex` and `TrilinearTerrainTex` say.
+* Roads follow `Anisotropic` as well. Their mips blend smoothly even with `TrilinearTerrainTex = No`,
+and their bump maps stay sharp in the distance.
+
+Shadow mapping, specular, terrain glint, HQ sky cloud shadows, stochastic terrain, normal and glow maps, per-pixel lights, soft particles, flame
+and laser shading, per-map colour grading, planar mirrors and the other features that need the Direct3D 9 build are on [Direct3D 9 Features](dx9feat.md).
+
+### Bloom
+
+Soft glow around additive particles (fire, muzzle flashes, tracers, lasers, explosions) and `Add`
+blended meshes such as building lights. Smoke and alpha blended effects do not glow. Needs no shader
+support.
+
+* `Bloom = No` - (Yes turns the glow on. Also `Bloom` on the Graphics page,
+applied on Accept.)
+* `BloomStrength = 0.5` - (0 to 1. 0 is off. The box beside `Bloom` on the Graphics page.)
+* `BloomDebug = No` - (Yes shows only the blurred glow buffer on black, to see what feeds it.
+`Bloom debug view` on the Graphics page. Cheat builds only: a release build hides the checkbox and
+ignores the key.)
+
+Menu controls need `CheckBloom`, `TextEntryBloomStrength` and `CheckBloomDebug` in `OptionsMenu.wnd`;
+`build/move_bloom_to_shaders_wnd.py` moves them onto the Graphics page and `build/bloom_row_wnd.py`
+puts the strength box beside the checkbox.
+
+Notes:
+* Costs fill rate in proportion to on-screen additive particles.
+* Off while `AntiAliasing` is above 1 on the Direct3D 8 build. The Direct3D 9 build glows with MSAA
+on too, and blurs through a pixel shader where the card has one.
+* Particles hidden behind terrain or buildings do not glow.
+* Additive meshes on skinned models (infantry and other bone-deformed meshes) do not glow.
+* Retail night models keep their lights in the opaque pass and add the lit skin on top. The game
+swaps the two passes at load, so the lights glow and the walls do not.
+
+### Vertical sync
+
+* `VSync = Yes` - (Waits for the monitor's refresh before showing each frame, which stops tearing.
+No shows frames as soon as they are drawn. Without the key, vsync is on in fullscreen and off in a
+window, as before. Also `Vertical sync` in the advanced display options, applied on Accept. Needs
+`CheckVSync` in `OptionsMenu.wnd` for the menu control.)
+
+### Anti-aliasing
+
+* `AntiAliasing = 0` - (Multisample anti-aliasing: 0 off, 2, 4 or 8 samples. Also `Anti-aliasing` under
+Detail in the options menu, applied on Accept without a restart; a sample count the card lacks falls
+back to off. Needs `AntiAliasingLabel` in `OptionsMenu.wnd` and `ComboBoxAntiAliasing` not hidden
+for the menu control. Ambient occlusion is off while it is on.)
+
+### Low latency mode
+
+* `LowLatency = No` - (Yes lets the game prepare at most one frame ahead of the graphics card, instead
+of the driver's usual three, so the screen answers the mouse sooner. Can cost a little frame rate. Also
+`Low latency mode` in the advanced display options, applied on Accept. Needs `CheckLowLatency` in
+`OptionsMenu.wnd` for the menu control. Direct3D 9 build only.)
+
+### Smooth unit motion
+
+The game logic runs 30 times a second. Above that frame rate, units, projectiles and turrets draw
+between their last two logic positions instead of jumping once per logic frame, so they move smoothly
+at 60, 144 Hz and up. Health bars, status icons, attached effects and the camera lock follow the drawn
+model. Only drawing changes; the simulation does not, so it cannot desync.
+
+* `SmoothUnitMotion = Yes` - (No draws units at their logic positions, as before. Also `Smooth unit
+motion` in the advanced display options, applied on Accept. Needs `CheckSmoothUnitMotion` in
+`OptionsMenu.wnd` for the menu control.)
+
+Skirmish, campaign and replays run the logic at the game speed and render up to `FramesPerSecondLimit`
+from `GameData.ini`. The skirmish game speed slider sets the logic rate, 30 being normal speed; the
+campaign starts at 30. Mission scripts that set an FPS limit change the logic rate the same way, and
+the main menu map always runs at 30. Setting the slider to `--` leaves the game uncapped, with the
+logic stepping once per drawn frame, so there is nothing to smooth.
+
+Notes:
+* Units are drawn up to one logic frame (33 ms) behind the simulation.
+* Single player, skirmish and replays only. Online and LAN games draw as before.
+* Teleports, transport and tunnel exits, garrison exits and newly spawned objects snap into place.
+* The environment variable `CONTRA_INTERPOLATION=0` turns it off regardless of the option.
+
+### Model animations between keyframes
+
+Model animations advance every drawn frame and blend between keyframes, independent of `Smooth unit
+motion`. A bone that holds still and then jumps, such as a runway light stepping from bulb to bulb,
+jumps instead of sliding along the runway.
+
+Notes:
+* A step counts as a jump when it is at least 1 unit long and more than 4 times the steps before and
+after it, so loop restarts and bones hidden by moving them away jump too. Two such steps in a row
+count as one jump split over two frames.
+* Applies to uncompressed animations; compressed ones mark their jumps in the file.
+* Rotation still blends.
+
+### Laser ground glow
+
+Each laser beam lights the terrain along its length with up to twelve dynamic lights in the beam's
+colour (house coloured when the laser asks). Terrain only; units, buildings and roads are not lit.
+The Direct3D 9 build lights it with a shader instead, see
+[Laser ground glow](dx9-Effect-Shaders.md#laser-ground-glow).
+
+* `LaserRef = No` - (Yes turns the glow on. Also `Lasers light the ground` on the Graphics page, applied
+on Accept. Needs `CheckLaserRef` in `OptionsMenu.wnd` for the menu control.)
+
+Colour and intensity come from `GameData.ini`, overridable per `W3DLaserDraw` module with
+`GroundGlowColor` and `GroundGlowIntensity`. A non-zero module value wins, then `GameData.ini`, then
+the default:
+
+* `LaserGroundGlowColor = R:0 G:0 B:0` - (Light colour. Black derives it from the beam layers'
+colours weighted by width, times the laser texture's average colour, normalised to full brightness.)
+* `LaserGroundGlowIntensity = 70%` - (How strongly the colour is added to the ground.)
+* `LaserGroundGlowRadius = 0` - (How far the light reaches from the beam, in world units. 0 takes it
+from the beam, as below. Also `GroundGlowRadius` on the module.)
+
+Notes:
+* Each light's reach is `GroundGlowRadius` on the module, else `LaserGroundGlowRadius`, else the
+laser's `OuterBeamWidth`, at least 15, plus a 6 unit soft edge. Long beams spread and dim their twelve lights.
+* The terrain takes up to 64 dynamic lights a frame, of all kinds.
+* In the Direct3D 9 build, beams whose glows overlap light the ground together, so a spot several
+lasers hit brightens modestly instead of compounding. `LaserGroundGlowOverlap = No` in
+`GameData.ini` lights each beam on its own. See [Laser ground glow](dx9-Effect-Shaders.md#laser-ground-glow).
+
+## Drag Selection
+
+### EasyMilitaryDrag
+
+* `EasyMilitaryDrag = No` - (Yes leaves builders out of a drag selection, so boxing over a base picks
+up the army without dragging workers along.)
+
+Builders are `KINDOF_DOZER` and `KINDOF_IGNORES_SELECT_ALL`, as for Select All.
+
+`KindOf = NOT_MILITARY` marks any other unit as a builder for this option only. Select All still
+picks it up.
+
+Notes:
+* Ctrl while dragging selects **only** builders.
+* A drag that would select only structures ignores the filter.

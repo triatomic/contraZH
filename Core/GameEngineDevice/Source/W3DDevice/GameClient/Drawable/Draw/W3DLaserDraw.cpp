@@ -124,8 +124,47 @@ static RGBColor getAverageTextureColor( const AsciiString &name, TextureClass *t
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-W3DLaserDrawModuleData::W3DLaserDrawModuleData()
+BeamShaderTuning::BeamShaderTuning()
 {
+	Real *setting = &laserCore;
+	for (UnsignedInt i = 0; i < sizeof( BeamShaderTuning ) / sizeof( Real ); ++i)
+	{
+		setting[i] = -1.0f;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+const FieldParse *W3DLaserDrawModuleData::getShaderTuningFieldParse()
+{
+	static const FieldParse tuningFieldParse[] =
+	{
+		{ "ElectricArcs",							INI::parseReal,									nullptr, offsetof(BeamShaderTuning, electricArcs) },
+		{ "ElectricArcSharpness",			INI::parseReal,									nullptr, offsetof(BeamShaderTuning, electricArcSharpness) },
+		{ "ElectricNoiseSize",				INI::parseReal,									nullptr, offsetof(BeamShaderTuning, electricNoiseSize) },
+		{ "ElectricJitter",						INI::parseReal,									nullptr, offsetof(BeamShaderTuning, electricJitter) },
+		{ "ElectricFlicker",					INI::parseReal,									nullptr, offsetof(BeamShaderTuning, electricFlicker) },
+		{ "ElectricRate",							INI::parseReal,									nullptr, offsetof(BeamShaderTuning, electricRate) },
+		{ "CryoTint",								INI::parseRGBColor,								nullptr, offsetof(BeamShaderTuning, cryoTint) },
+		{ "CryoTintStrength",					INI::parseReal,									nullptr, offsetof(BeamShaderTuning, cryoTintStrength) },
+		{ "CryoCore",								INI::parseReal,									nullptr, offsetof(BeamShaderTuning, cryoCore) },
+		{ "CryoCoreWidth",						INI::parseReal,									nullptr, offsetof(BeamShaderTuning, cryoCoreWidth) },
+		{ "CryoFrost",								INI::parseReal,									nullptr, offsetof(BeamShaderTuning, cryoFrost) },
+		{ "CryoFrostSize",						INI::parseReal,									nullptr, offsetof(BeamShaderTuning, cryoFrostSize) },
+		{ "CryoFrostSpeed",						INI::parseReal,									nullptr, offsetof(BeamShaderTuning, cryoFrostSpeed) },
+		{ "CryoShards",							INI::parseReal,									nullptr, offsetof(BeamShaderTuning, cryoShards) },
+		{ "CryoShardSize",						INI::parseReal,									nullptr, offsetof(BeamShaderTuning, cryoShardSize) },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+	return tuningFieldParse;
+}
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+W3DLaserDrawModuleData::W3DLaserDrawModuleData() :
+	m_disruption(DisruptionShaderInfo::SHAPE_BEAM)
+{
+	m_disruptionWidth = 0.0f;
 	m_innerBeamWidth = 0.0f;         //The total width of beam
 	m_outerBeamWidth = 1.0f;         //The total width of beam
   m_numBeams = 1;                 //Number of overlapping cylinders that make the beam. 1 beam will just use inner data.
@@ -147,12 +186,7 @@ W3DLaserDrawModuleData::W3DLaserDrawModuleData()
 	m_laserShader = TRUE;
 	m_electricShader = FALSE;
 	m_cryoShader = FALSE;
-
-	Real *setting = &m_shaderTuning.laserCore;
-	for (UnsignedInt i = 0; i < sizeof( m_shaderTuning ) / sizeof( Real ); ++i)
-	{
-		setting[i] = -1.0f;
-	}
+	m_flameShader = FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -193,30 +227,20 @@ void W3DLaserDrawModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "LaserShader",							INI::parseBool,									nullptr, offsetof(W3DLaserDrawModuleData, m_laserShader) },
 		{ "ElectricShader",						INI::parseBool,									nullptr, offsetof(W3DLaserDrawModuleData, m_electricShader) },
 		{ "CryoShader",							INI::parseBool,									nullptr, offsetof(W3DLaserDrawModuleData, m_cryoShader) },
+		{ "FlameShader",							INI::parseBool,									nullptr, offsetof(W3DLaserDrawModuleData, m_flameShader) },
 		{ "LaserCore",								INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.laserCore) },
 		{ "LaserCoreWidth",						INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.laserCoreWidth) },
 		{ "LaserShimmer",							INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.laserShimmer) },
 		{ "LaserPulse",								INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.laserPulse) },
 		{ "LaserPulseSize",						INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.laserPulseSize) },
 		{ "LaserPulseSpeed",					INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.laserPulseSpeed) },
-		{ "ElectricArcs",							INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.electricArcs) },
-		{ "ElectricArcSharpness",			INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.electricArcSharpness) },
-		{ "ElectricNoiseSize",				INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.electricNoiseSize) },
-		{ "ElectricJitter",						INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.electricJitter) },
-		{ "ElectricFlicker",					INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.electricFlicker) },
-		{ "ElectricRate",							INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.electricRate) },
-		{ "CryoTint",								INI::parseRGBColor,								nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.cryoTint) },
-		{ "CryoTintStrength",					INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.cryoTintStrength) },
-		{ "CryoCore",								INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.cryoCore) },
-		{ "CryoCoreWidth",						INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.cryoCoreWidth) },
-		{ "CryoFrost",								INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.cryoFrost) },
-		{ "CryoFrostSize",						INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.cryoFrostSize) },
-		{ "CryoFrostSpeed",						INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.cryoFrostSpeed) },
-		{ "CryoShards",							INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.cryoShards) },
-		{ "CryoShardSize",						INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_shaderTuning.cryoShardSize) },
+		{ "DisruptionWidth",					INI::parseReal,									nullptr, offsetof(W3DLaserDrawModuleData, m_disruptionWidth) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
+  p.add(getShaderTuningFieldParse(), offsetof(W3DLaserDrawModuleData, m_shaderTuning));
+  p.add(ParticleSystemTemplate::getFlameTuningFieldParse(), offsetof(W3DLaserDrawModuleData, m_flameTuning));
+  p.add(DisruptionShaderInfo::getFieldParse(), offsetof(W3DLaserDrawModuleData, m_disruption));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -278,6 +302,7 @@ Real W3DLaserDrawModuleData::getIceTint( const BeamShaderTuning &tuning, RGBColo
 W3DLaserDraw::W3DLaserDraw( Thing *thing, const ModuleData* moduleData ) :
 	DrawModule( thing, moduleData ),
 	m_line3D(nullptr),
+	m_disruptionLine(nullptr),
 	m_texture(nullptr),
 	m_textureAspectRatio(1.0f),
 	m_selfDirty(TRUE),
@@ -350,6 +375,35 @@ W3DLaserDraw::W3DLaserDraw( Thing *thing, const ModuleData* moduleData ) :
 	//Allocate an array of lines equal to the number of beams * segments
 	m_line3D = NEW SegmentedLineClass *[ data->m_numBeams * data->m_segments ];
 
+	// the disruption shader takes its mask from the beam texture, and without the hook the strip would draw as plain art
+	if( data->m_disruption.isOn() && m_texture && SortingRendererClass::Peek_Soft_Particle_Hook() != nullptr )
+	{
+		m_disruptionLine = NEW SegmentedLineClass *[ data->m_segments ];
+		for( UnsignedInt segment = 0; segment < data->m_segments; segment++ )
+		{
+			SegmentedLineClass *line = NEW SegmentedLineClass;
+			m_disruptionLine[ segment ] = line;
+			line->Set_Texture( m_texture );
+			line->Set_Shader( ShaderClass::_PresetAdditiveShader );
+			line->Set_Color( Vector3( 1.0f, 1.0f, 1.0f ) );
+			line->Set_Effects( SoftParticleHookClass::EFFECT_DISRUPT, &data->m_disruption );
+			if (data->m_gridColumnsTotal > 1)
+			{
+				line->Set_Texture_Mapping_Mode(SegLineRendererClass::GRID_TILED_TEXTURE_MAP);
+				line->Set_U_Scale(1.0f / (Real)(data->m_gridColumnsTotal));
+			}
+			else
+			{
+				line->Set_Texture_Mapping_Mode(SegLineRendererClass::TILED_TEXTURE_MAP);
+			}
+			if (W3DDisplay::m_3DScene != nullptr)
+			{
+				W3DDisplay::m_3DScene->Add_Render_Object( line );
+			}
+			line->Set_Visible( 0 );
+		}
+	}
+
 	for( UnsignedInt segment = 0; segment < data->m_segments; segment++ )
 	{
 		//We don't care about segment positioning yet until we actually set the position
@@ -397,6 +451,10 @@ W3DLaserDraw::W3DLaserDraw( Thing *thing, const ModuleData* moduleData ) :
 				{
 					line->Set_Effects( SoftParticleHookClass::EFFECT_SOFT | SoftParticleHookClass::EFFECT_CRYO | SoftParticleHookClass::EFFECT_BEAM, &data->m_shaderTuning );
 				}
+				else if( data->m_flameShader )
+				{
+					line->Set_Effects( SoftParticleHookClass::EFFECT_SOFT | SoftParticleHookClass::EFFECT_FLAME | SoftParticleHookClass::EFFECT_BEAM, &data->m_flameTuning );
+				}
 				else if( data->m_electricShader )
 				{
 					line->Set_Effects( SoftParticleHookClass::EFFECT_SOFT | SoftParticleHookClass::EFFECT_ELECTRIC | SoftParticleHookClass::EFFECT_BEAM, &data->m_shaderTuning );
@@ -423,6 +481,12 @@ W3DLaserDraw::W3DLaserDraw( Thing *thing, const ModuleData* moduleData ) :
 				// hide the render object until the first time we come to draw it and
 				// set the correct position
 				line->Set_Visible( 0 );
+
+				// a beam that only disrupts keeps its lines for their bookkeeping and never shows them, unless nothing would disrupt
+				if( data->m_disruption.hidesArt() && m_disruptionLine && SortingRendererClass::Can_Disrupt() )
+				{
+					line->Set_Hidden( 1 );
+				}
 			}
 
 
@@ -453,6 +517,19 @@ W3DLaserDraw::~W3DLaserDraw()
 	}
 
 	delete [] m_line3D;
+
+	if( m_disruptionLine )
+	{
+		for( UnsignedInt segment = 0; segment < data->m_segments; segment++ )
+		{
+			if (W3DDisplay::m_3DScene != nullptr)
+			{
+				W3DDisplay::m_3DScene->Remove_Render_Object( m_disruptionLine[ segment ] );
+			}
+			REF_PTR_RELEASE( m_disruptionLine[ segment ] );
+		}
+		delete [] m_disruptionLine;
+	}
 	// TheSuperHackers @fix Mauller 11/03/2025 Free reference counted material
 	REF_PTR_RELEASE(m_texture);
 }
@@ -632,7 +709,7 @@ void W3DLaserDraw::updateGroundLights( LaserUpdate *update, Bool beamChanged )
 		const Coord3D *start = update->getStartPos();
 		const Coord3D *end = update->getEndPos();
 		// the glow pulses along with a laser-shaded beam and holds steady under any other
-		const BeamShaderTuning *pulses = (data->m_laserShader && !data->m_electricShader && !data->m_cryoShader) ? &data->m_shaderTuning : nullptr;
+		const BeamShaderTuning *pulses = (data->m_laserShader && !data->m_electricShader && !data->m_cryoShader && !data->m_flameShader) ? &data->m_shaderTuning : nullptr;
 		TheW3DLaserGlow->add( Vector3( start->x, start->y, start->z ), Vector3( end->x, end->y, end->z ), reach,
 			Vector3( glowRed, glowGreen, glowBlue ) * intensity, pulses );
 		return;
@@ -887,6 +964,16 @@ void W3DLaserDraw::doDrawModule(const Matrix3D* transformMtx)
 				//No arc -- way simpler!
 				laserPoints[ 0 ].Set( update->getStartPos()->x, update->getStartPos()->y, update->getStartPos()->z );
 				laserPoints[ 1 ].Set( update->getEndPos()->x, update->getEndPos()->y, update->getEndPos()->z );
+			}
+
+			if( m_disruptionLine )
+			{
+				// the strip fades with the beam, through the brightness the shader masks by
+				const Real level = MIN( MAX( update->getAlphaScale(), 0.0f ), 1.0f );
+				const Real stripWidth = data->m_disruptionWidth > 0.0f ? data->m_disruptionWidth : MAX( data->m_outerBeamWidth, data->m_innerBeamWidth );
+				m_disruptionLine[ segment ]->Set_Color( Vector3( level, level, level ) );
+				m_disruptionLine[ segment ]->Set_Width( stripWidth * update->getWidthScale() );
+				m_disruptionLine[ segment ]->Set_Points( 2, &laserPoints[0] );
 			}
 
 			//Get the color components for calculation purposes.

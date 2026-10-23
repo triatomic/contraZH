@@ -3,7 +3,7 @@
 // The including shader declares ShadowMap on its shadow stage and defines PACKED.
 // W3DShadowMap::bindReceiver fills c0, c4 and the shadow stage's texcoord.
 
-// x = shadow map texel size, y = depth bias, z = unused, w = filter tap spacing in texels
+// x = shadow map texel size, y = depth bias, z = 1 where clouds block only the sun, w = filter tap spacing in texels
 float4 ShadowParams : register(c0);
 
 // The map's shadow colour, which multiplies fully shadowed pixels per channel.
@@ -83,4 +83,12 @@ float ShadowLit(float4 shadowPos)
 float3 ShadowFactor(float4 shadowPos)
 {
     return lerp(ShadowColor.rgb, float3(1.0f, 1.0f, 1.0f), ShadowLit(shadowPos));
+}
+
+// The shadow factor with the cloud map in it. A cloud takes only the sun's share, as a shadow does, unless ShadowParams.z is 0.
+float3 CloudShadowFactor(float lit, float3 cloud)
+{
+    float3 sunOnly = lerp(ShadowColor.rgb, float3(1.0f, 1.0f, 1.0f), lit * cloud);
+    float3 legacy = lerp(ShadowColor.rgb, float3(1.0f, 1.0f, 1.0f), lit) * cloud;
+    return lerp(legacy, sunOnly, ShadowParams.z);
 }

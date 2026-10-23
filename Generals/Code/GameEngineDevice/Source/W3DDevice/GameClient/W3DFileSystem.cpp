@@ -490,14 +490,15 @@ void W3DFileSystem::reprioritizeTexturesBySize(ArchivedDirectoryInfo& dirInfo)
 			{
 				ArchiveFile* archive0 = it0->second;
 				ArchiveFile* archive1 = it1->second;
-				FileInfo info0;
-				FileInfo info1;
 				AsciiString filepath(dirInfo.m_path);
 				filepath.concat(file0);
 
-				if (archive0->getFileInfo(filepath, &info0) && archive1->getFileInfo(filepath, &info1))
+				// getFileInfo would also stat the archive on disk for a timestamp nothing here reads.
+				const ArchivedFileInfo* info0 = archive0->getArchivedFileInfo(filepath);
+				const ArchivedFileInfo* info1 = archive1->getArchivedFileInfo(filepath);
+				if (info0 != nullptr && info1 != nullptr)
 				{
-					if (info0.size() < info1.size()
+					if (info0->m_size < info1->m_size
 						&& archive0->getName().endsWithNoCase(inferiorArchive)
 						&& archive1->getName().endsWithNoCase(superiorArchive))
 					{
@@ -505,8 +506,8 @@ void W3DFileSystem::reprioritizeTexturesBySize(ArchivedDirectoryInfo& dirInfo)
 
 #if ENABLE_FILESYSTEM_LOGGING
 						DEBUG_LOG(("W3DFileSystem::reprioritizeTexturesBySize - prioritize %s(%ukb) from %s over %s(%ukb) from %s",
-							file1.str(), UnsignedInt(info1.size() / 1024), archive1->getName().str(),
-							file0.str(), UnsignedInt(info0.size() / 1024), archive0->getName().str()));
+							file1.str(), UnsignedInt(info1->m_size / 1024), archive1->getName().str(),
+							file0.str(), UnsignedInt(info0->m_size / 1024), archive0->getName().str()));
 #endif
 					}
 				}

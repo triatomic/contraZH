@@ -118,7 +118,7 @@ TornadoUpdateModuleData::TornadoUpdateModuleData()
 		{ "DamageType",			DamageTypeFlags::parseSingleBitFromINI,	nullptr,					offsetof( TornadoUpdateModuleData, m_damageType ) },
 		{ "DeathType",			INI::parseIndexList,					TheDeathNames,				offsetof( TornadoUpdateModuleData, m_deathType ) },
 		{ "KillObjectWhenDone",	INI::parseBool,							nullptr,					offsetof( TornadoUpdateModuleData, m_killObjectWhenDone ) },
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
 }

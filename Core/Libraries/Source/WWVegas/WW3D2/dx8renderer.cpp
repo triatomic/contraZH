@@ -374,6 +374,20 @@ static bool Allows_Material_Pass_Window(MaterialPassClass * pass, MeshClass * me
 	return !mesh->Peek_Model()->Get_Flag(MeshModelClass::SKIN);
 }
 
+// Why Allows_Material_Pass_Window turned a pass away, for the render log.
+static int Lone_Pass_Path(MaterialPassClass * pass, MeshClass * mesh)
+{
+	if (!Is_Window_Pass(pass))
+	{
+		return DX8InstancingStatsStruct::PASS_PATH_NOT_WINDOW_PASS;
+	}
+	if (mesh->Has_Material_Pass_Override())
+	{
+		return DX8InstancingStatsStruct::PASS_PATH_OVERRIDE;
+	}
+	return DX8InstancingStatsStruct::PASS_PATH_SKIN;
+}
+
 void DX8FVFCategoryContainer::Render_Instanced_Material_Passes()
 {
 	MatPassTaskClass * mpr = visible_matpass_head;
@@ -400,10 +414,12 @@ void DX8FVFCategoryContainer::Render_Instanced_Material_Passes()
 
 		if (Allows_Material_Pass_Window(mpr->Peek_Material_Pass(), mesh))
 		{
+			DX8MeshRendererClass::Record_Material_Pass_Path(DX8InstancingStatsStruct::PASS_PATH_WINDOW);
 			_MaterialPassWindow.push_back(mpr);
 		}
 		else
 		{
+			DX8MeshRendererClass::Record_Material_Pass_Path(Lone_Pass_Path(mpr->Peek_Material_Pass(), mesh));
 			Render_Material_Pass_Window();
 			mesh->Render_Material_Pass(mpr->Peek_Material_Pass(),index_buffer);
 			delete mpr;
@@ -424,6 +440,7 @@ void DX8FVFCategoryContainer::Render_Material_Pass_Window()
 	{
 		return;
 	}
+	DX8MeshRendererClass::Record_Material_Pass_Window();
 
 	static std::vector<MaterialPassClass *> passes;
 	static std::vector<InstancedFragment> instanced;
@@ -507,13 +524,11 @@ void DX8FVFCategoryContainer::Render_Material_Pass_Window()
 			}
 		}
 
+		// The window's passes take no lighting, and setting a mesh's light environment here would mark the
+		// material changed when its ambient differs, which reapplies it and drops the pass's texgen.
 		for (size_t i=0;i<fixed.size();++i)
 		{
 			MeshClass * mesh = fixed[i].first;
-			if (mesh->Get_Lighting_Environment() != nullptr)
-			{
-				DX8Wrapper::Set_Light_Environment(mesh->Get_Lighting_Environment());
-			}
 			DX8Wrapper::Set_Transform(D3DTS_WORLD,mesh->Get_Transform());
 			pass->Install_Polygon_Materials(fixed[i].second);
 			fixed[i].second->Render(mesh->Get_Base_Vertex_Offset());
@@ -544,6 +559,8 @@ void DX8FVFCategoryContainer::Render_Procedural_Material_Passes()
 		Render_Instanced_Material_Passes();
 		return;
 	}
+	const int path = (DX8InstancingClass::Get_Pass() != DX8InstancingClass::PASS_LIT) ? DX8InstancingStatsStruct::PASS_PATH_NOT_LIT
+		: (sorting ? DX8InstancingStatsStruct::PASS_PATH_SORTING : DX8InstancingStatsStruct::PASS_PATH_UNBOUND);
 
 	// additional passes
 	MatPassTaskClass * mpr = visible_matpass_head;
@@ -564,6 +581,7 @@ void DX8FVFCategoryContainer::Render_Procedural_Material_Passes()
    		}
 
 		mpr->Peek_Mesh()->Render_Material_Pass(mpr->Peek_Material_Pass(),index_buffer);
+		DX8MeshRendererClass::Record_Material_Pass_Path(path);
 		MatPassTaskClass * next_mpr = mpr->Get_Next_Visible();
 
 		// remove from list, then delete
@@ -611,6 +629,7 @@ void DX8RigidFVFCategoryContainer::Render_Delayed_Procedural_Material_Passes()
 	while (mpr != nullptr) {
 
 		mpr->Peek_Mesh()->Render_Material_Pass(mpr->Peek_Material_Pass(),index_buffer);
+		DX8MeshRendererClass::Record_Material_Pass_Path(DX8InstancingStatsStruct::PASS_PATH_DELAYED);
 		MatPassTaskClass * next_mpr = mpr->Get_Next_Visible();
 
 		delete mpr;
@@ -634,17 +653,16 @@ void DX8TextureCategoryClass::Log(bool only_visible)
 	}
 	work2.Format("\n	material: %x (%s)\n	shader: %x", material, material ? material->Get_Name() : "-", shader);
 	work+=work2;
-	RENDER_LOG((work));
+	RENDER_LOG(("%s", work.str()));
 
-	work.Format("	%8s %8s %6s %6s %6s %5s %s",
+	RENDER_LOG(("\t%8s %8s %6s %6s %6s %5s %s",
 		"idx_cnt",
 		"poly_cnt",
 		"i_offs",
 		"min_vi",
 		"vi_rng",
 		"ident",
-		"name");
-	RENDER_LOG((work));
+		"name"));
 
 	DX8PolygonRendererListIterator it(&PolygonRendererList);
 	while (!it.Is_Done()) {
@@ -1015,21 +1033,17 @@ DX8RigidFVFCategoryContainer::~DX8RigidFVFCategoryContainer()
 void DX8RigidFVFCategoryContainer::Log(bool only_visible)
 {
 #ifdef ENABLE_CATEGORY_LOG
-	StringClass work(255,true);
-	work.Format("DX8RigidFVFCategoryContainer --------------");
-	RENDER_LOG((work));
+	RENDER_LOG(("DX8RigidFVFCategoryContainer --------------"));
 	if (vertex_buffer) {
 		StringClass fvfname(255,true);
 		vertex_buffer->FVF_Info().Get_FVF_Name(fvfname);
-		work.Format("VB size (used/total): %d/%d FVF: %s",used_vertices,vertex_buffer->Get_Vertex_Count(),fvfname);
-		RENDER_LOG((work));
+		RENDER_LOG(("VB size (used/total): %d/%d FVF: %s",used_vertices,vertex_buffer->Get_Vertex_Count(),fvfname.str()));
 	}
 	else {
 		RENDER_LOG(("EMPTY VB"));
 	}
 	if (index_buffer) {
-		work.Format("IB size (used/total): %d/%d",used_indices,index_buffer->Get_Index_Count());
-		RENDER_LOG((work));
+		RENDER_LOG(("IB size (used/total): %d/%d",used_indices,index_buffer->Get_Index_Count()));
 	}
 	else {
 		RENDER_LOG(("EMPTY IB"));
@@ -1730,13 +1744,10 @@ void DX8SkinFVFCategoryContainer::Add_Skinned_Vertices(MeshModelClass* mmc)
 void DX8SkinFVFCategoryContainer::Log(bool only_visible)
 {
 #ifdef ENABLE_CATEGORY_LOG
-	StringClass work(255,true);
-	work.Format("DX8SkinFVFCategoryContainer --------------");
-	RENDER_LOG((work));
+	RENDER_LOG(("DX8SkinFVFCategoryContainer --------------"));
 
 	if (index_buffer) {
-		work.Format("IB size (used/total): %d/%d",used_indices,index_buffer->Get_Index_Count());
-		RENDER_LOG((work));
+		RENDER_LOG(("IB size (used/total): %d/%d",used_indices,index_buffer->Get_Index_Count()));
 	}
 	else {
 		RENDER_LOG(("EMPTY IB"));
@@ -2057,6 +2068,7 @@ void DX8SkinFVFCategoryContainer::Render_Skinned_Material_Passes()
 
 		DX8SkinningClass::Set_Mesh(mesh, Peek_Skinned_Model(mesh->Peek_Model())->Palette, nullptr);
 		mesh->Render_Material_Pass(mpr->Peek_Material_Pass(),index_buffer);
+		DX8MeshRendererClass::Record_Material_Pass_Path(DX8InstancingStatsStruct::PASS_PATH_SKIN);
 		MatPassTaskClass * next_mpr = mpr->Get_Next_Visible();
 
 		if (last_mpr == nullptr) {
@@ -2814,8 +2826,17 @@ void DX8TextureCategoryClass::Render_Task(PolyRenderTaskClass * prt, VertexMater
 	if (!DX8RendererDebugger::Is_Enabled() || !mesh->Is_Disabled_By_Debugger()) {
 
 	if (!replay && (!!mesh->Peek_Model()->Get_Flag(MeshGeometryClass::SORT)) && WW3D::Is_Sorting_Enabled()) {
-		renderer->Render_Sorted(mesh->Get_Base_Vertex_Offset(),mesh->Get_Bounding_Sphere());
-	} else {
+		if (mesh->Peek_Disruption() != nullptr) {
+			SortingRendererClass::Set_Insert_Effects(SoftParticleHookClass::EFFECT_DISRUPT,mesh->Peek_Disruption(),mesh->Get_Alpha_Override());
+			renderer->Render_Sorted(mesh->Get_Base_Vertex_Offset(),mesh->Get_Bounding_Sphere());
+			SortingRendererClass::Set_Insert_Effects(0,nullptr);
+		}
+		if (!mesh->Is_Disruption_Only() || !SortingRendererClass::Can_Disrupt()) {
+			SortingRendererClass::Set_Insert_Effects(mesh->Get_Shader_Effects(),mesh->Peek_Shader_Effect_Data());
+			renderer->Render_Sorted(mesh->Get_Base_Vertex_Offset(),mesh->Get_Bounding_Sphere());
+			SortingRendererClass::Set_Insert_Effects(0,nullptr);
+		}
+	} else if (!mesh->Is_Disruption_Only() || !SortingRendererClass::Can_Disrupt()) {
 		//non-transparent mesh that will be rendered immediately.  Okay to adjust the shader/material
 		//if necessary
 		if (mesh->Get_Alpha_Override() != 1.0 || (mesh->Get_User_Data() && *(int *)mesh->Get_User_Data() == RenderObjClass::USER_DATA_MATERIAL_OVERRIDE))

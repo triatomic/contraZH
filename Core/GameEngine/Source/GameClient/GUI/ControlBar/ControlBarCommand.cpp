@@ -37,6 +37,7 @@
 #include "Common/PlayerList.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/SpecialPower.h"
+#include "Common/TunnelTracker.h"
 #include "Common/OptionPreferences.h"
 #include "Common/Upgrade.h"
 #include "Common/BuildAssistant.h"
@@ -392,16 +393,26 @@ void ControlBar::populateCommand( Object *obj )
 									Int i;
 
 									// get command set
-									if( !player || !player->getPlayerTemplate()
-											|| player->getPlayerTemplate()->getPurchaseScienceCommandSetRank1().isEmpty()
-											|| player->getPlayerTemplate()->getPurchaseScienceCommandSetRank3().isEmpty()
-											|| player->getPlayerTemplate()->getPurchaseScienceCommandSetRank8().isEmpty() )
+									if( !player || !player->getPlayerTemplate() )
 									{
 										continue;
 									}
-									commandSet1 = findCommandSet( player->getPlayerTemplate()->getPurchaseScienceCommandSetRank1() );
-									commandSet3 = findCommandSet( player->getPlayerTemplate()->getPurchaseScienceCommandSetRank3() );
-									commandSet8 = findCommandSet( player->getPlayerTemplate()->getPurchaseScienceCommandSetRank8() );
+#if RTS_ZEROHOUR
+									AsciiString setName1 = player->getPlayerTemplate()->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK1, player );
+									AsciiString setName3 = player->getPlayerTemplate()->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK3, player );
+									AsciiString setName8 = player->getPlayerTemplate()->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK8, player );
+#else
+									AsciiString setName1 = player->getPlayerTemplate()->getPurchaseScienceCommandSetRank1();
+									AsciiString setName3 = player->getPlayerTemplate()->getPurchaseScienceCommandSetRank3();
+									AsciiString setName8 = player->getPlayerTemplate()->getPurchaseScienceCommandSetRank8();
+#endif
+									if( setName1.isEmpty() || setName3.isEmpty() || setName8.isEmpty() )
+									{
+										continue;
+									}
+									commandSet1 = findCommandSet( setName1 );
+									commandSet3 = findCommandSet( setName3 );
+									commandSet8 = findCommandSet( setName8 );
 
 									if( !commandSet1 || !commandSet3 || !commandSet8 )
 									{
@@ -1136,6 +1147,7 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 		GUICommandType commandType = command->getCommandType();
 		if( commandType != GUI_COMMAND_SELL &&
 				commandType != GUI_COMMAND_EVACUATE &&
+				commandType != GUI_COMMAND_EVACUATE_TO_WORK &&
 				commandType != GUI_COMMAND_AUTO_FILL &&
 				commandType != GUI_COMMAND_EXIT_CONTAINER &&
 				commandType != GUI_COMMAND_BEACON_DELETE &&
@@ -1443,6 +1455,7 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 		}
 
 		case GUI_COMMAND_EVACUATE:
+		case GUI_COMMAND_EVACUATE_TO_WORK:
 		{
 
 			// if we have no contained objects we can't evacuate anything
@@ -1607,6 +1620,28 @@ CommandAvailability ControlBar::getCommandAvailability( const CommandButton *com
 				return COMMAND_ACTIVE;
 
 			break;
+		}
+
+		//ShigureUi 15/9/2026 Switch auto pop on/off
+		case GUI_COMMAND_TOGGLE_TUNNEL_AUTO_POP:
+		{
+			// only tunnel can have it
+			if (!obj->getContain() || !obj->getContain()->isTunnelContain())
+				return COMMAND_RESTRICTED;
+
+
+			if (obj->getControllingPlayer())
+			{
+				TunnelTracker *tunnelSystem = obj->getControllingPlayer()->getTunnelSystem();
+				if (tunnelSystem)
+				{
+					if (tunnelSystem->isAutoExitTunnel(obj))
+						return COMMAND_ACTIVE;
+					else
+						break;
+				}
+			}
+			return COMMAND_RESTRICTED;
 		}
 
 		// switch weapon command

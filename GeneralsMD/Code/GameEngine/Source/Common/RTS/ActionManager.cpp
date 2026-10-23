@@ -43,6 +43,7 @@
 #include "Common/SpecialPower.h"
 #include "Common/Team.h"
 #include "Common/ThingTemplate.h"
+#include "Common/TunnelTracker.h"
 
 #include "GameClient/Drawable.h"
 #include "GameClient/InGameUI.h"
@@ -53,6 +54,7 @@
 #include "GameLogic/Module/ContainModule.h"
 #include "GameLogic/Module/CollideModule.h"
 #include "GameLogic/Module/DozerAIUpdate.h"
+#include "GameLogic/Module/GasBehavior.h"
 #include "GameLogic/Module/RailroadGuideAIUpdate.h"
 #include "GameLogic/Module/RailedTransportDockUpdate.h"
 #include "GameLogic/Module/SpawnBehavior.h"
@@ -489,16 +491,14 @@ Bool ActionManager::canResumeConstructionOf( const Object *obj,
 		return FALSE;
 
 	// TheSuperHackers @bugfix Stubbjax 06/01/2026 Ensure only the owner of the construction can resume it.
-#if RETAIL_COMPATIBLE_CRC
-	Relationship r = obj->getRelationship(objectBeingConstructed);
-
-	// only available to our allies
-	if( r != ALLIES )
-		return FALSE;
-#else
+	// The build state completes only for the owner, or for allies when the game enables Coop Buildings
 	if (obj->getControllingPlayer() != objectBeingConstructed->getControllingPlayer())
-		return FALSE;
-#endif
+	{
+		if( !TheGameLogic->getCoopBuildings() || obj->getRelationship( objectBeingConstructed ) != ALLIES )
+		{
+			return FALSE;
+		}
+	}
 
 	// if the objectBeingConstructed is not actually under construction we can't resume that!
 	if( !objectBeingConstructed->getStatusBits().test( OBJECT_STATUS_UNDER_CONSTRUCTION ) )
@@ -588,6 +588,14 @@ Bool ActionManager::canEnterObject( const Object *obj, const Object *objectToEnt
 			objectToEnter->getStatusBits().test( OBJECT_STATUS_UNDER_CONSTRUCTION ) )
 	{
 		return FALSE;
+	}
+
+	//ShigureUi 16/09/2026 cant enter tunnel with auto pop on
+	if (objectToEnter->getContain() && objectToEnter->getContain()->isTunnelContain())
+	{
+		Player* player = objectToEnter->getControllingPlayer();
+		if (player->getTunnelSystem() && player->getTunnelSystem()->isAutoExitTunnel(objectToEnter))
+			return FALSE;
 	}
 
 	// Can't enter something being sold
@@ -1624,6 +1632,11 @@ inline Bool isPointOnMap( const Coord3D  *testPos )
 // ------------------------------------------------------------------------------------------------
 Bool ActionManager::canDoSpecialPowerAtLocation( const Object *obj, const Coord3D *loc, CommandSourceType commandSource, const SpecialPowerTemplate *spTemplate, const Object *objectInWay, UnsignedInt commandOptions, Bool checkSourceRequirements )
 {
+	if( commandSource == CMD_FROM_PLAYER && GasBehavior::blocksPlayerOrders( obj ) )
+	{
+		return false;
+	}
+
 	if (checkSourceRequirements)
 	{
 		//First check, if our object can do this special power.
@@ -1859,6 +1872,11 @@ Bool ActionManager::canDoSpecialPowerAtLocation( const Object *obj, const Coord3
 // ------------------------------------------------------------------------------------------------
 Bool ActionManager::canDoSpecialPowerAtObject( const Object *obj, const Object *target, CommandSourceType commandSource, const SpecialPowerTemplate *spTemplate, UnsignedInt commandOptions, Bool checkSourceRequirements )
 {
+	if( commandSource == CMD_FROM_PLAYER && GasBehavior::blocksPlayerOrders( obj ) )
+	{
+		return false;
+	}
+
 	if (checkSourceRequirements)
 	{
 		//First check, if our object can do this special power.
@@ -2163,6 +2181,7 @@ SpecialPowerType ActionManager::getFallbackBehaviorType(SpecialPowerType type) {
 		return SPECIAL_PARADROP_AMERICA;
 
 	case SECW_SPECIAL_HUNTER_SEEKER:
+	case SPECIAL_ALL_BATTLE_PLANS:
 		return SPECIAL_CIA_INTELLIGENCE;
 
 	// Borrows the jumpjet position check: a ground target, never water or a cliff
@@ -2271,6 +2290,11 @@ SpecialPowerType ActionManager::getFallbackBehaviorType(SpecialPowerType type) {
 // ------------------------------------------------------------------------------------------------
 Bool ActionManager::canDoSpecialPower( const Object *obj, const SpecialPowerTemplate *spTemplate, CommandSourceType commandSource, UnsignedInt commandOptions, Bool checkSourceRequirements )
 {
+	if( commandSource == CMD_FROM_PLAYER && GasBehavior::blocksPlayerOrders( obj ) )
+	{
+		return false;
+	}
+
 	if (checkSourceRequirements)
 	{
 		//First check, if our object can do this special power.

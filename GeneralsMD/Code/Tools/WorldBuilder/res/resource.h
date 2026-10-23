@@ -1001,6 +1001,8 @@
 #define ID_FPSCAP_120                   33441
 #define ID_FPSCAP_UNCAPPED              33442
 #define ID_TEXT_OUTLINE                 33443
+#define ID_FILE_WATERTUNING_MAPINI      33446
+#define ID_FILE_HQPREVIEW_MAPINI        33447
 
 // Next default values for new objects
 //
@@ -1008,7 +1010,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_3D_CONTROLS                     1
 #define _APS_NEXT_RESOURCE_VALUE        258
-#define _APS_NEXT_COMMAND_VALUE         33446
+#define _APS_NEXT_COMMAND_VALUE         33448
 #define _APS_NEXT_CONTROL_VALUE         1393
 #define _APS_NEXT_SYMED_VALUE           101
 #endif

@@ -1086,6 +1086,57 @@ void ControlBarSchemeManager::drawBackground( ICoord2D offset )
 }
 
 //-----------------------------------------------------------------------------
+static ControlBarScheme *findBestScheme( const std::list<ControlBarScheme *> &schemes, const AsciiString &side )
+{
+	ControlBarScheme *best = nullptr;
+	for (std::list<ControlBarScheme *>::const_iterator it = schemes.begin(); it != schemes.end(); ++it)
+	{
+		ControlBarScheme *CBScheme = *it;
+		if (!CBScheme)
+		{
+			DEBUG_CRASH(("There's no ControlBarScheme in the ControlBarSchemeList:m_schemeList"));
+			continue;
+		}
+
+		// the highest creation resolution wins
+		if (CBScheme->m_side.compareNoCase(side) == 0 && (!best || best->m_ScreenCreationRes.x < CBScheme->m_ScreenCreationRes.x))
+		{
+			best = CBScheme;
+		}
+	}
+	return best;
+}
+
+#if RTS_ZEROHOUR
+//-----------------------------------------------------------------------------
+// A faction without its own scheme, such as a mod's campaign faction, uses its base side's scheme
+static ControlBarScheme *findBaseSideScheme( const std::list<ControlBarScheme *> &schemes, AsciiString baseSide, Bool useSmall )
+{
+	if (baseSide.isEmpty())
+	{
+		return nullptr;
+	}
+
+	// Templates call the American base side USA, but its schemes use America
+	if (baseSide.compareNoCase("USA") == 0)
+	{
+		baseSide.set("America");
+	}
+	if (useSmall)
+	{
+		baseSide.concat("Small");
+	}
+
+	ControlBarScheme *scheme = findBestScheme(schemes, baseSide);
+	if (scheme)
+	{
+		DEBUG_LOG(("setControlBarSchemeByPlayer fell back to the scheme of base side %s", baseSide.str()));
+	}
+	return scheme;
+}
+#endif
+
+//-----------------------------------------------------------------------------
 void ControlBarSchemeManager::setControlBarSchemeByPlayerTemplate( const PlayerTemplate *pt, Bool useSmall)
 {
 	if(!pt)
@@ -1105,29 +1156,14 @@ void ControlBarSchemeManager::setControlBarSchemeByPlayerTemplate( const PlayerT
 	if(side.isEmpty())
 		side.set("Observer");
 	DEBUG_LOG(("setControlBarSchemeByPlayer used %s as its side", side.str()));
-	ControlBarScheme *tempScheme = nullptr;
+	ControlBarScheme *tempScheme = findBestScheme( m_schemeList, side );
 
-	ControlBarSchemeList::iterator it = m_schemeList.begin();
-
-	// iterate through the list and return the scheme that we're looking for
-	while (it != m_schemeList.end())
+#if RTS_ZEROHOUR
+	if (!tempScheme)
 	{
-		ControlBarScheme *CBScheme = *it;
-		if( !CBScheme )
-		{
-			DEBUG_CRASH(("There's no ControlBarScheme in the ControlBarSchemeList:m_schemeList"));
-			it++;
-			continue;
-		}
-		// find the scheme that best matches our resolution
-		if(CBScheme->m_side.compareNoCase( side ) == 0)
-		{
-
-			if((!tempScheme || tempScheme->m_ScreenCreationRes.x < CBScheme->m_ScreenCreationRes.x) )//&& TheDisplay->getWidth() >= CBScheme->m_ScreenCreationRes.x )
-				tempScheme = CBScheme;
-		}
-		it ++;
+		tempScheme = findBaseSideScheme( m_schemeList, pt->getBaseSide(), useSmall );
 	}
+#endif
 
 	if(tempScheme)
 	{
@@ -1173,29 +1209,14 @@ void ControlBarSchemeManager::setControlBarSchemeByPlayer(Player *p)
 	if(side.isEmpty())
 		side.set("Observer");
 	DEBUG_LOG(("setControlBarSchemeByPlayer used %s as its side", side.str()));
-	ControlBarScheme *tempScheme = nullptr;
+	ControlBarScheme *tempScheme = findBestScheme( m_schemeList, side );
 
-	ControlBarSchemeList::iterator it = m_schemeList.begin();
-
-	// iterate through the list and return the scheme that we're looking for
-	while (it != m_schemeList.end())
+#if RTS_ZEROHOUR
+	if (!tempScheme)
 	{
-		ControlBarScheme *CBScheme = *it;
-		if( !CBScheme )
-		{
-			DEBUG_CRASH(("There's no ControlBarScheme in the ControlBarSchemeList:m_schemeList"));
-			it++;
-			continue;
-		}
-		// find the scheme that best matches our resolution
-		if(CBScheme->m_side.compareNoCase( side ) == 0)
-		{
-
-			if((!tempScheme || tempScheme->m_ScreenCreationRes.x < CBScheme->m_ScreenCreationRes.x) )//&& TheDisplay->getWidth() >= CBScheme->m_ScreenCreationRes.x )
-				tempScheme = CBScheme;
-		}
-		it ++;
+		tempScheme = findBaseSideScheme( m_schemeList, p->getBaseSide(), FALSE );
 	}
+#endif
 
 	if(tempScheme)
 	{

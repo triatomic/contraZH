@@ -85,7 +85,11 @@ void W3DOverlordTankDraw::doDrawModule(const Matrix3D* transformMtx)
 			const ContainedItemsList* addOns = me->getContain()->getAddOnList();
 			for (ContainedItemsList::const_iterator it = addOns->begin(); it != addOns->end(); it++) {
 				Drawable* riderDraw = (*it)->getDrawable();
-				riderDraw->setColorTintEnvelope(*getDrawable()->getColorTintEnvelope());
+				TintEnvelope* env = getDrawable()->getColorTintEnvelope();
+				if (env)
+				{
+					riderDraw->setColorTintEnvelope(*env);
+				}
 				riderDraw->notifyDrawableDependencyCleared();
 				riderDraw->draw();
 			}
@@ -94,7 +98,11 @@ void W3DOverlordTankDraw::doDrawModule(const Matrix3D* transformMtx)
 			&& me->getContain()->friend_getRider()->getDrawable())
 		{
 			Drawable* riderDraw = me->getContain()->friend_getRider()->getDrawable();
-			riderDraw->setColorTintEnvelope(*getDrawable()->getColorTintEnvelope());
+			TintEnvelope* env = getDrawable()->getColorTintEnvelope();
+			if (env)
+			{
+				riderDraw->setColorTintEnvelope(*env);
+			}
 
 			riderDraw->notifyDrawableDependencyCleared();
 			riderDraw->draw();

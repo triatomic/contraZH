@@ -92,6 +92,11 @@ public:
 						m_offsetX = 0.0f;
 						m_offsetY = 0.0f;
 						m_waterRenderMode = SHADOW_WATER_DEFAULT;
+						m_footprint = false;
+						m_footprintIsCircle = false;
+						m_footprintIsRing = false;
+						m_footprintMajor = 0.0f;
+						m_footprintMinor = 0.0f;
 				}
 
 				char	m_ShadowName[64];	//when set, overrides the default model shadow (used mostly for Decals).
@@ -103,6 +108,11 @@ public:
 				Real	m_offsetX;			//world shift along x axis
 				Real	m_offsetY;			//world shift along y axis
 				Int		m_waterRenderMode;	//ShadowWaterMode: above/below/default water ordering
+				Bool	m_footprint;		//footprint decal request (drawn by the Zero Hour render path only)
+				Bool	m_footprintIsCircle;	//a circle of the major radius, else a box
+				Bool	m_footprintIsRing;	//draw a ring of the major radius instead of fitting a hexagon
+				Real	m_footprintMajor;	//half length along the object's x axis
+				Real	m_footprintMinor;	//half length along the object's y axis
 		};
 
 		Shadow(void) : m_diffuse(0xffffffff), m_color(0xffffffff), m_opacity (0x000000ff), m_localAngle(0.0f), m_waterRenderMode(SHADOW_WATER_DEFAULT) {}

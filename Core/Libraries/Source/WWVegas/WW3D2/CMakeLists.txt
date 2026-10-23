@@ -182,6 +182,8 @@ set(WW3D2_SRC
     seglinerenderer.h
     #shader.cpp
     #shader.h
+    shaderdrawcounter.cpp
+    shaderdrawcounter.h
     shattersystem.cpp
     shattersystem.h
     shdlib.h

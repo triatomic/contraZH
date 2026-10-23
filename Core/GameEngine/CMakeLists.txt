@@ -117,6 +117,7 @@ set(GAMEENGINE_SRC
 #    Include/Common/StackDump.h
 #    Include/Common/StateMachine.h
 #    Include/Common/StatsCollector.h
+    Include/Common/SciencePurchaseSlots.h
     Include/Common/STLTypedefs.h
     Include/Common/StreamingArchiveFile.h
     Include/Common/SubsystemInterface.h
@@ -161,6 +162,7 @@ set(GAMEENGINE_SRC
     Include/GameClient/Display.h
     Include/GameClient/DisplayString.h
     Include/GameClient/DisplayStringManager.h
+    Include/GameClient/DisruptionShader.h
 #    Include/GameClient/Drawable.h
 #    Include/GameClient/DrawableInfo.h
     Include/GameClient/DrawGroupInfo.h
@@ -229,6 +231,9 @@ set(GAMEENGINE_SRC
     Include/GameClient/ShellMenuScheme.h
     Include/GameClient/Smudge.h
     Include/GameClient/Snow.h
+    Include/GameClient/StormShader.h
+    Include/GameClient/HeadlightShader.h
+    Include/GameClient/PlanarMirrorShader.h
     Include/GameClient/Statistics.h
     Include/GameClient/TerrainRoads.h
     Include/GameClient/TerrainVisual.h
@@ -769,7 +774,7 @@ set(GAMEENGINE_SRC
     Source/GameClient/GUI/GUICallbacks/IMECandidate.cpp
     Source/GameClient/GUI/GUICallbacks/InGameChat.cpp
     Source/GameClient/GUI/GUICallbacks/InGamePopupMessage.cpp
-#    Source/GameClient/GUI/GUICallbacks/Menus/ChallengeMenu.cpp
+    Source/GameClient/GUI/GUICallbacks/Menus/ChallengeMenu.cpp
 #    Source/GameClient/GUI/GUICallbacks/Menus/CreditsMenu.cpp
 #    Source/GameClient/GUI/GUICallbacks/Menus/DifficultySelect.cpp
 #    Source/GameClient/GUI/GUICallbacks/Menus/DisconnectWindow.cpp
@@ -847,8 +852,12 @@ set(GAMEENGINE_SRC
 #    Source/GameClient/System/CampaignManager.cpp
     Source/GameClient/System/Debug/AudioDebugDisplay.cpp
     Source/GameClient/System/DebugDisplay.cpp
+    Source/GameClient/System/DisruptionShader.cpp
     Source/GameClient/System/Image.cpp
     Source/GameClient/System/ParticleSys.cpp
+    Source/GameClient/System/StormShader.cpp
+    Source/GameClient/System/HeadlightShader.cpp
+    Source/GameClient/System/PlanarMirrorShader.cpp
     Source/GameClient/System/RayEffect.cpp
     Source/GameClient/System/Smudge.cpp
     Source/GameClient/Terrain/TerrainRoads.cpp
@@ -1214,6 +1223,10 @@ target_compile_definitions(corei_gameengine_private INTERFACE
 
 target_precompile_headers(corei_gameengine_private INTERFACE
     Include/Precompiled/PreRTS.h
+)
+
+target_compile_options(corei_gameengine_private INTERFACE
+    $<$<CXX_COMPILER_ID:MSVC>:/wd4995>
 )
 
 target_include_directories(corei_gameengine_public INTERFACE

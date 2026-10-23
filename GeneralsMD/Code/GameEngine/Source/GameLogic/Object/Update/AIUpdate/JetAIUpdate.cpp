@@ -119,6 +119,33 @@ Bool JetAIUpdate::isOutOfSpecialReloadAmmo() const
 }
 
 //-------------------------------------------------------------------------------------------------
+// Orders that fire or guard are useless to a jet that is out of ammo, so it reloads before flying
+// them. Every other order (move, enter, get repaired, follow a path) is flown as given; the jet
+// returns to reload once it is idle again.
+static Bool commandNeedsAmmo(AICommandType cmd)
+{
+	switch (cmd)
+	{
+		case AICMD_ATTACK_OBJECT:
+		case AICMD_FORCE_ATTACK_OBJECT:
+		case AICMD_ATTACK_TEAM:
+		case AICMD_ATTACK_POSITION:
+		case AICMD_ATTACK_AREA:
+		case AICMD_ATTACKMOVE_TO_POSITION:
+		case AICMD_ATTACKFOLLOW_WAYPOINT_PATH:
+		case AICMD_ATTACKFOLLOW_WAYPOINT_PATH_AS_TEAM:
+		case AICMD_HUNT:
+		case AICMD_GUARD_POSITION:
+		case AICMD_GUARD_OBJECT:
+		case AICMD_GUARD_AREA:
+		case AICMD_GUARD_RETALIATE:
+			return true;
+		default:
+			return false;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
 static ParkingPlaceBehaviorInterface* getPP(ObjectID id, Object** airfieldPP = nullptr)
 {
 	if (airfieldPP)
@@ -520,10 +547,10 @@ public:
 
 		Coord3D intermedPt;
 		Bool intermed = false;
-		Real orient = atan2(ppinfo.runwayPrep.y - ppinfo.parkingSpace.y, ppinfo.runwayPrep.x - ppinfo.parkingSpace.x);
+		Real orient = WWMath::Atan2(ppinfo.runwayPrep.y - ppinfo.parkingSpace.y, ppinfo.runwayPrep.x - ppinfo.parkingSpace.x);
 
 
-		if (fabs(stdAngleDiff(orient, ppinfo.parkingOrientation)) > PI/128)
+		if (WWMath::Fabs(stdAngleDiff(orient, ppinfo.parkingOrientation)) > PI/128)
 		{
 			intermedPt.z = (ppinfo.parkingSpace.z + ppinfo.runwayPrep.z) * 0.5f;
 			intermed = intersectInfiniteLine2D(
@@ -1085,7 +1112,7 @@ public:
 		}
 		else
 		{
-			Real dist = sqrtf(dSqr);
+			Real dist = WWMath::Sqrtf(dSqr);
 			if (dist < 1) dist = 1;
 			pos.x += PATHFIND_CELL_SIZE_F * dx / (dist * LOGICFRAMES_PER_SECOND);
 			pos.y += PATHFIND_CELL_SIZE_F * dy / (dist * LOGICFRAMES_PER_SECOND);
@@ -1605,7 +1632,7 @@ public:
 			return STATE_FAILURE;
 
 		const Real THRESH = 0.001f;
-		if (fabs(stdAngleDiff(jet->getOrientation(), ppinfo.parkingOrientation)) <= THRESH)
+		if (WWMath::Fabs(stdAngleDiff(jet->getOrientation(), ppinfo.parkingOrientation)) <= THRESH)
 			return STATE_SUCCESS;
 
 		// magically position it correctly.
@@ -2512,7 +2539,31 @@ UpdateSleepTime JetAIUpdate::update()
 		}
 
 		// note that we might still have weapons with ammo, but still be forced to return to reload.
-		if (isOutOfSpecialReloadAmmo() && getFlag(ALLOW_AIR_LOCO))
+		const Bool mustReturnForAmmo = isOutOfSpecialReloadAmmo() && getFlag(ALLOW_AIR_LOCO);
+
+		// A pending order that fires or guards waits until the jet has reloaded. Any other pending
+		// order (a move, say) is flown first, even on an empty jet: a parked jet that is out of ammo
+		// used to take off for the order and land straight back to reload instead (#80).
+		const Bool flyPendingCommand = getFlag(HAS_PENDING_COMMAND)
+			// srj sez: if we are reloading ammo, wait will we are done before processing the pending command.
+			&& getStateMachine()->getCurrentStateID() != RELOAD_AMMO
+			&& !(mustReturnForAmmo && commandNeedsAmmo(m_mostRecentCommand.getCommandType()));
+
+		if (flyPendingCommand)
+		{
+			m_returnToBaseFrame = 0;
+
+			// an empty jet keeps its return-for-ammo locomotor (the Aurora stays sluggish) until it reloads
+			if (mustReturnForAmmo)
+				setFlag(USE_SPECIAL_RETURN_LOCO, true);
+
+			AICommandParms parms(AICMD_MOVE_TO_POSITION, CMD_FROM_AI);	// values don't matter, will be wiped by next line
+			m_mostRecentCommand.reconstitute(parms);
+			setFlag(HAS_PENDING_COMMAND, false);
+
+ 			aiDoCommand(&parms);
+		}
+		else if (mustReturnForAmmo)
 		{
 			m_returnToBaseFrame = 0;
 
@@ -2522,18 +2573,6 @@ UpdateSleepTime JetAIUpdate::update()
 			setFlag(USE_SPECIAL_RETURN_LOCO, true);
 			setLastCommandSource( CMD_FROM_AI );
 			getStateMachine()->setState(RETURNING_FOR_LANDING);
-		}
-		else if (getFlag(HAS_PENDING_COMMAND)
-			// srj sez: if we are reloading ammo, wait will we are done before processing the pending command.
-			&& getStateMachine()->getCurrentStateID() != RELOAD_AMMO)
-		{
-			m_returnToBaseFrame = 0;
-
-			AICommandParms parms(AICMD_MOVE_TO_POSITION, CMD_FROM_AI);	// values don't matter, will be wiped by next line
-			m_mostRecentCommand.reconstitute(parms);
-			setFlag(HAS_PENDING_COMMAND, false);
-
- 			aiDoCommand(&parms);
 		}
 		else if (m_returnToBaseFrame != 0 && now >= m_returnToBaseFrame && getFlag(ALLOW_AIR_LOCO))
 		{
@@ -2789,7 +2828,7 @@ void JetAIUpdate::positionLockon()
 	Real dx = getObject()->getPosition()->x - pos.x;
 	Real dy = getObject()->getPosition()->y - pos.y;
 	if (dx || dy)
-		m_lockonDrawable->setOrientation(atan2(dy, dx));
+		m_lockonDrawable->setOrientation(WWMath::Atan2(dy, dx));
 
 	// the Gaussian sum, to avoid keeping a running total:
 	//
@@ -2979,8 +3018,8 @@ void JetAIUpdate::doLandingCommand(Object *airfield, CommandSourceType cmdSource
 			}
 
 			getObject()->setProducer(airfield);
-			DEBUG_ASSERTCRASH(isOutOfSpecialReloadAmmo() == false, ("Hmm, this seems unlikely -- isOutOfSpecialReloadAmmo()==false"));
-			setFlag(USE_SPECIAL_RETURN_LOCO, false);
+			// an empty jet sent to another airfield flies there with its return-for-ammo locomotor
+			setFlag(USE_SPECIAL_RETURN_LOCO, isOutOfSpecialReloadAmmo());
 			setFlag(ALLOW_INTERRUPT_AND_RESUME_OF_CUR_STATE_FOR_RELOAD, false);
 			setLastCommandSource( cmdSource );
 			getStateMachine()->setState(RETURNING_FOR_LANDING);
@@ -3094,28 +3133,6 @@ void JetAIUpdate::aiDoCommand(const AICommandParms* parms)
 				// don't need (or want) to take off for these
 				break;
 
-#if !RETAIL_COMPATIBLE_CRC
-			// TheSuperHackers @tweak Stubbjax 23/01/2026 Parked jets now defer offensive commands when out of ammo.
-			case AICMD_ATTACKMOVE_TO_POSITION:
-			case AICMD_ATTACK_AREA:
-			case AICMD_ATTACK_OBJECT:
-			case AICMD_ATTACK_POSITION:
-			case AICMD_ATTACK_TEAM:
-			case AICMD_FORCE_ATTACK_OBJECT:
-			case AICMD_GUARD_AREA:
-			case AICMD_GUARD_OBJECT:
-			case AICMD_GUARD_POSITION:
-			case AICMD_GUARD_RETALIATE:
-			case AICMD_HUNT:
-				if (isOutOfSpecialReloadAmmo())
-				{
-					setFlag(HAS_PENDING_COMMAND, true);
-					return;
-				}
-
-				FALLTHROUGH;
-#endif
-
 			case AICMD_ENTER:
 			case AICMD_GET_REPAIRED:
 
@@ -3127,6 +3144,14 @@ void JetAIUpdate::aiDoCommand(const AICommandParms* parms)
 
 			default:
 			{
+				// TheSuperHackers @tweak Stubbjax 23/01/2026 Parked jets now defer offensive commands when out of ammo.
+				// contraZH: always on; the jet reloads where it stands and then takes off for the order.
+				if (commandNeedsAmmo(parms->m_cmd) && isOutOfSpecialReloadAmmo())
+				{
+					setFlag(HAS_PENDING_COMMAND, true);
+					return;
+				}
+
 				// nuke any existing pending cmd
 				m_mostRecentCommand.store(*parms);
 				setFlag(HAS_PENDING_COMMAND, true);
@@ -3138,6 +3163,22 @@ void JetAIUpdate::aiDoCommand(const AICommandParms* parms)
 				return;
 			}
 		}
+	}
+	else if (commandNeedsAmmo(parms->m_cmd) && isOutOfSpecialReloadAmmo())
+	{
+		// Airborne and out of ammo: an attack would be flown with nothing to fire, so land and reload
+		// first, then take off for the order. A return (or a circle over a dead airfield) that is
+		// already under way is left alone.
+		setFlag(HAS_PENDING_COMMAND, true);
+		const StateID id = getStateMachine()->getCurrentStateID();
+		if (id < JETAISTATETYPE_FIRST || id > JETAISTATETYPE_LAST)
+		{
+			setFlag(USE_SPECIAL_RETURN_LOCO, true);
+			getStateMachine()->clear();
+			setLastCommandSource( CMD_FROM_AI );
+			getStateMachine()->setState( RETURNING_FOR_LANDING );
+		}
+		return;
 	}
 
 	switch (parms->m_cmd)

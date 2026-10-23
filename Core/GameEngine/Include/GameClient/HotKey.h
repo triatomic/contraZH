@@ -60,6 +60,7 @@
 //-----------------------------------------------------------------------------
 class AsciiString;
 class GameWindow;
+class INI;
 //-----------------------------------------------------------------------------
 // TYPE DEFINES ///////////////////////////////////////////////////////////////
 //-----------------------------------------------------------------------------
@@ -77,6 +78,7 @@ public:
 	HotKey();
 	GameWindow *m_win;
 	AsciiString m_key;
+	Bool m_priority;
 	// we may need a checkmark system.
 };
 
@@ -92,7 +94,9 @@ public:
 	virtual void reset() override;															///< Reset
 	//-----------------------------------------------------------------------------------------------
 
-	void addHotKey( GameWindow *win, const AsciiString& key);
+	// TheSuperHackers @feature A priority key takes the key from a normal holder and keeps it
+	// against any later normal claim.
+	void addHotKey( GameWindow *win, const AsciiString& key, Bool priority = FALSE );
 	Bool executeHotKey( const AsciiString& key); // called front eh HotKeyTranslator
 
 	AsciiString searchHotKey( const AsciiString& label);
@@ -102,6 +106,9 @@ public:
 	// Deliberately not derived from the window's label -- addHotKey drops keys that collide
 	// with an earlier button, so only this reports the key that will really work.
 	AsciiString getHotKeyForWindow( const GameWindow *win ) const;
+
+	// TheSuperHackers @feature The window holding this key, if its priority matches.
+	GameWindow *findHotKeyWindow( const AsciiString& key, Bool priority ) const;
 
 	// TheSuperHackers @feature True while a button press is being synthesized from a keyboard
 	// hotkey rather than an actual mouse click. Quick cast needs to tell the two apart.
@@ -118,11 +125,34 @@ public:
 	// letter, but only while a button actually wants it.
 	Bool isHotKeyClaimed( const AsciiString& key ) const;
 
+	// A command button's letter: the player's from Hotkeys.ini, else the one its label marks with '&'
+	AsciiString getButtonHotKey( const AsciiString& buttonName, const AsciiString& label );
+	// The label with '&' moved to the player's letter, or added after it when the label lacks the letter
+	UnicodeString getButtonLabel( const AsciiString& buttonName, const AsciiString& label );
+	static UnicodeString markLabel( const UnicodeString& text, const AsciiString& key );	///< the text with '&' on this key, or the key's name added
+
+	// Player letters by lower case button name; an empty letter means the button has no key
+	typedef std::map<AsciiString, AsciiString> ButtonKeyMap;
+	static const ButtonKeyMap& getPlayerButtonKeys() { return s_playerButtonKeys; }
+	static void parsePlayerButtonKey( INI *ini );
+
+	// Mouse inputs bound like keys: their names in Hotkeys.ini and the hotkey map, and their labels
+	static const char *mouseKeyName( Int key );	///< "mouse4" for a mouse key code, null for anything else
+	static Int mouseKeyFromName( const AsciiString& name );	///< the mouse key code a name stands for, 0 for none
+	static const WideChar *mouseKeyText( Int key );	///< "Mouse 4" for a mouse key code, null for anything else
+	static Char cornerOf( const AsciiString& key );	///< the one character a cameo corner shows for a key, 0 for none
+	static const char *cornerText( Char corner );	///< "M4" for a mouse key's corner character, null for a letter
+
+	// Hotkeys.ini in the user data folder, laid over the shipped command map and button letters
+	static AsciiString getPlayerKeysPath();
+	static void loadPlayerKeys();
+
 private:
 	typedef std::map<AsciiString, HotKey> HotKeyMap;
 	HotKeyMap m_hotKeyMap;
 	static Bool s_executingHotKey;
 	static Bool s_quickCastAiming;
+	static ButtonKeyMap s_playerButtonKeys;
 };
 extern HotKeyManager *TheHotKeyManager;
 //-----------------------------------------------------------------------------

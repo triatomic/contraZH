@@ -273,6 +273,7 @@ DrawableLocoInfo::DrawableLocoInfo()
 
   m_yawModulator = 0.0f;
   m_pitchModulator = 0.0f;
+	m_smoothedVelZ = 0.0f;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -615,6 +616,7 @@ Drawable::Drawable( const ThingTemplate *thingTemplate, DrawableStatusBits statu
 	//Real scaleFuzziness = thingTemplate->getInstanceScaleFuzziness();
 	//Real fuzzyScale = ( 1.0f + GameClientRandomValueReal( -scaleFuzziness, scaleFuzziness ));
 	m_instanceScale = thingTemplate->getAssetScale();// * fuzzyScale;
+	m_objectScale = 1.0f;
 
 	// initially not bound to an object
 	m_object = nullptr;
@@ -1246,7 +1248,7 @@ void Drawable::updateSelectionDecal( void )
 
 	for( DrawModule **dm = getDrawModules(); *dm; ++dm )
 	{
-		(*dm)->setSelectionDecal( wanted, radius, GameMakeColor( 0, 255, 0, 255 ) );
+		(*dm)->setSelectionDecal( wanted, radius, GameMakeColor( 0, 255, 0, 255 ), TRUE );
 		break;	// first draw module only, so rings do not stack
 	}
 }
@@ -1677,17 +1679,33 @@ void Drawable::applyPhysicsXform(Matrix3D* mtx)
 {
 	if (m_physicsXform != nullptr)
 	{
-		// TheSuperHackers @tweak Update the physics transform on every WW Sync only.
-		// All calculations are originally catered to a 30 fps logic step.
+		// TheSuperHackers @tweak Advance physics only on WW Sync frames.
 		if (WW3D::Get_Sync_Frame_Time() != 0)
 		{
+			m_physicsXform->setPrevTotals();
 			calcPhysicsXform(*m_physicsXform);
+
+			// New or previously undrawn objects have no result from the previous logic step.
+			if (m_physicsXform->m_syncTime != WW3D::Get_Previous_Sync_Time())
+			{
+				m_physicsXform->setPrevTotals();
+			}
+			m_physicsXform->m_syncTime = WW3D::Get_Sync_Time();
 		}
 
-		mtx->Translate(0.0f, 0.0f, m_physicsXform->m_totalZ);
-		mtx->Rotate_Y( m_physicsXform->m_totalPitch );
-		mtx->Rotate_X( -m_physicsXform->m_totalRoll );
-		mtx->Rotate_Z( m_physicsXform->m_totalYaw );
+		// TheSuperHackers @tweak bobtista 14/09/2026 Interpolate the rendered transform between
+		// logic frames, so the motion stays smooth when the render rate is above the logic rate.
+		const Real t = m_drawnValid ? m_drawnProgress : 1.0f;
+
+		const Real interpPitch = WWMath::Lerp(m_physicsXform->m_prevTotalPitch, m_physicsXform->m_totalPitch, t);
+		const Real interpRoll = WWMath::Lerp(m_physicsXform->m_prevTotalRoll, m_physicsXform->m_totalRoll, t);
+		const Real interpYaw = WWMath::Lerp(m_physicsXform->m_prevTotalYaw, m_physicsXform->m_totalYaw, t);
+		const Real interpZ = WWMath::Lerp(m_physicsXform->m_prevTotalZ, m_physicsXform->m_totalZ, t);
+
+		mtx->Translate(0.0f, 0.0f, interpZ);
+		mtx->Rotate_Y( interpPitch );
+		mtx->Rotate_X( -interpRoll );
+		mtx->Rotate_Z( interpYaw );
 	}
 }
 
@@ -1900,10 +1918,14 @@ void Drawable::calcPhysicsXformHoverOrWings( const Locomotor *locomotor, Physics
   {
 		if (Z_VEL_PITCH_COEFF != 0.0f)
 		{
+			// Lift control on a slope alternates full and zero lift each frame, which pitches slow fliers visibly.
+			const Real Z_VEL_SMOOTHING = 0.2f;
+			m_locoInfo->m_smoothedVelZ += Z_VEL_SMOOTHING * (vel->z - m_locoInfo->m_smoothedVelZ);
+
 			const Real TINY_DZ = 0.001f;
-			if (fabs(vel->z) > TINY_DZ)
+			if (fabs(m_locoInfo->m_smoothedVelZ) > TINY_DZ)
 			{
-				Real pitch = atan2(vel->z, sqrt(sqr(vel->x)+sqr(vel->y)));
+				Real pitch = atan2(m_locoInfo->m_smoothedVelZ, sqrt(sqr(vel->x)+sqr(vel->y)));
 				m_locoInfo->m_pitch -= Z_VEL_PITCH_COEFF * pitch;
 			}
 		}
@@ -2139,36 +2161,6 @@ void Drawable::calcPhysicsXformTreads( const Locomotor *locomotor, PhysicsXformI
 		m_locoInfo->m_accelerationRollRate += -(LATERAL_ACCEL_COEFF * lateralAccel);
 	}
 
-#ifdef RECOIL_FROM_BEING_DAMAGED
-	// recoil from being hit
-	/// @todo Recoil needs to be based on sane damage amounts (MSB)
-	const DamageInfo *damageInfo = obj->getBodyModule()->getLastDamageInfo();
-	if (damageInfo)
-	{
-		if (obj->getBodyModule()->getLastDamageTimestamp() > m_lastDamageTimestamp && damageInfo->in.m_amount > RECOIL_DAMAGE)
-		{
-			Object *attacker = TheGameLogic->getObject( damageInfo->in.m_sourceID );
-			if (attacker)
-			{
-				Coord3D to;
-				ThePartitionManager->getVectorTo( obj, attacker, FROM_CENTER_2D, &to );
-
-				to.normalize();
-
-				Real forward = dir->x * to.x + dir->y * to.y;
-				Real lateral = perp.x * to.x + perp.y * to.y;
-
-				Real recoil = PI/16.0f * GameClientRandomValueReal( 0.5f, 1.0f );
-
-				m_locoInfo->m_accelerationPitchRate -= recoil * forward;
-				m_locoInfo->m_accelerationRollRate -= recoil * lateral;
-			}
-
-			m_lastDamageTimestamp = obj->getBodyModule()->getLastDamageTimestamp();
-		}
-	}
-#endif
-
 	// limit recoil pitch and roll
 
 	if (m_locoInfo->m_accelerationPitch > DECEL_PITCH_LIMIT)
@@ -2291,6 +2283,11 @@ void Drawable::calcPhysicsXformWheels( const Locomotor *locomotor, PhysicsXformI
 		Real width = obj->getGeometryInfo().getMinorRadius();
 		Real pitchHeight = length*Sin(m_locoInfo->m_pitch + m_locoInfo->m_accelerationPitch - groundPitch);
 		Real rollHeight = width*Sin(m_locoInfo->m_roll + m_locoInfo->m_accelerationRoll - groundRoll);
+
+		// Draw level while airborne, as retail did; the persistent transform would otherwise keep the last ground tilt.
+		info.m_totalPitch = 0.0f;
+		info.m_totalRoll = 0.0f;
+		info.m_totalYaw = 0.0f;
 		info.m_totalZ = fabs(pitchHeight)/4 + fabs(rollHeight)/4;
 		return; // maintain the same orientation while we fly through the air.
 	}
@@ -2974,6 +2971,12 @@ void Drawable::draw()
 #endif
 	}
 
+	// A baked per-instance scale would corrupt the pristine bones every instance of the template shares.
+	if (m_objectScale != 1.0f)
+	{
+		transformMtx.Scale(m_objectScale);
+	}
+
 	if (TheGlobalData->m_showClientPhysics && getObject() && !getObject()->isDisabledByType( DISABLED_HELD ))
 	{
 		applyPhysicsXform(&transformMtx);
@@ -3531,8 +3534,7 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 		}
 	}
 
-	// Each model gets a callout rather than a line in the stack: a leader runs from the model's
-	// centre out to one side, and the name sits at the end of it.
+	// Each model gets a callout with a leader to one side instead of a line in the stack.
 	if( wantModelNames && TheTacticalView != nullptr )
 	{
 		const UnsignedInt renderFrame = WW3D::Get_Frame_Count();
@@ -3661,7 +3663,7 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 
 		AsciiString armorName;
 		if( armorSet != NULL && TheArmorStore != NULL )
-			armorName = TheArmorStore->getArmorTemplateName( armorSet->getArmorTemplate() );
+			armorName = TheArmorStore->friend_findArmorTemplateName( armorSet->getArmorTemplate() );
 
 		UnicodeString armorLine;
 		// An object with no armor at all is normal for props and rubble, so say so rather than
@@ -3933,7 +3935,7 @@ void Drawable::drawIconUI()
 		return;
 #endif
 
-	if( TheGameLogic->getDrawIconUI() && (TheScriptEngine->getFade()==ScriptEngine::FADE_NONE) )
+	if( TheGameLogic->getDrawIconUI() && (TheScriptEngine->getFade()==ScriptEngine::FADE_NONE || TheScriptEngine->isLightningFade()) )
 	{
 		IRegion2D healthBarRegionStorage;
 		const IRegion2D* healthBarRegion = nullptr;
@@ -4075,6 +4077,15 @@ void Drawable::drawEmoticon( const IRegion2D *healthBarRegion )
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature Overlays shown without selection or hover hide while a script
+// letterboxes the screen, the way campaign cinematics hide the control bar.
+// ------------------------------------------------------------------------------------------------
+static Bool isScriptHidingUI()
+{
+	return TheDisplay && TheDisplay->isLetterBoxed();
+}
+
+// ------------------------------------------------------------------------------------------------
 void Drawable::drawAmmo( const IRegion2D *healthBarRegion )
 {
 	if (!healthBarRegion)
@@ -4087,7 +4098,7 @@ void Drawable::drawAmmo( const IRegion2D *healthBarRegion )
 	// to the player's own units -- not allies, not enemies -- since standing ammo counts on units
 	// you do not control would be information the game does not otherwise give away. A unit with
 	// no shots left draws nothing at all, so the pips read as "this one is still loaded".
-	const Bool smartPips = TheGlobalData->m_smartPips;
+	const Bool smartPips = TheGlobalData->m_smartPips && !isScriptHidingUI();
 
 	if (!smartPips)
 	{
@@ -4369,7 +4380,7 @@ void Drawable::drawProductionBar( const IRegion2D *healthBarRegion )
 
 	const Object* obj = getObject();
 
-	const Bool alwaysVisible = TheGlobalData->m_healthBarDisplayMode == HealthBarDisplayMode_Always;
+	const Bool alwaysVisible = TheGlobalData->m_healthBarDisplayMode == HealthBarDisplayMode_Always && !isScriptHidingUI();
 
 	if (!(
 				TheGlobalData->m_showObjectHealth &&
@@ -4450,7 +4461,7 @@ void Drawable::drawSupplyBar( const IRegion2D *healthBarRegion )
 
 	const Object* obj = getObject();
 
-	const Bool alwaysVisible = TheGlobalData->m_healthBarDisplayMode == HealthBarDisplayMode_Always;
+	const Bool alwaysVisible = TheGlobalData->m_healthBarDisplayMode == HealthBarDisplayMode_Always && !isScriptHidingUI();
 
 	if (!(
 				TheGlobalData->m_showObjectHealth &&
@@ -4528,7 +4539,7 @@ void Drawable::drawContained( const IRegion2D *healthBarRegion )
 	// allies, not enemies -- so this never reveals cargo the player could not already see. An
 	// empty transport draws nothing either way, thanks to the numFull check below, so the pips
 	// read as "this one is carrying someone".
-	const Bool smartPips = TheGlobalData->m_smartPips;
+	const Bool smartPips = TheGlobalData->m_smartPips && !isScriptHidingUI();
 
 	if (!smartPips)
 	{
@@ -4824,8 +4835,10 @@ void Drawable::drawHealing(const IRegion2D* healthBarRegion)
 //		if( lastDamage != nullptr && lastDamage->in.m_damageType == DAMAGE_HEALING
 //			&&(TheGameLogic->getFrame() - body->getLastHealingTimestamp()) <= HEALING_ICON_DISPLAY_TIME
 //			)
+		const UnsignedInt *lastHealingTimestamp = body->getLastHealingTimestamp();
 		if ( TheGameLogic->getFrame() > HEALING_ICON_DISPLAY_TIME && // because so many things init health early in game
-			(TheGameLogic->getFrame() - body->getLastHealingTimestamp() <= HEALING_ICON_DISPLAY_TIME) )
+			lastHealingTimestamp != nullptr &&
+			(TheGameLogic->getFrame() - *lastHealingTimestamp <= HEALING_ICON_DISPLAY_TIME) )
 
 			showHealing = TRUE;
 	}
@@ -5566,7 +5579,7 @@ static Bool isHealthBarAlwaysVisible( const Object *obj, Real healthRatio )
 {
 	const Int mode = TheGlobalData->m_healthBarDisplayMode;
 
-	if( mode == HealthBarDisplayMode_Classic )
+	if( mode == HealthBarDisplayMode_Classic || isScriptHidingUI() )
 		return FALSE;
 
 	// never label a corpse or a piece of scenery, in any mode
@@ -6641,6 +6654,23 @@ void Drawable::setDrawableHidden( Bool hidden )
 }
 
 //-------------------------------------------------------------------------------------------------
+/** Allow model-condition particle systems to keep emitting while the drawable is hidden */
+//-------------------------------------------------------------------------------------------------
+void Drawable::setKeepParticlesWhenHidden( Bool keep )
+{
+	if (keep == testDrawableStatus(DRAWABLE_STATUS_KEEP_PARTICLES_WHEN_HIDDEN))
+		return;
+
+	if (keep)
+		setDrawableStatus(DRAWABLE_STATUS_KEEP_PARTICLES_WHEN_HIDDEN);
+	else
+		clearDrawableStatus(DRAWABLE_STATUS_KEEP_PARTICLES_WHEN_HIDDEN);
+
+	// let the draw modules re-evaluate whether their particle systems run
+	updateHiddenStatus();
+}
+
+//-------------------------------------------------------------------------------------------------
 void Drawable::updateDrawableClipStatus( UnsignedInt shotsRemaining, UnsignedInt maxShots, WeaponSlotType slot )
 {
 	for (DrawModule** dm = getDrawModulesNonDirty(); *dm; ++dm)
@@ -6887,6 +6917,7 @@ void Drawable::xferDrawableModules( Xfer *xfer )
 	* 9: jamming overlay intensity
 	* 10: frozen overlay intensity
 	* 11: TheSuperHackers @tweak m_timeElapsedFade is now serialized as Real instead of UnsignedInt
+	* 12: m_objectScale
 	*/
 // ------------------------------------------------------------------------------------------------
 void Drawable::xfer( Xfer *xfer )
@@ -6898,7 +6929,7 @@ void Drawable::xfer( Xfer *xfer )
 #elif RETAIL_COMPATIBLE_XFER_SAVE
 	const XferVersion currentVersion = 7;
 #else
-	const XferVersion currentVersion = 11;
+	const XferVersion currentVersion = 12;
 #endif
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
@@ -7414,6 +7445,11 @@ void Drawable::xfer( Xfer *xfer )
 	if( version >= 10 )
 	{
 		xfer->xferReal( &m_frozenOverlayIntensity );
+	}
+
+	if( version >= 12 )
+	{
+		xfer->xferReal( &m_objectScale );
 	}
 }
 

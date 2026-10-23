@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>WBQtScriptEditListTab</class>
- <widget class="QWidget" name="WBQtScriptEditListTab">
+ <class>WBQtScriptEditListTabClassic</class>
+ <widget class="QWidget" name="WBQtScriptEditListTabClassic">
   <layout class="QVBoxLayout" name="rootLayout" stretch="0,1,0">
    <item>
     <widget class="QLabel" name="captionLabel"/>

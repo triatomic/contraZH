@@ -8,7 +8,7 @@
 // which covers everything drawn so far. 0 reads the terrain's height texture from stage 1, which
 // covers only the ground.
 //
-// FLAME shades the sprite as fire. A noise field on stage 2, fixed in the world and rising with
+// FLAME shades a sprite, beam or mesh as fire. A noise field on stage 2, fixed in the world and rising with
 // time, warps the texture lookup, breaks up dim edges and makes the brightness flicker. Bright
 // texels run to white at their own brightness and dim ones deepen toward their hue, so blue and
 // green flames keep their colour.
@@ -70,10 +70,11 @@ float4 FlameWorldX : register(c7);   // camera space to world x, y and z, one ro
 float4 FlameWorldY : register(c8);
 float4 FlameWorldZ : register(c9);
 float4 FlameShape  : register(c10);  // x = flicker swing, y = fringe breakup, z = the default camera's distance to the ground it looks at
+float4 FlameClamp  : register(c11);  // xy = lowest and zw = highest warped uv, open where the texture tiles
 #elif ELECTRIC
 float4 Electric       : register(c6);   // xy = this jump's noise offset, z = camera space to noise scale, w = texture jitter
 float4 ElectricShape  : register(c7);   // x = strobe swing, y = arc sharpness, z = half the arc brightness, w = depth where arcs start to widen
-float4 ElectricClamp  : register(c8);   // xy = lowest and zw = highest jittered uv, open along a beam whose texture tiles
+float4 ElectricClamp  : register(c8);   // xy = lowest and zw = highest jittered uv, open where the texture tiles
 float4 ElectricStrobe : register(c9);   // x = 1 - half the strobe swing
 #elif LASER
 float4 Laser      : register(c6);   // x = pulse travel so far, y = world to noise scale, z = -3 / core width squared, w = core brightness
@@ -110,7 +111,7 @@ float4 main(PsIn input) : COLOR
     float4 noiseA = tex2D(NoiseTexture, float2(flameWorld.x, flameWorld.z) * Flame.z - float2(0.0f, Flame.x));
     float4 noiseB = tex2D(NoiseTexture, float2(flameWorld.y, flameWorld.z) * (Flame.z * 1.7f) - float2(0.0f, Flame.x * 1.3f));
 
-    float2 uv = saturate(input.TexCoord + (noiseA.rg + noiseB.gr - 1.0f) * Flame.y);
+    float2 uv = clamp(input.TexCoord + (noiseA.rg + noiseB.gr - 1.0f) * Flame.y, FlameClamp.xy, FlameClamp.zw);
     float4 texel = tex2D(ParticleTexture, uv);
     float4 color = texel * input.Diffuse;
 

@@ -44,7 +44,10 @@
 #include "W3DDevice/GameClient/BaseHeightMap.h"
 #include <algorithm>
 #include <float.h>
+#include <map>
 #include <vector>
+#include <d2d1.h>
+#include <d2d1helper.h>
 
 Bool localIsUnderwater(Real x, Real y);
 static void clearRoadTexCache();
@@ -73,6 +76,8 @@ Bool MinimapDialog::s_loading = false;
 
 BEGIN_MESSAGE_MAP(MinimapDialog, CDialog)
 	ON_WM_PAINT()
+	ON_WM_ERASEBKGND()
+	ON_WM_SIZE()
 	ON_WM_EXITSIZEMOVE()
 	ON_WM_LBUTTONDOWN()
 	ON_WM_MOUSEMOVE()
@@ -84,7 +89,6 @@ MinimapDialog::MinimapDialog(CWnd *pParent)
 	: CDialog(MinimapDialog::IDD, pParent),
 	  m_pixelBuffer(NULL),
 	  m_terrainBuffer(NULL),
-	  m_terrainRoadsBuffer(NULL),
 	  m_roadsValid(false),
 	  m_terrainValid(false),
 	  m_resolution(MINIMAP_RES_DEFAULT),
@@ -98,10 +102,11 @@ MinimapDialog::MinimapDialog(CWnd *pParent)
 	  m_fullExtent(false),
 	  m_refreshDelayMs(250),
 	  m_lastSelectionSig(0),
-	  m_clipX0(0), m_clipY0(0), m_clipX1(0), m_clipY1(0),
-	  m_stretchBmp(NULL),
-	  m_stretchW(0), m_stretchH(0),
-	  m_stretchValid(false)
+	  m_d2dFactory(NULL),
+	  m_d2dTarget(NULL),
+	  m_d2dBrush(NULL),
+	  m_d2dBitmap(NULL),
+	  m_bitmapDirty(true)
 {
 	// Load persisted config (clamp to valid ranges).
 	m_resolution     = ::AfxGetApp()->GetProfileInt(MINIMAP_SECTION, "Resolution", MINIMAP_RES_DEFAULT);
@@ -124,9 +129,9 @@ MinimapDialog::~MinimapDialog()
 		TheMinimapDialog = NULL;
 	delete [] m_pixelBuffer;
 	delete [] m_terrainBuffer;
-	delete [] m_terrainRoadsBuffer;
-	if (m_stretchBmp)
-		::DeleteObject(m_stretchBmp);
+	discardDeviceResources();
+	if (m_d2dFactory)
+		m_d2dFactory->Release();
 	clearRoadTexCache();
 }
 
@@ -134,33 +139,22 @@ void MinimapDialog::allocBuffer()
 {
 	delete [] m_pixelBuffer;
 	delete [] m_terrainBuffer;
-	delete [] m_terrainRoadsBuffer;
 	Int n = m_resolution * m_resolution;
-	m_pixelBuffer        = new UnsignedInt[n];
-	m_terrainBuffer      = new UnsignedInt[n];
-	m_terrainRoadsBuffer = new UnsignedInt[n];
-	memset(m_pixelBuffer,        0, sizeof(UnsignedInt) * n);
-	memset(m_terrainBuffer,      0, sizeof(UnsignedInt) * n);
-	memset(m_terrainRoadsBuffer, 0, sizeof(UnsignedInt) * n);
+	m_pixelBuffer   = new UnsignedInt[n];
+	m_terrainBuffer = new UnsignedInt[n];
+	memset(m_pixelBuffer,   0, sizeof(UnsignedInt) * n);
+	memset(m_terrainBuffer, 0, sizeof(UnsignedInt) * n);
 	m_terrainBuilt = false;
 	m_terrainValid = false;
 	m_roadsValid   = false;
-	m_stretchValid = false;
-	m_lastSelected.clear();
-	resetClip();
-}
 
-void MinimapDialog::setClip(Int x0, Int y0, Int x1, Int y1)
-{
-	m_clipX0 = x0 < 0 ? 0 : x0;
-	m_clipY0 = y0 < 0 ? 0 : y0;
-	m_clipX1 = x1 > m_resolution ? m_resolution : x1;
-	m_clipY1 = y1 > m_resolution ? m_resolution : y1;
-}
-
-void MinimapDialog::resetClip()
-{
-	setClip(0, 0, m_resolution, m_resolution);
+	// The bitmap is sized to the buffer.
+	if (m_d2dBitmap)
+	{
+		m_d2dBitmap->Release();
+		m_d2dBitmap = NULL;
+	}
+	m_bitmapDirty = true;
 }
 
 BOOL MinimapDialog::OnInitDialog()
@@ -221,8 +215,7 @@ void MinimapDialog::setShowBorder(Bool show)
 {
 	m_showBorder = show;
 	::AfxGetApp()->WriteProfileInt(MINIMAP_SECTION, "ShowBorder", show ? 1 : 0);
-	// The border is a GDI overlay drawn in OnPaint (not baked into the buffer), so a
-	// repaint is all that's needed -- no terrain resample or object recomposite.
+	// The border is drawn in OnPaint, not baked into the buffer, so a repaint is enough.
 	if (::IsWindow(m_hWnd) && IsWindowVisible())
 		Invalidate(FALSE);
 }
@@ -276,14 +269,9 @@ void MinimapDialog::setCullObjects(Bool cull)
 {
 	m_cullObjects = cull;
 	::AfxGetApp()->WriteProfileInt(MINIMAP_SECTION, "CullObjects", cull ? 1 : 0);
-	if (IsWindowVisible())
-	{
-		// Object-only change: reuse the cached terrain resample (cheap recomposite).
-		if (m_terrainValid)
-			refreshObjects();
-		else
-			rebuildTerrain();
-	}
+	// The cull runs per paint against the current camera.
+	if (::IsWindow(m_hWnd) && IsWindowVisible())
+		Invalidate(FALSE);
 }
 
 void MinimapDialog::setRefreshDelayMs(Int ms)
@@ -407,19 +395,19 @@ void MinimapDialog::requestRebuild(Bool terrainChanged)
 }
 
 // A pure SELECTION change (the selection overlay's cyan halos must track the new
-// selection). Unlike requestRebuild(false), this does NOT invalidate the roads cache:
-// changing which objects are selected never moves a road, so the cached terrain+roads
-// composite stays valid and only the (cheaper) object pass needs redoing.
+// selection). Unlike requestRebuild(false), this keeps the terrain + roads bitmap:
+// changing which objects are selected never moves a road.
 void MinimapDialog::requestSelectionRefresh()
 {
 	if (s_loading)					// a map load/teardown is in progress -- don't fight it
 		return;
 	if (!::IsWindow(m_hWnd) || !IsWindowVisible())
 		return;
-	if (!m_terrainValid)			// no cached terrain yet -- let the normal path resample
+	if (!m_terrainBuilt)			// nothing shown yet -- let the normal path build it
 		return;
 
-	refreshSelectionBlips();
+	buildBlips();
+	Invalidate(FALSE);
 }
 
 // Cheap order-sensitive signature of the current selection set (FNV-1a over the selected
@@ -462,15 +450,8 @@ void MinimapDialog::notifySelectionChanged()
 }
 
 // A pure CAMERA move (panning, zoom, and especially dragging the minimap itself).
-// The composited buffer -- terrain, roads, object blips -- is all world space and
-// does NOT move; only the yellow view box (a cheap GDI overlay in OnPaint) follows.
-// So just invalidate to repaint the box; do NOT recomposite. Recompositing roads +
-// objects on every WM_MOUSEMOVE was what made the minimap drag clunky in the 3D view
-// (a full overlay rebuild ran on the UI thread ahead of the 3D paint, per event).
-//
-// EXCEPTION: with "Cull Objects To View" on, the visible blip set depends on the
-// camera, so the buffer must be recomposited -- coalesce it through the throttle
-// timer so a drag doesn't rebuild on every event.
+// Terrain, roads and blips are all world space, and the view box and the blip cull
+// are evaluated per paint, so a repaint is all a camera move needs.
 void MinimapDialog::requestViewBoxRefresh()
 {
 	if (s_loading)
@@ -478,14 +459,7 @@ void MinimapDialog::requestViewBoxRefresh()
 	if (!::IsWindow(m_hWnd) || !IsWindowVisible())
 		return;
 
-	if (m_cullObjects && m_terrainValid)
-	{
-		m_rebuildPending = true;
-		SetTimer(MINIMAP_REBUILD_TIMER, (UINT)(m_refreshDelayMs > 0 ? m_refreshDelayMs : 16), NULL);
-		return;
-	}
-
-	Invalidate(FALSE);		// repaint cached buffer + view-box overlay; no recomposite
+	Invalidate(FALSE);
 }
 
 void MinimapDialog::OnTimer(UINT_PTR nIDEvent)
@@ -507,6 +481,77 @@ void MinimapDialog::OnTimer(UINT_PTR nIDEvent)
 	CDialog::OnTimer(nIDEvent);
 }
 
+Bool MinimapDialog::createDeviceResources()
+{
+	if (!m_d2dFactory
+		&& FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &m_d2dFactory)))
+	{
+		m_d2dFactory = NULL;
+		return FALSE;
+	}
+
+	if (!m_d2dTarget)
+	{
+		CRect clientRect;
+		GetClientRect(&clientRect);
+
+		// 96 DPI keeps one DIP equal to one client pixel at any display scaling.
+		D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties();
+		props.dpiX = 96.0f;
+		props.dpiY = 96.0f;
+		// Present immediately; a vsync wait here would stall the UI thread on every camera move.
+		D2D1_HWND_RENDER_TARGET_PROPERTIES hwndProps = D2D1::HwndRenderTargetProperties(
+			m_hWnd, D2D1::SizeU(clientRect.Width(), clientRect.Height()),
+			D2D1_PRESENT_OPTIONS_IMMEDIATELY);
+		if (FAILED(m_d2dFactory->CreateHwndRenderTarget(props, hwndProps, &m_d2dTarget)))
+		{
+			m_d2dTarget = NULL;
+			return FALSE;
+		}
+	}
+
+	if (!m_d2dBrush
+		&& FAILED(m_d2dTarget->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), &m_d2dBrush)))
+	{
+		m_d2dBrush = NULL;
+		return FALSE;
+	}
+
+	if (!m_d2dBitmap)
+	{
+		D2D1_BITMAP_PROPERTIES bmpProps = D2D1::BitmapProperties(
+			D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE), 96.0f, 96.0f);
+		if (FAILED(m_d2dTarget->CreateBitmap(D2D1::SizeU(m_resolution, m_resolution),
+			m_pixelBuffer, m_resolution * sizeof(UnsignedInt), bmpProps, &m_d2dBitmap)))
+		{
+			m_d2dBitmap = NULL;
+			return FALSE;
+		}
+		m_bitmapDirty = false;
+	}
+	return TRUE;
+}
+
+void MinimapDialog::discardDeviceResources()
+{
+	if (m_d2dBitmap)
+	{
+		m_d2dBitmap->Release();
+		m_d2dBitmap = NULL;
+	}
+	if (m_d2dBrush)
+	{
+		m_d2dBrush->Release();
+		m_d2dBrush = NULL;
+	}
+	if (m_d2dTarget)
+	{
+		m_d2dTarget->Release();
+		m_d2dTarget = NULL;
+	}
+	m_bitmapDirty = true;
+}
+
 void MinimapDialog::OnPaint()
 {
 	WBPerfEvent perf("minimap paint");
@@ -515,15 +560,6 @@ void MinimapDialog::OnPaint()
 	if (!m_terrainBuilt)
 		return;
 
-	BITMAPINFO bmi;
-	memset(&bmi, 0, sizeof(bmi));
-	bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-	bmi.bmiHeader.biWidth = m_resolution;
-	bmi.bmiHeader.biHeight = -m_resolution;	// negative = top-down DIB (row 0 is the top scanline)
-	bmi.bmiHeader.biPlanes = 1;
-	bmi.bmiHeader.biBitCount = 32;
-	bmi.bmiHeader.biCompression = BI_RGB;
-
 	CRect clientRect;
 	GetClientRect(&clientRect);
 	const Int clientW = clientRect.Width();
@@ -531,50 +567,54 @@ void MinimapDialog::OnPaint()
 	if (clientW <= 0 || clientH <= 0)
 		return;
 
-	// The stretch from the buffer (up to 2048 square) to the client is the expensive
-	// part of a paint, and a camera move only moves the view box, so keep the stretched
-	// result in a client-sized bitmap and redo it only when the buffer or size changed.
-	if (m_stretchBmp && (m_stretchW != clientW || m_stretchH != clientH))
-	{
-		::DeleteObject(m_stretchBmp);
-		m_stretchBmp = NULL;
-		m_stretchValid = false;
-	}
-	if (!m_stretchBmp)
-	{
-		m_stretchBmp = ::CreateCompatibleBitmap(dc.m_hDC, clientW, clientH);
-		m_stretchW = clientW;
-		m_stretchH = clientH;
-		m_stretchValid = false;
-	}
-	HDC memDC = ::CreateCompatibleDC(dc.m_hDC);
-	HGDIOBJ oldBmp = ::SelectObject(memDC, m_stretchBmp);
-	if (!m_stretchValid)
-	{
-		SetStretchBltMode(memDC, COLORONCOLOR);
-		StretchDIBits(memDC,
-			0, 0, clientW, clientH,
-			0, 0, m_resolution, m_resolution,
-			m_pixelBuffer, &bmi, DIB_RGB_COLORS, SRCCOPY);
-		m_stretchValid = true;
-	}
-	::BitBlt(dc.m_hDC, 0, 0, clientW, clientH, memDC, 0, 0, SRCCOPY);
-	::SelectObject(memDC, oldBmp);
-	::DeleteDC(memDC);
+	if (!createDeviceResources())
+		return;
 
-	// Orange playable-area boundary, drawn first so the yellow camera view box sits on
-	// top of it. Only meaningful in full-extent mode, where the non-playable margin is
-	// visible around the playable rect (in playable-only mode it would just trace the
-	// minimap edge), so gate it on m_fullExtent too. Both are GDI overlays at full client
-	// resolution (not baked into the low-res buffer), so the lines stay crisp at any
-	// sampling resolution.
+	D2D1_SIZE_U size = m_d2dTarget->GetPixelSize();
+	if ((Int)size.width != clientW || (Int)size.height != clientH)
+		m_d2dTarget->Resize(D2D1::SizeU(clientW, clientH));
+
+	if (m_bitmapDirty)
+	{
+		m_d2dBitmap->CopyFromMemory(NULL, m_pixelBuffer, m_resolution * sizeof(UnsignedInt));
+		m_bitmapDirty = false;
+	}
+
+	m_d2dTarget->BeginDraw();
+	m_d2dTarget->SetTransform(D2D1::Matrix3x2F::Identity());
+	m_d2dTarget->DrawBitmap(m_d2dBitmap, D2D1::RectF(0.0f, 0.0f, (FLOAT)clientW, (FLOAT)clientH),
+		1.0f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+
+	if (m_showObjects)
+		drawBlips(clientW, clientH);
+
+	// The border only means something in full-extent mode; playable-only would trace the edge.
 	if (m_showBorder && m_fullExtent)
-		drawBorderOverlay(dc.m_hDC, clientRect.Width(), clientRect.Height());
+		drawBorderOverlay(clientW, clientH);
 
-	// Draw the camera view box as a GDI overlay at full client resolution (not baked
-	// into the low-res buffer), so the lines are smooth and the thickness is crisp
-	// regardless of the sampling resolution.
-	drawViewBoxOverlay(dc.m_hDC, clientRect.Width(), clientRect.Height());
+	drawViewBoxOverlay(clientW, clientH);
+
+	if (m_d2dTarget->EndDraw() == D2DERR_RECREATE_TARGET)
+	{
+		discardDeviceResources();
+		Invalidate(FALSE);
+	}
+}
+
+BOOL MinimapDialog::OnEraseBkgnd(CDC *pDC)
+{
+	// OnPaint covers the whole client once the terrain exists.
+	if (!m_terrainBuilt)
+		return CDialog::OnEraseBkgnd(pDC);
+	return TRUE;
+}
+
+void MinimapDialog::OnSize(UINT nType, int cx, int cy)
+{
+	CDialog::OnSize(nType, cx, cy);
+	if (m_d2dTarget && cx > 0 && cy > 0)
+		m_d2dTarget->Resize(D2D1::SizeU(cx, cy));
+	Invalidate(FALSE);
 }
 
 void MinimapDialog::centerViewAtClient(CPoint point)
@@ -613,7 +653,14 @@ void MinimapDialog::centerViewAtClient(CPoint point)
 	// than re-entrantly from this control bar's message handler.
 	WbView3d *p3d = pDoc->Get3DView();
 	if (p3d)
+	{
 		p3d->setCenterInViewDeferred(worldX, worldY);
+
+		// Mid-drag, both views' WM_PAINT waits behind the mouse moves, so paint them now,
+		// once per frame the FPS cap allows.
+		if (m_dragging && p3d->paintNowIfDue())
+			UpdateWindow();
+	}
 }
 
 void MinimapDialog::OnLButtonDown(UINT nFlags, CPoint point)
@@ -995,45 +1042,26 @@ void MinimapDialog::rebuildTerrain()
 	m_inRebuild = false;
 }
 
-// Cheap path: copy the cached terrain into the displayed buffer and overlay objects,
-// without resampling the terrain. Used when only objects changed.
+// Cheap path: rebuild roads over the cached terrain when they changed, and refresh
+// the blip list, without resampling the terrain.
 void MinimapDialog::refreshObjects()
 {
 	WBPerfEvent perf("minimap refreshObjects");
-	Int n = m_resolution * m_resolution;
 
-	// Roads are camera-invariant, but drawRoads() (per-segment lookup + oriented-quad
-	// rasterize over the whole road network) is expensive. With "Cull Objects To View"
-	// on, every camera move recomposites -- so re-rasterizing roads each time stutters
-	// the minimap-drag pan. Cache a terrain+roads layer and rebuild it only when terrain
-	// or roads actually change; camera-only recomposites then just copy the cache and
-	// redraw the (cheap) object blips.
+	// Roads are camera-invariant and expensive to rasterize, so they stay baked into the
+	// buffer until terrain or roads change.
 	if (!m_roadsValid)
 	{
-		memcpy(m_terrainRoadsBuffer, m_terrainBuffer, sizeof(UnsignedInt) * n);
+		memcpy(m_pixelBuffer, m_terrainBuffer, sizeof(UnsignedInt) * m_resolution * m_resolution);
 		if (m_showRoads)
-		{
-			// drawRoads / drawThickLine write into m_pixelBuffer; point the composite at
-			// the roads-cache buffer for the duration so roads bake into the cache.
-			UnsignedInt *saved = m_pixelBuffer;
-			m_pixelBuffer = m_terrainRoadsBuffer;
 			drawRoads();
-			m_pixelBuffer = saved;
-		}
 		m_roadsValid = true;
+		m_bitmapDirty = true;
 	}
 
-	memcpy(m_pixelBuffer, m_terrainRoadsBuffer, sizeof(UnsignedInt) * n);
-
-	m_lastSelected.clear();
-	if (m_showObjects)
-		drawObjects();
-
-	// The camera view box is drawn as a GDI overlay in OnPaint (display resolution),
-	// not baked into the buffer.
+	buildBlips();
 
 	m_terrainBuilt = true;
-	m_stretchValid = false;
 	if (IsWindow(m_hWnd))
 		Invalidate(FALSE);
 }
@@ -1100,83 +1128,6 @@ static Bool isResourceStructure(const ThingTemplate *t)
 	return t->getName() == "TechOilDerrick";
 }
 
-// Fill an axis-aligned rect (centered at cx,cy in top-down buffer space) with color,
-// clipped to the buffer. w/h are full extents.
-void MinimapDialog::fillRect(Int cx, Int cy, Int w, Int h, UnsignedInt color)
-{
-	Int left = cx - w / 2;
-	Int top  = cy - h / 2;
-	for (Int yy = top; yy < top + h; ++yy)
-	{
-		if (yy < m_clipY0 || yy >= m_clipY1) continue;
-		for (Int xx = left; xx < left + w; ++xx)
-		{
-			if (xx < m_clipX0 || xx >= m_clipX1) continue;
-			pixel(xx, yy) = color;
-		}
-	}
-}
-
-// Fill an axis-aligned rect with a 2-color checkerboard. Used for resource structures
-// (the "cashbox") so they read as a distinct special marker rather than a flat solid
-// block. w/h are full extents. 'cell' is the checker block size in buffer pixels: it
-// MUST be >= 2 so the pattern survives the COLORONCOLOR StretchDIBits to the client --
-// a 1-pixel-period checker aliases to a solid color (decimation drops every other
-// pixel) at any resolution where the buffer is downscaled, which is exactly the bug
-// that made these go solid black at resolutions other than the ~native one.
-//
-// The block index is RELATIVE to the marker's own origin (left/top), not absolute
-// buffer coords: that locks the checker to the marker box so it translates rigidly as
-// the object moves. Indexing by absolute coords instead makes the box edge slide
-// across a fixed global grid frame-to-frame, which reads as the pattern "crawling" or
-// morphing under the (fixed-width) outline as the unit moves.
-void MinimapDialog::fillCheckerRect(Int cx, Int cy, Int w, Int h,
-								UnsignedInt colorA, UnsignedInt colorB, Int cell)
-{
-	if (cell < 2) cell = 2;
-	Int left = cx - w / 2;
-	Int top  = cy - h / 2;
-	for (Int yy = top; yy < top + h; ++yy)
-	{
-		if (yy < m_clipY0 || yy >= m_clipY1) continue;
-		for (Int xx = left; xx < left + w; ++xx)
-		{
-			if (xx < m_clipX0 || xx >= m_clipX1) continue;
-			Int parity = (((xx - left) / cell) + ((yy - top) / cell)) & 1;
-			pixel(xx, yy) = parity ? colorA : colorB;
-		}
-	}
-}
-
-// Fill a diamond (rotated square) of the given size (centered at cx,cy in top-down
-// buffer space) with color, clipped to the buffer. Used for units so they read as
-// diamonds vs. the square building markers. 'size' is the full diagonal extent.
-void MinimapDialog::fillDiamond(Int cx, Int cy, Int size, UnsignedInt color)
-{
-	if (size < 1) size = 1;
-	Int r = size / 2;
-	if (r < 1)
-	{
-		// Single pixel for tiny blips so it doesn't vanish at low resolution.
-		if (cx >= m_clipX0 && cx < m_clipX1 && cy >= m_clipY0 && cy < m_clipY1)
-			pixel(cx, cy) = color;
-		return;
-	}
-
-	for (Int dy = -r; dy <= r; ++dy)
-	{
-		Int yy = cy + dy;
-		if (yy < m_clipY0 || yy >= m_clipY1) continue;
-		Int span = r - (dy < 0 ? -dy : dy);		// |dx| + |dy| <= r
-		for (Int dx = -span; dx <= span; ++dx)
-		{
-			Int xx = cx + dx;
-			if (xx < m_clipX0 || xx >= m_clipX1) continue;
-			pixel(xx, yy) = color;
-		}
-	}
-}
-
 // Map a world position to a minimap buffer cell (top-down, row already flipped).
 // Always writes a cell CLAMPED to the buffer; returns FALSE if the point was off-map
 // (caller may skip object dots) or TRUE if in-range. Shared by dots and the view box.
@@ -1214,45 +1165,26 @@ Bool MinimapDialog::worldToMinimap(Real worldX, Real worldY, Int *mx, Int *my)
 	return inRange;
 }
 
-// Is the world-space point (worldX, worldY) inside the 3D camera's ground footprint
-// (the same convex quad the yellow view box draws)? Used to cull object blips to only
-// those the 3D viewer can see. Corners come from WbView3d::getViewFrustumGroundCorners
-// in world units -- the same units as MapObject::getLocation -- so we test directly.
-// Standard convex-polygon test: the point is inside iff it lies on the same side of
-// every edge (all edge cross-products share one sign). A small epsilon keeps blips on
-// the boundary visible.
-Bool MinimapDialog::isInViewFrustum(Real worldX, Real worldY)
+// Is (x, y) inside the convex quad? True when the point is on the same side of every
+// edge; the epsilon keeps points on the boundary inside.
+static Bool isInQuad(const Coord3D *quad, Real x, Real y)
 {
-	CWorldBuilderDoc *pDoc = CWorldBuilderDoc::GetActiveDoc();
-	if (!pDoc) return TRUE;					// no doc -> don't cull
-	WbView3d *p3d = pDoc->Get3DView();
-	if (!p3d) return TRUE;
-
-	Coord3D corners[4];
-	if (!p3d->getViewFrustumGroundCorners(corners))
-		return TRUE;						// can't determine -> show it (fail open)
-
 	Int positive = 0, negative = 0;
 	for (Int i = 0; i < 4; ++i)
 	{
-		const Coord3D &a = corners[i];
-		const Coord3D &b = corners[(i + 1) & 3];
-		Real ex = b.x - a.x, ey = b.y - a.y;	// edge vector
-		Real px = worldX - a.x, py = worldY - a.y;	// point relative to edge start
-		Real cross = ex * py - ey * px;
+		const Coord3D &a = quad[i];
+		const Coord3D &b = quad[(i + 1) & 3];
+		Real cross = (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
 		if (cross >  0.001f) ++positive;
 		if (cross < -0.001f) ++negative;
 	}
-	// Inside a convex quad: never straddles (only one sign present).
 	return (positive == 0 || negative == 0);
 }
 
-// Draw the 3D view's camera frustum as a box, like the game radar's view box. Drawn
-// as a GDI overlay in client space (full display resolution) so the lines are smooth
-// and the thickness is crisp regardless of the sampling resolution. Corners come from
-// WbView3d::getViewFrustumGroundCorners (ground-plane projection of the 4 viewport
-// corners).
-void MinimapDialog::drawViewBoxOverlay(HDC hdc, Int clientW, Int clientH)
+// Draw the 3D view's camera frustum as a box, like the game radar's view box. Corners
+// come from WbView3d::getViewFrustumGroundCorners (ground-plane projection of the 4
+// viewport corners).
+void MinimapDialog::drawViewBoxOverlay(Int clientW, Int clientH)
 {
 	CWorldBuilderDoc* pDoc = CWorldBuilderDoc::GetActiveDoc();
 	if (!pDoc) return;
@@ -1275,37 +1207,40 @@ void MinimapDialog::drawViewBoxOverlay(HDC hdc, Int clientW, Int clientH)
 	// (getViewFrustumGroundCorners subtracts the border), so + border gives the absolute
 	// cell index; - originCell then matches worldToMinimap's transform in either extent
 	// mode.
-	POINT pts[5];
+	D2D1_POINT_2F pts[4];
 	for (int i = 0; i < 4; ++i)
 	{
 		Real fx = (corners[i].x / MAP_XY_FACTOR + border - originCell) / xSpan;
 		Real fy = (corners[i].y / MAP_XY_FACTOR + border - originCell) / ySpan;
 		if (fx < 0.0f) fx = 0.0f;  if (fx > 1.0f) fx = 1.0f;
 		if (fy < 0.0f) fy = 0.0f;  if (fy > 1.0f) fy = 1.0f;
-		pts[i].x = (LONG)(fx * clientW);
-		pts[i].y = (LONG)((1.0f - fy) * clientH);
+		pts[i] = D2D1::Point2F(fx * clientW, (1.0f - fy) * clientH);
 	}
-	pts[4] = pts[0];	// close the loop
 
-	// Thick yellow pen.
-	Int thickness = clientW / 128;		// ~2px at 256 client, scales with size
-	if (thickness < 2) thickness = 2;
-	HPEN pen = CreatePen(PS_SOLID, thickness, RGB(255, 255, 0));
-	HGDIOBJ oldPen = SelectObject(hdc, pen);
-	HGDIOBJ oldBrush = SelectObject(hdc, GetStockObject(NULL_BRUSH));
-	Polyline(hdc, pts, 5);
-	SelectObject(hdc, oldPen);
-	SelectObject(hdc, oldBrush);
-	DeleteObject(pen);
+	ID2D1PathGeometry *geometry = NULL;
+	if (FAILED(m_d2dFactory->CreatePathGeometry(&geometry)))
+		return;
+	ID2D1GeometrySink *sink = NULL;
+	if (SUCCEEDED(geometry->Open(&sink)))
+	{
+		sink->BeginFigure(pts[0], D2D1_FIGURE_BEGIN_HOLLOW);
+		sink->AddLines(pts + 1, 3);
+		sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+		sink->Close();
+		sink->Release();
+
+		Int thickness = clientW / 128;		// ~2px at 256 client, scales with size
+		if (thickness < 2) thickness = 2;
+		m_d2dBrush->SetColor(D2D1::ColorF(0xFFFF00));
+		m_d2dTarget->DrawGeometry(geometry, m_d2dBrush, (FLOAT)thickness);
+	}
+	geometry->Release();
 }
 
 // Draw the playable-area boundary as an orange rectangle, separating the playable
-// region from the non-playable border margin (the minimap now covers the full
-// heightmap extent, so the playable area is an inset rect). A GDI overlay in client
-// space (full display resolution) like the view box, so the line stays crisp at any
-// sampling resolution. The playable area spans heightmap cells [border, extent-border];
-// as a fraction of the full extent that is border/extent .. (extent-border)/extent.
-void MinimapDialog::drawBorderOverlay(HDC hdc, Int clientW, Int clientH)
+// region from the non-playable border margin. The playable area spans heightmap
+// cells [border, extent-border].
+void MinimapDialog::drawBorderOverlay(Int clientW, Int clientH)
 {
 	CWorldBuilderDoc* pDoc = CWorldBuilderDoc::GetActiveDoc();
 	if (!pDoc) return;
@@ -1320,29 +1255,21 @@ void MinimapDialog::drawBorderOverlay(HDC hdc, Int clientW, Int clientH)
 	Real xSpan, ySpan, originCell;
 	if (!mapSpans(&xSpan, &ySpan, &originCell)) return;
 
-	// Playable rect = heightmap cells [border, extent-border]; map each edge cell the
-	// same way the blips do, pixel = (cell - originCell) / span. (In playable-only mode
-	// this is the whole minimap edge, but OnPaint only draws the border in full-extent
-	// mode, where the rect sits inset with the non-playable margin around it.)
 	Real fxL = (border           - originCell) / xSpan;
 	Real fxR = (xExtent - border - originCell) / xSpan;
 	Real fyB = (border           - originCell) / ySpan;		// world-space bottom edge
 	Real fyT = (yExtent - border - originCell) / ySpan;		// world-space top edge
 
-	// Map to client pixels. Y is flipped (world +y is up, client +y is down), so the
-	// world TOP edge becomes the client TOP (smaller y).
+	// Y is flipped (world +y is up, client +y is down). The half-pixel inset centers the
+	// 1px hairline on whole pixels.
 	Int left   = (Int)(fxL * clientW);
 	Int right  = (Int)(fxR * clientW);
 	Int top    = (Int)((1.0f - fyT) * clientH);
 	Int bottom = (Int)((1.0f - fyB) * clientH);
 
-	HPEN pen = CreatePen(PS_SOLID, 1, RGB(255, 140, 0));	// orange, fixed 1px hairline
-	HGDIOBJ oldPen = SelectObject(hdc, pen);
-	HGDIOBJ oldBrush = SelectObject(hdc, GetStockObject(NULL_BRUSH));
-	Rectangle(hdc, left, top, right, bottom);
-	SelectObject(hdc, oldPen);
-	SelectObject(hdc, oldBrush);
-	DeleteObject(pen);
+	m_d2dBrush->SetColor(D2D1::ColorF(0xFF8C00));
+	m_d2dTarget->DrawRectangle(D2D1::RectF(left + 0.5f, top + 0.5f, right - 0.5f, bottom - 0.5f),
+		m_d2dBrush, 1.0f);
 }
 
 // ----------------------------------------------------------------------------
@@ -1604,12 +1531,12 @@ void MinimapDialog::drawRoads()
 	if (!mapSpans(&xSpan, &ySpan, &originCell)) return;
 
 
-	// The buffer (m_resolution) is StretchDIBits-shrunk to the dialog client, so a width
-	// measured in BUFFER pixels shrinks on screen as resolution rises -- at 2048 a road
-	// becomes sub-pixel after the shrink and aliases away (the bridge vanishes first).
-	// Size roads by a DISPLAY-pixel target and convert to buffer pixels the same way the
-	// object blips do (see drawObjects), so on-screen thickness is constant at every
-	// resolution. Use the real client width (the dialog is resizable).
+	// The buffer (m_resolution) is scaled to the dialog client, so a width measured in
+	// BUFFER pixels shrinks on screen as resolution rises -- at 2048 a road becomes
+	// sub-pixel after the shrink and aliases away (the bridge vanishes first). Size
+	// roads by a DISPLAY-pixel target and convert to buffer pixels, so on-screen
+	// thickness is constant at every resolution. Use the real client width (the dialog
+	// is resizable).
 	CRect clientRect;
 	GetClientRect(&clientRect);
 	Int clientPx = clientRect.Width() > 0 ? clientRect.Width() : MINIMAP_DISPLAY_SIZE;
@@ -1676,250 +1603,164 @@ void MinimapDialog::drawRoads()
 	#undef ROAD_DISP_TO_BUF
 }
 
-// Overlay map objects, adapting the Thrax minimap upgrade:
-//   - units:     filled square blip in the owner's house color
-//   - structures: black-outlined box with house-color fill (distinct from units)
-//   - resource structures (supply/oil): solid black marker
-// Buffer is top-down, so world-row maps to (m_resolution-1 - row).
-void MinimapDialog::blipStyle(BlipStyle &style)
+// Cache one marker per unit/structure, adapting the Thrax minimap upgrade:
+//   - units:      diamond in the owner's house color
+//   - structures: black-outlined box with house-color fill
+//   - resource structures (supply/oil): gold/black checkerboard
+void MinimapDialog::buildBlips()
 {
-	// Blips are rasterized into the buffer (m_resolution) but the buffer is stretched to
-	// the dialog client, so a fixed BUFFER size looks huge at 128 and like specks at 2048.
-	// Size them by a target in DISPLAY (client) pixels and convert to buffer pixels:
-	//   bufferPx = displayPx * m_resolution / clientPx
-	// so the on-screen size is the same at every resolution. Use the REAL client size
-	// (the dialog is resizable; a hardcoded 256 was wrong), and keep floors at 1 buffer
-	// px -- a higher floor at low res is exactly what made 128 blips too big. (At very
-	// low res the buffer granularity still limits how small a blip can be, but no longer
-	// inflates it beyond the target.)
-	CRect clientRect;
-	GetClientRect(&clientRect);
-	Int clientPx = clientRect.Width() > 0 ? clientRect.Width() : MINIMAP_DISPLAY_SIZE;
-	#define DISP_TO_BUF(d) (((d) * m_resolution + clientPx / 2) / clientPx)
-	Int unitSize     = DISP_TO_BUF(6);		// ~6 display px
-	Int structSize   = DISP_TO_BUF(6);
-	Int outlineWidth = DISP_TO_BUF(2);		// ~2 display px black border
-	#undef DISP_TO_BUF
-	// Minimal floors (1 buffer px) so a blip never vanishes; odd unit diameter for a
-	// symmetric disc/diamond.
-	if (unitSize     < 1) unitSize     = 1;
-	if ((unitSize & 1) == 0) unitSize += 1;
-	if (structSize   < 1) structSize   = 1;
-	// Outline is a thin rim: clamp to <= structSize/5 per side so the colored inner
-	// fill stays >= ~60% of the box at every resolution (at 2048 the unclamped "2
-	// display px" would otherwise be a ~16px slab dwarfing the fill).
-	Int maxOutline = structSize / 5;
-	if (maxOutline < 1) maxOutline = 1;
-	if (outlineWidth > maxOutline) outlineWidth = maxOutline;
-	if (outlineWidth < 1) outlineWidth = 1;
-
-	style.clientPx     = clientPx;
-	style.unitSize     = unitSize;
-	style.structSize   = structSize;
-	style.outlineWidth = outlineWidth;
-	style.black    = packBGRA(0x000000);
-	style.gold     = packBGRA(0xFFD700);	// resource checkerboard accent
-	style.darkGray = packBGRA(0x404040);	// resource-marker outline
-	style.cyan     = packBGRA(0x33FFFF);	// selection halo (matches 3D view)
-
-	// Selection overlay shares the 3D view's toggle (View > Show Object Selection
-	// Overlay). When on, selected objects get a cyan halo drawn behind their blip.
-	// Read the 3D view's cached member instead of GetProfileInt so a recomposite never
-	// hits the registry (drawObjects runs on every object/selection refresh).
-	WbView3d *p3ViewSel = CWorldBuilderDoc::GetActive3DView();
-	style.showSelection = p3ViewSel ? p3ViewSel->getShowSelectionOverlay() : false;
-	// Halo is ~2 display px larger on each side than the blip; floor so it stays visible.
-	style.haloPad = unitSize / 3;
-	if (style.haloPad < 1) style.haloPad = 1;
-	style.ownerColors.clear();
-}
-
-Int MinimapDialog::blipHalfExtent(const BlipStyle &style) const
-{
-	Int ext = style.unitSize + style.haloPad * 2;
-	if (style.structSize + style.haloPad * 2 > ext) ext = style.structSize + style.haloPad * 2;
-	if ((style.structSize * 7) / 6 + 1 > ext) ext = (style.structSize * 7) / 6 + 1;
-	return ext / 2 + 2;
-}
-
-Bool MinimapDialog::blipCell(MapObject *pObj, Int *mx, Int *my)
-{
-	if (pObj->isWaypoint())
-		return false;
-	const ThingTemplate *t = pObj->getThingTemplate();
-	if (!t)
-		return false;
-
-	EditorSortingType es = t->getEditorSorting();
-	Bool isStructure = (es == ES_STRUCTURE);
-	Bool isUnit      = (es == ES_INFANTRY || es == ES_VEHICLE);
-	if (!isStructure && !isUnit)
-		return false;								// skip props/trees/debris/system/audio
-
-	// World position -> minimap cell (top-down, row flipped). Skip if off-map.
-	const Coord3D *loc = pObj->getLocation();
-
-	// Optional cull: only blips inside the 3D view frustum (what the 3D viewer sees).
-	if (m_cullObjects && !isInViewFrustum(loc->x, loc->y))
-		return false;
-
-	return worldToMinimap(loc->x, loc->y, mx, my);
-}
-
-void MinimapDialog::drawBlip(MapObject *pObj, Int mx, Int cy, BlipStyle &style)
-{
-	const ThingTemplate *t = pObj->getThingTemplate();
-	const Bool isUnit = (t->getEditorSorting() == ES_INFANTRY || t->getEditorSorting() == ES_VEHICLE);
-	const Int unitSize = style.unitSize;
-	const Int structSize = style.structSize;
-	const Int outlineWidth = style.outlineWidth;
-	const Int haloPad = style.haloPad;
-	const Int clientPx = style.clientPx;
-
-	// Selection halo: a larger cyan shape drawn first; the normal blip overpaints
-	// the center, leaving a cyan rim so the object's house color stays readable.
-	Bool selected = style.showSelection && pObj->isSelected();
-
-	if (isUnit)
-	{
-		// Units/infantry render as diamonds to distinguish them from buildings.
-		if (selected)
-			fillDiamond(mx, cy, unitSize + haloPad * 2, style.cyan);
-		fillDiamond(mx, cy, unitSize, packBGRA(getMapObjectHouseColor(pObj, style.ownerColors)));
+	m_blips.clear();
+	if (!m_showObjects)
 		return;
-	}
 
-	if (selected)
-		fillRect(mx, cy, structSize + haloPad * 2, structSize + haloPad * 2, style.cyan);
+	CWorldBuilderDoc *pDoc = CWorldBuilderDoc::GetActiveDoc();
+	if (!pDoc) return;
+	WorldHeightMapEdit *pMap = pDoc->GetHeightMap();
+	if (!pMap) return;
+	Real xSpan, ySpan, originCell;
+	if (!mapSpans(&xSpan, &ySpan, &originCell)) return;
+	const Real border = INT_TO_REAL(pMap->getBorderSize());
 
-	// Structure.
-	if (isResourceStructure(t))
-	{
-		// Gold/black checkerboard marker with a dark-gray outline, slightly larger
-		// than a normal structure, so resource buildings (supply docks + oil
-		// derricks) read as distinct and don't blend into any single terrain tone.
-		Int rs = (structSize * 7) / 6;		// ~7 display px (structSize is ~6)
-		if (rs <= structSize) rs = structSize + 1;
-		// Dark-gray rim: fill the full marker gray, then inset the checker by the
-		// outline width on every side so a gray border remains. Use the same thin
-		// rim width as the house-color boxes; clamp so the checker keeps most of
-		// the marker (and never inverts to nothing at low res).
-		Int rim = outlineWidth;
-		Int inner = rs - rim * 2;
-		if (inner < rs / 2) { rim = 1; inner = rs - 2; }	// keep checker dominant
-		if (inner < 1) { rim = 0; inner = rs; }				// too small for a rim
-		if (rim > 0)
-			fillRect(mx, cy, rs, rs, style.darkGray);
-		// Checker cell size in buffer px. The buffer is StretchDIBits'd to the
-		// client with COLORONCOLOR (decimation), so a cell must be at least a
-		// couple of DISPLAY px or the pattern aliases to a solid color. Convert a
-		// ~2 display-px target to buffer px (= 2*m_resolution/clientPx), floor 2,
-		// then cap so the marker still holds at least a 2x2 checker (else it's solid).
-		Int cell = (2 * m_resolution + clientPx / 2) / clientPx;
-		if (cell < 2) cell = 2;
-		if (cell > inner / 2) cell = inner / 2;
-		if (cell < 1) cell = 1;					// inner<2 (extreme low res): 1px is all we have
-		fillCheckerRect(mx, cy, inner, inner, style.gold, style.black, cell);
-		return;
-	}
+	// Selection halos share the 3D view's toggle (View > Show Object Selection Overlay).
+	WbView3d *p3View = CWorldBuilderDoc::GetActive3DView();
+	const Bool showSelection = p3View ? p3View->getShowSelectionOverlay() : false;
 
-	// Outlined box: black outer rect, house-color inner fill -- but only when the
-	// box is big enough that the rim stays a minority (inner fill at least as wide
-	// as the two borders combined). At very low resolution (e.g. 128) the box is
-	// only ~3 buffer px, where a 1px rim leaves a 1px center and the outline looks
-	// "super thick"; there, just draw a solid house-color box (still a square, so
-	// it stays distinct from the diamond units).
-	UnsignedInt houseColor = packBGRA(getMapObjectHouseColor(pObj, style.ownerColors));
-	Int innerW = structSize - outlineWidth * 2;
-	if (innerW >= outlineWidth * 2)
-	{
-		fillRect(mx, cy, structSize, structSize, style.black);
-		fillRect(mx, cy, innerW, innerW, houseColor);
-	}
-	else
-	{
-		fillRect(mx, cy, structSize, structSize, houseColor);
-	}
-}
-
-void MinimapDialog::drawObjects()
-{
-	// (Roads are drawn separately in refreshObjects, before this, so they sit under
-	// the object dots and are independently toggleable.)
-	BlipStyle style;
-	blipStyle(style);
-	m_lastSelected.clear();
-
+	std::map<AsciiString, Int> ownerColors;
 	for (MapObject *pObj = MapObject::getFirstMapObject(); pObj; pObj = pObj->getNext())
 	{
-		Int mx, cy;
-		if (!blipCell(pObj, &mx, &cy))
+		if (pObj->isWaypoint())
 			continue;
-		drawBlip(pObj, mx, cy, style);
-		if (style.showSelection && pObj->isSelected())
-			m_lastSelected.insert(pObj);
+		const ThingTemplate *t = pObj->getThingTemplate();
+		if (!t)
+			continue;
+
+		EditorSortingType es = t->getEditorSorting();
+		Bool isStructure = (es == ES_STRUCTURE);
+		Bool isUnit      = (es == ES_INFANTRY || es == ES_VEHICLE);
+		if (!isStructure && !isUnit)
+			continue;								// skip props/trees/debris/system/audio
+
+		// Object locations are border-relative world units; see worldToMinimap.
+		const Coord3D *loc = pObj->getLocation();
+		Real fx = (loc->x / MAP_XY_FACTOR + border - originCell) / xSpan;
+		Real fy = (loc->y / MAP_XY_FACTOR + border - originCell) / ySpan;
+		if (fx < 0.0f || fx >= 1.0f || fy < 0.0f || fy >= 1.0f)
+			continue;
+
+		Blip b;
+		b.fx = fx;
+		b.fy = 1.0f - fy;
+		b.worldX = loc->x;
+		b.worldY = loc->y;
+		b.selected = showSelection && pObj->isSelected();
+		if (isUnit)
+			b.kind = BLIP_UNIT;
+		else if (isResourceStructure(t))
+			b.kind = BLIP_RESOURCE;
+		else
+			b.kind = BLIP_STRUCTURE;
+		b.color = (b.kind == BLIP_RESOURCE) ? 0 : getMapObjectHouseColor(pObj, ownerColors);
+		m_blips.push_back(b);
 	}
 }
 
-// A selection change only moves halos. Restore the cached terrain+roads pixels under
-// each blip whose halo appeared or vanished, then redraw every blip touching that
-// rect under a clip, so overlapping neighbours come out as a full pass would draw them.
-void MinimapDialog::refreshSelectionBlips()
+// A w x w box whose top-left sits at (cx - w/2, cy - w/2), on whole pixels.
+static D2D1_RECT_F blipBox(Int cx, Int cy, Int w)
 {
-	WBPerfEvent perf("minimap refreshSelectionBlips");
-	// Anything else pending gets the full pass, which also drops stale pointers.
-	if (!m_terrainBuilt || !m_roadsValid || !m_showObjects || m_rebuildPending)
+	FLOAT left = (FLOAT)(cx - w / 2);
+	FLOAT top  = (FLOAT)(cy - w / 2);
+	return D2D1::RectF(left, top, left + w, top + w);
+}
+
+void MinimapDialog::drawBlips(Int clientW, Int clientH)
+{
+	// Marker sizes in display pixels.
+	const Int unitSize     = 7;		// diamond diagonal
+	const Int structSize   = 6;
+	const Int resourceSize = 7;
+	const Int outline      = 1;
+	const Int haloPad      = 2;
+	const Int checkerCell  = 2;
+
+	// Cull against the camera at paint time, so camera moves need no blip rebuild.
+	Coord3D corners[4];
+	Bool cull = false;
+	if (m_cullObjects)
 	{
-		refreshObjects();
-		return;
+		CWorldBuilderDoc *pDoc = CWorldBuilderDoc::GetActiveDoc();
+		WbView3d *p3d = pDoc ? pDoc->Get3DView() : NULL;
+		cull = p3d != NULL && p3d->getViewFrustumGroundCorners(corners);
 	}
 
-	BlipStyle style;
-	blipStyle(style);
-	const Int half = blipHalfExtent(style);
+	const D2D1::ColorF cyan(0x33FFFF);		// selection halo (matches 3D view)
+	const D2D1::ColorF black(0x000000);
+	const D2D1::ColorF gold(0xFFD700);
+	const D2D1::ColorF darkGray(0x404040);
 
-	std::set<MapObject*> nowSelected;
-	std::vector<RECT> dirty;
-	for (MapObject *pObj = MapObject::getFirstMapObject(); pObj; pObj = pObj->getNext())
+	for (size_t i = 0; i < m_blips.size(); ++i)
 	{
-		const Bool isSel = style.showSelection && pObj->isSelected();
-		if (isSel)
-			nowSelected.insert(pObj);
-		const Bool wasSel = m_lastSelected.find(pObj) != m_lastSelected.end();
-		if (isSel == wasSel)
+		const Blip &b = m_blips[i];
+		if (cull && !isInQuad(corners, b.worldX, b.worldY))
 			continue;
-		Int mx, cy;
-		if (!blipCell(pObj, &mx, &cy))
+		const Int cx = (Int)(b.fx * clientW);
+		const Int cy = (Int)(b.fy * clientH);
+
+		if (b.kind == BLIP_UNIT)
+		{
+			// A square turned 45 degrees about the pixel center draws the diamond.
+			const FLOAT px = cx + 0.5f;
+			const FLOAT py = cy + 0.5f;
+			m_d2dTarget->SetTransform(D2D1::Matrix3x2F::Rotation(45.0f, D2D1::Point2F(px, py)));
+			if (b.selected)
+			{
+				const FLOAT half = (unitSize + haloPad * 2) * 0.35355f;
+				m_d2dBrush->SetColor(cyan);
+				m_d2dTarget->FillRectangle(D2D1::RectF(px - half, py - half, px + half, py + half), m_d2dBrush);
+			}
+			const FLOAT half = unitSize * 0.35355f;
+			m_d2dBrush->SetColor(D2D1::ColorF((UINT32)b.color));
+			m_d2dTarget->FillRectangle(D2D1::RectF(px - half, py - half, px + half, py + half), m_d2dBrush);
+			m_d2dTarget->SetTransform(D2D1::Matrix3x2F::Identity());
 			continue;
-		RECT r = { mx - half, cy - half, mx + half + 1, cy + half + 1 };
-		dirty.push_back(r);
-	}
-	m_lastSelected = nowSelected;
-	if (dirty.empty())
-		return;
-
-	for (size_t d = 0; d < dirty.size(); ++d)
-	{
-		setClip(dirty[d].left, dirty[d].top, dirty[d].right, dirty[d].bottom);
-		for (Int yy = m_clipY0; yy < m_clipY1; ++yy)
-		{
-			memcpy(m_pixelBuffer + yy * m_resolution + m_clipX0,
-				m_terrainRoadsBuffer + yy * m_resolution + m_clipX0,
-				sizeof(UnsignedInt) * (m_clipX1 - m_clipX0));
 		}
-		for (MapObject *pObj = MapObject::getFirstMapObject(); pObj; pObj = pObj->getNext())
-		{
-			Int mx, cy;
-			if (!blipCell(pObj, &mx, &cy))
-				continue;
-			if (mx + half < m_clipX0 || mx - half >= m_clipX1 || cy + half < m_clipY0 || cy - half >= m_clipY1)
-				continue;
-			drawBlip(pObj, mx, cy, style);
-		}
-	}
-	resetClip();
 
-	m_stretchValid = false;
-	if (IsWindow(m_hWnd))
-		Invalidate(FALSE);
+		if (b.selected)
+		{
+			m_d2dBrush->SetColor(cyan);
+			m_d2dTarget->FillRectangle(blipBox(cx, cy, structSize + haloPad * 2), m_d2dBrush);
+		}
+
+		if (b.kind == BLIP_RESOURCE)
+		{
+			// Dark-gray rim around a gold/black checker, distinct from any terrain tone.
+			m_d2dBrush->SetColor(darkGray);
+			m_d2dTarget->FillRectangle(blipBox(cx, cy, resourceSize), m_d2dBrush);
+			const Int inner = resourceSize - outline * 2;
+			const D2D1_RECT_F innerRect = blipBox(cx, cy, inner);
+			m_d2dBrush->SetColor(black);
+			m_d2dTarget->FillRectangle(innerRect, m_d2dBrush);
+			m_d2dBrush->SetColor(gold);
+			for (Int y = 0; y < inner; y += checkerCell)
+			{
+				for (Int x = 0; x < inner; x += checkerCell)
+				{
+					if ((((x / checkerCell) + (y / checkerCell)) & 1) == 0)
+					{
+						continue;
+					}
+					const FLOAT l = innerRect.left + x;
+					const FLOAT t = innerRect.top + y;
+					const FLOAT r = (x + checkerCell < inner) ? l + checkerCell : innerRect.right;
+					const FLOAT btm = (y + checkerCell < inner) ? t + checkerCell : innerRect.bottom;
+					m_d2dTarget->FillRectangle(D2D1::RectF(l, t, r, btm), m_d2dBrush);
+				}
+			}
+			continue;
+		}
+
+		m_d2dBrush->SetColor(black);
+		m_d2dTarget->FillRectangle(blipBox(cx, cy, structSize), m_d2dBrush);
+		m_d2dBrush->SetColor(D2D1::ColorF((UINT32)b.color));
+		m_d2dTarget->FillRectangle(blipBox(cx, cy, structSize - outline * 2), m_d2dBrush);
+	}
 }

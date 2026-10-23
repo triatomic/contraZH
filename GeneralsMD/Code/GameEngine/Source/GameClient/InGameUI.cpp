@@ -42,6 +42,7 @@
 #include "Common/NameKeyGenerator.h"
 #include "Common/PerfTimer.h"
 #include "Common/Player.h"
+#include "Common/OptionPreferences.h"
 #include "Common/PlayerList.h"
 #include "Common/Radar.h"
 #include "Common/Team.h"
@@ -86,6 +87,8 @@
 #include "GameClient/GlobalLanguage.h"
 
 #include "GameLogic/AIGuard.h"
+#include "GameLogic/AIPathfind.h"
+#include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/GameLogic.h"
@@ -150,8 +153,6 @@ static UnicodeString formatIncomeValue(UnsignedInt cashPerMin)
 //-------------------------------------------------------------------------------------------------
 /// The InGameUI singleton instance.
 InGameUI *TheInGameUI = nullptr;
-
-GameWindow *m_replayWindow = nullptr;
 
 // ------------------------------------------------------------------------------------------------
 struct KindOfSelectionData
@@ -269,38 +270,6 @@ static Bool similarUnitSelection( Drawable *test, void *userData )
 		}
 	}
 	return FALSE;
-}
-
-// ------------------------------------------------------------------------------------------------
-// ------------------------------------------------------------------------------------------------
-void showReplayControls()
-{
-	if (m_replayWindow)
-	{
-		Bool show = TheGameLogic->isInReplayGame();
-		m_replayWindow->winHide(!show);
-	}
-}
-
-// ------------------------------------------------------------------------------------------------
-// ------------------------------------------------------------------------------------------------
-void hideReplayControls()
-{
-	if (m_replayWindow)
-	{
-		m_replayWindow->winHide(TRUE);
-	}
-}
-
-// ------------------------------------------------------------------------------------------------
-// ------------------------------------------------------------------------------------------------
-void toggleReplayControls()
-{
-	if (m_replayWindow)
-	{
-		Bool show = TheGameLogic->isInReplayGame() && m_replayWindow->winIsHidden();
-		m_replayWindow->winHide(!show);
-	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1238,6 +1207,7 @@ InGameUI::InGameUI()
 
 	}
 
+	m_controlBarWindow = nullptr;
 	m_replayWindow = nullptr;
 	m_messagesOn = TRUE;
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
@@ -1249,6 +1219,8 @@ InGameUI::InGameUI()
 	m_modelNameOverlayOn = FALSE;
 	m_laserNameOverlayOn = FALSE;
 	m_laserBeamBlockOverlayOn = FALSE;
+	m_windowNameOverlayOn = FALSE;
+	m_windowNameString = nullptr;
 #endif
 
 	// TheSuperHackers @info the default font, size and positions of the various counters were chosen based on GenTools implementation
@@ -1407,6 +1379,9 @@ InGameUI::~InGameUI()
 	// clear world animations
 	clearWorldAnimations();
 	resetIdleWorker();
+
+	destroyReplayControl();
+	destroyControlBar();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1966,7 +1941,7 @@ void InGameUI::handleBuildPlacements()
 						if (isInForceAttackMode())
 						{
 							const Real snapRadians = DEG_TO_RADF(45);
-							angle = WWMath::Round(angle / snapRadians) * snapRadians;
+							angle = WWMath::Roundf(angle / snapRadians) * snapRadians;
 						}
 					}
 				}
@@ -2185,6 +2160,8 @@ void InGameUI::update()
 
 	// TheSuperHackers @feature Fire a queued quick cast as soon as its ability comes up.
 	updateQueuedQuickCast();
+
+	updateActionLines();
 
 	/// @todo make sure this code gets called even when the UI is not being drawn
 	if ( m_videoStream && m_videoBuffer )
@@ -2659,6 +2636,10 @@ void InGameUI::freeCustomUiResources()
 #if defined(GENERALS_ONLINE)
 	TheDisplayStringManager->freeDisplayString(m_observerNotificationString);
 	m_observerNotificationString = nullptr;
+#endif
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	TheDisplayStringManager->freeDisplayString(m_windowNameString);
+	m_windowNameString = nullptr;
 #endif
 }
 
@@ -4470,15 +4451,254 @@ void InGameUI::setInputEnabled( Bool enable )
 			(admittedly, this code will actually do the wrong thing if you were to hold down the ctrl
 			key thru the whole cinematic, but that's even more unlikely...)
 		*/
-		setForceAttackMode( false );			// CTRL
-		setForceMoveMode( false );				// apparently unmapped in current CommandMap.ini
-		setWaypointMode( false );					// ALT
-		setPreferSelectionMode( false );	// SHIFT
-		setCameraRotateLeft( false );			// KP4
-		setCameraRotateRight( false );		// KP6
-		setCameraZoomIn( false );					// KP8
-		setCameraZoomOut( false );				// KP2
+		clearModifierModes();
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Losing focus also eats key releases, so alt-tab would otherwise leave waypoint mode on. */
+//-------------------------------------------------------------------------------------------------
+void InGameUI::clearModifierModes()
+{
+	setForceAttackMode( false );			// CTRL
+	setForceMoveMode( false );				// apparently unmapped in current CommandMap.ini
+	setWaypointMode( false );					// ALT
+	setPreferSelectionMode( false );	// SHIFT
+	setCameraRotateLeft( false );			// KP4
+	setCameraRotateRight( false );		// KP6
+	setCameraZoomIn( false );					// KP8
+	setCameraZoomOut( false );				// KP2
+}
+
+//-------------------------------------------------------------------------------------------------
+/** A guard order clears the goal position, so the guarded spot is read off the AI itself. */
+//-------------------------------------------------------------------------------------------------
+static Bool getGuardedSpot( const AIUpdateInterface *ai, Coord3D& spot )
+{
+	switch( ai->getGuardTargetType() )
+	{
+		case GUARDTARGET_LOCATION:
+			spot = *ai->getGuardLocation();
+			return TRUE;
+
+		case GUARDTARGET_OBJECT:
+		{
+			const Object *guarded = TheGameLogic->findObjectByID( ai->getGuardObject() );
+			if( guarded == nullptr )
+			{
+				return FALSE;
+			}
+			spot = *guarded->getPosition();
+			return TRUE;
+		}
+
+		default:
+			return FALSE;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Read each selected unit's destination off its AI every frame, so a line lasts exactly as long
+	* as its order. */
+//-------------------------------------------------------------------------------------------------
+void InGameUI::updateActionLines()
+{
+	m_actionLines.clear();
+
+	if( TheGlobalData->m_actionLineMode == ActionLineMode_Off )
+	{
+		return;
+	}
+	const Bool attackOnly = TheGlobalData->m_actionLineMode == ActionLineMode_AttackOnly;
+
+	Player *local = ThePlayerList->getLocalPlayer();
+	for( DrawableList::const_iterator it = m_selectedDrawables.begin(); it != m_selectedDrawables.end(); ++it )
+	{
+		Object *obj = (*it)->getObject();
+		if( obj == nullptr || obj->getControllingPlayer() != local )
+		{
+			continue;
+		}
+
+		// the nexus holds an angry mob's order, so only it draws
+		if( obj->isKindOf( KINDOF_IGNORED_IN_GUI ) )
+		{
+			continue;
+		}
+
+		AIUpdateInterface *ai = obj->getAIUpdateInterface();
+		if( ai == nullptr )
+		{
+			continue;
+		}
+
+		ActionLine line;
+		line.from = *obj->getPosition();
+		Bool goalResolved = FALSE;
+
+		switch( ai->getCurrentStateID() )
+		{
+			case AI_MOVE_TO:
+			case AI_FOLLOW_PATH:
+			case AI_FOLLOW_EXITPRODUCTION_PATH:
+			case AI_MOVE_AND_EVACUATE:
+			case AI_MOVE_AND_EVACUATE_AND_EXIT:
+			case AI_MOVE_AND_DELETE:
+			case AI_MOVE_AND_TIGHTEN:
+			case AI_PICK_UP_CRATE:
+			case AI_FOLLOW_WAYPOINT_PATH_AS_TEAM:
+			case AI_FOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS:
+			case AI_FOLLOW_WAYPOINT_PATH_AS_TEAM_EXACT:
+			case AI_FOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS_EXACT:
+			case AI_ENTER:
+			case AI_RAPPEL_INTO:
+			case AI_COMBATDROP:
+			case AI_DOCK:
+			case AI_GET_REPAIRED:
+			case AI_HACK_INTERNET:
+				line.kind = ACTION_LINE_MOVE;
+				break;
+
+			// the attack move path is replaced whenever the unit stops to fight, so aim at the clicked point
+			case AI_ATTACK_MOVE_TO:
+				line.kind = ACTION_LINE_ATTACK_MOVE;
+				line.to = *ai->getGoalPosition();
+				goalResolved = TRUE;
+				break;
+
+			case AI_ATTACKFOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS:
+			case AI_ATTACKFOLLOW_WAYPOINT_PATH_AS_TEAM:
+			case AI_HUNT:
+				line.kind = ACTION_LINE_ATTACK_MOVE;
+				break;
+
+			case AI_ATTACK_OBJECT:
+			case AI_ATTACK_AND_FOLLOW_OBJECT:
+			case AI_ATTACK_SQUAD:
+			case AI_FORCE_ATTACK_OBJECT:
+			case AI_ATTACK_AREA:
+				line.kind = ACTION_LINE_ATTACK;
+				break;
+
+			case AI_ATTACK_POSITION:
+				line.kind = ACTION_LINE_ATTACK_GROUND;
+				line.to = *ai->getGoalPosition();
+				goalResolved = TRUE;
+				break;
+
+			case AI_GUARD:
+			case AI_GUARD_RETALIATE:
+			case AI_GUARD_TUNNEL_NETWORK:
+				line.kind = ACTION_LINE_GUARD;
+				goalResolved = getGuardedSpot( ai, line.to );
+				if( !goalResolved )
+				{
+					continue;
+				}
+				break;
+
+			default:
+				continue;
+		}
+
+		if( attackOnly && ( line.kind == ACTION_LINE_MOVE || line.kind == ACTION_LINE_GUARD ) )
+		{
+			continue;
+		}
+
+		if( !goalResolved )
+		{
+			const Int pathSize = ai->friend_getWaypointGoalPathSize();
+			const Int pathIndex = ai->friend_getCurrentGoalPathIndex();
+			Object *goalObj = ai->getGoalObject();
+			Path *path = ai->getPath();
+			if( pathSize > 0 && pathIndex >= 0 && pathIndex < pathSize )
+			{
+				// a queued path draws one line per leg
+				for( Int i = pathIndex; i < pathSize - 1; ++i )
+				{
+					line.to = *ai->friend_getGoalPathPosition( i );
+					m_actionLines.push_back( line );
+					line.from = line.to;
+				}
+				line.to = *ai->friend_getGoalPathPosition( pathSize - 1 );
+			}
+			else if( goalObj )
+			{
+				// a line to a target hidden in fog would give away where it is
+				if( goalObj->getDrawable() && goalObj->getDrawable()->getFullyObscuredByShroud() )
+				{
+					continue;
+				}
+				line.to = *goalObj->getPosition();
+			}
+			else if( path )
+			{
+				// a group sent to one spot spreads over the free cells round it
+				line.to = *path->getLastNode()->getPosition();
+			}
+			else
+			{
+				line.to = *ai->getGoalPosition();
+			}
+		}
+
+		m_actionLines.push_back( line );
+	}
+
+	bunchActionLines();
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Lines of one kind that start and end near each other merge into one from their average start
+	* to their average end. */
+//-------------------------------------------------------------------------------------------------
+void InGameUI::bunchActionLines()
+{
+	const Real BUNCH_RADIUS = 100.0f;
+	const Real bunchRadiusSqr = BUNCH_RADIUS * BUNCH_RADIUS;
+
+	std::vector<ActionLine> bunches;
+	std::vector<Int> memberCounts;
+	for( std::vector<ActionLine>::const_iterator line = m_actionLines.begin(); line != m_actionLines.end(); ++line )
+	{
+		Bool joined = FALSE;
+		for( size_t i = 0; i < bunches.size(); ++i )
+		{
+			ActionLine& bunch = bunches[ i ];
+			if( bunch.kind != line->kind )
+			{
+				continue;
+			}
+			const Real fromX = bunch.from.x - line->from.x;
+			const Real fromY = bunch.from.y - line->from.y;
+			const Real toX = bunch.to.x - line->to.x;
+			const Real toY = bunch.to.y - line->to.y;
+			if( fromX * fromX + fromY * fromY > bunchRadiusSqr || toX * toX + toY * toY > bunchRadiusSqr )
+			{
+				continue;
+			}
+
+			// running averages, so later members compare against the middle of the bunch
+			const Real share = 1.0f / (Real)( ++memberCounts[ i ] );
+			bunch.from.x += ( line->from.x - bunch.from.x ) * share;
+			bunch.from.y += ( line->from.y - bunch.from.y ) * share;
+			bunch.from.z += ( line->from.z - bunch.from.z ) * share;
+			bunch.to.x += ( line->to.x - bunch.to.x ) * share;
+			bunch.to.y += ( line->to.y - bunch.to.y ) * share;
+			bunch.to.z += ( line->to.z - bunch.to.z ) * share;
+			joined = TRUE;
+			break;
+		}
+
+		if( !joined )
+		{
+			bunches.push_back( *line );
+			memberCounts.push_back( 1 );
+		}
+	}
+
+	m_actionLines.swap( bunches );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4502,6 +4722,11 @@ void InGameUI::postWindowDraw()
 	// system and game time, network latency and the observer player list.
 	if (TheTacticalView && TheTacticalView->isCameraCheatModeActive())
 		return;
+
+	if (m_windowNameOverlayOn)
+	{
+		drawWindowNameOverlay();
+	}
 #endif
 
 	Int hudOffsetX = 0;
@@ -4546,6 +4771,200 @@ void InGameUI::postWindowDraw()
 	}
 #endif
 }
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+
+// Window labels placed this frame. A label that would overlap one of them is skipped.
+static const Int MAX_WINDOW_LABEL_SLOTS = 512;
+static IRegion2D s_windowLabelSlots[ MAX_WINDOW_LABEL_SLOTS ];
+static Int s_windowLabelSlotCount = 0;
+
+// Most ancestors listed in the cursor readout.
+static const Int MAX_WINDOW_CHAIN = 16;
+
+//-------------------------------------------------------------------------------------------------
+static Bool windowLabelOverlaps( const IRegion2D &rect )
+{
+	for( Int i = 0; i < s_windowLabelSlotCount; ++i )
+	{
+		const IRegion2D &slot = s_windowLabelSlots[i];
+		if( rect.lo.x < slot.hi.x && rect.hi.x > slot.lo.x && rect.lo.y < slot.hi.y && rect.hi.y > slot.lo.y )
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Outline a visible window and label it in its top left corner, then do the same for its children.
+//-------------------------------------------------------------------------------------------------
+static void drawWindowNameTree( GameWindow *window, DisplayString *str, Bool topLevel )
+{
+	if( window->winIsHidden() )
+	{
+		return;
+	}
+
+	Int x, y, width, height;
+	window->winGetScreenPosition( &x, &y );
+	window->winGetSize( &width, &height );
+
+	const AsciiString &name = window->winGetInstanceData()->m_decoratedNameString;
+	if( !name.isEmpty() && width > 0 && height > 0 )
+	{
+		TheDisplay->drawOpenRect( x, y, width, height, 1.0f, GameMakeColor( 255, 190, 0, 150 ) );
+
+		// Top level windows keep their .wnd file prefix, children show only their own name.
+		const char *label = name.str();
+		const char *colon = topLevel ? nullptr : strrchr( label, ':' );
+		if( colon != nullptr )
+		{
+			label = colon + 1;
+		}
+
+		UnicodeString text;
+		text.format( L"%hs", label );
+		str->setText( text );
+
+		Int textWidth, textHeight;
+		str->getSize( &textWidth, &textHeight );
+
+		IRegion2D rect;
+		rect.lo.x = x + 2;
+		rect.lo.y = y + 1;
+		rect.hi.x = rect.lo.x + textWidth;
+		rect.hi.y = rect.lo.y + textHeight;
+
+		if( !windowLabelOverlaps( rect ) && s_windowLabelSlotCount < MAX_WINDOW_LABEL_SLOTS )
+		{
+			s_windowLabelSlots[ s_windowLabelSlotCount++ ] = rect;
+			TheDisplay->drawFillRect( rect.lo.x - 1, rect.lo.y, textWidth + 2, textHeight, GameMakeColor( 0, 0, 0, 170 ) );
+			str->draw( rect.lo.x, rect.lo.y, GameMakeColor( 255, 220, 120, 255 ), GameMakeColor( 0, 0, 0, 255 ) );
+		}
+	}
+
+	for( GameWindow *child = window->winGetChild(); child; child = child->winGetNext() )
+	{
+		drawWindowNameTree( child, str, FALSE );
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+static void setWindowChainText( DisplayString *str, GameWindow *window, Bool withRegion )
+{
+	const AsciiString &name = window->winGetInstanceData()->m_decoratedNameString;
+
+	UnicodeString text;
+	if( name.isEmpty() )
+	{
+		text.format( L"<unnamed id %d>", window->winGetWindowId() );
+	}
+	else
+	{
+		text.format( L"%hs", name.str() );
+	}
+
+	if( withRegion )
+	{
+		Int x, y, width, height;
+		window->winGetScreenPosition( &x, &y );
+		window->winGetSize( &width, &height );
+
+		UnicodeString region;
+		region.format( L"  (%d,%d %dx%d)", x, y, width, height );
+		text.concat( region );
+	}
+
+	str->setText( text );
+}
+
+//-------------------------------------------------------------------------------------------------
+// Every visible window outlined and labelled, plus the window under the cursor highlighted with
+// its parent chain listed beside the cursor, root first.
+//-------------------------------------------------------------------------------------------------
+void InGameUI::drawWindowNameOverlay()
+{
+	if( TheWindowManager == nullptr || TheDisplay == nullptr || TheMouse == nullptr )
+	{
+		return;
+	}
+
+	if( m_windowNameString == nullptr )
+	{
+		m_windowNameString = TheDisplayStringManager->newDisplayString();
+		m_windowNameString->setFont( TheWindowManager->winFindFont( "Tahoma", TheGlobalLanguageData->adjustFontSize( 8 ), FALSE ) );
+	}
+
+	s_windowLabelSlotCount = 0;
+	for( GameWindow *window = TheWindowManager->winGetWindowList(); window; window = window->winGetNext() )
+	{
+		drawWindowNameTree( window, m_windowNameString, TRUE );
+	}
+
+	const MouseIO *mouse = TheMouse->getMouseStatus();
+	GameWindow *hovered = TheWindowManager->getWindowUnderCursor( mouse->pos.x, mouse->pos.y, TRUE );
+	if( hovered == nullptr )
+	{
+		return;
+	}
+
+	Int x, y, width, height;
+	hovered->winGetScreenPosition( &x, &y );
+	hovered->winGetSize( &width, &height );
+	TheDisplay->drawOpenRect( x, y, width, height, 2.0f, GameMakeColor( 0, 255, 255, 255 ) );
+
+	GameWindow *chain[ MAX_WINDOW_CHAIN ];
+	Int depth = 0;
+	for( GameWindow *window = hovered; window && depth < MAX_WINDOW_CHAIN; window = window->winGetParent() )
+	{
+		chain[ depth++ ] = window;
+	}
+
+	Int boxWidth = 0;
+	Int lineHeight = 0;
+	for( Int i = 0; i < depth; ++i )
+	{
+		setWindowChainText( m_windowNameString, chain[i], i == 0 );
+
+		Int textWidth, textHeight;
+		m_windowNameString->getSize( &textWidth, &textHeight );
+		boxWidth = max( boxWidth, textWidth );
+		lineHeight = max( lineHeight, textHeight );
+	}
+
+	const Int padding = 4;
+	const Int boxHeight = depth * lineHeight;
+	Int boxX = mouse->pos.x + 20;
+	Int boxY = mouse->pos.y + 20;
+
+	// Flip to the other side of the cursor rather than run off the screen.
+	if( boxX + boxWidth + padding * 2 > (Int)TheDisplay->getWidth() )
+	{
+		boxX = mouse->pos.x - boxWidth - padding * 2 - 8;
+	}
+	if( boxY + boxHeight + padding * 2 > (Int)TheDisplay->getHeight() )
+	{
+		boxY = mouse->pos.y - boxHeight - padding * 2 - 8;
+	}
+	boxX = max( boxX, 0 );
+	boxY = max( boxY, 0 );
+
+	TheDisplay->drawFillRect( boxX, boxY, boxWidth + padding * 2, boxHeight + padding * 2, GameMakeColor( 0, 0, 0, 200 ) );
+	TheDisplay->drawOpenRect( boxX, boxY, boxWidth + padding * 2, boxHeight + padding * 2, 1.0f, GameMakeColor( 0, 255, 255, 255 ) );
+
+	Int lineY = boxY + padding;
+	for( Int i = depth - 1; i >= 0; --i )
+	{
+		setWindowChainText( m_windowNameString, chain[i], i == 0 );
+
+		const Color color = ( i == 0 ) ? GameMakeColor( 0, 255, 255, 255 ) : GameMakeColor( 255, 220, 120, 255 );
+		m_windowNameString->draw( boxX + padding, lineY, color, GameMakeColor( 0, 0, 0, 255 ) );
+		lineY += lineHeight;
+	}
+}
+
+#endif
 
 //-------------------------------------------------------------------------------------------------
 /** This is called after the UI has been drawn. */
@@ -4646,6 +5065,12 @@ void InGameUI::postDraw()
 				{
 					SuperweaponInfo *info = *listIt;
 					DEBUG_ASSERTCRASH(info, ("No superweapon info!"));
+					// Owner-only timers are drawn only for the player they belong to.
+					if (info && info->getSpecialPowerTemplate()->isOwnerOnlyTimer() &&
+							(ThePlayerList->getLocalPlayer() == nullptr || i != ThePlayerList->getLocalPlayer()->getPlayerIndex()))
+					{
+						continue;
+					}
 					if (info && !info->m_hiddenByScript && !info->m_hiddenByScience)
 					{
 						//enforce bottom margin of tactical view
@@ -4780,6 +5205,9 @@ void InGameUI::postDraw()
                     info->m_evaReadyPlayed = false; // Reset Eva for next time
                 }
 
+                // A flashing timer is drawn like a ready one while it counts down.
+                const Bool drawReady = isReady || module->getSpecialPowerTemplate()->isFlashingTimer();
+
                 // draw the text
                 if ( !m_superweaponHiddenByScript && !marginExceeded && !hideTimersForCameraCheat )
                 {
@@ -4787,7 +5215,7 @@ void InGameUI::postDraw()
  								  Bool changeBolding = (readySecs != info->m_timestamp) || (isReady != info->m_ready) || info->m_forceUpdateText;
  								  if (changeBolding)
  								  {
- 									  if (isReady)
+ 									  if (drawReady)
 									  {
 										  // go bold - we're good to go
 										  info->setFont( m_superweaponReadyFont, m_superweaponReadyPointSize, m_superweaponReadyBold );
@@ -4815,7 +5243,7 @@ void InGameUI::postDraw()
                     info->setText(name, time);
                   }
 
-                  if (isReady)
+                  if (drawReady)
 								  {
 									  if ( m_superweaponFlashDuration != 0.0f )
 									  {
@@ -5004,7 +5432,7 @@ void InGameUI::expireHint( HintType type, UnsignedInt hintIndex )
 void InGameUI::createControlBar()
 {
 
-	TheWindowManager->winCreateFromScript( "ControlBar.wnd" );
+	m_controlBarWindow = TheWindowManager->winCreateFromScript( "ControlBar.wnd" );
 	HideControlBar();
 /*
 	// hide all windows created from this layout
@@ -5013,6 +5441,16 @@ void InGameUI::createControlBar()
 		window->winHide( TRUE );
 */
 
+}
+
+void InGameUI::destroyControlBar()
+{
+	if (m_controlBarWindow != nullptr)
+	{
+		TheWindowManager->winDestroy(m_controlBarWindow);
+		m_controlBarWindow = nullptr;
+		m_idleWorkerWin = nullptr; // This window belongs to the Control Bar and is implicitly deleted as well.
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -5030,6 +5468,41 @@ void InGameUI::createReplayControl()
 		window->winHide( TRUE );
 */
 
+}
+
+void InGameUI::destroyReplayControl()
+{
+	if (m_replayWindow != nullptr)
+	{
+		TheWindowManager->winDestroy(m_replayWindow);
+		m_replayWindow = nullptr;
+	}
+}
+
+void InGameUI::showReplayControls()
+{
+	if (m_replayWindow)
+	{
+		Bool show = TheGameLogic->isInReplayGame();
+		m_replayWindow->winHide(!show);
+	}
+}
+
+void InGameUI::hideReplayControls()
+{
+	if (m_replayWindow)
+	{
+		m_replayWindow->winHide(TRUE);
+	}
+}
+
+void InGameUI::toggleReplayControls()
+{
+	if (m_replayWindow)
+	{
+		Bool show = TheGameLogic->isInReplayGame() && m_replayWindow->winIsHidden();
+		m_replayWindow->winHide(!show);
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -6841,11 +7314,7 @@ void InGameUI::resetIdleWorker()
 
 void InGameUI::recreateControlBar()
 {
-	GameWindow *win = TheWindowManager->winGetWindowFromId(nullptr, TheNameKeyGenerator->nameToKey("ControlBar.wnd"));
-	deleteInstance(win);
-
-	m_idleWorkerWin = nullptr;
-
+	destroyControlBar();
 	createControlBar();
 
 	delete TheControlBar;

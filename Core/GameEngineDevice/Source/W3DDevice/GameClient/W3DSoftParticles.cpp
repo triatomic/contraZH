@@ -19,7 +19,7 @@
 // W3DSoftParticles.cpp ///////////////////////////////////////////////////////////////////////////
 // Fades particle sprites where they near the scene's depth or the terrain behind them, shades
 // flame sprites as fire, electric sprites as arcs, laser beams and streaks as lasers and cryo effects
-// as ice, and draws the heat haze behind flames
+// as ice, and draws the heat haze behind flames and the disruption behind jammers
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Lib/BaseType.h"
@@ -27,8 +27,10 @@
 #include "W3DDevice/GameClient/W3DSoftParticles.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/W3DWater.h"
+#include "W3DDevice/GameClient/W3DPlanarMirror.h"
 #include "Common/GlobalData.h"
 #include "GameClient/ParticleSys.h"
+#include "GameClient/DisruptionShader.h"
 #include "W3DDevice/GameClient/Module/W3DLaserDraw.h"
 #include "WW3D2/dx8wrapper.h"
 #include "WW3D2/dx8caps.h"
@@ -65,6 +67,12 @@ static const Int LaserShaderMode = Get_Env_Mode("CONTRA_LASERSHADER", 1);
 // CONTRA_CRYOSHADER bisects faults: 0 plain cryo effects, 1 cryo shading.
 static const Int CryoShaderMode = Get_Env_Mode("CONTRA_CRYOSHADER", 1);
 
+// CONTRA_DISRUPTSHADER bisects faults: 0 no disruption, 1 disruption shading.
+static const Int DisruptionShaderMode = Get_Env_Mode("CONTRA_DISRUPTSHADER", 1);
+
+// DisruptionGlitchSize counts pixels on a screen this many lines tall, so the bands look the same at any resolution.
+static const Real GLITCH_SCREEN_LINES = 1080.0f;
+
 // The sprite's camera-space position comes through this stage, which also holds the surface it fades against.
 static const Int SOFT_STAGE = 1;
 static const Int NOISE_STAGE = 2;
@@ -94,13 +102,18 @@ W3DSoftParticles::W3DSoftParticles()
 	  m_noise(nullptr),
 	  m_sceneCopy(nullptr),
 	  m_loaded(FALSE),
+	  m_disrupting(FALSE),
 	  m_bound(0)
 {
+	m_disruptionShaders[0] = 0;
+	m_disruptionShaders[1] = 0;
+	m_disruptionShaders[2] = 0;
 	Set_D3DMATRIX_Identity(m_view);
 	Set_D3DMATRIX_Identity(m_projection);
 	Set_D3DMATRIX_Identity(m_toWorld);
 
-	if (SoftParticleMode != SOFT_PARTICLES_OFF || FlameShaderMode != FLAME_SHADER_OFF || ElectricShaderMode != 0 || LaserShaderMode != 0 || CryoShaderMode != 0)
+	if (SoftParticleMode != SOFT_PARTICLES_OFF || FlameShaderMode != FLAME_SHADER_OFF || ElectricShaderMode != 0 || LaserShaderMode != 0 || CryoShaderMode != 0 ||
+		DisruptionShaderMode != 0)
 	{
 		SortingRendererClass::Set_Soft_Particle_Hook(this);
 	}
@@ -140,6 +153,9 @@ void W3DSoftParticles::ReleaseResources()
 		DX8_DELETE_PIXEL_SHADER(device, m_cryoBeamHeightShader);
 		DX8_DELETE_PIXEL_SHADER(device, m_cryoBeamShader);
 		DX8_DELETE_PIXEL_SHADER(device, m_hazeShader);
+		DX8_DELETE_PIXEL_SHADER(device, m_disruptionShaders[0]);
+		DX8_DELETE_PIXEL_SHADER(device, m_disruptionShaders[1]);
+		DX8_DELETE_PIXEL_SHADER(device, m_disruptionShaders[2]);
 	}
 	m_depthShader = 0;
 	m_heightShader = 0;
@@ -159,6 +175,10 @@ void W3DSoftParticles::ReleaseResources()
 	m_cryoBeamHeightShader = 0;
 	m_cryoBeamShader = 0;
 	m_hazeShader = 0;
+	m_disruptionShaders[0] = 0;
+	m_disruptionShaders[1] = 0;
+	m_disruptionShaders[2] = 0;
+	m_disrupting = FALSE;
 
 	if (m_noise != nullptr)
 	{
@@ -226,6 +246,16 @@ Bool W3DSoftParticles::cryoEnabled()
 	return m_cryoShader != 0 && m_cryoBeamShader != 0 && m_noise != nullptr;
 }
 
+Bool W3DSoftParticles::disruptionEnabled()
+{
+	if (DisruptionShaderMode == 0 || !TheGlobalData->m_useHeatEffects)
+	{
+		return FALSE;
+	}
+	loadShaders();
+	return m_disruptionShaders[0] != 0 && m_disruptionShaders[1] != 0 && m_disruptionShaders[2] != 0 && m_noise != nullptr;
+}
+
 static void Load_Pixel_Shader(const char *path, DWORD &shader)
 {
 	if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(path, nullptr, 0, false, &shader)))
@@ -274,7 +304,13 @@ Bool W3DSoftParticles::loadShaders()
 				Load_Pixel_Shader("shaders\\softparticlecryobeamheight.pso", m_cryoBeamHeightShader);
 				Load_Pixel_Shader("shaders\\particlecryobeam.pso", m_cryoBeamShader);
 			}
-			if (FlameShaderMode != FLAME_SHADER_OFF || ElectricShaderMode != 0 || LaserShaderMode != 0 || CryoShaderMode != 0)
+			if (DisruptionShaderMode != 0)
+			{
+				Load_Pixel_Shader("shaders\\disruptionsprite.pso", m_disruptionShaders[DisruptionShaderInfo::SHAPE_SPRITE]);
+				Load_Pixel_Shader("shaders\\disruptioncenter.pso", m_disruptionShaders[DisruptionShaderInfo::SHAPE_CENTER]);
+				Load_Pixel_Shader("shaders\\disruptionbeam.pso", m_disruptionShaders[DisruptionShaderInfo::SHAPE_BEAM]);
+			}
+			if (FlameShaderMode != FLAME_SHADER_OFF || ElectricShaderMode != 0 || LaserShaderMode != 0 || CryoShaderMode != 0 || DisruptionShaderMode != 0)
 			{
 				createNoise();
 			}
@@ -512,18 +548,27 @@ static Real Default_Camera_Distance()
 	return TheGlobalData->m_cameraHeight / sinf(pitch);
 }
 
-void W3DSoftParticles::bindFlame(const FlameShaderTuning &tuning)
+// A beam's texture tiles along its length in v and a mesh's may tile both ways, so a warped lookup stays inside the texture only where it does not tile.
+static Vector4 Warp_Clamp(Bool beam, Bool mesh)
+{
+	const Real open = 1.0e6f;
+	return Vector4(mesh ? -open : 0.0f, (beam || mesh) ? -open : 0.0f, mesh ? open : 1.0f, (beam || mesh) ? open : 1.0f);
+}
+
+void W3DSoftParticles::bindFlame(const FlameShaderTuning &tuning, Bool beam, Bool mesh)
 {
 	const Vector4 flame(Noise_Rise(tuning.rise), tuning.warp, Noise_Scale(tuning.noiseSize), tuning.heat);
 	const Vector4 shape(tuning.flicker, tuning.breakup, Default_Camera_Distance(), 0.0f);
+	const Vector4 clamp = Warp_Clamp(beam, mesh);
 	DX8Wrapper::Set_Pixel_Shader_Constant(6, &flame, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(10, &shape, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(11, &clamp, 1);
 	setWorldConstants(7);
 	Bind_Noise(m_noise);
 }
 
 // The field jumps to a fresh spot ElectricRate times a second, so arcs crackle rather than drift.
-void W3DSoftParticles::bindElectric(const BeamShaderTuning &tuning, Bool beam)
+void W3DSoftParticles::bindElectric(const BeamShaderTuning &tuning, Bool beam, Bool mesh)
 {
 	const Real rate = tuning.electricRate;
 	const Int jump = (rate > 0.0f) ? (Int)fmod(WW3D::Get_Sync_Time() / 1000.0 * rate, 65536.0) : 0;
@@ -532,8 +577,7 @@ void W3DSoftParticles::bindElectric(const BeamShaderTuning &tuning, Bool beam)
 
 	const Vector4 electric(offsetX, offsetY, Noise_Scale(tuning.electricNoiseSize), tuning.electricJitter);
 	const Vector4 shape(tuning.electricFlicker, tuning.electricArcSharpness, tuning.electricArcs * 0.5f, Default_Camera_Distance());
-	// A beam's texture tiles along its length in v, so the jitter only stays inside the texture across it.
-	const Vector4 clamp(0.0f, beam ? -1.0e6f : 0.0f, 1.0f, beam ? 1.0e6f : 1.0f);
+	const Vector4 clamp = Warp_Clamp(beam, mesh);
 	const Vector4 strobe(1.0f - 0.5f * tuning.electricFlicker, 0.0f, 0.0f, 0.0f);
 	DX8Wrapper::Set_Pixel_Shader_Constant(6, &electric, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(7, &shape, 1);
@@ -623,6 +667,16 @@ Bool W3DSoftParticles::beginHaze()
 	return W3DShaderManager::copyRenderTarget(m_sceneCopy);
 }
 
+void W3DSoftParticles::bindSceneCopy()
+{
+	DX8Wrapper::_Get_D3D_Device8()->SetTexture(SCENE_STAGE, m_sceneCopy);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(SCENE_STAGE, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(SCENE_STAGE, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(SCENE_STAGE, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(SCENE_STAGE, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+	DX8Wrapper::Set_DX8_Texture_Stage_State(SCENE_STAGE, D3DTSS_MIPFILTER, D3DTEXF_NONE);
+}
+
 // The flame's shader tells the mask whether alpha counts. Fog is off because the scene copy already carries it.
 Bool W3DSoftParticles::bindHaze(const ShaderClass &shader, const FlameShaderTuning &tuning)
 {
@@ -652,13 +706,7 @@ Bool W3DSoftParticles::bindHaze(const ShaderClass &shader, const FlameShaderTuni
 	DX8Wrapper::Set_Pixel_Shader_Constant(5, &params, 1);
 
 	Bind_Noise(m_noise);
-
-	DX8Wrapper::_Get_D3D_Device8()->SetTexture(SCENE_STAGE, m_sceneCopy);
-	DX8Wrapper::Set_DX8_Texture_Stage_State(SCENE_STAGE, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
-	DX8Wrapper::Set_DX8_Texture_Stage_State(SCENE_STAGE, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
-	DX8Wrapper::Set_DX8_Texture_Stage_State(SCENE_STAGE, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
-	DX8Wrapper::Set_DX8_Texture_Stage_State(SCENE_STAGE, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
-	DX8Wrapper::Set_DX8_Texture_Stage_State(SCENE_STAGE, D3DTSS_MIPFILTER, D3DTEXF_NONE);
+	bindSceneCopy();
 
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE, TRUE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
@@ -673,13 +721,139 @@ Bool W3DSoftParticles::bindHaze(const ShaderClass &shader, const FlameShaderTuni
 #endif
 }
 
+bool W3DSoftParticles::Can_Disrupt()
+{
+	return disruptionEnabled() != FALSE;
+}
+
+Bool W3DSoftParticles::beginDisruption()
+{
+	m_disrupting = disruptionEnabled() && W3DShaderManager::copyRenderTarget(m_sceneCopy);
+	return m_disrupting;
+}
+
+void W3DSoftParticles::endDisruption()
+{
+	m_disrupting = FALSE;
+}
+
+// Blend, alpha test, depth write and fog are overridden as the haze does, and End puts them back the same way.
+Bool W3DSoftParticles::bindDisruption(const ShaderClass &shader, const DisruptionShaderInfo &info)
+{
+#if defined(BUILD_WITH_D3D9)
+	if (!m_disrupting || m_sceneCopy == nullptr || info.shape < 0 || info.shape > DisruptionShaderInfo::SHAPE_BEAM)
+	{
+		return FALSE;
+	}
+
+	DisruptionShaderTuning tuning;
+	info.resolveTuning(tuning);
+
+	// The rings start at the draw's own origin, so its transforms are read before anything here changes state.
+	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
+	D3DMATRIX world;
+	D3DMATRIX view;
+	device->GetTransform(D3DTS_WORLD, &world);
+	device->GetTransform(D3DTS_VIEW, &view);
+	const D3DMATRIX worldView = world * view;
+	Vector4 center(worldView.m[3][0], worldView.m[3][1], worldView.m[3][2], 0.0f);
+
+	// A draw with world-space vertices has no transform to read, so the sorter says where it sits.
+	const Vector3 *placed = SortingRendererClass::Peek_Disruption_Center();
+	if (placed != nullptr)
+	{
+		center.X = placed->X * view.m[0][0] + placed->Y * view.m[1][0] + placed->Z * view.m[2][0] + view.m[3][0];
+		center.Y = placed->X * view.m[0][1] + placed->Y * view.m[1][1] + placed->Z * view.m[2][1] + view.m[3][1];
+		center.Z = placed->X * view.m[0][2] + placed->Y * view.m[1][2] + placed->Z * view.m[2][2] + view.m[3][2];
+	}
+
+	DX8Wrapper::Set_Texture(SOFT_STAGE, nullptr);
+	DX8Wrapper::Set_Texture(NOISE_STAGE, nullptr);
+	DX8Wrapper::Set_Texture(SCENE_STAGE, nullptr);
+	DX8Wrapper::Apply_Render_State_Changes();
+
+	D3DSURFACE_DESC desc;
+	m_sceneCopy->GetLevelDesc(0, &desc);
+	const Vector4 screenMap = setClipConstants((Real)desc.Width, (Real)desc.Height);
+	setWorldConstants(7);
+
+	const double seconds = WW3D::Get_Sync_Time() / 1000.0;
+	const Real twoPi = 2.0f * PI;
+	const Real ringSize = max(tuning.ringSize, 0.01f);
+	const Vector4 rings(twoPi / ringSize, (Real)fmod(seconds * tuning.ringSpeed / ringSize, 1.0) * twoPi, tuning.ringStrength, tuning.chromaSpread);
+
+	const Bool addsColor = shader.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_ONE;
+	const Vector4 params(SortingRendererClass::Get_Disruption_Strength(), addsColor ? 1.0f : 0.0f, 0.0f, 0.0f);
+
+	const Vector4 wobble(Noise_Scale(tuning.wobbleSize), Noise_Rise(tuning.wobbleSpeed), tuning.wobble, tuning.mask);
+
+	// The bands jump to fresh texels DisruptionGlitchRate times a second, each lookup on a texel's centre.
+	const Int jump = (tuning.glitchRate > 0.0f) ? (Int)fmod(seconds * tuning.glitchRate, 65536.0) : 0;
+	const Real spotU = ((Hash_Lattice(jump, 0, 11) % NOISE_SIZE) + 0.5f) / NOISE_SIZE;
+	const Real spotV = ((Hash_Lattice(jump, 1, 11) % NOISE_SIZE) + 0.5f) / NOISE_SIZE;
+	const Vector4 glitch(0.5f * GLITCH_SCREEN_LINES / max(tuning.glitchSize, 1.0f), spotU, spotV, tuning.glitch);
+
+	// A world unit at unit depth, in scene uv. The shader divides by the shape's depth.
+	const Vector4 bend(fabs(m_projection.m[0][0] * screenMap.X), fabs(m_projection.m[1][1] * screenMap.Y), 1.0f + tuning.chroma, 1.0f - tuning.chroma);
+
+	DX8Wrapper::Set_Pixel_Shader_Constant(4, &rings, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(5, &params, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(6, &wobble, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(10, &glitch, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(11, &bend, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(12, &center, 1);
+
+	Bind_Noise(m_noise);
+	bindSceneCopy();
+
+	// Texture coordinates arrive packed by textured stage, so the later ones keep their places only with stage 1 filled.
+	device->SetTexture(SOFT_STAGE, m_noise);
+
+	const Bool beam = info.shape == DisruptionShaderInfo::SHAPE_BEAM;
+	if (beam)
+	{
+		// The beam coordinates are the second uv set, and reach the pixel shader as TEXCOORD2.
+		DX8Wrapper::Set_DX8_Texture_Stage_State(NOISE_STAGE, D3DTSS_TEXCOORDINDEX, 1);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(NOISE_STAGE, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+	}
+
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE, TRUE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHATESTENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZWRITEENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_FOGENABLE, FALSE);
+	Bind_Camera_Position();
+	DX8Wrapper::Set_Pixel_Shader(m_disruptionShaders[info.shape]);
+	m_bound = beam ? (EFFECT_DISRUPT | EFFECT_BEAM) : EFFECT_DISRUPT;
+	return TRUE;
+#else
+	return FALSE;
+#endif
+}
+
 bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const void *effectData)
 {
 	m_bound = 0;
+	if ((effects & EFFECT_MIRROR) != 0)
+	{
+		if (TheW3DPlanarMirrors == nullptr || !TheW3DPlanarMirrors->beginTranslucent(shader, effectData))
+		{
+			return false;
+		}
+		m_bound = EFFECT_MIRROR;
+		return true;
+	}
+
+	if ((effects & EFFECT_DISRUPT) != 0)
+	{
+		return effectData != nullptr && bindDisruption(shader, *static_cast<const DisruptionShaderInfo *>(effectData)) != FALSE;
+	}
+
 	FlameShaderTuning tuning;
 	if ((effects & (EFFECT_FLAME | EFFECT_HAZE)) != 0)
 	{
-		ParticleSystemTemplate::resolveFlameTuning(static_cast<const ParticleSystemTemplate *>(effectData), tuning);
+		ParticleSystemTemplate::resolveFlameTuning(static_cast<const FlameShaderTuning *>(effectData), tuning);
 	}
 
 	if ((effects & EFFECT_HAZE) != 0)
@@ -692,10 +866,11 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const 
 	const Bool electric = !cryo && !flame && (effects & EFFECT_ELECTRIC) != 0 && electricEnabled();
 	const Bool laser = !cryo && !flame && !electric && (effects & EFFECT_LASER) != 0 && laserEnabled();
 	const Bool beam = (effects & EFFECT_BEAM) != 0;
+	const Bool mesh = (effects & EFFECT_MESH) != 0;
 	// A beam or streak fades only as part of its shaded look, so with its shader off it draws as it always has.
 	const Bool soft = (effects & EFFECT_SOFT) != 0 && SoftParticleMode != SOFT_PARTICLES_OFF &&
 		TheGlobalData->m_useSoftParticles && TheGlobalData->m_softParticleDistance > 0.0f &&
-		(laser || electric || cryo || (effects & (EFFECT_LASER | EFFECT_BEAM)) == 0);
+		(flame || laser || electric || cryo || (effects & (EFFECT_LASER | EFFECT_BEAM)) == 0);
 	if ((!soft && !flame && !electric && !laser && !cryo) || !loadShaders())
 	{
 		return false;
@@ -750,11 +925,8 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const 
 		DX8Wrapper::Set_Pixel_Shader(shadedShader);
 		bound = TRUE;
 
-		// Texture coordinates arrive packed by textured stage, so the beam's reach TEXCOORD2 only with stage 1 filled.
-		if (laser || (cryo && beam))
-		{
-			DX8Wrapper::_Get_D3D_Device8()->SetTexture(SOFT_STAGE, m_noise);
-		}
+		// Texture coordinates arrive packed by textured stage, so the camera position reaches TEXCOORD1 only with stage 1 filled.
+		DX8Wrapper::_Get_D3D_Device8()->SetTexture(SOFT_STAGE, m_noise);
 	}
 	if (!bound)
 	{
@@ -763,13 +935,13 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const 
 
 	if (flame)
 	{
-		bindFlame(tuning);
+		bindFlame(tuning, beam, mesh);
 		m_bound = EFFECT_FLAME;
 	}
 	else if (electric || laser || cryo)
 	{
 		BeamShaderTuning beamTuning;
-		W3DLaserDrawModuleData::resolveShaderTuning(beam ? static_cast<const BeamShaderTuning *>(effectData) : nullptr, beamTuning);
+		W3DLaserDrawModuleData::resolveShaderTuning((beam || mesh) ? static_cast<const BeamShaderTuning *>(effectData) : nullptr, beamTuning);
 		if (cryo)
 		{
 			bindCryo(beamTuning, beam);
@@ -777,7 +949,7 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const 
 		}
 		else if (electric)
 		{
-			bindElectric(beamTuning, beam);
+			bindElectric(beamTuning, beam, mesh);
 			m_bound = EFFECT_ELECTRIC;
 		}
 		else
@@ -807,6 +979,13 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const 
 
 void W3DSoftParticles::End()
 {
+	if ((m_bound & EFFECT_MIRROR) != 0)
+	{
+		TheW3DPlanarMirrors->endTranslucent();
+		m_bound = 0;
+		return;
+	}
+
 	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
 	DX8Wrapper::Set_Pixel_Shader(0);
 	device->SetTexture(SOFT_STAGE, nullptr);
@@ -824,7 +1003,7 @@ void W3DSoftParticles::End()
 		// ShaderClass never sets the blend op, so it is put back here.
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_BLENDOP, D3DBLENDOP_ADD);
 	}
-	if ((m_bound & EFFECT_HAZE) != 0)
+	if ((m_bound & (EFFECT_HAZE | EFFECT_DISRUPT)) != 0)
 	{
 		device->SetTexture(SCENE_STAGE, nullptr);
 

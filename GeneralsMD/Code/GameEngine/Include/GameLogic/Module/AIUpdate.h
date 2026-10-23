@@ -219,6 +219,12 @@ public:
 	//Bool m_attackAngleMirrored;
 	std::vector<AttackAngleData> m_attackAngles;
 
+	Bool m_minRangeRetreatStraight;	///< when inside weapon min range, back off straight away from the target, just far enough
+	Bool m_aimByReversing;					///< no-turret aiming at a target in front: turn by backing up instead of driving forward
+	Real m_aimByReversingMaxAngle;	///< only reverse to aim if the target is at most this far off the nose (radians)
+	Real m_aimByReversingMargin;		///< safety margin added to the min range in the "would a forward turn get too close" test
+	Real m_aimByReversingTurnFactor;	///< scales the forward-turn closing estimate (turn radius * sin(angle))
+
 
   AIUpdateModuleData();
 	virtual ~AIUpdateModuleData() override;
@@ -358,6 +364,11 @@ public:
 
 	//Real getAttackAngle() const { return getAIUpdateModuleData()->m_attackAngle; }
 	Bool useAttackAngle() const { return getAIUpdateModuleData()->m_useAttackAngle; }
+	Bool isMinRangeRetreatStraight() const { return getAIUpdateModuleData()->m_minRangeRetreatStraight; }
+	Bool isAimByReversing() const { return getAIUpdateModuleData()->m_aimByReversing; }
+	Real getAimByReversingMaxAngle() const { return getAIUpdateModuleData()->m_aimByReversingMaxAngle; }
+	Real getAimByReversingMargin() const { return getAIUpdateModuleData()->m_aimByReversingMargin; }
+	Real getAimByReversingTurnFactor() const { return getAIUpdateModuleData()->m_aimByReversingTurnFactor; }
 	//Bool isAttackAngleMirrored() const { return getAIUpdateModuleData()->m_attackAngleMirrored; }
 
 	// this is present solely for some transports to override, so that they can land before 
@@ -443,6 +454,7 @@ public:
 	virtual void setLocomotorGoalPositionOnPath();
 	virtual void setLocomotorGoalPositionExplicit(const Coord3D& newPos);
 	virtual void setLocomotorGoalOrientation(Real angle);
+	void setLocomotorGoalOrientationByReversing(Real angle);	///< like setLocomotorGoalOrientation, but turn by backing up (AimByReversing)
 	virtual void setLocomotorGoalNone();
 	virtual Bool isDoingGroundMovement() const;  ///< True if moving along ground.
 
@@ -509,7 +521,7 @@ public:
 	void destroyPath( void );												///< destroy the current path, setting it to null
 	UnsignedInt getPathAge( void ) const { return TheGameLogic->getFrame() - m_pathTimestamp; }	///< return the "age" of the path
 	Bool isPathAvailable( const Coord3D *destination ) const; ///< does a path exist between us and the destination
-	Bool isQuickPathAvailable( const Coord3D *destination ) const;  ///< does a path (using quick pathfind) exist between us and the destination
+	Bool isQuickPathAvailable( const Coord3D *destination, Bool acceptRubble = FALSE ) const;  ///< does a path (using quick pathfind) exist between us and the destination
 	Int getNumFramesBlocked(void) const {return m_blockedFrames;}
 	Bool isBlockedAndStuck(void) const {return m_isBlockedAndStuck;}
 	Bool isForcedMoveBackwards(void) const {return m_forceMoveBackwards;}	///< True while a REVERSE_MOVE order is being executed.
@@ -638,6 +650,10 @@ public:
 	void friend_queueShots(WeaponSlotType slot, Int shots, const Coord3D* pos);
 	Int friend_getQueuedShotsLeft() const { return m_queuedShotsLeft; }
 
+	// OCL Attack placed through SPECIAL_POWER_CONSTRUCT: the FireOCL of the next shots spawns at the placed spot and angle
+	void friend_setAttackPlacement(const Coord3D* pos, Real angle, Int shots);
+	Bool friend_takeAttackPlacement(Coord3D* pos, Real* angle);
+
 	Bool canAutoAcquire() const { return getAIUpdateModuleData()->m_autoAcquireEnemiesWhenIdle; }
 
 	Bool canAutoAcquireWhileStealthed() const;
@@ -656,6 +672,10 @@ public:
 	inline Real getLoadTurnRateFactor(void) const { return m_loadTurnRateFactor; }
 	inline Real getLoadAccelFactor(void) const { return m_loadAccelFactor; }
 	inline Real getLoadLiftFactor(void) const { return m_loadLiftFactor; }
+
+	/// TRUE if a jammed unit of a fair-play computer player holds this script order until the jam ends.
+	Bool holdOrderWhileJammed(const AICommandParms* parms) const;
+	void releaseJammedOrder();
 
 protected:
 
@@ -832,6 +852,7 @@ private:
 	LocomotorSetType	m_curLocomotorSet;
 	LocoGoalType			m_locomotorGoalType;
 	Coord3D						m_locomotorGoalData;
+	Bool							m_locomotorGoalTurnByReversing;	///< ANGLE goal: turn by backing up (AimByReversing). Not saved.
 
 	// Turrets -------------------------------------------------------------------------------------------------
 	TurretAI*					m_turretAI[MAX_TURRETS];		// ai for our turret (or null if no turret)
@@ -847,6 +868,9 @@ private:
 	Coord3D				m_queuedShotsPos;
 	UnsignedInt		m_clearFiringStatusFrame;
 	void fireQueuedShots();
+	Coord3D				m_attackPlacementPos;
+	Real					m_attackPlacementAngle;
+	Int						m_attackPlacementShotsLeft;
 
 	// Common AI "status" effects -------------------------------------------------------------------
 #ifdef ALLOW_DEMORALIZE
@@ -893,6 +917,9 @@ private:
 	Real        m_loadTurnRateFactor;
 	Real        m_loadAccelFactor;
 	Real        m_loadLiftFactor;
+
+	mutable AICommandParmsStorage m_jammedOrder;	///< newest script order held while jammed, stored from the const command gate
+	mutable Int m_jammedOrderPlayer;				///< player index that gave m_jammedOrder, -1 if none
 };
 
 //------------------------------------------------------------------------------------------------------------

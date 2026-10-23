@@ -29,6 +29,7 @@
 class CWorldBuilderView;
 class WbView3d;
 class WorldHeightMapEdit;
+class WaterTransparencySetting;
 class Undoable;
 class DataChunkInput;
 struct DataChunkInfo;
@@ -220,6 +221,8 @@ protected:
 	// Map.ini loader commands (File > Map.ini submenu).
 	afx_msg void OnOpenMapIni();
 	afx_msg void OnEditMapIni();	///< the built-in Qt editor (falls back to OnOpenMapIni's shell)
+	afx_msg void OnWaterTuningMapIni();
+	afx_msg void OnGenerateHQPreview();
 	afx_msg void OnReloadMapIni();
 	afx_msg void OnCheckMapIni();
 	afx_msg void OnToggleWatchMapIni();
@@ -229,6 +232,8 @@ protected:
 public:
 	// Called from CMainFrame's timer while auto-reload is on: reload if map.ini changed.
 	void pollMapIniWatch();
+	// WorldBuilder wrote map.ini itself: keep the watch from reloading over it.
+	void noteMapIniSaved();
 protected:
 
 	afx_msg void OnJumpToMapFolderWBData();
@@ -289,6 +294,9 @@ Bool WBMapIni_IsPhantomTemplate(const AsciiString &name);
 // same as the loader's unload (it skips the template re-link, which is both pointless at exit
 // and unsafe while the document still references those templates). See the definition.
 void WBMapIni_UnloadForShutdown(void);
+
+// The map's WaterTransparency override, created from the Water.ini values when the map has none.
+WaterTransparencySetting *WBMapIni_EnsureWaterOverride(void);
 
 //{{AFX_INSERT_LOCATION}}
 // Microsoft Visual C++ will insert additional declarations immediately before the previous line.

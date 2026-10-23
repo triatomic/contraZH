@@ -12,7 +12,6 @@
 #include "ScriptDialog.h"
 #include "MainFrm.h"
 #include "CUndoable.h"				// SidesListUndoable / AddObjectUndoable (import commit)
-#include "EditGroup.h"				// the New Folder name dialog (same one OnNewFolder pops)
 #include "EditParameter.h"			// setCurSidesList (the param editors resolve sides from it)
 #include "ExportScriptsOptions.h"	// the export options statics (qtM import/export)
 #include "GameLogic/ScriptEngine.h"	// Script/Condition/OrCondition/ScriptAction/Parameter
@@ -23,6 +22,7 @@
 #include "qt/panels/WBQtScriptEditBridge.h"	// WBQtScriptEdit_Run (new/edit script sheet)
 #include "qt/panels/WBQtParamBridge.h"		// WBQtEditGroup_Run (edit folder dialog)
 #include "qt/panels/WBQtEntityFinderBridge.h"	// WBQtEntityFinder_FindByName (entity-jump lookup)
+#include "qt/WBQtMessageBox.h"
 
 #include <vector>
 
@@ -342,8 +342,7 @@ void ScriptDialog::qtMInsertScript(Script *pNewScript)
 	}
 }
 
-// == OnNewFolder minus the tree refresh. Pops the same EditGroup name dialog the MFC path
-// does (OnNewFolder never got a Qt-dialog branch; parity kept).
+// == OnNewFolder minus the tree refresh, with the Qt folder dialog Edit Folder uses.
 void ScriptDialog::qtMNewFolder(void)
 {
 	Int ndx;
@@ -360,8 +359,7 @@ void ScriptDialog::qtMNewFolder(void)
 	{
 		ListType savSel = m_curSelection;
 		ScriptGroup *pNewGroup = newInstance( ScriptGroup);
-		EditGroup editDlg(pNewGroup);
-		if (IDOK==editDlg.DoModal())
+		if (WBQtEditGroup_Run(pNewGroup, ::AfxGetMainWnd()->GetSafeHwnd()) != 0)
 		{
 			AsciiString name = pNewGroup->getName();
 			name.trim();
@@ -1199,14 +1197,12 @@ void ScriptDialog::qtMSetCheckbox(int which, int checked)
 	}
 }
 
-// == OnLoad minus the final reloadPlayer/updateIcons loop (no tree). The chunk parsers are
-// the same protected statics; the SidesListUndoable commit + m_sides re-copy are verbatim.
+// == OnLoad minus the final reloadPlayer/updateIcons loop (no tree); importScriptFile does the work.
 void ScriptDialog::qtMImportScripts(void)
 {
-	CFileDialog fileDlg(true, ".scb", NULL, 0,
-		"Script files (.scb)|*.scb||", this);
-
-	Int result = fileDlg.DoModal();
+	char pathBuf[_MAX_PATH];
+	Int result = WBQtFileDialog_Run(0, "Import Scripts", "Script files (.scb, .json)|*.scb;*.json||",
+		"scb", NULL, pathBuf, sizeof(pathBuf)) != 0 ? IDOK : IDCANCEL;
 
 	// Open document dialog may change working directory, change it back.
 	char buf[_MAX_PATH];
@@ -1221,133 +1217,13 @@ void ScriptDialog::qtMImportScripts(void)
 		}
 		pEnd--;
 	}
-	CWorldBuilderDoc* pDoc = CWorldBuilderDoc::GetActiveDoc();
 	::SetCurrentDirectory(buf);
 	if (IDCANCEL==result)
 	{
 		return;
 	}
 
-	CString path = fileDlg.GetPathName();
-
-	CachedFileInputStream theInputStream;
-	if (theInputStream.open(AsciiString(path)))
-	try {
-		ChunkInputStream *pStrm = &theInputStream;
-		DataChunkInput file( pStrm );
-		m_firstReadObject = NULL;
-		m_firstTrigger = NULL;
-		m_waypointBase = pDoc->getNextWaypointID();
-		m_maxWaypoint = m_waypointBase;
-		file.registerParser( AsciiString("PlayerScriptsList"), AsciiString::TheEmptyString, ScriptList::ParseScriptsDataChunk );
-		file.registerParser( AsciiString("ObjectsList"), AsciiString::TheEmptyString, ParseObjectsDataChunk );
-		file.registerParser( AsciiString("PolygonTriggers"), AsciiString::TheEmptyString, ParsePolygonTriggersDataChunk );
-		file.registerParser( AsciiString("WaypointsList"), AsciiString::TheEmptyString, ParseWaypointDataChunk );
-		file.registerParser( AsciiString("ScriptTeams"), AsciiString::TheEmptyString, ParseTeamsDataChunk );
-		file.registerParser( AsciiString("ScriptsPlayers"), AsciiString::TheEmptyString, ParsePlayersDataChunk );
-		if (!file.parse(this))
-		{
-			throw(ERROR_CORRUPT_FILE_FORMAT);
-		}
-		pDoc->setNextWaypointID(m_maxWaypoint);
-
-		SidesListUndoable *pUndo = new SidesListUndoable(m_sides, pDoc);
-		pDoc->AddAndDoUndoable(pUndo);
-		REF_PTR_RELEASE(pUndo); // belongs to pDoc now.
-		m_sides = *TheSidesList;
-		// The import committed app-level and re-seeded the working copy; editor-local
-		// snapshots from before it would desync the two, so drop them.
-		qtClearUndoHistory();
-
-		if (m_firstReadObject)
-		{
-			AddObjectUndoable *pObjUndo = new AddObjectUndoable(pDoc, m_firstReadObject);
-			pDoc->AddAndDoUndoable(pObjUndo);
-			REF_PTR_RELEASE(pObjUndo); // belongs to pDoc now.
-			m_firstReadObject = NULL; // undoable owns it now.
-		}
-		PolygonTrigger *pTrig;
-		PolygonTrigger *pNextTrig;
-		for (pTrig=m_firstTrigger; pTrig; pTrig = pNextTrig)
-		{
-			pNextTrig = pTrig->getNext();
-			pTrig->setNextPoly(NULL);
-			PolygonTrigger::addPolygonTrigger(pTrig);
-		}
-
-		ScriptList *scripts[MAX_PLAYER_COUNT];
-		Int count = ScriptList::getReadScripts(scripts);
-		Int i;
-		for (i=0; i<count; i++)
-		{
-			if (scripts[i]->getScript() == NULL && scripts[i]->getScriptGroup()==NULL)
-			{
-				continue;
-			}
-			Int curSide = -1;
-			if (count==1)
-			{
-				curSide = m_curSelection.m_playerIndex;
-			}
-			else
-			{
-				Int j;
-				for (j=0; j<m_sides.getNumSides(); j++)
-				{
-					// Using i as an index assumes that i < m_sides.getNumSides.  Is that safe???
-					AsciiString name = m_sides.getSideInfo(i)->getDict()->getAsciiString(TheKey_playerName);
-					if (name == m_readPlayerNames[j])
-					{
-						curSide = j;
-						break;
-					}
-				}
-				if (curSide == -1)
-				{
-					CString msg = "Could not find player";
-					msg += m_readPlayerNames[i].str();
-					msg += ", discarding scripts for this player.";
-					::AfxMessageBox(msg);
-					continue;
-				}
-			}
-			if (curSide>= m_sides.getNumSides())
-			{
-				curSide = 0;
-				::AfxMessageBox("Imported scripts came from more players than exist in this map.  Additional scripts moved to Neutral player.");
-			}
-			ScriptList *pSL = m_sides.getSideInfo(curSide)->getScriptList();
-
-			if (pSL)
-			{
-				Script *pScr;
-				Script *pNextScr;
-				Int j=0;
-				for (pScr = scripts[i]->getScript(); pScr; pScr=pNextScr)
-				{
-					pNextScr=pScr->getNext();
-					pScr->setNextScript(NULL);
-					pSL->addScript(pScr, j); //unlink it and add.
-					j++;
-				}
-				j=0;
-				ScriptGroup *pGroup;
-				ScriptGroup *pNextGroup;
-				for (pGroup = scripts[i]->getScriptGroup(); pGroup; pGroup=pNextGroup)
-				{
-					pNextGroup=pGroup->getNext();
-					pGroup->setNextGroup(NULL);
-					pSL->addGroup(pGroup, j);
-					j++;
-				}
-				scripts[i]->discard(); /* Frees the script list, but none of it's children, as they have been
-															copied into the current scripts. */
-				scripts[i] = NULL;
-			}
-		}
-	} catch(...) {
-		DEBUG_CRASH(("threw exception in ScriptDialog::qtMImportScripts"));
-	}
+	importScriptFile(pathBuf);
 }
 
 extern "C" {
@@ -1681,6 +1557,16 @@ void WBQtScript_GetDetail(int listTypeInt, char *descOut, int descCap, char *com
 	{
 		dlg->qtGetDetail(listTypeInt, descOut, descCap, commentOut, commentCap);
 	}
+}
+
+int WBQtScript_GetNewDesign(void)
+{
+	return ::AfxGetApp()->GetProfileInt(SCRIPT_DIALOG_SECTION, "NewDesign", 0) ? 1 : 0;
+}
+
+void WBQtScript_SetNewDesign(int on)
+{
+	::AfxGetApp()->WriteProfileInt(SCRIPT_DIALOG_SECTION, "NewDesign", on ? 1 : 0);
 }
 
 int WBQtScript_GetCheckbox(int which)

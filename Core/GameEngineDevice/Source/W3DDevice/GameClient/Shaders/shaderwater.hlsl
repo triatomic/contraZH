@@ -45,11 +45,6 @@ sampler2D HeightTexture : register(s4);
 sampler2D SceneTexture  : register(s5);
 sampler2D ShadowMap     : register(s6);
 sampler2D FoamTexture   : register(s7);
-sampler2D SkyNorth      : register(s8);
-sampler2D SkyEast       : register(s9);
-sampler2D SkySouth      : register(s10);
-sampler2D SkyWest       : register(s11);
-sampler2D SkyTop        : register(s12);
 sampler2D Reflection    : register(s13);   // mirrored scene at half size, alpha 1 where anything drew
 #if RADIAL
 sampler2D WaterMask     : register(s14);   // standing water's coverage in alpha, its level at 1/16 unit in red and green times coverage
@@ -97,6 +92,9 @@ float4 RichParams    : register(c29);  // x = 1 / world units a pixel at which t
                                        // z = 1 where shadows leave the reflections alone, w = 1 where shadows soften with depth and sway with the ripples
 float4 Enclosed      : register(c30);  // kept in enclosed water: x = wave strength, y = broad waves, z = swell
 float4 SparkleSun    : register(c31);  // a sun ahead of the camera at the map sun's height, w = how far below the view to set it instead, 0 keeps the map's
+#if !RIVER
+float4 ShoreFoam     : register(c32);  // x = strength, 0 when off, y = 1 / depth the band reaches, z = share of the band the surge pulls back
+#endif
 #endif
 
 #include "shadowreceive.hlsli"
@@ -264,25 +262,7 @@ float SwellHeight(float2 world)
 }
 #endif
 
-// The skybox is a box around the camera with five faces, no bottom, laid out as new_skybox.w3d
-// maps them. Every face is sampled and the one the ray leaves through is kept.
-float3 SkyboxColor(float3 dir)
-{
-    dir.z = max(dir.z, 0.02f);
-    float3 a = abs(dir);
-    float2 pX = dir.yz / a.x;
-    float2 pY = dir.xz / a.y;
-    float2 pZ = dir.xy / a.z;
-
-    float3 north = tex2D(SkyNorth, float2(1.0f - pX.x, 1.0f - pX.y) * 0.5f).rgb;
-    float3 south = tex2D(SkySouth, float2(1.0f + pX.x, 1.0f - pX.y) * 0.5f).rgb;
-    float3 east  = tex2D(SkyEast,  float2(1.0f + pY.x, 1.0f - pY.y) * 0.5f).rgb;
-    float3 west  = tex2D(SkyWest,  float2(1.0f - pY.x, 1.0f - pY.y) * 0.5f).rgb;
-    float3 top   = tex2D(SkyTop,   float2(1.0f - pZ.x, 1.0f + pZ.y) * 0.5f).rgb;
-
-    float3 side = (a.x >= a.y) ? ((dir.x < 0.0f) ? north : south) : ((dir.y < 0.0f) ? east : west);
-    return (a.z >= max(a.x, a.y)) ? top : side;
-}
+#include "skybox.hlsli"
 
 float4 main(PsIn input) : COLOR
 {
@@ -459,7 +439,7 @@ float4 main(PsIn input) : COLOR
     // A foam depth of 0 reaches the shader as 1 / 10000, and turns crest foam off with the rest.
     foamMask = max(foamMask, saturate((swellHere / max(SwellShape.y, 0.001f) - 0.35f) * 2.5f) * step(WaterParams.z, 1000.0f));
 #endif
-    // The shadow receiver leaves ShadowParams.z unused, and W3DWater puts the foam's world to texcoord scale there.
+    // The water never reads the receiver's cloud switch in ShadowParams.z, so W3DWater puts the foam's world to texcoord scale there.
     // Past about two texels a pixel, each doubling of the ground a pixel covers doubles the foam, so its web stays readable from any height.
     float2 worldDx = ddx(world.xy);
     float2 worldDy = ddy(world.xy);
@@ -478,6 +458,17 @@ float4 main(PsIn input) : COLOR
     float foam = saturate(HexSample(FoamTexture, cells, world.xy * fineScale + foamShift, worldDx * fineScale, worldDy * fineScale, foamMean).r);
     float foamCoarse = saturate(HexSample(FoamTexture, cells, world.xy * coarseScale + foamShift, worldDx * coarseScale, worldDy * coarseScale, foamMean).r);
     foam = lerp(foam, foamCoarse, frac(octave));
+#if RICH && !RIVER
+    // The shoreline band surges up and back, out of step along the shore, and its web thins out with depth.
+    float shoreFoam = 0.0f;
+    [branch] if (ShoreFoam.x > 0.0f)
+    {
+        float surgePhase = 3.0f * (sin(dot(world.xy, float2(0.013f, 0.021f))) + sin(dot(world.xy, float2(-0.009f, 0.017f))));
+        float surge = 0.5f + 0.5f * sin(time * 1.25f + surgePhase);
+        float band = saturate(1.0f - depth * ShoreFoam.y / (1.0f - ShoreFoam.z * surge));
+        shoreFoam = saturate((foam + 1.3f * band - 1.0f) * 3.0f) * ShoreFoam.x;
+    }
+#endif
     foam *= foamMask * Planar.w;
 
     // As the legacy soft water edge did, the surface fades out at the waterline instead of ending in a line.
@@ -491,6 +482,10 @@ float4 main(PsIn input) : COLOR
     float dry = 1.0f - edge;
     dry *= dry;
     foam *= 1.0f - dry * dry;
+#if RICH && !RIVER
+    // The band runs right up to the waterline, fading in over a quarter unit so the contact stays soft.
+    foam = max(foam, shoreFoam * saturate(depth * 4.0f));
+#endif
 
     // The scene copy is already shrouded, so the shroud only darkens the water's own light.
     float3 shroud = tex2D(ShroudTexture, world.xy * ShroudMapping.xy + ShroudMapping.zw).rgb;

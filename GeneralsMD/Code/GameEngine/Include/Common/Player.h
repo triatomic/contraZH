@@ -281,7 +281,7 @@ public:
 	PlayerIndex getPlayerIndex() const { return m_playerIndex; }
 
 	/// return a bitmask that is unique to this player.
-	PlayerMaskType getPlayerMask() const { return 1 << m_playerIndex; }
+	PlayerMaskType getPlayerMask() const { return (PlayerMaskType)1 << m_playerIndex; }
 
 	/// a convenience function to test the ThingTemplate against the players canBuild flags
 	/// called by canBuild
@@ -601,6 +601,10 @@ public:
 	BuildListInfo *getBuildList() { return m_pBuildList; }		///< returns the build list. (build list might be modified by the solo AI)
 	void addToBuildList(Object *obj);			///< Adds this to the build list.	 Used for factories placed instead of in build list.
 	void addToPriorityBuildList(AsciiString templateName, Coord3D *pos, Real angle);			///< Adds this to the build list.	 Used for factories placed instead of in build list.
+
+	// CLP_AI script support; clpPrependToBuildList is defined in ScriptActionsCLPAI.cpp.
+	AIPlayer *getAIPlayer() const { return m_ai; }
+	void clpPrependToBuildList(BuildListInfo *info);
 
 	/// get the relationship between this->that.
 	Relationship getRelationship(const Team *that) const;

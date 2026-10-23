@@ -36,6 +36,7 @@
 #include "Common/GameType.h"
 #include "W3DDevice/GameClient/WorldHeightMap.h"
 #include "W3DDevice/GameClient/BaseHeightMap.h"
+#include "WWMath/aabox.h"
 #include <vector>
 
 
@@ -82,7 +83,8 @@ public:
 	virtual void doPartialUpdate(const IRegion2D &partialRange, WorldHeightMap *htMap, RefRenderObjListIterator *pLightsIterator) override;
 
 	virtual void oversizeTerrain(Int tilesToOversize) override; ///< Oversize the visible terrain area.
-	virtual void renderShadowMapCaster() override;
+	virtual void renderShadowMapCaster(const FrustumClass &frustum) override;
+	virtual Bool isCellCulled(Int x, Int y) const override;
 	virtual void setTerrainDrawSize(Int width, Int height) override; ///< Resize the visible terrain area. Always defaults to oversize dimensions when oversize is set.
 
 	virtual int updateBlock(Int x0, Int y0, Int x1, Int y1, WorldHeightMap *pMap, RefRenderObjListIterator *pLightsIterator) override;
@@ -109,14 +111,21 @@ protected:
 	std::vector<Int> m_tilePixelLights;	///<each VB tile's per-pixel lights, W3DShaderManager::MAX_PIXEL_LIGHTS slots a tile
 	std::vector<Int> m_tilePixelLightCounts;	///<how many of its slots each VB tile fills
 	std::vector<Bool> m_tileSeabed;	///<whether each VB tile has standing water, so it draws through the seabed shaders
+	std::vector<AABoxClass> m_tileBounds;	///<each VB tile's world bounds, for culling it
+	std::vector<Bool> m_tileBoundsStale;	///<whether each VB tile's vertices changed since its bounds were taken
+	std::vector<Bool> m_tileCulled;	///<whether the render under way leaves each VB tile out
+	Bool m_cullingTiles;	///<m_tileCulled holds for the render under way
+	Int m_numCulledTiles;	///<tiles the render under way leaves out, for the render log
 
 	DX8VertexBufferClass *getVertexBufferTile(Int x, Int y);
+	void cullTiles(const FrustumClass &frustum);
+	Bool isTileCulled(Int x, Int y) const { return m_cullingTiles && m_tileCulled[y*m_numVBTilesX+x]; }
 	VERTEX_FORMAT *getVertexBufferBackup(Int x, Int y);
 	UnsignedInt doTheDynamicLight(VERTEX_FORMAT *vb, VERTEX_FORMAT *vbMirror, Vector3*light, Vector3*normal, W3DDynamicLight *pLights[], Int numLights);
 	Int getXWithOrigin(Int x);
 	Int getYWithOrigin(Int x);
-	Int getTileColumn(Int x);	///<the VB tile column holding a column of cells, counted from the drawn area's edge
-	Int getTileRow(Int y);	///<the VB tile row holding a row of cells, counted from the drawn area's edge
+	Int getTileColumn(Int x) const;	///<the VB tile column holding a column of cells, counted from the drawn area's edge
+	Int getTileRow(Int y) const;	///<the VB tile row holding a row of cells, counted from the drawn area's edge
 	void assignPixelLights(RefRenderObjListIterator &lights);	///<hands the terrain shader the lights each VB tile has room for
 	void setTilePixelLights(Int tile);	///<lights the draws that follow with one VB tile's lights
 	void prepareSeabed();	///<hands the terrain shader this frame's seabed and marks the VB tiles with standing water

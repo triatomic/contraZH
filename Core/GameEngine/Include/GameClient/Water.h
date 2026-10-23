@@ -99,6 +99,8 @@ class WaterTransparencySetting : public Overridable
 		Real m_shaderWaterWaveStrength;	///< steepness of the waves
 		Real m_shaderWaterFoamDepth;	///< depth where shore foam fades out
 		Real m_shaderWaterFoamStrength;	///< scales the foam's brightness
+		Real m_shaderWaterShoreFoamDepth;	///< depth the shoreline foam band reaches at the top of its surge
+		Real m_shaderWaterShoreFoamSurge;	///< share of the shoreline foam band the surge pulls back
 		Real m_shaderWaterClarity;		///< scales TransparentWaterDepth, higher sees deeper
 		Real m_shaderWaterOpacity;		///< opacity of deep water, 0 takes TransparentWaterMinOpacity
 		RGBColor m_shaderWaterDeepColor;	///< colour of deep water, negative takes the water texture's average
@@ -126,9 +128,9 @@ class WaterTransparencySetting : public Overridable
 		{
 			m_transparentWaterDepth = 3.0f;
 			m_minWaterOpacity = 1.0f;
-			m_standingWaterColor.red = 1.0f;
-			m_standingWaterColor.green = 1.0f;
-			m_standingWaterColor.blue = 1.0f;
+			m_standingWaterColor.red = 200.0f / 255.0f;
+			m_standingWaterColor.green = 200.0f / 255.0f;
+			m_standingWaterColor.blue = 160.0f / 255.0f;
 			m_radarColor.red = 0.55f;
 			m_radarColor.green = 0.55f;
 			m_radarColor.blue = 1.0f;
@@ -143,36 +145,38 @@ class WaterTransparencySetting : public Overridable
 
 			m_shaderWaterReflection = 3.0f;
 			m_shaderWaterSpecular = 1.0f;
-			m_shaderWaterSpecularSpread = 1.0f;
-			m_shaderWaterVirtualSun = FALSE;
+			m_shaderWaterSpecularSpread = 0.3f;
+			m_shaderWaterVirtualSun = TRUE;
 			m_shaderWaterRefraction = 0.015f;
 			m_shaderWaterWaveScale = 160.0f;
-			m_shaderWaterWaveStrength = 0.3f;
+			m_shaderWaterWaveStrength = 0.2f;
 			m_shaderWaterFoamDepth = 6.0f;
-			m_shaderWaterFoamStrength = 0.5f;
+			m_shaderWaterFoamStrength = 0.15f;
+			m_shaderWaterShoreFoamDepth = 3.0f;
+			m_shaderWaterShoreFoamSurge = 0.4f;
 			m_shaderWaterClarity = 1.0f;
 			m_shaderWaterOpacity = 0.95f;
 			m_shaderWaterDeepColor.red = -1.0f;
 			m_shaderWaterDeepColor.green = -1.0f;
 			m_shaderWaterDeepColor.blue = -1.0f;
-			m_shaderWaterWaveShading = 1.0f;
-			m_shaderWaterSparkle = 2.0f;
-			m_shaderWaterTexturePattern = 0.0f;
-			m_shaderWaterAutoMeasure = TRUE;
-			m_shaderWaterOpenReach = 400.0f;
-			m_shaderWaterEnclosedCalm = 1.0f;
+			m_shaderWaterWaveShading = 0.1f;
+			m_shaderWaterSparkle = 0.6f;
+			m_shaderWaterTexturePattern = 0.1f;
+			m_shaderWaterAutoMeasure = FALSE;
+			m_shaderWaterOpenReach = 371.0f;
+			m_shaderWaterEnclosedCalm = 0.8f;
 			m_shaderWaterZoomCompensation = TRUE;
 			m_shaderWaterClearReflections = TRUE;
 			m_shaderWaterSoftShadows = TRUE;
 			m_shaderWaterSwellHeight = 3.0f;
 			m_shaderWaterSwellScale = 700.0f;
 			m_shaderWaterSwellSpeed = 30.0f;
-			m_shaderWaterPlanarDistortion = 0.02f;
+			m_shaderWaterPlanarDistortion = 0.025f;
 			m_shaderWaterPlanarStrength = 0.3f;
-			m_shaderWaterStochasticSize = 100.0f;
+			m_shaderWaterStochasticSize = 502.0f;
 			m_shaderWaterStochasticSeabed = TRUE;
 			m_isWater = TRUE;
-			m_waterAnimationFps = 0;
+			m_waterAnimationFps = 30;
 		}
 
 		static const FieldParse m_waterTransparencySettingFieldParseTable[];		///< the parse table for INI definition

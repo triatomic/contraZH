@@ -279,6 +279,10 @@ static int sorting_polygons;
 static int last_frame_sorting_polygons;
 static int sorting_vertices;
 static int last_frame_sorting_vertices;
+static int terrain_particle_triangles;
+static int last_frame_terrain_particle_triangles;
+static int terrain_particle_batches;
+static int last_frame_terrain_particle_batches;
 static int draw_calls;
 static int last_frame_draw_calls;
 static int draws_2d;
@@ -348,6 +352,22 @@ int Debug_Statistics::Get_Sorting_Vertices()
 	return last_frame_sorting_vertices;
 }
 
+void Debug_Statistics::Record_Terrain_Particle_Batch(int triangle_count)
+{
+	terrain_particle_triangles += triangle_count;
+	terrain_particle_batches++;
+}
+
+int Debug_Statistics::Get_Terrain_Particle_Triangles()
+{
+	return last_frame_terrain_particle_triangles;
+}
+
+int Debug_Statistics::Get_Terrain_Particle_Batches()
+{
+	return last_frame_terrain_particle_batches;
+}
+
 int Debug_Statistics::Get_Draw_Calls()
 {
 	return last_frame_draw_calls;
@@ -388,6 +408,8 @@ void Debug_Statistics::Begin_Statistics()
 	dx8_skin_renders=0;
 	sorting_polygons=0;
 	sorting_vertices=0;
+	terrain_particle_triangles=0;
+	terrain_particle_batches=0;
 	draw_calls=0;
 	draws_2d=0;
 	text_textures=0;
@@ -406,6 +428,8 @@ void Debug_Statistics::End_Statistics()
 	last_frame_dx8_vertices=dx8_vertices;
 	last_frame_sorting_polygons=sorting_polygons;
 	last_frame_sorting_vertices=sorting_vertices;
+	last_frame_terrain_particle_triangles=terrain_particle_triangles;
+	last_frame_terrain_particle_batches=terrain_particle_batches;
 	last_frame_draw_calls=draw_calls;
 	last_frame_draws_2d=draws_2d;
 	last_frame_text_textures=text_textures;

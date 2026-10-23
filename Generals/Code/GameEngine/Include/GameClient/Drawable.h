@@ -232,6 +232,7 @@ enum DrawableStatus CPP_11(: DrawableStatusBits)
 	DRAWABLE_STATUS_NONE									= 0x00000000,		///< no status
 	DRAWABLE_STATUS_DRAWS_IN_MIRROR				=	0x00000001,		///< drawable can reflect
 	DRAWABLE_STATUS_SHADOWS								=	0x00000002,		///< use setShadowsEnabled() access method
+	DRAWABLE_STATUS_KEEP_PARTICLES_WHEN_HIDDEN = 0x00000004,		///< model-condition particle systems keep emitting while the drawable is hidden
 	DRAWABLE_STATUS_NO_STATE_PARTICLES		= 0x00000008,		///< do *not* auto-create particle systems based on model condition
 	DRAWABLE_STATUS_NO_SAVE								= 0x00000010,		///< do *not* save this drawable (UI fluff only). ignored (error, actually) if attached to an object
 
@@ -622,7 +623,23 @@ protected:
 		Real m_totalYaw;						///< Current total yaw for this frame
 		Real m_totalZ;
 
-		PhysicsXformInfo() : m_totalPitch(0), m_totalRoll(0), m_totalYaw(0), m_totalZ(0) { }
+		Real m_prevTotalPitch;
+		Real m_prevTotalRoll;
+		Real m_prevTotalYaw;
+		Real m_prevTotalZ;
+
+		UnsignedInt m_syncTime;			///< WW3D sync time of the last calculation.
+
+		PhysicsXformInfo() : m_totalPitch(0), m_totalRoll(0), m_totalYaw(0), m_totalZ(0),
+			m_prevTotalPitch(0), m_prevTotalRoll(0), m_prevTotalYaw(0), m_prevTotalZ(0), m_syncTime(~0u) { }
+
+		void setPrevTotals()
+		{
+			m_prevTotalPitch = m_totalPitch;
+			m_prevTotalRoll = m_totalRoll;
+			m_prevTotalYaw = m_totalYaw;
+			m_prevTotalZ = m_totalZ;
+		}
 	};
 
 	Bool calcPhysicsXform(PhysicsXformInfo& info);

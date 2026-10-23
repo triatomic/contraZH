@@ -100,13 +100,16 @@ static FunctionLexicon::TableEntry gameWinSystemTable[] =
 	{ NAMEKEY_INVALID, "QuitMenuSystem",                     (void*)QuitMenuSystem },
 	{ NAMEKEY_INVALID, "MapSelectMenuSystem",                (void*)MapSelectMenuSystem },
 	{ NAMEKEY_INVALID, "ReplayMenuSystem",                   (void*)ReplayMenuSystem },
+	{ NAMEKEY_INVALID, "CampaignChaptersMenuSystem",                   (void*)CampaignChaptersMenuSystem },
 	{ NAMEKEY_INVALID, "CreditsMenuSystem",                  (void*)CreditsMenuSystem },
 	{ NAMEKEY_INVALID, "LanLobbyMenuSystem",                 (void*)LanLobbyMenuSystem },
 	{ NAMEKEY_INVALID, "LanGameOptionsMenuSystem",           (void*)LanGameOptionsMenuSystem },
 	{ NAMEKEY_INVALID, "LanMapSelectMenuSystem",             (void*)LanMapSelectMenuSystem },
 	{ NAMEKEY_INVALID, "SkirmishGameOptionsMenuSystem",      (void*)SkirmishGameOptionsMenuSystem },
 	{ NAMEKEY_INVALID, "SkirmishMapSelectMenuSystem",        (void*)SkirmishMapSelectMenuSystem },
-	{ NAMEKEY_INVALID, "ChallengeMenuSystem",                (void*)ChallengeMenuSystem },
+#if !(RTS_GENERALS && RETAIL_COMPATIBLE_CRC)
+	{ NAMEKEY_INVALID, "ChallengeMenuSystem",                (void*)ChallengeMenuSystem }, // Added in Zero Hour
+#endif
 	{ NAMEKEY_INVALID, "SaveLoadMenuSystem",                 (void*)SaveLoadMenuSystem },
 	{ NAMEKEY_INVALID, "PopupCommunicatorSystem",            (void*)PopupCommunicatorSystem },
 	{ NAMEKEY_INVALID, "PopupBuddyNotificationSystem",       (void*)PopupBuddyNotificationSystem },
@@ -177,6 +180,7 @@ static FunctionLexicon::TableEntry gameWinInputTable[] =
 	{ NAMEKEY_INVALID, "SinglePlayerMenuInput",             (void*)SinglePlayerMenuInput },
 	{ NAMEKEY_INVALID, "LanLobbyMenuInput",                 (void*)LanLobbyMenuInput },
 	{ NAMEKEY_INVALID, "ReplayMenuInput",                   (void*)ReplayMenuInput },
+	{ NAMEKEY_INVALID, "CampaignChaptersMenuInput",                   (void*)CampaignChaptersMenuInput },
 	{ NAMEKEY_INVALID, "CreditsMenuInput",                  (void*)CreditsMenuInput },
 	{ NAMEKEY_INVALID, "KeyboardOptionsMenuInput",          (void*)KeyboardOptionsMenuInput },
 	{ NAMEKEY_INVALID, "PopupCommunicatorInput",            (void*)PopupCommunicatorInput },
@@ -184,7 +188,9 @@ static FunctionLexicon::TableEntry gameWinInputTable[] =
 	{ NAMEKEY_INVALID, "LanMapSelectMenuInput",             (void*)LanMapSelectMenuInput },
 	{ NAMEKEY_INVALID, "SkirmishGameOptionsMenuInput",      (void*)SkirmishGameOptionsMenuInput },
 	{ NAMEKEY_INVALID, "SkirmishMapSelectMenuInput",        (void*)SkirmishMapSelectMenuInput },
-	{ NAMEKEY_INVALID, "ChallengeMenuInput",                (void*)ChallengeMenuInput },
+#if !(RTS_GENERALS && RETAIL_COMPATIBLE_CRC)
+	{ NAMEKEY_INVALID, "ChallengeMenuInput",                (void*)ChallengeMenuInput }, // Added in Zero Hour
+#endif
 	{ NAMEKEY_INVALID, "WOLLadderScreenInput",              (void*)WOLLadderScreenInput },
 	{ NAMEKEY_INVALID, "WOLLoginMenuInput",                 (void*)WOLLoginMenuInput },
 	{ NAMEKEY_INVALID, "WOLLocaleSelectInput",              (void*)WOLLocaleSelectInput },
@@ -251,12 +257,15 @@ static FunctionLexicon::TableEntry winLayoutInitTable[] =
 	{ NAMEKEY_INVALID, "MapSelectMenuInit",             (void*)MapSelectMenuInit },
 	{ NAMEKEY_INVALID, "LanLobbyMenuInit",              (void*)LanLobbyMenuInit },
 	{ NAMEKEY_INVALID, "ReplayMenuInit",                (void*)ReplayMenuInit },
+	{ NAMEKEY_INVALID, "CampaignChaptersMenuInit",                (void*)CampaignChaptersMenuInit },
 	{ NAMEKEY_INVALID, "CreditsMenuInit",               (void*)CreditsMenuInit },
 	{ NAMEKEY_INVALID, "LanGameOptionsMenuInit",        (void*)LanGameOptionsMenuInit },
 	{ NAMEKEY_INVALID, "LanMapSelectMenuInit",          (void*)LanMapSelectMenuInit },
 	{ NAMEKEY_INVALID, "SkirmishGameOptionsMenuInit",   (void*)SkirmishGameOptionsMenuInit },
 	{ NAMEKEY_INVALID, "SkirmishMapSelectMenuInit",     (void*)SkirmishMapSelectMenuInit },
-	{ NAMEKEY_INVALID, "ChallengeMenuInit",             (void*)ChallengeMenuInit },
+#if !(RTS_GENERALS && RETAIL_COMPATIBLE_CRC)
+	{ NAMEKEY_INVALID, "ChallengeMenuInit",             (void*)ChallengeMenuInit }, // Added in Zero Hour
+#endif
 	{ NAMEKEY_INVALID, "WOLLadderScreenInit",           (void*)WOLLadderScreenInit },
 	{ NAMEKEY_INVALID, "WOLLoginMenuInit",              (void*)WOLLoginMenuInit },
 	{ NAMEKEY_INVALID, "WOLLocaleSelectInit",           (void*)WOLLocaleSelectInit },
@@ -298,6 +307,7 @@ static FunctionLexicon::TableEntry winLayoutUpdateTable[] =
 	{ NAMEKEY_INVALID, "MapSelectMenuUpdate",             (void*)MapSelectMenuUpdate },
 	{ NAMEKEY_INVALID, "LanLobbyMenuUpdate",              (void*)LanLobbyMenuUpdate },
 	{ NAMEKEY_INVALID, "ReplayMenuUpdate",                (void*)ReplayMenuUpdate },
+	{ NAMEKEY_INVALID, "CampaignChaptersMenuUpdate",                (void*)CampaignChaptersMenuUpdate },
 	{ NAMEKEY_INVALID, "SaveLoadMenuUpdate",              (void*)SaveLoadMenuUpdate },
 
 	{ NAMEKEY_INVALID, "CreditsMenuUpdate",               (void*)CreditsMenuUpdate },
@@ -305,13 +315,17 @@ static FunctionLexicon::TableEntry winLayoutUpdateTable[] =
 	{ NAMEKEY_INVALID, "LanMapSelectMenuUpdate",          (void*)LanMapSelectMenuUpdate },
 	{ NAMEKEY_INVALID, "SkirmishGameOptionsMenuUpdate",   (void*)SkirmishGameOptionsMenuUpdate },
 	{ NAMEKEY_INVALID, "SkirmishMapSelectMenuUpdate",     (void*)SkirmishMapSelectMenuUpdate },
-	{ NAMEKEY_INVALID, "ChallengeMenuUpdate",             (void*)ChallengeMenuUpdate },
+#if !(RTS_GENERALS && RETAIL_COMPATIBLE_CRC)
+	{ NAMEKEY_INVALID, "ChallengeMenuUpdate",             (void*)ChallengeMenuUpdate }, // Added in Zero Hour
+#endif
 	{ NAMEKEY_INVALID, "WOLLadderScreenUpdate",           (void*)WOLLadderScreenUpdate },
 	{ NAMEKEY_INVALID, "WOLLoginMenuUpdate",              (void*)WOLLoginMenuUpdate },
 	{ NAMEKEY_INVALID, "WOLLocaleSelectUpdate",           (void*)WOLLocaleSelectUpdate },
 	{ NAMEKEY_INVALID, "WOLLobbyMenuUpdate",              (void*)WOLLobbyMenuUpdate },
 	{ NAMEKEY_INVALID, "WOLGameSetupMenuUpdate",          (void*)WOLGameSetupMenuUpdate },
-	{ NAMEKEY_INVALID, "PopupHostGameUpdate",             (void*)PopupHostGameUpdate },
+#if !(RTS_GENERALS && RETAIL_COMPATIBLE_CRC)
+	{ NAMEKEY_INVALID, "PopupHostGameUpdate",             (void*)PopupHostGameUpdate }, // Added in Zero Hour
+#endif
 	{ NAMEKEY_INVALID, "WOLMapSelectMenuUpdate",          (void*)WOLMapSelectMenuUpdate },
 	{ NAMEKEY_INVALID, "WOLBuddyOverlayUpdate",           (void*)WOLBuddyOverlayUpdate },
 	{ NAMEKEY_INVALID, "GameSpyPlayerInfoOverlayUpdate",  (void*)GameSpyPlayerInfoOverlayUpdate },
@@ -342,12 +356,15 @@ static FunctionLexicon::TableEntry winLayoutShutdownTable[] =
 	{ NAMEKEY_INVALID, "MapSelectMenuShutdown",             (void*)MapSelectMenuShutdown },
 	{ NAMEKEY_INVALID, "LanLobbyMenuShutdown",              (void*)LanLobbyMenuShutdown },
 	{ NAMEKEY_INVALID, "ReplayMenuShutdown",                (void*)ReplayMenuShutdown },
+	{ NAMEKEY_INVALID, "CampaignChaptersMenuShutdown",                (void*)CampaignChaptersMenuShutdown },
 	{ NAMEKEY_INVALID, "CreditsMenuShutdown",               (void*)CreditsMenuShutdown },
 	{ NAMEKEY_INVALID, "LanGameOptionsMenuShutdown",        (void*)LanGameOptionsMenuShutdown },
 	{ NAMEKEY_INVALID, "LanMapSelectMenuShutdown",          (void*)LanMapSelectMenuShutdown },
 	{ NAMEKEY_INVALID, "SkirmishGameOptionsMenuShutdown",   (void*)SkirmishGameOptionsMenuShutdown },
 	{ NAMEKEY_INVALID, "SkirmishMapSelectMenuShutdown",     (void*)SkirmishMapSelectMenuShutdown },
-	{ NAMEKEY_INVALID, "ChallengeMenuShutdown",             (void*)ChallengeMenuShutdown },
+#if !(RTS_GENERALS && RETAIL_COMPATIBLE_CRC)
+	{ NAMEKEY_INVALID, "ChallengeMenuShutdown",             (void*)ChallengeMenuShutdown }, // Added in Zero Hour
+#endif
 	{ NAMEKEY_INVALID, "WOLLadderScreenShutdown",           (void*)WOLLadderScreenShutdown },
 	{ NAMEKEY_INVALID, "WOLLoginMenuShutdown",              (void*)WOLLoginMenuShutdown },
 	{ NAMEKEY_INVALID, "WOLLocaleSelectShutdown",           (void*)WOLLocaleSelectShutdown },

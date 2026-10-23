@@ -447,11 +447,14 @@ Bool addDrawableToList( Drawable *draw, void *userData )
 	// KINDOF_IGNORES_SELECT_ALL marker a mod can put on anything else it wants left alone. Note
 	// KINDOF_DOZER also catches GLA Workers, which carry it alongside KINDOF_INFANTRY and
 	// KINDOF_HARVESTER.
+	//
+	// KINDOF_NOT_MILITARY opts a unit out of drags while leaving it in Select All.
 	if (!pds->easyMilitaryDragDisabled &&
 			!pds->isPointSelection && (pds->easyMilitaryDrag || pds->easyMilitaryDragInverted))
 	{
 		const Bool isBuilder =
-				draw->isKindOf(KINDOF_DOZER) || draw->isKindOf(KINDOF_IGNORES_SELECT_ALL);
+				draw->isKindOf(KINDOF_DOZER) || draw->isKindOf(KINDOF_IGNORES_SELECT_ALL) ||
+				draw->isKindOf(KINDOF_NOT_MILITARY);
 
 		// normally drop the builders; with Ctrl held, drop everything else instead
 		const Bool wantBuilders = pds->easyMilitaryDragInverted;

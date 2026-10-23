@@ -4,9 +4,9 @@
 // CMainFrame::onEditScripts. In Qt mode the MFC ScriptDialog is still Create()d but kept
 // hidden -- it owns the working model (m_sides), the condition/action sub-editors, the
 // option persistence, and the OK/Cancel commit. This window replaces the whole dialog UI:
-// the tree, the description + comment detail panels, the option checkboxes, and every command
-// button -- driving the hidden dialog through the WBQtScript_* seam. Only the native Qt
-// condition/action sub-editors are still deferred (they use the MFC property sheet).
+// the tree, the selected script's detail card, the option checkboxes, and every command
+// button -- driving the hidden dialog through the WBQtScript_* seam. The script, condition and
+// action sub-editors are Qt too (WBQtScriptEdit_Run, WBQtCondActDialog).
 #ifndef WB_QT_SCRIPT_WINDOW_H
 #define WB_QT_SCRIPT_WINDOW_H
 
@@ -14,8 +14,11 @@
 #include <QFont>
 #include <QIcon>
 #include <QTreeWidget>
+#include <QList>
+#include <QPair>
 #include <QWidget>
 
+class QAction;
 class QCheckBox;
 class QCompleter;
 class QLabel;
@@ -90,6 +93,8 @@ private slots:
 	void onImport();
 	void onSaveNow();
 	void onCheckboxToggled();
+	void onOptionsMenuAboutToShow();	// tick the Options menu items from their checkboxes
+	void onNewDesignToggled(bool on);
 	void onFind();
 	void onSearchTextChanged(const QString &text);	// live filter when NewSearch is on (debounced)
 	void onSearchDebounce();						// the debounce timer fired -> apply the filter
@@ -114,7 +119,7 @@ private slots:
 private:
 	void pushSelectionToDialog();
 	void updateButtonStates();
-	void updateDetail();				// fill the description + comment panels for the selection
+	void updateDetail();				// fill the detail card for the selection
 	void seedCheckboxes();				// initial checkbox states from the seam
 	void buildIcons();					// build the base + state-variant node icons (once)
 	QIcon nodeIcon(int listType, int flags) const;	// pick the icon for a node's type + state
@@ -126,6 +131,9 @@ private:
 	// filtering. filterActive() is true iff any filter is in effect; textFilterActive() iff the
 	// search box (NewSearch on, non-empty) is contributing.
 	void applyFilters();
+	// Show the redesigned layout (options menu, filter chips, live search, detail card) or the original.
+	void applyDesign();
+	bool textSearchFilters() const;	// whether typing in the search box filters the tree
 	bool filterActive() const;
 	bool textFilterActive() const;
 
@@ -153,8 +161,11 @@ private:
 	Ui::WBQtScriptWindow *m_ui;	// owns the static widget tree (WBQtScriptWindow.ui)
 
 	WBQtScriptTree *m_tree;
-	QPlainTextEdit *m_description;
+	QPlainTextEdit *m_description;	// the original design's script breakdown
 	QTextBrowser *m_comment;	// browser, not edit: the "[Referenced in]" names are links
+	QToolButton *m_optionsButton;	// the new design's Options menu
+	QCheckBox *m_newDesignCheck;
+	bool m_newDesign;
 	QLineEdit   *m_search;
 	QPushButton *m_findBtn;
 	QTimer      *m_searchDebounce;	// coalesces keystrokes so the live filter scans once per pause
@@ -195,6 +206,7 @@ private:
 	QCheckBox   *m_ckRefByParam;
 	QCheckBox   *m_ckDisableRef;
 
+	QList<QPair<QAction *, QCheckBox *> > m_optionActions;	// Options menu item -> its checkbox
 	QPushButton *m_newFolder;
 	QPushButton *m_newScript;
 	QPushButton *m_editScript;

@@ -1346,7 +1346,7 @@ Bool WorkerStateMachine::supplyTruckSubMachineWantsToEnter( State *thisState, vo
 	//If I detect a Supply force message, or if I have been put straight in dock,
 	//then the worker master part of me wants to switch to the Supply sub-brain
 
-	return update->isForcedIntoWantingState() || (masterState == AI_DOCK);
+	return (update->isForcedIntoWantingState() && !owner->isContained()) || (masterState == AI_DOCK);
 }
 
 // ------------------------------------------------------------------------------------------------

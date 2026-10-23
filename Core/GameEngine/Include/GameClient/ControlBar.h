@@ -34,6 +34,7 @@
 #include "Common/GameType.h"
 #include "Common/Overridable.h"
 #include "Common/Science.h"
+#include "Common/SciencePurchaseSlots.h"
 #include "GameClient/Color.h"
 #include "GameClient/GameWindow.h"
 #include "GameLogic/Module/ProductionUpdate.h"
@@ -104,6 +105,7 @@ enum CommandOption CPP_11(: Int)
 	MUST_BE_STOPPED							= 0x00800000, // Unit must be stopped in order to be able to use button.
 	FORMATION_LAUNCH						= 0x01000000, // code-only: jumpjet group launch, keep formation offset instead of random scatter.
 	NEED_N_TARGET_POS						= 0x02000000, // command needs the user to select N target positions (NumberOfTargets); only the final click commits (chronosphere = 2).
+	SKIP_CLEAR_PATH_CHECK				= 0x04000000, // SPECIAL_POWER_CONSTRUCT placement does not require the unit to be able to path to the spot
 };
 
 #ifdef DEFINE_COMMAND_OPTION_NAMES
@@ -139,6 +141,7 @@ static const char *const TheCommandOptionNames[] =
 	"MUST_BE_STOPPED",
 	"FORMATION_LAUNCH",
 	"NEED_N_TARGET_POS",
+	"SKIP_CLEAR_PATH_CHECK",
 
 	nullptr
 };
@@ -252,7 +255,8 @@ enum GUICommandType CPP_11(: Int)
 	GUI_COMMAND_HOLD_FIRE,								///< TheSuperHackers @feature toggle the Hold Fire stance
 	GUI_COMMAND_TOGGLE_DEPLOY,						///< toggle a DeployStyleAIUpdate object between deployed and packed
 	GUI_COMMAND_TOGGLE_FIRE_WEAPON,				///< fire a weapon, or stop firing it if it is already firing
-
+	GUI_COMMAND_TOGGLE_TUNNEL_AUTO_POP,		///< tunnel with this toggle on will automatically evac units and becomes not enterable 
+	GUI_COMMAND_EVACUATE_TO_WORK,					///< dump all our contents, supply gatherers among them resume gathering
 	// add more commands here, don't forget to update the string command list below too ...
 
 	GUI_COMMAND_NUM_COMMANDS
@@ -311,6 +315,8 @@ static const char *const TheGuiCommandNames[] =
 	"HOLD_FIRE",
 	"TOGGLE_DEPLOY",
 	"TOGGLE_FIRE_WEAPON",
+	"TOGGLE_TUNNEL_AUTO_POP",
+	"EVACUATE_TO_WORK",
 
 	nullptr
 };
@@ -477,11 +483,6 @@ private:
 //-------------------------------------------------------------------------------------------------
 enum { MAX_COMMANDS_PER_SET = 32 };  // user interface max is 14 (but internally it's 18 for script only buttons!)
 enum { MAX_RIGHT_HUD_UPGRADE_CAMEOS = 9};
-enum {
-			 MAX_PURCHASE_SCIENCE_RANK_1 = 7,
-			 MAX_PURCHASE_SCIENCE_RANK_3 = 21,
-			 MAX_PURCHASE_SCIENCE_RANK_8 = 7,
-			};
 enum { MAX_STRUCTURE_INVENTORY_BUTTONS = 10 }; // there are this many physical buttons in "inventory" windows for structures
 enum { MAX_BUILD_QUEUE_BUTTONS = 9 };// physical button count for the build queue
 enum { MAX_SPECIAL_POWER_SHORTCUTS = 32};
@@ -793,6 +794,7 @@ public:
 	const CommandSet *findCommandSet( const AsciiString& name );
 
 	void showPurchaseScience();
+	void refreshPurchaseScience();	///< repopulate the panel only while it is showing
 	void hidePurchaseScience();
 	void togglePurchaseScience();
 
@@ -865,9 +867,8 @@ public:
 	/// set the command data into the button
 	void setControlCommand( GameWindow *button, const CommandButton *commandButton );
 	// TheSuperHackers @feature Grid hotkey for a command bar slot, empty if not applicable.
-	// isGridSlot, if given, reports whether the button is a command bar slot the grid covers,
-	// which is how the caller tells "excluded, so no key" apart from "not in the grid at all".
-	AsciiString getGridHotKeyForButton( GameWindow *button, Bool *isGridSlot = nullptr ) const;
+	AsciiString getGridHotKeyForButton( GameWindow *button ) const;
+	void findGridSlots();	///< ranks the command windows by position into rows and columns
 
 	void getForegroundMarkerPos(Int *x, Int *y);
 	void getBackgroundMarkerPos(Int *x, Int *y);
@@ -1036,10 +1037,11 @@ protected:
 		Object *producer;
 		ProductionID head;										///< first entry, PRODUCTIONID_INVALID when the queue is empty
 		UnsignedInt count;
+		Bool isDisabled;
 
 		Bool operator!=( const QueueSignature &other ) const
 		{
-			return producer != other.producer || head != other.head || count != other.count;
+			return producer != other.producer || head != other.head || count != other.count || isDisabled != other.isDisabled;
 		}
 	};
 	std::vector<QueueSignature> m_displayedQueueSignature;	///< multi select queue state last displayed to user
@@ -1095,6 +1097,9 @@ protected:
 	GameWindow *m_commandGroupButtons[ MAX_COMMAND_GROUP_BUTTONS ];
 
 	GameWindow *m_commandWindows[ MAX_COMMANDS_PER_SET ];			///< command window controls for easy access
+	Int m_gridRow[ MAX_COMMANDS_PER_SET ];							///< each command window's row on the bar, for grid hotkeys
+	Int m_gridColumn[ MAX_COMMANDS_PER_SET ];						///< each command window's column on the bar
+	Int m_gridRows;													///< how many rows the command windows form
 	const CommandButton *m_commonCommands[ MAX_COMMANDS_PER_SET ];	///< shared commands we will use for multi-selection
 
 		// removed from multiplayer branch

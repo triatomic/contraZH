@@ -155,8 +155,9 @@ public:
 	/// Whether the specular pass draws point lights per pixel, so its meshes must go without fixed-function ones.
 	static Bool supportsUnitPixelLights();
 	/// Sets whether the terrain shaders read the normal atlas in TERRAIN_NORMAL_TEXTURE, and how strongly.
-	/// debug shows only the bump's shading, on grey.
-	static void setTerrainBumps(Bool enabled, Real strength, Bool debug);
+	/// debug shows only the bump's shading, on grey. roadHeight is the rise, in world units, of full
+	/// brightness on road textures without a normal map, and 0 leaves them flat.
+	static void setTerrainBumps(Bool enabled, Real strength, Bool debug, Real roadHeight);
 	/// Whether the terrain shaders will read the normal atlas, so the terrain should build and hand it over.
 	static Bool wantsTerrainNormalAtlas();
 	/// Sets the sun's glint on the ground, once a frame. gloss sharpens it, and albedo is how far it
@@ -176,16 +177,25 @@ public:
 	static void setRoadHeightBlend(Bool blendTiles);
 	/// How many terrain draws used the normal atlas since the last call.
 	static Int takeTerrainBumpCount();
+	/// How many road and blend tile draws read a normal map since the last call.
+	static Int takeRoadBumpCount();
 	/// How many mesh draws the specular pass ran on, and how many polygon groups of those it
 	/// bumped from brightness or from a normal map, or lit with a glow mask, since the last call.
 	static void takeSpecularCounts(Int &meshes, Int &derived, Int &normalMapped, Int &emissive);
 	/// The pass objects push for a per-pixel sun highlight, bumps and glow, or null when all are off or unsupported.
 	static MaterialPassClass *getSpecularPass();
 	/// The same pass for one object this frame, also adding the given lights. lightsOnly leaves out the
-	/// highlight, bumps and glow, and gives null without lights.
-	static MaterialPassClass *getSpecularPass(const Int *lights, Int lightCount, Bool lightsOnly);
+	/// highlight, bumps and glow, and gives null without lights. receivesShadow asks it to do the shadow
+	/// receiver pass's work as well, which only canSpecularReceiveShadow allows, and comes back true where it does.
+	static MaterialPassClass *getSpecularPass(const Int *lights, Int lightCount, Bool lightsOnly, Bool &receivesShadow);
+	/// Whether the specular pass can take in the shadow receiver's work: its shaders loaded and the map's shadow colour grey.
+	static Bool canSpecularReceiveShadow();
 	/// The pass every specular pass above shares its vertex processing with, or null when it is unsupported.
 	static const MaterialPassClass *getSpecularPassKey();
+	/// Binds the texture, and its normal map and glow mask, for geometry drawn through ST_SPECULAR outside the mesh renderer.
+	static void setSpecularTexture(TextureClass *texture);
+	/// Overrides, until ST_SPECULAR is next set, the rise of full brightness on textures without a normal map.
+	static void setSpecularBumpHeight(Real height);
 	/// Whether the device runs ps_2_a shaders, which have gradients and 512 instruction slots.
 	static Bool supportsPixelShader2a();
 	/// The <name>_nrm.dds beside a texture, or null when there is none. Not reference counted.
@@ -209,6 +219,8 @@ public:
 	static Bool copyRenderTarget(IDirect3DTexture8 *&copy);
 	/// Scale in xy and offset in zw from clip space to the texel centres of a width by height copy of the render target.
 	static Vector4 getClipToTargetMapping(Real width, Real height);
+	/// Target pixels per screen pixel, above 1 while the scene renders larger than the screen for supersampling.
+	static Real getScreenToTargetScale();
 	/// Draws a quad over the viewport through identity transforms, its uv mapped from clip space by clipToTarget.
 	static void drawClipQuad(const Vector4 &clipToTarget);
 	static Bool isRenderingToTexture() {return m_renderingToTexture; }

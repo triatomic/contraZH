@@ -30,6 +30,7 @@
 #include <stdlib.h>
 
 #include "Common/GlobalData.h"
+#include "Common/OptionPreferences.h"
 #include "Common/ThingTemplate.h"
 #include "Common/ThingFactory.h"
 #include "GameLogic/TerrainLogic.h"
@@ -395,6 +396,11 @@ void W3DInGameUI::draw()
 	if( m_isDragSelecting )
 		drawSelectionRegion();
 
+	if( TheGlobalData->m_actionLineMode != ActionLineMode_Off )
+	{
+		drawActionLines();
+	}
+
 	// for each view draw hints
 	/// @todo should the UI be iterating through views like this?
 	if( TheDisplay )
@@ -460,6 +466,54 @@ void W3DInGameUI::drawSelectionRegion()
 														width,
 														color );
 
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Pink for an attack move, red for an attack, blue for a guard, green for everything else. */
+//-------------------------------------------------------------------------------------------------
+static UnsignedInt actionLineColor( InGameUI::ActionLineKind kind )
+{
+	switch( kind )
+	{
+		case InGameUI::ACTION_LINE_ATTACK_MOVE:
+			return 0x66FF66CC;
+		case InGameUI::ACTION_LINE_ATTACK:
+		case InGameUI::ACTION_LINE_ATTACK_GROUND:
+			return 0x66FF5555;
+		case InGameUI::ACTION_LINE_GUARD:
+			return 0x6655CCFF;
+		default:
+			return 0x6655FF55;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** A faint line per bunch of selected units, ending in a dot on the destination. */
+//-------------------------------------------------------------------------------------------------
+void W3DInGameUI::drawActionLines()
+{
+	const std::vector<ActionLine>& lines = getActionLines();
+	if( lines.empty() )
+	{
+		return;
+	}
+
+	for( std::vector<ActionLine>::const_iterator it = lines.begin(); it != lines.end(); ++it )
+	{
+		// off-screen points still project usefully, so drop only those behind the camera
+		ICoord2D from, to;
+		if( TheTacticalView->worldToScreenTriReturn( &it->from, &from ) == View::WTS_INVALID ||
+				TheTacticalView->worldToScreenTriReturn( &it->to, &to ) == View::WTS_INVALID )
+		{
+			continue;
+		}
+
+		// clear at the unit, so the lines do not crowd the selection
+		const UnsignedInt lineColor = actionLineColor( it->kind );
+		TheDisplay->drawLine( from.x, from.y, to.x, to.y, 1.0f, lineColor & 0x00FFFFFF, lineColor );
+
+		TheDisplay->drawFillRect( to.x - 2, to.y - 2, 5, 5, ( lineColor & 0x00FFFFFF ) | 0xCC000000 );
+	}
 }
 
 //-------------------------------------------------------------------------------------------------

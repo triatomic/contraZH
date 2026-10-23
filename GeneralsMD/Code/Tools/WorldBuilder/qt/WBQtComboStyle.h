@@ -55,8 +55,8 @@ namespace WBQtComboStyle
 	// Unlike applyTypeToFilter() the combo stays pick-ONLY in effect: the field is editable so
 	// the user can type, but a partial or non-matching string is reverted to the current item
 	// when focus leaves, so the box never displays something that isn't the selected value.
-	// Safe to re-call after the item list is rebuilt.
-	void applySearchable(QComboBox *combo);
+	// Safe to re-call after the item list is rebuilt. `always` skips the ComboSearch gate.
+	void applySearchable(QComboBox *combo, bool always = false);
 }
 
 #endif // WB_QT_COMBO_STYLE_H

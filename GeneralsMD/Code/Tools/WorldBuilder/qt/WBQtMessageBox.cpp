@@ -7,13 +7,19 @@
 
 #include <QAbstractButton>
 #include <QApplication>
+#include <QDir>
+#include <QFileDialog>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QString>
+#include <QStringList>
+
+#include <string.h>
 
 // The Qt main window (WBQtMainWindow*), C++ linkage, from WBQtBridge.cpp. Declared as QWidget*
 // to avoid pulling the WBQtMainWindow header here.
 QWidget *WBQt_MainWindowWidget(void);
+QWidget *WBQt_DialogParent(void);
 
 extern "C" int WBQtMessageBox_Show(const char *text, const char *caption, unsigned mbType)
 {
@@ -144,4 +150,75 @@ extern "C" int WBQtMessageBox_Show(const char *text, const char *caption, unsign
 	}
 	// Closed via the title-bar X / Esc: MFC returns IDCANCEL when a Cancel exists, else IDOK.
 	return (bCancel != NULL) ? IDCANCEL : IDOK;
+}
+
+extern "C" int WBQtFileDialog_Run(int save, const char *title, const char *filter, const char *defExt,
+	const char *initialPath, char *outPath, int outSize)
+{
+	if (qApp == NULL || outPath == NULL || outSize <= 0)
+	{
+		return 0;
+	}
+	outPath[0] = 0;
+
+	// "Desc|pattern|Desc|pattern||" -> "Desc (pattern)" entries.
+	QStringList filters;
+	QStringList parts = QString::fromLocal8Bit((filter != NULL) ? filter : "").split('|');
+	for (int i = 0; i + 1 < parts.size(); i += 2)
+	{
+		QString desc = parts[i].trimmed();
+		QString patterns = parts[i + 1].trimmed();
+		if (desc.isEmpty() || patterns.isEmpty())
+		{
+			break;
+		}
+		patterns.replace(';', ' ');
+		// Qt reads the patterns from the last parentheses, so a "(.scb)" in the text must go.
+		int paren = desc.lastIndexOf('(');
+		if (paren > 0 && desc.endsWith(')'))
+		{
+			desc = desc.left(paren).trimmed();
+		}
+		filters.append(QString("%1 (%2)").arg(desc, patterns));
+	}
+
+	QWidget *parent = QApplication::activeModalWidget();
+	if (parent == NULL)
+	{
+		parent = QApplication::activeWindow();
+	}
+	if (parent == NULL)
+	{
+		parent = WBQt_DialogParent();
+	}
+
+	QFileDialog dlg(parent, QString::fromLocal8Bit((title != NULL) ? title : ""));
+	dlg.setAcceptMode(save ? QFileDialog::AcceptSave : QFileDialog::AcceptOpen);
+	dlg.setFileMode(save ? QFileDialog::AnyFile : QFileDialog::ExistingFile);
+	if (!filters.isEmpty())
+	{
+		dlg.setNameFilters(filters);
+	}
+	if (defExt != NULL && defExt[0] != 0)
+	{
+		dlg.setDefaultSuffix(QString::fromLocal8Bit(defExt[0] == '.' ? defExt + 1 : defExt));
+	}
+	if (initialPath != NULL && initialPath[0] != 0)
+	{
+		dlg.selectFile(QDir::fromNativeSeparators(QString::fromLocal8Bit(initialPath)));
+	}
+	if (dlg.exec() != QDialog::Accepted || dlg.selectedFiles().isEmpty())
+	{
+		return 0;
+	}
+
+	QByteArray path = QDir::toNativeSeparators(dlg.selectedFiles().first()).toLocal8Bit();
+	if (path.size() >= outSize)
+	{
+		WBQtMessageBox_Show("The selected path is too long.", NULL, MB_OK | MB_ICONERROR);
+		return 0;
+	}
+	strcpy(outPath, path.constData());
+	int index = filters.indexOf(dlg.selectedNameFilter());
+	return (index >= 0) ? index + 1 : 1;
 }

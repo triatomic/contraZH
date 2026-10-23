@@ -1,23 +1,24 @@
-// WBQtTeamSheetDialog.h -- the native Qt team template sheet (Tier 3b-3), replacing the MFC
-// CPropertySheet of TeamIdentity / TeamReinforcement / TeamBehavior / TeamGeneric. Four HIDDEN
-// MFC pages stay the logic owners (their handlers write the team dict live); this dialog
-// mirrors their controls and drives them through the generic page facade in WBQtTeamsBridge.h
-// (set control -> send the real WM_COMMAND notification). Edits are live against the Teams
-// dialog's working copy -- like the MFC sheet, closing never reverts (the outer Teams dialog's
-// Cancel does).
+// WBQtTeamSheetDialog.h -- the Qt team template sheet; the hidden MFC Team* pages own the logic and
+// write the team dict live, and this dialog drives their controls through WBQtTeamsBridge.h.
 #ifndef WB_QT_TEAMSHEET_DIALOG_H
 #define WB_QT_TEAMSHEET_DIALOG_H
 
 #include <QDialog>
+#include <QHash>
 #include <QStringList>
 
 class QCheckBox;
 class QComboBox;
-class QLabel;
 class QLineEdit;
+class QSpinBox;
+class QToolButton;
 
 namespace Ui { class WBQtTeamSheetDialog; }	// generated from WBQtTeamSheetDialog.ui
 
+// Show the named script read-only, or say that there is none; shared with the Team Builder's card.
+void WBQtShowTeamScript(QWidget *parent, const QString &name);
+
+// One page of collapsible sections: identity, members, production, reinforcement, behavior, scripts.
 class WBQtTeamSheetDialog : public QDialog
 {
 	Q_OBJECT
@@ -26,34 +27,45 @@ public:
 	virtual ~WBQtTeamSheetDialog();
 
 private slots:
-	// Re-apply the missing-unit red tint to whichever member combo changed.
-	void onUnitTypeChanged();
+	void onUnitTypeChanged();		///< re-tint the member combo that changed
+	void onAddUnit();
+	void onRemoveUnit();
+	void onSectionToggled(bool open);
+	void onViewScript();
+	void onGenericMove();
+	void onGenericRemove();
+	void updateWarnings();
 
 private:
-	// wire the .ui widgets of each tab to their hidden page controls
-	void setupIdentityTab();
-	void setupReinforcementTab();
-	void setupBehaviorTab();
-	void setupGenericTab();
-	// Re-seed the 16 generic-script combos from the compacted hook chain and hide the rows
-	// past the first empty slot (== TeamGeneric::_dictToScripts).
+	void setupSections();
+	void setupIdentity();
+	void setupMembers();
+	void setupProduction();
+	void setupReinforcement();
+	void setupBehavior();
+	void setupGeneric();
+	// Show the filled member rows plus any added ones, and total their counts.
+	void refreshMembers();
+	// Re-seed the generic-script rows from the compacted hook chain, showing one empty slot to add with.
 	void refreshGenericScripts();
 
-	// binding helpers (each wires the widget to the hidden page control); the
-	// widget-creating overloads serve the dynamic member/script row loops
-	QLineEdit *bindEdit(int page, int ctrlId, QWidget *parent, int notify);
+	// binding helpers: each wires a widget to its hidden page control
 	void bindEdit(int page, int ctrlId, QLineEdit *edit, int notify);
+	void bindSpin(int page, int ctrlId, QSpinBox *spin, int notify);
 	void bindCheck(int page, int ctrlId, QCheckBox *check);
-	QComboBox *bindCombo(int page, int ctrlId, const QStringList &items, QWidget *parent, int notify);
 	void bindCombo(int page, int ctrlId, const QStringList &items, QComboBox *combo, int notify);
 	QStringList readComboItems(int page, int ctrlId) const;
 
 	Ui::WBQtTeamSheetDialog *m_ui;	// owns the static widget tree (WBQtTeamSheetDialog.ui)
 
-	QLineEdit *m_nameEdit;
+	QHash<QObject *, QWidget *> m_sectionBodies;	///< section header -> its body
 	QComboBox *m_unitCombos[7];
-	QComboBox *m_genericCombos[16];		// the 16 generic-script combos (for live compaction)
-	QLabel    *m_genericLabels[16];		// their row labels (hidden together with the combos)
+	QSpinBox *m_minSpins[7];
+	QSpinBox *m_maxSpins[7];
+	QWidget *m_memberWidgets[7][5];		///< each member row: unit, pick, min, max, remove
+	bool m_memberAdded[7];				///< an empty row the user opened with Add unit
+	QComboBox *m_genericCombos[16];
+	QWidget *m_genericWidgets[16][6];	///< each script row: label, combo, view, up, down, remove
 };
 
 #endif // WB_QT_TEAMSHEET_DIALOG_H

@@ -78,6 +78,7 @@ public:
 	/// The shader water's reflection draws what the main view would above the water plane
 	void setPlanarMirrorPass(Bool on, Real planeZ, const Region3D &region) {m_planarMirrorPass = on; m_planarMirrorZ = planeZ; m_planarMirrorRegion = region;}
 	Bool isPlanarMirrorPass() const {return m_planarMirrorPass;}
+	Real getPlanarMirrorZ() const {return m_planarMirrorZ;}
 
 	void Flush(RenderInfoClass & rinfo);	//draw queued up models.
 	/// Drawing control method

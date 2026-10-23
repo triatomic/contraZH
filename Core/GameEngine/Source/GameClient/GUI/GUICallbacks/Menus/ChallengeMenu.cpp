@@ -34,6 +34,7 @@
 #include "Common/GameEngine.h"
 //#include "Common/GameLOD.h"
 #include "Common/GameState.h"
+#include "Common/OptionPreferences.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/RandomValue.h"
 #include "Common/Recorder.h"
@@ -43,6 +44,7 @@
 #include "GameClient/Gadget.h"
 #include "GameClient/GadgetCheckBox.h"
 #include "GameClient/GadgetListBox.h"
+#include "GameClient/GadgetPushButton.h"
 #include "GameClient/GadgetStaticText.h"
 #include "GameClient/GameText.h"
 #include "GameClient/GameWindowManager.h"
@@ -87,6 +89,7 @@ static GameWindow *bioLine4Entry = nullptr;
 static GameWindow *buttonGeneralPosition[NUM_GENERALS] = {nullptr};
 static GameWindow *backdrop = nullptr;
 static GameWindow *bioParent = nullptr;
+static GameWindow *buttonDifficulty[DIFFICULTY_COUNT] = {nullptr};
 
 //static NameKeyType testWinID = NAMEKEY_INVALID;
 //static GameWindow *testWin = nullptr;
@@ -328,6 +331,78 @@ Bool updateBio(Int frames)
 
 
 //-------------------------------------------------------------------------------------------------
+// find the Easy, Medium and Hard buttons, building any the layout lacks left of Play in its look
+//-------------------------------------------------------------------------------------------------
+static void initDifficultyButtons()
+{
+	static const char *const names[DIFFICULTY_COUNT] = { "ChallengeMenu.wnd:ButtonEasy", "ChallengeMenu.wnd:ButtonMedium", "ChallengeMenu.wnd:ButtonHard" };
+	static const char *const labels[DIFFICULTY_COUNT] = { "GUI:EasyCaps", "GUI:MediumDifficultyCaps", "GUI:HardCaps" };
+
+	Int playX = 0, playY = 0, playWidth = 0, playHeight = 0;
+	buttonPlay->winGetPosition( &playX, &playY );
+	buttonPlay->winGetSize( &playWidth, &playHeight );
+	const Int gap = playHeight / 6;
+	const Int width = playWidth * 7 / 12;
+	const WinInstanceData *look = buttonPlay->winGetInstanceData();
+
+	for( Int i = 0; i < DIFFICULTY_COUNT; ++i )
+	{
+		const NameKeyType id = TheNameKeyGenerator->nameToKey( names[i] );
+		buttonDifficulty[i] = TheWindowManager->winGetWindowFromId( parentMenu, id );
+		if( buttonDifficulty[i] == nullptr )
+		{
+			WinInstanceData data;
+			for( Int d = 0; d < MAX_DRAW_DATA; ++d )
+			{
+				data.m_enabledDrawData[d] = look->m_enabledDrawData[d];
+				data.m_disabledDrawData[d] = look->m_disabledDrawData[d];
+				data.m_hiliteDrawData[d] = look->m_hiliteDrawData[d];
+			}
+			data.m_enabledText = look->m_enabledText;
+			data.m_disabledText = look->m_disabledText;
+			data.m_hiliteText = look->m_hiliteText;
+			data.m_imageOffset = look->m_imageOffset;
+			data.m_style = look->m_style;
+			data.m_font = look->m_font;
+			data.m_owner = look->m_owner;
+
+			const Int x = playX - ( DIFFICULTY_COUNT - i ) * ( width + gap );
+			const UnsignedInt status = ( buttonPlay->winGetStatus() & ( WIN_STATUS_IMAGE | WIN_STATUS_BORDER ) ) | WIN_STATUS_ENABLED;
+			buttonDifficulty[i] = TheWindowManager->gogoGadgetPushButton( buttonPlay->winGetParent(), status, x, playY,
+				width, playHeight, &data, data.m_font, FALSE );
+			buttonDifficulty[i]->winSetWindowId( id );
+			GadgetButtonSetText( buttonDifficulty[i], TheGameText->fetch( labels[i] ) );
+		}
+		GadgetButtonEnableCheckLike( buttonDifficulty[i], TRUE, FALSE );
+
+		// A checked button away from the mouse draws its enabled selected pictures, which Play leaves empty
+		if( GadgetButtonGetLeftEnabledSelectedImage( buttonDifficulty[i] ) == nullptr )
+		{
+			GadgetButtonSetLeftEnabledSelectedImage( buttonDifficulty[i], GadgetButtonGetLeftHiliteSelectedImage( buttonDifficulty[i] ) );
+			GadgetButtonSetMiddleEnabledSelectedImage( buttonDifficulty[i], GadgetButtonGetMiddleHiliteSelectedImage( buttonDifficulty[i] ) );
+			GadgetButtonSetRightEnabledSelectedImage( buttonDifficulty[i], GadgetButtonGetRightHiliteSelectedImage( buttonDifficulty[i] ) );
+		}
+	}
+}
+
+
+//-------------------------------------------------------------------------------------------------
+// select the difficulty the Play button starts
+//-------------------------------------------------------------------------------------------------
+static void showDifficulty( GameDifficulty difficulty )
+{
+	TheChallengeGenerals->setCurrentDifficulty( difficulty );
+	for( Int i = 0; i < DIFFICULTY_COUNT; ++i )
+	{
+		if( buttonDifficulty[i] )
+		{
+			GadgetCheckLikeButtonSetVisualCheck( buttonDifficulty[i], i == difficulty );
+		}
+	}
+}
+
+
+//-------------------------------------------------------------------------------------------------
 /** init the challenge mode menu */
 //-------------------------------------------------------------------------------------------------
 void ChallengeMenuInit( WindowLayout *layout, void *userData )
@@ -391,6 +466,9 @@ void ChallengeMenuInit( WindowLayout *layout, void *userData )
 	isAutoSelecting = FALSE;
 	buttonSequenceStep = 0;
 	setEnabledButtons();
+	initDifficultyButtons();
+	OptionPreferences pref;
+	showDifficulty( (GameDifficulty)pref.getCampaignDifficulty() );
 
 	// show menu
 	layout->hide( FALSE );
@@ -705,6 +783,19 @@ WindowMsgHandledType ChallengeMenuSystem( GameWindow *window, UnsignedInt msg, W
 			else if( controlID == buttonBackID )
 			{
 				TheShell->pop();
+			}
+			else
+			{
+				for( Int i = 0; i < DIFFICULTY_COUNT; ++i )
+				{
+					if( control == buttonDifficulty[i] )
+					{
+						showDifficulty( (GameDifficulty)i );
+						OptionPreferences pref;
+						pref.setCampaignDifficulty( i );
+						pref.write();
+					}
+				}
 			}
 			break;
 		}

@@ -319,13 +319,13 @@ void WBQtComboStyle::applyTypeToFilter(QComboBox *combo)
 	applyPopupScroll(combo);
 }
 
-void WBQtComboStyle::applySearchable(QComboBox *combo)
+void WBQtComboStyle::applySearchable(QComboBox *combo, bool always)
 {
 	if (combo == NULL)
 	{
 		return;
 	}
-	if (WBQtConfig_GetComboSearch() == 0)
+	if (!always && WBQtConfig_GetComboSearch() == 0)
 	{
 		// Gated off (the default): leave the combo plain pick-only, exactly as before this
 		// existed. Still bound the popup -- that is the separate MFC WS_VSCROLL behaviour.

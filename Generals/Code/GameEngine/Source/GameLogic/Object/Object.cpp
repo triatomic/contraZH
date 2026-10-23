@@ -44,6 +44,9 @@
 #include "Common/Team.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
+#if RTS_GENERALS && RETAIL_COMPATIBLE_CRC
+#include "Common/TunnelTracker.h"
+#endif
 #include "Common/Upgrade.h"
 #include "Common/WellKnownKeys.h"
 #include "Common/Xfer.h"
@@ -652,6 +655,23 @@ void Object::onRemovedFrom( Object *removedFrom )
 	m_containedByID = INVALID_ID;
 #endif
 }
+
+#if RTS_GENERALS && RETAIL_COMPATIBLE_CRC
+//-------------------------------------------------------------------------------------------------
+void Object::removeFromTunnelContain()
+{
+	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+	{
+		TunnelTracker* tracker = ThePlayerList->getNthPlayer(i)->getTunnelSystem();
+		if (tracker && tracker->removeFromContain(this))
+		{
+			break;
+		}
+	}
+
+	onRemovedFrom(nullptr);
+}
+#endif
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
@@ -1647,13 +1667,13 @@ inline Bool isPosDifferent(const Coord3D* a, const Coord3D* b)
 	// so we must put in some cleverness...
 	const Real THRESH = 0.01f;
 
-	if (fabs(a->x - b->x) > THRESH)
+	if (WWMath::Fabs(a->x - b->x) > THRESH)
 		return true;
 
-	if (fabs(a->y - b->y) > THRESH)
+	if (WWMath::Fabs(a->y - b->y) > THRESH)
 		return true;
 
-	if (fabs(a->z - b->z) > THRESH)
+	if (WWMath::Fabs(a->z - b->z) > THRESH)
 		return true;
 
 	return false;
@@ -1669,7 +1689,7 @@ inline Bool isAngleDifferent(Real a, Real b)
 
 	const Real THRESH = 0.01f;	// in radians, this is approx 1/2 degree.
 
-	if (fabs(a - b) > THRESH)
+	if (WWMath::Fabs(a - b) > THRESH)
 		return true;
 
 	return false;

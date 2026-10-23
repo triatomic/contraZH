@@ -69,7 +69,7 @@ void LocomotorSetUpgradeModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "EnableUpgrade", INI::parseBool, NULL, offsetof(LocomotorSetUpgradeModuleData, m_setUpgraded) },
 		{ "ExplicitLocomotorType", LocomotorSetUpgradeModuleData::parseLocomotorType, NULL, offsetof(LocomotorSetUpgradeModuleData, m_LocomotorType)},
 		//{ "NeedsParkedAircraft", INI::parseBool, NULL, offsetof(WeaponSetUpgradeModuleData, m_needsParkedAircraft) },
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 
 	p.add(dataFieldParse);

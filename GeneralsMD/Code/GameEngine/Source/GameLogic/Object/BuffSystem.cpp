@@ -116,12 +116,12 @@ public:
 		if (m_armorDamageScalar != 1.0) {
 			BodyModuleInterface* body = targetObj->getBodyModule();
 			if (body) {
-				body->applyDamageScalar(1.0f / pow(m_armorDamageScalar, exp));
+				body->applyDamageScalar(1.0f / WWMath::Powf(m_armorDamageScalar, exp));
 			}
 		}
 
 		if (m_sightRangeScalar != 1.0) {
-			Real scalar = 1.0f / pow(m_sightRangeScalar, exp);
+			Real scalar = 1.0f / WWMath::Powf(m_sightRangeScalar, exp);
 			targetObj->setVisionRange(targetObj->getVisionRange() * scalar);
 			targetObj->setShroudClearingRange(targetObj->getShroudClearingRange() * scalar);
 		}
@@ -129,7 +129,7 @@ public:
 		if (m_moveSpeedScalar != 1.0) {
 			AIUpdateInterface* ai = targetObj->getAI();
 			if (ai) {
-				ai->applySpeedMultiplier(1.0f / pow(m_moveSpeedScalar, exp));
+				ai->applySpeedMultiplier(1.0f / WWMath::Powf(m_moveSpeedScalar, exp));
 			}
 		}
 
@@ -142,7 +142,7 @@ public:
 			{ "MovementSpeedScalar", parseMultiplier, NULL, offsetof(ValueModifierBuffEffectNugget, m_moveSpeedScalar) },
 			{ "ArmorDamageScalar", parseMultiplier, NULL, offsetof(ValueModifierBuffEffectNugget, m_armorDamageScalar) },
 			{ "SightRangeScalar", parseMultiplier, NULL, offsetof(ValueModifierBuffEffectNugget, m_sightRangeScalar) },
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
 
 		MultiIniFieldParse p;
@@ -321,7 +321,7 @@ public:
 		static const FieldParse myFieldParse[] =
 		{
 			{ "TintStatusType", TintStatusFlags::parseSingleBitFromINI,	NULL, offsetof(ColorTintBuffEffectNugget, m_tintStatus) },
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
 
 		MultiIniFieldParse p;
@@ -379,7 +379,7 @@ public:
 		static const FieldParse myFieldParse[] =
 		{
 			{ "ParticleSystem", INI::parseParticleSystemTemplate,	NULL, offsetof(ParticleSystemBuffEffectNugget, m_particleSysTemplate) },
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
 
 		MultiIniFieldParse p;
@@ -417,7 +417,7 @@ const FieldParse BuffTemplate::TheBuffTemplateFieldParse[] =
 	{ "MaxStacksSize",		INI::parseUnsignedInt, NULL,  offsetof(BuffTemplate, m_maxStackSize)},
 	{ "HasPriorityOver",		INI::parseAsciiStringVectorAppend, NULL,  offsetof(BuffTemplate, m_priorityTemplates)},
 	
-	{ NULL, NULL, 0, 0 }  // keep this last
+	{ nullptr, nullptr, nullptr, 0 }  // keep this last
 };
 
 
@@ -433,7 +433,7 @@ void BuffTemplate::parseFlagModifier(INI* ini, void* instance, void* /*store*/, 
 			{ "ArmorSetFlag", INI::parseIndexList,	ArmorSetFlags::getBitNames(), offsetof(BuffTemplate, m_armorSetFlag) },
 			{ "StatusToSet", ObjectStatusMaskType::parseFromINI,	NULL, offsetof(BuffTemplate, m_statusToSet) },
 			// { "StatusToClear", ObjectStatusMaskType::parseFromINI,	NULL, offsetof(BuffTemplate, m_statusToClear) },
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
 
 		MultiIniFieldParse p;

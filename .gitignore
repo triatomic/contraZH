@@ -6,6 +6,7 @@
 !.github
 !.mcp.json
 !.gitmodules
+!.mcp.json
 
 *.user
 *.ncb
@@ -54,7 +55,6 @@ thumbs.db
 
 ## AI assistant config (user-specific)
 /.claude/
-/CLAUDE.md
 
 ## IntelliJ, CLion, etc.
 /.idea
@@ -75,3 +75,6 @@ __pycache__/
 *.pyc
 # Local session notes, not part of the source tree
 SESSION_CHANGES.md
+# MkDocs build output
+/site/
+.venv/

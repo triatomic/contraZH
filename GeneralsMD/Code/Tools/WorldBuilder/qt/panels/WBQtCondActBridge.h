@@ -30,6 +30,7 @@ int  WBQtCondActData_GetTemplateCount(int isAction);
 void WBQtCondActData_GetTemplateName(int isAction, int i, char *buf, int cap);	// '/'-separated path
 void WBQtCondActData_GetTemplateName2(int isAction, int i, char *buf, int cap);	// alt path or ""
 void WBQtCondActData_GetTemplateHelp(int isAction, int i, char *buf, int cap);
+int  WBQtCondActData_PinnedFolderRank(const char *name);	// top-level mod folder position, or -1
 
 // --- the edited item ---
 int  WBQtCondActData_GetType(void *item, int isAction);
@@ -50,10 +51,33 @@ void WBQtCondAct_EditParameter(void *item, int isAction, int i);
 void WBQtCondActData_GetWarnings(void *item, int isAction, char *warnBuf, int warnCap, char *infoBuf, int infoCap);
 // 1 when parameter i is the one a warning is about, so the sentence can render it red.
 int  WBQtCondActData_ParameterHasWarning(void *item, int isAction, int i);
+// Parameter i's own warning text, empty when it has none.
+void WBQtCondActData_GetParameterWarning(void *item, int isAction, int i, char *buf, int cap);
 
-// --- the "Compress Script" tree-density toggle (registry-backed, "CompressScripts") ---
+// What a parameter names, which picks its chip colour.
+enum
+{
+	WBQT_PARAM_OTHER = 0,
+	WBQT_PARAM_THING,		///< teams, units, object types, upgrades, sciences, powers
+	WBQT_PARAM_PLAYER,		///< sides, relations, moods
+	WBQT_PARAM_PLACE,		///< waypoints, paths, trigger areas, positions
+	WBQT_PARAM_NUMBER,		///< numbers, comparisons, booleans, colours
+	WBQT_PARAM_TEXT,		///< strings, sounds, music, movies, dialog
+	WBQT_PARAM_LOGIC		///< scripts, subroutines, counters, flags
+};
+int  WBQtCondActData_GetParameterFamily(void *item, int isAction, int i);
+// Template i's parameter families in order, up to cap; returns how many.
+int  WBQtCondActData_GetTemplateFamilies(int isAction, int i, int *out, int cap);
+
+// --- the "Compress Script" tree-density setting (registry-backed, "CompressScripts") ---
 int  WBQtCondAct_GetCompress(void);
 void WBQtCondAct_SetCompress(int enabled);
+
+// --- picker preferences, per mode: '|'-separated template paths, newest first ---
+void WBQtCondAct_GetSavedList(int isAction, int favorites, char *buf, int cap);
+void WBQtCondAct_SetSavedList(int isAction, int favorites, const char *paths);
+int  WBQtCondAct_GetNotesOpen(void);
+void WBQtCondAct_SetNotesOpen(int open);
 
 #ifdef __cplusplus
 }

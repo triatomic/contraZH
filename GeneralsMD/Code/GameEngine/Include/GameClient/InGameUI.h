@@ -180,6 +180,9 @@ enum RadiusCursorType CPP_11(: Int)
 	RADIUSCURSOR_ATTACK_DAMAGE_AREA3,
 	RADIUSCURSOR_ATTACK_DAMAGE_AREA4,
 
+	RADIUSCURSOR_NEUTRON_BOMB,
+	RADIUSCURSOR_RIFT_GENERATOR,
+
 	RADIUSCURSOR_COUNT
 };
 
@@ -285,6 +288,9 @@ static const char *const TheRadiusCursorNames[] =
 	"ATTACK_DAMAGE_AREA2",
 	"ATTACK_DAMAGE_AREA3",
 	"ATTACK_DAMAGE_AREA4",
+
+	"NEUTRON_BOMB",
+	"RIFT_GENERATOR",
 
 	nullptr
 };
@@ -575,6 +581,9 @@ public:  // ********************************************************************
 	virtual Bool isLaserNameOverlayOn( void ) const { return m_laserNameOverlayOn; }
 	virtual void toggleLaserBeamBlockOverlay( void ) { m_laserBeamBlockOverlayOn = !m_laserBeamBlockOverlayOn; }
 	virtual Bool isLaserBeamBlockOverlayOn( void ) const { return m_laserBeamBlockOverlayOn; }
+	// Outline and name of every visible GUI window, with the full chain under the cursor.
+	virtual void toggleWindowNameOverlay( void ) { m_windowNameOverlayOn = !m_windowNameOverlayOn; }
+	virtual Bool isWindowNameOverlayOn( void ) const { return m_windowNameOverlayOn; }
 #endif
 	void freeMessageResources();				///< free resources for the ui messages
 	void freeCustomUiResources();				///< free resources for custom ui elements
@@ -671,6 +680,7 @@ public:  // ********************************************************************
 	virtual void setRadiusCursorNone() { setRadiusCursor(RADIUSCURSOR_NONE, nullptr, PRIMARY_WEAPON); }
 
 	virtual void setInputEnabled( Bool enable );										///< Set the input enabled or disabled
+	virtual void clearModifierModes();														///< Forget every mode a held key puts us in
 	virtual Bool getInputEnabled() { return m_inputEnabled; }	///< Get the current input status
 
 	virtual void disregardDrawable( Drawable *draw );				///< Drawable is being destroyed, clean up any UI elements associated with it
@@ -808,6 +818,29 @@ public:  // ********************************************************************
 	void setDrawRMBScrollAnchor(Bool b) { m_drawRMBScrollAnchor = b; }
 	void setMoveRMBScrollAnchor(Bool b) { m_moveRMBScrollAnchor = b; }
 
+	// The colour of an action line says what the order is for.
+	enum ActionLineKind
+	{
+		ACTION_LINE_MOVE = 0,
+		ACTION_LINE_ATTACK_MOVE,
+		ACTION_LINE_ATTACK,
+		ACTION_LINE_ATTACK_GROUND,
+		ACTION_LINE_GUARD,
+
+		ACTION_LINE_KIND_COUNT
+	};
+	struct ActionLine
+	{
+		Coord3D from;
+		Coord3D to;
+		ActionLineKind kind;
+	};
+	const std::vector<ActionLine>& getActionLines() const { return m_actionLines; }
+
+	void showReplayControls();
+	void hideReplayControls();
+	void toggleReplayControls();
+
 private:
 	virtual Int getIdleWorkerCount();
 	virtual Object *findIdleWorker( Object *obj);
@@ -822,6 +855,9 @@ private:
 	void drawSystemTime(Int &x, Int &y);
 	void drawGameTime();
 	void drawPlayerInfoList();
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	void drawWindowNameOverlay();
+#endif
 #if defined(GENERALS_ONLINE)
 	void drawObserverNotifications();
 	void checkObserverMilestones();
@@ -970,7 +1006,9 @@ protected:
 	void expireHint( HintType type, UnsignedInt hintIndex );
 
 	void createControlBar();			///< create the control bar user interface
+	void destroyControlBar();
 	void createReplayControl();		///< create the replay control window
+	void destroyReplayControl();
 
 	void setMouseCursor(Mouse::MouseCursor c);
 
@@ -981,6 +1019,9 @@ protected:
 	void addMessageText( const UnicodeString& formattedMessage, const RGBColor *rgbColor = nullptr );  ///< internal workhorse for adding plain text for messages
 #endif
 	void removeMessageAtIndex( Int i );				///< remove the message at index i
+
+	void updateActionLines();							///< read where each selected unit is headed
+	void bunchActionLines();							///< merge the lines of units going the same way
 
 	void updateFloatingText();						///< Update function to move our floating text
 	void drawFloatingText();							///< Draw all our floating text
@@ -1010,6 +1051,7 @@ protected:
 	IRegion2D										m_dragSelectRegion;														///< if isDragSelecting is TRUE, this contains select region
 	Bool												m_displayedMaxWarning;                        ///< keeps the warning from being shown over and over
 	MoveHintStruct							m_moveHint[ MAX_MOVE_HINTS ];
+	std::vector<ActionLine>			m_actionLines;																	///< one per bunch of selected units going the same way
 	Int													m_nextMoveHint;
 	const CommandButton *				m_pendingGUICommand;										///< GUI command that needs additional interaction from the user
 	std::vector<Coord3D>				m_pendingSpecialPowerLocations;					///< accepted target points for a NEED_N_TARGET_POS power (in click order)
@@ -1240,6 +1282,8 @@ protected:
 	Bool												m_modelNameOverlayOn;
 	Bool												m_laserNameOverlayOn;
 	Bool												m_laserBeamBlockOverlayOn;
+	Bool												m_windowNameOverlayOn;
+	DisplayString *							m_windowNameString;
 #endif
 
 	Color												m_messageColor1;
@@ -1294,6 +1338,9 @@ protected:
 	Bool												m_moveRMBScrollAnchor;
 	Bool												m_clientQuiet;         ///< When the user clicks exit,restart, etc. this is set true
 																												///< to skip some client sounds/fx during shutdown
+
+	GameWindow *m_controlBarWindow;
+	GameWindow *m_replayWindow;
 
 	// World Animation Data
 	WorldAnimationList					m_worldAnimationList;		///< the list of world animations

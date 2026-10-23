@@ -4,8 +4,9 @@
 Added support for UpgradeCameo6-9 slots. These need to be defined in the controlbar .wnd files to work.
 
 ## WeaponSet
-Added new parameter to an object's WeaponSet definition
+Added new parameters to an object's WeaponSet definition
 * `WeaponReloadSharedAcrossSets = No` - If a unit switched between weaponset, it's reload time and ammo count (in percent) will be kept. For instance Migs will not reload in air when they get BlackNapalm. 
+* `ShareWeaponClip = No` - (If Yes, all weapon slots in this WeaponSet draw from one shared ammo clip instead of reloading independently: firing any slot also ticks down the clip of every other slot in the set.)
 
 ### AutoChooseSources
 Added new types for AutoChooseSources
@@ -38,53 +39,6 @@ Added a new parameter for object definitions:
 
 Note: This parameter might be moved to individual weapons in the future, to allow displaying ammo pips for multiple weapon slots at once.
 
-## Display Decal (New)
-
-A ground decal drawn under the object, for auras, faction markers and similar. It is separate from
-the object's shadow: an object can carry a `Shadow` and a display decal at the same time, and the
-decal keeps drawing when the player turns 2D or 3D shadows off in the video options. It does hide
-under shroud, while the object is hidden, and once the object dies, slow death included.
-
-Added new parameters for object definitions:
-
-```
-  DisplayDecal = Yes                ; default No
-  DecalTexture = ShadowIH           ; required; the engine appends .tga
-  DecalSizeX = 14                   ; world-space size in X
-  DecalSizeY = 14                   ; world-space size in Y
-  DecalOffsetX = 0                  ; world-space offset in X
-  DecalOffsetY = 0                  ; world-space offset in Y
-  DecalStyle = SHADOW_ALPHA_DECAL   ; SHADOW_DECAL, SHADOW_ALPHA_DECAL or SHADOW_ADDITIVE_DECAL
-  DecalColor = R:255 G:255 B:255    ; tint, default white
-  DecalOpacity = 100%               ; default 100%
-  DecalHideWhenDisabled = No        ; default No
-```
-
-* `DecalTexture` has no default, unlike `ShadowTexture`. An object that sets `DisplayDecal = Yes`
-without naming a texture draws nothing.
-* `DecalStyle` takes only the three decal blend styles; the projection and volume types need a
-shadow-casting setup a display decal does not have, and fall back to `SHADOW_ALPHA_DECAL`.
-  - `SHADOW_DECAL` multiplies, exactly like a 2D shadow. White is invisible and darker pixels
-  darken the ground, so the art needs no alpha channel at all - a plain DXT1 works.
-  - `SHADOW_ALPHA_DECAL` alpha blends, for a painted marker. Needs a real alpha channel.
-  - `SHADOW_ADDITIVE_DECAL` adds, for a glow. Ignores alpha; black is what reads as nothing.
-* Whichever style, the decal always rasterizes the full `DecalSizeX` by `DecalSizeY` rectangle,
-snapped outward to whole terrain cells, and relies on clamped texture addressing. The art has to
-fade out at its own edges - an opaque edge texel gets stretched across the whole footprint.
-* `DecalHideWhenDisabled = Yes` stops drawing the decal while the object is disabled - EMP,
-hacked, subdued, unmanned, out of power, disabled by script and so on - and brings it back when
-the object recovers. Useful when the decal reads as something the unit is actively doing.
-* `DecalColor` tints the texture. Any alpha written here is ignored - `DecalOpacity` is what fades
-the decal. Both are ignored under `SHADOW_DECAL`, whose blend has no way to apply them.
-* `DecalOpacity` means different things per style. Under `SHADOW_ALPHA_DECAL` it is an ordinary
-alpha fade. Under `SHADOW_ADDITIVE_DECAL` the blend ignores alpha entirely, so opacity instead
-scales the colour toward black, dimming the glow.
-* A unit with several draw modules gets one decal, not one per module.
-* The whole feature can be switched off by the player with `ObjectDecals = No` in Options.ini.
-
-This is for a decal that belongs to a unit for its whole life. For a temporary decal spawned by an
-effect — a scorch mark or a footprint — use the [Decal FX nugget](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/FXList-&-ParticleSystems#decal-entries) with `W3DDecalDraw` instead.
-
 # Object Modules
 
 ## AIUpdateInterface (And all other AIUpdate types)
@@ -94,63 +48,30 @@ New experimental parameter:
 When a unit turns to attack, it will attempt to turn to this angle. If mirrored is enable it can also use the same angle +180°. Possibly useful for battleship setups with multiple turrets. Only works for locomotors that can turn in place (minTurnSpeed = 0)
 Note: this is NOT needed for limited turret angles (See below). Units will follow the actual turret angles when trying to attack.
 
-New `AutoAcquireEnemiesWhenIdle` value:
-* `NOTWHILEMOVING` - the object will not shoot on the move. Intended for artillery that has to be stationary
-to fire, which previously had to be faked in other ways.
-Combine it with the other values as usual, e.g. `AutoAcquireEnemiesWhenIdle = Yes NOTWHILEMOVING`.
+### Minimum range handling (reversing)
+New parameters for vehicles with a weapon `MinimumAttackRange`, mainly slow-turning units without a turret (e.g. artillery). They use the locomotor's reverse movement, so the locomotor needs `CanMoveBackwards = Yes` (see [Locomotor](Locomotor.md#reverse-backwards-movement)).
 
-What it does, by order type:
-
-| Order | Behaviour |
-|---|---|
-| Move | Drives past enemies without stopping or engaging. |
-| Attack-move | Drives, spots a target, halts once in range, fires, then carries on. |
-| Attack (direct order) | Closes on the target, halts, fires. |
-| Stationary | Fires normally. |
-
-This takes two separate checks, because the two halves pull against each other. Targets of opportunity - the
-idle scans, including a turret scanning while the chassis under it drives - are suppressed while the object is
-in motion, which is what keeps it from shooting on an ordinary move. Attack-move deliberately still acquires
-on the move, because spotting a target while driving is exactly what makes the unit stop for it; the object
-then keeps aiming, without firing, until it has actually come to rest. It holds its target throughout and
-fires the moment it settles, so any PreAttackDelay wind-up plays where the shot is taken rather than being
-spent on the approach.
-
-### DeployStyleAIUpdate
-New command for deploying artillery, replacing the old trick of pointing a `FIRE_WEAPON` button at a dummy
-weapon slot. That worked, but it went through the weapon lock and brought its bugs with it.
+* `MinRangeRetreatStraight = No` - (When the unit is inside its weapon's minimum range, it backs off straight away from the target, just far enough to get back into range (min range + one pathfind cell). Without it the pathfinder picks the nearest valid cell, often to the side, which is a long arc for slow-turning vehicles and leaves them facing the wrong way. Falls back to normal attack pathfinding if the straight spot is blocked. Ground units only.)
+* `AimByReversing = No` - (Units without a turret that have to turn to aim: if the target is in front and a forward turn would carry the unit into its minimum range, it turns by backing up instead. Once it started reversing it keeps reversing until aligned. Not used if turning would take the unit out of its maximum range.)
+* `AimByReversingMaxAngle = 90` - (Only reverse to aim if the target is at most this many degrees off the nose.)
+* `AimByReversingMargin = 10.0` - (Safety margin, in world units, added to the minimum range in the "would a forward turn get too close" test.)
+* `AimByReversingTurnFactor = 1.0` - (Scales the estimate of how much closer a forward turn brings the unit (turn radius × sin(angle)). Raise it if units still drive into their minimum range while turning, lower it if they reverse too eagerly.)
 
 ```
-CommandButton Command_Deploy
-  Command           = TOGGLE_DEPLOY
-  Options           = OK_FOR_MULTI_SELECT
-  ButtonImage       = SNNukeCannonDeploy
-  ButtonBorderType  = ACTION
-  TextLabel         = CONTROLBAR:ToolTipDeploy
-  UnitSpecificSound = NukeCannonVoiceDeploy
+Behavior = AIUpdateInterface ModuleTag_AI
+  ...
+  MinRangeRetreatStraight = Yes
+  AimByReversing = Yes
+  AimByReversingMaxAngle = 90
 End
 ```
-
-`TOGGLE_DEPLOY` needs no `WeaponSlot`. It flips the object between deployed and packed, and the button shows
-as toggled on while deployed. It works on any object with a `DeployStyleAIUpdate`; on anything else the
-button is unavailable.
-
-A deploy asked for this way latches, so the unit holds the stance instead of packing up again the moment
-nothing is in range - which is the point, since it lets a unit deploy before the enemy arrives. The latch is
-dropped when the player gives any order other than an attack, so a move order packs the unit up as usual.
-Automatic deploying when a target comes into range is unchanged.
-
-Selecting a mixed group and pressing the button moves the whole group to one stance rather than flipping each
-unit separately, so a second press does not undo half of them.
 
 ### Turret
 New paramters for Turret or AltTurret entries
 * `MinTurretAngle = 0` - Minimum angle the turret is allowed to turn
 * `MaxTurretAngle = 0` - Maximum angle the turret is allowed to turn
 Notes:
-- Angles are relative to the hull. Positive turns the turret to its left, negative to its right, so `MinTurretAngle` is always the rightmost edge of the arc and `MaxTurretAngle` the leftmost.
-- To mirror an arc onto the other side, negate and swap the values: a left sponson with `MinTurretAngle = 0` / `MaxTurretAngle = 50` becomes `MinTurretAngle = -50` / `MaxTurretAngle = 0` on the right.
-- For backwards facing configurations, set MaxTurretAngle < MinTurretAngle; the arc then wraps through the rear (e.g. `150` / `-150` covers the rear 60 degrees). Currently this is not working 100% reliably.
+- for backwards facing configurations, MaxTurretAngle can be > MinTurretAngle; Currently this is not working 100% reliably
 - Remove the angle limit lines to use unlimited angle. A value of 0 will use 0 as limit.
 - If the turret cannot turn to the front (e.g. side mounted gun on a helicopter), the unit will attempt to turn to the turret's firing arc
   - this feature only works for locomotors that can turn in place (minTurnSpeed = 0)
@@ -338,6 +259,11 @@ New parameters:
 
 * `DynamicHeightMinScale = 1.0` - (Scales the projectile's arc height based on the distance to the target. At maximum weapon range the full arc height is used; the closer the target, the more the height is scaled down towards this value. `1.0` = no scaling (default). Useful so short-range shots don't arc as high, e.g. for torpedoes/arcing guns.)
 * `DynamicHeightMinRange = 1.0` - (The target distance at/below which `DynamicHeightMinScale` is fully reached. The height scale interpolates between this range and the weapon's max range.)
+* `LinearFlightPath = No` - (If Yes, the projectile flies a straight line from launch point to target at constant speed instead of the Bezier arc. The arc parameters (`FirstHeight`, `SecondHeight`, `FirstPercentIndent`, ...) are ignored.)
+* `KillSelfDelay = 0` - (Time in ms the projectile lingers at the impact point after detonating before it dies. During that time it is hidden, frozen in place and has no collisions, but its exhaust and model-condition particle systems keep emitting, so trails can catch up instead of being cut off. The detonation weapon still fires immediately; only the death (and its die modules) is delayed. 0 = die immediately (old behavior).)
+
+Notes:
+* Lingering projectiles are ignored by `PointDefenseLaserUpdate` and no longer trigger `ScatterShotUpdate`.
 
 ## FreeFallProjectileBehavior
 New type of projectile module that mimics the behavior of Bombs dropped by genpowers.
@@ -424,153 +350,6 @@ Default values:
 Setting `PassengerWeaponBonusList = None` will override the default value.
 
 Note: HelixContain grants GARRISONED to its passengers in vanilla ZH. This is changed to CONTAINED. To restore vanilla behaviour you will need to manually set the bonus here.
-
-### Targeting through addon turrets
-
-A unit whose weapons live on a contained addon turret (an OverlordContain or MultiAddOnContain
-rider) could not be ordered to attack anything only the turret can hit -- the cursor showed a red
-cross, and the workaround was a dummy weapon on the carrier with the turret's range. This key
-replaces the dummy weapon. It works on every contain module except TunnelContain and CaveContain,
-where it parses but stays inert: their contained list is the player's whole shared network, so
-the answers would come from units sitting at other entrances.
-
-* `AcceptTargetsForPassengers = No` - (Yes lets the container accept attack orders on behalf of its
-passengers: when the container's own weapons cannot attack a target, the passengers' weapons are
-asked instead, and their best answer drives the cursor and the order. Requires
-`PassengersAllowedToFire = Yes`.)
-
-```
-Behavior = OverlordContain ModuleTag_Turret
-  Slots                     = 1
-  AllowInsideKindOf         = PORTABLE_STRUCTURE
-  PassengersAllowedToFire   = Yes
-  PassengersInTurret        = Yes
-  PayloadTemplateName       = AmericaThorTurretBolt
-  AcceptTargetsForPassengers = Yes   ; New
-End
-```
-
-Behaviour notes:
-* When the order is given, the turret is told to attack (the engine already forwards attack orders
-to firing passengers); the carrier's own guns do not try to aim at a target they cannot attack.
-* A turret that is EMP'd, hacked, subdued or paralyzed does not answer for the carrier.
-* The turret cannot move, so a target beyond its range shows the out-of-range cursor rather than a
-green attack cursor -- the carrier does not automatically drive into range. Keep a dummy weapon if
-you want the carrier to approach on its own.
-
-### Add-on turret range from the carrier's center
-
-An add-on turret is a separate object placed at a bone on its carrier -- `AddOnBoneName` for
-MultiAddOnContain, the FIREPOINT bones for OverlordContain -- and with `PassengersInTurret = Yes`
-that bone rides the carrier's turret. Weapon range is measured from the firing object's own
-position and bounding circle, so the turret's reach swings by the bone's offset as the carrier's
-turret sweeps: longer the way the barrel points, shorter the other way. The Overlord's gattling
-shows it, and a turret mounted at the front of a chassis shows it plainly -- it opens fire early
-forward and falls short backward, and no single `AttackRange` works in both directions.
-
-* `AddOnWeaponRangeFromCenter = No` - (Yes measures the add-on's weapon range from the carrier's
-center, using the carrier's bounding circle, instead of from its own attachment point.)
-
-```
-Behavior = OverlordContain ModuleTag_Turret
-  Slots                      = 1
-  AllowInsideKindOf          = PORTABLE_STRUCTURE
-  PassengersAllowedToFire    = Yes
-  PassengersInTurret         = Yes
-  PayloadTemplateName        = AmericaThorTurretBolt
-  AddOnWeaponRangeFromCenter = Yes   ; New
-End
-```
-
-Behaviour notes:
-* An add-on whose `AttackRange` equals the carrier's now reaches exactly as far as the carrier
-does, in every direction, at every turret angle -- the range no longer has to be tuned to
-compensate for where the bone sits.
-* `MinimumAttackRange` moves with it, so the too-close band is measured from the carrier's hull
-too, as it would be for a weapon mounted on the carrier.
-* The approach distance moves with it, so a carrier ordered to attack stops where its add-on can
-actually reach.
-* Only the range test moves. The add-on still aims and fires from its own barrel, and its line of
-sight, muzzle effects and projectiles are unchanged.
-* Parses on every contain module but stays inert on TunnelContain and CaveContain, whose passengers
-sit at whichever entrance they used rather than on a bone of the container.
-
-
-### Load slowdown from occupants
-
-A container can be slowed by what it carries. The penalty scales with how full it is, so each
-passenger costs a share of it and leaving gives that share back; an emptied container returns to
-exactly its original speed. Fullness is measured in slots, not bodies, so a unit that takes three
-slots slows the transport three times as much as one that takes a single slot.
-
-The defaults come from GameData's `TransportLoadSpeedPenalty` and friends, and these four override
-them per container. Each is the fraction of that value lost at a full load.
-
-* `LoadSpeedPenalty = 0%` - (Fraction of `Speed` lost at a full load.)
-* `LoadTurnRatePenalty = 0%` - (Fraction of `TurnRate` lost at a full load.)
-* `LoadAccelerationPenalty = 0%` - (Fraction of `Acceleration` lost at a full load.)
-* `LoadLiftPenalty = 0%` - (Fraction of `Lift` lost at a full load.)
-* `LoadPenaltyEnabled = Yes` - (`No` exempts this container entirely, whatever GameData sets. Use it
-to keep one transport at full speed without restating every percentage.)
-* `LoadPenaltyKindOf = <KindOf list>` - (If set, only occupants with one of these KindOfs count
-toward the load. Everything counts by default.)
-* `LoadPenaltyForbidKindOf = <KindOf list>` - (Occupants with any of these KindOfs never count
-toward the load. Nothing is excluded by default.)
-
-Example - a transport that is dragged down by vehicles but not by the infantry it carries:
-```
-Behavior = TransportContain ModuleTag_07
-  Slots                   = 8
-  LoadSpeedPenalty        = 40%
-  LoadAccelerationPenalty = 25%
-  LoadPenaltyForbidKindOf = INFANTRY
-End
-```
-
-Behaviour notes:
-* Each penalty covers the damaged variant of its value, so `SpeedDamaged` scales by the same
-percentage as `Speed`.
-* The penalty follows the container across locomotor sets, so an upgrade that grants
-`SET_NORMAL_UPGRADED`, or a switch to `SET_PANIC`, keeps it in effect.
-* A container that cannot move ignores all of this. The keys parse on every contain module, but a
-garrisoned building has no locomotor to slow down.
-* Slot counts come from the occupant's `TransportSlotCount`, so a bunker riding an Overlord is
-weighed by what is inside it.
-* A loaded transport moving with a group slows the whole group, the same way any slow unit does.
-* Leaving every penalty at `0%` is the previous behavior exactly, so existing INI is unaffected.
-
-### Filtering by object name
-
-`AllowInsideKindOf` and `ForbidInsideKindOf` can only speak in whole KindOfs. These two name
-individual objects instead, and work on every contain module -- TunnelContain, TransportContain,
-GarrisonContain, CaveContain, OverlordContain, HelixContain and the rest.
-
-* `ForbidInsideObjects = <object list>` - (These objects can never enter. Checked first, so it
-beats everything else, including `AllowInsideObjects`.)
-* `AllowInsideObjects = <object list>` - (If set, ONLY these objects may enter, whatever their
-KindOfs say. Leave it out to allow everything the other filters permit.)
-
-Example -- a tunnel network that refuses one specific unit:
-```
-Behavior = TunnelContain ModuleTag_05
-  TimeForFullHeal = 5000
-  ForbidInsideObjects = Aslt_GLAInfantryHijacker
-End
-```
-
-Example -- a transport that carries nothing but two named units:
-```
-Behavior = TransportContain ModuleTag_07
-  ContainMax = 4
-  AllowInsideObjects = Aslt_GLAInfantryJarmenKell Aslt_GLAInfantryHijacker
-End
-```
-
-Both keys take several names per line and append across repeated lines, so a long list can be
-split up. Matching is on the object name and ignores case.
-
-Note: these filters decide whether a unit may *enter*. They do not evict anyone already inside,
-so changing them does not affect units that are already loaded.
 
 ## StickyBombUpdate#
 
@@ -698,144 +477,6 @@ Notes:
 * ParkedUnitsDamageScalar can be used to apply an upgrade that grants damage protection to parked aircraft
 * Required/Forbidden KindOf can be used to allow only specific kinds of aircraft to land (i.e. to use different sizes, or differ between VTOL/Regular jets)
 
-### Filtering by object name
-
-`RequiredKindOf` and `ForbiddenKindOf` can only speak in whole KindOfs. These two name individual
-objects instead, so a single aircraft can be kept off an airfield without inventing a KindOf for it.
-
-* `ForbiddenObjects = <object list>` - (These aircraft can never land here. Checked first, so it beats
-everything else, including `AllowedObjects`.)
-* `AllowedObjects = <object list>` - (If set, ONLY these aircraft may land here. Leave it out to allow
-everything the other filters permit.)
-
-Example - an airfield that takes only two of the player's jets:
-```
-Behavior = ParkingPlaceBehavior ModuleTag_park
-  NumRows = 2
-  NumCols = 2
-  HasRunways = Yes
-  ApproachHeight = 40
-  AllowedObjects = AirF_AmericaJetRaptor SupW_AmericaJetStealthFighter
-End
-```
-
-Both keys take several names on one line, and a second line of the same key replaces the first rather
-than adding to it. Matching is on the object name and ignores case.
-
-Notes:
-* These filters are checked in addition to `RequiredKindOf` and `ForbiddenKindOf`, not instead of them.
-An aircraft has to pass both to land, so naming it in `AllowedObjects` does not get it past a
-`ForbiddenKindOf` that rejects it.
-* Leaving both keys out is the previous behavior exactly, so existing INI is unaffected.
-* The filters decide whether an aircraft may land or be produced here. They do not evict anything
-already parked, so changing them does not affect aircraft that are on the airfield.
-* Aircraft with `KINDOF_PRODUCED_AT_HELIPAD` skip these filters, as they already skip the KindOf ones.
-
-## DozerAIUpdate / WorkerAIUpdate
-
-Both modules build and repair structures, and both take the same restriction keys. A module without
-them behaves exactly as before.
-
-### Restricting what may be built
-
-* `ForbiddenBuildObjects = <object list>` - (These may never be built. Checked first, so it beats
-everything else, including `AllowedBuildObjects`.)
-* `AllowedBuildObjects = <object list>` - (If set, ONLY these may be built. Leave it out to allow
-everything the unit's CommandSet offers.)
-
-Example - a worker that may only put up the two cheapest structures:
-```
-Behavior = WorkerAIUpdate ModuleTag_worker
-  RepairHealthPercentPerSecond = 2%
-  BoredTime = 5000
-  BoredRange = 150
-  AllowedBuildObjects = GLAPowerPlant GLABarracks
-End
-```
-
-Both keys take several names on one line, and a second line of the same key adds to the first rather
-than replacing it. Matching is on the object name and ignores case.
-
-Notes:
-* The list gates starting a building, resuming one somebody else began, and a GLA hole rebuild. An AI
-player is held to it too, unlike the normal build validation which AI players skip.
-* A forbidden structure's command button greys out rather than disappearing, so button positions stay
-the same across units that share a CommandSet.
-* This is checked in addition to the unit's CommandSet, not instead of it. Naming something in
-`AllowedBuildObjects` does not let a unit build what its CommandSet never offered.
-
-### Removing the repair ability
-
-* `CanRepair = Yes` - (Default. `No` takes the repair ability away entirely.)
-
-A unit with `CanRepair = No` shows no repair cursor over a damaged building, ignores a repair order,
-and does not go looking for something to repair when it gets bored.
-
-### Giving a dozer to an armed unit
-
-A stock dozer carries no weapon except a mine clearing one. When it has been idle for `BoredTime` it
-looks for something to repair, and failing that it sets its mine clearing weapon set and attacks the
-nearest enemy or neutral object within `BoredRange`. That search does not check that the target is a
-mine - it checks that the target is attackable, which on a stock dozer only mines are.
-
-Put `DozerAIUpdate` or `WorkerAIUpdate` on a unit that keeps a real weapon and the same search starts
-returning ordinary neutral objects, so the unit opens fire on scenery whenever it goes idle. Two ways
-around it:
-
-* `BoredRange = 0` - the search runs with a zero radius and finds nothing, so the unit never picks a
-bored target. This also switches off the bored auto-repair scan, which shares the same range. Direct
-repair orders still work.
-* Give the unit a weapon set under `WEAPONSET_MINE_CLEARING_DETAIL` that cannot hit ordinary ground
-targets. The bored search then fails the attackability test for everything but mines, the same way it
-does on a stock dozer, and bored auto-repair keeps working.
-
-`BoredTime = 0` does not help - the check is `idle time > BoredTime`, so zero makes the unit run the
-search on every idle frame rather than never.
-
-## PoisonedBehavior
-
-Added Beta and Gamma poison tiers, so the poison-over-time effect can be strengthened once the attacker owns an upgrade. The retail parameters keep working unchanged.
-
-* `PoisonBetaDamageInterval = 0` - tick interval while Beta poison is active. 0 uses `PoisonDamageInterval`
-* `PoisonBetaDuration = 0` - how long Beta poison lasts after the last dose. 0 uses `PoisonDuration`
-* `PoisonBetaDamageBonus = 1.0` - multiplier on the per-tick damage (1.2 = 20% more)
-* `PoisonBetaTriggeredBy = <upgrade name>` - upgrade the attacker needs for Beta poison. Empty disables the tier
-* `PoisonGammaDamageInterval = 0` - as above, for Gamma
-* `PoisonGammaDuration = 0` - as above, for Gamma
-* `PoisonGammaDamageBonus = 1.0` - as above, for Gamma
-* `PoisonGammaTriggeredBy = <upgrade name>` - as above, for Gamma
-
-Notes:
-* The tier is picked per hit from the attacker, not the victim. The upgrade counts if the attacking player has researched it or the attacking object itself carries it, so both player and object upgrades work.
-* Gamma is checked before Beta. If neither upgrade is present the hit applies normal poison.
-* Only one tier is active at a time and poison never stacks. A stronger hit takes over damage, interval and duration; an equally strong hit refreshes them as retail does; a weaker hit is ignored while the stronger poison is still running.
-* A hit with `DeathType = POISONED` is promoted to `POISONED_BETA` or `POISONED_GAMMA` for the active tier, so die modules and death FX can tell the tiers apart. A weapon that already names a tier death type is left alone.
-* If the attacker no longer exists when the damage lands, the hit counts as normal poison.
-* Healing of any kind still cures poison completely and clears the tier.
-
-## NeutronBlastBehavior
-
-The neutron blast that kills infantry and leaves vehicles unmanned. Two parameters were added so
-the effect can be kept off things it should not touch.
-
-```
-Behavior = NeutronBlastBehavior ModuleTag_neutron
-  BlastRadius = 100.0
-  AffectAirborne = No
-  AffectAllies = No
-  AffectGarrison = Yes         ; New
-  RejectEffectOnUnit = CyborgCommando AnotherUnit YetAnotherUnit   ; New
-End
-```
-
-Added parameters:
-* `AffectGarrison = Yes` - (No spares infantry garrisoned in a structure. Only garrisons are
-affected by this: passengers of transports, tunnels and bunkers are killed either way, as before.)
-* `RejectEffectOnUnit = <object list>` - (Object names that the blast skips entirely, whatever their
-KindOfs. This is the only way to spare a unit the hardcoded infantry and vehicle rules, which is what
-it exists for: riders such as the Cyborg Commando. A rejected object keeps its passengers too. All
-names go on one line; a second line replaces the first. Matching ignores case.)
-
 ## UnitProductionBonusUpgrade (New)
 
 This upgrade module allows to set a cost and/or build time modifier for individual types of units. This affects the whole player and not just individual factories.
@@ -845,12 +486,8 @@ Parameters:
 * `CostModifierPercentage = 0` - Percentage amount that the unit's costs are modified
 * `BuildTimeModifierPercentage = 0` - Percentage amount that the unit's build time is modified
 * `UnitTemplateName = <Name of an Object>` - The unit to apply this bonus to. (multiple lines are allowed)
-* `IsOneShotUpgrade = No` - (Yes makes the bonus permanent: it is never removed when the granting
-object dies and does not transfer when it is captured.)
-* `BonusStacksWith = NO_STACKING` - (`NO_STACKING` | `OTHER_TYPE` | `SAME_TYPE`. How the bonus
-stacks when several objects grant it. `NO_STACKING` is the previous behaviour, where only differing
-percentages stack; `OTHER_TYPE` stacks across different source object types; `SAME_TYPE` stacks
-across objects of the same type.)
+* `IsOneShotUpgrade = No` - (If Yes, the bonus is applied once and is not tracked/removed - matches the old, pre-stacking behavior. If No (default), the bonus is now correctly removed if the upgrade module is deleted, and transferred to the new owner if the object is captured.)
+* `BonusStacksWith = NO_STACKING` - (Controls stacking when the same unit type receives this bonus from multiple sources. Options: `NO_STACKING` (default; a second source does not add further bonus), `SAME_TYPE` (stacks with bonuses from any source, including the same upgrade/object type), `OTHER_TYPE` (stacks only with bonuses coming from a different source object type).)
 
 **Example**
 ```
@@ -860,13 +497,26 @@ Behavior = UnitProductionBonusUpgrade ModuleTag_01
   BuildTimeModifierPercentage = -80%    ; Build time is reduced by 80%
   UnitTemplateName = Tank_ChinaInfantryRedguard    ; The units this bonus applies to
   UnitTemplateName = Tank_ChinaTankBattleMaster
+  BonusStacksWith = SAME_TYPE
 End
 ```
 
 **Notes**
-- The bonus is now removed when the granting object is destroyed and transfers with it on capture,
-so it works for per-building upgrades such as Tech OilRefinery and not only as a global upgrade.
-Set `IsOneShotUpgrade = Yes` to get the old permanent behaviour back.
+- This upgrade is now removable and capture-aware (as long as `IsOneShotUpgrade = No`): the bonus goes away with the granting module and follows the object if it's captured by another player, similar to the CostModifierUpgrade module for Tech OilRefinery.
+
+## PropagateUpgradeToContainedUpgrade (New)
+
+An upgrade module that, when triggered, forwards one or more player upgrades onto every object currently contained (garrisoned/loaded) inside this object - so passengers with a matching `UpgradeModule` react as if they had been upgraded directly, without needing the upgrade to be player-wide.
+
+* `UpgradeToPropagate = <Upgrade name> ...` - (One or more upgrade template names to grant to each currently-contained object. Multiple names can be listed.)
+
+**Example**
+```
+Behavior = PropagateUpgradeToContainedUpgrade ModuleTag_01
+  TriggeredBy = Upgrade_NationalismReactorBonus
+  UpgradeToPropagate = Upgrade_Nationalism
+End
+```
 
 ## StealthUpgrade
 
@@ -896,6 +546,7 @@ Behavior = BattlePlanBonusBehavior ModuleTag_BPB
   WeaponBonus = <BATTLE_PLAN_NAME> <WEAPON_BONUS_NAME>  ; Grant this weaponbonus while this battleplan is active
   ArmorDamageScalar = <BATTLE_PLAN_NAME> 1.0   ; Set damage reduction while this battleplan is active
   SightRangeScalar = <BATTLE_PLAN_NAME> 1.0  ; Set a sight range bonus while this battleplan is active
+  MovementSpeedScalar = <BATTLE_PLAN_NAME> 1.0  ; Multiply movement speed while this battleplan is active (kept across locomotor set changes)
   StatusToSet = <BATTLE_PLAN_NAME> <STATUS_TYPE>   ; Set this status when enabling this battle plan. Clear it on battle plan removal
   StatusToClear = <BATTLE_PLAN_NAME> <STATUS_TYPE>  ; Clear this status when enabling this battle plan. Set it on battle plan removal
 End
@@ -939,6 +590,87 @@ End
 This adds no additional effects, but makes the unit skip default BattlePlan effects (and paralyze) initially, and applies them only after the upgrade.
 Note: For this to work, the unit needs to be inlcuded in the BattlePlan's valid KindOfs, even though the intention is to not give them the battlePlan effects by default.
 
+## AllBattlePlansUpdate (New)
+
+Grants the controlling player the army bonuses of **all three** battle plans (Bombardment, Hold the Line, Search & Destroy) while its object exists. It counts as an additional battle plan source next to the Strategy Centers, so the plan a Strategy Center runs, plan switching and the building-only plan effects are not touched. When the object is deleted the bonuses are removed again; if it is captured they move to the new owner.
+
+```
+Behavior = AllBattlePlansUpdate ModuleTag_AllPlans
+  StrategyCenterTemplate = AmericaStrategyCenter   ; object whose BattlePlanUpdate provides the bonus values and member KindOfs
+End
+```
+
+The bonus values (Hold the Line armor scalar, Search & Destroy sight scalar) and the valid/invalid member KindOfs are read from the `BattlePlanUpdate` of `StrategyCenterTemplate`, so they match the permanent plans exactly. Units with a `BattlePlanBonusBehavior` get their custom effects as usual.
+
+Intended use: an `OCLSpecialPower` spawns an invisible marker object with this module and a `DeletionUpdate` for the duration. The special power enum `SPECIAL_ALL_BATTLE_PLANS` (behaves like the no-target CIA Intelligence power) is meant for the power. The marker can carry a second, never-fired power with `SPECIAL_ALL_BATTLE_PLANS_ACTIVE` that only shows the owner the remaining time (`PublicTimer` + `OwnerOnlyTimer` + `FlashingTimer`, see [SpecialPowers](SpecialPowers.md#new-parser-fields)).
+
+Example marker object (the power that creates it is a normal `OCLSpecialPower` with `Enum = SPECIAL_ALL_BATTLE_PLANS`):
+```
+Object SupW_StrategicEscalationMarker
+  ; no Draw module, invisible
+  EditorSorting = SYSTEM
+  KindOf = IMMOBILE NO_COLLIDE UNATTACKABLE NO_SELECT INERT
+  Body = InactiveBody ModuleTag_01
+  End
+  Behavior = AllBattlePlansUpdate ModuleTag_02
+    StrategyCenterTemplate = SupW_AmericaStrategyCenter
+  End
+  Behavior = DeletionUpdate ModuleTag_03     ; power duration
+    MinLifetime = 60000
+    MaxLifetime = 60000
+  End
+  Behavior = OCLSpecialPower ModuleTag_04    ; never fired, only shows the remaining duration to the owner
+    SpecialPowerTemplate = SupW_SpecialPowerStrategicEscalationActive
+  End
+End
+
+SpecialPower SupW_SpecialPowerStrategicEscalationActive
+  Enum = SPECIAL_ALL_BATTLE_PLANS_ACTIVE
+  ReloadTime = 60000      ; = marker lifetime
+  PublicTimer = Yes
+  OwnerOnlyTimer = Yes
+  FlashingTimer = Yes
+  ShortcutPower = No
+End
+```
+
+## PointDefenseLaserUpdate
+
+Can now be switched on by an upgrade. Without `TriggeredBy` it is always active, as before.
+
+```
+Behavior = PointDefenseLaserUpdate ModuleTag_PDL
+  ; ... existing parameters ...
+  ; Generic Upgrade parameters:
+  TriggeredBy = <Upgrade entry>
+  ConflictsWith = <Upgrade entry>
+  RequiresAllTriggers = No
+  ; ---
+  StartsActive = No   ; active from the start even with TriggeredBy
+End
+```
+
+Removing the trigger upgrade switches the laser off again.
+
+## StealthDetectorUpdate
+
+Can now be switched on by an upgrade, and limited to playable owners. Without `TriggeredBy` it is always active, as before.
+
+```
+Behavior = StealthDetectorUpdate ModuleTag_SD
+  ; ... existing parameters ...
+  ; Generic Upgrade parameters:
+  TriggeredBy = <Upgrade entry>
+  ConflictsWith = <Upgrade entry>
+  RequiresAllTriggers = No
+  ; ---
+  StartsActive = No          ; active from the start even with TriggeredBy
+  RequiresPlayerOwner = No   ; if Yes, inactive while owned by a non-playable side (neutral, civilian), e.g. a tech building that only detects once captured
+End
+```
+
+Removing the trigger upgrade switches the detector off again. `InitiallyDisabled` and the battle plan switch still work on top of this.
+
 ## WeaponBonusUpdate
 
 Added Parameters:
@@ -946,48 +678,6 @@ Added Parameters:
 * `AffectsAirborne` = Yes  ; allow/disallow the bonus be applied to currently airborne units
 * `TintStatusType` = [TINT_STATUS type]  ; which color tint to apply
 * `BonusConditionType` = [WeaponBonus type]  ; The WeaponBonus condition flag that is granted to affected units (default = the module's own bonus). Lets you pick which WeaponBonus the module applies.
-
-## SpecialAbilityUpdate
-
-The valid targets for the laser lock ability (`SPECIAL_MISSILE_DEFENDER_LASER_GUIDED_MISSILES`) used to be hardcoded to
-`VEHICLE`, which in Zero Hour covers aircraft as well as ground vehicles, and to enemies only. These three keys make
-the target filter data-driven.
-
-* `ForbiddenTargetKindOf = <KindOf list>` - (The target may have none of these. Checked first, so it beats
-`RequiredTargetKindOf`. Default = `STRUCTURE`.)
-* `RequiredTargetKindOf = <KindOf list>` - (The target must have **all** of these. Default = `VEHICLE`.)
-* `TargetRelationship = [ALLIES/ENEMIES/NEUTRALS]` - (Which relationships to the owner may be targeted. Several may be
-listed together. Default = `ENEMIES`.)
-
-Example - an Avenger that can only lock onto enemy ground vehicles:
-```
-Behavior = SpecialAbilityUpdate ModuleTag_09
-  SpecialPowerTemplate  = SpecialAbilityLaserGuidedMissiles
-  StartAbilityRange     = 200.0
-  RequiredTargetKindOf  = VEHICLE
-  ForbiddenTargetKindOf = STRUCTURE AIRCRAFT   ; New
-  TargetRelationship    = ENEMIES              ; New
-End
-```
-
-The defaults reproduce the original hardcoded behaviour exactly, so leaving all three keys out changes nothing.
-
-Behaviour notes:
-* `RequiredTargetKindOf` is an all of test, not an any of test. Listing two KindOfs means the target must have both.
-* All three keys are honoured in two places, and always agree: the check that decides whether the cursor and the order
-are valid, and the check that runs while a lock is already in progress and cancels it if the target stops qualifying.
-Because the relationship is part of that test, a lock breaks off if the target changes sides mid lock - by being
-hijacked or captured - unless the new relationship is also allowed.
-* To let the ability target allies, **both** `TargetRelationship` here and `NEED_TARGET_ALLY_OBJECT` on the
-CommandButton are needed. The button filters the player's click; this key covers the paths that never see a button and
-keeps checking while the lock is held.
-* Allowing a relationship other than `ENEMIES` means the ability really will shoot that target - the missile is fired as
-a forced attack, so the usual "you may not attack allies" rule does not stop it. Do not allow allies unless that is what
-you want.
-* The AI never reads CommandButton target options, and its own scan only considers enemies, so it will not use ally or
-neutral locking even when both are configured.
-* These keys currently affect the laser lock ability only. Other abilities that use `SpecialAbilityUpdate` keep their
-own built in target rules and ignore all three.
 
 ## DelayedUpgradeBehavior (New)
 
@@ -1404,11 +1094,108 @@ Added parameter:
 
 * `BridgeHoleAreaPercentage = 100%` - (Percentage of the bridge span that is removed/becomes impassable when the bridge is destroyed. Lets you tune how much of the bridge collapses.)
 
+### Destroyable road bridges
+
+Road bridges (the procedural bridges placed with the bridge tool in WorldBuilder, drawn from `BridgeModelName`) can now be destroyed and rebuilt like landmark bridges. Before, they were always indestructible and had no towers.
+
+* `Destroyable = No` - (If Yes, the bridge can be damaged and destroyed. It is owned by the neutral player and gets the 4 targetable towers from `TowerObjectNameFromLeft/FromRight/ToLeft/ToRight`, which a Dozer/Worker can use to rebuild it (if the span object's `BridgeBehavior` has `Restoreable = Yes`). The deck model switches to `BridgeModelNameDamaged` / `ReallyDamaged` / `Broken` with the span object's damage state.)
+* `BridgeObjectName = GenericBridge` - (Object template that represents the bridge span in the logic. For a destroyable bridge this object needs a body, armor and `BridgeBehavior`, and `KindOf` should include `BRIDGE`. Its geometry is a placeholder: at runtime the box is resized to the bridge (half span length × half bridge width) so area weapons aimed at the deck hit it, and it collapses to nothing while the bridge is destroyed. Leave out to use `GenericBridge` as before.)
+* `BridgeDeckHeight = 0.0` - (Thickness of the deck (and girders/arches) below the driving surface. It is subtracted from the clearance under the bridge, so units that need clearance (see `RequiredBridgeHeight` below) have to fit below the bottom of the deck, not the road surface. Applies to all bridge types.)
+
+The sectional deck has no skeleton, so it cannot play a model animation. These parameters drive a procedural collapse instead: span sections fold toward the middle and drop. All default to 0, which keeps the old instant model swap.
+
+* `BridgeCollapseDuration = 0` - (Time in ms the collapse animation runs. The broken model is swapped in when it ends. 0 = no animation.)
+* `BridgeCollapseDrop = 0.0` - (World units a fully collapsed section falls.)
+* `BridgeCollapseTilt = 0` - (Degrees a fully collapsed section folds by. The two halves fold toward each other, hinging at the end nearest their bank.)
+* `BridgeCollapseStagger = 0%` - (Part of the duration spent rippling out from mid span: sections in the middle start falling immediately, those near the banks start up to this much later. Capped at 90%.)
+* `BridgeRebuildDuration = 0` - (Time in ms of the rebuild animation, the collapse played backwards when the bridge goes from rubble back to healthy. 0 = no animation.)
+* `BridgeCollapseSingleSpanRoll = 0` - (A bridge short enough to be a single span section has nothing to fold against, so it banks sideways by this many degrees instead. The sign picks the side.)
+* `BridgeCollapseSingleSpanDrop = 0.0` - (World units a single-span deck sinks. 0 = use `BridgeCollapseDrop`.)
+
+Notes:
+* A `Bridge` block that leaves out `RadarColor` or `BridgeHoleAreaPercentage`, or any of the new fields, now takes them from `DefaultBridge`, like the other fields.
+
+Example (Roads.ini):
+```
+Bridge IndustrialDestroyable
+  BridgeScale                    = 0.85
+  BridgeModelName                = CBBridgeIn
+  Texture                        = CBBridgeIn.tga
+  BridgeModelNameDamaged         = CBBridgeIn_d
+  TextureDamaged                 = CBBridgeIn_d.tga
+  BridgeModelNameReallyDamaged   = CBBridgeIn_e
+  TextureReallyDamaged           = CBBridgeIn_e.tga
+  BridgeModelNameBroken          = CBBridgeIn_r
+  TextureBroken                  = CBBridgeIn_r.tga
+  TowerObjectNameFromLeft        = DestructibleBridgeTowerConcreteLeft01
+  TowerObjectNameFromRight       = DestructibleBridgeTowerConcreteLeft02
+  TowerObjectNameToLeft          = DestructibleBridgeTowerConcreteRight01
+  TowerObjectNameToRight         = DestructibleBridgeTowerConcreteRight02
+  ScaffoldObjectName             = BridgeScaffold01
+  ScaffoldSupportObjectName      = BridgeScaffoldSupport01
+  Destroyable                    = Yes
+  BridgeObjectName               = GenericBridgeDestructible
+  BridgeDeckHeight               = 5.0
+  BridgeCollapseDuration         = 1200
+  BridgeCollapseDrop             = 22
+  BridgeCollapseTilt             = 25
+  BridgeCollapseStagger          = 60%
+  BridgeCollapseSingleSpanRoll   = 20
+  BridgeRebuildDuration          = 1500
+End
+```
+
+Span object for it:
+```
+Object GenericBridgeDestructible
+  Draw = W3DDefaultDraw ModuleTag_Draw
+    ; nothing -- the bridge system draws the span
+  End
+  EditorSorting = SYSTEM
+  ArmorSet
+    Conditions = None
+    Armor = StructureArmor
+    DamageFX = StructureDamageFXNoShake
+  End
+  RadarPriority = NOT_ON_RADAR
+  KindOf = STRUCTURE IMMOBILE BRIDGE
+  Body = StructureBody ModuleTag_Body
+    MaxHealth = 4000.0
+    InitialHealth = 4000.0
+  End
+  Behavior = BridgeBehavior ModuleTag_Bridge
+    LateralScaffoldSpeed = 100.0
+    VerticalScaffoldSpeed = 70.0
+    BridgeDieFX = FX:FX_RailroadBridgeCollapse Delay:0   SpanFraction:0.5
+    BridgeDieFX = FX:FX_RailroadBridgeCollapse Delay:250 SpanFraction:0.3
+    BridgeDieFX = FX:FX_RailroadBridgeCollapse Delay:250 SpanFraction:0.7
+    Restoreable = Yes
+    RepairPushDuration = 1500
+    RepairPushForce = 150
+  End
+  Geometry = BOX
+  GeometryMajorRadius = 1.0   ; overwritten at runtime (half span length)
+  GeometryMinorRadius = 1.0   ; overwritten at runtime (half bridge width)
+  GeometryHeight = 12.0
+  GeometryIsSmall = No
+  Shadow = NONE
+End
+```
+
+## ThingTemplate
+
+* `RequiredBridgeHeight = 0` - (Minimum bridge-layer height this object's pathfinding requires to be allowed to cross a bridge. Lets tall units/ships be blocked from bridges that aren't high enough for them, while shorter units can still cross.)
+  - Clearance is stored in steps of 10 world units; the requirement is rounded **up** to the next step (e.g. 12 needs 20), so an object is never let through a gap it does not fit under. The clearance is measured to the bottom of the deck (`BridgeDeckHeight`).
+
 ## BridgeBehavior
 
 Added parameters to push objects on a bridge when it is repaired:
 * `RepairPushDuration = 0` - (Duration in ms over which objects standing on the bridge are pushed up when the bridge is repaired/restored.)
 * `RepairPushForce = 0` - (Acceleration applied to objects on the bridge while it is being repaired.)
+
+`BridgeDieFX` / `BridgeDieOCL` accept a new optional location label:
+* `BridgeDieFX = FX:<FXList> Delay:<ms> [Bone:<bone>] [SpanFraction:<0..1>]`
+* `SpanFraction` places the effect along the bridge centreline: 0 = the 'from' bank, 1 = the 'to' bank. FX are oriented along the span. Meant for road bridges, whose span object has no model and so no bones. `Bone` takes priority if both are given; with neither, a random spot on the deck is used as before.
 
 ## DrawBridgeUpdate (New) / DrawBridgeTowerUpdate (New)
 
@@ -1421,12 +1208,6 @@ Behavior = DrawBridgeUpdate ModuleTag_DrawBridge
   ClosingDuration = 0       ; time in ms to close (lower) the bridge
   OpeningPushForce = 0      ; acceleration applied to objects when the bridge opens (pushes them off)
   ClosingDamageTime = 0     ; time in ms during closing when objects underneath take damage
-  BridgeOpeningFX = <FXList>    ; played when the bridge starts opening
-  BridgeOpenFX = <FXList>       ; played once fully open
-  BridgeClosingFX = <FXList>    ; played when the bridge starts closing
-  BridgeClosedFX = <FXList>     ; played once fully closed
-  BridgeOpeningAudio = <AudioEvent>   ; looping audio while opening
-  BridgeClosingAudio = <AudioEvent>   ; looping audio while closing
 End
 ```
 
@@ -1496,16 +1277,26 @@ A set of features to smoothly blend between animations and trigger frame-accurat
 
 * `FXEvent = <frame> <boneName> <FXList>` - (Per ConditionState; plays the given FXList at the given bone when the animation playback crosses the given frame number. Can be added multiple times. Lets you trigger effects at exact animation frames, e.g. footstep dust or muzzle smoke.)
 
-## AnimationSteeringUpdate (New)
+## AnimationSteeringUpdate
 
-A client update that drives steering/lean animations based on the unit's turning.
+Existing (retail) behavior module that plays steering animations from the unit's turning, as used by the GLA Combat Cycle. When the unit starts turning it sets `CENTER_TO_LEFT` / `CENTER_TO_RIGHT`; when it stops, it switches to `LEFT_TO_CENTER` / `RIGHT_TO_CENTER` and clears that once the unit drives straight. New parameters were added to the retail `MinTransitionTime`.
 
 ```
-ClientUpdate = AnimationSteeringUpdate ModuleTag_AnimSteer
-  MinAngle = 0           ; minimum turn angle (degrees) before a steering animation is used
-  SkipCenteringAnims = No   ; if Yes, do not play the "return to center" animations
+Behavior = AnimationSteeringUpdate ModuleTag_AnimSteer
+  MinTransitionTime = 0     ; (retail) minimum time in ms between two steering state changes
+  MinAngle = 0              ; (new) degrees; don't start a turn animation while the AI's goal is less than this far off the nose
+  SkipCenteringAnims = No   ; (new) if Yes, only CENTER_TO_LEFT / CENTER_TO_RIGHT are used; they are cleared directly when the turn ends, without LEFT_TO_CENTER / RIGHT_TO_CENTER
+  BackwardsCondition = No   ; (new) if Yes, set the MOVING_BACKWARDS condition state while the unit drives in reverse
+  BackwardsTurnAnims = No   ; (new) if Yes, keep playing the turn animations while reversing (otherwise they are suppressed)
 End
 ```
+
+Notes:
+* `MinAngle` uses the AI's current goal object or goal position. It only prevents a turn animation from starting; a running one finishes as usual. 0 = off (retail behavior).
+
+Notes on reversing (`BackwardsCondition = Yes`):
+* `MOVING_BACKWARDS` follows the actual movement (the unit's speed is backwards), with a little hysteresis so it doesn't flicker on small nudges.
+* Without `BackwardsTurnAnims`, the turn conditions (`CENTER_TO_LEFT`, `CENTER_TO_RIGHT`, `LEFT_TO_CENTER`, `RIGHT_TO_CENTER`) are cleared while reversing. With it, `MinAngle` is measured against the unit's rear.
 
 ## W3DDecalDraw (New)
 
@@ -1514,18 +1305,20 @@ A draw module that renders a single ground decal for its object. Mainly used tog
 ```
 Draw = W3DDecalDraw ModuleTag_Decal
   Texture = <texture name>
-  Style = SHADOW_ALPHA_DECAL   ; SHADOW_DECAL, SHADOW_ALPHA_DECAL or SHADOW_ADDITIVE_DECAL
+  Style = SHADOW_ALPHA_DECAL   ; SHADOW_ALPHA_DECAL or SHADOW_ADDITIVE_DECAL only - see note below
   Color = R:255 G:255 B:255 A:255
   Opacity = 100%
   SizeX = 1.0       ; world-space size in X
   SizeY = 1.0       ; world-space size in Y
   FadeInTime = 0    ; ms to fade in
   FadeOutTime = 0   ; ms to fade out (use with LifetimeUpdate)
-  RenderAboveWater = No   ; Yes draws the decal on the water surface instead of the terrain below
+  RenderAboveWater = DEFAULT   ; DEFAULT, ABOVE or BELOW - see note below
 End
 ```
-Note: `SHADOW_DECAL` is no longer a valid Style for this module. Use `SHADOW_ALPHA_DECAL` or
-`SHADOW_ADDITIVE_DECAL`.
+
+* `RenderAboveWater = DEFAULT` - (Per-decal override of whether this decal draws above or below the water surface. `DEFAULT` follows the global [`RadiusDecalsAboveWater`](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/GameData#radius-decals-above-water) GameData flag; `ABOVE`/`BELOW` force it regardless of the global setting.)
+
+Note: `Style = SHADOW_DECAL` is **not** supported here (it's a real object-shadow type, not a standalone FX decal, and will crash/get coerced to `SHADOW_ALPHA_DECAL`). Only `SHADOW_ALPHA_DECAL` and `SHADOW_ADDITIVE_DECAL` are valid.
 
 # Target Designator
 
@@ -1566,6 +1359,9 @@ An upgrade module that applies "crate"-style effects (salvage weapon/armor upgra
 
 `OverlordContain` (and Overlord-style contain redirection) now allows holding multiple add-ons at once, as long as they are `KINDOF_PORTABLE_STRUCTURE`. Objects with this KindOf are always added directly to the Overlord's own contain list (rather than being redirected to a single passenger), so several portable structures can be mounted on the same carrier. See also [MultiAddOnContain](#multiaddoncontain-new).
 
+New `OverlordContain` parameter:
+* `AddOnBoneName = FIREPOINT` - (Bone prefix the riders sit on. Rider N (in contain order) is placed at `<AddOnBoneName><NN>` (e.g. `FIREPOINT01`, `FIREPOINT02`), falling back to the bone without number, then to the container's own position. Must match the riders' `AttachToBoneInContainer`, so the logic position (turret aiming, projectile launch) matches where the rider is drawn. With `PassengersInTurret = Yes` the bones are looked up on the main turret.)
+
 # Water Genpower Support
 
 Improvements to make existing generals-power superweapons work correctly over water. (PR #97)
@@ -1580,39 +1376,6 @@ Improvements to make existing generals-power superweapons work correctly over wa
 * `HitWaterSurface = No` - (If Yes, the uplink cannon beam detonates at the water surface over water.)
 
 See also [OrbitalBeamUpdate `HitWaterSurface`](#orbitalbeamupdate-new) and the [DeliverPayload `StrafingWeaponTargetsWater`](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Object-Creation-List#deliverpayload) flag.
-
-See also [ParticleUplinkCannonUpdate `TornadoObjectName`](#particleuplinkcannonupdate-tornado).
-
-# Scorch Mark Selection
-
-## ParticleUplinkCannonUpdate
-
-The particle beam used to burn a random scorch decal (`SCORCH_1` to `SCORCH_4`) every time it marked the ground, which
-a mod cannot change. Mods that replace the scorch art with crater-like decals end up with craters punched along the
-beam path. This key picks which decals the beam is allowed to use, or turns them off entirely.
-
-* `ScorchType = SCORCH_1 SCORCH_2 SCORCH_3 SCORCH_4` - (The scorch types the beam may burn. One name always burns that
-type, several pick randomly among just those, and `NONE` burns no scorches at all. Accepts `SCORCH_1`, `SCORCH_2`,
-`SCORCH_3`, `SCORCH_4`, `SHADOW_SCORCH` and `NONE`.)
-
-Example - a beam that only leaves the fourth scorch decal:
-
-```
-Behavior = ParticleUplinkCannonUpdate ModuleTag_12
-  TotalScorchMarks = 20
-  ScorchMarkScalar = 1.0
-  ScorchType       = SCORCH_4   ; New
-End
-```
-
-Omitting `ScorchType` reproduces the original random `SCORCH_1` to `SCORCH_4` behaviour exactly, so data that does not
-mention it is unaffected.
-
-Behaviour notes:
-* `NONE` only suppresses the decal. The beam still counts its scorch marks, still fires its `GroundHitFX` on the same
-rhythm and still reveals the shroud, so the timing of everything else is untouched.
-* `SHADOW_SCORCH` was never reachable before, because the old random pick stopped at `SCORCH_4`. It is only used if you
-name it.
 
 # Veterancy
 
@@ -1691,8 +1454,8 @@ Behavior = OrbitalBeamUpdate ModuleTag_OrbitalBeam
   SpecialPowerTemplate = <SpecialPower entry>   ; (via SpecialPowerModule params)
   InitialDelay = 0             ; ms before the sequence starts
   InitialSound = <AudioEvent>
-  InitialFX = <FXList>         ; played when the sequence starts
-  InitialOCL = <OCL entry>     ; created when the sequence starts
+  InitialFX = <FXList>          ; FX played right at the start of the sequence
+  InitialOCL = <OCL>            ; OCL created right at the start of the sequence
 
   ; --- Charge beams (multiple beams that converge before the final shot) ---
   NumChargeBeams = 1
@@ -1704,8 +1467,8 @@ Behavior = OrbitalBeamUpdate ModuleTag_OrbitalBeam
   ChargeBeamInterpolation = <InterpolationType>   ; how the beams move in
   RandomizeChargeBeamOrder = No
   ChargeBeamStartFX = <FXList>
-  ChargeStartFX = <FXList>                ; played once as charging begins
-  ChargeStartOCL = <OCL entry>            ; created once as charging begins
+  ChargeStartFX = <FXList>      ; FX played when the charge phase begins
+  ChargeStartOCL = <OCL>        ; OCL created when the charge phase begins
   ChargeSound = <AudioEvent>
   ChargeWeapon = <Weapon entry>           ; weapon(s) fired per charge beam (can repeat)
   ChargeBeamParticleSystem = <ParticleSystem> ...       ; particle systems for the charge beam
@@ -1720,10 +1483,9 @@ Behavior = OrbitalBeamUpdate ModuleTag_OrbitalBeam
   FinalBeamName = <LaserName>
   FinalBeamDuration = 0
   FinalWeapon = <Weapon entry>
-  FinalFX = <FXList>
-  FinalOCL = <OCL entry>        ; created when the final beam fires
+  FinalFX = <FXList>            ; FX played when the final beam appears
+  FinalOCL = <OCL>              ; OCL created when the final beam appears
 
-  AreaDecalRadius = 0.0         ; radius of the area decal drawn at the target
   HitWaterSurface = No          ; if Yes, beam/effects detonate at the water surface over water
 End
 ```
@@ -1749,37 +1511,6 @@ Behavior = ChronoSphereUpdate ModuleTag_Chrono
 End
 ```
 
-## TeleportSelfSpecialPower (New)
-
-Special power update module that teleports its own object to a clicked ground position. This is the activated-ability counterpart to [TeleporterAIUpdate](#teleporteraiupdate-new---experimental), which instead replaces all normal movement with teleporting; a unit with this module walks normally the rest of the time.
-
-Pair it with a `SpecialPowerModule` (or `SpecialAbility`) that sets `UpdateModuleStartsAttack = Yes`, otherwise the power triggers itself and a rejected click still consumes the recharge. The `SpecialPower` entry needs `BehaviorEnum = SPECIAL_JUMPJET`, which supplies the position-only validation (no water, no cliffs).
-
-```
-Behavior = TeleportSelfSpecialPower ModuleTag_Teleport
-  SpecialPowerTemplate = <SpecialPower entry>
-  MaxTeleportRange = 0.0       ; furthest the object may teleport, 0 = unlimited
-  TeleportDelay = 0            ; ms between activation and the teleport happening
-  TeleportStartFX = <FXList>   ; FX at the position we left
-  TeleportTargetFX = <FXList>  ; FX at the position we arrived at
-
-  ; Recovery is off entirely unless RecoverDuration is set
-  RecoverDuration = 0          ; ms the unit is immobilized after landing
-  TeleportRecoverEndFX = <FXList>             ; FX when the recovery finishes
-  TeleportRecoverSoundAmbient = <AudioEvent>  ; looped while recovering
-  TeleportRecoverTint = <TintStatus>          ; color tint applied while recovering
-  TeleportRecoverCondition = <ModelCondition> ; e.g. TELEPORT_RECOVER
-  TeleportRecoverOpacityStart = 100%          ; opacity when the recovery starts
-  TeleportRecoverOpacityEnd = 100%            ; opacity when the recovery ends
-End
-```
-
-Notes:
-* The destination is validated when the order is given and again when it fires, so a spot that becomes blocked during `TeleportDelay` cancels the teleport rather than stranding the unit.
-* An unaffordable `Cost`, a dead/garrisoned/disabled caster, or an invalid destination all refuse the order without consuming the recharge.
-* `RecoverDuration` uses `DISABLED_TELEPORT_RECOVER`, which genuinely immobilizes the unit. Because any disable pauses special power countdowns, the effective cooldown becomes `ReloadTime` + `RecoverDuration`.
-* Do **not** set `KINDOF_TELEPORTER` on a unit using this module - that KindOf excludes units from group speed, leader selection and column formations, which would break normal squad movement.
-
 ## MultiLocationSpecialPowerUpdate (New)
 
 Special power update that can create objects/OCLs at multiple resolved map locations (e.g. edges relative to the source/target). Used together with the [multi-target CommandButton](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/SpecialPowers#multi-target-special-powers) fields.
@@ -1797,507 +1528,83 @@ Behavior = MultiLocationSpecialPowerUpdate ModuleTag_MultiLoc
   Delay = 0               ; ms between creations at each location
   OCL = <OCL entry>       ; default OCL created at each location
   UpgradeOCL = <Upgrade> <OCL>   ; optional per-upgrade OCL override (can repeat)
-  WaitForAttackComplete = No     ; advance only once the caster has stopped attacking
-  MaxWaitPerTarget = 0           ; ms; safety cap when WaitForAttackComplete is used
 End
 ```
 
-### Multi-click artillery
-If the OCL contains an Attack nugget, the caster attacks each point with one of its own weapon
-slots. `aiAttackPosition` replaces the previous order rather than queueing behind it, so with a
-fixed `Delay` the next point cuts the previous barrage short.
-* `WaitForAttackComplete = Yes` - advance to the next point only once the caster has actually
-stopped attacking, instead of after a fixed delay.
-* `MaxWaitPerTarget = 5000` - safety cap in ms. Without it, a point the caster cannot attack
-would stall the whole sequence.
-Note: `Delay` is still used as the poll interval, so leave it at a small value when
-`WaitForAttackComplete` is enabled.
+## RiftSlowDeathBehavior (New)
 
-## PropagateUpgradeToContainedUpgrade (New)
+A slow death behavior that turns its object into a gravity well ("rift" / black hole). Put it on a helper object (e.g. created by an OCL) and let it die right away (e.g. `LifetimeUpdate` with a 1 ms lifetime): when the slow death starts, the rift locks in its position `LiftHeight` above the ground and runs through its phases. Everything pullable within `Radius` is lifted, spun and sucked toward the center; things reaching `EventHorizonRadius` are consumed. At the end the rift collapses with an outward blast.
 
-Upgrade module that grants upgrades to everything currently contained inside the object when it
-triggers. Useful for a transport passing a bought upgrade down to its riders.
+Phases: **charge** (`InitialDelay`, FX only, nothing is pulled), **ramp-up** (`RampupTime`, strength 0 → 1), **main** (`MainDuration`, full strength), **fade-out** (`FadeOutTime`, strength 1 → 0), then **collapse**. Strength scales suction and damage. Suction also falls off linearly from the center to `Radius`.
+
+It extends `SlowDeathBehavior`, so all its parameters (`DestructionDelay`, `DeathTypes`, `FX`/`OCL` phases, ...) work too. `DestructionDelay` must be at least the sum of the four phase times, or the rift is cut off.
 
 ```
-Behavior = PropagateUpgradeToContainedUpgrade ModuleTag_Propagate
-  TriggeredBy = <Upgrade entry>
-  UpgradeToPropagate = <Upgrade entry>   ; granted to each contained object (can repeat)
+Behavior = RiftSlowDeathBehavior ModuleTag_Rift
+  DestructionDelay = 16050      ; >= sum of the phases below
+
+  ; --- Phases (ms) ---
+  InitialDelay = 0              ; charge phase, FXCharge only
+  RampupTime = 0                ; strength climbs 0 -> 1
+  MainDuration = 0              ; full strength
+  FadeOutTime = 0               ; strength falls 1 -> 0, then the rift collapses
+
+  ; --- Shape ---
+  Radius = 0.0                  ; 2D radius of the effect (the circle on the ground)
+  EventHorizonRadius = 0.0      ; victims closer than this (3D) are killed with ConsumeDeathType; 0 = off
+  LiftHeight = 100.0            ; height of the rift center above the ground
+
+  ; --- Suction ---
+  PullAcceleration = 0.0        ; inward acceleration, dist/sec^2
+  SwirlFactor = 0.0             ; bends the pull sideways: 0 = falls straight in, ~1 = orbits
+  PullDamping = 12%             ; velocity bled off per frame; terminal speed is about PullAcceleration / PullDamping
+  LiftAcceleration = 0.0        ; vertical acceleration toward the rift plane, dist/sec^2
+  MaxPullSpeed = 0.0            ; speed cap for held victims, dist/sec; 0 = no cap
+  InitialLiftVelocity = 0.0     ; upward kick on capture, dist/sec
+  CancelGravity = Yes           ; cancel world gravity while a victim is held
+  SpinRate = 0                  ; tumble, deg/sec
+  HugeVehiclePullScalar = 1.0   ; suction multiplier for KINDOF_HUGE_VEHICLE
+
+  ; --- Damage (everything within Radius, pullable or not) ---
+  DamagePerSecond = 0.0         ; at full strength (inside MaximumDamageRadius)
+  MaximumDamageRadius = 0.0     ; 2D distance within which the full DamagePerSecond applies
+  OuterDamagePerSecond = -1     ; damage per second at Radius, linear falloff from MaximumDamageRadius; negative = no falloff
+  DamageInterval = 1000         ; ms between damage ticks
+  DamageType = EXPLOSION
+  DeathType = NORMAL            ; death type of the continuous damage
+  ConsumeDeathType = EXPLODED   ; death type at the event horizon, and for damage kills within ConsumeDeathRadius
+  ConsumeDeathRadius = 0.0      ; victims killed within this distance keep falling in until they are destroyed
+
+  ; --- Collapse ---
+  FinalPushForce = 0.0          ; shockwave over the whole Radius at the collapse; 0 = none
+  FinalPushSpeed = 0.0          ; outward throw for victims still held, dist/sec
+  FinalPushDeathType = SPLATTED
+
+  ; --- Filters ---
+  PullKindOf = <KindOf list>    ; if set, only these kinds are pulled
+  NoPullKindOf = PROJECTILE SMALL_MISSILE BALLISTIC_MISSILE INERT DRAWABLE_ONLY OPTIMIZED_TREE MINE  ; (default) never pulled
+
+  ; --- Effects ---
+  FXCharge = <FXList>           ; at activation
+  FXMain = <FXList>             ; at the start of the ramp-up
+  FXFinal = <FXList>            ; at the collapse
+  FXConsume = <FXList>          ; on each victim crossing the event horizon
+  OCLConsume = <OCL>            ; on each victim crossing the event horizon
+
+  ; --- Structure debris ---
+  StructureDebrisOCL = <OCL>    ; fired at a random spot on a damaged structure; the created object is pulled in
+  StructureDebrisChance = 100%  ; per damaged structure per damage tick
+  StructureDebrisCount = 1      ; how often the OCL fires per spawn, each at its own spot
 End
 ```
 
-## GlobalLightingModifierUpdate (New)
-
-Update module that tints the global map lighting while the object lives. Intended for effects like
-a superweapon darkening the sky.
-
-```
-Behavior = GlobalLightingModifierUpdate ModuleTag_Lighting
-  TargetColor = R:0 G:0 B:0   ; colour blended towards
-  BlendMode = DARKEN          ; DARKEN | COLORIZE | BRIGHTEN
-  Intensity = 1.0             ; 0.0 - 1.0, strength of the blend
-  InitialDelay = 0            ; ms before the effect starts
-  Duration = 0                ; ms the effect is held at full intensity; 0 = while the object lives
-  FadeInTime = 0              ; ms to reach full intensity
-  FadeOutTime = 0             ; ms to fade back out
-  RequiredUpgrade = <Upgrade> ; optional; the modifier only applies once this upgrade is present
-End
-```
-
-## TornadoUpdate (New)
-
-Applies a tornado effect around the object: nearby units are dragged toward it, lifted, spun, and
-damaged, and they fall when the effect fades. The strength follows a weak - strong - weak envelope,
-so the tornado builds up, holds, and dies away like the particle uplink cannon beam does.
-
-The module never moves its own object, so a tornado that wanders needs a `Locomotor` and an AI
-module on the object like any other unit. A stationary one can be spawned by a weapon through
-`ProjectileDetonationOCL` or `FireOCL` with a `CreateObject` nugget.
-
-```
-Behavior = TornadoUpdate ModuleTag_Tornado
-  Radius = 120                    ; (required; how far out units are grabbed)
-  RingRadius = 12                 ; (distance from the axis victims orbit at; 0 = a tenth of Radius)
-  PullForce = 0.6                 ; (inward speed toward the centre, in distance per frame)
-  LiftForce = 1.5                 ; (climb speed toward MaxLiftHeight, in height per frame)
-  SpinForce = 6                   ; (orbit speed around the centre; a negative value orbits the other way)
-  YawRate = 360                   ; (how fast a victim spins about its own axis, in degrees per second)
-  MaxLiftHeight = 40              ; (above this height over the tornado ground, lift stops, so victims hover)
-  MaxVictimSpeed = 12             ; (speed cap on victims; 0 = uncapped, which lets them spiral away)
-  MassReference = 100             ; (victims heavier than this spin proportionally slower; 0 = no scaling)
-  ReleaseSpeed = 0                ; (horizontal speed kept when released; 0 drops them straight down)
-  RequiredKindOf = VEHICLE INFANTRY   ; (optional; a victim must be at least one of these)
-  ForbiddenKindOf = AIRCRAFT      ; (optional; a victim must be none of these)
-  AffectsTargets = ENEMIES NEUTRALS   ; (default = ALLIES ENEMIES NEUTRALS)
-  AffectAirborne = No             ; (default = No)
-  IgnoreVictimGeometry = No       ; (default = No; Yes stops held victims shoving each other apart)
-  RampUpTime = 2000               ; (ms to reach full strength)
-  FullStrengthTime = 6000         ; (ms at full strength; 0 = until the object dies or a controller ends it)
-  RampDownTime = 2000             ; (ms to fade to nothing; victims fall once it reaches zero)
-  DamagePerSecond = 20            ; (damage rate at full strength)
-  DamageRadius = 0                ; (default = 0, which uses Radius)
-  DamagePulseDelay = 500          ; (ms between damage pulses; 0 disables damage)
-  DamageType = EXPLOSION          ; (default = EXPLOSION)
-  DeathType = EXPLODED            ; (default = EXPLODED)
-  KillObjectWhenDone = No         ; (default = No; Yes destroys the object once the ramp down finishes)
-End
-```
-**Notes:**
-- A victim needs a `PhysicsBehavior`. Lift, pull and spin all ignore `Mass`, so every held unit
-  rides at the same height and speed. The one per unit resistance is `ShockResistance`, which
-  scales the whole effect down and doubles as an immunity dial.
-- Structures, immobile objects and projectiles take damage but are never pulled. Units inside a
-  transport are untouched; only the transport itself is grabbed.
-- Airborne targets are skipped unless `AffectAirborne = Yes`. Aircraft with a fixed flight height
-  overwrite their own height every frame, so lifting them does not work well.
-- Falling damage on release is the victim's own, from `MinFallHeightForDamage` and
-  `FallHeightDamageFactor` on its `PhysicsBehavior`. It only counts a steep descent, which is why
-  `ReleaseSpeed = 0` is the reliable way to splat units.
-- `IgnoreVictimGeometry` suppresses collision push-apart between held victims. Because they are
-  all steered onto the same ring they overlap constantly, and wide units can be shoved around
-  faster than the orbit settles, which reads as juddering. It is restored on release.
-- The module does not end the object. Pair it with a `LifetimeUpdate`, or the OCL `MinLifetime` and
-  `MaxLifetime` fields, or set `KillObjectWhenDone`. A tornado with `FullStrengthTime = 0` and none
-  of these, and no controller such as the cannon, fades out by itself after 30 seconds.
-
-## ThermiteBehavior (New)
-
-Goes on a projectile object. When the projectile detonates, the projectile itself stays alive as a
-hidden burn instead of being destroyed. If the projectile hit an object, the burn sticks to that
-object and follows it around. If the projectile detonated on the ground, the burn stays where it
-landed. Every time `Weapon` is ready it fires at the stuck object, or at the ground spot, until the
-lifetime runs out. Damage, radius, pulse rate and FX all come from that weapon.
-
-The module is meant for an upgrade such as thermite shells, so the upgrade fields gate it. Without
-the trigger the projectile detonates and dies as usual.
-
-```
-Behavior = ThermiteBehavior ModuleTag_Thermite
-  Weapon = FlameTankThermiteBurn  ; (required; fired on every pulse, its FireFX is the burn visual)
-  MinLifetime = 3000              ; (ms; shortest burn)
-  MaxLifetime = 5000              ; (ms; longest burn, picked once per projectile)
-  TriggeredBy = Upgrade_ChinaThermiteShells   ; (optional; none = always on)
-  ConflictsWith = Upgrade_Something           ; (optional)
-  RequiresAllTriggers = No        ; (default = No)
-End
-```
-**Notes:**
-- Works with `DumbProjectileBehavior`, `MissileAIUpdate` and `FreeFallProjectileBehavior`. The
-  normal `ProjectileDetonationFX` and damage still happen first, and only then does the burn start.
-- The projectile is the burn, so `DetonateCallsKill` and the projectile's own death FX are skipped
-  when the thermite ignites.
-- `Weapon` is fired from the projectile with the stuck object as the target, so it must have no
-  `MinimumAttackRange`. `DelayBetweenShots` sets the pulse rate. On the ground it is fired at the
-  burn position, so give it a `PrimaryDamageRadius`.
-- The stuck object is the one the projectile collided with, not the one it was aimed at. Mobile
-  victims are followed at their center. Structures and the ground keep the impact point.
-- A victim that dies or enters a transport or tunnel drops the burn to the ground under it, where
-  it keeps burning for the rest of its lifetime.
-- The upgrade check looks at the firing player, the launcher object and the projectile, so both
-  player upgrades and object upgrades on the launcher work as `TriggeredBy`.
-
-## PoweredBehavior (New)
-
-Controls what an object does while its owner is out of power. Without the module, a `KINDOF_POWERED`
-object gets the underpowered disable and shuts down completely. With the module the object stays
-active, and only the listed effects apply. The module replaces the `KINDOF_POWERED` disable on that
-object, so abilities and command buttons keep working.
-
-```
-Behavior = PoweredBehavior ModuleTag_Powered
-  IsMobile = No         ; (default = Yes; No = cannot move while out of power)
-  DisableWeapon = Yes   ; (default = No; Yes = cannot attack while out of power)
-  MovePenalty = 50%     ; (default = 0%; move speed lost while out of power)
-  LiftPenalty = 20%     ; (default = 0%; lift lost while out of power, hovering units only)
-  Icon = LowPower       ; (optional; name of an Animation block, shown while out of power)
-End
-```
-**Notes:**
-- `MovePenalty` of 100% or more acts like `IsMobile = No`.
-- `MovePenalty` never touches lift, so helicopters keep hovering. `LiftPenalty` lowers lift on
-  its own. Once lift no longer beats gravity the unit sinks, so keep it small. 100% is ignored.
-- `Icon` names an `Animation` block from `animation2d.ini`, like the stock `Disabled` one. It sits
-  above the health bar, beside the disabled icon when both show. See
-  [Animation2D.ini](#animation2dini) for the single-image `Texture` form.
-- Losing power with `IsMobile = No` stops the current move order. Attack orders still work, so a
-  turreted unit keeps firing from where it stands.
-- The effects follow the owner. A captured object takes the new owner's power state.
-- No disabled tint is shown; use `Icon` for feedback.
-
-## ParticleUplinkCannonUpdate (Tornado)
-
-* `TornadoObjectName = <object>` - (Creates this object at the beam ground point when the orbital
-  beam appears, drags it along with the beam, ramps it down when the beam starts decaying, and
-  destroys it when the beam dies or the cannon is sold or destroyed.)
-
-The named object is expected to carry a [TornadoUpdate](#tornadoupdate-new). Give it
-`FullStrengthTime = 0` and a `RampDownTime` matching the cannon `WidthGrowTime`, so that the tornado
-follows the beam for as long as it fires and then fades out with it.
-
-# Subdual Jamming
-
-Jamming damage that accumulates on the body like subdual damage, interacts with armor, and disables
-the unit when the threshold is reached. Healing ticks remove the damage over time.
-
-## New Damage Types
-
-Two new entries in `DamageType`:
-
-* `SUBDUAL_JAMMING` - jamming damage adjusted by armor coefficients
-* `SUBDUAL_JAMMING_UNRESISTABLE` - bypasses armor entirely (used internally for healing ticks)
-
-Neither type reduces health. Set these on a weapon's `DamageType` field.
-
-## Jam Effect
-
-When jamming damage reaches the unit's max health, the unit gains `UNSELECTABLE` object status, drops
-out of the player's selection, and its passengers are ordered to idle. The status clears once the
-jamming damage heals below the threshold.
-
-`UNSELECTABLE` on its own only blocks a new selection click. Dropping the unit from the current
-selection is something jamming asks for specifically, so other sources of the status - a slaved drone,
-a docked unit, a sold building - leave the selection alone.
-
-Jamming is independent of the `DISABLED_*` states: it neither waits for them nor ends them, and a
-disabled unit stays disabled through a jam. On unjam it only clears `UNSELECTABLE` if the jam was
-what set it, so a docked, slaved, or status-held unit keeps that state.
-
-## ActiveBody Fields
-
-```
-Body = ActiveBody ModuleTag_Body
-  ; ...existing ActiveBody fields...
-  JammingDamageCap  = 100.0   ; max jamming damage this unit can accumulate (0 = immune)
-  JammingDamageHealRate   = 500 ; milliseconds between each healing tick
-  JammingDamageHealAmount = 5.0 ; jamming damage removed per tick
-End
-```
-
-A unit with `JammingDamageCap = 0` ignores `SUBDUAL_JAMMING` damage entirely.
-The unit becomes jammed when accumulated jamming damage reaches `MaxHealth`. Healing begins
-automatically after the first hit.
-
-### Recovery timing
-
-Every hit resets the heal countdown, so the first healing tick lands one full `HealRate` after
-the last hit. Each tick then removes `HealAmount` until the stored damage reaches zero. The unit
-unjams as soon as the stored damage drops below `MaxHealth`; the overlay only disappears once it
-reaches zero. `JammingDamageCap` bounds the stored damage and therefore the longest recovery.
-
-```
-time to unjam        = HealRate * ceil((stored - MaxHealth) / HealAmount)
-time to clear overlay = HealRate * ceil(stored / HealAmount)
-```
-
-With the defaults in [Subdual Damage Defaults](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/GameData#subdual-damage-defaults)
-(cap `MaxHealth * 2`, heal `MaxHealth / 16.25` every 500 ms) a fully capped unit unjams after
-8.5 s and its overlay clears after 16.5 s. Subdual damage heals the same way, but its blue tint
-is a flag rather than a level and clears on the first healing tick.
-
-Any of these keys, and the `SubdualDamage*` trio, may be omitted. An omitted key takes its value
-from the matching `SubdualDamageDefaults` block in GameData.ini, and is 0 if no block matches.
-Cap and HealAmount keys accept `MaxHealth * 2` or `MaxHealth / 16.25` as well as a plain number,
-evaluated against the unit's current max health. ActiveBody also accepts `ChronoDamageHealRate`
-and `ChronoDamageHealAmount` in the same forms, which override the global chrono keys for that
-unit. See [Subdual Damage Defaults](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/GameData#subdual-damage-defaults).
-
-## Armor
-
-`SUBDUAL_JAMMING` interacts with armor normally. Define coefficients in `Armor.ini`:
-
-```
-Armor ChinaTankArmor
-  Armor = SUBDUAL_JAMMING 200%   ; takes twice as long to jam
-End
-```
-
-`SUBDUAL_JAMMING_UNRESISTABLE` bypasses armor (like `UNRESISTABLE` and `SUBDUAL_UNRESISTABLE`).
-
-## Overlay Texture
-
-A scrolling texture can be drawn over units taking jamming damage. Its opacity is the stored
-jamming damage divided by `MaxHealth`, clamped to 1, so it fades in as the unit is jammed, holds
-full strength while damage sits above `MaxHealth`, and fades out as it heals (see
-[Recovery timing](#recovery-timing)). Configured globally in `GameData.ini`:
-
-```
-JammingOverlayTexture  = JammingFX   ; texture name; omit or leave empty to disable
-JammingOverlayScrollU  = 0.5         ; horizontal scroll per second
-JammingOverlayScrollV  = 0.0         ; vertical scroll per second
-JammingOverlayScale    = 1.0         ; UV tiling; >1 repeats the texture more densely
-JammingOverlayColor    = R:255 G:255 B:255  ; tint multiplied into the texture
-JammingOverlayAdditive = Yes         ; Yes = additive glow, No = alpha blend
-```
-
-The effect is off by default. `Yes` suits an electrical shimmer; `No` suits an opaque layer
-such as frost, and needs the texture to carry an alpha channel.
-
-Note: a unit that is both jammed and stealth-detected shows the jamming overlay only. The
-engine carries one opacity value per render call, so the two effects cannot be layered with
-independent strengths. The [frozen overlay](#subdual-frozen) stacks with this one and shares
-that single value.
-
-## Icon
-
-A jammed unit shows its own icon beside the health bar, next to the disabled icon when both
-apply. Define an `Animation Jammed` block in `Animation2D.ini`; the icon is not drawn until this
-exists. The single-image `Texture` form is the natural fit — see
-[Animation2D.ini](#animation2dini):
-
-```
-Animation Jammed
-  NumberImages   = 1
-  Texture        = jammer.tga
-  AnimationMode  = ONCE
-  AnimationDelay = 0
-End
-```
-
-## Per-Unit Sounds
-
-Units can define custom jam/unjam sounds via their `UnitSpecificSounds` block:
-
-```
-Object SomeUnit
-  UnitSpecificSounds
-    SoundJammed   = JammedSoundEvent
-    SoundUnjammed = UnjammedSoundEvent
-  End
-End
-```
-
-If no per-unit sound is defined, the unit falls back to the global jam sounds in
-`MiscAudio.ini`, and is silent if those are unset too:
-
-```
-UnitJammed   = JammedSoundEvent
-UnitUnjammed = UnjammedSoundEvent
-```
-
-Jamming never borrows the building-disabled or vehicle-disabled sounds, so an EMP'd unit that
-is also jammed plays two distinct cues rather than a repeated one.
-
-## Example Weapon
-
-```
-Weapon JammerGun
-  PrimaryDamage     = 50.0
-  PrimaryDamageRadius = 0.0
-  DamageType        = SUBDUAL_JAMMING
-  DeathType         = NORMAL
-  ; ...other weapon fields...
-End
-```
-
-# Subdual Frozen
-
-Frozen damage is a third subdual pool beside retail subdual and [jamming](#subdual-jamming). It
-accumulates on the body, interacts with armor, and disables the unit the way retail subdual does
-once it reaches the threshold. Healing ticks remove the damage over time. The three pools are
-independent: each has its own counter, cap, heal rate and effect, and a unit can be subdued,
-jammed and frozen at the same time.
-
-## New Damage Types
-
-Two new entries in `DamageType`:
-
-* `SUBDUAL_FROZEN` - frozen damage adjusted by armor coefficients
-* `SUBDUAL_FROZEN_UNRESISTABLE` - bypasses armor entirely (used internally for healing ticks)
-
-Neither type reduces health. Set these on a weapon's `DamageType` field.
-
-## Freeze Effect
-
-When frozen damage reaches the unit's max health, the unit gains the `DISABLED_FROZEN` disabled
-type and the `FROZEN` condition state, and its passengers are ordered to idle. Both clear once the
-frozen damage heals below the threshold.
-
-`DISABLED_FROZEN` is checked everywhere the game checks `DISABLED_SUBDUED`, so a frozen unit
-behaves exactly like a subdued one: it cannot move, fire, animate, sell, evacuate or auto-target,
-transports refuse to load or unload it, a frozen stinger site silences its soldiers, and its
-command buttons grey out. A unit that is both frozen and EMP'd, subdued or hacked stays disabled
-until the last of those clears.
-
-The `FROZEN` condition state lets art react. A `ConditionState = FROZEN` block on a draw module can
-swap the model or play an animation for as long as the unit is frozen.
-
-A frozen unit does not take the dark-gray disabled tint that EMP and subdual apply, so the
-frozen overlay and any `FROZEN` art carry the look on their own.
-
-Projectiles take frozen damage but are never disabled by it; only the sound plays.
-
-## ActiveBody Fields
-
-```
-Body = ActiveBody ModuleTag_Body
-  ; ...existing ActiveBody fields...
-  FrozenDamageCap        = 100.0 ; max frozen damage this unit can accumulate (0 = immune)
-  FrozenDamageHealRate   = 500   ; milliseconds between each healing tick
-  FrozenDamageHealAmount = 5.0   ; frozen damage removed per tick
-End
-```
-
-A unit with `FrozenDamageCap = 0` ignores `SUBDUAL_FROZEN` damage entirely. The unit freezes when
-accumulated frozen damage reaches `MaxHealth`. Healing begins automatically after the first hit,
-with the same [recovery timing](#recovery-timing) as jamming.
-
-Any of these keys may be omitted. An omitted key takes its value from the matching
-`SubdualDamageDefaults` block in GameData.ini, and is 0 if no block matches. Cap and HealAmount
-keys accept `MaxHealth * 2` or `MaxHealth / 16.25` as well as a plain number. See
-[Subdual Damage Defaults](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/GameData#subdual-damage-defaults).
-
-## Armor
-
-`SUBDUAL_FROZEN` interacts with armor normally. Define coefficients in `Armor.ini`:
-
-```
-Armor ChinaTankArmor
-  Armor = SUBDUAL_FROZEN 200%   ; takes twice as long to freeze
-End
-```
-
-`SUBDUAL_FROZEN_UNRESISTABLE` bypasses armor (like `UNRESISTABLE` and `SUBDUAL_UNRESISTABLE`).
-
-## Overlay Texture
-
-A texture can be drawn over units taking frozen damage, with the same fade rule as the jamming
-overlay: opacity is the stored frozen damage divided by `MaxHealth`, clamped to 1. Configured
-globally in `GameData.ini` with the same keys as the jamming overlay:
-
-```
-FrozenOverlayTexture  = FrostFX.tga  ; texture name; omit or leave empty to disable
-FrozenOverlayScrollU  = 0.0          ; horizontal scroll per second
-FrozenOverlayScrollV  = 0.0          ; vertical scroll per second
-FrozenOverlayScale    = 1.0          ; UV tiling; >1 repeats the texture more densely
-FrozenOverlayColor    = R:255 G:255 B:255  ; tint multiplied into the texture
-FrozenOverlayAdditive = No           ; Yes = additive glow, No = alpha blend
-```
-
-The effect is off by default. The defaults differ from jamming: no scroll and alpha blend, which
-suits a static frost layer with an alpha channel.
-
-The jamming and frozen overlays stack, so a unit that is both jammed and frozen draws both
-textures. The engine carries one opacity value per render call, so both passes use the stronger
-of the two intensities and fade together. A unit that is also stealth-detected shows the subdual
-overlays only.
-
-## Icon
-
-A frozen unit shows its own icon beside the health bar, after the disabled and jammed icons when
-those apply. Define an `Animation Frozen` block in `Animation2D.ini`; the icon is not drawn until
-this exists. See [Animation2D.ini](#animation2dini):
-
-```
-Animation Frozen
-  NumberImages   = 1
-  Texture        = frozen.tga
-  AnimationMode  = ONCE
-  AnimationDelay = 0
-End
-```
-
-## Per-Unit Sounds
-
-Units can define custom freeze/thaw sounds via their `UnitSpecificSounds` block:
-
-```
-Object SomeUnit
-  UnitSpecificSounds
-    SoundFrozen   = FrozenSoundEvent
-    SoundUnfrozen = UnfrozenSoundEvent
-  End
-End
-```
-
-If no per-unit sound is defined, the unit falls back to the global sounds in `MiscAudio.ini`,
-and is silent if those are unset too:
-
-```
-UnitFrozen   = FrozenSoundEvent
-UnitUnfrozen = UnfrozenSoundEvent
-```
-
-Freezing never borrows the building-disabled or vehicle-disabled sounds.
-
-## Example Weapon
-
-```
-Weapon FreezeGun
-  PrimaryDamage     = 50.0
-  PrimaryDamageRadius = 0.0
-  DamageType        = SUBDUAL_FROZEN
-  DeathType         = NORMAL
-  ; ...other weapon fields...
-End
-```
-
-# Animation2D.ini
-
-## Texture (single image frames)
-
-An `Animation` block can name a texture file directly for a frame instead of a `MappedImage`.
-This is the simplest way to make a one-frame icon such as the low-power or jammed indicators:
-
-```
-Animation Jammed
-  NumberImages   = 1
-  Texture        = jammer.tga
-  AnimationMode  = ONCE
-  AnimationDelay = 0
-End
-```
-
-Syntax is `Texture = <file> [width height]`. The whole texture is used as the frame.
-
-- Width and height are optional and default to `32 32`. They set the size the frame is drawn
-  at, so they should match the file's real pixel size or the image will be scaled.
-- `Texture` and `Image` lines can be mixed in one block; each fills the next frame slot in order,
-  so `NumberImages` must still count them all.
-- The file name doubles as the image name. Every animation that names the same file shares one
-  image, and a `MappedImage` already defined under that name is reused rather than replaced.
-- The file is resolved like any other texture, so a `.dds` of the same name anywhere in the
-  archives takes priority over a loose `.tga`. Loose files go in `Art\Textures\`.
-
-A static icon wants `NumberImages = 1`, `AnimationMode = ONCE` and `AnimationDelay = 0`, as above.
+Notes:
+* Never pulled (they only take damage): `IMMOBILE`, `STRUCTURE`, `BRIDGE`, `BRIDGE_TOWER`, the new `IMMUNE_TO_PULL` KindOf, contained passengers, invulnerable objects and objects with `ImmortalBody` / `HighlanderBody`.
+* Aircraft whose locomotor has `LocomotorWorksWhenDisabled` are steered through their own locomotor; everything else is taken over by physics (disabled as in freefall while held).
+* Only the first object a `StructureDebrisOCL` creates can be grabbed, so use `Count = 1` in that OCL and `StructureDebrisCount` for more pieces. Debris is destroyed at the event horizon. Structures that can't be destroyed (indestructible, `ImmortalBody`, `HighlanderBody`) never spawn debris.
+* Victims consumed at the event horizon stay held until they are destroyed, so a death that plays out over time (e.g. a shrinking `ChronoDeathBehavior`) happens inside the singularity instead of dropping to the ground.
+* A new DamageType and DeathType `BLACK_HOLE` are available for `DamageType` / `ConsumeDeathType` and matching armor and die modules.
+* Rift generator superweapons can use the special power enum `SPECIAL_RIFT_GENERATOR`, the radius cursor `RIFT_GENERATOR` and the `*_RIFT_GENERATOR` EVA events (see [SpecialPowers](SpecialPowers.md)).
 
 # Misc Improvements
 
@@ -2309,6 +1616,7 @@ Syntax: `ObjectExtend NewObject ObjectToInheritFrom`
 Use `RemoveModule ModuleTag_xx` to remove a module inherited from the parent.  
 WeaponSet and ArmorSet are inherited, but if you define another one in the child, the inherited sets are removed.  
 If the parent has multiple WeaponSets all will be removed from the child if the child defines one. 
+`Prerequisites` work the same way: they are inherited, but a `Prerequisites` block in the child replaces the inherited ones instead of adding to them.
 
 Examples:  
 ```

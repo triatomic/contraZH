@@ -46,6 +46,19 @@
 class VertexMaterialClass;
 class RenderInfoClass;
 class TextureClass;
+struct IDirect3DVertexShader9;
+
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+struct BillboardInstance
+{
+	Vector3 Position;
+	float Size;
+	Vector2 Rotation;
+	unsigned Color;
+	Vector4 UVRect;
+	float Triangle;
+};
+#endif
 
 /*
 ** PointGroupClass -- a custom object for rendering
@@ -127,6 +140,9 @@ public:
 	// Hook effects beyond soft fading, from SoftParticleHookClass, for blended textured points.
 	void						Set_Effects(unsigned effects, const void *effectData) { Effects = effects; EffectData = effectData; }
 
+	// Per-point (u0,v0,u1,v1) rectangles, indexed like the location array, that the frame uvs map into. Null keeps them as they are.
+	void						Set_Texture_UV_Rects(ShareBufferClass<Vector4> *rects);
+
 	// The frame property is taken from a set of possible frames. The rows/columns in the frame
 	// texture determine the number of possible frames. Since it must be a power of 2, we represent
 	// it as its log base 2. This number cannot be greater than 4 (which corresponds to a 16x16
@@ -140,6 +156,13 @@ public:
 	void						RenderVolumeParticle(RenderInfoClass &rinfo, unsigned int depth);
 
 protected:
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+	bool Render_Instanced();
+#endif
+
+	// A vertex's frame uv, mapped into its point's rectangle when there are any.
+	Vector2					Vertex_UV(int vertex) const;
+
 	// Update arrays.
 	void						Update_Arrays(Vector3 *point_loc,
 									Vector4 *point_diffuse,
@@ -204,6 +227,7 @@ protected:
 	bool						GroundMorph;		// tilt ground aligned quads to the terrain under them
 	unsigned				Effects;
 	const void *		EffectData;
+	ShareBufferClass<Vector4> *	TextureUVRects;	// (null if not used) per-point uv rectangles
 	static GroundHeightFunc	GroundHeightCallback;
 
 	// Static stuff:
@@ -228,6 +252,11 @@ protected:
 public:
 	static void				_Init();
 	static void				_Shutdown();
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+	static void Set_Billboard_Shader(IDirect3DVertexShader9 *shader);
+	static void Release_Billboard_Resources();
+	static void Draw_Billboards(const BillboardInstance *instances, unsigned count, bool triangles);
+#endif
 
 private:
 	static Vector3 _TriVertexLocationOrientationTable[256][3];

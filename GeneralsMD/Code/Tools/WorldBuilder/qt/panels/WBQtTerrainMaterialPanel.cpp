@@ -2,6 +2,8 @@
 #include "WBQtTerrainMaterialPanel.h"
 #include "ui_WBQtTerrainMaterialPanel.h"
 #include "WBQtComboStyle.h"
+#include "WBQtNewBrushDialog.h"
+#include "WBQtPreviewImage.h"
 #include "WBQtTerrainMaterialBridge.h"
 #include "WBQtScrubSpinBox.h"
 #include "WBQtTreeStyle.h"
@@ -51,6 +53,7 @@ WBQtTerrainMaterialPanel::WBQtTerrainMaterialPanel(QWidget *owner)
 	m_search = m_ui->search;
 	m_searchBtn = m_ui->searchBtn;
 	m_resetBtn = m_ui->resetBtn;
+	m_newBrushBtn = m_ui->newBrushBtn;
 	m_tree = m_ui->tree;
 	m_nameLabel = m_ui->nameLabel;
 	m_fgSwatch = m_ui->fgSwatch;
@@ -73,6 +76,7 @@ WBQtTerrainMaterialPanel::WBQtTerrainMaterialPanel(QWidget *owner)
 	m_density = m_ui->density;
 	m_densityLabel = m_ui->densityLabel;
 	m_noMixing = m_ui->noMixing;
+	m_paintWaterOnly = m_ui->paintWaterOnly;
 	m_copyTexture = m_ui->copyTexture;
 	m_copyTerrain = m_ui->copyTerrain;
 	m_raiseOnly = m_ui->raiseOnly;
@@ -157,6 +161,7 @@ WBQtTerrainMaterialPanel::WBQtTerrainMaterialPanel(QWidget *owner)
 	}
 	m_density->setValue(WBQtTerrainMaterial_GetPaintDensity());
 	m_noMixing->setChecked(WBQtTerrainMaterial_IsNoMixing() != 0);
+	m_paintWaterOnly->setChecked(WBQtTerrainMaterial_IsPaintWaterOnly() != 0);
 	m_copyTexture->setChecked(WBQtTerrainMaterial_IsCopyTextureMode() != 0);
 	m_copyTerrain->setChecked(WBQtTerrainMaterial_IsCopyTerrainMode() != 0);
 	m_raiseOnly->setChecked(WBQtTerrainMaterial_IsRaiseOnly() != 0);
@@ -179,6 +184,7 @@ WBQtTerrainMaterialPanel::WBQtTerrainMaterialPanel(QWidget *owner)
 	connect(m_tree, SIGNAL(itemSelectionChanged()), this, SLOT(onTextureSelectionChanged()));
 	connect(m_searchBtn, SIGNAL(clicked()), this, SLOT(onSearch()));
 	connect(m_resetBtn, SIGNAL(clicked()), this, SLOT(onReset()));
+	connect(m_newBrushBtn, SIGNAL(clicked()), this, SLOT(onNewBrush()));
 	connect(m_search, SIGNAL(returnPressed()), this, SLOT(onSearch()));
 	if (WBQtConfig_GetNewSearch() != 0)
 	{
@@ -201,6 +207,7 @@ WBQtTerrainMaterialPanel::WBQtTerrainMaterialPanel(QWidget *owner)
 	connect(m_paintMode, SIGNAL(currentIndexChanged(int)), this, SLOT(onPaintModeChanged(int)));
 	connect(m_density, SIGNAL(valueChanged(int)), this, SLOT(onDensityChanged(int)));
 	connect(m_noMixing, SIGNAL(clicked()), this, SLOT(onNoMixingToggled()));
+	connect(m_paintWaterOnly, SIGNAL(clicked()), this, SLOT(onPaintWaterOnlyToggled()));
 	connect(m_copyTexture, SIGNAL(clicked()), this, SLOT(onCopyTextureToggled()));
 	connect(m_copyTerrain, SIGNAL(clicked()), this, SLOT(onCopyTerrainToggled()));
 	connect(m_raiseOnly, SIGNAL(clicked()), this, SLOT(onRaiseOnlyToggled()));
@@ -259,6 +266,74 @@ QTreeWidgetItem *WBQtTerrainMaterialPanel::findOrAddChild(QTreeWidgetItem *paren
 	return node;
 }
 
+// Splits the "\"-joined category path into nested grouping nodes.
+QTreeWidgetItem *WBQtTerrainMaterialPanel::addLeaf(const QString &path, const QString &label, int texClass)
+{
+	QTreeWidgetItem *parent = NULL;
+	if (!path.isEmpty())
+	{
+		QStringList segs = path.split(QChar('\\'), QString::SkipEmptyParts);
+		for (int s = 0; s < segs.size(); ++s)
+		{
+			parent = findOrAddChild(parent, segs.at(s));
+		}
+	}
+
+	QTreeWidgetItem *leaf;
+	if (parent == NULL)
+	{
+		leaf = new QTreeWidgetItem(m_tree);
+	}
+	else
+	{
+		leaf = new QTreeWidgetItem(parent);
+	}
+	leaf->setText(0, label);
+	leaf->setData(0, kTexClassRole, texClass);
+	return leaf;
+}
+
+// Every category path and its parents, read from the bridge so a search filter hides none.
+QStringList WBQtTerrainMaterialPanel::categoryPaths() const
+{
+	const int cap = 512;
+	char pathBuf[cap];
+	char leafBuf[cap];
+	char nameBuf[cap];
+	QStringList paths;
+	int count = WBQtTerrainMaterial_GetTexClassCount();
+	int aliasCount = WBQtTerrainMaterial_GetBrushAliasCount();
+	for (int i = 0; i < count + aliasCount; ++i)
+	{
+		int texClass = -1;
+		bool ok;
+		if (i < count)
+		{
+			ok = (WBQtTerrainMaterial_GetTexClassEntry(i, pathBuf, leafBuf, cap) != 0);
+		}
+		else
+		{
+			ok = (WBQtTerrainMaterial_GetBrushAliasEntry(i - count, &texClass, pathBuf, leafBuf, nameBuf, cap) != 0);
+		}
+		if (!ok || pathBuf[0] == 0)
+		{
+			continue;
+		}
+		QString path = QString::fromLatin1(pathBuf);
+		while (!path.isEmpty())
+		{
+			if (!paths.contains(path))
+			{
+				paths.append(path);
+			}
+			int cut = path.lastIndexOf(QChar('\\'));
+			path = (cut < 0) ? QString() : path.left(cut);
+		}
+	}
+	paths.sort(Qt::CaseInsensitive);
+	return paths;
+}
+
 void WBQtTerrainMaterialPanel::rebuildTextureTree(const QString &filter)
 {
 	m_tree->clear();
@@ -295,33 +370,26 @@ void WBQtTerrainMaterialPanel::rebuildTextureTree(const QString &filter)
 			}
 		}
 
-		// Split the "\"-joined category path into nested grouping nodes.
-		QTreeWidgetItem *parent = NULL;
-		QString path = QString::fromLatin1(pathBuf);
-		if (!path.isEmpty())
-		{
-			QStringList segs = path.split(QChar('\\'), QString::SkipEmptyParts);
-			for (int s = 0; s < segs.size(); ++s)
-			{
-				parent = findOrAddChild(parent, segs.at(s));
-			}
-		}
-
-		QTreeWidgetItem *leaf;
-		if (parent == NULL)
-		{
-			leaf = new QTreeWidgetItem(m_tree);
-		}
-		else
-		{
-			leaf = new QTreeWidgetItem(parent);
-		}
-		leaf->setText(0, QString::fromLatin1(leafBuf));
-		leaf->setData(0, kTexClassRole, i);
+		QTreeWidgetItem *leaf = addLeaf(QString::fromLatin1(pathBuf), QString::fromLatin1(leafBuf), i);
 		if (i == fgClass)
 		{
 			selectItem = leaf;
 		}
+	}
+
+	int aliasCount = WBQtTerrainMaterial_GetBrushAliasCount();
+	for (int i = 0; i < aliasCount; ++i)
+	{
+		int texClass = -1;
+		if (!WBQtTerrainMaterial_GetBrushAliasEntry(i, &texClass, pathBuf, leafBuf, nameBuf, cap))
+		{
+			continue;
+		}
+		if (!lowered.isEmpty() && !QString::fromLatin1(nameBuf).toLower().contains(lowered))
+		{
+			continue;
+		}
+		addLeaf(QString::fromLatin1(pathBuf), QString::fromLatin1(leafBuf), texClass);
 	}
 
 	m_tree->sortItems(0, Qt::AscendingOrder);
@@ -371,20 +439,7 @@ void WBQtTerrainMaterialPanel::setSwatch(QLabel *label, int texClass)
 		return;
 	}
 
-	QImage img(extent, extent, QImage::Format_RGB888);
-	// The MFC swatch blits the tile as a positive-height (bottom-up) DIB, so read source rows
-	// bottom-to-top; the source pixels are BGRA (drop A).
-	for (int y = 0; y < extent; ++y)
-	{
-		const unsigned char *src = reinterpret_cast<const unsigned char*>(bgra.constData()) + (extent - 1 - y) * extent * 4;
-		unsigned char *dst = img.scanLine(y);
-		for (int x = 0; x < extent; ++x)
-		{
-			dst[x * 3 + 0] = src[x * 4 + 2];	// R <- B
-			dst[x * 3 + 1] = src[x * 4 + 1];	// G
-			dst[x * 3 + 2] = src[x * 4 + 0];	// B <- R
-		}
-	}
+	QImage img = WBQtPreviewImage::fromBottomUpBgra(reinterpret_cast<const unsigned char*>(bgra.constData()), extent);
 	label->setPixmap(QPixmap::fromImage(img).scaled(label->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
 }
 
@@ -533,6 +588,66 @@ void WBQtTerrainMaterialPanel::onSwap()
 	refreshSwatches();
 	refreshName();
 	rebuildTextureTree(m_search->text().trimmed());
+	m_updating = false;
+}
+
+void WBQtTerrainMaterialPanel::onNewBrush()
+{
+	// Seed the category from the selected folder, or from the selected texture's folder.
+	QString category;
+	QList<QTreeWidgetItem*> sel = m_tree->selectedItems();
+	if (!sel.isEmpty())
+	{
+		QTreeWidgetItem *node = sel.first();
+		if (node->data(0, kTexClassRole).toInt() >= 0)
+		{
+			node = node->parent();
+		}
+		while (node != NULL)
+		{
+			category = category.isEmpty() ? node->text(0) : node->text(0) + "\\" + category;
+			node = node->parent();
+		}
+	}
+
+	const int cap = 512;
+	char nameBuf[cap];
+	QString terrain;
+	if (WBQtTerrainMaterial_GetTexClassTerrainName(WBQtTerrainMaterial_GetFgTexClass(), nameBuf, cap))
+	{
+		terrain = QString::fromLatin1(nameBuf);
+	}
+
+	WBQtNewBrushDialog dlg(categoryPaths(), category, terrain, this);
+	if (dlg.exec() != QDialog::Accepted)
+	{
+		return;
+	}
+
+	// A blend-edge texture is not a paint texture, so it is left unselected.
+	int texClass = dlg.createdTexClass();
+	if (WBQtTerrainMaterial_GetTexClassTerrainName(texClass, nameBuf, cap) && !WBQtTerrainMaterial_SelectFgTexClass(texClass))
+	{
+		QMessageBox::warning(this, "Terrain Material",
+			"That texture is too large to fit in the remaining texture space.");
+	}
+	m_updating = true;
+	m_search->clear();
+	rebuildTextureTree(QString());
+	QString suffix = " " + dlg.createdName();
+	QTreeWidgetItemIterator it(m_tree);
+	while (*it)
+	{
+		if ((*it)->data(0, kTexClassRole).toInt() == texClass && (*it)->text(0).endsWith(suffix))
+		{
+			m_tree->setCurrentItem(*it);
+			m_tree->scrollToItem(*it);
+			break;
+		}
+		++it;
+	}
+	refreshSwatches();
+	refreshName();
 	m_updating = false;
 }
 
@@ -707,6 +822,12 @@ void WBQtTerrainMaterialPanel::onNoMixingToggled()
 	WBQtTerrainMaterial_SetNoMixing(m_noMixing->isChecked() ? 1 : 0);
 }
 
+// --- Water-only slot ------------------------------------------------------------------------
+void WBQtTerrainMaterialPanel::onPaintWaterOnlyToggled()
+{
+	WBQtTerrainMaterial_SetPaintWaterOnly(m_paintWaterOnly->isChecked() ? 1 : 0);
+}
+
 // --- Copy mode slots ------------------------------------------------------------------------
 void WBQtTerrainMaterialPanel::onCopyTextureToggled()
 {
@@ -825,6 +946,7 @@ void WBQtTerrainMaterialPanel::refreshToolState()
 	}
 	m_density->setValue(WBQtTerrainMaterial_GetPaintDensity());
 	m_noMixing->setChecked(WBQtTerrainMaterial_IsNoMixing() != 0);
+	m_paintWaterOnly->setChecked(WBQtTerrainMaterial_IsPaintWaterOnly() != 0);
 	m_copyTexture->setChecked(WBQtTerrainMaterial_IsCopyTextureMode() != 0);
 	m_copyTerrain->setChecked(WBQtTerrainMaterial_IsCopyTerrainMode() != 0);
 	m_raiseOnly->setChecked(WBQtTerrainMaterial_IsRaiseOnly() != 0);

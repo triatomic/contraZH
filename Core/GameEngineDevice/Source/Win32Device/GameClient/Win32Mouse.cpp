@@ -88,6 +88,7 @@ void Win32Mouse::translateEvent( UnsignedInt eventIndex, MouseIO *result )
 
 	// set these to defaults
 	result->leftState = result->middleState = result->rightState = MBS_None;
+	result->x1State = result->x2State = MBS_None;
 	result->pos.x = result->pos.y = result->wheelPos = 0;
 
 	// Time is the same for all events
@@ -203,6 +204,25 @@ void Win32Mouse::translateEvent( UnsignedInt eventIndex, MouseIO *result )
 			result->pos.y = HIWORD( lParam );
 			break;
 
+		}
+
+		// ------------------------------------------------------------------------
+		case 0x020B:	// WM_XBUTTONDOWN
+		case 0x020C:	// WM_XBUTTONUP
+		case 0x020D:	// WM_XBUTTONDBLCLK
+		{
+			const MouseButtonState state = msg == 0x020C ? MBS_Up : MBS_Down;
+			if( HIWORD( wParam ) & 0x0001 )	// XBUTTON1
+			{
+				result->x1State = state;
+			}
+			if( HIWORD( wParam ) & 0x0002 )	// XBUTTON2
+			{
+				result->x2State = state;
+			}
+			result->pos.x = LOWORD( lParam );
+			result->pos.y = HIWORD( lParam );
+			break;
 		}
 
 		// ------------------------------------------------------------------------

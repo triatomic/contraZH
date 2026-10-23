@@ -5,9 +5,9 @@
   <property name="windowTitle">
    <string>Terrain Material Options</string>
   </property>
-  <layout class="QVBoxLayout" name="rootLayout" stretch="0,3,0,0,0,0,0,0,0,0,0">
+  <layout class="QVBoxLayout" name="rootLayout" stretch="0,3,0,0,0,0,0,0,0,0,0,0">
    <item>
-    <layout class="QHBoxLayout" name="searchRow" stretch="1,0,0">
+    <layout class="QHBoxLayout" name="searchRow" stretch="1,0,0,0">
      <item>
       <widget class="QLineEdit" name="search">
        <property name="placeholderText">
@@ -26,6 +26,16 @@
       <widget class="QPushButton" name="resetBtn">
        <property name="text">
         <string>Reset</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="newBrushBtn">
+       <property name="text">
+        <string>New...</string>
+       </property>
+       <property name="toolTip">
+        <string>Create a WorldBuilder brush, saved to WorldBuilderQt\TerrainBrushes.ini</string>
        </property>
       </widget>
      </item>
@@ -359,6 +369,16 @@
       </widget>
      </item>
     </layout>
+   </item>
+   <item>
+    <widget class="QCheckBox" name="paintWaterOnly">
+     <property name="text">
+      <string>Paint only under water</string>
+     </property>
+     <property name="toolTip">
+      <string>Paint only cells inside a water area that lie below its surface, up to the shoreline.</string>
+     </property>
+    </widget>
    </item>
    <item>
     <widget class="QFrame" name="copySep">

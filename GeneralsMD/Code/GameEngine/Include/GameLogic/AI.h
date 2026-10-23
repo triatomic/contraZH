@@ -34,6 +34,7 @@
 #include "Common/GameType.h"
 #include "GameLogic/Damage.h"
 #include "Common/STLTypedefs.h"
+#include "Common/SciencePurchaseSlots.h"
 
 class AIGroup;
 class AttackPriorityInfo;
@@ -88,7 +89,8 @@ enum
 	// If we want to consider the inner radius, we will specify guard inner. Otherwise, use guard outer.
 	AI_VISIONFACTOR_GUARDINNER = 0x04,
 };
-enum {MAX_AI_UPGRADES = 20};
+// A skill set can list every science a player can purchase.
+enum {MAX_AI_UPGRADES = MAX_PURCHASE_SCIENCES};
 
 typedef struct {
 	Int	m_numSkills;
@@ -952,6 +954,7 @@ public:
 	void groupDock( Object *obj, CommandSourceType cmdSource );							///< get near given object and wait for enter clearance
 	void groupExit( Object *objectToExit, CommandSourceType cmdSource );			///< get out of this Object
 	void groupEvacuate( CommandSourceType cmdSource );												///< empty its contents
+	void groupEvacuateToWork( CommandSourceType cmdSource );									///< empty its contents, supply gatherers among them resume gathering
 	void groupExecuteRailedTransport( CommandSourceType cmdSource );					///< execute railed transport events
 	void groupGoProne( const DamageInfo *damageInfo, CommandSourceType cmdSource );												///< life altering state change, if this AI can do it
 	void groupGuardPosition( const Coord3D *pos, GuardMode guardMode, CommandSourceType cmdSource );						///< guard the given spot
@@ -969,6 +972,7 @@ public:
 	void groupCheer( CommandSourceType cmdSource );
 	void groupSell( CommandSourceType cmdSource );
 	void groupToggleOvercharge( CommandSourceType cmdSource );
+	void groupToggleTunnelAutoPop( CommandSourceType cmdSource );
 	// TheSuperHackers @feature Toggle the Hold Fire stance for the whole group.
 	void groupToggleHoldFire( CommandSourceType cmdSource );
 	void groupToggleDeploy( CommandSourceType cmdSource );

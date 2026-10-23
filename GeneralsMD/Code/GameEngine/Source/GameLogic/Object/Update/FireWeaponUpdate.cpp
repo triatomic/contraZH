@@ -30,6 +30,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/Player.h"
 #include "Common/Xfer.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/FireWeaponUpdate.h"
@@ -59,6 +60,7 @@ FireWeaponUpdateModuleData::FireWeaponUpdateModuleData()
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
+	p.add(UpgradeMuxData::getFieldParse(), offsetof( FireWeaponUpdateModuleData, m_upgradeMuxData ));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -113,6 +115,17 @@ Bool FireWeaponUpdate::isOkayToFire()
 	if( m_weapon == nullptr )
 		return FALSE;
 
+	// tested live rather than latched, so ConflictsWith can switch us off again
+	UpgradeMaskType maskToCheck = me->getObjectCompletedUpgradeMask();
+	const Player *owner = me->getControllingPlayer();
+	if( owner )
+	{
+		maskToCheck.set( owner->getCompletedUpgradeMask() );
+	}
+
+	if( !testUpgradeConditions( maskToCheck ) )
+		return FALSE;
+
 	// Weapon is reloading
 	if( m_weapon->getStatus() != READY_TO_FIRE )
 		return FALSE;
@@ -135,18 +148,23 @@ void FireWeaponUpdate::crc( Xfer *xfer )
 	// extend base class
 	UpdateModule::crc( xfer );
 
+	// extend upgrade mux
+	UpgradeMux::upgradeMuxCRC( xfer );
+
 }
 
 // ------------------------------------------------------------------------------------------------
 /** Xfer method
 	* Version Info:
-	* 1: Initial version */
+	* 1: Initial version
+	* 2: Added m_initialDelayFrame
+	* 3: Added upgrade mux state */
 // ------------------------------------------------------------------------------------------------
 void FireWeaponUpdate::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 2;
+	XferVersion currentVersion = 3;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -159,6 +177,9 @@ void FireWeaponUpdate::xfer( Xfer *xfer )
   if ( version >= 2 )
     xfer->xferUnsignedInt( &m_initialDelayFrame );
 
+	if ( version >= 3 )
+		UpgradeMux::upgradeMuxXfer( xfer );
+
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -169,5 +190,8 @@ void FireWeaponUpdate::loadPostProcess()
 
 	// extend base class
 	UpdateModule::loadPostProcess();
+
+	// extend upgrade mux
+	UpgradeMux::upgradeMuxLoadPostProcess();
 
 }

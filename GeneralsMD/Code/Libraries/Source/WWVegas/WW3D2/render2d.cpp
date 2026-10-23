@@ -223,8 +223,8 @@ Vector2 Render2DClass::Convert_Vert( const Vector2 & v )
 	out.Y = (out.Y - 1.0f) * (Get_Screen_Resolution().Height() * -0.5f);
 
 	// Round to nearest pixel
-	out.X = WWMath::Floor( out.X + 0.5f );
-	out.Y = WWMath::Floor( out.Y + 0.5f );
+	out.X = WWMath::Floorf( out.X + 0.5f );
+	out.Y = WWMath::Floorf( out.Y + 0.5f );
 
 	// Bias
 	if ( WW3D::Is_Screen_UV_Biased() ) {	// Global bais setting
@@ -611,11 +611,11 @@ void Render2DClass::Render()
 	DX8Wrapper::Get_Transform(D3DTS_PROJECTION,proj);
 
 	//
-	//	Configure the viewport for entire screen
+	//	Configure the viewport for the entire target, which supersampling makes larger than the screen
 	//
 	int width, height, bits;
 	bool windowed;
-	WW3D::Get_Device_Resolution( width, height, bits, windowed );
+	WW3D::Get_Render_Target_Resolution( width, height, bits, windowed );
 	D3DVIEWPORT8 vp = { 0 };
 	vp.X			= 0;
 	vp.Y			= 0;

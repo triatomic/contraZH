@@ -44,6 +44,8 @@
 // behavior includes
 #include "GameLogic/Module/AutoHealBehavior.h"
 #include "GameLogic/Module/GrantStealthBehavior.h"
+#include "GameLogic/Module/GrantTemporaryStealthBehavior.h"
+#include "GameLogic/Module/ShieldFieldBehavior.h"
 #include "GameLogic/Module/NeutronBlastBehavior.h"
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/BridgeBehavior.h"
@@ -92,6 +94,7 @@
 #include "GameLogic/Module/ParkingPlaceBehavior.h"
 #include "GameLogic/Module/FlightDeckBehavior.h"
 #include "GameLogic/Module/PoisonedBehavior.h"
+#include "GameLogic/Module/GasBehavior.h"
 #include "GameLogic/Module/PoweredBehavior.h"
 #include "GameLogic/Module/RebuildHoleBehavior.h"
 #include "GameLogic/Module/SupplyWarehouseCripplingBehavior.h"
@@ -162,6 +165,7 @@
 #include "GameLogic/Module/KodiakDeploymentUpdate.h"
 #include "GameLogic/Module/BaikonurLaunchPower.h"
 #include "GameLogic/Module/BattlePlanUpdate.h"
+#include "GameLogic/Module/AllBattlePlansUpdate.h"
 #include "GameLogic/Module/LifetimeUpdate.h"
 #include "GameLogic/Module/RadiusDecalUpdate.h"
 #include "GameLogic/Module/RadiusDecalBehavior.h"
@@ -327,6 +331,8 @@
 #include "GameClient/Module/DynamicGeometryClientUpdate.h"
 #include "GameClient/Module/BeaconClientUpdate.h"
 
+#include "GameLogic/Module/RiftSlowDeathUpdate.h"
+
 // PUBLIC DATA ////////////////////////////////////////////////////////////////////////////////////
 ModuleFactory *TheModuleFactory = nullptr;  ///< the module factory singleton
 
@@ -368,6 +374,8 @@ void ModuleFactory::init()
 	// behavior modules
 	addModule( AutoHealBehavior );
 	addModule( GrantStealthBehavior );
+	addModule( GrantTemporaryStealthBehavior );
+	addModule( ShieldFieldBehavior );
 	addModule( NeutronBlastBehavior );
 	addModule( BridgeBehavior );
 	addModule( BridgeScaffoldBehavior );
@@ -384,6 +392,7 @@ void ModuleFactory::init()
 	addModule( HelicopterSlowDeathBehavior );
 	addModule( ShipSlowDeathBehavior );
 	addModule( NeutronMissileSlowDeathBehavior );
+	addModule( RiftSlowDeathBehavior );
 	addModule( CaveContain );
 	addModule( OpenContain );
 	addModule( OverchargeBehavior );
@@ -416,6 +425,7 @@ void ModuleFactory::init()
 	addModule( ParkingPlaceBehavior );
 	addModule( FlightDeckBehavior );
 	addModule( PoisonedBehavior );
+	addModule( GasBehavior );
 	addModule( PoweredBehavior );
 	addModule( RebuildHoleBehavior );
 	addModule( SupplyWarehouseCripplingBehavior );
@@ -503,6 +513,7 @@ void ModuleFactory::init()
 	addModule( KodiakDeploymentUpdate );
 	addModule( BaikonurLaunchPower );
 	addModule( BattlePlanUpdate );
+	addModule( AllBattlePlansUpdate );
 	addModule( ProjectileStreamUpdate );
 	addModule( QueueProductionExitUpdate );
 	addModule( RepairDockUpdate );

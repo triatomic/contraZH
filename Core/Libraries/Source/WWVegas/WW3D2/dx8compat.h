@@ -164,12 +164,18 @@ unsigned Surface_Size(const D3DSURFACE_DESC& desc);
 // Handles are tagged so a value is unambiguously a handle rather than an FVF code.
 #define DX8_SHADER_HANDLE_TAG 0x80000000u
 
-DWORD Register_D3D9_Vertex_Shader(IDirect3DVertexShader9* shader, IDirect3DVertexDeclaration9* declaration);
-DWORD Register_D3D9_Pixel_Shader(IDirect3DPixelShader9* shader);
+DWORD Register_D3D9_Vertex_Shader(IDirect3DVertexShader9* shader, IDirect3DVertexDeclaration9* declaration, const char* name);
+DWORD Register_D3D9_Pixel_Shader(IDirect3DPixelShader9* shader, const char* name);
+const char* Find_D3D9_Shader_Name(const void* shader);
 void Release_D3D9_Shader(DWORD handle);
 IDirect3DVertexShader9* Peek_D3D9_Vertex_Shader(DWORD handle);
 IDirect3DVertexDeclaration9* Peek_D3D9_Vertex_Declaration(DWORD handle);
 IDirect3DPixelShader9* Peek_D3D9_Pixel_Shader(DWORD handle);
+
+// Gives a pixel shader handle a second shader, which it binds in place of its own while debug shaders are on.
+// The handle takes over the reference. Switching returns whether anything changed.
+void Attach_D3D9_Debug_Pixel_Shader(DWORD handle, IDirect3DPixelShader9* shader);
+bool Set_D3D9_Debug_Pixel_Shaders(bool on);
 
 // Builds a D3D9 declaration from a D3D8 D3DVSD_* token stream
 HRESULT Create_D3D9_Declaration_From_D3D8(const DWORD* d3d8_declaration, IDirect3DVertexDeclaration9** out);

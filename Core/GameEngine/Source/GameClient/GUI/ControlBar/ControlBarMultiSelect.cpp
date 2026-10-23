@@ -425,7 +425,7 @@ void ControlBar::populateMultiSelectBuildQueue(ObjectVector *producerList)
 	std::vector<Real> currentBuildTime;
 	const ProductionEntry* pe;
 	Player* thePlayer = nullptr;
-	int producerCount = producerList->size(), productionSum = 0;
+	int producerCount = producerList->size();
 
 	allPU.resize(producerCount);
 	productionPointer.resize(producerCount);
@@ -449,14 +449,15 @@ void ControlBar::populateMultiSelectBuildQueue(ObjectVector *producerList)
 			thePlayer = (*producerList)[i]->getControllingPlayer();
 		allPU[i] = pu;
 		productionPointer[i] = pu->firstProduction();
-		productionSum += pu->getProductionCount();
 
 		QueueSignature signature;
 		signature.producer = (*producerList)[i];
 		signature.head = productionPointer[i] ? productionPointer[i]->getProductionID() : PRODUCTIONID_INVALID;
 		signature.count = pu->getProductionCount();
+		signature.isDisabled = (*producerList)[i]->isDisabled();
 		m_displayedQueueSignature.push_back(signature);
 		currentBuildTime[i] = 1e9;
+
 		if (productionPointer[i])
 		{
 			pe = productionPointer[i];
@@ -473,6 +474,9 @@ void ControlBar::populateMultiSelectBuildQueue(ObjectVector *producerList)
 			}
 
 			currentBuildTime[i] = (100.0f - pe->getPercentComplete()) / 100.f * totalFrames;
+
+			if ((*producerList)[i]->isDisabled())
+				currentBuildTime[i] += 1e7;
 		}
 	}
 
@@ -595,8 +599,8 @@ void ControlBar::populateMultiSelectBuildQueue(ObjectVector *producerList)
 	//
 	// save the count of things being produced in the build queue, when it changes we will
 	// repopulate the queue to visually show the change
-	//
-	m_displayedQueueCount = productionSum;
+	// no longer used for multiselect
+	// m_displayedQueueCount = 0;
 
 }
 
@@ -841,6 +845,7 @@ void ControlBar::updateContextMultiSelect()
 				signature.producer = producerList[i];
 				signature.head = head ? head->getProductionID() : PRODUCTIONID_INVALID;
 				signature.count = pu->getProductionCount();
+				signature.isDisabled = producerList[i]->isDisabled();
 				queueChanged = signature != m_displayedQueueSignature[i];
 			}
 

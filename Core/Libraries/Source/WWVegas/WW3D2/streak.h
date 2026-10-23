@@ -120,7 +120,7 @@ class StreakLineClass : public RenderObjClass
 		void					Set_Disable_Sorting(int onoff);
 		void					Set_End_Caps(int onoff);
 		// SoftParticleHookClass effects, drawn when the line is textured and blended
-		void					Set_Effects(unsigned int effects);
+		void					Set_Effects(unsigned int effects, const void *effectData = nullptr);
 
 		/////////////////////////////////////////////////////////////////////////////
 		// Render Object Interface - Cloning and Identification

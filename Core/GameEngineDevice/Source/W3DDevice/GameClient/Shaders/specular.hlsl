@@ -15,7 +15,8 @@
 // map, contiguous because texcoord sets are handed out in stage order.
 //
 // BUMP picks the surface detail. 0 is none, 1 treats the texture's brightness as height,
-// and 2 reads a tangent-space normal map from stage 4 on the mesh's own UVs. Both bumped
+// through the slope map W3DSlopeMap builds from it, and 2 reads a tangent-space normal map.
+// Either map sits on stage 4 and is read with the mesh's own UVs. Both bumped
 // variants build their frame from screen-space derivatives, because meshes carry no
 // tangents, so they need ps_2_a.
 //
@@ -24,17 +25,31 @@
 //
 // LIGHTS adds the dynamic point lights, in camera space, in place of the fixed-function
 // ones the mesh was drawn without. They need ps_2_a for their length.
+//
+// RECEIVE also does the shadow receiver pass's work, so the mesh draws once less. The soft
+// shadow and the cloud map scale alpha, which carries them exactly only while the map's
+// shadow colour is grey, so W3DShaderManager uses it only then. It needs ps_2_a for the taps.
 
 sampler2D MeshTexture : register(s0);
 
 #if SHADOWED
 sampler2D ShadowMap : register(s3);
+#if !RECEIVE
 // The pass only needs to know it is in shadow, and a soft edge would not fit ps_2_0.
 #define SHADOW_SINGLE_TAP 1
+#endif
 #include "shadowreceive.hlsli"
 #endif
 
-#if BUMP == 2
+#if RECEIVE
+sampler2D CloudTexture : register(s6);
+float4 CloudU : register(c26);   // camera space position onto the cloud map's u
+float4 CloudV : register(c27);   // and onto its v
+#endif
+
+#if BUMP == 1
+sampler2D SlopeMap : register(s4);
+#elif BUMP == 2
 sampler2D NormalMap : register(s4);
 #endif
 
@@ -45,12 +60,13 @@ float4 SunColor     : register(c2);   // sun colour times specular intensity
 float4 Gloss        : register(c3);   // x = specular power, y = 1 for the debug view
 float4 Bump         : register(c6);   // x = height of full brightness, y = normal map strength, z = ambient brightness
 float4 SunDiffuse   : register(c5);   // sun colour the mesh was lit with
-float4 TextureInfo  : register(c7);   // x = glow mask intensity, 0 without a mask; yz = one texel of the mesh texture in uv
+float4 TextureInfo  : register(c7);   // x = glow mask intensity, 0 without a mask; yz = the slope map's stored texel to height per uv; w = 1 where the cloud map shades
 
 #if LIGHTS
 // Eight fill c8 to c25, and fxc needs the rest for literals, so W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS must match.
 #define POINT_LIGHT_REGISTER c8
 #define POINT_LIGHT_COUNT 8
+#define POINT_LIGHT_NO_LITERALS 1
 #include "pointlights.hlsli"
 #endif
 
@@ -77,27 +93,7 @@ float3 NormalizeOr(float3 v, float3 fallback)
 
 #if BUMP == 1
 
-// Brightness as height, from one mip blurrier than the pixel needs, so fine texture noise does not sparkle.
-float Height(float2 uv)
-{
-    return Brightness(tex2Dbias(MeshTexture, float4(uv, 0.0f, 1.0f)).rgb);
-}
-
-// Height change per pixel along one screen axis. The samples sit at least a texel apart on either side,
-// so a magnified texture gives smooth slopes rather than one flat facet per texel.
-float HeightSlope(float2 uv, float2 step)
-{
-    float2 texels = step / TextureInfo.yz;
-    float stretch = max(1.0f, rsqrt(max(dot(texels, texels), 1e-8f)));
-    float2 reach = step * stretch;
-    float change = (Height(uv + reach) - Height(uv - reach)) * 0.5f;
-
-    // Paint lines and team colour edges jump far more than surface grain, so large jumps are softened.
-    change /= 1.0f + abs(change) * 6.0f;
-    return change / stretch;
-}
-
-// Mikkelsen's surface gradient.
+// Mikkelsen's surface gradient, with the height change per pixel from the slope map's change per uv.
 float3 BumpNormal(float3 normal, float3 position, float2 uv)
 {
     float3 dpdx = ddx(position);
@@ -107,8 +103,9 @@ float3 BumpNormal(float3 normal, float3 position, float2 uv)
     float3 r2 = cross(normal, dpdx);
     float det = dot(dpdx, r1);
 
-    float dhdx = HeightSlope(uv, ddx(uv));
-    float dhdy = HeightSlope(uv, ddy(uv));
+    float2 slope = (tex2D(SlopeMap, uv).rg - 128.0f / 255.0f) * TextureInfo.yz;
+    float dhdx = dot(slope, ddx(uv));
+    float dhdy = dot(slope, ddy(uv));
 
     float3 gradient = sign(det) * (dhdx * r1 + dhdy * r2) * Bump.x;
     return NormalizeOr(abs(det) * normal - gradient, normal);
@@ -169,7 +166,16 @@ float4 main(PsIn input) : COLOR
 #else
     float lit = 1.0f;
 #endif
+
+#if RECEIVE
+    float4 position = float4(input.Position, 1.0f);
+    float clouds = lerp(1.0f, Brightness(tex2D(CloudTexture, float2(dot(position, CloudU), dot(position, CloudV))).rgb), TextureInfo.w);
+
+    // A cloud that blocks the sun takes its highlight too.
+    highlight *= lit * lerp(1.0f, clouds, ShadowParams.z);
+#else
     highlight *= lit;
+#endif
 
     float3 color = SunColor.rgb * highlight;
     float darken = 1.0f;
@@ -185,11 +191,18 @@ float4 main(PsIn input) : COLOR
     color += texel * SunDiffuse.rgb * max(change, 0.0f);
 #endif
 
-#if LIGHTS
+#if LIGHTS && LIGHTS_DEBUG
+    // Zero alpha clears what the mesh drew, since the pass blends one plus destination times source alpha.
+    return float4(PointLighting(input.Position, surface), 0.0f);
+#elif LIGHTS
     color += texel * PointLighting(input.Position, surface);
 #endif
 
     color += tex2D(EmissiveMap, input.TexCoord).rgb * TextureInfo.x;
+
+#if RECEIVE
+    darken *= Brightness(CloudShadowFactor(lit, clouds.xxx));
+#endif
 
     // The debug view tints everything the pass covers faintly and shows the highlight 8x.
     float3 debugColor = float3(1.0f, 0.0f, 1.0f) * (0.15f + highlight * 8.0f);

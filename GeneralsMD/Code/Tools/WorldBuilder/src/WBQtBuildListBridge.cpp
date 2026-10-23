@@ -65,6 +65,8 @@ void WBQtBuildList_Import(void)                    { BuildList::qtImport(); }
 void WBQtBuildList_EditProps(void)                 { BuildList::qtEditProps(); }
 int  WBQtBuildList_GetForcedShow(void)             { return BuildList::qtGetForcedShow(); }
 void WBQtBuildList_SetForcedShow(int on)           { BuildList::qtSetForcedShow(on); }
+int  WBQtBuildList_GetSideOnly(void)               { return BuildList::qtGetSideOnly(); }
+void WBQtBuildList_SetSideOnly(int on)             { BuildList::qtSetSideOnly(on); }
 
 }
 #endif

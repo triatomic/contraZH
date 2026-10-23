@@ -62,6 +62,8 @@ void WBQtScriptEditData_SetDelaySeconds(void *script, int seconds);
 int  WBQtScriptEditData_GetConditionRowCount(void *script);
 // Fills the row label; returns 1 if the row is a condition, 0 if an OR header, -1 if out of range.
 int  WBQtScriptEditData_GetConditionRow(void *script, int row, char *buf, int cap);
+// 1 when the row's condition has a parameter warning.
+int  WBQtScriptEditData_GetConditionRowWarning(void *script, int row);
 // Commands keyed by the selected row (-1 = no selection). Each returns the row to select after
 // the rebuild, or -1 if nothing changed (cancelled modal / no-op).
 int  WBQtScriptEdit_ConditionNew(void *script, int row);
@@ -82,6 +84,8 @@ int  WBQtScriptEdit_ConditionPasteFromClipboard(void *script, int row);
 // --- Actions tabs (isFalse: 0 = "if true" list, 1 = "if false" list) ---
 int  WBQtScriptEditData_GetActionCount(void *script, int isFalse);
 void WBQtScriptEditData_GetActionLabel(void *script, int isFalse, int index, char *buf, int cap);
+// 1 when the action has a parameter warning.
+int  WBQtScriptEditData_GetActionWarning(void *script, int isFalse, int index);
 // Commands keyed by the selected action index (-1 = no selection); return the index to select
 // after the rebuild, or -1 if nothing changed.
 int  WBQtScriptEdit_ActionNew(void *script, int isFalse, int index);

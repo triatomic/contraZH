@@ -202,13 +202,22 @@ void ControlBar::populatePurchaseScience( Player* player )
 	if(TheScriptEngine->isGameEnding())
 		return;
 	// get command set
-	if(!player ||!player->getPlayerTemplate() || player->getPlayerTemplate()->getPurchaseScienceCommandSetRank1().isEmpty() ||
-			player->getPlayerTemplate()->getPurchaseScienceCommandSetRank3().isEmpty() ||
-			player->getPlayerTemplate()->getPurchaseScienceCommandSetRank8().isEmpty())
+	if(!player ||!player->getPlayerTemplate())
 		return;
-	commandSet1 = findCommandSet(player->getPlayerTemplate()->getPurchaseScienceCommandSetRank1()); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
-	commandSet3 = findCommandSet(player->getPlayerTemplate()->getPurchaseScienceCommandSetRank3()); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
-	commandSet8 = findCommandSet(player->getPlayerTemplate()->getPurchaseScienceCommandSetRank8()); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
+#if RTS_ZEROHOUR
+	AsciiString setName1 = player->getPlayerTemplate()->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK1, player );
+	AsciiString setName3 = player->getPlayerTemplate()->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK3, player );
+	AsciiString setName8 = player->getPlayerTemplate()->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK8, player );
+#else
+	AsciiString setName1 = player->getPlayerTemplate()->getPurchaseScienceCommandSetRank1();
+	AsciiString setName3 = player->getPlayerTemplate()->getPurchaseScienceCommandSetRank3();
+	AsciiString setName8 = player->getPlayerTemplate()->getPurchaseScienceCommandSetRank8();
+#endif
+	if(setName1.isEmpty() || setName3.isEmpty() || setName8.isEmpty())
+		return;
+	commandSet1 = findCommandSet(setName1); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
+	commandSet3 = findCommandSet(setName3); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
+	commandSet8 = findCommandSet(setName8); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
 
 	for( i = 0; i < MAX_PURCHASE_SCIENCE_RANK_1; i++ )
 		if (m_sciencePurchaseWindowsRank1[i]!=nullptr)
@@ -970,9 +979,12 @@ ControlBar::ControlBar()
 	m_commandBarBorderColor = GameMakeColor(0,0,0,100);
 	for( i = 0; i < NUM_CONTEXT_PARENTS; i++ )
 		m_contextParent[ i ] = nullptr;
+	m_gridRows = 0;
 	for( i = 0; i < MAX_COMMANDS_PER_SET; i++ )
 	{
 		m_commandWindows[ i ] = nullptr;
+		m_gridRow[ i ] = 0;
+		m_gridColumn[ i ] = 0;
 	// removed from multiplayer branch
 		//m_commandMarkers[ i ] = nullptr;
 	}
@@ -1226,6 +1238,7 @@ void ControlBar::init()
 
 
 		}
+		findGridSlots();
 
 		if( m_commandWindows[ 0 ] )
 		{
@@ -2564,66 +2577,91 @@ void ControlBar::setCommandBarBorder( GameWindow *button, CommandButtonMappedBor
 //-------------------------------------------------------------------------------------------------
 // TheSuperHackers @feature Grid hotkeys.
 //-------------------------------------------------------------------------------------------------
-/** Which grid key belongs to this command bar button, or empty if it is not one of them.
-	*
-	* The slot is found by looking the window up in m_commandWindows, so the mapping follows the
-	* bar's own ordering and needs no assumption about how many slots a mod uses. Slots past the
-	* end of the configured layout simply get no grid key. */
+/** The button's grid key; the layout splits evenly over the rows, and columns past a row's share get none. */
 //-------------------------------------------------------------------------------------------------
-AsciiString ControlBar::getGridHotKeyForButton( GameWindow *button, Bool *isGridSlot ) const
+AsciiString ControlBar::getGridHotKeyForButton( GameWindow *button ) const
 {
-	if( button == nullptr || TheGlobalData == nullptr )
+	if( button == nullptr || TheGlobalData == nullptr || m_gridRows == 0 )
+	{
 		return AsciiString::TheEmptyString;
+	}
 
 	const AsciiString &layout = TheGlobalData->m_gridHotkeyLayout;
-	if( layout.isEmpty() )
-		return AsciiString::TheEmptyString;
+	const Int rowLength = layout.getLength() / m_gridRows;
+	for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
+	{
+		if( m_commandWindows[ i ] == button && m_gridColumn[ i ] < rowLength )
+		{
+			AsciiString key;
+			key.concat( layout.getCharAt( m_gridRow[ i ] * rowLength + m_gridColumn[ i ] ) );
+			return key;
+		}
+	}
+	return AsciiString::TheEmptyString;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Ranks each command window into a row, by height within half a button, and a column within its row. */
+//-------------------------------------------------------------------------------------------------
+void ControlBar::findGridSlots()
+{
+	ICoord2D pos[ MAX_COMMANDS_PER_SET ];
+	Int tolerance = 0;
+	for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
+	{
+		if( m_commandWindows[ i ] )
+		{
+			ICoord2D size;
+			m_commandWindows[ i ]->winGetScreenPosition( &pos[ i ].x, &pos[ i ].y );
+			m_commandWindows[ i ]->winGetSize( &size.x, &size.y );
+			tolerance = size.y / 2;
+		}
+	}
+
+	// the first window at each height leads its row
+	Bool leads[ MAX_COMMANDS_PER_SET ];
+	m_gridRows = 0;
+	for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
+	{
+		leads[ i ] = m_commandWindows[ i ] != nullptr;
+		for( Int j = 0; j < i && leads[ i ]; ++j )
+		{
+			if( m_commandWindows[ j ] && abs( pos[ j ].y - pos[ i ].y ) <= tolerance )
+			{
+				leads[ i ] = FALSE;
+			}
+		}
+		if( leads[ i ] )
+		{
+			++m_gridRows;
+		}
+	}
 
 	for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
 	{
-		if( m_commandWindows[ i ] != button )
-			continue;
-
-		// The command bar numbers its slots down each column, but the layout string is written
-		// in reading order, so translate between the two. Without this, sequential letters land
-		// on alternating rows.
-		Int layoutIndex = i;
-		const Int columns = TheGlobalData->m_gridHotkeyColumns;
-		if( columns > 0 )
+		m_gridRow[ i ] = 0;
+		m_gridColumn[ i ] = 0;
+		if( m_commandWindows[ i ] == nullptr )
 		{
-			// Rows come from the layout's own length, not MAX_COMMANDS_PER_SET, which is the
-			// internal cap of 32 rather than however many slots the mod actually shows.
-			const Int rows = ( layout.getLength() + columns - 1 ) / columns;
-			if( rows > 0 )
+			continue;
+		}
+		for( Int j = 0; j < MAX_COMMANDS_PER_SET; ++j )
+		{
+			if( m_commandWindows[ j ] == nullptr || j == i )
 			{
-				const Int column = i / rows;	// slots run down a column before moving right
-				const Int row = i % rows;
-				layoutIndex = row * columns + column;
+				continue;
+			}
+			const Bool sameRow = abs( pos[ j ].y - pos[ i ].y ) <= tolerance;
+			if( sameRow && pos[ j ].x < pos[ i ].x )
+			{
+				++m_gridColumn[ i ];
+			}
+			if( !sameRow && leads[ j ] && pos[ j ].y < pos[ i ].y )
+			{
+				++m_gridRow[ i ];
 			}
 		}
-
-		if( layoutIndex >= layout.getLength() )
-			break;	// this mod has more slots than the layout covers
-
-		// this slot belongs to the grid, whatever we decide its key is
-		if( isGridSlot != nullptr )
-			*isGridSlot = TRUE;
-
-		AsciiString key;
-		key.concat( layout.getCharAt( layoutIndex ) );
-
-		// A key on the exclusion list is not used for this slot, so the slot falls back to its
-		// string file letter -- which is the point of the exclusion list: the key is freed for
-		// whatever the player wants it for, and the button keys the way it did before grid
-		// hotkeys existed. isGridSlot stays set, so the caller knows to check for a collision
-		// before handing the slot a letter the grid is already using.
-		if( OptionPreferences::isNonGridHotkeyInList( TheGlobalData->m_nonGridHotkeys, key ) )
-			return AsciiString::TheEmptyString;
-
-		return key;
 	}
-
-	return AsciiString::TheEmptyString;
 }
 
 void ControlBar::setControlCommand( GameWindow *button, const CommandButton *commandButton )
@@ -2701,55 +2739,79 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 		// bar rather than by the letter its string file marked with an ampersand, so the keys
 		// stay in the same place whatever is being built.
 		AsciiString hotKey;
-		Bool isGridSlot = FALSE;
+		const Bool gridEnabled = TheGlobalData && TheGlobalData->m_gridHotkeysEnabled;
 
-		if( TheGlobalData && TheGlobalData->m_gridHotkeysEnabled )
-			hotKey = getGridHotKeyForButton( button, &isGridSlot );
+		// Unit orders can keep their own letter and swap grid keys with the slot that had it
+		Bool displaced = FALSE;
+		const GUICommandType commandType = commandButton->getCommandType();
+		Bool isUnitOrder = gridEnabled && TheGlobalData->m_gridHotkeyUnitOrders &&
+				( commandType == GUI_COMMAND_STOP ||
+				commandType == GUI_COMMAND_GUARD ||
+				commandType == GUI_COMMAND_GUARD_WITHOUT_PURSUIT ||
+				commandType == GUI_COMMAND_GUARD_FLYING_UNITS_ONLY ||
+				commandType == GUI_COMMAND_ATTACK_MOVE ||
+				commandType == GUI_COMMAND_EVACUATE ||
+				commandType == GUI_COMMAND_EVACUATE_TO_WORK );
 
-		// Fall back to the string file letter whenever the grid did not supply one. That covers a
-		// button the grid does not reach -- past the end of the layout, or not in the command bar
-		// at all -- and also a slot whose key the player put on NonGridHotkeys, which is what
-		// excluding a key is for: the key goes back to the game, and the button keys the way it
-		// did before grid hotkeys existed.
-		if( hotKey.isEmpty() )
+		// A unit order whose label marks no letter keys by the grid like any other slot.
+		if( isUnitOrder )
 		{
-			const AsciiString strHotKey = TheHotKeyManager->searchHotKey(commandButton->getTextLabel());
+			hotKey = TheHotKeyManager->getButtonHotKey( commandButton->getName(), commandButton->getTextLabel() );
+			isUnitOrder = hotKey.isNotEmpty();
+		}
 
-			// A string file letter that the grid layout also uses would be a straight collision:
-			// addHotKey keeps whichever slot registered first and silently drops the other, so one
-			// of the two buttons would end up with no key and no overlay letter, seemingly at
-			// random. Leave the excluded slot without a hotkey instead -- the grid keeps its own
-			// letters, which is the behaviour the fixed layout is there to guarantee.
-			//
-			// Tested against the layout rather than against what is currently registered, so the
-			// result does not depend on the order the slots happen to be populated in.
-			Bool collidesWithGrid = FALSE;
-			if( isGridSlot && strHotKey.isNotEmpty() && TheGlobalData )
+		if( gridEnabled && !isUnitOrder )
+		{
+			hotKey = getGridHotKeyForButton( button );
+
+			GameWindow *unitOrder = hotKey.isEmpty() ? nullptr : TheHotKeyManager->findHotKeyWindow( hotKey, TRUE );
+			if( unitOrder != nullptr )
 			{
-				const AsciiString &layout = TheGlobalData->m_gridHotkeyLayout;
-				const char wanted = tolower( strHotKey.getCharAt( 0 ) );
-				for( const char *c = layout.str(); *c; ++c )
-				{
-					// A letter the player excluded is no longer the grid's, so it does not collide.
-					if( tolower( *c ) != wanted )
-						continue;
+				hotKey = getGridHotKeyForButton( unitOrder );
+				displaced = TRUE;
+			}
+		}
 
-					AsciiString gridKey;
-					gridKey.concat( *c );
-					if( !OptionPreferences::isNonGridHotkeyInList( TheGlobalData->m_nonGridHotkeys, gridKey ) )
+		// A button the grid does not reach keeps its string file letter
+		if( hotKey.isEmpty() && !isUnitOrder && !displaced )
+		{
+			hotKey = TheHotKeyManager->getButtonHotKey(commandButton->getName(), commandButton->getTextLabel());
+
+			// a bar slot past the layout's reach must not take a letter the grid gives another slot
+			if( gridEnabled && hotKey.getLength() == 1 )
+			{
+				Bool barSlot = FALSE;
+				for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
+				{
+					barSlot = barSlot || m_commandWindows[ i ] == button;
+				}
+				const char wanted = (char)tolower( (unsigned char)hotKey.getCharAt( 0 ) );
+				for( const char *c = TheGlobalData->m_gridHotkeyLayout.str(); barSlot && *c; ++c )
+				{
+					if( (char)tolower( (unsigned char)*c ) == wanted )
 					{
-						collidesWithGrid = TRUE;
+						hotKey.clear();
+						break;
 					}
-					break;
 				}
 			}
-
-			if( !collidesWithGrid )
-				hotKey = strHotKey;
 		}
 
 		if(hotKey.isNotEmpty())
-			TheHotKeyManager->addHotKey(button, hotKey);
+		{
+			GameWindow *gridSlot = isUnitOrder ? TheHotKeyManager->findHotKeyWindow( hotKey, FALSE ) : nullptr;
+			TheHotKeyManager->addHotKey(button, hotKey, isUnitOrder);
+
+			// A grid slot registered earlier loses the key here and takes this button's grid key.
+			if( gridSlot != nullptr && getGridHotKeyForButton( gridSlot ).compareNoCase( hotKey ) == 0 )
+			{
+				const AsciiString swapKey = getGridHotKeyForButton( button );
+				if( swapKey.isNotEmpty() )
+				{
+					TheHotKeyManager->addHotKey( gridSlot, swapKey );
+				}
+			}
+		}
 	}
 	GadgetButtonSetAltSound(button, "GUICommandBarClick");
 
@@ -3216,6 +3278,14 @@ void ControlBar::updatePurchaseScience()
 //	}
 }
 
+void ControlBar::refreshPurchaseScience()
+{
+	if( m_contextParent[ CP_PURCHASE_SCIENCE ] && !m_contextParent[ CP_PURCHASE_SCIENCE ]->winIsHidden() )
+	{
+		populatePurchaseScience(ThePlayerList->getLocalPlayer());
+	}
+}
+
 void ControlBar::showPurchaseScience()
 {
 
@@ -3574,9 +3644,14 @@ void ControlBar::populateSpecialPowerShortcut( Player *player)
 	}
 
 	// get command set
-	if(player->getPlayerTemplate()->getSpecialPowerShortcutCommandSet().isEmpty() )
+#if RTS_ZEROHOUR
+	AsciiString shortcutSetName = player->getPlayerTemplate()->getCommandSet( PLAYER_COMMANDSET_SHORTCUT, player );
+#else
+	AsciiString shortcutSetName = player->getPlayerTemplate()->getSpecialPowerShortcutCommandSet();
+#endif
+	if(shortcutSetName.isEmpty() )
 		return;
-	commandSet = findCommandSet(player->getPlayerTemplate()->getSpecialPowerShortcutCommandSet()); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
+	commandSet = findCommandSet(shortcutSetName); // TEMP WILL CHANGE TO PROPER WAY ONCE WORKING
 	if(!commandSet)
 		return;
 	// populate the button with commands defined
@@ -3673,16 +3748,26 @@ void ControlBar::populateSpecialPowerShortcut( Player *player)
 							Int i;
 
 							// get command set
-							if( !player || !player->getPlayerTemplate()
-									|| player->getPlayerTemplate()->getPurchaseScienceCommandSetRank1().isEmpty()
-									|| player->getPlayerTemplate()->getPurchaseScienceCommandSetRank3().isEmpty()
-									|| player->getPlayerTemplate()->getPurchaseScienceCommandSetRank8().isEmpty() )
+							if( !player || !player->getPlayerTemplate() )
 							{
 								continue;
 							}
-							commandSet1 = findCommandSet( player->getPlayerTemplate()->getPurchaseScienceCommandSetRank1() );
-							commandSet3 = findCommandSet( player->getPlayerTemplate()->getPurchaseScienceCommandSetRank3() );
-							commandSet8 = findCommandSet( player->getPlayerTemplate()->getPurchaseScienceCommandSetRank8() );
+#if RTS_ZEROHOUR
+							AsciiString setName1 = player->getPlayerTemplate()->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK1, player );
+							AsciiString setName3 = player->getPlayerTemplate()->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK3, player );
+							AsciiString setName8 = player->getPlayerTemplate()->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK8, player );
+#else
+							AsciiString setName1 = player->getPlayerTemplate()->getPurchaseScienceCommandSetRank1();
+							AsciiString setName3 = player->getPlayerTemplate()->getPurchaseScienceCommandSetRank3();
+							AsciiString setName8 = player->getPlayerTemplate()->getPurchaseScienceCommandSetRank8();
+#endif
+							if( setName1.isEmpty() || setName3.isEmpty() || setName8.isEmpty() )
+							{
+								continue;
+							}
+							commandSet1 = findCommandSet( setName1 );
+							commandSet3 = findCommandSet( setName3 );
+							commandSet8 = findCommandSet( setName8 );
 
 							if( !commandSet1 || !commandSet3 || !commandSet8 )
 							{

@@ -82,7 +82,7 @@ void W3DProfilerFrameCapture::Capture(UnsignedInt displayWidth, UnsignedInt disp
 	}
 
 	const Real aspectRatio = (Real)displayHeight / (Real)displayWidth;
-	const UnsignedInt imageHeight = min((int)WWMath::Round(PROFILER_FRAME_IMAGE_SIZE * aspectRatio), PROFILER_FRAME_IMAGE_SIZE);
+	const UnsignedInt imageHeight = min((int)WWMath::Roundf(PROFILER_FRAME_IMAGE_SIZE * aspectRatio), PROFILER_FRAME_IMAGE_SIZE);
 
 	// StretchRect cannot resolve multisampling and scale at once, so a multisampled frame resolves at full size first.
 	IDirect3DSurface8 *resolved = nullptr;
@@ -173,7 +173,7 @@ void W3DProfilerFrameCapture::Capture(UnsignedInt displayWidth, UnsignedInt disp
 
 	// allocate surface class
 	const Real aspectRatio = (Real)displayHeight / (Real)displayWidth;
-	unsigned int profilerImageHeight = min((int)WWMath::Round(PROFILER_FRAME_IMAGE_SIZE * aspectRatio), PROFILER_FRAME_IMAGE_SIZE);
+	unsigned int profilerImageHeight = min((int)WWMath::Roundf(PROFILER_FRAME_IMAGE_SIZE * aspectRatio), PROFILER_FRAME_IMAGE_SIZE);
 	SurfaceClass *surfaceClass = NEW_REF(SurfaceClass, (PROFILER_FRAME_IMAGE_SIZE, profilerImageHeight, WW3D_FORMAT_A8R8G8B8));
 	if (!surfaceClass)
 	{

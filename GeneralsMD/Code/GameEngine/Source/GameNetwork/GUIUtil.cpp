@@ -39,6 +39,7 @@
 #include "GameClient/GadgetTextEntry.h"
 #include "GameClient/GadgetStaticText.h"
 #include "GameClient/GadgetPushButton.h"
+#include "GameClient/GadgetCheckBox.h"
 #include "GameClient/GameText.h"
 #include "GameLogic/GameLogic.h" // SUPERWEAPON_RESTRICT_COUNT
 #include "GameNetwork/GameInfo.h"
@@ -406,6 +407,104 @@ static UnicodeString formatMoneyForStartingCashComboBox( const Money & moneyAmou
   UnicodeString rtn;
   rtn.format( TheGameText->fetch( "GUI:StartingMoneyFormat" ), moneyAmount.countMoney() );
   return rtn;
+}
+
+static GameWindow *findLobbyWindow( GameWindow *parent, const char *layoutFilename, const char *name )
+{
+	AsciiString fullName;
+	fullName.format( "%s:%s", layoutFilename, name );
+	return TheWindowManager->winGetWindowFromId( parent, TheNameKeyGenerator->nameToKey( fullName ) );
+}
+
+void InitLobbyTabs( LobbyTabs &tabs, GameWindow *parent, const char *layoutFilename )
+{
+	AsciiString fullName;
+	fullName.format( "%s:ButtonTabGame", layoutFilename );
+	tabs.buttonGameID = TheNameKeyGenerator->nameToKey( fullName );
+	fullName.format( "%s:ButtonTabRules", layoutFilename );
+	tabs.buttonRulesID = TheNameKeyGenerator->nameToKey( fullName );
+	tabs.buttonGame = TheWindowManager->winGetWindowFromId( parent, tabs.buttonGameID );
+	tabs.buttonRules = TheWindowManager->winGetWindowFromId( parent, tabs.buttonRulesID );
+	tabs.panelGame = findLobbyWindow( parent, layoutFilename, "PanelGame" );
+	tabs.panelRules = findLobbyWindow( parent, layoutFilename, "PanelRules" );
+	if (!tabs.buttonGame || !tabs.buttonRules || !tabs.panelGame || !tabs.panelRules)
+	{
+		tabs.buttonGame = nullptr;
+		tabs.buttonRules = nullptr;
+		tabs.panelGame = nullptr;
+		tabs.panelRules = nullptr;
+		return;
+	}
+
+	// The tab buttons start hidden so an exe without this code keeps the Game page
+	GadgetButtonSetText( tabs.buttonRules, TheGameText->fetch("GUI:TabRules") );
+	tabs.buttonGame->winHide( FALSE );
+	tabs.buttonRules->winHide( FALSE );
+	ShowLobbyTab( tabs, FALSE );
+}
+
+void ShowLobbyTab( LobbyTabs &tabs, Bool rules )
+{
+	if (!tabs.buttonGame)
+	{
+		return;
+	}
+	tabs.panelGame->winHide( rules );
+	tabs.panelRules->winHide( !rules );
+	GadgetCheckLikeButtonSetVisualCheck( tabs.buttonGame, !rules );
+	GadgetCheckLikeButtonSetVisualCheck( tabs.buttonRules, rules );
+	if (!rules)
+	{
+		GadgetButtonSetText( tabs.buttonGame, TheGameText->fetch("GUI:TabGame") );
+	}
+}
+
+Bool IsLobbyRulesTabShown( const LobbyTabs &tabs )
+{
+	return tabs.panelRules && !tabs.panelRules->winIsHidden();
+}
+
+void MarkLobbyGameTab( LobbyTabs &tabs )
+{
+	if (!tabs.buttonGame)
+	{
+		return;
+	}
+	UnicodeString label = TheGameText->fetch("GUI:TabGame");
+	label.concat( L" *" );
+	GadgetButtonSetText( tabs.buttonGame, label );
+}
+
+struct LobbyRuleCaption
+{
+	const char *label;
+	const WideChar *labelText;
+	const char *tip;
+	const WideChar *tipText;
+};
+
+static const LobbyRuleCaption s_lobbyRuleCaptions[LOBBY_RULE_COUNT] =
+{
+	{ "GUI:DiplomacyRule", L"Diplomacy", "TOOLTIP:DiplomacyRule", L"Players may change alliances during the match from the Diplomacy window" },
+	{ "GUI:FreeRadar", L"Free Radar", "TOOLTIP:FreeRadar", L"Every player has radar from the start without building a radar source" },
+	{ "GUI:RevealMap", L"Reveal Map", "TOOLTIP:RevealMap", L"No shroud: every player sees the whole map from the start" },
+	{ "GUI:CoopBuildings", L"Coop Buildings", "TOOLTIP:CoopBuildings", L"Lets allies finish each other's unfinished buildings" },
+	{ "GUI:QuickGame", L"Quick Game", "TOOLTIP:QuickGame", L"Lifts the rank requirements on advanced structures, superweapons and super units" },
+};
+
+UnicodeString LobbyRuleName( LobbyRule rule )
+{
+	return TheGameText->FETCH_OR_SUBSTITUTE( s_lobbyRuleCaptions[rule].label, s_lobbyRuleCaptions[rule].labelText );
+}
+
+void SetLobbyRuleCaption( GameWindow *check, LobbyRule rule )
+{
+	if (!check)
+	{
+		return;
+	}
+	GadgetCheckBoxSetText( check, LobbyRuleName( rule ) );
+	check->winSetTooltip( TheGameText->FETCH_OR_SUBSTITUTE( s_lobbyRuleCaptions[rule].tip, s_lobbyRuleCaptions[rule].tipText ) );
 }
 
 void PopulateStartingCashComboBox(GameWindow *comboBox, GameInfo *myGame)

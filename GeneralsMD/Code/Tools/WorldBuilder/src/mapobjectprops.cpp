@@ -3899,6 +3899,16 @@ int MapObjectProps::qtGetSoundPlaying(void)
 	return (TheMapObjectProps != NULL && TheMapObjectProps->m_soundPreviewPlaying) ? 1 : 0;
 }
 
+int MapObjectProps::qtMSoundPreviewMs(void)
+{
+	if (TheMapObjectProps == NULL || TheMapObjectProps->m_soundPreviewData.empty())
+	{
+		return 0;
+	}
+	return (int)wavDurationMs(&TheMapObjectProps->m_soundPreviewData[0],
+		(UnsignedInt)TheMapObjectProps->m_soundPreviewData.size());
+}
+
 void MapObjectProps::qtToggleSoundPreview(void)
 {
 	if (TheMapObjectProps != NULL)

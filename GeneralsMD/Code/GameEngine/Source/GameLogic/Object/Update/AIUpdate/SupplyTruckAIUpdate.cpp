@@ -687,7 +687,8 @@ TheInGameUI->DEBUG_addFloatingText("exiting docking state", getMachineOwner()->g
 	if( !update )
 		return false;
 
-	if (update->isForcedIntoWantingState())
+	// A force latched on a passenger waits until it is outside its container.
+	if (update->isForcedIntoWantingState() && !owner->isContained())
 	{
 #ifdef DEBUG_SUPPLY_STATE
 AsciiString tmp;

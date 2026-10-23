@@ -25,9 +25,10 @@ struct PS_INPUT
 
 float4 main(PS_INPUT input) : COLOR
 {
-    float3 color = ShadowFactor(input.ShadowPos);
 #if CLOUD
-    color *= tex2D(CloudTexture, input.CloudUV).rgb;
+    float3 color = CloudShadowFactor(ShadowLit(input.ShadowPos), tex2D(CloudTexture, input.CloudUV).rgb);
+#else
+    float3 color = ShadowFactor(input.ShadowPos);
 #endif
     return float4(color, 1.0f);
 }

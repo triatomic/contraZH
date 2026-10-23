@@ -37,7 +37,7 @@ void DroneCarrierSlavedUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 	static const FieldParse dataFieldParse[] =
 	{
 		{ "LeashRange",			INI::parseReal,	NULL, offsetof(DroneCarrierSlavedUpdateModuleData, m_leashRange) },
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
 }

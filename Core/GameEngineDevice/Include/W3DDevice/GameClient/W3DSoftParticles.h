@@ -28,8 +28,9 @@ class RenderInfoClass;
 class Vector4;
 struct FlameShaderTuning;
 struct BeamShaderTuning;
+struct DisruptionShaderInfo;
 
-// Fades particle sprites near the surface behind them, shades flames as fire, electricity as arcs, beams as lasers and cryo effects as ice, and draws the heat haze behind flames.
+// Fades particle sprites near the surface behind them, shades flames as fire, electricity as arcs, beams as lasers and cryo effects as ice, and draws the heat haze behind flames and the disruption behind jammers.
 class W3DSoftParticles : public SoftParticleHookClass
 {
 public:
@@ -57,9 +58,17 @@ public:
 	/// Copies the scene for the haze pass. False leaves the haze undrawn.
 	Bool beginHaze();
 
-	/// The effect data is the flame's ParticleSystemTemplate, or with EFFECT_BEAM the beam's BeamShaderTuning, and null takes GameData.ini's.
+	/// Whether anything gets the disruption effect at all, loading its shaders on first ask.
+	Bool disruptionEnabled();
+
+	/// Copies the scene for the disruption pass, whose draws bind only until endDisruption. False leaves them undrawn.
+	Bool beginDisruption();
+	void endDisruption();
+
+	/// The effect data is a flame's FlameShaderTuning, a beam's or mesh's BeamShaderTuning or with EFFECT_DISRUPT the draw's DisruptionShaderInfo, and null takes GameData.ini's.
 	virtual bool Begin(const ShaderClass &shader, unsigned effects, const void *effectData) override;
 	virtual void End() override;
+	virtual bool Can_Disrupt() override;
 
 	void ReleaseResources();	///< drops the shaders and textures before a device reset; the next draw makes them again
 
@@ -70,11 +79,13 @@ private:
 	void setWorldConstants(Int firstRegister);
 	Bool bindSceneDepth(DWORD shader);
 	Bool bindTerrainHeight(DWORD shader);
-	void bindFlame(const FlameShaderTuning &tuning);
-	void bindElectric(const BeamShaderTuning &tuning, Bool beam);
+	void bindFlame(const FlameShaderTuning &tuning, Bool beam, Bool mesh);
+	void bindElectric(const BeamShaderTuning &tuning, Bool beam, Bool mesh);
 	void bindLaser(const BeamShaderTuning &tuning);
 	void bindCryo(const BeamShaderTuning &tuning, Bool beam);
 	Bool bindHaze(const ShaderClass &shader, const FlameShaderTuning &tuning);
+	Bool bindDisruption(const ShaderClass &shader, const DisruptionShaderInfo &info);
+	void bindSceneCopy();
 
 	DWORD m_depthShader;
 	DWORD m_heightShader;
@@ -94,9 +105,11 @@ private:
 	DWORD m_cryoBeamHeightShader;
 	DWORD m_cryoBeamShader;
 	DWORD m_hazeShader;
+	DWORD m_disruptionShaders[3];	///< one per DisruptionShaderInfo::Shape
 	IDirect3DTexture8 *m_noise;
 	IDirect3DTexture8 *m_sceneCopy;
 	Bool m_loaded;
+	Bool m_disrupting;	///< between beginDisruption and endDisruption, while the scene copy is the disruption's
 	unsigned m_bound;		///< effects the current Begin bound, for End to undo
 	D3DMATRIX m_view;
 	D3DMATRIX m_projection;

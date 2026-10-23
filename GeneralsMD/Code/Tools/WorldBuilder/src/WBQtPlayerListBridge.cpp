@@ -331,7 +331,7 @@ void PlayerListDlg::qtMRebuild(void)
 	std::sort(s_regardOut.begin(), s_regardOut.end(), qtmNameLess);
 	std::sort(s_regardIn.begin(), s_regardIn.end(), qtmNameLess);
 
-	s_canAdd = (m_sides.getNumSides() < MAX_PLAYER_COUNT);
+	s_canAdd = (m_sides.getNumSides() < MAX_PLAYER_COUNT - 1);
 	s_removeEnabled = (m_sides.getNumSides() > 1 && !isNeutral);
 }
 

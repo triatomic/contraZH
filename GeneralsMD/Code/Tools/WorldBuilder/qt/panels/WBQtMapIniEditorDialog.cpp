@@ -2,11 +2,14 @@
 #include "WBQtMapIniEditorDialog.h"
 #include "ui_WBQtMapIniEditorDialog.h"
 #include "WBQtMapIniEditorBridge.h"
+#include "WBQtMapIniCodeEditor.h"
+#include "WBQtMapIniReport.h"		// WBQT_MAPINI_BLOCK_* for the outline badges
 #include "../WBQtNameMatch.h"
 
 #include <QAction>
 #include <QApplication>
 #include <QAbstractItemView>
+#include <QClipboard>
 #include <QCloseEvent>
 #include <QCompleter>
 #include <QDialogButtonBox>
@@ -18,20 +21,27 @@
 #include <QFileInfo>
 #include <QFont>
 #include <QHash>
+#include <QHBoxLayout>
+#include <QHeaderView>
 #include <QKeyEvent>
 #include <QListWidget>
 #include <QListWidgetItem>
 #include <QMenu>
 #include <QMessageBox>
+#include <QPainter>
+#include <QPushButton>
 #include <QPlainTextEdit>
 #include <QRegExp>
 #include <QScrollBar>
 #include <QSplitter>
 #include <QStringListModel>
+#include <QStyledItemDelegate>
 #include <QSet>
 #include <QTextBlock>
 #include <QTextOption>
 #include <QTimer>
+#include <QTreeWidget>
+#include <QTreeWidgetItem>
 #include <QTextStream>
 #include <QWindow>
 
@@ -484,15 +494,21 @@ bool WBQtMapIniHighlighter::isEndLine(const QString &line)
 	return iniCodePart(line).compare("End", Qt::CaseInsensitive) == 0;
 }
 
-// Whether a line opens a block that an "End" must close. Two shapes, both verified against real
-// map.inis (whose Ends balance to exactly zero under this rule):
-//
-//   `Object Foo` / `SkillSet1`   -- a bare keyword, optionally with a name
-//   `Behavior = Xyz ModuleTag_5` -- a MODULE, which despite the '=' is a block
-//
-// The module case is why "no '=' means no block" is wrong. But two tokens after the '=' is not
-// enough either: `Locomotor = SET_NORMAL LimoLocomotor` has two and opens nothing. What separates
-// them is the module-tag convention -- a module block's last token is its tag.
+// Whether `keyword` starts a top-level block in the game's INI loader, cached for the per-line repaint.
+static bool isEngineBlockType(const QString &keyword)
+{
+	static QHash<QString, bool> s_cache;
+	QHash<QString, bool>::const_iterator it = s_cache.constFind(keyword);
+	if (it != s_cache.constEnd())
+	{
+		return it.value();
+	}
+	const bool known = (WBQtMapIniEditorData_IsBlockType(keyword.toLocal8Bit().constData()) != 0);
+	s_cache.insert(keyword, known);
+	return known;
+}
+
+// Whether a line opens a block that an "End" must close; these shapes balance 33 real map.inis.
 bool WBQtMapIniHighlighter::opensBlock(const QString &line)
 {
 	const QString scan = iniCodePart(line);
@@ -504,22 +520,57 @@ bool WBQtMapIniHighlighter::opensBlock(const QString &line)
 	const int eq = scan.indexOf('=');
 	if (eq >= 0)
 	{
-		// A module: `Key = ModuleType ModuleTag_N`. Anything else with an '=' is a plain
-		// assignment, however many tokens it has.
+		const QString key = scan.left(eq).trimmed();
+		if (key.compare("ConditionState", Qt::CaseInsensitive) == 0
+			|| key.compare("TransitionState", Qt::CaseInsensitive) == 0)
+		{
+			return true;
+		}
 		const QStringList rhs = scan.mid(eq + 1).simplified()
 			.split(' ', QString::SkipEmptyParts);
 		if (rhs.size() < 2)
 		{
 			return false;
 		}
+		// A module key takes any tag name; `Locomotor = SET_NORMAL Foo` and the like open nothing.
+		static const char *const kModuleKeys[] = {
+			"Behavior", "Draw", "Body", "ClientUpdate", "ClientBehavior", NULL
+		};
+		for (int k = 0; kModuleKeys[k] != NULL; ++k)
+		{
+			if (key.compare(QLatin1String(kModuleKeys[k]), Qt::CaseInsensitive) == 0)
+			{
+				return true;
+			}
+		}
 		return rhs.last().startsWith("ModuleTag", Qt::CaseInsensitive);
 	}
 
-	// Bare keyword, or keyword + name. Anything with three or more tokens is not a header.
 	const QStringList tokens = scan.simplified().split(' ', QString::SkipEmptyParts);
-	if (tokens.size() > 2 || tokens.isEmpty())
+	if (tokens.isEmpty() || tokens.size() > 3)
 	{
 		return false;
+	}
+	// `ObjectReskin New Old` also names the template it copies.
+	if (tokens.size() == 3)
+	{
+		return tokens.at(0).compare("ObjectReskin", Qt::CaseInsensitive) == 0;
+	}
+	// Two words need a block keyword, since `Scale 1.1` is a field written without its '='.
+	static const char *const kNestedHeaders[] = {
+		"ReplaceModule", "SideInfo", "SkirmishBuildList", "Structure", "Mission", NULL
+	};
+	if (tokens.size() == 2 && !isEngineBlockType(tokens.at(0)))
+	{
+		bool nested = false;
+		for (int k = 0; kNestedHeaders[k] != NULL && !nested; ++k)
+		{
+			nested = (tokens.at(0).compare(QLatin1String(kNestedHeaders[k]), Qt::CaseInsensitive) == 0);
+		}
+		if (!nested)
+		{
+			return false;
+		}
 	}
 	// One-line directives that take a name but open nothing ("RemoveModule ModuleTag_DIE").
 	static const char *const kOneLiners[] = { "RemoveModule", "InheritableModule", NULL };
@@ -982,6 +1033,91 @@ bool WBQtMapIniValuePicker::eventFilter(QObject *watched, QEvent *event)
 
 WBQtMapIniEditorDialog *WBQtMapIniEditorDialog::s_instance = NULL;
 
+namespace
+{
+	// Paints a column's text as a rounded badge in the colour stored under Qt::UserRole.
+	class BadgeDelegate : public QStyledItemDelegate
+	{
+	public:
+		explicit BadgeDelegate(QObject *parent) : QStyledItemDelegate(parent) {}
+
+		virtual void paint(QPainter *painter, const QStyleOptionViewItem &option,
+			const QModelIndex &index) const
+		{
+			// The row's own background first, so selection still shows behind the badge.
+			QStyleOptionViewItem row(option);
+			initStyleOption(&row, index);
+			row.text.clear();
+			const QWidget *widget = option.widget;
+			QStyle *style = widget ? widget->style() : QApplication::style();
+			style->drawControl(QStyle::CE_ItemViewItem, &row, painter, widget);
+
+			const QString text = index.data(Qt::DisplayRole).toString();
+			if (text.isEmpty())
+			{
+				return;
+			}
+			const QFontMetrics metrics(option.font);
+			const int height = metrics.height();
+			const QRect badge(option.rect.left() + 3, option.rect.center().y() - height / 2,
+				metrics.horizontalAdvance(text) + 12, height);
+			painter->save();
+			painter->setRenderHint(QPainter::Antialiasing, true);
+			painter->setPen(Qt::NoPen);
+			painter->setBrush(index.data(Qt::UserRole).value<QColor>());
+			painter->drawRoundedRect(badge, 3.0, 3.0);
+			painter->setPen(Qt::white);
+			painter->drawText(badge, Qt::AlignCenter, text);
+			painter->restore();
+		}
+
+		virtual QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
+		{
+			QSize size = QStyledItemDelegate::sizeHint(option, index);
+			const QString text = index.data(Qt::DisplayRole).toString();
+			if (!text.isEmpty())
+			{
+				size.setWidth(QFontMetrics(option.font).horizontalAdvance(text) + 18);
+			}
+			return size;
+		}
+	};
+
+	// New or overridden where the loaded data can answer for the name; -1 means no badge.
+	int outlineStatus(const QString &store, const QString &name)
+	{
+		WBQtMapIniHighlighter::NameKind kind = WBQtMapIniHighlighter::KindNone;
+		if (store == "Object" || store == "ObjectReskin")
+		{
+			kind = WBQtMapIniHighlighter::KindObject;
+		}
+		else if (store == "Upgrade")
+		{
+			kind = WBQtMapIniHighlighter::KindUpgrade;
+		}
+		else if (store == "CommandSet")
+		{
+			kind = WBQtMapIniHighlighter::KindCommandSet;
+		}
+		else if (store == "CommandButton")
+		{
+			kind = WBQtMapIniHighlighter::KindCommandButton;
+		}
+		else if (store == "Science")
+		{
+			kind = WBQtMapIniHighlighter::KindScience;
+		}
+		if (kind == WBQtMapIniHighlighter::KindNone || name.isEmpty())
+		{
+			return -1;
+		}
+		return WBQtMapIniHighlighter::isInCatalog(name, kind)
+			? WBQT_MAPINI_BLOCK_OVERRIDDEN : WBQT_MAPINI_BLOCK_NEW;
+	}
+
+	const QColor kIssueColour(175, 55, 55);
+}
+
 WBQtMapIniEditorDialog::WBQtMapIniEditorDialog(void *frameHwnd)
 	: QWidget(NULL, Qt::Window),
 	  m_ui(new Ui::WBQtMapIniEditorDialog),
@@ -990,6 +1126,9 @@ WBQtMapIniEditorDialog::WBQtMapIniEditorDialog(void *frameHwnd)
 	  m_rescanTimer(NULL),
 	  m_errorList(NULL),
 	  m_split(NULL),
+	  m_outlineSplit(NULL),
+	  m_outlineFilter(NULL),
+	  m_outline(NULL),
 	  m_completer(NULL),
 	  m_recentMenu(NULL)
 {
@@ -1106,6 +1245,8 @@ void WBQtMapIniEditorDialog::loadFile(const QString &path)
 	m_rescanTimer->setInterval(lineCount > 5000 ? 1200 : 400);
 
 	noteRecentFile(path);
+	refreshAnalysis();
+	m_rescanTimer->stop();		// the local names were seeded from this same text
 	updateStatus(tr("Loaded %1 line(s).").arg(lineCount));
 }
 
@@ -1139,9 +1280,43 @@ bool WBQtMapIniEditorDialog::maybeSave()
 
 void WBQtMapIniEditorDialog::createEditor()
 {
-	m_split = new QSplitter(Qt::Vertical, m_ui->editorHost);
-	m_editor = new QPlainTextEdit(m_split);
+	// The block outline sits left of the text, with its filter and the fold buttons above it.
+	m_outlineSplit = new QSplitter(Qt::Horizontal, m_ui->editorHost);
+	QWidget *outlinePane = new QWidget(m_outlineSplit);
+	QVBoxLayout *outlineLayout = new QVBoxLayout(outlinePane);
+	outlineLayout->setContentsMargins(0, 0, 0, 0);
+	outlineLayout->setSpacing(4);
+	m_outlineFilter = new QLineEdit(outlinePane);
+	m_outlineFilter->setPlaceholderText(tr("filter blocks (name or type)"));
+	m_outlineFilter->setClearButtonEnabled(true);
+	outlineLayout->addWidget(m_outlineFilter);
+	QHBoxLayout *foldRow = new QHBoxLayout();
+	QPushButton *foldAll = new QPushButton(tr("Fold all"), outlinePane);
+	QPushButton *unfoldAll = new QPushButton(tr("Unfold all"), outlinePane);
+	foldAll->setAutoDefault(false);
+	unfoldAll->setAutoDefault(false);
+	foldRow->addWidget(foldAll);
+	foldRow->addWidget(unfoldAll);
+	outlineLayout->addLayout(foldRow);
+	m_outline = new QTreeWidget(outlinePane);
+	m_outline->setColumnCount(3);
+	m_outline->setHeaderHidden(true);
+	m_outline->setUniformRowHeights(true);
+	m_outline->header()->setStretchLastSection(false);
+	m_outline->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+	m_outline->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+	m_outline->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+	m_outline->setItemDelegateForColumn(1, new BadgeDelegate(m_outline));
+	m_outline->setItemDelegateForColumn(2, new BadgeDelegate(m_outline));
+	m_outline->setContextMenuPolicy(Qt::CustomContextMenu);
+	m_outline->setToolTip(tr("Click a block to go to it; double-click to fold or unfold it."));
+	outlineLayout->addWidget(m_outline);
+	m_outlineSplit->addWidget(outlinePane);
+
+	m_split = new QSplitter(Qt::Vertical, m_outlineSplit);
+	m_editor = new WBQtMapIniCodeEditor(m_split);
 	m_editor->setLineWrapMode(QPlainTextEdit::NoWrap);
+	m_editor->setFoldingEnabled(true);
 	m_errorList = new QListWidget(m_split);
 	m_errorList->setAlternatingRowColors(true);
 	m_errorList->setMaximumHeight(200);
@@ -1153,7 +1328,12 @@ void WBQtMapIniEditorDialog::createEditor()
 	m_split->setStretchFactor(0, 1);	// the text takes the slack when the window resizes
 	m_split->setStretchFactor(1, 0);
 	m_split->setChildrenCollapsible(false);
-	m_ui->editorHostLay->addWidget(m_split);
+	m_outlineSplit->addWidget(m_split);
+	m_outlineSplit->setStretchFactor(0, 0);
+	m_outlineSplit->setStretchFactor(1, 1);
+	m_outlineSplit->setSizes(QList<int>()
+		<< WBQtMapIniEditorData_GetProfileInt("OutlineWidth", 300) << 900);
+	m_ui->editorHostLay->addWidget(m_outlineSplit);
 
 	// Fixed-pitch: INI files are column-aligned by hand and a proportional font ruins that.
 	QFont mono = iniMonoFont();
@@ -1181,6 +1361,18 @@ void WBQtMapIniEditorDialog::createEditor()
 			this, SLOT(onErrorRowChanged(QListWidgetItem*,QListWidgetItem*)));
 	connect(m_editor, SIGNAL(textChanged()), this, SLOT(onTextChanged()));
 	m_editor->installEventFilter(this);
+
+	connect(m_outlineFilter, SIGNAL(textChanged(QString)), this, SLOT(onOutlineFilterChanged(QString)));
+	connect(m_outline, SIGNAL(itemClicked(QTreeWidgetItem*,int)),
+			this, SLOT(onOutlineItemClicked(QTreeWidgetItem*,int)));
+	connect(m_outline, SIGNAL(itemActivated(QTreeWidgetItem*,int)),
+			this, SLOT(onOutlineItemClicked(QTreeWidgetItem*,int)));
+	connect(m_outline, SIGNAL(itemDoubleClicked(QTreeWidgetItem*,int)),
+			this, SLOT(onOutlineItemDoubleClicked(QTreeWidgetItem*,int)));
+	connect(m_outline, SIGNAL(customContextMenuRequested(QPoint)),
+			this, SLOT(onOutlineContextMenu(QPoint)));
+	connect(foldAll, SIGNAL(clicked()), this, SLOT(onFoldAll()));
+	connect(unfoldAll, SIGNAL(clicked()), this, SLOT(onUnfoldAll()));
 
 	// Undo/redo follow the document's own stack, so they cover typing and applied fixes alike.
 	m_ui->undoButton->setEnabled(false);
@@ -1425,10 +1617,7 @@ void WBQtMapIniEditorDialog::onReload()
 void WBQtMapIniEditorDialog::onCheckNamesToggled(bool on)
 {
 	m_highlighter->setCheckNames(on);
-	if (m_ui->showErrorsBox->isChecked())
-	{
-		rebuildErrorList();
-	}
+	refreshAnalysis();
 }
 
 // Render spaces and tabs. INI files are hand-aligned, so a tab where the rest of the block uses
@@ -1454,10 +1643,7 @@ void WBQtMapIniEditorDialog::onWhitespaceToggled(bool on)
 void WBQtMapIniEditorDialog::onCheckSyntaxToggled(bool on)
 {
 	m_highlighter->setCheckSyntax(on);
-	if (m_ui->showErrorsBox->isChecked())
-	{
-		rebuildErrorList();
-	}
+	refreshAnalysis();
 }
 
 void WBQtMapIniEditorDialog::onModificationChanged(bool modified)
@@ -1471,24 +1657,13 @@ void WBQtMapIniEditorDialog::onModificationChanged(bool modified)
 // Walk the whole file, collecting the lines whose name does not resolve. Runs the same matcher
 // and the same block-context tracking the highlighter uses, so the list and the underlines can
 // never disagree.
-void WBQtMapIniEditorDialog::rebuildErrorList()
+QList<WBQtMapIniEditorDialog::LineIssue> WBQtMapIniEditorDialog::collectIssues() const
 {
-	// The list refills on every edit; re-selecting by ROW would jump around as lines are fixed,
-	// so remember which file line was selected and restore that instead. Blocked so the restore
-	// does not fire the navigation slot and yank the cursor away from where you are typing.
-	int wasLine = -1;
-	if (m_errorList->currentItem() != NULL)
-	{
-		wasLine = m_errorList->currentItem()->data(Qt::UserRole).toInt();
-	}
-	const bool blocked = m_errorList->blockSignals(true);
-
-	m_errorList->clear();
+	QList<LineIssue> issues;
 	// Walk the document's blocks rather than toPlainText().split('\n'): that copies the entire
 	// buffer and then allocates a QString per line, which on a 10,000-line file is megabytes of
 	// churn every time this runs.
 	int context = WBQtMapIniHighlighter::ContextOther;
-	int flagged = 0;
 	int i = -1;
 	int depth = 0;
 	// Where each still-open block was opened, so an unclosed one can name its own line.
@@ -1525,12 +1700,11 @@ void WBQtMapIniEditorDialog::rebuildErrorList()
 				const QString what = (problem == WBQtMapIniHighlighter::SyntaxStrayEnd)
 					? tr("End with no block open")
 					: tr("key with no value");
-				QListWidgetItem *item = new QListWidgetItem(
-					tr("%1:  %2  --  %3").arg(i + 1, 5).arg(line.trimmed()).arg(what),
-					m_errorList);
-				item->setData(Qt::UserRole, i);
-				item->setForeground(QBrush(QColor(200, 60, 60)));
-				++flagged;
+				LineIssue issue;
+				issue.line = i;
+				issue.text = tr("%1:  %2  --  %3").arg(i + 1, 5).arg(line.trimmed()).arg(what);
+				issue.syntax = true;
+				issues.append(issue);
 			}
 		}
 
@@ -1538,7 +1712,8 @@ void WBQtMapIniEditorDialog::rebuildErrorList()
 		int start = 0;
 		int length = 0;
 		WBQtMapIniHighlighter::NameKind kind = WBQtMapIniHighlighter::KindNone;
-		if (!checkableNameOnLineIn(line, context, &name, &start, &length, &kind))
+		if (!m_ui->checkNamesBox->isChecked()
+			|| !checkableNameOnLineIn(line, context, &name, &start, &length, &kind))
 		{
 			continue;
 		}
@@ -1546,12 +1721,11 @@ void WBQtMapIniEditorDialog::rebuildErrorList()
 		{
 			continue;
 		}
-		QListWidgetItem *item = new QListWidgetItem(
-			tr("%1:  %2").arg(i + 1, 5).arg(line.trimmed()), m_errorList);
-		// The line number the row jumps to; the text itself is only for reading.
-		item->setData(Qt::UserRole, i);
-		item->setForeground(QBrush(QColor(220, 140, 40)));
-		++flagged;
+		LineIssue issue;
+		issue.line = i;
+		issue.text = tr("%1:  %2").arg(i + 1, 5).arg(line.trimmed());
+		issue.syntax = false;
+		issues.append(issue);
 	}
 	// Blocks still open at end of file: each one is missing its End. Only knowable here, since
 	// the highlighter sees a line at a time and cannot tell "not closed yet" from "never closed".
@@ -1562,17 +1736,39 @@ void WBQtMapIniEditorDialog::rebuildErrorList()
 			const int lineNumber = openLines.at(n);
 			const QString lineText =
 				m_editor->document()->findBlockByNumber(lineNumber).text().trimmed();
-			QListWidgetItem *item = new QListWidgetItem(
-				tr("%1:  %2  --  block never closed (missing End)")
-					.arg(lineNumber + 1, 5).arg(lineText),
-				m_errorList);
-			item->setData(Qt::UserRole, lineNumber);
-			item->setForeground(QBrush(QColor(200, 60, 60)));
-			++flagged;
+			LineIssue issue;
+			issue.line = lineNumber;
+			issue.text = tr("%1:  %2  --  block never closed (missing End)")
+				.arg(lineNumber + 1, 5).arg(lineText);
+			issue.syntax = true;
+			issues.append(issue);
 		}
 	}
+	return issues;
+}
 
-	if (flagged == 0)
+void WBQtMapIniEditorDialog::rebuildErrorList(const QList<LineIssue> &issues)
+{
+	// The list refills on every edit; re-selecting by ROW would jump around as lines are fixed,
+	// so remember which file line was selected and restore that instead. Blocked so the restore
+	// does not fire the navigation slot and yank the cursor away from where you are typing.
+	int wasLine = -1;
+	if (m_errorList->currentItem() != NULL)
+	{
+		wasLine = m_errorList->currentItem()->data(Qt::UserRole).toInt();
+	}
+	const bool blocked = m_errorList->blockSignals(true);
+
+	m_errorList->clear();
+	for (int n = 0; n < issues.size(); ++n)
+	{
+		QListWidgetItem *item = new QListWidgetItem(issues.at(n).text, m_errorList);
+		// The line number the row jumps to; the text itself is only for reading.
+		item->setData(Qt::UserRole, issues.at(n).line);
+		item->setForeground(QBrush(issues.at(n).syntax ? QColor(200, 60, 60) : QColor(220, 140, 40)));
+	}
+
+	if (issues.isEmpty())
 	{
 		QListWidgetItem *item = new QListWidgetItem(
 			tr("No problems found."), m_errorList);
@@ -1594,12 +1790,382 @@ void WBQtMapIniEditorDialog::rebuildErrorList()
 		}
 	}
 	m_errorList->blockSignals(blocked);
+}
 
+void WBQtMapIniEditorDialog::refreshAnalysis()
+{
+	const QList<LineIssue> issues = collectIssues();
+	if (m_ui->showErrorsBox->isChecked())
+	{
+		rebuildErrorList(issues);
+	}
 	// The count goes on the checkbox, NOT the status label: that label follows the cursor, and
 	// with the pane open the cursor moves constantly, so a count there would be wiped the moment
 	// you clicked a row.
-	m_ui->showErrorsBox->setText(flagged > 0
-		? tr("Show errors (%1)").arg(flagged) : tr("Show errors"));
+	m_ui->showErrorsBox->setText(!issues.isEmpty()
+		? tr("Show errors (%1)").arg(issues.size()) : tr("Show errors"));
+
+	const QList<OutlineBlock> blocks = collectBlocks(issues);
+	QList<QPair<int, int> > ranges;
+	for (int b = 0; b < blocks.size(); ++b)
+	{
+		ranges.append(qMakePair(blocks.at(b).header, blocks.at(b).last));
+	}
+	m_editor->setFoldRanges(ranges);
+	rebuildOutline(blocks);
+}
+
+// The top-level blocks by the syntax check's depth rule, each with the issues inside it.
+QList<WBQtMapIniEditorDialog::OutlineBlock> WBQtMapIniEditorDialog::collectBlocks(
+	const QList<LineIssue> &issues) const
+{
+	QList<OutlineBlock> blocks;
+	int depth = 0;
+	int i = -1;
+	for (QTextBlock block = m_editor->document()->firstBlock(); block.isValid(); block = block.next())
+	{
+		++i;
+		const QString line = block.text();
+		// An engine block header in column 0 starts a new block, so a missing End cannot swallow the file.
+		if (depth > 0 && !line.isEmpty() && !line.at(0).isSpace())
+		{
+			const QString code = WBQtMapIniHighlighter::codePart(line);
+			const QStringList tokens = code.simplified().split(' ', QString::SkipEmptyParts);
+			if (!code.contains('=') && tokens.size() >= 2 && isEngineBlockType(tokens.at(0)))
+			{
+				depth = 0;
+			}
+		}
+		int depthAfter = depth;
+		WBQtMapIniHighlighter::checkLineSyntax(line, depth, &depthAfter);
+		if (depth == 0 && depthAfter > 0)
+		{
+			const QStringList tokens = WBQtMapIniHighlighter::codePart(line).simplified()
+				.split(' ', QString::SkipEmptyParts);
+			OutlineBlock outline;
+			outline.header = i;
+			outline.last = i;
+			outline.store = tokens.value(0);
+			outline.name = tokens.value(1);
+			outline.status = outlineStatus(outline.store, outline.name);
+			outline.issues = 0;
+			blocks.append(outline);
+		}
+		else if (depth > 0 && !blocks.isEmpty())
+		{
+			blocks.last().last = i;
+		}
+		depth = depthAfter;
+	}
+
+	// Blocks are in file order, so each issue finds its block by binary search.
+	for (int n = 0; n < issues.size(); ++n)
+	{
+		const int line = issues.at(n).line;
+		int lo = 0;
+		int hi = blocks.size() - 1;
+		int found = -1;
+		while (lo <= hi)
+		{
+			const int mid = (lo + hi) / 2;
+			if (blocks.at(mid).header <= line)
+			{
+				found = mid;
+				lo = mid + 1;
+			}
+			else
+			{
+				hi = mid - 1;
+			}
+		}
+		if (found >= 0 && line <= blocks.at(found).last)
+		{
+			blocks[found].issues++;
+		}
+	}
+	return blocks;
+}
+
+void WBQtMapIniEditorDialog::rebuildOutline(const QList<OutlineBlock> &blocks)
+{
+	// Same rows as before: only the lines moved, so the tree stays as it is.
+	bool sameShape = (blocks.size() == m_blocks.size());
+	for (int b = 0; sameShape && b < blocks.size(); ++b)
+	{
+		const OutlineBlock &now = blocks.at(b);
+		const OutlineBlock &was = m_blocks.at(b);
+		sameShape = (now.store == was.store && now.name == was.name
+			&& now.status == was.status && now.issues == was.issues);
+	}
+	m_blocks = blocks;
+	if (sameShape && m_outline->topLevelItemCount() > 0)
+	{
+		for (int g = 0; g < m_outline->topLevelItemCount(); ++g)
+		{
+			QTreeWidgetItem *group = m_outline->topLevelItem(g);
+			for (int c = 0; c < group->childCount(); ++c)
+			{
+				const OutlineBlock *outline = outlineBlockForItem(group->child(c));
+				if (outline != NULL)
+				{
+					group->child(c)->setToolTip(0, tr("%1 %2 -- line %3").arg(outline->store)
+						.arg(outline->name).arg(outline->header + 1));
+				}
+			}
+		}
+		return;
+	}
+
+	// Rebuilt: keep the collapsed groups, the selected block and the scroll position.
+	QSet<QString> collapsed;
+	for (int g = 0; g < m_outline->topLevelItemCount(); ++g)
+	{
+		if (!m_outline->topLevelItem(g)->isExpanded())
+		{
+			collapsed.insert(m_outline->topLevelItem(g)->data(0, Qt::UserRole + 1).toString());
+		}
+	}
+	QString selectedKey;
+	const OutlineBlock *selected = outlineBlockForItem(m_outline->currentItem());
+	if (selected != NULL)
+	{
+		selectedKey = selected->store + " " + selected->name;
+	}
+	const int scroll = m_outline->verticalScrollBar()->value();
+
+	const bool blocked = m_outline->blockSignals(true);
+	m_outline->clear();
+
+	// Objects first, then the other block types in the order the file first uses them.
+	QStringList order;
+	for (int b = 0; b < blocks.size(); ++b)
+	{
+		if (blocks.at(b).store == "Object")
+		{
+			order.append("Object");
+			break;
+		}
+	}
+	for (int b = 0; b < blocks.size(); ++b)
+	{
+		if (!order.contains(blocks.at(b).store))
+		{
+			order.append(blocks.at(b).store);
+		}
+	}
+
+	QTreeWidgetItem *current = NULL;
+	for (int s = 0; s < order.size(); ++s)
+	{
+		QTreeWidgetItem *group = new QTreeWidgetItem(m_outline);
+		group->setData(0, Qt::UserRole + 1, order.at(s));
+		QFont bold = group->font(0);
+		bold.setBold(true);
+		group->setFont(0, bold);
+		group->setFlags(group->flags() & ~Qt::ItemIsSelectable);
+
+		int count = 0;
+		int groupIssues = 0;
+		for (int b = 0; b < blocks.size(); ++b)
+		{
+			const OutlineBlock &outline = blocks.at(b);
+			if (outline.store != order.at(s))
+			{
+				continue;
+			}
+			++count;
+			groupIssues += outline.issues;
+			QTreeWidgetItem *item = new QTreeWidgetItem(group);
+			item->setText(0, outline.name.isEmpty() ? outline.store : outline.name);
+			item->setData(0, Qt::UserRole, b);
+			item->setToolTip(0, tr("%1 %2 -- line %3").arg(outline.store).arg(outline.name)
+				.arg(outline.header + 1));
+			if (outline.status >= 0)
+			{
+				item->setText(1, WBQtMapIniStatusText(outline.status));
+				item->setData(1, Qt::UserRole, WBQtMapIniStatusColour(outline.status));
+			}
+			if (outline.issues > 0)
+			{
+				item->setText(2, tr("%1 issue(s)").arg(outline.issues));
+				item->setData(2, Qt::UserRole, kIssueColour);
+			}
+			if (!selectedKey.isEmpty() && selectedKey == outline.store + " " + outline.name)
+			{
+				current = item;
+			}
+		}
+		group->setText(0, tr("%1  (%2)").arg(order.at(s)).arg(count));
+		if (groupIssues > 0)
+		{
+			group->setText(2, tr("%1 issue(s)").arg(groupIssues));
+			group->setData(2, Qt::UserRole, kIssueColour);
+		}
+		group->setExpanded(!collapsed.contains(order.at(s)));
+	}
+
+	if (current != NULL)
+	{
+		m_outline->setCurrentItem(current);
+	}
+	m_outline->verticalScrollBar()->setValue(scroll);
+	m_outline->blockSignals(blocked);
+	onOutlineFilterChanged(m_outlineFilter->text());
+}
+
+const WBQtMapIniEditorDialog::OutlineBlock *WBQtMapIniEditorDialog::outlineBlockForItem(
+	QTreeWidgetItem *item) const
+{
+	if (item == NULL || item->parent() == NULL)
+	{
+		return NULL;	// nothing, or a group row
+	}
+	bool ok = false;
+	const int index = item->data(0, Qt::UserRole).toInt(&ok);
+	if (!ok || index < 0 || index >= m_blocks.size())
+	{
+		return NULL;
+	}
+	return &m_blocks.at(index);
+}
+
+void WBQtMapIniEditorDialog::syncOutlineToCursor()
+{
+	const int line = m_editor->textCursor().blockNumber();
+	for (int g = 0; g < m_outline->topLevelItemCount(); ++g)
+	{
+		QTreeWidgetItem *group = m_outline->topLevelItem(g);
+		for (int c = 0; c < group->childCount(); ++c)
+		{
+			const OutlineBlock *outline = outlineBlockForItem(group->child(c));
+			if (outline != NULL && outline->header <= line && line <= outline->last)
+			{
+				if (m_outline->currentItem() != group->child(c))
+				{
+					const bool blocked = m_outline->blockSignals(true);
+					m_outline->setCurrentItem(group->child(c));
+					m_outline->blockSignals(blocked);
+				}
+				return;
+			}
+		}
+	}
+}
+
+void WBQtMapIniEditorDialog::onOutlineFilterChanged(const QString &text)
+{
+	const QString needle = text.trimmed();
+	for (int g = 0; g < m_outline->topLevelItemCount(); ++g)
+	{
+		QTreeWidgetItem *group = m_outline->topLevelItem(g);
+		const bool groupMatches = group->data(0, Qt::UserRole + 1).toString()
+			.contains(needle, Qt::CaseInsensitive);
+		int shown = 0;
+		for (int c = 0; c < group->childCount(); ++c)
+		{
+			QTreeWidgetItem *item = group->child(c);
+			const bool match = needle.isEmpty() || groupMatches
+				|| item->text(0).contains(needle, Qt::CaseInsensitive);
+			item->setHidden(!match);
+			if (match)
+			{
+				++shown;
+			}
+		}
+		group->setHidden(shown == 0);
+		if (!needle.isEmpty() && shown > 0)
+		{
+			group->setExpanded(true);
+		}
+	}
+}
+
+void WBQtMapIniEditorDialog::onOutlineItemClicked(QTreeWidgetItem *item, int column)
+{
+	Q_UNUSED(column);
+	const OutlineBlock *outline = outlineBlockForItem(item);
+	if (outline == NULL)
+	{
+		return;
+	}
+	m_editor->scrollLineToTop(outline->header);
+	// Focus stays on the outline, so the arrow keys keep stepping through the blocks.
+}
+
+void WBQtMapIniEditorDialog::onOutlineItemDoubleClicked(QTreeWidgetItem *item, int column)
+{
+	Q_UNUSED(column);
+	const OutlineBlock *outline = outlineBlockForItem(item);
+	if (outline == NULL)
+	{
+		return;
+	}
+	m_editor->setFolded(outline->header, !m_editor->isFolded(outline->header));
+}
+
+void WBQtMapIniEditorDialog::onOutlineContextMenu(const QPoint &pos)
+{
+	QTreeWidgetItem *item = m_outline->itemAt(pos);
+	const OutlineBlock *outline = outlineBlockForItem(item);
+	if (outline == NULL)
+	{
+		return;
+	}
+	const int header = outline->header;
+	const int last = outline->last;
+	const QString title = outline->name.isEmpty() ? outline->store : outline->store + " " + outline->name;
+
+	QMenu menu(this);
+	QAction *fold = menu.addAction(m_editor->isFolded(header) ? tr("Unfold") : tr("Fold"));
+	QAction *copy = menu.addAction(tr("Copy block"));
+	QAction *popOut = menu.addAction(tr("Pop out (read-only)"));
+	QAction *chosen = menu.exec(m_outline->viewport()->mapToGlobal(pos));
+	if (chosen == NULL)
+	{
+		return;
+	}
+
+	QStringList lines;
+	for (QTextBlock block = m_editor->document()->findBlockByNumber(header);
+			block.isValid() && block.blockNumber() <= last;
+			block = block.next())
+	{
+		lines.append(block.text());
+	}
+	const QString source = lines.join("\n");
+
+	if (chosen == fold)
+	{
+		m_editor->setFolded(header, !m_editor->isFolded(header));
+	}
+	else if (chosen == copy)
+	{
+		QApplication::clipboard()->setText(source);
+	}
+	else if (chosen == popOut)
+	{
+		// A snapshot of the block, for reading it beside the place you are editing.
+		QWidget *window = new QWidget(this, Qt::Window);
+		window->setAttribute(Qt::WA_DeleteOnClose);
+		window->setWindowTitle(tr("%1 -- line %2").arg(title).arg(header + 1));
+		QVBoxLayout *layout = new QVBoxLayout(window);
+		layout->setContentsMargins(4, 4, 4, 4);
+		WBQtMapIniCodeEditor *view = WBQtMapIniCodeEditor::createReadOnly(source, header + 1, window);
+		view->setFont(m_editor->font());
+		layout->addWidget(view);
+		window->resize(900, 640);
+		window->show();
+	}
+}
+
+void WBQtMapIniEditorDialog::onFoldAll()
+{
+	m_editor->setAllFolded(true);
+}
+
+void WBQtMapIniEditorDialog::onUnfoldAll()
+{
+	m_editor->setAllFolded(false);
 }
 
 void WBQtMapIniEditorDialog::onShowErrorsToggled(bool on)
@@ -1609,7 +2175,7 @@ void WBQtMapIniEditorDialog::onShowErrorsToggled(bool on)
 		// Listing the flagged lines while name checking is off would read as a contradiction
 		// (an empty list next to an unticked "Check names"), so switch it back on.
 		m_ui->checkNamesBox->setChecked(true);
-		rebuildErrorList();
+		refreshAnalysis();
 	}
 	// A second pane BELOW the text rather than a mode that replaces it (== the script editor's
 	// comment pane): the file stays visible and editable while the list is up, so clicking
@@ -1928,10 +2494,7 @@ void WBQtMapIniEditorDialog::rescanLocalNames()
 		m_highlighter->setLocalNames(found);
 		m_highlighter->rehighlight();
 	}
-	if (m_ui->showErrorsBox->isChecked())
-	{
-		rebuildErrorList();		// keep the filtered list in step with the text behind it
-	}
+	refreshAnalysis();		// keep the outline and the error list in step with the text
 }
 
 void WBQtMapIniEditorDialog::onCursorMoved()
@@ -1940,6 +2503,7 @@ void WBQtMapIniEditorDialog::onCursorMoved()
 	updateStatus(tr("Line %1, column %2")
 		.arg(cursor.blockNumber() + 1)
 		.arg(cursor.positionInBlock() + 1));
+	syncOutlineToCursor();
 }
 
 void WBQtMapIniEditorDialog::onFindNext()
@@ -2150,6 +2714,11 @@ void WBQtMapIniEditorDialog::savePosition()
 	WBQtMapIniEditor_SetProfileInt("Top", y());
 	WBQtMapIniEditor_SetProfileInt("Width", width());
 	WBQtMapIniEditor_SetProfileInt("Height", height());
+	const QList<int> sizes = m_outlineSplit->sizes();
+	if (!sizes.isEmpty())
+	{
+		WBQtMapIniEditor_SetProfileInt("OutlineWidth", sizes.at(0));
+	}
 }
 
 void WBQtMapIniEditorDialog::closeEvent(QCloseEvent *event)
@@ -2192,4 +2761,44 @@ extern "C" int WBQtMapIniEditor_Open(void *frameHwnd, const char *iniPath)
 	dlg->raise();
 	dlg->activateWindow();
 	return 1;
+}
+
+bool WBQtMapIniEditorDialog::hasUnsavedChangesTo(const QString &path) const
+{
+	return m_editor->document()->isModified() && QFileInfo(m_path) == QFileInfo(path);
+}
+
+void WBQtMapIniEditorDialog::reloadIfShowing(const QString &path)
+{
+	if (m_editor->document()->isModified() || QFileInfo(m_path) != QFileInfo(path))
+	{
+		return;
+	}
+	const int caret = m_editor->textCursor().position();
+	const int scroll = m_editor->verticalScrollBar()->value();
+	loadFile(m_path);
+	QTextCursor cursor = m_editor->textCursor();
+	cursor.setPosition(qMin(caret, m_editor->document()->characterCount() - 1));
+	m_editor->setTextCursor(cursor);
+	m_editor->verticalScrollBar()->setValue(scroll);
+}
+
+extern "C" int WBQtMapIniEditor_HasUnsavedChanges(const char *iniPath)
+{
+	WBQtMapIniEditorDialog *dlg = WBQtMapIniEditorDialog::instance();
+	if (dlg == NULL || iniPath == NULL)
+	{
+		return 0;
+	}
+	return dlg->hasUnsavedChangesTo(QString::fromLocal8Bit(iniPath)) ? 1 : 0;
+}
+
+extern "C" void WBQtMapIniEditor_ReloadIfOpen(const char *iniPath)
+{
+	WBQtMapIniEditorDialog *dlg = WBQtMapIniEditorDialog::instance();
+	if (dlg == NULL || iniPath == NULL)
+	{
+		return;
+	}
+	dlg->reloadIfShowing(QString::fromLocal8Bit(iniPath));
 }

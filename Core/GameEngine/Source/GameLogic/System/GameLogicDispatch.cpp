@@ -48,6 +48,9 @@
 #include "Common/BuildAssistant.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingTemplate.h"
+#include "Common/Team.h"
+#include "GameLogic/Module/BehaviorModule.h"
+#include "GameLogic/Module/CreateModule.h"
 #include "Common/Upgrade.h"
 #include "Common/StatsCollector.h"
 #include "Common/Radar.h"
@@ -226,6 +229,25 @@ static void doSetRallyPoint( Object *obj, const Coord3D& pos )
 static Player *getMessagePlayer(GameMessage *msg)
 {
 	return ThePlayerList->getNthPlayer( msg->getPlayerIndex() );
+}
+
+// ------------------------------------------------------------------------------------------------
+// Counts humans from the player list, so a live game and its replay answer the same. Observers
+// do not count: every skirmish and LAN game adds a hidden ReplayObserver player flagged human,
+// which would otherwise make a single player skirmish look like a two human game.
+// ------------------------------------------------------------------------------------------------
+static Bool hasMultipleHumanPlayers()
+{
+	Int humans = 0;
+	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+	{
+		Player *player = ThePlayerList->getNthPlayer( i );
+		if (player != nullptr && player->getPlayerType() == PLAYER_HUMAN && !player->isPlayerObserver())
+		{
+			++humans;
+		}
+	}
+	return humans > 1;
 }
 
 
@@ -713,6 +735,55 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			break;
 
 		}
+		//---------------------------------------------------------------------------------------------
+		// Debug/cheat spawn of a single object for the message's player.
+		// This is dispatched through the logic instead of being created directly by the chat command
+		// in the client, because W3DModelDraw only validates its public bones, turret info and weapon
+		// barrel info while TheGameLogic is inside its update (see isValidTimeToCalcLogicStuff).
+		// Creating the object outside of that leaves the drawable uninitialized: muzzle flashes stay
+		// visible, turrets do not track, and giving the object an order can crash.
+		case GameMessage::MSG_SPAWN_OBJECT_AT_POSITION:
+		{
+			// The chat command only sends this outside multiplayer, so reject one a modified client sent.
+			if( hasMultipleHumanPlayers() )
+			{
+				break;
+			}
+
+			const Coord3D pos = msg->getArgument( 1 )->location;
+
+			const ThingTemplate *tmpl = TheThingFactory->findByTemplateID( (UnsignedShort)msg->getArgument( 0 )->integer );
+			if( tmpl == nullptr )
+				break;
+
+			Team *team = msgPlayer->getDefaultTeam();
+			if( team == nullptr )
+				break;
+
+			Object *obj = TheThingFactory->newObject( tmpl, team );
+			if( obj == nullptr )
+				break;
+
+			obj->setPosition( &pos );
+			obj->setOrientation( 0.0f );
+
+			// onCreate() already ran in the constructor, but the game side CreateModules still need to
+			// run so that upgrades are granted, weapons are locked and special powers are registered.
+			for( BehaviorModule **m = obj->getBehaviorModules(); m && *m; ++m )
+			{
+				CreateModuleInterface *create = (*m)->getCreate();
+				if( create == nullptr )
+					continue;
+
+				create->onBuildComplete();
+			}
+
+			// Creation is another valid and essential time to call this. This object now Looks.
+			obj->handlePartitionCellMaintenance();
+
+			break;
+
+		}
 
 		//---------------------------------------------------------------------------------------------
 		case GameMessage::MSG_EXIT:
@@ -723,6 +794,16 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 		case GameMessage::MSG_EVACUATE:
 		{
 			onEvacuate(msg, currentlySelectedGroup);
+			break;
+		}
+		case GameMessage::MSG_EVACUATE_TO_WORK:
+		{
+			if( currentlySelectedGroup )
+			{
+				currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);
+				currentlySelectedGroup->groupEvacuateToWork( CMD_FROM_PLAYER );
+			}
+
 			break;
 		}
 		case GameMessage::MSG_EXECUTE_RAILED_TRANSPORT:
@@ -831,6 +912,14 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			onToggleOvercharge(msg, currentlySelectedGroup);
 			break;
 		}
+
+		// Auto-pop, switch between two states of tunnel.
+		case GameMessage::MSG_TOGGLE_TUNNEL_AUTO_POP:
+		{
+			onToggleTunnelAutoPop(msg, currentlySelectedGroup);
+			break;
+		}
+
 		// TheSuperHackers @feature Hold Fire stance.
 		case GameMessage::MSG_TOGGLE_HOLD_FIRE:
 		{
@@ -987,6 +1076,18 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			onPurchaseScience(msg);
 			break;
 		}
+#if RTS_ZEROHOUR
+		case GameMessage::MSG_SET_DIPLOMACY_STANCE:
+		{
+			onSetDiplomacyStance(msg);
+			break;
+		}
+		case GameMessage::MSG_ENABLE_LOBBY_RULE:
+		{
+			onEnableLobbyRule(msg);
+			break;
+		}
+#endif
 	}
 
 #if RETAIL_COMPATIBLE_AIGROUP
@@ -1723,6 +1824,7 @@ bool GameLogic::onEvacuate(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlyS
 {
 	// issue command for either single object or for selected group
 	//	AIGroup *group = TheAI->findGroup( *selectedGroupID );
+
 	if( currentlySelectedGroup )
 	{
 		//Coord3D pos;
@@ -2378,6 +2480,15 @@ bool GameLogic::onToggleOvercharge(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &cu
 	// use the selected group
 	if( currentlySelectedGroup )
 		currentlySelectedGroup->groupToggleOvercharge( CMD_FROM_PLAYER );
+
+	return true;
+}
+
+bool GameLogic::onToggleTunnelAutoPop(MAYBE_UNUSED GameMessage* msg, AIGroupPtr& currentlySelectedGroup)
+{
+	// use the selected group
+	if (currentlySelectedGroup)
+		currentlySelectedGroup->groupToggleTunnelAutoPop(CMD_FROM_PLAYER);
 
 	return true;
 }

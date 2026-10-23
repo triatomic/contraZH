@@ -97,6 +97,11 @@
 #include "W3DDevice/GameClient/W3DSmudge.h"
 #include "W3DDevice/GameClient/W3DBloom.h"
 #include "W3DDevice/GameClient/W3DShockwave.h"
+#include "W3DDevice/GameClient/W3DDisruption.h"
+#include "W3DDevice/GameClient/W3DStorm.h"
+#include "W3DDevice/GameClient/W3DColorLut.h"
+#include "W3DDevice/GameClient/W3DHeadlight.h"
+#include "W3DDevice/GameClient/W3DPlanarMirror.h"
 #include "W3DDevice/GameClient/W3DSoftParticles.h"
 #include "W3DDevice/GameClient/W3DAmbientOcclusion.h"
 #include "W3DDevice/GameClient/W3DLaserGlow.h"
@@ -443,6 +448,31 @@ void BaseHeightMapRenderObjClass::ReleaseResources()
 	if (TheW3DShockwaves)
 	{
 		TheW3DShockwaves->ReleaseResources();
+	}
+
+	if (TheW3DDisruption)
+	{
+		TheW3DDisruption->ReleaseResources();
+	}
+
+	if (TheW3DStorms)
+	{
+		TheW3DStorms->ReleaseResources();
+	}
+
+	if (TheW3DColorLut)
+	{
+		TheW3DColorLut->ReleaseResources();
+	}
+
+	if (TheW3DHeadlights)
+	{
+		TheW3DHeadlights->ReleaseResources();
+	}
+
+	if (TheW3DPlanarMirrors)
+	{
+		TheW3DPlanarMirrors->ReleaseResources();
 	}
 
 	if (TheW3DSoftParticles)
@@ -1309,7 +1339,7 @@ Bool BaseHeightMapRenderObjClass::isClearLineOfSight(const Coord3D& pos, const C
 	// seems acceptable accuracy. If performance here is inadequate,
 	// we can try increasing the step size, but be sure to retest
 	// accuracy.
-	Real len = ceilf(sqrtf(fdx*fdx + fdy*fdy));
+	Real len = WWMath::Ceilf(WWMath::Sqrtf(fdx*fdx + fdy*fdy));
 	const Real STEP_LEN = 2.0f;
 	Int numSteps = REAL_TO_INT_CEIL(len / STEP_LEN);
 	if (numSteps < 1) numSteps = 1;
@@ -1612,7 +1642,7 @@ Bool BaseHeightMapRenderObjClass::evaluateAsVisibleCliff(Int xIndex, Int yIndex,
 	{
 		0.0f,
 		1.0 * MAP_XY_FACTOR,
-		sqrt(2.0f) * MAP_XY_FACTOR,
+		(Real)(WWMath::Sqrt(2.0) * MAP_XY_FACTOR),
 		1.0 * MAP_XY_FACTOR,
 	};
 
@@ -1637,7 +1667,7 @@ Bool BaseHeightMapRenderObjClass::evaluateAsVisibleCliff(Int xIndex, Int yIndex,
 	Bool anyImpassable = FALSE;
 
 	for (Int i = 1; i < 4 && !anyImpassable; ++i) {
-		if (fabs((heights[i] - heights[0]) / distance[i]) > valuesGreaterThanRad) {
+		if (WWMath::Fabs((heights[i] - heights[0]) / distance[i]) > valuesGreaterThanRad) {
 			anyImpassable = TRUE;
 		}
 	}
@@ -2027,7 +2057,7 @@ void BaseHeightMapRenderObjClass::updateViewImpassableAreas(Bool partial, Int mi
 	}
 
 	// save calculating the tangent over and over again.
-	Real tanImpassableRad = tan(m_curImpassableSlope / 360.f * 2 * PI);
+	Real tanImpassableRad = WWMath::Tan(m_curImpassableSlope / 360.f * 2 * PI);
 	for (Int j = minY; j < maxY; ++j) {
 		for (Int i = minX; i < maxX; ++i) {
 			m_showAsVisibleCliff[i + j * xSize] = evaluateAsVisibleCliff(i, j, tanImpassableRad);
@@ -2860,13 +2890,13 @@ void BaseHeightMapRenderObjClass::renderShoreLinesSorted(CameraClass *pCamera)
 					for (Int k=lastRenderedTile; k<sortInfo->numTiles; k++)
 					{
 						Int tileY = shoreInfo->m_xy >> 16;
-						if (tileY < startY)
+						if (tileY >= edgeY)
+							break;	//since tiles are x-sorted, there will not be any visible ones after this one.
+
+						if (tileY < startY || isCellCulled(x, tileY))
 						{	shoreInfo++;	//advance to next tile.
 							continue;	//this tile is not visible
 						}
-
-						if (tileY >= edgeY)
-							break;	//since tiles are x-sorted, there will not be any visible ones after this one.
 
 						if (vertexCount >= (DEFAULT_MAX_BATCH_SHORELINE_TILES*4))
 						{	lastRenderedTile=k;
@@ -2981,13 +3011,13 @@ flushVertexBuffer0:
 					for (Int k=lastRenderedTile; k<sortInfo->numTiles; k++)
 					{
 						Int tileX = shoreInfo->m_xy & 0xffff;
-						if (tileX < startX)
+						if (tileX >= edgeX)
+							break;	//since tiles are x-sorted, there will not be any visible ones after this one.
+
+						if (tileX < startX || isCellCulled(tileX, y))
 						{	shoreInfo++;	//advance to next tile.
 							continue;	//this tile is not visible
 						}
-
-						if (tileX >= edgeX)
-							break;	//since tiles are x-sorted, there will not be any visible ones after this one.
 
 						if (vertexCount >= (DEFAULT_MAX_BATCH_SHORELINE_TILES*4))
 						{	lastRenderedTile=k;

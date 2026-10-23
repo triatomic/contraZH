@@ -153,12 +153,9 @@ public:
 	void clear();
 
 	/**
-		add a nugget to the list. It belongs to the FXList, who is responsible for freeing it.
+		add a nugget to the list. It belongs to the Store, so lists can share it.
 	*/
-	void addFXNugget(FXNugget *fxn)
-	{
-		m_nuggets.push_back(fxn);
-	}
+	void addFXNugget(FXNugget *fxn);
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	// TheSuperHackers @feature The FXList's own name, kept only so nuggets can stamp it onto the
@@ -208,7 +205,7 @@ private:
 
 	typedef std::list< FXNugget* > FXNuggetList;
 
-	FXNuggetList m_nuggets;
+	FXNuggetList m_nuggets;				///< owned by the Store, not this list
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	AsciiString m_name;						///< this list's own name, debug overlay only
 #endif
@@ -238,6 +235,9 @@ public:
 	const FXList *findFXList( const char* name ) const;
 
 	static void parseFXListDefinition(INI* ini);
+	static void parseFXListExtendDefinition(INI* ini);
+
+	void addFXNugget(FXNugget *fxn);
 
 private:
 
@@ -245,6 +245,9 @@ private:
 	typedef std::hash_map< NameKeyType, FXList, rts::hash<NameKeyType>, rts::equal_to<NameKeyType>/**/> FXListMap;
 
 	FXListMap m_fxmap;
+
+	typedef std::vector< FXNugget* > FXNuggetVector;
+	FXNuggetVector m_nuggets;			///< every list's nuggets, deleted with the Store
 
 };
 

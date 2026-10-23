@@ -123,7 +123,7 @@ public:
 			{ "CapturePingFX", INI::parseFXList, NULL, offsetof(ProximityCaptureUpdateModuleData, m_capturePingFX) },
 			{ "CapturePingContestedFX", INI::parseFXList, NULL, offsetof(ProximityCaptureUpdateModuleData, m_capturePingContestedFX) },
 			{ "SkillPointsForCapture", INI::parseInt, NULL, offsetof(ProximityCaptureUpdateModuleData, m_skillPointsForCapture) },
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
     p.add(dataFieldParse);
 	}

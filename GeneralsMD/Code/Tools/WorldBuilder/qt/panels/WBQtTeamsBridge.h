@@ -1,9 +1,8 @@
 // WBQtTeamsBridge.h -- opaque facade for the Qt Teams dialog (Tier 3b-2).
 //
 // Model: the MFC CTeamsDialog is created HIDDEN and stays the model owner -- its working-copy
-// m_sides, the new/copy/delete/move-team logic, the team property sheet (still the MFC
-// CPropertySheet in this stage), the fix-owner validation and the import/export file flow are
-// all reused verbatim. The Qt dialog reads the hidden list-control/listbox contents back
+// m_sides, the new/copy/delete/move-team logic, the fix-owner validation and the import/export
+// file flow are all reused verbatim; the team property sheet is the Qt WBQtTeamSheetDialog. The Qt dialog reads the hidden list-control/listbox contents back
 // (updateUI keeps them canonical) and pushes actions through the real handlers, via qt* member
 // functions defined in src/WBQtTeamsBridge.cpp. Plain C surface (int / const char* only).
 #ifndef WB_QT_TEAMS_BRIDGE_H
@@ -70,6 +69,19 @@ int  WBQtTeams_ReplaceUnitName(const char *from, const char *to);
 // 1 when the team templates still name at least one unit type that has no template, i.e. the
 // Fix Missing Units button has something to do.
 int  WBQtTeamsData_HasMissingUnits(void);
+
+// One value of a team row's dictionary by key name ("teamHome", "teamUnitType1", ...), as text;
+// booleans come back as 1/0, and an unset key as an empty string.
+void WBQtTeamsData_GetTeamField(int row, const char *key, char *buf, int cap);
+// How many teams player i owns.
+int  WBQtTeamsData_GetPlayerTeamCount(int i);
+// The "New design" setting: 1 opens the redesigned Team Builder and sheet, 0 the originals.
+int  WBQtTeams_GetNewDesign(void);
+void WBQtTeams_SetNewDesign(int on);
+// 1 when `name` is an object template the game data defines.
+int  WBQtTeamsData_IsTemplate(const char *name);
+// The working copy's script named `name` as its IF / THEN / ELSE text; empty when there is none.
+void WBQtTeamsData_GetScriptText(const char *name, char *buf, int cap);
 
 // --- the Qt team property sheet (Tier 3b-3): four HIDDEN Team* pages bound to the current
 // team; the Qt sheet drives their real controls and sends the real WM_COMMAND notifications,

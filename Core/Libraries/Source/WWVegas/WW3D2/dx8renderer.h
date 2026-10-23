@@ -338,6 +338,20 @@ struct DX8InstancingStatsStruct
 	enum { SCENE_MAIN, SCENE_SHADOW_DEPTH, SCENE_COUNT };
 	enum { SIZE_CLASSES = 4, MAX_PASSES = 8 };
 
+	// Whether each mesh's material pass drew batched in a window, and why it drew alone otherwise.
+	enum
+	{
+		PASS_PATH_WINDOW,			// batched in a window
+		PASS_PATH_NOT_LIT,			// outside the instanced main scene
+		PASS_PATH_SORTING,			// a sorting container
+		PASS_PATH_UNBOUND,			// a container without static buffers
+		PASS_PATH_NOT_WINDOW_PASS,	// a pass instancing does not redraw, or culled per polygon
+		PASS_PATH_OVERRIDE,			// a mesh with a material pass override
+		PASS_PATH_SKIN,				// a skin mesh
+		PASS_PATH_DELAYED,			// a pass held back for the delayed list
+		PASS_PATH_COUNT
+	};
+
 	struct SceneStruct
 	{
 		int	RigidDraws;
@@ -350,6 +364,8 @@ struct DX8InstancingStatsStruct
 	const MaterialPassClass *	Passes[MAX_PASSES];
 	int								PassDraws[MAX_PASSES];
 	int								OtherPassDraws;
+	int								PassPaths[PASS_PATH_COUNT];
+	int								PassWindows;	// windows drawn, each installing its passes once
 };
 
 /**
@@ -388,6 +404,8 @@ public:
 	static void				Record_Eligible_Group(int draws);
 	static void				Record_Instanced_Group(int draws);
 	static void				Record_Material_Pass(const MaterialPassClass* pass, int draws);
+	static void				Record_Material_Pass_Path(int path) { instancing_stats.PassPaths[path]++; }
+	static void				Record_Material_Pass_Window() { instancing_stats.PassWindows++; }
 	static void				Take_Instancing_Stats(DX8InstancingStatsStruct& stats);
 
 	void						Log_Statistics_String(bool only_visible);

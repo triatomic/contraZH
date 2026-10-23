@@ -77,7 +77,7 @@ public:
 			{ "Animation2DBase",		parseAnimBaseName,					NULL, 0 },
 			{ "Animation2DTimed",		parseAnimTimedName,					NULL, 0 },
 			{ "ShowTimer",		INI::parseBool,					NULL, offsetof( StickyBombUpdateModuleData, m_showTimer) },
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
     p.add(dataFieldParse);
 	}

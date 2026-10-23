@@ -30,6 +30,27 @@ int  WBQtTerrainMaterial_GetTexClassCount(void);
 int  WBQtTerrainMaterial_GetTexClassEntry(int texClass, char *pathOut, char *leafOut, int cap);
 // The lower-cased UI name, for the search filter (matches TerrainMaterial::OnSearch).
 int  WBQtTerrainMaterial_GetTexClassUiName(int texClass, char *nameOut, int cap);
+// The Terrain.ini name of a class. Returns 0 for eval textures and blend edges.
+int  WBQtTerrainMaterial_GetTexClassTerrainName(int texClass, char *nameOut, int cap);
+// The class' Terrain.ini keys as parsed; returns 0 for eval textures.
+int  WBQtTerrainMaterial_GetTerrainKeys(int texClass, int *blendEdges, int *restrictConstruction, double *glintStrength, double *glintGloss);
+enum { WBQT_TERRAIN_KEY_RESTRICT = 1, WBQT_TERRAIN_KEY_GLINT_STRENGTH = 2, WBQT_TERRAIN_KEY_GLINT_GLOSS = 4 };
+// Writes the changedKeys (WBQT_TERRAIN_KEY_* bits) to the loose Terrain.ini; returns 0 with the reason in errorOut.
+int  WBQtTerrainMaterial_SetTerrainKeys(int texClass, int changedKeys, int restrictConstruction, double glintStrength, double glintGloss, char *errorOut, int cap);
+
+// --- WorldBuilder-only brushes from WorldBuilderQt\*.ini (TerrainBrushes). ------------------
+int  WBQtTerrainMaterial_GetBrushAliasCount(void);
+// Returns 0 when the alias' terrain has no loaded texture.
+int  WBQtTerrainMaterial_GetBrushAliasEntry(int index, int *texClassOut, char *pathOut, char *leafOut, char *nameOut, int cap);
+// Returns the texture class the new brush paints, or -1; errorOut can hold a warning even on success.
+int  WBQtTerrainMaterial_CreateBrush(const char *name, const char *category, const char *terrain, const char *texture,
+	int blendEdges, int restrictConstruction, double glintStrength, double glintGloss, char *errorOut, int cap);
+// The game-relative terrain texture folder ("Art/Terrain/").
+int  WBQtTerrainMaterial_GetTerrainTextureDir(char *dirOut, int cap);
+// Previews are bottom-up BGRA; each call returns the side length in pixels, or 0.
+int  WBQtTerrainMaterial_GetPreviewMaxExtent(void);
+int  WBQtTerrainMaterial_GetTexClassPreview(int texClass, unsigned char *bgraOut, int cap);
+int  WBQtTerrainMaterial_GetTexturePreview(const char *texture, unsigned char *bgraOut, int cap);
 
 // --- Selection. The fg/bg class indices are the statics the tools read. Selecting a class
 //     validates the size (canFitTexture) and returns 0 (with the class still set) if it does
@@ -84,6 +105,10 @@ int  WBQtTerrainMaterial_GetPaintDensity(void);
 // --- No-mixing toggle (multi-tile only). Mirrors OnToggleNoMixing. -------------------------
 void WBQtTerrainMaterial_SetNoMixing(int on);
 int  WBQtTerrainMaterial_IsNoMixing(void);
+
+// --- Water-only painting. Texture paint skips cells outside the water areas. ----------------
+void WBQtTerrainMaterial_SetPaintWaterOnly(int on);
+int  WBQtTerrainMaterial_IsPaintWaterOnly(void);
 
 // --- Copy mode (texture / terrain / raise-only + select / apply + rotation). Mirrors
 //     OnCopyMode / OnCopyModeTerrain / OnRaiseOnly / OnCopySelect / OnCopyApply / OnRotate*. -

@@ -203,21 +203,25 @@ void W3DAmbientOcclusion::render(RenderInfoClass &rinfo)
 		return;
 	}
 
-	// The targets share the depth's pixel grid, so one uv reads both.
+	// The passes work in uv, so under supersampling the occlusion is computed at the screen's size and read up from there.
 	D3DSURFACE_DESC depthDesc;
 	D3DSURFACE_DESC targetDesc;
 	depthTexture->GetLevelDesc(0, &depthDesc);
 	sceneTarget->GetDesc(&targetDesc);
+	const Real scale = DX8Wrapper::Get_Super_Sampling();
+	const UnsignedInt occlusionWidth = max((UnsignedInt)(depthDesc.Width / scale + 0.5f), 1u);
+	const UnsignedInt occlusionHeight = max((UnsignedInt)(depthDesc.Height / scale + 0.5f), 1u);
 	if (targetDesc.Width != depthDesc.Width || targetDesc.Height != depthDesc.Height ||
-		targetDesc.MultiSampleType != D3DMULTISAMPLE_NONE || !acquireTargets(depthDesc.Width, depthDesc.Height))
+		targetDesc.MultiSampleType != D3DMULTISAMPLE_NONE || !acquireTargets(occlusionWidth, occlusionHeight))
 	{
 		sceneTarget->Release();
 		sceneDepth->Release();
 		return;
 	}
 
-	const Real width = (Real)depthDesc.Width;
-	const Real height = (Real)depthDesc.Height;
+	const Real width = (Real)occlusionWidth;
+	const Real height = (Real)occlusionHeight;
+	const Vector4 sceneMap = W3DShaderManager::getClipToTargetMapping((Real)depthDesc.Width, (Real)depthDesc.Height);
 
 	rinfo.Camera.Apply();
 	D3DMATRIX projection;
@@ -314,7 +318,12 @@ void W3DAmbientOcclusion::render(RenderInfoClass &rinfo)
 				const Vector4 down(0.0f, 1.0f / height, 1.0f / BLUR_DEPTH_TOLERANCE, 0.0f);
 				DX8Wrapper::Set_Pixel_Shader_Constant(1, &down, 1);
 				device->SetTexture(1, m_target[TARGET_BLUR]);
-				W3DShaderManager::drawClipQuad(cameraMap);
+				if (occlusionWidth != depthDesc.Width)
+				{
+					DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+					DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+				}
+				W3DShaderManager::drawClipQuad(sceneMap);
 			}
 		}
 	}

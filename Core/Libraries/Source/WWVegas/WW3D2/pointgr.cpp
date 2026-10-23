@@ -87,6 +87,13 @@
 #include "camera.h"
 #include "dx8fvf.h"
 #include "sortingrenderer.h"
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+#include "dx8caps.h"
+#include "dx8vertexshading.h"
+#include <stddef.h>
+#include <stdlib.h>
+#include <vector>
+#endif
 
 // Upgraded to DX8 2/2/01 HY
 
@@ -135,6 +142,271 @@ VectorClass<Vector2>			VertexUV;		// vertex texture coords
 DX8IndexBufferClass			*Tris, *Quads;						// Index buffers.
 SortingIndexBufferClass		*SortingTris, *SortingQuads;	// Sorting index buffers.
 
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+
+enum { BILLBOARD_BUFFER_COUNT = 8192 };
+
+static IDirect3DVertexShader9 *BillboardShader = nullptr;
+static IDirect3DVertexDeclaration9 *BillboardDeclaration = nullptr;
+static IDirect3DVertexBuffer9 *BillboardInstances = nullptr;
+static DX8VertexBufferClass *BillboardQuad = nullptr;
+static DX8VertexBufferClass *BillboardFallback = nullptr;
+static unsigned BillboardBufferUsed = BILLBOARD_BUFFER_COUNT;
+
+static bool Billboard_Instancing_Enabled()
+{
+	const char *value = getenv("CONTRA_PARTICLE_INSTANCING");
+	return value == nullptr || atoi(value) != 0;
+}
+
+static const bool BillboardInstancingEnabled = Billboard_Instancing_Enabled();
+
+void PointGroupClass::Set_Billboard_Shader(IDirect3DVertexShader9 *shader)
+{
+	BillboardShader = shader;
+}
+
+void PointGroupClass::Release_Billboard_Resources()
+{
+	REF_PTR_RELEASE(BillboardQuad);
+	REF_PTR_RELEASE(BillboardFallback);
+	SAFE_RELEASE(BillboardInstances);
+	SAFE_RELEASE(BillboardDeclaration);
+	BillboardBufferUsed = BILLBOARD_BUFFER_COUNT;
+}
+
+static bool Create_Billboard_Resources()
+{
+	IDirect3DDevice9 *device = DX8Wrapper::_Get_D3D_Device8();
+	if (BillboardDeclaration == nullptr)
+	{
+		const D3DVERTEXELEMENT9 elements[] =
+		{
+			{ 0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0 },
+			{ 0, 12, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0 },
+			{ 1, (WORD)offsetof(BillboardInstance, Position), D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 4 },
+			{ 1, (WORD)offsetof(BillboardInstance, Rotation), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 5 },
+			{ 1, (WORD)offsetof(BillboardInstance, Color), D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0 },
+			{ 1, (WORD)offsetof(BillboardInstance, UVRect), D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 6 },
+			{ 1, (WORD)offsetof(BillboardInstance, Triangle), D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 7 },
+			D3DDECL_END()
+		};
+		if (FAILED(device->CreateVertexDeclaration(elements, &BillboardDeclaration)))
+		{
+			return false;
+		}
+	}
+	if (BillboardInstances == nullptr && FAILED(device->CreateVertexBuffer(BILLBOARD_BUFFER_COUNT * sizeof(BillboardInstance),
+		D3DUSAGE_DYNAMIC | D3DUSAGE_WRITEONLY, 0, D3DPOOL_DEFAULT, &BillboardInstances, nullptr)))
+	{
+		return false;
+	}
+	if (BillboardQuad == nullptr)
+	{
+		const Vector3 positions[] =
+		{
+			Vector3(-0.5f, 0.5f, 0.0f), Vector3(-0.5f, -0.5f, 0.0f),
+			Vector3(0.5f, -0.5f, 0.0f), Vector3(0.5f, 0.5f, 0.0f)
+		};
+		const Vector2 uvs[] =
+		{
+			Vector2(0.0f, 0.0f), Vector2(0.0f, 1.0f), Vector2(1.0f, 1.0f), Vector2(1.0f, 0.0f)
+		};
+		BillboardQuad = NEW_REF(DX8VertexBufferClass, (positions, uvs, 4));
+	}
+	return true;
+}
+
+static bool Can_Instance_Billboards()
+{
+	if (!BillboardInstancingEnabled || BillboardShader == nullptr)
+	{
+		return false;
+	}
+	const DX8Caps *caps = DX8Wrapper::Get_Current_Caps();
+	IDirect3DDevice9 *device = DX8Wrapper::_Get_D3D_Device8();
+	if (caps->Get_Vertex_Shader_Major_Version() < 3 || caps->Get_DX8_Caps().MaxStreams < 2 ||
+		caps->Get_DX8_Caps().MaxStreamStride < sizeof(BillboardInstance) ||
+		!(caps->Get_DX8_Caps().DevCaps2 & D3DDEVCAPS2_STREAMOFFSET) ||
+		!(caps->Get_DX8_Caps().DevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT) || device->GetSoftwareVertexProcessing())
+	{
+		return false;
+	}
+	DX8Wrapper::Apply_Render_State_Changes();
+	Vector4 fog;
+	return !DX8VertexShadingClass::Are_Clip_Planes_Enabled() && DX8VertexShadingClass::Get_Fog_Constant(fog) && Create_Billboard_Resources();
+}
+
+static bool Draw_Instanced_Billboards(const BillboardInstance *instances, unsigned count, bool triangles)
+{
+	if (!Can_Instance_Billboards())
+	{
+		return false;
+	}
+	DWORD flags = D3DLOCK_NOOVERWRITE;
+	if (BillboardBufferUsed + count > BILLBOARD_BUFFER_COUNT)
+	{
+		BillboardBufferUsed = 0;
+		flags = D3DLOCK_DISCARD;
+	}
+	const unsigned offset = BillboardBufferUsed * sizeof(BillboardInstance);
+	void *data = nullptr;
+	if (FAILED(BillboardInstances->Lock(offset, count * sizeof(BillboardInstance), &data, flags)))
+	{
+		BillboardBufferUsed = BILLBOARD_BUFFER_COUNT;
+		return false;
+	}
+	memcpy(data, instances, count * sizeof(BillboardInstance));
+	if (FAILED(BillboardInstances->Unlock()))
+	{
+		BillboardBufferUsed = BILLBOARD_BUFFER_COUNT;
+		return false;
+	}
+	BillboardBufferUsed += count;
+
+	DX8Wrapper::Set_Vertex_Buffer(BillboardQuad);
+	DX8Wrapper::Set_Index_Buffer(Quads, 0);
+	DX8Wrapper::Apply_Render_State_Changes();
+	Vector4 constants[DX8VertexShadingClass::CONSTANT_COUNT];
+	DX8VertexShadingClass::Get_View_Constants(constants);
+	DX8VertexShadingClass::Get_Fog_Constant(constants[DX8VertexShadingClass::CONSTANT_FOG]);
+	DX8VertexShadingClass::Get_Stage_Constants(&constants[DX8VertexShadingClass::CONSTANT_STAGE_SOURCE], &constants[DX8VertexShadingClass::CONSTANT_STAGE_COLUMNS]);
+	DX8Wrapper::Set_Vertex_Shader_Constant(0, constants, 7);
+	DX8Wrapper::Set_Vertex_Shader_Constant(DX8VertexShadingClass::CONSTANT_FOG, &constants[DX8VertexShadingClass::CONSTANT_FOG], 1);
+	DX8Wrapper::Set_Vertex_Shader_Constant(DX8VertexShadingClass::CONSTANT_STAGE_SOURCE, &constants[DX8VertexShadingClass::CONSTANT_STAGE_SOURCE],
+		DX8VertexShadingClass::CONSTANT_COUNT - DX8VertexShadingClass::CONSTANT_STAGE_SOURCE);
+
+	DX8Wrapper::Begin_Instanced_Drawing(BillboardDeclaration, BillboardShader);
+	DX8Wrapper::Draw_Instanced_Triangles(0, triangles ? 1 : 2, 0, triangles ? 3 : 4, BillboardInstances, offset, sizeof(BillboardInstance), count);
+	DX8Wrapper::End_Instanced_Drawing();
+	return true;
+}
+
+void PointGroupClass::Draw_Billboards(const BillboardInstance *instances, unsigned count, bool triangles)
+{
+	while (count != 0)
+	{
+		unsigned batch = std::min<unsigned>(count, BILLBOARD_BUFFER_COUNT);
+		if (!Draw_Instanced_Billboards(instances, batch, triangles))
+		{
+			batch = std::min<unsigned>(count, MAX_QUAD_POINTS);
+			const unsigned corners = triangles ? 3 : 4;
+			if (BillboardFallback == nullptr)
+			{
+				BillboardFallback = NEW_REF(DX8VertexBufferClass, (dynamic_fvf_type, MAX_VB_SIZE, DX8VertexBufferClass::USAGE_DYNAMIC));
+			}
+			{
+				VertexBufferClass::WriteLockClass lock(BillboardFallback, D3DLOCK_DISCARD);
+				VertexFormatXYZNDUV2 *destination = static_cast<VertexFormatXYZNDUV2 *>(lock.Get_Vertex_Array());
+				memset(destination, 0, batch * corners * sizeof(VertexFormatXYZNDUV2));
+				const Vector3 positions[] =
+				{
+					Vector3(-0.5f, 0.5f, 0.0f), Vector3(-0.5f, -0.5f, 0.0f),
+					Vector3(0.5f, -0.5f, 0.0f), Vector3(0.5f, 0.5f, 0.0f)
+				};
+				const Vector2 uvs[] = { Vector2(0.0f, 0.0f), Vector2(0.0f, 1.0f), Vector2(1.0f, 1.0f), Vector2(1.0f, 0.0f) };
+				for (unsigned i = 0; i < batch; ++i)
+				{
+					const BillboardInstance &instance = instances[i];
+					for (unsigned j = 0; j < corners; ++j)
+					{
+						const unsigned corner = instance.Triangle != 0.0f ? (j + 2) % 4 : j;
+						const Vector3 &p = positions[corner];
+						VertexFormatXYZNDUV2 &vertex = destination[i * corners + j];
+						vertex.x = instance.Position.X + (p.X * instance.Rotation.X - p.Y * instance.Rotation.Y) * instance.Size;
+						vertex.y = instance.Position.Y + (p.X * instance.Rotation.Y + p.Y * instance.Rotation.X) * instance.Size;
+						vertex.z = instance.Position.Z;
+						vertex.diffuse = instance.Color;
+						vertex.u1 = instance.UVRect.X + uvs[corner].X * (instance.UVRect.Z - instance.UVRect.X);
+						vertex.v1 = instance.UVRect.Y + uvs[corner].Y * (instance.UVRect.W - instance.UVRect.Y);
+					}
+				}
+			}
+			DX8Wrapper::Set_Vertex_Buffer(BillboardFallback);
+			DX8Wrapper::Set_Index_Buffer(triangles ? Tris : Quads, 0);
+			DX8Wrapper::Draw_Triangles(0, triangles ? batch : batch * 2, 0, batch * corners);
+		}
+		instances += batch;
+		count -= batch;
+	}
+}
+
+bool PointGroupClass::Render_Instanced()
+{
+	if (!Billboard || GroundMorph || PointMode != QUADS || PointCount > BILLBOARD_BUFFER_COUNT ||
+		Shader.Uses_Secondary_Gradient() || !Can_Instance_Billboards())
+	{
+		return false;
+	}
+	Matrix4x4 view;
+	DX8Wrapper::Get_Transform(D3DTS_VIEW, view);
+	static std::vector<BillboardInstance> records;
+	records.resize(PointCount);
+	for (int i = 0; i < PointCount; ++i)
+	{
+		const unsigned index = APT ? APT->Get_Array()[i] : i;
+		BillboardInstance &instance = records[i];
+		instance.Position = PointLoc->Get_Array()[index];
+		if (Get_Flag(TRANSFORM))
+		{
+			const Vector4 position = view * instance.Position;
+			instance.Position.Set(position.X, position.Y, position.Z);
+		}
+		instance.Triangle = 0.0f;
+		instance.Size = PointSize ? PointSize->Get_Array()[index] : DefaultPointSize;
+		const unsigned orientation = PointOrientation ? PointOrientation->Get_Array()[index] : DefaultPointOrientation;
+		const Vector3 *corners = _QuadVertexLocationOrientationTable[orientation];
+		instance.Rotation.Set(corners[0].Y - corners[1].Y, corners[1].X - corners[0].X);
+		instance.Color = DX8Wrapper::Convert_Color_Clamp(PointDiffuse ? PointDiffuse->Get_Array()[index] :
+			Vector4(DefaultPointColor.X, DefaultPointColor.Y, DefaultPointColor.Z, DefaultPointAlpha));
+
+		const unsigned frame = (PointFrame ? PointFrame->Get_Array()[index] : DefaultPointFrame) & ((1u << (2 * FrameRowColumnCountLog2)) - 1);
+		const Vector2 *uv = &_QuadVertexUVFrameTable[FrameRowColumnCountLog2][frame * 4];
+		instance.UVRect.Set(uv[0].X, uv[0].Y, uv[2].X, uv[2].Y);
+		if (TextureUVRects != nullptr)
+		{
+			WWASSERT(index < (unsigned)TextureUVRects->Get_Count());
+			const Vector4 &rect = TextureUVRects->Get_Array()[index];
+			instance.UVRect.Set(rect.X + uv[0].X * (rect.Z - rect.X), rect.Y + uv[0].Y * (rect.W - rect.Y),
+				rect.X + uv[2].X * (rect.Z - rect.X), rect.Y + uv[2].Y * (rect.W - rect.Y));
+		}
+	}
+	const Matrix4x4 identity(true);
+	DX8Wrapper::Set_Transform(D3DTS_WORLD, identity);
+	DX8Wrapper::Set_Transform(D3DTS_VIEW, identity);
+	DX8Wrapper::Set_Material(PointMaterial);
+	DX8Wrapper::Set_Shader(Shader);
+	DX8Wrapper::Set_Texture(0, Texture);
+	DX8Wrapper::Set_Vertex_Buffer(nullptr);
+	DX8Wrapper::Set_Index_Buffer(nullptr, 0);
+
+	SoftParticleHookClass *hook = SortingRendererClass::Peek_Soft_Particle_Hook();
+	const unsigned effects = hook != nullptr && Texture != nullptr && Shader.Get_Alpha_Test() == ShaderClass::ALPHATEST_DISABLE &&
+		Shader.Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO ? Effects | SoftParticleHookClass::EFFECT_SOFT : 0;
+	const bool sort = Shader.Get_Dst_Blend_Func() != ShaderClass::DSTBLEND_ZERO &&
+		Shader.Get_Alpha_Test() == ShaderClass::ALPHATEST_DISABLE && WW3D::Is_Sorting_Enabled() && !Get_Flag(DISABLE_SORTING);
+	if (sort)
+	{
+		SortingRendererClass::Set_Insert_Effects(effects, EffectData);
+		SortingRendererClass::Insert_Billboards(&records[0], PointCount);
+		SortingRendererClass::Set_Insert_Effects(0, nullptr);
+	}
+	else
+	{
+		DX8Wrapper::Apply_Render_State_Changes();
+		const bool shaded = effects != 0 && hook->Begin(Shader, effects, EffectData);
+		Draw_Billboards(&records[0], PointCount, false);
+		if (shaded)
+		{
+			hook->End();
+		}
+	}
+	DX8Wrapper::Set_Transform(D3DTS_VIEW, view);
+	return true;
+}
+
+#endif
+
 /**************************************************************************
  * PointGroupClass::PointGroupClass -- PointGroupClass CTor.              *
  *                                                                        *
@@ -174,6 +446,7 @@ PointGroupClass::PointGroupClass() :
 	GroundMorph = false;
 	Effects = 0;
 	EffectData = nullptr;
+	TextureUVRects = nullptr;
 }
 
 /**************************************************************************
@@ -218,6 +491,7 @@ PointGroupClass::~PointGroupClass()
 		REF_PTR_RELEASE(Texture);
 		Texture = nullptr;
 	}
+	REF_PTR_RELEASE(TextureUVRects);
 }
 
 /**************************************************************************
@@ -305,6 +579,24 @@ void PointGroupClass::Set_Arrays(
 	VPYMin = vpymin;
 	VPXMax = vpxmax;
 	VPYMax = vpymax;
+}
+
+void PointGroupClass::Set_Texture_UV_Rects(ShareBufferClass<Vector4> *rects)
+{
+	REF_PTR_SET(TextureUVRects,rects);
+}
+
+Vector2 PointGroupClass::Vertex_UV(int vertex) const
+{
+	Vector2 uv=VertexUV[vertex];
+	if (TextureUVRects) {
+		const int point = vertex / (PointMode == QUADS ? 4 : 3);
+		const unsigned index = APT ? APT->Get_Array()[point] : point;
+		WWASSERT(index < (unsigned)TextureUVRects->Get_Count());
+		const Vector4& rect = TextureUVRects->Get_Array()[index];
+		uv.Set(rect.X + uv.X * (rect.Z - rect.X), rect.Y + uv.Y * (rect.W - rect.Y));
+	}
+	return uv;
 }
 
 /**************************************************************************
@@ -839,6 +1131,13 @@ void PointGroupClass::Render(RenderInfoClass &rinfo)
 		Shader.Set_Texturing(ShaderClass::TEXTURING_DISABLE);
 	}
 
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+	if (Render_Instanced())
+	{
+		return;
+	}
+#endif
+
 	// If there is an active point table, use it to compress the point
 	// locations/colors/alphas/sizes/orientations/frames.
 	if (APT) {
@@ -1009,7 +1308,7 @@ void PointGroupClass::Render(RenderInfoClass &rinfo)
 				else
 					*(unsigned int*)(vb+fvfinfo.Get_Diffuse_Offset())=
 						DX8Wrapper::Convert_Color_Clamp(Vector4(DefaultPointColor[0],DefaultPointColor[1],DefaultPointColor[2],DefaultPointAlpha));
-				*(Vector2*)(vb+fvfinfo.Get_Tex_Offset(0))=VertexUV[i];
+				*(Vector2*)(vb+fvfinfo.Get_Tex_Offset(0))=Vertex_UV(i);
 				vb+=fvfinfo.Get_FVF_Size();
 			}
 		}
@@ -1710,6 +2009,11 @@ void PointGroupClass::_Init()
  *========================================================================*/
 void PointGroupClass::_Shutdown()
 {
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+	Release_Billboard_Resources();
+	BillboardShader = nullptr;
+#endif
+
 	for (int i = 0; i < 5; i++) {
 		delete [] _TriVertexUVFrameTable[i];
 		delete [] _QuadVertexUVFrameTable[i];
@@ -1997,7 +2301,7 @@ void PointGroupClass::RenderVolumeParticle(RenderInfoClass &rinfo, unsigned int 
 					else
 						*(unsigned int*)(vb+fvfinfo.Get_Diffuse_Offset())=
 							DX8Wrapper::Convert_Color_Clamp(Vector4(DefaultPointColor[0],DefaultPointColor[1],DefaultPointColor[2],DefaultPointAlpha));
-					*(Vector2*)(vb+fvfinfo.Get_Tex_Offset(0))=VertexUV[i];
+					*(Vector2*)(vb+fvfinfo.Get_Tex_Offset(0))=Vertex_UV(i);
 					vb+=fvfinfo.Get_FVF_Size();
 				}
 			}

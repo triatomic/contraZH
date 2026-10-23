@@ -45,6 +45,8 @@ public:
 	W3DParticleSystemManager();
 	virtual ~W3DParticleSystemManager() override;
 
+	virtual void reset() override;
+
 	virtual void doParticles(RenderInfoClass &rinfo) override;
 	virtual void queueParticleRender() override;
 	///< returns the number of particles shown on screen per frame
@@ -55,13 +57,15 @@ private:
 	{
 		DRAW_MAIN,
 		DRAW_BLOOM,		///< additive systems again, into the bloom target
-		DRAW_HAZE			///< flame systems as heat haze, before the main pass
+		DRAW_HAZE,		///< flame systems as heat haze, before the main pass
+		DRAW_DISRUPT	///< disrupting systems as masks for the disruption shader, before the haze
 	};
 
 	void drawSystems(RenderInfoClass &rinfo, DrawPass pass);	///< draws m_drawOrder
 	unsigned systemEffects(ParticleSystem &system, DrawPass pass);
-	Bool finishedBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, unsigned effects, const ParticleSystemTemplate *tuning);
-	void initializeBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, unsigned effects, const ParticleSystemTemplate *tuning);
+	Bool disrupts(ParticleSystem &system);	///< whether the disruption pass draws the system
+	Bool finishedBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, Bool premultiplied, unsigned effects, const void *effectData);
+	void initializeBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, Bool premultiplied, unsigned effects, const void *effectData);
 	void flushParticleBatch(RenderInfoClass& rinfo, UnsignedInt& pointCount);
 
 	enum { MAX_POINTS_PER_GROUP = 512 };
@@ -70,11 +74,12 @@ private:
 	{
 		ParticleSystem *sys;
 		Real depth;												///< view space Z of the visible particles' mean, only filled when ordering back to front
+		RefCountPtr<TextureClass> texture;		///< the particle texture, null for smudges
 	};
 	static Bool isFarther(const DrawEntry &a, const DrawEntry &b);
 
 	// TheSuperHackers @feature renders ground aligned particles as terrain conforming meshes
-	class W3DTerrainParticle *m_terrainParticles;
+	class W3DTerrainParticles *m_terrainParticles;
 	std::vector<DrawEntry> m_drawOrder;			///< visible systems in the order they draw this frame
 	RefCountPtr<TextureClass> m_batchTexture;		///< the texture used as the drawing surface for batched particle draws
 	PointGroupClass *m_pointGroup;							///< the point group that contains all of the particles
@@ -83,10 +88,13 @@ private:
 	ShareBufferClass<Vector4> *m_RGBABuffer;		///< array of particle color and alpha
 	ShareBufferClass<float> *m_sizeBuffer;			///< array of particle sizes
 	ShareBufferClass<uint8> *m_angleBuffer;			///< array of particle orientations
+	ShareBufferClass<Vector4> *m_uvRectBuffer;		///< array of particle rectangles in an atlas page
+	AABoxClass m_currentBoundingBox;
 
 	ParticleSystemInfo::ParticleShaderType m_batchShaderType;
 	Bool m_readyToRender;											///< if true, it is OK to render
 	Bool m_batchBillboard;
+	Bool m_batchPremultiplied;								///< the batch draws from an atlas page, so its shader type is only that of its first system
 	unsigned m_batchEffects;									///< SoftParticleHookClass effects beyond soft fading
-	const ParticleSystemTemplate *m_batchTuning;	///< the template whose flame settings override GameData.ini's, or null
+	const void *m_batchEffectData;						///< what the hook gets with the effects: a template with flame settings of its own, a DisruptionShaderInfo, or null
 };

@@ -35,6 +35,10 @@
 #include "Common/GameMemory.h"
 #include "Common/SubsystemInterface.h"
 #include "GameClient/Color.h"
+#include "GameClient/DisruptionShader.h"
+#include "GameClient/StormShader.h"
+#include "GameClient/HeadlightShader.h"
+#include "GameClient/PlanarMirrorShader.h"
 #include "GameClient/TintStatus.h"
 #include "Common/STLTypedefs.h"
 #include "Common/Money.h"
@@ -224,9 +228,8 @@ public:
 	// TheSuperHackers @feature Command bar keys by slot position instead of by string file.
 	Bool m_gridHotkeysEnabled;
 	AsciiString m_gridHotkeyLayout;
-	Int m_gridHotkeyColumns;
-	// Keys the player asked to leave out of the grid; those slots keep their string file letter.
-	AsciiString m_nonGridHotkeys;
+	// Unit orders keep their string file letter and swap grid keys with the slot that had it.
+	Bool m_gridHotkeyUnitOrders;
 	// TheSuperHackers @feature Show each command bar cameo's hotkey letter on the cameo.
 	Bool m_keyboardOverlayEnabled;
 	Color m_keyboardOverlayColor;
@@ -238,6 +241,7 @@ public:
 	Bool m_smartSelection;
 	Bool m_smartSelectionUseMouse;
 	Bool m_smartCommandGroup;
+	Int m_actionLineMode;						///< holds an ActionLineMode
 	Bool m_doubleClickAttackMove;
 	Bool m_rightMouseAlwaysScrolls;
 	Int m_jpegQuality; // TheSuperHackers @feature Quality for JPEG screenshots.
@@ -250,6 +254,7 @@ public:
 	Real m_unitSpecularIntensity;	///< GameData UnitSpecularIntensity: brightness of the sun highlight on vehicles and structures, 0 for none
 	Real m_unitSpecularPower;		///< GameData UnitSpecularPower: tightness of that highlight, higher is smaller and sharper
 	Real m_unitBumpHeight;			///< GameData UnitBumpHeight: rise, in world units, of full brightness on textures without a normal map, 0 for flat
+	Real m_roadBumpHeight;			///< GameData RoadBumpHeight: the same for road and bridge textures without a normal map
 	Real m_unitNormalMapStrength;	///< GameData UnitNormalMapStrength: scales the tilt of authored _nrm normal maps
 	Real m_terrainNormalMapStrength;	///< GameData TerrainNormalMapStrength: scales the tilt of terrain _nrm normal maps
 	Real m_terrainGlintIntensity;	///< GameData TerrainGlintIntensity: brightness of the sun's glint on the ground, 0 for none
@@ -300,6 +305,13 @@ public:
 	Real m_cryoGlintSize;
 	Real m_cryoGlintRate;
 	Real m_cryoParticleScale;			///< GameData CryoParticleScale: how much larger or smaller cryo-shaded particles draw, 1 unchanged
+	DisruptionShaderTuning m_disruptionTuning;	///< GameData DisruptionRingStrength and the keys beside it: disruption shader defaults
+	HeadlightShaderTuning m_headlightTuning;	///< GameData HeadlightShader and the Headlight keys: headlights drawn in place of HEADLIGHT meshes
+	KindOfMaskType m_headlightForbiddenKindOf;	///< GameData HeadlightShaderForbiddenKindOf: objects of these kinds keep their HEADLIGHT meshes
+	Bool m_rotrHack;	///< GameData RotrHack: additive HEADLIGHT meshes keep their own look, for Rise of the Reds' lit windows
+	Bool m_planarMirrorShader;	///< GameData PlanarMirrorShader: whether models' PlanarMirror meshes reflect, read at launch
+	PlanarMirrorShaderTuning m_planarMirrorTuning;	///< GameData PlanarMirrorReflectivity and the keys beside it: what mirrors take where their model sets nothing
+	StormShaderInfo m_stormTuning[StormShaderInfo::TYPE_COUNT];	///< GameData SandStorm and SnowStorm keys: what each storm type takes where its entry sets nothing
 	Real m_ambientOcclusionRadius;		///< GameData AmbientOcclusionRadius: how far, in world units, geometry darkens what is near it
 	Real m_ambientOcclusionStrength;	///< GameData AmbientOcclusionStrength: how dark the occlusion gets, 0 for none
 	Real m_groundNoiseStrength;			///< GameData GroundNoiseStrength and the keys below: the noise that stands in for the light map, see W3DGroundNoise
@@ -308,7 +320,6 @@ public:
 	Real m_groundNoiseBrightness;
 	Real m_terrainHeightBlendStrength;	///< GameData TerrainHeightBlendStrength: how far the taller texture pushes into the other's side of a blend
 	Real m_terrainHeightBlendSharpness;	///< GameData TerrainHeightBlendSharpness: how narrow the blend's edge is, 1 as wide as the legacy blend
-	Int m_terrainAtlasBorder;			///< GameData TerrainAtlasBorder: texels copied around each texture in the terrain atlas
 	Real m_skyCloudSize;				///< GameData SkyCloudSize and the keys below: the HQ sky's cloud shadows, see W3DSkyClouds
 	Real m_skyCloudCoverage;
 	Real m_skyCloudSoftness;
@@ -319,6 +330,25 @@ public:
 	Real m_skyCloudChurn;
 	Real m_skyCloudBillow;
 	Real m_skyCloudDetail;
+	AsciiString m_colorLut;			///< GameData ColorLut and the keys below: the colour grade over the 3D scene, see W3DColorLut
+	Real m_colorLutStrength;
+	Real m_colorLutBrightness;
+	Real m_colorLutContrast;
+	Real m_colorLutSaturation;
+	RGBColor m_colorLutTint;
+	Real m_colorLutChroma;
+	Real m_colorLutLuma;
+	Real m_colorLutVibrance;
+	Real m_colorLutTechnicolor;
+	Real m_colorLutBlackPoint;
+	Real m_colorLutWhitePoint;
+	Real m_colorLutGamma;
+	Real m_colorLutOutputBlack;
+	Real m_colorLutOutputWhite;
+	Real m_colorLutVignette;
+	Real m_colorLutVignetteRadius;
+	Real m_colorLutGrain;
+	Real m_colorLutDither;
 	Int  m_textureReductionFactor;	//how much to cut texture resolution: 2 is half, 3 is quarter, etc.
 	Bool m_enableBehindBuildingMarkers;
 	Real m_waterPositionX;
@@ -580,6 +610,7 @@ public:
 																			 smaller area within the rectangle to order the gather. */
 
 	UnsignedInt m_antiAliasLevel;          ///< value of selected antialias level in the game options
+	Int m_superSampling;                   ///< Options.ini SuperSampling: the world's render size as a percent of the screen's, 100 to 200
 	UnsignedInt m_textureFilteringMode;       ///< value related to TextureFilterClass::TextureFilterModeEnum
 	UnsignedInt m_textureAnisotropyLevel;     ///< value related to TextureFilterClass::AnisotropicFilterMode
 
@@ -695,6 +726,7 @@ public:
   Bool m_queueReorder;            ///< Ctrl+click moves a build queue entry one position earlier; off unless GameData enables it
   Bool m_noOccupantFriendlyFire;  ///< spares the container a passenger is riding in from its own splash; off unless GameData enables it
   Bool m_batchParticles;          ///< draws same-looking particle systems in one batch; off unless GameData enables it
+  Bool m_particleAtlas;           ///< packs particle textures into shared premultiplied pages so mixed systems batch together; off unless GameData enables it
   Bool m_skipTranslucencySort;    ///< skips the per-triangle translucency sorter; off unless GameData or the LOD level enables it
   Bool m_backToFront;             ///< with the sorter off, draws whole particle systems far to near; off unless GameData enables it
   Bool m_useBloom;                ///< Options.ini Bloom: glow around additive particles
@@ -702,9 +734,11 @@ public:
   Bool m_bloomDebug;              ///< Options.ini BloomDebug: show the glow buffer instead of the scene
   Bool m_laserRef;                ///< Options.ini LaserRef: lasers light the ground along the beam
   Bool m_useShadowMap;            ///< Options.ini ShadowMap: shadows come from a sun shadow map where the hardware allows
+  Int m_shadowMapResolution;      ///< Options.ini ShadowMapResolution: the shadow map's width and height in texels
   Bool m_useSpecular;             ///< Options.ini Specular: per-pixel sun highlight on vehicles and structures, and the sun's glint on the ground, where the hardware allows
   Bool m_useNormalMaps;           ///< Options.ini NormalMaps: bump detail in the sun's light on vehicles, structures and terrain where the hardware allows
   Bool m_waterReflections;        ///< Options.ini WaterReflections: smooth water mirrors the terrain, units and buildings
+  Bool m_shorelineFoam;           ///< Options.ini ShorelineFoam: smooth water gathers a band of surf where it meets the shore
   Bool m_useSoftParticles;        ///< Options.ini SoftParticles: smoke and fire fade where they meet the ground and buildings
   Bool m_useFlameShaders;         ///< Options.ini FlameShaders: flame weapon fire flickers and glows white-hot at its core
   Bool m_useElectricShaders;      ///< Options.ini ElectricShaders: electric sparks and flares crackle with arcs
@@ -721,6 +755,7 @@ public:
   Bool m_specularDebug;           ///< Options.ini SpecularDebug: show what the specular pass covers and its highlight in magenta
   Bool m_normalMapDebug;          ///< Options.ini NormalMapDebug: show only the terrain's bump shading, on grey
   Bool m_ambientOcclusionDebug;   ///< Options.ini AmbientOcclusionDebug: show only the occlusion, in grey
+  Bool m_dynamicLightsDebug;      ///< Options.ini DynamicLightsDebug: show only the per-pixel dynamic lights, on black
   Color m_laserGlowColor;         ///< GameData LaserGroundGlowColor: black takes the beam color
   Real m_laserGlowIntensity;      ///< GameData LaserGroundGlowIntensity: how strongly the color is added
   Real m_laserGlowRadius;         ///< GameData LaserGroundGlowRadius: how far the light reaches from the beam, 0 derives it from the beam width

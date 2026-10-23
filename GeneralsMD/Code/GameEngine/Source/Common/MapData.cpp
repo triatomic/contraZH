@@ -24,7 +24,7 @@ MapData* TheWriteableMapData = NULL;				///< The current map data singleton
 	{ "TerrainHeightAmbientLightHeight1",	INI::parseReal,				NULL,			offsetof( MapData, m_terrainHeightAmbientLightHeight1) },
 	{ "TerrainHeightAmbientLightHeight2",	INI::parseReal,				NULL,			offsetof( MapData, m_terrainHeightAmbientLightHeight2) },
 	{ "TerrainHeightAmbientLightAdditive",INI::parseBool,				NULL,			offsetof( MapData, m_terrainHeightAmbientLightAdditive) },
-	{ NULL,					NULL,						NULL,						0 }  // keep this last
+	{ nullptr, nullptr, nullptr, 0 }  // keep this last
 
 };
 

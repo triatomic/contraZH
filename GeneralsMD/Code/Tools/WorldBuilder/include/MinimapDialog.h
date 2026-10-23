@@ -23,10 +23,13 @@
 
 #include "Lib/BaseType.h"
 #include "Common/AsciiString.h"
-#include <map>
-#include <set>
+#include <vector>
 
 class MapObject;
+struct ID2D1Factory;
+struct ID2D1HwndRenderTarget;
+struct ID2D1SolidColorBrush;
+struct ID2D1Bitmap;
 
 #define MINIMAP_SECTION "MinimapDialog"
 
@@ -51,8 +54,8 @@ public:
 	void rebuildTerrain();			///< Resample the terrain (expensive); then composite objects.
 	void refreshObjects();			///< Cheap: re-composite cached terrain + objects (no resample).
 	void requestRebuild(Bool terrainChanged = true);	///< Object/camera changes refresh instantly; terrain edits are throttled.
-	void requestSelectionRefresh();	///< Selection-only change: recomposite objects, keep the roads cache (roads didn't move).
-	void requestViewBoxRefresh();	///< Camera moved (only the view box moves): cheap repaint, no recomposite (unless culling).
+	void requestSelectionRefresh();	///< Selection-only change: rebuild the blip list, keep the terrain + roads bitmap.
+	void requestViewBoxRefresh();	///< Camera moved: repaint only.
 
 	// Called from the pointer tool after a click that may have changed the selection.
 	// Does nothing unless the minimap is actually VISIBLE, the selection-overlay is on,
@@ -97,6 +100,8 @@ protected:
 	virtual void OnOK();
 
 	afx_msg void OnPaint();
+	afx_msg BOOL OnEraseBkgnd(CDC *pDC);
+	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnExitSizeMove();		///< Persist the window position once, when the user finishes dragging.
 	afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
@@ -111,33 +116,29 @@ private:
 	Bool minimapToWorld(Int mx, Int my, Real *worldX, Real *worldY);
 	void centerViewAtClient(CPoint point);
 	void allocBuffer();				///< (Re)allocate the buffers for the current resolution.
-	void drawObjects();				///< Overlay map objects (units/structures) onto the buffer.
+	void buildBlips();				///< Cache the unit/structure markers Direct2D draws each paint.
 
-	// Blip sizes in buffer pixels for the current resolution and client size, the
-	// shared colors and toggles, and the owner -> house color memo for one blip pass.
-	struct BlipStyle
+	// One unit/structure marker. Positions are fractions of the minimap, so markers
+	// keep a fixed display size at any resolution.
+	enum { BLIP_UNIT, BLIP_STRUCTURE, BLIP_RESOURCE };
+	struct Blip
 	{
-		Int unitSize, structSize, outlineWidth, haloPad, clientPx;
-		Bool showSelection;
-		UnsignedInt black, gold, darkGray, cyan;
-		std::map<AsciiString, Int> ownerColors;
+		Real fx, fy;				///< minimap fraction, row 0 at the top
+		Real worldX, worldY;		///< world position, for the view cull
+		Int  kind;
+		Int  color;					///< house color, 0x00RRGGBB
+		Bool selected;
 	};
-	void blipStyle(BlipStyle &style);
-	Bool blipCell(MapObject *pObj, Int *mx, Int *my);	///< buffer cell of an object's blip; FALSE when it draws none.
-	void drawBlip(MapObject *pObj, Int mx, Int my, BlipStyle &style);
-	Int  blipHalfExtent(const BlipStyle &style) const;	///< largest half size any blip or halo can reach.
-	void refreshSelectionBlips();	///< Redraw only the blips whose halo changed, under a clip, over the cached terrain+roads.
-	void setClip(Int x0, Int y0, Int x1, Int y1);		///< Fill helpers write only inside [x0,x1) x [y0,y1).
-	void resetClip();
-	void drawRoads();				///< Rasterize road/bridge segments into the buffer (drawn under objects).
+
+	Bool createDeviceResources();	///< Direct2D target, brush and terrain bitmap; FALSE when unavailable.
+	void discardDeviceResources();
+	void drawBlips(Int clientW, Int clientH);
+	void drawRoads();				///< Rasterize road/bridge segments into the buffer.
 	void drawThickLine(Int x0, Int y0, Int x1, Int y1, Int halfW, UnsignedInt color,
 		struct RoadTex *tex = NULL, Real segLenPx = 0.0f,
 		Real tintR = 1.0f, Real tintG = 1.0f, Real tintB = 1.0f);	///< Textured (or flat) thick line into the buffer.
-	void drawViewBoxOverlay(HDC hdc, Int clientW, Int clientH);	///< GDI camera-frustum box (display res).
-	void drawBorderOverlay(HDC hdc, Int clientW, Int clientH);	///< GDI orange playable-area boundary (display res).
-	void fillRect(Int cx, Int cy, Int w, Int h, UnsignedInt color);	///< centered, clipped buffer fill.
-	void fillCheckerRect(Int cx, Int cy, Int w, Int h, UnsignedInt colorA, UnsignedInt colorB, Int cell);	///< centered checkerboard fill (cashbox); cell = block size in buffer px.
-	void fillDiamond(Int cx, Int cy, Int size, UnsignedInt color);	///< centered, clipped diamond fill (units).
+	void drawViewBoxOverlay(Int clientW, Int clientH);	///< yellow camera-frustum box
+	void drawBorderOverlay(Int clientW, Int clientH);	///< orange playable-area boundary
 	Bool worldToMinimap(Real worldX, Real worldY, Int *mx, Int *my);	///< world coords -> minimap cell.
 	// The coordinate mapping shared by every minimap path (terrain resample, blips,
 	// roads, view box, drag-to-center). Depends on m_fullExtent: full-extent maps the
@@ -147,15 +148,10 @@ private:
 	// A heightmap cell c maps to minimap pixel (c - originCell) / span * res. Returns
 	// FALSE if there is no map.
 	Bool mapSpans(Real *xSpan, Real *ySpan, Real *originCell);
-	Bool isInViewFrustum(Real worldX, Real worldY);	///< point (world units) inside the 3D view's ground footprint?
-	inline UnsignedInt &pixel(Int x, Int y) { return m_pixelBuffer[y * m_resolution + x]; }
 
-	UnsignedInt *m_pixelBuffer;		///< composited (terrain + objects), shown via the DIB.
+	UnsignedInt *m_pixelBuffer;		///< terrain + roads, the source of the Direct2D bitmap.
 	UnsignedInt *m_terrainBuffer;	///< cached terrain-only resample; reused when only objects change.
-	UnsignedInt *m_terrainRoadsBuffer;	///< cached terrain+roads layer; roads are camera-invariant,
-									///< so this is reused across camera-only recomposites (cull-on drag)
-									///< and only rebuilt when terrain or roads actually change.
-	Bool m_roadsValid;				///< m_terrainRoadsBuffer is current (terrain+roads composited).
+	Bool m_roadsValid;				///< m_pixelBuffer holds the current terrain + roads.
 	Bool m_terrainValid;			///< m_terrainBuffer holds a current resample.
 	Int  m_resolution;				///< current sampling/buffer edge (square).
 	Bool m_terrainBuilt;
@@ -173,17 +169,14 @@ private:
 
 	UnsignedInt m_lastSelectionSig;	///< signature of the selection set at the last halo refresh,
 									///< so notifySelectionChanged() can skip no-op clicks.
-	std::set<MapObject*> m_lastSelected;	///< objects drawn with a halo in the last blip pass.
 
-	// Clip window for the fill helpers, in buffer pixels; the whole buffer unless a
-	// selection refresh narrows it to the dirty rects.
-	Int m_clipX0, m_clipY0, m_clipX1, m_clipY1;
+	std::vector<Blip> m_blips;
 
-	// The composited buffer stretched to the client size, kept between paints so a
-	// camera move only blits it and redraws the overlays.
-	HBITMAP m_stretchBmp;
-	Int  m_stretchW, m_stretchH;
-	Bool m_stretchValid;
+	ID2D1Factory          *m_d2dFactory;
+	ID2D1HwndRenderTarget *m_d2dTarget;
+	ID2D1SolidColorBrush  *m_d2dBrush;
+	ID2D1Bitmap           *m_d2dBitmap;	///< m_pixelBuffer on the GPU
+	Bool m_bitmapDirty;					///< m_pixelBuffer changed since the last upload
 };
 
 extern MinimapDialog *TheMinimapDialog;

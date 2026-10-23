@@ -78,6 +78,7 @@
 #include "W3DDevice/GameClient/WorldHeightMap.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/W3DSkyClouds.h"
+#include "W3DDevice/GameClient/W3DSlopeMap.h"
 #include "W3DDevice/GameClient/W3DShadow.h"
 #include "W3DDevice/GameClient/W3DWater.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
@@ -179,6 +180,7 @@ void FlatHeightMapRenderObjClass::adjustTerrainLOD(Int adj)
 //=============================================================================
 void FlatHeightMapRenderObjClass::ReleaseResources()
 {
+	releaseTiles();
 	BaseHeightMapRenderObjClass::ReleaseResources();
 }
 
@@ -471,6 +473,7 @@ void FlatHeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 			TheW3DSkyClouds->update(rinfo, *this);
 		}
 	}
+	W3DSlopeMap::update(rinfo);
 
 	Matrix3D tm(Transform);
 	// If there are trees, tell them to draw at the transparent time to draw.

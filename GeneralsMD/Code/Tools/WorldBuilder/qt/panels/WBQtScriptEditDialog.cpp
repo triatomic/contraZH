@@ -1,25 +1,31 @@
-// WBQtScriptEditDialog.cpp -- see WBQtScriptEditDialog.h. Layout and behavior mirror the four
-// MFC property pages (IDD_ScriptProperties / IDD_ScriptConditions / IDD_ScriptActionsTrue /
-// IDD_ScriptActionsFalse); every command routes through the bridge, which ports the page
-// handlers verbatim and reports back the row to select after the rebuild.
+// WBQtScriptEditDialog.cpp -- see WBQtScriptEditDialog.h.
 #include "WBQtScriptEditDialog.h"
-#include "ui_WBQtScriptEditListTab.h"
 #include "ui_WBQtScriptEditDialog.h"
 #include "WBQtScriptEditBridge.h"
 #include "WBQtScriptWindow.h"
+#include "WBQtScriptEditDialogClassic.h"
 
+// The script editor's "New design" setting (WBQtScriptBridge.cpp).
+extern "C" int WBQtScript_GetNewDesign(void);
+
+#include <QAbstractTextDocumentLayout>
+#include <QApplication>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QDialogButtonBox>
-#include <QGroupBox>
+#include <QDropEvent>
+#include <QHBoxLayout>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
-#include <QShortcut>
+#include <QPainter>
 #include <QPlainTextEdit>
-#include <QPushButton>
-#include <QRadioButton>
+#include <QShortcut>
 #include <QSpinBox>
-#include <QTabWidget>
+#include <QStyledItemDelegate>
+#include <QToolButton>
+#include <QVBoxLayout>
 
 #include <qt_windows.h>
 
@@ -31,8 +37,13 @@ namespace
 	const int kLabelCap = 1024;
 	const int kCommentCap = 8192;
 
-	// Item data role holding the row kind on the conditions list (1 condition, 0 OR header).
-	const int kRowKindRole = Qt::UserRole;
+	// Row data: kind (1 item, 0 IF/OR header), a warning flag, the OR group, and the gray prefix.
+	const int kKindRole = Qt::UserRole;
+	const int kWarningRole = Qt::UserRole + 1;
+	const int kGroupRole = Qt::UserRole + 2;
+	const int kPrefixRole = Qt::UserRole + 3;
+
+	const QColor kWarningColour(200, 70, 70);
 
 	QString bridgeText(void *script, int field)
 	{
@@ -41,59 +52,220 @@ namespace
 		WBQtScriptEditData_GetText(script, field, buf, sizeof(buf));
 		return QString::fromLocal8Bit(buf);
 	}
+
+	// Size a note to its text, between minLines and maxLines.
+	void fitNote(QPlainTextEdit *note, int minLines, int maxLines)
+	{
+		const int lines = qBound(minLines, (int)note->document()->documentLayout()->documentSize().height(), maxLines);
+		note->setFixedHeight(lines * note->fontMetrics().lineSpacing()
+			+ qRound(note->document()->documentMargin() * 2.0) + note->frameWidth() * 2);
+	}
+
+	// IF/OR headers as dividers, OR groups as tinted bands, AND or number prefixes, warnings in red.
+	class RowDelegate : public QStyledItemDelegate
+	{
+	public:
+		explicit RowDelegate(QObject *parent) : QStyledItemDelegate(parent) {}
+
+		virtual void paint(QPainter *painter, const QStyleOptionViewItem &option,
+			const QModelIndex &index) const
+		{
+			QStyleOptionViewItem opt(option);
+			initStyleOption(&opt, index);
+			const QString text = opt.text;
+			opt.text.clear();
+			const QWidget *widget = option.widget;
+			QStyle *style = widget ? widget->style() : QApplication::style();
+			const QRect r = option.rect;
+			const QFontMetrics metrics(opt.font);
+
+			painter->save();
+			if (index.data(kKindRole).toInt() == 0)
+			{
+				const int y = r.center().y();
+				painter->setPen(option.palette.color(QPalette::Mid));
+				painter->drawLine(r.left() + 4, y, r.right() - 4, y);
+				QFont bold = opt.font;
+				bold.setBold(true);
+				const QRect pill(r.left() + 12, y - metrics.height() / 2,
+					QFontMetrics(bold).horizontalAdvance(text) + 16, metrics.height());
+				painter->setRenderHint(QPainter::Antialiasing, true);
+				painter->setPen(Qt::NoPen);
+				painter->setBrush(text == "OR" ? QColor(160, 100, 40) : QColor(55, 105, 165));
+				painter->drawRoundedRect(pill, 3.0, 3.0);
+				painter->setPen(Qt::white);
+				painter->setFont(bold);
+				painter->drawText(pill, Qt::AlignCenter, text);
+				painter->restore();
+				return;
+			}
+
+			const QVariant group = index.data(kGroupRole);
+			if (group.isValid() && (group.toInt() % 2) == 1)
+			{
+				painter->fillRect(r, QColor(255, 255, 255, 14));
+			}
+			style->drawControl(QStyle::CE_ItemViewItem, &opt, painter, widget);
+
+			const bool warn = index.data(kWarningRole).toBool();
+			QColor bar = warn ? kWarningColour : QColor(55, 105, 165);
+			if (group.isValid() && (group.toInt() % 2) == 1 && !warn)
+			{
+				bar = QColor(55, 130, 75);
+			}
+			painter->fillRect(QRect(r.left(), r.top() + 1, 3, r.height() - 2), bar);
+
+			// The prefix column has a fixed width, so the text lines up row to row.
+			const QString prefix = index.data(kPrefixRole).toString();
+			const int prefixWidth = group.isValid()
+				? metrics.horizontalAdvance("AND") + 14 : metrics.horizontalAdvance("999.") + 8;
+			const int x = r.left() + 10;
+			if (!prefix.isEmpty())
+			{
+				painter->setPen(option.palette.color(QPalette::Disabled, QPalette::Text));
+				painter->drawText(QRect(x, r.top(), prefixWidth, r.height()),
+					Qt::AlignVCenter | Qt::AlignLeft, prefix);
+			}
+			const bool selected = (option.state & QStyle::State_Selected) != 0;
+			painter->setPen(warn ? QColor(235, 95, 95)
+				: option.palette.color(selected ? QPalette::HighlightedText : QPalette::Text));
+			const QRect textRect(x + prefixWidth, r.top(), r.right() - x - prefixWidth - 4, r.height());
+			painter->drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft,
+				metrics.elidedText(text, Qt::ElideRight, textRect.width()));
+			painter->restore();
+		}
+
+		virtual QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
+		{
+			QSize size = QStyledItemDelegate::sizeHint(option, index);
+			size.setHeight(size.height() + 6);
+			return size;
+		}
+	};
+
+	// A list whose drops reorder the script through the section instead of moving list items.
+	class DragList : public QListWidget
+	{
+	public:
+		DragList(WBQtScriptEditSection *section, QWidget *parent)
+			: QListWidget(parent), m_section(section), m_from(-1), m_to(-1)
+		{
+			setDragDropMode(QAbstractItemView::InternalMove);
+			setDefaultDropAction(Qt::MoveAction);
+		}
+
+		int takeFrom() { const int v = m_from; m_from = -1; return v; }
+		int takeTo() { const int v = m_to; m_to = -1; return v; }
+
+	protected:
+		virtual void dropEvent(QDropEvent *event)
+		{
+			QListWidgetItem *target = itemAt(event->pos());
+			m_from = currentRow();
+			m_to = (target != NULL) ? row(target) : count() - 1;
+			// Nothing moves in the widget itself; the section rebuilds it once the drag is over.
+			event->setDropAction(Qt::IgnoreAction);
+			event->accept();
+			QMetaObject::invokeMethod(m_section, "onDropped", Qt::QueuedConnection);
+		}
+
+	private:
+		WBQtScriptEditSection *m_section;
+		int m_from;
+		int m_to;
+	};
+
+	// The key with exactly these Ctrl/Alt/Shift modifiers; the keypad flag is ignored.
+	bool keyIs(const QKeyEvent *key, int code, Qt::KeyboardModifiers mods)
+	{
+		const Qt::KeyboardModifiers held = key->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::ShiftModifier);
+		return key->key() == code && held == mods;
+	}
+
+	QToolButton *makeToolButton(const QString &text, const QString &tip, QWidget *parent)
+	{
+		QToolButton *button = new QToolButton(parent);
+		button->setText(text);
+		button->setToolTip(tip);
+		button->setAutoRaise(true);
+		return button;
+	}
 }
 
-// ===================== WBQtScriptEditListTab =====================
+// ===================== WBQtScriptEditSection =====================
 
-WBQtScriptEditListTab::WBQtScriptEditListTab(void *script, Mode mode, QWidget *parent)
+WBQtScriptEditSection::WBQtScriptEditSection(void *script, Mode mode, QWidget *parent)
 	: QWidget(parent),
-	m_ui(new Ui::WBQtScriptEditListTab),
 	m_script(script),
 	m_mode(mode),
 	m_updating(false),
+	m_note(NULL),
 	m_orButton(NULL),
-	m_moveToOtherButton(NULL)
+	m_otherButton(NULL)
 {
-	// The static widget tree lives in WBQtScriptEditListTab.ui; the mode-dependent
-	// pieces (caption, New button text, the Or / Move-to-Other button) are set here.
-	m_ui->setupUi(this);
+	QVBoxLayout *outer = new QVBoxLayout(this);
+	outer->setContentsMargins(0, 0, 0, 0);
+	outer->setSpacing(2);
 
-	m_list = m_ui->list;
-	m_smartCopyCheck = m_ui->smartCopyCheck;
-	m_newButton = m_ui->newButton;
-	m_editButton = m_ui->editButton;
-	m_copyButton = m_ui->copyButton;
-	m_deleteButton = m_ui->deleteButton;
-	m_moveUpButton = m_ui->moveUpButton;
-	m_moveDownButton = m_ui->moveDownButton;
-	m_commentEdit = m_ui->commentEdit;
+	QHBoxLayout *header = new QHBoxLayout();
+	header->setSpacing(2);
+	m_toggle = new QToolButton(this);
+	m_toggle->setAutoRaise(true);
+	m_toggle->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+	QFont bold = m_toggle->font();
+	bold.setBold(true);
+	m_toggle->setFont(bold);
+	header->addWidget(m_toggle);
+	header->addStretch(1);
 
-	const char *caption = "Conditions for this script:";
-	if (m_mode == ModeActionsTrue)
-	{
-		caption = "Actions to take if conditions are true:";
-	}
-	else if (m_mode == ModeActionsFalse)
-	{
-		caption = "Actions to take if conditions are false:";
-	}
-	m_ui->captionLabel->setText(caption);
-
-	m_newButton->setText((m_mode == ModeConditions) ? "New... [&S]" : "New...[&S]");
+	QToolButton *newButton = makeToolButton("New", "New (Ins)", this);
+	m_editButton = makeToolButton("Edit", "Edit (Enter or double-click)", this);
+	m_copyButton = makeToolButton("Copy", "Duplicate (Ctrl+D)", this);
+	m_deleteButton = makeToolButton("Delete", "Delete (Del)", this);
+	header->addWidget(newButton);
+	header->addWidget(m_editButton);
+	header->addWidget(m_copyButton);
+	header->addWidget(m_deleteButton);
 	if (m_mode == ModeConditions)
 	{
-		m_orButton = new QPushButton("O&r", this);
-		m_ui->buttonsLayout->insertWidget(5, m_orButton);	// after Delete, before the stretch
+		m_orButton = makeToolButton("OR", "Start a new OR group", this);
+		header->addWidget(m_orButton);
 	}
 	else
 	{
-		m_moveToOtherButton = new QPushButton((m_mode == ModeActionsTrue) ? "Move to False" : "Move to True", this);
-		m_ui->buttonsLayout->insertWidget(5, m_moveToOtherButton);	// after Delete, before the stretch
+		m_otherButton = makeToolButton((m_mode == ModeActionsTrue) ? "To ELSE" : "To THEN",
+			(m_mode == ModeActionsTrue) ? "Move to the actions if false" : "Move to the actions if true", this);
+		header->addWidget(m_otherButton);
 	}
+	m_upButton = makeToolButton("Up", "Move up (Alt+Up, or drag)", this);
+	m_downButton = makeToolButton("Down", "Move down (Alt+Down, or drag)", this);
+	header->addWidget(m_upButton);
+	header->addWidget(m_downButton);
+	outer->addLayout(header);
 
+	m_body = new QWidget(this);
+	QVBoxLayout *bodyLayout = new QVBoxLayout(m_body);
+	bodyLayout->setContentsMargins(0, 0, 0, 0);
+	bodyLayout->setSpacing(4);
+	DragList *list = new DragList(this, m_body);
+	m_list = list;
+	m_list->setItemDelegate(new RowDelegate(m_list));
+	m_list->setMinimumHeight(90);
+	m_list->installEventFilter(this);
+	bodyLayout->addWidget(m_list);
+	if (m_mode == ModeConditions)
+	{
+		m_note = new QPlainTextEdit(m_body);
+		m_note->setPlaceholderText("Conditions note");
+		bodyLayout->addWidget(m_note);
+		connect(m_note, SIGNAL(textChanged()), this, SLOT(onNoteChanged()));
+	}
+	outer->addWidget(m_body, 1);
+
+	connect(m_toggle, SIGNAL(clicked()), this, SLOT(onToggle()));
 	connect(m_list, SIGNAL(currentRowChanged(int)), this, SLOT(onSelectionChanged()));
 	connect(m_list, SIGNAL(itemDoubleClicked(QListWidgetItem*)), this, SLOT(onEdit()));
-	connect(m_newButton, SIGNAL(clicked()), this, SLOT(onNew()));
+	connect(newButton, SIGNAL(clicked()), this, SLOT(onNew()));
 	connect(m_editButton, SIGNAL(clicked()), this, SLOT(onEdit()));
 	connect(m_copyButton, SIGNAL(clicked()), this, SLOT(onCopy()));
 	connect(m_deleteButton, SIGNAL(clicked()), this, SLOT(onDelete()));
@@ -101,19 +273,14 @@ WBQtScriptEditListTab::WBQtScriptEditListTab(void *script, Mode mode, QWidget *p
 	{
 		connect(m_orButton, SIGNAL(clicked()), this, SLOT(onOr()));
 	}
-	if (m_moveToOtherButton != NULL)
+	if (m_otherButton != NULL)
 	{
-		connect(m_moveToOtherButton, SIGNAL(clicked()), this, SLOT(onMoveToOther()));
+		connect(m_otherButton, SIGNAL(clicked()), this, SLOT(onMoveToOther()));
 	}
-	connect(m_moveUpButton, SIGNAL(clicked()), this, SLOT(onMoveUp()));
-	connect(m_moveDownButton, SIGNAL(clicked()), this, SLOT(onMoveDown()));
-	connect(m_smartCopyCheck, SIGNAL(toggled(bool)), this, SLOT(onSmartCopyToggled(bool)));
-	connect(m_commentEdit, SIGNAL(textChanged()), this, SLOT(onCommentChanged()));
+	connect(m_upButton, SIGNAL(clicked()), this, SLOT(onMoveUp()));
+	connect(m_downButton, SIGNAL(clicked()), this, SLOT(onMoveDown()));
 
-	// Ctrl+C / Ctrl+V: copy the selected condition/action to the cross-script clipboard and paste
-	// it (into any script's matching list). WidgetShortcut = active only while THIS list has focus,
-	// so Ctrl+C/V keep their text meaning in the comment box. Same-type is enforced by the bridge:
-	// a condition list only has a condition clipboard, an action list only an action clipboard.
+	// Ctrl+C / Ctrl+V: the cross-script clipboard, only while this list has focus.
 	QShortcut *copySc = new QShortcut(QKeySequence(Qt::CTRL + Qt::Key_C), m_list);
 	copySc->setContext(Qt::WidgetShortcut);
 	connect(copySc, SIGNAL(activated()), this, SLOT(onCopyClipboard()));
@@ -121,22 +288,22 @@ WBQtScriptEditListTab::WBQtScriptEditListTab(void *script, Mode mode, QWidget *p
 	pasteSc->setContext(Qt::WidgetShortcut);
 	connect(pasteSc, SIGNAL(activated()), this, SLOT(onPasteClipboard()));
 
-	// Initial fill: the conditions page selected row 1 (the first condition) in OnInitDialog;
-	// the actions pages started at the top.
+	setExpanded(true);
+	// The first condition sits under the IF header, on row 1.
 	reload((m_mode == ModeConditions) ? 1 : 0);
 }
 
-WBQtScriptEditListTab::~WBQtScriptEditListTab()
-{
-	delete m_ui;
-}
-
-int WBQtScriptEditListTab::currentRow() const
+int WBQtScriptEditSection::currentRow() const
 {
 	return m_list->currentRow();
 }
 
-void WBQtScriptEditListTab::reload(int selectRow)
+int WBQtScriptEditSection::isFalse() const
+{
+	return (m_mode == ModeActionsFalse) ? 1 : 0;
+}
+
+void WBQtScriptEditSection::reload(int selectRow)
 {
 	m_updating = true;
 	if (selectRow < 0)
@@ -145,181 +312,215 @@ void WBQtScriptEditListTab::reload(int selectRow)
 	}
 	m_list->clear();
 	char buf[kLabelCap];
+	int items = 0;
 	if (m_mode == ModeConditions)
 	{
-		int count = WBQtScriptEditData_GetConditionRowCount(m_script);
+		const int count = WBQtScriptEditData_GetConditionRowCount(m_script);
+		int group = -1;
 		for (int i = 0; i < count; i++)
 		{
-			int kind = WBQtScriptEditData_GetConditionRow(m_script, i, buf, sizeof(buf));
-			QListWidgetItem *item = new QListWidgetItem(QString::fromLocal8Bit(buf), m_list);
-			item->setData(kRowKindRole, kind);
+			const int kind = WBQtScriptEditData_GetConditionRow(m_script, i, buf, sizeof(buf));
+			QString label = QString::fromLocal8Bit(buf);
+			QListWidgetItem *item = new QListWidgetItem(m_list);
+			item->setData(kKindRole, kind);
+			if (kind == 0)
+			{
+				++group;
+				item->setText(label.contains("OR") ? "OR" : "IF");
+				item->setFlags(item->flags() & ~Qt::ItemIsDragEnabled);
+				continue;
+			}
+			++items;
+			const bool isAnd = label.startsWith("  *AND* ");
+			label = isAnd ? label.mid(8) : label.trimmed();
+			item->setText(label);
+			item->setToolTip(label);
+			item->setData(kGroupRole, group);
+			item->setData(kPrefixRole, isAnd ? "AND" : "");
+			item->setData(kWarningRole, WBQtScriptEditData_GetConditionRowWarning(m_script, i) != 0);
 		}
 	}
 	else
 	{
-		int isFalse = (m_mode == ModeActionsFalse) ? 1 : 0;
-		int count = WBQtScriptEditData_GetActionCount(m_script, isFalse);
+		const int count = WBQtScriptEditData_GetActionCount(m_script, isFalse());
 		for (int i = 0; i < count; i++)
 		{
-			WBQtScriptEditData_GetActionLabel(m_script, isFalse, i, buf, sizeof(buf));
-			new QListWidgetItem(QString::fromLocal8Bit(buf), m_list);
+			WBQtScriptEditData_GetActionLabel(m_script, isFalse(), i, buf, sizeof(buf));
+			const QString label = QString::fromLocal8Bit(buf);
+			QListWidgetItem *item = new QListWidgetItem(label, m_list);
+			item->setToolTip(label);
+			item->setData(kKindRole, 1);
+			item->setData(kPrefixRole, QString("%1.").arg(i + 1));
+			item->setData(kWarningRole, WBQtScriptEditData_GetActionWarning(m_script, isFalse(), i) != 0);
 		}
+		items = count;
 	}
 	if (m_list->count() > 0)
 	{
-		if (selectRow >= m_list->count())
-		{
-			selectRow = m_list->count() - 1;
-		}
-		if (selectRow < 0)
-		{
-			selectRow = 0;
-		}
-		m_list->setCurrentRow(selectRow);
+		m_list->setCurrentRow(qBound(0, selectRow, m_list->count() - 1));
 	}
 
-	m_smartCopyCheck->setChecked(WBQtScriptEdit_GetSmartCopy() != 0);
-	int commentField = (m_mode == ModeConditions) ? WB_QT_SCRIPTEDIT_TEXT_CONDITION_COMMENT
-												  : WB_QT_SCRIPTEDIT_TEXT_ACTION_COMMENT;
-	QString comment = bridgeText(m_script, commentField);
-	if (m_commentEdit->toPlainText() != comment)
+	static const char *const kTitles[] = { "IF", "THEN", "ELSE" };
+	static const char *const kSubtitles[] = { "conditions", "actions if true", "actions if false" };
+	m_toggle->setText(QString("%1   %2 (%3)").arg(kTitles[m_mode]).arg(kSubtitles[m_mode]).arg(items));
+
+	if (m_note != NULL)
 	{
-		m_commentEdit->setPlainText(comment);
+		const QString note = bridgeText(m_script, WB_QT_SCRIPTEDIT_TEXT_CONDITION_COMMENT);
+		if (m_note->toPlainText() != note)
+		{
+			m_note->setPlainText(note);
+		}
+		fitNote(m_note, 1, 6);
 	}
 	m_updating = false;
 	updateButtonStates();
 }
 
-void WBQtScriptEditListTab::updateButtonStates()
+void WBQtScriptEditSection::setExpanded(bool expanded)
 {
-	int row = currentRow();
+	m_body->setVisible(expanded);
+	m_toggle->setArrowType(expanded ? Qt::DownArrow : Qt::RightArrow);
+	// A collapsed section shrinks to its header and gives its height to the open ones.
+	setSizePolicy(QSizePolicy::Preferred, expanded ? QSizePolicy::Expanding : QSizePolicy::Maximum);
+}
+
+void WBQtScriptEditSection::focusList()
+{
+	m_list->setFocus();
+}
+
+void WBQtScriptEditSection::onToggle()
+{
+	setExpanded(!m_body->isVisible());
+}
+
+void WBQtScriptEditSection::updateButtonStates()
+{
+	const int row = currentRow();
+	bool isItem = false;
+	if (row >= 0)
+	{
+		QListWidgetItem *item = m_list->item(row);
+		isItem = (item != NULL && item->data(kKindRole).toInt() == 1);
+	}
+	m_editButton->setEnabled(isItem);
+	m_copyButton->setEnabled(isItem);
 	if (m_mode == ModeConditions)
 	{
-		// == ScriptConditionsDlg::enableUI: Edit/Copy need a condition row, Delete needs any row.
-		bool isCondition = false;
-		if (row >= 0)
-		{
-			QListWidgetItem *item = m_list->item(row);
-			isCondition = (item != NULL && item->data(kRowKindRole).toInt() == 1);
-		}
-		m_editButton->setEnabled(isCondition);
-		m_copyButton->setEnabled(isCondition);
+		// A header row can be deleted, which merges its OR group into the one above.
 		m_deleteButton->setEnabled(row >= 0);
 	}
 	else
 	{
-		// == ScriptActionsTrue/False::enableUI.
-		bool hasAction = (row >= 0);
-		m_editButton->setEnabled(hasAction);
-		m_copyButton->setEnabled(hasAction);
-		m_deleteButton->setEnabled(hasAction);
-		m_moveToOtherButton->setEnabled(hasAction);
-		m_moveDownButton->setEnabled(hasAction && row < m_list->count() - 1);
-		m_moveUpButton->setEnabled(hasAction && row > 0);
+		m_deleteButton->setEnabled(isItem);
+		m_otherButton->setEnabled(isItem);
+		m_upButton->setEnabled(isItem && row > 0);
+		m_downButton->setEnabled(isItem && row < m_list->count() - 1);
 	}
 }
 
-void WBQtScriptEditListTab::onSelectionChanged()
+bool WBQtScriptEditSection::eventFilter(QObject *watched, QEvent *event)
 {
-	if (m_updating)
+	if (watched == m_list && event->type() == QEvent::KeyPress)
 	{
-		return;
+		QKeyEvent *key = static_cast<QKeyEvent *>(event);
+		if (keyIs(key, Qt::Key_Return, Qt::NoModifier) || keyIs(key, Qt::Key_Enter, Qt::NoModifier))
+		{
+			onEdit();
+			return true;
+		}
+		if (keyIs(key, Qt::Key_Delete, Qt::NoModifier))
+		{
+			onDelete();
+			return true;
+		}
+		if (keyIs(key, Qt::Key_Insert, Qt::NoModifier))
+		{
+			onNew();
+			return true;
+		}
+		if (keyIs(key, Qt::Key_D, Qt::ControlModifier))
+		{
+			onCopy();
+			return true;
+		}
+		if (keyIs(key, Qt::Key_Up, Qt::AltModifier))
+		{
+			onMoveUp();
+			return true;
+		}
+		if (keyIs(key, Qt::Key_Down, Qt::AltModifier))
+		{
+			onMoveDown();
+			return true;
+		}
 	}
-	updateButtonStates();
+	return QWidget::eventFilter(watched, event);
 }
 
-void WBQtScriptEditListTab::onNew()
+void WBQtScriptEditSection::onSelectionChanged()
 {
-	int newRow;
-	if (m_mode == ModeConditions)
+	if (!m_updating)
 	{
-		newRow = WBQtScriptEdit_ConditionNew(m_script, currentRow());
+		updateButtonStates();
 	}
-	else
-	{
-		newRow = WBQtScriptEdit_ActionNew(m_script, (m_mode == ModeActionsFalse) ? 1 : 0, currentRow());
-	}
+}
+
+void WBQtScriptEditSection::apply(int newRow)
+{
 	if (newRow >= 0)
 	{
 		reload(newRow);
 	}
 }
 
-void WBQtScriptEditListTab::onEdit()
+void WBQtScriptEditSection::onNew()
 {
-	int newRow;
-	if (m_mode == ModeConditions)
-	{
-		newRow = WBQtScriptEdit_ConditionEdit(m_script, currentRow());
-	}
-	else
-	{
-		newRow = WBQtScriptEdit_ActionEdit(m_script, (m_mode == ModeActionsFalse) ? 1 : 0, currentRow());
-	}
-	if (newRow >= 0)
-	{
-		reload(newRow);
-	}
+	apply((m_mode == ModeConditions)
+		? WBQtScriptEdit_ConditionNew(m_script, currentRow())
+		: WBQtScriptEdit_ActionNew(m_script, isFalse(), currentRow()));
 }
 
-void WBQtScriptEditListTab::onCopy()
+void WBQtScriptEditSection::onEdit()
 {
-	int newRow;
-	if (m_mode == ModeConditions)
-	{
-		newRow = WBQtScriptEdit_ConditionCopy(m_script, currentRow());
-	}
-	else
-	{
-		newRow = WBQtScriptEdit_ActionCopy(m_script, (m_mode == ModeActionsFalse) ? 1 : 0, currentRow());
-	}
-	if (newRow >= 0)
-	{
-		reload(newRow);
-	}
+	apply((m_mode == ModeConditions)
+		? WBQtScriptEdit_ConditionEdit(m_script, currentRow())
+		: WBQtScriptEdit_ActionEdit(m_script, isFalse(), currentRow()));
 }
 
-void WBQtScriptEditListTab::onCopyClipboard()
+void WBQtScriptEditSection::onCopy()
 {
-	// Stash the selected item to the app-lifetime clipboard (no list change, so no reload).
+	apply((m_mode == ModeConditions)
+		? WBQtScriptEdit_ConditionCopy(m_script, currentRow())
+		: WBQtScriptEdit_ActionCopy(m_script, isFalse(), currentRow()));
+}
+
+void WBQtScriptEditSection::onCopyClipboard()
+{
+	// Stashes the selected item; the list itself does not change.
 	if (m_mode == ModeConditions)
 	{
 		WBQtScriptEdit_ConditionCopyToClipboard(m_script, currentRow());
 	}
 	else
 	{
-		WBQtScriptEdit_ActionCopyToClipboard(m_script, (m_mode == ModeActionsFalse) ? 1 : 0, currentRow());
+		WBQtScriptEdit_ActionCopyToClipboard(m_script, isFalse(), currentRow());
 	}
 }
 
-void WBQtScriptEditListTab::onPasteClipboard()
+void WBQtScriptEditSection::onPasteClipboard()
 {
-	int newRow;
-	if (m_mode == ModeConditions)
-	{
-		newRow = WBQtScriptEdit_ConditionPasteFromClipboard(m_script, currentRow());
-	}
-	else
-	{
-		newRow = WBQtScriptEdit_ActionPasteFromClipboard(m_script, (m_mode == ModeActionsFalse) ? 1 : 0, currentRow());
-	}
-	if (newRow >= 0)
-	{
-		reload(newRow);
-	}
+	apply((m_mode == ModeConditions)
+		? WBQtScriptEdit_ConditionPasteFromClipboard(m_script, currentRow())
+		: WBQtScriptEdit_ActionPasteFromClipboard(m_script, isFalse(), currentRow()));
 }
 
-void WBQtScriptEditListTab::onDelete()
+void WBQtScriptEditSection::onDelete()
 {
-	int newRow;
-	if (m_mode == ModeConditions)
-	{
-		newRow = WBQtScriptEdit_ConditionDelete(m_script, currentRow());
-	}
-	else
-	{
-		newRow = WBQtScriptEdit_ActionDelete(m_script, (m_mode == ModeActionsFalse) ? 1 : 0, currentRow());
-	}
+	const int newRow = (m_mode == ModeConditions)
+		? WBQtScriptEdit_ConditionDelete(m_script, currentRow())
+		: WBQtScriptEdit_ActionDelete(m_script, isFalse(), currentRow());
 	if (newRow >= 0)
 	{
 		reload(newRow);
@@ -331,78 +532,74 @@ void WBQtScriptEditListTab::onDelete()
 	}
 }
 
-void WBQtScriptEditListTab::onOr()
+void WBQtScriptEditSection::onOr()
 {
-	int newRow = WBQtScriptEdit_ConditionOr(m_script, currentRow());
+	apply(WBQtScriptEdit_ConditionOr(m_script, currentRow()));
+}
+
+void WBQtScriptEditSection::onMoveToOther()
+{
+	const int newRow = WBQtScriptEdit_ActionMoveToOther(m_script, isFalse(), currentRow());
 	if (newRow >= 0)
 	{
 		reload(newRow);
+		emit otherListChanged();
 	}
 }
 
-void WBQtScriptEditListTab::onMoveToOther()
+void WBQtScriptEditSection::onMoveUp()
 {
-	int newRow = WBQtScriptEdit_ActionMoveToOther(m_script, (m_mode == ModeActionsFalse) ? 1 : 0, currentRow());
-	if (newRow >= 0)
-	{
-		// The other tab is rebuilt when it is activated (== the MFC pages' OnSetActive reload).
-		reload(newRow);
-	}
+	apply((m_mode == ModeConditions)
+		? WBQtScriptEdit_ConditionMoveUp(m_script, currentRow())
+		: WBQtScriptEdit_ActionMoveUp(m_script, isFalse(), currentRow()));
 }
 
-void WBQtScriptEditListTab::onMoveUp()
+void WBQtScriptEditSection::onMoveDown()
 {
-	int newRow;
-	if (m_mode == ModeConditions)
-	{
-		newRow = WBQtScriptEdit_ConditionMoveUp(m_script, currentRow());
-	}
-	else
-	{
-		newRow = WBQtScriptEdit_ActionMoveUp(m_script, (m_mode == ModeActionsFalse) ? 1 : 0, currentRow());
-	}
-	if (newRow >= 0)
-	{
-		reload(newRow);
-	}
+	apply((m_mode == ModeConditions)
+		? WBQtScriptEdit_ConditionMoveDown(m_script, currentRow())
+		: WBQtScriptEdit_ActionMoveDown(m_script, isFalse(), currentRow()));
 }
 
-void WBQtScriptEditListTab::onMoveDown()
+void WBQtScriptEditSection::onDropped()
 {
-	int newRow;
-	if (m_mode == ModeConditions)
-	{
-		newRow = WBQtScriptEdit_ConditionMoveDown(m_script, currentRow());
-	}
-	else
-	{
-		newRow = WBQtScriptEdit_ActionMoveDown(m_script, (m_mode == ModeActionsFalse) ? 1 : 0, currentRow());
-	}
-	if (newRow >= 0)
-	{
-		reload(newRow);
-	}
+	DragList *list = static_cast<DragList *>(m_list);
+	moveRow(list->takeFrom(), list->takeTo());
 }
 
-void WBQtScriptEditListTab::onSmartCopyToggled(bool checked)
+void WBQtScriptEditSection::moveRow(int from, int to)
 {
+	if (from < 0 || to < 0 || from == to)
+	{
+		return;
+	}
+	int row = from;
+	// Each bridge move is one step; the cap stops a move the bridge refuses from looping.
+	for (int step = 0; row != to && step < m_list->count() * 2; ++step)
+	{
+		const int next = (to > row)
+			? ((m_mode == ModeConditions) ? WBQtScriptEdit_ConditionMoveDown(m_script, row)
+				: WBQtScriptEdit_ActionMoveDown(m_script, isFalse(), row))
+			: ((m_mode == ModeConditions) ? WBQtScriptEdit_ConditionMoveUp(m_script, row)
+				: WBQtScriptEdit_ActionMoveUp(m_script, isFalse(), row));
+		if (next < 0 || next == row)
+		{
+			break;
+		}
+		row = next;
+	}
+	reload(row);
+}
+
+void WBQtScriptEditSection::onNoteChanged()
+{
+	fitNote(m_note, 1, 6);
 	if (m_updating)
 	{
 		return;
 	}
-	WBQtScriptEdit_SetSmartCopy(checked ? 1 : 0);
-}
-
-void WBQtScriptEditListTab::onCommentChanged()
-{
-	if (m_updating)
-	{
-		return;
-	}
-	int commentField = (m_mode == ModeConditions) ? WB_QT_SCRIPTEDIT_TEXT_CONDITION_COMMENT
-												  : WB_QT_SCRIPTEDIT_TEXT_ACTION_COMMENT;
-	QByteArray text = m_commentEdit->toPlainText().toLocal8Bit();
-	WBQtScriptEditData_SetText(m_script, commentField, text.constData());
+	const QByteArray text = m_note->toPlainText().toLocal8Bit();
+	WBQtScriptEditData_SetText(m_script, WB_QT_SCRIPTEDIT_TEXT_CONDITION_COMMENT, text.constData());
 }
 
 // ===================== WBQtScriptEditDialog =====================
@@ -413,28 +610,46 @@ WBQtScriptEditDialog::WBQtScriptEditDialog(void *script, QWidget *parent)
 	m_script(script),
 	m_updating(false)
 {
-	setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
-
-	// The static widget tree (tab widget + Script Properties page + button box) lives in
-	// WBQtScriptEditDialog.ui; the three list pages are runtime-built WBQtScriptEditListTabs.
+	setWindowFlags((windowFlags() & ~Qt::WindowContextHelpButtonHint) | Qt::WindowMaximizeButtonHint);
 	m_ui->setupUi(this);
 
-	m_tabs = m_ui->tabs;
+	// The flag chips: checkable, outlined when off and filled when on.
+	m_ui->activeChip->setProperty("scriptFlag", WB_QT_SCRIPTEDIT_FLAG_ACTIVE);
+	m_ui->subroutineChip->setProperty("scriptFlag", WB_QT_SCRIPTEDIT_FLAG_SUBROUTINE);
+	m_ui->oneShotChip->setProperty("scriptFlag", WB_QT_SCRIPTEDIT_FLAG_ONE_SHOT);
+	m_ui->easyChip->setProperty("scriptFlag", WB_QT_SCRIPTEDIT_FLAG_EASY);
+	m_ui->normalChip->setProperty("scriptFlag", WB_QT_SCRIPTEDIT_FLAG_NORMAL);
+	m_ui->hardChip->setProperty("scriptFlag", WB_QT_SCRIPTEDIT_FLAG_HARD);
+	const QList<QToolButton *> chips = flagChips();
+	for (int i = 0; i < chips.size(); ++i)
+	{
+		chips.at(i)->setCheckable(true);
+		chips.at(i)->setStyleSheet(
+			"QToolButton { border: 1px solid palette(mid); border-radius: 10px; padding: 2px 10px; }"
+			"QToolButton:checked { background-color: #37699f; border-color: #37699f; color: white; }");
+		connect(chips.at(i), SIGNAL(toggled(bool)), this, SLOT(onFlagToggled(bool)));
+	}
 
-	wirePropertiesTab();
-	m_conditionsTab = new WBQtScriptEditListTab(m_script, WBQtScriptEditListTab::ModeConditions, this);
-	m_tabs->addTab(m_conditionsTab, "Script Conditions");
-	m_trueTab = new WBQtScriptEditListTab(m_script, WBQtScriptEditListTab::ModeActionsTrue, this);
-	m_tabs->addTab(m_trueTab, "Actions if true.");
-	m_falseTab = new WBQtScriptEditListTab(m_script, WBQtScriptEditListTab::ModeActionsFalse, this);
-	m_tabs->addTab(m_falseTab, "Actions if false.");
-	connect(m_tabs, SIGNAL(currentChanged(int)), this, SLOT(onTabChanged(int)));
+	m_conditions = new WBQtScriptEditSection(m_script, WBQtScriptEditSection::ModeConditions, m_ui->sectionsHost);
+	m_actionsTrue = new WBQtScriptEditSection(m_script, WBQtScriptEditSection::ModeActionsTrue, m_ui->sectionsHost);
+	m_actionsFalse = new WBQtScriptEditSection(m_script, WBQtScriptEditSection::ModeActionsFalse, m_ui->sectionsHost);
+	m_ui->sectionsLayout->addWidget(m_conditions);
+	m_ui->sectionsLayout->addWidget(m_actionsTrue);
+	m_ui->sectionsLayout->addWidget(m_actionsFalse);
 
+	connect(m_actionsTrue, SIGNAL(otherListChanged()), this, SLOT(onFalseListChanged()));
+	connect(m_actionsFalse, SIGNAL(otherListChanged()), this, SLOT(onTrueListChanged()));
+	connect(m_ui->nameEdit, SIGNAL(textChanged(QString)), this, SLOT(onNameChanged(QString)));
+	connect(m_ui->commentEdit, SIGNAL(textChanged()), this, SLOT(onCommentChanged()));
+	connect(m_ui->actionNoteEdit, SIGNAL(textChanged()), this, SLOT(onActionNoteChanged()));
+	connect(m_ui->evalCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(onEvalChanged(int)));
+	connect(m_ui->secondsSpin, SIGNAL(valueChanged(int)), this, SLOT(onSecondsChanged(int)));
+	connect(m_ui->smartCopyCheck, SIGNAL(toggled(bool)), this, SLOT(onSmartCopyToggled(bool)));
 	connect(m_ui->buttonBox, SIGNAL(accepted()), this, SLOT(accept()));
 	connect(m_ui->buttonBox, SIGNAL(rejected()), this, SLOT(reject()));
 
 	seedProperties();
-	resize(780, 560);
+	resize(880, 760);
 }
 
 WBQtScriptEditDialog::~WBQtScriptEditDialog()
@@ -444,136 +659,70 @@ WBQtScriptEditDialog::~WBQtScriptEditDialog()
 
 void WBQtScriptEditDialog::applyInitialFocus(int tab, int row)
 {
-	if (tab < 0 || tab >= m_tabs->count())
-	{
-		return;
-	}
-	m_tabs->setCurrentIndex(tab);
-	WBQtScriptEditListTab *page = NULL;
+	WBQtScriptEditSection *section = NULL;
 	if (tab == 1)
 	{
-		page = m_conditionsTab;
+		section = m_conditions;
 	}
 	else if (tab == 2)
 	{
-		page = m_trueTab;
+		section = m_actionsTrue;
 	}
 	else if (tab == 3)
 	{
-		page = m_falseTab;
+		section = m_actionsFalse;
 	}
-	if (page != NULL)
+	if (section == NULL)
 	{
-		page->reload(row);
+		m_ui->nameEdit->setFocus();
+		return;
 	}
-}
-
-void WBQtScriptEditDialog::wirePropertiesTab()
-{
-	m_nameEdit = m_ui->nameEdit;
-	m_subroutineCheck = m_ui->subroutineCheck;
-	m_activeCheck = m_ui->activeCheck;
-	m_oneShotCheck = m_ui->oneShotCheck;
-	m_easyCheck = m_ui->easyCheck;
-	m_normalCheck = m_ui->normalCheck;
-	m_hardCheck = m_ui->hardCheck;
-	m_everyFrameRadio = m_ui->everyFrameRadio;
-	m_everySecondRadio = m_ui->everySecondRadio;
-	m_secondsSpin = m_ui->secondsSpin;
-	m_commentEdit = m_ui->commentEdit;
-
-	connect(m_nameEdit, SIGNAL(textChanged(QString)), this, SLOT(onNameChanged(QString)));
-	connect(m_commentEdit, SIGNAL(textChanged()), this, SLOT(onCommentChanged()));
-	connect(m_everyFrameRadio, SIGNAL(clicked()), this, SLOT(onEveryFrame()));
-	connect(m_everySecondRadio, SIGNAL(clicked()), this, SLOT(onEverySecond()));
-	connect(m_secondsSpin, SIGNAL(valueChanged(int)), this, SLOT(onSecondsChanged(int)));
-
-	// The six flag checkboxes write straight through (== the page's ON_BN_CLICKED handlers).
-	connect(m_subroutineCheck, &QCheckBox::toggled, this, [this](bool on)
-	{
-		if (!m_updating)
-		{
-			WBQtScriptEditData_SetFlag(m_script, WB_QT_SCRIPTEDIT_FLAG_SUBROUTINE, on ? 1 : 0);
-		}
-	});
-	connect(m_activeCheck, &QCheckBox::toggled, this, [this](bool on)
-	{
-		if (!m_updating)
-		{
-			WBQtScriptEditData_SetFlag(m_script, WB_QT_SCRIPTEDIT_FLAG_ACTIVE, on ? 1 : 0);
-		}
-	});
-	connect(m_oneShotCheck, &QCheckBox::toggled, this, [this](bool on)
-	{
-		if (!m_updating)
-		{
-			WBQtScriptEditData_SetFlag(m_script, WB_QT_SCRIPTEDIT_FLAG_ONE_SHOT, on ? 1 : 0);
-		}
-	});
-	connect(m_easyCheck, &QCheckBox::toggled, this, [this](bool on)
-	{
-		if (!m_updating)
-		{
-			WBQtScriptEditData_SetFlag(m_script, WB_QT_SCRIPTEDIT_FLAG_EASY, on ? 1 : 0);
-		}
-	});
-	connect(m_normalCheck, &QCheckBox::toggled, this, [this](bool on)
-	{
-		if (!m_updating)
-		{
-			WBQtScriptEditData_SetFlag(m_script, WB_QT_SCRIPTEDIT_FLAG_NORMAL, on ? 1 : 0);
-		}
-	});
-	connect(m_hardCheck, &QCheckBox::toggled, this, [this](bool on)
-	{
-		if (!m_updating)
-		{
-			WBQtScriptEditData_SetFlag(m_script, WB_QT_SCRIPTEDIT_FLAG_HARD, on ? 1 : 0);
-		}
-	});
+	section->setExpanded(true);
+	section->reload(row);
+	section->focusList();
 }
 
 void WBQtScriptEditDialog::seedProperties()
 {
 	m_updating = true;
-	QString name = bridgeText(m_script, WB_QT_SCRIPTEDIT_TEXT_NAME);
-	m_nameEdit->setText(name);
+	const QString name = bridgeText(m_script, WB_QT_SCRIPTEDIT_TEXT_NAME);
+	m_ui->nameEdit->setText(name);
 	setWindowTitle(name.isEmpty() ? QString("Script") : name);
-	m_commentEdit->setPlainText(bridgeText(m_script, WB_QT_SCRIPTEDIT_TEXT_COMMENT));
-	m_subroutineCheck->setChecked(WBQtScriptEditData_GetFlag(m_script, WB_QT_SCRIPTEDIT_FLAG_SUBROUTINE) != 0);
-	m_activeCheck->setChecked(WBQtScriptEditData_GetFlag(m_script, WB_QT_SCRIPTEDIT_FLAG_ACTIVE) != 0);
-	m_oneShotCheck->setChecked(WBQtScriptEditData_GetFlag(m_script, WB_QT_SCRIPTEDIT_FLAG_ONE_SHOT) != 0);
-	m_easyCheck->setChecked(WBQtScriptEditData_GetFlag(m_script, WB_QT_SCRIPTEDIT_FLAG_EASY) != 0);
-	m_normalCheck->setChecked(WBQtScriptEditData_GetFlag(m_script, WB_QT_SCRIPTEDIT_FLAG_NORMAL) != 0);
-	m_hardCheck->setChecked(WBQtScriptEditData_GetFlag(m_script, WB_QT_SCRIPTEDIT_FLAG_HARD) != 0);
+	m_ui->commentEdit->setPlainText(bridgeText(m_script, WB_QT_SCRIPTEDIT_TEXT_COMMENT));
+	m_ui->actionNoteEdit->setPlainText(bridgeText(m_script, WB_QT_SCRIPTEDIT_TEXT_ACTION_COMMENT));
+	fitNote(m_ui->commentEdit, 2, 5);
+	fitNote(m_ui->actionNoteEdit, 1, 6);
 
-	int delay = WBQtScriptEditData_GetDelaySeconds(m_script);
-	m_everySecondRadio->setChecked(delay > 0);
-	m_everyFrameRadio->setChecked(delay == 0);
+	const QList<QToolButton *> chips = flagChips();
+	for (int i = 0; i < chips.size(); ++i)
+	{
+		chips.at(i)->setChecked(WBQtScriptEditData_GetFlag(m_script, chips.at(i)->property("scriptFlag").toInt()) != 0);
+	}
+
+	const int delay = WBQtScriptEditData_GetDelaySeconds(m_script);
+	m_ui->evalCombo->setCurrentIndex(delay > 0 ? 1 : 0);
 	if (delay > 0)
 	{
-		m_secondsSpin->setValue(delay);
+		m_ui->secondsSpin->setValue(delay);
 	}
-	m_secondsSpin->setEnabled(delay > 0);
+	m_ui->secondsSpin->setEnabled(delay > 0);
+	m_ui->smartCopyCheck->setChecked(WBQtScriptEdit_GetSmartCopy() != 0);
 	m_updating = false;
 }
 
-void WBQtScriptEditDialog::onTabChanged(int index)
+QList<QToolButton *> WBQtScriptEditDialog::flagChips() const
 {
-	// == the MFC pages' OnSetActive: the list pages rebuild on activation (this is what lets
-	// "Move to False/True" show up on the other page) and re-read the Smart Copy setting.
-	QWidget *page = m_tabs->widget(index);
-	if (page == m_conditionsTab)
+	QList<QToolButton *> chips;
+	chips << m_ui->activeChip << m_ui->subroutineChip << m_ui->oneShotChip
+		<< m_ui->easyChip << m_ui->normalChip << m_ui->hardChip;
+	return chips;
+}
+
+void WBQtScriptEditDialog::onFlagToggled(bool on)
+{
+	if (!m_updating)
 	{
-		m_conditionsTab->reload(-1);
-	}
-	else if (page == m_trueTab)
-	{
-		m_trueTab->reload(-1);
-	}
-	else if (page == m_falseTab)
-	{
-		m_falseTab->reload(-1);
+		WBQtScriptEditData_SetFlag(m_script, sender()->property("scriptFlag").toInt(), on ? 1 : 0);
 	}
 }
 
@@ -583,42 +732,40 @@ void WBQtScriptEditDialog::onNameChanged(const QString &text)
 	{
 		return;
 	}
-	QByteArray name = text.toLocal8Bit();
+	const QByteArray name = text.toLocal8Bit();
 	WBQtScriptEditData_SetText(m_script, WB_QT_SCRIPTEDIT_TEXT_NAME, name.constData());
-	// == ScriptProperties::OnChangeScriptName updating the sheet caption live.
 	setWindowTitle(text);
 }
 
 void WBQtScriptEditDialog::onCommentChanged()
 {
+	fitNote(m_ui->commentEdit, 2, 5);
 	if (m_updating)
 	{
 		return;
 	}
-	QByteArray text = m_commentEdit->toPlainText().toLocal8Bit();
+	const QByteArray text = m_ui->commentEdit->toPlainText().toLocal8Bit();
 	WBQtScriptEditData_SetText(m_script, WB_QT_SCRIPTEDIT_TEXT_COMMENT, text.constData());
 }
 
-void WBQtScriptEditDialog::onEveryFrame()
+void WBQtScriptEditDialog::onActionNoteChanged()
 {
+	fitNote(m_ui->actionNoteEdit, 1, 6);
 	if (m_updating)
 	{
 		return;
 	}
-	// == ScriptProperties::OnEveryFrame.
-	WBQtScriptEditData_SetDelaySeconds(m_script, 0);
-	m_secondsSpin->setEnabled(false);
+	const QByteArray text = m_ui->actionNoteEdit->toPlainText().toLocal8Bit();
+	WBQtScriptEditData_SetText(m_script, WB_QT_SCRIPTEDIT_TEXT_ACTION_COMMENT, text.constData());
 }
 
-void WBQtScriptEditDialog::onEverySecond()
+void WBQtScriptEditDialog::onEvalChanged(int index)
 {
-	if (m_updating)
+	m_ui->secondsSpin->setEnabled(index == 1);
+	if (!m_updating)
 	{
-		return;
+		WBQtScriptEditData_SetDelaySeconds(m_script, (index == 1) ? m_ui->secondsSpin->value() : 0);
 	}
-	// == ScriptProperties::OnEverySecond (seeds 1 second; the spin then edits it).
-	m_secondsSpin->setEnabled(true);
-	WBQtScriptEditData_SetDelaySeconds(m_script, m_secondsSpin->value());
 }
 
 void WBQtScriptEditDialog::onSecondsChanged(int value)
@@ -627,17 +774,37 @@ void WBQtScriptEditDialog::onSecondsChanged(int value)
 	{
 		return;
 	}
-	// == ScriptProperties::OnChangeSecondsEdit (typing switches to per-seconds evaluation).
-	m_everySecondRadio->setChecked(true);
-	m_secondsSpin->setEnabled(true);
+	// Typing a delay switches to per-seconds evaluation.
+	if (m_ui->evalCombo->currentIndex() != 1)
+	{
+		m_ui->evalCombo->setCurrentIndex(1);
+	}
 	WBQtScriptEditData_SetDelaySeconds(m_script, value);
+}
+
+void WBQtScriptEditDialog::onSmartCopyToggled(bool on)
+{
+	if (!m_updating)
+	{
+		WBQtScriptEdit_SetSmartCopy(on ? 1 : 0);
+	}
+}
+
+void WBQtScriptEditDialog::onTrueListChanged()
+{
+	m_actionsTrue->reload(-1);
+}
+
+void WBQtScriptEditDialog::onFalseListChanged()
+{
+	m_actionsFalse->reload(-1);
 }
 
 // ===================== the modal entry point =====================
 
 namespace
 {
-	// One-shot initial tab/row for the next Run (WBQtScriptEdit_SetInitialFocus); -1 = none.
+	// One-shot initial section/row for the next Run (WBQtScriptEdit_SetInitialFocus); -1 = none.
 	int s_initialFocusTab = -1;
 	int s_initialFocusRow = -1;
 }
@@ -648,11 +815,24 @@ extern "C" void WBQtScriptEdit_SetInitialFocus(int tab, int row)
 	s_initialFocusRow = row;
 }
 
+// Either design runs the same way: modal, focused, and owning the MFC sub-modals the bridge pops.
+template <class Dialog>
+static int runScriptEdit(Dialog &dlg, int initialTab, int initialRow)
+{
+	dlg.setWindowModality(Qt::ApplicationModal);
+	if (initialTab >= 0)
+	{
+		dlg.applyInitialFocus(initialTab, initialRow);
+	}
+	WBQtScriptEdit_SetModalOwner(reinterpret_cast<void *>(dlg.winId()));
+	const int rc = dlg.exec();
+	WBQtScriptEdit_SetModalOwner(NULL);
+	return (rc == QDialog::Accepted) ? 1 : 0;
+}
+
 extern "C" int WBQtScriptEdit_Run(void *script, void * /*frameHwnd*/)
 {
-	// Snapshot + clear the one-shot initial focus FIRST, unconditionally: the "one-shot"
-	// guarantee lives entirely here, so a pending focus can never leak into a later
-	// unrelated Run no matter which path the caller took to reach us.
+	// Snapshot + clear the one-shot focus first, so it can never leak into a later Run.
 	const int initialTab = s_initialFocusTab;
 	const int initialRow = s_initialFocusRow;
 	s_initialFocusTab = -1;
@@ -662,26 +842,17 @@ extern "C" int WBQtScriptEdit_Run(void *script, void * /*frameHwnd*/)
 	{
 		return 0;
 	}
-	// Parent to the Qt Script window: the dialog becomes transient to it (always stacks above
-	// the script window, centers over it), like the MFC sheet owned by the ScriptDialog. When
-	// the script window isn't visible, parent to the main window instead.
+	// Transient to the Qt Script window when it is up, else the main window.
 	QWidget *owner = WBQtScriptWindow::instance();
 	if (owner == NULL || !owner->isVisible())
 	{
 		owner = WBQt_DialogParent();
 	}
-	WBQtScriptEditDialog dlg(script, owner);
-	// Stage 1 phase 3: Qt ApplicationModal fences every Qt window incl. the hosted viewport
-	// (QWinHost WindowBlocked), so the old EnableWindow(frame) discipline is gone.
-	dlg.setWindowModality(Qt::ApplicationModal);
-	if (initialTab >= 0)
+	if (WBQtScript_GetNewDesign() == 0)
 	{
-		dlg.applyInitialFocus(initialTab, initialRow);
+		WBQtScriptEditDialogClassic classic(script, owner);
+		return runScriptEdit(classic, initialTab, initialRow);
 	}
-	// Register our HWND so the MFC EditCondition/EditAction modals the bridge pops are owned
-	// by (and disable) this dialog.
-	WBQtScriptEdit_SetModalOwner(reinterpret_cast<void *>(dlg.winId()));
-	int rc = dlg.exec();
-	WBQtScriptEdit_SetModalOwner(NULL);
-	return (rc == QDialog::Accepted) ? 1 : 0;
+	WBQtScriptEditDialog dlg(script, owner);
+	return runScriptEdit(dlg, initialTab, initialRow);
 }

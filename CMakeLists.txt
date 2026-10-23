@@ -49,6 +49,7 @@ if(MINGW)
 endif()
 
 # Find/Add build dependencies and stubs shared by all projects
+set(RTS_EMBEDDED_SHADERS_SOURCE "${CMAKE_BINARY_DIR}/generated/EmbeddedShaders.cpp")
 if((WIN32 OR "${CMAKE_SYSTEM}" MATCHES "Windows") AND ${CMAKE_SIZEOF_VOID_P} EQUAL 4)
     if(RTS_D3D_BACKEND STREQUAL "D3D9")
         include(cmake/dx9.cmake)
@@ -57,6 +58,12 @@ if((WIN32 OR "${CMAKE_SYSTEM}" MATCHES "Windows") AND ${CMAKE_SIZEOF_VOID_P} EQU
     else()
         include(cmake/dx8.cmake)
     endif()
+endif()
+if(NOT TARGET rts_shaders)
+    # Without the D3D9 shaders the engine still links the lookup, so it gets an empty table.
+    execute_process(COMMAND "${CMAKE_COMMAND}"
+        "-DOUTPUT_FILE=${RTS_EMBEDDED_SHADERS_SOURCE}"
+        -P "${CMAKE_SOURCE_DIR}/cmake/embed_shaders.cmake")
 endif()
 
 # Define a dummy stlport target when not on VC6.
@@ -68,6 +75,11 @@ endif()
 
 include(cmake/config.cmake)
 include(cmake/gamespy.cmake)
+if (IS_VS6_BUILD)
+    add_library(gamemath INTERFACE)
+else()
+    include(cmake/gamemath.cmake)
+endif()
 include(cmake/lzhl.cmake)
 include(cmake/stb.cmake)
 

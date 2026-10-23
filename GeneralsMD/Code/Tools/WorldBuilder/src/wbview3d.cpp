@@ -95,9 +95,11 @@ extern "C" int WBQtObject_GetRenderParticles(void);
 #include "W3DDevice/Common/W3DConvert.h"
 #include "W3DDevice/GameClient/W3DShadow.h"
 #include "W3DDevice/GameClient/W3DShadowMap.h"
+#include "W3DDevice/GameClient/W3DWater.h"
 #include "W3DDevice/GameClient/W3DBloom.h"
 #include "W3DDevice/GameClient/W3DSoftParticles.h"
 #include "W3DDevice/GameClient/W3DSkyClouds.h"
+#include "W3DDevice/GameClient/W3DColorLut.h"
 #include "DrawObject.h"
 #include "RulerTool.h"
 #include "TracingOverlayOptions.h"
@@ -675,6 +677,7 @@ WbView3d::WbView3d() :
 	m_time(0),
 	m_lastAnimTick(0),
 	m_updateCount(0),
+	m_topViewError(""),
 	m_labelEpoch(0),
 	m_labelAnchorMode(0),
 	m_labelRenderer(0),
@@ -812,6 +815,8 @@ WbView3d::~WbView3d()
 	TheW3DSoftParticles = nullptr;
 	delete TheW3DSkyClouds;
 	TheW3DSkyClouds = nullptr;
+	delete TheW3DColorLut;
+	TheW3DColorLut = nullptr;
 	shutdownWW3D();
 }
 // ----------------------------------------------------------------------------
@@ -1276,6 +1281,7 @@ void WbView3d::resetRenderObjects()
 		BuildListInfo *pBuild = pSide->getBuildList();
 		while (pBuild) {
 			pBuild->setRenderObj(nullptr);
+			pBuild->setShadowObj(nullptr);
 			pBuild = pBuild->getNext();
 		}
 	}
@@ -1465,6 +1471,14 @@ void WbView3d::updateScorches()
 }
 
 // ----------------------------------------------------------------------------
+static Real getMapObjectScale(MapObject *pMapObj)
+{
+	Bool exists;
+	Real scale = pMapObj->getProperties()->getReal(TheKey_objectScale, &exists);
+	return (exists && scale > 0.0f) ? scale : 1.0f;
+}
+
+// ----------------------------------------------------------------------------
 void WbView3d::updateTrees()
 {
 	/** 
@@ -1490,7 +1504,7 @@ void WbView3d::updateTrees()
 		tTemplate = pMapObj->getThingTemplate();
 		if (tTemplate && tTemplate->isKindOf(KINDOF_OPTIMIZED_TREE) )
 		{
-			Real scale = tTemplate->getAssetScale();
+			Real scale = tTemplate->getAssetScale() * getMapObjectScale(pMapObj);
 			const ModuleInfo& mi = tTemplate->getDrawModuleInfo();
 			if (mi.getCount() > 0)
 			{
@@ -1745,6 +1759,12 @@ AsciiString WbView3d::getBestModelName(const ThingTemplate* tt, const ModelCondi
 }
 
 // ----------------------------------------------------------------------------
+Bool WbView3d::isBuildListSideHidden(Int side)
+{
+	return BuildListTool::isActive() && getShowBuildListSideOnly() && side != BuildList::getCurSide();
+}
+
+// ----------------------------------------------------------------------------
 void WbView3d::invalBuildListItemInView(BuildListInfo *pBuildToInval)
 {
 	Int i;
@@ -1752,6 +1772,7 @@ void WbView3d::invalBuildListItemInView(BuildListInfo *pBuildToInval)
 
 	for (i=0; i<TheSidesList->getNumSides(); i++) {
 		SidesInfo *pSide = TheSidesList->getSideInfo(i);
+		Bool sideHidden = isBuildListSideHidden(i);
 
 		// find which player color we should use
 		Int playerColor = 0xFFFFFF;
@@ -1777,11 +1798,24 @@ void WbView3d::invalBuildListItemInView(BuildListInfo *pBuildToInval)
 			if (!BuildListTool::isActive() && !pBuild->isInitiallyBuilt() && !getShowBuildListObjects()) {
 				continue;
 			}
+			if (sideHidden) {
+				if (pBuild->getShadowObj()) {
+					TheW3DShadowManager->removeShadow(pBuild->getShadowObj());
+					pBuild->setShadowObj(nullptr);
+				}
+				if (pBuild->getRenderObj()) {
+					if (m_baseBuildScene->safeContains(pBuild->getRenderObj())) {
+						m_baseBuildScene->Remove_Render_Object(pBuild->getRenderObj());
+					}
+					pBuild->setRenderObj(nullptr);
+				}
+				continue;
+			}
 			// Update.
 			Coord3D loc = *pBuild->getLocation();
 			loc.z += m_heightMapRenderObj->getHeightMapHeight(loc.x, loc.y, nullptr);
 			RenderObjClass *renderObj=nullptr;
-			Shadow			*shadowObj=nullptr;
+			Shadow			*shadowObj=pBuild->getShadowObj();
 			// Build list render obj is not refcounted, so check & make sure it exists in the scene.
 			if (pBuild->getRenderObj()) {
 				if (!m_baseBuildScene->safeContains(pBuild->getRenderObj())) {
@@ -1861,6 +1895,10 @@ void WbView3d::invalBuildListItemInView(BuildListInfo *pBuildToInval)
 		if (!m_baseBuildScene->safeContains(pBuildToInval->getRenderObj())) {
 			pBuildToInval->setRenderObj(nullptr);
 		}
+	}
+	if (!found && pBuildToInval && pBuildToInval->getShadowObj()) {
+		TheW3DShadowManager->removeShadow(pBuildToInval->getShadowObj());
+		pBuildToInval->setShadowObj(nullptr);
 	}
 	if (!found && pBuildToInval && pBuildToInval->getRenderObj()) {
 		m_baseBuildScene->Remove_Render_Object(pBuildToInval->getRenderObj());
@@ -1970,7 +2008,7 @@ AsciiString WbView3d::getModelNameAndScale(MapObject *pMapObj, Real *scale,
 
 			// get visual data from the thing template
 			modelName = getBestModelNameWBPrev(tTemplate, state);
-			*scale = tTemplate->getAssetScale();
+			*scale = tTemplate->getAssetScale() * getMapObjectScale(pMapObj);
 
 		}  // end if
 	}  // end else
@@ -2261,6 +2299,7 @@ void WbView3d::invalObjectInView(MapObject *pMapObjIn)
 				if (scale > 2.0 && pMapObj->getThingTemplate()->isKindOf(KINDOF_INFANTRY)) {
 					scale *= 4.0f;  // scale up to 350% 
 				}
+				scale *= getMapObjectScale(pMapObj);
 		
 				// Setup model condition flags from the current damage state
 				ModelConditionFlags state;
@@ -3188,7 +3227,7 @@ MapObject *WbView3d::pickedTreeAlongRay(const Vector3 &rayStart, const Vector3 &
 		}
 
 		// Place it the way addTree() does: terrain height at the trunk, uniform template scale.
-		const Real scale = tt->getAssetScale();
+		const Real scale = tt->getAssetScale() * getMapObjectScale(pObj);
 		Coord3D pos = *pObj->getLocation();
 		pos.z += m_heightMapRenderObj->getHeightMapHeight(pos.x, pos.y, NULL);
 
@@ -4313,7 +4352,10 @@ BuildListInfo *WbView3d::pickedBuildObjectInView(CPoint viewPt)
 	Int i;
 	viewToDocCoords(viewPt, &cpt, false);
  	for (i=0; i<TheSidesList->getNumSides(); i++) {
-		SidesInfo *pSide = TheSidesList->getSideInfo(i); 
+		if (isBuildListSideHidden(i)) {
+			continue;
+		}
+		SidesInfo *pSide = TheSidesList->getSideInfo(i);
 		for (BuildListInfo *pBuild = pSide->getBuildList(); pBuild; pBuild = pBuild->getNext()) {
 			Coord3D center = *pBuild->getLocation();
 			center.x -= cpt.x;
@@ -4771,6 +4813,27 @@ void WbView3d::reloadIconColors()
 // }
 
 // ----------------------------------------------------------------------------
+// Animations advance by the time that actually passed, not a fixed step per redraw,
+// so the extra repaints a mouse move triggers do not speed them up. The cap keeps a
+// long stall from jumping them forward.
+void WbView3d::advanceAnimation()
+{
+	LARGE_INTEGER animFreq;
+	LARGE_INTEGER animNow;
+	::QueryPerformanceFrequency(&animFreq);
+	::QueryPerformanceCounter(&animNow);
+	Real animStepMs = TheFramePacer->getLogicTimeStepMilliseconds();
+	if (m_lastAnimTick != 0) {
+		animStepMs = (Real)((double)(animNow.QuadPart - m_lastAnimTick) * 1000.0 / (double)animFreq.QuadPart);
+		if (animStepMs > 100.0f) {
+			animStepMs = 100.0f;
+		}
+	}
+	m_lastAnimTick = animNow.QuadPart;
+	WW3D::Update_Logic_Frame_Time(animStepMs);
+	WW3D::Sync(WW3D::Get_Fractional_Sync_Milliseconds() >= WWSyncMilliseconds);
+}
+
 void WbView3d::redraw(void) 
 {
 	if (m_updateCount > 0) {
@@ -4847,23 +4910,7 @@ void WbView3d::redraw(void)
 		);
 	}
 
-	// Animations advance by the time that actually passed, not a fixed step per redraw,
-	// so the extra repaints a mouse move triggers do not speed them up. The cap keeps a
-	// long stall from jumping them forward.
-	LARGE_INTEGER animFreq;
-	LARGE_INTEGER animNow;
-	::QueryPerformanceFrequency(&animFreq);
-	::QueryPerformanceCounter(&animNow);
-	Real animStepMs = TheFramePacer->getLogicTimeStepMilliseconds();
-	if (m_lastAnimTick != 0) {
-		animStepMs = (Real)((double)(animNow.QuadPart - m_lastAnimTick) * 1000.0 / (double)animFreq.QuadPart);
-		if (animStepMs > 100.0f) {
-			animStepMs = 100.0f;
-		}
-	}
-	m_lastAnimTick = animNow.QuadPart;
-	WW3D::Update_Logic_Frame_Time(animStepMs);
-	WW3D::Sync(WW3D::Get_Fractional_Sync_Milliseconds() >= WWSyncMilliseconds);
+	advanceAnimation();
 
 	m_buildRedMultiplier += (GetTickCount()-m_time)/500.0f;
 	if (m_buildRedMultiplier>4.0f || m_buildRedMultiplier<0) {
@@ -4881,6 +4928,398 @@ void WbView3d::redraw(void)
 	TheFramePacer->update();
 
 	m_time = ::GetTickCount();
+}
+
+Bool WbView3d::beginTopView(const TopViewCapture &capture, Bool aboveGround)
+{
+	endTopView();
+	m_topViewError = "";
+	WorldHeightMapEdit *pMap = WbDoc() ? WbDoc()->GetHeightMap() : NULL;
+	if (!m_ww3dInited || pMap == NULL || m_heightMapRenderObj == NULL)
+	{
+		m_topViewError = "the 3D view is not ready";
+		return false;
+	}
+	const Real worldX = capture.x1 - capture.x0;
+	const Real worldY = capture.y1 - capture.y0;
+	if (worldX <= 0.0f || worldY <= 0.0f)
+	{
+		m_topViewError = "the area is empty";
+		return false;
+	}
+
+	TopViewSession &s = m_topView;
+	s.active = true;
+	s.capture = capture;
+	s.aboveGround = aboveGround;
+
+	// The editor view stays still while the session owns the terrain and the lights.
+	++m_updateCount;
+
+	Real maxZ = 0.0f;
+	for (Int j = 0; j < pMap->getYExtent(); j++)
+	{
+		for (Int i = 0; i < pMap->getXExtent(); i++)
+		{
+			maxZ = max(maxZ, pMap->getHeight(i, j) * MAP_HEIGHT_SCALE);
+		}
+	}
+	s.camZ = maxZ + 200.0f;
+
+	s.oldTimeOfDay = TheGlobalData->m_timeOfDay;
+	if (capture.timeOfDay > TIME_OF_DAY_INVALID && capture.timeOfDay < TIME_OF_DAY_COUNT && capture.timeOfDay != s.oldTimeOfDay)
+	{
+		TheWritableGlobalData->m_timeOfDay = (TimeOfDay)capture.timeOfDay;
+		updateLights();
+	}
+
+	m_heightMapRenderObj->removeAllRoads();
+	if (aboveGround && capture.roads)
+	{
+		m_heightMapRenderObj->loadRoadsAndBridges(NULL, FALSE);
+	}
+	s.removedTrees = !(aboveGround && capture.trees);
+	if (s.removedTrees)
+	{
+		m_heightMapRenderObj->removeAllTrees();
+	}
+	s.objects.clear();
+	s.wasHidden.clear();
+	for (MapObject *pObj = MapObject::getFirstMapObject(); pObj; pObj = pObj->getNext())
+	{
+		RenderObjClass *robj = pObj->getRenderObj();
+		if (robj != NULL)
+		{
+			s.objects.push_back(robj);
+			s.wasHidden.push_back(robj->Is_Hidden() != 0);
+			robj->Set_Hidden((aboveGround && capture.objects) ? 0 : 1);
+		}
+	}
+
+	// Volume shadows resolve only inside a back-buffer-sized quad, which a render larger than the window overruns.
+	// Under the shadow map they draw no volumes and cast into the map instead, so they stay on there.
+	s.wantShadowVolumes = TheGlobalData->m_useShadowVolumes;
+	s.wantShadowDecals = TheGlobalData->m_useShadowDecals;
+	s.wantClouds = TheGlobalData->m_useCloudMap;
+	s.wantMacroTexture = TheGlobalData->m_useLightMap;
+	if (!TheGlobalData->m_useShadowMap || !capture.shadows)
+	{
+		TheWritableGlobalData->m_useShadowVolumes = false;
+	}
+	if (!capture.shadows)
+	{
+		TheWritableGlobalData->m_useShadowDecals = false;
+	}
+	TheWritableGlobalData->m_useCloudMap = capture.clouds;
+	TheWritableGlobalData->m_useLightMap = capture.macroTexture;
+
+	// The terrain reads the paint on every render, so painting every cell covers all the ground.
+	s.paintEverywhere.clear();
+	s.paint = NULL;
+	if (capture.stochastic)
+	{
+		s.paintEverywhere.resize(pMap->getStochasticBytes());
+		for (size_t k = 0; k + 2 < s.paintEverywhere.size(); k += 3)
+		{
+			s.paintEverywhere[k] = 255;
+			s.paintEverywhere[k + 1] = 1;
+			s.paintEverywhere[k + 2] = 128;
+		}
+		s.paint = pMap->swapStochastic(&s.paintEverywhere[0]);
+	}
+
+	s.camera = NEW_REF(CameraClass, ());
+	Matrix3D camTran(1);
+	camTran.Set_Translation(Vector3((capture.x0 + capture.x1)*0.5f, (capture.y0 + capture.y1)*0.5f, s.camZ));
+	s.camera->Set_Transform(camTran);
+	s.camera->Set_Projection_Type(CameraClass::ORTHO);
+	s.camera->Set_View_Plane(Vector2(-worldX*0.5f, -worldY*0.5f), Vector2(worldX*0.5f, worldY*0.5f));
+	s.camera->Set_Clip_Planes(1.0f, s.camZ + 1000.0f);
+	return true;
+}
+
+Bool WbView3d::drawTopView(Int size)
+{
+	TopViewSession &s = m_topView;
+	if (!s.active || size <= 0)
+	{
+		m_topViewError = "no top view is set up";
+		return false;
+	}
+	const TopViewCapture &capture = s.capture;
+	const Real worldX = capture.x1 - capture.x0;
+	const Real worldY = capture.y1 - capture.y0;
+
+	if (s.target == NULL || s.targetSize != size)
+	{
+		REF_PTR_RELEASE(s.depth);
+		REF_PTR_RELEASE(s.target);
+		// The shadow pass ends with a back-buffer-sized quad masked by the stencil, so the depth needs stencil bits.
+		DX8Wrapper::Create_Render_Target(size, size, WW3D_FORMAT_X8R8G8B8, WW3D_ZFORMAT_D24S8, &s.target, &s.depth);
+		s.targetSize = size;
+		if (s.target == NULL)
+		{
+			REF_PTR_RELEASE(s.depth);
+			m_topViewError = "couldn't create the render target";
+			return false;
+		}
+	}
+
+	Vector3 center((capture.x0 + capture.x1)*0.5f, (capture.y0 + capture.y1)*0.5f, 0.0f);
+	RefRenderObjListIterator lightListIt(&m_lightList);
+	m_heightMapRenderObj->setDrawEntireMap(true);
+	m_heightMapRenderObj->updateCenter(s.camera, &center, &lightListIt);
+	m_heightMapRenderObj->On_Frame_Update();
+
+	Bool ok = false;
+	if (WW3D::Begin_Render(true, true, Vector3(0.0f, 0.0f, 0.0f)) == WW3D_ERROR_OK)
+	{
+		// The wrapper nests one render target, so the passes that draw into their own run before ours is bound.
+		RenderInfoClass rinfo(*s.camera);
+		if (TheW3DSkyClouds != nullptr && TheGlobalData->m_useCloudMap)
+		{
+			TheW3DSkyClouds->update(rinfo, *m_heightMapRenderObj);
+		}
+		if (TheW3DShadowMap != nullptr && TheW3DShadowMap->isAvailable() && TheW3DShadowManager != nullptr &&
+			TheGlobalData->m_useShadowMap && (TheGlobalData->m_useShadowVolumes || TheGlobalData->m_useShadowDecals))
+		{
+			TheW3DShadowMap->setShadowColor(TheW3DShadowManager->getShadowColor());
+			TheW3DShadowMap->updateFrustum(*s.camera, TheW3DShadowManager->getLightPosWorld(0), TheGlobalData->m_shadowMapMinSunElevation);
+			TheW3DShadowMap->renderDepthPass(rinfo);
+		}
+
+		DX8Wrapper::Set_Render_Target_With_Z(s.target, s.depth);
+		DX8Wrapper::Clear(true, true, Vector3(0.0f, 0.0f, 0.0f));
+		WW3D::Render(m_scene, s.camera);
+
+		// Water draws in both passes, so it does not count as something above the ground.
+		if (capture.water != TOP_VIEW_WATER_NONE && TheWaterRenderObj != nullptr)
+		{
+			// A far camera gives the shader a straight-down view at every pixel. Moving the clip planes with it keeps the depth values.
+			const Real raise = 100000.0f;
+			CameraClass *waterCamera = NEW_REF(CameraClass, ());
+			Matrix3D waterTran(1);
+			waterTran.Set_Translation(Vector3(center.X, center.Y, s.camZ + raise));
+			waterCamera->Set_Transform(waterTran);
+			waterCamera->Set_Projection_Type(CameraClass::ORTHO);
+			waterCamera->Set_View_Plane(Vector2(-worldX*0.5f, -worldY*0.5f), Vector2(worldX*0.5f, worldY*0.5f));
+			waterCamera->Set_Clip_Planes(1.0f + raise, s.camZ + 1000.0f + raise);
+			waterCamera->Apply();
+
+			// Without soft edges the water takes its flat path, blended by its own alpha.
+			const Bool softEdge = TheGlobalData->m_showSoftWaterEdge;
+			if (capture.water == TOP_VIEW_WATER_FLAT)
+			{
+				TheWritableGlobalData->m_showSoftWaterEdge = false;
+			}
+			TheWaterRenderObj->renderWater();
+			TheWritableGlobalData->m_showSoftWaterEdge = softEdge;
+			REF_PTR_RELEASE(waterCamera);
+		}
+
+		if (capture.colorGrade && TheW3DColorLut != nullptr)
+		{
+			TheW3DColorLut->render(*s.camera);
+		}
+		WW3D::End_Render(false);
+		ok = true;
+	}
+	else
+	{
+		m_topViewError = "WW3D refused to begin a frame";
+	}
+	DX8Wrapper::Set_Render_Target((IDirect3DSurface8 *)nullptr);
+	return ok;
+}
+
+Bool WbView3d::renderTopView(Int size, UnsignedByte *bgra)
+{
+	if (bgra == NULL || !drawTopView(size))
+	{
+		return false;
+	}
+	TopViewSession &s = m_topView;
+	SurfaceClass *surface = s.target->Get_Surface_Level();
+	IDirect3DSurface8 *rt = surface ? surface->Peek_D3D_Surface() : NULL;
+	Bool ok = rt != NULL;
+	IDirect3DSurface8 *copy = NULL;
+	if (rt != NULL)
+	{
+		LPDIRECT3DDEVICE8 dev = DX8Wrapper::_Get_D3D_Device8();
+		D3DSURFACE_DESC desc;
+		rt->GetDesc(&desc);
+#if defined(BUILD_WITH_D3D9)
+		ok = SUCCEEDED(dev->CreateOffscreenPlainSurface(desc.Width, desc.Height, desc.Format, D3DPOOL_SYSTEMMEM, &copy, nullptr))
+			&& SUCCEEDED(dev->GetRenderTargetData(rt, copy));
+#else
+		ok = SUCCEEDED(dev->CreateImageSurface(desc.Width, desc.Height, desc.Format, &copy))
+			&& SUCCEEDED(dev->CopyRects(rt, nullptr, 0, copy, nullptr));
+#endif
+		D3DLOCKED_RECT lrect;
+		if (ok && SUCCEEDED(copy->LockRect(&lrect, nullptr, D3DLOCK_READONLY)))
+		{
+			for (Int y = 0; y < size; y++)
+			{
+				memcpy(bgra + y*size*4, (UnsignedByte *)lrect.pBits + y*lrect.Pitch, size*4);
+			}
+			copy->UnlockRect();
+		}
+		else
+		{
+			ok = false;
+			m_topViewError = "couldn't read the render back";
+		}
+	}
+	if (copy != NULL)
+	{
+		copy->Release();
+	}
+	REF_PTR_RELEASE(surface);
+	return ok;
+}
+
+Bool WbView3d::presentTopView(Int size, void *window, const Real area[4])
+{
+	if (window == NULL)
+	{
+		return false;
+	}
+
+	// The editor view is held still, so the live view moves the clock, the water and the particles itself.
+	advanceAnimation();
+	if (TheWaterRenderObj != nullptr)
+	{
+		TheWaterRenderObj->update();
+	}
+	TheFramePacer->update();
+	WBParticleRuntime::tick();
+
+	if (!drawTopView(size))
+	{
+		return false;
+	}
+	TopViewSession &s = m_topView;
+	if (s.swapChain == NULL || s.swapWindow != window)
+	{
+		if (s.swapChain != NULL)
+		{
+			s.swapChain->Release();
+			s.swapChain = NULL;
+		}
+		s.swapChain = DX8Wrapper::Create_Additional_Swap_Chain((HWND)window);
+		s.swapWindow = window;
+		if (s.swapChain == NULL)
+		{
+			m_topViewError = "couldn't create a swap chain for the preview";
+			return false;
+		}
+	}
+
+	SurfaceClass *surface = s.target->Get_Surface_Level();
+	IDirect3DSurface8 *rt = surface ? surface->Peek_D3D_Surface() : NULL;
+	IDirect3DSurface8 *back = NULL;
+	Bool ok = rt != NULL && SUCCEEDED(s.swapChain->GetBackBuffer(0, D3DBACKBUFFER_TYPE_MONO, &back)) && back != NULL;
+	if (ok)
+	{
+		// The copy stays on the card. The bars around a map that is not square stay black.
+		LPDIRECT3DDEVICE8 dev = DX8Wrapper::_Get_D3D_Device8();
+		D3DSURFACE_DESC desc;
+		back->GetDesc(&desc);
+		dev->ColorFill(back, NULL, D3DCOLOR_XRGB(0, 0, 0));
+		RECT dst;
+		dst.left = (LONG)(area[0] * desc.Width);
+		dst.top = (LONG)(area[1] * desc.Height);
+		dst.right = (LONG)(area[2] * desc.Width + 0.5f);
+		dst.bottom = (LONG)(area[3] * desc.Height + 0.5f);
+		ok = SUCCEEDED(dev->StretchRect(rt, NULL, back, &dst, D3DTEXF_LINEAR))
+			&& SUCCEEDED(s.swapChain->Present(NULL, NULL, NULL, NULL, 0));
+		if (!ok)
+		{
+			m_topViewError = "couldn't show the frame in the preview";
+		}
+	}
+	else
+	{
+		m_topViewError = "couldn't reach the preview's back buffer";
+	}
+	if (back != NULL)
+	{
+		back->Release();
+	}
+	REF_PTR_RELEASE(surface);
+	return ok;
+}
+
+void WbView3d::endTopView()
+{
+	TopViewSession &s = m_topView;
+	if (!s.active)
+	{
+		return;
+	}
+	s.active = false;
+	if (s.swapChain != NULL)
+	{
+		s.swapChain->Release();
+		s.swapChain = NULL;
+	}
+	s.swapWindow = NULL;
+	REF_PTR_RELEASE(s.camera);
+	REF_PTR_RELEASE(s.depth);
+	REF_PTR_RELEASE(s.target);
+	s.targetSize = 0;
+
+	TheWritableGlobalData->m_useShadowVolumes = s.wantShadowVolumes;
+	TheWritableGlobalData->m_useShadowDecals = s.wantShadowDecals;
+	TheWritableGlobalData->m_useCloudMap = s.wantClouds;
+	TheWritableGlobalData->m_useLightMap = s.wantMacroTexture;
+	if (s.capture.stochastic)
+	{
+		WorldHeightMapEdit *pMap = WbDoc() ? WbDoc()->GetHeightMap() : NULL;
+		if (pMap != NULL)
+		{
+			pMap->swapStochastic(s.paint);
+		}
+		s.paint = NULL;
+		s.paintEverywhere.clear();
+	}
+
+	for (size_t k = 0; k < s.objects.size(); k++)
+	{
+		s.objects[k]->Set_Hidden(s.wasHidden[k] ? 1 : 0);
+	}
+	s.objects.clear();
+	s.wasHidden.clear();
+	m_heightMapRenderObj->removeAllRoads();
+	if (m_showRoads)
+	{
+		m_heightMapRenderObj->loadRoadsAndBridges(NULL, FALSE);
+	}
+	m_needToLoadRoads = false;
+	m_heightMapRenderObj->setDrawEntireMap(m_showEntireMap);
+	if (s.removedTrees)
+	{
+		updateTrees();
+	}
+	if (TheGlobalData->m_timeOfDay != s.oldTimeOfDay)
+	{
+		TheWritableGlobalData->m_timeOfDay = s.oldTimeOfDay;
+		updateLights();
+	}
+
+	--m_updateCount;
+	Invalidate(false);
+}
+
+Bool WbView3d::captureTopView(Int size, const TopViewCapture &capture, Bool aboveGround, UnsignedByte *bgra)
+{
+	if (!beginTopView(capture, aboveGround))
+	{
+		return false;
+	}
+	const Bool ok = renderTopView(size, bgra);
+	endTopView();
+	return ok;
 }
 
 #if defined(BUILD_WITH_D3D9)
@@ -5381,6 +5820,12 @@ void WbView3d::render()
 			TheWritableGlobalData->m_showSoftWaterEdge = savedSoftWater;
 		}
 
+		// The map.ini grade goes over the scene as in the game, and under the icons so they stay readable.
+		if (TheW3DColorLut != nullptr)
+		{
+			TheW3DColorLut->render(*m_camera);
+		}
+
 		// Draw the 3d obj icons on top of the rest of the data.
 		WW3D::Render(m_overlayScene,m_camera);
 		TheWritableGlobalData->m_useShadowMap = wantShadowMap;
@@ -5781,6 +6226,10 @@ void WbView3d::initWW3D()
 		if (TheW3DSkyClouds == nullptr)
 		{
 			TheW3DSkyClouds = new W3DSkyClouds;
+		}
+		if (TheW3DColorLut == nullptr)
+		{
+			TheW3DColorLut = new W3DColorLut;
 		}
 		init3dScene();
 		m_layer = new LayerClass( m_scene, m_camera );
@@ -7207,10 +7656,10 @@ static const UINT WB_FPSCAP_TIMER = 0xF9C;
 // Repaints requested faster than the cap (mouse moves invalidate on every event) are
 // folded into one repaint at the end of the current frame slot. Nothing sleeps, so
 // input stays responsive and the last presented frame stays on screen meanwhile.
-Bool WbView3d::deferPaintForFpsCap()
+double WbView3d::fpsCapWaitMs()
 {
 	if (m_fpsCap <= 0 || m_lastAnimTick == 0) {
-		return false;
+		return 0.0;
 	}
 	LARGE_INTEGER freq;
 	LARGE_INTEGER now;
@@ -7220,16 +7669,34 @@ Bool WbView3d::deferPaintForFpsCap()
 	const double slotMs = 1000.0 / (double)m_fpsCap;
 	// Timers fire late, so a repaint within 10% of its slot goes through, or the cap undershoots.
 	if (elapsedMs >= slotMs * 0.9) {
+		return 0.0;
+	}
+	return slotMs - elapsedMs;
+}
+
+Bool WbView3d::deferPaintForFpsCap()
+{
+	const double waitMs = fpsCapWaitMs();
+	if (waitMs <= 0.0) {
 		return false;
 	}
 	if (!m_fpsCapTimerSet) {
-		UINT waitMs = (UINT)(slotMs - elapsedMs + 0.5);
-		if (waitMs < 1) {
-			waitMs = 1;
+		UINT timerMs = (UINT)(waitMs + 0.5);
+		if (timerMs < 1) {
+			timerMs = 1;
 		}
-		SetTimer(WB_FPSCAP_TIMER, waitMs, NULL);
+		SetTimer(WB_FPSCAP_TIMER, timerMs, NULL);
 		m_fpsCapTimerSet = true;
 	}
+	return true;
+}
+
+Bool WbView3d::paintNowIfDue()
+{
+	if (fpsCapWaitMs() > 0.0) {
+		return false;
+	}
+	UpdateWindow();
 	return true;
 }
 
@@ -7524,6 +7991,11 @@ void WbView3d::OnViewShowshadows()
 		}
 	} else {
 		TheW3DShadowManager->removeAllShadows();
+		for (Int i = 0; i < TheSidesList->getNumSides(); i++) {
+			for (BuildListInfo *pBuild = TheSidesList->getSideInfo(i)->getBuildList(); pBuild; pBuild = pBuild->getNext()) {
+				pBuild->setShadowObj(nullptr);
+			}
+		}
 	}
 
 }

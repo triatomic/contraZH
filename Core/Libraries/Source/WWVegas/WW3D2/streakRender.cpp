@@ -69,6 +69,7 @@ StreakRendererClass::StreakRendererClass() :
 		// UVOffsetDeltaPerMS(0.0f, 0.0f),
 		Bits(DEFAULT_BITS),
 		Effects(0),
+		EffectData(nullptr),
 		m_vertexBufferSize(0),
 		m_vertexBuffer(nullptr)
 {
@@ -90,6 +91,7 @@ StreakRendererClass::StreakRendererClass(const StreakRendererClass & that) :
 		// UVOffsetDeltaPerMS(0.0f, 0.0f),
 		Bits(DEFAULT_BITS),
 		Effects(0),
+		EffectData(nullptr),
 		m_vertexBufferSize(0),
 		m_vertexBuffer(nullptr)
 {
@@ -113,6 +115,7 @@ StreakRendererClass & StreakRendererClass::operator = (const StreakRendererClass
 		// UVOffsetDeltaPerMS = that.UVOffsetDeltaPerMS;
 		Bits = that.Bits;
 		Effects = that.Effects;
+		EffectData = that.EffectData;
 		// Don't modify m_vertexBufferSize and m_vertexBuffer.
 	}
 	return *this;
@@ -1405,7 +1408,7 @@ void StreakRendererClass::RenderStreak
 
 		if (sorting)
 		{
-			SortingRendererClass::Set_Insert_Effects(effects, nullptr);
+			SortingRendererClass::Set_Insert_Effects(effects, EffectData);
 			SortingRendererClass::Insert_Triangles(obj_sphere,0,triangleIndex,0,vnum);
 			SortingRendererClass::Set_Insert_Effects(0, nullptr);
 		}

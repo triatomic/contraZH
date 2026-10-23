@@ -97,6 +97,7 @@ MissileAIUpdateModuleData::MissileAIUpdateModuleData()
 	// m_turnRateAttacking = BIGNUM;
 	m_zDirFactor = 2.0f;
 	m_applyLauncherBonus = FALSE;
+	m_detonateOnTargetLost = TRUE;
 }
 
 //-----------------------------------------------------------------------------
@@ -133,6 +134,7 @@ void MissileAIUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "ZCorrectionFactor", INI::parseReal,   nullptr, offsetof(MissileAIUpdateModuleData, m_zDirFactor) },
 		{ "ApplyLauncherBonus", INI::parseBool,  nullptr, offsetof(MissileAIUpdateModuleData, m_applyLauncherBonus) },
 		{ "IsTorpedo",         INI::parseBool,   nullptr, offsetof(MissileAIUpdateModuleData, m_isTorpedo) },
+		{ "DetonateOnTargetLost", INI::parseBool, nullptr, offsetof(MissileAIUpdateModuleData, m_detonateOnTargetLost) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 
@@ -286,7 +288,7 @@ void MissileAIUpdate::projectileFireAtObjectOrPosition( const Object *victim, co
 		Real deltaZ = victimPos->z - obj->getPosition()->z;
 		Real dx = victimPos->x - obj->getPosition()->x;
 		Real dy = victimPos->y - obj->getPosition()->y;
-		Real xyDist = sqrt(sqr(dx) + sqr(dy));
+		Real xyDist = WWMath::Sqrt(sqr(dx) + sqr(dy));
 		if (xyDist < 1) xyDist = 1;
 		Real zFactor = 0;
 		if (deltaZ > 0) {
@@ -758,8 +760,8 @@ void MissileAIUpdate::doAttackState(Bool turnOK, Bool randomPath)
 			targetPos.add(offset);
 
 			if (!d->m_isTorpedo) {
-				// Make sure Z is above ground
-				PathfindLayerEnum layer = TheTerrainLogic->getHighestLayerForDestination(&targetPos);
+				// Make sure Z is above ground.  A collapsed bridge is not something to clear.
+				PathfindLayerEnum layer = TheTerrainLogic->getHighestLayerForDestination(&targetPos, TRUE);
 				Real minHeight = TheTerrainLogic->getLayerHeight(targetPos.x, targetPos.y, layer) + APPROACH_HEIGHT;
 				targetPos.z = __max(targetPos.z, minHeight);
 			}
@@ -794,11 +796,10 @@ void MissileAIUpdate::doAttackState(Bool turnOK, Bool randomPath)
 
 	// If I was fired at a flyer and have lost target (most likely they died), then I need to do something better
 	// than cloverleaf around their last spot.
-	if( m_isTrackingTarget && (getGoalObject() == NULL) && !d->m_isTorpedo)
-		airborneTargetGone();
-
-	if (m_isTrackingTarget && (getGoalPosition() == NULL) && d->m_isTorpedo)
-		airborneTargetGone();
+	if (isTargetLost())
+	{
+		airborneTargetGone(TRUE);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -814,7 +815,7 @@ void MissileAIUpdate::doKillState()
 		}
 
 		// srj sez: killstate missiles should not be allowed to live forever.
-		airborneTargetGone();
+		airborneTargetGone(isTargetLost());
 		return;
 	}
 
@@ -878,11 +879,10 @@ void MissileAIUpdate::doKillState()
 	}
 	// If I was fired at a flyer and have lost target (most likely they died), then I need to do something better
 	// than cloverleaf around their last spot.
-	if( m_isTrackingTarget && (getGoalObject() == NULL) && !d->m_isTorpedo)
-		airborneTargetGone();
-
-	if (m_isTrackingTarget && (getGoalPosition() == nullptr) && d->m_isTorpedo)
-		airborneTargetGone();
+	if (isTargetLost())
+	{
+		airborneTargetGone(TRUE);
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -905,7 +905,7 @@ UpdateSleepTime MissileAIUpdate::update()
 	Coord3D newPos = *getObject()->getPosition();
 	if ((m_noTurnDistLeft > 0.0f || m_randomPathDistLeft > 0.0f) && m_state >= IGNITION)
 	{
-		Real distThisTurn = sqrtf(sqr(newPos.x-m_prevPos.x) + sqr(newPos.y-m_prevPos.y) + sqr(newPos.z-m_prevPos.z));
+		Real distThisTurn = WWMath::Sqrtf(sqr(newPos.x-m_prevPos.x) + sqr(newPos.y-m_prevPos.y) + sqr(newPos.z-m_prevPos.z));
 		if (m_noTurnDistLeft > 0.0f)
 			m_noTurnDistLeft -= distThisTurn;
 		if (m_randomPathDistLeft > 0.0f)
@@ -921,10 +921,10 @@ UpdateSleepTime MissileAIUpdate::update()
 	{
 		Object *missile = getObject();
 		m_framesTillDecoyed = 0;
-		m_noDamage = TRUE;
 		Object *victim = TheGameLogic->findObjectByID( m_victimID );
 		if( victim )
 		{
+			m_noDamage = TRUE;
 			ObjectID targetID = missile->calculateCountermeasureToDivertTo( *victim );
 			if( targetID != INVALID_ID )
 			{
@@ -981,6 +981,12 @@ UpdateSleepTime MissileAIUpdate::update()
 			m_originalTargetPos = targetPos;
 			m_isTrackingTarget = true;
 		}
+	}
+
+	// A lost-target missile flies to where its target was last seen.
+	if (!d->m_isTorpedo && m_isTrackingTarget && getGoalObject() != nullptr)
+	{
+		m_originalTargetPos = *getGoalObject()->getPosition();
 	}
 
 	switch( m_state )
@@ -1040,8 +1046,10 @@ UpdateSleepTime MissileAIUpdate::update()
 
 	// note that we want to use getHighestLayerForDestination() here, so that anything even slightly
 	// below the bridge translates into GROUND. (getLayerForDestination just does a "closest" check)
+	// a collapsed bridge has no deck left to stop us, so ask for healthy bridges only
+	const Bool onlyHealthyBridges = TRUE;
 	PathfindLayerEnum oldLayer = getObject()->getLayer();
-	PathfindLayerEnum newLayer = TheTerrainLogic->getHighestLayerForDestination(getObject()->getPosition());
+	PathfindLayerEnum newLayer = TheTerrainLogic->getHighestLayerForDestination(getObject()->getPosition(), onlyHealthyBridges);
 	getObject()->setLayer(newLayer);
 
 	if (projectileIsArmed() && oldLayer != LAYER_GROUND && newLayer == LAYER_GROUND)
@@ -1049,7 +1057,7 @@ UpdateSleepTime MissileAIUpdate::update()
 		// see if we' still in the bridge's xy area
 		Coord3D tmp = *getObject()->getPosition();
 		tmp.z = 9999.0f;
-		PathfindLayerEnum testLayer = TheTerrainLogic->getHighestLayerForDestination(&tmp);
+		PathfindLayerEnum testLayer = TheTerrainLogic->getHighestLayerForDestination(&tmp, onlyHealthyBridges);
 		if (testLayer == oldLayer)
 		{
 			// ensure we are slightly above the bridge, to account for fudge & sloppy art
@@ -1079,12 +1087,37 @@ Also determines whether objects are blocked, and if so, if they are stuck.  jba.
 }
 
 //-------------------------------------------------------------------------------------------------
-void MissileAIUpdate::airborneTargetGone()
+Bool MissileAIUpdate::isTargetLost()
 {
-	// I would really love it if this could retarget, but all of the targeting and legality is done
-	// by the Weapon that fired me.  The safest thing for me to do in this state is to just run out of gas.
-	m_fuelExpirationDate = TheGameLogic->getFrame();
-	switchToState(KILL_SELF);
+	// Torpedoes chase their goal position, which is never null, so they keep the old path.
+	return !getMissileAIUpdateModuleData()->m_isTorpedo && m_isTrackingTarget && getGoalObject() == nullptr;
+}
+
+//-------------------------------------------------------------------------------------------------
+void MissileAIUpdate::airborneTargetGone(Bool targetLost)
+{
+	// The NORMAL death of KILL_SELF is what INI die modules hook to retarget, as frog missiles do.
+	if (!targetLost || !getMissileAIUpdateModuleData()->m_detonateOnTargetLost)
+	{
+		// I would really love it if this could retarget, but all of the targeting and legality is done
+		// by the Weapon that fired me.  The safest thing for me to do in this state is to just run out of gas.
+		m_fuelExpirationDate = TheGameLogic->getFrame();
+		switchToState(KILL_SELF);
+		return;
+	}
+
+	// A cleared m_victimID marks the redirect as issued; KILL's braking move cannot overshoot and orbit.
+	if (m_victimID != INVALID_ID)
+	{
+		aiMoveToPosition(&m_originalTargetPos, CMD_FROM_AI);
+		m_victimID = INVALID_ID;
+		switchToState(KILL);
+	}
+
+	if (m_state != KILL_SELF && (isIdle() || TheGameLogic->getFrame() >= m_fuelExpirationDate))
+	{
+		detonate();
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1117,7 +1150,7 @@ void MissileAIUpdate::projectileNowJammed()
 	targetPosition.y += GameLogicRandomValue(-scatter, scatter);
 	targetPosition.z = TheTerrainLogic->getLayerHeight(	targetPosition.x,
 																											targetPosition.y,
-																											TheTerrainLogic->getHighestLayerForDestination(&targetPosition) );
+																											TheTerrainLogic->getHighestLayerForDestination(&targetPosition, TRUE) );
 
 	getStateMachine()->setGoalObject(nullptr);
 	// Projectiles are expressly forbidden from getting AIIdle.  Who am I to argue.

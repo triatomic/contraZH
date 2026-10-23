@@ -215,7 +215,7 @@ float2 BlockUV(float2 texel, float3 block)
 float4 SeabedSample(sampler2D atlas, float4 plain, float2 uv, float2 texel, float2 dx, float2 dy, HexCells cells)
 {
     float2 atlasTexel = uv * SeabedAtlas.xy;
-    // Point sampling picks the slot. The slot's size follows TerrainAtlasBorder, so it comes in constants.
+    // Point sampling picks the slot.
     float3 slots = tex2D(ClassMap, atlasTexel * SeabedSlot.x + SeabedSlot.y).rgb;
     float3 block = float3(slots.xy * SeabedSlot.z + SeabedSlot.w, slots.z * (255.0f * 64.0f));
 
@@ -361,7 +361,9 @@ float4 main(PsIn input) : COLOR
     float3 light = input.Diffuse.rgb;
 #endif
 
-#if LIGHTS
+#if LIGHTS && LIGHTS_DEBUG
+    return float4(PointLighting(input.WorldPos, bumped), color.a * input.Diffuse.a);
+#elif LIGHTS
     light += PointLighting(input.WorldPos, bumped);
 #endif
 
@@ -374,13 +376,17 @@ float4 main(PsIn input) : COLOR
 
 #if NOISE_COUNT >= 1
     float4 cloud = tex2D(Noise1Texture, input.Noise1UV);
+#if !SHADOWED
     color *= cloud;
+#endif
 #endif
 #if NOISE_COUNT >= 2
     color.rgb *= GroundNoise(Noise2Texture, input.Noise2UV);
 #endif
 
-#if SHADOWED
+#if SHADOWED && NOISE_COUNT >= 1
+    color.rgb *= CloudShadowFactor(lit, cloud.rgb);
+#elif SHADOWED
     color.rgb *= lerp(ShadowColor.rgb, float3(1.0f, 1.0f, 1.0f), lit);
 #endif
 

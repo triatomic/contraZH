@@ -42,6 +42,7 @@
 #include "W3DDevice/GameClient/Module/W3DRopeDraw.h"
 #include "W3DDevice/GameClient/Module/W3DSupplyDraw.h"
 #include "W3DDevice/GameClient/Module/W3DScienceModelDraw.h"
+#include "W3DDevice/GameClient/Module/W3DStormDraw.h"
 #include "W3DDevice/GameClient/Module/W3DTankDraw.h"
 #include "W3DDevice/GameClient/Module/W3DTruckDraw.h"
 #include "W3DDevice/GameClient/Module/W3DTankTruckDraw.h"
@@ -79,6 +80,7 @@ void W3DModuleFactory::init()
 	addModule( W3DTankDraw );
 	addModule( W3DTruckDraw );
 	addModule( W3DTracerDraw );
+	addModule( W3DStormDraw );
 	addModule( W3DTankTruckDraw );
 #if !(RTS_GENERALS && RETAIL_COMPATIBLE_CRC)
 	addModule( W3DTreeDraw );

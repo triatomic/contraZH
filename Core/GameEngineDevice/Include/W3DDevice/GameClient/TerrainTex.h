@@ -36,10 +36,9 @@
 
 class WorldHeightMap;
 
-// Bounds of GameData TerrainAtlasBorder, the texels copied around each texture in the terrain atlases.
-#define MIN_ATLAS_BORDER 4
-#define MAX_ATLAS_BORDER 32
-#define MAX_ATLAS_SLOTS (TEXTURE_WIDTH/(TILE_PIXEL_EXTENT+2*MIN_ATLAS_BORDER))
+// Texels copied around each texture in the terrain atlases.
+#define ATLAS_BORDER 4
+#define MAX_ATLAS_SLOTS (TEXTURE_WIDTH/(TILE_PIXEL_EXTENT+2*ATLAS_BORDER))
 
 // The blend edge texture keeps the original spacing, since nothing copies borders into it.
 #define EDGE_TILE_OFFSET 8

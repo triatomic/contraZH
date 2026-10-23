@@ -44,6 +44,7 @@
 #include "GameClient/InGameUI.h"
 #include "GameClient/Keyboard.h"
 #include "GameClient/Mouse.h"
+#include "GameClient/MetaEvent.h"
 #include "GameClient/GlobalLanguage.h"
 
 #include "GameLogic/GameLogic.h"
@@ -85,6 +86,7 @@ static const FieldParse TheMouseCursorFieldParseTable[] =
 	{ "Frames",							INI::parseInt,	nullptr,	offsetof( CursorInfo, numFrames ) },
 	{ "FPS",							INI::parseReal, nullptr, offsetof( CursorInfo, fps)},
 	{ "Directions",							INI::parseInt,	nullptr,	offsetof( CursorInfo, numDirections ) },
+	{ nullptr, nullptr, nullptr, 0 }
 };
 
 static const FieldParse TheMouseFieldParseTable[] =
@@ -110,7 +112,7 @@ static const FieldParse TheMouseFieldParseTable[] =
 	{ "DragTolerance",							INI::parseUnsignedInt,	nullptr,		offsetof( Mouse, m_dragTolerance) },
 	{ "DragTolerance3D",						INI::parseUnsignedInt,	nullptr,		offsetof( Mouse, m_dragTolerance3D) },
 	{ "DragToleranceMS",						INI::parseUnsignedInt,	nullptr,		offsetof( Mouse, m_dragToleranceMS) },
-
+	{ nullptr, nullptr, nullptr, 0 }
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -686,6 +688,19 @@ void Mouse::update()
 }
 
 //-------------------------------------------------------------------------------------------------
+void Mouse::postSideButton( MouseButtonState state, Int key )
+{
+	if( state == MBS_None )
+	{
+		return;
+	}
+	const Bool down = state != MBS_Up;
+	GameMessage *msg = TheMessageStream->appendMessage( down ? GameMessage::MSG_RAW_KEY_DOWN : GameMessage::MSG_RAW_KEY_UP );
+	msg->appendIntegerArgument( key );
+	msg->appendIntegerArgument( ( down ? KEY_STATE_DOWN : KEY_STATE_UP ) | TheKeyboard->getModifierFlags() );
+}
+
+//-------------------------------------------------------------------------------------------------
 /** Given the current state of this input device, turn the raw input
 	* data into raw stream messages and place those messages on the stream.
 	* NOTE that the click messages replace up messages in the mouse, so we
@@ -842,6 +857,9 @@ void Mouse::createStreamMessages()
 				break;
 
 		}
+
+		postSideButton( m_mouseEvents[ i ].x1State, MK_MOUSE4 );
+		postSideButton( m_mouseEvents[ i ].x2State, MK_MOUSE5 );
 
 		// wheel pos
 		msg = nullptr;
@@ -1164,7 +1182,11 @@ void Mouse::resetTooltipDelay()
 //-------------------------------------------------------------------------------------------------
 void Mouse::drawTooltip()
 {
-	if (TheScriptEngine->getFade()!=ScriptEngine::FADE_NONE) {
+	Bool fading = TheScriptEngine->getFade()!=ScriptEngine::FADE_NONE;
+#if RTS_ZEROHOUR
+	fading = fading && !TheScriptEngine->isLightningFade();
+#endif
+	if (fading) {
 		return;
 	}
 

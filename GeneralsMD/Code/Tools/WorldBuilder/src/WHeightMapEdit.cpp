@@ -43,6 +43,7 @@
 #include "LayersList.h"
 #ifdef RTS_HAS_QT
 #include "qt/panels/WBQtTerrainModalBridge.h"
+#include "qt/WBQtMessageBox.h"
 #endif
 
 #include "Common/DataChunk.h"
@@ -50,6 +51,7 @@
 
 int WorldHeightMapEdit::m_numGlobalTextureClasses=0;
 TGlobalTextureClass WorldHeightMapEdit::m_globalTextureClasses[NUM_TEXTURE_CLASSES];
+Bool WorldHeightMapEdit::s_paintWaterOnly = false;
 /** Destructor -.
 */
 WorldHeightMapEdit::~WorldHeightMapEdit()
@@ -83,6 +85,108 @@ void WorldHeightMapEdit::init()
 	}
 	loadBaseImages();
 
+}
+
+Int WorldHeightMapEdit::addTerrainTexture(TerrainType *terrain)
+{
+	if (terrain == nullptr || m_numGlobalTextureClasses >= NUM_TEXTURE_CLASSES)
+	{
+		return -1;
+	}
+	Int before = m_numGlobalTextureClasses;
+	loadImagesFromTerrainType(terrain);
+	if (m_numGlobalTextureClasses == before)
+	{
+		return -1;
+	}
+	return before;
+}
+
+// Tiles are numRows x numRows, laid out as readTiles fills them.
+static Int stitchTiles(TileData **tiles, Int numRows, UnsignedByte *bgraOut, Int cap)
+{
+	Int extent = numRows * TILE_PIXEL_EXTENT;
+	if (numRows < 1 || bgraOut == nullptr || cap < extent * extent * TILE_BYTES_PER_PIXEL)
+	{
+		return 0;
+	}
+	Int row, column;
+	for (row = 0; row < extent; row++)
+	{
+		for (column = 0; column < extent; column++)
+		{
+			TileData *tile = tiles[(column / TILE_PIXEL_EXTENT) + numRows * (row / TILE_PIXEL_EXTENT)];
+			if (tile == nullptr)
+			{
+				return 0;
+			}
+			Int pixelNdx = (column % TILE_PIXEL_EXTENT) + TILE_PIXEL_EXTENT * (row % TILE_PIXEL_EXTENT);
+			memcpy(bgraOut + (row * extent + column) * TILE_BYTES_PER_PIXEL,
+				tile->getDataPtr() + pixelNdx * TILE_BYTES_PER_PIXEL, TILE_BYTES_PER_PIXEL);
+		}
+	}
+	return extent;
+}
+
+Int WorldHeightMapEdit::getTexClassPixels(Int texClass, UnsignedByte *bgraOut, Int cap)
+{
+	if (texClass < 0 || texClass >= m_numGlobalTextureClasses)
+	{
+		return 0;
+	}
+	return stitchTiles(m_globalTextureClasses[texClass].tiles, m_globalTextureClasses[texClass].width, bgraOut, cap);
+}
+
+Int WorldHeightMapEdit::getTextureFilePixels(const AsciiString &texture, UnsignedByte *bgraOut, Int cap)
+{
+	AsciiString path;
+	path.format("%s%s", TERRAIN_TGA_DIR_PATH, texture.str());
+	CachedFileInputStream stream;
+	if (!stream.open(path))
+	{
+		return 0;
+	}
+	Int numTiles = WorldHeightMap::countTiles(&stream);
+	Int numRows = 0;
+	while ((numRows + 1) * (numRows + 1) <= numTiles)
+	{
+		numRows++;
+	}
+	if (numRows < 1)
+	{
+		return 0;
+	}
+	stream.rewind();
+
+	TileData *tiles[MAX_TILES_PER_CLASS];
+	Int i;
+	for (i = 0; i < MAX_TILES_PER_CLASS; i++)
+	{
+		tiles[i] = nullptr;
+	}
+	Int extent = 0;
+	if (WorldHeightMap::readTiles(&stream, tiles, numRows))
+	{
+		extent = stitchTiles(tiles, numRows, bgraOut, cap);
+	}
+	for (i = 0; i < MAX_TILES_PER_CLASS; i++)
+	{
+		REF_PTR_RELEASE(tiles[i]);
+	}
+	return extent;
+}
+
+Int WorldHeightMapEdit::findTexClass(const AsciiString &name)
+{
+	Int i;
+	for (i = 0; i < m_numGlobalTextureClasses; i++)
+	{
+		if (m_globalTextureClasses[i].name == name)
+		{
+			return i;
+		}
+	}
+	return -1;
 }
 
 //
@@ -183,7 +287,6 @@ m_warnTooManyBlend(false)
 	REF_PTR_SET(m_alphaTerrainTex, pThis->m_alphaTerrainTex);
 	m_dataSize = pThis->m_dataSize;
 	m_terrainTexHeight = pThis->m_terrainTexHeight;
-	m_atlasBorder = pThis->m_atlasBorder;
 	m_alphaTexHeight = pThis->m_alphaTexHeight;
 	m_alphaEdgeHeight = pThis->m_alphaEdgeHeight;
 	m_width = pThis->m_width;
@@ -865,6 +968,51 @@ WorldHeightMapEdit *WorldHeightMapEdit::duplicate()
 
 Bool WorldHeightMapEdit::setTileNdx(Int xIndex, Int yIndex, Int textureClass, Bool singleTile)
 {
+	if (s_paintWaterOnly && !isWaterCell(xIndex, yIndex))
+	{
+		return false;
+	}
+	return writeTileNdx(xIndex, yIndex, textureClass, singleTile);
+}
+
+/** True if every corner of the cell lies in a water area below its surface. The auto-blend then fades across the shoreline cells. */
+Bool WorldHeightMapEdit::isWaterCell(Int xIndex, Int yIndex)
+{
+	for (Int corner = 0; corner < 4; corner++)
+	{
+		Int vx = xIndex + (corner & 1);
+		Int vy = yIndex + (corner >> 1);
+		if (vx >= m_width)
+		{
+			vx = m_width - 1;
+		}
+		if (vy >= m_height)
+		{
+			vy = m_height - 1;
+		}
+
+		// Water areas are in world units without the border.
+		ICoord3D iLoc;
+		iLoc.x = (vx - m_borderSize) * MAP_XY_FACTOR;
+		iLoc.y = (vy - m_borderSize) * MAP_XY_FACTOR;
+		iLoc.z = 0;
+		const Real terrainZ = getHeight(vx, vy) * MAP_HEIGHT_SCALE;
+
+		Bool wet = false;
+		for (PolygonTrigger *pTrig = PolygonTrigger::getFirstPolygonTrigger(); pTrig && !wet; pTrig = pTrig->getNext())
+		{
+			wet = pTrig->isWaterArea() && pTrig->pointInTrigger(iLoc) && terrainZ < pTrig->getPoint(0)->z;
+		}
+		if (!wet)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+Bool WorldHeightMapEdit::writeTileNdx(Int xIndex, Int yIndex, Int textureClass, Bool singleTile)
+{
 	Int ndx = (yIndex*m_width)+xIndex;
 	Int numClasses = m_numTextureClasses;
 	DEBUG_ASSERTCRASH(ndx>=0 && ndx<this->m_dataSize,("oops"));
@@ -915,7 +1063,7 @@ Bool WorldHeightMapEdit::setTextureClass(Int xIndex, Int yIndex, Int textureClas
 	if (xIndex < 0 || yIndex < 0 || xIndex >= m_width || yIndex >= m_height)
 		return false;
 
-	return setTileNdx(xIndex, yIndex, textureClass, true);
+	return writeTileNdx(xIndex, yIndex, textureClass, true);
 }
 
 
@@ -1933,7 +2081,7 @@ void WorldHeightMapEdit::reloadTextures()
 void WorldHeightMapEdit::showTileStatusInfo()
 {
 	CString message;
-	Int tilesPerRow = TEXTURE_WIDTH/(2*TILE_PIXEL_EXTENT+2*getAtlasBorder());
+	Int tilesPerRow = TEXTURE_WIDTH/(2*TILE_PIXEL_EXTENT+2*ATLAS_BORDER);
 	Int availableTiles = 4 * tilesPerRow * tilesPerRow;
 	Int availableBlends = NUM_BLEND_TILES;
 
@@ -2668,7 +2816,12 @@ Bool WorldHeightMapEdit::selectInvalidTeam()
 	if (anySelected)
 	{
 		DEBUG_LOG(("%s", report.str()));
-		MessageBox(nullptr, report.str(), "Missing team report", MB_OK);
+#ifdef RTS_HAS_QT
+		if (WBQtMessageBox_Show(report.str(), "Missing team report", MB_OK) == 0)
+#endif
+		{
+			MessageBox(nullptr, report.str(), "Missing team report", MB_OK);
+		}
 	}
 
 	return anySelected;

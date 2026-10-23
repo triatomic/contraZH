@@ -38,6 +38,7 @@
 #include "Common/ThingFactory.h"
 
 #include "GameClient/Line2D.h"
+#include "GameClient/TerrainRoads.h"
 
 #include "GameLogic/AI.h"
 #include "GameLogic/GameLogic.h"
@@ -766,9 +767,9 @@ inline Bool isReallyClose(const Coord3D& a, const Coord3D& b)
 {
 	const Real CLOSE_ENOUGH = 0.1f;
 	return
-		fabs(a.x-b.x) <= CLOSE_ENOUGH &&
-		fabs(a.y-b.y) <= CLOSE_ENOUGH &&
-		fabs(a.z-b.z) <= CLOSE_ENOUGH;
+		WWMath::Fabs(a.x-b.x) <= CLOSE_ENOUGH &&
+		WWMath::Fabs(a.y-b.y) <= CLOSE_ENOUGH &&
+		WWMath::Fabs(a.z-b.z) <= CLOSE_ENOUGH;
 }
 
 /**
@@ -960,14 +961,14 @@ void Path::computePointOnPath(
 		// compute distance of point from this path segment
 		Real toDistSqr = sqr(toPos.x) + sqr(toPos.y);
 		Real offsetDistSq = toDistSqr - sqr(alongPathDist);
-		Real offsetDist = (offsetDistSq <= 0.0) ? 0.0 : sqrt(offsetDistSq);
+		Real offsetDist = (offsetDistSq <= 0.0) ? 0.0 : WWMath::Sqrt(offsetDistSq);
 
 		// If we are basically on the path, return the next path node as the movement goal.
 		// However, the farther off the path we get, the movement goal becomes closer to our
 		// projected position on the path.  If we are very far off the path, we will move
 		// directly towards the nearest point on the path, and not the next path node.
 		const Real maxPathError = 3.0f * PATHFIND_CELL_SIZE_F;
-		const Real maxPathErrorInv = 1.0 / maxPathError;
+		const Real maxPathErrorInv = 1.0f / maxPathError;
 		Real k = offsetDist * maxPathErrorInv;
 		if (k > 1.0f)
 			k = 1.0f;
@@ -1051,8 +1052,8 @@ void Path::computePointOnPath(
 				out.posOnPath.x = closeNodePos->x + alongPathDist * segmentDirNorm.x;
 				out.posOnPath.y = closeNodePos->y + alongPathDist * segmentDirNorm.y;
 				out.posOnPath.z = closeNodePos->z;
-				Real dx = fabs(pos.x - out.posOnPath.x);
-				Real dy = fabs(pos.y - out.posOnPath.y);
+				Real dx = WWMath::Fabs(pos.x - out.posOnPath.x);
+				Real dy = WWMath::Fabs(pos.y - out.posOnPath.y);
 				if (dx<1 && dy<1 && closeNode->getNextOptimized() && closeNode->getNextOptimized()->getNextOptimized()) {
 					out.posOnPath = *closeNode->getNextOptimized()->getNextOptimized()->getPosition();
 				}
@@ -1635,7 +1636,8 @@ inline ObjectID PathfindCell::getObstacleID() const
  */
 Bool PathfindCell::setTypeAsObstacle( Object *obstacle, Bool isFence, const ICoord2D &pos )
 {
-	if (m_type!=PathfindCell::CELL_CLEAR && m_type != PathfindCell::CELL_IMPASSABLE) {
+	// a structure built over rubble claims its cells, so removing the rubble later leaves them alone
+	if (m_type!=PathfindCell::CELL_CLEAR && m_type != PathfindCell::CELL_IMPASSABLE && m_type != PathfindCell::CELL_RUBBLE) {
 		return false;
 	}
 
@@ -2142,7 +2144,7 @@ UnsignedInt PathfindCell::costToGoal( PathfindCell *goal )
 	Int dy = m_info->m_pos.y - goal->getYIndex();
 #define NO_REAL_DIST
 #ifdef REAL_DIST
-	Int cost = COST_ORTHOGONAL*sqrt(dx*dx + dy*dy);
+	Int cost = COST_ORTHOGONAL*WWMath::Sqrt((float)(dx*dx + dy*dy));
 #else
 	if (dx<0) dx = -dx;
 	if (dy<0) dy = -dy;
@@ -2168,7 +2170,7 @@ UnsignedInt PathfindCell::costToHierGoal( PathfindCell *goal )
 	}
 	Int dx = m_info->m_pos.x - goal->getXIndex();
 	Int dy = m_info->m_pos.y - goal->getYIndex();
-	Int cost = REAL_TO_INT_FLOOR(COST_ORTHOGONAL*sqrt(dx*dx + dy*dy) + 0.5f);
+	Int cost = REAL_TO_INT_FLOOR(COST_ORTHOGONAL*WWMath::Sqrt((float)(dx*dx + dy*dy)) + 0.5f);
 	return cost;
 }
 
@@ -2254,11 +2256,11 @@ inline Bool waterGround(const PathfindCell &targetCell, const PathfindCell &sour
 	PathfindCell::CellType targetType = targetCell.getType();
 	PathfindCell::CellType srcType = sourceCell.getType();
 	if ( (targetType==PathfindCell::CELL_CLEAR &&
-		(srcType&PathfindCell::CELL_WATER ))) {
+		(srcType==PathfindCell::CELL_WATER ))) {
 			return true;
 	}
 	if ( (srcType==PathfindCell::CELL_CLEAR &&
-		(targetType&PathfindCell::CELL_WATER ))) {
+		(targetType==PathfindCell::CELL_WATER ))) {
 			return true;
 	}
 
@@ -2429,6 +2431,8 @@ m_numZones(0),
 m_groundCliffZones(nullptr),
 m_groundWaterZones(nullptr),
 m_groundRubbleZones(nullptr),
+m_groundCliffRubbleZones(nullptr),
+m_groundWaterRubbleZones(nullptr),
 m_crusherZones(nullptr),
 m_zonesAllocated(0),
 m_interactsWithBridge(FALSE)
@@ -2454,6 +2458,12 @@ void ZoneBlock::freeZones()
 
 	delete [] m_groundRubbleZones;
 	m_groundRubbleZones = nullptr;
+
+	delete [] m_groundCliffRubbleZones;
+	m_groundCliffRubbleZones = nullptr;
+
+	delete [] m_groundWaterRubbleZones;
+	m_groundWaterRubbleZones = nullptr;
 
 	delete [] m_crusherZones;
 	m_crusherZones = nullptr;
@@ -2488,6 +2498,8 @@ void ZoneBlock::blockCalculateZones(PathfindCell **map, PathfindLayer layers[], 
 		m_groundCliffZones[i] = i+m_firstZone;
 		m_groundWaterZones[i] = i+m_firstZone;
 		m_groundRubbleZones[i] = i+m_firstZone;
+		m_groundCliffRubbleZones[i] = i+m_firstZone;
+		m_groundWaterRubbleZones[i] = i+m_firstZone;
 		m_crusherZones[i] = i+m_firstZone;
 	}
 
@@ -2497,12 +2509,16 @@ void ZoneBlock::blockCalculateZones(PathfindCell **map, PathfindLayer layers[], 
 
 				if (waterGround(map[i][j], map[i-1][j])) {
 					applyBlockZone(map[i][j], map[i-1][j], m_groundWaterZones, m_firstZone, m_numZones);
+					applyBlockZone(map[i][j], map[i-1][j], m_groundWaterRubbleZones, m_firstZone, m_numZones);
 				}
 				if (groundRubble(map[i][j], map[i-1][j])) {
 					applyBlockZone(map[i][j], map[i-1][j], m_groundRubbleZones, m_firstZone, m_numZones);
+					applyBlockZone(map[i][j], map[i-1][j], m_groundCliffRubbleZones, m_firstZone, m_numZones);
+					applyBlockZone(map[i][j], map[i-1][j], m_groundWaterRubbleZones, m_firstZone, m_numZones);
 				}
 				if (groundCliff(map[i][j], map[i-1][j])) {
 					applyBlockZone(map[i][j], map[i-1][j], m_groundCliffZones, m_firstZone, m_numZones);
+					applyBlockZone(map[i][j], map[i-1][j], m_groundCliffRubbleZones, m_firstZone, m_numZones);
 				}
 				if (crusherGround(map[i][j], map[i-1][j])) {
 					applyBlockZone(map[i][j], map[i-1][j], m_crusherZones, m_firstZone, m_numZones);
@@ -2511,12 +2527,16 @@ void ZoneBlock::blockCalculateZones(PathfindCell **map, PathfindLayer layers[], 
 			if (j>bounds.lo.y && map[i][j].getZone()!=map[i][j-1].getZone()) {
 				if (waterGround(map[i][j],map[i][j-1])) {
 					applyBlockZone(map[i][j], map[i][j-1], m_groundWaterZones, m_firstZone, m_numZones);
+					applyBlockZone(map[i][j], map[i][j-1], m_groundWaterRubbleZones, m_firstZone, m_numZones);
 				}
 				if (groundRubble(map[i][j], map[i][j-1])) {
 					applyBlockZone(map[i][j], map[i][j-1], m_groundRubbleZones, m_firstZone, m_numZones);
+					applyBlockZone(map[i][j], map[i][j-1], m_groundCliffRubbleZones, m_firstZone, m_numZones);
+					applyBlockZone(map[i][j], map[i][j-1], m_groundWaterRubbleZones, m_firstZone, m_numZones);
 				}
 				if (groundCliff(map[i][j],map[i][j-1])) {
 					applyBlockZone(map[i][j], map[i][j-1], m_groundCliffZones, m_firstZone, m_numZones);
+					applyBlockZone(map[i][j], map[i][j-1], m_groundCliffRubbleZones, m_firstZone, m_numZones);
 				}
 				if (crusherGround(map[i][j], map[i][j-1])) {
 					applyBlockZone(map[i][j], map[i][j-1], m_crusherZones, m_firstZone, m_numZones);
@@ -2560,6 +2580,20 @@ zoneStorageType ZoneBlock::getEffectiveZone( LocomotorSurfaceTypeMask acceptable
 		zone = m_crusherZones[zone];
 		DEBUG_ASSERTCRASH(zone >=m_firstZone && zone < m_firstZone+m_numZones, ("Invalid range."));
 		zone -= m_firstZone;
+	}
+
+	if ( (acceptableSurfaces&LOCOMOTORSURFACE_GROUND) &&
+			(acceptableSurfaces&LOCOMOTORSURFACE_CLIFF) &&
+			(acceptableSurfaces&LOCOMOTORSURFACE_RUBBLE)) {
+		zone = m_groundCliffRubbleZones[zone];
+		return zone;
+	}
+
+	if ( (acceptableSurfaces&LOCOMOTORSURFACE_GROUND) &&
+			(acceptableSurfaces&LOCOMOTORSURFACE_WATER) &&
+			(acceptableSurfaces&LOCOMOTORSURFACE_RUBBLE)) {
+		zone = m_groundWaterRubbleZones[zone];
+		return zone;
 	}
 
 	if ( (acceptableSurfaces&LOCOMOTORSURFACE_GROUND) &&
@@ -2618,6 +2652,8 @@ void ZoneBlock::allocateZones()
 	m_groundCliffZones = MSGNEW("PathfindZoneInfo") zoneStorageType [m_zonesAllocated];
 	m_groundWaterZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
 	m_groundRubbleZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
+	m_groundCliffRubbleZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
+	m_groundWaterRubbleZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
 	m_crusherZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
 }
 
@@ -2628,6 +2664,8 @@ m_nextFrameToCalculateZones(0),
 m_groundCliffZones(nullptr),
 m_groundWaterZones(nullptr),
 m_groundRubbleZones(nullptr),
+m_groundCliffRubbleZones(nullptr),
+m_groundWaterRubbleZones(nullptr),
 m_terrainZones(nullptr),
 m_crusherZones(nullptr),
 m_hierarchicalZones(nullptr),
@@ -2655,6 +2693,12 @@ void PathfindZoneManager::freeZones()
 
 	delete [] m_groundRubbleZones;
 	m_groundRubbleZones = nullptr;
+
+	delete [] m_groundCliffRubbleZones;
+	m_groundCliffRubbleZones = nullptr;
+
+	delete [] m_groundWaterRubbleZones;
+	m_groundWaterRubbleZones = nullptr;
 
 	delete [] m_terrainZones;
 	m_terrainZones = nullptr;
@@ -2700,6 +2744,8 @@ void PathfindZoneManager::allocateZones()
 	m_groundCliffZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
 	m_groundWaterZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
 	m_groundRubbleZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
+	m_groundCliffRubbleZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
+	m_groundWaterRubbleZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
 	m_terrainZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
 	m_crusherZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
 	m_hierarchicalZones = MSGNEW("PathfindZoneInfo") zoneStorageType[m_zonesAllocated];
@@ -2923,6 +2969,8 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 		m_groundCliffZones[i] = i;
 		m_groundWaterZones[i] = i;
 		m_groundRubbleZones[i] = i;
+		m_groundCliffRubbleZones[i] = i;
+		m_groundWaterRubbleZones[i] = i;
 		m_terrainZones[i] = i;
 		m_crusherZones[i] = i;
 		m_hierarchicalZones[i] = i;
@@ -2947,12 +2995,16 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 				}
 				if (waterGround(r_thisCell, r_leftCell)) {
 					applyZone(r_thisCell, r_leftCell, m_groundWaterZones, m_maxZone);
+					applyZone(r_thisCell, r_leftCell, m_groundWaterRubbleZones, m_maxZone);
 				}
 				if (groundRubble(r_thisCell, r_leftCell)) {
 					applyZone(r_thisCell, r_leftCell, m_groundRubbleZones, m_maxZone);
+					applyZone(r_thisCell, r_leftCell, m_groundCliffRubbleZones, m_maxZone);
+					applyZone(r_thisCell, r_leftCell, m_groundWaterRubbleZones, m_maxZone);
 				}
 				if (groundCliff(r_thisCell, r_leftCell)) {
 					applyZone(r_thisCell, r_leftCell, m_groundCliffZones, m_maxZone);
+					applyZone(r_thisCell, r_leftCell, m_groundCliffRubbleZones, m_maxZone);
 				}
 				if (terrain(r_thisCell, r_leftCell)) {
 					applyZone(r_thisCell, r_leftCell, m_terrainZones, m_maxZone);
@@ -2979,11 +3031,21 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 
 					if ( notTerrainOrCrusher ) {
 						if (waterGround(r_thisCell, r_leftCell))
+						{
 							applyZone(r_thisCell, r_leftCell, m_groundWaterZones, m_maxZone);
+							applyZone(r_thisCell, r_leftCell, m_groundWaterRubbleZones, m_maxZone);
+						}
 						else if (groundRubble(r_thisCell, r_leftCell))
+						{
 							applyZone(r_thisCell, r_leftCell, m_groundRubbleZones, m_maxZone);
+							applyZone(r_thisCell, r_leftCell, m_groundCliffRubbleZones, m_maxZone);
+							applyZone(r_thisCell, r_leftCell, m_groundWaterRubbleZones, m_maxZone);
+						}
 						else if (groundCliff(r_thisCell, r_leftCell))
+						{
 							applyZone(r_thisCell, r_leftCell, m_groundCliffZones, m_maxZone);
+							applyZone(r_thisCell, r_leftCell, m_groundCliffRubbleZones, m_maxZone);
+						}
 					}
 
 				}
@@ -3000,12 +3062,16 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 				}
 				if (waterGround(r_thisCell, r_topCell)) {
 					applyZone(r_thisCell, r_topCell, m_groundWaterZones, m_maxZone);
+					applyZone(r_thisCell, r_topCell, m_groundWaterRubbleZones, m_maxZone);
 				}
 				if (groundRubble(r_thisCell, r_topCell)) {
 					applyZone(r_thisCell, r_topCell, m_groundRubbleZones, m_maxZone);
+					applyZone(r_thisCell, r_topCell, m_groundCliffRubbleZones, m_maxZone);
+					applyZone(r_thisCell, r_topCell, m_groundWaterRubbleZones, m_maxZone);
 				}
 				if (groundCliff(r_thisCell, r_topCell)) {
 					applyZone(r_thisCell, r_topCell, m_groundCliffZones, m_maxZone);
+					applyZone(r_thisCell, r_topCell, m_groundCliffRubbleZones, m_maxZone);
 				}
 				if (terrain(r_thisCell, r_topCell)) {
 					applyZone(r_thisCell, r_topCell, m_terrainZones, m_maxZone);
@@ -3032,11 +3098,21 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 
 					if (notTerrainOrCrusher) {
 						if (waterGround(r_thisCell, r_topCell))
+						{
 							applyZone(r_thisCell, r_topCell, m_groundWaterZones, m_maxZone);
+							applyZone(r_thisCell, r_topCell, m_groundWaterRubbleZones, m_maxZone);
+						}
 						else if (groundRubble(r_thisCell, r_topCell))
+						{
 							applyZone(r_thisCell, r_topCell, m_groundRubbleZones, m_maxZone);
+							applyZone(r_thisCell, r_topCell, m_groundCliffRubbleZones, m_maxZone);
+							applyZone(r_thisCell, r_topCell, m_groundWaterRubbleZones, m_maxZone);
+						}
 						else if (groundCliff(r_thisCell, r_topCell))
+						{
 							applyZone(r_thisCell, r_topCell, m_groundCliffZones, m_maxZone);
+							applyZone(r_thisCell, r_topCell, m_groundCliffRubbleZones, m_maxZone);
+						}
 					}
 
 				}
@@ -3057,6 +3133,8 @@ void PathfindZoneManager::calculateZones( PathfindCell **map, PathfindLayer laye
 	flattenZones(m_groundCliffZones, m_hierarchicalZones, m_maxZone);
 	flattenZones(m_groundWaterZones, m_hierarchicalZones, m_maxZone);
 	flattenZones(m_groundRubbleZones, m_hierarchicalZones, m_maxZone);
+	flattenZones(m_groundCliffRubbleZones, m_hierarchicalZones, m_maxZone);
+	flattenZones(m_groundWaterRubbleZones, m_hierarchicalZones, m_maxZone);
 	flattenZones(m_terrainZones, m_hierarchicalZones, m_maxZone);
 	flattenZones(m_crusherZones, m_hierarchicalZones, m_maxZone);
 
@@ -3432,6 +3510,20 @@ zoneStorageType PathfindZoneManager::getEffectiveZone( LocomotorSurfaceTypeMask 
 
 	if (crusher) {
 		zone = m_crusherZones[zone];
+	}
+
+	if ( (acceptableSurfaces&LOCOMOTORSURFACE_GROUND) &&
+			(acceptableSurfaces&LOCOMOTORSURFACE_CLIFF) &&
+			(acceptableSurfaces&LOCOMOTORSURFACE_RUBBLE)) {
+		zone = m_groundCliffRubbleZones[zone];
+		return zone;
+	}
+
+	if ( (acceptableSurfaces&LOCOMOTORSURFACE_GROUND) &&
+			(acceptableSurfaces&LOCOMOTORSURFACE_WATER) &&
+			(acceptableSurfaces&LOCOMOTORSURFACE_RUBBLE)) {
+		zone = m_groundWaterRubbleZones[zone];
+		return zone;
 	}
 
 	if ( (acceptableSurfaces&LOCOMOTORSURFACE_GROUND) &&
@@ -4059,8 +4151,8 @@ Bool PathfindLayer::isPointOnWall(ObjectID *wallPieces, Int numPieces, const Coo
 		Real pty = pt->y - obj->getPosition()->y;
 
 		// inverse-rotate it to the right coord system
-		Real ptx_new = (Real)fabs(ptx*c - pty*s);
-		Real pty_new = (Real)fabs(ptx*s + pty*c);
+		Real ptx_new = (Real)WWMath::Fabs(ptx*c - pty*s);
+		Real pty_new = (Real)WWMath::Fabs(ptx*s + pty*c);
 
 		if (ptx_new <= major && pty_new <= minor)
 		{
@@ -4431,6 +4523,12 @@ void Pathfinder::classifyObjectFootprint( Object *obj, Bool insert )
 
 	if (obj->isKindOf(KINDOF_BRIDGE_TOWER)) {
 		return;  // It is important to not abuse bridge towers.
+	}
+
+	if (obj->isKindOf(KINDOF_BRIDGE) && !obj->getTemplate()->isBridge()) {
+		// Procedural bridge span.  Its deck is a pathfind layer of its own, and the ground below it
+		// is governed by the bridge clearance, not by this object's placeholder box.
+		return;
 	}
 
 	if (obj->getTemplate()->getFenceWidth() > 0.0f)
@@ -4995,6 +5093,10 @@ static void calculateBridgeHeights(IRegion2D bounds, PathfindCell** map)
 		if (cellHiX > bounds.hi.x) cellHiX = bounds.hi.x;
 		if (cellHiY > bounds.hi.y) cellHiY = bounds.hi.y;
 
+		// a thick deck, girders or arches hang below the driving surface and take away room
+		TerrainRoadType *bridgeTemplate = TheTerrainRoads->findBridge( bridge->getBridgeTemplateName() );
+		Real deckHeight = bridgeTemplate ? bridgeTemplate->getBridgeDeckHeight() : 0.0f;
+
 		for (Int i = cellLoX; i < cellHiX; ++i) {
 			for (Int j = cellLoY; j < cellHiY; ++j) {
 				Real worldX = ((Real)i + 0.5f) * PATHFIND_CELL_SIZE_F;
@@ -5012,12 +5114,15 @@ static void calculateBridgeHeights(IRegion2D bounds, PathfindCell** map)
 					continue;
 				}
 
+				// the deck plane through the two bridge points is what a unit passing below clears
 				Real bridgeZ = TheTerrainLogic->getLayerHeight(worldX, worldY, layer);
-				Real waterZ, groundZ;
+
+				// isUnderwater leaves waterZ untouched where there is no water, so seed both
+				Real waterZ = 0.0f, groundZ = 0.0f;
 				TheTerrainLogic->isUnderwater(worldX, worldY, &waterZ, &groundZ);
 				Real baseZ   = (waterZ > groundZ) ? waterZ : groundZ;
 
-				Real gap = bridgeZ - baseZ;
+				Real gap = bridgeZ - deckHeight - baseZ;
 				if (gap < 0.0f) gap = 0.0f;
 
 				Int encoded = (Int)(gap / 10.0f);
@@ -7066,7 +7171,8 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 				toPos.y = newCellCoord.y * PATHFIND_CELL_SIZE_F ;
 				toPos.z = TheTerrainLogic->getGroundHeight(toPos.x , toPos.y);
 
-				if ( fabs(fromPos.z - toPos.z)<PATHFIND_CELL_SIZE_F) {
+				// Painted-impassable cells are flat; a real climb rises about the cliff limit per cell.
+				if ( WWMath::Fabs(fromPos.z - toPos.z)<PATHFIND_CELL_SIZE_F*0.5f) {
 					newCostSoFar += 7*COST_DIAGONAL;
 				}
 			} else if (newCell->getPinched()) {
@@ -7091,7 +7197,7 @@ Int Pathfinder::examineNeighboringCells(PathfindCell *parentCell, PathfindCell *
 				}	else {
 					dx = newCellCoord.x - goalCell->getXIndex();
 					dy = newCellCoord.y - goalCell->getYIndex();
-					costRemaining = COST_ORTHOGONAL*sqrt(dx*dx + dy*dy);
+					costRemaining = COST_ORTHOGONAL*WWMath::Sqrt((float)(dx*dx + dy*dy));
 					costRemaining -= attackDistance/2;
 					if (costRemaining<0)
 						costRemaining=0;
@@ -7456,7 +7562,7 @@ Path *Pathfinder::internalFindPath( Object *obj, const LocomotorSet& locomotorSe
 		dx = from->x - to->x;
 		dy = from->y - to->y;
 
-		Int count = sqrt(dx*dx+dy*dy)/(PATHFIND_CELL_SIZE_F/2);
+		Int count = WWMath::Sqrt(dx*dx+dy*dy)/(PATHFIND_CELL_SIZE_F/2);
 		if (count<2) count = 2;
 		Int i;
 		color.green = 0;
@@ -8152,7 +8258,7 @@ Path *Pathfinder::findGroundPath( const Coord3D *from,
 		dx = from->x - to->x;
 		dy = from->y - to->y;
 
-		Int count = sqrt(dx*dx+dy*dy)/(PATHFIND_CELL_SIZE_F/2);
+		Int count = WWMath::Sqrt(dx*dx+dy*dy)/(PATHFIND_CELL_SIZE_F/2);
 		if (count<2) count = 2;
 		Int i;
 		color.green = 0;
@@ -8196,7 +8302,7 @@ Path *Pathfinder::findGroundPath( const Coord3D *from,
 void Pathfinder::processHierarchicalCell( const ICoord2D &scanCell, const ICoord2D &delta, PathfindCell *parentCell,
 																				 PathfindCell *goalCell, zoneStorageType parentZone,
 																				 zoneStorageType *examinedZones, Int &numExZones,
-																				 Bool crusher, Int &cellCount)
+																				 LocomotorSurfaceTypeMask locomotorSurface, Bool crusher, Int &cellCount)
 {
 	if (scanCell.x<m_extent.lo.x || scanCell.x>m_extent.hi.x ||
 		scanCell.y<m_extent.lo.y || scanCell.y>m_extent.hi.y) {
@@ -8207,7 +8313,7 @@ void Pathfinder::processHierarchicalCell( const ICoord2D &scanCell, const ICoord
 		return;
 	}
 #endif
-	if (parentZone == m_zoneManager.getBlockZone(LOCOMOTORSURFACE_GROUND,
+	if (parentZone == m_zoneManager.getBlockZone(locomotorSurface,
 		crusher, scanCell.x, scanCell.y, m_map)) {
 		PathfindCell *newCell = getCell(LAYER_GROUND, scanCell.x, scanCell.y);
 #if RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING
@@ -8231,12 +8337,12 @@ void Pathfinder::processHierarchicalCell( const ICoord2D &scanCell, const ICoord
 		}
 		PathfindCell *adjNewCell = getCell(LAYER_GROUND, adjacentCell.x, adjacentCell.y);
 		if (adjNewCell->hasInfo() && (adjNewCell->getOpen() || adjNewCell->getClosed())) return; // already looked at this one.
-		zoneStorageType parentGlobalZone = m_zoneManager.getEffectiveZone(LOCOMOTORSURFACE_GROUND, crusher, parentZone);
+		zoneStorageType parentGlobalZone = m_zoneManager.getEffectiveZone(locomotorSurface, crusher, parentZone);
 
 		/// @todo - somehow out of bounds or bogus newZone.
-		zoneStorageType newZone = m_zoneManager.getBlockZone(LOCOMOTORSURFACE_GROUND,
+		zoneStorageType newZone = m_zoneManager.getBlockZone(locomotorSurface,
 							crusher, adjacentCell.x, adjacentCell.y, m_map);
-		zoneStorageType newGlobalZone = m_zoneManager.getEffectiveZone(LOCOMOTORSURFACE_GROUND, crusher, newZone);
+		zoneStorageType newGlobalZone = m_zoneManager.getEffectiveZone(locomotorSurface, crusher, newZone);
 		if (newGlobalZone != parentGlobalZone) {
 			return; // can't step over. jba.
 		}
@@ -8719,7 +8825,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 					continue;
 
 				processHierarchicalCell(scanCell, delta, parentCell,
-					goalCell, parentZone, examinedZones, numExZones, crusher, cellCount);
+					goalCell, parentZone, examinedZones, numExZones, locomotorSurface, crusher, cellCount);
 			}
 		}
 		// Right side.
@@ -8751,7 +8857,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 					continue;
 
 				processHierarchicalCell(scanCell, delta, parentCell,
-					goalCell, parentZone, examinedZones, numExZones, crusher, cellCount);
+					goalCell, parentZone, examinedZones, numExZones, locomotorSurface, crusher, cellCount);
 			}
 		}
 		// Top side.
@@ -8782,7 +8888,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 					continue;
 
 				processHierarchicalCell(scanCell, delta, parentCell,
-					goalCell, parentZone, examinedZones, numExZones, crusher, cellCount);
+					goalCell, parentZone, examinedZones, numExZones, locomotorSurface, crusher, cellCount);
 			}
 		}
 		// Bottom side.
@@ -8814,7 +8920,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 					continue;
 
 				processHierarchicalCell(scanCell, delta, parentCell,
-					goalCell, parentZone, examinedZones, numExZones, crusher, cellCount);
+					goalCell, parentZone, examinedZones, numExZones, locomotorSurface, crusher, cellCount);
 			}
 		}
 	}
@@ -8864,7 +8970,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 		dx = from->x - to->x;
 		dy = from->y - to->y;
 
-		Int count = sqrt(dx*dx+dy*dy)/(PATHFIND_CELL_SIZE_F/2);
+		Int count = WWMath::Sqrt(dx*dx+dy*dy)/(PATHFIND_CELL_SIZE_F/2);
 		if (count<2) count = 2;
 		Int i;
 		color.green = 0;
@@ -9016,7 +9122,8 @@ Bool Pathfinder::clientSafeQuickDoesPathExist( const LocomotorSet& locomotorSet,
  */
 Bool Pathfinder::clientSafeQuickDoesPathExistForUI( const LocomotorSet& locomotorSet,
 																const Coord3D *from,
-																const Coord3D *to )
+																const Coord3D *to,
+																Bool acceptRubble )
 {
 	// See if terrain or building is blocking the destination.
 	PathfindLayerEnum destinationLayer = TheTerrainLogic->getLayerForDestination(to);
@@ -9029,8 +9136,14 @@ Bool Pathfinder::clientSafeQuickDoesPathExistForUI( const LocomotorSet& locomoto
 		return false; // No goals on cliffs.
 	}
 
-	zone1 = m_zoneManager.getEffectiveZone(locomotorSet.getValidSurfaces(), false, parentCell->getZone());
-	zone2 =  m_zoneManager.getEffectiveZone(locomotorSet.getValidSurfaces(), false, goalCell->getZone());
+	LocomotorSurfaceTypeMask surfaces = locomotorSet.getValidSurfaces();
+	if (acceptRubble)
+	{
+		surfaces |= LOCOMOTORSURFACE_RUBBLE;
+	}
+
+	zone1 = m_zoneManager.getEffectiveZone(surfaces, false, parentCell->getZone());
+	zone2 =  m_zoneManager.getEffectiveZone(surfaces, false, goalCell->getZone());
 
 	if (zone1 == PathfindZoneManager::UNINITIALIZED_ZONE ||
 			zone2 == PathfindZoneManager::UNINITIALIZED_ZONE) {
@@ -9043,11 +9156,11 @@ Bool Pathfinder::clientSafeQuickDoesPathExistForUI( const LocomotorSet& locomoto
 		pathing as well. jba. */
 	zone1 = parentCell->getZone();
 	zone1 = m_zoneManager.getEffectiveTerrainZone(zone1);
-	zone1 = m_zoneManager.getEffectiveZone(locomotorSet.getValidSurfaces(), false, zone1);
+	zone1 = m_zoneManager.getEffectiveZone(surfaces, false, zone1);
 	zone1 = m_zoneManager.getEffectiveTerrainZone(zone1);
 	zone2 = goalCell->getZone();
 	zone2 = m_zoneManager.getEffectiveTerrainZone(zone2);
-	zone2 = m_zoneManager.getEffectiveZone(locomotorSet.getValidSurfaces(), false, zone2);
+	zone2 = m_zoneManager.getEffectiveZone(surfaces, false, zone2);
 	zone2 = m_zoneManager.getEffectiveTerrainZone(zone2);
 
 	if (zone1 == PathfindZoneManager::UNINITIALIZED_ZONE) {
@@ -10472,6 +10585,50 @@ struct ViewAttackBlockedStruct
 	return 0;	// keep going
 }
 
+struct BridgeDeckStruct
+{
+	Coord3D from;
+	Coord3D to;
+	Bool above;
+	Bool below;
+};
+
+// Stops once the sight line has been both above and below a bridge deck.
+static Int lineCrossesBridgeDeckCallback(Pathfinder* pathfinder, PathfindCell* from, PathfindCell* to, Int to_x, Int to_y, void* userData)
+{
+	BridgeDeckStruct* d = (BridgeDeckStruct*)userData;
+	PathfindLayerEnum deck = to->getBridgeLayer();
+	if (deck <= LAYER_GROUND)
+	{
+		return 0;
+	}
+
+	Real x = (to_x + 0.5f) * PATHFIND_CELL_SIZE_F;
+	Real y = (to_y + 0.5f) * PATHFIND_CELL_SIZE_F;
+	Real dx = d->to.x - d->from.x;
+	Real dy = d->to.y - d->from.y;
+	Real lenSqr = dx*dx + dy*dy;
+	Real t = lenSqr > 0.0f ? ((x - d->from.x)*dx + (y - d->from.y)*dy) / lenSqr : 0.0f;
+	if (t < 0.0f)
+	{
+		t = 0.0f;
+	}
+	else if (t > 1.0f)
+	{
+		t = 1.0f;
+	}
+	Real lineZ = d->from.z + (d->to.z - d->from.z) * t;
+	if (lineZ > TheTerrainLogic->getLayerHeight(x, y, deck))
+	{
+		d->above = true;
+	}
+	else
+	{
+		d->below = true;
+	}
+	return (d->above && d->below) ? 1 : 0;
+}
+
 //-----------------------------------------------------------------------------
 Bool Pathfinder::isViewBlockedByObstacle(const Object* obj, const Object* objOther)
 {
@@ -10509,6 +10666,25 @@ Bool Pathfinder::isAttackViewBlockedByObstacle(const Object* attacker, const Coo
 	{
 		//CRCDEBUG_LOG(("Pathfinder::isAttackViewBlockedByObstacle() 1"));
 		return false;
+	}
+
+	// A bridge deck between the two is a wall from either side.
+	if (TheTerrainLogic->getFirstBridge())
+	{
+		BridgeDeckStruct deck;
+		deck.from = attackerPos;
+		deck.from.z += attacker->getGeometryInfo().getMaxHeightAbovePosition();
+		deck.to = victimPos;
+		if (victim)
+		{
+			victim->getGeometryInfo().getCenterPosition(victimPos, deck.to);
+		}
+		deck.above = false;
+		deck.below = false;
+		if (iterateCellsAlongLine(attackerPos, victimPos, LAYER_GROUND, lineCrossesBridgeDeckCallback, &deck) != 0)
+		{
+			return true;
+		}
 	}
 
 	// If the attacker doesn't need line of sight, isn't blocked.
@@ -11788,6 +11964,42 @@ Path *Pathfinder::patchPath( const Object *obj, const LocomotorSet& locomotorSet
 }
 
 
+/** True if obj can stand at goalPos (on its current layer) and attack the victim from there.
+	* Same checks as the "quick check" in findAttackPath. */
+Bool Pathfinder::isValidAttackGoal( const Object *obj, const LocomotorSet& locomotorSet, const Coord3D& goalPos,
+		const Object *victim, const Coord3D* victimPos, const Weapon *weapon )
+{
+	if (!m_isMapReady || obj == nullptr || weapon == nullptr)
+		return false;
+
+	Bool isCrusher = obj->getCrusherLevel() > 0;
+	Short requiredBridgeHeight = obj->getRequiredBridgeHeight();
+	Int radius;
+	Bool centerInCell;
+	getRadiusAndCenter(obj, radius, centerInCell);
+
+	ICoord2D cellNdx;
+	worldToCell(&goalPos, &cellNdx);
+	PathfindCell *aCell = getCell(obj->getLayer(), cellNdx.x, cellNdx.y);
+	if (!aCell)
+		return false;
+
+	if (!validMovementPosition(isCrusher, locomotorSet.getValidSurfaces(), locomotorSet.getRequiredWaterLevel(), requiredBridgeHeight, aCell))
+		return false;
+
+	if (!checkDestination(obj, cellNdx.x, cellNdx.y, obj->getLayer(), radius, centerInCell))
+		return false;
+
+	if (!weapon->isGoalPosWithinAttackRange(obj, &goalPos, victim, victimPos))
+		return false;
+
+	if (isAttackViewBlockedByObstacle(obj, goalPos, victim, *victimPos))
+		return false;
+
+	return true;
+}
+
+
 /** Find a short, valid path to a location that obj can attack victim from.  */
 Path *Pathfinder::findAttackPath( const Object *obj, const LocomotorSet& locomotorSet, const Coord3D *from,
 		const Object *victim, const Coord3D* victimPos, const Weapon *weapon )
@@ -12237,7 +12449,7 @@ Path *Pathfinder::findSafePath( const Object *obj, const LocomotorSet& locomotor
 			farthestDistanceSqr = distSqr;
 			if (cellCount > MAX_CELLS) {
 #ifdef INTENSE_DEBUG
-				DEBUG_LOG(("Took intermediate path, dist %f, goal dist %f", sqrt(farthestDistanceSqr), repulsorRadius));
+				DEBUG_LOG(("Took intermediate path, dist %f, goal dist %f", WWMath::Sqrt(farthestDistanceSqr), repulsorRadius));
 #endif
 				ok = true; // Already a big search, just take this one.
 			}

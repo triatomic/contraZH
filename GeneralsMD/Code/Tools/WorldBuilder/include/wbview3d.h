@@ -42,6 +42,7 @@
 #include "WBFontAtlas.h"
 
 #include <map>
+#include <vector>
 
 //#include "GameLogic/Module/BodyModule.h" -- Yikes... not necessary to include this! (KM)
 enum BodyDamageType CPP_11(: Int); //Ahhhh much better!
@@ -359,6 +360,7 @@ private:
 	Int											m_time;
 	LONGLONG										m_lastAnimTick;	///< QPC tick of the last animation advance, 0 before the first
 	Int											m_updateCount;
+	const char									*m_topViewError;
 	UINT										m_timer;
 	DrawObject							*m_drawObject;
 	RefRenderObjListClass		m_lightList;
@@ -518,6 +520,7 @@ protected:
 	Int  m_fpsCap;							///< repaint cap in frames per second, 0 = uncapped
 	Bool m_fpsCapTimerSet;					///< a deferred repaint is scheduled on the cap timer
 	Bool deferPaintForFpsCap();				///< TRUE when this paint comes too soon and was rescheduled
+	double fpsCapWaitMs();					///< ms until the cap allows the next frame, 0 when it allows one now
 	Int  m_labelCull;						///< viewport-label cull: 0 = Off, 1 = Near, 2 = Medium, 3 = Far (ground distance from look-at target; zoom-independent)
 	void setMSAA(D3DMULTISAMPLE_TYPE type);
 	void setTextureFilter(int mode);
@@ -635,6 +638,8 @@ public:
 	
 	/// Invalidates an build list object.
 	void invalBuildListItemInView(BuildListInfo *pBuild);
+	/// True when the Build List tool limits the view to its selected player and side is another one.
+	Bool isBuildListSideHidden(Int side);
 
 	/// Invalidates the area of one height map cell in the 2d view.
 	virtual void invalidateCellInView(int xIndex, int yIndex) override;
@@ -759,6 +764,72 @@ public:
 
 //	void init(CWorldBuilderView *pMainView, HINSTANCE hInstance, CWnd* parent);
 	void redraw();
+	/// Moves WW3D's clock on by the time since the last call.
+	void advanceAnimation();
+
+	enum
+	{
+		TOP_VIEW_WATER_NONE = 0,
+		TOP_VIEW_WATER_FLAT,
+		TOP_VIEW_WATER_SHADER,
+	};
+	/// What captureTopView draws. The rectangle is in border-relative world units.
+	struct TopViewCapture
+	{
+		Real x0, y0, x1, y1;
+		Bool objects;
+		Bool trees;
+		Bool roads;
+		Bool colorGrade;
+		Int timeOfDay;	///< TIME_OF_DAY_INVALID keeps the current one
+		Int water;		///< TOP_VIEW_WATER_*
+		Bool clouds;
+		Bool macroTexture;
+		Bool stochastic;	///< paints stochastic terrain over all the ground for the capture
+		Bool shadows;
+	};
+	/// Renders the rectangle straight down into size*size BGRA pixels, top row north. Without aboveGround only terrain draws.
+	Bool captureTopView(Int size, const TopViewCapture &capture, Bool aboveGround, UnsignedByte *bgra);
+	/// Sets the scene up for a run of renderTopView frames, holding the editor view still until endTopView.
+	Bool beginTopView(const TopViewCapture &capture, Bool aboveGround);
+	Bool renderTopView(Int size, UnsignedByte *bgra);
+	/// Draws a frame and stretches it over the area, given as fractions of the window with the top row first.
+	Bool presentTopView(Int size, void *window, const Real area[4]);
+	void endTopView();
+	Bool isTopViewActive() const { return m_topView.active; }
+private:
+	Bool drawTopView(Int size);
+	/// What beginTopView changed, for endTopView to put back.
+	struct TopViewSession
+	{
+		TopViewSession() : active(false), aboveGround(false), camZ(0.0f), camera(NULL), target(NULL), depth(NULL), targetSize(0),
+			oldTimeOfDay(TIME_OF_DAY_INVALID), removedTrees(false), wantShadowVolumes(false), wantShadowDecals(false), wantClouds(false), wantMacroTexture(false), paint(NULL),
+			swapChain(NULL), swapWindow(NULL) {}
+		Bool active;
+		TopViewCapture capture;
+		Bool aboveGround;
+		Real camZ;
+		CameraClass *camera;
+		TextureClass *target;
+		ZTextureClass *depth;
+		Int targetSize;
+		TimeOfDay oldTimeOfDay;
+		Bool removedTrees;
+		std::vector<RenderObjClass *> objects;
+		std::vector<Bool> wasHidden;
+		Bool wantShadowVolumes;
+		Bool wantShadowDecals;
+		Bool wantClouds;
+		Bool wantMacroTexture;
+		std::vector<UnsignedByte> paintEverywhere;
+		UnsignedByte *paint;
+		IDirect3DSwapChain8 *swapChain;	///< presents into the live preview's window
+		void *swapWindow;
+	};
+	TopViewSession								m_topView;
+public:
+	/// Why the last captureTopView failed.
+	const char *getTopViewError() const { return m_topViewError; }
 
 	virtual void setCenterInView(Real x, Real y) override;
 
@@ -767,6 +838,11 @@ public:
 	// from another window's message handler (e.g. the Minimap dialog) without
 	// driving the D3D device from a foreign context.
 	void setCenterInViewDeferred(Real x, Real y);
+
+	// Paints through this view's own WM_PAINT when the FPS cap allows a frame, and
+	// returns TRUE when it did. A drag in another window needs it, because WM_PAINT
+	// waits behind that window's stream of mouse moves.
+	Bool paintNowIfDue();
 
 	// (getShowTerrain is WbView's inline accessor -- there was a bodiless redeclaration here that
 	// shadowed it with no definition, so the first caller got an unresolved external.)
@@ -781,6 +857,7 @@ public:
 	Bool getShowBuildZoneFeedBack(void) { return ::AfxGetApp()->GetProfileInt(OBJECT_OPTION_PANEL, "PreviewBuildZone", 1);}
 	Bool getUseWaterHeight(void) { return ::AfxGetApp()->GetProfileInt(OBJECT_OPTION_PANEL, "UseWaterHeight", 0);}
 	Bool getShowBuildListObjects(void) { return ::AfxGetApp()->GetProfileInt(BUILDLIST_OPTION_PANEL, "ForceShowBuildListObjects", 0);}
+	Bool getShowBuildListSideOnly(void) { return ::AfxGetApp()->GetProfileInt(BUILDLIST_OPTION_PANEL, "ShowSelectedSideOnly", 0);}
 
 	void setObjTracking(MapObject *pMapObj, Coord3D pos, Real angle, Bool show);
 	void setViewLayersList(Bool showLayersList) { m_showLayersList = showLayersList; }

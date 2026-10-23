@@ -81,6 +81,7 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/ScriptActions.h"
+#include "GameLogic/ScriptCLP.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/VictoryConditions.h"
@@ -109,6 +110,25 @@ static void updateTeamAndPlayerStuff( Object *obj, void *userData )
 			draw->setIndicatorColor(obj->getIndicatorColor());
 	}
 }
+
+//-------------------------------------------------------------------------------------------------
+/** Accepts objects the player could target as a human would, see clpIsFairAITarget. */
+//-------------------------------------------------------------------------------------------------
+class PartitionFilterFairAITarget : public PartitionFilter
+{
+public:
+	PartitionFilterFairAITarget(const Player *player) : m_player(player) { }
+	virtual Bool allow(Object *other) override
+	{
+		return clpIsFairAITarget(other, m_player);
+	}
+#if defined(RTS_DEBUG)
+	virtual const char* debugGetName() override { return "PartitionFilterFairAITarget"; }
+#endif
+private:
+	const Player *m_player;
+};
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 
@@ -2134,8 +2154,10 @@ void ScriptActions::doTeamHuntWithCommandButton(const AsciiString& teamName, con
 			case GUI_COMMAND_REVERSE_MOVE:
 			case GUI_COMMAND_HOLD_FIRE:
 			case GUI_COMMAND_TOGGLE_DEPLOY:
+			case GUI_COMMAND_TOGGLE_TUNNEL_AUTO_POP:
 			case GUI_COMMAND_TOGGLE_FIRE_WEAPON:
 			case GUI_COMMAND_AUTO_FILL:
+			case GUI_COMMAND_EVACUATE_TO_WORK:
 			case GUI_COMMAND_GUARD:
 			case GUI_COMMAND_GUARD_WITHOUT_PURSUIT:
 			case GUI_COMMAND_GUARD_FLYING_UNITS_ONLY:
@@ -5528,9 +5550,10 @@ void ScriptActions::doSkirmishCommandButtonOnMostValuable( const AsciiString& te
 
 	PartitionFilterPlayerAffiliation f1(team->getControllingPlayer(), ALLOW_ENEMIES, true);
 	PartitionFilterValidCommandButtonTarget f2(srcObj, commandButton, true, CMD_FROM_SCRIPT);
+	PartitionFilterFairAITarget filterFair(team->getControllingPlayer());
 	PartitionFilterSameMapStatus filterMapStatus(srcObj);
 
-	PartitionFilter *filters[] = { &f1, &f2, &filterMapStatus, nullptr };
+	PartitionFilter *filters[] = { &f1, &f2, &filterMapStatus, &filterFair, nullptr };
 	// @todo: Should we add the group's radius to the range? Seems like a possibility.
 	SimpleObjectIterator *iter = ThePartitionManager->iterateObjectsInRange(&pos, range, FROM_CENTER_2D, filters, ITER_SORTED_EXPENSIVE_TO_CHEAP);
 	MemoryPoolObjectHolder hold(iter);
@@ -5631,12 +5654,13 @@ void ScriptActions::doTeamUseCommandButtonOnNearestEnemy( const AsciiString& tea
 
 	PartitionFilterPlayerAffiliation f1(team->getControllingPlayer(), ALLOW_ENEMIES, true);
 	PartitionFilterValidCommandButtonTarget f2(srcObj, commandButton, true, CMD_FROM_SCRIPT);
+	PartitionFilterFairAITarget filterFair(team->getControllingPlayer());
 	PartitionFilterSameMapStatus filterMapStatus(srcObj);
 
 	Coord3D pos;
 	theGroup->getCenter(&pos);
 
-	PartitionFilter *filters[] = { &f1, &f2, &filterMapStatus, nullptr };
+	PartitionFilter *filters[] = { &f1, &f2, &filterMapStatus, &filterFair, nullptr };
 	Object *obj = ThePartitionManager->getClosestObject(&pos, REALLY_FAR, FROM_CENTER_2D, filters);
 	if (!obj) {
 		return;
@@ -5683,12 +5707,13 @@ void ScriptActions::doTeamUseCommandButtonOnNearestGarrisonedBuilding( const Asc
 	PartitionFilterAcceptByKindOf f2(MAKE_KINDOF_MASK(KINDOF_STRUCTURE), KINDOFMASK_NONE);
 	PartitionFilterGarrisonable f3(true);
 	PartitionFilterValidCommandButtonTarget f4(srcObj, commandButton, true, CMD_FROM_SCRIPT);
+	PartitionFilterFairAITarget filterFair(team->getControllingPlayer());
 	PartitionFilterSameMapStatus filterMapStatus(srcObj);
 
 	Coord3D pos;
 	theGroup->getCenter(&pos);
 
-	PartitionFilter *filters[] = { &f1, &f2, &f3, &f4, &filterMapStatus, nullptr };
+	PartitionFilter *filters[] = { &f1, &f2, &f3, &f4, &filterMapStatus, &filterFair, nullptr };
 	Object *obj = ThePartitionManager->getClosestObject(&pos, REALLY_FAR, FROM_CENTER_2D, filters);
 	if (!obj) {
 		return;
@@ -5734,12 +5759,13 @@ void ScriptActions::doTeamUseCommandButtonOnNearestKindof( const AsciiString& te
 	PartitionFilterPlayerAffiliation f1(team->getControllingPlayer(), ALLOW_ENEMIES, true);
 	PartitionFilterAcceptByKindOf f2(MAKE_KINDOF_MASK(kindofBit), KINDOFMASK_NONE);
 	PartitionFilterValidCommandButtonTarget f3(srcObj, commandButton, true, CMD_FROM_SCRIPT);
+	PartitionFilterFairAITarget filterFair(team->getControllingPlayer());
 	PartitionFilterSameMapStatus filterMapStatus(srcObj);
 
 	Coord3D pos;
 	theGroup->getCenter(&pos);
 
-	PartitionFilter *filters[] = { &f1, &f2, &f3, &filterMapStatus, nullptr };
+	PartitionFilter *filters[] = { &f1, &f2, &f3, &filterMapStatus, &filterFair, nullptr };
 	Object *obj = ThePartitionManager->getClosestObject(&pos, REALLY_FAR, FROM_CENTER_2D, filters);
 	if (!obj) {
 		return;
@@ -5785,12 +5811,13 @@ void ScriptActions::doTeamUseCommandButtonOnNearestBuilding( const AsciiString& 
 	PartitionFilterPlayerAffiliation f1(team->getControllingPlayer(), ALLOW_ENEMIES, true);
 	PartitionFilterAcceptByKindOf f2(MAKE_KINDOF_MASK(KINDOF_STRUCTURE), KINDOFMASK_NONE);
 	PartitionFilterValidCommandButtonTarget f3(srcObj, commandButton, true, CMD_FROM_SCRIPT);
+	PartitionFilterFairAITarget filterFair(team->getControllingPlayer());
 	PartitionFilterSameMapStatus filterMapStatus(srcObj);
 
 	Coord3D pos;
 	theGroup->getCenter(&pos);
 
-	PartitionFilter *filters[] = { &f1, &f2, &f3, &filterMapStatus, nullptr };
+	PartitionFilter *filters[] = { &f1, &f2, &f3, &filterMapStatus, &filterFair, nullptr };
 	Object *obj = ThePartitionManager->getClosestObject(&pos, REALLY_FAR, FROM_CENTER_2D, filters);
 	if (!obj) {
 		return;
@@ -5837,12 +5864,13 @@ void ScriptActions::doTeamUseCommandButtonOnNearestBuildingClass( const AsciiStr
 	PartitionFilterAcceptByKindOf f2(MAKE_KINDOF_MASK(KINDOF_STRUCTURE), KINDOFMASK_NONE);
 	PartitionFilterAcceptByKindOf f3(MAKE_KINDOF_MASK(kindofBit), KINDOFMASK_NONE);
 	PartitionFilterValidCommandButtonTarget f4(srcObj, commandButton, true, CMD_FROM_SCRIPT);
+	PartitionFilterFairAITarget filterFair(team->getControllingPlayer());
 	PartitionFilterSameMapStatus filterMapStatus(srcObj);
 
 	Coord3D pos;
 	theGroup->getCenter(&pos);
 
-	PartitionFilter *filters[] = { &f1, &f2, &f3, &f4, &filterMapStatus, nullptr };
+	PartitionFilter *filters[] = { &f1, &f2, &f3, &f4, &filterMapStatus, &filterFair, nullptr };
 	Object *obj = ThePartitionManager->getClosestObject(&pos, REALLY_FAR, FROM_CENTER_2D, filters);
 	if (!obj) {
 		return;
@@ -5894,8 +5922,9 @@ void ScriptActions::doTeamUseCommandButtonOnNearestObjectType( const AsciiString
 		PartitionFilterPlayerAffiliation f1(team->getControllingPlayer(), ALLOW_ENEMIES | ALLOW_NEUTRAL, true);
 		PartitionFilterThing f2(thingTemplate, true);
 		PartitionFilterValidCommandButtonTarget f3(srcObj, commandButton, true, CMD_FROM_SCRIPT);
+		PartitionFilterFairAITarget filterFair(team->getControllingPlayer());
 		PartitionFilterSameMapStatus filterMapStatus(srcObj);
-		PartitionFilter *filters[] = { &f1, &f2, &f3, &filterMapStatus, nullptr };
+		PartitionFilter *filters[] = { &f1, &f2, &f3, &filterMapStatus, &filterFair, nullptr };
 
 		Coord3D pos;
 		theGroup->getCenter(&pos);
@@ -5913,6 +5942,7 @@ void ScriptActions::doTeamUseCommandButtonOnNearestObjectType( const AsciiString
 		{
 			PartitionFilterPlayerAffiliation f1(team->getControllingPlayer(), ALLOW_ENEMIES | ALLOW_NEUTRAL, true);
 			PartitionFilterValidCommandButtonTarget f3(srcObj, commandButton, true, CMD_FROM_SCRIPT);
+			PartitionFilterFairAITarget filterFair(team->getControllingPlayer());
 			PartitionFilterSameMapStatus f4(srcObj);
 
 			Coord3D pos;
@@ -5927,7 +5957,7 @@ void ScriptActions::doTeamUseCommandButtonOnNearestObjectType( const AsciiString
 				if( thisType )
 				{
 					PartitionFilterThing f2( thisType, true );
-					PartitionFilter *filters[] = { &f1, &f2, &f3, &f4, nullptr };
+					PartitionFilter *filters[] = { &f1, &f2, &f3, &f4, &filterFair, nullptr };
 
 					Object *obj = ThePartitionManager->getClosestObject(&pos, REALLY_FAR, FROM_CENTER_2D, filters, &dist );
 					if( obj )
@@ -6404,6 +6434,155 @@ void ScriptActions::doGuardSupplyCenter(const AsciiString& teamName, Int supplie
 }
 
 //-------------------------------------------------------------------------------------------------
+/** Nearest supply source to pos that is not enemy owned and has no supply center of any player near it. */
+//-------------------------------------------------------------------------------------------------
+static Object *findFreeSupplySource(const Coord3D *pos, const Player *player, Int minimumCash)
+{
+	// Same as SUPPLY_CENTER_CLOSE_DIST in AIPlayer.cpp
+	const Real closeDist = 20*PATHFIND_CELL_SIZE_F;
+	static const NameKeyType key_warehouseUpdate = NAMEKEY("SupplyWarehouseDockUpdate");
+
+	Object *bestSource = nullptr;
+	Real bestDistSqr = 0;
+	do
+	{
+		for (Object *obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject())
+		{
+			if (!obj->isKindOf(KINDOF_STRUCTURE) || !obj->isKindOf(KINDOF_SUPPLY_SOURCE))
+			{
+				continue;
+			}
+			SupplyWarehouseDockUpdate *warehouseModule = (SupplyWarehouseDockUpdate*)obj->findUpdateModule(key_warehouseUpdate);
+			if (!warehouseModule)
+			{
+				continue;
+			}
+			Int availableCash = warehouseModule->getBoxesStored()*TheGlobalData->m_baseValuePerSupplyBox;
+			if (availableCash <= 0 || availableCash < minimumCash)
+			{
+				continue;
+			}
+			if (player->getRelationship(obj->getTeam()) == ENEMIES)
+			{
+				continue;
+			}
+
+			Real dx = obj->getPosition()->x - pos->x;
+			Real dy = obj->getPosition()->y - pos->y;
+			Real distSqr = dx*dx + dy*dy;
+			if (bestSource && distSqr >= bestDistSqr)
+			{
+				continue;
+			}
+
+			// Structures only, so a moving stash does not claim the source it drives past
+			PartitionFilterAcceptByKindOf filterKind(KindOfMaskType(KindOfMaskType::kInit, KINDOF_STRUCTURE, KINDOF_CASH_GENERATOR), KINDOFMASK_NONE);
+			PartitionFilterAlive filterAlive;
+			PartitionFilterOnMap filterMapStatus;
+			PartitionFilter *filters[] = { &filterKind, &filterAlive, &filterMapStatus, nullptr };
+			Real radius = closeDist + obj->getGeometryInfo().getBoundingCircleRadius();
+			if (ThePartitionManager->getClosestObject(obj->getPosition(), radius, FROM_BOUNDINGSPHERE_2D, filters))
+			{
+				continue;
+			}
+
+			bestSource = obj;
+			bestDistSqr = distSqr;
+		}
+		if (bestSource)
+		{
+			break;
+		}
+		minimumCash /= 2;
+	} while (minimumCash > 100);
+
+	return bestSource;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Point beside the source on the side facing from, clear of its supply build border. */
+//-------------------------------------------------------------------------------------------------
+static Coord3D getSupplySourceApproach(const Object *source, const Coord3D *from, Real moverRadius)
+{
+	Coord3D location = *source->getPosition();
+	Coord2D offset;
+	offset.x = from->x - location.x;
+	offset.y = from->y - location.y;
+	offset.normalize();
+	Real radius = source->getGeometryInfo().getBoundingCircleRadius() + 2*TheGlobalData->m_SupplyBuildBorder + moverRadius;
+	location.x += offset.x*radius;
+	location.y += offset.y*radius;
+	location.z = TheTerrainLogic->getGroundHeight(location.x, location.y);
+	return location;
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScriptActions::doTeamMoveToSupplySource(const AsciiString& teamName, Int supplies)
+{
+	Team *team = TheScriptEngine->getTeamNamed(teamName);
+	if (!team) {
+		return;
+	}
+	Player *player = team->getControllingPlayer();
+	if (!player) {
+		return;
+	}
+	const Coord3D *teamPos = team->getEstimateTeamPosition();
+	if (!teamPos) {
+		return;
+	}
+	Object *source = findFreeSupplySource(teamPos, player, supplies);
+	if (!source) {
+		return;
+	}
+
+	Real moverRadius = 0;
+	for (DLINK_ITERATOR<Object> iter = team->iterate_TeamMemberList(); !iter.done(); iter.advance())
+	{
+		moverRadius = max(moverRadius, iter.cur()->getGeometryInfo().getBoundingCircleRadius());
+	}
+
+	AIGroupPtr theGroup = TheAI->createGroup();
+	if (!theGroup) {
+		return;
+	}
+#if RETAIL_COMPATIBLE_AIGROUP
+	team->getTeamAsAIGroup(theGroup);
+#else
+	team->getTeamAsAIGroup(theGroup.Peek());
+#endif
+	Coord3D destination = getSupplySourceApproach(source, teamPos, moverRadius);
+	theGroup->groupMoveToPosition(&destination, false, CMD_FROM_SCRIPT);
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScriptActions::doNamedMoveToSupplySource(const AsciiString& unitName, Int supplies)
+{
+	Object *theObj = TheScriptEngine->getUnitNamed(unitName);
+	if (!theObj) {
+		return;
+	}
+	Player *player = theObj->getControllingPlayer();
+	if (!player) {
+		return;
+	}
+	AIUpdateInterface *aiUpdate = theObj->getAIUpdateInterface();
+	if (!aiUpdate) {
+		return;
+	}
+	Object *source = findFreeSupplySource(theObj->getPosition(), player, supplies);
+	if (!source) {
+		return;
+	}
+
+	Coord3D destination = getSupplySourceApproach(source, theObj->getPosition(), theObj->getGeometryInfo().getBoundingCircleRadius());
+	aiUpdate->clearWaypointQueue();
+	theObj->leaveGroup();
+	aiUpdate->chooseLocomotorSet(LOCOMOTORSET_NORMAL);
+	aiUpdate->aiMoveToPosition(&destination, CMD_FROM_SCRIPT);
+}
+
+//-------------------------------------------------------------------------------------------------
 void ScriptActions::doTeamGuardInTunnelNetwork(const AsciiString& teamName)
 {
 	Team *team = TheScriptEngine->getTeamNamed(teamName);
@@ -6556,6 +6735,10 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 {
 	switch (pAction->getActionType()) {
 		default:
+			if (executeCLPAction(pAction))
+			{
+				return;
+			}
 			DEBUG_CRASH(("Unknown ScriptAction type %d", pAction->getActionType())); return;
 		case ScriptAction::DEBUG_MESSAGE_BOX:
 			doDebugMessage(pAction->getParameter(0)->getString(), true);
@@ -7688,6 +7871,14 @@ void ScriptActions::executeAction( ScriptAction *pAction )
 
 		case ScriptAction::TEAM_GUARD_SUPPLY_CENTER:
 			doGuardSupplyCenter(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getInt());
+			return;
+
+		case ScriptAction::TEAM_MOVE_TO_SUPPLY_SOURCE:
+			doTeamMoveToSupplySource(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getInt());
+			return;
+
+		case ScriptAction::NAMED_MOVE_TO_SUPPLY_SOURCE:
+			doNamedMoveToSupplySource(pAction->getParameter(0)->getString(), pAction->getParameter(1)->getInt());
 			return;
 
 		case ScriptAction::OBJECT_ALLOW_BONUSES:

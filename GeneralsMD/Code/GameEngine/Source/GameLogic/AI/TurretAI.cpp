@@ -582,7 +582,7 @@ Bool TurretAI::friend_turnTowardsAngle(Real desiredAngle, Real rateModifier, Rea
 	//desiredAngle = WWMath::Normalize_Angle(desiredAngle);
 
 	// Are we close enough to the desired angle to just snap there?
-	if (fabs(angleDiff) < turnRate)
+	if (WWMath::Fabs(angleDiff) < turnRate)
 	{
 		// we are centered
 		actualAngle = desiredAngle;
@@ -614,7 +614,7 @@ Bool TurretAI::friend_turnTowardsAngle(Real desiredAngle, Real rateModifier, Rea
 		getOwner()->reactToTurretChange( m_whichTurret, origAngle, m_pitch );
 
 	// Bool aligned = fabs(m_angle - desiredAngle) <= relThresh;
-	Bool aligned = fabs(stdAngleDiffMod(m_angle, desiredAngle)) <= relThresh;
+	Bool aligned = WWMath::Fabs(stdAngleDiffMod(m_angle, desiredAngle)) <= relThresh;
 
 	// DEBUG_LOG((">>> TurretAI::friend_turnTowardsAngle: aligned = %d, actualAngle = %f, m_angle = %f, desiredAngle = %f, relThresh = %f\n", aligned, actualAngle * PI / 180.0, m_angle * PI / 180.0, desiredAngle * PI / 180.0, relThresh * PI / 180.0));
 
@@ -634,7 +634,7 @@ Bool TurretAI::friend_turnTowardsPitch(Real desiredPitch, Real rateModifier)
 	Real pitchRate = getPitchRate() * rateModifier;
 	Real pitchDiff = normalizeAngle(desiredPitch - actualPitch);
 
-	if (fabs(pitchDiff) < pitchRate)
+	if (WWMath::Fabs(pitchDiff) < pitchRate)
 	{
 		// we are centered
 		actualPitch = desiredPitch;
@@ -1354,7 +1354,7 @@ StateReturnType TurretAIAimTurretState::update()
 			turret->friend_setPositiveSweep(!turret->friend_getPositiveSweep());
 
 		Real angleDiff = normalizeAngle(relAngle - turret->getTurretAngle());
-		turnAlignedToNemesis = (fabs(angleDiff) < sweep);
+		turnAlignedToNemesis = (WWMath::Fabs(angleDiff) < sweep);
 	}
 
 	Bool pitchAlignedToNemesis = true;
@@ -1457,6 +1457,11 @@ StateReturnType TurretAIAimTurretState::update()
 		}
 #endif
 		if (preventing || nothingInRange)
+		{
+			return STATE_CONTINUE;
+		}
+		// the fire state only tests line of sight against a victim, so a ground target is tested here
+		if (targetType == TARGET_POSITION && isAttackViewBlockedToPosition(obj, &enemyPosition))
 		{
 			return STATE_CONTINUE;
 		}

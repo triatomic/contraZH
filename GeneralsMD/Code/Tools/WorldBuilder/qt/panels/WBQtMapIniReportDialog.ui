@@ -15,7 +15,7 @@
      <item>
       <widget class="QLineEdit" name="filter">
        <property name="placeholderText">
-        <string>substring (object / module / store name)...</string>
+        <string>substring (block name, store or source text)...</string>
        </property>
       </widget>
      </item>
@@ -42,21 +42,20 @@
     </layout>
    </item>
    <item>
-    <widget class="QTreeWidget" name="tree">
-     <property name="selectionMode">
-      <enum>QAbstractItemView::ExtendedSelection</enum>
-     </property>
-     <property name="uniformRowHeights">
+    <widget class="QScrollArea" name="scroll">
+     <property name="widgetResizable">
       <bool>true</bool>
      </property>
-     <property name="headerHidden">
-      <bool>true</bool>
+     <property name="frameShape">
+      <enum>QFrame::NoFrame</enum>
      </property>
-     <column>
-      <property name="text">
-       <string notr="true">1</string>
-      </property>
-     </column>
+     <widget class="QWidget" name="content">
+      <layout class="QVBoxLayout" name="contentLayout">
+       <property name="spacing">
+        <number>6</number>
+       </property>
+      </layout>
+     </widget>
     </widget>
    </item>
    <item>

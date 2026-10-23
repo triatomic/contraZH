@@ -55,7 +55,7 @@ public:
 			{ "CreationList",		INI::parseObjectCreationList,		nullptr, offsetof( CreateObjectOnKillBehaviorModuleData, m_ocl ) },
 			{ "CreateAtKillerLocation",	INI::parseBool,				nullptr, offsetof( CreateObjectOnKillBehaviorModuleData, m_createAtKillerLocation ) },
 			{ "CreateObjectForVictim",	INI::parseBool,				nullptr, offsetof( CreateObjectOnKillBehaviorModuleData, m_createObjectForVictim ) },
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
 
 		BehaviorModuleData::buildFieldParse(p);

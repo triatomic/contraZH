@@ -351,8 +351,12 @@ void MapCache::writeCacheINI( const AsciiString &mapDir )
 	TheFileSystem->createDirectory(mapDir);
 
 	filepath.concat(m_mapCacheName);
-	FILE *fp = fopen(filepath.str(), "w");
-	DEBUG_ASSERTCRASH(fp != nullptr, ("Failed to create %s", filepath.str()));
+
+	// write to a temp file and swap it in so a failed write never leaves a truncated MapCache.ini
+	AsciiString tempFilepath = filepath;
+	tempFilepath.concat(".tmp");
+	FILE *fp = fopen(tempFilepath.str(), "w");
+	DEBUG_ASSERTCRASH(fp != nullptr, ("Failed to create %s", tempFilepath.str()));
 	if (fp == nullptr) {
 		return;
 	}
@@ -415,7 +419,22 @@ void MapCache::writeCacheINI( const AsciiString &mapDir )
 		}
 	}
 
-	fclose(fp);
+	Bool ok = fflush(fp) == 0 && !ferror(fp);
+	if (fclose(fp) != 0)
+		ok = FALSE;
+
+#ifdef _WIN32
+	if (ok && !MoveFileExA(tempFilepath.str(), filepath.str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+		ok = FALSE;
+#else
+	if (ok && rename(tempFilepath.str(), filepath.str()) != 0)
+		ok = FALSE;
+#endif
+	if (!ok)
+	{
+		DEBUG_LOG(("MapCache::writeCacheINI - failed to write '%s'", filepath.str()));
+		remove(tempFilepath.str());
+	}
 }
 
 void MapCache::updateCache()
@@ -510,7 +529,7 @@ Bool MapCache::clearUnseenMaps( const AsciiString &mapDir )
 	return erasedSomething;
 }
 
-void MapCache::loadMapsFromMapCacheINI( const AsciiString &mapDir )
+Bool MapCache::loadMapsFromMapCacheINI( const AsciiString &mapDir )
 {
 	INI ini;
 	AsciiString fname;
@@ -518,8 +537,18 @@ void MapCache::loadMapsFromMapCacheINI( const AsciiString &mapDir )
 
 	if (TheFileSystem->doesFileExist(fname.str()))
 	{
-		ini.load( fname, INI_LOAD_OVERWRITE, nullptr );
+		// a partial or unreadable cache must not abort startup, the disk scan re-caches the maps and rewrites it
+		try
+		{
+			ini.load( fname, INI_LOAD_OVERWRITE, nullptr );
+		}
+		catch (...)
+		{
+			DEBUG_LOG(("MapCache::loadMapsFromMapCacheINI - ignoring unreadable '%s'", fname.str()));
+			return FALSE;
+		}
 	}
+	return TRUE;
 }
 
 Bool MapCache::loadMapsFromDisk( const AsciiString &mapDir, Bool isOfficial, Bool filterByAllowedMaps )
@@ -643,7 +672,25 @@ Bool MapCache::addMap(
 
 	DEBUG_LOG(("MapCache::addMap(): caching '%s' because '%s' was not found", fname.str(), lowerFname.str()));
 
-	loadMap(fname); // Just load for querying the data, since we aren't playing this map.
+	// Just load for querying the data, since we aren't playing this map.
+	Bool loaded = FALSE;
+	try
+	{
+		loaded = loadMap(fname);
+	}
+	catch (...)
+	{
+		loaded = FALSE;
+	}
+
+	const UnsignedInt mapCRC = loaded ? calcCRC(fname) : 0;
+	if (!loaded || mapCRC == 0)
+	{
+		// never cache a map we could not read; drop a stale entry so writeCacheINI does not persist it
+		DEBUG_LOG(("MapCache::addMap(): could not read '%s', not caching it", fname.str()));
+		resetMap();
+		return erase(lowerFname) > 0;
+	}
 
 	// The map is now loaded.  Pick out what we need.
 	MapMetaData md;
@@ -658,7 +705,7 @@ Bool MapCache::addMap(
 	md.m_timestamp.m_lowTimeStamp = fileInfo.timestampLow;
 	md.m_supplyPositions = m_supplyPositions;
 	md.m_techPositions = m_techPositions;
-	md.m_CRC = calcCRC(fname);
+	md.m_CRC = mapCRC;
 
 	Bool exists = false;
 	AsciiString nameLookupTag = worldDict.getAsciiString(TheKey_mapName, &exists);
@@ -772,6 +819,7 @@ struct MapListBoxData
 		, mapToSelect()
 		, selectionIndex(0) // always select *something*
 		, isMultiplayer(false)
+		, filter()
 	{
 	}
 
@@ -789,7 +837,23 @@ struct MapListBoxData
 	AsciiString mapToSelect;
 	Int selectionIndex;
 	Bool isMultiplayer;
+	UnicodeString filter;
 };
+
+//-------------------------------------------------------------------------------------------------
+static Bool containsNoCase( const UnicodeString& text, const UnicodeString& pattern )
+{
+	const Int patternLen = pattern.getLength();
+	const Int last = text.getLength() - patternLen;
+	for (Int i = 0; i <= last; ++i)
+	{
+		if (_wcsnicmp( text.str() + i, pattern.str(), patternLen ) == 0)
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
 
 //-------------------------------------------------------------------------------------------------
 static Bool addMapToMapListbox(
@@ -798,7 +862,8 @@ static Bool addMapToMapListbox(
 	const AsciiString& mapName,
 	const MapMetaData& mapMetaData)
 {
-	const Bool mapOk = mapName.startsWithNoCase(mapDir.str()) && lbData.isMultiplayer == mapMetaData.m_isMultiplayer && !mapMetaData.m_displayName.isEmpty();
+	const Bool mapOk = mapName.startsWithNoCase(mapDir.str()) && lbData.isMultiplayer == mapMetaData.m_isMultiplayer && !mapMetaData.m_displayName.isEmpty()
+		&& containsNoCase(mapMetaData.m_displayName, lbData.filter);
 
 	if (mapOk)
 	{
@@ -919,7 +984,7 @@ static Bool addMapCollectionToMapListbox(
 //-------------------------------------------------------------------------------------------------
 /** Load the listbox with all the map files available to play */
 //-------------------------------------------------------------------------------------------------
-Int populateMapListboxNoReset( GameWindow *listbox, Bool useSystemMaps, Bool isMultiplayer, AsciiString mapToSelect )
+Int populateMapListboxNoReset( GameWindow *listbox, Bool useSystemMaps, Bool isMultiplayer, AsciiString mapToSelect, const UnicodeString& filter )
 {
 	if(!TheMapCache)
 		return -1;
@@ -933,6 +998,7 @@ Int populateMapListboxNoReset( GameWindow *listbox, Bool useSystemMaps, Bool isM
 	lbData.numColumns = GadgetListBoxGetNumColumns( listbox );
 	lbData.mapToSelect = mapToSelect;
 	lbData.isMultiplayer = isMultiplayer;
+	lbData.filter = filter;
 
 	if (lbData.numColumns > 1)
 	{
@@ -979,6 +1045,12 @@ Int populateMapListboxNoReset( GameWindow *listbox, Bool useSystemMaps, Bool isM
 	delete lbData.battleHonors;
 	lbData.battleHonors = nullptr;
 
+	// an empty row swallows the selection silently, so an empty list must report -1
+	if (GadgetListBoxGetNumEntries(listbox) == 0)
+	{
+		lbData.selectionIndex = -1;
+	}
+
 	GadgetListBoxSetSelected(listbox, &lbData.selectionIndex, 1);
 
 	if (lbData.selectionIndex >= 0)
@@ -1001,7 +1073,7 @@ Int populateMapListboxNoReset( GameWindow *listbox, Bool useSystemMaps, Bool isM
 //-------------------------------------------------------------------------------------------------
 /** Load the listbox with all the map files available to play */
 //-------------------------------------------------------------------------------------------------
-Int populateMapListbox( GameWindow *listbox, Bool useSystemMaps, Bool isMultiplayer, AsciiString mapToSelect )
+Int populateMapListbox( GameWindow *listbox, Bool useSystemMaps, Bool isMultiplayer, AsciiString mapToSelect, const UnicodeString& filter )
 {
 	if(!TheMapCache)
 		return -1;
@@ -1012,7 +1084,63 @@ Int populateMapListbox( GameWindow *listbox, Bool useSystemMaps, Bool isMultipla
 	// reset the listbox content
 	GadgetListBoxReset( listbox );
 
-	return populateMapListboxNoReset( listbox, useSystemMaps, isMultiplayer, mapToSelect );
+	return populateMapListboxNoReset( listbox, useSystemMaps, isMultiplayer, mapToSelect, filter );
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Put a search box above the map listbox, taking its height from the top of the list */
+//-------------------------------------------------------------------------------------------------
+GameWindow *createMapListFilter( GameWindow *listbox, GameWindow *lookTemplate )
+{
+	if (!listbox)
+	{
+		return nullptr;
+	}
+
+	WinInstanceData instData;
+	instData.init();
+	instData.m_style = GWS_ENTRY_FIELD | GWS_MOUSE_TRACK;
+
+	UnsignedInt status = WIN_STATUS_ENABLED;
+	Int height = 22;
+	GameFont *font = listbox->winGetFont();
+	if (lookTemplate)
+	{
+		const WinInstanceData *look = lookTemplate->winGetInstanceData();
+		for (Int i = 0; i < MAX_DRAW_DATA; ++i)
+		{
+			instData.m_enabledDrawData[i] = look->m_enabledDrawData[i];
+			instData.m_disabledDrawData[i] = look->m_disabledDrawData[i];
+			instData.m_hiliteDrawData[i] = look->m_hiliteDrawData[i];
+		}
+		instData.m_enabledText = look->m_enabledText;
+		instData.m_disabledText = look->m_disabledText;
+		instData.m_hiliteText = look->m_hiliteText;
+		instData.m_imeCompositeText = look->m_imeCompositeText;
+		status |= lookTemplate->winGetStatus() & WIN_STATUS_IMAGE;
+		font = lookTemplate->winGetFont();
+		Int templateWidth;
+		lookTemplate->winGetSize( &templateWidth, &height );
+	}
+
+	Int x, y, width, listHeight;
+	listbox->winGetPosition( &x, &y );
+	listbox->winGetSize( &width, &listHeight );
+	const Int gap = 4;
+	listbox->winSetPosition( x, y + height + gap );
+	listbox->winSetSize( width, listHeight - height - gap );
+
+	EntryData entryData;
+	memset( &entryData, 0, sizeof( entryData ) );
+	entryData.maxTextLen = 32;
+	GameWindow *entry = TheWindowManager->gogoGadgetTextEntry( listbox->winGetParent(), status, x, y, width, height,
+		&instData, &entryData, font, lookTemplate == nullptr );
+	if (entry)
+	{
+		// messages go where the listbox's go, so the menu sees GEM_UPDATE_TEXT
+		entry->winSetOwner( listbox->winGetOwner() );
+	}
+	return entry;
 }
 
 
@@ -1104,53 +1232,38 @@ const MapMetaData *MapCache::findMap(AsciiString mapName)
 // ------------------------------------------------------------------------------------------------
 /** Embed the pristine map into the xfer stream */
 // ------------------------------------------------------------------------------------------------
-static void copyFromBigToDir( const AsciiString& infile, const AsciiString& outfile )
+static Bool copyFromBigToDir( const AsciiString& infile, const AsciiString& outfile )
 {
-	// open the map file
-
 	File *file = TheFileSystem->openFile( infile.str(), File::READ | File::BINARY );
 	if( file == nullptr )
 	{
 		DEBUG_CRASH(( "copyFromBigToDir - Error opening source file '%s'", infile.str() ));
-		throw SC_INVALID_DATA;
+		return FALSE;
 	}
 
-	// how big is the map file
-	Int fileSize = file->seek( 0, File::END );
-
-
-	// rewind to beginning of file
+	const Int fileSize = file->seek( 0, File::END );
 	file->seek( 0, File::START );
 
-	// allocate buffer big enough to hold the entire map file
 	char *buffer = NEW char[ fileSize ];
-	if( buffer == nullptr )
-	{
-		DEBUG_CRASH(( "copyFromBigToDir - Unable to allocate buffer for file '%s'", infile.str() ));
-		throw SC_INVALID_DATA;
-	}
-
-	// copy the file to the buffer
-	if( file->read( buffer, fileSize ) < fileSize )
-	{
-		DEBUG_CRASH(( "copyFromBigToDir - Error reading from file '%s'", infile.str() ));
-		throw SC_INVALID_DATA;
-	}
-	// close the BIG file
+	const Bool readOk = file->read( buffer, fileSize ) == fileSize;
 	file->close();
+	DEBUG_ASSERTCRASH( readOk, ( "copyFromBigToDir - Error reading from file '%s'", infile.str() ) );
 
-	File *filenew = TheFileSystem->openFile( outfile.str(), File::WRITE | File::CREATE | File::BINARY );
-
-	if( !filenew || filenew->write(buffer, fileSize) < fileSize)
+	Bool writeOk = FALSE;
+	if( readOk )
 	{
-		DEBUG_CRASH(( "copyFromBigToDir - Error writing to file '%s'", outfile.str() ));
-		throw SC_INVALID_DATA;
+		File *filenew = TheFileSystem->openFile( outfile.str(), File::WRITE | File::CREATE | File::BINARY );
+		if( filenew != nullptr )
+		{
+			writeOk = filenew->write( buffer, fileSize ) == fileSize;
+			filenew->close();
+		}
+		DEBUG_ASSERTCRASH( writeOk, ( "copyFromBigToDir - Error writing to file '%s'", outfile.str() ) );
 	}
 
-	filenew->close();
-
-	// delete the buffer
 	delete [] buffer;
+
+	return writeOk;
 }
 
 Image *getMapPreviewImage( AsciiString mapName )
@@ -1195,16 +1308,7 @@ Image *getMapPreviewImage( AsciiString mapName )
 
 		mapPreviewDir.concat(name);
 
-		Bool success = false;
-		try
-		{
-			copyFromBigToDir(tgaName, mapPreviewDir);
-			success = true;
-		}
-		catch (...)
-		{
-			success = false;	// no rethrow
-		}
+		const Bool success = copyFromBigToDir(tgaName, mapPreviewDir);
 
 		if (success)
 		{

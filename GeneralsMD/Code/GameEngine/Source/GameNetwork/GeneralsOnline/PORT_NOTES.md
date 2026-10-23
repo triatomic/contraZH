@@ -9,7 +9,8 @@ GameNetworkingSockets ICE P2P transport, lobbies/matchmaking/stats).
 
 - Ported from GO commit: `d7f75517dd76c3a4e3de75e988f328a6877621c5` (2026-08-24);
   re-synced to `9c1121bd5` (2026-09) including the 60 Hz simulation and engine-feel changes
-  listed under "Decisions made during the port"
+  listed under "Decisions made during the port"; re-synced to `6ff404436` (2026-10-05) by
+  cherry-picks, see "Not taken in the 2026-10 sync"
 - GO's merge base with TheSuperHackers: `e760b3695` (2026-07-26)
 - contraZH's merge base with TheSuperHackers at port time: `5943d3856` (== tsh HEAD)
 - Future re-syncs: `git fetch go && git diff -w <old-go-sha>..<new-go-sha> -- <ported
@@ -48,8 +49,10 @@ GameNetworkingSockets ICE P2P transport, lobbies/matchmaking/stats).
 
 ## Decisions made during the port (deviations from upstream GO)
 
-- **60 Hz client**: the simulation runs at 60 Hz like the official client (client id
-  `gen_online_60hz`, `GENERALS_ONLINE_HIGH_FPS_LIMIT` 60). The switch
+- **Client id**: `custom_third_party_client`, which the services map to a full game
+  session, instead of the official client's `gen_online_60hz`.
+- **60 Hz client**: the simulation runs at 60 Hz like the official client
+  (`GENERALS_ONLINE_HIGH_FPS_LIMIT` 60). The switch
   `GENERALS_ONLINE_HIGH_FPS_SERVER` is defined by `GeneralsMD/Code/CMakeLists.txt` next to
   `GENERALS_ONLINE`, not by NextGenMP_defines.h, because `WWSyncPerSecond` lives in
   WWLib's `WWCommon.h` and that static library cannot include GO headers. `GameCommon.h`
@@ -150,44 +153,46 @@ GameNetworkingSockets ICE P2P transport, lobbies/matchmaking/stats).
 - Log-only hunks (NetworkLog conversions of commented DEBUG_LOGs), `isspace/isdigit`
   cast fixes, `nullptr`->`NULL` reverts, and GO's dead `#else` branches were not taken.
 
-### Open: authenticated session is refused by the live service (as of 2026-08-26)
+### Not taken in the 2026-10 sync
 
-Where the bring-up currently stands against `api.playgenerals.online`:
+Range `9c1121bd5..6ff404436`, GO-authored commits only. The TSH commits GO merged arrive
+with contraZH's own TSH syncs. Menu edits land in the `Menus/GeneralsOnline/` copies and
+LobbyUtils.cpp edits in the GO whole-file copy.
 
-- **Working**: `VersionCheck`, `MOTD`, the whole browser login flow. `CheckLogin` returns
-  `result: 1` with a well formed JWT (`sub: 112094`, roles `Player`/`GameClient`,
-  `iss: GeneralsOnline`, `aud: GeneralsOnline-Client`). The GO team confirmed the user
-  row exists in their database, so login genuinely succeeds server side.
-- **Failing**: every *authenticated* call is answered `401 invalid_token` - the
-  `wss://api.playgenerals.online/ws` upgrade, `ServiceConfig`, and `RefreshToken` -
-  using a token 18 seconds old with ~14 minutes of validity left. Ruled out by
-  experiment: header format (`Bearer`/`bearer`/raw), token as `?access_token=` query
-  param, `contract/1` vs `contract/2`, user agent, and rate limiting (unauthenticated
-  endpoints answer 200 from the same machine at the same moment). The request shape
-  matches the shipping official client, verified by comparing strings in
-  `GeneralsOnlineZH_60.exe`.
-- **Leading theory** (unproven - only GO's server logs can confirm): the session is only
-  honored once the anticheat handshake completes. Their `OnLoginComplete` calls
-  `AnticheatPlugInterface::Authenticate()` immediately before connecting the WebSocket;
-  this fork compiles the plugin interface out, so that never runs. Their current
-  anticheat is **GOAC** (`plugins/goanticheat/goanticheat.dll`), not EAC - the EAC
-  references in their repo are historical. Alternative suspects visible in the token:
-  `client_id: "0"` and an empty `display_name`.
+| GO commit | Change | Reason |
+|---|---|---|
+| `a9aaa0ac2` `8e8d1cfe5` `4426d37cd` `7f113728c` `fb6cade08` `0ee25cc24` | vcpkg static networking deps, GNS fork with native ICE and WebRTC, CI, install and patch packaging | Vendored libs kept. The vendored header has the ICE implementation switch, and the service default (2, WebRTC) matches the vendored DLL |
+| `4055d287b` | Camera reset to a cached default max height | The fork never widens the max height for observer free-zoom, and the cached value goes stale when the lobby or Options camera height calls `setMaxHeightAboveGround` |
+| `ba7bf541f` `e2f439772` | Camera pitch keys (PgUp/PgDn/Home, numpad), minimum match pitch, slower keyboard rotation, rotate speed option | Unguarded changes to shared controls; would change offline Contra |
+| `4bbd06b70` | Thread list exit guard in Except.cpp | Builds on GO's thread list lock rework, which was never ported |
+| `8657eb2ef` `158104f1b` | Process-wide UTF-8 code page, Unicode window, AsciiString/UnicodeString conversion through the code page | Global encoding change for every build. `f73b0d1bc` (lobby map names as UTF-8) is taken; its helpers check `GetACP()` |
+| `c6f585fb9` | VC++ runtime check that downloads and installs the redistributable | Unguarded startup code with a "Generals Online" dialog |
+| `7322f0acc` `2e3e6b072` | Frameless startup splash window and hand-over | Unguarded WinMain and W3DDisplay changes at device creation |
 
-Next step is a question for the GO team, not a code change - see
-`FOR_GENERALSONLINE_DEVS.md` outside the repo. Note that enabling GOAC means loading a
-closed source anticheat DLL into a Contra build, which is a deliberate decision, not a
-default.
+Adapted while picking:
 
-### Login flow: the repo is AHEAD of production
+- `e629eb001` unbinds through `Set_DX8_Stream_Source`/`Set_DX8_Indices` so D3D9 compiles.
+- `03b457c42` guards both rider paths of the multi-addon Overlord draw.
+- `01cdd0cad` adds only the clamps; the surrounding tree code keeps contraZH's text.
+- `d97cfd432` guards the new `ResolveGameListLobbyID` declaration in LobbyUtils.h.
+- `dabb98b81` switches the login URLs to https; the restored `LoginCode` flow uses https too.
+- `d5124c304` leaves out the `/guard:cf` build flags; the plugin interface is compiled out.
+- `6b4b0185c` turned `GENERALS_ONLINE_USE_PLUGINS_INTERFACE` back on in NextGenMP_defines.h and
+  merged cleanly; it is commented out again. Check that define after every sync.
 
-GO commit `27da5b89d` ("- New login flow", 2026-08-22) introduced a server issued login
-code via a new `LoginCode` endpoint. Production does not serve it (hard 404) and the
-shipping official client does not contain the string at all - it still uses the older
-handshake: generate the gamecode client side, open the browser, poll `CheckLogin` with
-`{code, client_id}`. The `pre-newserver` branch reverts
-`OnlineServices_Auth.{h,cpp}` to `27da5b89d^` for that reason; `feature/go-port` keeps
-the newer flow for when production catches up.
+### Resolved: live service login (2026-10-12)
+
+Login against `api.playgenerals.online` works end to end without the anticheat plugin.
+It took the server issued login code (below) and the `custom_third_party_client` client
+id. Before that, in August, `CheckLogin` succeeded but every authenticated call
+(WebSocket upgrade, `ServiceConfig`, `RefreshToken`) answered `401 invalid_token`.
+
+### Login flow: server issued login code
+
+GO commit `27da5b89d` ("- New login flow", 2026-08-22) gets the login code from a
+`GET LoginCode` request and opens the browser with it. Production serves `LoginCode`
+since at least 2026-10-12, when `CheckLogin` answered a client generated code with 403,
+`result: 2`. The August revert to the client generated code (`072e4fd6e`) is undone.
 
 ### Vendor DLL fix (found by crash triage)
 

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "Lib/BaseDefines.h"
 #include "Lib/BaseTypeCore.h"
 #include "Lib/trig.h"
 
@@ -228,7 +229,7 @@ __forceinline float fast_float_ceil(float f)
 #define INT_TO_REAL(x)						((Real)(x))
 
 // once we've ceiled/floored, trunc and round are identical, and currently, round is faster... (srj)
-#if RTS_GENERALS /*&& RETAIL_COMPATIBLE_CRC*/
+#if RTS_GENERALS && RETAIL_COMPATIBLE_CRC
 #define REAL_TO_INT_CEIL(x)				(fast_float2long_round(ceilf(x)))
 #define REAL_TO_INT_FLOOR(x)			(fast_float2long_round(floorf(x)))
 #else
@@ -287,7 +288,7 @@ struct Coord2D
 		return x == value && y == value;
 	}
 
-	Real length() const { return (Real)sqrt( x*x + y*y ); }
+	Real length() const { return Sqrt( x*x + y*y ); }
 	Real lengthSqr() const { return x*x + y*y; }
 
 	void normalize()
@@ -354,13 +355,13 @@ inline Coord2D operator-( const Coord2D &a, const Coord2D &b )
 
 inline Real Coord2D::toAngle() const
 {
-#if RTS_GENERALS /*&& RETAIL_COMPATIBLE_CRC*/
+#if RTS_GENERALS && RETAIL_COMPATIBLE_CRC
 	Coord2D vector;
 
 	vector.x = x;
 	vector.y = y;
 
-	Real dist = (Real)sqrt(vector.x * vector.x + vector.y * vector.y);
+	Real dist = Sqrt(vector.x * vector.x + vector.y * vector.y);
 
 	// normalize
 	if (dist == 0.0f)
@@ -439,7 +440,7 @@ struct ICoord2D
 		return x == value && y == value;
 	}
 
-	Int length() const { return (Int)sqrt( (double)(x*x + y*y) ); }
+	Int length() const { return (Int)Sqrt( (double)(x*x + y*y) ); }
 	Int lengthSqr() const { return x*x + y*y; }
 
 	void add( const ICoord2D &a )
@@ -515,6 +516,27 @@ struct IRegion2D
 {
 	ICoord2D lo, hi;					// bounds of 2D rectangular region
 
+	// Keep only the overlapping portion of both regions.
+	void intersectWith( const IRegion2D &other )
+	{
+		if (lo.x < other.lo.x)
+		{
+			lo.x = other.lo.x;
+		}
+		if (lo.y < other.lo.y)
+		{
+			lo.y = other.lo.y;
+		}
+		if (hi.x > other.hi.x)
+		{
+			hi.x = other.hi.x;
+		}
+		if (hi.y > other.hi.y)
+		{
+			hi.y = other.hi.y;
+		}
+	}
+
 	void zero()
 	{
 		lo.zero();
@@ -529,6 +551,12 @@ struct IRegion2D
 	Int width() const { return hi.x - lo.x; }
 	Int height() const { return hi.y - lo.y; }
 	Bool isInRegion( Int x, Int y ) const { return (lo.x < x) && (x < hi.x) && (lo.y < y) && (y < hi.y); }
+
+	Bool contains( const IRegion2D& other ) const
+	{
+		return (lo.x <= other.lo.x) && (other.hi.x <= hi.x) &&
+					 (lo.y <= other.lo.y) && (other.hi.y <= hi.y);
+	}
 };
 
 
@@ -536,7 +564,17 @@ struct Coord3D
 {
 	Real x, y, z;
 
-	Real length() const { return (Real)sqrt( x*x + y*y + z*z ); }
+	Real length() const
+	{
+#if RETAIL_COMPATIBLE_CRC
+		// TheSuperHackers @info With VC6, (Real)sqrt() and Sqrt() give different results here because of x87 excess
+		// precision, and TurretAIAimTurretState::update() relies on it. Calling Sqrt() here breaks retail CRC.
+		// TheSuperHackers @todo Keep the original sqrt() only in TurretAIAimTurretState::update() and call Sqrt() here.
+		return (Real)sqrt( x*x + y*y + z*z );
+#else
+		return Sqrt( x*x + y*y + z*z );
+#endif
+	}
 	Real lengthSqr() const { return ( x*x + y*y + z*z ); }
 
 	void normalize()
@@ -648,7 +686,7 @@ struct ICoord3D
 {
 	Int x, y, z;
 
-	Int length() const { return (Int)sqrt( (double)(x*x + y*y + z*z) ); }
+	Int length() const { return (Int)Sqrt( (double)(x*x + y*y + z*z) ); }
 	Int lengthSqr() const { return x*x + y*y + z*z; }
 
 	void zero()

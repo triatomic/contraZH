@@ -66,6 +66,7 @@ set(GAMEENGINE_SRC
 #    Include/Common/LocalFileSystem.h
 #    Include/Common/MapObject.h
 #    Include/Common/MapReaderWriterInfo.h
+    Include/Common/McpJson.h
 #    Include/Common/MessageStream.h
 #    Include/Common/MiniLog.h
 #    Include/Common/MiscAudio.h
@@ -233,6 +234,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/AIGuardRetaliate.h
 #    Include/GameLogic/AIPathfind.h
     Include/GameLogic/AIPlayer.h
+    Include/GameLogic/AIMatch.h
     Include/GameLogic/AISkirmishPlayer.h
     Include/GameLogic/AIStateMachine.h
     Include/GameLogic/AITNGuard.h
@@ -262,6 +264,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/BaikonurLaunchPower.h
     Include/GameLogic/Module/BaseRegenerateUpdate.h
     Include/GameLogic/Module/BattleBusSlowDeathBehavior.h
+    Include/GameLogic/Module/AllBattlePlansUpdate.h
     Include/GameLogic/Module/BattlePlanUpdate.h
     Include/GameLogic/Module/BehaviorModule.h
     Include/GameLogic/Module/BodyModule.h
@@ -328,7 +331,9 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/GenerateMinefieldBehavior.h
     Include/GameLogic/Module/GrantScienceUpgrade.h
     Include/GameLogic/Module/GrantStealthBehavior.h
+    Include/GameLogic/Module/GrantTemporaryStealthBehavior.h
     Include/GameLogic/Module/GrantUpgradeCreate.h
+    Include/GameLogic/Module/ShieldFieldBehavior.h
     Include/GameLogic/Module/HackInternetAIUpdate.h
     Include/GameLogic/Module/HealContain.h
     Include/GameLogic/Module/HealCrateCollide.h
@@ -380,6 +385,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/PilotFindVehicleUpdate.h
     Include/GameLogic/Module/PointDefenseLaserUpdate.h
     Include/GameLogic/Module/PoisonedBehavior.h
+    Include/GameLogic/Module/GasBehavior.h
     Include/GameLogic/Module/PoweredBehavior.h
     Include/GameLogic/Module/PowerPlantUpdate.h
     Include/GameLogic/Module/PowerPlantUpgrade.h
@@ -406,6 +412,7 @@ set(GAMEENGINE_SRC
     Include/GameLogic/Module/RepairDockUpdate.h
     Include/GameLogic/Module/ReplaceObjectUpgrade.h
     Include/GameLogic/Module/RiderChangeContain.h
+    Include/GameLogic/Module/RiftSlowDeathUpdate.h
     Include/GameLogic/Module/SabotageCommandCenterCrateCollide.h
     Include/GameLogic/Module/SabotageFakeBuildingCrateCollide.h
     Include/GameLogic/Module/SabotageInternetCenterCrateCollide.h
@@ -486,8 +493,12 @@ set(GAMEENGINE_SRC
     Include/GameLogic/ScriptActions.h
     Include/GameLogic/ScriptConditions.h
     Include/GameLogic/ScriptEngine.h
+    Include/GameLogic/ScriptCLP.h
+    Include/GameLogic/ScriptCLPAI.h
+    Include/GameLogic/ScriptCLPWaypoints.h
     Include/GameLogic/Scripts.h
 #    Include/GameLogic/SidesList.h
+    Include/GameLogic/SkirmishLaunch.h
     Include/GameLogic/Squad.h
 #    Include/GameLogic/TerrainLogic.h
     Include/GameLogic/TurretAI.h
@@ -572,6 +583,7 @@ set(GAMEENGINE_SRC
     Source/Common/GameLOD.cpp
     Source/Common/GameMain.cpp
     Source/Common/GlobalData.cpp
+    Source/Common/McpJson.cpp
 #    Source/Common/INI/INI.cpp
 #    Source/Common/INI/INIAiData.cpp
 #    Source/Common/INI/INIAnimation.cpp
@@ -739,13 +751,15 @@ set(GAMEENGINE_SRC
 #    Source/GameClient/GUI/GUICallbacks/IMECandidate.cpp
 #    Source/GameClient/GUI/GUICallbacks/InGameChat.cpp
 #    Source/GameClient/GUI/GUICallbacks/InGamePopupMessage.cpp
-    Source/GameClient/GUI/GUICallbacks/Menus/ChallengeMenu.cpp
+    Source/GameClient/GUI/GUICallbacks/Menus/CampaignChaptersMenu.cpp
+#    Source/GameClient/GUI/GUICallbacks/Menus/ChallengeMenu.cpp
     Source/GameClient/GUI/GUICallbacks/Menus/CreditsMenu.cpp
     Source/GameClient/GUI/GUICallbacks/Menus/DifficultySelect.cpp
     Source/GameClient/GUI/GUICallbacks/Menus/DisconnectWindow.cpp
     Source/GameClient/GUI/GUICallbacks/Menus/DownloadMenu.cpp
     Source/GameClient/GUI/GUICallbacks/Menus/EstablishConnectionsWindow.cpp
     Source/GameClient/GUI/GUICallbacks/Menus/GameInfoWindow.cpp
+    Source/GameClient/GUI/GUICallbacks/Menus/HotkeysMenu.cpp
     Source/GameClient/GUI/GUICallbacks/Menus/KeyboardOptionsMenu.cpp
     Source/GameClient/GUI/GUICallbacks/Menus/LanGameOptionsMenu.cpp
     Source/GameClient/GUI/GUICallbacks/Menus/LanLobbyMenu.cpp
@@ -832,6 +846,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/AI/AIGuardRetaliate.cpp
 #    Source/GameLogic/AI/AIPathfind.cpp
     Source/GameLogic/AI/AIPlayer.cpp
+    Source/GameLogic/AI/AIMatch.cpp
     Source/GameLogic/AI/AISkirmishPlayer.cpp
     Source/GameLogic/AI/AIStates.cpp
     Source/GameLogic/AI/AITNGuard.cpp
@@ -855,13 +870,16 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Behavior/FlightDeckBehavior.cpp
     Source/GameLogic/Object/Behavior/GenerateMinefieldBehavior.cpp
     Source/GameLogic/Object/Behavior/GrantStealthBehavior.cpp
+    Source/GameLogic/Object/Behavior/GrantTemporaryStealthBehavior.cpp
     Source/GameLogic/Object/Behavior/InstantDeathBehavior.cpp
+    Source/GameLogic/Object/Behavior/ShieldFieldBehavior.cpp
     Source/GameLogic/Object/Behavior/JetSlowDeathBehavior.cpp
     Source/GameLogic/Object/Behavior/MinefieldBehavior.cpp
     Source/GameLogic/Object/Behavior/NeutonBlastBehavior.cpp
     Source/GameLogic/Object/Behavior/OverchargeBehavior.cpp
     Source/GameLogic/Object/Behavior/ParkingPlaceBehavior.cpp
     Source/GameLogic/Object/Behavior/PoisonedBehavior.cpp
+    Source/GameLogic/Object/Behavior/GasBehavior.cpp
     Source/GameLogic/Object/Behavior/PoweredBehavior.cpp
     Source/GameLogic/Object/Behavior/POWTruckBehavior.cpp
     Source/GameLogic/Object/Behavior/PrisonBehavior.cpp
@@ -987,6 +1005,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Update/AutoDepositUpdate.cpp
     Source/GameLogic/Object/Update/AutoFindHealingUpdate.cpp
     Source/GameLogic/Object/Update/BaseRenerateUpdate.cpp
+    Source/GameLogic/Object/Update/AllBattlePlansUpdate.cpp
     Source/GameLogic/Object/Update/BattlePlanUpdate.cpp
     Source/GameLogic/Object/Update/BoneFXUpdate.cpp
     Source/GameLogic/Object/Update/CheckpointUpdate.cpp
@@ -1077,9 +1096,20 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Weapon.cpp
     Source/GameLogic/Object/WeaponSet.cpp
     Source/GameLogic/ScriptEngine/ScriptActions.cpp
+    Source/GameLogic/ScriptEngine/ScriptActionsCLP.cpp
+    Source/GameLogic/ScriptEngine/ScriptActionsCLPAI.cpp
+    Source/GameLogic/ScriptEngine/ScriptActionsCLPPlayers.cpp
+    Source/GameLogic/ScriptEngine/ScriptActionsCLPUnits.cpp
+    Source/GameLogic/ScriptEngine/ScriptActionsCLPWaypoints.cpp
     Source/GameLogic/ScriptEngine/ScriptConditions.cpp
+    Source/GameLogic/ScriptEngine/ScriptConditionsCLP.cpp
+    Source/GameLogic/ScriptEngine/ScriptConditionsCLPPlayers.cpp
+    Source/GameLogic/ScriptEngine/ScriptConditionsCLPTeams.cpp
     Source/GameLogic/ScriptEngine/ScriptEngine.cpp
+    Source/GameLogic/ScriptEngine/ScriptEngineCLP.cpp
     Source/GameLogic/ScriptEngine/Scripts.cpp
+    Source/GameLogic/ScriptEngine/ScriptCLPState.cpp
+    Source/GameLogic/ScriptEngine/ScriptCLPTemplates.cpp
     Source/GameLogic/ScriptEngine/VictoryConditions.cpp
 #    Source/GameLogic/System/CaveSystem.cpp
 #    Source/GameLogic/System/CrateSystem.cpp
@@ -1087,6 +1117,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/System/GameLogic.cpp
 #    Source/GameLogic/System/GameLogicDispatch.cpp
 #    Source/GameLogic/System/RankInfo.cpp
+    Source/GameLogic/System/SkirmishLaunch.cpp
 #    Source/GameNetwork/Connection.cpp
 #    Source/GameNetwork/ConnectionManager.cpp
 #    Source/GameNetwork/DisconnectManager.cpp
@@ -1231,6 +1262,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/Object/Update/OrbitalBeamUpdate.cpp
     Source/GameLogic/Object/Update/ProximityCaptureUpdate.cpp
     Source/GameLogic/Object/Update/RadiusDecalBehavior.cpp
+    Source/GameLogic/Object/Update/RiftSlowDeathUpdate.cpp
     Source/GameLogic/Object/Update/ResetSpecialPowerTimerWhileAliveUpdate.cpp
     Source/GameLogic/Object/Update/ScatterShotUpdate.cpp
     Source/GameLogic/Object/Update/ShipSlowDeathBehavior.cpp
@@ -1349,6 +1381,23 @@ if(RTS_BUILD_GENERALS_ONLINE)
 endif()
 
 
+if(RTS_BUILD_OPTION_GAME_MCP)
+    list(APPEND GAMEENGINE_SRC
+        Include/Common/GameMcp.h
+        Source/Common/Mcp/GameMcp.cpp
+        Source/Common/Mcp/GameMcpCmdCheats.cpp
+        Source/Common/Mcp/GameMcpCmdObjects.cpp
+        Source/Common/Mcp/GameMcpCmdOrders.cpp
+        Source/Common/Mcp/GameMcpCmdPlayers.cpp
+        Source/Common/Mcp/GameMcpCmdScripts.cpp
+        Source/Common/Mcp/GameMcpCmdState.cpp
+        Source/Common/Mcp/GameMcpCmdView.cpp
+        Source/Common/Mcp/GameMcpCommands.cpp
+        Source/Common/Mcp/GameMcpCommands.h
+        Source/Common/Mcp/GameMcpServer.cpp
+    )
+endif()
+
 add_library(z_gameengine STATIC)
 
 target_sources(z_gameengine PRIVATE ${GAMEENGINE_SRC})
@@ -1382,6 +1431,19 @@ target_link_libraries(z_gameengine PUBLIC
     z_wwvegas
 )
 
+if(RTS_BUILD_OPTION_GAME_MCP)
+    target_link_libraries(z_gameengine PUBLIC ws2_32)
+endif()
+
 target_precompile_headers(z_gameengine PRIVATE
     [["Precompiled/precompiled.h"]] # Must be first
 )
+
+# Simulation sources may only reach transcendental math through the WWMath and Trig wrappers.
+if(MSVC)
+    file(GLOB_RECURSE RTS_SIMULATION_SOURCES CONFIGURE_DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/Source/GameLogic/*.cpp
+        ${CMAKE_SOURCE_DIR}/Core/GameEngine/Source/GameLogic/*.cpp
+    )
+    set_source_files_properties(${RTS_SIMULATION_SOURCES} PROPERTIES COMPILE_OPTIONS "/we4995")
+endif()

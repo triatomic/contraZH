@@ -17,6 +17,7 @@
 #include "EditParameter.h"			// qtCollectCommandButtons, for the Command entries
 #include "Common/FileSystem.h"		// TheFileSystem: the INI-tree scan for autocomplete
 #include "Common/File.h"
+#include "Common/INI.h"			// INI::friend_isBlockType, for the editor's block headers
 #include "qt/panels/WBQtMapIniEditorBridge.h"
 #include <map>
 #include <set>
@@ -103,6 +104,15 @@ extern "C" int WBQtMapIniEditorData_IsTemplate(const char *name)
 		return 0;
 	}
 	return (TheThingFactory->findTemplate(AsciiString(name)) != NULL) ? 1 : 0;
+}
+
+extern "C" int WBQtMapIniEditorData_IsBlockType(const char *keyword)
+{
+	if (keyword == NULL || keyword[0] == 0)
+	{
+		return 0;
+	}
+	return INI::friend_isBlockType(keyword) ? 1 : 0;
 }
 
 //----------------------------------------------------------------------------------------

@@ -20,3 +20,4 @@
 
 #include "CppMacros.h"
 #include "CppTypes.h"
+#include "unichar.h"

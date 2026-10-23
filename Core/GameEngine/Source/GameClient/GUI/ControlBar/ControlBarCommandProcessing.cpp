@@ -1454,6 +1454,15 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			break;
 		}
 
+		//---------------------------------------------------------------------------------------------
+		case GUI_COMMAND_EVACUATE_TO_WORK:
+		{
+			TheInGameUI->setGUICommand( nullptr );
+			pickAndPlayUnitVoiceResponse( TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_EVACUATE );
+			TheMessageStream->appendMessage( GameMessage::MSG_EVACUATE_TO_WORK );
+			break;
+		}
+
 		// --------------------------------------------------------------------------------------------
 		// TheSuperHackers @feature Fill the selected containers from nearby idle infantry. The UI only
 		// appends the message; the logic side decides who actually boards, so peers stay in sync.
@@ -1523,6 +1532,15 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		{
 
 			TheMessageStream->appendMessage( GameMessage::MSG_TOGGLE_DEPLOY );
+			break;
+
+		}
+
+		//Same as above
+		case GUI_COMMAND_TOGGLE_TUNNEL_AUTO_POP:
+		{
+
+			TheMessageStream->appendMessage(GameMessage::MSG_TOGGLE_TUNNEL_AUTO_POP);
 			break;
 
 		}

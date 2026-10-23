@@ -85,6 +85,7 @@
 #include "GameClient/GameClient.h"
 #include "GameClient/GameText.h"
 #include "GameClient/GUICallbacks.h"
+#include "GameClient/HotKey.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/DisplayStringManager.h"
@@ -247,8 +248,7 @@ void ControlBar::showBuildTooltipLayout( GameWindow *cmdButton )
 }
 
 
-// TheSuperHackers @feature Format a build time for the tooltip, using the same Auto/Seconds
-// rules as the cameo countdowns (Options.ini: BuildTimerDisplayMode).
+// TheSuperHackers @feature Build time as m:ss always; BuildTimerDisplayMode None still hides it.
 //
 // Note the value passed in should come from calcTimeToBuild(), which for units already folds
 // in the player's current energy penalty -- so a tooltip read while on low power correctly
@@ -272,10 +272,7 @@ static UnicodeString formatBuildTimeForTooltip( Int buildFrames )
 	// show 0 while there is work left.
 	const Int seconds = ( buildFrames + LOGICFRAMES_PER_SECOND / 2 ) / LOGICFRAMES_PER_SECOND;
 
-	if( TheGlobalData->m_buildTimerDisplayMode == BuildTimerDisplayMode_Auto && seconds >= 60 )
-		result.format( L"%d:%2.2d", seconds / 60, seconds % 60 );	// already reads as time
-	else
-		result.format( L"%ds", seconds );
+	result.format( L"%d:%2.2d", seconds / 60, seconds % 60 );
 
 	return result;
 }
@@ -297,8 +294,9 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 
 	Player *player = ThePlayerList->getLocalPlayer();
 	UnicodeString name, cost, descrip;
-	// TheSuperHackers @feature Build time shown under the cost, formatted like the cameo timers.
+	// TheSuperHackers @feature Build time and power draw shown alongside the cost.
 	UnicodeString buildTimeText;
+	UnicodeString powerText;
 	UnicodeString requiresFormat = UnicodeString::TheEmptyString, requiresList;
 	Bool firstRequirement = true;
 	const ProductionPrerequisite *prereq;
@@ -474,7 +472,21 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 
 		}
 
-		name = TheGameText->fetch(commandButton->getTextLabel().str());
+		name = TheHotKeyManager->getButtonLabel(commandButton->getName(), commandButton->getTextLabel());
+
+		// grid hotkeys key a bar slot by its place, so mark the key the slot really holds
+		if( TheGlobalData->m_gridHotkeysEnabled )
+		{
+			for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
+			{
+				if( m_commandWindows[ i ] && GadgetButtonGetData( m_commandWindows[ i ] ) == commandButton )
+				{
+					name = HotKeyManager::markLabel( TheGameText->fetch( commandButton->getTextLabel() ),
+							TheHotKeyManager->getHotKeyForWindow( m_commandWindows[ i ] ) );
+					break;
+				}
+			}
+		}
 
 		if( thingTemplate && commandButton->getCommandType() != GUI_COMMAND_PURCHASE_SCIENCE )
 		{
@@ -485,12 +497,16 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 			costToBuild = thingTemplate->calcCostToBuild( player );
 			if( costToBuild > 0 )
 			{
-				cost.format( TheGameText->fetch("TOOLTIP:Cost"), costToBuild );
+				cost.format( L"$%d", costToBuild );
 			}
 
 			// TheSuperHackers @feature calcTimeToBuild folds in the current energy penalty,
 			// so this tracks the player's power state as it changes.
 			buildTimeText = formatBuildTimeForTooltip( thingTemplate->calcTimeToBuild( player ) );
+
+			// EnergyProduction is already signed, so consumers print as -5 and reactors as +8
+			if( thingTemplate->getEnergyProduction() != 0 )
+				powerText.format( L"%+d", thingTemplate->getEnergyProduction() );
 
 			// ask each prerequisite to give us a list of the non satisfied prerequisites
 			for( Int i=0; i<thingTemplate->getPrereqCount(); i++ )
@@ -586,7 +602,7 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 				costToBuild = upgradeTemplate->calcCostToBuild( player );
 				if( costToBuild > 0 )
 				{
-					cost.format( TheGameText->fetch("TOOLTIP:Cost"), costToBuild );
+					cost.format( L"$%d", costToBuild );
 				}
 
 				// TheSuperHackers @feature Upgrades carry no energy penalty in the engine, so
@@ -691,18 +707,22 @@ void ControlBar::populateBuildTooltipLayout( const CommandButton *commandButton,
 	win = TheWindowManager->winGetWindowFromId(m_buildToolTipLayout->getFirstWindow(), TheNameKeyGenerator->nameToKey("ControlBarPopupDescription.wnd:StaticTextCost"));
 	if(win)
 	{
-		// TheSuperHackers @feature Show the build time alongside the cost. Also shown for
-		// free items, which have no cost line of their own but still take time to build.
-		// Kept on the cost line, separated by a watch glyph. The description window sits
-		// directly beneath this one in the .wnd layout, so a second line here overlaps it.
+		// Glyph fields stay on the cost line because the description window sits directly beneath it
 		UnicodeString costLine = cost;
 		if( !buildTimeText.isEmpty() )
 		{
 			if( !costLine.isEmpty() )
 				costLine.concat( L"   " );
 			costLine.concat( (WideChar)0x231A );	// WATCH
-			costLine.concat( L" " );
 			costLine.concat( buildTimeText );
+		}
+
+		if( !powerText.isEmpty() )
+		{
+			if( !costLine.isEmpty() )
+				costLine.concat( L"   " );
+			costLine.concat( (WideChar)0x26A1 );	// HIGH VOLTAGE SIGN
+			costLine.concat( powerText );
 		}
 
 		if( !costLine.isEmpty() )

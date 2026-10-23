@@ -106,6 +106,7 @@ void LANAPI::init()
 {
 	m_gameStartTime = 0;
 	m_gameStartSeconds = 0;
+	m_lastStartTimerHeard = 0;
 	m_transport->reset();
 	m_transport->init(m_localIP, lobbyPort);
 	m_transport->allowBroadcasts(true);
@@ -700,6 +701,7 @@ void LANAPI::RequestGameLeave()
 		// Exit out immediately if we're hosting
 		OnPlayerLeave(m_name);
 		removeGame(m_currentGame);
+		delete m_currentGame;
 		m_currentGame = nullptr;
 		m_inLobby = true;
 	}
@@ -737,7 +739,7 @@ void LANAPI::RequestGameAnnounce()
 	}
 }
 
-void LANAPI::RequestAccept()
+void LANAPI::RequestAccept( Bool accept )
 {
 	if (m_inLobby || !m_currentGame)
 		return;
@@ -745,7 +747,7 @@ void LANAPI::RequestAccept()
 	LANMessage msg;
 	fillInLANMessage( &msg );
 	msg.messageType = LANMessage::MSG_SET_ACCEPT;
-	msg.Accept.isAccepted = true;
+	msg.Accept.isAccepted = accept;
 	wcslcpy(msg.Accept.gameName, m_currentGame->getName().str(), ARRAY_SIZE(msg.Accept.gameName));
 	sendMessage(&msg);
 }
@@ -823,6 +825,16 @@ void LANAPI::ResetGameStartTimer()
 {
 	m_gameStartTime = 0;
 	m_gameStartSeconds = 0;
+}
+
+// The host sends a countdown second every 1000 ms, so a client counts it as running until one is overdue
+Bool LANAPI::IsGameStartCountdownRunning()
+{
+	if (m_gameStartTime != 0)
+	{
+		return TRUE;
+	}
+	return m_lastStartTimerHeard != 0 && timeGetTime() - m_lastStartTimerHeard < 1500;
 }
 
 void LANAPI::RequestGameStartTimer( Int seconds )

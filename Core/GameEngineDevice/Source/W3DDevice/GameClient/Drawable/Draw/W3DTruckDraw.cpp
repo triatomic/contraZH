@@ -170,7 +170,7 @@ void W3DTruckDraw::createWheelEmitters()
 		{
 			if (m_truckEffectIDs[i] == INVALID_PARTICLE_SYSTEM_ID)
 			{
-				const ParticleSystemTemplate *sysTemplate = TheParticleSystemManager->findTemplate(*effectNames[i]);
+				const ParticleSystemTemplate *sysTemplate = findMoveEffectTemplate(*effectNames[i]);
 				ParticleSystem *particleSys = TheParticleSystemManager->createParticleSystem( sysTemplate );
 				if (particleSys)
 				{

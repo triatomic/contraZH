@@ -213,6 +213,12 @@ public:
 				primaryObject->setWeaponLock( m_weaponSlot, LOCKED_TEMPORARILY );
 				ai->aiAttackPosition( secondary, m_numberOfShots, CMD_FROM_AI );
 			}
+
+			// only the SPECIAL_POWER_CONSTRUCT placement interface sends a valid angle
+			if( angle != INVALID_ANGLE )
+			{
+				ai->friend_setAttackPlacement( secondary, angle, m_numberOfShots );
+			}
 		}
 
 		static NameKeyType key_RadiusDecalUpdate = NAMEKEY("RadiusDecalUpdate");
@@ -306,7 +312,7 @@ public:
 			Real dy = primary->y - secondary->y;
 
 			//Calc length
-			Real length = sqrt( dx*dx + dy*dy );
+			Real length = WWMath::Sqrt( dx*dx + dy*dy );
 
 			//Normalize length
 			dx /= length;
@@ -379,7 +385,7 @@ public:
 			}
 
 
-			Real orient = atan2( moveToPos.y - startPos.y, moveToPos.x - startPos.x);
+			Real orient = WWMath::Atan2( moveToPos.y - startPos.y, moveToPos.x - startPos.x);
 			if( m_data.m_distToTarget > 0 )
 			{
 				const Real SLOP = 1.5f;
@@ -1199,7 +1205,7 @@ protected:
 
 				objUp->applyForce(&force);
 				if (m_orientInForceDirection)
-					orientation = atan2(force.y, force.x);
+					orientation = WWMath::Atan2(force.y, force.x);
 
 			}
 		}
@@ -1302,7 +1308,7 @@ protected:
 				objUp->applyForce(&force);
 				if (m_orientInForceDirection)
 				{
-					orientation = atan2(force.y, force.x);
+					orientation = WWMath::Atan2(force.y, force.x);
 				}
 				DUMPREAL(orientation);
 				objUp->setAngles(orientation, 0, 0);
@@ -1755,7 +1761,36 @@ void ObjectCreationListStore::addObjectCreationNugget(ObjectCreationNugget* nugg
 }
 
 //-------------------------------------------------------------------------------------------------
+/*static */ void ObjectCreationListStore::parseObjectCreationListExtendDefinition(INI *ini)
+{
+	const char *c = ini->getNextToken();
+	const char *parentName = ini->getNextToken();
+	const ObjectCreationList *parent = TheObjectCreationListStore->findObjectCreationList(parentName);
+	DEBUG_ASSERTCRASH(parent != nullptr, ("ObjectCreationListExtend '%s': parent '%s' does not exist", c, parentName));
+
+	NameKeyType key = TheNameKeyGenerator->nameToKey(c);
+	ObjectCreationList& ocl = TheObjectCreationListStore->m_ocls[key];
+
+	// The store owns the nuggets, so the copy shares the parent's and appends its own after them
+	if (parent == nullptr)
+	{
+		ocl.clear();
+	}
+	else if (&ocl != parent)
+	{
+		ocl = *parent;
+	}
+	ini->initFromINI(&ocl, TheObjectCreationListFieldParse);
+}
+
+//-------------------------------------------------------------------------------------------------
 /*static*/ void INI::parseObjectCreationListDefinition(INI *ini)
 {
 	ObjectCreationListStore::parseObjectCreationListDefinition(ini);
+}
+
+//-------------------------------------------------------------------------------------------------
+/*static*/ void INI::parseObjectCreationListExtendDefinition(INI *ini)
+{
+	ObjectCreationListStore::parseObjectCreationListExtendDefinition(ini);
 }

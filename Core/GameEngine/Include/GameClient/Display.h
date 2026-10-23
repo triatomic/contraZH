@@ -55,6 +55,8 @@ class DebugDisplayInterface;
 class Radar;
 class Image;
 class DisplayString;
+struct DisruptionShaderInfo;
+struct StormShaderInfo;
 enum StaticGameLODLevel CPP_11(: Int);
 /**
  * The Display class implements the Display interface
@@ -137,6 +139,10 @@ public:
 																 ) = 0;
 	/// an expanding ring that bends the scene, all in world units except strength when strengthInPixels counts it in pixels
 	virtual void createShockwave( const Coord3D *pos, Real radius, Real width, Real strength, Bool strengthInPixels, UnsignedInt durationFrames ) {}
+	/// a disc on the ground that ripples the scene; fade is the share of its life spent fading in and again fading out, and the settings must outlive it
+	virtual void createDisruption( const Coord3D *pos, Real radius, const DisruptionShaderInfo *info, UnsignedInt durationFrames, Real fade ) {}
+	/// a sandstorm or snowstorm that stands on the ground around pos
+	virtual void createStorm( const Coord3D *pos, const StormShaderInfo *info, UnsignedInt durationFrames ) {}
 
 	/// draw a line on the display in pixel coordinates with the specified color
 	virtual void drawLine( Int startX, Int startY, Int endX, Int endY,
@@ -198,6 +204,7 @@ public:
 	virtual Real getCurrentFPS() = 0;	///< returns the current FPS.
 	virtual Int getLastFrameDrawCalls() = 0;  ///< returns the number of draw calls issued in the previous frame
 	virtual Bool toggleFaceCulling() { return TRUE; }	///< toggles back face culling and returns whether it is now on
+	virtual Bool toggleShaderDrawCounts() { return FALSE; }	///< toggles the draw calls by shader overlay and returns whether it is now on
 
 protected:
 	virtual void onBeginBatch() { }
@@ -244,4 +251,5 @@ typedef struct _DisplaySettings
 	Int yRes;  //Resolution height
 	Int bitDepth; //Color Depth
 	Bool windowed; //Window mode TRUE: we're windowed, FALSE: we're not windowed
+	Bool framed; //Windowed with a title bar; windowed without one is borderless
 } DisplaySettings;

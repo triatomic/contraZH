@@ -30,5 +30,9 @@ float4 main(PsIn input) : COLOR
     facet *= (dot(facet, EyePosition.xyz - input.WorldPos) < 0.0f) ? -1.0f : 1.0f;
     float3 normal = facet * rsqrt(max(dot(facet, facet), 1e-30f));
 
+#if LIGHTS_DEBUG
+    return float4(PointLighting(input.WorldPos, normal), texel.a);
+#else
     return float4(texel.rgb * PointLighting(input.WorldPos, normal), texel.a);
+#endif
 }

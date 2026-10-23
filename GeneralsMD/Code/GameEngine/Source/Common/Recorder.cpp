@@ -50,6 +50,7 @@
 #include "Common/OptionPreferences.h"
 #include "Common/version.h"
 #include "Lib/PathUtil.h"
+#include <Utility/bit_adapter.h>
 
 #if defined(GENERALS_ONLINE)
 #include "GameNetwork/GeneralsOnline/NGMPGame.h"
@@ -1480,7 +1481,7 @@ void RecorderClass::readArgument(GameMessageArgumentDataType type, GameMessage *
 #ifdef DEBUG_LOGGING
 			if (m_doingAnalysis)
 			{
-				DEBUG_LOG(("Real argument: %g (%8.8X)", thereal, *(int *)&thereal));
+				DEBUG_LOG(("Real argument: %g (%8.8X)", thereal, std::bit_cast<int>(thereal)));
 			}
 #endif
 			break;
@@ -1541,7 +1542,7 @@ void RecorderClass::readArgument(GameMessageArgumentDataType type, GameMessage *
 			if (m_doingAnalysis)
 			{
 				DEBUG_LOG(("Coord3D argument: %g %g %g (%8.8X %8.8X %8.8X)", loc.x, loc.y, loc.z,
-					*(int *)&loc.x, *(int *)&loc.y, *(int *)&loc.z));
+					std::bit_cast<int>(loc.x), std::bit_cast<int>(loc.y), std::bit_cast<int>(loc.z)));
 			}
 #endif
 			break;

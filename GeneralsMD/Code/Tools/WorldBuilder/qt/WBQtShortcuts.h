@@ -30,6 +30,9 @@ int WBQtShortcuts_TranslateKey(void *pMsg);
 // not steal them from the focused QLineEdit.
 int WBQtShortcuts_QtToolWindowOwnsFocus(void);
 
+// Install the qApp filter that runs Ctrl and F-key hotkeys a floating Qt window left unused.
+void WBQtShortcuts_InstallQtFallback(void);
+
 // Implemented on the MFC side (src/WBQtChromeBridge.cpp): run the command's CCmdUI to
 // check it is enabled, and if so PostMessage(WM_COMMAND) to the frame. Swallows a
 // disabled command (returns without posting). Called by the translate function.

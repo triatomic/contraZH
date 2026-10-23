@@ -13,6 +13,7 @@
 #include "GameLogic/PolygonTrigger.h"	// PolygonTrigger (ditto)
 #include "GameLogic/Scripts.h"
 #include "ScriptDialog.h"			// updateScriptWarning + SCRIPT_DIALOG_SECTION
+#include "EditParameter.h"			// getWarningText, for the row warnings
 #include "qt/panels/WBQtScriptEditBridge.h"
 #include "qt/panels/WBQtCondActBridge.h"
 
@@ -196,6 +197,7 @@ static void qtApplySmartCopyToParameter(Parameter *param)
 		param->getParameterType() == Parameter::UNIT ||
 		param->getParameterType() == Parameter::REVEALNAME ||
 		param->getParameterType() == Parameter::COUNTER ||
+		param->getParameterType() == Parameter::KD_RATIO ||
 		param->getParameterType() == Parameter::FLAG ||
 		param->getParameterType() == Parameter::SIDE
 	)
@@ -345,6 +347,37 @@ extern "C" int WBQtScriptEditData_GetConditionRow(void *script, int row, char *b
 		pOr = pOr->getNextOrCondition();
 	}
 	return -1;
+}
+
+// Whether any parameter of an action has a warning, for the false list updateScriptWarning skips.
+template <class T>
+static int qtHasParameterWarning(T *item, Bool isAction)
+{
+	if (item == NULL)
+	{
+		return 0;
+	}
+	for (Int i = 0; i < item->getNumParameters(); ++i)
+	{
+		Parameter *param = item->getParameter(i);
+		if (param != NULL && !EditParameter::getWarningText(param, isAction).isEmpty())
+		{
+			return 1;
+		}
+	}
+	return 0;
+}
+
+extern "C" int WBQtScriptEditData_GetConditionRowWarning(void *script, int row)
+{
+	OrCondition *pOr = NULL;
+	Condition *pCond = NULL;
+	if (!qtResolveConditionRow(static_cast<Script *>(script), row, &pOr, &pCond))
+	{
+		return 0;
+	}
+	// GetConditionRowCount's updateScriptWarning has just set the flag.
+	return (pCond != NULL && pCond->hasWarnings()) ? 1 : 0;
 }
 
 // Does this parameter carry `value` as an OBJECT_TYPE? "???" (the ui placeholder the [Missing]
@@ -867,6 +900,17 @@ extern "C" void WBQtScriptEditData_GetActionLabel(void *script, int isFalse, int
 		}
 		copyOut(astr, buf, cap);
 	}
+}
+
+extern "C" int WBQtScriptEditData_GetActionWarning(void *script, int isFalse, int index)
+{
+	ScriptAction *pAction = qtActionAt(static_cast<Script *>(script), isFalse, index);
+	if (!isFalse)
+	{
+		// GetActionCount's updateScriptWarning has just set the flag for the true list.
+		return (pAction != NULL && pAction->hasWarnings()) ? 1 : 0;
+	}
+	return qtHasParameterWarning(pAction, TRUE);
 }
 
 // == loadList()'s index clamp: keep the requested index inside the rebuilt list.

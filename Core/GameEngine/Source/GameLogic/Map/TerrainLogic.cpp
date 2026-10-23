@@ -33,6 +33,8 @@
 #include "Common/DataChunk.h"
 #include "Common/GameState.h"
 #include "Common/MapObject.h"
+#include "Common/Player.h"
+#include "Common/PlayerList.h"
 #include "Common/Radar.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
@@ -94,6 +96,52 @@ m_biDirectional(biDirectional)
 Waypoint::~Waypoint()
 {
 
+}
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+Bool Waypoint::hasLink(const Waypoint *pLink) const
+{
+	for (Int i = 0; i < m_numLinks; ++i)
+	{
+		if (m_links[i] == pLink)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+void Waypoint::removeLink(const Waypoint *pLink)
+{
+	Int count = 0;
+	Int i;
+	for (i = 0; i < m_numLinks; ++i)
+	{
+		if (m_links[i] != pLink)
+		{
+			m_links[count] = m_links[i];
+			++count;
+		}
+	}
+	for (i = count; i < m_numLinks; ++i)
+	{
+		m_links[i] = nullptr;
+	}
+	m_numLinks = count;
+}
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+void Waypoint::clearLinks()
+{
+	for (Int i = 0; i < MAX_LINKS; ++i)
+	{
+		m_links[i] = nullptr;
+	}
+	m_numLinks = 0;
 }
 
 // Bridge ////////////////////////////////////////////////////////////////////////////////////////
@@ -224,6 +272,9 @@ m_bridgeInfo(theInfo)
 	// save the template name
 	m_templateName = bridgeTemplateName;
 
+	// set up front, several paths below bail out early
+	m_next = nullptr;
+
 	//Coord3D fromLeft, fromRight, toLeft, toRight; /// The 4 corners of the rectangle that the bridge covers.
 	m_bounds.lo.x = m_bridgeInfo.fromLeft.x;
 	m_bounds.lo.y = m_bridgeInfo.fromLeft.y;
@@ -243,13 +294,34 @@ m_bridgeInfo(theInfo)
 
 	m_bridgeInfo.curDamageState = BODY_PRISTINE;
 
-
-	static const ThingTemplate* genericBridgeTemplate = TheThingFactory->findTemplate("GenericBridge");
-	if (!genericBridgeTemplate) {
-		DEBUG_LOG(("*** GenericBridge template not found."));
+	//
+	// the bridge definition decides which object represents us in the logic, and whether we get
+	// the targetable towers, so it has to be resolved before the object is created
+	//
+	TerrainRoadType *bridgeTemplate = TheTerrainRoads->findBridge( bridgeTemplateName );
+	if( bridgeTemplate == nullptr ) {
+		DEBUG_LOG(( "*** Bridge Template Not Found '%s'.", bridgeTemplateName.str() ));
 		return;
 	}
-	Object *bridge = TheThingFactory->newObject(genericBridgeTemplate, nullptr);
+
+	AsciiString bridgeObjectName = bridgeTemplate->getBridgeObjectName();
+	if( bridgeObjectName.isEmpty() )
+		bridgeObjectName = "GenericBridge";
+	const ThingTemplate* bridgeObjectTemplate = TheThingFactory->findTemplate( bridgeObjectName );
+	if (!bridgeObjectTemplate) {
+		DEBUG_LOG(("*** Bridge object template '%s' not found.", bridgeObjectName.str()));
+		return;
+	}
+
+	//
+	// a destroyable bridge takes damage and its towers can be captured, both of which need a real
+	// team; indestructible bridges keep the teamless object they have always had
+	//
+	Team *team = nullptr;
+	if( bridgeTemplate->isDestroyable() )
+		team = ThePlayerList->getNeutralPlayer()->getDefaultTeam();
+
+	Object *bridge = TheThingFactory->newObject(bridgeObjectTemplate, team);
 	Coord3D center;
 	center.x = (m_bridgeInfo.fromLeft.x + m_bridgeInfo.toRight.x)/2.0f;
 	center.y = (m_bridgeInfo.fromLeft.y + m_bridgeInfo.toRight.y)/2.0f;
@@ -271,15 +343,46 @@ m_bridgeInfo(theInfo)
 	v.y = m_bridgeInfo.toLeft.y - m_bridgeInfo.toRight.y;
 	v.normalize();
 
-	// get the template of the bridge
-	TerrainRoadType *bridgeTemplate = TheTerrainRoads->findBridge( bridgeTemplateName );
-	if( bridgeTemplate == nullptr ) {
-		DEBUG_LOG(( "*** Bridge Template Not Found '%s'.", bridgeTemplateName.str() ));
+	// indestructible bridges are never shot at or opened, so there is nothing left to set up
+	if( bridgeTemplate->isDestroyable() == FALSE )
 		return;
+
+	updateBridgeObjectGeometry();
+
+	// if defined, set hole area for destroyable bridges/drawbridges
+	if (bridgeTemplate->getBridgeHoleAreaPercentage() > 0.0f) {
+		Real factor = std::clamp(bridgeTemplate->getBridgeHoleAreaPercentage(), 0.0f, 1.0f);
+
+		// midpoints of the two long edges of the bridge rectangle
+		Coord3D midLeft, midRight;
+		midLeft.x = (m_bridgeInfo.fromLeft.x + m_bridgeInfo.toLeft.x) / 2.0f;
+		midLeft.y = (m_bridgeInfo.fromLeft.y + m_bridgeInfo.toLeft.y) / 2.0f;
+		midLeft.z = (m_bridgeInfo.fromLeft.z + m_bridgeInfo.toLeft.z) / 2.0f;
+		midRight.x = (m_bridgeInfo.fromRight.x + m_bridgeInfo.toRight.x) / 2.0f;
+		midRight.y = (m_bridgeInfo.fromRight.y + m_bridgeInfo.toRight.y) / 2.0f;
+		midRight.z = (m_bridgeInfo.fromRight.z + m_bridgeInfo.toRight.z) / 2.0f;
+
+		// shrink the rectangle along the span axis about those midpoints, full width preserved
+		m_bridgeInfo.fromLeftHole.set(midLeft.x + (m_bridgeInfo.fromLeft.x - midLeft.x) * factor,
+																	midLeft.y + (m_bridgeInfo.fromLeft.y - midLeft.y) * factor,
+																	midLeft.z + (m_bridgeInfo.fromLeft.z - midLeft.z) * factor);
+		m_bridgeInfo.toLeftHole.set(midLeft.x + (m_bridgeInfo.toLeft.x - midLeft.x) * factor,
+																midLeft.y + (m_bridgeInfo.toLeft.y - midLeft.y) * factor,
+																midLeft.z + (m_bridgeInfo.toLeft.z - midLeft.z) * factor);
+		m_bridgeInfo.fromRightHole.set(midRight.x + (m_bridgeInfo.fromRight.x - midRight.x) * factor,
+																	 midRight.y + (m_bridgeInfo.fromRight.y - midRight.y) * factor,
+																	 midRight.z + (m_bridgeInfo.fromRight.z - midRight.z) * factor);
+		m_bridgeInfo.toRightHole.set(midRight.x + (m_bridgeInfo.toRight.x - midRight.x) * factor,
+																 midRight.y + (m_bridgeInfo.toRight.y - midRight.y) * factor,
+																 midRight.z + (m_bridgeInfo.toRight.z - midRight.z) * factor);
+	}
+	else {
+		m_bridgeInfo.fromLeftHole.zero();
+		m_bridgeInfo.toLeftHole.zero();
+		m_bridgeInfo.fromRightHole.zero();
+		m_bridgeInfo.toRightHole.zero();
 	}
 
-#define no_BRIDGE_TOWERS // since they aren't destructable, don't need towers.
-#if BRIDGE_TOWERS
 	// initialize each of the tower positions to that of the bridge info bounding rect
 	Coord3D towerPos[ BRIDGE_MAX_TOWERS ];
 	towerPos[ BRIDGE_TOWER_FROM_LEFT ] = m_bridgeInfo.fromLeft;
@@ -317,14 +420,14 @@ m_bridgeInfo(theInfo)
 
 		}
 		tower = createTower( &pos, type, towerTemplate, bridge );
-
-		// store the tower object ID
-		m_bridgeInfo.towerObjectID[ i ] = tower->getID();
+		if( tower )
+		{
+			// store the tower object ID
+			m_bridgeInfo.towerObjectID[ i ] = tower->getID();
+		}
 
 	}
-#endif
 
-	m_next = nullptr;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -481,6 +584,59 @@ void Bridge::setDrawBridgeStage(bool open) {
 }
 
 //-------------------------------------------------------------------------------------------------
+/** updateBridgeObjectGeometry - match the bridge object's collision box to the state of the deck. */
+//-------------------------------------------------------------------------------------------------
+void Bridge::updateBridgeObjectGeometry()
+{
+	Object *bridgeObj = TheGameLogic->findObjectByID( m_bridgeInfo.bridgeObjectID );
+	if( bridgeObj == nullptr )
+		return;
+
+	//
+	// once the deck is rubble, or a drawbridge stands open, there is nothing left to shoot at,
+	// bump into or block the ground below.  a landmark bridge keeps a box the size of the whole
+	// structure and the pathfinder stamps that into the ground, so it has to go with the deck.
+	//
+	const Bool deckIsGone = (bridgeObj->getBodyModule()->getDamageState() == BODY_RUBBLE) || hasHole();
+
+	GeometryInfo geom = bridgeObj->getTemplate()->getTemplateGeometryInfo();
+	if( deckIsGone )
+	{
+		geom.set( GEOMETRY_BOX, TRUE, 0.0f, 0.0f, 0.0f );
+	}
+	else
+	{
+		if( bridgeObj->getTemplate()->isBridge() == FALSE )
+		{
+			//
+			// a procedural span is drawn by the bridge buffer, so its template geometry is only a
+			// placeholder; size it to the actual span so area weapons aimed at the deck hit us
+			//
+			Coord2D span;
+			span.x = m_bridgeInfo.to.x - m_bridgeInfo.from.x;
+			span.y = m_bridgeInfo.to.y - m_bridgeInfo.from.y;
+			geom.setMajorRadius( span.length() / 2.0f );
+			geom.setMinorRadius( m_bridgeInfo.bridgeWidth / 2.0f );
+		}
+
+		//
+		// ActiveBody turns collisions off for good when a structure rubbles and never turns them
+		// back on, so a repaired bridge has to ask for them again
+		//
+		bridgeObj->clearStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_NO_COLLISIONS ) );
+	}
+
+	//
+	// the pathfind footprint is derived from the geometry when the object is stamped, so it has to
+	// come out and go back in around the change.  setGeometryInfo, not setGeometryInfoZ, so that
+	// the partition footprint follows the box too.
+	//
+	TheAI->pathfinder()->removeObjectFromPathfindMap( bridgeObj );
+	bridgeObj->setGeometryInfo( geom );
+	TheAI->pathfinder()->addObjectToPathfindMap( bridgeObj );
+}
+
+//-------------------------------------------------------------------------------------------------
 /** isPointOnBridge - see if point is on bridge. */
 //-------------------------------------------------------------------------------------------------
 Bool Bridge::isPointOnBridge(const Coord3D *pLoc, bool ignoreHole)
@@ -494,7 +650,17 @@ Bool Bridge::isPointOnBridge(const Coord3D *pLoc, bool ignoreHole)
 	unsigned char flags{ 0U };
 
 	// If bridge has hole and point is in hole area -> not on bridge
-	if (!ignoreHole && hasHole() && hasHoleArea()) {
+	if (!ignoreHole && hasHole()) {
+
+		//
+		// BridgeHoleAreaPercentage is optional, and without it there are no hole corners to test
+		// against.  a bridge that is destroyed or standing open has lost the whole deck, so say so
+		// rather than reporting it as intact.
+		//
+		if (!hasHoleArea()) {
+			return false;
+		}
+
 		Vector3 left1(m_bridgeInfo.fromLeftHole.x, m_bridgeInfo.fromLeftHole.y, m_bridgeInfo.fromLeftHole.z);
 		Vector3 right1(m_bridgeInfo.fromRightHole.x, m_bridgeInfo.fromRightHole.y, m_bridgeInfo.fromRightHole.z);
 		Vector3 left2(m_bridgeInfo.toLeftHole.x, m_bridgeInfo.toLeftHole.y, m_bridgeInfo.toLeftHole.z);
@@ -935,6 +1101,7 @@ void Bridge::updateDamageState()
 				m_bridgeInfo.curDamageState = damageState;
 				if (damageState == BODY_RUBBLE) {
 					TheAI->pathfinder()->changeBridgeState(m_layer, false);
+					updateBridgeObjectGeometry();
 					m_bridgeInfo.damageStateChanged = true;
 					Object *obj;
 					for (obj = TheGameLogic->getFirstObject(); obj; obj=obj->getNextObject()) {
@@ -971,6 +1138,16 @@ void Bridge::updateDamageState()
 					BridgeBehaviorInterface *bbi = BridgeBehavior::getBridgeBehaviorInterfaceFromObject( bridge );
 					if( bbi == nullptr || bbi->isScaffoldPresent() == FALSE )
 						TheAI->pathfinder()->changeBridgeState(m_layer, true);
+
+					//
+					// the deck is whole again, so drop the hole that onDie punched in it.  this has
+					// to happen before the box is rebuilt, since the box follows the hole.
+					//
+					setDrawBridgeStage(false);
+
+					// the bridge is shootable again as soon as it stops being rubble, even while
+					// the scaffolding still keeps the deck closed
+					updateBridgeObjectGeometry();
 					m_bridgeInfo.damageStateChanged = true;
 				}
 			}
@@ -1027,6 +1204,7 @@ TerrainLogic::TerrainLogic()
 	m_numWaterToUpdate = 0;
 
 	m_waypointListHead = nullptr;
+	m_removedWaypointListHead = nullptr;
 	m_bridgeListHead = nullptr;
 	m_mapData = nullptr;
 	m_bridgeDamageStatesChanged = FALSE;
@@ -1468,6 +1646,89 @@ void TerrainLogic::deleteWaypoints()
 		deleteInstance(pWay);
 	}
 	m_waypointListHead = nullptr;
+	for (pWay = m_removedWaypointListHead; pWay; pWay = pNext) {
+		pNext = pWay->getNext();
+		pWay->setNext(nullptr);
+		deleteInstance(pWay);
+	}
+	m_removedWaypointListHead = nullptr;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Adds a waypoint created at runtime. */
+//-------------------------------------------------------------------------------------------------
+void TerrainLogic::insertWaypoint(Waypoint *pWay)
+{
+	if (pWay == nullptr)
+	{
+		return;
+	}
+	pWay->setNext(m_waypointListHead);
+	m_waypointListHead = pWay;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Moves a waypoint to the removed list and drops every link to it. */
+//-------------------------------------------------------------------------------------------------
+void TerrainLogic::removeWaypoint(Waypoint *pWay)
+{
+	Waypoint *pPrior = nullptr;
+	Waypoint *way;
+	for (way = m_waypointListHead; way; way = way->getNext())
+	{
+		if (way == pWay)
+		{
+			break;
+		}
+		pPrior = way;
+	}
+	if (way == nullptr)
+	{
+		return;
+	}
+
+	if (pPrior)
+	{
+		pPrior->setNext(pWay->getNext());
+	}
+	else
+	{
+		m_waypointListHead = pWay->getNext();
+	}
+
+	for (way = m_waypointListHead; way; way = way->getNext())
+	{
+		way->removeLink(pWay);
+	}
+	for (way = m_removedWaypointListHead; way; way = way->getNext())
+	{
+		way->removeLink(pWay);
+	}
+
+	pWay->setNext(m_removedWaypointListHead);
+	m_removedWaypointListHead = pWay;
+}
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+static Waypoint *chainWaypoints(const std::vector<Waypoint *> &list)
+{
+	Waypoint *pNext = nullptr;
+	for (Int i = (Int)list.size() - 1; i >= 0; --i)
+	{
+		list[i]->setNext(pNext);
+		pNext = list[i];
+	}
+	return pNext;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Rebuilds the waypoint lists, used when a saved game restores runtime waypoint changes. */
+//-------------------------------------------------------------------------------------------------
+void TerrainLogic::setWaypointLists(const std::vector<Waypoint *> &active, const std::vector<Waypoint *> &removed)
+{
+	m_waypointListHead = chainWaypoints(active);
+	m_removedWaypointListHead = chainWaypoints(removed);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1521,7 +1782,7 @@ void makeAlignToNormalMatrix( Real angle, const Coord3D& pos, const Coord3D& nor
 	/*
 		It is extremely important that the resulting matrix is such that
 		the xvector points in the angle we specified; specifically,
-		that atan2(xvec.y, xvec.x) == angle. So we must construct
+		that WWMath::Atan2(xvec.y, xvec.x) == angle. So we must construct
 		the matrix carefully to ensure this!
 	*/
 	x.x = Cos( angle );
@@ -1542,7 +1803,7 @@ void makeAlignToNormalMatrix( Real angle, const Coord3D& pos, const Coord3D& nor
 		x.normalize();
 	}
 
-	DEBUG_ASSERTCRASH(fabs(x.x*z.x + x.y*z.y + x.z*z.z)<0.0001,("dot is not zero (%f)",fabs(x.x*z.x + x.y*z.y + x.z*z.z)));
+	DEBUG_ASSERTCRASH(WWMath::Fabs(x.x*z.x + x.y*z.y + x.z*z.z)<0.0001,("dot is not zero (%f)",WWMath::Fabs(x.x*z.x + x.y*z.y + x.z*z.z)));
 
 	// now computing the y vector is trivial.
 	y.crossProduct( z, x, y );
@@ -1629,6 +1890,14 @@ Waypoint *TerrainLogic::getWaypointByID( UnsignedInt id )
 	for( Waypoint *way = m_waypointListHead; way; way = way->getNext() )
 		if (way->getID() == id)
 			return way;
+
+	for( Waypoint *way = m_removedWaypointListHead; way; way = way->getNext() )
+	{
+		if (way->getID() == id)
+		{
+			return way;
+		}
+	}
 
 	return nullptr;
 }
@@ -1758,12 +2027,12 @@ PathfindLayerEnum TerrainLogic::getLayerForDestination(const Coord3D *pos)
 {
 	Bridge *pBridge = getFirstBridge();
 	PathfindLayerEnum bestLayer = LAYER_GROUND;
-	Real bestDistance = fabs(pos->z - getGroundHeight(pos->x, pos->y));
+	Real bestDistance = WWMath::Fabs(pos->z - getGroundHeight(pos->x, pos->y));
 
 	if (bestDistance > TheAI->pathfinder()->getWallHeight()/2) {
 		// check wall.
 		if (TheAI->pathfinder()->isPointOnWall(pos)) {
-			Real delta = fabs(pos->z-TheAI->pathfinder()->getWallHeight());
+			Real delta = WWMath::Fabs(pos->z-TheAI->pathfinder()->getWallHeight());
 			if (delta<bestDistance) {
 				bestLayer = (PathfindLayerEnum)LAYER_WALL;
 				bestDistance = delta;
@@ -1772,9 +2041,15 @@ PathfindLayerEnum TerrainLogic::getLayerForDestination(const Coord3D *pos)
 	}
 
 	while (pBridge ) {
+		// a collapsed bridge has no deck left to stand on, shoot at or put an effect on
+		if (pBridge->peekBridgeInfo()->curDamageState == BODY_RUBBLE) {
+			pBridge = pBridge->getNext();
+			continue;
+		}
+
 		// filter out destroyed bridges or open draw bridges
 		if (TheAI->pathfinder()->isPathfindLayerPassable(pBridge->getLayer()) && pBridge->isPointOnBridge(pos, false) ) {
-			Real delta = fabs(pos->z-pBridge->getBridgeHeight(pos, nullptr));
+			Real delta = WWMath::Fabs(pos->z-pBridge->getBridgeHeight(pos, nullptr));
 			if (delta<bestDistance) {
 				bestLayer = pBridge->getLayer();
 				bestDistance = delta;
@@ -1798,7 +2073,7 @@ PathfindLayerEnum TerrainLogic::getHighestLayerForDestination(const Coord3D *pos
 		if (TheAI->pathfinder()->isPointOnWall(pos)) {
 			Real delta = pos->z - TheAI->pathfinder()->getWallHeight();
 			// must be ABOVE (or on) the wall for this call. (srj)
-			if (delta >= 0 && fabs(delta) < fabs(bestDistance)) {
+			if (delta >= 0 && WWMath::Fabs(delta) < WWMath::Fabs(bestDistance)) {
 				bestLayer = (PathfindLayerEnum)LAYER_WALL;
 				bestDistance = delta;
 			}
@@ -1814,7 +2089,7 @@ PathfindLayerEnum TerrainLogic::getHighestLayerForDestination(const Coord3D *pos
 		if (pBridge->isPointOnBridge(pos, false)) {
 			Real delta = pos->z - pBridge->getBridgeHeight(pos, nullptr);
 			// must be ABOVE (or on) the bridge for this call. (srj)
-			if (delta >= 0 && fabs(delta) < fabs(bestDistance)) {
+			if (delta >= 0 && WWMath::Fabs(delta) < WWMath::Fabs(bestDistance)) {
 				bestLayer = pBridge->getLayer();
 				bestDistance = delta;
 			}
@@ -1863,7 +2138,7 @@ Bool TerrainLogic::objectInteractsWithBridgeLayer(Object *obj, Int layer, Bool c
 
 			if (match) {
 				Real bridgeHeight = pBridge->getBridgeHeight(obj->getPosition(), nullptr);
-				Real delta = fabs(obj->getPosition()->z-bridgeHeight);
+				Real delta = WWMath::Fabs(obj->getPosition()->z-bridgeHeight);
 				if (delta>LAYER_Z_CLOSE_ENOUGH_F) {
 					return false;
 				}
@@ -1912,7 +2187,7 @@ Bool TerrainLogic::objectInteractsWithBridgeEnd(Object *obj, Int layer) const
 
 			if (match) {
 				Real bridgeHeight = pBridge->getBridgeHeight(obj->getPosition(), nullptr);
-				Real delta = fabs(obj->getPosition()->z-bridgeHeight);
+				Real delta = WWMath::Fabs(obj->getPosition()->z-bridgeHeight);
 				if (delta>LAYER_Z_CLOSE_ENOUGH_F)
 				{
 					return false;
@@ -2170,10 +2445,10 @@ Coord3D TerrainLogic::findClosestEdgePoint ( const Coord3D *closestTo ) const
 	getExtent( &mapExtent );
 
 	Real distances[4];
-	distances[0] = fabs( closestTo->y - mapExtent.lo.y );//top
-	distances[1] = fabs( closestTo->x - mapExtent.hi.x );//right
-	distances[2] = fabs( closestTo->y - mapExtent.hi.y );//bottom
-	distances[3] = fabs( closestTo->x - mapExtent.lo.x );//left
+	distances[0] = WWMath::Fabs( closestTo->y - mapExtent.lo.y );//top
+	distances[1] = WWMath::Fabs( closestTo->x - mapExtent.hi.x );//right
+	distances[2] = WWMath::Fabs( closestTo->y - mapExtent.hi.y );//bottom
+	distances[3] = WWMath::Fabs( closestTo->x - mapExtent.lo.x );//left
 	Real bestDistance = distances[0];
 	Int bestDistanceIndex = 0;
 	for( Int lameIndex = 1; lameIndex < 4; lameIndex++ )
@@ -2259,8 +2534,8 @@ Coord3D TerrainLogic::findEdgePointForAngle(const Coord3D* pos, Real angle, bool
 	const Real y0 = pos->y;
 
 	// Direction from angle
-	const Real dx = std::cos(angle);
-	const Real dy = std::sin(angle);
+	const Real dx = WWMath::Cosf(angle);
+	const Real dy = WWMath::Sinf(angle);
 
 	// Small epsilon for float comparisons
 	const Real eps = static_cast<Real>(1e-6);
@@ -2617,7 +2892,7 @@ void TerrainLogic::setWaterHeight( const WaterHandle *water, Real height, Real d
 		center.z = 0.0f;  // irrelevant
 
 		// the max radius to scan around us is the diagonal of the bounding region
-		Real maxDist = sqrt( affectedRegion.width() * affectedRegion.width() +
+		Real maxDist = WWMath::Sqrt( affectedRegion.width() * affectedRegion.width() +
 												 affectedRegion.height() * affectedRegion.height() );
 
 		// scan the objects in the area of the water affected
@@ -2931,12 +3206,16 @@ void TerrainLogic::flattenTerrain(Object *obj)
 			iMin.y = REAL_TO_INT_FLOOR(minY/MAP_XY_FACTOR);
 			iMax.x = REAL_TO_INT_FLOOR(maxX/MAP_XY_FACTOR);
 			iMax.y = REAL_TO_INT_FLOOR(maxY/MAP_XY_FACTOR);
+#if RETAIL_COMPATIBLE_CRC
+			// TheSuperHackers @info bobtista 29/09/2026 Retail scans from row 0, so rows below the map edge stay untouched.
+			iMin.y = std::max(0, iMin.y);
+#endif
 
 			Int i, j;
 			Real totalHeight = 0;
 			Int numSamples = 0;
 			for (i=iMin.x; i<=iMax.x; i++) {
-				for (j=0; j<=iMax.y; j++) {
+				for (j=iMin.y; j<=iMax.y; ++j) {
 					Vector3	testPt(i*MAP_XY_FACTOR, j*MAP_XY_FACTOR, 0);
 					Bool match = false;
 					unsigned char flags;
@@ -2962,7 +3241,7 @@ void TerrainLogic::flattenTerrain(Object *obj)
 			if (rawDataHeight>centerHeight) rawDataHeight = centerHeight;
 
 			for (i=iMin.x; i<=iMax.x; i++) {
-				for (j=0; j<=iMax.y; j++) {
+				for (j=iMin.y; j<=iMax.y; ++j) {
 					Vector3	testPt(i*MAP_XY_FACTOR, j*MAP_XY_FACTOR, 0);
 					Bool match = false;
 					unsigned char flags;
@@ -3022,12 +3301,16 @@ void TerrainLogic::flattenTerrain(Object *obj)
 			iMin.y = REAL_TO_INT_FLOOR((pos->y-radius)/MAP_XY_FACTOR);
 			iMax.x = REAL_TO_INT_FLOOR((pos->x+radius)/MAP_XY_FACTOR);
 			iMax.y = REAL_TO_INT_FLOOR((pos->y+radius)/MAP_XY_FACTOR);
+#if RETAIL_COMPATIBLE_CRC
+			// TheSuperHackers @info bobtista 29/09/2026 Retail scans from row 0, so rows below the map edge stay untouched.
+			iMin.y = std::max(0, iMin.y);
+#endif
 
 			Int i, j;
 			Real totalHeight = 0;
 			Int numSamples = 0;
 			for (i=iMin.x; i<=iMax.x; i++) {
-				for (j=0; j<=iMax.y; j++) {
+				for (j=iMin.y; j<=iMax.y; ++j) {
 					Vector3	testPt(i*MAP_XY_FACTOR, j*MAP_XY_FACTOR, 0);
 					Bool match = false;
 					Real dx = testPt.X - pos->x;
@@ -3045,7 +3328,7 @@ void TerrainLogic::flattenTerrain(Object *obj)
 			Real avgHeight = totalHeight/numSamples;
 			Int rawDataHeight = REAL_TO_INT_FLOOR(0.5f + avgHeight/MAP_HEIGHT_SCALE);
 			for (i=iMin.x; i<=iMax.x; i++) {
-				for (j=0; j<=iMax.y; j++) {
+				for (j=iMin.y; j<=iMax.y; ++j) {
 					Vector3	testPt(i*MAP_XY_FACTOR, j*MAP_XY_FACTOR, 0);
 					Bool match = false;
 					Real dx = testPt.X - pos->x;
@@ -3161,17 +3444,21 @@ void TerrainLogic::createCraterInTerrain(Object *obj)
   iMin.y = REAL_TO_INT_FLOOR( ( pos->y - radius ) / MAP_XY_FACTOR );
   iMax.x = REAL_TO_INT_FLOOR( ( pos->x + radius ) / MAP_XY_FACTOR );
 	iMax.y = REAL_TO_INT_FLOOR( ( pos->y + radius ) / MAP_XY_FACTOR );
+#if RETAIL_COMPATIBLE_CRC
+	// TheSuperHackers @info bobtista 29/09/2026 Retail scans from row 0, so rows below the map edge stay untouched.
+	iMin.y = std::max( 0, iMin.y );
+#endif
 
   Real deltaX, deltaY;
 
 	for (Int i = iMin.x; i <= iMax.x; i++ )
   {
-		for ( Int j=0; j <= iMax.y; j++ )
+		for ( Int j=iMin.y; j <= iMax.y; ++j )
     {
 			deltaX = ( i * MAP_XY_FACTOR ) - pos->x;
 			deltaY = ( j * MAP_XY_FACTOR ) - pos->y;
 
-      Real distance = sqrt( sqr( deltaX ) + sqr( deltaY ) );
+      Real distance = WWMath::Sqrt( sqr( deltaX ) + sqr( deltaY ) );
 
 			if ( distance < radius ) //inside circle
       {

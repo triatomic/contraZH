@@ -58,6 +58,10 @@ enum { MAP_SIZE = 1024, NOISE_SIZE = 512, NOISE_SEED = 11 };
 static const Real MIN_SPAN = 1024.0f;
 static const Real MAX_SPAN = 16384.0f;
 
+// How far past the ground on screen the map reaches, and how far from the camera it fits ground at all.
+static const Real SPAN_MARGIN = 2.2f;
+static const Real MAX_REACH = MAX_SPAN / SPAN_MARGIN;
+
 // How far the shape channels spread around 0.5, one standard deviation, which skyclouds.hlsl's weights undo.
 static const Real SHAPE_SPREAD = 0.18f;
 
@@ -155,6 +159,47 @@ static Real Coverage_Threshold(Real coverage)
 	const Real t = (Real)sqrt(-2.0f * log(tail));
 	const Real z = t - (2.515517f + t * (0.802853f + t * 0.010328f)) / (1.0f + t * (1.432788f + t * (0.189269f + t * 0.001308f)));
 	return (coverage < 0.5f) ? z : -z;
+}
+
+// The ground the camera's edge rays reach, as a square around its centre. Near the horizon a ray lands
+// far away or never, and where it lands swings with every small turn, so each ray is cut at MAX_REACH
+// from the camera. The ground past that wraps the map, and a steady map keeps its clouds steady.
+static void Fit_Ground(const CameraClass &camera, Real groundHeight, Real &centerX, Real &centerY, Real &extent)
+{
+	const Vector3 *corners = camera.Get_Frustum_Corners();
+	const Vector3 eye = camera.Get_Position();
+	Real minX = eye.X;
+	Real maxX = eye.X;
+	Real minY = eye.Y;
+	Real maxY = eye.Y;
+
+	for (Int i = 0; i < 4; i++)
+	{
+		const Vector3 &nearPoint = corners[i];
+		const Vector3 &farPoint = corners[i + 4];
+		Vector3 point = farPoint;
+		if (nearPoint.Z > groundHeight && farPoint.Z < groundHeight)
+		{
+			point = nearPoint + (farPoint - nearPoint) * ((nearPoint.Z - groundHeight) / (nearPoint.Z - farPoint.Z));
+		}
+
+		Real dx = point.X - eye.X;
+		Real dy = point.Y - eye.Y;
+		const Real distance = (Real)sqrt(dx * dx + dy * dy);
+		if (distance > MAX_REACH)
+		{
+			dx *= MAX_REACH / distance;
+			dy *= MAX_REACH / distance;
+		}
+		minX = min(minX, eye.X + dx);
+		maxX = max(maxX, eye.X + dx);
+		minY = min(minY, eye.Y + dy);
+		maxY = max(maxY, eye.Y + dy);
+	}
+
+	centerX = 0.5f * (minX + maxX);
+	centerY = 0.5f * (minY + maxY);
+	extent = 0.5f * max(maxX - minX, maxY - minY);
 }
 
 W3DSkyClouds::W3DSkyClouds()
@@ -314,22 +359,21 @@ void W3DSkyClouds::update(RenderInfoClass &rinfo, BaseHeightMapRenderObjClass &t
 
 	advance(WW3D::Get_Logic_Frame_Time_Seconds());
 
-	AABoxClass visible;
-	if (!terrain.getMaximumVisibleBox(rinfo.Camera.Get_Frustum(), &visible, TRUE))
-	{
-		return;
-	}
+	Real centerX;
+	Real centerY;
+	Real extent;
+	Fit_Ground(rinfo.Camera, terrain.getMinHeight(), centerX, centerY, extent);
 
 	// Whole texels keep panning from moving the clouds across the map's grid, which would make them swim.
-	const Real reach = 2.2f * max(visible.Extent.X, visible.Extent.Y);
+	const Real reach = SPAN_MARGIN * extent;
 	Real span = MIN_SPAN;
 	while (span < reach && span < MAX_SPAN)
 	{
 		span *= 2.0f;
 	}
 	const Real texel = span / m_mapSize;
-	const Real originX = (Real)floor((visible.Center.X - 0.5f * span) / texel) * texel;
-	const Real originY = (Real)floor((visible.Center.Y - 0.5f * span) / texel) * texel;
+	const Real originX = (Real)floor((centerX - 0.5f * span) / texel) * texel;
+	const Real originY = (Real)floor((centerY - 0.5f * span) / texel) * texel;
 
 	const Real cloudSize = max(TheGlobalData->m_skyCloudSize, 1.0f);
 	const Real softness = max(TheGlobalData->m_skyCloudSoftness, 0.02f);

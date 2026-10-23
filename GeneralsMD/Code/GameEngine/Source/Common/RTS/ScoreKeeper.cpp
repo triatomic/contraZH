@@ -165,6 +165,21 @@ Int ScoreKeeper::getTotalUnitsBuilt( KindOfMaskType validMask, KindOfMaskType in
 	return count;
 }
 
+void ScoreKeeper::friend_countObjects( std::map<std::string, Int>& built, std::map<std::string, Int>& lost ) const
+{
+	for (ObjectCountMap::const_iterator it = m_objectsBuilt.begin(); it != m_objectsBuilt.end(); ++it)
+	{
+		if (it->first && it->second > 0)
+			built[it->first->getName().str()] += it->second;
+	}
+	for (ObjectCountMap::const_iterator it = m_objectsLost.begin(); it != m_objectsLost.end(); ++it)
+	{
+		if (it->first && it->second > 0)
+			lost[it->first->getName().str()] += it->second;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
 Int ScoreKeeper::getTotalObjectsBuilt( const ThingTemplate *pTemplate )
 {
 	Int count = 0;
@@ -498,7 +513,7 @@ void ScoreKeeper::xfer( Xfer *xfer )
 	xfer->xferInt( &m_totalMoneySpent );
 
 	// units destroyed
-	xfer->xferUser( m_totalUnitsDestroyed, sizeof( Int ) * MAX_PLAYER_COUNT );
+	xfer->xferUser( m_totalUnitsDestroyed, sizeof( Int ) * xfer->getPlayerCount() );
 
 	// units built
 	xfer->xferInt( &m_totalUnitsBuilt );
@@ -507,7 +522,7 @@ void ScoreKeeper::xfer( Xfer *xfer )
 	xfer->xferInt( &m_totalUnitsLost );
 
 	// buildings destroyed
-	xfer->xferUser( m_totalBuildingsDestroyed, sizeof( Int ) * MAX_PLAYER_COUNT );
+	xfer->xferUser( m_totalBuildingsDestroyed, sizeof( Int ) * xfer->getPlayerCount() );
 
 	// buildings built
 	xfer->xferInt( &m_totalBuildingsBuilt );
@@ -531,9 +546,9 @@ void ScoreKeeper::xfer( Xfer *xfer )
 	xferObjectCountMap( xfer, &m_objectsBuilt );
 
 	// objects destroyed
-	UnsignedShort destroyedArraySize = MAX_PLAYER_COUNT;
+	UnsignedShort destroyedArraySize = xfer->getPlayerCount();
 	xfer->xferUnsignedShort( &destroyedArraySize );
-	if( destroyedArraySize != MAX_PLAYER_COUNT )
+	if( destroyedArraySize != xfer->getPlayerCount() )
 	{
 
 		DEBUG_CRASH(( "ScoreKeeper::xfer - size of objects destroyed array has changed" ));

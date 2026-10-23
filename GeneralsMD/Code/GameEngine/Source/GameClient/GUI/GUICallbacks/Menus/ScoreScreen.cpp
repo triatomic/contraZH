@@ -836,6 +836,7 @@ void finishSinglePlayerInit()
 			TheAudio->update();
 		}
 
+		TheCampaignManager->markCurrentMissionCompleted();
 		TheCampaignManager->gotoNextMission();
 
 		if(TheCampaignManager->getCurrentMap().isEmpty())

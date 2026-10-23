@@ -1406,11 +1406,9 @@ void Radar::xfer( Xfer *xfer )
 	}
 	else
 	{
-		static_assert(sizeof(m_radarHidden) == 16, "Increase version if size changes");
-		xfer->xferUser(&m_radarHidden, sizeof(m_radarHidden));
+		xfer->xferUser(&m_radarHidden, sizeof(Bool) * xfer->getPlayerCount());
 
-		static_assert(sizeof(m_radarForceOn) == 16, "Increase version if size changes");
-		xfer->xferUser(&m_radarForceOn, sizeof(m_radarForceOn));
+		xfer->xferUser(&m_radarForceOn, sizeof(Bool) * xfer->getPlayerCount());
 	}
 
 	// save our local object list

@@ -36,7 +36,7 @@ ResetSpecialPowerTimerWhileAliveUpdateModuleData::ResetSpecialPowerTimerWhileAli
 	static const FieldParse dataFieldParse[] = 
 	{
 		{ "SpecialPowerTemplate",				INI::parseSpecialPowerTemplate,				NULL, offsetof(ResetSpecialPowerTimerWhileAliveUpdateModuleData, m_specialPowerTemplate ) },
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
 }
