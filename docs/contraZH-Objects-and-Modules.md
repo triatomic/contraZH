@@ -2,6 +2,22 @@
 
 ## Object.ini
 
+### Reverse movement sounds
+
+* `SoundReverseMoveLoop` plays while the unit moves in reverse.
+* `SoundReverseMoveLoopDamaged` plays while the unit moves in reverse and its body state is
+worse than `BODY_DAMAGED`, matching `SoundMoveLoopDamaged`.
+
+```
+  SoundReverseMoveLoop = TankReverseLoop
+  SoundReverseMoveLoopDamaged = TankReverseDamagedLoop
+```
+
+The reverse loop replaces the matching `SoundMoveLoop` or `SoundMoveLoopDamaged`. If the
+matching reverse sound is omitted, the unit keeps its normal movement sound behavior.
+The loop switches when direction or damage state changes during movement. Reverse loops also
+play when `SoundMoveStart` or `SoundMoveStartDamaged` is set.
+
 ### CaptureTimePercent
 
 * `CaptureTimePercent = 100%` - (Default. Scales how long it takes to capture this object.)

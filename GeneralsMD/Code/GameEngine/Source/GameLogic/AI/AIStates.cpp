@@ -1690,6 +1690,7 @@ Bool AIInternalMoveToState::computePath()
 StateReturnType AIInternalMoveToState::onEnter()
 {
 	m_ambientPlayingHandle = AHSV_Error;
+	m_moveLoopSound = nullptr;
 	Object *obj = getMachineOwner();
 	AIUpdateInterface *ai = obj->getAI();
 	m_waitingForPath = ai->isWaitingForPath();
@@ -1767,67 +1768,59 @@ void AIInternalMoveToState::startMoveSound()
 	Object *obj = getMachineOwner();
 	m_moveSoundState = MOVESOUND_STARTED;
 
+	const BodyModuleInterface *objBody = obj->getBodyModule();
+	Bool damaged = objBody && IS_CONDITION_WORSE(objBody->getDamageState(), BODY_DAMAGED);
+	AudioEventRTS soundEventMove = damaged ? *obj->getTemplate()->getSoundMoveStartDamaged() :
+		*obj->getTemplate()->getSoundMoveStart();
+	if (!soundEventMove.getEventName().isEmpty())
+	{
+		soundEventMove.setObjectID(obj->getID());
+		TheAudio->addAudioEvent( &soundEventMove );
+	}
+
+	updateMoveSound();
+}
+
+void AIInternalMoveToState::updateMoveSound()
+{
+	Object *obj = getMachineOwner();
+	const ThingTemplate *thing = obj->getTemplate();
 	const AIUpdateInterface *ai = obj->getAI();
 	Bool reversing = ai && ai->getCurLocomotor() && ai->getCurLocomotor()->isMovingBackwards();
-
 	const BodyModuleInterface *objBody = obj->getBodyModule();
-	if (objBody && IS_CONDITION_WORSE(objBody->getDamageState(), BODY_DAMAGED))
+	Bool damaged = objBody && IS_CONDITION_WORSE(objBody->getDamageState(), BODY_DAMAGED);
+	const AudioEventRTS *loopSound = nullptr;
+
+	if (reversing)
 	{
-		AudioEventRTS soundEventMoveDamaged = *obj->getTemplate()->getSoundMoveStartDamaged();
-		if (!soundEventMoveDamaged.getEventName().isEmpty())
+		loopSound = damaged ? thing->getSoundReverseMoveLoopDamaged() : thing->getSoundReverseMoveLoop();
+		if (loopSound->getEventName().isEmpty())
 		{
-			soundEventMoveDamaged.setObjectID(obj->getID());
-			TheAudio->addAudioEvent( &soundEventMoveDamaged );
-		}
-		else
-		{
-			if (reversing)
-			{
-				soundEventMoveDamaged = *obj->getTemplate()->getSoundReverseMoveLoopDamaged();
-			}
-
-			// a template without the reverse loop keeps the forward one
-			if (soundEventMoveDamaged.getEventName().isEmpty())
-			{
-				soundEventMoveDamaged = *obj->getTemplate()->getSoundMoveLoopDamaged();
-			}
-
-			if (!soundEventMoveDamaged.getEventName().isEmpty())
-			{
-				soundEventMoveDamaged.setObjectID(obj->getID());
-				m_ambientPlayingHandle = TheAudio->addAudioEvent( &soundEventMoveDamaged );
-			}
+			loopSound = nullptr;
 		}
 	}
-	else
+
+	if (!loopSound)
 	{
-		AudioEventRTS soundEventMove = *obj->getTemplate()->getSoundMoveStart();
-		soundEventMove.setObjectID(obj->getID());
-
-		if (!soundEventMove.getEventName().isEmpty())
+		const AudioEventRTS *startSound = damaged ? thing->getSoundMoveStartDamaged() : thing->getSoundMoveStart();
+		if (startSound->getEventName().isEmpty())
 		{
-			TheAudio->addAudioEvent( &soundEventMove );
+			loopSound = damaged ? thing->getSoundMoveLoopDamaged() : thing->getSoundMoveLoop();
 		}
-		else
+	}
+
+	if (loopSound != m_moveLoopSound)
+	{
+		TheAudio->removeAudioEvent( m_ambientPlayingHandle );
+		m_ambientPlayingHandle = AHSV_Error;
+		m_moveLoopSound = loopSound;
+		if (loopSound && !loopSound->getEventName().isEmpty())
 		{
-			if (reversing)
-			{
-				soundEventMove = *obj->getTemplate()->getSoundReverseMoveLoop();
-			}
-
-			if (soundEventMove.getEventName().isEmpty())
-			{
-				soundEventMove = *obj->getTemplate()->getSoundMoveLoop();
-			}
-
+			AudioEventRTS soundEventMove = *loopSound;
 			soundEventMove.setObjectID(obj->getID());
-			if (!soundEventMove.getEventName().isEmpty())
-			{
-				m_ambientPlayingHandle = TheAudio->addAudioEvent( &soundEventMove );
-			}
+			m_ambientPlayingHandle = TheAudio->addAudioEvent( &soundEventMove );
 		}
 	}
-
 }
 
 /**
@@ -1876,6 +1869,10 @@ StateReturnType AIInternalMoveToState::update()
 	else if (m_moveSoundState == MOVESOUND_LOCOMOTOR_RAN)
 	{
 		startMoveSound();
+	}
+	else if (m_moveSoundState == MOVESOUND_STARTED)
+	{
+		updateMoveSound();
 	}
 
 	//Kris: 7/01/03 (Temporary debug hook for units not being able to leave maps)

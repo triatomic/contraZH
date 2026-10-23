@@ -31,6 +31,7 @@
 #include "Lib/BaseType.h"
 
 #include "Common/AudioEventRTS.h"
+#include "Common/AudioHandleSpecialValues.h"
 #include "Common/GameMemory.h"
 #include "Common/StateMachine.h"
 
@@ -261,6 +262,8 @@ public:
 		m_adjustDestinations = true;
 		m_goalLayer = LAYER_INVALID;
 		m_moveSoundState = MOVESOUND_WAITING;
+		m_ambientPlayingHandle = AHSV_Error;
+		m_moveLoopSound = nullptr;
 	}
 
 	virtual StateReturnType onEnter() override;
@@ -285,6 +288,7 @@ protected:
 
 private:
 	void startMoveSound();
+	void updateMoveSound();
 
 protected:
 	// snapshot interface
@@ -300,6 +304,7 @@ protected:
 	Coord3D				m_pathGoalPosition;									///< the position our current path leads to
 private:
 	AudioHandle		m_ambientPlayingHandle;							///< Audio handle for the looping sound that we may play.
+	const AudioEventRTS *m_moveLoopSound;
 	// The locomotor runs after the state machine, so its reverse flag is only meaningful from the
 	// second update on. The move sound waits for that before it picks forward or reverse.
 	enum MoveSoundState CPP_11(: Int) { MOVESOUND_WAITING, MOVESOUND_LOCOMOTOR_RAN, MOVESOUND_STARTED };
