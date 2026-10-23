@@ -83,52 +83,24 @@ void MissingTexture::_Init()
 	);
 	IDirect3DTexture8* lockable=DX8Wrapper::_Peek_Lockable_Texture(tex);
 
-	D3DLOCKED_RECT locked_rect;
-	RECT rect;
-	rect.left=0;
-	rect.right=missing_image_width;
-	rect.top=0;
-	rect.bottom=missing_image_height;
-	DX8_ErrorCode(
-		lockable->LockRect(
-			0,
-			&locked_rect,
-			&rect,
-			0));
-
-	unsigned *buffer=(unsigned*)locked_rect.pBits;
-	//unsigned char *pixels=(unsigned char *)missing_image_pixels;
-	for (unsigned y=0;y<missing_image_height;y++)
+	// TheSuperHackers @fix bobtista 09/10/2026 Fill every mip level with the solid color.
+	for (unsigned level=0;level<tex->GetLevelCount();++level)
 	{
-		for (unsigned x=0; x<missing_image_width; x++)
-		{
-			//*buffer++=missing_image_palette[*pixels++];
-			*buffer++=MISSING_TEXTURE_COLOR;
-		}
-		buffer=(unsigned*)locked_rect.pBits;
-		buffer+=locked_rect.Pitch/sizeof(unsigned)*(y+1);
-	}
-
-	DX8_ErrorCode(lockable->UnlockRect(0));
-
-	// Every texel is the same color, so each mip is just that color again
-	for (unsigned i=1;i<tex->GetLevelCount();++i) {
 		D3DSURFACE_DESC desc;
-		DX8_ErrorCode(tex->GetLevelDesc(i,&desc));
-
-		D3DLOCKED_RECT mip_rect;
-		DX8_ErrorCode(lockable->LockRect(i,&mip_rect,nullptr,0));
+		D3DLOCKED_RECT locked_rect;
+		DX8_ErrorCode(tex->GetLevelDesc(level,&desc));
+		DX8_ErrorCode(lockable->LockRect(level,&locked_rect,nullptr,0));
 
 		for (unsigned y=0;y<desc.Height;y++)
 		{
-			unsigned *row=(unsigned*)((unsigned char*)mip_rect.pBits+mip_rect.Pitch*y);
+			unsigned *buffer=reinterpret_cast<unsigned*>(static_cast<unsigned char*>(locked_rect.pBits)+y*locked_rect.Pitch);
 			for (unsigned x=0;x<desc.Width;x++)
 			{
-				row[x]=MISSING_TEXTURE_COLOR;
+				buffer[x]=MISSING_TEXTURE_COLOR;
 			}
 		}
 
-		DX8_ErrorCode(lockable->UnlockRect(i));
+		DX8_ErrorCode(lockable->UnlockRect(level));
 	}
 	DX8Wrapper::_Upload_Lockable_Texture(tex);
 
