@@ -5433,7 +5433,14 @@ Bool Pathfinder::validMovementTerrainForObject( const Object *obj, const Locomot
 	Int radius;
 	Bool centerInCell;
 	getRadiusAndCenter(obj, radius, centerInCell);
-	return getClearanceShortage(cell, locomotor->getLegalSurfaces(), radius) < CLEARANCE_HARD_SHORTAGE;
+	LocomotorSurfaceTypeMask surfaces = locomotor->getLegalSurfaces();
+#if RTS_ZEROHOUR
+	if (obj->getAIUpdateInterface())
+	{
+		surfaces = obj->getAIUpdateInterface()->getLocomotorSet().getValidSurfaces();
+	}
+#endif
+	return getClearanceShortage(cell, surfaces, radius) < CLEARANCE_HARD_SHORTAGE;
 }
 
 /**
