@@ -46,6 +46,19 @@
 class VertexMaterialClass;
 class RenderInfoClass;
 class TextureClass;
+struct IDirect3DVertexShader9;
+
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+struct BillboardInstance
+{
+	Vector3 Position;
+	float Size;
+	Vector2 Rotation;
+	unsigned Color;
+	Vector4 UVRect;
+	float Triangle;
+};
+#endif
 
 /*
 ** PointGroupClass -- a custom object for rendering
@@ -143,6 +156,10 @@ public:
 	void						RenderVolumeParticle(RenderInfoClass &rinfo, unsigned int depth);
 
 protected:
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+	bool Render_Instanced();
+#endif
+
 	// A vertex's frame uv, mapped into its point's rectangle when there are any.
 	Vector2					Vertex_UV(int vertex) const;
 
@@ -235,6 +252,11 @@ protected:
 public:
 	static void				_Init();
 	static void				_Shutdown();
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+	static void Set_Billboard_Shader(IDirect3DVertexShader9 *shader);
+	static void Release_Billboard_Resources();
+	static void Draw_Billboards(const BillboardInstance *instances, unsigned count, bool triangles);
+#endif
 
 private:
 	static Vector3 _TriVertexLocationOrientationTable[256][3];

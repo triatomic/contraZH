@@ -85,6 +85,7 @@
 #include "WW3D2/dx8fvf.h"
 #include "WW3D2/dx8instancing.h"
 #include "WW3D2/dx8skinning.h"
+#include "WW3D2/pointgr.h"
 #include "WW3D2/dx8polygonrenderer.h"
 #include "WW3D2/matpass.h"
 #include "WW3D2/texture.h"
@@ -5429,6 +5430,9 @@ void RoadShader2Stage::reset()
 #if defined(BUILD_WITH_D3D9)
 static DWORD InstancedMainShader = 0;	///<main scene meshes and their passes drawn in groups; the scene draws without it.
 static DWORD SkinnedMainShader = 0;	///<main scene skins and their passes deformed on the GPU; the scene draws without it.
+#if defined(RTS_ZEROHOUR)
+static DWORD ParticleBillboardShader = 0;
+#endif
 #endif
 
 W3DShaderInterface **MasterShaderList[]=
@@ -5573,6 +5577,12 @@ void W3DShaderManager::init()
 	{
 		SkinnedMainShader = 0;
 	}
+#if defined(RTS_ZEROHOUR)
+	if (SUCCEEDED(Load_Vertex_Shading_Shader("shaders\\particlebillboard.vso", &ParticleBillboardShader)))
+	{
+		PointGroupClass::Set_Billboard_Shader(Peek_D3D9_Vertex_Shader(ParticleBillboardShader));
+	}
+#endif
 #endif
 
 	W3DFilterInterface **filters;
@@ -5628,6 +5638,14 @@ void W3DShaderManager::shutdown()
 	W3DSlopeMap::releaseResources();
 
 #if defined(BUILD_WITH_D3D9)
+#if defined(RTS_ZEROHOUR)
+	PointGroupClass::Set_Billboard_Shader(nullptr);
+	if (ParticleBillboardShader != 0)
+	{
+		DX8_DELETE_VERTEX_SHADER(DX8Wrapper::_Get_D3D_Device8(), ParticleBillboardShader);
+		ParticleBillboardShader = 0;
+	}
+#endif
 	DX8InstancingClass::Set_Main_Shader(nullptr);
 	if (InstancedMainShader != 0)
 	{

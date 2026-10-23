@@ -1,5 +1,14 @@
 # ParticleSystem.ini
 
+## D3D9 billboard rendering
+
+* D3D9 builds camera-facing particle quads on the GPU when shader model 3 hardware is available.
+* Texture atlases, particle colours, rotation, soft fading and shader effects keep their existing settings.
+* Instancing works with `SkipTranslucencySort = No` and preserves triangle sorting with other translucent geometry.
+* Each half of a sorted particle quad keeps its place in the sorted order; bloom, haze and disruption passes can instance independently.
+* Streaks, volume particles, ground-aligned particles and D3D8 builds use the existing renderer.
+* Set the environment variable `CONTRA_PARTICLE_INSTANCING=0` before starting the game to compare with CPU-built quads.
+
 ## ConformToTerrain
 
 * `ConformToTerrain = No` - (Default. `Yes` opts a single effect into terrain conforming.)

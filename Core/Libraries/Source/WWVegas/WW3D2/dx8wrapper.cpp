@@ -729,6 +729,9 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 		DynamicVBAccessClass::_Deinit();
 		DynamicIBAccessClass::_Deinit();
 		DX8InstancingClass::Release_Resources();
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+		PointGroupClass::Release_Billboard_Resources();
+#endif
 		DX8TextureManagerClass::Release_Textures();
 		SHD_SHUTDOWN_SHADERS;
 

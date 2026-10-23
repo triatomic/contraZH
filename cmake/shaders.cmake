@@ -92,6 +92,7 @@ rts_add_shader("${RTS_SHADER_DIR}/shadowdepth.hlsl"   ps_2_0 mainPackedPS  shado
 rts_add_shader("${RTS_SHADER_DIR}/instancedepth.hlsl" vs_2_0 main instancedepth.vso             PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/instancedepth.hlsl" vs_2_0 main instancedepthpacked.vso       PACKED=1)
 rts_add_shader("${RTS_SHADER_DIR}/instancemain.hlsl"  vs_2_0 main instancemain.vso)
+rts_add_shader("${RTS_SHADER_DIR}/particlebillboard.hlsl" vs_2_0 main particlebillboard.vso)
 rts_add_shader("${RTS_SHADER_DIR}/instancedepth.hlsl" vs_2_0 main skindepth.vso                 PACKED=0 SKINNED=1)
 rts_add_shader("${RTS_SHADER_DIR}/instancedepth.hlsl" vs_2_0 main skindepthpacked.vso           PACKED=1 SKINNED=1)
 rts_add_shader("${RTS_SHADER_DIR}/instancemain.hlsl"  vs_2_0 main skinmain.vso                  SKINNED=1)

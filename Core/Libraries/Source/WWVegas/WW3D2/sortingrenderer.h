@@ -25,6 +25,7 @@ class SphereClass;
 class ShaderClass;
 class Vector3;
 struct VertexFormatXYZNDUV2;
+struct BillboardInstance;
 
 // Shades particle sprites in a pixel shader, around each of their draws.
 class SoftParticleHookClass
@@ -66,6 +67,10 @@ class SortingRendererClass
 	static const unsigned short* Source_Indices(const SortingNodeStruct* state);
 
 public:
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+	static void Insert_Billboards(const BillboardInstance *instances, unsigned count);
+#endif
+
 	static void Insert_Triangles(
 		const SphereClass& bounding_sphere,
 		unsigned short start_index,
