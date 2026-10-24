@@ -2791,10 +2791,8 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 							Real gx = goalPos.x - here->x;
 							Real gy = goalPos.y - here->y;
 							const Real dist = WWMath::Sqrt(gx*gx + gy*gy);
-							Bool clearStep = dist <= 0.01f;
 							if (len > 0.01f && dist > 0.01f)
 							{
-								Coord3D sideGoal = goalPos;
 								const Real nx = sideAway.x / len;
 								const Real ny = sideAway.y / len;
 								const Real into = gx*nx + gy*ny;
@@ -2811,35 +2809,12 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 										gy = nx*side;
 										t = 1.0f;
 									}
-									sideGoal.x = here->x + gx*dist/t;
-									sideGoal.y = here->y + gy*dist/t;
+									goalPos.x = here->x + gx*dist/t;
+									goalPos.y = here->y + gy*dist/t;
 								}
 								// Push outward as well as sideways to keep moving vehicles from overlapping infantry.
-								sideGoal.x += nx*dist*0.5f;
-								sideGoal.y += ny*dist*0.5f;
-								for (Int attempt = 0; attempt < 2; ++attempt)
-								{
-									if (attempt != 0)
-									{
-										const Real away = (sideGoal.x - here->x)*nx + (sideGoal.y - here->y)*ny;
-										sideGoal.x = here->x + 2.0f*away*nx - (sideGoal.x - here->x);
-										sideGoal.y = here->y + 2.0f*away*ny - (sideGoal.y - here->y);
-									}
-									if (TheAI->pathfinder()->isLinePassable(getObject(), m_locomotorSet.getValidSurfaces(),
-										getObject()->getLayer(), *here, sideGoal, false, true, m_locomotorSet.getRequiredWaterLevel()))
-									{
-										goalPos = sideGoal;
-										clearStep = TRUE;
-										break;
-									}
-								}
-							}
-							if (!clearStep)
-							{
-								speed = 0.0f;
-								blocked = TRUE;
-								m_isBlocked = TRUE;
-								m_isBlockedAndStuck = TRUE;
+								goalPos.x += nx*dist*0.5f;
+								goalPos.y += ny*dist*0.5f;
 							}
 						}
 
