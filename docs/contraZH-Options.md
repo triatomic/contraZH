@@ -201,8 +201,9 @@ decides whether goals in front are also reversed to.
 ## Smart selection
 
 A row of small cameos above the command bar: one per unit type with a count, or one per object for
-a single-type selection. Single-object cameos show health, ammo clip segments and veterancy. Up to
-16 cameos; counts past 999 show no badge. Reskins share a cameo.
+a single-type selection. Single-object cameos show health, ammo and veterancy. Ammo clips with up
+to six shots show segments; larger clips show a continuous fill bar. Up to 16 cameos; counts past
+999 show no badge. Reskins share a cameo.
 
 * `SmartSelection = Yes` - (No hides the row and unbinds its keys.)
 * `SmartSelectionUseMouse = Yes` - (Yes keeps only a cameo's units on double click, No on

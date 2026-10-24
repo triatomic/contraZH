@@ -231,11 +231,11 @@ static void drawButtonHealthBar( GameWindow *window, Real ratio )
 }
 
 // drawButtonAmmoBar ==========================================================
-/** A light orange clip bar above the health bar, one segment per shot. */
+/** A light orange clip bar above the health bar. */
 //=============================================================================
 static void drawButtonAmmoBar( GameWindow *window, Int ammoInClip, Int clipSize )
 {
-	drawButtonBar( window, 1, (Real)ammoInClip / (Real)clipSize, clipSize,
+	drawButtonBar( window, 1, (Real)ammoInClip / (Real)clipSize, clipSize <= 6 ? clipSize : 1,
 		GameMakeColor( 128, 88, 40, 255 ), GameMakeColor( 255, 176, 80, 255 ) );
 }
 
