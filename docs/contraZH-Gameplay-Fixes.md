@@ -29,16 +29,6 @@ charge now carries over and finishes on schedule.
 Note: dropping out of snipe mode entirely is data - a set change drops the weapon lock unless the
 set is marked `WeaponLockSharedAcrossSets`.
 
-## Pre-attack delay applies to repeated shots
-
-The Omega Cannon could skip its `PreAttackType = PER_SHOT` wind-up on repeated shots at the same
-target. The fire state sometimes began too early to start the wind-up, then fired as soon as reload
-finished. It now returns to aiming until the wind-up can start. This also covers turretless weapons
-and ground targets; weapons with no applicable pre-attack delay keep their timing.
-
-Changes when units fire; affects replays.
-([#152](https://github.com/triatomic/contraZH/issues/152))
-
 ## Stealth kills no longer reveal the killer
 
 The floating bounty text is shown only to players who can see the killer: its owner, allies, and
