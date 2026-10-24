@@ -5258,7 +5258,8 @@ StateReturnType AIAttackAimAtTargetState::update()
 
 				// DEBUG_LOG((">>> (hasLimited) relAngle = %f, minAngle = %f, maxAngle = %f.\n", relAngle * 180 / PI, minAngle * 180 / PI, maxAngle * 180 / PI));
 
-				if ((relAngle < maxAngle) && (relAngle > minAngle)) {
+				if ((relAngle <= maxAngle) && (relAngle >= minAngle))
+				{
 					// If the target is inside our maximum turret angle, we can continue
 					return STATE_CONTINUE;
 				}
@@ -5345,8 +5346,8 @@ StateReturnType AIAttackAimAtTargetState::update()
 		{ // Check limited turret angles how to move
 			hasPreferredAngle = true;
 
-			Real maxAngle = sourceAI->getMaxTurretAngle(tur) + aimDelta;
-			Real minAngle = sourceAI->getMinTurretAngle(tur) - aimDelta;
+			Real maxAngle = sourceAI->getMaxTurretAngle(tur);
+			Real minAngle = sourceAI->getMinTurretAngle(tur);
 			if (maxAngle < minAngle) { // This might be a backwards facing configuration
 				maxAngle = nmod(maxAngle, 2.0 * PI);
 				relAngle = nmod(relAngle, 2.0 * PI);

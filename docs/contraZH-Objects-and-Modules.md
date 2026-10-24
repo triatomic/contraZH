@@ -115,6 +115,15 @@ effect — a scorch mark or a footprint — use the [Decal FX nugget](FXList-&-P
 
 ## Turret modules
 
+### Limited turret angles
+
+Units with `MinTurretAngle` or `MaxTurretAngle` turn their hull as soon as a target lies outside
+the turret's arc. `AimDelta` no longer widens the hull's allowed arc, which left a band near each
+limit where the turret could not fire and the hull would not turn. Targets exactly at either limit
+remain valid.
+
+Changes the simulation for units using these limits; older replays may play differently.
+
 ### MaxPhysicalPitch
 
 * `MaxPhysicalPitch = 90` - (Default. The highest pitch a turret with `AllowsPitch = Yes` will aim at,
