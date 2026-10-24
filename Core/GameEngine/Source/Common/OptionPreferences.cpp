@@ -1235,7 +1235,7 @@ Bool OptionPreferences::getFPSLimitEnabled()
 #if RTS_ZEROHOUR
 Int OptionPreferences::getRenderFPSLimit() const
 {
-	const Int fps = getInt("RenderFPSLimit", -1);
+	const Int fps = getInt("RenderFPSLimit", 240);
 	switch (fps)
 	{
 		case 0:
@@ -1245,7 +1245,7 @@ Int OptionPreferences::getRenderFPSLimit() const
 		case 240:
 			return fps;
 		default:
-			return -1;
+			return 240;
 	}
 }
 #endif
