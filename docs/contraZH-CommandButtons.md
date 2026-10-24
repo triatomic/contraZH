@@ -106,6 +106,7 @@ A deploy asked for this way latches, so the unit holds the stance instead of pac
 nothing is in range - which is the point, since it lets a unit deploy before the enemy arrives. The latch is
 dropped when the player gives any order other than an attack, so a move order packs the unit up as usual.
 While manually deployed, the unit cannot drive or coast, even when an attack target is outside weapon range.
+Pressing deploy again also finishes packing while idle, after the turret centers.
 Automatic deploying when a target comes into range is unchanged.
 
 Selecting a mixed group and pressing the button moves the whole group to one stance rather than flipping each

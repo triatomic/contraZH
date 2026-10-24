@@ -228,7 +228,7 @@ UpdateSleepTime DeployStyleAIUpdate::update()
 				break;
 		}
 	}
-	else if( isTryingToMove )
+	else if( isTryingToMove || m_state == ALIGNING_TURRETS )
 	{
 		switch( m_state )
 		{
