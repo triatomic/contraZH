@@ -128,5 +128,7 @@ protected:
 	UnsignedInt							m_frameToWaitForDeploy;
 	Bool										m_manualDeploy;		///< player asked us to hold this deployed stance
 
+	virtual UpdateSleepTime doLocomotor() override;
+
 	Bool isWithinAttackAngle() const;
 };

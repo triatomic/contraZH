@@ -342,6 +342,23 @@ UpdateSleepTime DeployStyleAIUpdate::update()
 }
 
 //-------------------------------------------------------------------------------------------------
+UpdateSleepTime DeployStyleAIUpdate::doLocomotor()
+{
+	// Attack states can create new movement goals after the deploy update has run.
+	if( m_manualDeploy && !isAiSuspendedByDisable() && !isAiInDeadState() )
+	{
+		PhysicsBehavior *physics = getObject()->getPhysics();
+		if( physics )
+		{
+			physics->scrubVelocity2D( 0 );
+		}
+		return UPDATE_SLEEP_NONE;
+	}
+
+	return AIUpdateInterface::doLocomotor();
+}
+
+//-------------------------------------------------------------------------------------------------
 /**
  * Deploy or pack up because the player said so, rather than because a target wandered into range.
  * The flag latches: update() consults it so we hold the stance instead of immediately undoing it.
