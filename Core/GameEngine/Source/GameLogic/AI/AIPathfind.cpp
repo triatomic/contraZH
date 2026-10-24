@@ -10736,6 +10736,13 @@ Bool Pathfinder::isAttackViewBlockedByObstacle(const Object* attacker, const Coo
 		return false;
 	}
 
+#if RTS_ZEROHOUR
+	if (attacker->isCurrentWeaponIgnoringLineOfSight())
+	{
+		return false;
+	}
+#endif
+
 // srj sez: this is a good start at taking terrain into account for attacks, but findAttackPath needs to be smartened also
 #define LOS_TERRAIN
 #ifdef LOS_TERRAIN

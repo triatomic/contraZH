@@ -2,6 +2,29 @@
 
 ## Object.ini
 
+### WeaponSet line of sight
+
+`IgnoreLineOfSight` lists weapon slots that bypass `ATTACK_NEEDS_LINE_OF_SIGHT`.
+The default is `NONE`. Separate multiple slots with spaces.
+
+```
+  WeaponSet
+    Conditions = WEAPON_RIDER1
+    Weapon = PRIMARY CyborgCommandoWeapon
+    Weapon = SECONDARY CyborgCommandoLongRangeWeapon
+    AutoChooseSources = PRIMARY FROM_PLAYER FROM_SCRIPT FROM_AI DEFAULT_SWITCH_WEAPON
+    AutoChooseSources = SECONDARY NONE
+    IgnoreLineOfSight = SECONDARY
+  End
+```
+
+The exception applies while a listed slot is selected in that weapon set. It lets the unit
+attack through buildings and over terrain without moving for a clear shot. Range, targeting
+rules, projectile collisions and bridge deck obstruction still apply.
+
+Use `IgnoreLineOfSight = SECONDARY TERTIARY` to exempt both slots, or `NONE` to clear the list.
+This changes the simulation when enabled; all players and replays need the same INI.
+
 ### Reverse movement sounds
 
 * `SoundReverseMoveLoop` plays while the unit moves in reverse.

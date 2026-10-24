@@ -128,6 +128,7 @@ void WeaponTemplateSet::clear()
 	m_isWeaponReloadSharedAcrossSets = FALSE;
 	m_isClipShared = false;
 	m_types.clear();
+	m_ignoreLineOfSightMask = 0;
 	for (int i = 0; i < WEAPONSLOT_COUNT; ++i)
 	{
 		m_template[i] = nullptr;
@@ -179,6 +180,7 @@ void WeaponTemplateSet::parseWeaponTemplateSet( INI* ini, const ThingTemplate* t
 		{ "Conditions", WeaponSetFlags::parseFromINI, nullptr, offsetof( WeaponTemplateSet, m_types ) },
 		{ "Weapon",	WeaponTemplateSet::parseWeapon,	nullptr, 0 },
 		{ "AutoChooseSources",	WeaponTemplateSet::parseAutoChoose, nullptr, 0 },
+		{ "IgnoreLineOfSight", INI::parseBitString32, TheWeaponSlotTypeNames, offsetof( WeaponTemplateSet, m_ignoreLineOfSightMask ) },
 		{ "PreferredAgainst", WeaponTemplateSet::parsePreferredAgainst, nullptr, 0 },
 		{ "ShareWeaponReloadTime", INI::parseBool, nullptr, offsetof( WeaponTemplateSet, m_isReloadTimeShared ) },
 		{ "WeaponLockSharedAcrossSets", INI::parseBool, nullptr, offsetof( WeaponTemplateSet, m_isWeaponLockSharedAcrossSets ) },
