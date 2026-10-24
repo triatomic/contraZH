@@ -295,6 +295,8 @@ and their bump maps stay sharp in the distance.
 Shadow mapping, specular, terrain glint, HQ sky cloud shadows, stochastic terrain, normal and glow maps, per-pixel lights, soft particles, flame
 and laser shading, per-map colour grading, planar mirrors and the other features that need the Direct3D 9 build are on [Direct3D 9 Features](dx9feat.md).
 
+HQ sky cloud shadows preserve the contrast of object shadows as clouds pass over them.
+
 ### Bloom
 
 Soft glow around additive particles (fire, muzzle flashes, tracers, lasers, explosions) and `Add`

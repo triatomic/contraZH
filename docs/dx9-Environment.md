@@ -239,9 +239,9 @@ matches the old clouds.)
 
 Notes:
 * Night keeps the clouds off, as before.
-* A cloud blocks only the sun, so clouded ground keeps its sky light and a cast shadow under a
-cloud stays as dark as it was. Unit highlights fade under clouds too. With shadow maps off, clouds
-darken everything as the old clouds did.
+* Clouded ground keeps its sky light. Clouds darken cast shadows by the same factor as the ground,
+so object shadows keep their contrast under clouds. Unit highlights fade under clouds too. With
+shadow maps off, clouds darken everything as the old clouds did.
 * `CONTRA_CLOUDSUN=0` brings back clouds that darken everything, to compare the two looks.
 * Trees and the water's reflected sky keep their old look.
 * `CONTRA_SKYCLOUDS=0` keeps the tiled texture, to rule the HQ sky out of a rendering fault.

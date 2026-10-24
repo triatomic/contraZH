@@ -85,10 +85,10 @@ float3 ShadowFactor(float4 shadowPos)
     return lerp(ShadowColor.rgb, float3(1.0f, 1.0f, 1.0f), ShadowLit(shadowPos));
 }
 
-// The shadow factor with the cloud map in it. A cloud takes only the sun's share, as a shadow does, unless ShadowParams.z is 0.
+// Clouds darken lit and shadowed pixels equally so cast shadows keep their contrast.
 float3 CloudShadowFactor(float lit, float3 cloud)
 {
-    float3 sunOnly = lerp(ShadowColor.rgb, float3(1.0f, 1.0f, 1.0f), lit * cloud);
-    float3 legacy = lerp(ShadowColor.rgb, float3(1.0f, 1.0f, 1.0f), lit) * cloud;
-    return lerp(legacy, sunOnly, ShadowParams.z);
+    float3 sunOnly = lerp(ShadowColor.rgb, float3(1.0f, 1.0f, 1.0f), cloud);
+    float3 shadow = lerp(ShadowColor.rgb, float3(1.0f, 1.0f, 1.0f), lit);
+    return shadow * lerp(cloud, sunOnly, ShadowParams.z);
 }
