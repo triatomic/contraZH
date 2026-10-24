@@ -102,12 +102,11 @@ End
 as toggled on while deployed. It works on any object with a `DeployStyleAIUpdate`; on anything else the
 button is unavailable.
 
-A deploy asked for this way latches, so the unit holds the stance instead of packing up again the moment
-nothing is in range - which is the point, since it lets a unit deploy before the enemy arrives. The latch is
-dropped when the player gives any order other than an attack, so a move order packs the unit up as usual.
-While manually deployed, the unit cannot drive or coast, even when an attack target is outside weapon range.
-Pressing deploy again also finishes packing while idle, after the turret centers.
-Automatic deploying when a target comes into range is unchanged.
+Manual deploy holds the unit stationary until another order. An in-range attack fires from the deployed
+position; an attack that requires movement packs the unit first, approaches, then deploys to fire.
+Pressing deploy again cancels the current attack, centers the turret, and packs the unit. It stays packed
+until another order or another press of the deploy button, even with enemies nearby.
+Automatic deploying when a target comes into range is unchanged outside the manual packed stance.
 
 Selecting a mixed group and pressing the button moves the whole group to one stance rather than flipping each
 unit separately, so a second press does not undo half of them.

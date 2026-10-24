@@ -57,6 +57,7 @@ DeployStyleAIUpdate::DeployStyleAIUpdate( Thing *thing, const ModuleData* module
 	m_state = READY_TO_MOVE;
 	m_frameToWaitForDeploy = 0;
 	m_manualDeploy = FALSE;
+	m_manualPack = FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -76,23 +77,21 @@ void DeployStyleAIUpdate::aiDoCommand( const AICommandParms* parms )
 	if (!isAllowedToRespondToAiCommands(parms))
 		return;
 
-	// Any fresh order other than attacking drops a manual deploy: the player has asked for something
-	// else and the latch would otherwise pin us deployed forever. Attacking is exempt because that is
-	// what a deployed artillery piece is for, and so is idle, which is what toggleManualDeploy itself
-	// issues to stop us before deploying.
-	if( m_manualDeploy )
+	if( m_manualPack && parms->m_cmdSource == CMD_FROM_AI )
 	{
 		switch( parms->m_cmd )
 		{
-			case AICMD_IDLE:
 			case AICMD_ATTACK_OBJECT:
 			case AICMD_FORCE_ATTACK_OBJECT:
 			case AICMD_ATTACK_POSITION:
-				break;
-			default:
-				m_manualDeploy = FALSE;
-				break;
+				return;
 		}
+	}
+
+	if( parms->m_cmd != AICMD_IDLE )
+	{
+		m_manualDeploy = FALSE;
+		m_manualPack = FALSE;
 	}
 
 	/*
@@ -184,12 +183,8 @@ UpdateSleepTime DeployStyleAIUpdate::update()
 		}
 	}
 
-	// The pathfinder may use a stricter range check than isInRange, so a moving unit must never deploy.
-	// A manual deploy holds the stance until the player says otherwise, so it counts as a reason to
-	// be deployed in its own right, and it suppresses the pack-up branch below. Without the second
-	// half a unit ordered to move would pack up again on the next update, which is the whole point
-	// of the latch.
-	if ((!isTryingToMove && (isInRange || isInGuardIdleState)) || m_manualDeploy)
+	// A movement path must finish packing before the unit can deploy again.
+	if( !m_manualPack && ((!isTryingToMove && (isInRange || isInGuardIdleState)) || m_manualDeploy) )
 	{
 		switch( m_state )
 		{
@@ -228,7 +223,7 @@ UpdateSleepTime DeployStyleAIUpdate::update()
 				break;
 		}
 	}
-	else if( isTryingToMove || m_state == ALIGNING_TURRETS )
+	else if( isTryingToMove || m_manualPack || m_state == ALIGNING_TURRETS )
 	{
 		switch( m_state )
 		{
@@ -263,13 +258,9 @@ UpdateSleepTime DeployStyleAIUpdate::update()
 			case ALIGNING_TURRETS:
 			{
 				WhichTurretType tur = getWhichTurretForCurWeapon();
-				if( tur != TURRET_INVALID )
+				if( tur == TURRET_INVALID || isTurretInNaturalPosition( tur ) )
 				{
-					if( isTurretInNaturalPosition( tur ) )
-					{
-						//Turrets are centers, so now we can undeploy.
-						setMyState( UNDEPLOY );
-					}
+					setMyState( UNDEPLOY );
 				}
 				break;
 			}
@@ -345,7 +336,7 @@ UpdateSleepTime DeployStyleAIUpdate::update()
 UpdateSleepTime DeployStyleAIUpdate::doLocomotor()
 {
 	// Attack states can create new movement goals after the deploy update has run.
-	if( m_manualDeploy && !isAiSuspendedByDisable() && !isAiInDeadState() )
+	if( (m_state != READY_TO_MOVE || m_manualPack) && !isAiSuspendedByDisable() && !isAiInDeadState() )
 	{
 		PhysicsBehavior *physics = getObject()->getPhysics();
 		if( physics )
@@ -367,9 +358,9 @@ void DeployStyleAIUpdate::toggleManualDeploy()
 {
 	if( isDeployedOrDeploying() )
 	{
-		// Packing up. Drop the latch and let the normal path run: it centres turrets first when the
-		// unit needs that, and reverses a half finished deploy rather than snapping.
 		m_manualDeploy = FALSE;
+		m_manualPack = TRUE;
+		aiIdle( CMD_FROM_PLAYER );
 
 		if( m_state == DEPLOY && m_frameToWaitForDeploy != 0 )
 		{
@@ -390,9 +381,8 @@ void DeployStyleAIUpdate::toggleManualDeploy()
 		return;
 	}
 
-	// Deploying. Stop first -- a unit part way through a move would otherwise be told to pack up
-	// again on the very next update, since that branch is driven by having a path.
 	m_manualDeploy = TRUE;
+	m_manualPack = FALSE;
 	aiIdle( CMD_FROM_PLAYER );
 
 	if( m_state == UNDEPLOY && m_frameToWaitForDeploy != 0 )
@@ -598,13 +588,11 @@ void DeployStyleAIUpdate::crc( Xfer *xfer )
 void DeployStyleAIUpdate::xfer( Xfer *xfer )
 {
   // version
-  // The manual deploy latch is only persisted where we are free to change the save format.
-  // In a retail compatible build it is simply not written, and a loaded unit reverts to
-  // deploying automatically, which is harmless.
+  // Manual stances only persist in saves that allow extensions.
 #if RETAIL_COMPATIBLE_XFER_SAVE
   XferVersion currentVersion = 4;
 #else
-  XferVersion currentVersion = 5;
+  XferVersion currentVersion = 6;
 #endif
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
@@ -620,6 +608,14 @@ void DeployStyleAIUpdate::xfer( Xfer *xfer )
 		if( version >= 5 )
 		{
 			xfer->xferBool(&m_manualDeploy);
+		}
+		if( version >= 6 )
+		{
+			xfer->xferBool(&m_manualPack);
+		}
+		else if( xfer->getXferMode() == XFER_LOAD )
+		{
+			m_manualPack = FALSE;
 		}
 	}
 	else if( xfer->getXferMode() == XFER_LOAD )

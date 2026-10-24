@@ -117,7 +117,7 @@ public:
 	void setMyState( DeployStateTypes StateID, Bool reverseDeploy = FALSE );
 
 	/// Deploy or pack up on the player's say so, rather than because a target came into range.
-	/// Latches until the player says otherwise, or the unit is ordered to move.
+	/// Holds the chosen stance until another order.
 	void toggleManualDeploy();
 	Bool isManuallyDeployed() const { return m_manualDeploy; }
 	Bool isDeployedOrDeploying() const { return m_state == DEPLOY || m_state == READY_TO_ATTACK; }
@@ -127,6 +127,7 @@ protected:
 	DeployStateTypes				m_state;
 	UnsignedInt							m_frameToWaitForDeploy;
 	Bool										m_manualDeploy;		///< player asked us to hold this deployed stance
+	Bool										m_manualPack;
 
 	virtual UpdateSleepTime doLocomotor() override;
 
