@@ -5574,6 +5574,17 @@ StateReturnType AIAttackFireWeaponState::onEnter()
 	}
 	Object *victim = getMachineGoalObject();
 
+#if !RETAIL_COMPATIBLE_CRC || !PRESERVE_SKIPPED_PREATTACK_DELAY
+	Weapon* weapon = obj->getCurrentWeapon();
+
+	// An early entry can skip the wind-up and then fire when reload finishes.
+	if (weapon && weapon->getPreAttackDelay(obj, victim) > 0
+		&& TheGameLogic->getFrame() + 1 < weapon->getPossibleNextShotFrame())
+	{
+		return STATE_FAILURE;
+	}
+#endif
+
 	if (victim && obj->getTeam()->getPrototype()->getTemplateInfo()->m_attackCommonTarget) {
 		if (obj->getTeam()->getTeamTargetObject()==nullptr) {
 			obj->getTeam()->setTeamTargetObject(victim);

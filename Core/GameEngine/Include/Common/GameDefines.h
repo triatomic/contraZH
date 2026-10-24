@@ -87,6 +87,10 @@
 #define PRESERVE_SNIPING_EMPTY_STINGER_SITES (0) // The fix for this unfavorable behavior was approved by the Game Design Committee.
 #endif
 
+#ifndef PRESERVE_SKIPPED_PREATTACK_DELAY
+#define PRESERVE_SKIPPED_PREATTACK_DELAY (0)
+#endif
+
 #ifndef PRESERVE_SLAVED_DRONE_CHASE
 #define PRESERVE_SLAVED_DRONE_CHASE (0) // The fix for this unfavorable behavior was approved by the Game Design Committee.
 #endif
