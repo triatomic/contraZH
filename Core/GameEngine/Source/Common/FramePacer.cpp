@@ -36,6 +36,9 @@ FramePacer::FramePacer()
 	timeBeginPeriod(1);
 
 	m_maxFPS = BaseFps;
+#if RTS_ZEROHOUR
+	m_renderFpsLimit = -1;
+#endif
 	m_logicTimeScaleFPS = LOGICFRAMES_PER_SECOND;
 	m_defaultGameSpeed = BaseFps;
 	m_updateTime = 1.0f / (Real)BaseFps; // initialized to something to avoid division by zero on first use
@@ -101,6 +104,13 @@ Int FramePacer::getFramesPerSecondLimit()  const
 	return m_maxFPS;
 }
 
+#if RTS_ZEROHOUR
+void FramePacer::setRenderFPSLimit(Int fps)
+{
+	m_renderFpsLimit = fps;
+}
+#endif
+
 void FramePacer::enableFramesPerSecondLimit( Bool enable )
 {
 	m_enableFpsLimit = enable;
@@ -125,7 +135,11 @@ Bool FramePacer::isActualFramesPerSecondLimitEnabled() const
 		allowFpsLimit &= !(!TheGameLogic->isGamePaused() && TheGlobalData->m_TiVOFastMode && TheGameLogic->isInReplayGame());
 	}
 
+#if RTS_ZEROHOUR
+	allowFpsLimit &= m_renderFpsLimit >= 0 ? m_renderFpsLimit != 0 : TheGlobalData->m_useFpsLimit;
+#else
 	allowFpsLimit &= TheGlobalData->m_useFpsLimit;
+#endif
 	allowFpsLimit &= isFramesPerSecondLimitEnabled();
 
 	return allowFpsLimit;
@@ -133,6 +147,17 @@ Bool FramePacer::isActualFramesPerSecondLimitEnabled() const
 
 Int FramePacer::getActualFramesPerSecondLimit() const
 {
+#if RTS_ZEROHOUR
+	if (isActualFramesPerSecondLimitEnabled() && m_renderFpsLimit > 0)
+	{
+		Int logicFps = LOGICFRAMES_PER_SECOND;
+		if (isLogicTimeScaleEnabled() || TheNetwork != nullptr)
+		{
+			logicFps = getActualLogicTimeScaleFps();
+		}
+		return max(m_renderFpsLimit, logicFps);
+	}
+#endif
 	return isActualFramesPerSecondLimitEnabled() ? getFramesPerSecondLimit() : RenderFpsPreset::UncappedFpsValue;
 }
 

@@ -47,6 +47,10 @@ public:
 	Bool isFramesPerSecondLimitEnabled() const; ///< Returns whether the fps limit is enabled here.
 	Bool isActualFramesPerSecondLimitEnabled() const; ///< Returns whether the fps limit is actually enabled when considering all game settings and setups.
 	Int  getActualFramesPerSecondLimit() const; // Get the actual update fps limit.
+#if RTS_ZEROHOUR
+	void setRenderFPSLimit(Int fps);
+	Int getRenderFPSLimit() const { return m_renderFpsLimit; }
+#endif
 
 	Real getUpdateTime() const; ///< Get the last update delta time in seconds.
 	Real getUpdateFps() const; ///< Get the last update fps.
@@ -78,6 +82,9 @@ protected:
 	FrameRateLimit m_frameRateLimit;
 
 	Int m_maxFPS; ///< Maximum frames per second for rendering
+#if RTS_ZEROHOUR
+	Int m_renderFpsLimit;
+#endif
 	Int m_logicTimeScaleFPS; ///< Maximum frames per second for logic time scale
 	Int m_defaultGameSpeed; ///< Speed the current offline game started at, in BaseFps units
 

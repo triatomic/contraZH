@@ -38,6 +38,7 @@
 #include "Common/GameEngine.h"
 #include "Common/OptionPreferences.h"
 #include "Common/GameLOD.h"
+#include "Common/FramePacer.h"
 #include "Common/Recorder.h"
 #include "Common/Registry.h"
 #include "Common/version.h"
@@ -203,6 +204,7 @@ static GameWindow *   comboBoxActionLines         = nullptr;
 static GameWindow *   comboBoxCastMode            = nullptr;
 static GameWindow *   comboBoxTextureFilter       = nullptr;
 static GameWindow *   comboBoxAnisotropy          = nullptr;
+static GameWindow *   comboBoxRenderFPSLimit      = nullptr;
 static GameWindow *   checkNumericalHealth        = nullptr;
 static GameWindow *   checkSmartPips              = nullptr;
 static GameWindow *   checkSelectionCircle        = nullptr;
@@ -264,6 +266,7 @@ static const char *const CastModeNames[] = { "Normal", "QuickCast", "QuickCastWi
 static const Int AnisotropyLevels[] = { 2, 4, 8, 16 };
 static const Int ShadowMapResolutions[] = { 512, 1024, 2048, 4096 };
 static const Int SuperSamplingPercents[] = { 100, 150, 200 };
+static const Int RenderFPSLimits[] = { 30, 60, 120, 240, 0 };
 static_assert( ARRAY_SIZE(HealthBarModeNames) == HealthBarDisplayMode_Count, "HealthBarModeNames out of date" );
 static const char *const AlliedDecalModeNames[] = { "Hidden", "House", "Army" };
 static_assert( ARRAY_SIZE(AlliedDecalModeNames) == AlliedDecalMode_Count, "AlliedDecalModeNames out of date" );
@@ -957,6 +960,19 @@ static void saveOptions()
 
 		if (levelChanged)
 			(*pref)["StaticGameLOD"] = TheGameLODManager->getStaticGameLODLevelName(TheGameLODManager->getStaticLODLevel());
+	}
+
+	if (comboBoxRenderFPSLimit)
+	{
+		GadgetComboBoxGetSelectedPos( comboBoxRenderFPSLimit, &index );
+		if (index >= 0 && index < ARRAY_SIZE(RenderFPSLimits))
+		{
+			const Int fps = RenderFPSLimits[index];
+			AsciiString value;
+			value.format("%d", fps);
+			(*pref)["RenderFPSLimit"] = value;
+			TheFramePacer->setRenderFPSLimit(fps);
+		}
 	}
 
 	//-------------------------------------------------------------------------------------------------
@@ -2049,6 +2065,29 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 
 	checkUnlockFpsID = TheNameKeyGenerator->nameToKey( "OptionsMenu.wnd:CheckUnlockFPS" );
 	checkUnlockFps   = TheWindowManager->winGetWindowFromId( nullptr, checkUnlockFpsID);
+	comboBoxRenderFPSLimit = findOptionsWindow( "OptionsMenu.wnd:ComboBoxRenderFPSLimit" );
+	setLabelText( "OptionsMenu.wnd:RenderFPSLimitLabel", "GUI:RenderFPSLimit" );
+	setTooltip( comboBoxRenderFPSLimit, "TOOLTIP:RenderFPSLimit" );
+	addComboEntries( comboBoxRenderFPSLimit, "GUI:RenderFPSLimit", ARRAY_SIZE(RenderFPSLimits) );
+	if (comboBoxRenderFPSLimit)
+	{
+		GadgetComboBoxSetMaxDisplay( comboBoxRenderFPSLimit, ARRAY_SIZE(RenderFPSLimits) );
+		Int fps = TheFramePacer->getRenderFPSLimit();
+		if (fps < 0)
+		{
+			fps = TheFramePacer->getActualFramesPerSecondLimit();
+		}
+		Int initialRenderFPSLimitPos = ARRAY_SIZE(RenderFPSLimits) - 1;
+		for (Int i = 0; i < ARRAY_SIZE(RenderFPSLimits); ++i)
+		{
+			if (RenderFPSLimits[i] == fps)
+			{
+				initialRenderFPSLimitPos = i;
+				break;
+			}
+		}
+		setComboPos( comboBoxRenderFPSLimit, initialRenderFPSLimitPos );
+	}
 
 	checkBuildingOcclusionID = TheNameKeyGenerator->nameToKey( "OptionsMenu.wnd:CheckBehindBuilding" );
 	checkBuildingOcclusion   = TheWindowManager->winGetWindowFromId( nullptr, checkBuildingOcclusionID);

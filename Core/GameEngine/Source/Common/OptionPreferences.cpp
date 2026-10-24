@@ -1232,6 +1232,24 @@ Bool OptionPreferences::getFPSLimitEnabled()
 	return FALSE;
 }
 
+#if RTS_ZEROHOUR
+Int OptionPreferences::getRenderFPSLimit() const
+{
+	const Int fps = getInt("RenderFPSLimit", -1);
+	switch (fps)
+	{
+		case 0:
+		case 30:
+		case 60:
+		case 120:
+		case 240:
+			return fps;
+		default:
+			return -1;
+	}
+}
+#endif
+
 Bool OptionPreferences::get3DShadowsEnabled()
 {
 	OptionPreferences::const_iterator it = find("UseShadowVolumes");

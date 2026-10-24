@@ -16,6 +16,12 @@ host's limit, or `GameData.ini`'s.)
 
 ## Display
 
+* `RenderFPSLimit` - (`30` | `60` | `120` | `240` | `0` for Unlimited. Also the FPS Limit
+combo in the main menu's Graphics section. Accept saves the selection; Back discards it.
+Without this key, the engine keeps its existing frame limit. VSync can impose a lower cap.
+The render rate cannot drop below the current simulation rate, so faster game speeds and
+60 Hz online matches can raise a selected 30 FPS limit. Replay fast-forward bypasses the cap.)
+
 * `HealthBarDisplayMode = Classic` - (`Classic` | `Damaged` | `Always`. `Damaged` shows bars only on
 hurt objects, `Always` on everything.)
 * `AlliedDecalMode = House` - (`Hidden` | `House` | `Army`. Shows allies' general power decals once

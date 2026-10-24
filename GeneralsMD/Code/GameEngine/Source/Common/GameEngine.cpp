@@ -787,6 +787,8 @@ void GameEngine::init()
 
 		setStartupStage("Frame pacing and audio settings");
 		TheFramePacer->setFramesPerSecondLimit(TheGlobalData->m_framesPerSecondLimit);
+		OptionPreferences renderPreferences;
+		TheFramePacer->setRenderFPSLimit(renderPreferences.getRenderFPSLimit());
 
 		TheAudio->setOn(TheGlobalData->m_audioOn && TheGlobalData->m_musicOn, AudioAffect_Music);
 		TheAudio->setOn(TheGlobalData->m_audioOn && TheGlobalData->m_soundsOn, AudioAffect_Sound);

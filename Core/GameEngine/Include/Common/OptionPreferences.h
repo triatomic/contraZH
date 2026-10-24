@@ -273,6 +273,9 @@ public:
 	Bool getUseHeatEffects();
 	Bool getDynamicLODEnabled();
 	Bool getFPSLimitEnabled();
+#if RTS_ZEROHOUR
+	Int getRenderFPSLimit() const;
+#endif
 	Bool getBuildingOcclusionEnabled();
 	Int getParticleCap();
 
