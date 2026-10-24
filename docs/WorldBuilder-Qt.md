@@ -22,6 +22,10 @@ WorldBuilder loads game data from its own folder, so it must sit inside a Zero H
 the exe and the Qt DLLs next to it into the game folder and run it from there. The Qt runtime ships
 with the build; no separate Qt install is needed to run it.
 
+WorldBuilder and the game use separate instance identifiers, so either can start while the
+other is running. WorldBuilder does not consume a game instance number or make the game load
+an `Options_InstanceXX.ini` file.
+
 | Exe | Renderer |
 |---|---|
 | `WorldBuilderZH_Qt.exe` | Direct3D 8 |
