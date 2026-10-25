@@ -679,6 +679,22 @@ void PhysicsBehavior::setWaterImpactFX(const FXList* waterImpactFX)
 }
 
 //-------------------------------------------------------------------------------------------------
+Real PhysicsBehavior::getGroundCollisionAngle() const
+{
+	const Object* obj = getObject();
+	if (obj->isKindOf(KINDOF_PROJECTILE) && getFlag(STICK_TO_GROUND) && !getFlag(ALLOW_TO_FALL) && !getFlag(IS_IN_FREEFALL))
+	{
+		const AIUpdateInterface* ai = obj->getAIUpdateInterface();
+		const Locomotor* loco = ai ? ai->getCurLocomotor() : nullptr;
+		if (loco)
+		{
+			return loco->getGroundCollisionAngle();
+		}
+	}
+	return 0.0f;
+}
+
+//-------------------------------------------------------------------------------------------------
 static Bool followGround(const Coord3D& oldPos, Coord3D& newPos, PathfindLayerEnum layer, Real collisionAngle)
 {
 	Real dx = newPos.x - oldPos.x;
@@ -711,6 +727,18 @@ static Bool followGround(const Coord3D& oldPos, Coord3D& newPos, PathfindLayerEn
 }
 
 //-------------------------------------------------------------------------------------------------
+Bool PhysicsBehavior::constrainGroundMovement(Coord3D& pos) const
+{
+	Real collisionAngle = getGroundCollisionAngle();
+	if (collisionAngle <= 0.0f)
+	{
+		return false;
+	}
+	const Object* obj = getObject();
+	return followGround(*obj->getPosition(), pos, obj->getLayer(), collisionAngle);
+}
+
+//-------------------------------------------------------------------------------------------------
 /**
  * Basic rigid body physics using an Euler integrator.
  * @todo Currently, only translations are integrated. Rotations should also be integrated. (MSB)
@@ -727,18 +755,8 @@ UpdateSleepTime PhysicsBehavior::update()
 	Real															activeVelZ = 0;
 	Coord3D														bounceForce;
 	Bool															gotBounceForce = false;
-	Real groundCollisionAngle = 0.0f;
 	Bool hitSteepGround = false;
-	if (obj->isKindOf(KINDOF_PROJECTILE) && getFlag(STICK_TO_GROUND) && !getFlag(ALLOW_TO_FALL) && !getFlag(IS_IN_FREEFALL))
-	{
-		const AIUpdateInterface* ai = obj->getAIUpdateInterface();
-		const Locomotor* loco = ai ? ai->getCurLocomotor() : nullptr;
-		if (loco)
-		{
-			groundCollisionAngle = loco->getGroundCollisionAngle();
-		}
-	}
-	Bool followsGround = groundCollisionAngle > 0.0f;
+	Bool followsGround = getGroundCollisionAngle() > 0.0f;
 
 	DEBUG_ASSERTCRASH(!getFlag(IS_IN_UPDATE), ("impossible"));
 	setFlag(IS_IN_UPDATE, true);
@@ -880,7 +898,7 @@ UpdateSleepTime PhysicsBehavior::update()
 			newPos.x = mtx.Get_X_Translation();
 			newPos.y = mtx.Get_Y_Translation();
 			newPos.z = mtx.Get_Z_Translation();
-			hitSteepGround = followGround(prevPos, newPos, obj->getLayer(), groundCollisionAngle);
+			hitSteepGround = constrainGroundMovement(newPos);
 			mtx.Set_X_Translation(newPos.x);
 			mtx.Set_Y_Translation(newPos.y);
 			mtx.Set_Z_Translation(newPos.z);
@@ -970,7 +988,8 @@ UpdateSleepTime PhysicsBehavior::update()
 
 	Bool isUnderWater{ false };
 	Bool airborneAtEnd{ false };
-	if (m_pui != nullptr && m_pui->projectileShouldCollideWithWater()) {
+	Bool collidesWithWater = m_pui != nullptr && m_pui->projectileShouldCollideWithWater();
+	if (collidesWithWater) {
 		// For projectiles that collide with water, we consider water as not airborne
 		airborneAtEnd = obj->isAboveTerrainOrWater();
 		isUnderWater = obj->isBelowWater();
@@ -987,7 +1006,9 @@ UpdateSleepTime PhysicsBehavior::update()
 	// the start and end of this func... we have to compare since last frame,
 	// since (if we're held by a parachute, for instance) we might have been
 	// moved by other bits of code!
-	if (hitSteepGround || (getFlag(WAS_AIRBORNE_LAST_FRAME) && !airborneAtEnd && !getFlag(IMMUNE_TO_FALLING_DAMAGE)
+	Bool hitWater = followsGround && collidesWithWater && isUnderWater
+		&& (!getFlag(UPDATE_EVER_RUN) || getFlag(WAS_ABOVE_WATER_LAST_FRAME));
+	if (hitSteepGround || hitWater || (getFlag(WAS_AIRBORNE_LAST_FRAME) && !airborneAtEnd && !getFlag(IMMUNE_TO_FALLING_DAMAGE)
 		&& (!followsGround || isUnderWater)))
 	{
 		doBounceSound(prevPos);

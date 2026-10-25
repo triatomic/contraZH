@@ -29,6 +29,8 @@ To keep the wave from homing on a moving target, use `TryToFollowTarget = No` in
 
 The mode applies only to projectiles with a current locomotor. Falling and freefall behavior
 take precedence. Object collisions and configured water collisions still apply.
+The slope check also applies during the missile's final direct move toward its target.
+Entering water triggers a configured water collision even while the projectile follows the ground.
 Omitting `GroundCollisionAngle` preserves existing movement and collision behavior.
 
 Enabling the mode changes the simulation. All players and replays need the same INI definitions

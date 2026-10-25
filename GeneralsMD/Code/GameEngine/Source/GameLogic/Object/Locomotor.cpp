@@ -1323,7 +1323,13 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 				pos.y += dy * vel;
 			}
 		}
+		Bool hitSteepGround = physics->constrainGroundMovement(pos);
 		obj->setPosition(&pos);
+		if (hitSteepGround)
+		{
+			Coord3D normal = { 0.0f, 0.0f, -1.0f };
+			obj->onCollide(nullptr, &pos, &normal);
+		}
 	}
 
 }
