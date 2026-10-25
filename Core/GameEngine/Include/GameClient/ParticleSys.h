@@ -799,8 +799,13 @@ public:
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	// The cached emitter transform includes its parent's orientation and bone offset.
-	void getDebugWorldPosition( Coord3D *pos ) const
+	Bool getDebugWorldPosition( Coord3D *pos ) const
 	{
+		if( !m_debugWorldPositionValid )
+		{
+			return FALSE;
+		}
+
 		if( m_isIdentity )
 		{
 			pos->zero();
@@ -810,6 +815,7 @@ public:
 			const Vector3 translation = m_transform.Get_Translation();
 			pos->set( translation.X, translation.Y, translation.Z );
 		}
+		return TRUE;
 	}
 
 	// TheSuperHackers @feature Name of the FXList that spawned this system, for the debug name
@@ -877,6 +883,7 @@ protected:
 	DrawableID				m_attachedToDrawableID;					///< if non-zero, system is parented to this Drawable
 	ObjectID					m_attachedToObjectID;						///< if non-zero, system is parented to this Object
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	Bool m_debugWorldPositionValid;
 	AsciiString				m_fxListName;										///< FXList that spawned this system, debug overlay only
 #endif
 

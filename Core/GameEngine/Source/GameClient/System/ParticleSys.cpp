@@ -1270,6 +1270,10 @@ ParticleSystem::ParticleSystem( const ParticleSystemTemplate *sysTemplate,
 	m_transform.Make_Identity();
 	m_skipParentXfrm = false;
 
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	m_debugWorldPositionValid = FALSE;
+#endif
+
 	m_isStopped = false;
 	m_isDestroyed = false;
 	m_isSaveable = true;
@@ -2470,6 +2474,10 @@ void ParticleSystem::updateTransform()
 		m_lastPos = m_pos;
 		m_pos = *controlPos;
 	}
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	m_debugWorldPositionValid = TRUE;
+#endif
 }
 
 // ------------------------------------------------------------------------------------------------

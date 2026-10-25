@@ -3534,7 +3534,10 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 			if( alreadyListed )
 				continue;
 
-			sys->getDebugWorldPosition( &positions[ nameCount ] );
+			if( !sys->getDebugWorldPosition( &positions[ nameCount ] ) )
+			{
+				continue;
+			}
 			fxNames[ nameCount ] = fxName;
 			names[ nameCount++ ] = sysName;
 

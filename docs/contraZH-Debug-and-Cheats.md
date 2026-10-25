@@ -60,6 +60,7 @@ system has gone. 0 or absent shows names only while the system is alive.)
 Notes:
 * Without a linger, one-shot effects flash past unreadably. Lingering callouts point to the
 last recorded emitter position.
+* Delayed systems get callouts after their first world-transform update.
 * The particle overlay is expensive; leave it off when not in use.
 
 ## Window name overlay
