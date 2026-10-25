@@ -281,7 +281,7 @@ TransferFileProblem CheckTransferFile(const AsciiString& path)
 
 UnicodeString GetTransferFileProblemText(TransferFileProblem problem, const AsciiString& path)
 {
-	const AsciiString name = GetFileFromPath(path);
+	const AsciiString name = getFileName(path.str());
 
 	switch (problem)
 	{

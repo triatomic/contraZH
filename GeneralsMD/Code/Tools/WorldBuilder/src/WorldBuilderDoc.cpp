@@ -4131,7 +4131,7 @@ BOOL CWorldBuilderDoc::OnOpenDocument(LPCTSTR lpszPathName)
 	TheGameText->reset();
 	TheWriteableMapData->reset();
 	AsciiString s = lpszPathName;
-	const char* lastSep = s.reverseFind('\\');
+	const char* lastSep = getLastPathSeparator(s.str());
 	if (lastSep != nullptr)
 	{
 		s.truncateTo(lastSep - s.str() + 1);
@@ -4190,7 +4190,7 @@ BOOL CWorldBuilderDoc::OnOpenDocument(LPCTSTR lpszPathName)
 
 	WbApp()->setCurrentDirectory(AsciiString(buf));
 	::GetModuleFileName(nullptr, buf, sizeof(buf));
-	if (char *pEnd = strrchr(buf, '\\')) {
+	if (char *pEnd = getLastPathSeparator(buf)) {
 		*pEnd = 0;
 	}
 	::SetCurrentDirectory(buf);
@@ -4955,7 +4955,7 @@ void CWorldBuilderDoc::OnDumpDocToText()
 	try {
 		char curbuf[_MAX_PATH];
 		GetModuleFileName(nullptr, curbuf, sizeof(curbuf));
-		if (char *pEnd = strrchr(curbuf, '\\'))
+		if (char *pEnd = getLastPathSeparator(curbuf))
 		{
 			*(pEnd + 1) = 0;
 		}

@@ -547,9 +547,9 @@ CW3DViewDoc::LoadAssetsFromFile (LPCTSTR lpszPathName)
 	// HACK HACK -- Force the current directory to be the directory
 	//              the file is located in.
 	//
-	if (::strrchr (lpszPathName, '\\')) {
+	if (getLastPathSeparator (lpszPathName)) {
 		CString stringTemp = lpszPathName;
-		stringTemp = stringTemp.Left ((int)(::strrchr (lpszPathName, '\\') - lpszPathName));
+		stringTemp = stringTemp.Left ((int)(getLastPathSeparator (lpszPathName) - lpszPathName));
 		::SetCurrentDirectory (stringTemp);
 		// TheSuperHackers @performance Tria 18/04/2026 Only rebuild search paths when the directory
 		// changes, avoids clearing the path cache on every file during batch loading.
@@ -1560,13 +1560,13 @@ CW3DViewDoc::SaveSettings
         CString stringCompleteFilename = pszFilename;
 
         // Does this filename contain a path?
-        if (::strrchr (pszFilename, '\\') == nullptr)
+        if (getLastPathSeparator (pszFilename) == nullptr)
         {
             // Add the current directories path to the filename
             TCHAR szPath[MAX_PATH] = { 0 };
             ::GetCurrentDirectory (sizeof (szPath), szPath);
 
-            if (szPath[::lstrlen (szPath)-1] != '\\')
+            if (!isPathSeparator (szPath[::lstrlen (szPath)-1]))
             {
                 // Ensure the path is directory delimited
                 strlcat(szPath, "\\", ARRAY_SIZE(szPath));

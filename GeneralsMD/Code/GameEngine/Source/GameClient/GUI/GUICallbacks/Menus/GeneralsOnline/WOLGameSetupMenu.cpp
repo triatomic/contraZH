@@ -1381,17 +1381,12 @@ void WOLDisplayGameOptions()
 	}
 	else
 	{
-#if defined(GENERALS_ONLINE)
-		AsciiString s = theGame->getMap();
-#else
-		AsciiString s = TheGameSpyInfo->getCurrentStagingRoom()->getMap();
-#endif
-		if (s.reverseFind('\\'))
-		{
-			s = s.reverseFind('\\') + 1;
-		}
 		UnicodeString mapDisplay;
-		mapDisplay.translate(s);
+#if defined(GENERALS_ONLINE)
+		mapDisplay.translate(getFileName(theGame->getMap().str()));
+#else
+		mapDisplay.translate(getFileName(TheGameSpyInfo->getCurrentStagingRoom()->getMap().str()));
+#endif
 		GadgetStaticTextSetText(textEntryMapDisplay, mapDisplay);
 	}
 	WOLPositionStartSpots();
