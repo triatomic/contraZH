@@ -645,6 +645,9 @@ public:
 	Real getElectricParticleScale() const;
 	/// DisruptionShader and its settings, for sprites that bend the scene behind them.
 	const DisruptionShaderInfo &getDisruption() const { return m_disruption; }
+#if RTS_ZEROHOUR
+	Bool shouldBloom() const { return m_bloom; }
+#endif
 
 protected:
 	friend class ParticleSystemManager;					///< @todo remove this friendship
@@ -668,6 +671,9 @@ protected:
 	Real											m_cryoParticleScale;						///< negative takes GameData.ini's
 	Real											m_electricParticleScale;				///< negative takes GameData.ini's
 	DisruptionShaderInfo			m_disruption;
+#if RTS_ZEROHOUR
+	Bool m_bloom;
+#endif
 
 	// template attribute data inherited from ParticleSystemInfo class
 };

@@ -303,7 +303,7 @@ Bool W3DBloom::begin(RenderInfoClass &rinfo, Bool anythingToDraw)
 
 void W3DBloom::end(RenderInfoClass &rinfo)
 {
-	// additive meshes join the particles in the bloom target
+	// Replay the captured additive and emissive object meshes into the bloom target.
 	TheDX8MeshRenderer.Flush_Bloom();
 
 #if defined(BUILD_WITH_D3D9)

@@ -306,9 +306,9 @@ HQ sky cloud shadows preserve the contrast of object shadows as clouds pass over
 
 ### Bloom
 
-Soft glow around additive particles (fire, muzzle flashes, tracers, lasers, explosions) and `Add`
-blended meshes such as building lights. Smoke and alpha blended effects do not glow. Needs no shader
-support.
+Soft glow around `Add` blended object meshes, such as building lights, and object textures with
+`_emi` glow masks. Additive particles also feed bloom unless their particle system sets `Bloom = No`.
+Ordinary opaque surfaces, smoke and alpha blended effects do not feed bloom. Needs no shader support.
 
 * `Bloom = No` - (Yes turns the glow on. Also `Bloom` on the Graphics page,
 applied on Accept.)
@@ -322,10 +322,11 @@ Menu controls need `CheckBloom`, `TextEntryBloomStrength` and `CheckBloomDebug` 
 puts the strength box beside the checkbox.
 
 Notes:
-* Costs fill rate in proportion to on-screen additive particles.
+* Replays the glowing object meshes, then blurs the glow at half resolution and adds it to the scene.
 * Off while `AntiAliasing` is above 1 on the Direct3D 8 build. The Direct3D 9 build glows with MSAA
 on too, and blurs through a pixel shader where the card has one.
-* Particles hidden behind terrain or buildings do not glow.
+* Particle systems can opt out with [`Bloom = No`](contraZH-ParticleSystems.md#bloom).
+Their normal drawing and any glow painted into their textures stay unchanged.
 * Additive meshes on skinned models (infantry and other bone-deformed meshes) do not glow.
 * Retail night models keep their lights in the opaque pass and add the lit skin on top. The game
 swaps the two passes at load, so the lights glow and the walls do not.

@@ -175,6 +175,15 @@ void DoParticles( RenderInfoClass &rinfo )
 		TheParticleSystemManager->doParticles(rinfo);
 }
 
+static Bool shouldBloomParticle(ParticleSystem *system)
+{
+	Bool enabled = !system->isUsingSmudge() && system->getShaderType() == ParticleSystemInfo::ADDITIVE;
+#if RTS_ZEROHOUR
+	enabled = enabled && system->getTemplate()->shouldBloom();
+#endif
+	return enabled;
+}
+
 void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 {
 
@@ -281,7 +290,7 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 		if (particleCount == 0)
 			continue;
 
-		if (!sys->isUsingSmudge() && sys->getShaderType() == ParticleSystemInfo::ADDITIVE)
+		if (shouldBloomParticle(sys))
 		{
 			hasAdditive = TRUE;
 		}
@@ -370,21 +379,24 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	/// @todo lorenzen sez: this should be debug only:
 	TheParticleSystemManager->setOnScreenParticleCount(m_onScreenParticleCount);
 
-	// the glow comes from a second draw of the additive systems into the bloom target
+	// Only eligible particle systems join the captured object meshes in the bloom target.
 	if (TheW3DBloom && TheW3DBloom->begin(rinfo, hasAdditive || TheDX8MeshRenderer.Has_Bloom_Tasks()))
 	{
-		const Int onScreenCount = m_onScreenParticleCount;
-		const UnsignedInt fieldCount = m_fieldParticleCount;
+		if (hasAdditive)
+		{
+			const Int onScreenCount = m_onScreenParticleCount;
+			const UnsignedInt fieldCount = m_fieldParticleCount;
 
-		// the sorter would hold the quads until after the target is gone
-		m_pointGroup->Set_Flag(PointGroupClass::DISABLE_SORTING, true);
-		m_streakLine->Set_Disable_Sorting(true);
-		drawSystems(rinfo, DRAW_BLOOM);
-		m_streakLine->Set_Disable_Sorting(false);
-		m_pointGroup->Set_Flag(PointGroupClass::DISABLE_SORTING, false);
+			// the sorter would hold the quads until after the target is gone
+			m_pointGroup->Set_Flag(PointGroupClass::DISABLE_SORTING, true);
+			m_streakLine->Set_Disable_Sorting(true);
+			drawSystems(rinfo, DRAW_BLOOM);
+			m_streakLine->Set_Disable_Sorting(false);
+			m_pointGroup->Set_Flag(PointGroupClass::DISABLE_SORTING, false);
 
-		m_onScreenParticleCount = onScreenCount;
-		m_fieldParticleCount = fieldCount;
+			m_onScreenParticleCount = onScreenCount;
+			m_fieldParticleCount = fieldCount;
+		}
 		TheW3DBloom->end(rinfo);
 	}
 
@@ -466,7 +478,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 	{
 		ParticleSystem *sys = entry->sys;
 
-		if (pass == DRAW_BLOOM && (sys->isUsingSmudge() || sys->getShaderType() != ParticleSystemInfo::ADDITIVE))
+		if (pass == DRAW_BLOOM && !shouldBloomParticle(sys))
 		{
 			continue;
 		}

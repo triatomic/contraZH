@@ -1,5 +1,24 @@
 # ParticleSystem.ini
 
+## Bloom
+
+`Bloom = Yes` is the default. Set `Bloom = No` on a particle system to exclude its particles
+from the bloom pass while keeping their normal appearance.
+
+```ini
+ParticleSystem MyBeamEffect
+  Shader = ADDITIVE
+  Bloom = No
+  ; Other particle settings go here.
+End
+```
+
+The global `Bloom` setting must be enabled for particles or objects to glow. Only additive
+particles feed bloom; alpha-blended effects and smudges do not. The flag applies to sprites,
+streaks and other additive particle types supported by the existing bloom renderer.
+`ParticleSystemExtend` inherits the parent's flag and can override it with `Bloom = Yes` or `No`.
+FX lists that spawn the particle system use its flag; there is no separate FXList key.
+
 ## D3D9 billboard rendering
 
 * D3D9 builds camera-facing particle quads on the GPU when shader model 3 hardware is available.
