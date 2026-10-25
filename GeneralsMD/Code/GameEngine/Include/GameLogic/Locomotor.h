@@ -210,6 +210,7 @@ private:
 	Bool											m_apply2DFrictionWhenAirborne;	// apply "2d friction" even when airborne... useful for realistic-looking movement
 	Bool											m_downhillOnly;	// pinewood derby, moves only by gravity pulling downhill
 	Bool											m_stickToGround;				// if true, can't leave ground
+	Real											m_groundCollisionAngle;
 	Bool											m_canMoveBackward;				// if true, can move backwards.
 	Bool											m_requiresMoveToTurn;			///< if true, can't pivot in place (aim/face drive forward and turn via the normal mover)
 	Real											m_backwardsMoveAngleThreshold;			///< goal must be at least this far off our heading (radians) before we reverse
@@ -301,6 +302,7 @@ public:
 	Bool getLocomotorWorksWhenDead() const { return m_template->m_locomotorWorksWhenDead; }
 	Bool getLocomotorWorksWhenDisabled() const { return m_template->m_locomotorWorksWhenDisabled; }
 	Bool getStickToGround() const { return m_template->m_stickToGround; }
+	Real getGroundCollisionAngle() const { return m_template->m_groundCollisionAngle; }
 	Real getCloseEnoughDist() const { return m_closeEnoughDist; }
 	Bool isCloseEnoughDist3D() const { return getFlag(IS_CLOSE_ENOUGH_DIST_3D); }
 	Bool hasSuspension() const {return m_template->m_hasSuspension;}

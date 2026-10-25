@@ -333,6 +333,7 @@ LocomotorTemplate::LocomotorTemplate()
 	m_locomotorWorksWhenDisabled = false;
 	m_airborneTargetingHeight = INT_MAX;
 	m_stickToGround = false;
+	m_groundCollisionAngle = 0.0f;
 	m_canMoveBackward = false;
 	m_requiresMoveToTurn = false;
 	// defaults match the values the backwards-movement logic used before these were configurable
@@ -368,6 +369,12 @@ LocomotorTemplate::~LocomotorTemplate()
 //-------------------------------------------------------------------------------------------------
 void LocomotorTemplate::validate()
 {
+	if (!(m_groundCollisionAngle >= 0.0f && m_groundCollisionAngle < PI/2))
+	{
+		DEBUG_CRASH(("GroundCollisionAngle must be at least 0 and less than 90 degrees"));
+		throw INI_INVALID_DATA;
+	}
+
 	// this is ok; parachutes need it!
 	//DEBUG_ASSERTCRASH(m_lift == 0.0f || m_lift > fabs(TheGlobalData->m_gravity), ("Lift is too low to counteract gravity!"));
 	//DEBUG_ASSERTCRASH(m_liftDamaged == 0.0f || m_liftDamaged > fabs(TheGlobalData->m_gravity), ("LiftDamaged is too low to counteract gravity!"));
@@ -504,6 +511,7 @@ const FieldParse* LocomotorTemplate::getFieldParse() const
 		{ "LocomotorWorksWhenDisabled", INI::parseBool, nullptr, offsetof(LocomotorTemplate, m_locomotorWorksWhenDisabled) },
 		{ "AirborneTargetingHeight", INI::parseInt, nullptr, offsetof( LocomotorTemplate, m_airborneTargetingHeight ) },
 		{ "StickToGround",				INI::parseBool,			nullptr,	offsetof(LocomotorTemplate, m_stickToGround) },
+		{ "GroundCollisionAngle",			INI::parseAngleReal,	nullptr,	offsetof(LocomotorTemplate, m_groundCollisionAngle) },
 		{ "CanMoveBackwards",				INI::parseBool,			nullptr,	offsetof(LocomotorTemplate, m_canMoveBackward) },
 		{ "RequiresMoveToTurn",				INI::parseBool,			nullptr,	offsetof(LocomotorTemplate, m_requiresMoveToTurn) },
 		{ "BackwardsMoveAngleThreshold",				INI::parseAngleReal,	nullptr,	offsetof(LocomotorTemplate, m_backwardsMoveAngleThreshold) },

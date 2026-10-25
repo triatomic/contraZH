@@ -388,7 +388,8 @@ Bool MissileAIUpdate::projectileHandleCollision( Object *other )
 		delta.x = pos.x-goal.x;
 		delta.y = pos.y-goal.y;
 		delta.z = pos.z-goal.z;
-		if (delta.z > PATHFIND_CELL_SIZE_F) {
+		const Locomotor* loco = getCurLocomotor();
+		if (delta.z > PATHFIND_CELL_SIZE_F && (!loco || !loco->getStickToGround() || loco->getGroundCollisionAngle() <= 0.0f)) {
 			// we're above our target goal.
 			if (delta.length() > 3*PATHFIND_CELL_SIZE_F) {
 				// we're somewhere else.

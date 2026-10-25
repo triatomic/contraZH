@@ -37,6 +37,7 @@
 #include "Common/Xfer.h"
 #include "GameClient/FXList.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
@@ -678,6 +679,38 @@ void PhysicsBehavior::setWaterImpactFX(const FXList* waterImpactFX)
 }
 
 //-------------------------------------------------------------------------------------------------
+static Bool followGround(const Coord3D& oldPos, Coord3D& newPos, PathfindLayerEnum layer, Real collisionAngle)
+{
+	Real dx = newPos.x - oldPos.x;
+	Real dy = newPos.y - oldPos.y;
+	Real distance = WWMath::Sqrtf(sqr(dx) + sqr(dy));
+
+	// Sample at most one world unit apart so fast projectiles still hit cliff faces.
+	Int steps = (Int)distance + 1;
+	Real slopeSin = Sin(collisionAngle);
+	Real riseScale = Cos(collisionAngle);
+	Coord3D lastPos = oldPos;
+	lastPos.z = TheTerrainLogic->getLayerHeight(lastPos.x, lastPos.y, layer);
+	for (Int i = 1; i <= steps; ++i)
+	{
+		Real fraction = (Real)i / steps;
+		Coord3D pos;
+		pos.x = oldPos.x + dx * fraction;
+		pos.y = oldPos.y + dy * fraction;
+		pos.z = TheTerrainLogic->getLayerHeight(pos.x, pos.y, layer);
+		Real run = WWMath::Sqrtf(sqr(pos.x - lastPos.x) + sqr(pos.y - lastPos.y));
+		if ((pos.z - lastPos.z) * riseScale > run * slopeSin + 0.0001f)
+		{
+			newPos = lastPos;
+			return true;
+		}
+		lastPos = pos;
+	}
+	newPos = lastPos;
+	return false;
+}
+
+//-------------------------------------------------------------------------------------------------
 /**
  * Basic rigid body physics using an Euler integrator.
  * @todo Currently, only translations are integrated. Rotations should also be integrated. (MSB)
@@ -694,6 +727,18 @@ UpdateSleepTime PhysicsBehavior::update()
 	Real															activeVelZ = 0;
 	Coord3D														bounceForce;
 	Bool															gotBounceForce = false;
+	Real groundCollisionAngle = 0.0f;
+	Bool hitSteepGround = false;
+	if (obj->isKindOf(KINDOF_PROJECTILE) && getFlag(STICK_TO_GROUND) && !getFlag(ALLOW_TO_FALL) && !getFlag(IS_IN_FREEFALL))
+	{
+		const AIUpdateInterface* ai = obj->getAIUpdateInterface();
+		const Locomotor* loco = ai ? ai->getCurLocomotor() : nullptr;
+		if (loco)
+		{
+			groundCollisionAngle = loco->getGroundCollisionAngle();
+		}
+	}
+	Bool followsGround = groundCollisionAngle > 0.0f;
 
 	DEBUG_ASSERTCRASH(!getFlag(IS_IN_UPDATE), ("impossible"));
 	setFlag(IS_IN_UPDATE, true);
@@ -829,12 +874,27 @@ UpdateSleepTime PhysicsBehavior::update()
 		}
 
 		// do not allow object to pass through the ground
+		if (followsGround)
+		{
+			Coord3D newPos;
+			newPos.x = mtx.Get_X_Translation();
+			newPos.y = mtx.Get_Y_Translation();
+			newPos.z = mtx.Get_Z_Translation();
+			hitSteepGround = followGround(prevPos, newPos, obj->getLayer(), groundCollisionAngle);
+			mtx.Set_X_Translation(newPos.x);
+			mtx.Set_Y_Translation(newPos.y);
+			mtx.Set_Z_Translation(newPos.z);
+			m_vel.z = 0.0f;
+		}
 		Real groundZ = TheTerrainLogic->getLayerHeight(mtx.Get_X_Translation(), mtx.Get_Y_Translation(), obj->getLayer());
 		if( obj->getStatusBits().test( OBJECT_STATUS_DECK_HEIGHT_OFFSET ) )
 		{
 			groundZ += obj->getCarrierDeckHeight();
 		}
-		gotBounceForce = handleBounce(oldPosZ, mtx.Get_Z_Translation(), groundZ, &bounceForce);
+		if (!followsGround)
+		{
+			gotBounceForce = handleBounce(oldPosZ, mtx.Get_Z_Translation(), groundZ, &bounceForce);
+		}
 
 		// remember our z-vel prior to doing ground-slam adjustment
 		activeVelZ = m_vel.z;
@@ -927,7 +987,8 @@ UpdateSleepTime PhysicsBehavior::update()
 	// the start and end of this func... we have to compare since last frame,
 	// since (if we're held by a parachute, for instance) we might have been
 	// moved by other bits of code!
-	if (getFlag(WAS_AIRBORNE_LAST_FRAME) && !airborneAtEnd && !getFlag(IMMUNE_TO_FALLING_DAMAGE))
+	if (hitSteepGround || (getFlag(WAS_AIRBORNE_LAST_FRAME) && !airborneAtEnd && !getFlag(IMMUNE_TO_FALLING_DAMAGE)
+		&& (!followsGround || isUnderWater)))
 	{
 		doBounceSound(prevPos);
 

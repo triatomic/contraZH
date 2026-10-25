@@ -1,5 +1,8 @@
 # Locomotor.ini
 
+For terrain-following sonic waves and other projectiles, see
+[Ground-following projectiles](contraZH-Locomotors.md#ground-following-projectiles).
+
 ## Reverse (Backwards) Movement
 
 Locomotors that can rotate in place (e.g. `TREADS`, `HOVER`) can now reverse towards a goal that is behind them instead of always turning around first. The behavior is now configurable per locomotor.
