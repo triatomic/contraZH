@@ -141,6 +141,7 @@ class DrawableParticleNameInfo : public MemoryPoolObject
 public:
 	AsciiString						m_name[MAX_REMEMBERED_PARTICLE_NAMES];
 	AsciiString						m_fxName[MAX_REMEMBERED_PARTICLE_NAMES];
+	Coord3D							m_position[MAX_REMEMBERED_PARTICLE_NAMES];
 	UnsignedInt						m_lastSeenFrame[MAX_REMEMBERED_PARTICLE_NAMES];
 	Int										m_count;
 
@@ -863,10 +864,11 @@ private:
 	// Laser name and beam block overlays (Ctrl+, and Ctrl+.). Returns TRUE for a laser while either is on.
 	Bool drawDebugLaserOverlay();
 	// Fold this frame's findings into the remembered list, refreshing anything already there.
-	void rememberParticleNames( const AsciiString *names, const AsciiString *fxNames, Int count,
+	void rememberParticleNames( const AsciiString *names, const AsciiString *fxNames,
+														const Coord3D *positions, Int count,
 																UnsignedInt nowFrame );
 	// Read back everything still inside the linger window, newest first. Returns how many.
-	Int collectRememberedParticleNames( AsciiString *names, AsciiString *fxNames,
+	Int collectRememberedParticleNames( AsciiString *names, AsciiString *fxNames, Coord3D *positions,
 																				UnsignedInt nowFrame, UnsignedInt lingerFrames ) const;
 #endif
 	void drawContained( const IRegion2D *healthBarRegion );					///< draw icons

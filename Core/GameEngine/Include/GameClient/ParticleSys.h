@@ -798,6 +798,20 @@ public:
 	ObjectID getAttachedObject() { return m_attachedToObjectID; }
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// The cached emitter transform includes its parent's orientation and bone offset.
+	void getDebugWorldPosition( Coord3D *pos ) const
+	{
+		if( m_isIdentity )
+		{
+			pos->zero();
+		}
+		else
+		{
+			const Vector3 translation = m_transform.Get_Translation();
+			pos->set( translation.X, translation.Y, translation.Z );
+		}
+	}
+
 	// TheSuperHackers @feature Name of the FXList that spawned this system, for the debug name
 	// overlay. An FXList is a group of particle systems, and nothing in a created system otherwise
 	// records which list it came from -- the name exists only as the key in FXListStore's map --

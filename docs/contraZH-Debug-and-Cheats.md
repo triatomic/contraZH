@@ -27,7 +27,7 @@ Names drawn above every object on screen, props and wreckage included.
 * `Ctrl + [` - (Cycles three ways: off, the object's template (INI) name in white, then the
 model's subobject names in green as well.)
 * `Ctrl + ]` - (Particle systems running on that object, in blue, with the FXList that
-spawned them in amber)
+spawned them in amber. Each label has a line to the system's emitter position.)
 * `Ctrl + '` - (The `CommandSet` the object uses, in yellow)
 * `Ctrl + ;` - (The weapons the object is armed with, in red, under the command set)
 * `Ctrl + -` - (The `Armor` the object currently uses, in light blue, under the weapons)
@@ -58,7 +58,8 @@ Also bindable in `CommandMap.ini` as `CHEAT_SHOW_OBJECT_NAME`, `CHEAT_SHOW_PARTI
 system has gone. 0 or absent shows names only while the system is alive.)
 
 Notes:
-* Without a linger, one-shot effects flash past unreadably.
+* Without a linger, one-shot effects flash past unreadably. Lingering callouts point to the
+last recorded emitter position.
 * The particle overlay is expensive; leave it off when not in use.
 
 ## Window name overlay

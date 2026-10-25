@@ -3063,7 +3063,7 @@ static const Int MODEL_LABEL_SIDE_SLOP = 8;
 // Most models labelled on one object.
 static const Int MAX_OVERLAY_MODEL_LABELS = 16;
 
-// Model labels placed this render frame, so labels that would overlap push above each other.
+// Model and particle callouts share slots so their labels do not overlap.
 static const Int MAX_MODEL_OVERLAY_SLOTS = 256;
 static IRegion2D s_modelOverlaySlots[ MAX_MODEL_OVERLAY_SLOTS ];
 static Int s_modelOverlaySlotCount = 0;
@@ -3093,6 +3093,83 @@ static DisplayString *getOverlayString()
 		s_nameString = newSmallDisplayString();
 	}
 	return s_nameString;
+}
+
+//-------------------------------------------------------------------------------------------------
+static void drawOverlayCallout( const AsciiString &name, const AsciiString &fxName,
+		const ICoord2D &point, Bool toLeft, Color color, Color fxColor, Color dropColor )
+{
+	const UnsignedInt renderFrame = WW3D::Get_Frame_Count();
+	if( renderFrame != s_modelOverlayFrame )
+	{
+		s_modelOverlayFrame = renderFrame;
+		s_modelOverlaySlotCount = 0;
+	}
+
+	UnicodeString line;
+	line.format( L"%hs", name.str() );
+	s_nameString->setText( line );
+
+	Int width, height;
+	s_nameString->getSize( &width, &height );
+	Int fxHeight = 0;
+	UnicodeString fxLine;
+	if( !fxName.isEmpty() )
+	{
+		fxLine.format( L"%hs", fxName.str() );
+		s_nameString->setText( fxLine );
+		Int fxWidth;
+		s_nameString->getSize( &fxWidth, &fxHeight );
+		width = max( width, fxWidth );
+		height += fxHeight;
+	}
+
+	const Int leaderEndX = toLeft ? ( point.x - MODEL_LABEL_REACH_X ) : ( point.x + MODEL_LABEL_REACH_X );
+
+	IRegion2D rect;
+	rect.lo.x = toLeft ? ( leaderEndX - MODEL_LABEL_GAP - width ) : ( leaderEndX + MODEL_LABEL_GAP );
+	rect.hi.x = rect.lo.x + width;
+	rect.lo.y = point.y - MODEL_LABEL_REACH_Y - ( height / 2 );
+	rect.hi.y = rect.lo.y + height;
+
+	// Each push clears one placed label for good, so a pass per slot settles it.
+	for( Int pass = 0; pass <= s_modelOverlaySlotCount; ++pass )
+	{
+		Bool moved = FALSE;
+		for( Int i = 0; i < s_modelOverlaySlotCount; ++i )
+		{
+			const IRegion2D &slot = s_modelOverlaySlots[i];
+			if( rect.lo.x >= slot.hi.x || rect.hi.x <= slot.lo.x ||
+					rect.lo.y >= slot.hi.y || rect.hi.y <= slot.lo.y )
+			{
+				continue;
+			}
+
+			const Int shift = rect.hi.y - slot.lo.y;
+			rect.lo.y -= shift;
+			rect.hi.y -= shift;
+			moved = TRUE;
+		}
+
+		if( !moved )
+		{
+			break;
+		}
+	}
+
+	if( s_modelOverlaySlotCount < MAX_MODEL_OVERLAY_SLOTS )
+	{
+		s_modelOverlaySlots[ s_modelOverlaySlotCount++ ] = rect;
+	}
+
+	// The leader ends level with the middle of the text, wherever the push left it.
+	TheDisplay->drawLine( point.x, point.y, leaderEndX, ( rect.lo.y + rect.hi.y ) / 2, 1.0f, color );
+	if( fxHeight > 0 )
+	{
+		s_nameString->draw( rect.lo.x, rect.lo.y, fxColor, dropColor );
+	}
+	s_nameString->setText( line );
+	s_nameString->draw( rect.lo.x, rect.lo.y + fxHeight, color, dropColor );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3160,7 +3237,7 @@ static void drawOverlayLinePair( DisplayString *str, const UnicodeString &leftTe
 // keeps its slot. When the list is full the oldest entry is replaced, since the point of the
 // linger is to catch what just happened.
 //-------------------------------------------------------------------------------------------------
-void Drawable::rememberParticleNames( const AsciiString *names, const AsciiString *fxNames,
+void Drawable::rememberParticleNames( const AsciiString *names, const AsciiString *fxNames, const Coord3D *positions,
 																	Int count, UnsignedInt nowFrame )
 {
 	if( count <= 0 && m_particleNameInfo == nullptr )
@@ -3180,6 +3257,7 @@ void Drawable::rememberParticleNames( const AsciiString *names, const AsciiStrin
 			if( info->m_name[n] == names[i] && info->m_fxName[n] == fxNames[i] )
 			{
 				info->m_lastSeenFrame[n] = nowFrame;
+				info->m_position[n] = positions[i];
 				found = TRUE;
 				break;
 			}
@@ -3206,6 +3284,7 @@ void Drawable::rememberParticleNames( const AsciiString *names, const AsciiStrin
 
 		info->m_name[slot] = names[i];
 		info->m_fxName[slot] = fxNames[i];
+		info->m_position[slot] = positions[i];
 		info->m_lastSeenFrame[slot] = nowFrame;
 	}
 }
@@ -3217,7 +3296,7 @@ void Drawable::rememberParticleNames( const AsciiString *names, const AsciiStrin
 // draws bottom up, so the newest name lands at the top of the stack either way.
 // Returns how many were written into the caller's arrays.
 //-------------------------------------------------------------------------------------------------
-Int Drawable::collectRememberedParticleNames( AsciiString *names, AsciiString *fxNames,
+Int Drawable::collectRememberedParticleNames( AsciiString *names, AsciiString *fxNames, Coord3D *positions,
 																							UnsignedInt nowFrame, UnsignedInt lingerFrames ) const
 {
 	if( m_particleNameInfo == nullptr )
@@ -3270,6 +3349,7 @@ Int Drawable::collectRememberedParticleNames( AsciiString *names, AsciiString *f
 		const Int src = selected[ written - 1 - w ];
 		names[w] = info->m_name[src];
 		fxNames[w] = info->m_fxName[src];
+		positions[w] = info->m_position[src];
 	}
 
 	return written;
@@ -3279,7 +3359,7 @@ Int Drawable::collectRememberedParticleNames( AsciiString *names, AsciiString *f
 
 //-------------------------------------------------------------------------------------------------
 // TheSuperHackers @feature Draw the object template name and/or the names of the particle systems
-// running on this drawable, stacked above the health bar. Toggled by the Ctrl+[ and Ctrl+] cheats.
+// running on this drawable. Toggled by the Ctrl+[ and Ctrl+] cheats.
 //
 // Called from drawIconUI before the dead and KINDOF_IGNORED_IN_GUI bails, so this covers every
 // drawable on screen -- selected or not, props and wreckage included -- which is the whole point
@@ -3356,13 +3436,11 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 	const Color armorSetColor = GameMakeColor( 130, 200, 255, 255 );
 	const Color modelNameColor = GameMakeColor( 90, 225, 195, 255 );
 
-	// Lines stack upward from just above the bar, so adding particle names never pushes the object
-	// name off its anchor.
+	// Object labels stack upward from just above the health bar.
 	Int lineY = anchor.y - 2;
 
-	// Particle names sit above the object name, so they are gathered and drawn first from the
-	// bottom up. Reverse order here means the list still reads top to bottom on screen.
-	if( wantParticleNames && TheParticleSystemManager != nullptr )
+	// Particle callouts point to emitter positions and retain the last position while lingering.
+	if( wantParticleNames && TheParticleSystemManager != nullptr && TheTacticalView != nullptr )
 	{
 		const DrawableID myDrawableID = getID();
 		const ObjectID myObjectID = obj->getID();
@@ -3378,6 +3456,7 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 		// The FXList each system came from, empty when it was created directly rather than through
 		// one. Kept parallel to names so the pair can be drawn together.
 		AsciiString fxNames[ MAX_OVERLAY_PARTICLE_LINES ];
+		Coord3D positions[ MAX_OVERLAY_PARTICLE_LINES ];
 		Int nameCount = 0;
 
 		// Options.ini: ParticleNameLingerMS. Zero, or the key absent, keeps the original behaviour --
@@ -3455,6 +3534,7 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 			if( alreadyListed )
 				continue;
 
+			sys->getDebugWorldPosition( &positions[ nameCount ] );
 			fxNames[ nameCount ] = fxName;
 			names[ nameCount++ ] = sysName;
 
@@ -3468,29 +3548,33 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 		// and the overlay draws from that instead, so a name outlives the system that produced it.
 		if( remembering )
 		{
-			rememberParticleNames( names, fxNames, nameCount, nowFrame );
+			rememberParticleNames( names, fxNames, positions, nameCount, nowFrame );
 
 			const UnsignedInt lingerFrames =
 					(UnsignedInt)( (Real)lingerMS * LOGICFRAMES_PER_MSEC_REAL );
 
-			nameCount = collectRememberedParticleNames( names, fxNames, nowFrame, lingerFrames );
+			nameCount = collectRememberedParticleNames( names, fxNames, positions, nowFrame, lingerFrames );
 		}
 
-		// Drawn bottom up, so within a pair the particle name is emitted before the FXList that
-		// owns it -- leaving the FX name sitting above its particles on screen, the way the INI
-		// nests them.
 		for( Int i = nameCount - 1; i >= 0; --i )
 		{
-			UnicodeString line;
-			line.format( L"%hs", names[i].str() );
-			drawOverlayLine( s_nameString, line, anchor.x, lineY, particleColor, dropColor );
-
-			// Only systems created through an FXList carry one.
-			if( !fxNames[i].isEmpty() )
+			ICoord2D point;
+			if( !TheTacticalView->worldToScreen( &positions[i], &point ) )
 			{
-				line.format( L"%hs", fxNames[i].str() );
-				drawOverlayLine( s_nameString, line, anchor.x, lineY, fxListColor, dropColor );
+				continue;
 			}
+
+			Bool toLeft = ( ( i & 1 ) == 0 );
+			if( point.x < anchor.x - MODEL_LABEL_SIDE_SLOP )
+			{
+				toLeft = TRUE;
+			}
+			else if( point.x > anchor.x + MODEL_LABEL_SIDE_SLOP )
+			{
+				toLeft = FALSE;
+			}
+
+			drawOverlayCallout( names[i], fxNames[i], point, toLeft, particleColor, fxListColor, dropColor );
 		}
 	}
 
@@ -3537,13 +3621,6 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 	// Each model gets a callout with a leader to one side instead of a line in the stack.
 	if( wantModelNames && TheTacticalView != nullptr )
 	{
-		const UnsignedInt renderFrame = WW3D::Get_Frame_Count();
-		if( renderFrame != s_modelOverlayFrame )
-		{
-			s_modelOverlayFrame = renderFrame;
-			s_modelOverlaySlotCount = 0;
-		}
-
 		AsciiString modelNames[ MAX_OVERLAY_MODEL_LABELS ];
 		ICoord2D modelPoints[ MAX_OVERLAY_MODEL_LABELS ];
 		Int modelCount = 0;
@@ -3589,54 +3666,7 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 				toLeft = FALSE;
 			}
 
-			UnicodeString line;
-			line.format( L"%hs", modelNames[m].str() );
-			s_nameString->setText( line );
-
-			Int width, height;
-			s_nameString->getSize( &width, &height );
-
-			const Int leaderEndX = toLeft ? ( point.x - MODEL_LABEL_REACH_X ) : ( point.x + MODEL_LABEL_REACH_X );
-
-			IRegion2D rect;
-			rect.lo.x = toLeft ? ( leaderEndX - MODEL_LABEL_GAP - width ) : ( leaderEndX + MODEL_LABEL_GAP );
-			rect.hi.x = rect.lo.x + width;
-			rect.lo.y = point.y - MODEL_LABEL_REACH_Y - ( height / 2 );
-			rect.hi.y = rect.lo.y + height;
-
-			// Each push clears one placed label for good, so a pass per slot settles it.
-			for( Int pass = 0; pass <= s_modelOverlaySlotCount; ++pass )
-			{
-				Bool moved = FALSE;
-				for( Int i = 0; i < s_modelOverlaySlotCount; ++i )
-				{
-					const IRegion2D &slot = s_modelOverlaySlots[i];
-					if( rect.lo.x >= slot.hi.x || rect.hi.x <= slot.lo.x ||
-							rect.lo.y >= slot.hi.y || rect.hi.y <= slot.lo.y )
-					{
-						continue;
-					}
-
-					const Int shift = rect.hi.y - slot.lo.y;
-					rect.lo.y -= shift;
-					rect.hi.y -= shift;
-					moved = TRUE;
-				}
-
-				if( !moved )
-				{
-					break;
-				}
-			}
-
-			if( s_modelOverlaySlotCount < MAX_MODEL_OVERLAY_SLOTS )
-			{
-				s_modelOverlaySlots[ s_modelOverlaySlotCount++ ] = rect;
-			}
-
-			// The leader ends level with the middle of the text, wherever the push left it.
-			TheDisplay->drawLine( point.x, point.y, leaderEndX, ( rect.lo.y + rect.hi.y ) / 2, 1.0f, modelNameColor );
-			s_nameString->draw( rect.lo.x, rect.lo.y, modelNameColor, dropColor );
+			drawOverlayCallout( modelNames[m], AsciiString(), point, toLeft, modelNameColor, modelNameColor, dropColor );
 		}
 	}
 
