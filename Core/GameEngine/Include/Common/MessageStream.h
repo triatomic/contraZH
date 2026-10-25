@@ -477,6 +477,7 @@ public:
 		MSG_CHEAT_COPY_OBJECT_NAME,		///< copy the selected object template names to the clipboard
 		MSG_CHEAT_PATHFIND_LOG_ON,			///< start writing the per-second pathfinder counters to pathfinding.txt
 		MSG_CHEAT_PATHFIND_LOG_OFF,			///< stop writing the pathfinder counters
+		MSG_CHEAT_TOGGLE_SHADER_PANEL,
 
 		MSG_END_META_MESSAGES,											///< Marker to delineate "meta" messages
 
@@ -703,7 +704,7 @@ public:
 	static Bool isPlainOrder(GameMessage::Type t);
 
 	/// The debug cheat hotkeys appended at the end of the meta range, which also work in the shell map and cinematics
-	static Bool isDebugCheatHotkey(GameMessage::Type t) { return t >= MSG_CHEAT_KITCHEN_SINK && t <= MSG_CHEAT_SHOW_SHADER_DRAWS; }
+	static Bool isDebugCheatHotkey(GameMessage::Type t) { return (t >= MSG_CHEAT_KITCHEN_SINK && t <= MSG_CHEAT_SHOW_SHADER_DRAWS) || t == MSG_CHEAT_TOGGLE_SHADER_PANEL; }
 
 	Int getPlayerIndex() const { return m_playerIndex; }		///< Return the originating player
 

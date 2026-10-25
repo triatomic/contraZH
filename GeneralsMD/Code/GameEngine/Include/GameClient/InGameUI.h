@@ -584,6 +584,7 @@ public:  // ********************************************************************
 	// Outline and name of every visible GUI window, with the full chain under the cursor.
 	virtual void toggleWindowNameOverlay( void ) { m_windowNameOverlayOn = !m_windowNameOverlayOn; }
 	virtual Bool isWindowNameOverlayOn( void ) const { return m_windowNameOverlayOn; }
+	void toggleShaderDebugPanel();
 #endif
 	void freeMessageResources();				///< free resources for the ui messages
 	void freeCustomUiResources();				///< free resources for custom ui elements

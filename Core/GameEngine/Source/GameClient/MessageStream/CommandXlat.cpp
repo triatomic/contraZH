@@ -4512,6 +4512,15 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			break;
 		}
 
+#if RTS_ZEROHOUR
+		case GameMessage::MSG_CHEAT_TOGGLE_SHADER_PANEL:
+		{
+			TheInGameUI->toggleShaderDebugPanel();
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+#endif
+
 #endif
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)

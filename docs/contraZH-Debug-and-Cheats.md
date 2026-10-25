@@ -5,6 +5,21 @@ The health bar, pause and frame-step controls below also work in normal release 
 Keys use US keyboard labels. On other layouts, use the same physical keys.
 These are the engine's default bindings; `CommandMap.ini` can override them unless noted.
 
+## Shader debug panel
+
+`Ctrl + Shift + Tab` shows or hides a small shader panel near the upper-right corner during a
+match or replay. Click a row to toggle its effect immediately. The X hides the panel; the rest
+of the screen remains usable and the game keeps running.
+
+The panel controls bloom, laser glow, shadow maps, specular highlights and emissive glow,
+normal maps, water reflections, shoreline foam, soft particles, flame, electric, laser and cryo
+shaders, dynamic and pixel lights, ambient occlusion, height blending, HQ sky clouds and planar mirrors.
+
+Changes affect rendering only and the panel does not save `Options.ini`. Hiding the panel keeps
+the chosen states. A shader disabled by hardware limits or a launch-time environment variable
+cannot be enabled through the panel. The panel closes when the match or UI resources reset.
+The shortcut is also bindable as `CHEAT_TOGGLE_SHADER_PANEL` in cheat builds.
+
 ## Debug name overlays
 
 Names drawn above every object on screen, props and wreckage included.
@@ -102,6 +117,8 @@ binds this key to `SAVE_VIEW1`, which this cheat build shadows, so camera bookma
 line per vertex and pixel shader pair with its draw and primitive counts, busiest first. `fixed`
 means the fixed function pipeline. Refreshes twice a second. Takes the key from `CHEAT_RUNSCRIPT1` in
 CommandMapDemo.ini. `CHEAT_SHOW_SHADER_DRAWS` in CommandMap.ini)
+* `Shift + Ctrl + Tab` - (Opens or hides the shader debug panel. Click an option to toggle its
+rendering effect live. `CHEAT_TOGGLE_SHADER_PANEL` in CommandMap.ini)
 * `Alt + V` - (Copies the template (INI) name of the selected objects to the clipboard, one per
 line with duplicates folded, and confirms with a message. `CHEAT_COPY_OBJECT_NAME` in CommandMap.ini)
 

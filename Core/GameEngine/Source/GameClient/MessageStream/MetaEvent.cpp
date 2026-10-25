@@ -239,6 +239,9 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "CHEAT_SHOW_MODEL_NAMES",									  GameMessage::MSG_CHEAT_SHOW_MODEL_NAMES },
 	{ "CHEAT_SHOW_WINDOW_NAMES",								  GameMessage::MSG_CHEAT_SHOW_WINDOW_NAMES },
 	{ "CHEAT_SHOW_SHADER_DRAWS",								  GameMessage::MSG_CHEAT_SHOW_SHADER_DRAWS },
+#if RTS_ZEROHOUR
+	{ "CHEAT_TOGGLE_SHADER_PANEL", GameMessage::MSG_CHEAT_TOGGLE_SHADER_PANEL },
+#endif
 	{ "CHEAT_COPY_OBJECT_NAME",								  GameMessage::MSG_CHEAT_COPY_OBJECT_NAME },
 	{ "CHEAT_PATHFIND_LOG_ON",									  GameMessage::MSG_CHEAT_PATHFIND_LOG_ON },
 	{ "CHEAT_PATHFIND_LOG_OFF",									  GameMessage::MSG_CHEAT_PATHFIND_LOG_OFF },
@@ -1223,6 +1226,18 @@ void MetaMap::generateMetaMap()
 			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
 		}
 	}
+#if RTS_ZEROHOUR
+	{
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_TOGGLE_SHADER_PANEL);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_TAB;
+			map->m_transition = DOWN;
+			map->m_modState = SHIFT_CTRL;
+			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
+		}
+	}
+#endif
 	{
 		// Copy the template names of the selected objects to the clipboard. Alt+V is unbound in
 		// the engine defaults, in Contra's CommandMap.ini and in the demo map, which already puts

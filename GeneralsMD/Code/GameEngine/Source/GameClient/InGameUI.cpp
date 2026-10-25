@@ -1086,6 +1086,162 @@ InGameUI::PlayerInfoList::LastValues::LastValues()
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+namespace
+{
+struct ShaderDebugOption
+{
+	const wchar_t *label;
+	Bool GlobalData::*field;
+};
+
+const ShaderDebugOption ShaderDebugOptions[] =
+{
+	{ L"Bloom", &GlobalData::m_useBloom },
+	{ L"Laser glow", &GlobalData::m_laserRef },
+	{ L"Shadow maps", &GlobalData::m_useShadowMap },
+	{ L"Specular / glow", &GlobalData::m_useSpecular },
+	{ L"Normal maps", &GlobalData::m_useNormalMaps },
+	{ L"Water reflections", &GlobalData::m_waterReflections },
+	{ L"Shoreline foam", &GlobalData::m_shorelineFoam },
+	{ L"Soft particles", &GlobalData::m_useSoftParticles },
+	{ L"Flame shaders", &GlobalData::m_useFlameShaders },
+	{ L"Electric shaders", &GlobalData::m_useElectricShaders },
+	{ L"Laser shaders", &GlobalData::m_useLaserShaders },
+	{ L"Cryo shaders", &GlobalData::m_useCryoShaders },
+	{ L"Dynamic lights", &GlobalData::m_useDynamicLights },
+	{ L"Pixel lights", &GlobalData::m_usePixelLights },
+	{ L"Ambient occlusion", &GlobalData::m_useAmbientOcclusion },
+	{ L"Height blend", &GlobalData::m_useHeightBlend },
+	{ L"HQ sky clouds", &GlobalData::m_useHQSky },
+	{ L"Planar mirrors", &GlobalData::m_planarMirrorShader }
+};
+
+const Int SHADER_PANEL_COLUMN_WIDTH = 148;
+const Int SHADER_PANEL_ROW_HEIGHT = 20;
+const Int SHADER_PANEL_HEADER = 28;
+const Int SHADER_PANEL_ROWS = (ARRAY_SIZE(ShaderDebugOptions) + 1) / 2;
+const Int SHADER_PANEL_WIDTH = SHADER_PANEL_COLUMN_WIDTH * 2 + 16;
+const Int SHADER_PANEL_HEIGHT = SHADER_PANEL_HEADER + SHADER_PANEL_ROWS * SHADER_PANEL_ROW_HEIGHT + 20;
+GameWindow *ShaderPanelWindow = nullptr;
+DisplayString *ShaderPanelString = nullptr;
+
+void destroyShaderDebugPanel()
+{
+	if (ShaderPanelWindow && TheWindowManager)
+	{
+		TheWindowManager->winDestroy(ShaderPanelWindow);
+	}
+	ShaderPanelWindow = nullptr;
+	if (ShaderPanelString)
+	{
+		TheDisplayStringManager->freeDisplayString(ShaderPanelString);
+		ShaderPanelString = nullptr;
+	}
+}
+
+WindowMsgHandledType shaderPanelSystem(GameWindow *window, UnsignedInt msg, WindowMsgData, WindowMsgData)
+{
+	if (msg == GWM_DESTROY && window == ShaderPanelWindow)
+	{
+		ShaderPanelWindow = nullptr;
+	}
+	return MSG_IGNORED;
+}
+
+WindowMsgHandledType shaderPanelInput(GameWindow *window, UnsignedInt msg, WindowMsgData data, WindowMsgData)
+{
+	if (msg == GWM_LEFT_UP && TheWritableGlobalData)
+	{
+		Int left, top;
+		window->winGetScreenPosition(&left, &top);
+		Int x = (Int)LOLONGTOSHORT(data) - left;
+		Int y = (Int)HILONGTOSHORT(data) - top;
+		if (x >= SHADER_PANEL_WIDTH - 26 && x < SHADER_PANEL_WIDTH && y >= 0 && y < SHADER_PANEL_HEADER)
+		{
+			window->winHide(TRUE);
+		}
+		else if (x >= 8 && x < SHADER_PANEL_WIDTH - 8 && y >= SHADER_PANEL_HEADER
+			&& y < SHADER_PANEL_HEADER + SHADER_PANEL_ROWS * SHADER_PANEL_ROW_HEIGHT)
+		{
+			Int index = ((x - 8) / SHADER_PANEL_COLUMN_WIDTH) * SHADER_PANEL_ROWS
+				+ (y - SHADER_PANEL_HEADER) / SHADER_PANEL_ROW_HEIGHT;
+			if (index < ARRAY_SIZE(ShaderDebugOptions))
+			{
+				Bool &enabled = TheWritableGlobalData->*ShaderDebugOptions[index].field;
+				enabled = !enabled;
+			}
+		}
+	}
+	if ((msg >= GWM_LEFT_DOWN && msg <= GWM_WHEEL_DOWN) || msg == GWM_MOUSE_POS)
+	{
+		return MSG_HANDLED;
+	}
+	return MSG_IGNORED;
+}
+
+void drawShaderDebugPanel(GameWindow *window, WinInstanceData *)
+{
+	if (!TheGlobalData || !TheDisplay)
+	{
+		return;
+	}
+	if (!ShaderPanelString)
+	{
+		ShaderPanelString = TheDisplayStringManager->newDisplayString();
+		ShaderPanelString->setFont(TheWindowManager->winFindFont("Tahoma", 9, FALSE));
+	}
+	Int x, y;
+	window->winGetScreenPosition(&x, &y);
+	const Color white = GameMakeColor(235, 235, 235, 255);
+	const Color shadow = GameMakeColor(0, 0, 0, 255);
+	TheDisplay->drawFillRect(x, y, SHADER_PANEL_WIDTH, SHADER_PANEL_HEIGHT, GameMakeColor(12, 16, 20, 205));
+	TheDisplay->drawOpenRect(x, y, SHADER_PANEL_WIDTH, SHADER_PANEL_HEIGHT, 1.0f, GameMakeColor(130, 160, 180, 220));
+	ShaderPanelString->setText(UnicodeString(L"Shaders   Ctrl+Shift+Tab"));
+	ShaderPanelString->draw(x + 8, y + 6, white, shadow);
+	ShaderPanelString->setText(UnicodeString(L"X"));
+	ShaderPanelString->draw(x + SHADER_PANEL_WIDTH - 20, y + 6, white, shadow);
+	for (Int i = 0; i < ARRAY_SIZE(ShaderDebugOptions); ++i)
+	{
+		Bool enabled = TheGlobalData->*ShaderDebugOptions[i].field;
+		UnicodeString label;
+		label.format(L"[%ls] %ls", enabled ? L"x" : L" ", ShaderDebugOptions[i].label);
+		ShaderPanelString->setText(label);
+		ShaderPanelString->draw(x + 8 + (i / SHADER_PANEL_ROWS) * SHADER_PANEL_COLUMN_WIDTH,
+			y + SHADER_PANEL_HEADER + (i % SHADER_PANEL_ROWS) * SHADER_PANEL_ROW_HEIGHT,
+			enabled ? GameMakeColor(160, 235, 160, 255) : white, shadow);
+	}
+	ShaderPanelString->setText(UnicodeString(L"Changes apply now; no save"));
+	ShaderPanelString->draw(x + 8, y + SHADER_PANEL_HEIGHT - 18, white, shadow);
+}
+}
+
+void InGameUI::toggleShaderDebugPanel()
+{
+	if (!TheWindowManager || !TheDisplay || !TheWritableGlobalData)
+	{
+		return;
+	}
+	if (ShaderPanelWindow)
+	{
+		ShaderPanelWindow->winHide((ShaderPanelWindow->winGetStatus() & WIN_STATUS_HIDDEN) == 0);
+		return;
+	}
+	ShaderPanelWindow = TheWindowManager->winCreate(nullptr, WIN_STATUS_ENABLED,
+		max(0, (Int)TheDisplay->getWidth() - SHADER_PANEL_WIDTH - 12), 60,
+		SHADER_PANEL_WIDTH, SHADER_PANEL_HEIGHT, shaderPanelSystem);
+	if (ShaderPanelWindow)
+	{
+		WinInstanceData data;
+		data.m_style = GWS_USER_WINDOW;
+		ShaderPanelWindow->winSetInstanceData(&data);
+		ShaderPanelWindow->winSetWindowId(TheNameKeyGenerator->nameToKey("Debug:ShaderPanel"));
+		ShaderPanelWindow->winSetInputFunc(shaderPanelInput);
+		ShaderPanelWindow->winSetDrawFunc(drawShaderDebugPanel);
+	}
+}
+#endif
+
 InGameUI::InGameUI()
 {
 	Int i;
@@ -2493,6 +2649,9 @@ void InGameUI::unregisterWindowLayout( WindowLayout *layout )
 //-------------------------------------------------------------------------------------------------
 void InGameUI::reset()
 {
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	destroyShaderDebugPanel();
+#endif
 	m_isQuitMenuVisible = FALSE;
 	m_inputEnabled = true;
 	// reset the command bar
@@ -2619,6 +2778,9 @@ void InGameUI::freeMessageResources()
 
 void InGameUI::freeCustomUiResources()
 {
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	destroyShaderDebugPanel();
+#endif
 	TheDisplayStringManager->freeDisplayString(m_networkLatencyString);
 	m_networkLatencyString = nullptr;
 	TheDisplayStringManager->freeDisplayString(m_renderFpsString);
