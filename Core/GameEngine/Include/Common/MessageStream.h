@@ -887,7 +887,7 @@ public:
 
 protected:
 
-	Bool isRedundantMessage(const GameMessage *msg) const;
+	Bool isRedundantNetworkMessage(const GameMessage *msg) const;
 
 	struct TranslatorData
 	{
