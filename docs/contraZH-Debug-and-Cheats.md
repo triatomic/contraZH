@@ -1,13 +1,16 @@
 # Debug and Cheat Features
 
-Only in builds made with `RTS_DEBUG_CHEATS=ON`.
+The debug overlays and cheat commands require builds made with `RTS_DEBUG_CHEATS=ON`.
+The health bar, pause and frame-step controls below also work in normal release builds.
+Keys use US keyboard labels. On other layouts, use the same physical keys.
+These are the engine's default bindings; `CommandMap.ini` can override them unless noted.
 
 ## Debug name overlays
 
 Names drawn above every object on screen, props and wreckage included.
 
 * `Ctrl + [` - (Cycles three ways: off, the object's template (INI) name in white, then the
-model's sub object names in green as well.)
+model's subobject names in green as well.)
 * `Ctrl + ]` - (Particle systems running on that object, in blue, with the FXList that
 spawned them in amber)
 * `Ctrl + '` - (The `CommandSet` the object uses, in yellow)
@@ -19,7 +22,7 @@ from the model out to one side and the name sits at the end of it)
 at the middle of the beam)
 * `Ctrl + .` - (Laser beams: the `W3DLaserDraw` module tags, in lavender, under the laser name)
 
-* Sub object names (hull, turret, wheels, ...) are for `ShowSubObject` / `HideSubObject`. Up to 16,
+* Subobject names (hull, turret, wheels, ...) are for `ShowSubObject` / `HideSubObject`. Up to 16,
 then "and N more".
 * Command set, weapons and armor are read from the live object, so they show the set or block the
 engine actually picked. Empty cases show `<none>`, `<no weapons>` or `<no armor>`.
@@ -69,7 +72,7 @@ the map edge and gray one cell further in.)
 * Zones - (Connected zones, drawn when the zones are rebuilt.)
 
 Notes:
-* Singleplayer only.
+* Single player only.
 * Terrain mode also switches off column group moves, an original debugging hook. Judge group
 movement in Cells or Paths mode.
 * With the overlay on, the camera can scroll past the map edge.
@@ -88,10 +91,9 @@ replaces the file, later starts append.
 
 ## Other cheat hotkeys
 
-* ``Ctrl + ` `` - (Instant build, +999999 credits, this general's own sciences, max rank,
-reveals the map)
-* `Ctrl + \` - (Pauses or resumes a single player game in place, like `Shift + P`, without the menu
-Esc opens. Sound stops, music plays on, and the camera still moves)
+* ``Shift + Ctrl + ` `` - (Toggles instant build for human players. When enabled, also gives the
+local player +999999 credits, this general's own sciences, max rank and a revealed map.
+Single player only. `CHEAT_KITCHEN_SINK` in CommandMap.ini)
 * `Shift + Ctrl + Z` - (Toggles the camera zoom limit)
 * `Ctrl + F1` - (Toggles back face culling, drawing every face double sided when off. Contra also
 binds this key to `SAVE_VIEW1`, which this cheat build shadows, so camera bookmark 1 is not saved.
@@ -102,12 +104,60 @@ means the fixed function pipeline. Refreshes twice a second. Takes the key from 
 CommandMapDemo.ini. `CHEAT_SHOW_SHADER_DRAWS` in CommandMap.ini)
 * `Alt + V` - (Copies the template (INI) name of the selected objects to the clipboard, one per
 line with duplicates folded, and confirms with a message. `CHEAT_COPY_OBJECT_NAME` in CommandMap.ini)
-* ``Shift + Ctrl + ` `` - (Cycles `HealthBarDisplayMode` live)
 
 Notes:
-* The health bar cycle and the `Ctrl + \` pause are **not** cheats and work in a normal release build too.
-* A second press of the combined cheat resets rank via `resetRank()`, wiping purchased sciences.
-* Sciences granted are only this general's own tree.
+* Disabling the combined cheat resets rank to 1 and wipes purchased sciences. It does not remove
+the cash or hide the revealed map.
+* The combined cheat grants only this general's own sciences.
+
+## Individual cheats and map scripts
+
+Contra's `CommandMapDemo.ini` supplies these bindings in cheat builds. All are single player only.
+
+| Key | Action | CommandMap name |
+|---|---|---|
+| `Alt + F` | Toggle instant build for the local player. | `CHEAT_INSTANT_BUILD` |
+| `Ctrl + =` | Add 10000 credits. Use the main keyboard's equals key. | `CHEAT_ADD_CASH` |
+| `Ctrl + R` | Reveal the map permanently for the local player. | `CHEAT_DESHROUD` |
+| `Shift + Ctrl + Alt + K` | Grant every grantable science, including other generals' sciences. | `CHEAT_GIVE_ALL_SCIENCES` |
+| `Shift + Ctrl + P` | Add one science purchase point. | `CHEAT_GIVE_SCIENCEPURCHASEPOINTS` |
+| `Ctrl + S` | Toggle special power cooldown delays. | `CHEAT_TOGGLE_SPECIAL_POWER_DELAYS` |
+| `Shift + Ctrl + Space` | Switch control to the next non-neutral player. | `CHEAT_SWITCH_TEAMS` |
+| `Shift + Ctrl + X` | Kill the selected objects. | `CHEAT_KILL_SELECTION` |
+| `Alt + G` | Toggle Hand-of-God mode, which kills an object when you select it. | `CHEAT_TOGGLE_HAND_OF_GOD_MODE` |
+| `Alt + H` | Toggle the object health debug display. | `CHEAT_SHOW_HEALTH` |
+| `Alt + T` | Toggle on-screen message text. | `CHEAT_TOGGLE_MESSAGE_TEXT` |
+| `Shift + Ctrl + F2` through `F9` | Run the map script `KEY_F2` through `KEY_F9`, if present. | `CHEAT_RUNSCRIPT2` through `CHEAT_RUNSCRIPT9` |
+
+`Shift + Ctrl + F1` opens the shader draw list instead of running `KEY_F1`. Rebind
+`CHEAT_RUNSCRIPT1` to another key to run that script.
+
+## Camera and scene controls
+
+* `Delete` - (Cycles Default, Free, Chase, Perspective and Orthographic camera modes, then returns
+to Default. Chase and Perspective need a selected object and are skipped without one.
+`CHEAT_CYCLE_CAMERA_MODE` in CommandMap.ini)
+* `Ctrl + Home` - (Cycles the skybox through the map default, Morning and Moon. Forces the sky to
+draw. `CHEAT_CYCLE_SKYBOX` in CommandMap.ini)
+* `Ctrl + End` - (Cycles terrain rendering through normal, black background and green screen.
+Hides terrain, roads, trees, shroud, water and sky while keeping units visible.
+`CHEAT_CYCLE_TERRAIN_MODE` in CommandMap.ini)
+
+Camera modes hide the HUD and clear terrain shroud without revealing hidden enemy units.
+The camera and scene controls affect only this client's view and also work in multiplayer and replays.
+See [Camera Controls](CameraControls.md) for movement, mouse gestures, sun lighting and `CapsLock`
+selection controls.
+
+## Controls available without cheats
+
+* ``Ctrl + ` `` - (Cycles `HealthBarDisplayMode` through Classic, Damaged and Always for the current
+session. Does not save to Options.ini. `CYCLE_HEALTH_BAR_MODE` in CommandMap.ini)
+* `Ctrl + \` or `Shift + P` - (Pauses or resumes a single player game without opening the Esc menu.
+Sound stops, music plays on, and the camera still moves. `TOGGLE_PAUSE_ALT` in CommandMap.ini)
+* `Shift + O` - (Advances one simulation frame, then pauses. Single player only.
+`STEP_FRAME_ALT` in CommandMap.ini)
+
+Observers can also use `P` to pause and `O` to step one frame.
 
 ## Debug views
 
