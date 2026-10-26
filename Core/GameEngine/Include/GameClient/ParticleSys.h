@@ -647,6 +647,7 @@ public:
 	const DisruptionShaderInfo &getDisruption() const { return m_disruption; }
 #if RTS_ZEROHOUR
 	Bool shouldBloom() const { return m_bloom; }
+	Bool shouldCompensateBloomZoom() const { return m_bloomZoomCompensation; }
 #endif
 
 protected:
@@ -673,6 +674,7 @@ protected:
 	DisruptionShaderInfo			m_disruption;
 #if RTS_ZEROHOUR
 	Bool m_bloom;
+	Bool m_bloomZoomCompensation;
 #endif
 
 	// template attribute data inherited from ParticleSystemInfo class

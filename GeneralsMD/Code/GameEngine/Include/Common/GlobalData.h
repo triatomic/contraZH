@@ -733,7 +733,6 @@ public:
   Real m_bloomStrength;           ///< Options.ini BloomStrength: glow brightness, 0 to 1
   Real m_bloomThreshold;          ///< Options.ini BloomThreshold: minimum source brightness, 0 to 1
   Real m_bloomSize;               ///< Options.ini BloomSize: blur radius multiplier, 0.25 to 4
-  Bool m_bloomZoomCompensation;   ///< keeps glowing particles at their default-camera screen size when zoomed out
   Bool m_bloomDebug;              ///< Options.ini BloomDebug: show the glow buffer instead of the scene
   Bool m_laserRef;                ///< Options.ini LaserRef: lasers light the ground along the beam
   Bool m_useShadowMap;            ///< Options.ini ShadowMap: shadows come from a sun shadow map where the hardware allows

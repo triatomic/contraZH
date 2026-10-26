@@ -188,7 +188,7 @@ static Real bloomZoomReference(ParticleSystem *system, CameraClass &camera)
 {
 #if RTS_ZEROHOUR
 	if (TheGlobalData->m_useBloom && TheGlobalData->m_bloomStrength > 0.0f &&
-		TheGlobalData->m_bloomZoomCompensation && shouldBloomParticle(system) &&
+		system->getTemplate()->shouldCompensateBloomZoom() && shouldBloomParticle(system) &&
 		camera.Get_Projection_Type() == CameraClass::PERSPECTIVE)
 	{
 		const Real pitch = DEG_TO_RADF(max(TheGlobalData->m_cameraPitch, 10.0f));

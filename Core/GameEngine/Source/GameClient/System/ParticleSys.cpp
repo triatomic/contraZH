@@ -3193,6 +3193,7 @@ const FieldParse ParticleSystemTemplate::m_fieldParseTable[] =
 	{ "CryoShader",					INI::parseIndexList, CryoShaderModeNames, offsetof( ParticleSystemTemplate, m_cryoShader ) },
 #if RTS_ZEROHOUR
 	{ "Bloom", INI::parseBool, nullptr, offsetof( ParticleSystemTemplate, m_bloom ) },
+	{ "BloomZoomCompensation", INI::parseBool, nullptr, offsetof( ParticleSystemTemplate, m_bloomZoomCompensation ) },
 #endif
 	{ "FlameWarp",					INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.warp ) },
 	{ "FlameHeat",					INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.heat ) },
@@ -3327,6 +3328,7 @@ ParticleSystemTemplate::ParticleSystemTemplate( const AsciiString &name ) :
 	m_electricParticleScale = -1.0f;
 #if RTS_ZEROHOUR
 	m_bloom = TRUE;
+	m_bloomZoomCompensation = FALSE;
 #endif
 
 	Real *setting = &m_flameTuning.warp;

@@ -160,7 +160,6 @@ public:
 #if defined(RTS_ZEROHOUR)
 	Real getBloomThreshold() const;
 	Real getBloomSize() const;
-	Bool getBloomZoomCompensation() const;
 #endif
 	Bool getBloomDebugEnabled() const;
 	// Options.ini: LaserRef = Yes lights the ground along each laser beam

@@ -20,6 +20,20 @@ streaks and other additive particle types supported by the existing bloom render
 `ParticleSystemExtend` inherits the parent's flag and can override it with `Bloom = Yes` or `No`.
 FX lists that spawn the particle system use its flag; there is no separate FXList key.
 
+`BloomZoomCompensation = No` is the default. Set it to `Yes` on a particle system to keep its
+glowing sprites and streak widths at their default-camera screen size when zoomed out.
+The system must use `Shader = ADDITIVE` and `Bloom = Yes`, and global bloom must be on.
+Streak paths still follow their world positions. `ParticleSystemExtend` inherits the setting
+and can override it. The FX tuner exposes the flag under each particle system's `System` controls.
+
+```ini
+ParticleSystem MyGlowEffect
+  Shader = ADDITIVE
+  Bloom = Yes
+  BloomZoomCompensation = Yes
+End
+```
+
 ## D3D9 billboard rendering
 
 * D3D9 builds camera-facing particle quads on the GPU when shader model 3 hardware is available.

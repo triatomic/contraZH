@@ -930,7 +930,6 @@ GlobalData::GlobalData()
   m_bloomStrength = 0.5f;
   m_bloomThreshold = 0.0f;
   m_bloomSize = 1.0f;
-  m_bloomZoomCompensation = FALSE;
   m_bloomDebug = FALSE;
   m_laserRef = FALSE;
   m_useShadowMap = TRUE;
@@ -2048,7 +2047,6 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_bloomStrength = optionPref.getBloomStrength();
 	TheWritableGlobalData->m_bloomThreshold = optionPref.getBloomThreshold();
 	TheWritableGlobalData->m_bloomSize = optionPref.getBloomSize();
-	TheWritableGlobalData->m_bloomZoomCompensation = optionPref.getBloomZoomCompensation();
 	TheWritableGlobalData->m_bloomDebug = optionPref.getBloomDebugEnabled();
 	TheWritableGlobalData->m_laserRef = optionPref.getLaserRefEnabled();
 	TheWritableGlobalData->m_useShadowMap = optionPref.getShadowMapEnabled();

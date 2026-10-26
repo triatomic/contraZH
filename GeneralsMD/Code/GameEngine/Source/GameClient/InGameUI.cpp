@@ -1098,7 +1098,6 @@ struct ShaderDebugOption
 const ShaderDebugOption ShaderDebugOptions[] =
 {
 	{ L"Bloom", &GlobalData::m_useBloom },
-	{ L"Bloom zoom lock", &GlobalData::m_bloomZoomCompensation },
 	{ L"Laser glow", &GlobalData::m_laserRef },
 	{ L"Shadow maps", &GlobalData::m_useShadowMap },
 	{ L"Specular / glow", &GlobalData::m_useSpecular },

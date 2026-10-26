@@ -318,11 +318,6 @@ Uses the brightest RGB channel and preserves its color. `Threshold %` on the Gra
 from 0 to 100. Requires the Direct3D 9 pixel shader.)
 * `BloomSize = 1.0` - (0.25 to 4. Multiplies the glow radius. 1 keeps the original size.
 `Size %` on the Graphics page, from 25 to 400.)
-* `BloomZoomCompensation = No` - (Yes keeps glowing particle sprites at their default-camera
-screen size as you zoom out, preserving the glow's coverage. Streak widths also stay steady;
-their paths still follow their world positions. Only additive particle systems with `Bloom = Yes`
-are affected, while global bloom is on. Also available on the Graphics page and in the
-`Ctrl + Shift + Tab` panel.)
 * `BloomDebug = No` - (Yes shows only the blurred glow buffer on black, to see what feeds it.
 `Bloom debug view` on the Graphics page. Cheat builds only: a release build hides the checkbox and
 ignores the key.)

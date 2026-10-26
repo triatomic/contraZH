@@ -17,7 +17,6 @@ shaders, dynamic and pixel lights, ambient occlusion, height blending, HQ sky cl
 
 The minus and plus buttons change bloom threshold in 5% steps and bloom size in 25% steps.
 Threshold runs from 0% to 100% and requires Direct3D 9. Size runs from 25% to 400%.
-`Bloom zoom lock` keeps glowing particle sizes and glow coverage steady when zoomed out.
 
 Changes affect rendering only and the panel does not save `Options.ini`. Hiding the panel keeps
 the chosen states. A shader disabled by hardware limits or a launch-time environment variable
