@@ -39,7 +39,8 @@ settings.)
 * `SmartPips = No` - (Yes keeps ammo and passenger pips visible on own units whenever there is
 something to show.)
 * `BuildTimerDisplayMode = None` - (`None` | `Seconds` | `Auto`. Countdowns on build queue and special
-power cameos. `Auto` switches to MM:SS past a minute.)
+power cameos. `Auto` switches to MM:SS past a minute. Hover tooltips always show build time,
+including power penalties, regardless of this setting.)
 * `NewRadar = No` - (Yes gives an RA3 style radar: outlined blips, larger structures, dark
 waterline, flat ground in three tones (olive, tan for desert sand, grey for rock and pavement),
 256x256 grid.)

@@ -68,7 +68,6 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/GlobalData.h"
-#include "Common/OptionPreferences.h"
 #include "Common/BuildAssistant.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -107,18 +106,12 @@ void ControlBarPopupDescriptionUpdateFunc( WindowLayout *layout, void *param )
 	if(TheScriptEngine->isGameEnding())
 		TheControlBar->hideBuildTooltipLayout();
 
-	// TheSuperHackers @fix The unit build time follows the player's power state, but nothing
-	// marks the control bar dirty when power changes - so an open tooltip kept showing the
-	// old time. Refresh it about once a second while it is up; with the timer display off
-	// the tooltip carries no time and stays as cheap as retail.
-	if( TheGlobalData && TheGlobalData->m_buildTimerDisplayMode != BuildTimerDisplayMode_None )
+	// Power changes do not mark the control bar dirty, so refresh the tooltip's build time.
+	static UnsignedInt s_framesSinceRefresh = 0;
+	if( ++s_framesSinceRefresh >= LOGICFRAMES_PER_SECOND )
 	{
-		static UnsignedInt s_framesSinceRefresh = 0;
-		if( ++s_framesSinceRefresh >= LOGICFRAMES_PER_SECOND )
-		{
-			s_framesSinceRefresh = 0;
-			TheControlBar->repopulateBuildTooltipLayout();
-		}
+		s_framesSinceRefresh = 0;
+		TheControlBar->repopulateBuildTooltipLayout();
 	}
 
 	if(theAnimateWindowManager && !TheControlBar->getShowBuildTooltipLayout() && !theAnimateWindowManager->isReversed())
@@ -248,22 +241,15 @@ void ControlBar::showBuildTooltipLayout( GameWindow *cmdButton )
 }
 
 
-// TheSuperHackers @feature Build time as m:ss always; BuildTimerDisplayMode None still hides it.
-//
-// Note the value passed in should come from calcTimeToBuild(), which for units already folds
-// in the player's current energy penalty -- so a tooltip read while on low power correctly
-// shows the slower time, and speeds back up once power is restored. Upgrades have no energy
-// penalty in the engine, so their time is the same regardless of power state.
+// calcTimeToBuild() includes the player's energy penalty for units.
 static UnicodeString formatBuildTimeForTooltip( Int buildFrames )
 {
 	UnicodeString result = UnicodeString::TheEmptyString;
 
 	if( buildFrames <= 0 )
+	{
 		return result;
-
-	if( TheGlobalData == nullptr ||
-			TheGlobalData->m_buildTimerDisplayMode == BuildTimerDisplayMode_None )
-		return result;
+	}
 
 	// Round to nearest, so a template built from a fractional BuildTime reads as the number
 	// the modder typed rather than always the one above it. Integer math throughout, because
