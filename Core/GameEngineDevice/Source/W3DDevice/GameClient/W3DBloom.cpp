@@ -334,9 +334,13 @@ void W3DBloom::end(RenderInfoClass &rinfo)
 	// alternating the axis makes the kernel separable, and each pair widens the halo
 	const Real blurWidth = (Real)m_target[TARGET_BLUR]->Get_Width();
 	const Real blurHeight = (Real)m_target[TARGET_BLUR]->Get_Height();
+	Real size = 1.0f;
+#if defined(RTS_ZEROHOUR)
+	size = TheGlobalData->m_bloomSize;
+#endif
 	for (Int pass = 0; drawn && pass < BLOOM_BLUR_PASSES; ++pass)
 	{
-		const Real spread = 1.0f + (Real)(pass / 2);
+		const Real spread = size * (1.0f + (Real)(pass / 2));
 		const Bool horizontal = (pass & 1) == 0;
 		drawn = blurPass(m_target[TARGET_BLUR + (pass & 1)], TARGET_BLUR + ((pass + 1) & 1),
 			horizontal ? spread / blurWidth : 0.0f,
@@ -436,7 +440,11 @@ Bool W3DBloom::blurPass(TextureClass *source, Int target, Real offsetU, Real off
 
 	if (m_blurShader != 0)
 	{
-		drawShaderTaps(source, taps, count);
+		Real threshold = 0.0f;
+#if defined(RTS_ZEROHOUR)
+		threshold = shrink ? TheGlobalData->m_bloomThreshold : 0.0f;
+#endif
+		drawShaderTaps(source, taps, count, threshold);
 	}
 	else
 	{
@@ -446,13 +454,14 @@ Bool W3DBloom::blurPass(TextureClass *source, Int target, Real offsetU, Real off
 }
 
 // one quad whose pixel shader sums the taps, so the target is written once at full precision
-void W3DBloom::drawShaderTaps(TextureClass *source, const Tap *taps, Int count)
+void W3DBloom::drawShaderTaps(TextureClass *source, const Tap *taps, Int count, Real threshold)
 {
-	Vector4 constants[BLOOM_MAX_TAPS];
+	Vector4 constants[BLOOM_MAX_TAPS + 1];
 	for (Int i = 0; i < BLOOM_MAX_TAPS; ++i)
 	{
 		constants[i] = (i < count) ? Vector4(taps[i].u0, taps[i].v0, taps[i].brightness, 0.0f) : Vector4(0.0f, 0.0f, 0.0f, 0.0f);
 	}
+	constants[BLOOM_MAX_TAPS] = Vector4(threshold, 0.0f, 0.0f, 0.0f);
 
 	Tap quad;
 	quad.u0 = 0.0f;
@@ -461,7 +470,7 @@ void W3DBloom::drawShaderTaps(TextureClass *source, const Tap *taps, Int count)
 	quad.v1 = 1.0f;
 	quad.brightness = 1.0f;
 
-	DX8Wrapper::Set_Pixel_Shader_Constant(0, constants, BLOOM_MAX_TAPS);
+	DX8Wrapper::Set_Pixel_Shader_Constant(0, constants, BLOOM_MAX_TAPS + 1);
 	DX8Wrapper::Set_Pixel_Shader(m_blurShader);
 	drawTaps(source, &quad, 1, m_copyShader);
 	DX8Wrapper::Set_Pixel_Shader(0);

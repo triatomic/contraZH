@@ -363,6 +363,18 @@ Real OptionPreferences::getBloomStrength(void) const
 	return clamp(0.0f, strength, 1.0f);
 }
 
+#if defined(RTS_ZEROHOUR)
+Real OptionPreferences::getBloomThreshold(void) const
+{
+	return clamp(0.0f, getReal("BloomThreshold", 0.0f), 1.0f);
+}
+
+Real OptionPreferences::getBloomSize(void) const
+{
+	return clamp(0.25f, getReal("BloomSize", 1.0f), 4.0f);
+}
+#endif
+
 // The debug views are developer aids: a build without cheats never turns one on, whatever Options.ini says
 static Bool debugViewEnabled(const UserPreferences &pref, const char *key)
 {

@@ -313,6 +313,11 @@ Ordinary opaque surfaces, smoke and alpha blended effects do not feed bloom. Nee
 * `Bloom = No` - (Yes turns the glow on. Also `Bloom` on the Graphics page,
 applied on Accept.)
 * `BloomStrength = 0.5` - (0 to 1. 0 is off. The box beside `Bloom` on the Graphics page.)
+* `BloomThreshold = 0.0` - (0 to 1. Only source brightness above this value feeds the glow.
+Uses the brightest RGB channel and preserves its color. `Threshold %` on the Graphics page,
+from 0 to 100. Requires the Direct3D 9 pixel shader.)
+* `BloomSize = 1.0` - (0.25 to 4. Multiplies the glow radius. 1 keeps the original size.
+`Size %` on the Graphics page, from 25 to 400.)
 * `BloomDebug = No` - (Yes shows only the blurred glow buffer on black, to see what feeds it.
 `Bloom debug view` on the Graphics page. Cheat builds only: a release build hides the checkbox and
 ignores the key.)
@@ -320,6 +325,11 @@ ignores the key.)
 Menu controls need `CheckBloom`, `TextEntryBloomStrength` and `CheckBloomDebug` in `OptionsMenu.wnd`;
 `build/move_bloom_to_shaders_wnd.py` moves them onto the Graphics page and `build/bloom_row_wnd.py`
 puts the strength box beside the checkbox.
+`python scripts/add_bloom_controls.py <game-folder>` adds the threshold and size rows and their
+labels to the loose menu and string files, keeping copies under the game folder's sibling
+`_bak_to_delete` directory.
+Cheat builds also let you adjust threshold and size live in the
+[`Ctrl + Shift + Tab` panel](contraZH-Debug-and-Cheats.md#shader-debug-panel), without saving them.
 
 Notes:
 * Replays the glowing object meshes, then blurs the glow at half resolution and adds it to the scene.

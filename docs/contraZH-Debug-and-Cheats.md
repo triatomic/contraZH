@@ -15,6 +15,9 @@ The panel controls bloom, laser glow, shadow maps, specular highlights and emiss
 normal maps, water reflections, shoreline foam, soft particles, flame, electric, laser and cryo
 shaders, dynamic and pixel lights, ambient occlusion, height blending, HQ sky clouds and planar mirrors.
 
+The minus and plus buttons change bloom threshold in 5% steps and bloom size in 25% steps.
+Threshold runs from 0% to 100% and requires Direct3D 9. Size runs from 25% to 400%.
+
 Changes affect rendering only and the panel does not save `Options.ini`. Hiding the panel keeps
 the chosen states. A shader disabled by hardware limits or a launch-time environment variable
 cannot be enabled through the panel. The panel closes when the match or UI resources reset.

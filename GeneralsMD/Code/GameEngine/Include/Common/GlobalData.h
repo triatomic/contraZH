@@ -731,6 +731,8 @@ public:
   Bool m_backToFront;             ///< with the sorter off, draws whole particle systems far to near; off unless GameData enables it
   Bool m_useBloom;                ///< Options.ini Bloom: glow around additive particles
   Real m_bloomStrength;           ///< Options.ini BloomStrength: glow brightness, 0 to 1
+  Real m_bloomThreshold;          ///< Options.ini BloomThreshold: minimum source brightness, 0 to 1
+  Real m_bloomSize;               ///< Options.ini BloomSize: blur radius multiplier, 0.25 to 4
   Bool m_bloomDebug;              ///< Options.ini BloomDebug: show the glow buffer instead of the scene
   Bool m_laserRef;                ///< Options.ini LaserRef: lasers light the ground along the beam
   Bool m_useShadowMap;            ///< Options.ini ShadowMap: shadows come from a sun shadow map where the hardware allows

@@ -66,7 +66,7 @@ private:
 	Bool setTarget(Int target);
 	Bool blurPass(TextureClass *source, Int target, Real offsetU, Real offsetV, Bool shrink);
 	void drawTaps(TextureClass *source, const Tap *taps, Int count, const ShaderClass &firstShader);
-	void drawShaderTaps(TextureClass *source, const Tap *taps, Int count);
+	void drawShaderTaps(TextureClass *source, const Tap *taps, Int count, Real threshold);
 
 	// the full sized target that receives the additive draws, then two reduced ones to ping-pong the blur through
 	enum { TARGET_FULL = 0, TARGET_BLUR = 1, TARGET_COUNT = 3 };

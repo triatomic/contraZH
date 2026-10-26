@@ -1117,12 +1117,30 @@ const ShaderDebugOption ShaderDebugOptions[] =
 	{ L"Planar mirrors", &GlobalData::m_planarMirrorShader }
 };
 
+struct ShaderDebugValue
+{
+	const wchar_t *label;
+	Real GlobalData::*field;
+	Real minimum;
+	Real maximum;
+	Real step;
+};
+
+const ShaderDebugValue ShaderDebugValues[] =
+{
+#if defined(BUILD_WITH_D3D9)
+	{ L"Bloom threshold", &GlobalData::m_bloomThreshold, 0.0f, 1.0f, 0.05f },
+#endif
+	{ L"Bloom size", &GlobalData::m_bloomSize, 0.25f, 4.0f, 0.25f }
+};
+
 const Int SHADER_PANEL_COLUMN_WIDTH = 148;
 const Int SHADER_PANEL_ROW_HEIGHT = 20;
 const Int SHADER_PANEL_HEADER = 28;
 const Int SHADER_PANEL_ROWS = (ARRAY_SIZE(ShaderDebugOptions) + 1) / 2;
 const Int SHADER_PANEL_WIDTH = SHADER_PANEL_COLUMN_WIDTH * 2 + 16;
-const Int SHADER_PANEL_HEIGHT = SHADER_PANEL_HEADER + SHADER_PANEL_ROWS * SHADER_PANEL_ROW_HEIGHT + 20;
+const Int SHADER_PANEL_VALUE_TOP = SHADER_PANEL_HEADER + SHADER_PANEL_ROWS * SHADER_PANEL_ROW_HEIGHT;
+const Int SHADER_PANEL_HEIGHT = SHADER_PANEL_VALUE_TOP + ARRAY_SIZE(ShaderDebugValues) * SHADER_PANEL_ROW_HEIGHT + 20;
 GameWindow *ShaderPanelWindow = nullptr;
 DisplayString *ShaderPanelString = nullptr;
 
@@ -1172,6 +1190,13 @@ WindowMsgHandledType shaderPanelInput(GameWindow *window, UnsignedInt msg, Windo
 				enabled = !enabled;
 			}
 		}
+		else if (x >= SHADER_PANEL_WIDTH - 64 && x < SHADER_PANEL_WIDTH - 8 && y >= SHADER_PANEL_VALUE_TOP
+			&& y < SHADER_PANEL_HEIGHT - 20)
+		{
+			const ShaderDebugValue &option = ShaderDebugValues[(y - SHADER_PANEL_VALUE_TOP) / SHADER_PANEL_ROW_HEIGHT];
+			Real &value = TheWritableGlobalData->*option.field;
+			value = clamp(option.minimum, value + (x < SHADER_PANEL_WIDTH - 36 ? -option.step : option.step), option.maximum);
+		}
 	}
 	if ((msg >= GWM_LEFT_DOWN && msg <= GWM_WHEEL_DOWN) || msg == GWM_MOUSE_POS)
 	{
@@ -1210,6 +1235,21 @@ void drawShaderDebugPanel(GameWindow *window, WinInstanceData *)
 		ShaderPanelString->draw(x + 8 + (i / SHADER_PANEL_ROWS) * SHADER_PANEL_COLUMN_WIDTH,
 			y + SHADER_PANEL_HEADER + (i % SHADER_PANEL_ROWS) * SHADER_PANEL_ROW_HEIGHT,
 			enabled ? GameMakeColor(160, 235, 160, 255) : white, shadow);
+	}
+	for (Int i = 0; i < ARRAY_SIZE(ShaderDebugValues); ++i)
+	{
+		const Int rowY = y + SHADER_PANEL_VALUE_TOP + i * SHADER_PANEL_ROW_HEIGHT;
+		UnicodeString label;
+		label.format(L"%ls  %.0f%%", ShaderDebugValues[i].label, (TheGlobalData->*ShaderDebugValues[i].field) * 100.0f);
+		ShaderPanelString->setText(label);
+		ShaderPanelString->draw(x + 8, rowY, white, shadow);
+		for (Int button = 0; button < 2; ++button)
+		{
+			const Int buttonX = x + SHADER_PANEL_WIDTH - 64 + button * 28;
+			TheDisplay->drawOpenRect(buttonX, rowY, 24, SHADER_PANEL_ROW_HEIGHT - 2, 1.0f, white);
+			ShaderPanelString->setText(UnicodeString(button == 0 ? L"-" : L"+"));
+			ShaderPanelString->draw(buttonX + 8, rowY, white, shadow);
+		}
 	}
 	ShaderPanelString->setText(UnicodeString(L"Changes apply now; no save"));
 	ShaderPanelString->draw(x + 8, y + SHADER_PANEL_HEIGHT - 18, white, shadow);

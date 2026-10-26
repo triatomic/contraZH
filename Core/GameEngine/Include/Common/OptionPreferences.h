@@ -157,6 +157,10 @@ public:
 	// Options.ini: Bloom = Yes adds a glow around additive particles, BloomStrength (0..1) sets how bright
 	Bool getBloomEnabled() const;
 	Real getBloomStrength() const;
+#if defined(RTS_ZEROHOUR)
+	Real getBloomThreshold() const;
+	Real getBloomSize() const;
+#endif
 	Bool getBloomDebugEnabled() const;
 	// Options.ini: LaserRef = Yes lights the ground along each laser beam
 	Bool getLaserRefEnabled() const;

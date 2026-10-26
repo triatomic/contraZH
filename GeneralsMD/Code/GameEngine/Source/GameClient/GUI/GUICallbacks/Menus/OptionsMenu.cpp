@@ -233,6 +233,8 @@ static GameWindow *   textEntryKeyboardOverlayBackdropOpacity = nullptr;
 static NameKeyType    checkBloomID                = NAMEKEY_INVALID;
 static GameWindow *   checkBloom                  = nullptr;
 static GameWindow *   textEntryBloomStrength      = nullptr;
+static GameWindow *   textEntryBloomThreshold     = nullptr;
+static GameWindow *   textEntryBloomSize          = nullptr;
 static GameWindow *   checkBloomDebug             = nullptr;
 static GameWindow *   checkLaserRef               = nullptr;
 static GameWindow *   checkShadowMap              = nullptr;
@@ -582,6 +584,12 @@ static void updateGameOptionsEnables()
 
 	const Bool bloom = getCheck( checkBloom, FALSE );
 	enableWindow( textEntryBloomStrength, bloom );
+#if defined(BUILD_WITH_D3D9)
+	enableWindow( textEntryBloomThreshold, bloom );
+#else
+	enableWindow( textEntryBloomThreshold, FALSE );
+#endif
+	enableWindow( textEntryBloomSize, bloom );
 	enableWindow( checkBloomDebug, bloom );
 
 	enableWindow( checkPixelLights, getCheck( checkDynamicLights, TRUE ) );
@@ -629,6 +637,8 @@ static void populateGameOptions()
 	showColorEntries( pref->getKeyboardOverlayColor(), textEntryKeyboardOverlayRed, textEntryKeyboardOverlayGreen, textEntryKeyboardOverlayBlue, nullptr );
 	showColorEntries( pref->getKeyboardOverlayBackdropColor(), textEntryKeyboardOverlayBackdropRed, textEntryKeyboardOverlayBackdropGreen, textEntryKeyboardOverlayBackdropBlue, textEntryKeyboardOverlayBackdropOpacity );
 	setEntryInt( textEntryBloomStrength, bloomPercent( pref->getBloomStrength() ) );
+	setEntryInt( textEntryBloomThreshold, bloomPercent( pref->getBloomThreshold() ) );
+	setEntryInt( textEntryBloomSize, bloomPercent( pref->getBloomSize() ) );
 
 	updateGameOptionsEnables();
 }
@@ -647,6 +657,8 @@ static void populateShaders()
 		}
 	}
 	setEntryInt( textEntryBloomStrength, bloomPercent( pref->getBloomStrength() ) );
+	setEntryInt( textEntryBloomThreshold, bloomPercent( pref->getBloomThreshold() ) );
+	setEntryInt( textEntryBloomSize, bloomPercent( pref->getBloomSize() ) );
 	updateGameOptionsEnables();
 }
 
@@ -676,6 +688,8 @@ static void setGameOptionsDefaults()
 	showColorEntries( GameMakeColor( 255, 255, 255, 255 ), textEntryKeyboardOverlayRed, textEntryKeyboardOverlayGreen, textEntryKeyboardOverlayBlue, nullptr );
 	showColorEntries( GameMakeColor( 0, 0, 0, 128 ), textEntryKeyboardOverlayBackdropRed, textEntryKeyboardOverlayBackdropGreen, textEntryKeyboardOverlayBackdropBlue, textEntryKeyboardOverlayBackdropOpacity );
 	setEntryInt( textEntryBloomStrength, 50 );
+	setEntryInt( textEntryBloomThreshold, 0 );
+	setEntryInt( textEntryBloomSize, 100 );
 
 	updateGameOptionsEnables();
 }
@@ -1227,6 +1241,16 @@ static void saveOptions()
 		prefString.format( "%.2f", percent / 100.0f );
 		(*pref)["BloomStrength"] = prefString;
 		TheWritableGlobalData->m_bloomStrength = percent / 100.0f;
+
+		const Int threshold = getEntryInt( textEntryBloomThreshold, 0, 100, bloomPercent( pref->getBloomThreshold() ) );
+		prefString.format( "%.2f", threshold / 100.0f );
+		(*pref)["BloomThreshold"] = prefString;
+		TheWritableGlobalData->m_bloomThreshold = threshold / 100.0f;
+
+		const Int size = getEntryInt( textEntryBloomSize, 25, 400, bloomPercent( pref->getBloomSize() ) );
+		prefString.format( "%.2f", size / 100.0f );
+		(*pref)["BloomSize"] = prefString;
+		TheWritableGlobalData->m_bloomSize = size / 100.0f;
 	}
 
 	//-------------------------------------------------------------------------------------------------
@@ -1735,6 +1759,8 @@ static void initGameOptionsWindows()
 	textEntryKeyboardOverlayBackdropOpacity = findOptionsWindow( "OptionsMenu.wnd:TextEntryKeyboardOverlayBackdropOpacity" );
 	checkBloom = findOptionsWindow( "OptionsMenu.wnd:CheckBloom", checkBloomID );
 	textEntryBloomStrength = findOptionsWindow( "OptionsMenu.wnd:TextEntryBloomStrength" );
+	textEntryBloomThreshold = findOptionsWindow( "OptionsMenu.wnd:TextEntryBloomThreshold" );
+	textEntryBloomSize = findOptionsWindow( "OptionsMenu.wnd:TextEntryBloomSize" );
 	checkBloomDebug = findDebugViewCheck( "OptionsMenu.wnd:CheckBloomDebug" );
 	checkLaserRef = findOptionsWindow( "OptionsMenu.wnd:CheckLaserRef" );
 	checkShadowMap = findOptionsWindow( "OptionsMenu.wnd:CheckShadowMap" );
@@ -1781,6 +1807,8 @@ static void initGameOptionsWindows()
 	setLabelText( "OptionsMenu.wnd:KeyboardOverlayBackdropOpacityLabel", "GUI:KeyboardOverlayBackdropOpacity" );
 	setLabelText( "OptionsMenu.wnd:BloomGroupLabel", "GUI:GameOptionsBloom" );
 	setLabelText( "OptionsMenu.wnd:BloomStrengthLabel", "GUI:BloomStrength" );
+	setLabelText( "OptionsMenu.wnd:BloomThresholdLabel", "GUI:BloomThreshold" );
+	setLabelText( "OptionsMenu.wnd:BloomSizeLabel", "GUI:BloomSize" );
 
 	setCheckText( checkNumericalHealth, "GUI:NumericalHealth", "TOOLTIP:NumericalHealth" );
 	setCheckText( checkSmartPips, "GUI:SmartPips", "TOOLTIP:SmartPips" );
@@ -1805,6 +1833,8 @@ static void initGameOptionsWindows()
 	setCheckText( checkBloom, "GUI:Bloom", "TOOLTIP:Bloom" );
 	setCheckText( checkBloomDebug, "GUI:BloomDebug", "TOOLTIP:BloomDebug" );
 	setTooltip( textEntryBloomStrength, "TOOLTIP:BloomStrength" );
+	setTooltip( textEntryBloomThreshold, "TOOLTIP:BloomThreshold" );
+	setTooltip( textEntryBloomSize, "TOOLTIP:BloomSize" );
 	setCheckText( checkLaserRef, "GUI:LaserRef", "TOOLTIP:LaserRef" );
 	setCheckText( checkSpecular, "GUI:Specular", "TOOLTIP:Specular" );
 	setCheckText( checkSpecularDebug, "GUI:SpecularDebug", "TOOLTIP:SpecularDebug" );
