@@ -235,6 +235,7 @@ static GameWindow *   checkBloom                  = nullptr;
 static GameWindow *   textEntryBloomStrength      = nullptr;
 static GameWindow *   textEntryBloomThreshold     = nullptr;
 static GameWindow *   textEntryBloomSize          = nullptr;
+static GameWindow *   checkBloomZoomCompensation  = nullptr;
 static GameWindow *   checkBloomDebug             = nullptr;
 static GameWindow *   checkLaserRef               = nullptr;
 static GameWindow *   checkShadowMap              = nullptr;
@@ -517,6 +518,7 @@ static const BoolOption BoolOptions[] =
 	{ &checkKeyboardOverlay, "KeyboardOverlay", &OptionPreferences::getKeyboardOverlayEnabled, &GlobalData::m_keyboardOverlayEnabled, FALSE },
 	{ &checkKeyboardOverlayBackdrop, "KeyboardOverlayBackdrop", &OptionPreferences::getKeyboardOverlayBackdropEnabled, &GlobalData::m_keyboardOverlayBackdrop, TRUE },
 	{ &checkBloom, "Bloom", &OptionPreferences::getBloomEnabled, &GlobalData::m_useBloom, FALSE },
+	{ &checkBloomZoomCompensation, "BloomZoomCompensation", &OptionPreferences::getBloomZoomCompensation, &GlobalData::m_bloomZoomCompensation, FALSE },
 	{ &checkBloomDebug, "BloomDebug", &OptionPreferences::getBloomDebugEnabled, &GlobalData::m_bloomDebug, FALSE },
 	{ &checkLaserRef, "LaserRef", &OptionPreferences::getLaserRefEnabled, &GlobalData::m_laserRef, FALSE },
 	{ &checkShadowMap, "ShadowMap", &OptionPreferences::getShadowMapEnabled, &GlobalData::m_useShadowMap, TRUE },
@@ -590,6 +592,7 @@ static void updateGameOptionsEnables()
 	enableWindow( textEntryBloomThreshold, FALSE );
 #endif
 	enableWindow( textEntryBloomSize, bloom );
+	enableWindow( checkBloomZoomCompensation, bloom );
 	enableWindow( checkBloomDebug, bloom );
 
 	enableWindow( checkPixelLights, getCheck( checkDynamicLights, TRUE ) );
@@ -1761,6 +1764,7 @@ static void initGameOptionsWindows()
 	textEntryBloomStrength = findOptionsWindow( "OptionsMenu.wnd:TextEntryBloomStrength" );
 	textEntryBloomThreshold = findOptionsWindow( "OptionsMenu.wnd:TextEntryBloomThreshold" );
 	textEntryBloomSize = findOptionsWindow( "OptionsMenu.wnd:TextEntryBloomSize" );
+	checkBloomZoomCompensation = findOptionsWindow( "OptionsMenu.wnd:CheckBloomZoomCompensation" );
 	checkBloomDebug = findDebugViewCheck( "OptionsMenu.wnd:CheckBloomDebug" );
 	checkLaserRef = findOptionsWindow( "OptionsMenu.wnd:CheckLaserRef" );
 	checkShadowMap = findOptionsWindow( "OptionsMenu.wnd:CheckShadowMap" );
@@ -1831,6 +1835,7 @@ static void initGameOptionsWindows()
 	setCheckText( checkKeyboardOverlay, "GUI:KeyboardOverlay", "TOOLTIP:KeyboardOverlay" );
 	setCheckText( checkKeyboardOverlayBackdrop, "GUI:KeyboardOverlayBackdrop", "TOOLTIP:KeyboardOverlayBackdrop" );
 	setCheckText( checkBloom, "GUI:Bloom", "TOOLTIP:Bloom" );
+	setCheckText( checkBloomZoomCompensation, "GUI:BloomZoomCompensation", "TOOLTIP:BloomZoomCompensation" );
 	setCheckText( checkBloomDebug, "GUI:BloomDebug", "TOOLTIP:BloomDebug" );
 	setTooltip( textEntryBloomStrength, "TOOLTIP:BloomStrength" );
 	setTooltip( textEntryBloomThreshold, "TOOLTIP:BloomThreshold" );

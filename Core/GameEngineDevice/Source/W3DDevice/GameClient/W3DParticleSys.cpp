@@ -184,6 +184,31 @@ static Bool shouldBloomParticle(ParticleSystem *system)
 	return enabled;
 }
 
+static Real bloomZoomReference(ParticleSystem *system, CameraClass &camera)
+{
+#if RTS_ZEROHOUR
+	if (TheGlobalData->m_useBloom && TheGlobalData->m_bloomStrength > 0.0f &&
+		TheGlobalData->m_bloomZoomCompensation && shouldBloomParticle(system) &&
+		camera.Get_Projection_Type() == CameraClass::PERSPECTIVE)
+	{
+		const Real pitch = DEG_TO_RADF(max(TheGlobalData->m_cameraPitch, 10.0f));
+		return max(TheGlobalData->m_cameraHeight / sinf(pitch), 1.0f);
+	}
+#endif
+	return 0.0f;
+}
+
+static Real bloomZoomScale(CameraClass &camera, const Coord3D *position, Real reference)
+{
+	if (reference <= 0.0f)
+	{
+		return 1.0f;
+	}
+	Vector3 view;
+	camera.Transform_To_View_Space(view, Vector3(position->x, position->y, position->z));
+	return max(1.0f, -view.Z / reference);
+}
+
 void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 {
 
@@ -265,10 +290,11 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 		// TheSuperHackers @performance Mauller 16/08/2026 Skip processing particle system if no particles are in view.
 		UnsignedInt particleCount = 0;
 		Vector3 visibleSum(0.0f, 0.0f, 0.0f);
+		const Real zoomReference = bloomZoomReference(sys, rinfo.Camera);
 		for (Particle* vp = sys->getFirstParticle(); vp; vp = vp->m_systemNext)
 		{
 			const Coord3D* pos = vp->getPosition();
-			const Real psize = vp->getSize();
+			const Real psize = vp->getSize() * bloomZoomScale(rinfo.Camera, pos, zoomReference);
 
 			//Test if particle is at the screen or terrain edges.
 			if (WWMath::Fabsf_Legacy(pos->x - bcX) > (beX + psize) ||
@@ -612,6 +638,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		const Coord3D *pos;
 		const RGBColor *color;
 		Real psize;
+		const Real zoomReference = bloomZoomReference(sys, rinfo.Camera);
 
 
 
@@ -622,7 +649,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 				continue;
 
 			pos = p->getPosition();
-			psize = p->getSize();
+			psize = p->getSize() * bloomZoomScale(rinfo.Camera, pos, zoomReference);
 
 			m_fieldParticleCount += ( sys->getPriority() == AREA_EFFECT && sys->m_isGroundAligned != FALSE );
 

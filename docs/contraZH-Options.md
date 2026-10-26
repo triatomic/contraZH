@@ -318,6 +318,11 @@ Uses the brightest RGB channel and preserves its color. `Threshold %` on the Gra
 from 0 to 100. Requires the Direct3D 9 pixel shader.)
 * `BloomSize = 1.0` - (0.25 to 4. Multiplies the glow radius. 1 keeps the original size.
 `Size %` on the Graphics page, from 25 to 400.)
+* `BloomZoomCompensation = No` - (Yes keeps glowing particle sprites at their default-camera
+screen size as you zoom out, preserving the glow's coverage. Streak widths also stay steady;
+their paths still follow their world positions. Only additive particle systems with `Bloom = Yes`
+are affected, while global bloom is on. Also available on the Graphics page and in the
+`Ctrl + Shift + Tab` panel.)
 * `BloomDebug = No` - (Yes shows only the blurred glow buffer on black, to see what feeds it.
 `Bloom debug view` on the Graphics page. Cheat builds only: a release build hides the checkbox and
 ignores the key.)
@@ -330,6 +335,9 @@ labels to the loose menu and string files, keeping copies under the game folder'
 `_bak_to_delete` directory.
 Cheat builds also let you adjust threshold and size live in the
 [`Ctrl + Shift + Tab` panel](contraZH-Debug-and-Cheats.md#shader-debug-panel), without saving them.
+The FX tuner's `Bloom` checkbox updates its previews and writes the global `Bloom` setting to
+`Options.ini` immediately. Choose that file in the tuner's Configuration page. The game reads the
+setting when options reload or at launch; the preview uses its strength, threshold and size.
 
 Notes:
 * Replays the glowing object meshes, then blurs the glow at half resolution and adds it to the scene.

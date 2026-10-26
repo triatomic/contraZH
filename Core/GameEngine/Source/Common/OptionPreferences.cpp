@@ -373,6 +373,11 @@ Real OptionPreferences::getBloomSize(void) const
 {
 	return clamp(0.25f, getReal("BloomSize", 1.0f), 4.0f);
 }
+
+Bool OptionPreferences::getBloomZoomCompensation(void) const
+{
+	return getBool("BloomZoomCompensation", FALSE);
+}
 #endif
 
 // The debug views are developer aids: a build without cheats never turns one on, whatever Options.ini says

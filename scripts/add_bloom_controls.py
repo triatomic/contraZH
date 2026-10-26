@@ -51,13 +51,28 @@ def patch_strings(text):
     entries = {
         "GUI:BloomThreshold": "Threshold %",
         "GUI:BloomSize": "Size %",
+        "GUI:BloomZoomCompensation": "Bloom zoom compensation",
         "TOOLTIP:BloomThreshold": "0 to 100. Only brightness above this value feeds the glow. Requires Direct3D 9.",
         "TOOLTIP:BloomSize": "25 to 400. Glow radius as a percentage of its original size. 100 keeps the original size.",
+        "TOOLTIP:BloomZoomCompensation": "Keep glowing particles at their default-camera screen size when zoomed out. Only additive systems with Bloom enabled are affected.",
     }
     for key, value in entries.items():
         if not re.search(r"^" + re.escape(key) + r"\s*$", text, re.MULTILINE):
             text += newline + newline.join((key, '"%s"' % value, "END", ""))
     return text
+
+
+def patch_zoom_control(text):
+    if 'NAME = "OptionsMenu.wnd:CheckBloomZoomCompensation";' in text:
+        return text
+    bloom = window_block(text, "CheckBloom")
+    control = bloom.replace("CheckBloom", "CheckBloomZoomCompensation")
+    control = control.replace('"GUI:Bloom"', '"GUI:BloomZoomCompensation"').replace('"TOOLTIP:Bloom"', '"TOOLTIP:BloomZoomCompensation"')
+    control = place(control, (160, 341, 390, 361))
+    for name, y in (("CheckBloomDebug", 364), ("CheckAmbientOcclusionDebug", 387)):
+        old = window_block(text, name)
+        text = text.replace(old, place(old, (160, y, 390, y + 20)), 1)
+    return text.replace(bloom, bloom + control, 1)
 
 
 def main():
@@ -66,7 +81,7 @@ def main():
     parser.add_argument("--output-dir", type=Path)
     args = parser.parse_args()
     sources = (args.game_dir / "Window/Menus/OptionsMenu.wnd", args.game_dir / "Data/Generals.str")
-    updated = [patch_window(sources[0].read_bytes().decode("latin-1")),
+    updated = [patch_zoom_control(patch_window(sources[0].read_bytes().decode("latin-1"))),
                patch_strings(sources[1].read_bytes().decode("latin-1"))]
     if args.output_dir:
         args.output_dir.mkdir(parents=True, exist_ok=True)

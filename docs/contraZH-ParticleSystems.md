@@ -4,6 +4,7 @@
 
 `Bloom = Yes` is the default. Set `Bloom = No` on a particle system to exclude its particles
 from the bloom pass while keeping their normal appearance.
+The FX tuner's INI entries mode exposes `Bloom` under each particle system's `System` controls.
 
 ```ini
 ParticleSystem MyBeamEffect
