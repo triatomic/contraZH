@@ -47,6 +47,8 @@ namespace
 	{
 		WATER_BOOL("IsWater", m_isWater, 0,
 			"No draws the old water without shaders, for lava and the like."),
+		WATER_BOOL("AdditiveBlending", m_additiveBlend, 0,
+			"Yes uses the old additive water and disables shader water."),
 		WATER_REAL("ShaderWaterOpacity", m_shaderWaterOpacity, 0.0f, 1.0f, 0.01f, 0,
 			"Deep water opacity. 1 hides the seabed. 0 uses TransparentWaterMinOpacity."),
 		WATER_REAL("ShaderWaterClarity", m_shaderWaterClarity, 0.1f, 10.0f, 0.1f, 0,
