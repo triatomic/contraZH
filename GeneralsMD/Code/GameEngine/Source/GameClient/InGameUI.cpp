@@ -69,6 +69,9 @@
 #include "GameClient/Drawable.h"
 #include "GameClient/FXList.h"
 #include "GameClient/GadgetPushButton.h"
+#include "GameClient/GadgetComboBox.h"
+#include "GameClient/GadgetListBox.h"
+#include "GameClient/GadgetTextEntry.h"
 #include "GameClient/GameClient.h"
 #include "GameClient/GameWindowGlobal.h"
 #include "GameClient/GameWindowID.h"
@@ -1134,23 +1137,341 @@ const ShaderDebugValue ShaderDebugValues[] =
 	{ L"Bloom size", &GlobalData::m_bloomSize, 0.25f, 4.0f, 0.25f }
 };
 
-const Int SHADER_PANEL_COLUMN_WIDTH = 148;
+const Int SHADER_PANEL_COLUMN_WIDTH = 200;
 const Int SHADER_PANEL_ROW_HEIGHT = 20;
-const Int SHADER_PANEL_HEADER = 28;
+const Int SHADER_PANEL_HEADER = 52;
 const Int SHADER_PANEL_ROWS = (ARRAY_SIZE(ShaderDebugOptions) + 1) / 2;
 const Int SHADER_PANEL_WIDTH = SHADER_PANEL_COLUMN_WIDTH * 2 + 16;
 const Int SHADER_PANEL_VALUE_TOP = SHADER_PANEL_HEADER + SHADER_PANEL_ROWS * SHADER_PANEL_ROW_HEIGHT;
 const Int SHADER_PANEL_HEIGHT = SHADER_PANEL_VALUE_TOP + ARRAY_SIZE(ShaderDebugValues) * SHADER_PANEL_ROW_HEIGHT + 20;
 GameWindow *ShaderPanelWindow = nullptr;
 DisplayString *ShaderPanelString = nullptr;
+const Int UNIT_SPAWNER_HEIGHT = 420;
+Bool UnitSpawnerTab = FALSE;
+GameWindow *UnitSpawnerSide = nullptr;
+GameWindow *UnitSpawnerSearch = nullptr;
+GameWindow *UnitSpawnerList = nullptr;
+GameWindow *UnitSpawnerPlacement = nullptr;
+UnsignedShort UnitSpawnerTemplateID = 0;
+std::vector<const ThingTemplate *> UnitSpawnerTemplates;
+std::vector<AsciiString> UnitSpawnerSides;
+
+Bool canSpawnDebugUnit()
+{
+	return TheGameLogic && (TheGameLogic->isInSkirmishGame() || TheGameLogic->isInSinglePlayerGame())
+		&& !TheGameLogic->isInReplayGame() && (!TheRecorder || !TheRecorder->isPlaybackMode())
+		&& ThePlayerList && !ThePlayerList->getLocalPlayer()->isPlayerObserver()
+		&& !ThePlayerList->getLocalPlayer()->isPlayerDead();
+}
+
+Bool unitSpawnerMatches(const UnicodeString &text, const UnicodeString &search)
+{
+	for (const WideChar *at = text.str(); *at; ++at)
+	{
+		if (_wcsnicmp(at, search.str(), search.getLength()) == 0)
+		{
+			return TRUE;
+		}
+	}
+	return search.isEmpty();
+}
+
+Bool unitSpawnerTemplateLess(const ThingTemplate *left, const ThingTemplate *right)
+{
+	return _stricmp(left->getName().str(), right->getName().str()) < 0;
+}
+
+void refreshUnitSpawnerList()
+{
+	if (!UnitSpawnerList || !UnitSpawnerSide || !UnitSpawnerSearch)
+	{
+		return;
+	}
+	Int side = 0;
+	GadgetComboBoxGetSelectedPos(UnitSpawnerSide, &side);
+	const UnicodeString search = GadgetTextEntryGetText(UnitSpawnerSearch);
+	GadgetListBoxReset(UnitSpawnerList);
+	GadgetListBoxBatchAddScope batch(UnitSpawnerList);
+	for (Int i = 0; i < (Int)UnitSpawnerTemplates.size(); ++i)
+	{
+		const ThingTemplate *tmpl = UnitSpawnerTemplates[i];
+		if (side > 0 && side < (Int)UnitSpawnerSides.size()
+			&& _stricmp(tmpl->getDefaultOwningSide().str(), UnitSpawnerSides[side].str()) != 0)
+		{
+			continue;
+		}
+		UnicodeString name;
+		name.translate(tmpl->getName());
+		if (!unitSpawnerMatches(name, search) && !unitSpawnerMatches(tmpl->getDisplayName(), search))
+		{
+			continue;
+		}
+		UnicodeString label;
+		if (tmpl->getDisplayName().isEmpty())
+		{
+			label = name;
+		}
+		else
+		{
+			label.format(L"%ls [%ls]", tmpl->getDisplayName().str(), name.str());
+		}
+		const Int row = GadgetListBoxAddEntryText(UnitSpawnerList, label, GameMakeColor(235, 235, 235, 255), -1);
+		DEBUG_ASSERTCRASH(row >= 0, ("Unit spawner list is full"));
+		if (row < 0)
+		{
+			break;
+		}
+		GadgetListBoxSetItemData(UnitSpawnerList, const_cast<ThingTemplate *>(tmpl), row);
+	}
+	GadgetListBoxSetTopVisibleEntry(UnitSpawnerList, 0);
+	if (GadgetListBoxGetNumEntries(UnitSpawnerList) > 0)
+	{
+		GadgetListBoxSetSelected(UnitSpawnerList, 0);
+	}
+}
+
+void finishUnitSpawnerPlacement()
+{
+	if (UnitSpawnerPlacement)
+	{
+		TheWindowManager->winDestroy(UnitSpawnerPlacement);
+		UnitSpawnerPlacement = nullptr;
+	}
+	if (ShaderPanelWindow)
+	{
+		ShaderPanelWindow->winHide(FALSE);
+	}
+}
+
+WindowMsgHandledType unitSpawnerPlacementSystem(GameWindow *window, UnsignedInt msg, WindowMsgData, WindowMsgData data)
+{
+	if (msg == GWM_INPUT_FOCUS)
+	{
+		*(Bool *)data = TRUE;
+		return MSG_HANDLED;
+	}
+	if (msg == GWM_DESTROY && window == UnitSpawnerPlacement)
+	{
+		UnitSpawnerPlacement = nullptr;
+	}
+	return MSG_IGNORED;
+}
+
+WindowMsgHandledType unitSpawnerPlacementInput(GameWindow *, UnsignedInt msg, WindowMsgData data, WindowMsgData state)
+{
+	if (msg == GWM_RIGHT_UP || (msg == GWM_CHAR && data == KEY_ESC && (state & KEY_STATE_DOWN)))
+	{
+		finishUnitSpawnerPlacement();
+	}
+	else if (msg == GWM_LEFT_UP)
+	{
+		ICoord2D screen;
+		screen.x = (Int)LOLONGTOSHORT(data);
+		screen.y = (Int)HILONGTOSHORT(data);
+		Coord3D pos;
+		if (canSpawnDebugUnit() && TheTacticalView && TheMessageStream
+			&& TheTacticalView->screenToTerrain(&screen, &pos))
+		{
+			GameMessage *spawn = TheMessageStream->appendMessage(GameMessage::MSG_SPAWN_OBJECT_AT_POSITION);
+			spawn->appendIntegerArgument((Int)UnitSpawnerTemplateID);
+			spawn->appendLocationArgument(pos);
+			finishUnitSpawnerPlacement();
+		}
+	}
+	return MSG_HANDLED;
+}
+
+void startUnitSpawnerPlacement()
+{
+	if (!canSpawnDebugUnit() || !UnitSpawnerList || UnitSpawnerPlacement)
+	{
+		return;
+	}
+	Int row = -1;
+	GadgetListBoxGetSelected(UnitSpawnerList, &row);
+	if (row < 0 || row >= GadgetListBoxGetNumEntries(UnitSpawnerList))
+	{
+		return;
+	}
+	const ThingTemplate *tmpl = (const ThingTemplate *)GadgetListBoxGetItemData(UnitSpawnerList, row);
+	if (!tmpl)
+	{
+		return;
+	}
+	UnitSpawnerTemplateID = tmpl->getTemplateID();
+	WinInstanceData data;
+	data.m_style = GWS_USER_WINDOW;
+	UnitSpawnerPlacement = TheWindowManager->winCreate(nullptr, WIN_STATUS_ENABLED,
+		0, 0, TheDisplay->getWidth(), TheDisplay->getHeight(), unitSpawnerPlacementSystem, &data);
+	if (UnitSpawnerPlacement)
+	{
+		UnitSpawnerPlacement->winSetInputFunc(unitSpawnerPlacementInput);
+		UnitSpawnerPlacement->winBringToTop();
+		ShaderPanelWindow->winHide(TRUE);
+		TheWindowManager->winSetFocus(UnitSpawnerPlacement);
+		TheInGameUI->message(UnicodeString(L"Click the ground to spawn. Right-click or Escape cancels."));
+	}
+}
+
+void styleUnitSpawnerControl(GameWindow *window)
+{
+	const Color background = GameMakeColor(20, 28, 36, 255);
+	const Color border = GameMakeColor(110, 140, 160, 255);
+	const Color selected = GameMakeColor(55, 85, 105, 255);
+	for (Int i = 0; i < 2; ++i)
+	{
+		window->winSetEnabledColor(i, i == 0 ? background : selected);
+		window->winSetEnabledBorderColor(i, border);
+		window->winSetHiliteColor(i, selected);
+		window->winSetHiliteBorderColor(i, border);
+		window->winSetDisabledColor(i, background);
+		window->winSetDisabledBorderColor(i, border);
+	}
+	window->winSetEnabledTextColors(GameMakeColor(235, 235, 235, 255), GameMakeColor(0, 0, 0, 255));
+	window->winSetHiliteTextColors(GameMakeColor(255, 255, 255, 255), GameMakeColor(0, 0, 0, 255));
+	if (window->winGetStyle() & GWS_PUSH_BUTTON)
+	{
+		window->winClearStatus(WIN_STATUS_IMAGE);
+		window->winSetDrawFunc(TheWindowManager->getPushButtonDrawFunc());
+	}
+	for (GameWindow *child = window->winGetChild(); child; child = child->winGetNext())
+	{
+		styleUnitSpawnerControl(child);
+	}
+}
+
+void styleUnitSpawnerList(GameWindow *window)
+{
+	styleUnitSpawnerControl(window);
+	ListboxData *list = (ListboxData *)window->winGetUserData();
+	GadgetButtonSetText(list->upButton, UnicodeString(L"\x25B2"));
+	GadgetButtonSetText(list->downButton, UnicodeString(L"\x25BC"));
+}
+
+void createUnitSpawner()
+{
+	if (UnitSpawnerList || !TheThingFactory)
+	{
+		return;
+	}
+	UnitSpawnerTemplates.clear();
+	UnitSpawnerSides.clear();
+	UnitSpawnerSides.push_back(AsciiString::TheEmptyString);
+	for (const ThingTemplate *base = TheThingFactory->firstTemplate(); base; base = base->friend_getNextTemplate())
+	{
+		const ThingTemplate *tmpl = (const ThingTemplate *)base->getFinalOverride();
+		if (!tmpl->isKindOf(KINDOF_INFANTRY) && !tmpl->isKindOf(KINDOF_VEHICLE)
+			&& !tmpl->isKindOf(KINDOF_AIRCRAFT) && !tmpl->isKindOf(KINDOF_STRUCTURE)
+			&& !tmpl->isKindOf(KINDOF_PORTABLE_STRUCTURE))
+		{
+			continue;
+		}
+		UnitSpawnerTemplates.push_back(tmpl);
+		const AsciiString &side = tmpl->getDefaultOwningSide();
+		if (!side.isEmpty() && std::find(UnitSpawnerSides.begin(), UnitSpawnerSides.end(), side) == UnitSpawnerSides.end())
+		{
+			UnitSpawnerSides.push_back(side);
+		}
+	}
+	std::sort(UnitSpawnerTemplates.begin(), UnitSpawnerTemplates.end(), unitSpawnerTemplateLess);
+	std::sort(UnitSpawnerSides.begin() + 1, UnitSpawnerSides.end());
+	GameFont *font = TheWindowManager->winFindFont("Tahoma", 9, FALSE);
+	WinInstanceData data;
+	data.m_style = GWS_COMBO_BOX | GWS_MOUSE_TRACK;
+	data.m_font = font;
+	ComboBoxData combo;
+	memset(&combo, 0, sizeof(combo));
+	combo.maxDisplay = 10;
+	combo.maxChars = 96;
+	combo.entryData = NEW EntryData;
+	memset(combo.entryData, 0, sizeof(EntryData));
+	combo.listboxData = NEW ListboxData;
+	memset(combo.listboxData, 0, sizeof(ListboxData));
+	combo.listboxData->listLength = max(1, (Int)UnitSpawnerSides.size());
+	combo.listboxData->columns = 1;
+	combo.listboxData->scrollBar = TRUE;
+	UnitSpawnerSide = TheWindowManager->gogoGadgetComboBox(ShaderPanelWindow, WIN_STATUS_ENABLED,
+		64, 58, SHADER_PANEL_WIDTH - 72, 22, &data, &combo, font, TRUE);
+	for (Int i = 0; i < (Int)UnitSpawnerSides.size(); ++i)
+	{
+		UnicodeString side;
+		side.translate(UnitSpawnerSides[i]);
+		GadgetComboBoxAddEntry(UnitSpawnerSide, i == 0 ? UnicodeString(L"All sides") : side, GameMakeColor(235, 235, 235, 255));
+	}
+	GadgetComboBoxSetSelectedPos(UnitSpawnerSide, 0);
+	data.init();
+	data.m_style = GWS_ENTRY_FIELD | GWS_MOUSE_TRACK;
+	data.m_font = font;
+	EntryData entry;
+	memset(&entry, 0, sizeof(entry));
+	entry.maxTextLen = 96;
+	UnitSpawnerSearch = TheWindowManager->gogoGadgetTextEntry(ShaderPanelWindow, WIN_STATUS_ENABLED,
+		64, 88, SHADER_PANEL_WIDTH - 72, 22, &data, &entry, font, TRUE);
+	data.init();
+	data.m_style = GWS_SCROLL_LISTBOX | GWS_MOUSE_TRACK;
+	data.m_font = font;
+	ListboxData list;
+	memset(&list, 0, sizeof(list));
+	list.listLength = max(1, (Int)UnitSpawnerTemplates.size());
+	list.columns = 1;
+	list.scrollBar = TRUE;
+	list.forceSelect = TRUE;
+	UnitSpawnerList = TheWindowManager->gogoGadgetListBox(ShaderPanelWindow, WIN_STATUS_ENABLED,
+		8, 118, SHADER_PANEL_WIDTH - 16, UNIT_SPAWNER_HEIGHT - 184, &data, &list, font, TRUE);
+	styleUnitSpawnerControl(UnitSpawnerSearch);
+	styleUnitSpawnerControl(UnitSpawnerSide);
+	GadgetButtonSetText(GadgetComboBoxGetDropDownButton(UnitSpawnerSide), UnicodeString(L"\x25BC"));
+	styleUnitSpawnerList(GadgetComboBoxGetListBox(UnitSpawnerSide));
+	styleUnitSpawnerList(UnitSpawnerList);
+	UnitSpawnerSide->winBringToTop();
+	refreshUnitSpawnerList();
+}
+
+void selectDebugPanelTab(Bool spawner)
+{
+	TheWindowManager->winSetFocus(nullptr);
+	if (spawner)
+	{
+		createUnitSpawner();
+	}
+	if (UnitSpawnerSide)
+	{
+		GadgetComboBoxHideList(UnitSpawnerSide);
+	}
+	UnitSpawnerTab = spawner;
+	GameWindow *controls[] = { UnitSpawnerSide, UnitSpawnerSearch, UnitSpawnerList };
+	for (Int i = 0; i < ARRAY_SIZE(controls); ++i)
+	{
+		if (controls[i])
+		{
+			controls[i]->winHide(!spawner);
+		}
+	}
+	ShaderPanelWindow->winSetSize(SHADER_PANEL_WIDTH, spawner ? UNIT_SPAWNER_HEIGHT : SHADER_PANEL_HEIGHT);
+	if (spawner && UnitSpawnerSearch)
+	{
+		TheWindowManager->winSetFocus(UnitSpawnerSearch);
+	}
+}
 
 void destroyShaderDebugPanel()
 {
+	if (UnitSpawnerPlacement && TheWindowManager)
+	{
+		TheWindowManager->winDestroy(UnitSpawnerPlacement);
+	}
+	UnitSpawnerPlacement = nullptr;
 	if (ShaderPanelWindow && TheWindowManager)
 	{
 		TheWindowManager->winDestroy(ShaderPanelWindow);
 	}
 	ShaderPanelWindow = nullptr;
+	UnitSpawnerSide = nullptr;
+	UnitSpawnerSearch = nullptr;
+	UnitSpawnerList = nullptr;
+	UnitSpawnerTab = FALSE;
+	UnitSpawnerTemplates.clear();
+	UnitSpawnerSides.clear();
 	if (ShaderPanelString)
 	{
 		TheDisplayStringManager->freeDisplayString(ShaderPanelString);
@@ -1158,26 +1479,59 @@ void destroyShaderDebugPanel()
 	}
 }
 
-WindowMsgHandledType shaderPanelSystem(GameWindow *window, UnsignedInt msg, WindowMsgData, WindowMsgData)
+WindowMsgHandledType shaderPanelSystem(GameWindow *window, UnsignedInt msg, WindowMsgData data, WindowMsgData)
 {
+	if ((msg == GEM_UPDATE_TEXT && (GameWindow *)data == UnitSpawnerSearch)
+		|| (msg == GCM_SELECTED && (GameWindow *)data == UnitSpawnerSide))
+	{
+		refreshUnitSpawnerList();
+		return MSG_HANDLED;
+	}
+	if (msg == GLM_DOUBLE_CLICKED && (GameWindow *)data == UnitSpawnerList)
+	{
+		startUnitSpawnerPlacement();
+		return MSG_HANDLED;
+	}
 	if (msg == GWM_DESTROY && window == ShaderPanelWindow)
 	{
 		ShaderPanelWindow = nullptr;
+		UnitSpawnerSide = nullptr;
+		UnitSpawnerSearch = nullptr;
+		UnitSpawnerList = nullptr;
+		UnitSpawnerTab = FALSE;
+		UnitSpawnerTemplates.clear();
+		UnitSpawnerSides.clear();
 	}
 	return MSG_IGNORED;
 }
 
-WindowMsgHandledType shaderPanelInput(GameWindow *window, UnsignedInt msg, WindowMsgData data, WindowMsgData)
+WindowMsgHandledType shaderPanelInput(GameWindow *window, UnsignedInt msg, WindowMsgData data, WindowMsgData state)
 {
+	if (msg == GWM_CHAR && data == KEY_ESC && (state & KEY_STATE_DOWN))
+	{
+		window->winHide(TRUE);
+		return MSG_HANDLED;
+	}
 	if (msg == GWM_LEFT_UP && TheWritableGlobalData)
 	{
 		Int left, top;
 		window->winGetScreenPosition(&left, &top);
 		Int x = (Int)LOLONGTOSHORT(data) - left;
 		Int y = (Int)HILONGTOSHORT(data) - top;
-		if (x >= SHADER_PANEL_WIDTH - 26 && x < SHADER_PANEL_WIDTH && y >= 0 && y < SHADER_PANEL_HEADER)
+		if (x >= SHADER_PANEL_WIDTH - 26 && x < SHADER_PANEL_WIDTH && y >= 0 && y < 28)
 		{
 			window->winHide(TRUE);
+		}
+		else if (y >= 28 && y < SHADER_PANEL_HEADER)
+		{
+			selectDebugPanelTab(x >= SHADER_PANEL_WIDTH / 2);
+		}
+		else if (UnitSpawnerTab)
+		{
+			if (y >= UNIT_SPAWNER_HEIGHT - 58 && y < UNIT_SPAWNER_HEIGHT - 30)
+			{
+				startUnitSpawnerPlacement();
+			}
 		}
 		else if (x >= 8 && x < SHADER_PANEL_WIDTH - 8 && y >= SHADER_PANEL_HEADER
 			&& y < SHADER_PANEL_HEADER + SHADER_PANEL_ROWS * SHADER_PANEL_ROW_HEIGHT)
@@ -1220,12 +1574,39 @@ void drawShaderDebugPanel(GameWindow *window, WinInstanceData *)
 	window->winGetScreenPosition(&x, &y);
 	const Color white = GameMakeColor(235, 235, 235, 255);
 	const Color shadow = GameMakeColor(0, 0, 0, 255);
-	TheDisplay->drawFillRect(x, y, SHADER_PANEL_WIDTH, SHADER_PANEL_HEIGHT, GameMakeColor(12, 16, 20, 205));
-	TheDisplay->drawOpenRect(x, y, SHADER_PANEL_WIDTH, SHADER_PANEL_HEIGHT, 1.0f, GameMakeColor(130, 160, 180, 220));
-	ShaderPanelString->setText(UnicodeString(L"Shaders   Ctrl+Shift+Tab"));
+	const Int height = UnitSpawnerTab ? UNIT_SPAWNER_HEIGHT : SHADER_PANEL_HEIGHT;
+	TheDisplay->drawFillRect(x, y, SHADER_PANEL_WIDTH, height, GameMakeColor(12, 16, 20, 205));
+	TheDisplay->drawOpenRect(x, y, SHADER_PANEL_WIDTH, height, 1.0f, GameMakeColor(130, 160, 180, 220));
+	ShaderPanelString->setText(UnicodeString(L"Debug   Ctrl+Shift+Tab"));
 	ShaderPanelString->draw(x + 8, y + 6, white, shadow);
 	ShaderPanelString->setText(UnicodeString(L"X"));
 	ShaderPanelString->draw(x + SHADER_PANEL_WIDTH - 20, y + 6, white, shadow);
+	for (Int tab = 0; tab < 2; ++tab)
+	{
+		TheDisplay->drawFillRect(x + tab * SHADER_PANEL_WIDTH / 2 + 4, y + 28,
+			SHADER_PANEL_WIDTH / 2 - 8, 20, tab == (Int)UnitSpawnerTab
+			? GameMakeColor(55, 85, 105, 255) : GameMakeColor(25, 35, 45, 255));
+		ShaderPanelString->setText(UnicodeString(tab == 0 ? L"Shaders" : L"Unit spawner"));
+		ShaderPanelString->draw(x + tab * SHADER_PANEL_WIDTH / 2 + 12, y + 30, white, shadow);
+	}
+	if (UnitSpawnerTab)
+	{
+		ShaderPanelString->setText(UnicodeString(L"Side"));
+		ShaderPanelString->draw(x + 8, y + 62, white, shadow);
+		ShaderPanelString->setText(UnicodeString(L"Search"));
+		ShaderPanelString->draw(x + 8, y + 92, white, shadow);
+		UnicodeString count;
+		count.format(L"%d units", UnitSpawnerList ? GadgetListBoxGetNumEntries(UnitSpawnerList) : 0);
+		ShaderPanelString->setText(count);
+		ShaderPanelString->draw(x + 8, y + UNIT_SPAWNER_HEIGHT - 84, white, shadow);
+		const Color buttonColor = canSpawnDebugUnit() ? GameMakeColor(160, 235, 160, 255) : GameMakeColor(130, 130, 130, 255);
+		TheDisplay->drawOpenRect(x + 8, y + UNIT_SPAWNER_HEIGHT - 58, SHADER_PANEL_WIDTH - 16, 26, 1.0f, buttonColor);
+		ShaderPanelString->setText(UnicodeString(L"Place selected unit"));
+		ShaderPanelString->draw(x + 16, y + UNIT_SPAWNER_HEIGHT - 52, buttonColor, shadow);
+		ShaderPanelString->setText(UnicodeString(canSpawnDebugUnit() ? L"Double-click a unit, then click the ground" : L"Spawning requires a single-player match"));
+		ShaderPanelString->draw(x + 8, y + UNIT_SPAWNER_HEIGHT - 22, white, shadow);
+		return;
+	}
 	for (Int i = 0; i < ARRAY_SIZE(ShaderDebugOptions); ++i)
 	{
 		Bool enabled = TheGlobalData->*ShaderDebugOptions[i].field;
@@ -1264,6 +1645,10 @@ void InGameUI::toggleShaderDebugPanel()
 	}
 	if (ShaderPanelWindow)
 	{
+		if (UnitSpawnerPlacement)
+		{
+			finishUnitSpawnerPlacement();
+		}
 		ShaderPanelWindow->winHide((ShaderPanelWindow->winGetStatus() & WIN_STATUS_HIDDEN) == 0);
 		return;
 	}

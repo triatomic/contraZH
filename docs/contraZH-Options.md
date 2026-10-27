@@ -330,7 +330,7 @@ puts the strength box beside the checkbox.
 labels to the loose menu and string files, keeping copies under the game folder's sibling
 `_bak_to_delete` directory.
 Cheat builds also let you adjust threshold and size live in the
-[`Ctrl + Shift + Tab` panel](contraZH-Debug-and-Cheats.md#shader-debug-panel), without saving them.
+[`Ctrl + Shift + Tab` panel](contraZH-Debug-and-Cheats.md#debug-panel), without saving them.
 The FX tuner's `Bloom` checkbox updates its previews and writes the global `Bloom` setting to
 `Options.ini` immediately. Choose that file in the tuner's Configuration page. The game reads the
 setting when options reload or at launch; the preview uses its strength, threshold and size.

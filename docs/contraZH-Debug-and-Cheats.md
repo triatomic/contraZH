@@ -5,11 +5,15 @@ The health bar, pause and frame-step controls below also work in normal release 
 Keys use US keyboard labels. On other layouts, use the same physical keys.
 These are the engine's default bindings; `CommandMap.ini` can override them unless noted.
 
-## Shader debug panel
+## Debug panel
 
-`Ctrl + Shift + Tab` shows or hides a small shader panel near the upper-right corner during a
-match or replay. Click a row to toggle its effect immediately. The X hides the panel; the rest
-of the screen remains usable and the game keeps running.
+`Ctrl + Shift + Tab` shows or hides the debug panel near the upper-right corner during a match
+or replay. The Shaders and Unit spawner tabs switch between rendering controls and unit placement.
+The X hides the panel; the rest of the screen remains usable and the game keeps running.
+
+### Shaders
+
+Click a row to toggle its effect immediately.
 
 The panel controls bloom, laser glow, shadow maps, specular highlights and emissive glow,
 normal maps, water reflections, shoreline foam, soft particles, flame, electric, laser and cryo
@@ -22,6 +26,20 @@ Changes affect rendering only and the panel does not save `Options.ini`. Hiding 
 the chosen states. A shader disabled by hardware limits or a launch-time environment variable
 cannot be enabled through the panel. The panel closes when the match or UI resources reset.
 The shortcut is also bindable as `CHEAT_TOGGLE_SHADER_PANEL` in cheat builds.
+
+### Unit spawner
+
+Choose a side or leave All sides selected, then type in Search. The list comes from the loaded
+object definitions, including map overrides, and includes units, buildings and portable addons.
+Search matches display names and INI object names without regard to case.
+
+Select an entry and click Place selected unit, or double-click the entry. The panel hides while
+you choose a ground position. Left-click to spawn one object for your player; right-click or
+Escape cancels. The panel returns after placement or cancellation.
+
+Spawning works in single-player campaign and skirmish matches. Replays and multiplayer games
+can browse the list but cannot place objects. Spawns use the existing chat-command spawn path,
+so the engine creates the object during its logic update and completes its build callbacks.
 
 ## Debug name overlays
 
