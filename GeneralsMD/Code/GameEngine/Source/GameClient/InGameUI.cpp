@@ -48,6 +48,7 @@
 #include "Common/Team.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
+#include "Common/ThingSort.h"
 #include "Common/BuildAssistant.h"
 #include "Common/Recorder.h"
 #include "Common/SpecialPower.h"
@@ -1146,15 +1147,76 @@ const Int SHADER_PANEL_VALUE_TOP = SHADER_PANEL_HEADER + SHADER_PANEL_ROWS * SHA
 const Int SHADER_PANEL_HEIGHT = SHADER_PANEL_VALUE_TOP + ARRAY_SIZE(ShaderDebugValues) * SHADER_PANEL_ROW_HEIGHT + 20;
 GameWindow *ShaderPanelWindow = nullptr;
 DisplayString *ShaderPanelString = nullptr;
-const Int UNIT_SPAWNER_HEIGHT = 420;
+const Int UNIT_SPAWNER_HEIGHT = 450;
 Bool UnitSpawnerTab = FALSE;
 GameWindow *UnitSpawnerSide = nullptr;
+GameWindow *UnitSpawnerKindFilter = nullptr;
 GameWindow *UnitSpawnerSearch = nullptr;
 GameWindow *UnitSpawnerList = nullptr;
 GameWindow *UnitSpawnerPlacement = nullptr;
 UnsignedShort UnitSpawnerTemplateID = 0;
 std::vector<const ThingTemplate *> UnitSpawnerTemplates;
 std::vector<AsciiString> UnitSpawnerSides;
+
+enum UnitSpawnerKind
+{
+	SPAWNER_ALL,
+	SPAWNER_BUILDINGS,
+	SPAWNER_UNITS,
+	SPAWNER_AIRPLANES,
+	SPAWNER_EFFECTS,
+	SPAWNER_INFANTRY,
+	SPAWNER_VEHICLES,
+	SPAWNER_PROJECTILES,
+	SPAWNER_ADDONS,
+	SPAWNER_PROPS,
+	SPAWNER_OTHER
+};
+
+const wchar_t *UnitSpawnerKindNames[] =
+{
+	L"All", L"Buildings", L"Units", L"Airplanes", L"Effects", L"Infantry",
+	L"Vehicles", L"Projectiles", L"Addons", L"Props", L"Other"
+};
+
+UnitSpawnerKind unitSpawnerKind(const ThingTemplate *tmpl)
+{
+	if (tmpl->isKindOf(KINDOF_PROJECTILE))
+	{
+		return SPAWNER_PROJECTILES;
+	}
+	if (tmpl->isKindOf(KINDOF_PORTABLE_STRUCTURE))
+	{
+		return SPAWNER_ADDONS;
+	}
+	if (tmpl->isKindOf(KINDOF_STRUCTURE))
+	{
+		return SPAWNER_BUILDINGS;
+	}
+	if (tmpl->isKindOf(KINDOF_AIRCRAFT))
+	{
+		return SPAWNER_AIRPLANES;
+	}
+	if (tmpl->isKindOf(KINDOF_INFANTRY))
+	{
+		return SPAWNER_INFANTRY;
+	}
+	if (tmpl->isKindOf(KINDOF_VEHICLE))
+	{
+		return SPAWNER_VEHICLES;
+	}
+	const EditorSortingType sorting = tmpl->getEditorSorting();
+	if (tmpl->isKindOf(KINDOF_PROP) || sorting == ES_SHRUBBERY || sorting == ES_MISC_MAN_MADE
+		|| sorting == ES_MISC_NATURAL || sorting == ES_DEBRIS)
+	{
+		return SPAWNER_PROPS;
+	}
+	if (tmpl->isKindOf(KINDOF_INERT) || sorting == ES_SYSTEM || sorting == ES_AUDIO)
+	{
+		return SPAWNER_EFFECTS;
+	}
+	return SPAWNER_OTHER;
+}
 
 Bool canSpawnDebugUnit()
 {
@@ -1183,18 +1245,26 @@ Bool unitSpawnerTemplateLess(const ThingTemplate *left, const ThingTemplate *rig
 
 void refreshUnitSpawnerList()
 {
-	if (!UnitSpawnerList || !UnitSpawnerSide || !UnitSpawnerSearch)
+	if (!UnitSpawnerList || !UnitSpawnerSide || !UnitSpawnerKindFilter || !UnitSpawnerSearch)
 	{
 		return;
 	}
 	Int side = 0;
+	Int kind = SPAWNER_ALL;
 	GadgetComboBoxGetSelectedPos(UnitSpawnerSide, &side);
+	GadgetComboBoxGetSelectedPos(UnitSpawnerKindFilter, &kind);
 	const UnicodeString search = GadgetTextEntryGetText(UnitSpawnerSearch);
 	GadgetListBoxReset(UnitSpawnerList);
 	GadgetListBoxBatchAddScope batch(UnitSpawnerList);
 	for (Int i = 0; i < (Int)UnitSpawnerTemplates.size(); ++i)
 	{
 		const ThingTemplate *tmpl = UnitSpawnerTemplates[i];
+		const UnitSpawnerKind templateKind = unitSpawnerKind(tmpl);
+		if (kind != SPAWNER_ALL && kind != templateKind
+			&& !(kind == SPAWNER_UNITS && (templateKind == SPAWNER_INFANTRY || templateKind == SPAWNER_VEHICLES)))
+		{
+			continue;
+		}
 		if (side > 0 && side < (Int)UnitSpawnerSides.size()
 			&& _stricmp(tmpl->getDefaultOwningSide().str(), UnitSpawnerSides[side].str()) != 0)
 		{
@@ -1322,13 +1392,13 @@ void styleUnitSpawnerControl(GameWindow *window)
 	{
 		window->winSetEnabledColor(i, i == 0 ? background : selected);
 		window->winSetEnabledBorderColor(i, border);
-		window->winSetHiliteColor(i, selected);
+		window->winSetHiliteColor(i, i == 0 ? background : selected);
 		window->winSetHiliteBorderColor(i, border);
 		window->winSetDisabledColor(i, background);
 		window->winSetDisabledBorderColor(i, border);
 	}
 	window->winSetEnabledTextColors(GameMakeColor(235, 235, 235, 255), GameMakeColor(0, 0, 0, 255));
-	window->winSetHiliteTextColors(GameMakeColor(255, 255, 255, 255), GameMakeColor(0, 0, 0, 255));
+	window->winSetHiliteTextColors(GameMakeColor(235, 235, 235, 255), GameMakeColor(0, 0, 0, 255));
 	if (window->winGetStyle() & GWS_PUSH_BUTTON)
 	{
 		window->winClearStatus(WIN_STATUS_IMAGE);
@@ -1348,6 +1418,30 @@ void styleUnitSpawnerList(GameWindow *window)
 	GadgetButtonSetText(list->downButton, UnicodeString(L"\x25BC"));
 }
 
+GameWindow *createUnitSpawnerCombo(Int y, Int entries, GameFont *font)
+{
+	WinInstanceData data;
+	data.m_style = GWS_COMBO_BOX | GWS_MOUSE_TRACK;
+	data.m_font = font;
+	ComboBoxData combo;
+	memset(&combo, 0, sizeof(combo));
+	combo.maxDisplay = 10;
+	combo.maxChars = 96;
+	combo.entryData = NEW EntryData;
+	memset(combo.entryData, 0, sizeof(EntryData));
+	combo.listboxData = NEW ListboxData;
+	memset(combo.listboxData, 0, sizeof(ListboxData));
+	combo.listboxData->listLength = max(1, entries);
+	combo.listboxData->columns = 1;
+	combo.listboxData->scrollBar = TRUE;
+	GameWindow *window = TheWindowManager->gogoGadgetComboBox(ShaderPanelWindow, WIN_STATUS_ENABLED,
+		64, y, SHADER_PANEL_WIDTH - 72, 22, &data, &combo, font, TRUE);
+	styleUnitSpawnerControl(window);
+	GadgetButtonSetText(GadgetComboBoxGetDropDownButton(window), UnicodeString(L"\x25BC"));
+	styleUnitSpawnerList(GadgetComboBoxGetListBox(window));
+	return window;
+}
+
 void createUnitSpawner()
 {
 	if (UnitSpawnerList || !TheThingFactory)
@@ -1360,9 +1454,7 @@ void createUnitSpawner()
 	for (const ThingTemplate *base = TheThingFactory->firstTemplate(); base; base = base->friend_getNextTemplate())
 	{
 		const ThingTemplate *tmpl = (const ThingTemplate *)base->getFinalOverride();
-		if (!tmpl->isKindOf(KINDOF_INFANTRY) && !tmpl->isKindOf(KINDOF_VEHICLE)
-			&& !tmpl->isKindOf(KINDOF_AIRCRAFT) && !tmpl->isKindOf(KINDOF_STRUCTURE)
-			&& !tmpl->isKindOf(KINDOF_PORTABLE_STRUCTURE))
+		if (tmpl->isKindOf(KINDOF_DRAWABLE_ONLY))
 		{
 			continue;
 		}
@@ -1376,22 +1468,7 @@ void createUnitSpawner()
 	std::sort(UnitSpawnerTemplates.begin(), UnitSpawnerTemplates.end(), unitSpawnerTemplateLess);
 	std::sort(UnitSpawnerSides.begin() + 1, UnitSpawnerSides.end());
 	GameFont *font = TheWindowManager->winFindFont("Tahoma", 9, FALSE);
-	WinInstanceData data;
-	data.m_style = GWS_COMBO_BOX | GWS_MOUSE_TRACK;
-	data.m_font = font;
-	ComboBoxData combo;
-	memset(&combo, 0, sizeof(combo));
-	combo.maxDisplay = 10;
-	combo.maxChars = 96;
-	combo.entryData = NEW EntryData;
-	memset(combo.entryData, 0, sizeof(EntryData));
-	combo.listboxData = NEW ListboxData;
-	memset(combo.listboxData, 0, sizeof(ListboxData));
-	combo.listboxData->listLength = max(1, (Int)UnitSpawnerSides.size());
-	combo.listboxData->columns = 1;
-	combo.listboxData->scrollBar = TRUE;
-	UnitSpawnerSide = TheWindowManager->gogoGadgetComboBox(ShaderPanelWindow, WIN_STATUS_ENABLED,
-		64, 58, SHADER_PANEL_WIDTH - 72, 22, &data, &combo, font, TRUE);
+	UnitSpawnerSide = createUnitSpawnerCombo(58, (Int)UnitSpawnerSides.size(), font);
 	for (Int i = 0; i < (Int)UnitSpawnerSides.size(); ++i)
 	{
 		UnicodeString side;
@@ -1399,14 +1476,20 @@ void createUnitSpawner()
 		GadgetComboBoxAddEntry(UnitSpawnerSide, i == 0 ? UnicodeString(L"All sides") : side, GameMakeColor(235, 235, 235, 255));
 	}
 	GadgetComboBoxSetSelectedPos(UnitSpawnerSide, 0);
-	data.init();
+	UnitSpawnerKindFilter = createUnitSpawnerCombo(88, ARRAY_SIZE(UnitSpawnerKindNames), font);
+	for (Int i = 0; i < ARRAY_SIZE(UnitSpawnerKindNames); ++i)
+	{
+		GadgetComboBoxAddEntry(UnitSpawnerKindFilter, UnicodeString(UnitSpawnerKindNames[i]), GameMakeColor(235, 235, 235, 255));
+	}
+	GadgetComboBoxSetSelectedPos(UnitSpawnerKindFilter, SPAWNER_ALL);
+	WinInstanceData data;
 	data.m_style = GWS_ENTRY_FIELD | GWS_MOUSE_TRACK;
 	data.m_font = font;
 	EntryData entry;
 	memset(&entry, 0, sizeof(entry));
 	entry.maxTextLen = 96;
 	UnitSpawnerSearch = TheWindowManager->gogoGadgetTextEntry(ShaderPanelWindow, WIN_STATUS_ENABLED,
-		64, 88, SHADER_PANEL_WIDTH - 72, 22, &data, &entry, font, TRUE);
+		64, 118, SHADER_PANEL_WIDTH - 72, 22, &data, &entry, font, TRUE);
 	data.init();
 	data.m_style = GWS_SCROLL_LISTBOX | GWS_MOUSE_TRACK;
 	data.m_font = font;
@@ -1417,12 +1500,10 @@ void createUnitSpawner()
 	list.scrollBar = TRUE;
 	list.forceSelect = TRUE;
 	UnitSpawnerList = TheWindowManager->gogoGadgetListBox(ShaderPanelWindow, WIN_STATUS_ENABLED,
-		8, 118, SHADER_PANEL_WIDTH - 16, UNIT_SPAWNER_HEIGHT - 184, &data, &list, font, TRUE);
+		8, 148, SHADER_PANEL_WIDTH - 16, UNIT_SPAWNER_HEIGHT - 238, &data, &list, font, TRUE);
 	styleUnitSpawnerControl(UnitSpawnerSearch);
-	styleUnitSpawnerControl(UnitSpawnerSide);
-	GadgetButtonSetText(GadgetComboBoxGetDropDownButton(UnitSpawnerSide), UnicodeString(L"\x25BC"));
-	styleUnitSpawnerList(GadgetComboBoxGetListBox(UnitSpawnerSide));
 	styleUnitSpawnerList(UnitSpawnerList);
+	UnitSpawnerKindFilter->winBringToTop();
 	UnitSpawnerSide->winBringToTop();
 	refreshUnitSpawnerList();
 }
@@ -1438,8 +1519,12 @@ void selectDebugPanelTab(Bool spawner)
 	{
 		GadgetComboBoxHideList(UnitSpawnerSide);
 	}
+	if (UnitSpawnerKindFilter)
+	{
+		GadgetComboBoxHideList(UnitSpawnerKindFilter);
+	}
 	UnitSpawnerTab = spawner;
-	GameWindow *controls[] = { UnitSpawnerSide, UnitSpawnerSearch, UnitSpawnerList };
+	GameWindow *controls[] = { UnitSpawnerSide, UnitSpawnerKindFilter, UnitSpawnerSearch, UnitSpawnerList };
 	for (Int i = 0; i < ARRAY_SIZE(controls); ++i)
 	{
 		if (controls[i])
@@ -1467,6 +1552,7 @@ void destroyShaderDebugPanel()
 	}
 	ShaderPanelWindow = nullptr;
 	UnitSpawnerSide = nullptr;
+	UnitSpawnerKindFilter = nullptr;
 	UnitSpawnerSearch = nullptr;
 	UnitSpawnerList = nullptr;
 	UnitSpawnerTab = FALSE;
@@ -1482,7 +1568,7 @@ void destroyShaderDebugPanel()
 WindowMsgHandledType shaderPanelSystem(GameWindow *window, UnsignedInt msg, WindowMsgData data, WindowMsgData)
 {
 	if ((msg == GEM_UPDATE_TEXT && (GameWindow *)data == UnitSpawnerSearch)
-		|| (msg == GCM_SELECTED && (GameWindow *)data == UnitSpawnerSide))
+		|| (msg == GCM_SELECTED && ((GameWindow *)data == UnitSpawnerSide || (GameWindow *)data == UnitSpawnerKindFilter)))
 	{
 		refreshUnitSpawnerList();
 		return MSG_HANDLED;
@@ -1496,6 +1582,7 @@ WindowMsgHandledType shaderPanelSystem(GameWindow *window, UnsignedInt msg, Wind
 	{
 		ShaderPanelWindow = nullptr;
 		UnitSpawnerSide = nullptr;
+		UnitSpawnerKindFilter = nullptr;
 		UnitSpawnerSearch = nullptr;
 		UnitSpawnerList = nullptr;
 		UnitSpawnerTab = FALSE;
@@ -1507,6 +1594,27 @@ WindowMsgHandledType shaderPanelSystem(GameWindow *window, UnsignedInt msg, Wind
 
 WindowMsgHandledType shaderPanelInput(GameWindow *window, UnsignedInt msg, WindowMsgData data, WindowMsgData state)
 {
+	if (msg == GWM_LEFT_DOWN)
+	{
+		Int left, top;
+		window->winGetScreenPosition(&left, &top);
+		const Int x = (Int)LOLONGTOSHORT(data) - left;
+		const Int y = (Int)HILONGTOSHORT(data) - top;
+		if (x >= 0 && x < SHADER_PANEL_WIDTH - 26 && y >= 0 && y < 28)
+		{
+			window->winSetStatus(WIN_STATUS_DRAGGABLE);
+			window->winBringToTop();
+		}
+		else
+		{
+			window->winClearStatus(WIN_STATUS_DRAGGABLE);
+		}
+	}
+	if (msg == GWM_LEFT_UP && (window->winGetStatus() & WIN_STATUS_DRAGGABLE))
+	{
+		window->winClearStatus(WIN_STATUS_DRAGGABLE);
+		return MSG_HANDLED;
+	}
 	if (msg == GWM_CHAR && data == KEY_ESC && (state & KEY_STATE_DOWN))
 	{
 		window->winHide(TRUE);
@@ -1552,7 +1660,8 @@ WindowMsgHandledType shaderPanelInput(GameWindow *window, UnsignedInt msg, Windo
 			value = clamp(option.minimum, value + (x < SHADER_PANEL_WIDTH - 36 ? -option.step : option.step), option.maximum);
 		}
 	}
-	if ((msg >= GWM_LEFT_DOWN && msg <= GWM_WHEEL_DOWN) || msg == GWM_MOUSE_POS)
+	// The window manager closes dropdowns when a parent consumes their hover events.
+	if (msg >= GWM_LEFT_DOWN && msg <= GWM_WHEEL_DOWN)
 	{
 		return MSG_HANDLED;
 	}
@@ -1593,10 +1702,12 @@ void drawShaderDebugPanel(GameWindow *window, WinInstanceData *)
 	{
 		ShaderPanelString->setText(UnicodeString(L"Side"));
 		ShaderPanelString->draw(x + 8, y + 62, white, shadow);
-		ShaderPanelString->setText(UnicodeString(L"Search"));
+		ShaderPanelString->setText(UnicodeString(L"Kind"));
 		ShaderPanelString->draw(x + 8, y + 92, white, shadow);
+		ShaderPanelString->setText(UnicodeString(L"Search"));
+		ShaderPanelString->draw(x + 8, y + 122, white, shadow);
 		UnicodeString count;
-		count.format(L"%d units", UnitSpawnerList ? GadgetListBoxGetNumEntries(UnitSpawnerList) : 0);
+		count.format(L"%d objects", UnitSpawnerList ? GadgetListBoxGetNumEntries(UnitSpawnerList) : 0);
 		ShaderPanelString->setText(count);
 		ShaderPanelString->draw(x + 8, y + UNIT_SPAWNER_HEIGHT - 84, white, shadow);
 		const Color buttonColor = canSpawnDebugUnit() ? GameMakeColor(160, 235, 160, 255) : GameMakeColor(130, 130, 130, 255);

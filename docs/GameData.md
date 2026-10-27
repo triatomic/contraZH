@@ -6,7 +6,7 @@ All units now move with the same speed in all directions. In vanilla ZH, diagona
 
 Vanilla behavior can be restored with this parameter:
 
-* `UseVanillaDiagonalMoveSpeed = Yes` - (Default = No)
+* `UseVanillaDiagonalMoveSpeed = Yes` - (Default = Yes)
 
 ## Color Tint (TintStatus) definitions
 

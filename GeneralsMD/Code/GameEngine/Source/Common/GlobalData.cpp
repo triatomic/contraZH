@@ -1626,7 +1626,7 @@ GlobalData::GlobalData()
 	m_actionLineMode = ActionLineMode_Default;
 	m_doubleClickAttackMove = FALSE;
 
-	m_useOldMoveSpeed = FALSE;  //Fix is enabled by default
+	m_useOldMoveSpeed = TRUE;
 
 	// Empty texture leaves the jamming overlay off until art supplies one.
 	m_jammingOverlayTexture.clear();

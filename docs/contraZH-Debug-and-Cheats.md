@@ -5,11 +5,29 @@ The health bar, pause and frame-step controls below also work in normal release 
 Keys use US keyboard labels. On other layouts, use the same physical keys.
 These are the engine's default bindings; `CommandMap.ini` can override them unless noted.
 
+## Launching with environment variables
+
+Double-click `scripts/Launch-Contra.cmd` in the repository to open the PowerShell GUI launcher.
+The launcher also works with builds without cheats.
+
+Choose the executable and arguments, then enter variable names and values in the table.
+Tick `Use` for each override and press `Launch Contra`. Unchecked rows are ignored.
+The table lists all 29 environment variables found in the engine sources, with value meanings.
+All rows start unchecked. Values show inherited settings when present, otherwise an example override.
+Most rendering controls require D3D9. `WB_PARALLEL` applies only to WorldBuilder.
+For example, checking `CONTRA_INTERPOLATION = 0` disables movement interpolation.
+Overrides apply only to the launched game. Other environment variables are inherited.
+
+The default executable is `C:\Games\contra\contraprerelease\generalszh_c.exe`.
+`Launch-Contra.ps1 -ExePath '<path>'` opens the GUI with a different executable selected.
+
 ## Debug panel
 
 `Ctrl + Shift + Tab` shows or hides the debug panel near the upper-right corner during a match
 or replay. The Shaders and Unit spawner tabs switch between rendering controls and unit placement.
 The X hides the panel; the rest of the screen remains usable and the game keeps running.
+Drag the title bar to move the panel. Spawner controls highlight selected entries without changing
+their appearance on hover.
 
 ### Shaders
 
@@ -29,9 +47,15 @@ The shortcut is also bindable as `CHEAT_TOGGLE_SHADER_PANEL` in cheat builds.
 
 ### Unit spawner
 
-Choose a side or leave All sides selected, then type in Search. The list comes from the loaded
-object definitions, including map overrides, and includes units, buildings and portable addons.
-Search matches display names and INI object names without regard to case.
+Choose a side or leave All sides selected, choose a Kind, then type in Search. Both filters and
+search apply together. Kind offers All, Buildings, Units, Airplanes, Effects, Infantry, Vehicles,
+Projectiles, Addons, Props and Other. Units groups ground infantry and vehicles; Airplanes includes
+all aircraft. Effects groups inert and system objects that are not units, buildings, projectiles
+or props.
+
+The list comes from the loaded object definitions, including map overrides. All includes every
+object template the spawner can create; drawable-only templates are excluded. Search matches
+display names and INI object names without regard to case.
 
 Select an entry and click Place selected unit, or double-click the entry. The panel hides while
 you choose a ground position. Left-click to spawn one object for your player; right-click or
