@@ -1356,14 +1356,16 @@ WindowMsgHandledType unitSpawnerPlacementInput(GameWindow *, UnsignedInt msg, Wi
 	return MSG_HANDLED;
 }
 
-void startUnitSpawnerPlacement()
+void startUnitSpawnerPlacement(Int row = -1)
 {
 	if (!canSpawnDebugUnit() || !UnitSpawnerList || UnitSpawnerPlacement)
 	{
 		return;
 	}
-	Int row = -1;
-	GadgetListBoxGetSelected(UnitSpawnerList, &row);
+	if (row == -1)
+	{
+		GadgetListBoxGetSelected(UnitSpawnerList, &row);
+	}
 	if (row < 0 || row >= GadgetListBoxGetNumEntries(UnitSpawnerList))
 	{
 		return;
@@ -1425,6 +1427,12 @@ void styleUnitSpawnerList(GameWindow *window)
 	GadgetButtonSetText(list->downButton, UnicodeString(L"\x25BC"));
 }
 
+WindowMsgHandledType unitSpawnerComboFieldInput(GameWindow *window, UnsignedInt msg, WindowMsgData data, WindowMsgData state)
+{
+	GameWindow *button = GadgetComboBoxGetDropDownButton(window->winGetParent());
+	return TheWindowManager->winSendInputMsg(button, msg, data, state);
+}
+
 GameWindow *createUnitSpawnerCombo(Int y, Int entries, GameFont *font)
 {
 	WinInstanceData data;
@@ -1443,6 +1451,10 @@ GameWindow *createUnitSpawnerCombo(Int y, Int entries, GameFont *font)
 	combo.listboxData->scrollBar = TRUE;
 	GameWindow *window = TheWindowManager->gogoGadgetComboBox(ShaderPanelWindow, WIN_STATUS_ENABLED,
 		64, y, SHADER_PANEL_WIDTH - 72, 22, &data, &combo, font, TRUE);
+	GameWindow *field = GadgetComboBoxGetEditBox(window);
+	field->winClearStatus(WIN_STATUS_NO_INPUT);
+	field->winSetStatus(WIN_STATUS_NO_FOCUS);
+	field->winSetInputFunc(unitSpawnerComboFieldInput);
 	styleUnitSpawnerControl(window);
 	GadgetButtonSetText(GadgetComboBoxGetDropDownButton(window), UnicodeString(L"\x25BC"));
 	styleUnitSpawnerList(GadgetComboBoxGetListBox(window));
@@ -1587,7 +1599,7 @@ void destroyShaderDebugPanel()
 	}
 }
 
-WindowMsgHandledType shaderPanelSystem(GameWindow *window, UnsignedInt msg, WindowMsgData data, WindowMsgData)
+WindowMsgHandledType shaderPanelSystem(GameWindow *window, UnsignedInt msg, WindowMsgData data, WindowMsgData selection)
 {
 	if ((msg == GEM_UPDATE_TEXT && (GameWindow *)data == UnitSpawnerSearch)
 		|| (msg == GCM_SELECTED && ((GameWindow *)data == UnitSpawnerSide || (GameWindow *)data == UnitSpawnerKindFilter)))
@@ -1597,7 +1609,7 @@ WindowMsgHandledType shaderPanelSystem(GameWindow *window, UnsignedInt msg, Wind
 	}
 	if (msg == GLM_DOUBLE_CLICKED && (GameWindow *)data == UnitSpawnerList)
 	{
-		startUnitSpawnerPlacement();
+		startUnitSpawnerPlacement((Int)selection);
 		return MSG_HANDLED;
 	}
 	if (msg == GWM_DESTROY && window == ShaderPanelWindow)
