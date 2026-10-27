@@ -8,6 +8,11 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QColorDialog>
+#include <QGroupBox>
+#include <QPixmap>
+#include <QSlider>
+#include <QStyle>
 #include <QDir>
 #include <QFile>
 #include <QGridLayout>
@@ -36,16 +41,72 @@ namespace
 	// What a ticked ShaderWaterDeepColor starts from when Water.ini leaves it unset.
 	const float kDeepColorStart[3] = { 40.0f, 85.0f, 95.0f };
 
-	const char *const kChannelNames[3] = { "red", "green", "blue" };
-
 	enum
 	{
 		COL_LABEL = 0,
-		COL_MINUS,
+		COL_SLIDER,
 		COL_SPIN,
-		COL_PLUS,
 		COL_RESET
 	};
+
+	QString settingLabel(const QString &key)
+	{
+		static const char *const names[][2] =
+		{
+			{ "IsWater", "Is water" },
+			{ "ShaderWaterWaveScale", "Ripple scale" },
+			{ "ShaderWaterWaveStrength", "Ripple strength" },
+			{ "ShaderWaterSpecular", "Sun glint" },
+			{ "ShaderWaterDeepColor", "Deep colour" },
+			{ "ShaderWaterAutoMeasure", "Calm enclosed water automatically" },
+			{ "ShaderWaterZoomCompensation", "Keep ripple size when zooming" },
+			{ "TransparentWaterDepth", "Shore depth" },
+			{ "TransparentWaterMinOpacity", "Minimum opacity" },
+			{ "ColorLut", "Colour table" },
+			{ "ColorLutStrength", "Strength" }
+		};
+		for (int i = 0; i < (int)(sizeof(names) / sizeof(names[0])); ++i)
+		{
+			if (key == QLatin1String(names[i][0]))
+			{
+				return QString::fromLatin1(names[i][1]);
+			}
+		}
+		QString label = key;
+		label.remove(QRegularExpression("^(ShaderWater|TerrainGlint|GroundNoise|TerrainHeightBlend|SkyCloud)"));
+		label.replace(QRegularExpression("([a-z0-9])([A-Z])"), "\\1 \\2");
+		label = label.toLower();
+		if (!label.isEmpty())
+		{
+			label[0] = label.at(0).toUpper();
+		}
+		return label;
+	}
+
+	QString waterGroup(const QString &key, bool advanced)
+	{
+		if (advanced)
+		{
+			return "Advanced";
+		}
+		if (key == "IsWater" || key == "AdditiveBlending")
+		{
+			return QString();
+		}
+		if (key == "ShaderWaterOpacity" || key == "ShaderWaterClarity" || key == "ShaderWaterDeepColor")
+		{
+			return "Appearance";
+		}
+		if (key == "ShaderWaterWaveScale" || key == "ShaderWaterWaveStrength" || key == "ShaderWaterSwellHeight")
+		{
+			return "Waves";
+		}
+		if (key == "ShaderWaterAutoMeasure" || key == "ShaderWaterEnclosedCalm" || key == "ShaderWaterZoomCompensation")
+		{
+			return "Behaviour";
+		}
+		return "Light & foam";
+	}
 
 	int decimalsOf(double value)
 	{
@@ -294,14 +355,14 @@ WBQtWaterTuningPanel::Row::Row()
 	  label(NULL),
 	  check(NULL),
 	  combo(NULL),
+	  spin(NULL),
+	  slider(NULL),
+	  colour(NULL),
 	  reset(NULL)
 {
 	for (int c = 0; c < 3; ++c)
 	{
 		value[c] = 0.0f;
-		spin[c] = NULL;
-		minus[c] = NULL;
-		plus[c] = NULL;
 	}
 }
 
@@ -309,7 +370,8 @@ WBQtWaterTuningPanel::WBQtWaterTuningPanel(QWidget *owner)
 	: QWidget(owner, Qt::Tool),
 	  m_ui(new Ui::WBQtWaterTuningPanel),
 	  m_saveTimer(new QTimer(this)),
-	  m_updating(false)
+	  m_updating(false),
+	  m_advancedGroup(NULL)
 {
 	// The shell and its two tabs live in WBQtWaterTuningPanel.ui; the rows come from the bridge's key table.
 	m_ui->setupUi(this);
@@ -334,40 +396,35 @@ WBQtWaterTuningPanel::~WBQtWaterTuningPanel()
 	delete m_ui;
 }
 
-void WBQtWaterTuningPanel::addStepper(Row &row, int rowIndex, int channel, QGridLayout *grid, int gridRow, const QString &tip)
+void WBQtWaterTuningPanel::addSlider(Row &row, int rowIndex, QGridLayout *grid, int gridRow, const QString &tip)
 {
 	QWidget *host = grid->parentWidget();
+	row.slider = new QSlider(Qt::Horizontal, host);
+	row.slider->setObjectName(row.key + "Slider");
+	row.slider->setAccessibleName(settingLabel(row.key));
+	row.slider->setRange(0, qMax(1, qRound((row.hi - row.lo) / row.step)));
+	row.slider->setProperty("row", rowIndex);
+	row.slider->setToolTip(tip);
+	row.slider->setMinimumWidth(80);
 
-	QToolButton *minus = makeButton(host, QString(QChar(0x2212)), rowIndex);
-	QToolButton *plus = makeButton(host, "+", rowIndex);
-	minus->setProperty("chan", channel);
-	minus->setProperty("dir", -1);
-	plus->setProperty("chan", channel);
-	plus->setProperty("dir", 1);
-	minus->setAutoRepeat(true);
-	plus->setAutoRepeat(true);
+	row.spin = new WBQtScrubSpinBox(host);
+	row.spin->setObjectName(row.key + "Value");
+	row.spin->setAccessibleName(settingLabel(row.key));
+	row.spin->setKeyboardTracking(false);
+	row.spin->setAlignment(Qt::AlignRight);
+	row.spin->setFixedWidth(86);
+	row.spin->setToolTip(tip);
+	row.spin->setProperty("row", rowIndex);
+	// Typed and loaded values can exceed the slider's normal tuning range.
+	row.spin->setRange((row.lo < 0.0f) ? row.lo * 10.0 - 10.0 : 0.0, row.hi * 10.0 + 10.0);
+	row.spin->setSingleStep(row.step);
+	row.spin->setDecimals(decimalsOf(row.step));
 
-	WBQtScrubSpinBox *spin = new WBQtScrubSpinBox(host);
-	spin->setButtonSymbols(QAbstractSpinBox::NoButtons);
-	spin->setKeyboardTracking(false);
-	spin->setAlignment(Qt::AlignRight);
-	spin->setMinimumWidth(72);
-	spin->setToolTip(tip);
-	spin->setProperty("row", rowIndex);
-	spin->setProperty("chan", channel);
-
-	grid->addWidget(minus, gridRow, COL_MINUS);
-	grid->addWidget(spin, gridRow, COL_SPIN);
-	grid->addWidget(plus, gridRow, COL_PLUS);
-
-	connect(minus, SIGNAL(clicked()), this, SLOT(onStepClicked()));
-	connect(plus, SIGNAL(clicked()), this, SLOT(onStepClicked()));
-	connect(spin, SIGNAL(valueChanged(double)), this, SLOT(onSpinChanged(double)));
-
-	row.minus[channel] = minus;
-	row.plus[channel] = plus;
-	row.spin[channel] = spin;
-	row.widgets << minus << spin << plus;
+	grid->addWidget(row.slider, gridRow, COL_SLIDER);
+	grid->addWidget(row.spin, gridRow, COL_SPIN);
+	connect(row.slider, SIGNAL(valueChanged(int)), this, SLOT(onSliderChanged(int)));
+	connect(row.spin, SIGNAL(valueChanged(double)), this, SLOT(onSpinChanged(double)));
+	row.widgets << row.slider << row.spin;
 }
 
 // A scrolling grid of rows on its own tab, like the Water tab in WBQtWaterTuningPanel.ui.
@@ -380,7 +437,10 @@ QGridLayout *WBQtWaterTuningPanel::addTab(const QString &title)
 	scroll->setWidgetResizable(true);
 	QWidget *host = new QWidget(scroll);
 	QGridLayout *grid = new QGridLayout(host);
-	grid->setColumnStretch(COL_LABEL, 1);
+	grid->setColumnMinimumWidth(COL_LABEL, 155);
+	grid->setColumnStretch(COL_SLIDER, 1);
+	grid->setVerticalSpacing(4);
+	grid->setAlignment(Qt::AlignTop);
 	scroll->setWidget(host);
 	layout->addWidget(scroll);
 	m_ui->tabs->addTab(page, title);
@@ -389,12 +449,13 @@ QGridLayout *WBQtWaterTuningPanel::addTab(const QString &title)
 
 void WBQtWaterTuningPanel::buildRows()
 {
-	// The Water tab's grid, then one tab per GameData group as the groups appear.
-	QVector<QGridLayout *> grids;
-	QVector<int> gridRows;
-	grids << m_ui->rowsGrid;
-	gridRows << 0;
-	QString group;
+	QMap<QString, QGridLayout *> grids;
+	QMap<QGridLayout *, int> gridRows;
+	int waterRow = 0;
+	m_ui->rowsGrid->setColumnMinimumWidth(COL_LABEL, 155);
+	m_ui->rowsGrid->setColumnStretch(COL_SLIDER, 1);
+	m_ui->rowsGrid->setAlignment(Qt::AlignTop);
+	m_ui->rowsGrid->setVerticalSpacing(6);
 
 	const int count = WBQtWaterTuning_Count();
 	m_rows.reserve(count);
@@ -406,8 +467,7 @@ void WBQtWaterTuningPanel::buildRows()
 			continue;
 		}
 		const int r = m_rows.size();
-		const QString tip = QString::fromLatin1(desc.help);
-
+		const QString tip = QString::fromLatin1(desc.key) + "\n" + QString::fromLatin1(desc.help);
 		Row row;
 		row.index = i;
 		row.kind = desc.kind;
@@ -419,91 +479,105 @@ void WBQtWaterTuningPanel::buildRows()
 		row.advanced = desc.advanced != 0;
 
 		const bool water = (row.block == "WaterTransparency");
-		if (!water && desc.group != NULL && group != desc.group)
+		const QString group = water ? waterGroup(row.key, row.advanced) : QString::fromLatin1(desc.group);
+		QGridLayout *grid = m_ui->rowsGrid;
+		int gridRow;
+		if (water && group.isEmpty())
 		{
-			group = QString::fromLatin1(desc.group);
-			grids << addTab(group);
-			gridRows << 0;
+			gridRow = waterRow++;
 		}
-		QGridLayout *grid = water ? grids[0] : grids.last();
+		else
+		{
+			const QString groupKey = row.block + "/" + group;
+			if (!grids.contains(groupKey))
+			{
+				if (water)
+				{
+					QString title = group;
+					title.replace("&", "&&");
+					QGroupBox *box = new QGroupBox(title, m_ui->rowsHost);
+					grid = new QGridLayout(box);
+					grid->setColumnMinimumWidth(COL_LABEL, 155);
+					grid->setColumnStretch(COL_SLIDER, 1);
+					grid->setVerticalSpacing(4);
+					grid->setContentsMargins(8, 4, 8, 6);
+					m_ui->rowsGrid->addWidget(box, waterRow++, 0, 1, COL_RESET + 1);
+					if (row.advanced)
+					{
+						m_advancedGroup = box;
+					}
+				}
+				else
+				{
+					grid = addTab(group);
+				}
+				grids[groupKey] = grid;
+			}
+			grid = grids.value(groupKey);
+			gridRow = gridRows[grid]++;
+		}
 		QWidget *host = grid->parentWidget();
-		int &gridRow = water ? gridRows[0] : gridRows.last();
-
-		row.reset = makeButton(host, QString(QChar(0x21BA)), r);
+		row.reset = makeButton(host, QString(), r);
+		row.reset->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
+		row.reset->setObjectName(row.key + "Reset");
+		row.reset->setAccessibleName(tr("Reset %1").arg(settingLabel(row.key)));
 		row.reset->setToolTip(tr("Remove the key from map.ini, so the map follows %1")
 			.arg(water ? "Water.ini" : "GameData.ini"));
 		connect(row.reset, SIGNAL(clicked()), this, SLOT(onResetClicked()));
 		grid->addWidget(row.reset, gridRow, COL_RESET);
 		row.widgets << row.reset;
 
-		if (desc.kind == WBQT_WATER_FLOAT)
+		if (desc.kind == WBQT_WATER_FLOAT || desc.kind == WBQT_WATER_TEXT)
 		{
-			row.label = new QLabel(row.key, host);
+			row.label = new QLabel(settingLabel(row.key), host);
 			row.label->setToolTip(tip);
 			grid->addWidget(row.label, gridRow, COL_LABEL);
 			row.widgets << row.label;
-
-			addStepper(row, r, 0, grid, gridRow, tip);
-			// Wider than lo to hi, so a typed or loaded value is never clamped.
-			row.spin[0]->setRange((desc.lo < 0.0f) ? desc.lo * 10.0 - 10.0 : 0.0, desc.hi * 10.0 + 10.0);
-			row.spin[0]->setSingleStep(desc.step);
-			row.spin[0]->setDecimals(decimalsOf(desc.step));
-			++gridRow;
-		}
-		else if (desc.kind == WBQT_WATER_TEXT)
-		{
-			row.label = new QLabel(row.key, host);
-			row.label->setToolTip(tip);
-			grid->addWidget(row.label, gridRow, COL_LABEL);
-			row.widgets << row.label;
-
-			// Any name can be typed, since the list only has the files found on disk.
-			row.combo = new QComboBox(host);
-			row.combo->setEditable(true);
-			row.combo->setInsertPolicy(QComboBox::NoInsert);
-			row.combo->setToolTip(tip);
-			row.combo->setProperty("row", r);
-			row.combo->lineEdit()->setProperty("row", r);
-			row.combo->addItem("None");
-			row.combo->addItems(tableNames());
-			grid->addWidget(row.combo, gridRow, COL_MINUS, 1, COL_PLUS - COL_MINUS + 1);
-			connect(row.combo, SIGNAL(activated(int)), this, SLOT(onTextChosen()));
-			connect(row.combo->lineEdit(), SIGNAL(editingFinished()), this, SLOT(onTextChosen()));
-			row.widgets << row.combo;
-			++gridRow;
+			if (desc.kind == WBQT_WATER_FLOAT)
+			{
+				addSlider(row, r, grid, gridRow, tip);
+				row.label->setBuddy(row.spin);
+			}
+			else
+			{
+				row.combo = new QComboBox(host);
+				row.combo->setEditable(true);
+				row.combo->setInsertPolicy(QComboBox::NoInsert);
+				row.combo->setToolTip(tip);
+				row.combo->setProperty("row", r);
+				row.combo->lineEdit()->setProperty("row", r);
+				row.combo->addItem("None");
+				row.combo->addItems(tableNames());
+				grid->addWidget(row.combo, gridRow, COL_SLIDER, 1, COL_SPIN - COL_SLIDER + 1);
+				connect(row.combo, SIGNAL(activated(int)), this, SLOT(onTextChosen()));
+				connect(row.combo->lineEdit(), SIGNAL(editingFinished()), this, SLOT(onTextChosen()));
+				row.label->setBuddy(row.combo);
+				row.widgets << row.combo;
+			}
 		}
 		else
 		{
-			row.check = new QCheckBox(row.key, host);
+			row.check = new QCheckBox(settingLabel(row.key), host);
+			row.check->setObjectName(row.key + "Check");
 			row.check->setToolTip(tip);
 			row.check->setProperty("row", r);
 			connect(row.check, SIGNAL(toggled(bool)), this, SLOT(onCheckToggled(bool)));
-			grid->addWidget(row.check, gridRow, COL_LABEL, 1, COL_RESET - COL_LABEL);
+			grid->addWidget(row.check, gridRow, COL_LABEL, 1, desc.kind == WBQT_WATER_COLOR ? 1 : COL_RESET);
 			row.widgets << row.check;
-			++gridRow;
-
 			if (desc.kind == WBQT_WATER_COLOR)
 			{
-				for (int c = 0; c < 3; ++c)
-				{
-					QLabel *channel = new QLabel(QString("    ") + kChannelNames[c], host);
-					channel->setToolTip(tip);
-					grid->addWidget(channel, gridRow, COL_LABEL);
-					row.widgets << channel;
-
-					addStepper(row, r, c, grid, gridRow, tip);
-					row.spin[c]->setRange(0.0, 255.0);
-					row.spin[c]->setSingleStep(1.0);
-					row.spin[c]->setDecimals(0);
-					++gridRow;
-				}
+				row.colour = makeButton(host, QString(), r);
+				row.colour->setFixedWidth(86);
+				row.colour->setIconSize(QSize(60, 16));
+				row.colour->setObjectName(row.key + "Colour");
+				row.colour->setAccessibleName(tr("Choose %1").arg(settingLabel(row.key)));
+				row.colour->setToolTip(tip);
+				connect(row.colour, SIGNAL(clicked()), this, SLOT(onColourClicked()));
+				grid->addWidget(row.colour, gridRow, COL_SLIDER, 1, COL_SPIN - COL_SLIDER + 1, Qt::AlignRight);
+				row.widgets << row.colour;
 			}
 		}
 		m_rows.append(row);
-	}
-	for (int g = 0; g < grids.size(); ++g)
-	{
-		grids[g]->setRowStretch(gridRows[g], 1);
 	}
 }
 
@@ -541,6 +615,14 @@ void WBQtWaterTuningPanel::showRow(int r)
 	QFont font = title->font();
 	font.setBold(row.inFile);
 	title->setFont(font);
+	if (row.spin != NULL)
+	{
+		row.spin->setFont(font);
+	}
+	if (row.combo != NULL)
+	{
+		row.combo->setFont(font);
+	}
 	row.reset->setEnabled(row.inFile);
 
 	switch (row.kind)
@@ -548,8 +630,9 @@ void WBQtWaterTuningPanel::showRow(int r)
 		case WBQT_WATER_FLOAT:
 		{
 			// A loaded value keeps the decimals it was written with.
-			row.spin[0]->setDecimals(qMax(decimalsOf(row.step), decimalsOf(row.value[0])));
-			row.spin[0]->setValue(row.value[0]);
+			row.spin->setDecimals(qMax(decimalsOf(row.step), decimalsOf(row.value[0])));
+			row.spin->setValue(row.value[0]);
+			row.slider->setValue(qRound((row.value[0] - row.lo) / row.step));
 			break;
 		}
 		case WBQT_WATER_BOOL:
@@ -560,13 +643,11 @@ void WBQtWaterTuningPanel::showRow(int r)
 		case WBQT_WATER_COLOR:
 		{
 			row.check->setChecked(row.inFile);
-			for (int c = 0; c < 3; ++c)
-			{
-				row.spin[c]->setValue((row.value[c] < 0.0f) ? kDeepColorStart[c] : row.value[c]);
-				row.spin[c]->setEnabled(row.inFile);
-				row.minus[c]->setEnabled(row.inFile);
-				row.plus[c]->setEnabled(row.inFile);
-			}
+			QPixmap swatch(60, 16);
+			swatch.fill(QColor(qBound(0, qRound((row.value[0] < 0.0f) ? kDeepColorStart[0] : row.value[0]), 255),
+				qBound(0, qRound((row.value[1] < 0.0f) ? kDeepColorStart[1] : row.value[1]), 255),
+				qBound(0, qRound((row.value[2] < 0.0f) ? kDeepColorStart[2] : row.value[2]), 255)));
+			row.colour->setIcon(QIcon(swatch));
 			break;
 		}
 		case WBQT_WATER_TEXT:
@@ -608,6 +689,7 @@ void WBQtWaterTuningPanel::markChanged(int r)
 	row.inFile = true;
 	showRow(r);
 	pushLive(row);
+	updateWaterAvailability();
 	m_pending[row.key] = formatValue(row);
 	m_saveTimer->start(kSaveDelayMs);
 }
@@ -620,6 +702,7 @@ void WBQtWaterTuningPanel::resetRow(int r)
 	row.inFile = false;
 	showRow(r);
 	pushLive(row);
+	updateWaterAvailability();
 	m_pending[row.key] = QString();
 	m_saveTimer->start(kSaveDelayMs);
 }
@@ -678,6 +761,7 @@ void WBQtWaterTuningPanel::reseed()
 		showRow(r);
 		pushLive(row);
 	}
+	updateWaterAvailability();
 	if (!m_pending.isEmpty())
 	{
 		m_saveTimer->start(kSaveRetryMs);
@@ -775,31 +859,70 @@ void WBQtWaterTuningPanel::onSpinChanged(double value)
 		return;
 	}
 	const int r = sender()->property("row").toInt();
-	const int c = sender()->property("chan").toInt();
-	m_rows[r].value[c] = (float)value;
+	m_rows[r].value[0] = (float)value;
 	markChanged(r);
 }
 
-void WBQtWaterTuningPanel::onStepClicked()
+void WBQtWaterTuningPanel::onSliderChanged(int value)
+{
+	if (m_updating)
+	{
+		return;
+	}
+	Row &row = m_rows[sender()->property("row").toInt()];
+	row.spin->setValue(qBound((double)row.lo, row.lo + value * (double)row.step, (double)row.hi));
+}
+
+void WBQtWaterTuningPanel::onColourClicked()
 {
 	const int r = sender()->property("row").toInt();
-	const int c = sender()->property("chan").toInt();
-	const int dir = sender()->property("dir").toInt();
-	const Row &row = m_rows[r];
-	WBQtScrubSpinBox *spin = row.spin[c];
+	Row &row = m_rows[r];
+	const QColor initial(qBound(0, qRound((row.value[0] < 0.0f) ? kDeepColorStart[0] : row.value[0]), 255),
+		qBound(0, qRound((row.value[1] < 0.0f) ? kDeepColorStart[1] : row.value[1]), 255),
+		qBound(0, qRound((row.value[2] < 0.0f) ? kDeepColorStart[2] : row.value[2]), 255));
+	const QColor colour = QColorDialog::getColor(initial, this, settingLabel(row.key));
+	if (!colour.isValid())
+	{
+		return;
+	}
+	row.value[0] = (float)colour.red();
+	row.value[1] = (float)colour.green();
+	row.value[2] = (float)colour.blue();
+	markChanged(r);
+}
 
-	// A value already past lo or hi may step back in, but not further out.
-	const double now = spin->value();
-	double next = now + dir * spin->singleStep();
-	if (dir > 0 && next > row.hi)
+void WBQtWaterTuningPanel::updateWaterAvailability()
+{
+	bool enabled = true;
+	bool additive = false;
+	for (int r = 0; r < m_rows.size(); ++r)
 	{
-		next = qMax(now, (double)row.hi);
+		if (m_rows[r].key == "IsWater")
+		{
+			enabled = m_rows[r].value[0] >= 0.5f;
+		}
+		if (m_rows[r].key == "AdditiveBlending")
+		{
+			additive = m_rows[r].value[0] >= 0.5f;
+		}
 	}
-	if (dir < 0 && next < row.lo)
+	enabled = enabled && !additive;
+	m_ui->waterNotice->setVisible(!enabled);
+	m_ui->waterNotice->setText(additive ? tr("Additive blending uses legacy water. Shader controls are disabled.")
+		: tr("Enable Is water to use shader water."));
+	for (int r = 0; r < m_rows.size(); ++r)
 	{
-		next = qMin(now, (double)row.lo);
+		Row &row = m_rows[r];
+		if (row.block != "WaterTransparency" || !row.key.startsWith("ShaderWater"))
+		{
+			continue;
+		}
+		for (int w = 0; w < row.widgets.size(); ++w)
+		{
+			row.widgets[w]->setEnabled(enabled);
+		}
+		row.reset->setEnabled(enabled && row.inFile);
 	}
-	spin->setValue(next);
 }
 
 void WBQtWaterTuningPanel::onCheckToggled(bool on)
@@ -825,7 +948,10 @@ void WBQtWaterTuningPanel::onCheckToggled(bool on)
 	}
 	for (int c = 0; c < 3; ++c)
 	{
-		row.value[c] = (float)row.spin[c]->value();
+		if (row.value[c] < 0.0f)
+		{
+			row.value[c] = kDeepColorStart[c];
+		}
 	}
 	markChanged(r);
 }
@@ -854,6 +980,10 @@ void WBQtWaterTuningPanel::onResetClicked()
 
 void WBQtWaterTuningPanel::onAdvancedToggled(bool on)
 {
+	if (m_advancedGroup != NULL)
+	{
+		m_advancedGroup->setVisible(on);
+	}
 	for (int r = 0; r < m_rows.size(); ++r)
 	{
 		const Row &row = m_rows[r];

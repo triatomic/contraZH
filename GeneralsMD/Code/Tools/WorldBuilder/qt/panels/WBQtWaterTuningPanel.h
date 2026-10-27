@@ -15,9 +15,11 @@
 class QCheckBox;
 class QComboBox;
 class QGridLayout;
+class QGroupBox;
 class QHideEvent;
 class QLabel;
 class QTimer;
+class QSlider;
 class QToolButton;
 class WBQtScrubSpinBox;
 
@@ -50,7 +52,8 @@ protected:
 
 private slots:
 	void onSpinChanged(double value);
-	void onStepClicked();
+	void onSliderChanged(int value);
+	void onColourClicked();
 	void onCheckToggled(bool on);
 	void onTextChosen();
 	void onResetClicked();
@@ -66,7 +69,7 @@ private:
 		int kind;				// WBQT_WATER_*
 		QString key;
 		QString block;			// map.ini block the key is saved in
-		float lo;				// the - and + buttons stop at lo and hi
+		float lo;				// the slider spans lo to hi
 		float hi;
 		float step;
 		bool advanced;
@@ -76,16 +79,17 @@ private:
 		QLabel *label;			// float and text rows
 		QCheckBox *check;		// bool rows, and the colour's "set in map.ini" box
 		QComboBox *combo;		// text rows, editable, listing the files the bridge found
-		WBQtScrubSpinBox *spin[3];
-		QToolButton *minus[3];
-		QToolButton *plus[3];
+		WBQtScrubSpinBox *spin;
+		QSlider *slider;
+		QToolButton *colour;
 		QToolButton *reset;
 		QVector<QWidget *> widgets;
 	};
 
 	void buildRows();
 	QGridLayout *addTab(const QString &title);
-	void addStepper(Row &row, int rowIndex, int channel, QGridLayout *grid, int gridRow, const QString &tip);
+	void addSlider(Row &row, int rowIndex, QGridLayout *grid, int gridRow, const QString &tip);
+	void updateWaterAvailability();
 	void showRow(int r);
 	void loadBase(Row &row);		// the Water.ini or GameData.ini value
 	void pushLive(const Row &row);	// into the 3D view
@@ -101,6 +105,7 @@ private:
 	QString m_path;
 	QTimer *m_saveTimer;
 	bool m_updating;
+	QGroupBox *m_advancedGroup;
 
 	static WBQtWaterTuningPanel *s_instance;
 };

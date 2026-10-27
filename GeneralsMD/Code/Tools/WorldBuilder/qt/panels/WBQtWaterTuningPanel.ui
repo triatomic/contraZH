@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>440</width>
-    <height>560</height>
+    <width>640</width>
+    <height>760</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -25,12 +25,9 @@
       </attribute>
       <layout class="QVBoxLayout" name="waterLayout">
        <item>
-        <widget class="QCheckBox" name="advancedCheck">
-         <property name="toolTip">
-          <string>Show every water key, not only the main ones</string>
-         </property>
-         <property name="text">
-          <string>Advanced keys</string>
+        <widget class="QLabel" name="waterNotice">
+         <property name="wordWrap">
+          <bool>true</bool>
          </property>
         </widget>
        </item>
@@ -43,9 +40,39 @@
           <bool>true</bool>
          </property>
          <widget class="QWidget" name="rowsHost">
-          <layout class="QGridLayout" name="rowsGrid" columnstretch="1,0,0,0,0"/>
+          <layout class="QGridLayout" name="rowsGrid" columnstretch="0,1,0,0"/>
          </widget>
         </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="optionsLayout" stretch="0,1">
+         <item>
+          <widget class="QCheckBox" name="advancedCheck">
+           <property name="toolTip">
+            <string>Show every water key, not only the main ones</string>
+           </property>
+           <property name="text">
+            <string>Advanced settings</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="inheritanceLabel">
+           <property name="alignment">
+            <set>Qt::AlignRight|Qt::AlignVCenter</set>
+           </property>
+           <property name="text">
+            <string>Bold values override inherited settings.</string>
+           </property>
+           <property name="toolTip">
+            <string>Changes apply live and save automatically to map.ini. Reset removes the map override.</string>
+           </property>
+           <property name="wordWrap">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </item>
       </layout>
      </widget>

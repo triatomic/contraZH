@@ -61,11 +61,13 @@ know are underlined, and right-click offers the closest matches.)
 * Reload map.ini and Check map.ini - (Apply or check the file without reopening the map. The report
 lists every block that failed to parse; only those blocks are dropped.)
 * Auto-reload map.ini on change - (Reloads when the file is saved outside WorldBuilder.)
-* Water tuning - (Tunes the map's water against the 3D view. Each row is a `WaterTransparency` key
-from [Water](Water.md), stepped with the - and + buttons or typed. A changed key is saved to the
-`WaterTransparency` block of the map's `map.ini`; the reset button removes it, so the map follows
-`Water.ini` again. Offers to create `map.ini` when the map has none. `AdditiveBlending` switches
-between the old additive water and shader water; enable it for the old water.)
+* Water tuning - (Groups the map's water into Appearance, Waves, Light & foam, and Behaviour.
+Sliders, numeric fields and a colour picker update the 3D view. Tooltips show the exact
+`WaterTransparency` keys from [Water](Water.md). Advanced settings stay hidden until enabled.
+A changed key is saved to the `WaterTransparency` block of the map's `map.ini`; reset removes it,
+so the map follows `Water.ini` again. Offers to create `map.ini` when the map has none.
+`AdditiveBlending` switches between the old additive water and shader water. Shader controls are
+disabled while additive blending is on or Is water is off.)
 * Water tuning > Terrain and sky - (The second tab tunes the `TerrainGlint`, `GroundNoise`,
 `TerrainHeightBlend` and `SkyCloud` keys of [Direct3D 9 Features](dx9feat.md)
 the same way. A changed key is saved to the `GameData` block of `map.ini`, which the game reads per
