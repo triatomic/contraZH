@@ -6101,6 +6101,26 @@ BEGIN_MESSAGE_MAP(WbView3d, WbView)
 	ON_UPDATE_COMMAND_UI(ID_FX_HEIGHTBLEND, OnUpdateFxHeightBlend)
 	ON_COMMAND(ID_FX_SPECULAR, OnFxSpecular)
 	ON_UPDATE_COMMAND_UI(ID_FX_SPECULAR, OnUpdateFxSpecular)
+	ON_COMMAND(ID_FX_SOFTPARTICLES, OnFxSoftParticles)
+	ON_UPDATE_COMMAND_UI(ID_FX_SOFTPARTICLES, OnUpdateFxSoftParticles)
+	ON_COMMAND(ID_FX_FLAMESHADERS, OnFxFlameShaders)
+	ON_UPDATE_COMMAND_UI(ID_FX_FLAMESHADERS, OnUpdateFxFlameShaders)
+	ON_COMMAND(ID_FX_ELECTRICSHADERS, OnFxElectricShaders)
+	ON_UPDATE_COMMAND_UI(ID_FX_ELECTRICSHADERS, OnUpdateFxElectricShaders)
+	ON_COMMAND(ID_FX_LASERSHADERS, OnFxLaserShaders)
+	ON_UPDATE_COMMAND_UI(ID_FX_LASERSHADERS, OnUpdateFxLaserShaders)
+	ON_COMMAND(ID_FX_CRYOSHADERS, OnFxCryoShaders)
+	ON_UPDATE_COMMAND_UI(ID_FX_CRYOSHADERS, OnUpdateFxCryoShaders)
+	ON_COMMAND(ID_FX_DYNAMICLIGHTS, OnFxDynamicLights)
+	ON_UPDATE_COMMAND_UI(ID_FX_DYNAMICLIGHTS, OnUpdateFxDynamicLights)
+	ON_COMMAND(ID_FX_PIXELLIGHTS, OnFxPixelLights)
+	ON_UPDATE_COMMAND_UI(ID_FX_PIXELLIGHTS, OnUpdateFxPixelLights)
+	ON_UPDATE_COMMAND_UI(ID_FX_WATERREFLECTIONS, OnUpdateFxWaterReflections)
+	ON_COMMAND(ID_FX_SHORELINEFOAM, OnFxShorelineFoam)
+	ON_UPDATE_COMMAND_UI(ID_FX_SHORELINEFOAM, OnUpdateFxShorelineFoam)
+	ON_UPDATE_COMMAND_UI(ID_FX_AMBIENTOCCLUSION, OnUpdateFxAmbientOcclusion)
+	ON_UPDATE_COMMAND_UI(ID_FX_LASERGLOW, OnUpdateFxLaserGlow)
+	ON_UPDATE_COMMAND_UI(ID_FX_PLANARMIRRORS, OnUpdateFxPlanarMirrors)
 	ON_COMMAND(ID_TEXT_SHADOW, OnTextShadow)
 	ON_UPDATE_COMMAND_UI(ID_TEXT_SHADOW, OnUpdateTextShadow)
 	ON_COMMAND(ID_TEXT_OUTLINE, OnTextOutline)
@@ -9317,13 +9337,23 @@ void WbView3d::loadFxShaderSettings()
 {
 	TheWritableGlobalData->m_useShadowMap = readFxSetting("FxShadowMap", TheGlobalData->m_useShadowMap);
 	TheWritableGlobalData->m_useBloom = readFxSetting("FxBloom", TheGlobalData->m_useBloom);
-	setEffectShaders(readFxSetting("FxEffectShaders",
-		TheGlobalData->m_useFlameShaders || TheGlobalData->m_useElectricShaders ||
-		TheGlobalData->m_useLaserShaders || TheGlobalData->m_useCryoShaders));
+	const Int effectShaders = ::AfxGetApp()->GetProfileInt(MAIN_FRAME_SECTION, "FxEffectShaders", -1);
+	if (effectShaders != -1)
+	{
+		setEffectShaders(effectShaders != 0);
+	}
 	TheWritableGlobalData->m_useHQSky = readFxSetting("FxHQSky", TheGlobalData->m_useHQSky);
 	TheWritableGlobalData->m_useNormalMaps = readFxSetting("FxNormalMaps", TheGlobalData->m_useNormalMaps);
 	TheWritableGlobalData->m_useHeightBlend = readFxSetting("FxHeightBlend", TheGlobalData->m_useHeightBlend);
 	TheWritableGlobalData->m_useSpecular = readFxSetting("FxSpecular", TheGlobalData->m_useSpecular);
+	TheWritableGlobalData->m_useSoftParticles = readFxSetting("FxSoftParticles", TheGlobalData->m_useSoftParticles);
+	TheWritableGlobalData->m_useFlameShaders = readFxSetting("FxFlameShaders", TheGlobalData->m_useFlameShaders);
+	TheWritableGlobalData->m_useElectricShaders = readFxSetting("FxElectricShaders", TheGlobalData->m_useElectricShaders);
+	TheWritableGlobalData->m_useLaserShaders = readFxSetting("FxLaserShaders", TheGlobalData->m_useLaserShaders);
+	TheWritableGlobalData->m_useCryoShaders = readFxSetting("FxCryoShaders", TheGlobalData->m_useCryoShaders);
+	TheWritableGlobalData->m_useDynamicLights = readFxSetting("FxDynamicLights", TheGlobalData->m_useDynamicLights);
+	TheWritableGlobalData->m_usePixelLights = readFxSetting("FxPixelLights", TheGlobalData->m_usePixelLights);
+	TheWritableGlobalData->m_shorelineFoam = readFxSetting("FxShorelineFoam", TheGlobalData->m_shorelineFoam);
 }
 
 void WbView3d::setEffectShaders(Bool on)
@@ -9362,14 +9392,22 @@ void WbView3d::OnUpdateFxBloom(CCmdUI* pCmdUI)
 
 void WbView3d::OnFxEffectShaders()
 {
-	setEffectShaders(!TheGlobalData->m_useFlameShaders);
+	setEffectShaders(!(TheGlobalData->m_useSoftParticles && TheGlobalData->m_useFlameShaders &&
+		TheGlobalData->m_useElectricShaders && TheGlobalData->m_useLaserShaders && TheGlobalData->m_useCryoShaders));
 	writeFxSetting("FxEffectShaders", TheGlobalData->m_useFlameShaders);
+	writeFxSetting("FxSoftParticles", TheGlobalData->m_useSoftParticles);
+	writeFxSetting("FxFlameShaders", TheGlobalData->m_useFlameShaders);
+	writeFxSetting("FxElectricShaders", TheGlobalData->m_useElectricShaders);
+	writeFxSetting("FxLaserShaders", TheGlobalData->m_useLaserShaders);
+	writeFxSetting("FxCryoShaders", TheGlobalData->m_useCryoShaders);
 	Invalidate();
 }
 
 void WbView3d::OnUpdateFxEffectShaders(CCmdUI* pCmdUI)
 {
-	updateFxItem(pCmdUI, TheGlobalData->m_useFlameShaders, fxD3D9Available() && TheW3DSoftParticles != nullptr);
+	updateFxItem(pCmdUI, TheGlobalData->m_useSoftParticles && TheGlobalData->m_useFlameShaders &&
+		TheGlobalData->m_useElectricShaders && TheGlobalData->m_useLaserShaders && TheGlobalData->m_useCryoShaders,
+		fxD3D9Available() && TheW3DSoftParticles != nullptr);
 }
 
 void WbView3d::OnFxHQSky()
@@ -9419,6 +9457,122 @@ void WbView3d::OnFxSpecular()
 void WbView3d::OnUpdateFxSpecular(CCmdUI* pCmdUI)
 {
 	updateFxItem(pCmdUI, TheGlobalData->m_useSpecular, fxD3D9Available());
+}
+
+void WbView3d::OnFxSoftParticles()
+{
+	TheWritableGlobalData->m_useSoftParticles = !TheGlobalData->m_useSoftParticles;
+	writeFxSetting("FxSoftParticles", TheGlobalData->m_useSoftParticles);
+	Invalidate();
+}
+
+void WbView3d::OnUpdateFxSoftParticles(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_useSoftParticles, fxD3D9Available() && TheW3DSoftParticles != nullptr);
+}
+
+void WbView3d::OnFxFlameShaders()
+{
+	TheWritableGlobalData->m_useFlameShaders = !TheGlobalData->m_useFlameShaders;
+	writeFxSetting("FxFlameShaders", TheGlobalData->m_useFlameShaders);
+	Invalidate();
+}
+
+void WbView3d::OnUpdateFxFlameShaders(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_useFlameShaders, fxD3D9Available() && TheW3DSoftParticles != nullptr);
+}
+
+void WbView3d::OnFxElectricShaders()
+{
+	TheWritableGlobalData->m_useElectricShaders = !TheGlobalData->m_useElectricShaders;
+	writeFxSetting("FxElectricShaders", TheGlobalData->m_useElectricShaders);
+	Invalidate();
+}
+
+void WbView3d::OnUpdateFxElectricShaders(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_useElectricShaders, fxD3D9Available() && TheW3DSoftParticles != nullptr);
+}
+
+void WbView3d::OnFxLaserShaders()
+{
+	TheWritableGlobalData->m_useLaserShaders = !TheGlobalData->m_useLaserShaders;
+	writeFxSetting("FxLaserShaders", TheGlobalData->m_useLaserShaders);
+	Invalidate();
+}
+
+void WbView3d::OnUpdateFxLaserShaders(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_useLaserShaders, fxD3D9Available() && TheW3DSoftParticles != nullptr);
+}
+
+void WbView3d::OnFxCryoShaders()
+{
+	TheWritableGlobalData->m_useCryoShaders = !TheGlobalData->m_useCryoShaders;
+	writeFxSetting("FxCryoShaders", TheGlobalData->m_useCryoShaders);
+	Invalidate();
+}
+
+void WbView3d::OnUpdateFxCryoShaders(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_useCryoShaders, fxD3D9Available() && TheW3DSoftParticles != nullptr);
+}
+
+void WbView3d::OnFxDynamicLights()
+{
+	TheWritableGlobalData->m_useDynamicLights = !TheGlobalData->m_useDynamicLights;
+	writeFxSetting("FxDynamicLights", TheGlobalData->m_useDynamicLights);
+	Invalidate();
+}
+
+void WbView3d::OnUpdateFxDynamicLights(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_useDynamicLights, true);
+}
+
+void WbView3d::OnFxPixelLights()
+{
+	TheWritableGlobalData->m_usePixelLights = !TheGlobalData->m_usePixelLights;
+	writeFxSetting("FxPixelLights", TheGlobalData->m_usePixelLights);
+	Invalidate();
+}
+
+void WbView3d::OnUpdateFxPixelLights(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_usePixelLights, W3DShaderManager::supportsPixelLights());
+}
+
+void WbView3d::OnUpdateFxWaterReflections(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_waterReflections, false);
+}
+
+void WbView3d::OnFxShorelineFoam()
+{
+	TheWritableGlobalData->m_shorelineFoam = !TheGlobalData->m_shorelineFoam;
+	writeFxSetting("FxShorelineFoam", TheGlobalData->m_shorelineFoam);
+	Invalidate();
+}
+
+void WbView3d::OnUpdateFxShorelineFoam(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_shorelineFoam, fxD3D9Available());
+}
+
+void WbView3d::OnUpdateFxAmbientOcclusion(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_useAmbientOcclusion, false);
+}
+
+void WbView3d::OnUpdateFxLaserGlow(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_laserRef, false);
+}
+
+void WbView3d::OnUpdateFxPlanarMirrors(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_planarMirrorShader, false);
 }
 
 void WbView3d::OnTextShadow()

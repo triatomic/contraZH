@@ -27,13 +27,19 @@ Level Of Detail > FX Shaders switches the game's D3D9 effects in the Direct3D 9 
 
 * Shadow Mapping - (Needs View > Models > Show Shadows. Objects cast into the shadow map and the
 terrain receives it.)
-* Bloom - (The only item in the Direct3D 8 exe.)
-* Effect Shaders - (Flame, electric, laser and cryo, with soft particles.)
+* Bloom - (Available in both Direct3D 8 and Direct3D 9.)
+* Effect Shaders - (Switches soft particles, flame, electric, laser and cryo together. Each also
+has its own switch.)
 * HQ Sky Cloud Shadows - (Needs Show Clouds.)
 * Terrain Normal Maps, Terrain Height Blend, Specular & Glint
+* Dynamic Lights, Pixel Lights - (Pixel lights need Dynamic Lights and supported shaders.)
+* Shoreline Foam - (Applies to shader water in Direct3D 9.)
 
 Each item starts from the player's `Options.ini` and is then remembered in `WorldBuilder.ini`.
-Ambient occlusion, shockwaves and laser ground glow are left out.
+Bloom and Dynamic Lights are available in Direct3D 8; other switches need Direct3D 9.
+Water Reflections, Ambient Occlusion, Laser Ground Glow and Planar Mirrors appear disabled
+and marked Unavailable because their rendering passes are not connected to the editor.
+Shockwaves require game FX events and are not previewed.
 
 The Stochastic Terrain brush paints hex-cell tiling onto dry ground to hide texture repeats. See
 [Stochastic terrain](dx9-Terrain.md#stochastic-terrain).

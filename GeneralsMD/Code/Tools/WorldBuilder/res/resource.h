@@ -925,6 +925,18 @@
 #define ID_FX_NORMALMAPS                33436
 #define ID_FX_HEIGHTBLEND               33437
 #define ID_FX_SPECULAR                  33438
+#define ID_FX_SOFTPARTICLES            33448
+#define ID_FX_FLAMESHADERS             33449
+#define ID_FX_ELECTRICSHADERS          33450
+#define ID_FX_LASERSHADERS             33451
+#define ID_FX_CRYOSHADERS              33452
+#define ID_FX_DYNAMICLIGHTS            33453
+#define ID_FX_PIXELLIGHTS              33454
+#define ID_FX_WATERREFLECTIONS         33455
+#define ID_FX_SHORELINEFOAM            33456
+#define ID_FX_AMBIENTOCCLUSION         33457
+#define ID_FX_LASERGLOW                33458
+#define ID_FX_PLANARMIRRORS            33459
 #define IDS_NEW                         61446
 #define IDS_RESIZE                      61447
 #define IDS_REMOVING_INUSE_TEAM         61448
@@ -1010,7 +1022,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_3D_CONTROLS                     1
 #define _APS_NEXT_RESOURCE_VALUE        258
-#define _APS_NEXT_COMMAND_VALUE         33448
+#define _APS_NEXT_COMMAND_VALUE         33460
 #define _APS_NEXT_CONTROL_VALUE         1393
 #define _APS_NEXT_SYMED_VALUE           101
 #endif

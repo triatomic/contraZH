@@ -394,11 +394,25 @@ BEGIN
             MENUITEM "Shadow Mapping",              ID_FX_SHADOWMAP
             MENUITEM "Bloom",                       ID_FX_BLOOM
             MENUITEM "Effect Shaders (Flame, Electric, Laser, Cryo)", ID_FX_EFFECTSHADERS
+            MENUITEM "Soft Particles",              ID_FX_SOFTPARTICLES
+            MENUITEM "Flame Shaders",               ID_FX_FLAMESHADERS
+            MENUITEM "Electric Shaders",            ID_FX_ELECTRICSHADERS
+            MENUITEM "Laser Shaders",               ID_FX_LASERSHADERS
+            MENUITEM "Cryo Shaders",                ID_FX_CRYOSHADERS
             MENUITEM "HQ Sky Cloud Shadows",        ID_FX_HQSKY
             MENUITEM SEPARATOR
             MENUITEM "Terrain Normal Maps",         ID_FX_NORMALMAPS
             MENUITEM "Terrain Height Blend",        ID_FX_HEIGHTBLEND
             MENUITEM "Specular && Glint",           ID_FX_SPECULAR
+            MENUITEM SEPARATOR
+            MENUITEM "Dynamic Lights",              ID_FX_DYNAMICLIGHTS
+            MENUITEM "Pixel Lights",                ID_FX_PIXELLIGHTS
+            MENUITEM "Shoreline Foam",              ID_FX_SHORELINEFOAM
+            MENUITEM SEPARATOR
+            MENUITEM "Water Reflections (Unavailable)", ID_FX_WATERREFLECTIONS
+            MENUITEM "Ambient Occlusion (Unavailable)", ID_FX_AMBIENTOCCLUSION
+            MENUITEM "Laser Ground Glow (Unavailable)", ID_FX_LASERGLOW
+            MENUITEM "Planar Mirrors (Unavailable)", ID_FX_PLANARMIRRORS
         END
         POPUP "Minimap"
         BEGIN

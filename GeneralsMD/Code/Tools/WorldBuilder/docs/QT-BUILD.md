@@ -69,11 +69,15 @@ overlays are decoded with `stb_image`.
 
 The game's D3D9 effects are switched from **Level Of Detail > FX Shaders**: shadow mapping,
 bloom, the particle effect shaders (flame, electric, laser, cryo, with soft particles), HQ sky
-cloud shadows, terrain normal maps, terrain height blend, and specular/glint. Each item starts
+cloud shadows, terrain normal maps, terrain height blend, specular/glint, dynamic lights, pixel
+lights, and shoreline foam. Soft particles and each effect shader also have
+individual switches. Each item starts
 from the value in the player's `Options.ini` and is remembered in `WorldBuilder.ini`. Shadow
 mapping still needs View > Show Shadows, and HQ sky needs View > Show Clouds. Objects cast into
 the shadow map and the terrain receives it; the objects themselves keep their classic shadows.
-In the D3D8 exe only Bloom is available.
+Water reflections, ambient occlusion, laser ground glow and planar mirrors are listed as
+unavailable because their rendering passes are not connected to the editor.
+In the D3D8 exe Bloom and Dynamic Lights are available.
 
 ## Configure + build (Visual Studio generator, alternative)
 
