@@ -70,6 +70,7 @@
 #include "GameClient/Drawable.h"
 #include "GameClient/FXList.h"
 #include "GameClient/GadgetPushButton.h"
+#include "GameClient/GadgetCheckBox.h"
 #include "GameClient/GadgetComboBox.h"
 #include "GameClient/GadgetListBox.h"
 #include "GameClient/GadgetTextEntry.h"
@@ -1153,6 +1154,7 @@ GameWindow *UnitSpawnerSide = nullptr;
 GameWindow *UnitSpawnerKindFilter = nullptr;
 GameWindow *UnitSpawnerSearch = nullptr;
 GameWindow *UnitSpawnerList = nullptr;
+GameWindow *UnitSpawnerSpawnMode = nullptr;
 GameWindow *UnitSpawnerPlacement = nullptr;
 UnsignedShort UnitSpawnerTemplateID = 0;
 std::vector<const ThingTemplate *> UnitSpawnerTemplates;
@@ -1345,7 +1347,10 @@ WindowMsgHandledType unitSpawnerPlacementInput(GameWindow *, UnsignedInt msg, Wi
 			GameMessage *spawn = TheMessageStream->appendMessage(GameMessage::MSG_SPAWN_OBJECT_AT_POSITION);
 			spawn->appendIntegerArgument((Int)UnitSpawnerTemplateID);
 			spawn->appendLocationArgument(pos);
-			finishUnitSpawnerPlacement();
+			if (!UnitSpawnerSpawnMode || !GadgetCheckBoxIsChecked(UnitSpawnerSpawnMode))
+			{
+				finishUnitSpawnerPlacement();
+			}
 		}
 	}
 	return MSG_HANDLED;
@@ -1379,7 +1384,9 @@ void startUnitSpawnerPlacement()
 		UnitSpawnerPlacement->winBringToTop();
 		ShaderPanelWindow->winHide(TRUE);
 		TheWindowManager->winSetFocus(UnitSpawnerPlacement);
-		TheInGameUI->message(UnicodeString(L"Click the ground to spawn. Right-click or Escape cancels."));
+		TheInGameUI->message(UnicodeString(GadgetCheckBoxIsChecked(UnitSpawnerSpawnMode)
+			? L"Spawn mode. Left-click to keep spawning. Right-click or Escape exits."
+			: L"Click the ground to spawn. Right-click or Escape cancels."));
 	}
 }
 
@@ -1503,6 +1510,20 @@ void createUnitSpawner()
 		8, 148, SHADER_PANEL_WIDTH - 16, UNIT_SPAWNER_HEIGHT - 238, &data, &list, font, TRUE);
 	styleUnitSpawnerControl(UnitSpawnerSearch);
 	styleUnitSpawnerList(UnitSpawnerList);
+	data.init();
+	data.m_style = GWS_CHECK_BOX | GWS_MOUSE_TRACK;
+	data.m_font = font;
+	UnitSpawnerSpawnMode = TheWindowManager->gogoGadgetCheckbox(ShaderPanelWindow, WIN_STATUS_ENABLED,
+		SHADER_PANEL_WIDTH - 144, UNIT_SPAWNER_HEIGHT - 88, 136, 22, &data, font, TRUE);
+	styleUnitSpawnerControl(UnitSpawnerSpawnMode);
+	GadgetCheckBoxSetText(UnitSpawnerSpawnMode, UnicodeString(L"Spawn mode"));
+	GadgetCheckBoxSetChecked(UnitSpawnerSpawnMode, FALSE);
+	GadgetCheckBoxSetEnabledUncheckedBoxColor(UnitSpawnerSpawnMode, WIN_COLOR_UNDEFINED);
+	GadgetCheckBoxSetHiliteUncheckedBoxColor(UnitSpawnerSpawnMode, WIN_COLOR_UNDEFINED);
+	GadgetCheckBoxSetEnabledCheckedBoxColor(UnitSpawnerSpawnMode, GameMakeColor(160, 235, 160, 255));
+	GadgetCheckBoxSetHiliteCheckedBoxColor(UnitSpawnerSpawnMode, GameMakeColor(160, 235, 160, 255));
+	GadgetCheckBoxSetEnabledCheckedBoxBorderColor(UnitSpawnerSpawnMode, GameMakeColor(110, 140, 160, 255));
+	GadgetCheckBoxSetHiliteCheckedBoxBorderColor(UnitSpawnerSpawnMode, GameMakeColor(110, 140, 160, 255));
 	UnitSpawnerKindFilter->winBringToTop();
 	UnitSpawnerSide->winBringToTop();
 	refreshUnitSpawnerList();
@@ -1524,7 +1545,7 @@ void selectDebugPanelTab(Bool spawner)
 		GadgetComboBoxHideList(UnitSpawnerKindFilter);
 	}
 	UnitSpawnerTab = spawner;
-	GameWindow *controls[] = { UnitSpawnerSide, UnitSpawnerKindFilter, UnitSpawnerSearch, UnitSpawnerList };
+	GameWindow *controls[] = { UnitSpawnerSide, UnitSpawnerKindFilter, UnitSpawnerSearch, UnitSpawnerList, UnitSpawnerSpawnMode };
 	for (Int i = 0; i < ARRAY_SIZE(controls); ++i)
 	{
 		if (controls[i])
@@ -1555,6 +1576,7 @@ void destroyShaderDebugPanel()
 	UnitSpawnerKindFilter = nullptr;
 	UnitSpawnerSearch = nullptr;
 	UnitSpawnerList = nullptr;
+	UnitSpawnerSpawnMode = nullptr;
 	UnitSpawnerTab = FALSE;
 	UnitSpawnerTemplates.clear();
 	UnitSpawnerSides.clear();
@@ -1585,6 +1607,7 @@ WindowMsgHandledType shaderPanelSystem(GameWindow *window, UnsignedInt msg, Wind
 		UnitSpawnerKindFilter = nullptr;
 		UnitSpawnerSearch = nullptr;
 		UnitSpawnerList = nullptr;
+		UnitSpawnerSpawnMode = nullptr;
 		UnitSpawnerTab = FALSE;
 		UnitSpawnerTemplates.clear();
 		UnitSpawnerSides.clear();

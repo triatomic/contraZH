@@ -61,6 +61,9 @@ Select an entry and click Place selected unit, or double-click the entry. The pa
 you choose a ground position. Left-click to spawn one object for your player; right-click or
 Escape cancels. The panel returns after placement or cancellation.
 
+Check Spawn mode before placing to keep the selected object active. Each left-click spawns another
+copy until right-click or Escape ends placement and returns to the panel. Spawn mode starts unchecked.
+
 Spawning works in single-player campaign and skirmish matches. Replays and multiplayer games
 can browse the list but cannot place objects. Spawns use the existing chat-command spawn path,
 so the engine creates the object during its logic update and completes its build callbacks.
