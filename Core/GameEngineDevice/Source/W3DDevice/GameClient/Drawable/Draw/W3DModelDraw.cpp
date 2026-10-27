@@ -3563,8 +3563,13 @@ void W3DModelDraw::updateObjectDecalVisibility()
 
 	if (visible && getDrawable()->getTemplate()->hidesDecalWhenDisabled())
 	{
-		if (obj && obj->isDisabled())
+		// Containment holds addons without stopping their propaganda effect.
+		DisabledMaskType disabling = MAKE_DISABLED_MASK(DISABLED_HELD);
+		FLIP_DISABLEDMASK(disabling);
+		if (obj && TEST_DISABLEDMASK_ANY(obj->getDisabledFlags(), disabling))
+		{
 			visible = FALSE;
+		}
 	}
 
 	m_objectDecal->enableShadowRender(visible);

@@ -129,6 +129,8 @@ fade out at its own edges - an opaque edge texel gets stretched across the whole
 * `DecalHideWhenDisabled = Yes` stops drawing the decal while the object is disabled - EMP,
 hacked, subdued, unmanned, out of power, disabled by script and so on - and brings it back when
 the object recovers. Useful when the decal reads as something the unit is actively doing.
+Being held by a container alone does not hide the decal, so visible addons such as Overlord
+propaganda towers keep their auras. Other disabling states still hide it.
 * `DecalColor` tints the texture. Any alpha written here is ignored - `DecalOpacity` is what fades
 the decal. Both are ignored under `SHADOW_DECAL`, whose blend has no way to apply them.
 * `DecalOpacity` means different things per style. Under `SHADOW_ALPHA_DECAL` it is an ordinary
