@@ -1440,6 +1440,36 @@ void W3DProjectedShadowManager::prepareShadows()
 	m_drawStartY=hmap->getDrawOrgY();
 }
 
+static Bool isDecalVisible(RenderObjClass *robj)
+{
+	if (robj == nullptr)
+	{
+		return TRUE;
+	}
+
+	// queueDecal clips to visible terrain, so the model may be outside the camera view.
+	if (!robj->Is_Not_Hidden_At_All())
+	{
+		return FALSE;
+	}
+
+	const DrawableInfo *info = (const DrawableInfo *)robj->Get_User_Data();
+	Drawable *draw = info ? info->m_drawable : nullptr;
+	while (draw)
+	{
+		if (draw->isDrawableEffectivelyHidden() || draw->getFullyObscuredByShroud())
+		{
+			return FALSE;
+		}
+
+		// A contained addon's shroud state does not include its carrier's state.
+		const Object *obj = draw->getObject();
+		const Object *container = obj ? obj->getContainedBy() : nullptr;
+		draw = container ? container->getDrawable() : nullptr;
+	}
+	return TRUE;
+}
+
 Int W3DProjectedShadowManager::renderShadows(RenderInfoClass & rinfo)
 {
 	Int projectionCount=0;
@@ -1493,10 +1523,9 @@ Int W3DProjectedShadowManager::renderShadows(RenderInfoClass & rinfo)
 						lastShadowDecalTexture=shadow->m_shadowTexture[0];
 						lastShadowType=shadow->m_type;
 					}
-					///@todo: may need to fix this if shadows are large enough to be seen while object is not visible
-					if (shadow->m_robj->Is_Really_Visible())
-					{	//queueSimpleDecal(shadow);
-						queueDecal(shadow);	//only draw shadow if casting object is visible
+					if (isDecalVisible(shadow->m_robj))
+					{
+						queueDecal(shadow);
 						projectionCount++;
 					}
 					continue;
@@ -1646,7 +1675,7 @@ Int W3DProjectedShadowManager::renderDecals(RenderInfoClass & rinfo, Bool aboveW
 			// A footprint carries its own shader constants, so it draws alone.
 			if (shadow->m_isFootprint)
 			{
-				if (canDrawFootprints() && !(shadow->m_robj && !shadow->m_robj->Is_Really_Visible()))
+				if (canDrawFootprints() && isDecalVisible(shadow->m_robj))
 				{
 					flushDecals(lastShadowDecalTexture,lastShadowType);
 					queueDecal(shadow);
@@ -1669,10 +1698,9 @@ Int W3DProjectedShadowManager::renderDecals(RenderInfoClass & rinfo, Bool aboveW
 				lastShadowDecalTexture=shadow->m_shadowTexture[0];
 				lastShadowType=shadow->m_type;
 			}
-			///@todo: may need to fix this if shadows are large enough to be seen while object is not visible
-			if (!(shadow->m_robj && !shadow->m_robj->Is_Really_Visible()))
-			{	//queueSimpleDecal(shadow);
-				queueDecal(shadow);	//only draw shadow if casting object is visible
+			if (isDecalVisible(shadow->m_robj))
+			{
+				queueDecal(shadow);
 				projectionCount++;
 			}
 		}

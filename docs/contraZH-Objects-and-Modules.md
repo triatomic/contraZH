@@ -96,6 +96,10 @@ the object's shadow: an object can carry a `Shadow` and a display decal at the s
 decal keeps drawing when the player turns 2D or 3D shadows off in the video options. It does hide
 under shroud, while the object is hidden, and once the object dies, slow death included.
 
+Decals stay visible when their model leaves the camera view but the decal still reaches visible
+terrain. This also applies to legacy `ShadowTexture` decals. Contained addons follow their
+carrier's hidden and shroud state.
+
 Added new parameters for object definitions:
 
 ```
