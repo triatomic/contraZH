@@ -105,6 +105,14 @@ enum AIStateType CPP_11(: Int)
 	AI_GUARD_RETALIATE,												///< attacks attacker but with restrictions (hybrid of attack and guard).
 };
 
+struct PathPointInfo
+{
+	Bool m_isReverse;
+	UnsignedInt m_cmdNodeID;
+
+	PathPointInfo(Bool isReverse = false, UnsignedInt cmdNodeID = 0) :m_isReverse(isReverse), m_cmdNodeID(cmdNodeID) {}
+};
+
 //-----------------------------------------------------------------------------------------------------------
 // generically state transition conditions
 extern Bool outOfWeaponRangeObject( State *thisState, void* userData );
@@ -142,9 +150,10 @@ public:
 	virtual StateReturnType setState( StateID newStateID ) override;
 
 	/// @todo Rethink state parameter passing. Continuing in this fashion will have a pile of params in the machine (MSB)
-	void setGoalPath( std::vector<Coord3D>* path );
-	void addToGoalPath( const Coord3D *pathPoint );
+	void setGoalPath( std::vector<Coord3D>* path, Bool isReverse = false, UnsignedInt lastCmdNodeID = 0);
+	void addToGoalPath( const Coord3D *pathPoint, const PathPointInfo*pointInfo = nullptr);
 	const Coord3D *getGoalPathPosition( Int i ) const;		///< return path position at index "i"
+	const PathPointInfo* getPathPointInfo(Int i) const;		///< return path point info at index "i"
 	Int getGoalPathSize() const { return m_goalPath.size(); }
 
 
@@ -178,6 +187,8 @@ protected:
 
 private:
 	std::vector<Coord3D>	m_goalPath;					///< defines a simple path to follow
+	///< ShigureUi Info include reverse move and command sequence node ID
+	std::vector<PathPointInfo> m_goalPathInfo;
 	const Waypoint *			m_goalWaypoint;
 	Squad *								m_goalSquad;
 
@@ -823,6 +834,9 @@ public:
 	virtual StateReturnType onEnter() override;
 	virtual void onExit( StateExitType status ) override;
 	virtual StateReturnType update() override;
+
+	// ShigureUi 28/10/2026 only used by AIStateMachine::addToGoalPath()
+	void friend_recheckFinalDestination(Int index);
 
 protected:
 

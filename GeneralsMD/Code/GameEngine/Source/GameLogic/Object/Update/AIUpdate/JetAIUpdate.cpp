@@ -2940,7 +2940,7 @@ Bool JetAIUpdate::isParkedInHangar() const
 /**
  * Follow the path defined by the given array of points
  */
-void JetAIUpdate::privateFollowPath( std::vector<Coord3D>* path, Object *ignoreObject, CommandSourceType cmdSource, Bool exitProduction )
+void JetAIUpdate::privateFollowPath( std::vector<Coord3D>* path, Object *ignoreObject, CommandSourceType cmdSource, Bool exitProduction, Bool isReverse, UnsignedInt lastCmdNodeID)
 {
 	if (exitProduction)
 	{
@@ -2955,15 +2955,8 @@ void JetAIUpdate::privateFollowPath( std::vector<Coord3D>* path, Object *ignoreO
 	}
 	else
 	{
-		AIUpdateInterface::privateFollowPath(path, ignoreObject, cmdSource, exitProduction);
+		AIUpdateInterface::privateFollowPath(path, ignoreObject, cmdSource, exitProduction, isReverse, lastCmdNodeID);
 	}
-}
-
-//----------------------------------------------------------------------------------------
-void JetAIUpdate::privateFollowPathAppend( const Coord3D *pos, CommandSourceType cmdSource )
-{
-	// nothing yet... might need to override. not sure. (srj)
-	AIUpdateInterface::privateFollowPathAppend(pos, cmdSource);
 }
 
 //----------------------------------------------------------------------------------------
@@ -3250,12 +3243,6 @@ void JetAIUpdate::friend_enableLandingEffects(Bool v)
 			TheAudio->removeAudioEvent(m_landingSound.getPlayingHandle());
 		}
 	}
-}
-
-//-------------------------------------------------------------------------------------------------
-void JetAIUpdate::friend_addWaypointToGoalPath( const Coord3D &bestPos )
-{
-	privateFollowPathAppend( &bestPos, CMD_FROM_AI );
 }
 
 //-------------------------------------------------------------------------------------------------

@@ -677,6 +677,7 @@ AIStateMachine::AIStateMachine( Object *obj, AsciiString name ) : StateMachine( 
 	DEBUG_ASSERTCRASH(getOwner()->getAI(), ("An AI State Machine '%s' was constructed without an AIUpdateInterface, please tell JKMCD", name.str()));
 
 	m_goalPath.clear();
+	m_goalPathInfo.clear();
 	m_goalWaypoint = nullptr;
 	m_goalSquad = nullptr;
 
@@ -823,9 +824,18 @@ void AIStateMachine::loadPostProcess()
 /**
  * Define a simple path
  */
-void AIStateMachine::setGoalPath( std::vector<Coord3D>* path )
+void AIStateMachine::setGoalPath( std::vector<Coord3D>* path, Bool isReverse, UnsignedInt lastCmdNodeID)
 {
 	MOVE_TO(m_goalPath) = std::move(*path);
+	m_goalPathInfo.resize(m_goalPath.size());
+	for (Int i = 0; i < m_goalPathInfo.size(); i++)
+	{
+		m_goalPathInfo[i].m_isReverse = isReverse;
+		if (i == m_goalPathInfo.size() - 1)
+			m_goalPathInfo[i].m_cmdNodeID = lastCmdNodeID;
+		else
+			m_goalPathInfo[i].m_cmdNodeID = 0;
+	}
 }
 
 #ifdef STATE_MACHINE_DEBUG
@@ -971,8 +981,10 @@ StateReturnType AIStateMachine::setTemporaryState( StateID newStateID, Int frame
 /**
  * Add a point to a simple path
  */
-void AIStateMachine::addToGoalPath( const Coord3D *pathPoint)
+void AIStateMachine::addToGoalPath( const Coord3D *pathPoint, const PathPointInfo *pointInfo)
 {
+	// ShigureUi 27/10/2026 recieve or not now determined by command sequence, otherwise it will leak
+	/*
 	if (m_goalPath.empty()) {
 		m_goalPath.push_back(*pathPoint);
 	}	else {
@@ -981,6 +993,15 @@ void AIStateMachine::addToGoalPath( const Coord3D *pathPoint)
 		{
 			m_goalPath.push_back(*pathPoint);
 		}
+	}*/
+
+	m_goalPath.push_back(*pathPoint);
+	m_goalPathInfo.push_back(pointInfo ? *pointInfo : PathPointInfo(false, 0));
+
+	if (getCurrentStateID() == AI_FOLLOW_PATH)
+	{
+		AIFollowPathState *state = (AIFollowPathState*)internalGetState(AI_FOLLOW_PATH);
+		state->friend_recheckFinalDestination(m_goalPath.size()-1);
 	}
 }
 
@@ -994,6 +1015,14 @@ const Coord3D *AIStateMachine::getGoalPathPosition( Int i ) const
 		return nullptr;
 
 	return &m_goalPath[i];
+}
+
+const PathPointInfo *AIStateMachine::getPathPointInfo(Int i) const
+{
+	if (i < 0 || i >= m_goalPath.size())
+		return nullptr;
+
+	return &m_goalPathInfo[i];
 }
 
 //----------------------------------------------------------------------------------------------------------
@@ -1020,6 +1049,7 @@ void AIStateMachine::clear()
 {
 	StateMachine::clear();
 	m_goalPath.clear();
+	m_goalPathInfo.clear();
 	m_goalWaypoint = nullptr;
 	m_goalSquad = nullptr;
 
@@ -3394,6 +3424,12 @@ StateReturnType AIFollowPathState::onEnter()
 
 	m_index = 0;
 	const Coord3D *pos = ai->friend_getGoalPathPosition( m_index );
+	const PathPointInfo *ppi = ai->friend_getPathPointInfo(m_index);
+
+	if (ai->getLastCommandSource() == CMD_FROM_PLAYER && ai->isSameMachine((AIStateMachine*)getMachine()))
+	{
+		TheCommandSequence->verifyFollowPathCommand(getMachineOwner());
+	}
 
 	if (pos == nullptr)
 		return STATE_FAILURE;
@@ -3402,6 +3438,11 @@ StateReturnType AIFollowPathState::onEnter()
 	m_goalPosition = *pos;
  	const Coord3D *nextPos = ai->friend_getGoalPathPosition( m_index+1 );
 	m_adjustFinal = true;
+
+	if (ppi->m_isReverse)
+		ai->friend_setForcedMoveBackwards(true);
+	else
+		ai->friend_setForcedMoveBackwards(false);
 
 	//Assign this value to the AIUpdateInterface so object's can access this value while
 	//determine which waypoints to plot in the waypoint renderer.
@@ -3446,11 +3487,6 @@ StateReturnType AIFollowPathState::onEnter()
 		}
 	}
 
-	if (ai->getLastCommandSource() == CMD_FROM_PLAYER && ai->isSameMachine((AIStateMachine*)getMachine()))
-	{
-		TheCommandSequence->verifyObjectCommand(getMachineOwner());
-	}
-
 	return ret;
 }
 
@@ -3471,7 +3507,7 @@ void AIFollowPathState::onExit( StateExitType status )
 	ai->friend_setCurrentGoalPathIndex( -1 );
 
 	if (ai->getLastCommandSource() == CMD_FROM_PLAYER && ai->isSameMachine((AIStateMachine*)getMachine()))
-		TheCommandSequence->terminateVerifiedCommand(getMachineOwner());
+		TheCommandSequence->terminateVerifiedFollowPathCommand(getMachineOwner());
 }
 
 //----------------------------------------------------------------------------------------------------------
@@ -3485,10 +3521,14 @@ StateReturnType AIFollowPathState::update()
 	{
 		Object *obj = getMachineOwner();
 		AIUpdateInterface *ai = obj->getAI();
+		const PathPointInfo *ppi;
 		if (status == STATE_FAILURE && m_retryCount>0) {
 			// If we failed, & haven't reached retry limit, try again.  jba.
 			m_retryCount--;
 		}	else {
+			ppi = ai->friend_getPathPointInfo(m_index);
+			if (ppi->m_cmdNodeID == obj->getCurrentCommand() && ppi->m_cmdNodeID != obj->getLastCommandInMoveStreak())
+				TheCommandSequence->removeCurrentCommand(obj);
 			++m_index;
 		}
 		const Coord3D *pos = ai->friend_getGoalPathPosition( m_index );
@@ -3502,11 +3542,22 @@ StateReturnType AIFollowPathState::update()
 				tooClose = true;
 			}
 			if (tooClose) {
+				ppi = ai->friend_getPathPointInfo(m_index);
+				if (ppi->m_cmdNodeID == obj->getCurrentCommand() && ppi->m_cmdNodeID != obj->getLastCommandInMoveStreak())
+					TheCommandSequence->removeCurrentCommand(obj);
 				m_index++;
 				pos = ai->friend_getGoalPathPosition(m_index);
 			}
 		}
 
+		ppi = ai->friend_getPathPointInfo(m_index);
+		if (ppi)
+		{
+			if (ppi->m_isReverse)
+				ai->friend_setForcedMoveBackwards(true);
+			else
+				ai->friend_setForcedMoveBackwards(false);
+		}
 
 		//Assign this value to the AIUpdateInterface so object's can access this value while
 		//determine which waypoints to plot in the waypoint renderer.
@@ -3558,6 +3609,30 @@ StateReturnType AIFollowPathState::update()
 	}
 
 	return status;
+}
+
+void AIFollowPathState::friend_recheckFinalDestination(Int index)
+{
+	Object* obj = getMachineOwner();
+	AIUpdateInterface* ai = obj->getAI();
+	const Coord3D* pos = ai->friend_getGoalPathPosition(m_index);
+
+	m_goalPosition = *pos;
+	const Coord3D* nextPos = ai->friend_getGoalPathPosition(m_index + 1);
+
+	if (nextPos && m_index + 1 == index)
+	{
+		Coord2D delta;
+		delta.x = nextPos->x - pos->x;
+		delta.y = nextPos->y - pos->y;
+		Real offset = delta.length();
+		const Coord3D* followingPos = ai->friend_getGoalPathPosition(m_index + 2);
+		if (followingPos) offset += 4 * PATHFIND_CELL_SIZE_F;
+		ai->setPathExtraDistance(offset);
+		// We are in the middle of a path, so don't set the final goal location yet.
+		setAdjustsDestination(false);
+	}
+	computePath();
 }
 
 //----------------------------------------------------------------------------------------------------------

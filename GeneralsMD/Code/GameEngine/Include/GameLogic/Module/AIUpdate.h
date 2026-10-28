@@ -268,9 +268,9 @@ protected:
 	virtual void privateFollowWaypointPathAsTeam( const Waypoint *way, CommandSourceType cmdSource );///< start following the path from the given point
 	virtual void privateFollowWaypointPathExact( const Waypoint *way, CommandSourceType cmdSource );///< start following the path from the given point
 	virtual void privateFollowWaypointPathAsTeamExact( const Waypoint *way, CommandSourceType cmdSource );///< start following the path from the given point
-	virtual void privateFollowPath( std::vector<Coord3D>* path, Object *ignoreObject, CommandSourceType cmdSource, Bool exitProduction );///< follow the path defined by the given array of points
-	virtual void privateFollowPathAppend( const Coord3D *pos, CommandSourceType cmdSource );
-	virtual void privateAttackObject( Object *victim, Int maxShotsToFire, CommandSourceType cmdSource );					///< attack given object
+	virtual void privateFollowPath( std::vector<Coord3D>* path, Object *ignoreObject, CommandSourceType cmdSource, Bool exitProduction, Bool isReverse = false, UnsignedInt lastCmdNodeID = 0);///< follow the path defined by the given array of points
+	virtual void privateFollowPathAppend( const Coord3D *pos, CommandSourceType cmdSource, Bool isReverse = false, UnsignedInt cmdNodeID = 0);
+	virtual void privateAttackObject( Object *victim, Int maxShotsToFire, CommandSourceType cmdSource);					///< attack given object
 	virtual void privateForceAttackObject( Object *victim, Int maxShotsToFire, CommandSourceType cmdSource );					///< attack given object
 	virtual void privateGuardRetaliate( Object *victim, const Coord3D *pos, Int maxShotsToFire, CommandSourceType cmdSource );				///< retaliate and attack attacker -- but with guard restrictions
 	virtual void privateAttackTeam( const Team *team, Int maxShotsToFire, CommandSourceType cmdSource );							///< attack the given team
@@ -515,6 +515,7 @@ public:
 	Int getNumFramesBlocked(void) const {return m_blockedFrames;}
 	Bool isBlockedAndStuck(void) const {return m_isBlockedAndStuck;}
 	Bool isForcedMoveBackwards(void) const {return m_forceMoveBackwards;}	///< True while a REVERSE_MOVE order is being executed.
+	void friend_setForcedMoveBackwards(Bool forceMoveBackwards) { m_forceMoveBackwards = forceMoveBackwards; }
 	Bool canComputeQuickPath(void); ///< Returns true if we can quickly comput a path.  Usually missiles & the like that just move straight to the destination.
 	Bool computeQuickPath(const Coord3D *destination); ///< Computes a quick path to the destination.
 	Bool arePathLayersStillValid(); ///< Check if the current used layers are still passable
@@ -716,6 +717,7 @@ public:
 
 	// this is intended for use ONLY by W3dWaypointBuffer and AIFollowPathState.
 	const Coord3D* friend_getGoalPathPosition( Int index ) const { return getStateMachine()->getGoalPathPosition( index ); }
+	const PathPointInfo* friend_getPathPointInfo(Int index) const { return getStateMachine()->getPathPointInfo(index); }
 
 	// this is intended for use ONLY by W3dWaypointBuffer.
 	Int friend_getWaypointGoalPathSize() const;

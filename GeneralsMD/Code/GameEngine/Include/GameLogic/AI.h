@@ -574,19 +574,20 @@ public:
 		aiDoCommand(&parms);
 	}
 
-	void aiFollowPath( std::vector<Coord3D>* path, Object *ignoreObject, CommandSourceType cmdSource )
+	void aiFollowPath( std::vector<Coord3D>* path, Object *ignoreObject, CommandSourceType cmdSource, Bool isReverse = false, UnsignedInt cmdNodeID = 0)
 	{
 		AICommandParms parms(AICMD_FOLLOW_PATH, cmdSource);
 		MOVE_TO(parms.m_coords) = std::move(*path);
 		parms.m_obj = ignoreObject;
+		parms.m_intValue = (Int)cmdNodeID * (isReverse ? -1 : 1);
 		aiDoCommand(&parms);
 	}
 
-	//ShigureUi 01/10/2026 now only used by ai don't delete it
-	void aiFollowPathAppend( const Coord3D* pos, CommandSourceType cmdSource )
+	void aiFollowPathAppend( const Coord3D* pos, CommandSourceType cmdSource, Bool isReverse = false, UnsignedInt cmdNodeID = 0 )
 	{
 		AICommandParms parms(AICMD_FOLLOW_PATH_APPEND, cmdSource);
 		parms.m_pos = *pos;
+		parms.m_intValue = (Int)cmdNodeID * (isReverse ? -1 : 1);
 		aiDoCommand(&parms);
 	}
 

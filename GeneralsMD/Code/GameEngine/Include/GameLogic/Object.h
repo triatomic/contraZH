@@ -174,6 +174,7 @@ enum CommandVerifyStatus
 	STATUS_UNIT_PENDING,
 	STATUS_EXIT_VERIFIED,
 	STATUS_ON_HELD,
+	STATUS_FOLLOW_PATH_VERIFIED,
 	STATUS_VERIFIED,
 	STATUS_COMPLETE
 };
@@ -723,6 +724,8 @@ public:
 	void removeFromPendingExitList(Object *obj);
 	Bool isPendingExitListEmpty() { return m_pendingExitList.empty(); }
 	void clearPendingExitList() { m_pendingExitList.clear(); }
+	UnsignedInt getLastCommandInMoveStreak() { return m_lastMoveStreakCommand; }
+	void setLastCommandInMoveStreak(UnsignedInt lastMoveStreakCommand) { m_lastMoveStreakCommand = lastMoveStreakCommand; }
 
 protected:
 
@@ -902,6 +905,7 @@ private:
 	/// ShigureUi 16/10/2026 used by advanced waypoint system(class CommandSequence)
 	UnsignedInt										m_currentCommand;
 	UnsignedInt										m_lastCommand;
+	UnsignedInt										m_lastMoveStreakCommand;
 	CommandVerifyStatus						m_commandVerifyStatus;
 	ObjectIDVector								m_pendingExitList;
 

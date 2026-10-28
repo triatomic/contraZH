@@ -150,6 +150,8 @@ public:
 	Bool terminateVerifiedCommand(Object *obj);
 	Bool confirmExitCommand(Object *objWantToExit, Object *objectContainingExiter);
 	Bool terminateOCLVerifiedCommand(Object *obj);
+	Bool verifyFollowPathCommand(Object *obj);
+	Bool terminateVerifiedFollowPathCommand(Object* obj);
 
 	UnsignedInt removeCurrentCommand(Object *obj, Bool doCleanUp = true);
 	void updateConstructionCount(Object *obj, Int delta);
@@ -161,6 +163,7 @@ public:
 protected:
 	CommandNode *newCommandNode(CommandType commandType);
 	CommandNode *findCommandByID(UnsignedInt commandNodeID);
+	CommandNode *nextCommand(Object *obj, CommandNode *cmdNode);
 
 	void doCurrentCommand(Object *obj, CommandVerifyStatus cvs);
 };

@@ -2990,11 +2990,11 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 		case AICMD_FOLLOW_PATH:
 		{
 			std::vector<Coord3D> coords = parms->m_coords;
-			privateFollowPath(&coords, parms->m_obj, parms->m_cmdSource, FALSE);
+			privateFollowPath(&coords, parms->m_obj, parms->m_cmdSource, FALSE, parms->m_intValue < 0, abs(parms->m_intValue));
 			break;
 		}
 		case AICMD_FOLLOW_PATH_APPEND:
-			privateFollowPathAppend(&parms->m_pos, parms->m_cmdSource);
+			privateFollowPathAppend(&parms->m_pos, parms->m_cmdSource, parms->m_intValue < 0, abs(parms->m_intValue));
 			break;
 		case AICMD_FOLLOW_EXITPRODUCTION_PATH:
 		{
@@ -3667,31 +3667,14 @@ void AIUpdateInterface::privateFollowWaypointPathAsTeamExact( const Waypoint *wa
 }
 
 //----------------------------------------------------------------------------------------
-void AIUpdateInterface::privateFollowPathAppend( const Coord3D *pos, CommandSourceType cmdSource )
+void AIUpdateInterface::privateFollowPathAppend( const Coord3D *pos, CommandSourceType cmdSource, Bool isReverse, UnsignedInt cmdNodeID)
 {
-	// We're adding a dynamic waypoint!
-	Bool effectivelyMoving = isMoving() || isWaitingForPath();
 
-	if (getAIStateType() == AI_FOLLOW_PATH && getStateMachine()->getGoalPathSize() > 0 && effectivelyMoving)
+	if (getAIStateType() == AI_FOLLOW_PATH && getStateMachine()->getGoalPathSize() > 0)
 	{
 		//We already have a path, so simply add the point to the end of it!
-		getStateMachine()->addToGoalPath(pos);
-	}
-	else if (effectivelyMoving)
-	{
-		//Our unit is moving to a point already so simply add our waypoint after that point
-		//and convert it to a waypoint command!
-		std::vector<Coord3D> path;
-		path.push_back( *getGoalPosition() );
-		path.push_back( *pos );
-		privateFollowPath( &path, nullptr, cmdSource, false );
-	}
-	else
-	{
-		//Hopefully we're idle or doing something that doesn't require movement.
-		std::vector<Coord3D> path;
-		path.push_back( *pos );
-		privateFollowPath( &path, nullptr, cmdSource, false );
+		PathPointInfo ppi(isReverse, cmdNodeID);
+		getStateMachine()->addToGoalPath(pos, &ppi);
 	}
 }
 
@@ -3699,7 +3682,7 @@ void AIUpdateInterface::privateFollowPathAppend( const Coord3D *pos, CommandSour
 /**
  * Follow the path defined by the given array of points
  */
-void AIUpdateInterface::privateFollowPath( std::vector<Coord3D>* path, Object *ignoreObject, CommandSourceType cmdSource, Bool exitProduction )
+void AIUpdateInterface::privateFollowPath( std::vector<Coord3D>* path, Object *ignoreObject, CommandSourceType cmdSource, Bool exitProduction, Bool isReverse, UnsignedInt lastCmdNodeID)
 {
 	if (getObject()->isMobile() == FALSE)
 		return;
@@ -3718,7 +3701,7 @@ void AIUpdateInterface::privateFollowPath( std::vector<Coord3D>* path, Object *i
 		getStateMachine()->setGoalPosition(&goal);
 	}
 	// set path info
-	getStateMachine()->setGoalPath( path );
+	getStateMachine()->setGoalPath( path, isReverse, lastCmdNodeID);
 
 
 	// set the command source

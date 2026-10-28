@@ -2011,10 +2011,10 @@ void AIGroup::groupTightenToPosition( const Coord3D *pos, Bool addWaypoint, Comm
       else
   			ai->aiTightenToPosition( pos, cmdSource );
 		}
-		else
-		{
-			ai->aiFollowPathAppend(pos, cmdSource);
-		}
+		//else
+		//{
+		//	ai->aiFollowPathAppend(pos, cmdSource);
+		//}
 	}
 
 	for (theUnit = iter->first(); theUnit; theUnit = iter->next())
