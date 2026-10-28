@@ -1214,7 +1214,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 		if (m_template->m_wanderWidthFactor == 0.0f)
 		{
 			Coord3D turnGoal = goalPos;
-			if (getFlag(MOVING_BACKWARDS) || isForcedReverse(obj))
+			if (isForcedReverse(obj))
 			{
 				turnGoal.x = 2.0f * obj->getPosition()->x - goalPos.x;
 				turnGoal.y = 2.0f * obj->getPosition()->y - goalPos.y;

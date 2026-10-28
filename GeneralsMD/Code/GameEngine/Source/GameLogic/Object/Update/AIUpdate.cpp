@@ -1533,13 +1533,13 @@ void AIUpdateInterface::markAsDead()
 }
 
 //-------------------------------------------------------------------------------------------------
-static Bool isReversingForCollision(const Object *object)
+static Bool isManualReverseForCollision(const Object *object)
 {
 	const AIUpdateInterface *ai = object->getAIUpdateInterface();
 	const Locomotor *locomotor = ai ? ai->getCurLocomotor() : nullptr;
 	const PhysicsBehavior *physics = object->getPhysics();
 	return locomotor && locomotor->canMoveBackwards()
-		&& (ai->isForcedMoveBackwards() || locomotor->isMovingBackwards())
+		&& ai->isForcedMoveBackwards()
 		&& (!physics || physics->getForwardSpeed2D() <= 0.0f);
 }
 
@@ -1547,7 +1547,7 @@ static Bool isReversingForCollision(const Object *object)
 static Coord3D getCollisionDirection(const Object *object)
 {
 	Coord3D direction = *object->getUnitDirectionVector2D();
-	if (isReversingForCollision(object))
+	if (isManualReverseForCollision(object))
 	{
 		direction.x = -direction.x;
 		direction.y = -direction.y;
@@ -1674,6 +1674,11 @@ Bool AIUpdateInterface::blockedBy(Object *other)
 		return FALSE; // Can't be blocked if the other is airborne.
 	}
 
+	if (!m_forceMoveBackwards && getCurLocomotor() && getCurLocomotor()->isMovingBackwards())
+	{
+		return FALSE;
+	}
+
 	Coord3D ourDir = getCollisionDirection(obj);
 	Coord3D theirDir = getCollisionDirection(other);
 	Bool otherMoving = ( aiOther->m_locomotorGoalType != NONE );
@@ -1712,11 +1717,11 @@ Bool AIUpdateInterface::blockedBy(Object *other)
 
 	Real collisionAngle = ThePartitionManager->getRelativeAngle2D( obj, &otherPos );
 	Real otherAngle = ThePartitionManager->getRelativeAngle2D( other, &pos );
-	if (isReversingForCollision(obj))
+	if (isManualReverseForCollision(obj))
 	{
 		collisionAngle = stdAngleDiff(collisionAngle, PI);
 	}
-	if (isReversingForCollision(other))
+	if (isManualReverseForCollision(other))
 	{
 		otherAngle = stdAngleDiff(otherAngle, PI);
 	}
@@ -1772,7 +1777,7 @@ Bool AIUpdateInterface::needToRotate()
 		CRCDEBUG_LOG(("AIUpdateInterface::needToRotate() - calling computePointOnPath() for object %d", getObject()->getID()));
 		getPath()->computePointOnPath(getObject(), m_locomotorSet, *getObject()->getPosition(), info);
 		deltaAngle = ThePartitionManager->getRelativeAngle2D( getObject(), &info.posOnPath );
-		if (isReversingForCollision(getObject()))
+		if (isManualReverseForCollision(getObject()))
 		{
 			deltaAngle = stdAngleDiff(deltaAngle, PI);
 		}

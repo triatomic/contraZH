@@ -200,8 +200,9 @@ Needs a locomotor with `CanMoveBackwards = Yes`. Each selected unit backs up whi
 rear toward the path, even when units start facing different directions. Tanks keep at least a
 quarter of their requested reverse speed during sharp turns, subject to destination braking.
 Manual reverse orders ignore `BackwardsMoveAngleThreshold` and `ReverseMoveIgnoreAngleThreshold`.
-Units check collisions in their direction of travel and yield when another unit blocks their reverse path.
+During manual reverse orders, units check collisions in their direction of travel and yield when blocked.
 Packed selections, formations, and routes around obstacles keep their reverse order.
+Automatic reversing keeps its existing movement and collision behavior.
 
 ## Smart selection
 
