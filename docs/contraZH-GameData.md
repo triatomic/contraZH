@@ -262,3 +262,9 @@ For a colour of your own, use `DistanceFogPreset = Custom` and, for example,
 The pass needs shader model 2 and a readable INTZ depth buffer. It is inactive on D3D8, with MSAA,
 or when readable depth is unavailable. Supersampling works. Translucent effects take the depth of
 the opaque surface behind them. Very dark pixels receive less haze to preserve the black shroud.
+
+## Map override cleanup
+
+Maps with a `GameData` block no longer hang the game during exit or a map change. Reset removes
+each override from the current list head and restores the original settings. Each override owns
+its weapon bonus table, so removing an override leaves the original table intact.

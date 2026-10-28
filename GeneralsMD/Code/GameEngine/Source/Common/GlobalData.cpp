@@ -1716,7 +1716,7 @@ GlobalData::GlobalData()
 //-------------------------------------------------------------------------------------------------
 GlobalData::~GlobalData()
 {
-	DEBUG_ASSERTCRASH( TheWritableGlobalData->m_next == nullptr, ("~GlobalData: theOriginal is not original") );
+	DEBUG_ASSERTCRASH( m_theOriginal != this || m_next == nullptr, ("~GlobalData: theOriginal is not original") );
 
 	deleteInstance(m_weaponBonusSet);
 
@@ -1759,7 +1759,10 @@ GlobalData *GlobalData::newOverride()
 
 	// copy the data from the latest override (TheWritableGlobalData) to the newly created instance
 	DEBUG_ASSERTCRASH( TheWritableGlobalData, ("GlobalData::newOverride() - no existing data") );
+	WeaponBonusSet *weaponBonusSet = overrideData->m_weaponBonusSet;
+	weaponBonusSet->copyFrom(*TheWritableGlobalData->m_weaponBonusSet);
 	*overrideData = *TheWritableGlobalData;
+	overrideData->m_weaponBonusSet = weaponBonusSet;
 
 	//
 	// link the override to the previously created one, the link order is important here
@@ -1787,7 +1790,7 @@ void GlobalData::init()
 //-------------------------------------------------------------------------------------------------
 void GlobalData::reset()
 {
-	DEBUG_ASSERTCRASH(this == TheWritableGlobalData, ("calling reset on wrong GlobalData"));
+	DEBUG_ASSERTCRASH(this == m_theOriginal, ("calling reset on wrong GlobalData"));
 
 	//
 	// delete	any data instances that were loaded as an override and set the original
@@ -1797,7 +1800,7 @@ void GlobalData::reset()
 	{
 
 		// get next instance
-		GlobalData* next = m_next;
+		GlobalData* next = TheWritableGlobalData->m_next;
 
 		// delete the head of the global data list (the latest override)
 		delete TheWritableGlobalData;
