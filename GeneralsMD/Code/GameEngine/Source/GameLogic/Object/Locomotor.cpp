@@ -1213,7 +1213,13 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 		Real turnRate = getMaxTurnRate(obj->getBodyModule()->getDamageState());
 		if (m_template->m_wanderWidthFactor == 0.0f)
 		{
-			*blocked = (TURN_NONE != rotateObjAroundLocoPivot(obj, goalPos, turnRate));
+			Coord3D turnGoal = goalPos;
+			if (getFlag(MOVING_BACKWARDS) || isForcedReverse(obj))
+			{
+				turnGoal.x = 2.0f * obj->getPosition()->x - goalPos.x;
+				turnGoal.y = 2.0f * obj->getPosition()->y - goalPos.y;
+			}
+			*blocked = (TURN_NONE != rotateObjAroundLocoPivot(obj, turnGoal, turnRate));
 		}
 
 		// it is very important to be sure to call this in all situations, even if not moving in 2d space.
@@ -1351,7 +1357,7 @@ Bool Locomotor::shouldMoveBackwards(Object* obj, Real relAngle, Real onPathDistT
 	}
 
 	// A REVERSE_MOVE order forces reversing for the whole path, bypassing the distance heuristic.
-	if (getFlag(REVERSE_TO_TURN) || isForcedReverse(obj, relAngle))
+	if (getFlag(REVERSE_TO_TURN) || isForcedReverse(obj))
 	{
 		setFlag(MOVING_BACKWARDS, true);
 		return true;
@@ -1380,15 +1386,12 @@ Bool Locomotor::shouldMoveBackwards(Object* obj, Real relAngle, Real onPathDistT
 }
 
 //-------------------------------------------------------------------------------------------------
-// Unless ReverseMoveIgnoreAngleThreshold is set, the goal must be behind us (same angle gate as
-// automatic reversing), so a reverse order only engages when the current heading allows it.
+// Manual reverse orders let each unit back up while turning its rear toward the path.
 //-------------------------------------------------------------------------------------------------
-Bool Locomotor::isForcedReverse(Object* obj, Real relAngle) const
+Bool Locomotor::isForcedReverse(Object* obj) const
 {
 	return m_template->m_canMoveBackward
-		&& obj->getAIUpdateInterface() && obj->getAIUpdateInterface()->isForcedMoveBackwards()
-		&& (TheGlobalData->m_reverseMoveIgnoreAngleThreshold
-				|| fabs(relAngle) > m_template->m_backwardsMoveAngleThreshold);
+		&& obj->getAIUpdateInterface() && obj->getAIUpdateInterface()->isForcedMoveBackwards();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1416,6 +1419,7 @@ void Locomotor::moveTowardsPositionTreads(Object* obj, PhysicsBehavior *physics,
 	Real relAngle = stdAngleDiff(desiredAngle, obj->getOrientation());
 	Real actualSpeed = physics->getForwardSpeed2D();
 	Bool moveBackwards = shouldMoveBackwards(obj, relAngle, onPathDistToGoal, actualSpeed);
+	const Bool forceBackwards = moveBackwards && isForcedReverse(obj);
 	if (moveBackwards)
 		desiredSpeed *= m_template->m_backwardsMoveSpeedFactor;
 
@@ -1441,6 +1445,10 @@ void Locomotor::moveTowardsPositionTreads(Object* obj, PhysicsBehavior *physics,
 	Real angleCoeff = (Real)WWMath::Fabs( relAngle ) / QUAETERPI;
 	if (angleCoeff > 1.0f)
 		angleCoeff = 1.0;
+	if (forceBackwards && angleCoeff > 0.75f)
+	{
+		angleCoeff = 0.75f;
+	}
 
 
 	Real dx = obj->getPosition()->x - goalPos.x;
@@ -1458,7 +1466,7 @@ void Locomotor::moveTowardsPositionTreads(Object* obj, PhysicsBehavior *physics,
 	Real slowDownTime = actualSpeed / getBraking();
 	Real slowDownDist = (actualSpeed/1.50f) * slowDownTime;
 
-	if (sqr(dx)+sqr(dy)<sqr(2*PATHFIND_CELL_SIZE_F) && angleCoeff > 0.05) {
+	if (!forceBackwards && sqr(dx)+sqr(dy)<sqr(2*PATHFIND_CELL_SIZE_F) && angleCoeff > 0.05) {
 		goalSpeed = actualSpeed*0.6f;
 	}
 
@@ -1570,7 +1578,7 @@ void Locomotor::moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics,
 	const Real backwardsDist = m_template->m_backwardsMoveDistanceFactorThreshold * obj->getGeometryInfo().getMajorRadius();
 
 	// A REVERSE_MOVE order forces reversing along the whole path (no three-point turn).
-	const Bool forceBackwards = m_template->m_canMoveBackward && (getFlag(REVERSE_TO_TURN) || isForcedReverse(obj, relAngle));
+	const Bool forceBackwards = m_template->m_canMoveBackward && (getFlag(REVERSE_TO_TURN) || isForcedReverse(obj));
 	if (forceBackwards) {
 		setFlag(MOVING_BACKWARDS, true);
 		setFlag(DOING_THREE_POINT_TURN, false);

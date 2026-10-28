@@ -13,7 +13,7 @@ Locomotors that can rotate in place (e.g. `TREADS`, `HOVER`) can now reverse tow
 
 Notes:
 * Defaults match the values the hardcoded backwards-movement logic used before these were configurable.
-* A global override exists in GameData: [`ReverseMoveIgnoreAngleThreshold`](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/GameData#reverse-movement).
+* Manual `REVERSE_MOVE` orders bypass the angle and distance thresholds. Units back up while turning their rear toward the path.
 * AIUpdate can use reversing to stay out of a weapon's minimum range: [`MinRangeRetreatStraight` / `AimByReversing`](Objects-&-Modules.md#minimum-range-handling-reversing).
 * `AnimationSteeringUpdate` can set the `MOVING_BACKWARDS` condition state while reversing: [`BackwardsCondition`](Objects-&-Modules.md#animationsteeringupdate).
 

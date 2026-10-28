@@ -27,7 +27,7 @@ Add the button to the unit's `CommandSet` like any other command button.
 **Notes:**
 * Requires a locomotor that can rotate in place / reverse (e.g. `TREADS`, `HOVER`). The reverse speed and behavior are tuned via the [Locomotor backwards-movement parameters](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Locomotor#reverse-backwards-movement).
 * Plays the normal move voice response.
-* A manual `REVERSE_MOVE` order forces reversing for the entire path. The GameData flag [`ReverseMoveIgnoreAngleThreshold`](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/GameData#reverse-movement) controls whether a manual order reverses regardless of heading.
+* A manual `REVERSE_MOVE` order forces reversing for the entire path regardless of heading. Each selected unit backs up while turning its rear toward the path, ignoring `BackwardsMoveAngleThreshold` and `ReverseMoveIgnoreAngleThreshold`.
 
 ## Multi-Target Special Powers
 

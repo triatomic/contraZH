@@ -94,7 +94,12 @@ McpJson cmdMove(const McpJson &args)
 	const Coord3D pos = gameMcpArgPosition(args);
 	Player *owner = selectObjects(objects);
 	const bool attackMove = gameMcpArgBool(args, "attack_move", false);
-	GameMessage *msg = appendOrder(attackMove ? GameMessage::MSG_DO_ATTACKMOVETO : GameMessage::MSG_DO_MOVETO, owner);
+	GameMessage::Type type = attackMove ? GameMessage::MSG_DO_ATTACKMOVETO : GameMessage::MSG_DO_MOVETO;
+	if (gameMcpArgBool(args, "reverse", false))
+	{
+		type = GameMessage::MSG_DO_REVERSE_MOVETO;
+	}
+	GameMessage *msg = appendOrder(type, owner);
 	msg->appendLocationArgument(pos);
 	return queued(objects);
 }
@@ -265,7 +270,7 @@ McpJson cmdPurchaseScience(const McpJson &args)
 
 void gameMcpRegisterOrderCommands()
 {
-	gameMcpRegisterCommand("orders.move", cmdMove, "{ids, x, y, attack_move?} Moves units to a position.");
+	gameMcpRegisterCommand("orders.move", cmdMove, "{ids, x, y, attack_move?, reverse?} Moves units to a position.");
 	gameMcpRegisterCommand("orders.attack", cmdAttack, "{ids, target, force?} | {ids, x, y} Attacks an object, or fires at the ground.");
 	gameMcpRegisterCommand("orders.stop", cmdStop, "{ids} Stops units.");
 	gameMcpRegisterCommand("orders.guard", cmdGuard, "{ids, target | x, y, mode=0} Guards an object or position (mode 0 normal, 1 without pursuit, 2 flying units only).");

@@ -1533,6 +1533,29 @@ void AIUpdateInterface::markAsDead()
 }
 
 //-------------------------------------------------------------------------------------------------
+static Bool isReversingForCollision(const Object *object)
+{
+	const AIUpdateInterface *ai = object->getAIUpdateInterface();
+	const Locomotor *locomotor = ai ? ai->getCurLocomotor() : nullptr;
+	const PhysicsBehavior *physics = object->getPhysics();
+	return locomotor && locomotor->canMoveBackwards()
+		&& (ai->isForcedMoveBackwards() || locomotor->isMovingBackwards())
+		&& (!physics || physics->getForwardSpeed2D() <= 0.0f);
+}
+
+//-------------------------------------------------------------------------------------------------
+static Coord3D getCollisionDirection(const Object *object)
+{
+	Coord3D direction = *object->getUnitDirectionVector2D();
+	if (isReversingForCollision(object))
+	{
+		direction.x = -direction.x;
+		direction.y = -direction.y;
+	}
+	return direction;
+}
+
+//-------------------------------------------------------------------------------------------------
 /* Returns TRUE if this ai has a higher path priority than the other one.
 The way to have a higher priority is:
 1. If the paths were assigned when both units were in the same ai group, we use the path priority assigned.
@@ -1561,8 +1584,8 @@ Bool AIUpdateInterface::hasHigherPathPriority(AIUpdateInterface *otherAI) const
 	}
 
 	// The paths aren't of the same group, so see which unit is in front.
-	Coord3D ourDir = *getObject()->getUnitDirectionVector2D();
-	Coord3D otherDir = *other->getUnitDirectionVector2D();
+	Coord3D ourDir = getCollisionDirection(getObject());
+	Coord3D otherDir = getCollisionDirection(other);
 	if (ourDir.x*otherDir.x + ourDir.y*otherDir.y <= 0) {
 		return getObject()->getID() < other->getID();
 	}
@@ -1585,8 +1608,8 @@ Bool AIUpdateInterface::hasHigherPathPriority(AIUpdateInterface *otherAI) const
 */
 Real AIUpdateInterface::calculateMaxBlockedSpeed(Object *other) const
 {
-	Coord3D ourDir = *getObject()->getUnitDirectionVector2D();
-	Coord3D otherDir = *other->getUnitDirectionVector2D();
+	Coord3D ourDir = getCollisionDirection(getObject());
+	Coord3D otherDir = getCollisionDirection(other);
 	// Dot product is our directions projected onto each other.
 	Coord2D vectorToOther;
 	vectorToOther.x = other->getPosition()->x - getObject()->getPosition()->x;
@@ -1643,14 +1666,16 @@ Bool AIUpdateInterface::blockedBy(Object *other)
 
 	AIUpdateInterface* aiOther = other->getAI();
 
+	if (!aiOther)
+	{
+		return FALSE;
+	}
 	if (!aiOther->isDoingGroundMovement()) {
 		return FALSE; // Can't be blocked if the other is airborne.
 	}
-	if (!aiOther) return FALSE; // Ignore it.
 
-	if (getCurLocomotor() && getCurLocomotor()->isMovingBackwards()) {
-		return false; // don't collide.
-	}
+	Coord3D ourDir = getCollisionDirection(obj);
+	Coord3D theirDir = getCollisionDirection(other);
 	Bool otherMoving = ( aiOther->m_locomotorGoalType != NONE );
 	Coord3D otherPos = *other->getPosition();
 	Real dx = pos.x-otherPos.x;
@@ -1666,8 +1691,6 @@ Bool AIUpdateInterface::blockedBy(Object *other)
 		return FALSE;
 #else
 		// If we are crossing, just pass through.
-		Coord3D ourDir = *obj->getUnitDirectionVector2D();
-		Coord3D theirDir = *other->getUnitDirectionVector2D();
 		// Dot product is our directions projected onto each other.
 		Real dotProduct = ourDir.x*theirDir.x	+ ourDir.y*theirDir.y;
 		if (dotProduct<=0.25) return FALSE;  // we are not moving in the same direction.
@@ -1681,8 +1704,6 @@ Bool AIUpdateInterface::blockedBy(Object *other)
 	}
 
 	// we've been blocked for a while.  If we're crossing, just move through.
-	Coord3D ourDir = *obj->getUnitDirectionVector2D();
-	Coord3D theirDir = *other->getUnitDirectionVector2D();
 	// Dot product is our directions projected onto each other.
 	Real dotProduct = ourDir.x*theirDir.x	+ ourDir.y*theirDir.y;
 	if (getNumFramesBlocked()>LOGICFRAMES_PER_SECOND) {
@@ -1691,6 +1712,14 @@ Bool AIUpdateInterface::blockedBy(Object *other)
 
 	Real collisionAngle = ThePartitionManager->getRelativeAngle2D( obj, &otherPos );
 	Real otherAngle = ThePartitionManager->getRelativeAngle2D( other, &pos );
+	if (isReversingForCollision(obj))
+	{
+		collisionAngle = stdAngleDiff(collisionAngle, PI);
+	}
+	if (isReversingForCollision(other))
+	{
+		otherAngle = stdAngleDiff(otherAngle, PI);
+	}
 	//DEBUG_LOG(("Collision angle %.2f, %.2f, %s, %x %s", collisionAngle*180/PI, otherAngle*180/PI, obj->getTemplate()->getName().str(), obj, other->getTemplate()->getName().str()));
 	Real angleLimit = PI/4; // 45 degrees.
 	if (collisionAngle>PI/2 || collisionAngle<-PI/2) {
@@ -1701,8 +1730,6 @@ Bool AIUpdateInterface::blockedBy(Object *other)
 		if (dotProduct<=0.0f) return FALSE;  // we are not moving in the same direction.
 		if (otherMoving && (otherAngle>angleLimit || otherAngle<-angleLimit) ) {
 			// See if we're running into each other.
-			Coord3D ourDir = *obj->getUnitDirectionVector2D();
-			Coord3D theirDir = *other->getUnitDirectionVector2D();
 			dx += ourDir.x - theirDir.x;
 			dy += ourDir.y - theirDir.y;
 			if (curDSqr>dx*dx+dy*dy) {
@@ -1745,6 +1772,10 @@ Bool AIUpdateInterface::needToRotate()
 		CRCDEBUG_LOG(("AIUpdateInterface::needToRotate() - calling computePointOnPath() for object %d", getObject()->getID()));
 		getPath()->computePointOnPath(getObject(), m_locomotorSet, *getObject()->getPosition(), info);
 		deltaAngle = ThePartitionManager->getRelativeAngle2D( getObject(), &info.posOnPath );
+		if (isReversingForCollision(getObject()))
+		{
+			deltaAngle = stdAngleDiff(deltaAngle, PI);
+		}
 	}
 
 	if (WWMath::Fabs(deltaAngle)>PI/30)

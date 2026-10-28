@@ -63,7 +63,7 @@ This means the listed death types will be excluded from any Death module that us
 
 ## Reverse Movement
 
-* `ReverseMoveIgnoreAngleThreshold = No` - (Global override. If Yes, the per-locomotor `BackwardsMoveAngleThreshold` is ignored and units decide to reverse based only on distance. See [Locomotor reverse movement](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Locomotor#reverse-backwards-movement). Default = No)
+* `ReverseMoveIgnoreAngleThreshold = No` - (Accepted for INI compatibility. Manual `REVERSE_MOVE` orders always reverse regardless of heading; automatic reversing still uses the locomotor's angle and distance thresholds. Default = No)
 
 ## Smart Garrison
 

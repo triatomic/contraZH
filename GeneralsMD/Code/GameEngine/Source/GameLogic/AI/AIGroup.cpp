@@ -1753,7 +1753,7 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
   }
 
 
-	if (!addWaypoint && !isFormation) {
+	if (!addWaypoint && !isFormation && !reverse) {
 		friend_computeGroundPath(pos, cmdSource);
 		friend_moveInfantryToPos(pos, cmdSource, columnUnits);
 		friend_moveVehicleToPos(pos, cmdSource, columnUnits);
@@ -1801,7 +1801,7 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 
 
 
-	if (tightenGroup)
+	if (tightenGroup && !reverse)
 	{
 		isFormation = false;
 		if (!addWaypoint) {
@@ -1815,7 +1815,7 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 		}
 	}
 
-	if (isFormation) {
+	if (isFormation && !reverse) {
 		friend_computeGroundPath(pos, cmdSource);
 		friend_moveFormationToPos(pos, cmdSource);
 		return;

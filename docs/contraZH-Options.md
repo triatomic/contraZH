@@ -196,8 +196,12 @@ reverse, like the `REVERSE_MOVE` button. Pressing Caps Lock again or arming atta
 * The cursor uses a `MouseCursor ReverseMove` block from Mouse.ini if present (e.g. `Image = SCCMove`,
 `Texture = SCCMove`), else the move cursor.
 
-Needs a locomotor with `CanMoveBackwards = Yes`. `ReverseMoveIgnoreAngleThreshold` in GameData
-decides whether goals in front are also reversed to.
+Needs a locomotor with `CanMoveBackwards = Yes`. Each selected unit backs up while turning its
+rear toward the path, even when units start facing different directions. Tanks keep at least a
+quarter of their requested reverse speed during sharp turns, subject to destination braking.
+Manual reverse orders ignore `BackwardsMoveAngleThreshold` and `ReverseMoveIgnoreAngleThreshold`.
+Units check collisions in their direction of travel and yield when another unit blocks their reverse path.
+Packed selections, formations, and routes around obstacles keep their reverse order.
 
 ## Smart selection
 

@@ -53,6 +53,8 @@ same.
 In contraZH these direct changes are refused in LAN and online games, where they would desync the
 match. Reading state and giving orders still work there.
 
+`orders.move` accepts `reverse = true` to send the same reverse order as the terrain-click command.
+
 # AI Matches
 
 A skirmish between AI players, started from the command line, watched by an observer and logged:

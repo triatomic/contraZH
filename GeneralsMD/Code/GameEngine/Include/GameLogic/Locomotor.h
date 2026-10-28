@@ -414,7 +414,7 @@ protected:
 	void moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionTreads(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	Bool shouldMoveBackwards(Object* obj, Real relAngle, Real onPathDistToGoal, Real forwardSpeed);	///< decide (with hysteresis) whether to reverse toward a goal that is behind us, for locos that can rotate in place (treads/hover)
-	Bool isForcedReverse(Object* obj, Real relAngle) const;	///< a REVERSE_MOVE order is in effect and the heading allows it
+	Bool isForcedReverse(Object* obj) const;	///< a REVERSE_MOVE order is in effect and the locomotor supports it
 	void moveTowardsPositionOther(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionHover(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
