@@ -7275,15 +7275,15 @@ StateReturnType AIGuardState::onEnter()
 	}
 	m_guardMachine->setGuardMode(ai->getGuardMode());
 
-	// now that essential parameters are set, set the machine's initial state
-	if (m_guardMachine->initDefaultState() == STATE_FAILURE)
-		return STATE_FAILURE;
-	return m_guardMachine->setState(AI_GUARD_RETURN);
-
 	obj->getControllingPlayer()->getAcademyStats()->recordGuardAbilityUsed();
 
 	if (ai->getLastCommandSource() == CMD_FROM_PLAYER && ai->isSameMachine((AIStateMachine*)getMachine()))
 		TheCommandSequence->verifyObjectCommand(obj);
+
+	// now that essential parameters are set, set the machine's initial state
+	if (m_guardMachine->initDefaultState() == STATE_FAILURE)
+		return STATE_FAILURE;
+	return m_guardMachine->setState(AI_GUARD_RETURN);
 }
 
 //----------------------------------------------------------------------------------------------------------

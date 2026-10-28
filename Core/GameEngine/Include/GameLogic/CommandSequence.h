@@ -125,7 +125,7 @@ public:
 	Bool includeUnitInTypicalMovingCommand(UnsignedInt commandNodeID, Object* obj, Coord3D objDest);
 
 	inline Bool isTypicalMovingCommand(CommandType commandType);
-	inline Bool isEndCommand(CommandType commandType);
+	inline Bool isEndCommand(CommandNode *cmdNode);
 	inline Bool hasEndCommand(Object *obj);
 	inline Bool isLocatableCommand(UnsignedInt commandNodeID);
 
