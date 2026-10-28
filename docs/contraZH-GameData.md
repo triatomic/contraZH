@@ -216,3 +216,47 @@ Notes:
 * Immobile containers (garrisoned buildings) are unaffected.
 * A loaded transport slows its group like any slow unit.
 * Changes the simulation; replays must use the same setting. At `0%` nothing changes.
+
+## Distance fog
+
+The D3D9 game can blend distant scenery into a haze tinted by the map's current sun and ambient
+light. Nearby surfaces stay clear, and a smooth fade reaches full strength at the end distance.
+Fog draws before colour grading and the interface. Black shroud stays black.
+
+Put these keys in `GameData.ini`, or override them in a `GameData` block in the map's `map.ini`.
+`DistanceFog = Yes` activates the effect. It defaults to `No`. Map overrides use the normal
+GameData override lifetime, so the next map returns to the mod's settings.
+
+| Key | Default | Effect |
+| --- | --- | --- |
+| `DistanceFog` | `No` | Activates distance fog. |
+| `DistanceFogPreset` | `Sun` | Chooses `Sun`, `Desert`, `Futuristic`, `DarkHorse`, `Apocalyptic`, or `Custom`. |
+| `DistanceFogColor` | `R:166 G:184 B:191` | Sets the base colour when the preset is `Custom`. |
+| `DistanceFogStart` | `500` | Starts the fade at this camera depth, in world units. Negative values become zero. |
+| `DistanceFogEnd` | `1800` | Reaches full strength at this camera depth. A value at or below the start disables fog. |
+| `DistanceFogStrength` | `0.65` | Sets the maximum blend, clamped from 0 to 1. |
+| `DistanceFogSunInfluence` | `0.5` | Blends the preset or custom colour toward the map's current sun plus ambient light, from 0 to 1. `Sun` always takes the full light colour. |
+
+`Desert` gives a sandy tan, `Futuristic` a blue-green haze, `DarkHorse` a dark blue-grey haze,
+and `Apocalyptic` a dusty olive haze. Setting sun influence to zero keeps the chosen colour fixed.
+
+For example, a desert map's `map.ini` can contain
+
+```ini
+GameData
+  DistanceFog = Yes
+  DistanceFogPreset = Desert
+  DistanceFogStart = 500
+  DistanceFogEnd = 1800
+  DistanceFogStrength = 0.65
+  DistanceFogSunInfluence = 0.5
+End
+```
+
+For a colour of your own, use `DistanceFogPreset = Custom` and, for example,
+`DistanceFogColor = R:100 G:150 B:145`. A map can explicitly turn global fog off with
+`DistanceFog = No`. Cheat builds also reload these keys from the mod's `GameData.ini` while running.
+
+The pass needs shader model 2 and a readable INTZ depth buffer. It is inactive on D3D8, with MSAA,
+or when readable depth is unavailable. Supersampling works. Translucent effects take the depth of
+the opaque surface behind them. Very dark pixels receive less haze to preserve the black shroud.

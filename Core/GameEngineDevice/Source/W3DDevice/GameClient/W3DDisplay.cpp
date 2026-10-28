@@ -79,6 +79,7 @@ static void drawFramerateBar();
 #include "W3DDevice/GameClient/W3DWater.h"
 #include "W3DDevice/GameClient/W3DPlanarMirror.h"
 #include "W3DDevice/GameClient/W3DColorLut.h"
+#include "W3DDevice/GameClient/W3DDistanceFog.h"
 #include "W3DDevice/GameClient/W3DVideoBuffer.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/W3DShadowMap.h"
@@ -2323,6 +2324,10 @@ AGAIN:
 				// draw all views of the world
 				drawViews();
 
+				if (TheW3DDistanceFog != nullptr)
+				{
+					TheW3DDistanceFog->render(*primaryW3DView->get3DCamera());
+				}
 				// A supersampled scene comes down to the screen here, so the interface keeps its native pixels
 				// and the colour grade works over the screen's pixels alone
 				DX8Wrapper::Resolve_Scene_Target();

@@ -224,6 +224,8 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ prefix "GrainStreak",	INI::parseReal,	nullptr,	offsetof( GlobalData, m_stormTuning[stormType].grainStreak ) }, \
 	{ prefix "GrainOpacity",	INI::parsePercentToReal,	nullptr,	offsetof( GlobalData, m_stormTuning[stormType].grainOpacity ) },
 
+static const char *DistanceFogPresetNames[] = { "SUN", "DESERT", "FUTURISTIC", "DARKHORSE", "APOCALYPTIC", "CUSTOM", nullptr };
+
 /*static*/ const FieldParse GlobalData::s_GlobalDataFieldParseTable[] =
 {
 	{ "Windowed",									INI::parseBool,				nullptr,			offsetof( GlobalData, m_windowed ) },
@@ -363,6 +365,13 @@ const SubdualValue* GlobalData::findSubdualDefault( const ThingTemplate* tmpl, S
 	{ "PlanarMirrorTint",					INI::parseRGBColor,			nullptr,			offsetof( GlobalData, m_planarMirrorTuning.tint ) },
 	{ "PlanarMirrorDistortion",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_planarMirrorTuning.distortion ) },
 	{ "PlanarMirrorFrost",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_planarMirrorTuning.frost ) },
+	{ "DistanceFog", INI::parseBool, nullptr, offsetof( GlobalData, m_distanceFog ) },
+	{ "DistanceFogPreset", INI::parseIndexList, DistanceFogPresetNames, offsetof( GlobalData, m_distanceFogPreset ) },
+	{ "DistanceFogColor", INI::parseRGBColor, nullptr, offsetof( GlobalData, m_distanceFogColor ) },
+	{ "DistanceFogStart", INI::parseReal, nullptr, offsetof( GlobalData, m_distanceFogStart ) },
+	{ "DistanceFogEnd", INI::parseReal, nullptr, offsetof( GlobalData, m_distanceFogEnd ) },
+	{ "DistanceFogStrength", INI::parseReal, nullptr, offsetof( GlobalData, m_distanceFogStrength ) },
+	{ "DistanceFogSunInfluence", INI::parseReal, nullptr, offsetof( GlobalData, m_distanceFogSunInfluence ) },
 	{ "AmbientOcclusionRadius",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_ambientOcclusionRadius ) },
 	{ "AmbientOcclusionStrength",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_ambientOcclusionStrength ) },
 	{ "GroundNoiseStrength",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_groundNoiseStrength ) },
@@ -1143,6 +1152,15 @@ GlobalData::GlobalData()
 	m_rotrHack = FALSE;
 	m_planarMirrorShader = TRUE;
 	m_planarMirrorTuning.setDefaults();
+	m_distanceFog = FALSE;
+	m_distanceFogPreset = 0;
+	m_distanceFogColor.red = 0.65f;
+	m_distanceFogColor.green = 0.72f;
+	m_distanceFogColor.blue = 0.75f;
+	m_distanceFogStart = 500.0f;
+	m_distanceFogEnd = 1800.0f;
+	m_distanceFogStrength = 0.65f;
+	m_distanceFogSunInfluence = 0.5f;
 	m_ambientOcclusionRadius = 12.0f;
 	m_ambientOcclusionStrength = 1.0f;
 	m_groundNoiseStrength = 0.12f;
@@ -1810,6 +1828,8 @@ static const char *const LiveGameDataKeys[] =
 	"UnitSpecularIntensity", "UnitSpecularPower", "UnitBumpHeight", "UnitNormalMapStrength", "TerrainNormalMapStrength", "RoadBumpHeight",
 	"TerrainGlintIntensity", "TerrainGlintGloss", "TerrainGlintAlbedo",
 	"UnitEmissiveIntensity", "UnitEmissiveNightIntensity", "SoftParticleDistance",
+	"DistanceFog", "DistanceFogPreset", "DistanceFogColor", "DistanceFogStart", "DistanceFogEnd",
+	"DistanceFogStrength", "DistanceFogSunInfluence",
 	"AmbientOcclusionRadius", "AmbientOcclusionStrength",
 	"GroundNoiseStrength", "GroundNoiseSize", "GroundNoiseTint", "GroundNoiseBrightness",
 	"TerrainHeightBlendStrength", "TerrainHeightBlendSharpness",

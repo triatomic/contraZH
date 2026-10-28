@@ -65,6 +65,7 @@
 #include "W3DDevice/GameClient/W3DDisruption.h"
 #include "W3DDevice/GameClient/W3DStorm.h"
 #include "W3DDevice/GameClient/W3DColorLut.h"
+#include "W3DDevice/GameClient/W3DDistanceFog.h"
 #include "W3DDevice/GameClient/W3DHeadlight.h"
 #include "W3DDevice/GameClient/W3DPlanarMirror.h"
 #include "W3DDevice/GameClient/W3DAmbientOcclusion.h"
@@ -227,6 +228,9 @@ W3DTerrainVisual::~W3DTerrainVisual()
 	delete TheW3DStorms;
 	TheW3DStorms = nullptr;
 
+	delete TheW3DDistanceFog;
+	TheW3DDistanceFog = nullptr;
+
 	delete TheW3DColorLut;
 	TheW3DColorLut = nullptr;
 
@@ -292,6 +296,7 @@ void W3DTerrainVisual::init()
 		TheW3DDisruption = NEW W3DDisruptionManager;
 		TheW3DStorms = NEW W3DStormManager;
 		TheW3DColorLut = NEW W3DColorLut;
+		TheW3DDistanceFog = NEW W3DDistanceFog;
 		TheW3DHeadlights = NEW W3DHeadlightManager;
 		TheW3DPlanarMirrors = NEW W3DPlanarMirrorManager;
 		TheW3DAmbientOcclusion = NEW W3DAmbientOcclusion;

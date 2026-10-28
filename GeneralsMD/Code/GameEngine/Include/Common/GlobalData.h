@@ -312,6 +312,13 @@ public:
 	Bool m_planarMirrorShader;	///< GameData PlanarMirrorShader: whether models' PlanarMirror meshes reflect, read at launch
 	PlanarMirrorShaderTuning m_planarMirrorTuning;	///< GameData PlanarMirrorReflectivity and the keys beside it: what mirrors take where their model sets nothing
 	StormShaderInfo m_stormTuning[StormShaderInfo::TYPE_COUNT];	///< GameData SandStorm and SnowStorm keys: what each storm type takes where its entry sets nothing
+	Bool m_distanceFog;
+	Int m_distanceFogPreset;
+	RGBColor m_distanceFogColor;
+	Real m_distanceFogStart;
+	Real m_distanceFogEnd;
+	Real m_distanceFogStrength;
+	Real m_distanceFogSunInfluence;
 	Real m_ambientOcclusionRadius;		///< GameData AmbientOcclusionRadius: how far, in world units, geometry darkens what is near it
 	Real m_ambientOcclusionStrength;	///< GameData AmbientOcclusionStrength: how dark the occlusion gets, 0 for none
 	Real m_groundNoiseStrength;			///< GameData GroundNoiseStrength and the keys below: the noise that stands in for the light map, see W3DGroundNoise
