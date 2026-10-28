@@ -16,6 +16,7 @@
 #include "GameLogic/Module/OverchargeBehavior.h"
 #include "GameLogic/Module/SpawnBehavior.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
+#include "GameLogic/Weapon.h"
 
 //-----------------------------------------------------------------------------
 //         Public Data
@@ -573,7 +574,7 @@ Bool CommandSequence::includeUnitInCommand(UnsignedInt cmdNodeID, Object *obj)
 	UnsignedInt lastCmdNodeID = obj->getLastCommand();
 	CommandNode *lastCmdNode = findCommandByID(lastCmdNodeID);
 
-	if (lastCmdNode && isEndCommand(lastCmdNode->m_commandType))
+	if (lastCmdNode && isEndCommand(lastCmdNode))
 		return false;
 
 	cmdNode->m_nextCommand.insert(std::make_pair(obj->getID(), 0));
@@ -652,12 +653,18 @@ Bool CommandSequence::isTypicalMovingCommand(CommandType commandType)
 	}
 }
 
-inline Bool CommandSequence::isEndCommand(CommandType commandType)
+inline Bool CommandSequence::isEndCommand(CommandNode *cmdNode)
 {
-	switch (commandType)
+	switch (cmdNode->m_commandType)
 	{
 	case COMMAND_DO_GUARD_POSITION:
+	case COMMAND_INTERNET_HACK:
 		return true;
+	case COMMAND_DO_WEAPON_AT_LOCATION:
+		if (cmdNode->m_maxShotsToFire == NO_MAX_SHOTS_LIMIT)
+			return true;
+		else
+			return false;
 	default:
 		return false;
 	}
@@ -666,7 +673,7 @@ inline Bool CommandSequence::isEndCommand(CommandType commandType)
 inline Bool CommandSequence::hasEndCommand(Object *obj)
 {
 	CommandNode *cmdNode = findCommandByID(obj->getLastCommand());
-	if (isEndCommand(cmdNode->m_commandType))
+	if (isEndCommand(cmdNode))
 		return true;
 	return false;
 }
