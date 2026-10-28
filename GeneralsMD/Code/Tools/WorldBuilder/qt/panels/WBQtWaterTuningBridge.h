@@ -16,7 +16,8 @@ enum
 	WBQT_WATER_FLOAT = 0,
 	WBQT_WATER_BOOL = 1,
 	WBQT_WATER_COLOR = 2,
-	WBQT_WATER_TEXT = 3
+	WBQT_WATER_TEXT = 3,
+	WBQT_WATER_CHOICE = 4
 };
 
 typedef struct WBQtWaterTuningDesc
@@ -30,6 +31,7 @@ typedef struct WBQtWaterTuningDesc
 	float hi;
 	float step;
 	int advanced;		// 1 hides the row until "Advanced keys" is ticked
+	const char *const *choices;	// null-terminated names for WBQT_WATER_CHOICE
 } WBQtWaterTuningDesc;
 
 // ====== Qt -> MFC (implemented in src/WBQtWaterTuningBridge.cpp) ======

@@ -74,6 +74,12 @@ the same way. A changed key is saved to the `GameData` block of `map.ini`, which
 map; the reset button returns the map to `GameData.ini`. An effect that is off under Level Of Detail >
 FX Shaders shows no change.)
 
+* Water tuning > Fog - (Enables distance fog for the map and previews it in the 3D view.
+Choose Sun, Desert, Futuristic, DarkHorse, Apocalyptic, or Custom. Set the custom colour, start
+and end depths, maximum strength, and sun influence. Changes save to the `GameData` block of
+`map.ini`; reset removes the override and restores the mod's value. The preview needs D3D9 and
+readable depth, so MSAA disables it. See [Distance fog](contraZH-GameData.md#distance-fog).)
+
 The same editor opens any INI file from its own File menu. It completes names from the game's INI
 data, narrowed to the values each key takes, and Ctrl+Space opens a searchable picker. It also
 checks the file's structure.

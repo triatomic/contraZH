@@ -63,7 +63,9 @@ namespace
 			{ "TransparentWaterDepth", "Shore depth" },
 			{ "TransparentWaterMinOpacity", "Minimum opacity" },
 			{ "ColorLut", "Colour table" },
-			{ "ColorLutStrength", "Strength" }
+			{ "ColorLutStrength", "Strength" },
+			{ "DistanceFog", "Enable distance fog" },
+			{ "DistanceFogColor", "Custom colour" }
 		};
 		for (int i = 0; i < (int)(sizeof(names) / sizeof(names[0])); ++i)
 		{
@@ -73,7 +75,7 @@ namespace
 			}
 		}
 		QString label = key;
-		label.remove(QRegularExpression("^(ShaderWater|TerrainGlint|GroundNoise|TerrainHeightBlend|SkyCloud)"));
+		label.remove(QRegularExpression("^(ShaderWater|TerrainGlint|GroundNoise|TerrainHeightBlend|SkyCloud|DistanceFog)"));
 		label.replace(QRegularExpression("([a-z0-9])([A-Z])"), "\\1 \\2");
 		label = label.toLower();
 		if (!label.isEmpty())
@@ -527,7 +529,7 @@ void WBQtWaterTuningPanel::buildRows()
 		grid->addWidget(row.reset, gridRow, COL_RESET);
 		row.widgets << row.reset;
 
-		if (desc.kind == WBQT_WATER_FLOAT || desc.kind == WBQT_WATER_TEXT)
+		if (desc.kind == WBQT_WATER_FLOAT || desc.kind == WBQT_WATER_TEXT || desc.kind == WBQT_WATER_CHOICE)
 		{
 			row.label = new QLabel(settingLabel(row.key), host);
 			row.label->setToolTip(tip);
@@ -537,6 +539,21 @@ void WBQtWaterTuningPanel::buildRows()
 			{
 				addSlider(row, r, grid, gridRow, tip);
 				row.label->setBuddy(row.spin);
+			}
+			else if (desc.kind == WBQT_WATER_CHOICE)
+			{
+				row.combo = new QComboBox(host);
+				row.combo->setObjectName(row.key + "Combo");
+				row.combo->setToolTip(tip);
+				row.combo->setProperty("row", r);
+				for (int choice = 0; desc.choices != NULL && desc.choices[choice] != NULL; ++choice)
+				{
+					row.combo->addItem(QString::fromLatin1(desc.choices[choice]));
+				}
+				grid->addWidget(row.combo, gridRow, COL_SLIDER, 1, COL_SPIN - COL_SLIDER + 1);
+				connect(row.combo, SIGNAL(activated(int)), this, SLOT(onChoiceChosen(int)));
+				row.label->setBuddy(row.combo);
+				row.widgets << row.combo;
 			}
 			else
 			{
@@ -592,6 +609,8 @@ QString WBQtWaterTuningPanel::formatValue(const Row &row) const
 				.arg(qBound(0, qRound(row.value[0]), 255))
 				.arg(qBound(0, qRound(row.value[1]), 255))
 				.arg(qBound(0, qRound(row.value[2]), 255));
+		case WBQT_WATER_CHOICE:
+			return row.combo->itemText(qRound(row.value[0]));
 		case WBQT_WATER_TEXT:
 			return row.text.isEmpty() ? QString("None") : row.text;
 		default:
@@ -648,6 +667,11 @@ void WBQtWaterTuningPanel::showRow(int r)
 				qBound(0, qRound((row.value[1] < 0.0f) ? kDeepColorStart[1] : row.value[1]), 255),
 				qBound(0, qRound((row.value[2] < 0.0f) ? kDeepColorStart[2] : row.value[2]), 255)));
 			row.colour->setIcon(QIcon(swatch));
+			break;
+		}
+		case WBQT_WATER_CHOICE:
+		{
+			row.combo->setCurrentIndex(qRound(row.value[0]));
 			break;
 		}
 		case WBQT_WATER_TEXT:
@@ -752,6 +776,15 @@ void WBQtWaterTuningPanel::reseed()
 			if (row.inFile)
 			{
 				row.text = firstWord(raw);
+			}
+		}
+		else if (row.kind == WBQT_WATER_CHOICE)
+		{
+			const int choice = row.combo->findText(firstWord(raw), Qt::MatchFixedString);
+			row.inFile = !raw.isNull() && choice >= 0;
+			if (row.inFile)
+			{
+				row.value[0] = (float)choice;
 			}
 		}
 		else
@@ -953,6 +986,17 @@ void WBQtWaterTuningPanel::onCheckToggled(bool on)
 			row.value[c] = kDeepColorStart[c];
 		}
 	}
+	markChanged(r);
+}
+
+void WBQtWaterTuningPanel::onChoiceChosen(int choice)
+{
+	if (m_updating || choice < 0)
+	{
+		return;
+	}
+	const int r = sender()->property("row").toInt();
+	m_rows[r].value[0] = (float)choice;
 	markChanged(r);
 }
 

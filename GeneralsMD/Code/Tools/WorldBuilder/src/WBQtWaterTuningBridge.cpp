@@ -131,18 +131,27 @@ namespace
 		Int GlobalData::*integer;
 		RGBColor GlobalData::*color;
 		AsciiString GlobalData::*text;
+		Bool GlobalData::*flag;
+		const char *const *choices;
 	};
 
 #define RENDER_REAL(group, key, member, lo, hi, step, help) \
-	{ key, group, help, WBQT_WATER_FLOAT, lo, hi, step, &GlobalData::member, NULL, NULL, NULL }
+	{ key, group, help, WBQT_WATER_FLOAT, lo, hi, step, &GlobalData::member, NULL, NULL, NULL, NULL, NULL }
 #define RENDER_INT(group, key, member, lo, hi, step, help) \
-	{ key, group, help, WBQT_WATER_FLOAT, lo, hi, step, NULL, &GlobalData::member, NULL, NULL }
+	{ key, group, help, WBQT_WATER_FLOAT, lo, hi, step, NULL, &GlobalData::member, NULL, NULL, NULL, NULL }
 #define RENDER_COLOR(group, key, member, help) \
-	{ key, group, help, WBQT_WATER_COLOR, 0.0f, 255.0f, 1.0f, NULL, NULL, &GlobalData::member, NULL }
+	{ key, group, help, WBQT_WATER_COLOR, 0.0f, 255.0f, 1.0f, NULL, NULL, &GlobalData::member, NULL, NULL, NULL }
 #define RENDER_TEXT(group, key, member, help) \
-	{ key, group, help, WBQT_WATER_TEXT, 0.0f, 0.0f, 0.0f, NULL, NULL, NULL, &GlobalData::member }
+	{ key, group, help, WBQT_WATER_TEXT, 0.0f, 0.0f, 0.0f, NULL, NULL, NULL, &GlobalData::member, NULL, NULL }
 
-	// The GameData keys of the FX tuner's Glint, Ground, Blend, Sky and Colour grade tabs in its order, ranges and steps.
+#define RENDER_BOOL(group, key, member, help) \
+	{ key, group, help, WBQT_WATER_BOOL, 0.0f, 1.0f, 1.0f, NULL, NULL, NULL, NULL, &GlobalData::member, NULL }
+#define RENDER_CHOICE(group, key, member, names, help) \
+	{ key, group, help, WBQT_WATER_CHOICE, 0.0f, 0.0f, 0.0f, NULL, &GlobalData::member, NULL, NULL, NULL, names }
+
+	const char *const s_fogPresets[] = { "Sun", "Desert", "Futuristic", "DarkHorse", "Apocalyptic", "Custom", NULL };
+
+	// Each GameData group becomes a tab in the map tuning window.
 	const RenderKey s_renderKeys[] =
 	{
 		RENDER_REAL("Glint", "TerrainGlintIntensity", m_terrainGlintIntensity, 0.0f, 2.0f, 0.01f,
@@ -186,6 +195,21 @@ namespace
 			"How far shapes bulge and curl. High values twist them into streaks."),
 		RENDER_REAL("Sky", "SkyCloudDetail", m_skyCloudDetail, 0.0f, 1.0f, 0.01f,
 			"Ragged detail at the edges. 0 gives smooth blobs."),
+
+		RENDER_BOOL("Fog", "DistanceFog", m_distanceFog,
+			"Enables distance fog for this map. Requires D3D9 and readable depth; MSAA disables it."),
+		RENDER_CHOICE("Fog", "DistanceFogPreset", m_distanceFogPreset, s_fogPresets,
+			"Chooses the haze colour. Sun takes the map's current sun and ambient light; Custom uses the custom colour."),
+		RENDER_COLOR("Fog", "DistanceFogColor", m_distanceFogColor,
+			"Base colour for the Custom preset. Tick to override the mod's colour in map.ini."),
+		RENDER_REAL("Fog", "DistanceFogStart", m_distanceFogStart, 0.0f, 10000.0f, 10.0f,
+			"Camera depth where haze starts, in world units. Nearer surfaces stay clear."),
+		RENDER_REAL("Fog", "DistanceFogEnd", m_distanceFogEnd, 0.0f, 20000.0f, 10.0f,
+			"Camera depth where haze reaches full strength. Must exceed the start depth."),
+		RENDER_REAL("Fog", "DistanceFogStrength", m_distanceFogStrength, 0.0f, 1.0f, 0.01f,
+			"Maximum blend toward the fog colour. 0 turns fog off."),
+		RENDER_REAL("Fog", "DistanceFogSunInfluence", m_distanceFogSunInfluence, 0.0f, 1.0f, 0.01f,
+			"Blends the preset toward the map's sun and ambient light. 0 keeps the preset colour. Sun always uses 1."),
 
 		RENDER_TEXT("Colour grade", "ColorLut", m_colorLut,
 			"The colour table's file name in Art\\Textures, such as lut_desert.tga. None uses no table."),
@@ -248,6 +272,10 @@ namespace
 			v[1] = c.green * 255.0f;
 			v[2] = c.blue * 255.0f;
 		}
+		else if (k.flag != NULL)
+		{
+			v[0] = (data->*(k.flag)) ? 1.0f : 0.0f;
+		}
 		else if (k.integer != NULL)
 		{
 			v[0] = (float)(data->*(k.integer));
@@ -270,6 +298,10 @@ namespace
 			c.red = v[0] / 255.0f;
 			c.green = v[1] / 255.0f;
 			c.blue = v[2] / 255.0f;
+		}
+		else if (k.flag != NULL)
+		{
+			data->*(k.flag) = v[0] >= 0.5f;
 		}
 		else if (k.integer != NULL)
 		{
@@ -331,6 +363,29 @@ namespace
 
 	Bool parseRenderValue(const RenderKey &k, const char *text, float v[3])
 	{
+		if (k.choices != NULL)
+		{
+			const AsciiString word = firstWord(text);
+			for (int i = 0; k.choices[i] != NULL; ++i)
+			{
+				if (word.compareNoCase(k.choices[i]) == 0)
+				{
+					v[0] = (float)i;
+					return TRUE;
+				}
+			}
+			return FALSE;
+		}
+		if (k.flag != NULL)
+		{
+			const AsciiString word = firstWord(text);
+			if (word.compareNoCase("Yes") != 0 && word.compareNoCase("No") != 0)
+			{
+				return FALSE;
+			}
+			v[0] = word.compareNoCase("Yes") == 0 ? 1.0f : 0.0f;
+			return TRUE;
+		}
 		if (k.color != NULL)
 		{
 			int r = 0;
@@ -442,6 +497,7 @@ extern "C" int WBQtWaterTuning_GetDesc(int i, WBQtWaterTuningDesc *out)
 		out->hi = r.hi;
 		out->step = r.step;
 		out->advanced = 0;
+		out->choices = r.choices;
 		return 1;
 	}
 	const WaterKey &k = s_keys[i];
@@ -454,6 +510,7 @@ extern "C" int WBQtWaterTuning_GetDesc(int i, WBQtWaterTuningDesc *out)
 	out->hi = k.hi;
 	out->step = k.step;
 	out->advanced = k.advanced;
+	out->choices = NULL;
 	return 1;
 }
 

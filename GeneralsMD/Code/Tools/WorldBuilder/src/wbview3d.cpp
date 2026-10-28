@@ -100,6 +100,7 @@ extern "C" int WBQtObject_GetRenderParticles(void);
 #include "W3DDevice/GameClient/W3DSoftParticles.h"
 #include "W3DDevice/GameClient/W3DSkyClouds.h"
 #include "W3DDevice/GameClient/W3DColorLut.h"
+#include "W3DDevice/GameClient/W3DDistanceFog.h"
 #include "DrawObject.h"
 #include "RulerTool.h"
 #include "TracingOverlayOptions.h"
@@ -815,6 +816,8 @@ WbView3d::~WbView3d()
 	TheW3DSoftParticles = nullptr;
 	delete TheW3DSkyClouds;
 	TheW3DSkyClouds = nullptr;
+	delete TheW3DDistanceFog;
+	TheW3DDistanceFog = nullptr;
 	delete TheW3DColorLut;
 	TheW3DColorLut = nullptr;
 	shutdownWW3D();
@@ -5820,6 +5823,11 @@ void WbView3d::render()
 			TheWritableGlobalData->m_showSoftWaterEdge = savedSoftWater;
 		}
 
+		if (TheW3DDistanceFog != nullptr)
+		{
+			TheW3DDistanceFog->render(*m_camera);
+		}
+
 		// The map.ini grade goes over the scene as in the game, and under the icons so they stay readable.
 		if (TheW3DColorLut != nullptr)
 		{
@@ -6246,6 +6254,10 @@ void WbView3d::initWW3D()
 		if (TheW3DSkyClouds == nullptr)
 		{
 			TheW3DSkyClouds = new W3DSkyClouds;
+		}
+		if (TheW3DDistanceFog == nullptr)
+		{
+			TheW3DDistanceFog = new W3DDistanceFog;
 		}
 		if (TheW3DColorLut == nullptr)
 		{

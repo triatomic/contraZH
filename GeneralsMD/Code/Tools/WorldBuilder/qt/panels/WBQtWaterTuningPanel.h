@@ -56,6 +56,7 @@ private slots:
 	void onColourClicked();
 	void onCheckToggled(bool on);
 	void onTextChosen();
+	void onChoiceChosen(int choice);
 	void onResetClicked();
 	void onAdvancedToggled(bool on);
 	void onSaveTimer();

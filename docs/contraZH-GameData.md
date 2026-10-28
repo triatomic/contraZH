@@ -222,6 +222,8 @@ Notes:
 The D3D9 game can blend distant scenery into a haze tinted by the map's current sun and ambient
 light. Nearby surfaces stay clear, and a smooth fade reaches full strength at the end distance.
 Fog draws before colour grading and the interface. Black shroud stays black.
+WorldBuilder Qt exposes the same map settings under File > Map.ini > Water tuning > Fog, with a
+live viewport preview.
 
 Put these keys in `GameData.ini`, or override them in a `GameData` block in the map's `map.ini`.
 `DistanceFog = Yes` activates the effect. It defaults to `No`. Map overrides use the normal
