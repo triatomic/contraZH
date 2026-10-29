@@ -164,7 +164,7 @@ void Keyboard::updateKeys()
 			// The repeat delay runs from when the key is read, so a key read late after a stall does not repeat at once.
 			if( BitIsSet( m_keys[ index ].state, KEY_STATE_DOWN ) )
 			{
-				m_keyStatus[ m_keys[ index ].key ].keyDownTimeMsec = timeGetTime();
+				m_keyRepeatTimeMsec[ m_keys[ index ].key ] = timeGetTime() + m_repeatDelayMsec;
 				pressed = TRUE;
 			}
 		}
@@ -254,11 +254,10 @@ Bool Keyboard::checkKeyRepeat()
 		{
 
 			const UnsignedInt now = timeGetTime();
-			const UnsignedInt keyDownTime = m_keyStatus[ key ].keyDownTimeMsec;
-			// The difference is signed because a repeat slower than the delay schedules the next one ahead of now.
-			const Int elapsedMsec = (Int)(now - keyDownTime);
+			// TheSuperHackers @info The repeat time is usually ahead of now, so the difference is signed.
+			const Int msecUntilRepeat = (Int)(m_keyRepeatTimeMsec[ key ] - now);
 
-			if( elapsedMsec > (Int)m_repeatDelayMsec )
+			if( msecUntilRepeat <= 0 )
 			{
 				// Add key to this frame
 				m_keys[ index ].key = (UnsignedByte)key;
@@ -268,16 +267,13 @@ Bool Keyboard::checkKeyRepeat()
 				// Set End Flag
 				m_keys[ ++index ].key = KEY_NONE;
 
-				// Set all keys as new to prevent multiple keys repeating
-				for( index = 0; index< NUM_KEYS; index++ )
-					m_keyStatus[ index ].keyDownTimeMsec = now;
+				// Delay all other keys to prevent multiple keys repeating
+				for( index = 0; index < ARRAY_SIZE(m_keyRepeatTimeMsec); index++ )
+				{
+					m_keyRepeatTimeMsec[ index ] = now + m_repeatDelayMsec;
+				}
 
-				// TheSuperHackers @bugfix bobtista 09/06/2026 Schedule the next repeat one INTERVAL
-				// from now (time-based). The previous code subtracted DELAY+INTERVAL, leaving the key
-				// permanently past the repeat threshold so it repeated EVERY frame and ignored
-				// KEY_REPEAT_INTERVAL_MSEC. At high frame rates (e.g. macOS) that caused runaway
-				// repeats - one backspace tap deleting several characters.
-				m_keyStatus[ key ].keyDownTimeMsec = now - (m_repeatDelayMsec - m_repeatIntervalMsec);
+				m_keyRepeatTimeMsec[ key ] = now + m_repeatIntervalMsec;
 
 				retVal = TRUE;
 				break;  // exit for key
@@ -750,6 +746,7 @@ Keyboard::Keyboard()
 
 	memset( m_keys, 0, sizeof( m_keys ) );
 	memset( m_keyStatus, 0, sizeof( m_keyStatus ) );
+	memset( m_keyRepeatTimeMsec, 0, sizeof( m_keyRepeatTimeMsec ) );
 	m_modifiers = KEY_STATE_NONE;
 	m_updateCount = 0;
 	m_shift2Key = KEY_NONE;
@@ -812,6 +809,7 @@ void Keyboard::resetKeys()
 
 	memset( m_keys, 0, sizeof( m_keys ) );
 	memset( m_keyStatus, 0, sizeof( m_keyStatus ) );
+	memset( m_keyRepeatTimeMsec, 0, sizeof( m_keyRepeatTimeMsec ) );
 	m_modifiers = KEY_STATE_NONE;
 	if( getCapsState() )
 	{
