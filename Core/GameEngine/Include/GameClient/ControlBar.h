@@ -926,6 +926,13 @@ protected:
 	/// show/hide the portrait window image using the image from the object
 	void setPortraitByObject( Object *obj );
 
+#if defined(RTS_ZEROHOUR)
+	static void drawPortraitVeterancy( GameWindow *window, WinInstanceData *instData );
+	GameWinDrawFunc m_portraitDraw;
+	ObjectID m_portraitObjectID;
+	DisplayString *m_portraitExperienceString;
+#endif
+
 	/// show rally point at world location, a nullptr location will hide any visible rally point marker
 	void showRallyPoint( const Coord3D *loc );
 

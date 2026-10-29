@@ -54,6 +54,9 @@
 #include "Common/Recorder.h"
 
 #include "GameLogic/GameLogic.h"
+#if defined(RTS_ZEROHOUR)
+#include "GameLogic/ExperienceTracker.h"
+#endif
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/ProductionUpdate.h"
 #include "GameLogic/Module/OCLUpdate.h"
@@ -1024,6 +1027,11 @@ ControlBar::ControlBar()
 	m_scienceLayout = nullptr;
 	m_rightHUDWindow = nullptr;
 	m_rightHUDCameoWindow = nullptr;
+#if defined(RTS_ZEROHOUR)
+	m_portraitDraw = nullptr;
+	m_portraitObjectID = INVALID_ID;
+	m_portraitExperienceString = nullptr;
+#endif
 	for( i = 0; i < MAX_RIGHT_HUD_UPGRADE_CAMEOS; i++ )
 		m_rightHUDUpgradeCameos[i];
 	m_rightHUDUnitSelectParent = nullptr;
@@ -1072,6 +1080,12 @@ ControlBar::ControlBar()
 //-------------------------------------------------------------------------------------------------
 ControlBar::~ControlBar()
 {
+#if defined(RTS_ZEROHOUR)
+	if( m_portraitExperienceString && TheDisplayStringManager )
+	{
+		TheDisplayStringManager->freeDisplayString( m_portraitExperienceString );
+	}
+#endif
 
 	if(m_scienceLayout)
 	{
@@ -1287,6 +1301,14 @@ void ControlBar::init()
 
 		id = TheNameKeyGenerator->nameToKey( "ControlBar.wnd:CameoWindow" );
 		m_rightHUDCameoWindow = TheWindowManager->winGetWindowFromId( nullptr, id );
+#if defined(RTS_ZEROHOUR)
+		OptionPreferences options;
+		if( m_rightHUDCameoWindow && options.getBool( "VeterancyLevel", FALSE ) )
+		{
+			m_portraitDraw = m_rightHUDCameoWindow->winGetDrawFunc();
+			m_rightHUDCameoWindow->winSetDrawFunc( drawPortraitVeterancy );
+		}
+#endif
 		for( i = 0; i < MAX_RIGHT_HUD_UPGRADE_CAMEOS; i++ )
 		{
 			windowName.format( "ControlBar.wnd:UnitUpgrade%d", i+1 );
@@ -1411,6 +1433,9 @@ void ControlBar::init()
 //-------------------------------------------------------------------------------------------------
 void ControlBar::reset()
 {
+#if defined(RTS_ZEROHOUR)
+	m_portraitObjectID = INVALID_ID;
+#endif
 	hideSpecialPowerShortcut();
 	resetSmartSelection();
 	// the logic side focus goes with the old game, so the next one starts from no cache
@@ -2871,6 +2896,13 @@ void ControlBar::setControlCommand( const AsciiString& buttonWindowName, GameWin
 //-------------------------------------------------------------------------------------------------
 void ControlBar::setPortraitByImage( const Image *image )
 {
+#if defined(RTS_ZEROHOUR)
+	m_portraitObjectID = INVALID_ID;
+	if( m_portraitDraw )
+	{
+		GadgetButtonDrawOverlayImage( m_rightHUDCameoWindow, nullptr );
+	}
+#endif
 
 	if( image )
 	{
@@ -2897,6 +2929,143 @@ void ControlBar::setPortraitByImage( const Image *image )
 
 }
 
+#if defined(RTS_ZEROHOUR)
+static void drawVeterancyShape( const Coord2D *points, Int count, Int x, Int y, Int width, Int height, Int fillY )
+{
+	for( Int row = 0; row < height; ++row )
+	{
+		const Real scanY = (row + 0.5f) / height;
+		Real intersections[10];
+		Int hits = 0;
+		for( Int i = 0; i < count; ++i )
+		{
+			const Coord2D &a = points[i];
+			const Coord2D &b = points[(i + 1) % count];
+			if( (a.y <= scanY && b.y > scanY) || (b.y <= scanY && a.y > scanY) )
+			{
+				intersections[hits++] = a.x + (scanY - a.y) * (b.x - a.x) / (b.y - a.y);
+			}
+		}
+		std::sort( intersections, intersections + hits );
+		for( Int i = 0; i + 1 < hits; i += 2 )
+		{
+			const Int left = x + (Int)ceil( intersections[i] * width );
+			const Int right = x + (Int)ceil( intersections[i + 1] * width );
+			const Bool filled = y + row >= fillY;
+			const Int middle = clamp( left, x + width / 2, right );
+			TheDisplay->drawFillRect( left, y + row, middle - left, 1,
+				filled ? GameMakeColor( 255, 245 - row * 35 / height, 115, 255 ) : GameMakeColor( 65, 61, 43, 220 ) );
+			TheDisplay->drawFillRect( middle, y + row, right - middle, 1,
+				filled ? GameMakeColor( 255, 210 - row * 45 / height, 24, 255 ) : GameMakeColor( 65, 61, 43, 220 ) );
+		}
+	}
+	for( Int i = 0; i < count; ++i )
+	{
+		const Coord2D &a = points[i];
+		const Coord2D &b = points[(i + 1) % count];
+		TheDisplay->drawLine( x + (Int)(a.x * width), y + (Int)(a.y * height), x + (Int)(b.x * width), y + (Int)(b.y * height),
+			3.0f, GameMakeColor( 0, 0, 0, 255 ) );
+	}
+}
+
+void ControlBar::drawPortraitVeterancy( GameWindow *window, WinInstanceData *instData )
+{
+	ControlBar *bar = TheControlBar;
+	if( !bar )
+	{
+		return;
+	}
+	if( bar->m_portraitDraw )
+	{
+		bar->m_portraitDraw( window, instData );
+	}
+	Object *obj = TheGameLogic ? TheGameLogic->findObjectByID( bar->m_portraitObjectID ) : nullptr;
+	const ExperienceTracker *experience = obj ? obj->getExperienceTracker() : nullptr;
+	if( !experience || !experience->isTrainable() || !TheDisplayStringManager || !TheFontLibrary )
+	{
+		return;
+	}
+	Drawable *draw = obj->getDrawable();
+	if( draw && draw->getStealthLook() == STEALTHLOOK_DISGUISED_ENEMY )
+	{
+		return;
+	}
+	const Int level = experience->getVeterancyLevel();
+	const Int maxLevel = experience->getMaxVeterancyLevel();
+	if( maxLevel <= LEVEL_REGULAR )
+	{
+		return;
+	}
+	const Int targetLevel = min( level + 1, maxLevel );
+	const Int current = max( 0, experience->getCurrentExperience() );
+	const Int required = max( 0, obj->getTemplate()->getExperienceRequired( targetLevel ) );
+	const Int previous = max( 0, obj->getTemplate()->getExperienceRequired( level ) );
+	Real progress = 1.0f;
+	if( level < maxLevel && required > previous )
+	{
+		progress = clamp( 0.0f, (Real)(current - previous) / (required - previous), 1.0f );
+	}
+
+	ICoord2D origin, size;
+	window->winGetScreenPosition( &origin.x, &origin.y );
+	window->winGetSize( &size.x, &size.y );
+	const Int width = min( size.x / 3, size.y / 2 );
+	const Int height = width;
+	if( width < 6 )
+	{
+		return;
+	}
+	const Int x = origin.x + size.x - width - 3;
+	const Int y = origin.y + 3;
+	const Int fillY = y + height - (Int)(height * progress);
+	if( level <= LEVEL_HEROIC )
+	{
+		static const Coord2D chevron[] = { {0, 0.5f}, {0.5f, 0}, {1, 0.5f}, {1, 1}, {0.5f, 0.5f}, {0, 1} };
+		static const Coord2D star[] = { {0.5f, 0}, {0.62f, 0.35f}, {1, 0.38f}, {0.70f, 0.61f}, {0.81f, 1},
+			{0.5f, 0.77f}, {0.19f, 1}, {0.30f, 0.61f}, {0, 0.38f}, {0.38f, 0.35f} };
+		TheDisplay->beginBatch();
+		if( targetLevel == LEVEL_VETERAN )
+		{
+			drawVeterancyShape( chevron, 6, x, y, width, height, fillY );
+		}
+		else if( targetLevel == LEVEL_ELITE )
+		{
+			drawVeterancyShape( chevron, 6, x, y, width, height * 3 / 5, fillY );
+			drawVeterancyShape( chevron, 6, x, y + height * 2 / 5, width, height * 3 / 5, fillY );
+		}
+		else
+		{
+			drawVeterancyShape( star, 10, x, y, width, height, fillY );
+		}
+		TheDisplay->endBatch();
+	}
+
+	if( !bar->m_portraitExperienceString )
+	{
+		bar->m_portraitExperienceString = TheDisplayStringManager->newDisplayString();
+	}
+	DisplayString *text = bar->m_portraitExperienceString;
+	if( !text )
+	{
+		return;
+	}
+	text->setFont( TheFontLibrary->getFont( AsciiString( "Arial" ), clamp( 7, size.y / 13, 11 ), FALSE ) );
+	UnicodeString value;
+	value.format( L"%d / %d", current, required );
+	if( text->getText() != value )
+	{
+		text->setText( value );
+	}
+	Int textWidth, textHeight;
+	text->getSize( &textWidth, &textHeight );
+	if( textWidth <= size.x - 4 && height + textHeight + 6 <= size.y )
+	{
+		text->draw( origin.x + size.x - textWidth - 3, y + height + 3,
+			GameMakeColor( 215, 211, 191, 220 ), GameMakeColor( 0, 0, 0, 220 ) );
+	}
+}
+#endif
+
 //-------------------------------------------------------------------------------------------------
 /** show/hide the portrait image by object.  We like to use this method as opposed to the
 	* plain image one above so that we can build more intelligence into what portrait to
@@ -2904,6 +3073,9 @@ void ControlBar::setPortraitByImage( const Image *image )
 //-------------------------------------------------------------------------------------------------
 void ControlBar::setPortraitByObject( Object *obj )
 {
+#if defined(RTS_ZEROHOUR)
+	m_portraitObjectID = obj ? obj->getID() : INVALID_ID;
+#endif
 
 	if( obj )
 	{
@@ -2944,6 +3116,14 @@ void ControlBar::setPortraitByObject( Object *obj )
 
 		//Display the veterancy rank of the object on the portrait.
 		const Image *image = calculateVeterancyOverlayForObject( obj );
+#if defined(RTS_ZEROHOUR)
+		if( m_portraitDraw && obj->getVeterancyLevel() <= LEVEL_HEROIC
+			&& obj->getExperienceTracker()->isTrainable() && obj->getExperienceTracker()->getMaxVeterancyLevel() > LEVEL_REGULAR
+			&& (!draw || draw->getStealthLook() != STEALTHLOOK_DISGUISED_ENEMY) )
+		{
+			image = nullptr;
+		}
+#endif
 		GadgetButtonDrawOverlayImage( m_rightHUDCameoWindow, image );
 
 		//m_rightHUDWindow->winSetEnabledImage( 0, portrait );
