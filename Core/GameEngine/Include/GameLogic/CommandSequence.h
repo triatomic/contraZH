@@ -120,7 +120,7 @@ public:
 	UnsignedInt newSwitchWeaponCommand(CommandType commandType, WeaponSlotType weaponSlot);
 
 	// ShigreUi 01/10/2026 only do it on newly created command
-	Bool includeUnitInCommand(UnsignedInt commandNodeID, Object *obj);
+	Bool includeUnitInCommand(UnsignedInt commandNodeID, Object *obj, const Coord3D *objDest = nullptr);
 	// ShigreUi 01/10/2026 Moving comand include reverse move/attack move/etc, only do it on newly created command
 	Bool includeUnitInTypicalMovingCommand(UnsignedInt commandNodeID, Object* obj, Coord3D objDest);
 

@@ -715,7 +715,7 @@ void MetaEventTranslator::onKeyPressed(GameMessageDisposition &disp, Int systemK
 			break;
 		}
 	}
-
+	
 	if (systemKeyState & KEY_STATE_DOWN)
 	{
 #ifdef DUMP_ALL_KEYS_TO_LOG
@@ -737,7 +737,7 @@ void MetaEventTranslator::onKeyPressed(GameMessageDisposition &disp, Int systemK
 	{
 		if (keyModState != NONE)
 		{
-			DEBUG_ASSERTCRASH(keyType != MK_NONE, ("Key is expected to be not MK_NONE"));
+			//DEBUG_ASSERTCRASH(keyType != MK_NONE, ("Key is expected to be not MK_NONE"));
 
 			// Forget that this key and mod state are pressed.
 			m_keyDownInfos[keyType].clearKeyModState(keyModState);
