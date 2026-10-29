@@ -3150,7 +3150,7 @@ void ControlBar::drawPortraitVeterancy( GameWindow *window, WinInstanceData *ins
 	{
 		return;
 	}
-	text->setFont( TheFontLibrary->getFont( AsciiString( "Arial" ), clamp( 7, size.y / 13, 11 ), FALSE ) );
+	text->setFont( TheFontLibrary->getFont( AsciiString( "Arial" ), clamp( 10, size.y / 10, 12 ), FALSE ) );
 	UnicodeString value;
 	value.format( L"%d / %d", current, required );
 	if( text->getText() != value )
@@ -3161,8 +3161,16 @@ void ControlBar::drawPortraitVeterancy( GameWindow *window, WinInstanceData *ins
 	text->getSize( &textWidth, &textHeight );
 	if( textWidth <= size.x - 4 && height + textHeight + 6 <= size.y )
 	{
-		text->draw( origin.x + size.x - textWidth - 3, y + height + 3,
-			GameMakeColor( 215, 211, 191, 220 ), GameMakeColor( 0, 0, 0, 220 ) );
+		const Int textX = origin.x + size.x - textWidth - 3;
+		const Int textY = y + height + 3;
+		const Color outline = GameMakeColor( 8, 10, 6, 255 );
+
+		// Pair opposite offsets to draw all eight outline directions in four passes.
+		text->draw( textX - 1, textY - 1, outline, outline, 2, 2 );
+		text->draw( textX - 1, textY + 1, outline, outline, 2, -2 );
+		text->draw( textX - 1, textY, outline, outline, 2, 0 );
+		text->draw( textX, textY - 1, outline, outline, 0, 2 );
+		text->draw( textX, textY, GameMakeColor( 255, 253, 242, 255 ), 0 );
 	}
 }
 #endif
