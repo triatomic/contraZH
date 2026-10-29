@@ -76,6 +76,9 @@ The same value forms are accepted on ActiveBody itself, and ActiveBody also acce
 A texture can be drawn over units taking jamming or frozen damage. Each overlay has its own key
 set; the effect is off until a texture is named.
 
+Visible contained objects, including Overlord add-ons and carrier passengers, inherit their
+container's overlay intensity. This only changes rendering; replays are unaffected.
+
 ```
 JammingOverlayTexture  = JammingFX.tga
 JammingOverlayScrollU  = 0.5
