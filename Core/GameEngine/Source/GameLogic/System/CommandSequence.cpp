@@ -597,16 +597,34 @@ Bool CommandSequence::includeUnitInCommand(UnsignedInt cmdNodeID, Object *obj)
 			AIUpdateInterface *ai = obj->getAI();
 			if (ai)
 			{
+				Coord3D dest;
+				ObjectToLocMap::iterator it;
 				if (ai->getAIStateType() == AI_FOLLOW_PATH)
 				{
-					ai->aiFollowPathAppend(&cmdNode->m_loc, CMD_FROM_PLAYER, cmdNode->m_commandType == COMMAND_DO_REVERSE_MOVETO, cmdNodeID);
+					it = cmdNode->m_allocatedDest.find(obj->getID());
+					if (it == cmdNode->m_allocatedDest.end())
+						dest = cmdNode->m_loc;
+					else
+						dest = it->second;
+					ai->aiFollowPathAppend(&dest, CMD_FROM_PLAYER, cmdNode->m_commandType == COMMAND_DO_REVERSE_MOVETO, cmdNodeID);
 				}
 				else
 				{
 					VecCoord3D path;
-					path.push_back(lastCmdNode->m_loc);
+					it = lastCmdNode->m_allocatedDest.find(obj->getID());
+					if (it == lastCmdNode->m_allocatedDest.end())
+						dest = lastCmdNode->m_loc;
+					else
+						dest = it->second;
+					path.push_back(dest);
 					ai->aiFollowPath(&path, nullptr, CMD_FROM_PLAYER, lastCmdNode->m_commandType == COMMAND_DO_REVERSE_MOVETO, lastCmdNodeID);
-					ai->aiFollowPathAppend(&cmdNode->m_loc, CMD_FROM_PLAYER, cmdNode->m_commandType == COMMAND_DO_REVERSE_MOVETO, cmdNodeID);
+
+					it = cmdNode->m_allocatedDest.find(obj->getID());
+					if (it == cmdNode->m_allocatedDest.end())
+						dest = cmdNode->m_loc;
+					else
+						dest = it->second;
+					ai->aiFollowPathAppend(&dest, CMD_FROM_PLAYER, cmdNode->m_commandType == COMMAND_DO_REVERSE_MOVETO, cmdNodeID);
 				}
 			}
 		}
