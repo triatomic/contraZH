@@ -484,6 +484,28 @@ split up. Matching is on the object name and ignores case.
 Note: these filters decide whether a unit may *enter*. They do not evict anyone already inside,
 so changing them does not affect units that are already loaded.
 
+## FlightDeckBehavior
+
+Aircraft carriers accept the same landing filters as `ParkingPlaceBehavior`.
+
+* `RequiredKindOf = <KindOf list>` requires every listed KindOf. Defaults to none.
+* `ForbiddenKindOf = <KindOf list>` rejects aircraft with any listed KindOf. Defaults to none.
+* `AllowedObjects = <object list>` limits landing to the named aircraft when the list is nonempty.
+* `ForbiddenObjects = <object list>` rejects the named aircraft, even if also allowed.
+
+Aircraft must pass both the KindOf masks and the object-name lists. Names ignore case, and each
+object-list line replaces the previous value. Leaving all four keys out keeps existing behavior.
+The filters apply when checking space for production or landing and when reserving a parking space.
+
+Add these fields to an existing flight deck's behavior block, alongside its runway settings.
+
+```ini
+RequiredKindOf = AIRCRAFT
+ForbiddenKindOf = PRODUCED_AT_HELIPAD
+AllowedObjects = AmericaJetRaptor AmericaJetStealthFighter
+ForbiddenObjects = AmericaJetAurora
+```
+
 ## ParkingPlaceBehavior
 
 ### Filtering aircraft by object name

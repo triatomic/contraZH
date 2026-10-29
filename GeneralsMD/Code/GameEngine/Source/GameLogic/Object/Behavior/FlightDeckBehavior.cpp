@@ -119,6 +119,11 @@ void FlightDeckBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "LowerRampDelay",					INI::parseDurationUnsignedInt,		nullptr, offsetof( FlightDeckBehaviorModuleData, m_lowerRampFrames ) },
 		{ "CatapultFireDelay",			INI::parseDurationUnsignedInt,		nullptr, offsetof( FlightDeckBehaviorModuleData, m_catapultFireFrames ) },
 
+		{ "RequiredKindOf", KindOfMaskType::parseFromINI, nullptr, offsetof(FlightDeckBehaviorModuleData, m_kindof) },
+		{ "ForbiddenKindOf", KindOfMaskType::parseFromINI, nullptr, offsetof(FlightDeckBehaviorModuleData, m_kindofnot) },
+		{ "AllowedObjects", INI::parseAsciiStringVector, nullptr, offsetof(FlightDeckBehaviorModuleData, m_allowedObjects) },
+		{ "ForbiddenObjects", INI::parseAsciiStringVector, nullptr, offsetof(FlightDeckBehaviorModuleData, m_forbiddenObjects) },
+
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
@@ -422,6 +427,52 @@ FlightDeckBehavior::FlightDeckInfo* FlightDeckBehavior::findEmptyPPI()
 }
 
 //-------------------------------------------------------------------------------------------------
+Bool FlightDeckBehaviorModuleData::isTemplateAllowedToLand( const ThingTemplate *tmpl ) const
+{
+	if (tmpl == nullptr)
+	{
+		return TRUE;
+	}
+
+	if (!tmpl->isKindOfMulti(m_kindof, m_kindofnot))
+	{
+		return FALSE;
+	}
+
+	if (m_allowedObjects.empty() && m_forbiddenObjects.empty())
+	{
+		return TRUE;
+	}
+
+	const AsciiString& name = tmpl->getName();
+
+	for (std::vector<AsciiString>::const_iterator it = m_forbiddenObjects.begin();
+			 it != m_forbiddenObjects.end(); ++it)
+	{
+		if (it->compareNoCase( name ) == 0)
+		{
+			return FALSE;
+		}
+	}
+
+	if (m_allowedObjects.empty())
+	{
+		return TRUE;
+	}
+
+	for (std::vector<AsciiString>::const_iterator it = m_allowedObjects.begin();
+			 it != m_allowedObjects.end(); ++it)
+	{
+		if (it->compareNoCase( name ) == 0)
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
 // note: called from client, so MUST NOT modify self in any way, or desyncs will occur
 Bool FlightDeckBehavior::shouldReserveDoorWhenQueued(const ThingTemplate* thing) const
 {
@@ -434,6 +485,12 @@ Bool FlightDeckBehavior::hasAvailableSpaceFor(const ThingTemplate* thing, Unsign
 {
 	if (!m_gotInfo)	// degenerate case, shouldn't happen, but just in case...
 		return false;
+
+	const FlightDeckBehaviorModuleData* d = getFlightDeckBehaviorModuleData();
+	if (!d->isTemplateAllowedToLand(thing))
+	{
+		return FALSE;
+	}
 
 	UnsignedInt roomLeft = 0;
 	for (std::vector<FlightDeckInfo>::const_iterator it = m_spaces.begin(); it != m_spaces.end(); ++it)
@@ -466,6 +523,13 @@ Bool FlightDeckBehavior::reserveSpace(ObjectID id, Real parkingOffset, ParkingPl
 	purgeDead();
 
 	const FlightDeckBehaviorModuleData* d = getFlightDeckBehaviorModuleData();
+
+	Object* obj = TheGameLogic->findObjectByID(id);
+	const ThingTemplate* tmpl = obj ? obj->getTemplate() : nullptr;
+	if (!d->isTemplateAllowedToLand(tmpl))
+	{
+		return FALSE;
+	}
 
 	FlightDeckInfo* ppi = findPPI(id);
 	if (ppi == nullptr)
