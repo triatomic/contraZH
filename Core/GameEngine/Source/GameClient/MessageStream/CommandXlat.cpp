@@ -1103,7 +1103,7 @@ GameMessage::Type CommandTranslator::issueMoveToLocationCommand( const Coord3D *
 		//}
 		//else
 
-		if( TheInGameUI->isInAttackMoveToMode()) // not yet with waypoint
+		if( TheInGameUI->isInAttackMoveToMode())
 		{
 			msgType = GameMessage::MSG_DO_ATTACKMOVETO;
 		}
@@ -1117,7 +1117,7 @@ GameMessage::Type CommandTranslator::issueMoveToLocationCommand( const Coord3D *
 		}
 		else if( TheInGameUI->isInForceAttackMode() && isForceAttackable )
 		{
-			msgType = GameMessage::MSG_DO_ATTACK_OBJECT; // not yet with waypoint
+			msgType = GameMessage::MSG_DO_ATTACK_OBJECT;
 		}
 		else
 		{
