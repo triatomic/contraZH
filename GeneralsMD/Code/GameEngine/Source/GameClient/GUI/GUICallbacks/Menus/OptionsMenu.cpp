@@ -209,6 +209,7 @@ static GameWindow *   checkNumericalHealth        = nullptr;
 static GameWindow *   checkSmartPips              = nullptr;
 static GameWindow *   checkSelectionCircle        = nullptr;
 static GameWindow *   checkDefensesRangeCircle    = nullptr;
+static GameWindow *   checkVeterancyLevel         = nullptr;
 static GameWindow *   checkObjectDecals           = nullptr;
 static GameWindow *   checkEasyMilitaryDrag       = nullptr;
 static GameWindow *   checkSmartSelection         = nullptr;
@@ -631,6 +632,7 @@ static void populateGameOptions()
 		setCheck( *BoolOptions[i].check, (pref->*BoolOptions[i].read)() );
 	}
 	setCheck( checkLargeBlips, pref->getRadarBlipSize() == RadarBlipSize_Large );
+	setCheck( checkVeterancyLevel, pref->getBool( "VeterancyLevel", FALSE ) );
 
 	setComboPos( comboBoxGridHotkeyLayout, gridLayoutIndex( pref->getGridHotkeyLayout() ) );
 
@@ -682,6 +684,7 @@ static void setGameOptionsDefaults()
 		setCheck( *BoolOptions[i].check, BoolOptions[i].defaultValue );
 	}
 	setCheck( checkLargeBlips, RadarBlipSize_Default == RadarBlipSize_Large );
+	setCheck( checkVeterancyLevel, FALSE );
 
 	setComboPos( comboBoxGridHotkeyLayout, gridLayoutIndex( GRID_HOTKEY_LAYOUT_DEFAULT ) );
 
@@ -1209,6 +1212,7 @@ static void saveOptions()
 			TheWritableGlobalData->*option.field = on;
 		}
 		WW3D::Set_Low_Latency( TheGlobalData->m_lowLatency != FALSE );
+		pref->setBool( "VeterancyLevel", getCheck( checkVeterancyLevel, pref->getBool( "VeterancyLevel", FALSE ) ) );
 
 		// the radar caches this when it is created, so it waits for the next launch
 		const Bool large = getCheck( checkLargeBlips, pref->getRadarBlipSize() == RadarBlipSize_Large );
@@ -1738,6 +1742,7 @@ static void initGameOptionsWindows()
 	checkSmartPips = findOptionsWindow( "OptionsMenu.wnd:CheckSmartPips" );
 	checkSelectionCircle = findOptionsWindow( "OptionsMenu.wnd:CheckSelectionCircle" );
 	checkDefensesRangeCircle = findOptionsWindow( "OptionsMenu.wnd:CheckDefensesRangeCircle" );
+	checkVeterancyLevel = findOptionsWindow( "OptionsMenu.wnd:CheckVeterancyLevel" );
 	checkObjectDecals = findOptionsWindow( "OptionsMenu.wnd:CheckObjectDecals" );
 	checkEasyMilitaryDrag = findOptionsWindow( "OptionsMenu.wnd:CheckEasyMilitaryDrag" );
 	checkSmartSelection = findOptionsWindow( "OptionsMenu.wnd:CheckSmartSelection" );
@@ -1814,6 +1819,7 @@ static void initGameOptionsWindows()
 	setCheckText( checkSmartPips, "GUI:SmartPips", "TOOLTIP:SmartPips" );
 	setCheckText( checkSelectionCircle, "GUI:SelectionCircle", "TOOLTIP:SelectionCircle" );
 	setCheckText( checkDefensesRangeCircle, "GUI:DefensesRangeCircle", "TOOLTIP:DefensesRangeCircle" );
+	setCheckText( checkVeterancyLevel, "GUI:VeterancyLevel", "TOOLTIP:VeterancyLevel" );
 	setCheckText( checkObjectDecals, "GUI:ObjectDecals", "TOOLTIP:ObjectDecals" );
 	setCheckText( checkEasyMilitaryDrag, "GUI:EasyMilitaryDrag", "TOOLTIP:EasyMilitaryDrag" );
 	setCheckText( checkSmartSelection, "GUI:SmartSelection", "TOOLTIP:SmartSelection" );

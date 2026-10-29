@@ -33,7 +33,8 @@ the menu control.)
 selected unit's portrait, with subtle current XP / next-rank XP text below it. A single chevron,
 double chevron and star show progress toward veteran, elite and heroic. The fill resets after a
 promotion and stays full at the unit's rank cap. Mod ranks above heroic keep their existing art.
-Non-trainable units show no XP text. Icons above units in the world stay unchanged. Needs a restart.)
+Non-trainable units show no XP text. Icons above units in the world stay unchanged. Also the
+Veterancy Level checkbox below Attack Range Ring in Game Options. Needs a restart.)
 * `SelectionCircle = No` - (Yes draws a green ring under selected objects. The D3D9 build draws
 a hexagon fitted to the object's collision shape with a shader instead, on cards with `ps_2_a`.)
 * `DefensesRangeCircle = No` - (Yes shows an armed structure's widest attack range, upgrades
@@ -68,6 +69,7 @@ draw.
 greyscale ring with alpha).
 * `DisplayDecal` needs the `.tga` named by `DecalTexture`; there is no default.
 * The `DefensesRangeCircle` checkbox needs `CheckDefensesRangeCircle` in `OptionsMenu.wnd`.
+* The `VeterancyLevel` checkbox needs `CheckVeterancyLevel` in `OptionsMenu.wnd`.
 
 ## Hotkey overlay
 
