@@ -288,6 +288,10 @@ float4 main(PsIn input) : COLOR
     float2 waveDx = ddx(waveUV);
     float2 waveDy = ddy(waveUV);
     float4 waveMean = TextureMean(NormalMap);
+#if RIVER
+    // River UV gradients jump across uneven triangles, so the flow waves filter in world space.
+    float2 riverSlope = tex2Dgrad(NormalMap, input.BaseUV * float2(1.0f, 2.0f), waveDx, waveDy).rg * 2.0f - 1.0f;
+#endif
 #if RICH
     // Zoomed out, the waves double in size each time a pixel covers twice the ground, fading between sizes,
     // so their detail never shrinks below a pixel and filters away.
@@ -302,7 +306,7 @@ float4 main(PsIn input) : COLOR
         RichWaves(cells, waveUV * (0.5f * waveZoom), waveDx * (0.5f * waveZoom), waveDy * (0.5f * waveZoom), time, waveMean, broadGain),
         frac(waveOctave));
 #if RIVER
-    slope = 0.8f * slope + 0.4f * (WaveSlope(input.BaseUV * float2(1.0f, 2.0f)) - (waveMean.rg * 2.0f - 1.0f));
+    slope = 0.8f * slope + 0.4f * (riverSlope - (waveMean.rg * 2.0f - 1.0f));
 #endif
     slope *= waveGain;
     float2 ripple = slope;
@@ -311,7 +315,7 @@ float4 main(PsIn input) : COLOR
     // The fine, fast layer repeats too small and moves too quickly to show, so it skips the hex cells.
     slope += WaveSlope(waveUV * 2.7f + time * float2(-0.023f, 0.037f));
 #if RIVER
-    slope += WaveSlope(input.BaseUV * float2(1.0f, 2.0f));
+    slope += riverSlope;
     slope *= 0.33f;
 #else
     slope *= 0.5f;

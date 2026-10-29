@@ -74,13 +74,13 @@ static Bool doIt = false;
 
 void WaterTool::activate() 
 {
+	m_water_isActive = true;
 	CMainFrame::GetMainFrame()->showOptionsDialog(IDD_WATER_OPTIONS);
 	/**
 	 * Adriane [Deathscythe]
 	 * Bug fix 101 -- If theres a selected polygon then dont clear selection, just like on the area tool
 	 */ 
 	if(!m_poly_curSelectedPolygon){
-		m_water_isActive = true;
 		PointerTool::clearSelection();
 		DrawObject::setDoBrushFeedback(false);
 		m_poly_isActive = false;
@@ -90,6 +90,7 @@ void WaterTool::activate()
 		m_currentZ = WaterOptions::getHeight();
 		doIt = true;
 	}
+	WaterOptions::update();
 }
 
 
@@ -120,6 +121,7 @@ void WaterTool::mouseDown(TTrackingMode m, CPoint viewPt, WbView* pView, CWorldB
 	}
 	startMouseDown(m, viewPt, pView, pDoc);
 	m_poly_curSelectedPolygon->setWaterArea(true);
+	WaterOptions::update();
 
 }
 
