@@ -1303,11 +1303,7 @@ void ControlBar::init()
 		m_rightHUDCameoWindow = TheWindowManager->winGetWindowFromId( nullptr, id );
 #if defined(RTS_ZEROHOUR)
 		OptionPreferences options;
-		if( m_rightHUDCameoWindow && options.getBool( "VeterancyLevel", FALSE ) )
-		{
-			m_portraitDraw = m_rightHUDCameoWindow->winGetDrawFunc();
-			m_rightHUDCameoWindow->winSetDrawFunc( drawPortraitVeterancy );
-		}
+		setPortraitVeterancyEnabled( options.getBool( "VeterancyLevel", FALSE ) );
 #endif
 		for( i = 0; i < MAX_RIGHT_HUD_UPGRADE_CAMEOS; i++ )
 		{
@@ -2930,6 +2926,33 @@ void ControlBar::setPortraitByImage( const Image *image )
 }
 
 #if defined(RTS_ZEROHOUR)
+void ControlBar::setPortraitVeterancyEnabled( Bool enabled )
+{
+	if( !m_rightHUDCameoWindow )
+	{
+		return;
+	}
+	if( enabled )
+	{
+		if( m_rightHUDCameoWindow->winGetDrawFunc() == drawPortraitVeterancy )
+		{
+			return;
+		}
+		m_portraitDraw = m_rightHUDCameoWindow->winGetDrawFunc();
+		m_rightHUDCameoWindow->winSetDrawFunc( drawPortraitVeterancy );
+	}
+	else
+	{
+		if( m_rightHUDCameoWindow->winGetDrawFunc() != drawPortraitVeterancy )
+		{
+			return;
+		}
+		m_rightHUDCameoWindow->winSetDrawFunc( m_portraitDraw );
+		m_portraitDraw = nullptr;
+	}
+	markUIDirty();
+}
+
 static void drawVeterancyShape( const Coord2D *points, Int count, Int x, Int y, Int width, Int height, Int fillY )
 {
 	for( Int row = 0; row < height; ++row )

@@ -1212,7 +1212,12 @@ static void saveOptions()
 			TheWritableGlobalData->*option.field = on;
 		}
 		WW3D::Set_Low_Latency( TheGlobalData->m_lowLatency != FALSE );
-		pref->setBool( "VeterancyLevel", getCheck( checkVeterancyLevel, pref->getBool( "VeterancyLevel", FALSE ) ) );
+		const Bool veterancyLevel = getCheck( checkVeterancyLevel, pref->getBool( "VeterancyLevel", FALSE ) );
+		pref->setBool( "VeterancyLevel", veterancyLevel );
+		if( TheControlBar )
+		{
+			TheControlBar->setPortraitVeterancyEnabled( veterancyLevel );
+		}
 
 		// the radar caches this when it is created, so it waits for the next launch
 		const Bool large = getCheck( checkLargeBlips, pref->getRadarBlipSize() == RadarBlipSize_Large );

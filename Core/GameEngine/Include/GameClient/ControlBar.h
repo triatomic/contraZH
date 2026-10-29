@@ -741,6 +741,9 @@ public:
 
 	/// mark the UI as dirty so the context of everything is re-evaluated
 	void markUIDirty();
+#if defined(RTS_ZEROHOUR)
+	void setPortraitVeterancyEnabled( Bool enabled );
+#endif
 
 	/// a drawable has just become selected
 	void onDrawableSelected( Drawable *draw );
