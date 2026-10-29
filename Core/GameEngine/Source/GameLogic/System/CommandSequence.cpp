@@ -565,7 +565,7 @@ UnsignedInt CommandSequence::newSwitchWeaponCommand(CommandType commandType, Wea
 	return cmdNode->m_nodeID;
 }
 
-Bool CommandSequence::includeUnitInCommand(UnsignedInt cmdNodeID, Object *obj)
+Bool CommandSequence::includeUnitInCommand(UnsignedInt cmdNodeID, Object *obj, const Coord3D *objDest)
 {
 	if (!obj)
 		return false;
@@ -601,12 +601,7 @@ Bool CommandSequence::includeUnitInCommand(UnsignedInt cmdNodeID, Object *obj)
 				ObjectToLocMap::iterator it;
 				if (ai->getAIStateType() == AI_FOLLOW_PATH)
 				{
-					it = cmdNode->m_allocatedDest.find(obj->getID());
-					if (it == cmdNode->m_allocatedDest.end())
-						dest = cmdNode->m_loc;
-					else
-						dest = it->second;
-					ai->aiFollowPathAppend(&dest, CMD_FROM_PLAYER, cmdNode->m_commandType == COMMAND_DO_REVERSE_MOVETO, cmdNodeID);
+					ai->aiFollowPathAppend(objDest, CMD_FROM_PLAYER, cmdNode->m_commandType == COMMAND_DO_REVERSE_MOVETO, cmdNodeID);
 				}
 				else
 				{
@@ -618,13 +613,7 @@ Bool CommandSequence::includeUnitInCommand(UnsignedInt cmdNodeID, Object *obj)
 						dest = it->second;
 					path.push_back(dest);
 					ai->aiFollowPath(&path, nullptr, CMD_FROM_PLAYER, lastCmdNode->m_commandType == COMMAND_DO_REVERSE_MOVETO, lastCmdNodeID);
-
-					it = cmdNode->m_allocatedDest.find(obj->getID());
-					if (it == cmdNode->m_allocatedDest.end())
-						dest = cmdNode->m_loc;
-					else
-						dest = it->second;
-					ai->aiFollowPathAppend(&dest, CMD_FROM_PLAYER, cmdNode->m_commandType == COMMAND_DO_REVERSE_MOVETO, cmdNodeID);
+					ai->aiFollowPathAppend(objDest, CMD_FROM_PLAYER, cmdNode->m_commandType == COMMAND_DO_REVERSE_MOVETO, cmdNodeID);
 				}
 			}
 		}
@@ -647,7 +636,7 @@ Bool CommandSequence::includeUnitInCommand(UnsignedInt cmdNodeID, Object *obj)
 
 Bool CommandSequence::includeUnitInTypicalMovingCommand(UnsignedInt cmdNodeID, Object *obj, Coord3D objDest)
 {
-	if (!includeUnitInCommand(cmdNodeID, obj))
+	if (!includeUnitInCommand(cmdNodeID, obj, &objDest))
 		return false;
 
 	CommandNode *cmdNode = findCommandByID(cmdNodeID);
@@ -960,7 +949,14 @@ void CommandSequence::doCurrentCommand(Object *obj, CommandVerifyStatus cvs)
 					if (nextNode->m_commandType != COMMAND_DO_MOVETO && nextNode->m_commandType != COMMAND_DO_REVERSE_MOVETO)
 						break;
 					obj->setLastCommandInMoveStreak(nextNode->m_nodeID);
-					ai->aiFollowPathAppend(&nextNode->m_loc, cmdSource, nextNode->m_commandType == COMMAND_DO_REVERSE_MOVETO, nextNode->m_nodeID);
+
+					it = nextNode->m_allocatedDest.find(obj->getID());
+					if (it == nextNode->m_allocatedDest.end())
+						unitLoc = nextNode->m_loc;
+					else
+						unitLoc = it->second;
+
+					ai->aiFollowPathAppend(&unitLoc, cmdSource, nextNode->m_commandType == COMMAND_DO_REVERSE_MOVETO, nextNode->m_nodeID);
 					nextNode = nextCommand(obj, nextNode);
 				}
 			}
