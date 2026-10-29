@@ -322,7 +322,7 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 		}
 
 		// matches the haze pass, which skips only systems drawn as terrain-conforming meshes
-		const Bool conformsToTerrain = !sys->shouldBillboard() && sys->getVolumeParticleDepth() == 0 && sys->shouldConformToTerrain();
+		const Bool conformsToTerrain = !sys->shouldBillboard() && sys->getVolumeParticleDepth() == DEFAULT_VOLUME_PARTICLE_DEPTH && sys->shouldConformToTerrain();
 		if (!hasFlame && sys->isUsingParticles() && !conformsToTerrain && systemEffects(*sys, DRAW_HAZE) != 0)
 		{
 			hasFlame = TRUE;
@@ -483,7 +483,7 @@ unsigned W3DParticleSystemManager::systemEffects(ParticleSystem &system, DrawPas
 // The pass takes blended sprites alone, and only where the disruption can draw at all.
 Bool W3DParticleSystemManager::disrupts(ParticleSystem &system)
 {
-	const Bool conformsToTerrain = !system.shouldBillboard() && system.getVolumeParticleDepth() == 0 && system.shouldConformToTerrain();
+	const Bool conformsToTerrain = !system.shouldBillboard() && system.getVolumeParticleDepth() == DEFAULT_VOLUME_PARTICLE_DEPTH && system.shouldConformToTerrain();
 	const Bool volume = system.isUsingVolumeParticles() && system.getVolumeParticleDepth() > DEFAULT_VOLUME_PARTICLE_DEPTH;
 	return system.isUsingParticles() && !conformsToTerrain && !volume && systemEffects(system, DRAW_DISRUPT) != 0 &&
 		TheW3DSoftParticles->disruptionEnabled();
@@ -564,7 +564,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		// This renderer instead builds a mesh from the terrain's own heightmap cells, the same way
 		// projected decals do, so the particle inherits the ground geometry exactly.
 		const Bool useTerrainConformingParticles = !sys->shouldBillboard() &&
-				sys->getVolumeParticleDepth() == 0 &&
+				sys->getVolumeParticleDepth() == DEFAULT_VOLUME_PARTICLE_DEPTH &&
 				sys->shouldConformToTerrain();
 
 		if ((pass == DRAW_HAZE || pass == DRAW_DISRUPT) && useTerrainConformingParticles)

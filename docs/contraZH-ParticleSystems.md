@@ -52,6 +52,7 @@ decals, instead of a flat quad that cuts through hills.
 
 Notes:
 * Opt-in per effect; retail effects are unchanged.
+* Requires `IsGroundAligned = Yes` on the same effect; billboarded and multi-layer volume particles do not conform.
 * Flat ground becomes one quad; only uneven ground is meshed cell by cell.
 * Only the part on screen is meshed. Past 160 cells per side the mesh stops at coarser cells.
 
