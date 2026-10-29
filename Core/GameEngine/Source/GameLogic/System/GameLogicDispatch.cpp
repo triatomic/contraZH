@@ -231,26 +231,6 @@ static Player *getMessagePlayer(GameMessage *msg)
 	return ThePlayerList->getNthPlayer( msg->getPlayerIndex() );
 }
 
-// ------------------------------------------------------------------------------------------------
-// Counts humans from the player list, so a live game and its replay answer the same. Observers
-// do not count: every skirmish and LAN game adds a hidden ReplayObserver player flagged human,
-// which would otherwise make a single player skirmish look like a two human game.
-// ------------------------------------------------------------------------------------------------
-static Bool hasMultipleHumanPlayers()
-{
-	Int humans = 0;
-	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
-	{
-		Player *player = ThePlayerList->getNthPlayer( i );
-		if (player != nullptr && player->getPlayerType() == PLAYER_HUMAN && !player->isPlayerObserver())
-		{
-			++humans;
-		}
-	}
-	return humans > 1;
-}
-
-
 static Object * getSingleObjectFromSelection(const AIGroup *currentlySelectedGroup)
 {
 	if( currentlySelectedGroup && !currentlySelectedGroup->isEmpty() )
@@ -745,7 +725,7 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 		case GameMessage::MSG_SPAWN_OBJECT_AT_POSITION:
 		{
 			// The chat command only sends this outside multiplayer, so reject one a modified client sent.
-			if( hasMultipleHumanPlayers() )
+			if( isInMultiplayerGame() )
 			{
 				break;
 			}

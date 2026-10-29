@@ -3530,8 +3530,7 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		//-----------------------------------------------------------------------------------------
 		case GameMessage::MSG_META_CHAT_ALLIES:
 			// Chat is available in multiplayer, and in singleplayer/skirmish only when EnableSingleplayerChatwindow is set (for chat commands).
-			if (TheGameLogic->isInInteractiveGame() && !TheGameLogic->isInReplayGame()
-				&& (TheGameLogic->isInMultiplayerGame() || TheGlobalData->m_enableSingleplayerChatWindow))
+			if (TheGameLogic->isInMultiplayerGame() || TheGlobalData->m_enableSingleplayerChatWindow)
 			{
 				Player *localPlayer = ThePlayerList->getLocalPlayer();
 				if ((localPlayer && localPlayer->isPlayerActive()) || !TheGlobalData->m_netMinPlayers)
@@ -3546,8 +3545,7 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		//-----------------------------------------------------------------------------------------
 		case GameMessage::MSG_META_CHAT_EVERYONE:
 			// Chat is available in multiplayer, and in singleplayer/skirmish only when EnableSingleplayerChatwindow is set (for chat commands).
-			if (TheGameLogic->isInInteractiveGame() && !TheGameLogic->isInReplayGame()
-				&& (TheGameLogic->isInMultiplayerGame() || TheGlobalData->m_enableSingleplayerChatWindow))
+			if (TheGameLogic->isInMultiplayerGame() || TheGlobalData->m_enableSingleplayerChatWindow)
 			{
 				Player *localPlayer = ThePlayerList->getLocalPlayer();
 				// TheSuperHackers @tweak skyaero 19/07/2025 Observers can now chat

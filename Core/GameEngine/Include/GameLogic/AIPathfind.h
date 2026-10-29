@@ -782,6 +782,9 @@ public:
 
 	void logStatsIfDue(); ///< Writes the per-second pathfinder counters while logging is on.
 	void setStatsLogging( Bool enable ); ///< Starts or stops the counter log, written to pathfinding.txt beside the exe.
+#if RTS_ZEROHOUR
+	void logMovementEvent(const char *event, const Object *obj, Object *blocker, const Coord3D *goal);
+#endif
 	void beginSearchBudget( PathfindSearchType type ); ///< Sets the cell cap for the search about to start.
 	void countStatEvent( PathfindStatEvent event ); ///< Adds one to a PFSTAT event counter.
 	Bool didLastSearchHitCap() const { return m_lastSearchHitCap; }

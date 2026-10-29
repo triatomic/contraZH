@@ -62,9 +62,6 @@ extern NGMPGame* TheNGMPGame;
 // ------------------------------------------------------------------------------------------------
 void ShowInGameChat( Bool immediate )
 {
-	if (TheGameLogic->isInReplayGame())
-		return;
-
 	if (TheInGameUI->isQuitMenuVisible())
 		return;
 
@@ -188,8 +185,8 @@ Bool handleInGameSlashCommands(UnicodeString uText)
 		return TRUE; // was a slash command
 	}
 
-	// User-defined chat commands from ChatCommands.ini. Singleplayer/skirmish only for now.
-	const Bool isSinglePlayer = (!TheGameInfo || !TheGameInfo->isMultiPlayer());
+	// LAN and online matches cannot run local chat commands.
+	const Bool isSinglePlayer = TheGameLogic && !TheGameLogic->isInMultiplayerGame();
 	if (isSinglePlayer && TheChatCommandStore)
 	{
 		const ChatCommand *command = TheChatCommandStore->findChatCommand(token);
@@ -218,9 +215,6 @@ void ToggleInGameChat( Bool immediate )
 		return;
 	}
 
-	if (TheGameLogic->isInReplayGame())
-		return;
-
 	// Block the chat window in singleplayer/skirmish unless EnableSingleplayerChatwindow is set (for chat commands).
 	// GeneralsOnline port: an active NGMP game also allows chat (upstream GO instead
 	// allowed it ONLY then, which would break LAN and the singleplayer chat window).
@@ -229,7 +223,7 @@ void ToggleInGameChat( Bool immediate )
 		TheNGMPGame == nullptr &&
 #endif
 		!TheGlobalData->m_enableSingleplayerChatWindow
-		&& (!TheGameInfo || !TheGameInfo->isMultiPlayer()) && TheGlobalData->m_netMinPlayers)
+		&& !TheGameLogic->isInMultiplayerGame() && TheGlobalData->m_netMinPlayers)
 		return;
 
 	if (chatWindow)

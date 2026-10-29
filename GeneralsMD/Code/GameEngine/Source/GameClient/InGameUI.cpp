@@ -1222,10 +1222,8 @@ UnitSpawnerKind unitSpawnerKind(const ThingTemplate *tmpl)
 
 Bool canSpawnDebugUnit()
 {
-	return TheGameLogic && (TheGameLogic->isInSkirmishGame() || TheGameLogic->isInSinglePlayerGame())
-		&& !TheGameLogic->isInReplayGame() && (!TheRecorder || !TheRecorder->isPlaybackMode())
-		&& ThePlayerList && !ThePlayerList->getLocalPlayer()->isPlayerObserver()
-		&& !ThePlayerList->getLocalPlayer()->isPlayerDead();
+	return TheGameLogic && !TheGameLogic->isInMultiplayerGame()
+		&& ThePlayerList && ThePlayerList->getLocalPlayer();
 }
 
 Bool unitSpawnerMatches(const UnicodeString &text, const UnicodeString &search)
@@ -1749,7 +1747,7 @@ void drawShaderDebugPanel(GameWindow *window, WinInstanceData *)
 		TheDisplay->drawOpenRect(x + 8, y + UNIT_SPAWNER_HEIGHT - 58, SHADER_PANEL_WIDTH - 16, 26, 1.0f, buttonColor);
 		ShaderPanelString->setText(UnicodeString(L"Place selected unit"));
 		ShaderPanelString->draw(x + 16, y + UNIT_SPAWNER_HEIGHT - 52, buttonColor, shadow);
-		ShaderPanelString->setText(UnicodeString(canSpawnDebugUnit() ? L"Double-click a unit, then click the ground" : L"Spawning requires a single-player match"));
+		ShaderPanelString->setText(UnicodeString(canSpawnDebugUnit() ? L"Double-click a unit, then click the ground" : L"Spawning is disabled in LAN and online matches"));
 		ShaderPanelString->draw(x + 8, y + UNIT_SPAWNER_HEIGHT - 22, white, shadow);
 		return;
 	}
@@ -1785,7 +1783,8 @@ void drawShaderDebugPanel(GameWindow *window, WinInstanceData *)
 
 void InGameUI::toggleShaderDebugPanel()
 {
-	if (!TheWindowManager || !TheDisplay || !TheWritableGlobalData)
+	if (!TheWindowManager || !TheDisplay || !TheWritableGlobalData
+		|| !TheGameLogic || TheGameLogic->isInMultiplayerGame())
 	{
 		return;
 	}

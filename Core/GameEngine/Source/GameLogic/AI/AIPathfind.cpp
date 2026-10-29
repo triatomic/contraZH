@@ -6841,6 +6841,29 @@ void Pathfinder::setStatsLogging( Bool enable )
 	s_statsLogging = enable && s_statsFile != nullptr;
 }
 
+#if RTS_ZEROHOUR
+void Pathfinder::logMovementEvent(const char *event, const Object *obj, Object *blocker, const Coord3D *goal)
+{
+	if (!s_statsLogging || s_statsFile == nullptr)
+	{
+		return;
+	}
+	const Coord3D *pos = obj->getPosition();
+	const AIUpdateInterface *ai = obj->getAIUpdateInterface();
+	fprintf(s_statsFile, "PFMOVE f=%u event=%s id=%u type=%s name=%s pos=%.2f,%.2f heading=%.2f state=%d source=%d goal=%.2f,%.2f",
+		TheGameLogic->getFrame(), event, (UnsignedInt)obj->getID(), obj->getTemplate()->getName().str(), obj->getName().str(),
+		pos->x, pos->y, obj->getOrientation(), ai->getCurrentStateID(), ai->getLastCommandSource(), goal->x, goal->y);
+	if (blocker != nullptr)
+	{
+		fprintf(s_statsFile, " blocker=%u type=%s relation=%d crusher=%u crushable=%u canCrush=%d",
+			(UnsignedInt)blocker->getID(), blocker->getTemplate()->getName().str(), obj->getRelationship(blocker),
+			(UnsignedInt)obj->getCrusherLevel(), (UnsignedInt)blocker->getCrushableLevel(), obj->canCrushOrSquish(blocker, TEST_CRUSH_OR_SQUISH));
+	}
+	fprintf(s_statsFile, "\n");
+	fflush(s_statsFile);
+}
+#endif
+
 /**
  * Once a second, write the pathfinder counters when anything happened
  */

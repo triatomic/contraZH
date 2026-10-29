@@ -1899,6 +1899,10 @@ Bool AIUpdateInterface::processCollision(PhysicsBehavior *physics, Object *other
 		Bool blocked = blockedBy(other);
 		if (blocked)
 		{
+			if (m_blockedFrames == 0)
+			{
+				TheAI->pathfinder()->logMovementEvent("blocked", getObject(), other, getStateMachine()->getGoalPosition());
+			}
 			if (getObject()->isKindOf(KINDOF_INFANTRY))
 			{
 				// Panic bounces around.
@@ -2854,8 +2858,13 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 							}
 						}
 
+						const Bool wasReversing = m_curLocomotor->isMovingBackwards();
 						m_curLocomotor->locoUpdate_moveTowardsPosition(getObject(), goalPos,
 							onPathDistToGoal+getPathExtraDistance(), speed, &blocked);
+						if (wasReversing != m_curLocomotor->isMovingBackwards())
+						{
+							TheAI->pathfinder()->logMovementEvent(wasReversing ? "forward" : "reverse", getObject(), nullptr, &goalPos);
+						}
 
 						m_doFinalPosition = FALSE;
 					}
