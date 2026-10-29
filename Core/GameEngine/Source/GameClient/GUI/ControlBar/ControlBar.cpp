@@ -2955,39 +2955,117 @@ void ControlBar::setPortraitVeterancyEnabled( Bool enabled )
 
 static void drawVeterancyShape( const Coord2D *points, Int count, Int x, Int y, Int width, Int height, Int fillY )
 {
-	for( Int row = 0; row < height; ++row )
+	struct Pixel
 	{
-		const Real scanY = (row + 0.5f) / height;
-		Real intersections[10];
-		Int hits = 0;
-		for( Int i = 0; i < count; ++i )
+		Color gold;
+		Color empty;
+	};
+	struct Raster
+	{
+		const Coord2D *points;
+		Int width;
+		Int height;
+		std::vector<Pixel> pixels;
+		Raster() : points(nullptr), width(0), height(0) { }
+	};
+	static Raster rasters[3];
+	Raster &raster = rasters[count == 10 ? 2 : height < width ? 1 : 0];
+	const Int stride = width + 2;
+	if( raster.points != points || raster.width != width || raster.height != height )
+	{
+		raster.points = points;
+		raster.width = width;
+		raster.height = height;
+		raster.pixels.resize( stride * (height + 2) );
+		const Real border = clamp( 0.3f, width * 0.025f, 1.6f );
+		const Real bevel = clamp( 0.8f, width * 0.035f, 2.0f );
+		for( Int row = -1; row <= height; ++row )
 		{
-			const Coord2D &a = points[i];
-			const Coord2D &b = points[(i + 1) % count];
-			if( (a.y <= scanY && b.y > scanY) || (b.y <= scanY && a.y > scanY) )
+			for( Int column = -1; column <= width; ++column )
 			{
-				intersections[hits++] = a.x + (scanY - a.y) * (b.x - a.x) / (b.y - a.y);
+				const Real px = column + 0.5f;
+				const Real py = row + 0.5f;
+				Real nearest = (Real)(width * width + height * height + 1);
+				Real edgeLight = 0.0f;
+				Real faceLight = column < width / 2 ? 0.95f : 0.62f;
+				Bool inside = FALSE;
+				for( Int i = 0; i < count; ++i )
+				{
+					const Real ax = points[i].x * width;
+					const Real ay = points[i].y * height;
+					const Real bx = points[(i + 1) % count].x * width;
+					const Real by = points[(i + 1) % count].y * height;
+					const Real dx = bx - ax;
+					const Real dy = by - ay;
+					if( (ay > py) != (by > py) && px < ax + (py - ay) * dx / dy )
+					{
+						inside = !inside;
+					}
+					const Real lengthSquared = dx * dx + dy * dy;
+					const Real along = clamp( 0.0f, ((px - ax) * dx + (py - ay) * dy) / lengthSquared, 1.0f );
+					const Real distanceX = px - ax - along * dx;
+					const Real distanceY = py - ay - along * dy;
+					const Real distanceSquared = distanceX * distanceX + distanceY * distanceY;
+					if( distanceSquared < nearest )
+					{
+						nearest = distanceSquared;
+						edgeLight = clamp( 0.0f, 0.5f + (dx - dy) * 0.7f / (Real)sqrt( lengthSquared ), 1.0f );
+					}
+					if( count == 10 )
+					{
+						const Real ux = ax - width * 0.5f;
+						const Real uy = ay - height * 0.54f;
+						const Real vx = bx - width * 0.5f;
+						const Real vy = by - height * 0.54f;
+						const Real tx = px - width * 0.5f;
+						const Real ty = py - height * 0.54f;
+						if( ux * ty - uy * tx >= 0.0f && tx * vy - ty * vx >= 0.0f )
+						{
+							static const Real facets[10] = { 0.98f, 0.55f, 0.82f, 0.43f, 0.72f, 0.48f, 0.88f, 0.61f, 1.0f, 0.76f };
+							faceLight = facets[i];
+						}
+					}
+				}
+				const Real distance = (Real)sqrt( nearest ) * (inside ? 1.0f : -1.0f);
+				const Int alpha = (Int)(clamp( 0.0f, distance + 0.5f, 1.0f ) * 255.0f + 0.5f);
+				Pixel &pixel = raster.pixels[(row + 1) * stride + column + 1];
+				if( distance < border )
+				{
+					pixel.gold = pixel.empty = GameMakeColor( 12, 9, 3, alpha );
+				}
+				else
+				{
+					const Real light = distance < border + bevel ? edgeLight : faceLight;
+					pixel.gold = GameMakeColor( 164 + (Int)(91 * light), 87 + (Int)(151 * light), 5 + (Int)(108 * light), alpha );
+					pixel.empty = GameMakeColor( 40 + (Int)(39 * light), 38 + (Int)(35 * light), 29 + (Int)(21 * light), alpha );
+				}
 			}
 		}
-		std::sort( intersections, intersections + hits );
-		for( Int i = 0; i + 1 < hits; i += 2 )
-		{
-			const Int left = x + (Int)ceil( intersections[i] * width );
-			const Int right = x + (Int)ceil( intersections[i + 1] * width );
-			const Bool filled = y + row >= fillY;
-			const Int middle = clamp( left, x + width / 2, right );
-			TheDisplay->drawFillRect( left, y + row, middle - left, 1,
-				filled ? GameMakeColor( 255, 245 - row * 35 / height, 115, 255 ) : GameMakeColor( 65, 61, 43, 220 ) );
-			TheDisplay->drawFillRect( middle, y + row, right - middle, 1,
-				filled ? GameMakeColor( 255, 210 - row * 45 / height, 24, 255 ) : GameMakeColor( 65, 61, 43, 220 ) );
-		}
 	}
-	for( Int i = 0; i < count; ++i )
+	for( Int row = -1; row <= height; ++row )
 	{
-		const Coord2D &a = points[i];
-		const Coord2D &b = points[(i + 1) % count];
-		TheDisplay->drawLine( x + (Int)(a.x * width), y + (Int)(a.y * height), x + (Int)(b.x * width), y + (Int)(b.y * height),
-			3.0f, GameMakeColor( 0, 0, 0, 255 ) );
+		const Bool filled = y + row >= fillY;
+		Int start = 0;
+		while( start < stride )
+		{
+			const Pixel &pixel = raster.pixels[(row + 1) * stride + start];
+			const Color color = filled ? pixel.gold : pixel.empty;
+			Int end = start + 1;
+			while( end < stride )
+			{
+				const Pixel &next = raster.pixels[(row + 1) * stride + end];
+				if( (filled ? next.gold : next.empty) != color )
+				{
+					break;
+				}
+				++end;
+			}
+			if( color & 0xff000000 )
+			{
+				TheDisplay->drawFillRect( x + start - 1, y + row, end - start, 1, color );
+			}
+			start = end;
+		}
 	}
 }
 

@@ -29,7 +29,7 @@ fired, tinted in player colour (`House`) or faction colour (`Army`). `Hidden` is
 decals stay hidden. Needs `ComboBoxAlliedDecals` and `AlliedDecalsLabel` in `OptionsMenu.wnd` for
 the menu control.)
 * `NumericalHealth = No` - (Yes prints hit points beside the health bar, wherever a bar shows.)
-* `VeterancyLevel = No` - (Yes draws a gold veterancy icon that fills from bottom to top on the
+* `VeterancyLevel = No` - (Yes draws a beveled, antialiased gold veterancy icon that fills from bottom to top on the
 selected unit's portrait, with subtle current XP / next-rank XP text below it. A single chevron,
 double chevron and star show progress toward veteran, elite and heroic. The fill resets after a
 promotion and stays full at the unit's rank cap. Mod ranks above heroic keep their existing art.
