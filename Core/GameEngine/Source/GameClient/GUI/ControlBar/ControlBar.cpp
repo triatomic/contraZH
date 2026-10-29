@@ -3110,8 +3110,8 @@ void ControlBar::drawPortraitVeterancy( GameWindow *window, WinInstanceData *ins
 	ICoord2D origin, size;
 	window->winGetScreenPosition( &origin.x, &origin.y );
 	window->winGetSize( &size.x, &size.y );
-	const Int width = min( size.x / 3, size.y / 2 );
-	const Int height = width;
+	const Int width = min( size.x * (targetLevel <= LEVEL_ELITE ? 30 : 38) / 100, size.y / 2 );
+	const Int height = targetLevel == LEVEL_VETERAN ? width * 5 / 6 : targetLevel == LEVEL_ELITE ? width * 6 / 5 : width;
 	if( width < 6 )
 	{
 		return;
@@ -3121,7 +3121,7 @@ void ControlBar::drawPortraitVeterancy( GameWindow *window, WinInstanceData *ins
 	const Int fillY = y + height - (Int)(height * progress);
 	if( level <= LEVEL_HEROIC )
 	{
-		static const Coord2D chevron[] = { {0, 0.5f}, {0.5f, 0}, {1, 0.5f}, {1, 1}, {0.5f, 0.5f}, {0, 1} };
+		static const Coord2D chevron[] = { {0, 0.55f}, {0.5f, 0}, {1, 0.55f}, {1, 1}, {0.5f, 0.43f}, {0, 1} };
 		static const Coord2D star[] = { {0.5f, 0}, {0.62f, 0.35f}, {1, 0.38f}, {0.70f, 0.61f}, {0.81f, 1},
 			{0.5f, 0.77f}, {0.19f, 1}, {0.30f, 0.61f}, {0, 0.38f}, {0.38f, 0.35f} };
 		TheDisplay->beginBatch();
@@ -3131,8 +3131,9 @@ void ControlBar::drawPortraitVeterancy( GameWindow *window, WinInstanceData *ins
 		}
 		else if( targetLevel == LEVEL_ELITE )
 		{
-			drawVeterancyShape( chevron, 6, x, y, width, height * 3 / 5, fillY );
-			drawVeterancyShape( chevron, 6, x, y + height * 2 / 5, width, height * 3 / 5, fillY );
+			const Int chevronHeight = width * 5 / 6;
+			drawVeterancyShape( chevron, 6, x, y, width, chevronHeight, fillY );
+			drawVeterancyShape( chevron, 6, x, y + height - chevronHeight, width, chevronHeight, fillY );
 		}
 		else
 		{
