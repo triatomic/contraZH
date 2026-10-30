@@ -415,6 +415,7 @@ MetaEventTranslator::MetaEventTranslator()
 	for (Int i = 0; i < NUM_MOUSE_BUTTONS; ++i) {
 		m_nextUpShouldCreateDoubleClick[i] = FALSE;
 	}
+	m_lastModState = NONE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -580,50 +581,53 @@ void MetaEventTranslator::onKeyEvent(const GameMessage *msg, GameMessageDisposit
 	{
 		onKeyPressed(disp, systemKeyState, keyType, keyModState);
 	}
+
+	m_lastModState = keyModState;
 }
 
 //-------------------------------------------------------------------------------------------------
 void MetaEventTranslator::onKeyModStateRemoved(GameMessageDisposition &disp, MappableKeyModState keyModState)
 {
+	for (const MetaMapRec *map = TheMetaMap->getFirstMetaMapRec(); map; map = map->m_next)
+	{
+		if (map->m_key == NONE && map->m_transition == UP && (m_lastModState & map->m_modState) == map->m_modState && !(keyModState & map->m_modState))
+		{
+			TheMessageStream->appendMessage(map->m_meta);
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+	}
+
 	// TheSuperHackers @fix The key handler now ignores the order in which modifier keys are released.
 	// This avoids frustrating experiences where a wrong button release order would skip an important key event.
 
 	for (Int keyDownIndex = 0; keyDownIndex < ARRAY_SIZE(m_keyDownInfos); ++keyDownIndex)
 	{
 		const MappableKeyType keyDown = (MappableKeyType)keyDownIndex;
-		KeyDownInfo &keyDownInfo = m_keyDownInfos[keyDownIndex];
 
-		if (!keyDownInfo.isKeyDown())
+		if (!m_keyDownInfos[keyDownIndex])
 			continue;
 
-		for (UnsignedInt modStateIndex = 0; modStateIndex < KeyDownInfo::getMaxKeyModStateCount(); ++modStateIndex)
+		if ((m_keyDownInfos[keyDownIndex] & keyModState) == m_keyDownInfos[keyDownIndex])
+			continue;
+
+		for (const MetaMapRec *map = TheMetaMap->getFirstMetaMapRec(); map; map = map->m_next)
 		{
-			const MappableKeyModState keyDownModState = keyDownInfo.getKeyModState(modStateIndex);
-
-			if (keyDownModState == NONE)
+			if (!isMessageUsable(map->m_usableIn))
 				continue;
 
-			if (BitsAreSet(keyModState, keyDownModState))
+			const Bool isMatchingKeyCombo = map->m_key == keyDown && map->m_modState == m_keyDownInfos[keyDownIndex];
+			const Bool isTransitionUp = map->m_transition == UP;
+
+			if (!(isMatchingKeyCombo && isTransitionUp))
 				continue;
 
-			// Forget that this key and mod state are pressed.
-			keyDownInfo.clearKeyModState(modStateIndex);
-
-			for (const MetaMapRec *map = TheMetaMap->getFirstMetaMapRec(); map; map = map->m_next)
-			{
-				if (!isMessageUsable(map->m_usableIn))
-					continue;
-
-				const Bool isMatchingKeyCombo = map->m_key == keyDown && map->m_modState == keyDownModState;
-				const Bool isTransitionUp = map->m_transition == UP;
-
-				if (!(isMatchingKeyCombo && isTransitionUp))
-					continue;
-
-				TheMessageStream->appendMessage(map->m_meta);
-				disp = DESTROY_MESSAGE;
-			}
+			TheMessageStream->appendMessage(map->m_meta);
+			disp = DESTROY_MESSAGE;
 		}
+
+		// Forget that this key and mod state are pressed.
+		m_keyDownInfos[keyDownIndex] = NONE;
 	}
 }
 
@@ -641,9 +645,10 @@ void MetaEventTranslator::onKeyPressed(GameMessageDisposition &disp, Int systemK
 		const Bool isMatchingKeyCombo = map->m_key == keyType && map->m_modState == keyModState;
 		const Bool isMatchingTransitionUp = map->m_transition == UP && (systemKeyState & KEY_STATE_UP) != 0;
 		const Bool isMatchingTransitionDown = map->m_transition == DOWN && (systemKeyState & KEY_STATE_DOWN) != 0;
+		const Bool isModKeyDown = keyType == MK_NONE && map->m_key == NONE && map->m_transition == DOWN && !(m_lastModState & map->m_modState) && (keyModState & map->m_modState) == map->m_modState;
 		//const Bool isMatchingTransitionDoubleDown = map->m_transition == DOUBLEDOWN && (systemKeyState & KEY_STATE_DOWN) && m_lastKeyDown == key;
 
-		if (isMatchingKeyCombo && (isMatchingTransitionUp || isMatchingTransitionDown /*|| isMatchingTransitionDoubleDown*/))
+		if ((isMatchingKeyCombo && (isMatchingTransitionUp || isMatchingTransitionDown)) || isModKeyDown/*|| isMatchingTransitionDoubleDown*/)
 		{
 			if( systemKeyState & KEY_STATE_AUTOREPEAT )
 			{
@@ -727,20 +732,20 @@ void MetaEventTranslator::onKeyPressed(GameMessageDisposition &disp, Int systemK
 		DEBUG_LOG(("^%s ", aKey.str()));
 #endif
 
-		if (keyModState != NONE)
+		if (keyType != MK_NONE && keyModState != NONE)
 		{
 			// Remember that this key and mod state are pressed.
-			m_keyDownInfos[keyType].setKeyModState(keyModState);
+			m_keyDownInfos[keyType] = keyModState;
 		}
 	}
 	else
 	{
-		if (keyModState != NONE)
+		if (keyType != MK_NONE && keyModState != NONE)
 		{
 			//DEBUG_ASSERTCRASH(keyType != MK_NONE, ("Key is expected to be not MK_NONE"));
 
 			// Forget that this key and mod state are pressed.
-			m_keyDownInfos[keyType].clearKeyModState(keyModState);
+			m_keyDownInfos[keyType] = NONE;
 		}
 	}
 }
