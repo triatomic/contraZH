@@ -704,7 +704,23 @@ public:
 	static Bool isPlainOrder(GameMessage::Type t);
 
 	/// The debug cheat hotkeys appended at the end of the meta range, which also work in the shell map and cinematics
-	static Bool isDebugCheatHotkey(GameMessage::Type t) { return (t >= MSG_CHEAT_KITCHEN_SINK && t <= MSG_CHEAT_SHOW_SHADER_DRAWS) || t == MSG_CHEAT_TOGGLE_SHADER_PANEL; }
+	static Bool isDebugCheatHotkey(GameMessage::Type t)
+	{
+#if RTS_ZEROHOUR && defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+		if (t >= MSG_CHEAT_RUNSCRIPT1 && t <= MSG_CHEAT_TOGGLE_MESSAGE_TEXT)
+		{
+			return TRUE;
+		}
+#endif
+#if RTS_ZEROHOUR && (defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE))
+		if ((t >= MSG_META_DEMO_TOGGLE_BEHIND_BUILDINGS && t <= MSG_META_DEMO_TOGGLE_DEBUG_STATS) ||
+			t == MSG_META_TOGGLE_FAST_FORWARD_REPLAY)
+		{
+			return TRUE;
+		}
+#endif
+		return (t >= MSG_CHEAT_KITCHEN_SINK && t <= MSG_CHEAT_SHOW_SHADER_DRAWS) || t == MSG_CHEAT_TOGGLE_SHADER_PANEL;
+	}
 
 	Int getPlayerIndex() const { return m_playerIndex; }		///< Return the originating player
 

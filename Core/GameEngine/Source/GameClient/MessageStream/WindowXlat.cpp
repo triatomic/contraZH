@@ -51,6 +51,9 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////
 #include "Common/MessageStream.h"
 #include "GameClient/GameClient.h"
+#include "GameClient/KeyDefs.h"
+#include "GameClient/MetaEvent.h"
+#include "GameLogic/GameLogic.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/WindowXlat.h"
 #include "GameClient/Shell.h"
@@ -311,6 +314,15 @@ GameMessageDisposition WindowTranslator::translateGameMessage(const GameMessage 
 			// get key and state from args
 			UnsignedByte key		= msg->getArgument( 0 )->integer;
 			UnsignedByte state	= msg->getArgument( 1 )->integer;
+
+#if RTS_ZEROHOUR && (defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE))
+			if (TheGameLogic && (TheGameLogic->isInShellGame() ||
+				(TheInGameUI && !TheInGameUI->getInputEnabled())) &&
+				MetaEventTranslator::isDebugCheatKey(key, state))
+			{
+				return KEEP_MESSAGE;
+			}
+#endif
 
 			// process event through window system
 			if( TheWindowManager )

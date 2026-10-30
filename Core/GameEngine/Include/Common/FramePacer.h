@@ -45,6 +45,7 @@ public:
 	Int  getFramesPerSecondLimit() const; ///< Get the update fps limit.
 	void enableFramesPerSecondLimit( Bool enable ); ///< Enable or disable the update fps limit.
 	Bool isFramesPerSecondLimitEnabled() const; ///< Returns whether the fps limit is enabled here.
+	Bool isFastForwardAvailable() const;
 	Bool isActualFramesPerSecondLimitEnabled() const; ///< Returns whether the fps limit is actually enabled when considering all game settings and setups.
 	Int  getActualFramesPerSecondLimit() const; // Get the actual update fps limit.
 #if RTS_ZEROHOUR

@@ -3841,7 +3841,7 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		{
 			if( TheGlobalData )
 			{
-				if (TheGameLogic->isInReplayGame())
+				if (TheFramePacer->isFastForwardAvailable())
 				{
 					TheWritableGlobalData->m_TiVOFastMode = 1 - TheGlobalData->m_TiVOFastMode;
 					TheInGameUI->messageNoFormat( TheGlobalData->m_TiVOFastMode

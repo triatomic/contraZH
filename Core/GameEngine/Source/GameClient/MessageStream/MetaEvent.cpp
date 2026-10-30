@@ -32,6 +32,7 @@
 
 #include "Common/GameUtility.h"
 #include "Common/INI.h"
+#include "Common/FramePacer.h"
 #include "Common/MessageStream.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -481,6 +482,27 @@ static Bool isMessageUsable(CommandUsableInType usableIn, GameMessage::Type type
 }
 
 //-------------------------------------------------------------------------------------------------
+Bool MetaEventTranslator::isDebugCheatKey(Int systemKey, Int systemKeyState)
+{
+#if RTS_ZEROHOUR && (defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE))
+	if (TheMetaMap != nullptr)
+	{
+		const MappableKeyType keyType = getActionKeyType(systemKey);
+		const MappableKeyModState keyModState = getKeyModState(systemKeyState);
+		for (const MetaMapRec *map = TheMetaMap->getFirstMetaMapRec(); map; map = map->m_next)
+		{
+			if (keyType != MK_NONE && map->m_key == keyType && map->m_modState == keyModState &&
+				isMessageUsable(map->m_usableIn, map->m_meta))
+			{
+				return GameMessage::isDebugCheatHotkey(map->m_meta);
+			}
+		}
+	}
+#endif
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
 GameMessageDisposition MetaEventTranslator::translateGameMessage(const GameMessage *msg)
 {
 	GameMessageDisposition disp = KEEP_MESSAGE;
@@ -751,7 +773,7 @@ void MetaEventTranslator::onKeyPressed(GameMessageDisposition &disp, Int systemK
 				// THIS IS A GREASY HACK... MESSAGE SHOULD BE HANDLED IN A TRANSLATOR, BUT DURING CINEMATICS THE TRANSLATOR IS DISABLED
 				if( map->m_meta ==  GameMessage::MSG_META_TOGGLE_FAST_FORWARD_REPLAY)
 				{
-				if( TheGlobalData && TheGameLogic->isInReplayGame())
+				if( TheGlobalData && TheFramePacer->isFastForwardAvailable())
 					{
 						if ( TheWritableGlobalData )
 							TheWritableGlobalData->m_TiVOFastMode = 1 - TheGlobalData->m_TiVOFastMode;
@@ -1302,9 +1324,17 @@ void MetaMap::generateMetaMap()
 	{
 		// Is mostly useful for Generals.
 		MetaMapRec *map = getMetaMapRec(GameMessage::MSG_META_TOGGLE_FAST_FORWARD_REPLAY);
-		if (map->m_key == MK_NONE)
+		Bool useDefaultKey = map->m_key == MK_NONE;
+#if RTS_ZEROHOUR && (defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE))
+		useDefaultKey = useDefaultKey || (map->m_key == MK_F && map->m_modState == NONE);
+#endif
+		if (useDefaultKey)
 		{
+#if RTS_ZEROHOUR && (defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE))
+			map->m_key = MK_KPSTAR;
+#else
 			map->m_key = MK_F;
+#endif
 			map->m_transition = DOWN;
 			map->m_modState = NONE;
 			map->m_usableIn = COMMANDUSABLE_GAME; // @todo COMMANDUSABLE_OBSERVER

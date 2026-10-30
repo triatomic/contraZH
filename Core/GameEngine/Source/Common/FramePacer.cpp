@@ -121,6 +121,21 @@ Bool FramePacer::isFramesPerSecondLimitEnabled() const
 	return m_enableFpsLimit;
 }
 
+Bool FramePacer::isFastForwardAvailable() const
+{
+	if (TheGameLogic == nullptr)
+	{
+		return FALSE;
+	}
+#if RTS_ZEROHOUR && (defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE))
+	if (!TheGameLogic->isInMultiplayerGame())
+	{
+		return TRUE;
+	}
+#endif
+	return TheGameLogic->isInReplayGame();
+}
+
 Bool FramePacer::isActualFramesPerSecondLimitEnabled() const
 {
 	Bool allowFpsLimit = true;
@@ -132,7 +147,7 @@ Bool FramePacer::isActualFramesPerSecondLimitEnabled() const
 
 	if (TheGameLogic != nullptr)
 	{
-		allowFpsLimit &= !(!TheGameLogic->isGamePaused() && TheGlobalData->m_TiVOFastMode && TheGameLogic->isInReplayGame());
+		allowFpsLimit &= !(!TheGameLogic->isGamePaused() && TheGlobalData->m_TiVOFastMode && isFastForwardAvailable());
 	}
 
 #if RTS_ZEROHOUR

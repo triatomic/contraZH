@@ -2560,7 +2560,11 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 
   if ( isInReplayGame() && TheInGameUI && TheGameText )
   {
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+		TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE( "GUI:FastForwardCheatInstructions", L"Press numpad * to toggle Fast Forward" ) );
+#else
 		TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE( "GUI:FastForwardInstructions", L"Press F to toggle Fast Forward" ) );
+#endif
   }
 
 #ifdef PROFILER_ENABLED

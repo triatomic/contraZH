@@ -2,6 +2,7 @@
 
 The debug overlays and cheat commands require builds made with `RTS_DEBUG_CHEATS=ON`.
 The health bar, pause and frame-step controls below also work in normal release builds.
+Cheat hotkeys also work in the shellmap and during scripted scenes with player input disabled.
 Keys use US keyboard labels. On other layouts, use the same physical keys.
 These are the engine's default bindings; `CommandMap.ini` can override them unless noted.
 
@@ -179,11 +180,13 @@ the cash or hide the revealed map.
 
 ## Individual cheats and map scripts
 
-Contra's `CommandMapDemo.ini` supplies these bindings in cheat builds. All are single player only.
+Contra's `CommandMapDemo.ini` and the engine defaults supply these bindings in cheat builds.
+Gameplay cheats are single player only. Fast-forward also works in replays.
 
 | Key | Action | CommandMap name |
 |---|---|---|
 | `Alt + F` | Toggle instant build for the local player. | `CHEAT_INSTANT_BUILD` |
+| Numpad `*` | Toggle fast-forward in single-player matches and replays. | `TOGGLE_FAST_FORWARD_REPLAY` |
 | `Ctrl + =` | Add 10000 credits. Use the main keyboard's equals key. | `CHEAT_ADD_CASH` |
 | `Ctrl + R` | Reveal the map permanently for the local player. | `CHEAT_DESHROUD` |
 | `Shift + Ctrl + Alt + K` | Grant every grantable science, including other generals' sciences. | `CHEAT_GIVE_ALL_SCIENCES` |

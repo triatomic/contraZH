@@ -454,6 +454,8 @@ private:
 	Real	m_wheelSpin;	///< wheel travel not yet spent on a whole notch
 
 public:
+	static Bool isDebugCheatKey(Int systemKey, Int systemKeyState);
+
 	MetaEventTranslator();
 	virtual ~MetaEventTranslator() override;
 	virtual GameMessageDisposition translateGameMessage(const GameMessage *msg) override;

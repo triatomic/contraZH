@@ -1017,7 +1017,7 @@ Bool GameEngine::canUpdateRegularGameLogic(UnsignedInt logicTimeQueryFlags)
 
 	const Int maxRenderFps = TheFramePacer->getActualFramesPerSecondLimit();
 
-	const Bool useFastMode = TheGlobalData->m_TiVOFastMode && TheGameLogic->isInReplayGame();
+	const Bool useFastMode = TheGlobalData->m_TiVOFastMode && TheFramePacer->isFastForwardAvailable();
 
 	// Without a running game the logic only handles messages, such as starting the next game, which must not wait.
 	const Bool noGameRunning = !TheGameLogic->isInGame() || TheGameLogic->isStartingNewGame();
