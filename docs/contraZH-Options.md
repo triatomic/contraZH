@@ -317,6 +317,13 @@ and laser shading, per-map colour grading, planar mirrors and the other features
 
 HQ sky cloud shadows preserve the contrast of object shadows as clouds pass over them.
 
+With `DrawEntireTerrain = No` in `GameData.ini`, the terrain draw window grows to cover the
+visible ground at high camera zoom, including scripted cameras. This prevents the map's water
+plane from showing through gaps beyond the regular window. The window grows in whole buffer
+blocks and stays stable during camera rotation. Views across the horizon use the full map.
+`DrawEntireTerrain = Yes` keeps drawing the full map. This rendering fix comes from
+[TheSuperHackers PR #2785](https://github.com/TheSuperHackers/GeneralsGameCode/pull/2785).
+
 ### Bloom
 
 Soft glow around `Add` blended object meshes, such as building lights, and object textures with
