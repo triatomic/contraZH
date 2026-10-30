@@ -745,9 +745,9 @@ public:  // ********************************************************************
 
 	Bool isClientQuiet() const			{ return m_clientQuiet; }
 	Bool isInWaypointMode() const			{ return m_waypointMode; }
-	Bool isInForceAttackMode() const	{ return m_forceAttackMode; }
+	Bool isInForceAttackMode() const	{ return (m_forceAttackMode && m_preferSelection) ? false : m_forceAttackMode; }
 	Bool isInForceMoveToMode() const	{ return m_forceMoveToMode; }
-	Bool isInPreferSelectionMode() const { return m_preferSelection; }
+	Bool isInPreferSelectionMode() const { return (m_forceAttackMode && m_preferSelection) ? false : m_preferSelection; }
 
 	void setClientQuiet( Bool enabled )  { m_clientQuiet = enabled; }
 	void setWaypointMode( Bool enabled )		{ m_waypointMode = enabled; }
