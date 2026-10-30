@@ -201,6 +201,9 @@ static const BlockParse theWbTypeTable[] =
 
 	// { "WaterSet",						INI::parseWaterSettingDefinition },
 	{ "WaterTransparency",	            INI::parseWaterTransparencyDefinition},
+#if RTS_ZEROHOUR
+	{ "Weather",                        INI::parseWeatherDefinition },
+#endif
 	{ NULL,									NULL },		// keep this last!
 };
 

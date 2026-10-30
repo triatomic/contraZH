@@ -23,7 +23,7 @@ enum
 typedef struct WBQtWaterTuningDesc
 {
 	const char *key;	// INI key in its block
-	const char *block;	// map.ini block the key is saved in, WaterTransparency or GameData
+	const char *block;	// map.ini block the key is saved in, WaterTransparency, GameData or Weather
 	const char *group;	// heading over the key's rows, NULL on the water tab
 	const char *help;	// tooltip
 	int kind;			// WBQT_WATER_*
@@ -40,7 +40,7 @@ int  WBQtWaterTuning_Count(void);
 int  WBQtWaterTuning_GetDesc(int i, WBQtWaterTuningDesc *out);
 
 // A float or bool key uses v[0]. A colour uses v[0..2] as 0 to 255, negative when unset.
-// GetBase reads the Water.ini or GameData.ini value under any map override.
+// GetBase reads the Water.ini, GameData.ini or Weather.ini value under any map override.
 void WBQtWaterTuning_GetBase(int i, float v[3]);
 void WBQtWaterTuning_SetLive(int i, const float v[3]);
 // The value in effect now, with any map override.

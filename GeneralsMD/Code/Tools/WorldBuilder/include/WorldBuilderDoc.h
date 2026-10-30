@@ -298,5 +298,8 @@ void WBMapIni_UnloadForShutdown(void);
 // The map's WaterTransparency override, created from the Water.ini values when the map has none.
 WaterTransparencySetting *WBMapIni_EnsureWaterOverride(void);
 
+class WeatherSetting;
+WeatherSetting *WBMapIni_EnsureWeatherOverride(void);
+
 //{{AFX_INSERT_LOCATION}}
 // Microsoft Visual C++ will insert additional declarations immediately before the previous line.

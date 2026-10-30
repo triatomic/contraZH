@@ -101,6 +101,7 @@ extern "C" int WBQtObject_GetRenderParticles(void);
 #include "W3DDevice/GameClient/W3DSkyClouds.h"
 #include "W3DDevice/GameClient/W3DColorLut.h"
 #include "W3DDevice/GameClient/W3DDistanceFog.h"
+#include "W3DDevice/GameClient/W3DSnow.h"
 #include "DrawObject.h"
 #include "RulerTool.h"
 #include "TracingOverlayOptions.h"
@@ -820,6 +821,8 @@ WbView3d::~WbView3d()
 	TheW3DDistanceFog = nullptr;
 	delete TheW3DColorLut;
 	TheW3DColorLut = nullptr;
+	delete TheSnowManager;
+	TheSnowManager = nullptr;
 	shutdownWW3D();
 }
 // ----------------------------------------------------------------------------
@@ -5828,6 +5831,14 @@ void WbView3d::render()
 			TheW3DDistanceFog->render(*m_camera);
 		}
 
+		if (TheSnowManager != NULL && TheWeatherSetting->m_snowEnabled)
+		{
+			m_camera->Apply();
+			RenderInfoClass rinfo(*m_camera);
+			TheSnowManager->update();
+			((W3DSnowManager*)TheSnowManager)->render(rinfo);
+		}
+
 		// The map.ini grade goes over the scene as in the game, and under the icons so they stay readable.
 		if (TheW3DColorLut != nullptr)
 		{
@@ -6262,6 +6273,11 @@ void WbView3d::initWW3D()
 		if (TheW3DColorLut == nullptr)
 		{
 			TheW3DColorLut = new W3DColorLut;
+		}
+		if (TheSnowManager == NULL && TheWeatherSetting != NULL)
+		{
+			TheSnowManager = new W3DSnowManager;
+			TheSnowManager->init();
 		}
 		init3dScene();
 		m_layer = new LayerClass( m_scene, m_camera );
@@ -7818,6 +7834,7 @@ void WbView3d::OnTimer(UINT nIDEvent)
 
 		// Live particle emitters animate every frame too -- keep repainting while any exist.
 		Bool particlesActive = WBParticleRuntime::hasActiveEmitters();
+		Bool weatherActive = TheSnowManager != NULL && TheWeatherSetting->m_snowEnabled;
 
 		// Model animations (View > Animate Models) advance off WW3D::Sync in redraw(), so the view
 		// is never really "static" while any are playing -- keep repainting or they would freeze
@@ -7839,7 +7856,7 @@ void WbView3d::OnTimer(UINT nIDEvent)
 		Bool playingSoundsShown = m_showPlayingSounds && (m_listenMode != WB_LISTEN_NONE);
 
 		if (!interacting && !changed && !fallbackDue && !wavesActive && !particlesActive &&
-			!overlayActive && !modelAnimsActive && !playingSoundsShown)
+			!overlayActive && !modelAnimsActive && !playingSoundsShown && !weatherActive)
 		{
 			return;		// static view: leave the last frame (+ any GDI text) on screen
 		}

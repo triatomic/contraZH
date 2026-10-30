@@ -47,6 +47,7 @@
 #include "GameLogic/ObjectCreationList.h"
 #include "GameClient/FXList.h"
 #include "GameClient/Water.h"
+#include "GameClient/Snow.h"
 #include "Common/WellKnownKeys.h"
 #include "Common/MapData.h"
 
@@ -239,6 +240,16 @@ void WBMapIni_UnloadForShutdown(void)
 		TheWaterTransparency = (WaterTransparencySetting*)wt->deleteOverrides();
 	}
 
+	if (TheWeatherSetting.getNonOverloadedPointer() != NULL)
+	{
+		WeatherSetting *weather = (WeatherSetting*)TheWeatherSetting.getNonOverloadedPointer();
+		TheWeatherSetting = (WeatherSetting*)weather->deleteOverrides();
+		if (TheSnowManager != NULL)
+		{
+			TheSnowManager->updateIniSettings();
+		}
+	}
+
 	// NO postProcessLoad() here -- see above.
 	g_mapiniloaded = false;
 }
@@ -264,6 +275,26 @@ WaterTransparencySetting *WBMapIni_EnsureWaterOverride(void)
 	base->setNextOverride(wt);
 	g_mapiniloaded = true;	// so the next map load strips it
 	return wt;
+}
+
+WeatherSetting *WBMapIni_EnsureWeatherOverride(void)
+{
+	WeatherSetting *base = (WeatherSetting*)TheWeatherSetting.getNonOverloadedPointer();
+	if (base == NULL)
+	{
+		return NULL;
+	}
+	WeatherSetting *last = (WeatherSetting*)base->friend_getFinalOverride();
+	if (last != base)
+	{
+		return last;
+	}
+	WeatherSetting *weather = newInstance(WeatherSetting);
+	*weather = *base;
+	weather->markAsOverride();
+	base->setNextOverride(weather);
+	g_mapiniloaded = true;
+	return weather;
 }
 
 // ----------------------------------------------------------------------------

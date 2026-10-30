@@ -64,7 +64,9 @@ lists every block that failed to parse; only those blocks are dropped.)
 * Water tuning - (Groups the map's water into Appearance, Waves, Light & foam, and Behaviour.
 Sliders, numeric fields and a colour picker update the 3D view. Tooltips show the exact
 `WaterTransparency` keys from [Water](Water.md). Advanced settings stay hidden until enabled.
-A changed key is saved to the `WaterTransparency` block of the map's `map.ini`; reset removes it,
+Changes preview live. Click Save to write them to `map.ini`, or enable Save while changing
+for automatic saves on every tab. Manual changes stay pending when the window closes and are
+discarded when switching maps. Water keys use the `WaterTransparency` block; reset removes a key,
 so the map follows `Water.ini` again. Offers to create `map.ini` when the map has none.
 `AdditiveBlending` switches between the old additive water and shader water. Shader controls are
 disabled while additive blending is on or Is water is off.)
@@ -79,6 +81,12 @@ Choose Sun, Desert, Futuristic, DarkHorse, Apocalyptic, or Custom. Set the custo
 and end depths, maximum strength, and sun influence. Changes save to the `GameData` block of
 `map.ini`; reset removes the override and restores the mod's value. The preview needs D3D9 and
 readable depth, so MSAA disables it. See [Distance fog](contraZH-GameData.md#distance-fog).)
+
+* Water tuning > Weather - (Previews falling snow with the game's weather renderer.
+Enable snow and tune its texture, density, fall speed, sway, and flake size. Point sprites and
+textured quads use the same settings as the game. Changes save to the `Weather` block of
+`map.ini`; reset removes a key and restores its `Weather.ini` value. Weather also loads when
+opening or reloading a map and clears when switching maps.)
 
 The same editor opens any INI file from its own File menu. It completes names from the game's INI
 data, narrowed to the values each key takes, and Ctrl+Space opens a searchable picker. It also

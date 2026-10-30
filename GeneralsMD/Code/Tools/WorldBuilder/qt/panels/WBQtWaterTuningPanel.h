@@ -40,9 +40,9 @@ public:
 	void reseed();
 
 	// Write the pending changes. False when map.ini could not be written yet.
-	bool flush();
+	bool flush(bool manual = false);
 
-	// Another map is loading: save, forget the path and hide.
+	// Map changes discard unsaved manual edits.
 	void mapChanged();
 
 	static WBQtWaterTuningPanel *instance() { return s_instance; }
@@ -59,6 +59,8 @@ private slots:
 	void onChoiceChosen(int choice);
 	void onResetClicked();
 	void onAdvancedToggled(bool on);
+	void onSaveClicked();
+	void onSaveWhileChangingToggled(bool on);
 	void onSaveTimer();
 
 private:

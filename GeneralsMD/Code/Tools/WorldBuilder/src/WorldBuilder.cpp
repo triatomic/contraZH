@@ -487,6 +487,8 @@ BOOL CWorldBuilderApp::InitInstance()
 	// read the water settings from INI (must do prior to initing GameClient, apparently)
 	ini.loadFileDirectory( "Data\\INI\\Default\\Water", INI_LOAD_OVERWRITE, nullptr );
 	ini.loadFileDirectory( "Data\\INI\\Water", INI_LOAD_OVERWRITE, nullptr );
+	ini.loadFileDirectory( "Data\\INI\\Default\\Weather", INI_LOAD_OVERWRITE, nullptr );
+	ini.loadFileDirectory( "Data\\INI\\Weather", INI_LOAD_OVERWRITE, nullptr );
 
 	loadWindow.setProgress("Loading game data...");
 	initSubsystem(TheGameText, CreateGameTextInterface());

@@ -11,6 +11,7 @@
 #include <QColorDialog>
 #include <QGroupBox>
 #include <QPixmap>
+#include <QPushButton>
 #include <QSlider>
 #include <QStyle>
 #include <QDir>
@@ -385,6 +386,8 @@ WBQtWaterTuningPanel::WBQtWaterTuningPanel(QWidget *owner)
 	m_saveTimer->setSingleShot(true);
 	connect(m_saveTimer, SIGNAL(timeout()), this, SLOT(onSaveTimer()));
 	connect(m_ui->advancedCheck, SIGNAL(toggled(bool)), this, SLOT(onAdvancedToggled(bool)));
+	connect(m_ui->saveWhileChangingCheck, SIGNAL(toggled(bool)), this, SLOT(onSaveWhileChangingToggled(bool)));
+	connect(m_ui->saveButton, SIGNAL(clicked()), this, SLOT(onSaveClicked()));
 
 	s_instance = this;
 }
@@ -524,7 +527,7 @@ void WBQtWaterTuningPanel::buildRows()
 		row.reset->setObjectName(row.key + "Reset");
 		row.reset->setAccessibleName(tr("Reset %1").arg(settingLabel(row.key)));
 		row.reset->setToolTip(tr("Remove the key from map.ini, so the map follows %1")
-			.arg(water ? "Water.ini" : "GameData.ini"));
+			.arg(water ? "Water.ini" : row.block == "Weather" ? "Weather.ini" : "GameData.ini"));
 		connect(row.reset, SIGNAL(clicked()), this, SLOT(onResetClicked()));
 		grid->addWidget(row.reset, gridRow, COL_RESET);
 		row.widgets << row.reset;
@@ -564,7 +567,14 @@ void WBQtWaterTuningPanel::buildRows()
 				row.combo->setProperty("row", r);
 				row.combo->lineEdit()->setProperty("row", r);
 				row.combo->addItem("None");
-				row.combo->addItems(tableNames());
+				if (row.block == "Weather")
+				{
+					row.combo->addItem("EXSnowFlake.tga");
+				}
+				else
+				{
+					row.combo->addItems(tableNames());
+				}
 				grid->addWidget(row.combo, gridRow, COL_SLIDER, 1, COL_SPIN - COL_SLIDER + 1);
 				connect(row.combo, SIGNAL(activated(int)), this, SLOT(onTextChosen()));
 				connect(row.combo->lineEdit(), SIGNAL(editingFinished()), this, SLOT(onTextChosen()));
@@ -715,7 +725,7 @@ void WBQtWaterTuningPanel::markChanged(int r)
 	pushLive(row);
 	updateWaterAvailability();
 	m_pending[row.key] = formatValue(row);
-	m_saveTimer->start(kSaveDelayMs);
+	onSaveWhileChangingToggled(m_ui->saveWhileChangingCheck->isChecked());
 }
 
 // Take the key out of map.ini and return the row to the Water.ini value.
@@ -728,7 +738,7 @@ void WBQtWaterTuningPanel::resetRow(int r)
 	pushLive(row);
 	updateWaterAvailability();
 	m_pending[row.key] = QString();
-	m_saveTimer->start(kSaveDelayMs);
+	onSaveWhileChangingToggled(m_ui->saveWhileChangingCheck->isChecked());
 }
 
 void WBQtWaterTuningPanel::openOn(const QString &iniPath)
@@ -795,18 +805,20 @@ void WBQtWaterTuningPanel::reseed()
 		pushLive(row);
 	}
 	updateWaterAvailability();
-	if (!m_pending.isEmpty())
-	{
-		m_saveTimer->start(kSaveRetryMs);
-	}
+	onSaveWhileChangingToggled(m_ui->saveWhileChangingCheck->isChecked());
 }
 
-bool WBQtWaterTuningPanel::flush()
+bool WBQtWaterTuningPanel::flush(bool manual)
 {
 	m_saveTimer->stop();
+	if (!manual && !m_ui->saveWhileChangingCheck->isChecked())
+	{
+		return true;
+	}
 	if (m_pending.isEmpty() || m_path.isEmpty())
 	{
 		m_pending.clear();
+		m_ui->saveButton->setEnabled(false);
 		return true;
 	}
 
@@ -853,6 +865,7 @@ bool WBQtWaterTuningPanel::flush()
 	if (!edited)
 	{
 		m_pending.clear();
+		m_ui->saveButton->setEnabled(false);
 		return true;
 	}
 
@@ -865,6 +878,7 @@ bool WBQtWaterTuningPanel::flush()
 	file.close();
 
 	m_pending.clear();
+	m_ui->saveButton->setEnabled(false);
 	WBQtWaterTuning_NoteSaved();
 	WBQtMapIniEditor_ReloadIfOpen(localPath.constData());
 	setStatus(tr("Saved to %1.").arg(QDir::toNativeSeparators(m_path)));
@@ -875,6 +889,7 @@ void WBQtWaterTuningPanel::mapChanged()
 {
 	flush();
 	m_pending.clear();
+	m_ui->saveButton->setEnabled(false);
 	m_path.clear();
 	hide();
 }
@@ -1038,6 +1053,25 @@ void WBQtWaterTuningPanel::onAdvancedToggled(bool on)
 		for (int w = 0; w < row.widgets.size(); ++w)
 		{
 			row.widgets[w]->setVisible(on);
+		}
+	}
+}
+
+void WBQtWaterTuningPanel::onSaveClicked()
+{
+	flush(true);
+}
+
+void WBQtWaterTuningPanel::onSaveWhileChangingToggled(bool on)
+{
+	m_saveTimer->stop();
+	m_ui->saveButton->setEnabled(!m_pending.isEmpty());
+	if (!m_pending.isEmpty())
+	{
+		setStatus(tr("Unsaved tuning changes."));
+		if (on)
+		{
+			m_saveTimer->start(kSaveDelayMs);
 		}
 	}
 }

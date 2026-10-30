@@ -11,6 +11,7 @@
 #include "Common/FileSystem.h"
 #include "Common/GlobalData.h"
 #include "GameClient/Water.h"
+#include "GameClient/Snow.h"
 #include "W3DDevice/GameClient/BaseHeightMap.h"
 #include "WorldBuilderDoc.h"
 #include "wbview3d.h"
@@ -117,6 +118,77 @@ namespace
 	};
 
 	const int s_keyCount = sizeof(s_keys) / sizeof(s_keys[0]);
+
+	struct WeatherKey
+	{
+		WBQtWaterTuningDesc desc;
+		Real WeatherSetting::*real;
+		Bool WeatherSetting::*flag;
+	};
+
+#define WEATHER_REAL(key, member, lo, hi, step, help) \
+	{ { key, "Weather", "Weather", help, WBQT_WATER_FLOAT, lo, hi, step, 0, NULL }, &WeatherSetting::member, NULL }
+#define WEATHER_BOOL(key, member, help) \
+	{ { key, "Weather", "Weather", help, WBQT_WATER_BOOL, 0.0f, 1.0f, 1.0f, 0, NULL }, NULL, &WeatherSetting::member }
+
+	const WeatherKey s_weatherKeys[] =
+	{
+		WEATHER_BOOL("SnowEnabled", m_snowEnabled, "Shows falling snow on the map."),
+		{ { "SnowTexture", "Weather", "Weather", "Texture file in Art\\Textures, such as EXSnowFlake.tga.",
+			WBQT_WATER_TEXT, 0.0f, 0.0f, 0.0f, 0, NULL }, NULL, NULL },
+		WEATHER_BOOL("SnowPointSprites", m_usePointSprites,
+			"Uses hardware point sprites when supported. No draws textured quads."),
+		WEATHER_REAL("SnowBoxDensity", m_snowBoxDensity, 0.01f, 3.0f, 0.01f,
+			"Emitters per world unit along each axis. Doubling this draws four times as many flakes."),
+		WEATHER_REAL("SnowVelocity", m_snowVelocity, 0.1f, 100.0f, 0.1f,
+			"World units a second the snow falls."),
+		WEATHER_REAL("SnowBoxDimensions", m_snowBoxDimensions, 1.0f, 1000.0f, 1.0f,
+			"World units across the snow box around the camera."),
+		WEATHER_REAL("SnowAmplitude", m_snowAmplitude, 0.0f, 50.0f, 0.1f,
+			"World units the flakes sway sideways."),
+		WEATHER_REAL("SnowFrequencyScaleX", m_snowFrequencyScaleX, 0.0f, 1.0f, 0.0001f,
+			"Frequency of the flakes' sway along the X axis."),
+		WEATHER_REAL("SnowFrequencyScaleY", m_snowFrequencyScaleY, 0.0f, 1.0f, 0.0001f,
+			"Frequency of the flakes' sway along the Y axis."),
+		WEATHER_REAL("SnowPointSize", m_snowPointSize, 0.1f, 100.0f, 0.1f,
+			"Size of hardware point sprites before distance scaling."),
+		WEATHER_REAL("SnowMinPointSize", m_snowMinPointSize, 0.0f, 64.0f, 0.1f,
+			"Minimum point sprite size in pixels."),
+		WEATHER_REAL("SnowMaxPointSize", m_snowMaxPointSize, 0.1f, 256.0f, 0.1f,
+			"Maximum point sprite size in pixels."),
+		WEATHER_REAL("SnowQuadSize", m_snowQuadSize, 0.01f, 20.0f, 0.01f,
+			"World units across a flake when point sprites are disabled or unsupported."),
+	};
+
+	const int s_weatherKeyCount = sizeof(s_weatherKeys) / sizeof(s_weatherKeys[0]);
+
+	void readWeatherKey(const WeatherKey &key, const WeatherSetting *weather, float v[3])
+	{
+		if (weather != NULL)
+		{
+			if (key.flag != NULL)
+			{
+				v[0] = weather->*(key.flag) ? 1.0f : 0.0f;
+			}
+			else if (key.real != NULL)
+			{
+				v[0] = weather->*(key.real);
+			}
+		}
+	}
+
+	void refreshWeather()
+	{
+		if (TheSnowManager != NULL)
+		{
+			TheSnowManager->updateIniSettings();
+		}
+		WbView3d *view = CWorldBuilderDoc::GetActive3DView();
+		if (view != NULL)
+		{
+			view->Invalidate(false);
+		}
+	}
 
 	struct RenderKey
 	{
@@ -475,15 +547,20 @@ namespace
 
 extern "C" int WBQtWaterTuning_Count(void)
 {
-	return s_keyCount + s_renderKeyCount;
+	return s_keyCount + s_renderKeyCount + s_weatherKeyCount;
 }
 
 // The water keys come first, then the GameData keys.
 extern "C" int WBQtWaterTuning_GetDesc(int i, WBQtWaterTuningDesc *out)
 {
-	if (i < 0 || i >= s_keyCount + s_renderKeyCount || out == NULL)
+	if (i < 0 || i >= WBQtWaterTuning_Count() || out == NULL)
 	{
 		return 0;
+	}
+	if (i >= s_keyCount + s_renderKeyCount)
+	{
+		*out = s_weatherKeys[i - s_keyCount - s_renderKeyCount].desc;
+		return 1;
 	}
 	if (i >= s_keyCount)
 	{
@@ -521,6 +598,12 @@ extern "C" void WBQtWaterTuning_GetBase(int i, float v[3])
 		return;
 	}
 	v[0] = v[1] = v[2] = 0.0f;
+	if (i >= s_keyCount + s_renderKeyCount && i < WBQtWaterTuning_Count())
+	{
+		readWeatherKey(s_weatherKeys[i - s_keyCount - s_renderKeyCount],
+			TheWeatherSetting.getNonOverloadedPointer(), v);
+		return;
+	}
 	if (i >= s_keyCount && i < s_keyCount + s_renderKeyCount)
 	{
 		if (takeRenderBase())
@@ -544,6 +627,11 @@ extern "C" void WBQtWaterTuning_GetLive(int i, float v[3])
 		return;
 	}
 	v[0] = v[1] = v[2] = 0.0f;
+	if (i >= s_keyCount + s_renderKeyCount && i < WBQtWaterTuning_Count())
+	{
+		readWeatherKey(s_weatherKeys[i - s_keyCount - s_renderKeyCount], TheWeatherSetting, v);
+		return;
+	}
 	if (i >= s_keyCount && i < s_keyCount + s_renderKeyCount)
 	{
 		if (TheGlobalData != NULL)
@@ -561,8 +649,33 @@ extern "C" void WBQtWaterTuning_GetLive(int i, float v[3])
 
 extern "C" void WBQtWaterTuning_SetLive(int i, const float v[3])
 {
-	if (i < 0 || i >= s_keyCount + s_renderKeyCount || v == NULL)
+	if (i < 0 || i >= WBQtWaterTuning_Count() || v == NULL)
 	{
+		return;
+	}
+	if (i >= s_keyCount + s_renderKeyCount)
+	{
+		const WeatherKey &key = s_weatherKeys[i - s_keyCount - s_renderKeyCount];
+		float now[3] = { 0.0f, 0.0f, 0.0f };
+		readWeatherKey(key, TheWeatherSetting, now);
+		if (now[0] == v[0] || key.desc.kind == WBQT_WATER_TEXT)
+		{
+			return;
+		}
+		WeatherSetting *weather = WBMapIni_EnsureWeatherOverride();
+		if (weather == NULL)
+		{
+			return;
+		}
+		if (key.flag != NULL)
+		{
+			weather->*(key.flag) = v[0] >= 0.5f;
+		}
+		else
+		{
+			weather->*(key.real) = max(key.desc.lo, min(key.desc.hi, v[0]));
+		}
+		refreshWeather();
 		return;
 	}
 	if (i >= s_keyCount)
@@ -615,6 +728,16 @@ extern "C" int WBQtWaterTuning_GetBaseText(int i, char *buf, int size)
 		return 0;
 	}
 	buf[0] = 0;
+	if (i >= s_keyCount + s_renderKeyCount && i < WBQtWaterTuning_Count())
+	{
+		const WeatherSetting *base = TheWeatherSetting.getNonOverloadedPointer();
+		if (s_weatherKeys[i - s_keyCount - s_renderKeyCount].desc.kind != WBQT_WATER_TEXT || base == NULL)
+		{
+			return 0;
+		}
+		strlcpy(buf, base->m_snowTexture.str(), size);
+		return 1;
+	}
 	if (i < s_keyCount || i >= s_keyCount + s_renderKeyCount || s_renderKeys[i - s_keyCount].text == NULL || !takeRenderBase())
 	{
 		return 0;
@@ -625,6 +748,21 @@ extern "C" int WBQtWaterTuning_GetBaseText(int i, char *buf, int size)
 
 extern "C" void WBQtWaterTuning_SetLiveText(int i, const char *text)
 {
+	if (i >= s_keyCount + s_renderKeyCount && i < WBQtWaterTuning_Count() && text != NULL)
+	{
+		if (s_weatherKeys[i - s_keyCount - s_renderKeyCount].desc.kind != WBQT_WATER_TEXT ||
+			TheWeatherSetting == NULL || TheWeatherSetting->m_snowTexture == firstWord(text))
+		{
+			return;
+		}
+		WeatherSetting *weather = WBMapIni_EnsureWeatherOverride();
+		if (weather != NULL)
+		{
+			weather->m_snowTexture = firstWord(text);
+			refreshWeather();
+		}
+		return;
+	}
 	if (i < s_keyCount || i >= s_keyCount + s_renderKeyCount || text == NULL || !takeRenderBase())
 	{
 		return;

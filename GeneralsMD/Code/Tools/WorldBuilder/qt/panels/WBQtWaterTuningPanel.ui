@@ -65,7 +65,7 @@
             <string>Bold values override inherited settings.</string>
            </property>
            <property name="toolTip">
-            <string>Changes apply live and save automatically to map.ini. Reset removes the map override.</string>
+            <string>Changes apply live. Save writes them to map.ini. Reset removes the map override.</string>
            </property>
            <property name="wordWrap">
             <bool>true</bool>
@@ -77,6 +77,40 @@
       </layout>
      </widget>
     </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="saveLayout">
+     <item>
+      <widget class="QCheckBox" name="saveWhileChangingCheck">
+       <property name="text">
+        <string>Save while changing</string>
+       </property>
+       <property name="toolTip">
+        <string>Save changes to map.ini automatically. When off, click Save to keep your changes.</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="saveSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size><width>40</width><height>20</height></size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="saveButton">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="text">
+        <string>Save</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
    </item>
    <item>
     <widget class="QLabel" name="statusLabel">
