@@ -86,7 +86,8 @@ readable depth, so MSAA disables it. See [Distance fog](contraZH-GameData.md#dis
 Enable snow and tune its texture, density, fall speed, sway, and flake size. Point sprites and
 textured quads use the same settings as the game. Changes save to the `Weather` block of
 `map.ini`; reset removes a key and restores its `Weather.ini` value. Weather also loads when
-opening or reloading a map and clears when switching maps.)
+opening or reloading a map and clears when switching maps. Box dimensions must be at least 1;
+invalid values are rejected when loading the INI.)
 
 The same editor opens any INI file from its own File menu. It completes names from the game's INI
 data, narrowed to the values each key takes, and Ctrl+Space opens a searchable picker. It also

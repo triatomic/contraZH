@@ -673,7 +673,7 @@ extern "C" void WBQtWaterTuning_SetLive(int i, const float v[3])
 		}
 		else
 		{
-			weather->*(key.real) = max(key.desc.lo, min(key.desc.hi, v[0]));
+			weather->*(key.real) = v[0];
 		}
 		refreshWeather();
 		return;

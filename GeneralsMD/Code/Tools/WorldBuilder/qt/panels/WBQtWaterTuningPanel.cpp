@@ -421,7 +421,8 @@ void WBQtWaterTuningPanel::addSlider(Row &row, int rowIndex, QGridLayout *grid, 
 	row.spin->setToolTip(tip);
 	row.spin->setProperty("row", rowIndex);
 	// Typed and loaded values can exceed the slider's normal tuning range.
-	row.spin->setRange((row.lo < 0.0f) ? row.lo * 10.0 - 10.0 : 0.0, row.hi * 10.0 + 10.0);
+	const double minimum = row.block == "Weather" ? row.lo : (row.lo < 0.0f) ? row.lo * 10.0 - 10.0 : 0.0;
+	row.spin->setRange(minimum, row.hi * 10.0 + 10.0);
 	row.spin->setSingleStep(row.step);
 	row.spin->setDecimals(decimalsOf(row.step));
 
@@ -800,6 +801,12 @@ void WBQtWaterTuningPanel::reseed()
 		else
 		{
 			row.inFile = !raw.isNull() && parseValue(row.kind, raw, row.value);
+		}
+		if (row.inFile && row.key == "SnowBoxDimensions" &&
+			!(row.value[0] >= 1.0f && row.value[0] < 2147483648.0f))
+		{
+			loadBase(row);
+			row.inFile = false;
 		}
 		showRow(r);
 		pushLive(row);

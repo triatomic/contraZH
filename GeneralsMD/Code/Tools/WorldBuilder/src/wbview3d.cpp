@@ -5708,6 +5708,10 @@ void WbView3d::render()
 			DEBUG_LOG(("Culling pass threw an exception — skipping this frame.\n"));
 		}
 
+		if (TheSnowManager != NULL && TheWeatherSetting->m_snowEnabled)
+		{
+			TheSnowManager->update();
+		}
 		WW3D::Render(m_scene,m_camera);	
 		// Only the main scene fills the sun shadow map. RTS3DScene redoes the depth pass on every
 		// render, so keep it off for the build-list, wireframe, tracking and overlay passes below.
@@ -5829,14 +5833,6 @@ void WbView3d::render()
 		if (TheW3DDistanceFog != nullptr)
 		{
 			TheW3DDistanceFog->render(*m_camera);
-		}
-
-		if (TheSnowManager != NULL && TheWeatherSetting->m_snowEnabled)
-		{
-			m_camera->Apply();
-			RenderInfoClass rinfo(*m_camera);
-			TheSnowManager->update();
-			((W3DSnowManager*)TheSnowManager)->render(rinfo);
 		}
 
 		// The map.ini grade goes over the scene as in the game, and under the icons so they stay readable.
