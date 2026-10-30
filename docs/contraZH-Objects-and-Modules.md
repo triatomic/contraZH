@@ -954,6 +954,18 @@ detonation.
 * The AI keeps firing at shielded targets, as it did with the weapon-based shields.
 * The logic is deterministic and runs in game logic only, so it is multiplayer and replay safe.
 
+### Teleport targeting
+
+`ResetTargetingOnTeleport = Yes` makes other units drop their attack orders and turret targets
+on each teleported unit. It applies to `TeleportSelfSpecialPower`, `TeleporterAIUpdate` and
+`ChronoSphereUpdateModule`. The default is `No` for all three modules.
+
+Set the field inside the teleport behavior block. For the chronosphere, it applies to every
+object moved by the power. Units can acquire the teleported object again through normal targeting
+at its destination. The movement teleporter keeps its own attack target.
+
+This changes the simulation when enabled; all players and replays need the same INI.
+
 ### TeleportSelfSpecialPower
 
 Special power update module that teleports its own object to a clicked ground position. This is the activated-ability counterpart to [TeleporterAIUpdate](Objects-&-Modules.md#teleporteraiupdate-new---experimental), which instead replaces all normal movement with teleporting; a unit with this module walks normally the rest of the time.
@@ -965,6 +977,7 @@ Behavior = TeleportSelfSpecialPower ModuleTag_Teleport
   SpecialPowerTemplate = <SpecialPower entry>
   MaxTeleportRange = 0.0       ; furthest the object may teleport, 0 = unlimited
   TeleportDelay = 0            ; ms between activation and the teleport happening
+  ResetTargetingOnTeleport = No ; Yes makes attackers lose this unit
   TeleportStartFX = <FXList>   ; FX at the position we left
   TeleportTargetFX = <FXList>  ; FX at the position we arrived at
 

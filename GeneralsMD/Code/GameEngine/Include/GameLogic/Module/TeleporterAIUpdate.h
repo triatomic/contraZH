@@ -54,6 +54,7 @@ public:
 
 	Real m_opacityStart;
 	Real m_opacityEnd;
+	Bool m_resetTargetingOnTeleport;
 
 	TeleporterAIUpdateModuleData();
 

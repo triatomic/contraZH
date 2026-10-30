@@ -1016,6 +1016,35 @@ void Object::setTemporaryTeam( Team *team )
 
 //=============================================================================
 //=============================================================================
+void Object::resetTargetingOnSelf()
+{
+	for( Object *obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject() )
+	{
+		AIUpdateInterface *ai = obj->getAIUpdateInterface();
+		if( obj == this || ai == NULL )
+		{
+			continue;
+		}
+
+		if( ai->getCurrentVictim() == this
+				|| (ai->isAttacking() && ai->getGoalObject() == this) )
+		{
+			ai->aiIdle( CMD_FROM_AI );
+		}
+
+		for( Int i = 0; i < MAX_TURRETS; ++i )
+		{
+			WhichTurretType turret = (WhichTurretType)i;
+			if( ai->getTurretTargetObject( turret ) == this )
+			{
+				ai->setTurretTargetObject( turret, NULL );
+			}
+		}
+	}
+}
+
+//=============================================================================
+//=============================================================================
 void Object::setOrRestoreTeam( Team* team, Bool restoring )
 {
 	// don't do anything if the team hasn't changed

@@ -41,6 +41,7 @@ class ChronoSphereUpdateModuleData : public ModuleData
 {
 public:
 	SpecialPowerTemplate *m_specialPowerTemplate;
+	Bool m_resetTargetingOnTeleport;
 
 	UnsignedInt			m_teleportDelayFrames;	///< delay before the teleport happens
 	KindOfMaskType	m_requiredKindOf;				///< whitelist: units must match to be affected

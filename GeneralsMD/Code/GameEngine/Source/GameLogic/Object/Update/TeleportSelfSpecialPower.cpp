@@ -55,6 +55,7 @@ TeleportSelfSpecialPowerModuleData::TeleportSelfSpecialPowerModuleData( void )
 	m_recoverCondition = MODELCONDITION_INVALID;
 	m_opacityStart = 1.0f;
 	m_opacityEnd = 1.0f;
+	m_resetTargetingOnTeleport = FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -76,6 +77,7 @@ TeleportSelfSpecialPowerModuleData::TeleportSelfSpecialPowerModuleData( void )
 		{ "TeleportRecoverCondition", ModelConditionFlags::parseSingleBitFromINI, NULL, offsetof(TeleportSelfSpecialPowerModuleData, m_recoverCondition) },
 		{ "TeleportRecoverOpacityStart", INI::parsePercentToReal, NULL, offsetof(TeleportSelfSpecialPowerModuleData, m_opacityStart) },
 		{ "TeleportRecoverOpacityEnd", INI::parsePercentToReal, NULL, offsetof(TeleportSelfSpecialPowerModuleData, m_opacityEnd) },
+		{ "ResetTargetingOnTeleport", INI::parseBool, NULL, offsetof(TeleportSelfSpecialPowerModuleData, m_resetTargetingOnTeleport) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
@@ -240,6 +242,11 @@ void TeleportSelfSpecialPower::doTeleport()
 
 	obj->setPosition( &m_destLocation );
 	TheAI->pathfinder()->updatePos( obj, &m_destLocation );
+
+	if( data->m_resetTargetingOnTeleport )
+	{
+		obj->resetTargetingOnSelf();
+	}
 
 	FXList::doFXObj( data->m_targetFX, obj );
 

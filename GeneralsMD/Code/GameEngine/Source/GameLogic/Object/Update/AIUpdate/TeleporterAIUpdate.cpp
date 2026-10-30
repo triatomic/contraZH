@@ -59,6 +59,7 @@ TeleporterAIUpdateModuleData::TeleporterAIUpdateModuleData( void )
 	m_tintStatus = TINT_STATUS_INVALID;
 	m_opacityStart = 1.0;
 	m_opacityEnd = 1.0;
+	m_resetTargetingOnTeleport = FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -78,6 +79,7 @@ TeleporterAIUpdateModuleData::TeleporterAIUpdateModuleData( void )
 		{ "TeleportRecoverTint", TintStatusFlags::parseSingleBitFromINI, NULL, offsetof(TeleporterAIUpdateModuleData, m_tintStatus) },
 		{ "TeleportRecoverOpacityStart", INI::parsePercentToReal, NULL, offsetof(TeleporterAIUpdateModuleData, m_opacityStart) },
 		{ "TeleportRecoverOpacityEnd", INI::parsePercentToReal, NULL, offsetof(TeleporterAIUpdateModuleData, m_opacityEnd) },
+		{ "ResetTargetingOnTeleport", INI::parseBool, NULL, offsetof(TeleporterAIUpdateModuleData, m_resetTargetingOnTeleport) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
@@ -234,6 +236,11 @@ UpdateSleepTime TeleporterAIUpdate::doTeleport(Coord3D targetPos, Real angle, Re
 
 	obj->setPosition(&targetPos);
 	obj->setOrientation(angle);
+
+	if( d->m_resetTargetingOnTeleport )
+	{
+		obj->resetTargetingOnSelf();
+	}
 
 	FXList::doFXObj(d->m_targetFX, getObject());
 

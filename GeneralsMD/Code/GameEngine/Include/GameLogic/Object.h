@@ -653,6 +653,7 @@ public:
 	//When an AIAttackState is over, it needs to clean up any weapons that might be in leech range mode
 	//or else those weapons will have unlimited range!
 	void clearLeechRangeModeForAllWeapons();
+	void resetTargetingOnSelf();
 
 	Int getNumConsecutiveShotsFiredAtTarget( const Object *victim) const;
 
