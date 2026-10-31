@@ -2,6 +2,15 @@
 
 ## Maps
 
+### More terrain texture tiles
+
+* D3D9 builds use a 4096-pixel terrain atlas instead of 2048, increasing capacity from 784 to
+3,136 tile slots before gaps from packing texture classes. Source-tile storage rises from 1,024 to 4,096.
+* WorldBuilder reports texture usage against the atlas slot count. High-resolution textures use
+more slots, and a full atlas uses about four times the texture memory of the previous limit.
+* Requires support for 4096-pixel textures. Use matching D3D9 game and WorldBuilder builds for maps
+that exceed the old capacity. D3D8 builds keep the old limits.
+
 ### Per-object scale
 
 * Each placed object has a `Scale` field in WorldBuilder's Object Properties (`objectScale` in the

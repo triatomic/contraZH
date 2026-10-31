@@ -782,8 +782,7 @@ void TerrainMaterial::addTerrain(char *pPath, Int terrainNdx, HTREEITEM parent)
 		}
 	}
 
-	Int tilesPerRow = TEXTURE_WIDTH/(2*TILE_PIXEL_EXTENT+2*ATLAS_BORDER);
-	Int availableTiles = 4 * tilesPerRow * tilesPerRow;
+	Int availableTiles = MAX_ATLAS_SLOTS * MAX_ATLAS_SLOTS;
 	Int percent = (WorldHeightMapEdit::getTexClassNumTiles(terrainNdx)*100 + availableTiles/2) / availableTiles;
 
 	char label[_MAX_PATH];

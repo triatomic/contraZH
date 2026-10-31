@@ -2081,8 +2081,7 @@ void WorldHeightMapEdit::reloadTextures()
 void WorldHeightMapEdit::showTileStatusInfo()
 {
 	CString message;
-	Int tilesPerRow = TEXTURE_WIDTH/(2*TILE_PIXEL_EXTENT+2*ATLAS_BORDER);
-	Int availableTiles = 4 * tilesPerRow * tilesPerRow;
+	Int availableTiles = MAX_ATLAS_SLOTS * MAX_ATLAS_SLOTS;
 	Int availableBlends = NUM_BLEND_TILES;
 
 	CString tmp;

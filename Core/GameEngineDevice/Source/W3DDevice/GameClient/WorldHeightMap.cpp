@@ -1286,7 +1286,7 @@ Bool WorldHeightMap::ParseBlendTileData(DataChunkInput &file, DataChunkInfo *inf
 		initCliffFlagsFromHeights();
 	}
 	m_numBitmapTiles = file.readInt();
-	DEBUG_ASSERTCRASH(m_numBitmapTiles>0 && m_numBitmapTiles<2048, ("Unlikely numBitmapTiles."));
+	DEBUG_ASSERTCRASH(m_numBitmapTiles>0 && m_numBitmapTiles<=NUM_SOURCE_TILES, ("Unlikely numBitmapTiles."));
 	m_numBlendedTiles = file.readInt();
 	DEBUG_ASSERTCRASH(m_numBlendedTiles>0 && m_numBlendedTiles<NUM_BLEND_TILES+1, ("Unlikely numBlendedTiles."));
 	if (info->version >= K_BLEND_TILE_VERSION_5) {

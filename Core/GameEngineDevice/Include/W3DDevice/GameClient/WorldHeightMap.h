@@ -50,7 +50,7 @@ Not ref counted.  Do not store pointers to this class.  */
 #define K_MIN_HEIGHT  0
 #define K_MAX_HEIGHT  255
 
-#define NUM_SOURCE_TILES 1024
+#define NUM_SOURCE_TILES ((TEXTURE_WIDTH/TILE_PIXEL_EXTENT)*(TEXTURE_WIDTH/TILE_PIXEL_EXTENT))
 #define NUM_BLEND_TILES 16192
 #define NUM_CLIFF_INFO 32384
 #define FLAG_VAL 0x7ADA0000
@@ -87,7 +87,7 @@ typedef struct {
 #define NUM_TEXTURE_CLASSES 1024
 
 // Atlas slots along each side of the seabed's slot lookup, which terrainshadow.hlsl divides by too.
-#define CLASS_MAP_SLOTS 32
+#define CLASS_MAP_SLOTS (TEXTURE_WIDTH/TILE_PIXEL_EXTENT)
 
 // Bytes a cell of painted stochastic terrain takes: strength, seed and blending rate.
 #define STOCHASTIC_BYTES 3
