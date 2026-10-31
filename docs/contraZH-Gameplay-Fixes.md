@@ -3,6 +3,14 @@
 Always on, no `Options.ini` key. All are retail bugs upstream still carries. Each entry says whether
 it changes the simulation (older replays no longer play back identically) or only what is drawn.
 
+## Failed saves clean up safely
+
+A save that fails to load can leave update modules with unfinished queue indices. Cleanup now
+restores those indices before removing objects, so a rejected save no longer crashes the game
+while clearing the partially loaded match.
+
+This only changes cleanup; simulation and replay playback are unaffected.
+
 ## Guard mode holds its ground
 
 * A guarding unit that gets hit finishes its return or its current attack instead of chasing the

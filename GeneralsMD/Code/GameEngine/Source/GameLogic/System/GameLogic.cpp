@@ -331,6 +331,12 @@ void GameLogic::destroyAllObjectsImmediate()
 	Object *obj;
 	Object *nextObj;
 
+	// A failed save load can leave module indices unset.
+	for (Int i = 0; i < (Int)m_sleepyUpdates.size(); ++i)
+	{
+		m_sleepyUpdates[i]->friend_setIndexInLogic(i);
+	}
+
 	// TheSuperHackers @bugfix xezon 22/05/2025 Set all remaining objects effectively dead to avoid triggering their
 	// death modules that eventually would spawn new objects, such as debris, which could then crash the game.
 	// See https://github.com/TheSuperHackers/GeneralsGameCode/issues/896
