@@ -54,6 +54,7 @@
 #include "W3DDevice/GameClient/TileData.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "Common/GlobalData.h"
+#include "Common/TerrainTypes.h"
 #include "WW3D2/dx8wrapper.h"
 #include "WW3D2/formconv.h"
 
@@ -425,6 +426,92 @@ static void Box_Filter_Mips(IDirect3DTexture8 *texture, Int pixelBytes)
 		texture->UnlockRect(level-1);
 	}
 }
+
+#if defined(RTS_ZEROHOUR)
+TerrainEmissiveTextureClass::TerrainEmissiveTextureClass(int height) :
+	TextureClass(TEXTURE_WIDTH, height, WW3D_FORMAT_A8R8G8B8, MIP_LEVELS_3)
+{
+}
+
+Bool TerrainEmissiveTextureClass::update(WorldHeightMap *htMap, Real &scale)
+{
+	IDirect3DTexture8 *texture = DX8Wrapper::_Peek_Lockable_Texture(Peek_D3D_Texture());
+	if (texture == nullptr)
+	{
+		return false;
+	}
+	D3DSURFACE_DESC desc;
+	DX8_ErrorCode(texture->GetLevelDesc(0, &desc));
+	if (desc.Format != D3DFMT_A8R8G8B8 || desc.Width < TEXTURE_WIDTH)
+	{
+		return false;
+	}
+
+	std::vector<Real> strengths(htMap->m_numTextureClasses, 1.0f);
+	scale = 1.0f;
+	for (Int i=0; i<htMap->m_numTextureClasses; i++)
+	{
+		TerrainType *terrain = TheTerrainTypes->findTerrain(htMap->m_textureClasses[i].name);
+		if (terrain != nullptr)
+		{
+			strengths[i] = max(terrain->getUnitEmissiveIntensity(), 0.0f);
+		}
+		scale = max(scale, strengths[i]);
+	}
+
+	D3DLOCKED_RECT locked;
+	if (FAILED(texture->LockRect(0, &locked, nullptr, 0)))
+	{
+		return false;
+	}
+	UnsignedByte *bits = (UnsignedByte *)locked.pBits;
+	memset(bits, 0, locked.Pitch * desc.Height);
+	for (Int i=0; i<htMap->m_numTextureClasses; i++)
+	{
+		const TXTextureClass &info = htMap->m_textureClasses[i];
+		if (info.positionInTexture.x <= 0 || info.width <= 0)
+		{
+			continue;
+		}
+		const Real strength = strengths[i] / scale;
+		for (Int k=0; k<info.width*info.width; k++)
+		{
+			TileData *tile = htMap->getSourceTile(info.firstTile + k);
+			TileData *glow = htMap->m_sourceEmissiveTiles[info.firstTile + k];
+			if (tile == nullptr || glow == nullptr)
+			{
+				continue;
+			}
+			const ICoord2D position = tile->m_tileLocationInTexture;
+			if (position.x <= 0)
+			{
+				continue;
+			}
+			for (Int y=0; y<TILE_PIXEL_EXTENT; y++)
+			{
+				const UnsignedByte *src = glow->getRGBDataForWidth(TILE_PIXEL_EXTENT) +
+					(TILE_PIXEL_EXTENT-1-y)*TILE_BYTES_PER_PIXEL*TILE_PIXEL_EXTENT;
+				UnsignedByte *dst = bits + (position.y+y)*locked.Pitch + position.x*4;
+				for (Int x=0; x<TILE_PIXEL_EXTENT; x++)
+				{
+					dst[0] = (UnsignedByte)(src[0]*strength + 0.5f);
+					dst[1] = (UnsignedByte)(src[1]*strength + 0.5f);
+					dst[2] = (UnsignedByte)(src[2]*strength + 0.5f);
+					dst[3] = 255;
+					src += TILE_BYTES_PER_PIXEL;
+					dst += 4;
+				}
+			}
+		}
+		Copy_Wrap_Border(bits, locked.Pitch, 4, info.positionInTexture, info.width*TILE_PIXEL_EXTENT, ATLAS_BORDER);
+	}
+	texture->UnlockRect(0);
+	DX8_ErrorCode(Filter_Texture_Mipmaps(texture));
+	DX8Wrapper::_Upload_Lockable_Texture(Peek_D3D_Texture());
+	texture->SetLOD(WW3D::Get_Texture_Reduction());
+	return true;
+}
+#endif
 
 TerrainNormalTextureClass::TerrainNormalTextureClass(int height) :
 	TextureClass(TEXTURE_WIDTH, height,

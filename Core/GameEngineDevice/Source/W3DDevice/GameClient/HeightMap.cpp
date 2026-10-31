@@ -2383,6 +2383,11 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
  		W3DShaderManager::setTexture(W3DShaderManager::TERRAIN_NORMAL_TEXTURE,
  			(ShaderClass::Is_Backface_Culling_Inverted() || !W3DShaderManager::wantsTerrainNormalAtlas()) ? nullptr : m_map->getTerrainNormalTexture());
 		W3DShaderManager::setTexture(W3DShaderManager::TERRAIN_HEIGHT_TEXTURE, Height_Blend_Texture(m_map));
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+		W3DShaderManager::setTexture(W3DShaderManager::TERRAIN_EMISSIVE_TEXTURE,
+			ShaderClass::Is_Backface_Culling_Inverted() ? nullptr : m_map->getTerrainEmissiveTexture());
+		W3DShaderManager::setTerrainEmissiveScale(m_map->getTerrainEmissiveScale());
+#endif
 		//Disable writes to destination alpha channel (if there is one)
 		if (DX8Wrapper::getBackBufferFormat() == WW3D_FORMAT_A8R8G8B8)
 			DX8Wrapper::Set_DX8_Render_State(D3DRS_COLORWRITEENABLE,D3DCOLORWRITEENABLE_BLUE|D3DCOLORWRITEENABLE_GREEN|D3DCOLORWRITEENABLE_RED);
@@ -2432,6 +2437,25 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 	{
 		if (pass)	//shader was applied at least once?
  			W3DShaderManager::resetShader(st);
+
+#if defined(RTS_ZEROHOUR)
+		if (!m_disableTextures && W3DShaderManager::setTerrainEmissive())
+		{
+			for (Int y=0; y<m_numVBTilesY; y++)
+			{
+				for (Int x=0; x<m_numVBTilesX; x++)
+				{
+					if (Is_Hidden() == 0 && !isTileCulled(x, y))
+					{
+						DX8Wrapper::Set_Vertex_Buffer(getVertexBufferTile(x, y));
+						setTilePixelLights(y*m_numVBTilesX+x);
+						DX8Wrapper::Draw_Triangles(0, HEIGHTMAP_POLYGON_NUM, 0, HEIGHTMAP_VERTEX_NUM);
+					}
+				}
+			}
+			W3DShaderManager::resetShader(W3DShaderManager::ST_TERRAIN_BASE);
+		}
+#endif
 
 		//Draw feathered shorelines
 		renderShoreLines(&rinfo.Camera);
@@ -2856,6 +2880,11 @@ void HeightMapRenderObjClass::renderExtraBlendTiles()
 			W3DShaderManager::setTexture(1,cloudMapTexture());	//cloud
 			W3DShaderManager::setTexture(2,m_stageThreeTexture);	//noise/lightmap
 			W3DShaderManager::setTexture(W3DShaderManager::TERRAIN_HEIGHT_TEXTURE, Height_Blend_Texture(m_map));
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+			W3DShaderManager::setTexture(W3DShaderManager::TERRAIN_EMISSIVE_TEXTURE,
+				ShaderClass::Is_Backface_Culling_Inverted() ? nullptr : m_map->getTerrainEmissiveTexture());
+			W3DShaderManager::setTerrainEmissiveScale(m_map->getTerrainEmissiveScale());
+#endif
 			W3DShaderManager::setRoadHeightBlend(TRUE);
 
 			W3DShaderManager::ShaderTypes st = W3DShaderManager::ST_ROAD_BASE;

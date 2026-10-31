@@ -102,6 +102,9 @@ struct DataChunkInfo;
 class TerrainTextureClass;
 class TerrainNormalTextureClass;
 class TerrainHeightTextureClass;
+#if defined(RTS_ZEROHOUR)
+class TerrainEmissiveTextureClass;
+#endif
 class AlphaTerrainTextureClass;
 class AlphaEdgeTextureClass;
 
@@ -113,6 +116,9 @@ class WorldHeightMap : public RefCountClass,
 	friend class TerrainTextureClass;
 	friend class TerrainNormalTextureClass;
 	friend class TerrainHeightTextureClass;
+#if defined(RTS_ZEROHOUR)
+	friend class TerrainEmissiveTextureClass;
+#endif
 	friend class AlphaTerrainTextureClass;
 	friend class AlphaEdgeTextureClass;
 
@@ -182,6 +188,14 @@ protected:
 	TileData			*m_sourceNormalTiles[NUM_SOURCE_TILES];	///< Normal map tiles matching m_sourceTiles, null where a class has none
 	Bool				m_hasNormalTiles;	///< Some texture class has a normal map
 	TileData			*m_sourceHeightTiles[NUM_SOURCE_TILES];	///< Height map tiles matching m_sourceTiles, null where a class has none
+
+#if defined(RTS_ZEROHOUR)
+	TileData *m_sourceEmissiveTiles[NUM_SOURCE_TILES];
+	Bool m_hasEmissiveTiles;
+	TerrainEmissiveTextureClass *m_terrainEmissiveTex;
+	Real m_terrainEmissiveScale;
+	Bool m_terrainEmissiveTexFailed;
+#endif
 
 	TCliffInfo	m_cliffInfo[NUM_CLIFF_INFO];
 	Int m_numCliffInfo; ///< Number of cliffInfo's used in m_cliffInfo.
@@ -348,6 +362,10 @@ public:  // height map info.
 public:  // tile and texture info.
 	void setTextureLOD(Int lod);	///< set maximum lod level sent to the hardware.
 	TextureClass *getTerrainTexture();  //< generates if needed and returns the terrain texture
+#if defined(RTS_ZEROHOUR)
+	TextureClass *getTerrainEmissiveTexture();
+	Real getTerrainEmissiveScale() const { return m_terrainEmissiveScale; }
+#endif
 	TextureClass *getTerrainNormalTexture();  //< generates if needed and returns the terrain normal maps, or null when there are none
 	TextureClass *getTerrainHeightTexture();  //< generates if needed and returns the heights the textures blend by, or null when the card lacks the format
 	TextureClass *getTerrainClassMap();  //< generates if needed and returns the atlas slot lookup the seabed shaders read, or null

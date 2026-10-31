@@ -103,6 +103,8 @@ rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadown
 # The ground noise leaves the shadowed variants with it too long for ps_2_0.
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_a main terrainshadownoise2.pso       NOISE_COUNT=2 PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_a main terrainshadownoise2packed.pso NOISE_COUNT=2 PACKED=1)
+rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_a main terrainemissive.pso NOISE_COUNT=0 SHADOWED=0 GLINT=0 EMISSIVE_ONLY=1)
+rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_a main terrainemissiveseabed.pso NOISE_COUNT=0 SHADOWED=0 GLINT=0 SEABED=1 EMISSIVE_ONLY=1)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainnoshadow.pso           NOISE_COUNT=0 SHADOWED=0 PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainnoisenoshadow.pso      NOISE_COUNT=1 SHADOWED=0 PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainnoise2noshadow.pso      NOISE_COUNT=2 SHADOWED=0 PACKED=0)
@@ -168,7 +170,7 @@ foreach(RTS_SEABED_LIT 0 1)
     endforeach()
 endforeach()
 rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadow.pso                NOISE_COUNT=0 PACKED=0)
-rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadownoise.pso           NOISE_COUNT=1 PACKED=0)
+rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_a main roadshadownoise.pso           NOISE_COUNT=1 PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadowpacked.pso          NOISE_COUNT=0 PACKED=1)
 rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadownoisepacked.pso     NOISE_COUNT=1 PACKED=1)
 # The ground noise leaves the shadowed variants with it too long for ps_2_0.

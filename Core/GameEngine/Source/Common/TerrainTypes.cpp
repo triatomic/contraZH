@@ -49,6 +49,10 @@ const FieldParse TerrainType::m_terrainTypeFieldParseTable[] =
 	{ "GlintStrength", INI::parseReal,					nullptr,		offsetof( TerrainType, m_glintStrength ) },
 	{ "GlintGloss", INI::parseReal,							nullptr,		offsetof( TerrainType, m_glintGloss ) },
 
+#if defined(RTS_ZEROHOUR)
+	{ "UnitEmissiveIntensity", INI::parseReal, nullptr, offsetof( TerrainType, m_unitEmissiveIntensity ) },
+#endif
+
 	{ nullptr,					nullptr,												nullptr,		0 },
 
 };
@@ -65,6 +69,9 @@ TerrainType::TerrainType()
 	m_restrictConstruction = FALSE;
 	m_glintStrength = 1.0f;
 	m_glintGloss = 0.0f;
+#if defined(RTS_ZEROHOUR)
+	m_unitEmissiveIntensity = 1.0f;
+#endif
 	m_next = nullptr;
 
 }

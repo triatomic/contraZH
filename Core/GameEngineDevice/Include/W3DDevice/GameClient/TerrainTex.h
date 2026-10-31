@@ -97,6 +97,16 @@ public:
 };
 
 
+#if defined(RTS_ZEROHOUR)
+class TerrainEmissiveTextureClass : public TextureClass
+{
+	W3DMPO_CODE(TerrainEmissiveTextureClass)
+public:
+	TerrainEmissiveTextureClass(int height);
+	Bool update(WorldHeightMap *htMap, Real &scale);
+};
+#endif
+
 class AlphaTerrainTextureClass : public TextureClass
 {
 	W3DMPO_CODE(AlphaTerrainTextureClass)

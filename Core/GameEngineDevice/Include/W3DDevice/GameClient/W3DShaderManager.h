@@ -98,6 +98,11 @@ public:
 	enum { TERRAIN_NORMAL_TEXTURE = 4 };
 	/// The shader texture slot the terrain's height atlas goes in, or null for the legacy blend.
 	enum { TERRAIN_HEIGHT_TEXTURE = 5 };
+#if defined(RTS_ZEROHOUR)
+	enum { TERRAIN_EMISSIVE_TEXTURE = 6 };
+	static void setTerrainEmissiveScale(Real scale);
+	static Bool setTerrainEmissive();
+#endif
 	/// ST_SHADOW_MULTIPLY pass that also multiplies in the cloud map, for receivers without their own clouds.
 	enum { SHADOW_MULTIPLY_PASS_CLOUDS = 1 };
 	///Specify all textures (up to 8) which can be accessed by the shaders.

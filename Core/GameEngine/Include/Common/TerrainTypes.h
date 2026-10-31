@@ -174,6 +174,10 @@ public:
 	/// get the sun glint's gloss, or 0 for GameData's TerrainGlintGloss
 	Real getGlintGloss() { return m_glintGloss; }
 
+#if defined(RTS_ZEROHOUR)
+	Real getUnitEmissiveIntensity() { return m_unitEmissiveIntensity; }
+#endif
+
 	/// get next terrain in list, only for use by the terrain collection
 	TerrainType *friend_getNext() { return m_next; }
 
@@ -210,6 +214,9 @@ protected:
 	Bool m_restrictConstruction;			///< do not allow construction on this terrain tile
 	Real m_glintStrength;							///< sun glint strength, times GameData's TerrainGlintIntensity
 	Real m_glintGloss;								///< sun glint gloss, 0 for GameData's TerrainGlintGloss
+#if defined(RTS_ZEROHOUR)
+	Real m_unitEmissiveIntensity; ///< Multiplies GameData glow brightness for this terrain
+#endif
 	TerrainType *m_next;							///< next in terrain list
 
 	// for parsing from INI

@@ -1528,6 +1528,33 @@ static Int BumpNormalMapCount = 0;
 // The glow masks the specular pass adds, set once a frame by the scene.
 static Real EmissiveIntensity = 0.0f;
 static Int EmissiveMapCount = 0;
+#if defined(RTS_ZEROHOUR)
+static Real TerrainEmissiveScale = 1.0f;
+
+void W3DShaderManager::setTerrainEmissiveScale(Real scale)
+{
+	TerrainEmissiveScale = scale;
+}
+#endif
+
+static Real Bind_Terrain_Emissive(Bool terrain)
+{
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+	TextureClass *atlas = terrain ? W3DShaderManager::getShaderTexture(W3DShaderManager::TERRAIN_EMISSIVE_TEXTURE) : nullptr;
+	const Bool enabled = atlas != nullptr && atlas->Peek_D3D_Texture() != nullptr && EmissiveIntensity > 0.0f;
+	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
+	device->SetTexture(15, enabled ? atlas->Peek_D3D_Texture() : nullptr);
+	device->SetSamplerState(15, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
+	device->SetSamplerState(15, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
+	device->SetSamplerState(15, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+	device->SetSamplerState(15, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+	device->SetSamplerState(15, D3DSAMP_MIPFILTER, D3DTEXF_LINEAR);
+	return enabled ? EmissiveIntensity * TerrainEmissiveScale : 0.0f;
+#else
+	(void)terrain;
+	return 0.0f;
+#endif
+}
 
 // The point lights draws may add, set once a frame by the scene. Each draw names its own.
 static W3DShaderManager::PixelLight PixelLights[W3DShaderManager::MAX_PIXEL_LIGHT_CANDIDATES];
@@ -3346,7 +3373,15 @@ public:
 	TerrainShaderPixelShader() : m_shadowStage(-1), m_bumpStage(-1), m_lightStage(-1), m_seabedStage(-1), m_glintStage(-1)
 	{
 		m_dwPlainPixelShader[0] = m_dwPlainPixelShader[1] = m_dwPlainPixelShader[2] = 0;
+#if defined(RTS_ZEROHOUR)
+		m_dwEmissivePixelShader[0] = m_dwEmissivePixelShader[1] = 0;
+#endif
 	}
+
+#if defined(RTS_ZEROHOUR)
+	DWORD m_dwEmissivePixelShader[2];
+	Bool setEmissive();
+#endif
 
 private:
 	DWORD					m_dwBasePixelShader;	///<handle to terrain D3D pixel shader
@@ -3766,6 +3801,16 @@ Int TerrainShaderPixelShader::shutdown()
 		m_dwPlainPixelShader[i]=0;
 	}
 	TerrainHeightBlendLoaded = FALSE;
+#if defined(RTS_ZEROHOUR)
+	for (Int i=0; i<2; i++)
+	{
+		if (m_dwEmissivePixelShader[i] != 0)
+		{
+			DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_dwEmissivePixelShader[i]);
+			m_dwEmissivePixelShader[i] = 0;
+		}
+	}
+#endif
 
 	for (Int i=0; i<3; i++)
 	{
@@ -4299,6 +4344,13 @@ Int TerrainShaderPixelShader::init()
 			initPixelLights();
 			initSeabed();
 			initGlint();
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+			if (Supports_Pixel_Shader_2_a(DX8Wrapper::Get_Current_Caps()))
+			{
+				W3DShaderManager::LoadAndCreateD3DShader("shaders\\terrainemissive.pso", nullptr, 0, false, &m_dwEmissivePixelShader[0]);
+				W3DShaderManager::LoadAndCreateD3DShader("shaders\\terrainemissiveseabed.pso", nullptr, 0, false, &m_dwEmissivePixelShader[1]);
+			}
+#endif
 
 			W3DShaders[W3DShaderManager::ST_TERRAIN_BASE]=&terrainShaderPixelShader;
 			W3DShaders[W3DShaderManager::ST_TERRAIN_BASE_NOISE1]=&terrainShaderPixelShader;
@@ -4313,6 +4365,62 @@ Int TerrainShaderPixelShader::init()
 	}
 	return FALSE;
 }
+
+#if defined(RTS_ZEROHOUR)
+Bool W3DShaderManager::setTerrainEmissive()
+{
+	return terrainShaderPixelShader.setEmissive();
+}
+
+Bool TerrainShaderPixelShader::setEmissive()
+{
+#if defined(BUILD_WITH_D3D9)
+	if (m_dwEmissivePixelShader[0] == 0 || ShaderClass::Is_Backface_Culling_Inverted())
+	{
+		return FALSE;
+	}
+	const Real intensity = Bind_Terrain_Emissive(TRUE);
+	if (intensity <= 0.0f)
+	{
+		return FALSE;
+	}
+	TextureClass *atlas = W3DShaderManager::getShaderTexture(W3DShaderManager::TERRAIN_EMISSIVE_TEXTURE);
+	DX8Wrapper::Set_Texture(0, atlas);
+	DX8Wrapper::Set_Texture(1, atlas);
+	DX8Wrapper::Apply_Render_State_Changes();
+	for (Int stage=0; stage<2; stage++)
+	{
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, stage);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+		W3DShaderManager::setTerrainTextureFilter(stage, stage != 0);
+	}
+	Vector4 height = Bind_Height_Blend(W3DShaderManager::getShaderTexture(W3DShaderManager::TERRAIN_HEIGHT_TEXTURE));
+	height.W = intensity;
+	DX8Wrapper::Set_Pixel_Shader_Constant(TERRAIN_HEIGHT_BLEND_REGISTER, &height, 1);
+	End_Draw_Pixel_Lights();
+	if (m_dwEmissivePixelShader[1] != 0)
+	{
+		setSeabed(0, FALSE, FALSE, FALSE, m_dwEmissivePixelShader[0]);
+		if (DrawSeabedUnlitShader != 0)
+		{
+			DrawSeabedUnlitShader = m_dwEmissivePixelShader[1];
+			DrawSeabedLitShader = 0;
+		}
+	}
+	DX8Wrapper::Set_Pixel_Shader(m_dwEmissivePixelShader[0]);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZWRITEENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZFUNC, D3DCMP_EQUAL);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE, TRUE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_ONE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_ONE);
+	return TRUE;
+#else
+	return FALSE;
+#endif
+}
+#endif
 
 Int TerrainShaderPixelShader::set(Int pass)
 {
@@ -4506,6 +4614,7 @@ void TerrainShaderPixelShader::reset()
 	m_glintStage = -1;
 	Unbind_Glint_Maps();
 
+	Bind_Terrain_Emissive(FALSE);
 	End_Draw_Pixel_Lights();
 	Unbind_Height_Atlas();
 
@@ -4902,6 +5011,7 @@ Bool RoadShaderPixelShader::setPixelPath()
 
 	TextureClass *heights = W3DShaderManager::getShaderTexture(W3DShaderManager::TERRAIN_HEIGHT_TEXTURE);
 	const Bool heightBlend = RoadHeightBlendTiles && groundCapable && heights != nullptr && heights->Peek_D3D_Texture() != nullptr;
+	const Real emissive = Bind_Terrain_Emissive(RoadHeightBlendTiles);
 
 	Bool shadowed = (m_dwShadowPixelShader[noiseCount] != 0 && TheW3DShadowMap != nullptr && TheW3DShadowMap->hasDepth());
 	const Bool lightable = (RoadPixelLightsLoaded && (PixelLightCount > 0 || Get_Lights_Debug()));
@@ -4927,8 +5037,9 @@ Bool RoadShaderPixelShader::setPixelPath()
 	}
 	const Bool derivable = (slopeMap != nullptr && slopeMap->Peek_D3D_Texture() != nullptr);
 
-	if (!shadowed && !lightable && !lightMapReplaced && !heightBlend && !glintable && !bumpable && !derivable)
+	if (!shadowed && !lightable && !lightMapReplaced && !heightBlend && !glintable && !bumpable && !derivable && !emissive)
 	{
+		Bind_Terrain_Emissive(FALSE);
 		return FALSE;
 	}
 
@@ -4949,14 +5060,14 @@ Bool RoadShaderPixelShader::setPixelPath()
 		(!lightable || m_dwLitBumpPixelShader[shadowed ? 1 : 0][noiseCount] != 0);
 	const Bool derived = derivable && m_dwDerivedPixelShader[shadowed ? 1 : 0][noiseCount] != 0 &&
 		(!lightable || m_dwLitDerivedPixelShader[shadowed ? 1 : 0][noiseCount] != 0);
-	if (!shadowed && !lightable && !lightMapReplaced && !heightBlend && !glint && !bump && !derived)
+	if (!shadowed && !lightable && !lightMapReplaced && !heightBlend && !glint && !bump && !derived && !emissive)
 	{
 		return FALSE;
 	}
 
-	// Roads get the constants that leave their alpha alone. The unused w tells the bump the terrain atlas's layout.
+	// The fourth component is 1 plus glow brightness for terrain blend tiles, or 0 for roads.
 	Vector4 heightConstants = Bind_Height_Blend(heightBlend ? heights : nullptr);
-	heightConstants.W = RoadHeightBlendTiles ? 1.0f : 0.0f;
+	heightConstants.W = RoadHeightBlendTiles ? 1.0f + emissive : 0.0f;
 	if (derived)
 	{
 		// The derived bump leaves alpha alone without the register, so it holds the rise and the slope map's scales.
@@ -5221,6 +5332,7 @@ void RoadShaderPixelShader::reset()
 	m_normalStage = -1;
 	if (m_pixelPath)
 	{
+		Bind_Terrain_Emissive(FALSE);
 		Unbind_Height_Atlas();
 		Unbind_Glint_Maps();
 	}

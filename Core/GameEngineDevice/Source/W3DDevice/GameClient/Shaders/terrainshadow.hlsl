@@ -36,6 +36,10 @@
 // its constants turn it off, and GLINT alone gives the world position to terrain without bumps or lights.
 // Each texture's strength and gloss come from Terrain.ini through a map laid out like the colour atlas.
 
+#ifndef EMISSIVE_ONLY
+#define EMISSIVE_ONLY 0
+#endif
+
 #ifndef SHADOWED
 #define SHADOWED 1
 #endif
@@ -323,6 +327,9 @@ float4 main(PsIn input) : COLOR
 
     float weight = HeightBlendWeight(input.Diffuse.a, tex2D(HeightAtlas, input.BaseUV).r, tex2D(HeightAtlas, input.BlendUV).r);
     float4 color = lerp(base, blend, weight);
+#if EMISSIVE_ONLY
+    return float4(color.rgb * HeightBlend.w, 0.0f);
+#else
 #if GLINT
     float2 material = lerp(tex2D(GlintMaterials, input.BaseUV).rg, tex2D(GlintMaterials, input.BlendUV).rg, weight);
     float glintStrength = (dot(color.rgb, GlintAlbedo.xyz) + GlintAlbedo.w) * material.r;
@@ -413,4 +420,5 @@ float4 main(PsIn input) : COLOR
     color.rgb = lerp(color.rgb, saturate(0.5f + change * 4.0f).xxx, SunColor.w);
 #endif
     return color;
+#endif
 }

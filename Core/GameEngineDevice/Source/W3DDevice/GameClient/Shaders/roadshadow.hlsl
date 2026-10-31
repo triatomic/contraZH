@@ -52,6 +52,10 @@
 #define HEIGHT_BLEND_REGISTER c1
 #include "heightblend.hlsli"
 
+#if BUMP != 2
+sampler2D EmissiveAtlas : register(s15);
+#endif
+
 sampler2D RoadTexture : register(s0);
 
 #if NOISE_COUNT >= 1
@@ -112,7 +116,7 @@ float4 SunColor : register(c3);   // the sun's diffuse colour in the vertex ligh
 sampler2D NormalMap : register(CONCAT(s, NORMAL_INDEX));
 
 // Schuler's cotangent frame from the UV derivatives, since roads bend and turn their UVs with them.
-// z comes back from unit length, as the atlas has none. HeightBlend.w is 1 for the terrain atlas,
+// z comes back from unit length, as the atlas has none. HeightBlend.w is at least 1 for the terrain atlas,
 // which holds y in alpha, and 0 for a _nrm.dds, which holds it in green.
 float3 BumpNormal(float3 normal, float3 position, float2 uv)
 {
@@ -128,7 +132,7 @@ float3 BumpNormal(float3 normal, float3 position, float2 uv)
     float scale = side * ToSun.w * rsqrt(max(max(dot(tangent, tangent), dot(bitangent, bitangent)), 1e-30f));
 
     float4 texel = tex2D(NormalMap, uv);
-    float2 xy = float2(texel.r, lerp(texel.g, texel.a, HeightBlend.w)) * 2.0f - 1.0f;
+    float2 xy = float2(texel.r, lerp(texel.g, texel.a, saturate(HeightBlend.w))) * 2.0f - 1.0f;
     float3 bumped = (tangent * xy.x + bitangent * xy.y) * scale + normal * sqrt(saturate(1.0f - dot(xy, xy)));
     return (dot(bumped, bumped) > 1e-20f) ? normalize(bumped) : normal;
 }
@@ -266,6 +270,9 @@ float4 main(PsIn input) : COLOR
 #if BUMP
     // The debug view shows only the bump's shading, 4x, on grey.
     color.rgb = lerp(color.rgb, saturate(0.5f + change * 4.0f).xxx, SunColor.w);
+#endif
+#if BUMP != 2
+    color.rgb += tex2D(EmissiveAtlas, input.RoadUV).rgb * max(HeightBlend.w - 1.0f, 0.0f);
 #endif
     return color;
 }

@@ -328,6 +328,8 @@ blocks and stays stable during camera rotation. Views across the horizon use the
 
 Soft glow around `Add` blended object meshes, such as building lights, and object textures with
 `_emi` glow masks. Additive particles also feed bloom unless their particle system sets `Bloom = No`.
+Terrain textures also support `_emi` masks and a per-terrain `UnitEmissiveIntensity` key; see
+[Glow masks](dx9-Lighting.md#glow-masks). Terrain masks glow without feeding bloom.
 Ordinary opaque surfaces, smoke and alpha blended effects do not feed bloom. Needs no shader support.
 
 * `Bloom = No` - (Yes turns the glow on. Also `Bloom` on the Graphics page,

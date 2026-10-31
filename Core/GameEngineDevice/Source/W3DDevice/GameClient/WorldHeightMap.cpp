@@ -411,6 +411,9 @@ WorldHeightMap::~WorldHeightMap()
 		REF_PTR_RELEASE(m_edgeTiles[i]);
 		REF_PTR_RELEASE(m_sourceNormalTiles[i]);
 		REF_PTR_RELEASE(m_sourceHeightTiles[i]);
+#if defined(RTS_ZEROHOUR)
+		REF_PTR_RELEASE(m_sourceEmissiveTiles[i]);
+#endif
 	}
 	for (i=0; i<NUM_ALPHA_TILES; i++) {
 		REF_PTR_RELEASE(m_alphaTiles[i]);
@@ -418,6 +421,9 @@ WorldHeightMap::~WorldHeightMap()
 	REF_PTR_RELEASE(m_terrainTex);
 	REF_PTR_RELEASE(m_terrainNormalTex);
 	REF_PTR_RELEASE(m_terrainHeightTex);
+#if defined(RTS_ZEROHOUR)
+	REF_PTR_RELEASE(m_terrainEmissiveTex);
+#endif
 	REF_PTR_RELEASE(m_terrainClassMap);
 	REF_PTR_RELEASE(m_terrainGlintMap);
 	REF_PTR_RELEASE(m_stochasticTex);
@@ -456,6 +462,9 @@ WorldHeightMap::WorldHeightMap():
 	m_terrainTex(nullptr), m_alphaTerrainTex(nullptr), m_numBitmapTiles(0), m_numBlendedTiles(1),
 	m_terrainNormalTex(nullptr), m_terrainHeightTex(nullptr), m_terrainHeightTexFailed(false), m_terrainClassMap(nullptr), m_terrainClassMapAtlas(nullptr),
 	m_terrainGlintMap(nullptr), m_terrainGlintMapAtlas(nullptr), m_terrainGlintMapGloss(0.0f), m_terrainGlintStrengthScale(1.0f), m_terrainGlintGlossScale(1.0f), m_hasNormalTiles(false)
+#if defined(RTS_ZEROHOUR)
+	, m_hasEmissiveTiles(false), m_terrainEmissiveTex(nullptr), m_terrainEmissiveScale(1.0f), m_terrainEmissiveTexFailed(false)
+#endif
 {
 	Int i;
 	for (i=0; i<NUM_SOURCE_TILES; i++) {
@@ -463,6 +472,9 @@ WorldHeightMap::WorldHeightMap():
 		m_edgeTiles[i] = nullptr;
 		m_sourceNormalTiles[i] = nullptr;
 		m_sourceHeightTiles[i] = nullptr;
+#if defined(RTS_ZEROHOUR)
+		m_sourceEmissiveTiles[i] = nullptr;
+#endif
 	}
 
 	TheSidesList->validateSides();
@@ -500,6 +512,9 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly):
 	m_terrainTex(nullptr), m_alphaTerrainTex(nullptr), m_numBitmapTiles(0), m_numBlendedTiles(1),
 	m_terrainNormalTex(nullptr), m_terrainHeightTex(nullptr), m_terrainHeightTexFailed(false), m_terrainClassMap(nullptr), m_terrainClassMapAtlas(nullptr),
 	m_terrainGlintMap(nullptr), m_terrainGlintMapAtlas(nullptr), m_terrainGlintMapGloss(0.0f), m_terrainGlintStrengthScale(1.0f), m_terrainGlintGlossScale(1.0f), m_hasNormalTiles(false)
+#if defined(RTS_ZEROHOUR)
+	, m_hasEmissiveTiles(false), m_terrainEmissiveTex(nullptr), m_terrainEmissiveScale(1.0f), m_terrainEmissiveTexFailed(false)
+#endif
 {
 
 	int i;
@@ -508,6 +523,9 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly):
 		m_edgeTiles[i]=nullptr;
 		m_sourceNormalTiles[i]=nullptr;
 		m_sourceHeightTiles[i]=nullptr;
+#if defined(RTS_ZEROHOUR)
+		m_sourceEmissiveTiles[i]=nullptr;
+#endif
 	}
 
 	DataChunkInput file( pStrm );
@@ -1135,6 +1153,12 @@ void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData)
 					m_hasNormalTiles = true;
 				}
 				readMapTiles(texClass, terrain->getTexture().str(), width, "_hgt.dds", m_sourceHeightTiles);
+#if defined(RTS_ZEROHOUR)
+				if (readMapTiles(texClass, terrain->getTexture().str(), width, "_emi.dds", m_sourceEmissiveTiles))
+				{
+					m_hasEmissiveTiles = true;
+				}
+#endif
 			}
 		}
 		theFile->close();
@@ -2295,6 +2319,12 @@ void WorldHeightMap::setTextureLOD(Int lod)
 	{
 		m_terrainNormalTex->setLOD(lod);
 	}
+#if defined(RTS_ZEROHOUR)
+	if (m_terrainEmissiveTex != nullptr && m_terrainEmissiveTex->Peek_D3D_Texture() != nullptr)
+	{
+		m_terrainEmissiveTex->Peek_D3D_Texture()->SetLOD(lod);
+	}
+#endif
 	if (m_terrainHeightTex)
 	{
 		m_terrainHeightTex->setLOD(lod);
@@ -2316,6 +2346,10 @@ TextureClass *WorldHeightMap::getTerrainTexture()
 		m_terrainClassMapAtlas = nullptr;
 		REF_PTR_RELEASE(m_terrainGlintMap);
 		m_terrainGlintMapAtlas = nullptr;
+#if defined(RTS_ZEROHOUR)
+		REF_PTR_RELEASE(m_terrainEmissiveTex);
+		m_terrainEmissiveTexFailed = false;
+#endif
 		m_terrainTex = MSGNEW("WorldHeightMap_getTerrainTexture") TerrainTextureClass(pow2Height);
 		m_terrainTexHeight = m_terrainTex->update(this);
 		DEBUG_LOG(("Base tex height %d", pow2Height));
@@ -2586,6 +2620,23 @@ TextureClass *WorldHeightMap::getTerrainGlintMap(Real defaultGloss, Real &streng
 	glossScale = m_terrainGlintGlossScale;
 	return m_terrainGlintMap;
 }
+
+#if defined(RTS_ZEROHOUR)
+TextureClass *WorldHeightMap::getTerrainEmissiveTexture()
+{
+	if (m_terrainEmissiveTex == nullptr && m_hasEmissiveTiles && !m_terrainEmissiveTexFailed)
+	{
+		getTerrainTexture();
+		m_terrainEmissiveTex = MSGNEW("WorldHeightMap_getTerrainEmissiveTexture") TerrainEmissiveTextureClass(m_terrainTexHeight);
+		if (!m_terrainEmissiveTex->update(this, m_terrainEmissiveScale))
+		{
+			REF_PTR_RELEASE(m_terrainEmissiveTex);
+			m_terrainEmissiveTexFailed = true;
+		}
+	}
+	return m_terrainEmissiveTex;
+}
+#endif
 
 TextureClass *WorldHeightMap::getTerrainNormalTexture()
 {

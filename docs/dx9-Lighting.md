@@ -183,7 +183,18 @@ Tuned in the mod's `GameData.ini`:
 * `UnitEmissiveIntensity = 0.5` - (How bright the masks are by day. 0 turns them off by day.)
 * `UnitEmissiveNightIntensity = 1.5` - (The same at night.)
 
+Terrain textures also load `<texture>_emi.dds` from `Art\Textures`. For example,
+`NTGrass1.tga` uses `Art\Textures\NTGrass1_emi.dds`. The mask must cover at least the part
+of the terrain texture the game reads; using the same dimensions is simplest. Masks follow
+terrain UVs, two-way and three-way blends, and stochastic texture shifts. Terrain glow needs
+shader model 2.0a and ignores sunlight, shadows and clouds, as unit glow does.
+
+Each `Terrain` entry in `Terrain.ini` can set `UnitEmissiveIntensity = 1.0`. This multiplies
+GameData's day or night glow brightness for that terrain texture. Zero disables its glow;
+values above one brighten it. Missing keys use 1.0. Changes apply when a map loads.
+
 Notes:
+* Terrain masks glow but do not feed bloom. Flat terrain mode and water reflections omit terrain glow.
 * Skinned meshes glow but do not bloom.
 * Meshes with a glow mask are not hardware instanced while bloom is on.
 
