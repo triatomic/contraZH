@@ -308,7 +308,10 @@ void GameLogic::clearGameData( Bool showScoreScreen )
 		TheWritableGlobalData->m_maxCameraHeight = prefs.getMaxCameraHeight();
 	}
 
+	// Map overrides disappear during reset, including the next map selected by the menu.
+	const AsciiString pendingFile = TheGlobalData->m_pendingFile;
 	TheGameEngine->reset();
+	TheWritableGlobalData->m_pendingFile = pendingFile;
 	setGameMode(GAME_NONE);
 //	m_background->bringForward();
 //	if(shellGame)

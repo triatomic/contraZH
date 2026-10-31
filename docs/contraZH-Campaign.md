@@ -66,6 +66,8 @@ are missing.
 
 ## Generals' Challenge
 
+* Challenges keep the selected mission when leaving a shellmap with a `GameData` override in
+`map.ini`, so the versus screen and mission load correctly.
 * The single player `Challenge` button opens the challenge screen directly. Easy, Medium and Hard
 buttons sit left of Play there and share the campaign's `CampaignDifficulty` in `Options.ini`.
 * `ChallengeMenu.wnd` may define `ButtonEasy`, `ButtonMedium` and `ButtonHard` push buttons to
