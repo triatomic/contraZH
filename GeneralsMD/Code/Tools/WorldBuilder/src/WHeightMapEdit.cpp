@@ -2839,7 +2839,7 @@ static const Real HEIGHT_SCALE = MAP_HEIGHT_SCALE / MAP_XY_FACTOR;
 static const Real STRETCH_LIMIT = 1.5f;	 // If it is stretching less than this, don't adjust.
 static inline Int IABS(Int x) {	if (x>=0) return x; return -x;};
 
-static const Real TEX_PER_CELL = 32.0f/TEXTURE_WIDTH; // we use 32 texels per cell.
+static const Real TEX_PER_CELL = 32.0f/CLIFF_UV_REFERENCE_WIDTH; // we use 32 texels per cell.
 
 static const Real MIN_U_SPAN = TEX_PER_CELL * 0.4f;
 
@@ -2860,7 +2860,7 @@ Bool WorldHeightMapEdit::doCliffAdjustment(Int xIndex, Int yIndex)
 		return(false);
 	}
 	Real textureClassExtent = m_globalTextureClasses[curTileClass].width*TILE_PIXEL_EXTENT;
-	textureClassExtent /= TEXTURE_WIDTH;
+	textureClassExtent /= CLIFF_UV_REFERENCE_WIDTH;
 	Real startU = textureClassExtent/2;	// Center in the texture.
 	Real startV = 0; // We'll adjust the V values later.
 
@@ -3745,7 +3745,7 @@ void WorldHeightMapEdit::updateFlatCellForAdjacentCliffs(Int xIndex, Int yIndex,
 	}
 	if (!okToProcess) return;
 	Real textureClassExtent = m_globalTextureClasses[curTileClass].width*TILE_PIXEL_EXTENT;
-	textureClassExtent /= TEXTURE_WIDTH;
+	textureClassExtent /= CLIFF_UV_REFERENCE_WIDTH;
 	Int i, j;
 	for (i=xIndex-1; i<xIndex+2; i+=1) {
 		if (i<0) continue;

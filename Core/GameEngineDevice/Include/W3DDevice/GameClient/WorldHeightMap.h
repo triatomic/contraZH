@@ -71,6 +71,9 @@ typedef struct {
 } TXTextureClass;
 
 typedef enum {POS_X, POS_Y, NEG_X, NEG_Y} TVDirection;
+// Map files store cliff UVs relative to this width, independently of the render atlas.
+#define CLIFF_UV_REFERENCE_WIDTH 2048
+
 /// Struct in memory.
 typedef struct {
 	Real	u0, v0;	 // Upper left uv

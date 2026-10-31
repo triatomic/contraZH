@@ -1922,11 +1922,12 @@ Bool WorldHeightMap::getUVForTileIndex(Int ndx, Short tileNdx, float U[4], float
 				Real maxV = m_textureClasses[i].positionInTexture.y + m_textureClasses[i].width*TILE_PIXEL_EXTENT;
 				minU/=TEXTURE_WIDTH;
 				maxV/=m_terrainTexHeight;
-				Real vFactor = TEXTURE_WIDTH/m_terrainTexHeight;
-				U[0] = info.u0+minU;
-				U[1] = info.u1+minU;
-				U[2] = info.u2+minU;
-				U[3] = info.u3+minU;
+				Real uFactor = (Real)CLIFF_UV_REFERENCE_WIDTH/TEXTURE_WIDTH;
+				Real vFactor = (Real)CLIFF_UV_REFERENCE_WIDTH/m_terrainTexHeight;
+				U[0] = info.u0*uFactor+minU;
+				U[1] = info.u1*uFactor+minU;
+				U[2] = info.u2*uFactor+minU;
+				U[3] = info.u3*uFactor+minU;
 				V[0] = info.v0*vFactor+maxV;
 				V[1] = info.v1*vFactor+maxV;
 				V[2] = info.v2*vFactor+maxV;

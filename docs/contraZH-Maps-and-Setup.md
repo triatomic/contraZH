@@ -10,6 +10,8 @@
 more slots, and a full atlas uses about four times the texture memory of the previous limit.
 * Requires support for 4096-pixel textures. Use matching D3D9 game and WorldBuilder builds for maps
 that exceed the old capacity. D3D8 builds keep the old limits.
+* Saved cliff texture coordinates keep their existing scale, so maps with adjusted cliffs render
+and edit consistently with either atlas size.
 
 ### Per-object scale
 
