@@ -9,6 +9,7 @@ it redefines.)
 * Object Properties - (A Listen button plays the object's attached sound. Scale sets the object's
 visual size on top of the template `Scale`, for the whole selection.)
 * Selecting objects skips thumbnail rendering while the Object Options browser is hidden.
+* Selecting objects updates the placement template without searching the hidden legacy tree.
 * Placing an object whose template has `InstanceScaleFuzziness` gives it a random scale in that range.
 * Build List - (Replace swaps the selected building for another and keeps its position, angle,
 rebuild count and flags. Follow Object moves the view to the selected entry. Import of a file

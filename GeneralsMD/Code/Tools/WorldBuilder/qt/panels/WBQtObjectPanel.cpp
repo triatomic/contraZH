@@ -342,7 +342,7 @@ void WBQtObjectPanel::refreshTeamCombo()
 void WBQtObjectPanel::showEvent(QShowEvent *event)
 {
 	QWidget::showEvent(event);
-	refreshPreview();
+	selectListIndex(WBQtObject_GetSelectedIndex());
 }
 
 void WBQtObjectPanel::refreshPreview()
@@ -467,7 +467,7 @@ void WBQtObjectPanel::pushFromSelection()
 
 void WBQtObjectPanel::selectListIndex(int listIndex)
 {
-	if (listIndex < 0)
+	if (listIndex < 0 || !isVisible())
 	{
 		return;
 	}
