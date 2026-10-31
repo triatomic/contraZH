@@ -1524,9 +1524,7 @@ static Bool readTerrainDDSHeader(InputStream *stream, LegacyDDSURFACEDESC2 &head
 	{
 		return false;
 	}
-	return header.PixelFormat.FourCC == D3DFMT_DXT1 || header.PixelFormat.FourCC == D3DFMT_DXT2 ||
-		header.PixelFormat.FourCC == D3DFMT_DXT3 || header.PixelFormat.FourCC == D3DFMT_DXT4 ||
-		header.PixelFormat.FourCC == D3DFMT_DXT5;
+	return header.PixelFormat.FourCC == D3DFMT_DXT1 || header.PixelFormat.FourCC == D3DFMT_DXT5;
 }
 
 static Bool readTerrainDDSTiles(InputStream *stream, const char *filename, TileData **tiles, Int numRows)

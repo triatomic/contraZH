@@ -168,6 +168,13 @@ char const * GameFileClass::Set_Name( char const *filename )
 
 	GameFileType fileType = getFileType(filename);
 
+	if (isImageFileType(fileType) && strnicmp(filename, TERRAIN_TGA_DIR_PATH, strlen(TERRAIN_TGA_DIR_PATH)) == 0)
+	{
+		strlcpy(m_filePath, filename, ARRAY_SIZE(m_filePath));
+		m_fileExists = TheFileSystem->doesFileExist(m_filePath);
+		return m_filename;
+	}
+
 	// We need to be able to grab w3d's from a localization dir, since Germany hates exploding people units.
 	if( fileType == FILE_TYPE_W3D )
 	{
