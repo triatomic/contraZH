@@ -2435,12 +2435,10 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 
 	if (!doMultiPassWireFrame)
 	{
-		if (pass)	//shader was applied at least once?
- 			W3DShaderManager::resetShader(st);
-
 #if defined(RTS_ZEROHOUR)
 		if (!m_disableTextures && W3DShaderManager::setTerrainEmissive())
 		{
+			DEBUG_ASSERTCRASH(W3DShaderManager::getCurrentShader() != W3DShaderManager::ST_INVALID, ("Terrain glow requires an active terrain shader for cleanup."));
 			for (Int y=0; y<m_numVBTilesY; y++)
 			{
 				for (Int x=0; x<m_numVBTilesX; x++)
@@ -2453,9 +2451,12 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 					}
 				}
 			}
-			W3DShaderManager::resetShader(W3DShaderManager::ST_TERRAIN_BASE);
 		}
 #endif
+		if (pass)
+		{
+			W3DShaderManager::resetShader(st);
+		}
 
 		//Draw feathered shorelines
 		renderShoreLines(&rinfo.Camera);

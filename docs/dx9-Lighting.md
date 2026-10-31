@@ -195,6 +195,7 @@ values above one brighten it. Missing keys use 1.0. Changes apply when a map loa
 
 Notes:
 * Terrain masks glow but do not feed bloom. Flat terrain mode and water reflections omit terrain glow.
+* Terrain glow finishes before shader cleanup, so roads, shorelines and later objects draw with their own shaders.
 * Skinned meshes glow but do not bloom.
 * Meshes with a glow mask are not hardware instanced while bloom is on.
 
