@@ -28,7 +28,7 @@ ambient together. 0 turns them off. The specks are a narrow highlight off the ri
 ahead of the camera, so they show from every view. More of them show as `ShaderWaterWaveStrength`
 rises. Shader model 3 only.)
 * `ShaderWaterReflection = 3.0` - (Scales the sky reflection. 0 turns it off.)
-* `ShaderWaterSwellHeight = 3.0` - (Height of the vertex waves that lift lakes and seas, in world
+* `ShaderWaterSwellHeight = 0.0` - (Height of the vertex waves that lift lakes and seas, in world
 units. 0 turns them off. Needs a shader model 3 card.)
 * `ShaderWaterFoamStrength = 0.15` - (Brightness of the foam. 1 is full white web, 0 turns foam off.)
 * `ShaderWaterAutoMeasure = No` - (Calms water by its distance from shore, so ponds, harbours and

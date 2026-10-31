@@ -168,7 +168,7 @@ class WaterTransparencySetting : public Overridable
 			m_shaderWaterZoomCompensation = TRUE;
 			m_shaderWaterClearReflections = TRUE;
 			m_shaderWaterSoftShadows = TRUE;
-			m_shaderWaterSwellHeight = 3.0f;
+			m_shaderWaterSwellHeight = 0.0f;
 			m_shaderWaterSwellScale = 700.0f;
 			m_shaderWaterSwellSpeed = 30.0f;
 			m_shaderWaterPlanarDistortion = 0.025f;

@@ -24,7 +24,7 @@ One block. `map.ini` can override any of these keys for its map.
 | `ShaderWaterSpecular` | number | `1.0` | `0` - `5` | `0` turns the sun glint off. Above `5` the glint washes out to white. |
 | `ShaderWaterSparkle` | number | `0.6` | `0` **(hard)** - `10` | Brightness of the small sun sparkles. `0` turns them off. Shader model 3 only. |
 | `ShaderWaterReflection` | number | `3.0` | `0` - `10` | `0` turns the sky reflection off. Reflection is capped at 80% **(hard)**, so higher values only spread that cap to steeper views. |
-| `ShaderWaterSwellHeight` | number | `3.0` | `0` - `10` | Height of the vertex waves in world units. `0` turns them off. Waves shrink in water shallower than twice this. Above `10` they cut into hulls. |
+| `ShaderWaterSwellHeight` | number | `0.0` | `0` - `10` | Height of the vertex waves in world units. `0` turns them off. Waves shrink in water shallower than twice this. Above `10` they cut into hulls. |
 | `ShaderWaterFoamStrength` | number | `0.15` | `0` **(hard)** - `2` | Brightness of the foam. `0` turns it off. |
 | `ShaderWaterAutoMeasure` | Yes/No | `No` | - | Calms water by its distance from shore. `No` gives all water the open look. Shader model 3 only. |
 | `ShaderWaterEnclosedCalm` | number | `0.8` | `0` - `1` **(hard)** | How much calmer enclosed water is. `0` gives it the open look. |
