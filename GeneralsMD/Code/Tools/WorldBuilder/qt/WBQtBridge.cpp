@@ -40,11 +40,28 @@ class WbViewportHost : public QWinHost
 public:
 	explicit WbViewportHost(QWidget *parent)
 		: QWinHost(parent),
-		m_resizeTimer(new QTimer(this))
+		m_resizeTimer(new QTimer(this)),
+		m_frameTimer(new QTimer(this))
 	{
 		m_resizeTimer->setSingleShot(true);
 		m_resizeTimer->setInterval(60);
 		connect(m_resizeTimer, SIGNAL(timeout()), this, SLOT(applyDeviceSize()));
+		m_frameTimer->setSingleShot(true);
+		m_frameTimer->setTimerType(Qt::PreciseTimer);
+		connect(m_frameTimer, SIGNAL(timeout()), this, SLOT(requestFrame()));
+	}
+
+	void scheduleFrame(int delayMs)
+	{
+		if (!isVisible() || QWidget::window()->isMinimized())
+		{
+			m_frameTimer->stop();
+			return;
+		}
+		if (!m_frameTimer->isActive())
+		{
+			m_frameTimer->start(delayMs);
+		}
 	}
 
 protected:
@@ -55,6 +72,14 @@ protected:
 	}
 
 private slots:
+	void requestFrame()
+	{
+		if (isVisible() && !QWidget::window()->isMinimized() && ::IsWindow(window()))
+		{
+			::InvalidateRect(window(), NULL, FALSE);
+		}
+	}
+
 	void applyDeviceSize()
 	{
 		RECT rc;
@@ -66,6 +91,7 @@ private slots:
 
 private:
 	QTimer *m_resizeTimer;
+	QTimer *m_frameTimer;
 };
 
 // The Phase 2 host sandwich, owned for the process life:
@@ -74,6 +100,16 @@ private:
 // widget instead (QMainWindow -> g_wbViewportPane -> view).
 static QWinWidget    *g_wbViewportHost = NULL;
 static WbViewportHost *g_wbViewportPane = NULL;
+
+int WBQt_ScheduleViewportFrame(void *viewHwnd, int delayMs)
+{
+	if (g_wbViewportPane == NULL || g_wbViewportPane->window() != reinterpret_cast<HWND>(viewHwnd))
+	{
+		return 0;
+	}
+	g_wbViewportPane->scheduleFrame(delayMs);
+	return 1;
+}
 
 // Stage 1: the inversion is the default in Qt builds; it flips off only if the main
 // window cannot be created (then the legacy chrome-in-frame path runs).

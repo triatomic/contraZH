@@ -132,6 +132,7 @@ extern "C" int WBQtObject_GetRenderParticles(void);
 #include "GlobalLightOptions.h"
 #include "LayersList.h"
 #ifdef RTS_HAS_QT
+#include "qt/WBQtBridge.h"
 #include "qt/panels/WBQtLayersBridge.h"
 #include "qt/panels/WBQtMinimapBridge.h"
 #include "qt/panels/WBQtMiscModalsBridge.h"
@@ -6434,6 +6435,9 @@ void WbView3d::OnPaint()
 
 	PAINTSTRUCT ps;
 	HDC hdc = ::BeginPaint(m_hWnd, &ps);
+#ifdef RTS_HAS_QT
+	const LONGLONG previousAnimTick = m_lastAnimTick;
+#endif
 	if (!m_firstPaint && deferPaintForFpsCap()) {
 		::EndPaint(m_hWnd, &ps);
 		return;
@@ -6456,19 +6460,24 @@ void WbView3d::OnPaint()
 	}
 #endif
 	::EndPaint(m_hWnd, &ps);
-	// Record the view state we just painted, so OnTimer can skip timer repaints until
-	// something actually changes (all renderer modes -- see the idle skip in OnTimer;
-	// in GDI mode this also suppresses the strobe-inducing buffer flip). Not on the
-	// first paint: redraw() was skipped, so nothing was actually rendered yet.
+#ifndef RTS_HAS_QT
+	// The legacy timer skips unchanged frames to keep GDI labels from flickering.
 	if (!m_firstPaint) {
 		m_lastGdiPaintKey = buildLabelKey();
 		m_haveGdiPaintKey = true;
 	}
+#endif
 	if (m_firstPaint) {
 		CMainFrame::GetMainFrame()->adjustWindowSize();
 		m_firstPaint = false;
 	}
 	DX8Wrapper::SetCleanupHook(this);
+#ifdef RTS_HAS_QT
+	if (m_lastAnimTick != previousAnimTick)
+	{
+		WBQt_ScheduleViewportFrame(m_hWnd, (Int)ceil(fpsCapWaitMs()));
+	}
+#endif
 	
 }
 
@@ -7729,6 +7738,12 @@ Bool WbView3d::deferPaintForFpsCap()
 		if (timerMs < 1) {
 			timerMs = 1;
 		}
+#ifdef RTS_HAS_QT
+		if (WBQt_ScheduleViewportFrame(m_hWnd, timerMs))
+		{
+			return true;
+		}
+#endif
 		SetTimer(WB_FPSCAP_TIMER, timerMs, NULL);
 		m_fpsCapTimerSet = true;
 	}
@@ -7804,6 +7819,13 @@ void WbView3d::OnTimer(UINT nIDEvent)
 			refreshPathfindOverlay();
 		}
 	}
+
+#ifdef RTS_HAS_QT
+	if (WBQt_ScheduleViewportFrame(m_hWnd, 0))
+	{
+		return;
+	}
+#endif
 
 	if (getLastDrawTime()+UPDATE_TIME >= ::GetTickCount())
 		return;		// throttle: at most one repaint per UPDATE_TIME

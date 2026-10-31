@@ -1,5 +1,8 @@
 # Viewing the map
 
+The viewport keeps rendering when the cursor is still and respects the selected FPS cap.
+Rendering pauses while the main window is minimized or the viewport is hidden.
+
 Under View > Models:
 
 * Show Full Model - (Draws the units an object brings with it, such as the Overlord's turret or a
