@@ -1134,7 +1134,8 @@ void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData)
 	if (theFile != nullptr) {
 		GDIFileStream theStream(theFile);
 		InputStream *pStr = &theStream;
-		Int numTiles = WorldHeightMap::countTiles(pStr);
+		const char *filename = terrain != nullptr ? texturePath : texClass->name.str();
+		Int numTiles = WorldHeightMap::countTiles(pStr, nullptr, filename);
 		theFile->seek(0, File::START);
 		if (numTiles >= texClass->numTiles) {
 			numTiles = texClass->numTiles;
@@ -1145,7 +1146,7 @@ void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData)
 					break;
 				}
 			}
-			WorldHeightMap::readTiles(pStr, tileData+texClass->firstTile, width);
+			WorldHeightMap::readTiles(pStr, tileData+texClass->firstTile, width, filename);
 			if (tileData == m_sourceTiles && terrain != nullptr)
 			{
 				if (readMapTiles(texClass, terrain->getTexture().str(), width, "_nrm.dds", m_sourceNormalTiles))
@@ -1499,13 +1500,101 @@ typedef struct {
 
 
 
-/// Count how many tiles come in from a targa file.
-Int WorldHeightMap::countTiles(InputStream *pStr, Bool *halfTile)
+#if defined(RTS_ZEROHOUR)
+static Bool isTerrainDDS(const char *filename)
+{
+	const char *extension = filename != nullptr ? strrchr(filename, '.') : nullptr;
+	return extension != nullptr && stricmp(extension, ".dds") == 0;
+}
+
+static Bool readTerrainDDSHeader(InputStream *stream, LegacyDDSURFACEDESC2 &header)
+{
+	UnsignedInt magic;
+	if (stream->read(&magic, sizeof(magic)) != sizeof(magic) || magic != 0x20534444 ||
+		stream->read(&header, sizeof(header)) != sizeof(header))
+	{
+		return false;
+	}
+	if (header.Size != sizeof(header) || header.PixelFormat.Size != sizeof(header.PixelFormat) ||
+		(header.PixelFormat.Flags & 0x4) == 0 ||
+		header.Width < TILE_PIXEL_EXTENT || header.Width > 10*TILE_PIXEL_EXTENT ||
+		header.Height < TILE_PIXEL_EXTENT || header.Height > 10*TILE_PIXEL_EXTENT ||
+		header.Width % 4 != 0 || header.Height % 4 != 0 || header.Caps.Caps2 != 0 ||
+		header.Depth > 1 || header.MipMapCount > 10)
+	{
+		return false;
+	}
+	return header.PixelFormat.FourCC == D3DFMT_DXT1 || header.PixelFormat.FourCC == D3DFMT_DXT2 ||
+		header.PixelFormat.FourCC == D3DFMT_DXT3 || header.PixelFormat.FourCC == D3DFMT_DXT4 ||
+		header.PixelFormat.FourCC == D3DFMT_DXT5;
+}
+
+static Bool readTerrainDDSTiles(InputStream *stream, const char *filename, TileData **tiles, Int numRows)
+{
+	LegacyDDSURFACEDESC2 header;
+	if (!readTerrainDDSHeader(stream, header) || numRows < 1 || numRows > 10 ||
+		header.Width < numRows*TILE_PIXEL_EXTENT || header.Height < numRows*TILE_PIXEL_EXTENT)
+	{
+		return false;
+	}
+	const Int blockBytes = header.PixelFormat.FourCC == D3DFMT_DXT1 ? 8 : 16;
+	const Int dataSize = (header.Width/4)*(header.Height/4)*blockBytes;
+	std::vector<UnsignedByte> data(dataSize);
+	if (stream->read(&data[0], dataSize) != dataSize)
+	{
+		return false;
+	}
+	DDSFileClass dds(filename, 0);
+	if (!dds.Is_Available() || dds.Get_Type() != DDS_TEXTURE ||
+		dds.Get_Width(0) != header.Width || dds.Get_Height(0) != header.Height || !dds.Load() ||
+		dds.Get_Memory_Pointer(0) == nullptr)
+	{
+		return false;
+	}
+	const Int width = header.Width;
+	const Int height = header.Height;
+	std::vector<UnsignedByte> pixels(width*height*TILE_BYTES_PER_PIXEL);
+	dds.Copy_Level_To_Surface(0, WW3D_FORMAT_A8R8G8B8, width, height, &pixels[0], width*TILE_BYTES_PER_PIXEL);
+	for (Int i=0; i<numRows*numRows; i++)
+	{
+		if (tiles[i] == nullptr)
+		{
+			tiles[i] = MSGNEW("WorldHeightMap_readTiles") TileData;
+		}
+		const Int tileX = i%numRows;
+		const Int tileY = i/numRows;
+		for (Int row=0; row<TILE_PIXEL_EXTENT; row++)
+		{
+			const Int sourceY = height-1-(tileY*TILE_PIXEL_EXTENT+row);
+			memcpy(tiles[i]->getDataPtr()+row*TILE_PIXEL_EXTENT*TILE_BYTES_PER_PIXEL,
+				&pixels[(sourceY*width+tileX*TILE_PIXEL_EXTENT)*TILE_BYTES_PER_PIXEL],
+				TILE_PIXEL_EXTENT*TILE_BYTES_PER_PIXEL);
+		}
+		tiles[i]->updateMips();
+	}
+	return true;
+}
+#endif
+
+/// Count how many tiles come in from a terrain image.
+Int WorldHeightMap::countTiles(InputStream *pStr, Bool *halfTile, const char *filename)
 {
 	TTargaHeader hdr;
 	if (halfTile) {
 		*halfTile = false;
 	}
+#if defined(RTS_ZEROHOUR)
+	if (isTerrainDDS(filename))
+	{
+		LegacyDDSURFACEDESC2 header;
+		if (!readTerrainDDSHeader(pStr, header))
+		{
+			return 0;
+		}
+		const Int width = min(header.Width/TILE_PIXEL_EXTENT, header.Height/TILE_PIXEL_EXTENT);
+		return width*width;
+	}
+#endif
 	Int len = pStr->read(&hdr,sizeof(hdr));
 	if (len!=sizeof(hdr)) return(0);
 	Int tileWidth = hdr.imageWidth/TILE_PIXEL_EXTENT;
@@ -1541,9 +1630,15 @@ Int WorldHeightMap::countTiles(InputStream *pStr, Bool *halfTile)
 	}
 	return(0);
 }
-/*Break down a .tga file into a collection of tiles.  numRows * numRows total tiles.*/
-Bool WorldHeightMap::readTiles(InputStream *pStr, TileData **tiles, Int numRows)
+/*Break down a terrain image into a collection of tiles.  numRows * numRows total tiles.*/
+Bool WorldHeightMap::readTiles(InputStream *pStr, TileData **tiles, Int numRows, const char *filename)
 {
+#if defined(RTS_ZEROHOUR)
+	if (isTerrainDDS(filename))
+	{
+		return readTerrainDDSTiles(pStr, filename, tiles, numRows);
+	}
+#endif
 	TTargaHeader hdr;
 	pStr->read(&hdr, sizeof(hdr));
 	Int tileWidth = hdr.imageWidth/TILE_PIXEL_EXTENT;

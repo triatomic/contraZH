@@ -4,6 +4,10 @@
 
 ### More terrain texture tiles
 
+* Terrain `Texture` entries accept TGA or legacy DXT1-DXT5 DDS files in `Art/Terrain`, in both the
+game and WorldBuilder. DDS images use the same tile layout and atlas space as TGA images.
+* Individual terrain images still fit within 640 by 640 pixels. DDS cube maps, volume textures,
+uncompressed DDS and newer DX10/BC7 formats are unsupported.
 * D3D9 builds use a 4096-pixel terrain atlas instead of 2048, increasing capacity from 784 to
 3,136 tile slots before gaps from packing texture classes. Source-tile storage rises from 1,024 to 4,096.
 * WorldBuilder reports texture usage against the atlas slot count. High-resolution textures use

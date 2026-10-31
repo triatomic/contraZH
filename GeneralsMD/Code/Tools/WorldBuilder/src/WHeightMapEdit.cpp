@@ -146,7 +146,7 @@ Int WorldHeightMapEdit::getTextureFilePixels(const AsciiString &texture, Unsigne
 	{
 		return 0;
 	}
-	Int numTiles = WorldHeightMap::countTiles(&stream);
+	Int numTiles = WorldHeightMap::countTiles(&stream, nullptr, path.str());
 	Int numRows = 0;
 	while ((numRows + 1) * (numRows + 1) <= numTiles)
 	{
@@ -165,7 +165,7 @@ Int WorldHeightMapEdit::getTextureFilePixels(const AsciiString &texture, Unsigne
 		tiles[i] = nullptr;
 	}
 	Int extent = 0;
-	if (WorldHeightMap::readTiles(&stream, tiles, numRows))
+	if (WorldHeightMap::readTiles(&stream, tiles, numRows, path.str()))
 	{
 		extent = stitchTiles(tiles, numRows, bgraOut, cap);
 	}
@@ -491,7 +491,7 @@ void WorldHeightMapEdit::loadBitmap(char *path, const char *uiName)
 	}
 	InputStream *pStrm = &stream;
 
-	Int numTiles = WorldHeightMap::countTiles(pStrm);
+	Int numTiles = WorldHeightMap::countTiles(pStrm, nullptr, path);
 	int width;
 	Bool ok=false;
 	if (numTiles < 1) {
@@ -513,7 +513,7 @@ void WorldHeightMapEdit::loadBitmap(char *path, const char *uiName)
 	}
 
 #define BLEND_TILE_PREFIX "TE"
-	ok = readTiles(pStrm, m_globalTextureClasses[texToUse].tiles, width);
+	ok = readTiles(pStrm, m_globalTextureClasses[texToUse].tiles, width, path);
 	if (!ok) return;
 	m_globalTextureClasses[texToUse].numTiles = numTiles;
 	m_globalTextureClasses[texToUse].width = width;
@@ -611,7 +611,7 @@ void WorldHeightMapEdit::loadImagesFromTerrainType( TerrainType *terrain )
 	InputStream *pStrm = &stream;
 
 	// could the tiles in the file
-	Int numTiles = WorldHeightMap::countTiles( pStrm );
+	Int numTiles = WorldHeightMap::countTiles( pStrm, nullptr, texturePath.str() );
 	Int width;
 	if( numTiles < 1 )
 		return;
@@ -635,7 +635,7 @@ void WorldHeightMapEdit::loadImagesFromTerrainType( TerrainType *terrain )
 // -->
 
 	// read the tiles out of .tga file
-	Bool ok = readTiles( pStrm, m_globalTextureClasses[ texToUse ].tiles, width );
+	Bool ok = readTiles( pStrm, m_globalTextureClasses[ texToUse ].tiles, width, texturePath.str() );
 	if( !ok )
 		return;
 	m_globalTextureClasses[ texToUse ].name = terrain->getName();
@@ -2057,12 +2057,12 @@ void WorldHeightMapEdit::reloadTextures()
 		if (!stream.open(m_globalTextureClasses[i].filePath)) {
 			continue;
 		}
-		Int numTiles = WorldHeightMap::countTiles(&stream);
+		Int numTiles = WorldHeightMap::countTiles(&stream, nullptr, m_globalTextureClasses[i].filePath.str());
 		if (numTiles < m_globalTextureClasses[i].numTiles) {
 			continue;
 		}
 		stream.rewind();
-		/*Bool ok =*/ readTiles(&stream, m_globalTextureClasses[i].tiles, m_globalTextureClasses[i].width);
+		/*Bool ok =*/ readTiles(&stream, m_globalTextureClasses[i].tiles, m_globalTextureClasses[i].width, m_globalTextureClasses[i].filePath.str());
 		stream.close();
 	}
 	if (TheTerrainRenderObject) {

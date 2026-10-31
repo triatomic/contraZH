@@ -220,7 +220,7 @@ namespace
 		{
 			return false;
 		}
-		return WorldHeightMap::countTiles(&stream) >= 1;
+		return WorldHeightMap::countTiles(&stream, nullptr, path.str()) >= 1;
 	}
 }
 
