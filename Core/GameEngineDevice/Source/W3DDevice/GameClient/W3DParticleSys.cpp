@@ -488,7 +488,7 @@ unsigned W3DParticleSystemManager::systemEffects(ParticleSystem &system, DrawPas
 Bool W3DParticleSystemManager::disrupts(ParticleSystem &system)
 {
 	const Bool volume = system.isUsingVolumeParticles() && system.getVolumeParticleDepth() > DEFAULT_VOLUME_PARTICLE_DEPTH;
-	return system.isUsingParticles() && !volume && systemEffects(system, DRAW_DISRUPT) != 0 &&
+	return system.isUsingParticles() && !volume && !system.getParticleTypeName().isEmpty() && systemEffects(system, DRAW_DISRUPT) != 0 &&
 		TheW3DSoftParticles->disruptionEnabled();
 }
 

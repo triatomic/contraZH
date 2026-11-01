@@ -87,9 +87,11 @@ W3DSoftParticles::W3DSoftParticles()
 	  m_flameDepthShader(0),
 	  m_flameHeightShader(0),
 	  m_flameShader(0),
+	  m_flameTerrainShader(0),
 	  m_electricDepthShader(0),
 	  m_electricHeightShader(0),
 	  m_electricShader(0),
+	  m_electricTerrainShader(0),
 	  m_laserDepthShader(0),
 	  m_laserHeightShader(0),
 	  m_laserShader(0),
@@ -142,9 +144,11 @@ void W3DSoftParticles::ReleaseResources()
 		DX8_DELETE_PIXEL_SHADER(device, m_flameDepthShader);
 		DX8_DELETE_PIXEL_SHADER(device, m_flameHeightShader);
 		DX8_DELETE_PIXEL_SHADER(device, m_flameShader);
+		DX8_DELETE_PIXEL_SHADER(device, m_flameTerrainShader);
 		DX8_DELETE_PIXEL_SHADER(device, m_electricDepthShader);
 		DX8_DELETE_PIXEL_SHADER(device, m_electricHeightShader);
 		DX8_DELETE_PIXEL_SHADER(device, m_electricShader);
+		DX8_DELETE_PIXEL_SHADER(device, m_electricTerrainShader);
 		DX8_DELETE_PIXEL_SHADER(device, m_laserDepthShader);
 		DX8_DELETE_PIXEL_SHADER(device, m_laserHeightShader);
 		DX8_DELETE_PIXEL_SHADER(device, m_laserShader);
@@ -165,9 +169,11 @@ void W3DSoftParticles::ReleaseResources()
 	m_flameDepthShader = 0;
 	m_flameHeightShader = 0;
 	m_flameShader = 0;
+	m_flameTerrainShader = 0;
 	m_electricDepthShader = 0;
 	m_electricHeightShader = 0;
 	m_electricShader = 0;
+	m_electricTerrainShader = 0;
 	m_laserDepthShader = 0;
 	m_laserHeightShader = 0;
 	m_laserShader = 0;
@@ -299,6 +305,7 @@ Bool W3DSoftParticles::loadShaders()
 				Load_Pixel_Shader("shaders\\softparticleflamedepth.pso", m_flameDepthShader);
 				Load_Pixel_Shader("shaders\\softparticleflameheight.pso", m_flameHeightShader);
 				Load_Pixel_Shader("shaders\\particleflame.pso", m_flameShader);
+				Load_Pixel_Shader("shaders\\particleflameterrain.pso", m_flameTerrainShader);
 				Load_Pixel_Shader("shaders\\heathaze.pso", m_hazeShader);
 			}
 			if (ElectricShaderMode != 0)
@@ -306,6 +313,7 @@ Bool W3DSoftParticles::loadShaders()
 				Load_Pixel_Shader("shaders\\softparticleelectricdepth.pso", m_electricDepthShader);
 				Load_Pixel_Shader("shaders\\softparticleelectricheight.pso", m_electricHeightShader);
 				Load_Pixel_Shader("shaders\\particleelectric.pso", m_electricShader);
+				Load_Pixel_Shader("shaders\\particleelectricterrain.pso", m_electricTerrainShader);
 			}
 			if (LaserShaderMode != 0)
 			{
@@ -938,13 +946,13 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const 
 	{
 		depthShader = m_flameDepthShader;
 		heightShader = m_flameHeightShader;
-		shadedShader = m_flameShader;
+		shadedShader = terrain ? m_flameTerrainShader : m_flameShader;
 	}
 	else if (electric)
 	{
 		depthShader = m_electricDepthShader;
 		heightShader = m_electricHeightShader;
-		shadedShader = m_electricShader;
+		shadedShader = terrain ? m_electricTerrainShader : m_electricShader;
 	}
 	else if (laser)
 	{

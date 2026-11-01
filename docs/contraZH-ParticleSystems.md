@@ -129,6 +129,8 @@ Notes:
 * Fluid, flame, electric and cryo shaders shade the terrain mesh. Flame heat haze and disruption
 also follow the mesh, and cryo and electric particle-scale settings change its footprint.
 * Ground meshes retain their surface coverage instead of soft-fading against the terrain they follow.
+* Flame and electric terrain shaders require shader model 2.0a and keep warped edges inside the
+original particle footprint. Other particle shaders keep their existing hardware requirements.
 
 ## Snow move effects
 

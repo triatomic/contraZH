@@ -82,7 +82,7 @@ page. `ParticleSystem.ini` overrides take effect on the next launch.
 * A streak burns only with `FlameShader = Yes`, since `Auto` would turn every trail behind a flame
 shell to fire. Streaks, beams and models take the flame shading without the shimmer behind it.
 * Projectile streams and volume particles stay plain. Terrain-conforming particles take flame
-shading and heat haze on their terrain mesh.
+shading and heat haze on their terrain mesh. Flame shading on that mesh needs shader model 2.0a.
 * On a card without shader model 2.0a, flames keep their shading but lose the soft fade.
 * Launch with `CONTRA_FLAMESHADER=1` to drop the shimmer, or `0` to turn flame shading off.
 
@@ -151,7 +151,8 @@ depth, so they stay visible at the top of the screen and when zoomed out.
 * A system that is both flame and electric draws as flame.
 * Streaks such as `TeslaTrail.tga`, volume particles and multiplied
 sprites stay plain.
-* Terrain-conforming particles take electric shading and `ElectricParticleScale` on their terrain mesh.
+* Terrain-conforming particles take electric shading and `ElectricParticleScale` on their terrain
+mesh, with shader model 2.0a.
 * Launch with `CONTRA_ELECTRICSHADER=0` to turn electric shading off.
 
 # Laser shading
@@ -439,6 +440,8 @@ a jump.
 * On a particle system, `ALPHA_TEST` and `MULTIPLY` sprites, streaks and volume particles take no
 disruption, and draw their own art even with `Only`. Terrain-conforming particles disrupt through
 their terrain mesh, including with `Only`.
+* A particle system without a `ParticleName` texture keeps its plain art with `Only`, since it
+has no texture to mask the disruption.
 * The bend follows the mask at the size the sprite draws, so `CryoParticleScale` and
 `ElectricParticleScale` scale it too. On a model it fades with the object's opacity.
 * An `FXList` disc lies flat and ignores depth, like a shockwave. At most 32 show at once.

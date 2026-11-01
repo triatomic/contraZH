@@ -48,6 +48,9 @@
 #ifndef FLUID
 #define FLUID 0
 #endif
+#ifndef TERRAIN
+#define TERRAIN 0
+#endif
 
 sampler2D ParticleTexture : register(s0);
 sampler2D SurfaceTexture  : register(s1);
@@ -113,6 +116,11 @@ struct PsIn
 float4 main(PsIn input) : COLOR
 {
     float4 position = float4(input.Position, 1.0f);
+
+#if TERRAIN
+    // Terrain triangles are culled against the unwarped footprint.
+    clip(min(input.TexCoord, 1.0f - input.TexCoord));
+#endif
 
 #if FLUID
     float2 world = float2(dot(position, FluidWorldX), dot(position, FluidWorldY));

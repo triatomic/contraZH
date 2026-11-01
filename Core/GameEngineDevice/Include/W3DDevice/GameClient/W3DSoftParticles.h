@@ -97,9 +97,11 @@ private:
 	DWORD m_flameDepthShader;
 	DWORD m_flameHeightShader;
 	DWORD m_flameShader;
+	DWORD m_flameTerrainShader;
 	DWORD m_electricDepthShader;
 	DWORD m_electricHeightShader;
 	DWORD m_electricShader;
+	DWORD m_electricTerrainShader;
 	DWORD m_laserDepthShader;
 	DWORD m_laserHeightShader;
 	DWORD m_laserShader;
