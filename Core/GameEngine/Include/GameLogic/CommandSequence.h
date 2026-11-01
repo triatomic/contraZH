@@ -58,7 +58,7 @@ protected:
 	struct CommandNode
 	{
 		UnsignedInt m_nodeID;
-		CommandType m_commandType;
+		CommandType m_cmdType;
 		ObjectID m_targetID;
 		Real m_angle;
 		Coord3D m_loc, m_loc2;
@@ -77,6 +77,9 @@ protected:
 private:
 	typedef std::map<UnsignedInt, CommandNode*> IDToNodeMap;
 	IDToNodeMap m_allNodes;
+
+	typedef std::map<UnsignedInt, Drawable*> IDToDrawableMap;
+	IDToDrawableMap m_constructionShadows;
 
 	std::map<ObjectID, Int> m_constructionCount;
 
@@ -105,34 +108,34 @@ protected:
 public:
 	Bool hasAnyCommand(Object *obj);
 	void clearObjectCommand(Object *obj);
-	UnsignedInt newNoArgumentCommand(CommandType commandType);
-	UnsignedInt newSinglePosCommand(CommandType commandType, const Coord3D *pos);
-	UnsignedInt newSingleTargetCommand(CommandType commandType, Object *obj);
-	UnsignedInt newTargetNPosCommand(CommandType commandType, Object* obj, const Coord3D* pos);
-	UnsignedInt newPosNMaxShotsCommand(CommandType commandType, const Coord3D *pos, Int maxShotsToFire);
-	UnsignedInt newGuardCommand(CommandType commandType, const Coord3D *pos, Object *obj, GuardMode guardMode);
-	UnsignedInt newDoWeaponAtLocCommand(CommandType commandType, WeaponSlotType weaponSlot, const Coord3D *pos, Int maxShotsToFire, Bool releaseAfter);
-	UnsignedInt newDoWeaponAtObjCommand(CommandType commandType, WeaponSlotType weaponSlot, Object* obj, Int maxShotsToFire);
-	UnsignedInt newDozerConstructCommand(CommandType commandType, const ThingTemplate *thing, const Coord3D *pos1, const Coord3D *pos2, Real angle);
-	UnsignedInt newDoSpecialCommand(CommandType commandType, UnsignedInt specialPowerID, UnsignedInt commandOptions);
-	UnsignedInt newDoSpecialAtLocCommand(CommandType commandType, UnsignedInt specialPowerID, const Coord3D *location, Real angle, const Object *objectInWay, UnsignedInt commandOptions);
-	UnsignedInt newDoSpecialAtObjCommand(CommandType commandType, UnsignedInt specialPowerID, Object *target, UnsignedInt commandOptions);
-	UnsignedInt newSwitchWeaponCommand(CommandType commandType, WeaponSlotType weaponSlot);
+	UnsignedInt newNoArgumentCommand(CommandType cmdType);
+	UnsignedInt newSinglePosCommand(CommandType cmdType, const Coord3D *pos);
+	UnsignedInt newSingleTargetCommand(CommandType cmdType, Object *obj);
+	UnsignedInt newTargetNPosCommand(CommandType cmdType, Object* obj, const Coord3D* pos);
+	UnsignedInt newPosNMaxShotsCommand(CommandType cmdType, const Coord3D *pos, Int maxShotsToFire);
+	UnsignedInt newGuardCommand(CommandType cmdType, const Coord3D *pos, Object *obj, GuardMode guardMode);
+	UnsignedInt newDoWeaponAtLocCommand(CommandType cmdType, WeaponSlotType weaponSlot, const Coord3D *pos, Int maxShotsToFire, Bool releaseAfter);
+	UnsignedInt newDoWeaponAtObjCommand(CommandType cmdType, WeaponSlotType weaponSlot, Object* obj, Int maxShotsToFire);
+	UnsignedInt newDozerConstructCommand(CommandType cmdType, const ThingTemplate *thing, const Coord3D *pos1, const Coord3D *pos2, Real angle);
+	UnsignedInt newDoSpecialCommand(CommandType cmdType, UnsignedInt specialPowerID, UnsignedInt commandOptions);
+	UnsignedInt newDoSpecialAtLocCommand(CommandType cmdType, UnsignedInt specialPowerID, const Coord3D *location, Real angle, const Object *objectInWay, UnsignedInt commandOptions);
+	UnsignedInt newDoSpecialAtObjCommand(CommandType cmdType, UnsignedInt specialPowerID, Object *target, UnsignedInt commandOptions);
+	UnsignedInt newSwitchWeaponCommand(CommandType cmdType, WeaponSlotType weaponSlot);
 
 	// ShigreUi 01/10/2026 only do it on newly created command
-	Bool includeUnitInCommand(UnsignedInt commandNodeID, Object *obj, const Coord3D *objDest = nullptr);
+	Bool includeUnitInCommand(UnsignedInt cmdNodeID, Object *obj, const Coord3D *objDest = nullptr);
 	// ShigreUi 01/10/2026 Moving comand include reverse move/attack move/etc, only do it on newly created command
-	Bool includeUnitInTypicalMovingCommand(UnsignedInt commandNodeID, Object* obj, Coord3D objDest);
+	Bool includeUnitInTypicalMovingCommand(UnsignedInt cmdNodeID, Object* obj, Coord3D objDest);
 
-	inline Bool isTypicalMovingCommand(CommandType commandType);
+	inline Bool isTypicalMovingCommand(CommandType cmdType);
 	inline Bool isEndCommand(CommandNode *cmdNode);
 	inline Bool hasEndCommand(Object *obj);
-	inline Bool isLocatableCommand(UnsignedInt commandNodeID);
+	inline Bool isLocatableCommand(UnsignedInt cmdNodeID);
 
-	void cleanUpEmptyCommand(UnsignedInt commandNodeID);
+	void cleanUpEmptyCommand(UnsignedInt cmdNodeID);
 	UnsignedInt getFirstLocatableCommand(Object *obj);
-	UnsignedInt getNextLocatableCommand(Object *obj, UnsignedInt commandNodeID);
-	Bool getCommandLoc(UnsignedInt commandNodeID, Coord3D &loc);
+	UnsignedInt getNextLocatableCommand(Object *obj, UnsignedInt cmdNodeID);
+	Bool getCommandLoc(UnsignedInt cmdNodeID, Coord3D &loc);
 
 	Bool isStillAwaiting(Object *obj);
 	void proceedNextCommand(Object *obj);
@@ -151,18 +154,22 @@ public:
 	Bool confirmExitCommand(Object *objWantToExit, Object *objectContainingExiter);
 	Bool terminateOCLVerifiedCommand(Object *obj);
 	Bool verifyFollowPathCommand(Object *obj);
-	Bool terminateVerifiedFollowPathCommand(Object* obj);
+	Bool terminateVerifiedFollowPathCommand(Object *obj);
 
 	UnsignedInt removeCurrentCommand(Object *obj, Bool doCleanUp = true);
 	void updateConstructionCount(Object *obj, Int delta);
 	Int getConstructionCount(Object *obj);
 
+	void createConstructionShadow(UnsignedInt cmdNodeID, Object *sourceObject);
+	void removeConstructionShadow(UnsignedInt cmdNodeID);
+	Bool isShawdowInTheWay(const Coord3D *worldPos, const ThingTemplate *build, Real angle, const Object *builderObject);
+
 	Bool isCurrentExitCommand(Object *obj);
 	Bool isExitCommandComplete(Object *obj);
 
 protected:
-	CommandNode *newCommandNode(CommandType commandType);
-	CommandNode *findCommandByID(UnsignedInt commandNodeID);
+	CommandNode *newCommandNode(CommandType cmdType);
+	CommandNode *findCommandByID(UnsignedInt cmdNodeID);
 	CommandNode *nextCommand(Object *obj, CommandNode *cmdNode);
 
 	void doCurrentCommand(Object *obj, CommandVerifyStatus cvs);
