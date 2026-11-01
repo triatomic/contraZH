@@ -1000,6 +1000,7 @@ public:
 		m_delay.setRange(-1, -1, GameClientRandomVariable::CONSTANT);
 		m_offset.x = m_offset.y = m_offset.z = 0;
 		m_orientToObject = false;
+		m_orientOffset = true;
 		m_attachToObject = false;
 		m_createAtGroundHeight = FALSE;
 		m_useCallersRadius = FALSE;

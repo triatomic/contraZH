@@ -6,9 +6,9 @@
 
 ### Added Alignment Parameters
 
-Note: By default, FXList without "OrientToObject = Yes" will not have their offset aligned to the parent object anymore. This prevents the issue of large effects like Nuke mushroom clouds to be "drifting away".
+ParticleSystem offsets follow the parent object's rotation by default, matching vanilla behavior.
 
-* `OrientOffset = No` - Restores vanilla behavior by always orienting the Offset to the parent object (not recommended, this mainly exists for compatibility)
+* `OrientOffset = Yes` - (Default.) Rotates the offset with the parent object without rotating the particle system. Set it to `No` to keep the offset in world axes when `OrientToObject` and `OrientXY` are also `No`.
 * `OrientXY = No` - Like OrientToObject, but keeps the Z axis aligned upwards. Useful for directional impact effects that have an upwards cloud component.
 
 ### Height and Surface Restrictions

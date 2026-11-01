@@ -1,5 +1,12 @@
 # ParticleSystem.ini
 
+## FXList offsets
+
+FXList `ParticleSystem` entries default to `OrientOffset = Yes`, matching vanilla offset rotation.
+Effects such as the ICBM detonation spread their offsets with the missile's rotation.
+Set `OrientOffset = No` to keep offsets in world axes when `OrientToObject` and `OrientXY` are also `No`.
+This controls the spawn offset; `OrientToObject` controls the particle system's orientation.
+
 ## Bloom
 
 `Bloom = Yes` is the default. Set `Bloom = No` on a particle system to exclude its particles

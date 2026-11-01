@@ -74,7 +74,7 @@ This is now fixed and POISON damage is applied.
 Fixed an issue where TransitionStates are incorrectly initialized of Night or Snow states are not explicitly defined for a Draw module. This caused Turrets or firebones sometimes not working during Transition animations. 
 
 ## Fixed FXLists being wrongly aligned
-By default, FXList without "OrientToObject = Yes" will not have their offset aligned to the parent object. This prevents the issue of large effects like Nuke mushroom clouds to be "drifting away". The original behavior can be restored by using "OrientOffset = Yes".
+FXList ParticleSystem offsets follow the parent object's rotation by default, matching vanilla behavior. Set `OrientOffset = No` to keep the offset in world axes when `OrientToObject` and `OrientXY` are also `No`.
 
 ## Fixed shared weapon reload
 Fixed an issue with `WeaponReloadSharedAcrossSets` (see [Objects & Modules](https://github.com/Andreas-W/GeneralsGameCode_Modding/wiki/Objects-&-Modules#weaponset)) where reload time / ammo count was not shared correctly when switching between weapon sets.
