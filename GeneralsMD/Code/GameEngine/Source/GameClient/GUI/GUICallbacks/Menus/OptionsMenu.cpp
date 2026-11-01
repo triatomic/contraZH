@@ -573,6 +573,9 @@ static Int levelIndex( const Int *levels, Int count, Int level )
 // Fields that only matter while their checkbox is on stay greyed out otherwise
 static void updateGameOptionsEnables()
 {
+	const Bool canChangeDisplay = (!TheGameLogic->isInGame() || TheGameLogic->isInShellGame()) && !TheGameSpyInfo;
+	enableWindow( comboBoxResolution, canChangeDisplay && !getCheck( checkBorderlessWindow, FALSE ) );
+
 	const Bool grid = getCheck( checkGridHotkeys, FALSE );
 	enableWindow( comboBoxGridHotkeyLayout, grid );
 	enableWindow( checkGridHotkeyUnitOrders, grid );
@@ -744,6 +747,7 @@ static void setDefaults()
 	GadgetCheckBoxSetChecked( checkDoubleClickAttackMove, FALSE );
 	setCheck( checkBorderlessWindow, FALSE );
 	setCheck( checkWindowed, FALSE );
+	updateGameOptionsEnables();
 
 	//-------------------------------------------------------------------------------------------------
 //	// scroll speed val
@@ -1529,7 +1533,7 @@ static void saveOptions()
 	oldDispSettings.windowed = TheDisplay->getWindowed();
 	oldDispSettings.framed = TheGlobalData->m_windowed;
 
-	if (comboBoxResolution && comboBoxResolution->winGetEnabled() && index < TheDisplay->getDisplayModeCount() && index >= 0)
+	if (comboBoxResolution && (comboBoxResolution->winGetEnabled() || (checkBorderlessWindow && checkBorderlessWindow->winGetEnabled())) && index < TheDisplay->getDisplayModeCount() && index >= 0)
 	{
 		TheDisplay->getDisplayModeDescription(index,&xres,&yres,&bitDepth);
 
@@ -2442,6 +2446,7 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 	GadgetCheckBoxSetChecked( checkDoubleClickAttackMove, TheGlobalData->m_doubleClickAttackMove );
 	setCheck( checkBorderlessWindow, TheGlobalData->m_borderlessWindow && !TheGlobalData->m_windowed );
 	setCheck( checkWindowed, TheGlobalData->m_windowed );
+	updateGameOptionsEnables();
 
 	// set scroll speed slider
 	// TheSuperHackers @tweak xezon 11/07/2025 No longer sets the slider position if the user setting
@@ -2806,13 +2811,21 @@ WindowMsgHandledType OptionsMenuSystem( GameWindow *window, UnsignedInt msg,
 			{
 				TheShell->push( "Menus/KeyboardOptionsMenu.wnd" );
 			}
-			else if (controlID == checkWindowedID && GadgetCheckBoxIsChecked( control ))
+			else if (controlID == checkWindowedID)
 			{
-				setCheck( checkBorderlessWindow, FALSE );
+				if (GadgetCheckBoxIsChecked( control ))
+				{
+					setCheck( checkBorderlessWindow, FALSE );
+				}
+				updateGameOptionsEnables();
 			}
-			else if (controlID == checkBorderlessWindowID && GadgetCheckBoxIsChecked( control ))
+			else if (controlID == checkBorderlessWindowID)
 			{
-				setCheck( checkWindowed, FALSE );
+				if (GadgetCheckBoxIsChecked( control ))
+				{
+					setCheck( checkWindowed, FALSE );
+				}
+				updateGameOptionsEnables();
 			}
 			else if(controlID == checkMaxCameraHeightID )
 			{

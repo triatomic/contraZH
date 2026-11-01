@@ -53,7 +53,8 @@ waterline, flat ground in three tones (olive, tan for desert sand, grey for rock
 * `BlipSize = Large` - (`Small` | `Large`. `Small` is 3/5 px unit/structure, `Large` 5/7. Only with
 `NewRadar`.)
 * `BorderlessWindow = No` - (Yes runs a frameless centred window at the selected resolution. Also
-the Borderless checkbox beside Resolution. `-win` still gives a captioned window.)
+the Borderless checkbox beside Resolution, which disables the resolution dropdown while checked.
+`-win` still gives a captioned window.)
 Mouse input follows the rendered picture if Windows stretches the window after a resolution change.
 * `Windowed = No` - (Yes runs a movable window with a title bar at the selected resolution, like
 `-win`. Also the Windowed checkbox beside Borderless; checking one clears the other. `-win` still
