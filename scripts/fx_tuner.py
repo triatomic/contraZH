@@ -1,4 +1,4 @@
-# Tunes the electric, laser and laser ground glow shaders with live previews, and renders the pictures
+# Tunes fluid, electric, laser and laser ground glow shaders with live previews, and renders the pictures
 # for docs/Electric-&-Laser-Shading.md. The math follows softparticle.hlsl and laserglow.hlsl, and the
 # noise matches W3DSoftParticles::createNoise.
 #
@@ -176,6 +176,67 @@ def render_electric(p=None, electric=True, size=30.0, colour=(0.35, 0.55, 1.0), 
         colour_out = colour_out * strobe[..., None] + (hue + 1) * (0.5 * arc * reach * q['arcs'])[..., None]
 
     return to_image(colour_out * inside[..., None], ss=ss)
+
+# ---------------------------------------------------------------- fluid
+
+FLUID_DEFAULTS = dict(warp=0.035, noise_size=48.0, speed=6.0, body=0.6, bubbles=0.7, bubble_size=8.0, edge=0.3, glow=0.2)
+
+def pool_texture(u, v):
+    radius = np.sqrt((u - 0.5) ** 2 + (v - 0.5) ** 2)
+    noise = tex_noise(u * 1.3, v * 1.3)[..., 0]
+    alpha = np.clip((0.44 + (noise - 0.5) * 0.1 - radius) * 24, 0, 1)
+    return np.stack([np.ones_like(alpha)] * 3 + [alpha], axis=-1)
+
+def render_fluid(p=None, shaded=True, size=100.0, colour=(0.45, 0.8, 0.08), t=0.0,
+                 px=380, texture=None, additive=False, alpha=1.0, centre=(37.0, 11.0)):
+    q = dict(FLUID_DEFAULTS)
+    q.update(p or {})
+    coords = (np.arange(px) + 0.5) / px
+    u, v = np.meshgrid(coords, coords)
+    x = centre[0] + (u - 0.5) * size
+    y = centre[1] + (0.5 - v) * size
+    sample = texture.sample if texture is not None else pool_texture
+    mask = sample(u, v)
+    out = mask[..., :3] * np.array(colour)
+    opacity = mask[..., 3] * alpha
+    if shaded:
+        scale = 1.0 / max(q['noise_size'], 0.01)
+        speed = max(q['speed'], 0)
+        travel = np.fmod(t * speed * scale, 10.0)
+        a = tex_noise(x * scale - travel, y * scale - travel * 0.3)
+        b = tex_noise(x * scale * 1.7 + (a[..., 0] - 0.5) * 0.4 + travel * 0.7,
+                      y * scale * 1.7 + (a[..., 1] - 0.5) * 0.4 - travel * 1.3)
+        warp = np.clip(q['warp'], 0, 0.25)
+        texel = sample(np.clip(u + (a[..., 0] + b[..., 1] - 1) * warp, 0, 1),
+                       np.clip(v + (a[..., 1] + b[..., 0] - 1) * warp, 0, 1))
+        out = texel[..., :3] * np.array(colour)
+        footprint = mask[..., :3].max(-1) * (1 if additive else mask[..., 3])
+        keep = np.clip(1 + (footprint * 3 - b[..., 2]) * np.clip(q['edge'], 0, 1) * 4, 0, 1)
+        vein = np.clip(1 - np.abs(a[..., 2] - b[..., 1]) * 12, 0, 1)
+        body = 1 + np.clip(q['body'], 0, 1) * (-0.65 + b[..., 0] * 0.9)
+        bubble_scale = 1.0 / max(q['bubble_size'], 0.01)
+        cx, cy = x * bubble_scale, y * bubble_scale
+        seed = tex_noise((np.floor(cx) * 17 + 0.5) / 64, (np.floor(cy) * 29 + 0.5) / 64)
+        phase = np.mod(np.fmod(t * speed * bubble_scale * 0.15, 10.0) + seed[..., 2], 1)
+        local_x = np.mod(cx, 1) - (0.35 + seed[..., 0] * 0.3)
+        local_y = np.mod(cy, 1) - (0.35 + seed[..., 1] * 0.3)
+        radius = 0.06 + phase * 0.26
+        distance = np.sqrt(local_x * local_x + local_y * local_y)
+        ring = np.clip(1 - np.abs(distance - radius) * 35, 0, 1)
+        inside = np.clip((radius - distance) * 25, 0, 1)
+        life = phase * (1 - phase) * 4
+        bubbles = max(q['bubbles'], 0)
+        bubble = ring * life * (seed[..., 1] >= 0.45) * bubbles
+        peak = out.max(-1)
+        highlight = out * 0.35 + peak[..., None] * 0.65
+        out = out * (body * (1 - inside * life * np.clip(bubbles, 0, 1) * 0.45))[..., None]
+        out += highlight * (vein * vein * 0.6 + bubble)[..., None]
+        out += texel[..., :3] * np.array(colour) * (max(q['glow'], 0) * (0.5 + a[..., 1] + vein * 0.5))[..., None]
+        out *= (footprint * (keep if additive else 1))[..., None]
+        opacity *= keep
+    if additive:
+        return to_image(out)
+    return to_image(out * opacity[..., None] - BG * opacity[..., None])
 
 # ---------------------------------------------------------------- laser
 
@@ -398,6 +459,14 @@ def glow_images():
 
 # Tuner control -> GameData.ini key. The tuner edits only these.
 GAMEDATA_KEYS = [
+    ('fluid', 'warp', 'FluidWarp'),
+    ('fluid', 'noise_size', 'FluidNoiseSize'),
+    ('fluid', 'speed', 'FluidSpeed'),
+    ('fluid', 'body', 'FluidBody'),
+    ('fluid', 'bubbles', 'FluidBubbles'),
+    ('fluid', 'bubble_size', 'FluidBubbleSize'),
+    ('fluid', 'edge', 'FluidEdge'),
+    ('fluid', 'glow', 'FluidGlow'),
     ('electric', 'arcs', 'ElectricArcs'),
     ('electric', 'sharpness', 'ElectricArcSharpness'),
     ('electric', 'noise', 'ElectricNoiseSize'),
@@ -453,6 +522,14 @@ def write_gamedata(path, values):
 
 # Hover help for each GameData.ini key.
 KEY_HELP = {
+    'FluidWarp': 'Moves texture UVs with the currents, up to 0.25 texture widths.',
+    'FluidNoiseSize': 'World units across one tile of current noise.',
+    'FluidSpeed': 'World units per second of current travel. 0 freezes animation.',
+    'FluidBody': 'Marbling contrast, from 0 to 1.',
+    'FluidBubbles': 'Bubble brightness. 0 removes bubbles.',
+    'FluidBubbleSize': 'World units between bubble cells.',
+    'FluidEdge': "Breaks up the texture's faint fringe, from 0 to 1.",
+    'FluidGlow': "Adds brightness in the particle's own colour; it does not light the terrain.",
     'ElectricArcs': 'Arc brightness. 0 turns the arcs off. Past 4 the arcs wash the sprite white.',
     'ElectricArcSharpness': 'Arc thickness. Low values give broad glowing bands, high values thin threads.',
     'ElectricNoiseSize': 'World units across one tile of arc noise. Smaller gives more, closer arcs.',
@@ -576,10 +653,10 @@ def run_tuner(gamedata_path):
     class Tuner(QtWidgets.QMainWindow):
         def __init__(self):
             super().__init__()
-            self.setWindowTitle('Electric & Laser Shading Tuner')
+            self.setWindowTitle('FX Shading Tuner')
             self.controls = {}
-            self.colours = {'electric': (0.35, 0.55, 1.0), 'laser': (1.0, 0.22, 0.15), 'glow': (1.0, 0.27, 0.17)}
-            self.textures = {'electric': None, 'laser': None}
+            self.colours = {'electric': (0.35, 0.55, 1.0), 'laser': (1.0, 0.22, 0.15), 'glow': (1.0, 0.27, 0.17), 'fluid': (0.45, 0.8, 0.08)}
+            self.textures = {'electric': None, 'laser': None, 'fluid': None}
             self.camera_distance = CAMERA_DISTANCE
             self.backed_up = False
             self.start = time.perf_counter()
@@ -607,6 +684,7 @@ def run_tuner(gamedata_path):
             self.build_electric()
             self.build_laser()
             self.build_glow()
+            self.build_fluid()
 
             buttons = QtWidgets.QHBoxLayout()
             for text, slot, tip in (('Load from GameData.ini', self.load_values, 'Read the keys from the file'),
@@ -751,6 +829,29 @@ def run_tuner(gamedata_path):
             note.setStyleSheet('color: #909090;')
             view.addWidget(note)
 
+        def build_fluid(self):
+            keys, view = self.new_tab('Fluid')
+            for name, key, lo, hi, step in (
+                    ('warp', 'FluidWarp', 0, 0.25, 0.005),
+                    ('noise_size', 'FluidNoiseSize', 1, 300, 1),
+                    ('speed', 'FluidSpeed', 0, 60, 0.5),
+                    ('body', 'FluidBody', 0, 1, 0.05),
+                    ('bubbles', 'FluidBubbles', 0, 4, 0.05),
+                    ('bubble_size', 'FluidBubbleSize', 1, 60, 0.5),
+                    ('edge', 'FluidEdge', 0, 1, 0.05),
+                    ('glow', 'FluidGlow', 0, 3, 0.05)):
+                self.add_control(keys, 'fluid', name, key, lo, hi, step, FLUID_DEFAULTS[name], key)
+            self.add_control(view, 'fluid', 'size', 'Pool size (world units)', 10, 300, 5, 100)
+            self.add_control(view, 'fluid', 'alpha', 'Particle alpha', 0, 1, 0.05, 1)
+            self.colour_button(view, 'fluid', 'Particle colour...')
+            self.texture_row(view, 'fluid')
+            self.plain['fluid'] = self.check(view, 'Plain pool (shading off)', False)
+            self.fluid_additive = self.check(view, 'Additive blend', False)
+            self.animate.append(self.check(view, 'Animate', True))
+            note = QtWidgets.QLabel('Use FluidShader = Yes on the particle system.\nColour and blend controls affect this preview only.')
+            note.setWordWrap(True)
+            view.addWidget(note)
+
         # ------------------------------------------------ rendering
 
         def values(self, group):
@@ -779,7 +880,7 @@ def run_tuner(gamedata_path):
                 img = render_laser(q, shaded=not self.plain['laser'].isChecked(), width_px=760, beam_units=q['beam'],
                                    t=t, ss=1, colour=self.colours['laser'], texture=self.textures['laser'])
                 self.show_preview(1, img)
-            else:
+            elif tab == 2:
                 q = self.values('glow')
                 laser = self.values('laser')
                 reach = q['radius'] if q['radius'] > 0 else max(1.25 * q['outer'], 15.0)
@@ -789,6 +890,12 @@ def run_tuner(gamedata_path):
                 t = now if self.animate[2].isChecked() else 0.0
                 beam = ((-70, 0, q['start']), (70, 0, q['end']))
                 self.show_preview(2, render_glow(p, beam=beam, hills=self.hills.isChecked(), ss=1, glow_rgb=rgb, t=t, px=380))
+            else:
+                q = self.values('fluid')
+                t = now if self.animate[3].isChecked() else 0.0
+                self.show_preview(3, render_fluid(q, shaded=not self.plain['fluid'].isChecked(), size=q['size'],
+                                                 colour=self.colours['fluid'], t=t, texture=self.textures['fluid'],
+                                                 additive=self.fluid_additive.isChecked(), alpha=q['alpha']))
 
         def tick(self):
             tab = self.tabs.currentIndex()

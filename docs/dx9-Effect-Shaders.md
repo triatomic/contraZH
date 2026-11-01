@@ -18,6 +18,13 @@ against the ground only, since a multisampled depth buffer cannot be read.
 * Ground-aligned and alpha-tested sprites keep their edges.
 * Launch with `CONTRA_SOFTPARTICLES=2` to fade against the ground only, or `0` to turn the fade off.
 
+# Fluid shading
+
+Particle systems can draw acid, toxin and radiation pools with flowing marbling, highlights,
+bubble rings and broken edges. `FluidShader = Yes` opts a system in; `FluidShaders = No` in
+`Options.ini` turns the shading off globally. Requires shader model 2.0a.
+See [Fluid shading](contraZH-ParticleSystems.md#fluid-shading) for the tuning keys and examples.
+
 # Flame shading
 
 Flame weapon fire flickers, licks and breaks up at its edges, and glows white-hot where it is

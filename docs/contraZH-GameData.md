@@ -1,5 +1,12 @@
 # GameData.ini
 
+## Fluid defaults
+
+`FluidWarp`, `FluidNoiseSize`, `FluidSpeed`, `FluidBody`, `FluidBubbles`, `FluidBubbleSize`,
+`FluidEdge` and `FluidGlow` set the defaults for particle systems with `FluidShader = Yes`.
+Each system can override them. See [Fluid shading](contraZH-ParticleSystems.md#fluid-shading)
+for defaults, units and acid, toxin and radiation examples.
+
 ## Storm defaults
 
 `SandStorm...` keys set defaults for `Type = SAND`; `SnowStorm...` keys set defaults for

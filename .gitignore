@@ -78,3 +78,7 @@ SESSION_CHANGES.md
 # MkDocs build output
 /site/
 .venv/
+
+resources/gitinfo/git_watcher.cmake
+
+tools/test_terrain_tiles.py

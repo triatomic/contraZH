@@ -269,6 +269,14 @@ public:
 	Real m_flameBreakup;
 	Real m_flameNoiseSize;
 	Real m_flameRise;
+	Real m_fluidWarp;
+	Real m_fluidNoiseSize;
+	Real m_fluidSpeed;
+	Real m_fluidBody;
+	Real m_fluidBubbles;
+	Real m_fluidBubbleSize;
+	Real m_fluidEdge;
+	Real m_fluidGlow;
 	Real m_hazeBend;
 	Real m_hazeSize;
 	Real m_hazeLift;
@@ -752,6 +760,7 @@ public:
   Bool m_useFlameShaders;         ///< Options.ini FlameShaders: flame weapon fire flickers and glows white-hot at its core
   Bool m_useElectricShaders;      ///< Options.ini ElectricShaders: electric sparks and flares crackle with arcs
   Bool m_useLaserShaders;         ///< Options.ini LaserShaders: laser beams get a white-hot core and pulses running along them
+  Bool m_useFluidShaders;         ///< Options.ini FluidShaders enables fluid particle shading
   Bool m_useCryoShaders;          ///< Options.ini CryoShaders: cryo beams, streaks and sprites turn to ice
   Bool m_useDynamicLights;        ///< Options.ini DynamicLights: explosions, muzzle flashes and lasers light their surroundings
   Bool m_usePixelLights;          ///< Options.ini PixelLights: those lights are drawn per pixel where the hardware allows

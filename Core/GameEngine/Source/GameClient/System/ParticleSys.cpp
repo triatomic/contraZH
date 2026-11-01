@@ -3192,6 +3192,15 @@ const FieldParse ParticleSystemTemplate::m_fieldParseTable[] =
 	{ "LaserShader",				INI::parseIndexList, LaserShaderModeNames, offsetof( ParticleSystemTemplate, m_laserShader ) },
 	{ "CryoShader",					INI::parseIndexList, CryoShaderModeNames, offsetof( ParticleSystemTemplate, m_cryoShader ) },
 #if RTS_ZEROHOUR
+	{ "FluidShader", INI::parseBool, nullptr, offsetof( ParticleSystemTemplate, m_fluidShader ) },
+	{ "FluidWarp", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_fluidTuning.warp ) },
+	{ "FluidNoiseSize", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_fluidTuning.noiseSize ) },
+	{ "FluidSpeed", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_fluidTuning.speed ) },
+	{ "FluidBody", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_fluidTuning.body ) },
+	{ "FluidBubbles", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_fluidTuning.bubbles ) },
+	{ "FluidBubbleSize", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_fluidTuning.bubbleSize ) },
+	{ "FluidEdge", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_fluidTuning.edge ) },
+	{ "FluidGlow", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_fluidTuning.glow ) },
 	{ "Bloom", INI::parseBool, nullptr, offsetof( ParticleSystemTemplate, m_bloom ) },
 	{ "BloomZoomCompensation", INI::parseBool, nullptr, offsetof( ParticleSystemTemplate, m_bloomZoomCompensation ) },
 #endif
@@ -3327,6 +3336,7 @@ ParticleSystemTemplate::ParticleSystemTemplate( const AsciiString &name ) :
 	m_cryoParticleScale = -1.0f;
 	m_electricParticleScale = -1.0f;
 #if RTS_ZEROHOUR
+	m_fluidShader = FALSE;
 	m_bloom = TRUE;
 	m_bloomZoomCompensation = FALSE;
 #endif
@@ -3340,6 +3350,34 @@ ParticleSystemTemplate::ParticleSystemTemplate( const AsciiString &name ) :
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+#if RTS_ZEROHOUR
+FluidShaderTuning::FluidShaderTuning()
+	: warp(-1.0f), noiseSize(-1.0f), speed(-1.0f), body(-1.0f),
+	  bubbles(-1.0f), bubbleSize(-1.0f), edge(-1.0f), glow(-1.0f)
+{
+}
+
+Bool ParticleSystemTemplate::hasFluidTuning() const
+{
+	return m_fluidTuning.warp >= 0.0f || m_fluidTuning.noiseSize >= 0.0f ||
+		m_fluidTuning.speed >= 0.0f || m_fluidTuning.body >= 0.0f ||
+		m_fluidTuning.bubbles >= 0.0f || m_fluidTuning.bubbleSize >= 0.0f ||
+		m_fluidTuning.edge >= 0.0f || m_fluidTuning.glow >= 0.0f;
+}
+
+void ParticleSystemTemplate::resolveFluidTuning( const FluidShaderTuning *own, FluidShaderTuning &tuning )
+{
+	tuning.warp = (own != nullptr && own->warp >= 0.0f) ? own->warp : TheGlobalData->m_fluidWarp;
+	tuning.noiseSize = (own != nullptr && own->noiseSize >= 0.0f) ? own->noiseSize : TheGlobalData->m_fluidNoiseSize;
+	tuning.speed = (own != nullptr && own->speed >= 0.0f) ? own->speed : TheGlobalData->m_fluidSpeed;
+	tuning.body = (own != nullptr && own->body >= 0.0f) ? own->body : TheGlobalData->m_fluidBody;
+	tuning.bubbles = (own != nullptr && own->bubbles >= 0.0f) ? own->bubbles : TheGlobalData->m_fluidBubbles;
+	tuning.bubbleSize = (own != nullptr && own->bubbleSize >= 0.0f) ? own->bubbleSize : TheGlobalData->m_fluidBubbleSize;
+	tuning.edge = (own != nullptr && own->edge >= 0.0f) ? own->edge : TheGlobalData->m_fluidEdge;
+	tuning.glow = (own != nullptr && own->glow >= 0.0f) ? own->glow : TheGlobalData->m_fluidGlow;
+}
+#endif
+
 Bool ParticleSystemTemplate::hasFlameTuning() const
 {
 	const Real *setting = &m_flameTuning.warp;

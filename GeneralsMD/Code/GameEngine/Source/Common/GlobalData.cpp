@@ -294,6 +294,14 @@ static const char *DistanceFogPresetNames[] = { "SUN", "DESERT", "FUTURISTIC", "
 	{ "FlameBreakup",						INI::parseReal,				nullptr,			offsetof( GlobalData, m_flameBreakup ) },
 	{ "FlameNoiseSize",						INI::parseReal,				nullptr,			offsetof( GlobalData, m_flameNoiseSize ) },
 	{ "FlameRise",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_flameRise ) },
+	{ "FluidWarp", INI::parseReal, nullptr, offsetof( GlobalData, m_fluidWarp ) },
+	{ "FluidNoiseSize", INI::parseReal, nullptr, offsetof( GlobalData, m_fluidNoiseSize ) },
+	{ "FluidSpeed", INI::parseReal, nullptr, offsetof( GlobalData, m_fluidSpeed ) },
+	{ "FluidBody", INI::parseReal, nullptr, offsetof( GlobalData, m_fluidBody ) },
+	{ "FluidBubbles", INI::parseReal, nullptr, offsetof( GlobalData, m_fluidBubbles ) },
+	{ "FluidBubbleSize", INI::parseReal, nullptr, offsetof( GlobalData, m_fluidBubbleSize ) },
+	{ "FluidEdge", INI::parseReal, nullptr, offsetof( GlobalData, m_fluidEdge ) },
+	{ "FluidGlow", INI::parseReal, nullptr, offsetof( GlobalData, m_fluidGlow ) },
 	{ "HazeBend",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_hazeBend ) },
 	{ "HazeSize",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_hazeSize ) },
 	{ "HazeLift",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_hazeLift ) },
@@ -951,6 +959,7 @@ GlobalData::GlobalData()
   m_useFlameShaders = TRUE;
   m_useElectricShaders = TRUE;
   m_useLaserShaders = TRUE;
+  m_useFluidShaders = TRUE;
   m_useCryoShaders = TRUE;
   m_useDynamicLights = TRUE;
   m_usePixelLights = TRUE;
@@ -1095,6 +1104,14 @@ GlobalData::GlobalData()
 	m_flameBreakup = 1.0f;
 	m_flameNoiseSize = 20.0f;
 	m_flameRise = 0.8f;
+	m_fluidWarp = 0.035f;
+	m_fluidNoiseSize = 48.0f;
+	m_fluidSpeed = 6.0f;
+	m_fluidBody = 0.6f;
+	m_fluidBubbles = 0.7f;
+	m_fluidBubbleSize = 8.0f;
+	m_fluidEdge = 0.3f;
+	m_fluidGlow = 0.2f;
 	m_hazeBend = 1.2f;
 	m_hazeSize = 1.5f;
 	m_hazeLift = 0.3f;
@@ -1843,6 +1860,7 @@ static const char *const LiveGameDataKeys[] =
 	"ColorLutBlackPoint", "ColorLutWhitePoint", "ColorLutGamma", "ColorLutOutputBlack", "ColorLutOutputWhite",
 	"ColorLutVignette", "ColorLutVignetteRadius", "ColorLutGrain", "ColorLutDither",
 	"FlameWarp", "FlameHeat", "FlameFlicker", "FlameBreakup", "FlameNoiseSize", "FlameRise",
+	"FluidWarp", "FluidNoiseSize", "FluidSpeed", "FluidBody", "FluidBubbles", "FluidBubbleSize", "FluidEdge", "FluidGlow",
 	"HazeBend", "HazeSize", "HazeLift", "HazeNoiseSize", "HazeRise", "HazeMask",
 	"ElectricArcs", "ElectricArcSharpness", "ElectricNoiseSize", "ElectricJitter", "ElectricFlicker", "ElectricRate",
 	"ElectricParticleScale",
@@ -2082,6 +2100,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_useFlameShaders = optionPref.getFlameShadersEnabled();
 	TheWritableGlobalData->m_useElectricShaders = optionPref.getElectricShadersEnabled();
 	TheWritableGlobalData->m_useLaserShaders = optionPref.getLaserShadersEnabled();
+	TheWritableGlobalData->m_useFluidShaders = optionPref.getFluidShadersEnabled();
 	TheWritableGlobalData->m_useCryoShaders = optionPref.getCryoShadersEnabled();
 	TheWritableGlobalData->m_useDynamicLights = optionPref.getDynamicLightsEnabled();
 	TheWritableGlobalData->m_usePixelLights = optionPref.getPixelLightsEnabled();

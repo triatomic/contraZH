@@ -1114,6 +1114,7 @@ const ShaderDebugOption ShaderDebugOptions[] =
 	{ L"Electric shaders", &GlobalData::m_useElectricShaders },
 	{ L"Laser shaders", &GlobalData::m_useLaserShaders },
 	{ L"Cryo shaders", &GlobalData::m_useCryoShaders },
+	{ L"Fluid shaders", &GlobalData::m_useFluidShaders },
 	{ L"Dynamic lights", &GlobalData::m_useDynamicLights },
 	{ L"Pixel lights", &GlobalData::m_usePixelLights },
 	{ L"Ambient occlusion", &GlobalData::m_useAmbientOcclusion },

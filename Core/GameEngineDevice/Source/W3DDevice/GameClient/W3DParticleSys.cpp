@@ -452,7 +452,7 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 }
 
 // Flame systems shade as fire in every pass but the haze, which draws only them. Cryo and electric systems shade
-// in every pass but the haze. Cryo wins over the rest, and flame over electric. A multiplied sprite has no light to shade.
+// in every pass but the haze. Fluid wins over cryo, and flame over electric. A multiplied sprite has no light to shade.
 unsigned W3DParticleSystemManager::systemEffects(ParticleSystem &system, DrawPass pass)
 {
 	// Point groups never hand alpha-tested sprites to the hook, so the haze pass would draw them plain.
@@ -465,6 +465,12 @@ unsigned W3DParticleSystemManager::systemEffects(ParticleSystem &system, DrawPas
 	{
 		return system.getTemplate()->getDisruption().isOn() ? SoftParticleHookClass::EFFECT_DISRUPT : 0;
 	}
+#if RTS_ZEROHOUR
+	if (system.isUsingParticles() && system.getTemplate()->usesFluidShader() && TheW3DSoftParticles->fluidEnabled())
+	{
+		return (pass == DRAW_HAZE) ? 0 : SoftParticleHookClass::EFFECT_FLUID;
+	}
+#endif
 	if (TheW3DSoftParticles->cryoEnabled() && system.isCryo())
 	{
 		return (pass == DRAW_HAZE) ? 0 : SoftParticleHookClass::EFFECT_CRYO;
@@ -533,6 +539,12 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		const ParticleSystemTemplate *tuning = (flameEffects && sys->getTemplate()->hasFlameTuning()) ? sys->getTemplate() : nullptr;
 		const void *effectData = (pass == DRAW_DISRUPT) ? static_cast<const void *>(&disruption) :
 			(tuning != nullptr) ? static_cast<const void *>(tuning->peekFlameTuning()) : nullptr;
+#if RTS_ZEROHOUR
+		if ((effects & SoftParticleHookClass::EFFECT_FLUID) != 0 && sys->getTemplate()->hasFluidTuning())
+		{
+			effectData = sys->getTemplate()->peekFluidTuning();
+		}
+#endif
 
 		// Handle smudge type particles
 		if (sys->isUsingSmudge())

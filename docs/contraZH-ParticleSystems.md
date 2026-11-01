@@ -41,6 +41,70 @@ ParticleSystem MyGlowEffect
 End
 ```
 
+## Fluid shading
+
+`FluidShader = Yes` shades a particle system as flowing liquid with marbling, highlights,
+growing bubble rings and broken edges. It defaults to `No` and takes precedence over cryo,
+flame and electric shading. The texture supplies the footprint and colour; particle colour
+keys and alpha still control tint and lifetime fading. Use a soft pool texture with
+`IsGroundAligned = Yes` for acid, toxin and radiation puddles.
+
+Requires the D3D9 build and shader model 2.0a. D3D8 and unsupported cards draw the original
+particles. `FluidShaders = No` in `Options.ini`, or `CONTRA_FLUIDSHADER=0` before launch,
+also restores the original appearance. The shader panel includes a fluid toggle.
+
+The FX tuner's `Fluid` tab previews all eight settings, loads textures, compares alpha and
+additive blending, and loads, saves or copies the global INI values. Its plain-pool switch
+disables shading in the preview. Enable `FluidShader = Yes` in the particle definition to
+use the effect in game. Cheat builds reload saved global values while a map runs.
+
+These keys work in `GameData.ini` and in a `ParticleSystem` block. A system overrides only
+the keys it supplies; omitted keys use the global defaults.
+
+| Key | Default | Effect |
+| --- | --- | --- |
+| `FluidWarp` | `0.035` | Moves texture UVs with the currents, from 0 to 0.25 texture widths. |
+| `FluidNoiseSize` | `48` | Sets world units across one tile of current noise. |
+| `FluidSpeed` | `6` | Sets current travel in world units per second; 0 freezes animation. |
+| `FluidBody` | `0.6` | Sets marbling contrast from 0 to 1. |
+| `FluidBubbles` | `0.7` | Sets bubble brightness; 0 removes bubbles. |
+| `FluidBubbleSize` | `8` | Sets world units between bubble cells. |
+| `FluidEdge` | `0.3` | Breaks up the texture's faint fringe, from 0 to 1. |
+| `FluidGlow` | `0.2` | Adds brightness in the particle's own colour; 0 removes it. |
+
+Use nonnegative values. Noise and bubble sizes clamp to at least 0.01 world units.
+The pattern stays fixed in world XY while the camera moves, so overlapping particles with
+the same settings share currents and bubbles. Systems with local overrides batch separately.
+`ParticleSystemExtend` inherits the switch and tuning keys.
+
+```ini
+ParticleSystemExtend MyAcidPool ExistingPool
+  Shader = ALPHA
+  IsGroundAligned = Yes
+  FluidShader = Yes
+  FluidSpeed = 10
+  FluidBubbles = 1
+  FluidBubbleSize = 4
+  FluidEdge = 0.5
+End
+```
+
+Starting values for the three mockup styles follow. Set the yellow-green, dark emerald or
+lime tint through the texture and particle colour keys.
+
+| Style | FluidSpeed | FluidBody | FluidBubbles | FluidBubbleSize | FluidEdge | FluidGlow |
+| --- | --- | --- | --- | --- | --- | --- |
+| Acid | 10 | 0.4 | 1 | 4 | 0.5 | 0.1 |
+| Toxin | 2 | 0.9 | 0.6 | 14 | 0.2 | 0 |
+| Radiation | 5 | 0.5 | 1.2 | 10 | 0.35 | 0.8 |
+
+Both alpha-blended and additive sprites work. Alpha blending suits opaque sludge; additive
+blending suits luminous pools and can feed bloom. `FluidGlow` brightens the fluid itself;
+it does not light the surrounding terrain. Fluid particles keep their surface coverage
+instead of fading against scene depth, so ground pools remain visible.
+Streaks, volume particles, terrain-conforming particles, alpha-tested particles and multiplied
+particles keep their existing rendering. Use `ConformToTerrain = No` for fluid shading.
+
 ## D3D9 billboard rendering
 
 * D3D9 builds camera-facing particle quads on the GPU when shader model 3 hardware is available.

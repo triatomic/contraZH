@@ -389,6 +389,13 @@ of the driver's usual three, so the screen answers the mouse sooner. Can cost a 
 `Low latency mode` in the advanced display options, applied on Accept. Needs `CheckLowLatency` in
 `OptionsMenu.wnd` for the menu control. Direct3D 9 build only.)
 
+### Fluid particle shading
+
+`FluidShaders = Yes` enables fluid shading on particle systems that opt in with
+`FluidShader = Yes`. `No` restores their original sprites. The setting requires D3D9
+and shader model 2.0a. See [Fluid shading](contraZH-ParticleSystems.md#fluid-shading)
+for the tuning keys and acid, toxin and radiation examples.
+
 ### Smooth unit motion
 
 The game logic runs 30 times a second. Above that frame rate, units, projectiles and turrets draw

@@ -453,6 +453,13 @@ Bool OptionPreferences::getLaserShadersEnabled(void) const
 	return getBool("LaserShaders", TRUE);
 }
 
+#if RTS_ZEROHOUR
+Bool OptionPreferences::getFluidShadersEnabled(void) const
+{
+	return getBool("FluidShaders", TRUE);
+}
+#endif
+
 Bool OptionPreferences::getCryoShadersEnabled(void) const
 {
 	return getBool("CryoShaders", TRUE);

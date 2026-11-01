@@ -605,6 +605,21 @@ struct FlameShaderTuning
 	Real hazeMask;				///< how quickly the flame's brightness reaches full haze strength
 };
 
+#if RTS_ZEROHOUR
+struct FluidShaderTuning
+{
+	FluidShaderTuning();
+	Real warp;
+	Real noiseSize;
+	Real speed;
+	Real body;
+	Real bubbles;
+	Real bubbleSize;
+	Real edge;
+	Real glow;
+};
+#endif
+
 /**
  * A ParticleSystemTemplate, used by the ParticleSystemManager to instantiate ParticleSystems.
  */
@@ -646,6 +661,10 @@ public:
 	/// DisruptionShader and its settings, for sprites that bend the scene behind them.
 	const DisruptionShaderInfo &getDisruption() const { return m_disruption; }
 #if RTS_ZEROHOUR
+	Bool usesFluidShader() const { return m_fluidShader; }
+	Bool hasFluidTuning() const;
+	const FluidShaderTuning *peekFluidTuning() const { return &m_fluidTuning; }
+	static void resolveFluidTuning( const FluidShaderTuning *own, FluidShaderTuning &tuning );
 	Bool shouldBloom() const { return m_bloom; }
 	Bool shouldCompensateBloomZoom() const { return m_bloomZoomCompensation; }
 #endif
@@ -673,6 +692,8 @@ protected:
 	Real											m_electricParticleScale;				///< negative takes GameData.ini's
 	DisruptionShaderInfo			m_disruption;
 #if RTS_ZEROHOUR
+	Bool m_fluidShader;
+	FluidShaderTuning m_fluidTuning;
 	Bool m_bloom;
 	Bool m_bloomZoomCompensation;
 #endif
