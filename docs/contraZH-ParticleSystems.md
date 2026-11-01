@@ -102,8 +102,8 @@ Both alpha-blended and additive sprites work. Alpha blending suits opaque sludge
 blending suits luminous pools and can feed bloom. `FluidGlow` brightens the fluid itself;
 it does not light the surrounding terrain. Fluid particles keep their surface coverage
 instead of fading against scene depth, so ground pools remain visible.
-Streaks, volume particles, terrain-conforming particles, alpha-tested particles and multiplied
-particles keep their existing rendering. Use `ConformToTerrain = No` for fluid shading.
+Streaks, volume particles, alpha-tested particles and multiplied particles keep their existing
+rendering. Terrain-conforming particles take fluid shading on the mesh that follows the ground.
 
 ## D3D9 billboard rendering
 
@@ -126,6 +126,9 @@ Notes:
 * Requires `IsGroundAligned = Yes` on the same effect; billboarded and multi-layer volume particles do not conform.
 * Flat ground becomes one quad; only uneven ground is meshed cell by cell.
 * Only the part on screen is meshed. Past 160 cells per side the mesh stops at coarser cells.
+* Fluid, flame, electric and cryo shaders shade the terrain mesh. Flame heat haze and disruption
+also follow the mesh, and cryo and electric particle-scale settings change its footprint.
+* Ground meshes retain their surface coverage instead of soft-fading against the terrain they follow.
 
 ## Snow move effects
 

@@ -57,13 +57,14 @@ public:
 
 	void setTexture(TextureClass* texture);
 	void setShader(ShaderClass shader);
+	void setEffects(unsigned effects, const void* effectData);
 	void setArrays(ShareBufferClass<Vector3>* locs,
 	               ShareBufferClass<Vector4>* diffuse = nullptr,
 	               ShareBufferClass<Real>* sizes = nullptr,
 	               ShareBufferClass<UnsignedByte>* orientations = nullptr,
 	               Int activePointCount = -1);
 	void setBoundingBox(const AABoxClass& worldBoundingBox);
-	void render();
+	void render(Real heightScale = 0.0f);
 
 private:
 
@@ -89,6 +90,8 @@ private:
 
 	RefCountPtr<TextureClass> m_texture;
 	ShaderClass m_shader;
+	unsigned m_effects;
+	const void* m_effectData;
 
 	RefCountPtr<ShareBufferClass<Vector3>/**/> m_pointLoc;    ///< World-space point locations.
 	RefCountPtr<ShareBufferClass<Vector4>/**/> m_pointDiffuse;    ///< RGBA values (nullptr if not used).

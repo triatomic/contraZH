@@ -81,7 +81,8 @@ page. `ParticleSystem.ini` overrides take effect on the next launch.
 * Slave systems follow their master, and a system a particle carries follows that particle's system.
 * A streak burns only with `FlameShader = Yes`, since `Auto` would turn every trail behind a flame
 shell to fire. Streaks, beams and models take the flame shading without the shimmer behind it.
-* Projectile streams, volume particles and terrain-conforming particles stay plain.
+* Projectile streams and volume particles stay plain. Terrain-conforming particles take flame
+shading and heat haze on their terrain mesh.
 * On a card without shader model 2.0a, flames keep their shading but lose the soft fade.
 * Launch with `CONTRA_FLAMESHADER=1` to drop the shimmer, or `0` to turn flame shading off.
 
@@ -148,8 +149,9 @@ more arcs than small sparks.
 * Past the default camera's distance, `CameraHeight` over the sine of `CameraPitch`, arcs widen with
 depth, so they stay visible at the top of the screen and when zoomed out.
 * A system that is both flame and electric draws as flame.
-* Streaks such as `TeslaTrail.tga`, volume particles, terrain-conforming particles and multiplied
+* Streaks such as `TeslaTrail.tga`, volume particles and multiplied
 sprites stay plain.
+* Terrain-conforming particles take electric shading and `ElectricParticleScale` on their terrain mesh.
 * Launch with `CONTRA_ELECTRICSHADER=0` to turn electric shading off.
 
 # Laser shading
@@ -330,7 +332,8 @@ the tint.
 the sprite drifts through them.
 * The ground glow under a cryo beam holds steady and takes the beam's tint. With cryo shading off the
 beam and its glow keep their own colour.
-* Terrain-conforming particles, volume particles and multiplied sprites stay plain.
+* Volume particles and multiplied sprites stay plain.
+* Terrain-conforming particles take cryo shading and `CryoParticleScale` on their terrain mesh.
 * Launch with `CONTRA_CRYOSHADER=0` to turn cryo shading off.
 
 # Disruption shading
@@ -433,8 +436,9 @@ disc's at its middle. On a beam they run along its length and push across it.
 a jump.
 * A beam needs a `Texture`, which masks its strip. Without one it draws as a plain beam, even with
 `Only`.
-* On a particle system, `ALPHA_TEST` and `MULTIPLY` sprites, streaks, volume particles and
-terrain-conforming particles take no disruption, and draw their own art even with `Only`.
+* On a particle system, `ALPHA_TEST` and `MULTIPLY` sprites, streaks and volume particles take no
+disruption, and draw their own art even with `Only`. Terrain-conforming particles disrupt through
+their terrain mesh, including with `Only`.
 * The bend follows the mask at the size the sprite draws, so `CryoParticleScale` and
 `ElectricParticleScale` scale it too. On a model it fades with the object's opacity.
 * An `FXList` disc lies flat and ignores depth, like a shockwave. At most 32 show at once.

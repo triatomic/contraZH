@@ -321,13 +321,11 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 			hasAdditive = TRUE;
 		}
 
-		// matches the haze pass, which skips only systems drawn as terrain-conforming meshes
-		const Bool conformsToTerrain = !sys->shouldBillboard() && sys->getVolumeParticleDepth() == DEFAULT_VOLUME_PARTICLE_DEPTH && sys->shouldConformToTerrain();
-		if (!hasFlame && sys->isUsingParticles() && !conformsToTerrain && systemEffects(*sys, DRAW_HAZE) != 0)
+		if (!hasFlame && sys->isUsingParticles() && systemEffects(*sys, DRAW_HAZE) != 0)
 		{
 			hasFlame = TRUE;
 		}
-		if (!hasDisruption && sys->isUsingParticles() && !conformsToTerrain && systemEffects(*sys, DRAW_DISRUPT) != 0)
+		if (!hasDisruption && sys->isUsingParticles() && systemEffects(*sys, DRAW_DISRUPT) != 0)
 		{
 			hasDisruption = TRUE;
 		}
@@ -489,9 +487,8 @@ unsigned W3DParticleSystemManager::systemEffects(ParticleSystem &system, DrawPas
 // The pass takes blended sprites alone, and only where the disruption can draw at all.
 Bool W3DParticleSystemManager::disrupts(ParticleSystem &system)
 {
-	const Bool conformsToTerrain = !system.shouldBillboard() && system.getVolumeParticleDepth() == DEFAULT_VOLUME_PARTICLE_DEPTH && system.shouldConformToTerrain();
 	const Bool volume = system.isUsingVolumeParticles() && system.getVolumeParticleDepth() > DEFAULT_VOLUME_PARTICLE_DEPTH;
-	return system.isUsingParticles() && !conformsToTerrain && !volume && systemEffects(system, DRAW_DISRUPT) != 0 &&
+	return system.isUsingParticles() && !volume && systemEffects(system, DRAW_DISRUPT) != 0 &&
 		TheW3DSoftParticles->disruptionEnabled();
 }
 
@@ -579,11 +576,6 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 				sys->getVolumeParticleDepth() == DEFAULT_VOLUME_PARTICLE_DEPTH &&
 				sys->shouldConformToTerrain();
 
-		if ((pass == DRAW_HAZE || pass == DRAW_DISRUPT) && useTerrainConformingParticles)
-		{
-			continue;
-		}
-
 		// Atlas pages batch sprites across textures; alpha and additive sprites also share one blend.
 		const ParticleSystemInfo::ParticleShaderType shaderType = sys->getShaderType();
 		RefCountPtr<TextureClass> batchTexture = texture;
@@ -627,8 +619,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 			lift = resolved.hazeLift;
 		}
 		// only particles the cryo or electric shader draws scale, so they keep their size with that shading off
-		else if (!useTerrainConformingParticles &&
-			!(sys->isUsingVolumeParticles() && sys->getVolumeParticleDepth() > DEFAULT_VOLUME_PARTICLE_DEPTH))
+		else if (!(sys->isUsingVolumeParticles() && sys->getVolumeParticleDepth() > DEFAULT_VOLUME_PARTICLE_DEPTH))
 		{
 			// the disruption's mask is as large as the art the main pass draws
 			const unsigned artEffects = (pass == DRAW_DISRUPT) ? systemEffects(*sys, DRAW_MAIN) : effects;
@@ -781,9 +772,11 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		{
 			m_terrainParticles->setTexture( texture.Peek() );
 			m_terrainParticles->setShader( shaderForType( sys->getShaderType() ) );
+			m_terrainParticles->setEffects( effects, effectData );
 			m_terrainParticles->setArrays( m_posBuffer, m_RGBABuffer, m_sizeBuffer, m_angleBuffer, pointCount );
 			m_terrainParticles->setBoundingBox( m_currentBoundingBox );
-			m_terrainParticles->render();
+			m_terrainParticles->render( sizeScale > 0.0f ? lift / sizeScale : 0.0f );
+			m_terrainParticles->setEffects( 0, nullptr );
 			m_onScreenParticleCount += (pointCount - startCount);
 			pointCount = startCount;
 		}

@@ -26,6 +26,7 @@
 #include "WW3D2/dx8vertexbuffer.h"
 #include "WW3D2/dx8wrapper.h"
 #include "WW3D2/statistics.h"
+#include "WW3D2/sortingrenderer.h"
 #include "WW3D2/texture.h"
 #include "WW3D2/vertmaterial.h"
 #include "WWMath/vector3.h"
@@ -62,6 +63,7 @@ struct W3DTerrainParticles::ParticleContext
 	IRegion2D bounds;
 	UnsignedInt diffuse;
 	Real size;
+	Real heightOffset;
 	Real cosine;
 	Real sine;
 	Int minCells;
@@ -77,6 +79,8 @@ W3DTerrainParticles::W3DTerrainParticles()
   , m_numVertices(0)
   , m_numIndices(0)
   , m_texture(nullptr)
+  , m_effects(0)
+  , m_effectData(nullptr)
   , m_pointLoc(nullptr)
   , m_pointDiffuse(nullptr)
   , m_pointSize(nullptr)
@@ -91,7 +95,7 @@ W3DTerrainParticles::W3DTerrainParticles()
 	m_defaultDiffuse = DX8Wrapper::Convert_Color_Clamp(Vector4(m_defaultPointColor.X, m_defaultPointColor.Y, m_defaultPointColor.Z, m_defaultPointAlpha));
 }
 
-void W3DTerrainParticles::render()
+void W3DTerrainParticles::render(Real heightScale)
 {
 	if (m_pointCount <= 0 || !m_pointLoc || !TheTerrainRenderObject)
 		return;
@@ -126,6 +130,7 @@ void W3DTerrainParticles::render()
 		particle.bounds = bounds;
 		particle.diffuse = diffuse;
 		particle.size = size;
+		particle.heightOffset = size * heightScale;
 		particle.cosine = cosine;
 		particle.sine = sine;
 
@@ -218,7 +223,7 @@ UnsignedShort W3DTerrainParticles::addVertex(const WorldHeightMap& map, const Pa
 	vertex.diffuse = particle.diffuse;
 	vertex.x = x * MAP_XY_FACTOR;
 	vertex.y = y * MAP_XY_FACTOR;
-	vertex.z = map.getQuickHeight(x + map.getBorderSizeInline(), y + map.getBorderSizeInline()) * MAP_HEIGHT_SCALE + TerrainParticles::Z_OFFSET;
+	vertex.z = map.getQuickHeight(x + map.getBorderSizeInline(), y + map.getBorderSizeInline()) * MAP_HEIGHT_SCALE + TerrainParticles::Z_OFFSET + particle.heightOffset;
 	const Real deltaX = vertex.x - particle.loc.X;
 	const Real deltaY = vertex.y - particle.loc.Y;
 	const Real localX = particle.cosine * deltaX - particle.sine * deltaY;
@@ -263,11 +268,24 @@ void W3DTerrainParticles::flushBatch()
 
 		DX8Wrapper::Set_Index_Buffer(indexAccess, 0);
 		DX8Wrapper::Set_Vertex_Buffer(vertexAccess);
-		DX8_RECORD_TERRAIN_PARTICLE_BATCH(m_numIndices / 3);
-		DX8Wrapper::Draw_Triangles(0,
-		                           m_numIndices / 3,
-		                           0,
-		                           m_numVertices);
+		DX8Wrapper::Set_Shader(m_shader);
+		DX8Wrapper::Apply_Render_State_Changes();
+		SoftParticleHookClass* hook = SortingRendererClass::Peek_Soft_Particle_Hook();
+		const Bool shaded = m_texture && m_effects != 0 && hook != nullptr &&
+			hook->Begin(m_shader, m_effects | SoftParticleHookClass::EFFECT_TERRAIN, m_effectData);
+		const Bool effectsOnly = (m_effects & (SoftParticleHookClass::EFFECT_HAZE | SoftParticleHookClass::EFFECT_DISRUPT)) != 0;
+		if (shaded || !effectsOnly)
+		{
+			DX8_RECORD_TERRAIN_PARTICLE_BATCH(m_numIndices / 3);
+			DX8Wrapper::Draw_Triangles(0,
+			                           m_numIndices / 3,
+			                           0,
+			                           m_numVertices);
+		}
+		if (shaded)
+		{
+			hook->End();
+		}
 	}
 
 	m_numVertices = 0;
@@ -358,6 +376,12 @@ void W3DTerrainParticles::setTexture(TextureClass* texture)
 void W3DTerrainParticles::setShader(ShaderClass shader)
 {
 	m_shader = shader;
+}
+
+void W3DTerrainParticles::setEffects(unsigned effects, const void* effectData)
+{
+	m_effects = effects;
+	m_effectData = effectData;
 }
 
 void W3DTerrainParticles::setArrays(

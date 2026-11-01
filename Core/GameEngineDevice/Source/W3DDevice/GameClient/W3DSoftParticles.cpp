@@ -909,8 +909,9 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const 
 	const Bool laser = !fluid && !cryo && !flame && !electric && (effects & EFFECT_LASER) != 0 && laserEnabled();
 	const Bool beam = (effects & EFFECT_BEAM) != 0;
 	const Bool mesh = (effects & EFFECT_MESH) != 0;
+	const Bool terrain = (effects & EFFECT_TERRAIN) != 0;
 	// A beam or streak fades only as part of its shaded look, so with its shader off it draws as it always has.
-	const Bool soft = !fluid && (effects & EFFECT_SOFT) != 0 && SoftParticleMode != SOFT_PARTICLES_OFF &&
+	const Bool soft = !fluid && !terrain && (effects & EFFECT_SOFT) != 0 && SoftParticleMode != SOFT_PARTICLES_OFF &&
 		TheGlobalData->m_useSoftParticles && TheGlobalData->m_softParticleDistance > 0.0f &&
 		(flame || laser || electric || cryo || (effects & (EFFECT_LASER | EFFECT_BEAM)) == 0);
 	if ((!soft && !flame && !electric && !laser && !cryo && !fluid) || !loadShaders())
@@ -991,7 +992,7 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const 
 #endif
 	if (flame)
 	{
-		bindFlame(tuning, beam, mesh);
+		bindFlame(tuning, beam, mesh || terrain);
 		m_bound = EFFECT_FLAME;
 	}
 	else if (electric || laser || cryo)
@@ -1005,7 +1006,7 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const 
 		}
 		else if (electric)
 		{
-			bindElectric(beamTuning, beam, mesh);
+			bindElectric(beamTuning, beam, mesh || terrain);
 			m_bound = EFFECT_ELECTRIC;
 		}
 		else
