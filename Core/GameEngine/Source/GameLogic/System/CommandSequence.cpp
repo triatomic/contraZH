@@ -6,8 +6,13 @@
 #include "Common/ActionManager.h"
 #include "Common/BuildAssistant.h"
 #include "Common/GameState.h"
+#include "Common/Recorder.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingFactory.h"
+#include "Common/Player.h"
+
+#include "GameClient/GameClient.h"
+#include "GameClient/TerrainVisual.h"
 
 #include "GameLogic/CommandSequence.h"
 #include "GameLogic/Module/AIUpdate.h"
@@ -16,6 +21,7 @@
 #include "GameLogic/Module/OverchargeBehavior.h"
 #include "GameLogic/Module/SpawnBehavior.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
+#include "GameLogic/PartitionManager.h"
 #include "GameLogic/Weapon.h"
 
 //-----------------------------------------------------------------------------
@@ -33,6 +39,15 @@ CommandSequence::CommandSequence()
 
 CommandSequence::~CommandSequence()
 {
+	for (IDToNodeMap::iterator it = m_allNodes.begin(); it != m_allNodes.end(); it++)
+	{
+		delete it->second;
+	}
+
+	for (IDToDrawableMap::iterator it = m_constructionShadows.begin(); it != m_constructionShadows.end(); it++)
+	{
+		TheGameClient->destroyDrawable(it->second);
+	}
 }
 
 void CommandSequence::init()
@@ -43,14 +58,19 @@ void CommandSequence::init()
 
 void CommandSequence::reset()
 {
-	IDToNodeMap::iterator it;
-	for (it = m_allNodes.begin(); it != m_allNodes.end(); it++)
+	for (IDToNodeMap::iterator it = m_allNodes.begin(); it != m_allNodes.end(); it++)
 	{
 		delete it->second;
 	}
 
+	for (IDToDrawableMap::iterator it = m_constructionShadows.begin(); it != m_constructionShadows.end(); it++)
+	{
+		TheGameClient->destroyDrawable(it->second);
+	}
+
 	m_allNodes.clear();
 	m_constructionCount.clear();
+	m_constructionShadows.clear();
 	m_uniqueID = 0;
 	m_commandNodeCount = 0;
 }
@@ -87,6 +107,7 @@ void CommandSequence::xfer(Xfer* xfer)
 			xferCommandNode(xfer, cmdNode);
 		}
 
+		// xfer construction count
 		Int cnt;
 		xfer->xferInt(&cnt);
 		if (cnt < 0)
@@ -111,6 +132,7 @@ void CommandSequence::xfer(Xfer* xfer)
 			xferCommandNode(xfer, cmdNode);
 		}
 
+		// xfer construction count
 		Int cnt = m_constructionCount.size();
 		xfer->xferInt(&cnt);
 		for (std::map<ObjectID, Int>::iterator it = m_constructionCount.begin(); it != m_constructionCount.end(); it++)
@@ -124,13 +146,22 @@ void CommandSequence::xfer(Xfer* xfer)
 
 void CommandSequence::loadPostProcess()
 {
+	for (IDToNodeMap::iterator it = m_allNodes.begin(); it != m_allNodes.end(); it++)
+	{
+		CommandNode *cmdNode = it->second;
+		if (cmdNode->m_cmdType == COMMAND_DOZER_CONSTRUCT)
+		{
+			Object *obj = TheGameLogic->findObjectByID(cmdNode->m_nextCommand.begin()->first);
+			createConstructionShadow(cmdNode->m_nodeID, obj);
+		}
+	}
 }
 
 void CommandSequence::xferCommandNode(Xfer *xfer, CommandNode *cmdNode)
 {
-	xfer->xferInt((Int*)&cmdNode->m_commandType);
+	xfer->xferInt((Int*)&cmdNode->m_cmdType);
 
-	switch (cmdNode->m_commandType)
+	switch (cmdNode->m_cmdType)
 	{
 			// no argument
 		case COMMAND_DO_EVACUATE:
@@ -211,7 +242,7 @@ void CommandSequence::xferCommandNode(Xfer *xfer, CommandNode *cmdNode)
 			xfer->xferCoord3D(&cmdNode->m_loc);
 			xfer->xferUnsignedShort(&cmdNode->m_templateID);
 			xfer->xferReal(&cmdNode->m_angle);
-			if (cmdNode->m_commandType == COMMAND_DOZER_CONSTRUCT_LINE)
+			if (cmdNode->m_cmdType == COMMAND_DOZER_CONSTRUCT_LINE)
 				xfer->xferCoord3D(&cmdNode->m_loc2);
 			break;
 		}
@@ -263,7 +294,7 @@ void CommandSequence::xferCommandNode(Xfer *xfer, CommandNode *cmdNode)
 			cmdNode->m_nextCommand.insert(std::make_pair(objID, nextCmd));
 		}
 
-		if (isTypicalMovingCommand(cmdNode->m_commandType))
+		if (isTypicalMovingCommand(cmdNode->m_cmdType))
 		{
 			Coord3D dest;
 			xfer->xferInt(&cnt);
@@ -290,7 +321,7 @@ void CommandSequence::xferCommandNode(Xfer *xfer, CommandNode *cmdNode)
 			xfer->xferUnsignedInt(&it->second);
 		}
 
-		if (isTypicalMovingCommand(cmdNode->m_commandType))
+		if (isTypicalMovingCommand(cmdNode->m_cmdType))
 		{
 			cnt = cmdNode->m_allocatedDest.size();
 			xfer->xferInt(&cnt);
@@ -317,11 +348,11 @@ void CommandSequence::clearObjectCommand(Object *obj)
 		obj->clearPendingExitList();
 }
 
-CommandSequence::CommandNode *CommandSequence::newCommandNode(CommandType commandType)
+CommandSequence::CommandNode *CommandSequence::newCommandNode(CommandType cmdType)
 {
 	m_uniqueID++;
 	CommandNode *cmdNode = new CommandNode();
-	cmdNode->m_commandType = commandType;
+	cmdNode->m_cmdType = cmdType;
 	cmdNode->m_nodeID = m_uniqueID;
 	m_allNodes.insert(std::make_pair(m_uniqueID, cmdNode));
 	m_commandNodeCount++;
@@ -329,9 +360,9 @@ CommandSequence::CommandNode *CommandSequence::newCommandNode(CommandType comman
 }
 
 
-UnsignedInt CommandSequence::newNoArgumentCommand(CommandType commandType)
+UnsignedInt CommandSequence::newNoArgumentCommand(CommandType cmdType)
 {
-	switch (commandType)
+	switch (cmdType)
 	{
 	case COMMAND_DO_EVACUATE:
 	case COMMAND_INTERNET_HACK:
@@ -342,14 +373,14 @@ UnsignedInt CommandSequence::newNoArgumentCommand(CommandType commandType)
 	default:
 		return 0;
 	}
-	CommandNode* cmdNode = newCommandNode(commandType);
+	CommandNode* cmdNode = newCommandNode(cmdType);
 	return cmdNode->m_nodeID;
 }
 
 //ShigureUi 07/10/2026 note all sanity check needs a recheck
-UnsignedInt CommandSequence::newSinglePosCommand(CommandType commandType, const Coord3D *pos)
+UnsignedInt CommandSequence::newSinglePosCommand(CommandType cmdType, const Coord3D *pos)
 {
-	switch (commandType)
+	switch (cmdType)
 	{
 	case COMMAND_DO_MOVETO:
 	case COMMAND_DO_REVERSE_MOVETO:
@@ -357,14 +388,14 @@ UnsignedInt CommandSequence::newSinglePosCommand(CommandType commandType, const 
 	default:
 		return 0;
 	}
-	CommandNode *cmdNode = newCommandNode(commandType);
+	CommandNode *cmdNode = newCommandNode(cmdType);
 	cmdNode->m_loc = *pos;
 	return cmdNode->m_nodeID;
 }
 
-UnsignedInt CommandSequence::newSingleTargetCommand(CommandType commandType, Object *obj)
+UnsignedInt CommandSequence::newSingleTargetCommand(CommandType cmdType, Object *obj)
 {
-	switch (commandType)
+	switch (cmdType)
 	{
 	case COMMAND_GET_REPAIRED:
 	case COMMAND_GET_HEALED:
@@ -378,14 +409,14 @@ UnsignedInt CommandSequence::newSingleTargetCommand(CommandType commandType, Obj
 		return 0;
 	}
 
-	CommandNode *cmdNode = newCommandNode(commandType);
+	CommandNode *cmdNode = newCommandNode(cmdType);
 	cmdNode->m_targetID = obj ? obj->getID() : INVALID_ID;
 	return cmdNode->m_nodeID;
 }
 
-UnsignedInt CommandSequence::newTargetNPosCommand(CommandType commandType, Object* obj, const Coord3D* pos)
+UnsignedInt CommandSequence::newTargetNPosCommand(CommandType cmdType, Object* obj, const Coord3D* pos)
 {
-	switch (commandType)
+	switch (cmdType)
 	{
 	case COMMAND_DO_COMBATDROP:
 		break;
@@ -393,15 +424,15 @@ UnsignedInt CommandSequence::newTargetNPosCommand(CommandType commandType, Objec
 		return 0;
 	}
 
-	CommandNode* cmdNode = newCommandNode(commandType);
+	CommandNode* cmdNode = newCommandNode(cmdType);
 	cmdNode->m_targetID = obj ? obj->getID() : INVALID_ID;
 	cmdNode->m_loc = *pos;
 	return cmdNode->m_nodeID;
 }
 
-UnsignedInt CommandSequence::newPosNMaxShotsCommand(CommandType commandType, const Coord3D *pos, Int maxShotsToFire)
+UnsignedInt CommandSequence::newPosNMaxShotsCommand(CommandType cmdType, const Coord3D *pos, Int maxShotsToFire)
 {
-	switch (commandType)
+	switch (cmdType)
 	{
 	case COMMAND_DO_ATTACK_MOVETO:
 		break;
@@ -409,15 +440,15 @@ UnsignedInt CommandSequence::newPosNMaxShotsCommand(CommandType commandType, con
 		return 0;
 	}
 
-	CommandNode* cmdNode = newCommandNode(commandType);
+	CommandNode* cmdNode = newCommandNode(cmdType);
 	cmdNode->m_loc = *pos;
 	cmdNode->m_maxShotsToFire = maxShotsToFire;
 	return cmdNode->m_nodeID;
 }
 
-UnsignedInt CommandSequence::newGuardCommand(CommandType commandType, const Coord3D *pos, Object *obj, GuardMode guardMode)
+UnsignedInt CommandSequence::newGuardCommand(CommandType cmdType, const Coord3D *pos, Object *obj, GuardMode guardMode)
 {
-	switch (commandType)
+	switch (cmdType)
 	{
 	case COMMAND_DO_GUARD_POSITION:
 	case COMMAND_DO_GUARD_OBJECT:
@@ -426,8 +457,8 @@ UnsignedInt CommandSequence::newGuardCommand(CommandType commandType, const Coor
 		return 0;
 	}
 
-	CommandNode* cmdNode = newCommandNode(commandType);
-	if (cmdNode->m_commandType == COMMAND_DO_GUARD_POSITION)
+	CommandNode* cmdNode = newCommandNode(cmdType);
+	if (cmdNode->m_cmdType == COMMAND_DO_GUARD_POSITION)
 		cmdNode->m_loc = *pos;
 	else
 		cmdNode->m_targetID = obj->getID();
@@ -435,9 +466,9 @@ UnsignedInt CommandSequence::newGuardCommand(CommandType commandType, const Coor
 	return cmdNode->m_nodeID;
 }
 
-UnsignedInt CommandSequence::newDoWeaponAtLocCommand(CommandType commandType, WeaponSlotType weaponSlot, const Coord3D *pos, Int maxShotsToFire, Bool releaseAfter)
+UnsignedInt CommandSequence::newDoWeaponAtLocCommand(CommandType cmdType, WeaponSlotType weaponSlot, const Coord3D *pos, Int maxShotsToFire, Bool releaseAfter)
 {
-	switch (commandType)
+	switch (cmdType)
 	{
 	case COMMAND_DO_WEAPON:
 	case COMMAND_DO_WEAPON_AT_LOCATION:
@@ -446,17 +477,18 @@ UnsignedInt CommandSequence::newDoWeaponAtLocCommand(CommandType commandType, We
 		return 0;
 	}
 
-	CommandNode* cmdNode = newCommandNode(commandType);
+	CommandNode* cmdNode = newCommandNode(cmdType);
 	cmdNode->m_weaponSlot = weaponSlot;
-	cmdNode->m_loc = *pos;
+	if (pos)
+		cmdNode->m_loc = *pos;
 	cmdNode->m_maxShotsToFire = maxShotsToFire;
 	cmdNode->m_releaseAfter = releaseAfter;
 	return cmdNode->m_nodeID;
 }
 
-UnsignedInt CommandSequence::newDoWeaponAtObjCommand(CommandType commandType, WeaponSlotType weaponSlot, Object* obj, Int maxShotsToFire)
+UnsignedInt CommandSequence::newDoWeaponAtObjCommand(CommandType cmdType, WeaponSlotType weaponSlot, Object* obj, Int maxShotsToFire)
 {
-	switch (commandType)
+	switch (cmdType)
 	{
 	case COMMAND_DO_ATTACK_OBJECT:
 	case COMMAND_DO_FORCE_ATTACK_OBJECT:
@@ -465,16 +497,16 @@ UnsignedInt CommandSequence::newDoWeaponAtObjCommand(CommandType commandType, We
 		return 0;
 	}
 
-	CommandNode* cmdNode = newCommandNode(commandType);
+	CommandNode* cmdNode = newCommandNode(cmdType);
 	cmdNode->m_weaponSlot = weaponSlot;
 	cmdNode->m_targetID = obj->getID();
 	cmdNode->m_maxShotsToFire = maxShotsToFire;
 	return cmdNode->m_nodeID;
 }
 
-UnsignedInt CommandSequence::newDozerConstructCommand(CommandType commandType, const ThingTemplate *thing, const Coord3D *loc1, const Coord3D* loc2, Real angle)
+UnsignedInt CommandSequence::newDozerConstructCommand(CommandType cmdType, const ThingTemplate *thing, const Coord3D *loc1, const Coord3D* loc2, Real angle)
 {
-	switch (commandType)
+	switch (cmdType)
 	{
 	case COMMAND_DOZER_CONSTRUCT:
 	case COMMAND_DOZER_CONSTRUCT_LINE:
@@ -483,23 +515,23 @@ UnsignedInt CommandSequence::newDozerConstructCommand(CommandType commandType, c
 		return 0;
 	}
 
-	if (commandType == COMMAND_DOZER_CONSTRUCT && !loc1)
+	if (cmdType == COMMAND_DOZER_CONSTRUCT && !loc1)
 		return 0;
-	else if (commandType == COMMAND_DOZER_CONSTRUCT_LINE && (!loc1 || !loc2))
+	else if (cmdType == COMMAND_DOZER_CONSTRUCT_LINE && (!loc1 || !loc2))
 		return 0;
 
-	CommandNode* cmdNode = newCommandNode(commandType);
+	CommandNode* cmdNode = newCommandNode(cmdType);
 	cmdNode->m_loc = *loc1;
 	cmdNode->m_templateID = thing->getTemplateID();
 	cmdNode->m_angle = angle;
-	if (commandType == COMMAND_DOZER_CONSTRUCT_LINE)
+	if (cmdType == COMMAND_DOZER_CONSTRUCT_LINE)
 		cmdNode->m_loc2 = *loc2;
 	return cmdNode->m_nodeID;
 }
 
-UnsignedInt CommandSequence::newDoSpecialCommand(CommandType commandType, UnsignedInt specialPowerID, UnsignedInt commandOptions)
+UnsignedInt CommandSequence::newDoSpecialCommand(CommandType cmdType, UnsignedInt specialPowerID, UnsignedInt commandOptions)
 {
-	switch (commandType)
+	switch (cmdType)
 	{
 	case COMMAND_DO_SPECIAL_POWER:
 		break;
@@ -507,15 +539,15 @@ UnsignedInt CommandSequence::newDoSpecialCommand(CommandType commandType, Unsign
 		return 0;
 	}
 
-	CommandNode* cmdNode = newCommandNode(commandType);
+	CommandNode* cmdNode = newCommandNode(cmdType);
 	cmdNode->m_specialPowerID = specialPowerID;
 	cmdNode->m_specialOptions = commandOptions;
 	return cmdNode->m_nodeID;
 }
 
-UnsignedInt CommandSequence::newDoSpecialAtLocCommand(CommandType commandType, UnsignedInt specialPowerID, const Coord3D *location, Real angle, const Object* objectInWay, UnsignedInt commandOptions)
+UnsignedInt CommandSequence::newDoSpecialAtLocCommand(CommandType cmdType, UnsignedInt specialPowerID, const Coord3D *location, Real angle, const Object* objectInWay, UnsignedInt commandOptions)
 {
-	switch (commandType)
+	switch (cmdType)
 	{
 	case COMMAND_DO_SPECIAL_POWER_AT_POSITION:
 	case COMMAND_DO_MOVING_SPECIAL_POWER_AT_POSITION:
@@ -524,7 +556,7 @@ UnsignedInt CommandSequence::newDoSpecialAtLocCommand(CommandType commandType, U
 		return 0;
 	}
 
-	CommandNode* cmdNode = newCommandNode(commandType);
+	CommandNode* cmdNode = newCommandNode(cmdType);
 	cmdNode->m_specialPowerID = specialPowerID;
 	cmdNode->m_loc = *location;
 	cmdNode->m_angle = angle;
@@ -533,9 +565,9 @@ UnsignedInt CommandSequence::newDoSpecialAtLocCommand(CommandType commandType, U
 	return cmdNode->m_nodeID;
 }
 
-UnsignedInt CommandSequence::newDoSpecialAtObjCommand(CommandType commandType, UnsignedInt specialPowerID, Object* target, UnsignedInt commandOptions)
+UnsignedInt CommandSequence::newDoSpecialAtObjCommand(CommandType cmdType, UnsignedInt specialPowerID, Object* target, UnsignedInt commandOptions)
 {
-	switch (commandType)
+	switch (cmdType)
 	{
 	case COMMAND_DO_SPECIAL_POWER_AT_OBJECT:
 		break;
@@ -543,16 +575,16 @@ UnsignedInt CommandSequence::newDoSpecialAtObjCommand(CommandType commandType, U
 		return 0;
 	}
 
-	CommandNode* cmdNode = newCommandNode(commandType);
+	CommandNode* cmdNode = newCommandNode(cmdType);
 	cmdNode->m_specialPowerID = specialPowerID;
 	cmdNode->m_targetID = target->getID();
 	cmdNode->m_specialOptions = commandOptions;
 	return cmdNode->m_nodeID;
 }
 
-UnsignedInt CommandSequence::newSwitchWeaponCommand(CommandType commandType, WeaponSlotType weaponSlot)
+UnsignedInt CommandSequence::newSwitchWeaponCommand(CommandType cmdType, WeaponSlotType weaponSlot)
 {
-	switch (commandType)
+	switch (cmdType)
 	{
 	case COMMAND_SWITCH_WEAPON:
 		break;
@@ -560,7 +592,7 @@ UnsignedInt CommandSequence::newSwitchWeaponCommand(CommandType commandType, Wea
 		return 0;
 	}
 
-	CommandNode* cmdNode = newCommandNode(commandType);
+	CommandNode* cmdNode = newCommandNode(cmdType);
 	cmdNode->m_weaponSlot = weaponSlot;
 	return cmdNode->m_nodeID;
 }
@@ -589,7 +621,7 @@ Bool CommandSequence::includeUnitInCommand(UnsignedInt cmdNodeID, Object *obj, c
 
 		obj->setLastCommand(cmdNodeID);
 
-		if ((cmdNode->m_commandType == COMMAND_DO_MOVETO || cmdNode->m_commandType == COMMAND_DO_REVERSE_MOVETO)
+		if ((cmdNode->m_cmdType == COMMAND_DO_MOVETO || cmdNode->m_cmdType == COMMAND_DO_REVERSE_MOVETO)
 			&& obj->getLastCommandInMoveStreak() == lastCmdNodeID)
 		{
 			obj->setLastCommandInMoveStreak(cmdNodeID);
@@ -601,7 +633,7 @@ Bool CommandSequence::includeUnitInCommand(UnsignedInt cmdNodeID, Object *obj, c
 				ObjectToLocMap::iterator it;
 				if (ai->getAIStateType() == AI_FOLLOW_PATH)
 				{
-					ai->aiFollowPathAppend(objDest, CMD_FROM_PLAYER, cmdNode->m_commandType == COMMAND_DO_REVERSE_MOVETO, cmdNodeID);
+					ai->aiFollowPathAppend(objDest, CMD_FROM_PLAYER, cmdNode->m_cmdType == COMMAND_DO_REVERSE_MOVETO, cmdNodeID);
 				}
 				else
 				{
@@ -612,8 +644,8 @@ Bool CommandSequence::includeUnitInCommand(UnsignedInt cmdNodeID, Object *obj, c
 					else
 						dest = it->second;
 					path.push_back(dest);
-					ai->aiFollowPath(&path, nullptr, CMD_FROM_PLAYER, lastCmdNode->m_commandType == COMMAND_DO_REVERSE_MOVETO, lastCmdNodeID);
-					ai->aiFollowPathAppend(objDest, CMD_FROM_PLAYER, cmdNode->m_commandType == COMMAND_DO_REVERSE_MOVETO, cmdNodeID);
+					ai->aiFollowPath(&path, nullptr, CMD_FROM_PLAYER, lastCmdNode->m_cmdType == COMMAND_DO_REVERSE_MOVETO, lastCmdNodeID);
+					ai->aiFollowPathAppend(objDest, CMD_FROM_PLAYER, cmdNode->m_cmdType == COMMAND_DO_REVERSE_MOVETO, cmdNodeID);
 				}
 			}
 		}
@@ -624,11 +656,11 @@ Bool CommandSequence::includeUnitInCommand(UnsignedInt cmdNodeID, Object *obj, c
 		obj->setLastCommand(cmdNodeID);
 		obj->setCommandVerifyStatus(STATUS_FRESH);
 
-		if (cmdNode->m_commandType == COMMAND_DO_MOVETO || cmdNode->m_commandType == COMMAND_DO_REVERSE_MOVETO)
+		if (cmdNode->m_cmdType == COMMAND_DO_MOVETO || cmdNode->m_cmdType == COMMAND_DO_REVERSE_MOVETO)
 			obj->setLastCommandInMoveStreak(cmdNodeID);
 	}
 
-	if (cmdNode->m_commandType == COMMAND_DOZER_CONSTRUCT || cmdNode->m_commandType == COMMAND_RESUME_CONSTRUCTION)
+	if (cmdNode->m_cmdType == COMMAND_DOZER_CONSTRUCT || cmdNode->m_cmdType == COMMAND_RESUME_CONSTRUCTION)
 		updateConstructionCount(obj, 1);
 
 	return true;
@@ -641,15 +673,15 @@ Bool CommandSequence::includeUnitInTypicalMovingCommand(UnsignedInt cmdNodeID, O
 
 	CommandNode *cmdNode = findCommandByID(cmdNodeID);
 
-	if (isTypicalMovingCommand(cmdNode->m_commandType))
+	if (isTypicalMovingCommand(cmdNode->m_cmdType))
 		cmdNode->m_allocatedDest.insert(std::make_pair(obj->getID(), objDest));
 
 	return true;
 }
 
-Bool CommandSequence::isTypicalMovingCommand(CommandType commandType)
+Bool CommandSequence::isTypicalMovingCommand(CommandType cmdType)
 {
-	switch (commandType)
+	switch (cmdType)
 	{
 		case COMMAND_DO_MOVETO:
 		case COMMAND_DO_REVERSE_MOVETO:
@@ -662,7 +694,7 @@ Bool CommandSequence::isTypicalMovingCommand(CommandType commandType)
 
 inline Bool CommandSequence::isEndCommand(CommandNode *cmdNode)
 {
-	switch (cmdNode->m_commandType)
+	switch (cmdNode->m_cmdType)
 	{
 	case COMMAND_DO_GUARD_POSITION:
 	case COMMAND_INTERNET_HACK:
@@ -691,7 +723,7 @@ inline Bool CommandSequence::isLocatableCommand(UnsignedInt cmdNodeID)
 	if (cmdNode == nullptr)
 		return false;
 
-	switch (cmdNode->m_commandType)
+	switch (cmdNode->m_cmdType)
 	{
 		case COMMAND_NONE:
 		case COMMAND_DO_WEAPON:
@@ -780,7 +812,7 @@ Bool CommandSequence::getCommandLoc(UnsignedInt cmdNodeID, Coord3D &loc)
 
 	Object* obj = nullptr;
 
-	switch (cmdNode->m_commandType)
+	switch (cmdNode->m_cmdType)
 	{
 		case COMMAND_DO_MOVETO:
 		case COMMAND_DO_REVERSE_MOVETO:
@@ -859,7 +891,10 @@ UnsignedInt CommandSequence::removeCurrentCommand(Object *obj, Bool doCleanUp)
 
 	if (ret)
 	{
-		obj->setCurrentCommand(it->second);
+		obj->setCurrentCommand(ret);
+		CommandNode *cmdNode = findCommandByID(ret);
+		if (cmdNode->m_cmdType == COMMAND_DOZER_CONSTRUCT)
+			removeConstructionShadow(ret);
 		if (obj->getCommandVerifyStatus() != STATUS_FOLLOW_PATH_VERIFIED)
 			obj->setCommandVerifyStatus(STATUS_FRESH);
 	}
@@ -872,13 +907,13 @@ UnsignedInt CommandSequence::removeCurrentCommand(Object *obj, Bool doCleanUp)
 
 	node->m_nextCommand.erase(it);
 
-	if (isTypicalMovingCommand(node->m_commandType))
+	if (isTypicalMovingCommand(node->m_cmdType))
 	{
 		ObjectToLocMap::iterator lit = node->m_allocatedDest.find(obj->getID());
 		node->m_allocatedDest.erase(lit);
 	}
 
-	if (node->m_commandType == COMMAND_DOZER_CONSTRUCT || node->m_commandType == COMMAND_RESUME_CONSTRUCTION)
+	if (node->m_cmdType == COMMAND_DOZER_CONSTRUCT || node->m_cmdType == COMMAND_RESUME_CONSTRUCTION)
 		updateConstructionCount(obj, -1);
 
 	if (doCleanUp && node->m_nextCommand.empty())
@@ -915,7 +950,7 @@ void CommandSequence::doCurrentCommand(Object *obj, CommandVerifyStatus cvs)
 
 	prepareCommandForVerification(obj);
 
-	CommandType cmdType = cmdNode->m_commandType;
+	CommandType cmdType = cmdNode->m_cmdType;
 	const CommandSourceType cmdSource = CMD_FROM_PLAYER;
 
 	AIUpdateInterface *ai = obj->getAIUpdateInterface();
@@ -946,7 +981,7 @@ void CommandSequence::doCurrentCommand(Object *obj, CommandVerifyStatus cvs)
 
 				while (nextNode)
 				{
-					if (nextNode->m_commandType != COMMAND_DO_MOVETO && nextNode->m_commandType != COMMAND_DO_REVERSE_MOVETO)
+					if (nextNode->m_cmdType != COMMAND_DO_MOVETO && nextNode->m_cmdType != COMMAND_DO_REVERSE_MOVETO)
 						break;
 					obj->setLastCommandInMoveStreak(nextNode->m_nodeID);
 
@@ -956,7 +991,7 @@ void CommandSequence::doCurrentCommand(Object *obj, CommandVerifyStatus cvs)
 					else
 						unitLoc = it->second;
 
-					ai->aiFollowPathAppend(&unitLoc, cmdSource, nextNode->m_commandType == COMMAND_DO_REVERSE_MOVETO, nextNode->m_nodeID);
+					ai->aiFollowPathAppend(&unitLoc, cmdSource, nextNode->m_cmdType == COMMAND_DO_REVERSE_MOVETO, nextNode->m_nodeID);
 					nextNode = nextCommand(obj, nextNode);
 				}
 			}
@@ -1504,8 +1539,8 @@ Bool CommandSequence::verifyExitCommand(Object *objWantToExit, Object *objectCon
 {
 	CommandNode *cmdNode = findCommandByID(objectContainingExiter->getCurrentCommand());
 	if (cmdNode &&
-		(((cmdNode->m_commandType == COMMAND_DO_EXIT && cmdNode->m_targetID == objWantToExit->getID()))
-			|| cmdNode->m_commandType == COMMAND_DO_EVACUATE))
+		(((cmdNode->m_cmdType == COMMAND_DO_EXIT && cmdNode->m_targetID == objWantToExit->getID()))
+			|| cmdNode->m_cmdType == COMMAND_DO_EVACUATE))
 	{
 		objectContainingExiter->addToPendingExitList(objWantToExit);
 		CommandVerifyStatus cvs = objectContainingExiter->getCommandVerifyStatus();
@@ -1607,7 +1642,7 @@ Bool CommandSequence::isCurrentExitCommand(Object *obj)
 {
 	CommandNode *cmdNode = findCommandByID(obj->getCurrentCommand());
 
-	if (cmdNode && (cmdNode->m_commandType == COMMAND_DO_EXIT || cmdNode->m_commandType == COMMAND_DO_EVACUATE))
+	if (cmdNode && (cmdNode->m_cmdType == COMMAND_DO_EXIT || cmdNode->m_cmdType == COMMAND_DO_EVACUATE))
 		return true;
 	return false;
 }
@@ -1653,4 +1688,161 @@ Int CommandSequence::getConstructionCount(Object *obj)
 	{
 		return it->second;
 	}
+}
+
+void CommandSequence::createConstructionShadow(UnsignedInt cmdNodeID, Object *sourceObject)
+{
+	CommandNode *cmdNode = findCommandByID(cmdNodeID);
+	if (!cmdNode || cmdNode->m_cmdType != COMMAND_DOZER_CONSTRUCT)
+		return;
+
+	if (!TheRecorder->isPlaybackMode() && !sourceObject->getControllingPlayer()->isLocalPlayer())
+		return;
+
+	IDToDrawableMap::iterator it = m_constructionShadows.find(cmdNodeID);
+
+	const ThingTemplate* build = TheThingFactory->findByTemplateID(cmdNode->m_templateID);
+
+	if (!build)
+		return;
+
+	if (it == m_constructionShadows.end())
+	{
+		Drawable* draw;
+
+		UnsignedInt drawableStatus = DRAWABLE_STATUS_NO_STATE_PARTICLES;
+		drawableStatus |= TheGlobalData->m_objectPlacementShadows ? DRAWABLE_STATUS_SHADOWS : 0;
+		draw = TheThingFactory->newDrawable(build, drawableStatus);
+
+		if (sourceObject)
+		{
+			if (TheGlobalData->m_timeOfDay == TIME_OF_DAY_NIGHT)
+				draw->setIndicatorColor(sourceObject->getControllingPlayer()->getPlayerNightColor());
+			else
+				draw->setIndicatorColor(sourceObject->getControllingPlayer()->getPlayerColor());
+		}
+
+		// set the drawable position
+		draw->setPosition(&cmdNode->m_loc);
+
+		// set the angle in the icon we just created
+		draw->setOrientation(cmdNode->m_angle);
+
+		// set the build icon attached to the cursor to be "see-thru"
+		draw->setDrawableOpacity(TheGlobalData->m_objectPlacementOpacity);
+
+		m_constructionShadows.insert(std::make_pair(cmdNodeID, draw));
+	}
+}
+
+
+void CommandSequence::removeConstructionShadow(UnsignedInt cmdNodeID)
+{
+	CommandNode *cmdNode = findCommandByID(cmdNodeID);
+	if (!cmdNode || cmdNode->m_cmdType != COMMAND_DOZER_CONSTRUCT)
+		return;
+
+	IDToDrawableMap::iterator it = m_constructionShadows.find(cmdNodeID);
+
+	if (it != m_constructionShadows.end())
+	{
+		TheGameClient->destroyDrawable(it->second);
+		m_constructionShadows.erase(it);
+	}
+}
+
+Bool CommandSequence::isShawdowInTheWay(const Coord3D *worldPos, const ThingTemplate *build, Real angle, const Object *builderObject)
+{
+	Real myFactoryExitWidth = build->getFactoryExitWidth();
+	Real myExtraWidth = build->getFactoryExtraBibWidth();
+
+	Bool checkMyExit = false;
+	Coord3D myExitPos;
+	GeometryInfo myBounds = build->getTemplateGeometryInfo();
+	myBounds.setMajorRadius(myBounds.getMajorRadius() + myExtraWidth);
+	if (myBounds.getGeomType() != GEOMETRY_BOX) {
+		myBounds.set(GEOMETRY_BOX, false, 40, myBounds.getMajorRadius(), myBounds.getMajorRadius());
+	}
+	else {
+		myBounds.setMinorRadius(myBounds.getMinorRadius() + myExtraWidth);
+	}
+	GeometryInfo myGeom = build->getTemplateGeometryInfo();
+	if (myGeom.getGeomType() != GEOMETRY_BOX) {
+		myGeom.setMinorRadius(myGeom.getMajorRadius());
+	}
+	myGeom.setMajorRadius(myFactoryExitWidth / 2.0f);
+	if (myFactoryExitWidth > 0) {
+		myExitPos = *worldPos;
+		checkMyExit = true;
+		Real c = (Real)cos(angle);
+		Real s = (Real)sin(angle);
+		Real offset = build->getTemplateGeometryInfo().getMajorRadius() + myFactoryExitWidth / 2.0f;
+		myExitPos.x += c * offset;
+		myExitPos.y += s * offset;
+	}
+
+	for (IDToDrawableMap::iterator it = m_constructionShadows.begin(); it != m_constructionShadows.end(); it++)
+	{
+		CommandNode* cmdNode = findCommandByID(it->first);
+
+		const ThingTemplate* thing = TheThingFactory->findByTemplateID(cmdNode->m_templateID);
+
+		Real themFactoryExitWidth = thing->getFactoryExitWidth();
+		Real hisExtraWidth = thing->getFactoryExtraBibWidth();
+
+		Bool checkHisExit = false;
+		Coord3D hisExitPos;
+		GeometryInfo hisBounds = thing->getTemplateGeometryInfo();
+		hisBounds.setMajorRadius(hisBounds.getMajorRadius() + hisExtraWidth);
+		if (hisBounds.getGeomType() != GEOMETRY_BOX) {
+			hisBounds.set(GEOMETRY_BOX, false, 40, hisBounds.getMajorRadius(), hisBounds.getMajorRadius());
+		}
+		else {
+			hisBounds.setMinorRadius(hisBounds.getMinorRadius() + myExtraWidth);
+		}
+		GeometryInfo hisGeom = thing->getTemplateGeometryInfo();
+		hisGeom.setMajorRadius(themFactoryExitWidth / 2.0f);
+		if (hisGeom.getGeomType() != GEOMETRY_BOX) {
+			hisGeom.setMinorRadius(thing->getTemplateGeometryInfo().getMajorRadius());
+		}
+		if (themFactoryExitWidth > 0) {
+			hisExitPos = cmdNode->m_loc;
+			checkHisExit = true;
+			Real c = (Real)cos(cmdNode->m_angle);
+			Real s = (Real)sin(cmdNode->m_angle);
+			Real offset = thing->getTemplateGeometryInfo().getMajorRadius() + themFactoryExitWidth / 2.0f;
+			hisExitPos.x += c * offset;
+			hisExitPos.y += s * offset;
+		}
+		if (ThePartitionManager->geomCollidesWithGeom(&cmdNode->m_loc, hisBounds, cmdNode->m_angle,
+			worldPos, myBounds, angle)) {
+			TheTerrainVisual->addFactionBibDrawable(it->second, true);
+			return true;
+		}
+		if (!checkMyExit && !checkHisExit && !hisExtraWidth && !myExtraWidth)
+		{
+			continue; // neither has extra exit space.
+		}
+
+		/* Check for overlap of my exit rectangle to his geom info. */
+		if (checkMyExit && ThePartitionManager->geomCollidesWithGeom(&cmdNode->m_loc, hisBounds, cmdNode->m_angle,
+			&myExitPos, myGeom, angle)) {
+			TheTerrainVisual->addFactionBibDrawable(it->second, true);
+			return true;
+		}
+		// Check for overlap of his exit rectangle with my geom info
+		if (checkHisExit && ThePartitionManager->geomCollidesWithGeom(&hisExitPos, hisGeom, cmdNode->m_angle,
+			worldPos, myBounds, angle)) {
+			TheTerrainVisual->addFactionBibDrawable(it->second, true);
+			return true;
+		}
+		// Check both exit rectangles together.
+		if (checkMyExit && checkHisExit && ThePartitionManager->geomCollidesWithGeom(&hisExitPos, hisGeom, cmdNode->m_angle,
+			&myExitPos, myGeom, angle)) {
+			TheTerrainVisual->addFactionBibDrawable(it->second, true);
+			return true;
+		}
+	}
+
+	return false;
 }

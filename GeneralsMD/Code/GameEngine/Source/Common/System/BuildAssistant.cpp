@@ -45,9 +45,10 @@
 #include "GameClient/InGameUI.h"
 #include "GameClient/TerrainVisual.h"
 #include "GameLogic/AI.h"
+#include "GameLogic/AIPathfind.h"
+#include "GameLogic/CommandSequence.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/TerrainLogic.h"
-#include "GameLogic/AIPathfind.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BehaviorModule.h"
 #include "GameLogic/Module/ContainModule.h"
@@ -855,6 +856,12 @@ LegalBuildCode BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos
 		return LBC_OK;
 	}
 	// Check for overlapping exit areas.
+
+	Bool isOverlapWithShadow = TheCommandSequence->isShawdowInTheWay(worldPos, build, angle, builderObject);
+	if (isOverlapWithShadow)
+	{
+		return LBC_OBJECTS_IN_THE_WAY;
+	}
 
 	Real range = 2*(build->getTemplateGeometryInfo().getMajorRadius()+build->getTemplateGeometryInfo().getMinorRadius());
 

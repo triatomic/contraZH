@@ -2553,7 +2553,7 @@ void AIGroup::groupResumeConstruction( Object *obj, Bool isWaypoint, CommandSour
 	{
 		for (i = m_memberList.begin(); i != m_memberList.end(); ++i)
 		{
-			AIUpdateInterface *ai = bestBuilder->getAIUpdateInterface();
+			AIUpdateInterface* ai = (*i)->getAIUpdateInterface();
 			if (!ai)
 				break;
 

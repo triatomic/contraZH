@@ -2408,7 +2408,10 @@ bool GameLogic::onDozerConstruct(MAYBE_UNUSED GameMessage* msg, AIGroupPtr& curr
 			}*/
 		}
 		else
+		{
 			TheCommandSequence->includeUnitInCommand(cmdNode, constructorObject);
+			TheCommandSequence->createConstructionShadow(cmdNode, constructorObject);
+		}
 	}
 	else
 	{
