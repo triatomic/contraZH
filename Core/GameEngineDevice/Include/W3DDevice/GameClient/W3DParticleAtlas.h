@@ -28,15 +28,17 @@
 #include <utility>
 #include <vector>
 
-// Particle textures packed as they first draw into pages blended ONE, INV_SRC_ALPHA, so alpha and additive art share one draw.
+// Alpha and additive textures share premultiplied blending; other modes keep their original texels.
 class W3DParticleAtlas
 {
 public:
 	W3DParticleAtlas();
 	~W3DParticleAtlas();
 
+	enum TextureMode { UNMODIFIED, ALPHA, ADDITIVE };
+
 	/// the page holding the texture's converted art and its rectangle in uv, or null when it has no place
-	TextureClass *find(TextureClass *source, Bool additive, Vector4 &rect);
+	TextureClass *find(TextureClass *source, TextureMode mode, Vector4 &rect);
 
 	/// drops every page, so the next map packs only its own textures
 	void reset();
@@ -72,12 +74,12 @@ private:
 	};
 
 	typedef std::vector<UnsignedInt> Pixels;
-	typedef std::map<std::pair<TextureClass *, Bool>, Entry> EntryMap;
+	typedef std::map<std::pair<TextureClass *, TextureMode>, Entry> EntryMap;
 
 	Bool place(Int width, Int height, Int &page, Int &shelf, Int &x, Int &y);
 	void unplace(Int width, Int page, Int shelf);
 	Bool addPage();
-	Bool readLevels(TextureClass *source, Bool additive, std::vector<Pixels> &levels);
+	Bool readLevels(TextureClass *source, TextureMode mode, std::vector<Pixels> &levels);
 	Bool writeEntry(const Page &page, const std::vector<Pixels> &levels, Int x, Int y, Int width, Int height, Bool wrapU, Bool wrapV);
 
 	std::vector<Page> m_pages;

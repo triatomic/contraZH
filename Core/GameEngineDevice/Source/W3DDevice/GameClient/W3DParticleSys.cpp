@@ -572,24 +572,27 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 			continue;
 		}
 
-		// plain alpha and additive sprites draw from an atlas page, which batches them across textures and blends
+		// Atlas pages batch sprites across textures; alpha and additive sprites also share one blend.
 		const ParticleSystemInfo::ParticleShaderType shaderType = sys->getShaderType();
 		RefCountPtr<TextureClass> batchTexture = texture;
 		Vector4 atlasRect(0.0f, 0.0f, 1.0f, 1.0f);
 		Bool premultiplied = FALSE;
-		if (useAtlas && effects == 0 && sys->isUsingParticles() && !useTerrainConformingParticles &&
-			(shaderType == ParticleSystemInfo::ALPHA || shaderType == ParticleSystemInfo::ADDITIVE))
+		Bool atlased = FALSE;
+		if (useAtlas && effects == 0 && sys->isUsingParticles() && !useTerrainConformingParticles)
 		{
-			TextureClass *page = TheW3DParticleAtlas->find(texture.Peek(), shaderType == ParticleSystemInfo::ADDITIVE, atlasRect);
+			const W3DParticleAtlas::TextureMode mode = (shaderType == ParticleSystemInfo::ALPHA) ? W3DParticleAtlas::ALPHA :
+				(shaderType == ParticleSystemInfo::ADDITIVE) ? W3DParticleAtlas::ADDITIVE : W3DParticleAtlas::UNMODIFIED;
+			TextureClass *page = TheW3DParticleAtlas->find(texture.Peek(), mode, atlasRect);
 			if (page != nullptr)
 			{
 				batchTexture = page;
-				premultiplied = TRUE;
+				atlased = TRUE;
+				premultiplied = mode != W3DParticleAtlas::UNMODIFIED;
 			}
 		}
 		const Bool premultipliedAlpha = premultiplied && shaderType == ParticleSystemInfo::ALPHA;
 
-		const Bool canBatch = (batchParticles || premultiplied) && sys->isUsingParticles() && !useTerrainConformingParticles;
+		const Bool canBatch = (batchParticles || atlased) && sys->isUsingParticles() && !useTerrainConformingParticles;
 		if (!canBatch || finishedBatch(*sys, batchTexture, premultiplied, effects, effectData))
 		{
 			flushParticleBatch(rinfo, pointCount);
@@ -668,10 +671,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 			RGBAArray[pointCount].Z = color->blue;
 			RGBAArray[pointCount].W = p->getAlpha();
 
-			if (premultiplied)
-			{
-				uvRectArray[pointCount] = atlasRect;
-			}
+			uvRectArray[pointCount] = atlasRect;
 			if (premultipliedAlpha)
 			{
 				// clamped first, as the vertex colour is clamped before the fixed-function blend weighs it by alpha
@@ -870,7 +870,7 @@ void W3DParticleSystemManager::flushParticleBatch(RenderInfoClass& rinfo, Unsign
 		m_pointGroup->Set_Flag(PointGroupClass::TRANSFORM, true);
 		m_pointGroup->Set_Point_Mode(PointGroupClass::QUADS);
 		m_pointGroup->Set_Arrays(m_posBuffer, m_RGBABuffer, nullptr, m_sizeBuffer, m_angleBuffer, nullptr, pointCount);
-		m_pointGroup->Set_Texture_UV_Rects(m_batchPremultiplied ? m_uvRectBuffer : nullptr);
+		m_pointGroup->Set_Texture_UV_Rects(m_uvRectBuffer);
 		m_pointGroup->Set_Billboard(m_batchBillboard);
 		m_pointGroup->Set_Point_Frame(0);
 		m_pointGroup->Set_Effects(m_batchEffects, m_batchEffectData);

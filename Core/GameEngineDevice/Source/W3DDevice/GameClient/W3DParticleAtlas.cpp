@@ -108,14 +108,14 @@ void W3DParticleAtlas::reset()
 	m_pages.clear();
 }
 
-TextureClass *W3DParticleAtlas::find(TextureClass *source, Bool additive, Vector4 &rect)
+TextureClass *W3DParticleAtlas::find(TextureClass *source, TextureMode mode, Vector4 &rect)
 {
 	if (source == nullptr)
 	{
 		return nullptr;
 	}
 
-	const std::pair<TextureClass *, Bool> key(source, additive);
+	const std::pair<TextureClass *, TextureMode> key(source, mode);
 	EntryMap::iterator found = m_entries.find(key);
 	if (found != m_entries.end())
 	{
@@ -156,7 +156,7 @@ TextureClass *W3DParticleAtlas::find(TextureClass *source, Bool additive, Vector
 	entry.rect.Set(0.0f, 0.0f, 1.0f, 1.0f);
 
 	std::vector<Pixels> levels;
-	if (readLevels(source, additive, levels))
+	if (readLevels(source, mode, levels))
 	{
 		const Int width = source->Get_Width();
 		const Int height = source->Get_Height();
@@ -291,7 +291,7 @@ Bool W3DParticleAtlas::addPage()
 }
 
 // The source's own mips are kept, since rebuilding them from the top level shifts legacy sprites.
-Bool W3DParticleAtlas::readLevels(TextureClass *source, Bool additive, std::vector<Pixels> &levels)
+Bool W3DParticleAtlas::readLevels(TextureClass *source, TextureMode mode, std::vector<Pixels> &levels)
 {
 	IDirect3DTexture8 *texture = DX8Wrapper::_Peek_Lockable_Texture(source->Peek_D3D_Texture());
 	D3DSURFACE_DESC desc;
@@ -355,9 +355,12 @@ Bool W3DParticleAtlas::readLevels(TextureClass *source, Bool additive, std::vect
 		decoded->UnlockRect();
 		decoded->Release();
 
-		for (size_t i = 0; i < pixels.size(); ++i)
+		if (mode != UNMODIFIED)
 		{
-			pixels[i] = additive ? (pixels[i] & 0x00FFFFFFu) : Premultiply(pixels[i]);
+			for (size_t i = 0; i < pixels.size(); ++i)
+			{
+				pixels[i] = (mode == ADDITIVE) ? (pixels[i] & 0x00FFFFFFu) : Premultiply(pixels[i]);
+			}
 		}
 	}
 	return TRUE;
