@@ -22,8 +22,9 @@ not Contra's own.
 
 ## Tuner
 
-`scripts/fx_tuner.py` opens a window with sliders for fluid, electric and laser keys and a live, animated
-preview beside them. It needs Python with numpy, Pillow and PyQt5.
+The separate `Fxtuner` repository contains `fx_tuner.py`, which opens a window with sliders for fluid,
+electric and laser keys and a live, animated preview beside them. It needs Python with numpy,
+Pillow and PyQt5. Run the commands below from that repository.
 
 The `Fluid` tab previews currents, bubble rings, edge breakup and glow. It supports pool textures,
 colour, particle alpha and alpha/additive blend comparisons. All eight global fluid controls use
@@ -31,7 +32,7 @@ the same load, save, copy and reset paths as the other shaders. See
 [Fluid shading](contraZH-ParticleSystems.md#fluid-shading) for keys and example settings.
 
 ```
-python scripts/fx_tuner.py
+python fx_tuner.py
 ```
 
 * It loads the keys from the game's `GameData.ini` at start. The path is at the top of the window.
@@ -43,4 +44,4 @@ a second, so the game shows it with a map running.
 Keys a shader tab also shows stay in step with it. Its own keys are written only once changed.
 * Preview-only controls set the sprite size, camera distance, colours and beam height. `Texture...`
 loads an extracted `.tga` or `.dds` in place of the stand-in flare or beam.
-* `python scripts/fx_tuner.py --docs` redraws every picture in these pages into `docs/images`.
+* `python fx_tuner.py --docs` redraws the documentation pictures.
