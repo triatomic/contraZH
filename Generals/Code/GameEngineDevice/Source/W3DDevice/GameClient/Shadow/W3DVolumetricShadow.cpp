@@ -2523,9 +2523,8 @@ void W3DVolumetricShadow::constructVolume( Vector3 *lightPosObject,Real shadowEx
 			if (silhouetteIndices[k]==currentEdgeEnd)
 			{
 				//swap the two edges
-				Int tempIndex=*(Int *)(&silhouetteIndices[i+2]);
-				*(Int *)&silhouetteIndices[i+2]=*(Int *)&silhouetteIndices[k];
-				*(Int *)&silhouetteIndices[k]=tempIndex;
+				std::swap(silhouetteIndices[i+2], silhouetteIndices[k]);
+				std::swap(silhouetteIndices[i+3], silhouetteIndices[k+1]);
 				break;
 			}
 
@@ -2757,9 +2756,8 @@ void W3DVolumetricShadow::constructVolumeVB( Vector3 *lightPosObject,Real shadow
 				if (silhouetteIndices[k]==currentEdgeEnd)
 				{
 					//swap the two edges
-					Int tempIndex=*(Int *)(&silhouetteIndices[i+2]);
-					*(Int *)&silhouetteIndices[i+2]=*(Int *)&silhouetteIndices[k];
-					*(Int *)&silhouetteIndices[k]=tempIndex;
+					std::swap(silhouetteIndices[i+2], silhouetteIndices[k]);
+					std::swap(silhouetteIndices[i+3], silhouetteIndices[k+1]);
 					break;
 				}
 
