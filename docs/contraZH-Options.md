@@ -54,6 +54,7 @@ waterline, flat ground in three tones (olive, tan for desert sand, grey for rock
 `NewRadar`.)
 * `BorderlessWindow = No` - (Yes runs a frameless centred window at the selected resolution. Also
 the Borderless checkbox beside Resolution. `-win` still gives a captioned window.)
+Mouse input follows the rendered picture if Windows stretches the window after a resolution change.
 * `Windowed = No` - (Yes runs a movable window with a title bar at the selected resolution, like
 `-win`. Also the Windowed checkbox beside Borderless; checking one clears the other. `-win` still
 forces it on. Needs `CheckWindowed` in `OptionsMenu.wnd` for the menu control.)

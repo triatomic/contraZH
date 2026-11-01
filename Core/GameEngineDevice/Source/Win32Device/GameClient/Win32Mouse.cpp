@@ -33,6 +33,7 @@
 #include "Common/Debug.h"
 #include "Common/GlobalData.h"
 #include "Common/LocalFileSystem.h"
+#include "GameClient/Display.h"
 #include "GameClient/GameClient.h"
 #include "Win32Device/GameClient/Win32Mouse.h"
 #include "WinMain.h"
@@ -253,6 +254,17 @@ void Win32Mouse::translateEvent( UnsignedInt eventIndex, MouseIO *result )
 
 		}
 
+	}
+
+	// Windows can stretch a windowed back buffer beyond the selected resolution.
+	if (TheDisplay && TheDisplay->getWindowed())
+	{
+		RECT rect;
+		if (GetClientRect(ApplicationHWnd, &rect) && rect.right > 0 && rect.bottom > 0)
+		{
+			result->pos.x = MulDiv(result->pos.x, TheDisplay->getWidth(), rect.right);
+			result->pos.y = MulDiv(result->pos.y, TheDisplay->getHeight(), rect.bottom);
+		}
 	}
 
 }
