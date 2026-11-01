@@ -14,13 +14,72 @@ A storm comes from one of two places:
 * A `W3DStormDraw` module on an object keeps a storm around the object. The storm follows the
 object and dies down once the object is gone.
 
-Both take these keys. A key left out takes the value `GameData.ini` holds for the storm's `Type`.
-There each key carries the type's name in front, so `HazeDensity` is `SandStormHazeDensity` for sand
-and `SnowStormHazeDensity` for snow, and the percent keys take a plain number such as
-`SandStormEdgeFade = 35`. The two columns list what `GameData.ini` starts with. A storm reads
-`GameData.ini` every frame, so in a cheat build a saved change shows on a running storm:
+## Key names and overrides
 
-| Key | `SAND` | `SNOW` | Meaning |
+`Type = SAND` selects a sandstorm and `Type = SNOW` selects a snowstorm. `SAND` is the desert
+storm type; `DESERT` is not a valid type. Leaving out `Type` selects `SAND`.
+
+Both types accept the same keys inside an object's `W3DStormDraw` module or an FXList's `Storm`
+block. Use the short names there. In `GameData.ini`, use the `SandStorm` or `SnowStorm` prefix
+to set defaults for that type.
+
+| Object or FXList key | GameData sand key | GameData snow key |
+|---|---|---|
+| `Radius` | `SandStormRadius` | `SnowStormRadius` |
+| `Height` | `SandStormHeight` | `SnowStormHeight` |
+| `EdgeFade` | `SandStormEdgeFade` | `SnowStormEdgeFade` |
+| `FadeTime` | `SandStormFadeTime` | `SnowStormFadeTime` |
+| `HazeColor` | `SandStormHazeColor` | `SnowStormHazeColor` |
+| `HazeDensity` | `SandStormHazeDensity` | `SnowStormHazeDensity` |
+| `HazeMaxOpacity` | `SandStormHazeMaxOpacity` | `SnowStormHazeMaxOpacity` |
+| `HazeNoiseSize` | `SandStormHazeNoiseSize` | `SnowStormHazeNoiseSize` |
+| `Gusts` | `SandStormGusts` | `SnowStormGusts` |
+| `WindAngle` | `SandStormWindAngle` | `SnowStormWindAngle` |
+| `WindSpeed` | `SandStormWindSpeed` | `SnowStormWindSpeed` |
+| `FallSpeed` | `SandStormFallSpeed` | `SnowStormFallSpeed` |
+| `Turbulence` | `SandStormTurbulence` | `SnowStormTurbulence` |
+| `GrainColor` | `SandStormGrainColor` | `SnowStormGrainColor` |
+| `GrainCount` | `SandStormGrainCount` | `SnowStormGrainCount` |
+| `GrainSize` | `SandStormGrainSize` | `SnowStormGrainSize` |
+| `GrainStreak` | `SandStormGrainStreak` | `SnowStormGrainStreak` |
+| `GrainOpacity` | `SandStormGrainOpacity` | `SnowStormGrainOpacity` |
+
+`Type` belongs only in the object or FXList block. `Grain` means sand grains for `SAND` and
+snowflakes for `SNOW`.
+
+Each explicit block value overrides its matching GameData default, including zero. Each omitted
+key inherits the default for the selected type. GameData changes affect a running storm's
+inherited values after reload; explicit block values keep precedence.
+
+For example, these GameData defaults give snowstorms 5000 flakes and a wind speed of 45.
+
+```ini
+GameData
+  SnowStormGrainCount = 5000
+  SnowStormWindSpeed = 45
+End
+```
+
+This object instead draws 12000 flakes and inherits the wind speed of 45.
+
+```ini
+Object SnowstormEmitter
+  Draw = W3DStormDraw ModuleTag_Storm
+    Type = SNOW
+    GrainCount = 12000
+  End
+  ...
+End
+```
+
+Use `GrainCount` inside the module, not `SnowStormGrainCount`. Percent keys take a plain number
+from 0 to 100 in both places, such as `EdgeFade = 35` or `SnowStormEdgeFade = 35`.
+
+## Parameters
+
+The sand and snow columns below list the built-in defaults before GameData overrides them.
+
+| Object or FXList key | `SAND` default | `SNOW` default | Meaning |
 |---|---|---|---|
 | `Type` | | | `SAND` or `SNOW`. Default `SAND`. |
 | `Radius` | 300 | 300 | World units from the storm's middle to its edge. |

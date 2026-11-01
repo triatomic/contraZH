@@ -1,5 +1,12 @@
 # Objects & Modules
 
+## Storm draw module
+
+`Draw = W3DStormDraw ModuleTag_Storm` draws a sandstorm (`Type = SAND`) or snowstorm
+(`Type = SNOW`) around an object. Module keys use short names such as `Radius` and `GrainCount`;
+omitted keys inherit the matching `SandStorm...` or `SnowStorm...` GameData defaults.
+See [Storms](dx9-Environment.md#key-names-and-overrides) for the full key mapping and examples.
+
 ## Object.ini
 
 ### WeaponSet line of sight

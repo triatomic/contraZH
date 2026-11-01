@@ -1,5 +1,12 @@
 # GameData.ini
 
+## Storm defaults
+
+`SandStorm...` keys set defaults for `Type = SAND`; `SnowStorm...` keys set defaults for
+`Type = SNOW`. For example, `SnowStormGrainCount` supplies an omitted `GrainCount` in an object's
+`W3DStormDraw` module or an FXList's `Storm` block. Explicit block values override these defaults.
+See [Storms](dx9-Environment.md#key-names-and-overrides) for all 18 keys and examples.
+
 ## Unknown keys and blocks are skipped
 
 An INI key or block the game does not know is logged to `DebugLogFile.txt` and skipped instead of
