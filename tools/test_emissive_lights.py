@@ -128,7 +128,10 @@ public:
     enum { CLASSID_HLOD, CLASSID_MESH };
     Matrix3D transform;
     bool hidden;
-    RenderObjClass() : hidden(false) {}
+    void* userData;
+    RenderObjClass() : hidden(false), userData(NULL) {}
+    void* Get_User_Data() { return userData; }
+    SphereClass Get_Bounding_Sphere() { return SphereClass(transform.offset,1); }
     bool Is_Not_Hidden_At_All() { return !hidden; }
     virtual int Class_ID() { return CLASSID_MESH; }
     int Get_Num_Sub_Objects() { return 0; }
@@ -172,6 +175,7 @@ struct GlobalData
     bool m_laserRef, m_usePathTracing, m_useSpecular;
     int m_timeOfDay;
     float m_unitEmissiveNightIntensity, m_unitEmissiveIntensity;
+    bool m_isWorldBuilder;
 };
 static GlobalData globalData = { true, true, true, 0, 1, 1 };
 static GlobalData* TheGlobalData = &globalData;
@@ -218,6 +222,30 @@ public:
     int Get_Base_Vertex_Offset() { return 0; }
 };
 // ADD_OBJECT_FUNCTION
+enum { OBJECTSHROUD_FOGGED = 1 };
+struct Object
+{
+    int shroud;
+    int getShroudedStatus(int) { return shroud; }
+};
+struct Drawable
+{
+    bool hidden, obscured;
+    Object* object;
+    bool isDrawableEffectivelyHidden() { return hidden; }
+    bool getFullyObscuredByShroud() { return obscured; }
+    Object* getObject() { return object; }
+    float getEffectiveOpacity() { return 1; }
+};
+struct DrawableInfo { Drawable* m_drawable; };
+static void collectSceneEmitter(W3DEmissiveLights& m_emissiveLights, RenderObjClass* object, CameraClass& camera)
+{
+    const int localPlayerIndex=0;
+    do
+    {
+        // COLLECT_EMITTER
+    } while (false);
+}
 class MaterialPassClass
 {
 public:
@@ -399,6 +427,29 @@ int main()
     }
     const auto& shared=lights.finish(camera);
     assert(shared.size()==1 && near(shared[0].diffuse.X,1.5f));
+    lights.m_clusters.clear();
+    lights.m_lights.clear();
+    collectSceneEmitter(lights,&meshes[0],camera);
+    assert(lights.finish(camera).empty());
+    TheGlobalData->m_isWorldBuilder=true;
+    collectSceneEmitter(lights,&meshes[0],camera);
+    assert(lights.finish(camera).size()==1);
+    lights.m_clusters.clear();
+    lights.m_lights.clear();
+    DrawableInfo ghost={NULL};
+    meshes[0].userData=&ghost;
+    collectSceneEmitter(lights,&meshes[0],camera);
+    assert(lights.finish(camera).empty());
+    TheGlobalData->m_isWorldBuilder=false;
+    Object fogged={OBJECTSHROUD_FOGGED};
+    Drawable draw={false,false,&fogged};
+    DrawableInfo info={&draw};
+    meshes[0].userData=&info;
+    collectSceneEmitter(lights,&meshes[0],camera);
+    assert(lights.finish(camera).empty());
+    fogged.shroud=0;
+    collectSceneEmitter(lights,&meshes[0],camera);
+    assert(lights.finish(camera).size()==1);
     lights.reset();
 
     MeshClass firstInstance,secondInstance,thirdInstance,lastInstance;
@@ -557,6 +608,9 @@ def main():
                               + "\n" + function(shader, "void W3DShaderManager::filterPixelLights("))
     options = (ROOT / "GeneralsMD/Code/GameEngine/Source/GameClient/GUI/GUICallbacks/Menus/OptionsMenu.cpp").read_text(encoding="utf-8")
     scene = (ROOT / "GeneralsMD/Code/GameEngineDevice/Source/W3DDevice/GameClient/W3DScene.cpp").read_text(encoding="utf-8")
+    start = scene.index("\t\t\tDrawableInfo *info =", scene.index("void RTS3DScene::updatePixelLights("))
+    end = scene.index("\n\t\t}\n\t\tconst std::vector", start)
+    harness = harness.replace("// COLLECT_EMITTER", scene[start:end])
     tune = function(scene, "Bool Tune_Emissive_Light(", "\t")
     harness = harness.replace("// TUNE_FUNCTION", tune)
     harness = harness.replace("// OBJECT_LIGHTS", function(scene, "Int RTS3DScene::pickObjectPixelLights("))

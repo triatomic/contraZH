@@ -5718,6 +5718,8 @@ void WbView3d::render()
 		// render, so keep it off for the build-list, wireframe, tracking and overlay passes below.
 		const Bool wantShadowMap = TheGlobalData->m_useShadowMap;
 		TheWritableGlobalData->m_useShadowMap = false;
+		const Bool wantPathTracing = TheGlobalData->m_usePathTracing;
+		TheWritableGlobalData->m_usePathTracing = false;
 		Vector3 amb = m_baseBuildScene->Get_Ambient_Light();
 		Vector3 newAmb(amb);
 		Real mul = m_buildRedMultiplier;
@@ -5845,6 +5847,7 @@ void WbView3d::render()
 		// Draw the 3d obj icons on top of the rest of the data.
 		WW3D::Render(m_overlayScene,m_camera);
 		TheWritableGlobalData->m_useShadowMap = wantShadowMap;
+		TheWritableGlobalData->m_usePathTracing = wantPathTracing;
 
 		// Viewport labels, Old (D3DX) mode: draw directly with m3DFont inside the
 		// frame (flicker-free). drawLabels(NULL) takes the m3DFont->DrawText path.
@@ -6131,6 +6134,8 @@ BEGIN_MESSAGE_MAP(WbView3d, WbView)
 	ON_UPDATE_COMMAND_UI(ID_FX_DYNAMICLIGHTS, OnUpdateFxDynamicLights)
 	ON_COMMAND(ID_FX_PIXELLIGHTS, OnFxPixelLights)
 	ON_UPDATE_COMMAND_UI(ID_FX_PIXELLIGHTS, OnUpdateFxPixelLights)
+	ON_COMMAND(ID_FX_PATHTRACING, OnFxPathTracing)
+	ON_UPDATE_COMMAND_UI(ID_FX_PATHTRACING, OnUpdateFxPathTracing)
 	ON_UPDATE_COMMAND_UI(ID_FX_WATERREFLECTIONS, OnUpdateFxWaterReflections)
 	ON_COMMAND(ID_FX_SHORELINEFOAM, OnFxShorelineFoam)
 	ON_UPDATE_COMMAND_UI(ID_FX_SHORELINEFOAM, OnUpdateFxShorelineFoam)
@@ -9400,6 +9405,7 @@ void WbView3d::loadFxShaderSettings()
 	TheWritableGlobalData->m_useCryoShaders = readFxSetting("FxCryoShaders", TheGlobalData->m_useCryoShaders);
 	TheWritableGlobalData->m_useDynamicLights = readFxSetting("FxDynamicLights", TheGlobalData->m_useDynamicLights);
 	TheWritableGlobalData->m_usePixelLights = readFxSetting("FxPixelLights", TheGlobalData->m_usePixelLights);
+	TheWritableGlobalData->m_usePathTracing = readFxSetting("FxPathTracing", TheGlobalData->m_usePathTracing);
 	TheWritableGlobalData->m_shorelineFoam = readFxSetting("FxShorelineFoam", TheGlobalData->m_shorelineFoam);
 }
 
@@ -9588,6 +9594,19 @@ void WbView3d::OnFxPixelLights()
 void WbView3d::OnUpdateFxPixelLights(CCmdUI* pCmdUI)
 {
 	updateFxItem(pCmdUI, TheGlobalData->m_usePixelLights, W3DShaderManager::supportsPixelLights());
+}
+
+void WbView3d::OnFxPathTracing()
+{
+	TheWritableGlobalData->m_usePathTracing = !TheGlobalData->m_usePathTracing;
+	writeFxSetting("FxPathTracing", TheGlobalData->m_usePathTracing);
+	Invalidate();
+}
+
+void WbView3d::OnUpdateFxPathTracing(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_usePathTracing, fxD3D9Available() &&
+		TheGlobalData->m_useDynamicLights && TheGlobalData->m_usePixelLights && W3DShaderManager::supportsPixelLights());
 }
 
 void WbView3d::OnUpdateFxWaterReflections(CCmdUI* pCmdUI)

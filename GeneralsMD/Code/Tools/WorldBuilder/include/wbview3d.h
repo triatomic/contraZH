@@ -301,6 +301,8 @@ protected:
 	afx_msg void OnUpdateFxDynamicLights(CCmdUI* pCmdUI);
 	afx_msg void OnFxPixelLights();
 	afx_msg void OnUpdateFxPixelLights(CCmdUI* pCmdUI);
+	afx_msg void OnFxPathTracing();
+	afx_msg void OnUpdateFxPathTracing(CCmdUI* pCmdUI);
 	afx_msg void OnUpdateFxWaterReflections(CCmdUI* pCmdUI);
 	afx_msg void OnFxShorelineFoam();
 	afx_msg void OnUpdateFxShorelineFoam(CCmdUI* pCmdUI);

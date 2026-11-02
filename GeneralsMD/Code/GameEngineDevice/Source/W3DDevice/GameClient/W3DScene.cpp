@@ -991,6 +991,21 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 			for (Int globalLightIndex = 0; globalLightIndex < m_numGlobalLights; globalLightIndex++)
 				lightEnv.Add_Light(*m_globalLight[globalLightIndex]);
 		}
+		if (TheGlobalData->m_isWorldBuilder && TheGlobalData->m_usePathTracing &&
+			TheGlobalData->m_useDynamicLights && TheGlobalData->m_usePixelLights &&
+			m_customPassMode == SCENE_PASS_DEFAULT && !m_planarMirrorPass && !m_drawTerrainOnly &&
+			(robj->Class_ID() == RenderObjClass::CLASSID_MESH || robj->Class_ID() == RenderObjClass::CLASSID_HLOD) &&
+			W3DShaderManager::supportsUnitPixelLights())
+		{
+			pixelLightCount = pickObjectPixelLights(sph, &pixelLights[0]);
+			Bool receivesShadow = FALSE;
+			MaterialPassClass *pass = W3DShaderManager::getSpecularPass(&pixelLights[0], pixelLightCount, TRUE, receivesShadow);
+			if (pass != nullptr)
+			{
+				rinfo.Push_Material_Pass(pass);
+				extraMaterialPops++;
+			}
+		}
 	}
 
 	if (!drawableHidden)
@@ -2305,15 +2320,16 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 			RenderObjClass *object = objects.Peek_Obj();
 			DrawableInfo *info = (DrawableInfo *)object->Get_User_Data();
 			Drawable *draw = info != nullptr ? info->m_drawable : nullptr;
-			if (draw == nullptr || draw->isDrawableEffectivelyHidden() || draw->getFullyObscuredByShroud() ||
-				(draw->getObject() != nullptr && draw->getObject()->getShroudedStatus(localPlayerIndex) >= OBJECTSHROUD_FOGGED))
+			if ((draw == nullptr && (!TheGlobalData->m_isWorldBuilder || info != nullptr)) ||
+				(draw != nullptr && (draw->isDrawableEffectivelyHidden() || draw->getFullyObscuredByShroud() ||
+				(draw->getObject() != nullptr && draw->getObject()->getShroudedStatus(localPlayerIndex) >= OBJECTSHROUD_FOGGED))))
 			{
 				continue;
 			}
 			const SphereClass &bounds = object->Get_Bounding_Sphere();
 			if (!camera.Cull_Sphere(SphereClass(bounds.Center, bounds.Radius + 120.0f)))
 			{
-				m_emissiveLights.addObject(*object, draw->getEffectiveOpacity());
+				m_emissiveLights.addObject(*object, draw != nullptr ? draw->getEffectiveOpacity() : 1.0f);
 			}
 		}
 		const std::vector<W3DShaderManager::PixelLight> &emissive = m_emissiveLights.finish(camera);

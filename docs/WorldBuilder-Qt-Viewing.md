@@ -37,6 +37,9 @@ has its own switch.)
 * HQ Sky Cloud Shadows - (Needs Show Clouds.)
 * Terrain Normal Maps, Terrain Height Blend, Specular & Glint
 * Dynamic Lights, Pixel Lights - (Pixel lights need Dynamic Lights and supported shaders.)
+* Path Tracing - (Emissive models and additive particles light nearby terrain and models.
+Needs Dynamic Lights and Pixel Lights. Glow masks also need Specular & Glint; particle lights
+need Render Particles. Uses the game's shared light grouping.)
 * Shoreline Foam - (Applies to shader water in Direct3D 9.)
 
 Each item starts from the player's `Options.ini` and is then remembered in `WorldBuilder.ini`.

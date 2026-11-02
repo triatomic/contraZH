@@ -407,6 +407,7 @@ BEGIN
             MENUITEM SEPARATOR
             MENUITEM "Dynamic Lights",              ID_FX_DYNAMICLIGHTS
             MENUITEM "Pixel Lights",                ID_FX_PIXELLIGHTS
+            MENUITEM "Path Tracing",                ID_FX_PATHTRACING
             MENUITEM "Shoreline Foam",              ID_FX_SHORELINEFOAM
             MENUITEM SEPARATOR
             MENUITEM "Water Reflections (Unavailable)", ID_FX_WATERREFLECTIONS

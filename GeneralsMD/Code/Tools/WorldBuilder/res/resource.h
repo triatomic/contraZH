@@ -937,6 +937,7 @@
 #define ID_FX_AMBIENTOCCLUSION         33457
 #define ID_FX_LASERGLOW                33458
 #define ID_FX_PLANARMIRRORS            33459
+#define ID_FX_PATHTRACING              33460
 #define IDS_NEW                         61446
 #define IDS_RESIZE                      61447
 #define IDS_REMOVING_INUSE_TEAM         61448
@@ -1022,7 +1023,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_3D_CONTROLS                     1
 #define _APS_NEXT_RESOURCE_VALUE        258
-#define _APS_NEXT_COMMAND_VALUE         33460
+#define _APS_NEXT_COMMAND_VALUE         33461
 #define _APS_NEXT_CONTROL_VALUE         1393
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
