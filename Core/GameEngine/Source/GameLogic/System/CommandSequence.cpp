@@ -1280,7 +1280,6 @@ void CommandSequence::doCurrentCommand(Object *obj, CommandVerifyStatus cvs)
 		}
 		case COMMAND_DO_COMBATDROP:
 		{
-			AIUpdateInterface* ai = obj->getAIUpdateInterface();
 			if (!ai)
 				break;
 
@@ -1300,7 +1299,6 @@ void CommandSequence::doCurrentCommand(Object *obj, CommandVerifyStatus cvs)
 
 		case COMMAND_GET_REPAIRED:
 		{
-			AIUpdateInterface* ai = obj->getAIUpdateInterface();
 			if (!ai)
 				break;
 
@@ -1318,7 +1316,6 @@ void CommandSequence::doCurrentCommand(Object *obj, CommandVerifyStatus cvs)
 
 		case COMMAND_GET_HEALED:
 		{
-			AIUpdateInterface* ai = obj->getAIUpdateInterface();
 			if (!ai)
 				break;
 
@@ -1335,7 +1332,6 @@ void CommandSequence::doCurrentCommand(Object *obj, CommandVerifyStatus cvs)
 		}
 		case COMMAND_DO_REPAIR:
 		{
-			AIUpdateInterface* ai = obj->getAIUpdateInterface();
 			if (!ai)
 				break;
 
@@ -1349,10 +1345,20 @@ void CommandSequence::doCurrentCommand(Object *obj, CommandVerifyStatus cvs)
 			break;
 		}
 		case COMMAND_RESUME_CONSTRUCTION:
+		{
+			Object* target = TheGameLogic->findObjectByID(cmdNode->m_targetID);
+
+			if (!target)
+				break;
+
+			if (ai)
+			{
+				ai->aiResumeConstruction(target, cmdSource);
+			}
 			break;
+		}
 		case COMMAND_ENTER:
 		{
-			AIUpdateInterface *ai = obj->getAIUpdateInterface();
 			if (!ai)
 				break;
 
@@ -1372,7 +1378,6 @@ void CommandSequence::doCurrentCommand(Object *obj, CommandVerifyStatus cvs)
 		}
 		case COMMAND_DOCK:
 		{
-			AIUpdateInterface* ai = obj->getAIUpdateInterface();
 			if (!ai)
 				break;
 
@@ -1386,7 +1391,6 @@ void CommandSequence::doCurrentCommand(Object *obj, CommandVerifyStatus cvs)
 		}
 		case COMMAND_INTERNET_HACK:
 		{
-			AIUpdateInterface *ai = obj->getAIUpdateInterface();
 			if (!ai)
 				break;
 
@@ -1416,7 +1420,6 @@ void CommandSequence::doCurrentCommand(Object *obj, CommandVerifyStatus cvs)
 		}
 		case COMMAND_TOGGLE_HOLD_FIRE:
 		{
-			AIUpdateInterface *ai = obj->getAIUpdateInterface();
 			if (!ai)
 				break;
 
@@ -1426,7 +1429,6 @@ void CommandSequence::doCurrentCommand(Object *obj, CommandVerifyStatus cvs)
 		}
 		case COMMAND_TOGGLE_DEPLOY:
 		{
-			AIUpdateInterface* ai = obj->getAI();
 			DeployStyleAIUpdate* deployAI = ai ? ai->getDeployStyleAIUpdate() : nullptr;
 			if (deployAI == nullptr)
 				break;
