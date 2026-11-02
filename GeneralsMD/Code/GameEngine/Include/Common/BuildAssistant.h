@@ -180,7 +180,7 @@ public:
 	virtual Bool isLineBuildTemplate( const ThingTemplate *tTemplate );
 
 	/// are all the requirements for making this unit satisfied
-	virtual CanMakeType canMakeUnit( Object *builder, const ThingTemplate *whatToBuild ) const;
+	virtual CanMakeType canMakeUnit( Object *builder, const ThingTemplate *whatToBuild, Bool checkCash = true ) const;
 
 	/// are all the requirements for making this unit (except available cash) are satisfied
 	virtual Bool isPossibleToMakeUnit( Object *builder, const ThingTemplate *whatToBuild ) const;

@@ -72,6 +72,7 @@ protected:
 		ObjectToLocMap m_allocatedDest;
 		Bool m_releaseAfter; // For onDoForceAttackGround() weird release
 		GuardMode m_guardMode;
+		UnsignedInt m_cashWithdraw;
 	};
 
 private:
@@ -147,8 +148,7 @@ public:
 	Bool verifyOCLPendingCommand(Object *obj);
 	Bool verifyObjectCommand(Object *obj);
 	Bool unitPendingCommand(Object *obj);
-	Bool unitOnHeld(Object *obj);
-	Bool moveToAndEvacPending(Object *obj);
+	Bool unitOnHeld(Object* obj);
 	Bool verifyExitCommand(Object *objWantToExit, Object *objectContainingExiter);
 	Bool terminateVerifiedCommand(Object *obj);
 	Bool confirmExitCommand(Object *objWantToExit, Object *objectContainingExiter);
@@ -163,6 +163,9 @@ public:
 	void createConstructionShadow(UnsignedInt cmdNodeID, Object *sourceObject);
 	void removeConstructionShadow(UnsignedInt cmdNodeID);
 	Bool isShawdowInTheWay(const Coord3D *worldPos, const ThingTemplate *build, Real angle, const Object *builderObject);
+	UnsignedInt getConstructionCashWithdraw(UnsignedInt cmdNodeID);
+	void setConstructionCashWithdraw(UnsignedInt cmdNodeID, UnsignedInt cashWithdraw);
+	UnsignedInt getConstructionShadowCount(const ThingTemplate *build, const Player *player);
 
 	Bool isCurrentExitCommand(Object *obj);
 	Bool isExitCommandComplete(Object *obj);

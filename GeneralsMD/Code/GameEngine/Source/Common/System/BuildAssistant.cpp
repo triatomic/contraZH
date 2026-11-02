@@ -1470,7 +1470,7 @@ Bool BuildAssistant::isPossibleToMakeUnit( Object *builder, const ThingTemplate 
 /** This method will check to make sure it is possible to build the requested unit. and
   * that the player has enough money for 'whatToBuild' */
 //-------------------------------------------------------------------------------------------------
-CanMakeType BuildAssistant::canMakeUnit( Object *builder, const ThingTemplate *whatToBuild ) const
+CanMakeType BuildAssistant::canMakeUnit( Object *builder, const ThingTemplate *whatToBuild, Bool checkCash) const
 {
 
 	// sanity
@@ -1509,9 +1509,12 @@ CanMakeType BuildAssistant::canMakeUnit( Object *builder, const ThingTemplate *w
 	}
 
 	// make sure we have enough money to build this
-	Money *money = player->getMoney();
-	if( whatToBuild->calcCostToBuild( player ) > money->countMoney() )
-		return CANMAKE_NO_MONEY;
+	if (checkCash)
+	{
+		Money *money = player->getMoney();
+		if (whatToBuild->calcCostToBuild(player) > money->countMoney())
+			return CANMAKE_NO_MONEY;
+	}
 
 	// get the command set for the producer object
 	return CANMAKE_OK;
