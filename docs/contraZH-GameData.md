@@ -1,5 +1,30 @@
 # GameData.ini
 
+## Path tracing light radius and brightness
+
+These settings control the light cast by particles, lasers and emissive meshes while
+the Graphics menu's `Path tracing` option is enabled. They affect drawing only.
+
+| Key | Default | Effect |
+| --- | --- | --- |
+| `PathTracingLightMaxRadius` | `0.0` | Caps light radius in world units. Smaller lights keep their original radius; `0` means no cap. |
+| `PathTracingLightBrightness` | `1.0` | Multiplies emitted light. `0.25` gives one quarter of the brightness. |
+
+Zero or negative brightness disables this light spill. A negative radius cap means no cap.
+The cap and brightness are independent. These keys do not change the emitting sprites,
+lit windows or the legacy laser ground glow itself.
+
+Start with these values to limit large light pools and reduce brightness. Add the keys inside the
+existing `GameData` block in `GameData.ini`.
+
+```ini
+  PathTracingLightMaxRadius = 30.0
+  PathTracingLightBrightness = 0.25
+```
+
+Cheat builds reload changes to these keys while a map runs. Other builds read them
+at launch. A radius cap of `0` and brightness of `1.0` preserve the original appearance.
+
 ## Fluid defaults
 
 `FluidWarp`, `FluidNoiseSize`, `FluidSpeed`, `FluidBody`, `FluidBubbles`, `FluidBubbleSize`,

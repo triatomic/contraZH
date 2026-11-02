@@ -108,7 +108,7 @@ protected:
 	Int m_numVertexBufferTiles;	///<number of vertex buffers needed to store this heightmap
 	Int	m_numBlockColumnsInLastVB;///<a VB tile may be partially filled, this indicates how many 2x2 vertex blocks are filled.
 	Int	m_numBlockRowsInLastVB;///<a VB tile may be partially filled, this indicates how many 2x2 vertex blocks are filled.
-	std::vector<Int> m_tilePixelLights;	///<each VB tile's per-pixel lights, W3DShaderManager::MAX_PIXEL_LIGHTS slots a tile
+	std::vector<std::vector<Int> > m_tilePixelLights;	///<each VB tile's per-pixel lights
 	std::vector<Int> m_tilePixelLightCounts;	///<how many of its slots each VB tile fills
 	std::vector<Bool> m_tileSeabed;	///<whether each VB tile has standing water, so it draws through the seabed shaders
 	std::vector<AABoxClass> m_tileBounds;	///<each VB tile's world bounds, for culling it

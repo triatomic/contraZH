@@ -262,6 +262,8 @@ public:
 	Real m_terrainGlintAlbedo;		///< GameData TerrainGlintAlbedo: how far the glint follows the ground's brightness, 0 not at all to 1 fully
 	Real m_unitEmissiveIntensity;		///< GameData UnitEmissiveIntensity: brightness of _emi glow masks on vehicles and structures by day, 0 for none
 	Real m_unitEmissiveNightIntensity;	///< GameData UnitEmissiveNightIntensity: the same at night
+	Real m_pathTracingLightMaxRadius;
+	Real m_pathTracingLightBrightness;
 	Real m_softParticleDistance;		///< GameData SoftParticleDistance: how far in front of a surface a particle starts to fade, 0 for hard edges
 	Real m_flameWarp;					///< GameData FlameWarp and the keys below: flame shading and heat haze defaults, see FlameShaderTuning
 	Real m_flameHeat;
@@ -764,6 +766,7 @@ public:
   Bool m_useCryoShaders;          ///< Options.ini CryoShaders: cryo beams, streaks and sprites turn to ice
   Bool m_useDynamicLights;        ///< Options.ini DynamicLights: explosions, muzzle flashes and lasers light their surroundings
   Bool m_usePixelLights;          ///< Options.ini PixelLights: those lights are drawn per pixel where the hardware allows
+  Bool m_usePathTracing;          ///< Options.ini PathTracing enables light from particles and emissive meshes
   Bool m_useAmbientOcclusion;     ///< Options.ini AmbientOcclusion: creases and the ground beneath objects darken where the hardware allows
   Bool m_useHeightBlend;          ///< Options.ini HeightBlend: terrain textures blend by height where the hardware allows
   Bool m_useHQSky;                ///< Options.ini HQSky: cloud shadows drift softly and change shape where the hardware allows

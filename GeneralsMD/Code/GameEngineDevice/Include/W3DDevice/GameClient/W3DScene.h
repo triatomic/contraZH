@@ -33,6 +33,8 @@
 
 #pragma once
 
+#include "W3DDevice/GameClient/W3DEmissiveLights.h"
+
 // SYSTEM INCLUDES ////////////////////////////////////////////////////////////
 
 // USER INCLUDES //////////////////////////////////////////////////////////////
@@ -99,7 +101,7 @@ public:
 	virtual void init() override {}
 	virtual void update() override {}
 	virtual void draw() override;
-	virtual void reset() override {}
+	virtual void reset() override { m_emissiveLights.reset(); }
 	void doRender(CameraClass * cam);
 
 protected:
@@ -117,6 +119,7 @@ protected:
 
 protected:
 	RefRenderObjListClass	m_dynamicLightList;
+	W3DEmissiveLights m_emissiveLights;
 	Bool									m_drawTerrainOnly;
 	LightClass						*m_globalLight[LightEnvironmentClass::MAX_LIGHTS];				///< The global directional light (sun, moon) Applies to objects.
 	LightClass						*m_scratchLight; ///< a workspace for copying global lights and modifying // MLorenzen

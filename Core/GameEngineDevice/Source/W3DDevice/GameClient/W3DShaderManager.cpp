@@ -92,6 +92,7 @@
 #include "WWLib/ffactory.h"
 #include "WWMath/aabox.h"
 #include <vector>
+#include <map>
 
 
 // Turn this on to turn off pixel shaders. jba[4/3/2003]
@@ -1557,7 +1558,7 @@ static Real Bind_Terrain_Emissive(Bool terrain)
 }
 
 // The point lights draws may add, set once a frame by the scene. Each draw names its own.
-static W3DShaderManager::PixelLight PixelLights[W3DShaderManager::MAX_PIXEL_LIGHT_CANDIDATES];
+static std::vector<W3DShaderManager::PixelLight> PixelLights;
 static Int PixelLightCount = 0;
 enum { PIXEL_LIGHT_REGISTERS = W3DShaderManager::MAX_PIXEL_LIGHTS * 2 + (W3DShaderManager::MAX_PIXEL_LIGHTS + 3) / 4 };
 static Bool TerrainPixelLightsLoaded = FALSE;
@@ -1633,12 +1634,13 @@ static Vector4 Bind_Height_Blend(TextureClass *heights)
 // The lights of the object whose specular pass is installed.
 struct SpecularPassLights
 {
-	Int lights[W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS];
+	std::vector<Int> lights;
 	Int count;
 	Bool lightsOnly;	///< no highlight, bumps or glow
 	Bool receivesShadow;	///< the pass also does the shadow receiver's work
 };
 static const SpecularPassLights *CurrentSpecularLights = nullptr;
+static D3DMATRIX SpecularLightView;
 
 // Bisects per-pixel light faults without a rebuild. CONTRA_PIXELLIGHTS=0 leaves every light
 // to the vertex lighting, 1 draws them per pixel on the terrain only, 2 on units as well.
@@ -1652,6 +1654,65 @@ static Int Get_Pixel_Light_Mode()
 
 // Whether any lit shader carries its lights-only twin.
 static Bool LightsDebugAvailable = FALSE;
+
+#if defined(BUILD_WITH_D3D9)
+struct AdditionalLightShaders
+{
+	AdditionalLightShaders() : normal(nullptr), debug(nullptr) {}
+	IDirect3DPixelShader9 *normal;
+	IDirect3DPixelShader9 *debug;
+};
+static std::map<DWORD, AdditionalLightShaders> AdditionalShaders;
+
+static void Attach_Additional_Light_Shaders(const char *path, DWORD handle)
+{
+	std::map<DWORD, AdditionalLightShaders>::iterator old = AdditionalShaders.find(handle);
+	if (old != AdditionalShaders.end())
+	{
+		SAFE_RELEASE(old->second.normal);
+		SAFE_RELEASE(old->second.debug);
+		AdditionalShaders.erase(old);
+	}
+	const size_t length = strlen(path);
+	if (length < 4)
+	{
+		return;
+	}
+	AdditionalLightShaders shaders;
+	for (Int debug = 0; debug < 2; debug++)
+	{
+		char extraPath[_MAX_PATH];
+		snprintf(extraPath, sizeof(extraPath), "%.*sextralights%s.pso", (Int)length - 4, path, debug ? "debug" : "");
+		const void *data = nullptr;
+		DWORD size = 0;
+		if (!Find_Embedded_Shader(extraPath, data, size))
+		{
+			break;
+		}
+		IDirect3DPixelShader9 **shader = debug ? &shaders.debug : &shaders.normal;
+		DX8Wrapper::_Get_D3D_Device8()->CreatePixelShader((const DWORD *)data, shader);
+	}
+	if (shaders.normal != nullptr)
+	{
+		AdditionalShaders[handle] = shaders;
+	}
+	else
+	{
+		SAFE_RELEASE(shaders.debug);
+	}
+}
+
+static std::vector<Int> AdditionalLightIndices;
+static Int AdditionalLightSlots = 0;
+static Int AdditionalLightRegister = 0;
+static D3DMATRIX AdditionalLightView;
+static Bool AdditionalLightsInView = FALSE;
+static DWORD AdditionalLightShader = 0;
+static IDirect3DPixelShader9 *SavedLightShader = nullptr;
+static Vector4 SavedLightConstants[PIXEL_LIGHT_REGISTERS];
+static const D3DRENDERSTATETYPE AdditionalLightStates[] = { D3DRS_ALPHABLENDENABLE, D3DRS_DESTBLEND, D3DRS_ZWRITEENABLE, D3DRS_FOGCOLOR, D3DRS_BLENDOP };
+static DWORD SavedLightStates[ARRAY_SIZE(AdditionalLightStates)];
+#endif
 
 // DynamicLightsDebug draws every lightable surface through its lit shader, so unlit ground and objects go black too.
 static Bool Get_Lights_Debug()
@@ -1747,6 +1808,84 @@ static Int Pack_Pixel_Lights(Vector4 *constants, Int slots, const Int *indices, 
 	return slots * 2 + (slots + 3) / 4;
 }
 
+#if defined(BUILD_WITH_D3D9)
+static bool Draw_Additional_Light_Pass(unsigned pass)
+{
+	IDirect3DDevice9 *device = DX8Wrapper::_Get_D3D_Device8();
+	const size_t first = (size_t)pass * AdditionalLightSlots;
+	const Int registers = AdditionalLightSlots * 2 + (AdditionalLightSlots + 3) / 4;
+	if (first >= AdditionalLightIndices.size())
+	{
+		if (SavedLightShader != nullptr)
+		{
+			device->SetPixelShader(SavedLightShader);
+			SAFE_RELEASE(SavedLightShader);
+			device->SetPixelShaderConstantF(AdditionalLightRegister, &SavedLightConstants[0].X, registers);
+			for (Int i = 0; i < ARRAY_SIZE(AdditionalLightStates); i++)
+			{
+				device->SetRenderState(AdditionalLightStates[i], SavedLightStates[i]);
+			}
+		}
+		return false;
+	}
+	if (pass == 1)
+	{
+		// Direct device writes keep the wrapper's cached base-pass state unchanged.
+		device->GetPixelShader(&SavedLightShader);
+		if (SavedLightShader == nullptr)
+		{
+			return false;
+		}
+		device->GetPixelShaderConstantF(AdditionalLightRegister, &SavedLightConstants[0].X, registers);
+		for (Int i = 0; i < ARRAY_SIZE(AdditionalLightStates); i++)
+		{
+			device->GetRenderState(AdditionalLightStates[i], &SavedLightStates[i]);
+		}
+		device->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
+		device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
+		device->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
+		device->SetRenderState(D3DRS_FOGCOLOR, 0);
+		device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
+		const AdditionalLightShaders &shaders = AdditionalShaders.find(AdditionalLightShader)->second;
+		device->SetPixelShader(Get_Lights_Debug() && shaders.debug != nullptr ? shaders.debug : shaders.normal);
+	}
+	Vector4 constants[PIXEL_LIGHT_REGISTERS];
+	Pack_Pixel_Lights(constants, AdditionalLightSlots, &AdditionalLightIndices[first],
+		(Int)(AdditionalLightIndices.size() - first), AdditionalLightsInView ? &AdditionalLightView : nullptr);
+	device->SetPixelShaderConstantF(AdditionalLightRegister, &constants[0].X, registers);
+	return true;
+}
+#endif
+
+static void Set_Additional_Pixel_Lights(DWORD shader, const Int *indices, Int count, Int slots, Int firstRegister, const D3DMATRIX *view)
+{
+#if defined(BUILD_WITH_D3D9)
+	DX8Wrapper::Set_Additional_Pass_Callback(nullptr);
+	Bool enabled = FALSE;
+#if defined(RTS_ZEROHOUR)
+	enabled = TheGlobalData->m_usePathTracing;
+#endif
+	if (!enabled || count <= slots || AdditionalShaders.find(shader) == AdditionalShaders.end())
+	{
+		return;
+	}
+	AdditionalLightIndices.resize(count);
+	for (Int i = 0; i < count; i++)
+	{
+		AdditionalLightIndices[i] = indices != nullptr ? indices[i] : i;
+	}
+	AdditionalLightSlots = slots;
+	AdditionalLightRegister = firstRegister;
+	AdditionalLightShader = shader;
+	AdditionalLightsInView = view != nullptr;
+	if (view != nullptr)
+	{
+		AdditionalLightView = *view;
+	}
+	DX8Wrapper::Set_Additional_Pass_Callback(Draw_Additional_Light_Pass);
+#endif
+}
+
 // Every ground shader reads its world-space lights from c5.
 #define GROUND_POINT_LIGHT_REGISTER 5
 
@@ -1754,12 +1893,14 @@ static Int Pack_Pixel_Lights(Vector4 *constants, Int slots, const Int *indices, 
 // unlit shader leaves the lit one bound, for passes that only add the lights.
 static void Begin_Draw_Pixel_Lights(DWORD unlit, DWORD lit)
 {
+	Set_Additional_Pixel_Lights(0, nullptr, 0, 0, 0, nullptr);
 	DrawUnlitShader = unlit;
 	DrawLitShader = lit;
 }
 
 static void End_Draw_Pixel_Lights()
 {
+	Set_Additional_Pixel_Lights(0, nullptr, 0, 0, 0, nullptr);
 	DrawUnlitShader = 0;
 	DrawLitShader = 0;
 	DrawGroundShader = 0;
@@ -2522,6 +2663,7 @@ Int SpecularShader::set(Int pass)
 	// The shader lights in camera space, so the sun is turned into it with the view's rotation.
 	D3DMATRIX view;
 	DX8Wrapper::_Get_D3D_Device8()->GetTransform(D3DTS_VIEW, &view);
+	SpecularLightView = view;
 	Vector3 toSun(
 		SpecularToSun.X * view.m[0][0] + SpecularToSun.Y * view.m[1][0] + SpecularToSun.Z * view.m[2][0],
 		SpecularToSun.X * view.m[0][1] + SpecularToSun.Y * view.m[1][1] + SpecularToSun.Z * view.m[2][1],
@@ -2549,7 +2691,7 @@ Int SpecularShader::set(Int pass)
 	{
 		Vector4 constants[PIXEL_LIGHT_REGISTERS];
 		const Int registers = Pack_Pixel_Lights(constants, W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS,
-			passLights->lights, passLights->count, &view);
+			passLights->lights.empty() ? nullptr : &passLights->lights[0], passLights->count, &view);
 		DX8Wrapper::Set_Pixel_Shader_Constant(8, constants, registers);
 	}
 
@@ -2662,6 +2804,9 @@ void SpecularShader::setTexture(TextureClass *texture)
 
 	DX8Wrapper::Set_Texture(SPECULAR_NORMAL_MAP_STAGE, (bump != BUMP_NONE) ? bumpMap : nullptr);
 	DX8Wrapper::Set_Pixel_Shader(shaders[bump]);
+	Set_Additional_Pixel_Lights(shaders[bump], CurrentSpecularLights != nullptr && !CurrentSpecularLights->lights.empty()
+		? &CurrentSpecularLights->lights[0] : nullptr, m_lit ? CurrentSpecularLights->count : 0,
+		W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS, 8, &SpecularLightView);
 
 	TextureClass *emissiveMap = (EmissiveIntensity > 0.0f && texture != nullptr && !m_lightsOnly) ? Find_Emissive_Map(texture) : nullptr;
 	DX8Wrapper::Set_Texture(SPECULAR_EMISSIVE_STAGE, emissiveMap);
@@ -2692,6 +2837,7 @@ void SpecularShader::setBumpHeight(Real height)
 
 void SpecularShader::reset()
 {
+	Set_Additional_Pixel_Lights(0, nullptr, 0, 0, 0, nullptr);
 	DX8Wrapper::Set_Pixel_Shader(0);
 	DX8Wrapper::Set_Texture(SPECULAR_NORMAL_MAP_STAGE, nullptr);
 	DX8Wrapper::Set_Texture(SPECULAR_EMISSIVE_STAGE, nullptr);
@@ -2887,7 +3033,8 @@ public:
 	void setObjectLights(const MaterialPassClass *key, const Int *lights, Int count, Bool lightsOnly, Bool receivesShadow)
 	{
 		m_key = key;
-		m_lights.count = min(count, (Int)W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS);
+		m_lights.count = count;
+		m_lights.lights.resize(count);
 		for (Int i = 0; i < m_lights.count; i++)
 		{
 			m_lights.lights[i] = lights[i];
@@ -2966,7 +3113,8 @@ void W3DShaderManager::setEmissive(Real intensity)
 
 void W3DShaderManager::setPixelLights(const PixelLight *lights, Int count)
 {
-	PixelLightCount = min(count, (Int)MAX_PIXEL_LIGHT_CANDIDATES);
+	PixelLightCount = count;
+	PixelLights.resize(count);
 	for (Int i = 0; i < PixelLightCount; i++)
 	{
 		PixelLights[i] = lights[i];
@@ -2987,14 +3135,25 @@ const W3DShaderManager::PixelLight &W3DShaderManager::getPixelLight(Int index)
 
 void W3DShaderManager::setDrawPixelLights(const Int *indices, Int count)
 {
+	Set_Additional_Pixel_Lights(0, nullptr, 0, 0, 0, nullptr);
 	if (DrawLitShader == 0)
 	{
 		return;
 	}
 
+	std::vector<Int> groundLights;
 	if (indices == nullptr)
 	{
 		count = min(count, PixelLightCount);
+		for (Int i = 0; i < count; i++)
+		{
+			if (!PixelLights[i].objectsOnly)
+			{
+				groundLights.push_back(i);
+			}
+		}
+		count = (Int)groundLights.size();
+		indices = groundLights.empty() ? nullptr : &groundLights[0];
 	}
 	if (count <= 0 && DrawUnlitShader != 0 && !Get_Lights_Debug())
 	{
@@ -3006,6 +3165,7 @@ void W3DShaderManager::setDrawPixelLights(const Int *indices, Int count)
 	const Int registers = Pack_Pixel_Lights(constants, MAX_PIXEL_LIGHTS, indices, count, nullptr);
 	DX8Wrapper::Set_Pixel_Shader_Constant(GROUND_POINT_LIGHT_REGISTER, constants, registers);
 	DX8Wrapper::Set_Pixel_Shader(DrawLitShader);
+	Set_Additional_Pixel_Lights(DrawLitShader, indices, count, MAX_PIXEL_LIGHTS, GROUND_POINT_LIGHT_REGISTER, nullptr);
 }
 
 void W3DShaderManager::setTerrainSeabed(TextureClass *classMap, TextureClass *waterMask, TextureClass *painted, const Vector4 *constants)
@@ -3026,6 +3186,7 @@ Bool W3DShaderManager::supportsTerrainSeabed()
 
 void W3DShaderManager::setDrawTerrain(const Int *indices, Int count, Bool seabed)
 {
+	Set_Additional_Pixel_Lights(0, nullptr, 0, 0, 0, nullptr);
 	if (seabed && DrawSeabedUnlitShader != 0)
 	{
 		// Point lights for other draws overwrite the seabed's registers, so they go back each draw.
@@ -3036,6 +3197,7 @@ void W3DShaderManager::setDrawTerrain(const Int *indices, Int count, Bool seabed
 			const Int registers = Pack_Pixel_Lights(constants, SEABED_PIXEL_LIGHTS, indices, count, nullptr);
 			DX8Wrapper::Set_Pixel_Shader_Constant(GROUND_POINT_LIGHT_REGISTER, constants, registers);
 			DX8Wrapper::Set_Pixel_Shader(DrawSeabedLitShader);
+			Set_Additional_Pixel_Lights(DrawSeabedLitShader, indices, count, SEABED_PIXEL_LIGHTS, GROUND_POINT_LIGHT_REGISTER, nullptr);
 		}
 		else
 		{
@@ -3054,12 +3216,37 @@ void W3DShaderManager::setDrawTerrain(const Int *indices, Int count, Bool seabed
 	}
 }
 
+Int W3DShaderManager::pickPixelLights(const AABoxClass &box, std::vector<Int> &lights)
+{
+	lights.clear();
+	for (Int index = 0; index < PixelLightCount; index++)
+	{
+		const PixelLight &light = PixelLights[index];
+		if (light.objectsOnly)
+		{
+			continue;
+		}
+		const Real dx = max((Real)fabs(light.position.X - box.Center.X) - box.Extent.X, 0.0f);
+		const Real dy = max((Real)fabs(light.position.Y - box.Center.Y) - box.Extent.Y, 0.0f);
+		const Real dz = max((Real)fabs(light.position.Z - box.Center.Z) - box.Extent.Z, 0.0f);
+		if (dx * dx + dy * dy + dz * dz < light.outerRadius * light.outerRadius)
+		{
+			lights.push_back(index);
+		}
+	}
+	return (Int)lights.size();
+}
+
 Int W3DShaderManager::pickPixelLights(const AABoxClass &box, Int *lights)
 {
 	Int count = 0;
 	for (Int index = 0; index < PixelLightCount && count < MAX_PIXEL_LIGHTS; index++)
 	{
 		const PixelLight &light = PixelLights[index];
+		if (light.objectsOnly)
+		{
+			continue;
+		}
 		const Real dx = max((Real)fabs(light.position.X - box.Center.X) - box.Extent.X, 0.0f);
 		const Real dy = max((Real)fabs(light.position.Y - box.Center.Y) - box.Extent.Y, 0.0f);
 		const Real dz = max((Real)fabs(light.position.Z - box.Center.Z) - box.Extent.Z, 0.0f);
@@ -3203,6 +3390,15 @@ TextureClass *W3DShaderManager::findNormalMap(TextureClass *texture)
 {
 #if defined(BUILD_WITH_D3D9)
 	return (texture != nullptr) ? Find_Normal_Map(texture) : nullptr;
+#else
+	return nullptr;
+#endif
+}
+
+TextureClass *W3DShaderManager::findEmissiveMap(TextureClass *texture)
+{
+#if defined(BUILD_WITH_D3D9)
+	return texture != nullptr ? Find_Emissive_Map(texture) : nullptr;
 #else
 	return nullptr;
 #endif
@@ -5717,6 +5913,15 @@ void W3DShaderManager::init()
 //=============================================================================
 void W3DShaderManager::shutdown()
 {
+#if defined(BUILD_WITH_D3D9)
+	DX8Wrapper::Set_Additional_Pass_Callback(nullptr);
+	for (std::map<DWORD, AdditionalLightShaders>::iterator it = AdditionalShaders.begin(); it != AdditionalShaders.end(); ++it)
+	{
+		SAFE_RELEASE(it->second.normal);
+		SAFE_RELEASE(it->second.debug);
+	}
+	AdditionalShaders.clear();
+#endif
 	SAFE_RELEASE(m_newRenderSurface);
 	SAFE_RELEASE(m_renderTexture);
 	SAFE_RELEASE(m_oldRenderSurface);
@@ -6298,6 +6503,7 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 					else
 					{
 						Attach_Lights_Debug_Twin(strFilePath, *pHandle);
+						Attach_Additional_Light_Shaders(strFilePath, *pHandle);
 					}
 				}
 			}

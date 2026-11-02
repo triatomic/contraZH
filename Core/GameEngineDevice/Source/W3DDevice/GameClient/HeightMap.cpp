@@ -359,11 +359,15 @@ void HeightMapRenderObjClass::assignPixelLights(RefRenderObjListIterator &lights
 {
 	const Int slots = W3DShaderManager::MAX_PIXEL_LIGHTS;
 	m_tilePixelLightCounts.assign(m_numVertexBufferTiles, 0);
-	m_tilePixelLights.resize(m_numVertexBufferTiles * slots);
+	m_tilePixelLights.resize(m_numVertexBufferTiles);
+	for (Int tile = 0; tile < m_numVertexBufferTiles; tile++)
+	{
+		m_tilePixelLights[tile].clear();
+	}
 
-	W3DDynamicLight *byIndex[W3DShaderManager::MAX_PIXEL_LIGHT_CANDIDATES];
 	const Bool enabled = W3DShaderManager::supportsTerrainPixelLights() && m_numVertexBufferTiles > 0;
 	const Int count = enabled ? W3DShaderManager::getPixelLightCount() : 0;
+	std::vector<W3DDynamicLight *> byIndex(count);
 	for (Int index = 0; index < count; index++)
 	{
 		byIndex[index] = nullptr;
@@ -373,7 +377,7 @@ void HeightMapRenderObjClass::assignPixelLights(RefRenderObjListIterator &lights
 		W3DDynamicLight *pLight = (W3DDynamicLight*)lights.Peek_Obj();
 		pLight->m_pixelLit = false;
 		const Int index = pLight->getPixelIndex();
-		if (index >= 0 && index < count && pLight->m_enabled)
+		if (index >= 0 && index < count)
 		{
 			byIndex[index] = pLight;
 		}
@@ -386,13 +390,13 @@ void HeightMapRenderObjClass::assignPixelLights(RefRenderObjListIterator &lights
 	for (Int index = 0; index < count; index++)
 	{
 		W3DDynamicLight *pLight = byIndex[index];
-		if (pLight == nullptr)
+		const W3DShaderManager::PixelLight &light = W3DShaderManager::getPixelLight(index);
+		if (light.objectsOnly || (pLight != nullptr && !pLight->m_enabled))
 		{
 			continue;
 		}
 
 		// The cells the light reaches, bounded as the vertex lighting bounds them, within the drawn area.
-		const W3DShaderManager::PixelLight &light = W3DShaderManager::getPixelLight(index);
 		const Int x0 = max((Int)((light.position.X - light.outerRadius)/MAP_XY_FACTOR) - xCoordMin, 0);
 		const Int x1 = min((Int)((light.position.X + light.outerRadius)/MAP_XY_FACTOR + 1.0f) - xCoordMin, m_x-1);
 		const Int y0 = max((Int)((light.position.Y - light.outerRadius)/MAP_XY_FACTOR) - yCoordMin, 0);
@@ -415,7 +419,11 @@ void HeightMapRenderObjClass::assignPixelLights(RefRenderObjListIterator &lights
 		}
 
 		Bool room = TRUE;
-		for (Int j = 0; j < m_numVBTilesY && room; j++)
+		Bool multiplePasses = FALSE;
+#if defined(RTS_ZEROHOUR)
+		multiplePasses = TheGlobalData->m_usePathTracing;
+#endif
+		for (Int j = 0; j < m_numVBTilesY && room && !multiplePasses; j++)
 		{
 			for (Int i = 0; i < m_numVBTilesX; i++)
 			{
@@ -440,11 +448,15 @@ void HeightMapRenderObjClass::assignPixelLights(RefRenderObjListIterator &lights
 				if (rows[j] && columns[i])
 				{
 					const Int tile = j*m_numVBTilesX+i;
-					m_tilePixelLights[tile*slots + m_tilePixelLightCounts[tile]++] = index;
+					m_tilePixelLights[tile].push_back(index);
+					m_tilePixelLightCounts[tile]++;
 				}
 			}
 		}
-		pLight->m_pixelLit = true;
+		if (pLight != nullptr)
+		{
+			pLight->m_pixelLit = true;
+		}
 	}
 }
 
@@ -457,7 +469,8 @@ void HeightMapRenderObjClass::setTilePixelLights(Int tile)
 	{
 		// The mirror draws flat terrain, so it leaves the seabed out.
 		const Bool seabed = m_tileSeabed[tile] && !ShaderClass::Is_Backface_Culling_Inverted();
-		W3DShaderManager::setDrawTerrain(&m_tilePixelLights[tile * W3DShaderManager::MAX_PIXEL_LIGHTS], m_tilePixelLightCounts[tile], seabed);
+		const std::vector<Int> &lights = m_tilePixelLights[tile];
+		W3DShaderManager::setDrawTerrain(lights.empty() ? nullptr : &lights[0], (Int)lights.size(), seabed);
 	}
 }
 

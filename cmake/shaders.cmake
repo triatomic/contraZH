@@ -72,6 +72,23 @@ function(rts_add_shader SOURCE PROFILE ENTRY OUTPUT)
             VERBATIM
         )
         list(APPEND outputs "${debugDst}")
+        foreach(debug IN ITEMS 0 1)
+            if(debug)
+                set(extraSuffix "extralightsdebug.pso")
+            else()
+                set(extraSuffix "extralights.pso")
+            endif()
+            string(REGEX REPLACE "\\.pso$" "${extraSuffix}" extraOutput "${OUTPUT}")
+            set(extraDst "${RTS_SHADER_OUTPUT_DIR}/${extraOutput}")
+            add_custom_command(
+                OUTPUT "${extraDst}"
+                COMMAND "${RTS_FXC_EXECUTABLE}" /nologo /T ${PROFILE} /E ${ENTRY} ${defines} /D LIGHTS_ONLY=1 /D LIGHTS_DEBUG=${debug} /Fo "${extraDst}" "${src}"
+                DEPENDS "${src}" ${RTS_SHADER_INCLUDES}
+                COMMENT "Compiling ${extraOutput} (${PROFILE})"
+                VERBATIM
+            )
+            list(APPEND outputs "${extraDst}")
+        endforeach()
     endif()
 
     set(RTS_SHADER_OUTPUTS ${RTS_SHADER_OUTPUTS} ${outputs} PARENT_SCOPE)

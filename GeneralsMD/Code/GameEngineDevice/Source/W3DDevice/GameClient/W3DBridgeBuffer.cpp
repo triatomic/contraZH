@@ -1555,12 +1555,12 @@ void W3DBridgeBuffer::drawBridges(CameraClass * camera, Bool wireframe, TextureC
 				if (m_bridges[curBridge].isEnabled() && m_bridges[curBridge].isVisible()) {
 					const SphereClass &bounds = m_bridges[curBridge].getBounds();
 					const AABoxClass box(bounds.Center, Vector3(bounds.Radius, bounds.Radius, bounds.Radius));
-					Int lights[W3DShaderManager::MAX_PIXEL_LIGHTS];
+					std::vector<Int> lights;
 					const Int lightCount = W3DShaderManager::pickPixelLights(box, lights);
 					if (lightCount == 0 && !TheGlobalData->m_dynamicLightsDebug) {
 						continue;
 					}
-					W3DShaderManager::setDrawPixelLights(lights, lightCount);
+					W3DShaderManager::setDrawPixelLights(lights.empty() ? nullptr : &lights[0], lightCount);
 					m_bridges[curBridge].renderBridge(FALSE);
 				}
 			}

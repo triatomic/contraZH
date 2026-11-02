@@ -2345,6 +2345,15 @@ static IDirect3DVertexShader9* OverrideShader = nullptr;
 static DX8Wrapper::DrawHookType OverrideHook = nullptr;
 #endif
 
+#if defined(BUILD_WITH_D3D9)
+bool (*DX8Wrapper::AdditionalPassCallback)(unsigned pass) = nullptr;
+
+void DX8Wrapper::Set_Additional_Pass_Callback(bool (*callback)(unsigned pass))
+{
+	AdditionalPassCallback = callback;
+}
+#endif
+
 void DX8Wrapper::Draw(
 	unsigned primitive_type,
 	unsigned short start_index,

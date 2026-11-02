@@ -747,7 +747,7 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 	ObjectShroudStatus ss=OBJECTSHROUD_INVALID;
 	Int extraMaterialPops=0;
 	Bool doExtraFlagsPop=FALSE;
-	Int pixelLights[W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS];
+	std::vector<Int> pixelLights(max(W3DShaderManager::getPixelLightCount(), 1));
 	Int pixelLightCount=0;
 	LightClass **sceneLights=m_globalLight;
 
@@ -941,10 +941,10 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 		{
 			if (draw->getReceivesDynamicLights() && W3DShaderManager::supportsUnitPixelLights())
 			{
-				pixelLightCount = pickObjectPixelLights(sph, pixelLights);
+				pixelLightCount = pickObjectPixelLights(sph, &pixelLights[0]);
 			}
 			const Bool lightsOnly = !draw->isKindOf(KINDOF_VEHICLE) && !draw->isKindOf(KINDOF_STRUCTURE);
-			specularPass = W3DShaderManager::getSpecularPass(pixelLights, pixelLightCount, lightsOnly, specularTakesShadow);
+			specularPass = W3DShaderManager::getSpecularPass(&pixelLights[0], pixelLightCount, lightsOnly, specularTakesShadow);
 			if (specularPass == nullptr)
 			{
 				pixelLightCount = 0;
@@ -1018,7 +1018,7 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 				  continue;
 			  }
 			  // the specular pass adds this one per pixel
-			  if (std::find(pixelLights, pixelLights + pixelLightCount, pDyna->getPixelIndex()) != pixelLights + pixelLightCount) {
+			  if (std::find(pixelLights.begin(), pixelLights.begin() + pixelLightCount, pDyna->getPixelIndex()) != pixelLights.begin() + pixelLightCount) {
 				  continue;
 			  }
 			  SphereClass lSph = pDyna->Get_Bounding_Sphere();
@@ -2207,6 +2207,7 @@ namespace
 	struct PixelLightCandidate
 	{
 		W3DDynamicLight *light;
+		W3DShaderManager::PixelLight value;
 		Real gap;		///< how far outside the light's reach the screen centre is, in screen units
 		Real score;		///< reach times brightness, for lights at an equal gap
 	};
@@ -2218,6 +2219,21 @@ namespace
 			return a.gap < b.gap;
 		}
 		return a.score > b.score;
+	}
+
+	Bool Tune_Emissive_Light(W3DShaderManager::PixelLight &light, Real maxRadius, Real brightness)
+	{
+		if (!(brightness > 0.0f))
+		{
+			return FALSE;
+		}
+		if (maxRadius > 0.0f && light.outerRadius > maxRadius)
+		{
+			light.innerRadius *= maxRadius / light.outerRadius;
+			light.outerRadius = maxRadius;
+		}
+		light.diffuse = light.diffuse * brightness;
+		return TRUE;
 	}
 }
 
@@ -2277,13 +2293,72 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 		candidates.push_back(candidate);
 	}
 
-	std::sort(candidates.begin(), candidates.end(), Pixel_Light_Before);
-	const Int count = min((Int)candidates.size(), (Int)W3DShaderManager::MAX_PIXEL_LIGHT_CANDIDATES);
+	if (enabled && TheGlobalData->m_useDynamicLights && TheGlobalData->m_usePathTracing &&
+		TheGlobalData->m_pathTracingLightBrightness > 0.0f &&
+		m_customPassMode == SCENE_PASS_DEFAULT && !m_drawTerrainOnly)
+	{
+		m_emissiveLights.begin(camera);
+		const Int localPlayerIndex = rts::getObservedOrLocalPlayerIndex_Safe();
+		RefRenderObjListIterator objects(&RenderList);
+		for (objects.First(); !objects.Is_Done(); objects.Next())
+		{
+			RenderObjClass *object = objects.Peek_Obj();
+			DrawableInfo *info = (DrawableInfo *)object->Get_User_Data();
+			Drawable *draw = info != nullptr ? info->m_drawable : nullptr;
+			if (draw == nullptr || draw->isDrawableEffectivelyHidden() || draw->getFullyObscuredByShroud() ||
+				(draw->getObject() != nullptr && draw->getObject()->getShroudedStatus(localPlayerIndex) >= OBJECTSHROUD_FOGGED))
+			{
+				continue;
+			}
+			const SphereClass &bounds = object->Get_Bounding_Sphere();
+			if (!camera.Cull_Sphere(SphereClass(bounds.Center, bounds.Radius + 120.0f)))
+			{
+				m_emissiveLights.addObject(*object, draw->getEffectiveOpacity());
+			}
+		}
+		const std::vector<W3DShaderManager::PixelLight> &emissive = m_emissiveLights.finish(camera);
+		std::vector<W3DShaderManager::PixelLight> sources(emissive);
+		if (TheW3DLaserGlow != nullptr)
+		{
+			TheW3DLaserGlow->appendObjectLights(sources);
+		}
+		for (size_t i = 0; i < sources.size(); i++)
+		{
+			W3DShaderManager::PixelLight light = sources[i];
+			if (!Tune_Emissive_Light(light, TheGlobalData->m_pathTracingLightMaxRadius, TheGlobalData->m_pathTracingLightBrightness) ||
+				camera.Cull_Sphere(SphereClass(light.position, light.outerRadius)))
+			{
+				continue;
+			}
+			PixelLightCandidate candidate;
+			candidate.light = nullptr;
+			candidate.value = light;
+			candidate.score = light.outerRadius * max(light.diffuse.X, max(light.diffuse.Y, light.diffuse.Z));
+			candidate.gap = 0.0f;
+			Vector3 center;
+			Vector3 edge;
+			if (camera.Project(center, light.position) != CameraClass::OUTSIDE_NEAR_CLIP &&
+				camera.Project(edge, light.position + cameraRight * light.outerRadius) != CameraClass::OUTSIDE_NEAR_CLIP)
+			{
+				candidate.gap = max(sqrtf(center.X * center.X + center.Y * center.Y) - (edge - center).Length(), 0.0f);
+			}
+			candidates.push_back(candidate);
+		}
+	}
 
-	W3DShaderManager::PixelLight lights[W3DShaderManager::MAX_PIXEL_LIGHT_CANDIDATES];
+	std::sort(candidates.begin(), candidates.end(), Pixel_Light_Before);
+	const Int count = TheGlobalData->m_usePathTracing ? (Int)candidates.size()
+		: min((Int)candidates.size(), (Int)W3DShaderManager::MAX_PIXEL_LIGHT_CANDIDATES);
+
+	std::vector<W3DShaderManager::PixelLight> lights(max(count, 1));
 	for (Int i = 0; i < count; i++)
 	{
 		W3DDynamicLight *light = candidates[i].light;
+		if (light == nullptr)
+		{
+			lights[i] = candidates[i].value;
+			continue;
+		}
 		light->setPixelIndex(i);
 
 		double innerRadius, outerRadius;
@@ -2310,7 +2385,7 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 		lights[i].outerRadius = (Real)outerRadius;
 		lights[i].terrainOnly = light->isTerrainOnly();
 	}
-	W3DShaderManager::setPixelLights(lights, count);
+	W3DShaderManager::setPixelLights(&lights[0], count);
 
 	// Sampled every 300 frames, and only when an interval had lights, so quiet stretches stay out of the log.
 	static Int pixelLightFrames = 0;
@@ -2331,10 +2406,11 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 	}
 }
 
-// Picks this frame's per-pixel lights that reach the sphere, strongest there first, as many as the specular pass takes.
+// Picks this frame's per-pixel lights that reach the sphere, strongest there first.
 Int RTS3DScene::pickObjectPixelLights(const SphereClass &sphere, Int *lights)
 {
-	Real scores[W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS];
+	const Int limit = TheGlobalData->m_usePathTracing ? W3DShaderManager::getPixelLightCount() : (Int)W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS;
+	std::vector<Real> scores(limit);
 	Int count = 0;
 
 	const Int candidates = W3DShaderManager::getPixelLightCount();
@@ -2363,11 +2439,11 @@ Int RTS3DScene::pickObjectPixelLights(const SphereClass &sphere, Int *lights)
 		{
 			slot--;
 		}
-		if (slot >= W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS)
+		if (slot >= limit)
 		{
 			continue;
 		}
-		const Int last = min(count, (Int)W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS - 1);
+		const Int last = min(count, limit - 1);
 		for (Int i = last; i > slot; i--)
 		{
 			scores[i] = scores[i - 1];
@@ -2375,7 +2451,7 @@ Int RTS3DScene::pickObjectPixelLights(const SphereClass &sphere, Int *lights)
 		}
 		scores[slot] = score;
 		lights[slot] = index;
-		count = min(count + 1, (Int)W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS);
+		count = min(count + 1, limit);
 	}
 	return count;
 }

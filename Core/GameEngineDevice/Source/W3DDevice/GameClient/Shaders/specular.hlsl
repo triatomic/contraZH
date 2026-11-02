@@ -191,7 +191,11 @@ float4 main(PsIn input) : COLOR
     color += texel * SunDiffuse.rgb * max(change, 0.0f);
 #endif
 
-#if LIGHTS && LIGHTS_DEBUG
+#if LIGHTS && LIGHTS_ONLY && LIGHTS_DEBUG
+    return float4(PointLighting(input.Position, surface), 1.0f);
+#elif LIGHTS && LIGHTS_ONLY
+    return float4(texel * PointLighting(input.Position, surface), 1.0f);
+#elif LIGHTS && LIGHTS_DEBUG
     // Zero alpha clears what the mesh drew, since the pass blends one plus destination times source alpha.
     return float4(PointLighting(input.Position, surface), 0.0f);
 #elif LIGHTS

@@ -193,6 +193,7 @@ public:
 	Bool getDynamicLightsEnabled() const;
 	// Options.ini: PixelLights = Yes draws those lights per pixel where the hardware allows
 	Bool getPixelLightsEnabled() const;
+	Bool getPathTracingEnabled() const;
 	// Options.ini: AmbientOcclusion = Yes darkens creases and the ground where objects meet it
 	Bool getAmbientOcclusionEnabled() const;
 	// Options.ini: HeightBlend = Yes blends terrain textures by height where the hardware allows

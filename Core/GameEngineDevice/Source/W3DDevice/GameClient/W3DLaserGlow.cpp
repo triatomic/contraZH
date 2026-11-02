@@ -135,6 +135,31 @@ Bool W3DLaserGlow::isEnabled()
 #endif
 }
 
+void W3DLaserGlow::appendObjectLights(std::vector<W3DShaderManager::PixelLight> &lights) const
+{
+	for (Int i = 0; i < m_count; i++)
+	{
+		const Glow &glow = m_glows[i];
+		const Vector3 delta = glow.end - glow.start;
+		const Real length = delta.Length();
+		const Int count = min(max((Int)ceilf(length / max(glow.reach, 1.0f)), 1), 16);
+		const Real spacing = length / count;
+		for (Int j = 0; j < count; j++)
+		{
+			W3DShaderManager::PixelLight light;
+			light.position = glow.start + delta * ((j + 0.5f) / count);
+			light.innerRadius = 0.5f;
+			light.outerRadius = max(max(glow.reach, spacing), 1.0f);
+			const Real intensity = min(glow.reach / light.outerRadius, 1.0f);
+			light.diffuse = glow.color * (intensity * (count > 1 ? min(spacing / light.outerRadius, 1.0f) : 1.0f));
+			light.ambientScale = 0.0f;
+			light.terrainOnly = FALSE;
+			light.objectsOnly = TheGlobalData->m_laserRef;
+			lights.push_back(light);
+		}
+	}
+}
+
 void W3DLaserGlow::add(const Vector3 &start, const Vector3 &end, Real reach, const Vector3 &color, const BeamShaderTuning *pulses)
 {
 	if (m_count == MAX_GLOWS || reach <= 0.0f)
@@ -207,7 +232,7 @@ void W3DLaserGlow::render(RenderInfoClass &rinfo)
 #if defined(BUILD_WITH_D3D9)
 	const Int count = m_count;
 	m_count = 0;
-	if (count == 0 || !isEnabled() || TheTerrainRenderObject == nullptr || TheTerrainRenderObject->getMap() == nullptr)
+	if (count == 0 || !TheGlobalData->m_laserRef || !isEnabled() || TheTerrainRenderObject == nullptr || TheTerrainRenderObject->getMap() == nullptr)
 	{
 		return;
 	}

@@ -475,6 +475,11 @@ Bool OptionPreferences::getPixelLightsEnabled(void) const
 	return getBool("PixelLights", TRUE);
 }
 
+Bool OptionPreferences::getPathTracingEnabled(void) const
+{
+	return getBool("PathTracing", FALSE);
+}
+
 Bool OptionPreferences::getAmbientOcclusionEnabled(void) const
 {
 	return getBool("AmbientOcclusion", TRUE);

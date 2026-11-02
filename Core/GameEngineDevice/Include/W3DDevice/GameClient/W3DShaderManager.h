@@ -35,6 +35,7 @@
 
 #include "WW3D2/texture.h"
 #include "WWMath/vector4.h"
+#include <vector>
 enum FilterTypes CPP_11(: Int);
 enum FilterModes CPP_11(: Int);
 enum CustomScenePassModes CPP_11(: Int);
@@ -126,21 +127,24 @@ public:
 	/// A dynamic point light the shaders add per pixel, in world space.
 	struct PixelLight
 	{
+		PixelLight() : position(0.0f, 0.0f, 0.0f), innerRadius(0.0f), outerRadius(0.0f),
+			diffuse(0.0f, 0.0f, 0.0f), ambientScale(0.0f), terrainOnly(FALSE), objectsOnly(FALSE) {}
 		Vector3 position;
 		Real innerRadius;	///< full strength inside this
 		Real outerRadius;	///< nothing past this
 		Vector3 diffuse;
 		Real ambientScale;	///< ambient colour as a fraction of the diffuse
 		Bool terrainOnly;	///< lights the ground and nothing standing on it
+		Bool objectsOnly;	///< the laser terrain pass already lights the ground
 	};
-	/// Each ground draw takes up to eight lights, four under standing water, and each mesh up to eight, as their registers allow.
+	/// Each lighting pass takes eight lights, or three under standing water.
 	enum { MAX_PIXEL_LIGHTS = 8, SEABED_PIXEL_LIGHTS = 3, MAX_UNIT_PIXEL_LIGHTS = 8, MAX_PIXEL_LIGHT_CANDIDATES = 64 };
 	/// Sets the lights that may be drawn per pixel this frame, most important first. Draws name theirs by index.
 	static void setPixelLights(const PixelLight *lights, Int count);
 	static Int getPixelLightCount();
 	static const PixelLight &getPixelLight(Int index);
-	/// Lights the draws that follow with the given lights, up to eight, under the terrain, road, flat terrain
-	/// or point light shader in use. Null indices take the first count, the ones nearest the middle of the view.
+	/// Lights the draws that follow in batches under the terrain, road, flat terrain
+	/// or point light shader in use. Null indices take the first count except object-only lights.
 	static void setDrawPixelLights(const Int *indices, Int count);
 	/// The registers the terrain's seabed hex tiling reads, as terrainshadow.hlsl lays them out.
 	enum { SEABED_CONSTANTS = 5 };
@@ -153,6 +157,7 @@ public:
 	static void setDrawTerrain(const Int *indices, Int count, Bool seabed);
 	/// The first lights, nearest the middle of the view, that reach the box, as many as one ground draw takes.
 	static Int pickPixelLights(const AABoxClass &box, Int *lights);
+	static Int pickPixelLights(const AABoxClass &box, std::vector<Int> &lights);
 	/// Whether any surface draws point lights per pixel, so the scene has to pick them.
 	static Bool supportsPixelLights();
 	/// Whether the terrain draws point lights per pixel, so lights handed over must leave its vertex lighting.
@@ -205,6 +210,7 @@ public:
 	static Bool supportsPixelShader2a();
 	/// The <name>_nrm.dds beside a texture, or null when there is none. Not reference counted.
 	static TextureClass *findNormalMap(TextureClass *texture);
+	static TextureClass *findEmissiveMap(TextureClass *texture);
 
 	static Bool testMinimumRequirements(ChipsetType *videoChipType, CpuType *cpuType, Int *cpuFreq, MemValueType *numRAM, Real *intBenchIndex, Real *floatBenchIndex, Real *memBenchIndex);
 	static StaticGameLODLevel getGPUPerformanceIndex();

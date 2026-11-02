@@ -1,0 +1,400 @@
+"""Exercise the production emissive light clustering and laser sampling without the game."""
+
+from pathlib import Path
+import subprocess
+import tempfile
+
+
+ROOT = Path(__file__).resolve().parents[1]
+VCVARS = Path(r"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat")
+
+PREAMBLE = r'''
+#include <algorithm>
+#include <cassert>
+#include <cmath>
+#include <cstdio>
+#include <map>
+#include <string>
+#include <vector>
+using std::min;
+using std::max;
+typedef int Int;
+typedef float Real;
+typedef bool Bool;
+#define TRUE true
+#define FALSE false
+#define RTS_ZEROHOUR 1
+#define DEBUG_ASSERTCRASH(test, message) assert(test)
+struct Vector2
+{
+    float X, Y;
+    Vector2(float x=0, float y=0) : X(x), Y(y) {}
+    Vector2 operator*(float s) const { return Vector2(X*s,Y*s); }
+    Vector2 operator+(Vector2 v) const { return Vector2(X+v.X,Y+v.Y); }
+};
+struct Vector3
+{
+    float X, Y, Z;
+    Vector3() : X(0), Y(0), Z(0) {}
+    Vector3(float x, float y, float z) : X(x), Y(y), Z(z) {}
+    Vector3 operator+(Vector3 v) const { return Vector3(X+v.X, Y+v.Y, Z+v.Z); }
+    Vector3 operator-(Vector3 v) const { return Vector3(X-v.X, Y-v.Y, Z-v.Z); }
+    Vector3 operator*(float s) const { return Vector3(X*s, Y*s, Z*s); }
+    Vector3 operator/(float s) const { return *this * (1/s); }
+    Vector3& operator+=(Vector3 v) { *this = *this+v; return *this; }
+    Vector3& operator*=(float s) { *this = *this*s; return *this; }
+    Vector3& operator/=(float s) { *this = *this/s; return *this; }
+    void Set(float x,float y,float z) { X=x; Y=y; Z=z; }
+    static void Cross_Product(Vector3 a,Vector3 b,Vector3* out)
+    { out->Set(a.Y*b.Z-a.Z*b.Y,a.Z*b.X-a.X*b.Z,a.X*b.Y-a.Y*b.X); }
+    float Length2() const { return X*X+Y*Y+Z*Z; }
+    float Length() const { return sqrtf(Length2()); }
+};
+struct SphereClass
+{
+    Vector3 Center;
+    float Radius;
+    SphereClass(Vector3 center, float radius) : Center(center), Radius(radius) {}
+};
+struct AABoxClass { Vector3 Center, Extent; };
+class CameraClass
+{
+public:
+    bool hidden;
+    CameraClass() : hidden(false) {}
+    bool Cull_Sphere(const SphereClass&) const { return hidden; }
+};
+class TextureClass {};
+class ShaderClass
+{
+public:
+    enum { DSTBLEND_ONE, SRCBLEND_ONE, SRCBLEND_SRC_ALPHA };
+    int source;
+    ShaderClass() : source(SRCBLEND_SRC_ALPHA) {}
+    int Get_Dst_Blend_Func() const { return DSTBLEND_ONE; }
+    int Get_Src_Blend_Func() const { return source; }
+};
+class VertexMaterialClass
+{
+public:
+    void Get_Emissive(Vector3* v) { *v=Vector3(); }
+    void Get_Diffuse(Vector3* v) { *v=Vector3(1,1,1); }
+    float Get_Opacity() { return 1; }
+};
+struct TriIndex { int index[3]; int operator[](int i) const { return index[i]; } };
+class MeshModelClass
+{
+public:
+    Vector3 vertices[3];
+    TriIndex triangle;
+    Vector2 uv[3];
+    ShaderClass shader;
+    VertexMaterialClass material;
+    TextureClass texture;
+    MeshModelClass() : triangle{0,1,2} { vertices[1]=Vector3(10,0,0); vertices[2]=Vector3(0,10,0); }
+    const Vector3* Get_Vertex_Array() { return vertices; }
+    const TriIndex* Get_Polygon_Array() { return &triangle; }
+    int Get_Pass_Count() { return 1; }
+    int Get_Polygon_Count() { return 1; }
+    const Vector2* Get_UV_Array(int) { return uv; }
+    ShaderClass Get_Shader(int,int) { return shader; }
+    VertexMaterialClass* Peek_Material(int,int) { return &material; }
+    TextureClass* Peek_Texture(int,int) { return &texture; }
+};
+template<class T> struct RefCountPtr { T* ptr; };
+class W3DShaderManager
+{
+public:
+    static TextureClass* findEmissiveMap(TextureClass*) { return NULL; }
+    // PIXEL_LIGHT_STRUCT
+    enum { MAX_PIXEL_LIGHTS = 8 };
+    static int pickPixelLights(const AABoxClass&, int*);
+    static int pickPixelLights(const AABoxClass&, std::vector<int>&);
+    static void setPixelLights(const PixelLight*, int);
+};
+static std::vector<W3DShaderManager::PixelLight> PixelLights(64);
+static int PixelLightCount;
+static size_t ObjectSpecularPassesUsed;
+static void Update_Lights_Debug() {}
+struct GlobalData { bool m_laserRef; };
+static GlobalData globalData = { true };
+static GlobalData* TheGlobalData = &globalData;
+#define private public
+// EMISSIVE_HEADER
+#undef private
+static const Real EMISSIVE_CELL_SIZE = 24.0f;
+// EMISSIVE_FUNCTIONS
+W3DEmissiveLights::TextureSamples* W3DEmissiveLights::textureSamples(TextureClass* texture)
+{
+    return texture != NULL ? &m_textures[texture] : NULL;
+}
+class W3DLaserGlow
+{
+public:
+    struct Glow { Vector3 start, end; Real reach; Vector3 color; };
+    Glow m_glows[64];
+    Int m_count;
+    void appendObjectLights(std::vector<W3DShaderManager::PixelLight>&) const;
+};
+// LASER_FUNCTION
+// PICK_FUNCTION
+// TUNE_FUNCTION
+enum { MAX_DRAW_DATA = 9, WIN_STATUS_HIDDEN = 16 };
+struct WinInstanceData
+{
+    int m_id, m_style, m_enabledText, m_disabledText, m_hiliteText;
+    int m_enabledDrawData[9], m_disabledDrawData[9], m_hiliteDrawData[9];
+};
+class GameWindow
+{
+public:
+    int x, y, width, height;
+    GameWindow *parent, *child, *next;
+    WinInstanceData look;
+    std::wstring label, tooltip;
+    GameWindow(int left, int top, int w, int h) : x(left), y(top), width(w), height(h), parent(NULL), child(NULL), next(NULL), look() {}
+    void winGetPosition(int* a, int* b) { *a=x; *b=y; }
+    void winGetSize(int* a, int* b) { *a=width; *b=height; }
+    GameWindow* winGetParent() { return parent; }
+    GameWindow* winGetChild() { return child; }
+    GameWindow* winGetNext() { return next; }
+    const WinInstanceData* winGetInstanceData() { return &look; }
+    int winGetStatus() { return 8|128; }
+    void* winGetFont() { return NULL; }
+    void winSetTooltip(const wchar_t* text) { tooltip=text; }
+};
+static GameWindow *WinShaders, *checkAmbientOcclusion, *existingCheck;
+static GameWindow* findOptionsWindow(const char*) { return existingCheck; }
+static void GadgetCheckBoxSetText(GameWindow* w, const wchar_t* text) { w->label=text; }
+struct NameKeys { int nameToKey(const char*) { return 42; } };
+static NameKeys names;
+static NameKeys* TheNameKeyGenerator = &names;
+struct GameText { const wchar_t* fetch(const char*, const wchar_t* text) { return text; } };
+static GameText texts;
+static GameText* TheGameText = &texts;
+#define FETCH_OR_SUBSTITUTE fetch
+struct WindowManager
+{
+    GameWindow* gogoGadgetCheckbox(GameWindow* parent, int, int x, int y, int w, int h, WinInstanceData* data, void*, bool)
+    {
+        existingCheck = new GameWindow(x,y,w,h);
+        existingCheck->parent = parent;
+        existingCheck->look = *data;
+        return existingCheck;
+    }
+};
+static WindowManager windows;
+static WindowManager* TheWindowManager = &windows;
+// CHECKBOX_FUNCTION
+'''
+
+TESTS = r'''
+static bool near(float a, float b) { return fabsf(a-b) < 0.0001f; }
+int main()
+{
+    CameraClass camera;
+    W3DEmissiveLights lights;
+    lights.add(Vector3(4, 4, 4), Vector3(1, 0, 0), 64, 24);
+    const auto& one = lights.finish(camera);
+    assert(one.size() == 1);
+    assert(near(one[0].position.X, 4) && near(one[0].diffuse.X, 1));
+    assert(one[0].diffuse.Y == 0 && one[0].diffuse.Z == 0);
+    assert(!one[0].terrainOnly && !one[0].objectsOnly);
+    lights.reset();
+
+    // Brightness weights the source position when a red and blue lamp share a cell.
+    lights.add(Vector3(2, 2, 2), Vector3(1, 0, 0), 64, 24);
+    lights.add(Vector3(10, 2, 2), Vector3(0, 0, 1), 64, 36);
+    const auto& merged = lights.finish(camera);
+    assert(merged.size() == 1 && near(merged[0].position.X, 6));
+    assert(near(merged[0].diffuse.X, merged[0].diffuse.Z));
+    assert(merged[0].outerRadius == 36);
+    lights.reset();
+
+    // Sources across zero occupy different cells, as sources across any other boundary do.
+    lights.add(Vector3(-1, 0, 0), Vector3(1, 1, 1), 64, 24);
+    lights.add(Vector3(1, 0, 0), Vector3(1, 1, 1), 64, 24);
+    assert(lights.finish(camera).size() == 2);
+    lights.reset();
+    lights.add(Vector3(), Vector3(), 64, 24);
+    lights.add(Vector3(), Vector3(1, 1, 1), 0, 24);
+    lights.add(Vector3(), Vector3(1, 1, 1), 64, 0);
+    assert(lights.finish(camera).empty());
+    for (int i = 0; i < 10000; i++)
+    {
+        lights.add(Vector3(), Vector3(1, 0.5f, 0), 100, 24);
+    }
+    const auto& bright = lights.finish(camera);
+    assert(bright.size() == 1 && near(bright[0].diffuse.X, 1.5f));
+    assert(near(bright[0].diffuse.Y, 0.75f));
+    lights.reset();
+    camera.hidden = true;
+    lights.add(Vector3(), Vector3(1, 1, 1), 64, 24);
+    assert(lights.finish(camera).empty());
+    camera.hidden = false;
+    lights.reset();
+
+    W3DEmissiveLights::TextureSamples texture;
+    for (int i = 0; i < 32*32; i++)
+    {
+        texture.pixels[i] = Vector3(float(i), 0, 0);
+    }
+    assert(W3DEmissiveLights::sampleTexture(&texture, Vector2(1, 1)).X == 0);
+    assert(W3DEmissiveLights::sampleTexture(&texture, Vector2(-0.01f, -0.01f)).X == 1023);
+    assert(W3DEmissiveLights::sampleTexture(&texture, Vector2(0.99999f, 0.99999f)).X == 1023);
+
+    MeshModelClass model;
+    W3DEmissiveLights::TextureSamples& meshTexture=lights.m_textures[&model.texture];
+    for (int i=0; i<32*32; i++)
+    {
+        meshTexture.pixels[i]=Vector3(1,1,1);
+        meshTexture.alpha[i]=0;
+    }
+    std::vector<W3DEmissiveLights::Sample> samples;
+    assert(lights.sampleModel(model,samples) && samples.empty());
+    for (int i=0; i<32*32; i++)
+    {
+        meshTexture.alpha[i]=0.5f;
+    }
+    assert(lights.sampleModel(model,samples) && samples.size()==4);
+    assert(near(samples[0].color.X,0.5f));
+    samples.clear();
+    model.shader.source=ShaderClass::SRCBLEND_ONE;
+    assert(lights.sampleModel(model,samples) && samples.size()==4);
+    assert(near(samples[0].color.X,1));
+    lights.reset();
+
+    W3DLaserGlow laser;
+    laser.m_count = 1;
+    laser.m_glows[0] = { Vector3(0,0,10), Vector3(96,0,10), 24, Vector3(1,0,0) };
+    std::vector<W3DShaderManager::PixelLight> beam;
+    laser.appendObjectLights(beam);
+    assert(beam.size() == 4 && near(beam.front().position.X, 12) && near(beam.back().position.X, 84));
+    for (const auto& light : beam)
+    {
+        assert(light.objectsOnly && !light.terrainOnly);
+        assert(light.outerRadius > light.innerRadius && light.diffuse.X > 0);
+    }
+    beam.clear();
+    laser.m_glows[0].end = laser.m_glows[0].start;
+    laser.appendObjectLights(beam);
+    assert(beam.size() == 1 && std::isfinite(beam[0].diffuse.X));
+    beam.clear();
+    laser.m_glows[0].end = Vector3(100000,0,10);
+    laser.appendObjectLights(beam);
+    assert(beam.size() == 16);
+    assert(beam[0].outerRadius >= 100000.0f/16);
+    TheGlobalData->m_laserRef = false;
+    beam.clear();
+    laser.appendObjectLights(beam);
+    assert(!beam[0].objectsOnly);
+    TheGlobalData->m_laserRef = true;
+
+    // The laser's existing terrain pass must not be lit again by its object lights.
+    PixelLightCount = 2;
+    PixelLights[0] = beam[0];
+    PixelLights[0].objectsOnly = true;
+    PixelLights[0].position = Vector3();
+    PixelLights[1] = beam[0];
+    PixelLights[1].objectsOnly = false;
+    PixelLights[1].position = Vector3();
+    AABoxClass box;
+    int picked[8];
+    assert(W3DShaderManager::pickPixelLights(box, picked) == 1 && picked[0] == 1);
+
+    // Dense scenes keep emitters beyond both the global and per-draw limits.
+    std::vector<W3DShaderManager::PixelLight> dense(257, PixelLights[1]);
+    dense.back().objectsOnly = true;
+    W3DShaderManager::setPixelLights(&dense[0], (int)dense.size());
+    assert(PixelLightCount == 257 && PixelLights.size() == 257);
+    std::vector<int> allLights;
+    assert(W3DShaderManager::pickPixelLights(box, allLights) == 256);
+    assert(allLights.front() == 0 && allLights.back() == 255);
+
+    W3DShaderManager::PixelLight original = dense[0];
+    original.innerRadius = 10;
+    original.outerRadius = 60;
+    W3DShaderManager::PixelLight tuned = original;
+    assert(Tune_Emissive_Light(tuned, 30, 0.25f));
+    assert(near(tuned.outerRadius, 30) && near(tuned.innerRadius, 5));
+    assert(near(tuned.diffuse.X, original.diffuse.X * 0.25f));
+    assert(near(tuned.position.X, original.position.X) && tuned.objectsOnly == original.objectsOnly);
+    tuned = original;
+    tuned.outerRadius = 20;
+    assert(Tune_Emissive_Light(tuned, 30, 1.0f));
+    assert(near(tuned.outerRadius, 20) && near(tuned.innerRadius, 10));
+    assert(near(tuned.diffuse.X, original.diffuse.X));
+    tuned = original;
+    assert(Tune_Emissive_Light(tuned, 0, 1.0f));
+    assert(near(tuned.outerRadius, 60));
+    assert(Tune_Emissive_Light(tuned, -1, 1.0f));
+    assert(near(tuned.outerRadius, 60));
+    assert(!Tune_Emissive_Light(tuned, 30, 0.0f));
+    assert(!Tune_Emissive_Light(tuned, 30, -1.0f));
+
+    // Existing layouts receive one checkbox in a free row, with the surrounding controls' look.
+    GameWindow panel(0,0,600,300), anchor(10,40,230,20), occupied(10,63,230,20);
+    WinShaders = &panel;
+    checkAmbientOcclusion = &anchor;
+    anchor.parent = &panel;
+    anchor.look.m_style = 123;
+    panel.child = &anchor;
+    anchor.next = &occupied;
+    GameWindow* checkbox = createPathTracingCheck();
+    assert(checkbox != NULL && checkbox->x == 10 && checkbox->y == 86);
+    assert(checkbox->look.m_id == 42 && checkbox->look.m_style == 123);
+    assert(checkbox->label == L"Path tracing" && !checkbox->tooltip.empty());
+    assert(createPathTracingCheck() == checkbox);
+    delete checkbox;
+    existingCheck = NULL;
+    WinShaders = NULL;
+    assert(createPathTracingCheck() == NULL);
+    puts("PASS: emissive clustering, transparent mesh sampling, radius clamp, brightness, laser coverage and checkbox placement");
+}
+'''
+
+
+def function(source, signature, indent=""):
+    start = source.index(signature)
+    return source[start:source.index("\n" + indent + "}", start) + len(indent) + 2]
+
+
+def main():
+    client = ROOT / "Core/GameEngineDevice/Source/W3DDevice/GameClient"
+    emission = (client / "W3DEmissiveLights.cpp").read_text(encoding="utf-8")
+    shader = (client / "W3DShaderManager.cpp").read_text(encoding="utf-8")
+    shader_header = (ROOT / "Core/GameEngineDevice/Include/W3DDevice/GameClient/W3DShaderManager.h").read_text(encoding="utf-8")
+    start = shader_header.index("\tstruct PixelLight\n")
+    pixel_light = shader_header[start:shader_header.index("\n\t};", start) + 4]
+    header = (ROOT / "Core/GameEngineDevice/Include/W3DDevice/GameClient/W3DEmissiveLights.h").read_text(encoding="utf-8")
+    header = "\n".join(line for line in header.splitlines() if not line.startswith(("#pragma", '#include "')))
+    names = ["W3DEmissiveLights::W3DEmissiveLights()", "W3DEmissiveLights::~W3DEmissiveLights()",
+             "W3DEmissiveLights::Cluster::Cluster()", "void W3DEmissiveLights::reset()",
+             "void W3DEmissiveLights::add(", "const std::vector<W3DShaderManager::PixelLight> &W3DEmissiveLights::finish(",
+             "Vector3 W3DEmissiveLights::sampleTexture(", "Bool W3DEmissiveLights::sampleModel("]
+    harness = PREAMBLE.replace("// PIXEL_LIGHT_STRUCT", pixel_light).replace("// EMISSIVE_HEADER", header)
+    harness = harness.replace("// EMISSIVE_FUNCTIONS", "\n".join(function(emission, name) for name in names))
+    harness = harness.replace("// LASER_FUNCTION", function((client / "W3DLaserGlow.cpp").read_text(encoding="utf-8"),
+                              "void W3DLaserGlow::appendObjectLights("))
+    harness = harness.replace("// PICK_FUNCTION", function(shader, "Int W3DShaderManager::pickPixelLights(const AABoxClass &box, Int *lights)")
+                              + "\n" + function(shader, "Int W3DShaderManager::pickPixelLights(const AABoxClass &box, std::vector<Int> &lights)")
+                              + "\n" + function(shader, "void W3DShaderManager::setPixelLights("))
+    options = (ROOT / "GeneralsMD/Code/GameEngine/Source/GameClient/GUI/GUICallbacks/Menus/OptionsMenu.cpp").read_text(encoding="utf-8")
+    scene = (ROOT / "GeneralsMD/Code/GameEngineDevice/Source/W3DDevice/GameClient/W3DScene.cpp").read_text(encoding="utf-8")
+    tune = function(scene, "Bool Tune_Emissive_Light(", "\t")
+    harness = harness.replace("// TUNE_FUNCTION", tune)
+    harness = harness.replace("// CHECKBOX_FUNCTION", function(options, "static GameWindow *createPathTracingCheck()")) + TESTS
+    with tempfile.TemporaryDirectory(prefix="emissive-lights-", dir=ROOT / "build") as directory:
+        work = Path(directory)
+        (work / "test.cpp").write_text(harness, encoding="utf-8")
+        (work / "run.bat").write_text(
+            f'@echo off\ncall "{VCVARS}" x86 >nul\n'
+            'if errorlevel 1 exit /b 1\n'
+            'cl /nologo /EHsc /std:c++17 /Fe:test.exe test.cpp\n'
+            'if errorlevel 1 exit /b 1\n'
+            'test.exe\n', encoding="utf-8")
+        subprocess.run(["cmd", "/d", "/c", str(work / "run.bat")], cwd=work, check=True)
+
+
+if __name__ == "__main__":
+    main()

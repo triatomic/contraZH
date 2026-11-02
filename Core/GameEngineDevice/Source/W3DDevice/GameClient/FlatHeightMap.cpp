@@ -577,8 +577,9 @@ void FlatHeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 					disableTex = TRUE; // doing cloud/noise
 				}
 				if (!tile->isCulled()) {
-					Int pixelLights[W3DShaderManager::MAX_PIXEL_LIGHTS];
-					W3DShaderManager::setDrawPixelLights(pixelLights, W3DShaderManager::pickPixelLights(tile->getBounds(), pixelLights));
+					std::vector<Int> pixelLights;
+					W3DShaderManager::pickPixelLights(tile->getBounds(), pixelLights);
+					W3DShaderManager::setDrawPixelLights(pixelLights.empty() ? nullptr : &pixelLights[0], (Int)pixelLights.size());
 					tile->drawVisiblePolys(rinfo, disableTex);
 					if (i*CELLS_PER_TILE<xCoordMin) {
 						xCoordMin = i*CELLS_PER_TILE;

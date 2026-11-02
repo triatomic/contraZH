@@ -377,6 +377,9 @@ public:
 	static void Set_DX8_Indices(IDirect3DIndexBuffer8* index_buffer, UINT base_vertex_index);
 	static HRESULT Set_DX8_Render_Target_Surfaces(IDirect3DSurface8* render_target, IDirect3DSurface8* depth_stencil);
 	static void Draw_DX8_Indexed_Primitive(D3DPRIMITIVETYPE type, UINT min_index, UINT vertex_count, UINT start_index, UINT primitive_count);
+#if defined(BUILD_WITH_D3D9)
+	static void Set_Additional_Pass_Callback(bool (*callback)(unsigned pass));
+#endif
 
 	static void Set_Light_Environment(LightEnvironmentClass* light_env);
 	static LightEnvironmentClass* Get_Light_Environment() { return Light_Environment; }
@@ -770,6 +773,7 @@ protected:
 #if defined(BUILD_WITH_D3D9)
 	// D3D9 takes the base vertex index at the draw call rather than at SetIndices
 	static UINT							CurrentBaseVertexIndex;
+	static bool (*AdditionalPassCallback)(unsigned pass);
 #endif
 	static unsigned						TextureStageStates[MAX_TEXTURE_STAGES][32];
 	static IDirect3DBaseTexture8 *	Textures[MAX_TEXTURE_STAGES];
@@ -1197,6 +1201,11 @@ WWINLINE void DX8Wrapper::Draw_DX8_Indexed_Primitive(D3DPRIMITIVETYPE type, UINT
 	// D3D9 takes the base vertex index here rather than at SetIndices, so it comes
 	// from whichever caller bound the index buffer last.
 	DX8CALL(DrawIndexedPrimitive(type, (INT)CurrentBaseVertexIndex, min_index, vertex_count, start_index, primitive_count));
+	for (unsigned pass = 1; AdditionalPassCallback != nullptr && AdditionalPassCallback(pass); pass++)
+	{
+		DX8CALL(DrawIndexedPrimitive(type, (INT)CurrentBaseVertexIndex, min_index, vertex_count, start_index, primitive_count));
+		DX8_RECORD_DRAW_CALLS();
+	}
 #else
 	DX8CALL(DrawIndexedPrimitive(type, min_index, vertex_count, start_index, primitive_count));
 #endif

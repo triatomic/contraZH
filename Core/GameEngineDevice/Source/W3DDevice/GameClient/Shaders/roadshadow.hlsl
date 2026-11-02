@@ -223,14 +223,22 @@ float4 main(PsIn input) : COLOR
     float3 bumped = normal;
 #endif
 
-#if LIGHTS && LIGHTS_DEBUG
+#if LIGHTS && LIGHTS_ONLY && LIGHTS_DEBUG
+    return float4(PointLighting(input.WorldPos, bumped), color.a * weight);
+#elif LIGHTS && LIGHTS_ONLY
+    light = PointLighting(input.WorldPos, bumped);
+#elif LIGHTS && LIGHTS_DEBUG
     return float4(PointLighting(input.WorldPos, bumped), color.a * weight);
 #elif LIGHTS
     light += PointLighting(input.WorldPos, bumped);
 #endif
 
 #if LIGHTS || BUMP
+#if LIGHTS_ONLY
+    color.rgb *= light;
+#else
     color.rgb *= saturate(light);
+#endif
 #else
     color.rgb *= input.Diffuse.rgb;
 #endif
@@ -252,7 +260,7 @@ float4 main(PsIn input) : COLOR
     color.rgb *= lerp(ShadowColor.rgb, float3(1.0f, 1.0f, 1.0f), lit);
 #endif
 
-#if GLINT
+#if GLINT && !LIGHTS_ONLY
     // The bump tilts the smooth normal as far as it tilts the facet's.
 #if BUMP
     float3 glintNormal = normalize(GlintNormal(input.WorldPos) + bumped - normal);
@@ -267,11 +275,11 @@ float4 main(PsIn input) : COLOR
 #endif
 #endif
 
-#if BUMP
+#if BUMP && !LIGHTS_ONLY
     // The debug view shows only the bump's shading, 4x, on grey.
     color.rgb = lerp(color.rgb, saturate(0.5f + change * 4.0f).xxx, SunColor.w);
 #endif
-#if BUMP != 2
+#if BUMP != 2 && !LIGHTS_ONLY
     color.rgb += tex2D(EmissiveAtlas, input.RoadUV).rgb * max(HeightBlend.w - 1.0f, 0.0f);
 #endif
     return color;

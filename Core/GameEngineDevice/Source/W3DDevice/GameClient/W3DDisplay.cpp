@@ -1121,6 +1121,7 @@ void W3DDisplay::reset()
 
 	if (m_3DScene != nullptr)
 	{
+		m_3DScene->reset();
 		SceneIterator *sceneIter = m_3DScene->Create_Iterator();
 		sceneIter->First();
 		while(!sceneIter->Is_Done()) {

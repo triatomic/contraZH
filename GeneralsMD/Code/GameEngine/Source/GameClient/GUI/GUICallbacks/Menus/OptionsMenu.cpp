@@ -251,6 +251,7 @@ static NameKeyType    checkDynamicLightsID        = NAMEKEY_INVALID;
 static GameWindow *   checkDynamicLights          = nullptr;
 static NameKeyType    checkPixelLightsID          = NAMEKEY_INVALID;
 static GameWindow *   checkPixelLights            = nullptr;
+static GameWindow *   checkPathTracing            = nullptr;
 static GameWindow *   checkDynamicLightsDebug     = nullptr;
 static GameWindow *   checkSoftParticles          = nullptr;
 static NameKeyType    checkAmbientOcclusionID     = NAMEKEY_INVALID;
@@ -529,6 +530,7 @@ static const BoolOption BoolOptions[] =
 	{ &checkShorelineFoam, "ShorelineFoam", &OptionPreferences::getShorelineFoamEnabled, &GlobalData::m_shorelineFoam, TRUE },
 	{ &checkDynamicLights, "DynamicLights", &OptionPreferences::getDynamicLightsEnabled, &GlobalData::m_useDynamicLights, TRUE },
 	{ &checkPixelLights, "PixelLights", &OptionPreferences::getPixelLightsEnabled, &GlobalData::m_usePixelLights, TRUE },
+	{ &checkPathTracing, "PathTracing", &OptionPreferences::getPathTracingEnabled, &GlobalData::m_usePathTracing, FALSE },
 	{ &checkDynamicLightsDebug, "DynamicLightsDebug", &OptionPreferences::getDynamicLightsDebugEnabled, &GlobalData::m_dynamicLightsDebug, FALSE },
 	{ &checkSoftParticles, "SoftParticles", &OptionPreferences::getSoftParticlesEnabled, &GlobalData::m_useSoftParticles, TRUE },
 	{ &checkAmbientOcclusion, "AmbientOcclusion", &OptionPreferences::getAmbientOcclusionEnabled, &GlobalData::m_useAmbientOcclusion, TRUE },
@@ -597,6 +599,11 @@ static void updateGameOptionsEnables()
 	enableWindow( checkBloomDebug, bloom );
 
 	enableWindow( checkPixelLights, getCheck( checkDynamicLights, TRUE ) );
+#if defined(BUILD_WITH_D3D9)
+	enableWindow( checkPathTracing, getCheck( checkDynamicLights, TRUE ) && getCheck( checkPixelLights, TRUE ) );
+#else
+	enableWindow( checkPathTracing, FALSE );
+#endif
 	enableWindow( checkDynamicLightsDebug, getCheck( checkDynamicLights, TRUE ) && getCheck( checkPixelLights, TRUE ) );
 	// the specular pass also draws normal maps, so its debug tint shows while either is on
 	enableWindow( checkSpecularDebug, getCheck( checkSpecular, TRUE ) || getCheck( checkNormalMaps, TRUE ) );
@@ -1693,6 +1700,60 @@ static void setCheckText( GameWindow *check, const char *label, const char *tip 
 	}
 }
 
+static GameWindow *createPathTracingCheck()
+{
+	GameWindow *check = findOptionsWindow( "OptionsMenu.wnd:CheckPathTracing" );
+	GameWindow *anchor = checkAmbientOcclusion;
+	if (check == nullptr && WinShaders != nullptr && anchor != nullptr && anchor->winGetParent() == WinShaders)
+	{
+		Int x, y, width, height, panelWidth, panelHeight;
+		anchor->winGetPosition( &x, &y );
+		anchor->winGetSize( &width, &height );
+		WinShaders->winGetSize( &panelWidth, &panelHeight );
+		const Int step = max(height * 23 / 20, 1);
+		for (y += step; y + height < panelHeight && check == nullptr; y += step)
+		{
+			Bool free = TRUE;
+			for (GameWindow *child = WinShaders->winGetChild(); child != nullptr; child = child->winGetNext())
+			{
+				Int cx, cy, cw, ch;
+				child->winGetPosition( &cx, &cy );
+				child->winGetSize( &cw, &ch );
+				if (ch <= height * 2 && x < cx + cw && x + width > cx && y < cy + ch && y + height > cy)
+				{
+					free = FALSE;
+					break;
+				}
+			}
+			if (free)
+			{
+				WinInstanceData data;
+				const WinInstanceData *look = anchor->winGetInstanceData();
+				data.m_id = TheNameKeyGenerator->nameToKey( "OptionsMenu.wnd:CheckPathTracing" );
+				data.m_style = look->m_style;
+				data.m_enabledText = look->m_enabledText;
+				data.m_disabledText = look->m_disabledText;
+				data.m_hiliteText = look->m_hiliteText;
+				for (Int i = 0; i < MAX_DRAW_DATA; i++)
+				{
+					data.m_enabledDrawData[i] = look->m_enabledDrawData[i];
+					data.m_disabledDrawData[i] = look->m_disabledDrawData[i];
+					data.m_hiliteDrawData[i] = look->m_hiliteDrawData[i];
+				}
+				check = TheWindowManager->gogoGadgetCheckbox( WinShaders, anchor->winGetStatus() & ~WIN_STATUS_HIDDEN,
+					x, y, width, height, &data, anchor->winGetFont(), FALSE );
+			}
+		}
+	}
+	if (check != nullptr)
+	{
+		GadgetCheckBoxSetText( check, TheGameText->FETCH_OR_SUBSTITUTE( "GUI:PathTracing", L"Path tracing" ) );
+		check->winSetTooltip( TheGameText->FETCH_OR_SUBSTITUTE( "TOOLTIP:PathTracing",
+			L"Particles, lasers and glowing lamps light nearby surfaces. Requires dynamic lights and per-pixel lights." ) );
+	}
+	return check;
+}
+
 static void setTooltip( GameWindow *window, const char *tip )
 {
 	if (window)
@@ -1911,6 +1972,7 @@ static void initGameOptionsWindows()
 static void initShadersWindows()
 {
 	WinShaders = findOptionsWindow( "OptionsMenu.wnd:WinShaders" );
+	checkPathTracing = createPathTracingCheck();
 	GameWindow *button = findOptionsWindow( "OptionsMenu.wnd:ButtonShaders", ButtonShadersID );
 	if (!WinShaders)
 	{

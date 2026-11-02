@@ -389,6 +389,43 @@ of the driver's usual three, so the screen answers the mouse sooner. Can cost a 
 `Low latency mode` in the advanced display options, applied on Accept. Needs `CheckLowLatency` in
 `OptionsMenu.wnd` for the menu control. Direct3D 9 build only.)
 
+### Path tracing
+
+`PathTracing = No` is the default. `Yes` lets additive particles, streaks, laser beams,
+additive lamp meshes and model `_emi.dds` glow masks light nearby surfaces. The
+`Path tracing` checkbox on the Graphics page applies on Accept. Back discards changes
+and Defaults turns it off. The menu creates the checkbox when the layout has a Graphics
+panel and an ambient occlusion checkbox, so existing layouts need no new control.
+Layouts can supply `CheckPathTracing` to choose their own placement.
+
+Requires D3D9, shader model 2.0a, `DynamicLights = Yes` and `PixelLights = Yes`.
+The checkbox stays grey while either lighting setting is off. Bloom is independent.
+Glow masks follow the existing specular pass and the day/night emissive
+intensity settings; `Specular = No` disables their light.
+
+`PathTracingLightMaxRadius` in `GameData.ini` caps large lights without shrinking
+smaller ones. It defaults to `0`, which means no cap. `PathTracingLightBrightness`
+scales brightness independently and defaults to `1.0`; zero disables the new light
+spill. See [Light radius and brightness](contraZH-GameData.md#path-tracing-light-radius-and-brightness).
+
+This option approximates emissive lighting with world-space point lights. It does not
+trace rays, cast local shadows, or calculate reflected light. Lights can pass through walls.
+Nearby emitters share lights within 24 world units. All visible lights are kept, and
+surfaces draw additional batches of eight lights, or three under standing water.
+Extra passes add only light and do not repeat sunlight, glow masks or shadow darkening.
+Cloud and ground-noise factors apply to every light batch.
+Dense scenes cost more draw calls; there is no fixed light count shared by the whole view.
+Laser spill on models uses up to
+16 samples per beam. `Lasers light the ground` keeps the existing shaped terrain glow;
+with that setting off, the new point lights also light the ground. Roads exclude the
+object-only samples while the shaped ground glow is enabled, avoiding duplicate laser lighting.
+
+Model masks are sampled at 32 by 32 resolution on rigid meshes. Hidden and shrouded
+models emit no light. Skinned emitters, animated texture coordinates, terrain
+glow masks, alpha-blended smoke and multiplied effects do not supply lights. Mask and
+material samples are cached until the map closes. Source-alpha materials scale emitted
+light by texture alpha, so transparent texels emit no light. These changes affect drawing only.
+
 ### Fluid particle shading
 
 `FluidShaders = Yes` enables fluid shading on particle systems that opt in with

@@ -66,7 +66,11 @@ float4 main(PsIn input) : COLOR
     return float4(PointLighting(input.WorldPos, normal), color.a * input.Diffuse.a);
 #endif
 
+#if LIGHTS_ONLY
+    color.rgb *= PointLighting(input.WorldPos, normal);
+#else
     color.rgb *= saturate(input.Diffuse.rgb + PointLighting(input.WorldPos, normal));
+#endif
     color.a *= input.Diffuse.a;
 
 #if TEXTURE_COUNT >= 2

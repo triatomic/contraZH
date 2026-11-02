@@ -23,6 +23,8 @@
 #include "Lib/BaseType.h"
 #include "WW3D2/dx8compat.h"
 #include "WWMath/vector3.h"
+#include "W3DDevice/GameClient/W3DShaderManager.h"
+#include <vector>
 
 class RenderInfoClass;
 class Vector4;
@@ -46,6 +48,7 @@ public:
 
 	/// Draws this frame's glows over the terrain, then forgets them.
 	void render(RenderInfoClass &rinfo);
+	void appendObjectLights(std::vector<W3DShaderManager::PixelLight> &lights) const;
 
 	void ReleaseResources();	///< drops the shaders before a device reset; the next draw loads them again
 

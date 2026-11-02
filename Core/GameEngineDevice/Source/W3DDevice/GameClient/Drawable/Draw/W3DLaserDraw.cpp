@@ -686,8 +686,12 @@ void W3DLaserDraw::releaseGroundLights()
 //-------------------------------------------------------------------------------------------------
 void W3DLaserDraw::updateGroundLights( LaserUpdate *update, Bool beamChanged )
 {
+	Bool emissive = FALSE;
+#if defined(RTS_ZEROHOUR)
+	emissive = TheGlobalData->m_usePathTracing && TheGlobalData->m_usePixelLights;
+#endif
 	// the ground is lit from the first frame and goes dark the moment the beam starts to fade or decay
-	if (!TheGlobalData->m_laserRef || !TheGlobalData->m_useDynamicLights || update->isEnding() || update->getAlphaScale() <= 0.0f || update->getWidthScale() <= 0.0f)
+	if ((!TheGlobalData->m_laserRef && !emissive) || !TheGlobalData->m_useDynamicLights || update->isEnding() || update->getAlphaScale() <= 0.0f || update->getWidthScale() <= 0.0f)
 	{
 		releaseGroundLights();
 		return;
@@ -712,6 +716,12 @@ void W3DLaserDraw::updateGroundLights( LaserUpdate *update, Bool beamChanged )
 		const BeamShaderTuning *pulses = (data->m_laserShader && !data->m_electricShader && !data->m_cryoShader && !data->m_flameShader) ? &data->m_shaderTuning : nullptr;
 		TheW3DLaserGlow->add( Vector3( start->x, start->y, start->z ), Vector3( end->x, end->y, end->z ), reach,
 			Vector3( glowRed, glowGreen, glowBlue ) * intensity, pulses );
+		return;
+	}
+
+	if (!TheGlobalData->m_laserRef)
+	{
+		releaseGroundLights();
 		return;
 	}
 

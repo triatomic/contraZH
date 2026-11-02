@@ -287,6 +287,8 @@ static const char *DistanceFogPresetNames[] = { "SUN", "DESERT", "FUTURISTIC", "
 	{ "TerrainGlintAlbedo",					INI::parseReal,				nullptr,			offsetof( GlobalData, m_terrainGlintAlbedo ) },
 	{ "UnitEmissiveIntensity",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_unitEmissiveIntensity ) },
 	{ "UnitEmissiveNightIntensity",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_unitEmissiveNightIntensity ) },
+	{ "PathTracingLightMaxRadius", INI::parseReal, nullptr, offsetof( GlobalData, m_pathTracingLightMaxRadius ) },
+	{ "PathTracingLightBrightness", INI::parseReal, nullptr, offsetof( GlobalData, m_pathTracingLightBrightness ) },
 	{ "SoftParticleDistance",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_softParticleDistance ) },
 	{ "FlameWarp",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_flameWarp ) },
 	{ "FlameHeat",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_flameHeat ) },
@@ -963,6 +965,7 @@ GlobalData::GlobalData()
   m_useCryoShaders = TRUE;
   m_useDynamicLights = TRUE;
   m_usePixelLights = TRUE;
+  m_usePathTracing = FALSE;
   m_useAmbientOcclusion = TRUE;
   m_useHeightBlend = TRUE;
   m_useHQSky = TRUE;
@@ -1097,6 +1100,8 @@ GlobalData::GlobalData()
 	m_terrainGlintAlbedo = 0.5f;
 	m_unitEmissiveIntensity = 0.5f;
 	m_unitEmissiveNightIntensity = 1.5f;
+	m_pathTracingLightMaxRadius = 0.0f;
+	m_pathTracingLightBrightness = 1.0f;
 	m_softParticleDistance = 12.0f;
 	m_flameWarp = 0.04f;
 	m_flameHeat = 2.2f;
@@ -1848,6 +1853,7 @@ static const char *const LiveGameDataKeys[] =
 	"UnitSpecularIntensity", "UnitSpecularPower", "UnitBumpHeight", "UnitNormalMapStrength", "TerrainNormalMapStrength", "RoadBumpHeight",
 	"TerrainGlintIntensity", "TerrainGlintGloss", "TerrainGlintAlbedo",
 	"UnitEmissiveIntensity", "UnitEmissiveNightIntensity", "SoftParticleDistance",
+	"PathTracingLightMaxRadius", "PathTracingLightBrightness",
 	"DistanceFog", "DistanceFogPreset", "DistanceFogColor", "DistanceFogStart", "DistanceFogEnd",
 	"DistanceFogStrength", "DistanceFogSunInfluence",
 	"AmbientOcclusionRadius", "AmbientOcclusionStrength",
@@ -2104,6 +2110,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_useCryoShaders = optionPref.getCryoShadersEnabled();
 	TheWritableGlobalData->m_useDynamicLights = optionPref.getDynamicLightsEnabled();
 	TheWritableGlobalData->m_usePixelLights = optionPref.getPixelLightsEnabled();
+	TheWritableGlobalData->m_usePathTracing = optionPref.getPathTracingEnabled();
 	TheWritableGlobalData->m_useAmbientOcclusion = optionPref.getAmbientOcclusionEnabled();
 	TheWritableGlobalData->m_useHeightBlend = optionPref.getHeightBlendEnabled();
 	TheWritableGlobalData->m_useHQSky = optionPref.getHQSkyEnabled();
