@@ -56,6 +56,19 @@ struct SphereClass
     float Radius;
     SphereClass(Vector3 center, float radius) : Center(center), Radius(radius) {}
 };
+struct Matrix3D
+{
+    Vector3 offset;
+    float angle, scale;
+    Matrix3D() : angle(0), scale(1) {}
+    void Get_X_Vector(Vector3* axis) const { *axis=Vector3(scale,0,0); }
+    static void Transform_Vector(const Matrix3D& tm, const Vector3& in, Vector3* out)
+    {
+        const Vector3 result((in.X*cosf(tm.angle)-in.Y*sinf(tm.angle))*tm.scale,
+                             (in.X*sinf(tm.angle)+in.Y*cosf(tm.angle))*tm.scale, in.Z*tm.scale);
+        *out=result+tm.offset;
+    }
+};
 struct AABoxClass { Vector3 Center, Extent; };
 class CameraClass
 {
@@ -100,8 +113,38 @@ public:
     ShaderClass Get_Shader(int,int) { return shader; }
     VertexMaterialClass* Peek_Material(int,int) { return &material; }
     TextureClass* Peek_Texture(int,int) { return &texture; }
+    bool Get_Flag(int) { return false; }
+    bool Is_Alternate_Material_Description_Enabled() { return false; }
 };
-template<class T> struct RefCountPtr { T* ptr; };
+struct MeshGeometryClass { enum { SKIN }; };
+template<class T> struct RefCountPtr
+{
+    T* ptr;
+    RefCountPtr& operator=(T* value) { ptr=value; return *this; }
+};
+class RenderObjClass
+{
+public:
+    enum { CLASSID_HLOD, CLASSID_MESH };
+    Matrix3D transform;
+    bool hidden;
+    RenderObjClass() : hidden(false) {}
+    bool Is_Not_Hidden_At_All() { return !hidden; }
+    virtual int Class_ID() { return CLASSID_MESH; }
+    int Get_Num_Sub_Objects() { return 0; }
+    RenderObjClass* Get_Sub_Object(int) { return NULL; }
+    void Release_Ref() {}
+    const Matrix3D& Get_Transform() { return transform; }
+};
+class HLodClass : public RenderObjClass
+{
+public:
+    int Get_LOD_Level() { return 0; }
+    int Get_Lod_Model_Count(int) { return 0; }
+    RenderObjClass* Peek_Lod_Model(int,int) { return NULL; }
+    int Get_Additional_Model_Count() { return 0; }
+    RenderObjClass* Peek_Additional_Model(int) { return NULL; }
+};
 class W3DShaderManager
 {
 public:
@@ -123,8 +166,14 @@ class RTS3DScene { public: int pickObjectPixelLights(const SphereClass&, int*); 
 namespace WWMath { float Clamp(float x,float lo,float hi) { return min(max(x,lo),hi); } }
 static size_t ObjectSpecularPassesUsed;
 static void Update_Lights_Debug() {}
-struct GlobalData { bool m_laserRef; bool m_usePathTracing; };
-static GlobalData globalData = { true, true };
+enum { TIME_OF_DAY_NIGHT };
+struct GlobalData
+{
+    bool m_laserRef, m_usePathTracing, m_useSpecular;
+    int m_timeOfDay;
+    float m_unitEmissiveNightIntensity, m_unitEmissiveIntensity;
+};
+static GlobalData globalData = { true, true, true, 0, 1, 1 };
 static GlobalData* TheGlobalData = &globalData;
 #define private public
 // EMISSIVE_HEADER
@@ -159,12 +208,16 @@ public:
     unsigned Get_Min_Vertex_Index() { return 0; }
     unsigned Get_Vertex_Index_Range() { return 4; }
 };
-class MeshClass
+class MeshClass : public RenderObjClass
 {
 public:
+    MeshModelClass* model;
+    MeshClass() : model(NULL) {}
+    MeshModelClass* Peek_Model() { return model; }
     void* Get_Lighting_Environment() { return NULL; }
     int Get_Base_Vertex_Offset() { return 0; }
 };
+// ADD_OBJECT_FUNCTION
 class MaterialPassClass
 {
 public:
@@ -330,6 +383,51 @@ int main()
     assert(near(samples[0].color.X,1));
     lights.reset();
 
+    // A rigid emitter keeps its lights while translating and rotating across world cells.
+    MeshClass moving;
+    moving.model=&model;
+    auto& movingTexture=lights.m_textures[&model.texture];
+    for (int i=0; i<32*32; i++)
+    {
+        movingTexture.pixels[i]=Vector3(1,1,1);
+        movingTexture.alpha[i]=1;
+    }
+    lights.addObject(moving,1);
+    const auto reference=lights.finish(camera);
+    assert(reference.size()==1);
+    for (int frame=0; frame<300; frame++)
+    {
+        lights.m_clusters.clear();
+        lights.m_lights.clear();
+        moving.transform.offset=Vector3(frame*0.5f-75,frame*0.3f-45,frame*0.2f-30);
+        moving.transform.angle=frame*0.03f;
+        lights.addObject(moving,1);
+        const auto& current=lights.finish(camera);
+        assert(current.size()==reference.size());
+        Vector3 expected;
+        Matrix3D::Transform_Vector(moving.transform,reference[0].position,&expected);
+        assert((current[0].position-expected).Length()<0.0001f);
+        assert(near(current[0].diffuse.X,reference[0].diffuse.X));
+        assert(near(current[0].outerRadius,reference[0].outerRadius));
+    }
+    lights.m_lights.clear();
+    lights.add(Vector3(100,100,100),Vector3(1,0,0),64,24);
+    lights.addObject(moving,1);
+    lights.addObject(moving,1);
+    assert(lights.finish(camera).size()==3);
+    lights.m_lights.clear();
+    moving.hidden=true;
+    lights.addObject(moving,1);
+    assert(lights.finish(camera).empty());
+    moving.hidden=false;
+    lights.addObject(moving,0);
+    assert(lights.finish(camera).empty());
+    lights.addObject(moving,1);
+    camera.hidden=true;
+    assert(lights.finish(camera).empty());
+    camera.hidden=false;
+    lights.reset();
+
     MeshClass firstInstance,secondInstance,thirdInstance,lastInstance;
     MeshClass* instanceMeshes[]={&firstInstance,&secondInstance,&thirdInstance,&lastInstance};
     DX8PolygonRendererClass polygon;
@@ -473,10 +571,12 @@ def main():
     header = "\n".join(line for line in header.splitlines() if not line.startswith(("#pragma", '#include "')))
     names = ["W3DEmissiveLights::W3DEmissiveLights()", "W3DEmissiveLights::~W3DEmissiveLights()",
              "W3DEmissiveLights::Cluster::Cluster()", "void W3DEmissiveLights::reset()",
+             "void W3DEmissiveLights::flushClusters(",
              "void W3DEmissiveLights::add(", "const std::vector<W3DShaderManager::PixelLight> &W3DEmissiveLights::finish(",
              "Vector3 W3DEmissiveLights::sampleTexture(", "Bool W3DEmissiveLights::sampleModel("]
     harness = PREAMBLE.replace("// PIXEL_LIGHT_STRUCT", pixel_light).replace("// EMISSIVE_HEADER", header)
     harness = harness.replace("// EMISSIVE_FUNCTIONS", "\n".join(function(emission, name) for name in names))
+    harness = harness.replace("// ADD_OBJECT_FUNCTION", function(emission, "void W3DEmissiveLights::addObject("))
     harness = harness.replace("// LASER_FUNCTION", function((client / "W3DLaserGlow.cpp").read_text(encoding="utf-8"),
                               "void W3DLaserGlow::appendObjectLights("))
     harness = harness.replace("// PICK_FUNCTION", function(shader, "Int W3DShaderManager::pickPixelLights(const AABoxClass &box, Int *lights)")

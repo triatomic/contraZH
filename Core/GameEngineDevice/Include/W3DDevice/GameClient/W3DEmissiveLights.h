@@ -8,6 +8,7 @@
 class CameraClass;
 class RenderObjClass;
 class MeshModelClass;
+class Matrix3D;
 class Vector2;
 
 class W3DEmissiveLights
@@ -54,6 +55,7 @@ private:
 	static Vector3 sampleTexture(const TextureSamples *texture, const Vector2 &uv, Bool useAlpha = FALSE);
 	Bool sampleModel(MeshModelClass &model, std::vector<Sample> &samples);
 	void add(const Vector3 &position, const Vector3 &color, Real area, Real radius);
+	void flushClusters(const Matrix3D *transform = nullptr);
 
 	std::map<TextureClass *, TextureSamples> m_textures;
 	std::map<ModelKey, ModelSamples> m_models;
