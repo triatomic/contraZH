@@ -9,6 +9,8 @@ draws over the rows below it; rerun it after adding a drop-down.
 
 ## Drag to Face
 
+Thomas9393 contributed the Drag to Face feature.
+
 * `UseFacingDrag = No` leaves the feature off. Set it to `Yes`, or tick Drag to Face under Input in Options > Game Options.
 * Hold both mouse buttons with units selected. The second press sets the destination;
   the drag direction sets the facing. Release either button to give the order.
