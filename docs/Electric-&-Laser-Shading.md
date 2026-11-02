@@ -44,4 +44,8 @@ a second, so the game shows it with a map running.
 Keys a shader tab also shows stay in step with it. Its own keys are written only once changed.
 * Preview-only controls set the sprite size, camera distance, colours and beam height. `Texture...`
 loads an extracted `.tga` or `.dds` in place of the stand-in flare or beam.
+* In `INI entries`, double click the preview to open it and its controls in a resizable window.
+The controls remain available when maximized, and the preview stays live as you edit or select
+another entry. Close the window or press Escape to put the preview and controls back.
+The window title shows the current entry's name, kind and resolved shader.
 * `python fx_tuner.py --docs` redraws the documentation pictures.
