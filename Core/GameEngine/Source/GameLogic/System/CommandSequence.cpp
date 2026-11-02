@@ -1394,7 +1394,7 @@ void CommandSequence::doCurrentCommand(Object *obj, CommandVerifyStatus cvs)
 			if (!ai)
 				break;
 
-			ai->aiDock(target, cmdSource);
+			ai->aiHackInternet(cmdSource);
 
 			break;
 		}
