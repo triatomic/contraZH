@@ -526,6 +526,7 @@ UnsignedInt CommandSequence::newDozerConstructCommand(CommandType cmdType, const
 	cmdNode->m_angle = angle;
 	if (cmdType == COMMAND_DOZER_CONSTRUCT_LINE)
 		cmdNode->m_loc2 = *loc2;
+	cmdNode->m_cashWithdraw = 0;
 	return cmdNode->m_nodeID;
 }
 
@@ -887,14 +888,23 @@ UnsignedInt CommandSequence::removeCurrentCommand(Object *obj, Bool doCleanUp)
 	if (obj->getLastCommandInMoveStreak() == obj->getCurrentCommand())
 		obj->setLastCommandInMoveStreak(0);
 
+	if (node->m_cmdType == COMMAND_DOZER_CONSTRUCT || node->m_cmdType == COMMAND_RESUME_CONSTRUCTION)
+		updateConstructionCount(obj, -1);
+
+	if (node->m_cmdType == COMMAND_DOZER_CONSTRUCT)
+	{
+		removeConstructionShadow(obj->getCurrentCommand());
+
+		Money* money = obj->getControllingPlayer()->getMoney();
+
+		money->deposit(node->m_cashWithdraw, true, false);
+	}
+
 	UnsignedInt ret = it->second;
 
 	if (ret)
 	{
 		obj->setCurrentCommand(ret);
-		CommandNode *cmdNode = findCommandByID(ret);
-		if (cmdNode->m_cmdType == COMMAND_DOZER_CONSTRUCT)
-			removeConstructionShadow(ret);
 		if (obj->getCommandVerifyStatus() != STATUS_FOLLOW_PATH_VERIFIED)
 			obj->setCommandVerifyStatus(STATUS_FRESH);
 	}
@@ -912,9 +922,6 @@ UnsignedInt CommandSequence::removeCurrentCommand(Object *obj, Bool doCleanUp)
 		ObjectToLocMap::iterator lit = node->m_allocatedDest.find(obj->getID());
 		node->m_allocatedDest.erase(lit);
 	}
-
-	if (node->m_cmdType == COMMAND_DOZER_CONSTRUCT || node->m_cmdType == COMMAND_RESUME_CONSTRUCTION)
-		updateConstructionCount(obj, -1);
 
 	if (doCleanUp && node->m_nextCommand.empty())
 	{
@@ -1160,6 +1167,9 @@ void CommandSequence::doCurrentCommand(Object *obj, CommandVerifyStatus cvs)
 			const ThingTemplate* thing = TheThingFactory->findByTemplateID(cmdNode->m_templateID);
 			if (!thing)
 				break;
+
+			removeConstructionShadow(obj->getCurrentCommand());
+
 			TheBuildAssistant->buildObjectNow(obj, thing, &cmdNode->m_loc, cmdNode->m_angle,
 				obj->getControllingPlayer());
 			break;
@@ -1845,4 +1855,49 @@ Bool CommandSequence::isShawdowInTheWay(const Coord3D *worldPos, const ThingTemp
 	}
 
 	return false;
+}
+
+UnsignedInt CommandSequence::getConstructionCashWithdraw(UnsignedInt cmdNodeID)
+{
+	CommandNode *cmdNode = findCommandByID(cmdNodeID);
+
+	if (cmdNode && cmdNode->m_cmdType == COMMAND_DOZER_CONSTRUCT)
+		return cmdNode->m_cashWithdraw;
+
+	return 0;
+}
+
+void CommandSequence::setConstructionCashWithdraw(UnsignedInt cmdNodeID, UnsignedInt cashWithdraw)
+{
+	CommandNode *cmdNode = findCommandByID(cmdNodeID);
+
+	if (cmdNode && cmdNode->m_cmdType == COMMAND_DOZER_CONSTRUCT)
+		cmdNode->m_cashWithdraw = cashWithdraw;
+}
+
+UnsignedInt CommandSequence::getConstructionShadowCount(const ThingTemplate *build, const Player *player)
+{
+	UnsignedInt ret = 0;
+	for (IDToNodeMap::iterator it = m_allNodes.begin(); it != m_allNodes.end(); it++)
+	{
+		CommandNode *cmdNode = it->second;
+		if (cmdNode->m_cmdType == COMMAND_DOZER_CONSTRUCT)
+		{
+			Object *builder = TheGameLogic->findObjectByID(cmdNode->m_nextCommand.begin()->first);
+			if (!builder)
+				continue;
+
+			if (builder->getCurrentCommand() == it->first)
+			{
+				CommandVerifyStatus cvs = builder->getCommandVerifyStatus();
+				if (cvs != STATUS_FRESH && cvs != STATUS_EXIT_VERIFIED)
+					continue;
+			}
+
+			if (build->isEquivalentTo(TheThingFactory->findByTemplateID(cmdNode->m_templateID)))
+				ret++;
+		}
+	}
+
+	return ret;
 }

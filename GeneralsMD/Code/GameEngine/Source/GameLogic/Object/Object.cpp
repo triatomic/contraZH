@@ -4987,6 +4987,8 @@ void Object::onDie( DamageInfo *damageInfo )
 	m_hasDiedAlready = true;
 #endif
 
+	TheCommandSequence->clearObjectCommand(this);
+
 	Bool selfInflicted = (damageInfo->in.m_sourceID == getID());
 
 	// FIRST, call our die modules.

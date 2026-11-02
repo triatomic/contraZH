@@ -365,6 +365,9 @@ Object *WorkerAIUpdate::construct( const ThingTemplate *what,
 	if( canBuildTemplate( what ) == FALSE )
 		return nullptr;
 
+	Object* builder = getObject();
+	Bool cashAlreadySpent = TheCommandSequence->getConstructionCashWithdraw(builder->getCurrentCommand());
+
 	// if we're not rebuilding, we have a few checks to pass first for sanity
 	if( isRebuild == FALSE )
 	{
@@ -386,7 +389,7 @@ Object *WorkerAIUpdate::construct( const ThingTemplate *what,
 		{
 
 			// make sure the player is capable of building this
-			if( TheBuildAssistant->canMakeUnit( getObject(), what ) != CANMAKE_OK )
+			if( TheBuildAssistant->canMakeUnit( getObject(), what, !cashAlreadySpent ) != CANMAKE_OK )
 				return nullptr;
 
 			// validate the the position to build at is valid
@@ -411,13 +414,17 @@ Object *WorkerAIUpdate::construct( const ThingTemplate *what,
 	Object *obj = TheThingFactory->newObject( what, owningPlayer->getDefaultTeam(), statusBits );
 
 	// even though we haven't actually built anything yet, this keeps things tidy
-	obj->setProducer( getObject() );
-	obj->setBuilder( getObject() );
+	obj->setProducer(builder);
+	obj->setBuilder(builder);
 
 	// leave the supply truck state and now behave like a dozer.
 	exitingSupplyTruckState();
 
 	// take the required money away from the player
+	if (cashAlreadySpent)
+	{
+		TheCommandSequence->setConstructionCashWithdraw(builder->getCurrentCommand(), 0);
+	}
 	if( isRebuild == FALSE )
 	{
 		Money *money = owningPlayer->getMoney();
