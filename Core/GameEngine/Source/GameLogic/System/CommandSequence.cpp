@@ -1903,3 +1903,25 @@ UnsignedInt CommandSequence::getConstructionShadowCount(const ThingTemplate *bui
 
 	return ret;
 }
+
+void CommandSequence::transferAttack(ObjectID fromID, ObjectID toID)
+{
+	for (IDToNodeMap::iterator it = m_allNodes.begin(); it != m_allNodes.end(); it++)
+	{
+		CommandNode *cmdNode = it->second;
+		switch (cmdNode->m_cmdType)
+		{
+			case COMMAND_DO_GUARD_OBJECT:
+			case COMMAND_DO_ATTACK_OBJECT:
+			case COMMAND_DO_FORCE_ATTACK_OBJECT:
+			case COMMAND_DO_SPECIAL_POWER_AT_OBJECT:
+			{
+				if (cmdNode->m_targetID == fromID)
+					cmdNode->m_targetID = toID;
+				break;
+			}
+			default:
+				break;
+		}
+	}
+}

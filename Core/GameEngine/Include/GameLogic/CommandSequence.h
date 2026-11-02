@@ -170,6 +170,8 @@ public:
 	Bool isCurrentExitCommand(Object *obj);
 	Bool isExitCommandComplete(Object *obj);
 
+	void transferAttack(ObjectID fromID, ObjectID toID);
+
 protected:
 	CommandNode *newCommandNode(CommandType cmdType);
 	CommandNode *findCommandByID(UnsignedInt cmdNodeID);

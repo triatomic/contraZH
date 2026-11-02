@@ -5077,6 +5077,8 @@ void Object::onDie( DamageInfo *damageInfo )
 
 				ai->transferAttack( getID(), hole->getID() );
 			}
+
+			TheCommandSequence->transferAttack(getID(), hole->getID());
 		}
 	}
 
