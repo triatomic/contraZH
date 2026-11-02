@@ -1,4 +1,4 @@
-"""Check disruption fallback and particle shader bounds without starting the game.
+"""Check disruption fallback, particle shader bounds and fluid edges without starting the game.
 
 Run after building d3d9 Release. Requires Visual Studio and a D3D9-capable GPU.
 """
@@ -77,7 +77,7 @@ struct Vertex {
 };
 
 static DWORD draw(IDirect3DDevice9* device, IDirect3DSurface9* target, IDirect3DSurface9* readback,
-                  IDirect3DPixelShader9* shader, float u, float v)
+                  IDirect3DPixelShader9* shader, float u, float v, bool alpha = false)
 {
     Vertex vertices[4] = {
         { -0.5f, -0.5f, 0.0f, 1.0f, 0xffffffff, u, v, 0.0f, 0.0f, 100.0f },
@@ -93,7 +93,8 @@ static DWORD draw(IDirect3DDevice9* device, IDirect3DSurface9* target, IDirect3D
     check(device->GetRenderTargetData(target, readback));
     D3DLOCKED_RECT locked;
     check(readback->LockRect(&locked, NULL, D3DLOCK_READONLY));
-    const DWORD color = reinterpret_cast<DWORD*>(static_cast<char*>(locked.pBits) + 2 * locked.Pitch)[2] & 0xffffff;
+    const DWORD pixel = reinterpret_cast<DWORD*>(static_cast<char*>(locked.pBits) + 2 * locked.Pitch)[2];
+    const DWORD color = alpha ? pixel >> 24 : pixel & 0xffffff;
     check(readback->UnlockRect());
     return color;
 }
@@ -192,6 +193,40 @@ int main(int argc, char** argv)
         terrain->Release();
         plain->Release();
     }
+    IDirect3DPixelShader9* fluid = loadShader(device, std::string(argv[1]) + "/particlefluid.pso");
+    check(noise->LockRect(0, &locked, NULL, 0));
+    *static_cast<DWORD*>(locked.pBits) = 0xffc0c0c0;
+    check(noise->UnlockRect(0));
+    for (int additive = 0; additive < 2; ++additive)
+    {
+        for (int solid = 0; solid < 2; ++solid)
+        {
+            check(texture->LockRect(0, &locked, NULL, 0));
+            *static_cast<DWORD*>(locked.pBits) = solid ? 0xffffffff : 0xff808080;
+            check(texture->UnlockRect(0));
+            DWORD values[3];
+            const float edges[] = { 0.0f, 0.3f, 1.0f };
+            for (int edge = 0; edge < 3; ++edge)
+            {
+                float constants[12][4] = {};
+                constants[5][1] = static_cast<float>(additive);
+                constants[6][2] = constants[10][1] = 1.0f;
+                constants[7][0] = constants[8][1] = constants[9][2] = 1.0f;
+                constants[10][2] = edges[edge];
+                check(device->SetPixelShaderConstantF(0, &constants[0][0], 12));
+                values[edge] = draw(device, target, readback, fluid, 0.5f, 0.5f, !additive);
+            }
+            if (solid)
+            {
+                assert(values[0] != 0 && values[0] == values[1] && values[1] == values[2]);
+            }
+            else
+            {
+                assert(values[0] > values[1] && values[1] > values[2]);
+            }
+        }
+    }
+    fluid->Release();
     device->SetTexture(0, NULL);
     device->SetTexture(1, NULL);
     device->SetTexture(2, NULL);
@@ -202,7 +237,7 @@ int main(int argc, char** argv)
     device->Release();
     d3d->Release();
     DestroyWindow(window);
-    puts("PASS: untextured disruption fallback and all four flame/electric footprint edges on D3D9");
+    puts("PASS: disruption fallback, flame/electric bounds and fluid edge strength on D3D9");
 }
 '''
 

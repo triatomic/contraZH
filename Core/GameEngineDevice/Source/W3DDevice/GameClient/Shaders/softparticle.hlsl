@@ -135,7 +135,7 @@ float4 main(PsIn input) : COLOR
     // The unwarped mask keeps the liquid inside its particle footprint.
     float coverage = lerp(mask.a, 1.0f, Params.y);
     float footprint = max(mask.r, max(mask.g, mask.b)) * coverage;
-    float keep = saturate(1.0f + (footprint * 3.0f - noiseB.b) * FluidShape.z * 4.0f);
+    float keep = saturate(1.0f + (footprint - noiseB.b) * FluidShape.z * 4.0f);
     float vein = saturate(1.0f - abs(noiseA.b - noiseB.g) * 12.0f);
     float body = lerp(1.0f, 0.35f + noiseB.r * 0.9f, Fluid.w);
 

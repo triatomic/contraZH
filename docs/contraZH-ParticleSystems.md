@@ -69,7 +69,7 @@ the keys it supplies; omitted keys use the global defaults.
 | `FluidBody` | `0.6` | Sets marbling contrast from 0 to 1. |
 | `FluidBubbles` | `0.7` | Sets bubble brightness; 0 removes bubbles. |
 | `FluidBubbleSize` | `8` | Sets world units between bubble cells. |
-| `FluidEdge` | `0.3` | Breaks up the texture's faint fringe, from 0 to 1. |
+| `FluidEdge` | `0.3` | Breaks up the texture's visible fringe, from 0 to 1; 0 keeps it intact. |
 | `FluidGlow` | `0.2` | Adds brightness in the particle's own colour; 0 removes it. |
 
 Use nonnegative values. Noise and bubble sizes clamp to at least 0.01 world units.
