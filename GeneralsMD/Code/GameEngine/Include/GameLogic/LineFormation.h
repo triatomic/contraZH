@@ -81,8 +81,8 @@ Coord3D formationApproachPoint( const Coord3D &slot, Real angle, Real approachDi
 /// Units already behind the slot inside the approach cone need no extra waypoint.
 Bool needsFormationApproach( const Coord3D &unit, const Coord3D &slot, Real angle, Real approachDistance );
 
-/// Use exact movement only when the pathfinder keeps the destination within one cell.
-Bool canMoveExactlyToSlot( const Coord3D &slot, const Coord3D &adjusted );
+/// Compare against the object-specific grid snap, which does not search for a free cell.
+Bool canMoveExactlyToSlot( const Coord3D &snappedSlot, const Coord3D &adjusted );
 
 /// The members that move (the same filter as a normal group move).
 Bool isLineFormationMover( const Object *obj );

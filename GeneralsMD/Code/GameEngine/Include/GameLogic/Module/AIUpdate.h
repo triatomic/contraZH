@@ -507,6 +507,8 @@ public:
 
 	// Pathfinding ---------------------------------------------------------------------------------------
 private:
+	void cancelFacingMove();
+
 	Bool computePath(PathfindServicesInterface* pathfinder, Coord3D* destination);	///< computes path to destination, returns false if no path
 	Bool computeAttackPath(PathfindServicesInterface* pathfinder, const Object* victim, const Coord3D* victimPos);	///< computes path to attack the current target, returns false if no path
 #ifdef ALLOW_SURRENDER
@@ -913,14 +915,13 @@ private:
 	UnsignedInt	m_facingOrderFrame;					///< frame of the facing order
 	Bool				m_facingAroundCenter;				///< the facing turn in progress ignores TurnPivotOffset
 	Bool				m_exactFormationMove;				///< we made the locomotor ultra-accurate for a formation slot
-	UnsignedInt	m_exactFormationMoveFrame;		///< frame of that order
+	Bool				m_issuingFormationMove;
 	Bool				m_hasFormationSlot;					///< holding a formation slot (FacingMove.h)
 	Coord3D			m_formationSlot;
 	Real				m_formationAngle;
 	Real				m_formationRadius;
 	UnsignedInt	m_formationStyle;
 	Real				m_formationSpeed;						///< speed limit while moving to the slot, 0 = none
-	UnsignedInt	m_formationSlotFrame;
 	Int					m_formationReturns;
 	Bool				m_formationReturnPending;		///< pushed aside: go back once idle
 	UnsignedInt	m_formationReturnFrame;			///< frame to go back, 0 = not idle yet

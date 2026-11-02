@@ -126,19 +126,12 @@ TEST(FacingMove, FacesOnceArrived)
 	EXPECT_TRUE(shouldFaceOnArrival(101, 100, FALSE, FALSE, TRUE));
 }
 
-TEST(FacingMove, OnlyALaterOrderCancelsTheFacing)
-{
-	EXPECT_FALSE(doesCommandCancelFacing(100, 100));	// the move the facing came with
-	EXPECT_TRUE(doesCommandCancelFacing(101, 100));
-}
-
-// Holding the slot: only a new order from the player (or a script) after the formation order forgets it.
+// Player and script orders discard the slot; allied pushes and autonomous orders keep it.
 TEST(FacingMove, MakeWayAndOwnOrdersKeepTheSlot)
 {
-	EXPECT_TRUE(doesCommandKeepFormationSlot(100, 100, FALSE, FALSE));	// the formation order itself
-	EXPECT_TRUE(doesCommandKeepFormationSlot(150, 100, TRUE, TRUE));		// an ally's make-way push
-	EXPECT_TRUE(doesCommandKeepFormationSlot(150, 100, FALSE, TRUE));		// its own AI: facing turn, fighting
-	EXPECT_FALSE(doesCommandKeepFormationSlot(150, 100, FALSE, FALSE));	// the player's next order
+	EXPECT_TRUE(doesCommandKeepFormationSlot(TRUE, TRUE));		// an ally's make-way push
+	EXPECT_TRUE(doesCommandKeepFormationSlot(FALSE, TRUE));		// its own AI: facing turn, fighting
+	EXPECT_FALSE(doesCommandKeepFormationSlot(FALSE, FALSE));	// the player's next order
 }
 
 // Pushed aside: go back if near, just face if still on it, give up if far away or pushed too often.

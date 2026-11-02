@@ -408,14 +408,13 @@ AIUpdateInterface::AIUpdateInterface( Thing *thing, const ModuleData* moduleData
 	m_facingOrderFrame = 0;
 	m_facingAroundCenter = FALSE;
 	m_exactFormationMove = FALSE;
-	m_exactFormationMoveFrame = 0;
+	m_issuingFormationMove = FALSE;
 	m_hasFormationSlot = FALSE;
 	m_formationSlot.zero();
 	m_formationAngle = 0.0f;
 	m_formationRadius = 0.0f;
 	m_formationStyle = 0;
 	m_formationSpeed = 0.0f;
-	m_formationSlotFrame = 0;
 	m_formationReturns = 0;
 	m_formationReturnPending = FALSE;
 	m_formationReturnFrame = 0;
@@ -3434,11 +3433,6 @@ Bool shouldFaceOnArrival( UnsignedInt now, UnsignedInt orderFrame, Bool isMoving
 	return now > orderFrame && isIdle && !isMoving && !hasPath;
 }
 
-Bool doesCommandCancelFacing( UnsignedInt now, UnsignedInt orderFrame )
-{
-	return now > orderFrame;
-}
-
 void AIUpdateInterface::setFacingOnArrival( Real angle )
 {
 	m_faceOnArrival = TRUE;
@@ -3448,9 +3442,9 @@ void AIUpdateInterface::setFacingOnArrival( Real angle )
 }
 
 //-------------------------------------------------------------------------------------------------
-Bool doesCommandKeepFormationSlot( UnsignedInt now, UnsignedInt slotFrame, Bool isMakeWay, Bool isFromAI )
+Bool doesCommandKeepFormationSlot( Bool isMakeWay, Bool isFromAI )
 {
-	return now <= slotFrame || isMakeWay || isFromAI;
+	return isMakeWay || isFromAI;
 }
 
 FormationReturn decideFormationReturn( Real distToSlot, Int returnsSoFar )
@@ -3473,12 +3467,12 @@ void AIUpdateInterface::moveToFormationSlot( const Coord3D &slot, Real angle, Re
 	Real speedLimit, CommandSourceType cmdSource, Bool isReturn )
 {
 	Object *unit = getObject();
+	cancelFacingMove();
 	m_hasFormationSlot = TRUE;
 	m_formationSlot = slot;
 	m_formationAngle = angle;
 	m_formationRadius = radius;
 	m_formationStyle = style;
-	m_formationSlotFrame = TheGameLogic->getFrame();
 	m_formationReturnPending = FALSE;
 	m_formationReturnFrame = 0;
 	if( !isReturn )
@@ -3489,15 +3483,18 @@ void AIUpdateInterface::moveToFormationSlot( const Coord3D &slot, Real angle, Re
 	// Open ground: end exactly on the slot, not on the pathfinder's grid (ultra-accurate until the next order).
 	if( getCurLocomotor() && isDoingGroundMovement() )
 	{
+		Coord3D snappedSlot = slot;
+		TheAI->pathfinder()->snapPosition( unit, &snappedSlot );
 		Coord3D adjusted = slot;
 		if( TheAI->pathfinder()->adjustDestination( unit, getLocomotorSet(), &adjusted )
-			&& canMoveExactlyToSlot( slot, adjusted ) )
+			&& canMoveExactlyToSlot( snappedSlot, adjusted ) )
 		{
 			setExactFormationMove();
 		}
 	}
 
 	// Wheels turn around a pivot behind their centre: drive in along the facing instead of turning on the slot.
+	m_issuingFormationMove = TRUE;
 	const Locomotor *loco = getCurLocomotor();
 	const Real approach = formationApproachDistance( radius );
 	if( loco && loco->getTurnPivotOffset() != 0.0f && !(style & FORMATION_STYLE_WHEELS_TURN_IN_PLACE)
@@ -3514,6 +3511,7 @@ void AIUpdateInterface::moveToFormationSlot( const Coord3D &slot, Real angle, Re
 		Coord3D dest = slot;
 		aiMoveToPosition( &dest, cmdSource );
 	}
+	m_issuingFormationMove = FALSE;
 	setFacingOnArrival( angle );
 
 	// Each path leg resets the speed, so update() reapplies the formation limit.
@@ -3540,7 +3538,21 @@ void AIUpdateInterface::setExactFormationMove()
 		getCurLocomotor()->setUltraAccurate( TRUE );
 	}
 	m_exactFormationMove = TRUE;
-	m_exactFormationMoveFrame = TheGameLogic->getFrame();
+}
+
+void AIUpdateInterface::cancelFacingMove()
+{
+	m_faceOnArrival = FALSE;
+	m_facingAroundCenter = FALSE;
+	releaseFormationSpeed();
+	if (m_exactFormationMove)
+	{
+		m_exactFormationMove = FALSE;
+		if (getCurLocomotor())
+		{
+			getCurLocomotor()->setUltraAccurate( FALSE );
+		}
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3552,36 +3564,22 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 	if (!isAllowedToRespondToAiCommands(parms))
 		return;
 
-	// Drag-to-face: a later order cancels the pending facing
-	if( m_faceOnArrival && doesCommandCancelFacing( TheGameLogic->getFrame(), m_facingOrderFrame ) )
+	if (!m_issuingFormationMove)
 	{
-		m_faceOnArrival = FALSE;
-		releaseFormationSpeed();
+		cancelFacingMove();
 	}
-	m_facingAroundCenter = FALSE;
-	// Allied make-way commands preserve the slot for a later return.
-	if( m_hasFormationSlot )
+	if (m_hasFormationSlot && !m_issuingFormationMove)
 	{
 		const Bool isMakeWay = parms->m_cmd == AICMD_MOVE_AWAY_FROM_UNIT;
-		if( !doesCommandKeepFormationSlot( TheGameLogic->getFrame(), m_formationSlotFrame, isMakeWay, parms->m_cmdSource == CMD_FROM_AI ) )
+		if (!doesCommandKeepFormationSlot( isMakeWay, parms->m_cmdSource == CMD_FROM_AI ))
 		{
 			m_hasFormationSlot = FALSE;
 			m_formationReturnPending = FALSE;
 		}
-		else if( isMakeWay )
+		else if (isMakeWay)
 		{
 			m_formationReturnPending = TRUE;
 			m_formationReturnFrame = 0;
-		}
-	}
-
-	// The formation's exact move ends with any later order (the facing turn on arrival is one)
-	if( m_exactFormationMove && doesCommandCancelFacing( TheGameLogic->getFrame(), m_exactFormationMoveFrame ) )
-	{
-		m_exactFormationMove = FALSE;
-		if( getCurLocomotor() )
-		{
-			getCurLocomotor()->setUltraAccurate( FALSE );
 		}
 	}
 
@@ -6537,7 +6535,9 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 	if( version >= 100 )
 	{
 		xfer->xferBool( &m_exactFormationMove );
-		xfer->xferUnsignedInt( &m_exactFormationMoveFrame );
+		// Version 100 retains two unused frame fields in its save layout.
+		UnsignedInt reservedFrame = 0;
+		xfer->xferUnsignedInt( &reservedFrame );
 		xfer->xferBool( &m_faceOnArrival );
 		xfer->xferReal( &m_facingOnArrival );
 		xfer->xferUnsignedInt( &m_facingOrderFrame );
@@ -6548,7 +6548,7 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 		xfer->xferReal( &m_formationRadius );
 		xfer->xferUnsignedInt( &m_formationStyle );
 		xfer->xferReal( &m_formationSpeed );
-		xfer->xferUnsignedInt( &m_formationSlotFrame );
+		xfer->xferUnsignedInt( &reservedFrame );
 		xfer->xferInt( &m_formationReturns );
 		xfer->xferBool( &m_formationReturnPending );
 		xfer->xferUnsignedInt( &m_formationReturnFrame );

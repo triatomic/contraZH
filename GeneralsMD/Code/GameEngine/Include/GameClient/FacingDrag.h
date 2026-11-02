@@ -43,7 +43,7 @@ struct FacingDragState
 {
 	FacingDragState() : leftDown(FALSE), rightDown(FALSE), active(FALSE), swallowing(FALSE)
 	{
-		anchor.x = anchor.y;
+		anchor.x = anchor.y = 0;
 	}
 
 	Bool leftDown;
@@ -78,7 +78,7 @@ public:
 	virtual GameMessageDisposition translateGameMessage( const GameMessage *msg ) override;
 
 private:
-	GameMessageDisposition onButton( FacingDragButton button, Bool down, const ICoord2D &pos );
+	GameMessageDisposition onButton( FacingDragButton button, Bool down, const GameMessage *msg );
 	void giveOrder( const ICoord2D &releasePos );
 	void blockOtherTranslators( Bool block );
 	Bool computeFacing( const ICoord2D &cursor, Int moverCount, Real *angle, Int *rows ) const;

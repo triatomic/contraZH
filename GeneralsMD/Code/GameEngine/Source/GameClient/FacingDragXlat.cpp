@@ -151,14 +151,14 @@ GameMessageDisposition FacingDragTranslator::translateGameMessage( const GameMes
 		// a double click is a button down as well
 		case GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_DOWN:
 		case GameMessage::MSG_RAW_MOUSE_LEFT_DOUBLE_CLICK:
-			return onButton( FACING_DRAG_LEFT, TRUE, msg->getArgument( 0 )->pixel );
+			return onButton( FACING_DRAG_LEFT, TRUE, msg );
 		case GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_DOWN:
 		case GameMessage::MSG_RAW_MOUSE_RIGHT_DOUBLE_CLICK:
-			return onButton( FACING_DRAG_RIGHT, TRUE, msg->getArgument( 0 )->pixel );
+			return onButton( FACING_DRAG_RIGHT, TRUE, msg );
 		case GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_UP:
-			return onButton( FACING_DRAG_LEFT, FALSE, msg->getArgument( 0 )->pixel );
+			return onButton( FACING_DRAG_LEFT, FALSE, msg );
 		case GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_UP:
-			return onButton( FACING_DRAG_RIGHT, FALSE, msg->getArgument( 0 )->pixel );
+			return onButton( FACING_DRAG_RIGHT, FALSE, msg );
 
 		case GameMessage::MSG_MOUSE_LEFT_CLICK:
 		case GameMessage::MSG_MOUSE_LEFT_DOUBLE_CLICK:
@@ -199,8 +199,9 @@ GameMessageDisposition FacingDragTranslator::translateGameMessage( const GameMes
 }
 
 //-------------------------------------------------------------------------------------------------
-GameMessageDisposition FacingDragTranslator::onButton( FacingDragButton button, Bool down, const ICoord2D &pos )
+GameMessageDisposition FacingDragTranslator::onButton( FacingDragButton button, Bool down, const GameMessage *msg )
 {
+	const ICoord2D &pos = msg->getArgument( 0 )->pixel;
 	const Bool canOrder = TheInGameUI->getSelectCount() > 0;
 	const FacingDragAction action = facingDragOnButton( m_state, button, down, pos, canOrder );
 	// Later translators can still receive the first press from this frame.
@@ -209,6 +210,17 @@ GameMessageDisposition FacingDragTranslator::onButton( FacingDragButton button, 
 	{
 		case FACING_DRAG_BEGIN:
 		{
+			// Later translators must not receive the other press after both releases are swallowed.
+			const GameMessage::Type otherDown = button == FACING_DRAG_LEFT ? GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_DOWN : GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_DOWN;
+			const GameMessage::Type otherDouble = button == FACING_DRAG_LEFT ? GameMessage::MSG_RAW_MOUSE_RIGHT_DOUBLE_CLICK : GameMessage::MSG_RAW_MOUSE_LEFT_DOUBLE_CLICK;
+			for (const GameMessage *prior = msg->prev(); prior; prior = prior->prev())
+			{
+				if (prior->getType() == otherDown || prior->getType() == otherDouble)
+				{
+					deleteInstance(const_cast<GameMessage *>(prior));
+					break;
+				}
+			}
 			m_anchorValid = TheTacticalView->screenToTerrain( &pos, &m_anchorWorld );
 			beginPreview();
 			// the first button's up will come; its click must not select or order

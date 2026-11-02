@@ -196,16 +196,15 @@ TEST(LineFormation, ApproachOnlyWhenNotComingInFromBehind)
 	EXPECT_TRUE(needsFormationApproach(closeBehind, slot, 0.0f, 30.0f));
 }
 
-// The pathfinder snapping a slot within its own cell (10) means open ground: go there exactly. Moved further
-// (building, cliff, another unit's goal): keep the pathfinder's spot.
-TEST(LineFormation, ExactOnlyWhenThePathfinderKeepsTheCell)
+// Exact movement requires the same destination as the object-specific grid snap.
+TEST(LineFormation, ExactOnlyWhenThePathfinderKeepsTheSnappedCell)
 {
 	const Coord3D slot = { 103.0f, 107.0f, 0.0f };
 	const Coord3D ownCell = { 105.0f, 105.0f, 0.0f };
 	const Coord3D nextCell = { 115.0f, 105.0f, 0.0f };
 	const Coord3D farAway = { 160.0f, 107.0f, 0.0f };
 	EXPECT_TRUE(canMoveExactlyToSlot(slot, slot));
-	EXPECT_TRUE(canMoveExactlyToSlot(slot, ownCell));
+	EXPECT_TRUE(canMoveExactlyToSlot(ownCell, ownCell));
 	EXPECT_FALSE(canMoveExactlyToSlot(slot, nextCell));
 	EXPECT_FALSE(canMoveExactlyToSlot(slot, farAway));
 }
@@ -339,4 +338,33 @@ TEST(LineFormation, ArriveTogetherSpreadsTheSpeeds)
 	EXPECT_FLOAT_EQ(formationUnitSpeed(arrive, 300.0f, 60.0f, 20.0f, 5.0f), 0.0f);	// the one setting the time: full speed
 	EXPECT_FLOAT_EQ(formationUnitSpeed(arrive, 10.0f, 60.0f, 20.0f, 5.0f), 24.0f);	// floor: 40% of 60
 	EXPECT_FLOAT_EQ(formationUnitSpeed(arrive, 100.0f, 60.0f, 20.0f, 0.0f), 0.0f);	// nobody has to move
+}
+
+TEST(LineFormation, AdjacentFreeCellDoesNotEnableExactMovement)
+{
+	const Coord3D slot = { 109.0f, 105.0f, 0.0f };
+	const Coord3D snapped = { 105.0f, 105.0f, 0.0f };
+	const Coord3D adjusted = { 115.0f, 105.0f, 0.0f };
+	EXPECT_FALSE(canMoveExactlyToSlot(slot, adjusted));
+	EXPECT_FALSE(canMoveExactlyToSlot(snapped, adjusted));
+	EXPECT_TRUE(canMoveExactlyToSlot(snapped, snapped));
+}
+
+TEST(LineFormation, RowSwapsKeepRoomForDifferentSizes)
+{
+	const FormationMember m[4] = {
+		member(1, 30.0f, -100.0f, 3.0f, 100.0f), member(2, 30.0f, 100.0f, 3.0f, 100.0f),
+		member(3, 0.0f, -20.0f, 20.0f, 100.0f), member(4, 0.0f, 20.0f, 20.0f, 100.0f) };
+	const Coord3D center = { 0.0f, 0.0f, 0.0f };
+	Coord3D slots[4];
+	computeLineFormation(center, 0.0f, 2, m, 4, slots);
+	for (Int i = 0; i < 4; ++i)
+	{
+		for (Int j = i + 1; j < 4; ++j)
+		{
+			const Real dx = slots[i].x - slots[j].x;
+			const Real dy = slots[i].y - slots[j].y;
+			EXPECT_GE(std::sqrt(dx * dx + dy * dy), m[i].radius + m[j].radius);
+		}
+	}
 }

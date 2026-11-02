@@ -230,7 +230,7 @@ void computeLineFormation( const Coord3D &center, Real angle, Int rows, const Fo
 	}
 	std::sort( order.begin(), order.end(), rankedBefore );
 
-	// Row sizes: as the toughness order fills them; Nearest may put anyone anywhere, so every row fits the largest.
+	// Units can swap rows within a toughness band, so every row must fit the largest unit.
 	Real largest = 0.0f;
 	for( Int i = 0; i < count; ++i )
 	{
@@ -239,19 +239,7 @@ void computeLineFormation( const Coord3D &center, Real angle, Int rows, const Fo
 			largest = members[i].radius;
 		}
 	}
-	std::vector<Real> rowRadius( rows, nearest ? largest : 0.0f );
-	if( !nearest )
-	{
-		for( Int k = 0; k < count; ++k )
-		{
-			const Int r = k / cols;
-			const Real radius = members[order[k].index].radius;
-			if( radius > rowRadius[r] )
-			{
-				rowRadius[r] = radius;
-			}
-		}
-	}
+	std::vector<Real> rowRadius( rows, largest );
 
 	// Row depths: neighbouring rows are their largest radii apart, plus the gap; centred on the chord point.
 	std::vector<Real> rowForward( rows, 0.0f );
@@ -372,11 +360,9 @@ Bool needsFormationApproach( const Coord3D &unit, const Coord3D &slot, Real angl
 }
 
 //-------------------------------------------------------------------------------------------------
-Bool canMoveExactlyToSlot( const Coord3D &slot, const Coord3D &adjusted )
+Bool canMoveExactlyToSlot( const Coord3D &snappedSlot, const Coord3D &adjusted )
 {
-	const Real dx = adjusted.x - slot.x;
-	const Real dy = adjusted.y - slot.y;
-	return dx * dx + dy * dy < PATHFIND_CELL_SIZE_F * PATHFIND_CELL_SIZE_F;
+	return adjusted.x == snappedSlot.x && adjusted.y == snappedSlot.y;
 }
 
 //-------------------------------------------------------------------------------------------------

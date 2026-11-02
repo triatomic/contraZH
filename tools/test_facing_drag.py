@@ -76,14 +76,52 @@ def main():
                  "Bool isFacingDragLongEnough(", "Real facingAngle(", "Real snapFacingAngle("]:
         code += function(drag, name) + "\n"
     update = (ENGINE / "Source/GameLogic/Object/Update/AIUpdate.cpp").read_text()
-    for name in ["Bool shouldFaceOnArrival(", "Bool doesCommandCancelFacing(",
+    for name in ["Bool shouldFaceOnArrival(",
                  "Bool doesCommandKeepFormationSlot(", "FormationReturn decideFormationReturn("]:
         code += function(update, name) + "\n"
     messages = (ROOT / "Core/GameEngine/Source/Common/MessageStream.cpp").read_text()
     plain_order = function(messages, "Bool GameMessage::isPlainOrder(")
-    orders = sorted(set(re.findall(r"GameMessage::(MSG_\w+)", plain_order)))
-    code += "class GameMessage { public: enum Type {" + ",".join(orders) + "}; static Bool isPlainOrder(Type t); };\n"
+    orders = sorted(set(re.findall(r"GameMessage::(MSG_\w+)", plain_order + drag)))
+    code += "class GameMessage { public: enum Type {" + ",".join(orders) + "};" + r'''
+    struct Argument { ICoord2D pixel; } argument;
+    Type type;
+    GameMessage *previous, *following;
+    GameMessage(Type t) : type(t), previous(NULL), following(NULL) { argument.pixel.x = argument.pixel.y = 100; }
+    ~GameMessage()
+    {
+        if (previous)
+        {
+            previous->following = following;
+        }
+        if (following)
+        {
+            following->previous = previous;
+        }
+    }
+    Type getType() const { return type; }
+    const Argument *getArgument(Int) const { return &argument; }
+    GameMessage *prev() const { return previous; }
+    GameMessage *next() const { return following; }
+    static Bool isPlainOrder(Type);
+    };
+'''
     code += plain_order + "\n"
+    code += (ROOT / "tools/facing_drag/EngineStubs.h").read_text()
+    for name in ["GameMessageDisposition FacingDragTranslator::onButton(",
+                 "GameMessageDisposition FacingDragTranslator::translateGameMessage(",
+                 "void FacingDragTranslator::blockOtherTranslators("]:
+        code += function(drag, name) + "\n"
+    selection = (ROOT / "Core/GameEngine/Source/GameClient/MessageStream/SelectionXlat.cpp").read_text()
+    for name in ["void SelectionTranslator::setDragSelectBlocked(",
+                 "GameMessageDisposition SelectionTranslator::onRawMouseLeftButtonDown("]:
+        code += function(selection, name) + "\n"
+    look = (ROOT / "Core/GameEngine/Source/GameClient/MessageStream/LookAtXlat.cpp").read_text()
+    code += function(look, "void LookAtTranslator::setRightMouseScrollBlocked(") + "\n"
+    for name in ["void AIUpdateInterface::cancelFacingMove(", "void AIUpdateInterface::releaseFormationSpeed(",
+                 "void AIUpdateInterface::setExactFormationMove(", "void AIUpdateInterface::moveToFormationSlot("]:
+        code += function(update, name) + "\n"
+    command = function(update, "void AIUpdateInterface::aiDoCommand(")
+    code += command[:command.index("#ifdef ALLOW_SURRENDER")] + "}\n"
     tests = "\n".join(path.read_text() for path in sorted((ROOT / "tools/facing_drag").glob("*Test.cpp")))
     names = re.findall(r"^TEST\((\w+),\s*(\w+)\)", tests, re.M)
     tests = re.sub(r"(EXPECT_[^\n]+?\))\s*<<[^;]*;", r"\1;", tests)

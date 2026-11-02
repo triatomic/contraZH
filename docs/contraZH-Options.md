@@ -14,6 +14,7 @@ draws over the rows below it; rerun it after adding a drop-down.
   the drag direction sets the facing. Release either button to give the order.
 * A drag under 20 pixels gives a normal move. Dragging farther adds rows.
 * Ctrl snaps the facing to 45 degree steps. Translucent unit previews show the formation.
+* Rows leave enough room for the largest selected unit, including when units swap rows.
 * `FormationOrder = ToughFront` puts tougher units in front. `Nearest` assigns slots by distance.
 * `FormationWheels = DriveIn` makes wheeled units approach along the chosen facing.
   `TurnInPlace` makes them turn at their slots.
@@ -136,7 +137,7 @@ like any other button.
   Classic and Futuristic tech, Cyborg General: Spiders and Angels. Each entry shows the cards that
   path's upgrade swaps in and leaves out the units only the other path builds. A path is a player
   upgrade on a card whose rival upgrades swap the command sets of the same buildings.
-* Right: the picked object's portrait, name and command card, showing slots 1–18 in two rows of nine,
+* Right: the picked object's portrait, name and command card, showing slots 1â€“18 in two rows of nine,
   each button showing its letter. **Quick filter** narrows the icons or commands by name.
 * Click a card button, then press its new letter. Backspace takes the key off, Esc cancels.
 * Mouse inputs bind like keys, to commands and card buttons alike: the middle button, the two side
@@ -317,7 +318,7 @@ TheSuperHackers' texture filter option replaced this fork's version in the Augus
 * `TextureFilter = Bilinear` - (`None` | `Point` | `Bilinear` | `Trilinear` | `Anisotropic`. Also in
 the in-game options menu.)
 * `AnisotropyLevel = 2` - (`2` | `4` | `8` | `16`. Only with `TextureFilter = Anisotropic`.
-**Renamed from the pre-merge `AnisotropicLevel`** — update Options.ini by hand; the old key is
+**Renamed from the pre-merge `AnisotropicLevel`** â€” update Options.ini by hand; the old key is
 silently ignored.)
 
 Notes:
