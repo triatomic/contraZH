@@ -2451,7 +2451,7 @@ public:
 	virtual Int shutdown() override;
 
 	/// Binds one polygon group's texture, and its normal map and shader when it is bumped.
-	void setTexture(TextureClass *texture);
+	void setTexture(TextureClass *texture, MeshModelClass *model = nullptr, const AABoxClass *worldBounds = nullptr);
 	/// Sets the rise of full brightness the derived bumps take, for the rest of the pass.
 	void setBumpHeight(Real height);
 
@@ -2773,7 +2773,7 @@ static TextureClass *Find_Emissive_Map(TextureClass *texture)
 	return texture->Peek_Emissive_Map();
 }
 
-void SpecularShader::setTexture(TextureClass *texture)
+void SpecularShader::setTexture(TextureClass *texture, MeshModelClass *model, const AABoxClass *worldBounds)
 {
 	DX8Wrapper::Set_Texture(0, texture);
 
@@ -2804,9 +2804,41 @@ void SpecularShader::setTexture(TextureClass *texture)
 
 	DX8Wrapper::Set_Texture(SPECULAR_NORMAL_MAP_STAGE, (bump != BUMP_NONE) ? bumpMap : nullptr);
 	DX8Wrapper::Set_Pixel_Shader(shaders[bump]);
-	Set_Additional_Pixel_Lights(shaders[bump], CurrentSpecularLights != nullptr && !CurrentSpecularLights->lights.empty()
-		? &CurrentSpecularLights->lights[0] : nullptr, m_lit ? CurrentSpecularLights->count : 0,
-		W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS, 8, &SpecularLightView);
+	const Int *indices = CurrentSpecularLights != nullptr && !CurrentSpecularLights->lights.empty()
+		? &CurrentSpecularLights->lights[0] : nullptr;
+	Int count = m_lit ? CurrentSpecularLights->count : 0;
+	if (count > W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS)
+	{
+		static std::vector<Int> meshLights;
+		if (model != nullptr && !model->Get_Flag(MeshGeometryClass::SKIN) && (worldBounds != nullptr || !DX8Wrapper::Is_Instanced_Drawing()))
+		{
+			AABoxClass bounds;
+			if (worldBounds != nullptr)
+			{
+				bounds = *worldBounds;
+			}
+			else
+			{
+				Matrix4x4 world;
+				DX8Wrapper::Get_Transform(D3DTS_WORLD, world);
+				Matrix3D transform;
+				for (Int row = 0; row < 3; row++)
+				{
+					transform[row] = world[row];
+				}
+				model->Get_Bounding_Box(&bounds);
+				bounds.Transform(transform);
+			}
+			meshLights = CurrentSpecularLights->lights;
+			W3DShaderManager::filterPixelLights(bounds, meshLights);
+			indices = meshLights.empty() ? nullptr : &meshLights[0];
+			count = (Int)meshLights.size();
+		}
+		Vector4 constants[PIXEL_LIGHT_REGISTERS];
+		const Int registers = Pack_Pixel_Lights(constants, W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS, indices, count, &SpecularLightView);
+		DX8Wrapper::Set_Pixel_Shader_Constant(8, constants, registers);
+	}
+	Set_Additional_Pixel_Lights(shaders[bump], indices, count, W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS, 8, &SpecularLightView);
 
 	TextureClass *emissiveMap = (EmissiveIntensity > 0.0f && texture != nullptr && !m_lightsOnly) ? Find_Emissive_Map(texture) : nullptr;
 	DX8Wrapper::Set_Texture(SPECULAR_EMISSIVE_STAGE, emissiveMap);
@@ -3060,12 +3092,12 @@ public:
 		CurrentSpecularLights = nullptr;
 	}
 
-	virtual void Install_Polygon_Materials(DX8PolygonRendererClass *renderer) const override
+	virtual void Install_Polygon_Materials(DX8PolygonRendererClass *renderer, MeshClass *mesh = nullptr) const override
 	{
 		DX8TextureCategoryClass *category = renderer->Get_Texture_Category();
 		TextureClass *texture = (category != nullptr) ? category->Peek_Texture(0) : nullptr;
 #if defined(BUILD_WITH_D3D9)
-		specularShader.setTexture(texture);
+		specularShader.setTexture(texture, renderer->Get_Mesh_Model_Class(), mesh != nullptr ? &mesh->Get_Bounding_Box() : nullptr);
 #else
 		DX8Wrapper::Set_Texture(0, texture);
 #endif
@@ -3214,6 +3246,23 @@ void W3DShaderManager::setDrawTerrain(const Int *indices, Int count, Bool seabed
 	{
 		DX8Wrapper::Set_Pixel_Shader(DrawGroundShader);
 	}
+}
+
+void W3DShaderManager::filterPixelLights(const AABoxClass &box, std::vector<Int> &lights)
+{
+	size_t kept = 0;
+	for (size_t i = 0; i < lights.size(); i++)
+	{
+		const PixelLight &light = PixelLights[lights[i]];
+		const Real dx = max((Real)fabs(light.position.X - box.Center.X) - box.Extent.X, 0.0f);
+		const Real dy = max((Real)fabs(light.position.Y - box.Center.Y) - box.Extent.Y, 0.0f);
+		const Real dz = max((Real)fabs(light.position.Z - box.Center.Z) - box.Extent.Z, 0.0f);
+		if (dx * dx + dy * dy + dz * dz < light.outerRadius * light.outerRadius)
+		{
+			lights[kept++] = lights[i];
+		}
+	}
+	lights.resize(kept);
 }
 
 Int W3DShaderManager::pickPixelLights(const AABoxClass &box, std::vector<Int> &lights)

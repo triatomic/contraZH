@@ -98,7 +98,7 @@ public:
 		TheW3DPlanarMirrors->endOverlay();
 	}
 
-	virtual void Install_Polygon_Materials(DX8PolygonRendererClass *renderer) const override
+	virtual void Install_Polygon_Materials(DX8PolygonRendererClass *renderer, MeshClass *mesh = nullptr) const override
 	{
 		DX8TextureCategoryClass *category = renderer->Get_Texture_Category();
 		if (category != nullptr)

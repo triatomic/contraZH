@@ -469,7 +469,11 @@ void HeightMapRenderObjClass::setTilePixelLights(Int tile)
 	{
 		// The mirror draws flat terrain, so it leaves the seabed out.
 		const Bool seabed = m_tileSeabed[tile] && !ShaderClass::Is_Backface_Culling_Inverted();
-		const std::vector<Int> &lights = m_tilePixelLights[tile];
+		std::vector<Int> &lights = m_tilePixelLights[tile];
+		if (tile < (Int)m_tileBounds.size() && !m_tileBoundsStale[tile])
+		{
+			W3DShaderManager::filterPixelLights(m_tileBounds[tile], lights);
+		}
 		W3DShaderManager::setDrawTerrain(lights.empty() ? nullptr : &lights[0], (Int)lights.size(), seabed);
 	}
 }

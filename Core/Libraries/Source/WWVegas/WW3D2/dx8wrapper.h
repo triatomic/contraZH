@@ -430,6 +430,7 @@ public:
 		unsigned instance_stride,
 		unsigned instance_count);
 	static void End_Instanced_Drawing();
+	static bool Is_Instanced_Drawing();
 
 	// While set, every indexed draw replaces the FVF with this declaration and shader, and runs the hook
 	// once the device holds the draw's state so it can set constants from it. End puts the FVF back.

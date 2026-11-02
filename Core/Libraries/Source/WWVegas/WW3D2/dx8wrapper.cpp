@@ -2610,6 +2610,11 @@ void DX8Wrapper::Draw_Instanced_Triangles(
 		polygon_count);
 }
 
+bool DX8Wrapper::Is_Instanced_Drawing()
+{
+	return InstancedShader != nullptr;
+}
+
 void DX8Wrapper::End_Instanced_Drawing()
 {
 	// Stream 1 is never bound by the fixed-function path, which also only sets its FVF when the vertex buffer changes.

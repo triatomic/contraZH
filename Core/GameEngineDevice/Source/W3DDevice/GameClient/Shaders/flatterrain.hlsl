@@ -69,7 +69,7 @@ float4 main(PsIn input) : COLOR
 #if LIGHTS_ONLY
     color.rgb *= PointLighting(input.WorldPos, normal);
 #else
-    color.rgb *= saturate(input.Diffuse.rgb + PointLighting(input.WorldPos, normal));
+    color.rgb *= max(input.Diffuse.rgb + PointLighting(input.WorldPos, normal), 0.0f);
 #endif
     color.a *= input.Diffuse.a;
 

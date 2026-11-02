@@ -234,8 +234,8 @@ float4 main(PsIn input) : COLOR
 #endif
 
 #if LIGHTS || BUMP
-#if LIGHTS_ONLY
-    color.rgb *= light;
+#if LIGHTS
+    color.rgb *= max(light, 0.0f);
 #else
     color.rgb *= saturate(light);
 #endif

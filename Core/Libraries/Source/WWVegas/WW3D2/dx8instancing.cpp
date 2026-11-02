@@ -318,7 +318,7 @@ static void Draw_Instances(IDirect3DVertexDeclaration9 * declaration, IDirect3DV
 		}
 		if (pass != nullptr)
 		{
-			pass->Install_Polygon_Materials(renderer);
+			pass->Install_Polygon_Materials(renderer, counts[group] == 1 ? meshes[first] : nullptr);
 		}
 		DX8Wrapper::Set_Index_Buffer_Index_Offset(meshes[first]->Get_Base_Vertex_Offset());
 		DX8Wrapper::Draw_Instanced_Triangles(

@@ -2406,11 +2406,12 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 	}
 }
 
-// Picks this frame's per-pixel lights that reach the sphere, strongest there first.
+// Picks the lights that reach the sphere, keeping the strongest first when their count is limited.
 Int RTS3DScene::pickObjectPixelLights(const SphereClass &sphere, Int *lights)
 {
-	const Int limit = TheGlobalData->m_usePathTracing ? W3DShaderManager::getPixelLightCount() : (Int)W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS;
-	std::vector<Real> scores(limit);
+	const Bool allLights = TheGlobalData->m_usePathTracing;
+	const Int limit = W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS;
+	Real scores[W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS];
 	Int count = 0;
 
 	const Int candidates = W3DShaderManager::getPixelLightCount();
@@ -2426,6 +2427,11 @@ Int RTS3DScene::pickObjectPixelLights(const SphereClass &sphere, Int *lights)
 		const Real distance = max((pixelLight.position - sphere.Center).Length() - sphere.Radius, 0.0f);
 		if (distance >= pixelLight.outerRadius)
 		{
+			continue;
+		}
+		if (allLights)
+		{
+			lights[count++] = index;
 			continue;
 		}
 		const Real ramp = WWMath::Clamp((pixelLight.outerRadius - distance) / (pixelLight.outerRadius - pixelLight.innerRadius), 0.0f, 1.0f);

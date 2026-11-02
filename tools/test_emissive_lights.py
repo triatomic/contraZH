@@ -107,17 +107,24 @@ class W3DShaderManager
 public:
     static TextureClass* findEmissiveMap(TextureClass*) { return NULL; }
     // PIXEL_LIGHT_STRUCT
-    enum { MAX_PIXEL_LIGHTS = 8 };
+    enum { MAX_PIXEL_LIGHTS = 8, MAX_UNIT_PIXEL_LIGHTS = 8 };
+    static void filterPixelLights(const AABoxClass&, std::vector<int>&);
+    static int getPixelLightCount();
+    static const PixelLight& getPixelLight(int);
     static int pickPixelLights(const AABoxClass&, int*);
     static int pickPixelLights(const AABoxClass&, std::vector<int>&);
     static void setPixelLights(const PixelLight*, int);
 };
 static std::vector<W3DShaderManager::PixelLight> PixelLights(64);
 static int PixelLightCount;
+int W3DShaderManager::getPixelLightCount() { return PixelLightCount; }
+const W3DShaderManager::PixelLight& W3DShaderManager::getPixelLight(int i) { return PixelLights[i]; }
+class RTS3DScene { public: int pickObjectPixelLights(const SphereClass&, int*); };
+namespace WWMath { float Clamp(float x,float lo,float hi) { return min(max(x,lo),hi); } }
 static size_t ObjectSpecularPassesUsed;
 static void Update_Lights_Debug() {}
-struct GlobalData { bool m_laserRef; };
-static GlobalData globalData = { true };
+struct GlobalData { bool m_laserRef; bool m_usePathTracing; };
+static GlobalData globalData = { true, true };
 static GlobalData* TheGlobalData = &globalData;
 #define private public
 // EMISSIVE_HEADER
@@ -139,6 +146,65 @@ public:
 // LASER_FUNCTION
 // PICK_FUNCTION
 // TUNE_FUNCTION
+// OBJECT_LIGHTS
+struct Vector4 { float X,Y,Z,W; };
+struct IDirect3DVertexDeclaration9 {};
+struct IDirect3DVertexShader9 {};
+struct IDirect3DVertexBuffer9 {};
+class DX8PolygonRendererClass
+{
+public:
+    unsigned Get_Index_Offset() { return 0; }
+    unsigned Get_Index_Count() { return 6; }
+    unsigned Get_Min_Vertex_Index() { return 0; }
+    unsigned Get_Vertex_Index_Range() { return 4; }
+};
+class MeshClass
+{
+public:
+    void* Get_Lighting_Environment() { return NULL; }
+    int Get_Base_Vertex_Offset() { return 0; }
+};
+class MaterialPassClass
+{
+public:
+    mutable std::vector<MeshClass*> meshes;
+    void Install_Polygon_Materials(DX8PolygonRendererClass*,MeshClass* mesh=NULL) const { meshes.push_back(mesh); }
+};
+class DX8InstancingClass
+{
+public:
+    enum { PASS_LIT };
+    static int Get_Pass() { return PASS_LIT; }
+};
+class DX8VertexShadingClass
+{
+public:
+    enum { MAX_LIGHTS=3, CONSTANT_LIGHT_DIRECTION=0 };
+    static void Get_Light_Constants(void*,Vector4*) {}
+};
+class DX8Wrapper
+{
+public:
+    static bool active;
+    static std::vector<unsigned> counts;
+    static std::vector<unsigned> offsets;
+    static void Begin_Instanced_Drawing(IDirect3DVertexDeclaration9*,IDirect3DVertexShader9*) { active=true; }
+    static void End_Instanced_Drawing() { active=false; }
+    static void Set_Vertex_Shader_Constant(int,Vector4*,int) {}
+    static void Set_Index_Buffer_Index_Offset(int) {}
+    static void Draw_Instanced_Triangles(unsigned,unsigned,unsigned,unsigned,IDirect3DVertexBuffer9*,unsigned offset,unsigned,unsigned count)
+    {
+        assert(active);
+        offsets.push_back(offset);
+        counts.push_back(count);
+    }
+};
+bool DX8Wrapper::active=false;
+std::vector<unsigned> DX8Wrapper::counts,DX8Wrapper::offsets;
+struct InstanceRecord { float data[20]; };
+static IDirect3DVertexBuffer9* InstanceBuffer=NULL;
+// INSTANCED_DRAW
 enum { MAX_DRAW_DATA = 9, WIN_STATUS_HIDDEN = 16 };
 struct WinInstanceData
 {
@@ -264,6 +330,19 @@ int main()
     assert(near(samples[0].color.X,1));
     lights.reset();
 
+    MeshClass firstInstance,secondInstance,thirdInstance,lastInstance;
+    MeshClass* instanceMeshes[]={&firstInstance,&secondInstance,&thirdInstance,&lastInstance};
+    DX8PolygonRendererClass polygon;
+    DX8PolygonRendererClass* renderers[]={&polygon,&polygon,&polygon};
+    const int instanceCounts[]={1,2,1};
+    MaterialPassClass materialPass;
+    Draw_Instances(NULL,NULL,renderers,instanceCounts,3,instanceMeshes,0,&materialPass);
+    assert(materialPass.meshes.size()==3);
+    assert(materialPass.meshes[0]==&firstInstance && materialPass.meshes[1]==NULL && materialPass.meshes[2]==&lastInstance);
+    assert(DX8Wrapper::counts==std::vector<unsigned>({1,2,1}));
+    assert(DX8Wrapper::offsets==std::vector<unsigned>({0,80,240}));
+    assert(!DX8Wrapper::active);
+
     W3DLaserGlow laser;
     laser.m_count = 1;
     laser.m_glows[0] = { Vector3(0,0,10), Vector3(96,0,10), 24, Vector3(1,0,0) };
@@ -311,6 +390,30 @@ int main()
     assert(W3DShaderManager::pickPixelLights(box, allLights) == 256);
     assert(allLights.front() == 0 && allLights.back() == 255);
 
+    PixelLights[0].position=Vector3(0,0,100);
+    PixelLights[0].outerRadius=20;
+    PixelLights[1].position=Vector3(100,100,0);
+    PixelLights[1].outerRadius=20;
+    PixelLights[2].position=Vector3(2.5f,0,0);
+    PixelLights[2].outerRadius=3;
+    PixelLights[2].objectsOnly=true;
+    std::vector<int> local={0,1,2};
+    W3DShaderManager::filterPixelLights(box,local);
+    assert(local.size()==1 && local[0]==2);
+    W3DShaderManager::filterPixelLights(box,local);
+    assert(local.size()==1 && local[0]==2);
+    local.clear();
+    W3DShaderManager::filterPixelLights(box,local);
+    assert(local.empty());
+
+    RTS3DScene scene;
+    std::vector<int> objectLights(PixelLightCount);
+    PixelLights[3].terrainOnly=true;
+    assert(scene.pickObjectPixelLights(SphereClass(Vector3(),1),&objectLights[0])==254);
+    TheGlobalData->m_usePathTracing=false;
+    assert(scene.pickObjectPixelLights(SphereClass(Vector3(),1),&objectLights[0])==8);
+    TheGlobalData->m_usePathTracing=true;
+
     W3DShaderManager::PixelLight original = dense[0];
     original.innerRadius = 10;
     original.outerRadius = 60;
@@ -349,7 +452,7 @@ int main()
     existingCheck = NULL;
     WinShaders = NULL;
     assert(createPathTracingCheck() == NULL);
-    puts("PASS: emissive clustering, transparent mesh sampling, radius clamp, brightness, laser coverage and checkbox placement");
+    puts("PASS: single-instance mesh handoff, light bounds, object selection, emissive clustering, transparent meshes, tuning and lasers");
 }
 '''
 
@@ -378,11 +481,15 @@ def main():
                               "void W3DLaserGlow::appendObjectLights("))
     harness = harness.replace("// PICK_FUNCTION", function(shader, "Int W3DShaderManager::pickPixelLights(const AABoxClass &box, Int *lights)")
                               + "\n" + function(shader, "Int W3DShaderManager::pickPixelLights(const AABoxClass &box, std::vector<Int> &lights)")
-                              + "\n" + function(shader, "void W3DShaderManager::setPixelLights("))
+                              + "\n" + function(shader, "void W3DShaderManager::setPixelLights(")
+                              + "\n" + function(shader, "void W3DShaderManager::filterPixelLights("))
     options = (ROOT / "GeneralsMD/Code/GameEngine/Source/GameClient/GUI/GUICallbacks/Menus/OptionsMenu.cpp").read_text(encoding="utf-8")
     scene = (ROOT / "GeneralsMD/Code/GameEngineDevice/Source/W3DDevice/GameClient/W3DScene.cpp").read_text(encoding="utf-8")
     tune = function(scene, "Bool Tune_Emissive_Light(", "\t")
     harness = harness.replace("// TUNE_FUNCTION", tune)
+    harness = harness.replace("// OBJECT_LIGHTS", function(scene, "Int RTS3DScene::pickObjectPixelLights("))
+    instancing = (ROOT / "Core/Libraries/Source/WWVegas/WW3D2/dx8instancing.cpp").read_text(encoding="utf-8")
+    harness = harness.replace("// INSTANCED_DRAW", function(instancing, "static void Draw_Instances("))
     harness = harness.replace("// CHECKBOX_FUNCTION", function(options, "static GameWindow *createPathTracingCheck()")) + TESTS
     with tempfile.TemporaryDirectory(prefix="emissive-lights-", dir=ROOT / "build") as directory:
         work = Path(directory)

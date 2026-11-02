@@ -158,6 +158,7 @@ public:
 	/// The first lights, nearest the middle of the view, that reach the box, as many as one ground draw takes.
 	static Int pickPixelLights(const AABoxClass &box, Int *lights);
 	static Int pickPixelLights(const AABoxClass &box, std::vector<Int> &lights);
+	static void filterPixelLights(const AABoxClass &box, std::vector<Int> &lights);
 	/// Whether any surface draws point lights per pixel, so the scene has to pick them.
 	static Bool supportsPixelLights();
 	/// Whether the terrain draws point lights per pixel, so lights handed over must leave its vertex lighting.

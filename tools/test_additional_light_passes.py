@@ -41,10 +41,12 @@ struct Vector4
     float X, Y, Z, W;
     void Set(float x, float y, float z, float w) { X=x; Y=y; Z=z; W=w; }
 };
+struct AABoxClass { Vector3 Center, Extent; };
 struct W3DShaderManager
 {
     enum { MAX_PIXEL_LIGHTS = 8 };
     static void setDrawPixelLights(const Int*, Int);
+    static void filterPixelLights(const AABoxClass&,std::vector<Int>&);
     // PIXEL_LIGHT
 };
 static std::vector<W3DShaderManager::PixelLight> PixelLights;
@@ -89,6 +91,7 @@ unsigned DX8Wrapper::CurrentBaseVertexIndex = 0;
 // EXTRA_PASS
 // CONFIGURE_PASS
 // GROUND_LIGHTS
+// FILTER_LIGHTS
 // INDEXED_DRAW
 
 static IDirect3DPixelShader9* loadShader(const std::string& path)
@@ -108,11 +111,22 @@ struct Vertex
     DWORD color;
     float u0,v0,u1,v1,nz,px,py,pz,wx,wy,wz,vx,vy,vz;
 };
-static DWORD draw(int count, int slots, IDirect3DPixelShader9* base, IDirect3DSurface9* target, IDirect3DSurface9* readback, int firstRegister=5, bool groundLights=false)
+static DWORD draw(int count, int slots, IDirect3DPixelShader9* base, IDirect3DSurface9* target, IDirect3DSurface9* readback, int firstRegister=5, bool groundLights=false, const AABoxClass* bounds=NULL)
 {
     check(device->Clear(0,NULL,D3DCLEAR_TARGET,0,1,0));
+    std::vector<Int> selected;
+    if (bounds != NULL)
+    {
+        for (int i=0; i<count; i++)
+        {
+            selected.push_back(i);
+        }
+        W3DShaderManager::filterPixelLights(*bounds,selected);
+        count=(int)selected.size();
+    }
+    const Int* indices=selected.empty() ? NULL : &selected[0];
     Vector4 constants[32] = {};
-    Pack_Pixel_Lights(constants+firstRegister, slots, NULL, count, NULL);
+    Pack_Pixel_Lights(constants+firstRegister, slots, indices, count, NULL);
     check(device->SetPixelShaderConstantF(0, &constants[0].X, 32));
     check(device->SetPixelShader(base));
     check(device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ZERO));
@@ -134,7 +148,7 @@ static DWORD draw(int count, int slots, IDirect3DPixelShader9* base, IDirect3DSu
     }
     else
     {
-        Set_Additional_Pixel_Lights(1, NULL, count, slots, firstRegister, NULL);
+        Set_Additional_Pixel_Lights(1, indices, count, slots, firstRegister, NULL);
     }
     extraDraws = 0;
     check(device->BeginScene());
@@ -260,6 +274,25 @@ int main(int argc, char** argv)
     AdditionalShaders[1].normal=loadShader(std::string(argv[1])+"/specularlitnoshadowextralights.pso");
     const DWORD modelEight=draw(8,8,base,target,readback,8);
     assert(draw(73,8,base,target,readback,8)>modelEight+25);
+    AABoxClass meshBounds;
+    meshBounds.Extent=Vector3(2,2,0);
+    for (int i=9; i<73; i++)
+    {
+        PixelLights[i].position=Vector3(1000,1000,1000);
+    }
+    const DWORD beforeCull=draw(73,8,base,target,readback,8);
+    const int beforeDraws=extraDraws;
+    assert(draw(73,8,base,target,readback,8,false,&meshBounds)==beforeCull);
+    assert(beforeDraws==9 && extraDraws==1);
+    for (auto& light : PixelLights)
+    {
+        light.position=Vector3(1000,1000,1000);
+    }
+    assert(draw(73,8,base,target,readback,8,false,&meshBounds)==0 && extraDraws==0);
+    for (auto& light : PixelLights)
+    {
+        light.position=Vector3(0,0,10);
+    }
     AdditionalShaders[1].normal->Release();
     base->Release();
     IDirect3DTexture9* modulation=NULL;
@@ -301,14 +334,47 @@ int main(int argc, char** argv)
                 }
             }
         }
+        for (int stage=0; stage<5; stage++)
+        {
+            check(device->SetTexture(stage,white));
+        }
+        check(modulation->LockRect(0,&lock,NULL,0));
+        *(DWORD*)lock.pBits=0xff808080;
+        check(modulation->UnlockRect(0));
+        check(device->SetTexture(0,modulation));
+        if (variant<2)
+        {
+            check(device->SetTexture(1,modulation));
+        }
+        for (auto& light : PixelLights)
+        {
+            light.diffuse=Vector3();
+        }
+        PixelLights[0].diffuse=Vector3(0.9f,0.9f,0.9f);
+        const DWORD brightFirst=draw(8,8,base,target,readback);
+        PixelLights[8].diffuse=PixelLights[0].diffuse;
+        PixelLights[0].diffuse=Vector3();
+        const DWORD brightExtra=draw(9,8,base,target,readback);
+        assert(abs((int)brightFirst-(int)brightExtra)<=1);
         if (variant!=2)
         {
             AdditionalShaders[1].normal->Release();
             base->Release();
         }
     }
+    AdditionalShaders[1].normal->Release();
+    base->Release();
+    base=loadShader(std::string(argv[1])+"/flatterrainlit1.pso");
+    AdditionalShaders[1].normal=loadShader(std::string(argv[1])+"/flatterrainlit1extralights.pso");
+    check(device->SetTexture(1,modulation));
+    PixelLights[0].diffuse=PixelLights[8].diffuse;
+    PixelLights[8].diffuse=Vector3();
+    const DWORD flatFirst=draw(8,8,base,target,readback);
+    PixelLights[8].diffuse=PixelLights[0].diffuse;
+    PixelLights[0].diffuse=Vector3();
+    assert(abs((int)flatFirst-(int)draw(9,8,base,target,readback))<=1);
     modulation->Release();
-    puts("PASS: object-only road filtering, 73 GPU lights, terrain/road cloud and ground noise, model lighting and shader/state restoration");
+    puts("PASS: mesh bounds cut nine extra draws to one, empty batches skipped, tile seams, road filtering and shader/state restoration");
     AdditionalShaders[1].normal->Release();
     base->Release();
     ib->Release();
@@ -337,6 +403,7 @@ def main():
     harness = harness.replace("// EXTRA_PASS", function(shader,"static bool Draw_Additional_Light_Pass("))
     harness = harness.replace("// CONFIGURE_PASS", function(shader,"static void Set_Additional_Pixel_Lights("))
     harness = harness.replace("// GROUND_LIGHTS", function(shader,"void W3DShaderManager::setDrawPixelLights("))
+    harness = harness.replace("// FILTER_LIGHTS", function(shader,"void W3DShaderManager::filterPixelLights("))
     harness = harness.replace("// INDEXED_DRAW", function(wrapper,"WWINLINE void DX8Wrapper::Draw_DX8_Indexed_Primitive(").replace("WWINLINE ",""))
     with tempfile.TemporaryDirectory(prefix="additional-light-passes-",dir=ROOT / "build") as directory:
         work=Path(directory)
