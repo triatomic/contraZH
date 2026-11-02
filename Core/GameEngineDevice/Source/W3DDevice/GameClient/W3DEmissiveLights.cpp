@@ -301,30 +301,28 @@ void W3DEmissiveLights::addObject(RenderObjClass &object, Real opacity)
 	const Real scale = axis.Length();
 	const Real maskIntensity = !TheGlobalData->m_useSpecular ? 0.0f : TheGlobalData->m_timeOfDay == TIME_OF_DAY_NIGHT
 		? TheGlobalData->m_unitEmissiveNightIntensity : TheGlobalData->m_unitEmissiveIntensity;
-
-	// Mesh-local cells keep moving emitters from splitting at world-cell boundaries.
-	flushClusters();
 	for (size_t i = 0; i < found->second.samples.size(); i++)
 	{
 		const Sample &sample = found->second.samples[i];
+		Vector3 position;
+		Matrix3D::Transform_Vector(transform, sample.position, &position);
 		const Real area = sample.area * scale * scale;
-		add(sample.position, (sample.color + sample.mask * maskIntensity) * opacity, area, min(max(sqrtf(area) * 3.0f, EMISSIVE_CELL_SIZE), 120.0f));
+		add(position, (sample.color + sample.mask * maskIntensity) * opacity, area, min(max(sqrtf(area) * 3.0f, EMISSIVE_CELL_SIZE), 120.0f));
 	}
-	flushClusters(&transform);
 }
 
-void W3DEmissiveLights::flushClusters(const Matrix3D *transform)
+const std::vector<W3DShaderManager::PixelLight> &W3DEmissiveLights::finish(CameraClass &camera)
 {
 	for (std::map<Cell, Cluster>::const_iterator it = m_clusters.begin(); it != m_clusters.end(); ++it)
 	{
 		const Cluster &cluster = it->second;
 		W3DShaderManager::PixelLight light;
 		light.position = cluster.position / cluster.weight;
-		if (transform != nullptr)
-		{
-			Matrix3D::Transform_Vector(*transform, light.position, &light.position);
-		}
 		light.outerRadius = cluster.radius;
+		if (camera.Cull_Sphere(SphereClass(light.position, light.outerRadius)))
+		{
+			continue;
+		}
 		const Real strength = min(sqrtf(cluster.weight) / 8.0f, 1.5f);
 		light.diffuse = cluster.color * (strength / cluster.weight);
 		light.innerRadius = 0.5f;
@@ -333,22 +331,6 @@ void W3DEmissiveLights::flushClusters(const Matrix3D *transform)
 		DEBUG_ASSERTCRASH(light.outerRadius > light.innerRadius && light.diffuse.Length2() > 0.0f, ("Invalid emissive light"));
 		m_lights.push_back(light);
 	}
-	m_clusters.clear();
-}
-
-const std::vector<W3DShaderManager::PixelLight> &W3DEmissiveLights::finish(CameraClass &camera)
-{
-	flushClusters();
-	size_t count = 0;
-	for (size_t i = 0; i < m_lights.size(); i++)
-	{
-		const W3DShaderManager::PixelLight &light = m_lights[i];
-		if (!camera.Cull_Sphere(SphereClass(light.position, light.outerRadius)))
-		{
-			m_lights[count++] = light;
-		}
-	}
-	m_lights.resize(count);
 	return m_lights;
 }
 #endif

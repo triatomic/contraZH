@@ -410,9 +410,7 @@ spill. See [Light radius and brightness](contraZH-GameData.md#path-tracing-light
 
 This option approximates emissive lighting with world-space point lights. It does not
 trace rays, cast local shadows, or calculate reflected light. Lights can pass through walls.
-Particles share lights in world-space cells of 24 units. Each rigid mesh groups its
-samples in model-space cells of 24 units, so movement and rotation keep its lights
-steady. Separate meshes keep separate lights. All visible lights are kept, and
+Nearby emitters share lights within 24 world units. All visible lights are kept, and
 surfaces draw additional batches of eight lights, or three under standing water.
 Extra passes add only light and do not repeat sunlight, glow masks or shadow darkening.
 Cloud and ground-noise factors apply to every light batch. First and extra batches use

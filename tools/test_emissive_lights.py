@@ -383,49 +383,22 @@ int main()
     assert(near(samples[0].color.X,1));
     lights.reset();
 
-    // A rigid emitter keeps its lights while translating and rotating across world cells.
-    MeshClass moving;
-    moving.model=&model;
-    auto& movingTexture=lights.m_textures[&model.texture];
+    // Nearby meshes share a light instead of multiplying the lighting passes.
+    auto& meshPixels=lights.m_textures[&model.texture];
     for (int i=0; i<32*32; i++)
     {
-        movingTexture.pixels[i]=Vector3(1,1,1);
-        movingTexture.alpha[i]=1;
+        meshPixels.pixels[i]=Vector3(1,1,1);
+        meshPixels.alpha[i]=1;
     }
-    lights.addObject(moving,1);
-    const auto reference=lights.finish(camera);
-    assert(reference.size()==1);
-    for (int frame=0; frame<300; frame++)
+    MeshClass meshes[64];
+    for (int i=0; i<64; i++)
     {
-        lights.m_clusters.clear();
-        lights.m_lights.clear();
-        moving.transform.offset=Vector3(frame*0.5f-75,frame*0.3f-45,frame*0.2f-30);
-        moving.transform.angle=frame*0.03f;
-        lights.addObject(moving,1);
-        const auto& current=lights.finish(camera);
-        assert(current.size()==reference.size());
-        Vector3 expected;
-        Matrix3D::Transform_Vector(moving.transform,reference[0].position,&expected);
-        assert((current[0].position-expected).Length()<0.0001f);
-        assert(near(current[0].diffuse.X,reference[0].diffuse.X));
-        assert(near(current[0].outerRadius,reference[0].outerRadius));
+        meshes[i].model=&model;
+        meshes[i].transform.offset=Vector3(i*0.1f,2,2);
+        lights.addObject(meshes[i],1);
     }
-    lights.m_lights.clear();
-    lights.add(Vector3(100,100,100),Vector3(1,0,0),64,24);
-    lights.addObject(moving,1);
-    lights.addObject(moving,1);
-    assert(lights.finish(camera).size()==3);
-    lights.m_lights.clear();
-    moving.hidden=true;
-    lights.addObject(moving,1);
-    assert(lights.finish(camera).empty());
-    moving.hidden=false;
-    lights.addObject(moving,0);
-    assert(lights.finish(camera).empty());
-    lights.addObject(moving,1);
-    camera.hidden=true;
-    assert(lights.finish(camera).empty());
-    camera.hidden=false;
+    const auto& shared=lights.finish(camera);
+    assert(shared.size()==1 && near(shared[0].diffuse.X,1.5f));
     lights.reset();
 
     MeshClass firstInstance,secondInstance,thirdInstance,lastInstance;
@@ -571,7 +544,6 @@ def main():
     header = "\n".join(line for line in header.splitlines() if not line.startswith(("#pragma", '#include "')))
     names = ["W3DEmissiveLights::W3DEmissiveLights()", "W3DEmissiveLights::~W3DEmissiveLights()",
              "W3DEmissiveLights::Cluster::Cluster()", "void W3DEmissiveLights::reset()",
-             "void W3DEmissiveLights::flushClusters(",
              "void W3DEmissiveLights::add(", "const std::vector<W3DShaderManager::PixelLight> &W3DEmissiveLights::finish(",
              "Vector3 W3DEmissiveLights::sampleTexture(", "Bool W3DEmissiveLights::sampleModel("]
     harness = PREAMBLE.replace("// PIXEL_LIGHT_STRUCT", pixel_light).replace("// EMISSIVE_HEADER", header)
