@@ -419,6 +419,9 @@ Dense scenes cost more draw calls; there is no fixed light count shared by the w
 Extra batches leave out lights that cannot reach the terrain tile or rigid mesh being drawn.
 Single-instance draws use that mesh's world bounds too. Skinned meshes and groups
 with several instances keep their conservative light lists.
+Extra batches also skip pixels outside conservative screen bounds of their lights,
+and batches wholly outside the view can be skipped. This keeps full resolution,
+all light contributions and the existing falloff.
 Laser spill on models uses up to
 16 samples per beam. `Lasers light the ground` keeps the existing shaped terrain glow;
 with that setting off, the new point lights also light the ground. Roads exclude the

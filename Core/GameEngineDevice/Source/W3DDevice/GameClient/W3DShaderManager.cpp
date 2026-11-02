@@ -93,6 +93,7 @@
 #include "WWMath/aabox.h"
 #include <vector>
 #include <map>
+#include <float.h>
 
 
 // Turn this on to turn off pixel shaders. jba[4/3/2003]
@@ -1710,8 +1711,13 @@ static Bool AdditionalLightsInView = FALSE;
 static DWORD AdditionalLightShader = 0;
 static IDirect3DPixelShader9 *SavedLightShader = nullptr;
 static Vector4 SavedLightConstants[PIXEL_LIGHT_REGISTERS];
-static const D3DRENDERSTATETYPE AdditionalLightStates[] = { D3DRS_ALPHABLENDENABLE, D3DRS_DESTBLEND, D3DRS_ZWRITEENABLE, D3DRS_FOGCOLOR, D3DRS_BLENDOP };
+static const D3DRENDERSTATETYPE AdditionalLightStates[] = { D3DRS_ALPHABLENDENABLE, D3DRS_DESTBLEND, D3DRS_ZWRITEENABLE, D3DRS_FOGCOLOR, D3DRS_BLENDOP, D3DRS_SCISSORTESTENABLE };
 static DWORD SavedLightStates[ARRAY_SIZE(AdditionalLightStates)];
+static RECT SavedLightScissor;
+static D3DVIEWPORT9 AdditionalLightViewport;
+static D3DMATRIX AdditionalLightWorldToClip;
+static Bool AdditionalLightScissor = FALSE;
+static size_t AdditionalLightNext = 0;
 #endif
 
 // DynamicLightsDebug draws every lightable surface through its lit shader, so unlit ground and objects go black too.
@@ -1809,25 +1815,80 @@ static Int Pack_Pixel_Lights(Vector4 *constants, Int slots, const Int *indices, 
 }
 
 #if defined(BUILD_WITH_D3D9)
+static bool Pixel_Light_Screen_Rect(const W3DShaderManager::PixelLight &light, const D3DMATRIX &transform,
+	const D3DVIEWPORT9 &viewport, RECT &rectangle)
+{
+	rectangle.left = viewport.X;
+	rectangle.top = viewport.Y;
+	rectangle.right = viewport.X + viewport.Width;
+	rectangle.bottom = viewport.Y + viewport.Height;
+	double left = DBL_MAX;
+	double top = DBL_MAX;
+	double right = -DBL_MAX;
+	double bottom = -DBL_MAX;
+	for (Int corner = 0; corner < 8; corner++)
+	{
+		const double x = light.position.X + ((corner & 1) ? (double)light.outerRadius : -(double)light.outerRadius);
+		const double y = light.position.Y + ((corner & 2) ? (double)light.outerRadius : -(double)light.outerRadius);
+		const double z = light.position.Z + ((corner & 4) ? (double)light.outerRadius : -(double)light.outerRadius);
+		const double clipX = x * transform.m[0][0] + y * transform.m[1][0] + z * transform.m[2][0] + transform.m[3][0];
+		const double clipY = x * transform.m[0][1] + y * transform.m[1][1] + z * transform.m[2][1] + transform.m[3][1];
+		const double clipZ = x * transform.m[0][2] + y * transform.m[1][2] + z * transform.m[2][2] + transform.m[3][2];
+		const double clipW = x * transform.m[0][3] + y * transform.m[1][3] + z * transform.m[2][3] + transform.m[3][3];
+		// A box crossing the near plane keeps the full viewport because its projection is unbounded.
+		if (!_finite(clipX) || !_finite(clipY) || !_finite(clipZ) || !_finite(clipW) || clipZ <= 0.0 || clipW <= 1e-6)
+		{
+			return true;
+		}
+		const double pixelX = viewport.X + (clipX / clipW + 1.0) * viewport.Width * 0.5;
+		const double pixelY = viewport.Y + (1.0 - clipY / clipW) * viewport.Height * 0.5;
+		left = min(left, pixelX);
+		top = min(top, pixelY);
+		right = max(right, pixelX);
+		bottom = max(bottom, pixelY);
+	}
+	// Two pixels cover raster rounding and the shader's derivative helper pixels.
+	rectangle.left = (LONG)max((double)viewport.X, min((double)rectangle.right, floor(left) - 2.0));
+	rectangle.top = (LONG)max((double)viewport.Y, min((double)rectangle.bottom, floor(top) - 2.0));
+	rectangle.right = (LONG)min((double)rectangle.right, max((double)viewport.X, ceil(right) + 2.0));
+	rectangle.bottom = (LONG)min((double)rectangle.bottom, max((double)viewport.Y, ceil(bottom) + 2.0));
+	return rectangle.left < rectangle.right && rectangle.top < rectangle.bottom;
+}
+
+static bool Additional_Light_Screen_Rect(size_t first, RECT &rectangle)
+{
+	rectangle.left = AdditionalLightViewport.X + AdditionalLightViewport.Width;
+	rectangle.top = AdditionalLightViewport.Y + AdditionalLightViewport.Height;
+	rectangle.right = AdditionalLightViewport.X;
+	rectangle.bottom = AdditionalLightViewport.Y;
+	const size_t end = min(first + (size_t)AdditionalLightSlots, AdditionalLightIndices.size());
+	for (size_t i = first; i < end; i++)
+	{
+		const Int index = AdditionalLightIndices[i];
+		RECT lightRectangle;
+		if (index >= 0 && index < PixelLightCount &&
+			Pixel_Light_Screen_Rect(PixelLights[index], AdditionalLightWorldToClip, AdditionalLightViewport, lightRectangle))
+		{
+			rectangle.left = min(rectangle.left, lightRectangle.left);
+			rectangle.top = min(rectangle.top, lightRectangle.top);
+			rectangle.right = max(rectangle.right, lightRectangle.right);
+			rectangle.bottom = max(rectangle.bottom, lightRectangle.bottom);
+		}
+	}
+	if (SavedLightStates[ARRAY_SIZE(AdditionalLightStates) - 1])
+	{
+		rectangle.left = max(rectangle.left, SavedLightScissor.left);
+		rectangle.top = max(rectangle.top, SavedLightScissor.top);
+		rectangle.right = min(rectangle.right, SavedLightScissor.right);
+		rectangle.bottom = min(rectangle.bottom, SavedLightScissor.bottom);
+	}
+	return rectangle.left < rectangle.right && rectangle.top < rectangle.bottom;
+}
+
 static bool Draw_Additional_Light_Pass(unsigned pass)
 {
 	IDirect3DDevice9 *device = DX8Wrapper::_Get_D3D_Device8();
-	const size_t first = (size_t)pass * AdditionalLightSlots;
 	const Int registers = AdditionalLightSlots * 2 + (AdditionalLightSlots + 3) / 4;
-	if (first >= AdditionalLightIndices.size())
-	{
-		if (SavedLightShader != nullptr)
-		{
-			device->SetPixelShader(SavedLightShader);
-			SAFE_RELEASE(SavedLightShader);
-			device->SetPixelShaderConstantF(AdditionalLightRegister, &SavedLightConstants[0].X, registers);
-			for (Int i = 0; i < ARRAY_SIZE(AdditionalLightStates); i++)
-			{
-				device->SetRenderState(AdditionalLightStates[i], SavedLightStates[i]);
-			}
-		}
-		return false;
-	}
 	if (pass == 1)
 	{
 		// Direct device writes keep the wrapper's cached base-pass state unchanged.
@@ -1841,6 +1902,19 @@ static bool Draw_Additional_Light_Pass(unsigned pass)
 		{
 			device->GetRenderState(AdditionalLightStates[i], &SavedLightStates[i]);
 		}
+		DWORD colorWrite = 0;
+		D3DMATRIX view, projection;
+		AdditionalLightScissor = SUCCEEDED(device->GetScissorRect(&SavedLightScissor)) &&
+			SUCCEEDED(device->GetViewport(&AdditionalLightViewport)) &&
+			SUCCEEDED(device->GetTransform(D3DTS_VIEW, &view)) &&
+			SUCCEEDED(device->GetTransform(D3DTS_PROJECTION, &projection)) &&
+			SUCCEEDED(device->GetRenderState(D3DRS_COLORWRITEENABLE, &colorWrite)) &&
+			(colorWrite & D3DCOLORWRITEENABLE_ALPHA) == 0;
+		if (AdditionalLightScissor)
+		{
+			AdditionalLightWorldToClip = (AdditionalLightsInView ? AdditionalLightView : view) * projection;
+		}
+		AdditionalLightNext = AdditionalLightSlots;
 		device->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
 		device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
 		device->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
@@ -1849,6 +1923,43 @@ static bool Draw_Additional_Light_Pass(unsigned pass)
 		const AdditionalLightShaders &shaders = AdditionalShaders.find(AdditionalLightShader)->second;
 		device->SetPixelShader(Get_Lights_Debug() && shaders.debug != nullptr ? shaders.debug : shaders.normal);
 	}
+	size_t first = AdditionalLightNext;
+	RECT rectangle;
+	while (first < AdditionalLightIndices.size() && AdditionalLightScissor && !Additional_Light_Screen_Rect(first, rectangle))
+	{
+		first += AdditionalLightSlots;
+	}
+	if (first >= AdditionalLightIndices.size())
+	{
+		if (SavedLightShader != nullptr)
+		{
+			device->SetPixelShader(SavedLightShader);
+			SAFE_RELEASE(SavedLightShader);
+			device->SetPixelShaderConstantF(AdditionalLightRegister, &SavedLightConstants[0].X, registers);
+			for (Int i = 0; i < ARRAY_SIZE(AdditionalLightStates); i++)
+			{
+				device->SetRenderState(AdditionalLightStates[i], SavedLightStates[i]);
+			}
+			if (AdditionalLightScissor)
+			{
+				device->SetScissorRect(&SavedLightScissor);
+			}
+		}
+		return false;
+	}
+	if (AdditionalLightScissor)
+	{
+		if (SUCCEEDED(device->SetScissorRect(&rectangle)))
+		{
+			device->SetRenderState(D3DRS_SCISSORTESTENABLE, TRUE);
+		}
+		else
+		{
+			device->SetScissorRect(&SavedLightScissor);
+			device->SetRenderState(D3DRS_SCISSORTESTENABLE, SavedLightStates[ARRAY_SIZE(AdditionalLightStates) - 1]);
+		}
+	}
+	AdditionalLightNext = first + AdditionalLightSlots;
 	Vector4 constants[PIXEL_LIGHT_REGISTERS];
 	Pack_Pixel_Lights(constants, AdditionalLightSlots, &AdditionalLightIndices[first],
 		(Int)(AdditionalLightIndices.size() - first), AdditionalLightsInView ? &AdditionalLightView : nullptr);
