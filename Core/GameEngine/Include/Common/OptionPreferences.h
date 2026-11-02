@@ -234,6 +234,9 @@ public:
 	Bool getKeyboardOverlayBackdropEnabled() const;
 	Color getKeyboardOverlayBackdropColor() const;
 	Bool getDoubleClickAttackMoveEnabled();
+#if RTS_ZEROHOUR
+	Bool getFacingDragEnabled();		///< UseFacingDrag (Options "Drag to Face"): missing - off, retail
+#endif
 	Int getJpegQuality() const;
 	Real getScrollFactor();
 

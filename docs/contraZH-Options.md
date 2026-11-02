@@ -7,6 +7,24 @@ The menu's drop-down lists share the Resolution list's look and show every entry
 `build/fix_option_combos_wnd.py` restyles them in `OptionsMenu.wnd` and orders them so each open list
 draws over the rows below it; rerun it after adding a drop-down.
 
+## Drag to Face
+
+* `UseFacingDrag = No` leaves the feature off. Set it to `Yes`, or tick Drag to Face in Options.
+* Hold both mouse buttons with units selected. The second press sets the destination;
+  the drag direction sets the facing. Release either button to give the order.
+* A drag under 20 pixels gives a normal move. Dragging farther adds rows.
+* Ctrl snaps the facing to 45 degree steps. Translucent unit previews show the formation.
+* `FormationOrder = ToughFront` puts tougher units in front. `Nearest` assigns slots by distance.
+* `FormationWheels = DriveIn` makes wheeled units approach along the chosen facing.
+  `TurnInPlace` makes them turn at their slots.
+* `FormationSpeed = MarchTogether` uses the slowest ground unit's speed. `ArriveTogether`
+  adjusts speeds to arrive together; `Own` keeps each unit's speed.
+* Allied units can push a formation aside. Displaced units return after a short wait,
+  unless they have moved too far, returned three times, or received another player order.
+* Jets keep circling because their locomotors cannot stop in place.
+* Multiplayer peers and replay viewers need an engine with this order. Saves with an active
+  formation need this feature too. Formation styles travel with the order.
+
 ## Camera
 
 * `UseCustomMaxCameraHeight = No` - (`Yes` lets `MaxCameraHeight` replace `GameData.ini`'s value, 670

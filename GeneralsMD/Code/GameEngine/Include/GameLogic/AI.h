@@ -920,6 +920,7 @@ public:
 #endif
 
 	void groupMoveToPosition( const Coord3D *pos, Bool addWaypoint, CommandSourceType cmdSource, Bool reverse = false );
+	void groupMoveToPositionFacing( const Coord3D *pos, Real angle, Int rows, UnsignedInt style, CommandSourceType cmdSource );	///< drag-to-face: line formation there, facing angle on arrival (LineFormation.h)
 	void groupMoveToAndEvacuate( const Coord3D *pos, CommandSourceType cmdSource );			///< move to given position(s)
 	void groupMoveToAndEvacuateAndExit( const Coord3D *pos, CommandSourceType cmdSource );			///< move to given position & unload transport.
 	void groupIdle(CommandSourceType cmdSource);						///< Enter idle state.

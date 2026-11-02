@@ -937,6 +937,23 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 
 			break;
 		}
+#if RTS_ZEROHOUR
+		case GameMessage::MSG_DO_MOVETO_FACING:
+		{
+			// drag-to-face: line formation (rows deep) across the dragged direction, facing it on arrival
+			if( currentlySelectedGroup )
+			{
+				Coord3D dest = msg->getArgument( 0 )->location;
+				const Real angle = msg->getArgument( 1 )->real;
+				const Int rows = msg->getArgument( 2 )->integer;
+				// the player's formation style (FormationStyle), carried in the order so every machine runs the same move
+				const UnsignedInt style = (UnsignedInt)msg->getArgument( 3 )->integer;
+				currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
+				currentlySelectedGroup->groupMoveToPositionFacing( &dest, angle, rows, style, CMD_FROM_PLAYER );
+			}
+			break;
+		}
+#endif
 
 #ifdef ALLOW_SURRENDER
 		case GameMessage::MSG_DO_SURRENDER:

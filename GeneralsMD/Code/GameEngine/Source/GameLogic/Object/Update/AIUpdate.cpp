@@ -74,7 +74,12 @@
 #include "GameLogic/Weapon.h"
 #include "Common/Radar.h"									// For TheRadar
 
+#include "GameLogic/FacingMove.h"
+#include "GameLogic/LineFormation.h"
+
 #define SLEEPY_AI
+
+static const Real FACE_ON_ARRIVAL_DISTANCE = 100.0f;
 
 // Frames to wait before re-queueing a path request the full pathfind queue refused
 static const Int PATHFIND_QUEUE_RETRY_FRAMES = 2;
@@ -398,6 +403,22 @@ AIUpdateInterface::AIUpdateInterface( Thing *thing, const ModuleData* moduleData
 	m_isSafePath = FALSE;
 	m_movementComplete = FALSE;
 	m_isMoving = FALSE;
+	m_faceOnArrival = FALSE;
+	m_facingOnArrival = 0.0f;
+	m_facingOrderFrame = 0;
+	m_facingAroundCenter = FALSE;
+	m_exactFormationMove = FALSE;
+	m_exactFormationMoveFrame = 0;
+	m_hasFormationSlot = FALSE;
+	m_formationSlot.zero();
+	m_formationAngle = 0.0f;
+	m_formationRadius = 0.0f;
+	m_formationStyle = 0;
+	m_formationSpeed = 0.0f;
+	m_formationSlotFrame = 0;
+	m_formationReturns = 0;
+	m_formationReturnPending = FALSE;
+	m_formationReturnFrame = 0;
 	m_isBlocked = FALSE;
 	m_isBlockedAndStuck = FALSE;
 	m_forceMoveBackwards = FALSE;
@@ -1388,6 +1409,67 @@ UpdateSleepTime AIUpdateInterface::update()
 		}
 		m_movementComplete = FALSE;
 		ignoreObstacle(nullptr);
+	}
+
+	// Drag-to-face: once arrived, turn to the dragged direction; stay awake until then.
+	if( m_faceOnArrival )
+	{
+		if( shouldFaceOnArrival( TheGameLogic->getFrame(), m_facingOrderFrame, isMoving(), isWaitingForPath() || getPath() != nullptr, isIdle() ) )
+		{
+			m_faceOnArrival = FALSE;
+			releaseFormationSpeed();
+			Coord3D facePos = *getObject()->getPosition();
+			facePos.x += Cos( m_facingOnArrival ) * FACE_ON_ARRIVAL_DISTANCE;
+			facePos.y += Sin( m_facingOnArrival ) * FACE_ON_ARRIVAL_DISTANCE;
+			aiFacePosition( &facePos, CMD_FROM_AI );	// the unit's own order: keeps its formation slot
+			m_facingAroundCenter = TRUE;	// after aiFacePosition: its aiDoCommand clears it
+		}
+		else if( m_formationSpeed > 0.0f && getDesiredSpeed() != m_formationSpeed )
+		{
+			setDesiredSpeed( m_formationSpeed );	// a new leg of the path started at full speed
+		}
+		subMachineSleep = UPDATE_SLEEP_NONE;
+	}
+	if( m_facingAroundCenter && getCurrentStateID() != AI_FACE_POSITION )
+	{
+		m_facingAroundCenter = FALSE;
+	}
+
+	// Pushed off a formation slot: once idle for a moment, go back (or just face again)
+	if( m_formationReturnPending )
+	{
+		const UnsignedInt frame = TheGameLogic->getFrame();
+		if( !isIdle() || isMoving() || isWaitingForPath() || getPath() != nullptr )
+		{
+			m_formationReturnFrame = 0;
+		}
+		else if( m_formationReturnFrame == 0 )
+		{
+			m_formationReturnFrame = frame + FORMATION_RETURN_DELAY;
+		}
+		else if( frame >= m_formationReturnFrame )
+		{
+			m_formationReturnPending = FALSE;
+			m_formationReturnFrame = 0;
+			const Coord3D *pos = getObject()->getPosition();
+			const Real dx = m_formationSlot.x - pos->x;
+			const Real dy = m_formationSlot.y - pos->y;
+			switch( decideFormationReturn( sqrtf( dx * dx + dy * dy ), m_formationReturns ) )
+			{
+				case FORMATION_RETURN_MOVE:
+					++m_formationReturns;
+					moveToFormationSlot( m_formationSlot, m_formationAngle, m_formationRadius, m_formationStyle, 0.0f, CMD_FROM_AI, TRUE );	// back at its own speed
+					break;
+				case FORMATION_RETURN_FACE:
+					setFacingOnArrival( m_formationAngle );
+					break;
+				case FORMATION_RETURN_FORGET:
+				default:
+					m_hasFormationSlot = FALSE;
+					break;
+			}
+		}
+		subMachineSleep = UPDATE_SLEEP_NONE;
 	}
 
 	UnsignedInt now = TheGameLogic->getFrame();
@@ -2872,7 +2954,7 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 
 				case ANGLE:
 					{
-						m_curLocomotor->locoUpdate_moveTowardsAngle(getObject(), m_locomotorGoalData.x, m_locomotorGoalTurnByReversing);
+						m_curLocomotor->locoUpdate_moveTowardsAngle(getObject(), m_locomotorGoalData.x, m_locomotorGoalTurnByReversing, m_facingAroundCenter);
 						m_doFinalPosition = FALSE;
 					}
 					break;
@@ -3345,6 +3427,123 @@ void AIUpdateInterface::releaseJammedOrder()
 }
 
 //-------------------------------------------------------------------------------------------------
+// Drag-to-face, see FacingMove.h
+
+Bool shouldFaceOnArrival( UnsignedInt now, UnsignedInt orderFrame, Bool isMoving, Bool hasPath, Bool isIdle )
+{
+	return now > orderFrame && isIdle && !isMoving && !hasPath;
+}
+
+Bool doesCommandCancelFacing( UnsignedInt now, UnsignedInt orderFrame )
+{
+	return now > orderFrame;
+}
+
+void AIUpdateInterface::setFacingOnArrival( Real angle )
+{
+	m_faceOnArrival = TRUE;
+	m_facingOnArrival = angle;
+	m_facingOrderFrame = TheGameLogic->getFrame();
+	setWakeFrame( getObject(), UPDATE_SLEEP_NONE );
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool doesCommandKeepFormationSlot( UnsignedInt now, UnsignedInt slotFrame, Bool isMakeWay, Bool isFromAI )
+{
+	return now <= slotFrame || isMakeWay || isFromAI;
+}
+
+FormationReturn decideFormationReturn( Real distToSlot, Int returnsSoFar )
+{
+	if( distToSlot <= FORMATION_RETURN_MIN )
+	{
+		return FORMATION_RETURN_FACE;
+	}
+	if( distToSlot > FORMATION_RETURN_MAX || returnsSoFar >= FORMATION_MAX_RETURNS )
+	{
+		return FORMATION_RETURN_FORGET;
+	}
+	return FORMATION_RETURN_MOVE;
+}
+
+void clampWaypointPosition( Coord3D &position, Int margin );	// AIGroup.cpp
+
+// A displaced unit keeps its slot until a player or script gives another order.
+void AIUpdateInterface::moveToFormationSlot( const Coord3D &slot, Real angle, Real radius, UnsignedInt style,
+	Real speedLimit, CommandSourceType cmdSource, Bool isReturn )
+{
+	Object *unit = getObject();
+	m_hasFormationSlot = TRUE;
+	m_formationSlot = slot;
+	m_formationAngle = angle;
+	m_formationRadius = radius;
+	m_formationStyle = style;
+	m_formationSlotFrame = TheGameLogic->getFrame();
+	m_formationReturnPending = FALSE;
+	m_formationReturnFrame = 0;
+	if( !isReturn )
+	{
+		m_formationReturns = 0;
+	}
+
+	// Open ground: end exactly on the slot, not on the pathfinder's grid (ultra-accurate until the next order).
+	if( getCurLocomotor() && isDoingGroundMovement() )
+	{
+		Coord3D adjusted = slot;
+		if( TheAI->pathfinder()->adjustDestination( unit, getLocomotorSet(), &adjusted )
+			&& canMoveExactlyToSlot( slot, adjusted ) )
+		{
+			setExactFormationMove();
+		}
+	}
+
+	// Wheels turn around a pivot behind their centre: drive in along the facing instead of turning on the slot.
+	const Locomotor *loco = getCurLocomotor();
+	const Real approach = formationApproachDistance( radius );
+	if( loco && loco->getTurnPivotOffset() != 0.0f && !(style & FORMATION_STYLE_WHEELS_TURN_IN_PLACE)
+		&& needsFormationApproach( *unit->getPosition(), slot, angle, approach ) )
+	{
+		std::vector<Coord3D> path;
+		path.push_back( formationApproachPoint( slot, angle, approach ) );
+		clampWaypointPosition( path[0], (Int)(PATHFIND_CELL_SIZE_F * 4.0f) );
+		path.push_back( slot );
+		aiFollowPath( &path, nullptr, cmdSource );
+	}
+	else
+	{
+		Coord3D dest = slot;
+		aiMoveToPosition( &dest, cmdSource );
+	}
+	setFacingOnArrival( angle );
+
+	// Each path leg resets the speed, so update() reapplies the formation limit.
+	m_formationSpeed = speedLimit;
+	if( speedLimit > 0.0f )
+	{
+		setDesiredSpeed( speedLimit );
+	}
+}
+
+void AIUpdateInterface::releaseFormationSpeed()
+{
+	if( m_formationSpeed > 0.0f )
+	{
+		m_formationSpeed = 0.0f;
+		setDesiredSpeed( FAST_AS_POSSIBLE );
+	}
+}
+
+void AIUpdateInterface::setExactFormationMove()
+{
+	if( getCurLocomotor() )
+	{
+		getCurLocomotor()->setUltraAccurate( TRUE );
+	}
+	m_exactFormationMove = TRUE;
+	m_exactFormationMoveFrame = TheGameLogic->getFrame();
+}
+
+//-------------------------------------------------------------------------------------------------
 void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 {
 	// TheSuperHackers @info The AiCommandParms for m_obj, m_otherObj and m_team should be null tested before use.
@@ -3352,6 +3551,39 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 
 	if (!isAllowedToRespondToAiCommands(parms))
 		return;
+
+	// Drag-to-face: a later order cancels the pending facing
+	if( m_faceOnArrival && doesCommandCancelFacing( TheGameLogic->getFrame(), m_facingOrderFrame ) )
+	{
+		m_faceOnArrival = FALSE;
+		releaseFormationSpeed();
+	}
+	m_facingAroundCenter = FALSE;
+	// Allied make-way commands preserve the slot for a later return.
+	if( m_hasFormationSlot )
+	{
+		const Bool isMakeWay = parms->m_cmd == AICMD_MOVE_AWAY_FROM_UNIT;
+		if( !doesCommandKeepFormationSlot( TheGameLogic->getFrame(), m_formationSlotFrame, isMakeWay, parms->m_cmdSource == CMD_FROM_AI ) )
+		{
+			m_hasFormationSlot = FALSE;
+			m_formationReturnPending = FALSE;
+		}
+		else if( isMakeWay )
+		{
+			m_formationReturnPending = TRUE;
+			m_formationReturnFrame = 0;
+		}
+	}
+
+	// The formation's exact move ends with any later order (the facing turn on arrival is one)
+	if( m_exactFormationMove && doesCommandCancelFacing( TheGameLogic->getFrame(), m_exactFormationMoveFrame ) )
+	{
+		m_exactFormationMove = FALSE;
+		if( getCurLocomotor() )
+		{
+			getCurLocomotor()->setUltraAccurate( FALSE );
+		}
+	}
 
 #ifdef ALLOW_SURRENDER
 	// surrendered items have very limited options, and only via AI cmds
@@ -6017,17 +6249,21 @@ void AIUpdateInterface::crc( Xfer *x )
 	* 8: Added the queued shots (OCL Attack FireRegardlessOfOrders)
 	* 10: Added the order held while jammed
 	* 11: Added the attack placement (OCL Attack through SPECIAL_POWER_CONSTRUCT)
+	* 100: Added formation state after this fork's version 12 fields
 	*/
 // ------------------------------------------------------------------------------------------------
 void AIUpdateInterface::xfer( Xfer *xfer )
 {
   // version
 #if RETAIL_COMPATIBLE_CRC || RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = 4;
+	const XferVersion baseVersion = 4;
 #else
-	const XferVersion currentVersion = 12;
+	const XferVersion baseVersion = 12;
 #endif
-  XferVersion version = currentVersion;
+	const XferVersion currentVersion = 100;
+	const Bool isInFormationMove = m_exactFormationMove || m_faceOnArrival || m_facingAroundCenter || m_hasFormationSlot
+		|| m_formationSpeed > 0.0f;
+  XferVersion version = isInFormationMove ? currentVersion : baseVersion;
   xfer->xferVersion( &version, currentVersion );
 
  // extend base class
@@ -6296,6 +6532,35 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 	{
 		xfer->xferBool(&m_pathWasCapped);
 		xfer->xferUnsignedByte(&m_cappedLegs);
+	}
+
+	if( version >= 100 )
+	{
+		xfer->xferBool( &m_exactFormationMove );
+		xfer->xferUnsignedInt( &m_exactFormationMoveFrame );
+		xfer->xferBool( &m_faceOnArrival );
+		xfer->xferReal( &m_facingOnArrival );
+		xfer->xferUnsignedInt( &m_facingOrderFrame );
+		xfer->xferBool( &m_facingAroundCenter );
+		xfer->xferBool( &m_hasFormationSlot );
+		xfer->xferCoord3D( &m_formationSlot );
+		xfer->xferReal( &m_formationAngle );
+		xfer->xferReal( &m_formationRadius );
+		xfer->xferUnsignedInt( &m_formationStyle );
+		xfer->xferReal( &m_formationSpeed );
+		xfer->xferUnsignedInt( &m_formationSlotFrame );
+		xfer->xferInt( &m_formationReturns );
+		xfer->xferBool( &m_formationReturnPending );
+		xfer->xferUnsignedInt( &m_formationReturnFrame );
+	}
+	else if( xfer->getXferMode() == XFER_LOAD )
+	{
+		m_exactFormationMove = FALSE;
+		m_faceOnArrival = FALSE;
+		m_facingAroundCenter = FALSE;
+		m_hasFormationSlot = FALSE;
+		m_formationSpeed = 0.0f;
+		m_formationReturnPending = FALSE;
 	}
 
 }

@@ -2229,7 +2229,8 @@ void W3DModelDraw::setHidden(Bool hidden)
 	if (m_objectDecal)
 		updateObjectDecalVisibility();
 
-	if (m_trackRenderObject && hidden)
+	// TerrainTracks reads the owning object's layer.
+	if (m_trackRenderObject && hidden && getDrawable()->getObject())
 	{	const Coord3D* pos = getDrawable()->getPosition();
 		m_trackRenderObject->addCapEdgeToTrack(pos->x,pos->y);
 	}
@@ -4740,7 +4741,7 @@ void W3DModelDraw::reactToTransformChange( const Matrix3D* oldMtx,
 		m_renderObject->Set_Transform(mtx);
 	}
 
-	if (m_trackRenderObject)
+	if (m_trackRenderObject && getDrawable()->getObject())
 	{
 		Object *obj = getDrawable()->getObject();
 		const Coord3D* pos = getDrawable()->getPosition();

@@ -3531,7 +3531,8 @@ StateReturnType AIFollowPathState::update()
 		}
 		else
 		{
-			setAdjustsDestination(m_adjustFinal && (m_adjustFinalOverride || ai->isDoingGroundMovement()));
+			// drag-to-face's exact move: the path's last point is the slot, not the nearest grid point
+			setAdjustsDestination(m_adjustFinal && (m_adjustFinalOverride || ai->isDoingGroundMovement()) && !ai->isExactFormationMove());
 			if (getAdjustsDestination())
 			{
 				if (!TheAI->pathfinder()->adjustDestination(getMachineOwner(), ai->getLocomotorSet(), &m_goalPosition)) {

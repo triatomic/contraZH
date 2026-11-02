@@ -390,6 +390,13 @@ public:
 	//Definition of busy -- when explicitly in the busy state. Moving or attacking is not considered busy!
 	virtual Bool isBusy() const;
 
+	// Drag-to-face: after the move this came with, turn to angle on arrival (FacingMove.h).
+	void setFacingOnArrival( Real angle );
+	Bool isExactFormationMove() const { return m_exactFormationMove; }
+	void setExactFormationMove();	///< the next move ends exactly on its point; any later order undoes it
+	void releaseFormationSpeed();	///< back to full speed once the formation move ends
+	void moveToFormationSlot( const Coord3D &slot, Real angle, Real radius, UnsignedInt style, Real speedLimit, CommandSourceType cmdSource, Bool isReturn );	///< one unit of a drag-to-face formation
+
 	virtual void onObjectCreated() override;
 	virtual void doQuickExit( std::vector<Coord3D>* path );			///< get out of this Object
 
@@ -901,6 +908,22 @@ private:
 	Bool				m_isSafePath;								///< True if we are just approaching to tighten.
 	Bool				m_movementComplete;					///< True if we finished an AIInternalMoveToState.
 	Bool				m_isMoving;									///< True if we are in an AIInternalMoveToState.
+	Bool				m_faceOnArrival;						///< drag-to-face: turn to m_facingOnArrival once arrived
+	Real				m_facingOnArrival;					///< angle in radians
+	UnsignedInt	m_facingOrderFrame;					///< frame of the facing order
+	Bool				m_facingAroundCenter;				///< the facing turn in progress ignores TurnPivotOffset
+	Bool				m_exactFormationMove;				///< we made the locomotor ultra-accurate for a formation slot
+	UnsignedInt	m_exactFormationMoveFrame;		///< frame of that order
+	Bool				m_hasFormationSlot;					///< holding a formation slot (FacingMove.h)
+	Coord3D			m_formationSlot;
+	Real				m_formationAngle;
+	Real				m_formationRadius;
+	UnsignedInt	m_formationStyle;
+	Real				m_formationSpeed;						///< speed limit while moving to the slot, 0 = none
+	UnsignedInt	m_formationSlotFrame;
+	Int					m_formationReturns;
+	Bool				m_formationReturnPending;		///< pushed aside: go back once idle
+	UnsignedInt	m_formationReturnFrame;			///< frame to go back, 0 = not idle yet
 	Bool				m_isBlocked;
 	Bool				m_isBlockedAndStuck;				///< True if we are stuck & need to recompute path.
 	Bool				m_forceMoveBackwards;				///< True while executing a REVERSE_MOVE order; forces the locomotor to drive backwards.

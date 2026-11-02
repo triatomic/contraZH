@@ -60,6 +60,7 @@
 #include "GameLogic/Module/SupplyTruckAIUpdate.h"
 #include "GameLogic/Module/SpecialPowerUpdateModule.h"
 #include "GameLogic/ObjectIter.h"
+#include "GameLogic/LineFormation.h"
 #include "GameLogic/PartitionManager.h"
 
 
@@ -3409,6 +3410,90 @@ void AIGroup::groupSell( CommandSourceType cmdSource )
 		TheBuildAssistant->sellObject( groupObjectsCopy[j] );
 	}
 
+}
+
+//-------------------------------------------------------------------------------------------------
+void AIGroup::groupMoveToPositionFacing( const Coord3D *pos, Real angle, Int rows, UnsignedInt style, CommandSourceType cmdSource )
+{
+	std::vector<Object *> movers;
+	std::vector<FormationMember> members;
+	for( std::list<Object *>::iterator i = m_memberList.begin(); i != m_memberList.end(); ++i )
+	{
+		if( !isLineFormationMover( *i ) )
+		{
+			continue;
+		}
+		movers.push_back( *i );
+		members.push_back( makeFormationMember( *i ) );
+	}
+
+	// One unit: the normal move to the point, then the facing.
+	if( movers.size() <= 1 )
+	{
+		groupMoveToPosition( pos, false, cmdSource );
+		for( std::list<Object *>::iterator i = m_memberList.begin(); i != m_memberList.end(); ++i )
+		{
+			AIUpdateInterface *ai = (*i)->getAIUpdateInterface();
+			if( ai == nullptr )
+			{
+				continue;
+			}
+			ai->setFacingOnArrival( angle );
+		}
+		return;
+	}
+
+	// The same slots as the preview ghosts (LineFormation.h); each unit goes to its own at its own speed.
+	const Int count = (Int)movers.size();
+	std::vector<Coord3D> slots( count );
+	computeLineFormation( *pos, angle, rows, &members[0], count, &slots[0], style );
+	// Damaged units do not set the formation speed, as in AIGroup::recompute.
+	std::vector<Real> speeds( count, 0.0f ), distances( count, 0.0f );
+	Real slowest = 0.0f, slowestAny = 0.0f, arrivalTime = 0.0f;
+	for( Int k = 0; k < count; ++k )
+	{
+		clampWaypointPosition( slots[k], STD_WAYPOINT_CLAMP_MARGIN );
+		AIUpdateInterface *ai = movers[k]->getAIUpdateInterface();
+		if( !ai->isDoingGroundMovement() )
+		{
+			continue;
+		}
+		speeds[k] = ai->getCurLocomotorSpeed();
+		const Coord3D *at = movers[k]->getPosition();
+		const Real dx = slots[k].x - at->x;
+		const Real dy = slots[k].y - at->y;
+		distances[k] = sqrtf( dx * dx + dy * dy );
+		if( speeds[k] <= 0.0f )
+		{
+			continue;
+		}
+		if( slowestAny <= 0.0f || speeds[k] < slowestAny )
+		{
+			slowestAny = speeds[k];
+		}
+		if( IS_CONDITION_BETTER( movers[k]->getBodyModule()->getDamageState(), TheGlobalData->m_movementPenaltyDamageState )
+			&& (slowest <= 0.0f || speeds[k] < slowest) )
+		{
+			slowest = speeds[k];
+		}
+		if( distances[k] / speeds[k] > arrivalTime )
+		{
+			arrivalTime = distances[k] / speeds[k];
+		}
+	}
+	if( slowest <= 0.0f )
+	{
+		slowest = slowestAny;
+	}
+
+	for( Int k = 0; k < count; ++k )
+	{
+		Object *unit = movers[k];
+		unit->setFormationID( NO_FORMATION_ID );
+		TheAI->pathfinder()->removeGoal( unit );
+		const Real speedLimit = speeds[k] > 0.0f ? formationUnitSpeed( style, distances[k], speeds[k], slowest, arrivalTime ) : 0.0f;
+		unit->getAIUpdateInterface()->moveToFormationSlot( slots[k], angle, members[k].radius, style, speedLimit, cmdSource, FALSE );
+	}
 }
 
 /**

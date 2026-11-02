@@ -263,6 +263,9 @@ SelectionTranslator::SelectionTranslator()
 	m_rightMouseDownAnchor.zero();
 	m_rightMouseDownTimeMs = 0;
 	m_rightMouseDownCameraPos.zero();
+#if RTS_ZEROHOUR
+	m_dragSelectBlocked = FALSE;
+#endif
 	m_displayedMaxWarning = FALSE;
 	m_selectCountMap.clear();
 
@@ -1094,6 +1097,14 @@ GameMessageDisposition SelectionTranslator::onMouseLeftClick(MAYBE_UNUSED const 
 
 GameMessageDisposition SelectionTranslator::onRawMouseLeftButtonDown(MAYBE_UNUSED const GameMessage *msg)
 {
+#if RTS_ZEROHOUR
+	// a left press in the same frame as a drag-to-face chord reaches us after the chord began
+	if (m_dragSelectBlocked)
+	{
+		return KEEP_MESSAGE;
+	}
+#endif
+
 	// cannot actually start area selection yet - have to wait for cursor to move a bit
 	m_leftMouseButtonIsDown = true;
 	m_leftMouseDownAnchor = msg->getArgument( 0 )->pixel;
@@ -1506,3 +1517,24 @@ void SelectionTranslator::setLeftMouseButton(Bool state)
 {
 	m_leftMouseButtonIsDown = state;
 }
+
+// Drag-to-face took the left button: drop the box without selecting, and clear its drawing.
+#if RTS_ZEROHOUR
+void SelectionTranslator::setDragSelectBlocked(Bool blocked)
+{
+	m_dragSelectBlocked = blocked;
+	if (!blocked)
+	{
+		return;
+	}
+
+	m_leftMouseButtonIsDown = FALSE;
+	if (m_dragSelecting)
+	{
+		m_dragSelecting = FALSE;
+		TheTacticalView->setMouseLock( FALSE );
+		TheInGameUI->setSelecting( FALSE );
+		TheInGameUI->endAreaSelectHint(nullptr);
+	}
+}
+#endif

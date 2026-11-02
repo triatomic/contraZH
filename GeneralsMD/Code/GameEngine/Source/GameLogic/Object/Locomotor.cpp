@@ -980,7 +980,7 @@ Real Locomotor::getMaxLift(BodyDamageType condition) const
 }
 
 //-------------------------------------------------------------------------------------------------
-void Locomotor::locoUpdate_moveTowardsAngle(Object* obj, Real goalAngle, Bool turnByReversing)
+void Locomotor::locoUpdate_moveTowardsAngle(Object* obj, Real goalAngle, Bool turnByReversing, Bool aroundCenter)
 {
 	setFlag(MAINTAIN_POS_IS_VALID, false);
 
@@ -1023,7 +1023,7 @@ void Locomotor::locoUpdate_moveTowardsAngle(Object* obj, Real goalAngle, Bool tu
 	else
 	{
 		const Bool reverseToTurn = turnByReversing && m_template->m_canMoveBackward;
-		if (m_template->m_requiresMoveToTurn || reverseToTurn)
+		if (!aroundCenter && (m_template->m_requiresMoveToTurn || reverseToTurn))
 		{
 			// can't pivot in place (or asked to turn by reversing): move toward/away from the goal angle so
 			// the appearance-specific mover (e.g. moveTowardsPositionWheels) applies MinTurnSpeed / reversing.
@@ -1070,7 +1070,7 @@ void Locomotor::locoUpdate_moveTowardsAngle(Object* obj, Real goalAngle, Bool tu
 		Coord3D desiredPos = *obj->getPosition();
 		desiredPos.x += Cos(goalAngle) * 1000.0f;
 		desiredPos.y += Sin(goalAngle) * 1000.0f;
-		PhysicsTurningType rotating = rotateTowardsPosition(obj, desiredPos);
+		PhysicsTurningType rotating = rotateTowardsPosition(obj, desiredPos, nullptr, aroundCenter);
 		physics->setTurning(rotating);
 		handleBehaviorZ(obj, physics, *obj->getPosition());
 	}
@@ -1078,12 +1078,12 @@ void Locomotor::locoUpdate_moveTowardsAngle(Object* obj, Real goalAngle, Bool tu
 }
 
 //-------------------------------------------------------------------------------------------------
-PhysicsTurningType Locomotor::rotateTowardsPosition(Object* obj, const Coord3D& goalPos, Real *relAngle)
+PhysicsTurningType Locomotor::rotateTowardsPosition(Object* obj, const Coord3D& goalPos, Real *relAngle, Bool aroundCenter)
 {
 	BodyDamageType bdt = obj->getBodyModule()->getDamageState();
 	Real turnRate = getMaxTurnRate(bdt);
 
-	PhysicsTurningType rotating = rotateObjAroundLocoPivot(obj, goalPos, turnRate, relAngle);
+	PhysicsTurningType rotating = rotateObjAroundLocoPivot(obj, goalPos, turnRate, relAngle, aroundCenter);
 	return rotating;
 }
 
@@ -2442,7 +2442,7 @@ Real Locomotor::calcLiftToUseAtPt(Object* obj, PhysicsBehavior *physics, Real cu
 
 //-------------------------------------------------------------------------------------------------
 PhysicsTurningType Locomotor::rotateObjAroundLocoPivot(Object* obj, const Coord3D& goalPos,
-																											 Real maxTurnRate, Real *relAngle)
+																											 Real maxTurnRate, Real *relAngle, Bool aroundCenter)
 {
 	Real angle = obj->getOrientation();
 	Real offset = getTurnPivotOffset();
@@ -2450,6 +2450,10 @@ PhysicsTurningType Locomotor::rotateObjAroundLocoPivot(Object* obj, const Coord3
 	PhysicsTurningType turn = TURN_NONE;
 
 	if (getFlag(IS_BRAKING)) offset = 0.0f; // When braking we do exact movement towards goal, instead of physics.
+	if (aroundCenter)
+	{
+		offset = 0.0f;	// drag-to-face trim: turn on the spot, do not swing off it
+	}
 	//Rotating about pivot moves the object, and can make us miss our goal, so it is disabled.  jba.
 	if (offset != 0.0f)
 	{

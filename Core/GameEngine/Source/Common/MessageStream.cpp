@@ -209,6 +209,9 @@ Bool GameMessage::isPlainOrder(GameMessage::Type t)
 		case GameMessage::MSG_DO_FORCEMOVETO:
 		case GameMessage::MSG_DO_SALVAGE:
 		case GameMessage::MSG_DO_MOVETO:
+#if RTS_ZEROHOUR
+		case GameMessage::MSG_DO_MOVETO_FACING:
+#endif
 		case GameMessage::MSG_ADD_WAYPOINT:
 		case GameMessage::MSG_DO_GUARD_POSITION:
 		case GameMessage::MSG_DO_GUARD_OBJECT:
@@ -715,6 +718,9 @@ const char *GameMessage::getCommandTypeAsString(GameMessage::Type t)
 	CASE_LABEL(MSG_LOGIC_CRC)
 	CASE_LABEL(MSG_SET_MINE_CLEARING_DETAIL)
 	CASE_LABEL(MSG_ENABLE_RETALIATION_MODE)
+#if RTS_ZEROHOUR
+	CASE_LABEL(MSG_DO_MOVETO_FACING)
+#endif
 	CASE_LABEL(MSG_BEGIN_DEBUG_NETWORK_MESSAGES)
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)

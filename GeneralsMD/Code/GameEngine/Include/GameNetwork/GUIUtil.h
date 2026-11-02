@@ -40,6 +40,10 @@ void PopulatePlayerTemplateComboBox(Int comboBox, GameWindow *comboArray[], Game
 void PopulateTeamComboBox(Int comboBox, GameWindow *comboArray[], GameInfo *myGame, Bool isObserver = FALSE);
 void PopulateStartingCashComboBox(GameWindow *comboBox, GameInfo *myGame);
 
+/// a check box with an existing one's look and size, at x, y in the parent, unchecked
+GameWindow *CreateCheckBoxLike( GameWindow *lookLike, GameWindow *parent, Int x, Int y, const UnicodeString &text,
+	const char *decoratedName );
+
 void EnableSlotListUpdates( Bool val );
 Bool AreSlotListUpdatesEnabled();
 

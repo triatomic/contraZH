@@ -71,6 +71,7 @@
 #include "GameClient/Keyboard.h"
 #include "GameClient/LanguageFilter.h"
 #include "GameClient/LookAtXlat.h"
+#include "GameClient/FacingDrag.h"
 #include "GameClient/MetaEvent.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/ParticleSys.h"
@@ -102,6 +103,7 @@ GameClient::GameClient()
 		m_translators[ i ] = TRANSLATOR_ID_INVALID;
 	m_numTranslators = 0;
 	m_commandTranslator = nullptr;
+	m_facingDragTranslator = nullptr;
 
 	m_drawableTOC.clear();
 	m_textBearingDrawableList.clear();
@@ -228,6 +230,7 @@ GameClient::~GameClient()
 		TheMessageStream->removeTranslator( m_translators[ i ] );
 	m_numTranslators = 0;
 	m_commandTranslator = nullptr;
+	m_facingDragTranslator = nullptr;
 
 	delete TheAnim2DCollection;
 	TheAnim2DCollection = nullptr;
@@ -312,6 +315,8 @@ void GameClient::init()
 		m_translators[ m_numTranslators++ ] =	TheMessageStream->attachTranslator( MSGNEW("GameClientSubsystem") HotKeyTranslator,	25 );
 		m_translators[ m_numTranslators++ ] =	TheMessageStream->attachTranslator( MSGNEW("GameClientSubsystem") PlaceEventTranslator,	30 );
 		m_translators[ m_numTranslators++ ] = TheMessageStream->attachTranslator( MSGNEW("GameClientSubsystem") GUICommandTranslator, 40 );
+		// drag-to-face: before selection, scrolling and orders, which it takes the buttons from while held
+		m_translators[ m_numTranslators++ ] = TheMessageStream->attachTranslator( m_facingDragTranslator = MSGNEW("GameClientSubsystem") FacingDragTranslator, 45 );
 		m_translators[ m_numTranslators++ ] =	TheMessageStream->attachTranslator( MSGNEW("GameClientSubsystem") SelectionTranslator,	50 );
 		m_translators[ m_numTranslators++ ] =	TheMessageStream->attachTranslator( MSGNEW("GameClientSubsystem") LookAtTranslator,			60 );
 		m_translators[ m_numTranslators ] =	TheMessageStream->attachTranslator( MSGNEW("GameClientSubsystem") CommandTranslator,		70 );
@@ -465,6 +470,11 @@ void GameClient::init()
 /** Reset the game client for a new game */
 void GameClient::reset()
 {
+	if (m_facingDragTranslator)
+	{
+		m_facingDragTranslator->reset();
+	}
+
 	Drawable *draw, *nextDraw;
 //	m_drawableHash.clear();
 //	m_drawableHash.resize(DRAWABLE_HASH_SIZE);

@@ -1665,6 +1665,7 @@ GlobalData::GlobalData()
 	m_smartCommandGroup = TRUE;
 	m_actionLineMode = ActionLineMode_Default;
 	m_doubleClickAttackMove = FALSE;
+	m_facingDrag = FALSE;		// retail: no drag-to-face (the Options check box turns it on)
 
 	m_useOldMoveSpeed = TRUE;
 
@@ -2053,6 +2054,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_keyboardOverlayBackdrop = optionPref.getKeyboardOverlayBackdropEnabled();
 	TheWritableGlobalData->m_keyboardOverlayBackdropColor = optionPref.getKeyboardOverlayBackdropColor();
 	TheWritableGlobalData->m_doubleClickAttackMove = optionPref.getDoubleClickAttackMoveEnabled();
+	TheWritableGlobalData->m_facingDrag = optionPref.getFacingDragEnabled();
 	TheWritableGlobalData->m_easyMilitaryDrag = optionPref.getEasyMilitaryDragEnabled();
 	TheWritableGlobalData->m_smartSelection = optionPref.getSmartSelectionEnabled();
 	TheWritableGlobalData->m_smartSelectionUseMouse = optionPref.getSmartSelectionUseMouse();

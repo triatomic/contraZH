@@ -626,6 +626,8 @@ public:  // ********************************************************************
 	virtual void setScrolling( Bool isScrolling );							///< set right-click scroll mode
 	virtual Bool isScrolling();														///< are we scrolling?
 	virtual void setSelecting( Bool isSelecting );							///< set drag select mode
+	void setFacingDragPreview( Bool active, const Coord3D *anchor, Real angle, Bool showArrow );	///< drag-to-face ring/arrow
+	Bool getFacingDragPreview( Coord3D *anchor, Real *angle, Bool *showArrow ) const;	///< FALSE when not shown
 	virtual Bool isSelecting();														///< are we selecting?
 	virtual void setScrollAmount( Coord2D amt );								///< set scroll amount
 	virtual Coord2D getScrollAmount();										///< get scroll amount
@@ -1268,6 +1270,10 @@ protected:
 	MilitarySubtitleData *			m_militarySubtitle;		///< The pointer to subtitle class, if it's present then draw it.
 	Bool												m_isScrolling;
 	Bool												m_isSelecting;
+	Bool												m_facingDragActive;				///< drag-to-face ring/arrow shown
+	Coord3D											m_facingDragAnchor;
+	Real												m_facingDragAngle;
+	Bool												m_facingDragShowArrow;
 	MouseMode										m_mouseMode;
 	Int													m_mouseModeCursor;
 	DrawableID									m_mousedOverDrawableID;

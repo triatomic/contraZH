@@ -804,6 +804,15 @@ Bool OptionPreferences::getDoubleClickAttackMoveEnabled()
 	return FALSE;
 }
 
+// drag-to-face, off unless the player turned it on
+#if RTS_ZEROHOUR
+Bool OptionPreferences::getFacingDragEnabled()
+{
+	OptionPreferences::const_iterator it = find( "UseFacingDrag" );
+	return it != end() && stricmp( it->second.str(), "yes" ) == 0;
+}
+#endif
+
 Int OptionPreferences::getJpegQuality() const
 {
 	OptionPreferences::const_iterator it = find("JpegQuality");

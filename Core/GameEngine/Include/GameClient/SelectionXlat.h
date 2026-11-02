@@ -51,6 +51,9 @@ private:
 	ICoord2D m_rightMouseDownAnchor;	// Note: Used for drawing feedback only.
 	UnsignedInt m_rightMouseDownTimeMs;    ///< timer used for checking double click for type selection
 	Coord3D m_rightMouseDownCameraPos;
+#if RTS_ZEROHOUR
+	Bool m_dragSelectBlocked;	// set while drag-to-face owns the mouse buttons
+#endif
 
 	SelectCountMap m_selectCountMap;
 
@@ -65,6 +68,9 @@ public:
 	//changes the mode of drag selecting to it's opposite
 	void setDragSelecting(Bool dragSelect);
 	void setLeftMouseButton(Bool state);
+#if RTS_ZEROHOUR
+	void setDragSelectBlocked(Bool blocked); ///< drag-to-face owns the left button: end and don't start a selection box
+#endif
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
   Bool m_HandOfGodSelectionMode;

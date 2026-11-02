@@ -39,6 +39,7 @@
 // forward declarations
 class AsciiString;
 class Display;
+class FacingDragTranslator;
 class DisplayStringManager;
 class Drawable;
 class FontLibrary;
@@ -193,6 +194,7 @@ protected:
 	TranslatorID m_translators[ MAX_CLIENT_TRANSLATORS ];				///< translators we have used
 	UnsignedInt m_numTranslators;																///< number of translators in m_translators[]
 	CommandTranslator *m_commandTranslator;											///< the command translator on the message stream
+	FacingDragTranslator *m_facingDragTranslator;
 
 private:
 

@@ -1839,6 +1839,10 @@ InGameUI::InGameUI()
 	m_maxSelectCount = -1;
 	m_isScrolling = FALSE;
 	m_isSelecting = FALSE;
+	m_facingDragActive = FALSE;
+	m_facingDragAnchor.zero();
+	m_facingDragAngle = 0.0f;
+	m_facingDragShowArrow = FALSE;
 	m_mouseMode = MOUSEMODE_DEFAULT;
 	m_mouseModeCursor = Mouse::ARROW;
 	m_mousedOverDrawableID = INVALID_DRAWABLE_ID;
@@ -5443,6 +5447,31 @@ void InGameUI::disregardDrawable( Drawable *draw )
 	// make sure drawable is no longer selected
 	deselectDrawable( draw );
 
+}
+
+//-------------------------------------------------------------------------------------------------
+// Drag-to-face: the building placement ring (short drag) or arrow at the chord point; W3DInGameUI draws it
+void InGameUI::setFacingDragPreview( Bool active, const Coord3D *anchor, Real angle, Bool showArrow )
+{
+	m_facingDragActive = active;
+	if( anchor )
+	{
+		m_facingDragAnchor = *anchor;
+	}
+	m_facingDragAngle = angle;
+	m_facingDragShowArrow = showArrow;
+}
+
+Bool InGameUI::getFacingDragPreview( Coord3D *anchor, Real *angle, Bool *showArrow ) const
+{
+	if( !m_facingDragActive )
+	{
+		return FALSE;
+	}
+	*anchor = m_facingDragAnchor;
+	*angle = m_facingDragAngle;
+	*showArrow = m_facingDragShowArrow;
+	return TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------

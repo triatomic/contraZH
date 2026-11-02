@@ -662,6 +662,10 @@ public:
 		MSG_SET_DIPLOMACY_STANCE,										///< (player index, Bool ally) the sender treats that player as an ally or an enemy
 		MSG_ENABLE_LOBBY_RULE,												///< (LobbyRule) the Generals Online host turns a lobby rule on at the start of a match
 
+#if RTS_ZEROHOUR
+		MSG_DO_MOVETO_FACING,											///< location, angle, rows, formation style
+#endif
+
 		MSG_BEGIN_DEBUG_NETWORK_MESSAGES = 1900,		///< network messages that exist only in debug/internal builds. all grouped separately.
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)

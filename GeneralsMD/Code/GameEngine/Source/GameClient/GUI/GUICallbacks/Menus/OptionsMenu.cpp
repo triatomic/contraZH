@@ -61,6 +61,7 @@
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/GameText.h"
+#include "GameNetwork/GUIUtil.h"
 #include "GameClient/Display.h"
 #include "GameClient/ControlBar.h"
 #include "GameClient/IMEManager.h"
@@ -107,6 +108,7 @@ static GameWindow *		checkRetaliation		= nullptr;
 
 static NameKeyType		checkDoubleClickAttackMoveID	= NAMEKEY_INVALID;
 static GameWindow *		checkDoubleClickAttackMove		= nullptr;
+static GameWindow *		checkFacingDrag						= nullptr;	///< Drag to Face, under Double Click Guard
 
 static NameKeyType		sliderScrollSpeedID	= NAMEKEY_INVALID;
 static GameWindow *		sliderScrollSpeed		= nullptr;
@@ -752,6 +754,7 @@ static void setDefaults()
 	GadgetCheckBoxSetChecked(checkAlternateMouse, FALSE);
 	GadgetCheckBoxSetChecked(checkRetaliation, TRUE );
 	GadgetCheckBoxSetChecked( checkDoubleClickAttackMove, FALSE );
+	setCheck( checkFacingDrag, FALSE );
 	setCheck( checkBorderlessWindow, FALSE );
 	setCheck( checkWindowed, FALSE );
 	updateGameOptionsEnables();
@@ -1116,6 +1119,11 @@ static void saveOptions()
 	(*pref)["Retaliation"] = TheWritableGlobalData->m_clientRetaliationModeEnabled? "yes" : "no";
 
 	TheWritableGlobalData->m_doubleClickAttackMove = GadgetCheckBoxIsChecked( checkDoubleClickAttackMove );
+	if( checkFacingDrag )
+	{
+		TheWritableGlobalData->m_facingDrag = GadgetCheckBoxIsChecked( checkFacingDrag );
+		(*pref)["UseFacingDrag"] = TheWritableGlobalData->m_facingDrag ? "yes" : "no";
+	}
 	(*pref)["UseDoubleClickAttackMove"] = TheWritableGlobalData->m_doubleClickAttackMove ? "yes" : "no";
 
 	// TheSuperHackers @todo Add combo box ?
@@ -2509,6 +2517,41 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 	setCheck( checkBorderlessWindow, TheGlobalData->m_borderlessWindow && !TheGlobalData->m_windowed );
 	setCheck( checkWindowed, TheGlobalData->m_windowed );
 	updateGameOptionsEnables();
+
+	// Older menu layouts can omit this control.
+	checkFacingDrag = TheWindowManager->winGetWindowFromId( nullptr, NAMEKEY( "OptionsMenu.wnd:CheckFacingDrag" ) );
+	if( checkFacingDrag == nullptr && checkDoubleClickAttackMove && checkDoubleClickAttackMove->winGetParent() )
+	{
+		GameWindow *parent = checkDoubleClickAttackMove->winGetParent();
+		Int x, y, w, h, panelW, panelH;
+		checkDoubleClickAttackMove->winGetPosition( &x, &y );
+		checkDoubleClickAttackMove->winGetSize( &w, &h );
+		parent->winGetSize( &panelW, &panelH );
+		for (y += h; y + h < panelH && !checkFacingDrag; y += h)
+		{
+			Bool free = TRUE;
+			for (GameWindow *child = parent->winGetChild(); child; child = child->winGetNext())
+			{
+				Int cx, cy, cw, ch;
+				child->winGetPosition( &cx, &cy );
+				child->winGetSize( &cw, &ch );
+				if (ch <= h * 2 && x < cx + cw && x + w > cx && y < cy + ch && y + h > cy)
+				{
+					free = FALSE;
+					break;
+				}
+			}
+			if (free)
+			{
+				checkFacingDrag = CreateCheckBoxLike( checkDoubleClickAttackMove, parent, x, y,
+					TheGameText->fetchOrSubstitute( "GUI:FacingDrag", L"Drag to Face" ), "OptionsMenu.wnd:CheckFacingDrag" );
+			}
+		}
+	}
+	if( checkFacingDrag )
+	{
+		GadgetCheckBoxSetChecked( checkFacingDrag, TheGlobalData->m_facingDrag );
+	}
 
 	// set scroll speed slider
 	// TheSuperHackers @tweak xezon 11/07/2025 No longer sets the slider position if the user setting

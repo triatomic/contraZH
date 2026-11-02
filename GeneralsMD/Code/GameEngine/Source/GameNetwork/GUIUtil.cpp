@@ -38,6 +38,7 @@
 #include "GameClient/GadgetComboBox.h"
 #include "GameClient/GadgetTextEntry.h"
 #include "GameClient/GadgetStaticText.h"
+#include "GameClient/GadgetCheckBox.h"
 #include "GameClient/GadgetPushButton.h"
 #include "GameClient/GadgetCheckBox.h"
 #include "GameClient/GameText.h"
@@ -706,3 +707,41 @@ void UpdateSlotList( GameInfo *myGame, GameWindow *comboPlayer[],
 }
 
 // -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+
+GameWindow *CreateCheckBoxLike( GameWindow *lookLike, GameWindow *parent, Int x, Int y, const UnicodeString &text,
+	const char *decoratedName )
+{
+	if( lookLike == nullptr || parent == nullptr )
+	{
+		return nullptr;
+	}
+	WinInstanceData *look = lookLike->winGetInstanceData();
+	WinInstanceData instData;
+	instData.init();
+	instData.m_style = look->m_style;
+	for( Int i = 0; i < MAX_DRAW_DATA; i++ )
+	{
+		instData.m_enabledDrawData[ i ] = look->m_enabledDrawData[ i ];
+		instData.m_disabledDrawData[ i ] = look->m_disabledDrawData[ i ];
+		instData.m_hiliteDrawData[ i ] = look->m_hiliteDrawData[ i ];
+	}
+	instData.m_enabledText = look->m_enabledText;
+	instData.m_disabledText = look->m_disabledText;
+	instData.m_hiliteText = look->m_hiliteText;
+	instData.m_font = look->m_font;
+	instData.m_decoratedNameString = decoratedName;
+	Int width, height;
+	lookLike->winGetSize( &width, &height );
+	UnsignedInt status = lookLike->winGetStatus();
+	BitClear( status, WIN_STATUS_HIDDEN );
+	GameWindow *box = TheWindowManager->gogoGadgetCheckbox( parent, status, x, y, width, height, &instData, instData.m_font, FALSE );
+	if( box )
+	{
+		box->winSetWindowId( TheNameKeyGenerator->nameToKey( decoratedName ) );
+		GadgetCheckBoxSetText( box, text );
+		GadgetCheckBoxSetChecked( box, FALSE );
+	}
+	return box;
+}

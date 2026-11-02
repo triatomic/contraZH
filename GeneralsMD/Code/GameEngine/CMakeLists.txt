@@ -158,6 +158,7 @@ set(GAMEENGINE_SRC
 #    Include/GameClient/DrawGroupInfo.h
 #    Include/GameClient/EstablishConnectionsMenu.h
     Include/GameClient/Eva.h
+    Include/GameClient/FacingDrag.h
 #    Include/GameClient/ExtendedMessageBox.h
     Include/GameClient/FontDesc.h
 #    Include/GameClient/FXList.h
@@ -244,6 +245,8 @@ set(GAMEENGINE_SRC
 #    Include/GameLogic/CrateSystem.h
 #    Include/GameLogic/Damage.h
     Include/GameLogic/ExperienceTracker.h
+    Include/GameLogic/FacingMove.h
+    Include/GameLogic/LineFormation.h
     Include/GameLogic/FiringTracker.h
     Include/GameLogic/FPUControl.h
     Include/GameLogic/GameLogic.h
@@ -703,6 +706,7 @@ set(GAMEENGINE_SRC
 #    Source/GameClient/Drawable/Update/SwayClientUpdate.cpp
 #    Source/GameClient/DrawGroupInfo.cpp
     Source/GameClient/Eva.cpp
+    Source/GameClient/FacingDragXlat.cpp
 #    Source/GameClient/FXList.cpp
     Source/GameClient/GameClient.cpp
 #    Source/GameClient/GameClientDispatch.cpp
@@ -842,6 +846,7 @@ set(GAMEENGINE_SRC
     Source/GameLogic/AI/AI.cpp
     Source/GameLogic/AI/AIDock.cpp
     Source/GameLogic/AI/AIGroup.cpp
+    Source/GameLogic/AI/LineFormation.cpp
     Source/GameLogic/AI/AIGuard.cpp
     Source/GameLogic/AI/AIGuardRetaliate.cpp
 #    Source/GameLogic/AI/AIPathfind.cpp

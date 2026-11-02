@@ -243,6 +243,7 @@ public:
 	Bool m_smartCommandGroup;
 	Int m_actionLineMode;						///< holds an ActionLineMode
 	Bool m_doubleClickAttackMove;
+	Bool m_facingDrag;
 	Bool m_rightMouseAlwaysScrolls;
 	Int m_jpegQuality; // TheSuperHackers @feature Quality for JPEG screenshots.
 	Bool m_useWaterPlane;

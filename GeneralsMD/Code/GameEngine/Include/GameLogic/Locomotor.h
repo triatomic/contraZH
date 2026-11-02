@@ -250,7 +250,7 @@ public:
 
 	void locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalPos,
 		Real onPathDistToGoal, Real desiredSpeed, Bool *blocked);
-	void locoUpdate_moveTowardsAngle(Object* obj, Real angle, Bool turnByReversing = false);	///< turnByReversing: back up to turn (needs CanMoveBackwards)
+	void locoUpdate_moveTowardsAngle(Object* obj, Real angle, Bool turnByReversing = false, Bool aroundCenter = FALSE);	///< turnByReversing: back up to turn (needs CanMoveBackwards)
 	/**
 		Kill any current (2D) velocity (but stay at current position, or as close as possible)
 
@@ -428,14 +428,14 @@ protected:
 	void maintainCurrentPositionHover(Object* obj, PhysicsBehavior *physics);
 	void maintainCurrentPositionWings(Object* obj, PhysicsBehavior *physics);
 
-	PhysicsTurningType rotateTowardsPosition(Object* obj, const Coord3D& goalPos, Real *relAngle=nullptr);
+	PhysicsTurningType rotateTowardsPosition(Object* obj, const Coord3D& goalPos, Real *relAngle=nullptr, Bool aroundCenter = FALSE);
 
 	/*
 		return true if we can maintain the position without being called every frame (eg, we are
 		resting on the ground), false if not (eg, we are hovering or circling)
 	*/
 	Bool handleBehaviorZ(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos);
-	PhysicsTurningType rotateObjAroundLocoPivot(Object* obj, const Coord3D& goalPos, Real maxTurnRate, Real *relAngle = nullptr);
+	PhysicsTurningType rotateObjAroundLocoPivot(Object* obj, const Coord3D& goalPos, Real maxTurnRate, Real *relAngle = nullptr, Bool aroundCenter = FALSE);
 
 	Real calcLiftToUseAtPt(Object* obj, PhysicsBehavior *physics, Real curZ, Real surfaceAtPt, Real preferredHeight);
 
