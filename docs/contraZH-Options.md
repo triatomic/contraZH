@@ -434,8 +434,10 @@ trace rays, cast local shadows, or calculate reflected light. Lights can pass th
 Nearby emitters share lights within 24 world units. All visible lights are kept, and
 surfaces draw additional batches of eight lights, or three under standing water.
 Extra passes add only light and do not repeat sunlight, glow masks or shadow darkening.
-Cloud and ground-noise factors apply to every light batch. First and extra batches use
-the same brightness range to avoid seams between terrain tiles.
+On detailed terrain, roads and bridges, local lights retain surface textures, normals and
+ground noise but ignore sun shadows and clouds. This also applies to three-texture terrain
+blends and extra light batches. First and extra batches use the same brightness range to
+avoid seams between terrain tiles.
 Dense scenes cost more draw calls; there is no fixed light count shared by the whole view.
 Extra batches leave out lights that cannot reach the terrain tile or rigid mesh being drawn.
 Single-instance draws use that mesh's world bounds too. Skinned meshes and groups

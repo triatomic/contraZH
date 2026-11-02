@@ -371,11 +371,13 @@ float4 main(PsIn input) : COLOR
 #if LIGHTS && LIGHTS_ONLY && LIGHTS_DEBUG
     return float4(PointLighting(input.WorldPos, bumped), 1.0f);
 #elif LIGHTS && LIGHTS_ONLY
-    light = PointLighting(input.WorldPos, bumped);
+    light = float3(0.0f, 0.0f, 0.0f);
 #elif LIGHTS && LIGHTS_DEBUG
     return float4(PointLighting(input.WorldPos, bumped), color.a * input.Diffuse.a);
-#elif LIGHTS
-    light += PointLighting(input.WorldPos, bumped);
+#endif
+
+#if LIGHTS
+    float3 localColor = color.rgb * PointLighting(input.WorldPos, bumped);
 #endif
 
 #if BUMP || LIGHTS
@@ -395,14 +397,18 @@ float4 main(PsIn input) : COLOR
     color *= cloud;
 #endif
 #endif
-#if NOISE_COUNT >= 2
-    color.rgb *= GroundNoise(Noise2Texture, input.Noise2UV);
-#endif
-
 #if SHADOWED && NOISE_COUNT >= 1
     color.rgb *= CloudShadowFactor(lit, cloud.rgb);
 #elif SHADOWED
     color.rgb *= lerp(ShadowColor.rgb, float3(1.0f, 1.0f, 1.0f), lit);
+#endif
+
+#if LIGHTS
+    // Local lights do not inherit the sun's shadows or clouds.
+    color.rgb += localColor;
+#endif
+#if NOISE_COUNT >= 2
+    color.rgb *= GroundNoise(Noise2Texture, input.Noise2UV);
 #endif
 
 #if GLINT && !LIGHTS_ONLY

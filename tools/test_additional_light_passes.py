@@ -18,6 +18,7 @@ HARNESS = r'''
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <float.h>
 #include <fstream>
 #include <map>
 #include <string>
@@ -87,6 +88,21 @@ struct DX8Wrapper
 };
 bool (*DX8Wrapper::AdditionalPassCallback)(unsigned) = NULL;
 unsigned DX8Wrapper::CurrentBaseVertexIndex = 0;
+static D3DMATRIX operator*(const D3DMATRIX &a, const D3DMATRIX &b)
+{
+    D3DMATRIX result = {};
+    for (int row = 0; row < 4; row++)
+    {
+        for (int column = 0; column < 4; column++)
+        {
+            for (int k = 0; k < 4; k++)
+            {
+                result.m[row][column] += a.m[row][k] * b.m[k][column];
+            }
+        }
+    }
+    return result;
+}
 // PACK_LIGHTS
 // EXTRA_PASS
 // CONFIGURE_PASS
@@ -160,7 +176,7 @@ static DWORD draw(int count, int slots, IDirect3DPixelShader9* base, IDirect3DSu
     assert(bound == base);
     bound->Release();
     const DWORD states[] = { TRUE, D3DBLEND_ZERO, TRUE, 0xff123456, D3DBLENDOP_ADD };
-    for (int i=0; i<ARRAY_SIZE(AdditionalLightStates); i++)
+    for (int i=0; i<ARRAY_SIZE(states); i++)
     {
         DWORD value;
         check(device->GetRenderState(AdditionalLightStates[i],&value));
@@ -313,6 +329,7 @@ int main(int argc, char** argv)
             check(device->SetTexture(cloudStage,white));
             check(device->SetTexture(noiseStage,white));
             check(device->SetTexture(map==0 ? cloudStage : noiseStage,modulation));
+            int cloudContribution=0;
             for (int shade=0; shade<2; shade++)
             {
                 check(modulation->LockRect(0,&lock,NULL,0));
@@ -322,13 +339,27 @@ int main(int argc, char** argv)
                 {
                     light.diffuse=Vector3();
                 }
+                const DWORD unlit=draw(0,8,base,target,readback);
                 PixelLights[0].diffuse=Vector3(0.2f,0.2f,0.2f);
                 const DWORD firstBatch=draw(8,8,base,target,readback);
                 PixelLights[8].diffuse=PixelLights[0].diffuse;
                 PixelLights[0].diffuse=Vector3();
                 const DWORD extraBatch=draw(9,8,base,target,readback);
                 assert(abs((int)firstBatch-(int)extraBatch)<=1);
-                if (shade==0)
+                if (map==0)
+                {
+                    const int contribution=(int)firstBatch-(int)unlit;
+                    assert(contribution>5);
+                    if (shade==0)
+                    {
+                        cloudContribution=contribution;
+                    }
+                    else
+                    {
+                        assert(abs(contribution-cloudContribution)<=1);
+                    }
+                }
+                else if (shade==0)
                 {
                     assert(firstBatch<=1 && extraBatch<=1);
                 }
@@ -400,7 +431,11 @@ def main():
     start = shader.index("static std::vector<Int> AdditionalLightIndices;")
     harness = harness.replace("// PASS_STATE", shader[start:shader.index("\n#endif",start)])
     harness = harness.replace("// PACK_LIGHTS", function(shader,"static Int Pack_Pixel_Lights("))
-    harness = harness.replace("// EXTRA_PASS", function(shader,"static bool Draw_Additional_Light_Pass("))
+    extra_pass = "\n".join(function(shader, signature) for signature in (
+        "static bool Pixel_Light_Screen_Rect(",
+        "static bool Additional_Light_Screen_Rect(",
+        "static bool Draw_Additional_Light_Pass("))
+    harness = harness.replace("// EXTRA_PASS", extra_pass)
     harness = harness.replace("// CONFIGURE_PASS", function(shader,"static void Set_Additional_Pixel_Lights("))
     harness = harness.replace("// GROUND_LIGHTS", function(shader,"void W3DShaderManager::setDrawPixelLights("))
     harness = harness.replace("// FILTER_LIGHTS", function(shader,"void W3DShaderManager::filterPixelLights("))
