@@ -806,7 +806,7 @@ Bool OptionPreferences::getDoubleClickAttackMoveEnabled()
 
 // drag-to-face, off unless the player turned it on
 #if RTS_ZEROHOUR
-Bool OptionPreferences::getFacingDragEnabled()
+Bool OptionPreferences::getFacingDragEnabled() const
 {
 	OptionPreferences::const_iterator it = find( "UseFacingDrag" );
 	return it != end() && stricmp( it->second.str(), "yes" ) == 0;

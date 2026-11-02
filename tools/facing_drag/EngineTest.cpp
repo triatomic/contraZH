@@ -151,3 +151,34 @@ TEST(FacingMove, AReplacementFormationClearsThePreviousExactMove)
 	EXPECT_FLOAT_EQ(ai.desiredSpeed, FAST_AS_POSSIBLE);
 	testAI.finder.blocked = FALSE;
 }
+
+TEST(FacingDrag, CheckboxFitsBelowTheInputControls)
+{
+	GameWindow panel(151, 68, 485, 469);
+	GameWindow anchor(9, 385, 230, 20, &panel);
+	GameWindow actionLabel(9, 406, 95, 20, &panel);
+	GameWindow actionCombo(107, 406, 132, 20, &panel);
+	GameWindow accept(144, 432, 159, 29, &panel);
+	GameWindow back(315, 432, 159, 29, &panel);
+	GameWindow radar(245, 352, 230, 20, &panel);
+	WinGameOptions = &panel;
+	checkSmartCommandGroup = &anchor;
+	existingFacingDragCheck = NULL;
+	GameWindow *check = createFacingDragCheck();
+	EXPECT_TRUE(check != NULL);
+	EXPECT_EQ(check->parent, &panel);
+	EXPECT_EQ(check->label, std::wstring(L"Drag to Face"));
+	EXPECT_GE(check->y, anchor.y + anchor.height);
+	EXPECT_LE(check->y + check->height, actionLabel.y);
+	EXPECT_EQ(actionLabel.y, actionCombo.y);
+	EXPECT_LE(actionCombo.y + actionCombo.height, accept.y);
+	EXPECT_LE(back.y + back.height, panel.height);
+	EXPECT_EQ(panel.height, 490);
+	EXPECT_EQ(radar.y, 352);
+	EXPECT_EQ(createFacingDragCheck(), check);
+	EXPECT_EQ(panel.height, 490);
+	delete check;
+	existingFacingDragCheck = NULL;
+	WinGameOptions = NULL;
+	checkSmartCommandGroup = NULL;
+}

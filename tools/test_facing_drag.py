@@ -15,6 +15,8 @@ PREAMBLE = r'''
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <string>
+using std::max;
 #include <vector>
 typedef int Int;
 typedef unsigned int UnsignedInt;
@@ -122,6 +124,8 @@ def main():
         code += function(update, name) + "\n"
     command = function(update, "void AIUpdateInterface::aiDoCommand(")
     code += command[:command.index("#ifdef ALLOW_SURRENDER")] + "}\n"
+    options = (ENGINE / "Source/GameClient/GUI/GUICallbacks/Menus/OptionsMenu.cpp").read_text()
+    code += function(options, "static GameWindow *createFacingDragCheck()") + "\n"
     tests = "\n".join(path.read_text() for path in sorted((ROOT / "tools/facing_drag").glob("*Test.cpp")))
     names = re.findall(r"^TEST\((\w+),\s*(\w+)\)", tests, re.M)
     tests = re.sub(r"(EXPECT_[^\n]+?\))\s*<<[^;]*;", r"\1;", tests)

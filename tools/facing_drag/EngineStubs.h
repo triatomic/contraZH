@@ -148,3 +148,42 @@ struct AIUpdateInterface
 	void setExactFormationMove();
 	void moveToFormationSlot(const Coord3D &, Real, Real, UnsignedInt, Real, CommandSourceType, Bool);
 };
+
+struct GameWindow
+{
+	Int x, y, width, height;
+	GameWindow *parent, *firstChild, *next;
+	std::wstring label;
+	GameWindow(Int px, Int py, Int w, Int h, GameWindow *p = NULL) :
+		x(px), y(py), width(w), height(h), parent(p), firstChild(NULL), next(NULL)
+	{
+		if (parent)
+		{
+			next = parent->firstChild;
+			parent->firstChild = this;
+		}
+	}
+	GameWindow *winGetParent() { return parent; }
+	GameWindow *winGetChild() { return firstChild; }
+	GameWindow *winGetNext() { return next; }
+	void winGetPosition(Int *px, Int *py) { *px = x; *py = y; }
+	void winGetSize(Int *w, Int *h) { *w = width; *h = height; }
+	void winSetPosition(Int px, Int py) { x = px; y = py; }
+	void winSetSize(Int w, Int h) { width = w; height = h; }
+	void winSetTooltip(const wchar_t *) {}
+};
+GameWindow *WinGameOptions = NULL;
+GameWindow *checkSmartCommandGroup = NULL;
+GameWindow *existingFacingDragCheck = NULL;
+GameWindow *findOptionsWindow(const char *) { return existingFacingDragCheck; }
+GameWindow *CreateCheckBoxLike(GameWindow *anchor, GameWindow *parent, Int x, Int y, const wchar_t *, const char *)
+{
+	existingFacingDragCheck = new GameWindow(x, y, anchor->width, anchor->height, parent);
+	return existingFacingDragCheck;
+}
+void GadgetCheckBoxSetText(GameWindow *check, const wchar_t *label) { check->label = label; }
+struct TestGameText
+{
+	const wchar_t *fetchOrSubstitute(const char *, const wchar_t *fallback) { return fallback; }
+} testGameText;
+TestGameText *TheGameText = &testGameText;

@@ -108,7 +108,7 @@ static GameWindow *		checkRetaliation		= nullptr;
 
 static NameKeyType		checkDoubleClickAttackMoveID	= NAMEKEY_INVALID;
 static GameWindow *		checkDoubleClickAttackMove		= nullptr;
-static GameWindow *		checkFacingDrag						= nullptr;	///< Drag to Face, under Double Click Guard
+static GameWindow *		checkFacingDrag						= nullptr;
 
 static NameKeyType		sliderScrollSpeedID	= NAMEKEY_INVALID;
 static GameWindow *		sliderScrollSpeed		= nullptr;
@@ -511,6 +511,7 @@ static const BoolOption BoolOptions[] =
 	{ &checkDefensesRangeCircle, "DefensesRangeCircle", &OptionPreferences::getDefensesRangeCircleEnabled, &GlobalData::m_defensesRangeCircle, FALSE },
 	{ &checkObjectDecals, "ObjectDecals", &OptionPreferences::getObjectDecalsEnabled, &GlobalData::m_objectDecalsEnabled, TRUE },
 	{ &checkEasyMilitaryDrag, "EasyMilitaryDrag", &OptionPreferences::getEasyMilitaryDragEnabled, &GlobalData::m_easyMilitaryDrag, FALSE },
+	{ &checkFacingDrag, "UseFacingDrag", &OptionPreferences::getFacingDragEnabled, &GlobalData::m_facingDrag, FALSE },
 	{ &checkSmartSelection, "SmartSelection", &OptionPreferences::getSmartSelectionEnabled, &GlobalData::m_smartSelection, TRUE },
 	{ &checkSmartSelectionUseMouse, "SmartSelectionUseMouse", &OptionPreferences::getSmartSelectionUseMouse, &GlobalData::m_smartSelectionUseMouse, TRUE },
 	{ &checkSmartCommandGroup, "SmartCommandGroup", &OptionPreferences::getSmartCommandGroupEnabled, &GlobalData::m_smartCommandGroup, TRUE },
@@ -754,7 +755,6 @@ static void setDefaults()
 	GadgetCheckBoxSetChecked(checkAlternateMouse, FALSE);
 	GadgetCheckBoxSetChecked(checkRetaliation, TRUE );
 	GadgetCheckBoxSetChecked( checkDoubleClickAttackMove, FALSE );
-	setCheck( checkFacingDrag, FALSE );
 	setCheck( checkBorderlessWindow, FALSE );
 	setCheck( checkWindowed, FALSE );
 	updateGameOptionsEnables();
@@ -1119,11 +1119,6 @@ static void saveOptions()
 	(*pref)["Retaliation"] = TheWritableGlobalData->m_clientRetaliationModeEnabled? "yes" : "no";
 
 	TheWritableGlobalData->m_doubleClickAttackMove = GadgetCheckBoxIsChecked( checkDoubleClickAttackMove );
-	if( checkFacingDrag )
-	{
-		TheWritableGlobalData->m_facingDrag = GadgetCheckBoxIsChecked( checkFacingDrag );
-		(*pref)["UseFacingDrag"] = TheWritableGlobalData->m_facingDrag ? "yes" : "no";
-	}
 	(*pref)["UseDoubleClickAttackMove"] = TheWritableGlobalData->m_doubleClickAttackMove ? "yes" : "no";
 
 	// TheSuperHackers @todo Add combo box ?
@@ -1708,6 +1703,42 @@ static void setCheckText( GameWindow *check, const char *label, const char *tip 
 	}
 }
 
+static GameWindow *createFacingDragCheck()
+{
+	GameWindow *check = findOptionsWindow( "OptionsMenu.wnd:CheckFacingDrag" );
+	GameWindow *anchor = checkSmartCommandGroup;
+	if (!check && WinGameOptions && anchor && anchor->winGetParent() == WinGameOptions)
+	{
+		Int x, y, width, height, panelWidth, panelHeight;
+		anchor->winGetPosition( &x, &y );
+		anchor->winGetSize( &width, &height );
+		WinGameOptions->winGetSize( &panelWidth, &panelHeight );
+		const Int step = max(height * 21 / 20, 1);
+		check = CreateCheckBoxLike( anchor, WinGameOptions, x, y + step,
+			TheGameText->fetchOrSubstitute( "GUI:FacingDrag", L"Drag to Face" ), "OptionsMenu.wnd:CheckFacingDrag" );
+		if (check)
+		{
+			for (GameWindow *child = WinGameOptions->winGetChild(); child; child = child->winGetNext())
+			{
+				Int childX, childY;
+				child->winGetPosition( &childX, &childY );
+				if (child != check && childY >= y + height)
+				{
+					child->winSetPosition( childX, childY + step );
+				}
+			}
+			WinGameOptions->winSetSize( panelWidth, panelHeight + step );
+		}
+	}
+	if (check)
+	{
+		GadgetCheckBoxSetText( check, TheGameText->fetchOrSubstitute( "GUI:FacingDrag", L"Drag to Face" ) );
+		check->winSetTooltip( TheGameText->fetchOrSubstitute( "TOOLTIP:FacingDrag",
+			L"Hold both mouse buttons and drag to set the selected units' destination and facing." ) );
+	}
+	return check;
+}
+
 static GameWindow *createPathTracingCheck()
 {
 	GameWindow *check = findOptionsWindow( "OptionsMenu.wnd:CheckPathTracing" );
@@ -1826,6 +1857,7 @@ static void initGameOptionsWindows()
 	checkSmartSelection = findOptionsWindow( "OptionsMenu.wnd:CheckSmartSelection" );
 	checkSmartSelectionUseMouse = findOptionsWindow( "OptionsMenu.wnd:CheckSmartSelectionUseMouse" );
 	checkSmartCommandGroup = findOptionsWindow( "OptionsMenu.wnd:CheckSmartCommandGroup" );
+	checkFacingDrag = createFacingDragCheck();
 	checkNewRadar = findOptionsWindow( "OptionsMenu.wnd:CheckNewRadar" );
 	checkLargeBlips = findOptionsWindow( "OptionsMenu.wnd:CheckLargeBlips" );
 	checkGridHotkeys = findOptionsWindow( "OptionsMenu.wnd:CheckGridHotkeys", checkGridHotkeysID );
@@ -2517,41 +2549,6 @@ void OptionsMenuInit( WindowLayout *layout, void *userData )
 	setCheck( checkBorderlessWindow, TheGlobalData->m_borderlessWindow && !TheGlobalData->m_windowed );
 	setCheck( checkWindowed, TheGlobalData->m_windowed );
 	updateGameOptionsEnables();
-
-	// Older menu layouts can omit this control.
-	checkFacingDrag = TheWindowManager->winGetWindowFromId( nullptr, NAMEKEY( "OptionsMenu.wnd:CheckFacingDrag" ) );
-	if( checkFacingDrag == nullptr && checkDoubleClickAttackMove && checkDoubleClickAttackMove->winGetParent() )
-	{
-		GameWindow *parent = checkDoubleClickAttackMove->winGetParent();
-		Int x, y, w, h, panelW, panelH;
-		checkDoubleClickAttackMove->winGetPosition( &x, &y );
-		checkDoubleClickAttackMove->winGetSize( &w, &h );
-		parent->winGetSize( &panelW, &panelH );
-		for (y += h; y + h < panelH && !checkFacingDrag; y += h)
-		{
-			Bool free = TRUE;
-			for (GameWindow *child = parent->winGetChild(); child; child = child->winGetNext())
-			{
-				Int cx, cy, cw, ch;
-				child->winGetPosition( &cx, &cy );
-				child->winGetSize( &cw, &ch );
-				if (ch <= h * 2 && x < cx + cw && x + w > cx && y < cy + ch && y + h > cy)
-				{
-					free = FALSE;
-					break;
-				}
-			}
-			if (free)
-			{
-				checkFacingDrag = CreateCheckBoxLike( checkDoubleClickAttackMove, parent, x, y,
-					TheGameText->fetchOrSubstitute( "GUI:FacingDrag", L"Drag to Face" ), "OptionsMenu.wnd:CheckFacingDrag" );
-			}
-		}
-	}
-	if( checkFacingDrag )
-	{
-		GadgetCheckBoxSetChecked( checkFacingDrag, TheGlobalData->m_facingDrag );
-	}
 
 	// set scroll speed slider
 	// TheSuperHackers @tweak xezon 11/07/2025 No longer sets the slider position if the user setting
