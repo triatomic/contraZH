@@ -75,15 +75,18 @@ W3DEmissiveLights::TextureSamples *W3DEmissiveLights::textureSamples(TextureClas
 	}
 	TextureSamples &result = m_textures[texture];
 	result.texture = texture;
+	result.average.Set(0.0f, 0.0f, 0.0f);
 	for (Int y = 0; y < SAMPLE_SIZE; y++)
 	{
 		for (Int x = 0; x < SAMPLE_SIZE; x++)
 		{
 			const unsigned char *pixel = bits + y * pitch + x * 4;
 			result.pixels[y * SAMPLE_SIZE + x].Set(pixel[2] / 255.0f, pixel[1] / 255.0f, pixel[0] / 255.0f);
+			result.average += result.pixels[y * SAMPLE_SIZE + x];
 			result.alpha[y * SAMPLE_SIZE + x] = pixel[3] / 255.0f;
 		}
 	}
+	result.average /= (Real)(SAMPLE_SIZE * SAMPLE_SIZE);
 	sample->Unlock();
 	return &result;
 }
@@ -222,12 +225,7 @@ void W3DEmissiveLights::begin(CameraClass &camera)
 		{
 			continue;
 		}
-		Vector3 tint(0.0f, 0.0f, 0.0f);
-		for (Int i = 0; i < SAMPLE_SIZE * SAMPLE_SIZE; i++)
-		{
-			tint += pixels->pixels[i];
-		}
-		tint /= (Real)(SAMPLE_SIZE * SAMPLE_SIZE);
+		const Vector3 &tint = pixels->average;
 		for (Particle *particle = system->getFirstParticle(); particle != nullptr; particle = particle->m_systemNext)
 		{
 			const Coord3D *pos = particle->getPosition();

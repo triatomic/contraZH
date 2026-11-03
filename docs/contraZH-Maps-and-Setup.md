@@ -6,6 +6,8 @@
 
 * Terrain `Texture` entries accept TGA or legacy DXT1/DXT5 DDS files in `Art/Terrain`, in both the
 game and WorldBuilder. DDS images use the same tile layout and atlas space as TGA images.
+* A missing terrain TGA falls back to the matching DDS, so existing `Texture = name.tga` entries
+also work when the base texture is supplied only as `name.dds`.
 * Individual terrain images still fit within 640 by 640 pixels. DDS cube maps, volume textures,
 DXT2-DXT4, uncompressed DDS and newer DX10/BC7 formats are unsupported.
 * D3D9 builds use a 4096-pixel terrain atlas instead of 2048, increasing capacity from 784 to

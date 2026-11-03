@@ -6662,6 +6662,8 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 
 		const DWORD* pShader = (const DWORD*)pData;
 
+		do
+		{
 #if defined(BUILD_WITH_D3D9)
 			// D3D9 separates the declaration from the shader and hands back COM objects,
 			// so both go into the table the DWORD handle indexes.
@@ -6718,6 +6720,19 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 				hr = DX8Wrapper::_Get_D3D_Device8()->CreatePixelShader(pShader, pHandle);
 			}
 #endif
+
+#if defined(BUILD_WITH_D3D9)
+			if (FAILED(hr) && pFileData != nullptr && Find_Embedded_Shader(strFilePath, pData, dwSize))
+			{
+				HeapFree(GetProcessHeap(), 0, pFileData);
+				pFileData = nullptr;
+				pShader = (const DWORD*)pData;
+				RENDER_LOG(("LoadAndCreateD3DShader: rejected file %s, hr=0x%08X, retrying the embedded copy", strFilePath, hr));
+				continue;
+			}
+#endif
+			break;
+		} while (true);
 
 		if (pFileData)
 		{

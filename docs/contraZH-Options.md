@@ -318,6 +318,8 @@ box.
 first found only in a `.big` keeps loading from there, so a loose override dropped into the game
 folder while the game runs needs a restart. Loading opens fewer files without the flag.
 
+Window layouts accept `DISABLED` in `STATUS` fields to clear the enabled flag.
+
 ## Rendering
 
 TheSuperHackers' texture filter option replaced this fork's version in the August 2026 merge:
@@ -342,6 +344,9 @@ and their bump maps stay sharp in the distance.
 
 Shadow mapping, specular, terrain glint, HQ sky cloud shadows, stochastic terrain, normal and glow maps, per-pixel lights, soft particles, flame
 and laser shading, per-map colour grading, planar mirrors and the other features that need the Direct3D 9 build are on [Direct3D 9 Features](dx9feat.md).
+
+The Direct3D 9 build retries its embedded shader when a loose or archived override is rejected.
+This lets the original DX8 tree shader coexist with the DX9 renderer.
 
 HQ sky cloud shadows preserve the contrast of object shadows as clouds pass over them.
 
@@ -436,6 +441,7 @@ spill. See [Light radius and brightness](contraZH-GameData.md#path-tracing-light
 
 This option approximates emissive lighting with world-space point lights. It does not
 trace rays, cast local shadows, or calculate reflected light. Lights can pass through walls.
+Particle texture colours are averaged once per cached texture.
 Nearby emitters share lights within 24 world units. All visible lights are kept, and
 surfaces draw additional batches of eight lights, or three under standing water.
 Extra passes add only light and do not repeat sunlight, glow masks or shadow darkening.

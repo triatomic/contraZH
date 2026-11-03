@@ -25,6 +25,7 @@ private:
 	struct TextureSamples
 	{
 		RefCountPtr<TextureClass> texture;
+		Vector3 average;
 		Vector3 pixels[SAMPLE_SIZE * SAMPLE_SIZE];
 		Real alpha[SAMPLE_SIZE * SAMPLE_SIZE];
 	};

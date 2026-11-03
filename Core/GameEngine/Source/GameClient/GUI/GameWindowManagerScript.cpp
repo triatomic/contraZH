@@ -205,6 +205,14 @@ static Bool parseBitFlag( const char *flagString, UnsignedInt *bits,
 	ConstCharPtrArray c;
 	int i;
 
+#if defined(RTS_ZEROHOUR)
+	if (flagList == WindowStatusNames && stricmp(flagString, "DISABLED") == 0)
+	{
+		*bits &= ~WIN_STATUS_ENABLED;
+		return TRUE;
+	}
+#endif
+
 	for( i = 0, c = flagList; *c; i++, c++ )
 	{
 
@@ -224,7 +232,7 @@ static Bool parseBitFlag( const char *flagString, UnsignedInt *bits,
 /** Given a character string of the form 'A+B+C+D', parse the
 	* flags separated by the '+' symbols into a bitfield stored in the 'bits'
 	* argument.
-	* Note that this routine does not clear any bits, only sets them. */
+	* DISABLED clears the enabled bit when parsing window status flags. */
 //=============================================================================
 static void parseBitString( const char *inBuffer, UnsignedInt *bits, ConstCharPtrArray flagList )
 {

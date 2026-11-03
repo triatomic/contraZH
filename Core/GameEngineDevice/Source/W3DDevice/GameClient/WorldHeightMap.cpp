@@ -1129,6 +1129,17 @@ void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData)
 	{
 		snprintf( texturePath, ARRAY_SIZE(texturePath), "%s%s", TERRAIN_TGA_DIR_PATH, terrain->getTexture().str() );
 		theFile = TheFileSystem->openFile( texturePath, File::READ|File::BINARY);
+#if defined(RTS_ZEROHOUR)
+		if (theFile == nullptr)
+		{
+			char *extension = strrchr(texturePath, '.');
+			if (extension != nullptr && stricmp(extension, ".tga") == 0)
+			{
+				memcpy(extension, ".dds", sizeof(".dds"));
+				theFile = TheFileSystem->openFile( texturePath, File::READ|File::BINARY);
+			}
+		}
+#endif
 	}
 
 	if (theFile != nullptr) {
