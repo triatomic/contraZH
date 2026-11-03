@@ -153,9 +153,10 @@ like any other button.
 * **GENERAL** lists every command that needs no unit (selection, control groups, camera, chat,
   beacons, holds such as Force Attack). **Change**, a double click or Enter waits for a key; **No key** unbinds.
 * **Drag to Face (hold)** in **GENERAL** changes LMB + RMB to a key or side mouse button,
-  with optional modifiers, or a modifier alone. Release the hold to give the order.
-  **RESET TO DEFAULT** restores LMB + RMB; **No key** disables the binding.
+  with optional modifiers, or a modifier alone. Release the hold to give the order, even while Ctrl is held for snapping.
+  **RESET TO DEFAULT** restores the mod's default (LMB + RMB unless overridden); **No key** disables the binding.
   The Drag to Face option must still be enabled.
+  Mods can supply defaults through `CommandMap BEGIN_FACING_DRAG` and `CommandMap END_FACING_DRAG`.
 * A hold command (Force Attack, Waypoints, Prefer Selection) also takes Ctrl, Alt or Shift alone:
   press it and let go with no other key. It does not take the middle button or the wheel.
 * **KEY CONFLICTS** lists every card with a shared letter and every shared command chord; a double

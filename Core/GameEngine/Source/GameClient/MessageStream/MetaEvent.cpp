@@ -728,7 +728,12 @@ void MetaEventTranslator::onKeyPressed(GameMessageDisposition &disp, Int systemK
 		if (!isMessageUsable(map->m_usableIn, map->m_meta))
 			continue;
 
-		const Bool isMatchingKeyCombo = map->m_key == keyType && map->m_modState == keyModState;
+		Bool isMatchingKeyCombo = map->m_key == keyType && map->m_modState == keyModState;
+#if RTS_ZEROHOUR
+		const Bool facingDragRelease = map->m_meta == GameMessage::MSG_META_END_FACING_DRAG && map->m_key == keyType
+			&& (systemKeyState & KEY_STATE_UP) != 0 && m_keyDownInfos[keyType].hasKeyModState(map->m_modState);
+		isMatchingKeyCombo = isMatchingKeyCombo || facingDragRelease;
+#endif
 		const Bool isMatchingTransitionUp = map->m_transition == UP && (systemKeyState & KEY_STATE_UP) != 0;
 		const Bool isMatchingTransitionDown = map->m_transition == DOWN && (systemKeyState & KEY_STATE_DOWN) != 0;
 		//const Bool isMatchingTransitionDoubleDown = map->m_transition == DOUBLEDOWN && (systemKeyState & KEY_STATE_DOWN) && m_lastKeyDown == key;
@@ -754,6 +759,9 @@ void MetaEventTranslator::onKeyPressed(GameMessageDisposition &disp, Int systemK
 				// happens to sit on a visible button is swallowed: the meta event steps aside and
 				// HotKeyTranslator then rejects the modifiers, so the key does nothing at all.
 				if( (keyModState & ~SHIFT) == 0 &&
+#if RTS_ZEROHOUR
+						!facingDragRelease &&
+#endif
 						TheGlobalData && TheGlobalData->m_gridHotkeysEnabled && TheHotKeyManager )
 				{
 					WideChar wKey = TheKeyboard->getPrintableKey( (KeyDefType)keyType, 0 );
@@ -792,6 +800,16 @@ void MetaEventTranslator::onKeyPressed(GameMessageDisposition &disp, Int systemK
 					break;
 				}
 
+#if RTS_ZEROHOUR
+				if (map->m_meta == GameMessage::MSG_META_BEGIN_FACING_DRAG)
+				{
+					m_keyDownInfos[keyType].setKeyModState(map->m_modState);
+				}
+				else if (map->m_meta == GameMessage::MSG_META_END_FACING_DRAG)
+				{
+					m_keyDownInfos[keyType].clearKeyModState(map->m_modState);
+				}
+#endif
 				/*GameMessage *metaMsg =*/ TheMessageStream->appendMessage(map->m_meta);
 				//DEBUG_LOG(("Frame %d: MetaEventTranslator::translateGameMessage() normal: %s", TheGameLogic->getFrame(), findGameMessageNameByType(map->m_meta)));
 			}
@@ -1477,14 +1495,24 @@ void MetaMap::generateMetaMap()
 
 #if RTS_ZEROHOUR
 	{
-		MetaMapRec *begin = getMetaMapRec(GameMessage::MSG_META_BEGIN_FACING_DRAG);
-		MetaMapRec *end = getMetaMapRec(GameMessage::MSG_META_END_FACING_DRAG);
-		begin->m_key = end->m_key = MK_MOUSE_LEFT_RIGHT;
-		begin->m_modState = end->m_modState = NONE;
-		begin->m_usableIn = end->m_usableIn = COMMANDUSABLE_GAME;
-		begin->m_category = end->m_category = CATEGORY_CONTROL;
-		begin->m_transition = DOWN;
-		end->m_transition = UP;
+		const GameMessage::Type facingDragTypes[] = { GameMessage::MSG_META_BEGIN_FACING_DRAG, GameMessage::MSG_META_END_FACING_DRAG };
+		for (Int i = 0; i < ARRAY_SIZE(facingDragTypes); ++i)
+		{
+			const MetaMapRec *existing = getFirstMetaMapRec();
+			while (existing && existing->m_meta != facingDragTypes[i])
+			{
+				existing = existing->m_next;
+			}
+			if (!existing)
+			{
+				MetaMapRec *map = getMetaMapRec(facingDragTypes[i]);
+				map->m_key = MK_MOUSE_LEFT_RIGHT;
+				map->m_modState = NONE;
+				map->m_usableIn = COMMANDUSABLE_GAME;
+				map->m_category = CATEGORY_CONTROL;
+				map->m_transition = i == 0 ? DOWN : UP;
+			}
+		}
 	}
 #endif
 
