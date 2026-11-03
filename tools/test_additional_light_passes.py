@@ -127,7 +127,7 @@ struct Vertex
     DWORD color;
     float u0,v0,u1,v1,nz,px,py,pz,wx,wy,wz,vx,vy,vz;
 };
-static DWORD draw(int count, int slots, IDirect3DPixelShader9* base, IDirect3DSurface9* target, IDirect3DSurface9* readback, int firstRegister=5, bool groundLights=false, const AABoxClass* bounds=NULL)
+static DWORD draw(int count, int slots, IDirect3DPixelShader9* base, IDirect3DSurface9* target, IDirect3DSurface9* readback, int firstRegister=5, bool groundLights=false, const AABoxClass* bounds=NULL, bool opaque=false, DWORD sourceBlend=D3DBLEND_ONE)
 {
     check(device->Clear(0,NULL,D3DCLEAR_TARGET,0,1,0));
     std::vector<Int> selected;
@@ -146,7 +146,8 @@ static DWORD draw(int count, int slots, IDirect3DPixelShader9* base, IDirect3DSu
     check(device->SetPixelShaderConstantF(0, &constants[0].X, 32));
     check(device->SetPixelShader(base));
     check(device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ZERO));
-    check(device->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE));
+    check(device->SetRenderState(D3DRS_ALPHABLENDENABLE, !opaque));
+    check(device->SetRenderState(D3DRS_SRCBLEND, sourceBlend));
     check(device->SetRenderState(D3DRS_ZWRITEENABLE, TRUE));
     check(device->SetRenderState(D3DRS_FOGCOLOR, 0xff123456));
     check(device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD));
@@ -166,6 +167,11 @@ static DWORD draw(int count, int slots, IDirect3DPixelShader9* base, IDirect3DSu
     {
         Set_Additional_Pixel_Lights(1, indices, count, slots, firstRegister, NULL);
     }
+    DWORD states[ARRAY_SIZE(AdditionalLightStates)];
+    for (int i=0; i<ARRAY_SIZE(states); i++)
+    {
+        check(device->GetRenderState(AdditionalLightStates[i],&states[i]));
+    }
     extraDraws = 0;
     check(device->BeginScene());
     DX8Wrapper::Draw_DX8_Indexed_Primitive(D3DPT_TRIANGLELIST,0,4,0,2);
@@ -175,7 +181,6 @@ static DWORD draw(int count, int slots, IDirect3DPixelShader9* base, IDirect3DSu
     check(device->GetPixelShader(&bound));
     assert(bound == base);
     bound->Release();
-    const DWORD states[] = { TRUE, D3DBLEND_ZERO, TRUE, 0xff123456, D3DBLENDOP_ADD };
     for (int i=0; i<ARRAY_SIZE(states); i++)
     {
         DWORD value;
@@ -406,6 +411,34 @@ int main(int argc, char** argv)
     assert(abs((int)flatFirst-(int)draw(9,8,base,target,readback))<=1);
     modulation->Release();
     puts("PASS: mesh bounds cut nine extra draws to one, empty batches skipped, tile seams, road filtering and shader/state restoration");
+    AdditionalShaders[1].normal->Release();
+    base->Release();
+    base=loadShader(std::string(argv[1])+"/terrainlitnoshadow.pso");
+    AdditionalShaders[1].normal=loadShader(std::string(argv[1])+"/terrainlitnoshadowextralights.pso");
+    check(device->SetTexture(0,white));
+    check(device->SetTexture(1,white));
+    check(vb->Lock(0,0,&bits,0));
+    for (int i=0; i<4; i++)
+    {
+        static_cast<Vertex*>(bits)[i].color=0x40404040;
+    }
+    check(vb->Unlock());
+    for (int opaque=0; opaque<2; opaque++)
+    {
+        for (auto& light : PixelLights)
+        {
+            light.diffuse=Vector3();
+        }
+        const DWORD unlit=draw(0,8,base,target,readback,5,false,NULL,opaque!=0,D3DBLEND_SRCALPHA);
+        PixelLights[0].diffuse=Vector3(0.2f,0.2f,0.2f);
+        const DWORD first=draw(8,8,base,target,readback,5,false,NULL,opaque!=0,D3DBLEND_SRCALPHA);
+        PixelLights[8].diffuse=PixelLights[0].diffuse;
+        PixelLights[0].diffuse=Vector3();
+        const DWORD extra=draw(9,8,base,target,readback,5,false,NULL,opaque!=0,D3DBLEND_SRCALPHA);
+        assert(first>unlit+5 && abs((int)first-(int)extra)<=1);
+        assert(opaque ? first>100 : first<40);
+    }
+    puts("PASS: opaque and alpha-blended batches match with fractional alpha and restore all saved states");
     AdditionalShaders[1].normal->Release();
     base->Release();
     ib->Release();

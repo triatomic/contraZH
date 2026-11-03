@@ -437,7 +437,8 @@ Extra passes add only light and do not repeat sunlight, glow masks or shadow dar
 On detailed terrain, roads and bridges, local lights retain surface textures, normals and
 ground noise but ignore sun shadows and clouds. This also applies to three-texture terrain
 blends and extra light batches. First and extra batches use the same brightness range to
-avoid seams between terrain tiles.
+avoid seams between terrain tiles. Opaque surfaces receive the full light in every batch;
+roads and other transparent surfaces keep their alpha coverage.
 Dense scenes cost more draw calls; there is no fixed light count shared by the whole view.
 Extra batches leave out lights that cannot reach the terrain tile or rigid mesh being drawn.
 Single-instance draws use that mesh's world bounds too. Skinned meshes and groups

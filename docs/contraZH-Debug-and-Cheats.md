@@ -166,7 +166,8 @@ binds this key to `SAVE_VIEW1`, which this cheat build shadows, so camera bookma
 `CHEAT_TOGGLE_FACE_CULLING` in CommandMap.ini)
 * `Shift + Ctrl + F1` - (D3D9 only. Lists the last frame's draw calls in the top right corner, one
 line per vertex and pixel shader pair with its draw and primitive counts, busiest first. `fixed`
-means the fixed function pipeline. Refreshes twice a second. Takes the key from `CHEAT_RUNSCRIPT1` in
+means the fixed function pipeline. Extra light batches show their `extralights` shader filenames.
+Refreshes twice a second. Takes the key from `CHEAT_RUNSCRIPT1` in
 CommandMapDemo.ini. `CHEAT_SHOW_SHADER_DRAWS` in CommandMap.ini)
 * `Shift + Ctrl + Tab` - (Opens or hides the shader debug panel. Click an option to toggle its
 rendering effect live. `CHEAT_TOGGLE_SHADER_PANEL` in CommandMap.ini)

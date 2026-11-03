@@ -1670,7 +1670,9 @@ static void Attach_Additional_Light_Shaders(const char *path, DWORD handle)
 	std::map<DWORD, AdditionalLightShaders>::iterator old = AdditionalShaders.find(handle);
 	if (old != AdditionalShaders.end())
 	{
+		Set_D3D9_Shader_Name(old->second.normal, nullptr);
 		SAFE_RELEASE(old->second.normal);
+		Set_D3D9_Shader_Name(old->second.debug, nullptr);
 		SAFE_RELEASE(old->second.debug);
 		AdditionalShaders.erase(old);
 	}
@@ -1692,6 +1694,7 @@ static void Attach_Additional_Light_Shaders(const char *path, DWORD handle)
 		}
 		IDirect3DPixelShader9 **shader = debug ? &shaders.debug : &shaders.normal;
 		DX8Wrapper::_Get_D3D_Device8()->CreatePixelShader((const DWORD *)data, shader);
+		Set_D3D9_Shader_Name(*shader, extraPath);
 	}
 	if (shaders.normal != nullptr)
 	{
@@ -1699,6 +1702,7 @@ static void Attach_Additional_Light_Shaders(const char *path, DWORD handle)
 	}
 	else
 	{
+		Set_D3D9_Shader_Name(shaders.debug, nullptr);
 		SAFE_RELEASE(shaders.debug);
 	}
 }
@@ -1711,7 +1715,7 @@ static Bool AdditionalLightsInView = FALSE;
 static DWORD AdditionalLightShader = 0;
 static IDirect3DPixelShader9 *SavedLightShader = nullptr;
 static Vector4 SavedLightConstants[PIXEL_LIGHT_REGISTERS];
-static const D3DRENDERSTATETYPE AdditionalLightStates[] = { D3DRS_ALPHABLENDENABLE, D3DRS_DESTBLEND, D3DRS_ZWRITEENABLE, D3DRS_FOGCOLOR, D3DRS_BLENDOP, D3DRS_SCISSORTESTENABLE };
+static const D3DRENDERSTATETYPE AdditionalLightStates[] = { D3DRS_ALPHABLENDENABLE, D3DRS_DESTBLEND, D3DRS_ZWRITEENABLE, D3DRS_FOGCOLOR, D3DRS_BLENDOP, D3DRS_SRCBLEND, D3DRS_SCISSORTESTENABLE };
 static DWORD SavedLightStates[ARRAY_SIZE(AdditionalLightStates)];
 static RECT SavedLightScissor;
 static D3DVIEWPORT9 AdditionalLightViewport;
@@ -1915,6 +1919,11 @@ static bool Draw_Additional_Light_Pass(unsigned pass)
 			AdditionalLightWorldToClip = (AdditionalLightsInView ? AdditionalLightView : view) * projection;
 		}
 		AdditionalLightNext = AdditionalLightSlots;
+		// Opaque draws leave their source blend factor unspecified.
+		if (!SavedLightStates[0])
+		{
+			device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
+		}
 		device->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
 		device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
 		device->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
@@ -6077,7 +6086,9 @@ void W3DShaderManager::shutdown()
 	DX8Wrapper::Set_Additional_Pass_Callback(nullptr);
 	for (std::map<DWORD, AdditionalLightShaders>::iterator it = AdditionalShaders.begin(); it != AdditionalShaders.end(); ++it)
 	{
+		Set_D3D9_Shader_Name(it->second.normal, nullptr);
 		SAFE_RELEASE(it->second.normal);
+		Set_D3D9_Shader_Name(it->second.debug, nullptr);
 		SAFE_RELEASE(it->second.debug);
 	}
 	AdditionalShaders.clear();

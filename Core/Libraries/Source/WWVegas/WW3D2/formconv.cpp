@@ -41,6 +41,10 @@
 #include "dx8wrapper.h"
 #include "dx8caps.h"
 #include "bitmaphandler.h"
+#if defined(BUILD_WITH_D3D9)
+#include <map>
+#include <string>
+#endif
 
 D3DFORMAT WW3DFormatToD3DFormatConversionArray[WW3D_FORMAT_COUNT] = {
 	D3DFMT_UNKNOWN,
@@ -952,8 +956,30 @@ DWORD Register_D3D9_Pixel_Shader(IDirect3DPixelShader9* shader, const char* name
 	return Add_Shader_Entry(entry);
 }
 
+static std::map<const void*, std::string> _D3D9ShaderNames;
+
+void Set_D3D9_Shader_Name(const void* shader, const char* name)
+{
+	if (shader==nullptr)
+	{
+		return;
+	}
+	if (name==nullptr)
+	{
+		_D3D9ShaderNames.erase(shader);
+		return;
+	}
+	const char* slash=strrchr(name, '\\');
+	_D3D9ShaderNames[shader]=slash ? slash+1 : name;
+}
+
 const char* Find_D3D9_Shader_Name(const void* shader)
 {
+	std::map<const void*, std::string>::const_iterator found=_D3D9ShaderNames.find(shader);
+	if (found!=_D3D9ShaderNames.end())
+	{
+		return found->second.c_str();
+	}
 	for (unsigned index=1; index<_D3D9ShaderCount; ++index)
 	{
 		const D3D9ShaderEntry& slot=_D3D9Shaders[index];
