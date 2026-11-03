@@ -104,7 +104,7 @@ public:
 	virtual void loadPostProcess() override;
 
 protected:
-	void xferCommandNode(Xfer *xfer, CommandNode *cmdNode);
+	void xferCommandNode(Xfer *xfer, CommandNode *cmdNode, UnsignedByte version);
 
 public:
 	Bool hasAnyCommand(Object *obj);
@@ -176,6 +176,7 @@ protected:
 	CommandNode *newCommandNode(CommandType cmdType);
 	CommandNode *findCommandByID(UnsignedInt cmdNodeID);
 	CommandNode *nextCommand(Object *obj, CommandNode *cmdNode);
+	Bool isPendingConstruction(CommandNode *cmdNode, const Player *player);
 
 	void doCurrentCommand(Object *obj, CommandVerifyStatus cvs);
 };

@@ -2547,50 +2547,33 @@ void AIGroup::groupResumeConstruction( Object *obj, Bool isWaypoint, CommandSour
 	Real bestDist = 1e9, curDist;
 	const Coord3D *targetPos = obj->getPosition(), *builderPos;
 
+	for (i = m_memberList.begin(); i != m_memberList.end(); ++i)
+	{
+		AIUpdateInterface *ai = (*i)->getAIUpdateInterface();
+		if (!ai || !ai->getDozerAIInterface()
+			|| !TheActionManager->canResumeConstructionOf(*i, obj, cmdSource))
+		{
+			continue;
+		}
+
+		cnt = isWaypoint ? TheCommandSequence->getConstructionCount(*i) : 0;
+		builderPos = (*i)->getPosition();
+		curDist = sqr(builderPos->x - targetPos->x) + sqr(builderPos->y - targetPos->y);
+
+		if (cnt < minConstructionCount || (cnt == minConstructionCount && curDist < bestDist))
+		{
+			bestBuilder = *i;
+			minConstructionCount = cnt;
+			bestDist = curDist;
+		}
+	}
+
+	if (!bestBuilder)
+	{
+		return;
+	}
+
 	UnsignedInt cmdNode = TheCommandSequence->newSingleTargetCommand(CommandSequence::COMMAND_RESUME_CONSTRUCTION, obj);
-
-	if (!isWaypoint)
-	{
-		for (i = m_memberList.begin(); i != m_memberList.end(); ++i)
-		{
-			AIUpdateInterface* ai = (*i)->getAIUpdateInterface();
-			if (!ai)
-				break;
-
-			DozerAIInterface *dozerAi = ai->getDozerAIInterface();
-			if (!dozerAi)
-				break;
-
-			if (!dozerAi->isAnyTaskPending())
-			{
-				builderPos = (*i)->getPosition();
-				curDist = sqr(builderPos->x - targetPos->x) + sqr(builderPos->y - targetPos->y);
-				if (curDist < bestDist)
-				{
-					bestDist = curDist;
-					bestBuilder = *i;
-				}
-			}
-		}
-	}
-	else
-	{
-		for (i = m_memberList.begin(); i != m_memberList.end(); ++i)
-		{
-			cnt = TheCommandSequence->getConstructionCount(*i);
-
-			builderPos = (*i)->getPosition();
-			curDist = sqr(builderPos->x - targetPos->x) + sqr(builderPos->y - targetPos->y);
-
-			if (cnt < minConstructionCount || (cnt == minConstructionCount && curDist < bestDist))
-			{
-				bestBuilder = *i;
-				minConstructionCount = cnt;
-				bestDist = curDist;
-			}
-		}
-	}
-
 	AIUpdateInterface *ai = bestBuilder->getAIUpdateInterface();
 	if (ai)
 	{
@@ -2610,6 +2593,7 @@ void AIGroup::groupResumeConstruction( Object *obj, Bool isWaypoint, CommandSour
 		else
 			TheCommandSequence->includeUnitInCommand(cmdNode, bestBuilder);
 	}
+	TheCommandSequence->cleanUpEmptyCommand(cmdNode);
 }
 
 /**
@@ -3284,7 +3268,10 @@ void AIGroup::groupGuardObject( Object *objToGuard, GuardMode guardMode, Bool is
 					TheCommandSequence->removeCurrentCommand(*i, false);
 			}
 
-			TheCommandSequence->includeUnitInCommand(cmdNode, *i);
+			else
+			{
+				TheCommandSequence->includeUnitInCommand(cmdNode, *i);
+			}
 		}
 	}
 

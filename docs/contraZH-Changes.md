@@ -17,6 +17,18 @@ only casualty was the texture filter option, replaced by TheSuperHackers' versio
 Always on, no `Options.ini` key. All are retail bugs upstream still carries. Each entry says whether
 it changes the simulation (older replays no longer play back identically) or only what is drawn.
 
+## Advanced waypoint queues
+
+* Guard-object orders no longer loop back to themselves, and empty orders are removed safely.
+* Busy dozers and workers can switch to an abandoned scaffold without crashing.
+* Queued buildings reserve space and building limits only for their owner. Every multiplayer peer
+  checks the same queue, even when it does not draw that player's construction previews.
+* Workers pay once for queued buildings. Underfunded and rejected orders take no money.
+* New saves retain queued construction payments, resume targets, and reverse-movement waypoints.
+  Older saves remain readable, but fields omitted by older builds cannot be recovered.
+
+These fixes change the simulation. Multiplayer players must use the same build.
+
 ## Guard mode holds its ground
 
 * A guarding unit that gets hit finishes its return or its current attack instead of chasing the

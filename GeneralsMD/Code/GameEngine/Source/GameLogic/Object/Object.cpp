@@ -346,6 +346,7 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 
 	//ShigureUi 16/10/2026 for advanced waypoint system (class CommandSequence)
 	m_currentCommand = m_lastCommand = 0;
+	m_lastMoveStreakCommand = 0;
 	m_commandVerifyStatus = STATUS_NONE;
 	m_pendingExitList.clear();
 
@@ -4403,7 +4404,7 @@ void Object::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = 10;
+	const XferVersion currentVersion = 11;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -4815,6 +4816,10 @@ void Object::xfer( Xfer *xfer )
 		xfer->xferUnsignedInt(&m_lastCommand);
 		xfer->xferInt((Int*)&m_commandVerifyStatus);
 		xfer->xferSTLObjectIDVector(&m_pendingExitList);
+	}
+	if (version >= 11)
+	{
+		xfer->xferUnsignedInt(&m_lastMoveStreakCommand);
 	}
 
 	m_weaponBonusConditionAgainst.xfer(xfer);
