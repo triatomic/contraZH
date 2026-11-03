@@ -166,6 +166,9 @@ enum MappableKeyType CPP_11(: Int)
 	MK_MOUSE5				= 0xF3,
 	MK_WHEELUP			= 0xF4,
 	MK_WHEELDOWN		= 0xF5,
+#if RTS_ZEROHOUR
+	MK_MOUSE_LEFT_RIGHT	= 0xF6,
+#endif
 	MK_NONE					= KEY_NONE
 
 };
@@ -270,6 +273,9 @@ static const LookupListRec KeyNames[] =
 	{ "KEY_MOUSE5", MK_MOUSE5 },
 	{ "KEY_WHEELUP", MK_WHEELUP },
 	{ "KEY_WHEELDOWN", MK_WHEELDOWN },
+#if RTS_ZEROHOUR
+	{ "KEY_MOUSE_LEFT_RIGHT", MK_MOUSE_LEFT_RIGHT },
+#endif
 	{ "KEY_NONE", MK_NONE },
 	{ nullptr, 0	}
 };

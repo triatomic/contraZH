@@ -12,7 +12,7 @@ draws over the rows below it; rerun it after adding a drop-down.
 Thomas9393 contributed the Drag to Face feature.
 
 * `UseFacingDrag = No` leaves the feature off. Set it to `Yes`, or tick Drag to Face under Input in Options > Game Options.
-* Hold both mouse buttons with units selected. The second press sets the destination;
+* Hold both mouse buttons with units selected, or rebind **Drag to Face (hold)** in Options > Hotkeys > GENERAL. The second press sets the destination;
   the drag direction sets the facing. Release either button to give the order.
 * A drag under 20 pixels gives a normal move. Dragging farther adds rows.
 * Ctrl snaps the facing to 45 degree steps. Translucent unit previews show the formation.
@@ -152,6 +152,10 @@ like any other button.
   * A wheel notch over a menu or list still scrolls it and fires nothing.
 * **GENERAL** lists every command that needs no unit (selection, control groups, camera, chat,
   beacons, holds such as Force Attack). **Change**, a double click or Enter waits for a key; **No key** unbinds.
+* **Drag to Face (hold)** in **GENERAL** changes LMB + RMB to a key or side mouse button,
+  with optional modifiers, or a modifier alone. Release the hold to give the order.
+  **RESET TO DEFAULT** restores LMB + RMB; **No key** disables the binding.
+  The Drag to Face option must still be enabled.
 * A hold command (Force Attack, Waypoints, Prefer Selection) also takes Ctrl, Alt or Shift alone:
   press it and let go with no other key. It does not take the middle button or the wheel.
 * **KEY CONFLICTS** lists every card with a shared letter and every shared command chord; a double

@@ -30,7 +30,10 @@
 #include "GameClient/Drawable.h"
 #include "GameClient/GameClient.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/KeyDefs.h"
 #include "GameClient/LookAtXlat.h"
+#include "GameClient/MetaEvent.h"
+#include "GameClient/Mouse.h"
 #include "GameClient/SelectionXlat.h"
 #include "GameClient/View.h"
 #include "GameLogic/GameLogic.h"
@@ -114,6 +117,7 @@ Real snapFacingAngle( Real angle, Bool snap )
 //-------------------------------------------------------------------------------------------------
 // The player's formation style (Options.ini FormationOrder, FormationWheels, FormationSpeed), read once per session.
 FacingDragTranslator::FacingDragTranslator() :
+	m_hotkeyHeld(FALSE),
 	m_blocking(FALSE),
 	m_style(0),
 	m_anchorValid(FALSE)
@@ -133,6 +137,7 @@ void FacingDragTranslator::reset()
 {
 	endPreview();
 	m_state = FacingDragState();
+	m_hotkeyHeld = FALSE;
 	m_swallowClick[0] = m_swallowClick[1] = FALSE;
 	m_anchorValid = FALSE;
 	blockOtherTranslators( FALSE );
@@ -141,7 +146,90 @@ void FacingDragTranslator::reset()
 //-------------------------------------------------------------------------------------------------
 GameMessageDisposition FacingDragTranslator::translateGameMessage( const GameMessage *msg )
 {
-	// the player's Options "Drag to Face"; off, the chord does what retail's does
+	const GameMessage::Type type = msg->getType();
+	if( type == GameMessage::MSG_META_BEGIN_FACING_DRAG || type == GameMessage::MSG_META_END_FACING_DRAG )
+	{
+		const ICoord2D &pos = TheMouse->getMouseStatus()->pos;
+		if( type == GameMessage::MSG_META_BEGIN_FACING_DRAG )
+		{
+			if( TheGlobalData->m_facingDrag && !doesFacingDragOwnButtons( m_state ) && TheInGameUI->getSelectCount() > 0 )
+			{
+				m_hotkeyHeld = TRUE;
+				m_state = FacingDragState();
+				m_state.active = TRUE;
+				m_state.anchor = pos;
+				m_anchorValid = TheTacticalView->screenToTerrain( &pos, &m_anchorWorld );
+				blockOtherTranslators( TRUE );
+				beginPreview();
+			}
+		}
+		else if( m_hotkeyHeld )
+		{
+			giveOrder( pos );
+			endPreview();
+			m_hotkeyHeld = FALSE;
+			m_state.active = FALSE;
+			m_state.swallowing = m_state.leftDown || m_state.rightDown;
+			blockOtherTranslators( doesFacingDragOwnButtons( m_state ) );
+		}
+		return DESTROY_MESSAGE;
+	}
+
+	if( m_hotkeyHeld )
+	{
+		if( type == GameMessage::MSG_RAW_MOUSE_POSITION )
+		{
+			updatePreview( msg->getArgument( 0 )->pixel );
+		}
+		if( type == GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_DOWN || type == GameMessage::MSG_RAW_MOUSE_LEFT_DOUBLE_CLICK )
+		{
+			m_state.leftDown = TRUE;
+		}
+		else if( type == GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_UP )
+		{
+			m_state.leftDown = FALSE;
+			m_swallowClick[FACING_DRAG_LEFT] = TRUE;
+		}
+		else if( type == GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_DOWN || type == GameMessage::MSG_RAW_MOUSE_RIGHT_DOUBLE_CLICK )
+		{
+			m_state.rightDown = TRUE;
+		}
+		else if( type == GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_UP )
+		{
+			m_state.rightDown = FALSE;
+			m_swallowClick[FACING_DRAG_RIGHT] = TRUE;
+		}
+		if( ( type >= GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_DOWN && type <= GameMessage::MSG_RAW_MOUSE_LEFT_DRAG )
+			|| ( type >= GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_DOWN && type <= GameMessage::MSG_RAW_MOUSE_RIGHT_DRAG )
+			|| type == GameMessage::MSG_MOUSE_LEFT_CLICK || type == GameMessage::MSG_MOUSE_LEFT_DOUBLE_CLICK
+			|| type == GameMessage::MSG_MOUSE_RIGHT_CLICK || type == GameMessage::MSG_MOUSE_RIGHT_DOUBLE_CLICK )
+		{
+			if( type == GameMessage::MSG_MOUSE_LEFT_CLICK || type == GameMessage::MSG_MOUSE_LEFT_DOUBLE_CLICK )
+			{
+				m_swallowClick[FACING_DRAG_LEFT] = FALSE;
+			}
+			if( type == GameMessage::MSG_MOUSE_RIGHT_CLICK || type == GameMessage::MSG_MOUSE_RIGHT_DOUBLE_CLICK )
+			{
+				m_swallowClick[FACING_DRAG_RIGHT] = FALSE;
+			}
+			return DESTROY_MESSAGE;
+		}
+		return KEEP_MESSAGE;
+	}
+
+	const MetaMapRec *binding = TheMetaMap->getFirstMetaMapRec();
+	while( binding && binding->m_meta != GameMessage::MSG_META_BEGIN_FACING_DRAG )
+	{
+		binding = binding->m_next;
+	}
+	const Bool mouseChord = binding && binding->m_key == MK_MOUSE_LEFT_RIGHT && binding->m_usableIn != COMMANDUSABLE_NONE;
+	if( !mouseChord
+		&& !doesFacingDragOwnButtons( m_state ) && !m_swallowClick[0] && !m_swallowClick[1] )
+	{
+		return KEEP_MESSAGE;
+	}
+
+	// The option enables both the default chord and the player's hold key.
 	if( !TheGlobalData->m_facingDrag && !doesFacingDragOwnButtons( m_state ) )
 	{
 		return KEEP_MESSAGE;
@@ -151,9 +239,17 @@ GameMessageDisposition FacingDragTranslator::translateGameMessage( const GameMes
 		// a double click is a button down as well
 		case GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_DOWN:
 		case GameMessage::MSG_RAW_MOUSE_LEFT_DOUBLE_CLICK:
+			if( !mouseChord && !doesFacingDragOwnButtons( m_state ) )
+			{
+				return KEEP_MESSAGE;
+			}
 			return onButton( FACING_DRAG_LEFT, TRUE, msg );
 		case GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_DOWN:
 		case GameMessage::MSG_RAW_MOUSE_RIGHT_DOUBLE_CLICK:
+			if( !mouseChord && !doesFacingDragOwnButtons( m_state ) )
+			{
+				return KEEP_MESSAGE;
+			}
 			return onButton( FACING_DRAG_RIGHT, TRUE, msg );
 		case GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_UP:
 			return onButton( FACING_DRAG_LEFT, FALSE, msg );

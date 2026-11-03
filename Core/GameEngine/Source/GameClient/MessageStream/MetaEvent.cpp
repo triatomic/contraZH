@@ -174,6 +174,10 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "TOGGLE_REVERSEMOVE",												GameMessage::MSG_META_TOGGLE_REVERSEMOVE },
 	{ "BEGIN_PATH_BUILD",													GameMessage::MSG_META_BEGIN_PATH_BUILD },
 	{ "END_PATH_BUILD",														GameMessage::MSG_META_END_PATH_BUILD },
+#if RTS_ZEROHOUR
+	{ "BEGIN_FACING_DRAG", GameMessage::MSG_META_BEGIN_FACING_DRAG },
+	{ "END_FACING_DRAG", GameMessage::MSG_META_END_FACING_DRAG },
+#endif
 	{ "BEGIN_FORCEATTACK",												GameMessage::MSG_META_BEGIN_FORCEATTACK },
 	{ "END_FORCEATTACK",													GameMessage::MSG_META_END_FORCEATTACK },
 	{ "BEGIN_FORCEMOVE",													GameMessage::MSG_META_BEGIN_FORCEMOVE },
@@ -1470,6 +1474,19 @@ void MetaMap::generateMetaMap()
 			map->m_usableIn = COMMANDUSABLE_EVERYWHERE;
 		}
 	}
+
+#if RTS_ZEROHOUR
+	{
+		MetaMapRec *begin = getMetaMapRec(GameMessage::MSG_META_BEGIN_FACING_DRAG);
+		MetaMapRec *end = getMetaMapRec(GameMessage::MSG_META_END_FACING_DRAG);
+		begin->m_key = end->m_key = MK_MOUSE_LEFT_RIGHT;
+		begin->m_modState = end->m_modState = NONE;
+		begin->m_usableIn = end->m_usableIn = COMMANDUSABLE_GAME;
+		begin->m_category = end->m_category = CATEGORY_CONTROL;
+		begin->m_transition = DOWN;
+		end->m_transition = UP;
+	}
+#endif
 
 #if defined(RTS_DEBUG)
 	{

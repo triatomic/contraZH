@@ -200,6 +200,7 @@ const BuiltInText BUILT_IN_TEXT[] =
 	{ "GUI:HotkeysCommandDIPLOMACY", L"Diplomacy" },
 	{ "GUI:HotkeysCommandPLACE_BEACON", L"Place beacon" },
 	{ "GUI:HotkeysCommandDELETE_BEACON", L"Delete beacon" },
+	{ "GUI:HotkeysCommandBEGIN_FACING_DRAG", L"Drag to Face (hold)" },
 	{ "GUI:HotkeysCommandBEGIN_FORCEATTACK", L"Force attack (hold)" },
 	{ "GUI:HotkeysCommandBEGIN_WAYPOINTS", L"Waypoints (hold)" },
 	{ "GUI:HotkeysCommandBEGIN_PREFER_SELECTION", L"Prefer selection (hold)" },
@@ -420,6 +421,7 @@ UnicodeString chordText( const Binding& binding )
 		{ "PGUP", "Page Up" }, { "PGDN", "Page Down" }, { "INS", "Insert" }, { "DEL", "Delete" }, { "CAPS", "Caps Lock" },
 		{ "KPPLUS", "Num +" }, { "KPMINUS", "Num -" }, { "KPSLASH", "Num /" }, { "KPSTAR", "Num *" },
 		{ "KPDEL", "Num Del" }, { "KPENTER", "Num Enter" },
+		{ "MOUSE_LEFT_RIGHT", "LMB + RMB" },
 		{ "MOUSE3", "Middle mouse" }, { "MOUSE4", "Mouse 4" }, { "MOUSE5", "Mouse 5" }, { "WHEELUP", "Wheel up" }, { "WHEELDOWN", "Wheel down" },
 	};
 	AsciiString text;

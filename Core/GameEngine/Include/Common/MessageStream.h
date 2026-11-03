@@ -479,6 +479,11 @@ public:
 		MSG_CHEAT_PATHFIND_LOG_OFF,			///< stop writing the pathfinder counters
 		MSG_CHEAT_TOGGLE_SHADER_PANEL,
 
+#if RTS_ZEROHOUR
+		MSG_META_BEGIN_FACING_DRAG,
+		MSG_META_END_FACING_DRAG,
+#endif
+
 		MSG_END_META_MESSAGES,											///< Marker to delineate "meta" messages
 
 		MSG_MOUSEOVER_DRAWABLE_HINT,								///< (drawableid) the given drawable is under the mouse, regardless of button states

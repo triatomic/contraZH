@@ -1,3 +1,21 @@
+enum { MK_MOUSE_LEFT_RIGHT, MK_SPACE, COMMANDUSABLE_NONE, COMMANDUSABLE_GAME };
+struct MetaMapRec
+{
+	Int m_key, m_usableIn;
+	GameMessage::Type m_meta;
+	MetaMapRec *m_next;
+} testDragBinding = { MK_MOUSE_LEFT_RIGHT, COMMANDUSABLE_GAME, GameMessage::MSG_META_BEGIN_FACING_DRAG, NULL };
+struct TestMetaMap
+{
+	const MetaMapRec *getFirstMetaMapRec() { return &testDragBinding; }
+} testMetaMap;
+TestMetaMap *TheMetaMap = &testMetaMap;
+struct TestMouse
+{
+	ICoord2D pos;
+	const TestMouse *getMouseStatus() const { return this; }
+} testMouse = { { 100, 100 } };
+TestMouse *TheMouse = &testMouse;
 #define MAYBE_UNUSED
 #define deleteInstance(p) delete (p)
 enum GameMessageDisposition { KEEP_MESSAGE, DESTROY_MESSAGE };
@@ -38,10 +56,10 @@ LookAtTranslator *TheLookAtTranslator = &testLook;
 struct FacingDragTranslator
 {
 	FacingDragState m_state;
-	Bool m_blocking, m_anchorValid, m_swallowClick[2];
+	Bool m_hotkeyHeld, m_blocking, m_anchorValid, m_swallowClick[2];
 	Coord3D m_anchorWorld;
 	Int orders;
-	FacingDragTranslator() : m_blocking(FALSE), m_anchorValid(FALSE), orders(0)
+	FacingDragTranslator() : m_hotkeyHeld(FALSE), m_blocking(FALSE), m_anchorValid(FALSE), orders(0)
 	{
 		m_swallowClick[0] = m_swallowClick[1] = FALSE;
 	}

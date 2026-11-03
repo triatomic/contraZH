@@ -182,3 +182,66 @@ TEST(FacingDrag, CheckboxFitsBelowTheInputControls)
 	WinGameOptions = NULL;
 	checkSmartCommandGroup = NULL;
 }
+
+TEST(FacingDrag, ReboundHoldStartsAndOrdersOnRelease)
+{
+	testDragBinding.m_key = MK_SPACE;
+	FacingDragTranslator drag;
+	GameMessage begin(GameMessage::MSG_META_BEGIN_FACING_DRAG);
+	GameMessage end(GameMessage::MSG_META_END_FACING_DRAG);
+	EXPECT_EQ(drag.translateGameMessage(&begin), DESTROY_MESSAGE);
+	EXPECT_TRUE(drag.m_state.active);
+	EXPECT_TRUE(drag.m_blocking);
+	EXPECT_EQ(drag.translateGameMessage(&begin), DESTROY_MESSAGE);
+	EXPECT_EQ(drag.translateGameMessage(&end), DESTROY_MESSAGE);
+	EXPECT_EQ(drag.orders, 1);
+	EXPECT_FALSE(drag.m_blocking);
+	drag.translateGameMessage(&end);
+	EXPECT_EQ(drag.orders, 1);
+	testDragBinding.m_key = MK_MOUSE_LEFT_RIGHT;
+}
+
+TEST(FacingDrag, ReboundHoldReplacesTheMouseChord)
+{
+	testDragBinding.m_key = MK_SPACE;
+	FacingDragTranslator drag;
+	GameMessage head(GameMessage::MSG_DO_MOVETO);
+	appendInput(head, GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_DOWN);
+	appendInput(head, GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_DOWN);
+	appendInput(head, GameMessage::MSG_RAW_MOUSE_LEFT_BUTTON_UP);
+	appendInput(head, GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_UP);
+	runInputBatch(drag, head);
+	EXPECT_EQ(drag.orders, 0);
+	EXPECT_FALSE(drag.m_state.active);
+	testDragBinding.m_key = MK_MOUSE_LEFT_RIGHT;
+}
+
+TEST(FacingDrag, MouseReleaseAfterTheHoldDoesNotGiveAnotherOrder)
+{
+	testDragBinding.m_key = MK_SPACE;
+	FacingDragTranslator drag;
+	GameMessage head(GameMessage::MSG_DO_MOVETO);
+	appendInput(head, GameMessage::MSG_META_BEGIN_FACING_DRAG);
+	appendInput(head, GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_DOWN);
+	appendInput(head, GameMessage::MSG_META_END_FACING_DRAG);
+	appendInput(head, GameMessage::MSG_RAW_MOUSE_RIGHT_BUTTON_UP);
+	appendInput(head, GameMessage::MSG_MOUSE_RIGHT_CLICK);
+	runInputBatch(drag, head);
+	EXPECT_EQ(drag.orders, 1);
+	EXPECT_FALSE(drag.m_blocking);
+	EXPECT_FALSE(drag.m_swallowClick[FACING_DRAG_RIGHT]);
+	testDragBinding.m_key = MK_MOUSE_LEFT_RIGHT;
+}
+
+TEST(FacingDrag, DisabledOptionIgnoresTheReboundHold)
+{
+	TheGlobalData->m_facingDrag = FALSE;
+	FacingDragTranslator drag;
+	GameMessage begin(GameMessage::MSG_META_BEGIN_FACING_DRAG);
+	GameMessage end(GameMessage::MSG_META_END_FACING_DRAG);
+	drag.translateGameMessage(&begin);
+	drag.translateGameMessage(&end);
+	EXPECT_EQ(drag.orders, 0);
+	EXPECT_FALSE(drag.m_state.active);
+	TheGlobalData->m_facingDrag = TRUE;
+}

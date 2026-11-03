@@ -88,6 +88,7 @@ private:
 	void destroyGhosts();
 
 	FacingDragState m_state;
+	Bool m_hotkeyHeld;
 	Bool m_blocking;	///< selection box and right-button scroll are blocked
 	UnsignedInt m_style;	///< FormationStyle from Options.ini, sent with each order
 	Bool m_swallowClick[2];	///< the meta translator puts a click after each button up
