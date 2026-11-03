@@ -26,6 +26,8 @@ going back to an earlier chapter is one click.
 * Easy, Medium and Hard radios pick the difficulty, remembered as `CampaignDifficulty` in
 `Options.ini`. A started mission plays as a normal campaign mission, so winning it moves on to
 `NextMission`.
+* In Generals Online builds, Continue loads the next mission after a win, and Retry restarts
+the current mission after a loss.
 * The Contra mod ships the loose `MainMenu.wnd`, `CampaignChapters.wnd` and
 `WindowTransitions.ini` the screen needs, plus the `TOOLTIP:CampaignChapters`, `CAMPAIGN:Generals`
 and `CAMPAIGN:ZeroHour` strings. An older exe ignores the button.
