@@ -10,10 +10,10 @@ Buildings using `PoweredBehavior` also switch their lights off when their owner 
 of power. Animated textures keep their scroll and rotation state when lights switch off.
 
 This covers `HEADLIGHT` meshes, building meshes named `LIGHT` or `LIGHT` followed by digits
-(such as `Light00`, ignoring case), additive glow, emissive materials and `_emi.dds` textures,
+(such as `Light00`, ignoring case), additive glow and `_emi.dds` textures,
 including bloom and path tracing light spill. The change only affects rendering.
-Normal-map lighting follows the material's diffuse and ambient values, so switching off
-self-illumination does not leave bumps lit as though the material had full diffuse brightness.
+The building's other materials keep their authored surface lighting, so a power outage
+does not darken the walls and roof or change their normal-map shading.
 
 ## Storm draw module
 

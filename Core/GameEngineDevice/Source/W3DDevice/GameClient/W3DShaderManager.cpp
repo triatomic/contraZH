@@ -2915,7 +2915,7 @@ void SpecularShader::setTexture(TextureClass *texture, MeshModelClass *model, co
 			material->Get_Ambient(&color);
 			ambient *= color.X * 0.3f + color.Y * 0.59f + color.Z * 0.11f;
 		}
-		if (emissionEnabled && material->Get_Emissive_Color_Source() == VertexMaterialClass::MATERIAL)
+		if (material->Get_Emissive_Color_Source() == VertexMaterialClass::MATERIAL)
 		{
 			material->Get_Emissive(&color);
 			ambient += color.X * 0.3f + color.Y * 0.59f + color.Z * 0.11f;

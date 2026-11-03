@@ -2757,24 +2757,6 @@ void DX8TextureCategoryClass::Render_Task(PolyRenderTaskClass * prt, VertexMater
 	{
 		return;
 	}
-	VertexMaterialClass *originalMaterial = vmaterial;
-	if (emissionDisabled)
-	{
-		Vector3 emission;
-		vmaterial->Get_Emissive(&emission);
-		if (emission.Length2() > 0.0f || vmaterial->Get_Emissive_Color_Source() != VertexMaterialClass::MATERIAL)
-		{
-			// Sorted draws retain the material until the sorting queue flushes.
-			vmaterial = vmaterial->Clone();
-			for (int stage = 0; stage < MeshBuilderClass::MAX_STAGES; ++stage)
-			{
-				vmaterial->Set_Mapper(originalMaterial->Peek_Mapper(stage), stage);
-			}
-			vmaterial->Set_Emissive(0.0f, 0.0f, 0.0f);
-			vmaterial->Set_Emissive_Color_Source(VertexMaterialClass::MATERIAL);
-			DX8Wrapper::Set_Material(vmaterial);
-		}
-	}
 
 	/*
 	** If the user is not installing LightEnvironmentClasses, we leave the lighting render
@@ -2957,11 +2939,6 @@ void DX8TextureCategoryClass::Render_Task(PolyRenderTaskClass * prt, VertexMater
 
 	}
 
-	if (vmaterial != originalMaterial)
-	{
-		DX8Wrapper::Set_Material(originalMaterial);
-		REF_PTR_RELEASE(vmaterial);
-	}
 }
 
 void DX8TextureCategoryClass::Clear_Render_List()
