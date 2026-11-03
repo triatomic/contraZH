@@ -2409,15 +2409,18 @@ bool GameLogic::onDozerConstruct(MAYBE_UNUSED GameMessage* msg, AIGroupPtr& curr
 		}
 		else
 		{
-			TheCommandSequence->includeUnitInCommand(cmdNode, constructorObject);
-			TheCommandSequence->createConstructionShadow(cmdNode, constructorObject);
-
 			UnsignedInt cost = place->calcCostToBuild(constructorObject->getControllingPlayer());
 			Money* money = constructorObject->getControllingPlayer()->getMoney();
 
-			money->withdraw(cost);
+			if (money->countMoney() < cost || !TheCommandSequence->includeUnitInCommand(cmdNode, constructorObject))
+			{
+				TheCommandSequence->cleanUpEmptyCommand(cmdNode);
+				return false;
+			}
 
-			TheCommandSequence->setConstructionCashWithdraw(cmdNode, cost);
+			UnsignedInt paid = money->withdraw(cost);
+			TheCommandSequence->setConstructionCashWithdraw(cmdNode, paid);
+			TheCommandSequence->createConstructionShadow(cmdNode, constructorObject);
 		}
 	}
 	else

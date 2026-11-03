@@ -425,7 +425,7 @@ Object *WorkerAIUpdate::construct( const ThingTemplate *what,
 	{
 		TheCommandSequence->setConstructionCashWithdraw(builder->getCurrentCommand(), 0);
 	}
-	if( isRebuild == FALSE )
+	else if( isRebuild == FALSE )
 	{
 		Money *money = owningPlayer->getMoney();
 

@@ -55,6 +55,7 @@
 #include "GameLogic/AIStateMachine.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/CommandSequence.h"
+#include "Common/GameState.h"
 #include "GameLogic/Locomotor.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
@@ -752,7 +753,7 @@ void AIStateMachine::crc( Xfer *xfer )
 void AIStateMachine::xfer( Xfer *xfer )
 {
   // version
-  XferVersion currentVersion = 1;
+  XferVersion currentVersion = 2;
   XferVersion version = currentVersion;
   xfer->xferVersion( &version, currentVersion );
 
@@ -762,6 +763,15 @@ void AIStateMachine::xfer( Xfer *xfer )
 	Int i;
 	Int count = m_goalPath.size();
 	xfer->xferInt(&count);
+	if (count < 0)
+	{
+		throw SC_INVALID_DATA;
+	}
+	if (xfer->getXferMode() == XFER_LOAD)
+	{
+		m_goalPath.clear();
+		m_goalPathInfo.assign(count, PathPointInfo());
+	}
 	for (i=0; i<count; i++) {
 		Coord3D pos;
 		if (xfer->getXferMode() != XFER_LOAD)
@@ -772,6 +782,11 @@ void AIStateMachine::xfer( Xfer *xfer )
 		if (xfer->getXferMode() == XFER_LOAD)
 		{
 			m_goalPath.push_back(pos);
+		}
+		if (version >= 2)
+		{
+			xfer->xferBool(&m_goalPathInfo[i].m_isReverse);
+			xfer->xferUnsignedInt(&m_goalPathInfo[i].m_cmdNodeID);
 		}
 	}
 
