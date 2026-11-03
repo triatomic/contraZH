@@ -2766,6 +2766,10 @@ void DX8TextureCategoryClass::Render_Task(PolyRenderTaskClass * prt, VertexMater
 		{
 			// Sorted draws retain the material until the sorting queue flushes.
 			vmaterial = vmaterial->Clone();
+			for (int stage = 0; stage < MeshBuilderClass::MAX_STAGES; ++stage)
+			{
+				vmaterial->Set_Mapper(originalMaterial->Peek_Mapper(stage), stage);
+			}
 			vmaterial->Set_Emissive(0.0f, 0.0f, 0.0f);
 			vmaterial->Set_Emissive_Color_Source(VertexMaterialClass::MATERIAL);
 			DX8Wrapper::Set_Material(vmaterial);

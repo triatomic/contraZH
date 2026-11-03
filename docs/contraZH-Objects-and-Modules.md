@@ -6,8 +6,14 @@ Building lights turn off while the building is disabled, including low power, EM
 and scripted power cuts. Lights return when the building recovers, following the normal
 day/night rules. The internal `DISABLED_HELD` flag does not turn lights off.
 
-This covers `HEADLIGHT` meshes, additive glow, emissive materials and `_emi.dds` textures,
+Buildings using `PoweredBehavior` also switch their lights off when their owner runs out
+of power. Animated textures keep their scroll and rotation state when lights switch off.
+
+This covers `HEADLIGHT` meshes, building meshes named `LIGHT` or `LIGHT` followed by digits
+(such as `Light00`, ignoring case), additive glow, emissive materials and `_emi.dds` textures,
 including bloom and path tracing light spill. The change only affects rendering.
+Normal-map lighting follows the material's diffuse and ambient values, so switching off
+self-illumination does not leave bumps lit as though the material had full diffuse brightness.
 
 ## Storm draw module
 

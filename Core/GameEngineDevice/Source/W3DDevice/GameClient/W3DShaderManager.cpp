@@ -2571,7 +2571,7 @@ public:
 	virtual Int shutdown() override;
 
 	/// Binds one polygon group's texture, and its normal map and shader when it is bumped.
-	void setTexture(TextureClass *texture, MeshModelClass *model = nullptr, const AABoxClass *worldBounds = nullptr, Bool emissionEnabled = TRUE);
+	void setTexture(TextureClass *texture, MeshModelClass *model = nullptr, const AABoxClass *worldBounds = nullptr, Bool emissionEnabled = TRUE, VertexMaterialClass *material = nullptr);
 	/// Sets the rise of full brightness the derived bumps take, for the rest of the pass.
 	void setBumpHeight(Real height);
 
@@ -2893,9 +2893,38 @@ static TextureClass *Find_Emissive_Map(TextureClass *texture)
 	return texture->Peek_Emissive_Map();
 }
 
-void SpecularShader::setTexture(TextureClass *texture, MeshModelClass *model, const AABoxClass *worldBounds, Bool emissionEnabled)
+void SpecularShader::setTexture(TextureClass *texture, MeshModelClass *model, const AABoxClass *worldBounds, Bool emissionEnabled, VertexMaterialClass *material)
 {
 	DX8Wrapper::Set_Texture(0, texture);
+
+	Vector3 diffuse(1.0f, 1.0f, 1.0f);
+	Real ambient = BumpAmbient;
+	if (material != nullptr)
+	{
+		Vector3 color;
+		if (!material->Get_Lighting())
+		{
+			diffuse.Set(0.0f, 0.0f, 0.0f);
+		}
+		else if (material->Get_Diffuse_Color_Source() == VertexMaterialClass::MATERIAL)
+		{
+			material->Get_Diffuse(&diffuse);
+		}
+		if (material->Get_Ambient_Color_Source() == VertexMaterialClass::MATERIAL)
+		{
+			material->Get_Ambient(&color);
+			ambient *= color.X * 0.3f + color.Y * 0.59f + color.Z * 0.11f;
+		}
+		if (emissionEnabled && material->Get_Emissive_Color_Source() == VertexMaterialClass::MATERIAL)
+		{
+			material->Get_Emissive(&color);
+			ambient += color.X * 0.3f + color.Y * 0.59f + color.Z * 0.11f;
+		}
+	}
+	Vector4 sunDiffuse(SpecularSunDiffuse.X * diffuse.X, SpecularSunDiffuse.Y * diffuse.Y, SpecularSunDiffuse.Z * diffuse.Z, 0.0f);
+	Vector4 materialBump(m_bumpHeight, BumpNormalMapStrength, ambient, 0.0f);
+	DX8Wrapper::Set_Pixel_Shader_Constant(5, &sunDiffuse, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(6, &materialBump, 1);
 
 	const DWORD *shaders = pickShaders();
 
@@ -3218,7 +3247,7 @@ public:
 		TextureClass *texture = (category != nullptr) ? category->Peek_Texture(0) : nullptr;
 #if defined(BUILD_WITH_D3D9)
 		specularShader.setTexture(texture, renderer->Get_Mesh_Model_Class(), mesh != nullptr ? &mesh->Get_Bounding_Box() : nullptr,
-			mesh == nullptr || !mesh->Is_Emission_Disabled());
+			mesh == nullptr || !mesh->Is_Emission_Disabled(), category != nullptr ? (VertexMaterialClass *)category->Peek_Material() : nullptr);
 #else
 		DX8Wrapper::Set_Texture(0, texture);
 #endif

@@ -889,7 +889,14 @@ Bool Drawable::areLightsDisabled() const
 
 	DisabledMaskType disabling = obj->getDisabledFlags();
 	disabling.clear(MAKE_DISABLED_MASK(DISABLED_HELD));
-	return DISABLEDMASK_ANY_SET(disabling) || obj->testScriptStatusBit(OBJECT_STATUS_SCRIPT_UNPOWERED);
+	if (DISABLEDMASK_ANY_SET(disabling) || obj->testScriptStatusBit(OBJECT_STATUS_SCRIPT_UNPOWERED))
+	{
+		return TRUE;
+	}
+
+	static const NameKeyType poweredBehaviorKey = NAMEKEY("PoweredBehavior");
+	const Player *player = obj->getControllingPlayer();
+	return player && (obj->isKindOf(KINDOF_POWERED) || obj->findUpdateModule(poweredBehaviorKey)) && !player->getEnergy()->hasSufficientPower();
 }
 
 //-------------------------------------------------------------------------------------------------

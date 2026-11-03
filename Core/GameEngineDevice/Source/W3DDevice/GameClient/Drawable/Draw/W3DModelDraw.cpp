@@ -3783,6 +3783,17 @@ void W3DModelDraw::hideAllHeadlights(Bool hide)
 					}
 				}
 			}
+#if RTS_ZEROHOUR
+			else if (getDrawable()->isKindOf(KINDOF_STRUCTURE))
+			{
+				const char *name = strrchr(test->Get_Name(), '.');
+				name = name != nullptr ? name + 1 : test->Get_Name();
+				if (strnicmp(name, "LIGHT", 5) == 0 && strspn(name + 5, "0123456789") == strlen(name + 5))
+				{
+					test->Set_Hidden(hide);
+				}
+			}
+#endif
 			test->Release_Ref();
 		}
 	}
