@@ -894,7 +894,7 @@ void MeshClass::Render_Material_Pass(MaterialPassClass * pass,IndexBufferClass *
 		while (!it.Is_Done()) {
 			if (it.Peek_Obj()->Get_Pass() == 0)
 			{
-				pass->Install_Polygon_Materials(it.Peek_Obj());
+				pass->Install_Polygon_Materials(it.Peek_Obj(), this);
 				it.Peek_Obj()->Render(BaseVertexOffset);
 			}
 			it.Next();
@@ -1025,7 +1025,7 @@ void MeshClass::Render_Material_Pass(MaterialPassClass * pass,IndexBufferClass *
 
 			if (it.Peek_Obj()->Get_Pass() == 0)
 			{
-				pass->Install_Polygon_Materials(it.Peek_Obj());
+				pass->Install_Polygon_Materials(it.Peek_Obj(), this);
 				it.Peek_Obj()->Render(BaseVertexOffset);
 				draws++;
 			}

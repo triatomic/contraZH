@@ -52,6 +52,11 @@ bool DX8InstancingClass::Is_Vertex_Shader_Material_Pass(const MaterialPassClass 
 // and point-lit meshes draw alone.
 bool DX8InstancingClass::Allows_Mesh(MeshClass * mesh)
 {
+	if (mesh->Is_Emission_Disabled())
+	{
+		return false;
+	}
+
 	MeshModelClass * model = mesh->Peek_Model();
 	if (model->Get_Flag(MeshModelClass::ALIGNED) || model->Get_Flag(MeshModelClass::ORIENTED) || model->Get_Flag(MeshModelClass::SKIN))
 	{

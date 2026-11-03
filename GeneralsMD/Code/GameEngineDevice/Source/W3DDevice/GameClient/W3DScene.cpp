@@ -769,6 +769,11 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 			ss = OBJECTSHROUD_FOGGED;
 	}
 
+	if (draw != nullptr)
+	{
+		robj->Set_Emission_Disabled(draw->areLightsDisabled());
+	}
+
 	// all this ambient business no longer handles the tinting and flashing stuff,
 	// but it does still light the drawable explicitly, and can be fudged like this
 	// infantry test does, here...
@@ -2321,7 +2326,7 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 			DrawableInfo *info = (DrawableInfo *)object->Get_User_Data();
 			Drawable *draw = info != nullptr ? info->m_drawable : nullptr;
 			if ((draw == nullptr && (!TheGlobalData->m_isWorldBuilder || info != nullptr)) ||
-				(draw != nullptr && (draw->isDrawableEffectivelyHidden() || draw->getFullyObscuredByShroud() ||
+				(draw != nullptr && (draw->areLightsDisabled() || draw->isDrawableEffectivelyHidden() || draw->getFullyObscuredByShroud() ||
 				(draw->getObject() != nullptr && draw->getObject()->getShroudedStatus(localPlayerIndex) >= OBJECTSHROUD_FOGGED))))
 			{
 				continue;

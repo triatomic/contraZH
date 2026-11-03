@@ -1,5 +1,14 @@
 # Objects & Modules
 
+## Building lights
+
+Building lights turn off while the building is disabled, including low power, EMP, hacking
+and scripted power cuts. Lights return when the building recovers, following the normal
+day/night rules. The internal `DISABLED_HELD` flag does not turn lights off.
+
+This covers `HEADLIGHT` meshes, additive glow, emissive materials and `_emi.dds` textures,
+including bloom and path tracing light spill. The change only affects rendering.
+
 ## Storm draw module
 
 `Draw = W3DStormDraw ModuleTag_Storm` draws a sandstorm (`Type = SAND`) or snowstorm

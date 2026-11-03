@@ -452,6 +452,22 @@ public:
 	const void *					Peek_Disruption() const { return DisruptionData; }
 	bool							Is_Disruption_Only() const { return DisruptionOnly; }
 
+	void Set_Emission_Disabled(bool disabled)
+	{
+		if (disabled)
+		{
+			Bits |= EMISSION_DISABLED;
+		}
+		else
+		{
+			Bits &= ~EMISSION_DISABLED;
+		}
+	}
+	bool Is_Emission_Disabled() const
+	{
+		return (Bits & EMISSION_DISABLED) != 0 || (Container != nullptr && Container->Is_Emission_Disabled());
+	}
+
 	// SoftParticleHookClass effects a sorted mesh draws its own art with, and the data handed to the hook with them.
 	void							Set_Shader_Effects(unsigned effects, const void *data) { ShaderEffects=effects; ShaderEffectData=data; }
 	unsigned						Get_Shader_Effects() const { return ShaderEffects; }
@@ -541,6 +557,7 @@ protected:
 		IS_ADDITIVE = 0x00100000,	//added for Generals so we quickly determine what type of blending is on the mesh. -MW
 		IS_SELF_SHADOWED =			0x00080000,			// the mesh is self shadowed
 		IS_CHEATER =            0x00100000,// the new cheat spy code uses these bits, since nothing else now does
+		EMISSION_DISABLED =    0x00200000,
 		IS_REALLY_VISIBLE =			IS_VISIBLE | IS_NOT_HIDDEN | IS_NOT_ANIMATION_HIDDEN,
       IS_NOT_HIDDEN_AT_ALL =     IS_NOT_HIDDEN | IS_NOT_ANIMATION_HIDDEN,
 		DEFAULT_BITS =					COLL_TYPE_ALL | IS_NOT_HIDDEN | IS_NOT_ANIMATION_HIDDEN,

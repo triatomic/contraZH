@@ -530,7 +530,7 @@ void DX8FVFCategoryContainer::Render_Material_Pass_Window()
 		{
 			MeshClass * mesh = fixed[i].first;
 			DX8Wrapper::Set_Transform(D3DTS_WORLD,mesh->Get_Transform());
-			pass->Install_Polygon_Materials(fixed[i].second);
+			pass->Install_Polygon_Materials(fixed[i].second, mesh);
 			fixed[i].second->Render(mesh->Get_Base_Vertex_Offset());
 		}
 
@@ -2752,6 +2752,26 @@ void DX8TextureCategoryClass::Render_Task(PolyRenderTaskClass * prt, VertexMater
 	DX8PolygonRendererClass * renderer = prt->Peek_Polygon_Renderer();
 	MeshClass * mesh = prt->Peek_Mesh();
 
+	const bool emissionDisabled = mesh->Is_Emission_Disabled();
+	if (emissionDisabled && (Is_Additive() || replay))
+	{
+		return;
+	}
+	VertexMaterialClass *originalMaterial = vmaterial;
+	if (emissionDisabled)
+	{
+		Vector3 emission;
+		vmaterial->Get_Emissive(&emission);
+		if (emission.Length2() > 0.0f || vmaterial->Get_Emissive_Color_Source() != VertexMaterialClass::MATERIAL)
+		{
+			// Sorted draws retain the material until the sorting queue flushes.
+			vmaterial = vmaterial->Clone();
+			vmaterial->Set_Emissive(0.0f, 0.0f, 0.0f);
+			vmaterial->Set_Emissive_Color_Source(VertexMaterialClass::MATERIAL);
+			DX8Wrapper::Set_Material(vmaterial);
+		}
+	}
+
 	/*
 	** If the user is not installing LightEnvironmentClasses, we leave the lighting render
 	** states untouched.  This way they can set a couple global lights that affect the entire scene.
@@ -2931,6 +2951,12 @@ void DX8TextureCategoryClass::Render_Task(PolyRenderTaskClass * prt, VertexMater
 
 
 
+	}
+
+	if (vmaterial != originalMaterial)
+	{
+		DX8Wrapper::Set_Material(originalMaterial);
+		REF_PTR_RELEASE(vmaterial);
 	}
 }
 

@@ -609,6 +609,7 @@ public:
 	Bool isVisible();											///< for limiting tree sway, etc to visible objects
 
 	Bool getShouldAnimate( Bool considerPower ) const;
+	Bool areLightsDisabled() const;
 
 	// flash drawable methods ---------------------------------------------------------
   Int getFlashCount() { return m_flashCount; }

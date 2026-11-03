@@ -879,6 +879,20 @@ Bool Drawable::getShouldAnimate( Bool considerPower ) const
 }
 
 //-------------------------------------------------------------------------------------------------
+Bool Drawable::areLightsDisabled() const
+{
+	const Object *obj = getObject();
+	if (!obj || !obj->isKindOf(KINDOF_STRUCTURE))
+	{
+		return FALSE;
+	}
+
+	DisabledMaskType disabling = obj->getDisabledFlags();
+	disabling.clear(MAKE_DISABLED_MASK(DISABLED_HELD));
+	return DISABLEDMASK_ANY_SET(disabling) || obj->testScriptStatusBit(OBJECT_STATUS_SCRIPT_UNPOWERED);
+}
+
+//-------------------------------------------------------------------------------------------------
 // this method must ONLY be called from the client, NEVER From the logic, not even indirectly.
 Bool Drawable::clientOnly_getFirstRenderObjInfo(Coord3D* pos, Real* boundingSphereRadius, Matrix3D* transform)
 {

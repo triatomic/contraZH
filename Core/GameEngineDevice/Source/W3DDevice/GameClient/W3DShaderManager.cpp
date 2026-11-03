@@ -2571,7 +2571,7 @@ public:
 	virtual Int shutdown() override;
 
 	/// Binds one polygon group's texture, and its normal map and shader when it is bumped.
-	void setTexture(TextureClass *texture, MeshModelClass *model = nullptr, const AABoxClass *worldBounds = nullptr);
+	void setTexture(TextureClass *texture, MeshModelClass *model = nullptr, const AABoxClass *worldBounds = nullptr, Bool emissionEnabled = TRUE);
 	/// Sets the rise of full brightness the derived bumps take, for the rest of the pass.
 	void setBumpHeight(Real height);
 
@@ -2893,7 +2893,7 @@ static TextureClass *Find_Emissive_Map(TextureClass *texture)
 	return texture->Peek_Emissive_Map();
 }
 
-void SpecularShader::setTexture(TextureClass *texture, MeshModelClass *model, const AABoxClass *worldBounds)
+void SpecularShader::setTexture(TextureClass *texture, MeshModelClass *model, const AABoxClass *worldBounds, Bool emissionEnabled)
 {
 	DX8Wrapper::Set_Texture(0, texture);
 
@@ -2960,7 +2960,7 @@ void SpecularShader::setTexture(TextureClass *texture, MeshModelClass *model, co
 	}
 	Set_Additional_Pixel_Lights(shaders[bump], indices, count, W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS, 8, &SpecularLightView);
 
-	TextureClass *emissiveMap = (EmissiveIntensity > 0.0f && texture != nullptr && !m_lightsOnly) ? Find_Emissive_Map(texture) : nullptr;
+	TextureClass *emissiveMap = (emissionEnabled && EmissiveIntensity > 0.0f && texture != nullptr && !m_lightsOnly) ? Find_Emissive_Map(texture) : nullptr;
 	DX8Wrapper::Set_Texture(SPECULAR_EMISSIVE_STAGE, emissiveMap);
 
 	Vector4 textureInfo((emissiveMap != nullptr) ? EmissiveIntensity : 0.0f, slopeScaleU, slopeScaleV, m_clouds ? 1.0f : 0.0f);
@@ -3217,7 +3217,8 @@ public:
 		DX8TextureCategoryClass *category = renderer->Get_Texture_Category();
 		TextureClass *texture = (category != nullptr) ? category->Peek_Texture(0) : nullptr;
 #if defined(BUILD_WITH_D3D9)
-		specularShader.setTexture(texture, renderer->Get_Mesh_Model_Class(), mesh != nullptr ? &mesh->Get_Bounding_Box() : nullptr);
+		specularShader.setTexture(texture, renderer->Get_Mesh_Model_Class(), mesh != nullptr ? &mesh->Get_Bounding_Box() : nullptr,
+			mesh == nullptr || !mesh->Is_Emission_Disabled());
 #else
 		DX8Wrapper::Set_Texture(0, texture);
 #endif

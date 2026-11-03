@@ -2562,6 +2562,15 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 
 	handleFXEvents();
 
+#if RTS_ZEROHOUR
+	const Bool hideHeadlights = !getDrawable()->getModelConditionFlags().test(MODELCONDITION_NIGHT) || getDrawable()->areLightsDisabled();
+	if (m_hideHeadlights != hideHeadlights)
+	{
+		m_hideHeadlights = hideHeadlights;
+		hideAllHeadlights(m_hideHeadlights);
+	}
+#endif
+
 	submitHeadlights();
 
 	m_prevAnimHelper = getCurrentAnimHelper();
@@ -4188,6 +4197,9 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 void W3DModelDraw::replaceModelConditionState(const ModelConditionFlags& c)
 {
 	m_hideHeadlights = c.test(MODELCONDITION_NIGHT) ? false : true;
+#if RTS_ZEROHOUR
+	m_hideHeadlights = m_hideHeadlights || getDrawable()->areLightsDisabled();
+#endif
 
 	const ModelConditionInfo* info = findBestInfo(c);
 	if (info)
