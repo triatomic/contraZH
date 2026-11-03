@@ -194,18 +194,7 @@ File*		FileSystem::openFile( const Char *filename, Int access, size_t bufferSize
 			if (file != nullptr && (file->getAccess() & File::CREATE))
 			{
 				FastCriticalSectionClass::LockClass lock(m_fileExistMutex);
-				FileExistMap::iterator it = m_fileExist.find(FileExistMap::key_type::temporary(filename));
-				if (it != m_fileExist.end())
-				{
-					it->second.archiveOnly = FALSE;
-					++it->second.instanceExists;
-					if (it->second.instanceDoesNotExist != ~FileInstance(0))
-						++it->second.instanceDoesNotExist;
-				}
-				else
-				{
-					m_fileExist[filename];
-				}
+				m_fileExist.erase(FileExistMap::key_type::temporary(filename));
 			}
 #endif
 		}

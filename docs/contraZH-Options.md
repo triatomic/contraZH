@@ -163,7 +163,7 @@ like any other button.
 * Card borders: gold for the selected button, red for a shared letter, amber for a changed one.
 * **RESET TO DEFAULT** restores the selected object's card or the selected command. **RESET ALL**
   restores everything.
-* **SAVE** writes the file and applies it at once, also from Esc > Options in a match. **BACK**
+* **SAVE** writes the file and applies it on the first save, also from Esc > Options in a match. **BACK**
   leaves without saving.
 
 A button's letter applies on every bar that has the button. With grid hotkeys on, most slots still
