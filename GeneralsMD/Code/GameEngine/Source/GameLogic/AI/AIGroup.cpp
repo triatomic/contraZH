@@ -2547,25 +2547,37 @@ void AIGroup::groupResumeConstruction( Object *obj, Bool isWaypoint, CommandSour
 	Real bestDist = 1e9, curDist;
 	const Coord3D *targetPos = obj->getPosition(), *builderPos;
 
-	UnsignedInt cmdNode = TheCommandSequence->newSingleTargetCommand(CommandSequence::COMMAND_RESUME_CONSTRUCTION, obj);
-
 	if (!isWaypoint)
 	{
+		Bool isRepairTask = true;
+
 		for (i = m_memberList.begin(); i != m_memberList.end(); ++i)
 		{
 			AIUpdateInterface* ai = (*i)->getAIUpdateInterface();
 			if (!ai)
-				break;
+				continue;
 
 			DozerAIInterface *dozerAi = ai->getDozerAIInterface();
 			if (!dozerAi)
-				break;
+				continue;
+
+			if (!TheActionManager->canResumeConstructionOf(*i, obj, cmdSource))
+				continue;
 
 			if (!dozerAi->isAnyTaskPending())
 			{
 				builderPos = (*i)->getPosition();
 				curDist = sqr(builderPos->x - targetPos->x) + sqr(builderPos->y - targetPos->y);
-				if (curDist < bestDist)
+				if (curDist < bestDist || isRepairTask)
+				{
+					bestDist = curDist;
+					bestBuilder = *i;
+					isRepairTask = false;
+				}
+			}
+			else if (dozerAi->isTaskPending(DOZER_TASK_REPAIR) && !dozerAi->isTaskPending(DOZER_TASK_BUILD))
+			{
+				if (isRepairTask && curDist < bestDist)
 				{
 					bestDist = curDist;
 					bestBuilder = *i;
@@ -2577,6 +2589,9 @@ void AIGroup::groupResumeConstruction( Object *obj, Bool isWaypoint, CommandSour
 	{
 		for (i = m_memberList.begin(); i != m_memberList.end(); ++i)
 		{
+			if (!TheActionManager->canResumeConstructionOf(*i, obj, cmdSource))
+				continue;
+
 			cnt = TheCommandSequence->getConstructionCount(*i);
 
 			builderPos = (*i)->getPosition();
@@ -2591,9 +2606,14 @@ void AIGroup::groupResumeConstruction( Object *obj, Bool isWaypoint, CommandSour
 		}
 	}
 
+	if (!bestBuilder)
+		return;
+
 	AIUpdateInterface *ai = bestBuilder->getAIUpdateInterface();
 	if (ai)
 	{
+		UnsignedInt cmdNode = TheCommandSequence->newSingleTargetCommand(CommandSequence::COMMAND_RESUME_CONSTRUCTION, obj);
+
 		if (!isWaypoint)
 			TheCommandSequence->clearObjectCommand(bestBuilder);
 
@@ -3283,8 +3303,8 @@ void AIGroup::groupGuardObject( Object *objToGuard, GuardMode guardMode, Bool is
 				if (TheCommandSequence->isStillAwaiting(*i))
 					TheCommandSequence->removeCurrentCommand(*i, false);
 			}
-
-			TheCommandSequence->includeUnitInCommand(cmdNode, *i);
+			else
+				TheCommandSequence->includeUnitInCommand(cmdNode, *i);
 		}
 	}
 

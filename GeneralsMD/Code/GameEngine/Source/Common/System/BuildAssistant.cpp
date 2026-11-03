@@ -857,7 +857,7 @@ LegalBuildCode BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos
 	}
 	// Check for overlapping exit areas.
 
-	Bool isOverlapWithShadow = TheCommandSequence->isShawdowInTheWay(worldPos, build, angle, builderObject);
+	Bool isOverlapWithShadow = TheCommandSequence->isShawdowInTheWay(worldPos, build, angle, thePlayer);
 	if (isOverlapWithShadow)
 	{
 		return LBC_OBJECTS_IN_THE_WAY;
@@ -938,7 +938,7 @@ LegalBuildCode BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos
 		if (hisBounds.getGeomType() != GEOMETRY_BOX) {
 			hisBounds.set(GEOMETRY_BOX, false, 40, hisBounds.getMajorRadius(), hisBounds.getMajorRadius());
 		} else {
-			hisBounds.setMinorRadius(hisBounds.getMinorRadius()+myExtraWidth);
+			hisBounds.setMinorRadius(hisBounds.getMinorRadius()+hisExtraWidth);
 		}
 		GeometryInfo hisGeom = them->getGeometryInfo();
 		hisGeom.setMajorRadius(themFactoryExitWidth/2.0f);
