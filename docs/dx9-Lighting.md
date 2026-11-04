@@ -52,7 +52,7 @@ control.)
 
 Tuned in the mod's `GameData.ini`:
 
-* `UnitSpecularIntensity = 0.35` - (How bright the highlight is. 0 turns it off.)
+* `UnitSpecularIntensity = 0.8500` - (How bright the highlight is. 0 turns it off.)
 * `UnitSpecularPower = 24` - (How tight it is. Higher values give a smaller, sharper highlight.
 Around 4 to 128 is useful; past that the highlight shrinks to nothing.)
 

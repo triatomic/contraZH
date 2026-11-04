@@ -1089,7 +1089,7 @@ GlobalData::GlobalData()
 	m_useShadowDecals = FALSE;
 	m_shadowMapMinSunElevation = 30.0f;
 	m_shadowsAlwaysOn = FALSE;
-	m_unitSpecularIntensity = 0.35f;
+	m_unitSpecularIntensity = 0.8500f;
 	m_unitSpecularPower = 24.0f;
 	m_unitBumpHeight = 0.15f;
 	m_roadBumpHeight = 1.1f;
