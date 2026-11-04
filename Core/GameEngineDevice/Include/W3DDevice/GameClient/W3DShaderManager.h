@@ -137,8 +137,8 @@ public:
 		Bool terrainOnly;	///< lights the ground and nothing standing on it
 		Bool objectsOnly;	///< the laser terrain pass already lights the ground
 	};
-	/// Each lighting pass takes eight lights, or three under standing water.
-	enum { MAX_PIXEL_LIGHTS = 8, SEABED_PIXEL_LIGHTS = 3, MAX_UNIT_PIXEL_LIGHTS = 8, MAX_PIXEL_LIGHT_CANDIDATES = 64 };
+	/// Each lighting pass takes eight lights, or two under standing water.
+	enum { MAX_PIXEL_LIGHTS = 8, SEABED_PIXEL_LIGHTS = 2, MAX_UNIT_PIXEL_LIGHTS = 8, MAX_PIXEL_LIGHT_CANDIDATES = 64 };
 	/// Sets the lights that may be drawn per pixel this frame, most important first. Draws name theirs by index.
 	static void setPixelLights(const PixelLight *lights, Int count);
 	static Int getPixelLightCount();

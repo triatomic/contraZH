@@ -1584,7 +1584,7 @@ static DWORD DrawGroundShader = 0;
 static DWORD DrawSeabedUnlitShader = 0;
 static DWORD DrawSeabedLitShader = 0;
 
-// Where terrainshadow.hlsl reads the seabed, past the three point lights its seabed variants keep.
+// Where terrainshadow.hlsl reads the seabed, past the two point lights its seabed variants keep.
 #define SEABED_REGISTER 14
 #define SEABED_CLASS_MAP_SAMPLER 8
 #define SEABED_WATER_MASK_SAMPLER 9

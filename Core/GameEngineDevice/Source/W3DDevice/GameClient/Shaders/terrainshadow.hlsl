@@ -120,10 +120,10 @@ sampler2D ShadowMap : register(s4);
 
 #if LIGHTS
 // Eight fill c5 to c22 before the glint's c23 to c25, and fxc needs the rest for literals, so W3DShaderManager::MAX_PIXEL_LIGHTS must match.
-// The seabed keeps three, whose room ends inside c13, which W3DShaderManager::SEABED_PIXEL_LIGHTS matches.
+// The seabed keeps two, since a third runs past ps_2_a's 512 slots, which W3DShaderManager::SEABED_PIXEL_LIGHTS matches.
 #define POINT_LIGHT_REGISTER c5
 #if SEABED
-#define POINT_LIGHT_COUNT 3
+#define POINT_LIGHT_COUNT 2
 #else
 #define POINT_LIGHT_COUNT 8
 #endif

@@ -80,7 +80,7 @@ The cell spacing is `ShaderWaterStochasticSize` in `Water.ini`, 100 when that is
 
 Notes:
 * Cliffs keep their own texturing, as under water.
-* Terrain chunks with paint draw through the seabed shaders, which take three point lights instead
+* Terrain chunks with paint draw through the seabed shaders, which take two point lights instead
 of eight.
 * Flat terrain mode and the third texture of three-texture blend tiles draw without it.
 

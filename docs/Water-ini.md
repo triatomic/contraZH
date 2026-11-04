@@ -108,7 +108,7 @@ pattern up more but blends more of the surface. 0 turns it off.)
 * `ShaderWaterStochasticSeabed = Yes` - (The same cells also shift and turn the terrain textures under
 standing water, fading in below the waterline over `TransparentWaterDepth`. Cliffs keep their own
 texturing, and ground under rivers is left as it is. Terrain chunks with standing water draw through
-their own shaders, which take three point lights instead of eight. No turns it off. The same tiling can
+their own shaders, which take two point lights instead of eight. No turns it off. The same tiling can
 be painted onto dry ground; see [Stochastic terrain](dx9-Terrain.md#stochastic-terrain).)
 
 ### Animation

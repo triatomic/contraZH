@@ -216,7 +216,7 @@ lights` on the Graphics page, greyed out while dynamic lights are off. Needs
 
 Notes:
 * Every draw picks its own lights, so a busy battle can light the whole screen per pixel:
-  * The terrain draws in patches of 32 by 32 cells, each taking eight lights, or three with standing water.
+  * The terrain draws in patches of 32 by 32 cells, each taking eight lights, or two with standing water.
   * Each vehicle, structure or soldier takes the eight brightest where it stands.
   * Each bridge takes eight.
   * Roads take the eight lights nearest the middle of the view.
