@@ -534,18 +534,7 @@ Bool Particle::update()
 // ------------------------------------------------------------------------------------------------
 void Particle::draw(Real timeScale)
 {
-	// integrate velocity into position
-	const Coord3D *driftVel = m_system->getDriftVelocity();
-	m_pos.x += (m_vel.x + driftVel->x) * timeScale;
-	m_pos.y += (m_vel.y + driftVel->y) * timeScale;
-	m_pos.z += (m_vel.z + driftVel->z) * timeScale;
-
-	// integrate the wind (if specified) into position
-	ParticleSystemInfo::WindMotion windMotion = m_system->getWindMotion();
-
-	// see if we should even do anything
-	if( windMotion != ParticleSystemInfo::WIND_MOTION_NOT_USED )
-		doWindMotion(timeScale);
+	m_pos = computePosition(timeScale);
 
 	// update orientation
 #if PARTICLE_USE_XY_ROTATION
@@ -590,10 +579,20 @@ void Particle::draw(Real timeScale)
 }
 
 // ------------------------------------------------------------------------------------------------
-/** Do wind motion as specified by the particle system template, if present */
+/** Compute the position after a movement step without changing the particle. */
 // ------------------------------------------------------------------------------------------------
-void Particle::doWindMotion(Real timeScale)
+Coord3D Particle::computePosition(Real timeScale) const
 {
+	Coord3D pos = m_pos;
+	const Coord3D *driftVel = m_system->getDriftVelocity();
+	pos.x += (m_vel.x + driftVel->x) * timeScale;
+	pos.y += (m_vel.y + driftVel->y) * timeScale;
+	pos.z += (m_vel.z + driftVel->z) * timeScale;
+
+	if (m_system->getWindMotion() == ParticleSystemInfo::WIND_MOTION_NOT_USED)
+	{
+		return pos;
+	}
 
 	// get the angle of the wind
 	Real windAngle = m_system->getWindAngle();
@@ -639,9 +638,9 @@ void Particle::doWindMotion(Real timeScale)
 	// this to compute how much force we apply
 	//
 	Coord3D v;
-	v.x = m_pos.x - systemPos.x;
-	v.y = m_pos.y - systemPos.y;
-	v.z = m_pos.z - systemPos.z;
+	v.x = pos.x - systemPos.x;
+	v.y = pos.y - systemPos.y;
+	v.z = pos.z - systemPos.z;
 
 	// distance amounts for full force from wind and no force at all
 	Real fullForceDistance = 75.0f;
@@ -664,11 +663,12 @@ void Particle::doWindMotion(Real timeScale)
 																		(noForceDistance - fullForceDistance)));
 
 		// integrate the wind motion into the position
-		m_pos.x += (Cos( windAngle ) * windForceStrength);
-		m_pos.y += (Sin( windAngle ) * windForceStrength);
+		pos.x += (Cos( windAngle ) * windForceStrength);
+		pos.y += (Sin( windAngle ) * windForceStrength);
 
 	}
 
+	return pos;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -2465,14 +2465,19 @@ void ParticleSystem::updateTransform()
 	// if we are controlled by a particle, its position is local origin
 	if (m_controlParticle)
 	{
-		const Coord3D *controlPos = m_controlParticle->getPosition();
+#if RTS_ZEROHOUR
+		// Trails sample the completed movement step while the particle renders between steps.
+		const Coord3D controlPos = m_controlParticle->computePosition(1.0f);
+#else
+		const Coord3D controlPos = *m_controlParticle->getPosition();
+#endif
 		/// @todo Concatenate this, instead of overriding (MSB)
-		m_transform.Set_X_Translation( controlPos->x );
-		m_transform.Set_Y_Translation( controlPos->y );
-		m_transform.Set_Z_Translation( controlPos->z );
+		m_transform.Set_X_Translation( controlPos.x );
+		m_transform.Set_Y_Translation( controlPos.y );
+		m_transform.Set_Z_Translation( controlPos.z );
 		m_isIdentity = false;
 		m_lastPos = m_pos;
-		m_pos = *controlPos;
+		m_pos = controlPos;
 	}
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)

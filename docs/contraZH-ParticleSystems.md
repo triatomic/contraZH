@@ -1,5 +1,12 @@
 # ParticleSystem.ini
 
+## Attached particle trails
+
+`PerParticleAttachedSystem` samples its controlling particle at the end of each movement step.
+This keeps trails aligned with effects that offset their initial position to account for that step,
+such as `ShotgunProjectileObjects` with both line endpoints at `X:-16 Y:0 Z:0`.
+The controlling particle still moves smoothly between updates.
+
 ## FXList offsets
 
 FXList `ParticleSystem` entries default to `OrientOffset = Yes`, matching vanilla offset rotation.

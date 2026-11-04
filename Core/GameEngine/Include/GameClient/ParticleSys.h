@@ -184,7 +184,7 @@ public:
 	Bool update(); ///< update this particle's behavior - return false if dead
 
 	void draw( Real timeScale ); ///< render update
-	void doWindMotion( Real timeScale ); ///< do wind motion (if present) from particle system
+	Coord3D computePosition( Real timeScale ) const;
 
 	void applyForce( const Coord3D *force );		///< add the given acceleration
 
