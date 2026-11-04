@@ -149,10 +149,11 @@ void CommandSequence::loadPostProcess()
 	for (IDToNodeMap::iterator it = m_allNodes.begin(); it != m_allNodes.end(); it++)
 	{
 		CommandNode *cmdNode = it->second;
-		if (cmdNode->m_cmdType == COMMAND_DOZER_CONSTRUCT)
+		if (doesBuildCommandHasShadow(cmdNode))
 		{
 			Object *obj = TheGameLogic->findObjectByID(cmdNode->m_nextCommand.begin()->first);
-			createConstructionShadow(cmdNode->m_nodeID, obj);
+			if (obj && obj->getControllingPlayer()->isLocalPlayer())
+				createConstructionShadow(cmdNode->m_nodeID, obj);
 		}
 	}
 }
@@ -184,6 +185,7 @@ void CommandSequence::xferCommandNode(Xfer *xfer, CommandNode *cmdNode)
 		case COMMAND_DO_EXIT:
 		case COMMAND_DO_REPAIR:
 		case COMMAND_DOCK:
+		case COMMAND_RESUME_CONSTRUCTION:
 		{
 			xfer->xferObjectID(&cmdNode->m_targetID);
 			break;
@@ -244,6 +246,8 @@ void CommandSequence::xferCommandNode(Xfer *xfer, CommandNode *cmdNode)
 			xfer->xferReal(&cmdNode->m_angle);
 			if (cmdNode->m_cmdType == COMMAND_DOZER_CONSTRUCT_LINE)
 				xfer->xferCoord3D(&cmdNode->m_loc2);
+			if (cmdNode->m_cmdType == COMMAND_DOZER_CONSTRUCT)
+				xfer->xferUnsignedInt(&cmdNode->m_cashWithdraw);
 			break;
 		}
 		// do special
@@ -768,6 +772,7 @@ void CommandSequence::cleanUpEmptyCommand(UnsignedInt cmdNodeID)
 
 	if (cmdNode->m_nextCommand.empty())
 	{
+		m_allNodes.erase(cmdNodeID);
 		m_commandNodeCount--;
 		delete cmdNode;
 	}
@@ -1705,7 +1710,7 @@ Int CommandSequence::getConstructionCount(Object *obj)
 void CommandSequence::createConstructionShadow(UnsignedInt cmdNodeID, Object *sourceObject)
 {
 	CommandNode *cmdNode = findCommandByID(cmdNodeID);
-	if (!cmdNode || cmdNode->m_cmdType != COMMAND_DOZER_CONSTRUCT)
+	if (!sourceObject || !cmdNode || cmdNode->m_cmdType != COMMAND_DOZER_CONSTRUCT)
 		return;
 
 	if (!TheRecorder->isPlaybackMode() && !sourceObject->getControllingPlayer()->isLocalPlayer())
@@ -1763,7 +1768,7 @@ void CommandSequence::removeConstructionShadow(UnsignedInt cmdNodeID)
 	}
 }
 
-Bool CommandSequence::isShawdowInTheWay(const Coord3D *worldPos, const ThingTemplate *build, Real angle, const Object *builderObject)
+Bool CommandSequence::isShawdowInTheWay(const Coord3D *worldPos, const ThingTemplate *build, Real angle, Player *thePlayer)
 {
 	Real myFactoryExitWidth = build->getFactoryExitWidth();
 	Real myExtraWidth = build->getFactoryExtraBibWidth();
@@ -1793,11 +1798,29 @@ Bool CommandSequence::isShawdowInTheWay(const Coord3D *worldPos, const ThingTemp
 		myExitPos.y += s * offset;
 	}
 
-	for (IDToDrawableMap::iterator it = m_constructionShadows.begin(); it != m_constructionShadows.end(); it++)
+	for (IDToNodeMap::iterator it = m_allNodes.begin(); it != m_allNodes.end(); it++)
 	{
-		CommandNode* cmdNode = findCommandByID(it->first);
+		CommandNode *cmdNode = it->second;
 
-		const ThingTemplate* thing = TheThingFactory->findByTemplateID(cmdNode->m_templateID);
+		if (!doesBuildCommandHasShadow(cmdNode))
+			continue;
+
+		Object *obj = TheGameLogic->findObjectByID(cmdNode->m_nextCommand.begin()->first);
+		Bool isCurrentPlayerCommand = obj && obj->getControllingPlayer() == thePlayer;
+		Drawable *draw = nullptr;
+
+		if (!isCurrentPlayerCommand)
+			continue;
+		else
+		{
+			IDToDrawableMap::iterator dit = m_constructionShadows.find(it->first);
+			draw = dit == m_constructionShadows.end() ? nullptr : dit->second;
+		}
+
+		const ThingTemplate *thing = TheThingFactory->findByTemplateID(cmdNode->m_templateID);
+
+		if (!thing)
+			continue;
 
 		Real themFactoryExitWidth = thing->getFactoryExitWidth();
 		Real hisExtraWidth = thing->getFactoryExtraBibWidth();
@@ -1810,7 +1833,7 @@ Bool CommandSequence::isShawdowInTheWay(const Coord3D *worldPos, const ThingTemp
 			hisBounds.set(GEOMETRY_BOX, false, 40, hisBounds.getMajorRadius(), hisBounds.getMajorRadius());
 		}
 		else {
-			hisBounds.setMinorRadius(hisBounds.getMinorRadius() + myExtraWidth);
+			hisBounds.setMinorRadius(hisBounds.getMinorRadius() + hisExtraWidth);
 		}
 		GeometryInfo hisGeom = thing->getTemplateGeometryInfo();
 		hisGeom.setMajorRadius(themFactoryExitWidth / 2.0f);
@@ -1827,31 +1850,15 @@ Bool CommandSequence::isShawdowInTheWay(const Coord3D *worldPos, const ThingTemp
 			hisExitPos.y += s * offset;
 		}
 		if (ThePartitionManager->geomCollidesWithGeom(&cmdNode->m_loc, hisBounds, cmdNode->m_angle,
-			worldPos, myBounds, angle)) {
-			TheTerrainVisual->addFactionBibDrawable(it->second, true);
-			return true;
-		}
-		if (!checkMyExit && !checkHisExit && !hisExtraWidth && !myExtraWidth)
-		{
-			continue; // neither has extra exit space.
-		}
-
-		/* Check for overlap of my exit rectangle to his geom info. */
-		if (checkMyExit && ThePartitionManager->geomCollidesWithGeom(&cmdNode->m_loc, hisBounds, cmdNode->m_angle,
-			&myExitPos, myGeom, angle)) {
-			TheTerrainVisual->addFactionBibDrawable(it->second, true);
-			return true;
-		}
-		// Check for overlap of his exit rectangle with my geom info
-		if (checkHisExit && ThePartitionManager->geomCollidesWithGeom(&hisExitPos, hisGeom, cmdNode->m_angle,
-			worldPos, myBounds, angle)) {
-			TheTerrainVisual->addFactionBibDrawable(it->second, true);
-			return true;
-		}
-		// Check both exit rectangles together.
-		if (checkMyExit && checkHisExit && ThePartitionManager->geomCollidesWithGeom(&hisExitPos, hisGeom, cmdNode->m_angle,
-			&myExitPos, myGeom, angle)) {
-			TheTerrainVisual->addFactionBibDrawable(it->second, true);
+			worldPos, myBounds, angle)
+			|| (checkMyExit && ThePartitionManager->geomCollidesWithGeom(&cmdNode->m_loc, hisBounds, cmdNode->m_angle,
+				&myExitPos, myGeom, angle))
+			|| (checkHisExit && ThePartitionManager->geomCollidesWithGeom(&hisExitPos, hisGeom, cmdNode->m_angle,
+				worldPos, myBounds, angle))
+			|| (checkMyExit && checkHisExit && ThePartitionManager->geomCollidesWithGeom(&hisExitPos, hisGeom, cmdNode->m_angle,
+				&myExitPos, myGeom, angle))) {
+			if (draw)
+				TheTerrainVisual->addFactionBibDrawable(draw, true);
 			return true;
 		}
 	}
@@ -1877,28 +1884,35 @@ void CommandSequence::setConstructionCashWithdraw(UnsignedInt cmdNodeID, Unsigne
 		cmdNode->m_cashWithdraw = cashWithdraw;
 }
 
+Bool CommandSequence::doesBuildCommandHasShadow(const CommandNode *cmdNode)
+{
+	if (cmdNode->m_cmdType == COMMAND_DOZER_CONSTRUCT)
+	{
+		Object *builder = TheGameLogic->findObjectByID(cmdNode->m_nextCommand.begin()->first);
+		if (!builder)
+			return false;
+
+		if (builder->getCurrentCommand() == cmdNode->m_nodeID)
+		{
+			CommandVerifyStatus cvs = builder->getCommandVerifyStatus();
+			if (cvs != STATUS_FRESH && cvs != STATUS_EXIT_VERIFIED)
+				return false;
+		}
+
+		return true;
+	}
+
+	return false;
+}
+
 UnsignedInt CommandSequence::getConstructionShadowCount(const ThingTemplate *build, const Player *player)
 {
 	UnsignedInt ret = 0;
 	for (IDToNodeMap::iterator it = m_allNodes.begin(); it != m_allNodes.end(); it++)
 	{
 		CommandNode *cmdNode = it->second;
-		if (cmdNode->m_cmdType == COMMAND_DOZER_CONSTRUCT)
-		{
-			Object *builder = TheGameLogic->findObjectByID(cmdNode->m_nextCommand.begin()->first);
-			if (!builder)
-				continue;
-
-			if (builder->getCurrentCommand() == it->first)
-			{
-				CommandVerifyStatus cvs = builder->getCommandVerifyStatus();
-				if (cvs != STATUS_FRESH && cvs != STATUS_EXIT_VERIFIED)
-					continue;
-			}
-
-			if (build->isEquivalentTo(TheThingFactory->findByTemplateID(cmdNode->m_templateID)))
+		if (doesBuildCommandHasShadow(cmdNode) && build->isEquivalentTo(TheThingFactory->findByTemplateID(cmdNode->m_templateID)))
 				ret++;
-		}
 	}
 
 	return ret;

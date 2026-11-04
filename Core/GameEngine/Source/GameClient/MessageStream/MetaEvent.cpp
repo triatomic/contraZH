@@ -412,6 +412,11 @@ static const FieldParse TheMetaMapFieldParseTable[] =
 //-------------------------------------------------------------------------------------------------
 MetaEventTranslator::MetaEventTranslator()
 {
+	for (Int i = 0; i < KEY_COUNT; ++i)
+	{
+		m_keyDownInfos[i] = NONE;
+	}
+
 	for (Int i = 0; i < NUM_MOUSE_BUTTONS; ++i) {
 		m_nextUpShouldCreateDoubleClick[i] = FALSE;
 	}

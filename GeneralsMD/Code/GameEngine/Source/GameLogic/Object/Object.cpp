@@ -4815,6 +4815,7 @@ void Object::xfer( Xfer *xfer )
 		xfer->xferUnsignedInt(&m_lastCommand);
 		xfer->xferInt((Int*)&m_commandVerifyStatus);
 		xfer->xferSTLObjectIDVector(&m_pendingExitList);
+		xfer->xferUnsignedInt(&m_lastMoveStreakCommand);
 	}
 
 	m_weaponBonusConditionAgainst.xfer(xfer);
@@ -4971,6 +4972,7 @@ void Object::onCapture( Player *oldOwner, Player *newOwner )
 	}
 	TheCommandSequence->clearObjectCommand(this);
 	m_currentCommand = m_lastCommand = 0;
+	m_lastMoveStreakCommand = 0;
 	m_commandVerifyStatus = STATUS_NONE;
 	m_pendingExitList.clear();
 }

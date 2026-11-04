@@ -123,9 +123,9 @@ public:
 	UnsignedInt newDoSpecialAtObjCommand(CommandType cmdType, UnsignedInt specialPowerID, Object *target, UnsignedInt commandOptions);
 	UnsignedInt newSwitchWeaponCommand(CommandType cmdType, WeaponSlotType weaponSlot);
 
-	// ShigreUi 01/10/2026 only do it on newly created command
+	// ShigreUi 01/10/2026 only do it on newly created command! so no safety check for debug.
 	Bool includeUnitInCommand(UnsignedInt cmdNodeID, Object *obj, const Coord3D *objDest = nullptr);
-	// ShigreUi 01/10/2026 Moving comand include reverse move/attack move/etc, only do it on newly created command
+	// ShigreUi 01/10/2026 Moving comand include reverse move/attack move/etc, only do it on newly created command! so no safety check for debug.
 	Bool includeUnitInTypicalMovingCommand(UnsignedInt cmdNodeID, Object* obj, Coord3D objDest);
 
 	inline Bool isTypicalMovingCommand(CommandType cmdType);
@@ -133,6 +133,7 @@ public:
 	inline Bool hasEndCommand(Object *obj);
 	inline Bool isLocatableCommand(UnsignedInt cmdNodeID);
 
+	// ShigreUi 01/10/2026 only do it on newly created command! so no safety check for debug.
 	void cleanUpEmptyCommand(UnsignedInt cmdNodeID);
 	UnsignedInt getFirstLocatableCommand(Object *obj);
 	UnsignedInt getNextLocatableCommand(Object *obj, UnsignedInt cmdNodeID);
@@ -162,7 +163,8 @@ public:
 
 	void createConstructionShadow(UnsignedInt cmdNodeID, Object *sourceObject);
 	void removeConstructionShadow(UnsignedInt cmdNodeID);
-	Bool isShawdowInTheWay(const Coord3D *worldPos, const ThingTemplate *build, Real angle, const Object *builderObject);
+	Bool isShawdowInTheWay(const Coord3D *worldPos, const ThingTemplate *build, Real angle, Player *thePlayer);
+	Bool doesBuildCommandHasShadow(const CommandNode *cmdNode);
 	UnsignedInt getConstructionCashWithdraw(UnsignedInt cmdNodeID);
 	void setConstructionCashWithdraw(UnsignedInt cmdNodeID, UnsignedInt cashWithdraw);
 	UnsignedInt getConstructionShadowCount(const ThingTemplate *build, const Player *player);
