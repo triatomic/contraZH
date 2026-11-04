@@ -66,6 +66,6 @@ struct HeadlightShaderTuning
 		poolPitch = 0.2f;
 		poolFalloff = 1.5f;
 		poolClampBrightness = TRUE;
-		perConeAim = FALSE;
+		perConeAim = TRUE;
 	}
 };

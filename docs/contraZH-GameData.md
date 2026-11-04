@@ -1,5 +1,11 @@
 # GameData.ini
 
+## Headlight aim
+
+`HeadlightPerConeAim` defaults to `Yes`, so each cone of a `HEADLIGHT` mesh aims in its own direction.
+Set it to `No` to use the mesh's shared direction. The game reads this setting at launch.
+See [Headlights](dx9-Environment.md#headlights) for the other headlight settings.
+
 ## Path tracing light radius and brightness
 
 These settings control the light cast by particles, lasers and emissive meshes while
