@@ -142,7 +142,7 @@ Int WorldHeightMapEdit::getTextureFilePixels(const AsciiString &texture, Unsigne
 	AsciiString path;
 	path.format("%s%s", TERRAIN_TGA_DIR_PATH, texture.str());
 	CachedFileInputStream stream;
-	if (!stream.open(path))
+	if (!stream.open(openTerrainTexture(path)))
 	{
 		return 0;
 	}
@@ -604,8 +604,10 @@ void WorldHeightMapEdit::loadImagesFromTerrainType( TerrainType *terrain )
 
 	// open file
 	CachedFileInputStream stream;
-	if( !stream.open( texturePath ) )
+	if( !stream.open( openTerrainTexture(texturePath) ) )
+	{
 		return;
+	}
 
 	// get pointer to stream
 	InputStream *pStrm = &stream;
@@ -2054,7 +2056,8 @@ void WorldHeightMapEdit::reloadTextures()
 	for (i=0; i<m_numGlobalTextureClasses; i++) {
 		if (m_globalTextureClasses[i].numTiles == 0) continue;
 		CachedFileInputStream stream;
-		if (!stream.open(m_globalTextureClasses[i].filePath)) {
+		if (!stream.open(openTerrainTexture(m_globalTextureClasses[i].filePath)))
+		{
 			continue;
 		}
 		Int numTiles = WorldHeightMap::countTiles(&stream, nullptr, m_globalTextureClasses[i].filePath.str());

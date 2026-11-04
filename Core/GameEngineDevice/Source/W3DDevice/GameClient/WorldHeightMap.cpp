@@ -1109,6 +1109,24 @@ Bool WorldHeightMap::ParseBlendTileDataChunk(DataChunkInput &file, DataChunkInfo
 	return pThis->ParseBlendTileData(file, info, userData);
 }
 
+File *WorldHeightMap::openTerrainTexture(AsciiString &path)
+{
+	File *file = TheFileSystem->openFile(path.str(), File::READ | File::BINARY);
+#if defined(RTS_ZEROHOUR)
+	if (file == nullptr)
+	{
+		const char *extension = strrchr(path.str(), '.');
+		if (extension != nullptr && stricmp(extension, ".tga") == 0)
+		{
+			path.truncateBy(4);
+			path.concat(".dds");
+			file = TheFileSystem->openFile(path.str(), File::READ | File::BINARY);
+		}
+	}
+#endif
+	return file;
+}
+
 /** Function to read in the tiles for a texture class. */
 void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData)
 {
@@ -1118,7 +1136,7 @@ void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData)
 
 	// get the file from the description in TheTerrainTypes
 	TerrainType *terrain = TheTerrainTypes->findTerrain( texClass->name );
-	char texturePath[ _MAX_PATH ];
+	AsciiString texturePath;
 	if (terrain==nullptr)
 	{
 #ifdef LOAD_TEST_ASSETS
@@ -1127,25 +1145,14 @@ void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData)
 	}
 	else
 	{
-		snprintf( texturePath, ARRAY_SIZE(texturePath), "%s%s", TERRAIN_TGA_DIR_PATH, terrain->getTexture().str() );
-		theFile = TheFileSystem->openFile( texturePath, File::READ|File::BINARY);
-#if defined(RTS_ZEROHOUR)
-		if (theFile == nullptr)
-		{
-			char *extension = strrchr(texturePath, '.');
-			if (extension != nullptr && stricmp(extension, ".tga") == 0)
-			{
-				memcpy(extension, ".dds", sizeof(".dds"));
-				theFile = TheFileSystem->openFile( texturePath, File::READ|File::BINARY);
-			}
-		}
-#endif
+		texturePath.format("%s%s", TERRAIN_TGA_DIR_PATH, terrain->getTexture().str());
+		theFile = openTerrainTexture(texturePath);
 	}
 
 	if (theFile != nullptr) {
 		GDIFileStream theStream(theFile);
 		InputStream *pStr = &theStream;
-		const char *filename = terrain != nullptr ? texturePath : texClass->name.str();
+		const char *filename = terrain != nullptr ? texturePath.str() : texClass->name.str();
 		Int numTiles = WorldHeightMap::countTiles(pStr, nullptr, filename);
 		theFile->seek(0, File::START);
 		if (numTiles >= texClass->numTiles) {

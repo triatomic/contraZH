@@ -99,6 +99,7 @@ typedef struct {
 class TextureClass;
 class ChunkInputStream;
 class InputStream;
+class File;
 class OutputStream;
 class DataChunkInput;
 struct DataChunkInfo;
@@ -427,6 +428,7 @@ public:  // modify height value
 		if ((ndx>=0) && (ndx<m_dataSize) && m_data) m_data[ndx]=height;
 	};
 public: // Read tile utilities. jba [7/9/2003]
+	static File *openTerrainTexture(AsciiString &path);
 	static Bool readTiles(InputStream *pStrm, TileData **tiles, Int numRows, const char *filename=nullptr);
 	static Int countTiles(InputStream *pStrm, Bool *halfTile=nullptr, const char *filename=nullptr);
 
