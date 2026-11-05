@@ -12,7 +12,6 @@ on:
     paths:
       - 'docs/**'
       - 'docs-theme/**'
-      - 'mkdocs.yml'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
@@ -34,14 +33,12 @@ jobs:
         with:
           python-version: '3.12'
 
-      # MkDocs 2.0 drops plugin and theme support, so stay on 1.x
-      - name: Install MkDocs
-        run: pip install "mkdocs==1.6.1" "mkdocs-material==9.7.7" "mkdocs-redirects==1.2.3"
+      - name: Install Sphinx
+        run: pip install -r docs-theme/requirements.txt
 
+      # dirhtml keeps the Page/ URLs the MkDocs site used
       - name: Build
-        env:
-          DISABLE_MKDOCS_2_WARNING: 'true'
-        run: mkdocs build --strict
+        run: sphinx-build -b dirhtml -c docs-theme -d doctrees -W --keep-going docs site
 
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3

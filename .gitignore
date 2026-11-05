@@ -75,8 +75,9 @@ __pycache__/
 *.pyc
 # Local session notes, not part of the source tree
 SESSION_CHANGES.md
-# MkDocs build output
+# Sphinx build output
 /site/
+/doctrees/
 .venv/
 
 resources/gitinfo/git_watcher.cmake

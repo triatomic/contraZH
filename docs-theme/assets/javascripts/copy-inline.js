@@ -1,4 +1,4 @@
-// Click an inline code tag to copy its text; code blocks keep Material's copy button
+// Click an inline code tag to copy its text; code blocks keep sphinx-copybutton
 
 function contraCopyFallback(text) {
   var area = document.createElement("textarea");
@@ -26,7 +26,7 @@ function contraFlash(code) {
 }
 
 document.addEventListener("click", function (event) {
-  var code = event.target.closest(".md-typeset code");
+  var code = event.target.closest(".rst-content code.literal");
   if (!code || code.closest("pre") || code.closest("a")) {
     return;
   }
