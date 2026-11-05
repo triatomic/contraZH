@@ -22,6 +22,8 @@ records instead of 30,000.
 * A 3x3 vehicle pays extra to follow a shoreline. A 5x5 vehicle cannot enter a cell that leaves too
 much of its footprint beyond the shore.
 * Infantry and amphibious units keep their existing terrain rules.
+* Vehicles on a scripted exact waypoint path, or on a move that leaves the map, ignore shoreline
+clearance while turning, so they follow the path as placed.
 * Shoreline clearance uses the unit's full locomotor set, so amphibious units with separate ground
 and water locomotors can enter and leave water.
 

@@ -1681,8 +1681,20 @@ void Locomotor::moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics,
 		halfPos.y = pos->y+offset.y/2;
 		halfPos.z = pos->z;
 
-		if (!TheAI->pathfinder()->validMovementTerrainForObject(obj, this,&halfPos) ||
-			!TheAI->pathfinder()->validMovementTerrainForObject(obj, this,&nextPos))
+		// Exact waypoint paths and moves off the map may cross cells too narrow for the footprint
+		Bool turnBlocked;
+		if (getFlag(ALLOW_INVALID_POSITION))
+		{
+			turnBlocked = !TheAI->pathfinder()->validMovementTerrain(obj->getLayer(), this, &halfPos) ||
+				!TheAI->pathfinder()->validMovementTerrain(obj->getLayer(), this, &nextPos);
+		}
+		else
+		{
+			turnBlocked = !TheAI->pathfinder()->validMovementTerrainForObject(obj, this,&halfPos) ||
+				!TheAI->pathfinder()->validMovementTerrainForObject(obj, this,&nextPos);
+		}
+
+		if (turnBlocked)
 		{
 			Coord3D faceTowards = goalPos;
 			if (reverseToTurn)
