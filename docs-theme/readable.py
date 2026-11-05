@@ -9,12 +9,16 @@ from pygments.formatters import HtmlFormatter
 from pygments.styles import get_style_by_name
 from pygments.token import Token
 from sphinx.transforms import SphinxTransform
+from sphinx.util import logging
+
+logger = logging.getLogger(__name__)
 
 FENCE = re.compile(r'^\s*(```|~~~)')
 LIST_ITEM = re.compile(r'^(\s*)([*+-]|\d+\.)\s+')
 NOTE_LINE = re.compile(r'^(Note|NOTE|Notes?):\s*(.*)$')
 UPSTREAM_WIKI = re.compile(r'https://github\.com/Andreas-W/GeneralsGameCode_Modding/wiki/([^)#\s]+)(#[^)\s]*)?')
 SECTION_ID = re.compile(r'<section([^>]*?) id="([^"]+)"([^>]*)>(\s*)<h([1-6])>')
+SECTION_LEFT = re.compile(r'<section[^>]* id="')
 
 # The upstream pages stay verbatim, so their contraZH corrections are linked in here
 CORRECTIONS = {
@@ -85,6 +89,11 @@ def correction_note(lines, docname):
     return lines
 
 
+def nav_titles(nav):
+    """Sidebar title of each page in contra_nav, by docname."""
+    return dict((doc, title) for caption, pages in nav for title, doc in pages)
+
+
 def nav_title(lines, docname, nav):
     """Give pages without an h1 their nav title, so they get a sidebar link and a heading."""
     in_fence = False
@@ -93,11 +102,10 @@ def nav_title(lines, docname, nav):
             in_fence = not in_fence
         elif not in_fence and line.startswith('# '):
             return lines
-    for caption, pages in nav:
-        for title, doc in pages:
-            if doc == docname:
-                return ['# ' + title, ''] + lines
-    return lines
+    title = nav_titles(nav).get(docname)
+    if title is None:
+        return lines
+    return ['# ' + title, ''] + lines
 
 
 def nav_toctrees(nav):
@@ -154,18 +162,16 @@ def pagefind_body(app, pagename, templatename, context, doctree):
     if doctree is None or 'body' not in context:
         return
 
-    # Pagefind links section results through heading ids, but Sphinx puts the id on <section>
+    # Pagefind builds section results only from heading ids, but Sphinx puts the id on <section>
     body = SECTION_ID.sub(r'<section\1\3>\4<h\5 id="\2">', context['body'])
-
-    # The heading link icon is a private-use glyph that would show up in result titles
-    body = body.replace('<a class="headerlink"', '<a class="headerlink" data-pagefind-ignore')
+    if SECTION_LEFT.search(body):
+        logger.warning('section id not moved onto its heading, so Pagefind loses its section results', location=pagename)
 
     # Results show the sidebar title; many pages open with a generic h1 like "Overview"
     meta = ''
-    for caption, pages in app.config.contra_nav:
-        for title, doc in pages:
-            if doc == pagename and title != 'Overview':
-                meta = '<span data-pagefind-meta="title" hidden>%s</span>' % html.escape(title)
+    title = nav_titles(app.config.contra_nav).get(pagename)
+    if title is not None and title != 'Overview':
+        meta = '<span data-pagefind-meta="title" hidden>%s</span>' % html.escape(title)
     context['body'] = meta + '<div data-pagefind-body>' + body + '</div>'
 
 

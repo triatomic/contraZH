@@ -44,7 +44,7 @@ jobs:
 
       # Index for search as you type in the sidebar (search.js)
       - name: Index Search
-        run: npx -y pagefind@1.5.2 --site site
+        run: npx -y pagefind@1.5.2 --site site --exclude-selectors .headerlink
 
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3

@@ -3,7 +3,8 @@
 (function () {
   var MAX_PAGES = 8;
   var MAX_SECTIONS = 3;
-  var root = new URL(document.documentElement.getAttribute("data-content_root") || "./", location.href);
+  // The 404 page is served at any depth with a wrong content root, so the site root comes from this script's URL
+  var root = new URL("../../", document.currentScript.src);
   var pagefind = null;
 
   function loadPagefind() {
@@ -12,6 +13,9 @@
         return module.options({ baseUrl: root.pathname }).then(function () {
           return module;
         });
+      }).catch(function (error) {
+        pagefind = null;
+        throw error;
       });
     }
     return pagefind;
@@ -58,6 +62,8 @@
     panel.hidden = true;
     document.body.appendChild(panel);
     input.setAttribute("autocomplete", "off");
+    input.setAttribute("role", "combobox");
+    input.setAttribute("aria-autocomplete", "list");
     input.setAttribute("aria-controls", panel.id);
     input.setAttribute("aria-expanded", "false");
     var active = -1;
@@ -72,13 +78,18 @@
       panel.hidden = true;
       active = -1;
       input.setAttribute("aria-expanded", "false");
+      input.removeAttribute("aria-activedescendant");
     }
 
     function show(nodes) {
+      nodes.forEach(function (node, i) {
+        node.id = panel.id + "-" + i;
+      });
       panel.replaceChildren.apply(panel, nodes);
       panel.hidden = false;
       active = -1;
       input.setAttribute("aria-expanded", "true");
+      input.removeAttribute("aria-activedescendant");
       place();
     }
 
@@ -92,6 +103,7 @@
         links[i].classList.toggle("is-active", i === active);
         links[i].setAttribute("aria-selected", i === active ? "true" : "false");
       }
+      input.setAttribute("aria-activedescendant", links[active].id);
       links[active].scrollIntoView({ block: "nearest" });
     }
 
@@ -111,7 +123,7 @@
           return result.data();
         }));
       }).then(function (pages) {
-        if (pages === null) {
+        if (pages === null || input.value.trim() !== term) {
           return;
         }
         if (!pages.length) {
@@ -157,10 +169,14 @@
       event.preventDefault();
     });
 
-    window.addEventListener("resize", function () {
+    function follow() {
       if (!panel.hidden) {
         place();
       }
-    });
+    }
+
+    // Capture also sees the sidebar's own scroll, which does not bubble
+    window.addEventListener("resize", follow);
+    window.addEventListener("scroll", follow, true);
   });
 })();
