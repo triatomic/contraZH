@@ -79,6 +79,7 @@ private:
 	IDirect3DSurface8 *m_defaultDepth;
 	ShaderClass m_addShader;						///< adds the source onto the target
 	ShaderClass m_copyShader;						///< replaces the target, so a pass needs no clear
+	ShaderClass m_screenShader;					///< src + dst * (1 - src), so pixels already bright take little glow
 	DWORD m_blurShader;									///< sums a pass's taps in one quad; zero draws a quad per tap
 	Bool m_disabled;										///< the device refused the target; stays set until ReleaseResources
 };

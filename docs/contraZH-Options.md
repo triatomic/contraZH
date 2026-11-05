@@ -368,12 +368,13 @@ Soft glow around `Add` blended object meshes, such as building lights, and objec
 Terrain textures also support `_emi` masks and a per-terrain `UnitEmissiveIntensity` key; see
 [Glow masks](dx9-Lighting.md#glow-masks). Terrain masks glow without feeding bloom.
 Ordinary opaque surfaces, smoke and alpha blended effects do not feed bloom. Needs no shader support.
+The glow is screen blended, so pixels that are already bright take little of it and keep their detail.
 
 * `Bloom = Yes` - (No turns the glow off. Also `Bloom` on the Graphics page,
 applied on Accept.)
 * `BloomStrength = 0.5` - (0 to 1. 0 is off. The box beside `Bloom` on the Graphics page.)
-* `BloomThreshold = 0.0` - (0 to 1. Only source brightness above this value feeds the glow.
-Uses the brightest RGB channel and preserves its color. `Threshold %` on the Graphics page,
+* `BloomThreshold = 0.5` - (0 to 1. Only source brightness above this value feeds the glow, fading
+in over a soft knee below it. Uses the brightest RGB channel and preserves its color. `Threshold %` on the Graphics page,
 from 0 to 100. Requires the Direct3D 9 pixel shader.)
 * `BloomSize = 1.0` - (0.25 to 4. Multiplies the glow radius. 1 keeps the original size.
 `Size %` on the Graphics page, from 25 to 400.)

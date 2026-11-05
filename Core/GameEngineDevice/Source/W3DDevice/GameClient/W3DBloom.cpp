@@ -54,18 +54,18 @@ enum { BLOOM_MAX_TAPS = 5 };
 static const Real BLOOM_TAP_OFFSET[3] = { 0.0f, 1.3846154f, 3.2307692f };
 static const Real BLOOM_TAP_WEIGHT[3] = { 0.2270270f, 0.3162162f, 0.0702703f };
 
-// screen space quads; the copy variant replaces the target instead of adding to it
-static ShaderClass makeQuadShader(Bool additive)
+// the knee width as a fraction of the threshold
+static const Real BLOOM_KNEE = 0.5f;
+
+// screen space quads, added onto, replacing or screened over the target
+static ShaderClass makeQuadShader(ShaderClass::DstBlendFuncType dstBlend)
 {
 	ShaderClass shader = ShaderClass::_PresetAdditiveShader;
 	shader.Set_Depth_Compare(ShaderClass::PASS_ALWAYS);
 	shader.Set_Depth_Mask(ShaderClass::DEPTH_WRITE_DISABLE);
 	shader.Set_Cull_Mode(ShaderClass::CULL_MODE_DISABLE);
 	shader.Set_Primary_Gradient(ShaderClass::GRADIENT_MODULATE);
-	if (!additive)
-	{
-		shader.Set_Dst_Blend_Func(ShaderClass::DSTBLEND_ZERO);
-	}
+	shader.Set_Dst_Blend_Func(dstBlend);
 	return shader;
 }
 
@@ -89,8 +89,9 @@ static TextureClass *createTarget(Int width, Int height, WW3DFormat format)
 }
 
 W3DBloom::W3DBloom()
-	: m_addShader(makeQuadShader(TRUE)),
-	m_copyShader(makeQuadShader(FALSE))
+	: m_addShader(makeQuadShader(ShaderClass::DSTBLEND_ONE)),
+	m_copyShader(makeQuadShader(ShaderClass::DSTBLEND_ZERO)),
+	m_screenShader(makeQuadShader(ShaderClass::DSTBLEND_ONE_MINUS_SRC_COLOR))
 {
 	for (Int i = 0; i < TARGET_COUNT; ++i)
 	{
@@ -375,7 +376,7 @@ void W3DBloom::end(RenderInfoClass &rinfo)
 		composite.u1 = viewMax.X;
 		composite.v1 = viewMax.Y;
 		composite.brightness = debug ? 1.0f : TheGlobalData->m_bloomStrength;
-		drawTaps(m_target[TARGET_BLUR + (BLOOM_BLUR_PASSES & 1)], &composite, 1, debug ? m_copyShader : m_addShader);
+		drawTaps(m_target[TARGET_BLUR + (BLOOM_BLUR_PASSES & 1)], &composite, 1, debug ? m_copyShader : m_screenShader);
 	}
 
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, TRUE);
@@ -461,7 +462,8 @@ void W3DBloom::drawShaderTaps(TextureClass *source, const Tap *taps, Int count, 
 	{
 		constants[i] = (i < count) ? Vector4(taps[i].u0, taps[i].v0, taps[i].brightness, 0.0f) : Vector4(0.0f, 0.0f, 0.0f, 0.0f);
 	}
-	constants[BLOOM_MAX_TAPS] = Vector4(threshold, 0.0f, 0.0f, 0.0f);
+	const Real knee = threshold * BLOOM_KNEE;
+	constants[BLOOM_MAX_TAPS] = Vector4(threshold, knee, knee > 0.0f ? 0.25f / knee : 0.0f, 0.0f);
 
 	Tap quad;
 	quad.u0 = 0.0f;

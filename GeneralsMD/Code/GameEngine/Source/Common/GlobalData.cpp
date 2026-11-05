@@ -950,7 +950,7 @@ GlobalData::GlobalData()
   m_backToFront = FALSE;
   m_useBloom = TRUE;
   m_bloomStrength = 0.5f;
-  m_bloomThreshold = 0.0f;
+  m_bloomThreshold = 0.5f;
   m_bloomSize = 1.0f;
   m_bloomDebug = FALSE;
   m_laserRef = TRUE;

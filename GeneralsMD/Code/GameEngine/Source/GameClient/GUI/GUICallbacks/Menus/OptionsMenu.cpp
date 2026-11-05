@@ -704,7 +704,7 @@ static void setGameOptionsDefaults()
 	showColorEntries( GameMakeColor( 255, 255, 255, 255 ), textEntryKeyboardOverlayRed, textEntryKeyboardOverlayGreen, textEntryKeyboardOverlayBlue, nullptr );
 	showColorEntries( GameMakeColor( 0, 0, 0, 128 ), textEntryKeyboardOverlayBackdropRed, textEntryKeyboardOverlayBackdropGreen, textEntryKeyboardOverlayBackdropBlue, textEntryKeyboardOverlayBackdropOpacity );
 	setEntryInt( textEntryBloomStrength, 50 );
-	setEntryInt( textEntryBloomThreshold, 0 );
+	setEntryInt( textEntryBloomThreshold, 50 );
 	setEntryInt( textEntryBloomSize, 100 );
 
 	updateGameOptionsEnables();
