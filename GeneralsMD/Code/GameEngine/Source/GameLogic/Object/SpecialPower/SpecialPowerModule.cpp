@@ -338,6 +338,12 @@ Bool SpecialPowerModule::canActivateForCommand( UnsignedInt commandOptions ) con
 	{
 		return FALSE;
 	}
+#if !RETAIL_COMPATIBLE_CRC
+	if (getObject()->testStatus(OBJECT_STATUS_UNDER_CONSTRUCTION))
+	{
+		return FALSE;
+	}
+#endif
 	return m_pausedCount == 0 || (m_pausedCount == 1
 		&& BitIsSet(commandOptions, IGNORES_UNDERPOWERED)
 		&& getObject()->isDisabledByType(DISABLED_UNDERPOWERED)
@@ -753,7 +759,8 @@ Bool SpecialPowerModule::initiateIntentToDoSpecialPower( const Object *targetObj
 	}
 
 #if RETAIL_COMPATIBLE_CRC
-	// TheSuperHackers @info we need to leave early if we are in the MissileLauncherBuildingUpdate crash fix codepath
+	// TheSuperHackers @info Leave early when an update module refused the launch
+	// and marked this power with an invalid ready frame.
 	if (m_availableOnFrame == 0xFFFFFFFF)
 	{
 		DEBUG_ASSERTCRASH(!valid, ("Using MissileLauncherBuildingUpdate escape path when valid is set to true"));
@@ -1147,7 +1154,8 @@ void SpecialPowerModule::doSpecialPowerAtLocation( const Coord3D *loc, Real angl
 	initiateIntentToDoSpecialPower( nullptr, loc, nullptr, commandOptions );
 
 #if RETAIL_COMPATIBLE_CRC
-	// TheSuperHackers @info we need to leave early if we are in the MissileLauncherBuildingUpdate crash fix codepath
+	// TheSuperHackers @info Leave early when an update module refused the launch
+	// and marked this power with an invalid ready frame.
 	if (m_availableOnFrame == 0xFFFFFFFF)
 		return;
 #endif

@@ -187,7 +187,8 @@ void OCLSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, 
 	SpecialPowerModule::doSpecialPowerAtLocation( &targetCoord, angle, commandOptions );
 
 #if RETAIL_COMPATIBLE_CRC
-	// TheSuperHackers @info we need to leave early if we are in the MissileLauncherBuildingUpdate crash fix codepath
+	// TheSuperHackers @info Leave early when an update module refused the launch
+	// and marked this power with an invalid ready frame.
 	if (m_availableOnFrame == 0xFFFFFFFF)
 		return;
 #endif
@@ -312,6 +313,13 @@ void OCLSpecialPower::doSpecialPower( UnsignedInt commandOptions )
 
 	// call the base class action cause we are *EXTENDING* functionality
 	SpecialPowerModule::doSpecialPowerAtLocation( &creationCoord, INVALID_ANGLE, commandOptions );
+
+#if RETAIL_COMPATIBLE_CRC
+	// TheSuperHackers @info Leave early when an update module refused the launch
+	// and marked this power with an invalid ready frame.
+	if (m_availableOnFrame == 0xFFFFFFFF)
+		return;
+#endif
 
 	TheCommandSequence->oclPending(getObject());
 
