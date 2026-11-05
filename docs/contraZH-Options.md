@@ -73,6 +73,9 @@ waterline, flat ground in three tones (olive, tan for desert sand, grey for rock
 256x256 grid.)
 * `BlipSize = Large` - (`Small` | `Large`. `Small` is 3/5 px unit/structure, `Large` 5/7. Only with
 `NewRadar`.)
+* `Resolution = <width> <height>` - (Missing: the primary desktop's current resolution, or 800 x 600 when
+that cannot be read or is smaller. `-xres`/`-yres` and a `GameData.ini` `XResolution`/`YResolution` set it
+when the key is missing. Also the Resolution dropdown, written on Accept.)
 * `BorderlessWindow = No` - (Yes runs a frameless centred window at the selected resolution. Also
 the Borderless checkbox beside Resolution, which disables the resolution dropdown while checked.
 `-win` still gives a captioned window.)
