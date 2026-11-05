@@ -60,8 +60,26 @@ body,
   background: var(--contra-page);
 }
 
-.wy-nav-content {
-  max-width: 1100px;
+/* Sidebar and page share one centred 1400px column on wide screens; the fixed sidebar follows it through left: auto */
+
+@media screen and (min-width: 769px) {
+  .wy-grid-for-nav {
+    position: relative;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .wy-nav-side {
+    left: auto;
+  }
+
+  .wy-nav-content-wrap {
+    min-height: 100vh;
+  }
+
+  .wy-nav-content {
+    max-width: none;
+  }
 }
 
 ::selection {
