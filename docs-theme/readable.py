@@ -20,10 +20,6 @@ CORRECTIONS = {
     'ChatCommands': 'Undocumented-Upstream-Features.md#chatcommands',
 }
 
-REDIRECT = ('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>contraZH</title>'
-            '<meta http-equiv="refresh" content="0; url={0}"></head>'
-            '<body><a href="{0}">contraZH</a></body></html>\n')
-
 
 def note_admonitions(lines):
     """Turn 'Note:' paragraphs and 'Notes:' lists into note admonitions."""
@@ -151,23 +147,10 @@ def scheme_pygments(app):
     app.add_css_file('pygments-slate.css')
 
 
-def on_build_finished(app, exception):
-    """Send the site root to the root page, which keeps its wiki name."""
-    if exception is not None or app.builder.format != 'html':
-        return
-    target = app.builder.get_target_uri(app.config.root_doc)
-    index = os.path.join(app.outdir, 'index.html')
-    if target in ('', 'index.html') or os.path.exists(index):
-        return
-    with open(index, 'w', encoding='utf-8') as f:
-        f.write(REDIRECT.format(target))
-
-
 def setup(app):
     app.add_config_value('contra_nav', [], 'env')
     app.add_config_value('contra_slate_pygments', 'github-dark', 'html')
     app.connect('builder-inited', scheme_pygments)
     app.connect('source-read', on_source_read)
     app.add_transform(NestLaterTitles)
-    app.connect('build-finished', on_build_finished)
     return {'parallel_read_safe': True, 'parallel_write_safe': True}

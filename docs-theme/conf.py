@@ -6,14 +6,13 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 project = 'contraZH'
-author = 'triatomic'
-language = 'en'
 
-# Home.md keeps its wiki name, so the site root redirects to it
+# Home.md keeps its wiki name, so extra/index.html redirects the site root to it
 root_doc = 'Home'
 
 extensions = [
     'myst_parser',
+    'notfound.extension',
     'sphinx_copybutton',
     'sphinx_rtd_theme',
     'readable',
@@ -37,16 +36,14 @@ html_title = project
 html_baseurl = 'https://triatomic.github.io/contraZH/'
 html_favicon = 'assets/images/logo.svg'
 html_static_path = ['assets']
+html_extra_path = ['extra']
 html_css_files = ['stylesheets/contra.css']
 html_js_files = ['javascripts/scheme.js', 'javascripts/copy-inline.js']
 templates_path = ['templates']
-html_show_sourcelink = False
 html_copy_source = False
 html_show_copyright = False
 html_theme_options = {
-    'collapse_navigation': True,
     'navigation_depth': 3,
-    'prev_next_buttons_location': 'bottom',
     'vcs_pageview_mode': 'edit',
 }
 html_context = {
@@ -57,7 +54,8 @@ html_context = {
     'conf_py_path': '/docs/',
 }
 
-copybutton_exclude = '.linenos, .gp'
+# The 404 page loads its assets by absolute URL, so it works at any depth
+notfound_urls_prefix = '/contraZH/'
 
 # Sidebar sections; readable.py turns them into hidden toctrees on the root page
 contra_nav = [

@@ -36,9 +36,11 @@ jobs:
       - name: Install Sphinx
         run: pip install -r docs-theme/requirements.txt
 
-      # dirhtml keeps the Page/ URLs the MkDocs site used
+      # dirhtml keeps the Page/ URLs the MkDocs site used; Pages serves only a root 404.html
       - name: Build
-        run: sphinx-build -b dirhtml -c docs-theme -d doctrees -W --keep-going docs site
+        run: |
+          sphinx-build -b dirhtml -c docs-theme -d doctrees -W --keep-going docs site
+          cp site/404/index.html site/404.html
 
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
