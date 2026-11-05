@@ -61,12 +61,13 @@ private:
 	};
 
 	Bool acquireTargets(Int width, Int height, WW3DFormat format, Int sampleType, UnsignedInt sampleQuality);
+	void releaseShaders();
 	void releaseTargets();
 	void releaseDefaults();
 	Bool setTarget(Int target);
 	Bool blurPass(TextureClass *source, Int target, Real offsetU, Real offsetV, Bool shrink);
 	void drawTaps(TextureClass *source, const Tap *taps, Int count, const ShaderClass &firstShader);
-	void drawShaderTaps(TextureClass *source, const Tap *taps, Int count, Real threshold);
+	void drawShaderTaps(TextureClass *source, const Tap *taps, Int count, Real threshold, DWORD pixelShader);
 
 	// the full sized target that receives the additive draws, then two reduced ones to ping-pong the blur through
 	enum { TARGET_FULL = 0, TARGET_BLUR = 1, TARGET_COUNT = 3 };
@@ -81,6 +82,7 @@ private:
 	ShaderClass m_copyShader;						///< replaces the target, so a pass needs no clear
 	ShaderClass m_screenShader;					///< src + dst * (1 - src), so pixels already bright take little glow
 	DWORD m_blurShader;									///< sums a pass's taps in one quad; zero draws a quad per tap
+	DWORD m_shrinkShader;								///< the shrink pass, thresholding each tap
 	Bool m_disabled;										///< the device refused the target; stays set until ReleaseResources
 };
 

@@ -104,6 +104,7 @@ W3DBloom::W3DBloom()
 	m_defaultTarget = nullptr;
 	m_defaultDepth = nullptr;
 	m_blurShader = 0;
+	m_shrinkShader = 0;
 	m_disabled = false;
 }
 
@@ -155,9 +156,10 @@ Bool W3DBloom::acquireTargets(Int width, Int height, WW3DFormat format, Int samp
 	m_sampleType = sampleType;
 
 	if (DX8Wrapper::Get_Current_Caps()->Get_Pixel_Shader_Major_Version() >= 2 &&
-		FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\bloomblur.pso", nullptr, 0, false, &m_blurShader)))
+		(FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\bloomblur.pso", nullptr, 0, false, &m_blurShader)) ||
+		FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\bloomshrink.pso", nullptr, 0, false, &m_shrinkShader))))
 	{
-		m_blurShader = 0;
+		releaseShaders();
 	}
 #endif
 
@@ -181,13 +183,24 @@ Bool W3DBloom::acquireTargets(Int width, Int height, WW3DFormat format, Int samp
 	return true;
 }
 
-void W3DBloom::releaseTargets()
+// either both pass shaders exist or neither, so the passes never mix shader and fixed function sums
+void W3DBloom::releaseShaders()
 {
 	if (m_blurShader != 0)
 	{
 		DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_blurShader);
 		m_blurShader = 0;
 	}
+	if (m_shrinkShader != 0)
+	{
+		DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_shrinkShader);
+		m_shrinkShader = 0;
+	}
+}
+
+void W3DBloom::releaseTargets()
+{
+	releaseShaders();
 	if (m_sampledSurface)
 	{
 		m_sampledSurface->Release();
@@ -445,7 +458,7 @@ Bool W3DBloom::blurPass(TextureClass *source, Int target, Real offsetU, Real off
 #if defined(RTS_ZEROHOUR)
 		threshold = shrink ? TheGlobalData->m_bloomThreshold : 0.0f;
 #endif
-		drawShaderTaps(source, taps, count, threshold);
+		drawShaderTaps(source, taps, count, threshold, shrink ? m_shrinkShader : m_blurShader);
 	}
 	else
 	{
@@ -455,7 +468,7 @@ Bool W3DBloom::blurPass(TextureClass *source, Int target, Real offsetU, Real off
 }
 
 // one quad whose pixel shader sums the taps, so the target is written once at full precision
-void W3DBloom::drawShaderTaps(TextureClass *source, const Tap *taps, Int count, Real threshold)
+void W3DBloom::drawShaderTaps(TextureClass *source, const Tap *taps, Int count, Real threshold, DWORD pixelShader)
 {
 	Vector4 constants[BLOOM_MAX_TAPS + 1];
 	for (Int i = 0; i < BLOOM_MAX_TAPS; ++i)
@@ -463,7 +476,7 @@ void W3DBloom::drawShaderTaps(TextureClass *source, const Tap *taps, Int count, 
 		constants[i] = (i < count) ? Vector4(taps[i].u0, taps[i].v0, taps[i].brightness, 0.0f) : Vector4(0.0f, 0.0f, 0.0f, 0.0f);
 	}
 	const Real knee = threshold * BLOOM_KNEE;
-	constants[BLOOM_MAX_TAPS] = Vector4(threshold, knee, knee > 0.0f ? 0.25f / knee : 0.0f, 0.0f);
+	constants[BLOOM_MAX_TAPS] = Vector4(threshold, knee, knee > 0.0f ? 0.25f / knee : 0.0f, 2.0f * knee);
 
 	Tap quad;
 	quad.u0 = 0.0f;
@@ -473,7 +486,7 @@ void W3DBloom::drawShaderTaps(TextureClass *source, const Tap *taps, Int count, 
 	quad.brightness = 1.0f;
 
 	DX8Wrapper::Set_Pixel_Shader_Constant(0, constants, BLOOM_MAX_TAPS + 1);
-	DX8Wrapper::Set_Pixel_Shader(m_blurShader);
+	DX8Wrapper::Set_Pixel_Shader(pixelShader);
 	drawTaps(source, &quad, 1, m_copyShader);
 	DX8Wrapper::Set_Pixel_Shader(0);
 }

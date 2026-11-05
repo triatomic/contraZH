@@ -366,7 +366,7 @@ Real OptionPreferences::getBloomStrength(void) const
 #if defined(RTS_ZEROHOUR)
 Real OptionPreferences::getBloomThreshold(void) const
 {
-	return clamp(0.0f, getReal("BloomThreshold", 0.5f), 1.0f);
+	return clamp(0.0f, getReal("BloomThreshold", 0.25f), 1.0f);
 }
 
 Real OptionPreferences::getBloomSize(void) const

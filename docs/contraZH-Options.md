@@ -373,7 +373,7 @@ The glow is screen blended, so pixels that are already bright take little of it 
 * `Bloom = Yes` - (No turns the glow off. Also `Bloom` on the Graphics page,
 applied on Accept.)
 * `BloomStrength = 0.5` - (0 to 1. 0 is off. The box beside `Bloom` on the Graphics page.)
-* `BloomThreshold = 0.5` - (0 to 1. Only source brightness above this value feeds the glow, fading
+* `BloomThreshold = 0.25` - (0 to 1. Only source brightness above this value feeds the glow, fading
 in over a soft knee below it. Uses the brightest RGB channel and preserves its color. `Threshold %` on the Graphics page,
 from 0 to 100. Requires the Direct3D 9 pixel shader.)
 * `BloomSize = 1.0` - (0.25 to 4. Multiplies the glow radius. 1 keeps the original size.

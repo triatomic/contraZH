@@ -306,6 +306,7 @@ rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularrecei
 rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularreceivenormal.pso            SHADOWED=1 PACKED=0 BUMP=2 RECEIVE=1)
 rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularreceivenormalpacked.pso      SHADOWED=1 PACKED=1 BUMP=2 RECEIVE=1)
 rts_add_shader("${RTS_SHADER_DIR}/bloomblur.hlsl"      ps_2_0 main bloomblur.pso)
+rts_add_shader("${RTS_SHADER_DIR}/bloomblur.hlsl"      ps_2_0 main bloomshrink.pso              SHRINK=1)
 rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_0 main softparticledepth.pso        DEPTH=1)
 rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_0 main softparticleheight.pso       DEPTH=0)
 # Fading and flame shading together run past ps_2_0's 64 arithmetic slots.
