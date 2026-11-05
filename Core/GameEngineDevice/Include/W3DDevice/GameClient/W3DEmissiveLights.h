@@ -49,6 +49,7 @@ private:
 		Real weight;
 		Real radius;
 		Real strength;
+		Vector3 center;
 	};
 	typedef std::pair<Int, std::pair<Int, Int> > Cell;
 	typedef std::pair<MeshModelClass *, Bool> ModelKey;

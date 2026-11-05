@@ -143,6 +143,8 @@ public:
 	static void setPixelLights(const PixelLight *lights, Int count);
 	static Int getPixelLightCount();
 	static const PixelLight &getPixelLight(Int index);
+	/// Peak brightness with ambient, the shared basis for ranking lights.
+	static Real getPixelLightBrightness(const PixelLight &light);
 	/// Lights the draws that follow in batches under the terrain, road, flat terrain
 	/// or point light shader in use. Null indices take the first count except object-only lights.
 	static void setDrawPixelLights(const Int *indices, Int count);

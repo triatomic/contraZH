@@ -448,7 +448,7 @@ trace rays, cast local shadows, or calculate reflected light. Lights can pass th
 Particle texture colours are averaged once per cached texture.
 Nearby emitters share lights within 24 world units, and close lights merge further.
 Very dim lights are dropped. Surfaces draw additional batches of eight lights, or two
-under standing water, up to four batches per draw by default.
+under standing water, up to three on top of the first batch by default.
 Extra passes add only light and do not repeat sunlight, glow masks or shadow darkening.
 On detailed terrain, roads and bridges, local lights retain surface textures, normals and
 ground noise but ignore sun shadows and clouds. This also applies to three-texture terrain

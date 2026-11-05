@@ -2011,8 +2011,8 @@ static bool Pixel_Light_Stronger(Int a, Int b)
 {
 	const W3DShaderManager::PixelLight &first = PixelLights[a];
 	const W3DShaderManager::PixelLight &second = PixelLights[b];
-	return first.outerRadius * max(first.diffuse.X, max(first.diffuse.Y, first.diffuse.Z)) * (1.0f + first.ambientScale) >
-		second.outerRadius * max(second.diffuse.X, max(second.diffuse.Y, second.diffuse.Z)) * (1.0f + second.ambientScale);
+	return first.outerRadius * W3DShaderManager::getPixelLightBrightness(first) >
+		second.outerRadius * W3DShaderManager::getPixelLightBrightness(second);
 }
 
 // Path tracing keeps a draw's strongest lights, as many as PathTracingMaxLightPasses passes hold.
@@ -3018,7 +3018,6 @@ void SpecularShader::setTexture(TextureClass *texture, MeshModelClass *model, co
 			indices = meshLights.empty() ? nullptr : &meshLights[0];
 			count = (Int)meshLights.size();
 		}
-		Cap_Additional_Pixel_Lights(indices, count, W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS);
 		Vector4 constants[PIXEL_LIGHT_REGISTERS];
 		const Int registers = Pack_Pixel_Lights(constants, W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS, indices, count, &SpecularLightView);
 		DX8Wrapper::Set_Pixel_Shader_Constant(8, constants, registers);
@@ -3351,6 +3350,11 @@ const W3DShaderManager::PixelLight &W3DShaderManager::getPixelLight(Int index)
 	return PixelLights[index];
 }
 
+Real W3DShaderManager::getPixelLightBrightness(const PixelLight &light)
+{
+	return max(light.diffuse.X, max(light.diffuse.Y, light.diffuse.Z)) * (1.0f + light.ambientScale);
+}
+
 void W3DShaderManager::setDrawPixelLights(const Int *indices, Int count)
 {
 	Set_Additional_Pixel_Lights(0, nullptr, 0, 0, 0, nullptr);
@@ -3412,7 +3416,6 @@ void W3DShaderManager::setDrawTerrain(const Int *indices, Int count, Bool seabed
 		DX8Wrapper::Set_Pixel_Shader_Constant(SEABED_REGISTER, SeabedConstants, SEABED_CONSTANTS);
 		if ((count > 0 || Get_Lights_Debug()) && DrawLitShader != 0 && DrawSeabedLitShader != 0)
 		{
-			Cap_Additional_Pixel_Lights(indices, count, SEABED_PIXEL_LIGHTS);
 			Vector4 constants[PIXEL_LIGHT_REGISTERS];
 			const Int registers = Pack_Pixel_Lights(constants, SEABED_PIXEL_LIGHTS, indices, count, nullptr);
 			DX8Wrapper::Set_Pixel_Shader_Constant(GROUND_POINT_LIGHT_REGISTER, constants, registers);

@@ -17,7 +17,7 @@ the Graphics menu's `Path tracing` option is enabled. They affect drawing only.
 | `PathTracingLightBrightness` | `1.0` | Multiplies emitted light. `0.25` gives one quarter of the brightness. |
 | `PathTracingLightMergeDistance` | `0.5` | Merges emissive lights closer than this share of the smaller light's radius. The merged light keeps their combined brightness. `0` never merges. |
 | `PathTracingLightMinBrightness` | `0.02` | Drops lights dimmer than this after `PathTracingLightBrightness` applies. `0` keeps every light. |
-| `PathTracingMaxLightPasses` | `4` | Limits the light passes one draw may take. Each pass holds 8 lights, or 2 under standing water. The draw keeps its strongest lights. `0` removes the limit. |
+| `PathTracingMaxLightPasses` | `4` | Limits the light passes, the first included, that one draw may take. Each pass holds 8 lights, or 2 under standing water. Units keep the lights brightest on them; a light with no room on the ground falls back to vertex lighting. `0` removes the limit. |
 
 Zero or negative brightness disables this light spill. A negative radius cap means no cap.
 The cap and brightness are independent. These keys do not change the emitting sprites,

@@ -2346,8 +2346,8 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 		for (size_t i = 0; i < sources.size(); i++)
 		{
 			W3DShaderManager::PixelLight light = sources[i];
-			if (!Tune_Emissive_Light(light, TheGlobalData->m_pathTracingLightMaxRadius, TheGlobalData->m_pathTracingLightBrightness,
-				TheGlobalData->m_pathTracingLightMinBrightness) ||
+			const Real minBrightness = (i < emissive.size()) ? TheGlobalData->m_pathTracingLightMinBrightness : 0.0f;
+			if (!Tune_Emissive_Light(light, TheGlobalData->m_pathTracingLightMaxRadius, TheGlobalData->m_pathTracingLightBrightness, minBrightness) ||
 				camera.Cull_Sphere(SphereClass(light.position, light.outerRadius)))
 			{
 				continue;
@@ -2355,7 +2355,7 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 			PixelLightCandidate candidate;
 			candidate.light = nullptr;
 			candidate.value = light;
-			candidate.score = light.outerRadius * max(light.diffuse.X, max(light.diffuse.Y, light.diffuse.Z));
+			candidate.score = light.outerRadius * W3DShaderManager::getPixelLightBrightness(light);
 			candidate.gap = 0.0f;
 			Vector3 center;
 			Vector3 edge;
@@ -2431,9 +2431,12 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 // Picks the lights that reach the sphere, keeping the strongest first when their count is limited.
 Int RTS3DScene::pickObjectPixelLights(const SphereClass &sphere, Int *lights)
 {
-	const Bool allLights = TheGlobalData->m_usePathTracing;
-	const Int limit = W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS;
-	Real scores[W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS];
+	// Path tracing gives the object PathTracingMaxLightPasses passes of lights, 0 for no limit.
+	const Int passes = TheGlobalData->m_usePathTracing ? TheGlobalData->m_pathTracingMaxLightPasses : 1;
+	const Bool allLights = passes <= 0;
+	const Int limit = W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS * max(passes, 1);
+	static std::vector<Real> scores;
+	scores.resize(limit);
 	Int count = 0;
 
 	const Int candidates = W3DShaderManager::getPixelLightCount();
@@ -2458,8 +2461,7 @@ Int RTS3DScene::pickObjectPixelLights(const SphereClass &sphere, Int *lights)
 		}
 		const Real ramp = WWMath::Clamp((pixelLight.outerRadius - distance) / (pixelLight.outerRadius - pixelLight.innerRadius), 0.0f, 1.0f);
 		const Real falloff = ramp * ramp * (3.0f - 2.0f * ramp);
-		const Real brightness = max(pixelLight.diffuse.X, max(pixelLight.diffuse.Y, pixelLight.diffuse.Z)) * (1.0f + pixelLight.ambientScale);
-		const Real score = falloff * brightness;
+		const Real score = falloff * W3DShaderManager::getPixelLightBrightness(pixelLight);
 
 		// Kept sorted, so a full list drops its weakest.
 		Int slot = count;
