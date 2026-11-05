@@ -76,7 +76,6 @@ const unsigned MAX_VERTEX_STREAMS=2;
 const unsigned MAX_VERTEX_SHADER_CONSTANTS=256;
 // The ps_3_0 register file; the ps_3_0 water reaches past the 32 of ps_2_0.
 const unsigned MAX_PIXEL_SHADER_CONSTANTS=224;
-const unsigned PS_2_0_PIXEL_SHADER_CONSTANTS=32;
 #else
 const unsigned MAX_VERTEX_SHADER_CONSTANTS=96;
 const unsigned MAX_PIXEL_SHADER_CONSTANTS=8;
@@ -904,6 +903,10 @@ WWINLINE void DX8Wrapper::Set_Vertex_Shader_Constant(int reg, const void* data, 
 WWINLINE void DX8Wrapper::Set_Pixel_Shader_Constant(int reg, const void* data, int count)
 {
 	WWASSERT(reg>=0 && reg+count<=(int)MAX_PIXEL_SHADER_CONSTANTS);
+	if (reg<0 || reg+count>(int)MAX_PIXEL_SHADER_CONSTANTS)
+	{
+		return;
+	}
 	int memsize=sizeof(Vector4)*count;
 
 	// may be incorrect if shaders are created and destroyed dynamically
