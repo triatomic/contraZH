@@ -612,6 +612,33 @@ static void applyWindowStyle( Bool windowed )
 	::SetWindowPos( ApplicationHWnd, windowed ? HWND_NOTOPMOST : HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED );
 }
 
+// Shrinks a captioned window, keeping its aspect, until its frame fits the monitor work area; the desktop-sized default never does.
+static void fitCaptionedWindow( Int &xres, Int &yres )
+{
+	RECT work;
+	if (!ApplicationHWnd || !TheGlobalData->m_windowed || !SystemParametersInfo( SPI_GETWORKAREA, 0, &work, 0 ))
+	{
+		return;
+	}
+
+	RECT frame = { 0, 0, 0, 0 };
+	AdjustWindowRect( &frame, ::GetWindowLong( ApplicationHWnd, GWL_STYLE ), FALSE );
+	const Int maxWidth = (work.right - work.left) - (frame.right - frame.left);
+	const Int maxHeight = (work.bottom - work.top) - (frame.bottom - frame.top);
+	if (maxWidth <= 0 || maxHeight <= 0 || (xres <= maxWidth && yres <= maxHeight))
+	{
+		return;
+	}
+
+	Real scale = maxWidth / (Real)xres;
+	if (maxHeight / (Real)yres < scale)
+	{
+		scale = maxHeight / (Real)yres;
+	}
+	xres = (Int)(xres * scale);
+	yres = (Int)(yres * scale);
+}
+
 /** Set resolution of display */
 //=============================================================================
 Bool W3DDisplay::setDisplayMode( UnsignedInt xres, UnsignedInt yres, UnsignedInt bitdepth, Bool windowed )
@@ -961,8 +988,13 @@ void W3DDisplay::init()
 			case 0:
 			{
 				// set our default width and height and bit depth
-				setWidth( TheGlobalData->m_xResolution );
-				setHeight( TheGlobalData->m_yResolution );
+				Int xres = TheGlobalData->m_xResolution;
+				Int yres = TheGlobalData->m_yResolution;
+				fitCaptionedWindow( xres, yres );
+				TheWritableGlobalData->m_xResolution = xres;
+				TheWritableGlobalData->m_yResolution = yres;
+				setWidth( xres );
+				setHeight( yres );
 				setBitDepth( DEFAULT_DISPLAY_BIT_DEPTH );
 				break;
 			}

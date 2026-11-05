@@ -734,19 +734,25 @@ static void setDefaults()
 
 	//-------------------------------------------------------------------------------------------------
 	// Resolution
-	//Find index of 800x600 mode.
+	// The mode a fresh start picks, else 800x600.
 	if ((TheGameLogic->isInGame() == FALSE || TheGameLogic->isInShellGame() == TRUE) && !TheGameSpyInfo) {
+		Int defaultWidth, defaultHeight;
+		GlobalData::getDefaultResolution( defaultWidth, defaultHeight );
 		Int numResolutions = TheDisplay->getDisplayModeCount();
 		Int defaultResIndex=0;
 		for( Int i = 0; i < numResolutions; ++i )
 		{	Int xres,yres,bitDepth;
 			TheDisplay->getDisplayModeDescription(i,&xres,&yres,&bitDepth);
-			if (xres == DEFAULT_DISPLAY_WIDTH && yres == DEFAULT_DISPLAY_HEIGHT)	//keep track of default mode in case we need it.
+			if (xres == defaultWidth && yres == defaultHeight)
 			{	defaultResIndex=i;
 				break;
 			}
+			if (xres == DEFAULT_DISPLAY_WIDTH && yres == DEFAULT_DISPLAY_HEIGHT)
+			{
+				defaultResIndex=i;
+			}
 		}
-		GadgetComboBoxSetSelectedPos( comboBoxResolution, defaultResIndex );	//should be 800x600 (our lowest supported mode)
+		GadgetComboBoxSetSelectedPos( comboBoxResolution, defaultResIndex );
 	}
 	}
 

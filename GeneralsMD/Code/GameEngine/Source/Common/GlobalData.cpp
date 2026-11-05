@@ -1064,21 +1064,8 @@ GlobalData::GlobalData()
 	m_headless = FALSE;
 	m_windowed = 0;
 	m_borderlessWindow = FALSE;
-	// the primary desktop mode is the default; GameData XResolution, -xres and Options.ini override it
-	DEVMODE desktop;
-	ZeroMemory( &desktop, sizeof(desktop) );
-	desktop.dmSize = sizeof(desktop);
-	if (EnumDisplaySettings( nullptr, ENUM_CURRENT_SETTINGS, &desktop )
-		&& desktop.dmPelsWidth >= DEFAULT_DISPLAY_WIDTH && desktop.dmPelsHeight >= DEFAULT_DISPLAY_HEIGHT)
-	{
-		m_xResolution = desktop.dmPelsWidth;
-		m_yResolution = desktop.dmPelsHeight;
-	}
-	else
-	{
-		m_xResolution = DEFAULT_DISPLAY_WIDTH;
-		m_yResolution = DEFAULT_DISPLAY_HEIGHT;
-	}
+	// GameData XResolution, -xres and Options.ini override the desktop default
+	getDefaultResolution( m_xResolution, m_yResolution );
 	m_maxShellScreens = 0;
 	m_useCloudMap = FALSE;
 	m_use3WayTerrainBlends = 1;
@@ -1994,6 +1981,23 @@ void GlobalData::reloadEditedIni()
 	LiveReloadTable = nullptr;
 	RENDER_LOG(("GameData.ini render tuning reloaded"));
 #endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void GlobalData::getDefaultResolution( Int &width, Int &height )
+{
+	width = DEFAULT_DISPLAY_WIDTH;
+	height = DEFAULT_DISPLAY_HEIGHT;
+
+	DEVMODE desktop;
+	ZeroMemory( &desktop, sizeof(desktop) );
+	desktop.dmSize = sizeof(desktop);
+	if (EnumDisplaySettings( nullptr, ENUM_CURRENT_SETTINGS, &desktop )
+		&& desktop.dmPelsWidth >= DEFAULT_DISPLAY_WIDTH && desktop.dmPelsHeight >= DEFAULT_DISPLAY_HEIGHT)
+	{
+		width = desktop.dmPelsWidth;
+		height = desktop.dmPelsHeight;
+	}
 }
 
 //-------------------------------------------------------------------------------------------------

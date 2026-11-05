@@ -82,7 +82,8 @@ the Borderless checkbox beside Resolution, which disables the resolution dropdow
 Mouse input follows the rendered picture if Windows stretches the window after a resolution change.
 * `Windowed = No` - (Yes runs a movable window with a title bar at the selected resolution, like
 `-win`. Also the Windowed checkbox beside Borderless; checking one clears the other. `-win` still
-forces it on. Needs `CheckWindowed` in `OptionsMenu.wnd` for the menu control.)
+forces it on. A window larger than the monitor's work area shrinks at start to fit, keeping its aspect
+ratio. Needs `CheckWindowed` in `OptionsMenu.wnd` for the menu control.)
 
 Notes:
 * A blue bar under a building's health bar shows production progress; on supply gatherers it shows

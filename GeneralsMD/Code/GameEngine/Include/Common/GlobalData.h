@@ -137,6 +137,7 @@ public:
 
 	Bool setTimeOfDay( TimeOfDay tod );		///< Use this function to set the Time of day;
 
+	static void getDefaultResolution( Int &width, Int &height );	///< the primary desktop mode, or 800x600 when it is unreadable or smaller
 	static void parseGameDataDefinition( INI* ini );
 	static void reloadEditedIni();		///< picks up render tuning keys from GameData.ini saved while the game runs, in cheat builds
 	void parseCustomDefinition();
