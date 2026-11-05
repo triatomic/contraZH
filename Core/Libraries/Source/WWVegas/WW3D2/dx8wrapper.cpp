@@ -4770,9 +4770,15 @@ void DX8Wrapper::Apply_Default_State()
 	memset(vconst,0,sizeof(Vector4)*MAX_VERTEX_SHADER_CONSTANTS);
 	Set_Vertex_Shader_Constant(0, vconst, MAX_VERTEX_SHADER_CONSTANTS);
 
+#if defined(BUILD_WITH_D3D9)
+	// A ps_2_0 device rejects registers past its 32
+	const unsigned resetPixelConstants = PS_2_0_PIXEL_SHADER_CONSTANTS;
+#else
+	const unsigned resetPixelConstants = MAX_PIXEL_SHADER_CONSTANTS;
+#endif
 	Vector4 pconst[MAX_PIXEL_SHADER_CONSTANTS];
-	memset(pconst,0,sizeof(Vector4)*MAX_PIXEL_SHADER_CONSTANTS);
-	Set_Pixel_Shader_Constant(0, pconst, MAX_PIXEL_SHADER_CONSTANTS);
+	memset(pconst,0,sizeof(Vector4)*resetPixelConstants);
+	Set_Pixel_Shader_Constant(0, pconst, resetPixelConstants);
 
 	Set_Vertex_Shader(DX8_FVF_XYZNDUV2);
 	Set_Pixel_Shader(0);
