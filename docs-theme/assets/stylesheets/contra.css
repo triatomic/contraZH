@@ -414,6 +414,75 @@ span.highlighted {
   color: var(--contra-muted);
 }
 
+/* Search as you type (search.js) under the sidebar search box */
+
+.contra-search {
+  position: fixed;
+  z-index: 400;
+  width: 560px;
+  max-width: calc(100vw - 16px);
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--contra-page);
+  border: 1px solid var(--contra-line);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.contra-search[hidden] {
+  display: none;
+}
+
+.contra-search a.contra-search__item,
+.contra-search a.contra-search__item:visited {
+  display: block;
+  padding: 0.55em 0.9em;
+  color: var(--contra-text);
+  border-top: 1px solid var(--contra-line);
+}
+
+.contra-search a.contra-search__item:first-child {
+  border-top: none;
+}
+
+.contra-search a.contra-search__item--section {
+  padding-left: 2em;
+  border-top: none;
+}
+
+.contra-search a.contra-search__item:hover,
+.contra-search a.contra-search__item.is-active {
+  background: var(--contra-raised-2);
+}
+
+.contra-search__title {
+  display: block;
+  font-weight: 700;
+  color: var(--contra-accent);
+}
+
+.contra-search__item--section .contra-search__title {
+  font-weight: 400;
+}
+
+.contra-search__excerpt {
+  display: block;
+  font-size: 0.85em;
+  line-height: 1.4;
+  color: var(--contra-muted);
+}
+
+.contra-search mark {
+  font-style: normal;
+  color: var(--contra-bright);
+  background: var(--contra-select);
+}
+
+.contra-search__empty {
+  padding: 0.7em 0.9em;
+  color: var(--contra-muted);
+}
+
 /* Inline code copies on click (copy-inline.js); a Copy tag shows on hover */
 
 .rst-content :not(pre):not(a) > code.literal {

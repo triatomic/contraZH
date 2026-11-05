@@ -1,5 +1,6 @@
 """Build-time readability fixes for the docs site; the .md files stay GitHub Markdown."""
 
+import html
 import os
 import re
 
@@ -13,6 +14,7 @@ FENCE = re.compile(r'^\s*(```|~~~)')
 LIST_ITEM = re.compile(r'^(\s*)([*+-]|\d+\.)\s+')
 NOTE_LINE = re.compile(r'^(Note|NOTE|Notes?):\s*(.*)$')
 UPSTREAM_WIKI = re.compile(r'https://github\.com/Andreas-W/GeneralsGameCode_Modding/wiki/([^)#\s]+)(#[^)\s]*)?')
+SECTION_ID = re.compile(r'<section([^>]*?) id="([^"]+)"([^>]*)>(\s*)<h([1-6])>')
 
 # The upstream pages stay verbatim, so their contraZH corrections are linked in here
 CORRECTIONS = {
@@ -147,10 +149,31 @@ def scheme_pygments(app):
     app.add_css_file('pygments-slate.css')
 
 
+def pagefind_body(app, pagename, templatename, context, doctree):
+    """Let Pagefind index page content only; generated pages like search and 404 have no doctree."""
+    if doctree is None or 'body' not in context:
+        return
+
+    # Pagefind links section results through heading ids, but Sphinx puts the id on <section>
+    body = SECTION_ID.sub(r'<section\1\3>\4<h\5 id="\2">', context['body'])
+
+    # The heading link icon is a private-use glyph that would show up in result titles
+    body = body.replace('<a class="headerlink"', '<a class="headerlink" data-pagefind-ignore')
+
+    # Results show the sidebar title; many pages open with a generic h1 like "Overview"
+    meta = ''
+    for caption, pages in app.config.contra_nav:
+        for title, doc in pages:
+            if doc == pagename and title != 'Overview':
+                meta = '<span data-pagefind-meta="title" hidden>%s</span>' % html.escape(title)
+    context['body'] = meta + '<div data-pagefind-body>' + body + '</div>'
+
+
 def setup(app):
     app.add_config_value('contra_nav', [], 'env')
     app.add_config_value('contra_slate_pygments', 'github-dark', 'html')
     app.connect('builder-inited', scheme_pygments)
     app.connect('source-read', on_source_read)
     app.add_transform(NestLaterTitles)
+    app.connect('html-page-context', pagefind_body)
     return {'parallel_read_safe': True, 'parallel_write_safe': True}

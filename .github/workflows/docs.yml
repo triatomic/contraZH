@@ -42,6 +42,10 @@ jobs:
           sphinx-build -b dirhtml -c docs-theme -d doctrees -W --keep-going docs site
           cp site/404/index.html site/404.html
 
+      # Index for search as you type in the sidebar (search.js)
+      - name: Index Search
+        run: npx -y pagefind@1.5.2 --site site
+
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
         with:
