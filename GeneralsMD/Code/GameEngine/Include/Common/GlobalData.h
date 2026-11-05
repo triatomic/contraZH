@@ -266,6 +266,9 @@ public:
 	Real m_unitEmissiveNightIntensity;	///< GameData UnitEmissiveNightIntensity: the same at night
 	Real m_pathTracingLightMaxRadius;
 	Real m_pathTracingLightBrightness;
+	Real m_pathTracingLightMergeDistance;	///< GameData PathTracingLightMergeDistance: emissive lights closer than this share of their radius merge, 0 for never
+	Real m_pathTracingLightMinBrightness;	///< GameData PathTracingLightMinBrightness: path-traced lights dimmer than this are dropped
+	Int m_pathTracingMaxLightPasses;		///< GameData PathTracingMaxLightPasses: light passes one draw may take, 0 for no limit
 	Real m_softParticleDistance;		///< GameData SoftParticleDistance: how far in front of a surface a particle starts to fade, 0 for hard edges
 	Real m_flameWarp;					///< GameData FlameWarp and the keys below: flame shading and heat haze defaults, see FlameShaderTuning
 	Real m_flameHeat;

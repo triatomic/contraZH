@@ -12,6 +12,7 @@
 #include "WW3D2/surfaceclass.h"
 #include "WW3D2/assetmgr.h"
 #include "WW3D2/vertmaterial.h"
+#include <algorithm>
 
 static const Real EMISSIVE_CELL_SIZE = 24.0f;
 
@@ -24,7 +25,7 @@ W3DEmissiveLights::~W3DEmissiveLights()
 }
 
 W3DEmissiveLights::Cluster::Cluster()
-	: position(0.0f, 0.0f, 0.0f), color(0.0f, 0.0f, 0.0f), weight(0.0f), radius(0.0f)
+	: position(0.0f, 0.0f, 0.0f), color(0.0f, 0.0f, 0.0f), weight(0.0f), radius(0.0f), strength(0.0f)
 {
 }
 
@@ -33,6 +34,7 @@ void W3DEmissiveLights::reset()
 	m_models.clear();
 	m_textures.clear();
 	m_clusters.clear();
+	m_merged.clear();
 	m_lights.clear();
 }
 
@@ -309,19 +311,77 @@ void W3DEmissiveLights::addObject(RenderObjClass &object, Real opacity)
 	}
 }
 
-const std::vector<W3DShaderManager::PixelLight> &W3DEmissiveLights::finish(CameraClass &camera)
+bool W3DEmissiveLights::heavier(const Cluster &a, const Cluster &b)
 {
-	for (std::map<Cell, Cluster>::const_iterator it = m_clusters.begin(); it != m_clusters.end(); ++it)
+	return a.weight > b.weight;
+}
+
+// Clusters nearer than PathTracingLightMergeDistance of the smaller radius join the heavier one.
+void W3DEmissiveLights::mergeClusters()
+{
+	const Real fraction = TheGlobalData->m_pathTracingLightMergeDistance;
+	if (!(fraction > 0.0f) || m_merged.size() < 2)
 	{
-		const Cluster &cluster = it->second;
-		W3DShaderManager::PixelLight light;
-		light.position = cluster.position / cluster.weight;
-		light.outerRadius = cluster.radius;
-		if (camera.Cull_Sphere(SphereClass(light.position, light.outerRadius)))
+		return;
+	}
+	std::sort(m_merged.begin(), m_merged.end(), heavier);
+	size_t kept = 0;
+	for (size_t i = 0; i < m_merged.size(); i++)
+	{
+		Cluster cluster = m_merged[i];
+
+		// A joined cluster is left with no weight.
+		if (cluster.weight <= 0.0f)
 		{
 			continue;
 		}
-		const Real strength = min(sqrtf(cluster.weight) / 8.0f, 1.5f);
+		const Vector3 center = cluster.position / cluster.weight;
+		const Real radius = cluster.radius;
+		for (size_t j = i + 1; j < m_merged.size(); j++)
+		{
+			Cluster &other = m_merged[j];
+			if (other.weight <= 0.0f)
+			{
+				continue;
+			}
+			const Real reach = fraction * min(radius, other.radius);
+			const Vector3 offset = other.position / other.weight - center;
+			if (offset.Length2() >= reach * reach)
+			{
+				continue;
+			}
+			cluster.position += other.position;
+			cluster.color += other.color;
+			cluster.weight += other.weight;
+			cluster.strength += other.strength;
+			cluster.radius = max(cluster.radius, offset.Length() + other.radius);
+			other.weight = 0.0f;
+		}
+		m_merged[kept++] = cluster;
+	}
+	m_merged.resize(kept);
+}
+
+const std::vector<W3DShaderManager::PixelLight> &W3DEmissiveLights::finish(CameraClass &camera)
+{
+	m_merged.clear();
+	for (std::map<Cell, Cluster>::const_iterator it = m_clusters.begin(); it != m_clusters.end(); ++it)
+	{
+		Cluster cluster = it->second;
+		if (!camera.Cull_Sphere(SphereClass(cluster.position / cluster.weight, cluster.radius)))
+		{
+			cluster.strength = min(sqrtf(cluster.weight) / 8.0f, 1.5f);
+			m_merged.push_back(cluster);
+		}
+	}
+	mergeClusters();
+	for (size_t i = 0; i < m_merged.size(); i++)
+	{
+		const Cluster &cluster = m_merged[i];
+		W3DShaderManager::PixelLight light;
+		light.position = cluster.position / cluster.weight;
+		light.outerRadius = cluster.radius;
+		const Real strength = min(cluster.strength, 1.5f);
 		light.diffuse = cluster.color * (strength / cluster.weight);
 		light.innerRadius = 0.5f;
 		light.ambientScale = 0.1f;

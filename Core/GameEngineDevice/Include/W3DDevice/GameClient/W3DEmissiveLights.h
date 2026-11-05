@@ -48,6 +48,7 @@ private:
 		Vector3 color;
 		Real weight;
 		Real radius;
+		Real strength;
 	};
 	typedef std::pair<Int, std::pair<Int, Int> > Cell;
 	typedef std::pair<MeshModelClass *, Bool> ModelKey;
@@ -55,10 +56,13 @@ private:
 	static Vector3 sampleTexture(const TextureSamples *texture, const Vector2 &uv, Bool useAlpha = FALSE);
 	Bool sampleModel(MeshModelClass &model, std::vector<Sample> &samples);
 	void add(const Vector3 &position, const Vector3 &color, Real area, Real radius);
+	static bool heavier(const Cluster &a, const Cluster &b);
+	void mergeClusters();
 
 	std::map<TextureClass *, TextureSamples> m_textures;
 	std::map<ModelKey, ModelSamples> m_models;
 	std::map<Cell, Cluster> m_clusters;
+	std::vector<Cluster> m_merged;
 	std::vector<W3DShaderManager::PixelLight> m_lights;
 };
 #endif

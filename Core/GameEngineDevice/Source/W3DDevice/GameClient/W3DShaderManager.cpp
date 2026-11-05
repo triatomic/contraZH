@@ -93,6 +93,7 @@
 #include "WWMath/aabox.h"
 #include <vector>
 #include <map>
+#include <algorithm>
 #include <float.h>
 
 
@@ -2006,6 +2007,40 @@ static void Set_Additional_Pixel_Lights(DWORD shader, const Int *indices, Int co
 #endif
 }
 
+static bool Pixel_Light_Stronger(Int a, Int b)
+{
+	const W3DShaderManager::PixelLight &first = PixelLights[a];
+	const W3DShaderManager::PixelLight &second = PixelLights[b];
+	return first.outerRadius * max(first.diffuse.X, max(first.diffuse.Y, first.diffuse.Z)) * (1.0f + first.ambientScale) >
+		second.outerRadius * max(second.diffuse.X, max(second.diffuse.Y, second.diffuse.Z)) * (1.0f + second.ambientScale);
+}
+
+// Path tracing keeps a draw's strongest lights, as many as PathTracingMaxLightPasses passes hold.
+static void Cap_Additional_Pixel_Lights(const Int *&indices, Int &count, Int slots)
+{
+#if defined(RTS_ZEROHOUR)
+	const Int passes = TheGlobalData->m_pathTracingMaxLightPasses;
+	if (!TheGlobalData->m_usePathTracing || passes <= 0 || count <= slots * passes)
+	{
+		return;
+	}
+	static std::vector<Int> capped;
+	capped.resize(count);
+	for (Int i = 0; i < count; i++)
+	{
+		capped[i] = indices != nullptr ? indices[i] : i;
+	}
+	const Int keep = slots * passes;
+	std::partial_sort(capped.begin(), capped.begin() + keep, capped.end(), Pixel_Light_Stronger);
+	indices = &capped[0];
+	count = keep;
+#else
+	(void)indices;
+	(void)count;
+	(void)slots;
+#endif
+}
+
 // Every ground shader reads its world-space lights from c5.
 #define GROUND_POINT_LIGHT_REGISTER 5
 
@@ -2983,6 +3018,7 @@ void SpecularShader::setTexture(TextureClass *texture, MeshModelClass *model, co
 			indices = meshLights.empty() ? nullptr : &meshLights[0];
 			count = (Int)meshLights.size();
 		}
+		Cap_Additional_Pixel_Lights(indices, count, W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS);
 		Vector4 constants[PIXEL_LIGHT_REGISTERS];
 		const Int registers = Pack_Pixel_Lights(constants, W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS, indices, count, &SpecularLightView);
 		DX8Wrapper::Set_Pixel_Shader_Constant(8, constants, registers);
@@ -3343,6 +3379,7 @@ void W3DShaderManager::setDrawPixelLights(const Int *indices, Int count)
 		return;
 	}
 
+	Cap_Additional_Pixel_Lights(indices, count, MAX_PIXEL_LIGHTS);
 	Vector4 constants[PIXEL_LIGHT_REGISTERS];
 	const Int registers = Pack_Pixel_Lights(constants, MAX_PIXEL_LIGHTS, indices, count, nullptr);
 	DX8Wrapper::Set_Pixel_Shader_Constant(GROUND_POINT_LIGHT_REGISTER, constants, registers);
@@ -3375,6 +3412,7 @@ void W3DShaderManager::setDrawTerrain(const Int *indices, Int count, Bool seabed
 		DX8Wrapper::Set_Pixel_Shader_Constant(SEABED_REGISTER, SeabedConstants, SEABED_CONSTANTS);
 		if ((count > 0 || Get_Lights_Debug()) && DrawLitShader != 0 && DrawSeabedLitShader != 0)
 		{
+			Cap_Additional_Pixel_Lights(indices, count, SEABED_PIXEL_LIGHTS);
 			Vector4 constants[PIXEL_LIGHT_REGISTERS];
 			const Int registers = Pack_Pixel_Lights(constants, SEABED_PIXEL_LIGHTS, indices, count, nullptr);
 			DX8Wrapper::Set_Pixel_Shader_Constant(GROUND_POINT_LIGHT_REGISTER, constants, registers);

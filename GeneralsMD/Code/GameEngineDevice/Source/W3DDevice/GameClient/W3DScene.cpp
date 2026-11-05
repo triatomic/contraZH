@@ -2241,7 +2241,7 @@ namespace
 		return a.score > b.score;
 	}
 
-	Bool Tune_Emissive_Light(W3DShaderManager::PixelLight &light, Real maxRadius, Real brightness)
+	Bool Tune_Emissive_Light(W3DShaderManager::PixelLight &light, Real maxRadius, Real brightness, Real minBrightness)
 	{
 		if (!(brightness > 0.0f))
 		{
@@ -2253,7 +2253,7 @@ namespace
 			light.outerRadius = maxRadius;
 		}
 		light.diffuse = light.diffuse * brightness;
-		return TRUE;
+		return max(light.diffuse.X, max(light.diffuse.Y, light.diffuse.Z)) >= minBrightness;
 	}
 }
 
@@ -2346,7 +2346,8 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 		for (size_t i = 0; i < sources.size(); i++)
 		{
 			W3DShaderManager::PixelLight light = sources[i];
-			if (!Tune_Emissive_Light(light, TheGlobalData->m_pathTracingLightMaxRadius, TheGlobalData->m_pathTracingLightBrightness) ||
+			if (!Tune_Emissive_Light(light, TheGlobalData->m_pathTracingLightMaxRadius, TheGlobalData->m_pathTracingLightBrightness,
+				TheGlobalData->m_pathTracingLightMinBrightness) ||
 				camera.Cull_Sphere(SphereClass(light.position, light.outerRadius)))
 			{
 				continue;

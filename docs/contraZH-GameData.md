@@ -6,7 +6,7 @@
 Set it to `No` to use the mesh's shared direction. The game reads this setting at launch.
 See [Headlights](dx9-Environment.md#headlights) for the other headlight settings.
 
-## Path tracing light radius and brightness
+## Path tracing lights
 
 These settings control the light cast by particles, lasers and emissive meshes while
 the Graphics menu's `Path tracing` option is enabled. They affect drawing only.
@@ -15,6 +15,9 @@ the Graphics menu's `Path tracing` option is enabled. They affect drawing only.
 | --- | --- | --- |
 | `PathTracingLightMaxRadius` | `0.0` | Caps light radius in world units. Smaller lights keep their original radius; `0` means no cap. |
 | `PathTracingLightBrightness` | `1.0` | Multiplies emitted light. `0.25` gives one quarter of the brightness. |
+| `PathTracingLightMergeDistance` | `0.5` | Merges emissive lights closer than this share of the smaller light's radius. The merged light keeps their combined brightness. `0` never merges. |
+| `PathTracingLightMinBrightness` | `0.02` | Drops lights dimmer than this after `PathTracingLightBrightness` applies. `0` keeps every light. |
+| `PathTracingMaxLightPasses` | `4` | Limits the light passes one draw may take. Each pass holds 8 lights, or 2 under standing water. The draw keeps its strongest lights. `0` removes the limit. |
 
 Zero or negative brightness disables this light spill. A negative radius cap means no cap.
 The cap and brightness are independent. These keys do not change the emitting sprites,
@@ -30,6 +33,9 @@ existing `GameData` block in `GameData.ini`.
 
 Cheat builds reload changes to these keys while a map runs. Other builds read them
 at launch. A radius cap of `0` and brightness of `1.0` preserve the original appearance.
+
+The last three keys trade a little light for speed in large battles. Set all three to `0`
+to draw every light.
 
 ## Fluid defaults
 
