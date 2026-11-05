@@ -580,10 +580,10 @@ GlobalData::GlobalData()
   m_batchParticles = FALSE;
   m_skipTranslucencySort = FALSE;
   m_backToFront = FALSE;
-  m_useBloom = FALSE;
+  m_useBloom = TRUE;
   m_bloomStrength = 0.5f;
   m_bloomDebug = FALSE;
-  m_laserRef = FALSE;
+  m_laserRef = TRUE;
   m_useDynamicLights = TRUE;
   m_useSoftParticles = TRUE;
   m_useFlameShaders = TRUE;
@@ -652,7 +652,7 @@ GlobalData::GlobalData()
   m_headlightTuning.setDefaults();
   m_headlightForbiddenKindOf.clear();
   m_rotrHack = FALSE;
-  m_useAmbientOcclusion = TRUE;
+  m_useAmbientOcclusion = FALSE;
   m_useHeightBlend = TRUE;
   m_useHQSky = TRUE;
   m_shadowMapResolution = 4096;
@@ -1082,8 +1082,8 @@ GlobalData::GlobalData()
 	m_standardPublicBones.clear();
 
 	m_antiAliasLevel = WW3D::MultiSampleModeEnum::MULTISAMPLE_MODE_NONE;
-	m_textureFilteringMode = TextureFilterClass::TextureFilterMode::TEXTURE_FILTER_BILINEAR;
-	m_textureAnisotropyLevel = TextureFilterClass::AnisotropicFilterMode::TEXTURE_FILTER_ANISOTROPIC_2X;
+	m_textureFilteringMode = TextureFilterClass::TextureFilterMode::TEXTURE_FILTER_ANISOTROPIC;
+	m_textureAnisotropyLevel = TextureFilterClass::AnisotropicFilterMode::TEXTURE_FILTER_ANISOTROPIC_8X;
 
 //	m_languageFilterPref = false;
 	m_languageFilterPref = true;

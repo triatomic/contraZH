@@ -511,7 +511,7 @@ static const BoolOption BoolOptions[] =
 	{ &checkDefensesRangeCircle, "DefensesRangeCircle", &OptionPreferences::getDefensesRangeCircleEnabled, &GlobalData::m_defensesRangeCircle, FALSE },
 	{ &checkObjectDecals, "ObjectDecals", &OptionPreferences::getObjectDecalsEnabled, &GlobalData::m_objectDecalsEnabled, TRUE },
 	{ &checkEasyMilitaryDrag, "EasyMilitaryDrag", &OptionPreferences::getEasyMilitaryDragEnabled, &GlobalData::m_easyMilitaryDrag, FALSE },
-	{ &checkFacingDrag, "UseFacingDrag", &OptionPreferences::getFacingDragEnabled, &GlobalData::m_facingDrag, FALSE },
+	{ &checkFacingDrag, "UseFacingDrag", &OptionPreferences::getFacingDragEnabled, &GlobalData::m_facingDrag, TRUE },
 	{ &checkSmartSelection, "SmartSelection", &OptionPreferences::getSmartSelectionEnabled, &GlobalData::m_smartSelection, TRUE },
 	{ &checkSmartSelectionUseMouse, "SmartSelectionUseMouse", &OptionPreferences::getSmartSelectionUseMouse, &GlobalData::m_smartSelectionUseMouse, TRUE },
 	{ &checkSmartCommandGroup, "SmartCommandGroup", &OptionPreferences::getSmartCommandGroupEnabled, &GlobalData::m_smartCommandGroup, TRUE },
@@ -519,15 +519,15 @@ static const BoolOption BoolOptions[] =
 	{ &checkNewRadar, "NewRadar", &OptionPreferences::getNewRadarEnabled, &GlobalData::m_newRadar, FALSE },
 	{ &checkGridHotkeys, "GridHotkeys", &OptionPreferences::getGridHotkeysEnabled, &GlobalData::m_gridHotkeysEnabled, FALSE },
 	{ &checkGridHotkeyUnitOrders, "GridHotkeyUnitOrders", &OptionPreferences::getGridHotkeyUnitOrders, &GlobalData::m_gridHotkeyUnitOrders, TRUE },
-	{ &checkKeyboardOverlay, "KeyboardOverlay", &OptionPreferences::getKeyboardOverlayEnabled, &GlobalData::m_keyboardOverlayEnabled, FALSE },
+	{ &checkKeyboardOverlay, "KeyboardOverlay", &OptionPreferences::getKeyboardOverlayEnabled, &GlobalData::m_keyboardOverlayEnabled, TRUE },
 	{ &checkKeyboardOverlayBackdrop, "KeyboardOverlayBackdrop", &OptionPreferences::getKeyboardOverlayBackdropEnabled, &GlobalData::m_keyboardOverlayBackdrop, TRUE },
-	{ &checkBloom, "Bloom", &OptionPreferences::getBloomEnabled, &GlobalData::m_useBloom, FALSE },
+	{ &checkBloom, "Bloom", &OptionPreferences::getBloomEnabled, &GlobalData::m_useBloom, TRUE },
 	{ &checkBloomDebug, "BloomDebug", &OptionPreferences::getBloomDebugEnabled, &GlobalData::m_bloomDebug, FALSE },
-	{ &checkLaserRef, "LaserRef", &OptionPreferences::getLaserRefEnabled, &GlobalData::m_laserRef, FALSE },
+	{ &checkLaserRef, "LaserRef", &OptionPreferences::getLaserRefEnabled, &GlobalData::m_laserRef, TRUE },
 	{ &checkShadowMap, "ShadowMap", &OptionPreferences::getShadowMapEnabled, &GlobalData::m_useShadowMap, TRUE },
 	{ &checkSpecular, "Specular", &OptionPreferences::getSpecularEnabled, &GlobalData::m_useSpecular, TRUE },
 	{ &checkSpecularDebug, "SpecularDebug", &OptionPreferences::getSpecularDebugEnabled, &GlobalData::m_specularDebug, FALSE },
-	{ &checkNormalMaps, "NormalMaps", &OptionPreferences::getNormalMapsEnabled, &GlobalData::m_useNormalMaps, TRUE },
+	{ &checkNormalMaps, "NormalMaps", &OptionPreferences::getNormalMapsEnabled, &GlobalData::m_useNormalMaps, FALSE },
 	{ &checkNormalMapDebug, "NormalMapDebug", &OptionPreferences::getNormalMapDebugEnabled, &GlobalData::m_normalMapDebug, FALSE },
 	{ &checkWaterReflections, "WaterReflections", &OptionPreferences::getWaterReflectionsEnabled, &GlobalData::m_waterReflections, TRUE },
 	{ &checkShorelineFoam, "ShorelineFoam", &OptionPreferences::getShorelineFoamEnabled, &GlobalData::m_shorelineFoam, TRUE },
@@ -536,7 +536,7 @@ static const BoolOption BoolOptions[] =
 	{ &checkPathTracing, "PathTracing", &OptionPreferences::getPathTracingEnabled, &GlobalData::m_usePathTracing, FALSE },
 	{ &checkDynamicLightsDebug, "DynamicLightsDebug", &OptionPreferences::getDynamicLightsDebugEnabled, &GlobalData::m_dynamicLightsDebug, FALSE },
 	{ &checkSoftParticles, "SoftParticles", &OptionPreferences::getSoftParticlesEnabled, &GlobalData::m_useSoftParticles, TRUE },
-	{ &checkAmbientOcclusion, "AmbientOcclusion", &OptionPreferences::getAmbientOcclusionEnabled, &GlobalData::m_useAmbientOcclusion, TRUE },
+	{ &checkAmbientOcclusion, "AmbientOcclusion", &OptionPreferences::getAmbientOcclusionEnabled, &GlobalData::m_useAmbientOcclusion, FALSE },
 	{ &checkAmbientOcclusionDebug, "AmbientOcclusionDebug", &OptionPreferences::getAmbientOcclusionDebugEnabled, &GlobalData::m_ambientOcclusionDebug, FALSE },
 	{ &checkHeightBlend, "HeightBlend", &OptionPreferences::getHeightBlendEnabled, &GlobalData::m_useHeightBlend, TRUE },
 	{ &checkHQSky, "HQSky", &OptionPreferences::getHQSkyEnabled, &GlobalData::m_useHQSky, TRUE },
@@ -591,7 +591,7 @@ static void updateGameOptionsEnables()
 	enableWindow( textEntryKeyboardOverlayBackdropBlue, backdrop );
 	enableWindow( textEntryKeyboardOverlayBackdropOpacity, backdrop );
 
-	const Bool bloom = getCheck( checkBloom, FALSE );
+	const Bool bloom = getCheck( checkBloom, TRUE );
 	enableWindow( textEntryBloomStrength, bloom );
 #if defined(BUILD_WITH_D3D9)
 	enableWindow( textEntryBloomThreshold, bloom );
@@ -609,8 +609,8 @@ static void updateGameOptionsEnables()
 #endif
 	enableWindow( checkDynamicLightsDebug, getCheck( checkDynamicLights, TRUE ) && getCheck( checkPixelLights, TRUE ) );
 	// the specular pass also draws normal maps, so its debug tint shows while either is on
-	enableWindow( checkSpecularDebug, getCheck( checkSpecular, TRUE ) || getCheck( checkNormalMaps, TRUE ) );
-	enableWindow( checkNormalMapDebug, getCheck( checkNormalMaps, TRUE ) );
+	enableWindow( checkSpecularDebug, getCheck( checkSpecular, TRUE ) || getCheck( checkNormalMaps, FALSE ) );
+	enableWindow( checkNormalMapDebug, getCheck( checkNormalMaps, FALSE ) );
 	enableWindow( checkHQSky, getCheck( checkCloudShadows, TRUE ) );
 
 	// the scene depth it reads is multisampled, and so unreadable, with MSAA on; supersampling takes MSAA's place and keeps it readable
@@ -689,8 +689,8 @@ static void setGameOptionsDefaults()
 	setComboPos( comboBoxBuildTimers, BuildTimerDisplayMode_Default );
 	setComboPos( comboBoxActionLines, ActionLineMode_Default );
 	setComboPos( comboBoxCastMode, CastMode_Default );
-	setComboPos( comboBoxTextureFilter, TextureFilterClass::TEXTURE_FILTER_BILINEAR );
-	setComboPos( comboBoxAnisotropy, levelIndex( AnisotropyLevels, ARRAY_SIZE(AnisotropyLevels), TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC_2X ) );
+	setComboPos( comboBoxTextureFilter, TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC );
+	setComboPos( comboBoxAnisotropy, levelIndex( AnisotropyLevels, ARRAY_SIZE(AnisotropyLevels), TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC_8X ) );
 
 	for (Int i = 0; i < ARRAY_SIZE(BoolOptions); ++i)
 	{

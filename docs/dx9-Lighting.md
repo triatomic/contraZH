@@ -116,7 +116,7 @@ and bridges it shades both diffuse light and the specular highlight, fades in sh
 extra draw. Infantry stay flat. Needs the Direct3D 9 build and shader model 2.0a; other cards get plain highlights and
 flat terrain.
 
-* `NormalMaps = Yes` - (No turns the detail off. Also `Surface detail` on the Graphics
+* `NormalMaps = No` - (Yes turns the detail on. Also `Surface detail` on the Graphics
 page, applied on Accept. Needs `CheckNormalMaps` in `OptionsMenu.wnd` for the menu control.)
 
 Units, structures and bridges use a normal map when one exists and otherwise derive bumps from
@@ -244,7 +244,7 @@ Creases, corners, and the ground where units and buildings stand fall into soft 
 on the terrain instead of floating over it. Needs the Direct3D 9 build, shader model 2.0a and
 anti-aliasing off.
 
-* `AmbientOcclusion = Yes` - (No turns the shade off. Also `Ambient occlusion` on the Graphics
+* `AmbientOcclusion = No` - (Yes turns the shade on. Also `Ambient occlusion` on the Graphics
 page, greyed out while anti-aliasing is on. Needs `CheckAmbientOcclusion` in `OptionsMenu.wnd` for
 the menu control.)
 

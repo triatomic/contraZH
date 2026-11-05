@@ -3,8 +3,7 @@
 Changes in [contraZH](https://github.com/triatomic/contraZH), a fork of GeneralsGameCode_Modding.
 Everything here is additional to upstream; the rest of these docs still applies.
 
-* Most changes are client-side, read from `Options.ini`, and default to retail behaviour. An
-untouched `Options.ini` plays exactly as before.
+* Most changes are client-side and read from `Options.ini`; each setting states its default.
 * [Gameplay Fixes](contraZH-Gameplay-Fixes.md) are always on and fix retail simulation bugs.
 * A few simulation rules are read from the mod's `GameData.ini`; each states its default.
 * The map editor has its own page, [WorldBuilder Qt](WorldBuilder-Qt.md).

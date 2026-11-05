@@ -11,7 +11,7 @@ draws over the rows below it; rerun it after adding a drop-down.
 
 Thomas9393 contributed the Drag to Face feature.
 
-* `UseFacingDrag = No` leaves the feature off. Set it to `Yes`, or tick Drag to Face under Input in Options > Game Options.
+* `UseFacingDrag = Yes` is the default. Set it to `No`, or untick Drag to Face under Input in Options > Game Options, to turn it off.
 * Hold both mouse buttons with units selected, or rebind **Drag to Face (hold)** in Options > Hotkeys > GENERAL. The second press sets the destination;
   the drag direction sets the facing. Release either button to give the order.
 * A drag under 20 pixels gives a normal move. Dragging farther adds rows.
@@ -98,7 +98,7 @@ greyscale ring with alpha).
 
 Draws each cameo's hotkey letter on the cameo.
 
-* `KeyboardOverlay = No` - (Yes shows the letters.)
+* `KeyboardOverlay = Yes` - (No hides the letters.)
 * `KeyboardOverlayRed = 255` - (Letter colour, 0-255 per channel.)
 * `KeyboardOverlayGreen = 255`
 * `KeyboardOverlayBlue = 255`
@@ -324,9 +324,9 @@ Window layouts accept `DISABLED` in `STATUS` fields to clear the enabled flag.
 
 TheSuperHackers' texture filter option replaced this fork's version in the August 2026 merge:
 
-* `TextureFilter = Bilinear` - (`None` | `Point` | `Bilinear` | `Trilinear` | `Anisotropic`. Also in
+* `TextureFilter = Anisotropic` - (`None` | `Point` | `Bilinear` | `Trilinear` | `Anisotropic`. Also in
 the in-game options menu.)
-* `AnisotropyLevel = 2` - (`2` | `4` | `8` | `16`. Only with `TextureFilter = Anisotropic`.
+* `AnisotropyLevel = 8` - (`2` | `4` | `8` | `16`. Only with `TextureFilter = Anisotropic`.
 **Renamed from the pre-merge `AnisotropicLevel`** â€” update Options.ini by hand; the old key is
 silently ignored.)
 
@@ -365,7 +365,7 @@ Terrain textures also support `_emi` masks and a per-terrain `UnitEmissiveIntens
 [Glow masks](dx9-Lighting.md#glow-masks). Terrain masks glow without feeding bloom.
 Ordinary opaque surfaces, smoke and alpha blended effects do not feed bloom. Needs no shader support.
 
-* `Bloom = No` - (Yes turns the glow on. Also `Bloom` on the Graphics page,
+* `Bloom = Yes` - (No turns the glow off. Also `Bloom` on the Graphics page,
 applied on Accept.)
 * `BloomStrength = 0.5` - (0 to 1. 0 is off. The box beside `Bloom` on the Graphics page.)
 * `BloomThreshold = 0.0` - (0 to 1. Only source brightness above this value feeds the glow.
@@ -518,7 +518,7 @@ colour (house coloured when the laser asks). Terrain only; units, buildings and 
 The Direct3D 9 build lights it with a shader instead, see
 [Laser ground glow](dx9-Effect-Shaders.md#laser-ground-glow).
 
-* `LaserRef = No` - (Yes turns the glow on. Also `Lasers light the ground` on the Graphics page, applied
+* `LaserRef = Yes` - (No turns the glow off. Also `Lasers light the ground` on the Graphics page, applied
 on Accept. Needs `CheckLaserRef` in `OptionsMenu.wnd` for the menu control.)
 
 Colour and intensity come from `GameData.ini`, overridable per `W3DLaserDraw` module with

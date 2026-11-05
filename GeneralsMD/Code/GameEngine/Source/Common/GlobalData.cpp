@@ -945,16 +945,16 @@ GlobalData::GlobalData()
   m_particleAtlas = FALSE;
   m_skipTranslucencySort = FALSE;
   m_backToFront = FALSE;
-  m_useBloom = FALSE;
+  m_useBloom = TRUE;
   m_bloomStrength = 0.5f;
   m_bloomThreshold = 0.0f;
   m_bloomSize = 1.0f;
   m_bloomDebug = FALSE;
-  m_laserRef = FALSE;
+  m_laserRef = TRUE;
   m_useShadowMap = TRUE;
   m_shadowMapResolution = 4096;
   m_useSpecular = TRUE;
-  m_useNormalMaps = TRUE;
+  m_useNormalMaps = FALSE;
   m_waterReflections = TRUE;
   m_shorelineFoam = TRUE;
   m_useSoftParticles = TRUE;
@@ -966,7 +966,7 @@ GlobalData::GlobalData()
   m_useDynamicLights = TRUE;
   m_usePixelLights = TRUE;
   m_usePathTracing = FALSE;
-  m_useAmbientOcclusion = TRUE;
+  m_useAmbientOcclusion = FALSE;
   m_useHeightBlend = TRUE;
   m_useHQSky = TRUE;
   m_vsync = -1;
@@ -1507,8 +1507,8 @@ GlobalData::GlobalData()
 
 	m_antiAliasLevel = WW3D::MultiSampleModeEnum::MULTISAMPLE_MODE_NONE;
 	m_superSampling = 100;
-	m_textureFilteringMode = TextureFilterClass::TextureFilterMode::TEXTURE_FILTER_BILINEAR;
-	m_textureAnisotropyLevel = TextureFilterClass::AnisotropicFilterMode::TEXTURE_FILTER_ANISOTROPIC_2X;
+	m_textureFilteringMode = TextureFilterClass::TextureFilterMode::TEXTURE_FILTER_ANISOTROPIC;
+	m_textureAnisotropyLevel = TextureFilterClass::AnisotropicFilterMode::TEXTURE_FILTER_ANISOTROPIC_8X;
 
 //	m_languageFilterPref = false;
 	m_languageFilterPref = true;
@@ -1655,7 +1655,7 @@ GlobalData::GlobalData()
 	m_gridHotkeysEnabled = FALSE;
 	m_gridHotkeyLayout.clear();
 	m_gridHotkeyUnitOrders = TRUE;
-	m_keyboardOverlayEnabled = FALSE;
+	m_keyboardOverlayEnabled = TRUE;
 	m_keyboardOverlayColor = GameMakeColor( 255, 255, 255, 255 );
 	m_keyboardOverlayBackdrop = TRUE;
 	m_keyboardOverlayBackdropColor = GameMakeColor( 0, 0, 0, 128 );
@@ -1665,7 +1665,7 @@ GlobalData::GlobalData()
 	m_smartCommandGroup = TRUE;
 	m_actionLineMode = ActionLineMode_Default;
 	m_doubleClickAttackMove = FALSE;
-	m_facingDrag = FALSE;		// retail: no drag-to-face (the Options check box turns it on)
+	m_facingDrag = TRUE;		// on by default (the Options check box turns it off)
 
 	m_useOldMoveSpeed = TRUE;
 

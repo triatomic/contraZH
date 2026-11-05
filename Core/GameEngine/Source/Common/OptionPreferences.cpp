@@ -98,7 +98,7 @@ TextureFilterClass::TextureFilterMode OptionPreferences::getTextureFilterMode() 
 {
 	OptionPreferences::const_iterator it = find("TextureFilter");
 	if (it == end())
-		return TextureFilterClass::TEXTURE_FILTER_BILINEAR;
+		return TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC;
 
 	return TextureFilterClass::getTextureFilterMode(it->second.str());
 }
@@ -107,7 +107,7 @@ TextureFilterClass::AnisotropicFilterMode OptionPreferences::getTextureAnisotrop
 {
 	OptionPreferences::const_iterator it = find("AnisotropyLevel");
 	if (it == end())
-		return TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC_2X;
+		return TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC_8X;
 
 	TextureFilterClass::AnisotropicFilterMode level = (TextureFilterClass::AnisotropicFilterMode)atoi(it->second.str());
 	level = clamp(TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC_2X, level, TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC_16X);
@@ -268,7 +268,7 @@ Bool OptionPreferences::getKeyboardOverlayEnabled(void) const
 {
 	OptionPreferences::const_iterator it = find("KeyboardOverlay");
 	if (it == end())
-		return FALSE;
+		return TRUE;
 
 	if (stricmp(it->second.str(), "yes") == 0) {
 		return TRUE;
@@ -354,7 +354,7 @@ Bool OptionPreferences::getObjectDecalsEnabled(void) const
 
 Bool OptionPreferences::getBloomEnabled(void) const
 {
-	return getBool("Bloom", FALSE);
+	return getBool("Bloom", TRUE);
 }
 
 Real OptionPreferences::getBloomStrength(void) const
@@ -393,7 +393,7 @@ Bool OptionPreferences::getBloomDebugEnabled(void) const
 
 Bool OptionPreferences::getLaserRefEnabled(void) const
 {
-	return getBool("LaserRef", FALSE);
+	return getBool("LaserRef", TRUE);
 }
 
 Bool OptionPreferences::getShadowMapEnabled(void) const
@@ -420,7 +420,7 @@ Bool OptionPreferences::getSpecularEnabled(void) const
 
 Bool OptionPreferences::getNormalMapsEnabled(void) const
 {
-	return getBool("NormalMaps", TRUE);
+	return getBool("NormalMaps", FALSE);
 }
 
 Bool OptionPreferences::getWaterReflectionsEnabled(void) const
@@ -482,7 +482,7 @@ Bool OptionPreferences::getPathTracingEnabled(void) const
 
 Bool OptionPreferences::getAmbientOcclusionEnabled(void) const
 {
-	return getBool("AmbientOcclusion", TRUE);
+	return getBool("AmbientOcclusion", FALSE);
 }
 
 Bool OptionPreferences::getHeightBlendEnabled(void) const
@@ -804,12 +804,12 @@ Bool OptionPreferences::getDoubleClickAttackMoveEnabled()
 	return FALSE;
 }
 
-// drag-to-face, off unless the player turned it on
+// drag-to-face, on unless the player turned it off
 #if RTS_ZEROHOUR
 Bool OptionPreferences::getFacingDragEnabled() const
 {
 	OptionPreferences::const_iterator it = find( "UseFacingDrag" );
-	return it != end() && stricmp( it->second.str(), "yes" ) == 0;
+	return it == end() || stricmp( it->second.str(), "yes" ) == 0;
 }
 #endif
 
