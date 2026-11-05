@@ -216,7 +216,7 @@ namespace
 		AsciiString path;
 		path.format("%s%s", TERRAIN_TGA_DIR_PATH, texture.str());
 		CachedFileInputStream stream;
-		if (!stream.open(WorldHeightMap::openTerrainTexture(path)))
+		if (!stream.open(WorldHeightMap::openTerrainTexture(path, FALSE)))
 		{
 			return false;
 		}

@@ -604,7 +604,7 @@ void WorldHeightMapEdit::loadImagesFromTerrainType( TerrainType *terrain )
 
 	// open file
 	CachedFileInputStream stream;
-	if( !stream.open( openTerrainTexture(texturePath) ) )
+	if( !stream.open( openTerrainTexture(texturePath, FALSE) ) )
 	{
 		return;
 	}

@@ -1109,7 +1109,53 @@ Bool WorldHeightMap::ParseBlendTileDataChunk(DataChunkInput &file, DataChunkInfo
 	return pThis->ParseBlendTileData(file, info, userData);
 }
 
-File *WorldHeightMap::openTerrainTexture(AsciiString &path)
+#if defined(RTS_ZEROHOUR)
+static const char *const MISSING_TERRAIN_TEXTURE = "misstex.dds";
+
+static Bool isMissingTerrainTexture(const char *path)
+{
+	const char *name = strrchr(path, '/');
+	return name != nullptr && stricmp(name + 1, MISSING_TERRAIN_TEXTURE) == 0;
+}
+
+static Int tileGridWidth(Int numTiles)
+{
+	Int width = 10;
+	while (width > 1 && width*width > numTiles)
+	{
+		width--;
+	}
+	return width;
+}
+
+/** Fills a texture class's tiles by repeating a smaller image's tile grid. */
+static void readRepeatedTiles(InputStream *pStr, TileData **tiles, Int numTiles, Int sourceTiles, const char *filename)
+{
+	const Int width = tileGridWidth(numTiles);
+	const Int sourceWidth = tileGridWidth(sourceTiles);
+	TileData *source[100] = { nullptr };
+	const Bool loaded = WorldHeightMap::readTiles(pStr, source, sourceWidth, filename);
+	for (Int row=0; loaded && row<width; row++)
+	{
+		for (Int column=0; column<width; column++)
+		{
+			TileData *&tile = tiles[column + width*row];
+			if (tile == nullptr)
+			{
+				tile = MSGNEW("WorldHeightMap_readRepeatedTiles") TileData;
+			}
+			memcpy(tile->getDataPtr(), source[column%sourceWidth + sourceWidth*(row%sourceWidth)]->getDataPtr(), TileData::dataLen());
+			tile->updateMips();
+		}
+	}
+	for (Int i=0; i<sourceWidth*sourceWidth; i++)
+	{
+		REF_PTR_RELEASE(source[i]);
+	}
+}
+#endif
+
+File *WorldHeightMap::openTerrainTexture(AsciiString &path, Bool useMissingTexture)
 {
 	File *file = TheFileSystem->openFile(path.str(), File::READ | File::BINARY);
 #if defined(RTS_ZEROHOUR)
@@ -1122,6 +1168,12 @@ File *WorldHeightMap::openTerrainTexture(AsciiString &path)
 			path.concat(".dds");
 			file = TheFileSystem->openFile(path.str(), File::READ | File::BINARY);
 		}
+	}
+	if (file == nullptr && useMissingTexture)
+	{
+		RENDER_LOG(("Terrain texture %s not found, using misstex.dds", path.str()));
+		path.format("%s%s", TERRAIN_TGA_DIR_PATH, MISSING_TERRAIN_TEXTURE);
+		file = TheFileSystem->openFile(path.str(), File::READ | File::BINARY);
 	}
 #endif
 	return file;
@@ -1180,6 +1232,12 @@ void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData)
 #endif
 			}
 		}
+#if defined(RTS_ZEROHOUR)
+		else if (numTiles >= 1 && isMissingTerrainTexture(filename))
+		{
+			readRepeatedTiles(pStr, tileData+texClass->firstTile, texClass->numTiles, numTiles, filename);
+		}
+#endif
 		theFile->close();
 	}
 }
