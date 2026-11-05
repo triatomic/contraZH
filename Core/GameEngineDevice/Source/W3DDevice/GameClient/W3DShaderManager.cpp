@@ -93,7 +93,6 @@
 #include "WWMath/aabox.h"
 #include <vector>
 #include <map>
-#include <algorithm>
 #include <float.h>
 
 
@@ -2007,40 +2006,6 @@ static void Set_Additional_Pixel_Lights(DWORD shader, const Int *indices, Int co
 #endif
 }
 
-static bool Pixel_Light_Stronger(Int a, Int b)
-{
-	const W3DShaderManager::PixelLight &first = PixelLights[a];
-	const W3DShaderManager::PixelLight &second = PixelLights[b];
-	return first.outerRadius * W3DShaderManager::getPixelLightBrightness(first) >
-		second.outerRadius * W3DShaderManager::getPixelLightBrightness(second);
-}
-
-// Path tracing keeps a draw's strongest lights, as many as PathTracingMaxLightPasses passes hold.
-static void Cap_Additional_Pixel_Lights(const Int *&indices, Int &count, Int slots)
-{
-#if defined(RTS_ZEROHOUR)
-	const Int passes = TheGlobalData->m_pathTracingMaxLightPasses;
-	if (!TheGlobalData->m_usePathTracing || passes <= 0 || count <= slots * passes)
-	{
-		return;
-	}
-	static std::vector<Int> capped;
-	capped.resize(count);
-	for (Int i = 0; i < count; i++)
-	{
-		capped[i] = indices != nullptr ? indices[i] : i;
-	}
-	const Int keep = slots * passes;
-	std::partial_sort(capped.begin(), capped.begin() + keep, capped.end(), Pixel_Light_Stronger);
-	indices = &capped[0];
-	count = keep;
-#else
-	(void)indices;
-	(void)count;
-	(void)slots;
-#endif
-}
-
 // Every ground shader reads its world-space lights from c5.
 #define GROUND_POINT_LIGHT_REGISTER 5
 
@@ -3350,11 +3315,6 @@ const W3DShaderManager::PixelLight &W3DShaderManager::getPixelLight(Int index)
 	return PixelLights[index];
 }
 
-Real W3DShaderManager::getPixelLightBrightness(const PixelLight &light)
-{
-	return max(light.diffuse.X, max(light.diffuse.Y, light.diffuse.Z)) * (1.0f + light.ambientScale);
-}
-
 void W3DShaderManager::setDrawPixelLights(const Int *indices, Int count)
 {
 	Set_Additional_Pixel_Lights(0, nullptr, 0, 0, 0, nullptr);
@@ -3383,7 +3343,6 @@ void W3DShaderManager::setDrawPixelLights(const Int *indices, Int count)
 		return;
 	}
 
-	Cap_Additional_Pixel_Lights(indices, count, MAX_PIXEL_LIGHTS);
 	Vector4 constants[PIXEL_LIGHT_REGISTERS];
 	const Int registers = Pack_Pixel_Lights(constants, MAX_PIXEL_LIGHTS, indices, count, nullptr);
 	DX8Wrapper::Set_Pixel_Shader_Constant(GROUND_POINT_LIGHT_REGISTER, constants, registers);

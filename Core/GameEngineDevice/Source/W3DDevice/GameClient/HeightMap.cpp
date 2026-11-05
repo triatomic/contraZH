@@ -419,20 +419,16 @@ void HeightMapRenderObjClass::assignPixelLights(RefRenderObjListIterator &lights
 		}
 
 		Bool room = TRUE;
-		Int passes = 1;
+		Bool multiplePasses = FALSE;
 #if defined(RTS_ZEROHOUR)
-		// Path tracing gives each tile PathTracingMaxLightPasses passes of lights, 0 for no limit.
-		if (TheGlobalData->m_usePathTracing)
-		{
-			passes = TheGlobalData->m_pathTracingMaxLightPasses;
-		}
+		multiplePasses = TheGlobalData->m_usePathTracing;
 #endif
-		for (Int j = 0; j < m_numVBTilesY && room && passes > 0; j++)
+		for (Int j = 0; j < m_numVBTilesY && room && !multiplePasses; j++)
 		{
 			for (Int i = 0; i < m_numVBTilesX; i++)
 			{
 				const Int tile = j*m_numVBTilesX+i;
-				const Int limit = (m_tileSeabed[tile] ? (Int)W3DShaderManager::SEABED_PIXEL_LIGHTS : slots) * passes;
+				const Int limit = m_tileSeabed[tile] ? (Int)W3DShaderManager::SEABED_PIXEL_LIGHTS : slots;
 				if (rows[j] && columns[i] && m_tilePixelLightCounts[tile] >= limit)
 				{
 					room = FALSE;

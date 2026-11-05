@@ -442,14 +442,13 @@ intensity settings; `Specular = No` disables their light.
 `PathTracingLightMaxRadius` in `GameData.ini` caps large lights without shrinking
 smaller ones. It defaults to `0`, which means no cap. `PathTracingLightBrightness`
 scales brightness independently and defaults to `1.0`; zero disables the new light
-spill. See [Path tracing lights](contraZH-GameData.md#path-tracing-lights).
+spill. See [Light radius and brightness](contraZH-GameData.md#path-tracing-light-radius-and-brightness).
 
 This option approximates emissive lighting with world-space point lights. It does not
 trace rays, cast local shadows, or calculate reflected light. Lights can pass through walls.
 Particle texture colours are averaged once per cached texture.
-Nearby emitters share lights within 24 world units, and close lights merge further.
-Very dim lights are dropped. Surfaces draw additional batches of eight lights, or two
-under standing water, up to three on top of the first batch by default.
+Nearby emitters share lights within 24 world units. All visible lights are kept, and
+surfaces draw additional batches of eight lights, or two under standing water.
 Extra passes add only light and do not repeat sunlight, glow masks or shadow darkening.
 On detailed terrain, roads and bridges, local lights retain surface textures, normals and
 ground noise but ignore sun shadows and clouds. This also applies to three-texture terrain

@@ -289,9 +289,6 @@ static const char *DistanceFogPresetNames[] = { "SUN", "DESERT", "FUTURISTIC", "
 	{ "UnitEmissiveNightIntensity",			INI::parseReal,				nullptr,			offsetof( GlobalData, m_unitEmissiveNightIntensity ) },
 	{ "PathTracingLightMaxRadius", INI::parseReal, nullptr, offsetof( GlobalData, m_pathTracingLightMaxRadius ) },
 	{ "PathTracingLightBrightness", INI::parseReal, nullptr, offsetof( GlobalData, m_pathTracingLightBrightness ) },
-	{ "PathTracingLightMergeDistance", INI::parseReal, nullptr, offsetof( GlobalData, m_pathTracingLightMergeDistance ) },
-	{ "PathTracingLightMinBrightness", INI::parseReal, nullptr, offsetof( GlobalData, m_pathTracingLightMinBrightness ) },
-	{ "PathTracingMaxLightPasses", INI::parseInt, nullptr, offsetof( GlobalData, m_pathTracingMaxLightPasses ) },
 	{ "SoftParticleDistance",				INI::parseReal,				nullptr,			offsetof( GlobalData, m_softParticleDistance ) },
 	{ "FlameWarp",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_flameWarp ) },
 	{ "FlameHeat",							INI::parseReal,				nullptr,			offsetof( GlobalData, m_flameHeat ) },
@@ -1105,9 +1102,6 @@ GlobalData::GlobalData()
 	m_unitEmissiveNightIntensity = 1.5f;
 	m_pathTracingLightMaxRadius = 0.0f;
 	m_pathTracingLightBrightness = 1.0f;
-	m_pathTracingLightMergeDistance = 0.5f;
-	m_pathTracingLightMinBrightness = 0.02f;
-	m_pathTracingMaxLightPasses = 4;
 	m_softParticleDistance = 12.0f;
 	m_flameWarp = 0.04f;
 	m_flameHeat = 2.2f;
@@ -1860,8 +1854,7 @@ static const char *const LiveGameDataKeys[] =
 	"UnitSpecularIntensity", "UnitSpecularPower", "UnitBumpHeight", "UnitNormalMapStrength", "TerrainNormalMapStrength", "RoadBumpHeight",
 	"TerrainGlintIntensity", "TerrainGlintGloss", "TerrainGlintAlbedo",
 	"UnitEmissiveIntensity", "UnitEmissiveNightIntensity", "SoftParticleDistance",
-	"PathTracingLightMaxRadius", "PathTracingLightBrightness", "PathTracingLightMergeDistance", "PathTracingLightMinBrightness",
-	"PathTracingMaxLightPasses",
+	"PathTracingLightMaxRadius", "PathTracingLightBrightness",
 	"DistanceFog", "DistanceFogPreset", "DistanceFogColor", "DistanceFogStart", "DistanceFogEnd",
 	"DistanceFogStrength", "DistanceFogSunInfluence",
 	"AmbientOcclusionRadius", "AmbientOcclusionStrength",

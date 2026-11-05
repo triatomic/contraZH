@@ -12,10 +12,8 @@
 #include "WW3D2/surfaceclass.h"
 #include "WW3D2/assetmgr.h"
 #include "WW3D2/vertmaterial.h"
-#include <algorithm>
 
 static const Real EMISSIVE_CELL_SIZE = 24.0f;
-static const Real EMISSIVE_MAX_RADIUS = 120.0f;
 
 W3DEmissiveLights::W3DEmissiveLights()
 {
@@ -26,7 +24,7 @@ W3DEmissiveLights::~W3DEmissiveLights()
 }
 
 W3DEmissiveLights::Cluster::Cluster()
-	: position(0.0f, 0.0f, 0.0f), color(0.0f, 0.0f, 0.0f), weight(0.0f), radius(0.0f), strength(0.0f), center(0.0f, 0.0f, 0.0f)
+	: position(0.0f, 0.0f, 0.0f), color(0.0f, 0.0f, 0.0f), weight(0.0f), radius(0.0f)
 {
 }
 
@@ -35,7 +33,6 @@ void W3DEmissiveLights::reset()
 	m_models.clear();
 	m_textures.clear();
 	m_clusters.clear();
-	m_merged.clear();
 	m_lights.clear();
 }
 
@@ -234,7 +231,7 @@ void W3DEmissiveLights::begin(CameraClass &camera)
 			const Coord3D *pos = particle->getPosition();
 			const Vector3 position(pos->x, pos->y, pos->z);
 			const Real size = particle->getSize();
-			const Real radius = min(max(size * 3.0f, EMISSIVE_CELL_SIZE), EMISSIVE_MAX_RADIUS);
+			const Real radius = min(max(size * 3.0f, EMISSIVE_CELL_SIZE), 120.0f);
 			if (size <= 0.0f || camera.Cull_Sphere(SphereClass(position, radius)))
 			{
 				continue;
@@ -308,81 +305,23 @@ void W3DEmissiveLights::addObject(RenderObjClass &object, Real opacity)
 		Vector3 position;
 		Matrix3D::Transform_Vector(transform, sample.position, &position);
 		const Real area = sample.area * scale * scale;
-		add(position, (sample.color + sample.mask * maskIntensity) * opacity, area, min(max(sqrtf(area) * 3.0f, EMISSIVE_CELL_SIZE), EMISSIVE_MAX_RADIUS));
+		add(position, (sample.color + sample.mask * maskIntensity) * opacity, area, min(max(sqrtf(area) * 3.0f, EMISSIVE_CELL_SIZE), 120.0f));
 	}
-}
-
-bool W3DEmissiveLights::heavier(const Cluster &a, const Cluster &b)
-{
-	return a.weight > b.weight;
-}
-
-// Clusters nearer than PathTracingLightMergeDistance of the smaller radius join the heavier one.
-void W3DEmissiveLights::mergeClusters()
-{
-	const Real fraction = TheGlobalData->m_pathTracingLightMergeDistance;
-	if (!(fraction > 0.0f) || m_merged.size() < 2)
-	{
-		return;
-	}
-	std::sort(m_merged.begin(), m_merged.end(), heavier);
-	size_t kept = 0;
-	for (size_t i = 0; i < m_merged.size(); i++)
-	{
-		Cluster cluster = m_merged[i];
-
-		// A joined cluster is left with no weight.
-		if (cluster.weight <= 0.0f)
-		{
-			continue;
-		}
-		const Real radius = cluster.radius;
-		for (size_t j = i + 1; j < m_merged.size(); j++)
-		{
-			Cluster &other = m_merged[j];
-			if (other.weight <= 0.0f)
-			{
-				continue;
-			}
-			const Real reach = fraction * min(radius, other.radius);
-			const Vector3 offset = other.center - cluster.center;
-			if (offset.Length2() >= reach * reach)
-			{
-				continue;
-			}
-			cluster.position += other.position;
-			cluster.color += other.color;
-			cluster.weight += other.weight;
-			cluster.strength += other.strength;
-			cluster.radius = min(max(cluster.radius, offset.Length() + other.radius), EMISSIVE_MAX_RADIUS);
-			other.weight = 0.0f;
-		}
-		m_merged[kept++] = cluster;
-	}
-	m_merged.resize(kept);
 }
 
 const std::vector<W3DShaderManager::PixelLight> &W3DEmissiveLights::finish(CameraClass &camera)
 {
-	m_merged.clear();
 	for (std::map<Cell, Cluster>::const_iterator it = m_clusters.begin(); it != m_clusters.end(); ++it)
 	{
-		Cluster cluster = it->second;
-		cluster.center = cluster.position / cluster.weight;
-		if (!camera.Cull_Sphere(SphereClass(cluster.center, cluster.radius)))
-		{
-			cluster.strength = min(sqrtf(cluster.weight) / 8.0f, 1.5f);
-			m_merged.push_back(cluster);
-		}
-	}
-	mergeClusters();
-	for (size_t i = 0; i < m_merged.size(); i++)
-	{
-		const Cluster &cluster = m_merged[i];
+		const Cluster &cluster = it->second;
 		W3DShaderManager::PixelLight light;
 		light.position = cluster.position / cluster.weight;
 		light.outerRadius = cluster.radius;
-		const Real strength = min(cluster.strength, 1.5f);
+		if (camera.Cull_Sphere(SphereClass(light.position, light.outerRadius)))
+		{
+			continue;
+		}
+		const Real strength = min(sqrtf(cluster.weight) / 8.0f, 1.5f);
 		light.diffuse = cluster.color * (strength / cluster.weight);
 		light.innerRadius = 0.5f;
 		light.ambientScale = 0.1f;
