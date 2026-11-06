@@ -544,9 +544,9 @@ void GameWindowManager::addWindowToParentAtEnd( GameWindow *window,
 void GameWindowManager::windowHiding( GameWindow *window )
 {
 
-	// if this window has keyboard focus remove it
+	// if this window has keyboard focus remove it, telling it so a text entry releases the IME
 	if( m_keyboardFocus == window )
-		m_keyboardFocus = nullptr;
+		winSetFocus( nullptr );
 
 	// if this is the modal head, unset it
 	if( m_modalHead && m_modalHead->window == window )
