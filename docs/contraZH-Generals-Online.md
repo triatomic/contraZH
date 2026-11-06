@@ -27,6 +27,8 @@ keyframes, script timers, deploy animations) keeps retail timing via a 30 Hz cou
 
 * Replays only play back in the same build; 30 Hz and 60 Hz replays are rejected by each other.
 * The lowest render frame rate cap is 60.
+* `-DRTS_GENERALS_ONLINE_60HZ=OFF` builds a classic 30 Hz online client instead.
+* A 30 Hz client only plays with players on the same 30 Hz exe. Lobbies refuse a different exe CRC, so it never meets the official 60 Hz client.
 
 ### Frame rate cap during online matches
 

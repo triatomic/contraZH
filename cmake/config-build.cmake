@@ -10,6 +10,7 @@ option(RTS_BUILD_OPTION_ASAN "Build code with Address Sanitizer." OFF)
 option(RTS_BUILD_OPTION_VC6_FULL_DEBUG "Build VC6 with full debug info." OFF)
 option(RTS_BUILD_OPTION_FFMPEG "Enable FFmpeg support" OFF)
 option(RTS_BUILD_GENERALS_ONLINE "Build the Generals Online services stack for Zero Hour (replaces GameSpy online when ON)" OFF)
+option(RTS_GENERALS_ONLINE_60HZ "Run the Generals Online simulation at 60 Hz like the official client; OFF runs the classic 30 Hz" ON)
 
 set(RTS_D3D_BACKEND "D3D8" CACHE STRING "Direct3D backend to render with.")
 set_property(CACHE RTS_D3D_BACKEND PROPERTY STRINGS "D3D8" "D3D9")
@@ -36,6 +37,7 @@ add_feature_info(WorldBuilderQt RTS_ENABLE_WORLDBUILDER_QT "Building WorldBuilde
 add_feature_info(Vc6FullDebug RTS_BUILD_OPTION_VC6_FULL_DEBUG "Building VC6 with full debug info")
 add_feature_info(FFmpegSupport RTS_BUILD_OPTION_FFMPEG "Building with FFmpeg support")
 add_feature_info(GeneralsOnline RTS_BUILD_GENERALS_ONLINE "Building the Generals Online network stack")
+add_feature_info(GeneralsOnline60Hz RTS_GENERALS_ONLINE_60HZ "Running the Generals Online simulation at 60 Hz")
 add_feature_info(GameMcp RTS_BUILD_OPTION_GAME_MCP "Building the game with the MCP bridge")
 
 set(RTS_BUILD_OUTPUT_SUFFIX "" CACHE STRING "Suffix appended to output names of installable targets")

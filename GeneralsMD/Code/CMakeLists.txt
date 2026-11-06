@@ -19,18 +19,21 @@ target_compile_definitions(zi_always_no_pch INTERFACE
 if(RTS_BUILD_GENERALS_ONLINE)
     # _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR keeps MSVC's STL mutex ABI compatible
     # with the prebuilt Generals Online vendor libraries.
-    # GENERALS_ONLINE_HIGH_FPS_SERVER selects the 60 Hz simulation; it is defined here
-    # rather than in NextGenMP_defines.h so WWLib's WWSyncPerSecond can see it.
     target_compile_definitions(zi_always INTERFACE
         GENERALS_ONLINE
-        GENERALS_ONLINE_HIGH_FPS_SERVER
         _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR
     )
     target_compile_definitions(zi_always_no_pch INTERFACE
         GENERALS_ONLINE
-        GENERALS_ONLINE_HIGH_FPS_SERVER
         _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR
     )
+
+    # GENERALS_ONLINE_HIGH_FPS_SERVER selects the 60 Hz simulation; it is defined here
+    # rather than in NextGenMP_defines.h so WWLib's WWSyncPerSecond can see it.
+    if(RTS_GENERALS_ONLINE_60HZ)
+        target_compile_definitions(zi_always INTERFACE GENERALS_ONLINE_HIGH_FPS_SERVER)
+        target_compile_definitions(zi_always_no_pch INTERFACE GENERALS_ONLINE_HIGH_FPS_SERVER)
+    endif()
 endif()
 target_link_libraries(zi_gameengine_include INTERFACE
     corei_gameengine_include
