@@ -288,6 +288,7 @@ static CommandStatus doAttackMoveCommand( const CommandButton *command, const IC
 	// send the message to set the rally point
 	GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_DO_ATTACKMOVETO );
 	msg->appendLocationArgument( world );
+	msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 
 	// Play the unit voice response
 	pickAndPlayUnitVoiceResponse(TheInGameUI->getAllSelectedDrawables(), GameMessage::MSG_DO_ATTACKMOVETO);
