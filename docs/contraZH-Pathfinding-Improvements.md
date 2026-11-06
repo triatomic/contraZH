@@ -23,6 +23,8 @@ records instead of 30,000.
 * Ground vehicles account for their footprint near water, cliffs and the map edge.
 * A 3x3 vehicle pays extra to follow a shoreline. A 5x5 vehicle cannot enter a cell that leaves too
 much of its footprint beyond the shore.
+* The coarse search skips block crossings a 5x5 vehicle cannot enter, so it does not route large
+vehicles over land strips too narrow for them.
 * Infantry and amphibious units keep their existing terrain rules.
 * Vehicles on a scripted exact waypoint path, or on a move that leaves the map, ignore shoreline
 clearance while turning, so they follow the path as placed.

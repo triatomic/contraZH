@@ -7331,8 +7331,11 @@ Path *Pathfinder::findPath( Object *obj, const LocomotorSet& locomotorSet, const
 		isHuman = false; // computer gets to cheat.
 	}
 
+	Int radius;
+	Bool centerInCell;
+	getRadiusAndCenter(obj, radius, centerInCell);
 	m_zoneManager.clearPassableFlags();
-	Path *hPat = findHierarchicalPath(isHuman, locomotorSet, from, rawTo, false);
+	Path *hPat = findHierarchicalPath(isHuman, locomotorSet, from, rawTo, false, radius);
 	if (hPat) {
 		deleteInstance(hPat);
 	}	else {
@@ -7988,7 +7991,7 @@ Path *Pathfinder::findGroundPath( const Coord3D *from,
 	m_zoneManager.clearPassableFlags();
 	Bool isHuman = true;
 
-	Path *hPat = internal_findHierarchicalPath(isHuman, LOCOMOTORSURFACE_GROUND, from, rawTo, false, false);
+	Path *hPat = internal_findHierarchicalPath(isHuman, LOCOMOTORSURFACE_GROUND, from, rawTo, false, false, 0);
 	if (hPat) {
 		deleteInstance(hPat);
 	}	else {
@@ -8374,7 +8377,7 @@ Path *Pathfinder::findGroundPath( const Coord3D *from,
 void Pathfinder::processHierarchicalCell( const ICoord2D &scanCell, const ICoord2D &delta, PathfindCell *parentCell,
 																				 PathfindCell *goalCell, zoneStorageType parentZone,
 																				 zoneStorageType *examinedZones, Int &numExZones,
-																				 LocomotorSurfaceTypeMask locomotorSurface, Bool crusher, Int &cellCount)
+																				 LocomotorSurfaceTypeMask locomotorSurface, Bool crusher, Int radius, Int &cellCount)
 {
 	if (scanCell.x<m_extent.lo.x || scanCell.x>m_extent.hi.x ||
 		scanCell.y<m_extent.lo.y || scanCell.y>m_extent.hi.y) {
@@ -8429,6 +8432,14 @@ void Pathfinder::processHierarchicalCell( const ICoord2D &scanCell, const ICoord
 		if (found) {
 			return;
 		}
+#if !(RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING)
+		// Zones ignore footprints, so skip a crossing the fine search refuses for this unit
+		if (getClearanceShortage(newCell, locomotorSurface, radius) >= CLEARANCE_HARD_SHORTAGE ||
+			getClearanceShortage(adjNewCell, locomotorSurface, radius) >= CLEARANCE_HARD_SHORTAGE)
+		{
+			return;
+		}
+#endif
 
 		if (!newCell->allocateInfo(scanCell))
 		{
@@ -8479,9 +8490,9 @@ void Pathfinder::processHierarchicalCell( const ICoord2D &scanCell, const ICoord
  * Uses A* algorithm.
  */
 Path *Pathfinder::findHierarchicalPath( Bool isHuman, const LocomotorSet& locomotorSet, const Coord3D *from,
-													 const Coord3D *to, Bool crusher)
+													 const Coord3D *to, Bool crusher, Int radius)
 {
-	return internal_findHierarchicalPath(isHuman, locomotorSet.getValidSurfaces(), from, to, crusher, FALSE);
+	return internal_findHierarchicalPath(isHuman, locomotorSet.getValidSurfaces(), from, to, crusher, FALSE, radius);
 }
 
 
@@ -8490,9 +8501,9 @@ Path *Pathfinder::findHierarchicalPath( Bool isHuman, const LocomotorSet& locomo
  * Uses A* algorithm.
  */
 Path *Pathfinder::findClosestHierarchicalPath( Bool isHuman, const LocomotorSet& locomotorSet, const Coord3D *from,
-													 const Coord3D *to, Bool crusher)
+													 const Coord3D *to, Bool crusher, Int radius)
 {
-	return internal_findHierarchicalPath(isHuman, locomotorSet.getValidSurfaces(), from, to, crusher, TRUE);
+	return internal_findHierarchicalPath(isHuman, locomotorSet.getValidSurfaces(), from, to, crusher, TRUE, radius);
 }
 
 
@@ -8502,7 +8513,7 @@ Path *Pathfinder::findClosestHierarchicalPath( Bool isHuman, const LocomotorSet&
  * Uses A* algorithm.
  */
 Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSurfaceTypeMask locomotorSurface, const Coord3D *from,
-													 const Coord3D *rawTo, Bool crusher, Bool closestOK)
+													 const Coord3D *rawTo, Bool crusher, Bool closestOK, Int radius)
 {
 	//CRCDEBUG_LOG(("Pathfinder::findGroundPath()"));
 #ifdef DEBUG_LOGGING
@@ -8897,7 +8908,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 					continue;
 
 				processHierarchicalCell(scanCell, delta, parentCell,
-					goalCell, parentZone, examinedZones, numExZones, locomotorSurface, crusher, cellCount);
+					goalCell, parentZone, examinedZones, numExZones, locomotorSurface, crusher, radius, cellCount);
 			}
 		}
 		// Right side.
@@ -8929,7 +8940,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 					continue;
 
 				processHierarchicalCell(scanCell, delta, parentCell,
-					goalCell, parentZone, examinedZones, numExZones, locomotorSurface, crusher, cellCount);
+					goalCell, parentZone, examinedZones, numExZones, locomotorSurface, crusher, radius, cellCount);
 			}
 		}
 		// Top side.
@@ -8960,7 +8971,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 					continue;
 
 				processHierarchicalCell(scanCell, delta, parentCell,
-					goalCell, parentZone, examinedZones, numExZones, locomotorSurface, crusher, cellCount);
+					goalCell, parentZone, examinedZones, numExZones, locomotorSurface, crusher, radius, cellCount);
 			}
 		}
 		// Bottom side.
@@ -8992,7 +9003,7 @@ Path *Pathfinder::internal_findHierarchicalPath( Bool isHuman, const LocomotorSu
 					continue;
 
 				processHierarchicalCell(scanCell, delta, parentCell,
-					goalCell, parentZone, examinedZones, numExZones, locomotorSurface, crusher, cellCount);
+					goalCell, parentZone, examinedZones, numExZones, locomotorSurface, crusher, radius, cellCount);
 			}
 		}
 	}
@@ -9974,7 +9985,7 @@ Path *Pathfinder::findClosestPath( Object *obj, const LocomotorSet& locomotorSet
 		m_zoneManager.setAllPassable(); // can't optimize.
 	}	else {
 		m_zoneManager.clearPassableFlags();
-		Path *hPat = findClosestHierarchicalPath(isHuman, locomotorSet, from, rawTo, false);
+		Path *hPat = findClosestHierarchicalPath(isHuman, locomotorSet, from, rawTo, false, radius);
 		if (hPat) {
 			deleteInstance(hPat);
 			gotHierarchicalPath = true;
@@ -10701,6 +10712,24 @@ static Int lineCrossesBridgeDeckCallback(Pathfinder* pathfinder, PathfindCell* f
 	return (d->above && d->below) ? 1 : 0;
 }
 
+// Deck cells sit inside their bridge's bounds, so a line clear of every bounds box crosses no deck.
+static Bool lineNearBridge(const Coord3D& from, const Coord3D& to)
+{
+	const Real loX = (from.x < to.x ? from.x : to.x) - PATHFIND_CELL_SIZE_F;
+	const Real hiX = (from.x > to.x ? from.x : to.x) + PATHFIND_CELL_SIZE_F;
+	const Real loY = (from.y < to.y ? from.y : to.y) - PATHFIND_CELL_SIZE_F;
+	const Real hiY = (from.y > to.y ? from.y : to.y) + PATHFIND_CELL_SIZE_F;
+	for (Bridge* bridge = TheTerrainLogic->getFirstBridge(); bridge; bridge = bridge->getNext())
+	{
+		const Region2D* bounds = bridge->getBounds();
+		if (loX <= bounds->hi.x && hiX >= bounds->lo.x && loY <= bounds->hi.y && hiY >= bounds->lo.y)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 //-----------------------------------------------------------------------------
 Bool Pathfinder::isViewBlockedByObstacle(const Object* obj, const Object* objOther)
 {
@@ -10741,7 +10770,7 @@ Bool Pathfinder::isAttackViewBlockedByObstacle(const Object* attacker, const Coo
 	}
 
 	// A bridge deck between the two is a wall from either side.
-	if (TheTerrainLogic->getFirstBridge())
+	if (lineNearBridge(attackerPos, victimPos))
 	{
 		BridgeDeckStruct deck;
 		deck.from = attackerPos;
@@ -12143,7 +12172,7 @@ Path *Pathfinder::findAttackPath( const Object *obj, const LocomotorSet& locomot
 		isHuman = false; // computer gets to cheat.
 	}
 	m_zoneManager.clearPassableFlags();
-	Path *hPat = findClosestHierarchicalPath(isHuman, locomotorSet, from, victimPos, isCrusher);
+	Path *hPat = findClosestHierarchicalPath(isHuman, locomotorSet, from, victimPos, isCrusher, radius);
 	if (hPat) {
 		deleteInstance(hPat);
 	}	else {
