@@ -7028,7 +7028,14 @@ struct ExamineCellsStruct
 				// already on one of the lists - if existing costSoFar is less,
 				// the new cell is on a longer path, so skip it
 				if (to->getCostSoFar() <= newCostSoFar)
+				{
+#if RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING
 					return 0; // keep going.
+#else
+					// This cell's own probe walks on toward the goal
+					return 1;
+#endif
+				}
 			}
 
 			to->setCostSoFar(newCostSoFar);

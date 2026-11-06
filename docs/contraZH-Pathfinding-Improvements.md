@@ -13,6 +13,8 @@ between ground and bridge layers count toward the limit.
 destination for up to eight more legs. Repairing that route around traffic keeps the continuation;
 a new order or destination starts a fresh allowance.
 * Zero Hour's coarse search expands beyond its starting block and gives the fine search a corridor.
+* The fine search's straight-line probe toward the goal stops at the first cell it already reached
+more cheaply, instead of re-walking explored ground.
 * Search costs use 32 bits, preventing the old overflow at 65535. The cell record pool holds 100,000
 records instead of 30,000.
 
