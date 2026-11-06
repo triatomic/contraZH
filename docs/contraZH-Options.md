@@ -440,8 +440,8 @@ Glow masks follow the existing specular pass and the day/night emissive
 intensity settings; `Specular = No` disables their light.
 
 `PathTracingLightMaxRadius` in `GameData.ini` caps large lights without shrinking
-smaller ones. It defaults to `28`; `0` means no cap. `PathTracingLightBrightness`
-scales brightness independently and defaults to `0.8`; zero disables the new light
+smaller ones. It defaults to `25`; `0` means no cap. `PathTracingLightBrightness`
+scales brightness independently and defaults to `0.75`; zero disables the new light
 spill. See [Light radius and brightness](contraZH-GameData.md#path-tracing-light-radius-and-brightness).
 
 This option approximates emissive lighting with world-space point lights. It does not

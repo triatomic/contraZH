@@ -1100,8 +1100,8 @@ GlobalData::GlobalData()
 	m_terrainGlintAlbedo = 0.5f;
 	m_unitEmissiveIntensity = 0.5f;
 	m_unitEmissiveNightIntensity = 1.5f;
-	m_pathTracingLightMaxRadius = 28.0f;
-	m_pathTracingLightBrightness = 0.8f;
+	m_pathTracingLightMaxRadius = 25.0f;
+	m_pathTracingLightBrightness = 0.75f;
 	m_softParticleDistance = 12.0f;
 	m_flameWarp = 0.04f;
 	m_flameHeat = 2.2f;

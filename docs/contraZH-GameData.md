@@ -13,8 +13,8 @@ the Graphics menu's `Path tracing` option is enabled. They affect drawing only.
 
 | Key | Default | Effect |
 | --- | --- | --- |
-| `PathTracingLightMaxRadius` | `28.0` | Caps light radius in world units. Smaller lights keep their original radius; `0` means no cap. |
-| `PathTracingLightBrightness` | `0.8` | Multiplies emitted light. `0.25` gives one quarter of the brightness. |
+| `PathTracingLightMaxRadius` | `25.0` | Caps light radius in world units. Smaller lights keep their original radius; `0` means no cap. |
+| `PathTracingLightBrightness` | `0.75` | Multiplies emitted light. `0.25` gives one quarter of the brightness. |
 
 Zero or negative brightness disables this light spill. A negative radius cap means no cap.
 The cap and brightness are independent. These keys do not change the emitting sprites,
