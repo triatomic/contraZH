@@ -299,6 +299,9 @@ public:
 			jetAI->friend_setLandingInProgress(false);
 			jetAI->friend_setAllowCircling(false);
 		}
+
+		if (status == STATE_FAILURE)
+			TheCommandSequence->terminateVerifiedCommand(jet);
 	}
 
 };
@@ -681,6 +684,9 @@ public:
 	virtual void onExit( StateExitType status ) override
 	{
 		Object* jet = getMachineOwner();
+		if (status == STATE_FAILURE)
+			TheCommandSequence->terminateVerifiedCommand(jet);
+
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		if (jetAI)
 		{
@@ -899,9 +905,13 @@ public:
 
 		// just in case.
 		Object* jet = getMachineOwner();
+		if (status == STATE_FAILURE)
+			TheCommandSequence->terminateVerifiedCommand(jet);
+
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		if( !jetAI )
 			return;
+
 
 		jetAI->friend_setTakeoffInProgress(false);
 		jetAI->friend_setLandingInProgress(false);
@@ -1628,6 +1638,9 @@ public:
 	virtual void onExit( StateExitType status ) override
 	{
 		Object* jet = getMachineOwner();
+		if (status == STATE_FAILURE)
+			TheCommandSequence->terminateVerifiedCommand(jet);
+
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		if( !jetAI )
 			return;
@@ -2068,6 +2081,8 @@ public:
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		jetAI->friend_setTakeoffInProgress(false);
 		jetAI->friend_setLandingInProgress(false);
+
+		TheCommandSequence->terminateVerifiedCommand(jet);
 	}
 
 };
@@ -2120,6 +2135,8 @@ public:
 			m_goalPosition = jetAI->friend_needsRunway() ? ppinfo.runwayApproach : ppinfo.parkingSpace;
 		}
 		setAdjustsDestination(false);		// precision is necessary
+
+		TheCommandSequence->verifyObjectCommand(jet);
 
 		return AIInternalMoveToState::onEnter();
 	}
