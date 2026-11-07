@@ -132,6 +132,14 @@ Int parseLiveLooseFiles(char *args[], int)
 	return 1;
 }
 
+// Use a plain D3D9 device instead of D3D9Ex, same as CONTRA_D3D9EX=0 (read when the device is created).
+Int parseD3D9(char *args[], int)
+{
+	_putenv("CONTRA_D3D9EX=0");
+
+	return 1;
+}
+
 //=============================================================================
 //=============================================================================
 Int parseNoMusic(char *args[], int)
@@ -1235,6 +1243,9 @@ static CommandLineParam paramsForStartup[] =
 
 	// Check the loose file before the archive on every read, so overrides added while running take effect.
 	{ "-live", parseLiveLooseFiles },
+
+	// Use a plain D3D9 device instead of D3D9Ex (D3D9 builds only; same as CONTRA_D3D9EX=0).
+	{ "-d3d9", parseD3D9 },
 };
 
 // These Params are parsed during Engine Init before INI data is loaded

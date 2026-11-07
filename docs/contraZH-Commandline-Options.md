@@ -37,6 +37,7 @@ These options are registered without a debug-build requirement.
 | `-yres <pixels>` | Set the vertical resolution. |
 | `-forcefullviewport` | Set the viewport height scale to 1.0 for Control Bar Pro-style addons. |
 | `-noshaders` | Force the legacy minimal-feature chipset path. This is not a switch for every D3D9 effect. |
+| `-d3d9` | Use a plain Direct3D 9 device instead of Direct3D 9Ex (D3D9 builds only). Same as setting `CONTRA_D3D9EX=0`. |
 | `-headless` | Run without a window, graphics, input or audio; skip intro and sizzle videos. Useful for replay simulation and AI matches. |
 
 ### Startup, data and tools

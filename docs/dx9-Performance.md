@@ -72,5 +72,5 @@ multisampled target that resolves into the swap chain each frame.
 Notes:
 * Fullscreen keeps the classic swap chain.
 * Terrain and tree textures ignore the texture reduction setting.
-* The `CONTRA_D3D9EX` environment variable set to `0` returns to a plain Direct3D 9 device.
+* The `-d3d9` command-line option, or the `CONTRA_D3D9EX` environment variable set to `0`, returns to a plain Direct3D 9 device.
 
