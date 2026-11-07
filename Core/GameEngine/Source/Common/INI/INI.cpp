@@ -604,7 +604,16 @@ void INI::loadHotKeys( AsciiString filename )
 			// the player's file is not CRC checked, so it must not reach game data
 			if( strcmp( token, "CommandMap" ) == 0 )
 			{
-				parseMetaMapDefinition( this );
+				// a command this build lacks (another build's, like the GO keys) costs only its own
+				// block, not the keys after it
+				try
+				{
+					parseMetaMapDefinition( this );
+				}
+				catch( ... )
+				{
+					skipToEndToken();
+				}
 			}
 			else if( strcmp( token, "CommandButtonHotKey" ) == 0 )
 			{

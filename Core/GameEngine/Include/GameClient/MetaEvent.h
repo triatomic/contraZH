@@ -495,6 +495,7 @@ private:
 protected:
 	GameMessage::Type findGameMessageMetaType(const char* name);
 	MetaMapRec *getMetaMapRec(GameMessage::Type t);
+	MetaMapRec *appendMetaMapRec(GameMessage::Type t);	///< a new record behind every other, which win a shared key
 
 public:
 

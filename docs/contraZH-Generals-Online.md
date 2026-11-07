@@ -63,7 +63,10 @@ Rebindable under **GO** in Options > Hotkeys; `Hotkeys.ini` names them by comman
 | F5 | `TOGGLE_BUDDY_OVERLAY` | Open or close the buddy overlay |
 | Insert | `TOGGLE_BUDDY_OVERLAY_ALT` | Same, second key |
 
-Like any two commands on one key, both fire; the Hotkeys screen marks the clash in red.
+A key only one command can have: when another command already uses a GO default (an F5 control
+group in `Hotkeys.ini`, say), that command keeps it, and the Hotkeys screen marks the clash in red.
+The offline build skips these commands when it reads a `Hotkeys.ini` the GO build wrote, but its
+own Save writes the file without them, so GO key changes go back to the defaults.
 
 ### Widescreen layouts and camera
 

@@ -950,15 +950,8 @@ GameMessage::Type MetaMap::findGameMessageMetaType(const char* name)
 }
 
 //-------------------------------------------------------------------------------------------------
-MetaMapRec *MetaMap::getMetaMapRec(GameMessage::Type t)
+static MetaMapRec *newMetaMapRec(GameMessage::Type t)
 {
-	for (MetaMapRec *map = m_metaMaps; map; map = map->m_next)
-	{
-		if (map->m_meta == t)
-			return map;
-	}
-
-	// not found.. create a new one.
 	MetaMapRec *m = newInstance(MetaMapRec);
 	m->m_meta = t;
 	m->m_key = MK_NONE;
@@ -968,8 +961,37 @@ MetaMapRec *MetaMap::getMetaMapRec(GameMessage::Type t)
 	m->m_category = CATEGORY_MISC;
 	m->m_description.clear();
 	m->m_displayName.clear();
+	m->m_next = nullptr;
+	return m;
+}
+
+//-------------------------------------------------------------------------------------------------
+MetaMapRec *MetaMap::getMetaMapRec(GameMessage::Type t)
+{
+	for (MetaMapRec *map = m_metaMaps; map; map = map->m_next)
+	{
+		if (map->m_meta == t)
+			return map;
+	}
+
+	// not found.. create a new one.
+	MetaMapRec *m = newMetaMapRec(t);
 	m->m_next = m_metaMaps;
 	m_metaMaps = m;
+
+	return m;
+}
+
+//-------------------------------------------------------------------------------------------------
+// The translator fires only the first record that matches a key, so a record added here leaves
+// a key that any other record holds to that one.
+MetaMapRec *MetaMap::appendMetaMapRec(GameMessage::Type t)
+{
+	MetaMapRec *m = newMetaMapRec(t);
+	MetaMapRec **tail = &m_metaMaps;
+	while (*tail)
+		tail = &(*tail)->m_next;
+	*tail = m;
 
 	return m;
 }
@@ -1406,7 +1428,6 @@ void MetaMap::generateMetaMap()
 	{
 		// Ctrl+\ is a second key for that pause, which stops a single player game in place without the menu Esc opens.
 		// A record holds one key, so this one gets its own, appended so lookups by message still find Shift+P.
-		MetaMapRec *last = nullptr;
 		Bool bound = FALSE;
 		for (MetaMapRec *rec = m_metaMaps; rec; rec = rec->m_next)
 		{
@@ -1414,28 +1435,14 @@ void MetaMap::generateMetaMap()
 			{
 				bound = TRUE;
 			}
-			last = rec;
 		}
 		if (!bound)
 		{
-			MetaMapRec *map = newInstance(MetaMapRec);
-			map->m_meta = GameMessage::MSG_META_TOGGLE_PAUSE_ALT;
+			MetaMapRec *map = appendMetaMapRec(GameMessage::MSG_META_TOGGLE_PAUSE_ALT);
 			map->m_key = MK_BACKSLASH;
 			map->m_transition = DOWN;
 			map->m_modState = CTRL;
 			map->m_usableIn = COMMANDUSABLE_EVERYWHERE;
-			map->m_category = CATEGORY_MISC;
-			map->m_description.clear();
-			map->m_displayName.clear();
-			map->m_next = nullptr;
-			if (last != nullptr)
-			{
-				last->m_next = map;
-			}
-			else
-			{
-				m_metaMaps = map;
-			}
 		}
 	}
 	{
@@ -1514,7 +1521,9 @@ void MetaMap::generateMetaMap()
 
 #if defined(GENERALS_ONLINE)
 	{
-		// GO's fixed keys, as commands so the Hotkeys screen can rebind them under GO.
+		// GO's fixed keys, as commands so the Hotkeys screen can rebind them under GO. Appended,
+		// so a command that already has one of these keys, or gets it from Hotkeys.ini (an F5
+		// control group, say), keeps it.
 		const struct { GameMessage::Type meta; MappableKeyType key; } goKeys[] =
 		{
 			{ GameMessage::MSG_META_TOGGLE_NETWORK_STATS, MK_F10 },
@@ -1524,15 +1533,10 @@ void MetaMap::generateMetaMap()
 		};
 		for (Int i = 0; i < ARRAY_SIZE(goKeys); ++i)
 		{
-			MetaMapRec *map = getMetaMapRec(goKeys[i].meta);
+			MetaMapRec *map = appendMetaMapRec(goKeys[i].meta);
 			map->m_category = CATEGORY_GO;
-			if (map->m_key == MK_NONE)
-			{
-				map->m_key = goKeys[i].key;
-				map->m_transition = DOWN;
-				map->m_modState = NONE;
-				map->m_usableIn = COMMANDUSABLE_EVERYWHERE;
-			}
+			map->m_key = goKeys[i].key;
+			map->m_usableIn = COMMANDUSABLE_EVERYWHERE;
 		}
 	}
 #endif

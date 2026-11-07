@@ -156,6 +156,10 @@ GameNetworkingSockets ICE P2P transport, lobbies/matchmaking/stats).
   `generateMetaMap` and a new `CATEGORY_GO` that the Hotkeys screen shows as its GO
   section. They fire on press, not GO's release. All of it is under `GENERALS_ONLINE`,
   which zi_always defines for every Zero Hour target, so the meta enum agrees across libs.
+  The meta translator fires only the first matching record, so the GO records are
+  appended (`appendMetaMapRec`) and any other command on the same key keeps it.
+  `INI::loadHotKeys` skips a CommandMap block it cannot read instead of the rest of the
+  file, because the offline build reads the same Hotkeys.ini and lacks these names.
   The F10 overlay moved from InGameUI.cpp to `NGMP_OnlineServicesManager::DrawAdvancedNetworkStats`
   (OnlineServices_Init.cpp), because NetworkMesh.h's winsock include defines `min`/`max` and
   breaks `std::max` in InGameUI.cpp. `drawGameTime` still calls it as upstream, so it shows
