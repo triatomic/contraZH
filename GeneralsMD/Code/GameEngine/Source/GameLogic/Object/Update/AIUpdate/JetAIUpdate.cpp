@@ -2534,7 +2534,7 @@ UpdateSleepTime JetAIUpdate::update()
 			m_mostRecentCommand.reconstitute(parms);
 			setFlag(HAS_PENDING_COMMAND, false);
 
-			Object* obj = getObject();
+			Object *obj = getObject();
 			CommandVerifyStatus cvs = obj->getCommandVerifyStatus();
 			if (cvs == STATUS_UNIT_PENDING)
 			{
@@ -3080,6 +3080,9 @@ void JetAIUpdate::aiDoCommand(const AICommandParms* parms)
 	{
 		// have to wait for takeoff or landing to complete, just store the sucker
 		setFlag(HAS_PENDING_COMMAND, true);
+
+		TheCommandSequence->unitPendingCommand(getObject());
+
 		return;
 	}
 	else if (parms->m_cmd == AICMD_IDLE && getStateMachine()->getCurrentStateID() == RELOAD_AMMO)
@@ -3088,6 +3091,9 @@ void JetAIUpdate::aiDoCommand(const AICommandParms* parms)
 		// since we're already doing "nothing" and responding to this will cease our reload...
 		// don't just return, tho, in case we were (say) reloading during a guard stint.
 		setFlag(HAS_PENDING_COMMAND, true);
+
+		TheCommandSequence->unitPendingCommand(getObject());
+
 		return;
 	}
 	else if( parms->m_cmd == AICMD_IDLE && getObject()->isAirborneTarget() && !getObject()->isKindOf( KINDOF_PRODUCED_AT_HELIPAD ) )
