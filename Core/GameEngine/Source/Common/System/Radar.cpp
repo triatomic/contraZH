@@ -1596,12 +1596,29 @@ void Radar::assignObjectColorToRadarObject( RadarObject *radarObj, Object *obj )
 			useIndicatorColor = false;
 	}
 
+	// TheSuperHackers @feature HouseColorMode recolors the blip the same way it recolors the model.
 	if( useIndicatorColor || (player == nullptr) )
 	{
-		radarObj->setColor( obj->getIndicatorColor() );
+		radarObj->setColor( rts::getHouseColorForLocalView( obj->getIndicatorColor(), obj->getControllingPlayer() ) );
 	}
 	else
 	{
-		radarObj->setColor( player->getPlayerColor() );
+		radarObj->setColor( rts::getHouseColorForLocalView( player->getPlayerColor(), player ) );
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+void Radar::refreshObjectColors()
+{
+	RadarObject *lists[] = { m_objectList, m_localObjectList };
+	for( Int i = 0; i < ARRAY_SIZE( lists ); ++i )
+	{
+		for( RadarObject *radarObj = lists[ i ]; radarObj; radarObj = radarObj->friend_getNext() )
+		{
+			if( Object *obj = radarObj->friend_getObject() )
+				assignObjectColorToRadarObject( radarObj, obj );
+		}
+	}
+
+	refreshObjects();
 }

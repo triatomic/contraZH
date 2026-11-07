@@ -24,6 +24,7 @@
 
 class Player;
 typedef Int PlayerIndex;
+typedef Int Color;
 
 namespace rts
 {
@@ -35,5 +36,12 @@ PlayerIndex getObservedOrLocalPlayerIndex_Safe(); ///< Get the current observed 
 
 void changeLocalPlayer(Player* player); //< Change local player during game. Must not pass null.
 void changeObservedPlayer(Player* player); ///< Change observed player during game. Can pass null: is identical to passing the "ReplayObserver" player.
+
+// TheSuperHackers @feature HouseColorMode (Options.ini). The house color to draw for `color` as the
+// observed or local player sees it. `owner` is the player normally drawn in that color, when known;
+// any other player wearing it, such as a disguise, is found by the color itself. Client side only:
+// the result must never reach the game logic.
+Color getHouseColorForLocalView(Color color, const Player* owner);
+void refreshHouseColors(); ///< Recolor every model and radar blip after HouseColorMode or the viewing player changed.
 
 } // namespace rts

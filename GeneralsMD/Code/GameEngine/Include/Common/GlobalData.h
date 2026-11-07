@@ -200,6 +200,7 @@ public:
 	// have to pull in OptionPreferences.h.
 	Int m_healthBarDisplayMode;
 	Int m_alliedDecalMode;          ///< Options.ini AlliedDecalMode: how allied power decals are drawn
+	Int m_houseColorMode;           ///< TheSuperHackers @feature Options.ini HouseColorMode, a HouseColorMode
 	// TheSuperHackers @feature Countdown numbers on build queue and cooldown cameos.
 	// Holds a BuildTimerDisplayMode; stored as Int to avoid pulling OptionPreferences.h in here.
 	Int m_buildTimerDisplayMode;

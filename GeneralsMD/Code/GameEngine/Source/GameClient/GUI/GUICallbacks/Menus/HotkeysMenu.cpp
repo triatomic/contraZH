@@ -222,6 +222,7 @@ const BuiltInText BUILT_IN_TEXT[] =
 	{ "GUI:HotkeysCommandDECREASE_LOGIC_TIME_SCALE", L"Slow down game" },
 	{ "GUI:HotkeysCommandTOGGLE_PLAYER_OBSERVER", L"Switch observed player view" },
 	{ "GUI:HotkeysCommandCYCLE_HEALTH_BAR_MODE", L"Cycle health bars" },
+	{ "GUI:HotkeysCommandCYCLE_HOUSE_COLOR_MODE", L"Cycle house colors" },
 	{ "GUI:HotkeysCommandTAKE_SCREENSHOT_PNG", L"Screenshot as PNG" },
 };
 

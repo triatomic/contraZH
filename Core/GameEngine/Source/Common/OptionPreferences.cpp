@@ -262,6 +262,25 @@ AlliedDecalMode OptionPreferences::getAlliedDecalMode(void) const
 	return AlliedDecalMode_Default;
 }
 
+// TheSuperHackers @feature Options.ini: HouseColorMode = Default | Basic (a plain index also works).
+HouseColorMode OptionPreferences::getHouseColorMode(void) const
+{
+	OptionPreferences::const_iterator it = find("HouseColorMode");
+	if (it == end())
+		return HouseColorMode_Default;
+
+	if (stricmp(it->second.str(), "Basic") == 0)
+		return HouseColorMode_Basic;
+	if (stricmp(it->second.str(), "Default") == 0)
+		return HouseColorMode_PlayerColors;
+
+	Int mode = atoi(it->second.str());
+	if (mode >= 0 && mode < HouseColorMode_Count)
+		return (HouseColorMode)mode;
+
+	return HouseColorMode_Default;
+}
+
 // TheSuperHackers @feature Draw each command bar cameo's keyboard hotkey over the cameo.
 // Options.ini: KeyboardOverlay = Yes
 Bool OptionPreferences::getKeyboardOverlayEnabled(void) const

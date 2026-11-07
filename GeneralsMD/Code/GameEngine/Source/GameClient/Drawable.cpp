@@ -1685,7 +1685,7 @@ void Drawable::flashAsSelected( const RGBColor *color ) ///< drawable takes care
 		{
 			RGBColor tempColor;
 			if (TheGlobalData->m_selectionFlashHouseColor)
-				tempColor.setFromInt(obj->getIndicatorColor());
+				tempColor.setFromInt(rts::getHouseColorForLocalView(obj->getIndicatorColor(), obj->getControllingPlayer()));
 			else
 				tempColor.setFromInt(0xffffffff);//white
 
@@ -5980,6 +5980,17 @@ void Drawable::setIndicatorColor(Color color)
 		ObjectDrawInterface* di = (*dm)->getObjectDrawInterface();
 		if (di)
 			di->replaceIndicatorColor(color);
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+void Drawable::refreshIndicatorColor()
+{
+	for (DrawModule** dm = getDrawModules(); *dm; ++dm)
+	{
+		ObjectDrawInterface* di = (*dm)->getObjectDrawInterface();
+		if (di)
+			di->refreshIndicatorColor();
 	}
 }
 

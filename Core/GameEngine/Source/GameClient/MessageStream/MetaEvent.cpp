@@ -171,6 +171,7 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "TOGGLE_CONTROL_BAR",												GameMessage::MSG_META_TOGGLE_CONTROL_BAR },
 	{ "TOGGLE_PLAYER_OBSERVER",										GameMessage::MSG_META_TOGGLE_PLAYER_OBSERVER },
 	{ "CYCLE_HEALTH_BAR_MODE",										GameMessage::MSG_META_CYCLE_HEALTH_BAR_MODE },
+	{ "CYCLE_HOUSE_COLOR_MODE",										GameMessage::MSG_META_CYCLE_HOUSE_COLOR_MODE },
 	{ "TOGGLE_REVERSEMOVE",												GameMessage::MSG_META_TOGGLE_REVERSEMOVE },
 	{ "BEGIN_PATH_BUILD",													GameMessage::MSG_META_BEGIN_PATH_BUILD },
 	{ "END_PATH_BUILD",														GameMessage::MSG_META_END_PATH_BUILD },
@@ -1308,6 +1309,20 @@ void MetaMap::generateMetaMap()
 			map->m_transition = DOWN;
 			map->m_modState = CTRL;
 			// in game and while observing, but not in the menus, where health bars mean nothing
+			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
+		}
+	}
+	{
+		// TheSuperHackers @feature Alt+G cycles HouseColorMode. Free in retail and in Contra's
+		// CommandMap.ini. Builds that load CommandMapDemo.ini have CHEAT_TOGGLE_HAND_OF_GOD_MODE on
+		// Alt+G; this default is linked in after the INI and wins the key, as the cheat defaults
+		// above do.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_META_CYCLE_HOUSE_COLOR_MODE);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_G;
+			map->m_transition = DOWN;
+			map->m_modState = ALT;
 			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
 		}
 	}

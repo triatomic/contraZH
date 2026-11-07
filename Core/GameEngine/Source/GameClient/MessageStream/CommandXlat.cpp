@@ -3822,6 +3822,33 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		}
 
 		//-----------------------------------------------------------------------------------------
+		// TheSuperHackers @feature Cycle HouseColorMode in game. Client side only, like the health
+		// bar cycle above, and likewise not written back to Options.ini.
+		case GameMessage::MSG_META_CYCLE_HOUSE_COLOR_MODE:
+		{
+#if RTS_ZEROHOUR
+			if( TheWritableGlobalData )
+			{
+				Int mode = TheGlobalData->m_houseColorMode + 1;
+				if( mode >= HouseColorMode_Count || mode < 0 )
+					mode = HouseColorMode_PlayerColors;
+
+				TheWritableGlobalData->m_houseColorMode = mode;
+				rts::refreshHouseColors();
+
+				if( mode == HouseColorMode_Basic )
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE(
+							"GUI:HouseColorModeBasic", L"House colors: basic" ) );
+				else
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE(
+							"GUI:HouseColorModeDefault", L"House colors: default" ) );
+			}
+#endif
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
+		//-----------------------------------------------------------------------------------------
 		case GameMessage::MSG_META_TOGGLE_ATTACKMOVE:
 			TheInGameUI->toggleAttackMoveToMode();
 			break;

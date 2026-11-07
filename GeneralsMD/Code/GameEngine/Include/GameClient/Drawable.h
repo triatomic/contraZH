@@ -336,6 +336,7 @@ public:
 
 	void friend_bindToObject( Object *obj ); ///< bind this drawable to an object ID. for use ONLY by GameLogic!
 	void setIndicatorColor(Color color);
+	void refreshIndicatorColor(); ///< TheSuperHackers @feature rebuild house colored models for the current HouseColorMode
 
 	void setTintStatus(TintStatus statusType) { m_tintStatus.set(statusType); };
 	void clearTintStatus(TintStatus statusType) { m_tintStatus.set(statusType, 0); };

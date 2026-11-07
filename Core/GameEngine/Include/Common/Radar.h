@@ -213,6 +213,9 @@ public:
 	/// refresh the radar when the state of world objects changes drastically
 	virtual void refreshObjects() {};
 
+	/// TheSuperHackers @feature recolor every blip, after HouseColorMode or the viewing player changed
+	void refreshObjectColors();
+
 	/// queue a refresh of the terrain at the next available time
 	virtual void queueTerrainRefresh();
 

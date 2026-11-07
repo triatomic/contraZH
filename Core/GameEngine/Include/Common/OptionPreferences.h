@@ -108,6 +108,16 @@ enum AlliedDecalMode CPP_11(: Int)
 	AlliedDecalMode_Default = AlliedDecalMode_HouseColor
 };
 
+// TheSuperHackers @feature Options.ini: HouseColorMode = Default | Basic
+enum HouseColorMode CPP_11(: Int)
+{
+	HouseColorMode_PlayerColors = 0,	///< every player in their own color (retail behavior)
+	HouseColorMode_Basic,						///< yellow for you, cyan for allies, red for enemies
+
+	HouseColorMode_Count,
+	HouseColorMode_Default = HouseColorMode_PlayerColors
+};
+
 #define GRID_HOTKEY_LAYOUT_DEFAULT "QWERTYUIOASDFGHJKL"
 
 //-----------------------------------------------------------------------------
@@ -147,6 +157,7 @@ public:
 	Bool getRetaliationModeEnabled();
 	HealthBarDisplayMode getHealthBarDisplayMode() const;
 	AlliedDecalMode getAlliedDecalMode() const;
+	HouseColorMode getHouseColorMode() const;
 	BuildTimerDisplayMode getBuildTimerDisplayMode() const;
 	ActionLineMode getActionLineMode() const;
 	CastMode getCastMode() const;

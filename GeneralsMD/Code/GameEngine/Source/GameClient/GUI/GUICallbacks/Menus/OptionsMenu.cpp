@@ -39,6 +39,7 @@
 #include "Common/OptionPreferences.h"
 #include "Common/GameLOD.h"
 #include "Common/FramePacer.h"
+#include "Common/GameUtility.h"
 #include "Common/Recorder.h"
 #include "Common/Registry.h"
 #include "Common/version.h"
@@ -201,6 +202,7 @@ static GameWindow *   buttonMainDefaults          = nullptr;
 
 static GameWindow *   comboBoxHealthBars          = nullptr;
 static GameWindow *   comboBoxAlliedDecals        = nullptr;
+static GameWindow *   comboBoxHouseColors         = nullptr;
 static GameWindow *   comboBoxBuildTimers         = nullptr;
 static GameWindow *   comboBoxActionLines         = nullptr;
 static GameWindow *   comboBoxCastMode            = nullptr;
@@ -276,6 +278,8 @@ static const Int RenderFPSLimits[] = { 30, 60, 120, 240, 0 };
 static_assert( ARRAY_SIZE(HealthBarModeNames) == HealthBarDisplayMode_Count, "HealthBarModeNames out of date" );
 static const char *const AlliedDecalModeNames[] = { "Hidden", "House", "Army" };
 static_assert( ARRAY_SIZE(AlliedDecalModeNames) == AlliedDecalMode_Count, "AlliedDecalModeNames out of date" );
+static const char *const HouseColorModeNames[] = { "Default", "Basic" };
+static_assert( ARRAY_SIZE(HouseColorModeNames) == HouseColorMode_Count, "HouseColorModeNames out of date" );
 static_assert( ARRAY_SIZE(BuildTimerModeNames) == BuildTimerDisplayMode_Count, "BuildTimerModeNames out of date" );
 static const char *const ActionLineModeNames[] = { "Off", "All", "AttackOnly" };
 static_assert( ARRAY_SIZE(ActionLineModeNames) == ActionLineMode_Count, "ActionLineModeNames out of date" );
@@ -634,6 +638,7 @@ static void populateGameOptions()
 
 	setComboPos( comboBoxHealthBars, pref->getHealthBarDisplayMode() );
 	setComboPos( comboBoxAlliedDecals, pref->getAlliedDecalMode() );
+	setComboPos( comboBoxHouseColors, pref->getHouseColorMode() );
 	setComboPos( comboBoxBuildTimers, pref->getBuildTimerDisplayMode() );
 	setComboPos( comboBoxActionLines, pref->getActionLineMode() );
 	setComboPos( comboBoxCastMode, pref->getCastMode() );
@@ -686,6 +691,7 @@ static void setGameOptionsDefaults()
 
 	setComboPos( comboBoxHealthBars, HealthBarDisplayMode_Default );
 	setComboPos( comboBoxAlliedDecals, AlliedDecalMode_Default );
+	setComboPos( comboBoxHouseColors, HouseColorMode_Default );
 	setComboPos( comboBoxBuildTimers, BuildTimerDisplayMode_Default );
 	setComboPos( comboBoxActionLines, ActionLineMode_Default );
 	setComboPos( comboBoxCastMode, CastMode_Default );
@@ -1211,6 +1217,15 @@ static void saveOptions()
 		idx = clamp( 0, getComboPos( comboBoxAlliedDecals, pref->getAlliedDecalMode() ), (Int)AlliedDecalMode_Count - 1 );
 		(*pref)["AlliedDecalMode"] = AlliedDecalModeNames[idx];
 		TheWritableGlobalData->m_alliedDecalMode = idx;
+
+		// TheSuperHackers @feature A changed HouseColorMode recolors what is already on the map.
+		idx = clamp( 0, getComboPos( comboBoxHouseColors, pref->getHouseColorMode() ), (Int)HouseColorMode_Count - 1 );
+		(*pref)["HouseColorMode"] = HouseColorModeNames[idx];
+		if( TheGlobalData->m_houseColorMode != idx )
+		{
+			TheWritableGlobalData->m_houseColorMode = idx;
+			rts::refreshHouseColors();
+		}
 
 		idx = clamp( 0, getComboPos( comboBoxBuildTimers, pref->getBuildTimerDisplayMode() ), (Int)BuildTimerDisplayMode_Count - 1 );
 		(*pref)["BuildTimerDisplayMode"] = BuildTimerModeNames[idx];
@@ -1848,6 +1863,7 @@ static void initGameOptionsWindows()
 
 	comboBoxHealthBars = findOptionsWindow( "OptionsMenu.wnd:ComboBoxHealthBars" );
 	comboBoxAlliedDecals = findOptionsWindow( "OptionsMenu.wnd:ComboBoxAlliedDecals" );
+	comboBoxHouseColors = findOptionsWindow( "OptionsMenu.wnd:ComboBoxHouseColors" );
 	comboBoxBuildTimers = findOptionsWindow( "OptionsMenu.wnd:ComboBoxBuildTimers" );
 	comboBoxActionLines = findOptionsWindow( "OptionsMenu.wnd:ComboBoxActionLines" );
 	comboBoxCastMode = findOptionsWindow( "OptionsMenu.wnd:ComboBoxCastMode" );
@@ -1911,6 +1927,7 @@ static void initGameOptionsWindows()
 	setLabelText( "OptionsMenu.wnd:DisplayGroupLabel", "GUI:GameOptionsDisplay" );
 	setLabelText( "OptionsMenu.wnd:HealthBarsLabel", "GUI:HealthBars" );
 	setLabelText( "OptionsMenu.wnd:AlliedDecalsLabel", "GUI:AlliedDecals" );
+	setLabelText( "OptionsMenu.wnd:HouseColorsLabel", "GUI:HouseColors" );
 	setLabelText( "OptionsMenu.wnd:BuildTimersLabel", "GUI:BuildTimers" );
 	setLabelText( "OptionsMenu.wnd:ActionLinesLabel", "GUI:ActionLines" );
 	setLabelText( "OptionsMenu.wnd:InputGroupLabel", "GUI:GameOptionsInput" );
@@ -1979,6 +1996,7 @@ static void initGameOptionsWindows()
 
 	setTooltip( comboBoxHealthBars, "TOOLTIP:HealthBars" );
 	setTooltip( comboBoxAlliedDecals, "TOOLTIP:AlliedDecals" );
+	setTooltip( comboBoxHouseColors, "TOOLTIP:HouseColors" );
 	setTooltip( comboBoxBuildTimers, "TOOLTIP:BuildTimers" );
 	setTooltip( comboBoxActionLines, "TOOLTIP:ActionLines" );
 	setTooltip( comboBoxCastMode, "TOOLTIP:CastMode" );
@@ -1999,6 +2017,7 @@ static void initGameOptionsWindows()
 
 	addComboEntries( comboBoxHealthBars, "GUI:HealthBars", HealthBarDisplayMode_Count );
 	addComboEntries( comboBoxAlliedDecals, "GUI:AlliedDecals", AlliedDecalMode_Count );
+	addComboEntries( comboBoxHouseColors, "GUI:HouseColors", HouseColorMode_Count );
 	addComboEntries( comboBoxBuildTimers, "GUI:BuildTimers", BuildTimerDisplayMode_Count );
 	addComboEntries( comboBoxActionLines, "GUI:ActionLines", ActionLineMode_Count );
 	addComboEntries( comboBoxCastMode, "GUI:CastMode", CastMode_Count );

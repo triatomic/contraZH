@@ -40,6 +40,7 @@
 #include "Common/crc.h"
 #include "Common/CRCDebug.h"
 #include "Common/GameState.h"
+#include "Common/GameUtility.h"
 #include "Common/GlobalData.h"
 #include "Common/PerfTimer.h"
 #include "Common/RandomValue.h"
@@ -4022,7 +4023,10 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 		}
 		else
 		{
-			m_renderObject = W3DDisplay::m_assetManager->Create_Render_Obj(newState->m_modelName.str(), draw->getScale(), m_hexColor);
+			// TheSuperHackers @feature m_hexColor stays the logic's color; HouseColorMode only changes what is drawn.
+			const Object* owner = draw->getObject();
+			const Color drawnColor = rts::getHouseColorForLocalView(m_hexColor, owner ? owner->getControllingPlayer() : nullptr);
+			m_renderObject = W3DDisplay::m_assetManager->Create_Render_Obj(newState->m_modelName.str(), draw->getScale(), drawnColor);
 			DEBUG_ASSERTCRASH(m_renderObject, ("*** ASSET ERROR: Model %s not found!",newState->m_modelName.str()));
 			const W3DModelDrawModuleData *shaders = getW3DModelDrawModuleData();
 			if (m_renderObject && (shaders->m_disruption.isOn() || shaders->m_flameShader || shaders->m_electricShader || shaders->m_cryoShader ||
@@ -4247,15 +4251,28 @@ void W3DModelDraw::replaceIndicatorColor(Color color)
 		if (newColor != m_hexColor)
 		{
 			m_hexColor = newColor;
-
-			// set these to nullptr to force a regen of everything in setModelState.
-			const ModelConditionInfo* tmp = m_curState;
-			m_curState = nullptr;
-			m_nextState = nullptr;
-			m_nextStateAnimLoopDuration = NO_NEXT_DURATION;
-			setModelState(tmp);
+			rebuildRenderObject();
 		}
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+void W3DModelDraw::refreshIndicatorColor()
+{
+	// a model without a house color looks the same in every HouseColorMode
+	if (getW3DModelDrawModuleData()->m_okToChangeModelColor && getRenderObject() && m_hexColor != 0)
+		rebuildRenderObject();
+}
+
+//-------------------------------------------------------------------------------------------------
+void W3DModelDraw::rebuildRenderObject()
+{
+	// set these to nullptr to force a regen of everything in setModelState.
+	const ModelConditionInfo* tmp = m_curState;
+	m_curState = nullptr;
+	m_nextState = nullptr;
+	m_nextStateAnimLoopDuration = NO_NEXT_DURATION;
+	setModelState(tmp);
 }
 
 //-------------------------------------------------------------------------------------------------

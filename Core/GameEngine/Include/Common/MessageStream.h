@@ -247,6 +247,7 @@ public:
 		MSG_META_TOGGLE_CONTROL_BAR,								///< show/hide controlbar
 		MSG_META_TOGGLE_PLAYER_OBSERVER,						///< TheSuperHackers @feature Toggle the player observer view in game
 		MSG_META_CYCLE_HEALTH_BAR_MODE,							///< TheSuperHackers @feature Cycle HealthBarDisplayMode in game
+		MSG_META_CYCLE_HOUSE_COLOR_MODE,						///< TheSuperHackers @feature Cycle HouseColorMode in game
 
 		MSG_META_BEGIN_PATH_BUILD,									///< enter path-building mode
 		MSG_META_END_PATH_BUILD,										///< exit path-building mode
