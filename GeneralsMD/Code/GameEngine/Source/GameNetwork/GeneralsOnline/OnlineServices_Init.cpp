@@ -23,6 +23,7 @@
 #include "GameNetwork/GeneralsOnline/Vendor/stb_image/stb_image_write.h"
 #include "GameNetwork/GeneralsOnline/Vendor/stb_image/stb_image_resize.h"
 #include "GameClient/GameText.h"
+#include "ValveNetworkingSockets/steam/isteamnetworkingsockets.h"
 #include <unordered_set>
 
 extern "C"
@@ -40,6 +41,74 @@ std::vector<S3ScreenshotEntry> NGMP_OnlineServicesManager::m_vecGuardedSSData;
 
 
 bool NGMP_OnlineServicesManager::g_bAdvancedNetworkStats;
+
+// GO's F10 overlay: one line per mesh connection, green when the link and the peer's frame rate
+// are healthy, red otherwise. contraZH: GO returned out of drawGameTime when the mesh had no
+// connections, which hid the game timer; this only returns from the overlay.
+void NGMP_OnlineServicesManager::DrawAdvancedNetworkStats(DisplayString* str, Color dropColor)
+{
+	if (!g_bAdvancedNetworkStats || TheNGMPGame == nullptr || TheNetwork == nullptr || str == nullptr)
+		return;
+
+	NetworkMesh* pMesh = GetNetworkMesh();
+	NGMP_OnlineServices_LobbyInterface* pLobbyInterface = GetInterface<NGMP_OnlineServices_LobbyInterface>();
+	ISteamNetworkingSockets* pSteamNetSockets = SteamNetworkingSockets();
+	if (pMesh == nullptr || pLobbyInterface == nullptr || pSteamNetSockets == nullptr)
+		return;
+
+	const Color colorGood = GameMakeColor(0, 255, 0, 150);
+	const Color colorBad = GameMakeColor(255, 0, 0, 150);
+
+	int i = 0;
+	for (auto& connection : pMesh->GetAllConnections())
+	{
+		if (!connection.second.IsValid())
+			continue;
+
+		LobbyMemberEntry lobbyMember = pLobbyInterface->GetRoomMemberFromID(connection.first);
+
+		const int k_nLanes = 1;
+		SteamNetConnectionRealTimeStatus_t status;
+		SteamNetConnectionRealTimeLaneStatus_t laneStatus[k_nLanes];
+		EResult res = pSteamNetSockets->GetConnectionRealTimeStatus(connection.second.m_hSteamConnection, &status, k_nLanes, laneStatus);
+		if (res == k_EResultNoConnection || lobbyMember.display_name.empty())
+			continue;
+
+		int avgFPS = TheNetwork->getSlotAverageFPS(lobbyMember.m_SlotIndex);
+
+		UnicodeString netString;
+		netString.format(L"\n[usr %s|%d][%hs %hs][AVGFPS: %d] Lat: %i, QL: %.2f, QR: %.2f OutP/s: %.2f, OutB/s: %.2f, InP/s: %.2f, InB/s: %.2f, SR %i PU: %d, PR: %d, NACK: %d, QT: %I64d",
+			from_utf8(lobbyMember.display_name).c_str(),
+			(int)res,
+			connection.second.IsIPV4() ? "IPv4" : "IPv6",
+			connection.second.IsDirect() ? "Direct" : "Relay",
+			avgFPS,
+			status.m_nPing,
+			status.m_flConnectionQualityLocal,
+			status.m_flConnectionQualityRemote,
+			status.m_flOutPacketsPerSec,
+			status.m_flOutBytesPerSec,
+			status.m_flInPacketsPerSec,
+			status.m_flInBytesPerSec,
+			status.m_nSendRateBytesPerSecond,
+			status.m_cbPendingUnreliable,
+			status.m_cbPendingReliable,
+			status.m_cbSentUnackedReliable,
+			status.m_usecQueueTime);
+
+		Int w, h;
+		str->getSize(&w, &h);
+
+		const bool bIsHighQuality = !(avgFPS < (GENERALS_ONLINE_HIGH_FPS_LIMIT - 1)
+			|| status.m_cbSentUnackedReliable >= 1000
+			|| (status.m_flConnectionQualityLocal != -1.f && status.m_flConnectionQualityLocal < 1.f)
+			|| (status.m_flConnectionQualityRemote != -1.f && status.m_flConnectionQualityRemote < 1.f));
+
+		str->setText(netString);
+		str->draw(0, 500 + (i * h / 2), bIsHighQuality ? colorGood : colorBad, dropColor);
+		++i;
+	}
+}
 
 NetworkMesh* NGMP_OnlineServicesManager::GetNetworkMesh()
 {

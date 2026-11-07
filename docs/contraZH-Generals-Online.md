@@ -52,6 +52,16 @@ both.
 | `ObserverNotificationSpecialPowerPurchase` | `yes` | Announce promotions |
 | `ObserverNotificationMilestone` | `yes` | Announce rank, income, power and dozer milestones |
 
+### Fixed keys
+
+| Key | Action |
+|---|---|
+| F10 | Advanced network stats per connection (latency, peer FPS, quality, rates); red when a link is poor. Shows while the game timer is on |
+| F11 | JPEG screenshot |
+| F5 or Insert | Open or close the buddy overlay |
+
+A key that a CommandMap or `Hotkeys.ini` binding uses keeps that binding instead.
+
 ### Widescreen layouts and camera
 
 The UI targets 1280x720 instead of 800x600, and max camera height scales with aspect ratio. Window

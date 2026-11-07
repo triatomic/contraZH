@@ -149,8 +149,17 @@ GameNetworkingSockets ICE P2P transport, lobbies/matchmaking/stats).
   TU via CMake PCH, which transitively provides `NextGenMP_defines.h`. This port keeps
   contraZH's PCH setup, so `NextGenMP_defines.h` is included explicitly where needed
   (GeneralsOnline_Settings.h, NGMPGame.h, ConnectionManager.h).
-- **Deferred**: `GameSpyOpenOverlay` buddy bypass. (`SetLookAtPlayer` and the
-  StatsExporter pipeline have since been ported.)
+- **Fixed keys** (`af19d94ce` and earlier): GO's `MSG_RAW_KEY_UP` block in CommandXlat
+  (F11 JPEG screenshot, F10 advanced network stats, F5/Insert buddy overlay) is ported as
+  `handleGeneralsOnlineKeyUp`. Deviation: a key that any CommandMap/Hotkeys.ini binding
+  uses is left to that binding, so F1-F6 team keys do not also open the buddy overlay.
+  The F10 overlay moved from InGameUI.cpp to `NGMP_OnlineServicesManager::DrawAdvancedNetworkStats`
+  (OnlineServices_Init.cpp), because NetworkMesh.h's winsock include defines `min`/`max` and
+  breaks `std::max` in InGameUI.cpp. `drawGameTime` still calls it as upstream, so it shows
+  only while the game timer does. GO's early `return`, which hid the timer when the mesh had
+  no connections, is not taken.
+- `GameSpyOpenOverlay` buddy bypass is in (the GameSpy connection check is compiled out
+  under `GENERALS_ONLINE`). `SetLookAtPlayer` and the StatsExporter pipeline are ported.
 - Log-only hunks (NetworkLog conversions of commented DEBUG_LOGs), `isspace/isdigit`
   cast fixes, `nullptr`->`NULL` reverts, and GO's dead `#else` branches were not taken.
 

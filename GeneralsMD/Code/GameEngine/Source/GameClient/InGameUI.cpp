@@ -8650,6 +8650,11 @@ void InGameUI::drawSystemTime(Int &x, Int &y)
 
 void InGameUI::drawGameTime()
 {
+#if defined(GENERALS_ONLINE)
+	// GO's F10 overlay borrows the game time string, which is set back below.
+	NGMP_OnlineServicesManager::DrawAdvancedNetworkStats(m_gameTimeString, m_gameTimeDropColor);
+#endif
+
 	Int currentFrame = TheGameLogic->getFrame();
 	Int gameSeconds = (Int) (SECONDS_PER_LOGICFRAME_REAL * currentFrame );
 	Int hours = gameSeconds / 60 / 60;

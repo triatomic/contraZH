@@ -545,6 +545,9 @@ public:
 	static bool g_bAdvancedNetworkStats;
 	static void ToggleAdvancedNetworkStats() { g_bAdvancedNetworkStats = !g_bAdvancedNetworkStats; }
 	static bool IsAdvancedNetworkStatsEnabled() { return g_bAdvancedNetworkStats; }
+	// contraZH: GO drew this inline in InGameUI::drawGameTime; here it keeps the Steam and
+	// winsock headers (and their min/max macros) out of InGameUI.cpp.
+	static void DrawAdvancedNetworkStats(DisplayString* str, Color dropColor);
 
 	void OnLogin(ELoginResult loginResult, const char* szWSAddr, std::function<void(void)> fnWebsocketConnectedCallback);
 	
