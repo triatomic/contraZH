@@ -53,33 +53,6 @@
 
 const Real BIGNUM = 99999.0f;
 
-
-//-------------------------------------------------------------------------------------------------
-enum ChinookAIStateType CPP_11(: Int)
-{
-	// note that these must be distinct (numerically) from AIStateType. ick.
-	ChinookAIStateType_FIRST = 1000,
-
-		TAKING_OFF,
-		LANDING,
-
-		MOVE_TO_AND_LAND,
-
-		MOVE_TO_AND_EVAC,
-		LAND_AND_EVAC,
-		EVAC_AND_TAKEOFF,
-
-		MOVE_TO_AND_EVAC_AND_EXIT,
-		LAND_AND_EVAC_AND_EXIT,
-		EVAC_AND_EXIT,
-		TAKEOFF_AND_EXIT,
-		HEAD_OFF_MAP,
-
-		MOVE_TO_COMBAT_DROP,
-		DO_COMBAT_DROP,
-		MOVE_TO_AND_EVAC_AND_EXIT_INIT
-};
-
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
@@ -332,7 +305,7 @@ public:
 			obj->setLayer(LAYER_GROUND);
 		}
 
-		if (getID() == 1005 && status == STATE_FAILURE)
+		if (getID() == LAND_AND_EVAC)
 			TheCommandSequence->verifyObjectCommand(obj);
 
 	}

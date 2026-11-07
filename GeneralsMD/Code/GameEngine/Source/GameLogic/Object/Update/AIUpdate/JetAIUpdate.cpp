@@ -214,8 +214,11 @@ public:
 	{
 		Object* jet = getMachineOwner();
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
-		if( !jetAI )
+		if (!jetAI)
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		jetAI->friend_setTakeoffInProgress(!m_landing);
 		jetAI->friend_setLandingInProgress(m_landing);
@@ -227,11 +230,17 @@ public:
 	{
 		Object* jet = getMachineOwner();
 		if (jet->isEffectivelyDead())
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
-		if( !jetAI )
+		if (!jetAI)
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		ParkingPlaceBehaviorInterface* pp = getPP(jet->getProducerID());
 		if (pp == nullptr)
@@ -245,6 +254,7 @@ public:
 		if (!pp->reserveSpace(jet->getID(), jetAI->friend_getParkingOffset(), nullptr))
 		{
 			DEBUG_ASSERTCRASH(m_landing, ("hmm, this should never happen for taking-off things"));
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
 		}
 
@@ -299,9 +309,6 @@ public:
 			jetAI->friend_setLandingInProgress(false);
 			jetAI->friend_setAllowCircling(false);
 		}
-
-		if (status == STATE_FAILURE)
-			TheCommandSequence->terminateVerifiedCommand(jet);
 	}
 
 };
@@ -488,8 +495,11 @@ public:
 	{
 		Object* jet = getMachineOwner();
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
-		if( !jetAI )
+		if (!jetAI)
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		jetAI->setCanPathThroughUnits(true);
 		jetAI->friend_setTakeoffInProgress(m_taxiMode != TO_PARKING);
@@ -512,15 +522,21 @@ public:
 
 		ParkingPlaceBehaviorInterface* pp = getPP(jet->getProducerID());
 		if (pp == nullptr)
+		{
 #if RETAIL_COMPATIBLE_CRC
 			return STATE_SUCCESS;
 #else
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
 #endif
+		}
 
 		ParkingPlaceBehaviorInterface::PPInfo ppinfo;
 		if (!pp->reserveSpace(jet->getID(), jetAI->friend_getParkingOffset(), &ppinfo))
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;	// full?
+		}
 
 		Coord3D intermedPt;
 		Bool intermed = false;
@@ -610,6 +626,7 @@ public:
 					if( !pCreationLocations )
 					{
 						DEBUG_CRASH( ("No creation locations specified for runway for JetAIBehavior -- taxiing from hanger (Kris).") );
+						TheCommandSequence->terminateVerifiedCommand(jet);
 						return STATE_FAILURE;
 					}
 					std::vector<Coord3D>::const_iterator it;
@@ -647,6 +664,8 @@ public:
 		jetAI->ignoreObstacleID(jet->getProducerID());
 
 		StateReturnType ret = AIMoveOutOfTheWayState::onEnter();
+		if (ret == STATE_FAILURE)
+			TheCommandSequence->terminateVerifiedCommand(jet);
 		return ret;
 	}
 
@@ -654,11 +673,17 @@ public:
 	{
 		Object* jet = getMachineOwner();
 		if (jet->isEffectivelyDead())
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
-		if( !jetAI )
+		if (!jetAI)
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		if( m_taxiMode == TO_PARKING || m_taxiMode == FROM_HANGAR )
 		{
@@ -678,14 +703,15 @@ public:
 			}
 		}
 
-		return AIMoveOutOfTheWayState::update();
+		StateReturnType ret = AIMoveOutOfTheWayState::update();
+		if (ret == STATE_FAILURE)
+			TheCommandSequence->terminateVerifiedCommand(jet);
+		return ret;
 	}
 
 	virtual void onExit( StateExitType status ) override
 	{
 		Object* jet = getMachineOwner();
-		if (status == STATE_FAILURE)
-			TheCommandSequence->terminateVerifiedCommand(jet);
 
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		if (jetAI)
@@ -730,10 +756,16 @@ public:
 		Object* jet = getMachineOwner();
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		if (!jetAI)
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		if (jet->isEffectivelyDead())
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		jetAI->friend_setTakeoffInProgress(!m_landing);
 		jetAI->friend_setLandingInProgress(m_landing);
@@ -760,16 +792,20 @@ public:
 
 		ParkingPlaceBehaviorInterface* pp = getPP(jet->getProducerID());
 		if (pp == nullptr)
+		{
 #if RETAIL_COMPATIBLE_CRC
 			return STATE_SUCCESS;
 #else
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
 #endif
+		}
 
 		ParkingPlaceBehaviorInterface::PPInfo ppinfo;
 		if (!pp->reserveSpace(jet->getID(), jetAI->friend_getParkingOffset(), &ppinfo))
 		{
 			// it's full.
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
 		}
 
@@ -779,6 +815,7 @@ public:
 			if (!pp->reserveRunway(jet->getID(), m_landing))
 			{
 				DEBUG_CRASH(("we should never get to this state unless we have a runway available"));
+				TheCommandSequence->terminateVerifiedCommand(jet);
 				return STATE_FAILURE;
 			}
 		}
@@ -818,7 +855,8 @@ public:
 		jetAI->friend_setGoalPath( &path );
 
 		StateReturnType ret = AIFollowPathState::onEnter();
-
+		if (ret == STATE_FAILURE)
+			TheCommandSequence->terminateVerifiedCommand(jet);
 		return ret;
 	}
 
@@ -826,11 +864,17 @@ public:
 	{
 		Object* jet = getMachineOwner();
 		if (jet->isEffectivelyDead())
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		if( !jetAI )
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		if (m_landing)
 		{
@@ -896,6 +940,8 @@ public:
 		}
 
 		StateReturnType ret = AIFollowPathState::update();
+		if (ret == STATE_FAILURE)
+			TheCommandSequence->terminateVerifiedCommand(jet);
 		return ret;
 	}
 
@@ -905,8 +951,6 @@ public:
 
 		// just in case.
 		Object* jet = getMachineOwner();
-		if (status == STATE_FAILURE)
-			TheCommandSequence->terminateVerifiedCommand(jet);
 
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		if( !jetAI )
@@ -1581,7 +1625,10 @@ public:
 		Object* jet = getMachineOwner();
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		if( !jetAI )
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		if (jet->isKindOf(KINDOF_PRODUCED_AT_HELIPAD))
 		{
@@ -1599,21 +1646,31 @@ public:
 	{
 		Object* jet = getMachineOwner();
 		if (jet->isEffectivelyDead())
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		if( !jetAI )
 		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
 		}
 
 		ParkingPlaceBehaviorInterface* pp = getPP(jet->getProducerID());
 		if (pp == nullptr)
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		ParkingPlaceBehaviorInterface::PPInfo ppinfo;
 		if (!pp->reserveSpace(jet->getID(), jetAI->friend_getParkingOffset(), &ppinfo))
+		{
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
+		}
 
 		const Real THRESH = 0.001f;
 		if (fabs(stdAngleDiff(jet->getOrientation(), ppinfo.parkingOrientation)) <= THRESH)
@@ -1638,8 +1695,6 @@ public:
 	virtual void onExit( StateExitType status ) override
 	{
 		Object* jet = getMachineOwner();
-		if (status == STATE_FAILURE)
-			TheCommandSequence->terminateVerifiedCommand(jet);
 
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		if( !jetAI )
@@ -2104,6 +2159,8 @@ public:
 		Object* jet = getMachineOwner();
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 
+		TheCommandSequence->verifyObjectCommand(jet);
+
 		ParkingPlaceBehaviorInterface* pp = getPP(jet->getProducerID());
 		if (pp == nullptr)
 		{
@@ -2135,8 +2192,6 @@ public:
 			m_goalPosition = jetAI->friend_needsRunway() ? ppinfo.runwayApproach : ppinfo.parkingSpace;
 		}
 		setAdjustsDestination(false);		// precision is necessary
-
-		TheCommandSequence->verifyObjectCommand(jet);
 
 		return AIInternalMoveToState::onEnter();
 	}

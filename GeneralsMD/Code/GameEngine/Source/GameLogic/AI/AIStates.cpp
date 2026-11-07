@@ -2212,7 +2212,7 @@ StateReturnType AIMoveToState::onEnter()
 	}
 
 	if ((ai->getLastCommandSource() == CMD_FROM_PLAYER && ai->isSameMachine((AIStateMachine*)getMachine()))
-		|| (ai->getLastCommandSource() == CMD_FROM_AI && getID() == 1004)) //Chinook MOVE_TO_AND_EVAC
+		|| (ai->getLastCommandSource() == CMD_FROM_AI && getID() == MOVE_TO_AND_EVAC)) //Chinook MOVE_TO_AND_EVAC
 	{
 		TheCommandSequence->verifyObjectCommand(getMachineOwner());
 	}
@@ -2227,7 +2227,7 @@ void AIMoveToState::onExit( StateExitType status )
 	if (ai && ai->getLastCommandSource() == CMD_FROM_PLAYER && ai->isSameMachine((AIStateMachine*)getMachine()))
 		TheCommandSequence->terminateVerifiedCommand(getMachineOwner());
 
-	if (ai->getLastCommandSource() == CMD_FROM_AI && getID() == 1004 && status == STATE_FAILURE)
+	if (ai->getLastCommandSource() == CMD_FROM_AI && getID() == MOVE_TO_AND_EVAC)
 		TheCommandSequence->terminateVerifiedCommand(getMachineOwner());
 	AIInternalMoveToState::onExit( status );
 }
