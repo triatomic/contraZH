@@ -3831,8 +3831,8 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			// TheSuperHackers @feature The reverse move key follows CastMode like a command bar
 			// hotkey. QuickCast reverses to the cursor on the press. QuickCastWithIndicator arms
 			// on the press, so the reverse move cursor shows while the key is held, and fires on
-			// the release (MSG_RAW_KEY_UP below). In Normal, or with nowhere to fire, the press
-			// toggles the mode for the next click as before.
+			// the release (MSG_RAW_KEY_UP below). In Normal, or a QuickCast press with nowhere to
+			// fire, the press toggles the mode for the next click as before.
 #if RTS_ZEROHOUR
 			const Int castMode = TheGlobalData ? TheGlobalData->m_castMode : CastMode_Normal;
 #else
@@ -3872,9 +3872,10 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			m_reverseMoveAiming = FALSE;
 
 			// A click while the key was held has already given the order and dropped the mode.
-			// With nowhere to fire, the mode stays armed for the next click, so the press is not lost.
-			if( TheInGameUI->isInReverseMoveToMode() )
-				quickCastReverseMove();
+			// Letting go with nowhere to fire, over a panel say, calls the move off. A press always
+			// arms in this mode, so this is the only way the key itself can cancel it.
+			if( TheInGameUI->isInReverseMoveToMode() && !quickCastReverseMove() )
+				TheInGameUI->clearArmedMoveMode();
 			break;
 		}
 
