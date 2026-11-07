@@ -485,6 +485,13 @@ public:
 		MSG_META_END_FACING_DRAG,
 #endif
 
+#if defined(GENERALS_ONLINE)
+		MSG_META_TOGGLE_NETWORK_STATS,							///< GO's per connection network stats overlay
+		MSG_META_TAKE_SCREENSHOT_ALT,								///< GO's second key for the JPEG screenshot
+		MSG_META_TOGGLE_BUDDY_OVERLAY,							///< open or close the buddy overlay
+		MSG_META_TOGGLE_BUDDY_OVERLAY_ALT,					///< second key for the buddy overlay
+#endif
+
 		MSG_END_META_MESSAGES,											///< Marker to delineate "meta" messages
 
 		MSG_MOUSEOVER_DRAWABLE_HINT,								///< (drawableid) the given drawable is under the mouse, regardless of button states

@@ -179,6 +179,12 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "BEGIN_FACING_DRAG", GameMessage::MSG_META_BEGIN_FACING_DRAG },
 	{ "END_FACING_DRAG", GameMessage::MSG_META_END_FACING_DRAG },
 #endif
+#if defined(GENERALS_ONLINE)
+	{ "TOGGLE_NETWORK_STATS",											GameMessage::MSG_META_TOGGLE_NETWORK_STATS },
+	{ "TAKE_SCREENSHOT_ALT",											GameMessage::MSG_META_TAKE_SCREENSHOT_ALT },
+	{ "TOGGLE_BUDDY_OVERLAY",											GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY },
+	{ "TOGGLE_BUDDY_OVERLAY_ALT",									GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY_ALT },
+#endif
 	{ "BEGIN_FORCEATTACK",												GameMessage::MSG_META_BEGIN_FORCEATTACK },
 	{ "END_FORCEATTACK",													GameMessage::MSG_META_END_FORCEATTACK },
 	{ "BEGIN_FORCEMOVE",													GameMessage::MSG_META_BEGIN_FORCEMOVE },
@@ -1505,6 +1511,31 @@ void MetaMap::generateMetaMap()
 			map->m_usableIn = COMMANDUSABLE_EVERYWHERE;
 		}
 	}
+
+#if defined(GENERALS_ONLINE)
+	{
+		// GO's fixed keys, as commands so the Hotkeys screen can rebind them under GO.
+		const struct { GameMessage::Type meta; MappableKeyType key; } goKeys[] =
+		{
+			{ GameMessage::MSG_META_TOGGLE_NETWORK_STATS, MK_F10 },
+			{ GameMessage::MSG_META_TAKE_SCREENSHOT_ALT, MK_F11 },
+			{ GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY, MK_F5 },
+			{ GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY_ALT, MK_INS },
+		};
+		for (Int i = 0; i < ARRAY_SIZE(goKeys); ++i)
+		{
+			MetaMapRec *map = getMetaMapRec(goKeys[i].meta);
+			map->m_category = CATEGORY_GO;
+			if (map->m_key == MK_NONE)
+			{
+				map->m_key = goKeys[i].key;
+				map->m_transition = DOWN;
+				map->m_modState = NONE;
+				map->m_usableIn = COMMANDUSABLE_EVERYWHERE;
+			}
+		}
+	}
+#endif
 
 #if RTS_ZEROHOUR
 	{

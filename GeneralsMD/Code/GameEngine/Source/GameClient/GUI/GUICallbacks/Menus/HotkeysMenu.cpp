@@ -224,6 +224,13 @@ const BuiltInText BUILT_IN_TEXT[] =
 	{ "GUI:HotkeysCommandCYCLE_HEALTH_BAR_MODE", L"Cycle health bars" },
 	{ "GUI:HotkeysCommandCYCLE_HOUSE_COLOR_MODE", L"Cycle house colors" },
 	{ "GUI:HotkeysCommandTAKE_SCREENSHOT_PNG", L"Screenshot as PNG" },
+#if defined(GENERALS_ONLINE)
+	{ "GUI:HotkeysCategoryGO", L"GO" },
+	{ "GUI:HotkeysCommandTOGGLE_NETWORK_STATS", L"Network stats" },
+	{ "GUI:HotkeysCommandTAKE_SCREENSHOT_ALT", L"Screenshot, second key" },
+	{ "GUI:HotkeysCommandTOGGLE_BUDDY_OVERLAY", L"Buddy list" },
+	{ "GUI:HotkeysCommandTOGGLE_BUDDY_OVERLAY_ALT", L"Buddy list, second key" },
+#endif
 };
 
 const Color TEXT_COLOR = GameMakeColor( 254, 254, 254, 255 );
@@ -256,7 +263,10 @@ const char *const HIDDEN_COMMANDS[] =
 
 const Int CATEGORY_ORDER[] =
 {
-	CATEGORY_SELECTION, CATEGORY_TEAM, CATEGORY_CONTROL, CATEGORY_INFORMATION, CATEGORY_INTERFACE, CATEGORY_TAUNT, CATEGORY_MISC
+	CATEGORY_SELECTION, CATEGORY_TEAM, CATEGORY_CONTROL, CATEGORY_INFORMATION, CATEGORY_INTERFACE, CATEGORY_TAUNT, CATEGORY_MISC,
+#if defined(GENERALS_ONLINE)
+	CATEGORY_GO,
+#endif
 };
 
 GameWindow *s_parent = nullptr;

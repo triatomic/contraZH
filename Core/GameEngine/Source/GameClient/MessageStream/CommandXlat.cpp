@@ -101,40 +101,6 @@
 
 #if defined(GENERALS_ONLINE)
 #include "GameNetwork/GeneralsOnline/OnlineServices_Init.h"
-
-// GO's fixed keys, run on release: F11 JPEG screenshot, F10 advanced network stats, F5 or Insert
-// buddy overlay. contraZH: a key the key map uses keeps only its binding, so an F5 rebound to
-// CREATE_TEAM4 does not also open the buddy overlay. Returns TRUE when the key was used.
-static Bool handleGeneralsOnlineKeyUp( Int key )
-{
-	if( key != KEY_F11 && key != KEY_F10 && key != KEY_F5 && key != KEY_INS )
-		return FALSE;
-
-	for( const MetaMapRec *map = TheMetaMap->getFirstMetaMapRec(); map; map = map->m_next )
-	{
-		if( (Int)map->m_key == key )
-			return FALSE;
-	}
-
-	if( key == KEY_F11 )
-	{
-		if( TheDisplay )
-			TheDisplay->takeScreenShot( SCREENSHOT_JPEG, TheGlobalData->m_jpegQuality );
-	}
-	else if( key == KEY_F10 )
-	{
-		NGMP_OnlineServicesManager::ToggleAdvancedNetworkStats();
-	}
-	else if( GameSpyIsOverlayOpen( GSOVERLAY_BUDDY ) )
-	{
-		GameSpyCloseOverlay( GSOVERLAY_BUDDY );
-	}
-	else
-	{
-		GameSpyOpenOverlay( GSOVERLAY_BUDDY );
-	}
-	return TRUE;
-}
 #endif
 
 #if defined(RTS_DEBUG)
@@ -3918,14 +3884,6 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 
 		case GameMessage::MSG_RAW_KEY_UP:
 		{
-#if defined(GENERALS_ONLINE)
-			if( handleGeneralsOnlineKeyUp( msg->getArgument( 0 )->integer ) )
-			{
-				disp = DESTROY_MESSAGE;
-				break;
-			}
-#endif
-
 			// TheSuperHackers @feature Release half of hold to aim reverse move. The meta event
 			// only fires on the press, so watch for whatever key TOGGLE_REVERSEMOVE is bound to
 			// coming up. The message is kept, nothing here consumes the key.
@@ -4771,6 +4729,21 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		}
 
 		// --------------------------------------------------------------------------------------------
+#if defined(GENERALS_ONLINE)
+		// GO's keys (F10, F5 and Insert by default), rebindable in the Hotkeys screen's GO section
+		case GameMessage::MSG_META_TOGGLE_NETWORK_STATS:
+			NGMP_OnlineServicesManager::ToggleAdvancedNetworkStats();
+			disp = DESTROY_MESSAGE;
+			break;
+
+		case GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY:
+		case GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY_ALT:
+			GameSpyToggleOverlay( GSOVERLAY_BUDDY );
+			disp = DESTROY_MESSAGE;
+			break;
+
+		case GameMessage::MSG_META_TAKE_SCREENSHOT_ALT:
+#endif
 		case GameMessage::MSG_META_TAKE_SCREENSHOT:
 		{
 			if (TheDisplay)

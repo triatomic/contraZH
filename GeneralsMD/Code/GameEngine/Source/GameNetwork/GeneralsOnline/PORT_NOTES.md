@@ -149,10 +149,13 @@ GameNetworkingSockets ICE P2P transport, lobbies/matchmaking/stats).
   TU via CMake PCH, which transitively provides `NextGenMP_defines.h`. This port keeps
   contraZH's PCH setup, so `NextGenMP_defines.h` is included explicitly where needed
   (GeneralsOnline_Settings.h, NGMPGame.h, ConnectionManager.h).
-- **Fixed keys** (`af19d94ce` and earlier): GO's `MSG_RAW_KEY_UP` block in CommandXlat
-  (F11 JPEG screenshot, F10 advanced network stats, F5/Insert buddy overlay) is ported as
-  `handleGeneralsOnlineKeyUp`. Deviation: a key that any CommandMap/Hotkeys.ini binding
-  uses is left to that binding, so F1-F6 team keys do not also open the buddy overlay.
+- **Fixed keys** (`af19d94ce` and earlier): GO's hardcoded `MSG_RAW_KEY_UP` block in
+  CommandXlat (F11 JPEG screenshot, F10 advanced network stats, F5/Insert buddy overlay)
+  is ported as meta commands instead: `TOGGLE_NETWORK_STATS`, `TAKE_SCREENSHOT_ALT`,
+  `TOGGLE_BUDDY_OVERLAY` and `TOGGLE_BUDDY_OVERLAY_ALT`, with GO's keys as defaults in
+  `generateMetaMap` and a new `CATEGORY_GO` that the Hotkeys screen shows as its GO
+  section. They fire on press, not GO's release. All of it is under `GENERALS_ONLINE`,
+  which zi_always defines for every Zero Hour target, so the meta enum agrees across libs.
   The F10 overlay moved from InGameUI.cpp to `NGMP_OnlineServicesManager::DrawAdvancedNetworkStats`
   (OnlineServices_Init.cpp), because NetworkMesh.h's winsock include defines `min`/`max` and
   breaks `std::max` in InGameUI.cpp. `drawGameTime` still calls it as upstream, so it shows

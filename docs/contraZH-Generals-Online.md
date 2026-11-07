@@ -52,15 +52,18 @@ both.
 | `ObserverNotificationSpecialPowerPurchase` | `yes` | Announce promotions |
 | `ObserverNotificationMilestone` | `yes` | Announce rank, income, power and dozer milestones |
 
-### Fixed keys
+### GO keys
 
-| Key | Action |
-|---|---|
-| F10 | Advanced network stats per connection (latency, peer FPS, quality, rates); red when a link is poor. Shows while the game timer is on |
-| F11 | JPEG screenshot |
-| F5 or Insert | Open or close the buddy overlay |
+Rebindable under **GO** in Options > Hotkeys; `Hotkeys.ini` names them by command.
 
-A key that a CommandMap or `Hotkeys.ini` binding uses keeps that binding instead.
+| Default | Command | Action |
+|---|---|---|
+| F10 | `TOGGLE_NETWORK_STATS` | Advanced network stats per connection (latency, peer FPS, quality, rates); red when a link is poor. Shows while the game timer is on |
+| F11 | `TAKE_SCREENSHOT_ALT` | JPEG screenshot, a second key beside F12 |
+| F5 | `TOGGLE_BUDDY_OVERLAY` | Open or close the buddy overlay |
+| Insert | `TOGGLE_BUDDY_OVERLAY_ALT` | Same, second key |
+
+Like any two commands on one key, both fire; the Hotkeys screen marks the clash in red.
 
 ### Widescreen layouts and camera
 
