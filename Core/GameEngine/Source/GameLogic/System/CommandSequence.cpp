@@ -771,7 +771,6 @@ inline Bool CommandSequence::isLocatableCommand(UnsignedInt cmdNodeID)
 		case COMMAND_DO_GUARD_OBJECT:
 		case COMMAND_DO_ATTACK_OBJECT:
 		case COMMAND_DO_FORCE_ATTACK_OBJECT:
-		case COMMAND_DOZER_CONSTRUCT:
 		case COMMAND_DO_SPECIAL_POWER_AT_OBJECT:
 		case COMMAND_GET_REPAIRED:
 		case COMMAND_GET_HEALED:
@@ -1827,7 +1826,7 @@ Bool CommandSequence::isShawdowInTheWay(const Coord3D *worldPos, const ThingTemp
 			continue;
 
 		Object *obj = TheGameLogic->findObjectByID(cmdNode->m_nextCommand.begin()->first);
-		Bool isCurrentPlayerCommand = obj && obj->getControllingPlayer() == thePlayer;
+		Bool isCurrentPlayerCommand =obj && obj->getControllingPlayer() == thePlayer;
 		Drawable *draw = nullptr;
 
 		if (!isCurrentPlayerCommand)

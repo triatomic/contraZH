@@ -857,7 +857,7 @@ LegalBuildCode BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos
 	}
 	// Check for overlapping exit areas.
 
-	Bool isOverlapWithShadow = TheCommandSequence->isShawdowInTheWay(worldPos, build, angle, thePlayer);
+	Bool isOverlapWithShadow = TheCommandSequence->isShawdowInTheWay(worldPos, build, angle, builderObject->getControllingPlayer());
 	if (isOverlapWithShadow)
 	{
 		return LBC_OBJECTS_IN_THE_WAY;
