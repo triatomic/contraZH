@@ -321,7 +321,7 @@ WW3DFormat Get_Valid_Texture_Format(WW3DFormat format, bool is_compression_allow
 	else {
 		switch (format) {
 		case WW3D_FORMAT_DXT1:
-			// NVidia hack - switch to DXT2 is there is no DXT1 support (which is disabled on NVidia cards)
+			// Fall back to DXT2 if the device lacks DXT1 support
 			if (!DX8Wrapper::Get_Current_Caps()->Support_Texture_Format(WW3D_FORMAT_DXT1) &&
 				DX8Wrapper::Get_Current_Caps()->Support_Texture_Format(WW3D_FORMAT_DXT2)) {
 				format=WW3D_FORMAT_DXT2;

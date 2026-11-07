@@ -1013,18 +1013,10 @@ void DX8Caps::Vendor_Specific_Hacks(const D3DADAPTER_IDENTIFIER8& adapter_id)
 		if (SupportNPatches) {
 			DXLOG(("NVidia Driver reported N-Patch support, disabling.\r\n"));
 		}
-		if (SupportTextureFormat[WW3D_FORMAT_DXT1]) {
-			DXLOG(("Disabling DXT1 support on NVidia hardware.\r\n"));
-		}
 
 		SupportNPatches = false;	// Driver incorrectly report N-Patch support
-		SupportTextureFormat[WW3D_FORMAT_DXT1] = false;			// DXT1 is broken on NVidia hardware
-		SupportDXTC=
-			SupportTextureFormat[WW3D_FORMAT_DXT1]|
-			SupportTextureFormat[WW3D_FORMAT_DXT2]|
-			SupportTextureFormat[WW3D_FORMAT_DXT3]|
-			SupportTextureFormat[WW3D_FORMAT_DXT4]|
-			SupportTextureFormat[WW3D_FORMAT_DXT5];
+		// The original code disabled DXT1 here for GeForce 1-4 era banding. Modern
+		// NVidia hardware decodes DXT1 correctly, so all vendors share the native path.
 
 
     if (DeviceId == DEVICE_NVIDIA_GEFORCE2_MX ||
