@@ -59,6 +59,7 @@
 #include "GameClient/DebugDisplay.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/Keyboard.h"
+#include "GameClient/MetaEvent.h"
 #include "GameClient/GameClient.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/GameText.h"
@@ -1203,6 +1204,44 @@ GameMessage::Type CommandTranslator::issueMoveToLocationCommand( const Coord3D *
 }
 
 //------------------------------------------------------------------------------------
+// TheSuperHackers @feature Quick cast for the reverse move key (Options.ini: CastMode).
+/** Reverse the selection to the terrain under the cursor, the order a click there gives in
+	* reverse move mode. It always goes to the ground, never to a unit under the cursor, since the
+	* key means "back up to here".
+	*
+	* Returns FALSE, leaving the armed mode alone, when the cursor is not over the battlefield or
+	* nothing selected can take the order, so the caller can arm it for a click instead. */
+Bool CommandTranslator::quickCastReverseMove()
+{
+	if( !m_teamExists || !TheInGameUI->areSelectedObjectsControllable() )
+		return FALSE;
+
+	if( TheMouse == nullptr || TheTacticalView == nullptr )
+		return FALSE;
+
+	const MouseIO *mouseIO = TheMouse->getMouseStatus();
+	if( mouseIO == nullptr )
+		return FALSE;
+
+	// the cursor has to be over the battlefield, not the command bar or another panel
+	ICoord2D cursor = mouseIO->pos;
+	if( TheWindowManager && TheWindowManager->getWindowUnderCursor( cursor.x, cursor.y ) != nullptr )
+		return FALSE;
+
+	Coord3D pos;
+	if( !TheTacticalView->screenToTerrain( &cursor, &pos ) )
+		return FALSE;
+
+	// issueMoveToLocationCommand reads the armed mode to pick the order
+	if( !TheInGameUI->isInReverseMoveToMode() )
+		TheInGameUI->toggleReverseMoveToMode();
+
+	issueMoveToLocationCommand( &pos, nullptr, DO_COMMAND );
+	TheInGameUI->clearArmedMoveMode();
+	return TRUE;
+}
+
+//------------------------------------------------------------------------------------
 /// @todo Play attack command response sound on client-side to hide latency
 GameMessage::Type CommandTranslator::createAttackMessage( Drawable *draw,
 																													Drawable *other,
@@ -1691,6 +1730,7 @@ GameMessage::Type CommandTranslator::createSmartGarrisonMessage( Drawable *targe
 CommandTranslator::CommandTranslator() :
 	m_objective(0),
 	m_teamExists(false),
+	m_reverseMoveAiming(false),
 	m_rightMouseDownTimeMs(0),
 	m_rightMouseUpTimeMs(0)
 {
@@ -3787,8 +3827,56 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			break;
 
 		case GameMessage::MSG_META_TOGGLE_REVERSEMOVE:
-			TheInGameUI->toggleReverseMoveToMode();
+		{
+			// TheSuperHackers @feature The reverse move key follows CastMode like a command bar
+			// hotkey. QuickCast reverses to the cursor on the press. QuickCastWithIndicator arms
+			// on the press, so the reverse move cursor shows while the key is held, and fires on
+			// the release (MSG_RAW_KEY_UP below). In Normal, or with nowhere to fire, the press
+			// toggles the mode for the next click as before.
+#if RTS_ZEROHOUR
+			const Int castMode = TheGlobalData ? TheGlobalData->m_castMode : CastMode_Normal;
+#else
+			const Int castMode = CastMode_Normal;
+#endif
+			if( castMode == CastMode_QuickCastWithIndicator )
+			{
+				if( !TheInGameUI->isInReverseMoveToMode() )
+					TheInGameUI->toggleReverseMoveToMode();
+				m_reverseMoveAiming = TRUE;
+			}
+			else if( castMode != CastMode_QuickCast || !quickCastReverseMove() )
+			{
+				TheInGameUI->toggleReverseMoveToMode();
+			}
 			break;
+		}
+
+		case GameMessage::MSG_RAW_KEY_UP:
+		{
+			// TheSuperHackers @feature Release half of hold to aim reverse move. The meta event
+			// only fires on the press, so watch for whatever key TOGGLE_REVERSEMOVE is bound to
+			// coming up. The message is kept, nothing here consumes the key.
+			if( !m_reverseMoveAiming )
+				break;
+
+			const Int key = msg->getArgument( 0 )->integer;
+			Bool isReverseMoveKey = FALSE;
+			for( const MetaMapRec *map = TheMetaMap->getFirstMetaMapRec(); map; map = map->m_next )
+			{
+				if( map->m_meta == GameMessage::MSG_META_TOGGLE_REVERSEMOVE && (Int)map->m_key == key )
+					isReverseMoveKey = TRUE;
+			}
+			if( !isReverseMoveKey )
+				break;
+
+			m_reverseMoveAiming = FALSE;
+
+			// A click while the key was held has already given the order and dropped the mode.
+			// With nowhere to fire, the mode stays armed for the next click, so the press is not lost.
+			if( TheInGameUI->isInReverseMoveToMode() )
+				quickCastReverseMove();
+			break;
+		}
 
 		case GameMessage::MSG_META_BEGIN_CAMERA_ROTATE_LEFT:
 			DEBUG_ASSERTCRASH(!TheInGameUI->isCameraRotatingLeft(), ("Setting rotate camera left, but it's already set!"));

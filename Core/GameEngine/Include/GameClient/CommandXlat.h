@@ -49,6 +49,7 @@ private:
 
 	Int m_objective;
 	Bool m_teamExists;				///< is there a currently selected "team"?
+	Bool m_reverseMoveAiming;	///< TheSuperHackers @feature the reverse move key is held to aim, fire on release
 
 	// these are for determining if a drag occurred or it was just a sloppy click
 	ICoord2D m_rightMouseDownAnchor;		// the location of a possible mouse drag start
@@ -61,6 +62,7 @@ private:
 	GameMessage::Type createEnterMessage( Drawable *enter, CommandEvaluateType commandType );
 	GameMessage::Type createSmartGarrisonMessage( Drawable *target, CommandEvaluateType commandType );
 	GameMessage::Type issueMoveToLocationCommand( const Coord3D *pos, Drawable *drawableInWay, CommandEvaluateType commandType );
+	Bool quickCastReverseMove();
 	GameMessage::Type issueAttackCommand( Drawable *target, CommandEvaluateType commandType, GUICommandType command = (GUICommandType)0 );
 	GameMessage::Type issueSpecialPowerCommand( const CommandButton *command, CommandEvaluateType commandType, Drawable *target, const Coord3D *pos, Object* ignoreSelObj );
 	GameMessage::Type issueFireWeaponCommand( const CommandButton *command, CommandEvaluateType commandType, Drawable *target, const Coord3D *pos );

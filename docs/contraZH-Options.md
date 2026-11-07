@@ -230,6 +230,9 @@ Notes:
 Caps Lock arms a reverse move for the whole selection; the next terrain click drives there in
 reverse, like the `REVERSE_MOVE` button. Pressing Caps Lock again or arming attack move cancels it.
 
+* `CastMode` applies to it like a command hotkey. `QuickCast` reverses to the cursor on the press.
+`QuickCastWithIndicator` shows the reverse move cursor while held and reverses to the cursor on
+release. Pressed or released over the UI, it stays armed for the next click instead.
 * `TOGGLE_REVERSEMOVE` in CommandMap.ini rebinds it. The Caps Lock default only fills an empty slot.
 * `KEY_CAPS` is a new CommandMap key name. The Caps Lock state still toggles.
 * The cursor uses a `MouseCursor ReverseMove` block from Mouse.ini if present (e.g. `Image = SCCMove`,
