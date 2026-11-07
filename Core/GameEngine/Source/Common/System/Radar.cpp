@@ -1466,6 +1466,9 @@ void Radar::loadPostProcess()
 	//
 	refreshTerrain( TheTerrainLogic );
 
+	// TheSuperHackers @feature The save holds blip colors from the HouseColorMode it was made in.
+	refreshObjectColors();
+
 }
 
 // ------------------------------------------------------------------------------------------------

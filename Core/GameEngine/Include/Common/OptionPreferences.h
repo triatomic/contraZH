@@ -112,7 +112,7 @@ enum AlliedDecalMode CPP_11(: Int)
 enum HouseColorMode CPP_11(: Int)
 {
 	HouseColorMode_PlayerColors = 0,	///< every player in their own color (retail behavior)
-	HouseColorMode_Basic,						///< yellow for you, cyan for allies, red for enemies
+	HouseColorMode_Basic,						///< blue for you, yellow for allies, red for enemies
 
 	HouseColorMode_Count,
 	HouseColorMode_Default = HouseColorMode_PlayerColors

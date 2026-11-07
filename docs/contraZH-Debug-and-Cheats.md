@@ -195,7 +195,7 @@ Gameplay cheats are single player only. Fast-forward also works in replays.
 | `Ctrl + S` | Toggle special power cooldown delays. | `CHEAT_TOGGLE_SPECIAL_POWER_DELAYS` |
 | `Shift + Ctrl + Space` | Switch control to the next non-neutral player. | `CHEAT_SWITCH_TEAMS` |
 | `Shift + Ctrl + X` | Kill the selected objects. | `CHEAT_KILL_SELECTION` |
-| `Alt + G` | Toggle Hand-of-God mode, which kills an object when you select it. Shadowed by the `CYCLE_HOUSE_COLOR_MODE` default; rebind one of them in CommandMap.ini to use both. | `CHEAT_TOGGLE_HAND_OF_GOD_MODE` |
+| `Alt + G` | Toggle Hand-of-God mode, which kills an object when you select it. | `CHEAT_TOGGLE_HAND_OF_GOD_MODE` |
 | `Alt + H` | Toggle the object health debug display. | `CHEAT_SHOW_HEALTH` |
 | `Alt + T` | Toggle on-screen message text. | `CHEAT_TOGGLE_MESSAGE_TEXT` |
 | `Shift + Ctrl + F2` through `F9` | Run the map script `KEY_F2` through `KEY_F9`, if present. | `CHEAT_RUNSCRIPT2` through `CHEAT_RUNSCRIPT9` |
@@ -221,7 +221,7 @@ selection controls.
 
 ## Controls available without cheats
 
-* `Alt + G` - (Cycles `HouseColorMode` between Default and Basic for the current session. Does not
+* `Ctrl + Shift + G` - (Cycles `HouseColorMode` between Default and Basic for the current session. Does not
 save to Options.ini. `CYCLE_HOUSE_COLOR_MODE` in CommandMap.ini)
 * ``Ctrl + ` `` - (Cycles `HealthBarDisplayMode` through Classic, Damaged and Always for the current
 session. Does not save to Options.ini. `CYCLE_HEALTH_BAR_MODE` in CommandMap.ini)

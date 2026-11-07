@@ -1313,16 +1313,14 @@ void MetaMap::generateMetaMap()
 		}
 	}
 	{
-		// TheSuperHackers @feature Alt+G cycles HouseColorMode. Free in retail and in Contra's
-		// CommandMap.ini. Builds that load CommandMapDemo.ini have CHEAT_TOGGLE_HAND_OF_GOD_MODE on
-		// Alt+G; this default is linked in after the INI and wins the key, as the cheat defaults
-		// above do.
+		// TheSuperHackers @feature Ctrl+Shift+G cycles HouseColorMode. Free in retail and in
+		// Contra's CommandMap.ini and CommandMapDemo.ini, whose only G binding is Alt+G.
 		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_META_CYCLE_HOUSE_COLOR_MODE);
 		if (map->m_key == MK_NONE)
 		{
 			map->m_key = MK_G;
 			map->m_transition = DOWN;
-			map->m_modState = ALT;
+			map->m_modState = SHIFT_CTRL;
 			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
 		}
 	}

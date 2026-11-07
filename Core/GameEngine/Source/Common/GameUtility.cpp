@@ -41,6 +41,8 @@ namespace rts
 
 namespace detail
 {
+static Bool s_relationshipsChanged = false; ///< basic house colors are stale, see markRelationshipsChanged
+
 static Bool isBasicHouseColorMode()
 {
 #if RTS_ZEROHOUR
@@ -158,9 +160,10 @@ Color getHouseColorForLocalView(Color color, const Player* owner)
 	if (color == 0 || !detail::isBasicHouseColorMode() || ThePlayerList == nullptr)
 		return color;
 
-	// An observer watching nobody in particular has no side to color by.
+	// An observer watching nobody in particular has no side to color by. A defeated player still
+	// has one, so they keep the basic colors.
 	const Player* viewer = getObservedOrLocalPlayer_Safe();
-	if (viewer == nullptr || !viewer->isPlayerActive())
+	if (viewer == nullptr || viewer->isPlayerObserver())
 		return color;
 
 	const Player* wearer = (owner != nullptr && detail::wearsColor(owner, color)) ? owner : nullptr;
@@ -175,13 +178,14 @@ Color getHouseColorForLocalView(Color color, const Player* owner)
 	if (wearer == nullptr)
 		return color;
 
+	// The same blue, gold and red as Contra's multiplayer colors, so they read as player colors.
 	if (wearer == viewer)
-		return GameMakeColor(255, 255, 0, 255);
+		return GameMakeColor(67, 104, 254, 255);
 
 	switch (viewer->getRelationship(wearer->getDefaultTeam()))
 	{
 		case ALLIES:
-			return GameMakeColor(0, 255, 255, 255);
+			return GameMakeColor(221, 226, 13, 255);
 		case ENEMIES:
 			return GameMakeColor(255, 0, 0, 255);
 		default:
@@ -199,6 +203,23 @@ void refreshHouseColors()
 
 	if (TheRadar != nullptr)
 		TheRadar->refreshObjectColors();
+}
+
+void markRelationshipsChanged()
+{
+	// Alliances change in the logic (diplomacy, scripts, challenge map setup), often many at once,
+	// so only remember it here and repaint once on the client side.
+	detail::s_relationshipsChanged = true;
+}
+
+void updateHouseColors()
+{
+	if (!detail::s_relationshipsChanged)
+		return;
+
+	detail::s_relationshipsChanged = false;
+	if (detail::isBasicHouseColorMode())
+		refreshHouseColors();
 }
 
 } // namespace rts

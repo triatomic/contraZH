@@ -43,5 +43,7 @@ void changeObservedPlayer(Player* player); ///< Change observed player during ga
 // the result must never reach the game logic.
 Color getHouseColorForLocalView(Color color, const Player* owner);
 void refreshHouseColors(); ///< Recolor every model and radar blip after HouseColorMode or the viewing player changed.
+void markRelationshipsChanged(); ///< Cheap, safe from the logic: basic house colors repaint on the next client frame.
+void updateHouseColors(); ///< Once per client frame: does the repaint markRelationshipsChanged asked for.
 
 } // namespace rts

@@ -578,6 +578,9 @@ void GameClient::update()
 		}
 	}
 
+	// TheSuperHackers @feature Basic house colors follow alliance changes.
+	rts::updateHouseColors();
+
 	//Update snow particles.
 	if (TheSnowManager)
 		TheSnowManager->UPDATE();

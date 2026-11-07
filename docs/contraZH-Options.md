@@ -49,10 +49,10 @@ hurt objects, `Always` on everything.)
 fired, tinted in player colour (`House`) or faction colour (`Army`). `Hidden` is retail. Enemy
 decals stay hidden. Needs `ComboBoxAlliedDecals` and `AlliedDecalsLabel` in `OptionsMenu.wnd` for
 the menu control.)
-* `HouseColorMode = Default` - (`Default` | `Basic`. `Basic` draws your units yellow, allies cyan
+* `HouseColorMode = Default` - (`Default` | `Basic`. `Basic` draws your units blue, allies yellow
 and enemies red, on the models and the radar. Neutrals and civilians keep their own color, a
 disguised unit takes the color of the side it pretends to be, and an observer watching no one
-sees the default colors. Only this client's view changes. `Alt + G` cycles it in game for the
+sees the default colors. Only this client's view changes. `Ctrl + Shift + G` cycles it in game for the
 session. Needs `ComboBoxHouseColors` and `HouseColorsLabel` in `OptionsMenu.wnd` for the menu
 control.)
 * `NumericalHealth = No` - (Yes prints hit points beside the health bar, wherever a bar shows.)

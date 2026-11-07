@@ -53,6 +53,7 @@
 #include "Common/CRCDebug.h"
 #include "Common/DisabledTypes.h"
 #include "Common/GameState.h"
+#include "Common/GameUtility.h"
 #include "Common/GlobalData.h"
 #include "Common/MessageStream.h"
 #include "Common/MiscAudio.h"
@@ -616,12 +617,14 @@ void Player::setPlayerRelationship(const Player *that, Relationship r)
 	{
 		// note that this creates the entry if it doesn't exist.
 		m_playerRelations->m_map[that->getPlayerIndex()] = r;
+		rts::markRelationshipsChanged();
 	}
 }
 
 // ------------------------------------------------------------------------
 Bool Player::removePlayerRelationship(const Player *that)
 {
+	rts::markRelationshipsChanged();
 	if (!m_playerRelations->m_map.empty())
 	{
 		if (that == nullptr)
@@ -649,12 +652,14 @@ void Player::setTeamRelationship(const Team *that, Relationship r)
 	{
 		// note that this creates the entry if it doesn't exist.
 		m_teamRelations->m_map[that->getID()] = r;
+		rts::markRelationshipsChanged();
 	}
 }
 
 // ------------------------------------------------------------------------
 Bool Player::removeTeamRelationship(const Team *that)
 {
+	rts::markRelationshipsChanged();
 	if (!m_teamRelations->m_map.empty())
 	{
 		if (that == nullptr)
