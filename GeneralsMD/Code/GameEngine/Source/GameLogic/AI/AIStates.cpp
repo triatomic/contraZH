@@ -6830,7 +6830,7 @@ void AIEnterState::onExit( StateExitType status )
 			ContainModuleInterface* contain = goal->getContain();
 			if (contain)
 			{
-				if (contain->isContained(obj))
+				if (obj->isDisabledByType(DISABLED_HELD))
 					TheCommandSequence->unitOnHeld(obj);
 				contain->onObjectWantsToEnterOrExit(obj, WANTS_NEITHER);
 			}
