@@ -751,6 +751,7 @@ Keyboard::Keyboard()
 	memset( m_keys, 0, sizeof( m_keys ) );
 	memset( m_keyStatus, 0, sizeof( m_keyStatus ) );
 	m_modifiers = KEY_STATE_NONE;
+	m_updateCount = 0;
 	m_shift2Key = KEY_NONE;
 	m_repeatDelayMsec = KEY_REPEAT_DELAY_MSEC;
 	m_repeatIntervalMsec = KEY_REPEAT_INTERVAL_MSEC;
@@ -794,6 +795,7 @@ void Keyboard::update()
 
 	// update the key data
 	updateKeys();
+	m_updateCount++;
 
 }
 

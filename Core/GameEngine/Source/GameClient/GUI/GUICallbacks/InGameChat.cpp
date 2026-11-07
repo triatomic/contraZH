@@ -42,6 +42,7 @@
 #include "GameClient/GameText.h"
 #include "GameClient/GUICallbacks.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/Keyboard.h"
 #include "GameClient/LanguageFilter.h"
 #include "GameLogic/GameLogic.h"
 #include "GameNetwork/GameInfo.h"
@@ -208,10 +209,11 @@ Bool handleInGameSlashCommands(UnicodeString uText)
 // ------------------------------------------------------------------------------------------------
 void ToggleInGameChat( Bool immediate )
 {
-	static Bool justHid = false;
-	if (justHid)
+	// One Enter press arrives twice, as a key down and as a typed character, up to one keyboard read apart in either order
+	static UnsignedInt lastToggleRead = 0;
+	const UnsignedInt keyboardRead = TheKeyboard->getUpdateCount();
+	if (lastToggleRead != 0 && keyboardRead - lastToggleRead <= 1)
 	{
-		justHid = false;
 		return;
 	}
 
@@ -225,6 +227,8 @@ void ToggleInGameChat( Bool immediate )
 		!TheGlobalData->m_enableSingleplayerChatWindow
 		&& !TheGameLogic->isInMultiplayerGame() && TheGlobalData->m_netMinPlayers)
 		return;
+
+	lastToggleRead = keyboardRead;
 
 	if (chatWindow)
 	{
@@ -273,7 +277,6 @@ void ToggleInGameChat( Bool immediate )
 				}
 				GadgetTextEntrySetText( chatTextEntry, UnicodeString::TheEmptyString );
 				HideInGameChat( immediate );
-				justHid = true;
 			}
 		}
 	}
