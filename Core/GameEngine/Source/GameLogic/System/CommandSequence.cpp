@@ -707,7 +707,8 @@ Bool CommandSequence::includeUnitInTypicalMovingCommand(UnsignedInt cmdNodeID, O
 	if (isTypicalMovingCommand(cmdNode->m_cmdType))
 		cmdNode->m_allocatedDest.insert(std::make_pair(obj->getID(), objDest));
 
-	handleMoveStreak(obj);
+	if (obj->getCommandVerifyStatus() != STATUS_UNIT_PENDING)
+		handleMoveStreak(obj);
 
 	return true;
 }
@@ -1513,7 +1514,7 @@ Bool CommandSequence::dozerPendingTask(Object *obj)
 	return false;
 }
 
-Bool CommandSequence::oclPending(Object* obj)
+Bool CommandSequence::oclPending(Object *obj)
 {
 	if (obj->getCommandVerifyStatus() == STATUS_AWAITING)
 	{
