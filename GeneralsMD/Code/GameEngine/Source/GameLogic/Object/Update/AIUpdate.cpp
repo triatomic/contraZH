@@ -5958,7 +5958,6 @@ void AIUpdateInterface::proceedNextCommand()
 	if (cvs == STATUS_COMPLETE || cvs == STATUS_OCL_COMPLETE)
 	{
 		TheCommandSequence->removeCurrentCommand(obj);
-		TheCommandSequence->proceedNextCommand(obj);
 	}
 	else if (cvs == STATUS_EXIT_VERIFIED && obj->isPendingExitListEmpty())
 	{
@@ -5966,11 +5965,13 @@ void AIUpdateInterface::proceedNextCommand()
 			obj->setCommandVerifyStatus(STATUS_FRESH);
 		else
 			obj->setCommandVerifyStatus(STATUS_NONE);
-
-		TheCommandSequence->proceedNextCommand(obj);
 	}
 	else if (cvs == STATUS_EXIT_VERIFIED && TheCommandSequence->isCurrentExitCommand(obj))
 	{
-		TheCommandSequence->proceedNextCommand(obj);
+		obj->setCommandVerifyStatus(STATUS_FRESH);
 	}
+
+	cvs = obj->getCommandVerifyStatus();
+	if (cvs == STATUS_FRESH)
+		TheCommandSequence->proceedNextCommand(obj);
 }

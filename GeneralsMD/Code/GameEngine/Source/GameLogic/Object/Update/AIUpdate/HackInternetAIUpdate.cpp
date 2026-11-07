@@ -130,6 +130,8 @@ UpdateSleepTime HackInternetAIUpdate::update()
 
 				if (cvs == STATUS_EXIT_VERIFIED)
 					obj->setCommandVerifyStatus(cvs);
+
+				while (TheCommandSequence->handleMoveStreak(obj));
 			}
 			else
 				aiDoCommand(&parms);

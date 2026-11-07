@@ -157,6 +157,8 @@ public:
 	Bool verifyFollowPathCommand(Object *obj);
 	Bool terminateVerifiedFollowPathCommand(Object *obj);
 
+	Bool handleMoveStreak(Object *obj);
+
 	UnsignedInt removeCurrentCommand(Object *obj, Bool doCleanUp = true);
 	void updateConstructionCount(Object *obj, Int delta);
 	Int getConstructionCount(Object *obj);

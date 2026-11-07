@@ -238,12 +238,6 @@ UpdateSleepTime SpecialAbilityUpdate::update()
   //We need to do this now because it's possible the special objects need to be checked while
   //the the special ability is over (thus inactive).
 
-  if (getObject()->getCommandVerifyStatus() == STATUS_COMPLETE)
-  {
-    TheCommandSequence->removeCurrentCommand(getObject());
-    TheCommandSequence->proceedNextCommand(getObject());
-  }
-
 	const SpecialAbilityUpdateModuleData* data = getSpecialAbilityUpdateModuleData();
 
 	validateSpecialObjects();

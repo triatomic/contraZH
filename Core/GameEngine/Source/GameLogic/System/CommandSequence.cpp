@@ -602,6 +602,64 @@ UnsignedInt CommandSequence::newSwitchWeaponCommand(CommandType cmdType, WeaponS
 	return cmdNode->m_nodeID;
 }
 
+Bool CommandSequence::handleMoveStreak(Object* obj)
+{
+	if (!obj)
+		return false;
+
+	UnsignedInt curStreakID = obj->getLastCommandInMoveStreak();
+	CommandNode *curNode = findCommandByID(obj->getCurrentCommand());
+
+	CommandVerifyStatus cvs = obj->getCommandVerifyStatus();
+
+	// ShigureUi 07/11/2026 Don't bother do current command, it will be done somewhere else.
+	if (!curStreakID && (curNode->m_cmdType == COMMAND_DO_MOVETO || curNode->m_cmdType == COMMAND_DO_REVERSE_MOVETO) && cvs != STATUS_EXIT_VERIFIED)
+	{
+		obj->setLastCommandInMoveStreak(obj->getCurrentCommand());
+		return true;
+	}
+
+	CommandNode *curStreak = findCommandByID(curStreakID);
+	CommandNode *nextStreak = nextCommand(obj, curStreak);
+
+	if (!nextStreak || (nextStreak->m_cmdType != COMMAND_DO_MOVETO && nextStreak->m_cmdType != COMMAND_DO_REVERSE_MOVETO))
+		return false;
+
+	obj->setLastCommandInMoveStreak(nextStreak->m_nodeID);
+
+	AIUpdateInterface* ai = obj->getAI();
+	if (ai)
+	{
+		Coord3D curDest, nextDest;
+		ObjectToLocMap::iterator it;
+
+		it = nextStreak->m_allocatedDest.find(obj->getID());
+		if (it == nextStreak->m_allocatedDest.end())
+			nextDest = nextStreak->m_loc;
+		else
+			nextDest = it->second;
+		
+		if (ai->getAIStateType() == AI_FOLLOW_PATH)
+		{
+			ai->aiFollowPathAppend(&nextDest, CMD_FROM_PLAYER, nextStreak->m_cmdType == COMMAND_DO_REVERSE_MOVETO, nextStreak->m_nodeID);
+		}
+		else
+		{
+			it = curStreak->m_allocatedDest.find(obj->getID());
+			if (it == curStreak->m_allocatedDest.end())
+				curDest = curStreak->m_loc;
+			else
+				curDest = it->second;
+
+			VecCoord3D path;
+			path.push_back(curDest);
+			ai->aiFollowPath(&path, nullptr, CMD_FROM_PLAYER, curStreak->m_cmdType == COMMAND_DO_REVERSE_MOVETO, curStreakID);
+			ai->aiFollowPathAppend(&nextDest, CMD_FROM_PLAYER, nextStreak->m_cmdType == COMMAND_DO_REVERSE_MOVETO, nextStreak->m_nodeID);
+		}
+	}
+	return false;
+}
+
 Bool CommandSequence::includeUnitInCommand(UnsignedInt cmdNodeID, Object *obj, const Coord3D *objDest)
 {
 	if (!obj)
@@ -625,44 +683,12 @@ Bool CommandSequence::includeUnitInCommand(UnsignedInt cmdNodeID, Object *obj, c
 		it->second = cmdNodeID;
 
 		obj->setLastCommand(cmdNodeID);
-
-		if ((cmdNode->m_cmdType == COMMAND_DO_MOVETO || cmdNode->m_cmdType == COMMAND_DO_REVERSE_MOVETO)
-			&& obj->getLastCommandInMoveStreak() == lastCmdNodeID)
-		{
-			obj->setLastCommandInMoveStreak(cmdNodeID);
-
-			AIUpdateInterface *ai = obj->getAI();
-			if (ai)
-			{
-				Coord3D dest;
-				ObjectToLocMap::iterator it;
-				if (ai->getAIStateType() == AI_FOLLOW_PATH)
-				{
-					ai->aiFollowPathAppend(objDest, CMD_FROM_PLAYER, cmdNode->m_cmdType == COMMAND_DO_REVERSE_MOVETO, cmdNodeID);
-				}
-				else
-				{
-					VecCoord3D path;
-					it = lastCmdNode->m_allocatedDest.find(obj->getID());
-					if (it == lastCmdNode->m_allocatedDest.end())
-						dest = lastCmdNode->m_loc;
-					else
-						dest = it->second;
-					path.push_back(dest);
-					ai->aiFollowPath(&path, nullptr, CMD_FROM_PLAYER, lastCmdNode->m_cmdType == COMMAND_DO_REVERSE_MOVETO, lastCmdNodeID);
-					ai->aiFollowPathAppend(objDest, CMD_FROM_PLAYER, cmdNode->m_cmdType == COMMAND_DO_REVERSE_MOVETO, cmdNodeID);
-				}
-			}
-		}
 	}
 	else
 	{
 		obj->setCurrentCommand(cmdNodeID);
 		obj->setLastCommand(cmdNodeID);
 		obj->setCommandVerifyStatus(STATUS_FRESH);
-
-		if (cmdNode->m_cmdType == COMMAND_DO_MOVETO || cmdNode->m_cmdType == COMMAND_DO_REVERSE_MOVETO)
-			obj->setLastCommandInMoveStreak(cmdNodeID);
 	}
 
 	if (cmdNode->m_cmdType == COMMAND_DOZER_CONSTRUCT || cmdNode->m_cmdType == COMMAND_RESUME_CONSTRUCTION)
@@ -680,6 +706,8 @@ Bool CommandSequence::includeUnitInTypicalMovingCommand(UnsignedInt cmdNodeID, O
 
 	if (isTypicalMovingCommand(cmdNode->m_cmdType))
 		cmdNode->m_allocatedDest.insert(std::make_pair(obj->getID(), objDest));
+
+	handleMoveStreak(obj);
 
 	return true;
 }
@@ -740,7 +768,6 @@ inline Bool CommandSequence::isLocatableCommand(UnsignedInt cmdNodeID)
 		case COMMAND_TOGGLE_HOLD_FIRE:
 		case COMMAND_TOGGLE_DEPLOY:
 			return false;
-			break;
 		case COMMAND_DO_GUARD_OBJECT:
 		case COMMAND_DO_ATTACK_OBJECT:
 		case COMMAND_DO_FORCE_ATTACK_OBJECT:
@@ -752,8 +779,12 @@ inline Bool CommandSequence::isLocatableCommand(UnsignedInt cmdNodeID)
 		case COMMAND_RESUME_CONSTRUCTION:
 		case COMMAND_ENTER:
 		case COMMAND_DOCK:
-			return true;
-			break;
+		{
+			if (TheGameLogic->findObjectByID(cmdNode->m_targetID))
+				return true;
+			else
+				return false;
+		}
 		case COMMAND_DO_COMBATDROP:
 		{
 			if (!cmdNode->m_targetID || TheGameLogic->findObjectByID(cmdNode->m_targetID))
@@ -988,23 +1019,13 @@ void CommandSequence::doCurrentCommand(Object *obj, CommandVerifyStatus cvs)
 				VecCoord3D path;
 				path.push_back(unitLoc);
 				ai->aiFollowPath(&path, nullptr, cmdSource, isReverse, cmdNode->m_nodeID);
-
-				CommandNode *nextNode = nextCommand(obj, cmdNode);
-
-				while (nextNode)
+				if (!TheCommandSequence->isStillAwaiting(obj))
 				{
-					if (nextNode->m_cmdType != COMMAND_DO_MOVETO && nextNode->m_cmdType != COMMAND_DO_REVERSE_MOVETO)
-						break;
-					obj->setLastCommandInMoveStreak(nextNode->m_nodeID);
-
-					it = nextNode->m_allocatedDest.find(obj->getID());
-					if (it == nextNode->m_allocatedDest.end())
-						unitLoc = nextNode->m_loc;
-					else
-						unitLoc = it->second;
-
-					ai->aiFollowPathAppend(&unitLoc, cmdSource, nextNode->m_cmdType == COMMAND_DO_REVERSE_MOVETO, nextNode->m_nodeID);
-					nextNode = nextCommand(obj, nextNode);
+					obj->setLastCommandInMoveStreak(cmdNode->m_nodeID);
+					if (obj->getCommandVerifyStatus() != STATUS_UNIT_PENDING)
+					{
+						while (handleMoveStreak(obj));
+					}
 				}
 			}
 			break;
