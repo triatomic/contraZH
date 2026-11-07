@@ -26,6 +26,7 @@
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "Common/GlobalData.h"
 #include "WW3D2/dx8wrapper.h"
+#include "WW3D2/Renderer.h"
 #include "WW3D2/dx8caps.h"
 #include "WW3D2/dx8vertexbuffer.h"
 #include "WW3D2/dx8indexbuffer.h"
@@ -177,7 +178,7 @@ void W3DShockwaveManager::render(RenderInfoClass &rinfo)
 	rinfo.Camera.Get_Transform().Get_X_Vector(&cameraRight);
 
 	Matrix4x4 identity(true);
-	DX8Wrapper::Set_Transform(D3DTS_WORLD, identity);
+	Renderer::Set_Transform(RenderTransform_World, identity);
 	DX8Wrapper::Set_Texture(0, nullptr);
 	DX8Wrapper::Set_Texture(1, nullptr);
 	VertexMaterialClass *material = VertexMaterialClass::Get_Preset(VertexMaterialClass::PRELIT_DIFFUSE);

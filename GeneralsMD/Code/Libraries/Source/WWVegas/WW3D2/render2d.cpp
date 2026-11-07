@@ -610,8 +610,8 @@ void Render2DClass::Render()
 	Matrix4x4 view,proj;
 	Matrix4x4 identity(true);
 
-	DX8Wrapper::Get_Transform(D3DTS_VIEW,view);
-	DX8Wrapper::Get_Transform(D3DTS_PROJECTION,proj);
+	Renderer::Get_Transform(RenderTransform_View,view);
+	Renderer::Get_Transform(RenderTransform_Projection,proj);
 
 	//
 	//	Configure the viewport for the entire target, which supersampling makes larger than the screen
@@ -633,9 +633,9 @@ void Render2DClass::Render()
 	DX8Wrapper::Set_Material(vm);
 	REF_PTR_RELEASE(vm);
 
-	DX8Wrapper::Set_World_Identity();
-	DX8Wrapper::Set_View_Identity();
-	DX8Wrapper::Set_Transform(D3DTS_PROJECTION,identity);
+	Renderer::Set_World_Identity();
+	Renderer::Set_View_Identity();
+	Renderer::Set_Transform(RenderTransform_Projection,identity);
 
 	DynamicVBAccessClass vb(BUFFER_TYPE_DYNAMIC_DX8,dynamic_fvf_type,Vertices.Count());
 	{
@@ -700,8 +700,8 @@ void Render2DClass::Render()
 	DX8Wrapper::Draw_Triangles(0,Indices.Count()/3,0,Vertices.Count());
 	Debug_Statistics::Record_2D_Draw();
 
-	DX8Wrapper::Set_Transform(D3DTS_VIEW,view);
-	DX8Wrapper::Set_Transform(D3DTS_PROJECTION,proj);
+	Renderer::Set_Transform(RenderTransform_View,view);
+	Renderer::Set_Transform(RenderTransform_Projection,proj);
 	if (IsGrayScale)
 		ShaderClass::Invalidate();	//force both stages to be reset.
 

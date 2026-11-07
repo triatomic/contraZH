@@ -333,9 +333,9 @@ void W3DBloom::end(RenderInfoClass &rinfo)
 
 	// the quads are already in clip space
 	Matrix4x4 identity(true);
-	DX8Wrapper::Set_World_Identity();
-	DX8Wrapper::Set_View_Identity();
-	DX8Wrapper::Set_Transform(D3DTS_PROJECTION, identity);
+	Renderer::Set_World_Identity();
+	Renderer::Set_View_Identity();
+	Renderer::Set_Transform(RenderTransform_Projection, identity);
 
 	VertexMaterialClass *material = VertexMaterialClass::Get_Preset(VertexMaterialClass::PRELIT_DIFFUSE);
 	DX8Wrapper::Set_Material(material);

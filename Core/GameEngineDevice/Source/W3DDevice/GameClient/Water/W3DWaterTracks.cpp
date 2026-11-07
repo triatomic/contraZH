@@ -62,6 +62,7 @@
 #include "WW3D2/camera.h"
 #include "WW3D2/assetmgr.h"
 #include "WW3D2/dx8wrapper.h"
+#include "WW3D2/Renderer.h"
 
 #include <float.h>	// FLT_MAX sentinel returned by the editor water-height lookup
 
@@ -946,7 +947,7 @@ Try improving the fit to vertical surfaces like cliffs.
 	diffuseLight=REAL_TO_INT(shadeB) | (REAL_TO_INT(shadeG) << 8) | (REAL_TO_INT(shadeR) << 16);
 
 	Matrix3D tm(1);	///set to identity
-	DX8Wrapper::Set_Transform(D3DTS_WORLD,tm);	//position the water surface
+	Renderer::Set_Transform(RenderTransform_World,tm);	//position the water surface
 
 	DX8Wrapper::Set_Material(m_vertexMaterialClass);
 	DX8Wrapper::Set_Shader(m_shaderClass);

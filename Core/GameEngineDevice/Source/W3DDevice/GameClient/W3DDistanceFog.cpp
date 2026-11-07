@@ -22,6 +22,7 @@
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "Common/GlobalData.h"
 #include "WW3D2/dx8wrapper.h"
+#include "WW3D2/Renderer.h"
 #include "WW3D2/dx8caps.h"
 #include "WW3D2/shader.h"
 #include "WW3D2/vertmaterial.h"
@@ -150,9 +151,9 @@ void W3DDistanceFog::render(CameraClass &camera)
 	VertexMaterialClass *material = VertexMaterialClass::Get_Preset(VertexMaterialClass::PRELIT_DIFFUSE);
 	DX8Wrapper::Set_Material(material);
 	REF_PTR_RELEASE(material);
-	DX8Wrapper::Set_World_Identity();
-	DX8Wrapper::Set_View_Identity();
-	DX8Wrapper::Set_Transform(D3DTS_PROJECTION, Matrix4x4(true));
+	Renderer::Set_World_Identity();
+	Renderer::Set_View_Identity();
+	Renderer::Set_Transform(RenderTransform_Projection, Matrix4x4(true));
 	ShaderClass replace = ShaderClass::_PresetOpaque2DShader;
 	replace.Set_Cull_Mode(ShaderClass::CULL_MODE_DISABLE);
 	DX8Wrapper::Set_Shader(replace);

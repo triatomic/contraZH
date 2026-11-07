@@ -42,6 +42,7 @@
 
 #include "dx8renderer.h"
 #include "dx8wrapper.h"
+#include "Renderer.h"
 #include "dx8polygonrenderer.h"
 #include "dx8vertexbuffer.h"
 #include "dx8indexbuffer.h"
@@ -531,7 +532,7 @@ void DX8FVFCategoryContainer::Render_Material_Pass_Window()
 		for (size_t i=0;i<fixed.size();++i)
 		{
 			MeshClass * mesh = fixed[i].first;
-			DX8Wrapper::Set_Transform(D3DTS_WORLD,mesh->Get_Transform());
+			Renderer::Set_Transform(RenderTransform_World,mesh->Get_Transform());
 			pass->Install_Polygon_Materials(fixed[i].second, mesh);
 			fixed[i].second->Render(mesh->Get_Base_Vertex_Offset());
 		}
@@ -2122,7 +2123,7 @@ void DX8SkinFVFCategoryContainer::Render_Skinned_Material_Passes()
 		MaterialPassClass * pass = runs[r];
 		pass->Install_Materials();
 		DX8Wrapper::Set_Index_Buffer(index_buffer,0);
-		DX8Wrapper::Set_World_Identity();
+		Renderer::Set_World_Identity();
 
 		for (size_t i=0;i<tasks.size();++i)
 		{
@@ -2954,11 +2955,11 @@ void DX8TextureCategoryClass::Render_Task(PolyRenderTaskClass * prt, VertexMater
 
 	if (identity) {
 		SNAPSHOT_SAY(("Set_World_Identity"));
-		DX8Wrapper::Set_World_Identity();
+		Renderer::Set_World_Identity();
 	}
 	else {
 		SNAPSHOT_SAY(("Set_World_Transform"));
-		DX8Wrapper::Set_Transform(D3DTS_WORLD,*world_transform);
+		Renderer::Set_Transform(RenderTransform_World,*world_transform);
 	}
 
 

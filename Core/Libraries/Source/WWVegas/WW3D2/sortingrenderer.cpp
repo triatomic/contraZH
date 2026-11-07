@@ -43,6 +43,7 @@
 #include "dx8indexbuffer.h"
 #include "dx8wrapper.h"
 #include "dx8renderer.h"
+#include "Renderer.h"
 #include "vertmaterial.h"
 #include "texture.h"
 #include "dx8compat.h"
@@ -1016,8 +1017,8 @@ void SortingRendererClass::Flush_Disruption()
 
 	Matrix4x4 old_view;
 	Matrix4x4 old_world;
-	DX8Wrapper::Get_Transform(D3DTS_VIEW,old_view);
-	DX8Wrapper::Get_Transform(D3DTS_WORLD,old_world);
+	Renderer::Get_Transform(RenderTransform_View,old_view);
+	Renderer::Get_Transform(RenderTransform_World,old_world);
 
 	for (size_t i=0;i<disrupt_list.size();++i) {
 		SortingNodeStruct* state=disrupt_list[i];
@@ -1065,8 +1066,8 @@ void SortingRendererClass::Flush_Disruption()
 
 	DX8Wrapper::Set_Index_Buffer(nullptr,0);
 	DX8Wrapper::Set_Vertex_Buffer(nullptr);
-	DX8Wrapper::Set_Transform(D3DTS_VIEW,old_view);
-	DX8Wrapper::Set_Transform(D3DTS_WORLD,old_world);
+	Renderer::Set_Transform(RenderTransform_View,old_view);
+	Renderer::Set_Transform(RenderTransform_World,old_world);
 }
 
 // ----------------------------------------------------------------------------
@@ -1076,8 +1077,8 @@ void SortingRendererClass::Flush()
 	WWPROFILE("SortingRenderer::Flush");
 	Matrix4x4 old_view;
 	Matrix4x4 old_world;
-	DX8Wrapper::Get_Transform(D3DTS_VIEW,old_view);
-	DX8Wrapper::Get_Transform(D3DTS_WORLD,old_world);
+	Renderer::Get_Transform(RenderTransform_View,old_view);
+	Renderer::Get_Transform(RenderTransform_World,old_world);
 
 	// Only a pass that takes a scene copy draws these, and it has had its turn.
 	Recycle_Nodes(disrupt_list);
@@ -1103,8 +1104,8 @@ void SortingRendererClass::Flush()
 	DynamicVBAccessClass::_Reset(false);
 
 
-	DX8Wrapper::Set_Transform(D3DTS_VIEW,old_view);
-	DX8Wrapper::Set_Transform(D3DTS_WORLD,old_world);
+	Renderer::Set_Transform(RenderTransform_View,old_view);
+	Renderer::Set_Transform(RenderTransform_World,old_world);
 
 }
 

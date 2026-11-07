@@ -68,6 +68,7 @@
 #include "W3DDevice/GameClient/W3DShroud.h"
 #include "WW3D2/camera.h"
 #include "WW3D2/dx8wrapper.h"
+#include "WW3D2/Renderer.h"
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/mesh.h"
 #include "WW3D2/meshmdl.h"
@@ -1613,7 +1614,7 @@ void W3DBridgeBuffer::renderShadowMapCaster()
 		return;
 	}
 
-	DX8Wrapper::Set_Transform(D3DTS_WORLD, Matrix3D(true));
+	Renderer::Set_Transform(RenderTransform_World, Matrix3D(true));
 	DX8Wrapper::Set_Material(m_vertexMaterial);
 	DX8Wrapper::Set_Index_Buffer(m_indexBridge,0);
 	DX8Wrapper::Set_Vertex_Buffer(m_vertexBridge);

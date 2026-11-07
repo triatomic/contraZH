@@ -47,6 +47,7 @@
 #include "WWAudio/WWAudio.h"
 #include "WW3D2/metalmap.h"
 #include "WW3D2/dx8wrapper.h"
+#include "WW3D2/Renderer.h"
 #include "WWMath/matrix3.h"
 #include "WW3D2/shader.h"
 #include "WW3D2/vertmaterial.h"
@@ -333,7 +334,7 @@ static void Render_Bone_Overlays (CW3DViewDoc *doc)
 	REF_PTR_RELEASE (vm);
 
 	Matrix3D identity(true);
-	DX8Wrapper::Set_Transform (D3DTS_WORLD, identity);
+	Renderer::Set_Transform (RenderTransform_World, identity);
 	DX8Wrapper::Apply_Render_State_Changes ();
 
 	IDirect3DDevice8 *dev = DX8Wrapper::_Get_D3D_Device8 ();
@@ -553,7 +554,7 @@ static void Render_Selected_Item_Overlay (CGraphicView *view, CW3DViewDoc *doc, 
 	REF_PTR_RELEASE (vm);
 
 	Matrix3D identity (true);
-	DX8Wrapper::Set_Transform (D3DTS_WORLD, identity);
+	Renderer::Set_Transform (RenderTransform_World, identity);
 	DX8Wrapper::Apply_Render_State_Changes ();
 
 	IDirect3DDevice8 *dev = DX8Wrapper::_Get_D3D_Device8 ();
@@ -687,7 +688,7 @@ void CGraphicView::Render_Ground (CameraClass *camera, RenderObjClass *obj, cons
 	}
 
 	Matrix3D identity (true);
-	DX8Wrapper::Set_Transform (D3DTS_WORLD, identity);
+	Renderer::Set_Transform (RenderTransform_World, identity);
 	DX8Wrapper::Apply_Render_State_Changes ();
 
 	struct GroundVertex { float x, y, z; DWORD color; };

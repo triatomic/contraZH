@@ -3070,7 +3070,7 @@ void SpecularShader::setTexture(TextureClass *texture, MeshModelClass *model, co
 			else
 			{
 				Matrix4x4 world;
-				DX8Wrapper::Get_Transform(D3DTS_WORLD, world);
+				Renderer::Get_Transform(RenderTransform_World, world);
 				Matrix3D transform;
 				for (Int row = 0; row < 3; row++)
 				{

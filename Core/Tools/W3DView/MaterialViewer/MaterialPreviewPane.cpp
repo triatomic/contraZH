@@ -25,6 +25,7 @@
 #include "WW3D2/coltest.h"	// ray-cast for the Blender-style light placement
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/dx8wrapper.h"
+#include "WW3D2/Renderer.h"
 #include "WW3D2/light.h"
 #include "WWMath/matrix3.h"	// Matrix3x3 for the pan basis
 #include "WWMath/quat.h"		// Build_Matrix3 / Build_Quaternion / Trackball
@@ -1039,7 +1040,7 @@ CMaterialPreviewPane::Render_Highlight_Outline()
 	}
 
 	Matrix3D identity(true);
-	DX8Wrapper::Set_Transform(D3DTS_WORLD, identity);
+	Renderer::Set_Transform(RenderTransform_World, identity);
 	DX8Wrapper::Apply_Render_State_Changes();
 
 	IDirect3DDevice8 *dev = DX8Wrapper::_Get_D3D_Device8();
@@ -1111,7 +1112,7 @@ CMaterialPreviewPane::Render_Highlight_Tint(RenderObjClass *sub)
 		vm->Release_Ref();
 	}
 
-	DX8Wrapper::Set_Transform(D3DTS_WORLD, mesh->Get_Transform());
+	Renderer::Set_Transform(RenderTransform_World, mesh->Get_Transform());
 	DX8Wrapper::Apply_Render_State_Changes();
 
 	IDirect3DDevice8 *dev = DX8Wrapper::_Get_D3D_Device8();
@@ -1184,7 +1185,7 @@ CMaterialPreviewPane::Render_Lamp_Light()
 		vm->Release_Ref();
 	}
 	Matrix3D identity(true);
-	DX8Wrapper::Set_Transform(D3DTS_WORLD, identity);
+	Renderer::Set_Transform(RenderTransform_World, identity);
 
 	for (LampLitBatches::iterator it = batches.begin(); it != batches.end(); ++it) {
 		if (it->second.empty()) {
@@ -1227,7 +1228,7 @@ CMaterialPreviewPane::Render_Lamp_Pools()
 	}
 
 	Matrix3D identity(true);
-	DX8Wrapper::Set_Transform(D3DTS_WORLD, identity);
+	Renderer::Set_Transform(RenderTransform_World, identity);
 	DX8Wrapper::Apply_Render_State_Changes();
 	DX8_SET_FVF(dev, D3DFVF_XYZ | D3DFVF_DIFFUSE);
 

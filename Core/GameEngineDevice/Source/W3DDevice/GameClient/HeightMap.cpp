@@ -2300,7 +2300,7 @@ void HeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 	DX8Wrapper::Set_Texture(1,nullptr);
 	ShaderClass::Invalidate();
 
-	DX8Wrapper::Set_Transform(D3DTS_WORLD,Transform);
+	Renderer::Set_Transform(RenderTransform_World,Transform);
 
 	//Apply the shader and material
 
@@ -2619,7 +2619,7 @@ void HeightMapRenderObjClass::renderLightingModifierOverlay(void)
 	m_stageTwoTexture->restore();
 	ShaderClass::Invalidate();
 	DX8Wrapper::Set_Material(m_vertexMaterialClass);
-	DX8Wrapper::Set_Transform(D3DTS_WORLD, tm);
+	Renderer::Set_Transform(RenderTransform_World, tm);
 	DX8Wrapper::Set_Index_Buffer(m_indexBuffer, 0);
 
 	for (Int passIndex = 0; passIndex < 2; passIndex++)
@@ -2675,7 +2675,7 @@ void HeightMapRenderObjClass::renderShadowMapCaster(const FrustumClass &frustum)
 ///Performs additional terrain rendering pass, blending in the black shroud texture.
 void HeightMapRenderObjClass::renderTerrainPass(CameraClass *pCamera)
 {
-	DX8Wrapper::Set_Transform(D3DTS_WORLD,Matrix3D(true));
+	Renderer::Set_Transform(RenderTransform_World,Matrix3D(true));
 
 	//Apply the shader and material
 
