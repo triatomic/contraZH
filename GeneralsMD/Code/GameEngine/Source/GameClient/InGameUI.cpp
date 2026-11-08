@@ -1216,7 +1216,7 @@ InGameUI::InGameUI()
 	for( i = 0; i < TheGlobalData->m_maxLineBuildObjects; i++ )
 		m_placeIcon[ i ] = nullptr;
 	m_pendingPlaceType = nullptr;
-	m_pendingPlaceSourceObjectID = INVALID_ID;
+	m_pendingPlaceSourceObjectIDs.clear();
 	m_preventLeftClickDeselectionInAlternateMouseModeForOneClick = FALSE;
 	m_placeAnchorStart.x = m_placeAnchorStart.y = 0;
 	m_placeAnchorEnd.x = m_placeAnchorEnd.y = 0;
@@ -2035,20 +2035,54 @@ void InGameUI::handleBuildPlacements()
 			{
 				TheTerrainVisual->removeAllBibs();
 
-				Object *builderObject = TheGameLogic->findObjectByID( getPendingPlaceSourceObjectID() );
+				const std::list<ObjectID> *objIDList = getPendingPlaceSourceObjectIDs();
+				LegalBuildCode lbc, curLbc;
+				Int rating;
+				Bool hasLbc = false;
 
-				LegalBuildCode lbc;
-				lbc = TheBuildAssistant->isLocationLegalToBuild( &world,
-																												 m_pendingPlaceType,
-																												 angle,
-																												 BuildAssistant::USE_QUICK_PATHFIND |
-																												 BuildAssistant::TERRAIN_RESTRICTIONS |
-																												 BuildAssistant::CLEAR_PATH |
-																												 BuildAssistant::NO_OBJECT_OVERLAP |
-																												 BuildAssistant::SHROUD_REVEALED |
-																												 BuildAssistant::IGNORE_STEALTHED,
-																												 builderObject,
-																												 nullptr );
+				for (std::list<ObjectID>::const_iterator it = objIDList->cbegin(); it != objIDList->cend(); it++)
+				{
+					Object *builderObject = TheGameLogic->findObjectByID(*it);
+					if (!builderObject)
+						continue;
+					
+					curLbc = TheBuildAssistant->isLocationLegalToBuild(&world,
+							m_pendingPlaceType,
+							angle,
+							BuildAssistant::USE_QUICK_PATHFIND |
+							BuildAssistant::TERRAIN_RESTRICTIONS |
+							BuildAssistant::CLEAR_PATH |
+							BuildAssistant::NO_OBJECT_OVERLAP |
+							BuildAssistant::SHROUD_REVEALED |
+							BuildAssistant::IGNORE_STEALTHED,
+							builderObject,
+							nullptr);
+					rating = rateLegalBuildCode(curLbc);
+
+					if (!hasLbc)
+					{
+						lbc = curLbc;
+						hasLbc = true;
+					}
+					else if (curLbc == LBC_OK)
+					{
+						lbc = LBC_OK;
+						break;
+					}
+				}
+
+				if (!hasLbc)
+					lbc = TheBuildAssistant->isLocationLegalToBuild(&world,
+						m_pendingPlaceType,
+						angle,
+						BuildAssistant::USE_QUICK_PATHFIND |
+						BuildAssistant::TERRAIN_RESTRICTIONS |
+						BuildAssistant::CLEAR_PATH |
+						BuildAssistant::NO_OBJECT_OVERLAP |
+						BuildAssistant::SHROUD_REVEALED |
+						BuildAssistant::IGNORE_STEALTHED,
+						nullptr,
+						nullptr);
 
 				if( lbc != LBC_OK )
 					m_placeIcon[ 0 ]->colorTint( &IllegalBuildColor );
@@ -2088,7 +2122,7 @@ void InGameUI::handleBuildPlacements()
 				Int maxObjects = TheGlobalData->m_maxLineBuildObjects;
 
 				// get the builder object that will be constructing things
-				Object *builderObject = TheGameLogic->findObjectByID( getPendingPlaceSourceObjectID() );
+				Object *builderObject = TheGameLogic->findObjectByID( getPendingPlaceSourceObjectIDs()->empty() ? INVALID_ID : *(getPendingPlaceSourceObjectIDs()->cbegin()));
 
 				//
 				// given the start/end points in the world and the the angle of the wall, fill
@@ -4018,7 +4052,7 @@ void InGameUI::destroyPlacementIcons()
 	* record what that thing is so that the we can catch the next click in the world
 	* and try to place the object there */
 //-------------------------------------------------------------------------------------------------
-void InGameUI::placeBuildAvailable( const ThingTemplate *build, Drawable *buildDrawable )
+void InGameUI::placeBuildAvailable( const ThingTemplate *build, const DrawableList *buildDrawables )
 {
 
 	if (build != nullptr)
@@ -4042,14 +4076,23 @@ void InGameUI::placeBuildAvailable( const ThingTemplate *build, Drawable *buildD
 
 	//Keep the prev pending place for left click deselection prevention in alternate mouse mode.
 	//We want to keep our dozer selected after initiating construction.
-	setPreventLeftClickDeselectionInAlternateMouseModeForOneClick( m_pendingPlaceSourceObjectID != INVALID_ID );
-	m_pendingPlaceSourceObjectID = INVALID_ID;
+	setPreventLeftClickDeselectionInAlternateMouseModeForOneClick( !m_pendingPlaceSourceObjectIDs.empty());
+	m_pendingPlaceSourceObjectIDs.clear();
 
 	Object *sourceObject = nullptr;
-	if( buildDrawable )
-		sourceObject = buildDrawable->getObject();
-	if( sourceObject )
-		m_pendingPlaceSourceObjectID = sourceObject->getID();
+	if (buildDrawables)
+	{
+		for (DrawableListCIt it = buildDrawables->cbegin(); it != buildDrawables->cend(); it++)
+		{
+			if ((*it) && (*it)->getObject())
+			{
+				if (!sourceObject)
+					sourceObject = (*it)->getObject();
+
+				m_pendingPlaceSourceObjectIDs.push_back((*it)->getObject()->getID());
+			}
+		}
+	}
 
 	//
 	// hack, change our cursor to at least something different ... also note that it's
@@ -4150,10 +4193,10 @@ const ThingTemplate *InGameUI::getPendingPlaceType()
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-ObjectID InGameUI::getPendingPlaceSourceObjectID()
+const std::list<ObjectID> *InGameUI::getPendingPlaceSourceObjectIDs()
 {
 
-	return m_pendingPlaceSourceObjectID;
+	return &m_pendingPlaceSourceObjectIDs;
 
 }
 

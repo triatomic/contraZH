@@ -640,9 +640,9 @@ public:  // ********************************************************************
 	virtual Bool clampToSpecialPowerTargetArea( const CommandButton *cmd, Coord3D &pos ) const;		///< clamp pos into the active constraint area; returns TRUE if a constraint applied
 
 	// build interface
-	virtual void placeBuildAvailable( const ThingTemplate *build, Drawable *buildDrawable );				///< built thing being placed
+	virtual void placeBuildAvailable( const ThingTemplate *build, const DrawableList *buildDrawables );				///< built thing being placed
 	virtual const ThingTemplate *getPendingPlaceType();					///< get item we're trying to place
-	virtual ObjectID getPendingPlaceSourceObjectID();			///< get producing object
+	virtual const std::list<ObjectID> *getPendingPlaceSourceObjectIDs();			///< get producing object
 	virtual Bool getPreventLeftClickDeselectionInAlternateMouseModeForOneClick() const { return m_preventLeftClickDeselectionInAlternateMouseModeForOneClick; }
 	virtual void setPreventLeftClickDeselectionInAlternateMouseModeForOneClick( Bool set ) { m_preventLeftClickDeselectionInAlternateMouseModeForOneClick = set; }
 	virtual void setPlacementStart( const ICoord2D *start );					///< placement anchor point (for choosing angles)
@@ -1019,7 +1019,7 @@ protected:
 	std::vector<RadiusDecal*>		m_specialPowerLocationDecals;						///< client-only radius decals shown at each accepted point/anchor (heap-owned; RadiusDecal copy is broken)
 	BuildProgress								m_buildProgress[ MAX_BUILD_PROGRESS ];	///< progress for building units
 	const ThingTemplate *				m_pendingPlaceType;											///< type of built thing we're trying to place
-	ObjectID										m_pendingPlaceSourceObjectID;						///< source object of the thing constructing the item
+	std::list<ObjectID>					m_pendingPlaceSourceObjectIDs;						///< source object of the thing constructing the item
 	Bool										m_preventLeftClickDeselectionInAlternateMouseModeForOneClick;
 	Drawable **									m_placeIcon;														///< array for drawables to appear at the cursor when building in the world
 	Bool												m_placeAnchorInProgress;								///< is place angle interface for placement active
