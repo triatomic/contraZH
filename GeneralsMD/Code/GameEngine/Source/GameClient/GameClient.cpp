@@ -213,6 +213,10 @@ GameClient::~GameClient()
 	delete TheTerrainVisual;
 	TheTerrainVisual = nullptr;
 
+	// Snow holds D3D resources, which must go before the display releases the device
+	delete TheSnowManager;
+	TheSnowManager = nullptr;
+
 	// destroy the display
 	delete TheDisplay;
 	TheDisplay = nullptr;
@@ -251,9 +255,6 @@ GameClient::~GameClient()
 
 	delete TheEva;
 	TheEva = nullptr;
-
-	delete TheSnowManager;
-	TheSnowManager = nullptr;
 
 }
 
