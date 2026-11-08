@@ -624,8 +624,14 @@ bool DX8Wrapper::Create_Device()
 		return false;
 	}
 
+#if defined(BUILD_WITH_D3D9)
+	// Nothing switches to software processing, and a mixed-mode device creates large pixel shaders about 40 times slower
+	Vertex_Processing_Behavior=(caps.DevCaps&D3DDEVCAPS_HWTRANSFORMANDLIGHT) ?
+		D3DCREATE_HARDWARE_VERTEXPROCESSING : D3DCREATE_SOFTWARE_VERTEXPROCESSING;
+#else
 	Vertex_Processing_Behavior=(caps.DevCaps&D3DDEVCAPS_HWTRANSFORMANDLIGHT) ?
 		D3DCREATE_MIXED_VERTEXPROCESSING : D3DCREATE_SOFTWARE_VERTEXPROCESSING;
+#endif
 
 	// enable this when all 'get' dx calls are removed KJM
 	/*if (caps.DevCaps&D3DDEVCAPS_PUREDEVICE)

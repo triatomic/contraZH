@@ -1069,7 +1069,11 @@ WWINLINE void DX8Wrapper::Set_D3D9_Render_State(D3DRENDERSTATETYPE state, unsign
 		return;
 
 	case D3DRS_SOFTWAREVERTEXPROCESSING:
-		DX8CALL(SetSoftwareVertexProcessing( value ));
+		// Only a mixed-mode device can switch
+		if (Vertex_Processing_Behavior & D3DCREATE_MIXED_VERTEXPROCESSING)
+		{
+			DX8CALL(SetSoftwareVertexProcessing( value ));
+		}
 		return;
 
 	// No D3D9 equivalent. N-patches are gated on Support_NPatches(), which no
