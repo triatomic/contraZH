@@ -217,6 +217,40 @@ GameEngine *TheGameEngine = nullptr;
 SubsystemInterfaceList* TheSubsystemList = nullptr;
 
 //-------------------------------------------------------------------------------------------------
+// Milliseconds since the process started, so the STARTUP lines also cover static initialization.
+static double startupElapsedMs()
+{
+	static Bool s_started = FALSE;
+	static double s_baseMs = 0.0;
+	static LARGE_INTEGER s_start;
+	static LARGE_INTEGER s_frequency;
+
+	LARGE_INTEGER now;
+	QueryPerformanceCounter(&now);
+	if (!s_started)
+	{
+		s_started = TRUE;
+		s_start = now;
+		QueryPerformanceFrequency(&s_frequency);
+
+		FILETIME creationTime, exitTime, kernelTime, userTime, currentTime;
+		if (GetProcessTimes(GetCurrentProcess(), &creationTime, &exitTime, &kernelTime, &userTime))
+		{
+			GetSystemTimeAsFileTime(&currentTime);
+			ULARGE_INTEGER created;
+			ULARGE_INTEGER current;
+			created.LowPart = creationTime.dwLowDateTime;
+			created.HighPart = creationTime.dwHighDateTime;
+			current.LowPart = currentTime.dwLowDateTime;
+			current.HighPart = currentTime.dwHighDateTime;
+			s_baseMs = (double)(current.QuadPart - created.QuadPart) / 10000.0;
+		}
+	}
+
+	return s_baseMs + (double)(now.QuadPart - s_start.QuadPart) * 1000.0 / (double)s_frequency.QuadPart;
+}
+
+//-------------------------------------------------------------------------------------------------
 template<class SUBSYSTEM>
 void initSubsystem(
 	SUBSYSTEM*& sysref,
@@ -228,9 +262,11 @@ void initSubsystem(
 	bool optional = FALSE)
 {
 	sysref = sys;
-	DEBUG_LOG(("STARTUP: begin %s%s%s%s%s", name.str(), path1 ? " " : "", path1 ? path1 : "", path2 ? " " : "", path2 ? path2 : ""));
+	MAYBE_UNUSED const double beginMs = startupElapsedMs();
+	DEBUG_LOG(("STARTUP: [%8.1f ms] begin %s%s%s%s%s", beginMs, name.str(), path1 ? " " : "", path1 ? path1 : "", path2 ? " " : "", path2 ? path2 : ""));
 	TheSubsystemList->initSubsystem(sys, path1, path2, pXfer, name, optional);
-	DEBUG_LOG(("STARTUP: completed %s", name.str()));
+	MAYBE_UNUSED const double endMs = startupElapsedMs();
+	DEBUG_LOG(("STARTUP: [%8.1f ms] completed %s in %.1f ms", endMs, name.str(), endMs - beginMs));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -240,7 +276,7 @@ static const char* s_startupStage = "";
 static void setStartupStage(const char* stage)
 {
 	s_startupStage = stage;
-	DEBUG_LOG(("STARTUP: stage=%s", stage));
+	DEBUG_LOG(("STARTUP: [%8.1f ms] stage=%s", startupElapsedMs(), stage));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -923,7 +959,7 @@ void GameEngine::init()
 	m_discordRichPresence = new GeneralsOnlineDiscordRPC();
 	m_discordRichPresence->Initialize();
 #endif
-	DEBUG_LOG(("STARTUP: engine initialization completed"));
+	DEBUG_LOG(("STARTUP: [%8.1f ms] engine initialization completed", startupElapsedMs()));
 }
 
 /** -----------------------------------------------------------------------------------------------
