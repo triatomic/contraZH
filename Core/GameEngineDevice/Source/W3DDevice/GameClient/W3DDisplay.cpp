@@ -1070,6 +1070,12 @@ void W3DDisplay::init()
 		}
 		WW3D::Set_Texture_Bitdepth(getBitDepth());
 
+		// The recommendation needs the device, so -forceBenchmark only clears it and the device saves it here
+		if (TheGlobalData->m_forceBenchmark)
+		{
+			TheGameLODManager->getRecommendedStaticLODLevel();
+		}
+
 		//Check if level was never set and default to setting most suitable for system.
 		if (TheGameLODManager->getStaticLODLevel() == STATIC_GAME_LOD_UNKNOWN)
 		{

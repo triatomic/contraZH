@@ -162,10 +162,11 @@ public:
 	static VIAProcessorType Get_VIA_Processor() { return VIAProcessor; }
 	static RiseProcessorType Get_Rise_Processor() { return RiseProcessor; }
 
-	// Measured on the first call, which busy-waits for at least 400 ms; later clock changes are not seen.
-	static int Get_Processor_Speed() { Init_Processor_Speed(); return ProcessorSpeed; }
-	static sint64 Get_Processor_Ticks_Per_Second() { Init_Processor_Speed(); return ProcessorTicksPerSecond; }	// Ticks per second
-	static double Get_Inv_Processor_Ticks_Per_Second() { Init_Processor_Speed(); return InvProcessorTicksPerSecond; }	// 1.0 / Ticks per second
+	// Note that processor speed is only calculated at start and could change during execution, so
+	// this number is not to be relied on!
+	static int Get_Processor_Speed() { return ProcessorSpeed; }
+	static sint64 Get_Processor_Ticks_Per_Second() { return ProcessorTicksPerSecond; }	// Ticks per second
+	static double Get_Inv_Processor_Ticks_Per_Second() { return InvProcessorTicksPerSecond; }	// 1.0 / Ticks per second
 
 	static unsigned Get_Feature_Bits() { return FeatureBits; }
 	static unsigned Get_Extended_Feature_Bits() { return ExtendedFeatureBits; }

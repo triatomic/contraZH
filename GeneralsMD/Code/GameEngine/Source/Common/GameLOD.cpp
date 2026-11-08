@@ -46,7 +46,7 @@
 #define PROFILE_ERROR_LIMIT	0.94f	//fraction of profiled result needed to get a match.  Allows some room for error/fluctuation.
 
 //Hack to get access to a static method on the W3DDevice side. -MW
-extern Bool testMinimumRequirements(ChipsetType *videoChipType, CpuType *cpuType, Int *cpuFreq, MemValueType *numRAM, Real *intBenchIndex, Real *floatBenchIndex, Real *memBenchIndex);
+extern Bool testMinimumRequirements(ChipsetType *videoChipType, MemValueType *numRAM);
 
 GameLODManager *TheGameLODManager=nullptr;
 
@@ -144,43 +144,23 @@ DynamicGameLODInfo::DynamicGameLODInfo()
 };
 
 //Keep this in sync with enum in GameLOD.h
-static const char *const CPUNames[] =
-{
-	"XX","P3", "P4","K7", nullptr
-};
-static_assert(ARRAY_SIZE(CPUNames) == CPU_MAX + 1, "Incorrect array size");
-
-//Keep this in sync with enum in GameLOD.h
 static const char *const VideoNames[] =
 {
 	"XX","V2","V3","V4","V5","TNT","TNT2","GF2","R100","PS11","GF3","GF4","PS14","R200","PS20","R300", nullptr
 };
 static_assert(ARRAY_SIZE(VideoNames) == DC_MAX + 1, "Incorrect array size");
 
+// The CPU is not detected, so CPU speed and benchmark lines are read and discarded
 void parseReallyLowMHz(INI* ini)
 {
-	Int mhz;
-	INI::parseInt(ini,nullptr,&mhz,nullptr);
-	if (TheGameLODManager)
-	{
-		TheGameLODManager->setReallyLowMHz(mhz);
-	}
+	ini->getNextToken();
 }
 
 void INI::parseBenchProfile( INI* ini)
 {
-	if( TheGameLODManager )
+	for (Int i=0; i<5; ++i)
 	{
-			BenchProfile *preset = TheGameLODManager->newBenchProfile();
-
-			if (preset)
-			{
-				INI::parseIndexList(ini,nullptr,&preset->m_cpuType,CPUNames);
-				INI::parseInt(ini,nullptr,&preset->m_mhz,nullptr);
-				INI::parseReal(ini,nullptr,&preset->m_intBenchIndex,nullptr);
-				INI::parseReal(ini,nullptr,&preset->m_floatBenchIndex,nullptr);
-				INI::parseReal(ini,nullptr,&preset->m_memBenchIndex,nullptr);
-			}
+		ini->getNextToken();
 	}
 }
 
@@ -203,8 +183,9 @@ void INI::parseLODPreset( INI* ini )
 
 			if (preset)
 			{
-				INI::parseIndexList(ini,nullptr,&preset->m_cpuType,CPUNames);
-				INI::parseInt(ini,nullptr,&preset->m_mhz,nullptr);
+				// CPU type and MHz
+				ini->getNextToken();
+				ini->getNextToken();
 				INI::parseIndexList(ini,nullptr,&preset->m_videoType,VideoNames);
 				INI::parseInt(ini,nullptr,&preset->m_memory,nullptr);
 			}
@@ -227,8 +208,6 @@ GameLODManager::GameLODManager()
 	m_idealDetailLevel = STATIC_GAME_LOD_UNKNOWN;
 	m_videoChipType = DC_MAX;
 	m_numRAM=0;
-	m_numBenchProfiles=0;
-	m_reallyLowMHz = 400;
 
 	for (Int i=0; i<STATIC_GAME_LOD_CUSTOM; i++)
 		m_numLevelPresets[i]=0;
@@ -271,18 +250,6 @@ void GameLODManager::initStaticLODLevels()
 	veryhigh.m_useTrees = TRUE;
 }
 
-BenchProfile *GameLODManager::newBenchProfile()
-{
-	if (m_numBenchProfiles < MAX_BENCH_PROFILES)
-	{
-		m_numBenchProfiles++;
-		return &m_benchProfiles[m_numBenchProfiles-1];
-	}
-
-	DEBUG_CRASH(( "GameLODManager::newBenchProfile - Too many profiles defined"));
-	return nullptr;
-}
-
 LODPresetInfo *GameLODManager::newLODPreset(StaticGameLODLevel index)
 {
 	if (index >= 0 && index < STATIC_GAME_LOD_COUNT)
@@ -320,7 +287,7 @@ void GameLODManager::init()
 	m_idealDetailLevel=(StaticGameLODLevel)optionPref.getIdealStaticGameDetail();
 
 	//always get this data in case we need it later.
-	testMinimumRequirements(nullptr,nullptr,nullptr,&m_numRAM,nullptr,nullptr,nullptr);
+	testMinimumRequirements(nullptr,&m_numRAM);
 
 	if ((Real)(m_numRAM)/(Real)(256*1024*1024) >= PROFILE_ERROR_LIMIT)
 		m_memPassed=TRUE;	//check if they have at least 256 MB
@@ -441,7 +408,7 @@ StaticGameLODLevel GameLODManager::getRecommendedStaticLODLevel()
 		m_idealDetailLevel = STATIC_GAME_LOD_LOW;
 
 		//get system configuration - only need vide chip type, got rest in ::init().
-		testMinimumRequirements(&m_videoChipType,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr);
+		testMinimumRequirements(&m_videoChipType,nullptr);
 		if (m_videoChipType == DC_UNKNOWN)
 			m_videoChipType = DC_TNT2;	//presume it's at least TNT2 level
 

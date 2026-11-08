@@ -115,7 +115,8 @@ and RAM alone. It no longer detects or times the CPU.
 not checked. The highest level whose graphics card and memory requirements pass wins.
 * `BenchProfile` lines and `ReallyLowMHz` are still read and have no effect. Low RAM still turns the
 shell map off.
-* Startup is about 0.4 s faster, since the CPU speed test no longer runs at launch.
+* Startup is about 0.4 s faster: the CPU speed test at launch takes about 20 ms instead of at least
+400 ms.
 * Before, the 2003-era CPU tables misread current CPUs. Intel CPUs landed on a preset by the low digit
 of their model number, and every AMD CPU since the Athlon 64 was treated as a 1 GHz Pentium III,
 which usually meant `Low`.

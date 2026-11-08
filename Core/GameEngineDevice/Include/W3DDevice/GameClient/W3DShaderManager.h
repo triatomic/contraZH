@@ -41,7 +41,6 @@ enum FilterModes CPP_11(: Int);
 enum CustomScenePassModes CPP_11(: Int);
 enum StaticGameLODLevel CPP_11(: Int);
 enum ChipsetType CPP_11(: Int);
-enum CpuType CPP_11(: Int);
 enum GraphicsVenderID CPP_11(: Int);
 
 class TextureClass;	///forward reference
@@ -213,7 +212,7 @@ public:
 	static TextureClass *findNormalMap(TextureClass *texture);
 	static TextureClass *findEmissiveMap(TextureClass *texture);
 
-	static Bool testMinimumRequirements(ChipsetType *videoChipType, CpuType *cpuType, Int *cpuFreq, MemValueType *numRAM, Real *intBenchIndex, Real *floatBenchIndex, Real *memBenchIndex);
+	static Bool testMinimumRequirements(ChipsetType *videoChipType, MemValueType *numRAM);
 	static StaticGameLODLevel getGPUPerformanceIndex();
 	static Real GetCPUBenchTime();
 

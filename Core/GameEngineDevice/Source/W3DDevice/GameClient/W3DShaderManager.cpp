@@ -6763,49 +6763,18 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 #define MIN_ACCEPTED_TEXTURE_MEMORY	(1024*1024*30)	//30 MB
 
 /**Hack to give gameengine access to this function*/
-Bool testMinimumRequirements(ChipsetType *videoChipType, CpuType *cpuType, Int *cpuFreq, MemValueType *numRAM, Real *intBenchIndex, Real *floatBenchIndex, Real *memBenchIndex)
+Bool testMinimumRequirements(ChipsetType *videoChipType, MemValueType *numRAM)
 {
-	return W3DShaderManager::testMinimumRequirements(videoChipType,cpuType,cpuFreq,numRAM,intBenchIndex,floatBenchIndex,memBenchIndex);
+	return W3DShaderManager::testMinimumRequirements(videoChipType,numRAM);
 }
 
-Bool W3DShaderManager::testMinimumRequirements(ChipsetType *videoChipType, CpuType *cpuType, Int *cpuFreq, MemValueType *numRAM, Real *intBenchIndex, Real *floatBenchIndex, Real *memBenchIndex)
+Bool W3DShaderManager::testMinimumRequirements(ChipsetType *videoChipType, MemValueType *numRAM)
 {
 	if (videoChipType)
 		*videoChipType = getChipset();
 
-	if (cpuType)
-	{
-		*cpuType = XX;	//unknown
-
-		//Check if it's an Athlon
-		if (CPUDetectClass::Get_Processor_Manufacturer() == CPUDetectClass::MANUFACTURER_AMD &&
-				CPUDetectClass::Get_AMD_Processor() >= CPUDetectClass::AMD_PROCESSOR_ATHLON_025)
-				*cpuType = K7;
-
-		//Check if it's a P3
-		if (CPUDetectClass::Get_Processor_Manufacturer() == CPUDetectClass::MANUFACTURER_INTEL &&
-				CPUDetectClass::Get_Intel_Processor() >= CPUDetectClass::INTEL_PROCESSOR_PENTIUM_III_MODEL_7)
-				*cpuType = P3;
-		//Check if it's a P4
-		if (CPUDetectClass::Get_Processor_Manufacturer() == CPUDetectClass::MANUFACTURER_INTEL &&
-				CPUDetectClass::Get_Intel_Processor() >= CPUDetectClass::INTEL_PROCESSOR_PENTIUM4)
-				*cpuType = P4;
-	}
-
-	if (cpuFreq)
-		*cpuFreq=CPUDetectClass::Get_Processor_Speed();
-
 	if (numRAM)
 		*numRAM=CPUDetectClass::Get_Total_Physical_Memory();
-
-	if (intBenchIndex && floatBenchIndex && memBenchIndex)
-	{
-		// TheSuperHackers @tweak Aliendroid1 19/06/2025 Legacy benchmarking code was removed.
-		// Since modern hardware always meets the minimum requirements, we preset the benchmark "results" to a high value.
-		*intBenchIndex = 10.0f;
-		*floatBenchIndex = 10.0f;
-		*memBenchIndex = 10.0f;
-	}
 
 	return TRUE;
 }
