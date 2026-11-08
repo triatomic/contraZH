@@ -188,7 +188,6 @@ public:
 	BenchProfile *newBenchProfile();
 	Bool didMemPass();
 	void setReallyLowMHz(Int mhz) { m_reallyLowMHz = mhz; }
-	Bool isReallyLowMHz() const { return m_cpuFreq < m_reallyLowMHz; }
 
 	StaticGameLODInfo m_staticGameLODInfo[STATIC_GAME_LOD_COUNT];
 	DynamicGameLODInfo m_dynamicGameLODInfo[DYNAMIC_GAME_LOD_COUNT];
@@ -219,14 +218,8 @@ protected:
 	Int m_numBenchProfiles;
 	StaticGameLODLevel m_idealDetailLevel;
 	ChipsetType m_videoChipType;
-	CpuType m_cpuType;
 	MemValueType m_numRAM;
-	Int m_cpuFreq;
-	Real m_intBenchIndex;
-	Real m_floatBenchIndex;
-	Real m_memBenchIndex;
-	Real m_compositeBenchIndex;
-	Int m_reallyLowMHz;
+	Int m_reallyLowMHz;	///<still read from GameLODPresets.ini but no longer applied, since the CPU speed is not measured
 };
 
 Bool GameLODManager::isParticleSkipped()

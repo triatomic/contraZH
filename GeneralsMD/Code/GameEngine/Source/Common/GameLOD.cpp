@@ -226,13 +226,7 @@ GameLODManager::GameLODManager()
 	m_slowDeathScale=1.0f;
 	m_idealDetailLevel = STATIC_GAME_LOD_UNKNOWN;
 	m_videoChipType = DC_MAX;
-	m_cpuType = XX;
 	m_numRAM=0;
-	m_cpuFreq=0;
-	m_intBenchIndex=0;
-	m_floatBenchIndex=0;
-	m_memBenchIndex=0;
-	m_compositeBenchIndex=0;
 	m_numBenchProfiles=0;
 	m_reallyLowMHz = 400;
 
@@ -326,59 +320,14 @@ void GameLODManager::init()
 	m_idealDetailLevel=(StaticGameLODLevel)optionPref.getIdealStaticGameDetail();
 
 	//always get this data in case we need it later.
-	testMinimumRequirements(nullptr,&m_cpuType,&m_cpuFreq,&m_numRAM,nullptr,nullptr,nullptr);
+	testMinimumRequirements(nullptr,nullptr,nullptr,&m_numRAM,nullptr,nullptr,nullptr);
 
 	if ((Real)(m_numRAM)/(Real)(256*1024*1024) >= PROFILE_ERROR_LIMIT)
 		m_memPassed=TRUE;	//check if they have at least 256 MB
 
-	if (m_idealDetailLevel == STATIC_GAME_LOD_UNKNOWN || TheGlobalData->m_forceBenchmark)
+	if (TheGlobalData->m_forceBenchmark)
 	{
-		if (m_cpuType == XX || TheGlobalData->m_forceBenchmark)
-		{
-			//need to run the benchmark
-			testMinimumRequirements(nullptr,nullptr,nullptr,nullptr,&m_intBenchIndex,&m_floatBenchIndex,&m_memBenchIndex);
-
-			if (TheGlobalData->m_forceBenchmark)
-			{	//we want to see the numbers.  So dump them to a logfile.
-				FILE *fp=fopen("Benchmark.txt","w");
-				if (fp)
-				{
-					fprintf(fp,"BenchProfile = %s %d %f %f %f", CPUNames[m_cpuType], m_cpuFreq, m_intBenchIndex, m_floatBenchIndex, m_memBenchIndex);
-					fclose(fp);
-				}
-			}
-
-	 		m_compositeBenchIndex = m_intBenchIndex + m_floatBenchIndex;	///@todo: Need to scale these based on our apps usage of int/float/mem ops.
-
-			StaticGameLODLevel currentLevel=STATIC_GAME_LOD_LOW;
-			BenchProfile *prof=m_benchProfiles;
-			m_cpuType = P3;	//assume lowest spec.
-			m_cpuFreq = 1000;	//assume lowest spec.
-			for (Int k=0; k<m_numBenchProfiles; k++)
-			{
-				//Check if we're within 5% of the performance of this cpu profile.
-				if (m_intBenchIndex/prof->m_intBenchIndex >= PROFILE_ERROR_LIMIT && m_floatBenchIndex/prof->m_floatBenchIndex >= PROFILE_ERROR_LIMIT && m_memBenchIndex/prof->m_memBenchIndex >= PROFILE_ERROR_LIMIT)
-				{
-					for (Int i=STATIC_GAME_LOD_LAST; i >= STATIC_GAME_LOD_FIRST; i--)
-					{
-						LODPresetInfo *preset=&m_lodPresets[i][0];	//pointer to first preset at this LOD level.
-						for (Int j=0; j<m_numLevelPresets[i]; j++)
-						{
-							if(	prof->m_cpuType == preset->m_cpuType &&	((Real)prof->m_mhz/(Real)preset->m_mhz >= PROFILE_ERROR_LIMIT))
-							{	currentLevel = (StaticGameLODLevel)i;
-								m_cpuType = prof->m_cpuType;
-								m_cpuFreq = prof->m_mhz;
-								break;
-							}
-							preset++;	//skip to next preset
-						}
-						if (currentLevel >= i)
-							break;	//we already found a higher level than the remaining presets so no need to keep searching.
-					}
-				}
-				prof++;
-			}
-		}
+		m_idealDetailLevel = STATIC_GAME_LOD_UNKNOWN;
 	}
 
 	if (userSetDetail == STATIC_GAME_LOD_CUSTOM)
@@ -503,10 +452,8 @@ StaticGameLODLevel GameLODManager::getRecommendedStaticLODLevel()
 				LODPresetInfo *preset=&m_lodPresets[i][0];	//pointer to first preset at this LOD level.
 				for (Int j=0; j<m_numLevelPresets[i]; j++)
 				{
-
-					if(	m_cpuType == preset->m_cpuType &&
-							((Real)m_cpuFreq/(Real)preset->m_mhz >= PROFILE_ERROR_LIMIT) &&//make sure we're within 5% or higher
-							m_videoChipType >= preset->m_videoType &&
+					// Any current CPU outruns every preset, so the CPU type and MHz of a preset are not checked
+					if(	m_videoChipType >= preset->m_videoType &&
 							((Real)numMBRam/(Real)preset->m_memory >= PROFILE_ERROR_LIMIT)
 						)
 					{	m_idealDetailLevel = (StaticGameLODLevel)i;
@@ -631,7 +578,7 @@ void GameLODManager::applyStaticLODLevel(StaticGameLODLevel level)
 			WW3D::Enable_Sorting(!skipSort);
 		}
 
-		if (!m_memPassed || isReallyLowMHz()) {
+		if (!m_memPassed) {
 			TheWritableGlobalData->m_shellMapOn = false;
 		}
 	}

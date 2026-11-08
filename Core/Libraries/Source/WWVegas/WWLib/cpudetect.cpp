@@ -158,6 +158,12 @@ static unsigned Calculate_Processor_Speed(sint64& ticks_per_second)
 
 void CPUDetectClass::Init_Processor_Speed()
 {
+	static bool measured=false;
+	if (measured) {
+		return;
+	}
+	measured=true;
+
 	if (!Has_RDTSC_Instruction()) {
 		ProcessorSpeed=0;
 		return;
@@ -1014,7 +1020,7 @@ void CPUDetectClass::Init_Processor_Log()
 	SYSLOG(("OS-Info: %s\r\n", OSVersionExtraInfo.str()));
 
 	SYSLOG(("Processor: %s\r\n",CPUDetectClass::Get_Processor_String()));
-	SYSLOG(("Clock speed: ~%dMHz\r\n",CPUDetectClass::Get_Processor_Speed()));
+	SYSLOG(("Clock speed: ~%dMHz\r\n",ProcessorSpeed));
 	StringClass cpu_type(0,true);
 	switch (CPUDetectClass::Get_Processor_Type()) {
 	case 0: cpu_type="Original OEM"; break;
@@ -1120,7 +1126,7 @@ void CPUDetectClass::Init_Compact_Log()
 		COMPACTLOG(("%s\t",os_info.SubCode));
 	}
 
-	COMPACTLOG(("%s\t%d\t",Get_Processor_Manufacturer_Name(),Get_Processor_Speed()));
+	COMPACTLOG(("%s\t%d\t",Get_Processor_Manufacturer_Name(),ProcessorSpeed));
 
 	COMPACTLOG(("%d\t",Get_Total_Physical_Memory()/(1024*1024)+1));
 
@@ -1144,7 +1150,6 @@ public:
 			CPUDetectClass::Init_Memory();
 			CPUDetectClass::Init_OS();
 		}
-		CPUDetectClass::Init_Processor_Speed();
 
 		CPUDetectClass::Init_Processor_Log();
 		CPUDetectClass::Init_Compact_Log();

@@ -192,7 +192,7 @@ their handlers can set a mode even when its supporting tools are unavailable.
 | `-jabber` | Enable the legacy Jabber test mode. |
 | `-munkee` | Enable the legacy Munkee test mode. |
 | `-benchmark <n>` | Set both the benchmark timer and the play-stat logging value. |
-| `-forceBenchmark` | Force benchmark mode. |
+| `-forceBenchmark` | Recompute the recommended detail level and overwrite `IdealStaticGameLOD`. See [Recommended detail level](contraZH-Options.md#recommended-detail-level). |
 | `-vTune` | Enable the legacy VTune profiling mode. |
 | `-stats <n>` | Enable periodic performance-stat dumps and set the interval. Also requires `DUMP_PERF_STATS`. |
 | `-saveStats <directory>` | Enable statistics saving to this base directory. |
