@@ -26,12 +26,6 @@
 #include "ValveNetworkingSockets/steam/isteamnetworkingsockets.h"
 #include <unordered_set>
 
-extern "C"
-{
-	__declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
-	__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
-}
-
 NGMP_OnlineServicesManager* NGMP_OnlineServicesManager::m_pOnlineServicesManager = nullptr;
 std::recursive_mutex NGMP_OnlineServicesManager::m_singletonMutex;
 
