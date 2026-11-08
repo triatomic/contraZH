@@ -51,7 +51,7 @@ These options are registered without a debug-build requirement.
 | `-fullVersion <0\|1>` | Hide or show the full version string. The handler reads the value but only marks the option itself as consumed. |
 | `-mod <path>` | Load a mod directory or BIG file. Relative paths are resolved under the game's user-data directory; absolute paths are used directly. |
 | `-live` | Check loose files before archives on every read, allowing loose overrides added while the game runs to take effect. |
-| `-log` | Write `DebugLogFile.txt` and `d3d9render.txt` from the game exe in release builds without cheats, which write no log without it. Cheat builds, debug builds and the tools always log. Add it when reproducing a problem to report, since a normal run leaves no log to send. |
+| `-log` | Write `DebugLogFile.txt` and `d3d9render.txt` from the game exe in release builds without cheats, which write no log without it. Cheat builds, debug builds and the tools always log. Add it when reproducing a problem to report, since a normal run leaves no log to send. The log is written in blocks, so a crash the game cannot catch may lose its last lines; set the environment variable `CONTRA_LOG_FLUSH` to write every line at once. |
 | `-useCwd` | Use the working directory supplied when the process was launched. |
 | `-setCwd <directory>` | Set an explicit working directory. The last successful `-setCwd` or `-useCwd` selection wins; otherwise the executable directory is used. |
 | `-particleEdit` | Enable particle-editor mode, Windows cursors and windowed mode. |

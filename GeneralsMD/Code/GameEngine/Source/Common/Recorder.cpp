@@ -290,6 +290,7 @@ void RecorderClass::cleanUpReplayFile()
 		debugFname.truncateBy(3);
 		debugFname.concat("txt");
 		UnsignedInt fileSize = 0;
+		DebugFlushLog();
 		FILE *fp = fopen(logFileName, "rb");
 		if (fp)
 		{

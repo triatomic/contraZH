@@ -149,6 +149,7 @@ class AsciiString;
 	DEBUG_EXTERN_C int DebugLogEnabled();
 	DEBUG_EXTERN_C const char* DebugGetLogFileName();
 	DEBUG_EXTERN_C const char* DebugGetLogFileNamePrev();
+	DEBUG_EXTERN_C void DebugFlushLog();
 
 	// This defines a bitmask of log types that we care about, to allow some flexability
 	// in what gets logged.  This should be extended to asserts, too, but the assert box

@@ -115,6 +115,7 @@ static FILE *theRenderLogFile = nullptr;
 static char theRenderLogFileName[ _MAX_PATH ];
 static Bool theLogFilesRequested = FALSE;
 static Bool theLogSilent = FALSE;
+static Bool theLogFlushEachLine = FALSE;
 #endif
 #define LARGE_BUFFER	8192
 static char theBuffer[ LARGE_BUFFER ];	// make it big to avoid weird overflow bugs in debug mode
@@ -254,7 +255,10 @@ static void doLogOutput(const char *buffer, const char *endline)
 		if (theLogFile)
 		{
 			fprintf(theLogFile, "%s%s", buffer, endline);
-			fflush(theLogFile);
+			if (theLogFlushEachLine)
+			{
+				fflush(theLogFile);
+			}
 		}
 	}
 
@@ -296,6 +300,7 @@ static int doCrashBox(const char *buffer, Bool logResult)
 #ifdef DEBUG_LOGGING
 			if (logResult)
 				DebugLog("[Abort]");
+			DebugFlushLog();
 #endif
 			_exit(1);
 			break;
@@ -437,6 +442,9 @@ void DebugInit(int flags)
 #endif
 			}
 		}
+
+		// The log is buffered, so a crash that skips every handler loses its tail; CONTRA_LOG_FLUSH keeps every line.
+		theLogFlushEachLine = (getenv("CONTRA_LOG_FLUSH") != nullptr);
 
 		theLogFile = fopen(theLogFileName, "w");
 		if (theLogFile != nullptr)
@@ -589,6 +597,14 @@ const char* DebugGetLogFileNamePrev()
 	return theLogFileNamePrev;
 }
 
+void DebugFlushLog()
+{
+	if (theLogFile)
+	{
+		fflush(theLogFile);
+	}
+}
+
 #endif
 
 // ----------------------------------------------------------------------------
@@ -638,6 +654,9 @@ void DebugCrash(const char *format, ...)
 		{
 			doStackDump();
 		}
+#endif
+#ifdef DEBUG_LOGGING
+		DebugFlushLog();
 #endif
 	}
 
@@ -854,6 +873,9 @@ void ReleaseCrash(const char *reason)
 		}
 	}
 
+#ifdef DEBUG_LOGGING
+	DebugFlushLog();
+#endif
 	TriggerMiniDump();
 
 	char prevbuf[ _MAX_PATH ];
@@ -938,6 +960,9 @@ void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 		return;
 	}
 
+#ifdef DEBUG_LOGGING
+	DebugFlushLog();
+#endif
 	TriggerMiniDump();
 
 	UnicodeString prompt = TheGameText->fetch(p);
