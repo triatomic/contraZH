@@ -881,6 +881,11 @@ Bool Drawable::getShouldAnimate( Bool considerPower ) const
 //-------------------------------------------------------------------------------------------------
 Bool Drawable::areLightsDisabled() const
 {
+	if (testDrawableStatus(DRAWABLE_STATUS_NO_SHADERS))
+	{
+		return TRUE;
+	}
+
 	const Object *obj = getObject();
 	if (!obj || !obj->isKindOf(KINDOF_STRUCTURE))
 	{

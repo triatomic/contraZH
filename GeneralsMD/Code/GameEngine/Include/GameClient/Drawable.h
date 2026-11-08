@@ -268,6 +268,7 @@ enum DrawableStatus CPP_11(: DrawableStatusBits)
 	DRAWABLE_STATUS_KEEP_PARTICLES_WHEN_HIDDEN = 0x00000004,		///< model-condition particle systems keep emitting while the drawable is hidden
 	DRAWABLE_STATUS_NO_STATE_PARTICLES		= 0x00000008,		///< do *not* auto-create particle systems based on model condition
 	DRAWABLE_STATUS_NO_SAVE								= 0x00000010,		///< do *not* save this drawable (UI fluff only). ignored (error, actually) if attached to an object
+	DRAWABLE_STATUS_NO_SHADERS						= 0x00000020,		///< preview ghosts draw the plain model, without lights or per-model shaders
 
 	DRAWABLE_STATUS_DEFAULT = DRAWABLE_STATUS_SHADOWS,
 };

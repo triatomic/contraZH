@@ -4029,7 +4029,12 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 			m_renderObject = W3DDisplay::m_assetManager->Create_Render_Obj(newState->m_modelName.str(), draw->getScale(), drawnColor);
 			DEBUG_ASSERTCRASH(m_renderObject, ("*** ASSET ERROR: Model %s not found!",newState->m_modelName.str()));
 			const W3DModelDrawModuleData *shaders = getW3DModelDrawModuleData();
-			if (m_renderObject && (shaders->m_disruption.isOn() || shaders->m_flameShader || shaders->m_electricShader || shaders->m_cryoShader ||
+#if RTS_ZEROHOUR
+			const Bool plainModel = draw->testDrawableStatus(DRAWABLE_STATUS_NO_SHADERS);
+#else
+			const Bool plainModel = FALSE;
+#endif
+			if (m_renderObject && !plainModel && (shaders->m_disruption.isOn() || shaders->m_flameShader || shaders->m_electricShader || shaders->m_cryoShader ||
 				shaders->m_planarMirror))
 			{
 				setShaderEffects(m_renderObject, *shaders);

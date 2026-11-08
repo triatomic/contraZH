@@ -429,8 +429,7 @@ void FacingDragTranslator::beginPreview()
 // Hiding a truck ghost can start wheel emitters that require an object.
 static Drawable *createGhost( const Object *obj )
 {
-	UnsignedInt drawableStatus = DRAWABLE_STATUS_NO_STATE_PARTICLES | DRAWABLE_STATUS_NO_SAVE;
-	drawableStatus |= TheGlobalData->m_objectPlacementShadows ? DRAWABLE_STATUS_SHADOWS : 0;
+	UnsignedInt drawableStatus = DRAWABLE_STATUS_NO_STATE_PARTICLES | DRAWABLE_STATUS_NO_SAVE | DRAWABLE_STATUS_NO_SHADERS;
 	Drawable *ghost = TheThingFactory->newDrawable( obj->getTemplate(), drawableStatus );
 	if( !ghost )
 	{

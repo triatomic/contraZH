@@ -2813,7 +2813,7 @@ void InGameUI::handleBuildPlacements()
 
 					if( m_placeIcon[ i ] == nullptr )
 					{
-						UnsignedInt drawableStatus = DRAWABLE_STATUS_NO_STATE_PARTICLES;
+						UnsignedInt drawableStatus = DRAWABLE_STATUS_NO_STATE_PARTICLES | DRAWABLE_STATUS_NO_SHADERS;
 						drawableStatus |= TheGlobalData->m_objectPlacementShadows ? DRAWABLE_STATUS_SHADOWS : 0;
 						m_placeIcon[ i ] = TheThingFactory->newDrawable( m_pendingPlaceType, drawableStatus );
 						updatePlacementRangeCircle( m_placeIcon[ i ] );
@@ -4793,7 +4793,7 @@ void InGameUI::placeBuildAvailable( const ThingTemplate *build, Drawable *buildD
 
 			{
 				// create a drawable of what we are building to be "attached" at the cursor
-				UnsignedInt drawableStatus = DRAWABLE_STATUS_NO_STATE_PARTICLES;
+				UnsignedInt drawableStatus = DRAWABLE_STATUS_NO_STATE_PARTICLES | DRAWABLE_STATUS_NO_SHADERS;
 				drawableStatus |= TheGlobalData->m_objectPlacementShadows ? DRAWABLE_STATUS_SHADOWS : 0;
 				draw = TheThingFactory->newDrawable( build, drawableStatus );
 			}
