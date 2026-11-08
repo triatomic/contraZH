@@ -37,8 +37,8 @@ Left out, the brush re-files the terrain of its own name.)
 A new texture also appends a `Terrain` block to the loose `Data\INI\Terrain.ini`, so maps painted
 with it draw in-game.
 
-* Loose file only - (When `Terrain.ini` sits only inside a `.big`, New refuses. Extract it into
-`Data\INI\` first; a new loose copy would hide every terrain in the archive.)
+* Archive copy - (When `Terrain.ini` sits only inside a `.big`, the first write copies it whole into
+`Data\INI\`. From then on the loose copy hides that archive's `Terrain.ini`, including later updates to it.)
 * Multiplayer - (Terrain INI is part of the multiplayer INI check, so every player needs the edited
 `Terrain.ini`.)
 * File - (24- or 32-bit `.tga`. Each side is cut into 64-pixel tiles, at most 10, so a side over 640
@@ -61,7 +61,7 @@ created.)
 * New texture - (Ticked boxes are written into its new block.)
 * Existing terrain - (The boxes show its keys as the game parsed them. Blend edges is read-only.)
 * Save to Terrain.ini - (Writes only the keys that changed, into the terrain's last block in the
-loose `Terrain.ini`. A terrain defined only in an archive gets an override block of the same name.
+loose `Terrain.ini`. A terrain defined only in another file gets an override block of the same name.
 An unticked key is written as its default, `No`, `1` or `0`, so an earlier block cannot bring an
 old value back.)
 * Later files - (Save refuses when a file in `Data\INI\Terrain\` also defines the terrain, because

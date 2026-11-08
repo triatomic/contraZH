@@ -109,16 +109,51 @@ namespace
 		return true;
 	}
 
-	// A new loose Terrain.ini would hide the archive copy and every terrain in it.
-	Bool hasLooseTerrainIni(AsciiString &error)
+	// Writes beside the file and swaps it in, so a failed write leaves Terrain.ini whole.
+	Bool writeTerrainIni(const std::string &text, AsciiString &error)
 	{
-		DWORD attributes = GetFileAttributes(GAME_TERRAIN_FILE);
-		if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+		AsciiString tempPath;
+		tempPath.format("%s.tmp", GAME_TERRAIN_FILE);
+		FILE *fp = fopen(tempPath.str(), "wb");
+		if (fp == nullptr)
 		{
-			error.format("%s is not a loose file. Extract Terrain.ini from the mod's .big into Data\\INI\\ and try again.", GAME_TERRAIN_FILE);
+			error.format("Cannot write '%s'.", tempPath.str());
+			return false;
+		}
+		Bool ok = (fwrite(text.data(), 1, text.size(), fp) == text.size());
+		ok = (fclose(fp) == 0) && ok;
+		if (!ok || !MoveFileEx(tempPath.str(), GAME_TERRAIN_FILE, MOVEFILE_REPLACE_EXISTING))
+		{
+			DeleteFile(tempPath.str());
+			error.format("Cannot write '%s'.", GAME_TERRAIN_FILE);
 			return false;
 		}
 		return true;
+	}
+
+	// A loose Terrain.ini hides the archive's copy, so it starts as a full copy of it.
+	Bool ensureLooseTerrainIni(AsciiString &error)
+	{
+		DWORD attributes = GetFileAttributes(GAME_TERRAIN_FILE);
+		if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
+		{
+			return true;
+		}
+
+		File *file = TheFileSystem->openFile(GAME_TERRAIN_FILE, File::READ | File::BINARY);
+		if (file == nullptr)
+		{
+			error.format("Cannot find '%s' on disk or in any .big.", GAME_TERRAIN_FILE);
+			return false;
+		}
+		Int size = file->size();
+		char *data = file->readEntireAndClose();
+		std::string text(data, size);
+		delete[] data;
+
+		CreateDirectory("Data", nullptr);
+		CreateDirectory("Data\\INI", nullptr);
+		return writeTerrainIni(text, error);
 	}
 
 	// The line's first two whitespace-separated words.
@@ -458,7 +493,7 @@ Int TerrainBrushes::createTerrain(Block &block, const AsciiString &texture, cons
 		return -1;
 	}
 
-	if (!hasLooseTerrainIni(error))
+	if (!ensureLooseTerrainIni(error))
 	{
 		return -1;
 	}
@@ -532,14 +567,14 @@ Bool TerrainBrushes::setTerrainKeys(const char *name, const TerrainKeys &keys, U
 		error.format("Terrain '%s' is not defined.", name ? name : "");
 		return false;
 	}
-	if (!hasLooseTerrainIni(error))
-	{
-		return false;
-	}
 	AsciiString laterFile = findLaterDefinition(name);
 	if (!laterFile.isEmpty())
 	{
 		error.format("%s also defines Terrain %s and loads after Terrain.ini, so edit it there.", laterFile.str(), name);
+		return false;
+	}
+	if (!ensureLooseTerrainIni(error))
+	{
 		return false;
 	}
 
@@ -635,21 +670,8 @@ Bool TerrainBrushes::setTerrainKeys(const char *name, const TerrainKeys &keys, U
 		}
 	}
 
-	// Write beside the file and swap it in, so a failed write leaves Terrain.ini whole.
-	AsciiString tempPath;
-	tempPath.format("%s.tmp", GAME_TERRAIN_FILE);
-	fp = fopen(tempPath.str(), "wb");
-	if (fp == nullptr)
+	if (!writeTerrainIni(out, error))
 	{
-		error.format("Cannot write '%s'.", tempPath.str());
-		return false;
-	}
-	Bool ok = (fwrite(out.data(), 1, out.size(), fp) == out.size());
-	ok = (fclose(fp) == 0) && ok;
-	if (!ok || !MoveFileEx(tempPath.str(), GAME_TERRAIN_FILE, MOVEFILE_REPLACE_EXISTING))
-	{
-		DeleteFile(tempPath.str());
-		error.format("Cannot write '%s'.", GAME_TERRAIN_FILE);
 		return false;
 	}
 
