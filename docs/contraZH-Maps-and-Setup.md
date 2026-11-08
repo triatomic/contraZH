@@ -10,10 +10,12 @@ game and WorldBuilder. DDS images use the same tile layout and atlas space as TG
 also work when the base texture is supplied only as `name.dds`. WorldBuilder uses the same
 fallback for its texture palette, previews and brush validation.
 * A terrain texture missing from `Art/Terrain` is looked up in `Art/Textures`, as DDS and then TGA, in
-the game and WorldBuilder. A mod can pack it there beside its `_nrm`, `_hgt` and `_emi` maps.
-* A terrain texture missing from both folders draws `Art/Terrain/misstex.dds` instead, in the
+the game and WorldBuilder. A mod can pack it there beside its `_nrm`, `_hgt` and `_emi` maps. A file
+there that terrain cannot read counts as missing.
+* A terrain texture missing from both folders draws `misstex.dds` from either folder instead, in the
 game and on maps opened in WorldBuilder. Any multiple of 64 pixels works, because its tiles repeat to
 cover a larger texture. The WorldBuilder palette and brush validation still skip missing textures.
+* A terrain image with fewer tiles than a map saved repeats them to fill the texture on that map.
 * Individual terrain images still fit within 640 by 640 pixels. DDS cube maps, volume textures,
 DXT2-DXT4, uncompressed DDS and newer DX10/BC7 formats are unsupported.
 * D3D9 builds use a 4096-pixel terrain atlas instead of 2048, increasing capacity from 784 to

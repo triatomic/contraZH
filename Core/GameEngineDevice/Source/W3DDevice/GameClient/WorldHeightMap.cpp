@@ -1112,12 +1112,6 @@ Bool WorldHeightMap::ParseBlendTileDataChunk(DataChunkInput &file, DataChunkInfo
 #if defined(RTS_ZEROHOUR)
 static const char *const MISSING_TERRAIN_TEXTURE = "misstex.dds";
 
-static Bool isMissingTerrainTexture(const char *path)
-{
-	const char *name = strrchr(path, '/');
-	return name != nullptr && stricmp(name + 1, MISSING_TERRAIN_TEXTURE) == 0;
-}
-
 static Int tileGridWidth(Int numTiles)
 {
 	Int width = 10;
@@ -1183,7 +1177,18 @@ File *WorldHeightMap::openTerrainTexture(AsciiString &path, Bool useMissingTextu
 		}
 		if (file != nullptr)
 		{
-			path = texturesPath;
+			// Art/Textures also holds images terrain cannot read, such as 8-bit TGAs.
+			GDIFileStream stream(file);
+			if (countTiles(&stream, nullptr, texturesPath.str()) >= 1)
+			{
+				file->seek(0, File::START);
+				path = texturesPath;
+			}
+			else
+			{
+				file->close();
+				file = nullptr;
+			}
 		}
 	}
 	if (file == nullptr && useMissingTexture)
@@ -1191,6 +1196,11 @@ File *WorldHeightMap::openTerrainTexture(AsciiString &path, Bool useMissingTextu
 		RENDER_LOG(("Terrain texture %s not found, using misstex.dds", path.str()));
 		path.format("%s%s", TERRAIN_TGA_DIR_PATH, MISSING_TERRAIN_TEXTURE);
 		file = TheFileSystem->openFile(path.str(), File::READ | File::BINARY);
+		if (file == nullptr)
+		{
+			path.format("%s%s", TGA_DIR_PATH, MISSING_TERRAIN_TEXTURE);
+			file = TheFileSystem->openFile(path.str(), File::READ | File::BINARY);
+		}
 	}
 #endif
 	return file;
@@ -1250,7 +1260,7 @@ void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData)
 			}
 		}
 #if defined(RTS_ZEROHOUR)
-		else if (numTiles >= 1 && isMissingTerrainTexture(filename))
+		else if (numTiles >= 1)
 		{
 			readRepeatedTiles(pStr, tileData+texClass->firstTile, texClass->numTiles, numTiles, filename);
 		}
