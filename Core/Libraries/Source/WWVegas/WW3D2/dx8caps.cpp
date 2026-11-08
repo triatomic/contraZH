@@ -130,8 +130,6 @@ void DX8Caps::Compute_Caps(WW3DFormat display_format, const D3DADAPTER_IDENTIFIE
 {
 //	Init_Caps(D3DDevice);
 
-	IsFogAllowed=true;
-
 	VendorId=Define_Vendor(adapter_id.VendorId);
 
 	SupportPointSprites = (Caps.MaxPointSize > 1.0f);

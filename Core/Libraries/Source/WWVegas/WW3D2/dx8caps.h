@@ -78,7 +78,6 @@ public:
 	bool Support_Dot3() const { return SupportDot3; }
 	bool Support_PointSprites() const { return SupportPointSprites; }
 	bool Support_Cubemaps() const { return SupportCubemaps; }
-	bool Is_Fog_Allowed() const { return IsFogAllowed; }
 
 	int Get_Max_Textures_Per_Pass() const { return MaxTexturesPerPass; }
 
@@ -132,7 +131,6 @@ private:
 	bool SupportDot3;
 	bool SupportPointSprites;
 	bool SupportCubemaps;
-	bool IsFogAllowed;
 	int MaxTexturesPerPass;
 	int VertexShaderVersion;
 	int PixelShaderVersion;
