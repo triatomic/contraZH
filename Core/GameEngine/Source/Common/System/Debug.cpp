@@ -113,6 +113,8 @@ static char theLogFileName[ _MAX_PATH ];
 static char theLogFileNamePrev[ _MAX_PATH ];
 static FILE *theRenderLogFile = nullptr;
 static char theRenderLogFileName[ _MAX_PATH ];
+static Bool theLogFilesRequested = FALSE;
+static Bool theLogSilent = FALSE;
 #endif
 #define LARGE_BUFFER	8192
 static char theBuffer[ LARGE_BUFFER ];	// make it big to avoid weird overflow bugs in debug mode
@@ -384,6 +386,15 @@ void DebugInit(int flags)
 		if (!rts::ClientInstance::initialize())
 			return;
 
+#if !defined(RTS_DEBUG) && !defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+		// The game logs in builds without cheats only when -log asks for it; the tools have a prefix and always log
+		if (gAppPrefix[0] == '\0' && !theLogFilesRequested)
+		{
+			theLogSilent = TRUE;
+			return;
+		}
+#endif
+
 		char dirbuf[ _MAX_PATH ];
 		::GetModuleFileName( nullptr, dirbuf, sizeof( dirbuf ) );
 		if (char *pEnd = strrchr(dirbuf, '\\'))
@@ -464,6 +475,11 @@ void DebugInit(int flags)
 */
 void DebugLog(const char *format, ...)
 {
+	if (theLogSilent)
+	{
+		return;
+	}
+
 #ifdef DEBUG_THREADSAFE
 	ScopedCriticalSection scopedCriticalSection(TheDebugLogCriticalSection);
 #endif
@@ -491,6 +507,11 @@ void DebugLog(const char *format, ...)
 */
 void DebugLogRaw(const char *format, ...)
 {
+	if (theLogSilent)
+	{
+		return;
+	}
+
 #ifdef DEBUG_THREADSAFE
 	ScopedCriticalSection scopedCriticalSection(TheDebugLogCriticalSection);
 #endif
@@ -516,6 +537,11 @@ void DebugLogRaw(const char *format, ...)
 */
 void DebugRenderLog(const char *format, ...)
 {
+	if (theLogSilent)
+	{
+		return;
+	}
+
 #ifdef DEBUG_THREADSAFE
 	ScopedCriticalSection scopedCriticalSection(TheDebugLogCriticalSection);
 #endif
@@ -541,6 +567,11 @@ void DebugRenderLog(const char *format, ...)
 		::OutputDebugString(theBuffer);
 		::OutputDebugString("\n");
 	}
+}
+
+void DebugRequestLogFiles()
+{
+	theLogFilesRequested = TRUE;
 }
 
 const char* DebugGetLogFileName()

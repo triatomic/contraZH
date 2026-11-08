@@ -145,6 +145,7 @@ class AsciiString;
 	DEBUG_EXTERN_C void DebugLog(const char *format, ...);
 	DEBUG_EXTERN_C void DebugLogRaw(const char *format, ...);
 	DEBUG_EXTERN_C void DebugRenderLog(const char *format, ...);
+	DEBUG_EXTERN_C void DebugRequestLogFiles();
 	DEBUG_EXTERN_C const char* DebugGetLogFileName();
 	DEBUG_EXTERN_C const char* DebugGetLogFileNamePrev();
 

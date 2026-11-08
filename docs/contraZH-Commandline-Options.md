@@ -51,6 +51,7 @@ These options are registered without a debug-build requirement.
 | `-fullVersion <0\|1>` | Hide or show the full version string. The handler reads the value but only marks the option itself as consumed. |
 | `-mod <path>` | Load a mod directory or BIG file. Relative paths are resolved under the game's user-data directory; absolute paths are used directly. |
 | `-live` | Check loose files before archives on every read, allowing loose overrides added while the game runs to take effect. |
+| `-log` | Write `DebugLogFile.txt` and `d3d9render.txt` in builds without cheats. Without it those builds write no log; cheat builds always write both. |
 | `-useCwd` | Use the working directory supplied when the process was launched. |
 | `-setCwd <directory>` | Set an explicit working directory. The last successful `-setCwd` or `-useCwd` selection wins; otherwise the executable directory is used. |
 | `-particleEdit` | Enable particle-editor mode, Windows cursors and windowed mode. |
@@ -214,6 +215,7 @@ their handlers can set a mode even when its supporting tools are unavailable.
 These options use their own compile-time guards rather than `RTS_DEBUG`. In the current sources,
 `Debug.h` enables `RELEASE_DEBUG_LOGGING`, which enables `DEBUG_LOGGING`; `CRCDebug.h` then enables
 `DEBUG_CRC` unless `NO_DEBUG_CRC` is defined. These options can therefore be present in release builds.
+Builds without cheats still discard every log line unless `-log` is given.
 Use the same CRC settings on all multiplayer clients to avoid mismatches.
 
 | Option | Requirement | Effect |

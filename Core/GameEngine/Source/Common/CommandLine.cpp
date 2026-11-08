@@ -140,6 +140,15 @@ Int parseD3D9(char *args[], int)
 	return 1;
 }
 
+Int parseLog(char *args[], int)
+{
+#ifdef DEBUG_LOGGING
+	DebugRequestLogFiles();
+#endif
+
+	return 1;
+}
+
 //=============================================================================
 //=============================================================================
 Int parseNoMusic(char *args[], int)
@@ -1246,6 +1255,9 @@ static CommandLineParam paramsForStartup[] =
 
 	// Use a plain D3D9 device instead of D3D9Ex (D3D9 builds only; same as CONTRA_D3D9EX=0).
 	{ "-d3d9", parseD3D9 },
+
+	// Write DebugLogFile.txt and d3d9render.txt in builds without cheats, which stay silent otherwise.
+	{ "-log", parseLog },
 };
 
 // These Params are parsed during Engine Init before INI data is loaded
