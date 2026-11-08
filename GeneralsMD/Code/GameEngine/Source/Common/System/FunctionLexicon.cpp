@@ -561,7 +561,10 @@ void FunctionLexicon::init()
 	loadTable( winLayoutUpdateTable,				TABLE_WIN_LAYOUT_UPDATE );
 	loadTable( winLayoutShutdownTable,			TABLE_WIN_LAYOUT_SHUTDOWN );
 
+	// Optimized builds fold identical functions onto one address, so this reports hundreds of false duplicates.
+#ifdef INTENSE_DEBUG
 	validate();
+#endif
 
 }
 
