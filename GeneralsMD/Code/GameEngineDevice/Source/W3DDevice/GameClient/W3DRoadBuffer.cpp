@@ -183,8 +183,6 @@ void RoadType::loadTexture(AsciiString path, Int ID)
 	m_roadTexture->Get_Filter().Set_U_Addr_Mode(TextureFilterClass::TEXTURE_ADDRESS_REPEAT);
 	m_roadTexture->Get_Filter().Set_V_Addr_Mode(TextureFilterClass::TEXTURE_ADDRESS_REPEAT);
 
-	m_vertexRoad=NEW_REF(DX8VertexBufferClass,(DX8_FVF_XYZDUV1,TheGlobalData->m_maxRoadVertex+4, (s_dynamic?DX8VertexBufferClass::USAGE_DYNAMIC:DX8VertexBufferClass::USAGE_DEFAULT)));
-	m_indexRoad=NEW_REF(DX8IndexBufferClass,(TheGlobalData->m_maxRoadIndex+4, (s_dynamic?DX8IndexBufferClass::USAGE_DYNAMIC:DX8IndexBufferClass::USAGE_DEFAULT)));
 	m_numRoadVertices=0;
 	m_numRoadIndices=0;
 
@@ -192,6 +190,23 @@ void RoadType::loadTexture(AsciiString path, Int ID)
 	m_texturePath = path;
 #endif
 	m_uniqueID = ID;
+}
+
+//=============================================================================
+// RoadType allocateBuffers
+//=============================================================================
+/** Creates the vertex and index buffers the first time a map uses this road type. */
+//=============================================================================
+void RoadType::allocateBuffers()
+{
+	if (m_vertexRoad == nullptr)
+	{
+		m_vertexRoad=NEW_REF(DX8VertexBufferClass,(DX8_FVF_XYZDUV1,TheGlobalData->m_maxRoadVertex+4, (s_dynamic?DX8VertexBufferClass::USAGE_DYNAMIC:DX8VertexBufferClass::USAGE_DEFAULT)));
+	}
+	if (m_indexRoad == nullptr)
+	{
+		m_indexRoad=NEW_REF(DX8IndexBufferClass,(TheGlobalData->m_maxRoadIndex+4, (s_dynamic?DX8IndexBufferClass::USAGE_DYNAMIC:DX8IndexBufferClass::USAGE_DEFAULT)));
+	}
 }
 
 #ifdef LOAD_TEST_ASSETS
@@ -1232,9 +1247,19 @@ void W3DRoadBuffer::loadRoadsInVertexAndIndexBuffers()
 	UnsignedShort *ib;
 	// Lock the buffers.
 	if (m_roadTypes[m_curRoadType].getIB() == nullptr) {
-		this->m_roadTypes[m_curRoadType].setNumVertices(0);
-		this->m_roadTypes[m_curRoadType].setNumIndices(0);
-		return;
+		Bool used = false;
+		for (Int i=0; i<m_numRoads; i++) {
+			if (m_roads[i].m_uniqueID == m_curUniqueID) {
+				used = true;
+				break;
+			}
+		}
+		if (!used) {
+			this->m_roadTypes[m_curRoadType].setNumVertices(0);
+			this->m_roadTypes[m_curRoadType].setNumIndices(0);
+			return;
+		}
+		m_roadTypes[m_curRoadType].allocateBuffers();
 	}
 	DX8IndexBufferClass::WriteLockClass lockIdxBuffer(m_roadTypes[m_curRoadType].getIB(), s_dynamic?D3DLOCK_DISCARD:0);
 	DX8VertexBufferClass::WriteLockClass lockVtxBuffer(m_roadTypes[m_curRoadType].getVB(), s_dynamic?D3DLOCK_DISCARD:0);
@@ -1315,6 +1340,11 @@ void W3DRoadBuffer::loadLitRoadsInVertexAndIndexBuffers(RefRenderObjListIterator
 	VertexFormatXYZDUV1 *vb;
 	UnsignedShort *ib;
 	// Lock the buffers.
+	if (m_roadTypes[m_curRoadType].getIB() == nullptr) {
+		this->m_roadTypes[m_curRoadType].setNumVertices(0);
+		this->m_roadTypes[m_curRoadType].setNumIndices(0);
+		return;
+	}
 	DX8IndexBufferClass::WriteLockClass lockIdxBuffer(m_roadTypes[m_curRoadType].getIB());
 	DX8VertexBufferClass::WriteLockClass lockVtxBuffer(m_roadTypes[m_curRoadType].getVB());
 	vb=(VertexFormatXYZDUV1*)lockVtxBuffer.Get_Vertex_Array();
