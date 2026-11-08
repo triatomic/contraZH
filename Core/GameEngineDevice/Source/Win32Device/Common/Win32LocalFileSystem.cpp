@@ -159,13 +159,13 @@ void Win32LocalFileSystem::getFileListInDirectory(const AsciiString& currentDire
 		AsciiString subdirsearch;
 		subdirsearch = originalDirectory;
 		subdirsearch.concat(currentDirectory);
-		subdirsearch.concat("*.");
+		subdirsearch.concat("*");
 		fileHandle = FindFirstFile(subdirsearch.str(), &findData);
 		done = fileHandle == INVALID_HANDLE_VALUE;
 
 		while (!done) {
-			if ((findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
-					(strcmp(findData.cFileName, ".") != 0 && strcmp(findData.cFileName, "..") != 0)) {
+			// A leading dot covers . and .. and hidden folders; a "*." search would also drop "Map v1.2"
+			if ((findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && findData.cFileName[0] != '.') {
 
 					AsciiString tempsearchstr;
 					tempsearchstr.concat(currentDirectory);

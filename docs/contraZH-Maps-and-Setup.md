@@ -160,6 +160,15 @@ button researches. Object upgrades never swap the sets.
 already bought stay bought; the swap only changes which buttons are shown.
 * Presentation only; the simulation and replays are unaffected.
 
+### Folders with a dot in the name
+
+* Maps in a folder with a dot in its name, such as `Maps\Desert v1.2\Desert v1.2.map`, now show
+in the map list. Folder scans used to skip every folder with a dot anywhere in its name.
+* The same applies to every folder scan of loose files: INI folders, `.big` archives in subfolders
+of the game folder, and the user data folder.
+* Folders whose name starts with a dot, such as `.git` or a launcher's `.ContraDevSync`, are always
+skipped. Before, whether they were skipped depended on the drive's 8.3 short-name setting.
+
 ## Game Setup
 
 ### Random army per faction
