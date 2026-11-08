@@ -29,6 +29,7 @@ set(GAMEENGINE_SRC
     Include/Common/DamageFX.h
 #    Include/Common/DataChunk.h
     Include/Common/Debug.h
+    Include/Common/DedicatedGpuExports.h
     Include/Common/Diagnostic/SimulationMathCrc.h
     Include/Common/Dict.h
 #    Include/Common/Directory.h

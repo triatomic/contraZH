@@ -51,6 +51,7 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////
 #include "Common/CommandLine.h"
 #include "Common/Debug.h"
+#include "Common/DedicatedGpuExports.h"
 #include "Common/FramePacer.h"
 #include "Common/GameMemory.h"
 #include "GameClient/GameWindowManager.h"

@@ -8,7 +8,7 @@ Everything here is additional to upstream; the rest of these docs still applies.
 * A few simulation rules are read from the mod's `GameData.ini`; each states its default.
 * NVIDIA cards now load DXT1 textures natively, as AMD and Intel cards do. This halves their memory use and makes one-bit alpha visible.
 * The map editor has its own page, [WorldBuilder Qt](WorldBuilder-Qt.md).
-* On laptops with two GPUs, the game asks the NVIDIA or AMD driver to run it on the dedicated GPU.
+* On laptops with two GPUs, the game, WorldBuilder and GUIEdit ask the NVIDIA or AMD driver to run them on the dedicated GPU.
 * Synced with TheSuperHackers/GeneralsGameCode as of August 2026 and with GeneralsGameCode_Modding
 as of October 2026. The only casualty was the texture filter option, replaced by TheSuperHackers'
 version - see [Rendering](contraZH-Options.md#rendering) for the renamed `AnisotropyLevel` key.

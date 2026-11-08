@@ -169,6 +169,11 @@ GameNetworkingSockets ICE P2P transport, lobbies/matchmaking/stats).
   under `GENERALS_ONLINE`). `SetLookAtPlayer` and the StatsExporter pipeline are ported.
 - Log-only hunks (NetworkLog conversions of commented DEBUG_LOGs), `isspace/isdigit`
   cast fixes, `nullptr`->`NULL` reverts, and GO's dead `#else` branches were not taken.
+- **Dedicated GPU exports**: `NvOptimusEnablement` and `AmdPowerXpressRequestHighPerformance`
+  live in `Common/DedicatedGpuExports.h`, included once per exe, because the GO-off build and
+  the tools want them too. This is a deliberate exception to port decision 2. Upstream GO
+  defines them in `OnlineServices_Init.cpp`, and a re-sync must drop that block because a
+  second definition fails the `win32-go` link with LNK2005.
 
 ### Not taken in the 2026-10 sync
 

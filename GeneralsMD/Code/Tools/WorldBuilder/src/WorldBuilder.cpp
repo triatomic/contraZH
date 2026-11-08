@@ -50,6 +50,7 @@
 //#include <wsys/StdFileSystem.h>
 #include "W3DDevice/GameClient/W3DFileSystem.h"
 #include "Common/CommandLine.h"
+#include "Common/DedicatedGpuExports.h"
 #include "Common/FramePacer.h"
 #include "Common/GlobalData.h"
 #include "Common/MapData.h"
