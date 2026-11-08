@@ -58,6 +58,7 @@
 #include "Common/GlobalData.h"
 #include "Common/MapData.h"
 #include "Common/PerfTimer.h"
+#include "Common/StartupTiming.h"
 #include "Common/Xfer.h"
 
 #include "GameClient/TerrainVisual.h"
@@ -247,6 +248,8 @@ BaseHeightMapRenderObjClass::~BaseHeightMapRenderObjClass()
 //=============================================================================
 BaseHeightMapRenderObjClass::BaseHeightMapRenderObjClass()
 {
+	StartupStepClock clock("HeightMap");
+
 	m_x=0;
 	m_y=0;
 	m_needFullUpdate = false;
@@ -296,21 +299,28 @@ BaseHeightMapRenderObjClass::BaseHeightMapRenderObjClass()
 	m_scorches = NEW W3DScorchDummy;
 	m_staticScorches = NEW W3DScorchDummy;
 #endif
+	clock.mark("scorches");
 	m_bridgeBuffer = NEW W3DBridgeBuffer;
+	clock.mark("bridge buffer");
 
 	if (TheGlobalData->m_headless)
 		return;
 
 	m_treeBuffer = NEW W3DTreeBuffer;
+	clock.mark("tree buffer");
 
 	m_propBuffer = NEW W3DPropBuffer;
+	clock.mark("prop buffer");
 
 	m_bibBuffer = NEW W3DBibBuffer;
+	clock.mark("bib buffer");
 
 	m_curImpassableSlope = 45.0f;	// default to 45 degrees.
 	m_waypointBuffer = NEW W3DWaypointBuffer;
+	clock.mark("waypoint buffer");
 #ifdef DO_ROADS
 	m_roadBuffer = NEW W3DRoadBuffer;
+	clock.mark("road buffer");
 #endif
 #if ENABLE_CONFIGURABLE_SHROUD
 	if (TheGlobalData->m_shroudOn)
@@ -321,6 +331,7 @@ BaseHeightMapRenderObjClass::BaseHeightMapRenderObjClass()
 	m_shroud = NEW W3DShroud;
 #endif
 	DX8Wrapper::SetCleanupHook(this);
+	clock.mark("shroud");
 }
 
 void BaseHeightMapRenderObjClass::scheduleFullUpdate()

@@ -49,6 +49,7 @@ static void drawFramerateBar();
 #include "Common/LocalFileSystem.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/StartupTiming.h"
 #include "Common/ThingTemplate.h"
 #include "Common/GameLOD.h"
 #include "Common/DrawModule.h"
@@ -886,6 +887,8 @@ void W3DDisplay::init()
 		return;
 
 	}
+	StartupStepClock clock("W3DDisplay");
+
 	// Override the W3D File system
 	TheW3DFileSystem = NEW W3DFileSystem;
 
@@ -946,6 +949,7 @@ void W3DDisplay::init()
 	m_assetManager->Register_Prototype_Loader(&_ParticleEmitterLoader );
 	m_assetManager->Register_Prototype_Loader(&_AggregateLoader);
 	m_assetManager->Set_WW3D_Load_On_Demand( true );
+	clock.mark("scenes, lights and asset manager");
 
 	if (!TheGlobalData->m_headless)
 	{
@@ -956,6 +960,7 @@ void W3DDisplay::init()
 		}
 		if (WW3D::Init( ApplicationHWnd ) != WW3D_ERROR_OK)
 			throw ERROR_INVALID_D3D;	//failed to initialize.  User probably doesn't have DX 8.1
+		clock.mark("WW3D::Init");
 
 		WW3D::Set_Prelit_Mode( WW3D::PRELIT_MODE_LIGHTMAP_MULTI_PASS );
 		WW3D::Set_Collision_Box_Display_Mask(0x00);	///<set to 0xff to make collision boxes visible
@@ -1069,6 +1074,7 @@ void W3DDisplay::init()
 			return;
 		}
 		WW3D::Set_Texture_Bitdepth(getBitDepth());
+		clock.mark("render device");
 
 		// The recommendation needs the device, so -forceBenchmark only clears it and the device saves it here
 		if (TheGlobalData->m_forceBenchmark)
@@ -1090,9 +1096,11 @@ void W3DDisplay::init()
 
 		if (TheGlobalData->m_displayGamma != 1.0f)
 			setGamma(TheGlobalData->m_displayGamma,0.0f,1.0f,FALSE);
+		clock.mark("detail level and gamma");
 	}
 
 	initAssets();
+	clock.mark("assets");
 
 	if (!TheGlobalData->m_headless)
 	{
@@ -1105,8 +1113,10 @@ void W3DDisplay::init()
 		TheW3DShadowMap->init();
 
 		TheW3DParticleAtlas = NEW W3DParticleAtlas;
+		clock.mark("scene setup and shadow map");
 
 		W3DShaderManager::init();
+		clock.mark("shader manager");
 
 		// Create and initialize the debug display
 		m_nativeDebugDisplay = NEW W3DDebugDisplay();
@@ -1132,6 +1142,7 @@ void W3DDisplay::init()
 		}
 
 		DX8WebBrowser::Initialize();
+		clock.mark("debug display and web browser");
 	}
 
 	// we're now online

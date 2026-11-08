@@ -52,6 +52,7 @@
 #include "Common/GameState.h"
 #include "Common/GlobalData.h"
 #include "Common/PerfTimer.h"
+#include "Common/StartupTiming.h"
 #include "Common/Xfer.h"
 #include "Common/GameLOD.h"
 #include "Common/FileSystem.h"
@@ -3353,6 +3354,7 @@ void WaterRenderObjClass::ReleaseResources()
 //-------------------------------------------------------------------------------------------------
 void WaterRenderObjClass::ReAcquireResources()
 {
+	StartupStepClock clock("Water resources");
 	HRESULT hr;
 
 	m_indexBuffer=NEW_REF(DX8IndexBufferClass,(6));
@@ -3419,6 +3421,7 @@ void WaterRenderObjClass::ReAcquireResources()
 
 	if (m_waterTrackSystem)
 		m_waterTrackSystem->ReAcquireResources();
+	clock.mark("index and grid buffers");
 
 	if (W3DShaderManager::getChipset() >= DC_GENERIC_PIXEL_SHADER_1_1)
 	{
@@ -3429,6 +3432,7 @@ void WaterRenderObjClass::ReAcquireResources()
 		W3DShaderManager::LoadAndCreateD3DShader("shaders\\riverwater.pso", water_declaration, 0, false, &m_riverWaterPixelShader);
 		W3DShaderManager::LoadAndCreateD3DShader("shaders\\water.pso", water_declaration, 0, false, &m_waterPixelShader);
 		W3DShaderManager::LoadAndCreateD3DShader("shaders\\trapezoidwater.pso", water_declaration, 0, false, &m_trapezoidWaterPixelShader);
+		clock.mark("classic water shaders");
 
 #if defined(BUILD_WITH_D3D9)
 		if (W3DShaderManager::supportsPixelShader2a())
@@ -3446,8 +3450,11 @@ void WaterRenderObjClass::ReAcquireResources()
 					m_shaderRiverPixelShader[i] = 0;
 				}
 			}
+			clock.mark("shader water and river shaders");
 			createNormalTexture();
+			clock.mark("normal texture");
 			createFoamTexture();
+			clock.mark("foam texture");
 
 			// The vertex shaders read the fixed-function vertex format, so the declaration only has to be valid.
 			const DX8Caps *caps = DX8Wrapper::Get_Current_Caps();
@@ -3458,6 +3465,7 @@ void WaterRenderObjClass::ReAcquireResources()
 				D3DVSD_END()
 			};
 			m_vertexTextureFetch = caps->Get_Vertex_Shader_Major_Version() >= 3 && Supports_Vertex_Texture(D3DFMT_A8R8G8B8);
+			clock.mark("vertex texture check");
 			if (caps->Get_Vertex_Shader_Major_Version() >= 3 && caps->Get_Pixel_Shader_Major_Version() >= 3)
 			{
 				if (FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\shaderwaterflat.vso", swellDeclaration, 0, true, &m_shaderWaterFlatVertexShader)))
@@ -3478,6 +3486,7 @@ void WaterRenderObjClass::ReAcquireResources()
 					}
 				}
 			}
+			clock.mark("rich water shaders");
 			if (caps->Get_Vertex_Shader_Major_Version() >= 3 && caps->Get_Pixel_Shader_Major_Version() >= 3 && Supports_Vertex_Texture(D3DFMT_A8R8G8B8))
 			{
 				if (FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\shaderwaterswell.vso", swellDeclaration, 0, true, &m_shaderWaterSwellVertexShader)))
@@ -3506,6 +3515,7 @@ void WaterRenderObjClass::ReAcquireResources()
 					}
 				}
 			}
+			clock.mark("swell and radial shaders");
 		}
 #endif
 	}
@@ -3546,6 +3556,7 @@ void WaterRenderObjClass::load()
 //-------------------------------------------------------------------------------------------------
 Int WaterRenderObjClass::init(Real waterLevel, Real dx, Real dy, SceneClass *parentScene, WaterType type)
 {
+	StartupStepClock clock("Water");
 
 	m_fBumpFrame=0;
 	m_fBumpScale=SEA_BUMP_SCALE;
@@ -3595,11 +3606,13 @@ Int WaterRenderObjClass::init(Real waterLevel, Real dx, Real dy, SceneClass *par
 	loadSetting( &m_settings[ TIME_OF_DAY_AFTERNOON ], TIME_OF_DAY_AFTERNOON );
 	loadSetting( &m_settings[ TIME_OF_DAY_EVENING ], TIME_OF_DAY_EVENING );
 	loadSetting( &m_settings[ TIME_OF_DAY_NIGHT ], TIME_OF_DAY_NIGHT );
+	clock.mark("sky and water textures for 4 times of day");
 
 	Set_Sort_Level(2);	//force water to be drawn after all other non translucent objects in scene.
 	Set_Force_Visible(TRUE);	//water is always visible since it's a composite object made of multiple planes all over the map.
 
 	ReAcquireResources();
+	clock.mark("buffers, render targets and shaders");
 #if 0	//MD does not support the old bump-mapped water at all so no point loading textures. -MW 8-11-03
 	if (type == WATER_TYPE_2_PVSHADER || (W3DShaderManager::getChipset() >= DC_GENERIC_PIXEL_SHADER_1_1))
 	{	//geforce3 specific water requires some extra D3D assets
@@ -3648,7 +3661,10 @@ Int WaterRenderObjClass::init(Real waterLevel, Real dx, Real dy, SceneClass *par
 	m_alphaClippingTexture=WW3DAssetManager::Get_Instance()->Get_Texture("alphaclip.tga");
 #endif
 
+	clock.mark("sky body texture");
+
 	m_skyBox = ((W3DAssetManager*)W3DAssetManager::Get_Instance())->Create_Render_Obj( "new_skybox", TheGlobalData->m_skyBoxScale, 0);
+	clock.mark("skybox model");
 
 	//Enable clamping on all textures used by the skybox (to reduce corner seams).
 	if (m_skyBox && m_skyBox->Class_ID() == RenderObjClass::CLASSID_MESH)
@@ -3687,6 +3703,7 @@ Int WaterRenderObjClass::init(Real waterLevel, Real dx, Real dy, SceneClass *par
 	m_waterTrackSystem = NEW WaterTracksRenderSystem;
 	m_waterTrackSystem->init();
 #endif
+	clock.mark("river, noise, edge and sparkle textures");
 
 	return 0;
 }

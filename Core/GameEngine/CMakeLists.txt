@@ -116,6 +116,7 @@ set(GAMEENGINE_SRC
 #    Include/Common/SpecialPowerMaskType.h
 #    Include/Common/SpecialPowerType.h
 #    Include/Common/StackDump.h
+    Include/Common/StartupTiming.h
 #    Include/Common/StateMachine.h
 #    Include/Common/StatsCollector.h
     Include/Common/SciencePurchaseSlots.h
