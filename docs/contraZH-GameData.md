@@ -47,7 +47,7 @@ See [Storms](dx9-Environment.md#key-names-and-overrides) for all 18 keys and exa
 
 ## Unknown keys and blocks are skipped
 
-An INI key or block the game does not know is logged to `DebugLogFile.txt` and skipped instead of
+An INI key or block the game does not know is logged to `DebugLogFile.txt` (player builds need `-log`) and skipped instead of
 crashing the game or WorldBuilder. Retail asserted on an unknown key in debug builds and threw on
 an unknown block in every build, so a mod INI written for a newer exe could not load on an older
 one. An unknown block is skipped up to its `End`, which also covers a new key that opens a nested

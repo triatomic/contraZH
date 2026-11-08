@@ -378,7 +378,11 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 	Invalidate_Cached_Render_States();
 
 	if (!lite) {
-		D3D8Lib = LoadLibrary(DX8_D3D_DLL_NAME);
+		// Shutdown keeps the library loaded because driver threads still call into it
+		if (D3D8Lib == nullptr)
+		{
+			D3D8Lib = LoadLibrary(DX8_D3D_DLL_NAME);
+		}
 
 		if (D3D8Lib == nullptr) return false;	// Return false at this point if init failed
 
@@ -429,6 +433,15 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 
 void DX8Wrapper::Shutdown()
 {
+	for (size_t i = 0; i < ARRAY_SIZE(Textures); ++i)
+	{
+		if (Textures[i])
+		{
+			Textures[i]->Release();
+			Textures[i] = nullptr;
+		}
+	}
+
 	if (D3DDevice) {
 
 		Set_Render_Target ((IDirect3DSurface8 *)nullptr);
@@ -440,18 +453,6 @@ void DX8Wrapper::Shutdown()
 		D3DInterface=nullptr;
 
 	}
-
-	for (size_t i = 0; i < ARRAY_SIZE(Textures); ++i)
-	{
-		if (Textures[i])
-		{
-			Textures[i]->Release();
-			Textures[i] = nullptr;
-		}
-	}
-
-	// The library stays loaded because driver threads and late resource releases still call into it
-	D3D8Lib = nullptr;
 
 	_RenderDeviceNameTable.Clear();		 // note - Delete_All() resizes the vector, causing a reallocation.  Clear is better. jba.
 	_RenderDeviceShortNameTable.Clear();

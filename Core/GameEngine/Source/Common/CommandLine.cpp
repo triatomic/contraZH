@@ -1256,7 +1256,7 @@ static CommandLineParam paramsForStartup[] =
 	// Use a plain D3D9 device instead of D3D9Ex (D3D9 builds only; same as CONTRA_D3D9EX=0).
 	{ "-d3d9", parseD3D9 },
 
-	// Write DebugLogFile.txt and d3d9render.txt in builds without cheats, which stay silent otherwise.
+	// Write DebugLogFile.txt and d3d9render.txt.
 	{ "-log", parseLog },
 };
 

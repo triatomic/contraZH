@@ -574,6 +574,11 @@ void DebugRequestLogFiles()
 	theLogFilesRequested = TRUE;
 }
 
+int DebugLogEnabled()
+{
+	return !theLogSilent;
+}
+
 const char* DebugGetLogFileName()
 {
 	return theLogFileName;
