@@ -459,7 +459,6 @@ void DX8Wrapper::Shutdown()
 	_RenderDeviceShortNameTable.Clear();
 	_RenderDeviceDescriptionTable.Clear();
 
-	DX8Caps::Shutdown();
 	IsInitted = false;		// 010803 srj
 }
 
@@ -876,8 +875,6 @@ void DX8Wrapper::Enumerate_Devices()
 			D3DInterface->GetDeviceCaps(adapter_index,WW3D_DEVTYPE,&desc.Caps);
 			D3DInterface->GetAdapterIdentifier(adapter_index,D3DENUM_NO_WHQL_LEVEL,&desc.AdapterIdentifier);
 
-			DX8Caps dx8caps(D3DInterface,desc.Caps,WW3D_FORMAT_UNKNOWN,desc.AdapterIdentifier);
-
 			/*
 			** Enumerate the resolutions
 			*/
@@ -906,11 +903,6 @@ void DX8Wrapper::Enumerate_Devices()
 
 						case D3DFMT_R5G6B5:
 						case D3DFMT_X1R5G5B5:		bits = 16; break;
-					}
-
-					// Some cards fail in certain modes, DX8Caps keeps list of those.
-					if (!dx8caps.Is_Valid_Display_Format(d3dmode.Width,d3dmode.Height,D3DFormat_To_WW3DFormat(d3dmode.Format))) {
-						bits=0;
 					}
 
 					/*
