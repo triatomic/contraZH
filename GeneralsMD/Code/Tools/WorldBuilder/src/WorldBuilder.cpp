@@ -353,6 +353,9 @@ CWorldBuilderApp::~CWorldBuilderApp()
 static LONG WINAPI UnHandledExceptionFilter(struct _EXCEPTION_POINTERS* e_info)
 {
 	DumpExceptionInfo(e_info->ExceptionRecord->ExceptionCode, e_info);
+#ifdef DEBUG_LOGGING
+	DebugFlushLog();
+#endif
 #ifdef RTS_ENABLE_CRASHDUMP
 	if (TheMiniDumper && TheMiniDumper->IsInitialized())
 	{
