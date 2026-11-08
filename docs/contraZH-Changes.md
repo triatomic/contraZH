@@ -6,6 +6,7 @@ Everything here is additional to upstream; the rest of these docs still applies.
 * Most changes are client-side and read from `Options.ini`; each setting states its default.
 * [Gameplay Fixes](contraZH-Gameplay-Fixes.md) are always on and fix retail simulation bugs.
 * A few simulation rules are read from the mod's `GameData.ini`; each states its default.
+* NVIDIA cards now load DXT1 textures natively, as AMD and Intel cards do. This halves their memory use and makes one-bit alpha visible.
 * The map editor has its own page, [WorldBuilder Qt](WorldBuilder-Qt.md).
 * Synced with TheSuperHackers/GeneralsGameCode as of August 2026 and with GeneralsGameCode_Modding
 as of October 2026. The only casualty was the texture filter option, replaced by TheSuperHackers'

@@ -315,8 +315,6 @@ void DX8Caps::Vendor_Specific_Hacks(const D3DADAPTER_IDENTIFIER8& adapter_id)
 		}
 
 		SupportNPatches = false;	// Driver incorrectly report N-Patch support
-		// The original code disabled DXT1 here for GeForce 1-4 era banding. Modern
-		// NVidia hardware decodes DXT1 correctly, so all vendors share the native path.
 	}
 
 	if (VendorId==VENDOR_VMWARE) {
