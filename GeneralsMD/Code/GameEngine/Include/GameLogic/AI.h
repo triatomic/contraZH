@@ -944,6 +944,8 @@ public:
 	void groupAttackMoveToPosition( const Coord3D *pos, Int maxShotsToFire, Bool isWaypoint, CommandSourceType cmdSource );	///< Attack move to the location
 	void groupHunt( CommandSourceType cmdSource );														///< begin "seek and destroy"
 	void groupRepair( Object *obj, Bool isWaypoint, CommandSourceType cmdSource );						///< repair the given object
+	// ShigureUi 08/11/2026 smart cast dozer construct in multiselect
+	void groupConstruct(const ThingTemplate *thing, const Coord3D* pos, Real angle, Bool isWaypoint, CommandSourceType cmdSource);
 	void groupResumeConstruction( Object *obj, Bool isWaypoint, CommandSourceType cmdSource );	///< resume construction on the object
 	void groupGetHealed( Object *healDepot, Bool isWaypoint, CommandSourceType cmdSource );		///< go get healed at the heal depot
 	void groupGetRepaired( Object *repairDepot, Bool isWaypoint, CommandSourceType cmdSource );///< go get repaired at the repair depot

@@ -617,15 +617,30 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		case GUI_COMMAND_DOZER_CONSTRUCT:
 		{
 
-			// sanity
-			if( m_currentSelectedDrawable == nullptr )
-				break;
-
 			//Kris: September 27, 2002
 			//Make sure we have enough CASH to build it WHEN we click the button to build it,
 			//before actually previewing the purchase, otherwise, cancel altogether.
 			const ThingTemplate *whatToBuild = commandButton->getThingTemplate();
-			CanMakeType cmt = TheBuildAssistant->canMakeUnit( obj, whatToBuild );
+			CanMakeType cmt, curCmt;
+
+			for (DrawableListCIt it = selected->begin(); it != selected->end(); ++it)
+			{
+				curCmt = TheBuildAssistant->canMakeUnit((*it)->getObject(), whatToBuild);
+
+				if (curCmt == CANMAKE_NO_MONEY || cmt == CANMAKE_MAXED_OUT_FOR_PLAYER)
+				{
+					cmt = curCmt;
+					break;
+				}
+
+				if (it == selected->begin())
+					cmt = curCmt;
+				else if (curCmt == CANMAKE_QUEUE_FULL && cmt == CANMAKE_PARKING_PLACES_FULL)
+					cmt = CANMAKE_QUEUE_FULL;
+				else if (curCmt == CANMAKE_OK)
+					cmt = CANMAKE_OK;
+			}
+			
 			if (cmt == CANMAKE_NO_MONEY)
 			{
 				TheEva->setShouldPlay(EVA_InsufficientFunds);
@@ -649,7 +664,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			}
 
 			// tell the UI that we want to build something so we get a building at the cursor
-			TheInGameUI->placeBuildAvailable( commandButton->getThingTemplate(), m_currentSelectedDrawable );
+			TheInGameUI->placeBuildAvailable( commandButton->getThingTemplate(), selected);
 
 			break;
 
@@ -693,10 +708,12 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				break;
 			}
 
+			DrawableList drawList;
+			drawList.push_back(draw);
 			// tell the UI that we want to build something so we get a building at the cursor
-			TheInGameUI->placeBuildAvailable( commandButton->getThingTemplate(), draw );
+			TheInGameUI->placeBuildAvailable( commandButton->getThingTemplate(), &drawList);
 
-			ProductionUpdateInterface* pu = obj->getProductionUpdateInterface();
+			ProductionUpdateInterface *pu = obj->getProductionUpdateInterface();
 			if( pu )
 			{
 				pu->setSpecialPowerConstructionCommandButton( commandButton );
@@ -735,8 +752,11 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				break;
 			}
 
+
+			DrawableList drawList;
+			drawList.push_back(m_currentSelectedDrawable);
 			// tell the UI that we want to build something so we get a building at the cursor
-			TheInGameUI->placeBuildAvailable( commandButton->getThingTemplate(), m_currentSelectedDrawable );
+			TheInGameUI->placeBuildAvailable( commandButton->getThingTemplate(), &drawList);
 
 			ProductionUpdateInterface* pu = obj->getProductionUpdateInterface();
 			if( pu )

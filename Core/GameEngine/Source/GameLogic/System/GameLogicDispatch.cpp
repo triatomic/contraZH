@@ -2357,9 +2357,9 @@ bool GameLogic::onDozerConstruct(MAYBE_UNUSED GameMessage* msg, AIGroupPtr& curr
 	// TheSuperHackers @feature The first of the group builds and any dozer behind it is sent to
 	// help, so a smart selection focus can lead the rest of the selected dozers to one site.
 #if RETAIL_COMPATIBLE_AIGROUP
-	const AIGroup* group = currentlySelectedGroup;
+	AIGroup* group = currentlySelectedGroup;
 #else
-	const AIGroup* group = currentlySelectedGroup.Peek();
+	AIGroup* group = currentlySelectedGroup.Peek();
 #endif
 	if (group == nullptr || group->isEmpty())
 		return false;
@@ -2370,58 +2370,21 @@ bool GameLogic::onDozerConstruct(MAYBE_UNUSED GameMessage* msg, AIGroupPtr& curr
 	angle = msg->getArgument(2)->real;
 
 	Bool isWaypoint = msg->getArgument(3)->boolean;
-	UnsignedInt cmdNode;
 
 	if (place == nullptr || constructorObject == nullptr)
 		return false;  //These are not crashes, as the object may have died before this message came in
 
-	if (!isWaypoint)
-	{
-		TheCommandSequence->clearObjectCommand(constructorObject);
-	}
-
 	if (msg->getType() == GameMessage::MSG_DOZER_CONSTRUCT)
 	{
-		cmdNode = TheCommandSequence->newDozerConstructCommand(CommandSequence::COMMAND_DOZER_CONSTRUCT, place, &loc, nullptr, angle);
-
-		if (!TheCommandSequence->hasAnyCommand(constructorObject))
-		{
-
-			TheCommandSequence->includeUnitInCommand(cmdNode, constructorObject);
-			TheCommandSequence->prepareCommandForVerification(constructorObject);
-
-			//Object* building =
-			TheBuildAssistant->buildObjectNow(constructorObject, place, &loc, angle,
-				constructorObject->getControllingPlayer());
-
-			if (TheCommandSequence->isStillAwaiting(constructorObject))
-				TheCommandSequence->removeCurrentCommand(constructorObject);
-			/*
-			for (size_t i = 1; building && i < groupIDs.size(); i++)
-			{
-				Object* helper = findObjectByID(groupIDs[i]);
-				if (helper && helper->getAIUpdateInterface() &&
-					TheActionManager->canResumeConstructionOf(helper, building, CMD_FROM_PLAYER))
-				{
-					helper->getAIUpdateInterface()->aiResumeConstruction(building, CMD_FROM_PLAYER);
-				}
-			}*/
-		}
-		else
-		{
-			UnsignedInt cost = place->calcCostToBuild(constructorObject->getControllingPlayer());
-			Money* money = constructorObject->getControllingPlayer()->getMoney();
-
-			if (money->countMoney() >= cost && TheCommandSequence->includeUnitInCommand(cmdNode, constructorObject))
-			{
-				money->withdraw(cost);
-				TheCommandSequence->createConstructionShadow(cmdNode, constructorObject);
-				TheCommandSequence->setConstructionCashWithdraw(cmdNode, cost);
-			}
-		}
+		group->groupConstruct(place, &loc, angle, isWaypoint, CMD_FROM_PLAYER);
 	}
 	else
 	{
+		if (!isWaypoint)
+		{
+			TheCommandSequence->clearObjectCommand(constructorObject);
+		}
+
 		Coord3D locEnd;
 
 		// get the end of the line location in the world

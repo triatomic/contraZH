@@ -2536,6 +2536,104 @@ void AIGroup::groupRepair( Object *obj, Bool isWaypoint, CommandSourceType cmdSo
 	TheCommandSequence->cleanUpEmptyCommand(cmdNode);
 }
 
+void AIGroup::groupConstruct(const ThingTemplate *thing, const Coord3D *pos, Real angle, Bool isWaypoint, CommandSourceType cmdSource)
+{
+	Int minConstructionCount = INT_MAX, cnt;
+	Object *bestBuilder = nullptr;
+	std::list<Object*>::iterator i;
+	Real bestDist = 1e9, curDist;
+	const Coord3D *builderPos;
+
+	if (!isWaypoint)
+	{
+		Bool isRepairTask = true;
+
+		for (i = m_memberList.begin(); i != m_memberList.end(); ++i)
+		{
+			AIUpdateInterface* ai = (*i)->getAIUpdateInterface();
+			if (!ai)
+				continue;
+
+			DozerAIInterface* dozerAi = ai->getDozerAIInterface();
+			if (!dozerAi)
+				continue;
+
+			if (TheBuildAssistant->canMakeUnit(*i, thing) != CANMAKE_OK)
+				continue;
+
+			if (!dozerAi->isAnyTaskPending())
+			{
+				builderPos = (*i)->getPosition();
+				curDist = sqr(builderPos->x - pos->x) + sqr(builderPos->y - pos->y);
+				if (curDist < bestDist || isRepairTask)
+				{
+					bestDist = curDist;
+					bestBuilder = *i;
+					isRepairTask = false;
+				}
+			}
+			else if (dozerAi->isTaskPending(DOZER_TASK_REPAIR) && !dozerAi->isTaskPending(DOZER_TASK_BUILD))
+			{
+				if (isRepairTask && curDist < bestDist)
+				{
+					bestDist = curDist;
+					bestBuilder = *i;
+				}
+			}
+		}
+	}
+	else
+	{
+		for (i = m_memberList.begin(); i != m_memberList.end(); ++i)
+		{
+			if (TheBuildAssistant->canMakeUnit(*i, thing) != CANMAKE_OK)
+				continue;
+
+			cnt = TheCommandSequence->getConstructionCount(*i);
+
+			builderPos = (*i)->getPosition();
+			curDist = sqr(builderPos->x - pos->x) + sqr(builderPos->y - pos->y);
+
+			if (cnt < minConstructionCount || (cnt == minConstructionCount && curDist < bestDist))
+			{
+				bestBuilder = *i;
+				minConstructionCount = cnt;
+				bestDist = curDist;
+			}
+		}
+	}
+
+	if (!bestBuilder)
+		return;
+
+	UnsignedInt cmdNode = TheCommandSequence->newDozerConstructCommand(CommandSequence::COMMAND_DOZER_CONSTRUCT, thing, pos, nullptr, angle);
+
+	if (!TheCommandSequence->hasAnyCommand(bestBuilder))
+	{
+
+		TheCommandSequence->includeUnitInCommand(cmdNode, bestBuilder);
+		TheCommandSequence->prepareCommandForVerification(bestBuilder);
+
+		TheBuildAssistant->buildObjectNow(bestBuilder, thing, pos, angle,
+			bestBuilder->getControllingPlayer());
+
+		if (TheCommandSequence->isStillAwaiting(bestBuilder))
+			TheCommandSequence->removeCurrentCommand(bestBuilder);
+	}
+	else
+	{
+		UnsignedInt cost = thing->calcCostToBuild(bestBuilder->getControllingPlayer());
+		Money* money = bestBuilder->getControllingPlayer()->getMoney();
+
+		if (money->countMoney() >= cost && TheCommandSequence->includeUnitInCommand(cmdNode, bestBuilder))
+		{
+			money->withdraw(cost);
+			TheCommandSequence->createConstructionShadow(cmdNode, bestBuilder);
+			TheCommandSequence->setConstructionCashWithdraw(cmdNode, cost);
+		}
+	}
+}
+
 /**
 	* Resume construction on object
 	*/
