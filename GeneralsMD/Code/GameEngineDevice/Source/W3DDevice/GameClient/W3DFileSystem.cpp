@@ -168,7 +168,8 @@ char const * GameFileClass::Set_Name( char const *filename )
 
 	GameFileType fileType = getFileType(filename);
 
-	if (isImageFileType(fileType) && strnicmp(filename, TERRAIN_TGA_DIR_PATH, strlen(TERRAIN_TGA_DIR_PATH)) == 0)
+	if (isImageFileType(fileType) && (strnicmp(filename, TERRAIN_TGA_DIR_PATH, strlen(TERRAIN_TGA_DIR_PATH)) == 0
+		|| strnicmp(filename, TGA_DIR_PATH, strlen(TGA_DIR_PATH)) == 0))
 	{
 		strlcpy(m_filePath, filename, ARRAY_SIZE(m_filePath));
 		m_fileExists = TheFileSystem->doesFileExist(m_filePath);

@@ -501,6 +501,9 @@ BOOL CWorldBuilderApp::InitInstance()
 	initSubsystem(TheTerrainTypes, new TerrainTypeCollection(), "Data\\INI\\Default\\Terrain", "Data\\INI\\Terrain");
 	initSubsystem(TheTerrainRoads, new TerrainRoadCollection(), "Data\\INI\\Default\\Roads", "Data\\INI\\Roads");
 
+	// The terrain palette reads DDS textures through the W3D file factory.
+	TheW3DFileSystem = new WB_W3DFileSystem;
+
 	TerrainBrushes::load();
 	WorldHeightMapEdit::init();
 
@@ -534,8 +537,6 @@ BOOL CWorldBuilderApp::InitInstance()
 
 	loadWindow.setProgress("Finalizing...");
 	TheSubsystemListRecord.postProcessLoadAll();
-
-	TheW3DFileSystem = new WB_W3DFileSystem;
 
 	// Just to be sure - wb doesn't do well with half res terrain.
 	DEBUG_ASSERTCRASH(!TheGlobalData->m_useHalfHeightMap, ("TheGlobalData->m_useHalfHeightMap : Don't use this setting in WB."));

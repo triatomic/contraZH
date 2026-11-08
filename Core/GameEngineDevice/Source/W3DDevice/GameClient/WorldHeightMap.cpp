@@ -1169,6 +1169,23 @@ File *WorldHeightMap::openTerrainTexture(AsciiString &path, Bool useMissingTextu
 			file = TheFileSystem->openFile(path.str(), File::READ | File::BINARY);
 		}
 	}
+	// Mods can pack a terrain texture in Art/Textures, beside its _nrm, _hgt and _emi maps.
+	if (file == nullptr && path.startsWithNoCase(TERRAIN_TGA_DIR_PATH))
+	{
+		AsciiString texturesPath;
+		texturesPath.format("%s%s", TGA_DIR_PATH, path.str() + strlen(TERRAIN_TGA_DIR_PATH));
+		file = TheFileSystem->openFile(texturesPath.str(), File::READ | File::BINARY);
+		if (file == nullptr && texturesPath.endsWithNoCase(".dds"))
+		{
+			texturesPath.truncateBy(4);
+			texturesPath.concat(".tga");
+			file = TheFileSystem->openFile(texturesPath.str(), File::READ | File::BINARY);
+		}
+		if (file != nullptr)
+		{
+			path = texturesPath;
+		}
+	}
 	if (file == nullptr && useMissingTexture)
 	{
 		RENDER_LOG(("Terrain texture %s not found, using misstex.dds", path.str()));
