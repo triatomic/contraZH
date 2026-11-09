@@ -120,6 +120,20 @@ finished units of a batch stay finished.
 * No effect on the first entry or a finished unit waiting to exit.
 * Plain click still cancels; Shift+click still cancels all of that type.
 
+### Auto queue
+
+Right click a unit cameo on a production building to have that building build the unit by itself.
+
+* The building queues one unit at a time, only when its queue is empty.
+* The cameo shows a green frame and an AUTO tag.
+* Right click the cameo again to stop. Right clicking another unit switches to that unit.
+* Short of money, at the unit limit or out of parking, the building waits and builds when it can.
+* Cancelling the last queued unit of that type also stops it. So does losing the building to capture.
+* With several producers selected, a right click starts it on all of them. If any already auto queues
+that unit, those producers stop instead.
+* On a greyed out cameo, a right click can only stop it.
+* Save and load keep it.
+
 ## New CommandButton Options
 
 ### SKIP_CLEAR_PATH_CHECK

@@ -789,9 +789,13 @@ void ControlBar::updateContextCommand()
 		if( pu )
 		{
 
-			// update the whole queue as necessary
-			if( pu->getProductionCount() != m_displayedQueueCount )
+			// update the whole queue as necessary, an auto queue refill keeps the count but changes the head
+			const ProductionEntry *head = pu->firstProduction();
+			if( pu->getProductionCount() != m_displayedQueueCount ||
+					( head != nullptr && head->getProductionID() != m_queueData[ 0 ].productionID ) )
+			{
 				populateBuildQueue( obj );
+			}
 
 			//
 			// update the build percentage on the first thing (the thing that's being built)
@@ -914,6 +918,13 @@ void ControlBar::updateContextCommand()
 			const Image *image = calculateVeterancyOverlayForThing( command->getThingTemplate() );
 			GadgetButtonDrawOverlayImage( win, image );
 		}
+
+#if RTS_ZEROHOUR
+		if( pu && command->getCommandType() == GUI_COMMAND_UNIT_BUILD && pu->isAutoQueueUnit( command->getThingTemplate() ) )
+		{
+			GadgetButtonDrawAutoQueue( win );
+		}
+#endif
 
 		//
 		// for check-like commands we will keep the push button "pushed" or "unpushed" depending

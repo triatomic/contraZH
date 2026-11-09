@@ -2752,6 +2752,11 @@ void ControlBar::setControlCommand( GameWindow *button, const CommandButton *com
 	GadgetButtonSetData(button, (void*)commandButton);
 	//button->winSetUserData( commandButton );
 
+#if RTS_ZEROHOUR
+	// right click toggles auto queue on a unit cameo
+	GadgetButtonEnableRightClick( button, commandButton->getCommandType() == GUI_COMMAND_UNIT_BUILD );
+#endif
+
 	setCommandBarBorder(button, commandButton->getCommandButtonMappedBorderType());
 
 	if (TheHotKeyManager)

@@ -195,6 +195,7 @@ ProductionUpdate::ProductionUpdate( Thing *thing, const ModuleData* moduleData )
 	m_setFlags.clear();
 	m_flagsDirty = FALSE;
 	m_specialPowerConstructionCommandButton = nullptr;
+	m_autoQueueUnit = nullptr;
 
 }
 
@@ -608,6 +609,44 @@ void ProductionUpdate::cancelAllUnitsOfType( const ThingTemplate *unitType)
 }
 
 //-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+Bool ProductionUpdate::isAutoQueueUnit( const ThingTemplate *unitType ) const
+{
+	return m_autoQueueUnit != nullptr && m_autoQueueUnit->isEquivalentTo( unitType );
+}
+
+//-------------------------------------------------------------------------------------------------
+/** queueCreateUnit refuses while money, the unit limit or parking fall short, and the next
+	* update tries again */
+//-------------------------------------------------------------------------------------------------
+void ProductionUpdate::tryAutoQueueUnit()
+{
+	if( m_autoQueueUnit == nullptr )
+	{
+		return;
+	}
+
+	// nothing refunds a unit queued on a dying or sold building
+	Object *us = getObject();
+	if( us->isEffectivelyDead() || us->getStatusBits().test( OBJECT_STATUS_SOLD ) )
+	{
+		return;
+	}
+
+	queueCreateUnit( m_autoQueueUnit, PRODUCTIONID_AUTO_QUEUE );
+}
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+void ProductionUpdate::onCapture( Player *oldOwner, Player *newOwner )
+{
+	if( oldOwner != newOwner )
+	{
+		m_autoQueueUnit = nullptr;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
 /** Update the door behavior */
 //-------------------------------------------------------------------------------------------------
 void ProductionUpdate::updateDoors()
@@ -735,7 +774,10 @@ UpdateSleepTime ProductionUpdate::update()
 
 	// if nothing in the queue get outta here
 	if( production == nullptr )
+	{
+		tryAutoQueueUnit();
 		return UPDATE_SLEEP_NONE;
+	}
 
 	//
 	// if we've become OBJECT_STATUS_SOLD, halt all production ... leave things in the
@@ -1057,6 +1099,12 @@ UpdateSleepTime ProductionUpdate::update()
 
 	}
 
+	// refill in this update, or the control bar would show an empty queue between two units
+	if( m_productionQueue == nullptr )
+	{
+		tryAutoQueueUnit();
+	}
+
 	return UPDATE_SLEEP_NONE;
 }
 
@@ -1096,6 +1144,13 @@ void ProductionUpdate::addToProductionQueue( ProductionEntry *production )
 
 			m_setFlags.set( MODELCONDITION_ACTIVELY_CONSTRUCTING );
 			m_flagsDirty = TRUE;
+
+		}
+		else
+		{
+
+			// the entry that just left may have asked to clear this, and it has not applied yet
+			m_clearFlags.set( MODELCONDITION_ACTIVELY_CONSTRUCTING, false );
 
 		}
 
@@ -1213,11 +1268,19 @@ Bool ProductionUpdate::cancelUnitCreate( ProductionEntry *production )
 	Money *money = player->getMoney();
 	money->deposit( production->m_objectToProduce->calcCostToBuild( player ), TRUE, FALSE );
 
+	const Bool cancelledAutoQueueUnit = isAutoQueueUnit( production->m_objectToProduce );
+
 	// remove from queue list
 	removeFromProductionQueue( production );
 
 	// delete the production entry
 	deleteInstance(production);
+
+	// the next update would otherwise queue it straight back
+	if( cancelledAutoQueueUnit && m_productionQueue == nullptr )
+	{
+		m_autoQueueUnit = nullptr;
+	}
 
 	return TRUE;
 }
@@ -1370,13 +1433,14 @@ void ProductionUpdate::crc( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 /** Xfer method
 	* Version Info:
-	* 1: Initial version */
+	* 1: Initial version
+	* 2: Auto queue unit */
 // ------------------------------------------------------------------------------------------------
 void ProductionUpdate::xfer( Xfer *xfer )
 {
 
 	// version
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -1540,6 +1604,21 @@ void ProductionUpdate::xfer( Xfer *xfer )
 
 	// flags dirty
 	xfer->xferBool( &m_flagsDirty );
+
+	if( version >= 2 )
+	{
+		AsciiString autoQueueUnitName;
+		if( m_autoQueueUnit != nullptr )
+		{
+			autoQueueUnitName = m_autoQueueUnit->getName();
+		}
+		xfer->xferAsciiString( &autoQueueUnitName );
+
+		if( xfer->getXferMode() == XFER_LOAD && autoQueueUnitName.isNotEmpty() )
+		{
+			m_autoQueueUnit = TheThingFactory->findTemplate( autoQueueUnitName );
+		}
+	}
 
 }
 

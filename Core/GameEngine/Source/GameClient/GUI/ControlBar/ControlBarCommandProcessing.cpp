@@ -213,6 +213,43 @@ static void selectObjectOfType( Object* obj, void* selectObjectsInfo )
 	}
 }
 
+#if RTS_ZEROHOUR
+//-------------------------------------------------------------------------------------------------
+/** Producers already auto queueing this unit stop. If there are none, every producer starts. */
+//-------------------------------------------------------------------------------------------------
+static void toggleAutoQueueUnit( const DrawableList &factories, const ThingTemplate *unitType, Bool canStart )
+{
+	Bool anyOn = FALSE;
+	for( DrawableListCIt it = factories.begin(); it != factories.end(); ++it )
+	{
+		if( (*it)->getObject()->getProductionUpdateInterface()->isAutoQueueUnit( unitType ) )
+		{
+			anyOn = TRUE;
+			break;
+		}
+	}
+
+	// only the cameo enforces NEED_UPGRADE, so a greyed one may stop auto queue but never start it
+	if( !anyOn && !canStart )
+	{
+		return;
+	}
+
+	for( DrawableListCIt it = factories.begin(); it != factories.end(); ++it )
+	{
+		Object *factory = (*it)->getObject();
+		if( anyOn && !factory->getProductionUpdateInterface()->isAutoQueueUnit( unitType ) )
+		{
+			continue;
+		}
+
+		GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_SET_AUTO_QUEUE_UNIT );
+		msg->appendObjectIDArgument( factory->getID() );
+		msg->appendIntegerArgument( anyOn ? 0 : unitType->getTemplateID() );
+	}
+}
+#endif
+
 //-------------------------------------------------------------------------------------------------
 // ShigureUi 19/09/2026 calculate estimated production finished time of a production update
 //-------------------------------------------------------------------------------------------------
@@ -520,10 +557,11 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				continue;
 			}
 
+			// a right click on a disabled producer can still stop its auto queue
 			if (draw && draw->getObject() &&
 				!draw->getObject()->getStatusBits().test(OBJECT_STATUS_SOLD) &&
 				!draw->getObject()->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION) &&
-				!draw->getObject()->isDisabled())
+				(gadgetMessage == GBM_SELECTED_RIGHT || !draw->getObject()->isDisabled()))
 			{
 				factories.push_back(draw);
 			}
@@ -779,6 +817,14 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			// sanity, we must have something to build
 			DEBUG_ASSERTCRASH( whatToBuild, ("Undefined BUILD command for object '%s'",
 												 commandButton->getThingTemplate()->getName().str()) );
+
+#if RTS_ZEROHOUR
+			if( gadgetMessage == GBM_SELECTED_RIGHT )
+			{
+				toggleAutoQueueUnit( factories, whatToBuild, control->winGetEnabled() );
+				break;
+			}
+#endif
 
 			Real curFinishTime;
 			Object *curFactory;

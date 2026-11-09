@@ -439,6 +439,7 @@ typedef struct _PushButtonData
 	Int ammoInClip;					///< Clip bar above the health bar, shots left. One shot like the health bar.
 	Int ammoClipSize;				///< Shots per clip, drawn as dividers past one. Zero for no bar.
 	Char cornerLetter;			///< TheSuperHackers @feature One letter drawn top left like the hotkey overlay, 0 for none. Persistent.
+	Bool autoQueue;					///< Auto queue frame and tag. One shot like the health bar.
 } PushButtonData;
 
 // TabControlData ------------------------------------------------------------

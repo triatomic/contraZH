@@ -767,6 +767,20 @@ void ControlBar::updateContextMultiSelect()
 			GadgetButtonDrawOverlayImage(m_commandWindows[ i ], image);
 		}
 
+#if RTS_ZEROHOUR
+		if (m_commonCommands[ i ]->getCommandType() == GUI_COMMAND_UNIT_BUILD)
+		{
+			for (size_t producer = 0; producer < producerList.size(); producer++)
+			{
+				if (producerList[ producer ]->getProductionUpdateInterface()->isAutoQueueUnit(m_commonCommands[ i ]->getThingTemplate()))
+				{
+					GadgetButtonDrawAutoQueue(m_commandWindows[ i ]);
+					break;
+				}
+			}
+		}
+#endif
+
 
 		// ShigureUi 07/09/2026 check if there is any command button is build/upgrade and available to all.
 		if (everyHasPU &&

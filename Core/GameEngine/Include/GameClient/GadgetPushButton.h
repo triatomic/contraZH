@@ -72,6 +72,7 @@
 void GadgetCheckLikeButtonSetVisualCheck( GameWindow *g, Bool checked );
 Bool GadgetCheckLikeButtonIsChecked( GameWindow *g );
 void GadgetButtonEnableCheckLike( GameWindow *g, Bool makeCheckLike, Bool initiallyChecked );
+void GadgetButtonEnableRightClick( GameWindow *g, Bool enable );
 
 void GadgetButtonSetText( GameWindow *g, UnicodeString text );
 void GadgetButtonDrawClock( GameWindow *g, Int percent, Color color ); //Darkens the progress
@@ -81,6 +82,7 @@ void GadgetButtonDrawCountdown( GameWindow *g, Int seconds );
 void GadgetButtonDrawHealthBar( GameWindow *g, Real ratio );
 void GadgetButtonDrawAmmoBar( GameWindow *g, Int ammoInClip, Int clipSize );
 void GadgetButtonSetCornerLetter( GameWindow *g, Char letter );
+void GadgetButtonDrawAutoQueue( GameWindow *g );
 void GadgetButtonDrawOverlayImage( GameWindow *g, const Image *image );
 void GadgetButtonSetBorder( GameWindow *g, Color color, Bool drawBorder = TRUE );
 void GadgetButtonSetData(GameWindow *g, void *data);

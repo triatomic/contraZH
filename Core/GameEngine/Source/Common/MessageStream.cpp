@@ -732,6 +732,7 @@ const char *GameMessage::getCommandTypeAsString(GameMessage::Type t)
 #if RTS_ZEROHOUR
 	CASE_LABEL(MSG_DO_MOVETO_FACING)
 #endif
+	CASE_LABEL(MSG_SET_AUTO_QUEUE_UNIT)
 	CASE_LABEL(MSG_BEGIN_DEBUG_NETWORK_MESSAGES)
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
