@@ -1851,6 +1851,11 @@ bool GameLogic::onExit(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelec
 
 				if (TheCommandSequence->isStillAwaiting(objectContainingExiter))
 					TheCommandSequence->removeCurrentCommand(objectContainingExiter);
+				else if (objectContainingExiter->getCommandVerifyStatus() == STATUS_EXIT_VERIFIED)
+				{
+					TheCommandSequence->removeCurrentCommand(objectContainingExiter);
+					objectContainingExiter->setCommandVerifyStatus(STATUS_EXIT_VERIFIED);
+				}
 			}
 			else
 				TheCommandSequence->includeUnitInCommand(cmdNode, objectContainingExiter);

@@ -3280,6 +3280,9 @@ void JetAIUpdate::aiDoCommand(const AICommandParms* parms)
 				if (commandNeedsAmmo(parms->m_cmd) && isOutOfSpecialReloadAmmo())
 				{
 					setFlag(HAS_PENDING_COMMAND, true);
+
+					TheCommandSequence->unitPendingCommand(getObject());
+
 					return;
 				}
 
@@ -3303,6 +3306,9 @@ void JetAIUpdate::aiDoCommand(const AICommandParms* parms)
 		// first, then take off for the order. A return (or a circle over a dead airfield) that is
 		// already under way is left alone.
 		setFlag(HAS_PENDING_COMMAND, true);
+
+		TheCommandSequence->unitPendingCommand(getObject());
+
 		const StateID id = getStateMachine()->getCurrentStateID();
 		if (id < JETAISTATETYPE_FIRST || id > JETAISTATETYPE_LAST)
 		{

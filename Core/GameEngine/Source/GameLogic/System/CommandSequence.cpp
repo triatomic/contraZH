@@ -1579,6 +1579,11 @@ Bool CommandSequence::unitOnHeld(Object *obj)
 
 Bool CommandSequence::verifyExitCommand(Object *objWantToExit, Object *objectContainingExiter)
 {
+	if (!objectContainingExiter)
+	{
+		return false;
+	}
+
 	CommandNode *cmdNode = findCommandByID(objectContainingExiter->getCurrentCommand());
 	if (cmdNode &&
 		(((cmdNode->m_cmdType == COMMAND_DO_EXIT && cmdNode->m_targetID == objWantToExit->getID()))
@@ -1658,6 +1663,12 @@ Bool CommandSequence::terminateVerifiedFollowPathCommand(Object* obj)
 
 Bool CommandSequence::confirmExitCommand(Object *objWantToExit, Object *objectContainingExiter)
 {
+	// The container can be destroyed while a passenger still waits to exit it.
+	if (!objectContainingExiter)
+	{
+		return false;
+	}
+
 	CommandVerifyStatus cvs = objectContainingExiter->getCommandVerifyStatus();
 	if (cvs == STATUS_EXIT_VERIFIED)
 	{
@@ -1816,8 +1827,8 @@ Bool CommandSequence::isShawdowInTheWay(const Coord3D *worldPos, const ThingTemp
 	if (myFactoryExitWidth > 0) {
 		myExitPos = *worldPos;
 		checkMyExit = true;
-		Real c = (Real)cos(angle);
-		Real s = (Real)sin(angle);
+		Real c = (Real)WWMath::Cos(angle);
+		Real s = (Real)WWMath::Sin(angle);
 		Real offset = build->getTemplateGeometryInfo().getMajorRadius() + myFactoryExitWidth / 2.0f;
 		myExitPos.x += c * offset;
 		myExitPos.y += s * offset;
@@ -1868,8 +1879,8 @@ Bool CommandSequence::isShawdowInTheWay(const Coord3D *worldPos, const ThingTemp
 		if (themFactoryExitWidth > 0) {
 			hisExitPos = cmdNode->m_loc;
 			checkHisExit = true;
-			Real c = (Real)cos(cmdNode->m_angle);
-			Real s = (Real)sin(cmdNode->m_angle);
+			Real c = (Real)WWMath::Cos(cmdNode->m_angle);
+			Real s = (Real)WWMath::Sin(cmdNode->m_angle);
 			Real offset = thing->getTemplateGeometryInfo().getMajorRadius() + themFactoryExitWidth / 2.0f;
 			hisExitPos.x += c * offset;
 			hisExitPos.y += s * offset;

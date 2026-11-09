@@ -433,11 +433,6 @@ static const FieldParse TheMetaMapFieldParseTable[] =
 //-------------------------------------------------------------------------------------------------
 MetaEventTranslator::MetaEventTranslator()
 {
-	for (Int i = 0; i < KEY_COUNT; ++i)
-	{
-		m_keyDownInfos[i] = NONE;
-	}
-
 	for (Int i = 0; i < NUM_MOUSE_BUTTONS; ++i) {
 		m_nextUpShouldCreateDoubleClick[i] = FALSE;
 	}
@@ -706,30 +701,39 @@ void MetaEventTranslator::onKeyModStateRemoved(GameMessageDisposition &disp, Map
 	for (Int keyDownIndex = 0; keyDownIndex < ARRAY_SIZE(m_keyDownInfos); ++keyDownIndex)
 	{
 		const MappableKeyType keyDown = (MappableKeyType)keyDownIndex;
+		KeyDownInfo &keyDownInfo = m_keyDownInfos[keyDownIndex];
 
-		if (!m_keyDownInfos[keyDownIndex])
+		if (!keyDownInfo.isKeyDown())
 			continue;
 
-		if ((m_keyDownInfos[keyDownIndex] & keyModState) == m_keyDownInfos[keyDownIndex])
-			continue;
-
-		for (const MetaMapRec *map = TheMetaMap->getFirstMetaMapRec(); map; map = map->m_next)
+		for (UnsignedInt modStateIndex = 0; modStateIndex < KeyDownInfo::getMaxKeyModStateCount(); ++modStateIndex)
 		{
-			if (!isMessageUsable(map->m_usableIn))
+			const MappableKeyModState keyDownModState = keyDownInfo.getKeyModState(modStateIndex);
+
+			if (keyDownModState == NONE)
 				continue;
 
-			const Bool isMatchingKeyCombo = map->m_key == keyDown && map->m_modState == m_keyDownInfos[keyDownIndex];
-			const Bool isTransitionUp = map->m_transition == UP;
-
-			if (!(isMatchingKeyCombo && isTransitionUp))
+			if (BitsAreSet(keyModState, keyDownModState))
 				continue;
 
-			TheMessageStream->appendMessage(map->m_meta);
-			disp = DESTROY_MESSAGE;
+			// Forget that this key and mod state are pressed.
+			keyDownInfo.clearKeyModState(modStateIndex);
+
+			for (const MetaMapRec *map = TheMetaMap->getFirstMetaMapRec(); map; map = map->m_next)
+			{
+				if (!isMessageUsable(map->m_usableIn, map->m_meta))
+					continue;
+
+				const Bool isMatchingKeyCombo = map->m_key == keyDown && map->m_modState == keyDownModState;
+				const Bool isTransitionUp = map->m_transition == UP;
+
+				if (!(isMatchingKeyCombo && isTransitionUp))
+					continue;
+
+				TheMessageStream->appendMessage(map->m_meta);
+				disp = DESTROY_MESSAGE;
+			}
 		}
-
-		// Forget that this key and mod state are pressed.
-		m_keyDownInfos[keyDownIndex] = NONE;
 	}
 }
 
@@ -850,7 +854,7 @@ void MetaEventTranslator::onKeyPressed(GameMessageDisposition &disp, Int systemK
 		if (keyType != MK_NONE && keyModState != NONE)
 		{
 			// Remember that this key and mod state are pressed.
-			m_keyDownInfos[keyType] = keyModState;
+			m_keyDownInfos[keyType].setKeyModState(keyModState);
 		}
 	}
 	else
@@ -860,7 +864,7 @@ void MetaEventTranslator::onKeyPressed(GameMessageDisposition &disp, Int systemK
 			//DEBUG_ASSERTCRASH(keyType != MK_NONE, ("Key is expected to be not MK_NONE"));
 
 			// Forget that this key and mod state are pressed.
-			m_keyDownInfos[keyType] = NONE;
+			m_keyDownInfos[keyType].clearKeyModState(keyModState);
 		}
 	}
 }

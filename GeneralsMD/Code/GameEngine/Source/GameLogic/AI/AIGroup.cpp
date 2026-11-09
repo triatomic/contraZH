@@ -825,7 +825,7 @@ static void clampToMap(Coord3D *dest, PlayerType pt)
 /**
  * Move to given position(s)
  */
-Bool AIGroup::friend_moveInfantryToPos( const Coord3D *pos, CommandSourceType cmdSource, std::vector<Object *> &columnUnits )
+Bool AIGroup::friend_moveInfantryToPos( const Coord3D *pos, UnsignedInt cmdNode, CommandSourceType cmdSource, std::vector<Object *> &columnUnits )
 
 {
 	if (m_groundPath==nullptr) return false;
@@ -1314,7 +1314,7 @@ void AIGroup::friend_moveFormationToPos( const Coord3D *pos, CommandSourceType c
 /**
  * Move to given position(s)
  */
-Bool AIGroup::friend_moveVehicleToPos( const Coord3D *pos, CommandSourceType cmdSource, std::vector<Object *> &columnUnits )
+Bool AIGroup::friend_moveVehicleToPos( const Coord3D *pos, UnsignedInt cmdNode, CommandSourceType cmdSource, std::vector<Object *> &columnUnits )
 
 {
 
@@ -1776,8 +1776,8 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 
 	if (!addWaypoint && !isFormation && !reverse) {
 		friend_computeGroundPath(pos, cmdSource);
-		friend_moveInfantryToPos(pos, cmdSource, columnUnits);
-		friend_moveVehicleToPos(pos, cmdSource, columnUnits);
+		friend_moveInfantryToPos(pos, cmdNode, cmdSource, columnUnits);
+		friend_moveVehicleToPos(pos, cmdNode, cmdSource, columnUnits);
 	}
 	if (m_dirty)
 		recompute();
@@ -2440,7 +2440,7 @@ void AIGroup::groupAttackObjectPrivate( Bool forced, WeaponSlotType weaponSlot, 
 				else
 					ai->aiAttackObject(victim, maxShotsToFire, cmdSource);
 				if (TheCommandSequence->isStillAwaiting(theUnit))
-					TheCommandSequence->clearObjectCommand(theUnit);
+					TheCommandSequence->removeCurrentCommand(theUnit, false);
 			}
 		}
 		else
