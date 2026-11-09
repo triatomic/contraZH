@@ -35,7 +35,7 @@ Tuned in the mod's `GameData.ini`:
 
 * `TerrainHeightBlendStrength = 2` - (How far the taller texture pushes into the other's side. 0 keeps
 the edge where the fade would put it.)
-* `TerrainHeightBlendSharpness = 4` - (How narrow the edge is. 1 is as wide as the soft fade.)
+* `TerrainHeightBlendSharpness = 1` - (How narrow the edge is. 1 is as wide as the soft fade.)
 
 Heights come from `<texture>_hgt.dds` in `Art\Textures`, named after the `Terrain.ini` texture as
 `_nrm.dds` is for normal maps, e.g. `NTGrass1_hgt.dds`. The game does not look for it in
