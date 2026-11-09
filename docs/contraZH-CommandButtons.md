@@ -131,7 +131,7 @@ Right click a unit cameo on a production building to have that building build th
 * Cancelling the last queued unit of that type also stops it. So does losing the building to capture.
 * With several producers selected, a right click starts it on all of them. If any already auto queues
 that unit, those producers stop instead.
-* It works on a greyed out cameo too. A unit that needs an upgrade waits for that upgrade.
+* On a greyed out cameo, a right click can only stop it.
 * Save and load keep it.
 
 ## New CommandButton Options

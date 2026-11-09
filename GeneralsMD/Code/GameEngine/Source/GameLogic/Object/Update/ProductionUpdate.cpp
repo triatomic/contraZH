@@ -616,43 +616,6 @@ Bool ProductionUpdate::isAutoQueueUnit( const ThingTemplate *unitType ) const
 }
 
 //-------------------------------------------------------------------------------------------------
-/** The build checks in queueCreateUnit leave NEED_UPGRADE to the cameo, which auto queue skips */
-//-------------------------------------------------------------------------------------------------
-Bool ProductionUpdate::hasAutoQueueUnitUpgrade()
-{
-	Object *us = getObject();
-	const CommandSet *commandSet = TheControlBar->findCommandSet( us->getCommandSetString() );
-	if( commandSet == nullptr )
-	{
-		return FALSE;
-	}
-
-	for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
-	{
-		const CommandButton *button = commandSet->getCommandButton( i );
-		if( button == nullptr ||
-				button->getCommandType() != GUI_COMMAND_UNIT_BUILD ||
-				!m_autoQueueUnit->isEquivalentTo( button->getThingTemplate() ) )
-		{
-			continue;
-		}
-
-		const UpgradeTemplate *upgrade = button->getUpgradeTemplate();
-		if( !BitIsSet( button->getOptions(), NEED_UPGRADE ) || upgrade == nullptr )
-		{
-			return TRUE;
-		}
-
-		if( upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER ? us->getControllingPlayer()->hasUpgradeComplete( upgrade ) : us->hasUpgrade( upgrade ) )
-		{
-			return TRUE;
-		}
-	}
-
-	return FALSE;
-}
-
-//-------------------------------------------------------------------------------------------------
 /** Anything that blocks the unit now only delays it, a later update tries again */
 //-------------------------------------------------------------------------------------------------
 void ProductionUpdate::tryAutoQueueUnit()
@@ -669,10 +632,7 @@ void ProductionUpdate::tryAutoQueueUnit()
 		return;
 	}
 
-	if( hasAutoQueueUnitUpgrade() )
-	{
-		queueCreateUnit( m_autoQueueUnit, (ProductionID)( PRODUCTIONID_AUTO_QUEUE_FIRST + m_autoQueueUnit->getTemplateID() ) );
-	}
+	queueCreateUnit( m_autoQueueUnit, (ProductionID)( PRODUCTIONID_AUTO_QUEUE_FIRST + m_autoQueueUnit->getTemplateID() ) );
 }
 
 //-------------------------------------------------------------------------------------------------

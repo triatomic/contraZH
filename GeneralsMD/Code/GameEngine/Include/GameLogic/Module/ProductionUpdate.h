@@ -260,7 +260,6 @@ protected:
 
 	void updateDoors();														///< update the door behavior
 	void tryAutoQueueUnit();
-	Bool hasAutoQueueUnitUpgrade();
 
 	struct DoorInfo
 	{
