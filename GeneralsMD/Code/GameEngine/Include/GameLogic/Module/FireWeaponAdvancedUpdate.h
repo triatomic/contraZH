@@ -9,6 +9,7 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "GameLogic/Module/UpdateModule.h"
+#include "GameLogic/Module/UpgradeModule.h"
 #include "GameLogic/Weapon.h"
 #include <GameClient/RadiusDecal.h>
 
@@ -16,6 +17,7 @@
 class FireWeaponAdvancedUpdateModuleData : public UpdateModuleData
 {
 public:
+	UpgradeMuxData m_upgradeMuxData;
 	const WeaponTemplate* m_weaponTemplate;
   UnsignedInt m_initialDelayFrames;
 	UnsignedInt m_exclusiveWeaponDelay;	///< If non-zero, any other weapon having fired this recently will keep us from doing anything
@@ -44,7 +46,7 @@ private:
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-class FireWeaponAdvancedUpdate : public UpdateModule
+class FireWeaponAdvancedUpdate : public UpdateModule, public UpgradeMux
 {
 
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( FireWeaponAdvancedUpdate, "FireWeaponAdvancedUpdate" )
@@ -55,9 +57,40 @@ public:
 	FireWeaponAdvancedUpdate( Thing *thing, const ModuleData* moduleData );
 	// virtual destructor prototype provided by memory pool declaration
 
+	static Int getInterfaceMask() { return UpdateModule::getInterfaceMask() | MODULEINTERFACE_UPGRADE; }
+
+	virtual UpgradeModuleInterface* getUpgrade() { return this; }
+
 	virtual UpdateSleepTime update();
 
 protected:
+
+	// firing is gated on the live mask, so the upgrade itself only drives FX and removal
+	virtual void upgradeImplementation()
+	{
+	}
+
+	virtual void getUpgradeActivationMasks(UpgradeMaskType& activation, UpgradeMaskType& conflicting) const
+	{
+		getFireWeaponAdvancedUpdateModuleData()->m_upgradeMuxData.getUpgradeActivationMasks(activation, conflicting);
+	}
+
+	virtual void performUpgradeFX()
+	{
+		getFireWeaponAdvancedUpdateModuleData()->m_upgradeMuxData.performUpgradeFX(getObject());
+	}
+
+	virtual void processUpgradeRemoval()
+	{
+		getFireWeaponAdvancedUpdateModuleData()->m_upgradeMuxData.muxDataProcessUpgradeRemoval(getObject());
+	}
+
+	virtual Bool requiresAllActivationUpgrades() const
+	{
+		return getFireWeaponAdvancedUpdateModuleData()->m_upgradeMuxData.m_requiresAllTriggers;
+	}
+
+	virtual Bool isSubObjectsUpgrade() { return false; }
 
 	Bool isOkayToFire();
 	Coord3D getNextTargetPos();

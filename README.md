@@ -1,3 +1,13 @@
+# contraZH
+
+contraZH is a fork of [GeneralsGameCode_Modding](https://github.com/Andreas-W/GeneralsGameCode_Modding)
+for the Contra mod. Its documentation, covering the modding reference, every contraZH change and
+WorldBuilder Qt, lives at **[triatomic.github.io/contraZH](https://triatomic.github.io/contraZH/)**.
+
+The rest of this file is the upstream GeneralsGameCode readme.
+
+---
+
 [![GitHub Release](https://img.shields.io/github/v/release/TheSuperHackers/GeneralsGameCode?include_prereleases&sort=date&display_name=tag&style=flat&label=Release)](https://github.com/TheSuperHackers/GeneralsGameCode/releases)
 ![GitHub milestone details](https://img.shields.io/github/milestones/progress-percent/TheSuperHackers/GeneralsGameCode/3)
 ![GitHub milestone details](https://img.shields.io/github/milestones/progress-percent/TheSuperHackers/GeneralsGameCode/1)

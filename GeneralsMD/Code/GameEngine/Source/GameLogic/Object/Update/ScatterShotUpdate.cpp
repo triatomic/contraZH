@@ -109,7 +109,7 @@ ScatterShotUpdateModuleData::ScatterShotUpdateModuleData()
 
 		//{ "InitialDelay", INI::parseDurationUnsignedInt, NULL, offsetof(ScatterShotUpdateModuleData, m_initialDelayFrames) },
 		//{ "ExclusiveWeaponDelay", INI::parseDurationUnsignedInt, NULL, offsetof(ScatterShotUpdateModuleData, m_exclusiveWeaponDelay) },
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
 }
@@ -227,6 +227,13 @@ UpdateSleepTime ScatterShotUpdate::update(void)
 	if (m_hasTriggered) {
 		// DEBUG_LOG((">>> SSU Update 2 - hasTriggered\n"));
 		return UPDATE_SLEEP_FOREVER;
+	}
+
+	// Our projectile has already detonated and only lingers for its trail (DumbProjectile KillSelfDelay); don't trigger anymore.
+	if (getObject()->isKindOf(KINDOF_PROJECTILE)) {
+		const ProjectileUpdateInterface* pui = getObject()->getProjectileUpdateInterface();
+		if (pui && pui->projectileIsLingering())
+			return UPDATE_SLEEP_FOREVER;
 	}
 
 	// Instant Trigger

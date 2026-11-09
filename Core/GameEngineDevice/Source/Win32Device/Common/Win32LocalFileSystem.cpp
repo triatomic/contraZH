@@ -60,7 +60,7 @@ File * Win32LocalFileSystem::openFile(const Char *filename, Int access, size_t b
 		AsciiString dirName;
 		string.nextToken(&token, "\\/");
 		dirName = token;
-		while ((token.find('.') == nullptr) || (string.find('.') != nullptr)) {
+		while (!string.isEmpty()) {
 			createDirectory(dirName);
 			string.nextToken(&token, "\\/");
 			dirName.concat('\\');
@@ -159,13 +159,13 @@ void Win32LocalFileSystem::getFileListInDirectory(const AsciiString& currentDire
 		AsciiString subdirsearch;
 		subdirsearch = originalDirectory;
 		subdirsearch.concat(currentDirectory);
-		subdirsearch.concat("*.");
+		subdirsearch.concat("*");
 		fileHandle = FindFirstFile(subdirsearch.str(), &findData);
 		done = fileHandle == INVALID_HANDLE_VALUE;
 
 		while (!done) {
-			if ((findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
-					(strcmp(findData.cFileName, ".") != 0 && strcmp(findData.cFileName, "..") != 0)) {
+			// A leading dot covers . and .. and hidden folders; a "*." search would also drop "Map v1.2"
+			if ((findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && findData.cFileName[0] != '.') {
 
 					AsciiString tempsearchstr;
 					tempsearchstr.concat(currentDirectory);
@@ -194,10 +194,10 @@ Bool Win32LocalFileSystem::getFileInfo(const AsciiString& filename, FileInfo *fi
 		return FALSE;
 	}
 
-	fileInfo->timestampHigh = findData.ftLastWriteTime.dwHighDateTime;
-	fileInfo->timestampLow = findData.ftLastWriteTime.dwLowDateTime;
 	fileInfo->sizeHigh = findData.nFileSizeHigh;
 	fileInfo->sizeLow = findData.nFileSizeLow;
+	fileInfo->timestampHigh = findData.ftLastWriteTime.dwHighDateTime;
+	fileInfo->timestampLow = findData.ftLastWriteTime.dwLowDateTime;
 
 	FindClose(findHandle);
 

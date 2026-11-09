@@ -143,6 +143,24 @@ static unsigned Calculate_Processor_Speed(sint64& ticks_per_second)
 	sint64 timer0=0;
 	sint64 timer1=0;
 
+#ifdef _WIN32
+	// The performance counter resolves microseconds, so a 10 ms window is as exact as the old 200 ms one
+	LARGE_INTEGER frequency;
+	LARGE_INTEGER start;
+	LARGE_INTEGER now;
+	QueryPerformanceFrequency(&frequency);
+	QueryPerformanceCounter(&start);
+	timer0=_rdtsc();
+	do {
+		QueryPerformanceCounter(&now);
+		timer1=_rdtsc();
+	} while (now.QuadPart-start.QuadPart<frequency.QuadPart/100);
+
+	const double seconds=double(now.QuadPart-start.QuadPart)/double(frequency.QuadPart);
+	const sint64 ticks=timer1-timer0;
+	ticks_per_second=(sint64)(double(ticks)/seconds);	// Ticks per second
+	return unsigned(double(ticks)/(seconds*1000000.0));
+#else
 	timer0=_rdtsc();
 
 	unsigned start=TIMEGETTIME();
@@ -154,6 +172,7 @@ static unsigned Calculate_Processor_Speed(sint64& ticks_per_second)
 	sint64 t=timer1-timer0;
 	ticks_per_second=(sint64)((1000.0/(double)elapsed)*(double)t);	// Ticks per second
 	return unsigned((double)t/(double)(elapsed*1000));
+#endif
 }
 
 void CPUDetectClass::Init_Processor_Speed()

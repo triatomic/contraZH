@@ -53,6 +53,7 @@
 #include "Common/CRCDebug.h"
 #include "Common/DisabledTypes.h"
 #include "Common/GameState.h"
+#include "Common/GameUtility.h"
 #include "Common/GlobalData.h"
 #include "Common/MessageStream.h"
 #include "Common/MiscAudio.h"
@@ -84,6 +85,7 @@
 #include "GameClient/GameText.h"
 
 #include "GameLogic/AI.h"
+#include "GameLogic/AIMatch.h"
 #include "GameLogic/AIPathfind.h"
 #include "GameLogic/AISkirmishPlayer.h"
 #include "GameLogic/CommandSequence.h"
@@ -616,12 +618,14 @@ void Player::setPlayerRelationship(const Player *that, Relationship r)
 	{
 		// note that this creates the entry if it doesn't exist.
 		m_playerRelations->m_map[that->getPlayerIndex()] = r;
+		rts::markRelationshipsChanged();
 	}
 }
 
 // ------------------------------------------------------------------------
 Bool Player::removePlayerRelationship(const Player *that)
 {
+	rts::markRelationshipsChanged();
 	if (!m_playerRelations->m_map.empty())
 	{
 		if (that == nullptr)
@@ -649,12 +653,14 @@ void Player::setTeamRelationship(const Team *that, Relationship r)
 	{
 		// note that this creates the entry if it doesn't exist.
 		m_teamRelations->m_map[that->getID()] = r;
+		rts::markRelationshipsChanged();
 	}
 }
 
 // ------------------------------------------------------------------------
 Bool Player::removeTeamRelationship(const Team *that)
 {
+	rts::markRelationshipsChanged();
 	if (!m_teamRelations->m_map.empty())
 	{
 		if (that == nullptr)
@@ -714,7 +720,13 @@ void Player::addToPriorityBuildList(AsciiString templateName, Coord3D *pos, Real
 void Player::update()
 {
 	if (m_ai)
+	{
+		if (TheAIMatch)
+			TheAIMatch->setAIPlayer(this);
 		m_ai->update();
+		if (TheAIMatch)
+			TheAIMatch->setAIPlayer(nullptr);
+	}
 
 	// Allow the teams this player owns to update themselves.
 	for( PlayerTeamList::iterator it = m_playerTeamPrototypes.begin(); it != m_playerTeamPrototypes.end(); ++it )
@@ -1085,7 +1097,9 @@ void Player::becomingTeamMember(Object *obj, Bool yes)
 		}
 	}
 
-	if( getNumBattlePlansActive() > 0 && obj->areModulesReady() )
+	// A loaded object already carries its bonuses in its saved state (vision, body, modules);
+	// applying them again while it is restored to its team would stack the sight scalar.
+	if( getNumBattlePlansActive() > 0 && obj->areModulesReady() && !TheGameState->isInLoadGame() )
 	{
 		if( yes )
 		{
@@ -1621,7 +1635,13 @@ void Player::onUnitCreated( Object *factory, Object *unit )
 
 	// ai notification callback
 	if( m_ai )
+	{
+		if (TheAIMatch)
+			TheAIMatch->setAIPlayer(this);
 		m_ai->onUnitProduced( factory, unit );
+		if (TheAIMatch)
+			TheAIMatch->setAIPlayer(nullptr);
+	}
 }
 
 
@@ -1735,7 +1755,13 @@ void Player::onStructureConstructionComplete(Object* builder, Object* structure,
 
 	// ai notification callback
 	if (m_ai)
+	{
+		if (TheAIMatch)
+			TheAIMatch->setAIPlayer(this);
 		m_ai->onStructureProduced(builder, structure);
+		if (TheAIMatch)
+			TheAIMatch->setAIPlayer(nullptr);
+	}
 
 	// the GUI needs to re-evaluate the information being displayed to the user now
 	if (TheControlBar)
@@ -1744,24 +1770,6 @@ void Player::onStructureConstructionComplete(Object* builder, Object* structure,
 	// This object may require us to play some EVA sounds.
 	Player* localPlayer = ThePlayerList->getLocalPlayer();
 
-	if( structure->hasSpecialPower( SPECIAL_PARTICLE_UPLINK_CANNON ) ||
-			structure->hasSpecialPower( SUPW_SPECIAL_PARTICLE_UPLINK_CANNON ) ||
-			structure->hasSpecialPower( LAZR_SPECIAL_PARTICLE_UPLINK_CANNON ) )
-  {
-    if ( localPlayer == structure->getControllingPlayer() )
-    {
-		  TheEva->setShouldPlay(EVA_SuperweaponDetected_Own_ParticleCannon);
-    }
-    else if ( localPlayer->getRelationship(structure->getTeam()) != ENEMIES )
-    {
-      // Note: treating NEUTRAL as ally. Is this correct?
-      TheEva->setShouldPlay(EVA_SuperweaponDetected_Ally_ParticleCannon);
-    }
-    else
-    {
-      TheEva->setShouldPlay(EVA_SuperweaponDetected_Enemy_ParticleCannon);
-    }
-  }
 	//Check if structure has a specialPower with new custom eva sounds
 	const SpecialPowerTemplate* specialPowerTemp = findSpecialPowerWithEvaDetected(structure);
 	if (specialPowerTemp != NULL) {
@@ -1770,41 +1778,6 @@ void Player::onStructureConstructionComplete(Object* builder, Object* structure,
 		bool isAlly = localPlayer->getRelationship(structure->getTeam()) != ENEMIES;
 		bool isEnemy = !isOwn && !isAlly;
 
-	if( structure->hasSpecialPower( SPECIAL_NEUTRON_MISSILE ) ||
-			structure->hasSpecialPower( NUKE_SPECIAL_NEUTRON_MISSILE ) ||
-			structure->hasSpecialPower( SUPW_SPECIAL_NEUTRON_MISSILE ) )
-  {
-    if ( localPlayer == structure->getControllingPlayer() )
-    {
-      TheEva->setShouldPlay(EVA_SuperweaponDetected_Own_Nuke);
-    }
-    else if ( localPlayer->getRelationship(structure->getTeam()) != ENEMIES )
-    {
-      // Note: treating NEUTRAL as ally. Is this correct?
-      TheEva->setShouldPlay(EVA_SuperweaponDetected_Ally_Nuke);
-    }
-    else
-    {
-      TheEva->setShouldPlay(EVA_SuperweaponDetected_Enemy_Nuke);
-    }
-  }
-
-	if (structure->hasSpecialPower(SPECIAL_SCUD_STORM))
-  {
-    if ( localPlayer == structure->getControllingPlayer() )
-    {
-      TheEva->setShouldPlay(EVA_SuperweaponDetected_Own_ScudStorm);
-    }
-    else if ( localPlayer->getRelationship(structure->getTeam()) != ENEMIES )
-    {
-      // Note: treating NEUTRAL as ally. Is this correct?
-      TheEva->setShouldPlay(EVA_SuperweaponDetected_Ally_ScudStorm);
-    }
-    else
-    {
-      TheEva->setShouldPlay(EVA_SuperweaponDetected_Enemy_ScudStorm);
-    }
-  }
 		//Check SpecialPower Eva
 		EvaMessage eva = EVA_Invalid;
 
@@ -2804,7 +2777,7 @@ void Player::doBountyForKill(const Object* killer, const Object* victim)
 	Int bounty = REAL_TO_INT_CEIL(costToBuild * m_cashBountyPercent);
 #else
 	// TheSuperHackers @bugfix Stubbjax 20/02/2026 Subtract epsilon to ensure bounty is rounded up correctly.
-	Int bounty = ceil((costToBuild * m_cashBountyPercent) - WWMATH_EPSILON);
+	Int bounty = WWMath::Ceil((costToBuild * m_cashBountyPercent) - WWMATH_EPSILON);
 #endif
 
 	if( bounty )
@@ -3511,6 +3484,10 @@ Upgrade *Player::addUpgrade( const UpgradeTemplate *upgradeTemplate, UpgradeStat
 	if( ThePlayerList->getLocalPlayer() == this )
 	{
 		TheControlBar->markUIDirty();
+		if( status == UPGRADE_STATUS_COMPLETE )
+		{
+			TheControlBar->refreshPurchaseScience();
+		}
 	}
 
 	return u;
@@ -3676,6 +3653,12 @@ void Player::enableRadar()
 //-------------------------------------------------------------------------------------------------
 Bool Player::hasRadar() const
 {
+	// The Free Radar rule stands in for a radar source and shrugs off brownouts
+	if( TheGameLogic->isFreeRadar() )
+	{
+		return TRUE;
+	}
+
 	if( m_radarDisabled  && (m_disableProofRadarCount == 0) )
 		return FALSE;// Nope, no matter how many you have, if I say no, you don't have it
 
@@ -3926,6 +3909,11 @@ void Player::changeBattlePlan( BattlePlanStatus plan, Int delta, const BattlePla
 			break;
 		}
 	}
+	DEBUG_LOG(( "BattlePlan frame %d: player %d plan %s %+d -> count %d (%s)",
+		TheGameLogic->getFrame(), getPlayerIndex(),
+		plan == PLANSTATUS_BOMBARDMENT ? "BOMBARDMENT" : plan == PLANSTATUS_HOLDTHELINE ? "HOLDTHELINE" : plan == PLANSTATUS_SEARCHANDDESTROY ? "SEARCHANDDESTROY" : "NONE",
+		delta, getBattlePlansActiveSpecific( plan ),
+		addBonus ? "bonus APPLIED" : removeBonus ? "bonus REMOVED" : "stacked, no change" ));
 	if( addBonus )
 	{
 		applyBattlePlanBonusesForPlayerObjects( bonus );
@@ -4049,7 +4037,8 @@ static void localApplyBattlePlanBonusesToObject( Object *obj, void *userData )
 			{
 				objectToModify->setWeaponBonusCondition( WEAPONBONUSCONDITION_BATTLEPLAN_BOMBARDMENT );
 			}
-			else
+			// Bonuses are deltas: a plan at 0 is unchanged and must not clear a flag another active plan source set.
+			else if( bonus->m_bombardment < 0 )
 			{
 				objectToModify->clearWeaponBonusCondition( WEAPONBONUSCONDITION_BATTLEPLAN_BOMBARDMENT );
 			}
@@ -4057,7 +4046,7 @@ static void localApplyBattlePlanBonusesToObject( Object *obj, void *userData )
 			{
 				objectToModify->setWeaponBonusCondition( WEAPONBONUSCONDITION_BATTLEPLAN_HOLDTHELINE );
 			}
-			else
+			else if( bonus->m_holdTheLine < 0 )
 			{
 				objectToModify->clearWeaponBonusCondition( WEAPONBONUSCONDITION_BATTLEPLAN_HOLDTHELINE );
 			}
@@ -4065,7 +4054,7 @@ static void localApplyBattlePlanBonusesToObject( Object *obj, void *userData )
 			{
 				objectToModify->setWeaponBonusCondition( WEAPONBONUSCONDITION_BATTLEPLAN_SEARCHANDDESTROY );
 			}
-			else
+			else if( bonus->m_searchAndDestroy < 0 )
 			{
 				objectToModify->clearWeaponBonusCondition( WEAPONBONUSCONDITION_BATTLEPLAN_SEARCHANDDESTROY );
 			}
@@ -4965,7 +4954,7 @@ void Player::xfer( Xfer *xfer )
 		m_listInScoreScreen = TRUE;
 	}
 	// attacked by
-	xfer->xferUser( m_attackedBy, sizeof( Bool ) * MAX_PLAYER_COUNT );
+	xfer->xferUser( m_attackedBy, sizeof( Bool ) * xfer->getPlayerCount() );
 
 	// cash bounty percent
 	xfer->xferReal( &m_cashBountyPercent );

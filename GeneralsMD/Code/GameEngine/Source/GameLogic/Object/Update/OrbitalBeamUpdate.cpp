@@ -222,13 +222,13 @@ Real OrbitalBeamUpdate::interpolate( Real t ) const
 		}
 
 		case INTERP_SINE:
-			return 0.5f - 0.5f * cos( PI * t );
+			return 0.5f - 0.5f * WWMath::Cosf( PI * t );
 
 		case INTERP_EXPO_IN:
-			return t <= 0.0f ? 0.0f : (Real)pow( 2.0f, 10.0f * (t - 1.0f) );
+			return t <= 0.0f ? 0.0f : (Real)WWMath::Powf( 2.0f, 10.0f * (t - 1.0f) );
 
 		case INTERP_EXPO_OUT:
-			return t >= 1.0f ? 1.0f : 1.0f - (Real)pow( 2.0f, -10.0f * t );
+			return t >= 1.0f ? 1.0f : 1.0f - (Real)WWMath::Powf( 2.0f, -10.0f * t );
 
 		case INTERP_CIRCULAR:
 			return 1.0f - sqrt( 1.0f - t * t );
@@ -248,7 +248,7 @@ Real OrbitalBeamUpdate::interpolate( Real t ) const
 			if( t <= 0.0f ) return 0.0f;
 			if( t >= 1.0f ) return 1.0f;
 			const Real c4 = (2.0f * PI) / 3.0f;
-			return (Real)pow( 2.0f, -10.0f * t ) * sin( (t * 10.0f - 0.75f) * c4 ) + 1.0f;
+			return (Real)WWMath::Powf( 2.0f, -10.0f * t ) * WWMath::Sinf( (t * 10.0f - 0.75f) * c4 ) + 1.0f;
 		}
 
 		case INTERP_BOUNCE:
@@ -686,8 +686,8 @@ UpdateSleepTime OrbitalBeamUpdate::update( void )
 				const Real angle = (Real)slot * TWO_PI / (Real)data->m_numChargeBeams;
 
 				Coord3D groundPos;
-				groundPos.x = center.x + data->m_chargeBeamRadius * cos( angle );
-				groundPos.y = center.y + data->m_chargeBeamRadius * sin( angle );
+				groundPos.x = center.x + data->m_chargeBeamRadius * WWMath::Cosf( angle );
+				groundPos.y = center.y + data->m_chargeBeamRadius * WWMath::Sinf( angle );
 				groundPos.z = surfaceZAt( groundPos.x, groundPos.y );
 
 				Coord3D sky = beamSkyPos( &groundPos, &center );
@@ -751,12 +751,12 @@ UpdateSleepTime OrbitalBeamUpdate::update( void )
 						// Spiral inward: radius shrinks to 0 while the angle sweeps the total rotation.
 						const Real dx = start.x - center.x;
 						const Real dy = start.y - center.y;
-						const Real baseAngle = atan2( dy, dx );
+						const Real baseAngle = WWMath::Atan2f( dy, dx );
 						const Real baseRadius = sqrt( dx * dx + dy * dy );
 						const Real curRadius = baseRadius * (1.0f - t);
 						const Real curAngle = baseAngle + t * data->m_chargeBeamRotation;
-						groundPos.x = center.x + curRadius * cos( curAngle );
-						groundPos.y = center.y + curRadius * sin( curAngle );
+						groundPos.x = center.x + curRadius * WWMath::Cosf( curAngle );
+						groundPos.y = center.y + curRadius * WWMath::Sinf( curAngle );
 					}
 					else
 					{

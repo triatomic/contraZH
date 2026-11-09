@@ -36,6 +36,10 @@
 // its constants turn it off, and GLINT alone gives the world position to terrain without bumps or lights.
 // Each texture's strength and gloss come from Terrain.ini through a map laid out like the colour atlas.
 
+#ifndef EMISSIVE_ONLY
+#define EMISSIVE_ONLY 0
+#endif
+
 #ifndef SHADOWED
 #define SHADOWED 1
 #endif
@@ -116,10 +120,10 @@ sampler2D ShadowMap : register(s4);
 
 #if LIGHTS
 // Eight fill c5 to c22 before the glint's c23 to c25, and fxc needs the rest for literals, so W3DShaderManager::MAX_PIXEL_LIGHTS must match.
-// The seabed keeps three, whose room ends inside c13, which W3DShaderManager::SEABED_PIXEL_LIGHTS matches.
+// The seabed keeps two, since a third runs past ps_2_a's 512 slots, which W3DShaderManager::SEABED_PIXEL_LIGHTS matches.
 #define POINT_LIGHT_REGISTER c5
 #if SEABED
-#define POINT_LIGHT_COUNT 3
+#define POINT_LIGHT_COUNT 2
 #else
 #define POINT_LIGHT_COUNT 8
 #endif
@@ -215,7 +219,7 @@ float2 BlockUV(float2 texel, float3 block)
 float4 SeabedSample(sampler2D atlas, float4 plain, float2 uv, float2 texel, float2 dx, float2 dy, HexCells cells)
 {
     float2 atlasTexel = uv * SeabedAtlas.xy;
-    // Point sampling picks the slot. The slot's size follows TerrainAtlasBorder, so it comes in constants.
+    // Point sampling picks the slot.
     float3 slots = tex2D(ClassMap, atlasTexel * SeabedSlot.x + SeabedSlot.y).rgb;
     float3 block = float3(slots.xy * SeabedSlot.z + SeabedSlot.w, slots.z * (255.0f * 64.0f));
 
@@ -323,6 +327,9 @@ float4 main(PsIn input) : COLOR
 
     float weight = HeightBlendWeight(input.Diffuse.a, tex2D(HeightAtlas, input.BaseUV).r, tex2D(HeightAtlas, input.BlendUV).r);
     float4 color = lerp(base, blend, weight);
+#if EMISSIVE_ONLY
+    return float4(color.rgb * HeightBlend.w, 0.0f);
+#else
 #if GLINT
     float2 material = lerp(tex2D(GlintMaterials, input.BaseUV).rg, tex2D(GlintMaterials, input.BlendUV).rg, weight);
     float glintStrength = (dot(color.rgb, GlintAlbedo.xyz) + GlintAlbedo.w) * material.r;
@@ -361,12 +368,24 @@ float4 main(PsIn input) : COLOR
     float3 light = input.Diffuse.rgb;
 #endif
 
+#if LIGHTS && LIGHTS_ONLY && LIGHTS_DEBUG
+    return float4(PointLighting(input.WorldPos, bumped), 1.0f);
+#elif LIGHTS && LIGHTS_ONLY
+    light = float3(0.0f, 0.0f, 0.0f);
+#elif LIGHTS && LIGHTS_DEBUG
+    return float4(PointLighting(input.WorldPos, bumped), color.a * input.Diffuse.a);
+#endif
+
 #if LIGHTS
-    light += PointLighting(input.WorldPos, bumped);
+    float3 localColor = color.rgb * PointLighting(input.WorldPos, bumped);
 #endif
 
 #if BUMP || LIGHTS
+#if LIGHTS
+    color.rgb *= max(light, 0.0f);
+#else
     color.rgb *= saturate(light);
+#endif
     color.a *= input.Diffuse.a;
 #else
     color *= input.Diffuse;
@@ -374,17 +393,25 @@ float4 main(PsIn input) : COLOR
 
 #if NOISE_COUNT >= 1
     float4 cloud = tex2D(Noise1Texture, input.Noise1UV);
+#if !SHADOWED
     color *= cloud;
+#endif
+#endif
+#if SHADOWED && NOISE_COUNT >= 1
+    color.rgb *= CloudShadowFactor(lit, cloud.rgb);
+#elif SHADOWED
+    color.rgb *= lerp(ShadowColor.rgb, float3(1.0f, 1.0f, 1.0f), lit);
+#endif
+
+#if LIGHTS
+    // Local lights do not inherit the sun's shadows or clouds.
+    color.rgb += localColor;
 #endif
 #if NOISE_COUNT >= 2
     color.rgb *= GroundNoise(Noise2Texture, input.Noise2UV);
 #endif
 
-#if SHADOWED
-    color.rgb *= lerp(ShadowColor.rgb, float3(1.0f, 1.0f, 1.0f), lit);
-#endif
-
-#if GLINT
+#if GLINT && !LIGHTS_ONLY
     // The bump tilts the smooth normal as far as it tilts the facet's.
 #if BUMP
     float3 glintNormal = normalize(GlintNormal(input.WorldPos) + bumped - normal);
@@ -402,9 +429,10 @@ float4 main(PsIn input) : COLOR
 #endif
 #endif
 
-#if BUMP
+#if BUMP && !LIGHTS_ONLY
     // The debug view shows only the bump's shading, 4x, on grey.
     color.rgb = lerp(color.rgb, saturate(0.5f + change * 4.0f).xxx, SunColor.w);
 #endif
     return color;
+#endif
 }

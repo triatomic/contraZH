@@ -60,6 +60,7 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/ScriptEngine.h"
+#include "GameLogic/ScriptCLP.h"
 #include "GameLogic/Squad.h"
 #include "GameLogic/TurretAI.h"
 #include "GameLogic/Weapon.h"
@@ -530,7 +531,7 @@ StateReturnType AIRappelState::onEnter()
 		obj->setLayer(layerAtDest);
 
 	AIUpdateInterface *ai = obj->getAI();
-	Real MAX_RAPPEL_RATE = fabs(TheGlobalData->m_gravity) * LOGICFRAMES_PER_SECOND * 2.5f;
+	Real MAX_RAPPEL_RATE = WWMath::Fabs(TheGlobalData->m_gravity) * LOGICFRAMES_PER_SECOND * 2.5f;
 	m_rappelRate = -min(ai->getDesiredSpeed(), MAX_RAPPEL_RATE);
 
 	return STATE_CONTINUE;
@@ -906,8 +907,14 @@ StateReturnType AIStateMachine::updateStateMachine()
 
 			return status;
 		}
-		m_temporaryState->onExit(EXIT_NORMAL);
-		m_temporaryState = nullptr;
+
+		// TheSuperHackers @bugfix Okladnoj 08/10/2026 Check that the temporary state still exists as it can be cleared from the state machine within the states update.
+		// This only happens without RETAIL_COMPATIBLE_CRC, where clear() resets the temporary state.
+		if (m_temporaryState)
+		{
+			m_temporaryState->onExit(EXIT_NORMAL);
+			m_temporaryState = nullptr;
+		}
 	}
 	StateReturnType retType = StateMachine::updateStateMachine();
 
@@ -1218,13 +1225,20 @@ Bool outOfWeaponRangeObject( State *thisState, void* userData )
 			//	victim->getID(), victim->getTemplate()->getName().str()));
 			return true;
 		}
-		// We are already engaging, so allow the target some drift before we go back to chasing it.
-		if (!weapon->hasLeechRange() && !weapon->isWithinContinueAttackRange(obj, victim))
+		// Aim is the machine's default state, so only a victim we already reached gets the drift slack.
+		if (!weapon->hasLeechRange())
 		{
-			//CRCDEBUG_LOG(("outOfWeaponRangeObject() - object %d (%s) is out of range for attacking %d (%s)",
-			//	obj->getID(), obj->getTemplate()->getName().str(),
-			//	victim->getID(), victim->getTemplate()->getName().str()));
-			return true;
+			Bool inRange = weapon->isWithinAttackRange(obj, victim)
+				|| (weapon->isEngagedWith(victim) && weapon->isWithinContinueAttackRange(obj, victim));
+			if (!inRange)
+			{
+				weapon->setEngagedVictim(nullptr);
+				//CRCDEBUG_LOG(("outOfWeaponRangeObject() - object %d (%s) is out of range for attacking %d (%s)",
+				//	obj->getID(), obj->getTemplate()->getName().str(),
+				//	victim->getID(), victim->getTemplate()->getName().str()));
+				return true;
+			}
+			weapon->setEngagedVictim(victim);
 		}
 	}
 
@@ -1249,7 +1263,7 @@ Bool wantToSquishTarget( State *thisState, void* userData )
 		if( obj->getAI() && (obj->getAI()->getWhichTurretForCurWeapon() != TURRET_INVALID) )
 		{
 			// I can only decide to crush-attack if I am attacking with a turreted weapon.
-			if (TheAI->getAiData()->m_aiCrushesInfantry) {
+			if (TheScriptCLPState->getCrushesInfantry(obj)) {
 				if (obj && obj->getControllingPlayer() &&
 					obj->getControllingPlayer()->getPlayerType()==PLAYER_COMPUTER) {
 					if (obj->canCrushOrSquish(victim)) {
@@ -1724,6 +1738,7 @@ Bool AIInternalMoveToState::computePath()
 StateReturnType AIInternalMoveToState::onEnter()
 {
 	m_ambientPlayingHandle = AHSV_Error;
+	m_moveLoopSound = nullptr;
 	Object *obj = getMachineOwner();
 	AIUpdateInterface *ai = obj->getAI();
 	m_waitingForPath = ai->isWaitingForPath();
@@ -1801,67 +1816,59 @@ void AIInternalMoveToState::startMoveSound()
 	Object *obj = getMachineOwner();
 	m_moveSoundState = MOVESOUND_STARTED;
 
+	const BodyModuleInterface *objBody = obj->getBodyModule();
+	Bool damaged = objBody && IS_CONDITION_WORSE(objBody->getDamageState(), BODY_DAMAGED);
+	AudioEventRTS soundEventMove = damaged ? *obj->getTemplate()->getSoundMoveStartDamaged() :
+		*obj->getTemplate()->getSoundMoveStart();
+	if (!soundEventMove.getEventName().isEmpty())
+	{
+		soundEventMove.setObjectID(obj->getID());
+		TheAudio->addAudioEvent( &soundEventMove );
+	}
+
+	updateMoveSound();
+}
+
+void AIInternalMoveToState::updateMoveSound()
+{
+	Object *obj = getMachineOwner();
+	const ThingTemplate *thing = obj->getTemplate();
 	const AIUpdateInterface *ai = obj->getAI();
 	Bool reversing = ai && ai->getCurLocomotor() && ai->getCurLocomotor()->isMovingBackwards();
-
 	const BodyModuleInterface *objBody = obj->getBodyModule();
-	if (objBody && IS_CONDITION_WORSE(objBody->getDamageState(), BODY_DAMAGED))
+	Bool damaged = objBody && IS_CONDITION_WORSE(objBody->getDamageState(), BODY_DAMAGED);
+	const AudioEventRTS *loopSound = nullptr;
+
+	if (reversing)
 	{
-		AudioEventRTS soundEventMoveDamaged = *obj->getTemplate()->getSoundMoveStartDamaged();
-		if (!soundEventMoveDamaged.getEventName().isEmpty())
+		loopSound = damaged ? thing->getSoundReverseMoveLoopDamaged() : thing->getSoundReverseMoveLoop();
+		if (loopSound->getEventName().isEmpty())
 		{
-			soundEventMoveDamaged.setObjectID(obj->getID());
-			TheAudio->addAudioEvent( &soundEventMoveDamaged );
-		}
-		else
-		{
-			if (reversing)
-			{
-				soundEventMoveDamaged = *obj->getTemplate()->getSoundReverseMoveLoopDamaged();
-			}
-
-			// a template without the reverse loop keeps the forward one
-			if (soundEventMoveDamaged.getEventName().isEmpty())
-			{
-				soundEventMoveDamaged = *obj->getTemplate()->getSoundMoveLoopDamaged();
-			}
-
-			if (!soundEventMoveDamaged.getEventName().isEmpty())
-			{
-				soundEventMoveDamaged.setObjectID(obj->getID());
-				m_ambientPlayingHandle = TheAudio->addAudioEvent( &soundEventMoveDamaged );
-			}
+			loopSound = nullptr;
 		}
 	}
-	else
+
+	if (!loopSound)
 	{
-		AudioEventRTS soundEventMove = *obj->getTemplate()->getSoundMoveStart();
-		soundEventMove.setObjectID(obj->getID());
-
-		if (!soundEventMove.getEventName().isEmpty())
+		const AudioEventRTS *startSound = damaged ? thing->getSoundMoveStartDamaged() : thing->getSoundMoveStart();
+		if (startSound->getEventName().isEmpty())
 		{
-			TheAudio->addAudioEvent( &soundEventMove );
+			loopSound = damaged ? thing->getSoundMoveLoopDamaged() : thing->getSoundMoveLoop();
 		}
-		else
+	}
+
+	if (loopSound != m_moveLoopSound)
+	{
+		TheAudio->removeAudioEvent( m_ambientPlayingHandle );
+		m_ambientPlayingHandle = AHSV_Error;
+		m_moveLoopSound = loopSound;
+		if (loopSound && !loopSound->getEventName().isEmpty())
 		{
-			if (reversing)
-			{
-				soundEventMove = *obj->getTemplate()->getSoundReverseMoveLoop();
-			}
-
-			if (soundEventMove.getEventName().isEmpty())
-			{
-				soundEventMove = *obj->getTemplate()->getSoundMoveLoop();
-			}
-
+			AudioEventRTS soundEventMove = *loopSound;
 			soundEventMove.setObjectID(obj->getID());
-			if (!soundEventMove.getEventName().isEmpty())
-			{
-				m_ambientPlayingHandle = TheAudio->addAudioEvent( &soundEventMove );
-			}
+			m_ambientPlayingHandle = TheAudio->addAudioEvent( &soundEventMove );
 		}
 	}
-
 }
 
 /**
@@ -1910,6 +1917,10 @@ StateReturnType AIInternalMoveToState::update()
 	else if (m_moveSoundState == MOVESOUND_LOCOMOTOR_RAN)
 	{
 		startMoveSound();
+	}
+	else if (m_moveSoundState == MOVESOUND_STARTED)
+	{
+		updateMoveSound();
 	}
 
 	//Kris: 7/01/03 (Temporary debug hook for units not being able to leave maps)
@@ -1964,6 +1975,7 @@ StateReturnType AIInternalMoveToState::update()
 		forceRecompute = true;
 		blocked = true;
 		m_blockedRepathTimestamp = TheGameLogic->getFrame();
+		TheAI->pathfinder()->countStatEvent(PFE_BLOCKED_REPATH);
 		// Intense debug logging jba.
 		//DEBUG_LOG(("Info - Blocked - recomputing."));
 	}
@@ -2074,6 +2086,12 @@ StateReturnType AIInternalMoveToState::update()
 			}
 		}
 		// we have reached the end of the path
+		if (ai->takeCappedPathLeg())
+		{
+			// The search stopped short of the goal, so path on from here
+			computePath();
+			return STATE_CONTINUE;
+		}
 		if (getAdjustsDestination())
 		{
 			ai->setLocomotorGoalNone();
@@ -2531,7 +2549,7 @@ static Bool canPursue(Object *source, Weapon *weapon, Object *victim)
 		return false;
 	}
 
-	if (TheAI->getAiData()->m_aiCrushesInfantry) {
+	if (TheScriptCLPState->getCrushesInfantry(source)) {
 		if ( source->getControllingPlayer() &&
 			(source->getControllingPlayer()->getPlayerType() == PLAYER_COMPUTER) &&
 			source->canCrushOrSquish(victim) ) {
@@ -3604,7 +3622,8 @@ StateReturnType AIFollowPathState::update()
 		}
 		else
 		{
-			setAdjustsDestination(m_adjustFinal && (m_adjustFinalOverride || ai->isDoingGroundMovement()));
+			// drag-to-face's exact move: the path's last point is the slot, not the nearest grid point
+			setAdjustsDestination(m_adjustFinal && (m_adjustFinalOverride || ai->isDoingGroundMovement()) && !ai->isExactFormationMove());
 			if (getAdjustsDestination())
 			{
 				if (!TheAI->pathfinder()->adjustDestination(getMachineOwner(), ai->getLocomotorSet(), &m_goalPosition)) {
@@ -3909,7 +3928,7 @@ StateReturnType AIAttackMoveToState::update()
 		if (distSqr < sqr(ATTACK_CLOSE_ENOUGH_CELLS*PATHFIND_CELL_SIZE_F)) {
 			return ret;
 		}
-		DEBUG_LOG(("AIAttackMoveToState::update Distance from goal %f, retrying.", sqrt(distSqr)));
+		DEBUG_LOG(("AIAttackMoveToState::update Distance from goal %f, retrying.", WWMath::Sqrt(distSqr)));
 
 		ret = STATE_CONTINUE;
 		m_retryCount--;
@@ -4139,16 +4158,16 @@ void AIFollowWaypointPathState::computeGoal(Bool useGroupOffsets)
 	if (m_priorWaypoint) {
 		dx = dest.x - m_priorWaypoint->getLocation()->x;
 		dy = dest.y - m_priorWaypoint->getLocation()->y;
-		angle = atan2(dy, dx);
+		angle = WWMath::Atan2(dy, dx);
 		Real deltaAngle = angle - m_angle;
-		Real s = sin(deltaAngle);
-		Real c = cos(deltaAngle);
+		Real s = WWMath::Sin(deltaAngle);
+		Real c = WWMath::Cos(deltaAngle);
 		Real x = m_groupOffset.x * c - m_groupOffset.y * s;
 		Real y = m_groupOffset.y * c + m_groupOffset.x * s;
 		m_groupOffset.x = x;
 		m_groupOffset.y = y;
 	}	else {
-		angle = atan2(dy, dx);
+		angle = WWMath::Atan2(dy, dx);
 	}
 	m_angle = angle;
 #endif
@@ -5159,6 +5178,7 @@ StateReturnType AIAttackAimAtTargetState::onEnter()
 	AIUpdateInterface* victimAI = victim ? victim->getAI() : nullptr;
 
 	Locomotor* curLoco = sourceAI->getCurLocomotor();
+	// Note: RequiresMoveToTurn locos still use angle goals here; locoUpdate_moveTowardsAngle drives them forward to turn.
 	m_canTurnInPlace = curLoco ? curLoco->getMinSpeed() == 0.0f : false;
 
 
@@ -5354,7 +5374,8 @@ StateReturnType AIAttackAimAtTargetState::update()
 
 				// DEBUG_LOG((">>> (hasLimited) relAngle = %f, minAngle = %f, maxAngle = %f.\n", relAngle * 180 / PI, minAngle * 180 / PI, maxAngle * 180 / PI));
 
-				if ((relAngle < maxAngle) && (relAngle > minAngle)) {
+				if ((relAngle <= maxAngle) && (relAngle >= minAngle))
+				{
 					// If the target is inside our maximum turret angle, we can continue
 					return STATE_CONTINUE;
 				}
@@ -5441,8 +5462,8 @@ StateReturnType AIAttackAimAtTargetState::update()
 		{ // Check limited turret angles how to move
 			hasPreferredAngle = true;
 
-			Real maxAngle = sourceAI->getMaxTurretAngle(tur) + aimDelta;
-			Real minAngle = sourceAI->getMinTurretAngle(tur) - aimDelta;
+			Real maxAngle = sourceAI->getMaxTurretAngle(tur);
+			Real minAngle = sourceAI->getMinTurretAngle(tur);
 			if (maxAngle < minAngle) { // This might be a backwards facing configuration
 				maxAngle = nmod(maxAngle, 2.0 * PI);
 				relAngle = nmod(relAngle, 2.0 * PI);
@@ -5511,8 +5532,59 @@ StateReturnType AIAttackAimAtTargetState::update()
 			{
 				if (fabs(relAngle) > aimDelta)
 				{
+					// AimByReversing: target in front and a forward turn would carry us into our minimum range ->
+					// turn by backing away from it instead. The reversing mover swings the nose toward the target
+					// while the distance grows (see MinRangeRetreatStraight).
 					Real desiredAngle = source->getOrientation() + relAngle;
-					sourceAI->setLocomotorGoalOrientation(desiredAngle);
+
+					Bool turnByReversing = false;
+					Locomotor* curLoco = sourceAI->getCurLocomotor();
+					Real minRange = weapon ? weapon->getTemplate()->getMinimumAttackRange() : 0.0f;
+					if (sourceAI->isAimByReversing() && curLoco && curLoco->canMoveBackwards()
+						&& minRange > 0.0f && fabs(relAngle) < sourceAI->getAimByReversingMaxAngle())
+					{
+						// edge-to-edge distance, same measure as the min/max attack range checks
+						Real edgeDistSqr = m_isAttackingObject
+							? ThePartitionManager->getDistanceSquared(source, victim, FROM_BOUNDINGSPHERE_2D)
+							: ThePartitionManager->getDistanceSquared(source, getMachineGoalPosition(), FROM_BOUNDINGSPHERE_2D);
+						Real edgeDist = WWMath::Sqrt(edgeDistSqr);
+						Real maxRange = weapon->getAttackRange(source);
+
+						// don't back out of max range while turning
+						if (edgeDist < maxRange - 2*PATHFIND_CELL_SIZE_F)
+						{
+							// (the locomotor flag can be stale after stopping, so also require actual backwards motion)
+							const PhysicsBehavior* physics = source->getPhysics();
+							if (curLoco->isMovingBackwards() && physics && physics->getForwardSpeed2D() < 0.0f)
+							{
+								// already backing up: keep reversing until aligned (no reverse/forward flip-flop)
+								turnByReversing = true;
+							}
+							else
+							{
+								// A forward turn of angle a on turn radius R closes in on the target by about R*sin(a).
+								// Turn radius mirrors the turn speed clamp in moveTowardsPositionWheels.
+								BodyDamageType bdt = source->getBodyModule()->getDamageState();
+								Real maxSpeed = curLoco->getMaxSpeedForCondition(bdt);
+								Real turnSpeed = curLoco->getMinTurnSpeed();
+								if (turnSpeed < maxSpeed/4.0f)
+									turnSpeed = maxSpeed/4.0f;
+								if (turnSpeed > maxSpeed)
+									turnSpeed = maxSpeed;
+								Real turnRate = curLoco->getMaxTurnRate(bdt);
+								Real turnRadius = (turnRate > 0.0f) ? turnSpeed / turnRate : 0.0f;
+								// AimByReversingTurnFactor scales this crude estimate (the real arc depends on current speed)
+								Real closing = turnRadius * Sin(fabs(relAngle)) * sourceAI->getAimByReversingTurnFactor();
+
+								turnByReversing = (edgeDist - closing) < (minRange + sourceAI->getAimByReversingMargin());
+							}
+						}
+					}
+
+					if (turnByReversing)
+						sourceAI->setLocomotorGoalOrientationByReversing(desiredAngle);
+					else
+						sourceAI->setLocomotorGoalOrientation(desiredAngle);
 					m_setLocomotor = true;
 				}
 			}
@@ -5522,7 +5594,7 @@ StateReturnType AIAttackAimAtTargetState::update()
 			}
 		}
 
-		if (!hasPreferredAngle && fabs(relAngle) < aimDelta /*&& !m_preAttackFrames*/ )
+		if (!hasPreferredAngle && WWMath::Fabs(relAngle) < aimDelta /*&& !m_preAttackFrames*/ )
 		{
 			AIUpdateInterface* victimAI = victim ? victim->getAI() : nullptr;
 			// add ourself as a targeter BEFORE calling isTemporarilyPreventingAimSuccess().
@@ -5617,6 +5689,17 @@ StateReturnType AIAttackFireWeaponState::onEnter()
 		return STATE_FAILURE;
 	}
 	Object *victim = getMachineGoalObject();
+
+#if !RETAIL_COMPATIBLE_CRC || !PRESERVE_SKIPPED_PREATTACK_DELAY
+	Weapon* weapon = obj->getCurrentWeapon();
+
+	// An early entry can skip the wind-up and then fire when reload finishes.
+	if (weapon && weapon->getPreAttackDelay(obj, victim) > 0
+		&& TheGameLogic->getFrame() + 1 < weapon->getPossibleNextShotFrame())
+	{
+		return STATE_FAILURE;
+	}
+#endif
 
 	if (victim && obj->getTeam()->getPrototype()->getTemplateInfo()->m_attackCommonTarget) {
 		if (obj->getTeam()->getTeamTargetObject()==nullptr) {
@@ -6027,6 +6110,7 @@ StateReturnType AIAttackState::onEnter()
 	if (m_attackParameters && m_attackParameters->shouldExit(getMachine()))
 		return STATE_SUCCESS;
 
+#if !(RTS_GENERALS && RETAIL_COMPATIBLE_CRC)
 	//Kris: Jan 12, 2005
 	//Don't allow units under construction to attack! The selection/action manager system was responsible for preventing this
 	//from ever happening, but failed in two cases which I fixed. This is an extra check to mitigate cheats.
@@ -6034,6 +6118,7 @@ StateReturnType AIAttackState::onEnter()
 	{
 		return STATE_FAILURE;
 	}
+#endif
 
 	// if all of our weapons are out of ammo, can't attack.
 	// (this can happen for units which never auto-reload, like the Raptor)
@@ -8013,6 +8098,7 @@ StateReturnType AIFaceState::onEnter()
 
 	AIUpdateInterface* ai = source->getAI();
 	Locomotor* curLoco = ai->getCurLocomotor();
+	// Note: RequiresMoveToTurn locos still use angle goals here; locoUpdate_moveTowardsAngle drives them forward to turn.
 	m_canTurnInPlace = curLoco ? curLoco->getMinSpeed() == 0.0f : false;
 
 	Object* target = getMachineGoalObject();
@@ -8051,7 +8137,7 @@ StateReturnType AIFaceState::update()
 	Real relAngle = ThePartitionManager->getRelativeAngle2D( obj, pos );
 
 	const Real REL_THRESH = 0.035f;	// about 2 degrees. (getRelativeAngle2D is current only accurate to about 1.25 degrees)
-	if( fabs( relAngle ) < REL_THRESH )
+	if( WWMath::Fabs( relAngle ) < REL_THRESH )
 	{
 		return STATE_SUCCESS;
 	}

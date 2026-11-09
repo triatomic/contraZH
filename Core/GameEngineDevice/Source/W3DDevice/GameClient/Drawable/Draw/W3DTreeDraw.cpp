@@ -128,7 +128,11 @@ void W3DTreeDraw::addToTreeBuffer()
 
 	DEBUG_ASSERTCRASH(draw->isPositioned(), ("W3DTreeDraw::addToTreeBuffer - This tree was not positioned!"));
 
+#if RTS_ZEROHOUR
+	Real scale = draw->getScale() * draw->getObjectScale();
+#else
 	Real scale = draw->getScale();
+#endif
 	Real scaleRandomness = draw->getTemplate()->getInstanceScaleFuzziness();
 	scaleRandomness = 0.0f; // We use the scale fuzziness inside WB to generate random scales, so they don't change at load time. jba. [4/22/2003]
 	TheTerrainRenderObject->addTree(draw->getID(), *draw->getPosition(), scale, draw->getOrientation(), scaleRandomness, moduleData);

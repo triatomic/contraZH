@@ -25,6 +25,7 @@
 
 #include "GameLogic/SidesList.h"
 #include <afxtempl.h> // for CArray, CMap, etc -- please review this one
+#include <vector>
 
 class ListType  {
 public:
@@ -228,6 +229,22 @@ protected:
 	Int							m_maxWaypoint;
 
 	AsciiString			m_readPlayerNames[MAX_PLAYER_COUNT];
+
+	// Import report and script-file edit mode
+	Bool						m_importEditFile;	///< the import being parsed replaces the players with the file's
+	std::vector<AsciiString>	m_importCreatedPlayers;
+	std::vector<AsciiString>	m_importTeamIssues;
+	CString					m_editFilePath;		///< the .scb or .json being edited, empty when none
+	Bool						m_editFileSides;	///< the edited file stores player dicts
+	CString					m_editFileDocPath;	///< the map the file was opened on
+	std::vector<AsciiString>	m_editFilePlayers;	///< the players the file was opened with
+
+	void showImportReport(const CString &path);
+	void addEditFilePlayer(const AsciiString &name, const Dict *fileDict);
+	void ensureScriptLists();
+	Bool importScriptFile(const CString &path);
+	Int countOwnedObjects();
+	Bool editFileStillOpen();
 
 	CString m_searchText;
 	HTREEITEM m_lastFoundItem;

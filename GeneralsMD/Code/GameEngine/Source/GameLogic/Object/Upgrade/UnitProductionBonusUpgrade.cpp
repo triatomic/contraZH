@@ -118,7 +118,7 @@ UnitProductionBonusUpgradeModuleData::UnitProductionBonusUpgradeModuleData( void
 		{ "BonusStacksWith",		INI::parseIndexList, TheBonusStackingTypeNames, offsetof( UnitProductionBonusUpgradeModuleData, m_stackingType) },
 		{ "UnitTemplateName", INI::parseAsciiStringVectorAppend, NULL, offsetof(UnitProductionBonusUpgradeModuleData, m_templateNames) },
 
-		{ 0, 0, 0, 0 } 
+		{ nullptr, nullptr, nullptr, 0 } 
 	};
 	p.add(dataFieldParse);
 

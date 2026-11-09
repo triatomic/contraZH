@@ -51,6 +51,7 @@
 #include "Lib/BaseType.h"
 #include "Common/CommandLine.h"
 #include "Common/CriticalSection.h"
+#include "Common/DedicatedGpuExports.h"
 #include "Common/GlobalData.h"
 #include "Common/GameEngine.h"
 #include "Common/GameSounds.h"
@@ -444,6 +445,11 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 				if (TheKeyboard)
 					TheKeyboard->resetKeys();
 
+				if (TheInGameUI)
+				{
+					TheInGameUI->clearModifierModes();
+				}
+
 				if (TheMouse)
 					TheMouse->regainFocus();
 
@@ -455,6 +461,11 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 			{
 				if (TheKeyboard)
 					TheKeyboard->resetKeys();
+
+				if (TheInGameUI)
+				{
+					TheInGameUI->clearModifierModes();
+				}
 
 				if (TheMouse)
 				{
@@ -551,6 +562,19 @@ LRESULT CALLBACK WndProc( HWND hWnd, UINT message,
 					TheWin32Mouse->addWin32Event( message, wParam, lParam, TheMessageTime );
 
 				return 0;
+			}
+
+			//-------------------------------------------------------------------------
+			case 0x020B: // WM_XBUTTONDOWN
+			case 0x020C: // WM_XBUTTONUP
+			case 0x020D: // WM_XBUTTONDBLCLK
+			{
+				if( TheWin32Mouse )
+				{
+					TheWin32Mouse->addWin32Event( message, wParam, lParam, TheMessageTime );
+				}
+				// a handled side button returns TRUE, which keeps Windows from also sending browser back
+				return TRUE;
 			}
 
 			//-------------------------------------------------------------------------
@@ -810,6 +834,9 @@ static CriticalSection critSec1, critSec2, critSec3, critSec4, critSec5;
 static LONG WINAPI UnHandledExceptionFilter( struct _EXCEPTION_POINTERS* e_info )
 {
 	DumpExceptionInfo( e_info->ExceptionRecord->ExceptionCode, e_info );
+#ifdef DEBUG_LOGGING
+	DebugFlushLog();
+#endif
 #ifdef RTS_ENABLE_CRASHDUMP
 	if (TheMiniDumper && TheMiniDumper->IsInitialized())
 	{
@@ -933,7 +960,7 @@ Int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 #if defined(GENERALS_ONLINE)
 		// TODO_NGMP: Better solution
 		TheVersion->setVersion(VERSION_MAJOR, VERSION_MINOR, GENERALS_ONLINE_VERSION, GENERALS_ONLINE_NET_VERSION,
-			AsciiString("Generals Online Development Team"), AsciiString(""),
+			AsciiString("triatomic"), AsciiString(""),
 			AsciiString(__TIME__), AsciiString(__DATE__));
 #else
 		TheVersion->setVersion(VERSION_MAJOR, VERSION_MINOR, VERSION_BUILDNUM, VERSION_LOCALBUILDNUM,

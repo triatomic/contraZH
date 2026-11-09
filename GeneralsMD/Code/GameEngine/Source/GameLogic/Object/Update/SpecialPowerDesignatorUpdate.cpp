@@ -64,7 +64,7 @@ SpecialPowerDesignatorUpdateModuleData::SpecialPowerDesignatorUpdateModuleData()
 		{ "TriggerStatusType",			ObjectStatusMaskType::parseSingleBitFromINI,	NULL,	offsetof(SpecialPowerDesignatorUpdateModuleData, m_triggerStatusType) },
 		{ "DecalRadius",			INI::parseReal,									NULL,	offsetof( RadiusDecalBehaviorModuleData, m_decalRadius) },
 		{ "TriggerFX", INI::parseFXList, NULL, offsetof(SpecialPowerDesignatorUpdateModuleData, m_triggerFX) },
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 
 	p.add(dataFieldParse);

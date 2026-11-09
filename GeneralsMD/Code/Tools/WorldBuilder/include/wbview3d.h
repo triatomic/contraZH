@@ -287,6 +287,28 @@ protected:
 	afx_msg void OnUpdateFxHeightBlend(CCmdUI* pCmdUI);
 	afx_msg void OnFxSpecular();
 	afx_msg void OnUpdateFxSpecular(CCmdUI* pCmdUI);
+	afx_msg void OnFxSoftParticles();
+	afx_msg void OnUpdateFxSoftParticles(CCmdUI* pCmdUI);
+	afx_msg void OnFxFlameShaders();
+	afx_msg void OnUpdateFxFlameShaders(CCmdUI* pCmdUI);
+	afx_msg void OnFxElectricShaders();
+	afx_msg void OnUpdateFxElectricShaders(CCmdUI* pCmdUI);
+	afx_msg void OnFxLaserShaders();
+	afx_msg void OnUpdateFxLaserShaders(CCmdUI* pCmdUI);
+	afx_msg void OnFxCryoShaders();
+	afx_msg void OnUpdateFxCryoShaders(CCmdUI* pCmdUI);
+	afx_msg void OnFxDynamicLights();
+	afx_msg void OnUpdateFxDynamicLights(CCmdUI* pCmdUI);
+	afx_msg void OnFxPixelLights();
+	afx_msg void OnUpdateFxPixelLights(CCmdUI* pCmdUI);
+	afx_msg void OnFxPathTracing();
+	afx_msg void OnUpdateFxPathTracing(CCmdUI* pCmdUI);
+	afx_msg void OnUpdateFxWaterReflections(CCmdUI* pCmdUI);
+	afx_msg void OnFxShorelineFoam();
+	afx_msg void OnUpdateFxShorelineFoam(CCmdUI* pCmdUI);
+	afx_msg void OnUpdateFxAmbientOcclusion(CCmdUI* pCmdUI);
+	afx_msg void OnUpdateFxLaserGlow(CCmdUI* pCmdUI);
+	afx_msg void OnUpdateFxPlanarMirrors(CCmdUI* pCmdUI);
 	afx_msg void OnTextShadow();
 	afx_msg void OnUpdateTextShadow(CCmdUI* pCmdUI);
 	afx_msg void OnTextOutline();
@@ -638,6 +660,8 @@ public:
 	
 	/// Invalidates an build list object.
 	void invalBuildListItemInView(BuildListInfo *pBuild);
+	/// True when the Build List tool limits the view to its selected player and side is another one.
+	Bool isBuildListSideHidden(Int side);
 
 	/// Invalidates the area of one height map cell in the 2d view.
 	virtual void invalidateCellInView(int xIndex, int yIndex) override;
@@ -784,13 +808,14 @@ public:
 		Bool clouds;
 		Bool macroTexture;
 		Bool stochastic;	///< paints stochastic terrain over all the ground for the capture
+		Bool shadows;
 	};
 	/// Renders the rectangle straight down into size*size BGRA pixels, top row north. Without aboveGround only terrain draws.
 	Bool captureTopView(Int size, const TopViewCapture &capture, Bool aboveGround, UnsignedByte *bgra);
 	/// Sets the scene up for a run of renderTopView frames, holding the editor view still until endTopView.
 	Bool beginTopView(const TopViewCapture &capture, Bool aboveGround);
 	Bool renderTopView(Int size, UnsignedByte *bgra);
-	/// Draws a frame and shows the area, given as fractions of the square with the top row first, in the window.
+	/// Draws a frame and stretches it over the area, given as fractions of the window with the top row first.
 	Bool presentTopView(Int size, void *window, const Real area[4]);
 	void endTopView();
 	Bool isTopViewActive() const { return m_topView.active; }
@@ -800,7 +825,7 @@ private:
 	struct TopViewSession
 	{
 		TopViewSession() : active(false), aboveGround(false), camZ(0.0f), camera(NULL), target(NULL), depth(NULL), targetSize(0),
-			oldTimeOfDay(TIME_OF_DAY_INVALID), removedTrees(false), wantShadowVolumes(false), wantClouds(false), wantMacroTexture(false), paint(NULL),
+			oldTimeOfDay(TIME_OF_DAY_INVALID), removedTrees(false), wantShadowVolumes(false), wantShadowDecals(false), wantClouds(false), wantMacroTexture(false), paint(NULL),
 			swapChain(NULL), swapWindow(NULL) {}
 		Bool active;
 		TopViewCapture capture;
@@ -815,6 +840,7 @@ private:
 		std::vector<RenderObjClass *> objects;
 		std::vector<Bool> wasHidden;
 		Bool wantShadowVolumes;
+		Bool wantShadowDecals;
 		Bool wantClouds;
 		Bool wantMacroTexture;
 		std::vector<UnsignedByte> paintEverywhere;
@@ -853,6 +879,7 @@ public:
 	Bool getShowBuildZoneFeedBack(void) { return ::AfxGetApp()->GetProfileInt(OBJECT_OPTION_PANEL, "PreviewBuildZone", 1);}
 	Bool getUseWaterHeight(void) { return ::AfxGetApp()->GetProfileInt(OBJECT_OPTION_PANEL, "UseWaterHeight", 0);}
 	Bool getShowBuildListObjects(void) { return ::AfxGetApp()->GetProfileInt(BUILDLIST_OPTION_PANEL, "ForceShowBuildListObjects", 0);}
+	Bool getShowBuildListSideOnly(void) { return ::AfxGetApp()->GetProfileInt(BUILDLIST_OPTION_PANEL, "ShowSelectedSideOnly", 0);}
 
 	void setObjTracking(MapObject *pMapObj, Coord3D pos, Real angle, Bool show);
 	void setViewLayersList(Bool showLayersList) { m_showLayersList = showLayersList; }

@@ -41,6 +41,9 @@ enum MappableKeyCategories CPP_11(: Int)
 	CATEGORY_TEAM,
 	CATEGORY_MISC,
 	CATEGORY_DEBUG,
+#if defined(GENERALS_ONLINE)
+	CATEGORY_GO,		///< Generals Online keys, the GO section of the Hotkeys screen
+#endif
 
 	CATEGORY_NUM_CATEGORIES
 };
@@ -55,6 +58,9 @@ static const LookupListRec CategoryListName[] =
 	{"TEAM",							CATEGORY_TEAM},
 	{"MISC",							CATEGORY_MISC},
 	{"DEBUG",							CATEGORY_DEBUG},
+#if defined(GENERALS_ONLINE)
+	{"GO",								CATEGORY_GO},
+#endif
 	{ nullptr, 0}
 };
 
@@ -160,6 +166,15 @@ enum MappableKeyType CPP_11(: Int)
 	MK_PGDN					= KEY_PGDN,
 	MK_INS					= KEY_INS,
 	MK_DEL					= KEY_DEL,
+	// mouse inputs bound like keys, in codes no keyboard key uses
+	MK_MOUSE3				= 0xF1,
+	MK_MOUSE4				= 0xF2,
+	MK_MOUSE5				= 0xF3,
+	MK_WHEELUP			= 0xF4,
+	MK_WHEELDOWN		= 0xF5,
+#if RTS_ZEROHOUR
+	MK_MOUSE_LEFT_RIGHT	= 0xF6,
+#endif
 	MK_NONE					= KEY_NONE
 
 };
@@ -259,6 +274,14 @@ static const LookupListRec KeyNames[] =
 	{ "KEY_PGDN", MK_PGDN },
 	{ "KEY_INS", MK_INS },
 	{ "KEY_DEL", MK_DEL },
+	{ "KEY_MOUSE3", MK_MOUSE3 },
+	{ "KEY_MOUSE4", MK_MOUSE4 },
+	{ "KEY_MOUSE5", MK_MOUSE5 },
+	{ "KEY_WHEELUP", MK_WHEELUP },
+	{ "KEY_WHEELDOWN", MK_WHEELDOWN },
+#if RTS_ZEROHOUR
+	{ "KEY_MOUSE_LEFT_RIGHT", MK_MOUSE_LEFT_RIGHT },
+#endif
 	{ "KEY_NONE", MK_NONE },
 	{ nullptr, 0	}
 };
@@ -362,8 +385,13 @@ private:
 	ICoord2D m_mouseDownPosition[NUM_MOUSE_BUTTONS];
 	Bool	m_nextUpShouldCreateDoubleClick[NUM_MOUSE_BUTTONS];
 	MappableKeyModState m_lastModState;
+	Bool	m_middleDragged;	///< the middle button moved past the drag tolerance since it went down
+	UnsignedInt m_middleDownTime;
+	Real	m_wheelSpin;	///< wheel travel not yet spent on a whole notch
 
 public:
+	static Bool isDebugCheatKey(Int systemKey, Int systemKeyState);
+
 	MetaEventTranslator();
 	virtual ~MetaEventTranslator() override;
 	virtual GameMessageDisposition translateGameMessage(const GameMessage *msg) override;
@@ -374,6 +402,7 @@ private:
 	void onKeyEvent(const GameMessage *msg, GameMessageDisposition &disp);
 	void onKeyModStateRemoved(GameMessageDisposition &disp, MappableKeyModState keyModState);
 	void onKeyPressed(GameMessageDisposition &disp, Int systemKeyState, MappableKeyType keyType, MappableKeyModState keyModState);
+	Bool onMouseKeyPressed(MappableKeyType keyType, Int systemModifiers); ///< a wheel notch or middle click, which has no key down and up of its own
 
 	static MappableKeyType getActionKeyType(Int systemKey); ///< CRTL, ALT, SHIFT will be treated as MK_NONE
 	static MappableKeyModState getKeyModState(Int systemKeyState); ///< Extract CTRL, ALT, SHIFT key mod state
@@ -390,6 +419,7 @@ private:
 protected:
 	GameMessage::Type findGameMessageMetaType(const char* name);
 	MetaMapRec *getMetaMapRec(GameMessage::Type t);
+	MetaMapRec *appendMetaMapRec(GameMessage::Type t);	///< a new record behind every other, which win a shared key
 
 public:
 
@@ -409,6 +439,25 @@ public:
 	void verifyMetaMap();
 
 	const MetaMapRec *getFirstMetaMapRec() const { return m_metaMaps; }
+
+	// The keys as shipped, before Hotkeys.ini, so the player's file can be laid over them again
+	struct DefaultKey
+	{
+		MappableKeyType key;
+		MappableKeyTransition transition;
+		MappableKeyModState modState;
+		CommandUsableInType usableIn;
+	};
+	void rememberDefaults();
+	void restoreDefaults();
+	Bool getDefaultKey( GameMessage::Type t, DefaultKey *key ) const;
+
+	static const LookupListRec *getMetaTypeNames();
+	static const char *findMetaTypeName( GameMessage::Type t );
+
+private:
+	typedef std::map<Int, DefaultKey> DefaultKeyMap;
+	DefaultKeyMap m_defaults;
 };
 
 extern MetaMap *TheMetaMap;

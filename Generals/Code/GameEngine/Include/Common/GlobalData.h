@@ -38,6 +38,7 @@
 #include "GameClient/DisruptionShader.h"
 #include "GameClient/StormShader.h"
 #include "GameClient/HeadlightShader.h"
+#include "Common/KindOf.h"
 #include "Common/STLTypedefs.h"
 #include "Common/Money.h"
 
@@ -94,6 +95,7 @@ public:
 
 	Bool setTimeOfDay( TimeOfDay tod );		///< Use this function to set the Time of day;
 
+	static void getDefaultResolution( Int &width, Int &height );	///< the primary desktop mode, or 800x600 when it is unreadable or smaller
 	static void parseGameDataDefinition( INI* ini );
 	void parseCustomDefinition();
 
@@ -563,10 +565,13 @@ public:
   Real m_cryoParticleScale;       ///< how much larger or smaller cryo-shaded particles draw, 1 unchanged
   DisruptionShaderTuning m_disruptionTuning;  ///< disruption shader defaults
   HeadlightShaderTuning m_headlightTuning;  ///< headlights drawn in place of HEADLIGHT meshes
+  KindOfMaskType m_headlightForbiddenKindOf;  ///< objects of these kinds keep their HEADLIGHT meshes
+  Bool m_rotrHack;  ///< additive HEADLIGHT meshes keep their own look
   StormShaderInfo m_stormTuning[StormShaderInfo::TYPE_COUNT];  ///< what each storm type takes where its entry sets nothing
   Bool m_useAmbientOcclusion;     ///< Options.ini AmbientOcclusion: creases and the ground beneath objects darken where the hardware allows
   Bool m_useHeightBlend;          ///< Options.ini HeightBlend: terrain textures blend by height where the hardware allows
   Bool m_useHQSky;                ///< Options.ini HQSky: cloud shadows drift softly and change shape where the hardware allows
+  Int m_shadowMapResolution;      ///< Options.ini ShadowMapResolution: the shadow map's width and height in texels
   Bool m_ambientOcclusionDebug;   ///< Options.ini AmbientOcclusionDebug: show only the occlusion, in grey
   Real m_ambientOcclusionRadius;  ///< how far, in world units, geometry darkens what is near it
   Real m_ambientOcclusionStrength; ///< how dark the occlusion gets, 0 for none
@@ -576,7 +581,6 @@ public:
   Real m_groundNoiseBrightness;
   Real m_terrainHeightBlendStrength; ///< how far the taller texture pushes into the other's side of a blend
   Real m_terrainHeightBlendSharpness; ///< how narrow the blend's edge is, 1 as wide as the legacy blend
-  Int m_terrainAtlasBorder;       ///< texels copied around each texture in the terrain atlas
   Real m_skyCloudSize;            ///< the HQ sky's cloud shadows, see W3DSkyClouds
   Real m_skyCloudCoverage;
   Real m_skyCloudSoftness;

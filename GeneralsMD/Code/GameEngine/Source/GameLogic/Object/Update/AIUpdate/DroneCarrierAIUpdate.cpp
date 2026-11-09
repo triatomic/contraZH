@@ -51,7 +51,7 @@ void DroneCarrierAIUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "Slots",								INI::parseInt,										NULL, offsetof(DroneCarrierAIUpdateModuleData, m_slots) },
 		{ "DronesEnterMainDoor",	INI::parseBool,										NULL, offsetof(DroneCarrierAIUpdateModuleData, m_drones_enter_main_door) },
 
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
 }

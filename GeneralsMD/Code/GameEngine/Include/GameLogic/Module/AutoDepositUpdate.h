@@ -99,7 +99,7 @@ public:
 			{ "ActualMoney",						INI::parseBool,		nullptr, offsetof( AutoDepositUpdateModuleData, m_isActualMoney ) },
 			{ "UpgradedBoost",					parseUpgradePair,		nullptr, offsetof( AutoDepositUpdateModuleData, m_upgradeBoost ) },
 			{ "TextHeightOffset",	      INI::parseReal,		NULL, offsetof( AutoDepositUpdateModuleData, m_textZOffset ) },
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
     p.add(dataFieldParse);
 	}

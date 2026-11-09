@@ -557,6 +557,152 @@ public:
 		SHOW_WEATHER,															///< show map defined weather.
 		AI_PLAYER_BUILD_TYPE_NEAREST_TEAM,				///< Tell the ai player to build an object nearest team.
 		SKIRMISH_BUILD_SHIPYARD,                  ///< Tell the ai player to build a shipyard
+		TEAM_MOVE_TO_SUPPLY_SOURCE,								///< Move a team next to the nearest free supply source.
+		NAMED_MOVE_TO_SUPPLY_SOURCE,							///< Move a unit next to the nearest free supply source.
+
+		// CLP_AI script actions ported from CookieLandProjects/CLP_AI
+		SET_COUNTER_RANDOM,														///< Set a counter to a random value between x and y.
+		COPY_COUNTER,																	///< Copy counter A onto B. If B doesn't yet exist, create a counter.
+		SET_KD_RATIO,																	///< Set a real number variable as a KD ratio to x kills and y deaths.
+		INCREMENT_KD_RATIO_KILLS,											///< Adds the kills of a KD ratio by <Real> credits.
+		INCREMENT_KD_RATIO_DEATHS,											///< Adds the deaths of a KD ration by <Real> credits.
+		DECREMENT_KD_RATIO_KILLS,											///< Subtracts the kills of a KD ratio by <Real> credits.
+		DECREMENT_KD_RATIO_DEATHS,											///< Subtracts the deaths of a KD ratio by <Real> credits.
+		UPDATE_KD_RATIO_KILLS_BUILDCOST,								///< Updates the kills of a KD ratio by the build cost of whatever is in m_lastFrameKills.
+		UPDATE_KD_RATIO_DEATHS_BUILDCOST,							///< Updates the deaths of a KD ratio by the build cost of whatever is in m_lastFrameKills.
+		COPY_KD_RATIO_ONTO_COUNTERS,										///< Copies a KD-Ratio's kills to counter A and deaths to Counter B.
+		AI_PLAYER_BUILDS_UNNAMED,											///< AI player adds a new unnamed unit to the production queue.
+		AI_PLAYER_BUILD_TYPE_NEAREST_TYPE_ROTATED,			///< AI player builds a structure near an object type rotated <Real> degrees.
+		AI_PLAYER_BUILD_TYPE_NEAREST_KINDOF_ROTATED,		///< AI player builds a structure near a kindOf rotated <Real> degrees.
+		AI_PLAYER_BUILD_TYPE_NEAREST_TEAM_ROTATED,			///< AI player builds a structure near a team rotated <Real> degrees.
+		AI_PLAYER_BUILD_TYPE_NEAREST_SUPPLY_ROTATED,		///< AI player builds a structure near a supply source rotaded <Real> degrees.
+		AI_PLAYER_BUILD_DEFENSE_FRONT_FROM_VECTOR_ROTATED_PERCENT,	///< AI player builds a defensive structure on the front from our vector, rotated <Real> degrees, and at a distance of <Real> percent of our actual base boundaries.
+		AI_PLAYER_BUILD_DEFENSE_FLANK_FROM_VECTOR_ROTATED_PERCENT,	///< AI player builds a defensive structure on the flank from our vector, rotated <Real> degrees, and at a distance of <Real> percent of our actual base boundaries.
+		AI_PLAYER_ADD_DEFENSE_TO_VECTOR,								///< add a defensive structure to m_baseDefenseStructures.
+		AI_PLAYER_REMOVE_DEFENSE_FROM_VECTOR,					///< remove a defensive structure from m_baseDefenseStructures.
+		AI_PLAYER_BUILD_DEFENSE_FRONT_FROM_VECTOR_ROTATED_PERCENT_AT_PLAYER,	///< AI player builds a defensive structure on the front from our vector, rotated <Real> degrees, and at a distance of <Real> percent of a player's actual base boundaries.
+		AI_PLAYER_BUILD_DEFENSE_FLANK_FROM_VECTOR_ROTATED_PERCENT_AT_PLAYER,	///< AI player builds a defensive structure on the flank from our vector, rotated <Real> degrees, and at a distance of <Real> percent of a player's actual base boundaries.
+		PLAYER_SURRENDER,															///< The player surrenders, provided that other allied players are alive; otherwise quit.
+		PLAYER_MERGE_KINDOF,														///< The player merges all units with <kindOf> into another team.
+		PLAYER_MERGE_TYPE,															///< The player merges all units with <objectType> into another team.
+		PLAYER_DISBAND_KINDOF,													///< The player disbands all units with <kindOf>.
+		PLAYER_DISBAND_TYPE,														///< The player disbands all units with <objectType>.
+		PLAYER_GARRISON_BUILDINGS_WITH_MAX_NUMBER,			///< The player garrisons nearby buildings with <int> infrantry each.
+		PLAYER_GARRISON_NUMBER_BUILDINGS,							///< The player equally garrisons <int> buildings with all available infantry.
+		TEAM_MOVE_RELATIVE,														///< Set a team to move relative to its own position.
+		TEAM_MOVE_NEAREST_BELONGING_TO_PLAYER,					///< Set a team to move towards an object type belonging to a player.
+		TEAM_MOVE_AWAY_FROM_RELATION,									///< A team moves <Real> feet into the opposite direction of a <relation> unit.
+		TEAM_MOVE_AWAY_FROM_RELATION_TYPE,							///< A team moves <Real> feet into the opposite direction of a <relation> <objectType>.
+		TEAM_MOVE_TOWARDS_RELATION,										///< A team moves <Real> feet towards a <relation> unit.
+		TEAM_MOVE_TOWARDS_RELATION_TYPE,								///< A team moves <Real> feet towards a <relation> <objectType>.
+		TEAM_MEET,																			///< Set a team to meet at its center point.
+		TEAM_MEET_AT_KINDOF,														///< Set a team to meet at the center point of all units with <kindOf>.
+		TEAM_MEET_AT_TYPE,															///< Set a team to meet at the center point of all units with <objectType>.
+		TEAM_USE_COMMAND_BUTTON_ABILITY_WITH_TYPE,			///< Set all units with an object type in a team to use a command button ability.
+		TEAM_USE_COMMAND_BUTTON_ABILITY_ON_TEAM,				///< Set a team to use a command button ability on another team.
+		TEAM_MERGE_KINDOF,															///< A team merges all units with <kindOf> into another team.
+		TEAM_MERGE_TYPE,																///< A team merges all units with <objectType> into another team.
+		TEAM_DISBAND_KINDOF,														///< A team disbands all units with <kindOf>.
+		TEAM_DISBAND_TYPE,															///< A team disbands all units with <objectType>.
+		TEAM_GARRISON_BUILDINGS_WITH_MAX_NUMBER,				///< A team garrisons nearby buildings with <int> infrantry each.
+		TEAM_GARRISON_NUMBER_BUILDINGS,								///< A team equally garrisons <int> buildings with all available infantry.
+		TEAM_MOVE_TO_TEAM,															///< Set a team to move towards another team.
+		TEAM_MEET_TEAM,																///< Set a team to meet at the center point of another team.
+		TEAM_LOAD_EVENLY,															///< A team loads evenly into their transport units.
+		UNIT_MOVE_RELATIVE,														///< Set a unit to move relative to its own position.
+		UNIT_MOVE_NEAREST_BELONGING_TO_PLAYER,					///< Set a unit to move towards the nearest object type belonging to a player.
+		UNIT_MOVE_AWAY_FROM_RELATION,									///< A unit moves <Real> feet into the opposite direction of a <relation> unit.
+		UNIT_MOVE_AWAY_FROM_RELATION_TYPE,							///< A unit moves <Real> feet into the opposite direction of a <relation> <objectType>.
+		UNIT_MOVE_TOWARDS_RELATION,										///< A unit moves <Real> feet towards a <relation> unit.
+		UNIT_MOVE_TOWARDS_RELATION_TYPE,								///< A unit moves <Real> feet towards a <relation> <objectType>.
+		CREATE_TEAM_FROM_TEAMLESS,											///< Create a team from all units that are owned by the default team.
+		CREATE_TEAM_FROM_TEAMLESS_TYPE,								///< Create a team from units with <objectType> that are owned by the default team.
+		CREATE_TEAM_FROM_TEAMLESS_KINDOF,							///< Create a team from units with <kindOf> that are owned by the default team.
+		SKIRMISH_FIRE_SPECIAL_POWER_AT_MOST_COST_TYPE,	///< The player fires their special power at the highest cost area, computed with heavy focus on an object type.
+		PLAYER_HUNT_TYPE,															///< A player's units with a type are set to hunt.
+		TEAM_HUNT_TYPE,																///< A team's units with a type are set to hunt.
+		PLAYER_SELL_ALL_BUILDINGS_IN_CAPTURE_PROCESS_PERCENTAGE,	///< Make an AI player sell off all buildings that are being captured with a % chance.
+		PLAYER_SELL_ALL_BUILDINGS_TYPE_IN_CAPTURE_PROCESS_PERCENTAGE,	///< Make an AI player sell off all buildings of a type that are being captured with a % chance.
+		PLAYER_SELL_ALL_BUILDINGS_AREA_IN_CAPTURE_PROCESS_PERCENTAGE,	///< Make an AI player sell off a building in an area that are being captured with a % chance.
+		PLAYER_SELL_ALL_BUILDINGS_TYPE_AREA_IN_CAPTURE_PROCESS_PERCENTAGE,	///< Make an AI player sell off a building of a type in an area that are being captured with a % chance.
+		PLAYER_CANCEL_ALL_CONSTRUCTIONS,								///< A player cancels the construction of all buildings.
+		PLAYER_CANCEL_ALL_CONSTRUCTIONS_TYPE,					///< A player cancels the construction of all buildings of a type.
+		PLAYER_CANCEL_ALL_CONSTRUCTIONS_AREA,					///< A player cancels the construction of all buildings in an area.
+		PLAYER_CANCEL_ALL_CONSTRUCTIONS_TYPE_AREA,			///< A player cancels the construction of all buildings of a type in an area.
+		PLAYER_SELL_ALL_BUILDINGS_TYPE,								///< Make an AI player sell off all buildings of a type.
+		PLAYER_SELL_ALL_BUILDINGS_AREA,								///< Make an AI player sell off all buildings in an area.
+		PLAYER_SELL_ALL_BUILDINGS_TYPE_AREA,						///< Make an AI player sell off all buildings of a type in an area.
+		AI_PLAYER_BUILD_TYPE_NEAREST_KINDOF_ROTATED_AREA,	///< AI player builds a structure near a kindOf in an area rotated <Real> degrees.
+		AI_PLAYER_BUILD_TYPE_NEAREST_TYPE_ROTATED_AREA,	///< AI player builds a structure near a type in an area source rotated <Real> degrees.
+		TEAM_ATTACK_TYPE,															///< Set a team to attack units with a specific type.
+		TEAM_ATTACK_TYPE_AREA,													///< Set a team to attack unis with a specific type in an area.
+		TEAM_ATTACK_SEEN_UNIT,													///< Set a team to attack units the player sees.
+		TEAM_ATTACK_SEEN_TYPE,													///< Set a team to attack units the player sees with a specific type.
+		TEAM_ATTACK_SEEN_AREA,													///< Set a team to attack units the player sees in an area.
+		TEAM_ATTACK_SEEN_TYPE_AREA,										///< Set a team to attack unis the player sees with a specific type in an area.
+		TEAM_ATTACKMOVE_WAYPOINT,											///< Set a team to attack move towards a waypoint.
+		TEAM_ATTACKMOVE_TYPE,													///< Set a team to attack move towards an enemy object of a type.
+		TEAM_ATTACKMOVE_TYPE_AREA,											///< Set a team to attack move towards an enemy object of a type in an area.
+		TEAM_EVACUATE_DESTROYED_PERCENT,								///< Set a team to evacuate all transports below N%.
+		TEAM_ATTACKMOVE_AREA,													///< Set a team to attack move towards an enemy object in an area.
+		TEAM_ATTACKMOVE_SEEN_UNIT,											///< Set a team to attack move towards units the player sees .
+		TEAM_ATTACKMOVE_SEEN_TYPE,											///< Set a team to attack move towards units of a type the player sees.
+		TEAM_ATTACKMOVE_SEEN_AREA,											///< Set a team to attack move towards units in an area the player sees.
+		TEAM_ATTACKMOVE_SEEN_TYPE_AREA,								///< Set a team to attack move towards units of a type in an area the player sees.
+		TEAM_ATTACKMOVE_PATH,													///< Set a team to attack move towards the beginning of a waypoint path.
+		TEAM_MOVE_CAPTURED,														///< Set a team to move to the closest building currently being captured.
+		TEAM_MOVE_CAPTURED_TYPE,												///< Set a team to move to the closest building of a type currently being captured.
+		TEAM_MOVE_TYPE_UNDER_FOG,											///< Set a team to move to the closest object of a type under the fog of war.
+		TEAM_MOVE_TYPE_AREA_UNDER_FOG,									///< Set a team to move to the closest object of a type in an area under the fog of war.
+		TEAM_MOVE_TYPE_NOT_UNDER_FOG,									///< Set a team to move to the closest object of a type NOT under the fog of war.
+		TEAM_MOVE_TYPE_AREA_NOT_UNDER_FOG,							///< Set a team to move to the closest object of a type in an area NOT under the fog of war.
+		UNIT_TELEPORT_TO_LOCATION,											///< Teleport a unit to a waypoint.
+		TEAM_TELEPORT_TO_LOCATION,											///< Teleport a team to a waypoint.
+		PLAYER_APPLY_ATTACK_PRIORITY_SET,							///< Set a player to apply a priority set.
+		PLAYER_APPLY_ATTACK_PRIORITY_SET_TYPE,					///< Set a player to apply a priority set with units of a specific type.
+		TEAM_APPLY_ATTACK_PRIORITY_SET_TYPE,						///< Set a team to apply a priority set with units of a specific type.
+		TEAM_KEEP_DISTANCE_RELATION,										///< A team moves to keep a <Real> feet distance from a <relation> unit.
+		UNIT_KEEP_DISTANCE_RELATION,										///< A unit moves to keep a <Real> feet distance from a <relation> unit.
+		TEAM_KEEP_DISTANCE_RELATION_TYPE,							///< A team moves to keep a <Real> feet distance from a <relation> unit of a type.
+		UNIT_KEEP_DISTANCE_RELATION_TYPE,							///< A unit moves to keep a <Real> feet distance from a <relation> unit of a type.
+		SET_WILLINGNESS_TO_CRUSH_PLAYER,								///< Override the settings of a player's willingness to crush infantry.
+		SET_WILLINGNESS_TO_CRUSH_TEAM,									///< Override the settings a team's willingness to crush infantry.
+		SET_WILLINGNESS_TO_CRUSH_UNIT,									///< Override the settings a unit's willingness to crush infantry.
+		PLAYER_HUNT_AREA,															///< A player's units inside an area are set to hunt.
+		TEAM_CUSTOM_COLOR,															///< Change the color of a team to a custom value.
+		PLAYER_CUSTOM_COLOR,														///< Change the color of a player to a custom value.
+		CREATE_WAYPOINT_LOCATION,											///< Create a waypoint at a specific location.
+		CREATE_WAYPOINT_UNIT,													///< Create a waypoint at a unit's location.
+		CREATE_WAYPOINT_TEAM,													///< Create a waypoint at a team's location.
+		CREATE_WAYPOINT_TYPE,													///< Create a waypoint at an objectType's location. Selection modes => 0: closest, 1: farthest, 2: random
+		REMOVE_WAYPOINT,																///< Delete a waypoint.
+		SET_WAYPOINT_LINK,															///< Add links between two waypoints.
+		REMOVE_WAYPOINT_LINK,													///< Remove links from one waypoint to a specific other and forwards backwards.
+		SET_WAYPOINT_LABELS,														///< Set custom waypoint path labels for a specific waypoint.
+		CLEAR_WAYPOINT_LABELS,													///< Clear the selected waypoint path labels for a specific waypoint.
+		RELOCATE_WAYPOINT_LOCATION,										///< Relocate a waypoint to a specific location.
+		RELOCATE_WAYPOINT_UNIT,												///< Relocate a waypoint to a unit's location.
+		RELOCATE_WAYPOINT_TEAM,												///< Relocate a waypoint to a team's location.
+		RELOCATE_WAYPOINT_TYPE,												///< Relocate a waypoint to an objectType's location. Selection modes => 0: closest, 1: farthest, 2: random
+		SET_WAYPOINT_BIDIRECTIONAL,										///< Set whether a waypoint is bi-directional or not.
+		TEAM_HUNT_WITH_COMMAND_BUTTON_TYPE,						///< Set a team's objects of a type to hunt using a command button ability.
+		SKIRMISH_SET_PARTICLE_CANNON_TELEPORT_MODE,		///< The player fires its particle cannon with the teleport mode <Bool>.
+		TEAM_GARRISON_TYPE,														///< Set a team to garrison a building of a type
+		PLAYER_GARRISON_BUILDINGS_TYPE_WITH_MAX_NUMBER,	///< A player garrisons nearby buildings of a type with <int> infrantry each.
+		TEAM_GARRISON_BUILDINGS_TYPE_WITH_MAX_NUMBER,	///< A team garrisons nearby buildings of a type with <int> infrantry each.
+		PLAYER_GARRISON_NUMBER_BUILDINGS_TYPE,					///< A player equally garrisons <int> buildings of a type with all available infantry.
+		TEAM_GARRISON_NUMBER_BUILDINGS_TYPE,						///< A team equally garrisons <int> buildings of a type with all available infantry.
+		TEAM_LOAD_TYPE_EVENLY,													///< A team loads evenly into their transport units of a specific type.
+		TEAM_REPAIR,																		///< A team sends units back to the closest factories that can repair them.
+		UNIT_REPAIR,																		///< A unit goes back to the closest factory that can repair it.
+		TEAM_REPAIR_TYPE,															///< A team sends units of type <objectType> back to the closest factories that can repair them.
+		ADD_PRIORITY_SET_TO_OTHER,											///< Add the content of one priority set to another.
+		INCREASE_PRIORITY_IN_SET_TYPE,									///< Increase the priorty in a set by <Int> for <objectType>.
+		DECREASE_PRIORITY_IN_SET_TYPE,									///< Decrease the priorty in a set by <Int> for <objectType>.
+		AI_PLAYER_CLOSEST_DOZER_BUILDING_PRIORITY,			///< The AI player chooses the AIData-entry closest to a non-busy dozer rather than the first unbuilt one.
+		AI_CLEAR_BUILDLIST,
+		AI_ADD_TO_BUILDLIST,
+		AREA_TRANSFER_TO_PLAYER,
 		// add new items here, please
 		NUM_ITEMS
 	};
@@ -638,9 +784,9 @@ protected:	// Note - If you add any member vars, you must take them into account
 	ScriptAction *m_action;			///< First in a list of actions executed if the conditions are true.
 	ScriptAction *m_actionFalse;///< First in a list of actions executed if the conditions are false.
 	Script			*m_nextScript;	///< Next in the list of scripts.
+	UnsignedInt m_frameToEvaluateAt; ///< When to evaluate the conditions next, if m_delayEvaluationSeconds>0.
 
 // Runtime fields - not saved or read.
-	UnsignedInt m_frameToEvaluateAt; ///< When to evaluate the conditions next, if m_delayEvaluationSeconds>0.
 	Bool				m_hasWarnings; ///< Runtime flag used by the editor only.
 	AsciiString	m_conditionTeamName; ///< Runtime name used by ScriptEngine only.
 	Real				m_conditionTime;		///< Amount of time (cum) to evaluate conditions.
@@ -797,6 +943,8 @@ public:
 		SCIENCE_AVAILABILITY, // String, the name of the different science availabilities.
     LEFT_OR_RIGHT,        // 1=left, 2=right, okay?
 		PERCENT,						// Real.  A percentage.
+		KD_RATIO,						// String, the name of a kills to deaths ratio.
+		SELECTION_MODE,			// Int, how to pick one object from several (CLOSEST, FARTHEST, RANDOM, YOUNGEST, OLDEST).
 		NUM_ITEMS
 	};
 
@@ -813,6 +961,14 @@ public:
 		REL_ENEMY			= ENEMIES,
 		REL_NEUTRAL		= NEUTRAL,
 		REL_FRIEND		= ALLIES
+	};
+
+	enum { // Selection modes.  Stored in Int value.
+		CLOSEST = 0,
+		FARTHEST,
+		RANDOM,
+		YOUNGEST,
+		OLDEST
 	};
 
 	Parameter(ParameterType type, int val = 0) :
@@ -996,6 +1152,77 @@ public:
 		NAMED_HAS_FREE_CONTAINER_SLOTS,					///< Kris -- Checks if any given container has any free slots.
 
 		SKIRMISH_SHIPS_ENABLED,                 // True if ships are enabled on the played map
+
+		// CLP_AI script conditions ported from CookieLandProjects/CLP_AI
+		KD_RATIO,																			// True if the KD Ratio is <comparison> a value.
+		COMPARE_COUNTERS,															// True if Counter A is <comparison> Counter B.
+		PLAYER_RELATION_FACTION,												// True if one or more of the player's <relation> co-players are a faction.
+		RELATION_IS,																		// True if the relation between two players is as specified.
+		SPOT_EMPTY,																		// True if a specified spot is empty.
+		SPOT_NEIGHBOURING,															// True if the index of a specified spot is neighbouring the player.
+		NEIGHBOURING_SPOTS_EMPTY,											// True if <comparison> amount of neighbouring spots are empty.
+		NEIGHBOURING_SPOTS_RELATION,										// True if <comparison> amount of neighbouring spots have a relation of <relation>.
+		MAP_COMPARE_SIZE,															// True if there are <comparison> starting points in the map.
+		MAP_ACTIVE_PLAYERS,														// True if there are <comparison> active layers in the map.
+		MAP_EMPTY_SPOTS,																// True if there are <comparison> empty starting points in the map.
+		STARTING_CASH_COMPARE,													// True if the player's starting cash is <comparison> <Int>.
+		CLOSEST_ENEMY_DISTANCE,												// True if the enemy's closest unit is <comparison> feet away.
+		PLAYER_HUNTED,																	// True if the player has construction units || command center || supply stash.
+		PLAYER_LOST_TYPE_AREA,													// True if the player has lost an object of <type> in <area>.
+		PLAYER_LOST_UNIT,															// True if the player has lost a unit.
+		TEAM_SIGHTED_RELATION_TYPE,										// True if a team has sighted a <relation> unit of <type>.
+		TEAM_LOST_TYPE,																// True if a team has lost an object of <type>.
+		TEAM_LOST_UNIT,																// True if a team has lost a unit.
+		PLAYER_DESTROYED_ENEMY_TYPE,										// True if a player has destroyed an enemy unit of <type>.
+		PLAYER_DESTROYED_ENEMY_UNIT,										// True if a player has destroyed an enemy unit.
+		PLAYER_MAPCONTROL,															// True if a player's map control is <comparison> <Real>.
+		PLAYER_RELATION_MAPCONTROL,										// True if all <relation> player's map control is <comparison> <Real>.
+		PLAYER_MAPCONTROL_AREA,												// True if a player's map control in an area is <comparison> <Real>.
+		PLAYER_RELATION_MAPCONTROL_AREA,								// True if all <relation> player's map control in an area is <comparison> <Real>.
+		PLAYER_SIGHTED_RELATION_TYPE,									// True if a player has sighted a <relation> unit of <type>.
+		RELATION_PLAYER_SIGHTED_RELATION_TYPE,					// True if a <relation> player has sighted a <relation> unit of <type>.
+		RELATION_PLAYER_VALUE_AREA,										// True if the value of a <relation> player in an area is <comparison> <Int>.
+		RELATION_PLAYER_OWNS_COMPARISON_TYPE,					// True if a <relation> player owns <comparison> amount of <type>.
+		PLAYER_ATTACKED_AREA,													// True if a player has been attacked in an area.
+		PLAYER_BUILDING_BEING_CAPTURED,								// True if a player's building is being captured by an enemy.
+		PLAYER_BUILDING_BEING_CAPTURED_TYPE,						// True if a player's building of a type is being captured by an enemy.
+		PLAYER_BUILDING_BEING_CAPTURED_AREA,						// True if a player's building in an area is being captured by an enemy.
+		PLAYER_BUILDING_BEING_CAPTURED_TYPE_AREA,			// True if a player's building of a type in an area is being captured by an enemy.
+		RELATION_PLAYER_COMPARISON_TYPE_AREA,					// True if all of player's <relation> co-players combined have <comparison> <int> <type> in an area.
+		PLAYER_COMPARISON_RATIO_OTHER,									// True if player A has <comparison> <Real> times as many units as player B.
+		PLAYER_COMPARISON_RATIO_TYPE_OTHER,						// True if player A has <comparison> <Real> times as many units of a type as player B.
+		PLAYER_COMPARISON_RATIO_AREA_OTHER,						// True if player A has <comparison> <Real> times as many units in an area as player B.
+		PLAYER_COMPARISON_RATIO_TYPE_AREA_OTHER,				// True if player A has <comparison> <Real> times as many units of a type in an area than player B.
+		RELATION_PLAYER_COMPARISON_RATIO_OTHER_RELATION,	// True if all of player A's <relation> co-players combined have <comparison> <Real> times as many units as player B's co-players.
+		RELATION_PLAYER_COMPARISON_RATIO_TYPE_OTHER_RELATION,	// True if all of player A's <relation> co-players combined have <comparison> <Real> times as many units of a type as player B's co-players.
+		RELATION_PLAYER_COMPARISON_RATIO_AREA_OTHER_RELATION,	// True if all of player A's <relation> co-players combined have <comparison> <Real> times as many units in an area as player B's co-players.
+		RELATION_PLAYER_COMPARISON_RATIO_TYPE_AREA_OTHER_RELATION,	// True if all of player A's <relation> co-players combined have <comparison> <Real> times as many units of a type in an area as Player B's co-players.
+		RELATION_PLAYER_SIGHTED_RELATION_AREA,					// True if one of a player's <relation> co-players has sighted a <relation> unit in an area.
+		RELATION_PLAYER_SIGHTED_RELATION_TYPE_AREA,		// True if one of a player's <relation> co-players has sighted a <relation> unit of type in an area.
+		TEAM_IDLE,																			// True if a team is idling.
+		TEAM_CONTAINS_TYPE,														// True if a team contains an object of a type.
+		TEAM_CONTAINS_COMPARISON_TYPE,									// True if a team contains <comparison> <int> objects of a type.
+		COUNTER_DIVISIBLE,															// True if a counter is divisible by <int>.
+		TEAM_SINGLE_BELOW_HEALTH,											// True if a single member of a team drops below <real> % health.
+		TEAM_BELOW_HEALTH,															// True if the entire team drops below <real> & health.
+		TEAM_IDLE_FRAMES,															// True if a team has been idling for at least the past <int> frames.
+		TEAM_SEEN,																			// True if at least one member of a team has been seen by enemy players.
+		PLAYER_COMPARISON_TEAM_INSTANCES,							// True if a player has <comparison> <int> instances of a team.
+		TEAM_CONTAINS_COMPARISON_RATIO_SIGHTED,				// True if a team has <comparison> <Real> times as many units as there are units the team sees.
+		TEAM_CONTAINS_COMPARISON_TYPE_RATIO_SIGHTED,		// True if a team has <comparison> <Real> times as many units of a type as there are units of a type the team sees.
+		SPOT_NEIGHBOURING_RELATION,										// True if a spot is neighbouring <relation> players.
+		TEAM_CLOSEST_RELATION_TYPE,										// True if a(n) <relation> object of a type is <comparison> <Real> feet away from a team.
+		UNIT_CLOSEST_RELATION_TYPE,										// True if a(n) <relation> object of a type is <comparison> <Real> feet away from a unit.
+		TEAM_ALL_CLEAR,																// True if a team just left combat. Utilizes the check from the behaviour tab.
+		NO_TEAMS,																			// True if no player is allied to another & there are more than 2 active players (a.k.a this is an FFA match).
+		TEAM_COMPARISON_APART,													// True if a team is <comparison> <Real> feet apart on average.
+		TEAM_CAN_LOAD_TRANSPORTS,											// True if a team can load into transports i.e. has loose infantry & transporters with room
+		TEAM_CLOSEST_TO_ENEMY_COMPARISON_RATIO_SIGHTED_RADIUS,	// True if the closest team member to the enemy sees <comparison> <ratio> units than it has allies in a specified radius.
+		TEAM_CLOSEST_TO_ENEMY_COMPARISON_TYPE_RATIO_SIGHTED_RADIUS,	// True if the closest team member to the enemy sees <comparison> <ratio> units of type <objectType> than it has allies of type <objectType> in a specified radius.
+		UNIT_RELOADED,																	// True if a unit is (partially if chosen) reloaded.
+		TEAM_RELOADED,																	// True if a team is (partially if chosen) reloaded.
+
+		QUICK_GAME_ENABLED,														// True if the host ticked Quick Game.
 
 		NUM_ITEMS		 // Always the last condition.
 	};

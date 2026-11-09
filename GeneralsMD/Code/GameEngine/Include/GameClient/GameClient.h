@@ -39,6 +39,7 @@
 // forward declarations
 class AsciiString;
 class Display;
+class FacingDragTranslator;
 class DisplayStringManager;
 class Drawable;
 class FontLibrary;
@@ -142,6 +143,7 @@ public:
 	// The legacy frame ticks at 30 Hz on the wall clock so client effects keep their retail cadence.
 	UnsignedInt getFrameLegacy() const { return m_frameLegacy; }
 	Bool HasLegacyFrameAdvanced() const { return m_frameLegacy != m_frameLegacyLast; }
+	Real getLegacyFramePhase() const { return min(1.0f, (Real)m_legacyFrameMsAccrued * BaseFps / MSEC_PER_SECOND); }
 #endif
 
 	//---------------------------------------------------------------------------
@@ -192,6 +194,7 @@ protected:
 	TranslatorID m_translators[ MAX_CLIENT_TRANSLATORS ];				///< translators we have used
 	UnsignedInt m_numTranslators;																///< number of translators in m_translators[]
 	CommandTranslator *m_commandTranslator;											///< the command translator on the message stream
+	FacingDragTranslator *m_facingDragTranslator;
 
 private:
 

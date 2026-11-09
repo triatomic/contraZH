@@ -54,6 +54,7 @@ public:
 #include "Common/SparseMatchFinder.h"
 #include "GameClient/ParticleSys.h"
 #include "GameClient/HeadlightShader.h"
+#include "GameClient/PlanarMirrorShader.h"
 #include "W3DLaserDraw.h"
 #include "Common/STLTypedefs.h"
 
@@ -347,6 +348,10 @@ public:
 	FlameShaderTuning									m_flameTuning;
 	BeamShaderTuning									m_beamTuning;  ///< the electric and cryo settings
 
+	Bool															m_planarMirror;  ///< some meshes reflect the scene as level mirrors, over any other mesh shader
+	std::vector<AsciiString>					m_planarMirrorMeshes;  ///< the mirror meshes by name, every mesh where empty
+	PlanarMirrorShaderTuning					m_planarMirrorTuning;  ///< the look keys, unset where the model takes GameData.ini's
+
 	// Bool															m_disableMoveEffectsOverWater;  ///< disable track marks and tread/wheel anims over water
 
 	W3DModelDrawModuleData();
@@ -429,6 +434,7 @@ public:
 	virtual void setHidden(Bool h) override;
 	virtual void replaceModelConditionState(const ModelConditionFlags& c) override;
 	virtual void replaceIndicatorColor(Color color) override;
+	virtual void refreshIndicatorColor() override;
 	virtual Bool handleWeaponFireFX(WeaponSlotType wslot, Int specificBarrelToUse, const FXList* fxl, Real weaponSpeed, const Coord3D* victimPos, Real damageRadius) override;
 	virtual Bool handleWeaponPreAttackFX(WeaponSlotType wslot, Int specificBarrelToUse, const FXList* fxl, Real weaponSpeed, const Coord3D* victimPos, Real damageRadius);
 	virtual Int getBarrelCount(WeaponSlotType wslot) const override;
@@ -471,6 +477,7 @@ public:
 
 	///@todo: I had to make this public because W3DDevice needs access for casting shadows -MW
 	RenderObjClass *getRenderObject() { return m_renderObject; }
+	const RenderObjClass *getRenderObject() const { return m_renderObject; }
 	virtual Bool updateBonesForClientParticleSystems() override;///< this will reposition particle systems on the fly ML
 
 	virtual void handleFXEvents();  // Check frame times and trigger FX events at correct positions
@@ -607,6 +614,7 @@ private:
 	void rebuildWeaponRecoilInfo(const ModelConditionInfo* state, bool clear = TRUE);
 	void doHideShowProjectileObjects( UnsignedInt showCount, UnsignedInt maxCount, WeaponSlotType slot );///< Means effectively, show m of n.
 	void nukeCurrentRender(Matrix3D* xform);
+	void rebuildRenderObject(); ///< recreate the render object, picking up the current house color
 	void createObjectDecal();
 	void updateObjectDecalVisibility();
 	void doStartOrStopParticleSys();

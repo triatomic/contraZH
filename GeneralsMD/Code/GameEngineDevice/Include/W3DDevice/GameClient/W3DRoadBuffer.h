@@ -166,6 +166,7 @@ protected:
 #endif
 public:
 	void loadTexture(AsciiString path, Int id);
+	void allocateBuffers();	///< creates the buffers the first time a map uses this road type
 	void applyTexture();
 	Int getStacking() {return m_stackingOrder;}
 	void setStacking(Int order) {m_stackingOrder = order;}

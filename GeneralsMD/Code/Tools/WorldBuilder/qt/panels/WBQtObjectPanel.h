@@ -38,6 +38,9 @@ public:
 
 	static WBQtObjectPanel *instance() { return s_instance; }
 
+protected:
+	virtual void showEvent(QShowEvent *event);
+
 private slots:
 	void onTreeSelectionChanged();
 	void onTeamChanged(int index);

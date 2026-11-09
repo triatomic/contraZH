@@ -111,12 +111,13 @@ public:
 	///allocate resources needed to render heightmap
 	virtual int initHeightData(Int width, Int height, WorldHeightMap *pMap, RefRenderObjListIterator *pLightsIterator, Bool updateExtraPassTiles=TRUE);
 	virtual Int freeMapResources();	///< free resources used to render heightmap
-	virtual void updateCenter(CameraClass *camera, const Vector3 *cameraPivot, RefRenderObjListIterator *pLightsIterator);
+	virtual void updateCenter(CameraClass *camera, const Vector3 *cameraPivot, RefRenderObjListIterator *pLightsIterator, const Vector2 *drawCenter = nullptr);
  	virtual void adjustTerrainLOD(Int adj);
 	virtual void doPartialUpdate(const IRegion2D &partialRange, WorldHeightMap *htMap, RefRenderObjListIterator *pLightsIterator) = 0;
 	virtual void staticLightingChanged();
 	virtual void oversizeTerrain(Int tilesToOversize) = 0; ///< Oversize the visible terrain area.
-	virtual void renderShadowMapCaster() {} ///< Draws the terrain geometry into the shadow map, so cliffs and hills cast.
+	virtual void renderShadowMapCaster(const FrustumClass &) {} ///< Draws the terrain the frustum takes in into the shadow map, so cliffs and hills cast.
+	virtual Bool isCellCulled(Int x, Int y) const { return FALSE; } ///< Whether the render under way leaves out the terrain tile holding this map cell.
 	virtual void setTerrainDrawSize(Int width, Int height) = 0; ///< Resize the visible terrain area. Always defaults to oversize dimensions when oversize is set.
 	virtual void reset();
 

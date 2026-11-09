@@ -49,7 +49,11 @@ CachedFileInputStream::~CachedFileInputStream()
 
 Bool CachedFileInputStream::open(AsciiString path)
 {
-	File *file=TheFileSystem->openFile(path.str(), File::READ | File::BINARY);
+	return open(TheFileSystem->openFile(path.str(), File::READ | File::BINARY));
+}
+
+Bool CachedFileInputStream::open(File *file)
+{
 	m_size = 0;
 
 	if (file) {
@@ -57,6 +61,11 @@ Bool CachedFileInputStream::open(AsciiString path)
 		if (m_size) {
 			m_buffer = file->readEntireAndClose();
 			file = nullptr;
+			if (m_buffer == nullptr)
+			{
+				m_size = 0;
+				return FALSE;
+			}
 		}
 		m_pos=0;
 	}
@@ -246,12 +255,22 @@ DataChunkOutput::~DataChunkOutput()
 	m_contents.write(*m_pOut);
 
 	// Rewind the temp m_tmp_file
+	if (m_tmp_file == nullptr)
+	{
+		DEBUG_CRASH(("DataChunkOutput - temp file was never opened"));
+		return;
+	}
 	::fclose(m_tmp_file);
 
 	AsciiString tmpFileName = TheGlobalData->getPath_UserData();
 	tmpFileName.concat(TEMP_FILENAME);
 
  	m_tmp_file = ::fopen( tmpFileName.str(), "rb" );
+	if (m_tmp_file == nullptr)
+	{
+		DEBUG_CRASH(("DataChunkOutput - could not reopen temp file '%s'", tmpFileName.str()));
+		return;
+	}
 	::fseek(m_tmp_file, 0, SEEK_SET);
 
 	// append the temp m_tmp_file m_contents

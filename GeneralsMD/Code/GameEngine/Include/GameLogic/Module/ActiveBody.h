@@ -116,8 +116,8 @@ public:
 	virtual Real getCurrentFrozenDamageAmount() const override { return m_currentFrozenDamage; }
 
 	virtual const DamageInfo *getLastDamageInfo() const { return &m_lastDamageInfo; }	///< return info on last damage dealt to this object
-	virtual UnsignedInt getLastDamageTimestamp() const { return m_lastDamageTimestamp; }	///< return frame of last damage dealt
-	virtual UnsignedInt getLastHealingTimestamp() const { return m_lastHealingTimestamp; }	///< return frame of last damage dealt
+	virtual const UnsignedInt *getLastDamageTimestamp() const;	///< return frame of last damage, or nullptr if none
+	virtual const UnsignedInt *getLastHealingTimestamp() const;	///< return frame of last healing, or nullptr if none
 	virtual ObjectID getClearableLastAttacker() const { return (m_lastDamageCleared ? INVALID_ID : m_lastDamageInfo.in.m_sourceID); }
 	virtual void clearLastAttacker() { m_lastDamageCleared = true; }
 

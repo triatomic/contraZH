@@ -50,10 +50,12 @@
 //#include <wsys/StdFileSystem.h>
 #include "W3DDevice/GameClient/W3DFileSystem.h"
 #include "Common/CommandLine.h"
+#include "Common/DedicatedGpuExports.h"
 #include "Common/FramePacer.h"
 #include "Common/GlobalData.h"
 #include "Common/MapData.h"
 #include "WHeightMapEdit.h"
+#include "TerrainBrushes.h"
 #include "WWLib/WBParallel.h"
 //#include "Common/GameFileSystem.h"
 #include "Common/FileSystem.h"
@@ -61,6 +63,7 @@
 #include "Common/LocalFileSystem.h"
 #include "Common/Debug.h"
 #include "Common/StackDump.h"
+#include "Common/MiniDumper.h"
 #include "Common/GameMemory.h"
 #include "Common/Science.h"
 #include "Common/ThingFactory.h"
@@ -99,7 +102,7 @@
 #include <io.h>
 #include "Win32Device/GameClient/Win32Mouse.h"
 #include "Win32Device/Common/Win32LocalFileSystem.h"
-#include "Win32Device/Common/Win32BIGFileSystem.h"
+#include "Common/BIGFileSystem.h"
 #include "ToastDialog.h"
 
 #include "Common/WellKnownKeys.h"
@@ -350,6 +353,17 @@ CWorldBuilderApp::~CWorldBuilderApp()
 static LONG WINAPI UnHandledExceptionFilter(struct _EXCEPTION_POINTERS* e_info)
 {
 	DumpExceptionInfo(e_info->ExceptionRecord->ExceptionCode, e_info);
+#ifdef DEBUG_LOGGING
+	DebugFlushLog();
+#endif
+#ifdef RTS_ENABLE_CRASHDUMP
+	if (TheMiniDumper && TheMiniDumper->IsInitialized())
+	{
+		TheMiniDumper->TriggerMiniDumpForException(e_info, DumpType_Minimal);
+		TheMiniDumper->TriggerMiniDumpForException(e_info, DumpType_Full);
+	}
+	MiniDumper::shutdownMiniDumper();
+#endif
 	return EXCEPTION_EXECUTE_HANDLER;
 }
 
@@ -377,6 +391,14 @@ BOOL CWorldBuilderApp::InitInstance()
 	initMemoryManager();
 
 	CommandLine::parseCommandLineForStartup();
+
+#ifdef RTS_ENABLE_CRASHDUMP
+	// A folder of its own keeps these dumps apart from the game's, which share the file names and pruning.
+	AsciiString dumpRoot = TheGlobalData->getPath_UserData();
+	dumpRoot.concat("WorldBuilder\\");
+	CreateDirectory(dumpRoot.str(), nullptr);
+	MiniDumper::initMiniDumper(dumpRoot);
+#endif
 
 #ifdef DEBUG_LOGGING
 	// Turn on console output jba [3/20/2003]
@@ -416,7 +438,7 @@ BOOL CWorldBuilderApp::InitInstance()
 	TheFileSystem = new FileSystem;
 
 	initSubsystem(TheLocalFileSystem, (LocalFileSystem*)new Win32LocalFileSystem);
-	initSubsystem(TheArchiveFileSystem, (ArchiveFileSystem*)new Win32BIGFileSystem);
+	initSubsystem(TheArchiveFileSystem, (ArchiveFileSystem*)new BIGFileSystem);
 
 	// Just for kicks, get the HINSTANCE that WOL would need
 	// if we were going to use it, which we aren't.
@@ -469,6 +491,8 @@ BOOL CWorldBuilderApp::InitInstance()
 	// read the water settings from INI (must do prior to initing GameClient, apparently)
 	ini.loadFileDirectory( "Data\\INI\\Default\\Water", INI_LOAD_OVERWRITE, nullptr );
 	ini.loadFileDirectory( "Data\\INI\\Water", INI_LOAD_OVERWRITE, nullptr );
+	ini.loadFileDirectory( "Data\\INI\\Default\\Weather", INI_LOAD_OVERWRITE, nullptr );
+	ini.loadFileDirectory( "Data\\INI\\Weather", INI_LOAD_OVERWRITE, nullptr );
 
 	loadWindow.setProgress("Loading game data...");
 	initSubsystem(TheGameText, CreateGameTextInterface());
@@ -477,6 +501,10 @@ BOOL CWorldBuilderApp::InitInstance()
 	initSubsystem(TheTerrainTypes, new TerrainTypeCollection(), "Data\\INI\\Default\\Terrain", "Data\\INI\\Terrain");
 	initSubsystem(TheTerrainRoads, new TerrainRoadCollection(), "Data\\INI\\Default\\Roads", "Data\\INI\\Roads");
 
+	// The terrain palette reads DDS textures through the W3D file factory.
+	TheW3DFileSystem = new WB_W3DFileSystem;
+
+	TerrainBrushes::load();
 	WorldHeightMapEdit::init();
 
 	initSubsystem(TheScriptEngine, (ScriptEngine*)(new ScriptEngine()));
@@ -509,8 +537,6 @@ BOOL CWorldBuilderApp::InitInstance()
 
 	loadWindow.setProgress("Finalizing...");
 	TheSubsystemListRecord.postProcessLoadAll();
-
-	TheW3DFileSystem = new WB_W3DFileSystem;
 
 	// Just to be sure - wb doesn't do well with half res terrain.
 	DEBUG_ASSERTCRASH(!TheGlobalData->m_useHalfHeightMap, ("TheGlobalData->m_useHalfHeightMap : Don't use this setting in WB."));
@@ -1670,6 +1696,9 @@ int CWorldBuilderApp::ExitInstance()
 	#ifdef MEMORYPOOL_DEBUG
 		TheMemoryPoolFactory->debugMemoryReport(REPORT_POOLINFO | REPORT_POOL_OVERFLOW | REPORT_SIMPLE_LEAKS, 0, 0);
 	#endif
+#ifdef RTS_ENABLE_CRASHDUMP
+	MiniDumper::shutdownMiniDumper();
+#endif
 	shutdownMemoryManager();
 
 	return CWinApp::ExitInstance();
@@ -1743,7 +1772,16 @@ void CWorldBuilderApp::OnFileOpen()
 		}
 	} catch(...) {}
 
+#ifdef RTS_HAS_QT
+	char qtPath[_MAX_PATH];
+	if (WBQtFileDialog_Run(0, "Open", "Missions (*.map)|*.map|All Files (*.*)|*.*||", "map",
+			NULL, qtPath, sizeof(qtPath)) != 0)
+	{
+		OpenDocumentFile(qtPath);
+	}
+#else
 	CWinApp::OnFileOpen();
+#endif
 }
 
 void CWorldBuilderApp::OnTexturesizingMapclifftextures()

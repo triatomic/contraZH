@@ -247,6 +247,7 @@ public:
 		MSG_META_TOGGLE_CONTROL_BAR,								///< show/hide controlbar
 		MSG_META_TOGGLE_PLAYER_OBSERVER,						///< TheSuperHackers @feature Toggle the player observer view in game
 		MSG_META_CYCLE_HEALTH_BAR_MODE,							///< TheSuperHackers @feature Cycle HealthBarDisplayMode in game
+		MSG_META_CYCLE_HOUSE_COLOR_MODE,						///< TheSuperHackers @feature Cycle HouseColorMode in game
 
 		MSG_META_BEGIN_PATH_BUILD,									///< enter path-building mode
 		MSG_META_END_PATH_BUILD,										///< exit path-building mode
@@ -472,6 +473,24 @@ public:
 		MSG_CHEAT_CYCLE_TERRAIN_MODE,		///< cycle the terrain: normal -> hidden on black -> hidden on green
 		MSG_CHEAT_TOGGLE_FACE_CULLING,		///< toggle back face culling, drawing every face double sided when off
 		MSG_CHEAT_SHOW_MODEL_NAMES,			///< show the W3D model each draw module has loaded
+		MSG_CHEAT_SHOW_WINDOW_NAMES,		///< outline and name every visible GUI window
+		MSG_CHEAT_SHOW_SHADER_DRAWS,		///< list each frame's draw calls by vertex and pixel shader
+		MSG_CHEAT_COPY_OBJECT_NAME,		///< copy the selected object template names to the clipboard
+		MSG_CHEAT_PATHFIND_LOG_ON,			///< start writing the per-second pathfinder counters to pathfinding.txt
+		MSG_CHEAT_PATHFIND_LOG_OFF,			///< stop writing the pathfinder counters
+		MSG_CHEAT_TOGGLE_SHADER_PANEL,
+
+#if RTS_ZEROHOUR
+		MSG_META_BEGIN_FACING_DRAG,
+		MSG_META_END_FACING_DRAG,
+#endif
+
+#if defined(GENERALS_ONLINE)
+		MSG_META_TOGGLE_NETWORK_STATS,							///< GO's per connection network stats overlay
+		MSG_META_TAKE_SCREENSHOT_ALT,								///< GO's second key for the JPEG screenshot
+		MSG_META_TOGGLE_BUDDY_OVERLAY,							///< open or close the buddy overlay
+		MSG_META_TOGGLE_BUDDY_OVERLAY_ALT,					///< second key for the buddy overlay
+#endif
 
 		MSG_END_META_MESSAGES,											///< Marker to delineate "meta" messages
 
@@ -652,6 +671,13 @@ public:
 		MSG_UPDATE_FOCUSED_GROUP,										///< update and tell every player that we have smart selection focus on this group
 		MSG_DO_REVERSE_MOVETO_HINT,									///< (location) If clicked, a reverse move would be ordered
 		MSG_EVACUATE_TO_WORK,												///< Dump out all of OUR contained objects, supply gatherers among them resume gathering
+		MSG_SPAWN_OBJECT_AT_POSITION,					///< (thingTemplate ID, location) debug/cheat spawn of one object for the local player; must run in the logic so the drawable is initialized correctly
+		MSG_SET_DIPLOMACY_STANCE,										///< (player index, Bool ally) the sender treats that player as an ally or an enemy
+		MSG_ENABLE_LOBBY_RULE,												///< (LobbyRule) the Generals Online host turns a lobby rule on at the start of a match
+
+#if RTS_ZEROHOUR
+		MSG_DO_MOVETO_FACING,											///< location, angle, rows, formation style
+#endif
 
 		MSG_BEGIN_DEBUG_NETWORK_MESSAGES = 1900,		///< network messages that exist only in debug/internal builds. all grouped separately.
 
@@ -693,6 +719,25 @@ public:
 
 	/// ShigureUi 11/09/2026 a plain order acts on the whole selection, never the smart selection focus
 	static Bool isPlainOrder(GameMessage::Type t);
+
+	/// The debug cheat hotkeys appended at the end of the meta range, which also work in the shell map and cinematics
+	static Bool isDebugCheatHotkey(GameMessage::Type t)
+	{
+#if RTS_ZEROHOUR && defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+		if (t >= MSG_CHEAT_RUNSCRIPT1 && t <= MSG_CHEAT_TOGGLE_MESSAGE_TEXT)
+		{
+			return TRUE;
+		}
+#endif
+#if RTS_ZEROHOUR && (defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE))
+		if ((t >= MSG_META_DEMO_TOGGLE_BEHIND_BUILDINGS && t <= MSG_META_DEMO_TOGGLE_DEBUG_STATS) ||
+			t == MSG_META_TOGGLE_FAST_FORWARD_REPLAY)
+		{
+			return TRUE;
+		}
+#endif
+		return (t >= MSG_CHEAT_KITCHEN_SINK && t <= MSG_CHEAT_SHOW_SHADER_DRAWS) || t == MSG_CHEAT_TOGGLE_SHADER_PANEL;
+	}
 
 	Int getPlayerIndex() const { return m_playerIndex; }		///< Return the originating player
 

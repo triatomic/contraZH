@@ -64,5 +64,12 @@ public:
 	virtual void adjustTransformMtx(Matrix3D& mtx) const override;
 
 protected:
+	void logMissingContainerBone(const Drawable* container, const AsciiString& slotBoneName) const;
+
 	Bool m_dependencyCleared; // The thing we depend on will clear this, and we will relatch it after we draw.
+
+	// The container state of the last missing-bone line, so an unchanged miss skips building it again.
+	mutable DrawableID m_missingBoneContainerID;
+	mutable ModelConditionFlags m_missingBoneConditions;
+	mutable AsciiString m_missingBoneSlotName;
 };

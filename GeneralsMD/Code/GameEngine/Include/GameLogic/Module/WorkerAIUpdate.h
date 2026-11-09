@@ -109,7 +109,7 @@ public:
 			{ "ForbiddenBuildObjects", INI::parseAsciiStringVectorAppend, nullptr, offsetof( WorkerAIUpdateModuleData, m_restrictions.m_forbiddenBuildObjects ) },
 			{ "CanRepair", INI::parseBool, nullptr, offsetof( WorkerAIUpdateModuleData, m_restrictions.m_canRepair ) },
 
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
     p.add(dataFieldParse);
 	}

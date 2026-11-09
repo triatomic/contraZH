@@ -91,6 +91,7 @@ void W3DDependencyCarrierDraw::adjustTransformMtx(Matrix3D& mtx) const
 	if (md->m_attachToDrawableBoneInContainer.isNotEmpty()
 		&& me
 		&& me->getContainedBy()
+		&& me->getContainedBy()->getContain()
 		// && !me->getContainedBy()->getContain()->isEnclosingContainerFor(me) // no enclosing check
 		)
 	{
@@ -117,8 +118,17 @@ void W3DDependencyCarrierDraw::adjustTransformMtx(Matrix3D& mtx) const
 			}
 			else
 			{
+#if RTS_ZEROHOUR
+				mtx = *theirDrawable->getDrawnTransformMatrix();
+#else
 				mtx = *theirDrawable->getTransformMatrix();
-				DEBUG_LOG(("m_attachToDrawableBoneInContainer %s not found", md->m_attachToDrawableBoneInContainer.str()));
+#endif
+
+				// An unloading rider has left the slot list but is still contained, so only a slotted miss is real there.
+				if (slot > -1 || !me->getContainedBy()->getContain()->isEnclosingContainerFor(me))
+				{
+					logMissingContainerBone(theirDrawable, boneName);
+				}
 			}
 		}
 	}

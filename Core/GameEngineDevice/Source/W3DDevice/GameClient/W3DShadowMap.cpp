@@ -35,10 +35,10 @@
 #include "GameClient/Color.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/BaseHeightMap.h"
+#include "Common/GlobalData.h"
 
 #if RTS_ZEROHOUR
 #include "Lib/BaseType.h"
-#include "Common/GlobalData.h"
 #include "GameClient/View.h"
 #include "W3DDevice/GameClient/W3DShadow.h"
 #include "W3DDevice/GameClient/W3DVolumetricShadow.h"
@@ -47,9 +47,6 @@
 #endif
 
 W3DShadowMap* TheW3DShadowMap = nullptr;
-
-// With a NULL colour target the map costs only its depth, 64 MB at this size.
-static const Int SHADOW_MAP_RESOLUTION = 4096;
 
 #if defined(BUILD_WITH_D3D9)
 static const D3DFORMAT D3DFMT_NULL_TARGET = (D3DFORMAT)MAKEFOURCC('N', 'U', 'L', 'L');
@@ -71,12 +68,17 @@ static const Real SHADOW_RECEIVER_BIAS_TEXELS = 0.5f;
 // Spacing of the receivers' 3x3 filter taps. The edge softens across roughly twice this
 // plus one texel, so larger values blur and smaller ones step.
 static const Real SHADOW_FILTER_SPACING_TEXELS = 0.33f;
+static const Real SHADOW_FILTER_SPACING_MAX_TEXELS = 1.0f;
 
-// Quantising the fitted radius stops small zoom and scroll changes resizing the
+// The circle fit's edge softness at this size is the least blur in world units, so the tighter fit sharpens only stair steps.
+static const Real SHADOW_FILTER_REFERENCE_RESOLUTION = 4096.0f;
+
+// Quantising the fitted half extents stops small zoom and scroll changes resizing the
 // frustum, which would make every shadow edge crawl.
-static const Real SHADOW_RADIUS_STEP = 64.0f;
-static const Real SHADOW_RADIUS_MIN  = 300.0f;
-static const Real SHADOW_RADIUS_MAX  = 2600.0f;
+static const Real SHADOW_EXTENT_STEP = 64.0f;
+static const Real SHADOW_EXTENT_MIN  = 300.0f;
+static const Real SHADOW_EXTENT_MAX  = 2600.0f;
+static const Real SHADOW_HEADING_STEP = DEG_TO_RADF(15.0f);
 
 // The cull camera is perspective, because that is all CameraClass culls with. Placed
 // this far back along the sun ray its frustum is close enough to the ortho box.
@@ -94,9 +96,19 @@ static Int Get_Shadow_Debug_Mode()
 
 static const Int ShadowDebugMode = Get_Shadow_Debug_Mode();
 
+// CONTRA_CLOUDSUN=0 brings back cloud shadows that darken everything, for comparing the looks.
+static Bool Get_Clouds_Block_Sun()
+{
+	const char *value = getenv("CONTRA_CLOUDSUN");
+	return (value != nullptr) ? atoi(value) != 0 : TRUE;
+}
+
+static const Bool CloudsBlockSun = Get_Clouds_Block_Sun();
+
 W3DShadowMap::W3DShadowMap()
 	: m_depthMode(DEPTH_MODE_NONE),
-	  m_resolution(SHADOW_MAP_RESOLUTION),
+	  m_resolution(0),
+	  m_requestedResolution(0),
 	  m_colorTarget(nullptr),
 	  m_depthTarget(nullptr),
 	  m_nullTarget(nullptr),
@@ -104,9 +116,12 @@ W3DShadowMap::W3DShadowMap()
 	  m_cullCamera(nullptr),
 	  m_fittedCenter(0.0f, 0.0f, 0.0f),
 	  m_lightDirection(0.0f, 0.0f, -1.0f),
+	  m_lightX(1.0f, 0.0f, 0.0f),
+	  m_lightY(0.0f, 1.0f, 0.0f),
 	  m_depthBias(0.0f),
 	  m_casterDepthBias(0.0f),
-	  m_fittedRadius(0.0f),
+	  m_fittedHalfExtent(0.0f, 0.0f),
+	  m_filterSpacing(SHADOW_FILTER_SPACING_TEXELS),
 	  m_lowestVisibleGround(0.0f),
 	  m_hasViewFrustum(FALSE),
 	  m_shadowColor(1.0f, 1.0f, 1.0f),
@@ -148,9 +163,18 @@ void W3DShadowMap::ReleaseResources()
 	m_hasDepth = FALSE;
 }
 
+void W3DShadowMap::followResolution()
+{
+	if (m_requestedResolution != TheGlobalData->m_shadowMapResolution)
+	{
+		ReAcquireResources();
+	}
+}
+
 Bool W3DShadowMap::ReAcquireResources()
 {
 	ReleaseResources();
+	m_requestedResolution = TheGlobalData->m_shadowMapResolution;
 
 	RENDER_LOG(("W3DShadowMap: debug mode %d", ShadowDebugMode));
 	if (ShadowDebugMode == SHADOW_DEBUG_OFF)
@@ -174,7 +198,7 @@ Bool W3DShadowMap::ReAcquireResources()
 
 	// Every target shares one size, so it is capped here rather than by each creator.
 	const D3DCAPS8 &deviceCaps = caps->Get_DX8_Caps();
-	m_resolution = SHADOW_MAP_RESOLUTION;
+	m_resolution = m_requestedResolution;
 	if (m_resolution > (Int)deviceCaps.MaxTextureWidth)
 	{
 		m_resolution = (Int)deviceCaps.MaxTextureWidth;
@@ -273,61 +297,57 @@ static Vector3 Ray_At_Height(const Vector3& nearPoint, const Vector3& farPoint, 
 	return nearPoint + (farPoint - nearPoint) * t;
 }
 
-// Centre for a footprint wider than the map can cover, as when the camera tilts toward the
-// horizon. The half of the points nearest the camera stay inside the circle, and the
-// centre reaches from them toward the full fit as far as that allows.
-static Vector3 Fit_Near_Ground(const Vector3 *points, Int count, const Vector3& eye,
-	const Vector3& fullCenter, Real radius)
+// The map's height follows the camera's quantised heading, so the visible trapezoid fills it and turning only pops the grid at each step.
+static void Light_Axes(const CameraClass& camera, const Vector3& lightDirection, Vector3 *xAxis, Vector3 *yAxis)
 {
-	Real distances[8];
-	for (Int i = 0; i < count; ++i)
+	const Matrix3D &transform = camera.Get_Transform();
+	Vector3 heading = transform.Get_Y_Vector();
+	heading.Z = 0.0f;
+	if (heading.Length2() < 1e-4f)
 	{
-		distances[i] = (points[i] - eye).Length2();
+		heading = -transform.Get_Z_Vector();
+		heading.Z = 0.0f;
 	}
-
-	const Int nearCount = count / 2;
-	Vector3 nearPoints[4];
-	for (Int n = 0; n < nearCount; ++n)
+	if (heading.Length2() >= 1e-4f)
 	{
-		Int closest = -1;
-		for (Int i = 0; i < count; ++i)
+		const Real angle = WWMath::Floorf(WWMath::Atan2(heading.Y, heading.X) / SHADOW_HEADING_STEP + 0.5f) * SHADOW_HEADING_STEP;
+		heading.Set(WWMath::Cosf_Legacy(angle), WWMath::Sinf_Legacy(angle), 0.0f);
+	}
+	heading -= lightDirection * Vector3::Dot_Product(heading, lightDirection);
+
+	if (heading.Length2() < 1e-4f)
+	{
+		Vector3 up(0.0f, 0.0f, 1.0f);
+		if (WWMath::Fabs(lightDirection.Z) > 0.99f)
 		{
-			if (distances[i] >= 0.0f && (closest < 0 || distances[i] < distances[closest]))
-			{
-				closest = i;
-			}
+			up.Set(0.0f, 1.0f, 0.0f);
 		}
-		nearPoints[n] = points[closest];
-		distances[closest] = -1.0f;
+		Vector3::Cross_Product(up, lightDirection, xAxis);
+		xAxis->Normalize();
+		Vector3::Cross_Product(lightDirection, *xAxis, yAxis);
+		return;
 	}
 
-	Vector3 nearCenter(0.0f, 0.0f, 0.0f);
-	for (Int n = 0; n < nearCount; ++n)
+	heading.Normalize();
+	*yAxis = heading;
+	Vector3::Cross_Product(heading, lightDirection, xAxis);
+	xAxis->Normalize();
+}
+
+// Ground wider than the map can cover, as when the camera tilts toward the horizon, keeps the part nearest the camera.
+static void Fit_Interval(Real lo, Real hi, Real eye, Real *middle, Real *halfExtent)
+{
+	const Real half = 0.5f * (hi - lo);
+	if (half > SHADOW_EXTENT_MAX)
 	{
-		nearCenter += nearPoints[n];
-	}
-	nearCenter /= (Real)nearCount;
-
-	Real nearRadius = 0.0f;
-	for (Int n = 0; n < nearCount; ++n)
-	{
-		const Real distance = (nearPoints[n] - nearCenter).Length();
-		if (distance > nearRadius)
-		{
-			nearRadius = distance;
-		}
+		*halfExtent = SHADOW_EXTENT_MAX;
+		*middle = WWMath::Clamp(eye - SHADOW_EXTENT_MAX, lo, hi - 2.0f * SHADOW_EXTENT_MAX) + SHADOW_EXTENT_MAX;
+		return;
 	}
 
-	Vector3 forward = fullCenter - nearCenter;
-	const Real forwardLength = forward.Length();
-	const Real reach = radius - nearRadius;
-	if (forwardLength <= WWMATH_EPSILON || reach <= 0.0f)
-	{
-		return nearCenter;
-	}
-
-	forward /= forwardLength;
-	return nearCenter + forward * WWMath::Min(reach, forwardLength);
+	*halfExtent = WWMath::Ceilf(half / SHADOW_EXTENT_STEP) * SHADOW_EXTENT_STEP;
+	*halfExtent = WWMath::Clamp(*halfExtent, SHADOW_EXTENT_MIN, SHADOW_EXTENT_MAX);
+	*middle = 0.5f * (lo + hi);
 }
 
 void W3DShadowMap::updateFrustum(const CameraClass& camera, const Vector3& lightPosWorld, Real minSunElevation)
@@ -343,10 +363,10 @@ void W3DShadowMap::updateFrustum(const CameraClass& camera, const Vector3& light
 	// straight overhead has none to keep and is already above any floor.
 	const Real minElevation = DEG_TO_RADF(minSunElevation);
 	const Real horizontal = WWMath::Sqrt(lightDirection.X * lightDirection.X + lightDirection.Y * lightDirection.Y);
-	if (-lightDirection.Z < WWMath::Sin(minElevation) && horizontal > WWMATH_EPSILON)
+	if (-lightDirection.Z < WWMath::Sinf_Legacy(minElevation) && horizontal > WWMATH_EPSILON)
 	{
-		const Real scale = WWMath::Cos(minElevation) / horizontal;
-		lightDirection.Set(lightDirection.X * scale, lightDirection.Y * scale, -WWMath::Sin(minElevation));
+		const Real scale = WWMath::Cosf_Legacy(minElevation) / horizontal;
+		lightDirection.Set(lightDirection.X * scale, lightDirection.Y * scale, -WWMath::Sinf_Legacy(minElevation));
 	}
 
 	// Fit to the terrain the camera can see. The frustum's own corners include the far
@@ -386,40 +406,58 @@ void W3DShadowMap::updateFrustum(const CameraClass& camera, const Vector3& light
 	}
 	center /= (Real)pointCount;
 
-	// Bounded with a circle rather than the points themselves, so orbiting the camera
-	// does not reshape the frustum and set the shadows crawling.
-	Real radius = 0.0f;
-	for (Int i = 0; i < pointCount; ++i)
+	// Bounded in the light's plane, where ground along the sun's heading foreshortens, so no texels go to slack.
+	Vector3 xAxis;
+	Vector3 yAxis;
+	Light_Axes(camera, lightDirection, &xAxis, &yAxis);
+
+	// The ground below the camera, since the camera itself projects along the light far from it.
+	Vector3 below = camera.Get_Position();
+	below.Z = center.Z;
+
+	const Vector3 *axes[2] = { &xAxis, &yAxis };
+	Real middle[2];
+	Real halfExtent[2];
+	for (Int a = 0; a < 2; ++a)
 	{
-		const Real distance = (groundPoints[i] - center).Length();
-		if (distance > radius)
+		Real lo = Vector3::Dot_Product(groundPoints[0] - center, *axes[a]);
+		Real hi = lo;
+		for (Int i = 1; i < pointCount; ++i)
 		{
-			radius = distance;
+			const Real along = Vector3::Dot_Product(groundPoints[i] - center, *axes[a]);
+			lo = WWMath::Min(lo, along);
+			hi = WWMath::Max(hi, along);
 		}
+		const Real eye = Vector3::Dot_Product(below - center, *axes[a]);
+		Fit_Interval(lo, hi, eye, &middle[a], &halfExtent[a]);
 	}
 
-	// Quantise so a small zoom leaves the extent alone.
-	radius = WWMath::Ceil(radius / SHADOW_RADIUS_STEP) * SHADOW_RADIUS_STEP;
-	if (radius < SHADOW_RADIUS_MIN)
+	Real circle = 0.0f;
+	for (Int i = 0; i < pointCount; ++i)
 	{
-		radius = SHADOW_RADIUS_MIN;
+		circle = WWMath::Max(circle, (groundPoints[i] - center).Length());
 	}
-	if (radius > SHADOW_RADIUS_MAX)
-	{
-		radius = SHADOW_RADIUS_MAX;
-		center = Fit_Near_Ground(groundPoints, pointCount, camera.Get_Position(), center, radius);
-	}
-	m_fittedRadius = radius;
+	circle = WWMath::Clamp(circle, SHADOW_EXTENT_MIN, SHADOW_EXTENT_MAX);
+	const Real softest = SHADOW_FILTER_SPACING_TEXELS * 2.0f * circle / SHADOW_FILTER_REFERENCE_RESOLUTION;
+	const Real texelWorld = 2.0f * WWMath::Sqrt(halfExtent[0] * halfExtent[1]) / (Real)m_resolution;
+	m_filterSpacing = WWMath::Clamp(softest / texelWorld, SHADOW_FILTER_SPACING_TEXELS, SHADOW_FILTER_SPACING_MAX_TEXELS);
+
+	center += xAxis * middle[0] + yAxis * middle[1];
+
+	m_fittedHalfExtent.Set(halfExtent[0], halfExtent[1]);
 	m_fittedCenter = center;
 	m_lightDirection = lightDirection;
+	m_lightX = xAxis;
+	m_lightY = yAxis;
 	m_viewFrustum = camera.Get_Frustum();
 	m_lowestVisibleGround = groundHeights[0];
 	m_hasViewFrustum = TRUE;
 
-	computeSunViewProjection(center, radius, lightDirection);
-	updateCullCamera(center, radius, lightDirection);
+	computeSunViewProjection();
+	updateCullCamera();
 
-	const Real worldPerTexel = (2.0f * radius) / (Real)m_resolution;
+	// The coarser axis sets the bias, since one depth bias must cover the larger texel side or that axis speckles.
+	const Real worldPerTexel = (2.0f * WWMath::Max(halfExtent[0], halfExtent[1])) / (Real)m_resolution;
 	const Real depthRange = SHADOW_FAR - SHADOW_NEAR;
 	m_depthBias = (SHADOW_RECEIVER_BIAS_TEXELS * worldPerTexel) / depthRange;
 	m_casterDepthBias = (SHADOW_CASTER_BIAS_TEXELS * worldPerTexel) / depthRange;
@@ -432,13 +470,10 @@ Real W3DShadowMap::getCasterSlopeBias()
 
 Bool W3DShadowMap::isCasterInRange(const SphereClass& bounds) const
 {
-	// The map is a box along the light, so a caster reaches it when its bounds come
-	// within the fitted radius of the light ray through the fitted centre.
-	Vector3 offset = bounds.Center - m_fittedCenter;
-	offset -= m_lightDirection * Vector3::Dot_Product(offset, m_lightDirection);
-
-	const Real reach = m_fittedRadius + bounds.Radius;
-	return offset.Length2() <= reach * reach;
+	// The map is a box along the light, so a caster reaches it when its bounds overlap the fitted rectangle.
+	const Vector3 offset = bounds.Center - m_fittedCenter;
+	return WWMath::Fabs(Vector3::Dot_Product(offset, m_lightX)) <= m_fittedHalfExtent.X + bounds.Radius &&
+		WWMath::Fabs(Vector3::Dot_Product(offset, m_lightY)) <= m_fittedHalfExtent.Y + bounds.Radius;
 }
 
 Bool W3DShadowMap::isCasterShadowInView(const SphereClass& bounds) const
@@ -512,7 +547,7 @@ Bool W3DShadowMap::bindReceiver(Int stage) const
 
 Vector4 W3DShadowMap::getReceiverParams() const
 {
-	return Vector4(1.0f / (Real)m_resolution, m_depthBias, 0.0f, SHADOW_FILTER_SPACING_TEXELS);
+	return Vector4(1.0f / (Real)m_resolution, m_depthBias, CloudsBlockSun ? 1.0f : 0.0f, m_filterSpacing);
 }
 
 Vector4 W3DShadowMap::getReceiverColor() const
@@ -647,6 +682,10 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 	RenderInfoClass sunInfo(*m_cullCamera);
 	W3DShaderManager::setShader(W3DShaderManager::ST_SHADOW_DEPTH, 0);
 
+	// Aligned and oriented casters face this view. The renderer still holds the last scene's camera,
+	// which WorldBuilder's top-view captures release before the next one renders.
+	TheDX8MeshRenderer.Set_Camera(&rinfo.Camera);
+
 	memset(&m_casterStats, 0, sizeof(m_casterStats));
 
 	// Each list casts only while its option is on, as the legacy shadows check every frame.
@@ -664,10 +703,10 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 	static Int passCount = 0;
 	if (passCount % 300 == 0 && passCount <= 300 * 15)
 	{
-		RENDER_LOG(("W3DShadowMap: pass %d drew %d, dropped %d disabled %d hidden %d shrouded %d out of range %d out of view, centre (%.0f, %.0f, %.0f) radius %.0f",
+		RENDER_LOG(("W3DShadowMap: pass %d drew %d, dropped %d disabled %d hidden %d shrouded %d out of range %d out of view, centre (%.0f, %.0f, %.0f) half extent %.0f x %.0f",
 			passCount, m_casterStats.drawn, m_casterStats.disabled, m_casterStats.hidden,
 			m_casterStats.shrouded, m_casterStats.outOfRange, m_casterStats.outOfView,
-			m_fittedCenter.X, m_fittedCenter.Y, m_fittedCenter.Z, m_fittedRadius));
+			m_fittedCenter.X, m_fittedCenter.Y, m_fittedCenter.Z, m_fittedHalfExtent.X, m_fittedHalfExtent.Y));
 	}
 	++passCount;
 
@@ -687,7 +726,7 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 	// own depth as a result, which the casters' slope-scaled bias keeps from speckling.
 	if (TheTerrainRenderObject != nullptr)
 	{
-		TheTerrainRenderObject->renderShadowMapCaster();
+		TheTerrainRenderObject->renderShadowMapCaster(m_cullCamera->Get_Frustum());
 
 		// Bridges draw from the terrain's own buffer rather than as scene objects, so no caster list holds them.
 		if (TheTerrainRenderObject->getBridgeBuffer() != nullptr)
@@ -714,22 +753,14 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 #endif
 }
 
-void W3DShadowMap::updateCullCamera(const Vector3& center, Real radius, const Vector3& lightDirection)
+void W3DShadowMap::updateCullCamera()
 {
-	// Matches the axes computeSunViewProjection builds, with X flipped because a camera
-	// looks down its own -Z and must stay right-handed.
-	Vector3 up(0.0f, 0.0f, 1.0f);
-	if (WWMath::Fabs(lightDirection.Z) > 0.99f)
-	{
-		up.Set(0.0f, 1.0f, 0.0f);
-	}
-
-	Vector3 xAxis;
-	Vector3::Cross_Product(up, lightDirection, &xAxis);
-	xAxis.Normalize();
-
-	Vector3 yAxis;
-	Vector3::Cross_Product(lightDirection, xAxis, &yAxis);
+	// The map's axes, with X flipped because a camera looks down its own -Z and must stay right-handed.
+	const Vector3 &center = m_fittedCenter;
+	const Vector2 &halfExtent = m_fittedHalfExtent;
+	const Vector3 &lightDirection = m_lightDirection;
+	const Vector3 &xAxis = m_lightX;
+	const Vector3 &yAxis = m_lightY;
 
 	const Vector3 position = center - lightDirection * (SHADOW_FAR * 0.5f + SHADOW_CULL_DISTANCE);
 
@@ -741,34 +772,21 @@ void W3DShadowMap::updateCullCamera(const Vector3& center, Real radius, const Ve
 	m_cullCamera->Set_Transform(transform);
 	m_cullCamera->Set_Clip_Planes(SHADOW_CULL_DISTANCE + SHADOW_NEAR, SHADOW_CULL_DISTANCE + SHADOW_FAR);
 
-	// Wide enough at the near plane to cover the corners of the square map.
-	const Real halfExtent = (radius * 1.5f) / SHADOW_CULL_DISTANCE;
-	m_cullCamera->Set_View_Plane(Vector2(-halfExtent, -halfExtent), Vector2(halfExtent, halfExtent));
+	// Wide enough at the near plane to cover the map with room to spare.
+	const Vector2 viewPlane = halfExtent * (1.5f / SHADOW_CULL_DISTANCE);
+	m_cullCamera->Set_View_Plane(-viewPlane, viewPlane);
 }
 
-void W3DShadowMap::computeSunViewProjection(const Vector3& center, Real radius,
-	const Vector3& lightDirection)
+void W3DShadowMap::computeSunViewProjection()
 {
 	// Look at the fitted centre from far enough back that the whole depth range is
 	// in front of the near plane.
-	Vector3 eye = center - lightDirection * (SHADOW_FAR * 0.5f);
+	Vector3 eye = m_fittedCenter - m_lightDirection * (SHADOW_FAR * 0.5f);
+	const Vector2 &halfExtent = m_fittedHalfExtent;
 
-	Vector3 up(0.0f, 0.0f, 1.0f);
-	if (WWMath::Fabs(lightDirection.Z) > 0.99f)
-	{
-		// Looking nearly straight down, so pick an up vector that is not parallel.
-		up.Set(0.0f, 1.0f, 0.0f);
-	}
-
-	Vector3 zAxis = lightDirection;
-	zAxis.Normalize();
-
-	Vector3 xAxis;
-	Vector3::Cross_Product(up, zAxis, &xAxis);
-	xAxis.Normalize();
-
-	Vector3 yAxis;
-	Vector3::Cross_Product(zAxis, xAxis, &yAxis);
+	const Vector3 &xAxis = m_lightX;
+	const Vector3 &yAxis = m_lightY;
+	const Vector3 &zAxis = m_lightDirection;
 
 	m_sunView[0].Set(xAxis.X, xAxis.Y, xAxis.Z, -Vector3::Dot_Product(xAxis, eye));
 	m_sunView[1].Set(yAxis.X, yAxis.Y, yAxis.Z, -Vector3::Dot_Product(yAxis, eye));
@@ -779,8 +797,8 @@ void W3DShadowMap::computeSunViewProjection(const Vector3& center, Real radius,
 	const Real invRange = 1.0f / (SHADOW_FAR - SHADOW_NEAR);
 
 	m_sunProjection.Make_Identity();
-	m_sunProjection[0][0] = 1.0f / radius;
-	m_sunProjection[1][1] = 1.0f / radius;
+	m_sunProjection[0][0] = 1.0f / halfExtent.X;
+	m_sunProjection[1][1] = 1.0f / halfExtent.Y;
 	m_sunProjection[2][2] = invRange;
 	m_sunProjection[2][3] = -SHADOW_NEAR * invRange;
 
@@ -797,8 +815,8 @@ void W3DShadowMap::computeSunViewProjection(const Vector3& center, Real radius,
 
 	// Exact in the projection because it is orthographic and the view's last row is
 	// (0,0,0,1), so the offset lands unchanged on every projected point.
-	m_sunProjection[0][3] += (WWMath::Floor(x + 0.5f) - x) / halfMap;
-	m_sunProjection[1][3] += (WWMath::Floor(y + 0.5f) - y) / halfMap;
+	m_sunProjection[0][3] += (WWMath::Floorf(x + 0.5f) - x) / halfMap;
+	m_sunProjection[1][3] += (WWMath::Floorf(y + 0.5f) - y) / halfMap;
 
 	m_sunViewProj = m_sunProjection * m_sunView;
 }

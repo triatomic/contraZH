@@ -2,9 +2,9 @@
 // TU (no Qt include). Serves both Condition and ScriptAction (selected by isAction), mirroring
 // how EditCondition / EditAction are twins: the template catalog comes from TheScriptEngine,
 // the sentence model from getUiStrings()/getParameter(i)->getUiText(), warnings from
-// EditParameter::getWarningText/getInfoText, and parameter editing pops the (still MFC)
-// EditParameter modal exactly like the rich-edit link click did. Whole body guarded by
-// RTS_HAS_QT so the OFF build compiles it to an empty object.
+// EditParameter::getWarningText/getInfoText, and parameter editing goes through
+// EditParameter::edit (the Qt parameter editor) like the rich-edit link click did. Whole body
+// guarded by RTS_HAS_QT so the OFF build compiles it to an empty object.
 #include "StdAfx.h"
 #include "resource.h"				// IDD_EDIT_PARAMETER (used in EditParameter.h's IDD enum)
 #include "Lib/BaseType.h"
@@ -12,6 +12,7 @@
 #include "GameLogic/ScriptEngine.h"
 #include "EditParameter.h"
 #include "qt/panels/WBQtCondActBridge.h"
+#include "ScriptFolderOrder.h"
 
 #define SCRIPT_DIALOG_SECTION "ScriptDialog"
 
@@ -68,6 +69,11 @@ extern "C" void WBQtCondActData_GetTemplateHelp(int isAction, int i, char *buf, 
 	{
 		copyOut(TheScriptEngine->getConditionTemplate(i)->getHelpText(), buf, cap);
 	}
+}
+
+extern "C" int WBQtCondActData_PinnedFolderRank(const char *name)
+{
+	return scriptFolderPinRank(name);
 }
 
 // ================= the edited item =================
@@ -242,14 +248,9 @@ extern "C" void WBQtCondActData_GetParameterWarning(void *item, int isAction, in
 		buf, cap);
 }
 
-extern "C" int WBQtCondActData_GetParameterFamily(void *item, int isAction, int i)
+static int familyOf(Parameter::ParameterType type)
 {
-	Parameter *param = qtParameterAt(item, isAction, i);
-	if (param == NULL)
-	{
-		return WBQT_PARAM_OTHER;
-	}
-	switch (param->getParameterType())
+	switch (type)
 	{
 		case Parameter::TEAM:
 		case Parameter::UNIT:
@@ -290,6 +291,7 @@ extern "C" int WBQtCondActData_GetParameterFamily(void *item, int isAction, int 
 		case Parameter::ANGLE:
 		case Parameter::PERCENT:
 		case Parameter::COMPARISON:
+		case Parameter::SELECTION_MODE:
 		case Parameter::BOOLEAN:
 		case Parameter::SHAKE_INTENSITY:
 		case Parameter::COLOR:
@@ -307,11 +309,39 @@ extern "C" int WBQtCondActData_GetParameterFamily(void *item, int isAction, int 
 		case Parameter::SCRIPT:
 		case Parameter::SCRIPT_SUBROUTINE:
 		case Parameter::COUNTER:
+		case Parameter::KD_RATIO:
 		case Parameter::FLAG:
 			return WBQT_PARAM_LOGIC;
 		default:
 			return WBQT_PARAM_OTHER;
 	}
+}
+
+extern "C" int WBQtCondActData_GetParameterFamily(void *item, int isAction, int i)
+{
+	Parameter *param = qtParameterAt(item, isAction, i);
+	return (param != NULL) ? familyOf(param->getParameterType()) : WBQT_PARAM_OTHER;
+}
+
+extern "C" int WBQtCondActData_GetTemplateFamilies(int isAction, int i, int *out, int cap)
+{
+	const Template *tmpl = isAction
+		? static_cast<const Template *>(TheScriptEngine->getActionTemplate(i))
+		: static_cast<const Template *>(TheScriptEngine->getConditionTemplate(i));
+	if (tmpl == NULL || out == NULL)
+	{
+		return 0;
+	}
+	int count = tmpl->getNumParameters();
+	if (count > cap)
+	{
+		count = cap;
+	}
+	for (int p = 0; p < count; p++)
+	{
+		out[p] = familyOf(tmpl->getParameterType(p));
+	}
+	return count;
 }
 
 // ================= picker preferences =================

@@ -110,20 +110,27 @@ inline Real ConvertAngularVelocityInDegreesPerSecToRadsPerFrame(Real degPerSec)
 // ----------------------------------------------------------------------------------------------
 enum
 {
-	MAX_PLAYER_COUNT = 16											///< max number of Players.
+#if RTS_ZEROHOUR
+	MAX_PLAYER_COUNT = 32,										///< max number of Players.
+#else
+	MAX_PLAYER_COUNT = 16,										///< max number of Players.
+#endif
+	RETAIL_PLAYER_COUNT = 16									///< player array size in retail saves and the retail CRC
 };
 
 // ----------------------------------------------------------------------------------------------
 /**
 	a bitmask that can uniquely represent each player.
 */
-#if MAX_PLAYER_COUNT <= 16
+#if RTS_ZEROHOUR
+	typedef UnsignedInt PlayerMaskType;
+	const PlayerMaskType PLAYERMASK_ALL = 0xffffffff;
+#else
 	typedef UnsignedShort PlayerMaskType;
 	const PlayerMaskType PLAYERMASK_ALL = 0xffff;
-	const PlayerMaskType PLAYERMASK_NONE = 0x0;
-#else
-	#error "this is the wrong size"
 #endif
+	const PlayerMaskType PLAYERMASK_NONE = 0x0;
+static_assert(sizeof(PlayerMaskType) * 8 >= MAX_PLAYER_COUNT, "PlayerMaskType has too few bits");
 
 // ----------------------------------------------------------------------------------------------
 enum

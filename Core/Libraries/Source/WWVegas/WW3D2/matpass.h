@@ -45,6 +45,7 @@
 class TextureClass;
 class VertexMaterialClass;
 class MeshModelClass;
+class MeshClass;
 class OBBoxClass;
 class DX8PolygonRendererClass;
 
@@ -72,7 +73,7 @@ public:
 	virtual void	Install_Materials() const;
 	virtual void	UnInstall_Materials() const { };	///< reset/cleanup D3D states
 	/// Called before each polygon group of the mesh draws, so a pass can use that group's own textures.
-	virtual void	Install_Polygon_Materials(DX8PolygonRendererClass * renderer) const { }
+	virtual void	Install_Polygon_Materials(DX8PolygonRendererClass * renderer, MeshClass * mesh = nullptr) const { }
 	/// The pass whose vertex processing this one shares, so copies of a whitelisted pass pass the same checks.
 	virtual const MaterialPassClass *	Peek_Vertex_Shading_Key() const { return this; }
 

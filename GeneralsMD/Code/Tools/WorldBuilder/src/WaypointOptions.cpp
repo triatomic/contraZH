@@ -28,6 +28,7 @@
 #include "WorldBuilderDoc.h"
 #include "wbview3d.h"
 #include "PolygonTool.h"
+#include "WaterTool.h"
 #include "WaypointTool.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/Scripts.h"
@@ -35,6 +36,7 @@
 #include "LayersList.h"
 #ifdef RTS_HAS_QT
 #include "qt/panels/WBQtWaypointBridge.h"
+#include "qt/panels/WBQtWaterBridge.h"
 #endif
 
 WaypointOptions *WaypointOptions::m_staticThis = nullptr;
@@ -89,7 +91,7 @@ PolygonTrigger *WaypointOptions::getSingleSelectedPolygon()
 	if (p3View) {
 		showPoly = p3View->isPolygonTriggerVisible();
 	}
-	if (showPoly || PolygonTool::isActive()) {
+	if (showPoly || PolygonTool::isActive() || WaterTool::isActive()) {
 		for (PolygonTrigger *pTrig=PolygonTrigger::getFirstPolygonTrigger(); pTrig; pTrig = pTrig->getNext()) {
 			if (PolygonTool::isSelected(pTrig)) {
 				return pTrig;
@@ -328,6 +330,7 @@ void WaypointOptions::update()
 	}
 #ifdef RTS_HAS_QT
 	WBQtWaypoint_PushRefresh();
+	WBQtWater_PushRefresh();
 #endif
 }
 

@@ -71,6 +71,7 @@
 #include "pointgr.h"
 #include "render2d.h"
 #include "sortingrenderer.h"
+#include "shaderdrawcounter.h"
 #include "shattersystem.h"
 #include "light.h"
 #include "assetmgr.h"
@@ -85,6 +86,7 @@
 #include "dx8texman.h"
 #include "WWLib/bound.h"
 #include "DbgHelpGuard.h"
+#include <Utility/bit_adapter.h>
 
 #include "shdlib.h"
 
@@ -126,6 +128,7 @@ bool								DX8Wrapper::FrameQueryIssued							= false;
 #endif
 D3DFORMAT					DX8Wrapper::DisplayFormat	= D3DFMT_UNKNOWN;
 D3DMULTISAMPLE_TYPE DX8Wrapper::MultiSampleAntiAliasing	= DEFAULT_MSAA;
+float						DX8Wrapper::SuperSampleScale					= 1.0f;
 
 // shader system additions KJM v
 DWORD								DX8Wrapper::Vertex_Shader								= 0;
@@ -169,6 +172,7 @@ DX8Wrapper::ApplyHookType			DX8Wrapper::ApplyHook									= nullptr;
 
 unsigned							DX8Wrapper::_MainThreadID								= 0;
 bool								DX8Wrapper::CurrentDX8LightEnables[4];
+D3DLIGHT8						DX8Wrapper::CurrentDX8Lights[4];
 bool								DX8Wrapper::IsDeviceLost;
 int								DX8Wrapper::ZBias;
 float								DX8Wrapper::ZNear;
@@ -203,6 +207,8 @@ HINSTANCE D3D8Lib = nullptr;
 
 bool								DX8Wrapper::IsEx											= false;
 IDirect3DSurface8 *			DX8Wrapper::SceneRenderTarget							= nullptr;
+IDirect3DSurface8 *			DX8Wrapper::DeviceDepthBuffer							= nullptr;
+bool							DX8Wrapper::SceneResolved								= false;
 IDirect3DSurface8 *			DX8Wrapper::SceneDepthBuffer							= nullptr;
 IDirect3DTexture8 *			DX8Wrapper::SceneDepthTexture							= nullptr;
 
@@ -270,6 +276,7 @@ static HRESULT Create_D3D_Device(UINT adapter, HWND hwnd, DWORD behavior, D3DPRE
 
 static HRESULT Reset_D3D_Device(D3DPRESENT_PARAMETERS& params)
 {
+	ShaderDrawCounterClass::Device_Reset();
 #if defined(BUILD_WITH_D3D9)
 	if (DX8Wrapper::Is_Ex())
 	{
@@ -371,12 +378,20 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 	Invalidate_Cached_Render_States();
 
 	if (!lite) {
-		D3D8Lib = LoadLibrary(DX8_D3D_DLL_NAME);
+		// Shutdown keeps the library loaded because driver threads still call into it
+		if (D3D8Lib == nullptr)
+		{
+			D3D8Lib = LoadLibrary(DX8_D3D_DLL_NAME);
+		}
 
 		if (D3D8Lib == nullptr) return false;	// Return false at this point if init failed
 
 		Direct3DCreate8Ptr = (Direct3DCreate8Type) GetProcAddress(D3D8Lib, DX8_D3D_CREATE_NAME);
-		if (Direct3DCreate8Ptr == nullptr) return false;
+		if (Direct3DCreate8Ptr == nullptr)
+		{
+			Shutdown();
+			return false;
+		}
 
 		/*
 		** Create the D3D interface object
@@ -400,6 +415,7 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 #endif
 		}
 		if (D3DInterface == nullptr) {
+			Shutdown();
 			return(false);
 		}
 		IsInitted = true;
@@ -417,6 +433,15 @@ bool DX8Wrapper::Init(void * hwnd, bool lite)
 
 void DX8Wrapper::Shutdown()
 {
+	for (size_t i = 0; i < ARRAY_SIZE(Textures); ++i)
+	{
+		if (Textures[i])
+		{
+			Textures[i]->Release();
+			Textures[i] = nullptr;
+		}
+	}
+
 	if (D3DDevice) {
 
 		Set_Render_Target ((IDirect3DSurface8 *)nullptr);
@@ -429,29 +454,10 @@ void DX8Wrapper::Shutdown()
 
 	}
 
-	if (CurrentCaps)
-	{
-		int max=CurrentCaps->Get_Max_Textures_Per_Pass();
-		for (int i = 0; i < max; i++)
-		{
-			if (Textures[i])
-			{
-				Textures[i]->Release();
-				Textures[i] = nullptr;
-			}
-		}
-	}
-
-	if (D3D8Lib) {
-		FreeLibrary(D3D8Lib);
-		D3D8Lib = nullptr;
-	}
-
 	_RenderDeviceNameTable.Clear();		 // note - Delete_All() resizes the vector, causing a reallocation.  Clear is better. jba.
 	_RenderDeviceShortNameTable.Clear();
 	_RenderDeviceDescriptionTable.Clear();
 
-	DX8Caps::Shutdown();
 	IsInitted = false;		// 010803 srj
 }
 
@@ -536,6 +542,9 @@ void DX8Wrapper::Invalidate_Cached_Render_States()
 	// (gth) clear the matrix shadows too
 	memset(&DX8Transforms, 0, sizeof(DX8Transforms));
 
+	// A zeroed light has no type, so the next light set reaches the device even where a reset cleared it
+	memset(CurrentDX8Lights, 0, sizeof(CurrentDX8Lights));
+
 	CurrentViewportValid = false;
 }
 
@@ -614,8 +623,14 @@ bool DX8Wrapper::Create_Device()
 		return false;
 	}
 
+#if defined(BUILD_WITH_D3D9)
+	// Nothing switches to software processing, and a mixed-mode device creates large pixel shaders about 40 times slower
+	Vertex_Processing_Behavior=(caps.DevCaps&D3DDEVCAPS_HWTRANSFORMANDLIGHT) ?
+		D3DCREATE_HARDWARE_VERTEXPROCESSING : D3DCREATE_SOFTWARE_VERTEXPROCESSING;
+#else
 	Vertex_Processing_Behavior=(caps.DevCaps&D3DDEVCAPS_HWTRANSFORMANDLIGHT) ?
 		D3DCREATE_MIXED_VERTEXPROCESSING : D3DCREATE_SOFTWARE_VERTEXPROCESSING;
+#endif
 
 	// enable this when all 'get' dx calls are removed KJM
 	/*if (caps.DevCaps&D3DDEVCAPS_PUREDEVICE)
@@ -718,6 +733,9 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 		DynamicVBAccessClass::_Deinit();
 		DynamicIBAccessClass::_Deinit();
 		DX8InstancingClass::Release_Resources();
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+		PointGroupClass::Release_Billboard_Resources();
+#endif
 		DX8TextureManagerClass::Release_Textures();
 		SHD_SHUTDOWN_SHADERS;
 
@@ -727,30 +745,18 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 		memset(Vertex_Shader_Constants,0,sizeof(Vector4)*MAX_VERTEX_SHADER_CONSTANTS);
 		memset(Pixel_Shader_Constants,0,sizeof(Vector4)*MAX_PIXEL_SHADER_CONSTANTS);
 
-		// TheSuperHackers @bugfix Tin Tin Hamans - Release all surface references before Reset().
-		// D3D8 requires that no non-managed surfaces (render targets, depth buffers) have outstanding
-		// references when Reset() is called. Failing to do so causes a crash inside the Intel integrated
-		// graphics driver (igd9trinity32.dll) during DestroyResource inside CSwapChain::Reset.
-		if (DefaultRenderTarget != nullptr)
+		// Set_Vertex_Buffer/Set_Index_Buffer are deferred, so unbind on the device itself.
+		// Resources still bound during Reset() crash the runtime in DestroyResource.
+		for (unsigned i = 0; i < MAX_VERTEX_STREAMS; ++i)
 		{
-			DefaultRenderTarget->Release();
-			DefaultRenderTarget = nullptr;
+			Set_DX8_Stream_Source(i, nullptr, 0, 0);
 		}
-		if (DefaultDepthBuffer != nullptr)
-		{
-			DefaultDepthBuffer->Release();
-			DefaultDepthBuffer = nullptr;
-		}
-		if (CurrentRenderTarget != nullptr)
-		{
-			CurrentRenderTarget->Release();
-			CurrentRenderTarget = nullptr;
-		}
-		if (CurrentDepthBuffer != nullptr)
-		{
-			CurrentDepthBuffer->Release();
-			CurrentDepthBuffer = nullptr;
-		}
+		Set_DX8_Indices(nullptr, 0);
+		Invalidate_Cached_Render_States();
+
+		// Rebind the back buffer and release all surface
+		// references before Reset(), otherwise it crashes in DestroyResource.
+		Set_Render_Target((IDirect3DSurface8*)nullptr);
 
 		Release_Scene_Target();
 		Release_Frame_Query();
@@ -803,6 +809,7 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 void DX8Wrapper::Release_Device()
 {
 	if (D3DDevice) {
+		ShaderDrawCounterClass::Release_Device();
 
 		for (int a=0;a<MAX_TEXTURE_STAGES;++a)
 		{	//release references to any textures that were used in last rendering call
@@ -873,8 +880,6 @@ void DX8Wrapper::Enumerate_Devices()
 			D3DInterface->GetDeviceCaps(adapter_index,WW3D_DEVTYPE,&desc.Caps);
 			D3DInterface->GetAdapterIdentifier(adapter_index,D3DENUM_NO_WHQL_LEVEL,&desc.AdapterIdentifier);
 
-			DX8Caps dx8caps(D3DInterface,desc.Caps,WW3D_FORMAT_UNKNOWN,desc.AdapterIdentifier);
-
 			/*
 			** Enumerate the resolutions
 			*/
@@ -903,11 +908,6 @@ void DX8Wrapper::Enumerate_Devices()
 
 						case D3DFMT_R5G6B5:
 						case D3DFMT_X1R5G5B5:		bits = 16; break;
-					}
-
-					// Some cards fail in certain modes, DX8Caps keeps list of those.
-					if (!dx8caps.Is_Valid_Display_Format(d3dmode.Width,d3dmode.Height,D3DFormat_To_WW3DFormat(d3dmode.Format))) {
-						bits=0;
 					}
 
 					/*
@@ -1220,6 +1220,17 @@ bool DX8Wrapper::Set_Render_Device(int dev, int width, int height, int bits, int
 		}
 	}
 
+	// Supersampling takes MSAA's place, since its larger target wants a single-sampled, readable depth.
+	const char *ssaaOverride = getenv("CONTRA_SSAA");
+	if (ssaaOverride != nullptr)
+	{
+		Set_Super_Sampling(atoi(ssaaOverride) / 100.0f);
+	}
+	if (SuperSampleScale > 1.0f)
+	{
+		MultiSampleAntiAliasing = D3DMULTISAMPLE_NONE;
+	}
+
 	/*
 	** Check the devices support for the requested MSAA mode then setup the multi sample type
 	*/
@@ -1521,9 +1532,11 @@ void DX8Wrapper::Get_Render_Target_Resolution(int & set_w,int & set_h,int & set_
 {
 	WWASSERT(IsInitted);
 
-	if (CurrentRenderTarget != nullptr) {
+	// Until it is resolved, the frame being drawn lives in the scene target, which supersampling makes larger than the screen
+	IDirect3DSurface8 *target = (CurrentRenderTarget != nullptr) ? CurrentRenderTarget : (!SceneResolved ? SceneRenderTarget : nullptr);
+	if (target != nullptr) {
 		D3DSURFACE_DESC info;
-		CurrentRenderTarget->GetDesc (&info);
+		target->GetDesc (&info);
 
 		set_w				= info.Width;
 		set_h				= info.Height;
@@ -1907,6 +1920,7 @@ void DX8Wrapper::Begin_Scene()
 	DX8WebBrowser::Update();
 #endif
 
+	Bind_Scene_Target();
 	DX8CALL(BeginScene());
 
 	DX8WebBrowser::Update();
@@ -1920,10 +1934,15 @@ void DX8Wrapper::End_Scene(bool flip_frames)
 	DX8WebBrowser::Render(0);
 
 	if (flip_frames) {
+		ShaderDrawCounterClass::End_Frame();
 		DX8_Assert();
 		HRESULT hr;
 #if defined(BUILD_WITH_D3D9)
-		if (SceneRenderTarget != nullptr)
+		if (SceneRenderTarget != nullptr && SuperSampleScale > 1.0f)
+		{
+			Resolve_Scene_Target();
+		}
+		else if (SceneRenderTarget != nullptr)
 		{
 			IDirect3DSurface8* back_buffer = nullptr;
 			DX8CALL(GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &back_buffer));
@@ -2323,6 +2342,15 @@ static IDirect3DVertexShader9* OverrideShader = nullptr;
 static DX8Wrapper::DrawHookType OverrideHook = nullptr;
 #endif
 
+#if defined(BUILD_WITH_D3D9)
+bool (*DX8Wrapper::AdditionalPassCallback)(unsigned pass) = nullptr;
+
+void DX8Wrapper::Set_Additional_Pass_Callback(bool (*callback)(unsigned pass))
+{
+	AdditionalPassCallback = callback;
+}
+#endif
+
 void DX8Wrapper::Draw(
 	unsigned primitive_type,
 	unsigned short start_index,
@@ -2577,6 +2605,11 @@ void DX8Wrapper::Draw_Instanced_Triangles(
 		vertex_count,
 		start_index+render_state.iba_offset,
 		polygon_count);
+}
+
+bool DX8Wrapper::Is_Instanced_Drawing()
+{
+	return InstancedShader != nullptr;
 }
 
 void DX8Wrapper::End_Instanced_Drawing()
@@ -2949,9 +2982,40 @@ void DX8Wrapper::Create_Scene_Target()
 {
 #if defined(BUILD_WITH_D3D9)
 	WWASSERT(SceneRenderTarget == nullptr && SceneDepthBuffer == nullptr && SceneDepthTexture == nullptr);
+	SceneResolved = false;
+	DX8CALL(GetDepthStencilSurface(&DeviceDepthBuffer));
+	HRESULT hr;
+
+	if (SuperSampleScale > 1.0f)
+	{
+		const unsigned width = (unsigned)(_PresentParameters.BackBufferWidth * SuperSampleScale + 0.5f);
+		const unsigned height = (unsigned)(_PresentParameters.BackBufferHeight * SuperSampleScale + 0.5f);
+		DX8CALL_HRES(CreateRenderTarget(width, height, _PresentParameters.BackBufferFormat, D3DMULTISAMPLE_NONE, 0, FALSE, &SceneRenderTarget, nullptr), hr);
+		if (SUCCEEDED(hr))
+		{
+			Create_Scene_Depth_Texture(width, height);
+			if (SceneDepthBuffer == nullptr)
+			{
+				DX8CALL_HRES(CreateDepthStencilSurface(width, height, _PresentParameters.AutoDepthStencilFormat, D3DMULTISAMPLE_NONE, 0, FALSE, &SceneDepthBuffer, nullptr), hr);
+			}
+		}
+		if (FAILED(hr))
+		{
+			RENDER_LOG(("Supersampled scene target creation failed, disabling supersampling"));
+			Release_Scene_Target();
+			SuperSampleScale = 1.0f;
+			DX8CALL(GetDepthStencilSurface(&DeviceDepthBuffer));
+			Create_Scene_Depth_Texture(_PresentParameters.BackBufferWidth, _PresentParameters.BackBufferHeight);
+			return;
+		}
+		Bind_Scene_Target();
+		RENDER_LOG(("Rendering to a %ux%u supersampled scene target, %d%%", width, height, (int)(SuperSampleScale * 100.0f + 0.5f)));
+		return;
+	}
+
 	if (MultiSampleAntiAliasing == D3DMULTISAMPLE_NONE)
 	{
-		Create_Scene_Depth_Texture();
+		Create_Scene_Depth_Texture(_PresentParameters.BackBufferWidth, _PresentParameters.BackBufferHeight);
 		return;
 	}
 	if (_PresentParameters.SwapEffect != D3DSWAPEFFECT_FLIPEX)
@@ -2959,7 +3023,6 @@ void DX8Wrapper::Create_Scene_Target()
 		return;
 	}
 
-	HRESULT hr;
 	DX8CALL_HRES(CreateRenderTarget(_PresentParameters.BackBufferWidth, _PresentParameters.BackBufferHeight,
 		_PresentParameters.BackBufferFormat, MultiSampleAntiAliasing, 0, FALSE, &SceneRenderTarget, nullptr), hr);
 	if (SUCCEEDED(hr))
@@ -2973,7 +3036,8 @@ void DX8Wrapper::Create_Scene_Target()
 		RENDER_LOG(("MSAA scene target creation failed, disabling MSAA"));
 		Release_Scene_Target();
 		MultiSampleAntiAliasing = D3DMULTISAMPLE_NONE;
-		Create_Scene_Depth_Texture();
+		DX8CALL(GetDepthStencilSurface(&DeviceDepthBuffer));
+		Create_Scene_Depth_Texture(_PresentParameters.BackBufferWidth, _PresentParameters.BackBufferHeight);
 		return;
 	}
 
@@ -2985,7 +3049,7 @@ void DX8Wrapper::Create_Scene_Target()
 }
 
 // CONTRA_SOFTPARTICLES=0 or 2 keeps the plain depth buffer, which the soft particles then do without.
-void DX8Wrapper::Create_Scene_Depth_Texture()
+void DX8Wrapper::Create_Scene_Depth_Texture(unsigned width, unsigned height)
 {
 #if defined(BUILD_WITH_D3D9)
 	const char *mode = getenv("CONTRA_SOFTPARTICLES");
@@ -3003,7 +3067,7 @@ void DX8Wrapper::Create_Scene_Depth_Texture()
 	}
 
 	HRESULT hr;
-	DX8CALL_HRES(CreateTexture(_PresentParameters.BackBufferWidth, _PresentParameters.BackBufferHeight, 1,
+	DX8CALL_HRES(CreateTexture(width, height, 1,
 		D3DUSAGE_DEPTHSTENCIL, intz, D3DPOOL_DEFAULT, &SceneDepthTexture, nullptr), hr);
 	if (SUCCEEDED(hr))
 	{
@@ -3011,17 +3075,65 @@ void DX8Wrapper::Create_Scene_Depth_Texture()
 	}
 	if (FAILED(hr))
 	{
-		Release_Scene_Target();
+		if (SceneDepthTexture != nullptr)
+		{
+			SceneDepthTexture->Release();
+			SceneDepthTexture = nullptr;
+		}
+		SceneDepthBuffer = nullptr;
 		return;
 	}
 
 	DX8CALL(SetDepthStencilSurface(SceneDepthBuffer));
-	RENDER_LOG(("Rendering the scene's depth to an INTZ texture"));
+	RENDER_LOG(("Rendering the scene's depth to a %ux%u INTZ texture", width, height));
+#endif
+}
+
+// Points the device at the scene target for the frame's 3D part. Harmless when it is bound already.
+void DX8Wrapper::Bind_Scene_Target()
+{
+#if defined(BUILD_WITH_D3D9)
+	if (SceneRenderTarget == nullptr || !SceneResolved)
+	{
+		return;
+	}
+	DX8CALL(SetRenderTarget(0, SceneRenderTarget));
+	DX8CALL(SetDepthStencilSurface(SceneDepthBuffer));
+	CurrentViewportValid = false;
+	SceneResolved = false;
+#endif
+}
+
+void DX8Wrapper::Resolve_Scene_Target()
+{
+#if defined(BUILD_WITH_D3D9)
+	if (SceneRenderTarget == nullptr || SceneResolved || SuperSampleScale <= 1.0f)
+	{
+		return;
+	}
+	IDirect3DSurface8 *back_buffer = nullptr;
+	DX8CALL(GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &back_buffer));
+	if (back_buffer == nullptr)
+	{
+		return;
+	}
+	DX8CALL(StretchRect(SceneRenderTarget, nullptr, back_buffer, nullptr, D3DTEXF_LINEAR));
+	DX8CALL(SetRenderTarget(0, back_buffer));
+	DX8CALL(SetDepthStencilSurface(DeviceDepthBuffer));
+	back_buffer->Release();
+	CurrentViewportValid = false;
+	SceneResolved = true;
 #endif
 }
 
 void DX8Wrapper::Release_Scene_Target()
 {
+	SceneResolved = false;
+	if (DeviceDepthBuffer != nullptr)
+	{
+		DeviceDepthBuffer->Release();
+		DeviceDepthBuffer = nullptr;
+	}
 	if (SceneRenderTarget != nullptr)
 	{
 		SceneRenderTarget->Release();
@@ -3936,8 +4048,8 @@ SurfaceClass * DX8Wrapper::_Get_DX8_Back_Buffer(unsigned int num)
 {
 	DX8_THREAD_ASSERT();
 
-	// Until Present resolves it, the frame being drawn lives in the scene target
-	if (SceneRenderTarget != nullptr && num == 0)
+	// Until it is resolved, the frame being drawn lives in the scene target
+	if (SceneRenderTarget != nullptr && num == 0 && !SceneResolved)
 	{
 		return NEW_REF(SurfaceClass,(SceneRenderTarget));
 	}
@@ -4655,9 +4767,11 @@ void DX8Wrapper::Apply_Default_State()
 	memset(vconst,0,sizeof(Vector4)*MAX_VERTEX_SHADER_CONSTANTS);
 	Set_Vertex_Shader_Constant(0, vconst, MAX_VERTEX_SHADER_CONSTANTS);
 
-	Vector4 pconst[MAX_PIXEL_SHADER_CONSTANTS];
-	memset(pconst,0,sizeof(Vector4)*MAX_PIXEL_SHADER_CONSTANTS);
-	Set_Pixel_Shader_Constant(0, pconst, MAX_PIXEL_SHADER_CONSTANTS);
+	// A ps_2_0 device rejects registers past its 32
+	const unsigned resetPixelConstants = MAX_PIXEL_SHADER_CONSTANTS < 32 ? MAX_PIXEL_SHADER_CONSTANTS : 32;
+	Vector4 pconst[resetPixelConstants];
+	memset(pconst,0,sizeof(Vector4)*resetPixelConstants);
+	Set_Pixel_Shader_Constant(0, pconst, resetPixelConstants);
 
 	Set_Vertex_Shader(DX8_FVF_XYZNDUV2);
 	Set_Pixel_Shader(0);
@@ -4867,7 +4981,7 @@ void DX8Wrapper::Get_DX8_Render_State_Value_Name(StringClass& name, D3DRENDERSTA
 	case D3DRS_PATCHSEGMENTS:
 	case D3DRS_POINTSIZE_MAX:
 	case D3DRS_TWEENFACTOR:
-		name.Format("%f",*(float*)&value);
+		name.Format("%f",std::bit_cast<float>(value));
 		break;
 
 	case D3DRS_ZBIAS:
@@ -4972,7 +5086,7 @@ void DX8Wrapper::Get_DX8_Texture_Stage_State_Value_Name(StringClass& name, D3DTE
 	case D3DTSS_BUMPENVMAT11:
 	case D3DTSS_BUMPENVLSCALE:
 	case D3DTSS_BUMPENVLOFFSET:
-		name.Format("%f",*(float*)&value);
+		name.Format("%f",std::bit_cast<float>(value));
 		break;
 
 	case D3DTSS_TEXCOORDINDEX:

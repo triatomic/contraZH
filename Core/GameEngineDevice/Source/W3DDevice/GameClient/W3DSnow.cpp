@@ -329,10 +329,7 @@ void W3DSnowManager::render(RenderInfoClass &rinfo)
 	//make sure the noise table is powers of 2 in dimensions.
 	WWASSERT(ISPOW2(SNOW_NOISE_X) && ISPOW2(SNOW_NOISE_Y));
 
-	//CameraClass &camera=rinfo.Camera;
-
-	const Coord3D &cPos=TheTacticalView->get3DCameraPosition();
-	Vector3 camPos(cPos.x,cPos.y,cPos.z);
+	const Vector3 camPos = rinfo.Camera.Get_Position();
 
 	//Number of emitters from cube center to edge of visible extent.
 	Int mumEmittersInHalf=(Int)floor(m_boxDimensions / m_emitterSpacing * 0.5f);

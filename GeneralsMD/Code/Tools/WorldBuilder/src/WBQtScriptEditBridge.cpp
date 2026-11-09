@@ -197,6 +197,7 @@ static void qtApplySmartCopyToParameter(Parameter *param)
 		param->getParameterType() == Parameter::UNIT ||
 		param->getParameterType() == Parameter::REVEALNAME ||
 		param->getParameterType() == Parameter::COUNTER ||
+		param->getParameterType() == Parameter::KD_RATIO ||
 		param->getParameterType() == Parameter::FLAG ||
 		param->getParameterType() == Parameter::SIDE
 	)

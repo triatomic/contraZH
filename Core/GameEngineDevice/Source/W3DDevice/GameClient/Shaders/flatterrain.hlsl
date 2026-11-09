@@ -62,7 +62,15 @@ float4 main(PsIn input) : COLOR
     facet *= (facet.z < 0.0f) ? -1.0f : 1.0f;
     float3 normal = facet * rsqrt(max(dot(facet, facet), 1e-30f));
 
-    color.rgb *= saturate(input.Diffuse.rgb + PointLighting(input.WorldPos, normal));
+#if LIGHTS_DEBUG
+    return float4(PointLighting(input.WorldPos, normal), color.a * input.Diffuse.a);
+#endif
+
+#if LIGHTS_ONLY
+    color.rgb *= PointLighting(input.WorldPos, normal);
+#else
+    color.rgb *= max(input.Diffuse.rgb + PointLighting(input.WorldPos, normal), 0.0f);
+#endif
     color.a *= input.Diffuse.a;
 
 #if TEXTURE_COUNT >= 2

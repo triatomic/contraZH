@@ -231,6 +231,23 @@ UpdateSleepTime PoisonedBehavior::calcSleepTime()
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+/*static*/ void PoisonedBehavior::findAttacker( const DamageInfo *damageInfo, const Object *&attacker, const Player *&player )
+{
+	// an attacker that no longer exists leaves us with the player mask alone, or with nothing
+	attacker = TheGameLogic->findObjectByID( damageInfo->in.m_sourceID );
+	player = nullptr;
+	if( damageInfo->in.m_sourcePlayerMask != 0 )
+	{
+		player = ThePlayerList->getPlayerFromMask( damageInfo->in.m_sourcePlayerMask );
+	}
+	if( player == nullptr && attacker != nullptr )
+	{
+		player = attacker->getControllingPlayer();
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 /*static*/ Bool PoisonedBehavior::attackerHasUpgrade( const UpgradeTemplate *upgrade, const Player *player, const Object *attacker )
 {
 	if( upgrade == nullptr )
@@ -261,17 +278,9 @@ PoisonTier PoisonedBehavior::resolveTier( const DamageInfo *damageInfo ) const
 		return POISON_TIER_PLAIN;
 	}
 
-	// an attacker that no longer exists leaves us with the player mask alone, or with nothing
-	const Object *attacker = TheGameLogic->findObjectByID( damageInfo->in.m_sourceID );
-	const Player *player = nullptr;
-	if( damageInfo->in.m_sourcePlayerMask != 0 )
-	{
-		player = ThePlayerList->getPlayerFromMask( damageInfo->in.m_sourcePlayerMask );
-	}
-	if( player == nullptr && attacker != nullptr )
-	{
-		player = attacker->getControllingPlayer();
-	}
+	const Object *attacker;
+	const Player *player;
+	findAttacker( damageInfo, attacker, player );
 
 	for( Int i = POISON_TIER_COUNT - 1; i > POISON_TIER_PLAIN; --i )
 	{

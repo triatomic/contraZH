@@ -96,7 +96,7 @@ void FreeFallProjectileBehaviorModuleData::buildFieldParse(MultiIniFieldParse& p
 		{ "GarrisonHitKillCount", INI::parseUnsignedInt, NULL, offsetof(FreeFallProjectileBehaviorModuleData, m_garrisonHitKillCount) },
 		{ "GarrisonHitKillFX", INI::parseFXList, NULL, offsetof(FreeFallProjectileBehaviorModuleData, m_garrisonHitKillFX) },
 
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 
 	p.add(dataFieldParse);

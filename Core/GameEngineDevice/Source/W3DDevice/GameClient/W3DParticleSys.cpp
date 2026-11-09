@@ -31,7 +31,8 @@
 #include "GameLogic/TerrainLogic.h"
 #include "GameClient/Color.h"
 #include "W3DDevice/GameClient/W3DParticleSys.h"
-#include "W3DDevice/GameClient/W3DTerrainParticle.h"
+#include "W3DDevice/GameClient/W3DParticleAtlas.h"
+#include "W3DDevice/GameClient/W3DTerrainParticles.h"
 #include "W3DDevice/GameClient/W3DAssetManager.h"
 #include "W3DDevice/GameClient/W3DDisplay.h"
 #include "W3DDevice/GameClient/HeightMap.h"
@@ -83,11 +84,20 @@ static const ShaderClass &shaderForType(ParticleSystemInfo::ParticleShaderType t
 	}
 }
 
+// Atlas pages hold alpha art with its colour times its alpha and additive art with no alpha, so one blend draws both.
+static ShaderClass premultipliedShader()
+{
+	ShaderClass shader = ShaderClass::_PresetAlphaSpriteShader;
+	shader.Set_Src_Blend_Func(ShaderClass::SRCBLEND_ONE);
+	return shader;
+}
+
 W3DParticleSystemManager::W3DParticleSystemManager()
 {
 	PointGroupClass::Set_Ground_Height_Func(getParticleGroundHeight);
 
 	m_batchBillboard = true;
+	m_batchPremultiplied = false;
 	m_batchShaderType = ParticleSystemInfo::INVALID_SHADER;
 	m_batchEffects = 0;
 	m_batchEffectData = nullptr;
@@ -99,12 +109,13 @@ W3DParticleSystemManager::W3DParticleSystemManager()
 	m_RGBABuffer = nullptr;
 	m_sizeBuffer = nullptr;
 	m_angleBuffer = nullptr;
+	m_uvRectBuffer = nullptr;
 	m_readyToRender = false;
 
 	m_onScreenParticleCount = 0;
 
 	m_pointGroup = NEW PointGroupClass();
-	m_terrainParticles = NEW W3DTerrainParticle();
+	m_terrainParticles = NEW W3DTerrainParticles();
 	//m_streakLine = nullptr;
 	m_streakLine = NEW StreakLineClass();
 
@@ -112,6 +123,7 @@ W3DParticleSystemManager::W3DParticleSystemManager()
 	m_RGBABuffer = NEW_REF( ShareBufferClass<Vector4>, (MAX_POINTS_PER_GROUP, "W3DParticleSystemManager::m_RGBABuffer") );
 	m_sizeBuffer = NEW_REF( ShareBufferClass<float>, (MAX_POINTS_PER_GROUP, "W3DParticleSystemManager::m_sizeBuffer") );
 	m_angleBuffer = NEW_REF( ShareBufferClass<uint8>, (MAX_POINTS_PER_GROUP, "W3DParticleSystemManager::m_angleBuffer") );
+	m_uvRectBuffer = NEW_REF( ShareBufferClass<Vector4>, (MAX_POINTS_PER_GROUP, "W3DParticleSystemManager::m_uvRectBuffer") );
 }
 
 W3DParticleSystemManager::~W3DParticleSystemManager()
@@ -132,6 +144,16 @@ W3DParticleSystemManager::~W3DParticleSystemManager()
 	REF_PTR_RELEASE(m_RGBABuffer);
 	REF_PTR_RELEASE(m_sizeBuffer);
 	REF_PTR_RELEASE(m_angleBuffer);
+	REF_PTR_RELEASE(m_uvRectBuffer);
+}
+
+void W3DParticleSystemManager::reset()
+{
+	ParticleSystemManager::reset();
+	if (TheW3DParticleAtlas)
+	{
+		TheW3DParticleAtlas->reset();
+	}
 }
 
 /**
@@ -153,6 +175,40 @@ void DoParticles( RenderInfoClass &rinfo )
 		TheParticleSystemManager->doParticles(rinfo);
 }
 
+static Bool shouldBloomParticle(ParticleSystem *system)
+{
+	Bool enabled = !system->isUsingSmudge() && system->getShaderType() == ParticleSystemInfo::ADDITIVE;
+#if RTS_ZEROHOUR
+	enabled = enabled && system->getTemplate()->shouldBloom();
+#endif
+	return enabled;
+}
+
+static Real bloomZoomReference(ParticleSystem *system, CameraClass &camera)
+{
+#if RTS_ZEROHOUR
+	if (TheGlobalData->m_useBloom && TheGlobalData->m_bloomStrength > 0.0f &&
+		system->getTemplate()->shouldCompensateBloomZoom() && shouldBloomParticle(system) &&
+		camera.Get_Projection_Type() == CameraClass::PERSPECTIVE)
+	{
+		const Real pitch = DEG_TO_RADF(max(TheGlobalData->m_cameraPitch, 10.0f));
+		return max(TheGlobalData->m_cameraHeight / sinf(pitch), 1.0f);
+	}
+#endif
+	return 0.0f;
+}
+
+static Real bloomZoomScale(CameraClass &camera, const Coord3D *position, Real reference)
+{
+	if (reference <= 0.0f)
+	{
+		return 1.0f;
+	}
+	Vector3 view;
+	camera.Transform_To_View_Space(view, Vector3(position->x, position->y, position->z));
+	return max(1.0f, -view.Z / reference);
+}
+
 void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 {
 
@@ -167,6 +223,11 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 		TheW3DSoftParticles->beginPass(rinfo);
 	}
 
+	if (TheW3DParticleAtlas)
+	{
+		TheW3DParticleAtlas->beginFrame();
+	}
+
 	//reset each frame
 	/// @todo lorenzen sez: this should be debug only:
 	m_onScreenParticleCount = 0;
@@ -179,6 +240,7 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	//particles falling under the ground.
 
  	TheTerrainRenderObject->getMaximumVisibleBox(frustum, &bbox, TRUE);
+	m_currentBoundingBox = bbox;
 
 	//@todo lorenzen sez: put these in registers for sure
 	Real bcX = bbox.Center.X;
@@ -209,6 +271,10 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	// whether any particle system masks the disruption pass this frame
 	Bool hasDisruption = FALSE;
 
+	// The lookup hashes the name under a lock, so a run of systems with the same texture shares one.
+	AsciiString lastTextureName;
+	RefCountPtr<TextureClass> lastTexture;
+
 	ParticleSystemManager::ParticleSystemList &particleSysList = TheParticleSystemManager->getAllParticleSystems();
 	for( ParticleSystemManager::ParticleSystemListIt it = particleSysList.begin(); it != particleSysList.end(); ++it)
 	{
@@ -224,15 +290,16 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 		// TheSuperHackers @performance Mauller 16/08/2026 Skip processing particle system if no particles are in view.
 		UnsignedInt particleCount = 0;
 		Vector3 visibleSum(0.0f, 0.0f, 0.0f);
+		const Real zoomReference = bloomZoomReference(sys, rinfo.Camera);
 		for (Particle* vp = sys->getFirstParticle(); vp; vp = vp->m_systemNext)
 		{
 			const Coord3D* pos = vp->getPosition();
-			const Real psize = vp->getSize();
+			const Real psize = vp->getSize() * bloomZoomScale(rinfo.Camera, pos, zoomReference);
 
 			//Test if particle is at the screen or terrain edges.
-			if (WWMath::Fabs(pos->x - bcX) > (beX + psize) ||
-				WWMath::Fabs(pos->y - bcY) > (beY + psize) ||
-				WWMath::Fabs(pos->z - bcZ) > (beZ + psize))
+			if (WWMath::Fabsf_Legacy(pos->x - bcX) > (beX + psize) ||
+				WWMath::Fabsf_Legacy(pos->y - bcY) > (beY + psize) ||
+				WWMath::Fabsf_Legacy(pos->z - bcZ) > (beZ + psize))
 			{
 				vp->setIsCulled(true);
 				continue;
@@ -249,18 +316,16 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 		if (particleCount == 0)
 			continue;
 
-		if (!sys->isUsingSmudge() && sys->getShaderType() == ParticleSystemInfo::ADDITIVE)
+		if (shouldBloomParticle(sys))
 		{
 			hasAdditive = TRUE;
 		}
 
-		// matches the haze pass, which skips only systems drawn as terrain-conforming meshes
-		const Bool conformsToTerrain = !sys->shouldBillboard() && sys->getVolumeParticleDepth() == 0 && sys->shouldConformToTerrain();
-		if (!hasFlame && sys->isUsingParticles() && !conformsToTerrain && systemEffects(*sys, DRAW_HAZE) != 0)
+		if (!hasFlame && sys->isUsingParticles() && systemEffects(*sys, DRAW_HAZE) != 0)
 		{
 			hasFlame = TRUE;
 		}
-		if (!hasDisruption && sys->isUsingParticles() && !conformsToTerrain && systemEffects(*sys, DRAW_DISRUPT) != 0)
+		if (!hasDisruption && sys->isUsingParticles() && systemEffects(*sys, DRAW_DISRUPT) != 0)
 		{
 			hasDisruption = TRUE;
 		}
@@ -273,6 +338,16 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 			// only the view Z row matters, and the row's translation is the same for every system
 			const Vector4 &viewZ = rinfo.Camera.Get_View_Matrix()[2];
 			entry.depth = (viewZ.X * visibleSum.X + viewZ.Y * visibleSum.Y + viewZ.Z * visibleSum.Z) / particleCount;
+		}
+		if (!sys->isUsingSmudge())
+		{
+			const AsciiString &textureName = sys->getParticleTypeName();
+			if (lastTexture == nullptr || textureName != lastTextureName)
+			{
+				lastTexture.Assign_No_Add_Ref(W3DDisplay::m_assetManager->Get_Texture(textureName.str()));
+				lastTextureName = textureName;
+			}
+			entry.texture = lastTexture;
 		}
 		m_drawOrder.push_back(entry);
 	}
@@ -328,23 +403,29 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	/// @todo lorenzen sez: this should be debug only:
 	TheParticleSystemManager->setOnScreenParticleCount(m_onScreenParticleCount);
 
-	// the glow comes from a second draw of the additive systems into the bloom target
+	// Only eligible particle systems join the captured object meshes in the bloom target.
 	if (TheW3DBloom && TheW3DBloom->begin(rinfo, hasAdditive || TheDX8MeshRenderer.Has_Bloom_Tasks()))
 	{
-		const Int onScreenCount = m_onScreenParticleCount;
-		const UnsignedInt fieldCount = m_fieldParticleCount;
+		if (hasAdditive)
+		{
+			const Int onScreenCount = m_onScreenParticleCount;
+			const UnsignedInt fieldCount = m_fieldParticleCount;
 
-		// the sorter would hold the quads until after the target is gone
-		m_pointGroup->Set_Flag(PointGroupClass::DISABLE_SORTING, true);
-		m_streakLine->Set_Disable_Sorting(true);
-		drawSystems(rinfo, DRAW_BLOOM);
-		m_streakLine->Set_Disable_Sorting(false);
-		m_pointGroup->Set_Flag(PointGroupClass::DISABLE_SORTING, false);
+			// the sorter would hold the quads until after the target is gone
+			m_pointGroup->Set_Flag(PointGroupClass::DISABLE_SORTING, true);
+			m_streakLine->Set_Disable_Sorting(true);
+			drawSystems(rinfo, DRAW_BLOOM);
+			m_streakLine->Set_Disable_Sorting(false);
+			m_pointGroup->Set_Flag(PointGroupClass::DISABLE_SORTING, false);
 
-		m_onScreenParticleCount = onScreenCount;
-		m_fieldParticleCount = fieldCount;
+			m_onScreenParticleCount = onScreenCount;
+			m_fieldParticleCount = fieldCount;
+		}
 		TheW3DBloom->end(rinfo);
 	}
+
+	// the entries hold texture references, which must not outlive the frame
+	m_drawOrder.clear();
 
 	//Draw any particles belonging to weather effects
 	if (TheSnowManager)
@@ -369,7 +450,7 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 }
 
 // Flame systems shade as fire in every pass but the haze, which draws only them. Cryo and electric systems shade
-// in every pass but the haze. Cryo wins over the rest, and flame over electric. A multiplied sprite has no light to shade.
+// in every pass but the haze. Fluid wins over cryo, and flame over electric. A multiplied sprite has no light to shade.
 unsigned W3DParticleSystemManager::systemEffects(ParticleSystem &system, DrawPass pass)
 {
 	// Point groups never hand alpha-tested sprites to the hook, so the haze pass would draw them plain.
@@ -382,6 +463,12 @@ unsigned W3DParticleSystemManager::systemEffects(ParticleSystem &system, DrawPas
 	{
 		return system.getTemplate()->getDisruption().isOn() ? SoftParticleHookClass::EFFECT_DISRUPT : 0;
 	}
+#if RTS_ZEROHOUR
+	if (system.isUsingParticles() && system.getTemplate()->usesFluidShader() && TheW3DSoftParticles->fluidEnabled())
+	{
+		return (pass == DRAW_HAZE) ? 0 : SoftParticleHookClass::EFFECT_FLUID;
+	}
+#endif
 	if (TheW3DSoftParticles->cryoEnabled() && system.isCryo())
 	{
 		return (pass == DRAW_HAZE) ? 0 : SoftParticleHookClass::EFFECT_CRYO;
@@ -400,9 +487,8 @@ unsigned W3DParticleSystemManager::systemEffects(ParticleSystem &system, DrawPas
 // The pass takes blended sprites alone, and only where the disruption can draw at all.
 Bool W3DParticleSystemManager::disrupts(ParticleSystem &system)
 {
-	const Bool conformsToTerrain = !system.shouldBillboard() && system.getVolumeParticleDepth() == 0 && system.shouldConformToTerrain();
 	const Bool volume = system.isUsingVolumeParticles() && system.getVolumeParticleDepth() > DEFAULT_VOLUME_PARTICLE_DEPTH;
-	return system.isUsingParticles() && !conformsToTerrain && !volume && systemEffects(system, DRAW_DISRUPT) != 0 &&
+	return system.isUsingParticles() && !volume && !system.getParticleTypeName().isEmpty() && systemEffects(system, DRAW_DISRUPT) != 0 &&
 		TheW3DSoftParticles->disruptionEnabled();
 }
 
@@ -410,6 +496,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 {
 	const Bool drawSmudge = TheSmudgeManager && TheSmudgeManager->getHardwareSupport() && TheGlobalData->m_useHeatEffects;
 	const Bool batchParticles = TheGlobalData->m_batchParticles;
+	const Bool useAtlas = TheGlobalData->m_particleAtlas && pass == DRAW_MAIN && TheW3DParticleAtlas != nullptr;
 
 	unsigned int personalities[MAX_POINTS_PER_GROUP];
 
@@ -420,7 +507,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 	{
 		ParticleSystem *sys = entry->sys;
 
-		if (pass == DRAW_BLOOM && (sys->isUsingSmudge() || sys->getShaderType() != ParticleSystemInfo::ADDITIVE))
+		if (pass == DRAW_BLOOM && !shouldBloomParticle(sys))
 		{
 			continue;
 		}
@@ -449,6 +536,12 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		const ParticleSystemTemplate *tuning = (flameEffects && sys->getTemplate()->hasFlameTuning()) ? sys->getTemplate() : nullptr;
 		const void *effectData = (pass == DRAW_DISRUPT) ? static_cast<const void *>(&disruption) :
 			(tuning != nullptr) ? static_cast<const void *>(tuning->peekFlameTuning()) : nullptr;
+#if RTS_ZEROHOUR
+		if ((effects & SoftParticleHookClass::EFFECT_FLUID) != 0 && sys->getTemplate()->hasFluidTuning())
+		{
+			effectData = sys->getTemplate()->peekFluidTuning();
+		}
+#endif
 
 		// Handle smudge type particles
 		if (sys->isUsingSmudge())
@@ -473,24 +566,38 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		// TheSuperHackers @performance Ronin/Mauller 09/08/2026 Implement batched rendering for similar particles.
 		// Particles with the same properties will now be batched onto a single texture surface before being drawn.
 		// If a different particle type appears before the batch is filled, the previous batch will be drawn first.
-		RefCountPtr<TextureClass> texture;
-		texture.Assign_No_Add_Ref(W3DDisplay::m_assetManager->Get_Texture(sys->getParticleTypeName().str()));
+		const RefCountPtr<TextureClass> &texture = entry->texture;
 
 		// TheSuperHackers @feature A ground aligned particle drawn as a quad can only ever be a
 		// flat plane, so a wide one cuts through a hillside no matter how its corners are placed.
 		// This renderer instead builds a mesh from the terrain's own heightmap cells, the same way
 		// projected decals do, so the particle inherits the ground geometry exactly.
 		const Bool useTerrainConformingParticles = !sys->shouldBillboard() &&
-				sys->getVolumeParticleDepth() == 0 &&
+				sys->getVolumeParticleDepth() == DEFAULT_VOLUME_PARTICLE_DEPTH &&
 				sys->shouldConformToTerrain();
 
-		if ((pass == DRAW_HAZE || pass == DRAW_DISRUPT) && useTerrainConformingParticles)
+		// Atlas pages batch sprites across textures; alpha and additive sprites also share one blend.
+		const ParticleSystemInfo::ParticleShaderType shaderType = sys->getShaderType();
+		RefCountPtr<TextureClass> batchTexture = texture;
+		Vector4 atlasRect(0.0f, 0.0f, 1.0f, 1.0f);
+		Bool premultiplied = FALSE;
+		Bool atlased = FALSE;
+		if (useAtlas && effects == 0 && sys->isUsingParticles() && !useTerrainConformingParticles)
 		{
-			continue;
+			const W3DParticleAtlas::TextureMode mode = (shaderType == ParticleSystemInfo::ALPHA) ? W3DParticleAtlas::ALPHA :
+				(shaderType == ParticleSystemInfo::ADDITIVE) ? W3DParticleAtlas::ADDITIVE : W3DParticleAtlas::UNMODIFIED;
+			TextureClass *page = TheW3DParticleAtlas->find(texture.Peek(), mode, atlasRect);
+			if (page != nullptr)
+			{
+				batchTexture = page;
+				atlased = TRUE;
+				premultiplied = mode != W3DParticleAtlas::UNMODIFIED;
+			}
 		}
+		const Bool premultipliedAlpha = premultiplied && shaderType == ParticleSystemInfo::ALPHA;
 
-		const Bool canBatch = batchParticles && sys->isUsingParticles() && !useTerrainConformingParticles;
-		if (!canBatch || finishedBatch(*sys, texture, effects, effectData))
+		const Bool canBatch = (batchParticles || atlased) && sys->isUsingParticles() && !useTerrainConformingParticles;
+		if (!canBatch || finishedBatch(*sys, batchTexture, premultiplied, effects, effectData))
 		{
 			flushParticleBatch(rinfo, pointCount);
 		}
@@ -498,7 +605,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		// the batch state always describes the system being filled, batched or not
 		if (m_batchTexture == nullptr)
 		{
-			initializeBatch(*sys, texture, effects, effectData);
+			initializeBatch(*sys, batchTexture, premultiplied, effects, effectData);
 		}
 
 		// haze spreads wider than the flame and rises above it
@@ -512,8 +619,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 			lift = resolved.hazeLift;
 		}
 		// only particles the cryo or electric shader draws scale, so they keep their size with that shading off
-		else if (!useTerrainConformingParticles &&
-			!(sys->isUsingVolumeParticles() && sys->getVolumeParticleDepth() > DEFAULT_VOLUME_PARTICLE_DEPTH))
+		else if (!(sys->isUsingVolumeParticles() && sys->getVolumeParticleDepth() > DEFAULT_VOLUME_PARTICLE_DEPTH))
 		{
 			// the disruption's mask is as large as the art the main pass draws
 			const unsigned artEffects = (pass == DRAW_DISRUPT) ? systemEffects(*sys, DRAW_MAIN) : effects;
@@ -534,9 +640,11 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		Real *sizeArray = m_sizeBuffer->Get_Array();
 		Vector4 *RGBAArray = m_RGBABuffer->Get_Array();
 		uint8 *angleArray = m_angleBuffer->Get_Array();
+		Vector4 *uvRectArray = m_uvRectBuffer->Get_Array();
 		const Coord3D *pos;
 		const RGBColor *color;
 		Real psize;
+		const Real zoomReference = bloomZoomReference(sys, rinfo.Camera);
 
 
 
@@ -547,7 +655,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 				continue;
 
 			pos = p->getPosition();
-			psize = p->getSize();
+			psize = p->getSize() * bloomZoomScale(rinfo.Camera, pos, zoomReference);
 
 			m_fieldParticleCount += ( sys->getPriority() == AREA_EFFECT && sys->m_isGroundAligned != FALSE );
 
@@ -566,6 +674,16 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 			RGBAArray[pointCount].Z = color->blue;
 			RGBAArray[pointCount].W = p->getAlpha();
 
+			uvRectArray[pointCount] = atlasRect;
+			if (premultipliedAlpha)
+			{
+				// clamped first, as the vertex colour is clamped before the fixed-function blend weighs it by alpha
+				const Real alpha = clamp(0.0f, RGBAArray[pointCount].W, 1.0f);
+				RGBAArray[pointCount].X = clamp(0.0f, RGBAArray[pointCount].X, 1.0f) * alpha;
+				RGBAArray[pointCount].Y = clamp(0.0f, RGBAArray[pointCount].Y, 1.0f) * alpha;
+				RGBAArray[pointCount].Z = clamp(0.0f, RGBAArray[pointCount].Z, 1.0f) * alpha;
+			}
+
 			angleArray[pointCount] = (uint8)(p->getAngle() * 255.0f / (2.0f * PI));
 
 			if (++pointCount == MAX_POINTS_PER_GROUP)
@@ -579,7 +697,7 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 				// This prevents particles being dropped. Bank the stats first as the flush resets count to 0.
 				m_onScreenParticleCount += (pointCount - startCount);
 				flushParticleBatch(rinfo, pointCount);
-				initializeBatch(*sys, texture, effects, effectData);
+				initializeBatch(*sys, batchTexture, premultiplied, effects, effectData);
 				startCount = 0;
 			}
 		}
@@ -645,18 +763,20 @@ void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass
 		if (sys->isUsingStreak() && (pointCount == 1))
 		{
 			m_onScreenParticleCount += (pointCount - startCount);
-			initializeBatch(*sys, texture, effects, effectData);
+			initializeBatch(*sys, texture, FALSE, effects, effectData);
 			flushParticleBatch(rinfo, pointCount);
 			startCount = 0;
 		}
 
 		if (useTerrainConformingParticles)
 		{
-			m_terrainParticles->Set_Texture( texture.Peek() );
-			m_terrainParticles->Set_Shader( shaderForType( sys->getShaderType() ) );
-			m_terrainParticles->Set_Arrays( m_posBuffer, m_RGBABuffer, m_sizeBuffer, m_angleBuffer, pointCount );
-
-			m_terrainParticles->Render();
+			m_terrainParticles->setTexture( texture.Peek() );
+			m_terrainParticles->setShader( shaderForType( sys->getShaderType() ) );
+			m_terrainParticles->setEffects( effects, effectData );
+			m_terrainParticles->setArrays( m_posBuffer, m_RGBABuffer, m_sizeBuffer, m_angleBuffer, pointCount );
+			m_terrainParticles->setBoundingBox( m_currentBoundingBox );
+			m_terrainParticles->render( sizeScale > 0.0f ? lift / sizeScale : 0.0f );
+			m_terrainParticles->setEffects( 0, nullptr );
 			m_onScreenParticleCount += (pointCount - startCount);
 			pointCount = startCount;
 		}
@@ -726,18 +846,20 @@ Bool W3DParticleSystemManager::isFarther(const DrawEntry &a, const DrawEntry &b)
 	return a.depth < b.depth;
 }
 
-Bool W3DParticleSystemManager::finishedBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, unsigned effects, const void *effectData)
+Bool W3DParticleSystemManager::finishedBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, Bool premultiplied, unsigned effects, const void *effectData)
 {
 	return texture.Peek() != m_batchTexture.Peek() ||
-		system.getShaderType() != m_batchShaderType ||
+		premultiplied != m_batchPremultiplied ||
+		(!premultiplied && system.getShaderType() != m_batchShaderType) ||
 		system.shouldBillboard() != m_batchBillboard ||
 		effects != m_batchEffects ||
 		effectData != m_batchEffectData;
 }
 
-void W3DParticleSystemManager::initializeBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, unsigned effects, const void *effectData)
+void W3DParticleSystemManager::initializeBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, Bool premultiplied, unsigned effects, const void *effectData)
 {
 	m_batchTexture = texture;
+	m_batchPremultiplied = premultiplied;
 	m_batchShaderType = system.getShaderType();
 	m_batchBillboard = system.shouldBillboard();
 	m_batchEffects = effects;
@@ -749,21 +871,24 @@ void W3DParticleSystemManager::flushParticleBatch(RenderInfoClass& rinfo, Unsign
 	if (pointCount > 0)
 	{
 		m_pointGroup->Set_Texture(m_batchTexture.Peek());
-		m_pointGroup->Set_Shader(shaderForType(m_batchShaderType));
+		m_pointGroup->Set_Shader(m_batchPremultiplied ? premultipliedShader() : shaderForType(m_batchShaderType));
 		m_pointGroup->Set_Flag(PointGroupClass::TRANSFORM, true);
 		m_pointGroup->Set_Point_Mode(PointGroupClass::QUADS);
 		m_pointGroup->Set_Arrays(m_posBuffer, m_RGBABuffer, nullptr, m_sizeBuffer, m_angleBuffer, nullptr, pointCount);
+		m_pointGroup->Set_Texture_UV_Rects(m_uvRectBuffer);
 		m_pointGroup->Set_Billboard(m_batchBillboard);
 		m_pointGroup->Set_Point_Frame(0);
 		m_pointGroup->Set_Effects(m_batchEffects, m_batchEffectData);
 		m_pointGroup->Render(rinfo);
 		m_pointGroup->Set_Effects(0, nullptr);
+		m_pointGroup->Set_Texture_UV_Rects(nullptr);
 
 		pointCount = 0;
 	}
 
 	m_batchTexture.Clear();
 	m_batchBillboard = false;
+	m_batchPremultiplied = false;
 	m_batchShaderType = ParticleSystemInfo::INVALID_SHADER;
 	m_batchEffects = 0;
 	m_batchEffectData = nullptr;

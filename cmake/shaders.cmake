@@ -58,7 +58,40 @@ function(rts_add_shader SOURCE PROFILE ENTRY OUTPUT)
         VERBATIM
     )
 
-    set(RTS_SHADER_OUTPUTS ${RTS_SHADER_OUTPUTS} "${dst}" PARENT_SCOPE)
+    set(outputs "${dst}")
+
+    # Every lit shader gets a twin that draws only the lights, which W3DShaderManager loads under DynamicLightsDebug.
+    if("LIGHTS=1" IN_LIST ARGN)
+        string(REGEX REPLACE "\\.pso$" "lightsdebug.pso" debugOutput "${OUTPUT}")
+        set(debugDst "${RTS_SHADER_OUTPUT_DIR}/${debugOutput}")
+        add_custom_command(
+            OUTPUT "${debugDst}"
+            COMMAND "${RTS_FXC_EXECUTABLE}" /nologo /T ${PROFILE} /E ${ENTRY} ${defines} /D LIGHTS_DEBUG=1 /Fo "${debugDst}" "${src}"
+            DEPENDS "${src}" ${RTS_SHADER_INCLUDES}
+            COMMENT "Compiling ${debugOutput} (${PROFILE})"
+            VERBATIM
+        )
+        list(APPEND outputs "${debugDst}")
+        foreach(debug IN ITEMS 0 1)
+            if(debug)
+                set(extraSuffix "extralightsdebug.pso")
+            else()
+                set(extraSuffix "extralights.pso")
+            endif()
+            string(REGEX REPLACE "\\.pso$" "${extraSuffix}" extraOutput "${OUTPUT}")
+            set(extraDst "${RTS_SHADER_OUTPUT_DIR}/${extraOutput}")
+            add_custom_command(
+                OUTPUT "${extraDst}"
+                COMMAND "${RTS_FXC_EXECUTABLE}" /nologo /T ${PROFILE} /E ${ENTRY} ${defines} /D LIGHTS_ONLY=1 /D LIGHTS_DEBUG=${debug} /Fo "${extraDst}" "${src}"
+                DEPENDS "${src}" ${RTS_SHADER_INCLUDES}
+                COMMENT "Compiling ${extraOutput} (${PROFILE})"
+                VERBATIM
+            )
+            list(APPEND outputs "${extraDst}")
+        endforeach()
+    endif()
+
+    set(RTS_SHADER_OUTPUTS ${RTS_SHADER_OUTPUTS} ${outputs} PARENT_SCOPE)
 endfunction()
 
 set(RTS_SHADER_DIR "Core/GameEngineDevice/Source/W3DDevice/GameClient/Shaders")
@@ -67,6 +100,7 @@ set(RTS_SHADER_DIR "Core/GameEngineDevice/Source/W3DDevice/GameClient/Shaders")
 set(RTS_SHADER_INCLUDES
     "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/shadowreceive.hlsli"
     "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/pointlights.hlsli"
+    "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/skybox.hlsli"
     "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/groundnoise.hlsli"
     "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/heightblend.hlsli"
     "${CMAKE_SOURCE_DIR}/${RTS_SHADER_DIR}/terrainglint.hlsli")
@@ -75,6 +109,7 @@ rts_add_shader("${RTS_SHADER_DIR}/shadowdepth.hlsl"   ps_2_0 mainPackedPS  shado
 rts_add_shader("${RTS_SHADER_DIR}/instancedepth.hlsl" vs_2_0 main instancedepth.vso             PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/instancedepth.hlsl" vs_2_0 main instancedepthpacked.vso       PACKED=1)
 rts_add_shader("${RTS_SHADER_DIR}/instancemain.hlsl"  vs_2_0 main instancemain.vso)
+rts_add_shader("${RTS_SHADER_DIR}/particlebillboard.hlsl" vs_2_0 main particlebillboard.vso)
 rts_add_shader("${RTS_SHADER_DIR}/instancedepth.hlsl" vs_2_0 main skindepth.vso                 PACKED=0 SKINNED=1)
 rts_add_shader("${RTS_SHADER_DIR}/instancedepth.hlsl" vs_2_0 main skindepthpacked.vso           PACKED=1 SKINNED=1)
 rts_add_shader("${RTS_SHADER_DIR}/instancemain.hlsl"  vs_2_0 main skinmain.vso                  SKINNED=1)
@@ -85,6 +120,8 @@ rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainshadown
 # The ground noise leaves the shadowed variants with it too long for ps_2_0.
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_a main terrainshadownoise2.pso       NOISE_COUNT=2 PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_a main terrainshadownoise2packed.pso NOISE_COUNT=2 PACKED=1)
+rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_a main terrainemissive.pso NOISE_COUNT=0 SHADOWED=0 GLINT=0 EMISSIVE_ONLY=1)
+rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_a main terrainemissiveseabed.pso NOISE_COUNT=0 SHADOWED=0 GLINT=0 SEABED=1 EMISSIVE_ONLY=1)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainnoshadow.pso           NOISE_COUNT=0 SHADOWED=0 PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainnoisenoshadow.pso      NOISE_COUNT=1 SHADOWED=0 PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/terrainshadow.hlsl" ps_2_0 main terrainnoise2noshadow.pso      NOISE_COUNT=2 SHADOWED=0 PACKED=0)
@@ -150,7 +187,7 @@ foreach(RTS_SEABED_LIT 0 1)
     endforeach()
 endforeach()
 rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadow.pso                NOISE_COUNT=0 PACKED=0)
-rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadownoise.pso           NOISE_COUNT=1 PACKED=0)
+rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_a main roadshadownoise.pso           NOISE_COUNT=1 PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadowpacked.pso          NOISE_COUNT=0 PACKED=1)
 rts_add_shader("${RTS_SHADER_DIR}/roadshadow.hlsl"    ps_2_0 main roadshadownoisepacked.pso     NOISE_COUNT=1 PACKED=1)
 # The ground noise leaves the shadowed variants with it too long for ps_2_0.
@@ -233,11 +270,11 @@ foreach(RTS_ROAD_BUMP_KIND 1 2)
         endforeach()
     endforeach()
 endforeach()
-rts_add_shader("${RTS_SHADER_DIR}/flatterrain.hlsl"   ps_2_a main flatterrainlit1.pso           TEXTURE_COUNT=1)
-rts_add_shader("${RTS_SHADER_DIR}/flatterrain.hlsl"   ps_2_a main flatterrainlit2.pso           TEXTURE_COUNT=2)
-rts_add_shader("${RTS_SHADER_DIR}/flatterrain.hlsl"   ps_2_a main flatterrainlit3.pso           TEXTURE_COUNT=3)
-rts_add_shader("${RTS_SHADER_DIR}/flatterrain.hlsl"   ps_2_a main flatterrainlit4.pso           TEXTURE_COUNT=4)
-rts_add_shader("${RTS_SHADER_DIR}/pointlightpass.hlsl" ps_2_a main pointlightpass.pso)
+rts_add_shader("${RTS_SHADER_DIR}/flatterrain.hlsl"   ps_2_a main flatterrainlit1.pso           TEXTURE_COUNT=1 LIGHTS=1)
+rts_add_shader("${RTS_SHADER_DIR}/flatterrain.hlsl"   ps_2_a main flatterrainlit2.pso           TEXTURE_COUNT=2 LIGHTS=1)
+rts_add_shader("${RTS_SHADER_DIR}/flatterrain.hlsl"   ps_2_a main flatterrainlit3.pso           TEXTURE_COUNT=3 LIGHTS=1)
+rts_add_shader("${RTS_SHADER_DIR}/flatterrain.hlsl"   ps_2_a main flatterrainlit4.pso           TEXTURE_COUNT=4 LIGHTS=1)
+rts_add_shader("${RTS_SHADER_DIR}/pointlightpass.hlsl" ps_2_a main pointlightpass.pso LIGHTS=1)
 rts_add_shader("${RTS_SHADER_DIR}/shadowmultiply.hlsl" ps_2_0 main shadowmultiply.pso           PACKED=0 CLOUD=0)
 rts_add_shader("${RTS_SHADER_DIR}/shadowmultiply.hlsl" ps_2_0 main shadowmultiplypacked.pso     PACKED=1 CLOUD=0)
 rts_add_shader("${RTS_SHADER_DIR}/shadowmultiply.hlsl" ps_2_0 main shadowmultiplycloud.pso      PACKED=0 CLOUD=1)
@@ -261,16 +298,27 @@ rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularlitde
 rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularlitnormal.pso          SHADOWED=1 PACKED=0 BUMP=2 LIGHTS=1)
 rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularlitnormalpacked.pso    SHADOWED=1 PACKED=1 BUMP=2 LIGHTS=1)
 rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularlitnormalnoshadow.pso  SHADOWED=0 PACKED=0 BUMP=2 LIGHTS=1)
+# The unlit passes also taking in the shadow receiver's work, with its soft shadow. The lit ones have no constants left for it.
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularreceive.pso                  SHADOWED=1 PACKED=0 BUMP=0 RECEIVE=1)
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularreceivepacked.pso            SHADOWED=1 PACKED=1 BUMP=0 RECEIVE=1)
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularreceivederived.pso           SHADOWED=1 PACKED=0 BUMP=1 RECEIVE=1)
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularreceivederivedpacked.pso     SHADOWED=1 PACKED=1 BUMP=1 RECEIVE=1)
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularreceivenormal.pso            SHADOWED=1 PACKED=0 BUMP=2 RECEIVE=1)
+rts_add_shader("${RTS_SHADER_DIR}/specular.hlsl"       ps_2_a main specularreceivenormalpacked.pso      SHADOWED=1 PACKED=1 BUMP=2 RECEIVE=1)
 rts_add_shader("${RTS_SHADER_DIR}/bloomblur.hlsl"      ps_2_0 main bloomblur.pso)
+rts_add_shader("${RTS_SHADER_DIR}/bloomblur.hlsl"      ps_2_0 main bloomshrink.pso              SHRINK=1)
 rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_0 main softparticledepth.pso        DEPTH=1)
 rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_0 main softparticleheight.pso       DEPTH=0)
 # Fading and flame shading together run past ps_2_0's 64 arithmetic slots.
 rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_a main softparticleflamedepth.pso   DEPTH=1 FLAME=1)
 rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_a main softparticleflameheight.pso  DEPTH=0 FLAME=1)
 rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_0 main particleflame.pso            SOFT=0 FLAME=1)
+rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_a main particleflameterrain.pso     SOFT=0 FLAME=1 TERRAIN=1)
+rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_a main particlefluid.pso            SOFT=0 FLUID=1)
 rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_0 main softparticleelectricdepth.pso   DEPTH=1 ELECTRIC=1)
 rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_0 main softparticleelectricheight.pso  DEPTH=0 ELECTRIC=1)
 rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_0 main particleelectric.pso            SOFT=0 ELECTRIC=1)
+rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_a main particleelectricterrain.pso     SOFT=0 ELECTRIC=1 TERRAIN=1)
 rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_0 main softparticlelaserdepth.pso      DEPTH=1 LASER=1)
 rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_0 main softparticlelaserheight.pso     DEPTH=0 LASER=1)
 rts_add_shader("${RTS_SHADER_DIR}/softparticle.hlsl"   ps_2_0 main particlelaser.pso               SOFT=0 LASER=1)
@@ -294,6 +342,7 @@ rts_add_shader("${RTS_SHADER_DIR}/shockwave.hlsl"      ps_2_0 main shockwave.pso
 rts_add_shader("${RTS_SHADER_DIR}/disruption.hlsl"     ps_2_a main disruptionsprite.pso         SHAPE=0)
 rts_add_shader("${RTS_SHADER_DIR}/disruption.hlsl"     ps_2_a main disruptioncenter.pso         SHAPE=1)
 rts_add_shader("${RTS_SHADER_DIR}/disruption.hlsl"     ps_2_a main disruptionbeam.pso           SHAPE=2)
+rts_add_shader("${RTS_SHADER_DIR}/distancefog.hlsl" ps_2_0 main distancefog.pso)
 rts_add_shader("${RTS_SHADER_DIR}/ambientocclusion.hlsl" ps_2_a main ambientocclusion.pso      BLUR=0)
 rts_add_shader("${RTS_SHADER_DIR}/ambientocclusion.hlsl" ps_2_a main ambientocclusionblur.pso  BLUR=1)
 rts_add_shader("${RTS_SHADER_DIR}/skyclouds.hlsl"      ps_2_0 main skyclouds.pso)
@@ -330,6 +379,10 @@ rts_add_shader("${RTS_SHADER_DIR}/headlight.hlsl"      ps_3_0 mainPS headlightbe
 rts_add_shader("${RTS_SHADER_DIR}/headlight.hlsl"      vs_3_0 mainVS headlightpool.vso          POOL=1)
 rts_add_shader("${RTS_SHADER_DIR}/headlight.hlsl"      ps_3_0 mainPS headlightpool.pso          POOL=1)
 rts_add_shader("${RTS_SHADER_DIR}/headlight.hlsl"      ps_3_0 mainPS headlightpoolmax.pso       POOL=2)
+# The mirrors read the skybox, which runs past ps_2_0's 64 arithmetic slots.
+rts_add_shader("${RTS_SHADER_DIR}/planarmirror.hlsl"   ps_2_a main planarmirror.pso             REFRACT=0)
+rts_add_shader("${RTS_SHADER_DIR}/planarmirror.hlsl"   ps_2_a main planarmirrorrefract.pso      REFRACT=1)
+rts_add_shader("${RTS_SHADER_DIR}/planarmirror.hlsl"   ps_2_a main planarmirrorglass.pso        REFRACT=1 GLASS=1)
 
 # The tree and classic water shaders are checked in already assembled, so they embed as they are.
 set(RTS_PREBUILT_SHADER_DIR "${CMAKE_SOURCE_DIR}/GeneralsMD/Code/GameEngineDevice/Source/W3DDevice/GameClient/Shaders")

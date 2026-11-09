@@ -200,6 +200,7 @@ public:
 	const ObjectCreationList *findObjectCreationList(const char* name) const;
 
 	static void parseObjectCreationListDefinition(INI* ini);
+	static void parseObjectCreationListExtendDefinition(INI* ini);
 
 	void addObjectCreationNugget(ObjectCreationNugget* nugget);
 

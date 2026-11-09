@@ -580,10 +580,10 @@ GlobalData::GlobalData()
   m_batchParticles = FALSE;
   m_skipTranslucencySort = FALSE;
   m_backToFront = FALSE;
-  m_useBloom = FALSE;
+  m_useBloom = TRUE;
   m_bloomStrength = 0.5f;
   m_bloomDebug = FALSE;
-  m_laserRef = FALSE;
+  m_laserRef = TRUE;
   m_useDynamicLights = TRUE;
   m_useSoftParticles = TRUE;
   m_useFlameShaders = TRUE;
@@ -650,9 +650,12 @@ GlobalData::GlobalData()
   m_stormTuning[StormShaderInfo::TYPE_SAND].setTypeDefaults(StormShaderInfo::TYPE_SAND);
   m_stormTuning[StormShaderInfo::TYPE_SNOW].setTypeDefaults(StormShaderInfo::TYPE_SNOW);
   m_headlightTuning.setDefaults();
-  m_useAmbientOcclusion = TRUE;
+  m_headlightForbiddenKindOf.clear();
+  m_rotrHack = FALSE;
+  m_useAmbientOcclusion = FALSE;
   m_useHeightBlend = TRUE;
   m_useHQSky = TRUE;
+  m_shadowMapResolution = 4096;
   m_ambientOcclusionDebug = FALSE;
   m_ambientOcclusionRadius = 12.0f;
   m_ambientOcclusionStrength = 1.0f;
@@ -661,12 +664,11 @@ GlobalData::GlobalData()
   m_groundNoiseTint = 0.03f;
   m_groundNoiseBrightness = 0.9f;
   m_terrainHeightBlendStrength = 2.0f;
-  m_terrainHeightBlendSharpness = 4.0f;
-  m_terrainAtlasBorder = 8;
+  m_terrainHeightBlendSharpness = 1.0f;
   m_skyCloudSize = 600.0f;
   m_skyCloudCoverage = 0.45f;
   m_skyCloudSoftness = 0.25f;
-  m_skyCloudShadowStrength = 0.35f;
+  m_skyCloudShadowStrength = 0.6f;
   m_skyCloudShadowTint.red = 235.0f / 255.0f;
   m_skyCloudShadowTint.green = 242.0f / 255.0f;
   m_skyCloudShadowTint.blue = 1.0f;
@@ -780,8 +782,8 @@ GlobalData::GlobalData()
 	m_chipSetType = 0;
 	m_headless = FALSE;
 	m_windowed = 0;
-	m_xResolution = DEFAULT_DISPLAY_WIDTH;
-	m_yResolution = DEFAULT_DISPLAY_HEIGHT;
+	// GameData XResolution, -xres and Options.ini override the desktop default
+	getDefaultResolution( m_xResolution, m_yResolution );
 	m_maxShellScreens = 0;
 	m_useCloudMap = FALSE;
 	m_use3WayTerrainBlends = 1;
@@ -1080,8 +1082,8 @@ GlobalData::GlobalData()
 	m_standardPublicBones.clear();
 
 	m_antiAliasLevel = WW3D::MultiSampleModeEnum::MULTISAMPLE_MODE_NONE;
-	m_textureFilteringMode = TextureFilterClass::TextureFilterMode::TEXTURE_FILTER_BILINEAR;
-	m_textureAnisotropyLevel = TextureFilterClass::AnisotropicFilterMode::TEXTURE_FILTER_ANISOTROPIC_2X;
+	m_textureFilteringMode = TextureFilterClass::TextureFilterMode::TEXTURE_FILTER_ANISOTROPIC;
+	m_textureAnisotropyLevel = TextureFilterClass::AnisotropicFilterMode::TEXTURE_FILTER_ANISOTROPIC_8X;
 
 //	m_languageFilterPref = false;
 	m_languageFilterPref = true;
@@ -1309,6 +1311,23 @@ void GlobalData::reset()
 }
 
 //-------------------------------------------------------------------------------------------------
+void GlobalData::getDefaultResolution( Int &width, Int &height )
+{
+	width = DEFAULT_DISPLAY_WIDTH;
+	height = DEFAULT_DISPLAY_HEIGHT;
+
+	DEVMODE desktop;
+	ZeroMemory( &desktop, sizeof(desktop) );
+	desktop.dmSize = sizeof(desktop);
+	if (EnumDisplaySettings( nullptr, ENUM_CURRENT_SETTINGS, &desktop )
+		&& desktop.dmPelsWidth >= DEFAULT_DISPLAY_WIDTH && desktop.dmPelsHeight >= DEFAULT_DISPLAY_HEIGHT)
+	{
+		width = desktop.dmPelsWidth;
+		height = desktop.dmPelsHeight;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
 /** Parse GameData entry */
 //-------------------------------------------------------------------------------------------------
 void GlobalData::parseGameDataDefinition( INI* ini )
@@ -1390,6 +1409,7 @@ void GlobalData::parseGameDataDefinition( INI* ini )
 	TheWritableGlobalData->m_useAmbientOcclusion = optionPref.getAmbientOcclusionEnabled();
 	TheWritableGlobalData->m_useHeightBlend = optionPref.getHeightBlendEnabled();
 	TheWritableGlobalData->m_useHQSky = optionPref.getHQSkyEnabled();
+	TheWritableGlobalData->m_shadowMapResolution = optionPref.getShadowMapResolution();
 	TheWritableGlobalData->m_ambientOcclusionDebug = optionPref.getAmbientOcclusionDebugEnabled();
 	TheWritableGlobalData->m_vsync = optionPref.getVSyncMode();
 	TheWritableGlobalData->m_lowLatency = optionPref.getLowLatencyEnabled();

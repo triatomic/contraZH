@@ -80,10 +80,14 @@ protected:
 	virtual void drawMoveHints( View *view );			///< draw move hint visual feedback
 	virtual void drawAttackHints( View *view );		///< draw attack hint visual feedback
 	virtual void drawPlaceAngle( View *view ); 		///< draw place building angle if needed
+	void drawActionLines();												///< a line from each selected unit to where its order sends it
+	void drawFacingDragAngle();						///< drag-to-face: the placement ring/arrow at the chord point
 
 	RenderObjClass *m_moveHintRenderObj[ MAX_MOVE_HINTS ];
 	HAnimClass		 *m_moveHintAnim[ MAX_MOVE_HINTS ];
 	RenderObjClass *m_buildingPlacementAnchor;
 	RenderObjClass *m_buildingPlacementArrow;
+	RenderObjClass *m_facingDragAnchor;	///< own copies, so building placement keeps its own
+	RenderObjClass *m_facingDragArrow;
 
 };

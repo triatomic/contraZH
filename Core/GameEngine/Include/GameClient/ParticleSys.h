@@ -184,7 +184,7 @@ public:
 	Bool update(); ///< update this particle's behavior - return false if dead
 
 	void draw( Real timeScale ); ///< render update
-	void doWindMotion( Real timeScale ); ///< do wind motion (if present) from particle system
+	Coord3D computePosition( Real timeScale ) const;
 
 	void applyForce( const Coord3D *force );		///< add the given acceleration
 
@@ -605,6 +605,21 @@ struct FlameShaderTuning
 	Real hazeMask;				///< how quickly the flame's brightness reaches full haze strength
 };
 
+#if RTS_ZEROHOUR
+struct FluidShaderTuning
+{
+	FluidShaderTuning();
+	Real warp;
+	Real noiseSize;
+	Real speed;
+	Real body;
+	Real bubbles;
+	Real bubbleSize;
+	Real edge;
+	Real glow;
+};
+#endif
+
 /**
  * A ParticleSystemTemplate, used by the ParticleSystemManager to instantiate ParticleSystems.
  */
@@ -616,6 +631,9 @@ public:
 	ParticleSystemTemplate( const AsciiString &name );
 
 	void validate();
+
+	/// Takes every setting from other except the name, for ParticleSystemExtend.
+	void copyFrom( const ParticleSystemTemplate *other );
 
 	const AsciiString& getName() const { return m_name; }
 
@@ -642,6 +660,14 @@ public:
 	Real getElectricParticleScale() const;
 	/// DisruptionShader and its settings, for sprites that bend the scene behind them.
 	const DisruptionShaderInfo &getDisruption() const { return m_disruption; }
+#if RTS_ZEROHOUR
+	Bool usesFluidShader() const { return m_fluidShader; }
+	Bool hasFluidTuning() const;
+	const FluidShaderTuning *peekFluidTuning() const { return &m_fluidTuning; }
+	static void resolveFluidTuning( const FluidShaderTuning *own, FluidShaderTuning &tuning );
+	Bool shouldBloom() const { return m_bloom; }
+	Bool shouldCompensateBloomZoom() const { return m_bloomZoomCompensation; }
+#endif
 
 protected:
 	friend class ParticleSystemManager;					///< @todo remove this friendship
@@ -665,6 +691,12 @@ protected:
 	Real											m_cryoParticleScale;						///< negative takes GameData.ini's
 	Real											m_electricParticleScale;				///< negative takes GameData.ini's
 	DisruptionShaderInfo			m_disruption;
+#if RTS_ZEROHOUR
+	Bool m_fluidShader;
+	FluidShaderTuning m_fluidTuning;
+	Bool m_bloom;
+	Bool m_bloomZoomCompensation;
+#endif
 
 	// template attribute data inherited from ParticleSystemInfo class
 };
@@ -789,6 +821,26 @@ public:
 	ObjectID getAttachedObject() { return m_attachedToObjectID; }
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	// The cached emitter transform includes its parent's orientation and bone offset.
+	Bool getDebugWorldPosition( Coord3D *pos ) const
+	{
+		if( !m_debugWorldPositionValid )
+		{
+			return FALSE;
+		}
+
+		if( m_isIdentity )
+		{
+			pos->zero();
+		}
+		else
+		{
+			const Vector3 translation = m_transform.Get_Translation();
+			pos->set( translation.X, translation.Y, translation.Z );
+		}
+		return TRUE;
+	}
+
 	// TheSuperHackers @feature Name of the FXList that spawned this system, for the debug name
 	// overlay. An FXList is a group of particle systems, and nothing in a created system otherwise
 	// records which list it came from -- the name exists only as the key in FXListStore's map --
@@ -854,6 +906,7 @@ protected:
 	DrawableID				m_attachedToDrawableID;					///< if non-zero, system is parented to this Drawable
 	ObjectID					m_attachedToObjectID;						///< if non-zero, system is parented to this Object
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	Bool m_debugWorldPositionValid;
 	AsciiString				m_fxListName;										///< FXList that spawned this system, debug overlay only
 #endif
 

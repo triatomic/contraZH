@@ -439,6 +439,8 @@ public:
 	Int getGradualRoundFrames(const WeaponBonus& bonus) const;
 	Int getClipReloadDelayFrames(const WeaponBonus& bonus) const;
 	Int getClipSize() const { return m_clipSize; }
+	Int getMinDelayBetweenShots() const { return m_minDelayBetweenShots; }	///< frames, without bonus or random spread
+	Int getMaxDelayBetweenShots() const { return m_maxDelayBetweenShots; }
 	Int getContinuousFireOneShotsNeeded() const { return m_continuousFireOneShotsNeeded; }
 	Int getContinuousFireTwoShotsNeeded() const { return m_continuousFireTwoShotsNeeded; }
 	UnsignedInt getContinuousFireCoastFrames() const { return m_continuousFireCoastFrames; }
@@ -477,6 +479,7 @@ public:
 	Bool isScatterTargetCenteredAtShooter() const { return m_scatterTargetCenteredAtShooter; }
 	Bool isScatterOnWaterSurface() const { return m_scatterOnWaterSurface; }
 	Bool isResetFireBonesOnReload() const { return m_resetFireBonesOnReload; }
+	Real getLineOfSightGraceHeight() const { return m_lineOfSightGraceHeight; }
 
 	Bool shouldProjectileCollideWith(
 		const Object* projectileLauncher,
@@ -627,6 +630,8 @@ private:
 
 	Bool m_resetFireBonesOnReload; ///< When reloading, set the next firebone/barrel to 0
 
+	Real m_lineOfSightGraceHeight; ///< terrain may rise this far above the firing line before it blocks the shot
+
 	mutable HistoricWeaponDamageList m_historicDamage;
 	mutable UnsignedInt m_historicDamageTriggerId;
 };
@@ -702,6 +707,11 @@ public:
 	// accumulates between approach recomputes. Never use it to decide whether to start an attack.
 	Bool isWithinContinueAttackRange(const Object *source, const Object *target) const;
 
+	// The AI's range test renews this every frame it holds the victim in range; nullptr clears it.
+	// Only an engaged victim gets the continue-range slack, in the AI test and at the shot.
+	void setEngagedVictim(const Object *victim);
+	Bool isEngagedWith(const Object *victim) const;
+
 	Bool isTooClose(const Object *source, const Object *target) const;
 	Bool isTooClose(const Object *source, const Coord3D *pos) const;
 
@@ -741,6 +751,7 @@ public:
 
 	// do not ever use this unless you are weaponset.cpp
 	void setPossibleNextShotFrame( UnsignedInt frameNum ) { m_whenWeCanFireAgain = frameNum; }
+	void holdFiringUntil( UnsignedInt frameNum );	///< don't fire before frameNum (never shortens an existing delay)
 	void setPreAttackFinishedFrame( UnsignedInt frameNum ) { m_whenPreAttackFinished = frameNum; }
 	void setLastReloadStartedFrame( UnsignedInt frameNum ) { m_whenLastReloadStarted = frameNum; }
 	void setNextPreAttackFXFrame(UnsignedInt frameNum) { m_nextPreAttackFXFrame = frameNum; }
@@ -771,8 +782,8 @@ public:
 
 	Bool isLaser() const { return m_template->getLaserName().isNotEmpty(); }
 	// void createLaser( const Object *sourceObj, const Object *victimObj, const Coord3D *victimPos );
-	ObjectID createLaser(const Object* sourceObj, const Object* victimObj, const Coord3D* victimPos); //now returns the object ID
-	void handleContinuousLaser(const Object* sourceObj, const Object* victimObj, const Coord3D* victimPos);
+	ObjectID createLaser(const Object* sourceObj, const Object* victimObj, const Coord3D* victimPos, Bool exactEnd = FALSE); //now returns the object ID
+	void handleContinuousLaser(const Object* sourceObj, const Object* victimObj, const Coord3D* victimPos, Bool exactEnd = FALSE);
 
 	const WeaponTemplate* getTemplate() const { return m_template; }
 	WeaponSlotType getWeaponSlot() const { return m_wslot; }
@@ -909,6 +920,8 @@ private:
 	ObjectID									m_bonusRefObjID;					///< for weapons fired from projectiles, we compute the bonus from the original source object instead.
 	UnsignedInt								m_gradualRoundStart;				///< frame the round now loading began (GRADUAL only)
 	UnsignedInt								m_gradualRoundFrames;				///< frames per round, rate-of-fire scaled; 0 when no round is loading
+	ObjectID									m_engagedVictimID;					///< victim the AI last held within attack range
+	UnsignedInt								m_engagedFrame;							///< frame that engagement was last renewed
 
 	// setter function for status that should not be used outside this class
 	void setStatus( WeaponStatus status) { m_status = status; }

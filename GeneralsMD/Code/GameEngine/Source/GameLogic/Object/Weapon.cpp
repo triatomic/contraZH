@@ -76,6 +76,7 @@
 #include "GameLogic/Module/ProjectileStreamUpdate.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/LifetimeUpdate.h"
+#include "GameLogic/Module/ShieldFieldBehavior.h"
 #include "GameLogic/Module/SpawnBehavior.h"
 #include "GameLogic/TerrainLogic.h"
 
@@ -170,6 +171,18 @@ static void parseAllVetLevelsPSys( INI* ini, void* /*instance*/, void * store, c
 	// Only fill through HEROIC; FOUR/FIVE are resolved from HEROIC in postProcessLoad.
 	for (Int i = LEVEL_FIRST; i <= LEVEL_HEROIC; ++i)
 		s[i] = pst;
+}
+
+//-------------------------------------------------------------------------------------------------
+static void parseNonNegativeReal( INI* ini, void* /*instance*/, void * store, const void* /*userData*/ )
+{
+	Real value = INI::scanReal(ini->getNextToken());
+	if (value < 0.0f)
+	{
+		DEBUG_CRASH(("invalid Real value %f -- expected >= 0", value));
+		throw INI_INVALID_DATA;
+	}
+	*(Real *)store = value;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -281,6 +294,7 @@ const FieldParse WeaponTemplate::TheWeaponTemplateFieldParseTable[] =
 	{ "LaserGroundUnitTargetHeight",				INI::parseReal,					NULL,					offsetof(WeaponTemplate, m_laserGroundUnitTargetHeight) },
 	{ "ScatterOnWaterSurface", INI::parseBool, NULL, offsetof(WeaponTemplate, m_scatterOnWaterSurface) },
 	{ "ResetFireBonesOnReload", INI::parseBool, NULL, offsetof(WeaponTemplate, m_resetFireBonesOnReload) },
+	{ "LineOfSightGraceHeight", parseNonNegativeReal, NULL, offsetof(WeaponTemplate, m_lineOfSightGraceHeight) },
 	{ nullptr,												nullptr,																		nullptr,							0 }
 
 };
@@ -385,6 +399,7 @@ WeaponTemplate::WeaponTemplate() : m_nextTemplate(nullptr)
 	m_scatterOnWaterSurface = TheGlobalData ? TheGlobalData->m_weaponScatterOnWaterSurfaceDefault : false;
 	m_historicDamageTriggerId = 0;
 	m_resetFireBonesOnReload = false;
+	m_lineOfSightGraceHeight = 0.0f;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -483,8 +498,8 @@ void WeaponTemplate::copy_from(const WeaponTemplate& other) {
 
 	// No matter what we have now, we want to convert it to frames from msec.
 	// ShotDelay used to use parseDurationUnsignedInt, and we are expanding on that.
-	self->m_minDelayBetweenShots = ceilf(ConvertDurationFromMsecsToFrames((Real)self->m_minDelayBetweenShots));
-	self->m_maxDelayBetweenShots = ceilf(ConvertDurationFromMsecsToFrames((Real)self->m_maxDelayBetweenShots));
+	self->m_minDelayBetweenShots = WWMath::Ceilf(ConvertDurationFromMsecsToFrames((Real)self->m_minDelayBetweenShots));
+	self->m_maxDelayBetweenShots = WWMath::Ceilf(ConvertDurationFromMsecsToFrames((Real)self->m_maxDelayBetweenShots));
 
 }
 
@@ -982,6 +997,9 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 	// or a centered add-on aims at a target it then silently refuses to fire on.
 	const Object* rangeSrc = Weapon::getWeaponRangeSource( sourceObj );
 
+	// Read before a sneaky offset swaps the victim for a position, since the AI judged the object.
+	const Bool engaged = !isProjectileDetonation && firingWeapon != nullptr && firingWeapon->isEngagedWith( victimObj );
+
 	Real distSqr;
 	ObjectID victimID;
 	TBridgeAttackInfo info;
@@ -1044,7 +1062,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		// Match the slack the AI used to stay engaged, so a shot it committed to against a moving
 		// victim still lands instead of being dropped here.
 		Real attackRange = getAttackRange(bonus);
-		if (victimObj != nullptr && !isProjectileDetonation)
+		if (engaged)
 		{
 			attackRange += CONTINUE_ATTACK_RANGE_MARGIN;
 		}
@@ -1073,7 +1091,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		if (distSqr < minAttackRangeSqr-0.5f && !isProjectileDetonation)
 #endif
 		{
-			DEBUG_ASSERTCRASH(distSqr > minAttackRangeSqr*0.8f, ("*** victim is closer than min attack range (%f vs %f) of this weapon -- why did we attempt to fire?",sqrtf(distSqr),sqrtf(minAttackRangeSqr)));
+			DEBUG_ASSERTCRASH(distSqr > minAttackRangeSqr*0.8f, ("*** victim is closer than min attack range (%f vs %f) of this weapon -- why did we attempt to fire?",WWMath::Sqrtf(distSqr),WWMath::Sqrtf(minAttackRangeSqr)));
 
 			//-extraLogging
 			#if defined(RTS_DEBUG)
@@ -1086,11 +1104,23 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		}
 	}
 
+	// A shield field between the shooter and the target stops an instant-hit shot at its surface.
+	ShieldFieldBehavior *shieldField = nullptr;
+	Coord3D shieldHitPos;
+	if( getProjectileTemplate() == nullptr && !isProjectileDetonation && !getDamageDealtAtSelfPosition() )
+	{
+		shieldField = ShieldFieldBehavior::findBlockingField( sourceObj, sourcePos, victimPos, &shieldHitPos );
+	}
+
 	// call this even if FXList is null, because this also handles stuff like Gun Barrel Recoil
 	if (sourceObj && sourceObj->getDrawable())
 	{
 		Coord3D targetPos;
-		if( victimObj )
+		if( shieldField )
+		{
+			targetPos.set( shieldHitPos );
+		}
+		else if( victimObj )
 		{
 			victimObj->getGeometryInfo().getCenterPosition( *victimObj->getPosition(), targetPos );
 		}
@@ -1099,7 +1129,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 			targetPos.set( *victimPos );
 		}
 		Real reAngle = getWeaponRecoilAmount();
-		Real reDir = reAngle != 0.0f ? (atan2(victimPos->y - sourcePos->y, victimPos->x - sourcePos->x)) : 0.0f;
+		Real reDir = reAngle != 0.0f ? (WWMath::Atan2(victimPos->y - sourcePos->y, victimPos->x - sourcePos->x)) : 0.0f;
 		VeterancyLevel v = getEffectiveFXVeterancy(sourceObj);
 		const FXList* fx = isProjectileDetonation ? getProjectileDetonateFX(v) : getFireFX(v);
 
@@ -1149,7 +1179,20 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		VeterancyLevel v = getEffectiveFXVeterancy(sourceObj);
 		const ObjectCreationList *oclToUse = isProjectileDetonation ? getProjectileDetonationOCL(v) : getFireOCL(v);
 		if( oclToUse )
-			ObjectCreationList::create( oclToUse, sourceObj, nullptr );
+		{
+			// a shot placed through SPECIAL_POWER_CONSTRUCT spawns its FireOCL at the placed spot and angle, not at the shooter
+			Coord3D placePos;
+			Real placeAngle;
+			AIUpdateInterface *ai = isProjectileDetonation ? nullptr : const_cast<Object *>( sourceObj )->getAI();
+			if( ai && ai->friend_takeAttackPlacement( &placePos, &placeAngle ) )
+			{
+				ObjectCreationList::create( oclToUse, sourceObj, &placePos, &placePos, placeAngle );
+			}
+			else
+			{
+				ObjectCreationList::create( oclToUse, sourceObj, nullptr );
+			}
+		}
 	}
 
 	Coord3D projectileDestination = *victimPos; //Need to copy this, as we have a pointer to their actual position
@@ -1234,9 +1277,27 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 		v.y = victimPos->y - sourcePos->y;
 		v.z = victimPos->z - sourcePos->z;
 		// don't round the result; we WANT a fractional-frame-delay in this case.
-		Real delayInFrames = (v.length() / getWeaponSpeed());
+		Real delayInFrames = WWMath::Div_Safe(v.length(), getWeaponSpeed());
 
 		ObjectID damageID = getDamageDealtAtSelfPosition() ? INVALID_ID : victimID;
+
+		if( shieldField )
+		{
+			if( firingWeapon->isLaser() )
+			{
+				if( firingWeapon->getContinuousLaserLoopTime() > 0 )
+				{
+					firingWeapon->handleContinuousLaser( sourceObj, nullptr, &shieldHitPos, TRUE );
+				}
+				else
+				{
+					firingWeapon->createLaser( sourceObj, nullptr, &shieldHitPos, TRUE );
+				}
+			}
+			shieldField->absorbShot( inflictDamage ? this : nullptr, bonus, sourceID, &shieldHitPos );
+			// the shot still takes its flight time to reach the surface
+			return TheGameLogic->getFrame() + REAL_TO_INT_CEIL(delayInFrames);
+		}
 
 		if( firingWeapon->isLaser() )
 		{
@@ -1280,7 +1341,7 @@ UnsignedInt WeaponTemplate::fireWeaponTemplate
 
 			VeterancyLevel vet = getEffectiveFXVeterancy(sourceObj);
 			const ObjectCreationList* detOCL = getProjectileDetonationOCL(vet);
-			Real laserAngle = atan2(v.y, v.x);  //TODO: check if this should be inverted
+			Real laserAngle = WWMath::Atan2f(v.y, v.x);  //TODO: check if this should be inverted
 			if (detOCL) {
 				//TODO: should we consider a proper 3D matrix?
 				ObjectCreationList::create(detOCL, sourceObj, &targetPos, NULL, laserAngle);
@@ -1967,9 +2028,9 @@ void WeaponTemplate::dealDamageInternal(ObjectID sourceID, ObjectID victimID, co
 				Coord3D shockWaveVector = damageDirection;
 
 				// Guard against zero vector. Make vector straight up if that is the case
-				if (fabs(shockWaveVector.x) < WWMATH_EPSILON &&
-						fabs(shockWaveVector.y) < WWMATH_EPSILON &&
-						fabs(shockWaveVector.z) < WWMATH_EPSILON)
+				if (WWMath::Fabs(shockWaveVector.x) < WWMATH_EPSILON &&
+						WWMath::Fabs(shockWaveVector.y) < WWMATH_EPSILON &&
+						WWMath::Fabs(shockWaveVector.z) < WWMATH_EPSILON)
 				{
 					shockWaveVector.z = 1.0f;
 				}
@@ -2413,6 +2474,8 @@ Weapon::Weapon(const WeaponTemplate* tmpl, WeaponSlotType wslot)
 	m_bonusRefObjID = INVALID_ID;
 	m_gradualRoundStart = 0;
 	m_gradualRoundFrames = 0;
+	m_engagedVictimID = INVALID_ID;
+	m_engagedFrame = 0;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2439,6 +2502,8 @@ Weapon::Weapon(const Weapon& that)
 	this->m_bonusRefObjID = INVALID_ID;
 	this->m_gradualRoundStart = 0;
 	this->m_gradualRoundFrames = 0;
+	this->m_engagedVictimID = INVALID_ID;
+	this->m_engagedFrame = 0;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2466,6 +2531,8 @@ Weapon& Weapon::operator=(const Weapon& that)
 		this->m_continuousLaserID = INVALID_ID;
 		this->m_gradualRoundStart = 0;
 		this->m_gradualRoundFrames = 0;
+		this->m_engagedVictimID = INVALID_ID;
+		this->m_engagedFrame = 0;
 	}
 	return *this;
 }
@@ -2927,11 +2994,11 @@ Bool Weapon::computeApproachTarget(const Object *source, const Object *target, c
 		if (source->isAboveTerrain())
 		{
 			// Don't do a 180 degree turn.
-			Real angle = atan2(-dir.y, -dir.x);
+			Real angle = WWMath::Atan2(-dir.y, -dir.x);
 			Real relAngle = source->getOrientation()- angle;
 			if (relAngle>2*PI) relAngle -= 2*PI;
 			if (relAngle<-2*PI) relAngle += 2*PI;
-			if (fabs(relAngle)<PI/2) {
+			if (WWMath::Fabs(relAngle)<PI/2) {
 				dir.x = -dir.x;
 				dir.y = -dir.y;
 				dir.z = -dir.z;
@@ -2940,7 +3007,7 @@ Bool Weapon::computeApproachTarget(const Object *source, const Object *target, c
 
 		if (angleOffset != 0.0f)
 		{
-			Real angle = atan2(dir.y, dir.x);
+			Real angle = WWMath::Atan2(dir.y, dir.x);
 			dir.x = (Real)Cos(angle + angleOffset);
 			dir.y = (Real)Sin(angle + angleOffset);
 		}
@@ -2981,7 +3048,7 @@ Bool Weapon::computeApproachTarget(const Object *source, const Object *target, c
 
 		if (angleOffset != 0.0f)
 		{
-			Real angle = atan2(dir.y, dir.x);
+			Real angle = WWMath::Atan2(dir.y, dir.x);
 			dir.x = (Real)Cos(angle + angleOffset);
 			dir.y = (Real)Sin(angle + angleOffset);
 		}
@@ -3127,6 +3194,22 @@ Bool Weapon::isWithinContinueAttackRange(const Object *source, const Object *tar
 {
 	// The minimum range stays where it is; only the outer edge moves.
 	return isWithinAttackRangeInternal( source, target, getAttackRange( source ) + CONTINUE_ATTACK_RANGE_MARGIN );
+}
+
+//-------------------------------------------------------------------------------------------------
+void Weapon::setEngagedVictim(const Object *victim)
+{
+	m_engagedVictimID = victim ? victim->getID() : INVALID_ID;
+	m_engagedFrame = TheGameLogic->getFrame();
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool Weapon::isEngagedWith(const Object *victim) const
+{
+	// A short grace covers the frames between state transitions; an older mark belongs to a past attack.
+	return victim != nullptr
+		&& m_engagedVictimID == victim->getID()
+		&& TheGameLogic->getFrame() <= m_engagedFrame + LOGICFRAMES_PER_SECOND;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3354,7 +3437,7 @@ void Weapon::newProjectileFired(const Object *sourceObj, const Object *projectil
 }
 
 //-------------------------------------------------------------------------------------------------
-ObjectID Weapon::createLaser( const Object *sourceObj, const Object *victimObj, const Coord3D *victimPos )
+ObjectID Weapon::createLaser( const Object *sourceObj, const Object *victimObj, const Coord3D *victimPos, Bool exactEnd )
 {
 	const ThingTemplate* pst = TheThingFactory->findTemplate(m_template->getLaserName());
 	if( !pst )
@@ -3386,7 +3469,9 @@ ObjectID Weapon::createLaser( const Object *sourceObj, const Object *victimObj, 
 					pos.z += getTemplate()->getLaserGroundUnitTargetHeight();
 				}
 			}
-			else { // We target the ground
+			else if( !exactEnd )
+			{
+				// We target the ground
 				pos.z += getTemplate()->getLaserGroundTargetHeight();
 			}
 			update->initLaser( sourceObj, victimObj, sourceObj->getPosition(), &pos, m_template->getLaserBoneName() );
@@ -3396,7 +3481,7 @@ ObjectID Weapon::createLaser( const Object *sourceObj, const Object *victimObj, 
 	return laser->getID();
 }
 //-------------------------------------------------------------------------------------------------
-void Weapon::handleContinuousLaser(const Object* sourceObj, const Object* victimObj, const Coord3D* victimPos)
+void Weapon::handleContinuousLaser(const Object* sourceObj, const Object* victimObj, const Coord3D* victimPos, Bool exactEnd)
 {
 	UnsignedInt frameNow = TheGameLogic->getFrame();
 	Object* continuousLaser = TheGameLogic->findObjectByID(m_continuousLaserID);
@@ -3404,7 +3489,7 @@ void Weapon::handleContinuousLaser(const Object* sourceObj, const Object* victim
 	if (m_lastFireFrame + m_template->getContinuousLaserLoopTime() < frameNow ||
 		continuousLaser == NULL) {
 		// We are outside the loop time, or the laser doesn't exist -> create a new laser
-		ObjectID laserId = createLaser(sourceObj, victimObj, victimPos);
+		ObjectID laserId = createLaser(sourceObj, victimObj, victimPos, exactEnd);
 		continuousLaser = TheGameLogic->findObjectByID(laserId);
 		if (continuousLaser == NULL) {
 			return;
@@ -3661,7 +3746,7 @@ Bool Weapon::privateFireWeapon(
 
 				Real angle = m_scatterTargetsAngle;
 				if (m_template->isScatterTargetAligned()) {
-					angle += atan2(targetPos.y - srcPos.y, targetPos.x - srcPos.x);
+					angle += WWMath::Atan2f(targetPos.y - srcPos.y, targetPos.x - srcPos.x);
 					// angle += atan2(srcPos.y - targetPos.y, srcPos.x - targetPos.x);
 				}
 
@@ -3892,6 +3977,19 @@ Object* Weapon::forceFireWeapon( const Object *source, const Coord3D *pos)
 }
 
 //-------------------------------------------------------------------------------------------------
+void Weapon::holdFiringUntil( UnsignedInt frameNum )
+{
+	if( m_whenWeCanFireAgain >= frameNum )
+		return;
+
+	// getStatus() keeps returning a cached READY_TO_FIRE until m_whenWeCanFireAgain, so the status
+	// must change too (same as shared reload time). Reloading / out of ammo keep their status.
+	if( getStatus() == READY_TO_FIRE )
+		setStatus( BETWEEN_FIRING_SHOTS );
+	m_whenWeCanFireAgain = frameNum;
+}
+
+//-------------------------------------------------------------------------------------------------
 WeaponStatus Weapon::getStatus() const
 {
 	UnsignedInt now = TheGameLogic->getFrame();
@@ -3920,7 +4018,7 @@ Bool Weapon::isWithinTargetPitch(const Object *source, const Object *victim) con
 	const Coord3D* dst = victim->getPosition();
 
 	const Real ACCEPTABLE_DZ = 10.0f;
-	if (fabs(dst->z - src->z) < ACCEPTABLE_DZ)
+	if (WWMath::Fabs(dst->z - src->z) < ACCEPTABLE_DZ)
 		return true;	// always good enough if dz is small, regardless of pitch
 
 	Real minPitch, maxPitch;
@@ -4260,7 +4358,7 @@ Bool Weapon::isClearGoalFiringLineOfSightTerrain(const Object* source, const Coo
 	getFiringLineOfSightOrigin(source, origin);
 	Coord3D victimPos;
 	victim->getGeometryInfo().getCenterPosition( *victim->getPosition(), victimPos );
-	return ThePartitionManager->isClearLineOfSightTerrain(nullptr, origin, nullptr, victimPos);
+	return ThePartitionManager->isClearLineOfSightTerrain(nullptr, origin, nullptr, victimPos, m_template->getLineOfSightGraceHeight());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4275,7 +4373,7 @@ Bool Weapon::isClearGoalFiringLineOfSightTerrain(const Object* source, const Coo
 	//CRCDEBUG_LOG(("Weapon::isClearFiringLineOfSightTerrain() - victimPos is (%g,%g,%g) (%X,%X,%X)",
 	//	victimPos.x, victimPos.y, victimPos.z,
 	//	AS_INT(victimPos.x),AS_INT(victimPos.y),AS_INT(victimPos.z)));
-	return ThePartitionManager->isClearLineOfSightTerrain(nullptr, origin, nullptr, victimPos);
+	return ThePartitionManager->isClearLineOfSightTerrain(nullptr, origin, nullptr, victimPos, m_template->getLineOfSightGraceHeight());
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4616,12 +4714,13 @@ void Weapon::crc( Xfer *xfer )
 	* Version Info:
 	* 1: Initial version
 	* 2-3: Undocumented in the original source
-	* 4: Gradual reload round timer */
+	* 4: Gradual reload round timer
+	* 5: Engaged victim for the continue-range slack */
 // ------------------------------------------------------------------------------------------------
 void Weapon::xfer( Xfer *xfer )
 {
 	// version
-	const XferVersion currentVersion = 4;
+	const XferVersion currentVersion = 5;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -4733,6 +4832,13 @@ void Weapon::xfer( Xfer *xfer )
 	{
 		xfer->xferUnsignedInt( &m_gradualRoundStart );
 		xfer->xferUnsignedInt( &m_gradualRoundFrames );
+	}
+
+	// engaged victim
+	if (version >= 5)
+	{
+		xfer->xferObjectID( &m_engagedVictimID );
+		xfer->xferUnsignedInt( &m_engagedFrame );
 	}
 
 }  // end xfer

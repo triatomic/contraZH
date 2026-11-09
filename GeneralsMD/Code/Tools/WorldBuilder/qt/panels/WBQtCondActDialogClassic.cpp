@@ -1,8 +1,8 @@
 // WBQtCondActDialogClassic.cpp -- see WBQtCondActDialogClassic.h. Layout and behavior mirror the MFC
 // IDD_ScriptCondition / IDD_ScriptAction dialogs: top command row (search / Compress Script /
 // OK / Cancel), template tree left, sentence + warnings + developer notes right. The parameter
-// links pop the (still MFC) EditParameter modals through the bridge; the sentence and warnings
-// re-render when they return.
+// links pop the Qt parameter editor through the bridge; the sentence and warnings re-render
+// when it returns.
 #include "WBQtCondActDialogClassic.h"
 #include "ui_WBQtCondActDialogClassic.h"
 #include "WBQtCondActBridge.h"
@@ -19,6 +19,7 @@ extern "C" int WBQtConfig_GetNewSearch(void);
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMap>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QTextBrowser>
@@ -212,6 +213,18 @@ int WBQtCondActDialogClassic::buildTree(const QString &filter)
 		}
 	}
 	m_tree->sortItems(0, Qt::AscendingOrder);
+
+	// Pinned mod folders go first, in rank order.
+	QMap<int, QTreeWidgetItem *> pinned;
+	for (int i = m_tree->topLevelItemCount() - 1; i >= 0; --i)
+	{
+		const int rank = WBQtCondActData_PinnedFolderRank(m_tree->topLevelItem(i)->text(0).toLocal8Bit().constData());
+		if (rank >= 0)
+		{
+			pinned.insert(rank, m_tree->takeTopLevelItem(i));
+		}
+	}
+	m_tree->insertTopLevelItems(0, pinned.values());
 	m_updating = false;
 	selectCurrentType(selLeaf);
 	return matchCount;
@@ -346,7 +359,7 @@ void WBQtCondActDialogClassic::onLinkClicked(const QUrl &url)
 	{
 		return;
 	}
-	// Pops the (still MFC) parameter editor; the sentence and warnings re-render on return.
+	// Pops the parameter editor; the sentence and warnings re-render on return.
 	WBQtCondAct_EditParameter(m_item, m_isAction, index);
 	renderSentence();
 }

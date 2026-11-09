@@ -1000,6 +1000,7 @@ public:
 		m_delay.setRange(-1, -1, GameClientRandomVariable::CONSTANT);
 		m_offset.x = m_offset.y = m_offset.z = 0;
 		m_orientToObject = false;
+		m_orientOffset = true;
 		m_attachToObject = false;
 		m_createAtGroundHeight = FALSE;
 		m_useCallersRadius = FALSE;
@@ -1078,7 +1079,7 @@ public:
 			{ "MaxAllowedHeight",			INI::parseReal,							nullptr, offsetof(ParticleSystemFXNugget, m_maxAllowedHeight) },
 			{ "AllowedSurface",				INI::parseIndexList,				AllowedSurfaceNames, offsetof(ParticleSystemFXNugget, m_allowedSurfaceType) },
 			{ "UseCachedSurfaceInfo", INI::parseBool,							nullptr, offsetof(ParticleSystemFXNugget, m_useSurfaceInfo) },
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
 
 		ParticleSystemFXNugget* nugget = newInstance( ParticleSystemFXNugget );
@@ -1361,11 +1362,15 @@ FXList::~FXList()
 //-------------------------------------------------------------------------------------------------
 void FXList::clear()
 {
-	for (FXNuggetList::iterator it = m_nuggets.begin(); it != m_nuggets.end(); ++it)
-	{
-		deleteInstance(*it);
-	}
+	// do NOT delete the nuggets -- they're owned by the Store.
 	m_nuggets.clear();
+}
+
+//-------------------------------------------------------------------------------------------------
+void FXList::addFXNugget(FXNugget *fxn)
+{
+	m_nuggets.push_back(fxn);
+	TheFXListStore->addFXNugget(fxn);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1417,6 +1422,11 @@ FXListStore::FXListStore()
 FXListStore::~FXListStore()
 {
 	m_fxmap.clear();
+	for (FXNuggetVector::iterator it = m_nuggets.begin(); it != m_nuggets.end(); ++it)
+	{
+		deleteInstance(*it);
+	}
+	m_nuggets.clear();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1434,6 +1444,12 @@ const FXList *FXListStore::findFXList(const char* name) const
 }
 
 //-------------------------------------------------------------------------------------------------
+void FXListStore::addFXNugget(FXNugget *fxn)
+{
+	m_nuggets.push_back(fxn);
+}
+
+//-------------------------------------------------------------------------------------------------
 /*static */ void FXListStore::parseFXListDefinition(INI *ini)
 {
 	// read the FXList name
@@ -1445,7 +1461,36 @@ const FXList *FXListStore::findFXList(const char* name) const
 }
 
 //-------------------------------------------------------------------------------------------------
+/*static */ void FXListStore::parseFXListExtendDefinition(INI *ini)
+{
+	const char *c = ini->getNextToken();
+	const char *parentName = ini->getNextToken();
+	const FXList *parent = TheFXListStore->findFXList(parentName);
+	DEBUG_ASSERTCRASH(parent != nullptr, ("FXListExtend '%s': parent '%s' does not exist", c, parentName));
+
+	NameKeyType key = TheNameKeyGenerator->nameToKey(c);
+	FXList& fxl = TheFXListStore->m_fxmap[key];
+
+	// The Store owns the nuggets, so the copy shares the parent's and appends its own after them
+	if (parent == nullptr)
+	{
+		fxl.clear();
+	}
+	else if (&fxl != parent)
+	{
+		fxl = *parent;
+	}
+	ini->initFromINI(&fxl, TheFXListFieldParse);
+}
+
+//-------------------------------------------------------------------------------------------------
 /*static*/ void INI::parseFXListDefinition(INI *ini)
 {
 	FXListStore::parseFXListDefinition(ini);
+}
+
+//-------------------------------------------------------------------------------------------------
+/*static*/ void INI::parseFXListExtendDefinition(INI *ini)
+{
+	FXListStore::parseFXListExtendDefinition(ini);
 }

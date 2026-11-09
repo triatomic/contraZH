@@ -91,7 +91,7 @@ void JumpjetContainModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "KillWhenLandingOnCliff",	INI::parseBool,		NULL, offsetof(JumpjetContainModuleData, m_killWhenLandingOnCliff) },
 		{ "KillWhenLandingOnImpassable",	INI::parseBool,		NULL, offsetof(JumpjetContainModuleData, m_killWhenLandingOnImpassable) },
 		{ "KillWhenLandingInWaterSlop",	INI::parseReal,		NULL, offsetof(JumpjetContainModuleData, m_killWhenLandingInWaterSlop) },
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
 }

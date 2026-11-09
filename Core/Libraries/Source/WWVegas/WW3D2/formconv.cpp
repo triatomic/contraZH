@@ -41,6 +41,10 @@
 #include "dx8wrapper.h"
 #include "dx8caps.h"
 #include "bitmaphandler.h"
+#if defined(BUILD_WITH_D3D9)
+#include <map>
+#include <string>
+#endif
 
 D3DFORMAT WW3DFormatToD3DFormatConversionArray[WW3D_FORMAT_COUNT] = {
 	D3DFMT_UNKNOWN,
@@ -875,7 +879,12 @@ struct D3D9ShaderEntry
 	IDirect3DVertexShader9*      VertexShader;
 	IDirect3DVertexDeclaration9* Declaration;
 	IDirect3DPixelShader9*       PixelShader;
+	IDirect3DPixelShader9*       DebugPixelShader;
+	char                         Name[32];
 };
+
+// Whether pixel shader handles with a debug twin bind the twin
+static bool _D3D9DebugPixelShaders=false;
 
 // Index 0 is reserved so a handle of 0 keeps meaning "no shader". The engine loads
 // a fixed set of shaders, so a flat array avoids any allocation concerns.
@@ -922,16 +931,64 @@ static D3D9ShaderEntry* Peek_Shader_Entry(DWORD handle)
 	return &_D3D9Shaders[index];
 }
 
-DWORD Register_D3D9_Vertex_Shader(IDirect3DVertexShader9* shader, IDirect3DVertexDeclaration9* declaration)
+// Keeps the file name without its folder, which is all the shader draw counter shows
+static void Set_Entry_Name(D3D9ShaderEntry& entry, const char* name)
+{
+	const char* slash=name ? strrchr(name, '\\') : nullptr;
+	if (slash!=nullptr)
+	{
+		name=slash+1;
+	}
+	strlcpy(entry.Name, name ? name : "", sizeof(entry.Name));
+}
+
+DWORD Register_D3D9_Vertex_Shader(IDirect3DVertexShader9* shader, IDirect3DVertexDeclaration9* declaration, const char* name)
 {
 	D3D9ShaderEntry entry={ shader, declaration, nullptr };
+	Set_Entry_Name(entry, name);
 	return Add_Shader_Entry(entry);
 }
 
-DWORD Register_D3D9_Pixel_Shader(IDirect3DPixelShader9* shader)
+DWORD Register_D3D9_Pixel_Shader(IDirect3DPixelShader9* shader, const char* name)
 {
 	D3D9ShaderEntry entry={ nullptr, nullptr, shader };
+	Set_Entry_Name(entry, name);
 	return Add_Shader_Entry(entry);
+}
+
+static std::map<const void*, std::string> _D3D9ShaderNames;
+
+void Set_D3D9_Shader_Name(const void* shader, const char* name)
+{
+	if (shader==nullptr)
+	{
+		return;
+	}
+	if (name==nullptr)
+	{
+		_D3D9ShaderNames.erase(shader);
+		return;
+	}
+	const char* slash=strrchr(name, '\\');
+	_D3D9ShaderNames[shader]=slash ? slash+1 : name;
+}
+
+const char* Find_D3D9_Shader_Name(const void* shader)
+{
+	std::map<const void*, std::string>::const_iterator found=_D3D9ShaderNames.find(shader);
+	if (found!=_D3D9ShaderNames.end())
+	{
+		return found->second.c_str();
+	}
+	for (unsigned index=1; index<_D3D9ShaderCount; ++index)
+	{
+		const D3D9ShaderEntry& slot=_D3D9Shaders[index];
+		if (shader==slot.VertexShader || shader==slot.PixelShader || shader==slot.DebugPixelShader)
+		{
+			return slot.Name;
+		}
+	}
+	return nullptr;
 }
 
 void Release_D3D9_Shader(DWORD handle)
@@ -954,6 +1011,10 @@ void Release_D3D9_Shader(DWORD handle)
 	{
 		entry->PixelShader->Release();
 	}
+	if (entry->DebugPixelShader)
+	{
+		entry->DebugPixelShader->Release();
+	}
 
 	// The slot can be reused, so a cached copy of this handle must not match its successor
 	DX8Wrapper::Forget_Shader_Handle(handle);
@@ -961,6 +1022,8 @@ void Release_D3D9_Shader(DWORD handle)
 	entry->VertexShader=nullptr;
 	entry->Declaration=nullptr;
 	entry->PixelShader=nullptr;
+	entry->DebugPixelShader=nullptr;
+	entry->Name[0]='\0';
 }
 
 IDirect3DVertexShader9* Peek_D3D9_Vertex_Shader(DWORD handle)
@@ -978,7 +1041,36 @@ IDirect3DVertexDeclaration9* Peek_D3D9_Vertex_Declaration(DWORD handle)
 IDirect3DPixelShader9* Peek_D3D9_Pixel_Shader(DWORD handle)
 {
 	const D3D9ShaderEntry* entry=Peek_Shader_Entry(handle);
-	return entry ? entry->PixelShader : nullptr;
+	if (entry==nullptr)
+	{
+		return nullptr;
+	}
+	return (_D3D9DebugPixelShaders && entry->DebugPixelShader) ? entry->DebugPixelShader : entry->PixelShader;
+}
+
+void Attach_D3D9_Debug_Pixel_Shader(DWORD handle, IDirect3DPixelShader9* shader)
+{
+	D3D9ShaderEntry* entry=Peek_Shader_Entry(handle);
+	if (entry==nullptr || entry->PixelShader==nullptr)
+	{
+		shader->Release();
+		return;
+	}
+	if (entry->DebugPixelShader)
+	{
+		entry->DebugPixelShader->Release();
+	}
+	entry->DebugPixelShader=shader;
+}
+
+bool Set_D3D9_Debug_Pixel_Shaders(bool on)
+{
+	if (_D3D9DebugPixelShaders==on)
+	{
+		return false;
+	}
+	_D3D9DebugPixelShaders=on;
+	return true;
 }
 
 // The D3D8 token stream names a vertex register per element; D3D9 names a usage

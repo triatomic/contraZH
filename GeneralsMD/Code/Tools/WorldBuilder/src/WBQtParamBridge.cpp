@@ -168,6 +168,11 @@ Int EditParameter::qtDescribe(Parameter *pParm, AsciiString unitName, CComboBox 
 			showCombo = true;
 			loadCounters(pCombo);
 			break;
+		case Parameter::KD_RATIO:
+			captionText = "KD ratio named:";
+			showCombo = true;
+			loadKDRatios(pCombo);
+			break;
 		case Parameter::INT:
 			captionText = "Integer:";
 			editText.Format("%d", m_parameter->getInt());
@@ -214,6 +219,16 @@ Int EditParameter::qtDescribe(Parameter *pParm, AsciiString unitName, CComboBox 
 			pList->InsertString(-1, "GE Greater Than or Equal");
 			pList->InsertString(-1, "GT Greater Than");
 			pList->InsertString(-1, "NE Not Equal To");
+			pList->SetCurSel(m_parameter->getInt());
+			showList = true;
+			break;
+		case Parameter::SELECTION_MODE:
+			captionText = "Selection mode:";
+			pList->InsertString(-1, "Closest");
+			pList->InsertString(-1, "Farthest");
+			pList->InsertString(-1, "Random");
+			pList->InsertString(-1, "Youngest");
+			pList->InsertString(-1, "Oldest");
 			pList->SetCurSel(m_parameter->getInt());
 			showList = true;
 			break;
@@ -482,6 +497,7 @@ Int EditParameter::qtStore(Parameter *pParm, const char *text, Int selIndex)
 		case Parameter::BRIDGE:
 		case Parameter::FLAG:
 		case Parameter::COUNTER:
+		case Parameter::KD_RATIO:
 		case Parameter::DIALOG:
 		case Parameter::MUSIC:
 		case Parameter::SPECIAL_POWER:
@@ -554,6 +570,7 @@ Int EditParameter::qtStore(Parameter *pParm, const char *text, Int selIndex)
 		}
 		case Parameter::BOOLEAN:
 		case Parameter::COMPARISON:
+		case Parameter::SELECTION_MODE:
 			m_parameter->friend_setInt(selIndex);
 			break;
 		case Parameter::KIND_OF_PARAM:

@@ -170,8 +170,7 @@ enum DDSType
 // locally, call Load() and use the copy functions to retrieve the surface.
 // The class handles conversion of the surface to equal compressed formats
 // and all non-compressed formats. the compressed DXTn formats can't be cross-
-// converted except for DXT1 which can be converted to DXT2 (this feature is
-// needed as the NVidia cards have problems with DXT1).
+// converted.
 //
 // ----------------------------------------------------------------------------
 

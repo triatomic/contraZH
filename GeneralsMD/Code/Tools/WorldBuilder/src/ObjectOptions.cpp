@@ -881,6 +881,14 @@ MapObject *ObjectOptions::duplicateCurMapObjectForPlace(const Coord3D* loc, Real
 																			 pCur->getThingTemplate() );
 			pNew->getProperties()->setAsciiString(TheKey_originalOwner, m_curOwnerName);
 			pNew->setColor(pCur->getColor());
+
+			// Rolled once here so the size is stored in the map; the game never re-rolls it.
+			Real fuzz = tt ? tt->getInstanceScaleFuzziness() : 0.0f;
+			if (fuzz > 0.0f)
+			{
+				Real roll = 2.0f * (Real)rand() / (Real)RAND_MAX - 1.0f;
+				pNew->getProperties()->setReal(TheKey_objectScale, 1.0f + fuzz * roll);
+			}
 			return pNew;
 		}
 	}
@@ -1208,6 +1216,21 @@ void ObjectOptions::OnEditchangeOwningteam()
 void ObjectOptions::selectObject(const MapObject* pObj)
 {
 	if (m_staticThis) {
+#ifdef RTS_HAS_QT
+		MapObject *selected = getObjectNamed(pObj->getName());
+		Int index = 0;
+		for (MapObject *entry = m_staticThis->m_objectsList; entry; entry = entry->getNext())
+		{
+			if (entry == selected)
+			{
+				qtSetCurrentSelection(index, entry->getName().str());
+				WBQtObject_SetTeam(WBQtObject_GetDefaultTeamForCurrent());
+				WBQtObject_PushSelectIndex(index);
+				return;
+			}
+			++index;
+		}
+#else
 
 		char buffer[NAME_MAX_LEN];
 		HTREEITEM objToSel = m_staticThis->findOrDont(pObj->getName().str());
@@ -1226,10 +1249,8 @@ void ObjectOptions::selectObject(const MapObject* pObj)
 		if (m_staticThis->m_objectTreeView.SelectItem(objToSel)) {
 			m_staticThis->m_currentObjectIndex = item.lParam;
 			strcpy(m_staticThis->m_currentObjectName, buffer);
-#ifdef RTS_HAS_QT
-			WBQtObject_PushSelectIndex(m_staticThis->m_currentObjectIndex);
-#endif
 		}
+#endif
 	}
 }
 

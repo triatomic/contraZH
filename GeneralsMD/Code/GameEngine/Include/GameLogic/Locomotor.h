@@ -139,6 +139,11 @@ public:
 
 	void friend_setName(const AsciiString& n) { m_name = n; }
 
+	// Read access for tools.
+	const AsciiString& friend_getName() const { return m_name; }
+	Real friend_getMaxSpeed() const { return m_maxSpeed; }	///< distance per logic frame
+	LocomotorSurfaceTypeMask friend_getSurfaces() const { return m_surfaces; }
+
 	void validate();
 
 protected:
@@ -205,7 +210,9 @@ private:
 	Bool											m_apply2DFrictionWhenAirborne;	// apply "2d friction" even when airborne... useful for realistic-looking movement
 	Bool											m_downhillOnly;	// pinewood derby, moves only by gravity pulling downhill
 	Bool											m_stickToGround;				// if true, can't leave ground
+	Real											m_groundCollisionAngle;
 	Bool											m_canMoveBackward;				// if true, can move backwards.
+	Bool											m_requiresMoveToTurn;			///< if true, can't pivot in place (aim/face drive forward and turn via the normal mover)
 	Real											m_backwardsMoveAngleThreshold;			///< goal must be at least this far off our heading (radians) before we reverse
 	Real											m_backwardsMoveDistanceFactorThreshold;	///< max reverse distance, as a factor of the object's MajorRadius
 	Real											m_backwardsMoveSpeedFactor;					///< multiplier applied to desired speed while moving backwards
@@ -243,7 +250,7 @@ public:
 
 	void locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalPos,
 		Real onPathDistToGoal, Real desiredSpeed, Bool *blocked);
-	void locoUpdate_moveTowardsAngle(Object* obj, Real angle);
+	void locoUpdate_moveTowardsAngle(Object* obj, Real angle, Bool turnByReversing = false, Bool aroundCenter = FALSE);	///< turnByReversing: back up to turn (needs CanMoveBackwards)
 	/**
 		Kill any current (2D) velocity (but stay at current position, or as close as possible)
 
@@ -268,6 +275,7 @@ public:
 	AsciiString getTemplateName() const { return m_template->m_name;}
 	Real getMinSpeed() const { return m_template->m_minSpeed;}
 	Real getMinTurnSpeed() const { return m_template->m_minTurnSpeed;}	///< must be going >= this speed to turn (0 = can turn in place)
+	Bool getRequiresMoveToTurn() const { return m_template->m_requiresMoveToTurn; }
 	Real getAccelPitchLimit() const { return m_template->m_accelPitchLimit;}	///< Maximum amount we will pitch up or down under acceleration (including recoil.)
 	Real getDecelPitchLimit() const { return m_template->m_decelPitchLimit;}	///< Maximum amount we will pitch down under deceleration (including recoil.)
 	Real getBounceKick() const { return m_template->m_bounceKick;}						///< How much simulating rough terrain "bounces" a wheel up.
@@ -294,6 +302,7 @@ public:
 	Bool getLocomotorWorksWhenDead() const { return m_template->m_locomotorWorksWhenDead; }
 	Bool getLocomotorWorksWhenDisabled() const { return m_template->m_locomotorWorksWhenDisabled; }
 	Bool getStickToGround() const { return m_template->m_stickToGround; }
+	Real getGroundCollisionAngle() const { return m_template->m_groundCollisionAngle; }
 	Real getCloseEnoughDist() const { return m_closeEnoughDist; }
 	Bool isCloseEnoughDist3D() const { return getFlag(IS_CLOSE_ENOUGH_DIST_3D); }
 	Bool hasSuspension() const {return m_template->m_hasSuspension;}
@@ -405,7 +414,7 @@ protected:
 	void moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionTreads(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	Bool shouldMoveBackwards(Object* obj, Real relAngle, Real onPathDistToGoal, Real forwardSpeed);	///< decide (with hysteresis) whether to reverse toward a goal that is behind us, for locos that can rotate in place (treads/hover)
-	Bool isForcedReverse(Object* obj, Real relAngle) const;	///< a REVERSE_MOVE order is in effect and the heading allows it
+	Bool isForcedReverse(Object* obj) const;	///< a REVERSE_MOVE order is in effect and the locomotor supports it
 	void moveTowardsPositionOther(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionHover(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
 	void moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos, Real onPathDistToGoal, Real desiredSpeed);
@@ -419,14 +428,14 @@ protected:
 	void maintainCurrentPositionHover(Object* obj, PhysicsBehavior *physics);
 	void maintainCurrentPositionWings(Object* obj, PhysicsBehavior *physics);
 
-	PhysicsTurningType rotateTowardsPosition(Object* obj, const Coord3D& goalPos, Real *relAngle=nullptr);
+	PhysicsTurningType rotateTowardsPosition(Object* obj, const Coord3D& goalPos, Real *relAngle=nullptr, Bool aroundCenter = FALSE);
 
 	/*
 		return true if we can maintain the position without being called every frame (eg, we are
 		resting on the ground), false if not (eg, we are hovering or circling)
 	*/
 	Bool handleBehaviorZ(Object* obj, PhysicsBehavior *physics, const Coord3D& goalPos);
-	PhysicsTurningType rotateObjAroundLocoPivot(Object* obj, const Coord3D& goalPos, Real maxTurnRate, Real *relAngle = nullptr);
+	PhysicsTurningType rotateObjAroundLocoPivot(Object* obj, const Coord3D& goalPos, Real maxTurnRate, Real *relAngle = nullptr, Bool aroundCenter = FALSE);
 
 	Real calcLiftToUseAtPt(Object* obj, PhysicsBehavior *physics, Real curZ, Real surfaceAtPt, Real preferredHeight);
 
@@ -467,7 +476,8 @@ private:
 		DOING_THREE_POINT_TURN,	// If we are doing a 3 pt turn.
 		CLIMBING,								// If we are in the process of climbing.
 		IS_CLOSE_ENOUGH_DIST_3D,
-		OFFSET_INCREASING
+		OFFSET_INCREASING,
+		REVERSE_TO_TURN				// transient (set/cleared within locoUpdate_moveTowardsAngle): force reversing to turn
 	};
 
 	Bool getFlag(LocoFlag f) const { return (m_flags & (1 << f)) != 0; }

@@ -43,6 +43,9 @@ XferCRC::XferCRC()
 
 	m_xferMode = XFER_CRC;
 	m_crc = 0;
+#if RETAIL_COMPATIBLE_CRC
+	m_playerCount = RETAIL_PLAYER_COUNT;
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------

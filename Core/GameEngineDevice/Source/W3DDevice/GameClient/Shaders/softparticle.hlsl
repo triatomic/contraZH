@@ -45,6 +45,12 @@
 #ifndef BEAM
 #define BEAM 0
 #endif
+#ifndef FLUID
+#define FLUID 0
+#endif
+#ifndef TERRAIN
+#define TERRAIN 0
+#endif
 
 sampler2D ParticleTexture : register(s0);
 sampler2D SurfaceTexture  : register(s1);
@@ -64,7 +70,14 @@ float4 HeightMap   : register(c3);   // xy scale and zw offset from world xy to 
 float4 HeightDecode : register(c4);  // weights of the high and low height bytes
 #endif
 float4 Params      : register(c5);   // x = 1 / fade distance, y = 1 to fade colour too, z = 1 to fade towards white, w = sign of depth along the view
-#if FLAME
+#if FLUID
+float4 Fluid       : register(c6);   // x = flow travel, y = uv warp, z = world to noise scale, w = body contrast
+float4 FluidWorldX : register(c7);
+float4 FluidWorldY : register(c8);
+float4 FluidWorldZ : register(c9);
+float4 FluidShape  : register(c10);  // x = bubble brightness, y = world to bubble scale, z = edge breakup, w = glow
+float4 FluidTime   : register(c11);  // x = bubble cycles elapsed
+#elif FLAME
 float4 Flame       : register(c6);   // x = noise rise so far, y = texture warp, z = world to noise scale, w = heat gain
 float4 FlameWorldX : register(c7);   // camera space to world x, y and z, one row each
 float4 FlameWorldY : register(c8);
@@ -104,7 +117,48 @@ float4 main(PsIn input) : COLOR
 {
     float4 position = float4(input.Position, 1.0f);
 
-#if FLAME
+#if TERRAIN
+    // Terrain triangles are culled against the unwarped footprint.
+    clip(min(input.TexCoord, 1.0f - input.TexCoord));
+#endif
+
+#if FLUID
+    float2 world = float2(dot(position, FluidWorldX), dot(position, FluidWorldY));
+    float2 field = world * Fluid.z;
+    float4 noiseA = tex2D(NoiseTexture, field - float2(Fluid.x, Fluid.x * 0.3f));
+    float4 noiseB = tex2D(NoiseTexture, field * 1.7f + (noiseA.rg - 0.5f) * 0.4f + float2(Fluid.x * 0.7f, -Fluid.x * 1.3f));
+    float4 mask = tex2D(ParticleTexture, input.TexCoord);
+    float2 uv = saturate(input.TexCoord + (noiseA.rg + noiseB.gr - 1.0f) * Fluid.y);
+    float4 texel = tex2D(ParticleTexture, uv);
+    float4 color = texel * input.Diffuse;
+
+    // The unwarped mask keeps the liquid inside its particle footprint.
+    float coverage = lerp(mask.a, 1.0f, Params.y);
+    float footprint = max(mask.r, max(mask.g, mask.b)) * coverage;
+    float keep = saturate(1.0f + (footprint - noiseB.b) * FluidShape.z * 4.0f);
+    float vein = saturate(1.0f - abs(noiseA.b - noiseB.g) * 12.0f);
+    float body = lerp(1.0f, 0.35f + noiseB.r * 0.9f, Fluid.w);
+
+    // Each world-fixed cell grows and fades one bubble at a different phase.
+    float2 cells = world * FluidShape.y;
+    float4 seed = tex2D(NoiseTexture, (floor(cells) * float2(17.0f, 29.0f) + 0.5f) / 64.0f);
+    float phase = frac(FluidTime.x + seed.b);
+    float2 local = frac(cells) - (0.35f + seed.rg * 0.3f);
+    float radius = 0.06f + phase * 0.26f;
+    float distance = length(local);
+    float ring = saturate(1.0f - abs(distance - radius) * 35.0f);
+    float inside = saturate((radius - distance) * 25.0f);
+    float life = phase * (1.0f - phase) * 4.0f;
+    float bubble = ring * life * step(0.45f, seed.g) * FluidShape.x;
+
+    float peak = max(color.r, max(color.g, color.b));
+    float3 highlight = color.rgb * 0.35f + peak * 0.65f;
+    color.rgb = color.rgb * body * (1.0f - inside * life * saturate(FluidShape.x) * 0.45f);
+    color.rgb += highlight * (vein * vein * 0.6f + bubble);
+    color.rgb += texel.rgb * input.Diffuse.rgb * FluidShape.w * (0.5f + noiseA.g + vein * 0.5f);
+    color.rgb *= footprint * lerp(1.0f, keep, Params.y);
+    color.a = mask.a * input.Diffuse.a * keep;
+#elif FLAME
     float3 flameWorld = float3(dot(position, FlameWorldX), dot(position, FlameWorldY), dot(position, FlameWorldZ));
 
     // Two upright slices through the field, so the pattern changes whichever way the camera faces.

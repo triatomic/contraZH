@@ -7,14 +7,17 @@
 #error "GeneralsOnline sources must only be compiled with RTS_BUILD_GENERALS_ONLINE=ON"
 #endif
 
+//#define WORLD_SERIES_CLIENT 1
+
 #define GENERALS_ONLINE_COMMUNITY_PATCH_CHANGES 1
 
+// contraZH port: anticheat and networking plugins stay compiled out; GO turns this on upstream.
 //#define GENERALS_ONLINE_USE_PLUGINS_INTERFACE
 
 //#define USE_MAULLER_ONEDRIVE_FIX 1
 //#define USE_STUBBJAX_TRANSPORT_CONTAIN_FIX 1
 
-#define GENERALS_ONLINE_VERSION_STRING "082826_QFE1" // NOTE: Format is critical here for Sentry to work
+#define GENERALS_ONLINE_VERSION_STRING "100126_QFE2" // NOTE: Format is critical here for Sentry to work
 
 // contraZH port: not taken - this fork keeps its own texture filtering and MSAA
 // support (TextureFilter / AnisotropyLevel in Options.ini and the options menu).
@@ -76,11 +79,8 @@ void showNotificationBox(AsciiString nick, UnicodeString message, bool bPlaySoun
 // contraZH port: GENERALS_ONLINE_HIGH_FPS_SERVER comes from GeneralsMD/Code/CMakeLists.txt
 // so WWLib (built without GO headers) sees the same switch.
 
-#if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
-#define GENERALS_ONLINE_CLIENT_ID "gen_online_60hz"
-#else
-#define GENERALS_ONLINE_CLIENT_ID "gen_online_30hz"
-#endif
+// contraZH: the services map this third party id to a full game session.
+#define GENERALS_ONLINE_CLIENT_ID "custom_third_party_client"
 
 #if defined(GENERALS_ONLINE_HIGH_FPS_SERVER)
 	#define GENERALS_ONLINE_HIGH_FPS_LIMIT 60

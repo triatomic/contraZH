@@ -80,6 +80,7 @@ public:
 	AsciiString m_missionObjectivesLabel[MAX_OBJECTIVE_LINES];
 	AudioEventRTS m_briefingVoice;
 	AsciiString m_locationNameLabel;
+	AsciiString m_nameLabel;						///< mission name label from string manager
 	AsciiString m_unitNames[MAX_DISPLAYED_UNITS];
 	Int m_voiceLength;
 	AsciiString m_generalName;
@@ -105,6 +106,7 @@ public:
 	AsciiString m_name;
 	AsciiString m_firstMission;
 	AsciiString m_campaignNameLabel;		///< campaign name label from string manager
+	AsciiString m_groupLabel;						///< campaign tab label from string manager
 	MissionList m_missions;
 	AsciiString m_finalMovieName;
 	Bool m_isChallengeCampaign;
@@ -137,6 +139,12 @@ public:
 	static void parseMissionPart( INI* ini, void *instance, void *store, const void *userData );					///< Parse the Mission Part
 
 	Campaign *newCampaign(AsciiString name);
+	const std::list< Campaign* > &getCampaignList() const { return m_campaignList; }
+
+	// Completed missions persist in CampaignProgress.ini; a mission unlocks once a mission leading to it is complete
+	Bool isMissionCompleted( const Campaign *campaign, const Mission *mission );
+	Bool isMissionUnlocked( const Campaign *campaign, const Mission *mission );
+	void markCurrentMissionCompleted();
 	Bool isVictorious() { return m_victorious; }
 	void SetVictorious( Bool victory ) { m_victorious = victory;	}
 

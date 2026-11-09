@@ -25,6 +25,7 @@
 
 #include "WWLib/always.h"
 #include "WWMath/matrix4.h"
+#include "WWMath/vector2.h"
 #include "WWMath/vector3.h"
 #include "WWMath/frustum.h"
 #include "WW3D2/matpass.h"
@@ -66,6 +67,7 @@ public:
 	Bool init();
 	void ReleaseResources();
 	Bool ReAcquireResources();
+	void followResolution();	///< rebuilds the map when the Options menu changes its size
 
 	Bool isAvailable() const { return m_depthMode != DEPTH_MODE_NONE; }
 	DepthMode getDepthMode() const { return m_depthMode; }
@@ -133,11 +135,13 @@ public:
 
 protected:
 
-	void computeSunViewProjection(const Vector3& center, Real radius, const Vector3& lightDirection);
-	void updateCullCamera(const Vector3& center, Real radius, const Vector3& lightDirection);
+	// Both read the fit updateFrustum stores.
+	void computeSunViewProjection();
+	void updateCullCamera();
 
 	DepthMode      m_depthMode;
 	Int            m_resolution;
+	Int            m_requestedResolution;	///< the size asked for at the last build, before the device caps it
 	TextureClass*  m_colorTarget;
 	ZTextureClass* m_depthTarget;
 
@@ -157,9 +161,14 @@ protected:
 	Matrix4x4      m_sunViewProj;
 	Vector3        m_fittedCenter;
 	Vector3        m_lightDirection;
+
+	// The map's width and height axes, across the light. Height follows the camera's heading.
+	Vector3        m_lightX;
+	Vector3        m_lightY;
 	Real           m_depthBias;
 	Real           m_casterDepthBias;
-	Real           m_fittedRadius;
+	Vector2        m_fittedHalfExtent;	///< half the map's width and height in world units
+	Real           m_filterSpacing;	///< receivers' filter tap spacing in texels
 	FrustumClass   m_viewFrustum;
 	Real           m_lowestVisibleGround;
 	Bool           m_hasViewFrustum;

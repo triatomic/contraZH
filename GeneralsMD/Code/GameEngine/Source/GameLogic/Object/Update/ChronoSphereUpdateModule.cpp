@@ -51,6 +51,7 @@
 ChronoSphereUpdateModuleData::ChronoSphereUpdateModuleData()
 {
 	m_specialPowerTemplate = nullptr;
+	m_resetTargetingOnTeleport = FALSE;
 	m_teleportDelayFrames = 0;
 	m_radius = 0.0f;
 	m_sourceFX = nullptr;
@@ -80,6 +81,7 @@ ChronoSphereUpdateModuleData::ChronoSphereUpdateModuleData()
 		{ "UnitTargetFX",					INI::parseFXList,								nullptr,				offsetof( ChronoSphereUpdateModuleData, m_unitTargetFX ) },
 		{ "SourceOCL",						INI::parseObjectCreationList,		nullptr,				offsetof( ChronoSphereUpdateModuleData, m_sourceOCL ) },
 		{ "TargetOCL",						INI::parseObjectCreationList,		nullptr,				offsetof( ChronoSphereUpdateModuleData, m_targetOCL ) },
+		{ "ResetTargetingOnTeleport", INI::parseBool, NULL, offsetof(ChronoSphereUpdateModuleData, m_resetTargetingOnTeleport) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
@@ -272,6 +274,11 @@ void ChronoSphereUpdateModule::doChronoTeleport()
 				ai->aiIdle( CMD_FROM_AI );
 			obj->setPosition( &dest );
 			pathfinder->updatePos( obj, &dest );
+		}
+
+		if( data->m_resetTargetingOnTeleport )
+		{
+			obj->resetTargetingOnSelf();
 		}
 
 		// Per-unit FX at the destination (after the move).

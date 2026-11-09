@@ -201,6 +201,7 @@ UnsignedByte DirectInputMouse::getMouseEvent( MouseIO *result, Bool flush )
 	/* set these to defaults */
 	result->leftState = result->middleState = result->rightState = FALSE;
 	result->leftState = result->middleState = result->rightState = MBS_None;
+	result->x1State = result->x2State = MBS_None;
 	result->pos.x = result->pos.y = result->wheelPos = 0;
 
 	if( m_pMouseDevice )

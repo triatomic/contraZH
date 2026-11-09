@@ -170,6 +170,7 @@ public:
 
 	// note that, unlike scrubVelocity2D(), this is a signed limit
 	void scrubVelocityZ( Real desiredVelocity );
+	Bool constrainGroundMovement(Coord3D& pos) const;
 
 	void setPitchRate(Real pitch);
 	void setRollRate(Real roll);
@@ -238,6 +239,7 @@ protected:
 	Real getForwardFriction() const;
 	Real getLateralFriction() const;
 	Real getZFriction() const;
+	Real getGroundCollisionAngle() const;
 
 	void applyGravitationalForces();
 	void applyFrictionalForces();

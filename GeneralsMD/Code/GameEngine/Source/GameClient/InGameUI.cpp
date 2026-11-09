@@ -42,11 +42,13 @@
 #include "Common/NameKeyGenerator.h"
 #include "Common/PerfTimer.h"
 #include "Common/Player.h"
+#include "Common/OptionPreferences.h"
 #include "Common/PlayerList.h"
 #include "Common/Radar.h"
 #include "Common/Team.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
+#include "Common/ThingSort.h"
 #include "Common/BuildAssistant.h"
 #include "Common/Recorder.h"
 #include "Common/SpecialPower.h"
@@ -68,6 +70,10 @@
 #include "GameClient/Drawable.h"
 #include "GameClient/FXList.h"
 #include "GameClient/GadgetPushButton.h"
+#include "GameClient/GadgetCheckBox.h"
+#include "GameClient/GadgetComboBox.h"
+#include "GameClient/GadgetListBox.h"
+#include "GameClient/GadgetTextEntry.h"
 #include "GameClient/GameClient.h"
 #include "GameClient/GameWindowGlobal.h"
 #include "GameClient/GameWindowID.h"
@@ -86,6 +92,8 @@
 #include "GameClient/GlobalLanguage.h"
 
 #include "GameLogic/AIGuard.h"
+#include "GameLogic/AIPathfind.h"
+#include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/GameLogic.h"
@@ -150,8 +158,6 @@ static UnicodeString formatIncomeValue(UnsignedInt cashPerMin)
 //-------------------------------------------------------------------------------------------------
 /// The InGameUI singleton instance.
 InGameUI *TheInGameUI = nullptr;
-
-GameWindow *m_replayWindow = nullptr;
 
 // ------------------------------------------------------------------------------------------------
 struct KindOfSelectionData
@@ -269,38 +275,6 @@ static Bool similarUnitSelection( Drawable *test, void *userData )
 		}
 	}
 	return FALSE;
-}
-
-// ------------------------------------------------------------------------------------------------
-// ------------------------------------------------------------------------------------------------
-void showReplayControls()
-{
-	if (m_replayWindow)
-	{
-		Bool show = TheGameLogic->isInReplayGame();
-		m_replayWindow->winHide(!show);
-	}
-}
-
-// ------------------------------------------------------------------------------------------------
-// ------------------------------------------------------------------------------------------------
-void hideReplayControls()
-{
-	if (m_replayWindow)
-	{
-		m_replayWindow->winHide(TRUE);
-	}
-}
-
-// ------------------------------------------------------------------------------------------------
-// ------------------------------------------------------------------------------------------------
-void toggleReplayControls()
-{
-	if (m_replayWindow)
-	{
-		Bool show = TheGameLogic->isInReplayGame() && m_replayWindow->winIsHidden();
-		m_replayWindow->winHide(!show);
-	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1117,6 +1091,728 @@ InGameUI::PlayerInfoList::LastValues::LastValues()
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+namespace
+{
+struct ShaderDebugOption
+{
+	const wchar_t *label;
+	Bool GlobalData::*field;
+};
+
+const ShaderDebugOption ShaderDebugOptions[] =
+{
+	{ L"Bloom", &GlobalData::m_useBloom },
+	{ L"Laser glow", &GlobalData::m_laserRef },
+	{ L"Shadow maps", &GlobalData::m_useShadowMap },
+	{ L"Specular / glow", &GlobalData::m_useSpecular },
+	{ L"Normal maps", &GlobalData::m_useNormalMaps },
+	{ L"Water reflections", &GlobalData::m_waterReflections },
+	{ L"Shoreline foam", &GlobalData::m_shorelineFoam },
+	{ L"Soft particles", &GlobalData::m_useSoftParticles },
+	{ L"Flame shaders", &GlobalData::m_useFlameShaders },
+	{ L"Electric shaders", &GlobalData::m_useElectricShaders },
+	{ L"Laser shaders", &GlobalData::m_useLaserShaders },
+	{ L"Cryo shaders", &GlobalData::m_useCryoShaders },
+	{ L"Fluid shaders", &GlobalData::m_useFluidShaders },
+	{ L"Dynamic lights", &GlobalData::m_useDynamicLights },
+	{ L"Pixel lights", &GlobalData::m_usePixelLights },
+	{ L"Ambient occlusion", &GlobalData::m_useAmbientOcclusion },
+	{ L"Height blend", &GlobalData::m_useHeightBlend },
+	{ L"HQ sky clouds", &GlobalData::m_useHQSky },
+	{ L"Planar mirrors", &GlobalData::m_planarMirrorShader }
+};
+
+struct ShaderDebugValue
+{
+	const wchar_t *label;
+	Real GlobalData::*field;
+	Real minimum;
+	Real maximum;
+	Real step;
+};
+
+const ShaderDebugValue ShaderDebugValues[] =
+{
+#if defined(BUILD_WITH_D3D9)
+	{ L"Bloom threshold", &GlobalData::m_bloomThreshold, 0.0f, 1.0f, 0.05f },
+#endif
+	{ L"Bloom size", &GlobalData::m_bloomSize, 0.25f, 4.0f, 0.25f }
+};
+
+const Int SHADER_PANEL_COLUMN_WIDTH = 200;
+const Int SHADER_PANEL_ROW_HEIGHT = 20;
+const Int SHADER_PANEL_HEADER = 52;
+const Int SHADER_PANEL_ROWS = (ARRAY_SIZE(ShaderDebugOptions) + 1) / 2;
+const Int SHADER_PANEL_WIDTH = SHADER_PANEL_COLUMN_WIDTH * 2 + 16;
+const Int SHADER_PANEL_VALUE_TOP = SHADER_PANEL_HEADER + SHADER_PANEL_ROWS * SHADER_PANEL_ROW_HEIGHT;
+const Int SHADER_PANEL_HEIGHT = SHADER_PANEL_VALUE_TOP + ARRAY_SIZE(ShaderDebugValues) * SHADER_PANEL_ROW_HEIGHT + 20;
+GameWindow *ShaderPanelWindow = nullptr;
+DisplayString *ShaderPanelString = nullptr;
+const Int UNIT_SPAWNER_HEIGHT = 450;
+Bool UnitSpawnerTab = FALSE;
+GameWindow *UnitSpawnerSide = nullptr;
+GameWindow *UnitSpawnerKindFilter = nullptr;
+GameWindow *UnitSpawnerSearch = nullptr;
+GameWindow *UnitSpawnerList = nullptr;
+GameWindow *UnitSpawnerSpawnMode = nullptr;
+GameWindow *UnitSpawnerPlacement = nullptr;
+UnsignedShort UnitSpawnerTemplateID = 0;
+std::vector<const ThingTemplate *> UnitSpawnerTemplates;
+std::vector<AsciiString> UnitSpawnerSides;
+
+enum UnitSpawnerKind
+{
+	SPAWNER_ALL,
+	SPAWNER_BUILDINGS,
+	SPAWNER_UNITS,
+	SPAWNER_AIRPLANES,
+	SPAWNER_EFFECTS,
+	SPAWNER_INFANTRY,
+	SPAWNER_VEHICLES,
+	SPAWNER_PROJECTILES,
+	SPAWNER_ADDONS,
+	SPAWNER_PROPS,
+	SPAWNER_OTHER
+};
+
+const wchar_t *UnitSpawnerKindNames[] =
+{
+	L"All", L"Buildings", L"Units", L"Airplanes", L"Effects", L"Infantry",
+	L"Vehicles", L"Projectiles", L"Addons", L"Props", L"Other"
+};
+
+UnitSpawnerKind unitSpawnerKind(const ThingTemplate *tmpl)
+{
+	if (tmpl->isKindOf(KINDOF_PROJECTILE))
+	{
+		return SPAWNER_PROJECTILES;
+	}
+	if (tmpl->isKindOf(KINDOF_PORTABLE_STRUCTURE))
+	{
+		return SPAWNER_ADDONS;
+	}
+	if (tmpl->isKindOf(KINDOF_STRUCTURE))
+	{
+		return SPAWNER_BUILDINGS;
+	}
+	if (tmpl->isKindOf(KINDOF_AIRCRAFT))
+	{
+		return SPAWNER_AIRPLANES;
+	}
+	if (tmpl->isKindOf(KINDOF_INFANTRY))
+	{
+		return SPAWNER_INFANTRY;
+	}
+	if (tmpl->isKindOf(KINDOF_VEHICLE))
+	{
+		return SPAWNER_VEHICLES;
+	}
+	const EditorSortingType sorting = tmpl->getEditorSorting();
+	if (tmpl->isKindOf(KINDOF_PROP) || sorting == ES_SHRUBBERY || sorting == ES_MISC_MAN_MADE
+		|| sorting == ES_MISC_NATURAL || sorting == ES_DEBRIS)
+	{
+		return SPAWNER_PROPS;
+	}
+	if (tmpl->isKindOf(KINDOF_INERT) || sorting == ES_SYSTEM || sorting == ES_AUDIO)
+	{
+		return SPAWNER_EFFECTS;
+	}
+	return SPAWNER_OTHER;
+}
+
+Bool canSpawnDebugUnit()
+{
+	return TheGameLogic && !TheGameLogic->isInMultiplayerGame()
+		&& ThePlayerList && ThePlayerList->getLocalPlayer();
+}
+
+Bool unitSpawnerMatches(const UnicodeString &text, const UnicodeString &search)
+{
+	for (const WideChar *at = text.str(); *at; ++at)
+	{
+		if (_wcsnicmp(at, search.str(), search.getLength()) == 0)
+		{
+			return TRUE;
+		}
+	}
+	return search.isEmpty();
+}
+
+Bool unitSpawnerTemplateLess(const ThingTemplate *left, const ThingTemplate *right)
+{
+	return _stricmp(left->getName().str(), right->getName().str()) < 0;
+}
+
+void refreshUnitSpawnerList()
+{
+	if (!UnitSpawnerList || !UnitSpawnerSide || !UnitSpawnerKindFilter || !UnitSpawnerSearch)
+	{
+		return;
+	}
+	Int side = 0;
+	Int kind = SPAWNER_ALL;
+	GadgetComboBoxGetSelectedPos(UnitSpawnerSide, &side);
+	GadgetComboBoxGetSelectedPos(UnitSpawnerKindFilter, &kind);
+	const UnicodeString search = GadgetTextEntryGetText(UnitSpawnerSearch);
+	GadgetListBoxReset(UnitSpawnerList);
+	GadgetListBoxBatchAddScope batch(UnitSpawnerList);
+	for (Int i = 0; i < (Int)UnitSpawnerTemplates.size(); ++i)
+	{
+		const ThingTemplate *tmpl = UnitSpawnerTemplates[i];
+		const UnitSpawnerKind templateKind = unitSpawnerKind(tmpl);
+		if (kind != SPAWNER_ALL && kind != templateKind
+			&& !(kind == SPAWNER_UNITS && (templateKind == SPAWNER_INFANTRY || templateKind == SPAWNER_VEHICLES)))
+		{
+			continue;
+		}
+		if (side > 0 && side < (Int)UnitSpawnerSides.size()
+			&& _stricmp(tmpl->getDefaultOwningSide().str(), UnitSpawnerSides[side].str()) != 0)
+		{
+			continue;
+		}
+		UnicodeString name;
+		name.translate(tmpl->getName());
+		if (!unitSpawnerMatches(name, search) && !unitSpawnerMatches(tmpl->getDisplayName(), search))
+		{
+			continue;
+		}
+		UnicodeString label;
+		if (tmpl->getDisplayName().isEmpty())
+		{
+			label = name;
+		}
+		else
+		{
+			label.format(L"%ls [%ls]", tmpl->getDisplayName().str(), name.str());
+		}
+		const Int row = GadgetListBoxAddEntryText(UnitSpawnerList, label, GameMakeColor(235, 235, 235, 255), -1);
+		DEBUG_ASSERTCRASH(row >= 0, ("Unit spawner list is full"));
+		if (row < 0)
+		{
+			break;
+		}
+		GadgetListBoxSetItemData(UnitSpawnerList, const_cast<ThingTemplate *>(tmpl), row);
+	}
+	GadgetListBoxSetTopVisibleEntry(UnitSpawnerList, 0);
+	if (GadgetListBoxGetNumEntries(UnitSpawnerList) > 0)
+	{
+		GadgetListBoxSetSelected(UnitSpawnerList, 0);
+	}
+}
+
+void finishUnitSpawnerPlacement()
+{
+	if (UnitSpawnerPlacement)
+	{
+		TheWindowManager->winDestroy(UnitSpawnerPlacement);
+		UnitSpawnerPlacement = nullptr;
+	}
+	if (ShaderPanelWindow)
+	{
+		ShaderPanelWindow->winHide(FALSE);
+	}
+}
+
+WindowMsgHandledType unitSpawnerPlacementSystem(GameWindow *window, UnsignedInt msg, WindowMsgData, WindowMsgData data)
+{
+	if (msg == GWM_INPUT_FOCUS)
+	{
+		*(Bool *)data = TRUE;
+		return MSG_HANDLED;
+	}
+	if (msg == GWM_DESTROY && window == UnitSpawnerPlacement)
+	{
+		UnitSpawnerPlacement = nullptr;
+	}
+	return MSG_IGNORED;
+}
+
+WindowMsgHandledType unitSpawnerPlacementInput(GameWindow *, UnsignedInt msg, WindowMsgData data, WindowMsgData state)
+{
+	if (msg == GWM_RIGHT_UP || (msg == GWM_CHAR && data == KEY_ESC && (state & KEY_STATE_DOWN)))
+	{
+		finishUnitSpawnerPlacement();
+	}
+	else if (msg == GWM_LEFT_UP)
+	{
+		ICoord2D screen;
+		screen.x = (Int)LOLONGTOSHORT(data);
+		screen.y = (Int)HILONGTOSHORT(data);
+		Coord3D pos;
+		if (canSpawnDebugUnit() && TheTacticalView && TheMessageStream
+			&& TheTacticalView->screenToTerrain(&screen, &pos))
+		{
+			GameMessage *spawn = TheMessageStream->appendMessage(GameMessage::MSG_SPAWN_OBJECT_AT_POSITION);
+			spawn->appendIntegerArgument((Int)UnitSpawnerTemplateID);
+			spawn->appendLocationArgument(pos);
+			if (!UnitSpawnerSpawnMode || !GadgetCheckBoxIsChecked(UnitSpawnerSpawnMode))
+			{
+				finishUnitSpawnerPlacement();
+			}
+		}
+	}
+	return MSG_HANDLED;
+}
+
+void startUnitSpawnerPlacement(Int row = -1)
+{
+	if (!canSpawnDebugUnit() || !UnitSpawnerList || UnitSpawnerPlacement)
+	{
+		return;
+	}
+	if (row == -1)
+	{
+		GadgetListBoxGetSelected(UnitSpawnerList, &row);
+	}
+	if (row < 0 || row >= GadgetListBoxGetNumEntries(UnitSpawnerList))
+	{
+		return;
+	}
+	const ThingTemplate *tmpl = (const ThingTemplate *)GadgetListBoxGetItemData(UnitSpawnerList, row);
+	if (!tmpl)
+	{
+		return;
+	}
+	UnitSpawnerTemplateID = tmpl->getTemplateID();
+	WinInstanceData data;
+	data.m_style = GWS_USER_WINDOW;
+	UnitSpawnerPlacement = TheWindowManager->winCreate(nullptr, WIN_STATUS_ENABLED,
+		0, 0, TheDisplay->getWidth(), TheDisplay->getHeight(), unitSpawnerPlacementSystem, &data);
+	if (UnitSpawnerPlacement)
+	{
+		UnitSpawnerPlacement->winSetInputFunc(unitSpawnerPlacementInput);
+		UnitSpawnerPlacement->winBringToTop();
+		ShaderPanelWindow->winHide(TRUE);
+		TheWindowManager->winSetFocus(UnitSpawnerPlacement);
+		TheInGameUI->message(UnicodeString(GadgetCheckBoxIsChecked(UnitSpawnerSpawnMode)
+			? L"Spawn mode. Left-click to keep spawning. Right-click or Escape exits."
+			: L"Click the ground to spawn. Right-click or Escape cancels."));
+	}
+}
+
+void styleUnitSpawnerControl(GameWindow *window)
+{
+	const Color background = GameMakeColor(20, 28, 36, 255);
+	const Color border = GameMakeColor(110, 140, 160, 255);
+	const Color selected = GameMakeColor(55, 85, 105, 255);
+	for (Int i = 0; i < 2; ++i)
+	{
+		window->winSetEnabledColor(i, i == 0 ? background : selected);
+		window->winSetEnabledBorderColor(i, border);
+		window->winSetHiliteColor(i, i == 0 ? background : selected);
+		window->winSetHiliteBorderColor(i, border);
+		window->winSetDisabledColor(i, background);
+		window->winSetDisabledBorderColor(i, border);
+	}
+	window->winSetEnabledTextColors(GameMakeColor(235, 235, 235, 255), GameMakeColor(0, 0, 0, 255));
+	window->winSetHiliteTextColors(GameMakeColor(235, 235, 235, 255), GameMakeColor(0, 0, 0, 255));
+	if (window->winGetStyle() & GWS_PUSH_BUTTON)
+	{
+		window->winClearStatus(WIN_STATUS_IMAGE);
+		window->winSetDrawFunc(TheWindowManager->getPushButtonDrawFunc());
+	}
+	for (GameWindow *child = window->winGetChild(); child; child = child->winGetNext())
+	{
+		styleUnitSpawnerControl(child);
+	}
+}
+
+void styleUnitSpawnerList(GameWindow *window)
+{
+	styleUnitSpawnerControl(window);
+	ListboxData *list = (ListboxData *)window->winGetUserData();
+	GadgetButtonSetText(list->upButton, UnicodeString(L"\x25B2"));
+	GadgetButtonSetText(list->downButton, UnicodeString(L"\x25BC"));
+}
+
+WindowMsgHandledType unitSpawnerComboFieldInput(GameWindow *window, UnsignedInt msg, WindowMsgData data, WindowMsgData state)
+{
+	GameWindow *button = GadgetComboBoxGetDropDownButton(window->winGetParent());
+	return TheWindowManager->winSendInputMsg(button, msg, data, state);
+}
+
+GameWindow *createUnitSpawnerCombo(Int y, Int entries, GameFont *font)
+{
+	WinInstanceData data;
+	data.m_style = GWS_COMBO_BOX | GWS_MOUSE_TRACK;
+	data.m_font = font;
+	ComboBoxData combo;
+	memset(&combo, 0, sizeof(combo));
+	combo.maxDisplay = 10;
+	combo.maxChars = 96;
+	combo.entryData = NEW EntryData;
+	memset(combo.entryData, 0, sizeof(EntryData));
+	combo.listboxData = NEW ListboxData;
+	memset(combo.listboxData, 0, sizeof(ListboxData));
+	combo.listboxData->listLength = max(1, entries);
+	combo.listboxData->columns = 1;
+	combo.listboxData->scrollBar = TRUE;
+	GameWindow *window = TheWindowManager->gogoGadgetComboBox(ShaderPanelWindow, WIN_STATUS_ENABLED,
+		64, y, SHADER_PANEL_WIDTH - 72, 22, &data, &combo, font, TRUE);
+	GameWindow *field = GadgetComboBoxGetEditBox(window);
+	field->winClearStatus(WIN_STATUS_NO_INPUT);
+	field->winSetStatus(WIN_STATUS_NO_FOCUS);
+	field->winSetInputFunc(unitSpawnerComboFieldInput);
+	styleUnitSpawnerControl(window);
+	GadgetButtonSetText(GadgetComboBoxGetDropDownButton(window), UnicodeString(L"\x25BC"));
+	styleUnitSpawnerList(GadgetComboBoxGetListBox(window));
+	return window;
+}
+
+void createUnitSpawner()
+{
+	if (UnitSpawnerList || !TheThingFactory)
+	{
+		return;
+	}
+	UnitSpawnerTemplates.clear();
+	UnitSpawnerSides.clear();
+	UnitSpawnerSides.push_back(AsciiString::TheEmptyString);
+	for (const ThingTemplate *base = TheThingFactory->firstTemplate(); base; base = base->friend_getNextTemplate())
+	{
+		const ThingTemplate *tmpl = (const ThingTemplate *)base->getFinalOverride();
+		if (tmpl->isKindOf(KINDOF_DRAWABLE_ONLY))
+		{
+			continue;
+		}
+		UnitSpawnerTemplates.push_back(tmpl);
+		const AsciiString &side = tmpl->getDefaultOwningSide();
+		if (!side.isEmpty() && std::find(UnitSpawnerSides.begin(), UnitSpawnerSides.end(), side) == UnitSpawnerSides.end())
+		{
+			UnitSpawnerSides.push_back(side);
+		}
+	}
+	std::sort(UnitSpawnerTemplates.begin(), UnitSpawnerTemplates.end(), unitSpawnerTemplateLess);
+	std::sort(UnitSpawnerSides.begin() + 1, UnitSpawnerSides.end());
+	GameFont *font = TheWindowManager->winFindFont("Tahoma", 9, FALSE);
+	UnitSpawnerSide = createUnitSpawnerCombo(58, (Int)UnitSpawnerSides.size(), font);
+	for (Int i = 0; i < (Int)UnitSpawnerSides.size(); ++i)
+	{
+		UnicodeString side;
+		side.translate(UnitSpawnerSides[i]);
+		GadgetComboBoxAddEntry(UnitSpawnerSide, i == 0 ? UnicodeString(L"All sides") : side, GameMakeColor(235, 235, 235, 255));
+	}
+	GadgetComboBoxSetSelectedPos(UnitSpawnerSide, 0);
+	UnitSpawnerKindFilter = createUnitSpawnerCombo(88, ARRAY_SIZE(UnitSpawnerKindNames), font);
+	for (Int i = 0; i < ARRAY_SIZE(UnitSpawnerKindNames); ++i)
+	{
+		GadgetComboBoxAddEntry(UnitSpawnerKindFilter, UnicodeString(UnitSpawnerKindNames[i]), GameMakeColor(235, 235, 235, 255));
+	}
+	GadgetComboBoxSetSelectedPos(UnitSpawnerKindFilter, SPAWNER_ALL);
+	WinInstanceData data;
+	data.m_style = GWS_ENTRY_FIELD | GWS_MOUSE_TRACK;
+	data.m_font = font;
+	EntryData entry;
+	memset(&entry, 0, sizeof(entry));
+	entry.maxTextLen = 96;
+	UnitSpawnerSearch = TheWindowManager->gogoGadgetTextEntry(ShaderPanelWindow, WIN_STATUS_ENABLED,
+		64, 118, SHADER_PANEL_WIDTH - 72, 22, &data, &entry, font, TRUE);
+	data.init();
+	data.m_style = GWS_SCROLL_LISTBOX | GWS_MOUSE_TRACK;
+	data.m_font = font;
+	ListboxData list;
+	memset(&list, 0, sizeof(list));
+	list.listLength = max(1, (Int)UnitSpawnerTemplates.size());
+	list.columns = 1;
+	list.scrollBar = TRUE;
+	list.forceSelect = TRUE;
+	UnitSpawnerList = TheWindowManager->gogoGadgetListBox(ShaderPanelWindow, WIN_STATUS_ENABLED,
+		8, 148, SHADER_PANEL_WIDTH - 16, UNIT_SPAWNER_HEIGHT - 238, &data, &list, font, TRUE);
+	styleUnitSpawnerControl(UnitSpawnerSearch);
+	styleUnitSpawnerList(UnitSpawnerList);
+	data.init();
+	data.m_style = GWS_CHECK_BOX | GWS_MOUSE_TRACK;
+	data.m_font = font;
+	UnitSpawnerSpawnMode = TheWindowManager->gogoGadgetCheckbox(ShaderPanelWindow, WIN_STATUS_ENABLED,
+		SHADER_PANEL_WIDTH - 144, UNIT_SPAWNER_HEIGHT - 88, 136, 22, &data, font, TRUE);
+	styleUnitSpawnerControl(UnitSpawnerSpawnMode);
+	GadgetCheckBoxSetText(UnitSpawnerSpawnMode, UnicodeString(L"Spawn mode"));
+	GadgetCheckBoxSetChecked(UnitSpawnerSpawnMode, FALSE);
+	GadgetCheckBoxSetEnabledUncheckedBoxColor(UnitSpawnerSpawnMode, WIN_COLOR_UNDEFINED);
+	GadgetCheckBoxSetHiliteUncheckedBoxColor(UnitSpawnerSpawnMode, WIN_COLOR_UNDEFINED);
+	GadgetCheckBoxSetEnabledCheckedBoxColor(UnitSpawnerSpawnMode, GameMakeColor(160, 235, 160, 255));
+	GadgetCheckBoxSetHiliteCheckedBoxColor(UnitSpawnerSpawnMode, GameMakeColor(160, 235, 160, 255));
+	GadgetCheckBoxSetEnabledCheckedBoxBorderColor(UnitSpawnerSpawnMode, GameMakeColor(110, 140, 160, 255));
+	GadgetCheckBoxSetHiliteCheckedBoxBorderColor(UnitSpawnerSpawnMode, GameMakeColor(110, 140, 160, 255));
+	UnitSpawnerKindFilter->winBringToTop();
+	UnitSpawnerSide->winBringToTop();
+	refreshUnitSpawnerList();
+}
+
+void selectDebugPanelTab(Bool spawner)
+{
+	TheWindowManager->winSetFocus(nullptr);
+	if (spawner)
+	{
+		createUnitSpawner();
+	}
+	if (UnitSpawnerSide)
+	{
+		GadgetComboBoxHideList(UnitSpawnerSide);
+	}
+	if (UnitSpawnerKindFilter)
+	{
+		GadgetComboBoxHideList(UnitSpawnerKindFilter);
+	}
+	UnitSpawnerTab = spawner;
+	GameWindow *controls[] = { UnitSpawnerSide, UnitSpawnerKindFilter, UnitSpawnerSearch, UnitSpawnerList, UnitSpawnerSpawnMode };
+	for (Int i = 0; i < ARRAY_SIZE(controls); ++i)
+	{
+		if (controls[i])
+		{
+			controls[i]->winHide(!spawner);
+		}
+	}
+	ShaderPanelWindow->winSetSize(SHADER_PANEL_WIDTH, spawner ? UNIT_SPAWNER_HEIGHT : SHADER_PANEL_HEIGHT);
+	if (spawner && UnitSpawnerSearch)
+	{
+		TheWindowManager->winSetFocus(UnitSpawnerSearch);
+	}
+}
+
+void destroyShaderDebugPanel()
+{
+	if (UnitSpawnerPlacement && TheWindowManager)
+	{
+		TheWindowManager->winDestroy(UnitSpawnerPlacement);
+	}
+	UnitSpawnerPlacement = nullptr;
+	if (ShaderPanelWindow && TheWindowManager)
+	{
+		TheWindowManager->winDestroy(ShaderPanelWindow);
+	}
+	ShaderPanelWindow = nullptr;
+	UnitSpawnerSide = nullptr;
+	UnitSpawnerKindFilter = nullptr;
+	UnitSpawnerSearch = nullptr;
+	UnitSpawnerList = nullptr;
+	UnitSpawnerSpawnMode = nullptr;
+	UnitSpawnerTab = FALSE;
+	UnitSpawnerTemplates.clear();
+	UnitSpawnerSides.clear();
+	if (ShaderPanelString)
+	{
+		TheDisplayStringManager->freeDisplayString(ShaderPanelString);
+		ShaderPanelString = nullptr;
+	}
+}
+
+WindowMsgHandledType shaderPanelSystem(GameWindow *window, UnsignedInt msg, WindowMsgData data, WindowMsgData selection)
+{
+	if ((msg == GEM_UPDATE_TEXT && (GameWindow *)data == UnitSpawnerSearch)
+		|| (msg == GCM_SELECTED && ((GameWindow *)data == UnitSpawnerSide || (GameWindow *)data == UnitSpawnerKindFilter)))
+	{
+		refreshUnitSpawnerList();
+		return MSG_HANDLED;
+	}
+	if (msg == GLM_DOUBLE_CLICKED && (GameWindow *)data == UnitSpawnerList)
+	{
+		startUnitSpawnerPlacement((Int)selection);
+		return MSG_HANDLED;
+	}
+	if (msg == GWM_DESTROY && window == ShaderPanelWindow)
+	{
+		ShaderPanelWindow = nullptr;
+		UnitSpawnerSide = nullptr;
+		UnitSpawnerKindFilter = nullptr;
+		UnitSpawnerSearch = nullptr;
+		UnitSpawnerList = nullptr;
+		UnitSpawnerSpawnMode = nullptr;
+		UnitSpawnerTab = FALSE;
+		UnitSpawnerTemplates.clear();
+		UnitSpawnerSides.clear();
+	}
+	return MSG_IGNORED;
+}
+
+WindowMsgHandledType shaderPanelInput(GameWindow *window, UnsignedInt msg, WindowMsgData data, WindowMsgData state)
+{
+	if (msg == GWM_LEFT_DOWN)
+	{
+		Int left, top;
+		window->winGetScreenPosition(&left, &top);
+		const Int x = (Int)LOLONGTOSHORT(data) - left;
+		const Int y = (Int)HILONGTOSHORT(data) - top;
+		if (x >= 0 && x < SHADER_PANEL_WIDTH - 26 && y >= 0 && y < 28)
+		{
+			window->winSetStatus(WIN_STATUS_DRAGGABLE);
+			window->winBringToTop();
+		}
+		else
+		{
+			window->winClearStatus(WIN_STATUS_DRAGGABLE);
+		}
+	}
+	if (msg == GWM_LEFT_UP && (window->winGetStatus() & WIN_STATUS_DRAGGABLE))
+	{
+		window->winClearStatus(WIN_STATUS_DRAGGABLE);
+		return MSG_HANDLED;
+	}
+	if (msg == GWM_CHAR && data == KEY_ESC && (state & KEY_STATE_DOWN))
+	{
+		window->winHide(TRUE);
+		return MSG_HANDLED;
+	}
+	if (msg == GWM_LEFT_UP && TheWritableGlobalData)
+	{
+		Int left, top;
+		window->winGetScreenPosition(&left, &top);
+		Int x = (Int)LOLONGTOSHORT(data) - left;
+		Int y = (Int)HILONGTOSHORT(data) - top;
+		if (x >= SHADER_PANEL_WIDTH - 26 && x < SHADER_PANEL_WIDTH && y >= 0 && y < 28)
+		{
+			window->winHide(TRUE);
+		}
+		else if (y >= 28 && y < SHADER_PANEL_HEADER)
+		{
+			selectDebugPanelTab(x >= SHADER_PANEL_WIDTH / 2);
+		}
+		else if (UnitSpawnerTab)
+		{
+			if (y >= UNIT_SPAWNER_HEIGHT - 58 && y < UNIT_SPAWNER_HEIGHT - 30)
+			{
+				startUnitSpawnerPlacement();
+			}
+		}
+		else if (x >= 8 && x < SHADER_PANEL_WIDTH - 8 && y >= SHADER_PANEL_HEADER
+			&& y < SHADER_PANEL_HEADER + SHADER_PANEL_ROWS * SHADER_PANEL_ROW_HEIGHT)
+		{
+			Int index = ((x - 8) / SHADER_PANEL_COLUMN_WIDTH) * SHADER_PANEL_ROWS
+				+ (y - SHADER_PANEL_HEADER) / SHADER_PANEL_ROW_HEIGHT;
+			if (index < ARRAY_SIZE(ShaderDebugOptions))
+			{
+				Bool &enabled = TheWritableGlobalData->*ShaderDebugOptions[index].field;
+				enabled = !enabled;
+			}
+		}
+		else if (x >= SHADER_PANEL_WIDTH - 64 && x < SHADER_PANEL_WIDTH - 8 && y >= SHADER_PANEL_VALUE_TOP
+			&& y < SHADER_PANEL_HEIGHT - 20)
+		{
+			const ShaderDebugValue &option = ShaderDebugValues[(y - SHADER_PANEL_VALUE_TOP) / SHADER_PANEL_ROW_HEIGHT];
+			Real &value = TheWritableGlobalData->*option.field;
+			value = clamp(option.minimum, value + (x < SHADER_PANEL_WIDTH - 36 ? -option.step : option.step), option.maximum);
+		}
+	}
+	// The window manager closes dropdowns when a parent consumes their hover events.
+	if (msg >= GWM_LEFT_DOWN && msg <= GWM_WHEEL_DOWN)
+	{
+		return MSG_HANDLED;
+	}
+	return MSG_IGNORED;
+}
+
+void drawShaderDebugPanel(GameWindow *window, WinInstanceData *)
+{
+	if (!TheGlobalData || !TheDisplay)
+	{
+		return;
+	}
+	if (!ShaderPanelString)
+	{
+		ShaderPanelString = TheDisplayStringManager->newDisplayString();
+		ShaderPanelString->setFont(TheWindowManager->winFindFont("Tahoma", 9, FALSE));
+	}
+	Int x, y;
+	window->winGetScreenPosition(&x, &y);
+	const Color white = GameMakeColor(235, 235, 235, 255);
+	const Color shadow = GameMakeColor(0, 0, 0, 255);
+	const Int height = UnitSpawnerTab ? UNIT_SPAWNER_HEIGHT : SHADER_PANEL_HEIGHT;
+	TheDisplay->drawFillRect(x, y, SHADER_PANEL_WIDTH, height, GameMakeColor(12, 16, 20, 205));
+	TheDisplay->drawOpenRect(x, y, SHADER_PANEL_WIDTH, height, 1.0f, GameMakeColor(130, 160, 180, 220));
+	ShaderPanelString->setText(UnicodeString(L"Debug   Ctrl+Shift+Tab"));
+	ShaderPanelString->draw(x + 8, y + 6, white, shadow);
+	ShaderPanelString->setText(UnicodeString(L"X"));
+	ShaderPanelString->draw(x + SHADER_PANEL_WIDTH - 20, y + 6, white, shadow);
+	for (Int tab = 0; tab < 2; ++tab)
+	{
+		TheDisplay->drawFillRect(x + tab * SHADER_PANEL_WIDTH / 2 + 4, y + 28,
+			SHADER_PANEL_WIDTH / 2 - 8, 20, tab == (Int)UnitSpawnerTab
+			? GameMakeColor(55, 85, 105, 255) : GameMakeColor(25, 35, 45, 255));
+		ShaderPanelString->setText(UnicodeString(tab == 0 ? L"Shaders" : L"Unit spawner"));
+		ShaderPanelString->draw(x + tab * SHADER_PANEL_WIDTH / 2 + 12, y + 30, white, shadow);
+	}
+	if (UnitSpawnerTab)
+	{
+		ShaderPanelString->setText(UnicodeString(L"Side"));
+		ShaderPanelString->draw(x + 8, y + 62, white, shadow);
+		ShaderPanelString->setText(UnicodeString(L"Kind"));
+		ShaderPanelString->draw(x + 8, y + 92, white, shadow);
+		ShaderPanelString->setText(UnicodeString(L"Search"));
+		ShaderPanelString->draw(x + 8, y + 122, white, shadow);
+		UnicodeString count;
+		count.format(L"%d objects", UnitSpawnerList ? GadgetListBoxGetNumEntries(UnitSpawnerList) : 0);
+		ShaderPanelString->setText(count);
+		ShaderPanelString->draw(x + 8, y + UNIT_SPAWNER_HEIGHT - 84, white, shadow);
+		const Color buttonColor = canSpawnDebugUnit() ? GameMakeColor(160, 235, 160, 255) : GameMakeColor(130, 130, 130, 255);
+		TheDisplay->drawOpenRect(x + 8, y + UNIT_SPAWNER_HEIGHT - 58, SHADER_PANEL_WIDTH - 16, 26, 1.0f, buttonColor);
+		ShaderPanelString->setText(UnicodeString(L"Place selected unit"));
+		ShaderPanelString->draw(x + 16, y + UNIT_SPAWNER_HEIGHT - 52, buttonColor, shadow);
+		ShaderPanelString->setText(UnicodeString(canSpawnDebugUnit() ? L"Double-click a unit, then click the ground" : L"Spawning is disabled in LAN and online matches"));
+		ShaderPanelString->draw(x + 8, y + UNIT_SPAWNER_HEIGHT - 22, white, shadow);
+		return;
+	}
+	for (Int i = 0; i < ARRAY_SIZE(ShaderDebugOptions); ++i)
+	{
+		Bool enabled = TheGlobalData->*ShaderDebugOptions[i].field;
+		UnicodeString label;
+		label.format(L"[%ls] %ls", enabled ? L"x" : L" ", ShaderDebugOptions[i].label);
+		ShaderPanelString->setText(label);
+		ShaderPanelString->draw(x + 8 + (i / SHADER_PANEL_ROWS) * SHADER_PANEL_COLUMN_WIDTH,
+			y + SHADER_PANEL_HEADER + (i % SHADER_PANEL_ROWS) * SHADER_PANEL_ROW_HEIGHT,
+			enabled ? GameMakeColor(160, 235, 160, 255) : white, shadow);
+	}
+	for (Int i = 0; i < ARRAY_SIZE(ShaderDebugValues); ++i)
+	{
+		const Int rowY = y + SHADER_PANEL_VALUE_TOP + i * SHADER_PANEL_ROW_HEIGHT;
+		UnicodeString label;
+		label.format(L"%ls  %.0f%%", ShaderDebugValues[i].label, (TheGlobalData->*ShaderDebugValues[i].field) * 100.0f);
+		ShaderPanelString->setText(label);
+		ShaderPanelString->draw(x + 8, rowY, white, shadow);
+		for (Int button = 0; button < 2; ++button)
+		{
+			const Int buttonX = x + SHADER_PANEL_WIDTH - 64 + button * 28;
+			TheDisplay->drawOpenRect(buttonX, rowY, 24, SHADER_PANEL_ROW_HEIGHT - 2, 1.0f, white);
+			ShaderPanelString->setText(UnicodeString(button == 0 ? L"-" : L"+"));
+			ShaderPanelString->draw(buttonX + 8, rowY, white, shadow);
+		}
+	}
+	ShaderPanelString->setText(UnicodeString(L"Changes apply now; no save"));
+	ShaderPanelString->draw(x + 8, y + SHADER_PANEL_HEIGHT - 18, white, shadow);
+}
+}
+
+void InGameUI::toggleShaderDebugPanel()
+{
+	if (!TheWindowManager || !TheDisplay || !TheWritableGlobalData
+		|| !TheGameLogic || TheGameLogic->isInMultiplayerGame())
+	{
+		return;
+	}
+	if (ShaderPanelWindow)
+	{
+		if (UnitSpawnerPlacement)
+		{
+			finishUnitSpawnerPlacement();
+		}
+		ShaderPanelWindow->winHide((ShaderPanelWindow->winGetStatus() & WIN_STATUS_HIDDEN) == 0);
+		return;
+	}
+	ShaderPanelWindow = TheWindowManager->winCreate(nullptr, WIN_STATUS_ENABLED,
+		max(0, (Int)TheDisplay->getWidth() - SHADER_PANEL_WIDTH - 12), 60,
+		SHADER_PANEL_WIDTH, SHADER_PANEL_HEIGHT, shaderPanelSystem);
+	if (ShaderPanelWindow)
+	{
+		WinInstanceData data;
+		data.m_style = GWS_USER_WINDOW;
+		ShaderPanelWindow->winSetInstanceData(&data);
+		ShaderPanelWindow->winSetWindowId(TheNameKeyGenerator->nameToKey("Debug:ShaderPanel"));
+		ShaderPanelWindow->winSetInputFunc(shaderPanelInput);
+		ShaderPanelWindow->winSetDrawFunc(drawShaderDebugPanel);
+	}
+}
+#endif
+
 InGameUI::InGameUI()
 {
 	Int i;
@@ -1143,6 +1839,10 @@ InGameUI::InGameUI()
 	m_maxSelectCount = -1;
 	m_isScrolling = FALSE;
 	m_isSelecting = FALSE;
+	m_facingDragActive = FALSE;
+	m_facingDragAnchor.zero();
+	m_facingDragAngle = 0.0f;
+	m_facingDragShowArrow = FALSE;
 	m_mouseMode = MOUSEMODE_DEFAULT;
 	m_mouseModeCursor = Mouse::ARROW;
 	m_mousedOverDrawableID = INVALID_DRAWABLE_ID;
@@ -1238,6 +1938,7 @@ InGameUI::InGameUI()
 
 	}
 
+	m_controlBarWindow = nullptr;
 	m_replayWindow = nullptr;
 	m_messagesOn = TRUE;
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
@@ -1249,6 +1950,8 @@ InGameUI::InGameUI()
 	m_modelNameOverlayOn = FALSE;
 	m_laserNameOverlayOn = FALSE;
 	m_laserBeamBlockOverlayOn = FALSE;
+	m_windowNameOverlayOn = FALSE;
+	m_windowNameString = nullptr;
 #endif
 
 	// TheSuperHackers @info the default font, size and positions of the various counters were chosen based on GenTools implementation
@@ -1407,6 +2110,9 @@ InGameUI::~InGameUI()
 	// clear world animations
 	clearWorldAnimations();
 	resetIdleWorker();
+
+	destroyReplayControl();
+	destroyControlBar();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1966,7 +2672,7 @@ void InGameUI::handleBuildPlacements()
 						if (isInForceAttackMode())
 						{
 							const Real snapRadians = DEG_TO_RADF(45);
-							angle = WWMath::Round(angle / snapRadians) * snapRadians;
+							angle = WWMath::Roundf(angle / snapRadians) * snapRadians;
 						}
 					}
 				}
@@ -2141,7 +2847,7 @@ void InGameUI::handleBuildPlacements()
 
 					if( m_placeIcon[ i ] == nullptr )
 					{
-						UnsignedInt drawableStatus = DRAWABLE_STATUS_NO_STATE_PARTICLES;
+						UnsignedInt drawableStatus = DRAWABLE_STATUS_NO_STATE_PARTICLES | DRAWABLE_STATUS_NO_SHADERS;
 						drawableStatus |= TheGlobalData->m_objectPlacementShadows ? DRAWABLE_STATUS_SHADOWS : 0;
 						m_placeIcon[ i ] = TheThingFactory->newDrawable( m_pendingPlaceType, drawableStatus );
 						updatePlacementRangeCircle( m_placeIcon[ i ] );
@@ -2219,6 +2925,8 @@ void InGameUI::update()
 
 	// TheSuperHackers @feature Fire a queued quick cast as soon as its ability comes up.
 	updateQueuedQuickCast();
+
+	updateActionLines();
 
 	/// @todo make sure this code gets called even when the UI is not being drawn
 	if ( m_videoStream && m_videoBuffer )
@@ -2550,6 +3258,9 @@ void InGameUI::unregisterWindowLayout( WindowLayout *layout )
 //-------------------------------------------------------------------------------------------------
 void InGameUI::reset()
 {
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	destroyShaderDebugPanel();
+#endif
 	m_isQuitMenuVisible = FALSE;
 	m_inputEnabled = true;
 	// reset the command bar
@@ -2676,6 +3387,9 @@ void InGameUI::freeMessageResources()
 
 void InGameUI::freeCustomUiResources()
 {
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	destroyShaderDebugPanel();
+#endif
 	TheDisplayStringManager->freeDisplayString(m_networkLatencyString);
 	m_networkLatencyString = nullptr;
 	TheDisplayStringManager->freeDisplayString(m_renderFpsString);
@@ -2693,6 +3407,10 @@ void InGameUI::freeCustomUiResources()
 #if defined(GENERALS_ONLINE)
 	TheDisplayStringManager->freeDisplayString(m_observerNotificationString);
 	m_observerNotificationString = nullptr;
+#endif
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	TheDisplayStringManager->freeDisplayString(m_windowNameString);
+	m_windowNameString = nullptr;
 #endif
 }
 
@@ -2953,7 +3671,7 @@ void InGameUI::createGarrisonHint( const GameMessage *msg )
 	}
 }
 
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 #define AI_DEBUG_TOOLTIPS		1
 
 #ifdef AI_DEBUG_TOOLTIPS
@@ -2962,7 +3680,7 @@ void InGameUI::createGarrisonHint( const GameMessage *msg )
 #include "GameLogic/AIPathfind.h"
 #endif // AI_DEBUG_TOOLTIPS
 
-#endif // defined(RTS_DEBUG)
+#endif // defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 
 //-------------------------------------------------------------------------------------------------
 /** Details of what is mouse hovered over right now are in this message.  Terrain might result
@@ -4118,7 +4836,7 @@ void InGameUI::placeBuildAvailable( const ThingTemplate *build, const DrawableLi
 
 			{
 				// create a drawable of what we are building to be "attached" at the cursor
-				UnsignedInt drawableStatus = DRAWABLE_STATUS_NO_STATE_PARTICLES;
+				UnsignedInt drawableStatus = DRAWABLE_STATUS_NO_STATE_PARTICLES | DRAWABLE_STATUS_NO_SHADERS;
 				drawableStatus |= TheGlobalData->m_objectPlacementShadows ? DRAWABLE_STATUS_SHADOWS : 0;
 				draw = TheThingFactory->newDrawable( build, drawableStatus );
 			}
@@ -4513,15 +5231,254 @@ void InGameUI::setInputEnabled( Bool enable )
 			(admittedly, this code will actually do the wrong thing if you were to hold down the ctrl
 			key thru the whole cinematic, but that's even more unlikely...)
 		*/
-		setForceAttackMode( false );			// CTRL
-		setForceMoveMode( false );				// apparently unmapped in current CommandMap.ini
-		setWaypointMode( false );					// ALT
-		setPreferSelectionMode( false );	// SHIFT
-		setCameraRotateLeft( false );			// KP4
-		setCameraRotateRight( false );		// KP6
-		setCameraZoomIn( false );					// KP8
-		setCameraZoomOut( false );				// KP2
+		clearModifierModes();
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Losing focus also eats key releases, so alt-tab would otherwise leave waypoint mode on. */
+//-------------------------------------------------------------------------------------------------
+void InGameUI::clearModifierModes()
+{
+	setForceAttackMode( false );			// CTRL
+	setForceMoveMode( false );				// apparently unmapped in current CommandMap.ini
+	setWaypointMode( false );					// ALT
+	setPreferSelectionMode( false );	// SHIFT
+	setCameraRotateLeft( false );			// KP4
+	setCameraRotateRight( false );		// KP6
+	setCameraZoomIn( false );					// KP8
+	setCameraZoomOut( false );				// KP2
+}
+
+//-------------------------------------------------------------------------------------------------
+/** A guard order clears the goal position, so the guarded spot is read off the AI itself. */
+//-------------------------------------------------------------------------------------------------
+static Bool getGuardedSpot( const AIUpdateInterface *ai, Coord3D& spot )
+{
+	switch( ai->getGuardTargetType() )
+	{
+		case GUARDTARGET_LOCATION:
+			spot = *ai->getGuardLocation();
+			return TRUE;
+
+		case GUARDTARGET_OBJECT:
+		{
+			const Object *guarded = TheGameLogic->findObjectByID( ai->getGuardObject() );
+			if( guarded == nullptr )
+			{
+				return FALSE;
+			}
+			spot = *guarded->getPosition();
+			return TRUE;
+		}
+
+		default:
+			return FALSE;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Read each selected unit's destination off its AI every frame, so a line lasts exactly as long
+	* as its order. */
+//-------------------------------------------------------------------------------------------------
+void InGameUI::updateActionLines()
+{
+	m_actionLines.clear();
+
+	if( TheGlobalData->m_actionLineMode == ActionLineMode_Off )
+	{
+		return;
+	}
+	const Bool attackOnly = TheGlobalData->m_actionLineMode == ActionLineMode_AttackOnly;
+
+	Player *local = ThePlayerList->getLocalPlayer();
+	for( DrawableList::const_iterator it = m_selectedDrawables.begin(); it != m_selectedDrawables.end(); ++it )
+	{
+		Object *obj = (*it)->getObject();
+		if( obj == nullptr || obj->getControllingPlayer() != local )
+		{
+			continue;
+		}
+
+		// the nexus holds an angry mob's order, so only it draws
+		if( obj->isKindOf( KINDOF_IGNORED_IN_GUI ) )
+		{
+			continue;
+		}
+
+		AIUpdateInterface *ai = obj->getAIUpdateInterface();
+		if( ai == nullptr )
+		{
+			continue;
+		}
+
+		ActionLine line;
+		line.from = *obj->getPosition();
+		Bool goalResolved = FALSE;
+
+		switch( ai->getCurrentStateID() )
+		{
+			case AI_MOVE_TO:
+			case AI_FOLLOW_PATH:
+			case AI_FOLLOW_EXITPRODUCTION_PATH:
+			case AI_MOVE_AND_EVACUATE:
+			case AI_MOVE_AND_EVACUATE_AND_EXIT:
+			case AI_MOVE_AND_DELETE:
+			case AI_MOVE_AND_TIGHTEN:
+			case AI_PICK_UP_CRATE:
+			case AI_FOLLOW_WAYPOINT_PATH_AS_TEAM:
+			case AI_FOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS:
+			case AI_FOLLOW_WAYPOINT_PATH_AS_TEAM_EXACT:
+			case AI_FOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS_EXACT:
+			case AI_ENTER:
+			case AI_RAPPEL_INTO:
+			case AI_COMBATDROP:
+			case AI_DOCK:
+			case AI_GET_REPAIRED:
+			case AI_HACK_INTERNET:
+				line.kind = ACTION_LINE_MOVE;
+				break;
+
+			// the attack move path is replaced whenever the unit stops to fight, so aim at the clicked point
+			case AI_ATTACK_MOVE_TO:
+				line.kind = ACTION_LINE_ATTACK_MOVE;
+				line.to = *ai->getGoalPosition();
+				goalResolved = TRUE;
+				break;
+
+			case AI_ATTACKFOLLOW_WAYPOINT_PATH_AS_INDIVIDUALS:
+			case AI_ATTACKFOLLOW_WAYPOINT_PATH_AS_TEAM:
+			case AI_HUNT:
+				line.kind = ACTION_LINE_ATTACK_MOVE;
+				break;
+
+			case AI_ATTACK_OBJECT:
+			case AI_ATTACK_AND_FOLLOW_OBJECT:
+			case AI_ATTACK_SQUAD:
+			case AI_FORCE_ATTACK_OBJECT:
+			case AI_ATTACK_AREA:
+				line.kind = ACTION_LINE_ATTACK;
+				break;
+
+			case AI_ATTACK_POSITION:
+				line.kind = ACTION_LINE_ATTACK_GROUND;
+				line.to = *ai->getGoalPosition();
+				goalResolved = TRUE;
+				break;
+
+			case AI_GUARD:
+			case AI_GUARD_RETALIATE:
+			case AI_GUARD_TUNNEL_NETWORK:
+				line.kind = ACTION_LINE_GUARD;
+				goalResolved = getGuardedSpot( ai, line.to );
+				if( !goalResolved )
+				{
+					continue;
+				}
+				break;
+
+			default:
+				continue;
+		}
+
+		if( attackOnly && ( line.kind == ACTION_LINE_MOVE || line.kind == ACTION_LINE_GUARD ) )
+		{
+			continue;
+		}
+
+		if( !goalResolved )
+		{
+			const Int pathSize = ai->friend_getWaypointGoalPathSize();
+			const Int pathIndex = ai->friend_getCurrentGoalPathIndex();
+			Object *goalObj = ai->getGoalObject();
+			Path *path = ai->getPath();
+			if( pathSize > 0 && pathIndex >= 0 && pathIndex < pathSize )
+			{
+				// a queued path draws one line per leg
+				for( Int i = pathIndex; i < pathSize - 1; ++i )
+				{
+					line.to = *ai->friend_getGoalPathPosition( i );
+					m_actionLines.push_back( line );
+					line.from = line.to;
+				}
+				line.to = *ai->friend_getGoalPathPosition( pathSize - 1 );
+			}
+			else if( goalObj )
+			{
+				// a line to a target hidden in fog would give away where it is
+				if( goalObj->getDrawable() && goalObj->getDrawable()->getFullyObscuredByShroud() )
+				{
+					continue;
+				}
+				line.to = *goalObj->getPosition();
+			}
+			else if( path )
+			{
+				// a group sent to one spot spreads over the free cells round it
+				line.to = *path->getLastNode()->getPosition();
+			}
+			else
+			{
+				line.to = *ai->getGoalPosition();
+			}
+		}
+
+		m_actionLines.push_back( line );
+	}
+
+	bunchActionLines();
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Lines of one kind that start and end near each other merge into one from their average start
+	* to their average end. */
+//-------------------------------------------------------------------------------------------------
+void InGameUI::bunchActionLines()
+{
+	const Real BUNCH_RADIUS = 100.0f;
+	const Real bunchRadiusSqr = BUNCH_RADIUS * BUNCH_RADIUS;
+
+	std::vector<ActionLine> bunches;
+	std::vector<Int> memberCounts;
+	for( std::vector<ActionLine>::const_iterator line = m_actionLines.begin(); line != m_actionLines.end(); ++line )
+	{
+		Bool joined = FALSE;
+		for( size_t i = 0; i < bunches.size(); ++i )
+		{
+			ActionLine& bunch = bunches[ i ];
+			if( bunch.kind != line->kind )
+			{
+				continue;
+			}
+			const Real fromX = bunch.from.x - line->from.x;
+			const Real fromY = bunch.from.y - line->from.y;
+			const Real toX = bunch.to.x - line->to.x;
+			const Real toY = bunch.to.y - line->to.y;
+			if( fromX * fromX + fromY * fromY > bunchRadiusSqr || toX * toX + toY * toY > bunchRadiusSqr )
+			{
+				continue;
+			}
+
+			// running averages, so later members compare against the middle of the bunch
+			const Real share = 1.0f / (Real)( ++memberCounts[ i ] );
+			bunch.from.x += ( line->from.x - bunch.from.x ) * share;
+			bunch.from.y += ( line->from.y - bunch.from.y ) * share;
+			bunch.from.z += ( line->from.z - bunch.from.z ) * share;
+			bunch.to.x += ( line->to.x - bunch.to.x ) * share;
+			bunch.to.y += ( line->to.y - bunch.to.y ) * share;
+			bunch.to.z += ( line->to.z - bunch.to.z ) * share;
+			joined = TRUE;
+			break;
+		}
+
+		if( !joined )
+		{
+			bunches.push_back( *line );
+			memberCounts.push_back( 1 );
+		}
+	}
+
+	m_actionLines.swap( bunches );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4536,6 +5493,31 @@ void InGameUI::disregardDrawable( Drawable *draw )
 }
 
 //-------------------------------------------------------------------------------------------------
+// Drag-to-face: the building placement ring (short drag) or arrow at the chord point; W3DInGameUI draws it
+void InGameUI::setFacingDragPreview( Bool active, const Coord3D *anchor, Real angle, Bool showArrow )
+{
+	m_facingDragActive = active;
+	if( anchor )
+	{
+		m_facingDragAnchor = *anchor;
+	}
+	m_facingDragAngle = angle;
+	m_facingDragShowArrow = showArrow;
+}
+
+Bool InGameUI::getFacingDragPreview( Coord3D *anchor, Real *angle, Bool *showArrow ) const
+{
+	if( !m_facingDragActive )
+	{
+		return FALSE;
+	}
+	*anchor = m_facingDragAnchor;
+	*angle = m_facingDragAngle;
+	*showArrow = m_facingDragShowArrow;
+	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
 /** This is called after the WindowManager has drawn the menus. */
 //-------------------------------------------------------------------------------------------------
 void InGameUI::postWindowDraw()
@@ -4545,6 +5527,11 @@ void InGameUI::postWindowDraw()
 	// system and game time, network latency and the observer player list.
 	if (TheTacticalView && TheTacticalView->isCameraCheatModeActive())
 		return;
+
+	if (m_windowNameOverlayOn)
+	{
+		drawWindowNameOverlay();
+	}
 #endif
 
 	Int hudOffsetX = 0;
@@ -4589,6 +5576,200 @@ void InGameUI::postWindowDraw()
 	}
 #endif
 }
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+
+// Window labels placed this frame. A label that would overlap one of them is skipped.
+static const Int MAX_WINDOW_LABEL_SLOTS = 512;
+static IRegion2D s_windowLabelSlots[ MAX_WINDOW_LABEL_SLOTS ];
+static Int s_windowLabelSlotCount = 0;
+
+// Most ancestors listed in the cursor readout.
+static const Int MAX_WINDOW_CHAIN = 16;
+
+//-------------------------------------------------------------------------------------------------
+static Bool windowLabelOverlaps( const IRegion2D &rect )
+{
+	for( Int i = 0; i < s_windowLabelSlotCount; ++i )
+	{
+		const IRegion2D &slot = s_windowLabelSlots[i];
+		if( rect.lo.x < slot.hi.x && rect.hi.x > slot.lo.x && rect.lo.y < slot.hi.y && rect.hi.y > slot.lo.y )
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Outline a visible window and label it in its top left corner, then do the same for its children.
+//-------------------------------------------------------------------------------------------------
+static void drawWindowNameTree( GameWindow *window, DisplayString *str, Bool topLevel )
+{
+	if( window->winIsHidden() )
+	{
+		return;
+	}
+
+	Int x, y, width, height;
+	window->winGetScreenPosition( &x, &y );
+	window->winGetSize( &width, &height );
+
+	const AsciiString &name = window->winGetInstanceData()->m_decoratedNameString;
+	if( !name.isEmpty() && width > 0 && height > 0 )
+	{
+		TheDisplay->drawOpenRect( x, y, width, height, 1.0f, GameMakeColor( 255, 190, 0, 150 ) );
+
+		// Top level windows keep their .wnd file prefix, children show only their own name.
+		const char *label = name.str();
+		const char *colon = topLevel ? nullptr : strrchr( label, ':' );
+		if( colon != nullptr )
+		{
+			label = colon + 1;
+		}
+
+		UnicodeString text;
+		text.format( L"%hs", label );
+		str->setText( text );
+
+		Int textWidth, textHeight;
+		str->getSize( &textWidth, &textHeight );
+
+		IRegion2D rect;
+		rect.lo.x = x + 2;
+		rect.lo.y = y + 1;
+		rect.hi.x = rect.lo.x + textWidth;
+		rect.hi.y = rect.lo.y + textHeight;
+
+		if( !windowLabelOverlaps( rect ) && s_windowLabelSlotCount < MAX_WINDOW_LABEL_SLOTS )
+		{
+			s_windowLabelSlots[ s_windowLabelSlotCount++ ] = rect;
+			TheDisplay->drawFillRect( rect.lo.x - 1, rect.lo.y, textWidth + 2, textHeight, GameMakeColor( 0, 0, 0, 170 ) );
+			str->draw( rect.lo.x, rect.lo.y, GameMakeColor( 255, 220, 120, 255 ), GameMakeColor( 0, 0, 0, 255 ) );
+		}
+	}
+
+	for( GameWindow *child = window->winGetChild(); child; child = child->winGetNext() )
+	{
+		drawWindowNameTree( child, str, FALSE );
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+static void setWindowChainText( DisplayString *str, GameWindow *window, Bool withRegion )
+{
+	const AsciiString &name = window->winGetInstanceData()->m_decoratedNameString;
+
+	UnicodeString text;
+	if( name.isEmpty() )
+	{
+		text.format( L"<unnamed id %d>", window->winGetWindowId() );
+	}
+	else
+	{
+		text.format( L"%hs", name.str() );
+	}
+
+	if( withRegion )
+	{
+		Int x, y, width, height;
+		window->winGetScreenPosition( &x, &y );
+		window->winGetSize( &width, &height );
+
+		UnicodeString region;
+		region.format( L"  (%d,%d %dx%d)", x, y, width, height );
+		text.concat( region );
+	}
+
+	str->setText( text );
+}
+
+//-------------------------------------------------------------------------------------------------
+// Every visible window outlined and labelled, plus the window under the cursor highlighted with
+// its parent chain listed beside the cursor, root first.
+//-------------------------------------------------------------------------------------------------
+void InGameUI::drawWindowNameOverlay()
+{
+	if( TheWindowManager == nullptr || TheDisplay == nullptr || TheMouse == nullptr )
+	{
+		return;
+	}
+
+	if( m_windowNameString == nullptr )
+	{
+		m_windowNameString = TheDisplayStringManager->newDisplayString();
+		m_windowNameString->setFont( TheWindowManager->winFindFont( "Tahoma", TheGlobalLanguageData->adjustFontSize( 8 ), FALSE ) );
+	}
+
+	s_windowLabelSlotCount = 0;
+	for( GameWindow *window = TheWindowManager->winGetWindowList(); window; window = window->winGetNext() )
+	{
+		drawWindowNameTree( window, m_windowNameString, TRUE );
+	}
+
+	const MouseIO *mouse = TheMouse->getMouseStatus();
+	GameWindow *hovered = TheWindowManager->getWindowUnderCursor( mouse->pos.x, mouse->pos.y, TRUE );
+	if( hovered == nullptr )
+	{
+		return;
+	}
+
+	Int x, y, width, height;
+	hovered->winGetScreenPosition( &x, &y );
+	hovered->winGetSize( &width, &height );
+	TheDisplay->drawOpenRect( x, y, width, height, 2.0f, GameMakeColor( 0, 255, 255, 255 ) );
+
+	GameWindow *chain[ MAX_WINDOW_CHAIN ];
+	Int depth = 0;
+	for( GameWindow *window = hovered; window && depth < MAX_WINDOW_CHAIN; window = window->winGetParent() )
+	{
+		chain[ depth++ ] = window;
+	}
+
+	Int boxWidth = 0;
+	Int lineHeight = 0;
+	for( Int i = 0; i < depth; ++i )
+	{
+		setWindowChainText( m_windowNameString, chain[i], i == 0 );
+
+		Int textWidth, textHeight;
+		m_windowNameString->getSize( &textWidth, &textHeight );
+		boxWidth = max( boxWidth, textWidth );
+		lineHeight = max( lineHeight, textHeight );
+	}
+
+	const Int padding = 4;
+	const Int boxHeight = depth * lineHeight;
+	Int boxX = mouse->pos.x + 20;
+	Int boxY = mouse->pos.y + 20;
+
+	// Flip to the other side of the cursor rather than run off the screen.
+	if( boxX + boxWidth + padding * 2 > (Int)TheDisplay->getWidth() )
+	{
+		boxX = mouse->pos.x - boxWidth - padding * 2 - 8;
+	}
+	if( boxY + boxHeight + padding * 2 > (Int)TheDisplay->getHeight() )
+	{
+		boxY = mouse->pos.y - boxHeight - padding * 2 - 8;
+	}
+	boxX = max( boxX, 0 );
+	boxY = max( boxY, 0 );
+
+	TheDisplay->drawFillRect( boxX, boxY, boxWidth + padding * 2, boxHeight + padding * 2, GameMakeColor( 0, 0, 0, 200 ) );
+	TheDisplay->drawOpenRect( boxX, boxY, boxWidth + padding * 2, boxHeight + padding * 2, 1.0f, GameMakeColor( 0, 255, 255, 255 ) );
+
+	Int lineY = boxY + padding;
+	for( Int i = depth - 1; i >= 0; --i )
+	{
+		setWindowChainText( m_windowNameString, chain[i], i == 0 );
+
+		const Color color = ( i == 0 ) ? GameMakeColor( 0, 255, 255, 255 ) : GameMakeColor( 255, 220, 120, 255 );
+		m_windowNameString->draw( boxX + padding, lineY, color, GameMakeColor( 0, 0, 0, 255 ) );
+		lineY += lineHeight;
+	}
+}
+
+#endif
 
 //-------------------------------------------------------------------------------------------------
 /** This is called after the UI has been drawn. */
@@ -4689,6 +5870,12 @@ void InGameUI::postDraw()
 				{
 					SuperweaponInfo *info = *listIt;
 					DEBUG_ASSERTCRASH(info, ("No superweapon info!"));
+					// Owner-only timers are drawn only for the player they belong to.
+					if (info && info->getSpecialPowerTemplate()->isOwnerOnlyTimer() &&
+							(ThePlayerList->getLocalPlayer() == nullptr || i != ThePlayerList->getLocalPlayer()->getPlayerIndex()))
+					{
+						continue;
+					}
 					if (info && !info->m_hiddenByScript && !info->m_hiddenByScience)
 					{
 						//enforce bottom margin of tactical view
@@ -4823,6 +6010,9 @@ void InGameUI::postDraw()
                     info->m_evaReadyPlayed = false; // Reset Eva for next time
                 }
 
+                // A flashing timer is drawn like a ready one while it counts down.
+                const Bool drawReady = isReady || module->getSpecialPowerTemplate()->isFlashingTimer();
+
                 // draw the text
                 if ( !m_superweaponHiddenByScript && !marginExceeded && !hideTimersForCameraCheat )
                 {
@@ -4830,7 +6020,7 @@ void InGameUI::postDraw()
  								  Bool changeBolding = (readySecs != info->m_timestamp) || (isReady != info->m_ready) || info->m_forceUpdateText;
  								  if (changeBolding)
  								  {
- 									  if (isReady)
+ 									  if (drawReady)
 									  {
 										  // go bold - we're good to go
 										  info->setFont( m_superweaponReadyFont, m_superweaponReadyPointSize, m_superweaponReadyBold );
@@ -4858,7 +6048,7 @@ void InGameUI::postDraw()
                     info->setText(name, time);
                   }
 
-                  if (isReady)
+                  if (drawReady)
 								  {
 									  if ( m_superweaponFlashDuration != 0.0f )
 									  {
@@ -5047,7 +6237,7 @@ void InGameUI::expireHint( HintType type, UnsignedInt hintIndex )
 void InGameUI::createControlBar()
 {
 
-	TheWindowManager->winCreateFromScript( "ControlBar.wnd" );
+	m_controlBarWindow = TheWindowManager->winCreateFromScript( "ControlBar.wnd" );
 	HideControlBar();
 /*
 	// hide all windows created from this layout
@@ -5056,6 +6246,16 @@ void InGameUI::createControlBar()
 		window->winHide( TRUE );
 */
 
+}
+
+void InGameUI::destroyControlBar()
+{
+	if (m_controlBarWindow != nullptr)
+	{
+		TheWindowManager->winDestroy(m_controlBarWindow);
+		m_controlBarWindow = nullptr;
+		m_idleWorkerWin = nullptr; // This window belongs to the Control Bar and is implicitly deleted as well.
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -5073,6 +6273,41 @@ void InGameUI::createReplayControl()
 		window->winHide( TRUE );
 */
 
+}
+
+void InGameUI::destroyReplayControl()
+{
+	if (m_replayWindow != nullptr)
+	{
+		TheWindowManager->winDestroy(m_replayWindow);
+		m_replayWindow = nullptr;
+	}
+}
+
+void InGameUI::showReplayControls()
+{
+	if (m_replayWindow)
+	{
+		Bool show = TheGameLogic->isInReplayGame();
+		m_replayWindow->winHide(!show);
+	}
+}
+
+void InGameUI::hideReplayControls()
+{
+	if (m_replayWindow)
+	{
+		m_replayWindow->winHide(TRUE);
+	}
+}
+
+void InGameUI::toggleReplayControls()
+{
+	if (m_replayWindow)
+	{
+		Bool show = TheGameLogic->isInReplayGame() && m_replayWindow->winIsHidden();
+		m_replayWindow->winHide(!show);
+	}
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -6884,11 +8119,7 @@ void InGameUI::resetIdleWorker()
 
 void InGameUI::recreateControlBar()
 {
-	GameWindow *win = TheWindowManager->winGetWindowFromId(nullptr, TheNameKeyGenerator->nameToKey("ControlBar.wnd"));
-	deleteInstance(win);
-
-	m_idleWorkerWin = nullptr;
-
+	destroyControlBar();
 	createControlBar();
 
 	delete TheControlBar;
@@ -7462,6 +8693,11 @@ void InGameUI::drawSystemTime(Int &x, Int &y)
 
 void InGameUI::drawGameTime()
 {
+#if defined(GENERALS_ONLINE)
+	// GO's F10 overlay borrows the game time string, which is set back below.
+	NGMP_OnlineServicesManager::DrawAdvancedNetworkStats(m_gameTimeString, m_gameTimeDropColor);
+#endif
+
 	Int currentFrame = TheGameLogic->getFrame();
 	Int gameSeconds = (Int) (SECONDS_PER_LOGICFRAME_REAL * currentFrame );
 	Int hours = gameSeconds / 60 / 60;

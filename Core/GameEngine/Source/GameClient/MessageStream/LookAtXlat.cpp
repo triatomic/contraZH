@@ -141,6 +141,9 @@ LookAtTranslator::LookAtTranslator() :
 	m_middleButtonDownTimeMsec(0),
 	m_lastPlaneID(INVALID_DRAWABLE_ID),
 	m_lastMouseMoveTimeMsec(0),
+#if RTS_ZEROHOUR
+	m_rightMouseScrollBlocked(FALSE),
+#endif
 	m_scrollType(SCROLL_NONE)
 {
 	m_anchor.x = m_anchor.y = 0;
@@ -285,7 +288,11 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 
 			const Bool userWantsRMBScroll = !TheGlobalData->m_useAlternateMouse || TheGlobalData->m_useRightMouseScrollWithAlternateMouse;
 
-			if (userWantsRMBScroll && !TheInGameUI->isSelecting() && !m_isScrolling)
+			if (userWantsRMBScroll
+#if RTS_ZEROHOUR
+				&& !m_rightMouseScrollBlocked
+#endif
+				&& !TheInGameUI->isSelecting() && !m_isScrolling)
 			{
 				setScrolling(SCROLL_RMB);
 			}
@@ -432,7 +439,7 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 				if (TheInGameUI->isInForceAttackMode())
 				{
 					const Real snapRadians = DEG_TO_RADF(45);
-					targetAngle = WWMath::Round(targetAngle / snapRadians) * snapRadians;
+					targetAngle = WWMath::Roundf(targetAngle / snapRadians) * snapRadians;
 				}
 
 				TheTacticalView->userSetAngle(targetAngle);
@@ -851,6 +858,18 @@ GameMessageDisposition LookAtTranslator::translateGameMessage(const GameMessage 
 	return disp;
 
 }
+
+// Later translators can still receive the first press from this frame.
+#if RTS_ZEROHOUR
+void LookAtTranslator::setRightMouseScrollBlocked( Bool blocked )
+{
+	m_rightMouseScrollBlocked = blocked;
+	if (blocked && m_scrollType == SCROLL_RMB)
+	{
+		stopScrolling();
+	}
+}
+#endif
 
 void LookAtTranslator::resetModes()
 {

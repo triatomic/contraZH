@@ -51,6 +51,7 @@
 #include "Common/Player.h"
 #include "Common/INI.h"
 #include "Common/Science.h"
+#include "Common/Upgrade.h"
 #include "GameClient/Image.h"
 
 
@@ -92,6 +93,10 @@
 		{ "PurchaseScienceCommandSetRank3",INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_purchaseScienceCommandSetRank3 ) },
 		{ "PurchaseScienceCommandSetRank8",INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_purchaseScienceCommandSetRank8 ) },
 		{ "SpecialPowerShortcutCommandSet",INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_specialPowerShortcutCommandSet ) },
+		{ "PurchaseScienceCommandSetRank1Upgrade",PlayerTemplate::parseUpgradeCommandSet,	nullptr, offsetof( PlayerTemplate, m_commandSetUpgrades[PLAYER_COMMANDSET_PURCHASE_RANK1] ) },
+		{ "PurchaseScienceCommandSetRank3Upgrade",PlayerTemplate::parseUpgradeCommandSet,	nullptr, offsetof( PlayerTemplate, m_commandSetUpgrades[PLAYER_COMMANDSET_PURCHASE_RANK3] ) },
+		{ "PurchaseScienceCommandSetRank8Upgrade",PlayerTemplate::parseUpgradeCommandSet,	nullptr, offsetof( PlayerTemplate, m_commandSetUpgrades[PLAYER_COMMANDSET_PURCHASE_RANK8] ) },
+		{ "SpecialPowerShortcutCommandSetUpgrade",PlayerTemplate::parseUpgradeCommandSet,	nullptr, offsetof( PlayerTemplate, m_commandSetUpgrades[PLAYER_COMMANDSET_SHORTCUT] ) },
 		{ "SpecialPowerShortcutWinName"		,INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_specialPowerShortcutWinName) },
 		{ "SpecialPowerShortcutButtonCount",INI::parseInt,												nullptr, offsetof( PlayerTemplate, m_specialPowerShortcutButtonCount ) },
 		{ "IsObserver",								INI::parseBool,																	nullptr, offsetof( PlayerTemplate, m_observer ) },
@@ -100,7 +105,7 @@
 		{ "ScoreScreenImage",					INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_scoreScreenImage ) },
 		{ "LoadScreenImage",					INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_loadScreenImage ) },
 		{ "LoadScreenMusic",					INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_loadScreenMusic ) },
-		{ "ScoreScreenMusic",					INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_scoreScreenMusic ) },
+		{ "ScoreScreenMusic",					INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_scoreScreenMusic ) }, // Added in Zero Hour
 
 		{ "HeadWaterMark",						INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_headWaterMark ) },
 		{ "FlagWaterMark",						INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_flagWaterMark ) },
@@ -109,14 +114,14 @@
 		//{ "HiliteImage",							INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_hiliteImage ) },
 		//{ "PushedImage",							INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_pushedImage ) },
 		{ "SideIconImage",						INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_sideIconImage ) },
-		{ "GeneralImage",						INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_generalImage ) },
+		{ "GeneralImage",						INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_generalImage ) }, // Added in Zero Hour
 
 		{ "BeaconName",								INI::parseAsciiString,													nullptr, offsetof( PlayerTemplate, m_beaconTemplate ) },
-		{ "ArmyTooltip",						INI::parseAsciiString,					nullptr, offsetof( PlayerTemplate, m_tooltip ) },
-		{ "Features",						INI::parseAsciiString,					nullptr, offsetof( PlayerTemplate, m_strGeneralFeatures ) },
-		{ "MedallionRegular",						INI::parseAsciiString,					nullptr, offsetof( PlayerTemplate, m_strMedallionNormal ) },
-		{ "MedallionHilite",						INI::parseAsciiString,					nullptr, offsetof( PlayerTemplate, m_strMedallionHilite ) },
-		{ "MedallionSelect",						INI::parseAsciiString,					nullptr, offsetof( PlayerTemplate, m_strMedallionSelected ) },
+		{ "ArmyTooltip",						INI::parseAsciiString,					nullptr, offsetof( PlayerTemplate, m_tooltip ) }, // Added in Zero Hour
+		{ "Features",						INI::parseAsciiString,					nullptr, offsetof( PlayerTemplate, m_strGeneralFeatures ) }, // Added in Zero Hour
+		{ "MedallionRegular",						INI::parseAsciiString,					nullptr, offsetof( PlayerTemplate, m_strMedallionNormal ) }, // Added in Zero Hour
+		{ "MedallionHilite",						INI::parseAsciiString,					nullptr, offsetof( PlayerTemplate, m_strMedallionHilite ) }, // Added in Zero Hour
+		{ "MedallionSelect",						INI::parseAsciiString,					nullptr, offsetof( PlayerTemplate, m_strMedallionSelected ) }, // Added in Zero Hour
 
 		{ nullptr,											nullptr,																				nullptr, 0 },
 	};
@@ -166,6 +171,70 @@ AsciiString PlayerTemplate::getStartingUnit( Int i ) const
 
 	VeterancyLevel startLevel = (VeterancyLevel)INI::scanIndexList(ini->getNextToken(), TheVeterancyNames);
 	self->m_productionVeterancyLevels[buildTemplateKey] = startLevel;
+}
+
+//-------------------------------------------------------------------------------------------------
+// Format is UpgradeName CommandSetName
+/*static*/ void PlayerTemplate::parseUpgradeCommandSet( INI* ini, void *instance, void *store, const void* /*userData*/ )
+{
+	UpgradeCommandSetList *swaps = (UpgradeCommandSetList*)store;
+
+	UpgradeCommandSet swap;
+	swap.m_upgradeName = ini->getNextToken();
+	swap.m_commandSet = ini->getNextToken();
+	swap.m_upgrade = nullptr;
+	swaps->push_back( swap );
+}
+
+//-------------------------------------------------------------------------------------------------
+AsciiString PlayerTemplate::getCommandSet( PlayerCommandSetType type, const Player *player ) const
+{
+	AsciiString result;
+	switch( type )
+	{
+		case PLAYER_COMMANDSET_PURCHASE_RANK1:
+			result = m_purchaseScienceCommandSetRank1;
+			break;
+		case PLAYER_COMMANDSET_PURCHASE_RANK3:
+			result = m_purchaseScienceCommandSetRank3;
+			break;
+		case PLAYER_COMMANDSET_PURCHASE_RANK8:
+			result = m_purchaseScienceCommandSetRank8;
+			break;
+		case PLAYER_COMMANDSET_SHORTCUT:
+			result = m_specialPowerShortcutCommandSet;
+			break;
+		default:
+			return result;
+	}
+
+	if( player == nullptr )
+	{
+		return result;
+	}
+
+	const UpgradeCommandSetList& swaps = m_commandSetUpgrades[ type ];
+	for( UpgradeCommandSetList::const_iterator it = swaps.begin(); it != swaps.end(); ++it )
+	{
+		if( it->m_upgrade == nullptr )
+		{
+			it->m_upgrade = TheUpgradeCenter->findUpgrade( it->m_upgradeName );
+		}
+		if( it->m_upgrade && player->hasUpgradeComplete( it->m_upgrade ) )
+		{
+			result = it->m_commandSet;
+		}
+	}
+	return result;
+}
+
+//-------------------------------------------------------------------------------------------------
+void PlayerTemplate::clearCommandSetUpgrades()
+{
+	for( Int i = 0; i < PLAYER_COMMANDSET_COUNT; ++i )
+	{
+		m_commandSetUpgrades[ i ].clear();
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -392,6 +461,8 @@ void PlayerTemplateStore::getAllSideStrings(AsciiStringList *outStringList)
 	PlayerTemplate* pt = const_cast<PlayerTemplate*>(ThePlayerTemplateStore->findPlayerTemplate(namekey));
 	if (pt)
 	{
+		// a redefinition replaces the swap lists; the scalar keys below overwrite theirs anyway
+		pt->clearCommandSetUpgrades();
 		ini->initFromINI(pt, pt->getFieldParse() );
 		pt->setNameKey(namekey);
 	}

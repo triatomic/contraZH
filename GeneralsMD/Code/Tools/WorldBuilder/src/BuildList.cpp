@@ -28,6 +28,7 @@
 #ifdef RTS_HAS_QT
 #include "qt/panels/WBQtMiscModalsBridge.h"
 #include "qt/panels/WBQtPickUnitBridge.h"	// the name matcher + the shared replace report
+#include "qt/WBQtMessageBox.h"
 #endif
 #include <vector>
 #include "CUndoable.h"
@@ -162,6 +163,16 @@ void BuildList::loadSides()
 	updateCurSide();
 }
 
+// Redraws the build lists after a side change when the view shows only the selected player's
+static void refreshSideOnlyView()
+{
+	WbView3d *p3View = CWorldBuilderDoc::GetActive3DView();
+	if (p3View && p3View->getShowBuildListSideOnly())
+	{
+		p3View->invalBuildListItemInView(nullptr);
+	}
+}
+
 /// Updates the current side, loading it's build list.
 void BuildList::updateCurSide()
 {
@@ -211,6 +222,7 @@ void BuildList::OnSelchangeSidesCombo()
 	if (pCombo->GetCurSel() != m_curSide) {
 		m_curSide = pCombo->GetCurSel();
 		updateCurSide();
+		refreshSideOnlyView();
 		CListBox *pList = (CListBox*)GetDlgItem(IDC_BUILD_LIST);
 		if (pList) {
 			pList->SetCurSel(0);
@@ -794,11 +806,13 @@ void BuildList::OnExport()
 	static FILE *theLogFile = nullptr;
 	Bool open = false;
 	try {
+#ifndef RTS_HAS_QT
 		CFileDialog dlg(FALSE, _T("ini"), _T("BuildList.ini"), OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
 			_T("INI Files (*.ini)|*.ini|All Files (*.*)|*.*||"));
+#endif
 
 		// Default file name suggestion based on current side/player
-		SidesInfo *pSide = TheSidesList->getSideInfo(m_curSide); 
+		SidesInfo *pSide = TheSidesList->getSideInfo(m_curSide);
 		if (!pSide) return;
 		Dict *d = pSide->getDict();
 		if (!d) return;
@@ -806,6 +820,16 @@ void BuildList::OnExport()
 		AsciiString name = d->getAsciiString(TheKey_playerName);
 		CString suggested;
 		suggested.Format(_T("%s_BuildList.ini"), name.str());
+#ifdef RTS_HAS_QT
+		char pathBuf[_MAX_PATH];
+		if (WBQtFileDialog_Run(1, "Export Build List", "INI Files (*.ini)|*.ini|All Files (*.*)|*.*||",
+				"ini", suggested, pathBuf, sizeof(pathBuf)) == 0)
+		{
+			return; // User cancelled
+		}
+
+		CString filePath = pathBuf;
+#else
 		dlg.m_ofn.lpstrFile = suggested.GetBuffer(MAX_PATH);
 
 		if (dlg.DoModal() != IDOK)
@@ -814,6 +838,7 @@ void BuildList::OnExport()
 		suggested.ReleaseBuffer();
 
 		CString filePath = dlg.GetPathName();
+#endif
 		theLogFile = fopen(filePath, "w");
 		if (theLogFile == NULL)
 			throw;
@@ -851,8 +876,180 @@ void BuildList::OnExport()
 	}
 }
 
-void BuildList::OnImport() 
+// Returns the list name when the line opens a SkirmishBuildList block, empty otherwise
+static AsciiString parseBuildListHeader(const char *p)
 {
+	static const char keyword[] = "SkirmishBuildList";
+	const size_t len = sizeof(keyword) - 1;
+	if (strncmp(p, keyword, len) != 0 || !isspace((unsigned char)p[len]))
+	{
+		return AsciiString::TheEmptyString;
+	}
+	char name[256];
+	if (sscanf(p + len, "%255s", name) != 1)
+	{
+		return AsciiString::TheEmptyString;
+	}
+	char *comment = strchr(name, ';');
+	if (comment)
+	{
+		*comment = '\0';
+	}
+	return AsciiString(name);
+}
+
+// The list name OnExport writes for this player; SCB edit mode players without a faction fall back to their name
+static AsciiString buildListSideFor(SidesInfo *pSide)
+{
+	Dict *d = pSide->getDict();
+	AsciiString faction = d->getAsciiString(TheKey_playerFaction);
+	const PlayerTemplate *pt = faction.isEmpty() ? nullptr : ThePlayerTemplateStore->findPlayerTemplate(NAMEKEY(faction));
+	if (pt)
+	{
+		return pt->getSide();
+	}
+	AsciiString name = d->getAsciiString(TheKey_playerName);
+	if (name.startsWith("Skirmish"))
+	{
+		return AsciiString(name.str() + 8);
+	}
+	if (name.startsWith("Plyr"))
+	{
+		return AsciiString(name.str() + 4);
+	}
+	return name;
+}
+
+// Replaces the side's build list with the structures of wantedList, or of every Structure when wantedList is empty
+static int importBuildListInto(FILE *file, const AsciiString &wantedList, SidesInfo *pSide)
+{
+	BuildListInfo *pBuild = pSide->getBuildList();
+	while (pBuild) {
+		BuildListInfo *pNext = pBuild->getNext();
+		pSide->removeFromBuildList(pBuild);
+		pBuild = pNext;
+	}
+	rewind(file);
+
+	char line[512];
+	BuildListInfo *currentBuild = NULL;
+	bool inStructure = false;
+	bool inWantedList = wantedList.isEmpty();
+	int importedCount = 0;
+
+	while (fgets(line, sizeof(line), file)) {
+		// Trim whitespace
+		char *p = line;
+		while (*p && isspace(*p)) p++;
+
+		// Skip comments and empty lines
+		if (*p == ';' || *p == '\0' || *p == '\n')
+			continue;
+
+		AsciiString listName = parseBuildListHeader(p);
+		if (!listName.isEmpty()) {
+			inWantedList = listName == wantedList;
+			continue;
+		}
+
+		// Check for Structure start
+		if (strstr(p, "Structure ") == p) {
+			inStructure = true;
+			if (!inWantedList) {
+				currentBuild = NULL;
+				continue;
+			}
+			currentBuild = newInstance(BuildListInfo);
+
+			// Extract template name
+			char *nameStart = p + 10; // strlen("Structure ")
+			char *nameEnd = strchr(nameStart, '\n');
+			if (nameEnd) *nameEnd = '\0';
+
+			// Trim trailing whitespace
+			char *end = nameStart + strlen(nameStart) - 1;
+			while (end > nameStart && isspace(*end)) *end-- = '\0';
+
+			currentBuild->setTemplateName(AsciiString(nameStart));
+
+			// Set defaults
+			currentBuild->setAngle(0.0f);
+			Coord3D defaultLoc;
+			defaultLoc.set(0.0f, 0.0f, 0.0f);
+			currentBuild->setLocation(defaultLoc);
+			currentBuild->setNumRebuilds(0);
+			currentBuild->setInitiallyBuilt(false);
+			continue;
+		}
+
+		// Check for Structure end
+		if (strstr(p, "END") == p && inStructure) {
+			if (currentBuild) {
+				pSide->addToBuildList(currentBuild, 1000);
+				importedCount++;
+				currentBuild = NULL;
+			}
+			inStructure = false;
+			continue;
+		}
+
+		// Parse structure properties
+		if (inStructure && currentBuild) {
+			if (strstr(p, "Name =") || strstr(p, "Name=")) {
+				char *valueStart = strchr(p, '=') + 1;
+				while (*valueStart && isspace(*valueStart)) valueStart++;
+				char *valueEnd = strchr(valueStart, '\n');
+				if (valueEnd) *valueEnd = '\0';
+				currentBuild->setBuildingName(AsciiString(valueStart));
+			}
+			else if (strstr(p, "Location =") || strstr(p, "Location=")) {
+				float x = 0, y = 0;
+				if (sscanf(p, "%*[^X]X:%f Y:%f", &x, &y) == 2) {
+					Coord3D loc;
+					loc.set(x, y, 0.0f);
+					currentBuild->setLocation(loc);
+				}
+			}
+			else if (strstr(p, "Rebuilds =") || strstr(p, "Rebuilds=")) {
+				int rebuilds = 0;
+				if (sscanf(p, "%*[^=]=%d", &rebuilds) == 1) {
+					currentBuild->setNumRebuilds(rebuilds);
+				}
+			}
+			else if (strstr(p, "Angle =") || strstr(p, "Angle=")) {
+				float angleDeg = 0;
+				if (sscanf(p, "%*[^=]=%f", &angleDeg) == 1) {
+					currentBuild->setAngle(angleDeg * PI / 180);
+				}
+			}
+			else if (strstr(p, "InitiallyBuilt =") || strstr(p, "InitiallyBuilt=")) {
+				char *valueStart = strchr(p, '=') + 1;
+				while (*valueStart && isspace(*valueStart)) valueStart++;
+				bool isBuilt = (strstr(valueStart, "Yes") != NULL || strstr(valueStart, "yes") != NULL);
+				currentBuild->setInitiallyBuilt(isBuilt);
+			}
+		}
+	}
+
+	// Drop a Structure that never reached its END
+	if (currentBuild) {
+		deleteInstance(currentBuild);
+	}
+	return importedCount;
+}
+
+void BuildList::OnImport()
+{
+#ifdef RTS_HAS_QT
+	char pathBuf[_MAX_PATH];
+	if (WBQtFileDialog_Run(0, "Import Build List", "INI Files (*.ini)|*.ini|All Files (*.*)|*.*||",
+			"ini", "BuildList.ini", pathBuf, sizeof(pathBuf)) == 0)
+	{
+		return; // User cancelled
+	}
+
+	CString filePath = pathBuf;
+#else
 	CFileDialog dlg(TRUE, _T("ini"), _T("BuildList.ini"), OFN_HIDEREADONLY | OFN_FILEMUSTEXIST,
 		_T("INI Files (*.ini)|*.ini|All Files (*.*)|*.*||"));
 
@@ -860,6 +1057,7 @@ void BuildList::OnImport()
 		return; // User cancelled
 
 	CString filePath = dlg.GetPathName();
+#endif
 	FILE* file = fopen(filePath, "r");
 	if (file == NULL) {
 		AfxMessageBox(_T("Failed to open file for import."));
@@ -870,109 +1068,64 @@ void BuildList::OnImport()
 		// Create a copy of the sides list for undo
 		SidesList sides;
 		sides = *TheSidesList;
-		SidesInfo *pSide = sides.getSideInfo(m_curSide);
-		
-		if (!pSide) {
-			fclose(file);
-			AfxMessageBox(_T("No valid side selected."));
-			return;
-		}
 
-		// Clear existing build list for this side
-		BuildListInfo *pBuild = pSide->getBuildList();
-		while (pBuild) {
-			BuildListInfo *pNext = pBuild->getNext();
-			pSide->removeFromBuildList(pBuild);
-			pBuild = pNext;
-		}
-
+		std::vector<AsciiString> listNames;
 		char line[512];
-		BuildListInfo *currentBuild = NULL;
-		bool inStructure = false;
-		int importedCount = 0;
-
 		while (fgets(line, sizeof(line), file)) {
-			// Trim whitespace
 			char *p = line;
 			while (*p && isspace(*p)) p++;
-			
-			// Skip comments and empty lines
-			if (*p == ';' || *p == '\0' || *p == '\n')
-				continue;
-
-			// Check for Structure start
-			if (strstr(p, "Structure ") == p) {
-				inStructure = true;
-				currentBuild = newInstance(BuildListInfo);
-				
-				// Extract template name
-				char *nameStart = p + 10; // strlen("Structure ")
-				char *nameEnd = strchr(nameStart, '\n');
-				if (nameEnd) *nameEnd = '\0';
-				
-				// Trim trailing whitespace
-				char *end = nameStart + strlen(nameStart) - 1;
-				while (end > nameStart && isspace(*end)) *end-- = '\0';
-				
-				currentBuild->setTemplateName(AsciiString(nameStart));
-				
-				// Set defaults
-				currentBuild->setAngle(0.0f);
-				Coord3D defaultLoc;
-				defaultLoc.set(0.0f, 0.0f, 0.0f);
-				currentBuild->setLocation(defaultLoc);
-				currentBuild->setNumRebuilds(0);
-				currentBuild->setInitiallyBuilt(false);
-				continue;
+			AsciiString listName = parseBuildListHeader(p);
+			if (!listName.isEmpty()) {
+				listNames.push_back(listName);
 			}
+		}
 
-			// Check for Structure end
-			if (strstr(p, "END") == p && inStructure) {
-				if (currentBuild) {
-					pSide->addToBuildList(currentBuild, 1000);
-					importedCount++;
-					currentBuild = NULL;
+		CString msg;
+		if (listNames.size() > 1) {
+			// Several lists fill every player whose faction side has one, as in a skirmish script file
+			CString filled;
+			int filledCount = 0;
+			for (Int i = 0; i < sides.getNumSides(); i++) {
+				SidesInfo *pSide = sides.getSideInfo(i);
+				AsciiString playerName = pSide->getDict()->getAsciiString(TheKey_playerName);
+				if (playerName.isEmpty()) {
+					continue;
 				}
-				inStructure = false;
-				continue;
-			}
-
-			// Parse structure properties
-			if (inStructure && currentBuild) {
-				if (strstr(p, "Name =") || strstr(p, "Name=")) {
-					char *valueStart = strchr(p, '=') + 1;
-					while (*valueStart && isspace(*valueStart)) valueStart++;
-					char *valueEnd = strchr(valueStart, '\n');
-					if (valueEnd) *valueEnd = '\0';
-					currentBuild->setBuildingName(AsciiString(valueStart));
-				}
-				else if (strstr(p, "Location =") || strstr(p, "Location=")) {
-					float x = 0, y = 0;
-					if (sscanf(p, "%*[^X]X:%f Y:%f", &x, &y) == 2) {
-						Coord3D loc;
-						loc.set(x, y, 0.0f);
-						currentBuild->setLocation(loc);
+				AsciiString side = buildListSideFor(pSide);
+				for (size_t j = 0; j < listNames.size(); j++) {
+					if (listNames[j].compareNoCase(side) == 0) {
+						int count = importBuildListInto(file, listNames[j], pSide);
+						CString row;
+						row.Format(_T("\n%s: %d buildings from %s"), playerName.str(), count, listNames[j].str());
+						filled += row;
+						filledCount++;
+						break;
 					}
 				}
-				else if (strstr(p, "Rebuilds =") || strstr(p, "Rebuilds=")) {
-					int rebuilds = 0;
-					if (sscanf(p, "%*[^=]=%d", &rebuilds) == 1) {
-						currentBuild->setNumRebuilds(rebuilds);
-					}
-				}
-				else if (strstr(p, "Angle =") || strstr(p, "Angle=")) {
-					float angleDeg = 0;
-					if (sscanf(p, "%*[^=]=%f", &angleDeg) == 1) {
-						currentBuild->setAngle(angleDeg * PI / 180);
-					}
-				}
-				else if (strstr(p, "InitiallyBuilt =") || strstr(p, "InitiallyBuilt=")) {
-					char *valueStart = strchr(p, '=') + 1;
-					while (*valueStart && isspace(*valueStart)) valueStart++;
-					bool isBuilt = (strstr(valueStart, "Yes") != NULL || strstr(valueStart, "yes") != NULL);
-					currentBuild->setInitiallyBuilt(isBuilt);
-				}
 			}
+			if (filledCount == 0) {
+				fclose(file);
+				msg = _T("No player's faction side matches a SkirmishBuildList in this file. It lists:\n");
+				for (size_t j = 0; j < listNames.size(); j++) {
+					msg += _T("\n");
+					msg += listNames[j].str();
+				}
+				AfxMessageBox(msg);
+				return;
+			}
+			msg.Format(_T("Imported build lists for %d players:\n"), filledCount);
+			msg += filled;
+		} else {
+			// One list or none imports into the selected player
+			SidesInfo *pSide = sides.getSideInfo(m_curSide);
+			if (!pSide) {
+				fclose(file);
+				AfxMessageBox(_T("No valid side selected."));
+				return;
+			}
+			AsciiString wantedList = listNames.empty() ? AsciiString::TheEmptyString : listNames[0];
+			int importedCount = importBuildListInto(file, wantedList, pSide);
+			msg.Format(_T("Successfully imported %d buildings."), importedCount);
 		}
 
 		fclose(file);
@@ -985,8 +1138,6 @@ void BuildList::OnImport()
 
 		updateCurSide();
 
-		CString msg;
-		msg.Format(_T("Successfully imported %d buildings."), importedCount);
 		AfxMessageBox(msg);
 
 	} catch (...) {
@@ -1062,6 +1213,7 @@ void BuildList::qtSetCurSide(int i)
 	if (i < 0 || i >= TheSidesList->getNumSides()) { return; }
 	m_staticThis->m_curSide = i;
 	m_staticThis->updateCurSide();
+	refreshSideOnlyView();
 }
 
 int BuildList::qtGetBuildCount(void)
@@ -1484,5 +1636,20 @@ int BuildList::qtGetForcedShow(void)
 void BuildList::qtSetForcedShow(int on)
 {
 	::AfxGetApp()->WriteProfileInt(BUILDLIST_OPTION_PANEL, "ForceShowBuildListObjects", on ? 1 : 0);
+}
+
+int BuildList::qtGetSideOnly(void)
+{
+	return ::AfxGetApp()->GetProfileInt(BUILDLIST_OPTION_PANEL, "ShowSelectedSideOnly", 0);
+}
+
+void BuildList::qtSetSideOnly(int on)
+{
+	::AfxGetApp()->WriteProfileInt(BUILDLIST_OPTION_PANEL, "ShowSelectedSideOnly", on ? 1 : 0);
+	WbView3d *p3View = CWorldBuilderDoc::GetActive3DView();
+	if (p3View)
+	{
+		p3View->invalBuildListItemInView(NULL);
+	}
 }
 #endif

@@ -80,6 +80,13 @@ public:
 	UnsignedInt   m_lowerRampFrames;
 	UnsignedInt		m_catapultFireFrames;
 
+	KindOfMaskType m_kindof;
+	KindOfMaskType m_kindofnot;
+	std::vector<AsciiString> m_allowedObjects;
+	std::vector<AsciiString> m_forbiddenObjects;
+
+	Bool isTemplateAllowedToLand( const ThingTemplate *tmpl ) const;
+
 	FlightDeckBehaviorModuleData();
 	static void buildFieldParse( MultiIniFieldParse& p );
 	static void parseRunwayStrip( INI* ini, void *instance, void *store, const void* /*userData*/ );

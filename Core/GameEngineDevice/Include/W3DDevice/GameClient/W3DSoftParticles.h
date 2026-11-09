@@ -27,6 +27,7 @@
 class RenderInfoClass;
 class Vector4;
 struct FlameShaderTuning;
+struct FluidShaderTuning;
 struct BeamShaderTuning;
 struct DisruptionShaderInfo;
 
@@ -51,6 +52,7 @@ public:
 
 	/// Whether cryo beams, streaks and sprites get the cryo effect at all, loading its shaders on first ask.
 	Bool cryoEnabled();
+	Bool fluidEnabled();
 
 	/// The noise laser pulses run on, with pulse x = travel so far, y = world to noise scale, z = swing, which is 0 with laser shading off or no settings.
 	IDirect3DTexture8 *getLaserPulse(const BeamShaderTuning *pulses, Vector4 &pulse);
@@ -83,6 +85,9 @@ private:
 	void bindElectric(const BeamShaderTuning &tuning, Bool beam, Bool mesh);
 	void bindLaser(const BeamShaderTuning &tuning);
 	void bindCryo(const BeamShaderTuning &tuning, Bool beam);
+#if RTS_ZEROHOUR
+	void bindFluid(const FluidShaderTuning &tuning);
+#endif
 	Bool bindHaze(const ShaderClass &shader, const FlameShaderTuning &tuning);
 	Bool bindDisruption(const ShaderClass &shader, const DisruptionShaderInfo &info);
 	void bindSceneCopy();
@@ -92,9 +97,11 @@ private:
 	DWORD m_flameDepthShader;
 	DWORD m_flameHeightShader;
 	DWORD m_flameShader;
+	DWORD m_flameTerrainShader;
 	DWORD m_electricDepthShader;
 	DWORD m_electricHeightShader;
 	DWORD m_electricShader;
+	DWORD m_electricTerrainShader;
 	DWORD m_laserDepthShader;
 	DWORD m_laserHeightShader;
 	DWORD m_laserShader;
@@ -104,6 +111,7 @@ private:
 	DWORD m_cryoBeamDepthShader;
 	DWORD m_cryoBeamHeightShader;
 	DWORD m_cryoBeamShader;
+	DWORD m_fluidShader;
 	DWORD m_hazeShader;
 	DWORD m_disruptionShaders[3];	///< one per DisruptionShaderInfo::Shape
 	IDirect3DTexture8 *m_noise;

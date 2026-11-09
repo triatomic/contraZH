@@ -11,6 +11,7 @@
 #include "Common/FileSystem.h"
 #include "Common/GlobalData.h"
 #include "GameClient/Water.h"
+#include "GameClient/Snow.h"
 #include "W3DDevice/GameClient/BaseHeightMap.h"
 #include "WorldBuilderDoc.h"
 #include "wbview3d.h"
@@ -47,6 +48,8 @@ namespace
 	{
 		WATER_BOOL("IsWater", m_isWater, 0,
 			"No draws the old water without shaders, for lava and the like."),
+		WATER_BOOL("AdditiveBlending", m_additiveBlend, 0,
+			"Yes uses the old additive water and disables shader water."),
 		WATER_REAL("ShaderWaterOpacity", m_shaderWaterOpacity, 0.0f, 1.0f, 0.01f, 0,
 			"Deep water opacity. 1 hides the seabed. 0 uses TransparentWaterMinOpacity."),
 		WATER_REAL("ShaderWaterClarity", m_shaderWaterClarity, 0.1f, 10.0f, 0.1f, 0,
@@ -80,6 +83,10 @@ namespace
 			"Deep water opacity of the old water, and of shader water when ShaderWaterOpacity is 0."),
 		WATER_REAL("ShaderWaterFoamDepth", m_shaderWaterFoamDepth, 0.0f, 30.0f, 0.5f, 1,
 			"Depth where shore foam fades out. 0 turns foam off, crest foam included."),
+		WATER_REAL("ShaderWaterShoreFoamDepth", m_shaderWaterShoreFoamDepth, 0.1f, 10.0f, 0.1f, 1,
+			"Depth the shoreline foam band reaches at the top of its surge. Gentle shores show it wider."),
+		WATER_REAL("ShaderWaterShoreFoamSurge", m_shaderWaterShoreFoamSurge, 0.0f, 0.9f, 0.05f, 1,
+			"Share of the shoreline foam band the surge pulls back. 0 holds the band still."),
 		WATER_REAL("ShaderWaterSpecularSpread", m_shaderWaterSpecularSpread, 0.1f, 16.0f, 0.1f, 1,
 			"Widens the sun glint to more view angles. Below 1 narrows it."),
 		WATER_BOOL("ShaderWaterVirtualSun", m_shaderWaterVirtualSun, 1,
@@ -112,6 +119,77 @@ namespace
 
 	const int s_keyCount = sizeof(s_keys) / sizeof(s_keys[0]);
 
+	struct WeatherKey
+	{
+		WBQtWaterTuningDesc desc;
+		Real WeatherSetting::*real;
+		Bool WeatherSetting::*flag;
+	};
+
+#define WEATHER_REAL(key, member, lo, hi, step, help) \
+	{ { key, "Weather", "Weather", help, WBQT_WATER_FLOAT, lo, hi, step, 0, NULL }, &WeatherSetting::member, NULL }
+#define WEATHER_BOOL(key, member, help) \
+	{ { key, "Weather", "Weather", help, WBQT_WATER_BOOL, 0.0f, 1.0f, 1.0f, 0, NULL }, NULL, &WeatherSetting::member }
+
+	const WeatherKey s_weatherKeys[] =
+	{
+		WEATHER_BOOL("SnowEnabled", m_snowEnabled, "Shows falling snow on the map."),
+		{ { "SnowTexture", "Weather", "Weather", "Texture file in Art\\Textures, such as EXSnowFlake.tga.",
+			WBQT_WATER_TEXT, 0.0f, 0.0f, 0.0f, 0, NULL }, NULL, NULL },
+		WEATHER_BOOL("SnowPointSprites", m_usePointSprites,
+			"Uses hardware point sprites when supported. No draws textured quads."),
+		WEATHER_REAL("SnowBoxDensity", m_snowBoxDensity, 0.01f, 3.0f, 0.01f,
+			"Emitters per world unit along each axis. Doubling this draws four times as many flakes."),
+		WEATHER_REAL("SnowVelocity", m_snowVelocity, 0.1f, 100.0f, 0.1f,
+			"World units a second the snow falls."),
+		WEATHER_REAL("SnowBoxDimensions", m_snowBoxDimensions, 1.0f, 1000.0f, 1.0f,
+			"World units across the snow box around the camera."),
+		WEATHER_REAL("SnowAmplitude", m_snowAmplitude, 0.0f, 50.0f, 0.1f,
+			"World units the flakes sway sideways."),
+		WEATHER_REAL("SnowFrequencyScaleX", m_snowFrequencyScaleX, 0.0f, 1.0f, 0.0001f,
+			"Frequency of the flakes' sway along the X axis."),
+		WEATHER_REAL("SnowFrequencyScaleY", m_snowFrequencyScaleY, 0.0f, 1.0f, 0.0001f,
+			"Frequency of the flakes' sway along the Y axis."),
+		WEATHER_REAL("SnowPointSize", m_snowPointSize, 0.1f, 100.0f, 0.1f,
+			"Size of hardware point sprites before distance scaling."),
+		WEATHER_REAL("SnowMinPointSize", m_snowMinPointSize, 0.0f, 64.0f, 0.1f,
+			"Minimum point sprite size in pixels."),
+		WEATHER_REAL("SnowMaxPointSize", m_snowMaxPointSize, 0.1f, 256.0f, 0.1f,
+			"Maximum point sprite size in pixels."),
+		WEATHER_REAL("SnowQuadSize", m_snowQuadSize, 0.01f, 20.0f, 0.01f,
+			"World units across a flake when point sprites are disabled or unsupported."),
+	};
+
+	const int s_weatherKeyCount = sizeof(s_weatherKeys) / sizeof(s_weatherKeys[0]);
+
+	void readWeatherKey(const WeatherKey &key, const WeatherSetting *weather, float v[3])
+	{
+		if (weather != NULL)
+		{
+			if (key.flag != NULL)
+			{
+				v[0] = weather->*(key.flag) ? 1.0f : 0.0f;
+			}
+			else if (key.real != NULL)
+			{
+				v[0] = weather->*(key.real);
+			}
+		}
+	}
+
+	void refreshWeather()
+	{
+		if (TheSnowManager != NULL)
+		{
+			TheSnowManager->updateIniSettings();
+		}
+		WbView3d *view = CWorldBuilderDoc::GetActive3DView();
+		if (view != NULL)
+		{
+			view->Invalidate(false);
+		}
+	}
+
 	struct RenderKey
 	{
 		const char *key;
@@ -125,18 +203,27 @@ namespace
 		Int GlobalData::*integer;
 		RGBColor GlobalData::*color;
 		AsciiString GlobalData::*text;
+		Bool GlobalData::*flag;
+		const char *const *choices;
 	};
 
 #define RENDER_REAL(group, key, member, lo, hi, step, help) \
-	{ key, group, help, WBQT_WATER_FLOAT, lo, hi, step, &GlobalData::member, NULL, NULL, NULL }
+	{ key, group, help, WBQT_WATER_FLOAT, lo, hi, step, &GlobalData::member, NULL, NULL, NULL, NULL, NULL }
 #define RENDER_INT(group, key, member, lo, hi, step, help) \
-	{ key, group, help, WBQT_WATER_FLOAT, lo, hi, step, NULL, &GlobalData::member, NULL, NULL }
+	{ key, group, help, WBQT_WATER_FLOAT, lo, hi, step, NULL, &GlobalData::member, NULL, NULL, NULL, NULL }
 #define RENDER_COLOR(group, key, member, help) \
-	{ key, group, help, WBQT_WATER_COLOR, 0.0f, 255.0f, 1.0f, NULL, NULL, &GlobalData::member, NULL }
+	{ key, group, help, WBQT_WATER_COLOR, 0.0f, 255.0f, 1.0f, NULL, NULL, &GlobalData::member, NULL, NULL, NULL }
 #define RENDER_TEXT(group, key, member, help) \
-	{ key, group, help, WBQT_WATER_TEXT, 0.0f, 0.0f, 0.0f, NULL, NULL, NULL, &GlobalData::member }
+	{ key, group, help, WBQT_WATER_TEXT, 0.0f, 0.0f, 0.0f, NULL, NULL, NULL, &GlobalData::member, NULL, NULL }
 
-	// The GameData keys of the FX tuner's Glint, Ground, Blend, Sky and Colour grade tabs in its order, ranges and steps.
+#define RENDER_BOOL(group, key, member, help) \
+	{ key, group, help, WBQT_WATER_BOOL, 0.0f, 1.0f, 1.0f, NULL, NULL, NULL, NULL, &GlobalData::member, NULL }
+#define RENDER_CHOICE(group, key, member, names, help) \
+	{ key, group, help, WBQT_WATER_CHOICE, 0.0f, 0.0f, 0.0f, NULL, &GlobalData::member, NULL, NULL, NULL, names }
+
+	const char *const s_fogPresets[] = { "Sun", "Desert", "Futuristic", "DarkHorse", "Apocalyptic", "Custom", NULL };
+
+	// Each GameData group becomes a tab in the map tuning window.
 	const RenderKey s_renderKeys[] =
 	{
 		RENDER_REAL("Glint", "TerrainGlintIntensity", m_terrainGlintIntensity, 0.0f, 2.0f, 0.01f,
@@ -159,8 +246,6 @@ namespace
 			"How far the taller texture pushes into the other's side of a blend. 0 keeps the edge where the soft fade would put it."),
 		RENDER_REAL("Blend", "TerrainHeightBlendSharpness", m_terrainHeightBlendSharpness, 1.0f, 12.0f, 0.1f,
 			"How narrow the blend's edge is. 1 is as wide as the soft fade."),
-		RENDER_INT("Blend", "TerrainAtlasBorder", m_terrainAtlasBorder, 4.0f, 32.0f, 4.0f,
-			"Texels copied around each texture in the terrain atlas, in steps of 4. Wider keeps high anisotropy clean but fits fewer textures."),
 
 		RENDER_REAL("Sky", "SkyCloudSize", m_skyCloudSize, 150.0f, 3000.0f, 10.0f,
 			"World units across a typical cloud."),
@@ -169,7 +254,7 @@ namespace
 		RENDER_REAL("Sky", "SkyCloudSoftness", m_skyCloudSoftness, 0.02f, 1.0f, 0.01f,
 			"How wide the fade at a cloud's edge is. Low gives crisp edges."),
 		RENDER_REAL("Sky", "SkyCloudShadowStrength", m_skyCloudShadowStrength, 0.0f, 1.0f, 0.01f,
-			"How dark a thick cloud's shadow is. 0 for none."),
+			"How much sun a thick cloud blocks. 0 for none, 1 as dark as a cast shadow."),
 		RENDER_COLOR("Sky", "SkyCloudShadowTint", m_skyCloudShadowTint,
 			"The shadow's hue. White gives neutral grey. Unticked leaves the key out, so GameData.ini decides."),
 		RENDER_REAL("Sky", "SkyCloudWindSpeed", m_skyCloudWindSpeed, 0.0f, 100.0f, 0.5f,
@@ -182,6 +267,21 @@ namespace
 			"How far shapes bulge and curl. High values twist them into streaks."),
 		RENDER_REAL("Sky", "SkyCloudDetail", m_skyCloudDetail, 0.0f, 1.0f, 0.01f,
 			"Ragged detail at the edges. 0 gives smooth blobs."),
+
+		RENDER_BOOL("Fog", "DistanceFog", m_distanceFog,
+			"Enables distance fog for this map. Requires D3D9 and readable depth; MSAA disables it."),
+		RENDER_CHOICE("Fog", "DistanceFogPreset", m_distanceFogPreset, s_fogPresets,
+			"Chooses the haze colour. Sun takes the map's current sun and ambient light; Custom uses the custom colour."),
+		RENDER_COLOR("Fog", "DistanceFogColor", m_distanceFogColor,
+			"Base colour for the Custom preset. Tick to override the mod's colour in map.ini."),
+		RENDER_REAL("Fog", "DistanceFogStart", m_distanceFogStart, 0.0f, 10000.0f, 10.0f,
+			"Camera depth where haze starts, in world units. Nearer surfaces stay clear."),
+		RENDER_REAL("Fog", "DistanceFogEnd", m_distanceFogEnd, 0.0f, 20000.0f, 10.0f,
+			"Camera depth where haze reaches full strength. Must exceed the start depth."),
+		RENDER_REAL("Fog", "DistanceFogStrength", m_distanceFogStrength, 0.0f, 1.0f, 0.01f,
+			"Maximum blend toward the fog colour. 0 turns fog off."),
+		RENDER_REAL("Fog", "DistanceFogSunInfluence", m_distanceFogSunInfluence, 0.0f, 1.0f, 0.01f,
+			"Blends the preset toward the map's sun and ambient light. 0 keeps the preset colour. Sun always uses 1."),
 
 		RENDER_TEXT("Colour grade", "ColorLut", m_colorLut,
 			"The colour table's file name in Art\\Textures, such as lut_desert.tga. None uses no table."),
@@ -244,6 +344,10 @@ namespace
 			v[1] = c.green * 255.0f;
 			v[2] = c.blue * 255.0f;
 		}
+		else if (k.flag != NULL)
+		{
+			v[0] = (data->*(k.flag)) ? 1.0f : 0.0f;
+		}
 		else if (k.integer != NULL)
 		{
 			v[0] = (float)(data->*(k.integer));
@@ -266,6 +370,10 @@ namespace
 			c.red = v[0] / 255.0f;
 			c.green = v[1] / 255.0f;
 			c.blue = v[2] / 255.0f;
+		}
+		else if (k.flag != NULL)
+		{
+			data->*(k.flag) = v[0] >= 0.5f;
 		}
 		else if (k.integer != NULL)
 		{
@@ -327,6 +435,29 @@ namespace
 
 	Bool parseRenderValue(const RenderKey &k, const char *text, float v[3])
 	{
+		if (k.choices != NULL)
+		{
+			const AsciiString word = firstWord(text);
+			for (int i = 0; k.choices[i] != NULL; ++i)
+			{
+				if (word.compareNoCase(k.choices[i]) == 0)
+				{
+					v[0] = (float)i;
+					return TRUE;
+				}
+			}
+			return FALSE;
+		}
+		if (k.flag != NULL)
+		{
+			const AsciiString word = firstWord(text);
+			if (word.compareNoCase("Yes") != 0 && word.compareNoCase("No") != 0)
+			{
+				return FALSE;
+			}
+			v[0] = word.compareNoCase("Yes") == 0 ? 1.0f : 0.0f;
+			return TRUE;
+		}
 		if (k.color != NULL)
 		{
 			int r = 0;
@@ -416,15 +547,20 @@ namespace
 
 extern "C" int WBQtWaterTuning_Count(void)
 {
-	return s_keyCount + s_renderKeyCount;
+	return s_keyCount + s_renderKeyCount + s_weatherKeyCount;
 }
 
 // The water keys come first, then the GameData keys.
 extern "C" int WBQtWaterTuning_GetDesc(int i, WBQtWaterTuningDesc *out)
 {
-	if (i < 0 || i >= s_keyCount + s_renderKeyCount || out == NULL)
+	if (i < 0 || i >= WBQtWaterTuning_Count() || out == NULL)
 	{
 		return 0;
+	}
+	if (i >= s_keyCount + s_renderKeyCount)
+	{
+		*out = s_weatherKeys[i - s_keyCount - s_renderKeyCount].desc;
+		return 1;
 	}
 	if (i >= s_keyCount)
 	{
@@ -438,6 +574,7 @@ extern "C" int WBQtWaterTuning_GetDesc(int i, WBQtWaterTuningDesc *out)
 		out->hi = r.hi;
 		out->step = r.step;
 		out->advanced = 0;
+		out->choices = r.choices;
 		return 1;
 	}
 	const WaterKey &k = s_keys[i];
@@ -450,6 +587,7 @@ extern "C" int WBQtWaterTuning_GetDesc(int i, WBQtWaterTuningDesc *out)
 	out->hi = k.hi;
 	out->step = k.step;
 	out->advanced = k.advanced;
+	out->choices = NULL;
 	return 1;
 }
 
@@ -460,6 +598,12 @@ extern "C" void WBQtWaterTuning_GetBase(int i, float v[3])
 		return;
 	}
 	v[0] = v[1] = v[2] = 0.0f;
+	if (i >= s_keyCount + s_renderKeyCount && i < WBQtWaterTuning_Count())
+	{
+		readWeatherKey(s_weatherKeys[i - s_keyCount - s_renderKeyCount],
+			TheWeatherSetting.getNonOverloadedPointer(), v);
+		return;
+	}
 	if (i >= s_keyCount && i < s_keyCount + s_renderKeyCount)
 	{
 		if (takeRenderBase())
@@ -483,6 +627,11 @@ extern "C" void WBQtWaterTuning_GetLive(int i, float v[3])
 		return;
 	}
 	v[0] = v[1] = v[2] = 0.0f;
+	if (i >= s_keyCount + s_renderKeyCount && i < WBQtWaterTuning_Count())
+	{
+		readWeatherKey(s_weatherKeys[i - s_keyCount - s_renderKeyCount], TheWeatherSetting, v);
+		return;
+	}
 	if (i >= s_keyCount && i < s_keyCount + s_renderKeyCount)
 	{
 		if (TheGlobalData != NULL)
@@ -500,8 +649,33 @@ extern "C" void WBQtWaterTuning_GetLive(int i, float v[3])
 
 extern "C" void WBQtWaterTuning_SetLive(int i, const float v[3])
 {
-	if (i < 0 || i >= s_keyCount + s_renderKeyCount || v == NULL)
+	if (i < 0 || i >= WBQtWaterTuning_Count() || v == NULL)
 	{
+		return;
+	}
+	if (i >= s_keyCount + s_renderKeyCount)
+	{
+		const WeatherKey &key = s_weatherKeys[i - s_keyCount - s_renderKeyCount];
+		float now[3] = { 0.0f, 0.0f, 0.0f };
+		readWeatherKey(key, TheWeatherSetting, now);
+		if (now[0] == v[0] || key.desc.kind == WBQT_WATER_TEXT)
+		{
+			return;
+		}
+		WeatherSetting *weather = WBMapIni_EnsureWeatherOverride();
+		if (weather == NULL)
+		{
+			return;
+		}
+		if (key.flag != NULL)
+		{
+			weather->*(key.flag) = v[0] >= 0.5f;
+		}
+		else
+		{
+			weather->*(key.real) = v[0];
+		}
+		refreshWeather();
 		return;
 	}
 	if (i >= s_keyCount)
@@ -554,6 +728,16 @@ extern "C" int WBQtWaterTuning_GetBaseText(int i, char *buf, int size)
 		return 0;
 	}
 	buf[0] = 0;
+	if (i >= s_keyCount + s_renderKeyCount && i < WBQtWaterTuning_Count())
+	{
+		const WeatherSetting *base = TheWeatherSetting.getNonOverloadedPointer();
+		if (s_weatherKeys[i - s_keyCount - s_renderKeyCount].desc.kind != WBQT_WATER_TEXT || base == NULL)
+		{
+			return 0;
+		}
+		strlcpy(buf, base->m_snowTexture.str(), size);
+		return 1;
+	}
 	if (i < s_keyCount || i >= s_keyCount + s_renderKeyCount || s_renderKeys[i - s_keyCount].text == NULL || !takeRenderBase())
 	{
 		return 0;
@@ -564,6 +748,21 @@ extern "C" int WBQtWaterTuning_GetBaseText(int i, char *buf, int size)
 
 extern "C" void WBQtWaterTuning_SetLiveText(int i, const char *text)
 {
+	if (i >= s_keyCount + s_renderKeyCount && i < WBQtWaterTuning_Count() && text != NULL)
+	{
+		if (s_weatherKeys[i - s_keyCount - s_renderKeyCount].desc.kind != WBQT_WATER_TEXT ||
+			TheWeatherSetting == NULL || TheWeatherSetting->m_snowTexture == firstWord(text))
+		{
+			return;
+		}
+		WeatherSetting *weather = WBMapIni_EnsureWeatherOverride();
+		if (weather != NULL)
+		{
+			weather->m_snowTexture = firstWord(text);
+			refreshWeather();
+		}
+		return;
+	}
 	if (i < s_keyCount || i >= s_keyCount + s_renderKeyCount || text == NULL || !takeRenderBase())
 	{
 		return;

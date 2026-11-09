@@ -84,7 +84,7 @@ static Real calcSlowDownDist(Real curSpeed, Real desiredSpeed, Real maxBraking)
 	if (delta <= 0)
 		return 0.0f;
 
-	Real dist = (sqr(delta) / fabs(maxBraking)) * 0.5f;
+	Real dist = (sqr(delta) / WWMath::Fabs(maxBraking)) * 0.5f;
 
 	// use a little fudge so that things can stop "on a dime" more easily...
 	const Real FUDGE = 1.05f;
@@ -95,14 +95,14 @@ static Real calcSlowDownDist(Real curSpeed, Real desiredSpeed, Real maxBraking)
 inline Bool isNearlyZero(Real a)
 {
 	const Real TINY_EPSILON = 0.001f;
-	return fabs(a) < TINY_EPSILON;
+	return WWMath::Fabs(a) < TINY_EPSILON;
 }
 
 //-----------------------------------------------------------------------------
 inline Bool isNearly(Real a, Real val)
 {
 	const Real TINY_EPSILON = 0.001f;
-	return fabs(a - val) < TINY_EPSILON;
+	return WWMath::Fabs(a - val) < TINY_EPSILON;
 }
 
 //-----------------------------------------------------------------------------
@@ -141,7 +141,7 @@ static Real tryToRotateVector3D(
 		}
 	}
 
-	if (fabs(angleBetween) <= maxAngle)
+	if (WWMath::Fabs(angleBetween) <= maxAngle)
 	{
 		// close enough
 		actualDir = goalDir;
@@ -231,9 +231,9 @@ static void calcDirectionToApplyThrust(
 
 	Bool foundSolution = false;
 	Real distToGoalSqr = vecToGoal.Length2();
-	Real distToGoal = sqrt(distToGoalSqr);
+	Real distToGoal = WWMath::Sqrt(distToGoalSqr);
 	Real curVelMagSqr = curVel.Length2();
-	Real curVelMag = sqrt(curVelMagSqr);
+	Real curVelMag = WWMath::Sqrt(curVelMagSqr);
 	Real maxAccelSqr = sqr(maxAccel);
 
 	Real denom = curVelMagSqr - maxAccelSqr;
@@ -333,7 +333,9 @@ LocomotorTemplate::LocomotorTemplate()
 	m_locomotorWorksWhenDisabled = false;
 	m_airborneTargetingHeight = INT_MAX;
 	m_stickToGround = false;
+	m_groundCollisionAngle = 0.0f;
 	m_canMoveBackward = false;
+	m_requiresMoveToTurn = false;
 	// defaults match the values the backwards-movement logic used before these were configurable
 	m_backwardsMoveAngleThreshold = PI/2;
 	m_backwardsMoveDistanceFactorThreshold = 5.0f;
@@ -367,6 +369,12 @@ LocomotorTemplate::~LocomotorTemplate()
 //-------------------------------------------------------------------------------------------------
 void LocomotorTemplate::validate()
 {
+	if (!(m_groundCollisionAngle >= 0.0f && m_groundCollisionAngle < PI/2))
+	{
+		DEBUG_CRASH(("GroundCollisionAngle must be at least 0 and less than 90 degrees"));
+		throw INI_INVALID_DATA;
+	}
+
 	// this is ok; parachutes need it!
 	//DEBUG_ASSERTCRASH(m_lift == 0.0f || m_lift > fabs(TheGlobalData->m_gravity), ("Lift is too low to counteract gravity!"));
 	//DEBUG_ASSERTCRASH(m_liftDamaged == 0.0f || m_liftDamaged > fabs(TheGlobalData->m_gravity), ("LiftDamaged is too low to counteract gravity!"));
@@ -503,7 +511,9 @@ const FieldParse* LocomotorTemplate::getFieldParse() const
 		{ "LocomotorWorksWhenDisabled", INI::parseBool, nullptr, offsetof(LocomotorTemplate, m_locomotorWorksWhenDisabled) },
 		{ "AirborneTargetingHeight", INI::parseInt, nullptr, offsetof( LocomotorTemplate, m_airborneTargetingHeight ) },
 		{ "StickToGround",				INI::parseBool,			nullptr,	offsetof(LocomotorTemplate, m_stickToGround) },
+		{ "GroundCollisionAngle",			INI::parseAngleReal,	nullptr,	offsetof(LocomotorTemplate, m_groundCollisionAngle) },
 		{ "CanMoveBackwards",				INI::parseBool,			nullptr,	offsetof(LocomotorTemplate, m_canMoveBackward) },
+		{ "RequiresMoveToTurn",				INI::parseBool,			nullptr,	offsetof(LocomotorTemplate, m_requiresMoveToTurn) },
 		{ "BackwardsMoveAngleThreshold",				INI::parseAngleReal,	nullptr,	offsetof(LocomotorTemplate, m_backwardsMoveAngleThreshold) },
 		{ "BackwardsMoveDistanceFactorThreshold",	INI::parseReal,			nullptr,	offsetof(LocomotorTemplate, m_backwardsMoveDistanceFactorThreshold) },
 		{ "BackwardsMoveSpeedFactor",				INI::parseReal,			nullptr,	offsetof(LocomotorTemplate, m_backwardsMoveSpeedFactor) },
@@ -970,7 +980,7 @@ Real Locomotor::getMaxLift(BodyDamageType condition) const
 }
 
 //-------------------------------------------------------------------------------------------------
-void Locomotor::locoUpdate_moveTowardsAngle(Object* obj, Real goalAngle)
+void Locomotor::locoUpdate_moveTowardsAngle(Object* obj, Real goalAngle, Bool turnByReversing, Bool aroundCenter)
 {
 	setFlag(MAINTAIN_POS_IS_VALID, false);
 
@@ -1012,11 +1022,55 @@ void Locomotor::locoUpdate_moveTowardsAngle(Object* obj, Real goalAngle)
 	}
 	else
 	{
+		const Bool reverseToTurn = turnByReversing && m_template->m_canMoveBackward;
+		if (!aroundCenter && (m_template->m_requiresMoveToTurn || reverseToTurn))
+		{
+			// can't pivot in place (or asked to turn by reversing): move toward/away from the goal angle so
+			// the appearance-specific mover (e.g. moveTowardsPositionWheels) applies MinTurnSpeed / reversing.
+			// Once aligned, fall through to the in-place path (no-op rotation).
+			const Real ALIGNED_THRESH = 0.035f;	// ~2 degrees, same as AI aim/face REL_THRESH
+			Real relAngle = stdAngleDiff(goalAngle, obj->getOrientation());
+			BodyDamageType bdt = obj->getBodyModule()->getDamageState();
+			Real maxSpeed = getMaxSpeedForCondition(bdt);
+			// with no speed to drive at, pivot instead so aim and face states can still finish
+			if (fabs(relAngle) > ALIGNED_THRESH && maxSpeed > 0.0f)
+			{
+				// mirrors the turnSpeed clamp in moveTowardsPositionWheels
+				Real speed = m_template->m_minTurnSpeed;
+				if (speed < maxSpeed/4.0f)
+					speed = maxSpeed/4.0f;
+				if (speed > maxSpeed)
+					speed = maxSpeed;
+
+				Coord3D desiredPos = *obj->getPosition();
+				if (reverseToTurn)
+				{
+					// back up toward a point opposite the goal angle: the reversing mover swings our nose to goalAngle.
+					desiredPos.x -= Cos(goalAngle) * 1000.0f;
+					desiredPos.y -= Sin(goalAngle) * 1000.0f;
+				}
+				else
+				{
+					desiredPos.x += Cos(goalAngle) * 1000.0f;
+					desiredPos.y += Sin(goalAngle) * 1000.0f;
+				}
+				// huge "dist to goal" so we don't brake as if nearing a destination
+				// (forced reversing never does a 3-point turn, so this is fine for reverseToTurn too)
+				const Real onPathDistToGoal = 99999.0f;
+				Bool blocked = false;
+				// REVERSE_TO_TURN makes the movers reverse right away, even while still rolling forward
+				setFlag(REVERSE_TO_TURN, reverseToTurn);
+				locoUpdate_moveTowardsPosition(obj, desiredPos, onPathDistToGoal, speed, &blocked);
+				setFlag(REVERSE_TO_TURN, false);
+				return;
+			}
+		}
+
 		DEBUG_ASSERTCRASH(m_template->m_appearance != LOCO_THRUST, ("THRUST should always have minspeeds!"));
 		Coord3D desiredPos = *obj->getPosition();
 		desiredPos.x += Cos(goalAngle) * 1000.0f;
 		desiredPos.y += Sin(goalAngle) * 1000.0f;
-		PhysicsTurningType rotating = rotateTowardsPosition(obj, desiredPos);
+		PhysicsTurningType rotating = rotateTowardsPosition(obj, desiredPos, nullptr, aroundCenter);
 		physics->setTurning(rotating);
 		handleBehaviorZ(obj, physics, *obj->getPosition());
 	}
@@ -1024,12 +1078,12 @@ void Locomotor::locoUpdate_moveTowardsAngle(Object* obj, Real goalAngle)
 }
 
 //-------------------------------------------------------------------------------------------------
-PhysicsTurningType Locomotor::rotateTowardsPosition(Object* obj, const Coord3D& goalPos, Real *relAngle)
+PhysicsTurningType Locomotor::rotateTowardsPosition(Object* obj, const Coord3D& goalPos, Real *relAngle, Bool aroundCenter)
 {
 	BodyDamageType bdt = obj->getBodyModule()->getDamageState();
 	Real turnRate = getMaxTurnRate(bdt);
 
-	PhysicsTurningType rotating = rotateObjAroundLocoPivot(obj, goalPos, turnRate, relAngle);
+	PhysicsTurningType rotating = rotateObjAroundLocoPivot(obj, goalPos, turnRate, relAngle, aroundCenter);
 	return rotating;
 }
 
@@ -1092,13 +1146,14 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 	// objects we don't need the pathfinder so we'll ignore this
 	//
 	if( BitIsSet( m_template->m_surfaces, LOCOMOTORSURFACE_AIR ) == false &&
-			!TheAI->pathfinder()->validMovementTerrain(obj->getLayer(), this, obj->getPosition()) &&
+			!TheAI->pathfinder()->validMovementTerrainForObject(obj, this,obj->getPosition()) &&
 			!getFlag(ALLOW_INVALID_POSITION))
 	{
 		// Somehow, we have gotten to an invalid location.
 		if (fixInvalidPosition(obj, physics))
 		{
 			// the we adjusted us toward a legal position, so just return.
+			TheAI->pathfinder()->countStatEvent(PFE_INVALID_FIX);
 			return;
 		}
 	}
@@ -1107,7 +1162,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 	Real dx = goalPos.x - obj->getPosition()->x;
 	Real dy = goalPos.y - obj->getPosition()->y;
 	Real dz = goalPos.z - obj->getPosition()->z;
-	Real dist = sqrt(dx*dx+dy*dy);
+	Real dist = WWMath::Sqrt(dx*dx+dy*dy);
 	if (dist>onPathDistToGoal)
 	{
 		if (!obj->isKindOf(KINDOF_PROJECTILE) && dist>2*onPathDistToGoal)
@@ -1158,7 +1213,13 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 		Real turnRate = getMaxTurnRate(obj->getBodyModule()->getDamageState());
 		if (m_template->m_wanderWidthFactor == 0.0f)
 		{
-			*blocked = (TURN_NONE != rotateObjAroundLocoPivot(obj, goalPos, turnRate));
+			Coord3D turnGoal = goalPos;
+			if (isForcedReverse(obj))
+			{
+				turnGoal.x = 2.0f * obj->getPosition()->x - goalPos.x;
+				turnGoal.y = 2.0f * obj->getPosition()->y - goalPos.y;
+			}
+			*blocked = (TURN_NONE != rotateObjAroundLocoPivot(obj, turnGoal, turnRate));
 		}
 
 		// it is very important to be sure to call this in all situations, even if not moving in 2d space.
@@ -1229,7 +1290,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 			// Projectiles never stop braking once they start.  jba.
 			obj->setStatus( MAKE_OBJECT_STATUS_MASK( OBJECT_STATUS_BRAKING ) );
 			// Projectiles cheat in 3 dimensions.
-			dist = sqrt(dx*dx+dy*dy+dz*dz);
+			dist = WWMath::Sqrt(dx*dx+dy*dy+dz*dz);
 			Real vel = physics->getVelocityMagnitude();
 			if (vel < MIN_VEL)
 				vel = MIN_VEL;
@@ -1256,7 +1317,7 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 			// Normalize.
 			if (dist > 0.001f)
 			{
-				Real vel = fabs(physics->getForwardSpeed2D());
+				Real vel = WWMath::Fabs(physics->getForwardSpeed2D());
 				if (vel < MIN_VEL)
 					vel = MIN_VEL;
 				if (vel > dist)
@@ -1268,7 +1329,13 @@ void Locomotor::locoUpdate_moveTowardsPosition(Object* obj, const Coord3D& goalP
 				pos.y += dy * vel;
 			}
 		}
+		Bool hitSteepGround = physics->constrainGroundMovement(pos);
 		obj->setPosition(&pos);
+		if (hitSteepGround)
+		{
+			Coord3D normal = { 0.0f, 0.0f, -1.0f };
+			obj->onCollide(nullptr, &pos, &normal);
+		}
 	}
 
 }
@@ -1290,7 +1357,7 @@ Bool Locomotor::shouldMoveBackwards(Object* obj, Real relAngle, Real onPathDistT
 	}
 
 	// A REVERSE_MOVE order forces reversing for the whole path, bypassing the distance heuristic.
-	if (isForcedReverse(obj, relAngle))
+	if (getFlag(REVERSE_TO_TURN) || isForcedReverse(obj))
 	{
 		setFlag(MOVING_BACKWARDS, true);
 		return true;
@@ -1319,15 +1386,12 @@ Bool Locomotor::shouldMoveBackwards(Object* obj, Real relAngle, Real onPathDistT
 }
 
 //-------------------------------------------------------------------------------------------------
-// Unless ReverseMoveIgnoreAngleThreshold is set, the goal must be behind us (same angle gate as
-// automatic reversing), so a reverse order only engages when the current heading allows it.
+// Manual reverse orders let each unit back up while turning its rear toward the path.
 //-------------------------------------------------------------------------------------------------
-Bool Locomotor::isForcedReverse(Object* obj, Real relAngle) const
+Bool Locomotor::isForcedReverse(Object* obj) const
 {
 	return m_template->m_canMoveBackward
-		&& obj->getAIUpdateInterface() && obj->getAIUpdateInterface()->isForcedMoveBackwards()
-		&& (TheGlobalData->m_reverseMoveIgnoreAngleThreshold
-				|| fabs(relAngle) > m_template->m_backwardsMoveAngleThreshold);
+		&& obj->getAIUpdateInterface() && obj->getAIUpdateInterface()->isForcedMoveBackwards();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1351,10 +1415,11 @@ void Locomotor::moveTowardsPositionTreads(Object* obj, PhysicsBehavior *physics,
 //	Real relAngle = ThePartitionManager->getRelativeAngle2D( obj, &goalPos );
 //	Real desiredAngle = angle + relAngle;
 	// Decide whether to reverse toward a goal that is behind us.
-	Real desiredAngle = atan2(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
+	Real desiredAngle = WWMath::Atan2f(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
 	Real relAngle = stdAngleDiff(desiredAngle, obj->getOrientation());
 	Real actualSpeed = physics->getForwardSpeed2D();
 	Bool moveBackwards = shouldMoveBackwards(obj, relAngle, onPathDistToGoal, actualSpeed);
+	const Bool forceBackwards = moveBackwards && isForcedReverse(obj);
 	if (moveBackwards)
 		desiredSpeed *= m_template->m_backwardsMoveSpeedFactor;
 
@@ -1377,9 +1442,13 @@ void Locomotor::moveTowardsPositionTreads(Object* obj, PhysicsBehavior *physics,
 	// Modulate speed according to turning. The more we have to turn, the slower we go
 	//
 	const Real QUAETERPI = PI / 4.0f;
-	Real angleCoeff = (Real)fabs( relAngle ) / QUAETERPI;
+	Real angleCoeff = (Real)WWMath::Fabs( relAngle ) / QUAETERPI;
 	if (angleCoeff > 1.0f)
 		angleCoeff = 1.0;
+	if (forceBackwards && angleCoeff > 0.75f)
+	{
+		angleCoeff = 0.75f;
+	}
 
 
 	Real dx = obj->getPosition()->x - goalPos.x;
@@ -1397,7 +1466,7 @@ void Locomotor::moveTowardsPositionTreads(Object* obj, PhysicsBehavior *physics,
 	Real slowDownTime = actualSpeed / getBraking();
 	Real slowDownDist = (actualSpeed/1.50f) * slowDownTime;
 
-	if (sqr(dx)+sqr(dy)<sqr(2*PATHFIND_CELL_SIZE_F) && angleCoeff > 0.05) {
+	if (!forceBackwards && sqr(dx)+sqr(dy)<sqr(2*PATHFIND_CELL_SIZE_F) && angleCoeff > 0.05) {
 		goalSpeed = actualSpeed*0.6f;
 	}
 
@@ -1455,7 +1524,7 @@ void Locomotor::moveTowardsPositionTreads(Object* obj, PhysicsBehavior *physics,
 			see how much force we really need to achieve our goal speed...
 		*/
 		Real maxForceNeeded = mass * speedDelta;
-		if (fabs(accelForce) > fabs(maxForceNeeded))
+		if (WWMath::Fabs(accelForce) > WWMath::Fabs(maxForceNeeded))
 			accelForce = maxForceNeeded;
 
 		const Coord3D *dir = obj->getUnitDirectionVector2D();
@@ -1490,7 +1559,7 @@ void Locomotor::moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics,
 	Real angle = obj->getOrientation();
 //	Real relAngle = ThePartitionManager->getRelativeAngle2D( obj, &goalPos );
 //	Real desiredAngle = angle + relAngle;
-	Real desiredAngle = atan2(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
+	Real desiredAngle = WWMath::Atan2(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
 	Real relAngle = stdAngleDiff(desiredAngle, angle);
 
 	Bool moveBackwards = false;
@@ -1509,7 +1578,7 @@ void Locomotor::moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics,
 	const Real backwardsDist = m_template->m_backwardsMoveDistanceFactorThreshold * obj->getGeometryInfo().getMajorRadius();
 
 	// A REVERSE_MOVE order forces reversing along the whole path (no three-point turn).
-	const Bool forceBackwards = isForcedReverse(obj, relAngle);
+	const Bool forceBackwards = m_template->m_canMoveBackward && (getFlag(REVERSE_TO_TURN) || isForcedReverse(obj));
 	if (forceBackwards) {
 		setFlag(MOVING_BACKWARDS, true);
 		setFlag(DOING_THREE_POINT_TURN, false);
@@ -1521,7 +1590,7 @@ void Locomotor::moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics,
 	else
 	if (actualSpeed==0.0f) {
 		setFlag(MOVING_BACKWARDS, false);
-		if (m_template->m_canMoveBackward && fabs(relAngle) > backwardsAngleThreshold) {
+		if (m_template->m_canMoveBackward && WWMath::Fabs(relAngle) > backwardsAngleThreshold) {
 			setFlag(MOVING_BACKWARDS, true );
 			setFlag(DOING_THREE_POINT_TURN, onPathDistToGoal>backwardsDist);
 		}
@@ -1529,7 +1598,7 @@ void Locomotor::moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics,
 	}
 	// (skipped when forced: the reverse heading was already resolved above)
 	if (!forceBackwards && getFlag(MOVING_BACKWARDS)) {
-		if (fabs(relAngle) < backwardsAngleThreshold) {
+		if (WWMath::Fabs(relAngle) < backwardsAngleThreshold) {
 			moveBackwards = false;
 			setFlag(MOVING_BACKWARDS, false);
 		} else {
@@ -1545,7 +1614,7 @@ void Locomotor::moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics,
 #endif
 
 	const Real SMALL_TURN = PI / 20.0f;
-	if ((Real)fabs( relAngle ) > SMALL_TURN)
+	if ((Real)WWMath::Fabs( relAngle ) > SMALL_TURN)
 	{
 		if (desiredSpeed>turnSpeed)
 		{
@@ -1571,7 +1640,7 @@ void Locomotor::moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics,
 
 	const Real FIFTEEN_DEGREES = PI / 12.0f;
 	const Real PROJECT_FRAMES = LOGICFRAMES_PER_SECOND/2; // Project out 1/2 second.
-	if (fabs( relAngle ) > FIFTEEN_DEGREES)
+	if (WWMath::Fabs( relAngle ) > FIFTEEN_DEGREES)
 	{
 		// If we're turning more than 10 degrees, check & see if we're moving into "impassable territory"
 		Real distance = PROJECT_FRAMES * (goalSpeed+actualSpeed)/2.0f;
@@ -1588,6 +1657,11 @@ void Locomotor::moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics,
 		{
 			targetAngle += turnAmount;
 		}
+		// When turning by reversing (AimByReversing), we travel backwards: project behind us.
+		const Bool reverseToTurn = moveBackwards && getFlag(REVERSE_TO_TURN);
+		if (reverseToTurn)
+			distance = -distance;
+
 		Coord3D offset;
 		offset.x = Cos(targetAngle)*distance;
 		offset.y = Sin(targetAngle)*distance;
@@ -1607,10 +1681,29 @@ void Locomotor::moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics,
 		halfPos.y = pos->y+offset.y/2;
 		halfPos.z = pos->z;
 
-		if (!TheAI->pathfinder()->validMovementTerrain(obj->getLayer(), this, &halfPos) ||
-			!TheAI->pathfinder()->validMovementTerrain(obj->getLayer(), this, &nextPos))
+		// Exact waypoint paths and moves off the map may cross cells too narrow for the footprint
+		Bool turnBlocked;
+		if (getFlag(ALLOW_INVALID_POSITION))
 		{
-			PhysicsTurningType rotating = rotateTowardsPosition(obj, goalPos);
+			turnBlocked = !TheAI->pathfinder()->validMovementTerrain(obj->getLayer(), this, &halfPos) ||
+				!TheAI->pathfinder()->validMovementTerrain(obj->getLayer(), this, &nextPos);
+		}
+		else
+		{
+			turnBlocked = !TheAI->pathfinder()->validMovementTerrainForObject(obj, this,&halfPos) ||
+				!TheAI->pathfinder()->validMovementTerrainForObject(obj, this,&nextPos);
+		}
+
+		if (turnBlocked)
+		{
+			Coord3D faceTowards = goalPos;
+			if (reverseToTurn)
+			{
+				// goalPos is behind us; turn the nose toward its mirror point (the goal angle) instead
+				faceTowards.x = 2*obj->getPosition()->x - goalPos.x;
+				faceTowards.y = 2*obj->getPosition()->y - goalPos.y;
+			}
+			PhysicsTurningType rotating = rotateTowardsPosition(obj, faceTowards);
 			physics->setTurning(rotating);
 
 			// apply a zero force to object so that it acts "driven"
@@ -1710,7 +1803,7 @@ void Locomotor::moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics,
 			see how much force we really need to achieve our goal speed...
 		*/
 		Real maxForceNeeded = mass * speedDelta;
-		if (fabs(accelForce) > fabs(maxForceNeeded))
+		if (WWMath::Fabs(accelForce) > WWMath::Fabs(maxForceNeeded))
 			accelForce = maxForceNeeded;
 
 		//DEBUG_LOG(("Braking %d, actualSpeed %f, goalSpeed %f, delta %f, accel %f", getFlag(IS_BRAKING),
@@ -1749,7 +1842,7 @@ Bool Locomotor::fixInvalidPosition(Object* obj, PhysicsBehavior *physics)
 			Coord3D thePos = *obj->getPosition();
 			thePos.x += i*PATHFIND_CELL_SIZE_F;
 			thePos.y += j*PATHFIND_CELL_SIZE_F;
-			if (!TheAI->pathfinder()->validMovementTerrain(obj->getLayer(), this, &thePos)) {
+			if (!TheAI->pathfinder()->validMovementTerrainForObject(obj, this,&thePos)) {
 				if (i<0) dx += 1;
 				if (i>0) dx -= 1;
 				if (j<0) dy += 1;
@@ -1781,7 +1874,7 @@ Bool Locomotor::fixInvalidPosition(Object* obj, PhysicsBehavior *physics)
 		//physics->clearAcceleration();
 
 		if (dot<0) {
-			dot = sqrt(-dot);
+			dot = WWMath::Sqrt(-dot);
 			correctionNormalized.x *= dot*physics->getMass();
 			correctionNormalized.y *= dot*physics->getMass();
 			physics->applyMotiveForce(&correctionNormalized);
@@ -1845,7 +1938,7 @@ void Locomotor::moveTowardsPositionLegs(Object* obj, PhysicsBehavior *physics, c
 	Real angle = obj->getOrientation();
 //	Real relAngle = ThePartitionManager->getRelativeAngle2D( obj, &goalPos );
 //	Real desiredAngle = angle + relAngle;
-	Real desiredAngle = atan2(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
+	Real desiredAngle = WWMath::Atan2(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
 
 	if (m_template->m_wanderWidthFactor != 0.0f) {
 		Real angleLimit = PI/8 * m_template->m_wanderWidthFactor;
@@ -1871,7 +1964,7 @@ void Locomotor::moveTowardsPositionLegs(Object* obj, PhysicsBehavior *physics, c
 	// Modulate speed according to turning. The more we have to turn, the slower we go
 	//
 	const Real QUARTERPI = PI / 4.0f;
-	Real angleCoeff = (Real)fabs( relAngle ) / (QUARTERPI);
+	Real angleCoeff = (Real)WWMath::Fabs( relAngle ) / (QUARTERPI);
 	if (angleCoeff > 1.0f)
 		angleCoeff = 1.0;
 
@@ -1901,7 +1994,7 @@ void Locomotor::moveTowardsPositionLegs(Object* obj, PhysicsBehavior *physics, c
 			see how much force we really need to achieve our goal speed...
 		*/
 		Real maxForceNeeded = mass * speedDelta;
-		if (fabs(accelForce) > fabs(maxForceNeeded))
+		if (WWMath::Fabs(accelForce) > WWMath::Fabs(maxForceNeeded))
 			accelForce = maxForceNeeded;
 
 		const Coord3D *dir = obj->getUnitDirectionVector2D();
@@ -1943,7 +2036,7 @@ void Locomotor::moveTowardsPositionClimb(Object* obj, PhysicsBehavior *physics, 
 	if (dz*dz > sqr(PATHFIND_CELL_SIZE_F)) {
 		setFlag(CLIMBING, true);
 	}
-	if (fabs(dz)<1) {
+	if (WWMath::Fabs(dz)<1) {
 		setFlag(CLIMBING, false);
 	}
 
@@ -1963,7 +2056,7 @@ void Locomotor::moveTowardsPositionClimb(Object* obj, PhysicsBehavior *physics, 
 			moveBackwards = true;
 		}
 
-		Real groundSlope = fabs(delta.z - pos.z);
+		Real groundSlope = WWMath::Fabs(delta.z - pos.z);
 		if (groundSlope<1.0f) groundSlope = 1.0f;
 
 		if (groundSlope>1.0f) {
@@ -1978,7 +2071,7 @@ void Locomotor::moveTowardsPositionClimb(Object* obj, PhysicsBehavior *physics, 
 	Real angle = obj->getOrientation();
 //	Real relAngle = ThePartitionManager->getRelativeAngle2D( obj, &goalPos );
 //	Real desiredAngle = angle + relAngle;
-	Real desiredAngle = atan2(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
+	Real desiredAngle = WWMath::Atan2(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
 	Real relAngle = stdAngleDiff(desiredAngle, angle);
 
 	if (moveBackwards) {
@@ -1992,7 +2085,7 @@ void Locomotor::moveTowardsPositionClimb(Object* obj, PhysicsBehavior *physics, 
 	// Modulate speed according to turning. The more we have to turn, the slower we go
 	//
 	const Real QUARTERPI = PI / 4.0f;
-	Real angleCoeff = (Real)fabs( relAngle ) / (QUARTERPI);
+	Real angleCoeff = (Real)WWMath::Fabs( relAngle ) / (QUARTERPI);
 	if (angleCoeff > 1.0f)
 		angleCoeff = 1.0;
 
@@ -2034,7 +2127,7 @@ void Locomotor::moveTowardsPositionClimb(Object* obj, PhysicsBehavior *physics, 
 			see how much force we really need to achieve our goal speed...
 		*/
 		Real maxForceNeeded = mass * speedDelta;
-		if (fabs(accelForce) > fabs(maxForceNeeded))
+		if (WWMath::Fabs(accelForce) > WWMath::Fabs(maxForceNeeded))
 			accelForce = maxForceNeeded;
 
 		const Coord3D *dir = obj->getUnitDirectionVector2D();
@@ -2061,7 +2154,7 @@ void Locomotor::moveTowardsPositionWings(Object* obj, PhysicsBehavior *physics, 
 		Real dx = goalPos.x - pos->x;
 		Real dy = goalPos.y - pos->y;
 		Real dz = goalPos.z - pos->z;
-		if (fabs(dz) > m_circleThresh)
+		if (WWMath::Fabs(dz) > m_circleThresh)
 		{
 			// aim for the spot on the opposite side of the circle.
 
@@ -2069,7 +2162,7 @@ void Locomotor::moveTowardsPositionWings(Object* obj, PhysicsBehavior *physics, 
 			Real angleTowardPos =
 					(isNearlyZero(dx) && isNearlyZero(dy)) ?
 					obj->getOrientation() :
-					atan2(dy, dx);
+					WWMath::Atan2(dy, dx);
 
 			Real aimDir = (PI - PI/8);
 			angleTowardPos += aimDir;
@@ -2157,7 +2250,7 @@ void Locomotor::moveTowardsPositionThrust(Object* obj, PhysicsBehavior *physics,
 		// so we tend to "level out" at that height. we don't use this till
 		// below, but go ahead and calc it now...
 		Real MAX_VERTICAL_DAMP_RANGE = m_preferredHeight * 0.5;
-		delta = fabs(delta);
+		delta = WWMath::Fabs(delta);
 		if (delta > MAX_VERTICAL_DAMP_RANGE)
 			delta = MAX_VERTICAL_DAMP_RANGE;
 		zDirDamping = 1.0f - (delta / MAX_VERTICAL_DAMP_RANGE);
@@ -2293,7 +2386,7 @@ Real Locomotor::calcLiftToUseAtPt(Object* obj, PhysicsBehavior *physics, Real cu
 	// see how far we need to slow to dead stop, given max braking
 	Real desiredAccel;
 	const Real TINY_ACCEL = 0.001f;
-	if (fabs(maxAccel) > TINY_ACCEL)
+	if (WWMath::Fabs(maxAccel) > TINY_ACCEL)
 	{
 		Real deltaZ = preferredHeight - curZ;
 		// calc how far it will take for us to go from cur speed to zero speed, at max accel.
@@ -2301,14 +2394,14 @@ Real Locomotor::calcLiftToUseAtPt(Object* obj, PhysicsBehavior *physics, Real cu
 		// in theory, the above is the correct calculation, but in practice,
 		// doesn't work in some situations (eg, opening of USA01 map). Why, I dunno.
 		// But for now I have gone back to the old, looks-incorrect-to-me-but-works calc. (srj)
-		Real brakeDist = (sqr(curVelZ) / fabs(maxAccel));
-		if (fabs(brakeDist) > fabs(deltaZ))
+		Real brakeDist = (sqr(curVelZ) / WWMath::Fabs(maxAccel));
+		if (WWMath::Fabs(brakeDist) > WWMath::Fabs(deltaZ))
 		{
 			// if the dist-to-accel (or dist-to-brake) is further than the dist-to-go,
 			// use the max accel.
 			desiredAccel = maxAccel;
 		}
-		else if (fabs(curVelZ) > m_template->m_speedLimitZ)
+		else if (WWMath::Fabs(curVelZ) > m_template->m_speedLimitZ)
 		{
 			// or, if we're going too fast, limit it here.
 			desiredAccel = m_template->m_speedLimitZ - curVelZ;
@@ -2361,7 +2454,7 @@ Real Locomotor::calcLiftToUseAtPt(Object* obj, PhysicsBehavior *physics, Real cu
 
 //-------------------------------------------------------------------------------------------------
 PhysicsTurningType Locomotor::rotateObjAroundLocoPivot(Object* obj, const Coord3D& goalPos,
-																											 Real maxTurnRate, Real *relAngle)
+																											 Real maxTurnRate, Real *relAngle, Bool aroundCenter)
 {
 	Real angle = obj->getOrientation();
 	Real offset = getTurnPivotOffset();
@@ -2369,6 +2462,10 @@ PhysicsTurningType Locomotor::rotateObjAroundLocoPivot(Object* obj, const Coord3
 	PhysicsTurningType turn = TURN_NONE;
 
 	if (getFlag(IS_BRAKING)) offset = 0.0f; // When braking we do exact movement towards goal, instead of physics.
+	if (aroundCenter)
+	{
+		offset = 0.0f;	// drag-to-face trim: turn on the spot, do not swing off it
+	}
 	//Rotating about pivot moves the object, and can make us miss our goal, so it is disabled.  jba.
 	if (offset != 0.0f)
 	{
@@ -2382,8 +2479,8 @@ PhysicsTurningType Locomotor::rotateObjAroundLocoPivot(Object* obj, const Coord3
 		Real dx =goalPos.x - turnPos.x;
 		Real dy = goalPos.y - turnPos.y;
 		// If we are very close to the goal, we twitch due to rounding error.  So just return. jba.
-		if (fabs(dx)<0.1f && fabs(dy)<0.1f) return TURN_NONE;
-		Real desiredAngle = atan2(dy, dx);
+		if (WWMath::Fabs(dx)<0.1f && WWMath::Fabs(dy)<0.1f) return TURN_NONE;
+		Real desiredAngle = WWMath::Atan2(dy, dx);
 		Real amount = stdAngleDiff(desiredAngle, angle);
 		if (relAngle) *relAngle = amount;
 		if (amount>maxTurnRate) {
@@ -2405,7 +2502,7 @@ PhysicsTurningType Locomotor::rotateObjAroundLocoPivot(Object* obj, const Coord3
 		// so, the thing is, we want to rotate ourselves so that our *center* is rotated
 		// by the given amount, but the rotation must be around turnPos. so do a little
 		// back-calculation.
-		Real angleDesiredForTurnPos = atan2(desiredPos.y - turnPos.y, desiredPos.x - turnPos.x);
+		Real angleDesiredForTurnPos = WWMath::Atan2(desiredPos.y - turnPos.y, desiredPos.x - turnPos.x);
 		amount = angleDesiredForTurnPos - angle;
 #endif
 		/// @todo srj -- there's probably a more efficient & more direct way to do this. find it.
@@ -2421,7 +2518,7 @@ PhysicsTurningType Locomotor::rotateObjAroundLocoPivot(Object* obj, const Coord3
 	}
 	else
 	{
-		Real desiredAngle = atan2(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
+		Real desiredAngle = WWMath::Atan2(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
 		Real amount = stdAngleDiff(desiredAngle, angle);
 		if (relAngle) *relAngle = amount;
 		if (amount>maxTurnRate) {
@@ -2637,7 +2734,7 @@ void Locomotor::moveTowardsPositionOther(Object* obj, PhysicsBehavior *physics, 
 	Coord3D dirToApplyForce = *obj->getUnitDirectionVector2D();
 
 	// Decide whether to reverse toward a goal that is behind us (opt-in via CanMoveBackwards).
-	Real desiredAngle = atan2(goalPos.y - pos->y, goalPos.x - pos->x);
+	Real desiredAngle = WWMath::Atan2f(goalPos.y - pos->y, goalPos.x - pos->x);
 	Real relAngle = stdAngleDiff(desiredAngle, obj->getOrientation());
 	Bool moveBackwards = shouldMoveBackwards(obj, relAngle, onPathDistToGoal, actualSpeed);
 	if (moveBackwards)
@@ -2650,8 +2747,8 @@ void Locomotor::moveTowardsPositionOther(Object* obj, PhysicsBehavior *physics, 
 //fabs(goalPos.y - pos->y),fabs(goalPos.x - pos->x),
 //fabs(goalPos.y - pos->y)/goalSpeed,fabs(goalPos.x - pos->x)/goalSpeed));
 	if (getFlag(ULTRA_ACCURATE) &&
-				fabs(goalPos.y - pos->y) <= goalSpeed * m_template->m_ultraAccurateSlideIntoPlaceFactor &&
-				fabs(goalPos.x - pos->x) <= goalSpeed * m_template->m_ultraAccurateSlideIntoPlaceFactor)
+				WWMath::Fabs(goalPos.y - pos->y) <= goalSpeed * m_template->m_ultraAccurateSlideIntoPlaceFactor &&
+				WWMath::Fabs(goalPos.x - pos->x) <= goalSpeed * m_template->m_ultraAccurateSlideIntoPlaceFactor)
 	{
 		// don't turn, just slide in the right direction
 		physics->setTurning(TURN_NONE);
@@ -2705,7 +2802,7 @@ void Locomotor::moveTowardsPositionOther(Object* obj, PhysicsBehavior *physics, 
 			see how much force we really need to achieve our goal speed...
 		*/
 		Real maxForceNeeded = mass * speedDelta;
-		if (fabs(accelForce) > fabs(maxForceNeeded))
+		if (WWMath::Fabs(accelForce) > WWMath::Fabs(maxForceNeeded))
 			accelForce = maxForceNeeded;
 
 		Coord3D force;
@@ -2822,7 +2919,7 @@ void Locomotor::maintainCurrentPositionWings(Object* obj, PhysicsBehavior *physi
 		Real angleTowardMaintainPos =
 				(isNearlyZero(dx) && isNearlyZero(dy)) ?
 				obj->getOrientation() :
-				atan2(dy, dx);
+				WWMath::Atan2(dy, dx);
 
 		Real aimDir = (PI - PI/8);
 		if (turnRadius < 0)
@@ -2856,7 +2953,7 @@ void Locomotor::maintainCurrentPositionHover(Object* obj, PhysicsBehavior *physi
 		//
 		Real minSpeed = max( 1.0E-10f, m_template->m_minSpeed );
 		Real speedDelta = minSpeed - actualSpeed;
-		if (fabs(speedDelta) > minSpeed)
+		if (WWMath::Fabs(speedDelta) > minSpeed)
 		{
 			Real mass = physics->getMass();
 			Real acceleration = (speedDelta > 0.0f) ? maxAcceleration : -getBraking();
@@ -2867,7 +2964,7 @@ void Locomotor::maintainCurrentPositionHover(Object* obj, PhysicsBehavior *physi
 				see how much force we really need to achieve our goal speed...
 			*/
 			Real maxForceNeeded = mass * speedDelta;
-			if (fabs(accelForce) > fabs(maxForceNeeded))
+			if (WWMath::Fabs(accelForce) > WWMath::Fabs(maxForceNeeded))
 				accelForce = maxForceNeeded;
 
 			const Coord3D *dir = obj->getUnitDirectionVector2D();

@@ -129,7 +129,7 @@ void DynamicGeometryClientUpdateModuleData::buildFieldParse(MultiIniFieldParse& 
 		{ "Interpolation", INI::parseIndexList, TheInterpolationTypeNames,  offsetof(DynamicGeometryClientUpdateModuleData, m_interpolationType)},
 		{ "TotalDuration",	INI::parseDurationUnsignedInt, NULL, offsetof(DynamicGeometryClientUpdateModuleData, m_totalFrames) },
 		{ "MidpointDuration",	INI::parseDurationUnsignedInt, NULL, offsetof(DynamicGeometryClientUpdateModuleData, m_midpointFrames) },
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
 }

@@ -260,6 +260,14 @@ public:
 
   UnsignedShort getSuperweaponRestriction() const; ///< Get any optional limits on superweapons
   void setSuperweaponRestriction();
+  Bool getCoopBuildings() const { return m_coopBuildings; } ///< May allies resume each other's construction
+  Bool isQuickGame() const { return m_quickGame; } ///< Do objects use their QuickGamePrerequisites
+  Bool isDiplomacy() const { return m_diplomacy; } ///< May players change their stance toward each other mid-match
+  Bool isDiplomacyParticipant(const Player *player) const; ///< May this player take or receive a Diplomacy stance
+  Bool isFreeRadar() const { return m_freeRadar; } ///< Does every player have radar without a radar source
+#if defined(GENERALS_ONLINE)
+  void sendPendingLobbyRules(); ///< The Generals Online host turns its rules on once the match runs
+#endif
 
 #ifdef DUMP_PERF_STATS
 	void getAIMetricsStatistics( UnsignedInt *numAI, UnsignedInt *numMoving, UnsignedInt *numAttacking, UnsignedInt *numWaitingForPath, UnsignedInt *overallFailedPathfinds );
@@ -388,8 +396,11 @@ private:
 	bool onAddTeam(GameMessage *msg);
 	bool onLogicCrc(GameMessage *msg);
 	bool onPurchaseScience(GameMessage *msg);
+	bool onSetDiplomacyStance(GameMessage *msg);
+	bool onEnableLobbyRule(GameMessage *msg);
+	void revealMapForAllPlayers();
 
-	static void createOptimizedTree(const ThingTemplate *thingTemplate, Coord3D *pos, Real angle);
+	static void createOptimizedTree(const ThingTemplate *thingTemplate, Coord3D *pos, Real angle, Real scale);
 
 private:
 
@@ -469,6 +480,14 @@ private:
 	GameMode m_gameMode;
 	Int m_rankLevelLimit;
   UnsignedShort m_superweaponRestriction;
+  Bool m_coopBuildings;
+  Bool m_quickGame;
+  Bool m_diplomacy;
+  Bool m_freeRadar;
+  Bool m_revealMap;
+#if defined(GENERALS_ONLINE)
+  UnsignedInt m_pendingLobbyRules; ///< LobbyRule bits the host has yet to send
+#endif
 
 	LoadScreen *getLoadScreen( Bool loadSaveGame );
 	LoadScreen *m_loadScreen;
@@ -509,6 +528,11 @@ private:
 	ObjectTOCEntry *findTOCEntryById( UnsignedShort id );		///< find ObjectTOC by id
 	void xferObjectTOC( Xfer *xfer );												///< save/load object TOC for current state of map
 	void prepareLogicForObjectLoad();									///< prepare engine for object data from game file
+
+#if RTS_GENERALS && defined(_MSC_VER) && _MSC_VER < 1300
+public:
+	Bool m_onUnitProducedZeroInit;
+#endif
 
 };
 

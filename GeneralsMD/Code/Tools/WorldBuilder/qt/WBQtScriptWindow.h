@@ -5,8 +5,8 @@
 // hidden -- it owns the working model (m_sides), the condition/action sub-editors, the
 // option persistence, and the OK/Cancel commit. This window replaces the whole dialog UI:
 // the tree, the selected script's detail card, the option checkboxes, and every command
-// button -- driving the hidden dialog through the WBQtScript_* seam. Only the native Qt
-// condition/action sub-editors are still deferred (they use the MFC property sheet).
+// button -- driving the hidden dialog through the WBQtScript_* seam. The script, condition and
+// action sub-editors are Qt too (WBQtScriptEdit_Run, WBQtCondActDialog).
 #ifndef WB_QT_SCRIPT_WINDOW_H
 #define WB_QT_SCRIPT_WINDOW_H
 

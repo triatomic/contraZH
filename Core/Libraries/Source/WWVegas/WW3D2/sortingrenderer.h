@@ -25,6 +25,7 @@ class SphereClass;
 class ShaderClass;
 class Vector3;
 struct VertexFormatXYZNDUV2;
+struct BillboardInstance;
 
 // Shades particle sprites in a pixel shader, around each of their draws.
 class SoftParticleHookClass
@@ -40,7 +41,10 @@ public:
 		EFFECT_BEAM = 32,	// a laser draw's beam or a streak, which fades only while shaded
 		EFFECT_CRYO = 64,	// ice tint with teeth and frost bands on a beam, splinters and glints on a sprite
 		EFFECT_DISRUPT = 128,	// ripple and colour-split the scene copy behind the shape, in a pass of its own before the sorted draws
-		EFFECT_MESH = 256	// a model's mesh, whose texture may tile both ways and whose settings come with it
+		EFFECT_MESH = 256,	// a model's mesh, whose texture may tile both ways and whose settings come with it
+		EFFECT_MIRROR = 512,	// a planar mirror mesh, shown as the scene behind it bent under its own colour, with the reflection over both
+		EFFECT_FLUID = 1024,	// fluid currents, bubbles and luminous edges
+		EFFECT_TERRAIN = 2048	// terrain-conforming particles keep their surface coverage and use border sampling
 	};
 
 	virtual ~SoftParticleHookClass() {}
@@ -65,6 +69,10 @@ class SortingRendererClass
 	static const unsigned short* Source_Indices(const SortingNodeStruct* state);
 
 public:
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+	static void Insert_Billboards(const BillboardInstance *instances, unsigned count);
+#endif
+
 	static void Insert_Triangles(
 		const SphereClass& bounding_sphere,
 		unsigned short start_index,

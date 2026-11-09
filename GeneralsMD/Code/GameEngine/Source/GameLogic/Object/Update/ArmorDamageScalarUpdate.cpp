@@ -107,7 +107,7 @@ void ArmorDamageScalarUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "TintStatusType",			TintStatusFlags::parseSingleBitFromINI,	NULL, offsetof(ArmorDamageScalarUpdateModuleData, m_tintStatus) },
 		//{ "ApplyColorTint",					INI::parseBool, NULL, offsetof(ArmorDamageScalarUpdateModuleData, m_applyTint)},
 		//{ "ParticlesPerCubicFoot",		INI::parseReal, NULL, offsetof(ArmorDamageScalarUpdateModuleData, m_sparksPerCubicFoot) },
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
 }

@@ -55,7 +55,11 @@ typedef struct {
 #define TILE_PIXEL_EXTENT_MIP4 4
 #define TILE_PIXEL_EXTENT_MIP5 2
 #define TILE_PIXEL_EXTENT_MIP6 1
+#if defined(RTS_ZEROHOUR) && defined(BUILD_WITH_D3D9)
+#define TEXTURE_WIDTH 4096
+#else
 #define TEXTURE_WIDTH 2048 // was 1024 jba
+#endif
 
 /** This class holds the bitmap data from the .tga texture files.  It is used to
 create the D3D texture in the game and 3d windows, and to create DIB data for the

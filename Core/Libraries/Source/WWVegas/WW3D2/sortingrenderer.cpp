@@ -47,6 +47,9 @@
 #include "dx8compat.h"
 #include "formconv.h"
 #include "statistics.h"
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+#include "pointgr.h"
+#endif
 #include <WWDebug/wwprofile.h>
 #include <algorithm>
 #include <functional>
@@ -248,6 +251,9 @@ public:
 	unsigned short polygon_count;			// Polygon count to process (3 indices = one polygon)
 	unsigned short min_vertex_index;		// First index used in the vb
 	unsigned short vertex_count;			// Number of vertices used in vb
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+	std::vector<BillboardInstance> billboards;
+#endif
 };
 
 typedef std::vector<SortingNodeStruct*> SortingNodeStructList;
@@ -313,6 +319,14 @@ static void Draw_Object_Node(SortingNodeStruct* state)
 {
 	DX8Wrapper::Set_Render_State(state->sorting_state);
 	const bool soft = Begin_Soft(state);
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+	if (!state->billboards.empty())
+	{
+		PointGroupClass::Draw_Billboards(&state->billboards[0], state->billboards.size(), false);
+		End_Soft(soft);
+		return;
+	}
+#endif
 	DX8Wrapper::Draw_Triangles(state->start_index,state->polygon_count,state->min_vertex_index,state->vertex_count);
 	End_Soft(soft);
 }
@@ -397,6 +411,12 @@ static bool Same_Render_State(const RenderStateStruct& a, const RenderStateStruc
 
 static bool Same_Node_State(const SortingNodeStruct* a, const SortingNodeStruct* b)
 {
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+	if (a->billboards.empty() != b->billboards.empty())
+	{
+		return false;
+	}
+#endif
 	return a->effects == b->effects && a->effect_data == b->effect_data && Same_Render_State(a->sorting_state, b->sorting_state);
 }
 
@@ -561,6 +581,9 @@ void SortingRendererClass::Insert_Triangles(
 
 void Release_Refs(SortingNodeStruct* state)
 {
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+	state->billboards.clear();
+#endif
 	int i;
 	for (i=0;i<MAX_VERTEX_STREAMS;++i) {
 		REF_PTR_RELEASE(state->sorting_state.vertex_buffers[i]);
@@ -609,6 +632,34 @@ void SortingRendererClass::Insert_To_Sorting_Pool(SortingNodeStruct* state)
 	overlapping_polygon_count+=state->polygon_count;
 	overlapping_node_count++;
 }
+
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+
+void SortingRendererClass::Insert_Billboards(const BillboardInstance *instances, unsigned count)
+{
+	WWASSERT(count != 0 && count * 2 <= 65535);
+	SortingNodeStruct *state = Get_Sorting_Struct();
+	DX8Wrapper::Get_Render_State(state->sorting_state);
+	state->billboards.assign(instances, instances + count);
+	state->start_index = 0;
+	state->min_vertex_index = 0;
+	state->polygon_count = count * 2;
+	state->vertex_count = 0;
+	state->depth = 0.0f;
+	state->effects = SoftHook != nullptr ? (unsigned short)InsertEffects : 0;
+	state->effect_data = state->effects != 0 ? InsertEffectData : nullptr;
+	DX8_RECORD_SORTING_RENDER(count * 2, count * 4);
+	if (BlendBatching && Is_Order_Independent(state->sorting_state.shader))
+	{
+		additive_object_list.push_back(state);
+	}
+	else
+	{
+		Insert_To_Sorting_Pool(state);
+	}
+}
+
+#endif
 
 // ----------------------------------------------------------------------------
 //static unsigned prevLight = 0xffffffff;
@@ -662,10 +713,27 @@ static void Apply_Render_State(RenderStateStruct& render_state)
 
 // ----------------------------------------------------------------------------
 
-static void Draw_Pool_Run(SortingNodeStruct* state, unsigned start_index, unsigned polygon_count, unsigned first_vertex, unsigned end_vertex)
+static void Draw_Pool_Run(SortingNodeStruct* state, unsigned start_index, unsigned polygon_count, unsigned first_vertex, unsigned end_vertex, const TempIndexStruct *sorted)
 {
 	Apply_Render_State(state->sorting_state);
 	const bool soft = Begin_Soft(state);
+
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+	if (!state->billboards.empty())
+	{
+		static std::vector<BillboardInstance> instances;
+		instances.resize(polygon_count);
+		for (unsigned i = 0; i < polygon_count; ++i)
+		{
+			const TempIndexStruct &triangle = sorted[i];
+			instances[i] = overlapping_nodes[triangle.idx]->billboards[triangle.tri.i];
+			instances[i].Triangle = (float)triangle.tri.j;
+		}
+		PointGroupClass::Draw_Billboards(&instances[0], polygon_count, true);
+		End_Soft(soft);
+		return;
+	}
+#endif
 
 	DX8Wrapper::Draw_Triangles(
 		start_index*3,
@@ -688,10 +756,11 @@ void SortingRendererClass::Flush_Sorting_Pool()
 	TempIndexStruct* tis=Get_Temp_Index_Array(overlapping_polygon_count);
 
 	unsigned vertexAllocCount = overlapping_vertex_count;
-	if (DynamicVBAccessClass::Get_Default_Vertex_Count() < DEFAULT_SORTING_VERTEX_COUNT)
+	if (overlapping_vertex_count != 0 && DynamicVBAccessClass::Get_Default_Vertex_Count() < DEFAULT_SORTING_VERTEX_COUNT)
 		vertexAllocCount = DEFAULT_SORTING_VERTEX_COUNT;	//make sure that we force the DX8 dynamic vertex buffer to maximum size
 	if (overlapping_vertex_count > vertexAllocCount)
 		vertexAllocCount = overlapping_vertex_count;
+	vertexAllocCount = std::max<unsigned>(vertexAllocCount, 1);
 	WWASSERT(DEFAULT_SORTING_VERTEX_COUNT == 1 || vertexAllocCount <= DEFAULT_SORTING_VERTEX_COUNT);
 	DynamicVBAccessClass dyn_vb_access(BUFFER_TYPE_DYNAMIC_DX8,dynamic_fvf_type,vertexAllocCount/*overlapping_vertex_count*/);
 	{
@@ -702,6 +771,25 @@ void SortingRendererClass::Flush_Sorting_Pool()
 		unsigned vertex_array_offset=0;
 		for (unsigned node_id=0;node_id<overlapping_node_count;++node_id) {
 			SortingNodeStruct* state=overlapping_nodes[node_id];
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+			if (!state->billboards.empty())
+			{
+				for (unsigned i = 0; i < state->polygon_count; ++i)
+				{
+					TempIndexStruct &triangle = tis[polygon_array_offset + i];
+					triangle.tri.i = i / 2;
+					triangle.tri.j = i % 2;
+					triangle.tri.k = 0;
+					triangle.idx = node_id;
+					const float z = state->billboards[i / 2].Position.Z;
+					triangle.z = (z + z + z) / 3.0f;
+					DEBUG_ASSERTCRASH((!_isnan(triangle.z) && _finite(triangle.z)), ("Billboard has invalid center"));
+				}
+				state->min_vertex_index = vertex_array_offset;
+				polygon_array_offset += state->polygon_count;
+				continue;
+			}
+#endif
 			const VertexFormatXYZNDUV2* src_verts=Source_Vertices(state);
 
 			// If you have a crash in here and "dest_verts" points to illegal memory area,
@@ -816,7 +904,9 @@ void SortingRendererClass::Flush_Sorting_Pool()
 				!(BlendBatching && Same_Node_State(overlapping_nodes[node_id], node));
 
 			if (count_to_render && (object_first || new_state)) {
-				Draw_Pool_Run(overlapping_nodes[node_id],start_index,count_to_render,first_vertex,end_vertex);
+				DX8Wrapper::Set_Index_Buffer(dyn_ib_access,0);
+				DX8Wrapper::Set_Vertex_Buffer(dyn_vb_access);
+				Draw_Pool_Run(overlapping_nodes[node_id],start_index,count_to_render,first_vertex,end_vertex,tis + chunkOffset + start_index);
 				count_to_render=0;
 			}
 
@@ -842,7 +932,9 @@ void SortingRendererClass::Flush_Sorting_Pool()
 
 		// Render any remaining polygons...
 		if (count_to_render) {
-			Draw_Pool_Run(overlapping_nodes[node_id],start_index,count_to_render,first_vertex,end_vertex);
+			DX8Wrapper::Set_Index_Buffer(dyn_ib_access,0);
+			DX8Wrapper::Set_Vertex_Buffer(dyn_vb_access);
+			Draw_Pool_Run(overlapping_nodes[node_id],start_index,count_to_render,first_vertex,end_vertex,tis + chunkOffset + start_index);
 		}
 
 		chunkOffset += chunkCount;

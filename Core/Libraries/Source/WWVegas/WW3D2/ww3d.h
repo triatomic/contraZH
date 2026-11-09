@@ -179,6 +179,8 @@ public:
 	// Total sync time in milliseconds. Advances in full logic time steps only.
 	static unsigned int		Get_Sync_Time() { return SyncTime; }
 
+	static unsigned int		Get_Previous_Sync_Time() { return PreviousSyncTime; }
+
 	// Current sync frame time in milliseconds. Can be zero when the logic has not stepped forward in the current render update.
 	static unsigned int		Get_Sync_Frame_Time() { return SyncTime - PreviousSyncTime; }
 
@@ -276,6 +278,9 @@ public:
 
 	static void					Set_MSAA_Mode(MultiSampleModeEnum mode);
 	static MultiSampleModeEnum Get_MSAA_Mode();
+	/// Supersampling as a percent of the screen's size each way, 100 to 200; above 100 it takes MSAA's place. Set before the device is made.
+	static void					Set_Super_Sampling(int percent);
+	static int					Get_Super_Sampling();
 
 	static void					Set_Mesh_Draw_Mode (MeshDrawModeEnum mode)	{ MeshDrawMode = mode; }
 	static MeshDrawModeEnum Get_Mesh_Draw_Mode ()								{ return (MeshDrawMode); }

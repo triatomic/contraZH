@@ -375,7 +375,7 @@ extern "C" void WBQtReplaceReport_SelectRow(int i)
 extern "C" void WBQtPickUnit_SavePos(int top, int left)
 {
 	// == PickUnitDialog::OnMove: keep the shared PickUnitWindow profile position in sync so
-	// BuildListTool's pick panel (still MFC) opens where the user last left a pick dialog.
+	// BuildListTool's pick panel opens where the user last left a pick dialog.
 	::AfxGetApp()->WriteProfileInt(BUILD_PICK_PANEL_SECTION, "Top", top);
 	::AfxGetApp()->WriteProfileInt(BUILD_PICK_PANEL_SECTION, "Left", left);
 }

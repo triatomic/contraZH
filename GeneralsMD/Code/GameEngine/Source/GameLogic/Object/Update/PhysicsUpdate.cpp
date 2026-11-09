@@ -37,6 +37,7 @@
 #include "Common/Xfer.h"
 #include "GameClient/FXList.h"
 #include "GameLogic/GameLogic.h"
+#include "GameLogic/Locomotor.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
@@ -104,7 +105,7 @@ static Real heightToSpeed(Real height)
 {
 	// don't bother trying to remember how far we've fallen; instead,
 	// back-calc it from our speed & gravity... v = sqrt(2*g*h)
-	return sqrt(fabs(2.0f * TheGlobalData->m_gravity * height));
+	return WWMath::Sqrt(WWMath::Fabs(2.0f * TheGlobalData->m_gravity * height));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -558,7 +559,7 @@ Bool PhysicsBehavior::handleBounce(Real oldZ, Real newZ, Real groundZ, Coord3D* 
 		Real vz = getVelocity()->z;
 		if (oldZ > groundZ && vz < 0.0f)
 		{
-			desiredAccelZ = fabs(vz) * stiffness;
+			desiredAccelZ = WWMath::Fabs(vz) * stiffness;
 		}
 
 		bounceForce->x = 0.0f;
@@ -600,7 +601,7 @@ Bool PhysicsBehavior::handleBounce(Real oldZ, Real newZ, Real groundZ, Coord3D* 
 inline Bool isVerySmall3D(const Coord3D& v)
 {
 	const Real THRESH = 0.01f;
-	return (fabs(v.x) < THRESH && fabs(v.y) < THRESH && fabs(v.z) < THRESH);
+	return (WWMath::Fabs(v.x) < THRESH && WWMath::Fabs(v.y) < THRESH && WWMath::Fabs(v.z) < THRESH);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -678,6 +679,66 @@ void PhysicsBehavior::setWaterImpactFX(const FXList* waterImpactFX)
 }
 
 //-------------------------------------------------------------------------------------------------
+Real PhysicsBehavior::getGroundCollisionAngle() const
+{
+	const Object* obj = getObject();
+	if (obj->isKindOf(KINDOF_PROJECTILE) && getFlag(STICK_TO_GROUND) && !getFlag(ALLOW_TO_FALL) && !getFlag(IS_IN_FREEFALL))
+	{
+		const AIUpdateInterface* ai = obj->getAIUpdateInterface();
+		const Locomotor* loco = ai ? ai->getCurLocomotor() : nullptr;
+		if (loco)
+		{
+			return loco->getGroundCollisionAngle();
+		}
+	}
+	return 0.0f;
+}
+
+//-------------------------------------------------------------------------------------------------
+static Bool followGround(const Coord3D& oldPos, Coord3D& newPos, PathfindLayerEnum layer, Real collisionAngle)
+{
+	Real dx = newPos.x - oldPos.x;
+	Real dy = newPos.y - oldPos.y;
+	Real distance = WWMath::Sqrtf(sqr(dx) + sqr(dy));
+
+	// Sample at most one world unit apart so fast projectiles still hit cliff faces.
+	Int steps = (Int)distance + 1;
+	Real slopeSin = Sin(collisionAngle);
+	Real riseScale = Cos(collisionAngle);
+	Coord3D lastPos = oldPos;
+	lastPos.z = TheTerrainLogic->getLayerHeight(lastPos.x, lastPos.y, layer);
+	for (Int i = 1; i <= steps; ++i)
+	{
+		Real fraction = (Real)i / steps;
+		Coord3D pos;
+		pos.x = oldPos.x + dx * fraction;
+		pos.y = oldPos.y + dy * fraction;
+		pos.z = TheTerrainLogic->getLayerHeight(pos.x, pos.y, layer);
+		Real run = WWMath::Sqrtf(sqr(pos.x - lastPos.x) + sqr(pos.y - lastPos.y));
+		if ((pos.z - lastPos.z) * riseScale > run * slopeSin + 0.0001f)
+		{
+			newPos = lastPos;
+			return true;
+		}
+		lastPos = pos;
+	}
+	newPos = lastPos;
+	return false;
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool PhysicsBehavior::constrainGroundMovement(Coord3D& pos) const
+{
+	Real collisionAngle = getGroundCollisionAngle();
+	if (collisionAngle <= 0.0f)
+	{
+		return false;
+	}
+	const Object* obj = getObject();
+	return followGround(*obj->getPosition(), pos, obj->getLayer(), collisionAngle);
+}
+
+//-------------------------------------------------------------------------------------------------
 /**
  * Basic rigid body physics using an Euler integrator.
  * @todo Currently, only translations are integrated. Rotations should also be integrated. (MSB)
@@ -694,6 +755,8 @@ UpdateSleepTime PhysicsBehavior::update()
 	Real															activeVelZ = 0;
 	Coord3D														bounceForce;
 	Bool															gotBounceForce = false;
+	Bool hitSteepGround = false;
+	Bool followsGround = getGroundCollisionAngle() > 0.0f;
 
 	DEBUG_ASSERTCRASH(!getFlag(IS_IN_UPDATE), ("impossible"));
 	setFlag(IS_IN_UPDATE, true);
@@ -725,14 +788,14 @@ UpdateSleepTime PhysicsBehavior::update()
 		// Info: At 60Hz, motive acceleration can be smaller than THRESH and must accumulate across frames.
 		if (!isMotive())
 		{
-			if (fabsf(m_vel.x) < THRESH) m_vel.x = 0.0f;
-			if (fabsf(m_vel.y) < THRESH) m_vel.y = 0.0f;
+			if (WWMath::Fabsf(m_vel.x) < THRESH) m_vel.x = 0.0f;
+			if (WWMath::Fabsf(m_vel.y) < THRESH) m_vel.y = 0.0f;
 		}
 #else
-		if (fabsf(m_vel.x) < THRESH) m_vel.x = 0.0f;
-		if (fabsf(m_vel.y) < THRESH) m_vel.y = 0.0f;
+		if (WWMath::Fabsf(m_vel.x) < THRESH) m_vel.x = 0.0f;
+		if (WWMath::Fabsf(m_vel.y) < THRESH) m_vel.y = 0.0f;
 #endif
-		if (fabsf(m_vel.z) < THRESH) m_vel.z = 0.0f;
+		if (WWMath::Fabsf(m_vel.z) < THRESH) m_vel.z = 0.0f;
 
 		m_velMag = INVALID_VEL_MAG;
 
@@ -764,9 +827,9 @@ UpdateSleepTime PhysicsBehavior::update()
 		// Check when to clear the stunned status
 		if (getIsStunned())
 		{
-			if ( (fabs(m_vel.x) < STUN_RELIEF_EPSILON &&
-				    fabs(m_vel.y) < STUN_RELIEF_EPSILON &&
-				    fabs(m_vel.z) < STUN_RELIEF_EPSILON)
+			if ( (WWMath::Fabs(m_vel.x) < STUN_RELIEF_EPSILON &&
+				    WWMath::Fabs(m_vel.y) < STUN_RELIEF_EPSILON &&
+				    WWMath::Fabs(m_vel.z) < STUN_RELIEF_EPSILON)
           ||
            obj->isSignificantlyAboveTerrain() == FALSE )
 			{
@@ -812,8 +875,8 @@ UpdateSleepTime PhysicsBehavior::update()
 			if (offset != 0.0f)
 			{
 				Vector3 xvec = mtx.Get_X_Vector();
-				Real xy = sqrtf(sqr(xvec.X) + sqr(xvec.Y));
-				Real pitchAngle = atan2(xvec.Z, xy);
+				Real xy = WWMath::Sqrtf(sqr(xvec.X) + sqr(xvec.Y));
+				Real pitchAngle = WWMath::Atan2(xvec.Z, xy);
 				Real remainingAngle = (offset > 0) ? ((PI/2) - pitchAngle) : (-(PI/2) + pitchAngle);
 				Real s = Sin(remainingAngle);
 				pitchRateToUse *= s;
@@ -829,12 +892,27 @@ UpdateSleepTime PhysicsBehavior::update()
 		}
 
 		// do not allow object to pass through the ground
+		if (followsGround)
+		{
+			Coord3D newPos;
+			newPos.x = mtx.Get_X_Translation();
+			newPos.y = mtx.Get_Y_Translation();
+			newPos.z = mtx.Get_Z_Translation();
+			hitSteepGround = constrainGroundMovement(newPos);
+			mtx.Set_X_Translation(newPos.x);
+			mtx.Set_Y_Translation(newPos.y);
+			mtx.Set_Z_Translation(newPos.z);
+			m_vel.z = 0.0f;
+		}
 		Real groundZ = TheTerrainLogic->getLayerHeight(mtx.Get_X_Translation(), mtx.Get_Y_Translation(), obj->getLayer());
 		if( obj->getStatusBits().test( OBJECT_STATUS_DECK_HEIGHT_OFFSET ) )
 		{
 			groundZ += obj->getCarrierDeckHeight();
 		}
-		gotBounceForce = handleBounce(oldPosZ, mtx.Get_Z_Translation(), groundZ, &bounceForce);
+		if (!followsGround)
+		{
+			gotBounceForce = handleBounce(oldPosZ, mtx.Get_Z_Translation(), groundZ, &bounceForce);
+		}
 
 		// remember our z-vel prior to doing ground-slam adjustment
 		activeVelZ = m_vel.z;
@@ -910,7 +988,8 @@ UpdateSleepTime PhysicsBehavior::update()
 
 	Bool isUnderWater{ false };
 	Bool airborneAtEnd{ false };
-	if (m_pui != nullptr && m_pui->projectileShouldCollideWithWater()) {
+	Bool collidesWithWater = m_pui != nullptr && m_pui->projectileShouldCollideWithWater();
+	if (collidesWithWater) {
 		// For projectiles that collide with water, we consider water as not airborne
 		airborneAtEnd = obj->isAboveTerrainOrWater();
 		isUnderWater = obj->isBelowWater();
@@ -927,7 +1006,10 @@ UpdateSleepTime PhysicsBehavior::update()
 	// the start and end of this func... we have to compare since last frame,
 	// since (if we're held by a parachute, for instance) we might have been
 	// moved by other bits of code!
-	if (getFlag(WAS_AIRBORNE_LAST_FRAME) && !airborneAtEnd && !getFlag(IMMUNE_TO_FALLING_DAMAGE))
+	Bool hitWater = followsGround && collidesWithWater && isUnderWater
+		&& (!getFlag(UPDATE_EVER_RUN) || getFlag(WAS_ABOVE_WATER_LAST_FRAME));
+	if (hitSteepGround || hitWater || (getFlag(WAS_AIRBORNE_LAST_FRAME) && !airborneAtEnd && !getFlag(IMMUNE_TO_FALLING_DAMAGE)
+		&& (!followsGround || isUnderWater)))
 	{
 		doBounceSound(prevPos);
 
@@ -954,8 +1036,8 @@ UpdateSleepTime PhysicsBehavior::update()
 			// going down hills don't injure themselves (unless the hill is really steep)
 			const Real MIN_ANGLE_TAN = 3.0f;	//	roughly 71 degrees
 			const Real TINY_DELTA = 0.01f;
-			if ((fabs(m_vel.x) <= TINY_DELTA || fabs(activeVelZ / m_vel.x) >= MIN_ANGLE_TAN) &&
-				(fabs(m_vel.y) <= TINY_DELTA || fabs(activeVelZ / m_vel.y) >= MIN_ANGLE_TAN))
+			if ((WWMath::Fabs(m_vel.x) <= TINY_DELTA || WWMath::Fabs(activeVelZ / m_vel.x) >= MIN_ANGLE_TAN) &&
+				(WWMath::Fabs(m_vel.y) <= TINY_DELTA || WWMath::Fabs(activeVelZ / m_vel.y) >= MIN_ANGLE_TAN))
 			{
 				Real damageAmt = netSpeed * getMass() * d->m_fallHeightDamageFactor;
 
@@ -1048,7 +1130,7 @@ Real PhysicsBehavior::getVelocityMagnitude() const
 {
 	if (m_velMag == INVALID_VEL_MAG)
 	{
-		m_velMag = (Real)sqrtf( sqr(m_vel.x) + sqr(m_vel.y) + sqr(m_vel.z) );
+		m_velMag = (Real)WWMath::Sqrtf( sqr(m_vel.x) + sqr(m_vel.y) + sqr(m_vel.z) );
 	}
 	return m_velMag;
 }
@@ -1070,7 +1152,7 @@ Real PhysicsBehavior::getForwardSpeed2D() const
 		Real speedSquared = vx * vx + vy * vy;
 		//	DEBUG_ASSERTCRASH( speedSquared != 0, ("zero speedSquared will overflow sqrtf()!") );// lorenzen... sanity check
 
-		Real speed = (Real)sqrtf(speedSquared);
+		Real speed = (Real)WWMath::Sqrtf(speedSquared);
 
 		if (dot >= 0.0f)
 			return speed;
@@ -1103,7 +1185,7 @@ Real PhysicsBehavior::getForwardSpeed3D() const
 	Real dot = vx + vy + vz;
 
 	if (TheGlobalData->m_useOldMoveSpeed) {
-		Real speed = (Real)sqrtf(vx * vx + vy * vy + vz * vz);
+		Real speed = (Real)WWMath::Sqrtf(vx * vx + vy * vy + vz * vz);
 
 		if (dot >= 0.0f)
 			return speed;
@@ -1137,7 +1219,7 @@ Bool PhysicsBehavior::wasPreviouslyOverlapped(Object *obj) const
 //-------------------------------------------------------------------------------------------------
 void PhysicsBehavior::scrubVelocityZ( Real desiredVelocity )
 {
-	if (fabs(desiredVelocity) < 0.001f)
+	if (WWMath::Fabs(desiredVelocity) < 0.001f)
 	{
 		m_vel.z = 0;
 	}
@@ -1161,7 +1243,7 @@ void PhysicsBehavior::scrubVelocity2D( Real desiredVelocity )
 	}
 	else
 	{
-		Real curVelocity = sqrtf(m_vel.x*m_vel.x + m_vel.y*m_vel.y);
+		Real curVelocity = WWMath::Sqrtf(m_vel.x*m_vel.x + m_vel.y*m_vel.y);
 		if (desiredVelocity > curVelocity)
 		{
 			return;
@@ -1244,9 +1326,9 @@ void PhysicsBehavior::doBounceSound(const Coord3D& prevPos)
 
 //Real vel = fabs(getVelocity()->z);
 // can't use velocity, because it's already been updated this frame, and will be zero... (srj)
-	Real vel = fabs(prevPos.z - getObject()->getPosition()->z);
+	Real vel = WWMath::Fabs(prevPos.z - getObject()->getPosition()->z);
 
-	Real mass = fabs(getMass());
+	Real mass = WWMath::Fabs(getMass());
 	if (vel > NORMAL_VEL_Z) {
 		vel = NORMAL_VEL_Z;
 	}
@@ -1446,7 +1528,7 @@ void PhysicsBehavior::onCollide( Object *other, const Coord3D *loc, const Coord3
 
 	m_lastCollidee = other->getID();
 
-	Real dist = sqrtf(distSqr);
+	Real dist = WWMath::Sqrtf(distSqr);
 	Real overlap = usRadius + themRadius - dist;
 
 	// if objects are coincident, dist is zero, so force would be infinite -- clearly
@@ -1587,7 +1669,7 @@ static Bool perpsLogicallyEqual( Real perpOne, Real perpTwo )
 {
 	// Equality with a wiggle fudge.
   const Real PERP_RANGE = 0.15f;
-	return fabs( perpOne - perpTwo ) <= PERP_RANGE;
+	return WWMath::Fabs( perpOne - perpTwo ) <= PERP_RANGE;
 }
 
 //-------------------------------------------------------------------------------------------------

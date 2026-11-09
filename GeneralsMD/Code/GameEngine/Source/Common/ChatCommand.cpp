@@ -26,6 +26,8 @@
 #include "Common/ChatCommand.h"
 #include "Common/GameUtility.h"
 #include "Common/GlobalData.h"
+#include "Common/MessageStream.h"
+#include "Common/NameKeyGenerator.h"
 #include "Common/INI.h"
 #include "Common/Money.h"
 #include "Common/Player.h"
@@ -44,7 +46,6 @@
 #include "GameClient/View.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/GameLogic.h"
-#include "GameLogic/Module/CreateModule.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/WeaponSetType.h"
@@ -88,7 +89,7 @@ const FieldParse ChatCommand::s_fieldParseTable[] =
 	{ "KillSelectedPilots",		INI::parseBool,			nullptr,	offsetof( ChatCommand, m_killSelectedPilots ) },
 	{ "ControlPlayer",			INI::parseBool,			nullptr,	offsetof( ChatCommand, m_controlPlayer ) },
 	{ "SubdueSelected",			INI::parseBool,			nullptr,	offsetof( ChatCommand, m_subdueSelected ) },
-	{ NULL, NULL, 0, 0 }  // keep this last
+	{ nullptr, nullptr, nullptr, 0 }  // keep this last
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -353,30 +354,22 @@ void ChatCommand::execute( const AsciiString& args ) const
 	if (m_isSpawnObjectCommand && !spawnName.isEmpty())
 	{
 		const ThingTemplate *tmpl = findTemplateForChatCommand( spawnName );
-		Player *player = ThePlayerList ? ThePlayerList->getLocalPlayer() : nullptr;
-		Team *team = player ? player->getDefaultTeam() : nullptr;
-		if (tmpl && team && TheMouse && TheTacticalView)
+		if (tmpl && TheMouse && TheTacticalView && TheMessageStream)
 		{
 			Coord3D pos;
 			const MouseIO *mouseIO = TheMouse->getMouseStatus();
-			TheTacticalView->screenToTerrain( &mouseIO->pos, &pos );
-
-			Object *obj = TheThingFactory->newObject( tmpl, team );
-			if (obj)
+			// screenToTerrain fails when the cursor is not over the terrain. Without testing it, pos
+			// would stay uninitialized and the object would be spawned at a garbage position.
+			if( TheTacticalView->screenToTerrain( &mouseIO->pos, &pos ) )
 			{
-				obj->setPosition( &pos );
-				obj->setOrientation( 0.0f );
-
-				// newObject only runs the onCreate half of creation, so finish the object off the
-				// way ProductionUpdate does after a factory builds one.
-				for (BehaviorModule **m = obj->getBehaviorModules(); m && *m; ++m)
-				{
-					CreateModuleInterface *create = (*m)->getCreate();
-					if (create != nullptr)
-					{
-						create->onBuildComplete();
-					}
-				}
+				// Do not create the object here. This runs from the in game chat window, so it is client
+				// code outside of the logic update, and W3DModelDraw only validates its public bones,
+				// turret info and weapon barrel info while TheGameLogic is inside its update. Creating
+				// the object here leaves the drawable uninitialized: muzzle flashes stay visible, turrets
+				// do not track, and giving the object an order can crash. Post it to the logic instead.
+				GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_SPAWN_OBJECT_AT_POSITION );
+				msg->appendIntegerArgument( (Int)tmpl->getTemplateID() );
+				msg->appendLocationArgument( pos );
 			}
 		}
 		else if (!tmpl)

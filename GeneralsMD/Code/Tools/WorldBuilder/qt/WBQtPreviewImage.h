@@ -34,6 +34,24 @@ namespace WBQtPreviewImage
 		return img.copy(w / 4, h / 4, w / 2, h / 2);
 	}
 
+	// Square bottom-up BGRA, as terrain tiles and texture previews come from the bridge, to top-down RGB.
+	inline QImage fromBottomUpBgra(const unsigned char *bgra, int extent)
+	{
+		QImage img(extent, extent, QImage::Format_RGB888);
+		for (int y = 0; y < extent; ++y)
+		{
+			const unsigned char *src = bgra + (extent - 1 - y) * extent * 4;
+			unsigned char *dst = img.scanLine(y);
+			for (int x = 0; x < extent; ++x)
+			{
+				dst[x * 3 + 0] = src[x * 4 + 2];	// R <- B
+				dst[x * 3 + 1] = src[x * 4 + 1];	// G
+				dst[x * 3 + 2] = src[x * 4 + 0];	// B <- R
+			}
+		}
+		return img;
+	}
+
 	// Fit the cropped image into the preview label. Upscales use nearest-neighbour like
 	// the MFC StretchDIBits (bilinear smoothing turns an upscaled model into a blur);
 	// downscales keep the smooth filter (nearest downscaling drops pixels and shimmers).

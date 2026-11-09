@@ -30,6 +30,7 @@
 #include <stdlib.h>
 
 #include "Common/GlobalData.h"
+#include "Common/OptionPreferences.h"
 #include "Common/ThingTemplate.h"
 #include "Common/ThingFactory.h"
 #include "GameLogic/TerrainLogic.h"
@@ -277,6 +278,8 @@ W3DInGameUI::W3DInGameUI()
 
 	m_buildingPlacementAnchor = nullptr;
 	m_buildingPlacementArrow = nullptr;
+	m_facingDragAnchor = nullptr;
+	m_facingDragArrow = nullptr;
 
 }
 
@@ -297,6 +300,8 @@ W3DInGameUI::~W3DInGameUI()
 
 	REF_PTR_RELEASE( m_buildingPlacementAnchor );
 	REF_PTR_RELEASE( m_buildingPlacementArrow );
+	REF_PTR_RELEASE( m_facingDragAnchor );
+	REF_PTR_RELEASE( m_facingDragArrow );
 
 }
 
@@ -395,6 +400,11 @@ void W3DInGameUI::draw()
 	if( m_isDragSelecting )
 		drawSelectionRegion();
 
+	if( TheGlobalData->m_actionLineMode != ActionLineMode_Off )
+	{
+		drawActionLines();
+	}
+
 	// for each view draw hints
 	/// @todo should the UI be iterating through views like this?
 	if( TheDisplay )
@@ -416,6 +426,8 @@ void W3DInGameUI::draw()
 			drawPlaceAngle( view );
 
 		}
+
+		drawFacingDragAngle();
 
 	}
 
@@ -460,6 +472,54 @@ void W3DInGameUI::drawSelectionRegion()
 														width,
 														color );
 
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Pink for an attack move, red for an attack, blue for a guard, green for everything else. */
+//-------------------------------------------------------------------------------------------------
+static UnsignedInt actionLineColor( InGameUI::ActionLineKind kind )
+{
+	switch( kind )
+	{
+		case InGameUI::ACTION_LINE_ATTACK_MOVE:
+			return 0x66FF66CC;
+		case InGameUI::ACTION_LINE_ATTACK:
+		case InGameUI::ACTION_LINE_ATTACK_GROUND:
+			return 0x66FF5555;
+		case InGameUI::ACTION_LINE_GUARD:
+			return 0x6655CCFF;
+		default:
+			return 0x6655FF55;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+/** A faint line per bunch of selected units, ending in a dot on the destination. */
+//-------------------------------------------------------------------------------------------------
+void W3DInGameUI::drawActionLines()
+{
+	const std::vector<ActionLine>& lines = getActionLines();
+	if( lines.empty() )
+	{
+		return;
+	}
+
+	for( std::vector<ActionLine>::const_iterator it = lines.begin(); it != lines.end(); ++it )
+	{
+		// off-screen points still project usefully, so drop only those behind the camera
+		ICoord2D from, to;
+		if( TheTacticalView->worldToScreenTriReturn( &it->from, &from ) == View::WTS_INVALID ||
+				TheTacticalView->worldToScreenTriReturn( &it->to, &to ) == View::WTS_INVALID )
+		{
+			continue;
+		}
+
+		// clear at the unit, so the lines do not crowd the selection
+		const UnsignedInt lineColor = actionLineColor( it->kind );
+		TheDisplay->drawLine( from.x, from.y, to.x, to.y, 1.0f, lineColor & 0x00FFFFFF, lineColor );
+
+		TheDisplay->drawFillRect( to.x - 2, to.y - 2, 5, 5, ( lineColor & 0x00FFFFFF ) | 0xCC000000 );
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -591,6 +651,59 @@ void W3DInGameUI::drawMoveHints( View *view )
 void W3DInGameUI::drawAttackHints( View *view )
 {
 
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Drag-to-face: the building placement anchor ring for a short drag, its arrow along the facing after. */
+//-------------------------------------------------------------------------------------------------
+void W3DInGameUI::drawFacingDragAngle()
+{
+	if (!m_facingDragActive && !m_facingDragAnchor && !m_facingDragArrow)
+	{
+		return;
+	}
+
+	if( !m_facingDragAnchor )
+	{
+		m_facingDragAnchor = W3DDisplay::m_assetManager->Create_Render_Obj( "Locater01" );
+	}
+	if( !m_facingDragArrow )
+	{
+		m_facingDragArrow = W3DDisplay::m_assetManager->Create_Render_Obj( "Locater02" );
+	}
+	if( !m_facingDragAnchor || !m_facingDragArrow )
+	{
+		return;
+	}
+
+	Coord3D anchor;
+	Real angle;
+	Bool showArrow;
+	const Bool active = getFacingDragPreview( &anchor, &angle, &showArrow );
+
+	RenderObjClass *shown = active ? (showArrow ? m_facingDragArrow : m_facingDragAnchor) : nullptr;
+	RenderObjClass *hidden[2] = { m_facingDragAnchor, m_facingDragArrow };
+	for( Int i = 0; i < 2; ++i )
+	{
+		if( hidden[i] != shown && hidden[i]->Peek_Scene() )
+		{
+			W3DDisplay::m_3DScene->Remove_Render_Object( hidden[i] );
+		}
+	}
+	if( !shown )
+	{
+		return;
+	}
+	if( !shown->Peek_Scene() )
+	{
+		W3DDisplay::m_3DScene->Add_Render_Object( shown );
+	}
+
+	// as the building icon's transform, which drawPlaceAngle copies: at the point, turned to the angle
+	Matrix3D transform( true );
+	transform.Translate( Vector3( anchor.x, anchor.y, anchor.z ) );
+	transform.Rotate_Z( angle );
+	shown->Set_Transform( transform );
 }
 
 //-------------------------------------------------------------------------------------------------

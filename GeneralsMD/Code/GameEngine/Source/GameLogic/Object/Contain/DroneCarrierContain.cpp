@@ -49,7 +49,7 @@ void DroneCarrierContainModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "KeepSlotAssignment", INI::parseBool, NULL, offsetof(DroneCarrierContainModuleData, m_keepSlotAssignment)},
 		{ "LaunchBone", INI::parseAsciiString, NULL, offsetof(DroneCarrierContainModuleData, m_launchBone)},
 		{ "NumLaunchBones", INI::parseInt, NULL, offsetof(DroneCarrierContainModuleData, m_numLaunchBones)},
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
 }

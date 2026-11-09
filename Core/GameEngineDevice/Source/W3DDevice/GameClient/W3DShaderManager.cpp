@@ -85,12 +85,15 @@
 #include "WW3D2/dx8fvf.h"
 #include "WW3D2/dx8instancing.h"
 #include "WW3D2/dx8skinning.h"
+#include "WW3D2/pointgr.h"
 #include "WW3D2/dx8polygonrenderer.h"
 #include "WW3D2/matpass.h"
 #include "WW3D2/texture.h"
 #include "WWLib/ffactory.h"
 #include "WWMath/aabox.h"
 #include <vector>
+#include <map>
+#include <float.h>
 
 
 // Turn this on to turn off pixel shaders. jba[4/3/2003]
@@ -221,18 +224,19 @@ Bool ScreenDefaultFilter::postRender(FilterModes mode, Coord2D &scrollDelta,Bool
 	TheTacticalView->getOrigin(&xpos,&ypos);
 	width=TheTacticalView->getWidth();
 	height=TheTacticalView->getHeight();
+	const Real targetScale = W3DShaderManager::getScreenToTargetScale();
 
 	//bottom right
-	v[0].p = Vector4( xpos+width-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[0].p = Vector4( (xpos+width)*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[0].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[0].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	//top right
-	v[1].p = Vector4( xpos+width-0.5f, ypos-0.5f, 0.0f, 1.0f );
+	v[1].p = Vector4( (xpos+width)*targetScale-0.5f, ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[1].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[1].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	//bottom left
-	v[2].p = Vector4(  xpos-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[2].p = Vector4(  xpos*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[2].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[2].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	//top left
-	v[3].p = Vector4(  xpos-0.5f,  ypos-0.5f, 0.0f, 1.0f );
+	v[3].p = Vector4(  xpos*targetScale-0.5f,  ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[3].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[3].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	v[0].color = 0xffffffff;
 	v[1].color = 0xffffffff;
@@ -360,18 +364,19 @@ Bool ScreenBWFilter::postRender(FilterModes mode, Coord2D &scrollDelta,Bool &doE
 	TheTacticalView->getOrigin(&xpos,&ypos);
 	width=TheTacticalView->getWidth();
 	height=TheTacticalView->getHeight();
+	const Real targetScale = W3DShaderManager::getScreenToTargetScale();
 
 	//bottom right
-	v[0].p = Vector4( xpos+width-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[0].p = Vector4( (xpos+width)*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[0].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[0].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	//top right
-	v[1].p = Vector4( xpos+width-0.5f, ypos-0.5f, 0.0f, 1.0f );
+	v[1].p = Vector4( (xpos+width)*targetScale-0.5f, ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[1].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[1].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	//bottom left
-	v[2].p = Vector4(  xpos-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[2].p = Vector4(  xpos*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[2].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[2].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	//top left
-	v[3].p = Vector4(  xpos-0.5f,  ypos-0.5f, 0.0f, 1.0f );
+	v[3].p = Vector4(  xpos*targetScale-0.5f,  ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[3].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[3].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	v[0].color = 0xffffffff;
 	v[1].color = 0xffffffff;
@@ -555,18 +560,19 @@ Bool ScreenBWFilterDOT3::postRender(FilterModes mode, Coord2D &scrollDelta,Bool 
 	TheTacticalView->getOrigin(&xpos,&ypos);
 	width=TheTacticalView->getWidth();
 	height=TheTacticalView->getHeight();
+	const Real targetScale = W3DShaderManager::getScreenToTargetScale();
 
 	//bottom right
-	v[0].p = Vector4( xpos+width-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[0].p = Vector4( (xpos+width)*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[0].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[0].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	//top right
-	v[1].p = Vector4( xpos+width-0.5f, ypos-0.5f, 0.0f, 1.0f );
+	v[1].p = Vector4( (xpos+width)*targetScale-0.5f, ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[1].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[1].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	//bottom left
-	v[2].p = Vector4(  xpos-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[2].p = Vector4(  xpos*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[2].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[2].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	//top left
-	v[3].p = Vector4(  xpos-0.5f,  ypos-0.5f, 0.0f, 1.0f );
+	v[3].p = Vector4(  xpos*targetScale-0.5f,  ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[3].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[3].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 
 	DWORD currentFade=(((Int)((1.0f-m_curFadeValue) * 255.0f))<<24) | 0x00ffffff;	//store alpha value
@@ -831,6 +837,7 @@ Bool ScreenCrossFadeFilter::postRender(FilterModes mode, Coord2D &scrollDelta,Bo
 	TheTacticalView->getOrigin(&xpos,&ypos);
 	width=TheTacticalView->getWidth();
 	height=TheTacticalView->getHeight();
+	const Real targetScale = W3DShaderManager::getScreenToTargetScale();
 
 /*	Real radius = (1.0f-m_curFadeValue);
 	if (radius <= 0)
@@ -838,19 +845,19 @@ Bool ScreenCrossFadeFilter::postRender(FilterModes mode, Coord2D &scrollDelta,Bo
 	radius = 25.0f-radius*24.75f;
 */
 	//bottom right
-	v[0].p = Vector4( xpos+width-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[0].p = Vector4( (xpos+width)*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[0].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[0].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	v[0].u1 = 0.5f+radius;	v[0].v1 = 0.5f+radius;
 	//top right
-	v[1].p = Vector4( xpos+width-0.5f, ypos-0.5f, 0.0f, 1.0f );
+	v[1].p = Vector4( (xpos+width)*targetScale-0.5f, ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[1].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[1].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	v[1].u1 = 0.5f+radius;	v[1].v1 = 0.5f-radius;
 	//bottom left
-	v[2].p = Vector4(  xpos-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[2].p = Vector4(  xpos*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[2].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[2].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	v[2].u1 = 0.5f-radius;	v[2].v1 = 0.5f+radius;
 	//top left
-	v[3].p = Vector4(  xpos-0.5f,  ypos-0.5f, 0.0f, 1.0f );
+	v[3].p = Vector4(  xpos*targetScale-0.5f,  ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[3].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[3].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	v[3].u1 = 0.5f-radius;	v[3].v1 = 0.5f-radius;
 
@@ -988,18 +995,19 @@ Bool ScreenMotionBlurFilter::postRender(FilterModes mode, Coord2D &scrollDelta,B
 	TheTacticalView->getOrigin(&xpos,&ypos);
 	width=TheTacticalView->getWidth();
 	height=TheTacticalView->getHeight();
+	const Real targetScale = W3DShaderManager::getScreenToTargetScale();
 
 	//bottom right
-	v[0].p = Vector4( xpos+width-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[0].p = Vector4( (xpos+width)*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[0].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[0].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	//top right
-	v[1].p = Vector4( xpos+width-0.5f, ypos-0.5f, 0.0f, 1.0f );
+	v[1].p = Vector4( (xpos+width)*targetScale-0.5f, ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[1].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[1].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	//bottom left
-	v[2].p = Vector4(  xpos-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[2].p = Vector4(  xpos*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[2].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[2].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	//top left
-	v[3].p = Vector4(  xpos-0.5f,  ypos-0.5f, 0.0f, 1.0f );
+	v[3].p = Vector4(  xpos*targetScale-0.5f,  ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[3].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[3].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	v[0].color = 0xffffffff;
 	v[1].color = 0xffffffff;
@@ -1522,9 +1530,36 @@ static Int BumpNormalMapCount = 0;
 // The glow masks the specular pass adds, set once a frame by the scene.
 static Real EmissiveIntensity = 0.0f;
 static Int EmissiveMapCount = 0;
+#if defined(RTS_ZEROHOUR)
+static Real TerrainEmissiveScale = 1.0f;
+
+void W3DShaderManager::setTerrainEmissiveScale(Real scale)
+{
+	TerrainEmissiveScale = scale;
+}
+#endif
+
+static Real Bind_Terrain_Emissive(Bool terrain)
+{
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+	TextureClass *atlas = terrain ? W3DShaderManager::getShaderTexture(W3DShaderManager::TERRAIN_EMISSIVE_TEXTURE) : nullptr;
+	const Bool enabled = atlas != nullptr && atlas->Peek_D3D_Texture() != nullptr && EmissiveIntensity > 0.0f;
+	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
+	device->SetTexture(15, enabled ? atlas->Peek_D3D_Texture() : nullptr);
+	device->SetSamplerState(15, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
+	device->SetSamplerState(15, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
+	device->SetSamplerState(15, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+	device->SetSamplerState(15, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+	device->SetSamplerState(15, D3DSAMP_MIPFILTER, D3DTEXF_LINEAR);
+	return enabled ? EmissiveIntensity * TerrainEmissiveScale : 0.0f;
+#else
+	(void)terrain;
+	return 0.0f;
+#endif
+}
 
 // The point lights draws may add, set once a frame by the scene. Each draw names its own.
-static W3DShaderManager::PixelLight PixelLights[W3DShaderManager::MAX_PIXEL_LIGHT_CANDIDATES];
+static std::vector<W3DShaderManager::PixelLight> PixelLights;
 static Int PixelLightCount = 0;
 enum { PIXEL_LIGHT_REGISTERS = W3DShaderManager::MAX_PIXEL_LIGHTS * 2 + (W3DShaderManager::MAX_PIXEL_LIGHTS + 3) / 4 };
 static Bool TerrainPixelLightsLoaded = FALSE;
@@ -1549,7 +1584,7 @@ static DWORD DrawGroundShader = 0;
 static DWORD DrawSeabedUnlitShader = 0;
 static DWORD DrawSeabedLitShader = 0;
 
-// Where terrainshadow.hlsl reads the seabed, past the three point lights its seabed variants keep.
+// Where terrainshadow.hlsl reads the seabed, past the two point lights its seabed variants keep.
 #define SEABED_REGISTER 14
 #define SEABED_CLASS_MAP_SAMPLER 8
 #define SEABED_WATER_MASK_SAMPLER 9
@@ -1600,11 +1635,13 @@ static Vector4 Bind_Height_Blend(TextureClass *heights)
 // The lights of the object whose specular pass is installed.
 struct SpecularPassLights
 {
-	Int lights[W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS];
+	std::vector<Int> lights;
 	Int count;
 	Bool lightsOnly;	///< no highlight, bumps or glow
+	Bool receivesShadow;	///< the pass also does the shadow receiver's work
 };
 static const SpecularPassLights *CurrentSpecularLights = nullptr;
+static D3DMATRIX SpecularLightView;
 
 // Bisects per-pixel light faults without a rebuild. CONTRA_PIXELLIGHTS=0 leaves every light
 // to the vertex lighting, 1 draws them per pixel on the terrain only, 2 on units as well.
@@ -1614,6 +1651,136 @@ static Int Get_Pixel_Light_Mode()
 {
 	const char *value = getenv("CONTRA_PIXELLIGHTS");
 	return (value != nullptr) ? atoi(value) : PIXEL_LIGHTS_ALL;
+}
+
+// Whether any lit shader carries its lights-only twin.
+static Bool LightsDebugAvailable = FALSE;
+
+#if defined(BUILD_WITH_D3D9)
+struct AdditionalLightShaders
+{
+	AdditionalLightShaders() : normal(nullptr), debug(nullptr) {}
+	IDirect3DPixelShader9 *normal;
+	IDirect3DPixelShader9 *debug;
+};
+static std::map<DWORD, AdditionalLightShaders> AdditionalShaders;
+
+static void Attach_Additional_Light_Shaders(const char *path, DWORD handle)
+{
+	std::map<DWORD, AdditionalLightShaders>::iterator old = AdditionalShaders.find(handle);
+	if (old != AdditionalShaders.end())
+	{
+		Set_D3D9_Shader_Name(old->second.normal, nullptr);
+		SAFE_RELEASE(old->second.normal);
+		Set_D3D9_Shader_Name(old->second.debug, nullptr);
+		SAFE_RELEASE(old->second.debug);
+		AdditionalShaders.erase(old);
+	}
+	const size_t length = strlen(path);
+	if (length < 4)
+	{
+		return;
+	}
+	AdditionalLightShaders shaders;
+	for (Int debug = 0; debug < 2; debug++)
+	{
+		char extraPath[_MAX_PATH];
+		snprintf(extraPath, sizeof(extraPath), "%.*sextralights%s.pso", (Int)length - 4, path, debug ? "debug" : "");
+		const void *data = nullptr;
+		DWORD size = 0;
+		if (!Find_Embedded_Shader(extraPath, data, size))
+		{
+			break;
+		}
+		IDirect3DPixelShader9 **shader = debug ? &shaders.debug : &shaders.normal;
+		DX8Wrapper::_Get_D3D_Device8()->CreatePixelShader((const DWORD *)data, shader);
+		Set_D3D9_Shader_Name(*shader, extraPath);
+	}
+	if (shaders.normal != nullptr)
+	{
+		AdditionalShaders[handle] = shaders;
+	}
+	else
+	{
+		Set_D3D9_Shader_Name(shaders.debug, nullptr);
+		SAFE_RELEASE(shaders.debug);
+	}
+}
+
+static std::vector<Int> AdditionalLightIndices;
+static Int AdditionalLightSlots = 0;
+static Int AdditionalLightRegister = 0;
+static D3DMATRIX AdditionalLightView;
+static Bool AdditionalLightsInView = FALSE;
+static DWORD AdditionalLightShader = 0;
+static IDirect3DPixelShader9 *SavedLightShader = nullptr;
+static Vector4 SavedLightConstants[PIXEL_LIGHT_REGISTERS];
+static const D3DRENDERSTATETYPE AdditionalLightStates[] = { D3DRS_ALPHABLENDENABLE, D3DRS_DESTBLEND, D3DRS_ZWRITEENABLE, D3DRS_FOGCOLOR, D3DRS_BLENDOP, D3DRS_SRCBLEND, D3DRS_SCISSORTESTENABLE };
+static DWORD SavedLightStates[ARRAY_SIZE(AdditionalLightStates)];
+static RECT SavedLightScissor;
+static D3DVIEWPORT9 AdditionalLightViewport;
+static D3DMATRIX AdditionalLightWorldToClip;
+static Bool AdditionalLightScissor = FALSE;
+static size_t AdditionalLightNext = 0;
+#endif
+
+// DynamicLightsDebug draws every lightable surface through its lit shader, so unlit ground and objects go black too.
+static Bool Get_Lights_Debug()
+{
+#if RTS_ZEROHOUR
+	return LightsDebugAvailable && TheGlobalData != nullptr && TheGlobalData->m_dynamicLightsDebug &&
+		TheGlobalData->m_useDynamicLights && TheGlobalData->m_usePixelLights;
+#else
+	return FALSE;
+#endif
+}
+
+// Names the lights-only twin the build compiles for a lit pixel shader.
+static Bool Get_Lights_Debug_Path(const char *path, char *debugPath, size_t size)
+{
+	const size_t length = strlen(path);
+	if (length < 4 || _stricmp(path + length - 4, ".pso") != 0 || strstr(path, "lightsdebug") != nullptr)
+	{
+		return FALSE;
+	}
+	snprintf(debugPath, size, "%.*slightsdebug.pso", (int)(length - 4), path);
+	return TRUE;
+}
+
+#if defined(BUILD_WITH_D3D9)
+// Hangs a lit shader's lights-only twin on its handle, which binds it while the debug view is on.
+static void Attach_Lights_Debug_Twin(const char *path, DWORD handle)
+{
+	char debugPath[_MAX_PATH];
+	const void *data = nullptr;
+	DWORD size = 0;
+	if (!Get_Lights_Debug_Path(path, debugPath, sizeof(debugPath)) || !Find_Embedded_Shader(debugPath, data, size))
+	{
+		return;
+	}
+
+	IDirect3DPixelShader9 *shader = nullptr;
+	if (SUCCEEDED(DX8Wrapper::_Get_D3D_Device8()->CreatePixelShader((const DWORD *)data, &shader)))
+	{
+		Attach_D3D9_Debug_Pixel_Shader(handle, shader);
+		LightsDebugAvailable = TRUE;
+	}
+	else
+	{
+		RENDER_LOG(("LoadAndCreateD3DShader: could not create %s", debugPath));
+	}
+}
+#endif
+
+// Switches the lit shaders to their twins or back as the frame starts, and rebinds whatever was bound.
+static void Update_Lights_Debug()
+{
+#if defined(BUILD_WITH_D3D9)
+	if (Set_D3D9_Debug_Pixel_Shaders(Get_Lights_Debug() != FALSE))
+	{
+		DX8Wrapper::Set_Pixel_Shader(0);
+	}
+#endif
 }
 
 // Packs the given lights, or the first count without indices, as pointlights.hlsli reads them in a shader
@@ -1651,6 +1818,194 @@ static Int Pack_Pixel_Lights(Vector4 *constants, Int slots, const Int *indices, 
 	return slots * 2 + (slots + 3) / 4;
 }
 
+#if defined(BUILD_WITH_D3D9)
+static bool Pixel_Light_Screen_Rect(const W3DShaderManager::PixelLight &light, const D3DMATRIX &transform,
+	const D3DVIEWPORT9 &viewport, RECT &rectangle)
+{
+	rectangle.left = viewport.X;
+	rectangle.top = viewport.Y;
+	rectangle.right = viewport.X + viewport.Width;
+	rectangle.bottom = viewport.Y + viewport.Height;
+	double left = DBL_MAX;
+	double top = DBL_MAX;
+	double right = -DBL_MAX;
+	double bottom = -DBL_MAX;
+	for (Int corner = 0; corner < 8; corner++)
+	{
+		const double x = light.position.X + ((corner & 1) ? (double)light.outerRadius : -(double)light.outerRadius);
+		const double y = light.position.Y + ((corner & 2) ? (double)light.outerRadius : -(double)light.outerRadius);
+		const double z = light.position.Z + ((corner & 4) ? (double)light.outerRadius : -(double)light.outerRadius);
+		const double clipX = x * transform.m[0][0] + y * transform.m[1][0] + z * transform.m[2][0] + transform.m[3][0];
+		const double clipY = x * transform.m[0][1] + y * transform.m[1][1] + z * transform.m[2][1] + transform.m[3][1];
+		const double clipZ = x * transform.m[0][2] + y * transform.m[1][2] + z * transform.m[2][2] + transform.m[3][2];
+		const double clipW = x * transform.m[0][3] + y * transform.m[1][3] + z * transform.m[2][3] + transform.m[3][3];
+		// A box crossing the near plane keeps the full viewport because its projection is unbounded.
+		if (!_finite(clipX) || !_finite(clipY) || !_finite(clipZ) || !_finite(clipW) || clipZ <= 0.0 || clipW <= 1e-6)
+		{
+			return true;
+		}
+		const double pixelX = viewport.X + (clipX / clipW + 1.0) * viewport.Width * 0.5;
+		const double pixelY = viewport.Y + (1.0 - clipY / clipW) * viewport.Height * 0.5;
+		left = min(left, pixelX);
+		top = min(top, pixelY);
+		right = max(right, pixelX);
+		bottom = max(bottom, pixelY);
+	}
+	// Two pixels cover raster rounding and the shader's derivative helper pixels.
+	rectangle.left = (LONG)max((double)viewport.X, min((double)rectangle.right, floor(left) - 2.0));
+	rectangle.top = (LONG)max((double)viewport.Y, min((double)rectangle.bottom, floor(top) - 2.0));
+	rectangle.right = (LONG)min((double)rectangle.right, max((double)viewport.X, ceil(right) + 2.0));
+	rectangle.bottom = (LONG)min((double)rectangle.bottom, max((double)viewport.Y, ceil(bottom) + 2.0));
+	return rectangle.left < rectangle.right && rectangle.top < rectangle.bottom;
+}
+
+static bool Additional_Light_Screen_Rect(size_t first, RECT &rectangle)
+{
+	rectangle.left = AdditionalLightViewport.X + AdditionalLightViewport.Width;
+	rectangle.top = AdditionalLightViewport.Y + AdditionalLightViewport.Height;
+	rectangle.right = AdditionalLightViewport.X;
+	rectangle.bottom = AdditionalLightViewport.Y;
+	const size_t end = min(first + (size_t)AdditionalLightSlots, AdditionalLightIndices.size());
+	for (size_t i = first; i < end; i++)
+	{
+		const Int index = AdditionalLightIndices[i];
+		RECT lightRectangle;
+		if (index >= 0 && index < PixelLightCount &&
+			Pixel_Light_Screen_Rect(PixelLights[index], AdditionalLightWorldToClip, AdditionalLightViewport, lightRectangle))
+		{
+			rectangle.left = min(rectangle.left, lightRectangle.left);
+			rectangle.top = min(rectangle.top, lightRectangle.top);
+			rectangle.right = max(rectangle.right, lightRectangle.right);
+			rectangle.bottom = max(rectangle.bottom, lightRectangle.bottom);
+		}
+	}
+	if (SavedLightStates[ARRAY_SIZE(AdditionalLightStates) - 1])
+	{
+		rectangle.left = max(rectangle.left, SavedLightScissor.left);
+		rectangle.top = max(rectangle.top, SavedLightScissor.top);
+		rectangle.right = min(rectangle.right, SavedLightScissor.right);
+		rectangle.bottom = min(rectangle.bottom, SavedLightScissor.bottom);
+	}
+	return rectangle.left < rectangle.right && rectangle.top < rectangle.bottom;
+}
+
+static bool Draw_Additional_Light_Pass(unsigned pass)
+{
+	IDirect3DDevice9 *device = DX8Wrapper::_Get_D3D_Device8();
+	const Int registers = AdditionalLightSlots * 2 + (AdditionalLightSlots + 3) / 4;
+	if (pass == 1)
+	{
+		// Direct device writes keep the wrapper's cached base-pass state unchanged.
+		device->GetPixelShader(&SavedLightShader);
+		if (SavedLightShader == nullptr)
+		{
+			return false;
+		}
+		device->GetPixelShaderConstantF(AdditionalLightRegister, &SavedLightConstants[0].X, registers);
+		for (Int i = 0; i < ARRAY_SIZE(AdditionalLightStates); i++)
+		{
+			device->GetRenderState(AdditionalLightStates[i], &SavedLightStates[i]);
+		}
+		DWORD colorWrite = 0;
+		D3DMATRIX view, projection;
+		AdditionalLightScissor = SUCCEEDED(device->GetScissorRect(&SavedLightScissor)) &&
+			SUCCEEDED(device->GetViewport(&AdditionalLightViewport)) &&
+			SUCCEEDED(device->GetTransform(D3DTS_VIEW, &view)) &&
+			SUCCEEDED(device->GetTransform(D3DTS_PROJECTION, &projection)) &&
+			SUCCEEDED(device->GetRenderState(D3DRS_COLORWRITEENABLE, &colorWrite)) &&
+			(colorWrite & D3DCOLORWRITEENABLE_ALPHA) == 0;
+		if (AdditionalLightScissor)
+		{
+			AdditionalLightWorldToClip = (AdditionalLightsInView ? AdditionalLightView : view) * projection;
+		}
+		AdditionalLightNext = AdditionalLightSlots;
+		// Opaque draws leave their source blend factor unspecified.
+		if (!SavedLightStates[0])
+		{
+			device->SetRenderState(D3DRS_SRCBLEND, D3DBLEND_ONE);
+		}
+		device->SetRenderState(D3DRS_ALPHABLENDENABLE, TRUE);
+		device->SetRenderState(D3DRS_DESTBLEND, D3DBLEND_ONE);
+		device->SetRenderState(D3DRS_ZWRITEENABLE, FALSE);
+		device->SetRenderState(D3DRS_FOGCOLOR, 0);
+		device->SetRenderState(D3DRS_BLENDOP, D3DBLENDOP_ADD);
+		const AdditionalLightShaders &shaders = AdditionalShaders.find(AdditionalLightShader)->second;
+		device->SetPixelShader(Get_Lights_Debug() && shaders.debug != nullptr ? shaders.debug : shaders.normal);
+	}
+	size_t first = AdditionalLightNext;
+	RECT rectangle;
+	while (first < AdditionalLightIndices.size() && AdditionalLightScissor && !Additional_Light_Screen_Rect(first, rectangle))
+	{
+		first += AdditionalLightSlots;
+	}
+	if (first >= AdditionalLightIndices.size())
+	{
+		if (SavedLightShader != nullptr)
+		{
+			device->SetPixelShader(SavedLightShader);
+			SAFE_RELEASE(SavedLightShader);
+			device->SetPixelShaderConstantF(AdditionalLightRegister, &SavedLightConstants[0].X, registers);
+			for (Int i = 0; i < ARRAY_SIZE(AdditionalLightStates); i++)
+			{
+				device->SetRenderState(AdditionalLightStates[i], SavedLightStates[i]);
+			}
+			if (AdditionalLightScissor)
+			{
+				device->SetScissorRect(&SavedLightScissor);
+			}
+		}
+		return false;
+	}
+	if (AdditionalLightScissor)
+	{
+		if (SUCCEEDED(device->SetScissorRect(&rectangle)))
+		{
+			device->SetRenderState(D3DRS_SCISSORTESTENABLE, TRUE);
+		}
+		else
+		{
+			device->SetScissorRect(&SavedLightScissor);
+			device->SetRenderState(D3DRS_SCISSORTESTENABLE, SavedLightStates[ARRAY_SIZE(AdditionalLightStates) - 1]);
+		}
+	}
+	AdditionalLightNext = first + AdditionalLightSlots;
+	Vector4 constants[PIXEL_LIGHT_REGISTERS];
+	Pack_Pixel_Lights(constants, AdditionalLightSlots, &AdditionalLightIndices[first],
+		(Int)(AdditionalLightIndices.size() - first), AdditionalLightsInView ? &AdditionalLightView : nullptr);
+	device->SetPixelShaderConstantF(AdditionalLightRegister, &constants[0].X, registers);
+	return true;
+}
+#endif
+
+static void Set_Additional_Pixel_Lights(DWORD shader, const Int *indices, Int count, Int slots, Int firstRegister, const D3DMATRIX *view)
+{
+#if defined(BUILD_WITH_D3D9)
+	DX8Wrapper::Set_Additional_Pass_Callback(nullptr);
+	Bool enabled = FALSE;
+#if defined(RTS_ZEROHOUR)
+	enabled = TheGlobalData->m_usePathTracing;
+#endif
+	if (!enabled || count <= slots || AdditionalShaders.find(shader) == AdditionalShaders.end())
+	{
+		return;
+	}
+	AdditionalLightIndices.resize(count);
+	for (Int i = 0; i < count; i++)
+	{
+		AdditionalLightIndices[i] = indices != nullptr ? indices[i] : i;
+	}
+	AdditionalLightSlots = slots;
+	AdditionalLightRegister = firstRegister;
+	AdditionalLightShader = shader;
+	AdditionalLightsInView = view != nullptr;
+	if (view != nullptr)
+	{
+		AdditionalLightView = *view;
+	}
+	DX8Wrapper::Set_Additional_Pass_Callback(Draw_Additional_Light_Pass);
+#endif
+}
+
 // Every ground shader reads its world-space lights from c5.
 #define GROUND_POINT_LIGHT_REGISTER 5
 
@@ -1658,12 +2013,14 @@ static Int Pack_Pixel_Lights(Vector4 *constants, Int slots, const Int *indices, 
 // unlit shader leaves the lit one bound, for passes that only add the lights.
 static void Begin_Draw_Pixel_Lights(DWORD unlit, DWORD lit)
 {
+	Set_Additional_Pixel_Lights(0, nullptr, 0, 0, 0, nullptr);
 	DrawUnlitShader = unlit;
 	DrawLitShader = lit;
 }
 
 static void End_Draw_Pixel_Lights()
 {
+	Set_Additional_Pixel_Lights(0, nullptr, 0, 0, 0, nullptr);
 	DrawUnlitShader = 0;
 	DrawLitShader = 0;
 	DrawGroundShader = 0;
@@ -2059,6 +2416,8 @@ static Bool Get_Unit_Clouds_Enabled()
 	return (value != nullptr) ? atoi(value) != 0 : TRUE;
 }
 
+static const Bool UnitCloudsEnabled = Get_Unit_Clouds_Enabled();
+
 static Bool bindCloudReceiver(Int stage);
 static void unbindCloudReceiver(Int stage);
 
@@ -2103,7 +2462,7 @@ Int ShadowMultiplyShader::init()
 
 	// Without the cloud variant, receivers fall back to the shadow alone.
 	const char *cloudFile = packed ? "shaders\\shadowmultiplycloudpacked.pso" : "shaders\\shadowmultiplycloud.pso";
-	if (!Get_Unit_Clouds_Enabled() ||
+	if (!UnitCloudsEnabled ||
 		FAILED(W3DShaderManager::LoadAndCreateD3DShader(cloudFile, nullptr, 0, false, &m_dwCloudPixelShader)))
 	{
 		m_dwCloudPixelShader = 0;
@@ -2194,7 +2553,7 @@ public:
 		BUMP_COUNT
 	};
 
-	SpecularShader() : m_shadowed(FALSE), m_lit(FALSE), m_lightsOnly(FALSE), m_bumpHeight(0.0f)
+	SpecularShader() : m_shadowed(FALSE), m_lit(FALSE), m_lightsOnly(FALSE), m_receiving(FALSE), m_clouds(FALSE), m_bumpHeight(0.0f)
 	{
 		for (Int i = 0; i < BUMP_COUNT; i++)
 		{
@@ -2202,6 +2561,7 @@ public:
 			m_dwUnshadowedShaders[i] = 0;
 			m_dwLitShadowedShaders[i] = 0;
 			m_dwLitUnshadowedShaders[i] = 0;
+			m_dwReceiveShaders[i] = 0;
 		}
 	}
 
@@ -2211,7 +2571,7 @@ public:
 	virtual Int shutdown() override;
 
 	/// Binds one polygon group's texture, and its normal map and shader when it is bumped.
-	void setTexture(TextureClass *texture);
+	void setTexture(TextureClass *texture, MeshModelClass *model = nullptr, const AABoxClass *worldBounds = nullptr, Bool emissionEnabled = TRUE, VertexMaterialClass *material = nullptr);
 	/// Sets the rise of full brightness the derived bumps take, for the rest of the pass.
 	void setBumpHeight(Real height);
 
@@ -2221,10 +2581,15 @@ protected:
 	DWORD m_dwUnshadowedShaders[BUMP_COUNT];	///<for when the shadow map is off or holds no depth
 	DWORD m_dwLitShadowedShaders[BUMP_COUNT];	///<the same two, also adding the point lights
 	DWORD m_dwLitUnshadowedShaders[BUMP_COUNT];
+	DWORD m_dwReceiveShaders[BUMP_COUNT];		///<the unlit shadowed ones also doing the shadow receiver's work
 	Bool m_shadowed;							///<which of the two the current pass uses
 	Bool m_lit;									///<whether it adds its object's point lights
 	Bool m_lightsOnly;							///<whether it adds nothing else
+	Bool m_receiving;							///<whether it does the shadow receiver's work
+	Bool m_clouds;								///<whether that work includes the cloud map, bound on SPECULAR_CLOUD_STAGE
 	Real m_bumpHeight;							///<the derived bumps' rise of full brightness in the current pass
+
+	const DWORD *pickShaders() const;
 } specularShader;
 
 W3DShaderInterface *SpecularShaderList[]=
@@ -2241,6 +2606,19 @@ W3DShaderInterface *SpecularShaderList[]=
 // The normal and glow maps come last and read the mesh's UVs from TEXCOORD0.
 #define SPECULAR_NORMAL_MAP_STAGE	4
 #define SPECULAR_EMISSIVE_STAGE		5
+// The cloud map takes no texcoords, since the shader finds its UVs from the position.
+#define SPECULAR_CLOUD_STAGE		6
+
+static Bool SpecularReceiveLoaded = FALSE;
+
+// CONTRA_SPECULARRECEIVE=0 keeps the shadow receiver as a pass of its own without a rebuild.
+static Bool Get_Specular_Receive_Enabled()
+{
+	const char *value = getenv("CONTRA_SPECULARRECEIVE");
+	return (value != nullptr) ? atoi(value) != 0 : TRUE;
+}
+
+static Bool bindCloudTexture(Int stage, D3DMATRIX &cameraToCloud);
 
 // The bumped shaders take screen-space derivatives, which only ps_2_a and up have.
 static Bool Supports_Pixel_Shader_2_a(const DX8Caps *caps)
@@ -2336,6 +2714,27 @@ Int SpecularShader::init()
 		}
 	}
 
+	// Every variant the pass may pick must be there, or the receiver keeps its own pass.
+	static const char *const receiveFiles[2][BUMP_COUNT] =
+	{
+		{ "shaders\\specularreceive.pso", "shaders\\specularreceivederived.pso", "shaders\\specularreceivenormal.pso" },
+		{ "shaders\\specularreceivepacked.pso", "shaders\\specularreceivederivedpacked.pso", "shaders\\specularreceivenormalpacked.pso" }
+	};
+	SpecularReceiveLoaded = FALSE;
+	if (shadowMap && m_dwShadowedShaders[BUMP_NONE] != 0 && Supports_Pixel_Shader_2_a(caps) && Get_Specular_Receive_Enabled())
+	{
+		const Int packed = (TheW3DShadowMap->getDepthMode() == W3DShadowMap::DEPTH_MODE_PACKED) ? 1 : 0;
+		SpecularReceiveLoaded = TRUE;
+		for (Int bump = BUMP_NONE; bump < BUMP_COUNT; bump++)
+		{
+			if (m_dwShadowedShaders[bump] != 0 && FAILED(W3DShaderManager::LoadAndCreateD3DShader(receiveFiles[packed][bump],
+					nullptr, 0, false, &m_dwReceiveShaders[bump])))
+			{
+				SpecularReceiveLoaded = FALSE;
+			}
+		}
+	}
+
 	W3DShaders[W3DShaderManager::ST_SPECULAR]=&specularShader;
 	W3DShadersPassCount[W3DShaderManager::ST_SPECULAR]=1;
 
@@ -2384,6 +2783,7 @@ Int SpecularShader::set(Int pass)
 	// The shader lights in camera space, so the sun is turned into it with the view's rotation.
 	D3DMATRIX view;
 	DX8Wrapper::_Get_D3D_Device8()->GetTransform(D3DTS_VIEW, &view);
+	SpecularLightView = view;
 	Vector3 toSun(
 		SpecularToSun.X * view.m[0][0] + SpecularToSun.Y * view.m[1][0] + SpecularToSun.Z * view.m[2][0],
 		SpecularToSun.X * view.m[0][1] + SpecularToSun.Y * view.m[1][1] + SpecularToSun.Z * view.m[2][1],
@@ -2406,20 +2806,42 @@ Int SpecularShader::set(Int pass)
 	DX8Wrapper::Set_Pixel_Shader_Constant(5, &sunDiffuse, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(6, &bump, 1);
 
-	m_lit = (UnitPixelLightsLoaded && passLights != nullptr && passLights->count > 0);
+	m_lit = (UnitPixelLightsLoaded && passLights != nullptr && (passLights->count > 0 || Get_Lights_Debug()));
 	if (m_lit)
 	{
 		Vector4 constants[PIXEL_LIGHT_REGISTERS];
 		const Int registers = Pack_Pixel_Lights(constants, W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS,
-			passLights->lights, passLights->count, &view);
+			passLights->lights.empty() ? nullptr : &passLights->lights[0], passLights->count, &view);
 		DX8Wrapper::Set_Pixel_Shader_Constant(8, constants, registers);
 	}
 
-	DX8Wrapper::Set_Pixel_Shader(m_lit
-		? (m_shadowed ? m_dwLitShadowedShaders[BUMP_NONE] : m_dwLitUnshadowedShaders[BUMP_NONE])
-		: (m_shadowed ? m_dwShadowedShaders[BUMP_NONE] : m_dwUnshadowedShaders[BUMP_NONE]));
+	// The receiver's cloud map is read through the same camera-space mapping its texgen used.
+	m_receiving = m_shadowed && !m_lit && SpecularReceiveLoaded && passLights != nullptr && passLights->receivesShadow;
+	m_clouds = FALSE;
+	D3DMATRIX cameraToCloud;
+	if (m_receiving && UnitCloudsEnabled && bindCloudTexture(SPECULAR_CLOUD_STAGE, cameraToCloud))
+	{
+		m_clouds = TRUE;
+		Vector4 cloudU(cameraToCloud.m[0][0], cameraToCloud.m[1][0], cameraToCloud.m[2][0], cameraToCloud.m[3][0]);
+		Vector4 cloudV(cameraToCloud.m[0][1], cameraToCloud.m[1][1], cameraToCloud.m[2][1], cameraToCloud.m[3][1]);
+		DX8Wrapper::Set_Pixel_Shader_Constant(26, &cloudU, 1);
+		DX8Wrapper::Set_Pixel_Shader_Constant(27, &cloudV, 1);
+	}
+
+	DX8Wrapper::Set_Pixel_Shader(pickShaders()[BUMP_NONE]);
 	++SpecularPassCount;
 	return TRUE;
+}
+
+const DWORD *SpecularShader::pickShaders() const
+{
+	if (m_receiving)
+	{
+		return m_dwReceiveShaders;
+	}
+	return m_lit
+		? (m_shadowed ? m_dwLitShadowedShaders : m_dwLitUnshadowedShaders)
+		: (m_shadowed ? m_dwShadowedShaders : m_dwUnshadowedShaders);
 }
 
 // Loads <name><suffix> beside the texture, or returns null. The caller releases it.
@@ -2471,13 +2893,40 @@ static TextureClass *Find_Emissive_Map(TextureClass *texture)
 	return texture->Peek_Emissive_Map();
 }
 
-void SpecularShader::setTexture(TextureClass *texture)
+void SpecularShader::setTexture(TextureClass *texture, MeshModelClass *model, const AABoxClass *worldBounds, Bool emissionEnabled, VertexMaterialClass *material)
 {
 	DX8Wrapper::Set_Texture(0, texture);
 
-	const DWORD *shaders = m_lit
-		? (m_shadowed ? m_dwLitShadowedShaders : m_dwLitUnshadowedShaders)
-		: (m_shadowed ? m_dwShadowedShaders : m_dwUnshadowedShaders);
+	Vector3 diffuse(1.0f, 1.0f, 1.0f);
+	Real ambient = BumpAmbient;
+	if (material != nullptr)
+	{
+		Vector3 color;
+		if (!material->Get_Lighting())
+		{
+			diffuse.Set(0.0f, 0.0f, 0.0f);
+		}
+		else if (material->Get_Diffuse_Color_Source() == VertexMaterialClass::MATERIAL)
+		{
+			material->Get_Diffuse(&diffuse);
+		}
+		if (material->Get_Ambient_Color_Source() == VertexMaterialClass::MATERIAL)
+		{
+			material->Get_Ambient(&color);
+			ambient *= color.X * 0.3f + color.Y * 0.59f + color.Z * 0.11f;
+		}
+		if (material->Get_Emissive_Color_Source() == VertexMaterialClass::MATERIAL)
+		{
+			material->Get_Emissive(&color);
+			ambient += color.X * 0.3f + color.Y * 0.59f + color.Z * 0.11f;
+		}
+	}
+	Vector4 sunDiffuse(SpecularSunDiffuse.X * diffuse.X, SpecularSunDiffuse.Y * diffuse.Y, SpecularSunDiffuse.Z * diffuse.Z, 0.0f);
+	Vector4 materialBump(m_bumpHeight, BumpNormalMapStrength, ambient, 0.0f);
+	DX8Wrapper::Set_Pixel_Shader_Constant(5, &sunDiffuse, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(6, &materialBump, 1);
+
+	const DWORD *shaders = pickShaders();
 
 	// A texture's first draws go flat while its slope map waits for the next frame's build.
 	Int bump = BUMP_NONE;
@@ -2504,11 +2953,46 @@ void SpecularShader::setTexture(TextureClass *texture)
 
 	DX8Wrapper::Set_Texture(SPECULAR_NORMAL_MAP_STAGE, (bump != BUMP_NONE) ? bumpMap : nullptr);
 	DX8Wrapper::Set_Pixel_Shader(shaders[bump]);
+	const Int *indices = CurrentSpecularLights != nullptr && !CurrentSpecularLights->lights.empty()
+		? &CurrentSpecularLights->lights[0] : nullptr;
+	Int count = m_lit ? CurrentSpecularLights->count : 0;
+	if (count > W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS)
+	{
+		static std::vector<Int> meshLights;
+		if (model != nullptr && !model->Get_Flag(MeshGeometryClass::SKIN) && (worldBounds != nullptr || !DX8Wrapper::Is_Instanced_Drawing()))
+		{
+			AABoxClass bounds;
+			if (worldBounds != nullptr)
+			{
+				bounds = *worldBounds;
+			}
+			else
+			{
+				Matrix4x4 world;
+				DX8Wrapper::Get_Transform(D3DTS_WORLD, world);
+				Matrix3D transform;
+				for (Int row = 0; row < 3; row++)
+				{
+					transform[row] = world[row];
+				}
+				model->Get_Bounding_Box(&bounds);
+				bounds.Transform(transform);
+			}
+			meshLights = CurrentSpecularLights->lights;
+			W3DShaderManager::filterPixelLights(bounds, meshLights);
+			indices = meshLights.empty() ? nullptr : &meshLights[0];
+			count = (Int)meshLights.size();
+		}
+		Vector4 constants[PIXEL_LIGHT_REGISTERS];
+		const Int registers = Pack_Pixel_Lights(constants, W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS, indices, count, &SpecularLightView);
+		DX8Wrapper::Set_Pixel_Shader_Constant(8, constants, registers);
+	}
+	Set_Additional_Pixel_Lights(shaders[bump], indices, count, W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS, 8, &SpecularLightView);
 
-	TextureClass *emissiveMap = (EmissiveIntensity > 0.0f && texture != nullptr && !m_lightsOnly) ? Find_Emissive_Map(texture) : nullptr;
+	TextureClass *emissiveMap = (emissionEnabled && EmissiveIntensity > 0.0f && texture != nullptr && !m_lightsOnly) ? Find_Emissive_Map(texture) : nullptr;
 	DX8Wrapper::Set_Texture(SPECULAR_EMISSIVE_STAGE, emissiveMap);
 
-	Vector4 textureInfo((emissiveMap != nullptr) ? EmissiveIntensity : 0.0f, slopeScaleU, slopeScaleV, 0.0f);
+	Vector4 textureInfo((emissiveMap != nullptr) ? EmissiveIntensity : 0.0f, slopeScaleU, slopeScaleV, m_clouds ? 1.0f : 0.0f);
 	DX8Wrapper::Set_Pixel_Shader_Constant(7, &textureInfo, 1);
 	if (emissiveMap != nullptr)
 	{
@@ -2534,9 +3018,14 @@ void SpecularShader::setBumpHeight(Real height)
 
 void SpecularShader::reset()
 {
+	Set_Additional_Pixel_Lights(0, nullptr, 0, 0, 0, nullptr);
 	DX8Wrapper::Set_Pixel_Shader(0);
 	DX8Wrapper::Set_Texture(SPECULAR_NORMAL_MAP_STAGE, nullptr);
 	DX8Wrapper::Set_Texture(SPECULAR_EMISSIVE_STAGE, nullptr);
+	if (m_clouds)
+	{
+		DX8Wrapper::Set_Texture(SPECULAR_CLOUD_STAGE, nullptr);
+	}
 
 	if (m_shadowed && TheW3DShadowMap != nullptr)
 	{
@@ -2545,6 +3034,8 @@ void SpecularShader::reset()
 	m_shadowed = FALSE;
 	m_lit = FALSE;
 	m_lightsOnly = FALSE;
+	m_receiving = FALSE;
+	m_clouds = FALSE;
 
 	for (Int stage = SPECULAR_NORMAL_STAGE; stage <= SPECULAR_POSITION_STAGE; stage++)
 	{
@@ -2572,15 +3063,18 @@ Int SpecularShader::shutdown()
 			DX8_DELETE_PIXEL_SHADER(device, m_dwUnshadowedShaders[bump]);
 			DX8_DELETE_PIXEL_SHADER(device, m_dwLitShadowedShaders[bump]);
 			DX8_DELETE_PIXEL_SHADER(device, m_dwLitUnshadowedShaders[bump]);
+			DX8_DELETE_PIXEL_SHADER(device, m_dwReceiveShaders[bump]);
 		}
 		m_dwShadowedShaders[bump] = 0;
 		m_dwUnshadowedShaders[bump] = 0;
 		m_dwLitShadowedShaders[bump] = 0;
 		m_dwLitUnshadowedShaders[bump] = 0;
+		m_dwReceiveShaders[bump] = 0;
 	}
 
 	BumpSupported = FALSE;
 	UnitPixelLightsLoaded = FALSE;
+	SpecularReceiveLoaded = FALSE;
 
 	W3DShaders[W3DShaderManager::ST_SPECULAR]=nullptr;
 	W3DShadersPassCount[W3DShaderManager::ST_SPECULAR]=0;
@@ -2640,20 +3134,20 @@ Int PointLightPassShader::init()
 // Expects the geometry bound and transformed, and its texture set on stage 0 draw by draw.
 Int PointLightPassShader::set(Int pass)
 {
-	if (PixelLightCount == 0)
+	if (PixelLightCount == 0 && !Get_Lights_Debug())
 	{
 		return FALSE;
 	}
 
 	// The geometry is redrawn at the same depth, so EQUAL limits the pass to pixels the first
-	// draw wrote. It adds its light where the texture is opaque.
+	// draw wrote. It adds its light where the texture is opaque, and replaces what is there in the debug view.
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, TRUE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZFUNC, D3DCMP_EQUAL);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZWRITEENABLE, FALSE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHATESTENABLE, FALSE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE, TRUE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
-	DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_ONE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, Get_Lights_Debug() ? D3DBLEND_ZERO : D3DBLEND_ONE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_FOGENABLE, FALSE);
 
 	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXCOORDINDEX, 0);
@@ -2709,22 +3203,25 @@ class W3DSpecularMaterialPassClass : public MaterialPassClass
 {
 public:
 
-	W3DSpecularMaterialPassClass() : m_key(this)
+	W3DSpecularMaterialPassClass(const MaterialPassClass *key = nullptr, Bool receivesShadow = FALSE) : m_key(key != nullptr ? key : this)
 	{
 		m_lights.count = 0;
 		m_lights.lightsOnly = FALSE;
+		m_lights.receivesShadow = receivesShadow;
 	}
 
-	/// Makes this a copy of key for one object, adding that object's lights.
-	void setObjectLights(const MaterialPassClass *key, const Int *lights, Int count, Bool lightsOnly)
+	/// Makes this a copy of key for one object, adding that object's lights and the shadow receiver's work.
+	void setObjectLights(const MaterialPassClass *key, const Int *lights, Int count, Bool lightsOnly, Bool receivesShadow)
 	{
 		m_key = key;
-		m_lights.count = min(count, (Int)W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS);
+		m_lights.count = count;
+		m_lights.lights.resize(count);
 		for (Int i = 0; i < m_lights.count; i++)
 		{
 			m_lights.lights[i] = lights[i];
 		}
 		m_lights.lightsOnly = lightsOnly;
+		m_lights.receivesShadow = receivesShadow;
 	}
 
 	virtual const MaterialPassClass *Peek_Vertex_Shading_Key() const override
@@ -2744,12 +3241,13 @@ public:
 		CurrentSpecularLights = nullptr;
 	}
 
-	virtual void Install_Polygon_Materials(DX8PolygonRendererClass *renderer) const override
+	virtual void Install_Polygon_Materials(DX8PolygonRendererClass *renderer, MeshClass *mesh = nullptr) const override
 	{
 		DX8TextureCategoryClass *category = renderer->Get_Texture_Category();
 		TextureClass *texture = (category != nullptr) ? category->Peek_Texture(0) : nullptr;
 #if defined(BUILD_WITH_D3D9)
-		specularShader.setTexture(texture);
+		specularShader.setTexture(texture, renderer->Get_Mesh_Model_Class(), mesh != nullptr ? &mesh->Get_Bounding_Box() : nullptr,
+			mesh == nullptr || !mesh->Is_Emission_Disabled(), category != nullptr ? (VertexMaterialClass *)category->Peek_Material() : nullptr);
 #else
 		DX8Wrapper::Set_Texture(0, texture);
 #endif
@@ -2762,6 +3260,9 @@ private:
 };
 
 static W3DSpecularMaterialPassClass SpecularMaterialPass;
+
+// Draws as the shared pass does, so instancing takes it as that pass, while doing the shadow receiver's work too.
+static W3DSpecularMaterialPassClass SpecularReceiveMaterialPass(&SpecularMaterialPass, TRUE);
 
 // Passes carrying one object's lights, handed out again from the start each frame. A pass stays
 // valid until the render that took it has flushed.
@@ -2794,12 +3295,14 @@ void W3DShaderManager::setEmissive(Real intensity)
 
 void W3DShaderManager::setPixelLights(const PixelLight *lights, Int count)
 {
-	PixelLightCount = min(count, (Int)MAX_PIXEL_LIGHT_CANDIDATES);
+	PixelLightCount = count;
+	PixelLights.resize(count);
 	for (Int i = 0; i < PixelLightCount; i++)
 	{
 		PixelLights[i] = lights[i];
 	}
 	ObjectSpecularPassesUsed = 0;
+	Update_Lights_Debug();
 }
 
 Int W3DShaderManager::getPixelLightCount()
@@ -2814,16 +3317,27 @@ const W3DShaderManager::PixelLight &W3DShaderManager::getPixelLight(Int index)
 
 void W3DShaderManager::setDrawPixelLights(const Int *indices, Int count)
 {
+	Set_Additional_Pixel_Lights(0, nullptr, 0, 0, 0, nullptr);
 	if (DrawLitShader == 0)
 	{
 		return;
 	}
 
+	std::vector<Int> groundLights;
 	if (indices == nullptr)
 	{
 		count = min(count, PixelLightCount);
+		for (Int i = 0; i < count; i++)
+		{
+			if (!PixelLights[i].objectsOnly)
+			{
+				groundLights.push_back(i);
+			}
+		}
+		count = (Int)groundLights.size();
+		indices = groundLights.empty() ? nullptr : &groundLights[0];
 	}
-	if (count <= 0 && DrawUnlitShader != 0)
+	if (count <= 0 && DrawUnlitShader != 0 && !Get_Lights_Debug())
 	{
 		DX8Wrapper::Set_Pixel_Shader(DrawUnlitShader);
 		return;
@@ -2833,6 +3347,7 @@ void W3DShaderManager::setDrawPixelLights(const Int *indices, Int count)
 	const Int registers = Pack_Pixel_Lights(constants, MAX_PIXEL_LIGHTS, indices, count, nullptr);
 	DX8Wrapper::Set_Pixel_Shader_Constant(GROUND_POINT_LIGHT_REGISTER, constants, registers);
 	DX8Wrapper::Set_Pixel_Shader(DrawLitShader);
+	Set_Additional_Pixel_Lights(DrawLitShader, indices, count, MAX_PIXEL_LIGHTS, GROUND_POINT_LIGHT_REGISTER, nullptr);
 }
 
 void W3DShaderManager::setTerrainSeabed(TextureClass *classMap, TextureClass *waterMask, TextureClass *painted, const Vector4 *constants)
@@ -2853,16 +3368,18 @@ Bool W3DShaderManager::supportsTerrainSeabed()
 
 void W3DShaderManager::setDrawTerrain(const Int *indices, Int count, Bool seabed)
 {
+	Set_Additional_Pixel_Lights(0, nullptr, 0, 0, 0, nullptr);
 	if (seabed && DrawSeabedUnlitShader != 0)
 	{
 		// Point lights for other draws overwrite the seabed's registers, so they go back each draw.
 		DX8Wrapper::Set_Pixel_Shader_Constant(SEABED_REGISTER, SeabedConstants, SEABED_CONSTANTS);
-		if (count > 0 && DrawLitShader != 0 && DrawSeabedLitShader != 0)
+		if ((count > 0 || Get_Lights_Debug()) && DrawLitShader != 0 && DrawSeabedLitShader != 0)
 		{
 			Vector4 constants[PIXEL_LIGHT_REGISTERS];
 			const Int registers = Pack_Pixel_Lights(constants, SEABED_PIXEL_LIGHTS, indices, count, nullptr);
 			DX8Wrapper::Set_Pixel_Shader_Constant(GROUND_POINT_LIGHT_REGISTER, constants, registers);
 			DX8Wrapper::Set_Pixel_Shader(DrawSeabedLitShader);
+			Set_Additional_Pixel_Lights(DrawSeabedLitShader, indices, count, SEABED_PIXEL_LIGHTS, GROUND_POINT_LIGHT_REGISTER, nullptr);
 		}
 		else
 		{
@@ -2881,12 +3398,54 @@ void W3DShaderManager::setDrawTerrain(const Int *indices, Int count, Bool seabed
 	}
 }
 
+void W3DShaderManager::filterPixelLights(const AABoxClass &box, std::vector<Int> &lights)
+{
+	size_t kept = 0;
+	for (size_t i = 0; i < lights.size(); i++)
+	{
+		const PixelLight &light = PixelLights[lights[i]];
+		const Real dx = max((Real)fabs(light.position.X - box.Center.X) - box.Extent.X, 0.0f);
+		const Real dy = max((Real)fabs(light.position.Y - box.Center.Y) - box.Extent.Y, 0.0f);
+		const Real dz = max((Real)fabs(light.position.Z - box.Center.Z) - box.Extent.Z, 0.0f);
+		if (dx * dx + dy * dy + dz * dz < light.outerRadius * light.outerRadius)
+		{
+			lights[kept++] = lights[i];
+		}
+	}
+	lights.resize(kept);
+}
+
+Int W3DShaderManager::pickPixelLights(const AABoxClass &box, std::vector<Int> &lights)
+{
+	lights.clear();
+	for (Int index = 0; index < PixelLightCount; index++)
+	{
+		const PixelLight &light = PixelLights[index];
+		if (light.objectsOnly)
+		{
+			continue;
+		}
+		const Real dx = max((Real)fabs(light.position.X - box.Center.X) - box.Extent.X, 0.0f);
+		const Real dy = max((Real)fabs(light.position.Y - box.Center.Y) - box.Extent.Y, 0.0f);
+		const Real dz = max((Real)fabs(light.position.Z - box.Center.Z) - box.Extent.Z, 0.0f);
+		if (dx * dx + dy * dy + dz * dz < light.outerRadius * light.outerRadius)
+		{
+			lights.push_back(index);
+		}
+	}
+	return (Int)lights.size();
+}
+
 Int W3DShaderManager::pickPixelLights(const AABoxClass &box, Int *lights)
 {
 	Int count = 0;
 	for (Int index = 0; index < PixelLightCount && count < MAX_PIXEL_LIGHTS; index++)
 	{
 		const PixelLight &light = PixelLights[index];
+		if (light.objectsOnly)
+		{
+			continue;
+		}
 		const Real dx = max((Real)fabs(light.position.X - box.Center.X) - box.Extent.X, 0.0f);
 		const Real dy = max((Real)fabs(light.position.Y - box.Center.Y) - box.Extent.Y, 0.0f);
 		const Real dz = max((Real)fabs(light.position.Z - box.Center.Z) - box.Extent.Z, 0.0f);
@@ -2913,19 +3472,24 @@ Bool W3DShaderManager::supportsUnitPixelLights()
 	return UnitPixelLightsLoaded;
 }
 
-void W3DShaderManager::setTerrainTextureFilter(Int stage, Bool bilinearMipLinear)
+// Returns the device caps when the player picked anisotropic filtering, else null.
+static const D3DCAPS8 *Anisotropic_Caps()
 {
-	const Bool linear = TheGlobalData && (TheGlobalData->m_bilinearTerrainTex || TheGlobalData->m_trilinearTerrainTex);
-	const Bool trilinear = TheGlobalData && TheGlobalData->m_trilinearTerrainTex;
-	DWORD minFilter = linear ? D3DTEXF_LINEAR : D3DTEXF_POINT;
-	DWORD magFilter = minFilter;
-	DWORD mipFilter = (trilinear || bilinearMipLinear) ? D3DTEXF_LINEAR : D3DTEXF_POINT;
-
-	// The player's anisotropy wins over the mod's settings per capability, as TextureFilterClass decides stage 0.
 	const DX8Caps *caps = DX8Wrapper::Get_Current_Caps();
-	if (WW3D::Get_Texture_Filter() == TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC && caps != nullptr)
+	if (WW3D::Get_Texture_Filter() != TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC || caps == nullptr)
 	{
-		const D3DCAPS8 &d3dCaps = caps->Get_DX8_Caps();
+		return nullptr;
+	}
+	return &caps->Get_DX8_Caps();
+}
+
+// The player's anisotropy wins over the given filters per capability, as TextureFilterClass decides stage 0.
+static void Set_Stage_Filter(Int stage, DWORD minFilter, DWORD magFilter, DWORD mipFilter)
+{
+	const D3DCAPS8 *anisotropicCaps = Anisotropic_Caps();
+	if (anisotropicCaps != nullptr)
+	{
+		const D3DCAPS8 &d3dCaps = *anisotropicCaps;
 		if (d3dCaps.TextureFilterCaps & D3DPTFILTERCAPS_MINFANISOTROPIC)
 		{
 			minFilter = D3DTEXF_ANISOTROPIC;
@@ -2951,6 +3515,14 @@ void W3DShaderManager::setTerrainTextureFilter(Int stage, Bool bilinearMipLinear
 	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_MINFILTER, minFilter);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_MAGFILTER, magFilter);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_MIPFILTER, mipFilter);
+}
+
+void W3DShaderManager::setTerrainTextureFilter(Int stage, Bool bilinearMipLinear)
+{
+	const Bool linear = TheGlobalData && (TheGlobalData->m_bilinearTerrainTex || TheGlobalData->m_trilinearTerrainTex);
+	const Bool trilinear = TheGlobalData && TheGlobalData->m_trilinearTerrainTex;
+	const DWORD filter = linear ? D3DTEXF_LINEAR : D3DTEXF_POINT;
+	Set_Stage_Filter(stage, filter, filter, (trilinear || bilinearMipLinear) ? D3DTEXF_LINEAR : D3DTEXF_POINT);
 }
 
 Bool W3DShaderManager::supportsTerrainHeightBlend()
@@ -3022,6 +3594,15 @@ TextureClass *W3DShaderManager::findNormalMap(TextureClass *texture)
 #endif
 }
 
+TextureClass *W3DShaderManager::findEmissiveMap(TextureClass *texture)
+{
+#if defined(BUILD_WITH_D3D9)
+	return texture != nullptr ? Find_Emissive_Map(texture) : nullptr;
+#else
+	return nullptr;
+#endif
+}
+
 Int W3DShaderManager::takeTerrainBumpCount()
 {
 	const Int count = TerrainBumpCount;
@@ -3058,20 +3639,43 @@ MaterialPassClass *W3DShaderManager::getSpecularPass()
 	return &SpecularMaterialPass;
 }
 
-MaterialPassClass *W3DShaderManager::getSpecularPass(const Int *lights, Int lightCount, Bool lightsOnly)
+MaterialPassClass *W3DShaderManager::getSpecularPass(const Int *lights, Int lightCount, Bool lightsOnly, Bool &receivesShadow)
 {
-	if (W3DShadersPassCount[ST_SPECULAR] == 0 || !UnitPixelLightsLoaded || lightCount <= 0)
+	if (W3DShadersPassCount[ST_SPECULAR] == 0 || !UnitPixelLightsLoaded || (lightCount <= 0 && !Get_Lights_Debug()))
 	{
-		return lightsOnly ? nullptr : getSpecularPass();
+		if (lightsOnly || getSpecularPass() == nullptr)
+		{
+			receivesShadow = FALSE;
+			return nullptr;
+		}
+		return receivesShadow ? &SpecularReceiveMaterialPass : &SpecularMaterialPass;
 	}
 
+	// The lit shaders have no constants left for the receiver's work.
+	receivesShadow = FALSE;
 	if (ObjectSpecularPassesUsed == ObjectSpecularPasses.size())
 	{
 		ObjectSpecularPasses.push_back(NEW_REF(W3DSpecularMaterialPassClass, ()));
 	}
 	W3DSpecularMaterialPassClass *pass = ObjectSpecularPasses[ObjectSpecularPassesUsed++];
-	pass->setObjectLights(&SpecularMaterialPass, lights, lightCount, lightsOnly);
+	pass->setObjectLights(&SpecularMaterialPass, lights, lightCount, lightsOnly, FALSE);
 	return pass;
+}
+
+Bool W3DShaderManager::canSpecularReceiveShadow()
+{
+#if defined(BUILD_WITH_D3D9)
+	if (!SpecularReceiveLoaded || TheW3DShadowMap == nullptr)
+	{
+		return FALSE;
+	}
+	// The pass scales by one value, so a tinted shadow keeps the receiver's own pass.
+	const Vector4 color = TheW3DShadowMap->getReceiverColor();
+	const Real tolerance = 0.5f / 255.0f;
+	return fabs(color.X - color.Y) <= tolerance && fabs(color.Y - color.Z) <= tolerance;
+#else
+	return FALSE;
+#endif
 }
 
 const MaterialPassClass *W3DShaderManager::getSpecularPassKey()
@@ -3164,7 +3768,15 @@ public:
 	TerrainShaderPixelShader() : m_shadowStage(-1), m_bumpStage(-1), m_lightStage(-1), m_seabedStage(-1), m_glintStage(-1)
 	{
 		m_dwPlainPixelShader[0] = m_dwPlainPixelShader[1] = m_dwPlainPixelShader[2] = 0;
+#if defined(RTS_ZEROHOUR)
+		m_dwEmissivePixelShader[0] = m_dwEmissivePixelShader[1] = 0;
+#endif
 	}
+
+#if defined(RTS_ZEROHOUR)
+	DWORD m_dwEmissivePixelShader[2];
+	Bool setEmissive();
+#endif
 
 private:
 	DWORD					m_dwBasePixelShader;	///<handle to terrain D3D pixel shader
@@ -3584,6 +4196,16 @@ Int TerrainShaderPixelShader::shutdown()
 		m_dwPlainPixelShader[i]=0;
 	}
 	TerrainHeightBlendLoaded = FALSE;
+#if defined(RTS_ZEROHOUR)
+	for (Int i=0; i<2; i++)
+	{
+		if (m_dwEmissivePixelShader[i] != 0)
+		{
+			DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_dwEmissivePixelShader[i]);
+			m_dwEmissivePixelShader[i] = 0;
+		}
+	}
+#endif
 
 	for (Int i=0; i<3; i++)
 	{
@@ -3915,7 +4537,7 @@ void TerrainShaderPixelShader::initPixelLights()
 Bool TerrainShaderPixelShader::setPixelLights(Int noiseCount, Bool shadowed, Bool bumped, Bool positioned, DWORD unlit)
 {
 	const DWORD shader = m_dwLitPixelShader[bumped ? 1 : 0][shadowed ? 1 : 0][noiseCount];
-	if (!TerrainPixelLightsLoaded || PixelLightCount == 0 || shader == 0 || unlit == 0)
+	if (!TerrainPixelLightsLoaded || (PixelLightCount == 0 && !Get_Lights_Debug()) || shader == 0 || unlit == 0)
 	{
 		return FALSE;
 	}
@@ -4117,6 +4739,13 @@ Int TerrainShaderPixelShader::init()
 			initPixelLights();
 			initSeabed();
 			initGlint();
+#if defined(BUILD_WITH_D3D9) && defined(RTS_ZEROHOUR)
+			if (Supports_Pixel_Shader_2_a(DX8Wrapper::Get_Current_Caps()))
+			{
+				W3DShaderManager::LoadAndCreateD3DShader("shaders\\terrainemissive.pso", nullptr, 0, false, &m_dwEmissivePixelShader[0]);
+				W3DShaderManager::LoadAndCreateD3DShader("shaders\\terrainemissiveseabed.pso", nullptr, 0, false, &m_dwEmissivePixelShader[1]);
+			}
+#endif
 
 			W3DShaders[W3DShaderManager::ST_TERRAIN_BASE]=&terrainShaderPixelShader;
 			W3DShaders[W3DShaderManager::ST_TERRAIN_BASE_NOISE1]=&terrainShaderPixelShader;
@@ -4131,6 +4760,62 @@ Int TerrainShaderPixelShader::init()
 	}
 	return FALSE;
 }
+
+#if defined(RTS_ZEROHOUR)
+Bool W3DShaderManager::setTerrainEmissive()
+{
+	return terrainShaderPixelShader.setEmissive();
+}
+
+Bool TerrainShaderPixelShader::setEmissive()
+{
+#if defined(BUILD_WITH_D3D9)
+	if (m_dwEmissivePixelShader[0] == 0 || ShaderClass::Is_Backface_Culling_Inverted())
+	{
+		return FALSE;
+	}
+	const Real intensity = Bind_Terrain_Emissive(TRUE);
+	if (intensity <= 0.0f)
+	{
+		return FALSE;
+	}
+	TextureClass *atlas = W3DShaderManager::getShaderTexture(W3DShaderManager::TERRAIN_EMISSIVE_TEXTURE);
+	DX8Wrapper::Set_Texture(0, atlas);
+	DX8Wrapper::Set_Texture(1, atlas);
+	DX8Wrapper::Apply_Render_State_Changes();
+	for (Int stage=0; stage<2; stage++)
+	{
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, stage);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+		DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+		W3DShaderManager::setTerrainTextureFilter(stage, stage != 0);
+	}
+	Vector4 height = Bind_Height_Blend(W3DShaderManager::getShaderTexture(W3DShaderManager::TERRAIN_HEIGHT_TEXTURE));
+	height.W = intensity;
+	DX8Wrapper::Set_Pixel_Shader_Constant(TERRAIN_HEIGHT_BLEND_REGISTER, &height, 1);
+	End_Draw_Pixel_Lights();
+	if (m_dwEmissivePixelShader[1] != 0)
+	{
+		setSeabed(0, FALSE, FALSE, FALSE, m_dwEmissivePixelShader[0]);
+		if (DrawSeabedUnlitShader != 0)
+		{
+			DrawSeabedUnlitShader = m_dwEmissivePixelShader[1];
+			DrawSeabedLitShader = 0;
+		}
+	}
+	DX8Wrapper::Set_Pixel_Shader(m_dwEmissivePixelShader[0]);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZWRITEENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZFUNC, D3DCMP_EQUAL);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE, TRUE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_ONE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_ONE);
+	return TRUE;
+#else
+	return FALSE;
+#endif
+}
+#endif
 
 Int TerrainShaderPixelShader::set(Int pass)
 {
@@ -4324,6 +5009,7 @@ void TerrainShaderPixelShader::reset()
 	m_glintStage = -1;
 	Unbind_Glint_Maps();
 
+	Bind_Terrain_Emissive(FALSE);
 	End_Draw_Pixel_Lights();
 	Unbind_Height_Atlas();
 
@@ -4422,8 +5108,8 @@ void CloudTextureShader::reset()
 	DX8Wrapper::Set_DX8_Texture_Stage_State( m_stageOfSet, D3DTSS_ALPHAOP,   D3DTOP_DISABLE );
 }
 
-// Projects the terrain's cloud map onto a pixel shader receiver, the way the terrain samples it.
-static Bool bindCloudReceiver(Int stage)
+// Binds the cloud map to stage and gives the mapping from camera space onto it.
+static Bool bindCloudTexture(Int stage, D3DMATRIX &cameraToCloud)
 {
 	TextureClass *cloudTexture = (TheTerrainRenderObject != nullptr) ? TheTerrainRenderObject->getCloudTexture() : nullptr;
 	if (cloudTexture == nullptr)
@@ -4449,8 +5135,18 @@ static Bool bindCloudReceiver(Int stage)
 	float det;
 	Invert_D3DMATRIX(inverseView, &det, view);
 
+	terrainShader2Stage.updateNoise1(&cameraToCloud, &inverseView, false);
+	return TRUE;
+}
+
+// Projects the terrain's cloud map onto a fixed-function receiver, the way the terrain samples it.
+static Bool bindCloudReceiver(Int stage)
+{
 	D3DMATRIX textureTransform;
-	terrainShader2Stage.updateNoise1(&textureTransform, &inverseView, false);
+	if (!bindCloudTexture(stage, textureTransform))
+	{
+		return FALSE;
+	}
 
 	DX8Wrapper::_Set_DX8_Transform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + stage), textureTransform);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
@@ -4710,9 +5406,10 @@ Bool RoadShaderPixelShader::setPixelPath()
 
 	TextureClass *heights = W3DShaderManager::getShaderTexture(W3DShaderManager::TERRAIN_HEIGHT_TEXTURE);
 	const Bool heightBlend = RoadHeightBlendTiles && groundCapable && heights != nullptr && heights->Peek_D3D_Texture() != nullptr;
+	const Real emissive = Bind_Terrain_Emissive(RoadHeightBlendTiles);
 
 	Bool shadowed = (m_dwShadowPixelShader[noiseCount] != 0 && TheW3DShadowMap != nullptr && TheW3DShadowMap->hasDepth());
-	const Bool lightable = (RoadPixelLightsLoaded && PixelLightCount > 0);
+	const Bool lightable = (RoadPixelLightsLoaded && (PixelLightCount > 0 || Get_Lights_Debug()));
 	const Bool lightMapReplaced = (anyLightMap && groundCapable);
 	const Bool glintable = Terrain_Glint_Wanted();
 
@@ -4735,8 +5432,9 @@ Bool RoadShaderPixelShader::setPixelPath()
 	}
 	const Bool derivable = (slopeMap != nullptr && slopeMap->Peek_D3D_Texture() != nullptr);
 
-	if (!shadowed && !lightable && !lightMapReplaced && !heightBlend && !glintable && !bumpable && !derivable)
+	if (!shadowed && !lightable && !lightMapReplaced && !heightBlend && !glintable && !bumpable && !derivable && !emissive)
 	{
+		Bind_Terrain_Emissive(FALSE);
 		return FALSE;
 	}
 
@@ -4757,14 +5455,14 @@ Bool RoadShaderPixelShader::setPixelPath()
 		(!lightable || m_dwLitBumpPixelShader[shadowed ? 1 : 0][noiseCount] != 0);
 	const Bool derived = derivable && m_dwDerivedPixelShader[shadowed ? 1 : 0][noiseCount] != 0 &&
 		(!lightable || m_dwLitDerivedPixelShader[shadowed ? 1 : 0][noiseCount] != 0);
-	if (!shadowed && !lightable && !lightMapReplaced && !heightBlend && !glint && !bump && !derived)
+	if (!shadowed && !lightable && !lightMapReplaced && !heightBlend && !glint && !bump && !derived && !emissive)
 	{
 		return FALSE;
 	}
 
-	// Roads get the constants that leave their alpha alone. The unused w tells the bump the terrain atlas's layout.
+	// The fourth component is 1 plus glow brightness for terrain blend tiles, or 0 for roads.
 	Vector4 heightConstants = Bind_Height_Blend(heightBlend ? heights : nullptr);
-	heightConstants.W = RoadHeightBlendTiles ? 1.0f : 0.0f;
+	heightConstants.W = RoadHeightBlendTiles ? 1.0f + emissive : 0.0f;
 	if (derived)
 	{
 		// The derived bump leaves alpha alone without the register, so it holds the rise and the slope map's scales.
@@ -4788,6 +5486,11 @@ Bool RoadShaderPixelShader::setPixelPath()
 	if (RoadHeightBlendTiles)
 	{
 		W3DShaderManager::setTerrainTextureFilter(0, FALSE);
+	}
+	else if (Anisotropic_Caps() != nullptr)
+	{
+		// Anisotropic filtering needs linear mips, or the road bands where its mips change.
+		Set_Stage_Filter(0, D3DTEXF_LINEAR, D3DTEXF_LINEAR, D3DTEXF_LINEAR);
 	}
 	else
 	{
@@ -4874,9 +5577,7 @@ Bool RoadShaderPixelShader::setPixelPath()
 		DX8Wrapper::Set_DX8_Texture_Stage_State(m_normalStage, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
 		DX8Wrapper::Set_DX8_Texture_Stage_State(m_normalStage, D3DTSS_ADDRESSU, address);
 		DX8Wrapper::Set_DX8_Texture_Stage_State(m_normalStage, D3DTSS_ADDRESSV, address);
-		DX8Wrapper::Set_DX8_Texture_Stage_State(m_normalStage, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
-		DX8Wrapper::Set_DX8_Texture_Stage_State(m_normalStage, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
-		DX8Wrapper::Set_DX8_Texture_Stage_State(m_normalStage, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
+		Set_Stage_Filter(m_normalStage, D3DTEXF_LINEAR, D3DTEXF_LINEAR, D3DTEXF_LINEAR);
 		++RoadBumpCount;
 	}
 	if (lightable)
@@ -4964,6 +5665,10 @@ Int RoadShaderPixelShader::set(Int pass)
 	{	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_MIPFILTER, D3DTEXF_POINT);
 		DX8Wrapper::Set_DX8_Texture_Stage_State(1, D3DTSS_MIPFILTER, D3DTEXF_POINT);
 	}
+	if (Anisotropic_Caps() != nullptr)
+	{
+		Set_Stage_Filter(0, D3DTEXF_LINEAR, D3DTEXF_LINEAR, D3DTEXF_LINEAR);
+	}
 
 	DX8Wrapper::Set_DX8_Texture_Stage_State(1,  D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
 	// Two output coordinates are used.
@@ -5022,6 +5727,7 @@ void RoadShaderPixelShader::reset()
 	m_normalStage = -1;
 	if (m_pixelPath)
 	{
+		Bind_Terrain_Emissive(FALSE);
 		Unbind_Height_Atlas();
 		Unbind_Glint_Maps();
 	}
@@ -5231,6 +5937,9 @@ void RoadShader2Stage::reset()
 #if defined(BUILD_WITH_D3D9)
 static DWORD InstancedMainShader = 0;	///<main scene meshes and their passes drawn in groups; the scene draws without it.
 static DWORD SkinnedMainShader = 0;	///<main scene skins and their passes deformed on the GPU; the scene draws without it.
+#if defined(RTS_ZEROHOUR)
+static DWORD ParticleBillboardShader = 0;
+#endif
 #endif
 
 W3DShaderInterface **MasterShaderList[]=
@@ -5375,6 +6084,12 @@ void W3DShaderManager::init()
 	{
 		SkinnedMainShader = 0;
 	}
+#if defined(RTS_ZEROHOUR)
+	if (SUCCEEDED(Load_Vertex_Shading_Shader("shaders\\particlebillboard.vso", &ParticleBillboardShader)))
+	{
+		PointGroupClass::Set_Billboard_Shader(Peek_D3D9_Vertex_Shader(ParticleBillboardShader));
+	}
+#endif
 #endif
 
 	W3DFilterInterface **filters;
@@ -5397,6 +6112,17 @@ void W3DShaderManager::init()
 //=============================================================================
 void W3DShaderManager::shutdown()
 {
+#if defined(BUILD_WITH_D3D9)
+	DX8Wrapper::Set_Additional_Pass_Callback(nullptr);
+	for (std::map<DWORD, AdditionalLightShaders>::iterator it = AdditionalShaders.begin(); it != AdditionalShaders.end(); ++it)
+	{
+		Set_D3D9_Shader_Name(it->second.normal, nullptr);
+		SAFE_RELEASE(it->second.normal);
+		Set_D3D9_Shader_Name(it->second.debug, nullptr);
+		SAFE_RELEASE(it->second.debug);
+	}
+	AdditionalShaders.clear();
+#endif
 	SAFE_RELEASE(m_newRenderSurface);
 	SAFE_RELEASE(m_renderTexture);
 	SAFE_RELEASE(m_oldRenderSurface);
@@ -5430,6 +6156,14 @@ void W3DShaderManager::shutdown()
 	W3DSlopeMap::releaseResources();
 
 #if defined(BUILD_WITH_D3D9)
+#if defined(RTS_ZEROHOUR)
+	PointGroupClass::Set_Billboard_Shader(nullptr);
+	if (ParticleBillboardShader != 0)
+	{
+		DX8_DELETE_VERTEX_SHADER(DX8Wrapper::_Get_D3D_Device8(), ParticleBillboardShader);
+		ParticleBillboardShader = 0;
+	}
+#endif
 	DX8InstancingClass::Set_Main_Shader(nullptr);
 	if (InstancedMainShader != 0)
 	{
@@ -5549,18 +6283,19 @@ void W3DShaderManager::drawViewport(Int color)
 	TheTacticalView->getOrigin(&xpos,&ypos);
 	width=TheTacticalView->getWidth();
 	height=TheTacticalView->getHeight();
+	const Real targetScale = W3DShaderManager::getScreenToTargetScale();
 
 	//bottom right
-	v[0].p = Vector4( xpos+width-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[0].p = Vector4( (xpos+width)*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[0].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[0].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	//top right
-	v[1].p = Vector4( xpos+width-0.5f, ypos-0.5f, 0.0f, 1.0f );
+	v[1].p = Vector4( (xpos+width)*targetScale-0.5f, ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[1].u = (Real)(xpos+width)/(Real)TheDisplay->getWidth();	v[1].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	//bottom left
-	v[2].p = Vector4(  xpos-0.5f, ypos+height-0.5f, 0.0f, 1.0f );
+	v[2].p = Vector4(  xpos*targetScale-0.5f, (ypos+height)*targetScale-0.5f, 0.0f, 1.0f );
 	v[2].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[2].v = (Real)(ypos+height)/(Real)TheDisplay->getHeight();
 	//top left
-	v[3].p = Vector4(  xpos-0.5f,  ypos-0.5f, 0.0f, 1.0f );
+	v[3].p = Vector4(  xpos*targetScale-0.5f,  ypos*targetScale-0.5f, 0.0f, 1.0f );
 	v[3].u = (Real)(xpos)/(Real)TheDisplay->getWidth();	v[3].v = (Real)(ypos)/(Real)TheDisplay->getHeight();
 	v[0].color = color;
 	v[1].color = color;
@@ -5714,6 +6449,15 @@ Bool W3DShaderManager::copyRenderTarget(IDirect3DTexture8 *&copy)
 	(void)copy;
 	return FALSE;
 #endif
+}
+
+Real W3DShaderManager::getScreenToTargetScale()
+{
+	int targetWidth, targetHeight, deviceWidth, deviceHeight, bits;
+	bool windowed;
+	WW3D::Get_Render_Target_Resolution(targetWidth, targetHeight, bits, windowed);
+	WW3D::Get_Device_Resolution(deviceWidth, deviceHeight, bits, windowed);
+	return (deviceWidth > 0) ? (Real)targetWidth / (Real)deviceWidth : 1.0f;
 }
 
 Vector4 W3DShaderManager::getClipToTargetMapping(Real width, Real height)
@@ -5918,6 +6662,8 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 
 		const DWORD* pShader = (const DWORD*)pData;
 
+		do
+		{
 #if defined(BUILD_WITH_D3D9)
 			// D3D9 separates the declaration from the shader and hands back COM objects,
 			// so both go into the table the DWORD handle indexes.
@@ -5931,7 +6677,7 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 					hr = DX8Wrapper::_Get_D3D_Device8()->CreateVertexShader(pShader, &vertex_shader);
 					if (SUCCEEDED(hr))
 					{
-						*pHandle = Register_D3D9_Vertex_Shader(vertex_shader, declaration);
+						*pHandle = Register_D3D9_Vertex_Shader(vertex_shader, declaration, strFilePath);
 						if (*pHandle == 0)
 						{
 							vertex_shader->Release();
@@ -5951,11 +6697,16 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 				hr = DX8Wrapper::_Get_D3D_Device8()->CreatePixelShader(pShader, &pixel_shader);
 				if (SUCCEEDED(hr))
 				{
-					*pHandle = Register_D3D9_Pixel_Shader(pixel_shader);
+					*pHandle = Register_D3D9_Pixel_Shader(pixel_shader, strFilePath);
 					if (*pHandle == 0)
 					{
 						pixel_shader->Release();
 						hr = E_OUTOFMEMORY;
+					}
+					else
+					{
+						Attach_Lights_Debug_Twin(strFilePath, *pHandle);
+						Attach_Additional_Light_Shaders(strFilePath, *pHandle);
 					}
 				}
 			}
@@ -5969,6 +6720,19 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 				hr = DX8Wrapper::_Get_D3D_Device8()->CreatePixelShader(pShader, pHandle);
 			}
 #endif
+
+#if defined(BUILD_WITH_D3D9)
+			if (FAILED(hr) && pFileData != nullptr && Find_Embedded_Shader(strFilePath, pData, dwSize))
+			{
+				HeapFree(GetProcessHeap(), 0, pFileData);
+				pFileData = nullptr;
+				pShader = (const DWORD*)pData;
+				RENDER_LOG(("LoadAndCreateD3DShader: rejected file %s, hr=0x%08X, retrying the embedded copy", strFilePath, hr));
+				continue;
+			}
+#endif
+			break;
+		} while (true);
 
 		if (pFileData)
 		{
@@ -5999,49 +6763,18 @@ HRESULT W3DShaderManager::LoadAndCreateD3DShader(const char* strFilePath, const 
 #define MIN_ACCEPTED_TEXTURE_MEMORY	(1024*1024*30)	//30 MB
 
 /**Hack to give gameengine access to this function*/
-Bool testMinimumRequirements(ChipsetType *videoChipType, CpuType *cpuType, Int *cpuFreq, MemValueType *numRAM, Real *intBenchIndex, Real *floatBenchIndex, Real *memBenchIndex)
+Bool testMinimumRequirements(ChipsetType *videoChipType, MemValueType *numRAM)
 {
-	return W3DShaderManager::testMinimumRequirements(videoChipType,cpuType,cpuFreq,numRAM,intBenchIndex,floatBenchIndex,memBenchIndex);
+	return W3DShaderManager::testMinimumRequirements(videoChipType,numRAM);
 }
 
-Bool W3DShaderManager::testMinimumRequirements(ChipsetType *videoChipType, CpuType *cpuType, Int *cpuFreq, MemValueType *numRAM, Real *intBenchIndex, Real *floatBenchIndex, Real *memBenchIndex)
+Bool W3DShaderManager::testMinimumRequirements(ChipsetType *videoChipType, MemValueType *numRAM)
 {
 	if (videoChipType)
 		*videoChipType = getChipset();
 
-	if (cpuType)
-	{
-		*cpuType = XX;	//unknown
-
-		//Check if it's an Athlon
-		if (CPUDetectClass::Get_Processor_Manufacturer() == CPUDetectClass::MANUFACTURER_AMD &&
-				CPUDetectClass::Get_AMD_Processor() >= CPUDetectClass::AMD_PROCESSOR_ATHLON_025)
-				*cpuType = K7;
-
-		//Check if it's a P3
-		if (CPUDetectClass::Get_Processor_Manufacturer() == CPUDetectClass::MANUFACTURER_INTEL &&
-				CPUDetectClass::Get_Intel_Processor() >= CPUDetectClass::INTEL_PROCESSOR_PENTIUM_III_MODEL_7)
-				*cpuType = P3;
-		//Check if it's a P4
-		if (CPUDetectClass::Get_Processor_Manufacturer() == CPUDetectClass::MANUFACTURER_INTEL &&
-				CPUDetectClass::Get_Intel_Processor() >= CPUDetectClass::INTEL_PROCESSOR_PENTIUM4)
-				*cpuType = P4;
-	}
-
-	if (cpuFreq)
-		*cpuFreq=CPUDetectClass::Get_Processor_Speed();
-
 	if (numRAM)
 		*numRAM=CPUDetectClass::Get_Total_Physical_Memory();
-
-	if (intBenchIndex && floatBenchIndex && memBenchIndex)
-	{
-		// TheSuperHackers @tweak Aliendroid1 19/06/2025 Legacy benchmarking code was removed.
-		// Since modern hardware always meets the minimum requirements, we preset the benchmark "results" to a high value.
-		*intBenchIndex = 10.0f;
-		*floatBenchIndex = 10.0f;
-		*memBenchIndex = 10.0f;
-	}
 
 	return TRUE;
 }
@@ -6652,7 +7385,7 @@ Int FlatTerrainShaderPixelShader::set(Int pass)
 
 	// Each tile then picks its lights. The world position goes on the first stage past the textures,
 	// which is 2 when only the terrain on stage 1 is read.
-	if (FlatPixelLightsLoaded && PixelLightCount > 0)
+	if (FlatPixelLightsLoaded && (PixelLightCount > 0 || Get_Lights_Debug()))
 	{
 		const Int textureCount = (curStage < 2) ? 1 : curStage;
 		const DWORD unlitShaders[4] = { m_dwBase0PixelShader, m_dwBasePixelShader, m_dwBaseNoise1PixelShader, m_dwBaseNoise2PixelShader };

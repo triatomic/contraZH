@@ -27,6 +27,7 @@
 // Author: Michael S. Booth, January 2002
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include <algorithm>
 
 #include "Common/ActionManager.h"
 #include "Common/BuildAssistant.h"
@@ -61,6 +62,7 @@
 #include "GameLogic/Module/SupplyTruckAIUpdate.h"
 #include "GameLogic/Module/SpecialPowerUpdateModule.h"
 #include "GameLogic/ObjectIter.h"
+#include "GameLogic/LineFormation.h"
 #include "GameLogic/PartitionManager.h"
 
 
@@ -559,17 +561,102 @@ void AIGroup::computeIndividualDestination( Coord3D *dest, const Coord3D *groupD
 
 	AIUpdateInterface *ai = obj->getAIUpdateInterface();
 	if (ai && ai->isDoingGroundMovement()) {
+		Bool adjusted;
 		if (isFormation) {
-			TheAI->pathfinder()->adjustDestination(obj, ai->getLocomotorSet(), dest, nullptr);
+			adjusted = TheAI->pathfinder()->adjustDestination(obj, ai->getLocomotorSet(), dest, nullptr);
 		}	else {
-			TheAI->pathfinder()->adjustDestination(obj, ai->getLocomotorSet(), dest, groupDest);
+			adjusted = TheAI->pathfinder()->adjustDestination(obj, ai->getLocomotorSet(), dest, groupDest);
 		}
-		TheAI->pathfinder()->updateGoal(obj, dest, LAYER_GROUND);
+		if (!adjusted) {
+			// Nothing free within the spiral, so at least land on a cell no parked unit holds
+			TheAI->pathfinder()->snapClosestGoalPosition(obj, dest);
+		}
+		TheAI->pathfinder()->updateGoal(obj, dest, layer);
 	}
 
 }
 
 static const Int PATH_DIAMETER_IN_CELLS = 6;
+
+// Hands the unit the slot assignGroupSlots gave it, if it got one
+static Bool takeAssignedSlot(const std::vector<PathfindSlotRequest>& requests, const Object *obj, Coord3D *dest)
+{
+	for (size_t i = 0; i < requests.size(); i++)
+	{
+		if (requests[i].obj == obj && requests[i].assigned)
+		{
+			*dest = requests[i].slot;
+			return true;
+		}
+	}
+	return false;
+}
+
+static void addSlotRequest(std::vector<PathfindSlotRequest>& requests, Object *obj, const Coord3D *pos)
+{
+	const LocomotorSurfaceTypeMask surfaces = obj->getAIUpdateInterface()->getLocomotorSet().getValidSurfaces();
+	if (!(surfaces & LOCOMOTORSURFACE_GROUND) || (surfaces & (LOCOMOTORSURFACE_WATER | LOCOMOTORSURFACE_CLIFF | LOCOMOTORSURFACE_AIR)))
+	{
+		return;
+	}
+	PathfindSlotRequest request;
+	request.obj = obj;
+	request.projection = 0.0f;
+	request.slot = *pos;
+	request.assigned = false;
+	requests.push_back(request);
+}
+
+// A unit joins a column only when its route passes within this reach, else the far half of a split group gets dragged to the leader
+static const Int COLUMN_JOIN_CELLS = 6;
+static const Real COLUMN_JOIN_FRACTION = 0.25f;
+
+static Bool columnPassesNear(Path *path, const Coord3D *unitPos)
+{
+	Real total = 0.0f;
+	for (PathNode *node = path->getFirstNode(); node && node->getNextOptimized(); node = node->getNextOptimized())
+	{
+		Coord2D seg;
+		seg.x = node->getNextOptimized()->getPosition()->x - node->getPosition()->x;
+		seg.y = node->getNextOptimized()->getPosition()->y - node->getPosition()->y;
+		total += seg.length();
+	}
+
+	Real bestDistSqr = -1.0f;
+	Real bestRemaining = 0.0f;
+	Real done = 0.0f;
+	for (PathNode *node = path->getFirstNode(); node; node = node->getNextOptimized())
+	{
+		const Coord3D *a = node->getPosition();
+		PathNode *nextNode = node->getNextOptimized();
+		Coord2D seg;
+		seg.x = 0.0f;
+		seg.y = 0.0f;
+		Real segLen = 0.0f;
+		if (nextNode)
+		{
+			seg.x = nextNode->getPosition()->x - a->x;
+			seg.y = nextNode->getPosition()->y - a->y;
+			segLen = seg.length();
+		}
+		Real t = 0.0f;
+		if (segLen > 0.0f)
+		{
+			t = ((unitPos->x - a->x)*seg.x + (unitPos->y - a->y)*seg.y) / (segLen*segLen);
+			t = MIN(1.0f, MAX(0.0f, t));
+		}
+		Real distSqr = sqr(unitPos->x - (a->x + seg.x*t)) + sqr(unitPos->y - (a->y + seg.y*t));
+		if (bestDistSqr < 0.0f || distSqr < bestDistSqr)
+		{
+			bestDistSqr = distSqr;
+			bestRemaining = total - (done + segLen*t);
+		}
+		done += segLen;
+	}
+
+	Real reach = MAX(COLUMN_JOIN_FRACTION * bestRemaining, COLUMN_JOIN_CELLS * PATHFIND_CELL_SIZE_F);
+	return bestDistSqr <= reach*reach;
+}
 
 //-------------------------------------------------------------------------------------------------
 // Internal function for moving a group of infantry as a column.
@@ -738,7 +825,7 @@ static void clampToMap(Coord3D *dest, PlayerType pt)
 /**
  * Move to given position(s)
  */
-Bool AIGroup::friend_moveInfantryToPos( const Coord3D *pos, UnsignedInt cmdNode, CommandSourceType cmdSource )
+Bool AIGroup::friend_moveInfantryToPos( const Coord3D *pos, CommandSourceType cmdSource, std::vector<Object *> &columnUnits )
 
 {
 	if (m_groundPath==nullptr) return false;
@@ -835,6 +922,10 @@ Bool AIGroup::friend_moveInfantryToPos( const Coord3D *pos, UnsignedInt cmdNode,
 			controllingPlayerType = (*i)->getControllingPlayer()->getPlayerType();
 		}
 		Coord3D unitPos = *((*i)->getPosition());
+		if (!columnPassesNear(m_groundPath, &unitPos))
+		{
+			continue;
+		}
 		TheAI->pathfinder()->removeGoal(*i);
 		dx = unitPos.x - center.x;
 		dy = unitPos.y - center.y;
@@ -983,6 +1074,12 @@ Bool AIGroup::friend_moveInfantryToPos( const Coord3D *pos, UnsignedInt cmdNode,
 	curIndex = 0;
 	Int columnFactor[5] = {0,0,0,0,0};
 	PathfindLayerEnum layer = TheTerrainLogic->getLayerForDestination(pos);
+	std::vector<PathfindSlotRequest> requests;
+	for (theUnit = iter2->first(); theUnit; theUnit = iter2->next())
+	{
+		addSlotRequest(requests, theUnit, pos);
+	}
+	TheAI->pathfinder()->assignGroupSlots(requests, pos, &center);
 	for (theUnit = iter2->first(); theUnit; theUnit = iter2->next())
 	{
 		AIUpdateInterface *ai = theUnit->getAIUpdateInterface();
@@ -1073,6 +1170,7 @@ Bool AIGroup::friend_moveInfantryToPos( const Coord3D *pos, UnsignedInt cmdNode,
 		dest.x -= factor*offset*endVector.x;
 		dest.y -= factor*offset*endVector.y;
 		dest.z = TheTerrainLogic->getLayerHeight( dest.x, dest.y, layer );
+		Bool hasSlot = takeAssignedSlot(requests, theUnit, &dest);
 
 		while (!path.empty()) {
 			Coord2D curVector;
@@ -1087,9 +1185,11 @@ Bool AIGroup::friend_moveInfantryToPos( const Coord3D *pos, UnsignedInt cmdNode,
 				break;
 			}
 		}
-		clampToMap(&dest, controllingPlayerType);
-		TheAI->pathfinder()->adjustDestination(theUnit, ai->getLocomotorSet(), &dest, nullptr);
-		TheAI->pathfinder()->updateGoal(theUnit, &dest, LAYER_GROUND);
+		if (!hasSlot) {
+			clampToMap(&dest, controllingPlayerType);
+			TheAI->pathfinder()->adjustDestination(theUnit, ai->getLocomotorSet(), &dest, nullptr);
+			TheAI->pathfinder()->updateGoal(theUnit, &dest, layer);
+		}
 		path.push_back(dest);
 		TheCommandSequence->clearObjectCommand(theUnit);
 		TheCommandSequence->includeUnitInTypicalMovingCommand(cmdNode, theUnit, dest);
@@ -1097,6 +1197,7 @@ Bool AIGroup::friend_moveInfantryToPos( const Coord3D *pos, UnsignedInt cmdNode,
 		ai->aiFollowPath( &path, nullptr, cmdSource );
 		if (TheCommandSequence->isStillAwaiting(theUnit))
 			TheCommandSequence->removeCurrentCommand(theUnit, false);
+		columnUnits.push_back(theUnit);
 	}
 	return true;
 }
@@ -1213,7 +1314,7 @@ void AIGroup::friend_moveFormationToPos( const Coord3D *pos, CommandSourceType c
 /**
  * Move to given position(s)
  */
-Bool AIGroup::friend_moveVehicleToPos( const Coord3D *pos, UnsignedInt cmdNode, CommandSourceType cmdSource )
+Bool AIGroup::friend_moveVehicleToPos( const Coord3D *pos, CommandSourceType cmdSource, std::vector<Object *> &columnUnits )
 
 {
 
@@ -1314,6 +1415,10 @@ Bool AIGroup::friend_moveVehicleToPos( const Coord3D *pos, UnsignedInt cmdNode, 
 			controllingPlayerType = (*i)->getControllingPlayer()->getPlayerType();
 		}
 		Coord3D unitPos = *((*i)->getPosition());
+		if (!columnPassesNear(m_groundPath, &unitPos))
+		{
+			continue;
+		}
 		TheAI->pathfinder()->removeGoal(*i);
 		Real dx, dy;
 		dx = unitPos.x - center.x;
@@ -1470,6 +1575,12 @@ Bool AIGroup::friend_moveVehicleToPos( const Coord3D *pos, UnsignedInt cmdNode, 
 	curIndex = 0;
 	Int columnFactor[5] = {0,0,0,0,0};
 	PathfindLayerEnum layer = TheTerrainLogic->getLayerForDestination(pos);
+	std::vector<PathfindSlotRequest> requests;
+	for (theUnit = iter2->first(); theUnit; theUnit = iter2->next())
+	{
+		addSlotRequest(requests, theUnit, pos);
+	}
+	TheAI->pathfinder()->assignGroupSlots(requests, pos, &center);
 	for (theUnit = iter2->first(); theUnit; theUnit = iter2->next())
 	{
 		AIUpdateInterface *ai = theUnit->getAIUpdateInterface();
@@ -1562,6 +1673,7 @@ Bool AIGroup::friend_moveVehicleToPos( const Coord3D *pos, UnsignedInt cmdNode, 
 		dest.x -= factor*offset*endVector.x;
 		dest.y -= factor*offset*endVector.y;
 		dest.z = TheTerrainLogic->getLayerHeight( dest.x, dest.y, layer );
+		Bool hasSlot = takeAssignedSlot(requests, theUnit, &dest);
 
 		while (!path.empty()) {
 			Coord2D curVector;
@@ -1576,9 +1688,11 @@ Bool AIGroup::friend_moveVehicleToPos( const Coord3D *pos, UnsignedInt cmdNode, 
 				break;
 			}
 		}
-		clampToMap(&dest, controllingPlayerType);
-		TheAI->pathfinder()->adjustDestination(theUnit, ai->getLocomotorSet(), &dest, nullptr);
-		TheAI->pathfinder()->updateGoal(theUnit, &dest, LAYER_GROUND);
+		if (!hasSlot) {
+			clampToMap(&dest, controllingPlayerType);
+			TheAI->pathfinder()->adjustDestination(theUnit, ai->getLocomotorSet(), &dest, nullptr);
+			TheAI->pathfinder()->updateGoal(theUnit, &dest, layer);
+		}
 		path.push_back(dest);
 		TheCommandSequence->clearObjectCommand(theUnit);
 		TheCommandSequence->includeUnitInTypicalMovingCommand(cmdNode, theUnit, dest);
@@ -1586,7 +1700,8 @@ Bool AIGroup::friend_moveVehicleToPos( const Coord3D *pos, UnsignedInt cmdNode, 
 		ai->aiFollowPath(&path, nullptr, cmdSource);
 		if (TheCommandSequence->isStillAwaiting(theUnit))
 			TheCommandSequence->removeCurrentCommand(theUnit, false);
-		
+    
+		columnUnits.push_back(theUnit);
 	}
 	return true;
 }
@@ -1634,16 +1749,19 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
   Coord3D position = *p_posIn;
   Coord3D *pos = &position;
 
-	Bool didInfantry = false;
-	Bool didVehicles = false;
+	std::vector<Object *> columnUnits;
 	// compute current centroid of the team
 	Coord3D center;
 	Coord2D min;
 	Coord2D max;
 	Coord3D dest;
 	Bool tightenGroup = FALSE;
+	std::vector<PathfindSlotRequest> requests;
 
 	Bool isFormation = getMinMaxAndCenter( &min, &max, &center );
+	// A click inside the group's own footprint keeps every unit's relative offset instead of packing slots
+	Coord2D boxMin = min;
+	Coord2D boxMax = max;
 	if (addWaypoint)
   {
     isFormation = false;
@@ -1656,10 +1774,10 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 		cmdNode = TheCommandSequence->newSinglePosCommand(CommandSequence::COMMAND_DO_MOVETO, pos);
 
 
-	if (!addWaypoint && !isFormation) {
+	if (!addWaypoint && !isFormation && !reverse) {
 		friend_computeGroundPath(pos, cmdSource);
-		didInfantry = friend_moveInfantryToPos(pos, cmdNode, cmdSource);
-		didVehicles = friend_moveVehicleToPos(pos, cmdNode, cmdSource);
+		friend_moveInfantryToPos(pos, cmdSource, columnUnits);
+		friend_moveVehicleToPos(pos, cmdSource, columnUnits);
 	}
 	if (m_dirty)
 		recompute();
@@ -1704,12 +1822,12 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 
 
 
-	if (tightenGroup)
+	if (tightenGroup && !reverse)
 	{
 		isFormation = false;
 		if (!addWaypoint) {
 			Int dx = (max.x-min.x)/PATHFIND_CELL_SIZE_F;
-			Int dy = (max.x-min.x)/PATHFIND_CELL_SIZE_F;
+			Int dy = (max.y-min.y)/PATHFIND_CELL_SIZE_F;
 			Int cells = (dx*dy);
 			if (cells<2000) {
 				groupTightenToPosition(pos, false, cmdSource);
@@ -1718,7 +1836,7 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 		}
 	}
 
-	if (isFormation) {
+	if (isFormation && !reverse) {
 		friend_computeGroundPath(pos, cmdSource);
 		friend_moveFormationToPos(pos, cmdSource);
 		return;
@@ -1743,23 +1861,20 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 		{
 			continue;
 		}
-		if ((*i)->isKindOf(KINDOF_INFANTRY) && didInfantry) {
-			continue;
-		}
-		if ((*i)->isKindOf(KINDOF_VEHICLE) && didVehicles)
+		// Units already sent down a column keep that order, except cliff jumpers which path on their own
+		if (std::find(columnUnits.begin(), columnUnits.end(), *i) != columnUnits.end())
 		{
-			if( (*i)->getAI()->isDoingGroundMovement() )
+			if ((*i)->isKindOf(KINDOF_INFANTRY) || !(*i)->isKindOf( KINDOF_CLIFF_JUMPER ))
 			{
-				Object *obj = (*i);
-				if( !obj->isKindOf( KINDOF_CLIFF_JUMPER ) )
-				{
-					//Not a cliff-jumper-offer unit.
-					continue;
-				}
+				continue;
 			}
 		}
 		Coord3D unitPos = *((*i)->getPosition());
 		TheAI->pathfinder()->removeGoal(*i);
+		if ((*i)->getAI()->isDoingGroundMovement())
+		{
+			addSlotRequest(requests, *i, pos);
+		}
 		dx = unitPos.x - pos->x;
 		dy = unitPos.y - pos->y;
 		// adjust so units are sorted first by move priority.
@@ -1777,6 +1892,11 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 		}
 #endif
 		iter->insert((*i), adjust + dx*dx+dy*dy);
+	}
+
+	if (!addWaypoint && !Coord3DInsideRect2D( pos, &boxMin, &boxMax ))
+	{
+		TheAI->pathfinder()->assignGroupSlots(requests, pos, &center);
 	}
 
 	Coord3D goalPos = *pos;
@@ -1801,7 +1921,10 @@ void AIGroup::groupMoveToPosition( const Coord3D *p_posIn, Bool addWaypoint, Com
 			}
 			firstUnit = false;
 		}
-		computeIndividualDestination( &dest, &goalPos, theUnit, &center, isFormation );
+		if (!takeAssignedSlot(requests, theUnit, &dest))
+		{
+			computeIndividualDestination( &dest, &goalPos, theUnit, &center, isFormation );
+		}
 
 		if (!addWaypoint)
 			TheCommandSequence->clearObjectCommand(theUnit);
@@ -1932,8 +2055,8 @@ void getHelicopterOffset( Coord3D& posOut, Int idx )
   }
 
   Coord3D tempCtr = posOut;
-  posOut.x = tempCtr.x + (sin(angle) * radius);
-  posOut.y = tempCtr.y + (cos(angle) * radius);
+  posOut.x = tempCtr.x + (WWMath::Sin(angle) * radius);
+  posOut.y = tempCtr.y + (WWMath::Cos(angle) * radius);
 
 }
 
@@ -2452,31 +2575,48 @@ void AIGroup::groupAttackMoveToPosition( const Coord3D *pos, Int maxShotsToFire,
 {
 	UnsignedInt cmdNode = TheCommandSequence->newPosNMaxShotsCommand(CommandSequence::COMMAND_DO_ATTACK_MOVETO, pos, maxShotsToFire);
 
+	Coord3D center;
+	Coord2D min;
+	Coord2D max;
+	getMinMaxAndCenter( &min, &max, &center );
+
+	// Ground movers each get their own arrival slot so a big group does not spiral out from one cell
+	std::vector<PathfindSlotRequest> requests;
 	std::list<Object *>::iterator i;
 	for (i = m_memberList.begin(); i != m_memberList.end(); ++i)
 	{
-		AIUpdateInterface* ai = (*i)->getAIUpdateInterface();
+		AIUpdateInterface *ai = (*i)->getAIUpdateInterface();
+		if (ai == nullptr || (*i)->isDisabledByType( DISABLED_HELD ) || (*i)->isKindOf( KINDOF_IMMOBILE ))
+		{
+			continue;
+		}
+		if (!ai->isDoingGroundMovement())
+		{
+			continue;
+		}
+		TheAI->pathfinder()->removeGoal(*i);
+		addSlotRequest(requests, *i, pos);
+	}
+	if (!Coord3DInsideRect2D( pos, &min, &max ))
+	{
+		TheAI->pathfinder()->assignGroupSlots(requests, pos, &center);
+	}
+
+	for( i = m_memberList.begin(); i != m_memberList.end(); ++i )
+	{
+		AIUpdateInterface *ai = (*i)->getAIUpdateInterface();
 		if (ai)
 		{
-			if (!isWaypoint)
-				TheCommandSequence->clearObjectCommand(*i);
-
-			if (!TheCommandSequence->hasAnyCommand(*i))
+			Coord3D dest = *pos;
+			takeAssignedSlot(requests, *i, &dest);
+			if ((*i)->isAbleToAttack())
 			{
-				(*i)->releaseWeaponLock(LOCKED_TEMPORARILY);
-				TheCommandSequence->includeUnitInCommand(cmdNode, *i);
-				TheCommandSequence->prepareCommandForVerification(*i);
-
-				if ((*i)->isAbleToAttack())
-					ai->aiAttackMoveToPosition(pos, maxShotsToFire, cmdSource);
-				else
-					ai->aiMoveToPosition(pos, cmdSource);
-
-				if (TheCommandSequence->isStillAwaiting(*i))
-					TheCommandSequence->removeCurrentCommand(*i, false);
+				ai->aiAttackMoveToPosition( &dest, maxShotsToFire, cmdSource );
 			}
 			else
-				TheCommandSequence->includeUnitInCommand(cmdNode, *i);
+			{
+				ai->aiMoveToPosition( &dest, cmdSource );
+			}
 		}
 	}
 
@@ -3866,6 +4006,90 @@ void AIGroup::groupSell( CommandSourceType cmdSource )
 		TheBuildAssistant->sellObject( groupObjectsCopy[j] );
 	}
 
+}
+
+//-------------------------------------------------------------------------------------------------
+void AIGroup::groupMoveToPositionFacing( const Coord3D *pos, Real angle, Int rows, UnsignedInt style, CommandSourceType cmdSource )
+{
+	std::vector<Object *> movers;
+	std::vector<FormationMember> members;
+	for( std::list<Object *>::iterator i = m_memberList.begin(); i != m_memberList.end(); ++i )
+	{
+		if( !isLineFormationMover( *i ) )
+		{
+			continue;
+		}
+		movers.push_back( *i );
+		members.push_back( makeFormationMember( *i ) );
+	}
+
+	// One unit: the normal move to the point, then the facing.
+	if( movers.size() <= 1 )
+	{
+		groupMoveToPosition( pos, false, cmdSource );
+		for( std::list<Object *>::iterator i = m_memberList.begin(); i != m_memberList.end(); ++i )
+		{
+			AIUpdateInterface *ai = (*i)->getAIUpdateInterface();
+			if( ai == nullptr )
+			{
+				continue;
+			}
+			ai->setFacingOnArrival( angle );
+		}
+		return;
+	}
+
+	// The same slots as the preview ghosts (LineFormation.h); each unit goes to its own at its own speed.
+	const Int count = (Int)movers.size();
+	std::vector<Coord3D> slots( count );
+	computeLineFormation( *pos, angle, rows, &members[0], count, &slots[0], style );
+	// Damaged units do not set the formation speed, as in AIGroup::recompute.
+	std::vector<Real> speeds( count, 0.0f ), distances( count, 0.0f );
+	Real slowest = 0.0f, slowestAny = 0.0f, arrivalTime = 0.0f;
+	for( Int k = 0; k < count; ++k )
+	{
+		clampWaypointPosition( slots[k], STD_WAYPOINT_CLAMP_MARGIN );
+		AIUpdateInterface *ai = movers[k]->getAIUpdateInterface();
+		if( !ai->isDoingGroundMovement() )
+		{
+			continue;
+		}
+		speeds[k] = ai->getCurLocomotorSpeed();
+		const Coord3D *at = movers[k]->getPosition();
+		const Real dx = slots[k].x - at->x;
+		const Real dy = slots[k].y - at->y;
+		distances[k] = sqrtf( dx * dx + dy * dy );
+		if( speeds[k] <= 0.0f )
+		{
+			continue;
+		}
+		if( slowestAny <= 0.0f || speeds[k] < slowestAny )
+		{
+			slowestAny = speeds[k];
+		}
+		if( IS_CONDITION_BETTER( movers[k]->getBodyModule()->getDamageState(), TheGlobalData->m_movementPenaltyDamageState )
+			&& (slowest <= 0.0f || speeds[k] < slowest) )
+		{
+			slowest = speeds[k];
+		}
+		if( distances[k] / speeds[k] > arrivalTime )
+		{
+			arrivalTime = distances[k] / speeds[k];
+		}
+	}
+	if( slowest <= 0.0f )
+	{
+		slowest = slowestAny;
+	}
+
+	for( Int k = 0; k < count; ++k )
+	{
+		Object *unit = movers[k];
+		unit->setFormationID( NO_FORMATION_ID );
+		TheAI->pathfinder()->removeGoal( unit );
+		const Real speedLimit = speeds[k] > 0.0f ? formationUnitSpeed( style, distances[k], speeds[k], slowest, arrivalTime ) : 0.0f;
+		unit->getAIUpdateInterface()->moveToFormationSlot( slots[k], angle, members[k].radius, style, speedLimit, cmdSource, FALSE );
+	}
 }
 
 /**

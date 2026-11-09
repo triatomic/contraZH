@@ -33,6 +33,7 @@
 #include "Common/Debug.h"
 #include "Common/GlobalData.h"
 #include "Common/LocalFileSystem.h"
+#include "GameClient/Display.h"
 #include "GameClient/GameClient.h"
 #include "Win32Device/GameClient/Win32Mouse.h"
 #include "WinMain.h"
@@ -88,6 +89,7 @@ void Win32Mouse::translateEvent( UnsignedInt eventIndex, MouseIO *result )
 
 	// set these to defaults
 	result->leftState = result->middleState = result->rightState = MBS_None;
+	result->x1State = result->x2State = MBS_None;
 	result->pos.x = result->pos.y = result->wheelPos = 0;
 
 	// Time is the same for all events
@@ -206,6 +208,25 @@ void Win32Mouse::translateEvent( UnsignedInt eventIndex, MouseIO *result )
 		}
 
 		// ------------------------------------------------------------------------
+		case 0x020B:	// WM_XBUTTONDOWN
+		case 0x020C:	// WM_XBUTTONUP
+		case 0x020D:	// WM_XBUTTONDBLCLK
+		{
+			const MouseButtonState state = msg == 0x020C ? MBS_Up : MBS_Down;
+			if( HIWORD( wParam ) & 0x0001 )	// XBUTTON1
+			{
+				result->x1State = state;
+			}
+			if( HIWORD( wParam ) & 0x0002 )	// XBUTTON2
+			{
+				result->x2State = state;
+			}
+			result->pos.x = LOWORD( lParam );
+			result->pos.y = HIWORD( lParam );
+			break;
+		}
+
+		// ------------------------------------------------------------------------
 		case 0x020A:	// WM_MOUSEWHEEL
 		{
 			POINT p;
@@ -233,6 +254,17 @@ void Win32Mouse::translateEvent( UnsignedInt eventIndex, MouseIO *result )
 
 		}
 
+	}
+
+	// Windows can stretch a windowed back buffer beyond the selected resolution.
+	if (TheDisplay && TheDisplay->getWindowed())
+	{
+		RECT rect;
+		if (GetClientRect(ApplicationHWnd, &rect) && rect.right > 0 && rect.bottom > 0)
+		{
+			result->pos.x = MulDiv(result->pos.x, TheDisplay->getWidth(), rect.right);
+			result->pos.y = MulDiv(result->pos.y, TheDisplay->getHeight(), rect.bottom);
+		}
 	}
 
 }

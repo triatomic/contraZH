@@ -102,6 +102,17 @@ SnowManager::~SnowManager()
 
 OVERRIDE<WeatherSetting> TheWeatherSetting = nullptr;
 
+static void parseSnowBoxDimensions(INI *ini, void *instance, void *store, const void *userData)
+{
+	Real value;
+	INI::parseReal(ini, instance, &value, userData);
+	if (!(value >= 1.0f && value < 2147483648.0f))
+	{
+		throw INI_INVALID_DATA;
+	}
+	*(Real*)store = value;
+}
+
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 const FieldParse WeatherSetting::m_weatherSettingFieldParseTable[] =
 {
@@ -113,7 +124,7 @@ const FieldParse WeatherSetting::m_weatherSettingFieldParseTable[] =
 	{ "SnowMaxPointSize",						INI::parseReal,nullptr,			offsetof( WeatherSetting, m_snowMaxPointSize ) },
 	{ "SnowMinPointSize",						INI::parseReal,nullptr,			offsetof( WeatherSetting, m_snowMinPointSize ) },
 	{ "SnowQuadSize",							INI::parseReal,nullptr,			offsetof( WeatherSetting, m_snowQuadSize ) },
-	{ "SnowBoxDimensions",						INI::parseReal,nullptr,			offsetof( WeatherSetting, m_snowBoxDimensions ) },
+	{ "SnowBoxDimensions",						parseSnowBoxDimensions,nullptr,			offsetof( WeatherSetting, m_snowBoxDimensions ) },
 	{ "SnowBoxDensity",							INI::parseReal,nullptr,			offsetof( WeatherSetting, m_snowBoxDensity ) },
 	{ "SnowVelocity",							INI::parseReal,nullptr,			offsetof( WeatherSetting, m_snowVelocity ) },
 	{ "SnowPointSprites",						INI::parseBool,nullptr,			offsetof( WeatherSetting, m_usePointSprites ) },

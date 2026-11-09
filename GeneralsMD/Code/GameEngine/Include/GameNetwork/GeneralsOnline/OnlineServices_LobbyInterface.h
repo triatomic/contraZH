@@ -3,12 +3,14 @@
 #include "NGMP_include.h"
 #include "OnlineServices_RoomsInterface.h"
 #include "GameNetwork/GameInfo.h"
+#include "GameNetwork/LobbyRules.h"
 #include <chrono>
 #include "Common/PlayerList.h"
 #include "Common/Player.h"
 #include "GameClient/InGameUI.h"
 #include "GameLogic/VictoryConditions.h"
 #include <atomic>
+#include <set>
 
 extern NGMPGame* TheNGMPGame;
 
@@ -186,8 +188,9 @@ public:
 		}
 	}
 
-	std::function<void(int)> m_fnCallbackMatchmakingSetupProgress = nullptr;
-	void RegisterForMatchmakingSetupProgressCallback(std::function<void(int)> cb)
+	// timeoutMs: how long to wait for the next step; countdownMs: start countdown length, 0 while setting up, -1 if not sent
+	std::function<void(int, int)> m_fnCallbackMatchmakingSetupProgress = nullptr;
+	void RegisterForMatchmakingSetupProgressCallback(std::function<void(int, int)> cb)
 	{
 		m_fnCallbackMatchmakingSetupProgress = cb;
 	}
@@ -197,17 +200,17 @@ public:
 		m_fnCallbackMatchmakingSetupProgress = nullptr;
 	}
 
-	void InvokeMatchmakingSetupProgressCallback(int timeoutMs)
+	void InvokeMatchmakingSetupProgressCallback(int timeoutMs, int countdownMs)
 	{
 		if (m_fnCallbackMatchmakingSetupProgress != nullptr)
 		{
-			m_fnCallbackMatchmakingSetupProgress(timeoutMs);
+			m_fnCallbackMatchmakingSetupProgress(timeoutMs, countdownMs);
 		}
 	}
 	
 
 	// updates
-	void UpdateCurrentLobby_Map(AsciiString strMap, AsciiString strMapPath, bool bIsOfficial, int newMaxPlayers);
+	void UpdateCurrentLobby_Map(UnicodeString strMap, AsciiString strMapPath, bool bIsOfficial, int newMaxPlayers);
 	void UpdateCurrentLobby_LimitSuperweapons(bool bLimitSuperweapons);
 	void UpdateCurrentLobby_StartingCash(UnsignedInt startingCashValue);
 
@@ -372,6 +375,26 @@ public:
 
 	bool IsHost();
 
+	// The service has no lobby field for these, so only the host knows; it sends MSG_ENABLE_LOBBY_RULE per rule in the match
+	bool IsLobbyRuleOn(LobbyRule rule) const { return m_lobbyRules[rule]; }
+	void SetLobbyRule(LobbyRule rule, bool bOn) { m_lobbyRules[rule] = bOn; }
+	void ResetLobbyRules()
+	{
+		for (int rule = 0; rule < LOBBY_RULE_COUNT; ++rule)
+		{
+			m_lobbyRules[rule] = false;
+		}
+	}
+
+private:
+	bool m_lobbyRules[LOBBY_RULE_COUNT] = {};
+	std::set<int64_t> m_setMembersBeforeUs;
+	bool m_bJoinOrderKnown = false;
+	void ResetJoinOrder();
+	void RecordJoinOrder(const std::vector<LobbyMemberEntry>& members);
+
+public:
+
 	void UpdateRoomDataCache(std::function<void(bool)> fnCallback = nullptr);
 
 	std::function<void(LobbyMemberEntry)> m_cbPlayerDoesntHaveMap = nullptr;
@@ -394,6 +417,36 @@ public:
 	void DeregisterForCannotConnectToLobbyCallback()
 	{
 		m_OnCannotConnectToLobbyCallback = nullptr;
+	}
+
+	// true if userID was already in the lobby when we joined, i.e. we are the later joiner of that pair
+	bool JoinedAfter(int64_t userID) const
+	{
+		return m_bJoinOrderKnown && m_setMembersBeforeUs.contains(userID);
+	}
+
+	bool IsJoinOrderKnown() const
+	{
+		return m_bJoinOrderKnown;
+	}
+
+	bool IsLobbyMember(int64_t userID) const
+	{
+		for (const LobbyMemberEntry& member : m_CurrentLobby.members)
+		{
+			if (member.user_id == userID)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	// raised from inside the mesh's GNS callbacks, dispatched by Tick once the mesh is done with them
+	bool m_bCannotConnectToLobbyPending = false;
+	void QueueCannotConnectToLobby()
+	{
+		m_bCannotConnectToLobbyPending = true;
 	}
 
 	std::function<void(UnicodeString strMessage, Color color)> m_OnChatCallback = nullptr;

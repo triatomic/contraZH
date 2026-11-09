@@ -182,6 +182,7 @@ public:
 	// Throws if the INI file is not found or is not read correctly.
 	UnsignedInt load( AsciiString filename, INILoadType loadType, Xfer *pXfer, Bool optional = FALSE);
 	void loadObjectsOnly(AsciiString filename, Xfer* pXfer);
+	void loadHotKeys( AsciiString filename );	///< only CommandMap and CommandButtonHotKey blocks, for the player's Hotkeys.ini
 	void loadWB(AsciiString filename, INILoadType loadType, Xfer* pXfer);  ///< Adriane[Deathscythe] : for loading map.ini under wb directly
 	/// The block headers loadWB had to skip because they would not parse against the installed
 	/// data (WorldBuilder only; valid until the next loadWB). Lets the editor report what it
@@ -217,6 +218,7 @@ public:
 	static void parseWebpageURLDefinition( INI *ini );
 	static void parseHeaderTemplateDefinition( INI *ini );
 	static void parseParticleSystemDefinition( INI *ini );
+	static void parseParticleSystemExtendDefinition( INI *ini );
 	static void parseWaterSettingDefinition( INI *ini );
 	static void parseWaterTransparencyDefinition( INI *ini );
 	static void parseWeatherDefinition( INI *ini );
@@ -229,10 +231,15 @@ public:
 	static void parseTerrainRoadDefinition( INI *ini );
 	static void parseTerrainBridgeDefinition( INI *ini );
 	static void parseMetaMapDefinition( INI *ini );
+	static void parseCommandButtonHotKeyDefinition( INI *ini );
 	static void parseFXListDefinition( INI *ini );
+	static void parseFXListExtendDefinition( INI *ini );
 	static void parseBuffTemplateDefinition( INI* ini );
 	static void parseChatCommandDefinition( INI* ini );
 	static void parseObjectCreationListDefinition( INI* ini );
+#if RTS_ZEROHOUR
+	static void parseObjectCreationListExtendDefinition( INI* ini );
+#endif
 	static void parseMultiplayerSettingsDefinition( INI* ini );
 	static void parseMultiplayerColorDefinition( INI* ini );
   static void parseMultiplayerStartingMoneyChoiceDefinition( INI* ini );
@@ -418,6 +425,7 @@ protected:
 	void unPrepFile();
 
 	void readLine();
+	void skipToEndToken();
 
 	char* m_readBuffer;                       ///< internal read buffer
 	unsigned m_readBufferNext;                ///< next char in read buffer

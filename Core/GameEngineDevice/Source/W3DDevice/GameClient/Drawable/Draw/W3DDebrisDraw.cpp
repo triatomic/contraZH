@@ -30,6 +30,7 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 
 #include "Common/FileSystem.h"	// this is only here to pull in LOAD_TEST_ASSETS
+#include "Common/GameUtility.h"
 #include "Common/GlobalData.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
@@ -108,6 +109,9 @@ void W3DDebrisDraw::setModelName(AsciiString name, Color color, ShadowType t)
 		Int hexColor = 0;
 		if (color != 0)
 			hexColor = color | 0xFF000000;
+		// TheSuperHackers @feature Wreckage keeps the HouseColorMode color of what it came from.
+		const Object* owner = getDrawable()->getObject();
+		hexColor = rts::getHouseColorForLocalView(hexColor, owner ? owner->getControllingPlayer() : nullptr);
 		m_renderObject = W3DDisplay::m_assetManager->Create_Render_Obj(name.str(), getDrawable()->getScale(), hexColor);
 		DEBUG_ASSERTCRASH(m_renderObject, ("Debris model %s not found!",name.str()));
 		if (m_renderObject)

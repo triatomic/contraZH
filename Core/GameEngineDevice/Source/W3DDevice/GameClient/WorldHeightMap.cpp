@@ -411,6 +411,9 @@ WorldHeightMap::~WorldHeightMap()
 		REF_PTR_RELEASE(m_edgeTiles[i]);
 		REF_PTR_RELEASE(m_sourceNormalTiles[i]);
 		REF_PTR_RELEASE(m_sourceHeightTiles[i]);
+#if defined(RTS_ZEROHOUR)
+		REF_PTR_RELEASE(m_sourceEmissiveTiles[i]);
+#endif
 	}
 	for (i=0; i<NUM_ALPHA_TILES; i++) {
 		REF_PTR_RELEASE(m_alphaTiles[i]);
@@ -418,6 +421,9 @@ WorldHeightMap::~WorldHeightMap()
 	REF_PTR_RELEASE(m_terrainTex);
 	REF_PTR_RELEASE(m_terrainNormalTex);
 	REF_PTR_RELEASE(m_terrainHeightTex);
+#if defined(RTS_ZEROHOUR)
+	REF_PTR_RELEASE(m_terrainEmissiveTex);
+#endif
 	REF_PTR_RELEASE(m_terrainClassMap);
 	REF_PTR_RELEASE(m_terrainGlintMap);
 	REF_PTR_RELEASE(m_stochasticTex);
@@ -448,7 +454,7 @@ WorldHeightMap::WorldHeightMap():
 	m_drawWidthX(NORMAL_DRAW_WIDTH), m_drawHeightY(NORMAL_DRAW_HEIGHT),
 	m_tileNdxes(nullptr), m_blendTileNdxes(nullptr), m_extraBlendTileNdxes(nullptr), m_cliffInfoNdxes(nullptr),
 	m_stochasticData(nullptr), m_stochasticTex(nullptr), m_stochasticTexDirty(true), m_stochasticTexExponent(0.0f),
-	m_terrainTexHeight(1), m_atlasBorder(MIN_ATLAS_BORDER), m_alphaTexHeight(1),	m_cellCliffState(nullptr),
+	m_terrainTexHeight(1), m_alphaTexHeight(1),	m_cellCliffState(nullptr),
 #ifdef EVAL_TILING_MODES
 	m_tileMode(TILE_4x4),
 #endif
@@ -456,6 +462,9 @@ WorldHeightMap::WorldHeightMap():
 	m_terrainTex(nullptr), m_alphaTerrainTex(nullptr), m_numBitmapTiles(0), m_numBlendedTiles(1),
 	m_terrainNormalTex(nullptr), m_terrainHeightTex(nullptr), m_terrainHeightTexFailed(false), m_terrainClassMap(nullptr), m_terrainClassMapAtlas(nullptr),
 	m_terrainGlintMap(nullptr), m_terrainGlintMapAtlas(nullptr), m_terrainGlintMapGloss(0.0f), m_terrainGlintStrengthScale(1.0f), m_terrainGlintGlossScale(1.0f), m_hasNormalTiles(false)
+#if defined(RTS_ZEROHOUR)
+	, m_hasEmissiveTiles(false), m_terrainEmissiveTex(nullptr), m_terrainEmissiveScale(1.0f), m_terrainEmissiveTexFailed(false)
+#endif
 {
 	Int i;
 	for (i=0; i<NUM_SOURCE_TILES; i++) {
@@ -463,6 +472,9 @@ WorldHeightMap::WorldHeightMap():
 		m_edgeTiles[i] = nullptr;
 		m_sourceNormalTiles[i] = nullptr;
 		m_sourceHeightTiles[i] = nullptr;
+#if defined(RTS_ZEROHOUR)
+		m_sourceEmissiveTiles[i] = nullptr;
+#endif
 	}
 
 	TheSidesList->validateSides();
@@ -492,7 +504,7 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly):
 	m_drawWidthX(NORMAL_DRAW_WIDTH), m_drawHeightY(NORMAL_DRAW_HEIGHT),
 	m_tileNdxes(nullptr), m_blendTileNdxes(nullptr), m_extraBlendTileNdxes(nullptr), m_cliffInfoNdxes(nullptr),
 	m_stochasticData(nullptr), m_stochasticTex(nullptr), m_stochasticTexDirty(true), m_stochasticTexExponent(0.0f),
-	m_terrainTexHeight(1), m_atlasBorder(MIN_ATLAS_BORDER), m_alphaTexHeight(1),
+	m_terrainTexHeight(1), m_alphaTexHeight(1),
 #ifdef EVAL_TILING_MODES
 	m_tileMode(TILE_4x4),
 #endif
@@ -500,6 +512,9 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly):
 	m_terrainTex(nullptr), m_alphaTerrainTex(nullptr), m_numBitmapTiles(0), m_numBlendedTiles(1),
 	m_terrainNormalTex(nullptr), m_terrainHeightTex(nullptr), m_terrainHeightTexFailed(false), m_terrainClassMap(nullptr), m_terrainClassMapAtlas(nullptr),
 	m_terrainGlintMap(nullptr), m_terrainGlintMapAtlas(nullptr), m_terrainGlintMapGloss(0.0f), m_terrainGlintStrengthScale(1.0f), m_terrainGlintGlossScale(1.0f), m_hasNormalTiles(false)
+#if defined(RTS_ZEROHOUR)
+	, m_hasEmissiveTiles(false), m_terrainEmissiveTex(nullptr), m_terrainEmissiveScale(1.0f), m_terrainEmissiveTexFailed(false)
+#endif
 {
 
 	int i;
@@ -508,6 +523,9 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly):
 		m_edgeTiles[i]=nullptr;
 		m_sourceNormalTiles[i]=nullptr;
 		m_sourceHeightTiles[i]=nullptr;
+#if defined(RTS_ZEROHOUR)
+		m_sourceEmissiveTiles[i]=nullptr;
+#endif
 	}
 
 	DataChunkInput file( pStrm );
@@ -558,6 +576,33 @@ WorldHeightMap::WorldHeightMap(ChunkInputStream *pStrm, Bool logicalDataOnly):
 
 	TheSidesList->validateSides();
 	setupAlphaTiles();
+}
+
+Bool WorldHeightMap::isTerrainFlat(const IRegion2D& bounds) const
+{
+	DEBUG_ASSERTCRASH(getLogicalBounds().contains(bounds), ("WorldHeightMap::isTerrainFlat must use a region contained by the logical map bounds."));
+
+	const Int width = bounds.width();
+	const Int height = bounds.height();
+	if (width <= 0 || height <= 0)
+		return true;
+
+	// Samples are 16 bit here, so memcchr over the row bytes does not apply.
+	const HeightSampleType* firstRow = m_data + (bounds.lo.y + m_borderSize) * m_width + bounds.lo.x + m_borderSize;
+	const HeightSampleType referenceHeight = firstRow[0];
+	for (Int j = 0; j < height; j++)
+	{
+		const HeightSampleType* row = firstRow + j * m_width;
+		for (Int i = 0; i < width; i++)
+		{
+			if (row[i] != referenceHeight)
+			{
+				return false;
+			}
+		}
+	}
+
+	return true;
 }
 
 /** Optimized version of method to get triangle flip state of a terrain cell.  Use this
@@ -871,6 +916,24 @@ Bool WorldHeightMap::ParseObjectsDataChunk(DataChunkInput &file, DataChunkInfo *
 	return (file.parse(userData));
 }
 
+Bool WorldHeightMap::isValidMapSize(Int width, Int height, Int borderSize)
+{
+	if (width <= 0 || width > MAX_MAP_DIMENSION)
+		return false;
+	if (height <= 0 || height > MAX_MAP_DIMENSION)
+		return false;
+	if (width * height > MAX_MAP_AREA)
+		return false;
+	if (borderSize < 0 || borderSize > (width - 1) / 2 || borderSize > (height - 1) / 2)
+		return false;
+	return true;
+}
+
+static Bool isValidHeightDataSize(DataChunkInput &file, Int dataSize, Int width, Int height)
+{
+	return dataSize > 0 && dataSize == width * height && (UnsignedInt)dataSize <= file.getChunkDataSizeLeft();
+}
+
 /**
 * WorldHeightMap::ParseHeightMapData - read a height map chunk.
 * Format is the newer CHUNKY format.
@@ -901,6 +964,10 @@ Bool WorldHeightMap::ParseHeightMapData(DataChunkInput &file, DataChunkInfo *inf
 		m_borderSize = 0;
 	}
 
+	if (!isValidMapSize(m_width, m_height, m_borderSize)) {
+		throw ERROR_CORRUPT_FILE_FORMAT;
+	}
+
 	if (info->version >= K_HEIGHT_MAP_VERSION_4) {
 		Int numBorders = file.readInt();
 		m_boundaries.resize(numBorders);
@@ -915,10 +982,11 @@ Bool WorldHeightMap::ParseHeightMapData(DataChunkInput &file, DataChunkInfo *inf
 	}
 
 	m_dataSize = file.readInt();
-	m_data = MSGNEW("WorldHeightMap_ParseHeightMapData") HeightSampleType[m_dataSize];
-	if (m_dataSize <= 0 || (m_dataSize != (m_width*m_height))) {
+	if (!isValidHeightDataSize(file, m_dataSize, m_width, m_height)) {
 		throw ERROR_CORRUPT_FILE_FORMAT	;
 	}
+
+	m_data = MSGNEW("WorldHeightMap_ParseHeightMapData") HeightSampleType[m_dataSize];
 
 	Int numBytesX = (m_width+7)/8;	//how many bytes to fit all bitflags
 	Int numBytesY = m_height;
@@ -981,6 +1049,10 @@ Bool WorldHeightMap::ParseSizeOnly(DataChunkInput &file, DataChunkInfo *info, vo
 		m_borderSize = 0;
 	}
 
+	if (!isValidMapSize(m_width, m_height, m_borderSize)) {
+		throw ERROR_CORRUPT_FILE_FORMAT;
+	}
+
 	if (info->version >= K_HEIGHT_MAP_VERSION_4) {
 		Int numBorders = file.readInt();
 		m_boundaries.resize(numBorders);
@@ -995,10 +1067,11 @@ Bool WorldHeightMap::ParseSizeOnly(DataChunkInput &file, DataChunkInfo *info, vo
 	}
 
 	m_dataSize = file.readInt();
-	m_data = MSGNEW("WorldHeightMap_ParseSizeOnly") HeightSampleType[m_dataSize];
-	if (m_dataSize <= 0 || (m_dataSize != (m_width*m_height))) {
+	if (!isValidHeightDataSize(file, m_dataSize, m_width, m_height)) {
 		throw ERROR_CORRUPT_FILE_FORMAT	;
 	}
+
+	m_data = MSGNEW("WorldHeightMap_ParseSizeOnly") HeightSampleType[m_dataSize];
 
 	//load as bytes first
 	std::vector<UnsignedByte> loaded_data(m_dataSize);
@@ -1036,6 +1109,110 @@ Bool WorldHeightMap::ParseBlendTileDataChunk(DataChunkInput &file, DataChunkInfo
 	return pThis->ParseBlendTileData(file, info, userData);
 }
 
+#if defined(RTS_ZEROHOUR)
+static const char *const MISSING_TERRAIN_TEXTURE = "misstex.dds";
+
+static Int tileGridWidth(Int numTiles)
+{
+	Int width = 10;
+	while (width > 1 && width*width > numTiles)
+	{
+		width--;
+	}
+	return width;
+}
+
+/** Fills a texture class's tiles by repeating a smaller image's tile grid. */
+static void readRepeatedTiles(InputStream *pStr, TileData **tiles, Int numTiles, Int sourceTiles, const char *filename)
+{
+	const Int width = tileGridWidth(numTiles);
+	const Int sourceWidth = tileGridWidth(sourceTiles);
+	TileData *source[100] = { nullptr };
+	const Bool loaded = WorldHeightMap::readTiles(pStr, source, sourceWidth, filename);
+	for (Int row=0; loaded && row<width; row++)
+	{
+		for (Int column=0; column<width; column++)
+		{
+			TileData *&tile = tiles[column + width*row];
+			if (tile == nullptr)
+			{
+				tile = MSGNEW("WorldHeightMap_readRepeatedTiles") TileData;
+			}
+			memcpy(tile->getDataPtr(), source[column%sourceWidth + sourceWidth*(row%sourceWidth)]->getDataPtr(), TileData::dataLen());
+			tile->updateMips();
+		}
+	}
+	for (Int i=0; i<sourceWidth*sourceWidth; i++)
+	{
+		REF_PTR_RELEASE(source[i]);
+	}
+}
+
+// Art/Textures also holds images terrain cannot read, such as 8-bit TGAs.
+static File *openReadableTerrainTexture(const AsciiString &path)
+{
+	File *file = TheFileSystem->openFile(path.str(), File::READ | File::BINARY);
+	if (file == nullptr)
+	{
+		return nullptr;
+	}
+	GDIFileStream stream(file);
+	if (WorldHeightMap::countTiles(&stream, nullptr, path.str()) < 1)
+	{
+		file->close();
+		return nullptr;
+	}
+	file->seek(0, File::START);
+	return file;
+}
+#endif
+
+File *WorldHeightMap::openTerrainTexture(AsciiString &path, Bool useMissingTexture)
+{
+	File *file = TheFileSystem->openFile(path.str(), File::READ | File::BINARY);
+#if defined(RTS_ZEROHOUR)
+	if (file == nullptr)
+	{
+		const char *extension = strrchr(path.str(), '.');
+		if (extension != nullptr && stricmp(extension, ".tga") == 0)
+		{
+			path.truncateBy(4);
+			path.concat(".dds");
+			file = TheFileSystem->openFile(path.str(), File::READ | File::BINARY);
+		}
+	}
+	// Mods can pack a terrain texture in Art/Textures, beside its _nrm, _hgt and _emi maps.
+	if (file == nullptr && path.startsWithNoCase(TERRAIN_TGA_DIR_PATH))
+	{
+		AsciiString texturesPath;
+		texturesPath.format("%s%s", TGA_DIR_PATH, path.str() + strlen(TERRAIN_TGA_DIR_PATH));
+		file = openReadableTerrainTexture(texturesPath);
+		if (file == nullptr && texturesPath.endsWithNoCase(".dds"))
+		{
+			texturesPath.truncateBy(4);
+			texturesPath.concat(".tga");
+			file = openReadableTerrainTexture(texturesPath);
+		}
+		if (file != nullptr)
+		{
+			path = texturesPath;
+		}
+	}
+	if (file == nullptr && useMissingTexture)
+	{
+		RENDER_LOG(("Terrain texture %s not found, using misstex.dds", path.str()));
+		path.format("%s%s", TERRAIN_TGA_DIR_PATH, MISSING_TERRAIN_TEXTURE);
+		file = TheFileSystem->openFile(path.str(), File::READ | File::BINARY);
+		if (file == nullptr)
+		{
+			path.format("%s%s", TGA_DIR_PATH, MISSING_TERRAIN_TEXTURE);
+			file = TheFileSystem->openFile(path.str(), File::READ | File::BINARY);
+		}
+	}
+#endif
+	return file;
+}
+
 /** Function to read in the tiles for a texture class. */
 void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData)
 {
@@ -1045,7 +1222,7 @@ void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData)
 
 	// get the file from the description in TheTerrainTypes
 	TerrainType *terrain = TheTerrainTypes->findTerrain( texClass->name );
-	char texturePath[ _MAX_PATH ];
+	AsciiString texturePath;
 	if (terrain==nullptr)
 	{
 #ifdef LOAD_TEST_ASSETS
@@ -1054,14 +1231,15 @@ void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData)
 	}
 	else
 	{
-		snprintf( texturePath, ARRAY_SIZE(texturePath), "%s%s", TERRAIN_TGA_DIR_PATH, terrain->getTexture().str() );
-		theFile = TheFileSystem->openFile( texturePath, File::READ|File::BINARY);
+		texturePath.format("%s%s", TERRAIN_TGA_DIR_PATH, terrain->getTexture().str());
+		theFile = openTerrainTexture(texturePath);
 	}
 
 	if (theFile != nullptr) {
 		GDIFileStream theStream(theFile);
 		InputStream *pStr = &theStream;
-		Int numTiles = WorldHeightMap::countTiles(pStr);
+		const char *filename = terrain != nullptr ? texturePath.str() : texClass->name.str();
+		Int numTiles = WorldHeightMap::countTiles(pStr, nullptr, filename);
 		theFile->seek(0, File::START);
 		if (numTiles >= texClass->numTiles) {
 			numTiles = texClass->numTiles;
@@ -1072,7 +1250,7 @@ void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData)
 					break;
 				}
 			}
-			WorldHeightMap::readTiles(pStr, tileData+texClass->firstTile, width);
+			WorldHeightMap::readTiles(pStr, tileData+texClass->firstTile, width, filename);
 			if (tileData == m_sourceTiles && terrain != nullptr)
 			{
 				if (readMapTiles(texClass, terrain->getTexture().str(), width, "_nrm.dds", m_sourceNormalTiles))
@@ -1080,8 +1258,20 @@ void WorldHeightMap::readTexClass(TXTextureClass *texClass, TileData **tileData)
 					m_hasNormalTiles = true;
 				}
 				readMapTiles(texClass, terrain->getTexture().str(), width, "_hgt.dds", m_sourceHeightTiles);
+#if defined(RTS_ZEROHOUR)
+				if (readMapTiles(texClass, terrain->getTexture().str(), width, "_emi.dds", m_sourceEmissiveTiles))
+				{
+					m_hasEmissiveTiles = true;
+				}
+#endif
 			}
 		}
+#if defined(RTS_ZEROHOUR)
+		else if (numTiles >= 1)
+		{
+			readRepeatedTiles(pStr, tileData+texClass->firstTile, texClass->numTiles, numTiles, filename);
+		}
+#endif
 		theFile->close();
 	}
 }
@@ -1199,6 +1389,7 @@ Bool WorldHeightMap::ParseBlendTileData(DataChunkInput &file, DataChunkInfo *inf
 					m_cellCliffState[j*m_flipStateWidth + i] = data[j*byteWidth + i];
 				}
 			}
+			delete[] data;
 		} else {
 			file.readArrayOfBytes((char*)m_cellCliffState, m_height*m_flipStateWidth);
 		}
@@ -1206,7 +1397,7 @@ Bool WorldHeightMap::ParseBlendTileData(DataChunkInput &file, DataChunkInfo *inf
 		initCliffFlagsFromHeights();
 	}
 	m_numBitmapTiles = file.readInt();
-	DEBUG_ASSERTCRASH(m_numBitmapTiles>0 && m_numBitmapTiles<2048, ("Unlikely numBitmapTiles."));
+	DEBUG_ASSERTCRASH(m_numBitmapTiles>0 && m_numBitmapTiles<=NUM_SOURCE_TILES, ("Unlikely numBitmapTiles."));
 	m_numBlendedTiles = file.readInt();
 	DEBUG_ASSERTCRASH(m_numBlendedTiles>0 && m_numBlendedTiles<NUM_BLEND_TILES+1, ("Unlikely numBlendedTiles."));
 	if (info->version >= K_BLEND_TILE_VERSION_5) {
@@ -1419,13 +1610,99 @@ typedef struct {
 
 
 
-/// Count how many tiles come in from a targa file.
-Int WorldHeightMap::countTiles(InputStream *pStr, Bool *halfTile)
+#if defined(RTS_ZEROHOUR)
+static Bool isTerrainDDS(const char *filename)
+{
+	const char *extension = filename != nullptr ? strrchr(filename, '.') : nullptr;
+	return extension != nullptr && stricmp(extension, ".dds") == 0;
+}
+
+static Bool readTerrainDDSHeader(InputStream *stream, LegacyDDSURFACEDESC2 &header)
+{
+	UnsignedInt magic;
+	if (stream->read(&magic, sizeof(magic)) != sizeof(magic) || magic != 0x20534444 ||
+		stream->read(&header, sizeof(header)) != sizeof(header))
+	{
+		return false;
+	}
+	if (header.Size != sizeof(header) || header.PixelFormat.Size != sizeof(header.PixelFormat) ||
+		(header.PixelFormat.Flags & 0x4) == 0 ||
+		header.Width < TILE_PIXEL_EXTENT || header.Width > 10*TILE_PIXEL_EXTENT ||
+		header.Height < TILE_PIXEL_EXTENT || header.Height > 10*TILE_PIXEL_EXTENT ||
+		header.Width % 4 != 0 || header.Height % 4 != 0 || header.Caps.Caps2 != 0 ||
+		header.Depth > 1 || header.MipMapCount > 10)
+	{
+		return false;
+	}
+	return header.PixelFormat.FourCC == D3DFMT_DXT1 || header.PixelFormat.FourCC == D3DFMT_DXT5;
+}
+
+static Bool readTerrainDDSTiles(InputStream *stream, const char *filename, TileData **tiles, Int numRows)
+{
+	LegacyDDSURFACEDESC2 header;
+	if (!readTerrainDDSHeader(stream, header) || numRows < 1 || numRows > 10 ||
+		header.Width < numRows*TILE_PIXEL_EXTENT || header.Height < numRows*TILE_PIXEL_EXTENT)
+	{
+		return false;
+	}
+	const Int blockBytes = header.PixelFormat.FourCC == D3DFMT_DXT1 ? 8 : 16;
+	const Int dataSize = (header.Width/4)*(header.Height/4)*blockBytes;
+	std::vector<UnsignedByte> data(dataSize);
+	if (stream->read(&data[0], dataSize) != dataSize)
+	{
+		return false;
+	}
+	DDSFileClass dds(filename, 0);
+	if (!dds.Is_Available() || dds.Get_Type() != DDS_TEXTURE ||
+		dds.Get_Width(0) != header.Width || dds.Get_Height(0) != header.Height || !dds.Load() ||
+		dds.Get_Memory_Pointer(0) == nullptr)
+	{
+		return false;
+	}
+	const Int width = header.Width;
+	const Int height = header.Height;
+	std::vector<UnsignedByte> pixels(width*height*TILE_BYTES_PER_PIXEL);
+	dds.Copy_Level_To_Surface(0, WW3D_FORMAT_A8R8G8B8, width, height, &pixels[0], width*TILE_BYTES_PER_PIXEL);
+	for (Int i=0; i<numRows*numRows; i++)
+	{
+		if (tiles[i] == nullptr)
+		{
+			tiles[i] = MSGNEW("WorldHeightMap_readTiles") TileData;
+		}
+		const Int tileX = i%numRows;
+		const Int tileY = i/numRows;
+		for (Int row=0; row<TILE_PIXEL_EXTENT; row++)
+		{
+			const Int sourceY = height-1-(tileY*TILE_PIXEL_EXTENT+row);
+			memcpy(tiles[i]->getDataPtr()+row*TILE_PIXEL_EXTENT*TILE_BYTES_PER_PIXEL,
+				&pixels[(sourceY*width+tileX*TILE_PIXEL_EXTENT)*TILE_BYTES_PER_PIXEL],
+				TILE_PIXEL_EXTENT*TILE_BYTES_PER_PIXEL);
+		}
+		tiles[i]->updateMips();
+	}
+	return true;
+}
+#endif
+
+/// Count how many tiles come in from a terrain image.
+Int WorldHeightMap::countTiles(InputStream *pStr, Bool *halfTile, const char *filename)
 {
 	TTargaHeader hdr;
 	if (halfTile) {
 		*halfTile = false;
 	}
+#if defined(RTS_ZEROHOUR)
+	if (isTerrainDDS(filename))
+	{
+		LegacyDDSURFACEDESC2 header;
+		if (!readTerrainDDSHeader(pStr, header))
+		{
+			return 0;
+		}
+		const Int width = min(header.Width/TILE_PIXEL_EXTENT, header.Height/TILE_PIXEL_EXTENT);
+		return width*width;
+	}
+#endif
 	Int len = pStr->read(&hdr,sizeof(hdr));
 	if (len!=sizeof(hdr)) return(0);
 	Int tileWidth = hdr.imageWidth/TILE_PIXEL_EXTENT;
@@ -1461,9 +1738,15 @@ Int WorldHeightMap::countTiles(InputStream *pStr, Bool *halfTile)
 	}
 	return(0);
 }
-/*Break down a .tga file into a collection of tiles.  numRows * numRows total tiles.*/
-Bool WorldHeightMap::readTiles(InputStream *pStr, TileData **tiles, Int numRows)
+/*Break down a terrain image into a collection of tiles.  numRows * numRows total tiles.*/
+Bool WorldHeightMap::readTiles(InputStream *pStr, TileData **tiles, Int numRows, const char *filename)
 {
+#if defined(RTS_ZEROHOUR)
+	if (isTerrainDDS(filename))
+	{
+		return readTerrainDDSTiles(pStr, filename, tiles, numRows);
+	}
+#endif
 	TTargaHeader hdr;
 	pStr->read(&hdr, sizeof(hdr));
 	Int tileWidth = hdr.imageWidth/TILE_PIXEL_EXTENT;
@@ -1549,37 +1832,13 @@ Bool WorldHeightMap::readTiles(InputStream *pStr, TileData **tiles, Int numRows)
 
 
 
-Int WorldHeightMap::getAtlasBorderSetting()
-{
-	// Rounded up to a multiple of 4, so every block starts on a whole texel of the smallest mip.
-	const Int requested = TheGlobalData ? TheGlobalData->m_terrainAtlasBorder : MIN_ATLAS_BORDER;
-	return clamp(MIN_ATLAS_BORDER, (requested + 3) / 4 * 4, MAX_ATLAS_BORDER);
-}
-
-Bool WorldHeightMap::refreshAtlasBorder()
-{
-	if (m_terrainTex == nullptr || m_atlasBorder == getAtlasBorderSetting())
-	{
-		return false;
-	}
-
-	// The render object keeps its own references until its update takes the new atlases.
-	REF_PTR_RELEASE(m_terrainTex);
-	REF_PTR_RELEASE(m_alphaTerrainTex);
-	REF_PTR_RELEASE(m_terrainNormalTex);
-	REF_PTR_RELEASE(m_terrainHeightTex);
-	RENDER_LOG(("Terrain atlas border changed to %d, laying the atlases out again", getAtlasBorderSetting()));
-	return true;
-}
-
 /** updateTileTexturePositions - assigns each tile a location in the texture.
 */
 Int WorldHeightMap::updateTileTexturePositions(Int *edgeHeight)
 {
 	Int i, j;
 	Int maxHeight = 0;
-	m_atlasBorder = getAtlasBorderSetting();
-	const Int slot = TILE_PIXEL_EXTENT + 2*m_atlasBorder;
+	const Int slot = TILE_PIXEL_EXTENT + 2*ATLAS_BORDER;
 	const Int tilesPerRow = TEXTURE_WIDTH/slot;
 
 	Bool availableGrid[MAX_ATLAS_SLOTS][MAX_ATLAS_SLOTS];
@@ -1624,18 +1883,18 @@ Int WorldHeightMap::updateTileTexturePositions(Int *edgeHeight)
 				if (found) break;
 			}
 			if (!found) {
-				RENDER_LOG(("Terrain atlas full: %s left out, so its cells draw wrong. A smaller TerrainAtlasBorder fits more.",
+				RENDER_LOG(("Terrain atlas full: %s left out, so its cells draw wrong.",
 					m_textureClasses[texClass].name.str()));
 				m_textureClasses[texClass].positionInTexture.x = 0;
 				m_textureClasses[texClass].positionInTexture.y = 0;
 				continue;
 			}
 
-			Int xOrigin = m_atlasBorder + column*slot;
-			Int yOrigin = m_atlasBorder + row*slot;
+			Int xOrigin = ATLAS_BORDER + column*slot;
+			Int yOrigin = ATLAS_BORDER + row*slot;
 			m_textureClasses[texClass].positionInTexture.x = xOrigin;
 			m_textureClasses[texClass].positionInTexture.y = yOrigin;
-			Int classHeight = yOrigin + width*TILE_PIXEL_EXTENT+ m_atlasBorder;
+			Int classHeight = yOrigin + width*TILE_PIXEL_EXTENT+ ATLAS_BORDER;
 			if (maxHeight < classHeight) maxHeight = classHeight;
 
 			for (i=0; i<width; i++) {
@@ -1866,11 +2125,12 @@ Bool WorldHeightMap::getUVForTileIndex(Int ndx, Short tileNdx, float U[4], float
 				Real maxV = m_textureClasses[i].positionInTexture.y + m_textureClasses[i].width*TILE_PIXEL_EXTENT;
 				minU/=TEXTURE_WIDTH;
 				maxV/=m_terrainTexHeight;
-				Real vFactor = TEXTURE_WIDTH/m_terrainTexHeight;
-				U[0] = info.u0+minU;
-				U[1] = info.u1+minU;
-				U[2] = info.u2+minU;
-				U[3] = info.u3+minU;
+				Real uFactor = (Real)CLIFF_UV_REFERENCE_WIDTH/TEXTURE_WIDTH;
+				Real vFactor = (Real)CLIFF_UV_REFERENCE_WIDTH/m_terrainTexHeight;
+				U[0] = info.u0*uFactor+minU;
+				U[1] = info.u1*uFactor+minU;
+				U[2] = info.u2*uFactor+minU;
+				U[3] = info.u3*uFactor+minU;
 				V[0] = info.v0*vFactor+maxV;
 				V[1] = info.v1*vFactor+maxV;
 				V[2] = info.v2*vFactor+maxV;
@@ -2263,6 +2523,12 @@ void WorldHeightMap::setTextureLOD(Int lod)
 	{
 		m_terrainNormalTex->setLOD(lod);
 	}
+#if defined(RTS_ZEROHOUR)
+	if (m_terrainEmissiveTex != nullptr && m_terrainEmissiveTex->Peek_D3D_Texture() != nullptr)
+	{
+		m_terrainEmissiveTex->Peek_D3D_Texture()->SetLOD(lod);
+	}
+#endif
 	if (m_terrainHeightTex)
 	{
 		m_terrainHeightTex->setLOD(lod);
@@ -2284,11 +2550,13 @@ TextureClass *WorldHeightMap::getTerrainTexture()
 		m_terrainClassMapAtlas = nullptr;
 		REF_PTR_RELEASE(m_terrainGlintMap);
 		m_terrainGlintMapAtlas = nullptr;
+#if defined(RTS_ZEROHOUR)
+		REF_PTR_RELEASE(m_terrainEmissiveTex);
+		m_terrainEmissiveTexFailed = false;
+#endif
 		m_terrainTex = MSGNEW("WorldHeightMap_getTerrainTexture") TerrainTextureClass(pow2Height);
 		m_terrainTexHeight = m_terrainTex->update(this);
-		char buf[64];
-		sprintf(buf, "Base tex height %d", pow2Height);
-		DEBUG_LOG((buf));
+		DEBUG_LOG(("Base tex height %d", pow2Height));
 		REF_PTR_RELEASE(m_alphaTerrainTex);
 		m_alphaTerrainTex = MSGNEW("WorldHeightMap_getTerrainTexture") AlphaTerrainTextureClass(m_terrainTex);
 
@@ -2335,7 +2603,7 @@ TextureClass *WorldHeightMap::getTerrainClassMap()
 
 	// The shader clamps reads to the lookup, so an atlas reaching past it turns the seabed off rather than read the wrong block.
 	const Int size = CLASS_MAP_SLOTS;
-	const Int slot = TILE_PIXEL_EXTENT + 2*m_atlasBorder;
+	const Int slot = TILE_PIXEL_EXTENT + 2*ATLAS_BORDER;
 	for (Int i=0; i<m_numTextureClasses; i++)
 	{
 		const TXTextureClass &texClass = m_textureClasses[i];
@@ -2343,8 +2611,8 @@ TextureClass *WorldHeightMap::getTerrainClassMap()
 		{
 			continue;
 		}
-		if ((texClass.positionInTexture.x - m_atlasBorder) / slot + texClass.width > size ||
-			(texClass.positionInTexture.y - m_atlasBorder) / slot + texClass.width > size)
+		if ((texClass.positionInTexture.x - ATLAS_BORDER) / slot + texClass.width > size ||
+			(texClass.positionInTexture.y - ATLAS_BORDER) / slot + texClass.width > size)
 		{
 			return nullptr;
 		}
@@ -2376,8 +2644,8 @@ TextureClass *WorldHeightMap::getTerrainClassMap()
 			{
 				continue;
 			}
-			const Int column = (texClass.positionInTexture.x - m_atlasBorder) / slot;
-			const Int row = (texClass.positionInTexture.y - m_atlasBorder) / slot;
+			const Int column = (texClass.positionInTexture.x - ATLAS_BORDER) / slot;
+			const Int row = (texClass.positionInTexture.y - ATLAS_BORDER) / slot;
 			const UnsignedInt texel = 0xff000000 | ((UnsignedInt)column << 16) | ((UnsignedInt)row << 8) | (UnsignedInt)width;
 			for (Int y=row; y<row + width && y<size; y++)
 			{
@@ -2520,7 +2788,7 @@ TextureClass *WorldHeightMap::getTerrainGlintMap(Real defaultGloss, Real &streng
 				}
 
 				// A class that did not fit sits at 0,0 and is never drawn.
-				const Int slot = TILE_PIXEL_EXTENT + 2*m_atlasBorder;
+				const Int slot = TILE_PIXEL_EXTENT + 2*ATLAS_BORDER;
 				for (Int i=0; i<m_numTextureClasses; i++)
 				{
 					const TXTextureClass &texClass = m_textureClasses[i];
@@ -2528,8 +2796,8 @@ TextureClass *WorldHeightMap::getTerrainGlintMap(Real defaultGloss, Real &streng
 					{
 						continue;
 					}
-					const Int left = (texClass.positionInTexture.x - m_atlasBorder) / GLINT_MAP_SHRINK;
-					const Int top = (texClass.positionInTexture.y - m_atlasBorder) / GLINT_MAP_SHRINK;
+					const Int left = (texClass.positionInTexture.x - ATLAS_BORDER) / GLINT_MAP_SHRINK;
+					const Int top = (texClass.positionInTexture.y - ATLAS_BORDER) / GLINT_MAP_SHRINK;
 					const Int side = texClass.width * slot / GLINT_MAP_SHRINK;
 					const UnsignedInt texel = 0xff000000 | (Glint_Byte(strengths[i], m_terrainGlintStrengthScale) << 16) |
 						(Glint_Byte(glosses[i], m_terrainGlintGlossScale) << 8);
@@ -2556,6 +2824,23 @@ TextureClass *WorldHeightMap::getTerrainGlintMap(Real defaultGloss, Real &streng
 	glossScale = m_terrainGlintGlossScale;
 	return m_terrainGlintMap;
 }
+
+#if defined(RTS_ZEROHOUR)
+TextureClass *WorldHeightMap::getTerrainEmissiveTexture()
+{
+	if (m_terrainEmissiveTex == nullptr && m_hasEmissiveTiles && !m_terrainEmissiveTexFailed)
+	{
+		getTerrainTexture();
+		m_terrainEmissiveTex = MSGNEW("WorldHeightMap_getTerrainEmissiveTexture") TerrainEmissiveTextureClass(m_terrainTexHeight);
+		if (!m_terrainEmissiveTex->update(this, m_terrainEmissiveScale))
+		{
+			REF_PTR_RELEASE(m_terrainEmissiveTex);
+			m_terrainEmissiveTexFailed = true;
+		}
+	}
+	return m_terrainEmissiveTex;
+}
+#endif
 
 TextureClass *WorldHeightMap::getTerrainNormalTexture()
 {
@@ -2694,6 +2979,13 @@ Bool WorldHeightMap::setDrawArea(const DrawArea& area)
 		return true;
 	}
 	return false;
+}
+
+Int WorldHeightMap::getMaxHeightValue()
+{
+	// Heights are stored as bytes in the map file and multiplied by the scale when loaded.
+	const Real scale = TheMapData ? TheMapData->m_HeightmapScale : 1.0f;
+	return (Int)std::round(K_MAX_HEIGHT * scale);
 }
 
 Bool WorldHeightMap::setDrawOrg(Int xOrg, Int yOrg)

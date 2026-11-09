@@ -99,6 +99,7 @@ public:
 	static void addBuilding(Coord3D loc, Real angle, AsciiString name);
 	static void update() {if (m_staticThis) m_staticThis->loadSides();};
 	static void setSelectedBuildList(BuildListInfo *pInfo);
+	static Int getCurSide() { return m_staticThis ? m_staticThis->m_curSide : 0; }
 
 #ifdef RTS_HAS_QT
 	// Qt front-end support (WBQtBuildListBridge). The MFC BuildList stays created + hidden
@@ -157,6 +158,8 @@ public:
 	static void qtEditProps(void);	// == OnDblclkBuildList (BaseBuildProps)
 	static int  qtGetForcedShow(void);
 	static void qtSetForcedShow(int on);
+	static int  qtGetSideOnly(void);
+	static void qtSetSideOnly(int on);
 #endif
 
 	virtual void GetPopSliderInfo(const long sliderID, long *pMin, long *pMax, long *pLineSize, long *pInitial);

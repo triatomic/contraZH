@@ -59,6 +59,8 @@ public:
 	Real									m_repeatDetonateMoveThresh;
 	Real									m_healthPercentToDrainPerSecond;
 	const ObjectCreationList* m_ocl; ///< object creaton list to make
+	KindOfMaskType				m_requiredKindOf;									///< a detonator must be at least one of these
+	KindOfMaskType				m_forbiddenKindOf;								///< a detonator must be none of these
 
 };
 

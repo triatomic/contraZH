@@ -52,6 +52,10 @@
 #define HEIGHT_BLEND_REGISTER c1
 #include "heightblend.hlsli"
 
+#if BUMP != 2
+sampler2D EmissiveAtlas : register(s15);
+#endif
+
 sampler2D RoadTexture : register(s0);
 
 #if NOISE_COUNT >= 1
@@ -112,7 +116,7 @@ float4 SunColor : register(c3);   // the sun's diffuse colour in the vertex ligh
 sampler2D NormalMap : register(CONCAT(s, NORMAL_INDEX));
 
 // Schuler's cotangent frame from the UV derivatives, since roads bend and turn their UVs with them.
-// z comes back from unit length, as the atlas has none. HeightBlend.w is 1 for the terrain atlas,
+// z comes back from unit length, as the atlas has none. HeightBlend.w is at least 1 for the terrain atlas,
 // which holds y in alpha, and 0 for a _nrm.dds, which holds it in green.
 float3 BumpNormal(float3 normal, float3 position, float2 uv)
 {
@@ -128,7 +132,7 @@ float3 BumpNormal(float3 normal, float3 position, float2 uv)
     float scale = side * ToSun.w * rsqrt(max(max(dot(tangent, tangent), dot(bitangent, bitangent)), 1e-30f));
 
     float4 texel = tex2D(NormalMap, uv);
-    float2 xy = float2(texel.r, lerp(texel.g, texel.a, HeightBlend.w)) * 2.0f - 1.0f;
+    float2 xy = float2(texel.r, lerp(texel.g, texel.a, saturate(HeightBlend.w))) * 2.0f - 1.0f;
     float3 bumped = (tangent * xy.x + bitangent * xy.y) * scale + normal * sqrt(saturate(1.0f - dot(xy, xy)));
     return (dot(bumped, bumped) > 1e-20f) ? normalize(bumped) : normal;
 }
@@ -219,12 +223,24 @@ float4 main(PsIn input) : COLOR
     float3 bumped = normal;
 #endif
 
+#if LIGHTS && LIGHTS_ONLY && LIGHTS_DEBUG
+    return float4(PointLighting(input.WorldPos, bumped), color.a * weight);
+#elif LIGHTS && LIGHTS_ONLY
+    light = float3(0.0f, 0.0f, 0.0f);
+#elif LIGHTS && LIGHTS_DEBUG
+    return float4(PointLighting(input.WorldPos, bumped), color.a * weight);
+#endif
+
 #if LIGHTS
-    light += PointLighting(input.WorldPos, bumped);
+    float3 localColor = color.rgb * PointLighting(input.WorldPos, bumped);
 #endif
 
 #if LIGHTS || BUMP
+#if LIGHTS
+    color.rgb *= max(light, 0.0f);
+#else
     color.rgb *= saturate(light);
+#endif
 #else
     color.rgb *= input.Diffuse.rgb;
 #endif
@@ -232,17 +248,25 @@ float4 main(PsIn input) : COLOR
 
 #if NOISE_COUNT >= 1
     float4 cloud = tex2D(Noise1Texture, input.Noise1UV);
+#if !SHADOWED
     color *= cloud;
+#endif
+#endif
+#if SHADOWED && NOISE_COUNT >= 1
+    color.rgb *= CloudShadowFactor(lit, cloud.rgb);
+#elif SHADOWED
+    color.rgb *= lerp(ShadowColor.rgb, float3(1.0f, 1.0f, 1.0f), lit);
+#endif
+
+#if LIGHTS
+    // Local lights do not inherit the sun's shadows or clouds.
+    color.rgb += localColor;
 #endif
 #if NOISE_COUNT >= 2
     color.rgb *= GroundNoise(Noise2Texture, input.Noise2UV);
 #endif
 
-#if SHADOWED
-    color.rgb *= lerp(ShadowColor.rgb, float3(1.0f, 1.0f, 1.0f), lit);
-#endif
-
-#if GLINT
+#if GLINT && !LIGHTS_ONLY
     // The bump tilts the smooth normal as far as it tilts the facet's.
 #if BUMP
     float3 glintNormal = normalize(GlintNormal(input.WorldPos) + bumped - normal);
@@ -257,9 +281,12 @@ float4 main(PsIn input) : COLOR
 #endif
 #endif
 
-#if BUMP
+#if BUMP && !LIGHTS_ONLY
     // The debug view shows only the bump's shading, 4x, on grey.
     color.rgb = lerp(color.rgb, saturate(0.5f + change * 4.0f).xxx, SunColor.w);
+#endif
+#if BUMP != 2 && !LIGHTS_ONLY
+    color.rgb += tex2D(EmissiveAtlas, input.RoadUV).rgb * max(HeightBlend.w - 1.0f, 0.0f);
 #endif
     return color;
 }

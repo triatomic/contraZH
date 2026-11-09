@@ -47,7 +47,7 @@ CarrierDroneAIUpdateModuleData::CarrierDroneAIUpdateModuleData()
 		//{ "DockingStartSound",					INI::parseIndexList, TheLocomotorSetNames, offsetof(CarrierDroneAIUpdateModuleData, m_dockingLoco) },
 		{ "LaunchTime",							INI::parseDurationUnsignedInt, NULL, offsetof(CarrierDroneAIUpdateModuleData, m_launchTime) },
 		{ "LaunchingLocomotorType",					INI::parseIndexList, TheLocomotorSetNames, offsetof(CarrierDroneAIUpdateModuleData, m_launchingLoco) },
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 	p.add(dataFieldParse);
 }

@@ -115,6 +115,11 @@ static NameKeyType sliderGameSpeedID = NAMEKEY_INVALID;
 static NameKeyType staticTextGameSpeedID = NAMEKEY_INVALID;
 static NameKeyType checkBoxLimitSuperweaponsID = NAMEKEY_INVALID;
 static NameKeyType comboBoxStartingCashID = NAMEKEY_INVALID;
+static NameKeyType checkCoopBuildingsID = NAMEKEY_INVALID;
+static NameKeyType checkQuickGameID = NAMEKEY_INVALID;
+static NameKeyType checkDiplomacyRuleID = NAMEKEY_INVALID;
+static NameKeyType checkFreeRadarID = NAMEKEY_INVALID;
+static NameKeyType checkRevealMapID = NAMEKEY_INVALID;
 
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *staticTextGameSpeed = nullptr;
@@ -128,6 +133,12 @@ static GameWindow *windowMap = nullptr;
 static GameWindow *textEntryPlayerName = nullptr;
 static GameWindow *checkBoxLimitSuperweapons = nullptr;
 static GameWindow *comboBoxStartingCash = nullptr;
+static GameWindow *checkCoopBuildings = nullptr;
+static GameWindow *checkQuickGame = nullptr;
+static GameWindow *checkDiplomacyRule = nullptr;
+static GameWindow *checkFreeRadar = nullptr;
+static GameWindow *checkRevealMap = nullptr;
+static LobbyTabs lobbyTabs;
 static GameWindow *comboBoxPlayer[MAX_SLOTS] = {0};
 
 static GameWindow *comboBoxColor[MAX_SLOTS] = {0};
@@ -1016,6 +1027,14 @@ static void handleLimitSuperweaponsClick()
   }
 }
 
+static void setSkirmishRule( GameWindow *check, void (GameInfo::*set)( Bool ) )
+{
+	if (TheSkirmishGameInfo && check)
+	{
+		(TheSkirmishGameInfo->*set)( GadgetCheckBoxIsChecked( check ) );
+	}
+}
+
 
 //-------------------------------------------------------------------------------------------------
 /** Initialize the Gadgets Options Menu */
@@ -1033,6 +1052,11 @@ void InitSkirmishGameGadgets()
 	staticTextGameSpeedID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:StaticTextGameSpeed" );
   checkBoxLimitSuperweaponsID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckboxLimitSuperweapons" );
   comboBoxStartingCashID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:ComboBoxStartingCash" );
+  checkCoopBuildingsID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckCoopBuildings" );
+  checkQuickGameID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckQuickGame" );
+  checkDiplomacyRuleID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckDiplomacyRule" );
+  checkFreeRadarID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckFreeRadar" );
+  checkRevealMapID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckRevealMap" );
 
 	// Initialize the pointers to our gadgets
 	parentSkirmishGameOptions = TheWindowManager->winGetWindowFromId( nullptr, parentSkirmishGameOptionsID );
@@ -1054,6 +1078,20 @@ void InitSkirmishGameGadgets()
   comboBoxStartingCash = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, comboBoxStartingCashID );
   DEBUG_ASSERTCRASH(comboBoxStartingCash, ("Could not find the comboBoxStartingCash"));
   PopulateStartingCashComboBox(comboBoxStartingCash, TheSkirmishGameInfo );
+
+	// The layout may predate this control, so it stays optional
+	checkCoopBuildings = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, checkCoopBuildingsID );
+	SetLobbyRuleCaption( checkCoopBuildings, LOBBY_RULE_COOP_BUILDINGS );
+	checkQuickGame = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, checkQuickGameID );
+	SetLobbyRuleCaption( checkQuickGame, LOBBY_RULE_QUICK_GAME );
+	checkDiplomacyRule = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, checkDiplomacyRuleID );
+	SetLobbyRuleCaption( checkDiplomacyRule, LOBBY_RULE_DIPLOMACY );
+	checkFreeRadar = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, checkFreeRadarID );
+	SetLobbyRuleCaption( checkFreeRadar, LOBBY_RULE_FREE_RADAR );
+	checkRevealMap = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, checkRevealMapID );
+	SetLobbyRuleCaption( checkRevealMap, LOBBY_RULE_REVEAL_MAP );
+
+	InitLobbyTabs( lobbyTabs, parentSkirmishGameOptions, "SkirmishGameOptionsMenu.wnd" );
 
 	textEntryPlayerNameID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:TextEntryPlayerName" );
   textEntryPlayerName = TheWindowManager->winGetWindowFromId( nullptr, textEntryPlayerNameID );
@@ -1234,6 +1272,26 @@ void updateSkirmishGameOptions()
 	}
 
   GadgetCheckBoxSetChecked( checkBoxLimitSuperweapons, TheSkirmishGameInfo->getSuperweaponRestriction() != 0 );
+  if (checkCoopBuildings)
+  {
+    GadgetCheckBoxSetChecked( checkCoopBuildings, TheSkirmishGameInfo->getCoopBuildings() );
+  }
+  if (checkQuickGame)
+  {
+    GadgetCheckBoxSetChecked( checkQuickGame, TheSkirmishGameInfo->getQuickGame() );
+  }
+  if (checkDiplomacyRule)
+  {
+    GadgetCheckBoxSetChecked( checkDiplomacyRule, TheSkirmishGameInfo->getDiplomacy() );
+  }
+  if (checkFreeRadar)
+  {
+    GadgetCheckBoxSetChecked( checkFreeRadar, TheSkirmishGameInfo->getFreeRadar() );
+  }
+  if (checkRevealMap)
+  {
+    GadgetCheckBoxSetChecked( checkRevealMap, TheSkirmishGameInfo->getRevealMap() );
+  }
   Int itemCount = GadgetComboBoxGetLength(comboBoxStartingCash);
   Int index = 0;
   for ( ; index < itemCount; index++ )
@@ -1647,6 +1705,34 @@ WindowMsgHandledType SkirmishGameOptionsMenuSystem( GameWindow *window, Unsigned
         else if ( controlID == checkBoxLimitSuperweaponsID )
         {
           handleLimitSuperweaponsClick();
+        }
+        else if ( controlID == checkCoopBuildingsID )
+        {
+          setSkirmishRule( checkCoopBuildings, &GameInfo::setCoopBuildings );
+        }
+        else if ( controlID == checkQuickGameID )
+        {
+          setSkirmishRule( checkQuickGame, &GameInfo::setQuickGame );
+        }
+        else if ( controlID == checkDiplomacyRuleID )
+        {
+          setSkirmishRule( checkDiplomacyRule, &GameInfo::setDiplomacy );
+        }
+        else if ( controlID == checkFreeRadarID )
+        {
+          setSkirmishRule( checkFreeRadar, &GameInfo::setFreeRadar );
+        }
+        else if ( controlID == checkRevealMapID )
+        {
+          setSkirmishRule( checkRevealMap, &GameInfo::setRevealMap );
+        }
+        else if ( controlID == lobbyTabs.buttonGameID )
+        {
+          ShowLobbyTab( lobbyTabs, FALSE );
+        }
+        else if ( controlID == lobbyTabs.buttonRulesID )
+        {
+          ShowLobbyTab( lobbyTabs, TRUE );
         }
 				else
 				{

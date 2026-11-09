@@ -179,7 +179,7 @@ public:
       { "RequiredTargetKindOf",       KindOfMaskType::parseFromINI,			nullptr, offsetof( SpecialAbilityUpdateModuleData, m_requiredTargetKindOf ) },
       { "ForbiddenTargetKindOf",      KindOfMaskType::parseFromINI,			nullptr, offsetof( SpecialAbilityUpdateModuleData, m_forbiddenTargetKindOf ) },
       { "TargetRelationship",         INI::parseBitString32,						TheWeaponAffectsMaskNames, offsetof( SpecialAbilityUpdateModuleData, m_targetRelationship ) },
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
     p.add(dataFieldParse);
 	}
@@ -260,6 +260,7 @@ protected:
 	Bool needToUnpack() const;
 
 	Bool isPreparationComplete() const { return !m_prepFrames; }
+	UnsignedInt calcPreparationFrames() const;
 	void endPreparation();
 	Bool isPersistentAbility() const { return getSpecialAbilityUpdateModuleData()->m_persistentPrepFrames > 0; }
 	void resetPreparation() { m_prepFrames = getSpecialAbilityUpdateModuleData()->m_persistentPrepFrames; }

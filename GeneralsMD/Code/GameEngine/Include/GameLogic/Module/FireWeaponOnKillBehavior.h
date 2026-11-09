@@ -49,7 +49,7 @@ public:
 		{
 			{ "StartsActive",	INI::parseBool,							nullptr, offsetof( FireWeaponOnKillBehaviorModuleData, m_initiallyActive ) },
 			{ "KillWeapon",		INI::parseWeaponTemplate,		nullptr, offsetof( FireWeaponOnKillBehaviorModuleData, m_killWeapon ) },
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
 
 		BehaviorModuleData::buildFieldParse(p);

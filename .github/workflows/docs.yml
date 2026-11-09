@@ -1,0 +1,65 @@
+name: Docs
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+      - 'docs-theme/**'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Site
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set Up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Sphinx
+        run: pip install -r docs-theme/requirements.txt
+
+      # dirhtml keeps the Page/ URLs the MkDocs site used; Pages serves only a root 404.html
+      - name: Build
+        run: |
+          sphinx-build -b dirhtml -c docs-theme -d doctrees -W --keep-going docs site
+          cp site/404/index.html site/404.html
+
+      # Index for search as you type in the sidebar (search.js)
+      - name: Index Search
+        run: npx -y pagefind@1.5.2 --site site --exclude-selectors .headerlink
+
+      - name: Upload Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: Deploy to Pages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

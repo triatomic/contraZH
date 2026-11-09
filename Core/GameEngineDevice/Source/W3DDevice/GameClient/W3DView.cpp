@@ -92,7 +92,6 @@
 #include "W3DDevice/GameClient/W3DScene.h"
 #include "W3DDevice/GameClient/W3DView.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
-#include "W3DDevice/GameClient/W3DColorLut.h"
 #include "W3DDevice/GameClient/Module/W3DModelDraw.h"
 #include "W3DDevice/GameClient/W3DCustomScene.h"
 
@@ -240,6 +239,9 @@ W3DView::~W3DView()
 
 	REF_PTR_RELEASE( m_2DCamera );
 	REF_PTR_RELEASE( m_3DCamera );
+
+	// Empty the global shaker list while its pools are alive; its static destructor runs too late at exit.
+	CameraShakerSystem.Reset();
 
 }
 
@@ -848,11 +850,8 @@ void W3DView::updateCameraClipPlanes(const Matrix3D &transform)
 {
 	Real farZ;
 
-	if (TheGlobalData->m_drawEntireTerrain)
-	{
-		farZ = 100000.0f;
-	}
-	else if (TheTerrainRenderObject && TheTerrainRenderObject->getMap())
+	// DrawEntireTerrain widens the draw region to the map, so the same fit covers it.
+	if (TheTerrainRenderObject && TheTerrainRenderObject->getMap())
 	{
 		WorldHeightMap *heightMap = TheTerrainRenderObject->getMap();
 
@@ -1860,7 +1859,7 @@ void W3DView::update()
 					if (cameraLockObj->isUsingAirborneLocomotor() && cameraLockObj->isAboveTerrainOrWater())
 					{
 						Matrix3D camXForm;
-						Real idealZRot = objAngle - M_PI_2;
+						Real idealZRot = objAngle - WWMATH_HALF_PI;
 
 						if (m_snapImmediate)
 						{
@@ -2255,11 +2254,6 @@ void W3DView::draw()
 		W3DDisplay::m_3DScene->doRender( m_3DCamera );
 		Coord2D deltaScroll;
 		W3DShaderManager::filterPostRender(m_viewFilter, m_viewFilterMode, deltaScroll, doExtraRender);
-	}
-
-	if (TheW3DColorLut != nullptr)
-	{
-		TheW3DColorLut->render(*m_3DCamera);
 	}
 
 	if( TheGlobalData->m_debugAI )
@@ -3136,7 +3130,7 @@ void W3DView::setDefaultView(Real pitch, Real angle, Real maxHeight)
 #endif
 {
 	// MDC - we no longer want to rotate maps (design made all of them right to begin with)
-	//	m_defaultAngle = angle * M_PI/180.0f;
+	//	m_defaultAngle = angle * WWMATH_PI/180.0f;
 	setDefaultPitch(pitch);
 #if defined(GENERALS_ONLINE_WIDESCREEN)
 	// A wider aspect than 4:3 shows less map vertically, so the camera may rise to compensate.
@@ -4624,20 +4618,21 @@ void W3DView::Add_Camera_Shake (const Coord3D & position,float radius,float dura
 	CameraShakerSystem.Add_Camera_Shake(vpos,radius,duration,power);
 }
 
-bool W3DView::getDesiredTerrainDrawSize(ICoord2D &dimensions) const
+bool W3DView::getDesiredTerrainDrawSize(ICoord2D &dimensions, Vector2 &drawCenter, bool &useDrawCenter) const
 {
+	useDrawCenter = false;
+	const WorldHeightMap *map = TheTerrainRenderObject->getMap();
+	if (!map)
+	{
+		return false;
+	}
+
+	// Keep the map-sized fallback for invalid camera data and footprints larger than the map.
+	dimensions.x = map->getXExtent();
+	dimensions.y = map->getYExtent();
 	if (TheGlobalData && TheGlobalData->m_drawEntireTerrain)
 	{
-		DEBUG_ASSERTCRASH(TheTerrainRenderObject != nullptr, ("TheTerrainRenderObject is null"));
-
-		if (const WorldHeightMap *heightMap = TheTerrainRenderObject->getMap())
-		{
-			dimensions.x = heightMap->getXExtent();
-			dimensions.y = heightMap->getYExtent();
-			return true;
-		}
-
-		return false;
+		return true;
 	}
 
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
@@ -4651,21 +4646,100 @@ bool W3DView::getDesiredTerrainDrawSize(ICoord2D &dimensions) const
 	}
 #endif
 
-	const Real cameraPitch = asin(fabs(m_3DCamera->Get_Forward_Dir().Z));
-
+	// Both height limits keep the footprint wide enough for valleys and higher ground.
+	const Matrix3D &cameraTransform = m_3DCamera->Get_Transform();
+	const Vector3 cameraLocation = cameraTransform.Get_Translation();
+	const Real cameraPitch = asin(fabs(cameraTransform[2][2]));
+	ICoord2D minimumSize;
 	if (cameraPitch > ViewDefaultLowPitchRadians || !m_isUserControlled)
 	{
-		// TheSuperHackers @info The scripted camera always uses the regular draw sizes
-		// and uses terrain oversize if it needs to enlarge.
-		dimensions.x = WorldHeightMap::NORMAL_DRAW_WIDTH;
-		dimensions.y = WorldHeightMap::NORMAL_DRAW_HEIGHT;
+		minimumSize.x = WorldHeightMap::NORMAL_DRAW_WIDTH;
+		minimumSize.y = WorldHeightMap::NORMAL_DRAW_HEIGHT;
+	}
+	else
+	{
+		// TheSuperHackers @tweak xezon 31/12/2025 Increases visible terrain area when lowering the camera pitch.
+		// Note: The default camera pitch in Generals was 37.5, which we prefer to keep the normal draw size for.
+		minimumSize.x = WorldHeightMap::LOW_ANGLE_DRAW_WIDTH;
+		minimumSize.y = WorldHeightMap::LOW_ANGLE_DRAW_HEIGHT;
+	}
+
+	const Real groundZ[2] = {
+		TheTerrainRenderObject->getMinHeight(),
+		std::min(TheTerrainRenderObject->getMaxHeight(), cameraLocation.Z)
+	};
+	if (!cameraLocation.Is_Valid() || cameraLocation.Z <= groundZ[0])
+	{
 		return true;
 	}
 
-	// TheSuperHackers @tweak xezon 31/12/2025 Increases visible terrain area when lowering the camera pitch.
-	// Note: The default camera pitch in Generals was 37.5, which we prefer to keep the normal draw size for.
-	dimensions.x = WorldHeightMap::LOW_ANGLE_DRAW_WIDTH;
-	dimensions.y = WorldHeightMap::LOW_ANGLE_DRAW_HEIGHT;
+	Vector2 viewPlaneMin, viewPlaneMax;
+	m_3DCamera->Get_View_Plane(viewPlaneMin, viewPlaneMax);
+	const Int planeCount = groundZ[0] < groundZ[1] ? 2 : 1;
+	Vector3 corners[8];
+	Vector2 footprintMin, footprintMax;
+	for (Int i = 0; i < 4; ++i)
+	{
+		const Vector3 ray((i & 1) ? viewPlaneMax.X : viewPlaneMin.X,
+			(i & 2) ? viewPlaneMax.Y : viewPlaneMin.Y, -1.0f);
+		const Real rayZ = cameraTransform[2][0]*ray.X + cameraTransform[2][1]*ray.Y - cameraTransform[2][2];
+		if (!(rayZ < 0.0f))
+		{
+			return true;
+		}
+
+		const Real inverseRayZ = 1.0f/rayZ;
+		for (Int plane = 0; plane < planeCount; ++plane)
+		{
+			Vector3 &corner = corners[plane*4 + i];
+			corner = ray * ((groundZ[plane] - cameraLocation.Z)*inverseRayZ);
+			if (!corner.Is_Valid())
+			{
+				return true;
+			}
+			const Vector2 offset(
+				cameraTransform[0][0]*corner.X + cameraTransform[0][1]*corner.Y + cameraTransform[0][2]*corner.Z,
+				cameraTransform[1][0]*corner.X + cameraTransform[1][1]*corner.Y + cameraTransform[1][2]*corner.Z);
+			if (i == 0 && plane == 0)
+			{
+				footprintMin = footprintMax = offset;
+			}
+			footprintMin.Update_Min(offset);
+			footprintMax.Update_Max(offset);
+		}
+	}
+
+	// Camera-space XY distances keep allocation thresholds stable as the camera rotates.
+	Real diameterSquared = 0.0f;
+	const Real worldBound = std::max(map->getXExtent(), map->getYExtent())*MAP_XY_FACTOR;
+	for (Int i = 0; i < planeCount*4; ++i)
+	{
+		for (Int j = 0; j < i; ++j)
+		{
+			const Vector3 delta = corners[i] - corners[j];
+			const Real deltaZ = groundZ[i/4] - groundZ[j/4];
+			const Real distanceSquared = delta.Length2() - deltaZ*deltaZ;
+			if (!(distanceSquared < worldBound*worldBound))
+			{
+				return true;
+			}
+			diameterSquared = std::max(diameterSquared, distanceSquared);
+		}
+	}
+
+	// CENTER_LIMIT permits two cells of origin drift per axis; nearest-cell centering adds half a cell.
+	const Int footprintTiles = (Int)ceil(WWMath::Sqrt(diameterSquared)/MAP_XY_FACTOR) + 5;
+	const Int blocks = (footprintTiles + VERTEX_BUFFER_TILE_LENGTH - 1)/VERTEX_BUFFER_TILE_LENGTH;
+	const Int drawSize = 1 + blocks*VERTEX_BUFFER_TILE_LENGTH;
+	dimensions.x = std::min(map->getXExtent(), std::max(minimumSize.x, drawSize));
+	dimensions.y = std::min(map->getYExtent(), std::max(minimumSize.y, drawSize));
+	if (dimensions.x > std::min(map->getXExtent(), minimumSize.x)
+		|| dimensions.y > std::min(map->getYExtent(), minimumSize.y))
+	{
+		drawCenter.Set(cameraLocation.X + (footprintMin.X + footprintMax.X)*0.5f,
+			cameraLocation.Y + (footprintMin.Y + footprintMax.Y)*0.5f);
+		useDrawCenter = true;
+	}
 	return true;
 }
 
@@ -4674,8 +4748,9 @@ void W3DView::updateTerrain()
 	DEBUG_ASSERTCRASH(TheTerrainRenderObject != nullptr, ("TheTerrainRenderObject is null"));
 
 	ICoord2D drawSize;
-
-	if (getDesiredTerrainDrawSize(drawSize))
+	Vector2 drawCenter;
+	bool useDrawCenter;
+	if (getDesiredTerrainDrawSize(drawSize, drawCenter, useDrawCenter))
 	{
 		TheTerrainRenderObject->setTerrainDrawSize(drawSize.x, drawSize.y);
 	}
@@ -4684,5 +4759,5 @@ void W3DView::updateTerrain()
 	RefRenderObjListIterator it(lightlist);
 
 	const Vector3 cameraPivot(m_pos.x, m_pos.y, m_pos.z);
-	TheTerrainRenderObject->updateCenter(m_3DCamera, &cameraPivot, &it);
+	TheTerrainRenderObject->updateCenter(m_3DCamera, &cameraPivot, &it, useDrawCenter ? &drawCenter : nullptr);
 }

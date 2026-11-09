@@ -152,6 +152,7 @@ private:
 	WeaponSetFlags					m_types;
 	const WeaponTemplate*		m_template[WEAPONSLOT_COUNT];
 	UnsignedInt							m_autoChooseMask[WEAPONSLOT_COUNT];
+	UnsignedInt							m_ignoreLineOfSightMask;
 	KindOfMaskType					m_preferredAgainst[WEAPONSLOT_COUNT];
 	Bool										m_isReloadTimeShared;
 	Bool										m_isClipShared;
@@ -178,6 +179,7 @@ public:
 	Bool isWeaponLockSharedAcrossSets() const {return m_isWeaponLockSharedAcrossSets; }
 	Bool isWeaponReloadSharedAcrossSets() const { return m_isWeaponReloadSharedAcrossSets; }
 	Bool isSharedClip() const { return m_isClipShared; }
+	Bool ignoresLineOfSight(WeaponSlotType n) const { return (m_ignoreLineOfSightMask & (1U << n)) != 0; }
 
 	Bool hasAnyWeapons() const;
 	inline const WeaponTemplate* getNth(WeaponSlotType n) const { return m_template[n]; }
@@ -258,6 +260,7 @@ public:
 	Weapon* getCurWeapon() { return m_weapons[m_curWeapon]; }
 	const Weapon* getCurWeapon() const { return m_weapons[m_curWeapon]; }
 	WeaponSlotType getCurWeaponSlot() const { return m_curWeapon; }
+	Bool isCurWeaponIgnoringLineOfSight() const { return m_curWeaponTemplateSet && getCurWeapon() && m_curWeaponTemplateSet->ignoresLineOfSight(m_curWeapon); }
 	Weapon* findWaypointFollowingCapableWeapon();
 	const Weapon* findAmmoPipShowingWeapon() const;
 	void weaponSetOnWeaponBonusChange(const Object *source);

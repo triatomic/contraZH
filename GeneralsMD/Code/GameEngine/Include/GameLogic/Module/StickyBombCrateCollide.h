@@ -73,7 +73,7 @@ public:
 			{ "ShowInfiltrationEvent", INI::parseBool, NULL, offsetof(StickyBombCrateCollideModuleData, m_showInfiltrationEvent) },
 			{ "StickyBombObject", INI::parseAsciiString, NULL, offsetof(StickyBombCrateCollideModuleData, m_stickyBombObjectName) },
 			{ "ChanceToTriggerPercent", INI::parsePercentToReal, NULL, offsetof(StickyBombCrateCollideModuleData, m_triggerChance) },
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
 		p.add( dataFieldParse );
 	}

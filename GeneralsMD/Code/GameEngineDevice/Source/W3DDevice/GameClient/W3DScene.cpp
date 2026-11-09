@@ -61,6 +61,8 @@
 #include "W3DDevice/GameClient/W3DShroud.h"
 #include "W3DDevice/GameClient/W3DAmbientOcclusion.h"
 #include "W3DDevice/GameClient/W3DLaserGlow.h"
+#include "W3DDevice/GameClient/W3DPlanarMirror.h"
+#include "W3DDevice/GameClient/W3DWater.h"
 #include "WW3D2/camera.h"
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/dx8instancing.h"
@@ -452,7 +454,8 @@ void RTS3DScene::Visibility_Check(CameraClass * camera)
 			}
 
 			const SphereClass &sphere = robj->Get_Bounding_Sphere();
-			Bool isVisible = !robj->Is_Hidden() && sphere.Center.Z + sphere.Radius > m_planarMirrorZ && !camera->Cull_Sphere(sphere);
+			Bool isVisible = !robj->Is_Hidden() && sphere.Center.Z + sphere.Radius > m_planarMirrorZ && !camera->Cull_Sphere(sphere) &&
+				(TheWaterRenderObj == nullptr || TheWaterRenderObj->canReflectOnWater(sphere, camera->Get_Position()));
 
 			drawInfo = (DrawableInfo *)robj->Get_User_Data();
 			if (drawInfo && (draw=drawInfo->m_drawable) != nullptr)
@@ -744,7 +747,7 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 	ObjectShroudStatus ss=OBJECTSHROUD_INVALID;
 	Int extraMaterialPops=0;
 	Bool doExtraFlagsPop=FALSE;
-	Int pixelLights[W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS];
+	std::vector<Int> pixelLights(max(W3DShaderManager::getPixelLightCount(), 1));
 	Int pixelLightCount=0;
 	LightClass **sceneLights=m_globalLight;
 
@@ -764,6 +767,11 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 		//a ghost object which is always fogged.
 		if (!draw)
 			ss = OBJECTSHROUD_FOGGED;
+	}
+
+	if (draw != nullptr)
+	{
+		robj->Set_Emission_Disabled(draw->areLightsDisabled());
 	}
 
 	// all this ambient business no longer handles the tinting and flashing stuff,
@@ -926,32 +934,38 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 		// Receive the sun's shadow on opaque drawables. Skipped where the base pass is
 		// suppressed, since the pass only darkens pixels the base pass drew.
 		MaterialPassClass *shadowPass = (TheW3DShadowMap != nullptr) ? TheW3DShadowMap->getReceivePass() : nullptr;
-		if (shadowPass != nullptr && m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop && !m_planarMirrorPass &&
-			draw->getEffectiveOpacity() == 1.0f)
+		const Bool takesSunPasses = m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop && !m_planarMirrorPass &&
+			draw->getEffectiveOpacity() == 1.0f;
+		const Bool receivesShadow = shadowPass != nullptr && takesSunPasses;
+
+		// Vehicles and structures catch a per-pixel sun highlight and bumps. Infantry and the rest stay
+		// matte, and take the pass only for the dynamic lights it draws.
+		MaterialPassClass *specularPass = nullptr;
+		Bool specularTakesShadow = receivesShadow && W3DShaderManager::canSpecularReceiveShadow();
+		if (takesSunPasses)
+		{
+			if (draw->getReceivesDynamicLights() && W3DShaderManager::supportsUnitPixelLights())
+			{
+				pixelLightCount = pickObjectPixelLights(sph, &pixelLights[0]);
+			}
+			const Bool lightsOnly = !draw->isKindOf(KINDOF_VEHICLE) && !draw->isKindOf(KINDOF_STRUCTURE);
+			specularPass = W3DShaderManager::getSpecularPass(&pixelLights[0], pixelLightCount, lightsOnly, specularTakesShadow);
+			if (specularPass == nullptr)
+			{
+				pixelLightCount = 0;
+			}
+		}
+
+		// Where the specular pass does the receiver's work, the mesh draws once less.
+		if (receivesShadow && !specularTakesShadow)
 		{
 			rinfo.Push_Material_Pass(shadowPass);
 			extraMaterialPops++;
 		}
-
-		// Vehicles and structures catch a per-pixel sun highlight and bumps. Infantry and the rest stay
-		// matte, and take the pass only for the dynamic lights it draws.
-		if (m_customPassMode == SCENE_PASS_DEFAULT && !doExtraFlagsPop && !m_planarMirrorPass && draw->getEffectiveOpacity() == 1.0f)
+		if (specularPass != nullptr)
 		{
-			if (draw->getReceivesDynamicLights() && W3DShaderManager::supportsUnitPixelLights())
-			{
-				pixelLightCount = pickObjectPixelLights(sph, pixelLights);
-			}
-			const Bool lightsOnly = !draw->isKindOf(KINDOF_VEHICLE) && !draw->isKindOf(KINDOF_STRUCTURE);
-			MaterialPassClass *specularPass = W3DShaderManager::getSpecularPass(pixelLights, pixelLightCount, lightsOnly);
-			if (specularPass != nullptr)
-			{
-				rinfo.Push_Material_Pass(specularPass);
-				extraMaterialPops++;
-			}
-			else
-			{
-				pixelLightCount = 0;
-			}
+			rinfo.Push_Material_Pass(specularPass);
+			extraMaterialPops++;
 		}
 	}
 	else
@@ -966,7 +980,13 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 			//Must be ghost object because we don't fog normal things.  Fogged objects always have a predefined
 			//lighting environment applied which emulates the look of fog.
 			rinfo.light_environment = &m_foggedLightEnv;
+			// A reflection would light a ghost's mirrors past the fog, so they draw plain.
+			const Bool mirrors = TheW3DPlanarMirrors != nullptr && TheW3DPlanarMirrors->suspendScenePass();
 			robj->Render(rinfo);
+			if (mirrors)
+			{
+				TheW3DPlanarMirrors->beginScenePass(FALSE);
+			}
 			rinfo.light_environment = nullptr;
 			return;
 		}
@@ -975,6 +995,21 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 			lightEnv.Reset(sph.Center, ambient);
 			for (Int globalLightIndex = 0; globalLightIndex < m_numGlobalLights; globalLightIndex++)
 				lightEnv.Add_Light(*m_globalLight[globalLightIndex]);
+		}
+		if (TheGlobalData->m_isWorldBuilder && TheGlobalData->m_usePathTracing &&
+			TheGlobalData->m_useDynamicLights && TheGlobalData->m_usePixelLights &&
+			m_customPassMode == SCENE_PASS_DEFAULT && !m_planarMirrorPass && !m_drawTerrainOnly &&
+			(robj->Class_ID() == RenderObjClass::CLASSID_MESH || robj->Class_ID() == RenderObjClass::CLASSID_HLOD) &&
+			W3DShaderManager::supportsUnitPixelLights())
+		{
+			pixelLightCount = pickObjectPixelLights(sph, &pixelLights[0]);
+			Bool receivesShadow = FALSE;
+			MaterialPassClass *pass = W3DShaderManager::getSpecularPass(&pixelLights[0], pixelLightCount, TRUE, receivesShadow);
+			if (pass != nullptr)
+			{
+				rinfo.Push_Material_Pass(pass);
+				extraMaterialPops++;
+			}
 		}
 	}
 
@@ -1003,7 +1038,7 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 				  continue;
 			  }
 			  // the specular pass adds this one per pixel
-			  if (std::find(pixelLights, pixelLights + pixelLightCount, pDyna->getPixelIndex()) != pixelLights + pixelLightCount) {
+			  if (std::find(pixelLights.begin(), pixelLights.begin() + pixelLightCount, pDyna->getPixelIndex()) != pixelLights.begin() + pixelLightCount) {
 				  continue;
 			  }
 			  SphereClass lSph = pDyna->Get_Bounding_Sphere();
@@ -1057,6 +1092,11 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 		rinfo.Pop_Material_Pass();
 	if (doExtraFlagsPop)
 		rinfo.Pop_Override_Flags();	//flags used to disable base pass and only render custom heat vision pass.
+
+	// The overrides belong to this object's overlay and heat vision passes. Left set, every later mesh would
+	// carry them, scaling its own passes and falling out of instancing and batched passes.
+	rinfo.materialPassEmissiveOverride = 1.0f;
+	rinfo.materialPassAlphaOverride = 1.0f;
 }
 
 //DECLARE_PERF_TIMER(translucentRender)
@@ -1133,6 +1173,11 @@ void RTS3DScene::Flush(RenderInfoClass & rinfo)
 		SortingRendererClass::Flush();	//draw sorted translucent polygons like particles.
 	}
 	TheDX8MeshRenderer.Clear_Pending_Delete_Lists();
+
+	if (TheW3DPlanarMirrors != nullptr)
+	{
+		TheW3DPlanarMirrors->suspendScenePass();
+	}
 }
 
 /**Generate a predefined light environment(s) that will be applied to many objects.  Useful for things like totally fogged
@@ -1493,6 +1538,9 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 		static Int otherPassDraws = 0;
 		static Int rejections[DX8InstancingClass::REJECT_COUNT];
 		static DX8SkinningClass::StatsStruct skinning;
+		static Int passPaths[DX8InstancingStatsStruct::PASS_PATH_COUNT];
+		static Int passWindows = 0;
+		static Int passPeakAlone = 0;
 
 		DX8InstancingStatsStruct stats;
 		DX8MeshRendererClass::Take_Instancing_Stats(stats);
@@ -1537,6 +1585,17 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 		{
 			rejections[i] += frameRejections[i];
 		}
+		Int renderAlone = 0;
+		for (Int i = 0; i < DX8InstancingStatsStruct::PASS_PATH_COUNT; ++i)
+		{
+			passPaths[i] += stats.PassPaths[i];
+			if (i != DX8InstancingStatsStruct::PASS_PATH_WINDOW)
+			{
+				renderAlone += stats.PassPaths[i];
+			}
+		}
+		passWindows += stats.PassWindows;
+		passPeakAlone = max(passPeakAlone, renderAlone);
 		skinning.SkinnedMeshes[0] += frameSkinning.SkinnedMeshes[0];
 		skinning.SkinnedMeshes[1] += frameSkinning.SkinnedMeshes[1];
 		for (Int i = 0; i < DX8SkinningClass::REJECT_COUNT; ++i)
@@ -1563,8 +1622,18 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 				skinning.Rejections[DX8SkinningClass::REJECT_STATE], skinning.Rejections[DX8SkinningClass::REJECT_MODEL],
 				skinning.Rejections[DX8SkinningClass::REJECT_MESH], skinning.Rejections[DX8SkinningClass::REJECT_CATEGORY],
 				skinning.Rejections[DX8SkinningClass::REJECT_PASS]));
+			// Each pass drawn alone installs and removes its shader state for that one mesh.
+			RENDER_LOG(("Material passes: render %d, %d batched in %d windows; alone outside the lit scene %d, sorting %d, unbound %d, not a window pass %d, override %d, skin %d, delayed %d; most alone in one render %d",
+				instancingFrames, passPaths[DX8InstancingStatsStruct::PASS_PATH_WINDOW], passWindows,
+				passPaths[DX8InstancingStatsStruct::PASS_PATH_NOT_LIT], passPaths[DX8InstancingStatsStruct::PASS_PATH_SORTING],
+				passPaths[DX8InstancingStatsStruct::PASS_PATH_UNBOUND], passPaths[DX8InstancingStatsStruct::PASS_PATH_NOT_WINDOW_PASS],
+				passPaths[DX8InstancingStatsStruct::PASS_PATH_OVERRIDE], passPaths[DX8InstancingStatsStruct::PASS_PATH_SKIN],
+				passPaths[DX8InstancingStatsStruct::PASS_PATH_DELAYED], passPeakAlone));
 
 			memset(scenes, 0, sizeof(scenes));
+			memset(passPaths, 0, sizeof(passPaths));
+			passWindows = 0;
+			passPeakAlone = 0;
 			receiveDraws = 0;
 			specularDraws = 0;
 			otherPassDraws = 0;
@@ -1576,6 +1645,10 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 
 	// Fill the shadow map before anything is queued for the main scene, because the
 	// depth pass flushes the mesh renderer and would otherwise consume those objects.
+	if (TheW3DShadowMap != nullptr && m_customPassMode == SCENE_PASS_DEFAULT)
+	{
+		TheW3DShadowMap->followResolution();
+	}
 	if (TheW3DShadowMap != nullptr && TheW3DShadowMap->isAvailable() &&
 		TheW3DShadowManager != nullptr &&
 		m_customPassMode == SCENE_PASS_DEFAULT &&
@@ -1594,6 +1667,13 @@ void RTS3DScene::Customized_Render( RenderInfoClass &rinfo )
 		{
 			TheW3DShadowMap->clearDepth();
 		}
+	}
+
+	// Mirrors shade only in the main scene's own draws, which start once the shadow map has its casters.
+	if (TheW3DPlanarMirrors != nullptr && m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE &&
+		!m_planarMirrorPass && !ShaderClass::Is_Backface_Culling_Inverted())
+	{
+		TheW3DPlanarMirrors->beginScenePass();
 	}
 
 	//terrain needs to be rendered first
@@ -1711,11 +1791,12 @@ void renderStenciledPlayerColor( UnsignedInt color, UnsignedInt stencilRef, Bool
 	TheTacticalView->getOrigin(&xpos,&ypos);
 	width=TheTacticalView->getWidth();
 	height=TheTacticalView->getHeight();
+	const Real targetScale = W3DShaderManager::getScreenToTargetScale();
 
-    v[0].p.Set(xpos+width, ypos+height, 0.0f, 1.0f );
-    v[1].p.Set(xpos+width, 0, 0.0f, 1.0f );
-    v[2].p.Set(xpos, ypos+height, 0.0f, 1.0f );
-    v[3].p.Set(xpos,  0, 0.0f, 1.0f );
+    v[0].p.Set((xpos+width)*targetScale, (ypos+height)*targetScale, 0.0f, 1.0f );
+    v[1].p.Set((xpos+width)*targetScale, 0, 0.0f, 1.0f );
+    v[2].p.Set(xpos*targetScale, (ypos+height)*targetScale, 0.0f, 1.0f );
+    v[3].p.Set(xpos*targetScale,  0, 0.0f, 1.0f );
     v[0].color = color;
     v[1].color = color;
     v[2].color = color;
@@ -2146,6 +2227,7 @@ namespace
 	struct PixelLightCandidate
 	{
 		W3DDynamicLight *light;
+		W3DShaderManager::PixelLight value;
 		Real gap;		///< how far outside the light's reach the screen centre is, in screen units
 		Real score;		///< reach times brightness, for lights at an equal gap
 	};
@@ -2157,6 +2239,21 @@ namespace
 			return a.gap < b.gap;
 		}
 		return a.score > b.score;
+	}
+
+	Bool Tune_Emissive_Light(W3DShaderManager::PixelLight &light, Real maxRadius, Real brightness)
+	{
+		if (!(brightness > 0.0f))
+		{
+			return FALSE;
+		}
+		if (maxRadius > 0.0f && light.outerRadius > maxRadius)
+		{
+			light.innerRadius *= maxRadius / light.outerRadius;
+			light.outerRadius = maxRadius;
+		}
+		light.diffuse = light.diffuse * brightness;
+		return TRUE;
 	}
 }
 
@@ -2216,13 +2313,73 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 		candidates.push_back(candidate);
 	}
 
-	std::sort(candidates.begin(), candidates.end(), Pixel_Light_Before);
-	const Int count = min((Int)candidates.size(), (Int)W3DShaderManager::MAX_PIXEL_LIGHT_CANDIDATES);
+	if (enabled && TheGlobalData->m_useDynamicLights && TheGlobalData->m_usePathTracing &&
+		TheGlobalData->m_pathTracingLightBrightness > 0.0f &&
+		m_customPassMode == SCENE_PASS_DEFAULT && !m_drawTerrainOnly)
+	{
+		m_emissiveLights.begin(camera);
+		const Int localPlayerIndex = rts::getObservedOrLocalPlayerIndex_Safe();
+		RefRenderObjListIterator objects(&RenderList);
+		for (objects.First(); !objects.Is_Done(); objects.Next())
+		{
+			RenderObjClass *object = objects.Peek_Obj();
+			DrawableInfo *info = (DrawableInfo *)object->Get_User_Data();
+			Drawable *draw = info != nullptr ? info->m_drawable : nullptr;
+			if ((draw == nullptr && (!TheGlobalData->m_isWorldBuilder || info != nullptr)) ||
+				(draw != nullptr && (draw->areLightsDisabled() || draw->isDrawableEffectivelyHidden() || draw->getFullyObscuredByShroud() ||
+				(draw->getObject() != nullptr && draw->getObject()->getShroudedStatus(localPlayerIndex) >= OBJECTSHROUD_FOGGED))))
+			{
+				continue;
+			}
+			const SphereClass &bounds = object->Get_Bounding_Sphere();
+			if (!camera.Cull_Sphere(SphereClass(bounds.Center, bounds.Radius + 120.0f)))
+			{
+				m_emissiveLights.addObject(*object, draw != nullptr ? draw->getEffectiveOpacity() : 1.0f);
+			}
+		}
+		const std::vector<W3DShaderManager::PixelLight> &emissive = m_emissiveLights.finish(camera);
+		std::vector<W3DShaderManager::PixelLight> sources(emissive);
+		if (TheW3DLaserGlow != nullptr)
+		{
+			TheW3DLaserGlow->appendObjectLights(sources);
+		}
+		for (size_t i = 0; i < sources.size(); i++)
+		{
+			W3DShaderManager::PixelLight light = sources[i];
+			if (!Tune_Emissive_Light(light, TheGlobalData->m_pathTracingLightMaxRadius, TheGlobalData->m_pathTracingLightBrightness) ||
+				camera.Cull_Sphere(SphereClass(light.position, light.outerRadius)))
+			{
+				continue;
+			}
+			PixelLightCandidate candidate;
+			candidate.light = nullptr;
+			candidate.value = light;
+			candidate.score = light.outerRadius * max(light.diffuse.X, max(light.diffuse.Y, light.diffuse.Z));
+			candidate.gap = 0.0f;
+			Vector3 center;
+			Vector3 edge;
+			if (camera.Project(center, light.position) != CameraClass::OUTSIDE_NEAR_CLIP &&
+				camera.Project(edge, light.position + cameraRight * light.outerRadius) != CameraClass::OUTSIDE_NEAR_CLIP)
+			{
+				candidate.gap = max(sqrtf(center.X * center.X + center.Y * center.Y) - (edge - center).Length(), 0.0f);
+			}
+			candidates.push_back(candidate);
+		}
+	}
 
-	W3DShaderManager::PixelLight lights[W3DShaderManager::MAX_PIXEL_LIGHT_CANDIDATES];
+	std::sort(candidates.begin(), candidates.end(), Pixel_Light_Before);
+	const Int count = TheGlobalData->m_usePathTracing ? (Int)candidates.size()
+		: min((Int)candidates.size(), (Int)W3DShaderManager::MAX_PIXEL_LIGHT_CANDIDATES);
+
+	std::vector<W3DShaderManager::PixelLight> lights(max(count, 1));
 	for (Int i = 0; i < count; i++)
 	{
 		W3DDynamicLight *light = candidates[i].light;
+		if (light == nullptr)
+		{
+			lights[i] = candidates[i].value;
+			continue;
+		}
 		light->setPixelIndex(i);
 
 		double innerRadius, outerRadius;
@@ -2249,7 +2406,7 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 		lights[i].outerRadius = (Real)outerRadius;
 		lights[i].terrainOnly = light->isTerrainOnly();
 	}
-	W3DShaderManager::setPixelLights(lights, count);
+	W3DShaderManager::setPixelLights(&lights[0], count);
 
 	// Sampled every 300 frames, and only when an interval had lights, so quiet stretches stay out of the log.
 	static Int pixelLightFrames = 0;
@@ -2270,9 +2427,11 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 	}
 }
 
-// Picks this frame's per-pixel lights that reach the sphere, strongest there first, as many as the specular pass takes.
+// Picks the lights that reach the sphere, keeping the strongest first when their count is limited.
 Int RTS3DScene::pickObjectPixelLights(const SphereClass &sphere, Int *lights)
 {
+	const Bool allLights = TheGlobalData->m_usePathTracing;
+	const Int limit = W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS;
 	Real scores[W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS];
 	Int count = 0;
 
@@ -2291,7 +2450,13 @@ Int RTS3DScene::pickObjectPixelLights(const SphereClass &sphere, Int *lights)
 		{
 			continue;
 		}
-		const Real falloff = WWMath::Clamp((pixelLight.outerRadius - distance) / (pixelLight.outerRadius - pixelLight.innerRadius), 0.0f, 1.0f);
+		if (allLights)
+		{
+			lights[count++] = index;
+			continue;
+		}
+		const Real ramp = WWMath::Clamp((pixelLight.outerRadius - distance) / (pixelLight.outerRadius - pixelLight.innerRadius), 0.0f, 1.0f);
+		const Real falloff = ramp * ramp * (3.0f - 2.0f * ramp);
 		const Real brightness = max(pixelLight.diffuse.X, max(pixelLight.diffuse.Y, pixelLight.diffuse.Z)) * (1.0f + pixelLight.ambientScale);
 		const Real score = falloff * brightness;
 
@@ -2301,11 +2466,11 @@ Int RTS3DScene::pickObjectPixelLights(const SphereClass &sphere, Int *lights)
 		{
 			slot--;
 		}
-		if (slot >= W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS)
+		if (slot >= limit)
 		{
 			continue;
 		}
-		const Int last = min(count, (Int)W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS - 1);
+		const Int last = min(count, limit - 1);
 		for (Int i = last; i > slot; i--)
 		{
 			scores[i] = scores[i - 1];
@@ -2313,7 +2478,7 @@ Int RTS3DScene::pickObjectPixelLights(const SphereClass &sphere, Int *lights)
 		}
 		scores[slot] = score;
 		lights[slot] = index;
-		count = min(count + 1, (Int)W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS);
+		count = min(count + 1, limit);
 	}
 	return count;
 }

@@ -23,6 +23,7 @@
 #include "WorldBuilder.h"
 #include "EditAction.h"
 #include "EditParameter.h"
+#include "ScriptFolderOrder.h"
 #include "GameLogic/ScriptEngine.h"
 
 #define SCRIPT_DIALOG_SECTION "ScriptDialog"
@@ -84,6 +85,10 @@ static HTREEITEM findOrAdd(CTreeCtrl *tree, HTREEITEM parent, const char *pLabel
 	::memset(&ins, 0, sizeof(ins));
 	ins.hParent = parent;
 	ins.hInsertAfter = TVI_SORT;
+	if (parent == TVI_ROOT)
+	{
+		ins.hInsertAfter = scriptFolderInsertAfter(tree, pLabel);
+	}
 	ins.item.mask = TVIF_PARAM|TVIF_TEXT;
 	ins.item.lParam = -1;
 	ins.item.pszText = (char*)pLabel;

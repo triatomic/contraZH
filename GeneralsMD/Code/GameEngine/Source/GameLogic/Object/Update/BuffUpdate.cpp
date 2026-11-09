@@ -87,7 +87,7 @@ void BuffUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "BuffDelay",							INI::parseDurationUnsignedInt,	NULL, offsetof( BuffUpdateModuleData, m_buffDelay) },
 		{ "BuffRange",							INI::parseReal,									NULL, offsetof( BuffUpdateModuleData, m_buffRange) },
 		{ "BuffTemplateName",			INI::parseAsciiString,	NULL, offsetof( BuffUpdateModuleData, m_buffTemplateName) },
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
 }

@@ -71,6 +71,7 @@ static const FieldParse TheStaticGameLODFieldParseTable[] =
 	{ "UseEmissiveNightMaterials",		INI::parseBool,					nullptr,	offsetof( StaticGameLODInfo, m_useEmissiveNightMaterials ) },
 	{ "TextureReductionFactor",		INI::parseInt,					nullptr,	offsetof( StaticGameLODInfo, m_textureReduction ) },
 	{ "SkipTranslucencySort",		INI::parseBool,					nullptr,	offsetof( StaticGameLODInfo, m_skipTranslucencySort ) },
+	{ nullptr, nullptr, nullptr, 0 }
 };
 
 static const char *const StaticGameLODNames[]=
@@ -118,6 +119,7 @@ static const FieldParse TheDynamicGameLODFieldParseTable[] =
 	{ "SlowDeathScale",					INI::parseReal,					nullptr,	offsetof( DynamicGameLODInfo, m_slowDeathScale)},
 	{ "MinParticlePriority",			INI::parseIndexList, ParticlePriorityNames,	offsetof( DynamicGameLODInfo, m_minDynamicParticlePriority)},
 	{ "MinParticleSkipPriority",		INI::parseIndexList, ParticlePriorityNames,	offsetof( DynamicGameLODInfo, m_minDynamicParticleSkipPriority)},
+	{ nullptr, nullptr, nullptr, 0 }
 };
 
 static const char *const DynamicGameLODNames[]=

@@ -319,7 +319,7 @@ void TunnelTracker::addToContainList( Object *obj )
 }
 
 // ------------------------------------------------------------------------
-void TunnelTracker::removeFromContain( Object *obj, Bool exposeStealthUnits )
+Bool TunnelTracker::removeFromContain( Object *obj, Bool exposeStealthUnits )
 {
 
 	ContainedItemsList::iterator it = std::find(m_containList.begin(), m_containList.end(), obj);
@@ -334,8 +334,11 @@ void TunnelTracker::removeFromContain( Object *obj, Bool exposeStealthUnits )
 			DEBUG_ASSERTCRASH(m_heroUnitsContained > 0, ("TunnelTracker::removeFromContain - Removing hero but hero count is %d", m_heroUnitsContained));
 			--m_heroUnitsContained;
 		}
+
+		return true;
 	}
 
+	return false;
 }
 
 // ------------------------------------------------------------------------
@@ -414,7 +417,7 @@ void TunnelTracker::onTunnelDestroyed( const Object *deadTunnel )
 	}
 }
 
-Bool TunnelTracker::doAutoPopRegistion(const Object* newTunnel) const
+Bool TunnelTracker::doAutoPopIconInit(const Object* newTunnel) const
 {
 	Drawable* draw = newTunnel->getDrawable();
 

@@ -165,6 +165,7 @@ void MapPreview::getDefaultHQCapture( HQCaptureParams *capture )
 	capture->clouds = true;
 	capture->macroTexture = true;
 	capture->stochastic = false;
+	capture->shadows = true;
 	capture->timeOfDay = TIME_OF_DAY_INVALID;
 	capture->area = HQ_AREA_MAP;
 	capture->customX0 = 0;
@@ -203,7 +204,7 @@ Bool MapPreview::getHQMapCells( Int *width, Int *height, Int *playableWidth, Int
 	return true;
 }
 
-Bool MapPreview::getHQTopView( const HQCaptureParams &capture, WbView3d::TopViewCapture *view3d, Real area[4] )
+Bool MapPreview::getHQTopView( const HQCaptureParams &capture, WbView3d::TopViewCapture *view3d )
 {
 	Int mapW = 0;
 	Int mapH = 0;
@@ -236,16 +237,11 @@ Bool MapPreview::getHQTopView( const HQCaptureParams &capture, WbView3d::TopView
 		return false;
 	}
 
-	// The lobby fits the map into its square preview at the map's own proportions, so the render is a square around the area.
-	area[0] = cx0 * MAP_XY_FACTOR;
-	area[1] = cy0 * MAP_XY_FACTOR;
-	area[2] = cx1 * MAP_XY_FACTOR;
-	area[3] = cy1 * MAP_XY_FACTOR;
-	const Real half = max(area[2] - area[0], area[3] - area[1]) * 0.5f;
-	view3d->x0 = (area[0] + area[2])*0.5f - half;
-	view3d->y0 = (area[1] + area[3])*0.5f - half;
-	view3d->x1 = (area[0] + area[2])*0.5f + half;
-	view3d->y1 = (area[1] + area[3])*0.5f + half;
+	// The lobby draws the tga into a rect at the map's own proportions, so the tga stretches the area to a square.
+	view3d->x0 = cx0 * MAP_XY_FACTOR;
+	view3d->y0 = cy0 * MAP_XY_FACTOR;
+	view3d->x1 = cx1 * MAP_XY_FACTOR;
+	view3d->y1 = cy1 * MAP_XY_FACTOR;
 	view3d->objects = capture.objects;
 	view3d->trees = capture.trees;
 	view3d->roads = capture.roads;
@@ -254,6 +250,7 @@ Bool MapPreview::getHQTopView( const HQCaptureParams &capture, WbView3d::TopView
 	view3d->clouds = capture.clouds;
 	view3d->macroTexture = capture.macroTexture;
 	view3d->stochastic = capture.stochastic;
+	view3d->shadows = capture.shadows;
 	view3d->water = capture.shaderWater ? WbView3d::TOP_VIEW_WATER_SHADER
 		: (capture.renderedWater ? WbView3d::TOP_VIEW_WATER_FLAT : WbView3d::TOP_VIEW_WATER_NONE);
 	return true;
@@ -265,15 +262,10 @@ Bool MapPreview::prepareHQ( WbView3d *view, const HQCaptureParams &capture )
 
 	WorldHeightMapEdit *pMap = CWorldBuilderDoc::GetActiveDoc() ? CWorldBuilderDoc::GetActiveDoc()->GetHeightMap() : NULL;
 	WbView3d::TopViewCapture view3d;
-	Real area[4];
-	if (view == NULL || pMap == NULL || TheTerrainRenderObject == NULL || !getHQTopView(capture, &view3d, area))
+	if (view == NULL || pMap == NULL || TheTerrainRenderObject == NULL || !getHQTopView(capture, &view3d))
 	{
 		return false;
 	}
-	const Real areaX0 = area[0];
-	const Real areaY0 = area[1];
-	const Real areaX1 = area[2];
-	const Real areaY1 = area[3];
 	const Int border = pMap->getBorderSize();
 	const Int mapW = pMap->getXExtent() - 2*border;
 	const Int mapH = pMap->getYExtent() - 2*border;
@@ -329,12 +321,6 @@ Bool MapPreview::prepareHQ( WbView3d *view, const HQCaptureParams &capture )
 		{
 			const Real x = view3d.x0 + worldX * (px + 0.5f) / big;
 			const Int n = py*big + px;
-			if (x < areaX0 || x > areaX1 || y < areaY0 || y > areaY1)
-			{
-				m_hqLight[n] = -2.0f;
-				m_hqDepth[n] = 0.0f;
-				continue;
-			}
 			const UnsignedByte *s = &m_hqScene[n*4];
 			const UnsignedByte *g = &ground[n*4];
 			const Bool aboveGround = (abs(s[0] - g[0]) + abs(s[1] - g[1]) + abs(s[2] - g[2])) > ABOVE_GROUND_DIFF;
@@ -387,12 +373,6 @@ void MapPreview::composeHQ( const HQPreviewParams &params, UnsignedByte *bgra )
 					const Int n = (oy*m_hqSuper + sy)*big + ox*m_hqSuper + sx;
 					const UnsignedByte *s = &m_hqScene[n*4];
 					Real c[3] = { (Real)s[0], (Real)s[1], (Real)s[2] };
-					if (m_hqLight[n] < -1.5f)
-					{
-						c[0] = 0.0f;
-						c[1] = 0.0f;
-						c[2] = 0.0f;
-					}
 					// A rendered water surface is flat, so the ground's relief stays off it.
 					const Bool water = m_hqDepth[n] > 0.0f;
 					if (m_hqLight[n] >= 0.0f && !(water && m_hqWaterRendered))

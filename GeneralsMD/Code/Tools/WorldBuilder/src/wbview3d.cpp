@@ -100,6 +100,8 @@ extern "C" int WBQtObject_GetRenderParticles(void);
 #include "W3DDevice/GameClient/W3DSoftParticles.h"
 #include "W3DDevice/GameClient/W3DSkyClouds.h"
 #include "W3DDevice/GameClient/W3DColorLut.h"
+#include "W3DDevice/GameClient/W3DDistanceFog.h"
+#include "W3DDevice/GameClient/W3DSnow.h"
 #include "DrawObject.h"
 #include "RulerTool.h"
 #include "TracingOverlayOptions.h"
@@ -130,6 +132,7 @@ extern "C" int WBQtObject_GetRenderParticles(void);
 #include "GlobalLightOptions.h"
 #include "LayersList.h"
 #ifdef RTS_HAS_QT
+#include "qt/WBQtBridge.h"
 #include "qt/panels/WBQtLayersBridge.h"
 #include "qt/panels/WBQtMinimapBridge.h"
 #include "qt/panels/WBQtMiscModalsBridge.h"
@@ -815,8 +818,12 @@ WbView3d::~WbView3d()
 	TheW3DSoftParticles = nullptr;
 	delete TheW3DSkyClouds;
 	TheW3DSkyClouds = nullptr;
+	delete TheW3DDistanceFog;
+	TheW3DDistanceFog = nullptr;
 	delete TheW3DColorLut;
 	TheW3DColorLut = nullptr;
+	delete TheSnowManager;
+	TheSnowManager = nullptr;
 	shutdownWW3D();
 }
 // ----------------------------------------------------------------------------
@@ -1281,6 +1288,7 @@ void WbView3d::resetRenderObjects()
 		BuildListInfo *pBuild = pSide->getBuildList();
 		while (pBuild) {
 			pBuild->setRenderObj(nullptr);
+			pBuild->setShadowObj(nullptr);
 			pBuild = pBuild->getNext();
 		}
 	}
@@ -1470,6 +1478,14 @@ void WbView3d::updateScorches()
 }
 
 // ----------------------------------------------------------------------------
+static Real getMapObjectScale(MapObject *pMapObj)
+{
+	Bool exists;
+	Real scale = pMapObj->getProperties()->getReal(TheKey_objectScale, &exists);
+	return (exists && scale > 0.0f) ? scale : 1.0f;
+}
+
+// ----------------------------------------------------------------------------
 void WbView3d::updateTrees()
 {
 	/** 
@@ -1495,7 +1511,7 @@ void WbView3d::updateTrees()
 		tTemplate = pMapObj->getThingTemplate();
 		if (tTemplate && tTemplate->isKindOf(KINDOF_OPTIMIZED_TREE) )
 		{
-			Real scale = tTemplate->getAssetScale();
+			Real scale = tTemplate->getAssetScale() * getMapObjectScale(pMapObj);
 			const ModuleInfo& mi = tTemplate->getDrawModuleInfo();
 			if (mi.getCount() > 0)
 			{
@@ -1750,6 +1766,12 @@ AsciiString WbView3d::getBestModelName(const ThingTemplate* tt, const ModelCondi
 }
 
 // ----------------------------------------------------------------------------
+Bool WbView3d::isBuildListSideHidden(Int side)
+{
+	return BuildListTool::isActive() && getShowBuildListSideOnly() && side != BuildList::getCurSide();
+}
+
+// ----------------------------------------------------------------------------
 void WbView3d::invalBuildListItemInView(BuildListInfo *pBuildToInval)
 {
 	Int i;
@@ -1757,6 +1779,7 @@ void WbView3d::invalBuildListItemInView(BuildListInfo *pBuildToInval)
 
 	for (i=0; i<TheSidesList->getNumSides(); i++) {
 		SidesInfo *pSide = TheSidesList->getSideInfo(i);
+		Bool sideHidden = isBuildListSideHidden(i);
 
 		// find which player color we should use
 		Int playerColor = 0xFFFFFF;
@@ -1782,11 +1805,24 @@ void WbView3d::invalBuildListItemInView(BuildListInfo *pBuildToInval)
 			if (!BuildListTool::isActive() && !pBuild->isInitiallyBuilt() && !getShowBuildListObjects()) {
 				continue;
 			}
+			if (sideHidden) {
+				if (pBuild->getShadowObj()) {
+					TheW3DShadowManager->removeShadow(pBuild->getShadowObj());
+					pBuild->setShadowObj(nullptr);
+				}
+				if (pBuild->getRenderObj()) {
+					if (m_baseBuildScene->safeContains(pBuild->getRenderObj())) {
+						m_baseBuildScene->Remove_Render_Object(pBuild->getRenderObj());
+					}
+					pBuild->setRenderObj(nullptr);
+				}
+				continue;
+			}
 			// Update.
 			Coord3D loc = *pBuild->getLocation();
 			loc.z += m_heightMapRenderObj->getHeightMapHeight(loc.x, loc.y, nullptr);
 			RenderObjClass *renderObj=nullptr;
-			Shadow			*shadowObj=nullptr;
+			Shadow			*shadowObj=pBuild->getShadowObj();
 			// Build list render obj is not refcounted, so check & make sure it exists in the scene.
 			if (pBuild->getRenderObj()) {
 				if (!m_baseBuildScene->safeContains(pBuild->getRenderObj())) {
@@ -1866,6 +1902,10 @@ void WbView3d::invalBuildListItemInView(BuildListInfo *pBuildToInval)
 		if (!m_baseBuildScene->safeContains(pBuildToInval->getRenderObj())) {
 			pBuildToInval->setRenderObj(nullptr);
 		}
+	}
+	if (!found && pBuildToInval && pBuildToInval->getShadowObj()) {
+		TheW3DShadowManager->removeShadow(pBuildToInval->getShadowObj());
+		pBuildToInval->setShadowObj(nullptr);
 	}
 	if (!found && pBuildToInval && pBuildToInval->getRenderObj()) {
 		m_baseBuildScene->Remove_Render_Object(pBuildToInval->getRenderObj());
@@ -1975,7 +2015,7 @@ AsciiString WbView3d::getModelNameAndScale(MapObject *pMapObj, Real *scale,
 
 			// get visual data from the thing template
 			modelName = getBestModelNameWBPrev(tTemplate, state);
-			*scale = tTemplate->getAssetScale();
+			*scale = tTemplate->getAssetScale() * getMapObjectScale(pMapObj);
 
 		}  // end if
 	}  // end else
@@ -2266,6 +2306,7 @@ void WbView3d::invalObjectInView(MapObject *pMapObjIn)
 				if (scale > 2.0 && pMapObj->getThingTemplate()->isKindOf(KINDOF_INFANTRY)) {
 					scale *= 4.0f;  // scale up to 350% 
 				}
+				scale *= getMapObjectScale(pMapObj);
 		
 				// Setup model condition flags from the current damage state
 				ModelConditionFlags state;
@@ -3193,7 +3234,7 @@ MapObject *WbView3d::pickedTreeAlongRay(const Vector3 &rayStart, const Vector3 &
 		}
 
 		// Place it the way addTree() does: terrain height at the trunk, uniform template scale.
-		const Real scale = tt->getAssetScale();
+		const Real scale = tt->getAssetScale() * getMapObjectScale(pObj);
 		Coord3D pos = *pObj->getLocation();
 		pos.z += m_heightMapRenderObj->getHeightMapHeight(pos.x, pos.y, NULL);
 
@@ -4318,7 +4359,10 @@ BuildListInfo *WbView3d::pickedBuildObjectInView(CPoint viewPt)
 	Int i;
 	viewToDocCoords(viewPt, &cpt, false);
  	for (i=0; i<TheSidesList->getNumSides(); i++) {
-		SidesInfo *pSide = TheSidesList->getSideInfo(i); 
+		if (isBuildListSideHidden(i)) {
+			continue;
+		}
+		SidesInfo *pSide = TheSidesList->getSideInfo(i);
 		for (BuildListInfo *pBuild = pSide->getBuildList(); pBuild; pBuild = pBuild->getNext()) {
 			Coord3D center = *pBuild->getLocation();
 			center.x -= cpt.x;
@@ -4962,11 +5006,16 @@ Bool WbView3d::beginTopView(const TopViewCapture &capture, Bool aboveGround)
 	// Volume shadows resolve only inside a back-buffer-sized quad, which a render larger than the window overruns.
 	// Under the shadow map they draw no volumes and cast into the map instead, so they stay on there.
 	s.wantShadowVolumes = TheGlobalData->m_useShadowVolumes;
+	s.wantShadowDecals = TheGlobalData->m_useShadowDecals;
 	s.wantClouds = TheGlobalData->m_useCloudMap;
 	s.wantMacroTexture = TheGlobalData->m_useLightMap;
-	if (!TheGlobalData->m_useShadowMap)
+	if (!TheGlobalData->m_useShadowMap || !capture.shadows)
 	{
 		TheWritableGlobalData->m_useShadowVolumes = false;
+	}
+	if (!capture.shadows)
+	{
+		TheWritableGlobalData->m_useShadowDecals = false;
 	}
 	TheWritableGlobalData->m_useCloudMap = capture.clouds;
 	TheWritableGlobalData->m_useLightMap = capture.macroTexture;
@@ -5184,17 +5233,12 @@ Bool WbView3d::presentTopView(Int size, void *window, const Real area[4])
 		D3DSURFACE_DESC desc;
 		back->GetDesc(&desc);
 		dev->ColorFill(back, NULL, D3DCOLOR_XRGB(0, 0, 0));
-		RECT src;
-		src.left = (LONG)(area[0] * size);
-		src.top = (LONG)(area[1] * size);
-		src.right = (LONG)(area[2] * size + 0.5f);
-		src.bottom = (LONG)(area[3] * size + 0.5f);
 		RECT dst;
 		dst.left = (LONG)(area[0] * desc.Width);
 		dst.top = (LONG)(area[1] * desc.Height);
 		dst.right = (LONG)(area[2] * desc.Width + 0.5f);
 		dst.bottom = (LONG)(area[3] * desc.Height + 0.5f);
-		ok = SUCCEEDED(dev->StretchRect(rt, &src, back, &dst, D3DTEXF_LINEAR))
+		ok = SUCCEEDED(dev->StretchRect(rt, NULL, back, &dst, D3DTEXF_LINEAR))
 			&& SUCCEEDED(s.swapChain->Present(NULL, NULL, NULL, NULL, 0));
 		if (!ok)
 		{
@@ -5233,6 +5277,7 @@ void WbView3d::endTopView()
 	s.targetSize = 0;
 
 	TheWritableGlobalData->m_useShadowVolumes = s.wantShadowVolumes;
+	TheWritableGlobalData->m_useShadowDecals = s.wantShadowDecals;
 	TheWritableGlobalData->m_useCloudMap = s.wantClouds;
 	TheWritableGlobalData->m_useLightMap = s.wantMacroTexture;
 	if (s.capture.stochastic)
@@ -5664,11 +5709,17 @@ void WbView3d::render()
 			DEBUG_LOG(("Culling pass threw an exception — skipping this frame.\n"));
 		}
 
+		if (TheSnowManager != NULL && TheWeatherSetting->m_snowEnabled)
+		{
+			TheSnowManager->update();
+		}
 		WW3D::Render(m_scene,m_camera);	
 		// Only the main scene fills the sun shadow map. RTS3DScene redoes the depth pass on every
 		// render, so keep it off for the build-list, wireframe, tracking and overlay passes below.
 		const Bool wantShadowMap = TheGlobalData->m_useShadowMap;
 		TheWritableGlobalData->m_useShadowMap = false;
+		const Bool wantPathTracing = TheGlobalData->m_usePathTracing;
+		TheWritableGlobalData->m_usePathTracing = false;
 		Vector3 amb = m_baseBuildScene->Get_Ambient_Light();
 		Vector3 newAmb(amb);
 		Real mul = m_buildRedMultiplier;
@@ -5782,6 +5833,11 @@ void WbView3d::render()
 			TheWritableGlobalData->m_showSoftWaterEdge = savedSoftWater;
 		}
 
+		if (TheW3DDistanceFog != nullptr)
+		{
+			TheW3DDistanceFog->render(*m_camera);
+		}
+
 		// The map.ini grade goes over the scene as in the game, and under the icons so they stay readable.
 		if (TheW3DColorLut != nullptr)
 		{
@@ -5791,6 +5847,7 @@ void WbView3d::render()
 		// Draw the 3d obj icons on top of the rest of the data.
 		WW3D::Render(m_overlayScene,m_camera);
 		TheWritableGlobalData->m_useShadowMap = wantShadowMap;
+		TheWritableGlobalData->m_usePathTracing = wantPathTracing;
 
 		// Viewport labels, Old (D3DX) mode: draw directly with m3DFont inside the
 		// frame (flicker-free). drawLabels(NULL) takes the m3DFont->DrawText path.
@@ -6063,6 +6120,28 @@ BEGIN_MESSAGE_MAP(WbView3d, WbView)
 	ON_UPDATE_COMMAND_UI(ID_FX_HEIGHTBLEND, OnUpdateFxHeightBlend)
 	ON_COMMAND(ID_FX_SPECULAR, OnFxSpecular)
 	ON_UPDATE_COMMAND_UI(ID_FX_SPECULAR, OnUpdateFxSpecular)
+	ON_COMMAND(ID_FX_SOFTPARTICLES, OnFxSoftParticles)
+	ON_UPDATE_COMMAND_UI(ID_FX_SOFTPARTICLES, OnUpdateFxSoftParticles)
+	ON_COMMAND(ID_FX_FLAMESHADERS, OnFxFlameShaders)
+	ON_UPDATE_COMMAND_UI(ID_FX_FLAMESHADERS, OnUpdateFxFlameShaders)
+	ON_COMMAND(ID_FX_ELECTRICSHADERS, OnFxElectricShaders)
+	ON_UPDATE_COMMAND_UI(ID_FX_ELECTRICSHADERS, OnUpdateFxElectricShaders)
+	ON_COMMAND(ID_FX_LASERSHADERS, OnFxLaserShaders)
+	ON_UPDATE_COMMAND_UI(ID_FX_LASERSHADERS, OnUpdateFxLaserShaders)
+	ON_COMMAND(ID_FX_CRYOSHADERS, OnFxCryoShaders)
+	ON_UPDATE_COMMAND_UI(ID_FX_CRYOSHADERS, OnUpdateFxCryoShaders)
+	ON_COMMAND(ID_FX_DYNAMICLIGHTS, OnFxDynamicLights)
+	ON_UPDATE_COMMAND_UI(ID_FX_DYNAMICLIGHTS, OnUpdateFxDynamicLights)
+	ON_COMMAND(ID_FX_PIXELLIGHTS, OnFxPixelLights)
+	ON_UPDATE_COMMAND_UI(ID_FX_PIXELLIGHTS, OnUpdateFxPixelLights)
+	ON_COMMAND(ID_FX_PATHTRACING, OnFxPathTracing)
+	ON_UPDATE_COMMAND_UI(ID_FX_PATHTRACING, OnUpdateFxPathTracing)
+	ON_UPDATE_COMMAND_UI(ID_FX_WATERREFLECTIONS, OnUpdateFxWaterReflections)
+	ON_COMMAND(ID_FX_SHORELINEFOAM, OnFxShorelineFoam)
+	ON_UPDATE_COMMAND_UI(ID_FX_SHORELINEFOAM, OnUpdateFxShorelineFoam)
+	ON_UPDATE_COMMAND_UI(ID_FX_AMBIENTOCCLUSION, OnUpdateFxAmbientOcclusion)
+	ON_UPDATE_COMMAND_UI(ID_FX_LASERGLOW, OnUpdateFxLaserGlow)
+	ON_UPDATE_COMMAND_UI(ID_FX_PLANARMIRRORS, OnUpdateFxPlanarMirrors)
 	ON_COMMAND(ID_TEXT_SHADOW, OnTextShadow)
 	ON_UPDATE_COMMAND_UI(ID_TEXT_SHADOW, OnUpdateTextShadow)
 	ON_COMMAND(ID_TEXT_OUTLINE, OnTextOutline)
@@ -6189,9 +6268,18 @@ void WbView3d::initWW3D()
 		{
 			TheW3DSkyClouds = new W3DSkyClouds;
 		}
+		if (TheW3DDistanceFog == nullptr)
+		{
+			TheW3DDistanceFog = new W3DDistanceFog;
+		}
 		if (TheW3DColorLut == nullptr)
 		{
 			TheW3DColorLut = new W3DColorLut;
+		}
+		if (TheSnowManager == NULL && TheWeatherSetting != NULL)
+		{
+			TheSnowManager = new W3DSnowManager;
+			TheSnowManager->init();
 		}
 		init3dScene();
 		m_layer = new LayerClass( m_scene, m_camera );
@@ -6352,6 +6440,9 @@ void WbView3d::OnPaint()
 
 	PAINTSTRUCT ps;
 	HDC hdc = ::BeginPaint(m_hWnd, &ps);
+#ifdef RTS_HAS_QT
+	const LONGLONG previousAnimTick = m_lastAnimTick;
+#endif
 	if (!m_firstPaint && deferPaintForFpsCap()) {
 		::EndPaint(m_hWnd, &ps);
 		return;
@@ -6374,19 +6465,24 @@ void WbView3d::OnPaint()
 	}
 #endif
 	::EndPaint(m_hWnd, &ps);
-	// Record the view state we just painted, so OnTimer can skip timer repaints until
-	// something actually changes (all renderer modes -- see the idle skip in OnTimer;
-	// in GDI mode this also suppresses the strobe-inducing buffer flip). Not on the
-	// first paint: redraw() was skipped, so nothing was actually rendered yet.
+#ifndef RTS_HAS_QT
+	// The legacy timer skips unchanged frames to keep GDI labels from flickering.
 	if (!m_firstPaint) {
 		m_lastGdiPaintKey = buildLabelKey();
 		m_haveGdiPaintKey = true;
 	}
+#endif
 	if (m_firstPaint) {
 		CMainFrame::GetMainFrame()->adjustWindowSize();
 		m_firstPaint = false;
 	}
 	DX8Wrapper::SetCleanupHook(this);
+#ifdef RTS_HAS_QT
+	if (m_lastAnimTick != previousAnimTick)
+	{
+		WBQt_ScheduleViewportFrame(m_hWnd, (Int)ceil(fpsCapWaitMs()));
+	}
+#endif
 	
 }
 
@@ -7647,6 +7743,12 @@ Bool WbView3d::deferPaintForFpsCap()
 		if (timerMs < 1) {
 			timerMs = 1;
 		}
+#ifdef RTS_HAS_QT
+		if (WBQt_ScheduleViewportFrame(m_hWnd, timerMs))
+		{
+			return true;
+		}
+#endif
 		SetTimer(WB_FPSCAP_TIMER, timerMs, NULL);
 		m_fpsCapTimerSet = true;
 	}
@@ -7723,6 +7825,13 @@ void WbView3d::OnTimer(UINT nIDEvent)
 		}
 	}
 
+#ifdef RTS_HAS_QT
+	if (WBQt_ScheduleViewportFrame(m_hWnd, 0))
+	{
+		return;
+	}
+#endif
+
 	if (getLastDrawTime()+UPDATE_TIME >= ::GetTickCount())
 		return;		// throttle: at most one repaint per UPDATE_TIME
 
@@ -7748,6 +7857,7 @@ void WbView3d::OnTimer(UINT nIDEvent)
 
 		// Live particle emitters animate every frame too -- keep repainting while any exist.
 		Bool particlesActive = WBParticleRuntime::hasActiveEmitters();
+		Bool weatherActive = TheSnowManager != NULL && TheWeatherSetting->m_snowEnabled;
 
 		// Model animations (View > Animate Models) advance off WW3D::Sync in redraw(), so the view
 		// is never really "static" while any are playing -- keep repainting or they would freeze
@@ -7769,7 +7879,7 @@ void WbView3d::OnTimer(UINT nIDEvent)
 		Bool playingSoundsShown = m_showPlayingSounds && (m_listenMode != WB_LISTEN_NONE);
 
 		if (!interacting && !changed && !fallbackDue && !wavesActive && !particlesActive &&
-			!overlayActive && !modelAnimsActive && !playingSoundsShown)
+			!overlayActive && !modelAnimsActive && !playingSoundsShown && !weatherActive)
 		{
 			return;		// static view: leave the last frame (+ any GDI text) on screen
 		}
@@ -7953,6 +8063,11 @@ void WbView3d::OnViewShowshadows()
 		}
 	} else {
 		TheW3DShadowManager->removeAllShadows();
+		for (Int i = 0; i < TheSidesList->getNumSides(); i++) {
+			for (BuildListInfo *pBuild = TheSidesList->getSideInfo(i)->getBuildList(); pBuild; pBuild = pBuild->getNext()) {
+				pBuild->setShadowObj(nullptr);
+			}
+		}
 	}
 
 }
@@ -9274,13 +9389,24 @@ void WbView3d::loadFxShaderSettings()
 {
 	TheWritableGlobalData->m_useShadowMap = readFxSetting("FxShadowMap", TheGlobalData->m_useShadowMap);
 	TheWritableGlobalData->m_useBloom = readFxSetting("FxBloom", TheGlobalData->m_useBloom);
-	setEffectShaders(readFxSetting("FxEffectShaders",
-		TheGlobalData->m_useFlameShaders || TheGlobalData->m_useElectricShaders ||
-		TheGlobalData->m_useLaserShaders || TheGlobalData->m_useCryoShaders));
+	const Int effectShaders = ::AfxGetApp()->GetProfileInt(MAIN_FRAME_SECTION, "FxEffectShaders", -1);
+	if (effectShaders != -1)
+	{
+		setEffectShaders(effectShaders != 0);
+	}
 	TheWritableGlobalData->m_useHQSky = readFxSetting("FxHQSky", TheGlobalData->m_useHQSky);
 	TheWritableGlobalData->m_useNormalMaps = readFxSetting("FxNormalMaps", TheGlobalData->m_useNormalMaps);
 	TheWritableGlobalData->m_useHeightBlend = readFxSetting("FxHeightBlend", TheGlobalData->m_useHeightBlend);
 	TheWritableGlobalData->m_useSpecular = readFxSetting("FxSpecular", TheGlobalData->m_useSpecular);
+	TheWritableGlobalData->m_useSoftParticles = readFxSetting("FxSoftParticles", TheGlobalData->m_useSoftParticles);
+	TheWritableGlobalData->m_useFlameShaders = readFxSetting("FxFlameShaders", TheGlobalData->m_useFlameShaders);
+	TheWritableGlobalData->m_useElectricShaders = readFxSetting("FxElectricShaders", TheGlobalData->m_useElectricShaders);
+	TheWritableGlobalData->m_useLaserShaders = readFxSetting("FxLaserShaders", TheGlobalData->m_useLaserShaders);
+	TheWritableGlobalData->m_useCryoShaders = readFxSetting("FxCryoShaders", TheGlobalData->m_useCryoShaders);
+	TheWritableGlobalData->m_useDynamicLights = readFxSetting("FxDynamicLights", TheGlobalData->m_useDynamicLights);
+	TheWritableGlobalData->m_usePixelLights = readFxSetting("FxPixelLights", TheGlobalData->m_usePixelLights);
+	TheWritableGlobalData->m_usePathTracing = readFxSetting("FxPathTracing", TheGlobalData->m_usePathTracing);
+	TheWritableGlobalData->m_shorelineFoam = readFxSetting("FxShorelineFoam", TheGlobalData->m_shorelineFoam);
 }
 
 void WbView3d::setEffectShaders(Bool on)
@@ -9319,14 +9445,22 @@ void WbView3d::OnUpdateFxBloom(CCmdUI* pCmdUI)
 
 void WbView3d::OnFxEffectShaders()
 {
-	setEffectShaders(!TheGlobalData->m_useFlameShaders);
+	setEffectShaders(!(TheGlobalData->m_useSoftParticles && TheGlobalData->m_useFlameShaders &&
+		TheGlobalData->m_useElectricShaders && TheGlobalData->m_useLaserShaders && TheGlobalData->m_useCryoShaders));
 	writeFxSetting("FxEffectShaders", TheGlobalData->m_useFlameShaders);
+	writeFxSetting("FxSoftParticles", TheGlobalData->m_useSoftParticles);
+	writeFxSetting("FxFlameShaders", TheGlobalData->m_useFlameShaders);
+	writeFxSetting("FxElectricShaders", TheGlobalData->m_useElectricShaders);
+	writeFxSetting("FxLaserShaders", TheGlobalData->m_useLaserShaders);
+	writeFxSetting("FxCryoShaders", TheGlobalData->m_useCryoShaders);
 	Invalidate();
 }
 
 void WbView3d::OnUpdateFxEffectShaders(CCmdUI* pCmdUI)
 {
-	updateFxItem(pCmdUI, TheGlobalData->m_useFlameShaders, fxD3D9Available() && TheW3DSoftParticles != nullptr);
+	updateFxItem(pCmdUI, TheGlobalData->m_useSoftParticles && TheGlobalData->m_useFlameShaders &&
+		TheGlobalData->m_useElectricShaders && TheGlobalData->m_useLaserShaders && TheGlobalData->m_useCryoShaders,
+		fxD3D9Available() && TheW3DSoftParticles != nullptr);
 }
 
 void WbView3d::OnFxHQSky()
@@ -9376,6 +9510,135 @@ void WbView3d::OnFxSpecular()
 void WbView3d::OnUpdateFxSpecular(CCmdUI* pCmdUI)
 {
 	updateFxItem(pCmdUI, TheGlobalData->m_useSpecular, fxD3D9Available());
+}
+
+void WbView3d::OnFxSoftParticles()
+{
+	TheWritableGlobalData->m_useSoftParticles = !TheGlobalData->m_useSoftParticles;
+	writeFxSetting("FxSoftParticles", TheGlobalData->m_useSoftParticles);
+	Invalidate();
+}
+
+void WbView3d::OnUpdateFxSoftParticles(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_useSoftParticles, fxD3D9Available() && TheW3DSoftParticles != nullptr);
+}
+
+void WbView3d::OnFxFlameShaders()
+{
+	TheWritableGlobalData->m_useFlameShaders = !TheGlobalData->m_useFlameShaders;
+	writeFxSetting("FxFlameShaders", TheGlobalData->m_useFlameShaders);
+	Invalidate();
+}
+
+void WbView3d::OnUpdateFxFlameShaders(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_useFlameShaders, fxD3D9Available() && TheW3DSoftParticles != nullptr);
+}
+
+void WbView3d::OnFxElectricShaders()
+{
+	TheWritableGlobalData->m_useElectricShaders = !TheGlobalData->m_useElectricShaders;
+	writeFxSetting("FxElectricShaders", TheGlobalData->m_useElectricShaders);
+	Invalidate();
+}
+
+void WbView3d::OnUpdateFxElectricShaders(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_useElectricShaders, fxD3D9Available() && TheW3DSoftParticles != nullptr);
+}
+
+void WbView3d::OnFxLaserShaders()
+{
+	TheWritableGlobalData->m_useLaserShaders = !TheGlobalData->m_useLaserShaders;
+	writeFxSetting("FxLaserShaders", TheGlobalData->m_useLaserShaders);
+	Invalidate();
+}
+
+void WbView3d::OnUpdateFxLaserShaders(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_useLaserShaders, fxD3D9Available() && TheW3DSoftParticles != nullptr);
+}
+
+void WbView3d::OnFxCryoShaders()
+{
+	TheWritableGlobalData->m_useCryoShaders = !TheGlobalData->m_useCryoShaders;
+	writeFxSetting("FxCryoShaders", TheGlobalData->m_useCryoShaders);
+	Invalidate();
+}
+
+void WbView3d::OnUpdateFxCryoShaders(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_useCryoShaders, fxD3D9Available() && TheW3DSoftParticles != nullptr);
+}
+
+void WbView3d::OnFxDynamicLights()
+{
+	TheWritableGlobalData->m_useDynamicLights = !TheGlobalData->m_useDynamicLights;
+	writeFxSetting("FxDynamicLights", TheGlobalData->m_useDynamicLights);
+	Invalidate();
+}
+
+void WbView3d::OnUpdateFxDynamicLights(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_useDynamicLights, true);
+}
+
+void WbView3d::OnFxPixelLights()
+{
+	TheWritableGlobalData->m_usePixelLights = !TheGlobalData->m_usePixelLights;
+	writeFxSetting("FxPixelLights", TheGlobalData->m_usePixelLights);
+	Invalidate();
+}
+
+void WbView3d::OnUpdateFxPixelLights(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_usePixelLights, W3DShaderManager::supportsPixelLights());
+}
+
+void WbView3d::OnFxPathTracing()
+{
+	TheWritableGlobalData->m_usePathTracing = !TheGlobalData->m_usePathTracing;
+	writeFxSetting("FxPathTracing", TheGlobalData->m_usePathTracing);
+	Invalidate();
+}
+
+void WbView3d::OnUpdateFxPathTracing(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_usePathTracing, fxD3D9Available() &&
+		TheGlobalData->m_useDynamicLights && TheGlobalData->m_usePixelLights && W3DShaderManager::supportsPixelLights());
+}
+
+void WbView3d::OnUpdateFxWaterReflections(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_waterReflections, false);
+}
+
+void WbView3d::OnFxShorelineFoam()
+{
+	TheWritableGlobalData->m_shorelineFoam = !TheGlobalData->m_shorelineFoam;
+	writeFxSetting("FxShorelineFoam", TheGlobalData->m_shorelineFoam);
+	Invalidate();
+}
+
+void WbView3d::OnUpdateFxShorelineFoam(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_shorelineFoam, fxD3D9Available());
+}
+
+void WbView3d::OnUpdateFxAmbientOcclusion(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_useAmbientOcclusion, false);
+}
+
+void WbView3d::OnUpdateFxLaserGlow(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_laserRef, false);
+}
+
+void WbView3d::OnUpdateFxPlanarMirrors(CCmdUI* pCmdUI)
+{
+	updateFxItem(pCmdUI, TheGlobalData->m_planarMirrorShader, false);
 }
 
 void WbView3d::OnTextShadow()

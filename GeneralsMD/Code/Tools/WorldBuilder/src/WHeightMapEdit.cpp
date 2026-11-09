@@ -43,6 +43,7 @@
 #include "LayersList.h"
 #ifdef RTS_HAS_QT
 #include "qt/panels/WBQtTerrainModalBridge.h"
+#include "qt/WBQtMessageBox.h"
 #endif
 
 #include "Common/DataChunk.h"
@@ -84,6 +85,108 @@ void WorldHeightMapEdit::init()
 	}
 	loadBaseImages();
 
+}
+
+Int WorldHeightMapEdit::addTerrainTexture(TerrainType *terrain)
+{
+	if (terrain == nullptr || m_numGlobalTextureClasses >= NUM_TEXTURE_CLASSES)
+	{
+		return -1;
+	}
+	Int before = m_numGlobalTextureClasses;
+	loadImagesFromTerrainType(terrain);
+	if (m_numGlobalTextureClasses == before)
+	{
+		return -1;
+	}
+	return before;
+}
+
+// Tiles are numRows x numRows, laid out as readTiles fills them.
+static Int stitchTiles(TileData **tiles, Int numRows, UnsignedByte *bgraOut, Int cap)
+{
+	Int extent = numRows * TILE_PIXEL_EXTENT;
+	if (numRows < 1 || bgraOut == nullptr || cap < extent * extent * TILE_BYTES_PER_PIXEL)
+	{
+		return 0;
+	}
+	Int row, column;
+	for (row = 0; row < extent; row++)
+	{
+		for (column = 0; column < extent; column++)
+		{
+			TileData *tile = tiles[(column / TILE_PIXEL_EXTENT) + numRows * (row / TILE_PIXEL_EXTENT)];
+			if (tile == nullptr)
+			{
+				return 0;
+			}
+			Int pixelNdx = (column % TILE_PIXEL_EXTENT) + TILE_PIXEL_EXTENT * (row % TILE_PIXEL_EXTENT);
+			memcpy(bgraOut + (row * extent + column) * TILE_BYTES_PER_PIXEL,
+				tile->getDataPtr() + pixelNdx * TILE_BYTES_PER_PIXEL, TILE_BYTES_PER_PIXEL);
+		}
+	}
+	return extent;
+}
+
+Int WorldHeightMapEdit::getTexClassPixels(Int texClass, UnsignedByte *bgraOut, Int cap)
+{
+	if (texClass < 0 || texClass >= m_numGlobalTextureClasses)
+	{
+		return 0;
+	}
+	return stitchTiles(m_globalTextureClasses[texClass].tiles, m_globalTextureClasses[texClass].width, bgraOut, cap);
+}
+
+Int WorldHeightMapEdit::getTextureFilePixels(const AsciiString &texture, UnsignedByte *bgraOut, Int cap)
+{
+	AsciiString path;
+	path.format("%s%s", TERRAIN_TGA_DIR_PATH, texture.str());
+	CachedFileInputStream stream;
+	if (!stream.open(openTerrainTexture(path)))
+	{
+		return 0;
+	}
+	Int numTiles = WorldHeightMap::countTiles(&stream, nullptr, path.str());
+	Int numRows = 0;
+	while ((numRows + 1) * (numRows + 1) <= numTiles)
+	{
+		numRows++;
+	}
+	if (numRows < 1)
+	{
+		return 0;
+	}
+	stream.rewind();
+
+	TileData *tiles[MAX_TILES_PER_CLASS];
+	Int i;
+	for (i = 0; i < MAX_TILES_PER_CLASS; i++)
+	{
+		tiles[i] = nullptr;
+	}
+	Int extent = 0;
+	if (WorldHeightMap::readTiles(&stream, tiles, numRows, path.str()))
+	{
+		extent = stitchTiles(tiles, numRows, bgraOut, cap);
+	}
+	for (i = 0; i < MAX_TILES_PER_CLASS; i++)
+	{
+		REF_PTR_RELEASE(tiles[i]);
+	}
+	return extent;
+}
+
+Int WorldHeightMapEdit::findTexClass(const AsciiString &name)
+{
+	Int i;
+	for (i = 0; i < m_numGlobalTextureClasses; i++)
+	{
+		if (m_globalTextureClasses[i].name == name)
+		{
+			return i;
+		}
+	}
+	return -1;
 }
 
 //
@@ -184,7 +287,6 @@ m_warnTooManyBlend(false)
 	REF_PTR_SET(m_alphaTerrainTex, pThis->m_alphaTerrainTex);
 	m_dataSize = pThis->m_dataSize;
 	m_terrainTexHeight = pThis->m_terrainTexHeight;
-	m_atlasBorder = pThis->m_atlasBorder;
 	m_alphaTexHeight = pThis->m_alphaTexHeight;
 	m_alphaEdgeHeight = pThis->m_alphaEdgeHeight;
 	m_width = pThis->m_width;
@@ -389,7 +491,7 @@ void WorldHeightMapEdit::loadBitmap(char *path, const char *uiName)
 	}
 	InputStream *pStrm = &stream;
 
-	Int numTiles = WorldHeightMap::countTiles(pStrm);
+	Int numTiles = WorldHeightMap::countTiles(pStrm, nullptr, path);
 	int width;
 	Bool ok=false;
 	if (numTiles < 1) {
@@ -411,7 +513,7 @@ void WorldHeightMapEdit::loadBitmap(char *path, const char *uiName)
 	}
 
 #define BLEND_TILE_PREFIX "TE"
-	ok = readTiles(pStrm, m_globalTextureClasses[texToUse].tiles, width);
+	ok = readTiles(pStrm, m_globalTextureClasses[texToUse].tiles, width, path);
 	if (!ok) return;
 	m_globalTextureClasses[texToUse].numTiles = numTiles;
 	m_globalTextureClasses[texToUse].width = width;
@@ -502,14 +604,16 @@ void WorldHeightMapEdit::loadImagesFromTerrainType( TerrainType *terrain )
 
 	// open file
 	CachedFileInputStream stream;
-	if( !stream.open( texturePath ) )
+	if( !stream.open( openTerrainTexture(texturePath, FALSE) ) )
+	{
 		return;
+	}
 
 	// get pointer to stream
 	InputStream *pStrm = &stream;
 
 	// could the tiles in the file
-	Int numTiles = WorldHeightMap::countTiles( pStrm );
+	Int numTiles = WorldHeightMap::countTiles( pStrm, nullptr, texturePath.str() );
 	Int width;
 	if( numTiles < 1 )
 		return;
@@ -533,7 +637,7 @@ void WorldHeightMapEdit::loadImagesFromTerrainType( TerrainType *terrain )
 // -->
 
 	// read the tiles out of .tga file
-	Bool ok = readTiles( pStrm, m_globalTextureClasses[ texToUse ].tiles, width );
+	Bool ok = readTiles( pStrm, m_globalTextureClasses[ texToUse ].tiles, width, texturePath.str() );
 	if( !ok )
 		return;
 	m_globalTextureClasses[ texToUse ].name = terrain->getName();
@@ -1952,15 +2056,16 @@ void WorldHeightMapEdit::reloadTextures()
 	for (i=0; i<m_numGlobalTextureClasses; i++) {
 		if (m_globalTextureClasses[i].numTiles == 0) continue;
 		CachedFileInputStream stream;
-		if (!stream.open(m_globalTextureClasses[i].filePath)) {
+		if (!stream.open(openTerrainTexture(m_globalTextureClasses[i].filePath)))
+		{
 			continue;
 		}
-		Int numTiles = WorldHeightMap::countTiles(&stream);
+		Int numTiles = WorldHeightMap::countTiles(&stream, nullptr, m_globalTextureClasses[i].filePath.str());
 		if (numTiles < m_globalTextureClasses[i].numTiles) {
 			continue;
 		}
 		stream.rewind();
-		/*Bool ok =*/ readTiles(&stream, m_globalTextureClasses[i].tiles, m_globalTextureClasses[i].width);
+		/*Bool ok =*/ readTiles(&stream, m_globalTextureClasses[i].tiles, m_globalTextureClasses[i].width, m_globalTextureClasses[i].filePath.str());
 		stream.close();
 	}
 	if (TheTerrainRenderObject) {
@@ -1979,8 +2084,7 @@ void WorldHeightMapEdit::reloadTextures()
 void WorldHeightMapEdit::showTileStatusInfo()
 {
 	CString message;
-	Int tilesPerRow = TEXTURE_WIDTH/(2*TILE_PIXEL_EXTENT+2*getAtlasBorder());
-	Int availableTiles = 4 * tilesPerRow * tilesPerRow;
+	Int availableTiles = MAX_ATLAS_SLOTS * MAX_ATLAS_SLOTS;
 	Int availableBlends = NUM_BLEND_TILES;
 
 	CString tmp;
@@ -2714,7 +2818,12 @@ Bool WorldHeightMapEdit::selectInvalidTeam()
 	if (anySelected)
 	{
 		DEBUG_LOG(("%s", report.str()));
-		MessageBox(nullptr, report.str(), "Missing team report", MB_OK);
+#ifdef RTS_HAS_QT
+		if (WBQtMessageBox_Show(report.str(), "Missing team report", MB_OK) == 0)
+#endif
+		{
+			MessageBox(nullptr, report.str(), "Missing team report", MB_OK);
+		}
 	}
 
 	return anySelected;
@@ -2733,7 +2842,7 @@ static const Real HEIGHT_SCALE = MAP_HEIGHT_SCALE / MAP_XY_FACTOR;
 static const Real STRETCH_LIMIT = 1.5f;	 // If it is stretching less than this, don't adjust.
 static inline Int IABS(Int x) {	if (x>=0) return x; return -x;};
 
-static const Real TEX_PER_CELL = 32.0f/TEXTURE_WIDTH; // we use 32 texels per cell.
+static const Real TEX_PER_CELL = 32.0f/CLIFF_UV_REFERENCE_WIDTH; // we use 32 texels per cell.
 
 static const Real MIN_U_SPAN = TEX_PER_CELL * 0.4f;
 
@@ -2754,7 +2863,7 @@ Bool WorldHeightMapEdit::doCliffAdjustment(Int xIndex, Int yIndex)
 		return(false);
 	}
 	Real textureClassExtent = m_globalTextureClasses[curTileClass].width*TILE_PIXEL_EXTENT;
-	textureClassExtent /= TEXTURE_WIDTH;
+	textureClassExtent /= CLIFF_UV_REFERENCE_WIDTH;
 	Real startU = textureClassExtent/2;	// Center in the texture.
 	Real startV = 0; // We'll adjust the V values later.
 
@@ -3639,7 +3748,7 @@ void WorldHeightMapEdit::updateFlatCellForAdjacentCliffs(Int xIndex, Int yIndex,
 	}
 	if (!okToProcess) return;
 	Real textureClassExtent = m_globalTextureClasses[curTileClass].width*TILE_PIXEL_EXTENT;
-	textureClassExtent /= TEXTURE_WIDTH;
+	textureClassExtent /= CLIFF_UV_REFERENCE_WIDTH;
 	Int i, j;
 	for (i=xIndex-1; i<xIndex+2; i+=1) {
 		if (i<0) continue;

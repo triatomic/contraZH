@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include "GameNetwork/LobbyRules.h"
+
 class GameWindow;
 class GameInfo;
 
@@ -37,6 +39,10 @@ void PopulateColorComboBox(Int comboBox, GameWindow *comboArray[], GameInfo *myG
 void PopulatePlayerTemplateComboBox(Int comboBox, GameWindow *comboArray[], GameInfo *myGame, Bool allowObservers );
 void PopulateTeamComboBox(Int comboBox, GameWindow *comboArray[], GameInfo *myGame, Bool isObserver = FALSE);
 void PopulateStartingCashComboBox(GameWindow *comboBox, GameInfo *myGame);
+
+/// a check box with an existing one's look and size, at x, y in the parent, unchecked
+GameWindow *CreateCheckBoxLike( GameWindow *lookLike, GameWindow *parent, Int x, Int y, const UnicodeString &text,
+	const char *decoratedName );
 
 void EnableSlotListUpdates( Bool val );
 Bool AreSlotListUpdatesEnabled();
@@ -50,3 +56,22 @@ void EnableAcceptControls(Bool Enabled, GameInfo *myGame, GameWindow *comboPlaye
 										GameWindow *comboColor[], GameWindow *comboPlayerTemplate[],
 										GameWindow *comboTeam[], GameWindow *buttonAccept[], GameWindow *buttonStart,
 										GameWindow *buttonMapStartPosition[], Int slotNum = -1);
+
+// Game and Rules tabs of the Skirmish and LAN lobbies; every pointer is null when the layout lacks them
+struct LobbyTabs
+{
+	NameKeyType buttonGameID;
+	NameKeyType buttonRulesID;
+	GameWindow *buttonGame;
+	GameWindow *buttonRules;
+	GameWindow *panelGame;
+	GameWindow *panelRules;
+};
+
+void InitLobbyTabs( LobbyTabs &tabs, GameWindow *parent, const char *layoutFilename );
+void ShowLobbyTab( LobbyTabs &tabs, Bool rules );
+Bool IsLobbyRulesTabShown( const LobbyTabs &tabs );
+void MarkLobbyGameTab( LobbyTabs &tabs );
+
+UnicodeString LobbyRuleName( LobbyRule rule ); ///< The caption of a Rules page checkbox, the same in every lobby
+void SetLobbyRuleCaption( GameWindow *check, LobbyRule rule ); ///< Caption and tooltip; a null check is left alone

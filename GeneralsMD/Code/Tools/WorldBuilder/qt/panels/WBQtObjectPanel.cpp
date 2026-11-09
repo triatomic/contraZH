@@ -339,8 +339,20 @@ void WBQtObjectPanel::refreshTeamCombo()
 	}
 }
 
+void WBQtObjectPanel::showEvent(QShowEvent *event)
+{
+	QWidget::showEvent(event);
+	selectListIndex(WBQtObject_GetSelectedIndex());
+}
+
 void WBQtObjectPanel::refreshPreview()
 {
+	// Selection updates reach this browser while Object Properties is showing.
+	if (!isVisible())
+	{
+		return;
+	}
+
 	int w = 128, h = 128;
 	WBQtObject_GetPreviewSize(&w, &h);
 	QByteArray bgr(w * h * 3, 0);
@@ -455,7 +467,7 @@ void WBQtObjectPanel::pushFromSelection()
 
 void WBQtObjectPanel::selectListIndex(int listIndex)
 {
-	if (listIndex < 0)
+	if (listIndex < 0 || !isVisible())
 	{
 		return;
 	}

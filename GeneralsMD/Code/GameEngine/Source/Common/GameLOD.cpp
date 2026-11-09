@@ -46,7 +46,7 @@
 #define PROFILE_ERROR_LIMIT	0.94f	//fraction of profiled result needed to get a match.  Allows some room for error/fluctuation.
 
 //Hack to get access to a static method on the W3DDevice side. -MW
-extern Bool testMinimumRequirements(ChipsetType *videoChipType, CpuType *cpuType, Int *cpuFreq, MemValueType *numRAM, Real *intBenchIndex, Real *floatBenchIndex, Real *memBenchIndex);
+extern Bool testMinimumRequirements(ChipsetType *videoChipType, MemValueType *numRAM);
 
 GameLODManager *TheGameLODManager=nullptr;
 
@@ -72,6 +72,7 @@ static const FieldParse TheStaticGameLODFieldParseTable[] =
 	{ "UseHeatEffects",					INI::parseBool,					nullptr,	offsetof( StaticGameLODInfo, m_useHeatEffects ) },
 	{ "SkipTranslucencySort",		INI::parseBool,					nullptr,	offsetof( StaticGameLODInfo, m_skipTranslucencySort ) },
 	{ "TextureReductionFactor",		INI::parseInt,					nullptr,	offsetof( StaticGameLODInfo, m_textureReduction ) },
+	{ nullptr, nullptr, nullptr, 0 }
 };
 
 static const char *const StaticGameLODNames[]=
@@ -120,6 +121,7 @@ static const FieldParse TheDynamicGameLODFieldParseTable[] =
 	{ "SlowDeathScale",					INI::parseReal,					nullptr,	offsetof( DynamicGameLODInfo, m_slowDeathScale)},
 	{ "MinParticlePriority",			INI::parseIndexList, ParticlePriorityNames,	offsetof( DynamicGameLODInfo, m_minDynamicParticlePriority)},
 	{ "MinParticleSkipPriority",		INI::parseIndexList, ParticlePriorityNames,	offsetof( DynamicGameLODInfo, m_minDynamicParticleSkipPriority)},
+	{ nullptr, nullptr, nullptr, 0 }
 };
 
 static const char *const DynamicGameLODNames[]=
@@ -142,43 +144,23 @@ DynamicGameLODInfo::DynamicGameLODInfo()
 };
 
 //Keep this in sync with enum in GameLOD.h
-static const char *const CPUNames[] =
-{
-	"XX","P3", "P4","K7", nullptr
-};
-static_assert(ARRAY_SIZE(CPUNames) == CPU_MAX + 1, "Incorrect array size");
-
-//Keep this in sync with enum in GameLOD.h
 static const char *const VideoNames[] =
 {
 	"XX","V2","V3","V4","V5","TNT","TNT2","GF2","R100","PS11","GF3","GF4","PS14","R200","PS20","R300", nullptr
 };
 static_assert(ARRAY_SIZE(VideoNames) == DC_MAX + 1, "Incorrect array size");
 
+// The CPU is not detected, so CPU speed and benchmark lines are read and discarded
 void parseReallyLowMHz(INI* ini)
 {
-	Int mhz;
-	INI::parseInt(ini,nullptr,&mhz,nullptr);
-	if (TheGameLODManager)
-	{
-		TheGameLODManager->setReallyLowMHz(mhz);
-	}
+	ini->getNextToken();
 }
 
 void INI::parseBenchProfile( INI* ini)
 {
-	if( TheGameLODManager )
+	for (Int i=0; i<5; ++i)
 	{
-			BenchProfile *preset = TheGameLODManager->newBenchProfile();
-
-			if (preset)
-			{
-				INI::parseIndexList(ini,nullptr,&preset->m_cpuType,CPUNames);
-				INI::parseInt(ini,nullptr,&preset->m_mhz,nullptr);
-				INI::parseReal(ini,nullptr,&preset->m_intBenchIndex,nullptr);
-				INI::parseReal(ini,nullptr,&preset->m_floatBenchIndex,nullptr);
-				INI::parseReal(ini,nullptr,&preset->m_memBenchIndex,nullptr);
-			}
+		ini->getNextToken();
 	}
 }
 
@@ -201,8 +183,9 @@ void INI::parseLODPreset( INI* ini )
 
 			if (preset)
 			{
-				INI::parseIndexList(ini,nullptr,&preset->m_cpuType,CPUNames);
-				INI::parseInt(ini,nullptr,&preset->m_mhz,nullptr);
+				// CPU type and MHz
+				ini->getNextToken();
+				ini->getNextToken();
 				INI::parseIndexList(ini,nullptr,&preset->m_videoType,VideoNames);
 				INI::parseInt(ini,nullptr,&preset->m_memory,nullptr);
 			}
@@ -224,15 +207,7 @@ GameLODManager::GameLODManager()
 	m_slowDeathScale=1.0f;
 	m_idealDetailLevel = STATIC_GAME_LOD_UNKNOWN;
 	m_videoChipType = DC_MAX;
-	m_cpuType = XX;
 	m_numRAM=0;
-	m_cpuFreq=0;
-	m_intBenchIndex=0;
-	m_floatBenchIndex=0;
-	m_memBenchIndex=0;
-	m_compositeBenchIndex=0;
-	m_numBenchProfiles=0;
-	m_reallyLowMHz = 400;
 
 	for (Int i=0; i<STATIC_GAME_LOD_CUSTOM; i++)
 		m_numLevelPresets[i]=0;
@@ -275,18 +250,6 @@ void GameLODManager::initStaticLODLevels()
 	veryhigh.m_useTrees = TRUE;
 }
 
-BenchProfile *GameLODManager::newBenchProfile()
-{
-	if (m_numBenchProfiles < MAX_BENCH_PROFILES)
-	{
-		m_numBenchProfiles++;
-		return &m_benchProfiles[m_numBenchProfiles-1];
-	}
-
-	DEBUG_CRASH(( "GameLODManager::newBenchProfile - Too many profiles defined"));
-	return nullptr;
-}
-
 LODPresetInfo *GameLODManager::newLODPreset(StaticGameLODLevel index)
 {
 	if (index >= 0 && index < STATIC_GAME_LOD_COUNT)
@@ -324,59 +287,14 @@ void GameLODManager::init()
 	m_idealDetailLevel=(StaticGameLODLevel)optionPref.getIdealStaticGameDetail();
 
 	//always get this data in case we need it later.
-	testMinimumRequirements(nullptr,&m_cpuType,&m_cpuFreq,&m_numRAM,nullptr,nullptr,nullptr);
+	testMinimumRequirements(nullptr,&m_numRAM);
 
 	if ((Real)(m_numRAM)/(Real)(256*1024*1024) >= PROFILE_ERROR_LIMIT)
 		m_memPassed=TRUE;	//check if they have at least 256 MB
 
-	if (m_idealDetailLevel == STATIC_GAME_LOD_UNKNOWN || TheGlobalData->m_forceBenchmark)
+	if (TheGlobalData->m_forceBenchmark)
 	{
-		if (m_cpuType == XX || TheGlobalData->m_forceBenchmark)
-		{
-			//need to run the benchmark
-			testMinimumRequirements(nullptr,nullptr,nullptr,nullptr,&m_intBenchIndex,&m_floatBenchIndex,&m_memBenchIndex);
-
-			if (TheGlobalData->m_forceBenchmark)
-			{	//we want to see the numbers.  So dump them to a logfile.
-				FILE *fp=fopen("Benchmark.txt","w");
-				if (fp)
-				{
-					fprintf(fp,"BenchProfile = %s %d %f %f %f", CPUNames[m_cpuType], m_cpuFreq, m_intBenchIndex, m_floatBenchIndex, m_memBenchIndex);
-					fclose(fp);
-				}
-			}
-
-	 		m_compositeBenchIndex = m_intBenchIndex + m_floatBenchIndex;	///@todo: Need to scale these based on our apps usage of int/float/mem ops.
-
-			StaticGameLODLevel currentLevel=STATIC_GAME_LOD_LOW;
-			BenchProfile *prof=m_benchProfiles;
-			m_cpuType = P3;	//assume lowest spec.
-			m_cpuFreq = 1000;	//assume lowest spec.
-			for (Int k=0; k<m_numBenchProfiles; k++)
-			{
-				//Check if we're within 5% of the performance of this cpu profile.
-				if (m_intBenchIndex/prof->m_intBenchIndex >= PROFILE_ERROR_LIMIT && m_floatBenchIndex/prof->m_floatBenchIndex >= PROFILE_ERROR_LIMIT && m_memBenchIndex/prof->m_memBenchIndex >= PROFILE_ERROR_LIMIT)
-				{
-					for (Int i=STATIC_GAME_LOD_LAST; i >= STATIC_GAME_LOD_FIRST; i--)
-					{
-						LODPresetInfo *preset=&m_lodPresets[i][0];	//pointer to first preset at this LOD level.
-						for (Int j=0; j<m_numLevelPresets[i]; j++)
-						{
-							if(	prof->m_cpuType == preset->m_cpuType &&	((Real)prof->m_mhz/(Real)preset->m_mhz >= PROFILE_ERROR_LIMIT))
-							{	currentLevel = (StaticGameLODLevel)i;
-								m_cpuType = prof->m_cpuType;
-								m_cpuFreq = prof->m_mhz;
-								break;
-							}
-							preset++;	//skip to next preset
-						}
-						if (currentLevel >= i)
-							break;	//we already found a higher level than the remaining presets so no need to keep searching.
-					}
-				}
-				prof++;
-			}
-		}
+		m_idealDetailLevel = STATIC_GAME_LOD_UNKNOWN;
 	}
 
 	if (userSetDetail == STATIC_GAME_LOD_CUSTOM)
@@ -490,7 +408,7 @@ StaticGameLODLevel GameLODManager::getRecommendedStaticLODLevel()
 		m_idealDetailLevel = STATIC_GAME_LOD_LOW;
 
 		//get system configuration - only need vide chip type, got rest in ::init().
-		testMinimumRequirements(&m_videoChipType,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr);
+		testMinimumRequirements(&m_videoChipType,nullptr);
 		if (m_videoChipType == DC_UNKNOWN)
 			m_videoChipType = DC_TNT2;	//presume it's at least TNT2 level
 
@@ -501,10 +419,8 @@ StaticGameLODLevel GameLODManager::getRecommendedStaticLODLevel()
 				LODPresetInfo *preset=&m_lodPresets[i][0];	//pointer to first preset at this LOD level.
 				for (Int j=0; j<m_numLevelPresets[i]; j++)
 				{
-
-					if(	m_cpuType == preset->m_cpuType &&
-							((Real)m_cpuFreq/(Real)preset->m_mhz >= PROFILE_ERROR_LIMIT) &&//make sure we're within 5% or higher
-							m_videoChipType >= preset->m_videoType &&
+					// Any current CPU outruns every preset, so the CPU type and MHz of a preset are not checked
+					if(	m_videoChipType >= preset->m_videoType &&
 							((Real)numMBRam/(Real)preset->m_memory >= PROFILE_ERROR_LIMIT)
 						)
 					{	m_idealDetailLevel = (StaticGameLODLevel)i;
@@ -629,7 +545,7 @@ void GameLODManager::applyStaticLODLevel(StaticGameLODLevel level)
 			WW3D::Enable_Sorting(!skipSort);
 		}
 
-		if (!m_memPassed || isReallyLowMHz()) {
+		if (!m_memPassed) {
 			TheWritableGlobalData->m_shellMapOn = false;
 		}
 	}

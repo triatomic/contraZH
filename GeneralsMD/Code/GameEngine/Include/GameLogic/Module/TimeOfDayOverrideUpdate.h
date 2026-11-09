@@ -63,7 +63,7 @@ public:
 			{ "FallbackTimeOfDay",		INI::parseIndexList,						TimeOfDayNames,	offsetof( TimeOfDayOverrideUpdateModuleData, m_fallbackTimeOfDay ) },
 			{ "Duration",							INI::parseDurationUnsignedInt,	nullptr,				offsetof( TimeOfDayOverrideUpdateModuleData, m_durationFrames ) },
 			{ "ActivateOnCreate",			INI::parseBool,									nullptr,				offsetof( TimeOfDayOverrideUpdateModuleData, m_activateOnCreate ) },
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
 		p.add(dataFieldParse);
 	}

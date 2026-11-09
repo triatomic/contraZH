@@ -65,6 +65,7 @@
 #include "GameClient/Shadow.h"
 
 #include "GameLogic/Armor.h"
+#include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/SpecialPowerModule.h"
 #include "GameLogic/Object.h"
@@ -161,6 +162,7 @@ const FieldParse ThingTemplate::s_objectFieldParseTable[] =
 
 // NOTE NOTE NOTE -- s_objectFieldParseTable and s_objectReskinFieldParseTable must be updated in tandem -- see comment above
 	{ "Prerequisites",				ThingTemplate::parsePrerequisites,	nullptr, 0 },
+	{ "QuickGamePrerequisites",	ThingTemplate::parseQuickGamePrerequisites,	nullptr, 0 },
 	{ "Buildable",						INI::parseByteSizedIndexList,				BuildableStatusNames, offsetof( ThingTemplate, m_buildable) },
 	{ "BuildCost",						INI::parseUnsignedShort,						nullptr,		offsetof( ThingTemplate, m_buildCost ) },
 	{ "BuildTime",						INI::parseReal,											nullptr,		offsetof( ThingTemplate, m_buildTime ) },
@@ -270,6 +272,7 @@ const FieldParse ThingTemplate::s_objectFieldParseTable[] =
 	{ "DecalTexture",					INI::parseAsciiString,	nullptr,	offsetof(ThingTemplate, m_decalTextureName) },
 	{ "DecalColor",						INI::parseColorInt,		nullptr,	offsetof(ThingTemplate, m_decalColor) },
 	{ "DecalOpacity",					INI::parsePercentToReal,	nullptr,	offsetof(ThingTemplate, m_decalOpacity) },
+	{ "CaptureTimePercent",		INI::parsePercentToReal,	nullptr,	offsetof(ThingTemplate, m_captureTimePercent) },
 	{ "OcclusionDelay",					INI::parseDurationUnsignedInt,		nullptr, offsetof( ThingTemplate, m_occlusionDelay ) },
 	{ "AddModule",						ThingTemplate::parseAddModule,			nullptr, 0 },
 	{ "RemoveModule",					ThingTemplate::parseRemoveModule,		nullptr, 0 },
@@ -759,12 +762,35 @@ void ThingTemplate::parsePrerequisites( INI* ini, void *instance, void *store, c
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 
-	if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES)
+	// An extended object that states prerequisites means those, not the ones of the object it extends in addition.
+	if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES || self->m_prereqsCopiedFromExtended)
 	{
+		self->m_prereqsCopiedFromExtended = FALSE;
 		self->m_prereqInfo.clear();
 	}
 
 	ini->initFromINI(&self->m_prereqInfo, myFieldParse);
+}
+
+//-------------------------------------------------------------------------------------------------
+void ThingTemplate::parseQuickGamePrerequisites( INI* ini, void *instance, void *store, const void* userData )
+{
+	ThingTemplate* self = (ThingTemplate*)instance;
+
+	static const FieldParse myFieldParse[] =
+	{
+		{ "Object", parsePrerequisiteUnit, nullptr, 0 },
+		{ "Science", parsePrerequisiteScience,	nullptr, 0 },
+		{ nullptr, nullptr, nullptr, 0 }
+	};
+
+	if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES)
+	{
+		self->m_quickGamePrereqInfo.clear();
+	}
+
+	self->m_hasQuickGamePrereqs = TRUE;
+	ini->initFromINI(&self->m_quickGamePrereqInfo, myFieldParse);
 }
 
 //-------------------------------------------------------------------------------------------Static
@@ -1088,7 +1114,8 @@ void ThingTemplate::parseRequiredBridgeHeight(INI* ini, void* instance, void* st
 		self->m_requiredBridgeHeight = -1;
 	}
 	else {
-		self->m_requiredBridgeHeight = std::clamp(static_cast<byte>(value / 10.0f), static_cast<byte>(0), static_cast<byte>(15));
+		// rounded up, see Object::getRequiredBridgeHeight.  0 still means "never blocked".
+		self->m_requiredBridgeHeight = static_cast<byte>(std::clamp(static_cast<Int>(REAL_TO_INT_CEIL(value / 10.0f)), 0, 15));
 	}
 }
 
@@ -1128,6 +1155,7 @@ ThingTemplate::ThingTemplate() :
 	// By default an object may reach the highest vanilla rank; MaxVeterancyLevel can cap it lower.
 	m_maxVeterancyLevel = LEVEL_HEROIC;
 	m_isTrainable = FALSE;
+	m_hasQuickGamePrereqs = FALSE;
 	m_enterGuard = FALSE;
 	m_hijackGuard = FALSE;
 
@@ -1136,6 +1164,7 @@ ThingTemplate::ThingTemplate() :
 	//m_defaultOwningSide = "";	// unnecessary
 	m_isBuildFacility = FALSE;
 	m_isPrerequisite = FALSE;
+	m_prereqsCopiedFromExtended = FALSE;
 	m_placementViewAngle = 0.0f;
 	m_factoryExitWidth = 0.0f;
 	m_factoryExtraBibWidth = 0.0f;
@@ -1159,6 +1188,7 @@ ThingTemplate::ThingTemplate() :
 	m_decalOffsetY = 0.0f;
 	m_decalColor = GameMakeColor(255, 255, 255, 255);
 	m_decalOpacity = 1.0f;
+	m_captureTimePercent = 1.0f;
 
 	m_occlusionDelay = TheGlobalData->m_defaultOcclusionDelay;
 
@@ -1396,6 +1426,7 @@ void ThingTemplate::setCopiedFromDefaultExtended()
 	// cannot be removed with RemoveModule
 	m_armorCopiedFromDefault = true;
 	m_weaponsCopiedFromDefault = true;
+	m_prereqsCopiedFromExtended = true;
 	//m_behaviorModuleInfo.setCopiedFromDefault(true);
 	//m_drawModuleInfo.setCopiedFromDefault(true);
 	//m_clientUpdateModuleInfo.setCopiedFromDefault(true);
@@ -1432,6 +1463,10 @@ void ThingTemplate::resolveNames()
 	{
 		m_prereqInfo[i].resolveNames();
 	}
+	for (i = 0; i < m_quickGamePrereqInfo.size(); i++)
+	{
+		m_quickGamePrereqInfo[i].resolveNames();
+	}
 
 	const Int MAX_BF = 32;
 	const ThingTemplate* tmpls[MAX_BF];
@@ -1446,6 +1481,19 @@ void ThingTemplate::resolveNames()
 			if( tmpls[ j ] )
 				const_cast<ThingTemplate*>(tmpls[j])->m_isBuildFacility = true;
 			// DEBUG_LOG(("BF: %s is a buildfacility for %s",tmpls[j]->m_nameString.str(),this->m_nameString.str()));
+		}
+	}
+
+	// Templates resolve before the game mode is known, so both lists mark build facilities
+	for (i = 0; i < m_quickGamePrereqInfo.size(); i++)
+	{
+		Int count = m_quickGamePrereqInfo[i].getAllPossibleBuildFacilityTemplates(tmpls, MAX_BF);
+		for (j = 0; j < count; j++)
+		{
+			if (tmpls[j])
+			{
+				const_cast<ThingTemplate*>(tmpls[j])->m_isBuildFacility = true;
+			}
 		}
 	}
 
@@ -1560,11 +1608,21 @@ Int ThingTemplate::getSkillPointValue(Int level) const
 }
 
 //-----------------------------------------------------------------------------
+const std::vector<ProductionPrerequisite>& ThingTemplate::getActivePrereqs() const
+{
+	if (m_hasQuickGamePrereqs && TheGameLogic != nullptr && TheGameLogic->isQuickGame())
+	{
+		return m_quickGamePrereqInfo;
+	}
+	return m_prereqInfo;
+}
+
+//-----------------------------------------------------------------------------
 const ThingTemplate *ThingTemplate::getBuildFacilityTemplate( const Player *player ) const
 {
 	if (getPrereqCount() > 0)
 	{
-		return m_prereqInfo[0].getExistingBuildFacilityTemplate(player);	// might return null
+		return getNthPrereq(0)->getExistingBuildFacilityTemplate(player);	// might return null
 	}
 	else
 	{

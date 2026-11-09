@@ -146,10 +146,24 @@ void WBQtMainWindow::dropEvent(QDropEvent *e)
 		{
 			continue;
 		}
-		QByteArray local = QFileInfo(path).absoluteFilePath().toLocal8Bit();
+		m_droppedMaps.append(QFileInfo(path).absoluteFilePath());
+	}
+	e->acceptProposedAction();
+	if (!m_droppedMaps.isEmpty())
+	{
+		QTimer::singleShot(0, this, SLOT(openDroppedMaps()));
+	}
+}
+
+void WBQtMainWindow::openDroppedMaps()
+{
+	QStringList paths = m_droppedMaps;
+	m_droppedMaps.clear();
+	for (int i = 0; i < paths.size(); i++)
+	{
+		QByteArray local = paths[i].toLocal8Bit();
 		// Native separators: the MFC doc system stores/compares Windows-style paths.
 		local.replace('/', '\\');
 		WBQt_OpenMapFileFromShell(local.constData());
 	}
-	e->acceptProposedAction();
 }

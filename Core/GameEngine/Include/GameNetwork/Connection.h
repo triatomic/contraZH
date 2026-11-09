@@ -66,6 +66,7 @@ public:
 	void setUser(User *user);
 	User *getUser();
 	void setFrameGrouping(time_t frameGrouping);
+	void updateRetryTime();
 
 	void sendNetCommandMsg(NetCommandMsg *msg, UnsignedByte relay);
 
@@ -97,6 +98,7 @@ protected:
 	time_t m_retryTime;						///< The time between sending retry packets for this connection.  Time is in milliseconds.
 	Real m_averageLatency;			///< The average time between sending a command and receiving an ACK.
 	Real m_latencies[CONNECTION_LATENCY_HISTORY_LENGTH];	///< List of the last 100 latencies.
+	Int m_latencySampleCount;		///< How many of m_latencies hold a measured value, capped at the history length.
 
 	time_t m_frameGrouping;				///< The minimum time between packet sends.
 	time_t m_lastTimeSent;				///< The time of the last packet send.

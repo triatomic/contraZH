@@ -54,18 +54,18 @@ enum { BLOOM_MAX_TAPS = 5 };
 static const Real BLOOM_TAP_OFFSET[3] = { 0.0f, 1.3846154f, 3.2307692f };
 static const Real BLOOM_TAP_WEIGHT[3] = { 0.2270270f, 0.3162162f, 0.0702703f };
 
-// screen space quads; the copy variant replaces the target instead of adding to it
-static ShaderClass makeQuadShader(Bool additive)
+// the knee width as a fraction of the threshold
+static const Real BLOOM_KNEE = 0.5f;
+
+// screen space quads, added onto, replacing or screened over the target
+static ShaderClass makeQuadShader(ShaderClass::DstBlendFuncType dstBlend)
 {
 	ShaderClass shader = ShaderClass::_PresetAdditiveShader;
 	shader.Set_Depth_Compare(ShaderClass::PASS_ALWAYS);
 	shader.Set_Depth_Mask(ShaderClass::DEPTH_WRITE_DISABLE);
 	shader.Set_Cull_Mode(ShaderClass::CULL_MODE_DISABLE);
 	shader.Set_Primary_Gradient(ShaderClass::GRADIENT_MODULATE);
-	if (!additive)
-	{
-		shader.Set_Dst_Blend_Func(ShaderClass::DSTBLEND_ZERO);
-	}
+	shader.Set_Dst_Blend_Func(dstBlend);
 	return shader;
 }
 
@@ -89,8 +89,9 @@ static TextureClass *createTarget(Int width, Int height, WW3DFormat format)
 }
 
 W3DBloom::W3DBloom()
-	: m_addShader(makeQuadShader(TRUE)),
-	m_copyShader(makeQuadShader(FALSE))
+	: m_addShader(makeQuadShader(ShaderClass::DSTBLEND_ONE)),
+	m_copyShader(makeQuadShader(ShaderClass::DSTBLEND_ZERO)),
+	m_screenShader(makeQuadShader(ShaderClass::DSTBLEND_ONE_MINUS_SRC_COLOR))
 {
 	for (Int i = 0; i < TARGET_COUNT; ++i)
 	{
@@ -103,6 +104,7 @@ W3DBloom::W3DBloom()
 	m_defaultTarget = nullptr;
 	m_defaultDepth = nullptr;
 	m_blurShader = 0;
+	m_shrinkShader = 0;
 	m_disabled = false;
 }
 
@@ -154,9 +156,10 @@ Bool W3DBloom::acquireTargets(Int width, Int height, WW3DFormat format, Int samp
 	m_sampleType = sampleType;
 
 	if (DX8Wrapper::Get_Current_Caps()->Get_Pixel_Shader_Major_Version() >= 2 &&
-		FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\bloomblur.pso", nullptr, 0, false, &m_blurShader)))
+		(FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\bloomblur.pso", nullptr, 0, false, &m_blurShader)) ||
+		FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\bloomshrink.pso", nullptr, 0, false, &m_shrinkShader))))
 	{
-		m_blurShader = 0;
+		releaseShaders();
 	}
 #endif
 
@@ -180,13 +183,24 @@ Bool W3DBloom::acquireTargets(Int width, Int height, WW3DFormat format, Int samp
 	return true;
 }
 
-void W3DBloom::releaseTargets()
+// either both pass shaders exist or neither, so the passes never mix shader and fixed function sums
+void W3DBloom::releaseShaders()
 {
 	if (m_blurShader != 0)
 	{
 		DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_blurShader);
 		m_blurShader = 0;
 	}
+	if (m_shrinkShader != 0)
+	{
+		DX8_DELETE_PIXEL_SHADER(DX8Wrapper::_Get_D3D_Device8(), m_shrinkShader);
+		m_shrinkShader = 0;
+	}
+}
+
+void W3DBloom::releaseTargets()
+{
+	releaseShaders();
 	if (m_sampledSurface)
 	{
 		m_sampledSurface->Release();
@@ -303,7 +317,7 @@ Bool W3DBloom::begin(RenderInfoClass &rinfo, Bool anythingToDraw)
 
 void W3DBloom::end(RenderInfoClass &rinfo)
 {
-	// additive meshes join the particles in the bloom target
+	// Replay the captured additive and emissive object meshes into the bloom target.
 	TheDX8MeshRenderer.Flush_Bloom();
 
 #if defined(BUILD_WITH_D3D9)
@@ -334,9 +348,13 @@ void W3DBloom::end(RenderInfoClass &rinfo)
 	// alternating the axis makes the kernel separable, and each pair widens the halo
 	const Real blurWidth = (Real)m_target[TARGET_BLUR]->Get_Width();
 	const Real blurHeight = (Real)m_target[TARGET_BLUR]->Get_Height();
+	Real size = 1.0f;
+#if defined(RTS_ZEROHOUR)
+	size = TheGlobalData->m_bloomSize;
+#endif
 	for (Int pass = 0; drawn && pass < BLOOM_BLUR_PASSES; ++pass)
 	{
-		const Real spread = 1.0f + (Real)(pass / 2);
+		const Real spread = size * (1.0f + (Real)(pass / 2));
 		const Bool horizontal = (pass & 1) == 0;
 		drawn = blurPass(m_target[TARGET_BLUR + (pass & 1)], TARGET_BLUR + ((pass + 1) & 1),
 			horizontal ? spread / blurWidth : 0.0f,
@@ -371,7 +389,7 @@ void W3DBloom::end(RenderInfoClass &rinfo)
 		composite.u1 = viewMax.X;
 		composite.v1 = viewMax.Y;
 		composite.brightness = debug ? 1.0f : TheGlobalData->m_bloomStrength;
-		drawTaps(m_target[TARGET_BLUR + (BLOOM_BLUR_PASSES & 1)], &composite, 1, debug ? m_copyShader : m_addShader);
+		drawTaps(m_target[TARGET_BLUR + (BLOOM_BLUR_PASSES & 1)], &composite, 1, debug ? m_copyShader : m_screenShader);
 	}
 
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, TRUE);
@@ -436,7 +454,11 @@ Bool W3DBloom::blurPass(TextureClass *source, Int target, Real offsetU, Real off
 
 	if (m_blurShader != 0)
 	{
-		drawShaderTaps(source, taps, count);
+		Real threshold = 0.0f;
+#if defined(RTS_ZEROHOUR)
+		threshold = shrink ? TheGlobalData->m_bloomThreshold : 0.0f;
+#endif
+		drawShaderTaps(source, taps, count, threshold, shrink ? m_shrinkShader : m_blurShader);
 	}
 	else
 	{
@@ -446,13 +468,15 @@ Bool W3DBloom::blurPass(TextureClass *source, Int target, Real offsetU, Real off
 }
 
 // one quad whose pixel shader sums the taps, so the target is written once at full precision
-void W3DBloom::drawShaderTaps(TextureClass *source, const Tap *taps, Int count)
+void W3DBloom::drawShaderTaps(TextureClass *source, const Tap *taps, Int count, Real threshold, DWORD pixelShader)
 {
-	Vector4 constants[BLOOM_MAX_TAPS];
+	Vector4 constants[BLOOM_MAX_TAPS + 1];
 	for (Int i = 0; i < BLOOM_MAX_TAPS; ++i)
 	{
 		constants[i] = (i < count) ? Vector4(taps[i].u0, taps[i].v0, taps[i].brightness, 0.0f) : Vector4(0.0f, 0.0f, 0.0f, 0.0f);
 	}
+	const Real knee = threshold * BLOOM_KNEE;
+	constants[BLOOM_MAX_TAPS] = Vector4(threshold, knee, knee > 0.0f ? 0.25f / knee : 0.0f, 2.0f * knee);
 
 	Tap quad;
 	quad.u0 = 0.0f;
@@ -461,8 +485,8 @@ void W3DBloom::drawShaderTaps(TextureClass *source, const Tap *taps, Int count)
 	quad.v1 = 1.0f;
 	quad.brightness = 1.0f;
 
-	DX8Wrapper::Set_Pixel_Shader_Constant(0, constants, BLOOM_MAX_TAPS);
-	DX8Wrapper::Set_Pixel_Shader(m_blurShader);
+	DX8Wrapper::Set_Pixel_Shader_Constant(0, constants, BLOOM_MAX_TAPS + 1);
+	DX8Wrapper::Set_Pixel_Shader(pixelShader);
 	drawTaps(source, &quad, 1, m_copyShader);
 	DX8Wrapper::Set_Pixel_Shader(0);
 }

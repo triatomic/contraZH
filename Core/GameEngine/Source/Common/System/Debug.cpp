@@ -113,6 +113,9 @@ static char theLogFileName[ _MAX_PATH ];
 static char theLogFileNamePrev[ _MAX_PATH ];
 static FILE *theRenderLogFile = nullptr;
 static char theRenderLogFileName[ _MAX_PATH ];
+static Bool theLogFilesRequested = FALSE;
+static Bool theLogSilent = FALSE;
+static Bool theLogFlushEachLine = FALSE;
 #endif
 #define LARGE_BUFFER	8192
 static char theBuffer[ LARGE_BUFFER ];	// make it big to avoid weird overflow bugs in debug mode
@@ -160,7 +163,11 @@ inline Bool ignoringAsserts()
 	if (TheGlobalData && TheGlobalData->m_headless)
 		return true;
 #ifdef DEBUG_CRASHING
+	// Remembered, so that asserts raised during shutdown (after the global data is gone) are ignored too.
+	static Bool ignoreAssertsWasSet = false;
 	if (TheGlobalData && TheGlobalData->m_debugIgnoreAsserts)
+		ignoreAssertsWasSet = true;
+	if (ignoreAssertsWasSet)
 		return true;
 #endif
 
@@ -248,7 +255,10 @@ static void doLogOutput(const char *buffer, const char *endline)
 		if (theLogFile)
 		{
 			fprintf(theLogFile, "%s%s", buffer, endline);
-			fflush(theLogFile);
+			if (theLogFlushEachLine)
+			{
+				fflush(theLogFile);
+			}
 		}
 	}
 
@@ -290,6 +300,7 @@ static int doCrashBox(const char *buffer, Bool logResult)
 #ifdef DEBUG_LOGGING
 			if (logResult)
 				DebugLog("[Abort]");
+			DebugFlushLog();
 #endif
 			_exit(1);
 			break;
@@ -380,6 +391,15 @@ void DebugInit(int flags)
 		if (!rts::ClientInstance::initialize())
 			return;
 
+#if !defined(RTS_DEBUG) && !defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+		// The game logs in builds without cheats only when -log asks for it; the tools have a prefix and always log
+		if (gAppPrefix[0] == '\0' && !theLogFilesRequested)
+		{
+			theLogSilent = TRUE;
+			return;
+		}
+#endif
+
 		char dirbuf[ _MAX_PATH ];
 		::GetModuleFileName( nullptr, dirbuf, sizeof( dirbuf ) );
 		if (char *pEnd = strrchr(dirbuf, '\\'))
@@ -423,6 +443,9 @@ void DebugInit(int flags)
 			}
 		}
 
+		// The log is buffered, so a crash that skips every handler loses its tail; CONTRA_LOG_FLUSH keeps every line.
+		theLogFlushEachLine = (getenv("CONTRA_LOG_FLUSH") != nullptr);
+
 		theLogFile = fopen(theLogFileName, "w");
 		if (theLogFile != nullptr)
 		{
@@ -460,6 +483,11 @@ void DebugInit(int flags)
 */
 void DebugLog(const char *format, ...)
 {
+	if (theLogSilent)
+	{
+		return;
+	}
+
 #ifdef DEBUG_THREADSAFE
 	ScopedCriticalSection scopedCriticalSection(TheDebugLogCriticalSection);
 #endif
@@ -487,6 +515,11 @@ void DebugLog(const char *format, ...)
 */
 void DebugLogRaw(const char *format, ...)
 {
+	if (theLogSilent)
+	{
+		return;
+	}
+
 #ifdef DEBUG_THREADSAFE
 	ScopedCriticalSection scopedCriticalSection(TheDebugLogCriticalSection);
 #endif
@@ -512,6 +545,11 @@ void DebugLogRaw(const char *format, ...)
 */
 void DebugRenderLog(const char *format, ...)
 {
+	if (theLogSilent)
+	{
+		return;
+	}
+
 #ifdef DEBUG_THREADSAFE
 	ScopedCriticalSection scopedCriticalSection(TheDebugLogCriticalSection);
 #endif
@@ -539,6 +577,16 @@ void DebugRenderLog(const char *format, ...)
 	}
 }
 
+void DebugRequestLogFiles()
+{
+	theLogFilesRequested = TRUE;
+}
+
+int DebugLogEnabled()
+{
+	return !theLogSilent;
+}
+
 const char* DebugGetLogFileName()
 {
 	return theLogFileName;
@@ -547,6 +595,14 @@ const char* DebugGetLogFileName()
 const char* DebugGetLogFileNamePrev()
 {
 	return theLogFileNamePrev;
+}
+
+void DebugFlushLog()
+{
+	if (theLogFile)
+	{
+		fflush(theLogFile);
+	}
 }
 
 #endif
@@ -598,6 +654,9 @@ void DebugCrash(const char *format, ...)
 		{
 			doStackDump();
 		}
+#endif
+#ifdef DEBUG_LOGGING
+		DebugFlushLog();
 #endif
 	}
 
@@ -814,6 +873,9 @@ void ReleaseCrash(const char *reason)
 		}
 	}
 
+#ifdef DEBUG_LOGGING
+	DebugFlushLog();
+#endif
 	TriggerMiniDump();
 
 	char prevbuf[ _MAX_PATH ];
@@ -898,6 +960,9 @@ void ReleaseCrashLocalized(const AsciiString& p, const AsciiString& m)
 		return;
 	}
 
+#ifdef DEBUG_LOGGING
+	DebugFlushLog();
+#endif
 	TriggerMiniDump();
 
 	UnicodeString prompt = TheGameText->fetch(p);

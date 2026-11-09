@@ -32,11 +32,14 @@
 // draw after he draws.
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
 #include "GameLogic/Object.h"
 #include "GameLogic/Module/ContainModule.h"
 #include "W3DDevice/GameClient/Module/W3DDependencyModelDraw.h"
+
+#include <set>
 
 
 
@@ -71,6 +74,7 @@ void W3DDependencyModelDrawModuleData::buildFieldParse(MultiIniFieldParse& p)
 W3DDependencyModelDraw::W3DDependencyModelDraw( Thing *thing, const ModuleData* moduleData ) : W3DModelDraw( thing, moduleData )
 {
 	m_dependencyCleared = FALSE;
+	m_missingBoneContainerID = INVALID_DRAWABLE_ID;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -100,7 +104,7 @@ void W3DDependencyModelDraw::doDrawModule(const Matrix3D* transformMtx)
 
 	  Drawable *theirDrawable = nullptr;
 
-	  if( me->getContainedBy() && !me->getContainedBy()->getContain()->isEnclosingContainerFor(me) )
+	  if( me->getContainedBy() && me->getContainedBy()->getContain() && !me->getContainedBy()->getContain()->isEnclosingContainerFor(me) )
 		  theirDrawable = me->getContainedBy()->getDrawable();
 
     if( ! theirDrawable )
@@ -129,6 +133,7 @@ void W3DDependencyModelDraw::adjustTransformMtx(Matrix3D& mtx) const
 	if( md->m_attachToDrawableBoneInContainer.isNotEmpty()
 		&& me
 		&& me->getContainedBy()
+		&& me->getContainedBy()->getContain()
 		&& !me->getContainedBy()->getContain()->isEnclosingContainerFor(me)
 		)
 	{
@@ -156,11 +161,65 @@ void W3DDependencyModelDraw::adjustTransformMtx(Matrix3D& mtx) const
 			}
 			else
 			{
+#if RTS_ZEROHOUR
+				mtx = *theirDrawable->getDrawnTransformMatrix();
+#else
         mtx = *theirDrawable->getTransformMatrix();//TransformMatrix();
-				DEBUG_LOG(("m_attachToDrawableBoneInContainer %s not found", md->m_attachToDrawableBoneInContainer.str()));
+#endif
+				logMissingContainerBone(theirDrawable, boneName);
 			}
 		}
 	}
+}
+
+// ------------------------------------------------------------------------------------------------
+void W3DDependencyModelDraw::logMissingContainerBone(const Drawable* container, const AsciiString& slotBoneName) const
+{
+#ifdef DEBUG_LOGGING
+	// Drawing the rider and moving it in logic both reach this every frame.
+	if (container->getID() == m_missingBoneContainerID
+		&& container->getModelConditionFlags() == m_missingBoneConditions
+		&& slotBoneName == m_missingBoneSlotName)
+	{
+		return;
+	}
+	m_missingBoneContainerID = container->getID();
+	m_missingBoneConditions = container->getModelConditionFlags();
+	m_missingBoneSlotName = slotBoneName;
+
+	// W3DModelDraw is the only ObjectDrawInterface.
+	AsciiString models;
+	for (DrawModule const** dm = container->getDrawModules(); dm && *dm; ++dm)
+	{
+		const ObjectDrawInterface* di = (*dm)->getObjectDrawInterface();
+		const RenderObjClass* robj = di ? ((const W3DModelDraw*)di)->getRenderObject() : nullptr;
+		if (robj)
+		{
+			if (models.isNotEmpty())
+			{
+				models.concat(", ");
+			}
+			models.concat(robj->Get_Name());
+		}
+	}
+
+	AsciiString line;
+	line.format("m_attachToDrawableBoneInContainer %s%s%s not found in models %s of %s, carrying %s",
+		slotBoneName.str(), slotBoneName.isEmpty() ? "" : " or ",
+		getW3DDependencyModelDrawModuleData()->m_attachToDrawableBoneInContainer.str(),
+		models.isEmpty() ? "<none>" : models.str(),
+		container->getTemplate()->getName().str(), getDrawable()->getTemplate()->getName().str());
+
+	// Every rider of a template repeats the same miss, so each distinct line logs once.
+	static std::set<AsciiString> s_loggedLines;
+	if (s_loggedLines.insert(line).second)
+	{
+		DEBUG_LOG(("%s", line.str()));
+	}
+#else
+	(void)container;
+	(void)slotBoneName;
+#endif
 }
 
 // ------------------------------------------------------------------------------------------------

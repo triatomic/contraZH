@@ -50,7 +50,7 @@ Not ref counted.  Do not store pointers to this class.  */
 #define K_MIN_HEIGHT  0
 #define K_MAX_HEIGHT  255
 
-#define NUM_SOURCE_TILES 1024
+#define NUM_SOURCE_TILES ((TEXTURE_WIDTH/TILE_PIXEL_EXTENT)*(TEXTURE_WIDTH/TILE_PIXEL_EXTENT))
 #define NUM_BLEND_TILES 16192
 #define NUM_CLIFF_INFO 32384
 #define FLAG_VAL 0x7ADA0000
@@ -71,6 +71,9 @@ typedef struct {
 } TXTextureClass;
 
 typedef enum {POS_X, POS_Y, NEG_X, NEG_Y} TVDirection;
+// Map files store cliff UVs relative to this width, independently of the render atlas.
+#define CLIFF_UV_REFERENCE_WIDTH 2048
+
 /// Struct in memory.
 typedef struct {
 	Real	u0, v0;	 // Upper left uv
@@ -87,7 +90,7 @@ typedef struct {
 #define NUM_TEXTURE_CLASSES 1024
 
 // Atlas slots along each side of the seabed's slot lookup, which terrainshadow.hlsl divides by too.
-#define CLASS_MAP_SLOTS 32
+#define CLASS_MAP_SLOTS (TEXTURE_WIDTH/TILE_PIXEL_EXTENT)
 
 // Bytes a cell of painted stochastic terrain takes: strength, seed and blending rate.
 #define STOCHASTIC_BYTES 3
@@ -96,12 +99,16 @@ typedef struct {
 class TextureClass;
 class ChunkInputStream;
 class InputStream;
+class File;
 class OutputStream;
 class DataChunkInput;
 struct DataChunkInfo;
 class TerrainTextureClass;
 class TerrainNormalTextureClass;
 class TerrainHeightTextureClass;
+#if defined(RTS_ZEROHOUR)
+class TerrainEmissiveTextureClass;
+#endif
 class AlphaTerrainTextureClass;
 class AlphaEdgeTextureClass;
 
@@ -113,6 +120,9 @@ class WorldHeightMap : public RefCountClass,
 	friend class TerrainTextureClass;
 	friend class TerrainNormalTextureClass;
 	friend class TerrainHeightTextureClass;
+#if defined(RTS_ZEROHOUR)
+	friend class TerrainEmissiveTextureClass;
+#endif
 	friend class AlphaTerrainTextureClass;
 	friend class AlphaEdgeTextureClass;
 
@@ -183,6 +193,14 @@ protected:
 	Bool				m_hasNormalTiles;	///< Some texture class has a normal map
 	TileData			*m_sourceHeightTiles[NUM_SOURCE_TILES];	///< Height map tiles matching m_sourceTiles, null where a class has none
 
+#if defined(RTS_ZEROHOUR)
+	TileData *m_sourceEmissiveTiles[NUM_SOURCE_TILES];
+	Bool m_hasEmissiveTiles;
+	TerrainEmissiveTextureClass *m_terrainEmissiveTex;
+	Real m_terrainEmissiveScale;
+	Bool m_terrainEmissiveTexFailed;
+#endif
+
 	TCliffInfo	m_cliffInfo[NUM_CLIFF_INFO];
 	Int m_numCliffInfo; ///< Number of cliffInfo's used in m_cliffInfo.
 
@@ -203,7 +221,6 @@ protected:
 	 texture. */
 	TerrainTextureClass *m_terrainTex;
 	Int	m_terrainTexHeight; /// Height of m_terrainTex allocated.
-	Int	m_atlasBorder; ///< Texels copied around each texture in the atlases, fixed when the tiles are placed
 	/** The normal maps laid out like m_terrainTex, so the same UVs index both. */
 	TerrainNormalTextureClass *m_terrainNormalTex;
 	/** The heights the textures blend by, laid out like m_terrainTex. */
@@ -278,13 +295,25 @@ public:  // Boundary info
 
 public:  // height map info.
 	static Int getMinHeightValue() {return K_MIN_HEIGHT;}
-	static Int getMaxHeightValue() {return K_MAX_HEIGHT;}
+	/// Highest value a height sample can have: K_MAX_HEIGHT times the HeightMapScale of the map.
+	static Int getMaxHeightValue();
+	static Bool isValidMapSize(Int width, Int height, Int borderSize); ///< Within MAX_MAP_DIMENSION and MAX_MAP_AREA, width and height include the border
 
 	HeightSampleType *getDataPtr() {return m_data;}
 
 
 	Int getXExtent() const {return m_width;}	///<number of vertices in x
 	Int getYExtent() const {return m_height;}	///<number of vertices in y
+
+	IRegion2D getLogicalBounds() const
+	{
+		IRegion2D bounds;
+		bounds.lo.x = -m_borderSize;
+		bounds.lo.y = -m_borderSize;
+		bounds.hi.x = m_width - m_borderSize;
+		bounds.hi.y = m_height - m_borderSize;
+		return bounds;
+	}
 
 	Region2D getDrawRegion2D();
 
@@ -313,6 +342,15 @@ public:  // height map info.
 	inline Int getStoredWidth() const {return m_width; }
 	inline Int getStoredHeight() const {return m_height; }
 
+	///Faster version of above function without all the safety checks
+	HeightSampleType getQuickHeight(Int xIndex, Int yIndex) const
+	{
+		return m_data[yIndex * m_width + xIndex];
+	}
+
+	///Check that the map is flat within logical bounds
+	Bool isTerrainFlat(const IRegion2D& bounds) const;
+
 	void getUVForBlend(Int edgeClass, Region2D *range);
 
 	DrawArea createDrawArea(Int xOrg, Int yOrg);
@@ -328,6 +366,10 @@ public:  // height map info.
 public:  // tile and texture info.
 	void setTextureLOD(Int lod);	///< set maximum lod level sent to the hardware.
 	TextureClass *getTerrainTexture();  //< generates if needed and returns the terrain texture
+#if defined(RTS_ZEROHOUR)
+	TextureClass *getTerrainEmissiveTexture();
+	Real getTerrainEmissiveScale() const { return m_terrainEmissiveScale; }
+#endif
 	TextureClass *getTerrainNormalTexture();  //< generates if needed and returns the terrain normal maps, or null when there are none
 	TextureClass *getTerrainHeightTexture();  //< generates if needed and returns the heights the textures blend by, or null when the card lacks the format
 	TextureClass *getTerrainClassMap();  //< generates if needed and returns the atlas slot lookup the seabed shaders read, or null
@@ -340,11 +382,6 @@ public:  // tile and texture info.
 	/// Generates if needed and returns each texture's glint strength and gloss, defaultGloss without a GlintGloss, and what a full channel stands for, or null.
 	TextureClass *getTerrainGlintMap(Real defaultGloss, Real &strengthScale, Real &glossScale);
 	Int getTerrainTexHeight() const { return m_terrainTexHeight; }
-	Int getAtlasBorder() const { return m_atlasBorder; }
-	/// The atlas border GameData TerrainAtlasBorder asks for, rounded and bounded as the atlases lay it out.
-	static Int getAtlasBorderSetting();
-	/// Drops atlases built at another border, and returns true when every cell's texture coordinates need updating.
-	Bool refreshAtlasBorder();
 	TextureClass *getAlphaTerrainTexture(); //< generates if needed and returns alpha terrain texture
 	TextureClass *getEdgeTerrainTexture(); //< generates if needed and returns blend edge texture
 	/// UV mapping data for a cell to map into the terrain texture.  Returns true if the textures had to be stretched for cliffs.
@@ -391,8 +428,9 @@ public:  // modify height value
 		if ((ndx>=0) && (ndx<m_dataSize) && m_data) m_data[ndx]=height;
 	};
 public: // Read tile utilities. jba [7/9/2003]
-	static Bool readTiles(InputStream *pStrm, TileData **tiles, Int numRows);
-	static Int countTiles(InputStream *pStrm, Bool *halfTile=nullptr);
+	static File *openTerrainTexture(AsciiString &path, Bool useMissingTexture=TRUE);
+	static Bool readTiles(InputStream *pStrm, TileData **tiles, Int numRows, const char *filename=nullptr);
+	static Int countTiles(InputStream *pStrm, Bool *halfTile=nullptr, const char *filename=nullptr);
 
 protected:
 	void setCliffState(Int xIndex, Int yIndex, Bool state);

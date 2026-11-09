@@ -50,6 +50,7 @@ private slots:
 	void onRebuildsChanged();
 	void onRebuildsTextCommitted();		// a hand-typed rebuild count (== MFC's CBN_EDITCHANGE)
 	void onForcedShowToggled();
+	void onSideOnlyToggled();
 	void onFollowObjectToggled();
 
 private:
@@ -73,6 +74,7 @@ private:
 	QProgressBar   *m_power;
 	QCheckBox      *m_followObject;
 	QCheckBox      *m_forcedShow;
+	QCheckBox      *m_sideOnly;
 
 	bool m_updating;	// re-entrancy guard while seeding controls
 

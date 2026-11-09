@@ -115,6 +115,7 @@ static PoolSizeRec PoolSizes[] =
 	{ "CountermeasuresBehavior", 256, 32 },
 	{ "BattlePlanBonusBehavior", 256, 32 },
 	{ "EnergyShieldBehavior", 256, 32 },
+	{ "ShieldFieldBehavior", 32, 32 },
 	{ "BaseRegenerateUpdate", 128, 32 },
 	{ "BoneFXDamage", 64, 32 },
 	{ "BoneFXUpdate", 64, 32 },
@@ -212,6 +213,7 @@ static PoolSizeRec PoolSizes[] =
 	{ "RadiusDecalBehavior", 32, 32 },
 	{ "SpecialPowerDesignatorUpdate", 32, 32 },
 	{ "BattlePlanUpdate", 32, 32 },
+	{ "AllBattlePlansUpdate", 32, 32 },
 	{ "LifetimeUpdate", 32, 32 },
 	{ "LocomotorSetUpgrade", 512, 128 },
 	{ "LockWeaponCreate", 64, 128 },
@@ -659,6 +661,7 @@ static PoolSizeRec PoolSizes[] =
 	{ "TerrainTextureClass", 4, 4 },
 	{ "TerrainNormalTextureClass", 4, 4 },
 	{ "TerrainHeightTextureClass", 4, 4 },
+	{ "TerrainEmissiveTextureClass", 4, 4 },
 	{ "MeshClass", 14000, 2000 },
 	{ "HTreeClass", 2048, 512 },
 	{ "HLodClass", 2048, 512 },
@@ -701,7 +704,6 @@ static PoolSizeRec PoolSizes[] =
 	{ "Render2DClass", 64, 32 },
 	{ "SurfaceClass", 128, 32 },
 	{ "FontCharsClassCharDataStruct", 1024, 32 },
-	{ "FontCharsBuffer", 16, 4 },
 	{ "FVFInfoClass", 152, 64 },
 	{ "TerrainTracksRenderObjClass", 128, 32 },
 	{ "DynamicIBAccessClass", 32, 32 },
@@ -727,5 +729,6 @@ static PoolSizeRec PoolSizes[] =
 	{ "DrawBridgeTowerUpdate", 8, 8 },
 	{ "DrawBridgeUpdate", 4, 4 },
 	{ "CrateApplyUpgrade", 64, 32 },
+	{ "RiftSlowDeathBehavior", 8, 8 },
 	{ 0, 0, 0 }
 };

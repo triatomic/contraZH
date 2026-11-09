@@ -58,6 +58,7 @@
 #include "Common/GlobalData.h"
 #include "Common/MapData.h"
 #include "Common/PerfTimer.h"
+#include "Common/StartupTiming.h"
 #include "Common/Xfer.h"
 
 #include "GameClient/TerrainVisual.h"
@@ -100,7 +101,9 @@
 #include "W3DDevice/GameClient/W3DDisruption.h"
 #include "W3DDevice/GameClient/W3DStorm.h"
 #include "W3DDevice/GameClient/W3DColorLut.h"
+#include "W3DDevice/GameClient/W3DDistanceFog.h"
 #include "W3DDevice/GameClient/W3DHeadlight.h"
+#include "W3DDevice/GameClient/W3DPlanarMirror.h"
 #include "W3DDevice/GameClient/W3DSoftParticles.h"
 #include "W3DDevice/GameClient/W3DAmbientOcclusion.h"
 #include "W3DDevice/GameClient/W3DLaserGlow.h"
@@ -245,6 +248,8 @@ BaseHeightMapRenderObjClass::~BaseHeightMapRenderObjClass()
 //=============================================================================
 BaseHeightMapRenderObjClass::BaseHeightMapRenderObjClass()
 {
+	StartupStepClock clock("HeightMap");
+
 	m_x=0;
 	m_y=0;
 	m_needFullUpdate = false;
@@ -294,21 +299,28 @@ BaseHeightMapRenderObjClass::BaseHeightMapRenderObjClass()
 	m_scorches = NEW W3DScorchDummy;
 	m_staticScorches = NEW W3DScorchDummy;
 #endif
+	clock.mark("scorches");
 	m_bridgeBuffer = NEW W3DBridgeBuffer;
+	clock.mark("bridge buffer");
 
 	if (TheGlobalData->m_headless)
 		return;
 
 	m_treeBuffer = NEW W3DTreeBuffer;
+	clock.mark("tree buffer");
 
 	m_propBuffer = NEW W3DPropBuffer;
+	clock.mark("prop buffer");
 
 	m_bibBuffer = NEW W3DBibBuffer;
+	clock.mark("bib buffer");
 
 	m_curImpassableSlope = 45.0f;	// default to 45 degrees.
 	m_waypointBuffer = NEW W3DWaypointBuffer;
+	clock.mark("waypoint buffer");
 #ifdef DO_ROADS
 	m_roadBuffer = NEW W3DRoadBuffer;
+	clock.mark("road buffer");
 #endif
 #if ENABLE_CONFIGURABLE_SHROUD
 	if (TheGlobalData->m_shroudOn)
@@ -319,6 +331,7 @@ BaseHeightMapRenderObjClass::BaseHeightMapRenderObjClass()
 	m_shroud = NEW W3DShroud;
 #endif
 	DX8Wrapper::SetCleanupHook(this);
+	clock.mark("shroud");
 }
 
 void BaseHeightMapRenderObjClass::scheduleFullUpdate()
@@ -459,6 +472,11 @@ void BaseHeightMapRenderObjClass::ReleaseResources()
 		TheW3DStorms->ReleaseResources();
 	}
 
+	if (TheW3DDistanceFog)
+	{
+		TheW3DDistanceFog->ReleaseResources();
+	}
+
 	if (TheW3DColorLut)
 	{
 		TheW3DColorLut->ReleaseResources();
@@ -467,6 +485,11 @@ void BaseHeightMapRenderObjClass::ReleaseResources()
 	if (TheW3DHeadlights)
 	{
 		TheW3DHeadlights->ReleaseResources();
+	}
+
+	if (TheW3DPlanarMirrors)
+	{
+		TheW3DPlanarMirrors->ReleaseResources();
 	}
 
 	if (TheW3DSoftParticles)
@@ -1333,7 +1356,7 @@ Bool BaseHeightMapRenderObjClass::isClearLineOfSight(const Coord3D& pos, const C
 	// seems acceptable accuracy. If performance here is inadequate,
 	// we can try increasing the step size, but be sure to retest
 	// accuracy.
-	Real len = ceilf(sqrtf(fdx*fdx + fdy*fdy));
+	Real len = WWMath::Ceilf(WWMath::Sqrtf(fdx*fdx + fdy*fdy));
 	const Real STEP_LEN = 2.0f;
 	Int numSteps = REAL_TO_INT_CEIL(len / STEP_LEN);
 	if (numSteps < 1) numSteps = 1;
@@ -1636,7 +1659,7 @@ Bool BaseHeightMapRenderObjClass::evaluateAsVisibleCliff(Int xIndex, Int yIndex,
 	{
 		0.0f,
 		1.0 * MAP_XY_FACTOR,
-		sqrt(2.0f) * MAP_XY_FACTOR,
+		(Real)(WWMath::Sqrt(2.0) * MAP_XY_FACTOR),
 		1.0 * MAP_XY_FACTOR,
 	};
 
@@ -1661,7 +1684,7 @@ Bool BaseHeightMapRenderObjClass::evaluateAsVisibleCliff(Int xIndex, Int yIndex,
 	Bool anyImpassable = FALSE;
 
 	for (Int i = 1; i < 4 && !anyImpassable; ++i) {
-		if (fabs((heights[i] - heights[0]) / distance[i]) > valuesGreaterThanRad) {
+		if (WWMath::Fabs((heights[i] - heights[0]) / distance[i]) > valuesGreaterThanRad) {
 			anyImpassable = TRUE;
 		}
 	}
@@ -2051,7 +2074,7 @@ void BaseHeightMapRenderObjClass::updateViewImpassableAreas(Bool partial, Int mi
 	}
 
 	// save calculating the tangent over and over again.
-	Real tanImpassableRad = tan(m_curImpassableSlope / 360.f * 2 * PI);
+	Real tanImpassableRad = WWMath::Tan(m_curImpassableSlope / 360.f * 2 * PI);
 	for (Int j = minY; j < maxY; ++j) {
 		for (Int i = minX; i < maxX; ++i) {
 			m_showAsVisibleCliff[i + j * xSize] = evaluateAsVisibleCliff(i, j, tanImpassableRad);
@@ -2562,7 +2585,7 @@ rendered portion of the terrain.  Only a 96x96 section is rendered at any time,
 even though maps can be up to 1024x1024.  This function determines which subset
 is rendered. */
 //=============================================================================
-void BaseHeightMapRenderObjClass::updateCenter(CameraClass *camera, const Vector3 *cameraPivot, RefRenderObjListIterator *pLightsIterator)
+void BaseHeightMapRenderObjClass::updateCenter(CameraClass *camera, const Vector3 *cameraPivot, RefRenderObjListIterator *pLightsIterator, const Vector2 *drawCenter)
 {
 	if (m_map==nullptr) {
 		return;
@@ -2884,13 +2907,13 @@ void BaseHeightMapRenderObjClass::renderShoreLinesSorted(CameraClass *pCamera)
 					for (Int k=lastRenderedTile; k<sortInfo->numTiles; k++)
 					{
 						Int tileY = shoreInfo->m_xy >> 16;
-						if (tileY < startY)
+						if (tileY >= edgeY)
+							break;	//since tiles are x-sorted, there will not be any visible ones after this one.
+
+						if (tileY < startY || isCellCulled(x, tileY))
 						{	shoreInfo++;	//advance to next tile.
 							continue;	//this tile is not visible
 						}
-
-						if (tileY >= edgeY)
-							break;	//since tiles are x-sorted, there will not be any visible ones after this one.
 
 						if (vertexCount >= (DEFAULT_MAX_BATCH_SHORELINE_TILES*4))
 						{	lastRenderedTile=k;
@@ -3005,13 +3028,13 @@ flushVertexBuffer0:
 					for (Int k=lastRenderedTile; k<sortInfo->numTiles; k++)
 					{
 						Int tileX = shoreInfo->m_xy & 0xffff;
-						if (tileX < startX)
+						if (tileX >= edgeX)
+							break;	//since tiles are x-sorted, there will not be any visible ones after this one.
+
+						if (tileX < startX || isCellCulled(tileX, y))
 						{	shoreInfo++;	//advance to next tile.
 							continue;	//this tile is not visible
 						}
-
-						if (tileX >= edgeX)
-							break;	//since tiles are x-sorted, there will not be any visible ones after this one.
 
 						if (vertexCount >= (DEFAULT_MAX_BATCH_SHORELINE_TILES*4))
 						{	lastRenderedTile=k;

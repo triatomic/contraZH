@@ -44,6 +44,7 @@
 #include "Common/PerfTimer.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
+#include "Common/StartupTiming.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
 #include "Common/Xfer.h"
@@ -71,6 +72,7 @@
 #include "GameClient/Keyboard.h"
 #include "GameClient/LanguageFilter.h"
 #include "GameClient/LookAtXlat.h"
+#include "GameClient/FacingDrag.h"
 #include "GameClient/MetaEvent.h"
 #include "GameClient/Mouse.h"
 #include "GameClient/ParticleSys.h"
@@ -102,6 +104,7 @@ GameClient::GameClient()
 		m_translators[ i ] = TRANSLATOR_ID_INVALID;
 	m_numTranslators = 0;
 	m_commandTranslator = nullptr;
+	m_facingDragTranslator = nullptr;
 
 	m_drawableTOC.clear();
 	m_textBearingDrawableList.clear();
@@ -210,6 +213,10 @@ GameClient::~GameClient()
 	delete TheTerrainVisual;
 	TheTerrainVisual = nullptr;
 
+	// Snow holds D3D resources, which must go before the display releases the device
+	delete TheSnowManager;
+	TheSnowManager = nullptr;
+
 	// destroy the display
 	delete TheDisplay;
 	TheDisplay = nullptr;
@@ -228,6 +235,7 @@ GameClient::~GameClient()
 		TheMessageStream->removeTranslator( m_translators[ i ] );
 	m_numTranslators = 0;
 	m_commandTranslator = nullptr;
+	m_facingDragTranslator = nullptr;
 
 	delete TheAnim2DCollection;
 	TheAnim2DCollection = nullptr;
@@ -248,9 +256,6 @@ GameClient::~GameClient()
 	delete TheEva;
 	TheEva = nullptr;
 
-	delete TheSnowManager;
-	TheSnowManager = nullptr;
-
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -258,6 +263,7 @@ GameClient::~GameClient()
 //-------------------------------------------------------------------------------------------------
 void GameClient::init()
 {
+	StartupStepClock clock("GameClient");
 
 	setFrameRate(MSEC_PER_LOGICFRAME_REAL);		// from GameCommon.h... tell W3D what our expected framerate is
 
@@ -272,6 +278,7 @@ void GameClient::init()
 		TheDrawGroupInfo->m_fontSize = TheGlobalLanguageData->m_drawGroupInfoFont.size;
 		TheDrawGroupInfo->m_fontIsBold = TheGlobalLanguageData->m_drawGroupInfoFont.bold;
 	}
+	clock.mark("DrawGroupInfo");
 
 	// create the display string factory
 	TheDisplayStringManager = createDisplayStringManager();
@@ -287,15 +294,18 @@ void GameClient::init()
 		TheKeyboard->init();
 		TheKeyboard->setName("TheKeyboard");
 	}
+	clock.mark("display strings and keyboard");
 
 	// allocate and load image collection for the GUI and just load the 256x256 ones for now
 	TheMappedImageCollection = MSGNEW("GameClientSubsystem") ImageCollection;
 	TheMappedImageCollection->load( 512 );
+	clock.mark("MappedImages");
 
 	// now that we have all the images loaded ... load any animation definitions from those images
 	TheAnim2DCollection = MSGNEW("GameClientSubsystem") Anim2DCollection;
 	TheAnim2DCollection->init();
  	TheAnim2DCollection->setName("TheAnim2DCollection");
+	clock.mark("Animation2D");
 
 	// register message translators
 	if( TheMessageStream )
@@ -312,6 +322,8 @@ void GameClient::init()
 		m_translators[ m_numTranslators++ ] =	TheMessageStream->attachTranslator( MSGNEW("GameClientSubsystem") HotKeyTranslator,	25 );
 		m_translators[ m_numTranslators++ ] =	TheMessageStream->attachTranslator( MSGNEW("GameClientSubsystem") PlaceEventTranslator,	30 );
 		m_translators[ m_numTranslators++ ] = TheMessageStream->attachTranslator( MSGNEW("GameClientSubsystem") GUICommandTranslator, 40 );
+		// drag-to-face: before selection, scrolling and orders, which it takes the buttons from while held
+		m_translators[ m_numTranslators++ ] = TheMessageStream->attachTranslator( m_facingDragTranslator = MSGNEW("GameClientSubsystem") FacingDragTranslator, 45 );
 		m_translators[ m_numTranslators++ ] =	TheMessageStream->attachTranslator( MSGNEW("GameClientSubsystem") SelectionTranslator,	50 );
 		m_translators[ m_numTranslators++ ] =	TheMessageStream->attachTranslator( MSGNEW("GameClientSubsystem") LookAtTranslator,			60 );
 		m_translators[ m_numTranslators ] =	TheMessageStream->attachTranslator( MSGNEW("GameClientSubsystem") CommandTranslator,		70 );
@@ -329,16 +341,20 @@ void GameClient::init()
 
 	}
 
+	clock.mark("message translators");
+
 	// create the font library
 	TheFontLibrary = createFontLibrary();
 	if( TheFontLibrary )
 		TheFontLibrary->init();
+	clock.mark("font library");
 
 	// create the mouse
 	TheMouse = TheGlobalData->m_headless ? NEW MouseDummy : createMouse();
 	TheMouse->parseIni();
 	TheMouse->initCursorResources();
  	TheMouse->setName("TheMouse");
+	clock.mark("mouse and cursors");
 
 	// instantiate the display
 	TheDisplay = createGameDisplay();
@@ -346,11 +362,13 @@ void GameClient::init()
 		TheDisplay->init();
  		TheDisplay->setName("TheDisplay");
 	}
+	clock.mark("display");
 
 	TheHeaderTemplateManager = MSGNEW("GameClientSubsystem") HeaderTemplateManager;
 	if(TheHeaderTemplateManager){
 		TheHeaderTemplateManager->init();
 	}
+	clock.mark("header templates");
 
 	// create the window manager
 	TheWindowManager = TheGlobalData->m_headless ? NEW GameWindowManagerDummy : createWindowManager();
@@ -362,6 +380,7 @@ void GameClient::init()
 //		TheWindowManager->initTestGUI();
 
 	}
+	clock.mark("window manager");
 
 	// create the IME manager
 	TheIMEManager = CreateIMEManagerInterface();
@@ -370,6 +389,7 @@ void GameClient::init()
 		TheIMEManager->init();
  		TheIMEManager->setName("TheIMEManager");
 	}
+	clock.mark("IME manager");
 
 	// create the shell
 	TheShell = MSGNEW("GameClientSubsystem") Shell;
@@ -377,6 +397,7 @@ void GameClient::init()
 		TheShell->init();
  		TheShell->setName("TheShell");
 	}
+	clock.mark("shell");
 
 	// instantiate the in-game user interface
 	TheInGameUI = createInGameUI();
@@ -384,6 +405,7 @@ void GameClient::init()
 		TheInGameUI->init();
  		TheInGameUI->setName("TheInGameUI");
 	}
+	clock.mark("in-game UI");
 
  	TheChallengeGenerals = createChallengeGenerals();
  	if( TheChallengeGenerals ) {
@@ -395,6 +417,7 @@ void GameClient::init()
 		TheHotKeyManager->init();
  		TheHotKeyManager->setName("TheHotKeyManager");
 	}
+	clock.mark("challenge generals and hotkeys");
 
 	// instantiate the terrain visual display
 	TheTerrainVisual = createTerrainVisual();
@@ -402,6 +425,7 @@ void GameClient::init()
 		TheTerrainVisual->init();
  		TheTerrainVisual->setName("TheTerrainVisual");
 	}
+	clock.mark("terrain visual");
 
 	// allocate the ray effects manager
 	TheRayEffects = MSGNEW("GameClientSubsystem") RayEffectSystem;
@@ -454,6 +478,7 @@ void GameClient::init()
 	}
 
 	m_intro = NEW Intro;
+	clock.mark("rays, video, language filter, campaigns, EVA and snow");
 
 #ifdef PERF_TIMERS
 	TheGraphDraw = new GraphDraw;
@@ -465,6 +490,11 @@ void GameClient::init()
 /** Reset the game client for a new game */
 void GameClient::reset()
 {
+	if (m_facingDragTranslator)
+	{
+		m_facingDragTranslator->reset();
+	}
+
 	Drawable *draw, *nextDraw;
 //	m_drawableHash.clear();
 //	m_drawableHash.resize(DRAWABLE_HASH_SIZE);
@@ -540,6 +570,10 @@ void GameClient::update()
 	GameMessage *frameMsg = TheMessageStream->appendMessage( GameMessage::MSG_FRAME_TICK );
 	frameMsg->appendTimestampArgument( getFrame() );
 
+#if defined(GENERALS_ONLINE)
+	TheGameLogic->sendPendingLobbyRules();
+#endif
+
 	// Update intro
 	if (m_intro != nullptr)
 	{
@@ -563,6 +597,9 @@ void GameClient::update()
 			}
 		}
 	}
+
+	// TheSuperHackers @feature Basic house colors follow alliance changes.
+	rts::updateHouseColors();
 
 	//Update snow particles.
 	if (TheSnowManager)
@@ -730,7 +767,13 @@ void GameClient::update()
 	// update all particle systems
 	// TheSuperHackers @info The particle update follows the display update, because that
 	// moves bone-attached particle systems to the current client bone transforms of their drawables.
-	if( !freezeTime && TheGameLogic->hasUpdated() )
+#if defined(GENERALS_ONLINE_HIGH_FPS_RENDER)
+	// Particles step on the legacy frame, which can advance on a render frame that steps no logic.
+	const Bool updateParticles = !freezeTime && HasLegacyFrameAdvanced();
+#else
+	const Bool updateParticles = !freezeTime && TheGameLogic->hasUpdated();
+#endif
+	if( updateParticles )
 	{
 		TheParticleSystemManager->setLocalPlayerIndex(localPlayerIndex);
 		TheParticleSystemManager->UPDATE();

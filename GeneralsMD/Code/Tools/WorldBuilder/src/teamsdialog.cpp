@@ -492,10 +492,15 @@ void CTeamsDialog::UpdateTeamsList()
 	Bool selected = false;
 	Int inserted = 0;
 
+	// neutral teams store an empty owner name, or its UI label
+	AsciiString ownerName = m_sides.getSideInfo(which)->getDict()->getAsciiString(TheKey_playerName);
+	AsciiString ownerUIName = playerNameForUI(m_sides, which);
+
 	for (Int i=0; i<numTeams; i++)
 	{
 		TeamsInfo *ti = m_sides.getTeamInfo(i);
-		if (ti->getDict()->getAsciiString(TheKey_teamOwner) == playerNameForUI(m_sides, which).str())
+		AsciiString teamOwner = ti->getDict()->getAsciiString(TheKey_teamOwner);
+		if (teamOwner == ownerName || teamOwner == ownerUIName)
 		{
 			Bool exists;
 			AsciiString teamName = teamNameForUI(m_sides, i);

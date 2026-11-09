@@ -40,6 +40,7 @@
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/GadgetListBox.h"
 #include "GameClient/GadgetRadioButton.h"
+#include "GameClient/GadgetTextEntry.h"
 #include "GameNetwork/LANAPICallbacks.h"
 #include "GameClient/MapUtil.h"
 #include "GameNetwork/GUIUtil.h"
@@ -52,6 +53,8 @@ static NameKeyType listboxMap = NAMEKEY_INVALID;
 static NameKeyType winMapPreviewID = NAMEKEY_INVALID;
 static GameWindow *parent = nullptr;
 static GameWindow *mapList = nullptr;
+static GameWindow *mapFilter = nullptr;
+static Bool showingSystemMaps = TRUE;
 static GameWindow *winMapPreview = nullptr;
 static NameKeyType radioButtonSystemMapsID = NAMEKEY_INVALID;
 static NameKeyType radioButtonUserMapsID = NAMEKEY_INVALID;
@@ -102,6 +105,7 @@ static void NullifyControls()
 {
 	parent = nullptr;
 	mapList = nullptr;
+	mapFilter = nullptr;
 	if (winMapPreview)
 	{
 		winMapPreview->winSetUserData(nullptr);
@@ -111,6 +115,12 @@ static void NullifyControls()
 	{
 		buttonMapStartPosition[i] = nullptr;
 	}
+}
+
+static void populateLanMapList( Bool useSystemMaps, AsciiString mapToSelect )
+{
+	showingSystemMaps = useSystemMaps;
+	populateMapListbox( mapList, useSystemMaps, TRUE, mapToSelect, GadgetTextEntryGetText( mapFilter ) );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -167,9 +177,16 @@ void LanMapSelectMenuInit( WindowLayout *layout, void *userData )
 	mapList = TheWindowManager->winGetWindowFromId( parent, mapListID );
 	if( mapList )
 	{
+		GameWindow *chatEntry = TheWindowManager->winGetWindowFromId( nullptr, TheNameKeyGenerator->nameToKey( "LanGameOptionsMenu.wnd:TextEntryChat" ) );
+		mapFilter = createMapListFilter( mapList, chatEntry );
+		if (mapFilter)
+		{
+			TheWindowManager->winSetFocus( mapFilter );
+		}
+
 		if (TheMapCache)
 			TheMapCache->updateCache();
-		populateMapListbox( mapList, usesSystemMapDir, TRUE, TheLAN->GetMyGame()->getMap() );
+		populateLanMapList( usesSystemMapDir, TheLAN->GetMyGame()->getMap() );
 	}
 }
 
@@ -293,6 +310,19 @@ WindowMsgHandledType LanMapSelectMenuSystem( GameWindow *window, UnsignedInt msg
 		}
 
 		//---------------------------------------------------------------------------------------------
+		case GEM_UPDATE_TEXT:
+		{
+			if( mapFilter && (GameWindow *)mData1 == mapFilter )
+			{
+				Int selected = -1;
+				GadgetListBoxGetSelected( mapList, &selected );
+				const char *mapFname = selected >= 0 ? (const char *)GadgetListBoxGetItemData( mapList, selected ) : nullptr;
+				populateLanMapList( showingSystemMaps, mapFname ? AsciiString( mapFname ) : TheLAN->GetMyGame()->getMap() );
+			}
+			break;
+		}
+
+		//---------------------------------------------------------------------------------------------
 		case GLM_DOUBLE_CLICKED:
 			{
 				GameWindow *control = (GameWindow *)mData1;
@@ -322,7 +352,7 @@ WindowMsgHandledType LanMapSelectMenuSystem( GameWindow *window, UnsignedInt msg
 			{
 				if (TheMapCache)
 					TheMapCache->updateCache();
-				populateMapListbox( mapList, TRUE, TRUE, TheLAN->GetMyGame()->getMap() );
+				populateLanMapList( TRUE, TheLAN->GetMyGame()->getMap() );
 				LANPreferences pref;
 				pref["UseSystemMapDir"] = "yes";
 				pref.write();
@@ -331,7 +361,7 @@ WindowMsgHandledType LanMapSelectMenuSystem( GameWindow *window, UnsignedInt msg
 			{
 				if (TheMapCache)
 					TheMapCache->updateCache();
-				populateMapListbox( mapList, FALSE, TRUE, TheLAN->GetMyGame()->getMap() );
+				populateLanMapList( FALSE, TheLAN->GetMyGame()->getMap() );
 				LANPreferences pref;
 				pref["UseSystemMapDir"] = "no";
 				pref.write();
@@ -420,7 +450,8 @@ WindowMsgHandledType LanMapSelectMenuSystem( GameWindow *window, UnsignedInt msg
 					if( rowSelected < 0 )
 					{
 						positionStartSpots( AsciiString::TheEmptyString, buttonMapStartPosition, winMapPreview);
-//						winMapPreview->winClearStatus(WIN_STATUS_IMAGE);
+						winMapPreview->winSetUserData(nullptr);
+						winMapPreview->winClearStatus(WIN_STATUS_IMAGE);
 						break;
 					}
 					winMapPreview->winSetStatus(WIN_STATUS_IMAGE);

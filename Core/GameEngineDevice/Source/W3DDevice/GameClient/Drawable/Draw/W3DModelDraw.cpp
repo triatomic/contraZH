@@ -40,6 +40,7 @@
 #include "Common/crc.h"
 #include "Common/CRCDebug.h"
 #include "Common/GameState.h"
+#include "Common/GameUtility.h"
 #include "Common/GlobalData.h"
 #include "Common/PerfTimer.h"
 #include "Common/RandomValue.h"
@@ -1065,6 +1066,7 @@ W3DModelDrawModuleData::W3DModelDrawModuleData() :
 	m_disruption(DisruptionShaderInfo::SHAPE_CENTER)
 {
 	m_headlightTuning.setUnset();
+	m_planarMirrorTuning.setUnset();
 	const Real MAX_SHIFT = 3.0f;
 	const Real INITIAL_RECOIL_RATE = 2.0f;
 	const Real RECOIL_DAMPING = 0.4f;
@@ -1086,6 +1088,7 @@ W3DModelDrawModuleData::W3DModelDrawModuleData() :
 	m_flameShader = FALSE;
 	m_electricShader = FALSE;
 	m_cryoShader = FALSE;
+	m_planarMirror = FALSE;
 
 	// m_ignoreConditionStates defaults to all zero, which is what we want
 }
@@ -1221,8 +1224,28 @@ const Vector3* W3DModelDrawModuleData::getAttachToDrawableBoneOffset(const Drawa
 #endif
 
 //-------------------------------------------------------------------------------------------------
+// A sub-object is named <model>.<mesh>, and the mesh part is what PlanarMirrorMeshes lists.
+static Bool isPlanarMirrorMesh(const char *name, const std::vector<AsciiString> &meshes)
+{
+	if (meshes.empty())
+	{
+		return TRUE;
+	}
+	const char *dot = (name != nullptr) ? strrchr(name, '.') : nullptr;
+	const char *meshName = (dot != nullptr) ? dot + 1 : name;
+	for (size_t i = 0; meshName != nullptr && i < meshes.size(); i++)
+	{
+		if (stricmp(meshName, meshes[i].str()) == 0)
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
 // Hands every mesh under the object the module's shader settings, which the module data keeps alive.
-// One shader draws a mesh, so cryo wins over flame and flame over electric, as on a beam.
+// One shader draws a mesh, so a mirror wins over the rest, cryo over flame and flame over electric, as on a beam.
 static void setShaderEffects(RenderObjClass *robj, const W3DModelDrawModuleData &data)
 {
 	if (robj->Class_ID() == RenderObjClass::CLASSID_MESH)
@@ -1232,7 +1255,11 @@ static void setShaderEffects(RenderObjClass *robj, const W3DModelDrawModuleData 
 			robj->Set_Disruption(&data.m_disruption, data.m_disruption.hidesArt());
 		}
 
-		if (data.m_cryoShader)
+		if (data.m_planarMirror && isPlanarMirrorMesh(robj->Get_Name(), data.m_planarMirrorMeshes))
+		{
+			robj->Set_Shader_Effects(SoftParticleHookClass::EFFECT_MIRROR | SoftParticleHookClass::EFFECT_MESH, &data.m_planarMirrorTuning);
+		}
+		else if (data.m_cryoShader)
 		{
 			robj->Set_Shader_Effects(SoftParticleHookClass::EFFECT_CRYO | SoftParticleHookClass::EFFECT_MESH, &data.m_beamTuning);
 		}
@@ -1308,12 +1335,16 @@ void W3DModelDrawModuleData::buildFieldParse(MultiIniFieldParse& p)
 		{ "FlameShader", INI::parseBool, nullptr, offsetof(W3DModelDrawModuleData, m_flameShader) },
 		{ "ElectricShader", INI::parseBool, nullptr, offsetof(W3DModelDrawModuleData, m_electricShader) },
 		{ "CryoShader", INI::parseBool, nullptr, offsetof(W3DModelDrawModuleData, m_cryoShader) },
+		{ "PlanarMirror", INI::parseBool, nullptr, offsetof(W3DModelDrawModuleData, m_planarMirror) },
+		{ "PlanarMirrorMeshes", INI::parseAsciiStringVector, nullptr, offsetof(W3DModelDrawModuleData, m_planarMirrorMeshes) },
+		{ "PlanarMirrorOverrideTexture", INI::parseBool, nullptr, offsetof(W3DModelDrawModuleData, m_planarMirrorTuning) + offsetof(PlanarMirrorShaderTuning, overrideTexture) },
 		//{ "DisableMovementEffectsOverWater", INI::parseBool, NULL, offsetof(W3DModelDrawModuleData, m_disableMoveEffectsOverWater) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
   p.add(dataFieldParse);
   p.add(DisruptionShaderInfo::getFieldParse(), offsetof(W3DModelDrawModuleData, m_disruption));
   p.add(HeadlightShaderTuning::getFieldParse(), offsetof(W3DModelDrawModuleData, m_headlightTuning));
+  p.add(PlanarMirrorShaderTuning::getFieldParse(), offsetof(W3DModelDrawModuleData, m_planarMirrorTuning));
   p.add(ParticleSystemTemplate::getFlameTuningFieldParse(), offsetof(W3DModelDrawModuleData, m_flameTuning));
   p.add(W3DLaserDrawModuleData::getShaderTuningFieldParse(), offsetof(W3DModelDrawModuleData, m_beamTuning));
 
@@ -2158,7 +2189,9 @@ W3DModelDraw::~W3DModelDraw()
 //-------------------------------------------------------------------------------------------------
 void W3DModelDraw::doStartOrStopParticleSys()
 {
-	Bool hidden = getDrawable()->isDrawableEffectivelyHidden() || m_fullyObscuredByShroud;
+	const Drawable* draw = getDrawable();
+	Bool hidden = (draw->isDrawableEffectivelyHidden() && !draw->testDrawableStatus(DRAWABLE_STATUS_KEEP_PARTICLES_WHEN_HIDDEN))
+		|| m_fullyObscuredByShroud;
 
 	for (std::vector<ParticleSysTrackerType>::const_iterator it = m_particleSystemIDs.begin(); it != m_particleSystemIDs.end(); ++it)
 	//for (std::vector<ParticleSystemID>::const_iterator it = m_particleSystemIDs.begin(); it != m_particleSystemIDs.end(); ++it)
@@ -2197,7 +2230,8 @@ void W3DModelDraw::setHidden(Bool hidden)
 	if (m_objectDecal)
 		updateObjectDecalVisibility();
 
-	if (m_trackRenderObject && hidden)
+	// TerrainTracks reads the owning object's layer.
+	if (m_trackRenderObject && hidden && getDrawable()->getObject())
 	{	const Coord3D* pos = getDrawable()->getPosition();
 		m_trackRenderObject->addCapEdgeToTrack(pos->x,pos->y);
 	}
@@ -2528,6 +2562,15 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
   handleClientRecoil();
 
 	handleFXEvents();
+
+#if RTS_ZEROHOUR
+	const Bool hideHeadlights = !getDrawable()->getModelConditionFlags().test(MODELCONDITION_NIGHT) || getDrawable()->areLightsDisabled();
+	if (m_hideHeadlights != hideHeadlights)
+	{
+		m_hideHeadlights = hideHeadlights;
+		hideAllHeadlights(m_hideHeadlights);
+	}
+#endif
 
 	submitHeadlights();
 
@@ -3256,7 +3299,8 @@ void W3DModelDraw::recalcBonesForClientParticleSystems()
 						// important: mark it as do-not-save, since we'll just re-create it when we reload.
 						sys->setSaveable(FALSE);
 
-						if (drawable->isDrawableEffectivelyHidden() || m_fullyObscuredByShroud)
+						if ((drawable->isDrawableEffectivelyHidden() && !drawable->testDrawableStatus(DRAWABLE_STATUS_KEEP_PARTICLES_WHEN_HIDDEN))
+							|| m_fullyObscuredByShroud)
 						{
 							sys->stop(); // don't start the systems for drawables that are hidden.
 						}
@@ -3530,8 +3574,13 @@ void W3DModelDraw::updateObjectDecalVisibility()
 
 	if (visible && getDrawable()->getTemplate()->hidesDecalWhenDisabled())
 	{
-		if (obj && obj->isDisabled())
+		// Containment holds addons without stopping their propaganda effect.
+		DisabledMaskType disabling = MAKE_DISABLED_MASK(DISABLED_HELD);
+		FLIP_DISABLEDMASK(disabling);
+		if (obj && TEST_DISABLEDMASK_ANY(obj->getDisabledFlags(), disabling))
+		{
 			visible = FALSE;
+		}
 	}
 
 	m_objectDecal->enableShadowRender(visible);
@@ -3701,7 +3750,9 @@ void W3DModelDraw::hideAllHeadlights(Bool hide)
 	if (m_renderObject)
 	{
 		// Where the headlight shader runs it draws the lights, and their meshes stay hidden.
-		const Bool shaded = TheW3DHeadlights != nullptr && TheW3DHeadlights->isActive() && getW3DModelDrawModuleData()->m_headlightTuning.enabled;
+		// Kinds in HeadlightShaderForbiddenKindOf keep the meshes, such as buildings whose HEADLIGHT meshes are lit windows.
+		const Bool shaded = TheW3DHeadlights != nullptr && TheW3DHeadlights->isActive() && getW3DModelDrawModuleData()->m_headlightTuning.enabled &&
+			!getDrawable()->isAnyKindOf(TheGlobalData->m_headlightForbiddenKindOf);
 
 		// The lamps are found once for each render object, since every change of state comes through here.
 		const Bool search = shaded && !hide && m_headlightSource != m_renderObject;
@@ -3716,8 +3767,9 @@ void W3DModelDraw::hideAllHeadlights(Bool hide)
 			RenderObjClass* test = m_renderObject->Get_Sub_Object(subObj);
 			if (strstr(test->Get_Name(),"HEADLIGHT"))
 			{
-				test->Set_Hidden(hide || shaded);
-				if (search)
+				const Bool lamp = shaded && !W3DHeadlightManager::keepsOwnLook(*test);
+				test->Set_Hidden(hide || lamp);
+				if (search && lamp)
 				{
 					// Each level of detail holds its own copy of the lamps, and one copy is enough.
 					const Int lod = getSubObjectLod(m_renderObject, subObj);
@@ -3732,6 +3784,17 @@ void W3DModelDraw::hideAllHeadlights(Bool hide)
 					}
 				}
 			}
+#if RTS_ZEROHOUR
+			else if (getDrawable()->isKindOf(KINDOF_STRUCTURE))
+			{
+				const char *name = strrchr(test->Get_Name(), '.');
+				name = name != nullptr ? name + 1 : test->Get_Name();
+				if (strnicmp(name, "LIGHT", 5) == 0 && strspn(name + 5, "0123456789") == strlen(name + 5))
+				{
+					test->Set_Hidden(hide);
+				}
+			}
+#endif
 			test->Release_Ref();
 		}
 	}
@@ -3960,10 +4023,19 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 		}
 		else
 		{
-			m_renderObject = W3DDisplay::m_assetManager->Create_Render_Obj(newState->m_modelName.str(), draw->getScale(), m_hexColor);
+			// TheSuperHackers @feature m_hexColor stays the logic's color; HouseColorMode only changes what is drawn.
+			const Object* owner = draw->getObject();
+			const Color drawnColor = rts::getHouseColorForLocalView(m_hexColor, owner ? owner->getControllingPlayer() : nullptr);
+			m_renderObject = W3DDisplay::m_assetManager->Create_Render_Obj(newState->m_modelName.str(), draw->getScale(), drawnColor);
 			DEBUG_ASSERTCRASH(m_renderObject, ("*** ASSET ERROR: Model %s not found!",newState->m_modelName.str()));
 			const W3DModelDrawModuleData *shaders = getW3DModelDrawModuleData();
-			if (m_renderObject && (shaders->m_disruption.isOn() || shaders->m_flameShader || shaders->m_electricShader || shaders->m_cryoShader))
+#if RTS_ZEROHOUR
+			const Bool plainModel = draw->testDrawableStatus(DRAWABLE_STATUS_NO_SHADERS);
+#else
+			const Bool plainModel = FALSE;
+#endif
+			if (m_renderObject && !plainModel && (shaders->m_disruption.isOn() || shaders->m_flameShader || shaders->m_electricShader || shaders->m_cryoShader ||
+				shaders->m_planarMirror))
 			{
 				setShaderEffects(m_renderObject, *shaders);
 			}
@@ -4145,6 +4217,9 @@ void W3DModelDraw::setModelState(const ModelConditionInfo* newState)
 void W3DModelDraw::replaceModelConditionState(const ModelConditionFlags& c)
 {
 	m_hideHeadlights = c.test(MODELCONDITION_NIGHT) ? false : true;
+#if RTS_ZEROHOUR
+	m_hideHeadlights = m_hideHeadlights || getDrawable()->areLightsDisabled();
+#endif
 
 	const ModelConditionInfo* info = findBestInfo(c);
 	if (info)
@@ -4181,15 +4256,28 @@ void W3DModelDraw::replaceIndicatorColor(Color color)
 		if (newColor != m_hexColor)
 		{
 			m_hexColor = newColor;
-
-			// set these to nullptr to force a regen of everything in setModelState.
-			const ModelConditionInfo* tmp = m_curState;
-			m_curState = nullptr;
-			m_nextState = nullptr;
-			m_nextStateAnimLoopDuration = NO_NEXT_DURATION;
-			setModelState(tmp);
+			rebuildRenderObject();
 		}
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+void W3DModelDraw::refreshIndicatorColor()
+{
+	// a model without a house color looks the same in every HouseColorMode
+	if (getW3DModelDrawModuleData()->m_okToChangeModelColor && getRenderObject() && m_hexColor != 0)
+		rebuildRenderObject();
+}
+
+//-------------------------------------------------------------------------------------------------
+void W3DModelDraw::rebuildRenderObject()
+{
+	// set these to nullptr to force a regen of everything in setModelState.
+	const ModelConditionInfo* tmp = m_curState;
+	m_curState = nullptr;
+	m_nextState = nullptr;
+	m_nextStateAnimLoopDuration = NO_NEXT_DURATION;
+	setModelState(tmp);
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4682,11 +4770,23 @@ void W3DModelDraw::reactToTransformChange( const Matrix3D* oldMtx,
 	if( m_renderObject )
 	{
 		Matrix3D mtx = *getDrawable()->getTransformMatrix();
+
+		// Scale like doDrawModule, or a fogged object that was never drawn is ghosted at its unscaled size.
+#if RTS_ZEROHOUR
+		Real scale = getDrawable()->getObjectScale() * getDrawable()->getInstanceScale();
+#else
+		Real scale = getDrawable()->getInstanceScale();
+#endif
+		if (scale != 1.0f)
+		{
+			mtx.Scale(scale);
+		}
+
 		adjustTransformMtx(mtx);
 		m_renderObject->Set_Transform(mtx);
 	}
 
-	if (m_trackRenderObject)
+	if (m_trackRenderObject && getDrawable()->getObject())
 	{
 		Object *obj = getDrawable()->getObject();
 		const Coord3D* pos = getDrawable()->getPosition();

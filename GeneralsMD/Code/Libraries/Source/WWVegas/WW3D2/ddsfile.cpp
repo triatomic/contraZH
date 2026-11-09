@@ -446,48 +446,7 @@ void DDSFileClass::Copy_Level_To_Surface
 	else {
 		// If size matches, copy each pixel linearly with color space conversion
 		if (dest_width==Get_Width(level) && dest_height==Get_Height(level)) {
-			// An exception here - if the source format is DXT1 and the destination
-			// is DXT2, just copy the contents and create an empty alpha channel.
-			// This is needed on NVidia cards that have problems with DXT1 compression.
-			if (Format==WW3D_FORMAT_DXT1 && dest_format==WW3D_FORMAT_DXT2) {
-				// If hue shift, we can't just copy...
-				if (has_hsv_shift) {
-					const unsigned* src_ptr=reinterpret_cast<const unsigned*>(Get_Memory_Pointer(level));
-					unsigned* dest_ptr=reinterpret_cast<unsigned*>(dest_surface);
-					for (unsigned y=0;y<dest_height;y+=4) {
-						for (unsigned x=0;x<dest_width;x+=4) {
-							*dest_ptr++=0xffffffff;		// Bytes 1-4 of alpha block
-							*dest_ptr++=0xffffffff;		// Bytes 5-8 of alpha block
-//							*dest_ptr++=*src_ptr++;		// Bytes 1-4 of color block
-
-							unsigned cols=*src_ptr++;	// Bytes 1-4 of color block
-							unsigned col0=RGB565_To_ARGB8888((unsigned short)(cols>>16));
-							unsigned col1=RGB565_To_ARGB8888((unsigned short)(cols&0xffff));
-							Recolor(col0,hsv_shift);
-							Recolor(col1,hsv_shift);
-							col0=ARGB8888_To_RGB565(col0);
-							col1=ARGB8888_To_RGB565(col1);
-							cols=unsigned(col0)<<16|col1;
-							*dest_ptr++=cols;
-
-							*dest_ptr++=*src_ptr++;		// Bytes 5-8 of color block
-						}
-					}
-				}
-				else {
-					const unsigned* src_ptr=reinterpret_cast<const unsigned*>(Get_Memory_Pointer(level));
-					unsigned* dest_ptr=reinterpret_cast<unsigned*>(dest_surface);
-					for (unsigned y=0;y<dest_height;y+=4) {
-						for (unsigned x=0;x<dest_width;x+=4) {
-							*dest_ptr++=0xffffffff;		// Bytes 1-4 of alpha block
-							*dest_ptr++=0xffffffff;		// Bytes 5-8 of alpha block
-							*dest_ptr++=*src_ptr++;		// Bytes 1-4 of color block
-							*dest_ptr++=*src_ptr++;		// Bytes 5-8 of color block
-						}
-					}
-				}
-			}
-			else {
+			{
 				unsigned dest_bpp=Get_Bytes_Per_Pixel(dest_format);
 
 				// Copy 4x4 block at a time
@@ -609,55 +568,6 @@ void DDSFileClass::Copy_CubeMap_Level_To_Surface
 		// If size matches, copy each pixel linearly with color space conversion
 		if (dest_width==Get_Width(level) && dest_height==Get_Height(level))
 		{
-			// An exception here - if the source format is DXT1 and the destination
-			// is DXT2, just copy the contents and create an empty alpha channel.
-			// This is needed on NVidia cards that have problems with DXT1 compression.
-			if (Format==WW3D_FORMAT_DXT1 && dest_format==WW3D_FORMAT_DXT2)
-			{
-				// If hue shift, we can't just copy...
-				if (has_hsv_shift)
-				{
-					const unsigned* src_ptr=reinterpret_cast<const unsigned*>(Get_CubeMap_Memory_Pointer(face,level));
-					unsigned* dest_ptr=reinterpret_cast<unsigned*>(dest_surface);
-					for (unsigned y=0;y<dest_height;y+=4)
-					{
-						for (unsigned x=0;x<dest_width;x+=4)
-						{
-							*dest_ptr++=0xffffffff;		// Bytes 1-4 of alpha block
-							*dest_ptr++=0xffffffff;		// Bytes 5-8 of alpha block
-//							*dest_ptr++=*src_ptr++;		// Bytes 1-4 of color block
-
-							unsigned cols=*src_ptr++;	// Bytes 1-4 of color block
-							unsigned col0=RGB565_To_ARGB8888((unsigned short)(cols>>16));
-							unsigned col1=RGB565_To_ARGB8888((unsigned short)(cols&0xffff));
-							Recolor(col0,hsv_shift);
-							Recolor(col1,hsv_shift);
-							col0=ARGB8888_To_RGB565(col0);
-							col1=ARGB8888_To_RGB565(col1);
-							cols=unsigned(col0)<<16|col1;
-							*dest_ptr++=cols;
-
-							*dest_ptr++=*src_ptr++;		// Bytes 5-8 of color block
-						}
-					}
-				}
-				else
-				{
-					const unsigned* src_ptr=reinterpret_cast<const unsigned*>(Get_CubeMap_Memory_Pointer(face,level));
-					unsigned* dest_ptr=reinterpret_cast<unsigned*>(dest_surface);
-					for (unsigned y=0;y<dest_height;y+=4)
-					{
-						for (unsigned x=0;x<dest_width;x+=4)
-						{
-							*dest_ptr++=0xffffffff;		// Bytes 1-4 of alpha block
-							*dest_ptr++=0xffffffff;		// Bytes 5-8 of alpha block
-							*dest_ptr++=*src_ptr++;		// Bytes 1-4 of color block
-							*dest_ptr++=*src_ptr++;		// Bytes 5-8 of color block
-						}
-					}
-				}
-			}
-			else
 			{
 				unsigned dest_bpp=Get_Bytes_Per_Pixel(dest_format);
 
@@ -782,55 +692,6 @@ void DDSFileClass::Copy_Volume_Level_To_Surface
 		// If size matches, copy each pixel linearly with color space conversion
 		if (dest_width==Get_Width(level) && dest_height==Get_Height(level))
 		{
-			// An exception here - if the source format is DXT1 and the destination
-			// is DXT2, just copy the contents and create an empty alpha channel.
-			// This is needed on NVidia cards that have problems with DXT1 compression.
-			if (Format==WW3D_FORMAT_DXT1 && dest_format==WW3D_FORMAT_DXT2)
-			{
-				// If hue shift, we can't just copy...
-				if (has_hsv_shift)
-				{
-					const unsigned* src_ptr=reinterpret_cast<const unsigned*>(Get_Volume_Memory_Pointer(level));
-					unsigned* dest_ptr=reinterpret_cast<unsigned*>(dest_surface);
-					for (unsigned y=0;y<dest_height;y+=4)
-					{
-						for (unsigned x=0;x<dest_width;x+=4)
-						{
-							*dest_ptr++=0xffffffff;		// Bytes 1-4 of alpha block
-							*dest_ptr++=0xffffffff;		// Bytes 5-8 of alpha block
-//							*dest_ptr++=*src_ptr++;		// Bytes 1-4 of color block
-
-							unsigned cols=*src_ptr++;	// Bytes 1-4 of color block
-							unsigned col0=RGB565_To_ARGB8888((unsigned short)(cols>>16));
-							unsigned col1=RGB565_To_ARGB8888((unsigned short)(cols&0xffff));
-							Recolor(col0,hsv_shift);
-							Recolor(col1,hsv_shift);
-							col0=ARGB8888_To_RGB565(col0);
-							col1=ARGB8888_To_RGB565(col1);
-							cols=unsigned(col0)<<16|col1;
-							*dest_ptr++=cols;
-
-							*dest_ptr++=*src_ptr++;		// Bytes 5-8 of color block
-						}
-					}
-				}
-				else
-				{
-					const unsigned* src_ptr=reinterpret_cast<const unsigned*>(Get_Volume_Memory_Pointer(level));
-					unsigned* dest_ptr=reinterpret_cast<unsigned*>(dest_surface);
-					for (unsigned y=0;y<dest_height;y+=4)
-					{
-						for (unsigned x=0;x<dest_width;x+=4)
-						{
-							*dest_ptr++=0xffffffff;		// Bytes 1-4 of alpha block
-							*dest_ptr++=0xffffffff;		// Bytes 5-8 of alpha block
-							*dest_ptr++=*src_ptr++;		// Bytes 1-4 of color block
-							*dest_ptr++=*src_ptr++;		// Bytes 5-8 of color block
-						}
-					}
-				}
-			}
-			else
 			{
 				WWASSERT(0);
 			/*	todo

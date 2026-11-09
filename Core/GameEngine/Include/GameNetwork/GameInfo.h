@@ -164,6 +164,7 @@ class GameInfo
 {
 public:
 	GameInfo();
+	virtual ~GameInfo();
 
 	void init();
 	virtual void reset();
@@ -246,6 +247,16 @@ public:
   inline void setOldFactionsOnly( Bool oldFactionsOnly );
   inline Int getMaxCameraHeight() const;
   inline void setMaxCameraHeight( Int maxCameraHeight );
+  inline Bool getCoopBuildings() const;
+  inline void setCoopBuildings( Bool coopBuildings );
+  inline Bool getQuickGame() const;
+  inline void setQuickGame( Bool quickGame );
+  inline Bool getDiplomacy() const;
+  inline void setDiplomacy( Bool diplomacy );
+  inline Bool getFreeRadar() const;
+  inline void setFreeRadar( Bool freeRadar );
+  inline Bool getRevealMap() const;
+  inline void setRevealMap( Bool revealMap );
 
 protected:
 	Int m_preorderMask;
@@ -269,6 +280,11 @@ protected:
   UnsignedShort m_superweaponRestriction;
   Bool m_oldFactionsOnly; // Only USA, China, GLA -- not USA Air Force General, GLA Toxic General, et al
   Int m_maxCameraHeight; // Shared camera limit for every player, 0 when the host set none
+  Bool m_coopBuildings; // Allies may resume each other's construction
+  Bool m_quickGame; // Objects use their QuickGamePrerequisites
+  Bool m_diplomacy; // Players may change their stance toward each other mid-match
+  Bool m_freeRadar; // Every player has radar without a radar source
+  Bool m_revealMap; // Every player sees the whole map from the start
 };
 
 extern GameInfo *TheGameInfo;
@@ -292,6 +308,16 @@ Bool        GameInfo::oldFactionsOnly() const           { return m_oldFactionsOn
 void        GameInfo::setOldFactionsOnly( Bool oldFactionsOnly ) { m_oldFactionsOnly = oldFactionsOnly; }
 Int         GameInfo::getMaxCameraHeight() const        { return m_maxCameraHeight; }
 void        GameInfo::setMaxCameraHeight( Int maxCameraHeight ) { m_maxCameraHeight = maxCameraHeight; }
+Bool        GameInfo::getCoopBuildings() const          { return m_coopBuildings; }
+void        GameInfo::setCoopBuildings( Bool coopBuildings ) { m_coopBuildings = coopBuildings; }
+Bool        GameInfo::getQuickGame() const              { return m_quickGame; }
+void        GameInfo::setQuickGame( Bool quickGame )     { m_quickGame = quickGame; }
+Bool        GameInfo::getDiplomacy() const              { return m_diplomacy; }
+void        GameInfo::setDiplomacy( Bool diplomacy )     { m_diplomacy = diplomacy; }
+Bool        GameInfo::getFreeRadar() const              { return m_freeRadar; }
+void        GameInfo::setFreeRadar( Bool freeRadar )     { m_freeRadar = freeRadar; }
+Bool        GameInfo::getRevealMap() const              { return m_revealMap; }
+void        GameInfo::setRevealMap( Bool revealMap )     { m_revealMap = revealMap; }
 
 AsciiString GameInfoToAsciiString( const GameInfo *game );
 Bool ParseAsciiStringToGameInfo( GameInfo *game, AsciiString options );
@@ -319,6 +345,7 @@ public:
 		for (Int i = 0; i< MAX_SLOTS; ++i)
 			setSlotPointer(i, &m_skirmishSlot[i]);
 	}
+	virtual ~SkirmishGameInfo() override {}
 };
 
 extern SkirmishGameInfo *TheSkirmishGameInfo;

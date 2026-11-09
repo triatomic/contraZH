@@ -94,6 +94,9 @@ int    WBQtObjectProps_GetPosition(char *out, int cap);
 void   WBQtObjectProps_SetPosition(const char *text);
 double WBQtObjectProps_GetZOffset(void);
 void   WBQtObjectProps_SetZOffset(double z);
+// Visual size multiplier on the template Scale (1 == unset), applied to the whole selection.
+double WBQtObjectProps_GetObjectScale(void);
+void   WBQtObjectProps_SetObjectScale(double scale);
 // Scrub batching: between Begin and End, SetZOffset/SetAngle mutate one undoable
 // (== the MFC pop-slider), so a whole scrub drag is a single undo step.
 void   WBQtObjectProps_BeginPosScrub(void);
@@ -127,6 +130,9 @@ void WBQtObjectProps_SetSoundCurSel(int i);
 // Qt button can show Listen / Stop).
 int  WBQtObjectProps_GetSoundPlaying(void);
 void WBQtObjectProps_ToggleSoundPreview(void);
+void WBQtObjectProps_StopSoundPreview(void);
+// Milliseconds until a playing one-shot preview ends; 0 for a loop or when nothing plays.
+int  WBQtObjectProps_GetSoundPreviewMs(void);
 
 // Customize / Enabled / Looping checkboxes (WBQT_SND_* ids). GetFlagEnabled reports the gated
 // enable state so the Qt checkbox greys out exactly like the MFC one.

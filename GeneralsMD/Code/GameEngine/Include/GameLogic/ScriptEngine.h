@@ -326,6 +326,7 @@ public:
 
 	TFade getFade() {return m_fade;}
 	Real	getFadeValue() {return m_curFadeValue;}
+	Bool	isLightningFade() const;	///< drawn as scene light instead of a screen layer
 
 	AsciiString getCurrentTrackName() const { return m_currentTrackName; }
 	void setCurrentTrackName(AsciiString a) { m_currentTrackName = a; }
@@ -338,6 +339,17 @@ public:
 	const AttackPriorityInfo *getAttackInfo(const AsciiString& name);
 
 	const TCounter *getCounter(const AsciiString& counterName);
+
+	/// Named flags and counters for tools that test scripts. Setting one creates it if needed.
+	const TFlag *getFlag(const AsciiString& flagName);
+	void setFlagValue(const AsciiString& flagName, Bool value);
+	void setCounterValue(const AsciiString& counterName, Int value);
+	Int friend_getNumFlags() const { return m_numFlags; }	///< flags start at 1
+	const TFlag *friend_getNthFlag(Int ndx) const { return &m_flags[ndx]; }
+	Int friend_getNumCounters() const { return m_numCounters; }	///< counters start at 1
+	const TCounter *friend_getNthCounter(Int ndx) const { return &m_counters[ndx]; }
+	/// Enables or disables a script or script group by name; false if there is none.
+	Bool setScriptActive(const AsciiString& name, Bool active);
 
 	void createNamedMapReveal(const AsciiString& revealName, const AsciiString& waypointName, Real radiusToReveal, const AsciiString& playerName);
 	void doNamedMapReveal(const AsciiString& revealName);
@@ -358,6 +370,23 @@ public:
 	void debugVictory();
 //#endif
 
+	// CLP_AI script actions and conditions ported from CookieLandProjects/CLP_AI
+	void setCounterRandom( ScriptAction *pAction );
+	void copyCounter( ScriptAction *pAction );
+	Bool evaluateTwoCounters( Condition *pCondition );
+	Bool evaluateCounterDivisible( Condition *pCondition );
+	void setKDRatio( ScriptAction *pAction );
+	void addKDRatioKills( ScriptAction *pAction );
+	void addKDRatioDeaths( ScriptAction *pAction );
+	void subKDRatioKills( ScriptAction *pAction );
+	void subKDRatioDeaths( ScriptAction *pAction );
+	void updateKDRatioKills( ScriptAction *pAction );
+	void updateKDRatioDeaths( ScriptAction *pAction );
+	void copyKDRatioOntoCounters( ScriptAction *pAction );
+	Bool evaluateKDRatio( Condition *pCondition );
+	void addPrioritySetToOther( ScriptAction *pAction );
+	void increasePriorityOfType( ScriptAction *pAction );
+	void decreasePriorityOfType( ScriptAction *pAction );
 
 	static void parseScriptAction( INI* ini );
 	static void parseScriptCondition( INI* ini );
@@ -371,6 +400,7 @@ protected:
 
 	void addActionTemplateInfo(Template *actionTemplate);
 	void addConditionTemplateInfo(Template *conditionTemplate);
+	void initCLPTemplates();
 
 	Int allocateCounter( const AsciiString& name);
 	Int allocateFlag( const AsciiString& name);

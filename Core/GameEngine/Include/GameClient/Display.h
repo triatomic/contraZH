@@ -204,6 +204,7 @@ public:
 	virtual Real getCurrentFPS() = 0;	///< returns the current FPS.
 	virtual Int getLastFrameDrawCalls() = 0;  ///< returns the number of draw calls issued in the previous frame
 	virtual Bool toggleFaceCulling() { return TRUE; }	///< toggles back face culling and returns whether it is now on
+	virtual Bool toggleShaderDrawCounts() { return FALSE; }	///< toggles the draw calls by shader overlay and returns whether it is now on
 
 protected:
 	virtual void onBeginBatch() { }
@@ -250,4 +251,5 @@ typedef struct _DisplaySettings
 	Int yRes;  //Resolution height
 	Int bitDepth; //Color Depth
 	Bool windowed; //Window mode TRUE: we're windowed, FALSE: we're not windowed
+	Bool framed; //Windowed with a title bar; windowed without one is borderless
 } DisplaySettings;

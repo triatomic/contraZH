@@ -500,6 +500,9 @@ public:
 	Color getDecalColor() const { return m_decalColor; }
 	const AsciiString& getDecalTextureName() const { return m_decalTextureName; }
 
+	// TheSuperHackers @feature triatomic 13/10/2026 Scales the PreparationTime of a capture aimed at this object.
+	Real getCaptureTimePercent() const { return m_captureTimePercent; }
+
 	UnsignedInt getOcclusionDelay() const { return m_occlusionDelay;}
 
 	const ModuleInfo& getBehaviorModuleInfo() const { return m_behaviorModuleInfo; }
@@ -620,8 +623,9 @@ public:
 
 	BuildableStatus getBuildable() const;
 
-	Int getPrereqCount() const { return m_prereqInfo.size(); }
-	const ProductionPrerequisite *getNthPrereq(Int i) const { return &m_prereqInfo[i]; }
+	// Quick Game reads QuickGamePrerequisites when the object defines them
+	Int getPrereqCount() const { return getActivePrereqs().size(); }
+	const ProductionPrerequisite *getNthPrereq(Int i) const { return &getActivePrereqs()[i]; }
 
 	/**
 		return the BuildFacilityTemplate, if any.
@@ -645,6 +649,7 @@ public:
 
 	/// Used only by Skirmish AI. Everyone else should call calcCostToBuild.
 	Int friend_getBuildCost() const { return m_buildCost; }
+	Real friend_getBuildTime() const { return m_buildTime; }	///< seconds, before any player modifiers
 
 	const AsciiString& getDefaultOwningSide() const { return m_defaultOwningSide; }
 
@@ -683,6 +688,7 @@ public:
 	AsciiString getUpgradeCameoName( Int n)const{ return m_upgradeCameoUpgradeNames[n];	}
 
 	const WeaponTemplateSetVector& getWeaponTemplateSets() const {return m_weaponTemplateSets;}
+	const ArmorTemplateSetVector& getArmorTemplateSets() const {return m_armorTemplateSets;}
 
 	Int getMaxPathFindingCellRadius(void) const { return static_cast<Int>(m_maxPathfindingCellRadius); };
 
@@ -708,6 +714,7 @@ protected:
 	static void parseArmorTemplateSet( INI* ini, void *instance, void *store, const void* /*userData*/ );
 	static void parseWeaponTemplateSet( INI* ini, void *instance, void *store, const void* /*userData*/ );
 	static void parsePrerequisites( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ );
+	static void parseQuickGamePrerequisites( INI* ini, void *instance, void * /*store*/, const void* /*userData*/ );
 	static void parseModuleName(INI* ini, void *instance, void* /*store*/, const void* userData);
 	static void parseIntList(INI* ini, void *instance, void* store, const void* userData);
 	static void parseExperienceValueList(INI* ini, void *instance, void* store, const void* userData);
@@ -733,6 +740,8 @@ private:
 	static const FieldParse s_objectFieldParseTable[];		///< the parse table
 	static const FieldParse s_objectReskinFieldParseTable[];		///< the parse table
 	static AudioEventRTS s_audioEventNoSound;
+
+	const std::vector<ProductionPrerequisite>& getActivePrereqs() const;
 
 private:
 
@@ -776,6 +785,7 @@ private:
 
 	// ---- STL-sized things
 	std::vector<ProductionPrerequisite>	m_prereqInfo;				///< the unit Prereqs for this tech
+	std::vector<ProductionPrerequisite>	m_quickGamePrereqInfo;	///< the unit Prereqs in a Quick Game, used when m_hasQuickGamePrereqs
 	std::vector<AsciiString>						m_buildVariations;	/**< if we build a unit of this type via script or ui, randomly choose one
 																														of these templates instead. (doesn't apply to MapObject-created items) */
 	WeaponTemplateSetVector							m_weaponTemplateSets;					///< our weaponsets
@@ -813,6 +823,7 @@ private:
 	Real					m_decalOffsetX;				///< world-space offset of the display decal texture
 	Real					m_decalOffsetY;				///< world-space offset of the display decal texture
 	Real					m_decalOpacity;				///< 0..1, fades the display decal
+	Real					m_captureTimePercent;	///< multiplies the PreparationTime of captures aimed at this object
 	Bool					m_displayDecal;				///< draw a display decal under this object, independent of its shadow
 	Bool					m_decalHideWhenDisabled;	///< stop drawing the display decal while the object is disabled
 
@@ -837,11 +848,13 @@ private:
 	Bool					m_isBridge;										///< True if this model is a bridge.
  	Bool					m_isBuildFacility;						///< is this the build facility for something? (calculated based on other template's prereqs)
 	Bool					m_isTrainable;								///< Whether or not I can even gain experience
+	Bool					m_hasQuickGamePrereqs;				///< QuickGamePrerequisites was given, even if empty
 	Bool          m_enterGuard;									///< Whether or not I can enter objects when guarding
 	Bool          m_hijackGuard;								///< Whether or not I can hijack objects when guarding
 	Bool					m_isForbidden;								///< useful when overriding in <mapfile>.ini
 	Bool					m_armorCopiedFromDefault;
 	Bool					m_weaponsCopiedFromDefault;
+	Bool					m_prereqsCopiedFromExtended;	///< prerequisites came with ObjectExtend; the object's own replace them
 
 	// ---- Byte-sized things
 	Byte					m_radarPriority;						///< does object appear on radar, and if so at what priority

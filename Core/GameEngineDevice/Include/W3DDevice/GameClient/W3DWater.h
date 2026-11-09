@@ -49,6 +49,7 @@
 #define CV_PATCH_SCALE_OFFSET 10
 
 class PolygonTrigger;
+class RTS3DScene;
 class WorldHeightMap;
 class WaterTracksRenderSystem;
 class Xfer;
@@ -139,6 +140,21 @@ public:
 	/// The hex cells as getSeabedMask gives them, for painted stochastic terrain, which keeps its cells with the water's tiling off.
 	static Vector4 getStochasticHex();
 	void renderPlanarReflection(CameraClass *cam);	///< mirrors the scene in the water under the view, before the views draw
+	/// Whether a sphere can show in the water's own mirror pass: seen from the mirrored eye, its picture lands on water.
+	/// True outside that pass.
+	Bool canReflectOnWater(const SphereClass &sphere, const Vector3 &mirrorEye);
+	static void drawReflectionCoverage(UnsignedInt width, UnsignedInt height);
+	/// Sets mirror up as the view's reflection in the horizontal plane at planeZ, clipped below clipZ.
+	static void reflectCamera(CameraClass *mirror, CameraClass *view, Real planeZ, Real clipZ);
+	/// Draws the scene through mirror into the bound target as a planar mirror pass, then unbinds it and applies view again.
+	static void renderMirroredScene(RTS3DScene *scene, CameraClass *mirror, CameraClass *view, Real planeZ, UnsignedInt width, UnsignedInt height);
+	/// Narrows a mirror camera, set up as a copy of the view's, to the part of the view between lo and hi, 0 to 1 across it
+	/// with v down. Every pixel keeps its place in the target, so only the frustum and the drawn area shrink.
+	static void narrowReflectionCamera(CameraClass *mirror, CameraClass *view, const Vector2 &lo, const Vector2 &hi);
+	/// Widens lo and hi, 0 to 1 across the view with v down, to take in a world point. False where it lies behind the camera.
+	static Bool widenReadRect(CameraClass *camera, const Vector3 &point, Vector2 &lo, Vector2 &hi);
+	TextureClass *peekSkyboxFace(Int face);	///< north, east, south, west or top, or null without a skybox
+	void bindSkyboxFaces();	///< binds the faces to the samplers from 8 on, white where there is no skybox
 
 protected:
 	DX8IndexBufferClass			*m_indexBuffer;	///<indices defining quad
@@ -326,16 +342,27 @@ protected:
 	UnsignedInt m_iniCheckTime;			///< when Water.ini was last looked at, in ms
 	Real m_animationPendingStep;		///< water movement held back by WaterAnimationFps
 	Real m_animationPendingTime;		///< seconds since the water last moved under WaterAnimationFps
+	UnsignedInt *m_mirrorWaterSums;		///< water map cells, rivers included, summed from the map's corner
+	Int m_mirrorWaterWidth;
+	Int m_mirrorWaterHeight;
+	UnsignedInt m_mirrorWaterSignature;	///< hash of the water polygons the sums were built from
+	const WorldHeightMap *m_mirrorWaterMap;
+	Bool m_mirrorCulling;				///< the water's own mirror pass is drawing
+	Real m_mirrorCullingPlaneZ;
+	Int m_mirrorCullingTested;			///< spheres tested, dropped and kept for running past the map's edge, for the render log
+	Int m_mirrorCullingDropped;
+	Int m_mirrorCullingPastEdge;
 
 	Bool useShaderWater() const;
 	Bool isWaterVisible(PolygonTrigger *pTrig) const;
 	Bool isWaterVisible(PolygonTrigger *pTrig, CameraClass *camera) const;
 	Bool pickReflectionPlane(CameraClass *camera, Real &planeZ) const;
+	Bool getMirrorReadRect(CameraClass *camera, Vector2 &lo, Vector2 &hi) const;
 	Bool ensureReflectionTargets(UnsignedInt width, UnsignedInt height);
-	void drawReflectionCoverage(UnsignedInt width, UnsignedInt height);
 	Int standingWaterDiffuse() const;
 	Bool buildRadialGrid();
 	void updateWaterMask();
+	Bool updateMirrorWaterSums();
 	TextureClass *updateOpenWater();
 	void setupOpenWater(Bool river);
 	void drawRadialWater(Real planeZ);
@@ -347,7 +374,6 @@ protected:
 	void setupSwell(const D3DMATRIX &clip);
 	TextureClass *findSwellTexture();
 	TextureClass *findFoamTexture();
-	TextureClass *peekSkyboxFace(Int face);
 	void cleanupShaderWater();
 
 	//Methods used for GeForce3 specific water

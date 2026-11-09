@@ -59,6 +59,7 @@
 #include "GameClient/DebugDisplay.h"
 #include "GameClient/Drawable.h"
 #include "GameClient/Keyboard.h"
+#include "GameClient/MetaEvent.h"
 #include "GameClient/GameClient.h"
 #include "GameClient/GameWindowManager.h"
 #include "GameClient/GameText.h"
@@ -72,6 +73,7 @@
 #include "GameClient/SelectionXlat.h"
 #include "GameClient/TerrainVisual.h"
 
+#include "GameLogic/AIPathfind.h"
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/ExperienceTracker.h"
 #include "GameLogic/GameLogic.h"
@@ -96,6 +98,10 @@
 #include "GameNetwork/GameSpy/BuddyThread.h"
 
 #include "WW3D2/ww3d.h"
+
+#if defined(GENERALS_ONLINE)
+#include "GameNetwork/GeneralsOnline/OnlineServices_Init.h"
+#endif
 
 #if defined(RTS_DEBUG)
 /*non-static*/ Real TheSkateDistOverride = 0.0f;
@@ -146,6 +152,42 @@ void giveAllSciences(Player* player)
 	}
 }
 
+// Put text on the Windows clipboard as Unicode text. Windows synthesizes the ANSI form from it
+// on demand, so plain text consumers read it too. Returns FALSE when another window holds the
+// clipboard or the allocation fails.
+static Bool copyTextToClipboard(const AsciiString& text)
+{
+#ifdef _WIN32
+	UnicodeString wide;
+	wide.translate(text);
+
+	if (!OpenClipboard(NULL))
+		return FALSE;
+
+	Bool copied = FALSE;
+	const size_t bytes = ((size_t)wide.getLength() + 1) * sizeof(WideChar);
+	HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, bytes);
+	if (hMem != NULL)
+	{
+		void *dst = GlobalLock(hMem);
+		if (dst != NULL)
+		{
+			memcpy(dst, wide.str(), bytes);
+			GlobalUnlock(hMem);
+			// the clipboard owns the memory once SetClipboardData succeeds
+			copied = EmptyClipboard() && SetClipboardData(CF_UNICODETEXT, hMem) != NULL;
+		}
+		if (!copied)
+			GlobalFree(hMem);
+	}
+
+	CloseClipboard();
+	return copied;
+#else
+	return FALSE;
+#endif
+}
+
 #if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 // TheSuperHackers @feature Grant only the sciences that belong to this player's own general.
 //
@@ -163,9 +205,15 @@ static void giveOwnFactionSciences(Player* player)
 		return;
 
 	AsciiString setNames[3];
+#if RTS_ZEROHOUR
+	setNames[0] = tmpl->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK1, player );
+	setNames[1] = tmpl->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK3, player );
+	setNames[2] = tmpl->getCommandSet( PLAYER_COMMANDSET_PURCHASE_RANK8, player );
+#else
 	setNames[0] = tmpl->getPurchaseScienceCommandSetRank1();
 	setNames[1] = tmpl->getPurchaseScienceCommandSetRank3();
 	setNames[2] = tmpl->getPurchaseScienceCommandSetRank8();
+#endif
 
 	for (Int setIndex = 0; setIndex < 3; ++setIndex)
 	{
@@ -455,6 +503,10 @@ static CanAttackResult canObjectForceAttack( Object *obj, const Object *victim, 
 //-------------------------------------------------------------------------------------------------
 static CanAttackResult canAnyForceAttack(const DrawableList *allSelected, const Object *victim, const Coord3D *pos )
 {
+	// TheSuperHackers @bugfix WebbontheWeb 06/10/2026 Checks all selected units instead of just first one,
+	// so a unit without a weapon doesn't prevent the entire group from force attacking.
+	CanAttackResult bestResult = ATTACKRESULT_NOT_POSSIBLE;
+
 	// check to make sure that allSelected can attack obj.
 	for (DrawableListCIt cit = allSelected->begin(); cit != allSelected->end(); ++cit)
 	{
@@ -470,10 +522,18 @@ static CanAttackResult canAnyForceAttack(const DrawableList *allSelected, const 
 			continue;
 		}
 
-		return canObjectForceAttack( obj, victim, pos );
+		const CanAttackResult result = canObjectForceAttack( obj, victim, pos );
+		if (result > bestResult)
+		{
+			bestResult = result;
+			if (bestResult == ATTACKRESULT_POSSIBLE)
+			{
+				break;
+			}
+		}
 	}
 
-	return ATTACKRESULT_NOT_POSSIBLE;
+	return bestResult;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1157,6 +1217,44 @@ GameMessage::Type CommandTranslator::issueMoveToLocationCommand( const Coord3D *
 }
 
 //------------------------------------------------------------------------------------
+// TheSuperHackers @feature Quick cast for the reverse move key (Options.ini: CastMode).
+/** Reverse the selection to the terrain under the cursor, the order a click there gives in
+	* reverse move mode. It always goes to the ground, never to a unit under the cursor, since the
+	* key means "back up to here".
+	*
+	* Returns FALSE, leaving the armed mode alone, when the cursor is not over the battlefield or
+	* nothing selected can take the order, so the caller can arm it for a click instead. */
+Bool CommandTranslator::quickCastReverseMove()
+{
+	if( !m_teamExists || !TheInGameUI->areSelectedObjectsControllable() )
+		return FALSE;
+
+	if( TheMouse == nullptr || TheTacticalView == nullptr )
+		return FALSE;
+
+	const MouseIO *mouseIO = TheMouse->getMouseStatus();
+	if( mouseIO == nullptr )
+		return FALSE;
+
+	// the cursor has to be over the battlefield, not the command bar or another panel
+	ICoord2D cursor = mouseIO->pos;
+	if( TheWindowManager && TheWindowManager->getWindowUnderCursor( cursor.x, cursor.y ) != nullptr )
+		return FALSE;
+
+	Coord3D pos;
+	if( !TheTacticalView->screenToTerrain( &cursor, &pos ) )
+		return FALSE;
+
+	// issueMoveToLocationCommand reads the armed mode to pick the order
+	if( !TheInGameUI->isInReverseMoveToMode() )
+		TheInGameUI->toggleReverseMoveToMode();
+
+	issueMoveToLocationCommand( &pos, nullptr, DO_COMMAND );
+	TheInGameUI->clearArmedMoveMode();
+	return TRUE;
+}
+
+//------------------------------------------------------------------------------------
 /// @todo Play attack command response sound on client-side to hide latency
 GameMessage::Type CommandTranslator::createAttackMessage( Drawable *draw,
 																													Drawable *other,
@@ -1660,6 +1758,7 @@ GameMessage::Type CommandTranslator::createSmartGarrisonMessage( Drawable *targe
 CommandTranslator::CommandTranslator() :
 	m_objective(0),
 	m_teamExists(false),
+	m_reverseMoveAiming(false),
 	m_rightMouseDownTimeMs(0),
 	m_rightMouseUpTimeMs(0)
 {
@@ -2787,7 +2886,7 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 	GameMessageDisposition disp = KEEP_MESSAGE;
 	// We want to always be able to get to the options menu even during no input times and a clear game data message should always go through
 	if (t != GameMessage::MSG_META_OPTIONS && t != GameMessage::MSG_CLEAR_GAME_DATA &&
-			!TheInGameUI->getInputEnabled() && !isSystemMessage(msg))
+			!TheInGameUI->getInputEnabled() && !isSystemMessage(msg) && !GameMessage::isDebugCheatHotkey(t))
 	{
 		return DESTROY_MESSAGE;
 	}
@@ -3508,8 +3607,7 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		//-----------------------------------------------------------------------------------------
 		case GameMessage::MSG_META_CHAT_ALLIES:
 			// Chat is available in multiplayer, and in singleplayer/skirmish only when EnableSingleplayerChatwindow is set (for chat commands).
-			if (TheGameLogic->isInInteractiveGame() && !TheGameLogic->isInReplayGame()
-				&& (TheGameLogic->isInMultiplayerGame() || TheGlobalData->m_enableSingleplayerChatWindow))
+			if (TheGameLogic->isInMultiplayerGame() || TheGlobalData->m_enableSingleplayerChatWindow)
 			{
 				Player *localPlayer = ThePlayerList->getLocalPlayer();
 				if ((localPlayer && localPlayer->isPlayerActive()) || !TheGlobalData->m_netMinPlayers)
@@ -3524,8 +3622,7 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		//-----------------------------------------------------------------------------------------
 		case GameMessage::MSG_META_CHAT_EVERYONE:
 			// Chat is available in multiplayer, and in singleplayer/skirmish only when EnableSingleplayerChatwindow is set (for chat commands).
-			if (TheGameLogic->isInInteractiveGame() && !TheGameLogic->isInReplayGame()
-				&& (TheGameLogic->isInMultiplayerGame() || TheGlobalData->m_enableSingleplayerChatWindow))
+			if (TheGameLogic->isInMultiplayerGame() || TheGlobalData->m_enableSingleplayerChatWindow)
 			{
 				Player *localPlayer = ThePlayerList->getLocalPlayer();
 				// TheSuperHackers @tweak skyaero 19/07/2025 Observers can now chat
@@ -3762,13 +3859,89 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		}
 
 		//-----------------------------------------------------------------------------------------
+		// TheSuperHackers @feature Cycle HouseColorMode in game. Client side only, like the health
+		// bar cycle above, and likewise not written back to Options.ini.
+		case GameMessage::MSG_META_CYCLE_HOUSE_COLOR_MODE:
+		{
+#if RTS_ZEROHOUR
+			if( TheWritableGlobalData )
+			{
+				Int mode = TheGlobalData->m_houseColorMode + 1;
+				if( mode >= HouseColorMode_Count || mode < 0 )
+					mode = HouseColorMode_PlayerColors;
+
+				TheWritableGlobalData->m_houseColorMode = mode;
+				rts::refreshHouseColors();
+
+				if( mode == HouseColorMode_Basic )
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE(
+							"GUI:HouseColorModeBasic", L"House colors: basic" ) );
+				else
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE(
+							"GUI:HouseColorModeDefault", L"House colors: default" ) );
+			}
+#endif
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
+		//-----------------------------------------------------------------------------------------
 		case GameMessage::MSG_META_TOGGLE_ATTACKMOVE:
 			TheInGameUI->toggleAttackMoveToMode();
 			break;
 
 		case GameMessage::MSG_META_TOGGLE_REVERSEMOVE:
-			TheInGameUI->toggleReverseMoveToMode();
+		{
+			// TheSuperHackers @feature The reverse move key follows CastMode like a command bar
+			// hotkey. QuickCast reverses to the cursor on the press. QuickCastWithIndicator arms
+			// on the press, so the reverse move cursor shows while the key is held, and fires on
+			// the release (MSG_RAW_KEY_UP below). In Normal, or a QuickCast press with nowhere to
+			// fire, the press toggles the mode for the next click as before.
+#if RTS_ZEROHOUR
+			const Int castMode = TheGlobalData ? TheGlobalData->m_castMode : CastMode_Normal;
+#else
+			const Int castMode = CastMode_Normal;
+#endif
+			if( castMode == CastMode_QuickCastWithIndicator )
+			{
+				if( !TheInGameUI->isInReverseMoveToMode() )
+					TheInGameUI->toggleReverseMoveToMode();
+				m_reverseMoveAiming = TRUE;
+			}
+			else if( castMode != CastMode_QuickCast || !quickCastReverseMove() )
+			{
+				TheInGameUI->toggleReverseMoveToMode();
+			}
 			break;
+		}
+
+		case GameMessage::MSG_RAW_KEY_UP:
+		{
+			// TheSuperHackers @feature Release half of hold to aim reverse move. The meta event
+			// only fires on the press, so watch for whatever key TOGGLE_REVERSEMOVE is bound to
+			// coming up. The message is kept, nothing here consumes the key.
+			if( !m_reverseMoveAiming )
+				break;
+
+			const Int key = msg->getArgument( 0 )->integer;
+			Bool isReverseMoveKey = FALSE;
+			for( const MetaMapRec *map = TheMetaMap->getFirstMetaMapRec(); map; map = map->m_next )
+			{
+				if( map->m_meta == GameMessage::MSG_META_TOGGLE_REVERSEMOVE && (Int)map->m_key == key )
+					isReverseMoveKey = TRUE;
+			}
+			if( !isReverseMoveKey )
+				break;
+
+			m_reverseMoveAiming = FALSE;
+
+			// A click while the key was held has already given the order and dropped the mode.
+			// Letting go with nowhere to fire, over a panel say, calls the move off. A press always
+			// arms in this mode, so this is the only way the key itself can cancel it.
+			if( TheInGameUI->isInReverseMoveToMode() && !quickCastReverseMove() )
+				TheInGameUI->clearArmedMoveMode();
+			break;
+		}
 
 		case GameMessage::MSG_META_BEGIN_CAMERA_ROTATE_LEFT:
 			DEBUG_ASSERTCRASH(!TheInGameUI->isCameraRotatingLeft(), ("Setting rotate camera left, but it's already set!"));
@@ -3821,9 +3994,7 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		{
 			if( TheGlobalData )
 			{
-#if !defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)//may be defined in GameCommon.h
-				if (TheGameLogic->isInReplayGame())
-#endif
+				if (TheFramePacer->isFastForwardAvailable())
 				{
 					TheWritableGlobalData->m_TiVOFastMode = 1 - TheGlobalData->m_TiVOFastMode;
 					TheInGameUI->messageNoFormat( TheGlobalData->m_TiVOFastMode
@@ -4253,6 +4424,75 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			break;
 		}
 
+		// Toggle the window name overlay, drawn over the GUI.
+		case GameMessage::MSG_CHEAT_SHOW_WINDOW_NAMES:
+		{
+			TheInGameUI->toggleWindowNameOverlay();
+
+			TheInGameUI->messageNoFormat( TheInGameUI->isWindowNameOverlayOn()
+				? TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugWindowNameOverlayOn", L"Window Names are ON")
+				: TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugWindowNameOverlayOff", L"Window Names are OFF") );
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
+		// Copy the template (INI) name of the selected objects to the clipboard, so it can be pasted
+		// into an INI, a search or a chat instead of being retyped from the Ctrl+[ overlay. One name
+		// per line, duplicates folded, so a selected squad copies its type once.
+		//
+		// Client side only -- it reads the selection and posts nothing to the logic, so it is
+		// replay and multiplayer safe.
+		case GameMessage::MSG_CHEAT_COPY_OBJECT_NAME:
+		{
+			std::vector<AsciiString> names;
+			const DrawableList *selected = TheInGameUI->getAllSelectedDrawables();
+			for (DrawableListCIt it = selected->begin(); it != selected->end(); ++it)
+			{
+				const Drawable *draw = *it;
+				if (draw == NULL || draw->getTemplate() == NULL)
+					continue;
+
+				const AsciiString &name = draw->getTemplate()->getName();
+				if (std::find(names.begin(), names.end(), name) == names.end())
+					names.push_back(name);
+			}
+
+			if (names.empty())
+			{
+				TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE(
+						"GUI:DebugCopyObjectNameNone", L"Nothing selected to copy") );
+			}
+			else
+			{
+				AsciiString text;
+				for (size_t i = 0; i < names.size(); ++i)
+				{
+					if (i > 0)
+						text.concat("\r\n");
+					text.concat(names[i]);
+				}
+
+				if (copyTextToClipboard(text))
+				{
+					if (names.size() == 1)
+						TheInGameUI->message( TheGameText->FETCH_OR_SUBSTITUTE_FORMAT(
+								"GUI:DebugCopyObjectNameOne", L"Copied %hs", names[0].str()) );
+					else
+						TheInGameUI->message( TheGameText->FETCH_OR_SUBSTITUTE_FORMAT(
+								"GUI:DebugCopyObjectNameMany", L"Copied %d object names", (Int)names.size()) );
+				}
+				else
+				{
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE(
+							"GUI:DebugCopyObjectNameFailed", L"Could not open the clipboard") );
+				}
+			}
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
 		// Toggle the laser name overlay, drawn at the middle of each beam.
 		case GameMessage::MSG_CHEAT_SHOW_LASER_NAME:
 		{
@@ -4392,6 +4632,76 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 			break;
 		}
 
+		case GameMessage::MSG_CHEAT_PATHFIND_LOG_ON:
+		case GameMessage::MSG_CHEAT_PATHFIND_LOG_OFF:
+		{
+			const Bool enable = (t == GameMessage::MSG_CHEAT_PATHFIND_LOG_ON);
+			if (TheAI && TheAI->pathfinder())
+			{
+				TheAI->pathfinder()->setStatsLogging(enable);
+			}
+			if (enable)
+			{
+				TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:PathfindLogOn", L"Pathfinding log: On (pathfinding.txt)") );
+			}
+			else
+			{
+				TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:PathfindLogOff", L"Pathfinding log: Off") );
+			}
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
+		// Toggle the overlay listing each frame's draw calls by shader.
+		case GameMessage::MSG_CHEAT_SHOW_SHADER_DRAWS:
+		{
+			TheInGameUI->messageNoFormat( TheDisplay->toggleShaderDrawCounts()
+				? TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugShaderDrawsOn", L"Shader Draws are ON")
+				: TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugShaderDrawsOff", L"Shader Draws are OFF") );
+
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+
+#if RTS_ZEROHOUR
+		case GameMessage::MSG_CHEAT_TOGGLE_SHADER_PANEL:
+		{
+			TheInGameUI->toggleShaderDebugPanel();
+			disp = DESTROY_MESSAGE;
+			break;
+		}
+#endif
+
+#endif
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+		//-----------------------------------------------------------------------------------------
+		case GameMessage::MSG_META_DEMO_TOGGLE_AI_DEBUG:
+		{
+			// The terrain view also switches off column moves in AIGroup, so it stays out of multiplayer
+			if (!TheGameLogic->isInMultiplayerGame())
+			{
+				static const char *const modeNames[AI_DEBUG_END] = { "Off", "Paths", "Terrain", "Cells", "Ground paths", "Zones" };
+				TheWritableGlobalData->m_debugAI = (AIDebugOptions)((Int)TheGlobalData->m_debugAI + 1);
+				if (TheGlobalData->m_debugAI >= AI_DEBUG_END)
+				{
+					TheWritableGlobalData->m_debugAI=AI_DEBUG_NONE;
+				}
+
+				UnicodeString line;
+				line.format(L"Level %d, %hs", TheGlobalData->m_debugAI, modeNames[TheGlobalData->m_debugAI]);
+				if (TheGlobalData->m_debugAI != AI_DEBUG_NONE)
+				{
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:DebugAiDebugOn", L"Debug AI Mode is %s", line.str()) );
+				}
+				else
+				{
+					TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugAiDebugOff", L"Debug AI Mode is OFF") );
+				}
+				disp = DESTROY_MESSAGE;
+			}
+			break;
+		}
 #endif
 
 		//-----------------------------------------------------------------------------------------
@@ -4452,6 +4762,21 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 		}
 
 		// --------------------------------------------------------------------------------------------
+#if defined(GENERALS_ONLINE)
+		// GO's keys (F10, F5 and Insert by default), rebindable in the Hotkeys screen's GO section
+		case GameMessage::MSG_META_TOGGLE_NETWORK_STATS:
+			NGMP_OnlineServicesManager::ToggleAdvancedNetworkStats();
+			disp = DESTROY_MESSAGE;
+			break;
+
+		case GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY:
+		case GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY_ALT:
+			GameSpyToggleOverlay( GSOVERLAY_BUDDY );
+			disp = DESTROY_MESSAGE;
+			break;
+
+		case GameMessage::MSG_META_TAKE_SCREENSHOT_ALT:
+#endif
 		case GameMessage::MSG_META_TAKE_SCREENSHOT:
 		{
 			if (TheDisplay)
@@ -5644,22 +5969,6 @@ GameMessageDisposition CommandTranslator::translateGameMessage(const GameMessage
 
 		//------------------------------------------------------------------------------- DEMO MESSAGES
 		//-----------------------------------------------------------------------------------------
-		case GameMessage::MSG_META_DEMO_TOGGLE_AI_DEBUG:
-		{
-			TheWritableGlobalData->m_debugAI = (AIDebugOptions)((Int)TheGlobalData->m_debugAI + 1);
-			if (TheGlobalData->m_debugAI >= AI_DEBUG_END)
-				TheWritableGlobalData->m_debugAI=AI_DEBUG_NONE;
-
-			UnicodeString line;
-			line.format(L"Level %d", TheGlobalData->m_debugAI);
-			if (TheGlobalData->m_debugAI != AI_DEBUG_NONE)
-				TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE_FORMAT("GUI:DebugAiDebugOn", L"Debug AI Mode is %s", line.str()) );
-			else
-				TheInGameUI->messageNoFormat( TheGameText->FETCH_OR_SUBSTITUTE("GUI:DebugAiDebugOff", L"Debug AI Mode is OFF") );
-			disp = DESTROY_MESSAGE;
-			break;
-		}
-
 		//------------------------------------------------------------------------------- DEMO MESSAGES
 		//-----------------------------------------------------------------------------------------
 		case GameMessage::MSG_META_DEMO_TOGGLE_SUPPLY_CENTER_PLACEMENT:

@@ -29,7 +29,7 @@
 #include "WW3D2/vertmaterial.h"
 #include "Lib/BaseType.h"
 
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 struct DebugIcon;
 //
 /// W3DDebugIcons: Draws huge numbers of debug icons for pathfinding quickly.
@@ -72,4 +72,4 @@ protected:
 public:
 	static void addIcon(const Coord3D *pos, Real width, Int numFramesDuration, RGBColor color);
 };
-#endif // RTS_DEBUG
+#endif // defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)

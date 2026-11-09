@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>WBQtNewBrushDialog</class>
+ <widget class="QDialog" name="WBQtNewBrushDialog">
+  <property name="windowTitle">
+   <string>New Terrain Brush</string>
+  </property>
+  <layout class="QVBoxLayout" name="rootLayout">
+   <item>
+    <layout class="QHBoxLayout" name="bodyRow" stretch="1,0">
+     <item>
+      <layout class="QVBoxLayout" name="settingsColumn">
+       <item>
+        <layout class="QFormLayout" name="formLayout">
+         <item row="0" column="0">
+          <widget class="QLabel" name="nameLabel">
+           <property name="text">
+            <string>Name:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QLineEdit" name="nameEdit">
+           <property name="placeholderText">
+            <string>Letters, digits, _ - .</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="categoryLabel">
+           <property name="text">
+            <string>Category:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QComboBox" name="categoryCombo">
+           <property name="editable">
+            <bool>true</bool>
+           </property>
+           <property name="insertPolicy">
+            <enum>QComboBox::NoInsert</enum>
+           </property>
+           <property name="toolTip">
+            <string>Folder path in the texture tree. Separate levels with \ or /.</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="paintsBox">
+         <property name="title">
+          <string>Paints</string>
+         </property>
+         <layout class="QGridLayout" name="paintsGrid" columnstretch="0,1,0">
+          <item row="0" column="0">
+           <widget class="QRadioButton" name="useTerrain">
+            <property name="text">
+             <string>Existing terrain:</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1" colspan="2">
+           <widget class="QComboBox" name="terrainCombo">
+            <property name="iconSize">
+             <size>
+              <width>24</width>
+              <height>24</height>
+             </size>
+            </property>
+            <property name="maxVisibleItems">
+             <number>16</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QRadioButton" name="useTexture">
+            <property name="text">
+             <string>New texture:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="textureEdit">
+            <property name="placeholderText">
+             <string>File in Art\Terrain, e.g. MyGround.tga; several split by ;</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="2">
+           <widget class="QPushButton" name="browseBtn">
+            <property name="text">
+             <string>Browse...</string>
+            </property>
+            <property name="autoDefault">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0" colspan="3">
+           <widget class="QLabel" name="textureNote">
+            <property name="text">
+             <string>A new texture is also added to the loose Data\INI\Terrain.ini so the game can draw it. Players need that file too; terrain INI is part of the multiplayer INI check.</string>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="keysBox">
+         <property name="title">
+          <string>Terrain.ini keys (new texture)</string>
+         </property>
+         <layout class="QGridLayout" name="keysGrid" columnstretch="0,1">
+          <item row="0" column="0" colspan="2">
+           <widget class="QCheckBox" name="blendEdgesCheck">
+            <property name="text">
+             <string>Blend edges</string>
+            </property>
+            <property name="toolTip">
+             <string>BlendEdges: the texture holds custom blend edges. It is listed in Blend Material, not in the texture tree.</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0" colspan="2">
+           <widget class="QCheckBox" name="restrictCheck">
+            <property name="text">
+             <string>Restrict construction</string>
+            </property>
+            <property name="toolTip">
+             <string>RestrictConstruction: nothing can be built on this texture in-game.</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QCheckBox" name="glintStrengthCheck">
+            <property name="text">
+             <string>Glint strength:</string>
+            </property>
+            <property name="toolTip">
+             <string>GlintStrength: multiplies GameData's TerrainGlintIntensity for this texture. 0 leaves it dull. Unticked, it stays 1.</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QDoubleSpinBox" name="glintStrengthSpin">
+            <property name="decimals">
+             <number>3</number>
+            </property>
+            <property name="maximum">
+             <double>1000.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.100000000000000</double>
+            </property>
+            <property name="value">
+             <double>1.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QCheckBox" name="glintGlossCheck">
+            <property name="text">
+             <string>Glint gloss:</string>
+            </property>
+            <property name="toolTip">
+             <string>GlintGloss: how tight the glint is; higher is smaller and sharper. Unticked, it takes GameData's TerrainGlintGloss.</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QDoubleSpinBox" name="glintGlossSpin">
+            <property name="decimals">
+             <number>3</number>
+            </property>
+            <property name="minimum">
+             <double>0.001000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>10000.000000000000000</double>
+            </property>
+            <property name="value">
+             <double>12.000000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0" colspan="2">
+           <widget class="QPushButton" name="saveKeysBtn">
+            <property name="text">
+             <string>Save to Terrain.ini</string>
+            </property>
+            <property name="toolTip">
+             <string>Rewrites this terrain's keys in the loose Data\INI\Terrain.ini. No brush is needed.</string>
+            </property>
+            <property name="autoDefault">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="settingsSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="previewBox">
+       <property name="title">
+        <string>Preview</string>
+       </property>
+       <layout class="QVBoxLayout" name="previewLayout">
+        <item>
+         <widget class="QLabel" name="preview">
+          <property name="minimumSize">
+           <size>
+            <width>256</width>
+            <height>256</height>
+           </size>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>256</width>
+            <height>256</height>
+           </size>
+          </property>
+          <property name="frameShape">
+           <enum>QFrame::StyledPanel</enum>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignCenter</set>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="previewInfo">
+          <property name="alignment">
+           <set>Qt::AlignCenter</set>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="previewSpacer">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="buttonsRow">
+     <item>
+      <spacer name="buttonsSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="okButton">
+       <property name="text">
+        <string>Create</string>
+       </property>
+       <property name="default">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="cancelButton">
+       <property name="text">
+        <string>Cancel</string>
+       </property>
+       <property name="autoDefault">
+        <bool>false</bool>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

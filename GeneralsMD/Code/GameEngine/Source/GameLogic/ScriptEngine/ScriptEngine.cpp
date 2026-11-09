@@ -54,7 +54,12 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/ScriptConditions.h"
+#include "Common/GameMcp.h"
+#include "GameLogic/AIMatch.h"
 #include "GameLogic/ScriptEngine.h"
+#include "GameLogic/ScriptCLP.h"
+#include "GameLogic/ScriptCLPAI.h"
+#include "GameLogic/ScriptCLPWaypoints.h"
 #include "GameLogic/SidesList.h"
 
 
@@ -465,6 +470,9 @@ m_ChooseVictimAlwaysUsesNormal(false)
 	// By default, difficulty should be normal.
 	setGlobalDifficulty(DIFFICULTY_NORMAL);
 
+	TheScriptCLPState = NEW ScriptCLPState;
+	TheScriptCLPWaypoints = NEW ScriptCLPWaypoints;
+	TheScriptCLPAI = NEW ScriptCLPAI;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -510,6 +518,12 @@ ScriptEngine::~ScriptEngine()
 	}
 #endif
 
+	delete TheScriptCLPAI;
+	TheScriptCLPAI = nullptr;
+	delete TheScriptCLPWaypoints;
+	TheScriptCLPWaypoints = nullptr;
+	delete TheScriptCLPState;
+	TheScriptCLPState = nullptr;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -4098,6 +4112,28 @@ void ScriptEngine::init()
 	curTemplate->m_uiStrings[0] = "Build a shipyard ";
 	curTemplate->m_uiStrings[1] = ", at next free shipyard waypoint.";
 
+	curTemplate = &m_actionTemplates[ScriptAction::TEAM_MOVE_TO_SUPPLY_SOURCE];
+	curTemplate->m_internalName = "TEAM_MOVE_TO_SUPPLY_SOURCE";
+	curTemplate->m_uiName = "Contra/Team_/Move/Set to move to the nearest free supply source.";
+	curTemplate->m_numParameters = 2;
+	curTemplate->m_parameters[0] = Parameter::TEAM;
+	curTemplate->m_parameters[1] = Parameter::INT;
+	curTemplate->m_numUiStrings = 3;
+	curTemplate->m_uiStrings[0] = "Have Team ";
+	curTemplate->m_uiStrings[1] = " move to the nearest free supply source with at least ";
+	curTemplate->m_uiStrings[2] = " available resources.";
+
+	curTemplate = &m_actionTemplates[ScriptAction::NAMED_MOVE_TO_SUPPLY_SOURCE];
+	curTemplate->m_internalName = "NAMED_MOVE_TO_SUPPLY_SOURCE";
+	curTemplate->m_uiName = "Contra/Unit_/Move/Move a specific unit to the nearest free supply source.";
+	curTemplate->m_numParameters = 2;
+	curTemplate->m_parameters[0] = Parameter::UNIT;
+	curTemplate->m_parameters[1] = Parameter::INT;
+	curTemplate->m_numUiStrings = 3;
+	curTemplate->m_uiStrings[0] = "Have ";
+	curTemplate->m_uiStrings[1] = " move to the nearest free supply source with at least ";
+	curTemplate->m_uiStrings[2] = " available resources.";
+
 	///////////////////////////////////////////////////////////////////////////////////////////////////
 
 	/* Recipe for adding a condition:
@@ -5243,6 +5279,13 @@ void ScriptEngine::init()
 	curTemplate->m_numUiStrings = 1;
 	curTemplate->m_uiStrings[0] = "Ships are enabled on this map";
 
+	curTemplate = &m_conditionTemplates[Condition::QUICK_GAME_ENABLED];
+	curTemplate->m_internalName = "QUICK_GAME_ENABLED";
+	curTemplate->m_uiName = "Skirmish/ Quick Game is enabled.";
+	curTemplate->m_numParameters = 0;
+	curTemplate->m_numUiStrings = 1;
+	curTemplate->m_uiStrings[0] = "Quick Game is enabled";
+
 	curTemplate = &m_actionTemplates[ScriptAction::SHOW_WEATHER];
 	curTemplate->m_internalName = "SHOW_WEATHER";
 	curTemplate->m_uiName = "Map/Environment/Show Weather.";
@@ -5250,6 +5293,8 @@ void ScriptEngine::init()
 	curTemplate->m_parameters[0] = Parameter::BOOLEAN;
 	curTemplate->m_numUiStrings = 1;
 	curTemplate->m_uiStrings[0] = "Show Weather = ";
+
+	initCLPTemplates();
 
 	Int i;
 	for (i=0; i<Condition::NUM_ITEMS; i++) {
@@ -5286,6 +5331,9 @@ void ScriptEngine::reset()
 	if (TheScriptConditions) {
 		TheScriptConditions->reset();
 	}
+	TheScriptCLPState->reset();
+	TheScriptCLPWaypoints->reset();
+	TheScriptCLPAI->reset();
 	m_numCounters = 1;
 	m_numAttackInfo = 1;
 	m_numFlags = 1;
@@ -5620,6 +5668,8 @@ void ScriptEngine::update()
 	// update all sequential stuff.
 	evaluateAndProgressAllSequentialScripts();
 
+	TheScriptCLPState->update();
+
 	// Script debugger stuff
 	st_CurrentFrame++;
 	if (st_DebugDLL) {
@@ -5780,6 +5830,14 @@ void ScriptEngine::updateFades()
 	}
 	// time is up.
 	m_fade = FADE_NONE;
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool ScriptEngine::isLightningFade() const
+{
+	// Maps fake lightning with short additive fades; a fade to white runs longer.
+	const Int frames = m_fadeFramesIncrease + m_fadeFramesHold + m_fadeFramesDecrease;
+	return m_fade == FADE_ADD && frames <= LOGICFRAMES_PER_SECOND && TheGlobalData->m_useDynamicLights;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -6197,6 +6255,59 @@ const TCounter *ScriptEngine::getCounter(const AsciiString& counterName)
 		}
 	}
 	return nullptr;
+}
+
+//-------------------------------------------------------------------------------------------------
+const TFlag *ScriptEngine::getFlag(const AsciiString& flagName)
+{
+	// Note - flags start at 1.  0 means not assigned.
+	for (Int i=1; i<m_numFlags; i++)
+	{
+		if (flagName == m_flags[i].name)
+		{
+			return &(m_flags[i]);
+		}
+	}
+	return nullptr;
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScriptEngine::setFlagValue(const AsciiString& flagName, Bool value)
+{
+	const Int flagNdx = allocateFlag(flagName);
+	if (flagNdx > 0)
+	{
+		m_flags[flagNdx].value = value;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+void ScriptEngine::setCounterValue(const AsciiString& counterName, Int value)
+{
+	const Int counterNdx = allocateCounter(counterName);
+	if (counterNdx > 0)
+	{
+		m_counters[counterNdx].value = value;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool ScriptEngine::setScriptActive(const AsciiString& name, Bool active)
+{
+	Bool found = FALSE;
+	ScriptGroup *pGroup = findGroup(name);
+	if (pGroup)
+	{
+		pGroup->setActive(active);
+		found = TRUE;
+	}
+	Script *pScript = findScript(name);
+	if (pScript)
+	{
+		pScript->setActive(active);
+		found = TRUE;
+	}
+	return found;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -7149,7 +7260,7 @@ void ScriptEngine::addObjectToCache(Object* pNewObject)
 				AsciiString newNameForDead;
 				newNameForDead.format("Reassigning dead object's name '%s' to object (%d) of type '%s'", objName.str(), pNewObject->getID(), pNewObject->getTemplate()->getName().str());
 				AppendDebugMessage(newNameForDead, FALSE);
-				DEBUG_LOG((newNameForDead.str()));
+				DEBUG_LOG(("%s", newNameForDead.str()));
 				it->second = pNewObject;
 				return;
 			} else {
@@ -8551,6 +8662,14 @@ void ScriptEngine::forceUnfreezeTime()
 
 void ScriptEngine::AppendDebugMessage(const AsciiString& strToAdd, Bool forcePause)
 {
+	if (TheAIMatch) {
+		TheAIMatch->scriptMessage(strToAdd);
+	}
+#ifdef RTS_GAME_MCP
+	if (TheGameMcp) {
+		TheGameMcp->scriptMessage(strToAdd);
+	}
+#endif
 #ifdef INTENSE_DEBUG
 	DEBUG_LOG(("-SCRIPT- %d %s", TheGameLogic->getFrame(), strToAdd.str()));
 #endif
@@ -9132,9 +9251,9 @@ void ScriptEngine::xfer( Xfer *xfer )
 	xferListAsciiString( xfer, &m_uiInteractions );
 
 	// triggered special powers
-	UnsignedShort triggeredSpecialPowersSize = MAX_PLAYER_COUNT;
+	UnsignedShort triggeredSpecialPowersSize = xfer->getPlayerCount();
 	xfer->xferUnsignedShort( &triggeredSpecialPowersSize );
-	if( triggeredSpecialPowersSize != MAX_PLAYER_COUNT )
+	if( triggeredSpecialPowersSize != xfer->getPlayerCount() )
 	{
 
 		DEBUG_CRASH(( "ScriptEngine::xfer - MAX_PLAYER_COUNT has changed, m_triggeredSpecialPowers size is now different and we must version this" ));
@@ -9145,9 +9264,9 @@ void ScriptEngine::xfer( Xfer *xfer )
 		xferListAsciiStringObjectID( xfer, &m_triggeredSpecialPowers[ i ] );
 
 	// midway special powers
-	UnsignedShort midwaySpecialPowersSize = MAX_PLAYER_COUNT;
+	UnsignedShort midwaySpecialPowersSize = xfer->getPlayerCount();
 	xfer->xferUnsignedShort( &midwaySpecialPowersSize );
-	if( midwaySpecialPowersSize != MAX_PLAYER_COUNT )
+	if( midwaySpecialPowersSize != xfer->getPlayerCount() )
 	{
 
 		DEBUG_CRASH(( "ScriptEngine::xfer - MAX_PLAYER_COUNT has changed, m_midwaySpecialPowers size is now different and we must version this" ));
@@ -9158,9 +9277,9 @@ void ScriptEngine::xfer( Xfer *xfer )
 		xferListAsciiStringObjectID( xfer, &m_midwaySpecialPowers[ i ] );
 
 	// finished special powers
-	UnsignedShort finishedSpecialPowersSize = MAX_PLAYER_COUNT;
+	UnsignedShort finishedSpecialPowersSize = xfer->getPlayerCount();
 	xfer->xferUnsignedShort( &finishedSpecialPowersSize );
-	if( finishedSpecialPowersSize != MAX_PLAYER_COUNT )
+	if( finishedSpecialPowersSize != xfer->getPlayerCount() )
 	{
 
 		DEBUG_CRASH(( "ScriptEngine::xfer - MAX_PLAYER_COUNT has changed, m_finishedSpecialPowers size is now different and we must version this" ));
@@ -9171,9 +9290,9 @@ void ScriptEngine::xfer( Xfer *xfer )
 		xferListAsciiStringObjectID( xfer, &m_finishedSpecialPowers[ i ] );
 
 	// completed upgrades
-	UnsignedShort completedUpgradesSize = MAX_PLAYER_COUNT;
+	UnsignedShort completedUpgradesSize = xfer->getPlayerCount();
 	xfer->xferUnsignedShort( &completedUpgradesSize );
-	if( completedUpgradesSize != MAX_PLAYER_COUNT )
+	if( completedUpgradesSize != xfer->getPlayerCount() )
 	{
 
 		DEBUG_CRASH(( "ScriptEngine::xfer - MAX_PLAYER_COUNT has changed, m_completedUpgrades size is now different and we must version this" ));
@@ -9184,9 +9303,9 @@ void ScriptEngine::xfer( Xfer *xfer )
 		xferListAsciiStringObjectID( xfer, &m_completedUpgrades[ i ] );
 
 	// acquired sciences
-	UnsignedShort acquiredSciencesSize = MAX_PLAYER_COUNT;
+	UnsignedShort acquiredSciencesSize = xfer->getPlayerCount();
 	xfer->xferUnsignedShort( &acquiredSciencesSize );
-	if( acquiredSciencesSize != MAX_PLAYER_COUNT )
+	if( acquiredSciencesSize != xfer->getPlayerCount() )
 	{
 
 		DEBUG_CRASH(( "ScriptEngine::xfer - MAX_PLAYER_COUNT has changed, m_acquiredSciences size is now different and we must version this" ));
@@ -9416,6 +9535,9 @@ void ScriptEngine::markMPLocalDefeatWindowShown()
 
 void _appendMessage(const AsciiString& str, Bool isTrueMessage, Bool shouldPause)
 {
+	if (TheAIMatch) {
+		TheAIMatch->scriptFired(str, isTrueMessage);
+	}
 	typedef void (*funcptr)(const char*);
 
 	AsciiString msg;

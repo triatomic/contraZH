@@ -534,18 +534,7 @@ Bool Particle::update()
 // ------------------------------------------------------------------------------------------------
 void Particle::draw(Real timeScale)
 {
-	// integrate velocity into position
-	const Coord3D *driftVel = m_system->getDriftVelocity();
-	m_pos.x += (m_vel.x + driftVel->x) * timeScale;
-	m_pos.y += (m_vel.y + driftVel->y) * timeScale;
-	m_pos.z += (m_vel.z + driftVel->z) * timeScale;
-
-	// integrate the wind (if specified) into position
-	ParticleSystemInfo::WindMotion windMotion = m_system->getWindMotion();
-
-	// see if we should even do anything
-	if( windMotion != ParticleSystemInfo::WIND_MOTION_NOT_USED )
-		doWindMotion(timeScale);
+	m_pos = computePosition(timeScale);
 
 	// update orientation
 #if PARTICLE_USE_XY_ROTATION
@@ -590,10 +579,20 @@ void Particle::draw(Real timeScale)
 }
 
 // ------------------------------------------------------------------------------------------------
-/** Do wind motion as specified by the particle system template, if present */
+/** Compute the position after a movement step without changing the particle. */
 // ------------------------------------------------------------------------------------------------
-void Particle::doWindMotion(Real timeScale)
+Coord3D Particle::computePosition(Real timeScale) const
 {
+	Coord3D pos = m_pos;
+	const Coord3D *driftVel = m_system->getDriftVelocity();
+	pos.x += (m_vel.x + driftVel->x) * timeScale;
+	pos.y += (m_vel.y + driftVel->y) * timeScale;
+	pos.z += (m_vel.z + driftVel->z) * timeScale;
+
+	if (m_system->getWindMotion() == ParticleSystemInfo::WIND_MOTION_NOT_USED)
+	{
+		return pos;
+	}
 
 	// get the angle of the wind
 	Real windAngle = m_system->getWindAngle();
@@ -639,9 +638,9 @@ void Particle::doWindMotion(Real timeScale)
 	// this to compute how much force we apply
 	//
 	Coord3D v;
-	v.x = m_pos.x - systemPos.x;
-	v.y = m_pos.y - systemPos.y;
-	v.z = m_pos.z - systemPos.z;
+	v.x = pos.x - systemPos.x;
+	v.y = pos.y - systemPos.y;
+	v.z = pos.z - systemPos.z;
 
 	// distance amounts for full force from wind and no force at all
 	Real fullForceDistance = 75.0f;
@@ -664,11 +663,12 @@ void Particle::doWindMotion(Real timeScale)
 																		(noForceDistance - fullForceDistance)));
 
 		// integrate the wind motion into the position
-		m_pos.x += (Cos( windAngle ) * windForceStrength);
-		m_pos.y += (Sin( windAngle ) * windForceStrength);
+		pos.x += (Cos( windAngle ) * windForceStrength);
+		pos.y += (Sin( windAngle ) * windForceStrength);
 
 	}
 
+	return pos;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -1233,6 +1233,10 @@ void ParticleSystemInfo::validate()
 #endif
 
 	validateAlphaKeyframes(m_alphaKey, ARRAY_SIZE(m_alphaKey));
+
+#if !ENABLE_TERRAIN_CONFORMING_PARTICLES
+	m_conformToTerrain = false;
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1265,6 +1269,10 @@ ParticleSystem::ParticleSystem( const ParticleSystemTemplate *sysTemplate,
 	m_isIdentity = true;
 	m_transform.Make_Identity();
 	m_skipParentXfrm = false;
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	m_debugWorldPositionValid = FALSE;
+#endif
 
 	m_isStopped = false;
 	m_isDestroyed = false;
@@ -2457,15 +2465,24 @@ void ParticleSystem::updateTransform()
 	// if we are controlled by a particle, its position is local origin
 	if (m_controlParticle)
 	{
-		const Coord3D *controlPos = m_controlParticle->getPosition();
+#if RTS_ZEROHOUR
+		// Trails sample the completed movement step while the particle renders between steps.
+		const Coord3D controlPos = m_controlParticle->computePosition(1.0f);
+#else
+		const Coord3D controlPos = *m_controlParticle->getPosition();
+#endif
 		/// @todo Concatenate this, instead of overriding (MSB)
-		m_transform.Set_X_Translation( controlPos->x );
-		m_transform.Set_Y_Translation( controlPos->y );
-		m_transform.Set_Z_Translation( controlPos->z );
+		m_transform.Set_X_Translation( controlPos.x );
+		m_transform.Set_Y_Translation( controlPos.y );
+		m_transform.Set_Z_Translation( controlPos.z );
 		m_isIdentity = false;
 		m_lastPos = m_pos;
-		m_pos = *controlPos;
+		m_pos = controlPos;
 	}
+
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	m_debugWorldPositionValid = TRUE;
+#endif
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -3179,6 +3196,19 @@ const FieldParse ParticleSystemTemplate::m_fieldParseTable[] =
 	{ "ElectricShader",			INI::parseIndexList, ElectricShaderModeNames, offsetof( ParticleSystemTemplate, m_electricShader ) },
 	{ "LaserShader",				INI::parseIndexList, LaserShaderModeNames, offsetof( ParticleSystemTemplate, m_laserShader ) },
 	{ "CryoShader",					INI::parseIndexList, CryoShaderModeNames, offsetof( ParticleSystemTemplate, m_cryoShader ) },
+#if RTS_ZEROHOUR
+	{ "FluidShader", INI::parseBool, nullptr, offsetof( ParticleSystemTemplate, m_fluidShader ) },
+	{ "FluidWarp", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_fluidTuning.warp ) },
+	{ "FluidNoiseSize", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_fluidTuning.noiseSize ) },
+	{ "FluidSpeed", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_fluidTuning.speed ) },
+	{ "FluidBody", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_fluidTuning.body ) },
+	{ "FluidBubbles", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_fluidTuning.bubbles ) },
+	{ "FluidBubbleSize", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_fluidTuning.bubbleSize ) },
+	{ "FluidEdge", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_fluidTuning.edge ) },
+	{ "FluidGlow", INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_fluidTuning.glow ) },
+	{ "Bloom", INI::parseBool, nullptr, offsetof( ParticleSystemTemplate, m_bloom ) },
+	{ "BloomZoomCompensation", INI::parseBool, nullptr, offsetof( ParticleSystemTemplate, m_bloomZoomCompensation ) },
+#endif
 	{ "FlameWarp",					INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.warp ) },
 	{ "FlameHeat",					INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.heat ) },
 	{ "FlameFlicker",				INI::parseReal, nullptr, offsetof( ParticleSystemTemplate, m_flameTuning.flicker ) },
@@ -3310,6 +3340,11 @@ ParticleSystemTemplate::ParticleSystemTemplate( const AsciiString &name ) :
 	m_slaveTemplate = nullptr;
 	m_cryoParticleScale = -1.0f;
 	m_electricParticleScale = -1.0f;
+#if RTS_ZEROHOUR
+	m_fluidShader = FALSE;
+	m_bloom = TRUE;
+	m_bloomZoomCompensation = FALSE;
+#endif
 
 	Real *setting = &m_flameTuning.warp;
 	for (UnsignedInt i = 0; i < sizeof( m_flameTuning ) / sizeof( Real ); ++i)
@@ -3320,6 +3355,34 @@ ParticleSystemTemplate::ParticleSystemTemplate( const AsciiString &name ) :
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+#if RTS_ZEROHOUR
+FluidShaderTuning::FluidShaderTuning()
+	: warp(-1.0f), noiseSize(-1.0f), speed(-1.0f), body(-1.0f),
+	  bubbles(-1.0f), bubbleSize(-1.0f), edge(-1.0f), glow(-1.0f)
+{
+}
+
+Bool ParticleSystemTemplate::hasFluidTuning() const
+{
+	return m_fluidTuning.warp >= 0.0f || m_fluidTuning.noiseSize >= 0.0f ||
+		m_fluidTuning.speed >= 0.0f || m_fluidTuning.body >= 0.0f ||
+		m_fluidTuning.bubbles >= 0.0f || m_fluidTuning.bubbleSize >= 0.0f ||
+		m_fluidTuning.edge >= 0.0f || m_fluidTuning.glow >= 0.0f;
+}
+
+void ParticleSystemTemplate::resolveFluidTuning( const FluidShaderTuning *own, FluidShaderTuning &tuning )
+{
+	tuning.warp = (own != nullptr && own->warp >= 0.0f) ? own->warp : TheGlobalData->m_fluidWarp;
+	tuning.noiseSize = (own != nullptr && own->noiseSize >= 0.0f) ? own->noiseSize : TheGlobalData->m_fluidNoiseSize;
+	tuning.speed = (own != nullptr && own->speed >= 0.0f) ? own->speed : TheGlobalData->m_fluidSpeed;
+	tuning.body = (own != nullptr && own->body >= 0.0f) ? own->body : TheGlobalData->m_fluidBody;
+	tuning.bubbles = (own != nullptr && own->bubbles >= 0.0f) ? own->bubbles : TheGlobalData->m_fluidBubbles;
+	tuning.bubbleSize = (own != nullptr && own->bubbleSize >= 0.0f) ? own->bubbleSize : TheGlobalData->m_fluidBubbleSize;
+	tuning.edge = (own != nullptr && own->edge >= 0.0f) ? own->edge : TheGlobalData->m_fluidEdge;
+	tuning.glow = (own != nullptr && own->glow >= 0.0f) ? own->glow : TheGlobalData->m_fluidGlow;
+}
+#endif
+
 Bool ParticleSystemTemplate::hasFlameTuning() const
 {
 	const Real *setting = &m_flameTuning.warp;
@@ -3426,6 +3489,22 @@ ParticleSystemTemplate::~ParticleSystemTemplate()
 void ParticleSystemTemplate::validate()
 {
 	ParticleSystemInfo::validate();
+}
+
+// ------------------------------------------------------------------------------------------------
+void ParticleSystemTemplate::copyFrom( const ParticleSystemTemplate *other )
+{
+	if (other == this)
+	{
+		return;
+	}
+
+	AsciiString name = m_name;
+	*this = *other;
+	m_name = name;
+
+	// Resolved again from m_slaveSystemName, which the extending block may change
+	m_slaveTemplate = nullptr;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -3624,7 +3703,12 @@ void ParticleSystemManager::draw()
 {
 	// TheSuperHackers @tweak Integrate the part of the logic frame that the render time
 	// has advanced into since the last render update.
+#if defined(GENERALS_ONLINE_HIGH_FPS_RENDER)
+	// Particles step on the legacy frame, so they blend by its phase, not the faster logic frame's.
+	const Real logicFramePhase = TheGameClient->getLegacyFramePhase();
+#else
 	const Real logicFramePhase = TheFramePacer->getLogicFramePhase();
+#endif
 	if (logicFramePhase > m_drawnLogicFramePhase)
 	{
 		const Real timeScale = logicFramePhase - m_drawnLogicFramePhase;

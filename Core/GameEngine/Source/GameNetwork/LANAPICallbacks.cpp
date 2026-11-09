@@ -117,9 +117,18 @@ void LANAPI::OnAccept( UnsignedInt playerIP, Bool status )
 			if (m_currentGame->getIP(i) == playerIP)
 			{
 				if(status)
+				{
 					m_currentGame->getLANSlot(i)->setAccept();
-				else
+				}
+				else if (m_gameStartTime == 0)
+				{
 					m_currentGame->getLANSlot(i)->unAccept();
+				}
+				// The start countdown has passed the point of taking an accept back, so nothing changed
+				else
+				{
+					return;
+				}
 				break;
 			}
 		}
@@ -186,6 +195,7 @@ void LANAPI::OnHasMap( UnsignedInt playerIP, Bool status )
 
 void LANAPI::OnGameStartTimer( Int seconds )
 {
+	m_lastStartTimerHeard = timeGetTime();
 	UnicodeString text;
 	if (seconds == 1)
 		text.format(TheGameText->fetch("LAN:GameStartTimerSingular"), seconds);
@@ -245,6 +255,7 @@ void LANAPI::OnGameStart()
 			DEBUG_LOG(("After transfer, we didn't really have the map.  Bailing..."));
 			OnPlayerLeave(m_name);
 			removeGame(m_currentGame);
+			delete m_currentGame;
 			m_currentGame = nullptr;
 			m_inLobby = TRUE;
 

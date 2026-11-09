@@ -48,6 +48,9 @@
 #include "Common/BuildAssistant.h"
 #include "Common/SpecialPower.h"
 #include "Common/ThingTemplate.h"
+#include "Common/Team.h"
+#include "GameLogic/Module/BehaviorModule.h"
+#include "GameLogic/Module/CreateModule.h"
 #include "Common/Upgrade.h"
 #include "Common/StatsCollector.h"
 #include "Common/Radar.h"
@@ -229,7 +232,6 @@ static Player *getMessagePlayer(GameMessage *msg)
 	return ThePlayerList->getNthPlayer( msg->getPlayerIndex() );
 }
 
-
 static Object * getSingleObjectFromSelection(const AIGroup *currentlySelectedGroup)
 {
 	if( currentlySelectedGroup && !currentlySelectedGroup->isEmpty() )
@@ -307,7 +309,10 @@ void GameLogic::clearGameData( Bool showScoreScreen )
 		TheWritableGlobalData->m_maxCameraHeight = prefs.getMaxCameraHeight();
 	}
 
+	// Map overrides disappear during reset, including the next map selected by the menu.
+	const AsciiString pendingFile = TheGlobalData->m_pendingFile;
 	TheGameEngine->reset();
+	TheWritableGlobalData->m_pendingFile = pendingFile;
 	setGameMode(GAME_NONE);
 //	m_background->bringForward();
 //	if(shellGame)
@@ -705,6 +710,55 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			break;
 
 		}
+		//---------------------------------------------------------------------------------------------
+		// Debug/cheat spawn of a single object for the message's player.
+		// This is dispatched through the logic instead of being created directly by the chat command
+		// in the client, because W3DModelDraw only validates its public bones, turret info and weapon
+		// barrel info while TheGameLogic is inside its update (see isValidTimeToCalcLogicStuff).
+		// Creating the object outside of that leaves the drawable uninitialized: muzzle flashes stay
+		// visible, turrets do not track, and giving the object an order can crash.
+		case GameMessage::MSG_SPAWN_OBJECT_AT_POSITION:
+		{
+			// The chat command only sends this outside multiplayer, so reject one a modified client sent.
+			if( isInMultiplayerGame() )
+			{
+				break;
+			}
+
+			const Coord3D pos = msg->getArgument( 1 )->location;
+
+			const ThingTemplate *tmpl = TheThingFactory->findByTemplateID( (UnsignedShort)msg->getArgument( 0 )->integer );
+			if( tmpl == nullptr )
+				break;
+
+			Team *team = msgPlayer->getDefaultTeam();
+			if( team == nullptr )
+				break;
+
+			Object *obj = TheThingFactory->newObject( tmpl, team );
+			if( obj == nullptr )
+				break;
+
+			obj->setPosition( &pos );
+			obj->setOrientation( 0.0f );
+
+			// onCreate() already ran in the constructor, but the game side CreateModules still need to
+			// run so that upgrades are granted, weapons are locked and special powers are registered.
+			for( BehaviorModule **m = obj->getBehaviorModules(); m && *m; ++m )
+			{
+				CreateModuleInterface *create = (*m)->getCreate();
+				if( create == nullptr )
+					continue;
+
+				create->onBuildComplete();
+			}
+
+			// Creation is another valid and essential time to call this. This object now Looks.
+			obj->handlePartitionCellMaintenance();
+
+			break;
+
+		}
 
 		//---------------------------------------------------------------------------------------------
 		case GameMessage::MSG_EXIT:
@@ -861,6 +915,23 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			onToggleDeploy(msg, currentlySelectedGroup);
 			break;
 		}
+#if RTS_ZEROHOUR
+		case GameMessage::MSG_DO_MOVETO_FACING:
+		{
+			// drag-to-face: line formation (rows deep) across the dragged direction, facing it on arrival
+			if( currentlySelectedGroup )
+			{
+				Coord3D dest = msg->getArgument( 0 )->location;
+				const Real angle = msg->getArgument( 1 )->real;
+				const Int rows = msg->getArgument( 2 )->integer;
+				// the player's formation style (FormationStyle), carried in the order so every machine runs the same move
+				const UnsignedInt style = (UnsignedInt)msg->getArgument( 3 )->integer;
+				currentlySelectedGroup->releaseWeaponLockForGroup(LOCKED_TEMPORARILY);	// release any temporary locks.
+				currentlySelectedGroup->groupMoveToPositionFacing( &dest, angle, rows, style, CMD_FROM_PLAYER );
+			}
+			break;
+		}
+#endif
 
 #ifdef ALLOW_SURRENDER
 		case GameMessage::MSG_DO_SURRENDER:
@@ -983,6 +1054,18 @@ void GameLogic::logicMessageDispatcher( GameMessage *msg, void *userData )
 			onPurchaseScience(msg);
 			break;
 		}
+#if RTS_ZEROHOUR
+		case GameMessage::MSG_SET_DIPLOMACY_STANCE:
+		{
+			onSetDiplomacyStance(msg);
+			break;
+		}
+		case GameMessage::MSG_ENABLE_LOBBY_RULE:
+		{
+			onEnableLobbyRule(msg);
+			break;
+		}
+#endif
 	}
 
 #if RETAIL_COMPATIBLE_AIGROUP

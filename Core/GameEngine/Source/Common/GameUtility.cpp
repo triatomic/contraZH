@@ -19,11 +19,15 @@
 #include "PreRTS.h"
 
 #include "Common/GameUtility.h"
+#include "Common/GlobalData.h"
+#include "Common/OptionPreferences.h"
 #include "Common/PlayerList.h"
 #include "Common/Player.h"
 #include "Common/Radar.h"
 
+#include "GameClient/Color.h"
 #include "GameClient/ControlBar.h"
+#include "GameClient/Drawable.h"
 #include "GameClient/GameClient.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/ParticleSys.h"
@@ -37,12 +41,33 @@ namespace rts
 
 namespace detail
 {
+static Bool s_relationshipsChanged = false; ///< basic house colors are stale, see markRelationshipsChanged
+
+static Bool isBasicHouseColorMode()
+{
+#if RTS_ZEROHOUR
+	return TheGlobalData != nullptr && TheGlobalData->m_houseColorMode == HouseColorMode_Basic;
+#else
+	return false;
+#endif
+}
+
+static Bool wearsColor(const Player* player, Color color)
+{
+	// model colors carry a forced opaque alpha, player colors may not
+	const Color opaque = color | 0xFF000000;
+	return (player->getPlayerColor() | 0xFF000000) == opaque || (player->getPlayerNightColor() | 0xFF000000) == opaque;
+}
+
 static void changePlayerCommon(Player* player)
 {
 	TheParticleSystemManager->setLocalPlayerIndex(player->getPlayerIndex());
 	ThePartitionManager->refreshShroudForLocalPlayer();
 	TheGhostObjectManager->setLocalPlayerIndex(player->getPlayerIndex());
 	TheGameClient->updateFakeDrawables();
+	// TheSuperHackers @feature Basic house colors follow whoever is being watched.
+	if (isBasicHouseColorMode())
+		refreshHouseColors();
 	TheRadar->refreshObjects();
 	TheInGameUI->deselectAllDrawables();
 }
@@ -128,6 +153,73 @@ void changeObservedPlayer(Player* player)
 			becomePlayer = ThePlayerList->findPlayerWithNameKey(TheNameKeyGenerator->nameToKey("ReplayObserver"));
 		detail::changePlayerCommon(becomePlayer);
 	}
+}
+
+Color getHouseColorForLocalView(Color color, const Player* owner)
+{
+	if (color == 0 || !detail::isBasicHouseColorMode() || ThePlayerList == nullptr)
+		return color;
+
+	// An observer watching nobody in particular has no side to color by. A defeated player still
+	// has one, so they keep the basic colors.
+	const Player* viewer = getObservedOrLocalPlayer_Safe();
+	if (viewer == nullptr || viewer->isPlayerObserver())
+		return color;
+
+	const Player* wearer = (owner != nullptr && detail::wearsColor(owner, color)) ? owner : nullptr;
+	for (Int i = 0; wearer == nullptr && i < ThePlayerList->getPlayerCount(); ++i)
+	{
+		const Player* player = ThePlayerList->getNthPlayer(i);
+		if (player != nullptr && detail::wearsColor(player, color))
+			wearer = player;
+	}
+
+	// A custom indicator color set by a script or module belongs to no player, so it stays.
+	if (wearer == nullptr)
+		return color;
+
+	// The same blue, gold and red as Contra's multiplayer colors, so they read as player colors.
+	if (wearer == viewer)
+		return GameMakeColor(67, 104, 254, 255);
+
+	switch (viewer->getRelationship(wearer->getDefaultTeam()))
+	{
+		case ALLIES:
+			return GameMakeColor(221, 226, 13, 255);
+		case ENEMIES:
+			return GameMakeColor(255, 0, 0, 255);
+		default:
+			return color; // civilians and other neutrals keep their own color
+	}
+}
+
+void refreshHouseColors()
+{
+	if (TheGameClient != nullptr)
+	{
+		for (Drawable* draw = TheGameClient->firstDrawable(); draw != nullptr; draw = draw->getNextDrawable())
+			draw->refreshIndicatorColor();
+	}
+
+	if (TheRadar != nullptr)
+		TheRadar->refreshObjectColors();
+}
+
+void markRelationshipsChanged()
+{
+	// Alliances change in the logic (diplomacy, scripts, challenge map setup), often many at once,
+	// so only remember it here and repaint once on the client side.
+	detail::s_relationshipsChanged = true;
+}
+
+void updateHouseColors()
+{
+	if (!detail::s_relationshipsChanged)
+		return;
+
+	detail::s_relationshipsChanged = false;
+	if (detail::isBasicHouseColorMode())
+		refreshHouseColors();
 }
 
 } // namespace rts

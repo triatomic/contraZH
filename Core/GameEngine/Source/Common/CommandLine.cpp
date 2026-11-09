@@ -28,6 +28,7 @@
 #include "Common/ArchiveFileSystem.h"
 #include "Common/CommandLine.h"
 #include "Common/CRCDebug.h"
+#include "Common/FileSystem.h"
 #include "Common/LocalFileSystem.h"
 #include "Common/version.h"
 #include "Common/WorkingDirectory.h"
@@ -92,6 +93,7 @@ static void ConvertShortMapPathToLongMapPath(AsciiString &mapName)
 	if (!token.endsWithNoCase(".map"))
 	{
 		DEBUG_CRASH(("Invalid map name %s", mapName.str()));
+		return;
 	}
 	// remove the .map from the end.
 	token.truncateBy(4);
@@ -117,6 +119,32 @@ Int parseNoLogOrCrash(char *args[], int)
 Int parseWin(char *args[], int)
 {
 	TheWritableGlobalData->m_windowed = true;
+
+	return 1;
+}
+
+//=============================================================================
+//=============================================================================
+Int parseLiveLooseFiles(char *args[], int)
+{
+	FileSystem::setLiveLooseFiles(TRUE);
+
+	return 1;
+}
+
+// Use a plain D3D9 device instead of D3D9Ex, same as CONTRA_D3D9EX=0 (read when the device is created).
+Int parseD3D9(char *args[], int)
+{
+	_putenv("CONTRA_D3D9EX=0");
+
+	return 1;
+}
+
+Int parseLog(char *args[], int)
+{
+#ifdef DEBUG_LOGGING
+	DebugRequestLogFiles();
+#endif
 
 	return 1;
 }
@@ -457,6 +485,14 @@ Int parseReplay(char *args[], int num)
 		return 2;
 	}
 	return 1;
+}
+
+/// A skirmish between AI players (see AIMatch.h, which reads the match options itself). Tools
+/// start it while WorldBuilder or another game is open, so it runs as an instance of its own.
+Int parseAIMatch(char *args[], int num)
+{
+	rts::ClientInstance::setMultiInstance(TRUE);
+	return (num > 1) ? 2 : 1;
 }
 
 Int parseJobs(char *args[], int num)
@@ -1194,6 +1230,9 @@ static CommandLineParam paramsForStartup[] =
 	// You can also include wildcards. The file must be in the replay folder or in a subfolder.
 	{ "-replay", parseReplay },
 
+	// Run a skirmish between AI players and log it. The map name follows.
+	{ "-aiMatch", parseAIMatch },
+
 	// TheSuperHackers @feature helmutbuhler 23/05/2025
 	// Simulate each replay in a separate process and use 1..N processes at the same time.
 	// (If you have 4 cores, call it with -jobs 4)
@@ -1210,6 +1249,15 @@ static CommandLineParam paramsForStartup[] =
 	// The last successful selection wins; otherwise use the executable directory.
 	{ "-setCwd", parseSetCwd },
 	{ "-useCwd", parseUseCwd },
+
+	// Check the loose file before the archive on every read, so overrides added while running take effect.
+	{ "-live", parseLiveLooseFiles },
+
+	// Use a plain D3D9 device instead of D3D9Ex (D3D9 builds only; same as CONTRA_D3D9EX=0).
+	{ "-d3d9", parseD3D9 },
+
+	// Write DebugLogFile.txt and d3d9render.txt.
+	{ "-log", parseLog },
 };
 
 // These Params are parsed during Engine Init before INI data is loaded

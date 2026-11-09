@@ -183,8 +183,6 @@ void RoadType::loadTexture(AsciiString path, Int ID)
 	m_roadTexture->Get_Filter().Set_U_Addr_Mode(TextureFilterClass::TEXTURE_ADDRESS_REPEAT);
 	m_roadTexture->Get_Filter().Set_V_Addr_Mode(TextureFilterClass::TEXTURE_ADDRESS_REPEAT);
 
-	m_vertexRoad=NEW_REF(DX8VertexBufferClass,(DX8_FVF_XYZDUV1,TheGlobalData->m_maxRoadVertex+4, (s_dynamic?DX8VertexBufferClass::USAGE_DYNAMIC:DX8VertexBufferClass::USAGE_DEFAULT)));
-	m_indexRoad=NEW_REF(DX8IndexBufferClass,(TheGlobalData->m_maxRoadIndex+4, (s_dynamic?DX8IndexBufferClass::USAGE_DYNAMIC:DX8IndexBufferClass::USAGE_DEFAULT)));
 	m_numRoadVertices=0;
 	m_numRoadIndices=0;
 
@@ -192,6 +190,23 @@ void RoadType::loadTexture(AsciiString path, Int ID)
 	m_texturePath = path;
 #endif
 	m_uniqueID = ID;
+}
+
+//=============================================================================
+// RoadType allocateBuffers
+//=============================================================================
+/** Creates the vertex and index buffers the first time a map uses this road type. */
+//=============================================================================
+void RoadType::allocateBuffers()
+{
+	if (m_vertexRoad == nullptr)
+	{
+		m_vertexRoad=NEW_REF(DX8VertexBufferClass,(DX8_FVF_XYZDUV1,TheGlobalData->m_maxRoadVertex+4, (s_dynamic?DX8VertexBufferClass::USAGE_DYNAMIC:DX8VertexBufferClass::USAGE_DEFAULT)));
+	}
+	if (m_indexRoad == nullptr)
+	{
+		m_indexRoad=NEW_REF(DX8IndexBufferClass,(TheGlobalData->m_maxRoadIndex+4, (s_dynamic?DX8IndexBufferClass::USAGE_DYNAMIC:DX8IndexBufferClass::USAGE_DEFAULT)));
+	}
 }
 
 #ifdef LOAD_TEST_ASSETS
@@ -1232,9 +1247,19 @@ void W3DRoadBuffer::loadRoadsInVertexAndIndexBuffers()
 	UnsignedShort *ib;
 	// Lock the buffers.
 	if (m_roadTypes[m_curRoadType].getIB() == nullptr) {
-		this->m_roadTypes[m_curRoadType].setNumVertices(0);
-		this->m_roadTypes[m_curRoadType].setNumIndices(0);
-		return;
+		Bool used = false;
+		for (Int i=0; i<m_numRoads; i++) {
+			if (m_roads[i].m_uniqueID == m_curUniqueID) {
+				used = true;
+				break;
+			}
+		}
+		if (!used) {
+			this->m_roadTypes[m_curRoadType].setNumVertices(0);
+			this->m_roadTypes[m_curRoadType].setNumIndices(0);
+			return;
+		}
+		m_roadTypes[m_curRoadType].allocateBuffers();
 	}
 	DX8IndexBufferClass::WriteLockClass lockIdxBuffer(m_roadTypes[m_curRoadType].getIB(), s_dynamic?D3DLOCK_DISCARD:0);
 	DX8VertexBufferClass::WriteLockClass lockVtxBuffer(m_roadTypes[m_curRoadType].getVB(), s_dynamic?D3DLOCK_DISCARD:0);
@@ -1315,6 +1340,11 @@ void W3DRoadBuffer::loadLitRoadsInVertexAndIndexBuffers(RefRenderObjListIterator
 	VertexFormatXYZDUV1 *vb;
 	UnsignedShort *ib;
 	// Lock the buffers.
+	if (m_roadTypes[m_curRoadType].getIB() == nullptr) {
+		this->m_roadTypes[m_curRoadType].setNumVertices(0);
+		this->m_roadTypes[m_curRoadType].setNumIndices(0);
+		return;
+	}
 	DX8IndexBufferClass::WriteLockClass lockIdxBuffer(m_roadTypes[m_curRoadType].getIB());
 	DX8VertexBufferClass::WriteLockClass lockVtxBuffer(m_roadTypes[m_curRoadType].getVB());
 	vb=(VertexFormatXYZDUV1*)lockVtxBuffer.Get_Vertex_Array();
@@ -2778,8 +2808,10 @@ void W3DRoadBuffer::insertCrossTypeJoins()
 
 
 		Real nu; // not used.
+		// A near-parallel join line meets the road edge far away and would stretch the join across the map.
+		const Real maxJoinDist = 2.0f * m_roads[i].m_scale * m_roads[i].m_widthInTexture;
 		Vector2 top = m_roads[i].m_pt1.top;
-		if (joinLine.Find_Intersection(roadLine, &pInt1, &nu, &pInt2, &nu) ) {
+		if (joinLine.Find_Intersection(roadLine, &pInt1, &nu, &pInt2, &nu) && Vector3::Distance(pInt1, vLoc1) < maxJoinDist) {
 			if (isPt1) {
 				m_roads[i].m_pt1.top.Set(pInt1.X, pInt1.Y);
 				top = m_roads[i].m_pt1.top;
@@ -2794,7 +2826,7 @@ void W3DRoadBuffer::insertCrossTypeJoins()
 		v2.Set(p2.X, p2.Y, 0);
 		roadLine.Set(v1,v2);
 		Vector2 bottom = m_roads[i].m_pt1.bottom;
-		if (joinLine.Find_Intersection(roadLine, &pInt1, &nu, &pInt2, &nu) ) {
+		if (joinLine.Find_Intersection(roadLine, &pInt1, &nu, &pInt2, &nu) && Vector3::Distance(pInt1, vLoc1) < maxJoinDist) {
 			if (isPt1) {
 				m_roads[i].m_pt1.bottom.Set(pInt1.X, pInt1.Y);
 				bottom = m_roads[i].m_pt1.bottom;
@@ -3115,6 +3147,18 @@ void W3DRoadBuffer::allocateRoadBuffers()
 	m_maxRoadIndex = TheGlobalData->m_maxRoadIndex;
 	m_maxRoadTypes = TheGlobalData->m_maxRoadTypes;
 
+	// MaxRoadTypes is a floor; a road past it would load no texture and never draw
+	TerrainRoadType *road;
+	Int roadCount = 0;
+	for( road = TheTerrainRoads->firstRoad(); road; road = TheTerrainRoads->nextRoad( road ) )
+	{
+		roadCount++;
+	}
+	if( m_maxRoadTypes < roadCount )
+	{
+		m_maxRoadTypes = roadCount;
+	}
+
 #ifdef LOAD_TEST_ASSETS
 	m_maxRoadTypes+=4;
 #endif
@@ -3125,7 +3169,6 @@ void W3DRoadBuffer::allocateRoadBuffers()
 	m_roadTypes = MSGNEW("RoadBuffer") RoadType[m_maxRoadTypes];
 
 	// load roads from INI
-	TerrainRoadType *road;
 	i = 0;
 	for( road = TheTerrainRoads->firstRoad(); road; road = TheTerrainRoads->nextRoad( road ) )
 	{
@@ -3350,8 +3393,8 @@ void W3DRoadBuffer::drawRoads(CameraClass * camera, TextureClass *cloudTexture, 
 			{
 				if (!wireframe)
 		 			W3DShaderManager::setShader(st, pass);
-				// A road type draws in one call, so it takes the lights nearest the middle of the view.
-				W3DShaderManager::setDrawPixelLights(nullptr, W3DShaderManager::MAX_PIXEL_LIGHTS);
+				// Road types share one draw each, so their light batches span the view.
+				W3DShaderManager::setDrawPixelLights(nullptr, W3DShaderManager::getPixelLightCount());
 				//Draw all this road type.
 				DX8Wrapper::Draw_Triangles(	0, m_roadTypes[i].getNumIndices()/3, 0,	m_roadTypes[i].getNumVertices());
 #ifdef LOG_STATS

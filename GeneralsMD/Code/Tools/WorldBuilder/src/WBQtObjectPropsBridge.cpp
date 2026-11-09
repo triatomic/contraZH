@@ -390,6 +390,39 @@ void MapObjectProps::qtMSetStoppingDistance(double dist)
 	}
 }
 
+double MapObjectProps::qtGetObjectScale(void)
+{
+	if (TheMapObjectProps == NULL || TheMapObjectProps->m_dictToEdit == NULL)
+	{
+		return 1.0;
+	}
+	Bool exists;
+	Real v = TheMapObjectProps->m_dictToEdit->getReal(TheKey_objectScale, &exists);
+	if (!exists)
+	{
+		return 1.0;
+	}
+	return v;
+}
+
+void MapObjectProps::qtMSetObjectScale(double scale)
+{
+	if (TheMapObjectProps == NULL || scale <= 0.0)
+	{
+		return;
+	}
+	TheMapObjectProps->getAllSelectedDicts();
+	CWorldBuilderDoc* pDoc = CWorldBuilderDoc::GetActiveDoc();
+	if ( pDoc != NULL )
+	{
+		Dict newDict;
+		newDict.setReal(TheKey_objectScale, (Real)scale);
+		DictItemUndoable *pUndo = new DictItemUndoable(&TheMapObjectProps->m_allSelectedDicts.front(), newDict, newDict.getNthKey(0), TheMapObjectProps->m_allSelectedDicts.size(), pDoc, true);
+		pDoc->AddAndDoUndoable(pUndo);
+		REF_PTR_RELEASE(pUndo); // belongs to pDoc now.
+	}
+}
+
 // == _WeatherToDict / _TimeToDict minus the combo reads.
 void MapObjectProps::qtMSetWeather(int index)
 {
@@ -744,8 +777,7 @@ int MapObjectProps::qtMGetSoundCurSel(void)
 	return qtMSoundCurIndex();
 }
 
-// == stopSoundPreview minus the button text / window timer (no window; the one-shot
-// auto-reset timer doesn't exist windowless -- the next toggle stops a finished one-shot).
+// == stopSoundPreview minus the button text / window timer (the Qt panel owns the timer).
 void MapObjectProps::qtMStopSoundPreview(void)
 {
 	if (TheMapObjectProps == NULL || !TheMapObjectProps->m_soundPreviewPlaying)
@@ -802,7 +834,9 @@ void MapObjectProps::qtMSetSoundCurSel(int i)
 	}
 }
 
-// == OnPlaySound minus the button text and the one-shot auto-reset timer (window ops).
+static Bool s_qtSoundPreviewLooping = false;
+
+// == OnPlaySound minus the button text and the one-shot auto-reset timer (the panel owns that).
 void MapObjectProps::qtMToggleSoundPreview(void)
 {
 	if (TheMapObjectProps == NULL)
@@ -865,6 +899,7 @@ void MapObjectProps::qtMToggleSoundPreview(void)
 		return;
 	}
 	TheMapObjectProps->m_soundPreviewPlaying = true;
+	s_qtSoundPreviewLooping = looping;
 }
 
 // The derived values the dictTo* seeders used to leave in the hidden controls.
@@ -1572,6 +1607,16 @@ extern "C" void WBQtObjectProps_SetStoppingDistance(double dist)
 	MapObjectProps::qtMSetStoppingDistance(dist);
 }
 
+extern "C" double WBQtObjectProps_GetObjectScale(void)
+{
+	return MapObjectProps::qtGetObjectScale();
+}
+
+extern "C" void WBQtObjectProps_SetObjectScale(double scale)
+{
+	MapObjectProps::qtMSetObjectScale(scale);
+}
+
 // --- Phase 3a: Visual section ---------------------------------------------------------------
 
 extern "C" int WBQtObjectProps_GetWeather(void)
@@ -1664,6 +1709,21 @@ extern "C" int WBQtObjectProps_GetSoundPlaying(void)
 extern "C" void WBQtObjectProps_ToggleSoundPreview(void)
 {
 	MapObjectProps::qtMToggleSoundPreview();
+}
+
+extern "C" void WBQtObjectProps_StopSoundPreview(void)
+{
+	MapObjectProps::qtMStopSoundPreview();
+}
+
+extern "C" int WBQtObjectProps_GetSoundPreviewMs(void)
+{
+	if (!MapObjectProps::qtGetSoundPlaying() || s_qtSoundPreviewLooping)
+	{
+		return 0;
+	}
+	int ms = MapObjectProps::qtMSoundPreviewMs();
+	return (ms > 0) ? ms + 100 : 10000;	// same margin and unknown-length fallback as MFC
 }
 
 extern "C" int WBQtObjectProps_GetSoundFlag(int which)

@@ -55,7 +55,7 @@ RadiusDecalBehaviorModuleData::RadiusDecalBehaviorModuleData()
 		{ "RadiusDecal",						RadiusDecalTemplate::parseRadiusDecalTemplate,	NULL, offsetof( RadiusDecalBehaviorModuleData, m_decalTemplate) },
 		{ "Radius",			INI::parseReal,									NULL,	offsetof( RadiusDecalBehaviorModuleData, m_decalRadius) },
 		{ "WorksWhileContained",					INI::parseBool,						NULL, offsetof(RadiusDecalBehaviorModuleData, m_worksWhileContained) },
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 
 	BehaviorModuleData::buildFieldParse(p);

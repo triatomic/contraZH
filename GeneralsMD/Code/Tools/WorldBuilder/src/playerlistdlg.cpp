@@ -584,7 +584,7 @@ void PlayerListDlg::updateTheUI()
 	Dict *playerDict = m_sides.getSideInfo(m_curPlayerIdx)->getDict();
 	Bool isneutral = playerDict->getAsciiString(TheKey_playerName).isEmpty();
 	if( newbtn )
-		newbtn->EnableWindow(m_sides.getNumSides() < MAX_PLAYER_COUNT);
+		newbtn->EnableWindow(m_sides.getNumSides() < MAX_PLAYER_COUNT - 1);
 	if( editbtn )
 		editbtn->EnableWindow(!isneutral);
 	if( rmvbtn )
@@ -845,7 +845,7 @@ void PlayerListDlg::OnChangePlayerdisplayname()
 }
 
 static void addSide(SidesList *sides, AsciiString faction,
-										AsciiString playerName, const wchar_t *playerUName)
+										AsciiString playerName, const WideChar *playerUName)
 {
 	if (!sides->findSideInfo(playerName)) {
 

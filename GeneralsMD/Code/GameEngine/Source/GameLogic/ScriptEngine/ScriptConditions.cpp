@@ -2731,8 +2731,15 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 {
 	switch (pCondition->getConditionType()) {
 		default:
+		{
+			Bool result;
+			if (evaluateCLPCondition(pCondition, &result))
+			{
+				return result;
+			}
 			DEBUG_CRASH(("Unknown ScriptCondition type %d", pCondition->getConditionType()));
 			return false;
+		}
 		case Condition::PLAYER_ALL_DESTROYED:
 			return evaluateAllDestroyed(pCondition->getParameter(0));
 		case Condition::PLAYER_ALL_BUILDFACILITIES_DESTROYED:
@@ -2989,6 +2996,9 @@ Bool ScriptConditions::evaluateCondition( Condition *pCondition )
 
 		case Condition::SKIRMISH_SHIPS_ENABLED:
 			return evaluateSkirmishShipsEnabled();
+
+		case Condition::QUICK_GAME_ENABLED:
+			return TheGameLogic->isQuickGame();
 
 	}
 }

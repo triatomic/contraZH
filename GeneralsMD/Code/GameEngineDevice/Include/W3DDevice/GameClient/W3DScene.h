@@ -33,6 +33,8 @@
 
 #pragma once
 
+#include "W3DDevice/GameClient/W3DEmissiveLights.h"
+
 // SYSTEM INCLUDES ////////////////////////////////////////////////////////////
 
 // USER INCLUDES //////////////////////////////////////////////////////////////
@@ -78,6 +80,7 @@ public:
 	/// The shader water's reflection draws what the main view would above the water plane
 	void setPlanarMirrorPass(Bool on, Real planeZ, const Region3D &region) {m_planarMirrorPass = on; m_planarMirrorZ = planeZ; m_planarMirrorRegion = region;}
 	Bool isPlanarMirrorPass() const {return m_planarMirrorPass;}
+	Real getPlanarMirrorZ() const {return m_planarMirrorZ;}
 
 	void Flush(RenderInfoClass & rinfo);	//draw queued up models.
 	/// Drawing control method
@@ -98,7 +101,7 @@ public:
 	virtual void init() override {}
 	virtual void update() override {}
 	virtual void draw() override;
-	virtual void reset() override {}
+	virtual void reset() override { m_emissiveLights.reset(); }
 	void doRender(CameraClass * cam);
 
 protected:
@@ -116,6 +119,7 @@ protected:
 
 protected:
 	RefRenderObjListClass	m_dynamicLightList;
+	W3DEmissiveLights m_emissiveLights;
 	Bool									m_drawTerrainOnly;
 	LightClass						*m_globalLight[LightEnvironmentClass::MAX_LIGHTS];				///< The global directional light (sun, moon) Applies to objects.
 	LightClass						*m_scratchLight; ///< a workspace for copying global lights and modifying // MLorenzen

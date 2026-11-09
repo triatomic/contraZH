@@ -117,6 +117,7 @@ static NameKeyType worldBuilderID = NAMEKEY_INVALID;
 static NameKeyType getUpdateID = NAMEKEY_INVALID;
 static NameKeyType buttonTRAININGID = NAMEKEY_INVALID;
 static NameKeyType buttonChallengeID = NAMEKEY_INVALID;
+static NameKeyType buttonCampaignChaptersID = NAMEKEY_INVALID;
 static NameKeyType buttonUSAID = NAMEKEY_INVALID;
 static NameKeyType buttonGLAID = NAMEKEY_INVALID;
 static NameKeyType buttonChinaID = NAMEKEY_INVALID;
@@ -203,7 +204,6 @@ static Int  showFrames = 0;
 static Int  showSide = SHOW_NONE;
 static Bool logoIsShown = FALSE;
 static Bool justEntered = FALSE;
-static Bool launchChallengeMenu = FALSE;
 
 static Bool dontAllowTransitions = FALSE;
 
@@ -280,22 +280,10 @@ void setupGameStart(AsciiString mapName, GameDifficulty diff)
 {
 	TheCampaignManager->setGameDifficulty(diff);
 
-	if (launchChallengeMenu)
-	{
-		if (TheChallengeGenerals)
-			TheChallengeGenerals->setCurrentDifficulty(diff);
-
-		campaignSelected = TRUE;
-		TheShell->push( "Menus/ChallengeMenu.wnd" );
-		TheTransitionHandler->reverse("MainMenuDifficultyMenuTraining");
-	}
-	else
-	{
-		startGame = TRUE;
-		TheWritableGlobalData->m_pendingFile = mapName;
-		TheShell->reverseAnimatewindow();
-		TheTransitionHandler->setGroup("FadeWholeScreen");
-	}
+	startGame = TRUE;
+	TheWritableGlobalData->m_pendingFile = mapName;
+	TheShell->reverseAnimatewindow();
+	TheTransitionHandler->setGroup("FadeWholeScreen");
 }
 
 void prepareCampaignGame(GameDifficulty diff)
@@ -471,6 +459,7 @@ void MainMenuInit( WindowLayout *layout, void *userData )
 	getUpdateID = TheNameKeyGenerator->nameToKey( "MainMenu.wnd:ButtonGetUpdate" );
 //	buttonTRAININGID = TheNameKeyGenerator->nameToKey( "MainMenu.wnd:ButtonTRAINING" );
 	buttonChallengeID = TheNameKeyGenerator->nameToKey( "MainMenu.wnd:ButtonChallenge" );
+	buttonCampaignChaptersID = TheNameKeyGenerator->nameToKey( "MainMenu.wnd:ButtonCampaignChapters" );
 	buttonUSAID = TheNameKeyGenerator->nameToKey( "MainMenu.wnd:ButtonUSA" );
 	buttonGLAID = TheNameKeyGenerator->nameToKey( "MainMenu.wnd:ButtonGLA" );
 	buttonChinaID = TheNameKeyGenerator->nameToKey( "MainMenu.wnd:ButtonChina" );
@@ -716,6 +705,9 @@ void DeclineResolution()
 	//Revert back to old resolution and reset all necessary
 	//parts of the shell
 
+	// the window frame follows m_windowed, so it must change before the mode does
+	const Bool newFramed = TheGlobalData->m_windowed;
+	TheWritableGlobalData->m_windowed = oldDispSettings.framed;
 	if (TheDisplay->setDisplayMode(oldDispSettings.xRes, oldDispSettings.yRes,
 										oldDispSettings.bitDepth, oldDispSettings.windowed))
 	{
@@ -734,13 +726,18 @@ void DeclineResolution()
 		OptionPreferences optionPref;
 		optionPref["Resolution"] = prefString;
 
-		// The options menu already stored the new borderless flag, so declining has to take it back
-		TheWritableGlobalData->m_borderlessWindow = oldDispSettings.windowed && !TheGlobalData->m_windowed;
+		// The options menu already stored the new window flags, so declining has to take them back
+		TheWritableGlobalData->m_borderlessWindow = oldDispSettings.windowed && !oldDispSettings.framed;
 		optionPref["BorderlessWindow"] = TheGlobalData->m_borderlessWindow ? "yes" : "no";
+		optionPref["Windowed"] = oldDispSettings.framed ? "yes" : "no";
 		optionPref.write();
 
 		TheInGameUI->recreateControlBar();
 		TheShell->recreateWindowLayouts();
+	}
+	else
+	{
+		TheWritableGlobalData->m_windowed = newFramed;
 	}
 }
 
@@ -1287,16 +1284,6 @@ WindowMsgHandledType MainMenuSystem( GameWindow *window, UnsignedInt msg,
 			else
 #endif
 
-			// don't allow mouse click slop that occurs during transitions to unset this flag
-			if (TheTransitionHandler->isFinished()
-				&& controlID != buttonEasyID && controlID != buttonMediumID && controlID != buttonHardID)
-			{
-				// this toggle must only be reset if one of these buttons have not been pressed
-				// ...the difficulty selection behavior must have a chance to act upon this toggle
-				launchChallengeMenu = FALSE;
-			}
-
-
 			if( controlID == buttonSinglePlayerID )
 			{
 				if(dontAllowTransitions)
@@ -1428,6 +1415,18 @@ WindowMsgHandledType MainMenuSystem( GameWindow *window, UnsignedInt msg,
 				TheShell->push( "Menus/SkirmishGameOptionsMenu.wnd" );
 				TheScriptEngine->signalUIInteract(TheShellHookNames[SHELL_SCRIPT_HOOK_MAIN_MENU_SKIRMISH_SELECTED]);
 			}
+			else if( controlID == buttonCampaignChaptersID )
+			{
+				if(campaignSelected || dontAllowTransitions)
+				{
+					break;
+				}
+				buttonPushed = TRUE;
+				campaignSelected = TRUE;
+				dropDownWindows[DROPDOWN_SINGLE]->winHide(FALSE);
+				TheTransitionHandler->reverse("MainMenuSinglePlayerMenuBackChapters");
+				TheShell->push( "Menus/CampaignChapters.wnd" );
+			}
 			else if( controlID == onlineID )
 			{
 				if(dontAllowTransitions)
@@ -1485,36 +1484,23 @@ WindowMsgHandledType MainMenuSystem( GameWindow *window, UnsignedInt msg,
 			}
 			else if( controlID == exitID )
 			{
-				// If we ever want to add a dialog before we exit out of the game, uncomment this line and kill the quitCallback() line below.
-//#if defined(RTS_DEBUG)
-				if (TheGlobalData->m_windowed)
-				{
-					quitCallback();
-//#else
-				}
-				else
-				{
-					QuitMessageBoxYesNo(TheGameText->fetch("GUI:QuitPopupTitle"), TheGameText->fetch("GUI:QuitPopupMessage"),quitCallback,nullptr);
-				}
-//#endif
-
+				QuitMessageBoxYesNo(TheGameText->fetch("GUI:QuitPopupTitle"), TheGameText->fetch("GUI:QuitPopupMessage"),quitCallback,nullptr);
 			}
 			else if(controlID == buttonChallengeID)
 			{
 				if(campaignSelected || dontAllowTransitions)
 					break;
 
-				// set up for the difficulty select into challenge menu
-				TheTransitionHandler->setGroup("MainMenuFactionTraining");
+				// The challenge menu has its own difficulty buttons
+				buttonPushed = TRUE;
+				campaignSelected = TRUE;
+				dropDownWindows[DROPDOWN_SINGLE]->winHide(FALSE);
+				TheTransitionHandler->remove("MainMenuFactionTraining");
 				GameWindow *win = TheWindowManager->winGetWindowFromId(parentMainMenu, TheNameKeyGenerator->nameToKey("MainMenu.wnd:WinFactionTraining"));
 				if(win)
 					win->winHide(TRUE);
 				TheTransitionHandler->reverse("MainMenuSinglePlayerMenuBackTraining");
-				TheTransitionHandler->setGroup("MainMenuDifficultyMenuTraining");
-				campaignSelected = TRUE;
-				showLogo = FALSE;
-				showSide = SHOW_TRAINING;
-				launchChallengeMenu = TRUE;
+				TheShell->push( "Menus/ChallengeMenu.wnd" );
 			}
 
 

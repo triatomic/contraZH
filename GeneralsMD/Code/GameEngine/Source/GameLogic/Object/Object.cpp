@@ -45,6 +45,9 @@
 #include "Common/Team.h"
 #include "Common/ThingFactory.h"
 #include "Common/ThingTemplate.h"
+#if RTS_GENERALS && RETAIL_COMPATIBLE_CRC
+#include "Common/TunnelTracker.h"
+#endif
 #include "Common/Upgrade.h"
 #include "Common/WellKnownKeys.h"
 #include "Common/Xfer.h"
@@ -116,6 +119,7 @@
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
 #include "GameLogic/ScriptEngine.h"
+#include "GameLogic/ScriptCLP.h"
 #include "GameLogic/Weapon.h"
 #include "GameLogic/WeaponSet.h"
 #include "GameLogic/Module/RadarUpdate.h"
@@ -819,6 +823,23 @@ void Object::onRemovedFrom( Object *removedFrom )
 
 }
 
+#if RTS_GENERALS && RETAIL_COMPATIBLE_CRC
+//-------------------------------------------------------------------------------------------------
+void Object::removeFromTunnelContain()
+{
+	for (Int i = 0; i < ThePlayerList->getPlayerCount(); ++i)
+	{
+		TunnelTracker* tracker = ThePlayerList->getNthPlayer(i)->getTunnelSystem();
+		if (tracker && tracker->removeFromContain(this))
+		{
+			break;
+		}
+	}
+
+	onRemovedFrom(nullptr);
+}
+#endif
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 Int Object::getTransportSlotCount() const
@@ -997,6 +1018,35 @@ void Object::setTemporaryTeam( Team *team )
 {
 	const Bool restoring = false;
 	setOrRestoreTeam(team, restoring);
+}
+
+//=============================================================================
+//=============================================================================
+void Object::resetTargetingOnSelf()
+{
+	for( Object *obj = TheGameLogic->getFirstObject(); obj; obj = obj->getNextObject() )
+	{
+		AIUpdateInterface *ai = obj->getAIUpdateInterface();
+		if( obj == this || ai == NULL )
+		{
+			continue;
+		}
+
+		if( ai->getCurrentVictim() == this
+				|| (ai->isAttacking() && ai->getGoalObject() == this) )
+		{
+			ai->aiIdle( CMD_FROM_AI );
+		}
+
+		for( Int i = 0; i < MAX_TURRETS; ++i )
+		{
+			WhichTurretType turret = (WhichTurretType)i;
+			if( ai->getTurretTargetObject( turret ) == this )
+			{
+				ai->setTurretTargetObject( turret, NULL );
+			}
+		}
+	}
 }
 
 //=============================================================================
@@ -2026,13 +2076,13 @@ inline Bool isPosDifferent(const Coord3D* a, const Coord3D* b)
 	// so we must put in some cleverness...
 	const Real THRESH = 0.01f;
 
-	if (fabs(a->x - b->x) > THRESH)
+	if (WWMath::Fabs(a->x - b->x) > THRESH)
 		return true;
 
-	if (fabs(a->y - b->y) > THRESH)
+	if (WWMath::Fabs(a->y - b->y) > THRESH)
 		return true;
 
-	if (fabs(a->z - b->z) > THRESH)
+	if (WWMath::Fabs(a->z - b->z) > THRESH)
 		return true;
 
 	return false;
@@ -2048,7 +2098,7 @@ inline Bool isAngleDifferent(Real a, Real b)
 
 	const Real THRESH = 0.01f;	// in radians, this is approx 1/2 degree.
 
-	if (fabs(a - b) > THRESH)
+	if (WWMath::Fabs(a - b) > THRESH)
 		return true;
 
 	return false;
@@ -2434,6 +2484,11 @@ void Object::setDisabledUntil( DisabledType type, UnsignedInt frame )
 		m_disabledTillFrame[ type ] = frame;
 		m_disabledMask.set( type, frame > TheGameLogic->getFrame() );
 
+		if( type == DISABLED_UNMANNED && m_disabledMask.test( type ) )
+		{
+			setModelConditionState( MODELCONDITION_UNMANNED );
+		}
+
 		if( m_drawable )
 		{
 			if( isDisabled() )
@@ -2628,6 +2683,11 @@ Bool Object::clearDisabled( DisabledType type )
 
 	m_disabledTillFrame[ type ] = NEVER;
 	m_disabledMask.set( type, 0 );
+
+	if( type == DISABLED_UNMANNED )
+	{
+		clearModelConditionState( MODELCONDITION_UNMANNED );
+	}
 
 	DisabledMaskType exceptions;
 	exceptions.set(DISABLED_HELD);
@@ -3288,6 +3348,7 @@ void Object::scoreTheKill( const Object *victim, const DamageInfo *damageInfo )
 	if (controller)
 	{
 		controller->getScoreKeeper()->addObjectDestroyed(victim);
+		TheScriptCLPState->onObjectKilled(controller, victim);
 		controller->addSkillPointsForKill(this, victim);
 		controller->doBountyForKill(this, victim);
 #if defined(GENERALS_ONLINE)
@@ -4014,6 +4075,12 @@ void Object::updateObjValuesFromMapProperties(Dict* properties)
       }
     }
 
+    valReal = properties->getReal(TheKey_objectScale, &exists);
+    if (exists && valReal > 0.0f)
+    {
+      drawable->setObjectScale(valReal);
+    }
+
     // See if we are supposed to playing the ambient sound
     Bool soundEnabledExists;
     Bool soundEnabled = properties->getBool( TheKey_objectSoundAmbientEnabled, &soundEnabledExists );
@@ -4503,10 +4570,10 @@ void Object::xfer( Xfer *xfer )
 	xfer->xferSnapshot( m_partitionLastShroud );
 
 	// vision spied by
-	xfer->xferUser( m_visionSpiedBy, sizeof( Int ) * MAX_PLAYER_COUNT );
+	xfer->xferUser( m_visionSpiedBy, sizeof( Int ) * xfer->getPlayerCount() );
 
 	// vision spied by mask
-	xfer->xferUser( &m_visionSpiedMask, sizeof( PlayerMaskType ) );
+	xfer->xferPlayerMask( &m_visionSpiedMask );
 
 	// sighting info, last threat
 	// John M says we don't need to save this (CBD)
@@ -5027,6 +5094,8 @@ void Object::onDie( DamageInfo *damageInfo )
 	handlePartitionCellMaintenance();
 	if(m_team)
 		m_team->notifyTeamOfObjectDeath();
+
+	TheScriptCLPState->onObjectDied(this);
 
 	// A unit scuttling itself by its own logic, such as a combat bike whose rider dismounted, is not a
 	// loss to report. The status is only ever set by the module staging that death.
@@ -6005,6 +6074,15 @@ void Object::doCommandButton( const CommandButton *commandButton, CommandSourceT
 		return;
 
 	AIUpdateInterface *ai = getAIUpdateInterface();
+	if( ai && cmdSource == CMD_FROM_SCRIPT )
+	{
+		AICommandParms parms( AICMD_COMMANDBUTTON, cmdSource );
+		parms.m_commandButton = commandButton;
+		if( ai->holdOrderWhileJammed( &parms ) )
+		{
+			return;
+		}
+	}
 	if( commandButton )
 	{
 		switch( commandButton->getCommandType() )
@@ -6170,6 +6248,16 @@ void Object::doCommandButtonAtObject( const CommandButton *commandButton, Object
 		return;
 
 	AIUpdateInterface *ai = getAIUpdateInterface();
+	if( ai && cmdSource == CMD_FROM_SCRIPT )
+	{
+		AICommandParms parms( AICMD_COMMANDBUTTON_OBJ, cmdSource );
+		parms.m_commandButton = commandButton;
+		parms.m_obj = obj;
+		if( ai->holdOrderWhileJammed( &parms ) )
+		{
+			return;
+		}
+	}
 	if( commandButton )
 	{
 		switch( commandButton->getCommandType() )
@@ -6302,6 +6390,16 @@ void Object::doCommandButtonAtPosition( const CommandButton *commandButton, cons
 		return;
 
 	AIUpdateInterface *ai = getAIUpdateInterface();
+	if( ai && cmdSource == CMD_FROM_SCRIPT && pos )
+	{
+		AICommandParms parms( AICMD_COMMANDBUTTON_POS, cmdSource );
+		parms.m_commandButton = commandButton;
+		parms.m_pos = *pos;
+		if( ai->holdOrderWhileJammed( &parms ) )
+		{
+			return;
+		}
+	}
 	if( commandButton )
 	{
 		switch( commandButton->getCommandType() )
@@ -7112,8 +7210,13 @@ Short Object::getRequiredBridgeHeight() const {
 		return 0;
 	}
 	else {
+		//
+		// A cell stores floor(clearance / 10), so a cell reporting 1 only guarantees 10 units of
+		// room.  Round the requirement up, otherwise a 12 unit tall object would ask for 1 and be
+		// let through a 10 unit gap it does not fit under.
+		//
 		Real geometryHeight = getGeometryInfo().getMaxHeightAbovePosition();
-		return std::clamp(static_cast<Short>(geometryHeight / 10.0f), static_cast<Short>(1), static_cast<Short>(15));
+		return std::clamp(static_cast<Short>(REAL_TO_INT_CEIL(geometryHeight / 10.0f)), static_cast<Short>(1), static_cast<Short>(15));
 	}
 }
 

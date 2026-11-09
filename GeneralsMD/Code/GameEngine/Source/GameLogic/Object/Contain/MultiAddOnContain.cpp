@@ -74,7 +74,7 @@ void MultiAddOnContainModuleData::buildFieldParse(MultiIniFieldParse& p)
     { "EmptySlotSubObjectName",  INI::parseAsciiString, NULL, offsetof(MultiAddOnContainModuleData, m_emptySlotSubObjName) },
     { "OccupiedSlotSubObjectName",  INI::parseAsciiString, NULL, offsetof(MultiAddOnContainModuleData, m_occupiedSlotSubObjName) },
     { "AddOnEntry", parseAddOnEntry, NULL, 0 },
-    { 0, 0, 0, 0 }
+    { nullptr, nullptr, nullptr, 0 }
   };
   p.add(dataFieldParse);
 }

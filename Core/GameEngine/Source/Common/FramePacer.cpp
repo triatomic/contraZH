@@ -36,6 +36,9 @@ FramePacer::FramePacer()
 	timeBeginPeriod(1);
 
 	m_maxFPS = BaseFps;
+#if RTS_ZEROHOUR
+	m_renderFpsLimit = -1;
+#endif
 	m_logicTimeScaleFPS = LOGICFRAMES_PER_SECOND;
 	m_defaultGameSpeed = BaseFps;
 	m_updateTime = 1.0f / (Real)BaseFps; // initialized to something to avoid division by zero on first use
@@ -101,6 +104,13 @@ Int FramePacer::getFramesPerSecondLimit()  const
 	return m_maxFPS;
 }
 
+#if RTS_ZEROHOUR
+void FramePacer::setRenderFPSLimit(Int fps)
+{
+	m_renderFpsLimit = fps;
+}
+#endif
+
 void FramePacer::enableFramesPerSecondLimit( Bool enable )
 {
 	m_enableFpsLimit = enable;
@@ -109,6 +119,21 @@ void FramePacer::enableFramesPerSecondLimit( Bool enable )
 Bool FramePacer::isFramesPerSecondLimitEnabled() const
 {
 	return m_enableFpsLimit;
+}
+
+Bool FramePacer::isFastForwardAvailable() const
+{
+	if (TheGameLogic == nullptr)
+	{
+		return FALSE;
+	}
+#if RTS_ZEROHOUR && (defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE))
+	if (!TheGameLogic->isInMultiplayerGame())
+	{
+		return TRUE;
+	}
+#endif
+	return TheGameLogic->isInReplayGame();
 }
 
 Bool FramePacer::isActualFramesPerSecondLimitEnabled() const
@@ -122,14 +147,14 @@ Bool FramePacer::isActualFramesPerSecondLimitEnabled() const
 
 	if (TheGameLogic != nullptr)
 	{
-#if defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
-		allowFpsLimit &= !(!TheGameLogic->isGamePaused() && TheGlobalData->m_TiVOFastMode);
-#else	//always allow this cheat key if we're in a replay game.
-		allowFpsLimit &= !(!TheGameLogic->isGamePaused() && TheGlobalData->m_TiVOFastMode && TheGameLogic->isInReplayGame());
-#endif
+		allowFpsLimit &= !(!TheGameLogic->isGamePaused() && TheGlobalData->m_TiVOFastMode && isFastForwardAvailable());
 	}
 
+#if RTS_ZEROHOUR
+	allowFpsLimit &= m_renderFpsLimit >= 0 ? m_renderFpsLimit != 0 : TheGlobalData->m_useFpsLimit;
+#else
 	allowFpsLimit &= TheGlobalData->m_useFpsLimit;
+#endif
 	allowFpsLimit &= isFramesPerSecondLimitEnabled();
 
 	return allowFpsLimit;
@@ -137,6 +162,17 @@ Bool FramePacer::isActualFramesPerSecondLimitEnabled() const
 
 Int FramePacer::getActualFramesPerSecondLimit() const
 {
+#if RTS_ZEROHOUR
+	if (isActualFramesPerSecondLimitEnabled() && m_renderFpsLimit > 0)
+	{
+		Int logicFps = LOGICFRAMES_PER_SECOND;
+		if (isLogicTimeScaleEnabled() || TheNetwork != nullptr)
+		{
+			logicFps = getActualLogicTimeScaleFps();
+		}
+		return max(m_renderFpsLimit, logicFps);
+	}
+#endif
 	return isActualFramesPerSecondLimitEnabled() ? getFramesPerSecondLimit() : RenderFpsPreset::UncappedFpsValue;
 }
 

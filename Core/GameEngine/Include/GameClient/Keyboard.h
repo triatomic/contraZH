@@ -114,6 +114,7 @@ public:
 	Bool isKeyDown( KeyDefType key ) { return getKeyStateBit( key, KEY_STATE_DOWN ); }  ///< is this key currently held
 	Bool isAlt();
 	Int getModifierFlags() { return m_modifiers; }
+	UnsignedInt getUpdateCount() const { return m_updateCount; }  ///< how many times update() has read the keys
 
 	// access methods for key data
 	void resetKeys();												///< reset the state of the keys
@@ -136,11 +137,13 @@ protected:
 	void initKeyNames();  ///< initialize the key names table
 	void updateKeys();  ///< update the state of our key data
 	Bool checkKeyRepeat();  ///< check for repeating keys
+	void readRepeatTiming();  ///< take the repeat delay and rate from the Windows keyboard settings
 	UnsignedByte getKeyStatusData( KeyDefType key );  ///< get key status
 	Bool getKeyStateBit( KeyDefType key, Int bit );  ///< get key state bit
 	void setKeyStateData( KeyDefType key, UnsignedByte data );  ///< get key state
 
 	UnsignedShort m_modifiers;
+	UnsignedInt m_updateCount;
 	// internal keyboard data members
 	//Bool m_capsState;			// 1 if caps lock is on
 	//Bool m_shiftState;		// 1 if either shift key is pressed
@@ -152,6 +155,8 @@ protected:
 	//Bool m_lAltState;			// 1 if left alt is down
 	//Bool m_rAltState;			// 1 if right alt is down
 	KeyDefType m_shift2Key;  // what key is the secondary shift key
+	UnsignedInt m_repeatDelayMsec;  ///< how long a key is held before it repeats
+	UnsignedInt m_repeatIntervalMsec;  ///< time between repeats of a held key
 
 	enum { NUM_KEYS  = 256 };
 	KeyboardIO m_keys[ NUM_KEYS ];  ///< the keys

@@ -114,6 +114,9 @@ struct MouseIO
 
 	MouseButtonState middleState;
 	Int middleEvent;
+
+	MouseButtonState x1State;	///< side buttons, posted as key presses for bindings
+	MouseButtonState x2State;
 };
 
 class CursorInfo
@@ -283,6 +286,7 @@ public:
 	virtual void createStreamMessages();  /**< given state of device, create
 																									 messages and put them on the
 																									 stream for the raw state. */
+	void postSideButton( MouseButtonState state, Int key );	///< a side button as a key press of a mouse key code
 
 	virtual void draw() override;													///< draw the mouse
 	virtual void setPosition( Int x, Int y );						///< set the mouse position

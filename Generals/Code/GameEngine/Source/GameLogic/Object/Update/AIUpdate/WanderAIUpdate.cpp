@@ -56,8 +56,8 @@ UpdateSleepTime WanderAIUpdate::update()
 	if (isIdle())
 	{
 		Coord3D dest = *(getObject()->getPosition());
-		dest.x += GameLogicRandomValue( 5, 50 );
-		dest.y += GameLogicRandomValue( 5, 50 );
+		dest.x += GameLogicRandomValue(-50, 50);
+		dest.y += GameLogicRandomValue(-50, 50);
  		aiMoveToPosition( &dest, CMD_FROM_AI );
 	}
 

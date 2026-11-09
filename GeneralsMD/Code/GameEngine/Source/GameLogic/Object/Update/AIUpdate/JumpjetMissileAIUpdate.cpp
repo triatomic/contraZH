@@ -78,7 +78,7 @@ void JumpjetMissileAIUpdateModuleData::buildFieldParse(MultiIniFieldParse& p)
 		//{ "TryToAvoidImpassable",	INI::parseBool, NULL, offsetof(JumpjetMissileAIUpdateModuleData, m_avoidImpassable) },
 		//{ "TryToAvoidWater",	INI::parseBool, NULL, offsetof(JumpjetMissileAIUpdateModuleData, m_avoidWater) },
 		//{ "TryToAvoidObjects",	INI::parseBool, NULL, offsetof(JumpjetMissileAIUpdateModuleData, m_avoidObjects) },
-		{ 0, 0, 0, 0 }
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 
 	p.add(dataFieldParse);

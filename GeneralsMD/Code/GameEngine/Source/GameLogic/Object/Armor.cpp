@@ -174,33 +174,26 @@ const ArmorTemplate* ArmorStore::findArmorTemplate(const char* name) const
 	return findArmorTemplate(TheNameKeyGenerator->nameToKey(name));
 }
 
-#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 //-------------------------------------------------------------------------------------------------
-// TheSuperHackers @feature Reverse of findArmorTemplate: the map is keyed by the name the armor was
-// defined under, so a linear walk is the only way back from a template pointer to that name. Only
-// the armor overlay cheat asks, and only for the objects on screen, so the cost never matters.
-//-------------------------------------------------------------------------------------------------
-AsciiString ArmorStore::getArmorTemplateName(const ArmorTemplate* tmpl) const
+AsciiString ArmorStore::friend_findArmorTemplateName(const ArmorTemplate* tmpl) const
 {
-	if (tmpl == nullptr)
-		return AsciiString::TheEmptyString;
-
 	for (ArmorTemplateMap::const_iterator it = m_armorTemplates.begin(); it != m_armorTemplates.end(); ++it)
 	{
-		if (&it->second == tmpl)
-			return TheNameKeyGenerator->keyToName(it->first);
+		if (&(*it).second == tmpl)
+		{
+			return TheNameKeyGenerator->keyToName((*it).first);
+		}
 	}
-
 	return AsciiString::TheEmptyString;
 }
-#endif
 
 //-------------------------------------------------------------------------------------------------
 /*static */ void ArmorStore::parseArmorDefinition(INI *ini)
 {
 	static const FieldParse myFieldParse[] =
 	{
-		{ "Armor", ArmorTemplate::parseArmorCoefficients, nullptr, 0 }
+		{ "Armor", ArmorTemplate::parseArmorCoefficients, nullptr, 0 },
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 
 	const char *c = ini->getNextToken();
@@ -216,7 +209,8 @@ AsciiString ArmorStore::getArmorTemplateName(const ArmorTemplate* tmpl) const
 	static const FieldParse myFieldParse[] =
 	{
 		{ "Armor", ArmorTemplate::parseArmorCoefficients, NULL, 0 },
-		{ "ArmorMult", ArmorTemplate::parseArmorMultiplier, NULL, 0 }
+		{ "ArmorMult", ArmorTemplate::parseArmorMultiplier, NULL, 0 },
+		{ nullptr, nullptr, nullptr, 0 }
 	};
 
 	const char* new_armor_name = ini->getNextToken();

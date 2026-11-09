@@ -34,6 +34,7 @@
 #include "Common/GlobalData.h"
 #include "Common/PerfTimer.h"
 #include "Common/MapReaderWriterInfo.h"
+#include "Common/StartupTiming.h"
 #include "Common/ThingTemplate.h"
 #include "Common/WellKnownKeys.h"
 #include "Common/TerrainTypes.h"
@@ -65,7 +66,9 @@
 #include "W3DDevice/GameClient/W3DDisruption.h"
 #include "W3DDevice/GameClient/W3DStorm.h"
 #include "W3DDevice/GameClient/W3DColorLut.h"
+#include "W3DDevice/GameClient/W3DDistanceFog.h"
 #include "W3DDevice/GameClient/W3DHeadlight.h"
+#include "W3DDevice/GameClient/W3DPlanarMirror.h"
 #include "W3DDevice/GameClient/W3DAmbientOcclusion.h"
 #include "W3DDevice/GameClient/W3DSkyClouds.h"
 #include "W3DDevice/GameClient/W3DLaserGlow.h"
@@ -226,11 +229,17 @@ W3DTerrainVisual::~W3DTerrainVisual()
 	delete TheW3DStorms;
 	TheW3DStorms = nullptr;
 
+	delete TheW3DDistanceFog;
+	TheW3DDistanceFog = nullptr;
+
 	delete TheW3DColorLut;
 	TheW3DColorLut = nullptr;
 
 	delete TheW3DHeadlights;
 	TheW3DHeadlights = nullptr;
+
+	delete TheW3DPlanarMirrors;
+	TheW3DPlanarMirrors = nullptr;
 
 	delete TheW3DAmbientOcclusion;
 	TheW3DAmbientOcclusion = nullptr;
@@ -255,6 +264,7 @@ W3DTerrainVisual::~W3DTerrainVisual()
 //-------------------------------------------------------------------------------------------------
 void W3DTerrainVisual::init()
 {
+	StartupStepClock clock("TerrainVisual");
 
 	// extend
 	TerrainVisual::init();
@@ -262,36 +272,55 @@ void W3DTerrainVisual::init()
 	m_terrainRenderObject = NEW_REF( HeightMapRenderObjClass, () );
 	m_terrainRenderObject->Set_Collision_Type( PICK_TYPE_TERRAIN );
 	TheTerrainRenderObject = m_terrainRenderObject;
+	clock.mark("height map");
 
 	if (!TheGlobalData->m_headless)
 	{
 		// initialize track drawing system
 		TheTerrainTracksRenderObjClassSystem = NEW TerrainTracksRenderObjClassSystem;
 		TheTerrainTracksRenderObjClassSystem->init(W3DDisplay::m_3DScene);
+		clock.mark("terrain tracks");
 
 		// initialize object shadow drawing system
 		TheW3DShadowManager = NEW W3DShadowManager;
  		TheW3DShadowManager->init();
+		clock.mark("shadow manager");
 
 		// create a water plane render object
 		TheWaterRenderObj=m_waterRenderObject = NEW_REF( WaterRenderObjClass, () );
 		m_waterRenderObject->init(TheGlobalData->m_waterPositionZ, TheGlobalData->m_waterExtentX, TheGlobalData->m_waterExtentY, W3DDisplay::m_3DScene, (WaterRenderObjClass::WaterType)TheGlobalData->m_waterType);	//create a water plane that's 128x128 units
 		m_waterRenderObject->Set_Position(Vector3(TheGlobalData->m_waterPositionX,TheGlobalData->m_waterPositionY,TheGlobalData->m_waterPositionZ));	//place water in world
+		clock.mark("water");
 
 		// create smudge rendering system.
 		TheSmudgeManager = NEW(W3DSmudgeManager);
 		TheSmudgeManager->init();
+		clock.mark("smudges");
 
 		TheW3DBloom = NEW W3DBloom;
+		clock.mark("bloom");
 		TheW3DSoftParticles = NEW W3DSoftParticles;
+		clock.mark("soft particles");
 		TheW3DShockwaves = NEW W3DShockwaveManager;
+		clock.mark("shockwaves");
 		TheW3DDisruption = NEW W3DDisruptionManager;
+		clock.mark("disruption");
 		TheW3DStorms = NEW W3DStormManager;
+		clock.mark("storms");
 		TheW3DColorLut = NEW W3DColorLut;
+		clock.mark("colour LUT");
+		TheW3DDistanceFog = NEW W3DDistanceFog;
+		clock.mark("distance fog");
 		TheW3DHeadlights = NEW W3DHeadlightManager;
+		clock.mark("headlights");
+		TheW3DPlanarMirrors = NEW W3DPlanarMirrorManager;
+		clock.mark("planar mirrors");
 		TheW3DAmbientOcclusion = NEW W3DAmbientOcclusion;
+		clock.mark("ambient occlusion");
 		TheW3DSkyClouds = NEW W3DSkyClouds;
+		clock.mark("sky clouds");
 		TheW3DLaserGlow = NEW W3DLaserGlow;
+		clock.mark("laser glow");
 
 #ifdef DO_UNIT_TIMINGS
 #pragma MESSAGE("********************* WARNING- Doing UNIT TIMINGS. ")
@@ -331,6 +360,7 @@ void W3DTerrainVisual::init()
 																								TheGlobalData->m_vertexWaterAttenuationC[ waterSettingIndex ],
 																								TheGlobalData->m_vertexWaterAttenuationRange[ waterSettingIndex ] );
 	m_isWaterGridRenderingEnabled = FALSE;
+	clock.mark("cloud layer and vertex water grid");
 
 #ifdef DO_SEISMIC_SIMULATIONS
   m_seismicSimulationList.clear();
@@ -734,7 +764,7 @@ Bool W3DTerrainVisual::load( AsciiString filename )
 	if (W3DDisplay::m_3DScene != nullptr)
 		W3DDisplay::m_3DScene->Add_Render_Object( m_terrainRenderObject );
 
-#if defined(RTS_DEBUG)
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
 	// Icon drawing utility object for pathfinding.
 	if (W3DDisplay::m_3DScene != nullptr)
 	{
@@ -1171,7 +1201,7 @@ void W3DTerrainVisual::removeTreesAndPropsForConstruction(const Coord3D* pos,
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
-void W3DTerrainVisual::addProp(const ThingTemplate *tTemplate, const Coord3D *pos, Real angle)
+void W3DTerrainVisual::addProp(const ThingTemplate *tTemplate, const Coord3D *pos, Real angle, Real objectScale)
 {
 	ModelConditionFlags state;
 	state.clear();
@@ -1184,7 +1214,7 @@ void W3DTerrainVisual::addProp(const ThingTemplate *tTemplate, const Coord3D *po
 		state.set(MODELCONDITION_NIGHT);
 	}
 	AsciiString modelName;
-	Real scale = tTemplate->getAssetScale();
+	Real scale = tTemplate->getAssetScale() * objectScale;
 	const ModuleInfo& mi = tTemplate->getDrawModuleInfo();
 	if (mi.getCount() > 0)
 	{

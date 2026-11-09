@@ -219,6 +219,12 @@ public:
 	//Bool m_attackAngleMirrored;
 	std::vector<AttackAngleData> m_attackAngles;
 
+	Bool m_minRangeRetreatStraight;	///< when inside weapon min range, back off straight away from the target, just far enough
+	Bool m_aimByReversing;					///< no-turret aiming at a target in front: turn by backing up instead of driving forward
+	Real m_aimByReversingMaxAngle;	///< only reverse to aim if the target is at most this far off the nose (radians)
+	Real m_aimByReversingMargin;		///< safety margin added to the min range in the "would a forward turn get too close" test
+	Real m_aimByReversingTurnFactor;	///< scales the forward-turn closing estimate (turn radius * sin(angle))
+
 
   AIUpdateModuleData();
 	virtual ~AIUpdateModuleData() override;
@@ -358,6 +364,11 @@ public:
 
 	//Real getAttackAngle() const { return getAIUpdateModuleData()->m_attackAngle; }
 	Bool useAttackAngle() const { return getAIUpdateModuleData()->m_useAttackAngle; }
+	Bool isMinRangeRetreatStraight() const { return getAIUpdateModuleData()->m_minRangeRetreatStraight; }
+	Bool isAimByReversing() const { return getAIUpdateModuleData()->m_aimByReversing; }
+	Real getAimByReversingMaxAngle() const { return getAIUpdateModuleData()->m_aimByReversingMaxAngle; }
+	Real getAimByReversingMargin() const { return getAIUpdateModuleData()->m_aimByReversingMargin; }
+	Real getAimByReversingTurnFactor() const { return getAIUpdateModuleData()->m_aimByReversingTurnFactor; }
 	//Bool isAttackAngleMirrored() const { return getAIUpdateModuleData()->m_attackAngleMirrored; }
 
 	// this is present solely for some transports to override, so that they can land before 
@@ -378,6 +389,13 @@ public:
 
 	//Definition of busy -- when explicitly in the busy state. Moving or attacking is not considered busy!
 	virtual Bool isBusy() const;
+
+	// Drag-to-face: after the move this came with, turn to angle on arrival (FacingMove.h).
+	void setFacingOnArrival( Real angle );
+	Bool isExactFormationMove() const { return m_exactFormationMove; }
+	void setExactFormationMove();	///< the next move ends exactly on its point; any later order undoes it
+	void releaseFormationSpeed();	///< back to full speed once the formation move ends
+	void moveToFormationSlot( const Coord3D &slot, Real angle, Real radius, UnsignedInt style, Real speedLimit, CommandSourceType cmdSource, Bool isReturn );	///< one unit of a drag-to-face formation
 
 	virtual void onObjectCreated() override;
 	virtual void doQuickExit( std::vector<Coord3D>* path );			///< get out of this Object
@@ -445,6 +463,7 @@ public:
 	virtual void setLocomotorGoalPositionOnPath();
 	virtual void setLocomotorGoalPositionExplicit(const Coord3D& newPos);
 	virtual void setLocomotorGoalOrientation(Real angle);
+	void setLocomotorGoalOrientationByReversing(Real angle);	///< like setLocomotorGoalOrientation, but turn by backing up (AimByReversing)
 	virtual void setLocomotorGoalNone();
 	virtual Bool isDoingGroundMovement() const;  ///< True if moving along ground.
 
@@ -490,6 +509,8 @@ public:
 
 	// Pathfinding ---------------------------------------------------------------------------------------
 private:
+	void cancelFacingMove();
+
 	Bool computePath(PathfindServicesInterface* pathfinder, Coord3D* destination);	///< computes path to destination, returns false if no path
 	Bool computeAttackPath(PathfindServicesInterface* pathfinder, const Object* victim, const Coord3D* victimPos);	///< computes path to attack the current target, returns false if no path
 #ifdef ALLOW_SURRENDER
@@ -511,7 +532,7 @@ public:
 	void destroyPath( void );												///< destroy the current path, setting it to null
 	UnsignedInt getPathAge( void ) const { return TheGameLogic->getFrame() - m_pathTimestamp; }	///< return the "age" of the path
 	Bool isPathAvailable( const Coord3D *destination ) const; ///< does a path exist between us and the destination
-	Bool isQuickPathAvailable( const Coord3D *destination ) const;  ///< does a path (using quick pathfind) exist between us and the destination
+	Bool isQuickPathAvailable( const Coord3D *destination, Bool acceptRubble = FALSE ) const;  ///< does a path (using quick pathfind) exist between us and the destination
 	Int getNumFramesBlocked(void) const {return m_blockedFrames;}
 	Bool isBlockedAndStuck(void) const {return m_isBlockedAndStuck;}
 	Bool isForcedMoveBackwards(void) const {return m_forceMoveBackwards;}	///< True while a REVERSE_MOVE order is being executed.
@@ -631,6 +652,7 @@ public:
 	void setIgnoreCollisionTime(Int frames) { m_ignoreCollisionsUntil = TheGameLogic->getFrame() + frames; }
 
 	void setQueueForPathTime(Int frames);
+	void queueForPathOrRetry(); ///< Queues a path request, or re-arms it a few frames out when the queue is full.
 
 	// For the attack move, that switches from move to attack, and the attack is CMD_FROM_AI,
 	// while the move is the original command source.  John A.
@@ -639,6 +661,10 @@ public:
 	// OCL Attack FireRegardlessOfOrders: shots fired straight from the slot outside the state machine, so orders never touch them
 	void friend_queueShots(WeaponSlotType slot, Int shots, const Coord3D* pos);
 	Int friend_getQueuedShotsLeft() const { return m_queuedShotsLeft; }
+
+	// OCL Attack placed through SPECIAL_POWER_CONSTRUCT: the FireOCL of the next shots spawns at the placed spot and angle
+	void friend_setAttackPlacement(const Coord3D* pos, Real angle, Int shots);
+	Bool friend_takeAttackPlacement(Coord3D* pos, Real* angle);
 
 	Bool canAutoAcquire() const { return getAIUpdateModuleData()->m_autoAcquireEnemiesWhenIdle; }
 
@@ -661,6 +687,10 @@ public:
 	inline Real getLoadTurnRateFactor(void) const { return m_loadTurnRateFactor; }
 	inline Real getLoadAccelFactor(void) const { return m_loadAccelFactor; }
 	inline Real getLoadLiftFactor(void) const { return m_loadLiftFactor; }
+
+	/// TRUE if a jammed unit of a fair-play computer player holds this script order until the jam ends.
+	Bool holdOrderWhileJammed(const AICommandParms* parms) const;
+	void releaseJammedOrder();
 
 protected:
 
@@ -751,6 +781,7 @@ public:
 	Int getTmpValue() {return m_tmpInt;}
 
 	Bool getRetryPath() {return m_retryPath;}
+	Bool takeCappedPathLeg(); ///< True when the current path stopped at the search cap and another leg toward the goal is allowed.
 
 	void setAllowedToChase( Bool allow ) { m_allowedToChase = allow; }
 	Bool isAllowedToChase() const { return m_allowedToChase; }
@@ -839,6 +870,7 @@ private:
 	LocomotorSetType	m_curLocomotorSet;
 	LocoGoalType			m_locomotorGoalType;
 	Coord3D						m_locomotorGoalData;
+	Bool							m_locomotorGoalTurnByReversing;	///< ANGLE goal: turn by backing up (AimByReversing). Not saved.
 
 	// Turrets -------------------------------------------------------------------------------------------------
 	TurretAI*					m_turretAI[MAX_TURRETS];		// ai for our turret (or null if no turret)
@@ -854,6 +886,9 @@ private:
 	Coord3D				m_queuedShotsPos;
 	UnsignedInt		m_clearFiringStatusFrame;
 	void fireQueuedShots();
+	Coord3D				m_attackPlacementPos;
+	Real					m_attackPlacementAngle;
+	Int						m_attackPlacementShotsLeft;
 
 	// Common AI "status" effects -------------------------------------------------------------------
 #ifdef ALLOW_DEMORALIZE
@@ -878,6 +913,21 @@ private:
 	Bool				m_isSafePath;								///< True if we are just approaching to tighten.
 	Bool				m_movementComplete;					///< True if we finished an AIInternalMoveToState.
 	Bool				m_isMoving;									///< True if we are in an AIInternalMoveToState.
+	Bool				m_faceOnArrival;						///< drag-to-face: turn to m_facingOnArrival once arrived
+	Real				m_facingOnArrival;					///< angle in radians
+	UnsignedInt	m_facingOrderFrame;					///< frame of the facing order
+	Bool				m_facingAroundCenter;				///< the facing turn in progress ignores TurnPivotOffset
+	Bool				m_exactFormationMove;				///< we made the locomotor ultra-accurate for a formation slot
+	Bool				m_issuingFormationMove;
+	Bool				m_hasFormationSlot;					///< holding a formation slot (FacingMove.h)
+	Coord3D			m_formationSlot;
+	Real				m_formationAngle;
+	Real				m_formationRadius;
+	UnsignedInt	m_formationStyle;
+	Real				m_formationSpeed;						///< speed limit while moving to the slot, 0 = none
+	Int					m_formationReturns;
+	Bool				m_formationReturnPending;		///< pushed aside: go back once idle
+	UnsignedInt	m_formationReturnFrame;			///< frame to go back, 0 = not idle yet
 	Bool				m_isBlocked;
 	Bool				m_isBlockedAndStuck;				///< True if we are stuck & need to recompute path.
 	Bool				m_forceMoveBackwards;				///< True while executing a REVERSE_MOVE order; forces the locomotor to drive backwards.
@@ -888,6 +938,8 @@ private:
 	Bool				m_isRecruitable;						///< TRUE if recruitable by the ai.
 	Bool				m_executingWaypointQueue;						///< if true, we are moving thru the waypoints
 	Bool				m_retryPath;								///< If true, we need to try the path a second time.  jba.
+	Bool				m_pathWasCapped;						///< True if the current path stopped at the search cell cap short of the goal.
+	UnsignedByte		m_cappedLegs;								///< Capped paths chained so far toward one goal.
 	Bool				m_allowedToChase;						///< Allowed to pursue targets.
 	Bool				m_isInUpdate;								///< If true, we are inside our update method.
 	Bool				m_fixLocoInPostProcess;
@@ -898,6 +950,9 @@ private:
 	Real        m_loadTurnRateFactor;
 	Real        m_loadAccelFactor;
 	Real        m_loadLiftFactor;
+
+	mutable AICommandParmsStorage m_jammedOrder;	///< newest script order held while jammed, stored from the const command gate
+	mutable Int m_jammedOrderPlayer;				///< player index that gave m_jammedOrder, -1 if none
 };
 
 //------------------------------------------------------------------------------------------------------------

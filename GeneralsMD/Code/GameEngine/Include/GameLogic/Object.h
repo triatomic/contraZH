@@ -536,6 +536,7 @@ public:
 
 	Weapon* getCurrentWeapon(WeaponSlotType* wslot = nullptr);
 	const Weapon* getCurrentWeapon(WeaponSlotType* wslot = nullptr) const;
+	Bool isCurrentWeaponIgnoringLineOfSight() const { return m_weaponSet.isCurWeaponIgnoringLineOfSight(); }
 	Bool isFiringWeaponSlot( WeaponSlotType wslot ) const;	///< is this object attacking with the weapon in this slot?
 	void stopFiringWeaponSlot( WeaponSlotType wslot );		///< end an attack being made with the weapon in this slot
 	void setFiringConditionForCurrentWeapon() const;
@@ -672,6 +673,7 @@ public:
 	//When an AIAttackState is over, it needs to clean up any weapons that might be in leech range mode
 	//or else those weapons will have unlimited range!
 	void clearLeechRangeModeForAllWeapons();
+	void resetTargetingOnSelf();
 
 	Int getNumConsecutiveShotsFiredAtTarget( const Object *victim) const;
 
@@ -774,6 +776,10 @@ protected:
 	void removeThreat();
 
 	virtual void reactToTransformChange(const Matrix3D* oldMtx, const Coord3D* oldPos, Real oldAngle) override;
+
+#if RTS_GENERALS && RETAIL_COMPATIBLE_CRC
+	void removeFromTunnelContain();
+#endif
 
 private:
 

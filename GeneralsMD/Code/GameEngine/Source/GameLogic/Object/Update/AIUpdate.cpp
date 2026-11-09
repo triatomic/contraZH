@@ -59,6 +59,7 @@
 #include "GameLogic/Module/AIUpdate.h"
 #include "GameLogic/Module/BodyModule.h"
 #include "GameLogic/Module/ContainModule.h"
+#include "GameLogic/Module/GasBehavior.h"
 #include "GameLogic/Module/PhysicsUpdate.h"
 #include "GameLogic/Module/ProneUpdate.h"
 #include "GameLogic/Module/DeliverPayloadAIUpdate.h"
@@ -68,12 +69,24 @@
 #include "GameLogic/Object.h"
 #include "GameLogic/PartitionManager.h"
 #include "GameLogic/PolygonTrigger.h"
+#include "GameLogic/ScriptCLP.h"
 #include "GameLogic/ScriptEngine.h"
 #include "GameLogic/TurretAI.h"
 #include "GameLogic/Weapon.h"
 #include "Common/Radar.h"									// For TheRadar
 
+#include "GameLogic/FacingMove.h"
+#include "GameLogic/LineFormation.h"
+
 #define SLEEPY_AI
+
+static const Real FACE_ON_ARRIVAL_DISTANCE = 100.0f;
+
+// Frames to wait before re-queueing a path request the full pathfind queue refused
+static const Int PATHFIND_QUEUE_RETRY_FRAMES = 2;
+
+// Capped partial paths a unit may chain toward one goal before it settles where it is
+static const Int MAX_CAPPED_PATH_LEGS = 8;
 
 
 //-------------------------------------------------------------------------------------------------
@@ -97,6 +110,11 @@ AIUpdateModuleData::AIUpdateModuleData()
 	m_useAttackAngle = FALSE;
 	m_attackAngles.clear();
 	//m_attackAngleMirrored = FALSE;
+	m_minRangeRetreatStraight = FALSE;
+	m_aimByReversing = FALSE;
+	m_aimByReversingMaxAngle = PI/2;
+	m_aimByReversingMargin = PATHFIND_CELL_SIZE_F;
+	m_aimByReversingTurnFactor = 1.0f;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -164,6 +182,11 @@ struct AttackAngleData
     // TheSuperHackers @feature If No, this object stays silent even when attacked while holding fire.
     { "HoldFireAllowsRetaliation",	INI::parseBool,										nullptr, offsetof( AIUpdateModuleData, m_holdFireAllowsRetaliation ) },
 		{ "PreferredAttackAngle",				AIUpdateModuleData::parseAttackAngle,					NULL, NULL },
+		{ "MinRangeRetreatStraight",		INI::parseBool,										nullptr, offsetof( AIUpdateModuleData, m_minRangeRetreatStraight ) },
+		{ "AimByReversing",							INI::parseBool,										nullptr, offsetof( AIUpdateModuleData, m_aimByReversing ) },
+		{ "AimByReversingMaxAngle",			INI::parseAngleReal,							nullptr, offsetof( AIUpdateModuleData, m_aimByReversingMaxAngle ) },
+		{ "AimByReversingMargin",				INI::parseReal,										nullptr, offsetof( AIUpdateModuleData, m_aimByReversingMargin ) },
+		{ "AimByReversingTurnFactor",		INI::parseReal,										nullptr, offsetof( AIUpdateModuleData, m_aimByReversingTurnFactor ) },
 
 		{ nullptr, nullptr, nullptr, 0 }
 	};
@@ -343,6 +366,7 @@ AIUpdateInterface::AIUpdateInterface( Thing *thing, const ModuleData* moduleData
 	m_curLocomotor = nullptr;
 	m_curLocomotorSet = LOCOMOTORSET_INVALID;
 	m_locomotorGoalType = NONE;
+	m_locomotorGoalTurnByReversing = FALSE;
 	m_locomotorGoalData.zero();
 	for (i = 0; i < MAX_TURRETS; i++)
 		m_turretAI[i] = nullptr;
@@ -355,6 +379,9 @@ AIUpdateInterface::AIUpdateInterface( Thing *thing, const ModuleData* moduleData
 	m_queuedShotsLeft = 0;
 	m_queuedShotsPos.zero();
 	m_clearFiringStatusFrame = 0;
+	m_attackPlacementPos.zero();
+	m_attackPlacementAngle = INVALID_ANGLE;
+	m_attackPlacementShotsLeft = 0;
 #ifdef ALLOW_DEMORALIZE
 	m_demoralizedFramesLeft = 0;
 #endif
@@ -372,6 +399,21 @@ AIUpdateInterface::AIUpdateInterface( Thing *thing, const ModuleData* moduleData
 	m_isSafePath = FALSE;
 	m_movementComplete = FALSE;
 	m_isMoving = FALSE;
+	m_faceOnArrival = FALSE;
+	m_facingOnArrival = 0.0f;
+	m_facingOrderFrame = 0;
+	m_facingAroundCenter = FALSE;
+	m_exactFormationMove = FALSE;
+	m_issuingFormationMove = FALSE;
+	m_hasFormationSlot = FALSE;
+	m_formationSlot.zero();
+	m_formationAngle = 0.0f;
+	m_formationRadius = 0.0f;
+	m_formationStyle = 0;
+	m_formationSpeed = 0.0f;
+	m_formationReturns = 0;
+	m_formationReturnPending = FALSE;
+	m_formationReturnFrame = 0;
 	m_isBlocked = FALSE;
 	m_isBlockedAndStuck = FALSE;
 	m_forceMoveBackwards = FALSE;
@@ -382,6 +424,8 @@ AIUpdateInterface::AIUpdateInterface( Thing *thing, const ModuleData* moduleData
 	m_isRecruitable = TRUE; // Things default to being recruitable.
 	m_executingWaypointQueue = FALSE;
 	m_retryPath = FALSE;
+	m_pathWasCapped = FALSE;
+	m_cappedLegs = 0;
 	m_isInUpdate = FALSE;
 	m_fixLocoInPostProcess = FALSE;
 	m_speedMultiplier = 1.0;
@@ -390,6 +434,10 @@ AIUpdateInterface::AIUpdateInterface( Thing *thing, const ModuleData* moduleData
 	m_loadTurnRateFactor = 1.0f;
 	m_loadAccelFactor = 1.0f;
 	m_loadLiftFactor = 1.0f;
+
+	// AICommandParmsStorage has no constructor, and its doXfer keeps stale pointers on load.
+	m_jammedOrder.store(AICommandParms(AICMD_IDLE, CMD_FROM_SCRIPT));
+	m_jammedOrderPlayer = -1;
 
 	// ---------------------------------------------
 
@@ -587,6 +635,10 @@ will be processed when we get to the front of the pathfind queue. jba */
 void AIUpdateInterface::requestPath( Coord3D *destination, Bool isFinalGoal )
 {
 
+	if (destination->x != m_requestedDestination.x || destination->y != m_requestedDestination.y || destination->z != m_requestedDestination.z)
+	{
+		m_cappedLegs = 0;
+	}
 	if (m_locomotorSet.getValidSurfaces() == 0) {
 		DEBUG_CRASH(("Attempting to path immobile unit."));
 	}
@@ -620,7 +672,7 @@ void AIUpdateInterface::requestPath( Coord3D *destination, Bool isFinalGoal )
 		}
 		return;
 	}
-	TheAI->pathfinder()->queueForPath(getObject()->getID());
+	queueForPathOrRetry();
 
 }
 
@@ -644,7 +696,7 @@ void AIUpdateInterface::requestAttackPath( ObjectID victimID, const Coord3D* vic
 		setLocomotorGoalNone();
 		return;
 	}
-	TheAI->pathfinder()->queueForPath(getObject()->getID());
+	queueForPathOrRetry();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -667,7 +719,7 @@ void AIUpdateInterface::requestApproachPath( Coord3D *destination )
 		setQueueForPathTime(2*LOGICFRAMES_PER_SECOND);
 		return;
 	}
-	TheAI->pathfinder()->queueForPath(getObject()->getID());
+	queueForPathOrRetry();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -691,7 +743,7 @@ void AIUpdateInterface::requestSafePath( ObjectID repulsor )
 		setQueueForPathTime(2*LOGICFRAMES_PER_SECOND);
 		return;
 	}
-	TheAI->pathfinder()->queueForPath(getObject()->getID());
+	queueForPathOrRetry();
 }
 
 enum {WAYPOINT_PATH_LIMIT=1024};
@@ -1063,12 +1115,16 @@ void AIUpdateInterface::chooseGoodLocomotorFromCurrentSet()
 }
 
 //----------------------------------------------------------------------------------------------------------
+// TheSuperHackers @bugfix WebbontheWeb 07/10/2026 The function can now return the crate object.
 Object* AIUpdateInterface::checkForCrateToPickup()
 {
 	if (m_crateCreated != INVALID_ID)
 	{
+#if RETAIL_COMPATIBLE_CRC
 		m_crateCreated = INVALID_ID; // we have processed it, so clear it.
+#endif
 		Object* crate = TheGameLogic->findObjectByID(m_crateCreated);
+		m_crateCreated = INVALID_ID; // we have processed it, so clear it.
 		if (crate)
 		{
 			for (BehaviorModule** m = crate->getBehaviorModules(); *m; ++m)
@@ -1143,6 +1199,28 @@ void AIUpdateInterface::setQueueForPathTime(Int frames)
 }
 
 //-------------------------------------------------------------------------------------------------
+void AIUpdateInterface::queueForPathOrRetry()
+{
+	if (TheAI->pathfinder()->queueForPath(getObject()->getID()))
+	{
+		return;
+	}
+	// The object id spreads the retries of a whole army over a few frames
+	setQueueForPathTime(PATHFIND_QUEUE_RETRY_FRAMES + (getObject()->getID() & 3));
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool AIUpdateInterface::takeCappedPathLeg()
+{
+	if (!m_pathWasCapped || m_cappedLegs >= MAX_CAPPED_PATH_LEGS)
+	{
+		return FALSE;
+	}
+	m_cappedLegs++;
+	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
 void AIUpdateInterface::wakeUpNow()
 {
 #ifdef SLEEPY_AI
@@ -1168,6 +1246,28 @@ void AIUpdateInterface::friend_queueShots(WeaponSlotType slot, Int shots, const 
 	m_queuedShotsLeft = shots;
 	m_queuedShotsPos = *pos;
 	wakeUpNow();
+}
+
+//-------------------------------------------------------------------------------------------------
+void AIUpdateInterface::friend_setAttackPlacement(const Coord3D* pos, Real angle, Int shots)
+{
+	m_attackPlacementPos = *pos;
+	m_attackPlacementAngle = angle;
+	m_attackPlacementShotsLeft = shots > 0 ? shots : 1;
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool AIUpdateInterface::friend_takeAttackPlacement(Coord3D* pos, Real* angle)
+{
+	if (m_attackPlacementShotsLeft <= 0)
+	{
+		return FALSE;
+	}
+
+	--m_attackPlacementShotsLeft;
+	*pos = m_attackPlacementPos;
+	*angle = m_attackPlacementAngle;
+	return TRUE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1308,19 +1408,79 @@ UpdateSleepTime AIUpdateInterface::update()
 		ignoreObstacle(nullptr);
 	}
 
+	// Drag-to-face: once arrived, turn to the dragged direction; stay awake until then.
+	if( m_faceOnArrival )
+	{
+		if( shouldFaceOnArrival( TheGameLogic->getFrame(), m_facingOrderFrame, isMoving(), isWaitingForPath() || getPath() != nullptr, isIdle() ) )
+		{
+			m_faceOnArrival = FALSE;
+			releaseFormationSpeed();
+			Coord3D facePos = *getObject()->getPosition();
+			facePos.x += Cos( m_facingOnArrival ) * FACE_ON_ARRIVAL_DISTANCE;
+			facePos.y += Sin( m_facingOnArrival ) * FACE_ON_ARRIVAL_DISTANCE;
+			aiFacePosition( &facePos, CMD_FROM_AI );	// the unit's own order: keeps its formation slot
+			m_facingAroundCenter = TRUE;	// after aiFacePosition: its aiDoCommand clears it
+		}
+		else if( m_formationSpeed > 0.0f && getDesiredSpeed() != m_formationSpeed )
+		{
+			setDesiredSpeed( m_formationSpeed );	// a new leg of the path started at full speed
+		}
+		subMachineSleep = UPDATE_SLEEP_NONE;
+	}
+	if( m_facingAroundCenter && getCurrentStateID() != AI_FACE_POSITION )
+	{
+		m_facingAroundCenter = FALSE;
+	}
+
+	// Pushed off a formation slot: once idle for a moment, go back (or just face again)
+	if( m_formationReturnPending )
+	{
+		const UnsignedInt frame = TheGameLogic->getFrame();
+		if( !isIdle() || isMoving() || isWaitingForPath() || getPath() != nullptr )
+		{
+			m_formationReturnFrame = 0;
+		}
+		else if( m_formationReturnFrame == 0 )
+		{
+			m_formationReturnFrame = frame + FORMATION_RETURN_DELAY;
+		}
+		else if( frame >= m_formationReturnFrame )
+		{
+			m_formationReturnPending = FALSE;
+			m_formationReturnFrame = 0;
+			const Coord3D *pos = getObject()->getPosition();
+			const Real dx = m_formationSlot.x - pos->x;
+			const Real dy = m_formationSlot.y - pos->y;
+			switch( decideFormationReturn( sqrtf( dx * dx + dy * dy ), m_formationReturns ) )
+			{
+				case FORMATION_RETURN_MOVE:
+					++m_formationReturns;
+					moveToFormationSlot( m_formationSlot, m_formationAngle, m_formationRadius, m_formationStyle, 0.0f, CMD_FROM_AI, TRUE );	// back at its own speed
+					break;
+				case FORMATION_RETURN_FACE:
+					setFacingOnArrival( m_formationAngle );
+					break;
+				case FORMATION_RETURN_FORGET:
+				default:
+					m_hasFormationSlot = FALSE;
+					break;
+			}
+		}
+		subMachineSleep = UPDATE_SLEEP_NONE;
+	}
+
 	UnsignedInt now = TheGameLogic->getFrame();
+	if (m_queueForPathFrame != 0 && now >= m_queueForPathFrame)
+	{
+		setQueueForPathTime(0);
+		queueForPathOrRetry();
+	}
 	if (m_queueForPathFrame != 0)
 	{
-		if (now >= m_queueForPathFrame)
+		UnsignedInt sleepForPathDelta = m_queueForPathFrame - now;
+		if (sleepForPathDelta < subMachineSleep)
 		{
-			TheAI->pathfinder()->queueForPath(getObject()->getID());
-			setQueueForPathTime(0);
-		}
-		else
-		{
-			UnsignedInt sleepForPathDelta = m_queueForPathFrame - now;
-			if (sleepForPathDelta < subMachineSleep)
-				subMachineSleep = UPDATE_SLEEP(sleepForPathDelta);
+			subMachineSleep = UPDATE_SLEEP(sleepForPathDelta);
 		}
 	}
 
@@ -1452,6 +1612,29 @@ void AIUpdateInterface::markAsDead()
 }
 
 //-------------------------------------------------------------------------------------------------
+static Bool isManualReverseForCollision(const Object *object)
+{
+	const AIUpdateInterface *ai = object->getAIUpdateInterface();
+	const Locomotor *locomotor = ai ? ai->getCurLocomotor() : nullptr;
+	const PhysicsBehavior *physics = object->getPhysics();
+	return locomotor && locomotor->canMoveBackwards()
+		&& ai->isForcedMoveBackwards()
+		&& (!physics || physics->getForwardSpeed2D() <= 0.0f);
+}
+
+//-------------------------------------------------------------------------------------------------
+static Coord3D getCollisionDirection(const Object *object)
+{
+	Coord3D direction = *object->getUnitDirectionVector2D();
+	if (isManualReverseForCollision(object))
+	{
+		direction.x = -direction.x;
+		direction.y = -direction.y;
+	}
+	return direction;
+}
+
+//-------------------------------------------------------------------------------------------------
 /* Returns TRUE if this ai has a higher path priority than the other one.
 The way to have a higher priority is:
 1. If the paths were assigned when both units were in the same ai group, we use the path priority assigned.
@@ -1480,8 +1663,8 @@ Bool AIUpdateInterface::hasHigherPathPriority(AIUpdateInterface *otherAI) const
 	}
 
 	// The paths aren't of the same group, so see which unit is in front.
-	Coord3D ourDir = *getObject()->getUnitDirectionVector2D();
-	Coord3D otherDir = *other->getUnitDirectionVector2D();
+	Coord3D ourDir = getCollisionDirection(getObject());
+	Coord3D otherDir = getCollisionDirection(other);
 	if (ourDir.x*otherDir.x + ourDir.y*otherDir.y <= 0) {
 		return getObject()->getID() < other->getID();
 	}
@@ -1504,8 +1687,8 @@ Bool AIUpdateInterface::hasHigherPathPriority(AIUpdateInterface *otherAI) const
 */
 Real AIUpdateInterface::calculateMaxBlockedSpeed(Object *other) const
 {
-	Coord3D ourDir = *getObject()->getUnitDirectionVector2D();
-	Coord3D otherDir = *other->getUnitDirectionVector2D();
+	Coord3D ourDir = getCollisionDirection(getObject());
+	Coord3D otherDir = getCollisionDirection(other);
 	// Dot product is our directions projected onto each other.
 	Coord2D vectorToOther;
 	vectorToOther.x = other->getPosition()->x - getObject()->getPosition()->x;
@@ -1550,8 +1733,8 @@ Bool AIUpdateInterface::blockedBy(Object *other)
 
 	// If we are near our final goal, don't get stuck.
 	if (goalCell.x>0 && goalCell.y>0) {
-		Real dx = fabs(goalPos.x-pos.x);
-		Real dy = fabs(goalPos.y-pos.y);
+		Real dx = WWMath::Fabs(goalPos.x-pos.x);
+		Real dy = WWMath::Fabs(goalPos.y-pos.y);
 		if (dx<PATHFIND_CELL_SIZE_F && dy<PATHFIND_CELL_SIZE_F) {
 			return FALSE; // If we're approaching our goal, ignore obstacles.
 		}
@@ -1562,14 +1745,21 @@ Bool AIUpdateInterface::blockedBy(Object *other)
 
 	AIUpdateInterface* aiOther = other->getAI();
 
+	if (!aiOther)
+	{
+		return FALSE;
+	}
 	if (!aiOther->isDoingGroundMovement()) {
 		return FALSE; // Can't be blocked if the other is airborne.
 	}
-	if (!aiOther) return FALSE; // Ignore it.
 
-	if (getCurLocomotor() && getCurLocomotor()->isMovingBackwards()) {
-		return false; // don't collide.
+	if (!m_forceMoveBackwards && getCurLocomotor() && getCurLocomotor()->isMovingBackwards())
+	{
+		return FALSE;
 	}
+
+	Coord3D ourDir = getCollisionDirection(obj);
+	Coord3D theirDir = getCollisionDirection(other);
 	Bool otherMoving = ( aiOther->m_locomotorGoalType != NONE );
 	Coord3D otherPos = *other->getPosition();
 	Real dx = pos.x-otherPos.x;
@@ -1585,8 +1775,6 @@ Bool AIUpdateInterface::blockedBy(Object *other)
 		return FALSE;
 #else
 		// If we are crossing, just pass through.
-		Coord3D ourDir = *obj->getUnitDirectionVector2D();
-		Coord3D theirDir = *other->getUnitDirectionVector2D();
 		// Dot product is our directions projected onto each other.
 		Real dotProduct = ourDir.x*theirDir.x	+ ourDir.y*theirDir.y;
 		if (dotProduct<=0.25) return FALSE;  // we are not moving in the same direction.
@@ -1600,8 +1788,6 @@ Bool AIUpdateInterface::blockedBy(Object *other)
 	}
 
 	// we've been blocked for a while.  If we're crossing, just move through.
-	Coord3D ourDir = *obj->getUnitDirectionVector2D();
-	Coord3D theirDir = *other->getUnitDirectionVector2D();
 	// Dot product is our directions projected onto each other.
 	Real dotProduct = ourDir.x*theirDir.x	+ ourDir.y*theirDir.y;
 	if (getNumFramesBlocked()>LOGICFRAMES_PER_SECOND) {
@@ -1610,6 +1796,14 @@ Bool AIUpdateInterface::blockedBy(Object *other)
 
 	Real collisionAngle = ThePartitionManager->getRelativeAngle2D( obj, &otherPos );
 	Real otherAngle = ThePartitionManager->getRelativeAngle2D( other, &pos );
+	if (isManualReverseForCollision(obj))
+	{
+		collisionAngle = stdAngleDiff(collisionAngle, PI);
+	}
+	if (isManualReverseForCollision(other))
+	{
+		otherAngle = stdAngleDiff(otherAngle, PI);
+	}
 	//DEBUG_LOG(("Collision angle %.2f, %.2f, %s, %x %s", collisionAngle*180/PI, otherAngle*180/PI, obj->getTemplate()->getName().str(), obj, other->getTemplate()->getName().str()));
 	Real angleLimit = PI/4; // 45 degrees.
 	if (collisionAngle>PI/2 || collisionAngle<-PI/2) {
@@ -1620,8 +1814,6 @@ Bool AIUpdateInterface::blockedBy(Object *other)
 		if (dotProduct<=0.0f) return FALSE;  // we are not moving in the same direction.
 		if (otherMoving && (otherAngle>angleLimit || otherAngle<-angleLimit) ) {
 			// See if we're running into each other.
-			Coord3D ourDir = *obj->getUnitDirectionVector2D();
-			Coord3D theirDir = *other->getUnitDirectionVector2D();
 			dx += ourDir.x - theirDir.x;
 			dy += ourDir.y - theirDir.y;
 			if (curDSqr>dx*dx+dy*dy) {
@@ -1664,9 +1856,13 @@ Bool AIUpdateInterface::needToRotate()
 		CRCDEBUG_LOG(("AIUpdateInterface::needToRotate() - calling computePointOnPath() for object %d", getObject()->getID()));
 		getPath()->computePointOnPath(getObject(), m_locomotorSet, *getObject()->getPosition(), info);
 		deltaAngle = ThePartitionManager->getRelativeAngle2D( getObject(), &info.posOnPath );
+		if (isManualReverseForCollision(getObject()))
+		{
+			deltaAngle = stdAngleDiff(deltaAngle, PI);
+		}
 	}
 
-	if (fabs(deltaAngle)>PI/30)
+	if (WWMath::Fabs(deltaAngle)>PI/30)
 	{
 		return TRUE;
 	}
@@ -1710,6 +1906,10 @@ Bool AIUpdateInterface::processCollision(PhysicsBehavior *physics, Object *other
 		Bool blocked = blockedBy(other);
 		if (blocked)
 		{
+			if (m_blockedFrames == 0)
+			{
+				TheAI->pathfinder()->logMovementEvent("blocked", getObject(), other, getStateMachine()->getGoalPosition());
+			}
 			if (getObject()->isKindOf(KINDOF_INFANTRY))
 			{
 				// Panic bounces around.
@@ -1806,6 +2006,16 @@ Bool AIUpdateInterface::processCollision(PhysicsBehavior *physics, Object *other
 		Real dx = getObject()->getPosition()->x - otherPos.x;
 		Real dy = getObject()->getPosition()->y - otherPos.y;
 		Real curDSqr = dx*dx+dy*dy;
+
+		// HOVER and SHIP locomotors brake slowly after a move ends, so an idle one can still slide into the unit it touches.
+		const Bool coasts = m_curLocomotor != nullptr
+			&& (m_curLocomotor->getAppearance() == LOCO_HOVER || m_curLocomotor->getAppearance() == LOCO_SHIP);
+		const Coord3D *vel = physics->getVelocity();
+		if (coasts && vel->x*dx + vel->y*dy < 0.0f)
+		{
+			physics->scrubVelocity2D(0);
+		}
+
 		if (!otherMoving && curDSqr < PATHFIND_CELL_SIZE_F*PATHFIND_CELL_SIZE_F*0.25f)
 		{
 			if (this->getCurrentStateID() == AI_BUSY) {
@@ -1865,6 +2075,7 @@ Bool AIUpdateInterface::canComputeQuickPath()
  */
 Bool AIUpdateInterface::computeQuickPath( const Coord3D *destination )
 {
+	m_pathWasCapped = FALSE;
 	// for now, quick path objects don't pathfind, generally airborne units
 	// build a trivial one-node path containing destination
 
@@ -1891,7 +2102,11 @@ Bool AIUpdateInterface::computeQuickPath( const Coord3D *destination )
 		m_path = TheAI->pathfinder()->getAircraftPath(getObject(), destination);
 	} else {
 		m_path = newInstance(Path);
-		m_path->prependNode( destination, LAYER_GROUND );
+		PathfindLayerEnum destinationLayer = LAYER_GROUND;
+		if (isDoingGroundMovement()) {
+			destinationLayer = TheTerrainLogic->getLayerForDestination(destination);
+		}
+		m_path->prependNode( destination, destinationLayer );
 		Coord3D pos = *getObject()->getPosition();
 		pos.z = destination->z;
 		m_path->prependNode( &pos, getObject()->getLayer() );
@@ -1928,6 +2143,8 @@ Bool AIUpdateInterface::computePath( PathfindServicesInterface *pathServices, Co
 		return computeQuickPath(destination);
 	}
 	m_retryPath = false;
+	const Bool patchingCappedPath = m_isBlockedAndStuck && m_pathWasCapped;
+	m_pathWasCapped = FALSE;
 	Region3D extent;
 	TheTerrainLogic->getMaximumPathfindExtent(&extent);
 	if (!extent.isInRegionNoZ(*destination)) {
@@ -1973,23 +2190,31 @@ Bool AIUpdateInterface::computePath( PathfindServicesInterface *pathServices, Co
 		if (m_isBlockedAndStuck) {
 			theNewPath = pathServices->patchPath( getObject(), m_locomotorSet,
 				getPath(), m_isBlockedAndStuck);
+			m_pathWasCapped = (theNewPath != nullptr) && patchingCappedPath;
 		}	else {
 			theNewPath = pathServices->findPath( getObject(), m_locomotorSet, getObject()->getPosition(),
 				destination);
+			m_pathWasCapped = (theNewPath != nullptr) && TheAI->pathfinder()->didLastSearchHitCap();
 		}
 	}
 	if (theNewPath==nullptr && m_path==nullptr) {
 		Real pathCostFactor = 0.0f;
+		Coord3D closestDestination = *destination;
 		theNewPath = pathServices->findClosestPath( getObject(), m_locomotorSet, getObject()->getPosition(),
-			destination, m_isBlockedAndStuck, pathCostFactor, FALSE );
+			&closestDestination, m_isBlockedAndStuck, pathCostFactor, FALSE );
+		m_pathWasCapped = (theNewPath != nullptr) && TheAI->pathfinder()->didLastSearchHitCap();
 		m_retryPath = true;
+	}
+	if (theNewPath && !m_pathWasCapped)
+	{
+		m_cappedLegs = 0;
 	}
 	TheAI->pathfinder()->setIgnoreObstacleID( INVALID_ID );
 	if (theNewPath) {
 		// destroy previous path
 		destroyPath();
 		m_path = theNewPath;
-		if (getCurLocomotor() && getCurLocomotor()->isUltraAccurate()) {
+		if (!m_pathWasCapped && getCurLocomotor() && getCurLocomotor()->isUltraAccurate()) {
 			// Move exactly to the destination.  Normal ground pathfinding moves to a gridded location.
 			theNewPath->updateLastNode(&originalDestination);
 		}
@@ -2172,6 +2397,62 @@ Bool AIUpdateInterface::computeAttackPath( PathfindServicesInterface *pathServic
 
 	localVictimPos.z = TheTerrainLogic->getLayerHeight( localVictimPos.x, localVictimPos.y, victimLayer );
 
+	// MinRangeRetreatStraight: we're inside our minimum range. Back off straight away from the target,
+	// just far enough, instead of letting the pathfinder pick the nearest valid cell (often to the side,
+	// which is a long arc for slow-turning vehicles and leaves us facing the wrong way).
+	if (isMinRangeRetreatStraight() && landBound && !source->isAboveTerrain()
+		&& (victim ? weapon->isTooClose(source, victim) : weapon->isTooClose(source, &localVictimPos)))
+	{
+		const Coord3D* srcPos = source->getPosition();
+		Coord3D dir;
+		dir.set(srcPos->x - localVictimPos.x, srcPos->y - localVictimPos.y, 0.0f);
+		Real curDist = dir.length();
+		if (curDist < 0.01f)
+		{
+			// on top of the target: back off along our reversed heading
+			const Coord3D* fwd = source->getUnitDirectionVector2D();
+			dir.set(-fwd->x, -fwd->y, 0.0f);
+			curDist = 0.0f;
+		}
+		else
+		{
+			dir.x /= curDist;
+			dir.y /= curDist;
+		}
+
+		// attack range is measured between bounding circles (ATTACK_RANGE_IS_2D), plus a margin of one cell
+		Real wantedDist = weapon->getTemplate()->getMinimumAttackRange() + PATHFIND_CELL_SIZE_F
+			+ source->getGeometryInfo().getBoundingCircleRadius();
+		if (victim && !victim->isKindOf(KINDOF_BRIDGE))
+			wantedDist += victim->getGeometryInfo().getBoundingCircleRadius();
+
+		Coord3D goal;
+		goal.x = srcPos->x + dir.x * (wantedDist - curDist);
+		goal.y = srcPos->y + dir.y * (wantedDist - curDist);
+		goal.z = TheTerrainLogic->getLayerHeight(goal.x, goal.y, source->getLayer());
+
+		if (TheAI->pathfinder()->isValidAttackGoal(source, m_locomotorSet, goal, victim, &localVictimPos, weapon))
+		{
+			destroyPath();
+			m_path = newInstance(Path);
+			m_path->prependNode(&goal, source->getLayer());
+			Coord3D pos = *srcPos;
+			m_path->prependNode(&pos, source->getLayer());
+			m_path->getFirstNode()->setNextOptimized(m_path->getFirstNode()->getNext());
+			if (TheGlobalData->m_debugAI == AI_DEBUG_PATHS)
+			{
+				TheAI->pathfinder()->setDebugPath(m_path);
+			}
+			TheAI->pathfinder()->updateGoal(source, &goal, source->getLayer());
+
+			m_pathTimestamp = TheGameLogic->getFrame();
+			m_blockedFrames = 0;
+			m_isBlockedAndStuck = FALSE;
+			return TRUE;
+		}
+		// blocked: fall through to the normal attack pathfinding
+	}
+
 	if (getObject()->isAboveTerrain() && !landBound)
 	{
 		// for now, airborne objects don't pathfind
@@ -2344,7 +2625,7 @@ Bool AIUpdateInterface::isPathAvailable( const Coord3D *destination ) const
 /** Is there a path (computed using the less accurate but quick method )
 	* at all that exists from us to the destination location */
 //-------------------------------------------------------------------------------------------------
-Bool AIUpdateInterface::isQuickPathAvailable( const Coord3D *destination ) const
+Bool AIUpdateInterface::isQuickPathAvailable( const Coord3D *destination, Bool acceptRubble ) const
 {
 
 	// sanity
@@ -2356,7 +2637,7 @@ Bool AIUpdateInterface::isQuickPathAvailable( const Coord3D *destination ) const
 #if RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING
 	return TheAI->pathfinder()->clientSafeQuickDoesPathExist(m_locomotorSet, myPos, destination);
 #else
-	return TheAI->pathfinder()->clientSafeQuickDoesPathExistForUI(m_locomotorSet, myPos, destination);
+	return TheAI->pathfinder()->clientSafeQuickDoesPathExistForUI(m_locomotorSet, myPos, destination, acceptRubble);
 #endif
 
 }
@@ -2524,8 +2805,13 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 							}
 						}
 
+						const Bool wasReversing = m_curLocomotor->isMovingBackwards();
 						m_curLocomotor->locoUpdate_moveTowardsPosition(getObject(), goalPos,
 							onPathDistToGoal+getPathExtraDistance(), speed, &blocked);
+						if (wasReversing != m_curLocomotor->isMovingBackwards())
+						{
+							TheAI->pathfinder()->logMovementEvent(wasReversing ? "forward" : "reverse", getObject(), nullptr, &goalPos);
+						}
 
 						m_doFinalPosition = FALSE;
 					}
@@ -2533,7 +2819,7 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 
 				case ANGLE:
 					{
-						m_curLocomotor->locoUpdate_moveTowardsAngle(getObject(), m_locomotorGoalData.x);
+						m_curLocomotor->locoUpdate_moveTowardsAngle(getObject(), m_locomotorGoalData.x, m_locomotorGoalTurnByReversing, m_facingAroundCenter);
 						m_doFinalPosition = FALSE;
 					}
 					break;
@@ -2559,7 +2845,7 @@ UpdateSleepTime AIUpdateInterface::doLocomotor()
 							}
 							else
 							{
-								Real dist = sqrtf(dSqr);
+								Real dist = WWMath::Sqrtf(dSqr);
 								if (dist<1) dist = 1;
 								pos.x += 2*PATHFIND_CELL_SIZE_F*dx/(dist*LOGICFRAMES_PER_SECOND);
 								pos.y += 2*PATHFIND_CELL_SIZE_F*dy/(dist*LOGICFRAMES_PER_SECOND);
@@ -2630,6 +2916,22 @@ void AIUpdateInterface::setLocomotorGoalOrientation(Real angle)
 {
 	m_locomotorGoalType = ANGLE;
 	m_locomotorGoalData.x = angle;
+	m_locomotorGoalTurnByReversing = FALSE;
+#ifdef RTS_DEBUG
+if (_isnan(m_locomotorGoalData.x) || _isnan(m_locomotorGoalData.y) || _isnan(m_locomotorGoalData.z))
+{
+	DEBUG_CRASH(("NAN in setLocomotorGoalOrientation"));
+}
+#endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void AIUpdateInterface::setLocomotorGoalOrientationByReversing(Real angle)
+{
+	m_locomotorGoalType = ANGLE;
+	m_locomotorGoalData.x = angle;
+	// Not saved/CRC'd (keeps retail CRC): the aim state re-issues this goal every update.
+	m_locomotorGoalTurnByReversing = TRUE;
 #ifdef RTS_DEBUG
 if (_isnan(m_locomotorGoalData.x) || _isnan(m_locomotorGoalData.y) || _isnan(m_locomotorGoalData.z))
 {
@@ -2642,6 +2944,7 @@ if (_isnan(m_locomotorGoalData.x) || _isnan(m_locomotorGoalData.y) || _isnan(m_l
 void AIUpdateInterface::setLocomotorGoalNone()
 {
 	m_locomotorGoalType = NONE;
+	m_locomotorGoalTurnByReversing = FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2768,7 +3071,7 @@ Real AIUpdateInterface::getLocomotorDistanceToGoal()
 					dest = m_path->getLastNode()->getPosition();
 				}
 				Real distance = ThePartitionManager->getDistanceSquared( me, dest, FROM_CENTER_3D );
-				return sqrt( distance );// Other paths return dots of normalized vectors, so one sqrt ain't so bad
+				return WWMath::Sqrt( distance );// Other paths return dots of normalized vectors, so one sqrt ain't so bad
 			}
 			else
 			{
@@ -2800,7 +3103,7 @@ Real AIUpdateInterface::getLocomotorDistanceToGoal()
 				{
 					if (sqr(dist) > distSqr)
 					{
-						return sqrt(distSqr);
+						return WWMath::Sqrt(distSqr);
 					}
 					else
 					{
@@ -2809,7 +3112,7 @@ Real AIUpdateInterface::getLocomotorDistanceToGoal()
 				}
 
 				if (dist<PATHFIND_CELL_SIZE_F || sqr(dist) < distSqr)
-					return sqrtf(distSqr);
+					return WWMath::Sqrtf(distSqr);
 				else
 					return dist;
 
@@ -2909,8 +3212,213 @@ Bool AIUpdateInterface::isAllowedToRespondToAiCommands(const AICommandParms* par
   // ALLOWING ONLY THE SPECTREUPDATE TO COMMAND IT VIA CMD_FROM_AI
   // AUTHOR, LORENZEN... 5/15/03
 
+	if (parms->m_cmdSource == CMD_FROM_PLAYER && GasBehavior::blocksPlayerOrders(getObject()))
+	{
+		return FALSE;
+	}
+
+	if (holdOrderWhileJammed(parms))
+	{
+		return FALSE;
+	}
 
 	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool AIUpdateInterface::holdOrderWhileJammed(const AICommandParms* parms) const
+{
+	if (parms->m_cmdSource != CMD_FROM_SCRIPT)
+	{
+		return FALSE;
+	}
+	const Object *obj = getObject();
+	const BodyModuleInterface *body = obj->getBodyModule();
+	if (!body || !body->isJammed())
+	{
+		return FALSE;
+	}
+	const Player *player = obj->getControllingPlayer();
+	if (!clpAIPlaysFair(player))
+	{
+		return FALSE;
+	}
+	m_jammedOrder.store(*parms);
+	m_jammedOrderPlayer = player->getPlayerIndex();
+	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+void AIUpdateInterface::releaseJammedOrder()
+{
+	if (m_jammedOrderPlayer < 0)
+	{
+		return;
+	}
+	Object *obj = getObject();
+	const Player *player = obj->getControllingPlayer();
+	Bool sameOwner = player && player->getPlayerIndex() == m_jammedOrderPlayer;
+	m_jammedOrderPlayer = -1;
+	if (!sameOwner)
+	{
+		return;
+	}
+
+	AICommandParms parms(AICMD_IDLE, CMD_FROM_SCRIPT);
+	m_jammedOrder.reconstitute(parms);
+
+	// AICommandParmsStorage::doXfer does not save the command source.
+	parms.m_cmdSource = CMD_FROM_SCRIPT;
+
+	// AIUpdate only implements command buttons for combat drop, so these go back through Object.
+	switch (parms.m_cmd)
+	{
+		case AICMD_COMMANDBUTTON:
+			obj->doCommandButton(parms.m_commandButton, CMD_FROM_SCRIPT);
+			break;
+		case AICMD_COMMANDBUTTON_OBJ:
+			if (parms.m_obj)
+			{
+				obj->doCommandButtonAtObject(parms.m_commandButton, parms.m_obj, CMD_FROM_SCRIPT);
+			}
+			break;
+		case AICMD_COMMANDBUTTON_POS:
+			obj->doCommandButtonAtPosition(parms.m_commandButton, &parms.m_pos, CMD_FROM_SCRIPT);
+			break;
+		default:
+			aiDoCommand(&parms);
+			break;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+// Drag-to-face, see FacingMove.h
+
+Bool shouldFaceOnArrival( UnsignedInt now, UnsignedInt orderFrame, Bool isMoving, Bool hasPath, Bool isIdle )
+{
+	return now > orderFrame && isIdle && !isMoving && !hasPath;
+}
+
+void AIUpdateInterface::setFacingOnArrival( Real angle )
+{
+	m_faceOnArrival = TRUE;
+	m_facingOnArrival = angle;
+	m_facingOrderFrame = TheGameLogic->getFrame();
+	setWakeFrame( getObject(), UPDATE_SLEEP_NONE );
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool doesCommandKeepFormationSlot( Bool isMakeWay, Bool isFromAI )
+{
+	return isMakeWay || isFromAI;
+}
+
+FormationReturn decideFormationReturn( Real distToSlot, Int returnsSoFar )
+{
+	if( distToSlot <= FORMATION_RETURN_MIN )
+	{
+		return FORMATION_RETURN_FACE;
+	}
+	if( distToSlot > FORMATION_RETURN_MAX || returnsSoFar >= FORMATION_MAX_RETURNS )
+	{
+		return FORMATION_RETURN_FORGET;
+	}
+	return FORMATION_RETURN_MOVE;
+}
+
+void clampWaypointPosition( Coord3D &position, Int margin );	// AIGroup.cpp
+
+// A displaced unit keeps its slot until a player or script gives another order.
+void AIUpdateInterface::moveToFormationSlot( const Coord3D &slot, Real angle, Real radius, UnsignedInt style,
+	Real speedLimit, CommandSourceType cmdSource, Bool isReturn )
+{
+	Object *unit = getObject();
+	cancelFacingMove();
+	m_hasFormationSlot = TRUE;
+	m_formationSlot = slot;
+	m_formationAngle = angle;
+	m_formationRadius = radius;
+	m_formationStyle = style;
+	m_formationReturnPending = FALSE;
+	m_formationReturnFrame = 0;
+	if( !isReturn )
+	{
+		m_formationReturns = 0;
+	}
+
+	// Open ground: end exactly on the slot, not on the pathfinder's grid (ultra-accurate until the next order).
+	if( getCurLocomotor() && isDoingGroundMovement() )
+	{
+		Coord3D snappedSlot = slot;
+		TheAI->pathfinder()->snapPosition( unit, &snappedSlot );
+		Coord3D adjusted = slot;
+		if( TheAI->pathfinder()->adjustDestination( unit, getLocomotorSet(), &adjusted )
+			&& canMoveExactlyToSlot( snappedSlot, adjusted ) )
+		{
+			setExactFormationMove();
+		}
+	}
+
+	// Wheels turn around a pivot behind their centre: drive in along the facing instead of turning on the slot.
+	m_issuingFormationMove = TRUE;
+	const Locomotor *loco = getCurLocomotor();
+	const Real approach = formationApproachDistance( radius );
+	if( loco && loco->getTurnPivotOffset() != 0.0f && !(style & FORMATION_STYLE_WHEELS_TURN_IN_PLACE)
+		&& needsFormationApproach( *unit->getPosition(), slot, angle, approach ) )
+	{
+		std::vector<Coord3D> path;
+		path.push_back( formationApproachPoint( slot, angle, approach ) );
+		clampWaypointPosition( path[0], (Int)(PATHFIND_CELL_SIZE_F * 4.0f) );
+		path.push_back( slot );
+		aiFollowPath( &path, nullptr, cmdSource );
+	}
+	else
+	{
+		Coord3D dest = slot;
+		aiMoveToPosition( &dest, cmdSource );
+	}
+	m_issuingFormationMove = FALSE;
+	setFacingOnArrival( angle );
+
+	// Each path leg resets the speed, so update() reapplies the formation limit.
+	m_formationSpeed = speedLimit;
+	if( speedLimit > 0.0f )
+	{
+		setDesiredSpeed( speedLimit );
+	}
+}
+
+void AIUpdateInterface::releaseFormationSpeed()
+{
+	if( m_formationSpeed > 0.0f )
+	{
+		m_formationSpeed = 0.0f;
+		setDesiredSpeed( FAST_AS_POSSIBLE );
+	}
+}
+
+void AIUpdateInterface::setExactFormationMove()
+{
+	if( getCurLocomotor() )
+	{
+		getCurLocomotor()->setUltraAccurate( TRUE );
+	}
+	m_exactFormationMove = TRUE;
+}
+
+void AIUpdateInterface::cancelFacingMove()
+{
+	m_faceOnArrival = FALSE;
+	m_facingAroundCenter = FALSE;
+	releaseFormationSpeed();
+	if (m_exactFormationMove)
+	{
+		m_exactFormationMove = FALSE;
+		if (getCurLocomotor())
+		{
+			getCurLocomotor()->setUltraAccurate( FALSE );
+		}
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -2921,6 +3429,25 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 
 	if (!isAllowedToRespondToAiCommands(parms))
 		return;
+
+	if (!m_issuingFormationMove)
+	{
+		cancelFacingMove();
+	}
+	if (m_hasFormationSlot && !m_issuingFormationMove)
+	{
+		const Bool isMakeWay = parms->m_cmd == AICMD_MOVE_AWAY_FROM_UNIT;
+		if (!doesCommandKeepFormationSlot( isMakeWay, parms->m_cmdSource == CMD_FROM_AI ))
+		{
+			m_hasFormationSlot = FALSE;
+			m_formationReturnPending = FALSE;
+		}
+		else if (isMakeWay)
+		{
+			m_formationReturnPending = TRUE;
+			m_formationReturnFrame = 0;
+		}
+	}
 
 #ifdef ALLOW_SURRENDER
 	// surrendered items have very limited options, and only via AI cmds
@@ -2946,8 +3473,16 @@ void AIUpdateInterface::aiDoCommand(const AICommandParms* parms)
 #endif
 
 
+	m_cappedLegs = 0;
+
 	// Any new order cancels a forced-reverse move; the REVERSE_MOVE case below re-sets it.
 	m_forceMoveBackwards = FALSE;
+
+	// A new order cancels the placed attack too, unless its shots are queued and outlive orders.
+	if (m_queuedShotsLeft <= 0)
+	{
+		m_attackPlacementShotsLeft = 0;
+	}
 
 	switch (parms->m_cmd)
 	{
@@ -5592,17 +6127,23 @@ void AIUpdateInterface::crc( Xfer *x )
 	* 6: Added m_forceMoveBackwards (REVERSE_MOVE order)
 	* 7: Added m_isHoldingFire (HOLD_FIRE stance)
 	* 8: Added the queued shots (OCL Attack FireRegardlessOfOrders)
+	* 10: Added the order held while jammed
+	* 11: Added the attack placement (OCL Attack through SPECIAL_POWER_CONSTRUCT)
+	* 100: Added formation state after this fork's version 12 fields
 	*/
 // ------------------------------------------------------------------------------------------------
 void AIUpdateInterface::xfer( Xfer *xfer )
 {
   // version
 #if RETAIL_COMPATIBLE_CRC || RETAIL_COMPATIBLE_XFER_SAVE
-	const XferVersion currentVersion = 4;
+	const XferVersion baseVersion = 4;
 #else
-	const XferVersion currentVersion = 9;
+	const XferVersion baseVersion = 12;
 #endif
-  XferVersion version = currentVersion;
+	const XferVersion currentVersion = 100;
+	const Bool isInFormationMove = m_exactFormationMove || m_faceOnArrival || m_facingAroundCenter || m_hasFormationSlot
+		|| m_formationSpeed > 0.0f;
+  XferVersion version = isInFormationMove ? currentVersion : baseVersion;
   xfer->xferVersion( &version, currentVersion );
 
  // extend base class
@@ -5851,6 +6392,59 @@ void AIUpdateInterface::xfer( Xfer *xfer )
 		xfer->xferReal(&m_liftMultiplier);
 	}
 
+	if (version >= 10)
+	{
+		xfer->xferInt(&m_jammedOrderPlayer);
+		if (m_jammedOrderPlayer >= 0)
+		{
+			m_jammedOrder.doXfer(xfer);
+		}
+	}
+
+	if (version >= 11)
+	{
+		xfer->xferCoord3D(&m_attackPlacementPos);
+		xfer->xferReal(&m_attackPlacementAngle);
+		xfer->xferInt(&m_attackPlacementShotsLeft);
+	}
+
+	if (version >= 12)
+	{
+		xfer->xferBool(&m_pathWasCapped);
+		xfer->xferUnsignedByte(&m_cappedLegs);
+	}
+
+	if( version >= 100 )
+	{
+		xfer->xferBool( &m_exactFormationMove );
+		// Version 100 retains two unused frame fields in its save layout.
+		UnsignedInt reservedFrame = 0;
+		xfer->xferUnsignedInt( &reservedFrame );
+		xfer->xferBool( &m_faceOnArrival );
+		xfer->xferReal( &m_facingOnArrival );
+		xfer->xferUnsignedInt( &m_facingOrderFrame );
+		xfer->xferBool( &m_facingAroundCenter );
+		xfer->xferBool( &m_hasFormationSlot );
+		xfer->xferCoord3D( &m_formationSlot );
+		xfer->xferReal( &m_formationAngle );
+		xfer->xferReal( &m_formationRadius );
+		xfer->xferUnsignedInt( &m_formationStyle );
+		xfer->xferReal( &m_formationSpeed );
+		xfer->xferUnsignedInt( &reservedFrame );
+		xfer->xferInt( &m_formationReturns );
+		xfer->xferBool( &m_formationReturnPending );
+		xfer->xferUnsignedInt( &m_formationReturnFrame );
+	}
+	else if( xfer->getXferMode() == XFER_LOAD )
+	{
+		m_exactFormationMove = FALSE;
+		m_faceOnArrival = FALSE;
+		m_facingAroundCenter = FALSE;
+		m_hasFormationSlot = FALSE;
+		m_formationSpeed = 0.0f;
+		m_formationReturnPending = FALSE;
+	}
+
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -5927,9 +6521,9 @@ Bool AIUpdateInterface::arePathLayersStillValid() {
 		//Check if going below bridges and if these are still opened/destroyed
 		if (path->needCheckBridges()) {
 			for (UnsignedShort i = PathfindLayerEnum::LAYER_GROUND + 1U; i < PathfindLayerEnum::LAYER_WALL; ++i) {
-				if (path->isPathBelowBridge(i)) {
-					// Path is below bridge -> if Bridge layer is now Passable, no longer valid -> recheck
-					return TheAI->pathfinder()->isPathfindLayerPassable(static_cast<PathfindLayerEnum>(i));
+				// A path under a bridge stays valid until that bridge becomes passable again
+				if (path->isPathBelowBridge(i) && TheAI->pathfinder()->isPathfindLayerPassable(static_cast<PathfindLayerEnum>(i))) {
+					return false;
 				}
 			}
 		}

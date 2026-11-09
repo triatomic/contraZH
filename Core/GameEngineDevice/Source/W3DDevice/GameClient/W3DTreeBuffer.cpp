@@ -1105,6 +1105,10 @@ void W3DTreeBuffer::unitMoved(Object *unit)
 	Int xMax = REAL_TO_INT_CEIL ( (x/(m_bounds.hi.x-m_bounds.lo.x)) * (PARTITION_WIDTH_HEIGHT-0.1f) );
 	Int yMax = REAL_TO_INT_CEIL ( (y/(m_bounds.hi.y-m_bounds.lo.y)) * (PARTITION_WIDTH_HEIGHT-0.1f) );
 	DEBUG_ASSERTCRASH(xMax>=0 && yMax>=0 && xMax<=PARTITION_WIDTH_HEIGHT && yMax<=PARTITION_WIDTH_HEIGHT, ("Invalid range."));
+	xIndex = clamp<Int>(0, xIndex, PARTITION_WIDTH_HEIGHT);
+	yIndex = clamp<Int>(0, yIndex, PARTITION_WIDTH_HEIGHT);
+	xMax = clamp<Int>(0, xMax, PARTITION_WIDTH_HEIGHT);
+	yMax = clamp<Int>(0, yMax, PARTITION_WIDTH_HEIGHT);
 	Int i, j;
 	for (i=xIndex; i<xMax; i++) {
 		for (j=yIndex; j<yMax; j++) {
@@ -1162,6 +1166,8 @@ void W3DTreeBuffer::allocateTreeBuffers()
 		m_curNumTreeVertices[i]=0;
 		m_curNumTreeIndices[i]=0;
 	}
+	// TheSuperHackers @bugfix arcticdolphin 09/10/2026 Refill the new buffers after a device reset.
+	m_anythingChanged = true;
 
 		//shader decleration
 	// DX8_FVF_XYZNDUV1
@@ -1352,8 +1358,8 @@ void W3DTreeBuffer::addTree(DrawableID id, Coord3D location, Real scale, Real an
 	}
 
 	Real randomScale = GameClientRandomValueReal( 1.0f - randomScaleAmount, 1.0f+ randomScaleAmount );
-	m_trees[m_numTrees].sin = WWMath::Sin(angle);
-	m_trees[m_numTrees].cos = WWMath::Cos(angle);
+	m_trees[m_numTrees].sin = WWMath::Sinf_Legacy(angle);
+	m_trees[m_numTrees].cos = WWMath::Cosf_Legacy(angle);
 	if (randomScaleAmount>0.0f) {
 		// Randomizes the scale and orientation of trees.
 		m_trees[m_numTrees].scale = scale*randomScale;
@@ -1397,8 +1403,8 @@ Bool W3DTreeBuffer::updateTreePosition(DrawableID id, Coord3D location, Real ang
 	for (i=0; i<m_numTrees; i++) {
 		if (m_trees[i].drawableID == id) {
 			m_trees[i].location = Vector3(location.x, location.y, location.z);
-			m_trees[i].sin = WWMath::Sin(angle);
-			m_trees[i].cos = WWMath::Cos(angle);
+			m_trees[i].sin = WWMath::Sinf_Legacy(angle);
+			m_trees[i].cos = WWMath::Cosf_Legacy(angle);
 			// Translate the bounding sphere of the model.
 			m_trees[i].bounds = m_treeTypes[m_trees[i].treeType].m_bounds;
 			m_trees[i].bounds.Center *= m_trees[i].scale;

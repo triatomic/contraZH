@@ -51,12 +51,12 @@ public:
 
 	Bool isValidContainerFor(const Object* obj, Bool checkCapacity) const;
 	void addToContainList( Object *obj );				///< add 'obj' to contain list
-	void removeFromContain( Object *obj, Bool exposeStealthUnits = FALSE );	///< remove 'obj' from contain list
+	Bool removeFromContain( Object *obj, Bool exposeStealthUnits = FALSE );	///< remove 'obj' from contain list
 	Bool isInContainer( Object *obj );				///< Is this thing inside?
 
 	void onTunnelCreated( const Object *newTunnel );		///< A tunnel was made
 	void onTunnelDestroyed( const Object *deadTunnel );	///< A tunnel was destroyed
-	Bool doAutoPopRegistion( const Object *newTunnel ) const;
+	Bool doAutoPopIconInit( const Object *newTunnel ) const;
 
 	static void destroyObject( Object *obj, void *userData ); ///< Callback for Iterate Contained system
 	static void healObject( Object *obj, void *frames ); ///< Callback for Iterate Contained system

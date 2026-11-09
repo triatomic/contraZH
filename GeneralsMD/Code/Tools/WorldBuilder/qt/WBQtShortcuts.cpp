@@ -11,6 +11,10 @@
 
 #include <qt_windows.h>
 
+#include <QApplication>
+#include <QKeyEvent>
+#include <QWidget>
+
 // Bridge entry points. The WBQt_* ones are declared in WBQtBridge.h with plain C++
 // linkage (that facade is C++), so match that here -- NOT extern "C". WBQt_GetHostedViewWindow
 // is a C++ symbol defined in WBQtBridge.cpp. WBQtChrome_PopupActive is genuinely extern "C".
@@ -19,6 +23,7 @@ void *WBQt_GetHostedViewWindow(void);
 void *WBQt_MainWindowHwnd(void);
 void WBQt_ToggleFullscreen(void);
 int  WBQt_IsFullscreen(void);
+QWidget *WBQt_MainWindowWidget(void);
 extern "C" int  WBQtChrome_PopupActive(void);
 
 // Modifier mask bits (our own -- not the RC's ACCEL fVirt).
@@ -263,9 +268,27 @@ extern "C" int WBQtShortcuts_TranslateKey(void *pMsgVoid)
 	const int vk = (int)pMsg->wParam;
 	WBQT_DBGLOG("TranslateKey: msg=0x%04X vk=0x%02X", msg, vk);
 
-	// F11 / Esc fullscreen: owned here regardless of focus (the frame's old handler is dead
-	// for viewport-focused keys under the inversion). Esc only exits when in fullscreen so a
-	// tool's own Esc-cancel still reaches it otherwise.
+	// While a Qt chrome menu popup is open every key must reach Qt (menu navigation).
+	if (WBQtChrome_PopupActive())
+	{
+		return 0;
+	}
+
+	// Focus gate (replaces the 7 *_OwnsFocus guards): act only when the hosted viewport --
+	// or the Qt main window itself -- owns Win32 focus. A line-edit in any floating Qt tool
+	// window is a different HWND, so its typing is never intercepted; keys its widgets leave
+	// unused reach the table through WBQtShortcutsFallback below.
+	HWND focus = ::GetFocus();
+	HWND view = reinterpret_cast<HWND>(WBQt_GetHostedViewWindow());
+	HWND mainWin = reinterpret_cast<HWND>(WBQt_MainWindowHwnd());
+	if (focus != view && focus != mainWin)
+	{
+		WBQT_DBGLOG("TranslateKey: focus-gate reject (floating Qt window owns focus); pass to Qt");
+		return 0;
+	}
+
+	// F11 / Esc fullscreen (the frame's old handler is dead for viewport-focused keys under the
+	// inversion). Esc only exits when in fullscreen so a tool's own Esc-cancel still reaches it.
 	if (msg == WM_KEYDOWN)
 	{
 		if (vk == VK_F11)
@@ -278,24 +301,6 @@ extern "C" int WBQtShortcuts_TranslateKey(void *pMsgVoid)
 			WBQt_ToggleFullscreen();
 			return 1;
 		}
-	}
-
-	// While a Qt chrome menu popup is open every key must reach Qt (menu navigation).
-	if (WBQtChrome_PopupActive())
-	{
-		return 0;
-	}
-
-	// Focus gate (replaces the 7 *_OwnsFocus guards): act only when the hosted viewport --
-	// or the Qt main window itself -- owns Win32 focus. A line-edit in any floating Qt tool
-	// window is a different HWND, so its typing is never intercepted.
-	HWND focus = ::GetFocus();
-	HWND view = reinterpret_cast<HWND>(WBQt_GetHostedViewWindow());
-	HWND mainWin = reinterpret_cast<HWND>(WBQt_MainWindowHwnd());
-	if (focus != view && focus != mainWin)
-	{
-		WBQT_DBGLOG("TranslateKey: focus-gate reject (floating Qt window owns focus); pass to Qt");
-		return 0;
 	}
 
 	unsigned mods = 0;
@@ -361,4 +366,67 @@ extern "C" int WBQtShortcuts_TranslateKey(void *pMsgVoid)
 	WBQT_DBGLOG("TranslateKey: hotkey vk=0x%02X mods=%u -> post command 0x%04X", vk, mods, commandId);
 	WBQtShortcuts_PostCommand(commandId);
 	return 1;
+}
+
+// Runs the table's Ctrl and F-key chords for a key no widget in a floating Qt window accepted.
+class WBQtShortcutsFallback : public QObject
+{
+public:
+	virtual bool eventFilter(QObject *watched, QEvent *event)
+	{
+		if (event->type() != QEvent::KeyPress || !watched->isWidgetType() || !WBQt_InversionActive())
+		{
+			return false;
+		}
+		QWidget *w = static_cast<QWidget *>(watched);
+		if (!w->isWindow() || w == WBQt_MainWindowWidget() || QApplication::activeModalWidget() != NULL)
+		{
+			return false;
+		}
+		QKeyEvent *ke = static_cast<QKeyEvent *>(event);
+		Qt::KeyboardModifiers qmods = ke->modifiers();
+		if (qmods & (Qt::AltModifier | Qt::MetaModifier))
+		{
+			return false;
+		}
+		const int vk = (int)ke->nativeVirtualKey();
+		unsigned mods = 0;
+		if (qmods & Qt::ControlModifier)
+		{
+			mods |= WBK_CTRL;
+		}
+		if (qmods & Qt::ShiftModifier)
+		{
+			mods |= WBK_SHIFT;
+		}
+		if (mods == WBK_NONE && vk == VK_F11)
+		{
+			WBQt_ToggleFullscreen();
+			return true;
+		}
+		if ((mods & WBK_CTRL) == 0 && (vk < VK_F1 || vk > VK_F5))
+		{
+			return false;
+		}
+		const int commandId = wbLookup(vk, mods);
+		if (commandId == 0 || commandId == WBID_EDIT_COPY || commandId == WBID_EDIT_CUT
+			|| commandId == WBID_EDIT_PASTE)
+		{
+			return false;
+		}
+		WBQT_DBGLOG("Fallback: vk=0x%02X mods=%u -> post command 0x%04X", vk, mods, commandId);
+		WBQtShortcuts_PostCommand(commandId);
+		return true;
+	}
+};
+
+extern "C" void WBQtShortcuts_InstallQtFallback(void)
+{
+	// Never deleted: Qt would free it with its own allocator, not WorldBuilder's pooled one.
+	static WBQtShortcutsFallback *s_fallback = NULL;
+	if (qApp != NULL && s_fallback == NULL)
+	{
+		s_fallback = new WBQtShortcutsFallback;
+		qApp->installEventFilter(s_fallback);
+	}
 }

@@ -39,6 +39,7 @@ typedef struct WBQtHQCaptureParams
 	int clouds;
 	int macroTexture;
 	int stochastic;		// stochastic filtering over all the ground
+	int shadows;
 	int timeOfDay;		// 0 keeps the current one, 1 to 4 morning to night
 	int area;			// WBQT_HQ_AREA_*
 	int customX0;		// custom area corners in cells, without the border
@@ -57,6 +58,8 @@ int  WBQtHQPreview_Supersample(void);
 int  WBQtHQPreview_MaxCapture(void);
 // The map without its border, and the playable boundary, in cells.
 void WBQtHQPreview_GetMapCells(int *width, int *height, int *playableWidth, int *playableHeight);
+// The area at its own proportions within a size^2 square. Frames stretch the area over the whole square.
+void WBQtHQPreview_FitSize(const WBQtHQCaptureParams *capture, int size, int *width, int *height);
 
 void WBQtHQPreview_GetDefaults(WBQtHQPreviewParams *params, WBQtHQCaptureParams *capture);
 // The settings last saved with, or the defaults.

@@ -19,8 +19,10 @@
 #include "WBQtMainWindow.h"
 #include "WBQtTheme.h"
 #include "WBQtChromeBridge.h"
+#include "WBQtShortcuts.h"
 
 #include <QApplication>
+#include <QGuiApplication>
 #include <QResizeEvent>
 #include <QScreen>
 #include <QTimer>
@@ -38,11 +40,28 @@ class WbViewportHost : public QWinHost
 public:
 	explicit WbViewportHost(QWidget *parent)
 		: QWinHost(parent),
-		m_resizeTimer(new QTimer(this))
+		m_resizeTimer(new QTimer(this)),
+		m_frameTimer(new QTimer(this))
 	{
 		m_resizeTimer->setSingleShot(true);
 		m_resizeTimer->setInterval(60);
 		connect(m_resizeTimer, SIGNAL(timeout()), this, SLOT(applyDeviceSize()));
+		m_frameTimer->setSingleShot(true);
+		m_frameTimer->setTimerType(Qt::PreciseTimer);
+		connect(m_frameTimer, SIGNAL(timeout()), this, SLOT(requestFrame()));
+	}
+
+	void scheduleFrame(int delayMs)
+	{
+		if (!isVisible() || QWidget::window()->isMinimized())
+		{
+			m_frameTimer->stop();
+			return;
+		}
+		if (!m_frameTimer->isActive())
+		{
+			m_frameTimer->start(delayMs);
+		}
 	}
 
 protected:
@@ -53,6 +72,14 @@ protected:
 	}
 
 private slots:
+	void requestFrame()
+	{
+		if (isVisible() && !QWidget::window()->isMinimized() && ::IsWindow(window()))
+		{
+			::InvalidateRect(window(), NULL, FALSE);
+		}
+	}
+
 	void applyDeviceSize()
 	{
 		RECT rc;
@@ -64,6 +91,7 @@ private slots:
 
 private:
 	QTimer *m_resizeTimer;
+	QTimer *m_frameTimer;
 };
 
 // The Phase 2 host sandwich, owned for the process life:
@@ -72,6 +100,16 @@ private:
 // widget instead (QMainWindow -> g_wbViewportPane -> view).
 static QWinWidget    *g_wbViewportHost = NULL;
 static WbViewportHost *g_wbViewportPane = NULL;
+
+int WBQt_ScheduleViewportFrame(void *viewHwnd, int delayMs)
+{
+	if (g_wbViewportPane == NULL || g_wbViewportPane->window() != reinterpret_cast<HWND>(viewHwnd))
+	{
+		return 0;
+	}
+	g_wbViewportPane->scheduleFrame(delayMs);
+	return 1;
+}
 
 // Stage 1: the inversion is the default in Qt builds; it flips off only if the main
 // window cannot be created (then the legacy chrome-in-frame path runs).
@@ -96,7 +134,16 @@ void WBQt_DisableInversion(void)
 // be oversized -- clamp against the available screen area.
 static void wbClampToAvailableScreen(int &x, int &y, int &w, int &h)
 {
-	QScreen *screen = QApplication::primaryScreen();
+	// The screen the window sits on, so a window closed on a second monitor reopens there.
+	QScreen *screen = QApplication::screenAt(QPoint(x + w / 2, y + h / 2));
+	if (screen == NULL)
+	{
+		screen = QApplication::screenAt(QPoint(x, y));
+	}
+	if (screen == NULL)
+	{
+		screen = QApplication::primaryScreen();
+	}
 	if (screen == NULL)
 	{
 		return;
@@ -299,6 +346,12 @@ void *WBQt_EffectiveOwnerHwnd(void *frameHwnd)
 
 void WBQt_Startup(void)
 {
+	// The main window always refuses close, so Qt's fallback would veto every Windows logoff.
+	QT_WARNING_PUSH
+	QT_WARNING_DISABLE_DEPRECATED
+	QGuiApplication::setFallbackSessionManagementEnabled(false);
+	QT_WARNING_POP
+
 	// pluginInstance(0): WorldBuilder is the executable itself, not a DLL, so there is
 	// no module to pin -- 0 is the documented same-executable usage. This creates the
 	// QApplication and installs the message hook that drives Qt from MFC's loop.
@@ -310,6 +363,8 @@ void WBQt_Startup(void)
 	// Give every Qt top-level (main window + all dialogs / tool windows) the app's title-bar
 	// icon, from the same IDR_MAINFRAME the MFC frame used. App-wide, before any window shows.
 	WBQtChrome_SetAppIcon();
+
+	WBQtShortcuts_InstallQtFallback();
 }
 
 void WBQt_Shutdown(void)

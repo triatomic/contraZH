@@ -273,6 +273,7 @@ DrawableLocoInfo::DrawableLocoInfo()
 
   m_yawModulator = 0.0f;
   m_pitchModulator = 0.0f;
+	m_smoothedVelZ = 0.0f;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -615,6 +616,7 @@ Drawable::Drawable( const ThingTemplate *thingTemplate, DrawableStatusBits statu
 	//Real scaleFuzziness = thingTemplate->getInstanceScaleFuzziness();
 	//Real fuzzyScale = ( 1.0f + GameClientRandomValueReal( -scaleFuzziness, scaleFuzziness ));
 	m_instanceScale = thingTemplate->getAssetScale();// * fuzzyScale;
+	m_objectScale = 1.0f;
 
 	// initially not bound to an object
 	m_object = nullptr;
@@ -874,6 +876,32 @@ Bool Drawable::getShouldAnimate( Bool considerPower ) const
 	}
 
 	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool Drawable::areLightsDisabled() const
+{
+	if (testDrawableStatus(DRAWABLE_STATUS_NO_SHADERS))
+	{
+		return TRUE;
+	}
+
+	const Object *obj = getObject();
+	if (!obj || !obj->isKindOf(KINDOF_STRUCTURE))
+	{
+		return FALSE;
+	}
+
+	DisabledMaskType disabling = obj->getDisabledFlags();
+	disabling.clear(MAKE_DISABLED_MASK(DISABLED_HELD));
+	if (DISABLEDMASK_ANY_SET(disabling) || obj->testScriptStatusBit(OBJECT_STATUS_SCRIPT_UNPOWERED))
+	{
+		return TRUE;
+	}
+
+	static const NameKeyType poweredBehaviorKey = NAMEKEY("PoweredBehavior");
+	const Player *player = obj->getControllingPlayer();
+	return player && (obj->isKindOf(KINDOF_POWERED) || obj->findUpdateModule(poweredBehaviorKey)) && !player->getEnergy()->hasSufficientPower();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -1397,6 +1425,8 @@ void Drawable::imitateStealthLook( Drawable& otherDraw )
   m_hiddenByStealth = otherDraw.isDrawableEffectivelyHidden();
   m_stealthLook = otherDraw.getStealthLook();
   m_secondMaterialPassOpacity = otherDraw.getSecondMaterialPassOpacity();
+  m_jammingOverlayIntensity = otherDraw.getJammingOverlayIntensity();
+  m_frozenOverlayIntensity = otherDraw.getFrozenOverlayIntensity();
 
 }
 
@@ -1660,7 +1690,7 @@ void Drawable::flashAsSelected( const RGBColor *color ) ///< drawable takes care
 		{
 			RGBColor tempColor;
 			if (TheGlobalData->m_selectionFlashHouseColor)
-				tempColor.setFromInt(obj->getIndicatorColor());
+				tempColor.setFromInt(rts::getHouseColorForLocalView(obj->getIndicatorColor(), obj->getControllingPlayer()));
 			else
 				tempColor.setFromInt(0xffffffff);//white
 
@@ -1677,17 +1707,33 @@ void Drawable::applyPhysicsXform(Matrix3D* mtx)
 {
 	if (m_physicsXform != nullptr)
 	{
-		// TheSuperHackers @tweak Update the physics transform on every WW Sync only.
-		// All calculations are originally catered to a 30 fps logic step.
+		// TheSuperHackers @tweak Advance physics only on WW Sync frames.
 		if (WW3D::Get_Sync_Frame_Time() != 0)
 		{
+			m_physicsXform->setPrevTotals();
 			calcPhysicsXform(*m_physicsXform);
+
+			// New or previously undrawn objects have no result from the previous logic step.
+			if (m_physicsXform->m_syncTime != WW3D::Get_Previous_Sync_Time())
+			{
+				m_physicsXform->setPrevTotals();
+			}
+			m_physicsXform->m_syncTime = WW3D::Get_Sync_Time();
 		}
 
-		mtx->Translate(0.0f, 0.0f, m_physicsXform->m_totalZ);
-		mtx->Rotate_Y( m_physicsXform->m_totalPitch );
-		mtx->Rotate_X( -m_physicsXform->m_totalRoll );
-		mtx->Rotate_Z( m_physicsXform->m_totalYaw );
+		// TheSuperHackers @tweak bobtista 14/09/2026 Interpolate the rendered transform between
+		// logic frames, so the motion stays smooth when the render rate is above the logic rate.
+		const Real t = m_drawnValid ? m_drawnProgress : 1.0f;
+
+		const Real interpPitch = WWMath::Lerp(m_physicsXform->m_prevTotalPitch, m_physicsXform->m_totalPitch, t);
+		const Real interpRoll = WWMath::Lerp(m_physicsXform->m_prevTotalRoll, m_physicsXform->m_totalRoll, t);
+		const Real interpYaw = WWMath::Lerp(m_physicsXform->m_prevTotalYaw, m_physicsXform->m_totalYaw, t);
+		const Real interpZ = WWMath::Lerp(m_physicsXform->m_prevTotalZ, m_physicsXform->m_totalZ, t);
+
+		mtx->Translate(0.0f, 0.0f, interpZ);
+		mtx->Rotate_Y( interpPitch );
+		mtx->Rotate_X( -interpRoll );
+		mtx->Rotate_Z( interpYaw );
 	}
 }
 
@@ -1900,10 +1946,14 @@ void Drawable::calcPhysicsXformHoverOrWings( const Locomotor *locomotor, Physics
   {
 		if (Z_VEL_PITCH_COEFF != 0.0f)
 		{
+			// Lift control on a slope alternates full and zero lift each frame, which pitches slow fliers visibly.
+			const Real Z_VEL_SMOOTHING = 0.2f;
+			m_locoInfo->m_smoothedVelZ += Z_VEL_SMOOTHING * (vel->z - m_locoInfo->m_smoothedVelZ);
+
 			const Real TINY_DZ = 0.001f;
-			if (fabs(vel->z) > TINY_DZ)
+			if (fabs(m_locoInfo->m_smoothedVelZ) > TINY_DZ)
 			{
-				Real pitch = atan2(vel->z, sqrt(sqr(vel->x)+sqr(vel->y)));
+				Real pitch = atan2(m_locoInfo->m_smoothedVelZ, sqrt(sqr(vel->x)+sqr(vel->y)));
 				m_locoInfo->m_pitch -= Z_VEL_PITCH_COEFF * pitch;
 			}
 		}
@@ -2139,36 +2189,6 @@ void Drawable::calcPhysicsXformTreads( const Locomotor *locomotor, PhysicsXformI
 		m_locoInfo->m_accelerationRollRate += -(LATERAL_ACCEL_COEFF * lateralAccel);
 	}
 
-#ifdef RECOIL_FROM_BEING_DAMAGED
-	// recoil from being hit
-	/// @todo Recoil needs to be based on sane damage amounts (MSB)
-	const DamageInfo *damageInfo = obj->getBodyModule()->getLastDamageInfo();
-	if (damageInfo)
-	{
-		if (obj->getBodyModule()->getLastDamageTimestamp() > m_lastDamageTimestamp && damageInfo->in.m_amount > RECOIL_DAMAGE)
-		{
-			Object *attacker = TheGameLogic->getObject( damageInfo->in.m_sourceID );
-			if (attacker)
-			{
-				Coord3D to;
-				ThePartitionManager->getVectorTo( obj, attacker, FROM_CENTER_2D, &to );
-
-				to.normalize();
-
-				Real forward = dir->x * to.x + dir->y * to.y;
-				Real lateral = perp.x * to.x + perp.y * to.y;
-
-				Real recoil = PI/16.0f * GameClientRandomValueReal( 0.5f, 1.0f );
-
-				m_locoInfo->m_accelerationPitchRate -= recoil * forward;
-				m_locoInfo->m_accelerationRollRate -= recoil * lateral;
-			}
-
-			m_lastDamageTimestamp = obj->getBodyModule()->getLastDamageTimestamp();
-		}
-	}
-#endif
-
 	// limit recoil pitch and roll
 
 	if (m_locoInfo->m_accelerationPitch > DECEL_PITCH_LIMIT)
@@ -2291,6 +2311,11 @@ void Drawable::calcPhysicsXformWheels( const Locomotor *locomotor, PhysicsXformI
 		Real width = obj->getGeometryInfo().getMinorRadius();
 		Real pitchHeight = length*Sin(m_locoInfo->m_pitch + m_locoInfo->m_accelerationPitch - groundPitch);
 		Real rollHeight = width*Sin(m_locoInfo->m_roll + m_locoInfo->m_accelerationRoll - groundRoll);
+
+		// Draw level while airborne, as retail did; the persistent transform would otherwise keep the last ground tilt.
+		info.m_totalPitch = 0.0f;
+		info.m_totalRoll = 0.0f;
+		info.m_totalYaw = 0.0f;
 		info.m_totalZ = fabs(pitchHeight)/4 + fabs(rollHeight)/4;
 		return; // maintain the same orientation while we fly through the air.
 	}
@@ -2974,6 +2999,12 @@ void Drawable::draw()
 #endif
 	}
 
+	// A baked per-instance scale would corrupt the pristine bones every instance of the template shares.
+	if (m_objectScale != 1.0f)
+	{
+		transformMtx.Scale(m_objectScale);
+	}
+
 	if (TheGlobalData->m_showClientPhysics && getObject() && !getObject()->isDisabledByType( DISABLED_HELD ))
 	{
 		applyPhysicsXform(&transformMtx);
@@ -3060,7 +3091,7 @@ static const Int MODEL_LABEL_SIDE_SLOP = 8;
 // Most models labelled on one object.
 static const Int MAX_OVERLAY_MODEL_LABELS = 16;
 
-// Model labels placed this render frame, so labels that would overlap push above each other.
+// Model and particle callouts share slots so their labels do not overlap.
 static const Int MAX_MODEL_OVERLAY_SLOTS = 256;
 static IRegion2D s_modelOverlaySlots[ MAX_MODEL_OVERLAY_SLOTS ];
 static Int s_modelOverlaySlotCount = 0;
@@ -3090,6 +3121,83 @@ static DisplayString *getOverlayString()
 		s_nameString = newSmallDisplayString();
 	}
 	return s_nameString;
+}
+
+//-------------------------------------------------------------------------------------------------
+static void drawOverlayCallout( const AsciiString &name, const AsciiString &fxName,
+		const ICoord2D &point, Bool toLeft, Color color, Color fxColor, Color dropColor )
+{
+	const UnsignedInt renderFrame = WW3D::Get_Frame_Count();
+	if( renderFrame != s_modelOverlayFrame )
+	{
+		s_modelOverlayFrame = renderFrame;
+		s_modelOverlaySlotCount = 0;
+	}
+
+	UnicodeString line;
+	line.format( L"%hs", name.str() );
+	s_nameString->setText( line );
+
+	Int width, height;
+	s_nameString->getSize( &width, &height );
+	Int fxHeight = 0;
+	UnicodeString fxLine;
+	if( !fxName.isEmpty() )
+	{
+		fxLine.format( L"%hs", fxName.str() );
+		s_nameString->setText( fxLine );
+		Int fxWidth;
+		s_nameString->getSize( &fxWidth, &fxHeight );
+		width = max( width, fxWidth );
+		height += fxHeight;
+	}
+
+	const Int leaderEndX = toLeft ? ( point.x - MODEL_LABEL_REACH_X ) : ( point.x + MODEL_LABEL_REACH_X );
+
+	IRegion2D rect;
+	rect.lo.x = toLeft ? ( leaderEndX - MODEL_LABEL_GAP - width ) : ( leaderEndX + MODEL_LABEL_GAP );
+	rect.hi.x = rect.lo.x + width;
+	rect.lo.y = point.y - MODEL_LABEL_REACH_Y - ( height / 2 );
+	rect.hi.y = rect.lo.y + height;
+
+	// Each push clears one placed label for good, so a pass per slot settles it.
+	for( Int pass = 0; pass <= s_modelOverlaySlotCount; ++pass )
+	{
+		Bool moved = FALSE;
+		for( Int i = 0; i < s_modelOverlaySlotCount; ++i )
+		{
+			const IRegion2D &slot = s_modelOverlaySlots[i];
+			if( rect.lo.x >= slot.hi.x || rect.hi.x <= slot.lo.x ||
+					rect.lo.y >= slot.hi.y || rect.hi.y <= slot.lo.y )
+			{
+				continue;
+			}
+
+			const Int shift = rect.hi.y - slot.lo.y;
+			rect.lo.y -= shift;
+			rect.hi.y -= shift;
+			moved = TRUE;
+		}
+
+		if( !moved )
+		{
+			break;
+		}
+	}
+
+	if( s_modelOverlaySlotCount < MAX_MODEL_OVERLAY_SLOTS )
+	{
+		s_modelOverlaySlots[ s_modelOverlaySlotCount++ ] = rect;
+	}
+
+	// The leader ends level with the middle of the text, wherever the push left it.
+	TheDisplay->drawLine( point.x, point.y, leaderEndX, ( rect.lo.y + rect.hi.y ) / 2, 1.0f, color );
+	if( fxHeight > 0 )
+	{
+		s_nameString->draw( rect.lo.x, rect.lo.y, fxColor, dropColor );
+	}
+	s_nameString->setText( line );
+	s_nameString->draw( rect.lo.x, rect.lo.y + fxHeight, color, dropColor );
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -3157,7 +3265,7 @@ static void drawOverlayLinePair( DisplayString *str, const UnicodeString &leftTe
 // keeps its slot. When the list is full the oldest entry is replaced, since the point of the
 // linger is to catch what just happened.
 //-------------------------------------------------------------------------------------------------
-void Drawable::rememberParticleNames( const AsciiString *names, const AsciiString *fxNames,
+void Drawable::rememberParticleNames( const AsciiString *names, const AsciiString *fxNames, const Coord3D *positions,
 																	Int count, UnsignedInt nowFrame )
 {
 	if( count <= 0 && m_particleNameInfo == nullptr )
@@ -3177,6 +3285,7 @@ void Drawable::rememberParticleNames( const AsciiString *names, const AsciiStrin
 			if( info->m_name[n] == names[i] && info->m_fxName[n] == fxNames[i] )
 			{
 				info->m_lastSeenFrame[n] = nowFrame;
+				info->m_position[n] = positions[i];
 				found = TRUE;
 				break;
 			}
@@ -3203,6 +3312,7 @@ void Drawable::rememberParticleNames( const AsciiString *names, const AsciiStrin
 
 		info->m_name[slot] = names[i];
 		info->m_fxName[slot] = fxNames[i];
+		info->m_position[slot] = positions[i];
 		info->m_lastSeenFrame[slot] = nowFrame;
 	}
 }
@@ -3214,7 +3324,7 @@ void Drawable::rememberParticleNames( const AsciiString *names, const AsciiStrin
 // draws bottom up, so the newest name lands at the top of the stack either way.
 // Returns how many were written into the caller's arrays.
 //-------------------------------------------------------------------------------------------------
-Int Drawable::collectRememberedParticleNames( AsciiString *names, AsciiString *fxNames,
+Int Drawable::collectRememberedParticleNames( AsciiString *names, AsciiString *fxNames, Coord3D *positions,
 																							UnsignedInt nowFrame, UnsignedInt lingerFrames ) const
 {
 	if( m_particleNameInfo == nullptr )
@@ -3267,6 +3377,7 @@ Int Drawable::collectRememberedParticleNames( AsciiString *names, AsciiString *f
 		const Int src = selected[ written - 1 - w ];
 		names[w] = info->m_name[src];
 		fxNames[w] = info->m_fxName[src];
+		positions[w] = info->m_position[src];
 	}
 
 	return written;
@@ -3276,7 +3387,7 @@ Int Drawable::collectRememberedParticleNames( AsciiString *names, AsciiString *f
 
 //-------------------------------------------------------------------------------------------------
 // TheSuperHackers @feature Draw the object template name and/or the names of the particle systems
-// running on this drawable, stacked above the health bar. Toggled by the Ctrl+[ and Ctrl+] cheats.
+// running on this drawable. Toggled by the Ctrl+[ and Ctrl+] cheats.
 //
 // Called from drawIconUI before the dead and KINDOF_IGNORED_IN_GUI bails, so this covers every
 // drawable on screen -- selected or not, props and wreckage included -- which is the whole point
@@ -3353,13 +3464,11 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 	const Color armorSetColor = GameMakeColor( 130, 200, 255, 255 );
 	const Color modelNameColor = GameMakeColor( 90, 225, 195, 255 );
 
-	// Lines stack upward from just above the bar, so adding particle names never pushes the object
-	// name off its anchor.
+	// Object labels stack upward from just above the health bar.
 	Int lineY = anchor.y - 2;
 
-	// Particle names sit above the object name, so they are gathered and drawn first from the
-	// bottom up. Reverse order here means the list still reads top to bottom on screen.
-	if( wantParticleNames && TheParticleSystemManager != nullptr )
+	// Particle callouts point to emitter positions and retain the last position while lingering.
+	if( wantParticleNames && TheParticleSystemManager != nullptr && TheTacticalView != nullptr )
 	{
 		const DrawableID myDrawableID = getID();
 		const ObjectID myObjectID = obj->getID();
@@ -3375,6 +3484,7 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 		// The FXList each system came from, empty when it was created directly rather than through
 		// one. Kept parallel to names so the pair can be drawn together.
 		AsciiString fxNames[ MAX_OVERLAY_PARTICLE_LINES ];
+		Coord3D positions[ MAX_OVERLAY_PARTICLE_LINES ];
 		Int nameCount = 0;
 
 		// Options.ini: ParticleNameLingerMS. Zero, or the key absent, keeps the original behaviour --
@@ -3452,6 +3562,10 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 			if( alreadyListed )
 				continue;
 
+			if( !sys->getDebugWorldPosition( &positions[ nameCount ] ) )
+			{
+				continue;
+			}
 			fxNames[ nameCount ] = fxName;
 			names[ nameCount++ ] = sysName;
 
@@ -3465,29 +3579,33 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 		// and the overlay draws from that instead, so a name outlives the system that produced it.
 		if( remembering )
 		{
-			rememberParticleNames( names, fxNames, nameCount, nowFrame );
+			rememberParticleNames( names, fxNames, positions, nameCount, nowFrame );
 
 			const UnsignedInt lingerFrames =
 					(UnsignedInt)( (Real)lingerMS * LOGICFRAMES_PER_MSEC_REAL );
 
-			nameCount = collectRememberedParticleNames( names, fxNames, nowFrame, lingerFrames );
+			nameCount = collectRememberedParticleNames( names, fxNames, positions, nowFrame, lingerFrames );
 		}
 
-		// Drawn bottom up, so within a pair the particle name is emitted before the FXList that
-		// owns it -- leaving the FX name sitting above its particles on screen, the way the INI
-		// nests them.
 		for( Int i = nameCount - 1; i >= 0; --i )
 		{
-			UnicodeString line;
-			line.format( L"%hs", names[i].str() );
-			drawOverlayLine( s_nameString, line, anchor.x, lineY, particleColor, dropColor );
-
-			// Only systems created through an FXList carry one.
-			if( !fxNames[i].isEmpty() )
+			ICoord2D point;
+			if( !TheTacticalView->worldToScreen( &positions[i], &point ) )
 			{
-				line.format( L"%hs", fxNames[i].str() );
-				drawOverlayLine( s_nameString, line, anchor.x, lineY, fxListColor, dropColor );
+				continue;
 			}
+
+			Bool toLeft = ( ( i & 1 ) == 0 );
+			if( point.x < anchor.x - MODEL_LABEL_SIDE_SLOP )
+			{
+				toLeft = TRUE;
+			}
+			else if( point.x > anchor.x + MODEL_LABEL_SIDE_SLOP )
+			{
+				toLeft = FALSE;
+			}
+
+			drawOverlayCallout( names[i], fxNames[i], point, toLeft, particleColor, fxListColor, dropColor );
 		}
 	}
 
@@ -3534,13 +3652,6 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 	// Each model gets a callout with a leader to one side instead of a line in the stack.
 	if( wantModelNames && TheTacticalView != nullptr )
 	{
-		const UnsignedInt renderFrame = WW3D::Get_Frame_Count();
-		if( renderFrame != s_modelOverlayFrame )
-		{
-			s_modelOverlayFrame = renderFrame;
-			s_modelOverlaySlotCount = 0;
-		}
-
 		AsciiString modelNames[ MAX_OVERLAY_MODEL_LABELS ];
 		ICoord2D modelPoints[ MAX_OVERLAY_MODEL_LABELS ];
 		Int modelCount = 0;
@@ -3586,54 +3697,7 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 				toLeft = FALSE;
 			}
 
-			UnicodeString line;
-			line.format( L"%hs", modelNames[m].str() );
-			s_nameString->setText( line );
-
-			Int width, height;
-			s_nameString->getSize( &width, &height );
-
-			const Int leaderEndX = toLeft ? ( point.x - MODEL_LABEL_REACH_X ) : ( point.x + MODEL_LABEL_REACH_X );
-
-			IRegion2D rect;
-			rect.lo.x = toLeft ? ( leaderEndX - MODEL_LABEL_GAP - width ) : ( leaderEndX + MODEL_LABEL_GAP );
-			rect.hi.x = rect.lo.x + width;
-			rect.lo.y = point.y - MODEL_LABEL_REACH_Y - ( height / 2 );
-			rect.hi.y = rect.lo.y + height;
-
-			// Each push clears one placed label for good, so a pass per slot settles it.
-			for( Int pass = 0; pass <= s_modelOverlaySlotCount; ++pass )
-			{
-				Bool moved = FALSE;
-				for( Int i = 0; i < s_modelOverlaySlotCount; ++i )
-				{
-					const IRegion2D &slot = s_modelOverlaySlots[i];
-					if( rect.lo.x >= slot.hi.x || rect.hi.x <= slot.lo.x ||
-							rect.lo.y >= slot.hi.y || rect.hi.y <= slot.lo.y )
-					{
-						continue;
-					}
-
-					const Int shift = rect.hi.y - slot.lo.y;
-					rect.lo.y -= shift;
-					rect.hi.y -= shift;
-					moved = TRUE;
-				}
-
-				if( !moved )
-				{
-					break;
-				}
-			}
-
-			if( s_modelOverlaySlotCount < MAX_MODEL_OVERLAY_SLOTS )
-			{
-				s_modelOverlaySlots[ s_modelOverlaySlotCount++ ] = rect;
-			}
-
-			// The leader ends level with the middle of the text, wherever the push left it.
-			TheDisplay->drawLine( point.x, point.y, leaderEndX, ( rect.lo.y + rect.hi.y ) / 2, 1.0f, modelNameColor );
-			s_nameString->draw( rect.lo.x, rect.lo.y, modelNameColor, dropColor );
+			drawOverlayCallout( modelNames[m], AsciiString(), point, toLeft, modelNameColor, modelNameColor, dropColor );
 		}
 	}
 
@@ -3660,7 +3724,7 @@ void Drawable::drawDebugNameOverlay( const IRegion2D *healthBarRegion )
 
 		AsciiString armorName;
 		if( armorSet != NULL && TheArmorStore != NULL )
-			armorName = TheArmorStore->getArmorTemplateName( armorSet->getArmorTemplate() );
+			armorName = TheArmorStore->friend_findArmorTemplateName( armorSet->getArmorTemplate() );
 
 		UnicodeString armorLine;
 		// An object with no armor at all is normal for props and rubble, so say so rather than
@@ -3932,7 +3996,7 @@ void Drawable::drawIconUI()
 		return;
 #endif
 
-	if( TheGameLogic->getDrawIconUI() && (TheScriptEngine->getFade()==ScriptEngine::FADE_NONE) )
+	if( TheGameLogic->getDrawIconUI() && (TheScriptEngine->getFade()==ScriptEngine::FADE_NONE || TheScriptEngine->isLightningFade()) )
 	{
 		IRegion2D healthBarRegionStorage;
 		const IRegion2D* healthBarRegion = nullptr;
@@ -4074,6 +4138,15 @@ void Drawable::drawEmoticon( const IRegion2D *healthBarRegion )
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+// TheSuperHackers @feature Overlays shown without selection or hover hide while a script
+// letterboxes the screen, the way campaign cinematics hide the control bar.
+// ------------------------------------------------------------------------------------------------
+static Bool isScriptHidingUI()
+{
+	return TheDisplay && TheDisplay->isLetterBoxed();
+}
+
+// ------------------------------------------------------------------------------------------------
 void Drawable::drawAmmo( const IRegion2D *healthBarRegion )
 {
 	if (!healthBarRegion)
@@ -4086,7 +4159,7 @@ void Drawable::drawAmmo( const IRegion2D *healthBarRegion )
 	// to the player's own units -- not allies, not enemies -- since standing ammo counts on units
 	// you do not control would be information the game does not otherwise give away. A unit with
 	// no shots left draws nothing at all, so the pips read as "this one is still loaded".
-	const Bool smartPips = TheGlobalData->m_smartPips;
+	const Bool smartPips = TheGlobalData->m_smartPips && !isScriptHidingUI();
 
 	if (!smartPips)
 	{
@@ -4368,7 +4441,7 @@ void Drawable::drawProductionBar( const IRegion2D *healthBarRegion )
 
 	const Object* obj = getObject();
 
-	const Bool alwaysVisible = TheGlobalData->m_healthBarDisplayMode == HealthBarDisplayMode_Always;
+	const Bool alwaysVisible = TheGlobalData->m_healthBarDisplayMode == HealthBarDisplayMode_Always && !isScriptHidingUI();
 
 	if (!(
 				TheGlobalData->m_showObjectHealth &&
@@ -4449,7 +4522,7 @@ void Drawable::drawSupplyBar( const IRegion2D *healthBarRegion )
 
 	const Object* obj = getObject();
 
-	const Bool alwaysVisible = TheGlobalData->m_healthBarDisplayMode == HealthBarDisplayMode_Always;
+	const Bool alwaysVisible = TheGlobalData->m_healthBarDisplayMode == HealthBarDisplayMode_Always && !isScriptHidingUI();
 
 	if (!(
 				TheGlobalData->m_showObjectHealth &&
@@ -4527,7 +4600,7 @@ void Drawable::drawContained( const IRegion2D *healthBarRegion )
 	// allies, not enemies -- so this never reveals cargo the player could not already see. An
 	// empty transport draws nothing either way, thanks to the numFull check below, so the pips
 	// read as "this one is carrying someone".
-	const Bool smartPips = TheGlobalData->m_smartPips;
+	const Bool smartPips = TheGlobalData->m_smartPips && !isScriptHidingUI();
 
 	if (!smartPips)
 	{
@@ -4823,8 +4896,10 @@ void Drawable::drawHealing(const IRegion2D* healthBarRegion)
 //		if( lastDamage != nullptr && lastDamage->in.m_damageType == DAMAGE_HEALING
 //			&&(TheGameLogic->getFrame() - body->getLastHealingTimestamp()) <= HEALING_ICON_DISPLAY_TIME
 //			)
+		const UnsignedInt *lastHealingTimestamp = body->getLastHealingTimestamp();
 		if ( TheGameLogic->getFrame() > HEALING_ICON_DISPLAY_TIME && // because so many things init health early in game
-			(TheGameLogic->getFrame() - body->getLastHealingTimestamp() <= HEALING_ICON_DISPLAY_TIME) )
+			lastHealingTimestamp != nullptr &&
+			(TheGameLogic->getFrame() - *lastHealingTimestamp <= HEALING_ICON_DISPLAY_TIME) )
 
 			showHealing = TRUE;
 	}
@@ -5565,7 +5640,7 @@ static Bool isHealthBarAlwaysVisible( const Object *obj, Real healthRatio )
 {
 	const Int mode = TheGlobalData->m_healthBarDisplayMode;
 
-	if( mode == HealthBarDisplayMode_Classic )
+	if( mode == HealthBarDisplayMode_Classic || isScriptHidingUI() )
 		return FALSE;
 
 	// never label a corpse or a piece of scenery, in any mode
@@ -5910,6 +5985,17 @@ void Drawable::setIndicatorColor(Color color)
 		ObjectDrawInterface* di = (*dm)->getObjectDrawInterface();
 		if (di)
 			di->replaceIndicatorColor(color);
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+void Drawable::refreshIndicatorColor()
+{
+	for (DrawModule** dm = getDrawModules(); *dm; ++dm)
+	{
+		ObjectDrawInterface* di = (*dm)->getObjectDrawInterface();
+		if (di)
+			di->refreshIndicatorColor();
 	}
 }
 
@@ -6640,6 +6726,23 @@ void Drawable::setDrawableHidden( Bool hidden )
 }
 
 //-------------------------------------------------------------------------------------------------
+/** Allow model-condition particle systems to keep emitting while the drawable is hidden */
+//-------------------------------------------------------------------------------------------------
+void Drawable::setKeepParticlesWhenHidden( Bool keep )
+{
+	if (keep == testDrawableStatus(DRAWABLE_STATUS_KEEP_PARTICLES_WHEN_HIDDEN))
+		return;
+
+	if (keep)
+		setDrawableStatus(DRAWABLE_STATUS_KEEP_PARTICLES_WHEN_HIDDEN);
+	else
+		clearDrawableStatus(DRAWABLE_STATUS_KEEP_PARTICLES_WHEN_HIDDEN);
+
+	// let the draw modules re-evaluate whether their particle systems run
+	updateHiddenStatus();
+}
+
+//-------------------------------------------------------------------------------------------------
 void Drawable::updateDrawableClipStatus( UnsignedInt shotsRemaining, UnsignedInt maxShots, WeaponSlotType slot )
 {
 	for (DrawModule** dm = getDrawModulesNonDirty(); *dm; ++dm)
@@ -6886,6 +6989,7 @@ void Drawable::xferDrawableModules( Xfer *xfer )
 	* 9: jamming overlay intensity
 	* 10: frozen overlay intensity
 	* 11: TheSuperHackers @tweak m_timeElapsedFade is now serialized as Real instead of UnsignedInt
+	* 12: m_objectScale
 	*/
 // ------------------------------------------------------------------------------------------------
 void Drawable::xfer( Xfer *xfer )
@@ -6897,7 +7001,7 @@ void Drawable::xfer( Xfer *xfer )
 #elif RETAIL_COMPATIBLE_XFER_SAVE
 	const XferVersion currentVersion = 7;
 #else
-	const XferVersion currentVersion = 11;
+	const XferVersion currentVersion = 12;
 #endif
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
@@ -7413,6 +7517,11 @@ void Drawable::xfer( Xfer *xfer )
 	if( version >= 10 )
 	{
 		xfer->xferReal( &m_frozenOverlayIntensity );
+	}
+
+	if( version >= 12 )
+	{
+		xfer->xferReal( &m_objectScale );
 	}
 }
 

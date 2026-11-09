@@ -75,7 +75,7 @@ public:
 	virtual void RequestGameJoin( LANGameInfo *game, UnsignedInt ip = 0 ) = 0;				///< Request to join a game
 	virtual void RequestGameJoinDirectConnect( UnsignedInt ipaddress ) = 0;						///< Request to join a game at an IP address
 	virtual void RequestGameLeave() = 0;																				///< Tell everyone we're leaving
-	virtual void RequestAccept() = 0;																						///< Indicate we're OK with the game options
+	virtual void RequestAccept( Bool accept = TRUE ) = 0;																	///< Indicate we're OK with the game options, or take that back
 	virtual void RequestHasMap() = 0;																						///< Send our map status
 	virtual void RequestChat( UnicodeString message, ChatType format ) = 0;						///< Send a chat message
 	virtual void RequestPlayerChat( UnicodeString message ) = 0;
@@ -294,7 +294,7 @@ public:
 	virtual void RequestGameJoin( LANGameInfo *game, UnsignedInt ip = 0 ) override;				///< Request to join a game
 	virtual void RequestGameJoinDirectConnect( UnsignedInt ipaddress ) override;						///< Request to join a game at an IP address
 	virtual void RequestGameLeave() override;																				///< Tell everyone we're leaving
-	virtual void RequestAccept() override;																						///< Indicate we're OK with the game options
+	virtual void RequestAccept( Bool accept = TRUE ) override;																	///< Indicate we're OK with the game options, or take that back
 	virtual void RequestHasMap() override;																						///< Send our map status
 	virtual void RequestChat( UnicodeString message, ChatType format ) override;						///< Send a chat message
 	virtual void RequestPlayerChat( UnicodeString message ) override;
@@ -341,6 +341,7 @@ public:
 	virtual UnsignedInt GetLocalIP() { return m_localIP; }								///< What's my IP?
 	virtual void fillInLANMessage( LANMessage *msg ) override;																	///< Fill in default params
 	virtual void checkMOTD() override;
+	Bool IsGameStartCountdownRunning();																											///< Has the host started the start countdown?
 protected:
 
 	enum PendingActionType
@@ -361,6 +362,7 @@ protected:
 	AsciiString					m_hostName;						///< machine name
 	UnsignedInt					m_gameStartTime;
 	Int									m_gameStartSeconds;
+	UnsignedInt					m_lastStartTimerHeard;	///< When the last countdown second arrived, for clients
 
 	PendingActionType		m_pendingAction;	///< What action are we performing?
 	UnsignedInt					m_expiration;						///< When should we give up on our action?

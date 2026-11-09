@@ -20,6 +20,8 @@
 
 #define GENERALS_GUID "685EAFF2-3216-4265-B047-251C5F4B82F3"
 
+extern const char *gAppPrefix;
+
 namespace rts
 {
 HANDLE ClientInstance::s_mutexHandle = nullptr;
@@ -127,6 +129,10 @@ UnsignedInt ClientInstance::getInstanceId()
 
 const char* ClientInstance::getFirstInstanceName()
 {
+	if (strcmp(gAppPrefix, "wb_") == 0)
+	{
+		return GENERALS_GUID "-WorldBuilder";
+	}
 	return GENERALS_GUID;
 }
 

@@ -31,12 +31,14 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "GameLogic/Module/UpdateModule.h"
+#include "GameLogic/Module/UpgradeModule.h"
 #include "GameLogic/Weapon.h"
 
 //-------------------------------------------------------------------------------------------------
 class FireWeaponUpdateModuleData : public UpdateModuleData
 {
 public:
+	UpgradeMuxData m_upgradeMuxData;
 	const WeaponTemplate* m_weaponTemplate;
   UnsignedInt m_initialDelayFrames;
 	UnsignedInt m_exclusiveWeaponDelay;	///< If non-zero, any other weapon having fired this recently will keep us from doing anything
@@ -51,7 +53,7 @@ private:
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
-class FireWeaponUpdate : public UpdateModule
+class FireWeaponUpdate : public UpdateModule, public UpgradeMux
 {
 
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE( FireWeaponUpdate, "FireWeaponUpdate" )
@@ -62,9 +64,40 @@ public:
 	FireWeaponUpdate( Thing *thing, const ModuleData* moduleData );
 	// virtual destructor prototype provided by memory pool declaration
 
+	static Int getInterfaceMask() { return UpdateModule::getInterfaceMask() | MODULEINTERFACE_UPGRADE; }
+
+	virtual UpgradeModuleInterface* getUpgrade() override { return this; }
+
 	virtual UpdateSleepTime update() override;
 
 protected:
+
+	// firing is gated on the live mask, so the upgrade itself only drives FX and removal
+	virtual void upgradeImplementation() override
+	{
+	}
+
+	virtual void getUpgradeActivationMasks(UpgradeMaskType& activation, UpgradeMaskType& conflicting) const override
+	{
+		getFireWeaponUpdateModuleData()->m_upgradeMuxData.getUpgradeActivationMasks(activation, conflicting);
+	}
+
+	virtual void performUpgradeFX() override
+	{
+		getFireWeaponUpdateModuleData()->m_upgradeMuxData.performUpgradeFX(getObject());
+	}
+
+	virtual void processUpgradeRemoval() override
+	{
+		getFireWeaponUpdateModuleData()->m_upgradeMuxData.muxDataProcessUpgradeRemoval(getObject());
+	}
+
+	virtual Bool requiresAllActivationUpgrades() const override
+	{
+		return getFireWeaponUpdateModuleData()->m_upgradeMuxData.m_requiresAllTriggers;
+	}
+
+	virtual Bool isSubObjectsUpgrade() override { return false; }
 
 	Bool isOkayToFire();
 

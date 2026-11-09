@@ -42,6 +42,7 @@
 #include "GameClient/GameText.h"
 #include "GameClient/GUICallbacks.h"
 #include "GameClient/InGameUI.h"
+#include "GameClient/Keyboard.h"
 #include "GameClient/LanguageFilter.h"
 #include "GameLogic/GameLogic.h"
 #include "GameNetwork/GameInfo.h"
@@ -62,9 +63,6 @@ extern NGMPGame* TheNGMPGame;
 // ------------------------------------------------------------------------------------------------
 void ShowInGameChat( Bool immediate )
 {
-	if (TheGameLogic->isInReplayGame())
-		return;
-
 	if (TheInGameUI->isQuitMenuVisible())
 		return;
 
@@ -188,8 +186,8 @@ Bool handleInGameSlashCommands(UnicodeString uText)
 		return TRUE; // was a slash command
 	}
 
-	// User-defined chat commands from ChatCommands.ini. Singleplayer/skirmish only for now.
-	const Bool isSinglePlayer = (!TheGameInfo || !TheGameInfo->isMultiPlayer());
+	// LAN and online matches cannot run local chat commands.
+	const Bool isSinglePlayer = TheGameLogic && !TheGameLogic->isInMultiplayerGame();
 	if (isSinglePlayer && TheChatCommandStore)
 	{
 		const ChatCommand *command = TheChatCommandStore->findChatCommand(token);
@@ -211,15 +209,13 @@ Bool handleInGameSlashCommands(UnicodeString uText)
 // ------------------------------------------------------------------------------------------------
 void ToggleInGameChat( Bool immediate )
 {
-	static Bool justHid = false;
-	if (justHid)
+	// One Enter press arrives twice, as a key down and as a typed character, up to one keyboard read apart in either order
+	static UnsignedInt lastToggleRead = 0;
+	const UnsignedInt keyboardRead = TheKeyboard->getUpdateCount();
+	if (lastToggleRead != 0 && keyboardRead - lastToggleRead <= 1)
 	{
-		justHid = false;
 		return;
 	}
-
-	if (TheGameLogic->isInReplayGame())
-		return;
 
 	// Block the chat window in singleplayer/skirmish unless EnableSingleplayerChatwindow is set (for chat commands).
 	// GeneralsOnline port: an active NGMP game also allows chat (upstream GO instead
@@ -229,8 +225,10 @@ void ToggleInGameChat( Bool immediate )
 		TheNGMPGame == nullptr &&
 #endif
 		!TheGlobalData->m_enableSingleplayerChatWindow
-		&& (!TheGameInfo || !TheGameInfo->isMultiPlayer()) && TheGlobalData->m_netMinPlayers)
+		&& !TheGameLogic->isInMultiplayerGame() && TheGlobalData->m_netMinPlayers)
 		return;
+
+	lastToggleRead = keyboardRead;
 
 	if (chatWindow)
 	{
@@ -279,7 +277,6 @@ void ToggleInGameChat( Bool immediate )
 				}
 				GadgetTextEntrySetText( chatTextEntry, UnicodeString::TheEmptyString );
 				HideInGameChat( immediate );
-				justHid = true;
 			}
 		}
 	}

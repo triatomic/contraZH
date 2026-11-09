@@ -2574,8 +2574,11 @@ Int DrawObject::updateVB(DX8VertexBufferClass	*pVB, Int color, Bool doArrow, Boo
 {
 	if (pVB )
 	{
+		// GPU buffer reads stall, so build the icon before locking its upload buffer.
+		VertexFormatXYZDUV1 vertices[6 * NUM_TRI] = {};
+		fillIconVertices(vertices, color, doArrow, doDiamond, disableColoring);
 		DX8VertexBufferClass::WriteLockClass lockVtxBuffer(pVB, D3DLOCK_DISCARD);
-		fillIconVertices((VertexFormatXYZDUV1*)lockVtxBuffer.Get_Vertex_Array(), color, doArrow, doDiamond, disableColoring);
+		memcpy(lockVtxBuffer.Get_Vertex_Array(), vertices, sizeof(vertices));
 		return 0; //success.
 	}
 	return -1;

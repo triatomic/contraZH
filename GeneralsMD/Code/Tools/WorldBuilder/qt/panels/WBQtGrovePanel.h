@@ -39,6 +39,8 @@ protected:
 	// Re-read Grovesets.ini into the set-name combo each time the panel is shown, so a set
 	// renamed (via the Settings button / Notepad) while the panel was hidden shows up.
 	virtual void showEvent(QShowEvent *event);
+	// Re-read the set names as the set combo's drop-down opens (== MFC ON_CBN_DROPDOWN).
+	virtual bool eventFilter(QObject *watched, QEvent *event);
 
 private slots:
 	void onSetNameChanged(int index);

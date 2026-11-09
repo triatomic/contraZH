@@ -55,6 +55,10 @@ public:
 	void setScreenEdgeScrollMode(ScreenEdgeScrollMode mode);
 
 	void resetModes(); //Used when disabling input, so when we reenable it we aren't stuck in a mode.
+#if RTS_ZEROHOUR
+	void setRightMouseScrollBlocked( Bool blocked );
+#endif
+	void consumeMiddleClick() { m_middleButtonDownTimeMsec = 0; }	///< the coming middle up fired a binding, so it does not reset the camera
 
 private:
 	enum
@@ -83,6 +87,9 @@ private:
 	ScrollType m_scrollType;
 	ScreenEdgeScrollMode m_screenEdgeScrollMode;
 	UnsignedInt m_lastMouseMoveTimeMsec;				// real-time in milliseconds when mouse last moved
+#if RTS_ZEROHOUR
+	Bool m_rightMouseScrollBlocked;				// set while drag-to-face owns the mouse buttons
+#endif
 
 	void setScrolling( ScrollType scrollType );
 	void stopScrolling();

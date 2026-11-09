@@ -33,6 +33,28 @@ extern "C" void WBQt_OnViewportHostResized(int width, int height)
 	{
 		int maxWidth = ::GetSystemMetrics(SM_CXSCREEN);
 		int maxHeight = ::GetSystemMetrics(SM_CYSCREEN);
+#ifdef BUILD_WITH_D3D9
+		// D3D9 presents on any monitor, so the view's own screen may hold a larger backbuffer.
+		WbView3d *view = CWorldBuilderDoc::GetActive3DView();
+		if (view != NULL && view->GetSafeHwnd() != NULL)
+		{
+			MONITORINFO mi;
+			mi.cbSize = sizeof(mi);
+			if (::GetMonitorInfo(::MonitorFromWindow(view->GetSafeHwnd(), MONITOR_DEFAULTTONEAREST), &mi))
+			{
+				int monWidth = mi.rcMonitor.right - mi.rcMonitor.left;
+				int monHeight = mi.rcMonitor.bottom - mi.rcMonitor.top;
+				if (monWidth > maxWidth)
+				{
+					maxWidth = monWidth;
+				}
+				if (monHeight > maxHeight)
+				{
+					maxHeight = monHeight;
+				}
+			}
+		}
+#endif
 		if (maxWidth > 0 && width > maxWidth)
 		{
 			width = maxWidth;

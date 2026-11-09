@@ -100,7 +100,7 @@ public:
 			{ "SkipSelfForHealing",			INI::parseBool,												nullptr, offsetof( AutoHealBehaviorModuleData, m_skipSelfForHealing ) },
 			{ "GrantSalvageUpgrade",		INI::parseBool,												nullptr, offsetof( AutoHealBehaviorModuleData, m_grantSalvageUpgrade ) },
 			{ "GrantPromotion",			    INI::parseBool,												nullptr, offsetof( AutoHealBehaviorModuleData, m_grantPromotion ) },
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
 
 		UpdateModuleData::buildFieldParse(p);

@@ -180,6 +180,7 @@ void FlatHeightMapRenderObjClass::adjustTerrainLOD(Int adj)
 //=============================================================================
 void FlatHeightMapRenderObjClass::ReleaseResources()
 {
+	releaseTiles();
 	BaseHeightMapRenderObjClass::ReleaseResources();
 }
 
@@ -408,13 +409,13 @@ rendered portion of the terrain.  Only a 96x96 section is rendered at any time,
 even though maps can be up to 1024x1024.  This function determines which subset
 is rendered. */
 //=============================================================================
-void FlatHeightMapRenderObjClass::updateCenter(CameraClass *camera, const Vector3 *cameraPivot, RefRenderObjListIterator *pLightsIterator)
+void FlatHeightMapRenderObjClass::updateCenter(CameraClass *camera, const Vector3 *cameraPivot, RefRenderObjListIterator *pLightsIterator, const Vector2 *drawCenter)
 {
 #ifdef DO_UNIT_TIMINGS
 #pragma MESSAGE("*** WARNING *** DOING DO_UNIT_TIMINGS!!!!")
 	return;
 #endif
-	BaseHeightMapRenderObjClass::updateCenter(camera, cameraPivot, pLightsIterator);
+	BaseHeightMapRenderObjClass::updateCenter(camera, cameraPivot, pLightsIterator, drawCenter);
 	m_needFullUpdate = false;
 	Int i, j;
 	Int culled = 0;
@@ -497,6 +498,10 @@ void FlatHeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 	// Flat terrain does not glint, and the maps a 3D terrain frame left may belong to an unloaded map.
 	W3DShaderManager::setTerrainGlintMaps(nullptr, Vector4(0.0f, 0.0f, 0.0f, 0.0f), nullptr, 1.0f, 1.0f);
 
+#if defined(RTS_ZEROHOUR)
+	W3DShaderManager::setTexture(W3DShaderManager::TERRAIN_EMISSIVE_TEXTURE, nullptr);
+#endif
+
 	// Force shaders to update.
 	m_stageTwoTexture->restore();
 	DX8Wrapper::Set_Texture(0,nullptr);
@@ -572,8 +577,9 @@ void FlatHeightMapRenderObjClass::Render(RenderInfoClass & rinfo)
 					disableTex = TRUE; // doing cloud/noise
 				}
 				if (!tile->isCulled()) {
-					Int pixelLights[W3DShaderManager::MAX_PIXEL_LIGHTS];
-					W3DShaderManager::setDrawPixelLights(pixelLights, W3DShaderManager::pickPixelLights(tile->getBounds(), pixelLights));
+					std::vector<Int> pixelLights;
+					W3DShaderManager::pickPixelLights(tile->getBounds(), pixelLights);
+					W3DShaderManager::setDrawPixelLights(pixelLights.empty() ? nullptr : &pixelLights[0], (Int)pixelLights.size());
 					tile->drawVisiblePolys(rinfo, disableTex);
 					if (i*CELLS_PER_TILE<xCoordMin) {
 						xCoordMin = i*CELLS_PER_TILE;

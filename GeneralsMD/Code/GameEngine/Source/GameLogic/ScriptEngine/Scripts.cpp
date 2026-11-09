@@ -953,13 +953,19 @@ void Script::crc( Xfer *xfer )
 // ------------------------------------------------------------------------------------------------
 /** Xfer method
 	* Version Info:
-	* 1: Initial version */
+	* 1: Initial version
+	* 2: TheSuperHackers @bugfix bobtista 13/08/2026 Save the next evaluation frame of delayed scripts
+	*/
 // ------------------------------------------------------------------------------------------------
 void Script::xfer( Xfer *xfer )
 {
 
 	// version
+#if RETAIL_COMPATIBLE_XFER_SAVE
 	XferVersion currentVersion = 1;
+#else
+	XferVersion currentVersion = 2;
+#endif
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -967,6 +973,11 @@ void Script::xfer( Xfer *xfer )
 	Bool active = isActive();
 	xfer->xferBool( &active );
 	setActive( active );
+
+	if( version >= 2 )
+	{
+		xfer->xferUnsignedInt( &m_frameToEvaluateAt );
+	}
 
 }
 
@@ -1810,6 +1821,7 @@ void Parameter::qualify(const AsciiString& qualifier,
 			FALLTHROUGH; /// otherwise drop down & qualify.
 		case SCRIPT:
 		case COUNTER:
+		case KD_RATIO:
 		case FLAG:
 		case SCRIPT_SUBROUTINE: m_string.concat(qualifier); break;
 		default: break;
@@ -1899,6 +1911,19 @@ AsciiString Parameter::getUiText() const
 			break;
 		case COUNTER:
 			uiText.format("'%s'", uiString.str());
+			break;
+		case KD_RATIO:
+			uiText.format("KD-Ratio '%s'", uiString.str());
+			break;
+		case SELECTION_MODE:
+			switch (m_int) {
+				case CLOSEST: uiText.format("the closest"); break;
+				case FARTHEST: uiText.format("the farthest"); break;
+				case RANDOM: uiText.format("a random"); break;
+				case YOUNGEST: uiText.format("the youngest"); break;
+				case OLDEST: uiText.format("the oldest"); break;
+				default : DEBUG_CRASH(("Unknown selection mode."));
+			}
 			break;
 		case INT:
 			uiText.format(" %d ", m_int);

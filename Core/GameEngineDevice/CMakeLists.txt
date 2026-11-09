@@ -56,6 +56,7 @@ set(GAMEENGINEDEVICE_SRC
 #    Include/W3DDevice/GameClient/W3DInGameUI.h
 #    Include/W3DDevice/GameClient/W3DMirror.h
     Include/W3DDevice/GameClient/W3DMouse.h
+    Include/W3DDevice/GameClient/W3DParticleAtlas.h
     Include/W3DDevice/GameClient/W3DParticleSys.h
 #    Include/W3DDevice/GameClient/W3DPoly.h
     Include/W3DDevice/GameClient/W3DProfilerFrameCapture.h
@@ -65,6 +66,7 @@ set(GAMEENGINEDEVICE_SRC
 #    Include/W3DDevice/GameClient/W3DRoadBuffer.h
 #    Include/W3DDevice/GameClient/W3DScene.h
     Include/W3DDevice/GameClient/W3DBloom.h
+    Include/W3DDevice/GameClient/W3DEmissiveLights.h
     Include/W3DDevice/GameClient/W3DShaderManager.h
 #    Include/W3DDevice/GameClient/W3DShadow.h
 #    Include/W3DDevice/GameClient/W3DShroud.h
@@ -75,8 +77,10 @@ set(GAMEENGINEDEVICE_SRC
     Include/W3DDevice/GameClient/W3DShockwave.h
     Include/W3DDevice/GameClient/W3DDisruption.h
     Include/W3DDevice/GameClient/W3DStorm.h
+    Include/W3DDevice/GameClient/W3DDistanceFog.h
     Include/W3DDevice/GameClient/W3DColorLut.h
     Include/W3DDevice/GameClient/W3DHeadlight.h
+    Include/W3DDevice/GameClient/W3DPlanarMirror.h
     Include/W3DDevice/GameClient/W3DLaserGlow.h
     Include/W3DDevice/GameClient/W3DAmbientOcclusion.h
     Include/W3DDevice/GameClient/W3DGroundNoise.h
@@ -86,6 +90,7 @@ set(GAMEENGINEDEVICE_SRC
     Include/W3DDevice/GameClient/W3DSlopeMap.h
 #    Include/W3DDevice/GameClient/W3DStatusCircle.h
     Include/W3DDevice/GameClient/W3DTerrainBackground.h
+    Include/W3DDevice/GameClient/W3DTerrainParticles.h
     Include/W3DDevice/GameClient/W3DTerrainTracks.h
     Include/W3DDevice/GameClient/W3DTerrainVisual.h
     Include/W3DDevice/GameClient/W3DTreeBuffer.h
@@ -101,8 +106,6 @@ set(GAMEENGINEDEVICE_SRC
 #    Include/W3DDevice/GameLogic/W3DGameLogic.h
 #    Include/W3DDevice/GameLogic/W3DGhostObject.h
 #    Include/W3DDevice/GameLogic/W3DTerrainLogic.h
-    Include/Win32Device/Common/Win32BIGFile.h
-    Include/Win32Device/Common/Win32BIGFileSystem.h
     Include/Win32Device/Common/Win32GameEngine.h
     Include/Win32Device/Common/Win32LocalFile.h
     Include/Win32Device/Common/Win32LocalFileSystem.h
@@ -179,6 +182,7 @@ set(GAMEENGINEDEVICE_SRC
 #    Source/W3DDevice/GameClient/W3DGameClient.cpp
 #    Source/W3DDevice/GameClient/W3DInGameUI.cpp
     Source/W3DDevice/GameClient/W3DMouse.cpp
+    Source/W3DDevice/GameClient/W3DParticleAtlas.cpp
     Source/W3DDevice/GameClient/W3DParticleSys.cpp
 #    Source/W3DDevice/GameClient/W3DPoly.cpp
     Source/W3DDevice/GameClient/W3DProfilerFrameCapture.cpp
@@ -187,6 +191,7 @@ set(GAMEENGINEDEVICE_SRC
 #    Source/W3DDevice/GameClient/W3DRoadBuffer.cpp
 #    Source/W3DDevice/GameClient/W3DScene.cpp
     Source/W3DDevice/GameClient/W3DBloom.cpp
+    Source/W3DDevice/GameClient/W3DEmissiveLights.cpp
     Source/W3DDevice/GameClient/W3DShaderManager.cpp
     Source/W3DDevice/GameClient/W3DEmbeddedShaders.cpp
 #    Source/W3DDevice/GameClient/W3DShroud.cpp
@@ -197,8 +202,10 @@ set(GAMEENGINEDEVICE_SRC
     Source/W3DDevice/GameClient/W3DShockwave.cpp
     Source/W3DDevice/GameClient/W3DDisruption.cpp
     Source/W3DDevice/GameClient/W3DStorm.cpp
+    Source/W3DDevice/GameClient/W3DDistanceFog.cpp
     Source/W3DDevice/GameClient/W3DColorLut.cpp
     Source/W3DDevice/GameClient/W3DHeadlight.cpp
+    Source/W3DDevice/GameClient/W3DPlanarMirror.cpp
     Source/W3DDevice/GameClient/W3DLaserGlow.cpp
     Source/W3DDevice/GameClient/W3DAmbientOcclusion.cpp
     Source/W3DDevice/GameClient/W3DGroundNoise.cpp
@@ -207,6 +214,7 @@ set(GAMEENGINEDEVICE_SRC
     Source/W3DDevice/GameClient/W3DSlopeMap.cpp
 #    Source/W3DDevice/GameClient/W3DStatusCircle.cpp
     Source/W3DDevice/GameClient/W3DTerrainBackground.cpp
+    Source/W3DDevice/GameClient/W3DTerrainParticles.cpp
     Source/W3DDevice/GameClient/W3DTerrainTracks.cpp
     Source/W3DDevice/GameClient/W3DTerrainVisual.cpp
     Source/W3DDevice/GameClient/W3DTreeBuffer.cpp
@@ -222,8 +230,6 @@ set(GAMEENGINEDEVICE_SRC
 #    Source/W3DDevice/GameLogic/W3DGameLogic.cpp
 #    Source/W3DDevice/GameLogic/W3DGhostObject.cpp
 #    Source/W3DDevice/GameLogic/W3DTerrainLogic.cpp
-    Source/Win32Device/Common/Win32BIGFile.cpp
-    Source/Win32Device/Common/Win32BIGFileSystem.cpp
     Source/Win32Device/Common/Win32GameEngine.cpp
     Source/Win32Device/Common/Win32LocalFile.cpp
     Source/Win32Device/Common/Win32LocalFileSystem.cpp
@@ -236,12 +242,8 @@ set(GAMEENGINEDEVICE_SRC
 # Add C++ 17 FileSystem implementation for non-VS6 builds
 if(NOT IS_VS6_BUILD)
     list(APPEND GAMEENGINEDEVICE_SRC
-        Include/StdDevice/Common/StdBIGFile.h
-        Include/StdDevice/Common/StdBIGFileSystem.h
         Include/StdDevice/Common/StdLocalFile.h
         Include/StdDevice/Common/StdLocalFileSystem.h
-        Source/StdDevice/Common/StdBIGFile.cpp
-        Source/StdDevice/Common/StdBIGFileSystem.cpp
         Source/StdDevice/Common/StdLocalFile.cpp
         Source/StdDevice/Common/StdLocalFileSystem.cpp
     )

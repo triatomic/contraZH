@@ -24,6 +24,7 @@ class QKeyEvent;
 class QLineEdit;
 class QListWidget;
 class QPushButton;
+class QTimer;
 class WBQtScrubSpinBox;
 
 namespace Ui { class WBQtObjectPropsPanel; }	// generated from WBQtObjectPropsPanel.ui
@@ -68,11 +69,13 @@ private slots:
 	void onPositionChanged();
 	void onZChanged();
 	void onAngleChanged();
+	void onScaleChanged();
 	void onPosScrubStarted();
 	void onPosScrubFinished();
 	// Sound section.
 	void onSoundChanged(int index);
 	void onListenClicked();
+	void onListenFinished();
 	void onSoundFlagToggled();
 	void onLoopCountChanged();
 	void onPriorityChanged(int index);
@@ -123,11 +126,13 @@ private:
 	QComboBox       *m_weather;
 	WBQtScrubSpinBox *m_angle;		// range 0..360 (matches IDC_ANGLE_POPUP)
 	QComboBox       *m_time;
+	WBQtScrubSpinBox *m_scale;		// commits on edit end and scrub end, since each commit rebuilds the view
 
 	// Sound section.
 	QGroupBox   *m_soundBox;
 	QComboBox   *m_sound;			// attached-sound combo (mirrors the large MFC combo)
 	QPushButton *m_listen;			// preview toggle (Listen / Stop)
+	QTimer      *m_listenTimer;		// flips Stop back to Listen when a one-shot preview ends
 	QCheckBox   *m_customize;
 	QCheckBox   *m_soundEnabled;
 	QCheckBox   *m_looping;

@@ -1,7 +1,7 @@
 # Camera Controls
 
-Cheat-build camera kit (`generalszh_c-camera.exe`). Everything here is client-side
-only: no effect on the simulation, replays or multiplayer sync.
+These camera controls require a build made with `RTS_DEBUG_CHEATS=ON`.
+They affect only this client's view and work in multiplayer and replays.
 
 ## Mode cycle — `Delete`
 
@@ -30,7 +30,7 @@ Everything restores on exit, on object death, and at match end.
 |---|---|
 | `W` `A` `S` `D` | Fly forward / left / back / right along the view. |
 | `Space` | Ascend. |
-| `Ctrl` | Descend (paused while RMB is held — that's the roll gesture). |
+| `Ctrl` | Descend unless RMB or MMB is held for a mouse gesture. |
 | `Shift` | Hold for 5× speed. |
 
 The camera cannot go below the terrain.
@@ -95,7 +95,7 @@ Terrain-hidden mode also suppresses the skybox (the water object draws it), so u
 
 ## Notes
 
-- All keys are rebindable through `CommandMap.ini`: `CHEAT_CYCLE_CAMERA_MODE`,
+- The mode and scene keys are rebindable through `CommandMap.ini`: `CHEAT_CYCLE_CAMERA_MODE`,
   `CHEAT_CYCLE_SKYBOX`, `CHEAT_CYCLE_TERRAIN_MODE`.
 - The mode-change message ("Camera: Free" …) stays on screen deliberately, so you
   always know where you are in the cycle.

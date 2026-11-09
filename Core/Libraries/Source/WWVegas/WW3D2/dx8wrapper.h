@@ -42,6 +42,7 @@
 #pragma once
 
 #include "WWLib/always.h"
+#include <Utility/bit_adapter.h>
 #include "dllist.h"
 #include "dx8compat.h"
 #include "WWMath/matrix4.h"
@@ -73,8 +74,8 @@ const unsigned MAX_VERTEX_STREAMS=2;
 #if defined(BUILD_WITH_D3D9)
 // Skinning's bone palette fills the whole vs_2_0 register file.
 const unsigned MAX_VERTEX_SHADER_CONSTANTS=256;
-// The ps_2_0 register file, which the water shader reaches past the first 8 of.
-const unsigned MAX_PIXEL_SHADER_CONSTANTS=32;
+// The ps_3_0 register file; the ps_3_0 water reaches past the 32 of ps_2_0.
+const unsigned MAX_PIXEL_SHADER_CONSTANTS=224;
 #else
 const unsigned MAX_VERTEX_SHADER_CONSTANTS=96;
 const unsigned MAX_PIXEL_SHADER_CONSTANTS=8;
@@ -376,6 +377,9 @@ public:
 	static void Set_DX8_Indices(IDirect3DIndexBuffer8* index_buffer, UINT base_vertex_index);
 	static HRESULT Set_DX8_Render_Target_Surfaces(IDirect3DSurface8* render_target, IDirect3DSurface8* depth_stencil);
 	static void Draw_DX8_Indexed_Primitive(D3DPRIMITIVETYPE type, UINT min_index, UINT vertex_count, UINT start_index, UINT primitive_count);
+#if defined(BUILD_WITH_D3D9)
+	static void Set_Additional_Pass_Callback(bool (*callback)(unsigned pass));
+#endif
 
 	static void Set_Light_Environment(LightEnvironmentClass* light_env);
 	static LightEnvironmentClass* Get_Light_Environment() { return Light_Environment; }
@@ -426,6 +430,7 @@ public:
 		unsigned instance_stride,
 		unsigned instance_count);
 	static void End_Instanced_Drawing();
+	static bool Is_Instanced_Drawing();
 
 	// While set, every indexed draw replaces the FVF with this declaration and shader, and runs the hook
 	// once the device holds the draw's state so it can set constants from it. End puts the FVF back.
@@ -492,6 +497,13 @@ public:
 	// The scene's depth as a readable INTZ texture, and its surface, or null when the scene has none
 	static IDirect3DTexture8 * Peek_Scene_Depth_Texture() { return SceneDepthTexture; }
 	static IDirect3DSurface8 * Peek_Scene_Depth_Surface() { return SceneDepthTexture != nullptr ? SceneDepthBuffer : nullptr; }
+
+	/// Filters the supersampled scene down to the back buffer and binds the back buffer, so what follows draws at the screen's size.
+	static void Resolve_Scene_Target();
+
+	// Supersampling renders the scene this many times the back buffer's size each way, 1 to 2, and takes MSAA's place.
+	static void Set_Super_Sampling(float scale) { SuperSampleScale = (scale < 1.0f) ? 1.0f : (scale > 2.0f) ? 2.0f : scale; }
+	static float Get_Super_Sampling() { return SuperSampleScale; }
 
 	static IDirect3DSurface8 * _Create_DX8_Surface(unsigned int width, unsigned int height, WW3DFormat format);
 	static IDirect3DSurface8 * _Create_DX8_Surface(const char *filename);
@@ -738,6 +750,7 @@ protected:
 	static void Release_Frame_Query();
 	static D3DFORMAT					DisplayFormat;
 	static D3DMULTISAMPLE_TYPE	MultiSampleAntiAliasing;
+	static float						SuperSampleScale;
 
 
 	// shader system updates KJM v
@@ -761,6 +774,7 @@ protected:
 #if defined(BUILD_WITH_D3D9)
 	// D3D9 takes the base vertex index at the draw call rather than at SetIndices
 	static UINT							CurrentBaseVertexIndex;
+	static bool (*AdditionalPassCallback)(unsigned pass);
 #endif
 	static unsigned						TextureStageStates[MAX_TEXTURE_STAGES][32];
 	static IDirect3DBaseTexture8 *	Textures[MAX_TEXTURE_STAGES];
@@ -776,6 +790,7 @@ protected:
 
 	static DX8FrameStatistics			FrameStatistics;
 	static bool								CurrentDX8LightEnables[4];
+	static D3DLIGHT8							CurrentDX8Lights[4];
 
 	static unsigned long FrameCount;
 
@@ -787,14 +802,19 @@ protected:
 	static IDirect3DDevice8 *			D3DDevice;				//d3ddevice8;
 	static bool								IsEx;
 
-	// A flip model swap chain cannot be multisampled, so MSAA renders here and resolves at Present
+	// A flip model swap chain cannot be multisampled, so MSAA renders here and resolves at Present. Supersampling renders here too, larger.
 	static IDirect3DSurface8 *			SceneRenderTarget;
 	static IDirect3DSurface8 *			SceneDepthBuffer;
 	// Without MSAA the scene's depth is an INTZ texture where the driver offers one, so shaders can read it
 	static IDirect3DTexture8 *			SceneDepthTexture;
+	// The device's own depth buffer, which the UI draws with once a supersampled scene is resolved
+	static IDirect3DSurface8 *			DeviceDepthBuffer;
+	// True from the resolve to the next frame's start, while the back buffer is the target
+	static bool							SceneResolved;
 	static void Create_Scene_Target();
-	static void Create_Scene_Depth_Texture();
+	static void Create_Scene_Depth_Texture(unsigned width, unsigned height);
 	static void Release_Scene_Target();
+	static void Bind_Scene_Target();
 
 #if defined(BUILD_WITH_D3D9)
 	// Without D3D9Ex, waiting on the last frame's event query holds the CPU to one frame ahead
@@ -882,6 +902,11 @@ WWINLINE void DX8Wrapper::Set_Vertex_Shader_Constant(int reg, const void* data, 
 
 WWINLINE void DX8Wrapper::Set_Pixel_Shader_Constant(int reg, const void* data, int count)
 {
+	WWASSERT(reg>=0 && reg+count<=(int)MAX_PIXEL_SHADER_CONSTANTS);
+	if (reg<0 || reg+count>(int)MAX_PIXEL_SHADER_CONSTANTS)
+	{
+		return;
+	}
 	int memsize=sizeof(Vector4)*count;
 
 	// may be incorrect if shaders are created and destroyed dynamically
@@ -951,8 +976,8 @@ WWINLINE void DX8Wrapper::Set_Fog(bool enable, const Vector3 &color, float start
 	ShaderClass::Invalidate();
 
 	// Set renderstates which are not affected by the shader
-	Set_DX8_Render_State(D3DRS_FOGSTART, *(DWORD *)(&start));
-	Set_DX8_Render_State(D3DRS_FOGEND,   *(DWORD *)(&end));
+	Set_DX8_Render_State(D3DRS_FOGSTART, std::bit_cast<DWORD>(start));
+	Set_DX8_Render_State(D3DRS_FOGEND,   std::bit_cast<DWORD>(end));
 }
 
 
@@ -981,10 +1006,15 @@ WWINLINE void DX8Wrapper::Set_DX8_Material(const D3DMATERIAL8* mat)
 WWINLINE void DX8Wrapper::Set_DX8_Light(int index, D3DLIGHT8* light)
 {
 	if (light) {
+		// Most meshes share the scene's lights, so the device usually holds this one already
+		if (CurrentDX8LightEnables[index] && memcmp(&CurrentDX8Lights[index], light, sizeof(D3DLIGHT8)) == 0) {
+			return;
+		}
 		DX8_RECORD_LIGHT_CHANGE();
 		DX8CALL(SetLight(index,light));
 		DX8CALL(LightEnable(index,TRUE));
 		CurrentDX8LightEnables[index]=true;
+		CurrentDX8Lights[index]=*light;
 		SNAPSHOT_SAY(("DX8 - SetLight %d",index));
 	}
 	else if (CurrentDX8LightEnables[index]) {
@@ -1039,7 +1069,11 @@ WWINLINE void DX8Wrapper::Set_D3D9_Render_State(D3DRENDERSTATETYPE state, unsign
 		return;
 
 	case D3DRS_SOFTWAREVERTEXPROCESSING:
-		DX8CALL(SetSoftwareVertexProcessing( value ));
+		// Only a mixed-mode device can switch
+		if (Vertex_Processing_Behavior & D3DCREATE_MIXED_VERTEXPROCESSING)
+		{
+			DX8CALL(SetSoftwareVertexProcessing( value ));
+		}
 		return;
 
 	// No D3D9 equivalent. N-patches are gated on Support_NPatches(), which no
@@ -1177,6 +1211,11 @@ WWINLINE void DX8Wrapper::Draw_DX8_Indexed_Primitive(D3DPRIMITIVETYPE type, UINT
 	// D3D9 takes the base vertex index here rather than at SetIndices, so it comes
 	// from whichever caller bound the index buffer last.
 	DX8CALL(DrawIndexedPrimitive(type, (INT)CurrentBaseVertexIndex, min_index, vertex_count, start_index, primitive_count));
+	for (unsigned pass = 1; AdditionalPassCallback != nullptr && AdditionalPassCallback(pass); pass++)
+	{
+		DX8CALL(DrawIndexedPrimitive(type, (INT)CurrentBaseVertexIndex, min_index, vertex_count, start_index, primitive_count));
+		DX8_RECORD_DRAW_CALLS();
+	}
 #else
 	DX8CALL(DrawIndexedPrimitive(type, min_index, vertex_count, start_index, primitive_count));
 #endif

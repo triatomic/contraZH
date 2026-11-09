@@ -18,7 +18,6 @@ static WbView3d *s_view = NULL;
 static CString s_mapPath;
 static CString s_error;
 static WbView3d::TopViewCapture s_liveView;
-static Real s_liveArea[4];
 
 static void toParams(const WBQtHQPreviewParams *in, HQPreviewParams *out)
 {
@@ -44,6 +43,7 @@ static void toCapture(const WBQtHQCaptureParams *in, HQCaptureParams *out)
 	out->clouds = in->clouds != 0;
 	out->macroTexture = in->macroTexture != 0;
 	out->stochastic = in->stochastic != 0;
+	out->shadows = in->shadows != 0;
 	out->timeOfDay = in->timeOfDay;
 	out->area = in->area;
 	out->customX0 = in->customX0;
@@ -148,6 +148,7 @@ void WBQtHQPreview_GetDefaults(WBQtHQPreviewParams *params, WBQtHQCaptureParams 
 	capture->clouds = c.clouds ? 1 : 0;
 	capture->macroTexture = c.macroTexture ? 1 : 0;
 	capture->stochastic = c.stochastic ? 1 : 0;
+	capture->shadows = c.shadows ? 1 : 0;
 	capture->timeOfDay = c.timeOfDay;
 	capture->area = c.area;
 	capture->supersample = c.supersample;
@@ -181,6 +182,7 @@ void WBQtHQPreview_GetLast(WBQtHQPreviewParams *params, WBQtHQCaptureParams *cap
 	capture->clouds = getProfileInt("Clouds", capture->clouds);
 	capture->macroTexture = getProfileInt("MacroTexture", capture->macroTexture);
 	capture->stochastic = getProfileInt("Stochastic", capture->stochastic);
+	capture->shadows = getProfileInt("Shadows", capture->shadows);
 	capture->timeOfDay = getProfileInt("TimeOfDay", capture->timeOfDay);
 	capture->supersample = getProfileInt("Supersample", capture->supersample);
 	capture->size = getProfileInt("Size", capture->size);
@@ -215,7 +217,7 @@ int WBQtHQPreview_LiveBegin(const WBQtHQCaptureParams *capture)
 	}
 	HQCaptureParams c;
 	toCapture(capture, &c);
-	if (!MapPreview::getHQTopView(c, &s_liveView, s_liveArea))
+	if (!MapPreview::getHQTopView(c, &s_liveView))
 	{
 		s_error = "the area is empty";
 		return 0;
@@ -235,24 +237,29 @@ int WBQtHQPreview_LiveFrame(unsigned char *bgra, int size)
 		s_error = (s_view != NULL) ? s_view->getTopViewError() : "the 3D view is not ready";
 		return 0;
 	}
-
-	// The bars around a map that is not square stay black, as the saved preview has them.
-	const Real width = s_liveView.x1 - s_liveView.x0;
-	const Real height = s_liveView.y1 - s_liveView.y0;
-	for (int py = 0; py < size; ++py)
-	{
-		const Real y = s_liveView.y1 - height * (py + 0.5f) / size;
-		for (int px = 0; px < size; ++px)
-		{
-			const Real x = s_liveView.x0 + width * (px + 0.5f) / size;
-			if (x < s_liveArea[0] || x > s_liveArea[2] || y < s_liveArea[1] || y > s_liveArea[3])
-			{
-				unsigned char *p = bgra + (py*size + px)*4;
-				p[0] = p[1] = p[2] = 0;
-			}
-		}
-	}
 	return 1;
+}
+
+static void fitSize(const WbView3d::TopViewCapture &view, int size, int *width, int *height)
+{
+	const Real w = view.x1 - view.x0;
+	const Real h = view.y1 - view.y0;
+	const Real scale = size / max(w, h);
+	*width = max(1, (int)(w*scale + 0.5f));
+	*height = max(1, (int)(h*scale + 0.5f));
+}
+
+void WBQtHQPreview_FitSize(const WBQtHQCaptureParams *capture, int size, int *width, int *height)
+{
+	*width = size;
+	*height = size;
+	HQCaptureParams c;
+	WbView3d::TopViewCapture view;
+	toCapture(capture, &c);
+	if (MapPreview::getHQTopView(c, &view))
+	{
+		fitSize(view, size, width, height);
+	}
 }
 
 int WBQtHQPreview_LivePresent(void *window, int size)
@@ -262,13 +269,14 @@ int WBQtHQPreview_LivePresent(void *window, int size)
 		s_error = "the 3D view is not ready";
 		return 0;
 	}
-	const Real width = s_liveView.x1 - s_liveView.x0;
-	const Real height = s_liveView.y1 - s_liveView.y0;
+	int width = 0;
+	int height = 0;
+	fitSize(s_liveView, size, &width, &height);
 	Real area[4];
-	area[0] = (s_liveArea[0] - s_liveView.x0) / width;
-	area[1] = (s_liveView.y1 - s_liveArea[3]) / height;
-	area[2] = (s_liveArea[2] - s_liveView.x0) / width;
-	area[3] = (s_liveView.y1 - s_liveArea[1]) / height;
+	area[0] = 0.5f - 0.5f*width/size;
+	area[1] = 0.5f - 0.5f*height/size;
+	area[2] = 0.5f + 0.5f*width/size;
+	area[3] = 0.5f + 0.5f*height/size;
 	if (!s_view->presentTopView(size, window, area))
 	{
 		s_error = s_view->getTopViewError();
@@ -333,6 +341,7 @@ int WBQtHQPreview_Save(const WBQtHQPreviewParams *params, const WBQtHQCapturePar
 	writeProfileInt("Clouds", capture->clouds);
 	writeProfileInt("MacroTexture", capture->macroTexture);
 	writeProfileInt("Stochastic", capture->stochastic);
+	writeProfileInt("Shadows", capture->shadows);
 	writeProfileInt("TimeOfDay", capture->timeOfDay);
 	writeProfileInt("Supersample", capture->supersample);
 	writeProfileInt("Size", capture->size);

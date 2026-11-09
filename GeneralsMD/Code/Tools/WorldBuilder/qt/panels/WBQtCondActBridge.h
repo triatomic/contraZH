@@ -30,6 +30,7 @@ int  WBQtCondActData_GetTemplateCount(int isAction);
 void WBQtCondActData_GetTemplateName(int isAction, int i, char *buf, int cap);	// '/'-separated path
 void WBQtCondActData_GetTemplateName2(int isAction, int i, char *buf, int cap);	// alt path or ""
 void WBQtCondActData_GetTemplateHelp(int isAction, int i, char *buf, int cap);
+int  WBQtCondActData_PinnedFolderRank(const char *name);	// top-level mod folder position, or -1
 
 // --- the edited item ---
 int  WBQtCondActData_GetType(void *item, int isAction);
@@ -65,6 +66,8 @@ enum
 	WBQT_PARAM_LOGIC		///< scripts, subroutines, counters, flags
 };
 int  WBQtCondActData_GetParameterFamily(void *item, int isAction, int i);
+// Template i's parameter families in order, up to cap; returns how many.
+int  WBQtCondActData_GetTemplateFamilies(int isAction, int i, int *out, int cap);
 
 // --- the "Compress Script" tree-density setting (registry-backed, "CompressScripts") ---
 int  WBQtCondAct_GetCompress(void);

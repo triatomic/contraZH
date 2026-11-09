@@ -34,6 +34,7 @@
 #include "Common/GameType.h"
 #include "GameLogic/Damage.h"
 #include "Common/STLTypedefs.h"
+#include "Common/SciencePurchaseSlots.h"
 
 class AIGroup;
 class AttackPriorityInfo;
@@ -88,7 +89,8 @@ enum
 	// If we want to consider the inner radius, we will specify guard inner. Otherwise, use guard outer.
 	AI_VISIONFACTOR_GUARDINNER = 0x04,
 };
-enum {MAX_AI_UPGRADES = 20};
+// A skill set can list every science a player can purchase.
+enum {MAX_AI_UPGRADES = MAX_PURCHASE_SCIENCES};
 
 typedef struct {
 	Int	m_numSkills;
@@ -920,6 +922,7 @@ public:
 #endif
 
 	void groupMoveToPosition( const Coord3D *pos, Bool addWaypoint, CommandSourceType cmdSource, Bool reverse = false );
+	void groupMoveToPositionFacing( const Coord3D *pos, Real angle, Int rows, UnsignedInt style, CommandSourceType cmdSource );	///< drag-to-face: line formation there, facing angle on arrival (LineFormation.h)
 	void groupMoveToAndEvacuate( const Coord3D *pos, CommandSourceType cmdSource );			///< move to given position(s)
 	void groupMoveToAndEvacuateAndExit( const Coord3D *pos, CommandSourceType cmdSource );			///< move to given position & unload transport.
 	void groupIdle(CommandSourceType cmdSource);						///< Enter idle state.
@@ -1052,8 +1055,8 @@ protected:
 
 	ListObjectPtrIt internalRemove(ListObjectPtrIt iterToRemove);
 
-	Bool friend_moveInfantryToPos( const Coord3D *pos, UnsignedInt cmdNode, CommandSourceType cmdSource );
-	Bool friend_moveVehicleToPos( const Coord3D *pos, UnsignedInt cmdNode, CommandSourceType cmdSource );
+	Bool friend_moveInfantryToPos( const Coord3D *pos, CommandSourceType cmdSource, std::vector<Object *> &columnUnits );
+	Bool friend_moveVehicleToPos( const Coord3D *pos, CommandSourceType cmdSource, std::vector<Object *> &columnUnits );
 	void friend_moveFormationToPos( const Coord3D *pos, CommandSourceType cmdSource );
 	Bool friend_computeGroundPath( const Coord3D *pos, CommandSourceType cmdSource );
 

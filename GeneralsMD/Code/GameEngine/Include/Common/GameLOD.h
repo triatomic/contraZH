@@ -36,7 +36,6 @@
 enum ParticlePriorityType CPP_11(: Int);
 
 #define MAX_LOD_PRESETS_PER_LEVEL	32	//number of hardware configs preset for each low,medium,high,veryhigh
-#define MAX_BENCH_PROFILES	16
 
 //Make sure this enum stays in sync with GameLODNames[]
 enum StaticGameLODLevel CPP_11(: Int)
@@ -63,17 +62,6 @@ enum DynamicGameLODLevel CPP_11(: Int)
 	DYNAMIC_GAME_LOD_HIGH,
 	DYNAMIC_GAME_LOD_VERY_HIGH,
 	DYNAMIC_GAME_LOD_COUNT
-};
-
-//Make sure this stays in sync with CPUNames[] in gamelod.cpp
-enum CpuType CPP_11(: Int)
-{
-	XX,	//unknown type
-	P3,
-	P4,
-	K7,
-
-	CPU_MAX
 };
 
 //Keep this in sync with VideoNames in Gamelod.cpp
@@ -141,23 +129,9 @@ struct DynamicGameLODInfo
 
 struct LODPresetInfo
 {
-	LODPresetInfo() : m_cpuType(XX),m_mhz(1),m_cpuPerfIndex(1.0f),m_videoType(DC_UNKNOWN),m_memory(1) {};
-	CpuType  m_cpuType;
-	Int	 m_mhz;
-	Real m_cpuPerfIndex;	//used to select preset for unidentified cpu's
+	LODPresetInfo() : m_videoType(DC_UNKNOWN),m_memory(1) {};
 	ChipsetType  m_videoType;
 	Int  m_memory;
-};
-
-struct BenchProfile
-{
-	BenchProfile() : m_cpuType(XX),m_mhz(1),m_intBenchIndex(1.0f),m_floatBenchIndex(1.0f),m_memBenchIndex(1.0f) {};
-
-	CpuType  m_cpuType;
-	Int	 m_mhz;
-	Real m_intBenchIndex;
-	Real m_floatBenchIndex;
-	Real m_memBenchIndex;
 };
 
 class GameLODManager
@@ -185,15 +159,11 @@ public:
 	Int getRecommendedTextureReduction();	///<return the optimal texture reduction for the system.
 	Int getLevelTextureReduction(StaticGameLODLevel level);	///<return texture reduction specified in INI for this game detail.
 	LODPresetInfo *newLODPreset(StaticGameLODLevel index);
-	BenchProfile *newBenchProfile();
 	Bool didMemPass();
-	void setReallyLowMHz(Int mhz) { m_reallyLowMHz = mhz; }
-	Bool isReallyLowMHz() const { return m_cpuFreq < m_reallyLowMHz; }
 
 	StaticGameLODInfo m_staticGameLODInfo[STATIC_GAME_LOD_COUNT];
 	DynamicGameLODInfo m_dynamicGameLODInfo[DYNAMIC_GAME_LOD_COUNT];
 	LODPresetInfo m_lodPresets[STATIC_GAME_LOD_CUSTOM][MAX_LOD_PRESETS_PER_LEVEL];
-	BenchProfile m_benchProfiles[MAX_BENCH_PROFILES];
 
 protected:
 	void initStaticLODLevels();
@@ -216,17 +186,9 @@ protected:
 	Bool m_cpuPassed;
 	Bool m_memPassed;
 	Int m_numLevelPresets[STATIC_GAME_LOD_CUSTOM];
-	Int m_numBenchProfiles;
 	StaticGameLODLevel m_idealDetailLevel;
 	ChipsetType m_videoChipType;
-	CpuType m_cpuType;
 	MemValueType m_numRAM;
-	Int m_cpuFreq;
-	Real m_intBenchIndex;
-	Real m_floatBenchIndex;
-	Real m_memBenchIndex;
-	Real m_compositeBenchIndex;
-	Int m_reallyLowMHz;
 };
 
 Bool GameLODManager::isParticleSkipped()

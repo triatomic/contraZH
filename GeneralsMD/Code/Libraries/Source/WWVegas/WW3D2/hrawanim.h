@@ -58,6 +58,9 @@ struct NodeMotionStruct
 	MotionChannelClass *		Q;
 
 	BitChannelClass *			Vis;
+
+	// Per frame, nonzero when the translation jumps to the next frame instead of moving there
+	unsigned char *				Teleport;
 };
 
 /**********************************************************************************
@@ -126,5 +129,9 @@ private:
 
 	bool read_bit_channel(ChunkLoadClass & cload,BitChannelClass * * newchan,bool pre30);
 	void add_bit_channel(BitChannelClass * newchan);
+
+	void get_translation_key(const NodeMotionStruct & motion, int frame, Vector3 & trans) const;
+	void find_teleports();
+	bool is_teleport(const NodeMotionStruct & motion, int frame) const;
 
 };

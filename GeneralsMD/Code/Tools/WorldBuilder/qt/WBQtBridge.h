@@ -108,6 +108,9 @@ void WBQt_UnhostViewport(void *frameHwnd, void *viewHwnd);
 // frame whenever the pane rect changes.
 void WBQt_SetViewportHostGeometry(int x, int y, int width, int height);
 
+// Return non-zero when the Qt host owns scheduling the next viewport paint.
+int WBQt_ScheduleViewportFrame(void *viewHwnd, int delayMs);
+
 // Reverse callback: DEFINED on the MFC side (src/WBQtHostBridge.cpp), CALLED from the
 // Qt host when it resizes, so the D3D device tracks the host's pixel size. extern "C"
 // so the Qt static lib resolves it against the exe at the final link.

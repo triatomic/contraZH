@@ -32,6 +32,7 @@
 
 #include "Common/GameUtility.h"
 #include "Common/INI.h"
+#include "Common/FramePacer.h"
 #include "Common/MessageStream.h"
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
@@ -43,6 +44,7 @@
 #include "GameClient/GameClient.h"
 #include "GameClient/InGameUI.h"
 #include "GameClient/KeyDefs.h"
+#include "GameClient/LookAtXlat.h"
 #include "GameClient/ParticleSys.h"	// for ParticleSystemDebugDisplay
 #include "GameClient/Shell.h"
 #include "GameClient/WindowLayout.h"
@@ -169,9 +171,20 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "TOGGLE_CONTROL_BAR",												GameMessage::MSG_META_TOGGLE_CONTROL_BAR },
 	{ "TOGGLE_PLAYER_OBSERVER",										GameMessage::MSG_META_TOGGLE_PLAYER_OBSERVER },
 	{ "CYCLE_HEALTH_BAR_MODE",										GameMessage::MSG_META_CYCLE_HEALTH_BAR_MODE },
+	{ "CYCLE_HOUSE_COLOR_MODE",										GameMessage::MSG_META_CYCLE_HOUSE_COLOR_MODE },
 	{ "TOGGLE_REVERSEMOVE",												GameMessage::MSG_META_TOGGLE_REVERSEMOVE },
 	{ "BEGIN_PATH_BUILD",													GameMessage::MSG_META_BEGIN_PATH_BUILD },
 	{ "END_PATH_BUILD",														GameMessage::MSG_META_END_PATH_BUILD },
+#if RTS_ZEROHOUR
+	{ "BEGIN_FACING_DRAG", GameMessage::MSG_META_BEGIN_FACING_DRAG },
+	{ "END_FACING_DRAG", GameMessage::MSG_META_END_FACING_DRAG },
+#endif
+#if defined(GENERALS_ONLINE)
+	{ "TOGGLE_NETWORK_STATS",											GameMessage::MSG_META_TOGGLE_NETWORK_STATS },
+	{ "TAKE_SCREENSHOT_ALT",											GameMessage::MSG_META_TAKE_SCREENSHOT_ALT },
+	{ "TOGGLE_BUDDY_OVERLAY",											GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY },
+	{ "TOGGLE_BUDDY_OVERLAY_ALT",									GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY_ALT },
+#endif
 	{ "BEGIN_FORCEATTACK",												GameMessage::MSG_META_BEGIN_FORCEATTACK },
 	{ "END_FORCEATTACK",													GameMessage::MSG_META_END_FORCEATTACK },
 	{ "BEGIN_FORCEMOVE",													GameMessage::MSG_META_BEGIN_FORCEMOVE },
@@ -236,6 +249,14 @@ static const LookupListRec GameMessageMetaTypeNames[] =
 	{ "CHEAT_CYCLE_TERRAIN_MODE",							  GameMessage::MSG_CHEAT_CYCLE_TERRAIN_MODE },
 	{ "CHEAT_TOGGLE_FACE_CULLING",							  GameMessage::MSG_CHEAT_TOGGLE_FACE_CULLING },
 	{ "CHEAT_SHOW_MODEL_NAMES",									  GameMessage::MSG_CHEAT_SHOW_MODEL_NAMES },
+	{ "CHEAT_SHOW_WINDOW_NAMES",								  GameMessage::MSG_CHEAT_SHOW_WINDOW_NAMES },
+	{ "CHEAT_SHOW_SHADER_DRAWS",								  GameMessage::MSG_CHEAT_SHOW_SHADER_DRAWS },
+#if RTS_ZEROHOUR
+	{ "CHEAT_TOGGLE_SHADER_PANEL", GameMessage::MSG_CHEAT_TOGGLE_SHADER_PANEL },
+#endif
+	{ "CHEAT_COPY_OBJECT_NAME",								  GameMessage::MSG_CHEAT_COPY_OBJECT_NAME },
+	{ "CHEAT_PATHFIND_LOG_ON",									  GameMessage::MSG_CHEAT_PATHFIND_LOG_ON },
+	{ "CHEAT_PATHFIND_LOG_OFF",									  GameMessage::MSG_CHEAT_PATHFIND_LOG_OFF },
 	{ "CHEAT_ADD_CASH",									          GameMessage::MSG_CHEAT_ADD_CASH },
 	{ "CHEAT_GIVE_ALL_SCIENCES",					        GameMessage::MSG_CHEAT_GIVE_ALL_SCIENCES },
   { "CHEAT_GIVE_SCIENCEPURCHASEPOINTS",        	GameMessage::MSG_CHEAT_GIVE_SCIENCEPURCHASEPOINTS },
@@ -421,6 +442,9 @@ MetaEventTranslator::MetaEventTranslator()
 		m_nextUpShouldCreateDoubleClick[i] = FALSE;
 	}
 	m_lastModState = NONE;
+	m_middleDragged = FALSE;
+	m_middleDownTime = 0;
+	m_wheelSpin = 0.0f;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -431,16 +455,18 @@ MetaEventTranslator::~MetaEventTranslator()
 //-------------------------------------------------------------------------------------------------
 static const char * findGameMessageNameByType(GameMessage::Type type)
 {
-	for (const LookupListRec* metaNames = GameMessageMetaTypeNames; metaNames->name; metaNames++)
-		if (metaNames->value == (Int)type)
-			return metaNames->name;
+	const char *name = MetaMap::findMetaTypeName(type);
+	if (name)
+	{
+		return name;
+	}
 
 	DEBUG_CRASH(("MetaTypeName %d not found -- did you remember to add it to GameMessageMetaTypeNames[] ?", (Int)type));
 	return "???";
 }
 
 //-------------------------------------------------------------------------------------------------
-static Bool isMessageUsable(CommandUsableInType usableIn)
+static Bool isMessageUsable(CommandUsableInType usableIn, GameMessage::Type type)
 {
 	// We will ignore all commands if the game client has not yet incremented to frame 1.
 	// It prevents the user from doing commands during a map load, which throws the input
@@ -465,7 +491,32 @@ static Bool isMessageUsable(CommandUsableInType usableIn)
 	if (usableAsObserver && isObserving)
 		return true;
 
+	// The shell map runs with the shell active, so a game-only cheat key would never fire there.
+	if ((usableInGame || usableAsObserver) && GameMessage::isDebugCheatHotkey(type) && TheGameLogic->isInShellGame())
+		return true;
+
 	return false;
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool MetaEventTranslator::isDebugCheatKey(Int systemKey, Int systemKeyState)
+{
+#if RTS_ZEROHOUR && (defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE))
+	if (TheMetaMap != nullptr)
+	{
+		const MappableKeyType keyType = getActionKeyType(systemKey);
+		const MappableKeyModState keyModState = getKeyModState(systemKeyState);
+		for (const MetaMapRec *map = TheMetaMap->getFirstMetaMapRec(); map; map = map->m_next)
+		{
+			if (keyType != MK_NONE && map->m_key == keyType && map->m_modState == keyModState &&
+				isMessageUsable(map->m_usableIn, map->m_meta))
+			{
+				return GameMessage::isDebugCheatHotkey(map->m_meta);
+			}
+		}
+	}
+#endif
+	return FALSE;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -477,6 +528,27 @@ GameMessageDisposition MetaEventTranslator::translateGameMessage(const GameMessa
 	if (t == GameMessage::MSG_RAW_KEY_DOWN || t == GameMessage::MSG_RAW_KEY_UP)
 	{
 		onKeyEvent(msg, disp);
+	}
+	else if (t == GameMessage::MSG_RAW_MOUSE_WHEEL)
+	{
+		// only a wheel no window used reaches here, and one that fires a binding does not zoom
+		const Real spin = msg->getArgument(1)->real;
+		if ((spin > 0.0f) != (m_wheelSpin > 0.0f))
+		{
+			m_wheelSpin = 0.0f;
+		}
+		m_wheelSpin += spin;
+
+		// touchpads and smooth wheels send fractions of a notch; a binding fires once per whole notch
+		if (fabs(m_wheelSpin) >= 1.0f)
+		{
+			const Bool up = m_wheelSpin > 0.0f;
+			m_wheelSpin -= up ? 1.0f : -1.0f;
+			if (onMouseKeyPressed(up ? MK_WHEELUP : MK_WHEELDOWN, msg->getArgument(2)->integer))
+			{
+				disp = DESTROY_MESSAGE;
+			}
+		}
 	}
 	else if (t > GameMessage::MSG_RAW_MOUSE_BEGIN && t < GameMessage::MSG_RAW_MOUSE_END )
 	{
@@ -503,6 +575,21 @@ void MetaEventTranslator::onMouseEvent(const GameMessage *msg)
 			--index;
 			m_mouseDownPosition[index] = msg->getArgument(0)->pixel;
 			m_nextUpShouldCreateDoubleClick[index] = FALSE;
+			if (index == 1)
+			{
+				m_middleDragged = FALSE;
+				m_middleDownTime = msg->getArgument(2)->integer;
+			}
+			break;
+		}
+
+		case GameMessage::MSG_RAW_MOUSE_MIDDLE_DRAG:
+		{
+			// a rotate that comes back to where it started is still a drag
+			if (!TheMouse->isClick(0, 0, m_mouseDownPosition[1], msg->getArgument(0)->pixel))
+			{
+				m_middleDragged = TRUE;
+			}
 			break;
 		}
 
@@ -559,6 +646,16 @@ void MetaEventTranslator::onMouseEvent(const GameMessage *msg)
 
 			// append the modifier keys to the message.
 			newMessage->appendIntegerArgument( msg->getArgument(1)->integer );
+
+			// a middle click that did not drag the camera fires what is bound to the middle button
+			if (index == 1 && !m_middleDragged &&
+					TheMouse->isClick(m_middleDownTime, msg->getArgument(2)->integer, m_mouseDownPosition[index], location))
+			{
+				if (onMouseKeyPressed(MK_MOUSE3, msg->getArgument(1)->integer) && TheLookAtTranslator)
+				{
+					TheLookAtTranslator->consumeMiddleClick();
+				}
+			}
 
 			// append the time to the message.
 			//newMessage->appendIntegerArgument( msg->getArgument(2)->integer );
@@ -644,10 +741,15 @@ void MetaEventTranslator::onKeyPressed(GameMessageDisposition &disp, Int systemK
 
 	for (const MetaMapRec *map = TheMetaMap->getFirstMetaMapRec(); map; map = map->m_next)
 	{
-		if (!isMessageUsable(map->m_usableIn))
+		if (!isMessageUsable(map->m_usableIn, map->m_meta))
 			continue;
 
-		const Bool isMatchingKeyCombo = map->m_key == keyType && map->m_modState == keyModState;
+		Bool isMatchingKeyCombo = map->m_key == keyType && map->m_modState == keyModState;
+#if RTS_ZEROHOUR
+		const Bool facingDragRelease = map->m_meta == GameMessage::MSG_META_END_FACING_DRAG && map->m_key == keyType
+			&& (systemKeyState & KEY_STATE_UP) != 0 && m_keyDownInfos[keyType].hasKeyModState(map->m_modState);
+		isMatchingKeyCombo = isMatchingKeyCombo || facingDragRelease;
+#endif
 		const Bool isMatchingTransitionUp = map->m_transition == UP && (systemKeyState & KEY_STATE_UP) != 0;
 		const Bool isMatchingTransitionDown = map->m_transition == DOWN && (systemKeyState & KEY_STATE_DOWN) != 0;
 		const Bool isModKeyDown = keyType == MK_NONE && map->m_key == NONE && map->m_transition == DOWN && !(m_lastModState & map->m_modState) && (keyModState & map->m_modState) == map->m_modState;
@@ -674,6 +776,9 @@ void MetaEventTranslator::onKeyPressed(GameMessageDisposition &disp, Int systemK
 				// happens to sit on a visible button is swallowed: the meta event steps aside and
 				// HotKeyTranslator then rejects the modifiers, so the key does nothing at all.
 				if( (keyModState & ~SHIFT) == 0 &&
+#if RTS_ZEROHOUR
+						!facingDragRelease &&
+#endif
 						TheGlobalData && TheGlobalData->m_gridHotkeysEnabled && TheHotKeyManager )
 				{
 					WideChar wKey = TheKeyboard->getPrintableKey( (KeyDefType)keyType, 0 );
@@ -681,14 +786,13 @@ void MetaEventTranslator::onKeyPressed(GameMessageDisposition &disp, Int systemK
 					uKey.concat( wKey );
 					AsciiString aKey;
 					aKey.translate( uKey );
+					const char *mouseKey = HotKeyManager::mouseKeyName( keyType );
+					if( mouseKey )
+					{
+						aKey = mouseKey;
+					}
 
-					// A key on the exclusion list keeps its meta event no matter what, which is the
-					// whole point of listing it -- otherwise a button that took the key through the
-					// string file fallback would still shadow it.
-					const Bool nonGrid = OptionPreferences::isNonGridHotkeyInList(
-							TheGlobalData->m_nonGridHotkeys, aKey );
-
-					if( !nonGrid && aKey.isNotEmpty() && TheHotKeyManager->isHotKeyClaimed( aKey ) )
+					if( aKey.isNotEmpty() && TheHotKeyManager->isHotKeyClaimed( aKey ) )
 					{
 						disp = KEEP_MESSAGE;	// let HotKeyTranslator have it
 						break;
@@ -698,11 +802,7 @@ void MetaEventTranslator::onKeyPressed(GameMessageDisposition &disp, Int systemK
 				// THIS IS A GREASY HACK... MESSAGE SHOULD BE HANDLED IN A TRANSLATOR, BUT DURING CINEMATICS THE TRANSLATOR IS DISABLED
 				if( map->m_meta ==  GameMessage::MSG_META_TOGGLE_FAST_FORWARD_REPLAY)
 				{
-			#if defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)//may be defined in GameCommon.h
-					if( TheGlobalData )
-			#else
-				if( TheGlobalData && TheGameLogic->isInReplayGame())
-			#endif
+				if( TheGlobalData && TheFramePacer->isFastForwardAvailable())
 					{
 						if ( TheWritableGlobalData )
 							TheWritableGlobalData->m_TiVOFastMode = 1 - TheGlobalData->m_TiVOFastMode;
@@ -717,6 +817,16 @@ void MetaEventTranslator::onKeyPressed(GameMessageDisposition &disp, Int systemK
 					break;
 				}
 
+#if RTS_ZEROHOUR
+				if (map->m_meta == GameMessage::MSG_META_BEGIN_FACING_DRAG)
+				{
+					m_keyDownInfos[keyType].setKeyModState(map->m_modState);
+				}
+				else if (map->m_meta == GameMessage::MSG_META_END_FACING_DRAG)
+				{
+					m_keyDownInfos[keyType].clearKeyModState(map->m_modState);
+				}
+#endif
 				/*GameMessage *metaMsg =*/ TheMessageStream->appendMessage(map->m_meta);
 				//DEBUG_LOG(("Frame %d: MetaEventTranslator::translateGameMessage() normal: %s", TheGameLogic->getFrame(), findGameMessageNameByType(map->m_meta)));
 			}
@@ -753,6 +863,26 @@ void MetaEventTranslator::onKeyPressed(GameMessageDisposition &disp, Int systemK
 			m_keyDownInfos[keyType] = NONE;
 		}
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool MetaEventTranslator::onMouseKeyPressed(MappableKeyType keyType, Int systemModifiers)
+{
+	GameMessageDisposition disp = KEEP_MESSAGE;
+	const MappableKeyModState keyModState = getKeyModState(systemModifiers);
+	onKeyPressed(disp, KEY_STATE_DOWN | systemModifiers, keyType, keyModState);
+	onKeyPressed(disp, KEY_STATE_UP | systemModifiers, keyType, keyModState);
+	if (disp == DESTROY_MESSAGE)
+	{
+		return TRUE;
+	}
+
+	// a cameo on this input, by the rules HotKeyTranslator keeps for keys
+	if ((keyModState & ~SHIFT) != 0 || TheHotKeyManager == nullptr)
+	{
+		return FALSE;
+	}
+	return TheHotKeyManager->executeHotKey(AsciiString(HotKeyManager::mouseKeyName(keyType)));
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -830,15 +960,8 @@ GameMessage::Type MetaMap::findGameMessageMetaType(const char* name)
 }
 
 //-------------------------------------------------------------------------------------------------
-MetaMapRec *MetaMap::getMetaMapRec(GameMessage::Type t)
+static MetaMapRec *newMetaMapRec(GameMessage::Type t)
 {
-	for (MetaMapRec *map = m_metaMaps; map; map = map->m_next)
-	{
-		if (map->m_meta == t)
-			return map;
-	}
-
-	// not found.. create a new one.
 	MetaMapRec *m = newInstance(MetaMapRec);
 	m->m_meta = t;
 	m->m_key = MK_NONE;
@@ -848,8 +971,37 @@ MetaMapRec *MetaMap::getMetaMapRec(GameMessage::Type t)
 	m->m_category = CATEGORY_MISC;
 	m->m_description.clear();
 	m->m_displayName.clear();
+	m->m_next = nullptr;
+	return m;
+}
+
+//-------------------------------------------------------------------------------------------------
+MetaMapRec *MetaMap::getMetaMapRec(GameMessage::Type t)
+{
+	for (MetaMapRec *map = m_metaMaps; map; map = map->m_next)
+	{
+		if (map->m_meta == t)
+			return map;
+	}
+
+	// not found.. create a new one.
+	MetaMapRec *m = newMetaMapRec(t);
 	m->m_next = m_metaMaps;
 	m_metaMaps = m;
+
+	return m;
+}
+
+//-------------------------------------------------------------------------------------------------
+// The translator fires only the first record that matches a key, so a record added here leaves
+// a key that any other record holds to that one.
+MetaMapRec *MetaMap::appendMetaMapRec(GameMessage::Type t)
+{
+	MetaMapRec *m = newMetaMapRec(t);
+	MetaMapRec **tail = &m_metaMaps;
+	while (*tail)
+		tail = &(*tail)->m_next;
+	*tail = m;
 
 	return m;
 }
@@ -946,20 +1098,6 @@ void MetaMap::generateMetaMap()
 		}
 	}
 	{
-		// TheSuperHackers @feature Toggle rendering off and on. Retail binds this to Ctrl+\ in the
-		// debug command map, but Contra ships an empty CommandMapDebug.ini, so nothing was bound to
-		// it in practice. Defaulted here instead, which is how the other cheats in this fork reach
-		// a key without needing a mod side INI entry.
-		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_META_DEMO_TOGGLE_RENDER);
-		if (map->m_key == MK_NONE)
-		{
-			map->m_key = MK_BACKSLASH;
-			map->m_transition = DOWN;
-			map->m_modState = CTRL;
-			map->m_usableIn = COMMANDUSABLE_GAME;
-		}
-	}
-	{
 		// TheSuperHackers @feature Default binding for the combined cheat. Shift+Ctrl+` is free in
 		// the engine, in the demo command map and in Contra's own, and it does not collide with
 		// the Ctrl+` health bar cycle because the modifier sets differ. Only exists in builds
@@ -1048,6 +1186,17 @@ void MetaMap::generateMetaMap()
 		}
 	}
 	{
+		// Outline and name every visible GUI window.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_SHOW_WINDOW_NAMES);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_SLASH;
+			map->m_transition = DOWN;
+			map->m_modState = SHIFT_CTRL;
+			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
+		}
+	}
+	{
 		// Ctrl+, is free in Contra's CommandMap.ini; RTS_DEBUG builds give it to DEMO_BEGIN_ADJUST_DEFAULTPITCH below instead.
 		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_SHOW_LASER_NAME);
 		if (map->m_key == MK_NONE)
@@ -1109,14 +1258,79 @@ void MetaMap::generateMetaMap()
 		}
 	}
 	{
-		// Toggle back face culling. Contra's CommandMap.ini also binds Ctrl+F1 to SAVE_VIEW1, and the
-		// meta translator fires every matching record, so this press saves camera bookmark 1 too.
+		// Toggle back face culling. Records made here sit ahead of the INI ones and only the first match fires, so this shadows Contra's Ctrl+F1 SAVE_VIEW1.
 		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_TOGGLE_FACE_CULLING);
 		if (map->m_key == MK_NONE)
 		{
 			map->m_key = MK_F1;
 			map->m_transition = DOWN;
 			map->m_modState = CTRL;
+			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
+		}
+	}
+	{
+		// Cycle the pathfinding debug overlay. Ctrl+A is retail's debug map binding and is free in Contra's maps.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_META_DEMO_TOGGLE_AI_DEBUG);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_A;
+			map->m_transition = DOWN;
+			map->m_modState = CTRL;
+			map->m_usableIn = COMMANDUSABLE_GAME;
+		}
+	}
+	{
+		// Pathfinder counter log on the bare keypad plus and minus, which no map binds without a modifier.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_PATHFIND_LOG_ON);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_KPPLUS;
+			map->m_transition = DOWN;
+			map->m_modState = NONE;
+			map->m_usableIn = COMMANDUSABLE_GAME;
+		}
+		map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_PATHFIND_LOG_OFF);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_KPMINUS;
+			map->m_transition = DOWN;
+			map->m_modState = NONE;
+			map->m_usableIn = COMMANDUSABLE_GAME;
+		}
+	}
+	{
+		// Shadows CHEAT_RUNSCRIPT1 on Shift+Ctrl+F1 in Contra's CommandMapDemo.ini, the same way as face culling above.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_SHOW_SHADER_DRAWS);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_F1;
+			map->m_transition = DOWN;
+			map->m_modState = SHIFT_CTRL;
+			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
+		}
+	}
+#if RTS_ZEROHOUR
+	{
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_TOGGLE_SHADER_PANEL);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_TAB;
+			map->m_transition = DOWN;
+			map->m_modState = SHIFT_CTRL;
+			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
+		}
+	}
+#endif
+	{
+		// Copy the template names of the selected objects to the clipboard. Alt+V is unbound in
+		// the engine defaults, in Contra's CommandMap.ini and in the demo map, which already puts
+		// its own cheats on Alt+F, Alt+G, Alt+H and Alt+T. Observer usable too, like the overlays.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_CHEAT_COPY_OBJECT_NAME);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_V;
+			map->m_transition = DOWN;
+			map->m_modState = ALT;
 			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
 		}
 	}
@@ -1133,6 +1347,18 @@ void MetaMap::generateMetaMap()
 			map->m_transition = DOWN;
 			map->m_modState = CTRL;
 			// in game and while observing, but not in the menus, where health bars mean nothing
+			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
+		}
+	}
+	{
+		// TheSuperHackers @feature Ctrl+Shift+G cycles HouseColorMode. Free in retail and in
+		// Contra's CommandMap.ini and CommandMapDemo.ini, whose only G binding is Alt+G.
+		MetaMapRec *map = TheMetaMap->getMetaMapRec(GameMessage::MSG_META_CYCLE_HOUSE_COLOR_MODE);
+		if (map->m_key == MK_NONE)
+		{
+			map->m_key = MK_G;
+			map->m_transition = DOWN;
+			map->m_modState = SHIFT_CTRL;
 			map->m_usableIn = (CommandUsableInType)(COMMANDUSABLE_GAME | COMMANDUSABLE_OBSERVER);
 		}
 	}
@@ -1171,9 +1397,17 @@ void MetaMap::generateMetaMap()
 	{
 		// Is mostly useful for Generals.
 		MetaMapRec *map = getMetaMapRec(GameMessage::MSG_META_TOGGLE_FAST_FORWARD_REPLAY);
-		if (map->m_key == MK_NONE)
+		Bool useDefaultKey = map->m_key == MK_NONE;
+#if RTS_ZEROHOUR && (defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE))
+		useDefaultKey = useDefaultKey || (map->m_key == MK_F && map->m_modState == NONE);
+#endif
+		if (useDefaultKey)
 		{
+#if RTS_ZEROHOUR && (defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE))
+			map->m_key = MK_KPSTAR;
+#else
 			map->m_key = MK_F;
+#endif
 			map->m_transition = DOWN;
 			map->m_modState = NONE;
 			map->m_usableIn = COMMANDUSABLE_GAME; // @todo COMMANDUSABLE_OBSERVER
@@ -1198,6 +1432,26 @@ void MetaMap::generateMetaMap()
 			map->m_key = MK_P;
 			map->m_transition = DOWN;
 			map->m_modState = SHIFT; // Requires modifier to avoid key conflicts as a player.
+			map->m_usableIn = COMMANDUSABLE_EVERYWHERE;
+		}
+	}
+	{
+		// Ctrl+\ is a second key for that pause, which stops a single player game in place without the menu Esc opens.
+		// A record holds one key, so this one gets its own, appended so lookups by message still find Shift+P.
+		Bool bound = FALSE;
+		for (MetaMapRec *rec = m_metaMaps; rec; rec = rec->m_next)
+		{
+			if (rec->m_key == MK_BACKSLASH && rec->m_modState == CTRL)
+			{
+				bound = TRUE;
+			}
+		}
+		if (!bound)
+		{
+			MetaMapRec *map = appendMetaMapRec(GameMessage::MSG_META_TOGGLE_PAUSE_ALT);
+			map->m_key = MK_BACKSLASH;
+			map->m_transition = DOWN;
+			map->m_modState = CTRL;
 			map->m_usableIn = COMMANDUSABLE_EVERYWHERE;
 		}
 	}
@@ -1275,6 +1529,51 @@ void MetaMap::generateMetaMap()
 		}
 	}
 
+#if defined(GENERALS_ONLINE)
+	{
+		// GO's fixed keys, as commands so the Hotkeys screen can rebind them under GO. Appended,
+		// so a command that already has one of these keys, or gets it from Hotkeys.ini (an F5
+		// control group, say), keeps it.
+		const struct { GameMessage::Type meta; MappableKeyType key; } goKeys[] =
+		{
+			{ GameMessage::MSG_META_TOGGLE_NETWORK_STATS, MK_F10 },
+			{ GameMessage::MSG_META_TAKE_SCREENSHOT_ALT, MK_F11 },
+			{ GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY, MK_F5 },
+			{ GameMessage::MSG_META_TOGGLE_BUDDY_OVERLAY_ALT, MK_INS },
+		};
+		for (Int i = 0; i < ARRAY_SIZE(goKeys); ++i)
+		{
+			MetaMapRec *map = appendMetaMapRec(goKeys[i].meta);
+			map->m_category = CATEGORY_GO;
+			map->m_key = goKeys[i].key;
+			map->m_usableIn = COMMANDUSABLE_EVERYWHERE;
+		}
+	}
+#endif
+
+#if RTS_ZEROHOUR
+	{
+		const GameMessage::Type facingDragTypes[] = { GameMessage::MSG_META_BEGIN_FACING_DRAG, GameMessage::MSG_META_END_FACING_DRAG };
+		for (Int i = 0; i < ARRAY_SIZE(facingDragTypes); ++i)
+		{
+			const MetaMapRec *existing = getFirstMetaMapRec();
+			while (existing && existing->m_meta != facingDragTypes[i])
+			{
+				existing = existing->m_next;
+			}
+			if (!existing)
+			{
+				MetaMapRec *map = getMetaMapRec(facingDragTypes[i]);
+				map->m_key = MK_MOUSE_LEFT_RIGHT;
+				map->m_modState = NONE;
+				map->m_usableIn = COMMANDUSABLE_GAME;
+				map->m_category = CATEGORY_CONTROL;
+				map->m_transition = i == 0 ? DOWN : UP;
+			}
+		}
+	}
+#endif
+
 #if defined(RTS_DEBUG)
 	{
 		// Is useful for Generals and Zero Hour.
@@ -1335,6 +1634,78 @@ void MetaMap::verifyMetaMap()
 			("hmm, expected only meta-msgs here"));
 	}
 #endif
+}
+
+//-------------------------------------------------------------------------------------------------
+void MetaMap::rememberDefaults()
+{
+	m_defaults.clear();
+	for (const MetaMapRec *map = m_metaMaps; map; map = map->m_next)
+	{
+		DefaultKey key;
+		key.key = map->m_key;
+		key.transition = map->m_transition;
+		key.modState = map->m_modState;
+		key.usableIn = map->m_usableIn;
+		m_defaults[map->m_meta] = key;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+void MetaMap::restoreDefaults()
+{
+	for (MetaMapRec *map = m_metaMaps; map; map = map->m_next)
+	{
+		DefaultKeyMap::const_iterator it = m_defaults.find(map->m_meta);
+		if (it == m_defaults.end())
+		{
+			// a record only the player's file made
+			map->m_key = MK_NONE;
+			map->m_transition = DOWN;
+			map->m_modState = NONE;
+			map->m_usableIn = COMMANDUSABLE_NONE;
+			continue;
+		}
+		map->m_key = it->second.key;
+		map->m_transition = it->second.transition;
+		map->m_modState = it->second.modState;
+		map->m_usableIn = it->second.usableIn;
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+Bool MetaMap::getDefaultKey(GameMessage::Type t, DefaultKey *key) const
+{
+	DefaultKeyMap::const_iterator it = m_defaults.find(t);
+	if (it == m_defaults.end())
+	{
+		key->key = MK_NONE;
+		key->transition = DOWN;
+		key->modState = NONE;
+		key->usableIn = COMMANDUSABLE_NONE;
+		return FALSE;
+	}
+	*key = it->second;
+	return TRUE;
+}
+
+//-------------------------------------------------------------------------------------------------
+const LookupListRec *MetaMap::getMetaTypeNames()
+{
+	return GameMessageMetaTypeNames;
+}
+
+//-------------------------------------------------------------------------------------------------
+const char *MetaMap::findMetaTypeName(GameMessage::Type t)
+{
+	for (const LookupListRec *metaNames = GameMessageMetaTypeNames; metaNames->name; metaNames++)
+	{
+		if (metaNames->value == t)
+		{
+			return metaNames->name;
+		}
+	}
+	return nullptr;
 }
 
 //-------------------------------------------------------------------------------------------------

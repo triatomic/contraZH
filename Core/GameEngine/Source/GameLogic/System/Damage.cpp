@@ -96,6 +96,7 @@ const char* const DamageTypeFlags::s_bitNameList[] =
 	"JET_TORPEDO",
 	"ANTI_SHIP",
 	"CRYO",
+	"BLACK_HOLE",
 	// Specific damage types with special logic attached
 	"TORPEDO",
 	"ANTI_TORPEDO",
@@ -105,6 +106,7 @@ const char* const DamageTypeFlags::s_bitNameList[] =
 	"SUBDUAL_JAMMING_UNRESISTABLE",
 	"SUBDUAL_FROZEN",
 	"SUBDUAL_FROZEN_UNRESISTABLE",
+	"GAS",
 	//"ZOMBIE_VIRUS",  // TODO
 	//"MIND_CONTROL",  // TODO
 	nullptr
@@ -160,7 +162,7 @@ void DamageInfoInput::xfer( Xfer *xfer )
 	xfer->xferObjectID( &m_sourceID );
 
 	// source player mask
-	xfer->xferUser( &m_sourcePlayerMask, sizeof( PlayerMaskType ) );
+	xfer->xferPlayerMask( &m_sourcePlayerMask );
 
 	// damage type
 	xfer->xferUser( &m_damageType, sizeof( DamageType ) );

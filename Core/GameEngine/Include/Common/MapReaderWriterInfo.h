@@ -56,6 +56,11 @@
 #define K_WORLDDICT_VERSION_1 1
 #define K_MAPPREVIEW_VERSION_1 1
 #define K_STOCHASTIC_VERSION_1 1	// contraZH painted stochastic terrain; older builds skip the chunk.
+
+// TheSuperHackers @bugfix arcticdolphin 12/10/2026 Map size limits.
+#define MAX_MAP_DIMENSION 8192 // The shroud texture spans the map and shoreline tiles pack each coordinate into 16 bits
+#define MAX_MAP_AREA (4096*4096) // Terrain, pathfinding and partition arrays allocate per cell in a 32 bit process
+
 /** Virtual helper class, so that we can write map data using FILE* or CFile. */
 class OutputStream {
 public:
@@ -90,6 +95,7 @@ public:
 	CachedFileInputStream();
 	~CachedFileInputStream();
 	Bool open(AsciiString path);	///< Returns true if open succeeded.
+	Bool open(class File *file);	///< Takes ownership of file, which may be null. Returns true if open succeeded.
 	void close();  ///< Explict close.  Destructor closes if file is left open.
 	virtual Int read(void *pData, Int numBytes) override;
 	virtual UnsignedInt tell() override;

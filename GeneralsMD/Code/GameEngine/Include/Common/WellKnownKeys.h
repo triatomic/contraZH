@@ -690,6 +690,13 @@ DEFINE_KEY(objectStoppingDistance)
 
 /**
 	Which: MapObject Properties
+	Type: Real
+	Usage: Visual size multiplier for this object, on top of the template Scale. Logic geometry is unchanged.
+*/
+DEFINE_KEY(objectScale)
+
+/**
+	Which: MapObject Properties
 	Type: AsciiString
 	Usage: What is the name of the layer that this thing lives on? (Empty means default)
 */

@@ -80,11 +80,25 @@ WW3D::MultiSampleModeEnum OptionPreferences::getAntiAliasing() const
 	return level;
 }
 
+Int OptionPreferences::getSuperSampling() const
+{
+	const Int percent = getInt("SuperSampling", 100);
+	if (percent >= 200)
+	{
+		return 200;
+	}
+	if (percent >= 150)
+	{
+		return 150;
+	}
+	return 100;
+}
+
 TextureFilterClass::TextureFilterMode OptionPreferences::getTextureFilterMode() const
 {
 	OptionPreferences::const_iterator it = find("TextureFilter");
 	if (it == end())
-		return TextureFilterClass::TEXTURE_FILTER_BILINEAR;
+		return TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC;
 
 	return TextureFilterClass::getTextureFilterMode(it->second.str());
 }
@@ -93,7 +107,7 @@ TextureFilterClass::AnisotropicFilterMode OptionPreferences::getTextureAnisotrop
 {
 	OptionPreferences::const_iterator it = find("AnisotropyLevel");
 	if (it == end())
-		return TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC_2X;
+		return TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC_8X;
 
 	TextureFilterClass::AnisotropicFilterMode level = (TextureFilterClass::AnisotropicFilterMode)atoi(it->second.str());
 	level = clamp(TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC_2X, level, TextureFilterClass::TEXTURE_FILTER_ANISOTROPIC_16X);
@@ -248,13 +262,32 @@ AlliedDecalMode OptionPreferences::getAlliedDecalMode(void) const
 	return AlliedDecalMode_Default;
 }
 
+// TheSuperHackers @feature Options.ini: HouseColorMode = Default | Basic (a plain index also works).
+HouseColorMode OptionPreferences::getHouseColorMode(void) const
+{
+	OptionPreferences::const_iterator it = find("HouseColorMode");
+	if (it == end())
+		return HouseColorMode_Default;
+
+	if (stricmp(it->second.str(), "Basic") == 0)
+		return HouseColorMode_Basic;
+	if (stricmp(it->second.str(), "Default") == 0)
+		return HouseColorMode_PlayerColors;
+
+	Int mode = atoi(it->second.str());
+	if (mode >= 0 && mode < HouseColorMode_Count)
+		return (HouseColorMode)mode;
+
+	return HouseColorMode_Default;
+}
+
 // TheSuperHackers @feature Draw each command bar cameo's keyboard hotkey over the cameo.
 // Options.ini: KeyboardOverlay = Yes
 Bool OptionPreferences::getKeyboardOverlayEnabled(void) const
 {
 	OptionPreferences::const_iterator it = find("KeyboardOverlay");
 	if (it == end())
-		return FALSE;
+		return TRUE;
 
 	if (stricmp(it->second.str(), "yes") == 0) {
 		return TRUE;
@@ -289,77 +322,24 @@ Bool OptionPreferences::getGridHotkeysEnabled(void) const
 	return FALSE;
 }
 
-// TheSuperHackers @feature The key for each slot, in slot order. Defaults to two rows of nine,
-// matching a command bar that is two rows deep. Mods with a different bar can set their own,
-// and the count is whatever the string is long -- slots past the end simply get no grid key.
-// Options.ini: GridHotkeyLayout = QWERTYUIOASDFGHJKL
+// TheSuperHackers @feature Grid keys in reading order, presets in OptionsMenu.cpp. Options.ini: GridHotkeyLayout = QWERTYUIOASDFGHJKL
 AsciiString OptionPreferences::getGridHotkeyLayout(void) const
 {
 	OptionPreferences::const_iterator it = find("GridHotkeyLayout");
 	if (it == end() || it->second.isEmpty())
-		return AsciiString("QWERTYUIOASDFGHJKL");
+		return AsciiString(GRID_HOTKEY_LAYOUT_DEFAULT);
 
 	return it->second;
 }
 
-// TheSuperHackers @feature Keys listed here opt out of the grid entirely. The slot that would
-// have taken such a key falls back to its string file letter, and the key keeps whatever it
-// normally does -- so a mod can leave S, G and friends on their usual bindings while everything
-// else grids. Letters only, case insensitive, separators optional: "SG" and "S,G" both work.
-// Options.ini: NonGridHotkeys = SG
-AsciiString OptionPreferences::getNonGridHotkeys(void) const
+// TheSuperHackers @feature Unit orders keep their own letter, not a grid key. Options.ini: GridHotkeyUnitOrders = Yes
+Bool OptionPreferences::getGridHotkeyUnitOrders(void) const
 {
-	OptionPreferences::const_iterator it = find("NonGridHotkeys");
+	OptionPreferences::const_iterator it = find("GridHotkeyUnitOrders");
 	if (it == end())
-		return AsciiString::TheEmptyString;
+		return TRUE;
 
-	return it->second;
-}
-
-// TheSuperHackers @feature Is this key one the player asked to keep out of the grid?
-Bool OptionPreferences::isNonGridHotkey(const AsciiString& key) const
-{
-	if (key.isEmpty())
-		return FALSE;
-
-	return isNonGridHotkeyInList(getNonGridHotkeys(), key);
-}
-
-// TheSuperHackers @feature Shared by the option lookup above and by GlobalData's cached copy,
-// so both read the exclusion list exactly the same way.
-Bool OptionPreferences::isNonGridHotkeyInList(const AsciiString& list, const AsciiString& key)
-{
-	if (list.isEmpty() || key.isEmpty())
-		return FALSE;
-
-	const char wanted = tolower(key.getCharAt(0));
-	const char *c = list.str();
-	for (; *c; ++c)
-	{
-		// a plain scan, so commas, spaces or nothing at all all work as separators
-		if (tolower(*c) == wanted)
-			return TRUE;
-	}
-
-	return FALSE;
-}
-
-// TheSuperHackers @feature How many columns the command bar is wide. The engine numbers command
-// slots down each column rather than across each row, so the layout string -- which is written in
-// reading order -- has to be mapped through this to land the right key on the right button.
-// 0 means do not remap, i.e. the layout string is already in slot order.
-// Options.ini: GridHotkeyColumns = 9
-Int OptionPreferences::getGridHotkeyColumns(void) const
-{
-	OptionPreferences::const_iterator it = find("GridHotkeyColumns");
-	if (it == end())
-		return 9;	// two rows of nine, matching a bar two rows deep
-
-	Int columns = atoi(it->second.str());
-	if (columns < 0)
-		columns = 0;
-
-	return columns;
+	return stricmp(it->second.str(), "yes") == 0;
 }
 
 // TheSuperHackers @feature Options.ini: SelectionCircle = Yes draws a green hexagon under
@@ -393,7 +373,7 @@ Bool OptionPreferences::getObjectDecalsEnabled(void) const
 
 Bool OptionPreferences::getBloomEnabled(void) const
 {
-	return getBool("Bloom", FALSE);
+	return getBool("Bloom", TRUE);
 }
 
 Real OptionPreferences::getBloomStrength(void) const
@@ -402,19 +382,54 @@ Real OptionPreferences::getBloomStrength(void) const
 	return clamp(0.0f, strength, 1.0f);
 }
 
+#if defined(RTS_ZEROHOUR)
+Real OptionPreferences::getBloomThreshold(void) const
+{
+	return clamp(0.0f, getReal("BloomThreshold", 0.25f), 1.0f);
+}
+
+Real OptionPreferences::getBloomSize(void) const
+{
+	return clamp(0.25f, getReal("BloomSize", 1.0f), 4.0f);
+}
+
+#endif
+
+// The debug views are developer aids: a build without cheats never turns one on, whatever Options.ini says
+static Bool debugViewEnabled(const UserPreferences &pref, const char *key)
+{
+#if defined(RTS_DEBUG) || defined(_ALLOW_DEBUG_CHEATS_IN_RELEASE)
+	return pref.getBool(key, FALSE);
+#else
+	return FALSE;
+#endif
+}
+
 Bool OptionPreferences::getBloomDebugEnabled(void) const
 {
-	return getBool("BloomDebug", FALSE);
+	return debugViewEnabled(*this, "BloomDebug");
 }
 
 Bool OptionPreferences::getLaserRefEnabled(void) const
 {
-	return getBool("LaserRef", FALSE);
+	return getBool("LaserRef", TRUE);
 }
 
 Bool OptionPreferences::getShadowMapEnabled(void) const
 {
 	return getBool("ShadowMap", TRUE);
+}
+
+// Snapped up to the next size the Options menu offers.
+Int OptionPreferences::getShadowMapResolution(void) const
+{
+	const Int resolution = getInt("ShadowMapResolution", 4096);
+	Int size = 512;
+	while (size < 4096 && size < resolution)
+	{
+		size *= 2;
+	}
+	return size;
 }
 
 Bool OptionPreferences::getSpecularEnabled(void) const
@@ -424,12 +439,17 @@ Bool OptionPreferences::getSpecularEnabled(void) const
 
 Bool OptionPreferences::getNormalMapsEnabled(void) const
 {
-	return getBool("NormalMaps", TRUE);
+	return getBool("NormalMaps", FALSE);
 }
 
 Bool OptionPreferences::getWaterReflectionsEnabled(void) const
 {
 	return getBool("WaterReflections", TRUE);
+}
+
+Bool OptionPreferences::getShorelineFoamEnabled(void) const
+{
+	return getBool("ShorelineFoam", TRUE);
 }
 
 Bool OptionPreferences::getSoftParticlesEnabled(void) const
@@ -452,6 +472,13 @@ Bool OptionPreferences::getLaserShadersEnabled(void) const
 	return getBool("LaserShaders", TRUE);
 }
 
+#if RTS_ZEROHOUR
+Bool OptionPreferences::getFluidShadersEnabled(void) const
+{
+	return getBool("FluidShaders", TRUE);
+}
+#endif
+
 Bool OptionPreferences::getCryoShadersEnabled(void) const
 {
 	return getBool("CryoShaders", TRUE);
@@ -467,9 +494,14 @@ Bool OptionPreferences::getPixelLightsEnabled(void) const
 	return getBool("PixelLights", TRUE);
 }
 
+Bool OptionPreferences::getPathTracingEnabled(void) const
+{
+	return getBool("PathTracing", FALSE);
+}
+
 Bool OptionPreferences::getAmbientOcclusionEnabled(void) const
 {
-	return getBool("AmbientOcclusion", TRUE);
+	return getBool("AmbientOcclusion", FALSE);
 }
 
 Bool OptionPreferences::getHeightBlendEnabled(void) const
@@ -503,22 +535,32 @@ Bool OptionPreferences::getSmoothUnitMotionEnabled(void) const
 
 Bool OptionPreferences::getSpecularDebugEnabled(void) const
 {
-	return getBool("SpecularDebug", FALSE);
+	return debugViewEnabled(*this, "SpecularDebug");
 }
 
 Bool OptionPreferences::getNormalMapDebugEnabled(void) const
 {
-	return getBool("NormalMapDebug", FALSE);
+	return debugViewEnabled(*this, "NormalMapDebug");
 }
 
 Bool OptionPreferences::getAmbientOcclusionDebugEnabled(void) const
 {
-	return getBool("AmbientOcclusionDebug", FALSE);
+	return debugViewEnabled(*this, "AmbientOcclusionDebug");
+}
+
+Bool OptionPreferences::getDynamicLightsDebugEnabled(void) const
+{
+	return debugViewEnabled(*this, "DynamicLightsDebug");
 }
 
 Bool OptionPreferences::getBorderlessWindowEnabled(void) const
 {
 	return getBool("BorderlessWindow", FALSE);
+}
+
+Bool OptionPreferences::getWindowedEnabled(void) const
+{
+	return getBool("Windowed", FALSE);
 }
 
 // TheSuperHackers @feature Options.ini: NumericalHealth = Yes prints the hit points beside the
@@ -685,6 +727,27 @@ BuildTimerDisplayMode OptionPreferences::getBuildTimerDisplayMode(void) const
 	return BuildTimerDisplayMode_Default;
 }
 
+// Options.ini as ActionLines = Off | All | AttackOnly (a plain index also works).
+ActionLineMode OptionPreferences::getActionLineMode(void) const
+{
+	OptionPreferences::const_iterator it = find("ActionLines");
+	if (it == end())
+		return ActionLineMode_Default;
+
+	if (stricmp(it->second.str(), "All") == 0)
+		return ActionLineMode_All;
+	if (stricmp(it->second.str(), "AttackOnly") == 0)
+		return ActionLineMode_AttackOnly;
+	if (stricmp(it->second.str(), "Off") == 0)
+		return ActionLineMode_Off;
+
+	Int mode = atoi(it->second.str());
+	if (mode >= 0 && mode < ActionLineMode_Count)
+		return (ActionLineMode)mode;
+
+	return ActionLineMode_Default;
+}
+
 UnsignedByte OptionPreferences::getColorChannel(const char *keyName, UnsignedByte defaultValue) const
 {
 	OptionPreferences::const_iterator it = find(AsciiString(keyName));
@@ -759,6 +822,15 @@ Bool OptionPreferences::getDoubleClickAttackMoveEnabled()
 
 	return FALSE;
 }
+
+// drag-to-face, on unless the player turned it off
+#if RTS_ZEROHOUR
+Bool OptionPreferences::getFacingDragEnabled() const
+{
+	OptionPreferences::const_iterator it = find( "UseFacingDrag" );
+	return it == end() || stricmp( it->second.str(), "yes" ) == 0;
+}
+#endif
 
 Int OptionPreferences::getJpegQuality() const
 {
@@ -1212,6 +1284,24 @@ Bool OptionPreferences::getFPSLimitEnabled()
 	}
 	return FALSE;
 }
+
+#if RTS_ZEROHOUR
+Int OptionPreferences::getRenderFPSLimit() const
+{
+	const Int fps = getInt("RenderFPSLimit", 240);
+	switch (fps)
+	{
+		case 0:
+		case 30:
+		case 60:
+		case 120:
+		case 240:
+			return fps;
+		default:
+			return 240;
+	}
+}
+#endif
 
 Bool OptionPreferences::get3DShadowsEnabled()
 {

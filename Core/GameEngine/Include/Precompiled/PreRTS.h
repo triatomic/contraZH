@@ -128,6 +128,7 @@ class STLSpecialAlloc;
 
 #include "Common/Thing.h"
 #include "Common/UnicodeString.h"
+#include "Common/SimulationMathGuard.h"
 
 #if defined(__GNUC__) && defined(_WIN32)
     #pragma GCC diagnostic pop

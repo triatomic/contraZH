@@ -66,7 +66,7 @@ public:
 			{ "AffectAllies",		INI::parseBool, nullptr, offsetof( NeutronBlastBehaviorModuleData, m_affectAllies ) },
 			{ "AffectGarrison",	INI::parseBool, nullptr, offsetof( NeutronBlastBehaviorModuleData, m_affectGarrison ) },
 			{ "RejectEffectOnUnit", INI::parseAsciiStringVector, nullptr, offsetof( NeutronBlastBehaviorModuleData, m_rejectEffectOnUnit ) },
-			{ 0, 0, 0, 0 }
+			{ nullptr, nullptr, nullptr, 0 }
 		};
 
 		p.add(dataFieldParse);

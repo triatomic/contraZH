@@ -911,24 +911,48 @@ Bool W3DRadar::isManMadeTerrainColor( const RGBColor *color ) const
 }
 
 //-------------------------------------------------------------------------------------------------
-/** The tone the new radar draws ground in: a pale grey for rock and the man made surfaces sitting
-	* on it, and an olive for everything natural.
+/** Does this natural terrain sample read as desert sand rather than grass, dirt or rock?
 	*
-	* Mixed by how much of the cell read as man made rather than picked outright, because picking
-	* leaves every boundary a hard step between the two tones and the ground stops looking like
+	* Sand is the one natural ground that is both warm and bright. Dirt and dry grass share its
+	* hue but sit well below it in brightness, and nothing green or blue is sand however bright it
+	* is. Measured over the terrain textures the sand tiles average above 0.70 on their strongest
+	* channel while temperate rock, cobble and grass top out near 0.66, so the cut sits between
+	* the two. Desert cliffs land on the sand side of it, which is where a desert map wants them. */
+//-------------------------------------------------------------------------------------------------
+Bool W3DRadar::isSandTerrainColor( const RGBColor *color ) const
+{
+	const Real sandBrightness = 0.68f;		// a warm sample at least this bright is called sand
+
+	const Bool isWarm = (color->red >= color->green && color->green >= color->blue);
+
+	return (isWarm && color->red >= sandBrightness);
+
+}
+
+//-------------------------------------------------------------------------------------------------
+/** The tone the new radar draws ground in: a pale grey for rock and the man made surfaces sitting
+	* on it, a tan for desert sand, and an olive for everything else natural.
+	*
+	* Mixed by how much of the cell read as each rather than picked outright, because picking
+	* leaves every boundary a hard step between the tones and the ground stops looking like
 	* ground. Ground that is all one thing still comes out as one flat tone, which is the look this
 	* is after; it is only the cells along an edge that land somewhere in between. */
 //-------------------------------------------------------------------------------------------------
-void W3DRadar::getTerrainTone( RGBColor *color, Real manMadeFraction ) const
+void W3DRadar::getTerrainTone( RGBColor *color, Real manMadeFraction, Real sandFraction ) const
 {
 	const RGBColor groundTone = { 0.45f, 0.42f, 0.26f };		///< olive for natural ground
+	const RGBColor sandTone = { 0.66f, 0.56f, 0.36f };			///< tan for desert sand
 	const RGBColor structureTone = { 0.72f, 0.73f, 0.72f };	///< pale grey for rock and concrete
 
 	manMadeFraction = clamp( 0.0f, manMadeFraction, 1.0f );
+	sandFraction = clamp( 0.0f, sandFraction, 1.0f - manMadeFraction );
 
-	color->red = groundTone.red + (structureTone.red - groundTone.red) * manMadeFraction;
-	color->green = groundTone.green + (structureTone.green - groundTone.green) * manMadeFraction;
-	color->blue = groundTone.blue + (structureTone.blue - groundTone.blue) * manMadeFraction;
+	color->red = groundTone.red + (structureTone.red - groundTone.red) * manMadeFraction
+														 + (sandTone.red - groundTone.red) * sandFraction;
+	color->green = groundTone.green + (structureTone.green - groundTone.green) * manMadeFraction
+															 + (sandTone.green - groundTone.green) * sandFraction;
+	color->blue = groundTone.blue + (structureTone.blue - groundTone.blue) * manMadeFraction
+															+ (sandTone.blue - groundTone.blue) * sandFraction;
 
 }
 //-------------------------------------------------------------------------------------------------
@@ -1405,6 +1429,7 @@ void W3DRadar::buildTerrainTexture( TerrainLogic *terrain )
 				sampleColor.red = sampleColor.green = sampleColor.blue = 0.0f;
 				samples = 0;
 				Int manMadeSamples = 0;
+				Int sandSamples = 0;
 				Real sampleHeight = 0.0f;
 
 				for( j = y - samplesAway; j <= y + samplesAway; j++ )
@@ -1463,11 +1488,15 @@ void W3DRadar::buildTerrainTexture( TerrainLogic *terrain )
 									// just take the vote here. Which tone the cell ends up in is settled once, after
 									// all its samples are in, because a cell over the edge of a car park or a road
 									// through a park genuinely has both kinds of ground under it, and snapping each
-									// sample on its own leaves those cells dithering between the two tones.
+									// sample on its own leaves those cells dithering between the tones.
 									//
 									if( m_newRadar && isManMadeTerrainColor( &color ) )
 									{
 										manMadeSamples++;
+									}
+									else if( m_newRadar && isSandTerrainColor( &color ) )
+									{
+										sandSamples++;
 									}
 
 									//
@@ -1515,14 +1544,14 @@ void W3DRadar::buildTerrainTexture( TerrainLogic *terrain )
 				color.blue = sampleColor.blue / (Real)samples;
 
 				//
-				// take the tone from how much of the cell read as man made, rather than from which kind
-				// won it. Ground that is all one thing still comes out flat, a cell over a kerb no longer
-				// dithers, and an edge between the two gets a step of shading across it instead of a
-				// hard seam. The averaged colour above is dropped; only its height shading is re-applied.
+				// take the tone from how much of the cell read as man made and as sand, rather than from
+				// which kind won it. Ground that is all one thing still comes out flat, a cell over a kerb
+				// no longer dithers, and an edge between two kinds gets a step of shading across it instead
+				// of a hard seam. The averaged colour above is dropped; only its height shading is re-applied.
 				//
 				if( m_newRadar && workingBridge == FALSE )
 				{
-					getTerrainTone( &color, (Real)manMadeSamples / (Real)samples );
+					getTerrainTone( &color, (Real)manMadeSamples / (Real)samples, (Real)sandSamples / (Real)samples );
 					interpolateColorForHeight( &color, sampleHeight / (Real)samples, getTerrainAverageZ(),
 																	 m_mapExtent.hi.z, m_mapExtent.lo.z );
 				}
