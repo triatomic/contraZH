@@ -107,6 +107,7 @@ public:
 	NameKeyType getModuleTagNameKey() const { return m_moduleTagNameKey; }
 
 	virtual Bool isAiModuleData() const { return false; }
+	virtual Bool takesOverPowerDisable() const { return false; }	///< TRUE if the module's onPowerChange returns TRUE
 
 	// ugh, hack
 	virtual const W3DModelDrawModuleData* getAsW3DModelDrawModuleData() const { return nullptr; }

@@ -63,7 +63,8 @@ PoweredBehaviorModuleData::PoweredBehaviorModuleData()
 //-------------------------------------------------------------------------------------------------
 PoweredBehavior::PoweredBehavior( Thing *thing, const ModuleData* moduleData ) :
 	UpdateModule( thing, moduleData ),
-	m_powered(TRUE)
+	m_powered(TRUE),
+	m_clearOldDisable(FALSE)
 {
 	// the owner is not known yet, so the first tick reads the power state
 	setWakeFrame( getObject(), UPDATE_SLEEP_NONE );
@@ -77,7 +78,9 @@ PoweredBehavior::~PoweredBehavior()
 //-------------------------------------------------------------------------------------------------
 static Real weaponPenaltyToScalar( Real penalty )
 {
-	return (penalty > 0.0f && penalty < 1.0f) ? 1.0f - penalty : 1.0f;
+	// Module-fired weapons ignore NO_ATTACK, and a zero rate of fire would divide by zero.
+	const Real MIN_WEAPON_SCALAR = 0.01f;
+	return penalty > 0.0f ? max( 1.0f - penalty, MIN_WEAPON_SCALAR ) : 1.0f;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -170,13 +173,15 @@ void PoweredBehavior::crc( Xfer *xfer )
 
 //-------------------------------------------------------------------------------------------------
 /** Version Info:
-	* 1: Initial version */
+	* 1: Initial version
+	* 2: No data change, marks saves that cannot hold the KINDOF_POWERED disable */
 //-------------------------------------------------------------------------------------------------
 void PoweredBehavior::xfer( Xfer *xfer )
 {
-	XferVersion currentVersion = 1;
+	XferVersion currentVersion = 2;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
+	m_clearOldDisable = (version < 2);
 
 	UpdateModule::xfer( xfer );
 
@@ -189,6 +194,8 @@ void PoweredBehavior::loadPostProcess()
 {
 	UpdateModule::loadPostProcess();
 
-	// Saves from older builds can hold the disable this module replaces.
-	getObject()->clearDisabled( DISABLED_UNDERPOWERED );
+	if (m_clearOldDisable)
+	{
+		getObject()->clearDisabled( DISABLED_UNDERPOWERED );
+	}
 }
