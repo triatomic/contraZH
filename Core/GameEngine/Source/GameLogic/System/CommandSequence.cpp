@@ -609,6 +609,10 @@ Bool CommandSequence::handleMoveStreak(Object* obj)
 
 	UnsignedInt curStreakID = obj->getLastCommandInMoveStreak();
 	CommandNode *curNode = findCommandByID(obj->getCurrentCommand());
+	if (!curNode)
+	{
+		return false;
+	}
 
 	CommandVerifyStatus cvs = obj->getCommandVerifyStatus();
 
