@@ -661,7 +661,7 @@ Bool CommandSequence::handleMoveStreak(Object* obj)
 			ai->aiFollowPathAppend(&nextDest, CMD_FROM_PLAYER, nextStreak->m_cmdType == COMMAND_DO_REVERSE_MOVETO, nextStreak->m_nodeID);
 		}
 	}
-	return false;
+	return true;
 }
 
 Bool CommandSequence::includeUnitInCommand(UnsignedInt cmdNodeID, Object *obj, const Coord3D *objDest)
