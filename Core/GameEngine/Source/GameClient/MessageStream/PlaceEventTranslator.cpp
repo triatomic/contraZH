@@ -264,8 +264,10 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 						rating = rateLegalBuildCode(curLbc);
 						if (rating < 0)
 						{
+							hasLbc = true;
 							lbc = curLbc;
 							cantBuildObj = builderObj;
+							break;
 						}
 
 						if (!hasLbc)

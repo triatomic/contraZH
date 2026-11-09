@@ -622,24 +622,32 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			//before actually previewing the purchase, otherwise, cancel altogether.
 			const ThingTemplate *whatToBuild = commandButton->getThingTemplate();
 			CanMakeType cmt = CANMAKE_NO_PREREQ, curCmt;
+			Bool hasCmt = false;
+			Int rating;
 
 			for (DrawableListCIt it = selected->begin(); it != selected->end(); ++it)
 			{
 				curCmt = TheBuildAssistant->canMakeUnit((*it)->getObject(), whatToBuild);
+				rating = rateCanMakeType(curCmt);
 
-				if (curCmt == CANMAKE_NO_MONEY || curCmt == CANMAKE_MAXED_OUT_FOR_PLAYER)
+				if (rating < 0)
 				{
+					hasCmt = true;
 					cmt = curCmt;
 					break;
 				}
 
-				if (it == selected->begin())
+				if (!hasCmt)
+				{
+					hasCmt = true;
 					cmt = curCmt;
-				else if (curCmt == CANMAKE_QUEUE_FULL && cmt == CANMAKE_PARKING_PLACES_FULL)
-					cmt = CANMAKE_QUEUE_FULL;
-				else if (curCmt == CANMAKE_OK)
-					cmt = CANMAKE_OK;
+				}
+				else if (rating < rateCanMakeType(cmt))
+					cmt = curCmt;
 			}
+
+			if (!hasCmt)
+				break;
 			
 			if (cmt == CANMAKE_NO_MONEY)
 			{

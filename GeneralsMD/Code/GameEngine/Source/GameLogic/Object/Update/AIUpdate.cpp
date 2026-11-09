@@ -5968,7 +5968,7 @@ void AIUpdateInterface::proceedNextCommand()
 	}
 	else if (cvs == STATUS_EXIT_VERIFIED && TheCommandSequence->isCurrentExitCommand(obj))
 	{
-		obj->setCommandVerifyStatus(STATUS_FRESH);
+		TheCommandSequence->proceedNextCommand(obj);
 	}
 
 	cvs = obj->getCommandVerifyStatus();

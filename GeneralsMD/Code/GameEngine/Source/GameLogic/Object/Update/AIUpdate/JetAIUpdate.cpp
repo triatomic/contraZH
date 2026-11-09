@@ -2166,8 +2166,6 @@ public:
 		Object* jet = getMachineOwner();
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 
-		TheCommandSequence->verifyObjectCommand(jet);
-
 		ParkingPlaceBehaviorInterface* pp = getPP(jet->getProducerID());
 		if (pp == nullptr)
 		{
@@ -2200,7 +2198,12 @@ public:
 		}
 		setAdjustsDestination(false);		// precision is necessary
 
-		return AIInternalMoveToState::onEnter();
+		StateReturnType ret =  AIInternalMoveToState::onEnter();
+
+		if (ret != STATE_FAILURE)
+			TheCommandSequence->verifyObjectCommand(jet);
+
+		return ret;
 	}
 };
 EMPTY_DTOR(JetOrHeliReturnForLandingState)
