@@ -2608,6 +2608,11 @@ void AIGroup::groupConstruct(const ThingTemplate *thing, const Coord3D *pos, Rea
 
 	UnsignedInt cmdNode = TheCommandSequence->newDozerConstructCommand(CommandSequence::COMMAND_DOZER_CONSTRUCT, thing, pos, nullptr, angle);
 
+	if (!isWaypoint)
+	{
+		TheCommandSequence->clearObjectCommand(bestBuilder);
+	}
+
 	if (!TheCommandSequence->hasAnyCommand(bestBuilder))
 	{
 
