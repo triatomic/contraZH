@@ -1554,7 +1554,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		case GUI_COMMAND_HOLD_FIRE:
 		{
 
-			TheMessageStream->appendMessage( GameMessage::MSG_TOGGLE_HOLD_FIRE );
+			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_TOGGLE_HOLD_FIRE );
+			msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 			break;
 
 		}
@@ -1565,7 +1566,8 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 		case GUI_COMMAND_TOGGLE_DEPLOY:
 		{
 
-			TheMessageStream->appendMessage( GameMessage::MSG_TOGGLE_DEPLOY );
+			GameMessage *msg = TheMessageStream->appendMessage( GameMessage::MSG_TOGGLE_DEPLOY );
+			msg->appendBooleanArgument(TheInGameUI->isInWaypointMode());
 			break;
 
 		}

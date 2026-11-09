@@ -4085,6 +4085,7 @@ void AIGroup::groupMoveToPositionFacing( const Coord3D *pos, Real angle, Int row
 	for( Int k = 0; k < count; ++k )
 	{
 		Object *unit = movers[k];
+		TheCommandSequence->clearObjectCommand( unit );
 		unit->setFormationID( NO_FORMATION_ID );
 		TheAI->pathfinder()->removeGoal( unit );
 		const Real speedLimit = speeds[k] > 0.0f ? formationUnitSpeed( style, distances[k], speeds[k], slowest, arrivalTime ) : 0.0f;
