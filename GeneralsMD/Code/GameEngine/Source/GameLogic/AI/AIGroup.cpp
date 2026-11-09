@@ -2561,10 +2561,16 @@ void AIGroup::groupConstruct(const ThingTemplate *thing, const Coord3D *pos, Rea
 			if (TheBuildAssistant->canMakeUnit(*i, thing) != CANMAKE_OK)
 				continue;
 
+			if (!thing->isKindOf(KINDOF_SHIPYARD) && !ai->isQuickPathAvailable(pos))
+			{
+				continue;
+			}
+
+			builderPos = (*i)->getPosition();
+			curDist = sqr(builderPos->x - pos->x) + sqr(builderPos->y - pos->y);
+
 			if (!dozerAi->isAnyTaskPending())
 			{
-				builderPos = (*i)->getPosition();
-				curDist = sqr(builderPos->x - pos->x) + sqr(builderPos->y - pos->y);
 				if (curDist < bestDist || isRepairTask)
 				{
 					bestDist = curDist;
@@ -2589,6 +2595,17 @@ void AIGroup::groupConstruct(const ThingTemplate *thing, const Coord3D *pos, Rea
 			if (TheBuildAssistant->canMakeUnit(*i, thing) != CANMAKE_OK)
 				continue;
 
+			AIUpdateInterface* ai = (*i)->getAIUpdateInterface();
+			if (!ai)
+			{
+				continue;
+			}
+
+			if (!thing->isKindOf(KINDOF_SHIPYARD) && !ai->isQuickPathAvailable(pos))
+			{
+				continue;
+			}
+
 			cnt = TheCommandSequence->getConstructionCount(*i);
 
 			builderPos = (*i)->getPosition();
@@ -2607,6 +2624,11 @@ void AIGroup::groupConstruct(const ThingTemplate *thing, const Coord3D *pos, Rea
 		return;
 
 	UnsignedInt cmdNode = TheCommandSequence->newDozerConstructCommand(CommandSequence::COMMAND_DOZER_CONSTRUCT, thing, pos, nullptr, angle);
+
+	if (!isWaypoint)
+	{
+		TheCommandSequence->clearObjectCommand(bestBuilder);
+	}
 
 	if (!TheCommandSequence->hasAnyCommand(bestBuilder))
 	{
@@ -2662,10 +2684,11 @@ void AIGroup::groupResumeConstruction( Object *obj, Bool isWaypoint, CommandSour
 			if (!TheActionManager->canResumeConstructionOf(*i, obj, cmdSource))
 				continue;
 
+			builderPos = (*i)->getPosition();
+			curDist = sqr(builderPos->x - targetPos->x) + sqr(builderPos->y - targetPos->y);
+
 			if (!dozerAi->isAnyTaskPending())
 			{
-				builderPos = (*i)->getPosition();
-				curDist = sqr(builderPos->x - targetPos->x) + sqr(builderPos->y - targetPos->y);
 				if (curDist < bestDist || isRepairTask)
 				{
 					bestDist = curDist;

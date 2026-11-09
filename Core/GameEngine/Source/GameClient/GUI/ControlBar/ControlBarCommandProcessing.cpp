@@ -621,13 +621,13 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 			//Make sure we have enough CASH to build it WHEN we click the button to build it,
 			//before actually previewing the purchase, otherwise, cancel altogether.
 			const ThingTemplate *whatToBuild = commandButton->getThingTemplate();
-			CanMakeType cmt, curCmt;
+			CanMakeType cmt = CANMAKE_NO_PREREQ, curCmt;
 
 			for (DrawableListCIt it = selected->begin(); it != selected->end(); ++it)
 			{
 				curCmt = TheBuildAssistant->canMakeUnit((*it)->getObject(), whatToBuild);
 
-				if (curCmt == CANMAKE_NO_MONEY || cmt == CANMAKE_MAXED_OUT_FOR_PLAYER)
+				if (curCmt == CANMAKE_NO_MONEY || curCmt == CANMAKE_MAXED_OUT_FOR_PLAYER)
 				{
 					cmt = curCmt;
 					break;

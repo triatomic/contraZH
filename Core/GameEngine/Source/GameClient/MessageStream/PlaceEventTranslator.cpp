@@ -233,6 +233,7 @@ GameMessageDisposition PlaceEventTranslator::translateGameMessage(const GameMess
 					if (rating < 0)
 					{
 						cmt = curCmt;
+						hasCmt = true;
 						singleBuilderObj = nullptr;
 						break;
 					}

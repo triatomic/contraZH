@@ -244,11 +244,14 @@ public:
 
 		ParkingPlaceBehaviorInterface* pp = getPP(jet->getProducerID());
 		if (pp == nullptr)
+		{
 #if RETAIL_COMPATIBLE_CRC
 			return STATE_SUCCESS;
 #else
+			TheCommandSequence->terminateVerifiedCommand(jet);
 			return STATE_FAILURE;
 #endif
+		}
 
 		// gotta reserve a space in order to reserve a runway
 		if (!pp->reserveSpace(jet->getID(), jetAI->friend_getParkingOffset(), nullptr))
@@ -433,6 +436,10 @@ public:
 	virtual StateReturnType onEnter() override
 	{
 		Object* jet = getMachineOwner();
+
+		// Every landing failure enters this state with its command still verified.
+		TheCommandSequence->terminateVerifiedCommand(jet);
+
 		JetAIUpdate* jetAI = (JetAIUpdate*)jet->getAIUpdateInterface();
 		if( !jetAI )
 		{
@@ -2622,7 +2629,12 @@ UpdateSleepTime JetAIUpdate::update()
 				if (cvs == STATUS_EXIT_VERIFIED)
 					obj->setCommandVerifyStatus(cvs);
 
-				while (TheCommandSequence->handleMoveStreak(obj));
+				if (obj->getCommandVerifyStatus() != STATUS_UNIT_PENDING)
+				{
+					while (TheCommandSequence->handleMoveStreak(obj))
+					{
+					}
+				}
 			}
 			else
 				aiDoCommand(&parms);
@@ -3201,6 +3213,9 @@ void JetAIUpdate::aiDoCommand(const AICommandParms* parms)
 				if (isOutOfSpecialReloadAmmo())
 				{
 					setFlag(HAS_PENDING_COMMAND, true);
+
+					TheCommandSequence->unitPendingCommand(getObject());
+
 					return;
 				}
 

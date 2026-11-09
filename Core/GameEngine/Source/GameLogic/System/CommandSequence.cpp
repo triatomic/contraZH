@@ -609,6 +609,10 @@ Bool CommandSequence::handleMoveStreak(Object* obj)
 
 	UnsignedInt curStreakID = obj->getLastCommandInMoveStreak();
 	CommandNode *curNode = findCommandByID(obj->getCurrentCommand());
+	if (!curNode)
+	{
+		return false;
+	}
 
 	CommandVerifyStatus cvs = obj->getCommandVerifyStatus();
 
@@ -657,7 +661,7 @@ Bool CommandSequence::handleMoveStreak(Object* obj)
 			ai->aiFollowPathAppend(&nextDest, CMD_FROM_PLAYER, nextStreak->m_cmdType == COMMAND_DO_REVERSE_MOVETO, nextStreak->m_nodeID);
 		}
 	}
-	return false;
+	return true;
 }
 
 Bool CommandSequence::includeUnitInCommand(UnsignedInt cmdNodeID, Object *obj, const Coord3D *objDest)
@@ -1475,7 +1479,7 @@ void CommandSequence::doCurrentCommand(Object *obj, CommandVerifyStatus cvs)
 	if (newCvs == STATUS_AWAITING || newCvs == STATUS_EXIT_VERIFIED)
 		removeCurrentCommand(obj);
 
-	if (cvs == STATUS_EXIT_VERIFIED || newCvs == STATUS_EXIT_VERIFIED)
+	if (cvs == STATUS_EXIT_VERIFIED || newCvs == STATUS_EXIT_VERIFIED || !obj->isPendingExitListEmpty())
 		obj->setCommandVerifyStatus(STATUS_EXIT_VERIFIED);
 }
 
