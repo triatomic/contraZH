@@ -2684,10 +2684,11 @@ void AIGroup::groupResumeConstruction( Object *obj, Bool isWaypoint, CommandSour
 			if (!TheActionManager->canResumeConstructionOf(*i, obj, cmdSource))
 				continue;
 
+			builderPos = (*i)->getPosition();
+			curDist = sqr(builderPos->x - targetPos->x) + sqr(builderPos->y - targetPos->y);
+
 			if (!dozerAi->isAnyTaskPending())
 			{
-				builderPos = (*i)->getPosition();
-				curDist = sqr(builderPos->x - targetPos->x) + sqr(builderPos->y - targetPos->y);
 				if (curDist < bestDist || isRepairTask)
 				{
 					bestDist = curDist;
