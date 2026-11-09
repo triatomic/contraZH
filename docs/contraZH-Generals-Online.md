@@ -81,8 +81,8 @@ draw at the wrong scale; with it, the options menu lacks Contra's controls. See 
 
 ### Lobby rules
 
-The lobby gets a **Rules** tab with Diplomacy, Free Radar, Reveal Map, Coop Buildings and Quick
-Game. The GO service has no field for them, so the host's client keeps the state, mirrors it to
+The lobby gets a **Rules** tab with Diplomacy, Free Radar, Reveal Map, Coop Buildings, Quick Game
+and Military Auto Queue. The GO service has no field for them, so the host's client keeps the state, mirrors it to
 everyone's Rules tab through a hidden lobby message, and switches each rule on in the first frames
 of the match. Only the host can tick them; a host change turns them all off. The chat commands still
 work:
@@ -97,6 +97,8 @@ work:
 [Allied scaffolds](contraZH-Gameplay-Fixes.md#allied-scaffolds-no-longer-lure-your-builders).
 * `/quickgame` lifts the rank requirements on advanced units and structures. See
 [Quick Game](contraZH-Maps-and-Setup.md#quick-game).
+* `/autoqueue` lets players right click a unit to build it whenever the queue is empty. See
+[Military Auto Queue](contraZH-Maps-and-Setup.md#military-auto-queue).
 
 The tab comes from a loose `GameSpyGameOptionsMenu.wnd` written by `build/add_go_rules_tab_wnd.py`;
 without it the lobby shows the Game page alone.

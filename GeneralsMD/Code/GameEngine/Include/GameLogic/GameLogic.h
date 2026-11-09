@@ -265,6 +265,7 @@ public:
   Bool isDiplomacy() const { return m_diplomacy; } ///< May players change their stance toward each other mid-match
   Bool isDiplomacyParticipant(const Player *player) const; ///< May this player take or receive a Diplomacy stance
   Bool isFreeRadar() const { return m_freeRadar; } ///< Does every player have radar without a radar source
+  Bool isAutoQueue() const { return m_autoQueue; } ///< May players have producers build a unit whenever their queue is empty
 #if defined(GENERALS_ONLINE)
   void sendPendingLobbyRules(); ///< The Generals Online host turns its rules on once the match runs
 #endif
@@ -481,6 +482,7 @@ private:
   Bool m_diplomacy;
   Bool m_freeRadar;
   Bool m_revealMap;
+  Bool m_autoQueue;
 #if defined(GENERALS_ONLINE)
   UnsignedInt m_pendingLobbyRules; ///< LobbyRule bits the host has yet to send
 #endif

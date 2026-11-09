@@ -253,6 +253,8 @@ static LobbyRuleControl s_lobbyRules[LOBBY_RULE_COUNT] =
 		"coopbuildings", L"/coopbuildings - Let allies finish each other's buildings (host only).", NAMEKEY_INVALID, NULL },
 	{ "CheckQuickGame", L" is ON: rank requirements are lifted.",
 		"quickgame", L"/quickgame - Lift the rank requirements on advanced units and structures (host only).", NAMEKEY_INVALID, NULL },
+	{ "CheckAutoQueue", L" is ON: right click a unit to build it whenever the queue is empty.",
+		"autoqueue", L"/autoqueue - Let players right click a unit to build it whenever the queue is empty (host only).", NAMEKEY_INVALID, NULL },
 };
 
 // A hidden announcement carrying one digit per rule, in table order

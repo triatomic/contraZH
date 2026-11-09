@@ -491,6 +491,7 @@ static const LobbyRuleCaption s_lobbyRuleCaptions[LOBBY_RULE_COUNT] =
 	{ "GUI:RevealMap", L"Reveal Map", "TOOLTIP:RevealMap", L"No shroud: every player sees the whole map from the start" },
 	{ "GUI:CoopBuildings", L"Coop Buildings", "TOOLTIP:CoopBuildings", L"Lets allies finish each other's unfinished buildings" },
 	{ "GUI:QuickGame", L"Quick Game", "TOOLTIP:QuickGame", L"Lifts the rank requirements on advanced structures, superweapons and super units" },
+	{ "GUI:AutoQueue", L"Military Auto Queue", "TOOLTIP:AutoQueue", L"Right click a unit at a production building to have it built whenever the queue is empty" },
 };
 
 UnicodeString LobbyRuleName( LobbyRule rule )

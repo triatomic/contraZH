@@ -122,7 +122,8 @@ finished units of a batch stay finished.
 
 ### Auto queue
 
-Right click a unit cameo on a production building to have that building build the unit by itself.
+Needs the [Military Auto Queue](contraZH-Maps-and-Setup.md#military-auto-queue) lobby rule. Right click
+a unit cameo on a production building to have that building build the unit by itself.
 
 * The building queues one unit at a time, only when its queue is empty.
 * The cameo shows a green frame and an AUTO tag.

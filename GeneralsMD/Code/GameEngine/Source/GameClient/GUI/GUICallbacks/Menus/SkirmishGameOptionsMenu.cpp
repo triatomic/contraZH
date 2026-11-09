@@ -120,6 +120,7 @@ static NameKeyType checkQuickGameID = NAMEKEY_INVALID;
 static NameKeyType checkDiplomacyRuleID = NAMEKEY_INVALID;
 static NameKeyType checkFreeRadarID = NAMEKEY_INVALID;
 static NameKeyType checkRevealMapID = NAMEKEY_INVALID;
+static NameKeyType checkAutoQueueID = NAMEKEY_INVALID;
 
 // Window Pointers ------------------------------------------------------------------------
 static GameWindow *staticTextGameSpeed = nullptr;
@@ -138,6 +139,7 @@ static GameWindow *checkQuickGame = nullptr;
 static GameWindow *checkDiplomacyRule = nullptr;
 static GameWindow *checkFreeRadar = nullptr;
 static GameWindow *checkRevealMap = nullptr;
+static GameWindow *checkAutoQueue = nullptr;
 static LobbyTabs lobbyTabs;
 static GameWindow *comboBoxPlayer[MAX_SLOTS] = {0};
 
@@ -1057,6 +1059,7 @@ void InitSkirmishGameGadgets()
   checkDiplomacyRuleID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckDiplomacyRule" );
   checkFreeRadarID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckFreeRadar" );
   checkRevealMapID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckRevealMap" );
+  checkAutoQueueID = TheNameKeyGenerator->nameToKey( "SkirmishGameOptionsMenu.wnd:CheckAutoQueue" );
 
 	// Initialize the pointers to our gadgets
 	parentSkirmishGameOptions = TheWindowManager->winGetWindowFromId( nullptr, parentSkirmishGameOptionsID );
@@ -1090,6 +1093,8 @@ void InitSkirmishGameGadgets()
 	SetLobbyRuleCaption( checkFreeRadar, LOBBY_RULE_FREE_RADAR );
 	checkRevealMap = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, checkRevealMapID );
 	SetLobbyRuleCaption( checkRevealMap, LOBBY_RULE_REVEAL_MAP );
+	checkAutoQueue = TheWindowManager->winGetWindowFromId( parentSkirmishGameOptions, checkAutoQueueID );
+	SetLobbyRuleCaption( checkAutoQueue, LOBBY_RULE_AUTO_QUEUE );
 
 	InitLobbyTabs( lobbyTabs, parentSkirmishGameOptions, "SkirmishGameOptionsMenu.wnd" );
 
@@ -1291,6 +1296,10 @@ void updateSkirmishGameOptions()
   if (checkRevealMap)
   {
     GadgetCheckBoxSetChecked( checkRevealMap, TheSkirmishGameInfo->getRevealMap() );
+  }
+  if (checkAutoQueue)
+  {
+    GadgetCheckBoxSetChecked( checkAutoQueue, TheSkirmishGameInfo->getAutoQueue() );
   }
   Int itemCount = GadgetComboBoxGetLength(comboBoxStartingCash);
   Int index = 0;
@@ -1725,6 +1734,10 @@ WindowMsgHandledType SkirmishGameOptionsMenuSystem( GameWindow *window, Unsigned
         else if ( controlID == checkRevealMapID )
         {
           setSkirmishRule( checkRevealMap, &GameInfo::setRevealMap );
+        }
+        else if ( controlID == checkAutoQueueID )
+        {
+          setSkirmishRule( checkAutoQueue, &GameInfo::setAutoQueue );
         }
         else if ( controlID == lobbyTabs.buttonGameID )
         {

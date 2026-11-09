@@ -194,8 +194,8 @@ back to `Random <BaseSide>`.
 
 * The Skirmish, LAN and Generals Online lobbies get **Game** and **Rules** tab buttons in the title
 row.
-* The Rules page holds Quick Game, Coop Buildings, Diplomacy, Free Radar, Reveal Map and, in LAN,
-Max Camera Height. It takes the place of the battle honors and info box in Skirmish, and of the chat
+* The Rules page holds Quick Game, Coop Buildings, Diplomacy, Free Radar, Reveal Map, Military Auto
+Queue and, in LAN, Max Camera Height. It takes the place of the battle honors and info box in Skirmish, and of the chat
 in LAN and Generals Online. The Generals Online page holds every rule but Max Camera Height.
 
 Notes:
@@ -203,7 +203,7 @@ Notes:
 * The layouts carry `ButtonTabGame`, `ButtonTabRules`, `PanelGame` and `PanelRules`. The buttons and
 the Rules page start hidden, so an older exe shows the Game page without the new options.
 * `build/add_go_rules_tab_wnd.py` writes a loose `GameSpyGameOptionsMenu.wnd` with the tab pair and
-the five Generals Online checkboxes; the other two layouts get theirs from `build/add_rules_tab_wnd.py`.
+the Generals Online checkboxes; the other two layouts get theirs from `build/add_rules_tab_wnd.py`.
 
 ### LAN unready
 
@@ -324,6 +324,26 @@ it beside Free Radar.
 * The options string carries `RM=1` only when the rule is on. Older exes can't join such a lobby or
 play its replays, but games with the rule off are unaffected.
 * A save game brings the revealed map back on its own.
+* Changes the simulation; affects replays.
+
+### Military Auto Queue
+
+* The Skirmish, LAN and Generals Online lobbies get a **Military Auto Queue** checkbox on the Rules
+page, off by default. Only the host can change it.
+* With the rule on, right clicking a unit cameo controls
+[auto queue](contraZH-CommandButtons.md#auto-queue). With it off, right clicks on cameos do nothing new.
+* The campaign has no Rules page, so auto queue stays off there.
+
+Notes:
+* Labels are `GUI:AutoQueue`, `TOOLTIP:AutoQueue` and `GUI:AutoQueueEnabled`, all falling back to
+English text. `GUI:AutoQueueEnabled` takes one `%ls` player name.
+* The checkbox comes from `CheckAutoQueue` in the lobby layouts. `build/add_game_rules_wnd.py` adds it
+to Skirmish and LAN, and `build/add_go_rules_tab_wnd.py` to Generals Online.
+* Generals Online has no lobby field for the rule. Its host ticks it on the Rules tab or types
+`/autoqueue` in lobby chat, and the host's game turns the rule on in the first frames of the match.
+* The options string carries `AQ=1` only when the rule is on. Older exes can't join such a lobby or
+play its replays, but games with the rule off are unaffected.
+* Save games keep the rule.
 * Changes the simulation; affects replays.
 
 ### Host camera height

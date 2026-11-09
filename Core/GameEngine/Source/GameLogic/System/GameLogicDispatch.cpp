@@ -2267,6 +2267,12 @@ bool GameLogic::onCancelUnitCreate(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &cu
 #if RTS_ZEROHOUR
 bool GameLogic::onSetAutoQueueUnit(MAYBE_UNUSED GameMessage *msg, AIGroupPtr &currentlySelectedGroup)
 {
+	// refused here as well as at the click, so no client can use it with the rule off
+	if( !isAutoQueue() )
+	{
+		return false;
+	}
+
 	Object *producer = findObjectByID((ObjectID)msg->getArgument(0)->objectID);
 	if( producer == nullptr || producer->getControllingPlayer() != getMessagePlayer(msg) )
 	{

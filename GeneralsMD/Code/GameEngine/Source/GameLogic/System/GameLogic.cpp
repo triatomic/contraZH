@@ -265,6 +265,7 @@ GameLogic::GameLogic()
 	m_diplomacy = FALSE;
 	m_freeRadar = FALSE;
 	m_revealMap = FALSE;
+	m_autoQueue = FALSE;
 #if defined(GENERALS_ONLINE)
 	m_pendingLobbyRules = 0;
 #endif
@@ -1391,6 +1392,9 @@ void GameLogic::tryStartNewGame( Bool loadingSaveGame )
 	// Both saved with the skirmish setup, like Quick Game
 	m_freeRadar = TheGameInfo != nullptr && TheGameInfo->getFreeRadar();
 	m_revealMap = TheGameInfo != nullptr && TheGameInfo->getRevealMap();
+
+	// Saved too, because producers save the unit they auto queue
+	m_autoQueue = TheGameInfo != nullptr && TheGameInfo->getAutoQueue();
 #if defined(GENERALS_ONLINE)
 	m_pendingLobbyRules = 0;
 	if (!loadingSaveGame && TheNGMPGame != nullptr && TheGameInfo == TheNGMPGame && !TheRecorder->isPlaybackMode())
@@ -5851,6 +5855,7 @@ bool GameLogic::onEnableLobbyRule(GameMessage *msg)
 		{ &GameLogic::m_revealMap, "GUI:RevealMapEnabled", L"%ls turned on Reveal Map. Every player sees the whole map." },
 		{ &GameLogic::m_coopBuildings, "GUI:CoopBuildingsEnabled", L"%ls turned on Coop Buildings. Allies may finish each other's buildings." },
 		{ &GameLogic::m_quickGame, "GUI:QuickGameEnabled", L"%ls turned on Quick Game. Rank requirements are lifted." },
+		{ &GameLogic::m_autoQueue, "GUI:AutoQueueEnabled", L"%ls turned on Military Auto Queue. Right click a unit to build it whenever the queue is empty." },
 	};
 
 	// The host sends them on the first frames; a late one would change the rules mid-match
@@ -5876,6 +5881,11 @@ bool GameLogic::onEnableLobbyRule(GameMessage *msg)
 	if (rule == LOBBY_RULE_DIPLOMACY)
 	{
 		PopulateInGameDiplomacyPopup();
+	}
+	if (rule == LOBBY_RULE_AUTO_QUEUE)
+	{
+		// a building selected before this message has cameos that ignore right clicks
+		TheControlBar->markUIDirty();
 	}
 	return true;
 }
