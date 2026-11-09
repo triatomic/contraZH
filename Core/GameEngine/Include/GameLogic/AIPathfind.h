@@ -233,6 +233,18 @@ public:
 	static void releaseACellInfo(PathfindCellInfo *theInfo);
 	static Int getFreeCount() {return s_freeCount;}
 
+	// Orders the open list. On equal totals the cell further along its path sorts first.
+	Bool operator<(const PathfindCellInfo& other) const
+	{
+#if !(RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING)
+		if (m_totalCost == other.m_totalCost)
+		{
+			return m_costSoFar > other.m_costSoFar;
+		}
+#endif
+		return m_totalCost < other.m_totalCost;
+	}
+
 protected:
 	static PathfindCellInfo *s_infoArray;
 	static PathfindCellInfo *s_firstFree;							///<
@@ -344,6 +356,11 @@ public:
 
 	/// Return estimated cost from given cell to reach goal cell
 	UnsignedInt costToGoal( PathfindCell *goal );
+
+	/// Cost of the shortest unobstructed 8-way walk between two cells
+	static Int octalDistance( PathfindCell *start, PathfindCell *finish );
+
+	Bool operator<(const PathfindCell& other) const { return *m_info < *other.m_info; }
 
 	UnsignedInt costToHierGoal( PathfindCell *goal );
 

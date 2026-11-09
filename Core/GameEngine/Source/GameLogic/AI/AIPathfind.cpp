@@ -1777,7 +1777,7 @@ void PathfindCell::forwardInsertionSortRetailCompatible(PathfindCellList& list)
 	PathfindCell* currentCell = list.m_head;
 	PathfindCell* previousCell = nullptr;
 	UnsignedInt cellCount = 0;
-	while (currentCell && cellCount < PATHFIND_CELLS_PER_FRAME && currentCell->m_info->m_totalCost <= m_info->m_totalCost)
+	while (currentCell && cellCount < PATHFIND_CELLS_PER_FRAME && !(*m_info < *currentCell->m_info))
 	{
 		// Prevent a retail crash where a pathfindCell has an m_info with a dangling nextOpen pointer
 		if (currentCell->m_info->m_nextOpen && !currentCell->m_info->m_nextOpen->m_cell->m_info)
@@ -1834,7 +1834,7 @@ void PathfindCell::forwardInsertionSort(PathfindCellList& list)
 	}
 
 	// If the node needs inserting before the current list head
-	if (m_info->m_totalCost < list.m_head->m_info->m_totalCost) {
+	if (*m_info < *list.m_head->m_info) {
 		m_info->m_prevOpen = nullptr;
 		list.m_head->m_info->m_prevOpen = this->m_info;
 		m_info->m_nextOpen = list.m_head->m_info;
@@ -1844,7 +1844,7 @@ void PathfindCell::forwardInsertionSort(PathfindCellList& list)
 
 	// Traverse the list to find correct position
 	PathfindCell* current = list.m_head;
-	while (current->m_info->m_nextOpen && current->m_info->m_nextOpen->m_totalCost <= m_info->m_totalCost) {
+	while (current->m_info->m_nextOpen && !(*m_info < *current->m_info->m_nextOpen)) {
 		current = current->getNextOpen();
 	}
 
@@ -1880,7 +1880,7 @@ void PathfindCell::reverseInsertionSort(PathfindCellList& list)
 	}
 
 	// If the node needs inserting after the current list tail
-	if (m_info->m_totalCost >= list.m_tail->m_info->m_totalCost) {
+	if (!(*m_info < *list.m_tail->m_info)) {
 		m_info->m_prevOpen = list.m_tail->m_info;
 		list.m_tail->m_info->m_nextOpen = this->m_info;
 		m_info->m_nextOpen = nullptr;
@@ -1890,7 +1890,7 @@ void PathfindCell::reverseInsertionSort(PathfindCellList& list)
 
 	// Traverse the list to find correct position
 	PathfindCell* current = list.m_tail;
-	while (current->m_info->m_prevOpen && current->m_info->m_prevOpen->m_totalCost > m_info->m_totalCost) {
+	while (current->m_info->m_prevOpen && *m_info < *current->m_info->m_prevOpen) {
 		current = current->getPrevOpen();
 	}
 
@@ -2137,8 +2137,27 @@ const Int CLEARANCE_SOFT_COST = 4*COST_ORTHOGONAL; // Step cost when the footpri
 const Real COST_TO_DISTANCE_FACTOR = 1.0f/10.0f;
 const Real COST_TO_DISTANCE_FACTOR_SQR = COST_TO_DISTANCE_FACTOR*COST_TO_DISTANCE_FACTOR;
 
+Int PathfindCell::octalDistance( PathfindCell *start, PathfindCell *finish )
+{
+	DEBUG_ASSERTCRASH(start->m_info && finish->m_info, ("Has to have info."));
+	Int dx = abs(start->getXIndex() - finish->getXIndex());
+	Int dy = abs(start->getYIndex() - finish->getYIndex());
+	Int longSide = dx;
+	Int shortSide = dy;
+	if (dy > dx)
+	{
+		longSide = dy;
+		shortSide = dx;
+	}
+
+	return COST_ORTHOGONAL*longSide + (COST_DIAGONAL - COST_ORTHOGONAL)*shortSide;
+}
+
 UnsignedInt PathfindCell::costToGoal( PathfindCell *goal )
 {
+#if !(RTS_GENERALS && RETAIL_COMPATIBLE_PATHFINDING)
+	return octalDistance(this, goal);
+#else
 	DEBUG_ASSERTCRASH(m_info, ("Has to have info."));
 	Int dx = m_info->m_pos.x - goal->getXIndex();
 	Int dy = m_info->m_pos.y - goal->getYIndex();
@@ -2159,6 +2178,7 @@ UnsignedInt PathfindCell::costToGoal( PathfindCell *goal )
 
 
 	return cost;
+#endif
 }
 
 UnsignedInt PathfindCell::costToHierGoal( PathfindCell *goal )
