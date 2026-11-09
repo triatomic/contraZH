@@ -390,6 +390,7 @@ void ShieldFieldBehavior::stopProjectile( Object* projectile, const Coord3D* at 
 		{
 			weapon->getExtraBonus()->appendBonuses( flags, bonus );
 		}
+		projectile->applyWeaponScalars( bonus );
 	}
 
 	absorbShot( weapon, bonus, launcherID != INVALID_ID ? launcherID : projectile->getID(), at );

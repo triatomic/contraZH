@@ -3666,6 +3666,21 @@ Bool Player::hasRadar() const
 
 //-------------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------------
+static Bool templateHasPoweredBehavior( const ThingTemplate *tt )
+{
+	const ModuleInfo &info = tt->getBehaviorModuleInfo();
+	for( Int i = 0; i < info.getCount(); ++i )
+	{
+		if( info.getNthName( i ).compare( "PoweredBehavior" ) == 0 )
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------------
 static void doPowerDisable( Object *obj, void *userData )
 {
 	Bool disabling = *((Bool*)userData);
@@ -3674,7 +3689,8 @@ static void doPowerDisable( Object *obj, void *userData )
 		return;
 	}
 
-	Bool handled = FALSE;
+	// An object joins its team inside its constructor, before its modules exist.
+	Bool handled = !obj->areModulesReady() && templateHasPoweredBehavior( obj->getTemplate() );
 	for( BehaviorModule **module = obj->getBehaviorModules(); *module; ++module )
 	{
 		if( (*module)->onPowerChange( !disabling ) )

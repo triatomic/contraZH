@@ -20,6 +20,7 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/GameState.h"
 #include "Common/Player.h"
 #include "Common/Xfer.h"
 #include "GameClient/Drawable.h"
@@ -34,6 +35,9 @@ PoweredBehaviorModuleData::PoweredBehaviorModuleData()
 	m_disableWeapon = FALSE;
 	m_movePenalty = 0.0f;
 	m_liftPenalty = 0.0f;
+	m_damagePenalty = 0.0f;
+	m_rateOfFirePenalty = 0.0f;
+	m_rangePenalty = 0.0f;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -47,6 +51,9 @@ PoweredBehaviorModuleData::PoweredBehaviorModuleData()
 		{ "DisableWeapon",	INI::parseBool,						nullptr, offsetof( PoweredBehaviorModuleData, m_disableWeapon ) },
 		{ "MovePenalty",		INI::parsePercentToReal,	nullptr, offsetof( PoweredBehaviorModuleData, m_movePenalty ) },
 		{ "LiftPenalty",		INI::parsePercentToReal,	nullptr, offsetof( PoweredBehaviorModuleData, m_liftPenalty ) },
+		{ "DamagePenalty",	INI::parsePercentToReal,	nullptr, offsetof( PoweredBehaviorModuleData, m_damagePenalty ) },
+		{ "RateOfFirePenalty",	INI::parsePercentToReal,	nullptr, offsetof( PoweredBehaviorModuleData, m_rateOfFirePenalty ) },
+		{ "RangePenalty",		INI::parsePercentToReal,	nullptr, offsetof( PoweredBehaviorModuleData, m_rangePenalty ) },
 		{ "Icon",						INI::parseAsciiString,		nullptr, offsetof( PoweredBehaviorModuleData, m_iconName ) },
 		{ nullptr, nullptr, nullptr, 0 }
 	};
@@ -68,8 +75,20 @@ PoweredBehavior::~PoweredBehavior()
 }
 
 //-------------------------------------------------------------------------------------------------
+static Real weaponPenaltyToScalar( Real penalty )
+{
+	return (penalty > 0.0f && penalty < 1.0f) ? 1.0f - penalty : 1.0f;
+}
+
+//-------------------------------------------------------------------------------------------------
 Bool PoweredBehavior::onPowerChange( Bool hasPower )
 {
+	// A load rebuilds the power totals object by object, so they mean nothing until it ends.
+	if (TheGameState->isInLoadGame())
+	{
+		return TRUE;
+	}
+
 	if (m_powered == hasPower)
 	{
 		return TRUE;
@@ -83,6 +102,7 @@ Bool PoweredBehavior::onPowerChange( Bool hasPower )
 	Bool immobile = !d->m_isMobile || d->m_movePenalty >= 1.0f;
 	Real speedScalar = (!immobile && d->m_movePenalty > 0.0f) ? 1.0f - d->m_movePenalty : 1.0f;
 	Real liftScalar = (d->m_liftPenalty > 0.0f && d->m_liftPenalty < 1.0f) ? 1.0f - d->m_liftPenalty : 1.0f;
+	Bool noAttack = d->m_disableWeapon || d->m_damagePenalty >= 1.0f || d->m_rateOfFirePenalty >= 1.0f || d->m_rangePenalty >= 1.0f;
 
 	if (ai)
 	{
@@ -98,6 +118,7 @@ Bool PoweredBehavior::onPowerChange( Bool hasPower )
 		}
 		obj->clearStatus( m_appliedStatus );
 		m_appliedStatus.clear();
+		obj->setWeaponScalars( 1.0f, 1.0f, 1.0f );
 	}
 	else
 	{
@@ -105,9 +126,10 @@ Bool PoweredBehavior::onPowerChange( Bool hasPower )
 		{
 			draw->setStatusIcon( d->m_iconName );
 		}
-		m_appliedStatus.set( OBJECT_STATUS_NO_ATTACK, d->m_disableWeapon );
+		m_appliedStatus.set( OBJECT_STATUS_NO_ATTACK, noAttack );
 		m_appliedStatus.set( OBJECT_STATUS_IMMOBILE, immobile );
 		obj->setStatus( m_appliedStatus );
+		obj->setWeaponScalars( weaponPenaltyToScalar( d->m_damagePenalty ), weaponPenaltyToScalar( d->m_rateOfFirePenalty ), weaponPenaltyToScalar( d->m_rangePenalty ) );
 		if (immobile && ai)
 		{
 			ai->aiIdle( CMD_FROM_AI );
@@ -166,4 +188,7 @@ void PoweredBehavior::xfer( Xfer *xfer )
 void PoweredBehavior::loadPostProcess()
 {
 	UpdateModule::loadPostProcess();
+
+	// Saves from older builds can hold the disable this module replaces.
+	getObject()->clearDisabled( DISABLED_UNDERPOWERED );
 }

@@ -99,6 +99,7 @@ class UpgradeModule;
 class UpgradeModuleInterface;
 class UpgradeTemplate;
 class BuffTemplate;
+class WeaponBonus;
 
 class ObjectHeldHelper;
 class ObjectDisabledHelper;
@@ -609,6 +610,11 @@ public:
 	void applyWeaponBonusConditionFlags(WeaponBonusConditionFlags flags);
 	void removeWeaponBonusConditionFlags(WeaponBonusConditionFlags flags);
 
+	// These multiply the weapon bonus result, unlike conditions, which add to it.
+	void setWeaponScalars(Real damage, Real rateOfFire, Real range);
+	void copyWeaponScalars(const Object *source);
+	void applyWeaponScalars(WeaponBonus &bonus) const;
+
 	// Weapon Bonus Against,  i.e. like Target Designator logic
 	inline void setWeaponBonusConditionAgainst(WeaponBonusConditionType wst) { m_weaponBonusConditionAgainst.set(wst); }
 	inline void clearWeaponBonusConditionAgainst(WeaponBonusConditionType wst) { m_weaponBonusConditionAgainst.set(wst, 0); }
@@ -848,6 +854,9 @@ private:
 	Byte													m_lastWeaponCondition[WEAPONSLOT_COUNT];
 
 	WeaponBonusConditionFlags			m_weaponBonusConditionAgainst;  ///< Weapon bonus granted when attacking this target;
+	Real													m_weaponDamageScalar;
+	Real													m_weaponRateOfFireScalar;
+	Real													m_weaponRangeScalar;
 
 	SpecialPowerMaskType					m_specialPowerBits; ///< bits determining what kind of special abilities this object has access to.
 

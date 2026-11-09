@@ -40,6 +40,9 @@ public:
 	Bool	m_disableWeapon;	///< Yes = cannot attack while out of power
 	Real	m_movePenalty;		///< share of move speed lost while out of power, 1.0 or more immobilizes
 	Real	m_liftPenalty;		///< share of lift lost while out of power, for hovering units
+	Real	m_damagePenalty;	///< share of weapon damage lost while out of power, 1.0 or more disables the weapon
+	Real	m_rateOfFirePenalty;	///< share of rate of fire lost while out of power, 1.0 or more disables the weapon
+	Real	m_rangePenalty;		///< share of weapon range lost while out of power, 1.0 or more disables the weapon
 	AsciiString	m_iconName;	///< Animation block shown over the object while out of power
 
 	static void buildFieldParse(MultiIniFieldParse& p);

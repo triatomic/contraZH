@@ -1125,11 +1125,20 @@ Behavior = PoweredBehavior ModuleTag_Powered
   DisableWeapon = Yes   ; (default = No; Yes = cannot attack while out of power)
   MovePenalty = 50%     ; (default = 0%; move speed lost while out of power)
   LiftPenalty = 20%     ; (default = 0%; lift lost while out of power, hovering units only)
+  DamagePenalty = 30%   ; (default = 0%; weapon damage lost while out of power)
+  RateOfFirePenalty = 50%  ; (default = 0%; rate of fire lost while out of power)
+  RangePenalty = 25%    ; (default = 0%; weapon range lost while out of power)
   Icon = LowPower       ; (optional; name of an Animation block, shown while out of power)
 End
 ```
 **Notes:**
 - `MovePenalty` of 100% or more acts like `IsMobile = No`.
+- `DamagePenalty`, `RateOfFirePenalty` or `RangePenalty` of 100% or more acts like `DisableWeapon = Yes`.
+- The weapon penalties multiply the result of any `WeaponBonus` conditions. A 50% `RateOfFirePenalty`
+  doubles the delay between shots and the clip reload time.
+- A projectile keeps the penalties of its launcher at the moment it was fired.
+- `RangePenalty` does not lower `MinimumAttackRange`. Keep the reduced range above it, or the
+  weapon cannot fire while out of power.
 - `MovePenalty` never touches lift, so helicopters keep hovering. `LiftPenalty` lowers lift on
   its own. Once lift no longer beats gravity the unit sinks, so keep it small. 100% is ignored.
 - `Icon` names an `Animation` block from `animation2d.ini`, like the stock `Disabled` one. It sits

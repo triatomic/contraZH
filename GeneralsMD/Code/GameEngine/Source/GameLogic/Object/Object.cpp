@@ -302,6 +302,9 @@ Object::Object( const ThingTemplate *tt, const ObjectStatusMaskType &objectStatu
 
 	m_weaponBonusCondition = 0;
 	m_weaponBonusConditionAgainst = 0;
+	m_weaponDamageScalar = 1.0f;
+	m_weaponRateOfFireScalar = 1.0f;
+	m_weaponRangeScalar = 1.0f;
 	m_curWeaponSetFlags.clear();
 
 	// sanity
@@ -4458,13 +4461,14 @@ void Object::crc( Xfer *xfer )
 	* 7: save full mtx, not pos+orient.
 	* 8: Kris: Conversion of object status bits from UnsignedInt to BitFlags<>
 	* 9: Extra sighting for reveal to all with different range units
+	* 10: Weapon damage, rate of fire and range scalars
 	*/
 //-------------------------------------------------------------------------------------------------
 void Object::xfer( Xfer *xfer )
 {
 
 	// version
-	const XferVersion currentVersion = 9;
+	const XferVersion currentVersion = 10;
 	XferVersion version = currentVersion;
 	xfer->xferVersion( &version, currentVersion );
 
@@ -4872,6 +4876,13 @@ void Object::xfer( Xfer *xfer )
 
 	m_weaponBonusConditionAgainst.xfer(xfer);
 
+	if (version >= 10)
+	{
+		xfer->xferReal(&m_weaponDamageScalar);
+		xfer->xferReal(&m_weaponRateOfFireScalar);
+		xfer->xferReal(&m_weaponRangeScalar);
+	}
+
 }  // end xfer
 
 //-------------------------------------------------------------------------------------------------
@@ -5160,6 +5171,35 @@ void Object::clearWeaponBonusCondition(WeaponBonusConditionType wst)
 		// Our weapon bonus just changed, so we need to immediately update our weapons
 		m_weaponSet.weaponSetOnWeaponBonusChange(this);
 	}
+}
+
+//-------------------------------------------------------------------------------------------------
+void Object::setWeaponScalars(Real damage, Real rateOfFire, Real range)
+{
+	Bool rateOfFireChanged = m_weaponRateOfFireScalar != rateOfFire;
+
+	m_weaponDamageScalar = damage;
+	m_weaponRateOfFireScalar = rateOfFire;
+	m_weaponRangeScalar = range;
+
+	if( rateOfFireChanged )
+	{
+		m_weaponSet.weaponSetOnWeaponBonusChange(this);
+	}
+}
+
+//-------------------------------------------------------------------------------------------------
+void Object::copyWeaponScalars(const Object *source)
+{
+	setWeaponScalars(source->m_weaponDamageScalar, source->m_weaponRateOfFireScalar, source->m_weaponRangeScalar);
+}
+
+//-------------------------------------------------------------------------------------------------
+void Object::applyWeaponScalars(WeaponBonus &bonus) const
+{
+	bonus.setField(WeaponBonus::DAMAGE, bonus.getField(WeaponBonus::DAMAGE) * m_weaponDamageScalar);
+	bonus.setField(WeaponBonus::RATE_OF_FIRE, bonus.getField(WeaponBonus::RATE_OF_FIRE) * m_weaponRateOfFireScalar);
+	bonus.setField(WeaponBonus::RANGE, bonus.getField(WeaponBonus::RANGE) * m_weaponRangeScalar);
 }
 
 //-------------------------------------------------------------------------------------------------

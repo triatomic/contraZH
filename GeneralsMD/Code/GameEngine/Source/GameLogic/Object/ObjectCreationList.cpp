@@ -1105,6 +1105,7 @@ protected:
 
 		if (m_inheritsWeaponBonus && sourceObj) {
 			obj->setWeaponBonusConditionFlags(sourceObj->getWeaponBonusCondition());
+			obj->copyWeaponScalars(sourceObj);
 		}
 
 		if ( m_invulnerableTime > 0 )
