@@ -1128,7 +1128,12 @@ UpdateSleepTime ChinookAIUpdate::update()
 					if (cvs == STATUS_EXIT_VERIFIED)
 						obj->setCommandVerifyStatus(cvs);
 
-					while (TheCommandSequence->handleMoveStreak(obj));
+					if (obj->getCommandVerifyStatus() != STATUS_UNIT_PENDING)
+					{
+						while (TheCommandSequence->handleMoveStreak(obj))
+						{
+						}
+					}
 				}
 				else
 					aiDoCommand(&parms);

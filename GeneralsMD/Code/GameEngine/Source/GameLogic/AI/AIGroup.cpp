@@ -2561,6 +2561,11 @@ void AIGroup::groupConstruct(const ThingTemplate *thing, const Coord3D *pos, Rea
 			if (TheBuildAssistant->canMakeUnit(*i, thing) != CANMAKE_OK)
 				continue;
 
+			if (!thing->isKindOf(KINDOF_SHIPYARD) && !ai->isQuickPathAvailable(pos))
+			{
+				continue;
+			}
+
 			builderPos = (*i)->getPosition();
 			curDist = sqr(builderPos->x - pos->x) + sqr(builderPos->y - pos->y);
 
@@ -2589,6 +2594,17 @@ void AIGroup::groupConstruct(const ThingTemplate *thing, const Coord3D *pos, Rea
 		{
 			if (TheBuildAssistant->canMakeUnit(*i, thing) != CANMAKE_OK)
 				continue;
+
+			AIUpdateInterface* ai = (*i)->getAIUpdateInterface();
+			if (!ai)
+			{
+				continue;
+			}
+
+			if (!thing->isKindOf(KINDOF_SHIPYARD) && !ai->isQuickPathAvailable(pos))
+			{
+				continue;
+			}
 
 			cnt = TheCommandSequence->getConstructionCount(*i);
 
