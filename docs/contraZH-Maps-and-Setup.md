@@ -16,6 +16,8 @@ there that terrain cannot read counts as missing.
 game and on maps opened in WorldBuilder. Any multiple of 64 pixels works, because its tiles repeat to
 cover a larger texture. The WorldBuilder palette and brush validation still skip missing textures.
 * A terrain image with fewer tiles than a map saved repeats them to fill the texture on that map.
+Its `_nrm`, `_hgt` and `_emi` maps do not repeat, so on that map it has no normals or glow and its
+height comes from its color.
 * Individual terrain images still fit within 640 by 640 pixels. DDS cube maps, volume textures,
 DXT2-DXT4, uncompressed DDS and newer DX10/BC7 formats are unsupported.
 * D3D9 builds use a 4096-pixel terrain atlas instead of 2048, increasing capacity from 784 to

@@ -1147,6 +1147,24 @@ static void readRepeatedTiles(InputStream *pStr, TileData **tiles, Int numTiles,
 		REF_PTR_RELEASE(source[i]);
 	}
 }
+
+// Art/Textures also holds images terrain cannot read, such as 8-bit TGAs.
+static File *openReadableTerrainTexture(const AsciiString &path)
+{
+	File *file = TheFileSystem->openFile(path.str(), File::READ | File::BINARY);
+	if (file == nullptr)
+	{
+		return nullptr;
+	}
+	GDIFileStream stream(file);
+	if (WorldHeightMap::countTiles(&stream, nullptr, path.str()) < 1)
+	{
+		file->close();
+		return nullptr;
+	}
+	file->seek(0, File::START);
+	return file;
+}
 #endif
 
 File *WorldHeightMap::openTerrainTexture(AsciiString &path, Bool useMissingTexture)
@@ -1168,27 +1186,16 @@ File *WorldHeightMap::openTerrainTexture(AsciiString &path, Bool useMissingTextu
 	{
 		AsciiString texturesPath;
 		texturesPath.format("%s%s", TGA_DIR_PATH, path.str() + strlen(TERRAIN_TGA_DIR_PATH));
-		file = TheFileSystem->openFile(texturesPath.str(), File::READ | File::BINARY);
+		file = openReadableTerrainTexture(texturesPath);
 		if (file == nullptr && texturesPath.endsWithNoCase(".dds"))
 		{
 			texturesPath.truncateBy(4);
 			texturesPath.concat(".tga");
-			file = TheFileSystem->openFile(texturesPath.str(), File::READ | File::BINARY);
+			file = openReadableTerrainTexture(texturesPath);
 		}
 		if (file != nullptr)
 		{
-			// Art/Textures also holds images terrain cannot read, such as 8-bit TGAs.
-			GDIFileStream stream(file);
-			if (countTiles(&stream, nullptr, texturesPath.str()) >= 1)
-			{
-				file->seek(0, File::START);
-				path = texturesPath;
-			}
-			else
-			{
-				file->close();
-				file = nullptr;
-			}
+			path = texturesPath;
 		}
 	}
 	if (file == nullptr && useMissingTexture)
