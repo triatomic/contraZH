@@ -200,6 +200,8 @@ in LAN and Generals Online. The Generals Online page holds every rule but Max Ca
 
 Notes:
 * Labels are `GUI:TabGame` and `GUI:TabRules`, falling back to `Game` and `Rules`.
+* Rule labels, tooltips and `Enabled` messages have no English fallback. A game folder without them
+in its string file shows `MISSING` text.
 * The layouts carry `ButtonTabGame`, `ButtonTabRules`, `PanelGame` and `PanelRules`. The buttons and
 the Rules page start hidden, so an older exe shows the Game page without the new options.
 * `build/add_go_rules_tab_wnd.py` writes a loose `GameSpyGameOptionsMenu.wnd` with the tab pair and
@@ -233,7 +235,7 @@ the clause either, or the counter jumps at game start; move its other actions in
 gated by `QUICK_GAME_ENABLED` instead.
 
 Notes:
-* Labels are `GUI:QuickGame` and `TOOLTIP:QuickGame`, falling back to English text.
+* Labels are `GUI:QuickGame`, `TOOLTIP:QuickGame` and `GUI:QuickGameEnabled`.
 * The checkbox comes from `CheckQuickGame` in `SkirmishGameOptionsMenu.wnd` and
 `LanGameOptionsMenu.wnd`; a layout without it shows no checkbox.
 * Save games and replays keep the setting. A save without Quick Game stays loadable by retail.
@@ -264,11 +266,11 @@ stance.
 * Observers and defeated players can't change stances, and nobody can change stance toward them.
 
 Notes:
-* Labels are `GUI:DiplomacyRule`, `TOOLTIP:DiplomacyRule`, `GUI:DiplomacyStanceAlly`,
+* Labels are `GUI:DiplomacyRule`, `TOOLTIP:DiplomacyRule` and `GUI:DiplomacyRuleEnabled`. These also
+exist, falling back to English text: `GUI:DiplomacyStanceAlly`,
 `GUI:DiplomacyStanceAllied`, `GUI:DiplomacyStanceEnemy`, `TOOLTIP:DiplomacyStanceToAlly`,
 `TOOLTIP:DiplomacyStanceToEnemy`, `GUI:DiplomacyAllied`, `GUI:DiplomacyOfferAlly`,
-`GUI:DiplomacyBrokeAlliance`, `GUI:DiplomacyEnemy` and `GUI:DiplomacyRuleEnabled`, all falling back
-to English text. The four message labels take two `%ls` player names; `GUI:DiplomacyRuleEnabled`
+`GUI:DiplomacyBrokeAlliance` and `GUI:DiplomacyEnemy`. The four message labels take two `%ls` player names; `GUI:DiplomacyRuleEnabled`
 takes one.
 * The checkbox comes from `CheckDiplomacyRule` in `SkirmishGameOptionsMenu.wnd` and
 `LanGameOptionsMenu.wnd`. A layout without it shows no checkbox. `build/add_diplomacy_wnd.py` adds it
@@ -293,8 +295,8 @@ the LAN host can change it.
 and a power brownout does not take it away.
 
 Notes:
-* Labels are `GUI:FreeRadar`, `TOOLTIP:FreeRadar` and `GUI:FreeRadarEnabled`, all falling back to
-English text. `GUI:FreeRadarEnabled` takes one `%ls` player name.
+* Labels are `GUI:FreeRadar`, `TOOLTIP:FreeRadar` and `GUI:FreeRadarEnabled`.
+`GUI:FreeRadarEnabled` takes one `%ls` player name.
 * The checkbox comes from `CheckFreeRadar` in `SkirmishGameOptionsMenu.wnd` and
 `LanGameOptionsMenu.wnd`. A layout without it shows no checkbox. `build/add_game_rules_wnd.py` adds
 it and Reveal Map in a second column of the Rules page and needs the Diplomacy checkbox from
@@ -315,8 +317,8 @@ the LAN host can change it.
 the first frame, the way an observer does.
 
 Notes:
-* Labels are `GUI:RevealMap`, `TOOLTIP:RevealMap` and `GUI:RevealMapEnabled`, all falling back to
-English text. `GUI:RevealMapEnabled` takes one `%ls` player name.
+* Labels are `GUI:RevealMap`, `TOOLTIP:RevealMap` and `GUI:RevealMapEnabled`.
+`GUI:RevealMapEnabled` takes one `%ls` player name.
 * The checkbox comes from `CheckRevealMap` in both lobby layouts; `build/add_game_rules_wnd.py` adds
 it beside Free Radar.
 * Generals Online has no lobby field for the rule. Its host ticks it on the Rules tab or types
@@ -335,8 +337,8 @@ page, off by default. Only the host can change it.
 * The campaign has no Rules page, so auto queue stays off there.
 
 Notes:
-* Labels are `GUI:AutoQueue`, `TOOLTIP:AutoQueue` and `GUI:AutoQueueEnabled`, all falling back to
-English text. `GUI:AutoQueueEnabled` takes one `%ls` player name.
+* Labels are `GUI:AutoQueue`, `TOOLTIP:AutoQueue` and `GUI:AutoQueueEnabled`.
+`GUI:AutoQueueEnabled` takes one `%ls` player name.
 * The checkbox comes from `CheckAutoQueue` in the lobby layouts. `build/add_game_rules_wnd.py` adds it
 to Skirmish and LAN, and `build/add_go_rules_tab_wnd.py` to Generals Online.
 * Generals Online has no lobby field for the rule. Its host ticks it on the Rules tab or types

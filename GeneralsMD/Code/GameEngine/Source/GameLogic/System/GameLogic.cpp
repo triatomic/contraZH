@@ -5846,16 +5846,15 @@ bool GameLogic::onEnableLobbyRule(GameMessage *msg)
 	{
 		Bool GameLogic::*flag;
 		const char *label;
-		const WideChar *fallback;
 	};
 	static const Enable enables[LOBBY_RULE_COUNT] =
 	{
-		{ &GameLogic::m_diplomacy, "GUI:DiplomacyRuleEnabled", L"%ls turned on Diplomacy. Players may change alliances." },
-		{ &GameLogic::m_freeRadar, "GUI:FreeRadarEnabled", L"%ls turned on Free Radar. Every player has radar." },
-		{ &GameLogic::m_revealMap, "GUI:RevealMapEnabled", L"%ls turned on Reveal Map. Every player sees the whole map." },
-		{ &GameLogic::m_coopBuildings, "GUI:CoopBuildingsEnabled", L"%ls turned on Coop Buildings. Allies may finish each other's buildings." },
-		{ &GameLogic::m_quickGame, "GUI:QuickGameEnabled", L"%ls turned on Quick Game. Rank requirements are lifted." },
-		{ &GameLogic::m_autoQueue, "GUI:AutoQueueEnabled", L"%ls turned on Military Auto Queue. Right click a unit to build it whenever the queue is empty." },
+		{ &GameLogic::m_diplomacy, "GUI:DiplomacyRuleEnabled" },
+		{ &GameLogic::m_freeRadar, "GUI:FreeRadarEnabled" },
+		{ &GameLogic::m_revealMap, "GUI:RevealMapEnabled" },
+		{ &GameLogic::m_coopBuildings, "GUI:CoopBuildingsEnabled" },
+		{ &GameLogic::m_quickGame, "GUI:QuickGameEnabled" },
+		{ &GameLogic::m_autoQueue, "GUI:AutoQueueEnabled" },
 	};
 
 	// The host sends them on the first frames; a late one would change the rules mid-match
@@ -5876,7 +5875,7 @@ bool GameLogic::onEnableLobbyRule(GameMessage *msg)
 	{
 		revealMapForAllPlayers();
 	}
-	TheInGameUI->messageNoFormat(TheGameText->FETCH_OR_SUBSTITUTE_FORMAT(enables[rule].label, enables[rule].fallback,
+	TheInGameUI->messageNoFormat(TheGameText->fetchFormat(enables[rule].label,
 		ThePlayerList->getNthPlayer(msg->getPlayerIndex())->getPlayerDisplayName().str()));
 	if (rule == LOBBY_RULE_DIPLOMACY)
 	{

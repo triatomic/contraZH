@@ -1807,9 +1807,8 @@ static GameWindow *createPathTracingCheck()
 	}
 	if (check != nullptr)
 	{
-		GadgetCheckBoxSetText( check, TheGameText->FETCH_OR_SUBSTITUTE( "GUI:PathTracing", L"Path tracing" ) );
-		check->winSetTooltip( TheGameText->FETCH_OR_SUBSTITUTE( "TOOLTIP:PathTracing",
-			L"Particles, lasers and glowing lamps light nearby surfaces. Requires dynamic lights and per-pixel lights." ) );
+		GadgetCheckBoxSetText( check, TheGameText->fetch( "GUI:PathTracing" ) );
+		check->winSetTooltip( TheGameText->fetch( "TOOLTIP:PathTracing" ) );
 	}
 	return check;
 }
