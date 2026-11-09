@@ -1479,7 +1479,7 @@ void CommandSequence::doCurrentCommand(Object *obj, CommandVerifyStatus cvs)
 	if (newCvs == STATUS_AWAITING || newCvs == STATUS_EXIT_VERIFIED)
 		removeCurrentCommand(obj);
 
-	if (cvs == STATUS_EXIT_VERIFIED || newCvs == STATUS_EXIT_VERIFIED)
+	if (cvs == STATUS_EXIT_VERIFIED || newCvs == STATUS_EXIT_VERIFIED || !obj->isPendingExitListEmpty())
 		obj->setCommandVerifyStatus(STATUS_EXIT_VERIFIED);
 }
 

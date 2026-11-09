@@ -2561,10 +2561,11 @@ void AIGroup::groupConstruct(const ThingTemplate *thing, const Coord3D *pos, Rea
 			if (TheBuildAssistant->canMakeUnit(*i, thing) != CANMAKE_OK)
 				continue;
 
+			builderPos = (*i)->getPosition();
+			curDist = sqr(builderPos->x - pos->x) + sqr(builderPos->y - pos->y);
+
 			if (!dozerAi->isAnyTaskPending())
 			{
-				builderPos = (*i)->getPosition();
-				curDist = sqr(builderPos->x - pos->x) + sqr(builderPos->y - pos->y);
 				if (curDist < bestDist || isRepairTask)
 				{
 					bestDist = curDist;
