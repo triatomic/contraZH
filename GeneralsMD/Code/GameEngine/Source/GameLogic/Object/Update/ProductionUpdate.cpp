@@ -616,8 +616,44 @@ Bool ProductionUpdate::isAutoQueueUnit( const ThingTemplate *unitType ) const
 }
 
 //-------------------------------------------------------------------------------------------------
-/** queueCreateUnit refuses while money, the unit limit or parking fall short, and the next
-	* update tries again */
+/** The build checks in queueCreateUnit leave NEED_UPGRADE to the cameo, which auto queue skips */
+//-------------------------------------------------------------------------------------------------
+Bool ProductionUpdate::hasAutoQueueUnitUpgrade()
+{
+	Object *us = getObject();
+	const CommandSet *commandSet = TheControlBar->findCommandSet( us->getCommandSetString() );
+	if( commandSet == nullptr )
+	{
+		return FALSE;
+	}
+
+	for( Int i = 0; i < MAX_COMMANDS_PER_SET; ++i )
+	{
+		const CommandButton *button = commandSet->getCommandButton( i );
+		if( button == nullptr ||
+				button->getCommandType() != GUI_COMMAND_UNIT_BUILD ||
+				!m_autoQueueUnit->isEquivalentTo( button->getThingTemplate() ) )
+		{
+			continue;
+		}
+
+		const UpgradeTemplate *upgrade = button->getUpgradeTemplate();
+		if( !BitIsSet( button->getOptions(), NEED_UPGRADE ) || upgrade == nullptr )
+		{
+			return TRUE;
+		}
+
+		if( upgrade->getUpgradeType() == UPGRADE_TYPE_PLAYER ? us->getControllingPlayer()->hasUpgradeComplete( upgrade ) : us->hasUpgrade( upgrade ) )
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------------------------
+/** Anything that blocks the unit now only delays it, a later update tries again */
 //-------------------------------------------------------------------------------------------------
 void ProductionUpdate::tryAutoQueueUnit()
 {
@@ -633,7 +669,10 @@ void ProductionUpdate::tryAutoQueueUnit()
 		return;
 	}
 
-	queueCreateUnit( m_autoQueueUnit, PRODUCTIONID_AUTO_QUEUE );
+	if( hasAutoQueueUnitUpgrade() )
+	{
+		queueCreateUnit( m_autoQueueUnit, (ProductionID)( PRODUCTIONID_AUTO_QUEUE_FIRST + m_autoQueueUnit->getTemplateID() ) );
+	}
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -775,7 +814,11 @@ UpdateSleepTime ProductionUpdate::update()
 	// if nothing in the queue get outta here
 	if( production == nullptr )
 	{
-		tryAutoQueueUnit();
+		// a blocked unit retries now and then, its build checks are too costly for every frame
+		if( now % ( LOGICFRAMES_PER_SECOND / 5 ) == 0 )
+		{
+			tryAutoQueueUnit();
+		}
 		return UPDATE_SLEEP_NONE;
 	}
 
@@ -1276,8 +1319,8 @@ Bool ProductionUpdate::cancelUnitCreate( ProductionEntry *production )
 	// delete the production entry
 	deleteInstance(production);
 
-	// the next update would otherwise queue it straight back
-	if( cancelledAutoQueueUnit && m_productionQueue == nullptr )
+	// cancelling the last one of the type stops auto queue, which would otherwise queue it again
+	if( cancelledAutoQueueUnit && countUnitTypeInQueue( m_autoQueueUnit ) == 0 )
 	{
 		m_autoQueueUnit = nullptr;
 	}

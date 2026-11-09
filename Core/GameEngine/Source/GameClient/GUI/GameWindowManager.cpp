@@ -1028,14 +1028,12 @@ WinInputReturnCode GameWindowManager::winProcessMouseEvent( GameWindowMessage ms
 			{
 				GameWindow *tempWin;
 
-				// a disabled button never gets input messages, so it fires here on the press
-				GameWindow *disabledWin = ( msg == GWM_RIGHT_DOWN ) ? window->winPointInChild( mousePos->x, mousePos->y, TRUE ) : nullptr;
-				if( disabledWin != nullptr &&
-						BitIsSet( disabledWin->m_status, WIN_STATUS_RIGHT_CLICK_WHEN_DISABLED ) &&
-						!BitIsSet( disabledWin->m_status, WIN_STATUS_ENABLED ) )
+				// a disabled button never gets input messages, so this cannot live in the button input
+				GameWindow *pressedWin = ( msg == GWM_RIGHT_DOWN ) ? window->winPointInChild( mousePos->x, mousePos->y, TRUE ) : nullptr;
+				if( pressedWin != nullptr && BitIsSet( pressedWin->m_status, WIN_STATUS_RIGHT_CLICK_ON_PRESS ) )
 				{
-					winSendSystemMsg( disabledWin->m_instData.getOwner(), GBM_SELECTED_RIGHT,
-														(WindowMsgData)disabledWin, packedMouseCoords );
+					winSendSystemMsg( pressedWin->m_instData.getOwner(), GBM_SELECTED_RIGHT,
+														(WindowMsgData)pressedWin, packedMouseCoords );
 					returnCode = WIN_INPUT_USED;
 				}
 				//

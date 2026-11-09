@@ -772,31 +772,6 @@ void GadgetButtonDrawAutoQueue( GameWindow *g )
 
 }
 
-// GadgetButtonEnableRightClick ===============================================
-/** Send GBM_SELECTED_RIGHT for right clicks, even while the button is disabled. */
-//=============================================================================
-void GadgetButtonEnableRightClick( GameWindow *g, Bool enable )
-{
-
-	if( g == nullptr )
-	{
-		return;
-	}
-
-	// the button input reads the instance copy of the status, the window manager the window's
-	if( enable )
-	{
-		BitSet( g->winGetInstanceData()->m_status, WIN_STATUS_RIGHT_CLICK );
-		g->winSetStatus( WIN_STATUS_RIGHT_CLICK_WHEN_DISABLED );
-	}
-	else
-	{
-		BitClear( g->winGetInstanceData()->m_status, WIN_STATUS_RIGHT_CLICK );
-		g->winClearStatus( WIN_STATUS_RIGHT_CLICK_WHEN_DISABLED );
-	}
-
-}
-
 void GadgetButtonDrawOverlayImage( GameWindow *g, const Image *image )
 {
 	if( g == nullptr )

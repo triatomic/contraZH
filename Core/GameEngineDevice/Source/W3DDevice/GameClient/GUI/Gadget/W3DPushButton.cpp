@@ -363,13 +363,19 @@ static void drawButtonAutoQueue( GameWindow *window )
 			return;
 		}
 
-		Int pointSize = 8;
-		if( TheGlobalLanguageData )
-		{
-			pointSize = TheGlobalLanguageData->adjustFontSize( pointSize );
-		}
-		s_autoQueueString->setFont( TheFontLibrary->getFont( AsciiString( "Arial" ), pointSize, TRUE ) );
 		s_autoQueueString->setText( L"AUTO" );
+	}
+
+	// the size follows the resolution, which can change between matches
+	Int pointSize = 8;
+	if( TheGlobalLanguageData )
+	{
+		pointSize = TheGlobalLanguageData->adjustFontSize( pointSize );
+	}
+	GameFont *font = TheFontLibrary->getFont( AsciiString( "Arial" ), pointSize, TRUE );
+	if( s_autoQueueString->getFont() != font )
+	{
+		s_autoQueueString->setFont( font );
 	}
 
 	ICoord2D origin, size;

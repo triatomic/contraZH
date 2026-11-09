@@ -43,7 +43,7 @@ class UpgradeTemplate;
 enum ProductionID CPP_11(: Int)
 {
 	PRODUCTIONID_INVALID = 0,
-	PRODUCTIONID_AUTO_QUEUE = 0x7FFFFFFF	///< requestUniqueUnitID only advances on the clicking client, and auto queue only fills an empty queue
+	PRODUCTIONID_AUTO_QUEUE_FIRST = 0x7FFF0000	///< auto queue adds the unit's template ID, because requestUniqueUnitID only advances on the clicking client
 };
 
 enum ProductionType CPP_11(: Int)
@@ -260,6 +260,7 @@ protected:
 
 	void updateDoors();														///< update the door behavior
 	void tryAutoQueueUnit();
+	Bool hasAutoQueueUnitUpgrade();
 
 	struct DoorInfo
 	{

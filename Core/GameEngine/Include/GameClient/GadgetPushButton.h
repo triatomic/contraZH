@@ -72,7 +72,6 @@
 void GadgetCheckLikeButtonSetVisualCheck( GameWindow *g, Bool checked );
 Bool GadgetCheckLikeButtonIsChecked( GameWindow *g );
 void GadgetButtonEnableCheckLike( GameWindow *g, Bool makeCheckLike, Bool initiallyChecked );
-void GadgetButtonEnableRightClick( GameWindow *g, Bool enable );
 
 void GadgetButtonSetText( GameWindow *g, UnicodeString text );
 void GadgetButtonDrawClock( GameWindow *g, Int percent, Color color ); //Darkens the progress

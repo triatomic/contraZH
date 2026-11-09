@@ -217,8 +217,11 @@ static void selectObjectOfType( Object* obj, void* selectObjectsInfo )
 //-------------------------------------------------------------------------------------------------
 /** Producers already auto queueing this unit stop. If there are none, every producer starts. */
 //-------------------------------------------------------------------------------------------------
-static void toggleAutoQueueUnit( const DrawableList &factories, const ThingTemplate *unitType, Bool canStart )
+static void toggleAutoQueueUnit( const DrawableList &factories, const ThingTemplate *unitType )
 {
+	AudioEventRTS click( "GUIClick" );
+	TheAudio->addAudioEvent( &click );
+
 	Bool anyOn = FALSE;
 	for( DrawableListCIt it = factories.begin(); it != factories.end(); ++it )
 	{
@@ -227,12 +230,6 @@ static void toggleAutoQueueUnit( const DrawableList &factories, const ThingTempl
 			anyOn = TRUE;
 			break;
 		}
-	}
-
-	// only the cameo enforces NEED_UPGRADE, so a greyed one may stop auto queue but never start it
-	if( !anyOn && !canStart )
-	{
-		return;
 	}
 
 	for( DrawableListCIt it = factories.begin(); it != factories.end(); ++it )
@@ -557,7 +554,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 				continue;
 			}
 
-			// a right click on a disabled producer can still stop its auto queue
+			// auto queue can still be switched on a disabled producer
 			if (draw && draw->getObject() &&
 				!draw->getObject()->getStatusBits().test(OBJECT_STATUS_SOLD) &&
 				!draw->getObject()->getStatusBits().test(OBJECT_STATUS_UNDER_CONSTRUCTION) &&
@@ -821,7 +818,7 @@ CBCommandStatus ControlBar::processCommandUI( GameWindow *control,
 #if RTS_ZEROHOUR
 			if( gadgetMessage == GBM_SELECTED_RIGHT )
 			{
-				toggleAutoQueueUnit( factories, whatToBuild, control->winGetEnabled() );
+				toggleAutoQueueUnit( factories, whatToBuild );
 				break;
 			}
 #endif
