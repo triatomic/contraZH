@@ -1129,7 +1129,7 @@ GameMessageDisposition SelectionTranslator::onRawMouseLeftButtonUp(MAYBE_UNUSED 
 		if( !TheInGameUI->getGUICommand() && !TheKeyboard->isShift() && !TheKeyboard->isCtrl() && !TheKeyboard->isAlt() )
 		{
 			//No GUI command mode, so deselect everyone if we're in alternate mouse mode.
-			if( TheGlobalData->m_useAlternateMouse && !TheInGameUI->getPendingPlaceSourceObjectIDs()->empty() )
+			if( TheGlobalData->m_useAlternateMouse && TheInGameUI->getPendingPlaceSourceObjectIDs()->empty() )
 			{
 				if( !TheInGameUI->getPreventLeftClickDeselectionInAlternateMouseModeForOneClick() )
 				{
