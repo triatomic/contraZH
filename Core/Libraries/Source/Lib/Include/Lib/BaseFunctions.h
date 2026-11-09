@@ -98,10 +98,6 @@ __forceinline float fast_float_ceil(float f)
 #define REAL_TO_INT_FLOOR(x)			(fast_float2long_round(fast_float_floor(x)))
 #endif
 
-#define FAST_REAL_TRUNC(x)        fast_float_trunc(x)
-#define FAST_REAL_CEIL(x)         fast_float_ceil(x)
-#define FAST_REAL_FLOOR(x)        fast_float_floor(x)
-
 // Modulo function working with negative values, required for angles
 inline Real nmod(Real x, Real y) {
     return fmod(fmod(x, y) + y, y);
