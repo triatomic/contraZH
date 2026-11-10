@@ -2496,8 +2496,24 @@ void DX8TextureCategoryClass::Render_Instanced_Groups(VertexMaterialClass * vmat
 	drawn.clear();
 }
 
+bool DX8MeshRendererClass::Casts_Shadow(const ShaderClass& shader)
+{
+	const ShaderClass::SrcBlendFuncType src = shader.Get_Src_Blend_Func();
+	const ShaderClass::DstBlendFuncType dst = shader.Get_Dst_Blend_Func();
+	return src != ShaderClass::SRCBLEND_ZERO && dst != ShaderClass::DSTBLEND_ONE &&
+		dst != ShaderClass::DSTBLEND_SRC_COLOR && dst != ShaderClass::DSTBLEND_ONE_MINUS_SRC_COLOR;
+}
+
 void DX8TextureCategoryClass::Render()
 {
+	// The shadow depth pass writes neither depth nor colour for these, so their draws would do nothing.
+	if (DX8MeshRendererClass::Get_Stats_Scene() == DX8InstancingStatsStruct::SCENE_SHADOW_DEPTH &&
+		!DX8MeshRendererClass::Casts_Shadow(Get_Shader()))
+	{
+		Clear_Render_List();
+		return;
+	}
+
 	#ifdef WWDEBUG
 	if (!WW3D::Expose_Prelit()) {
 	#endif

@@ -2279,21 +2279,15 @@ void ShadowDepthShader::applyOverride(const ShaderClass &shader)
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, FALSE);
 
 	const ShaderClass::SrcBlendFuncType src = shader.Get_Src_Blend_Func();
-	const ShaderClass::DstBlendFuncType dst = shader.Get_Dst_Blend_Func();
 
 	// Alpha decides the shape only where the mesh's own shader cuts or blends by it. Many
 	// opaque textures carry masks in alpha, so testing those would punch holes in shadows.
-	Bool casts = TRUE;
 	Bool cutout = FALSE;
 	Bool inverted = (src == ShaderClass::SRCBLEND_ONE_MINUS_SRC_ALPHA);
 
 	// Additive and multiplied passes are glows and effects, which cast nothing, even when they fade by alpha.
-	if (src == ShaderClass::SRCBLEND_ZERO || dst == ShaderClass::DSTBLEND_ONE ||
-		dst == ShaderClass::DSTBLEND_SRC_COLOR || dst == ShaderClass::DSTBLEND_ONE_MINUS_SRC_COLOR)
-	{
-		casts = FALSE;
-	}
-	else if (shader.Uses_Alpha())
+	const Bool casts = DX8MeshRendererClass::Casts_Shadow(shader);
+	if (casts && shader.Uses_Alpha())
 	{
 		cutout = TRUE;
 	}
@@ -3185,6 +3179,7 @@ public:
 		m_lights.count = 0;
 		m_lights.lightsOnly = FALSE;
 		m_lights.receivesShadow = receivesShadow;
+		Enable_On_Sorted_Meshes(false);
 	}
 
 	/// Makes this a copy of key for one object, adding that object's lights and the shadow receiver's work.

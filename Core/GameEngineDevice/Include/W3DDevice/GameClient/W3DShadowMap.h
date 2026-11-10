@@ -43,6 +43,11 @@ class W3DShadowReceiveMaterialPassClass : public MaterialPassClass
 {
 public:
 
+	W3DShadowReceiveMaterialPassClass()
+	{
+		Enable_On_Sorted_Meshes(false);
+	}
+
 	virtual void Install_Materials() const override;
 	virtual void UnInstall_Materials() const override;
 };

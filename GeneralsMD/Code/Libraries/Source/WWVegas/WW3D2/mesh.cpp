@@ -792,9 +792,15 @@ void MeshClass::Render(RenderInfoClass & rinfo)
 			** If the rendering context specifies procedural material passes, register them
 			** for rendering
 			*/
+			const bool sorted_base = Model->Get_Flag(MeshGeometryClass::SORT) && WW3D::Is_Sorting_Enabled();
 			for (int i=0; !mirror_replaces && i<rinfo.Additional_Pass_Count(); i++) {
 
 				MaterialPassClass * matpass = rinfo.Peek_Additional_Pass(i);
+
+				if (sorted_base && !matpass->Is_Enabled_On_Sorted_Meshes())
+				{
+					continue;
+				}
 
 				if ((!Is_Translucent()) || (matpass->Is_Enabled_On_Translucent_Meshes())) {
 

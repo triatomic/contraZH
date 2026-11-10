@@ -94,6 +94,10 @@ public:
 	void							Enable_On_Translucent_Meshes(bool onoff)	{ EnableOnTranslucentMeshes = onoff; }
 	bool							Is_Enabled_On_Translucent_Meshes()		{ return EnableOnTranslucentMeshes; }
 
+	/// A sorted mesh draws its base after the passes, so a pass that tests depth equal turns this off.
+	void							Enable_On_Sorted_Meshes(bool onoff)			{ EnableOnSortedMeshes = onoff; }
+	bool							Is_Enabled_On_Sorted_Meshes()				{ return EnableOnSortedMeshes; }
+
 	static void					Enable_Per_Polygon_Culling(bool onoff)		{ EnablePerPolygonCulling = onoff; }
 	static bool					Is_Per_Polygon_Culling_Enabled()		{ return EnablePerPolygonCulling; }
 
@@ -105,6 +109,7 @@ protected:
 	ShaderClass					Shader;
 	VertexMaterialClass *	Material;
 	bool							EnableOnTranslucentMeshes;
+	bool							EnableOnSortedMeshes;
 
 	OBBoxClass *				CullVolume;
 	static bool					EnablePerPolygonCulling;

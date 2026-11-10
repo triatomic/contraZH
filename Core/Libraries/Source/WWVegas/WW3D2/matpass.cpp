@@ -73,7 +73,8 @@ MaterialPassClass::MaterialPassClass() :
 	Shader(0),
 	Material(nullptr),
 	CullVolume(nullptr),
-	EnableOnTranslucentMeshes(true)
+	EnableOnTranslucentMeshes(true),
+	EnableOnSortedMeshes(true)
 {
 	for (int i=0; i<MAX_TEX_STAGES; i++) {
 		Texture[i] = nullptr;
