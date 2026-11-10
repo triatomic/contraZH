@@ -1561,6 +1561,21 @@ static Real Bind_Terrain_Emissive(Bool terrain)
 // The point lights draws may add, set once a frame by the scene. Each draw names its own.
 static std::vector<W3DShaderManager::PixelLight> PixelLights;
 static Int PixelLightCount = 0;
+
+// A key per light that sorts neighbours on the ground next to each other.
+static std::vector<UnsignedInt> PixelLightOrder;
+static const Real PIXEL_LIGHT_ORDER_CELL = 16.0f;
+
+// Moves the low 16 bits apart, leaving a zero between each.
+static UnsignedInt Spread_Bits(UnsignedInt value)
+{
+	value &= 0x0000ffff;
+	value = (value | (value << 8)) & 0x00ff00ff;
+	value = (value | (value << 4)) & 0x0f0f0f0f;
+	value = (value | (value << 2)) & 0x33333333;
+	value = (value | (value << 1)) & 0x55555555;
+	return value;
+}
 enum { PIXEL_LIGHT_REGISTERS = W3DShaderManager::MAX_PIXEL_LIGHTS * 2 + (W3DShaderManager::MAX_PIXEL_LIGHTS + 3) / 4 };
 static Bool TerrainPixelLightsLoaded = FALSE;
 static Bool UnitPixelLightsLoaded = FALSE;
@@ -1954,6 +1969,15 @@ static bool Draw_Additional_Light_Pass(unsigned pass)
 }
 #endif
 
+#if defined(BUILD_WITH_D3D9)
+static bool Pixel_Light_Nearer_First(Int a, Int b)
+{
+	const UnsignedInt keyA = (a >= 0 && a < (Int)PixelLightOrder.size()) ? PixelLightOrder[a] : 0xffffffff;
+	const UnsignedInt keyB = (b >= 0 && b < (Int)PixelLightOrder.size()) ? PixelLightOrder[b] : 0xffffffff;
+	return keyA < keyB;
+}
+#endif
+
 static void Set_Additional_Pixel_Lights(DWORD shader, const Int *indices, Int count, Int slots, Int firstRegister, const D3DMATRIX *view)
 {
 #if defined(BUILD_WITH_D3D9)
@@ -1971,6 +1995,9 @@ static void Set_Additional_Pixel_Lights(DWORD shader, const Int *indices, Int co
 	{
 		AdditionalLightIndices[i] = indices != nullptr ? indices[i] : i;
 	}
+
+	// Each extra pass scissors to its lights, so neighbours share a pass and it shades a small area.
+	std::sort(AdditionalLightIndices.begin() + slots, AdditionalLightIndices.end(), Pixel_Light_Nearer_First);
 	AdditionalLightSlots = slots;
 	AdditionalLightRegister = firstRegister;
 	AdditionalLightShader = shader;
@@ -3269,9 +3296,22 @@ void W3DShaderManager::setPixelLights(const PixelLight *lights, Int count)
 {
 	PixelLightCount = count;
 	PixelLights.resize(count);
+	Real minX = 0.0f;
+	Real minY = 0.0f;
 	for (Int i = 0; i < PixelLightCount; i++)
 	{
 		PixelLights[i] = lights[i];
+		minX = (i == 0) ? lights[i].position.X : min(minX, lights[i].position.X);
+		minY = (i == 0) ? lights[i].position.Y : min(minY, lights[i].position.Y);
+	}
+
+	// Interleaving the bits of each light's ground cell gives a key that keeps nearby cells together.
+	PixelLightOrder.resize(count);
+	for (Int i = 0; i < PixelLightCount; i++)
+	{
+		const UnsignedInt cellX = (UnsignedInt)min((lights[i].position.X - minX) / PIXEL_LIGHT_ORDER_CELL, 65535.0f);
+		const UnsignedInt cellY = (UnsignedInt)min((lights[i].position.Y - minY) / PIXEL_LIGHT_ORDER_CELL, 65535.0f);
+		PixelLightOrder[i] = Spread_Bits(cellX) | (Spread_Bits(cellY) << 1);
 	}
 	ObjectSpecularPassesUsed = 0;
 	Update_Lights_Debug();

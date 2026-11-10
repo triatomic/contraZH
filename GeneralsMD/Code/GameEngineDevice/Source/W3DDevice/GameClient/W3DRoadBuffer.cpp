@@ -3393,7 +3393,7 @@ void W3DRoadBuffer::drawRoads(CameraClass * camera, TextureClass *cloudTexture, 
 			{
 				if (!wireframe)
 		 			W3DShaderManager::setShader(st, pass);
-				// Road types share one draw each, so their light batches span the view.
+				// Road types share one draw each, so each takes every light.
 				W3DShaderManager::setDrawPixelLights(nullptr, W3DShaderManager::getPixelLightCount());
 				//Draw all this road type.
 				DX8Wrapper::Draw_Triangles(	0, m_roadTypes[i].getNumIndices()/3, 0,	m_roadTypes[i].getNumVertices());
