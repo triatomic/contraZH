@@ -3325,8 +3325,12 @@ static void Pick_Road_Lights(RoadSegment *roads, Int numRoads, Int uniqueID, std
 			continue;
 		}
 		const SphereClass &bounds = roads[road].getBounds();
-		for (Int index = 0; index < count; index++)
+		static std::vector<Int> nearby;
+		W3DShaderManager::gatherPixelLights(bounds.Center.X - bounds.Radius, bounds.Center.Y - bounds.Radius,
+			bounds.Center.X + bounds.Radius, bounds.Center.Y + bounds.Radius, nearby);
+		for (size_t candidate = 0; candidate < nearby.size(); candidate++)
 		{
+			const Int index = nearby[candidate];
 			const W3DShaderManager::PixelLight &light = W3DShaderManager::getPixelLight(index);
 			const Real reach = light.outerRadius + bounds.Radius;
 			if (!reached[index] && !light.objectsOnly && (light.position - bounds.Center).Length2() < reach * reach)

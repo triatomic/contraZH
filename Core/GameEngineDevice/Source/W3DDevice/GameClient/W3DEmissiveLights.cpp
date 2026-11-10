@@ -15,7 +15,16 @@
 
 static const Real EMISSIVE_CELL_SIZE = 24.0f;
 
+// A mesh left undrawn for this many frames gives up its cached clusters.
+static const UnsignedInt OBJECT_LIGHTS_FRAMES = 256;
+
 W3DEmissiveLights::W3DEmissiveLights()
+	: m_frame(0)
+{
+}
+
+W3DEmissiveLights::ObjectLights::ObjectLights()
+	: model(nullptr), alternate(FALSE), transform(true), maskIntensity(0.0f), frame(0)
 {
 }
 
@@ -32,6 +41,7 @@ void W3DEmissiveLights::reset()
 {
 	m_models.clear();
 	m_textures.clear();
+	m_objects.clear();
 	m_clusters.clear();
 	m_lights.clear();
 }
@@ -186,7 +196,7 @@ Bool W3DEmissiveLights::sampleModel(MeshModelClass &model, std::vector<Sample> &
 	return ready;
 }
 
-void W3DEmissiveLights::add(const Vector3 &position, const Vector3 &color, Real area, Real radius)
+void W3DEmissiveLights::add(ClusterMap &clusters, const Vector3 &position, const Vector3 &color, Real area, Real radius)
 {
 	const Real brightness = max(color.X, max(color.Y, color.Z));
 	if (brightness <= 0.001f || area <= 0.0f || radius <= 0.0f)
@@ -195,7 +205,7 @@ void W3DEmissiveLights::add(const Vector3 &position, const Vector3 &color, Real 
 	}
 	const Cell cell((Int)floorf(position.X / EMISSIVE_CELL_SIZE), std::make_pair(
 		(Int)floorf(position.Y / EMISSIVE_CELL_SIZE), (Int)floorf(position.Z / EMISSIVE_CELL_SIZE)));
-	Cluster &cluster = m_clusters[cell];
+	Cluster &cluster = clusters[cell];
 	cluster.position += position * (area * brightness);
 	cluster.color += color * area;
 	cluster.weight += area * brightness;
@@ -206,6 +216,24 @@ void W3DEmissiveLights::begin(CameraClass &camera)
 {
 	m_clusters.clear();
 	m_lights.clear();
+
+	m_frame++;
+	if (m_frame % OBJECT_LIGHTS_FRAMES == 0)
+	{
+		std::map<RenderObjClass *, ObjectLights>::iterator it = m_objects.begin();
+		while (it != m_objects.end())
+		{
+			if (m_frame - it->second.frame >= OBJECT_LIGHTS_FRAMES)
+			{
+				m_objects.erase(it++);
+			}
+			else
+			{
+				++it;
+			}
+		}
+	}
+
 	if (TheParticleSystemManager == nullptr)
 	{
 		return;
@@ -238,7 +266,7 @@ void W3DEmissiveLights::begin(CameraClass &camera)
 			}
 			const RGBColor *color = particle->getColor();
 			const Vector3 emission(color->red * tint.X, color->green * tint.Y, color->blue * tint.Z);
-			add(position, emission * WWMath::Clamp(particle->getAlpha(), 0.0f, 1.0f), size * size, radius);
+			add(m_clusters, position, emission * WWMath::Clamp(particle->getAlpha(), 0.0f, 1.0f), size * size, radius);
 		}
 	}
 }
@@ -294,18 +322,42 @@ void W3DEmissiveLights::addObject(RenderObjClass &object, Real opacity)
 		found = m_models.insert(std::make_pair(key, entry)).first;
 	}
 	const Matrix3D &transform = object.Get_Transform();
-	Vector3 axis;
-	transform.Get_X_Vector(&axis);
-	const Real scale = axis.Length();
 	const Real maskIntensity = !TheGlobalData->m_useSpecular ? 0.0f : TheGlobalData->m_timeOfDay == TIME_OF_DAY_NIGHT
 		? TheGlobalData->m_unitEmissiveNightIntensity : TheGlobalData->m_unitEmissiveIntensity;
-	for (size_t i = 0; i < found->second.samples.size(); i++)
+
+	// A mesh that stands still hands over the clusters of its last frame, so only moving ones walk their samples.
+	ObjectLights &lights = m_objects[&object];
+	if (lights.model != model || lights.alternate != key.second || lights.maskIntensity != maskIntensity || lights.transform != transform)
 	{
-		const Sample &sample = found->second.samples[i];
-		Vector3 position;
-		Matrix3D::Transform_Vector(transform, sample.position, &position);
-		const Real area = sample.area * scale * scale;
-		add(position, (sample.color + sample.mask * maskIntensity) * opacity, area, min(max(sqrtf(area) * 3.0f, EMISSIVE_CELL_SIZE), 120.0f));
+		Vector3 axis;
+		transform.Get_X_Vector(&axis);
+		const Real scale = axis.Length();
+		m_objectClusters.clear();
+		for (size_t i = 0; i < found->second.samples.size(); i++)
+		{
+			const Sample &sample = found->second.samples[i];
+			Vector3 position;
+			Matrix3D::Transform_Vector(transform, sample.position, &position);
+			const Real area = sample.area * scale * scale;
+			add(m_objectClusters, position, sample.color + sample.mask * maskIntensity, area, min(max(sqrtf(area) * 3.0f, EMISSIVE_CELL_SIZE), 120.0f));
+		}
+		lights.model = model;
+		lights.alternate = key.second;
+		lights.transform = transform;
+		lights.maskIntensity = maskIntensity;
+		lights.clusters.assign(m_objectClusters.begin(), m_objectClusters.end());
+	}
+	lights.frame = m_frame;
+
+	// Position, colour and weight all scale with opacity, so the stored clusters fade as the samples would.
+	for (size_t i = 0; i < lights.clusters.size(); i++)
+	{
+		const Cluster &stored = lights.clusters[i].second;
+		Cluster &cluster = m_clusters[lights.clusters[i].first];
+		cluster.position += stored.position * opacity;
+		cluster.color += stored.color * opacity;
+		cluster.weight += stored.weight * opacity;
+		cluster.radius = max(cluster.radius, stored.radius);
 	}
 }
 

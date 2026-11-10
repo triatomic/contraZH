@@ -2435,9 +2435,12 @@ Int RTS3DScene::pickObjectPixelLights(const SphereClass &sphere, Int *lights)
 	Real scores[W3DShaderManager::MAX_UNIT_PIXEL_LIGHTS];
 	Int count = 0;
 
-	const Int candidates = W3DShaderManager::getPixelLightCount();
-	for (Int index = 0; index < candidates; index++)
+	static std::vector<Int> nearby;
+	W3DShaderManager::gatherPixelLights(sphere.Center.X - sphere.Radius, sphere.Center.Y - sphere.Radius,
+		sphere.Center.X + sphere.Radius, sphere.Center.Y + sphere.Radius, nearby);
+	for (size_t candidate = 0; candidate < nearby.size(); candidate++)
 	{
+		const Int index = nearby[candidate];
 		const W3DShaderManager::PixelLight &pixelLight = W3DShaderManager::getPixelLight(index);
 		if (pixelLight.terrainOnly)
 		{

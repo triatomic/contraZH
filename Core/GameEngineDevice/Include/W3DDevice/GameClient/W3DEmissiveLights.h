@@ -2,6 +2,7 @@
 
 #if defined(RTS_ZEROHOUR)
 #include "W3DDevice/GameClient/W3DShaderManager.h"
+#include "WWMath/matrix3d.h"
 #include <map>
 #include <vector>
 
@@ -51,14 +52,30 @@ private:
 	};
 	typedef std::pair<Int, std::pair<Int, Int> > Cell;
 	typedef std::pair<MeshModelClass *, Bool> ModelKey;
+	typedef std::map<Cell, Cluster> ClusterMap;
+
+	/// A mesh's clusters at full opacity, good while its model, placement and mask intensity stay as they were.
+	struct ObjectLights
+	{
+		ObjectLights();
+		MeshModelClass *model;
+		Bool alternate;
+		Matrix3D transform;
+		Real maskIntensity;
+		UnsignedInt frame;	///< the last frame that drew it
+		std::vector<std::pair<Cell, Cluster> > clusters;
+	};
 	TextureSamples *textureSamples(TextureClass *texture);
 	static Vector3 sampleTexture(const TextureSamples *texture, const Vector2 &uv, Bool useAlpha = FALSE);
 	Bool sampleModel(MeshModelClass &model, std::vector<Sample> &samples);
-	void add(const Vector3 &position, const Vector3 &color, Real area, Real radius);
+	static void add(ClusterMap &clusters, const Vector3 &position, const Vector3 &color, Real area, Real radius);
 
 	std::map<TextureClass *, TextureSamples> m_textures;
 	std::map<ModelKey, ModelSamples> m_models;
-	std::map<Cell, Cluster> m_clusters;
+	std::map<RenderObjClass *, ObjectLights> m_objects;
+	ClusterMap m_clusters;
+	ClusterMap m_objectClusters;	///< one mesh's clusters while they are rebuilt
 	std::vector<W3DShaderManager::PixelLight> m_lights;
+	UnsignedInt m_frame;
 };
 #endif

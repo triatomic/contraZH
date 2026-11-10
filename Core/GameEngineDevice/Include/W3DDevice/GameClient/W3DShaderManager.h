@@ -142,6 +142,8 @@ public:
 	static void setPixelLights(const PixelLight *lights, Int count);
 	static Int getPixelLightCount();
 	static const PixelLight &getPixelLight(Int index);
+	/// Lists in rising order every light that could reach a ground rectangle, for the caller to test against its own shape.
+	static void gatherPixelLights(Real minX, Real minY, Real maxX, Real maxY, std::vector<Int> &lights);
 	/// Lights the draws that follow in batches under the terrain, road, flat terrain
 	/// or point light shader in use. Null indices take the first count except object-only lights.
 	static void setDrawPixelLights(const Int *indices, Int count);

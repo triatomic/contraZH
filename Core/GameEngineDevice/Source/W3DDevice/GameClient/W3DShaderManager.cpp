@@ -1566,6 +1566,88 @@ static Int PixelLightCount = 0;
 static std::vector<UnsignedInt> PixelLightOrder;
 static const Real PIXEL_LIGHT_ORDER_CELL = 16.0f;
 
+// Past a handful of lights, those no wider than a cell sit in a ground grid by their centre and the rest in a list.
+static const Int PIXEL_LIGHT_GRID_MIN_LIGHTS = 32;
+static const Int PIXEL_LIGHT_GRID_MAX_SIDE = 128;
+static const Real PIXEL_LIGHT_GRID_MIN_CELL = 64.0f;
+static std::vector<Int> PixelLightGridStarts;
+static std::vector<Int> PixelLightGridLights;
+static std::vector<Int> PixelLightGridWide;
+static Int PixelLightGridWidth = 0;
+static Int PixelLightGridHeight = 0;
+static Real PixelLightGridCell = 0.0f;
+static Real PixelLightGridMinX = 0.0f;
+static Real PixelLightGridMinY = 0.0f;
+
+static Int Pixel_Light_Grid_Column(Real x)
+{
+	return (Int)min(max((x - PixelLightGridMinX) / PixelLightGridCell, 0.0f), (Real)(PixelLightGridWidth - 1));
+}
+
+static Int Pixel_Light_Grid_Row(Real y)
+{
+	return (Int)min(max((y - PixelLightGridMinY) / PixelLightGridCell, 0.0f), (Real)(PixelLightGridHeight - 1));
+}
+
+static void Build_Pixel_Light_Grid()
+{
+	PixelLightGridWidth = 0;
+	PixelLightGridHeight = 0;
+	PixelLightGridWide.clear();
+	if (PixelLightCount < PIXEL_LIGHT_GRID_MIN_LIGHTS)
+	{
+		return;
+	}
+
+	Real minX = PixelLights[0].position.X;
+	Real minY = PixelLights[0].position.Y;
+	Real maxX = minX;
+	Real maxY = minY;
+	for (Int i = 1; i < PixelLightCount; i++)
+	{
+		minX = min(minX, PixelLights[i].position.X);
+		minY = min(minY, PixelLights[i].position.Y);
+		maxX = max(maxX, PixelLights[i].position.X);
+		maxY = max(maxY, PixelLights[i].position.Y);
+	}
+	PixelLightGridMinX = minX;
+	PixelLightGridMinY = minY;
+	PixelLightGridCell = max(PIXEL_LIGHT_GRID_MIN_CELL, max(maxX - minX, maxY - minY) / (Real)PIXEL_LIGHT_GRID_MAX_SIDE);
+	PixelLightGridWidth = (Int)((maxX - minX) / PixelLightGridCell) + 1;
+	PixelLightGridHeight = (Int)((maxY - minY) / PixelLightGridCell) + 1;
+
+	// Counted first, so each cell's lights lie together in one array.
+	static std::vector<Int> cells;
+	cells.resize(PixelLightCount);
+	PixelLightGridStarts.assign(PixelLightGridWidth * PixelLightGridHeight + 1, 0);
+	for (Int i = 0; i < PixelLightCount; i++)
+	{
+		const W3DShaderManager::PixelLight &light = PixelLights[i];
+		if (light.outerRadius > PixelLightGridCell)
+		{
+			cells[i] = -1;
+			PixelLightGridWide.push_back(i);
+			continue;
+		}
+		cells[i] = Pixel_Light_Grid_Row(light.position.Y) * PixelLightGridWidth + Pixel_Light_Grid_Column(light.position.X);
+		PixelLightGridStarts[cells[i] + 1]++;
+	}
+	for (size_t cell = 1; cell < PixelLightGridStarts.size(); cell++)
+	{
+		PixelLightGridStarts[cell] += PixelLightGridStarts[cell - 1];
+	}
+	static std::vector<Int> next;
+	next.assign(PixelLightGridStarts.begin(), PixelLightGridStarts.end());
+	PixelLightGridLights.resize(PixelLightCount);
+	for (Int i = 0; i < PixelLightCount; i++)
+	{
+		if (cells[i] >= 0)
+		{
+			PixelLightGridLights[next[cells[i]]++] = i;
+		}
+	}
+}
+
 // Moves the low 16 bits apart, leaving a zero between each.
 static UnsignedInt Spread_Bits(UnsignedInt value)
 {
@@ -3313,6 +3395,7 @@ void W3DShaderManager::setPixelLights(const PixelLight *lights, Int count)
 		const UnsignedInt cellY = (UnsignedInt)min((lights[i].position.Y - minY) / PIXEL_LIGHT_ORDER_CELL, 65535.0f);
 		PixelLightOrder[i] = Spread_Bits(cellX) | (Spread_Bits(cellY) << 1);
 	}
+	Build_Pixel_Light_Grid();
 	ObjectSpecularPassesUsed = 0;
 	Update_Lights_Debug();
 }
@@ -3325,6 +3408,39 @@ Int W3DShaderManager::getPixelLightCount()
 const W3DShaderManager::PixelLight &W3DShaderManager::getPixelLight(Int index)
 {
 	return PixelLights[index];
+}
+
+void W3DShaderManager::gatherPixelLights(Real minX, Real minY, Real maxX, Real maxY, std::vector<Int> &lights)
+{
+	lights.clear();
+	if (PixelLightGridWidth == 0)
+	{
+		for (Int i = 0; i < PixelLightCount; i++)
+		{
+			lights.push_back(i);
+		}
+		return;
+	}
+
+	// A light in the grid reaches no further than a cell, so the box grows by one cell each way.
+	const Real reach = PixelLightGridCell;
+	const Real gridMaxX = PixelLightGridMinX + PixelLightGridWidth * PixelLightGridCell;
+	const Real gridMaxY = PixelLightGridMinY + PixelLightGridHeight * PixelLightGridCell;
+	if (maxX + reach >= PixelLightGridMinX && minX - reach <= gridMaxX && maxY + reach >= PixelLightGridMinY && minY - reach <= gridMaxY)
+	{
+		const Int x0 = Pixel_Light_Grid_Column(minX - reach);
+		const Int x1 = Pixel_Light_Grid_Column(maxX + reach);
+		const Int y0 = Pixel_Light_Grid_Row(minY - reach);
+		const Int y1 = Pixel_Light_Grid_Row(maxY + reach);
+		for (Int y = y0; y <= y1; y++)
+		{
+			const Int first = PixelLightGridStarts[y * PixelLightGridWidth + x0];
+			const Int last = PixelLightGridStarts[y * PixelLightGridWidth + x1 + 1];
+			lights.insert(lights.end(), PixelLightGridLights.begin() + first, PixelLightGridLights.begin() + last);
+		}
+	}
+	lights.insert(lights.end(), PixelLightGridWide.begin(), PixelLightGridWide.end());
+	std::sort(lights.begin(), lights.end());
 }
 
 void W3DShaderManager::setDrawPixelLights(const Int *indices, Int count)
@@ -3429,9 +3545,12 @@ void W3DShaderManager::filterPixelLights(const AABoxClass &box, std::vector<Int>
 
 Int W3DShaderManager::pickPixelLights(const AABoxClass &box, std::vector<Int> &lights)
 {
+	static std::vector<Int> nearby;
+	gatherPixelLights(box.Center.X - box.Extent.X, box.Center.Y - box.Extent.Y, box.Center.X + box.Extent.X, box.Center.Y + box.Extent.Y, nearby);
 	lights.clear();
-	for (Int index = 0; index < PixelLightCount; index++)
+	for (size_t i = 0; i < nearby.size(); i++)
 	{
+		const Int index = nearby[i];
 		const PixelLight &light = PixelLights[index];
 		if (light.objectsOnly)
 		{
@@ -3450,9 +3569,12 @@ Int W3DShaderManager::pickPixelLights(const AABoxClass &box, std::vector<Int> &l
 
 Int W3DShaderManager::pickPixelLights(const AABoxClass &box, Int *lights)
 {
+	static std::vector<Int> nearby;
+	gatherPixelLights(box.Center.X - box.Extent.X, box.Center.Y - box.Extent.Y, box.Center.X + box.Extent.X, box.Center.Y + box.Extent.Y, nearby);
 	Int count = 0;
-	for (Int index = 0; index < PixelLightCount && count < MAX_PIXEL_LIGHTS; index++)
+	for (size_t i = 0; i < nearby.size() && count < MAX_PIXEL_LIGHTS; i++)
 	{
+		const Int index = nearby[i];
 		const PixelLight &light = PixelLights[index];
 		if (light.objectsOnly)
 		{
