@@ -2350,8 +2350,8 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 		{
 			TheW3DLaserGlow->appendObjectLights(sources);
 		}
-		// One deferred draw takes every light meant for ground and objects alike, which spares each surface a pass per group.
-		const Bool deferred = TheW3DDeferredLights != nullptr && TheW3DDeferredLights->isEnabled();
+		// In fast mode one deferred draw takes every light meant for ground and objects alike, which spares each surface a pass per group.
+		const Bool deferred = TheGlobalData->m_pathTracingFast && TheW3DDeferredLights != nullptr && TheW3DDeferredLights->isEnabled();
 		static std::vector<W3DShaderManager::PixelLight> deferredLights;
 		deferredLights.clear();
 		for (size_t i = 0; i < sources.size(); i++)

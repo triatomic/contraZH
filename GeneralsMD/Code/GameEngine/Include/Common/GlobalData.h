@@ -770,6 +770,7 @@ public:
   Bool m_useDynamicLights;        ///< Options.ini DynamicLights: explosions, muzzle flashes and lasers light their surroundings
   Bool m_usePixelLights;          ///< Options.ini PixelLights: those lights are drawn per pixel where the hardware allows
   Bool m_usePathTracing;          ///< Options.ini PathTracing enables light from particles and emissive meshes
+  Bool m_pathTracingFast;         ///< Options.ini PathTracing = Fast adds those lights in one screen-space draw, softer than the per-surface passes
   Bool m_useAmbientOcclusion;     ///< Options.ini AmbientOcclusion: creases and the ground beneath objects darken where the hardware allows
   Bool m_useHeightBlend;          ///< Options.ini HeightBlend: terrain textures blend by height where the hardware allows
   Bool m_useHQSky;                ///< Options.ini HQSky: cloud shadows drift softly and change shape where the hardware allows
