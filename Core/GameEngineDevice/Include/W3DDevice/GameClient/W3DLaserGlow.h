@@ -50,6 +50,9 @@ public:
 	void render(RenderInfoClass &rinfo);
 	void appendObjectLights(std::vector<W3DShaderManager::PixelLight> &lights) const;
 
+	/// The terrain's ambient and sun light on flat ground, which a light that multiplies the scene is measured against.
+	static Vector3 getSceneLight();
+
 	void ReleaseResources();	///< drops the shaders before a device reset; the next draw loads them again
 
 private:

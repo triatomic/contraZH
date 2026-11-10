@@ -70,6 +70,7 @@
 #include "W3DDevice/GameClient/W3DHeadlight.h"
 #include "W3DDevice/GameClient/W3DPlanarMirror.h"
 #include "W3DDevice/GameClient/W3DAmbientOcclusion.h"
+#include "W3DDevice/GameClient/W3DDeferredLights.h"
 #include "W3DDevice/GameClient/W3DSkyClouds.h"
 #include "W3DDevice/GameClient/W3DLaserGlow.h"
 #include "W3DDevice/GameClient/Module/W3DModelDraw.h"
@@ -243,6 +244,8 @@ W3DTerrainVisual::~W3DTerrainVisual()
 
 	delete TheW3DAmbientOcclusion;
 	TheW3DAmbientOcclusion = nullptr;
+	delete TheW3DDeferredLights;
+	TheW3DDeferredLights = nullptr;
 	delete TheW3DSkyClouds;
 	TheW3DSkyClouds = nullptr;
 
@@ -317,6 +320,8 @@ void W3DTerrainVisual::init()
 		clock.mark("planar mirrors");
 		TheW3DAmbientOcclusion = NEW W3DAmbientOcclusion;
 		clock.mark("ambient occlusion");
+		TheW3DDeferredLights = NEW W3DDeferredLights;
+		clock.mark("deferred lights");
 		TheW3DSkyClouds = NEW W3DSkyClouds;
 		clock.mark("sky clouds");
 		TheW3DLaserGlow = NEW W3DLaserGlow;

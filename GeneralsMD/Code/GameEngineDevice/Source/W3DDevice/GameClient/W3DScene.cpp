@@ -60,6 +60,7 @@
 #include "W3DDevice/GameClient/W3DCustomScene.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
 #include "W3DDevice/GameClient/W3DAmbientOcclusion.h"
+#include "W3DDevice/GameClient/W3DDeferredLights.h"
 #include "W3DDevice/GameClient/W3DLaserGlow.h"
 #include "W3DDevice/GameClient/W3DPlanarMirror.h"
 #include "W3DDevice/GameClient/W3DWater.h"
@@ -1145,6 +1146,12 @@ void RTS3DScene::Flush(RenderInfoClass & rinfo)
 	if (TheW3DAmbientOcclusion && m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE && !m_planarMirrorPass)
 	{
 		TheW3DAmbientOcclusion->render(rinfo);
+	}
+
+	// The small lights land on the finished opaque scene, under the water, decals and particles drawn next.
+	if (TheW3DDeferredLights && m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE && !m_planarMirrorPass)
+	{
+		TheW3DDeferredLights->render(rinfo);
 	}
 
 	// Laser light lands on the finished ground, and water drawn next covers what lies under it.
@@ -2343,12 +2350,21 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 		{
 			TheW3DLaserGlow->appendObjectLights(sources);
 		}
+		// One deferred draw takes every light meant for ground and objects alike, which spares each surface a pass per group.
+		const Bool deferred = TheW3DDeferredLights != nullptr && TheW3DDeferredLights->isEnabled();
+		static std::vector<W3DShaderManager::PixelLight> deferredLights;
+		deferredLights.clear();
 		for (size_t i = 0; i < sources.size(); i++)
 		{
 			W3DShaderManager::PixelLight light = sources[i];
 			if (!Tune_Emissive_Light(light, TheGlobalData->m_pathTracingLightMaxRadius, TheGlobalData->m_pathTracingLightBrightness) ||
 				camera.Cull_Sphere(SphereClass(light.position, light.outerRadius)))
 			{
+				continue;
+			}
+			if (deferred && !light.terrainOnly && !light.objectsOnly)
+			{
+				deferredLights.push_back(light);
 				continue;
 			}
 			PixelLightCandidate candidate;
@@ -2364,6 +2380,10 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 				candidate.gap = max(sqrtf(center.X * center.X + center.Y * center.Y) - (edge - center).Length(), 0.0f);
 			}
 			candidates.push_back(candidate);
+		}
+		if (TheW3DDeferredLights != nullptr)
+		{
+			TheW3DDeferredLights->setLights(deferredLights);
 		}
 	}
 

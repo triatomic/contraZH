@@ -471,6 +471,14 @@ smaller ones. It defaults to `25`; `0` means no cap. `PathTracingLightBrightness
 scales brightness independently and defaults to `0.75`; zero disables the new light
 spill. See [Light radius and brightness](contraZH-GameData.md#path-tracing-light-radius-and-brightness).
 
+Where the scene's depth can be read and the card instances draws, these lights are added
+in one screen-space draw after the opaque scene, so their count no longer adds draw calls.
+That draw takes a surface's normal from the depth buffer, without normal maps, and
+multiplies the colour already on screen, so it leaves sprites and transparent meshes
+drawn later unlit. The batches described below remain for game lights, laser spill on
+models, and cards or settings the screen-space draw cannot run on, such as multisampling.
+Setting the environment variable `CONTRA_DEFERREDLIGHTS=0` sends every light back to them.
+
 This option approximates emissive lighting with world-space point lights. It does not
 trace rays, cast local shadows, or calculate reflected light. Lights can pass through walls.
 Particle texture colours are averaged once per cached texture.

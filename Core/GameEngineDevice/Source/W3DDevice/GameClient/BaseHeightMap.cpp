@@ -106,6 +106,7 @@
 #include "W3DDevice/GameClient/W3DPlanarMirror.h"
 #include "W3DDevice/GameClient/W3DSoftParticles.h"
 #include "W3DDevice/GameClient/W3DAmbientOcclusion.h"
+#include "W3DDevice/GameClient/W3DDeferredLights.h"
 #include "W3DDevice/GameClient/W3DLaserGlow.h"
 #include "W3DDevice/GameClient/W3DSkyClouds.h"
 #include "W3DDevice/GameClient/W3DSnow.h"
@@ -500,6 +501,11 @@ void BaseHeightMapRenderObjClass::ReleaseResources()
 	if (TheW3DAmbientOcclusion)
 	{
 		TheW3DAmbientOcclusion->ReleaseResources();
+	}
+
+	if (TheW3DDeferredLights)
+	{
+		TheW3DDeferredLights->ReleaseResources();
 	}
 
 	if (TheW3DLaserGlow)
