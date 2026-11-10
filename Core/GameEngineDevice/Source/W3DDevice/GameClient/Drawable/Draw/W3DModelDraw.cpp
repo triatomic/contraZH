@@ -1922,7 +1922,7 @@ void W3DModelDrawModuleData::parseConditionState(INI* ini, void *instance, void 
 			if (info.m_modelName.isNone())
 				info.m_modelName.clear();
 
-			self->m_conditionStates.push_back(info);
+			self->m_conditionStates.push_back(std::move(info));
 
 			// yes, return, NOT break! (no body to parse for AutoConditionState)
 			return;
@@ -2051,7 +2051,7 @@ void W3DModelDrawModuleData::parseConditionState(INI* ini, void *instance, void 
 		// earlier auto-generated state). size() == index of the element about to be pushed.
 		if (cst == PARSE_NORMAL || cst == PARSE_DEFAULT)
 			self->m_lastRealConditionStateIndex = (Int)self->m_conditionStates.size();
-		self->m_conditionStates.push_back(info);
+		self->m_conditionStates.push_back(std::move(info));
 	}
 }
 
