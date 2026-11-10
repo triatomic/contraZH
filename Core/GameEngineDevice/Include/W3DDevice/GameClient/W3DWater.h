@@ -135,7 +135,7 @@ public:
 	/// tiling is off. mapping takes world xy to its texture coordinates, and hex holds the hex cells' spacing,
 	/// weight exponent, shift and turn as the water shaders take them.
 	TextureClass *getSeabedMask(Vector4 &mapping, Vector4 &hex);
-	/// Whether a height map point lies in flat standing water, as of the last getSeabedMask.
+	/// Whether a height map point lies in flat standing water with ground under its surface, as of the last getSeabedMask.
 	Bool isSeabedPoint(Int x, Int y) const;
 	/// The hex cells as getSeabedMask gives them, for painted stochastic terrain, which keeps its cells with the water's tiling off.
 	static Vector4 getStochasticHex();
@@ -326,7 +326,9 @@ protected:
 	TextureClass *m_waterMaskTexture;	///< flat standing water per map cell, coverage in alpha and level in red and green
 	UnsignedInt m_waterMaskSignature;	///< hash of the water polygons the mask was built from
 	const WorldHeightMap *m_waterMaskMap;
-	UnsignedByte *m_waterMaskCells;		///< the mask's coverage kept on the CPU, 1 per standing water point
+	UnsignedInt *m_waterMaskCells;		///< the mask kept on the CPU as the texture stores it, nonzero per standing water point
+	UnsignedByte *m_seabedCells;		///< 1 per mask point whose ground dips under its water
+	Bool m_seabedCellsStale;			///< the mask or the terrain heights changed since m_seabedCells was filled
 	UnsignedInt *m_waterCells;			///< the mask's water before growing, flat water as the texture stores it and 1 for other water
 	TextureClass *m_openWaterTexture;	///< each map cell's distance to dry ground, in cells
 	UnsignedInt m_openWaterSignature;	///< mask signature the distances were measured from
@@ -362,6 +364,7 @@ protected:
 	Int standingWaterDiffuse() const;
 	Bool buildRadialGrid();
 	void updateWaterMask();
+	void updateSeabedCells();
 	Bool updateMirrorWaterSums();
 	TextureClass *updateOpenWater();
 	void setupOpenWater(Bool river);

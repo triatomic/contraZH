@@ -1026,6 +1026,7 @@ void WaterRenderObjClass::updateHeightTexture()
 	m_heightTextureMap = map;
 	m_heightTextureDirty = FALSE;
 	m_heightTextureVersion++;
+	m_seabedCellsStale = TRUE;
 #endif
 }
 
@@ -1082,6 +1083,7 @@ TextureClass *WaterRenderObjClass::getSeabedMask(Vector4 &mapping, Vector4 &hex)
 		return nullptr;
 	}
 	updateWaterMask();
+	updateSeabedCells();
 	return (m_waterMaskCells != nullptr) ? m_waterMaskTexture : nullptr;
 #else
 	(void)mapping;
@@ -1092,11 +1094,47 @@ TextureClass *WaterRenderObjClass::getSeabedMask(Vector4 &mapping, Vector4 &hex)
 
 Bool WaterRenderObjClass::isSeabedPoint(Int x, Int y) const
 {
-	if (m_waterMaskCells == nullptr || x < 0 || y < 0 || x >= m_waterMaskCellsWidth || y >= m_waterMaskCellsHeight)
+	if (m_seabedCells == nullptr || x < 0 || y < 0 || x >= m_waterMaskCellsWidth || y >= m_waterMaskCellsHeight)
 	{
 		return FALSE;
 	}
-	return m_waterMaskCells[y * m_waterMaskCellsWidth + x] != 0;
+	return m_seabedCells[y * m_waterMaskCellsWidth + x] != 0;
+}
+
+// A mask point shades the cells around it, so it counts when the highest water there stands over their lowest corner.
+void WaterRenderObjClass::updateSeabedCells()
+{
+#if defined(BUILD_WITH_D3D9)
+	WorldHeightMap *map = TheTerrainRenderObject->getMap();
+	if (!m_seabedCellsStale || m_waterMaskCells == nullptr || m_seabedCells == nullptr || map == nullptr)
+	{
+		return;
+	}
+
+	const Int width = m_waterMaskCellsWidth;
+	const Int height = m_waterMaskCellsHeight;
+	const Int lastX = map->getXExtent() - 1;
+	const Int lastY = map->getYExtent() - 1;
+	for (Int y=0; y<height; y++)
+	{
+		for (Int x=0; x<width; x++)
+		{
+			UnsignedInt level = 0;
+			UnsignedInt ground = 0xffffffff;
+			for (Int ny=max(y - 1, 0); ny<=min(y + 1, height - 1); ny++)
+			{
+				for (Int nx=max(x - 1, 0); nx<=min(x + 1, width - 1); nx++)
+				{
+					level = max(level, (m_waterMaskCells[ny * width + nx] >> 8) & 0xffff);
+					ground = min(ground, (UnsignedInt)map->getHeight(min(nx, lastX), min(ny, lastY)));
+				}
+			}
+			const Bool under = m_waterMaskCells[y * width + x] != 0 && ground * MAP_HEIGHT_SCALE < level / 16.0f;
+			m_seabedCells[y * width + x] = under ? 1 : 0;
+		}
+	}
+	m_seabedCellsStale = FALSE;
+#endif
 }
 
 void WaterRenderObjClass::grabRefraction()
@@ -1865,11 +1903,15 @@ void WaterRenderObjClass::updateWaterMask()
 	if (m_waterMaskCellsWidth != width || m_waterMaskCellsHeight != height)
 	{
 		delete [] m_waterMaskCells;
-		m_waterMaskCells = NEW UnsignedByte[width * height];
+		m_waterMaskCells = NEW UnsignedInt[width * height];
+		delete [] m_seabedCells;
+		m_seabedCells = NEW UnsignedByte[width * height];
 		m_waterMaskCellsWidth = width;
 		m_waterMaskCellsHeight = height;
 	}
-	memset(m_waterMaskCells, 0, width * height);
+	memset(m_waterMaskCells, 0, width * height * sizeof(UnsignedInt));
+	memset(m_seabedCells, 0, width * height);
+	m_seabedCellsStale = TRUE;
 
 	// Grown by a cell, the mask ends on dry land instead of in a step short of the polygon's waterline.
 	SurfaceClass *surface = m_waterMaskTexture->Get_Surface_Level(0);
@@ -1894,7 +1936,7 @@ void WaterRenderObjClass::updateWaterMask()
 					}
 				}
 				row[x] = (cell == otherWater) ? 0 : cell;
-				m_waterMaskCells[y * width + x] = (row[x] != 0) ? 1 : 0;
+				m_waterMaskCells[y * width + x] = row[x];
 			}
 		}
 		surface->Unlock();
@@ -2635,6 +2677,7 @@ Bool WaterRenderObjClass::canReflectOnWater(const SphereClass &sphere, const Vec
 WaterRenderObjClass::~WaterRenderObjClass()
 {
 	delete [] m_waterMaskCells;
+	delete [] m_seabedCells;
 	delete [] m_waterCells;
 	delete [] m_mirrorWaterSums;
 	REF_PTR_RELEASE(m_meshVertexMaterialClass);
@@ -2776,6 +2819,8 @@ WaterRenderObjClass::WaterRenderObjClass()
 	m_waterMaskSignature=0;
 	m_waterMaskMap=nullptr;
 	m_waterMaskCells=nullptr;
+	m_seabedCells=nullptr;
+	m_seabedCellsStale=TRUE;
 	m_waterCells=nullptr;
 	m_openWaterTexture=nullptr;
 	m_openWaterSignature=0;
