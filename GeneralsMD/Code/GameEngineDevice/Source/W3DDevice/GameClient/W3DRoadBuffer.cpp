@@ -3311,6 +3311,39 @@ void W3DRoadBuffer::updateCenter()
 	m_updateBuffers = true;
 }
 
+// A road type draws its visible segments at once, so it takes the ground lights reaching any of them, most important first.
+static void Pick_Road_Lights(RoadSegment *roads, Int numRoads, Int uniqueID, std::vector<Int> &lights)
+{
+	static std::vector<Bool> reached;
+	const Int count = W3DShaderManager::getPixelLightCount();
+	lights.clear();
+	reached.assign(count, FALSE);
+	for (Int road = 0; road < numRoads && count > 0; road++)
+	{
+		if (roads[road].m_uniqueID != uniqueID || !roads[road].m_visible)
+		{
+			continue;
+		}
+		const SphereClass &bounds = roads[road].getBounds();
+		for (Int index = 0; index < count; index++)
+		{
+			const W3DShaderManager::PixelLight &light = W3DShaderManager::getPixelLight(index);
+			const Real reach = light.outerRadius + bounds.Radius;
+			if (!reached[index] && !light.objectsOnly && (light.position - bounds.Center).Length2() < reach * reach)
+			{
+				reached[index] = TRUE;
+			}
+		}
+	}
+	for (Int index = 0; index < count; index++)
+	{
+		if (reached[index])
+		{
+			lights.push_back(index);
+		}
+	}
+}
+
 //=============================================================================
 // W3DRoadBuffer::drawRoads
 //=============================================================================
@@ -3389,12 +3422,13 @@ void W3DRoadBuffer::drawRoads(CameraClass * camera, TextureClass *cloudTexture, 
 	#ifdef RTS_DEBUG
 			//DX8Wrapper::Set_Shader(detailShader); // shows clipping.
 	#endif
+			static std::vector<Int> lights;
+			Pick_Road_Lights(m_roads, m_numRoads, m_curUniqueID, lights);
 			for (Int pass=0; pass < devicePasses; pass++)
 			{
 				if (!wireframe)
 		 			W3DShaderManager::setShader(st, pass);
-				// Road types share one draw each, so each takes every light.
-				W3DShaderManager::setDrawPixelLights(nullptr, W3DShaderManager::getPixelLightCount());
+				W3DShaderManager::setDrawPixelLights(lights.empty() ? nullptr : &lights[0], (Int)lights.size());
 				//Draw all this road type.
 				DX8Wrapper::Draw_Triangles(	0, m_roadTypes[i].getNumIndices()/3, 0,	m_roadTypes[i].getNumVertices());
 #ifdef LOG_STATS
