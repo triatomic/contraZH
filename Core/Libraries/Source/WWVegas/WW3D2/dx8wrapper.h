@@ -318,6 +318,7 @@ public:
 	static void Clear(bool clear_color, bool clear_z_stencil, const Vector3 &color, float dest_alpha=0.0f, float z=1.0f, unsigned int stencil=0);
 
 	static void	Set_Viewport(CONST D3DVIEWPORT8* pViewport);
+	static void	Get_Viewport(D3DVIEWPORT8& viewport);
 
 	static void Set_Vertex_Buffer(const VertexBufferClass* vb, unsigned stream=0);
 	static void Set_Vertex_Buffer(const DynamicVBAccessClass& vba);
@@ -349,6 +350,9 @@ public:
 
 	static void _Set_DX8_Transform(D3DTRANSFORMSTATETYPE transform, const D3DMATRIX& m);
 	static void _Get_DX8_Transform(D3DTRANSFORMSTATETYPE transform, D3DMATRIX& m);
+
+	// The device's view or projection, taken from the wrapper's record of it unless an invalidation dropped that.
+	static void _Get_Device_Transform(D3DTRANSFORMSTATETYPE transform, D3DMATRIX& m);
 
 	static void Set_DX8_Light(int index,D3DLIGHT8* light);
 	static void Set_DX8_Render_State(D3DRENDERSTATETYPE state, unsigned value);
@@ -609,6 +613,10 @@ public:
 	static void Set_Vertex_Shader_Constant(int reg, const void* data, int count);
 	static void Set_Pixel_Shader_Constant(int reg, const void* data, int count);
 
+	// What the wrapper last bound, for passes that write the device directly and put it back.
+	static DWORD Get_Pixel_Shader() { return Pixel_Shader; }
+	static const Vector4* Peek_Pixel_Shader_Constants(int reg) { return &Pixel_Shader_Constants[reg]; }
+
 	static DWORD Get_Vertex_Processing_Behavior() { return Vertex_Processing_Behavior; }
 
 	// Needed by scene lighting class
@@ -633,6 +641,9 @@ public:
 	static const char* Get_DX8_Render_State_Name(D3DRENDERSTATETYPE state);
 	static const char* Get_DX8_Texture_Stage_State_Name(D3DTEXTURESTAGESTATETYPE state);
 	static unsigned Get_DX8_Render_State(D3DRENDERSTATETYPE state) { return RenderStates[state]; }
+
+	// The device's value, from the cache unless an invalidation dropped it. Not for states D3D9 takes translated.
+	static unsigned Get_Device_Render_State(D3DRENDERSTATETYPE state);
 
 	// Names of the specific values of render states and texture stage states
 	static void Get_DX8_Texture_Stage_State_Value_Name(StringClass& name, D3DTEXTURESTAGESTATETYPE state, unsigned value);
@@ -942,6 +953,32 @@ WWINLINE void DX8Wrapper::_Set_DX8_Transform(D3DTRANSFORMSTATETYPE transform, co
 WWINLINE void DX8Wrapper::_Get_DX8_Transform(D3DTRANSFORMSTATETYPE transform, D3DMATRIX& m)
 {
 	DX8CALL(GetTransform(transform,&m));
+}
+
+WWINLINE void DX8Wrapper::_Get_Device_Transform(D3DTRANSFORMSTATETYPE transform, D3DMATRIX& m)
+{
+	// Texture and world writes can bypass the record.
+	WWASSERT(transform==D3DTS_VIEW || transform==D3DTS_PROJECTION);
+
+	// An invalidation zeroes the record, and every real view or projection has one of these set.
+	D3DMATRIX& known=DX8Transforms[transform];
+	if (known.m[2][3]==0.0f && known.m[3][3]==0.0f)
+	{
+		DX8CALL(GetTransform(transform,&known));
+	}
+	m=known;
+}
+
+WWINLINE unsigned DX8Wrapper::Get_Device_Render_State(D3DRENDERSTATETYPE state)
+{
+	// Invalidate_Cached_Render_States leaves this marker in every entry.
+	if (RenderStates[state]==0x12345678)
+	{
+		DWORD value=0;
+		DX8CALL(GetRenderState(state,&value));
+		RenderStates[state]=value;
+	}
+	return RenderStates[state];
 }
 
 // ----------------------------------------------------------------------------
@@ -1528,9 +1565,11 @@ WWINLINE void DX8Wrapper::Set_Projection_Transform_With_Z_Bias(const Matrix4x4& 
 		tmp_zbias*=(1.0f/16.0f);
 		tmp_zbias*=1.0f / (ZFar - ZNear);
 		tmp.m[2][2]-=tmp_zbias*tmp.m[3][2];
+		DX8Transforms[D3DTS_PROJECTION]=tmp;
 		DX8CALL(SetTransform(D3DTS_PROJECTION,&tmp));
 	}
 	else {
+		DX8Transforms[D3DTS_PROJECTION]=ProjectionMatrix;
 		DX8CALL(SetTransform(D3DTS_PROJECTION,&ProjectionMatrix));
 	}
 }
@@ -1553,6 +1592,7 @@ WWINLINE void DX8Wrapper::Set_Transform(D3DTRANSFORMSTATETYPE transform,const Ma
 			D3DMATRIX ProjectionMatrix=To_D3DMATRIX(m);
 			ZFar=0.0f;
 			ZNear=0.0f;
+			DX8Transforms[D3DTS_PROJECTION]=ProjectionMatrix;
 			DX8CALL(SetTransform(D3DTS_PROJECTION,&ProjectionMatrix));
 		}
 		break;

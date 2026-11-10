@@ -2149,6 +2149,17 @@ void DX8Wrapper::Set_Viewport(CONST D3DVIEWPORT8* pViewport)
 	CurrentViewportValid = true;
 }
 
+void DX8Wrapper::Get_Viewport(D3DVIEWPORT8& viewport)
+{
+	DX8_THREAD_ASSERT();
+	if (!CurrentViewportValid)
+	{
+		DX8CALL(GetViewport(&CurrentViewport));
+		CurrentViewportValid = true;
+	}
+	viewport = CurrentViewport;
+}
+
 // ----------------------------------------------------------------------------
 //
 // Set vertex buffer. A reference to previous vertex buffer is released and

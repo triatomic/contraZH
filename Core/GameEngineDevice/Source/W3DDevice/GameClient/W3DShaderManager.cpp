@@ -1713,11 +1713,8 @@ static Int AdditionalLightRegister = 0;
 static D3DMATRIX AdditionalLightView;
 static Bool AdditionalLightsInView = FALSE;
 static DWORD AdditionalLightShader = 0;
-static IDirect3DPixelShader9 *SavedLightShader = nullptr;
-static Vector4 SavedLightConstants[PIXEL_LIGHT_REGISTERS];
-static const D3DRENDERSTATETYPE AdditionalLightStates[] = { D3DRS_ALPHABLENDENABLE, D3DRS_DESTBLEND, D3DRS_ZWRITEENABLE, D3DRS_FOGCOLOR, D3DRS_BLENDOP, D3DRS_SRCBLEND, D3DRS_SCISSORTESTENABLE };
+static const D3DRENDERSTATETYPE AdditionalLightStates[] = { D3DRS_ALPHABLENDENABLE, D3DRS_DESTBLEND, D3DRS_ZWRITEENABLE, D3DRS_FOGCOLOR, D3DRS_BLENDOP, D3DRS_SRCBLEND };
 static DWORD SavedLightStates[ARRAY_SIZE(AdditionalLightStates)];
-static RECT SavedLightScissor;
 static D3DVIEWPORT9 AdditionalLightViewport;
 static D3DMATRIX AdditionalLightWorldToClip;
 static Bool AdditionalLightScissor = FALSE;
@@ -1879,13 +1876,6 @@ static bool Additional_Light_Screen_Rect(size_t first, RECT &rectangle)
 			rectangle.bottom = max(rectangle.bottom, lightRectangle.bottom);
 		}
 	}
-	if (SavedLightStates[ARRAY_SIZE(AdditionalLightStates) - 1])
-	{
-		rectangle.left = max(rectangle.left, SavedLightScissor.left);
-		rectangle.top = max(rectangle.top, SavedLightScissor.top);
-		rectangle.right = min(rectangle.right, SavedLightScissor.right);
-		rectangle.bottom = min(rectangle.bottom, SavedLightScissor.bottom);
-	}
 	return rectangle.left < rectangle.right && rectangle.top < rectangle.bottom;
 }
 
@@ -1895,27 +1885,25 @@ static bool Draw_Additional_Light_Pass(unsigned pass)
 	const Int registers = AdditionalLightSlots * 2 + (AdditionalLightSlots + 3) / 4;
 	if (pass == 1)
 	{
-		// Direct device writes keep the wrapper's cached base-pass state unchanged.
-		device->GetPixelShader(&SavedLightShader);
-		if (SavedLightShader == nullptr)
+		// Direct device writes leave the wrapper's record of the base pass intact, and the device goes back to it afterwards.
+		if (Peek_D3D9_Pixel_Shader(DX8Wrapper::Get_Pixel_Shader()) == nullptr)
 		{
 			return false;
 		}
-		device->GetPixelShaderConstantF(AdditionalLightRegister, &SavedLightConstants[0].X, registers);
 		for (Int i = 0; i < ARRAY_SIZE(AdditionalLightStates); i++)
 		{
-			device->GetRenderState(AdditionalLightStates[i], &SavedLightStates[i]);
+			SavedLightStates[i] = DX8Wrapper::Get_Device_Render_State(AdditionalLightStates[i]);
 		}
-		DWORD colorWrite = 0;
-		D3DMATRIX view, projection;
-		AdditionalLightScissor = SUCCEEDED(device->GetScissorRect(&SavedLightScissor)) &&
-			SUCCEEDED(device->GetViewport(&AdditionalLightViewport)) &&
-			SUCCEEDED(device->GetTransform(D3DTS_VIEW, &view)) &&
-			SUCCEEDED(device->GetTransform(D3DTS_PROJECTION, &projection)) &&
-			SUCCEEDED(device->GetRenderState(D3DRS_COLORWRITEENABLE, &colorWrite)) &&
-			(colorWrite & D3DCOLORWRITEENABLE_ALPHA) == 0;
+		AdditionalLightScissor = (DX8Wrapper::Get_Device_Render_State(D3DRS_COLORWRITEENABLE) & D3DCOLORWRITEENABLE_ALPHA) == 0;
 		if (AdditionalLightScissor)
 		{
+			D3DMATRIX view, projection;
+			DX8Wrapper::Get_Viewport(AdditionalLightViewport);
+			DX8Wrapper::_Get_Device_Transform(D3DTS_PROJECTION, projection);
+			if (!AdditionalLightsInView)
+			{
+				DX8Wrapper::_Get_Device_Transform(D3DTS_VIEW, view);
+			}
 			AdditionalLightWorldToClip = (AdditionalLightsInView ? AdditionalLightView : view) * projection;
 		}
 		AdditionalLightNext = AdditionalLightSlots;
@@ -1940,33 +1928,22 @@ static bool Draw_Additional_Light_Pass(unsigned pass)
 	}
 	if (first >= AdditionalLightIndices.size())
 	{
-		if (SavedLightShader != nullptr)
+		device->SetPixelShader(Peek_D3D9_Pixel_Shader(DX8Wrapper::Get_Pixel_Shader()));
+		device->SetPixelShaderConstantF(AdditionalLightRegister, &DX8Wrapper::Peek_Pixel_Shader_Constants(AdditionalLightRegister)->X, registers);
+		for (Int i = 0; i < ARRAY_SIZE(AdditionalLightStates); i++)
 		{
-			device->SetPixelShader(SavedLightShader);
-			SAFE_RELEASE(SavedLightShader);
-			device->SetPixelShaderConstantF(AdditionalLightRegister, &SavedLightConstants[0].X, registers);
-			for (Int i = 0; i < ARRAY_SIZE(AdditionalLightStates); i++)
-			{
-				device->SetRenderState(AdditionalLightStates[i], SavedLightStates[i]);
-			}
-			if (AdditionalLightScissor)
-			{
-				device->SetScissorRect(&SavedLightScissor);
-			}
+			device->SetRenderState(AdditionalLightStates[i], SavedLightStates[i]);
+		}
+		// No other draw scissors, so off is the state to leave behind.
+		if (AdditionalLightScissor)
+		{
+			device->SetRenderState(D3DRS_SCISSORTESTENABLE, FALSE);
 		}
 		return false;
 	}
 	if (AdditionalLightScissor)
 	{
-		if (SUCCEEDED(device->SetScissorRect(&rectangle)))
-		{
-			device->SetRenderState(D3DRS_SCISSORTESTENABLE, TRUE);
-		}
-		else
-		{
-			device->SetScissorRect(&SavedLightScissor);
-			device->SetRenderState(D3DRS_SCISSORTESTENABLE, SavedLightStates[ARRAY_SIZE(AdditionalLightStates) - 1]);
-		}
+		device->SetRenderState(D3DRS_SCISSORTESTENABLE, SUCCEEDED(device->SetScissorRect(&rectangle)) ? TRUE : FALSE);
 	}
 	AdditionalLightNext = first + AdditionalLightSlots;
 	Vector4 constants[PIXEL_LIGHT_REGISTERS];
@@ -7393,7 +7370,7 @@ Int FlatTerrainShaderPixelShader::set(Int pass)
 		Set_Terrain_World_Position(m_lightStage);
 		Begin_Draw_Pixel_Lights(unlitShaders[textureCount - 1], m_dwLitPixelShader[textureCount - 1]);
 	}
-	DX8Wrapper::_Get_D3D_Device8()->SetRenderState(D3DRS_ALPHABLENDENABLE, false);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE, FALSE);
 	DX8Wrapper::Apply_Render_State_Changes();
 	DX8Wrapper::_Get_D3D_Device8()->SetTexture(curStage, W3DShaderManager::getShaderTexture(3)->Peek_D3D_Texture());
 	return TRUE;
