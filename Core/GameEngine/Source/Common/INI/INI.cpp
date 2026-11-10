@@ -510,7 +510,7 @@ static INIFieldParseProc findFieldParse(const FieldParse* parseTable, const char
 	const FieldParse* parse = parseTable;
 	for (; parse->token; ++parse)
 	{
-		if (strcmp( parse->token, token ) == 0)
+		if (parse->token[0] == token[0] && strcmp( parse->token, token ) == 0)
 		{
 			offset = parse->offset;
 			userData = parse->userData;
@@ -758,45 +758,53 @@ void INI::readLine()
 	}
 	else
 	{
-		// read up till the newline or semicolon character, or until out of space
-		char *p = m_buffer;
-		while (p != m_buffer+INI_MAX_CHARS_PER_LINE)
+		// read up till the newline character, or until out of space
+		const char *src = m_readBuffer + m_readBufferNext;
+		unsigned count = m_readBufferUsed - m_readBufferNext;
+		if (count > INI_MAX_CHARS_PER_LINE)
 		{
-			// test end of read buffer
-			if (m_readBufferNext==m_readBufferUsed)
+			count = INI_MAX_CHARS_PER_LINE;
+		}
+
+		const char *newline = (const char *)memchr(src, '\n', count);
+		if (newline)
+		{
+			count = (unsigned)(newline - src);
+			m_readBufferNext += count + 1;
+		}
+		else
+		{
+			m_readBufferNext += count;
+
+			// The data ran out before the line buffer did
+			if (count < INI_MAX_CHARS_PER_LINE)
 			{
 				m_endOfFile = true;
-				*p = 0;
-				break;
 			}
+		}
 
-			// get next character
-			*p = m_readBuffer[m_readBufferNext++];
+		DEBUG_ASSERTCRASH(memchr(src, '\t', count) == nullptr, ("tab characters are not allowed in INI files (%s). please check your editor settings. Line Number %d", m_filename.str(), getLineNum()));
 
-			// check for new line
-			if (*p == '\n')
-			{
-				*p = 0;
-				break;
-			}
-
-			DEBUG_ASSERTCRASH(*p != '\t', ("tab characters are not allowed in INI files (%s). please check your editor settings. Line Number %d", m_filename.str(), getLineNum()));
+		for (unsigned i = 0; i < count; ++i)
+		{
+			char c = src[i];
 
 			// if this is a semicolon, that represents the start of a comment
-			if (*p == ';')
+			if (c == ';')
 			{
-				*p = 0;
+				c = 0;
 			}
 
 			// make whitespace characters actual spaces
-			else if (*p > 0 && *p < 32)
+			else if (c > 0 && c < 32)
 			{
-				*p = ' ';
+				c = ' ';
 			}
 
-			p++;
+			m_buffer[i] = c;
 		}
 
+		char *p = m_buffer + count;
 		*p = 0;
 
 		// increase our line count
@@ -2123,7 +2131,8 @@ Type scanType(const char* tokenString)
 	Int count = 0;
 	for(ConstCharPtrArray name = nameList; *name; name++, count++ )
 	{
-		if( stricmp( *name, token ) == 0 )
+		// First letters that differ beyond their case bit rule a match out without the stricmp call
+		if( (((*name)[0] ^ token[0]) & ~0x20) == 0 && stricmp( *name, token ) == 0 )
 		{
 			return count;
 		}
@@ -2146,7 +2155,7 @@ Type scanType(const char* tokenString)
 	// search for matching name
 	for( const LookupListRec* lookup = &lookupList[0]; lookup->name; lookup++ )
 	{
-		if( stricmp( lookup->name, token ) == 0 )
+		if( ((lookup->name[0] ^ token[0]) & ~0x20) == 0 && stricmp( lookup->name, token ) == 0 )
 		{
 			return lookup->value;
 		}
