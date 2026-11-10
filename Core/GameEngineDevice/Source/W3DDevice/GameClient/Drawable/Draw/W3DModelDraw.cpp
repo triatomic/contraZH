@@ -2043,7 +2043,7 @@ void W3DModelDrawModuleData::parseConditionState(INI* ini, void *instance, void 
 			throw INI_INVALID_DATA;
 		}
 
-		self->m_transitionMap[info.m_transitionSig] = info;
+		self->m_transitionMap[info.m_transitionSig] = std::move(info);
 	}
 	else
 	{
