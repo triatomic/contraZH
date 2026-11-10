@@ -1224,7 +1224,7 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 
 	// World to scene-copy texcoords: clip space, then the viewport's place in the copy, at texel centres.
 	D3DVIEWPORT9 viewport;
-	device->GetViewport(&viewport);
+	DX8Wrapper::Get_Viewport(viewport);
 	D3DSURFACE_DESC copyDesc;
 	m_refractionTexture->GetLevelDesc(0, &copyDesc);
 	const D3DMATRIX clip = view * projection;
@@ -1390,8 +1390,7 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 		{
 			D3DSURFACE_DESC depthDesc;
 			depthTexture->GetLevelDesc(0, &depthDesc);
-			DWORD depthWrites = TRUE;
-			device->GetRenderState(D3DRS_ZWRITEENABLE, &depthWrites);
+			const DWORD depthWrites = DX8Wrapper::Get_Device_Render_State(D3DRS_ZWRITEENABLE);
 			sceneDepth = boundDepth == DX8Wrapper::Peek_Scene_Depth_Surface() && depthWrites == FALSE &&
 				depthDesc.Width == copyDesc.Width && depthDesc.Height == copyDesc.Height;
 			boundDepth->Release();

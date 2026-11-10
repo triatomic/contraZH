@@ -300,7 +300,7 @@ void W3DColorLut::render(CameraClass &camera)
 
 	// The quad's uv back to clip space, with x stretched so a circle stays round.
 	D3DVIEWPORT8 viewport;
-	device->GetViewport(&viewport);
+	DX8Wrapper::Get_Viewport(viewport);
 	const Real aspect = (Real)viewport.Width / (Real)max(viewport.Height, (DWORD)1);
 	const Vector4 viewMap(aspect / screenMap.X, 1.0f / screenMap.Y, -screenMap.Z * aspect / screenMap.X, -screenMap.W / screenMap.Y);
 

@@ -353,7 +353,7 @@ bool DX8InstancingClass::Is_Supported()
 	{
 		return false;
 	}
-	return DX8Wrapper::_Get_D3D_Device8()->GetSoftwareVertexProcessing() == FALSE;
+	return DX8Wrapper::Is_Hardware_Vertex_Processing();
 }
 
 void DX8InstancingClass::Set_Main_Shader(IDirect3DVertexShader9 * shader)

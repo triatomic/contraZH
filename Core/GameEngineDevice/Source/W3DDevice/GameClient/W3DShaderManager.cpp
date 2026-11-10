@@ -6440,7 +6440,7 @@ Real W3DShaderManager::getScreenToTargetScale()
 Vector4 W3DShaderManager::getClipToTargetMapping(Real width, Real height)
 {
 	D3DVIEWPORT8 viewport;
-	DX8Wrapper::_Get_D3D_Device8()->GetViewport(&viewport);
+	DX8Wrapper::Get_Viewport(viewport);
 	return Vector4(0.5f * viewport.Width / width, -0.5f * viewport.Height / height,
 		(viewport.X + 0.5f * viewport.Width + 0.5f) / width, (viewport.Y + 0.5f * viewport.Height + 0.5f) / height);
 }

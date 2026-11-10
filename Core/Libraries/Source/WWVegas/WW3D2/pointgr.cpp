@@ -224,11 +224,10 @@ static bool Can_Instance_Billboards()
 		return false;
 	}
 	const DX8Caps *caps = DX8Wrapper::Get_Current_Caps();
-	IDirect3DDevice9 *device = DX8Wrapper::_Get_D3D_Device8();
 	if (caps->Get_Vertex_Shader_Major_Version() < 3 || caps->Get_DX8_Caps().MaxStreams < 2 ||
 		caps->Get_DX8_Caps().MaxStreamStride < sizeof(BillboardInstance) ||
 		!(caps->Get_DX8_Caps().DevCaps2 & D3DDEVCAPS2_STREAMOFFSET) ||
-		!(caps->Get_DX8_Caps().DevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT) || device->GetSoftwareVertexProcessing())
+		!(caps->Get_DX8_Caps().DevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT) || !DX8Wrapper::Is_Hardware_Vertex_Processing())
 	{
 		return false;
 	}

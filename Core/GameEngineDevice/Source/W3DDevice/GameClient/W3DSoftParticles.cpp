@@ -471,10 +471,7 @@ Bool W3DSoftParticles::bindSceneDepth(DWORD shader)
 	const Bool sceneDepth = (bound == DX8Wrapper::Peek_Scene_Depth_Surface());
 	bound->Release();
 
-	// The device is read because the wrapper's cache can hold a placeholder after an invalidate.
-	DWORD depthWrites = TRUE;
-	device->GetRenderState(D3DRS_ZWRITEENABLE, &depthWrites);
-	if (!sceneDepth || depthWrites != FALSE)
+	if (!sceneDepth || DX8Wrapper::Get_Device_Render_State(D3DRS_ZWRITEENABLE) != FALSE)
 	{
 		return FALSE;
 	}

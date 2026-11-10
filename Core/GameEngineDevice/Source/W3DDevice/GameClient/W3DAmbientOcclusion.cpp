@@ -227,7 +227,7 @@ void W3DAmbientOcclusion::render(RenderInfoClass &rinfo)
 	D3DMATRIX projection;
 	D3DVIEWPORT8 cameraViewport;
 	DX8Wrapper::_Get_DX8_Transform(D3DTS_PROJECTION, projection);
-	device->GetViewport(&cameraViewport);
+	DX8Wrapper::Get_Viewport(cameraViewport);
 	const Vector4 cameraMap = W3DShaderManager::getClipToTargetMapping(width, height);
 
 	// Texel uv to the camera's clip space, then back through the projection to camera space.

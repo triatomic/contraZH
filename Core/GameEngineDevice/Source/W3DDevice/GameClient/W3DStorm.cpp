@@ -785,7 +785,7 @@ void W3DStormManager::render(RenderInfoClass &rinfo)
 			}
 		}
 		D3DVIEWPORT8 viewport;
-		device->GetViewport(&viewport);
+		DX8Wrapper::Get_Viewport(viewport);
 		const Real minHalfSize = 0.5f * MIN_GRAIN_PIXELS * 2.0f / (fabs(projection.m[1][1]) * max((Real)viewport.Height, 1.0f));
 		const Vector4 eyePosition(eye.X, eye.Y, eye.Z, 0.0f);
 		const Vector3 middleRay = View_Ray(projection, toWorld, 0.0f, 0.0f);

@@ -616,6 +616,9 @@ public:
 
 	static DWORD Get_Vertex_Processing_Behavior() { return Vertex_Processing_Behavior; }
 
+	// A device created hardware or software keeps that mode for its lifetime. A mixed one can switch, so it reports false.
+	static bool Is_Hardware_Vertex_Processing() { return !(Vertex_Processing_Behavior & (D3DCREATE_SOFTWARE_VERTEXPROCESSING|D3DCREATE_MIXED_VERTEXPROCESSING)); }
+
 	// Needed by scene lighting class
 	static void						Set_Ambient(const Vector3& color);
 	static const Vector3&		Get_Ambient() { return Ambient_Color; }
@@ -641,6 +644,7 @@ public:
 
 	// The device's value, from the cache unless an invalidation dropped it. Not for states D3D9 takes translated.
 	static unsigned Get_Device_Render_State(D3DRENDERSTATETYPE state);
+	static unsigned Get_Device_Texture_Stage_State(unsigned stage, D3DTEXTURESTAGESTATETYPE state);
 
 	// Names of the specific values of render states and texture stage states
 	static void Get_DX8_Texture_Stage_State_Value_Name(StringClass& name, D3DTEXTURESTAGESTATETYPE state, unsigned value);
@@ -949,20 +953,50 @@ WWINLINE void DX8Wrapper::_Set_DX8_Transform(D3DTRANSFORMSTATETYPE transform, co
 
 WWINLINE void DX8Wrapper::_Get_DX8_Transform(D3DTRANSFORMSTATETYPE transform, D3DMATRIX& m)
 {
-	// Only the view and projection records follow every device write.
-	if (transform!=D3DTS_VIEW && transform!=D3DTS_PROJECTION)
+	// The world matrix is also written straight to the device, so its record cannot be trusted.
+	const bool recorded=transform==D3DTS_VIEW || transform==D3DTS_PROJECTION ||
+		(transform>=D3DTS_TEXTURE0 && transform<=D3DTS_TEXTURE7);
+	if (!recorded)
 	{
 		DX8CALL(GetTransform(transform,&m));
 		return;
 	}
 
-	// An invalidation zeroes the record, and every real view or projection has one of these set.
+	// An invalidation zeroes the record, which no matrix in use is.
 	D3DMATRIX& known=DX8Transforms[transform];
-	if (known.m[2][3]==0.0f && known.m[3][3]==0.0f)
+	const float* values=&known.m[0][0];
+	bool dropped=true;
+	for (int i=0;i<16;++i)
+	{
+		if (values[i]!=0.0f)
+		{
+			dropped=false;
+			break;
+		}
+	}
+	if (dropped)
 	{
 		DX8CALL(GetTransform(transform,&known));
 	}
 	m=known;
+}
+
+WWINLINE unsigned DX8Wrapper::Get_Device_Texture_Stage_State(unsigned stage, D3DTEXTURESTAGESTATETYPE state)
+{
+	DWORD value=0;
+	if (stage>=MAX_TEXTURE_STAGES)
+	{
+		DX8CALL(GetTextureStageState(stage,state,&value));
+		return value;
+	}
+
+	// Invalidate_Cached_Render_States leaves this marker in every entry.
+	if (TextureStageStates[stage][(unsigned int)state]==0x12345678)
+	{
+		DX8CALL(GetTextureStageState(stage,state,&value));
+		TextureStageStates[stage][(unsigned int)state]=value;
+	}
+	return TextureStageStates[stage][(unsigned int)state];
 }
 
 WWINLINE unsigned DX8Wrapper::Get_Device_Render_State(D3DRENDERSTATETYPE state)
@@ -1595,6 +1629,10 @@ WWINLINE void DX8Wrapper::Set_Transform(D3DTRANSFORMSTATETYPE transform,const Ma
 	default:
 		DX8_RECORD_MATRIX_CHANGE();
 		D3DMATRIX dxm=To_D3DMATRIX(m);
+		if ((unsigned)transform<=D3DTS_WORLD)
+		{
+			DX8Transforms[transform]=dxm;
+		}
 		DX8CALL(SetTransform(transform,&dxm));
 		break;
 	}
@@ -1616,9 +1654,9 @@ WWINLINE void DX8Wrapper::Set_Transform(D3DTRANSFORMSTATETYPE transform,const Ma
 	default:
 		DX8_RECORD_MATRIX_CHANGE();
 		D3DMATRIX dxm=To_D3DMATRIX(m);
-		if (transform==D3DTS_PROJECTION)
+		if ((unsigned)transform<=D3DTS_WORLD)
 		{
-			DX8Transforms[D3DTS_PROJECTION]=dxm;
+			DX8Transforms[transform]=dxm;
 		}
 		DX8CALL(SetTransform(transform,&dxm));
 		break;
