@@ -121,9 +121,12 @@ static StringCaseInfo getStringCaseInfo(const char *str)
 // -----------------------------------------------------
 AsciiString::AsciiString(const AsciiString& stringSrc) : m_data(stringSrc.m_data)
 {
-	ScopedCriticalSection scopedCriticalSection(TheAsciiStringCriticalSection);
+	// The lock guards the shared buffer's reference count, and an empty string has no buffer
 	if (m_data)
+	{
+		ScopedCriticalSection scopedCriticalSection(TheAsciiStringCriticalSection);
 		++m_data->m_refCount;
+	}
 	validate();
 }
 
@@ -214,6 +217,11 @@ void AsciiString::ensureUniqueBufferOfSize(int numCharsNeeded, Bool preserveData
 // -----------------------------------------------------
 void AsciiString::releaseBuffer()
 {
+	if (m_data == nullptr)
+	{
+		return;
+	}
+
 	ScopedCriticalSection scopedCriticalSection(TheAsciiStringCriticalSection);
 
 	validate();
@@ -253,6 +261,11 @@ AsciiString::AsciiString(const char* s, int len) : m_data(nullptr)
 // -----------------------------------------------------
 void AsciiString::set(const AsciiString& stringSrc)
 {
+	if (m_data == nullptr && stringSrc.m_data == nullptr)
+	{
+		return;
+	}
+
 	ScopedCriticalSection scopedCriticalSection(TheAsciiStringCriticalSection);
 
 	validate();
