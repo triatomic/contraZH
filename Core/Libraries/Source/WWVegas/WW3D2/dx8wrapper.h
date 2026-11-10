@@ -351,9 +351,6 @@ public:
 	static void _Set_DX8_Transform(D3DTRANSFORMSTATETYPE transform, const D3DMATRIX& m);
 	static void _Get_DX8_Transform(D3DTRANSFORMSTATETYPE transform, D3DMATRIX& m);
 
-	// The device's view or projection, taken from the wrapper's record of it unless an invalidation dropped that.
-	static void _Get_Device_Transform(D3DTRANSFORMSTATETYPE transform, D3DMATRIX& m);
-
 	static void Set_DX8_Light(int index,D3DLIGHT8* light);
 	static void Set_DX8_Render_State(D3DRENDERSTATETYPE state, unsigned value);
 	static void Set_DX8_Clip_Plane(DWORD Index, CONST float* pPlane);
@@ -952,13 +949,12 @@ WWINLINE void DX8Wrapper::_Set_DX8_Transform(D3DTRANSFORMSTATETYPE transform, co
 
 WWINLINE void DX8Wrapper::_Get_DX8_Transform(D3DTRANSFORMSTATETYPE transform, D3DMATRIX& m)
 {
-	DX8CALL(GetTransform(transform,&m));
-}
-
-WWINLINE void DX8Wrapper::_Get_Device_Transform(D3DTRANSFORMSTATETYPE transform, D3DMATRIX& m)
-{
-	// Texture and world writes can bypass the record.
-	WWASSERT(transform==D3DTS_VIEW || transform==D3DTS_PROJECTION);
+	// Only the view and projection records follow every device write.
+	if (transform!=D3DTS_VIEW && transform!=D3DTS_PROJECTION)
+	{
+		DX8CALL(GetTransform(transform,&m));
+		return;
+	}
 
 	// An invalidation zeroes the record, and every real view or projection has one of these set.
 	D3DMATRIX& known=DX8Transforms[transform];
@@ -1620,6 +1616,10 @@ WWINLINE void DX8Wrapper::Set_Transform(D3DTRANSFORMSTATETYPE transform,const Ma
 	default:
 		DX8_RECORD_MATRIX_CHANGE();
 		D3DMATRIX dxm=To_D3DMATRIX(m);
+		if (transform==D3DTS_PROJECTION)
+		{
+			DX8Transforms[D3DTS_PROJECTION]=dxm;
+		}
 		DX8CALL(SetTransform(transform,&dxm));
 		break;
 	}
@@ -1648,7 +1648,7 @@ WWINLINE void DX8Wrapper::Get_Transform(D3DTRANSFORMSTATETYPE transform, Matrix4
 		break;
 	default:
 		D3DMATRIX dxm;
-		DX8CALL(GetTransform(transform,&dxm));
+		_Get_DX8_Transform(transform,dxm);
 		m=To_Matrix4x4(dxm);
 		break;
 	}

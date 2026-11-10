@@ -177,8 +177,8 @@ void DX8VertexShadingClass::Get_View_Constants(Vector4 * constants)
 {
 	D3DMATRIX view;
 	D3DMATRIX projection;
-	DX8Wrapper::_Get_D3D_Device8()->GetTransform(D3DTS_VIEW, &view);
-	DX8Wrapper::_Get_D3D_Device8()->GetTransform(D3DTS_PROJECTION, &projection);
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_PROJECTION, projection);
 
 	for (int column=0;column<4;++column)
 	{

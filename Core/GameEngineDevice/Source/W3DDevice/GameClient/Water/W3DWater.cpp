@@ -1215,8 +1215,8 @@ void WaterRenderObjClass::setupShaderWater(Bool river)
 	D3DMATRIX projection;
 	D3DMATRIX inverseView;
 	float det;
-	device->GetTransform(D3DTS_VIEW, &view);
-	device->GetTransform(D3DTS_PROJECTION, &projection);
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_PROJECTION, projection);
 	Invert_D3DMATRIX(inverseView, &det, view);
 	DX8Wrapper::_Set_DX8_Transform(D3DTS_TEXTURE2, inverseView);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(2, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);

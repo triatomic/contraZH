@@ -1899,10 +1899,10 @@ static bool Draw_Additional_Light_Pass(unsigned pass)
 		{
 			D3DMATRIX view, projection;
 			DX8Wrapper::Get_Viewport(AdditionalLightViewport);
-			DX8Wrapper::_Get_Device_Transform(D3DTS_PROJECTION, projection);
+			DX8Wrapper::_Get_DX8_Transform(D3DTS_PROJECTION, projection);
 			if (!AdditionalLightsInView)
 			{
-				DX8Wrapper::_Get_Device_Transform(D3DTS_VIEW, view);
+				DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
 			}
 			AdditionalLightWorldToClip = (AdditionalLightsInView ? AdditionalLightView : view) * projection;
 		}
@@ -2759,7 +2759,7 @@ Int SpecularShader::set(Int pass)
 
 	// The shader lights in camera space, so the sun is turned into it with the view's rotation.
 	D3DMATRIX view;
-	DX8Wrapper::_Get_D3D_Device8()->GetTransform(D3DTS_VIEW, &view);
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
 	SpecularLightView = view;
 	Vector3 toSun(
 		SpecularToSun.X * view.m[0][0] + SpecularToSun.Y * view.m[1][0] + SpecularToSun.Z * view.m[2][0],
@@ -5106,7 +5106,7 @@ static Bool bindCloudTexture(Int stage, D3DMATRIX &cameraToCloud)
 
 	// The wrapper's view copy is zeroed by every invalidate, so the device's is read.
 	D3DMATRIX view;
-	DX8Wrapper::_Get_D3D_Device8()->GetTransform(D3DTS_VIEW, &view);
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
 
 	D3DMATRIX inverseView;
 	float det;

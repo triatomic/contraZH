@@ -226,7 +226,7 @@ void W3DAmbientOcclusion::render(RenderInfoClass &rinfo)
 	rinfo.Camera.Apply();
 	D3DMATRIX projection;
 	D3DVIEWPORT8 cameraViewport;
-	device->GetTransform(D3DTS_PROJECTION, &projection);
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_PROJECTION, projection);
 	device->GetViewport(&cameraViewport);
 	const Vector4 cameraMap = W3DShaderManager::getClipToTargetMapping(width, height);
 

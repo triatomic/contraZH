@@ -543,7 +543,7 @@ void W3DStormManager::render(RenderInfoClass &rinfo)
 	// Apply defers the view to the next state flush, so it is read from the camera, not the device.
 	const D3DMATRIX view = To_D3DMATRIX(rinfo.Camera.Get_View_Matrix());
 	D3DMATRIX projection;
-	device->GetTransform(D3DTS_PROJECTION, &projection);
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_PROJECTION, projection);
 	if (fabs(projection.m[2][3]) < 1.0e-6f || fabs(projection.m[0][0]) < 1.0e-6f || fabs(projection.m[1][1]) < 1.0e-6f)
 	{
 		return;

@@ -524,7 +524,7 @@ Bool W3DShadowMap::bindReceiver(Int stage) const
 	// The view is read from the device, because every invalidate zeroes the wrapper's copy
 	// and receivers drawn after the terrain would otherwise invert a zero matrix.
 	D3DMATRIX view;
-	DX8Wrapper::_Get_D3D_Device8()->GetTransform(D3DTS_VIEW, &view);
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
 
 	D3DMATRIX inverseView;
 	float det;

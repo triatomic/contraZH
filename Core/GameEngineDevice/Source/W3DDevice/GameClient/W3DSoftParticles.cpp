@@ -209,8 +209,7 @@ void W3DSoftParticles::beginPass(RenderInfoClass &rinfo)
 
 	// Apply defers the view to the next state flush, so it is read from the camera, not the device.
 	m_view = To_D3DMATRIX(rinfo.Camera.Get_View_Matrix());
-	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
-	device->GetTransform(D3DTS_PROJECTION, &m_projection);
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_PROJECTION, m_projection);
 
 	float det;
 	Invert_D3DMATRIX(m_toWorld, &det, m_view);
@@ -803,7 +802,7 @@ Bool W3DSoftParticles::bindDisruption(const ShaderClass &shader, const Disruptio
 	D3DMATRIX world;
 	D3DMATRIX view;
 	device->GetTransform(D3DTS_WORLD, &world);
-	device->GetTransform(D3DTS_VIEW, &view);
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
 	const D3DMATRIX worldView = world * view;
 	Vector4 center(worldView.m[3][0], worldView.m[3][1], worldView.m[3][2], 0.0f);
 

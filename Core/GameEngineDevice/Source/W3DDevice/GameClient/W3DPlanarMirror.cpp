@@ -612,8 +612,8 @@ void W3DPlanarMirrorManager::bindShading(const PlanarMirrorShaderTuning *own, DW
 	D3DMATRIX projection;
 	D3DMATRIX toWorld;
 	float det;
-	device->GetTransform(D3DTS_VIEW, &view);
-	device->GetTransform(D3DTS_PROJECTION, &projection);
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_PROJECTION, projection);
 	Invert_D3DMATRIX(toWorld, &det, view);
 
 	IDirect3DSurface8 *target = nullptr;
