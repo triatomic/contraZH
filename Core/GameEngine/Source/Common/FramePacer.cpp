@@ -67,7 +67,7 @@ void FramePacer::update()
 
 	if (refreshRate != 0 && maxFps >= refreshRate)
 	{
-		maxFps = max(maxFps, refreshRate + refreshRate / 10);
+		maxFps = max(maxFps, refreshRate + refreshRate / 50);
 	}
 
 	m_updateTime = m_frameRateLimit.wait(maxFps);
