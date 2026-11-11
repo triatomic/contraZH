@@ -1,5 +1,21 @@
 # CommandButtons & Selection
 
+## Power requirements
+
+`Options = REQUIRES_POWER` disables a button when its owner lacks sufficient power. It also applies to units using `PoweredBehavior`, whose movement and weapon penalties replace the normal `POWERED` disable. Buttons without this option keep their current behavior. `REQUIRES_POWER` takes precedence over `IGNORES_UNDERPOWERED`.
+
+`Options = IGNORES_UNDERPOWERED` lets an OCL special power activate when low power is its only disable reason. EMP, hacking, subdual, and other disable reasons still block activation. A power that was ready before the shortage remains usable. An unfinished recharge stays paused until power returns, and using the ability starts a new recharge without crediting the earlier pause again.
+
+```
+CommandButton Command_ElectricityNet
+  Command = SPECIAL_POWER
+  SpecialPower = SuperweaponElectricityNet
+  Options = IGNORES_UNDERPOWERED
+End
+```
+
+The UI checks `REQUIRES_POWER` for every command type. Object command-button dispatch and special-power dispatch also check it during execution. Other command types still need execution-path validation before this option can be treated as a general simulation-side restriction.
+
 ## New CommandButton Commands
 
 ### HOLD_FIRE

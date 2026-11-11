@@ -154,8 +154,10 @@ OCLSpecialPower::~OCLSpecialPower()
 //-------------------------------------------------------------------------------------------------
 void OCLSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled())
+	if (!canActivateForCommand(commandOptions))
+	{
 		return;
+	}
 
 	// sanity
 	if( loc == nullptr )
@@ -245,8 +247,10 @@ void OCLSpecialPower::doSpecialPowerAtLocation( const Coord3D *loc, Real angle, 
 // ------------------------------------------------------------------------------------------------
 void OCLSpecialPower::doSpecialPowerAtObject( Object *obj, UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled())
+	if (!canActivateForCommand(commandOptions))
+	{
 		return;
+	}
 
 	// convert to a location
 	if( !obj )
@@ -257,8 +261,10 @@ void OCLSpecialPower::doSpecialPowerAtObject( Object *obj, UnsignedInt commandOp
 // ------------------------------------------------------------------------------------------------
 void OCLSpecialPower::doSpecialPower( UnsignedInt commandOptions )
 {
-	if (getObject()->isDisabled())
+	if (!canActivateForCommand(commandOptions))
+	{
 		return;
+	}
 
 	Coord3D creationCoord;
 	creationCoord.set( *getObject()->getPosition() );

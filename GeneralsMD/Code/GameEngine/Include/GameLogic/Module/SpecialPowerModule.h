@@ -49,6 +49,7 @@ public:
 
 	virtual Bool isModuleForPower( const SpecialPowerTemplate *specialPowerTemplate ) const = 0;
 	virtual Bool isReady() const = 0;
+	virtual Bool isReadyForCommand( UnsignedInt commandOptions ) const = 0;
 //  This is the althernate way to one-at-a-time BlackLotus' specials; we'll keep it commented her until Dustin decides, or until 12/10/02
 //	virtual Bool isBusy() const = 0;
 	virtual Real getPercentReady() const = 0;
@@ -114,6 +115,7 @@ public:
 	virtual SpecialPowerModuleInterface* getSpecialPower() override { return this; }
 
 	virtual Bool isModuleForPower( const SpecialPowerTemplate *specialPowerTemplate ) const override;	///< is this module for the specified special power
+	virtual Bool isReadyForCommand( UnsignedInt commandOptions ) const override;
 	virtual Bool isReady() const override; 						///< is this special power available now
 //  This is the althernate way to one-at-a-time BlackLotus' specials; we'll keep it commented her until Dustin decides, or until 12/10/02
 //	Bool isBusy() const { return FALSE; }
@@ -178,6 +180,7 @@ public:
 
 protected:
 
+	Bool canActivateForCommand( UnsignedInt commandOptions ) const;
 	Bool initiateIntentToDoSpecialPower( const Object *targetObj, const Coord3D *targetPos, const Waypoint *way, UnsignedInt commandOptions );
 	void triggerSpecialPower( const Coord3D *location );
 	void createViewObject( const Coord3D *location );

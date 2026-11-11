@@ -106,6 +106,9 @@ enum CommandOption CPP_11(: Int)
 	FORMATION_LAUNCH						= 0x01000000, // code-only: jumpjet group launch, keep formation offset instead of random scatter.
 	NEED_N_TARGET_POS						= 0x02000000, // command needs the user to select N target positions (NumberOfTargets); only the final click commits (chronosphere = 2).
 	SKIP_CLEAR_PATH_CHECK				= 0x04000000, // SPECIAL_POWER_CONSTRUCT placement does not require the unit to be able to path to the spot
+#if RTS_ZEROHOUR
+	REQUIRES_POWER						= 0x08000000, // this button requires sufficient player power
+#endif
 };
 
 #ifdef DEFINE_COMMAND_OPTION_NAMES
@@ -142,6 +145,9 @@ static const char *const TheCommandOptionNames[] =
 	"FORMATION_LAUNCH",
 	"NEED_N_TARGET_POS",
 	"SKIP_CLEAR_PATH_CHECK",
+#if RTS_ZEROHOUR
+	"REQUIRES_POWER",
+#endif
 
 	nullptr
 };

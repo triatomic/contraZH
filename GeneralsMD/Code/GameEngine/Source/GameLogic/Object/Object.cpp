@@ -5970,13 +5970,32 @@ SpecialPowerModuleInterface *Object::getSpecialPowerModule( const SpecialPowerTe
 }
 
 //-------------------------------------------------------------------------------------------------
+Bool Object::isDisabledForCommand( UnsignedInt commandOptions ) const
+{
+	const Player *player = getControllingPlayer();
+	if (BitIsSet(commandOptions, REQUIRES_POWER) && (!player || !player->getEnergy()->hasSufficientPower()))
+	{
+		return TRUE;
+	}
+
+	DisabledMaskType disabled = getDisabledFlags();
+	if (BitIsSet(commandOptions, IGNORES_UNDERPOWERED))
+	{
+		disabled.set(DISABLED_UNDERPOWERED, FALSE);
+	}
+	return disabled.any();
+}
+
+//-------------------------------------------------------------------------------------------------
 /** Execute special power */
 //-------------------------------------------------------------------------------------------------
 void Object::doSpecialPower( const SpecialPowerTemplate *specialPowerTemplate, UnsignedInt commandOptions, Bool forced )
 {
 
-	if (isDisabled())
+	if (isDisabledForCommand(commandOptions))
+	{
 		return;
+	}
 
 	// sanity
 	if( !forced && TheSpecialPowerStore->canUseSpecialPower( this, specialPowerTemplate ) == FALSE )
@@ -5995,8 +6014,10 @@ void Object::doSpecialPower( const SpecialPowerTemplate *specialPowerTemplate, U
 void Object::doSpecialPowerAtObject( const SpecialPowerTemplate *specialPowerTemplate, Object *obj, UnsignedInt commandOptions, Bool forced )
 {
 
-	if (isDisabled())
+	if (isDisabledForCommand(commandOptions))
+	{
 		return;
+	}
 
 	// sanity
 	if( !forced && TheSpecialPowerStore->canUseSpecialPower( this, specialPowerTemplate ) == FALSE )
@@ -6015,8 +6036,10 @@ void Object::doSpecialPowerAtLocation( const SpecialPowerTemplate *specialPowerT
 																			 const Coord3D *loc, Real angle, UnsignedInt commandOptions, Bool forced )
 {
 
-	if (isDisabled())
+	if (isDisabledForCommand(commandOptions))
+	{
 		return;
+	}
 
 	// sanity
 	if( !forced && TheSpecialPowerStore->canUseSpecialPower( this, specialPowerTemplate ) == FALSE )
@@ -6038,8 +6061,10 @@ void Object::doSpecialPowerAtMultipleLocations( const SpecialPowerTemplate *spec
 																								const std::vector<Coord3D>& locs, UnsignedInt commandOptions, Bool forced )
 {
 
-	if (isDisabled())
+	if (isDisabledForCommand(commandOptions))
+	{
 		return;
+	}
 
 	if( locs.empty() )
 		return;
@@ -6068,8 +6093,10 @@ void Object::doSpecialPowerAtMultipleLocations( const SpecialPowerTemplate *spec
 void Object::doSpecialPowerUsingWaypoints( const SpecialPowerTemplate *specialPowerTemplate, const Waypoint *way, UnsignedInt commandOptions, Bool forced )
 {
 
-	if (isDisabled())
+	if (isDisabledForCommand(commandOptions))
+	{
 		return;
+	}
 
 	// sanity
 	if( !forced && TheSpecialPowerStore->canUseSpecialPower( this, specialPowerTemplate ) == FALSE )
@@ -6087,8 +6114,10 @@ void Object::doSpecialPowerUsingWaypoints( const SpecialPowerTemplate *specialPo
 //-------------------------------------------------------------------------------------------------
 void Object::doCommandButton( const CommandButton *commandButton, CommandSourceType cmdSource )
 {
-	if (isDisabled())
+	if (isDisabledForCommand(commandButton ? commandButton->getOptions() : 0))
+	{
 		return;
+	}
 
 	AIUpdateInterface *ai = getAIUpdateInterface();
 	if( ai && cmdSource == CMD_FROM_SCRIPT )
@@ -6261,8 +6290,10 @@ void Object::doCommandButton( const CommandButton *commandButton, CommandSourceT
 //-------------------------------------------------------------------------------------------------
 void Object::doCommandButtonAtObject( const CommandButton *commandButton, Object *obj, CommandSourceType cmdSource )
 {
-	if (isDisabled())
+	if (isDisabledForCommand(commandButton ? commandButton->getOptions() : 0))
+	{
 		return;
+	}
 
 	AIUpdateInterface *ai = getAIUpdateInterface();
 	if( ai && cmdSource == CMD_FROM_SCRIPT )
@@ -6403,8 +6434,10 @@ void Object::doCommandButtonAtObject( const CommandButton *commandButton, Object
 //-------------------------------------------------------------------------------------------------
 void Object::doCommandButtonAtPosition( const CommandButton *commandButton, const Coord3D *pos, CommandSourceType cmdSource )
 {
-	if (isDisabled())
+	if (isDisabledForCommand(commandButton ? commandButton->getOptions() : 0))
+	{
 		return;
+	}
 
 	AIUpdateInterface *ai = getAIUpdateInterface();
 	if( ai && cmdSource == CMD_FROM_SCRIPT && pos )
@@ -6522,8 +6555,10 @@ void Object::doCommandButtonAtPosition( const CommandButton *commandButton, cons
 //-------------------------------------------------------------------------------------------------
 void Object::doCommandButtonUsingWaypoints( const CommandButton *commandButton, const Waypoint *way, CommandSourceType cmdSource )
 {
-	if (isDisabled())
+	if (isDisabledForCommand(commandButton ? commandButton->getOptions() : 0))
+	{
 		return;
+	}
 
 	if( commandButton )
 	{
