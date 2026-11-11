@@ -62,6 +62,20 @@ may layer wrongly.
 translucent triangle and draws each piece on its own, `1` adds the additive batches and shared
 draws, and `2` (the default) also sorts translucent models as whole objects.
 
+# Screen-space shadow receiving
+
+Units and buildings take the sun's shadow in one full-screen draw instead of each drawing a second
+time. The pass finds each object pixel's position from the scene's depth and reads the shadow map
+there. Scenes with many objects issue far fewer draw calls. Direct3D 9 build only.
+
+Notes:
+* Terrain, roads, bridges and water still shade themselves.
+* Needs a readable scene depth, so MSAA and drivers without INTZ depth textures keep the per-object
+shadow draws.
+* The coloured outline of a unit hidden behind a building darkens where the building's face is in
+shade.
+* The `CONTRA_SCREENSHADOW` environment variable set to `0` returns to the per-object shadow draws.
+
 # Flip model presentation
 
 The Direct3D 9 build runs on a Direct3D 9Ex device. Windowed and borderless modes present through a

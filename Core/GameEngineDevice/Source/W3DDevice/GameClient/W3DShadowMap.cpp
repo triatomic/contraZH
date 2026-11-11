@@ -107,11 +107,11 @@ static Bool Get_Clouds_Block_Sun()
 
 static const Bool CloudsBlockSun = Get_Clouds_Block_Sun();
 
-// CONTRA_SCREENSHADOW=1 shadows objects in one full-screen pass, in place of each object's own receiver draw.
+// CONTRA_SCREENSHADOW=0 returns objects to their own receiver draws, in place of the one full-screen pass.
 static Bool Get_Screen_Shadow_Enabled()
 {
 	const char *value = getenv("CONTRA_SCREENSHADOW");
-	return (value != nullptr) ? atoi(value) != 0 : FALSE;
+	return (value != nullptr) ? atoi(value) != 0 : TRUE;
 }
 
 static const Bool ScreenShadowEnabled = Get_Screen_Shadow_Enabled();
