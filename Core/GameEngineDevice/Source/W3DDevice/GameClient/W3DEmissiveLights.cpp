@@ -128,16 +128,14 @@ Bool W3DEmissiveLights::sampleModel(MeshModelClass &model, std::vector<Sample> &
 				(shader.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_ONE || shader.Get_Src_Blend_Func() == ShaderClass::SRCBLEND_SRC_ALPHA);
 			const TriIndex &triangle = triangles[polygon];
 			VertexMaterialClass *material = model.Peek_Material(triangle[0], pass);
+			// Emissive on a mesh that does not add its colour is how art makes it fullbright, so it is no lamp.
 			Vector3 emission(0.0f, 0.0f, 0.0f);
-			if (material != nullptr)
-			{
-				material->Get_Emissive(&emission);
-			}
 			if (additive)
 			{
 				Vector3 diffuse(1.0f, 1.0f, 1.0f);
 				if (material != nullptr)
 				{
+					material->Get_Emissive(&emission);
 					material->Get_Diffuse(&diffuse);
 				}
 				emission += diffuse;

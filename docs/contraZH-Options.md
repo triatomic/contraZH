@@ -477,6 +477,10 @@ The control stays grey while either lighting setting is off. Bloom is independen
 Glow masks follow the existing specular pass and the day/night emissive
 intensity settings; `Specular = No` disables their light.
 
+A mesh lights its surroundings through its material only when it is additive. A mesh that is
+emissive without being additive, the usual way to keep thin parts such as barbed wire bright in
+shadow, emits no light. Give it an `_emi.dds` mask to make it a lamp.
+
 `PathTracingLightMaxRadius` in `GameData.ini` caps large lights without shrinking
 smaller ones. It defaults to `25`; `0` means no cap. `PathTracingLightBrightness`
 scales brightness independently and defaults to `0.75`; zero disables the new light
