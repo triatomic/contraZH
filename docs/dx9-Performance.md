@@ -26,7 +26,9 @@ shrunk to the screen.
 * The world's colour and depth take about 1 GB of video memory, and every effect that copies the
 scene takes another 0.5 GB. If the card cannot make the target, supersampling turns itself off.
 * A card that cannot make textures 15360 wide gets the largest scene it can make.
-* `Options.ini` stores it as `SuperSampling = 15360`, and `CONTRA_SSAA=15360` sets it for one run.
+* It lasts for one run. `Options.ini` keeps the percent saved before, so the next launch returns to
+it, and a `SuperSampling` value typed into the file never turns 16K on.
+* `CONTRA_SSAA=15360` starts a run in 16K.
 * The combo's fourth entry reads its label from `GUI:SuperSampling3` in `Generals.str`.
 * The combo needs a layout with the `ComboBoxSuperSampling` row, which `build/add_ssaa_wnd.py` adds
 to a loose `OptionsMenu.wnd`.

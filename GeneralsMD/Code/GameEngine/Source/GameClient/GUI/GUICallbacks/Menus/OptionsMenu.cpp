@@ -671,7 +671,8 @@ static void populateGameOptions()
 static void populateShaders()
 {
 	setComboPos( comboBoxShadows, levelIndex( ShadowMapResolutions, ARRAY_SIZE(ShadowMapResolutions), pref->getShadowMapResolution() ) );
-	setComboPos( comboBoxSuperSampling, levelIndex( SuperSamplingPercents, ARRAY_SIZE(SuperSamplingPercents), pref->getSuperSampling() ) );
+	// The device's own setting, because 16K is never saved and the file would show the entry before it
+	setComboPos( comboBoxSuperSampling, levelIndex( SuperSamplingPercents, ARRAY_SIZE(SuperSamplingPercents), WW3D::Get_Super_Sampling() ) );
 	setComboPos( comboBoxPathTracing, pref->getPathTracingMode() );
 	for (Int i = 0; i < ARRAY_SIZE(BoolOptions); ++i)
 	{
@@ -1332,6 +1333,8 @@ static void saveOptions()
 	if (comboBoxSuperSampling)
 	{
 		Int percent = SuperSamplingPercents[getComboPos( comboBoxSuperSampling, 0 )];
+		// 16K lasts for this run alone, so choosing it leaves the file's percent as it is
+		const Bool saved = percent != WW3D::SUPER_SAMPLING_16K;
 		if (percent != WW3D::Get_Super_Sampling())
 		{
 			WW3D::Set_Super_Sampling( percent );
@@ -1339,9 +1342,12 @@ static void saveOptions()
 			percent = WW3D::Get_Super_Sampling();
 			TheWritableGlobalData->m_antiAliasLevel = (UnsignedInt)WW3D::Get_MSAA_Mode();
 		}
-		AsciiString prefString;
-		prefString.format( "%d", percent );
-		(*pref)["SuperSampling"] = prefString;
+		if (saved)
+		{
+			AsciiString prefString;
+			prefString.format( "%d", percent );
+			(*pref)["SuperSampling"] = prefString;
+		}
 		TheWritableGlobalData->m_superSampling = percent;
 	}
 

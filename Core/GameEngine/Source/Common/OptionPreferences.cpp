@@ -83,10 +83,6 @@ WW3D::MultiSampleModeEnum OptionPreferences::getAntiAliasing() const
 Int OptionPreferences::getSuperSampling() const
 {
 	const Int percent = getInt("SuperSampling", 100);
-	if (percent >= WW3D::SUPER_SAMPLING_16K)
-	{
-		return WW3D::SUPER_SAMPLING_16K;
-	}
 	if (percent >= 200)
 	{
 		return 200;

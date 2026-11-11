@@ -3053,14 +3053,6 @@ void DX8Wrapper::Create_Scene_Target()
 		const unsigned width = (unsigned)(_PresentParameters.BackBufferWidth * SuperSampleScale + 0.5f);
 		const unsigned height = (unsigned)(_PresentParameters.BackBufferHeight * SuperSampleScale + 0.5f);
 		DX8CALL_HRES(CreateRenderTarget(width, height, _PresentParameters.BackBufferFormat, D3DMULTISAMPLE_NONE, 0, FALSE, &SceneRenderTarget, nullptr), hr);
-		if (SUCCEEDED(hr))
-		{
-			Create_Scene_Depth_Texture(width, height);
-			if (SceneDepthBuffer == nullptr)
-			{
-				DX8CALL_HRES(CreateDepthStencilSurface(width, height, _PresentParameters.AutoDepthStencilFormat, D3DMULTISAMPLE_NONE, 0, FALSE, &SceneDepthBuffer, nullptr), hr);
-			}
-		}
 
 		// A linear filter reads four pixels, which is every pixel only while a step shrinks to half or less
 		unsigned stepWidth = width;
@@ -3070,6 +3062,16 @@ void DX8Wrapper::Create_Scene_Target()
 			stepWidth = (stepWidth + 1) / 2;
 			stepHeight = (stepHeight + 1) / 2;
 			DX8CALL_HRES(CreateRenderTarget(stepWidth, stepHeight, _PresentParameters.BackBufferFormat, D3DMULTISAMPLE_NONE, 0, FALSE, &SceneResolveSteps[step], nullptr), hr);
+		}
+
+		// The depth comes last because it binds itself, and the failure below reads the device's own depth back
+		if (SUCCEEDED(hr))
+		{
+			Create_Scene_Depth_Texture(width, height);
+			if (SceneDepthBuffer == nullptr)
+			{
+				DX8CALL_HRES(CreateDepthStencilSurface(width, height, _PresentParameters.AutoDepthStencilFormat, D3DMULTISAMPLE_NONE, 0, FALSE, &SceneDepthBuffer, nullptr), hr);
+			}
 		}
 
 		if (FAILED(hr))

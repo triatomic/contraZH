@@ -119,17 +119,22 @@ static int writeScreenshotImage(const ScreenshotThreadData* data, const char* pa
 	return success;
 }
 
+// TheSuperHackers @feature bobtista 08/07/2026 Save screenshots into a Screenshots subfolder
+// to keep the user data root folder tidy.
+static void makeScreenshotPath(char* pathname, size_t size, const char* userDataDirectory, const char* leafname)
+{
+	strlcpy(pathname, userDataDirectory, size);
+	strlcat(pathname, "Screenshots\\", size);
+	CreateDirectory(pathname, nullptr);
+	strlcat(pathname, leafname, size);
+}
+
 static DWORD WINAPI screenshotThreadFunc(LPVOID param)
 {
 	ScreenshotThreadData* data = static_cast<ScreenshotThreadData*>(param);
 
-	// TheSuperHackers @feature bobtista 08/07/2026 Save screenshots into a Screenshots subfolder
-	// to keep the user data root folder tidy.
 	char pathname[_MAX_PATH];
-	strlcpy(pathname, data->userDataDirectory, ARRAY_SIZE(pathname));
-	strlcat(pathname, "Screenshots\\", ARRAY_SIZE(pathname));
-	CreateDirectory(pathname, nullptr);
-	strlcat(pathname, data->leafname, ARRAY_SIZE(pathname));
+	makeScreenshotPath(pathname, ARRAY_SIZE(pathname), data->userDataDirectory, data->leafname);
 
 	const int success = writeScreenshotImage(data, pathname);
 
@@ -399,10 +404,7 @@ static bool writeSceneTargetPng(IDirect3DSurface8* scene, const char* pathname)
 static bool saveSceneScreenshot(IDirect3DSurface8* scene, const char* leafname)
 {
 	char pathname[_MAX_PATH];
-	strlcpy(pathname, TheGlobalData->getPath_UserData().str(), ARRAY_SIZE(pathname));
-	strlcat(pathname, "Screenshots\\", ARRAY_SIZE(pathname));
-	CreateDirectory(pathname, nullptr);
-	strlcat(pathname, leafname, ARRAY_SIZE(pathname));
+	makeScreenshotPath(pathname, ARRAY_SIZE(pathname), TheGlobalData->getPath_UserData().str(), leafname);
 
 	if (!writeSceneTargetPng(scene, pathname))
 	{
