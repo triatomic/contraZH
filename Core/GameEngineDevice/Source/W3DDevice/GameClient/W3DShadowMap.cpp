@@ -688,6 +688,9 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 
 	memset(&m_casterStats, 0, sizeof(m_casterStats));
 
+	// Set from the casters' own renders to the sorter's flush, since both renderers skip draws that cast nothing.
+	DX8MeshRendererClass::Set_Stats_Scene(DX8InstancingStatsStruct::SCENE_SHADOW_DEPTH);
+
 	// Each list casts only while its option is on, as the legacy shadows check every frame.
 	if (TheW3DVolumetricShadowManager != nullptr && TheGlobalData->m_useShadowVolumes)
 	{
@@ -713,14 +716,13 @@ void W3DShadowMap::renderDepthPass(RenderInfoClass& rinfo)
 	// Kept tasks would replay into the bloom target alongside the main pass's.
 	const bool bloomCapture = DX8MeshRendererClass::Is_Bloom_Capture_Enabled();
 	DX8MeshRendererClass::Enable_Bloom_Capture(false);
-	DX8MeshRendererClass::Set_Stats_Scene(DX8InstancingStatsStruct::SCENE_SHADOW_DEPTH);
 	TheDX8MeshRenderer.Flush();
-	DX8MeshRendererClass::Set_Stats_Scene(DX8InstancingStatsStruct::SCENE_MAIN);
 	DX8MeshRendererClass::Enable_Bloom_Capture(bloomCapture);
 
 	// Sorted meshes, often foliage, were deferred rather than drawn. Flushed here they
 	// draw into the map with the sun's matrices, and not into the main view later.
 	SortingRendererClass::Flush();
+	DX8MeshRendererClass::Set_Stats_Scene(DX8InstancingStatsStruct::SCENE_MAIN);
 
 	// Terrain casts too, so cliffs and hills shadow the ground below them. It receives its
 	// own depth as a result, which the casters' slope-scaled bias keeps from speckling.
