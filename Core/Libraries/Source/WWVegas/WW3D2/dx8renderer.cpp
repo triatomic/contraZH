@@ -2812,6 +2812,15 @@ void DX8TextureCategoryClass::Clear_Bloom_List()
 	}
 }
 
+// CONTRA_DEPTHUNSORTED=0 sends blended casters through the sorter in the shadow depth pass again, for comparing call counts.
+static bool Get_Depth_Unsorted_Enabled()
+{
+	const char *value = getenv("CONTRA_DEPTHUNSORTED");
+	return (value != nullptr) ? atoi(value) != 0 : true;
+}
+
+static const bool DepthUnsortedEnabled = Get_Depth_Unsorted_Enabled();
+
 // draws one visible mesh fragment with the category's state already applied
 // the bloom replay of a sorting container cannot go through its buffers, which would only queue the draw
 static void Draw_Polygons(DX8FVFCategoryContainer * container, DX8PolygonRendererClass * renderer, MeshClass * mesh, VertexMaterialClass * vmaterial, bool replay)
@@ -2910,7 +2919,11 @@ void DX8TextureCategoryClass::Render_Task(PolyRenderTaskClass * prt, VertexMater
 	//(gth) this if statement's contents are not tabbed to avoid perforce merge problems...
 	if (!DX8RendererDebugger::Is_Enabled() || !mesh->Is_Disabled_By_Debugger()) {
 
-	if (!replay && (!!mesh->Peek_Model()->Get_Flag(MeshGeometryClass::SORT)) && WW3D::Is_Sorting_Enabled()) {
+	// A blended caster is cut out by alpha test in the shadow depth pass, so its draw order cannot matter there.
+	const bool unsortedCaster = DepthUnsortedEnabled && !container->Is_Sorting() &&
+		DX8MeshRendererClass::Get_Stats_Scene() == DX8InstancingStatsStruct::SCENE_SHADOW_DEPTH;
+
+	if (!replay && !unsortedCaster && (!!mesh->Peek_Model()->Get_Flag(MeshGeometryClass::SORT)) && WW3D::Is_Sorting_Enabled()) {
 		if (mesh->Peek_Disruption() != nullptr) {
 			SortingRendererClass::Set_Insert_Effects(SoftParticleHookClass::EFFECT_DISRUPT,mesh->Peek_Disruption(),mesh->Get_Alpha_Override());
 			renderer->Render_Sorted(mesh->Get_Base_Vertex_Offset(),mesh->Get_Bounding_Sphere());
