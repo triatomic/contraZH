@@ -37,7 +37,7 @@ public:
 	/// Whether the pass can draw here, loading its shaders on first ask. Lights it cannot take keep their own passes.
 	Bool isEnabled();
 
-	/// Hands over the lights for the next render, which lights ground and objects alike.
+	/// Hands over the lights for the next render, which lights ground and objects alike unless a light splits at the ground.
 	void setLights(const std::vector<W3DShaderManager::PixelLight> &lights);
 
 	void render(RenderInfoClass &rinfo);

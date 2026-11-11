@@ -52,12 +52,15 @@ static const Int DeferredLightsMode = Get_Deferred_Lights_Mode();
 
 enum { LIGHT_BUFFER_COUNT = 4096 };
 
+// A light split at the ground fades over this height between its ground and object halves.
+static const Real GROUND_SPLIT_BAND = 3.0f;
+
 // One light as the vertex shader reads it from the instance stream.
 struct LightInstance
 {
 	Vector4 place;	///< camera space position, and the outer radius
 	Vector4 color;	///< colour over the scene's light, and 1 / (outer - inner radius)
-	Real ambient;	///< ambient as a fraction of the colour
+	Vector3 ambient;	///< ambient as a fraction of the colour, then the scale and offset from a pixel's world height to its share of the light
 };
 
 static IDirect3DVertexDeclaration9 *LightDeclaration = nullptr;
@@ -141,7 +144,7 @@ Bool W3DDeferredLights::loadResources()
 			{ 0, 12, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0 },
 			{ 1, (WORD)offsetof(LightInstance, place), D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 4 },
 			{ 1, (WORD)offsetof(LightInstance, color), D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 5 },
-			{ 1, (WORD)offsetof(LightInstance, ambient), D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 6 },
+			{ 1, (WORD)offsetof(LightInstance, ambient), D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 6 },
 			D3DDECL_END()
 		};
 		if (FAILED(device->CreateVertexDeclaration(elements, &LightDeclaration)))
@@ -268,6 +271,10 @@ void W3DDeferredLights::render(RenderInfoClass &rinfo)
 	}
 	vertexConstants[4] = depthMap;
 
+	// The view only turns and moves, so its third row takes camera space back to world height.
+	const Vector4 worldHeight(view.m[2][0], view.m[2][1], view.m[2][2],
+		-(view.m[3][0] * view.m[2][0] + view.m[3][1] * view.m[2][1] + view.m[3][2] * view.m[2][2]));
+
 	// The light multiplies the pixel's own colour, which the scene's light already dimmed, so that light is divided out.
 	const Vector3 sceneLight = W3DLaserGlow::getSceneLight();
 	static std::vector<LightInstance> instances;
@@ -284,7 +291,17 @@ void W3DDeferredLights::render(RenderInfoClass &rinfo)
 			light.outerRadius);
 		instance.color.Set(light.diffuse.X / sceneLight.X, light.diffuse.Y / sceneLight.Y, light.diffuse.Z / sceneLight.Z,
 			1.0f / max(light.outerRadius - light.innerRadius, 0.001f));
-		instance.ambient = light.ambientScale;
+		instance.ambient.Set(light.ambientScale, 0.0f, 1.0f);
+		if (light.splitAtGround && light.objectsOnly)
+		{
+			instance.ambient.Y = 1.0f / GROUND_SPLIT_BAND;
+			instance.ambient.Z = -light.groundHeight / GROUND_SPLIT_BAND;
+		}
+		else if (light.splitAtGround && light.terrainOnly)
+		{
+			instance.ambient.Y = -1.0f / GROUND_SPLIT_BAND;
+			instance.ambient.Z = 1.0f + light.groundHeight / GROUND_SPLIT_BAND;
+		}
 	}
 	m_lights.clear();
 
@@ -330,6 +347,7 @@ void W3DDeferredLights::render(RenderInfoClass &rinfo)
 		device->SetTexture(0, depthTexture);
 		DX8Wrapper::Set_Pixel_Shader(m_pixelShader);
 		DX8Wrapper::Set_Pixel_Shader_Constant(0, &toView, 4);
+		DX8Wrapper::Set_Pixel_Shader_Constant(4, &worldHeight, 1);
 		DX8Wrapper::Set_Vertex_Shader_Constant(0, vertexConstants, 5);
 
 		size_t drawn = 0;

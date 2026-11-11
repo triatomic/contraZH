@@ -496,8 +496,15 @@ cannot run on, such as multisampling.
 Setting the environment variable `CONTRA_DEFERREDLIGHTS=0` sends every light back to them.
 
 This option approximates emissive lighting with world-space point lights. It does not
-trace rays, cast local shadows, or calculate reflected light. Lights can pass through walls.
+cast local shadows or calculate reflected light.
 Particle texture colours are averaged once per cached texture.
+
+A model's own opaque meshes block the light its lamps throw on the ground. Each group of
+lamps that sit together and face one way casts 24 rays to the ground around it. A lamp the
+hull hides, such as one on a turret roof, lights no ground. A half-hidden one, such as a lamp
+on a wall, lights a smaller pool on its open side. The lamp still lights models as before,
+including its own, and one model's meshes never block another model's lamps. Meshes that blend, skinned meshes and particles block
+nothing. `Fast` tells ground from models by height, so on a slope the split is rough.
 Nearby emitters share lights within 24 world units. All visible lights are kept, and
 surfaces draw additional batches of eight lights, or two under standing water.
 Extra passes add only light and do not repeat sunlight, glow masks or shadow darkening.

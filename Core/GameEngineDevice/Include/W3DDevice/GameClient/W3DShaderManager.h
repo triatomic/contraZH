@@ -127,14 +127,17 @@ public:
 	struct PixelLight
 	{
 		PixelLight() : position(0.0f, 0.0f, 0.0f), innerRadius(0.0f), outerRadius(0.0f),
-			diffuse(0.0f, 0.0f, 0.0f), ambientScale(0.0f), terrainOnly(FALSE), objectsOnly(FALSE) {}
+			diffuse(0.0f, 0.0f, 0.0f), ambientScale(0.0f), terrainOnly(FALSE), objectsOnly(FALSE),
+			splitAtGround(FALSE), groundHeight(0.0f) {}
 		Vector3 position;
 		Real innerRadius;	///< full strength inside this
 		Real outerRadius;	///< nothing past this
 		Vector3 diffuse;
 		Real ambientScale;	///< ambient colour as a fraction of the diffuse
 		Bool terrainOnly;	///< lights the ground and nothing standing on it
-		Bool objectsOnly;	///< the laser terrain pass already lights the ground
+		Bool objectsOnly;	///< the ground gets its light from a laser's terrain pass or a fitted ground light
+		Bool splitAtGround;	///< the depth pass can part ground from objects at groundHeight
+		Real groundHeight;
 	};
 	/// Each lighting pass takes eight lights, or two under standing water.
 	enum { MAX_PIXEL_LIGHTS = 8, SEABED_PIXEL_LIGHTS = 2, MAX_UNIT_PIXEL_LIGHTS = 8, MAX_PIXEL_LIGHT_CANDIDATES = 64 };

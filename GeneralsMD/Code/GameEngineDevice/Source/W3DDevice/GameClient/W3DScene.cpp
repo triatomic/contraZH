@@ -2427,7 +2427,7 @@ void RTS3DScene::updatePixelLights(CameraClass &camera)
 			{
 				continue;
 			}
-			if (deferred && !light.terrainOnly && !light.objectsOnly)
+			if (deferred && (light.splitAtGround || (!light.terrainOnly && !light.objectsOnly)))
 			{
 				deferredLights.push_back(light);
 				continue;

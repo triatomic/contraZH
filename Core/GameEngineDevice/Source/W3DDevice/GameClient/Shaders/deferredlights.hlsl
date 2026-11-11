@@ -15,7 +15,7 @@ struct VsIn
     float2 UV      : TEXCOORD0;
     float4 Place   : TEXCOORD4;   // camera space position, and the outer radius
     float4 Color   : TEXCOORD5;   // colour over the scene's light, and 1 / (outer - inner radius)
-    float  Ambient : TEXCOORD6;   // ambient as a fraction of the colour
+    float3 Ambient : TEXCOORD6;   // ambient as a fraction of the colour, then the scale and offset from world height to the light's share
 };
 
 struct VsOut
@@ -24,7 +24,7 @@ struct VsOut
     float2 UV       : TEXCOORD0;
     float4 Place    : TEXCOORD1;
     float4 Color    : TEXCOORD2;
-    float  Ambient  : TEXCOORD3;
+    float3 Ambient  : TEXCOORD3;
 };
 
 VsOut mainVS(VsIn input)
@@ -65,13 +65,14 @@ float4 ToView0 : register(c0);   // depth texture uv and stored depth to homogen
 float4 ToView1 : register(c1);
 float4 ToView2 : register(c2);
 float4 ToView3 : register(c3);
+float4 WorldHeight : register(c4);   // camera space position to world height
 
 struct PsIn
 {
     float2 UV      : TEXCOORD0;
     float4 Place   : TEXCOORD1;
     float4 Color   : TEXCOORD2;
-    float  Ambient : TEXCOORD3;
+    float3 Ambient : TEXCOORD3;
 };
 
 float4 mainPS(PsIn input) : COLOR
@@ -90,8 +91,11 @@ float4 mainPS(PsIn input) : COLOR
     float factor = ramp * ramp * (3.0f - 2.0f * ramp);
     float shade = saturate(dot(normal, toLight) / max(distance, 1e-3f));
 
+    // A light split at the ground reaches only the pixels on its side of it.
+    float share = saturate((dot(position, WorldHeight.xyz) + WorldHeight.w) * input.Ambient.y + input.Ambient.z);
+
     // Alpha stays 0, so the blend leaves the target's alpha as it was.
-    return float4(input.Color.rgb * (factor * (shade + input.Ambient)), 0.0f);
+    return float4(input.Color.rgb * (factor * share * (shade + input.Ambient.x)), 0.0f);
 }
 
 #endif
