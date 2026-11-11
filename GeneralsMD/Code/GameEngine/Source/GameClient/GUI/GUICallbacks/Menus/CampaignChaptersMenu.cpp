@@ -454,6 +454,7 @@ void CampaignChaptersMenuInit( WindowLayout *layout, void *userData )
 		GadgetRadioSetSelection( radio, FALSE );
 	}
 
+	TheCampaignManager->reloadProgress();
 	buildTabs();
 	layoutTabs();
 	selectCurrentCampaign();
