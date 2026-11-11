@@ -129,6 +129,8 @@ Notes:
 Quick Game.
 * The build tooltip lists the requirements of the current game.
 * A map.ini override replaces the list, as it does for `Prerequisites`.
+* An `ObjectExtend` child inherits the list until it defines `QuickGamePrerequisites`. Its first
+block replaces the inherited entries; later blocks add entries. See [Extend Blocks](contraZH-Extend.md#object-inis).
 
 ### Display Decal
 

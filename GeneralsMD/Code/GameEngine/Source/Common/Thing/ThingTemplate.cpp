@@ -784,8 +784,9 @@ void ThingTemplate::parseQuickGamePrerequisites( INI* ini, void *instance, void 
 		{ nullptr, nullptr, nullptr, 0 }
 	};
 
-	if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES)
+	if (ini->getLoadType() == INI_LOAD_CREATE_OVERRIDES || self->m_quickGamePrereqsCopiedFromExtended)
 	{
+		self->m_quickGamePrereqsCopiedFromExtended = FALSE;
 		self->m_quickGamePrereqInfo.clear();
 	}
 
@@ -1165,6 +1166,7 @@ ThingTemplate::ThingTemplate() :
 	m_isBuildFacility = FALSE;
 	m_isPrerequisite = FALSE;
 	m_prereqsCopiedFromExtended = FALSE;
+	m_quickGamePrereqsCopiedFromExtended = FALSE;
 	m_placementViewAngle = 0.0f;
 	m_factoryExitWidth = 0.0f;
 	m_factoryExtraBibWidth = 0.0f;
@@ -1427,6 +1429,7 @@ void ThingTemplate::setCopiedFromDefaultExtended()
 	m_armorCopiedFromDefault = true;
 	m_weaponsCopiedFromDefault = true;
 	m_prereqsCopiedFromExtended = true;
+	m_quickGamePrereqsCopiedFromExtended = true;
 	//m_behaviorModuleInfo.setCopiedFromDefault(true);
 	//m_drawModuleInfo.setCopiedFromDefault(true);
 	//m_clientUpdateModuleInfo.setCopiedFromDefault(true);
