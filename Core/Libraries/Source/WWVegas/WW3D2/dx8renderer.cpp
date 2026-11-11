@@ -65,6 +65,7 @@
 #include "lightenvironment.h"
 #include <algorithm>
 #include <vector>
+#include <stdlib.h>
 
 /*
 ** Global Instance of the DX8MeshRender
@@ -2048,9 +2049,21 @@ void DX8SkinFVFCategoryContainer::Render_Skinned_Meshes()
 	VisibleVertexCount = kept_vertices;
 }
 
-// The per-mesh material pass loop, with each mesh's palette loaded ahead of its passes.
+// CONTRA_SKINPASSRUNS=0 installs each skin's passes mesh by mesh again, for comparing call counts.
+static bool Get_Skin_Pass_Runs_Enabled()
+{
+	const char *value = getenv("CONTRA_SKINPASSRUNS");
+	return (value != nullptr) ? atoi(value) != 0 : true;
+}
+
+static const bool SkinPassRunsEnabled = Get_Skin_Pass_Runs_Enabled();
+
+// Each pass installs once for all its skins, in the order the passes first appear, so a mesh's own passes keep their order.
 void DX8SkinFVFCategoryContainer::Render_Skinned_Material_Passes()
 {
+	static std::vector<MatPassTaskClass *> tasks;
+	static std::vector<MaterialPassClass *> runs;
+
 	MatPassTaskClass * mpr = visible_matpass_head;
 	MatPassTaskClass * last_mpr = nullptr;
 	bool renderTasksRemaining=false;
@@ -2066,8 +2079,6 @@ void DX8SkinFVFCategoryContainer::Render_Skinned_Material_Passes()
 			continue;
 		}
 
-		DX8SkinningClass::Set_Mesh(mesh, Peek_Skinned_Model(mesh->Peek_Model())->Palette, nullptr);
-		mesh->Render_Material_Pass(mpr->Peek_Material_Pass(),index_buffer);
 		DX8MeshRendererClass::Record_Material_Pass_Path(DX8InstancingStatsStruct::PASS_PATH_SKIN);
 		MatPassTaskClass * next_mpr = mpr->Get_Next_Visible();
 
@@ -2077,11 +2088,63 @@ void DX8SkinFVFCategoryContainer::Render_Skinned_Material_Passes()
 			last_mpr->Set_Next_Visible(next_mpr);
 		}
 
-		delete mpr;
+		if (SkinPassRunsEnabled)
+		{
+			tasks.push_back(mpr);
+			if (std::find(runs.begin(), runs.end(), mpr->Peek_Material_Pass()) == runs.end())
+			{
+				runs.push_back(mpr->Peek_Material_Pass());
+			}
+		}
+		else
+		{
+			DX8SkinningClass::Set_Mesh(mesh, Peek_Skinned_Model(mesh->Peek_Model())->Palette, nullptr);
+			mesh->Render_Material_Pass(mpr->Peek_Material_Pass(),index_buffer);
+			delete mpr;
+		}
 		mpr = next_mpr;
 	}
 
 	visible_matpass_tail = renderTasksRemaining ? last_mpr : nullptr;
+
+	// These passes take no lighting, and a mesh's light environment set between draws would drop the pass's texgen.
+	for (size_t r=0;r<runs.size();++r)
+	{
+		MaterialPassClass * pass = runs[r];
+		pass->Install_Materials();
+		DX8Wrapper::Set_Index_Buffer(index_buffer,0);
+		DX8Wrapper::Set_World_Identity();
+
+		for (size_t i=0;i<tasks.size();++i)
+		{
+			if (tasks[i]->Peek_Material_Pass() != pass)
+			{
+				continue;
+			}
+			MeshClass * mesh = tasks[i]->Peek_Mesh();
+			DX8SkinningClass::Set_Mesh(mesh, Peek_Skinned_Model(mesh->Peek_Model())->Palette, nullptr);
+
+			DX8PolygonRendererListIterator it(&mesh->Peek_Model()->PolygonRendererList);
+			for (;!it.Is_Done();it.Next())
+			{
+				DX8PolygonRendererClass * renderer = it.Peek_Obj();
+				if (renderer->Get_Pass() == 0)
+				{
+					pass->Install_Polygon_Materials(renderer, mesh);
+					renderer->Render(mesh->Get_Base_Vertex_Offset());
+				}
+			}
+		}
+
+		pass->UnInstall_Materials();
+	}
+
+	for (size_t i=0;i<tasks.size();++i)
+	{
+		delete tasks[i];
+	}
+	tasks.clear();
+	runs.clear();
 }
 
 void DX8SkinFVFCategoryContainer::clearVisibleSkinList()
