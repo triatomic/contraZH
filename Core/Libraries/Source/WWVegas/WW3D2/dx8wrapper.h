@@ -718,6 +718,8 @@ protected:
 	// -1 keeps vsync on in fullscreen and off in a window, 0 turns it off, 1 on. A change resets a live device.
 	static void	Set_VSync_Mode(int mode);
 	static bool	Is_VSync_On() { return Choose_Present_Interval() != D3DPRESENT_INTERVAL_IMMEDIATE; }
+	// Rate in Hz at which Present paces frames, 0 while it does not wait for the display.
+	static unsigned	Get_VSync_Refresh_Rate() { return D3DDevice != nullptr ? VSyncRefreshRate : 0; }
 	// On keeps at most one frame queued ahead of the GPU; off leaves the driver's default. Direct3D 9 only.
 	static void	Set_Low_Latency(bool on);
 	static void Set_Polygon_Mode(int mode);
@@ -757,6 +759,8 @@ protected:
 	static bool								IsWindowed;
 	static int								VSyncMode;
 	static UINT Choose_Present_Interval();
+	static unsigned						VSyncRefreshRate;
+	static void Update_VSync_Refresh_Rate();
 	static bool								LowLatency;
 	static void Apply_Frame_Latency();
 	static void Release_Frame_Query();

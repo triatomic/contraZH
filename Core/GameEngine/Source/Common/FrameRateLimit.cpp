@@ -20,6 +20,10 @@
 #include "Common/FrameRateLimit.h"
 
 
+#ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
+#define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
+#endif
+
 FrameRateLimit::FrameRateLimit()
 {
 	LARGE_INTEGER freq;
@@ -28,6 +32,18 @@ FrameRateLimit::FrameRateLimit()
 	QueryPerformanceCounter(&start);
 	m_freq = freq.QuadPart;
 	m_start = start.QuadPart;
+	m_last = start.QuadPart;
+
+	// Fails before Windows 10 1803, which leaves wait on Sleep.
+	m_timer = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+}
+
+FrameRateLimit::~FrameRateLimit()
+{
+	if (m_timer != nullptr)
+	{
+		CloseHandle(m_timer);
+	}
 }
 
 Real FrameRateLimit::wait(UnsignedInt maxFps)
@@ -35,26 +51,61 @@ Real FrameRateLimit::wait(UnsignedInt maxFps)
 	PROFILER_SECTION;
 	LARGE_INTEGER tick;
 	QueryPerformanceCounter(&tick);
-	double elapsedSeconds = static_cast<double>(tick.QuadPart - m_start) / m_freq;
-	const double targetSeconds = 1.0 / maxFps;
-	const double sleepSeconds = targetSeconds - elapsedSeconds - 0.002; // leave ~2ms for spin wait
 
-	if (sleepSeconds > 0.0)
-	{
-		// Non busy wait with Munkee sleep
-		DWORD dwMilliseconds = static_cast<DWORD>(sleepSeconds * 1000);
-		Sleep(dwMilliseconds);
-	}
+	// The deadline always lies past the last return, so the returned time is never zero.
+	const Int64 period = m_freq / maxFps;
+	const Int64 deadline = std::max(m_start + period, m_last + 1);
 
-	// Busy wait for remaining time
-	do
+	if (tick.QuadPart < deadline)
 	{
+		// Sleep until just short of the deadline. The timer can wake about 1 ms late, Sleep about 2 ms.
+		if (m_timer != nullptr)
+		{
+			const Int64 sleepTicks = deadline - tick.QuadPart - m_freq / 1000;
+
+			if (sleepTicks > 0)
+			{
+				LARGE_INTEGER due;
+				due.QuadPart = -(sleepTicks * 10000000 / m_freq);
+
+				if (SetWaitableTimer(m_timer, &due, 0, nullptr, nullptr, FALSE))
+				{
+					WaitForSingleObject(m_timer, INFINITE);
+				}
+			}
+		}
+		else
+		{
+			const Int64 sleepMilliseconds = (deadline - tick.QuadPart) * 1000 / m_freq - 2;
+
+			if (sleepMilliseconds > 0)
+			{
+				Sleep(static_cast<DWORD>(sleepMilliseconds));
+			}
+		}
+
+		// Busy wait for remaining time
 		QueryPerformanceCounter(&tick);
-		elapsedSeconds = static_cast<double>(tick.QuadPart - m_start) / m_freq;
-	}
-	while (elapsedSeconds < targetSeconds);
 
-	m_start = tick.QuadPart;
+		while (tick.QuadPart < deadline)
+		{
+			YieldProcessor();
+			QueryPerformanceCounter(&tick);
+		}
+	}
+
+	// A frame that ran up to half a period late shortens the next one, which holds the average rate on the limit.
+	if (tick.QuadPart - deadline > period / 2)
+	{
+		m_start = tick.QuadPart;
+	}
+	else
+	{
+		m_start = deadline;
+	}
+
+	const double elapsedSeconds = static_cast<double>(tick.QuadPart - m_last) / m_freq;
+	m_last = tick.QuadPart;
 	return (Real)elapsedSeconds;
 }
 
@@ -63,6 +114,7 @@ void FrameRateLimit::reset()
 	LARGE_INTEGER tick;
 	QueryPerformanceCounter(&tick);
 	m_start = tick.QuadPart;
+	m_last = tick.QuadPart;
 }
 
 

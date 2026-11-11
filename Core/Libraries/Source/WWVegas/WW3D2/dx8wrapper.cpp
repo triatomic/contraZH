@@ -121,6 +121,7 @@ int								DX8Wrapper::BitDepth										= DEFAULT_BIT_DEPTH;
 int								DX8Wrapper::TextureBitDepth							= DEFAULT_TEXTURE_BIT_DEPTH;
 bool								DX8Wrapper::IsWindowed									= false;
 int								DX8Wrapper::VSyncMode									= -1;
+unsigned							DX8Wrapper::VSyncRefreshRate							= 0;
 bool								DX8Wrapper::LowLatency									= false;
 #if defined(BUILD_WITH_D3D9)
 IDirect3DQuery9*				DX8Wrapper::FrameQuery									= nullptr;
@@ -706,6 +707,7 @@ bool DX8Wrapper::Create_Device()
 
 	Create_Scene_Target();
 	Apply_Frame_Latency();
+	Update_VSync_Refresh_Rate();
 
 	/*
 	** Initialize all subsystems
@@ -779,6 +781,7 @@ bool DX8Wrapper::Reset_Device(bool reload_assets)
 
 		Create_Scene_Target();
 		Apply_Frame_Latency();
+		Update_VSync_Refresh_Rate();
 
 		if (reload_assets)
 		{
@@ -1405,6 +1408,32 @@ void DX8Wrapper::Set_VSync_Mode(int mode)
 	_PresentParameters.FullScreen_PresentationInterval = interval;
 	RENDER_LOG(("DX8Wrapper::Set_VSync_Mode is resetting the device."));
 	Reset_Device();
+}
+
+void DX8Wrapper::Update_VSync_Refresh_Rate()
+{
+	VSyncRefreshRate = 0;
+
+	const UINT interval = _PresentParameters.FullScreen_PresentationInterval;
+	if (D3DDevice == nullptr || (interval != D3DPRESENT_INTERVAL_DEFAULT && interval != D3DPRESENT_INTERVAL_ONE))
+	{
+		return;
+	}
+
+#if defined(BUILD_WITH_D3D9)
+	D3DDISPLAYMODE mode;
+	if (SUCCEEDED(D3DDevice->GetDisplayMode(0, &mode)))
+	{
+		VSyncRefreshRate = mode.RefreshRate;
+	}
+#else
+	// Direct3D 8 presents windowed frames without waiting.
+	D3DDISPLAYMODE mode;
+	if (!IsWindowed && SUCCEEDED(D3DDevice->GetDisplayMode(&mode)))
+	{
+		VSyncRefreshRate = mode.RefreshRate;
+	}
+#endif
 }
 
 void DX8Wrapper::Set_Low_Latency(bool on)

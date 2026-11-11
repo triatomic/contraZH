@@ -228,6 +228,8 @@ public:
 	// -1 keeps vsync on in fullscreen and off in a window, 0 turns it off, 1 on
 	static void					Set_VSync_Mode(int mode);
 	static bool					Is_VSync_On();
+	// Rate in Hz at which Present paces frames, 0 while it does not wait for the display
+	static unsigned			Get_VSync_Refresh_Rate();
 	// On keeps at most one frame queued ahead of the GPU
 	static void					Set_Low_Latency(bool on);
 

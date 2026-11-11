@@ -1250,6 +1250,11 @@ bool WW3D::Is_VSync_On()
 	return DX8Wrapper::Is_VSync_On();
 }
 
+unsigned WW3D::Get_VSync_Refresh_Rate()
+{
+	return DX8Wrapper::Get_VSync_Refresh_Rate();
+}
+
 void WW3D::Set_Low_Latency(bool on)
 {
 	DX8Wrapper::Set_Low_Latency(on);
