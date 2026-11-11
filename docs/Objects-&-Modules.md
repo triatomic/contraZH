@@ -1616,7 +1616,7 @@ Syntax: `ObjectExtend NewObject ObjectToInheritFrom`
 Use `RemoveModule ModuleTag_xx` to remove a module inherited from the parent.  
 WeaponSet and ArmorSet are inherited, but if you define another one in the child, the inherited sets are removed.  
 If the parent has multiple WeaponSets all will be removed from the child if the child defines one. 
-`Prerequisites` and `QuickGamePrerequisites` are inherited independently. The first block of either kind in the child replaces the inherited entries of that kind. Later blocks add entries. An empty block clears the inherited entries without adding any.
+`Prerequisites` work the same way: they are inherited, but a `Prerequisites` block in the child replaces the inherited ones instead of adding to them.
 
 Examples:  
 ```
