@@ -347,6 +347,7 @@ rts_add_shader("${RTS_SHADER_DIR}/ambientocclusion.hlsl" ps_2_a main ambientoccl
 rts_add_shader("${RTS_SHADER_DIR}/ambientocclusion.hlsl" ps_2_a main ambientocclusionblur.pso  BLUR=1)
 rts_add_shader("${RTS_SHADER_DIR}/deferredlights.hlsl" vs_2_0 mainVS deferredlights.vso         VERTEX=1)
 rts_add_shader("${RTS_SHADER_DIR}/deferredlights.hlsl" ps_2_a mainPS deferredlights.pso         VERTEX=0)
+rts_add_shader("${RTS_SHADER_DIR}/screenshadow.hlsl"   ps_2_a main screenshadow.pso             PACKED=0)
 rts_add_shader("${RTS_SHADER_DIR}/skyclouds.hlsl"      ps_2_0 main skyclouds.pso)
 rts_add_shader("${RTS_SHADER_DIR}/slopemap.hlsl"       ps_2_0 main slopemap.pso)
 # The water shaders outgrow ps_2_0's instruction limit.

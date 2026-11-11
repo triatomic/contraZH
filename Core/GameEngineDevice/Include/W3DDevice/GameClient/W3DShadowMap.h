@@ -79,7 +79,7 @@ public:
 
 	// True once the depth pass has filled the map, until clearDepth is called.
 	Bool hasDepth() const { return m_hasDepth; }
-	void clearDepth() { m_hasDepth = FALSE; }
+	void clearDepth() { m_hasDepth = FALSE; m_screenReceiver = FALSE; }
 
 	// Fits the sun frustum to the ground the camera can see, for this frame. The sun is
 	// lifted to minSunElevation degrees when it sits lower.
@@ -126,6 +126,9 @@ public:
 	// The pass objects push to receive the shadow, or null when nothing can receive it.
 	MaterialPassClass* getReceivePass();
 
+	// Shadows the opaque scene from its depth in one full-screen draw, when this frame's receivers were left to it.
+	void renderScreenReceiver(RenderInfoClass& rinfo);
+
 	const Matrix4x4& getSunViewProjection() const { return m_sunViewProj; }
 	const Matrix4x4& getSunProjection() const { return m_sunProjection; }
 	TextureClass* peekColorTarget() const { return m_colorTarget; }
@@ -139,6 +142,8 @@ public:
 	static Real getCasterSlopeBias();
 
 protected:
+
+	Bool canUseScreenReceiver();
 
 	// Both read the fit updateFrustum stores.
 	void computeSunViewProjection();
@@ -180,6 +185,10 @@ protected:
 	Vector3        m_shadowColor;
 	Bool           m_hasDepth;
 	CasterStats    m_casterStats;
+
+	DWORD          m_screenShader;
+	Bool           m_screenShaderLoaded;
+	Bool           m_screenReceiver;	///< this frame's opaque receivers are left to the full-screen pass
 
 	W3DShadowReceiveMaterialPassClass m_receivePass;
 };
