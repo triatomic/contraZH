@@ -1102,6 +1102,28 @@ void RTS3DScene::renderOneObject(RenderInfoClass &rinfo, RenderObjClass *robj, I
 
 //DECLARE_PERF_TIMER(translucentRender)
 
+// True while this render's object flushes mark their pixels in stencil for the full-screen shadow receiver.
+static Bool MarkShadowReceivers = FALSE;
+
+// Sets the receiver bit on every pixel drawn until the end call, or clears it where mark is false.
+static void Begin_Receiver_Mark(Bool mark)
+{
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, TRUE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILFUNC, D3DCMP_ALWAYS);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILREF, mark ? W3DShadowMap::SCREEN_RECEIVER_STENCIL_BIT : 0);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILMASK, 0xffffffff);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILWRITEMASK, W3DShadowMap::SCREEN_RECEIVER_STENCIL_BIT);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILZFAIL, D3DSTENCILOP_KEEP);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILFAIL, D3DSTENCILOP_KEEP);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILPASS, D3DSTENCILOP_REPLACE);
+}
+
+static void End_Receiver_Mark()
+{
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILWRITEMASK, 0xffffffff);
+}
+
 /**Draw everything that was submitted from this scene*/
 void RTS3DScene::Flush(RenderInfoClass & rinfo)
 {
@@ -1120,7 +1142,17 @@ void RTS3DScene::Flush(RenderInfoClass & rinfo)
 		DX8InstancingClass::Begin_Lit_Pass();
 		DX8SkinningClass::Begin_Lit_Pass();
 	}
+	MarkShadowReceivers = m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE && !m_planarMirrorPass &&
+		TheW3DShadowMap != nullptr && TheW3DShadowMap->usesScreenReceiver();
+	if (MarkShadowReceivers)
+	{
+		Begin_Receiver_Mark(TRUE);
+	}
 	TheDX8MeshRenderer.Flush();	//draw all non-translucent objects.
+	if (MarkShadowReceivers)
+	{
+		End_Receiver_Mark();
+	}
 
 	//draw all non-translucent objects which were separated because they are hidden and need custom rendering.
 #ifdef USE_NON_STENCIL_OCCLUSION
@@ -1136,13 +1168,22 @@ void RTS3DScene::Flush(RenderInfoClass & rinfo)
 	SHD_FLUSH;
 
 	// Draw the trees last so they alpha blend onto everything correctly.
+	// A tree over an object takes that pixel out of the receiver, since trees take no map shadow.
+	if (MarkShadowReceivers)
+	{
+		Begin_Receiver_Mark(FALSE);
+	}
 	DoTrees(rinfo);
+	if (MarkShadowReceivers)
+	{
+		End_Receiver_Mark();
+	}
 
 	//don't draw shadows in this mode because they interfere with destination alpha
 	if (m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE && !m_planarMirrorPass)
 		DoShadows(rinfo, true);	//draw all stencil shadows
 
-	// The sun's shadow lands on the finished opaque scene, under the water, decals and particles drawn next.
+	// The sun's shadow lands on the scene's finished objects, under the water, decals and particles drawn next.
 	if (TheW3DShadowMap && m_customPassMode == SCENE_PASS_DEFAULT && Get_Extra_Pass_Polygon_Mode() == EXTRA_PASS_DISABLE && !m_planarMirrorPass)
 	{
 		TheW3DShadowMap->renderScreenReceiver(rinfo);
@@ -1864,7 +1905,7 @@ void renderStenciledPlayerColor( UnsignedInt color, UnsignedInt stencilRef, Bool
 	else
 	{
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILREF,      stencilRef );
-		DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILMASK,     0xffffffff );
+		DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILMASK,     MarkShadowReceivers ? ~(DWORD)W3DShadowMap::SCREEN_RECEIVER_STENCIL_BIT : 0xffffffff );
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILWRITEMASK,0xffffffff );
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILFUNC,  D3DCMP_EQUAL );
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILZFAIL, D3DSTENCILOP_KEEP );
@@ -1916,8 +1957,11 @@ void RTS3DScene::flushOccludedObjectsIntoStencil(RenderInfoClass & rinfo)
 		playerColorIndex[i]=-1;
 	}
 
+	// Occludees and occluders are objects too, so their stencil writes carry the receiver bit.
+	const Int receiverBit = MarkShadowReceivers ? W3DShadowMap::SCREEN_RECEIVER_STENCIL_BIT : 0;
+
 	//Assume no player colors are visible and all stencil bits are free for use by shadows.
-	TheW3DShadowManager->setStencilShadowMask(0);
+	TheW3DShadowManager->setStencilShadowMask(receiverBit);
 
 	const Int localPlayerIndex = rts::getObservedOrLocalPlayerIndex_Safe();
 
@@ -1983,7 +2027,7 @@ void RTS3DScene::flushOccludedObjectsIntoStencil(RenderInfoClass & rinfo)
 				Int thisPlayerColorIndex=playerColorIndex[k];
 
 				//Store this object's color index into bits 3-6 of stencil buffer
-				DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILREF, thisPlayerColorIndex<<3);
+				DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILREF, (thisPlayerColorIndex<<3) | receiverBit);
 
 				//Render all of this player's objects for which we care when they are occluded.
 				RenderObjClass **renderList=&playerObjects[k][0];
@@ -1996,6 +2040,8 @@ void RTS3DScene::flushOccludedObjectsIntoStencil(RenderInfoClass & rinfo)
 						TheDX8MeshRenderer.Flush();	//render all the submitted meshes using current stencil function
 						SHD_FLUSH;
 						//Disable writing to color buffer since translucent objects are rendered at end of frame.
+						// Nothing is drawn here yet, so the pixel keeps the receiver bit of what shows through.
+						DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILWRITEMASK, ~(DWORD)receiverBit);
 						DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILFUNC,  D3DCMP_NEVER );	//never allow frame buffer writes.
 						DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILFAIL,  D3DSTENCILOP_REPLACE );	//always replace existing stencil value
 						renderOneObject(rinfo, (*renderList), localPlayerIndex);
@@ -2003,6 +2049,7 @@ void RTS3DScene::flushOccludedObjectsIntoStencil(RenderInfoClass & rinfo)
 						SHD_FLUSH;
 						DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILFAIL,  D3DSTENCILOP_KEEP );
 						DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILFUNC,  D3DCMP_ALWAYS );
+						DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILWRITEMASK, 0xffffffff);
 					}
 					else
 					{
@@ -2018,6 +2065,10 @@ void RTS3DScene::flushOccludedObjectsIntoStencil(RenderInfoClass & rinfo)
 		//non-occluder or occludee objects such as small rocks, shrubs, etc. which we don't care about
 		//but need to render here so that they don't interfere with building occlusion.
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, FALSE );	//these objects are not stored in stencil
+		if (MarkShadowReceivers)
+		{
+			Begin_Receiver_Mark(TRUE);
+		}
 		RenderObjClass **nonOccluderOrOccludeeList=m_nonOccludersOrOccludees;
 		for (k=0; k<m_numNonOccluderOrOccludee; k++)
 		{
@@ -2032,7 +2083,7 @@ void RTS3DScene::flushOccludedObjectsIntoStencil(RenderInfoClass & rinfo)
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, TRUE );
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILREF, 0xffffffff);
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILMASK, 0xffffffff);	//isolate lowest player color
-		DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILWRITEMASK, 0x80);	//only write to MSB
+		DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILWRITEMASK, 0x80 | receiverBit);	//only write to MSB
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILFUNC,  D3DCMP_ALWAYS );	//check if player colors stored in pixel
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILZFAIL, D3DSTENCILOP_KEEP );
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILFAIL,  D3DSTENCILOP_KEEP );
@@ -2060,8 +2111,8 @@ void RTS3DScene::flushOccludedObjectsIntoStencil(RenderInfoClass & rinfo)
 			usedPlayerColorBits |= stencilRef;	//keep track of all bits used for occlusion/player colors.
 		}
 
-		TheW3DShadowManager->setStencilShadowMask(usedPlayerColorBits);
-		if (numVisiblePlayerColors >= 8 && TheGlobalData->m_useShadowVolumes)
+		TheW3DShadowManager->setStencilShadowMask(usedPlayerColorBits | receiverBit);
+		if (numVisiblePlayerColors >= 8 && TheGlobalData->m_useShadowVolumes && !MarkShadowReceivers)
 		{
 			//for cases where we have 8 or more visible players, we're only left with 3 bits to store
 			//stencil shadows.  That's probably not enough since it will only allow 7 overlapping shadows.
@@ -2106,7 +2157,15 @@ void RTS3DScene::flushOccludedObjectsIntoStencil(RenderInfoClass & rinfo)
 			renderOneObject(rinfo, (*nonOccluderOrOccludeeList), localPlayerIndex);
 			nonOccluderOrOccludeeList++;	//advance to next one
 		}
+		if (MarkShadowReceivers)
+		{
+			Begin_Receiver_Mark(TRUE);
+		}
 		TheDX8MeshRenderer.Flush();	//render all the submitted meshes using current stencil function
+		if (MarkShadowReceivers)
+		{
+			End_Receiver_Mark();
+		}
 	}
 
 	//Reset scene ambient because we sometimes mess around with it to make objects

@@ -107,7 +107,7 @@ static Bool Get_Clouds_Block_Sun()
 
 static const Bool CloudsBlockSun = Get_Clouds_Block_Sun();
 
-// CONTRA_SCREENSHADOW=1 shadows the opaque scene in one full-screen pass, in place of every receiver's own sampling.
+// CONTRA_SCREENSHADOW=1 shadows objects in one full-screen pass, in place of each object's own receiver draw.
 static Bool Get_Screen_Shadow_Enabled()
 {
 	const char *value = getenv("CONTRA_SCREENSHADOW");
@@ -138,6 +138,7 @@ W3DShadowMap::W3DShadowMap()
 	  m_shadowColor(1.0f, 1.0f, 1.0f),
 	  m_hasDepth(FALSE),
 	  m_screenShader(0),
+	  m_screenCloudShader(0),
 	  m_screenShaderLoaded(FALSE),
 	  m_screenReceiver(FALSE)
 {
@@ -177,8 +178,10 @@ void W3DShadowMap::ReleaseResources()
 	if (device != nullptr)
 	{
 		DX8_DELETE_PIXEL_SHADER(device, m_screenShader);
+		DX8_DELETE_PIXEL_SHADER(device, m_screenCloudShader);
 	}
 	m_screenShader = 0;
+	m_screenCloudShader = 0;
 	m_screenShaderLoaded = FALSE;
 	m_screenReceiver = FALSE;
 	m_depthMode = DEPTH_MODE_NONE;
@@ -542,29 +545,17 @@ Bool W3DShadowMap::bindReceiver(Int stage) const
 		return FALSE;
 	}
 
-	D3DMATRIX textureTransform;
-	if (m_screenReceiver)
-	{
-		// Every pixel lands outside the map, which receivers read as lit, so their shaders run as they are under the full-screen pass.
-		memset(&textureTransform, 0, sizeof(textureTransform));
-		textureTransform.m[3][0] = 2.0f;
-		textureTransform.m[3][1] = 2.0f;
-		textureTransform.m[3][3] = 1.0f;
-	}
-	else
-	{
-		// Camera space back to world, then onto the map.
-		// The view is read from the device, because every invalidate zeroes the wrapper's copy
-		// and receivers drawn after the terrain would otherwise invert a zero matrix.
-		D3DMATRIX view;
-		DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
+	// Camera space back to world, then onto the map.
+	// The view is read from the device, because every invalidate zeroes the wrapper's copy
+	// and receivers drawn after the terrain would otherwise invert a zero matrix.
+	D3DMATRIX view;
+	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
 
-		D3DMATRIX inverseView;
-		float det;
-		Invert_D3DMATRIX(inverseView, &det, view);
+	D3DMATRIX inverseView;
+	float det;
+	Invert_D3DMATRIX(inverseView, &det, view);
 
-		textureTransform = inverseView * worldToMap;
-	}
+	D3DMATRIX textureTransform = inverseView * worldToMap;
 	DX8Wrapper::_Set_DX8_Transform((D3DTRANSFORMSTATETYPE)(D3DTS_TEXTURE0 + stage), textureTransform);
 
 	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_CAMERASPACEPOSITION);
@@ -639,20 +630,26 @@ void W3DShadowMap::unbindReceiver(Int stage) const
 	DX8Wrapper::Set_DX8_Texture_Stage_State(stage, D3DTSS_TEXCOORDINDEX, D3DTSS_TCI_PASSTHRU | stage);
 }
 
+Bool W3DShadowMap::canMultiplyReceive() const
+{
+	return m_hasDepth && W3DShaderManager::getShaderPasses(W3DShaderManager::ST_SHADOW_MULTIPLY) != 0;
+}
+
 MaterialPassClass* W3DShadowMap::getReceivePass()
 {
-	if (!m_hasDepth || m_screenReceiver || W3DShaderManager::getShaderPasses(W3DShaderManager::ST_SHADOW_MULTIPLY) == 0)
+	if (!canMultiplyReceive() || m_screenReceiver)
 	{
 		return nullptr;
 	}
 	return &m_receivePass;
 }
 
-// Needs the hardware map for its sampler compare and the scene's depth as a texture, which multisampling rules out.
+// Needs the hardware map for its sampler compare, a stencil for the object mark, and the scene's depth as a texture, which multisampling rules out.
 Bool W3DShadowMap::canUseScreenReceiver()
 {
 #if defined(BUILD_WITH_D3D9)
-	if (!ScreenShadowEnabled || m_depthMode != DEPTH_MODE_HARDWARE || DX8Wrapper::Peek_Scene_Depth_Texture() == nullptr)
+	if (!ScreenShadowEnabled || m_depthMode != DEPTH_MODE_HARDWARE || !DX8Wrapper::Has_Stencil() ||
+		DX8Wrapper::Peek_Scene_Depth_Texture() == nullptr)
 	{
 		return FALSE;
 	}
@@ -663,6 +660,13 @@ Bool W3DShadowMap::canUseScreenReceiver()
 			FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\screenshadow.pso", nullptr, 0, false, &m_screenShader)))
 		{
 			m_screenShader = 0;
+		}
+
+		// Without the cloud variant, objects take the shadow alone.
+		if (m_screenShader == 0 ||
+			FAILED(W3DShaderManager::LoadAndCreateD3DShader("shaders\\screenshadowcloud.pso", nullptr, 0, false, &m_screenCloudShader)))
+		{
+			m_screenCloudShader = 0;
 		}
 		RENDER_LOG(("W3DShadowMap: full-screen receiver %s", m_screenShader != 0 ? "on" : "unavailable"));
 	}
@@ -682,27 +686,17 @@ void W3DShadowMap::renderScreenReceiver(RenderInfoClass& rinfo)
 	}
 
 	// Only while the scene's depth is the bound one, which leaves out reflections.
+	// It stays bound for its stencil, which INTZ allows while depth writes are off.
 	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
-	IDirect3DSurface8 *sceneDepth = nullptr;
-	IDirect3DSurface8 *sceneTarget = nullptr;
-	if (FAILED(device->GetDepthStencilSurface(&sceneDepth)) || sceneDepth == nullptr)
+	IDirect3DSurface8 *bound = nullptr;
+	if (FAILED(device->GetDepthStencilSurface(&bound)) || bound == nullptr)
 	{
 		return;
 	}
-	if (sceneDepth != DX8Wrapper::Peek_Scene_Depth_Surface() || FAILED(device->GetRenderTarget(0, &sceneTarget)) || sceneTarget == nullptr)
+	const Bool sceneDepth = (bound == DX8Wrapper::Peek_Scene_Depth_Surface());
+	bound->Release();
+	if (!sceneDepth)
 	{
-		sceneDepth->Release();
-		return;
-	}
-
-	D3DSURFACE_DESC depthDesc;
-	D3DSURFACE_DESC targetDesc;
-	depthTexture->GetLevelDesc(0, &depthDesc);
-	sceneTarget->GetDesc(&targetDesc);
-	if (targetDesc.Width != depthDesc.Width || targetDesc.Height != depthDesc.Height || targetDesc.MultiSampleType != D3DMULTISAMPLE_NONE)
-	{
-		sceneTarget->Release();
-		sceneDepth->Release();
 		return;
 	}
 
@@ -710,10 +704,12 @@ void W3DShadowMap::renderScreenReceiver(RenderInfoClass& rinfo)
 	DX8Wrapper::Apply_Render_State_Changes();
 	D3DMATRIX view;
 	D3DMATRIX projection;
-	D3DVIEWPORT8 cameraViewport;
 	DX8Wrapper::_Get_DX8_Transform(D3DTS_VIEW, view);
 	DX8Wrapper::_Get_DX8_Transform(D3DTS_PROJECTION, projection);
-	DX8Wrapper::Get_Viewport(cameraViewport);
+
+	// The depth buffer shares the target's pixels, so the viewport maps onto it whatever the target's size.
+	D3DSURFACE_DESC depthDesc;
+	depthTexture->GetLevelDesc(0, &depthDesc);
 	const Vector4 depthMap = W3DShaderManager::getClipToTargetMapping((Real)depthDesc.Width, (Real)depthDesc.Height);
 
 	// Depth texture uv to the camera's clip space, then back through the projection to camera space.
@@ -730,6 +726,10 @@ void W3DShadowMap::renderScreenReceiver(RenderInfoClass& rinfo)
 	Invert_D3DMATRIX(inverseView, &det, view);
 	const D3DMATRIX toView = uvToClip * unproject;
 
+	// The cloud map reads the scene's view, so it binds before the quad's identity transforms.
+	D3DMATRIX cameraToCloud;
+	const Bool clouded = m_screenCloudShader != 0 && W3DShaderManager::bindCloudMap(2, cameraToCloud);
+
 	DX8Wrapper::Set_Texture(0, nullptr);
 	DX8Wrapper::Set_Texture(1, nullptr);
 	VertexMaterialClass *material = VertexMaterialClass::Get_Preset(VertexMaterialClass::PRELIT_DIFFUSE);
@@ -745,7 +745,7 @@ void W3DShadowMap::renderScreenReceiver(RenderInfoClass& rinfo)
 
 	// Applies the state above with the map's own sampler state.
 	D3DMATRIX worldToMap;
-	const Bool bound = bindWorldReceiver(1, worldToMap);
+	const Bool mapped = bindWorldReceiver(1, worldToMap);
 	const D3DMATRIX toMap = inverseView * worldToMap;
 
 	// The device is read because the wrapper's cache can hold a placeholder after an invalidate.
@@ -753,10 +753,21 @@ void W3DShadowMap::renderScreenReceiver(RenderInfoClass& rinfo)
 	DWORD stencil = FALSE;
 	device->GetRenderState(D3DRS_ZENABLE, &depthTest);
 	device->GetRenderState(D3DRS_STENCILENABLE, &stencil);
-	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, FALSE);
-	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, TRUE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZFUNC, D3DCMP_ALWAYS);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZWRITEENABLE, FALSE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHATESTENABLE, FALSE);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_FOGENABLE, FALSE);
+
+	// Only the pixels the object flushes marked. The ground, roads and bridges shadow themselves.
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, TRUE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILFUNC, D3DCMP_EQUAL);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILREF, SCREEN_RECEIVER_STENCIL_BIT);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILMASK, SCREEN_RECEIVER_STENCIL_BIT);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILWRITEMASK, 0);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILZFAIL, D3DSTENCILOP_KEEP);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILFAIL, D3DSTENCILOP_KEEP);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILPASS, D3DSTENCILOP_KEEP);
 
 	// Depth reads stay point sampled, so a pixel takes its own surface and not a blend across an edge.
 	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_MINFILTER, D3DTEXF_POINT);
@@ -767,12 +778,10 @@ void W3DShadowMap::renderScreenReceiver(RenderInfoClass& rinfo)
 	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXCOORDINDEX, 0);
 	DX8Wrapper::Set_DX8_Texture_Stage_State(0, D3DTSS_TEXTURETRANSFORMFLAGS, D3DTTFF_DISABLE);
 
-	// No depth is bound while the pass reads it, and the new binding starts with a full viewport.
-	if (bound && SUCCEEDED(DX8Wrapper::Set_DX8_Render_Target_Surfaces(sceneTarget, nullptr)))
+	if (mapped)
 	{
-		DX8Wrapper::Set_Viewport(&cameraViewport);
 		device->SetTexture(0, depthTexture);
-		DX8Wrapper::Set_Pixel_Shader(m_screenShader);
+		DX8Wrapper::Set_Pixel_Shader(clouded ? m_screenCloudShader : m_screenShader);
 
 		const Vector4 params = getReceiverParams();
 		const Vector4 color = getReceiverColor();
@@ -780,21 +789,31 @@ void W3DShadowMap::renderScreenReceiver(RenderInfoClass& rinfo)
 		DX8Wrapper::Set_Pixel_Shader_Constant(4, &color, 1);
 		DX8Wrapper::Set_Pixel_Shader_Constant(5, &toView, 4);
 		DX8Wrapper::Set_Pixel_Shader_Constant(9, &toMap, 4);
+		if (clouded)
+		{
+			const D3DMATRIX &c = cameraToCloud;
+			const Vector4 cloudColumns[2] =
+			{
+				Vector4(c.m[0][0], c.m[1][0], c.m[2][0], c.m[3][0]),
+				Vector4(c.m[0][1], c.m[1][1], c.m[2][1], c.m[3][1])
+			};
+			DX8Wrapper::Set_Pixel_Shader_Constant(13, cloudColumns, 2);
+		}
 		W3DShaderManager::drawClipQuad(depthMap);
 	}
 
 	DX8Wrapper::Set_Pixel_Shader(0);
 	device->SetTexture(0, nullptr);
 	DX8Wrapper::Set_Texture(1, nullptr);
+	DX8Wrapper::Set_Texture(2, nullptr);
 	DX8Wrapper::Set_Vertex_Buffer(nullptr);
 	DX8Wrapper::Set_Index_Buffer(nullptr, 0);
-	DX8Wrapper::Set_DX8_Render_Target_Surfaces(sceneTarget, sceneDepth);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZENABLE, depthTest);
 	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILENABLE, stencil);
-	sceneTarget->Release();
-	sceneDepth->Release();
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILMASK, 0xffffffff);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_STENCILWRITEMASK, 0xffffffff);
 
-	// Blend, alpha test, fog and cull are ShaderClass state, so the next shader set restores them in full.
+	// Blend, depth compare, alpha test, fog and cull are ShaderClass state, so the next shader set restores them in full.
 	ShaderClass::Invalidate();
 	rinfo.Camera.Apply();
 

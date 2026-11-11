@@ -236,6 +236,8 @@ public:
 	static Real getScreenToTargetScale();
 	/// Draws a quad over the viewport through identity transforms, its uv mapped from clip space by clipToTarget.
 	static void drawClipQuad(const Vector4 &clipToTarget);
+	/// Binds the terrain's cloud map to stage and gives the mapping from camera space onto it, where objects take cloud shadows.
+	static Bool bindCloudMap(Int stage, D3DMATRIX &cameraToCloud);
 	static Bool isRenderingToTexture() {return m_renderingToTexture; }
 	static void drawViewport(Int color);	///<draws 2 triangles covering the current tactical viewport
 

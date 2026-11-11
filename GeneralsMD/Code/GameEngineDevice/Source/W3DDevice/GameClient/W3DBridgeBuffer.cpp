@@ -1476,7 +1476,7 @@ void W3DBridgeBuffer::drawBridges(CameraClass * camera, Bool wireframe, TextureC
 	DX8Wrapper::Apply_Render_State_Changes();
 
 	// The shadow pass folds the clouds into the sun's share as the ground does, so only bridges without it multiply them in here.
-	const Bool shadowPass = !wireframe && m_numBridges > 0 && TheW3DShadowMap != nullptr && TheW3DShadowMap->getReceivePass() != nullptr;
+	const Bool shadowPass = !wireframe && m_numBridges > 0 && TheW3DShadowMap != nullptr && TheW3DShadowMap->canMultiplyReceive();
 	const Bool cloudStage = !wireframe && cloudTexture && !shadowPass;
 
 	if (cloudStage)

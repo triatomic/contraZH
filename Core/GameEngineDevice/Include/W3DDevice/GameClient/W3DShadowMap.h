@@ -123,10 +123,19 @@ public:
 	Vector4 getReceiverParams() const;
 	Vector4 getReceiverColor() const;
 
-	// The pass objects push to receive the shadow, or null when nothing can receive it.
+	// True when a surface can multiply the shadow in with a second draw of its own, as bridges do.
+	Bool canMultiplyReceive() const;
+
+	// The pass objects push to receive the shadow, or null when they receive some other way or not at all.
 	MaterialPassClass* getReceivePass();
 
-	// Shadows the opaque scene from its depth in one full-screen draw, when this frame's receivers were left to it.
+	// The stencil bit the scene sets on object pixels for the full-screen receiver.
+	enum { SCREEN_RECEIVER_STENCIL_BIT = 0x04 };
+
+	// True while this frame's objects are left to the full-screen receiver.
+	Bool usesScreenReceiver() const { return m_screenReceiver; }
+
+	// Shadows the marked object pixels from the scene's depth in one full-screen draw.
 	void renderScreenReceiver(RenderInfoClass& rinfo);
 
 	const Matrix4x4& getSunViewProjection() const { return m_sunViewProj; }
@@ -187,8 +196,9 @@ protected:
 	CasterStats    m_casterStats;
 
 	DWORD          m_screenShader;
+	DWORD          m_screenCloudShader;
 	Bool           m_screenShaderLoaded;
-	Bool           m_screenReceiver;	///< this frame's opaque receivers are left to the full-screen pass
+	Bool           m_screenReceiver;	///< this frame's objects are left to the full-screen pass
 
 	W3DShadowReceiveMaterialPassClass m_receivePass;
 };
