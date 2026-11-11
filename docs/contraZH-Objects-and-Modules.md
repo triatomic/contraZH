@@ -1,5 +1,24 @@
 # Objects & Modules
 
+## Lifetime progress bars
+
+`LifetimeUpdate` can show a draining lifetime bar on objects with `SHOW_PROGRESS_BAR`
+in their `KindOf` list. The game's health-bar display setting must be enabled.
+
+```
+  Behavior = LifetimeUpdate ModuleTag_Lifetime
+    MinLifetime = 60000
+    MaxLifetime = 60000
+    ShowProgressBar = Yes
+    ProgressBarUpgrade = Upgrade_GLARecycling
+  End
+```
+
+`ShowProgressBar` defaults to `No`. `ProgressBarUpgrade` defaults to `None`.
+When an upgrade is specified, the bar appears only after the object or its current owner
+has completed that upgrade. The timer keeps running while the bar is hidden. Researching
+the upgrade reveals the remaining lifetime without restarting it.
+
 ## Building lights
 
 Building lights turn off while the building is disabled, including low power, EMP, hacking

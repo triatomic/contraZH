@@ -32,6 +32,8 @@
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "GameLogic/Module/UpdateModule.h"
 
+class UpgradeTemplate;
+
 //-------------------------------------------------------------------------------------------------
 class LifetimeUpdateModuleData : public UpdateModuleData
 {
@@ -39,11 +41,14 @@ public:
 	UnsignedInt m_minFrames;
 	UnsignedInt m_maxFrames;
 	Bool m_showProgressBar;
+	const UpgradeTemplate *m_progressBarUpgrade;
 
 	LifetimeUpdateModuleData()
 	{
 		m_minFrames = 0.0f;
 		m_maxFrames = 0.0f;
+		m_showProgressBar = FALSE;
+		m_progressBarUpgrade = nullptr;
 	}
 
 	static void buildFieldParse(MultiIniFieldParse& p)
@@ -54,6 +59,7 @@ public:
 			{ "MinLifetime",					INI::parseDurationUnsignedInt,		nullptr, offsetof( LifetimeUpdateModuleData, m_minFrames ) },
 			{ "MaxLifetime",					INI::parseDurationUnsignedInt,		nullptr, offsetof( LifetimeUpdateModuleData, m_maxFrames ) },
 			{ "ShowProgressBar",					INI::parseBool,		NULL, offsetof( LifetimeUpdateModuleData, m_showProgressBar ) },
+			{ "ProgressBarUpgrade", INI::parseUpgradeTemplate, nullptr, offsetof( LifetimeUpdateModuleData, m_progressBarUpgrade ) },
 			{ nullptr, nullptr, nullptr, 0 }
 		};
     p.add(dataFieldParse);
@@ -80,7 +86,7 @@ public:
 	virtual UpdateSleepTime update() override;
 
 	Real getProgress();
-	inline Bool showProgressBar(void) const { return getLifetimeUpdateModuleData()->m_showProgressBar; }
+	Bool showProgressBar(void) const;
 
 private:
 

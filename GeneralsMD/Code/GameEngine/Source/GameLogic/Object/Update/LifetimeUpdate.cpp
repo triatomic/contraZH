@@ -31,6 +31,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
 #include "Common/RandomValue.h"
+#include "Common/Player.h"
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Module/LifetimeUpdate.h"
@@ -94,6 +95,21 @@ UnsignedInt LifetimeUpdate::calcSleepDelay(UnsignedInt minFrames, UnsignedInt ma
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
+Bool LifetimeUpdate::showProgressBar(void) const
+{
+	const LifetimeUpdateModuleData* data = getLifetimeUpdateModuleData();
+	if (!data->m_showProgressBar)
+	{
+		return FALSE;
+	}
+	if (!data->m_progressBarUpgrade || getObject()->hasUpgrade(data->m_progressBarUpgrade))
+	{
+		return TRUE;
+	}
+	const Player* player = getObject()->getControllingPlayer();
+	return player && player->hasUpgradeComplete(data->m_progressBarUpgrade);
+}
+
 Real LifetimeUpdate::getProgress(void) {
 	if (m_dieFrame > 0 && m_startDieFrame > 0) {
 		return INT_TO_REAL(TheGameLogic->getFrame() - m_startDieFrame) / INT_TO_REAL(m_dieFrame - m_startDieFrame);
