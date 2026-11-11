@@ -1039,6 +1039,7 @@ public:
 	UnsignedInt getParticleCount() const { return m_particleCount; }
 
 	UnsignedInt getFieldParticleCount()     const { return m_fieldParticleCount; }
+	UnsignedInt getUpdateCount()            const { return m_updateCount; }	///< particle updates run so far, which paces what changes once per update
 
 	UnsignedInt getParticleSystemCount() const { return m_particleSystemCount; }
 
@@ -1077,6 +1078,7 @@ protected:
 	Int m_onScreenParticleCount;                ///< number of particles displayed on screen per frame
 	Int m_localPlayerIndex;	///<used to tell particle systems which particles can be skipped due to player shroud status
 	Real m_drawnLogicFramePhase; ///< How far the render updates have integrated the current logic frame, ranging 0 to 1.
+	UnsignedInt m_updateCount;
 
 private:
 	TemplateMap m_templateMap;		///< a hash map of all particle system templates

@@ -278,8 +278,7 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	// whether any particle system masks the disruption pass this frame
 	Bool hasDisruption = FALSE;
 
-	// whether the smudge pass has anything to draw at all this frame
-	Bool hasSmudge = FALSE;
+	m_smudgeSystems.clear();
 
 	// The lookup hashes the name under a lock, so a run of systems with the same texture shares one.
 	AsciiString lastTextureName;
@@ -351,7 +350,7 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 		}
 		if (sys->isUsingSmudge())
 		{
-			hasSmudge = TRUE;
+			m_smudgeSystems.push_back(sys);
 		}
 		else
 		{
@@ -438,6 +437,9 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 		TheW3DBloom->end(rinfo);
 	}
 
+	// the entries hold texture references, which must not outlive the frame
+	m_drawOrder.clear();
+
 	//Draw any particles belonging to weather effects
 	if (TheSnowManager)
 		((W3DSnowManager *)TheSnowManager)->render(rinfo);
@@ -451,7 +453,7 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	//Now process screen smudges which are particles that distort the background behind them.
 	if (shadedSmudges)
 	{
-		if (hasSmudge && TheGlobalData->m_useHeatEffects)
+		if (!m_smudgeSystems.empty() && TheGlobalData->m_useHeatEffects)
 		{
 			drawSmudges(rinfo);
 		}
@@ -460,9 +462,6 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	{
 		((W3DSmudgeManager *)TheSmudgeManager)->render(rinfo);
 	}
-
-	// the entries hold texture references, which must not outlive the frame
-	m_drawOrder.clear();
 
 	if (TheW3DShockwaves)
 	{
@@ -513,16 +512,20 @@ Bool W3DParticleSystemManager::disrupts(ParticleSystem &system)
 		TheW3DSoftParticles->disruptionEnabled();
 }
 
-// Retail rolled each smudge a new shift on every particle update, 30 times a second.
-static const UnsignedInt SMUDGE_SHIFTS_PER_SECOND = 30;
-
-// Two unrelated values from 0 to 1 that a particle keeps for one step.
-static Vector2 smudgeShift(UnsignedInt personality, UnsignedInt step)
+// A whole byte as a vertex colour, placed so the conversion back lands on it whether it rounds or cuts.
+static Real colorByte(Int value)
 {
-	UnsignedInt h = personality * 374761393u + step * 668265263u;
+	return (value + 0.25f) / 255.0f;
+}
+
+// One axis of a particle's shift as a colour byte, where 127 is none and 0 and 254 the furthest each way.
+// The shift is new on every particle update, as retail's random roll was.
+static Int smudgeShiftByte(UnsignedInt personality, UnsignedInt step, UnsignedInt axis)
+{
+	UnsignedInt h = personality * 374761393u + step * 668265263u + axis * 2246822519u;
 	h = (h ^ (h >> 13)) * 1274126177u;
 	h ^= h >> 16;
-	return Vector2((h & 0xffff) / 65535.0f, (h >> 16) / 65535.0f);
+	return (Int)(h % 255u);
 }
 
 // The sprites shift a copy of the scene taken after everything else drew, so the particles behind them shimmer too.
@@ -533,17 +536,16 @@ void W3DParticleSystemManager::drawSmudges(RenderInfoClass &rinfo)
 	rinfo.Camera.Get_View_Matrix(&view);
 	rinfo.Camera.Get_Projection_Matrix(&projection);
 
+	const UnsignedInt step = getUpdateCount();
+
 	// the screen area the sprites cover, in clip space, least xy and most zw
 	Vector4 area(FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
 
-	for (std::vector<DrawEntry>::iterator entry = m_drawOrder.begin(); entry != m_drawOrder.end(); ++entry)
-	{
-		if (!entry->sys->isUsingSmudge())
-		{
-			continue;
-		}
+	m_smudgeSprites.clear();
 
-		for (Particle *p = entry->sys->getFirstParticle(); p; p = p->m_systemNext)
+	for (std::vector<ParticleSystem *>::iterator sys = m_smudgeSystems.begin(); sys != m_smudgeSystems.end(); ++sys)
+	{
+		for (Particle *p = (*sys)->getFirstParticle(); p; p = p->m_systemNext)
 		{
 			if (p->isCulled())
 			{
@@ -565,14 +567,31 @@ void W3DParticleSystemManager::drawSmudges(RenderInfoClass &rinfo)
 			}
 
 			const Real toClip = 1.0f / low.W;
-			area.X = min(area.X, min(low.X, high.X) * toClip);
-			area.Y = min(area.Y, min(low.Y, high.Y) * toClip);
-			area.Z = max(area.Z, max(low.X, high.X) * toClip);
-			area.W = max(area.W, max(low.Y, high.Y) * toClip);
+			const Real left = min(low.X, high.X) * toClip;
+			const Real right = max(low.X, high.X) * toClip;
+			const Real bottom = min(low.Y, high.Y) * toClip;
+			const Real top = max(low.Y, high.Y) * toClip;
+			area.X = min(area.X, left);
+			area.Y = min(area.Y, bottom);
+			area.Z = max(area.Z, right);
+			area.W = max(area.W, top);
+
+			SmudgeSprite sprite;
+			sprite.pos.Set(pos->x, pos->y, pos->z);
+			sprite.size = p->getSize();
+
+			// a sprite that reaches past the view loses its shift along that axis, as retail's did
+			const Int shiftX = (left < -1.0f || right > 1.0f) ? 127 : smudgeShiftByte(p->getPersonality(), step, 0);
+			const Int shiftY = (bottom < -1.0f || top > 1.0f) ? 127 : smudgeShiftByte(p->getPersonality(), step, 1);
+
+			// retail cut the opacity to a byte and kept its low eight bits
+			const Int opacity = (Int)(p->getAlpha() * 255.0f) & 0xff;
+			sprite.color.Set(colorByte(shiftX), colorByte(shiftY), 0.0f, colorByte(opacity));
+			m_smudgeSprites.push_back(sprite);
 		}
 	}
 
-	if (area.X > area.Z || area.Y > area.W)
+	if (m_smudgeSprites.empty())
 	{
 		return;
 	}
@@ -591,8 +610,6 @@ void W3DParticleSystemManager::drawSmudges(RenderInfoClass &rinfo)
 		m_smudgeTexture.Assign_No_Add_Ref(NEW_REF(TextureClass, (1, 1, WW3D_FORMAT_A8R8G8B8, MIP_LEVELS_1)));
 	}
 
-	const UnsignedInt step = (UnsignedInt)(WW3D::Get_Sync_Time() * SMUDGE_SHIFTS_PER_SECOND / 1000);
-
 	Vector3 *posArray = m_posBuffer->Get_Array();
 	Real *sizeArray = m_sizeBuffer->Get_Array();
 	Vector4 *RGBAArray = m_RGBABuffer->Get_Array();
@@ -602,41 +619,17 @@ void W3DParticleSystemManager::drawSmudges(RenderInfoClass &rinfo)
 
 	m_pointGroup->Set_Flag(PointGroupClass::DISABLE_SORTING, true);
 
-	for (std::vector<DrawEntry>::iterator entry = m_drawOrder.begin(); entry != m_drawOrder.end(); ++entry)
+	for (std::vector<SmudgeSprite>::iterator sprite = m_smudgeSprites.begin(); sprite != m_smudgeSprites.end(); ++sprite)
 	{
-		if (!entry->sys->isUsingSmudge())
+		posArray[pointCount] = sprite->pos;
+		sizeArray[pointCount] = sprite->size;
+		RGBAArray[pointCount] = sprite->color;
+		angleArray[pointCount] = 0;
+		uvRectArray[pointCount] = Vector4(0.0f, 0.0f, 1.0f, 1.0f);
+
+		if (++pointCount == MAX_POINTS_PER_GROUP)
 		{
-			continue;
-		}
-
-		for (Particle *p = entry->sys->getFirstParticle(); p; p = p->m_systemNext)
-		{
-			if (p->isCulled())
-			{
-				continue;
-			}
-
-			const Coord3D *pos = p->getPosition();
-			posArray[pointCount].X = pos->x;
-			posArray[pointCount].Y = pos->y;
-			posArray[pointCount].Z = pos->z;
-
-			sizeArray[pointCount] = p->getSize();
-
-			// red and green carry the shift to the shader, and alpha how much of it shows
-			const Vector2 shift = smudgeShift(p->getPersonality(), step);
-			RGBAArray[pointCount].X = shift.X;
-			RGBAArray[pointCount].Y = shift.Y;
-			RGBAArray[pointCount].Z = 0.0f;
-			RGBAArray[pointCount].W = p->getAlpha();
-
-			angleArray[pointCount] = 0;
-			uvRectArray[pointCount] = Vector4(0.0f, 0.0f, 1.0f, 1.0f);
-
-			if (++pointCount == MAX_POINTS_PER_GROUP)
-			{
-				flushSmudgeBatch(rinfo, pointCount);
-			}
+			flushSmudgeBatch(rinfo, pointCount);
 		}
 	}
 

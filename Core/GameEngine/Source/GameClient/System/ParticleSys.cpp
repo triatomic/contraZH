@@ -3536,6 +3536,7 @@ ParticleSystemManager::ParticleSystemManager()
 	m_onScreenParticleCount = 0;
 	m_localPlayerIndex = 0;
 	m_drawnLogicFramePhase = 1.0f;
+	m_updateCount = 0;
 
 	m_particleCount = 0;
 	m_fieldParticleCount = 0;
@@ -3659,6 +3660,8 @@ void ParticleSystemManager::update()
 			deleteInstance(sys);
 		}
 	}
+
+	++m_updateCount;
 
 	const Bool drawSmudge = TheSmudgeManager && !TheSmudgeManager->isReplaced() && TheSmudgeManager->getHardwareSupport() && TheGlobalData->m_useHeatEffects;
 

@@ -62,7 +62,7 @@ private:
 	};
 
 	void drawSystems(RenderInfoClass &rinfo, DrawPass pass);	///< draws m_drawOrder
-	void drawSmudges(RenderInfoClass &rinfo);	///< draws m_drawOrder's heat particles as sprites that shift the scene behind them
+	void drawSmudges(RenderInfoClass &rinfo);	///< draws m_smudgeSystems' particles as sprites that shift the scene behind them
 	void flushSmudgeBatch(RenderInfoClass &rinfo, UnsignedInt &pointCount);
 	unsigned systemEffects(ParticleSystem &system, DrawPass pass);
 	Bool disrupts(ParticleSystem &system);	///< whether the disruption pass draws the system
@@ -80,9 +80,18 @@ private:
 	};
 	static Bool isFarther(const DrawEntry &a, const DrawEntry &b);
 
+	struct SmudgeSprite
+	{
+		Vector3 pos;
+		Real size;
+		Vector4 color;	///< red and green carry the shift to the shader, and alpha the opacity
+	};
+
 	// TheSuperHackers @feature renders ground aligned particles as terrain conforming meshes
 	class W3DTerrainParticles *m_terrainParticles;
 	std::vector<DrawEntry> m_drawOrder;			///< visible systems in the order they draw this frame
+	std::vector<ParticleSystem *> m_smudgeSystems;	///< visible heat systems in list order, which is the order retail drew them in
+	std::vector<SmudgeSprite> m_smudgeSprites;	///< this frame's heat sprites, kept to reuse the storage
 	RefCountPtr<TextureClass> m_batchTexture;		///< the texture used as the drawing surface for batched particle draws
 	RefCountPtr<TextureClass> m_smudgeTexture;	///< never read, as point groups shade only textured sprites
 	PointGroupClass *m_pointGroup;							///< the point group that contains all of the particles

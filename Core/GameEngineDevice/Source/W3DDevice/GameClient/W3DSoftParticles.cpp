@@ -989,6 +989,10 @@ Bool W3DSoftParticles::bindSmudge()
 	// A world unit at unit depth, in scene uv. The shader divides by the sprite's depth.
 	const Vector4 bend(fabs(m_projection.m[0][0] * screenMap.X), fabs(m_projection.m[1][1] * screenMap.Y), 0.0f, 0.0f);
 	const Vector4 bounds(m_smudgeBounds[0], m_smudgeBounds[1], m_smudgeBounds[2], m_smudgeBounds[3]);
+
+	// Retail read the copy half a texel off the texel centres, which is the slight blur a smudge has.
+	const Vector4 lookup(screenMap.X, screenMap.Y, screenMap.Z - 0.5f / desc.Width, screenMap.W - 0.5f / desc.Height);
+	DX8Wrapper::Set_Pixel_Shader_Constant(3, &lookup, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(4, &bend, 1);
 	DX8Wrapper::Set_Pixel_Shader_Constant(5, &bounds, 1);
 

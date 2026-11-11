@@ -2,8 +2,8 @@
 //
 // The sprite draws after the particles, over a copy of the scene on stage 3. The shift and the
 // sprite's alpha are full at its middle and gone at its edges. The red and green of its colour
-// carry the shift, as a share of the sprite's size. Its vertices are in camera space, and stage 1
-// hands that position over as TEXCOORD1.
+// carry the shift as bytes, where 127 is none and 0 and 254 the furthest each way. Its vertices
+// are in camera space, and stage 1 hands that position over as TEXCOORD1.
 
 sampler2D SceneTexture : register(s3);
 
@@ -17,7 +17,7 @@ float4 Bounds    : register(c5);   // the scene uv the copy holds, xy the least 
 // The furthest shift, as a share of the sprite's size.
 static const float Reach = 0.06f;
 
-static const float3 Tint = float3(1.0f, 0.933f, 0.867f);
+static const float3 Tint = float3(1.0f, 238.0f / 255.0f, 221.0f / 255.0f);
 
 struct PsIn
 {
@@ -38,7 +38,7 @@ float4 main(PsIn input) : COLOR
     // A texture width in world units, from how fast each crosses the screen.
     float size = length(ddx(input.Position)) / max(length(ddx(input.TexCoord)), 1e-6f);
 
-    float2 shift = (input.Diffuse.rg * 2.0f - 1.0f) * (Reach * size * weight);
+    float2 shift = (input.Diffuse.rg * (255.0f / 127.0f) - 1.0f) * (Reach * size * weight);
     float2 uv = ndc * ScreenMap.xy + ScreenMap.zw + shift * Bend.xy / w;
     uv = clamp(uv, Bounds.xy, Bounds.zw);
 

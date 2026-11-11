@@ -455,7 +455,9 @@ Heat particle systems, the shimmer behind jet engines, microwave beams and blast
 sprites through a pixel shader. A system is a heat system when its `ParticleName` starts with
 `SMUDGE.`, as in `ParticleName = SMUDGE.tga`, or when it has `Type = SMUDGE`. The texture is never
 loaded, and `Shader` is ignored. The look is the original one. Each particle shifts the scene behind it
-towards a spot that jumps 30 times a second, strongest at the particle's middle and gone at its edges.
+towards a spot that jumps on every particle update, strongest at the particle's middle and gone at its
+edges. The area is slightly blurred, and a particle that reaches past the edge of the view loses its
+shift along that axis.
 
 Needs the Direct3D 9 build, a shader model 2.0a card and `Heat Effects` on. It has no INI keys.
 
