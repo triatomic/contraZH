@@ -99,7 +99,9 @@ private:
 		std::vector<std::pair<Cell, Cluster> > clusters;
 		Matrix3D pose;		///< its placement within the drawn object when the fits were made
 		Real maxRadius;
+		Real fitHeight;		///< its height over the ground when the fits were made
 		UnsignedInt fitFrame;
+		Bool refit;			///< it moved since its fits and waits for its turn or the frame's budget
 		std::vector<GroundFit> fits;	///< one a group
 	};
 	TextureSamples *textureSamples(TextureClass *texture);
@@ -112,6 +114,7 @@ private:
 	void gatherBlockers(RenderObjClass &object);
 	Bool isBlocked(const Vector3 &from, const Vector3 &to) const;
 	void fitGround(RenderObjClass &root, const ModelSamples &model, const Matrix3D &transform, std::vector<GroundFit> &fits);
+	void fitGroup(const Vector3 &origin, Real radius, Real ground, GroundFit &fit) const;
 
 	std::map<TextureClass *, TextureSamples> m_textures;
 	std::map<ModelKey, ModelSamples> m_models;

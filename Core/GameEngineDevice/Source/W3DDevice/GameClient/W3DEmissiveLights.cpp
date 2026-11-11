@@ -26,8 +26,9 @@ static const Real EMISSIVE_AMBIENT = 0.1f;
 // A ground fit casts FIT_RINGS * FIT_AZIMUTHS rays, and a frame fits FIT_BUDGET groups before the rest wait a frame.
 enum { FIT_RINGS = 3, FIT_AZIMUTHS = 8, FIT_BUDGET = 96 };
 
-// A mesh that turns within its object refits this often.
+// A mesh that turns within its object, or rises or sinks FIT_HEIGHT over the ground, refits this often.
 static const UnsignedInt FIT_FRAMES = 4;
+static const Real FIT_HEIGHT = 4.0f;
 
 // A group's ground light is dropped under FIT_DARK of its unblocked energy and left alone above FIT_CLEAR.
 static const Real FIT_DARK = 0.03f;
@@ -65,7 +66,7 @@ W3DEmissiveLights::W3DEmissiveLights()
 }
 
 W3DEmissiveLights::ObjectLights::ObjectLights()
-	: model(nullptr), alternate(FALSE), transform(true), maskIntensity(0.0f), frame(0), pose(true), maxRadius(0.0f), fitFrame(0)
+	: model(nullptr), alternate(FALSE), transform(true), maskIntensity(0.0f), frame(0), pose(true), maxRadius(0.0f), fitHeight(0.0f), fitFrame(0), refit(FALSE)
 {
 }
 
@@ -394,16 +395,6 @@ void W3DEmissiveLights::fitGround(RenderObjClass &root, const ModelSamples &mode
 	{
 		return;
 	}
-	if (m_blockerRoot != &root)
-	{
-		m_blockers.clear();
-		gatherBlockers(root);
-		m_blockerRoot = &root;
-	}
-	if (m_blockers.empty())
-	{
-		return;
-	}
 
 	Vector3 axis;
 	transform.Get_X_Vector(&axis);
@@ -424,67 +415,84 @@ void W3DEmissiveLights::fitGround(RenderObjClass &root, const ModelSamples &mode
 		{
 			continue;
 		}
-		const Real reach = sqrtf(radius * radius - height * height);
-
-		Real all = 0.0f;
-		Real allSpread = 0.0f;
-		Real lit = 0.0f;
-		Real litXX = 0.0f;
-		Real litYY = 0.0f;
-		Real litXY = 0.0f;
-		Vector2 middle(0.0f, 0.0f);
-		for (Int ring = 0; ring < FIT_RINGS; ring++)
+		if (m_blockerRoot != &root)
 		{
-			const Real distance = reach * ((Real)ring + 0.5f) / (Real)FIT_RINGS;
-			const Real weight = Ground_Light(radius, height, distance) * distance;
-			for (Int azimuth = 0; azimuth < FIT_AZIMUTHS; azimuth++)
+			m_blockers.clear();
+			gatherBlockers(root);
+			m_blockerRoot = &root;
+		}
+		if (m_blockers.empty())
+		{
+			return;
+		}
+		fitGroup(origin, radius, ground, fits[group]);
+		Matrix3D::Inverse_Rotate_Vector(transform, fits[group].offset, &fits[group].offset);
+		fits[group].offset /= scale * scale;
+	}
+}
+
+// Fits a light whose radius reaches the ground, and leaves the offset in world space.
+void W3DEmissiveLights::fitGroup(const Vector3 &origin, Real radius, Real ground, GroundFit &fit) const
+{
+	const Real height = origin.Z - ground;
+	const Real reach = sqrtf(radius * radius - height * height);
+
+	Real all = 0.0f;
+	Real allSpread = 0.0f;
+	Real lit = 0.0f;
+	Real litXX = 0.0f;
+	Real litYY = 0.0f;
+	Real litXY = 0.0f;
+	Vector2 middle(0.0f, 0.0f);
+	for (Int ring = 0; ring < FIT_RINGS; ring++)
+	{
+		const Real distance = reach * ((Real)ring + 0.5f) / (Real)FIT_RINGS;
+		const Real weight = Ground_Light(radius, height, distance) * distance;
+		for (Int azimuth = 0; azimuth < FIT_AZIMUTHS; azimuth++)
+		{
+			const Real angle = ((Real)azimuth + 0.5f * (Real)(ring & 1)) * (2.0f * PI / (Real)FIT_AZIMUTHS);
+			const Vector2 step(cosf(angle) * distance, sinf(angle) * distance);
+			all += weight;
+			allSpread += weight * distance * distance;
+			if (weight > 0.0f && !isBlocked(origin, Vector3(origin.X + step.X, origin.Y + step.Y, ground)))
 			{
-				const Real angle = ((Real)azimuth + 0.5f * (Real)(ring & 1)) * (2.0f * PI / (Real)FIT_AZIMUTHS);
-				const Vector2 step(cosf(angle) * distance, sinf(angle) * distance);
-				all += weight;
-				allSpread += weight * distance * distance;
-				if (weight > 0.0f && !isBlocked(origin, Vector3(origin.X + step.X, origin.Y + step.Y, ground)))
-				{
-					lit += weight;
-					litXX += weight * step.X * step.X;
-					litYY += weight * step.Y * step.Y;
-					litXY += weight * step.X * step.Y;
-					middle += step * weight;
-				}
+				lit += weight;
+				litXX += weight * step.X * step.X;
+				litYY += weight * step.Y * step.Y;
+				litXY += weight * step.X * step.Y;
+				middle += step * weight;
 			}
 		}
-		if (lit >= all * FIT_CLEAR)
-		{
-			continue;
-		}
-		GroundFit &fit = fits[group];
-		if (lit <= all * FIT_DARK)
-		{
-			fit.scale = 0.0f;
-			continue;
-		}
-		middle /= lit;
-
-		// The lit ground's narrowest axis sets the radius, so the light stays off the blocked side.
-		litXX = litXX / lit - middle.X * middle.X;
-		litYY = litYY / lit - middle.Y * middle.Y;
-		litXY = litXY / lit - middle.X * middle.Y;
-		const Real narrow = (litXX + litYY) * 0.5f - sqrtf((litXX - litYY) * (litXX - litYY) * 0.25f + litXY * litXY);
-		fit.spread = WWMath::Clamp(sqrtf(max(narrow, 0.0f) / (allSpread / all * 0.5f)), 0.25f, 1.0f);
-
-		// The fitted light carries the energy that got through, and never outshines the unblocked one.
-		const Real fitReach = reach * fit.spread;
-		const Real fitRadius = sqrtf(fitReach * fitReach + height * height);
-		Real fitted = 0.0f;
-		for (Int ring = 0; ring < FIT_RINGS; ring++)
-		{
-			const Real distance = fitReach * ((Real)ring + 0.5f) / (Real)FIT_RINGS;
-			fitted += Ground_Light(fitRadius, height, distance) * distance * (Real)FIT_AZIMUTHS;
-		}
-		fit.scale = fitted > 0.0f ? min(lit * reach / (fitted * fitReach), 1.0f) : 0.0f;
-		Matrix3D::Inverse_Rotate_Vector(transform, Vector3(middle.X, middle.Y, 0.0f), &fit.offset);
-		fit.offset /= scale * scale;
 	}
+	if (lit >= all * FIT_CLEAR)
+	{
+		return;
+	}
+	if (lit <= all * FIT_DARK)
+	{
+		fit.scale = 0.0f;
+		return;
+	}
+	middle /= lit;
+
+	// The lit ground's narrowest axis sets the radius, so the light stays off the blocked side.
+	litXX = litXX / lit - middle.X * middle.X;
+	litYY = litYY / lit - middle.Y * middle.Y;
+	litXY = litXY / lit - middle.X * middle.Y;
+	const Real narrow = (litXX + litYY) * 0.5f - sqrtf((litXX - litYY) * (litXX - litYY) * 0.25f + litXY * litXY);
+	fit.spread = WWMath::Clamp(sqrtf(max(narrow, 0.0f) / (allSpread / all * 0.5f)), 0.25f, 1.0f);
+
+	// The fitted light carries the energy that got through, and never outshines the unblocked one.
+	const Real fitReach = reach * fit.spread;
+	const Real fitRadius = sqrtf(fitReach * fitReach + height * height);
+	Real fitted = 0.0f;
+	for (Int ring = 0; ring < FIT_RINGS; ring++)
+	{
+		const Real distance = fitReach * ((Real)ring + 0.5f) / (Real)FIT_RINGS;
+		fitted += Ground_Light(fitRadius, height, distance) * distance * (Real)FIT_AZIMUTHS;
+	}
+	fit.scale = fitted > 0.0f ? min(lit * reach / (fitted * fitReach), 1.0f) : 0.0f;
+	fit.offset.Set(middle.X, middle.Y, 0.0f);
 }
 
 void W3DEmissiveLights::begin(CameraClass &camera)
@@ -603,6 +611,10 @@ void W3DEmissiveLights::addObject(RenderObjClass &object, Real opacity, RenderOb
 		}
 		found = m_models.insert(std::make_pair(key, entry)).first;
 	}
+	if (found->second.samples.empty())
+	{
+		return;
+	}
 	const Matrix3D &transform = object.Get_Transform();
 	const Real maskIntensity = !TheGlobalData->m_useSpecular ? 0.0f : TheGlobalData->m_timeOfDay == TIME_OF_DAY_NIGHT
 		? TheGlobalData->m_unitEmissiveNightIntensity : TheGlobalData->m_unitEmissiveIntensity;
@@ -611,14 +623,16 @@ void W3DEmissiveLights::addObject(RenderObjClass &object, Real opacity, RenderOb
 	const Real maxRadius = TheGlobalData->m_pathTracingLightMaxRadius;
 	ObjectLights &lights = m_objects[&object];
 	if (lights.model != model || lights.alternate != key.second || lights.maskIntensity != maskIntensity || lights.transform != transform ||
-		lights.maxRadius != maxRadius)
+		lights.maxRadius != maxRadius || lights.refit)
 	{
 		Vector3 axis;
 		transform.Get_X_Vector(&axis);
 		const Real scale = axis.Length();
 
-		// A mesh that only travels with its object keeps its fits.
+		// A mesh that only travels with its object, at one height over the ground, keeps its fits.
 		const std::vector<Group> &groups = found->second.groups;
+		const Vector3 place = transform.Get_Translation();
+		const Real height = TheTerrainRenderObject != nullptr ? place.Z - TheTerrainRenderObject->getHeightMapHeight(place.X, place.Y, nullptr) : 0.0f;
 		Matrix3D pose(true);
 		if (&object != &root)
 		{
@@ -627,8 +641,9 @@ void W3DEmissiveLights::addObject(RenderObjClass &object, Real opacity, RenderOb
 			Matrix3D::Multiply(rootInverse, transform, &pose);
 		}
 		const Bool unfitted = lights.model != model || lights.alternate != key.second || lights.fits.size() != groups.size();
+		const Bool moved = !Same_Pose(lights.pose, pose) || fabs(height - lights.fitHeight) > FIT_HEIGHT;
 		Bool fitted = TRUE;
-		if (unfitted || lights.maxRadius != maxRadius || (m_frame - lights.fitFrame >= FIT_FRAMES && !Same_Pose(lights.pose, pose)))
+		if (unfitted || lights.maxRadius != maxRadius || (moved && m_frame - lights.fitFrame >= FIT_FRAMES))
 		{
 			if (m_fitBudget > 0)
 			{
@@ -636,6 +651,7 @@ void W3DEmissiveLights::addObject(RenderObjClass &object, Real opacity, RenderOb
 				fitGround(root, found->second, transform, lights.fits);
 				lights.pose = pose;
 				lights.maxRadius = maxRadius;
+				lights.fitHeight = height;
 				lights.fitFrame = m_frame;
 			}
 			else if (unfitted)
@@ -644,6 +660,7 @@ void W3DEmissiveLights::addObject(RenderObjClass &object, Real opacity, RenderOb
 				fitted = FALSE;
 			}
 		}
+		lights.refit = moved && lights.fitFrame != m_frame;
 		m_groundOffsets.resize(groups.size());
 		for (size_t i = 0; i < groups.size(); i++)
 		{
