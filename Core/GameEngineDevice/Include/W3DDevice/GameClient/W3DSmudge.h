@@ -44,6 +44,7 @@ public:
 	void render (RenderInfoClass &rinfo);
 	virtual void ReleaseResources() override;
 	virtual void ReAcquireResources() override;
+	virtual void setReplaced(Bool replaced) override;	///< also drops the background copy while it has no use
 
 private:
 	Bool testHardwareSupport();		///<test if video card supports the effect.

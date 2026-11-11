@@ -44,7 +44,8 @@ public:
 		EFFECT_MESH = 256,	// a model's mesh, whose texture may tile both ways and whose settings come with it
 		EFFECT_MIRROR = 512,	// a planar mirror mesh, shown as the scene behind it bent under its own colour, with the reflection over both
 		EFFECT_FLUID = 1024,	// fluid currents, bubbles and luminous edges
-		EFFECT_TERRAIN = 2048	// terrain-conforming particles keep their surface coverage and use border sampling
+		EFFECT_TERRAIN = 2048,	// terrain-conforming particles keep their surface coverage and use border sampling
+		EFFECT_SMUDGE = 4096	// shift the scene copy behind a heat sprite, in a pass of its own after the sorted draws
 	};
 
 	virtual ~SoftParticleHookClass() {}

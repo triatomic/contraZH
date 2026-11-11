@@ -19,7 +19,8 @@
 // W3DSoftParticles.cpp ///////////////////////////////////////////////////////////////////////////
 // Fades particle sprites where they near the scene's depth or the terrain behind them, shades
 // flame sprites as fire, electric sprites as arcs, laser beams and streaks as lasers and cryo effects
-// as ice, and draws the heat haze behind flames and the disruption behind jammers
+// as ice, and draws the heat haze behind flames, the disruption behind jammers and the smudges
+// of heat particles
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Lib/BaseType.h"
@@ -71,6 +72,12 @@ static const Int FluidShaderMode = Get_Env_Mode("CONTRA_FLUIDSHADER", 1);
 // CONTRA_DISRUPTSHADER bisects faults: 0 no disruption, 1 disruption shading.
 static const Int DisruptionShaderMode = Get_Env_Mode("CONTRA_DISRUPTSHADER", 1);
 
+// CONTRA_SMUDGESHADER bisects faults: 0 heat particles as the smudge manager's fans, 1 as shaded sprites.
+static const Int SmudgeShaderMode = Get_Env_Mode("CONTRA_SMUDGESHADER", 1);
+
+// A bilinear lookup at the area's edge reads this many pixels past it.
+static const Int SMUDGE_AREA_PAD = 2;
+
 // DisruptionGlitchSize counts pixels on a screen this many lines tall, so the bands look the same at any resolution.
 static const Real GLITCH_SCREEN_LINES = 1080.0f;
 
@@ -103,21 +110,27 @@ W3DSoftParticles::W3DSoftParticles()
 	  m_cryoBeamShader(0),
 	  m_fluidShader(0),
 	  m_hazeShader(0),
+	  m_smudgeShader(0),
 	  m_noise(nullptr),
 	  m_sceneCopy(nullptr),
 	  m_loaded(FALSE),
 	  m_disrupting(FALSE),
+	  m_smudging(FALSE),
 	  m_bound(0)
 {
 	m_disruptionShaders[0] = 0;
 	m_disruptionShaders[1] = 0;
 	m_disruptionShaders[2] = 0;
+	m_smudgeBounds[0] = 0.0f;
+	m_smudgeBounds[1] = 0.0f;
+	m_smudgeBounds[2] = 1.0f;
+	m_smudgeBounds[3] = 1.0f;
 	Set_D3DMATRIX_Identity(m_view);
 	Set_D3DMATRIX_Identity(m_projection);
 	Set_D3DMATRIX_Identity(m_toWorld);
 
 	if (SoftParticleMode != SOFT_PARTICLES_OFF || FlameShaderMode != FLAME_SHADER_OFF || ElectricShaderMode != 0 || LaserShaderMode != 0 || CryoShaderMode != 0 ||
-		DisruptionShaderMode != 0 || FluidShaderMode != 0)
+		DisruptionShaderMode != 0 || FluidShaderMode != 0 || SmudgeShaderMode != 0)
 	{
 		SortingRendererClass::Set_Soft_Particle_Hook(this);
 	}
@@ -163,6 +176,7 @@ void W3DSoftParticles::ReleaseResources()
 		DX8_DELETE_PIXEL_SHADER(device, m_disruptionShaders[0]);
 		DX8_DELETE_PIXEL_SHADER(device, m_disruptionShaders[1]);
 		DX8_DELETE_PIXEL_SHADER(device, m_disruptionShaders[2]);
+		DX8_DELETE_PIXEL_SHADER(device, m_smudgeShader);
 	}
 	m_depthShader = 0;
 	m_heightShader = 0;
@@ -188,7 +202,9 @@ void W3DSoftParticles::ReleaseResources()
 	m_disruptionShaders[0] = 0;
 	m_disruptionShaders[1] = 0;
 	m_disruptionShaders[2] = 0;
+	m_smudgeShader = 0;
 	m_disrupting = FALSE;
+	m_smudging = FALSE;
 
 	if (m_noise != nullptr)
 	{
@@ -279,6 +295,17 @@ Bool W3DSoftParticles::disruptionEnabled()
 	return m_disruptionShaders[0] != 0 && m_disruptionShaders[1] != 0 && m_disruptionShaders[2] != 0 && m_noise != nullptr;
 }
 
+// The Heat Effects option is left out, so turning it off does not hand heat particles back to the smudge manager.
+Bool W3DSoftParticles::smudgeEnabled()
+{
+	if (SmudgeShaderMode == 0)
+	{
+		return FALSE;
+	}
+	loadShaders();
+	return m_smudgeShader != 0 && m_noise != nullptr;
+}
+
 static void Load_Pixel_Shader(const char *path, DWORD &shader)
 {
 	if (FAILED(W3DShaderManager::LoadAndCreateD3DShader(path, nullptr, 0, false, &shader)))
@@ -335,13 +362,18 @@ Bool W3DSoftParticles::loadShaders()
 				Load_Pixel_Shader("shaders\\disruptioncenter.pso", m_disruptionShaders[DisruptionShaderInfo::SHAPE_CENTER]);
 				Load_Pixel_Shader("shaders\\disruptionbeam.pso", m_disruptionShaders[DisruptionShaderInfo::SHAPE_BEAM]);
 			}
+			if (SmudgeShaderMode != 0)
+			{
+				Load_Pixel_Shader("shaders\\heatsmudge.pso", m_smudgeShader);
+			}
 #if RTS_ZEROHOUR
 			if (FluidShaderMode != 0)
 			{
 				Load_Pixel_Shader("shaders\\particlefluid.pso", m_fluidShader);
 			}
 #endif
-			if (FlameShaderMode != FLAME_SHADER_OFF || ElectricShaderMode != 0 || LaserShaderMode != 0 || CryoShaderMode != 0 || DisruptionShaderMode != 0 || FluidShaderMode != 0)
+			if (FlameShaderMode != FLAME_SHADER_OFF || ElectricShaderMode != 0 || LaserShaderMode != 0 || CryoShaderMode != 0 || DisruptionShaderMode != 0 || FluidShaderMode != 0 ||
+				SmudgeShaderMode != 0)
 			{
 				createNoise();
 			}
@@ -877,6 +909,109 @@ Bool W3DSoftParticles::bindDisruption(const ShaderClass &shader, const Disruptio
 #endif
 }
 
+// Only the area the heat sprites cover is copied, which is all their shader reads.
+Bool W3DSoftParticles::beginSmudges(const Vector4 &clipArea)
+{
+	m_smudging = FALSE;
+#if defined(BUILD_WITH_D3D9)
+	if (!smudgeEnabled())
+	{
+		return FALSE;
+	}
+
+	IDirect3DSurface8 *target = nullptr;
+	if (FAILED(DX8Wrapper::_Get_D3D_Device8()->GetRenderTarget(0, &target)))
+	{
+		return FALSE;
+	}
+	D3DSURFACE_DESC desc;
+	target->GetDesc(&desc);
+	target->Release();
+
+	D3DVIEWPORT8 viewport;
+	DX8Wrapper::Get_Viewport(viewport);
+	const Vector4 map = W3DShaderManager::getClipToTargetMapping((Real)desc.Width, (Real)desc.Height);
+
+	// The mapping lands on texel centres, and clip y runs up where the target's runs down.
+	const Real left = (max(clipArea.X, -1.0f) * map.X + map.Z) * desc.Width - 0.5f;
+	const Real right = (min(clipArea.Z, 1.0f) * map.X + map.Z) * desc.Width - 0.5f;
+	const Real top = (min(clipArea.W, 1.0f) * map.Y + map.W) * desc.Height - 0.5f;
+	const Real bottom = (max(clipArea.Y, -1.0f) * map.Y + map.W) * desc.Height - 0.5f;
+
+	RECT area;
+	area.left = max((Int)floorf(left) - SMUDGE_AREA_PAD, (Int)viewport.X);
+	area.top = max((Int)floorf(top) - SMUDGE_AREA_PAD, (Int)viewport.Y);
+	area.right = min((Int)ceilf(right) + 1 + SMUDGE_AREA_PAD, (Int)(viewport.X + viewport.Width));
+	area.bottom = min((Int)ceilf(bottom) + 1 + SMUDGE_AREA_PAD, (Int)(viewport.Y + viewport.Height));
+	if (area.right <= area.left || area.bottom <= area.top)
+	{
+		return FALSE;
+	}
+
+	if (!W3DShaderManager::copyRenderTarget(m_sceneCopy, &area))
+	{
+		return FALSE;
+	}
+
+	m_smudgeBounds[0] = (area.left + 0.5f) / desc.Width;
+	m_smudgeBounds[1] = (area.top + 0.5f) / desc.Height;
+	m_smudgeBounds[2] = (area.right - 0.5f) / desc.Width;
+	m_smudgeBounds[3] = (area.bottom - 0.5f) / desc.Height;
+	m_smudging = TRUE;
+#else
+	(void)clipArea;
+#endif
+	return m_smudging;
+}
+
+void W3DSoftParticles::endSmudges()
+{
+	m_smudging = FALSE;
+}
+
+// Blend, alpha test, depth write and fog are overridden as the haze does, and End puts them back the same way.
+Bool W3DSoftParticles::bindSmudge()
+{
+#if defined(BUILD_WITH_D3D9)
+	if (!m_smudging || m_smudgeShader == 0 || m_sceneCopy == nullptr)
+	{
+		return FALSE;
+	}
+
+	DX8Wrapper::Set_Texture(SOFT_STAGE, nullptr);
+	DX8Wrapper::Set_Texture(SCENE_STAGE, nullptr);
+	DX8Wrapper::Apply_Render_State_Changes();
+
+	D3DSURFACE_DESC desc;
+	m_sceneCopy->GetLevelDesc(0, &desc);
+	const Vector4 screenMap = setClipConstants((Real)desc.Width, (Real)desc.Height);
+
+	// A world unit at unit depth, in scene uv. The shader divides by the sprite's depth.
+	const Vector4 bend(fabs(m_projection.m[0][0] * screenMap.X), fabs(m_projection.m[1][1] * screenMap.Y), 0.0f, 0.0f);
+	const Vector4 bounds(m_smudgeBounds[0], m_smudgeBounds[1], m_smudgeBounds[2], m_smudgeBounds[3]);
+	DX8Wrapper::Set_Pixel_Shader_Constant(4, &bend, 1);
+	DX8Wrapper::Set_Pixel_Shader_Constant(5, &bounds, 1);
+
+	bindSceneCopy();
+
+	// Texture coordinates arrive packed by textured stage, so the camera position reaches TEXCOORD1 only with stage 1 filled.
+	DX8Wrapper::_Get_D3D_Device8()->SetTexture(SOFT_STAGE, m_noise);
+
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHABLENDENABLE, TRUE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_SRCBLEND, D3DBLEND_SRCALPHA);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ALPHATESTENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_ZWRITEENABLE, FALSE);
+	DX8Wrapper::Set_DX8_Render_State(D3DRS_FOGENABLE, FALSE);
+	Bind_Camera_Position();
+	DX8Wrapper::Set_Pixel_Shader(m_smudgeShader);
+	m_bound = EFFECT_SMUDGE;
+	return TRUE;
+#else
+	return FALSE;
+#endif
+}
+
 bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const void *effectData)
 {
 	m_bound = 0;
@@ -893,6 +1028,11 @@ bool W3DSoftParticles::Begin(const ShaderClass &shader, unsigned effects, const 
 	if ((effects & EFFECT_DISRUPT) != 0)
 	{
 		return effectData != nullptr && bindDisruption(shader, *static_cast<const DisruptionShaderInfo *>(effectData)) != FALSE;
+	}
+
+	if ((effects & EFFECT_SMUDGE) != 0)
+	{
+		return bindSmudge() != FALSE;
 	}
 
 	FlameShaderTuning tuning;
@@ -1064,7 +1204,7 @@ void W3DSoftParticles::End()
 		// ShaderClass never sets the blend op, so it is put back here.
 		DX8Wrapper::Set_DX8_Render_State(D3DRS_BLENDOP, D3DBLENDOP_ADD);
 	}
-	if ((m_bound & (EFFECT_HAZE | EFFECT_DISRUPT)) != 0)
+	if ((m_bound & (EFFECT_HAZE | EFFECT_DISRUPT | EFFECT_SMUDGE)) != 0)
 	{
 		device->SetTexture(SCENE_STAGE, nullptr);
 

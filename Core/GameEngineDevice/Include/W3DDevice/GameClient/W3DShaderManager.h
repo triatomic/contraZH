@@ -229,7 +229,8 @@ public:
 	static IDirect3DTexture8 * endRenderToTexture(); ///< Ends render to texture, & returns texture.
 	static IDirect3DTexture8 * getRenderTexture();	///< returns last used render target texture
 	/// Copies the bound render target into copy, resolving multisampling and recreating copy when the target changes shape.
-	static Bool copyRenderTarget(IDirect3DTexture8 *&copy);
+	/// An area copies those target pixels alone, and leaves the rest of copy as it was.
+	static Bool copyRenderTarget(IDirect3DTexture8 *&copy, const RECT *area = nullptr);
 	/// Scale in xy and offset in zw from clip space to the texel centres of a width by height copy of the render target.
 	static Vector4 getClipToTargetMapping(Real width, Real height);
 	/// Target pixels per screen pixel, above 1 while the scene renders larger than the screen for supersampling.

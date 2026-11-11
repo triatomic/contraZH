@@ -449,6 +449,27 @@ has no texture to mask the disruption.
 the effect never vanishes.
 * Launch with `CONTRA_DISRUPTSHADER=0` to turn disruption off.
 
+# Heat smudges
+
+Heat particle systems, the shimmer behind jet engines, microwave beams and blast waves, draw as
+sprites through a pixel shader. A system is a heat system when its `ParticleName` starts with
+`SMUDGE.`, as in `ParticleName = SMUDGE.tga`, or when it has `Type = SMUDGE`. The texture is never
+loaded, and `Shader` is ignored. The look is the original one. Each particle shifts the scene behind it
+towards a spot that jumps 30 times a second, strongest at the particle's middle and gone at its edges.
+
+Needs the Direct3D 9 build, a shader model 2.0a card and `Heat Effects` on. It has no INI keys.
+
+What changed against the original smudges:
+* The game copies only the part of the screen the heat particles cover, where the original copied
+the whole screen for a single particle. With anti-aliasing on it still copies the whole screen.
+* Heat particles draw in batches with the other particles. The game no longer rebuilds a smudge
+list every particle update.
+
+Notes:
+* The heat still bends the particles behind it, since it draws after them.
+* On the Direct3D 8 build or a card without shader model 2.0a, the original smudges draw.
+* Launch with `CONTRA_SMUDGESHADER=0` to bring the original smudges back.
+
 # Shockwave (FXList.ini)
 
 An expanding ring on the ground that bends everything behind it, like the air a big blast pushes

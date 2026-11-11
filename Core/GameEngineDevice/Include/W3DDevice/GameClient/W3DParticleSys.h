@@ -62,6 +62,8 @@ private:
 	};
 
 	void drawSystems(RenderInfoClass &rinfo, DrawPass pass);	///< draws m_drawOrder
+	void drawSmudges(RenderInfoClass &rinfo);	///< draws m_drawOrder's heat particles as sprites that shift the scene behind them
+	void flushSmudgeBatch(RenderInfoClass &rinfo, UnsignedInt &pointCount);
 	unsigned systemEffects(ParticleSystem &system, DrawPass pass);
 	Bool disrupts(ParticleSystem &system);	///< whether the disruption pass draws the system
 	Bool finishedBatch(const ParticleSystem& system, const RefCountPtr<TextureClass>& texture, Bool premultiplied, unsigned effects, const void *effectData);
@@ -82,6 +84,7 @@ private:
 	class W3DTerrainParticles *m_terrainParticles;
 	std::vector<DrawEntry> m_drawOrder;			///< visible systems in the order they draw this frame
 	RefCountPtr<TextureClass> m_batchTexture;		///< the texture used as the drawing surface for batched particle draws
+	RefCountPtr<TextureClass> m_smudgeTexture;	///< never read, as point groups shade only textured sprites
 	PointGroupClass *m_pointGroup;							///< the point group that contains all of the particles
 	StreakLineClass *m_streakLine;							///< the streak class that contains all of the streaks
 	ShareBufferClass<Vector3> *m_posBuffer;			///< array of particle positions

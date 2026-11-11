@@ -252,7 +252,14 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 
 	m_fieldParticleCount = 0;
 
-	if (TheSmudgeManager && TheSmudgeManager->getHardwareSupport() && TheGlobalData->m_useHeatEffects)
+	// heat particles draw as shaded sprites where the smudge shader runs, and as the smudge manager's fans elsewhere
+	const Bool shadedSmudges = TheW3DSoftParticles != nullptr && TheW3DSoftParticles->smudgeEnabled();
+	if (TheSmudgeManager)
+	{
+		TheSmudgeManager->setReplaced(shadedSmudges);
+	}
+
+	if (TheSmudgeManager && !shadedSmudges && TheSmudgeManager->getHardwareSupport() && TheGlobalData->m_useHeatEffects)
 	{
 		TheSmudgeManager->resetDraw();
 	}
@@ -270,6 +277,9 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 
 	// whether any particle system masks the disruption pass this frame
 	Bool hasDisruption = FALSE;
+
+	// whether the smudge pass has anything to draw at all this frame
+	Bool hasSmudge = FALSE;
 
 	// The lookup hashes the name under a lock, so a run of systems with the same texture shares one.
 	AsciiString lastTextureName;
@@ -339,7 +349,11 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 			const Vector4 &viewZ = rinfo.Camera.Get_View_Matrix()[2];
 			entry.depth = (viewZ.X * visibleSum.X + viewZ.Y * visibleSum.Y + viewZ.Z * visibleSum.Z) / particleCount;
 		}
-		if (!sys->isUsingSmudge())
+		if (sys->isUsingSmudge())
+		{
+			hasSmudge = TRUE;
+		}
+		else
 		{
 			const AsciiString &textureName = sys->getParticleTypeName();
 			if (lastTexture == nullptr || textureName != lastTextureName)
@@ -424,9 +438,6 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 		TheW3DBloom->end(rinfo);
 	}
 
-	// the entries hold texture references, which must not outlive the frame
-	m_drawOrder.clear();
-
 	//Draw any particles belonging to weather effects
 	if (TheSnowManager)
 		((W3DSnowManager *)TheSnowManager)->render(rinfo);
@@ -438,10 +449,20 @@ void W3DParticleSystemManager::doParticles(RenderInfoClass &rinfo)
 	}
 
 	//Now process screen smudges which are particles that distort the background behind them.
-	if(TheSmudgeManager)
+	if (shadedSmudges)
+	{
+		if (hasSmudge && TheGlobalData->m_useHeatEffects)
+		{
+			drawSmudges(rinfo);
+		}
+	}
+	else if(TheSmudgeManager)
 	{
 		((W3DSmudgeManager *)TheSmudgeManager)->render(rinfo);
 	}
+
+	// the entries hold texture references, which must not outlive the frame
+	m_drawOrder.clear();
 
 	if (TheW3DShockwaves)
 	{
@@ -492,9 +513,153 @@ Bool W3DParticleSystemManager::disrupts(ParticleSystem &system)
 		TheW3DSoftParticles->disruptionEnabled();
 }
 
+// Retail rolled each smudge a new shift on every particle update, 30 times a second.
+static const UnsignedInt SMUDGE_SHIFTS_PER_SECOND = 30;
+
+// Two unrelated values from 0 to 1 that a particle keeps for one step.
+static Vector2 smudgeShift(UnsignedInt personality, UnsignedInt step)
+{
+	UnsignedInt h = personality * 374761393u + step * 668265263u;
+	h = (h ^ (h >> 13)) * 1274126177u;
+	h ^= h >> 16;
+	return Vector2((h & 0xffff) / 65535.0f, (h >> 16) / 65535.0f);
+}
+
+// The sprites shift a copy of the scene taken after everything else drew, so the particles behind them shimmer too.
+void W3DParticleSystemManager::drawSmudges(RenderInfoClass &rinfo)
+{
+	Matrix3D view;
+	Matrix4x4 projection;
+	rinfo.Camera.Get_View_Matrix(&view);
+	rinfo.Camera.Get_Projection_Matrix(&projection);
+
+	// the screen area the sprites cover, in clip space, least xy and most zw
+	Vector4 area(FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
+
+	for (std::vector<DrawEntry>::iterator entry = m_drawOrder.begin(); entry != m_drawOrder.end(); ++entry)
+	{
+		if (!entry->sys->isUsingSmudge())
+		{
+			continue;
+		}
+
+		for (Particle *p = entry->sys->getFirstParticle(); p; p = p->m_systemNext)
+		{
+			if (p->isCulled())
+			{
+				continue;
+			}
+
+			const Coord3D *pos = p->getPosition();
+			Vector3 center;
+			Matrix3D::Transform_Vector(view, Vector3(pos->x, pos->y, pos->z), &center);
+
+			const Real half = 0.5f * p->getSize();
+			const Vector4 low = projection * Vector3(center.X - half, center.Y - half, center.Z);
+			const Vector4 high = projection * Vector3(center.X + half, center.Y + half, center.Z);
+
+			// a sprite faces the camera, so it is in front of it whole or not at all
+			if (low.W <= WWMATH_EPSILON)
+			{
+				continue;
+			}
+
+			const Real toClip = 1.0f / low.W;
+			area.X = min(area.X, min(low.X, high.X) * toClip);
+			area.Y = min(area.Y, min(low.Y, high.Y) * toClip);
+			area.Z = max(area.Z, max(low.X, high.X) * toClip);
+			area.W = max(area.W, max(low.Y, high.Y) * toClip);
+		}
+	}
+
+	if (area.X > area.Z || area.Y > area.W)
+	{
+		return;
+	}
+
+	// the particles drawn so far are still queued, and belong in the copy
+	SortingRendererClass::Flush();
+
+	TheW3DSoftParticles->beginPass(rinfo);
+	if (!TheW3DSoftParticles->beginSmudges(area))
+	{
+		return;
+	}
+
+	if (m_smudgeTexture == nullptr)
+	{
+		m_smudgeTexture.Assign_No_Add_Ref(NEW_REF(TextureClass, (1, 1, WW3D_FORMAT_A8R8G8B8, MIP_LEVELS_1)));
+	}
+
+	const UnsignedInt step = (UnsignedInt)(WW3D::Get_Sync_Time() * SMUDGE_SHIFTS_PER_SECOND / 1000);
+
+	Vector3 *posArray = m_posBuffer->Get_Array();
+	Real *sizeArray = m_sizeBuffer->Get_Array();
+	Vector4 *RGBAArray = m_RGBABuffer->Get_Array();
+	uint8 *angleArray = m_angleBuffer->Get_Array();
+	Vector4 *uvRectArray = m_uvRectBuffer->Get_Array();
+	UnsignedInt pointCount = 0;
+
+	m_pointGroup->Set_Flag(PointGroupClass::DISABLE_SORTING, true);
+
+	for (std::vector<DrawEntry>::iterator entry = m_drawOrder.begin(); entry != m_drawOrder.end(); ++entry)
+	{
+		if (!entry->sys->isUsingSmudge())
+		{
+			continue;
+		}
+
+		for (Particle *p = entry->sys->getFirstParticle(); p; p = p->m_systemNext)
+		{
+			if (p->isCulled())
+			{
+				continue;
+			}
+
+			const Coord3D *pos = p->getPosition();
+			posArray[pointCount].X = pos->x;
+			posArray[pointCount].Y = pos->y;
+			posArray[pointCount].Z = pos->z;
+
+			sizeArray[pointCount] = p->getSize();
+
+			// red and green carry the shift to the shader, and alpha how much of it shows
+			const Vector2 shift = smudgeShift(p->getPersonality(), step);
+			RGBAArray[pointCount].X = shift.X;
+			RGBAArray[pointCount].Y = shift.Y;
+			RGBAArray[pointCount].Z = 0.0f;
+			RGBAArray[pointCount].W = p->getAlpha();
+
+			angleArray[pointCount] = 0;
+			uvRectArray[pointCount] = Vector4(0.0f, 0.0f, 1.0f, 1.0f);
+
+			if (++pointCount == MAX_POINTS_PER_GROUP)
+			{
+				flushSmudgeBatch(rinfo, pointCount);
+			}
+		}
+	}
+
+	flushSmudgeBatch(rinfo, pointCount);
+
+	m_pointGroup->Set_Flag(PointGroupClass::DISABLE_SORTING, false);
+	TheW3DSoftParticles->endSmudges();
+}
+
+void W3DParticleSystemManager::flushSmudgeBatch(RenderInfoClass &rinfo, UnsignedInt &pointCount)
+{
+	m_batchTexture = m_smudgeTexture;
+	m_batchPremultiplied = false;
+	m_batchShaderType = ParticleSystemInfo::ALPHA;
+	m_batchBillboard = true;
+	m_batchEffects = SoftParticleHookClass::EFFECT_SMUDGE;
+	m_batchEffectData = nullptr;
+	flushParticleBatch(rinfo, pointCount);
+}
+
 void W3DParticleSystemManager::drawSystems(RenderInfoClass &rinfo, DrawPass pass)
 {
-	const Bool drawSmudge = TheSmudgeManager && TheSmudgeManager->getHardwareSupport() && TheGlobalData->m_useHeatEffects;
+	const Bool drawSmudge = TheSmudgeManager && !TheSmudgeManager->isReplaced() && TheSmudgeManager->getHardwareSupport() && TheGlobalData->m_useHeatEffects;
 	const Bool batchParticles = TheGlobalData->m_batchParticles;
 	const Bool useAtlas = TheGlobalData->m_particleAtlas && pass == DRAW_MAIN && TheW3DParticleAtlas != nullptr;
 

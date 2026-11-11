@@ -18,7 +18,7 @@ the error until the next save.
 
 * [Lighting & Surfaces](dx9-Lighting.md) - shadow mapping, specular, terrain glint, normal and glow maps, per-pixel lights, ambient occlusion
 * [Terrain](dx9-Terrain.md) - ground noise, height blending and stochastic tiling
-* [Effect Shaders](dx9-Effect-Shaders.md) - soft particles, flame, electric, laser, cryo, disruption and shockwaves
+* [Effect Shaders](dx9-Effect-Shaders.md) - soft particles, flame, electric, laser, cryo, disruption, heat smudges and shockwaves
 * [Weather, Sky & Reflections](dx9-Environment.md) - storms, headlights, planar mirrors, sky, colour grading and water
 * [Performance](dx9-Performance.md) - supersampling, instancing, GPU skinning and presentation
 
@@ -68,7 +68,8 @@ out of a list.
 | `PARTICLE` | `ADDITIVE`, `ALPHA` | Flame, electric or cryo, the soft fade, and disruption |
 | `PARTICLE` | `ALPHA_TEST`, `MULTIPLY` | Nothing |
 | `STREAK` | Any but `MULTIPLY` | Laser, cryo, or flame with `FlameShader = Yes` |
-| `VOLUME_PARTICLE`, `SMUDGE`, `DRAWABLE` | Any | Nothing |
+| `SMUDGE`, or any with `ParticleName = SMUDGE.tga` | Any | [Heat smudges](dx9-Effect-Shaders.md#heat-smudges), with no keys to set |
+| `VOLUME_PARTICLE`, `DRAWABLE` | Any | Nothing |
 
 * Cryo wins over every other shader. A system, beam or model with cryo on draws as ice.
 * Flame comes next. A system, beam or model that is both flame and electric draws as flame.
@@ -124,11 +125,11 @@ End
 * The Direct3D 8 build ignores every shader in these pages.
 * `FlameShaders`, `ElectricShaders`, `LaserShaders` and `CryoShaders` in `Options.ini` default to Yes.
 No turns that shader off everywhere.
-* Flame haze, shockwaves and disruption need `Heat Effects` on. Bloom needs `Bloom = Yes`.
+* Flame haze, heat smudges, shockwaves and disruption need `Heat Effects` on. Bloom needs `Bloom = Yes`.
 * The system's `Type` and `Shader` must allow the shader, as in the table above.
 * `ParticleSystem.ini` changes and the texture lists apply on the next launch. `GameData.ini` tuning
 reloads in cheat builds.
 * `CONTRA_FLAMESHADER`, `CONTRA_ELECTRICSHADER`, `CONTRA_LASERSHADER`, `CONTRA_CRYOSHADER` or
-`CONTRA_DISRUPTSHADER` set to 0 turns that shader off. `CONTRA_STORMSHADER=0` turns storms off, `CONTRA_HEADLIGHTSHADER=0` brings back the headlight meshes, and `CONTRA_PLANARMIRROR=0` draws mirror meshes plain.
+`CONTRA_DISRUPTSHADER` set to 0 turns that shader off. `CONTRA_SMUDGESHADER=0` brings back the original heat smudges. `CONTRA_STORMSHADER=0` turns storms off, `CONTRA_HEADLIGHTSHADER=0` brings back the headlight meshes, and `CONTRA_PLANARMIRROR=0` draws mirror meshes plain.
 * `LaserDebug = Yes` in `GameData.ini` draws shaded beams dark, so it shows which beams took the
 laser shader.

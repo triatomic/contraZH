@@ -106,6 +106,9 @@ public:
 	Int getSmudgeCountLastFrame() {return m_smudgeCountLastFrame;} ///<return number of smudges submitted last frame.
 	Bool getHardwareSupport() { return m_hardwareSupportStatus != SMUDGE_SUPPORT_NO;}
 
+	virtual void setReplaced(Bool replaced);	///< while something else draws the heat particles, no smudges are kept for them
+	Bool isReplaced() const { return m_replaced; }
+
 protected:
 
 	enum HardwareSmudgeSupport {SMUDGE_SUPPORT_UNKNOWN,SMUDGE_SUPPORT_NO,SMUDGE_SUPPORT_YES};
@@ -115,6 +118,7 @@ protected:
 	SmudgeSetDeque m_usedSmudgeSetList;	///<used SmudgeSets
 	SmudgeSetDeque m_freeSmudgeSetList;	///<unused SmudgeSets ready for re-use.
 	Int m_smudgeCountLastFrame;	//number of total smudges in manager last frame.
+	Bool m_replaced;
 };
 
 extern SmudgeManager *TheSmudgeManager;	///<singleton

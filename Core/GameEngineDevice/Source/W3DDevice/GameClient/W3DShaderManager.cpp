@@ -6545,7 +6545,7 @@ IDirect3DTexture8 *W3DShaderManager::getRenderTexture()
 	return m_renderTexture;
 }
 
-Bool W3DShaderManager::copyRenderTarget(IDirect3DTexture8 *&copy)
+Bool W3DShaderManager::copyRenderTarget(IDirect3DTexture8 *&copy, const RECT *area)
 {
 #if defined(BUILD_WITH_D3D9)
 	IDirect3DDevice8 *device = DX8Wrapper::_Get_D3D_Device8();
@@ -6574,18 +6574,24 @@ Bool W3DShaderManager::copyRenderTarget(IDirect3DTexture8 *&copy)
 		return FALSE;
 	}
 
-	// StretchRect also resolves a multisampled target.
+	// StretchRect also resolves a multisampled target, but only as a whole.
+	if (targetDesc.MultiSampleType != D3DMULTISAMPLE_NONE)
+	{
+		area = nullptr;
+	}
+
 	IDirect3DSurface8 *copySurface = nullptr;
 	Bool copied = FALSE;
 	if (SUCCEEDED(copy->GetSurfaceLevel(0, &copySurface)))
 	{
-		copied = SUCCEEDED(device->StretchRect(target, nullptr, copySurface, nullptr, D3DTEXF_NONE));
+		copied = SUCCEEDED(device->StretchRect(target, area, copySurface, area, D3DTEXF_NONE));
 		copySurface->Release();
 	}
 	target->Release();
 	return copied;
 #else
 	(void)copy;
+	(void)area;
 	return FALSE;
 #endif
 }

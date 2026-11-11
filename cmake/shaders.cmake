@@ -337,6 +337,8 @@ rts_add_shader("${RTS_SHADER_DIR}/laserglow.hlsl"      ps_2_a main laserglow7.ps
 rts_add_shader("${RTS_SHADER_DIR}/footprint.hlsl"      ps_2_a main footprint.pso)
 rts_add_shader("${RTS_SHADER_DIR}/footprint.hlsl"      ps_2_a main footprintring.pso            RING=1)
 rts_add_shader("${RTS_SHADER_DIR}/heathaze.hlsl"       ps_2_0 main heathaze.pso)
+# The heat smudge sizes its shift with derivatives, which ps_2_0 lacks.
+rts_add_shader("${RTS_SHADER_DIR}/heatsmudge.hlsl"     ps_2_a main heatsmudge.pso)
 rts_add_shader("${RTS_SHADER_DIR}/shockwave.hlsl"      ps_2_0 main shockwave.pso)
 # The disruption's rings find their way across the screen with derivatives, which ps_2_0 lacks.
 rts_add_shader("${RTS_SHADER_DIR}/disruption.hlsl"     ps_2_a main disruptionsprite.pso         SHAPE=0)

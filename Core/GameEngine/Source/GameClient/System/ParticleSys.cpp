@@ -3660,7 +3660,7 @@ void ParticleSystemManager::update()
 		}
 	}
 
-	const Bool drawSmudge = TheSmudgeManager && TheSmudgeManager->getHardwareSupport() && TheGlobalData->m_useHeatEffects;
+	const Bool drawSmudge = TheSmudgeManager && !TheSmudgeManager->isReplaced() && TheSmudgeManager->getHardwareSupport() && TheGlobalData->m_useHeatEffects;
 
 	if (drawSmudge)
 	{

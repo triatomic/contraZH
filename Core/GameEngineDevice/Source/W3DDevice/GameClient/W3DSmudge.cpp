@@ -76,9 +76,24 @@ void W3DSmudgeManager::ReleaseResources()
 static_assert(SMUDGE_DRAW_SIZE * 5 < 0x10000, "Vertex index exceeds 16-bit limit");
 
 
+void W3DSmudgeManager::setReplaced(Bool replaced)
+{
+	const Bool changed = replaced != isReplaced();
+	SmudgeManager::setReplaced(replaced);
+	if (changed)
+	{
+		ReAcquireResources();
+	}
+}
+
 void W3DSmudgeManager::ReAcquireResources()
 {
 	ReleaseResources();
+
+	if (isReplaced())
+	{
+		return;
+	}
 
 	SurfaceClass *surface=DX8Wrapper::_Get_DX8_Back_Buffer();
 	SurfaceClass::SurfaceDescription surface_desc;
