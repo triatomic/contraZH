@@ -503,8 +503,15 @@ public:
 	static void Resolve_Scene_Target();
 
 	// Supersampling renders the scene this many times the back buffer's size each way, 1 to 2, and takes MSAA's place.
-	static void Set_Super_Sampling(float scale) { SuperSampleScale = (scale < 1.0f) ? 1.0f : (scale > 2.0f) ? 2.0f : scale; }
+	static void Set_Super_Sampling(float scale) { SuperSampleWidth = 0; SuperSampleScale = (scale < 1.0f) ? 1.0f : (scale > 2.0f) ? 2.0f : scale; }
 	static float Get_Super_Sampling() { return SuperSampleScale; }
+
+	// A scene width in pixels sets the scale from the back buffer's width, past the usual limit of 2. 0 is for none.
+	static void Set_Super_Sample_Width(unsigned width) { SuperSampleWidth = width; }
+	static unsigned Get_Super_Sample_Width() { return SuperSampleWidth; }
+
+	// The supersampled scene at its own size, which holds the last frame's world between frames, or null without supersampling
+	static IDirect3DSurface8 * _Peek_Scene_Target() { return (SuperSampleScale > 1.0f) ? SceneRenderTarget : nullptr; }
 
 	static IDirect3DSurface8 * _Create_DX8_Surface(unsigned int width, unsigned int height, WW3DFormat format);
 	static IDirect3DSurface8 * _Create_DX8_Surface(const char *filename);
@@ -767,6 +774,7 @@ protected:
 	static D3DFORMAT					DisplayFormat;
 	static D3DMULTISAMPLE_TYPE	MultiSampleAntiAliasing;
 	static float						SuperSampleScale;
+	static unsigned						SuperSampleWidth;
 
 
 	// shader system updates KJM v
@@ -827,6 +835,9 @@ protected:
 	static IDirect3DSurface8 *			DeviceDepthBuffer;
 	// True from the resolve to the next frame's start, while the back buffer is the target
 	static bool							SceneResolved;
+	// Each halves the one before it, so a scene far larger than the screen reaches it with every pixel counted
+	enum { MAX_SCENE_RESOLVE_STEPS = 4 };
+	static IDirect3DSurface8 *			SceneResolveSteps[MAX_SCENE_RESOLVE_STEPS];
 	static void Create_Scene_Target();
 	static void Create_Scene_Depth_Texture(unsigned width, unsigned height);
 	static void Release_Scene_Target();

@@ -141,7 +141,7 @@ public:
 	Bool loadFromIniFile();
 
 	WW3D::MultiSampleModeEnum getAntiAliasing() const;
-	// Options.ini: SuperSampling = 150 or 200 renders the world that percent of the screen's size each way, 100 for off
+	// Options.ini: SuperSampling = 150 or 200 renders the world that percent of the screen's size each way, 100 for off, 15360 for 16K
 	Int getSuperSampling() const;
 	TextureFilterClass::TextureFilterMode getTextureFilterMode() const;
 	TextureFilterClass::AnisotropicFilterMode getTextureAnisotropyLevel() const;

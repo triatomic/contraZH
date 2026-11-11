@@ -274,7 +274,7 @@ static const char *const BuildTimerModeNames[] = { "None", "Seconds", "Auto" };
 static const char *const CastModeNames[] = { "Normal", "QuickCast", "QuickCastWithIndicator" };
 static const Int AnisotropyLevels[] = { 2, 4, 8, 16 };
 static const Int ShadowMapResolutions[] = { 512, 1024, 2048, 4096 };
-static const Int SuperSamplingPercents[] = { 100, 150, 200 };
+static const Int SuperSamplingPercents[] = { 100, 150, 200, WW3D::SUPER_SAMPLING_16K };
 static const char *const PathTracingModeNames[] = { "Off", "Quality", "Fast" };
 static const Int RenderFPSLimits[] = { 30, 60, 120, 240, 0 };
 static_assert( ARRAY_SIZE(HealthBarModeNames) == HealthBarDisplayMode_Count, "HealthBarModeNames out of date" );

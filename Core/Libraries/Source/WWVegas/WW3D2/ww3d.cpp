@@ -2079,10 +2079,18 @@ void WW3D::Set_MSAA_Mode(MultiSampleModeEnum mode)
 void WW3D::Set_Super_Sampling(int percent)
 {
 	DX8Wrapper::Set_Super_Sampling(percent / 100.0f);
+	if (percent >= SUPER_SAMPLING_16K)
+	{
+		DX8Wrapper::Set_Super_Sample_Width(SUPER_SAMPLING_16K);
+	}
 }
 
 int WW3D::Get_Super_Sampling()
 {
+	if (DX8Wrapper::Get_Super_Sample_Width() != 0)
+	{
+		return SUPER_SAMPLING_16K;
+	}
 	return (int)(DX8Wrapper::Get_Super_Sampling() * 100.0f + 0.5f);
 }
 

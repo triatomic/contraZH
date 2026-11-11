@@ -630,7 +630,7 @@ public:
 																			 smaller area within the rectangle to order the gather. */
 
 	UnsignedInt m_antiAliasLevel;          ///< value of selected antialias level in the game options
-	Int m_superSampling;                   ///< Options.ini SuperSampling: the world's render size as a percent of the screen's, 100 to 200
+	Int m_superSampling;                   ///< Options.ini SuperSampling: the world's render size as a percent of the screen's, 100 to 200, or 15360 for 16K
 	UnsignedInt m_textureFilteringMode;       ///< value related to TextureFilterClass::TextureFilterModeEnum
 	UnsignedInt m_textureAnisotropyLevel;     ///< value related to TextureFilterClass::AnisotropicFilterMode
 

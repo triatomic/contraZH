@@ -1,6 +1,6 @@
 # Supersampling
 
-`Supersampling` on the Graphics page offers `150%` and `200%`. The world renders to a target that
+`Supersampling` on the Graphics page offers `150%`, `200%` and [`16K`](#16k). The world renders to a target that
 many percent of the screen's size each way and is filtered down to the screen with a box filter,
 which smooths edges, alpha-tested cutouts, particles and shader output alike. The interface and
 the mouse draw after that at the screen's own size, so text stays sharp. Unlike MSAA the larger
@@ -12,6 +12,22 @@ Notes:
 * Supersampling takes MSAA's place; the Anti-aliasing box greys out while it is on.
 * `Options.ini` stores it as `SuperSampling = 150` or `200`.
 * The `CONTRA_SSAA` environment variable set to a percent overrides the option for one run.
+
+## 16K
+
+The `16K` entry is for screenshots, not for play. It renders the world 15360 pixels wide on any
+screen, which is 600% at 2560x1440 and 400% at 4K, and the frame rate drops to match.
+
+* While it is on, both screenshot keys save the world at its full size as a PNG, 15360x8640 on a
+16:9 screen. The shot has no interface and no mouse, because those draw after the world is
+shrunk to the screen.
+* The game pauses for several seconds while the file is written. A shot is often over 100 MB.
+* The colour grade runs at the full size in this mode, so the saved picture carries it.
+* The world's colour and depth take about 1 GB of video memory, and every effect that copies the
+scene takes another 0.5 GB. If the card cannot make the target, supersampling turns itself off.
+* A card that cannot make textures 15360 wide gets the largest scene it can make.
+* `Options.ini` stores it as `SuperSampling = 15360`, and `CONTRA_SSAA=15360` sets it for one run.
+* The combo's fourth entry reads its label from `GUI:SuperSampling3` in `Generals.str`.
 * The combo needs a layout with the `ComboBoxSuperSampling` row, which `build/add_ssaa_wnd.py` adds
 to a loose `OptionsMenu.wnd`.
 

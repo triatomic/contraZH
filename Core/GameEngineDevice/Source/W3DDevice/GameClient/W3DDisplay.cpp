@@ -2378,10 +2378,16 @@ AGAIN:
 				{
 					TheW3DDistanceFog->render(*primaryW3DView->get3DCamera());
 				}
+				// A scene of a fixed width is what a screenshot saves, so it takes the colour grade at its own size
+				const Bool gradeScene = DX8Wrapper::Get_Super_Sample_Width() != 0;
+				if (gradeScene && TheW3DColorLut != nullptr)
+				{
+					TheW3DColorLut->render(*primaryW3DView->get3DCamera());
+				}
 				// A supersampled scene comes down to the screen here, so the interface keeps its native pixels
 				// and the colour grade works over the screen's pixels alone
 				DX8Wrapper::Resolve_Scene_Target();
-				if (TheW3DColorLut != nullptr)
+				if (!gradeScene && TheW3DColorLut != nullptr)
 				{
 					TheW3DColorLut->render(*primaryW3DView->get3DCamera());
 				}

@@ -281,6 +281,8 @@ public:
 	static void					Set_MSAA_Mode(MultiSampleModeEnum mode);
 	static MultiSampleModeEnum Get_MSAA_Mode();
 	/// Supersampling as a percent of the screen's size each way, 100 to 200; above 100 it takes MSAA's place. Set before the device is made.
+	/// SUPER_SAMPLING_16K in place of a percent renders the world 15360 pixels wide on any screen, for screenshots.
+	enum { SUPER_SAMPLING_16K = 15360 };
 	static void					Set_Super_Sampling(int percent);
 	static int					Get_Super_Sampling();
 
