@@ -774,8 +774,9 @@ void W3DShadowMap::updateCullCamera()
 	m_cullCamera->Set_Transform(transform);
 	m_cullCamera->Set_Clip_Planes(SHADOW_CULL_DISTANCE + SHADOW_NEAR, SHADOW_CULL_DISTANCE + SHADOW_FAR);
 
-	// Wide enough at the near plane to cover the map with room to spare.
-	const Vector2 viewPlane = halfExtent * (1.5f / SHADOW_CULL_DISTANCE);
+	// The frustum widens with distance, so covering the map at the near plane covers it throughout. A texel of margin takes in the projection's snap.
+	const Real margin = 1.0f + 2.0f / (Real)m_resolution;
+	const Vector2 viewPlane = halfExtent * (margin / (SHADOW_CULL_DISTANCE + SHADOW_NEAR));
 	m_cullCamera->Set_View_Plane(-viewPlane, viewPlane);
 }
 
