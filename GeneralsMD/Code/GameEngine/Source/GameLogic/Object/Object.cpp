@@ -3207,9 +3207,13 @@ void Object::friend_prepareForMapBoundaryAdjust()
 //-------------------------------------------------------------------------------------------------
 void Object::friend_notifyOfNewMapBoundary()
 {
-	ThePartitionManager->registerObject(this);
-	TheRadar->addObject(this);
-	TheAI->pathfinder()->addObjectToPathfindMap( this );
+	// Enclosed occupants stay outside the world systems when map boundaries change.
+	if (!getEnclosingContainedBy())
+	{
+		ThePartitionManager->registerObject(this);
+		TheRadar->addObject(this);
+		TheAI->pathfinder()->addObjectToPathfindMap( this );
+	}
 
 	// Now that the PartitionManager has finished its reset, we need to relook
 	handlePartitionCellMaintenance();
