@@ -127,6 +127,50 @@ Automatic deploying when a target comes into range is unchanged outside the manu
 Selecting a mixed group and pressing the button moves the whole group to one stance rather than flipping each
 unit separately, so a second press does not undo half of them.
 
+### TOGGLE_TUNNEL_AUTO_POP
+
+Turns a tunnel into an exit. While a player has at least one exit, every other tunnel of that player
+is an entrance, and units that enter the network come straight out of an exit
+([#95](https://github.com/triatomic/contraZH/pull/95)).
+
+```
+CommandButton Command_TunnelAutoExit
+  Command       = TOGGLE_TUNNEL_AUTO_POP
+  Options       = CHECK_LIKE OK_FOR_MULTI_SELECT   ; CHECK_LIKE shows the button as toggled on
+  TextLabel     = CONTROLBAR:TunnelAutoExit
+  ButtonImage   = SUTunnelAutoExit
+  DescriptLabel = CONTROLBAR:ToolTipTunnelAutoExit
+End
+```
+
+The button works on objects with a `TunnelContain` module and is unavailable on anything else,
+including `CaveContain`.
+
+Exits:
+* An exit cannot be entered. If every tunnel is an exit, nothing can enter the network.
+* Each logic frame one exit releases everyone inside the network. Several exits take turns, frame
+by frame, so a group that enters over several frames comes out spread across them.
+* Units already inside leave as soon as the first exit is switched on.
+* A disabled exit (EMP, low power) is skipped. If every exit is disabled, units wait inside.
+* A sold, destroyed or captured exit stops being an exit. A captured tunnel joins its new owner's
+network as an entrance.
+* Save and load keep the exits.
+
+Model conditions let art mark the two roles, for example with an icon on a draw module:
+* `TUNNEL_AUTO_EXIT` is set on each exit.
+* `TUNNEL_AUTO_ENTRANCE` is set on every other finished tunnel while at least one exit exists.
+* Both clear when the last exit is switched off or lost.
+
+```
+ConditionState = TUNNEL_AUTO_EXIT
+  Model = GLATunnelExitIcon
+End
+```
+
+With several tunnels selected, one press moves them all to the same state. If any of them is an
+exit, the press switches all of them off; otherwise it makes all of them exits. Tunnels under
+construction are left alone.
+
 ### Queue reorder
 
 Off by default; enable with `QueueReorder = Yes` in the `GameData` block of GameData.ini.
