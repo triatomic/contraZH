@@ -531,8 +531,8 @@ BOOL CWorldBuilderApp::InitInstance()
 	initSubsystem(TheArmorStore, new ArmorStore(), nullptr, "Data\\INI\\Armor");
 	loadWindow.setProgress("Loading objects...");
 	initSubsystem(TheThingFactory, new ThingFactory(), "Data\\INI\\Default\\Object", "Data\\INI\\Object");
-	initSubsystem(TheCrateSystem, new CrateSystem(), "Data\\INI\\Default\\Crate", "Data\\INI\\Crate");
 	initSubsystem(TheUpgradeCenter, new UpgradeCenter, "Data\\INI\\Default\\Upgrade", "Data\\INI\\Upgrade");
+	initSubsystem(TheCrateSystem, new CrateSystem(), "Data\\INI\\Default\\Crate", "Data\\INI\\Crate");
 	initSubsystem(TheAnim2DCollection, new Anim2DCollection ); //Init's itself.
 
 	loadWindow.setProgress("Finalizing...");
