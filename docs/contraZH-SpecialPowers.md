@@ -145,3 +145,11 @@ event set is chosen per template, not per enum.
 `SuperweaponParticleUplinkCannon`, `SuperweaponParticleUplinkCannonSupW`, `SuperweaponNeutronMissile`,
 `Nuke_SuperweaponNeutronMissile` and `SuperweaponScudStorm` keep the vanilla hardcoded events, so they
 got no new set.
+
+## Construction placement
+
+`SPECIAL_POWER_CONSTRUCT` and `SPECIAL_POWER_CONSTRUCT_FROM_SHORTCUT` check the ground
+footprints of immobile objects even when their base heights differ. This prevents
+zero-height placement objects, such as laser fence spawners, from overlapping buildings
+on uneven terrain. The preview and placement click use the same check. Ordinary
+construction also uses this footprint check.

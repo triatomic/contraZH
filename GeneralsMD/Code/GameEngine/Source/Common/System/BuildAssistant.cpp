@@ -730,6 +730,35 @@ void BuildAssistant::iterateFootprint( const ThingTemplate *build,
 
 
 //-------------------------------------------------------------------------------------------------
+class PartitionFilterBuildPlacement : public PartitionFilter
+{
+private:
+	Coord3D m_position;
+	GeometryInfo m_geometry;
+	Real m_angle;
+public:
+	PartitionFilterBuildPlacement(const Coord3D &position, const GeometryInfo &geometry, Real angle) :
+		m_position(position), m_geometry(geometry), m_angle(angle)
+	{
+	}
+
+	virtual Bool allow(Object *object) override
+	{
+		Coord3D position = *object->getPosition();
+		if (object->isKindOf(KINDOF_IMMOBILE))
+		{
+			// Construction reserves the ground footprint across changes in terrain height.
+			position.z = m_position.z;
+		}
+		return ThePartitionManager->geomCollidesWithGeom(&m_position, m_geometry, m_angle,
+			&position, object->getGeometryInfo(), object->getOrientation());
+	}
+#if defined(RTS_DEBUG)
+	virtual const char* debugGetName() override { return "PartitionFilterBuildPlacement"; }
+#endif
+};
+
+//-------------------------------------------------------------------------------------------------
 /** Check for objects preventing building at this location.
 	* TheSuperHackers @tweak Stubbjax 05/09/2025 Return LBC_SHROUD for shrouded objects near the
 	* edge of the shroud so that players cannot use this info to determine whether they exist. */
@@ -741,10 +770,11 @@ LegalBuildCode BuildAssistant::isLocationClearOfObjects( const Coord3D *worldPos
 																											 UnsignedInt options,
 																											 Player *thePlayer)
 {
-	ObjectIterator *iter =
-			ThePartitionManager->iteratePotentialCollisions( worldPos,
-																											 build->getTemplateGeometryInfo(),
-																											 angle );
+	PartitionFilterBuildPlacement filter(*worldPos, build->getTemplateGeometryInfo(), angle);
+	PartitionFilter *placementFilters[] = { &filter, nullptr };
+	Real placementRange = build->getTemplateGeometryInfo().getBoundingCircleRadius() * 1.1f;
+	ObjectIterator *iter = ThePartitionManager->iterateObjectsInRange(worldPos, placementRange,
+		FROM_BOUNDINGSPHERE_2D, placementFilters);
 	Object *them;
 	Bool onlyCheckEnemies = (options == NO_ENEMY_OBJECT_OVERLAP);
 	MemoryPoolObjectHolder hold(iter);
