@@ -3,6 +3,14 @@
 Always on, no `Options.ini` key. All are retail bugs upstream still carries. Each entry says whether
 it changes the simulation (older replays no longer play back identically) or only what is drawn.
 
+## Healed infantry follow the barracks rally point
+
+Infantry leaving a healing container move clear of the building, then follow its rally point.
+This also works when the container has no model exit paths (`NumberOfExitPaths = 0`).
+The container uses the building's production rally point when it has no rally point of its own.
+
+Changes the simulation and can change older replay playback.
+
 ## Failed saves clean up safely
 
 A save that fails to load can leave update modules with unfinished queue indices. Cleanup now

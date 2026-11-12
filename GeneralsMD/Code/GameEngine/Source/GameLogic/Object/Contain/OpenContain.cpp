@@ -1355,6 +1355,22 @@ void OpenContain::exitObjectViaDoor( Object *exitObj, ExitDoorType exitDoor )
 		///< @todo This really should be automatically wrapped up in an activation sequence	for objects in general
 		// tell the AI about it
 		TheAI->pathfinder()->addObjectToPathfindMap( exitObj );
+
+		AIUpdateInterface *ai = exitObj->getAI();
+		const Coord3D *rallyPoint = getRallyPoint();
+		if( ai && rallyPoint )
+		{
+			std::vector<Coord3D> exitPath;
+			ExitInterface *primaryExit = me->getObjectExitInterface();
+			Coord3D naturalRallyPoint;
+			if( primaryExit && primaryExit != static_cast<ExitInterface *>(this)
+				&& primaryExit->getNaturalRallyPoint(naturalRallyPoint) )
+			{
+				exitPath.push_back(naturalRallyPoint);
+			}
+			exitPath.push_back(*rallyPoint);
+			ai->aiFollowPath( &exitPath, me, CMD_FROM_AI );
+		}
 	}
 }
 // ------------------------------------------------------------------------------------------------
