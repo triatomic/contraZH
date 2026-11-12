@@ -130,7 +130,9 @@ until it sinks. Dying vehicles still block until they become hulks.
 ## Jammed units deselect properly
 
 * Jamming deselects the unit, so the control bar no longer appears stuck.
-* Double-clicking a jammed unit can no longer select it and expose its command buttons.
+* Jammed objects reject selection through clicks, hotkeys, idle-worker cycling and command buttons
+until the jam ends, including `ALWAYS_SELECTABLE` objects.
+* Jamming clears both the UI and simulation selections and hides the object's command buttons.
 * `UNSELECTABLE` alone blocks new selection clicks but no longer empties the current selection.
 * The jam state is tracked directly, so a promotion or health upgrade can no longer leave a unit
 jammed forever.

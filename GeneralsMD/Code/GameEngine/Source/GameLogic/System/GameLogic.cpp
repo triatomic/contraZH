@@ -2964,6 +2964,11 @@ void GameLogic::selectObject(Object *obj, Bool createNewSelection, PlayerMaskTyp
 		return;
 	}
 
+	const BodyModuleInterface *body = obj->getBodyModule();
+	if (body && body->isJammed())
+	{
+		return;
+	}
 
 	while( playerMask )
 	{

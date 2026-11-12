@@ -3441,6 +3441,12 @@ void Object::setSelectable(Bool selectable)
 //-------------------------------------------------------------------------------------------------
 Bool Object::isSelectable() const
 {
+	const BodyModuleInterface *body = getBodyModule();
+	if (body && body->isJammed())
+	{
+		return FALSE;
+	}
+
 //	return getTemplate()->isKindOf(KINDOF_ALWAYS_SELECTABLE)
 //				|| (m_isSelectable
 //						&& !testStatus(OBJECT_STATUS_UNSELECTABLE)
