@@ -224,6 +224,7 @@ UpdateSleepTime SlavedUpdate::update()
 	if( isBeyondLeash( master ) )
 	{
 		endRepair();
+		// aiIdle draws a logic random, so it only runs when there is a state to clear
 		if( !myAI->isIdle() )
 		{
 			myAI->aiIdle( CMD_FROM_AI );

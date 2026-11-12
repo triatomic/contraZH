@@ -100,7 +100,7 @@ attack and scout orders, even when the parent has no target. A drone past the le
 attack state and moves back toward its parent. Previously, the return order could leave the
 drone's attack active after the parent lost its target.
 
-Drones without a guard range keep their existing behavior.
+Drones without a guard range and Stinger Site stingers keep their existing behavior.
 
 Changes the simulation.
 
