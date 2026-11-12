@@ -101,6 +101,9 @@ static constexpr const Int MAX_MESSAGE_LEN = MAX_NETWORK_MESSAGE_LEN;
 // TheSuperHackers @bugfix Mauller 08/02/2026 Double send and receive buffer sizes to alleviate the occurance of disconnection issues in retail and non retail code.
 static constexpr const Int MAX_MESSAGES = 256;
 
+// The Windows default of 64 KB overflows when a file transfer sends more than about 58 full packets between two receives
+static constexpr const Int UDP_RECEIVE_BUFFER_SIZE = 512 * 1024;
+
 /**
  * Command packet - contains frame #, total # of commands, and each command.  This is what gets sent
  * to each player every frame
