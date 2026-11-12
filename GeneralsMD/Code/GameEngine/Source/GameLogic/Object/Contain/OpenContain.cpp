@@ -1904,7 +1904,7 @@ const Coord3D *OpenContain::getRallyPoint() const
 	if (m_rallyPointExists)
 		return &m_rallyPoint;
 
-	// The production module owns the building's rally point.
+	// TheSuperHackers @bugfix arcticdolphin 02/03/2026 Use primary exit interface rally point if available.
 	if (getObject())
 	{
 		ExitInterface *primaryExit = getObject()->getObjectExitInterface();
