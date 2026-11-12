@@ -143,27 +143,37 @@ CommandButton Command_TunnelAutoExit
 End
 ```
 
+The label and image names above are placeholders; use the mod's own.
+
 The button works on objects with a `TunnelContain` module and is unavailable on anything else,
 including `CaveContain`.
 
 Exits:
 * An exit cannot be entered. If every tunnel is an exit, nothing can enter the network.
-* Each logic frame one exit releases everyone inside the network. Several exits take turns, frame
-by frame, so a group that enters over several frames comes out spread across them.
+* Each logic frame one exit orders everyone inside the network to leave through it. Several exits
+take turns, frame by frame, and a unit uses the exit that ordered it last.
 * Units already inside leave as soon as the first exit is switched on.
 * A disabled exit (EMP, low power) is skipped. If every exit is disabled, units wait inside.
 * A sold, destroyed or captured exit stops being an exit. A captured tunnel joins its new owner's
-network as an entrance.
+network as an ordinary tunnel, or as an entrance if that owner has an exit.
 * Save and load keep the exits.
 
-Model conditions let art mark the two roles, for example with an icon on a draw module:
+Model conditions let art mark the two roles:
 * `TUNNEL_AUTO_EXIT` is set on each exit.
 * `TUNNEL_AUTO_ENTRANCE` is set on every other finished tunnel while at least one exit exists.
 * Both clear when the last exit is switched off or lost.
 
+An icon needs a draw module of its own. In the tunnel's main draw module the block would replace
+the building model. `GLATunnelExitIcon` is a placeholder name.
+
 ```
-ConditionState = TUNNEL_AUTO_EXIT
-  Model = GLATunnelExitIcon
+Draw = W3DModelDraw ModuleTag_AutoExitIcon
+  DefaultConditionState
+    Model = NONE
+  End
+  ConditionState = TUNNEL_AUTO_EXIT
+    Model = GLATunnelExitIcon
+  End
 End
 ```
 
