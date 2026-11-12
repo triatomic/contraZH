@@ -46,8 +46,10 @@ End
 * Cooldown timing still follows `StartCooldownOnFirstShot`. With that setting off, the cooldown
 starts when the power triggers, even if the attack is later cancelled.
 * The caster must fire the shot itself, as with an OCL `Attack` nugget. Shots from spawned units
-do not count. A caster without a firing tracker is not charged.
-* The shot wait ends after `ReloadTime`. A shot fired after the wait ends does not incur the cost.
+do not count. A caster that cannot fire pays when the power triggers.
+* Any shot from the caster during the wait counts, including one at a target ordered afterwards.
+* The shot wait ends after `ReloadTime`. A caster still attacking at that point pays then.
+* A script or crate that resets the timer during the wait also collects the cost.
 * Saving and loading preserves any unpaid cost.
 
 ## Eva events for Contra superweapons
