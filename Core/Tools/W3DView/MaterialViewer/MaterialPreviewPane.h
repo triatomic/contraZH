@@ -50,7 +50,8 @@ public:
 	BOOL Create(CWnd *parent, const RECT &rect, UINT id);
 
 	// Creates a render object by name from the shared asset manager and frames
-	// the camera on it. Returns false if the asset does not exist.
+	// the camera on it. Returns false if the asset does not exist, or is a skinned
+	// mesh on its own.
 	bool LoadModel(const char *name);
 
 	// Removes the current render object and releases its ref (so the asset

@@ -1787,14 +1787,15 @@ CMaterialViewerFrame::UpdatePreviewModel()
 
 	MaterialViewerTab &tab = Active();
 
-	const std::string &name = (tab.showFullObject && !tab.topLevelName.empty())
-		? tab.topLevelName : tab.currentMeshName;
+	bool full = (tab.showFullObject && !tab.topLevelName.empty());
+	const std::string &name = full ? tab.topLevelName : tab.currentMeshName;
 
 	if (!name.empty() && m_Preview->LoadModel(name.c_str()) == false) {
-		// Fall back to the other candidate before giving up silently.
-		const std::string &other = tab.showFullObject ? tab.currentMeshName : tab.topLevelName;
-		if (!other.empty()) {
-			m_Preview->LoadModel(other.c_str());
+		// Fall back to the other candidate before giving up silently. A skinned
+		// mesh lands here, because the pane only draws it on its full object.
+		const std::string &other = full ? tab.currentMeshName : tab.topLevelName;
+		if (!other.empty() && m_Preview->LoadModel(other.c_str())) {
+			full = !full;
 		}
 	}
 
@@ -1809,7 +1810,7 @@ CMaterialViewerFrame::UpdatePreviewModel()
 
 	// In the full-object view, outline the selected mesh so the user can see
 	// which part of the object the panel is editing.
-	m_Preview->Set_Highlight_Mesh((tab.showFullObject && !tab.currentMeshName.empty())
+	m_Preview->Set_Highlight_Mesh((full && !tab.currentMeshName.empty())
 		? tab.currentMeshName.c_str() : nullptr);
 
 	// The model (and so the ground plane's default height/range) may have changed.

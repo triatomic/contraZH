@@ -298,6 +298,15 @@ CMaterialPreviewPane::LoadModel(const char *name)
 		return false;
 	}
 
+	// A skin deforms against its parent's skeleton, so it cannot be drawn alone
+	if (render_obj->Class_ID() == RenderObjClass::CLASSID_MESH) {
+		MeshModelClass *model = static_cast<MeshClass *>(render_obj)->Peek_Model();
+		if (model != nullptr && model->Get_Flag(MeshGeometryClass::SKIN)) {
+			render_obj->Release_Ref();
+			return false;
+		}
+	}
+
 	render_obj->Set_Transform(Matrix3D(1));
 	m_Scene->Add_Render_Object(render_obj);
 	m_RenderObj = render_obj;
