@@ -3207,11 +3207,13 @@ void Object::friend_prepareForMapBoundaryAdjust()
 //-------------------------------------------------------------------------------------------------
 void Object::friend_notifyOfNewMapBoundary()
 {
-	// Enclosed occupants stay outside the world systems when map boundaries change.
+	// the radar keeps occupants listed and hides them, so every object goes back on it
+	TheRadar->addObject(this);
+
+	// a container keeps its enclosed occupants out of the partition and the pathfind map
 	if (!getEnclosingContainedBy())
 	{
 		ThePartitionManager->registerObject(this);
-		TheRadar->addObject(this);
 		TheAI->pathfinder()->addObjectToPathfindMap( this );
 	}
 

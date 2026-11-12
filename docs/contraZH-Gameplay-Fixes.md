@@ -9,8 +9,9 @@ Shrinking or expanding the active map border no longer exposes enclosed occupant
 area damage. This also covers units that entered a garrison outside the active border and units
 inside nested containers, such as infantry in an Overlord bunker.
 
-Enclosed occupants stay out of the spatial partition, radar and pathfinding maps during the
-border rebuild. Weapons designed to clear garrisons keep their normal behavior.
+Enclosed occupants stay out of the spatial partition and the pathfinding map during the border
+rebuild. They stay on the radar list, so they show on the minimap again once they leave. Weapons
+designed to clear garrisons keep their normal behavior.
 
 This changes the simulation and can change older replay playback after a map border change.
 
