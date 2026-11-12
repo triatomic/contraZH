@@ -365,7 +365,7 @@ What it does, by order type:
 
 | Order | Behaviour |
 |---|---|
-| Move | Drives past enemies without stopping or engaging. |
+| Move | Drives past enemies without stopping or engaging, including while turning in place or waiting for a path. |
 | Attack-move | Drives, spots a target, halts once in range, fires, then carries on. |
 | Attack (direct order) | Closes on the target, halts, fires. |
 | Stationary | Fires normally. |
