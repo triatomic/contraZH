@@ -802,16 +802,11 @@ void SortingRendererClass::Flush_Pool_Batch(unsigned first_node,unsigned end_nod
 			memcpy(dest_verts, src_verts, sizeof(VertexFormatXYZNDUV2)*state->vertex_count);
 			dest_verts += state->vertex_count;
 
-			// Only the third column of world*view is needed, to get each triangle's
-			// view depth. Both operands are D3DMATRIX, so this stays row-major.
-			const D3DMATRIX& world=state->sorting_state.world;
-			const D3DMATRIX& view=state->sorting_state.view;
-			const D3DMATRIX product=world*view;
-			const float (&mtx)[4][4]=product.m;
+			const Matrix4x4 mtx=To_Matrix4x4(state->sorting_state.view)*To_Matrix4x4(state->sorting_state.world);
 
 			const unsigned short* indices=Source_Indices(state);
 
-			if (mtx[0][2] == 0.0f && mtx[1][2] == 0.0f && mtx[3][2] == 0.0f && mtx[2][2] == 1.0f) {
+			if (mtx[2][0] == 0.0f && mtx[2][1] == 0.0f && mtx[2][3] == 0.0f && mtx[2][2] == 1.0f) {
 				// The common case for particle systems.
 				for (int i=0;i<state->polygon_count;++i) {
 					unsigned short idx1=indices[i*3]-state->min_vertex_index;
@@ -851,9 +846,9 @@ void SortingRendererClass::Flush_Pool_Batch(unsigned first_node,unsigned end_nod
 					tis_ptr->tri.j = idx2 + vertex_array_offset;
 					tis_ptr->tri.k = idx3 + vertex_array_offset;
 					tis_ptr->idx = node_id;
-					tis_ptr->z = (mtx[0][2]*(v1->x + v2->x + v3->x) +
-												mtx[1][2]*(v1->y + v2->y + v3->y) +
-												mtx[2][2]*(v1->z + v2->z + v3->z))/3.0f + mtx[3][2];
+					tis_ptr->z = (mtx[2][0]*(v1->x + v2->x + v3->x) +
+												mtx[2][1]*(v1->y + v2->y + v3->y) +
+												mtx[2][2]*(v1->z + v2->z + v3->z))/3.0f + mtx[2][3];
 					DEBUG_ASSERTCRASH((! _isnan(tis_ptr->z) && _finite(tis_ptr->z)), ("Triangle has invalid center"));
 				}
 			}

@@ -124,10 +124,6 @@ Vector3 PointGroupClass::_ScreenspaceVertexLocationSizeTable[2][3] =
 	Vector3(-0.7f, 2.0f, -1.0f)
 };
 
-// useful for particles that aren't aligned with the screen.
-static Vector3 GroundMultiplierX(1.0f, 0.0f, 0.0f);
-static Vector3 GroundMultiplierY(0.0f, 1.0f, 0.0f);
-
 // Some internal variables
 VectorClass<Vector3>			VertexLoc;		// camera-space vertex locations
 VectorClass<Vector4>			VertexDiffuse;	// vertex diffuse/alpha colors
@@ -1572,20 +1568,14 @@ void PointGroupClass::Update_Arrays(
 				for (i = 0; i < active_points; i++) {
 					if (!Billboard) {
 						// If we're not billboarding, then the coordinate we have is in screen space.
-						// The rotation is clockwise: the D3DX matrix this replaces was written
-						// into the transposed Matrix4x4 layout, which negated the angle.
 						const float angle = (float)point_orientation[i] / 255.0f * 2 * WWMATH_PI;
-						const float cos_a = cosf(angle);
-						const float sin_a = sinf(angle);
+						const float c = WWMath::Cos(angle);
+						const float s = WWMath::Sin(angle);
 
-						Matrix4x4 rotMat(
-							Vector4( cos_a, sin_a, 0.0f, 0.0f),
-							Vector4(-sin_a, cos_a, 0.0f, 0.0f),
-							Vector4(  0.0f,  0.0f, 1.0f, 0.0f),
-							Vector4(  0.0f,  0.0f, 0.0f, 1.0f));
-
-						Vector4 orientedVecX = rotMat * GroundMultiplierX;
-						Vector4 orientedVecY = rotMat * GroundMultiplierY;
+						Vector2 orientedVecX(1.0f, 0.0f);
+						Vector2 orientedVecY(0.0f, 1.0f);
+						orientedVecX.Rotate(-s, c);
+						orientedVecY.Rotate(-s, c);
 
 						vertex_loc[vert + 0].X = point_loc[i].X +	(orientedVecX.X + orientedVecY.X) * point_size[i];
 						vertex_loc[vert + 0].Y = point_loc[i].Y +	(orientedVecX.Y + orientedVecY.Y) * point_size[i];
