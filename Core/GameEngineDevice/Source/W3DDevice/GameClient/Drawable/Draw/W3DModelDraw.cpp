@@ -2484,9 +2484,15 @@ void W3DModelDraw::doDrawModule(const Matrix3D* transformMtx)
 	// update whether or not we should be animating.
 	setPauseAnimation( !getDrawable()->getShouldAnimate(getW3DModelDrawModuleData()->m_animationsRequirePower) );
 
-	// death and disabled state change without touching the model, so the decal has to follow them here
+	if (!m_objectDecal && getDrawable()->getTemplate()->displaysDecal())
+	{
+		createObjectDecal();
+	}
+
 	if (m_objectDecal)
+	{
 		updateObjectDecalVisibility();
+	}
 
 	Matrix3D scaledTransform;
 	if (getDrawable()->getInstanceScale() != 1.0f)
@@ -3562,7 +3568,7 @@ void W3DModelDraw::updateObjectDecalVisibility()
 	if (m_objectDecal == nullptr)
 		return;
 
-	Bool visible = !getDrawable()->isDrawableEffectivelyHidden();
+	Bool visible = TheGlobalData->m_objectDecalsEnabled && !getDrawable()->isDrawableEffectivelyHidden();
 
 	const Object *obj = getDrawable()->getObject();
 

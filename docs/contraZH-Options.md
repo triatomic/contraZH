@@ -71,7 +71,7 @@ a hexagon fitted to the object's collision shape with a shader instead, on cards
 included, while placing it. Wall pieces get one ring each. The D3D9 build draws the ring with the
 same shader as `SelectionCircle`, on cards with `ps_2_a`.)
 * `ObjectDecals = Yes` - (No hides ground decals requested with `DisplayDecal`. Independent of shadow
-settings.)
+settings. Applies on Accept, including to objects already on the map.)
 * `SmartPips = No` - (Yes keeps ammo and passenger pips visible on own units whenever there is
 something to show.)
 * `BuildTimerDisplayMode = None` - (`None` | `Seconds` | `Auto`. Countdowns on build queue and special
