@@ -3313,12 +3313,7 @@ void Object::scoreTheKill( const Object *victim, const DamageInfo *damageInfo )
 	/// @todo Multiplayer score hook location?
 
 	Player* victimController = victim->getControllingPlayer();
-	// if the other player is not a playable side (i.e. they are civilian, observer, whatever)
-	// we shouldn't count the kill.
-	if (victimController->isPlayableSide() == FALSE)
-	{
-		return;
-	}
+	const Bool countKill = victimController && victimController->isPlayableSide();
 
 
 	if ( victim->isKindOf( KINDOF_IGNORED_IN_GUI ) )
@@ -3327,7 +3322,7 @@ void Object::scoreTheKill( const Object *victim, const DamageInfo *damageInfo )
 
 	Player* controller = getControllingPlayer();
 
-	if (victimController)
+	if (countKill)
 	{
 		victimController->getScoreKeeper()->addObjectLost(victim);
 	}
@@ -3344,17 +3339,23 @@ void Object::scoreTheKill( const Object *victim, const DamageInfo *damageInfo )
 
 	if (controller)
 	{
-		controller->getScoreKeeper()->addObjectDestroyed(victim);
-		TheScriptCLPState->onObjectKilled(controller, victim);
-		controller->addSkillPointsForKill(this, victim);
-		controller->doBountyForKill(this, victim);
-#if defined(GENERALS_ONLINE)
-		if (TheGlobalData->m_exportStats)
+		if (countKill)
 		{
-			const DamageInfo *damageInfo = victim->getBodyModule() ? victim->getBodyModule()->getLastDamageInfo() : nullptr;
-			StatsExporterRecordKill(this, victim, damageInfo);
+			controller->getScoreKeeper()->addObjectDestroyed(victim);
+			TheScriptCLPState->onObjectKilled(controller, victim);
 		}
+		controller->addSkillPointsForKill(this, victim);
+		if (countKill)
+		{
+			controller->doBountyForKill(this, victim);
+#if defined(GENERALS_ONLINE)
+			if (TheGlobalData->m_exportStats)
+			{
+				const DamageInfo *damageInfo = victim->getBodyModule() ? victim->getBodyModule()->getLastDamageInfo() : nullptr;
+				StatsExporterRecordKill(this, victim, damageInfo);
+			}
 #endif
+		}
 	}
 
 	// Now handle experience, if we can gain any

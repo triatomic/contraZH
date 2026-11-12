@@ -132,8 +132,10 @@ following them.
 
 ### New factions in PlayerTemplate.ini
 
-`PlayableSide` defaults to `No`. Killing units of a faction without `PlayableSide = Yes` earns no
-general experience and no unit veterancy. This is a retail default, not a code change.
+`PlayableSide` defaults to `No`. Killing enemy units of these factions now grants the configured
+general experience and unit veterancy. Objects ignored in the GUI and objects under construction
+still grant neither. Kill/loss scores and cash bounties still require `PlayableSide = Yes`.
+([#200](https://github.com/triatomic/contraZH/issues/200))
 
 A faction whose `Side` has no matching scheme in `ControlBarScheme.ini` uses the scheme of its
 `BaseSide`, with `USA` read as `America`. Retail fell back to the art-less `Default` scheme, which
