@@ -670,6 +670,11 @@ Bool CommandSequence::includeUnitInCommand(UnsignedInt cmdNodeID, Object *obj, c
 		return false;
 
 	CommandNode *cmdNode = findCommandByID(cmdNodeID);
+	if (cmdNode == nullptr)
+	{
+		return false;
+	}
+
 	UnsignedInt lastCmdNodeID = obj->getLastCommand();
 	CommandNode *lastCmdNode = findCommandByID(lastCmdNodeID);
 
@@ -804,6 +809,12 @@ inline Bool CommandSequence::isLocatableCommand(UnsignedInt cmdNodeID)
 void CommandSequence::cleanUpEmptyCommand(UnsignedInt cmdNodeID)
 {
 	CommandNode *cmdNode = findCommandByID(cmdNodeID);
+
+	// A unit that dies while carrying out the command takes the emptied node with it.
+	if (cmdNode == nullptr)
+	{
+		return;
+	}
 
 	if (cmdNode->m_nextCommand.empty())
 	{
