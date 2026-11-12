@@ -637,6 +637,13 @@ GameMessageDisposition SelectionTranslator::onMouseLeftDoubleClick(MAYBE_UNUSED 
 	if (picked == nullptr)
 		return KEEP_MESSAGE;
 
+#if RTS_ZEROHOUR
+	if (!CanSelectDrawable(picked, FALSE))
+	{
+		return KEEP_MESSAGE;
+	}
+#endif
+
 	//ShigureUi 07/09/2026 delay "return KEEP_MESSAGE".
 	//if (!picked->isMassSelectable())  
 	//	return KEEP_MESSAGE;
