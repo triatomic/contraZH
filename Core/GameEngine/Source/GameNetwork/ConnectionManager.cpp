@@ -66,6 +66,7 @@
 // A compressed transfer changes the bytes on the wire, so every peer must run this build. A Generals Online peer may not.
 #if RTS_ZEROHOUR && !defined(GENERALS_ONLINE)
 #define COMPRESS_FILE_TRANSFERS (1)
+static const CompressionType TRANSFER_COMPRESSION = COMPRESSION_ZLIB9;
 #else
 #define COMPRESS_FILE_TRANSFERS (0)
 #endif
@@ -230,31 +231,50 @@ static UnsignedInt getTransferFileMaxSize(const AsciiString& filePath)
 	return transferFileRules[fileType].maxSize;
 }
 
-Bool CanTransferFile(const AsciiString& path)
+Bool CanTransferFile(const AsciiString& path, UnicodeString *problem)
 {
+	const AsciiString name = GetFileFromPath(path);
+	UnicodeString text;
+	Bool valid = FALSE;
+
 	File *theFile = TheLocalFileSystem->openFile(path.str());
-	if (theFile == nullptr)
+	const Int len = theFile ? theFile->size() : 0;
+	const UnsignedInt maxSize = getTransferFileMaxSize(path);
+
+	if (len <= 0)
 	{
-		return FALSE;
+		text.format(L"'%hs' is missing or empty", name.str());
+	}
+	else if ((UnsignedInt)len > maxSize)
+	{
+		text.format(L"'%hs' is %d bytes, the limit is %u bytes", name.str(), len, maxSize);
 	}
 
-	const Int len = theFile->size();
-	if (len <= 0 || (UnsignedInt)len > getTransferFileMaxSize(path))
+	if (theFile != nullptr && !text.isEmpty())
 	{
 		theFile->close();
-		return FALSE;
+		theFile = nullptr;
 	}
 
-	char *buf = theFile->readEntireAndClose();
-	if (buf == nullptr)
+	if (theFile != nullptr)
 	{
-		return FALSE;
+		char *buf = theFile->readEntireAndClose();
+		if (buf != nullptr)
+		{
+			valid = hasValidTransferFileContent(path, reinterpret_cast<const UnsignedByte *>(buf), len);
+			delete[] buf;
+		}
+
+		if (!valid)
+		{
+			text.format(L"'%hs' is not a valid file of its type", name.str());
+		}
 	}
 
-	const Bool valid = hasValidTransferFileExtension(path)
-		&& hasValidTransferFileContent(path, reinterpret_cast<const UnsignedByte *>(buf), len);
-
-	delete[] buf;
+	if (problem != nullptr)
+	{
+		*problem = text;
+	}
 	return valid;
 }
 
@@ -885,9 +905,9 @@ void ConnectionManager::processFile(NetFileCommandMsg *msg)
 	Int len = msg->getFileLength();
 
 #if COMPRESS_FILE_TRANSFERS
-	// The sender adds one compression layer to every file, also to a file that is compressed on disk
+	// Only the sender's own zlib layer is unpacked: the other decoders take no output size, and a file compressed on disk arrives inside that layer
 	Bool deleteBuf = FALSE;
-	if (CompressionManager::isDataCompressed(buf, len))
+	if (CompressionManager::getCompressionType(buf, len) == TRANSFER_COMPRESSION)
 	{
 		const Int uncompLen = CompressionManager::getUncompressedSize(buf, len);
 		if (uncompLen <= 0 || (UnsignedInt)uncompLen > getTransferFileMaxSize(realFileName))
@@ -2700,18 +2720,17 @@ void ConnectionManager::sendFile(AsciiString path, UnsignedByte playerMask, Unsi
 
 #if COMPRESS_FILE_TRANSFERS
 	// zlib is told the output size, so a file that does not shrink cannot overrun the buffer
-	const CompressionType compType = COMPRESSION_ZLIB9;
-	const Int compressedLen = CompressionManager::getMaxCompressedSize(len, compType);
+	const Int compressedLen = CompressionManager::getMaxCompressedSize(len, TRANSFER_COMPRESSION);
 	char *compressedBuf = NEW char[compressedLen];
-	const Int compressedSize = CompressionManager::compressData(compType, buf, len, compressedBuf, compressedLen);
+	const Int compressedSize = CompressionManager::compressData(TRANSFER_COMPRESSION, buf, len, compressedBuf, compressedLen);
 
 	if (!compressedSize)
 	{
 		delete[] compressedBuf;
 		compressedBuf = nullptr;
 
-		// The receiver unwraps whatever looks compressed, so a file that is compressed on disk cannot go out bare
-		if (CompressionManager::isDataCompressed(buf, len))
+		// A bare file that starts like the transfer layer would be unpacked by the receiver
+		if (CompressionManager::getCompressionType(buf, len) == TRANSFER_COMPRESSION)
 		{
 			DEBUG_LOG_LEVEL(DEBUG_LEVEL_NET, ("Not sending file '%s' to %X, it could not be compressed", path.str(), playerMask));
 			return;

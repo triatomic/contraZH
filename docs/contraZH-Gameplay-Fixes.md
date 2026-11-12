@@ -90,19 +90,29 @@ identically.
 
 Network game packets now carry up to about 1100 bytes instead of the 476 bytes sized for a 512-byte
 modem packet, so a burst of orders goes out in one packet instead of several. This applies to every
-multiplayer game. The lobby already refuses a player whose executable differs, so an older build
-cannot join a game hosted on this one.
+multiplayer game. A lobby refuses a player whose executable differs, so an older build cannot join
+a game hosted on this one.
+
+## LAN games need the same build
+
+A LAN host now refuses a player whose game executable differs from its own, and that player sees
+the CRC mismatch message. Previously, Zero Hour let any build join a LAN game. Builds differ in
+packet size and in how they send map files, so a mixed game could not work.
 
 ## Map transfer
 
 A host whose map cannot be transferred is told when pressing Start, before anyone enters the
-transfer screen. A map fails this check when its `.map` file is over 5 MB. Previously the whole map
-was sent, every receiver rejected it silently and all players waited two minutes.
+transfer screen. The lobby chat names the file and the cause, such as a `.map` over 5 MB. Previously
+the whole map was sent, every receiver rejected it silently and all players waited two minutes.
 
-A side file that cannot be sent is left out and the map transfers without it. The side files are the
-preview, `map.ini`, `map.str`, `solo.ini`, `assetusage.txt` and `readme.txt`. One is left out when it
-is empty, over its size limit (2 MB for the preview and `map.ini`) or not a valid file of its type,
-such as a preview without a TGA 2.0 footer. Previously, one such file failed the whole transfer.
+A side file that cannot be sent is left out and the map transfers without it. This applies to the
+preview, `map.str`, `assetusage.txt` and `readme.txt`. One is left out when it is empty, over its size
+limit or not a valid file of its type, such as a preview without a TGA 2.0 footer. Previously, one
+such file failed the whole transfer.
+
+`map.ini` and `solo.ini` change the game data, so a player without them would go out of sync. A map
+whose `map.ini` or `solo.ini` cannot be sent (over 2 MB, or containing a zero byte) still blocks
+Start. An empty one is left out, because it loads the same as a missing one.
 
 The transfer now ends after 60 seconds without progress from any player. Previously, it ended two
 minutes after it began, even while a slow link was still delivering.

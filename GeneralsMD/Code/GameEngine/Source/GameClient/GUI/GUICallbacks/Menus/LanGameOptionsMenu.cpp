@@ -390,9 +390,11 @@ void StartPressed()
 			playerCount++;
 	}
 
-	if (TheLAN->AmIHost() && !CanTransferMap(myGame))
+	UnicodeString transferProblem;
+	if (TheLAN->AmIHost() && !CanTransferMap(myGame, &transferProblem))
 	{
 		GadgetListBoxAddEntryText(listboxChatWindowLanGame, TheGameText->fetch("GUI:CouldNotTransferMap"), chatSystemColor, -1, 0);
+		GadgetListBoxAddEntryText(listboxChatWindowLanGame, transferProblem, chatSystemColor, -1, 0);
 		return;
 	}
 

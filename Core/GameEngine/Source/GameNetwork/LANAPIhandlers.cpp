@@ -290,6 +290,10 @@ void LANAPI::handleRequestJoin( LANMessage *msg, UnsignedInt senderIP )
 #if !RTS_ZEROHOUR
 			if (msg->GameToJoin.iniCRC != TheGlobalData->m_iniCRC ||
 					msg->GameToJoin.exeCRC != TheGlobalData->m_exeCRC)
+#else
+			// Builds differ in packet size and transfer format, so they cannot share a game
+			if (msg->GameToJoin.exeCRC != TheGlobalData->m_exeCRC)
+#endif
 			{
 				DEBUG_LOG(("LANAPI::handleRequestJoin - join denied because of CRC mismatch. CRCs are them/us INI:%X/%X exe:%X/%X",
 					msg->GameToJoin.iniCRC, TheGlobalData->m_iniCRC,
@@ -300,7 +304,6 @@ void LANAPI::handleRequestJoin( LANMessage *msg, UnsignedInt senderIP )
 				reply.GameNotJoined.playerIP = senderIP;
 				canJoin = false;
 			}
-#endif
 #if defined(RTS_DEBUG)
 			}
 #endif

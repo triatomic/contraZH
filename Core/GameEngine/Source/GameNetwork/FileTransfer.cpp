@@ -30,6 +30,8 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file in the GameEngine
 
+#include "Common/file.h"
+#include "Common/LocalFileSystem.h"
 #include "GameClient/LoadScreen.h"
 #include "GameClient/Shell.h"
 #include "GameNetwork/FileTransfer.h"
@@ -270,17 +272,31 @@ struct MapSideFile
 {
 	Int contentsBit;
 	AsciiString (*getPath)(AsciiString mapPath);
+	Bool changesGameData;	///< A player without this file runs a different simulation than the host.
 };
 
 static const MapSideFile s_mapSideFiles[] =
 {
-	{ 2, GetPreviewFromMap },
-	{ 4, GetINIFromMap },
-	{ 8, GetStrFileFromMap },
-	{ 16, GetSoloINIFromMap },
-	{ 32, GetAssetUsageFromMap },
-	{ 64, GetReadmeFromMap },
+	{ 2, GetPreviewFromMap, FALSE },
+	{ 4, GetINIFromMap, TRUE },
+	{ 8, GetStrFileFromMap, FALSE },
+	{ 16, GetSoloINIFromMap, TRUE },
+	{ 32, GetAssetUsageFromMap, FALSE },
+	{ 64, GetReadmeFromMap, FALSE },
 };
+
+static Bool isFileEmpty(const AsciiString& path)
+{
+	File *theFile = TheLocalFileSystem->openFile(path.str());
+	if (theFile == nullptr)
+	{
+		return FALSE;
+	}
+
+	const Bool empty = theFile->size() <= 0;
+	theFile->close();
+	return empty;
+}
 
 static void getMapTransferFiles(const GameInfo *game, std::vector<AsciiString>& files)
 {
@@ -305,16 +321,24 @@ Int RemoveUntransferableMapContents(const AsciiString& mapPath, Int contentsMask
 		}
 
 		const AsciiString path = s_mapSideFiles[i].getPath(mapPath);
-		if (!CanTransferFile(path))
+		if (CanTransferFile(path))
 		{
-			DEBUG_LOG(("Side file '%s' cannot be transferred and is left out of the map contents", path.str()));
-			contentsMask &= ~bit;
+			continue;
 		}
+
+		// An empty file loads the same as an absent one, so it is the only game data file that may be left out
+		if (s_mapSideFiles[i].changesGameData && !isFileEmpty(path))
+		{
+			continue;
+		}
+
+		DEBUG_LOG(("Side file '%s' cannot be transferred and is left out of the map contents", path.str()));
+		contentsMask &= ~bit;
 	}
 	return contentsMask;
 }
 
-Bool CanTransferMap(const GameInfo *game)
+Bool CanTransferMap(const GameInfo *game, UnicodeString *problem)
 {
 	if (!getMapTransferMask(game))
 	{
@@ -325,9 +349,8 @@ Bool CanTransferMap(const GameInfo *game)
 	getMapTransferFiles(game, files);
 	for (size_t i = 0; i < files.size(); ++i)
 	{
-		if (!CanTransferFile(files[i]))
+		if (!CanTransferFile(files[i], problem))
 		{
-			DEBUG_LOG(("Map file '%s' is missing, too large or not valid for a transfer", files[i].str()));
 			return FALSE;
 		}
 	}

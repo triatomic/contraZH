@@ -1116,9 +1116,11 @@ static void StartPressed()
 		}
 	}
 
-	if (myGame->amIHost() && !CanTransferMap(myGame))
+	UnicodeString transferProblem;
+	if (myGame->amIHost() && !CanTransferMap(myGame, &transferProblem))
 	{
 		GadgetListBoxAddEntryText(listboxGameSetupChat, TheGameText->fetch("GUI:CouldNotTransferMap"), GameSpyColor[GSCOLOR_DEFAULT], -1, -1);
+		GadgetListBoxAddEntryText(listboxGameSetupChat, transferProblem, GameSpyColor[GSCOLOR_DEFAULT], -1, -1);
 		return;
 	}
 
